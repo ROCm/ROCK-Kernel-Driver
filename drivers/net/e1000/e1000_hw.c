@@ -241,7 +241,7 @@ e1000_reset_hw(struct e1000_hw *hw)
 
     /* Delay to allow any outstanding PCI transactions to complete before
      * resetting the device
-     */ 
+     */
     msec_delay(10);
 
     /* Issue a global reset to the MAC.  This will reset the chip's
@@ -312,8 +312,8 @@ e1000_reset_hw(struct e1000_hw *hw)
  * Performs basic configuration of the adapter.
  *
  * hw - Struct containing variables accessed by shared code
- * 
- * Assumes that the controller has previously been reset and is in a 
+ *
+ * Assumes that the controller has previously been reset and is in a
  * post-reset uninitialized state. Initializes the receive address registers,
  * multicast table, and VLAN filter table. Calls routines to setup link
  * configuration and flow control settings. Clears all on-chip counters. Leaves
@@ -338,7 +338,7 @@ e1000_init_hw(struct e1000_hw *hw)
         DEBUGOUT("Error Initializing Identification LED\n");
         return ret_val;
     }
-    
+
     /* Set the Media Type and exit with error if it is not valid. */
     if(hw->mac_type != e1000_82543) {
         /* tbi_compatibility is only valid on 82543 */
@@ -441,13 +441,13 @@ e1000_init_hw(struct e1000_hw *hw)
 
 /******************************************************************************
  * Configures flow control and link settings.
- * 
+ *
  * hw - Struct containing variables accessed by shared code
- * 
+ *
  * Determines which flow control settings to use. Calls the apropriate media-
  * specific link configuration function. Configures the flow control settings.
  * Assuming the adapter has a valid link partner, a valid link should be
- * established. Assumes the hardware has previously been reset and the 
+ * established. Assumes the hardware has previously been reset and the
  * transmitter and receiver are not enabled.
  *****************************************************************************/
 int32_t
@@ -475,7 +475,7 @@ e1000_setup_link(struct e1000_hw *hw)
     if(hw->fc == e1000_fc_default) {
         if((eeprom_data & EEPROM_WORD0F_PAUSE_MASK) == 0)
             hw->fc = e1000_fc_none;
-        else if((eeprom_data & EEPROM_WORD0F_PAUSE_MASK) == 
+        else if((eeprom_data & EEPROM_WORD0F_PAUSE_MASK) ==
                 EEPROM_WORD0F_ASM_DIR)
             hw->fc = e1000_fc_tx_pause;
         else
@@ -504,7 +504,7 @@ e1000_setup_link(struct e1000_hw *hw)
      * or e1000_phy_setup() is called.
      */
     if(hw->mac_type == e1000_82543) {
-        ctrl_ext = ((eeprom_data & EEPROM_WORD0F_SWPDIO_EXT) << 
+        ctrl_ext = ((eeprom_data & EEPROM_WORD0F_SWPDIO_EXT) <<
                     SWDPIO__EXT_SHIFT);
         E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
     }
@@ -530,7 +530,7 @@ e1000_setup_link(struct e1000_hw *hw)
      * these registers will be set to a default threshold that may be
      * adjusted later by the driver's runtime code.  However, if the
      * ability to transmit pause frames in not enabled, then these
-     * registers will be set to 0. 
+     * registers will be set to 0.
      */
     if(!(hw->fc & e1000_fc_tx_pause)) {
         E1000_WRITE_REG(hw, FCRTL, 0);
@@ -559,7 +559,7 @@ e1000_setup_link(struct e1000_hw *hw)
  * link. Assumes the hardware has been previously reset and the transmitter
  * and receiver are not enabled.
  *****************************************************************************/
-static int32_t 
+static int32_t
 e1000_setup_fiber_link(struct e1000_hw *hw)
 {
     uint32_t ctrl;
@@ -571,29 +571,29 @@ e1000_setup_fiber_link(struct e1000_hw *hw)
 
     DEBUGFUNC("e1000_setup_fiber_link");
 
-    /* On adapters with a MAC newer that 82544, SW Defineable pin 1 will be 
-     * set when the optics detect a signal. On older adapters, it will be 
+    /* On adapters with a MAC newer that 82544, SW Defineable pin 1 will be
+     * set when the optics detect a signal. On older adapters, it will be
      * cleared when there is a signal
      */
     ctrl = E1000_READ_REG(hw, CTRL);
     if(hw->mac_type > e1000_82544) signal = E1000_CTRL_SWDPIN1;
     else signal = 0;
-   
+
     /* Take the link out of reset */
     ctrl &= ~(E1000_CTRL_LRST);
-    
+
     e1000_config_collision_dist(hw);
 
     /* Check for a software override of the flow control settings, and setup
      * the device accordingly.  If auto-negotiation is enabled, then software
      * will have to set the "PAUSE" bits to the correct value in the Tranmsit
      * Config Word Register (TXCW) and re-start auto-negotiation.  However, if
-     * auto-negotiation is disabled, then software will have to manually 
+     * auto-negotiation is disabled, then software will have to manually
      * configure the two flow control enable bits in the CTRL register.
      *
      * The possible values of the "fc" parameter are:
      *      0:  Flow control is completely disabled
-     *      1:  Rx flow control is enabled (we can receive pause frames, but 
+     *      1:  Rx flow control is enabled (we can receive pause frames, but
      *          not send pause frames).
      *      2:  Tx flow control is enabled (we can send pause frames but we do
      *          not support receiving pause frames).
@@ -605,8 +605,8 @@ e1000_setup_fiber_link(struct e1000_hw *hw)
         txcw = (E1000_TXCW_ANE | E1000_TXCW_FD);
         break;
     case e1000_fc_rx_pause:
-        /* RX Flow control is enabled and TX Flow control is disabled by a 
-         * software over-ride. Since there really isn't a way to advertise 
+        /* RX Flow control is enabled and TX Flow control is disabled by a
+         * software over-ride. Since there really isn't a way to advertise
          * that we are capable of RX Pause ONLY, we will advertise that we
          * support both symmetric and asymmetric RX PAUSE. Later, we will
          *  disable the adapter's ability to send PAUSE frames.
@@ -614,7 +614,7 @@ e1000_setup_fiber_link(struct e1000_hw *hw)
         txcw = (E1000_TXCW_ANE | E1000_TXCW_FD | E1000_TXCW_PAUSE_MASK);
         break;
     case e1000_fc_tx_pause:
-        /* TX Flow control is enabled, and RX Flow control is disabled, by a 
+        /* TX Flow control is enabled, and RX Flow control is disabled, by a
          * software over-ride.
          */
         txcw = (E1000_TXCW_ANE | E1000_TXCW_FD | E1000_TXCW_ASM_DIR);
@@ -645,8 +645,8 @@ e1000_setup_fiber_link(struct e1000_hw *hw)
     msec_delay(1);
 
     /* If we have a signal (the cable is plugged in) then poll for a "Link-Up"
-     * indication in the Device Status Register.  Time-out if a link isn't 
-     * seen in 500 milliseconds seconds (Auto-negotiation should complete in 
+     * indication in the Device Status Register.  Time-out if a link isn't
+     * seen in 500 milliseconds seconds (Auto-negotiation should complete in
      * less than 500 milliseconds even if the other end is doing it in SW).
      */
     if((E1000_READ_REG(hw, CTRL) & E1000_CTRL_SWDPIN1) == signal) {
@@ -657,7 +657,7 @@ e1000_setup_fiber_link(struct e1000_hw *hw)
             if(status & E1000_STATUS_LU) break;
         }
         if(i == (LINK_UP_TIMEOUT / 10)) {
-            /* AutoNeg failed to achieve a link, so we'll call 
+            /* AutoNeg failed to achieve a link, so we'll call
              * e1000_check_for_link. This routine will force the link up if we
              * detect a signal. This will allow us to communicate with
              * non-autonegotiating link partners.
@@ -1266,7 +1266,7 @@ if (hw->phy_type == e1000_phy_m88) {
         }
         if(i == 0) { /* We didn't get link */
             /* Reset the DSP and wait again for link. */
-            
+
             ret_val = e1000_phy_reset_dsp(hw);
             if(ret_val < 0) {
                 DEBUGOUT("Error Resetting PHY DSP\n");
@@ -1417,7 +1417,7 @@ if (hw->phy_type == e1000_phy_igp) {
 
 /******************************************************************************
  * Forces the MAC's flow control settings.
- * 
+ *
  * hw - Struct containing variables accessed by shared code
  *
  * Sets the TFCE and RFCE bits in the device control register to reflect
@@ -1484,7 +1484,7 @@ e1000_force_mac_fc(struct e1000_hw *hw)
 
 /******************************************************************************
  * Configures flow control settings after link is established
- * 
+ *
  * hw - Struct containing variables accessed by shared code
  *
  * Should be called immediately after a valid link has been established.
@@ -1706,9 +1706,9 @@ e1000_check_for_link(struct e1000_hw *hw)
     uint16_t lp_capability;
 
     DEBUGFUNC("e1000_check_for_link");
-    
-    /* On adapters with a MAC newer that 82544, SW Defineable pin 1 will be 
-     * set when the optics detect a signal. On older adapters, it will be 
+
+    /* On adapters with a MAC newer that 82544, SW Defineable pin 1 will be
+     * set when the optics detect a signal. On older adapters, it will be
      * cleared when there is a signal
      */
     if(hw->mac_type > e1000_82544) signal = E1000_CTRL_SWDPIN1;
@@ -1773,7 +1773,7 @@ e1000_check_for_link(struct e1000_hw *hw)
             }
         }
 
-        /* Configure Flow Control now that Auto-Neg has completed. First, we 
+        /* Configure Flow Control now that Auto-Neg has completed. First, we
          * need to restore the desired flow control settings because we may
          * have had to re-autoneg with a different link partner.
          */
@@ -1802,7 +1802,7 @@ e1000_check_for_link(struct e1000_hw *hw)
                                 NWAY_LPAR_100TX_HD_CAPS |
                                 NWAY_LPAR_100TX_FD_CAPS |
                                 NWAY_LPAR_100T4_CAPS)) {
-                /* If our link partner advertises anything in addition to 
+                /* If our link partner advertises anything in addition to
                  * gigabit, we do not need to enable TBI compatibility.
                  */
                 if(hw->tbi_compatibility_on) {
@@ -2006,7 +2006,7 @@ e1000_shift_out_mdi_bits(struct e1000_hw *hw,
     uint32_t mask;
 
     /* We need to shift "count" number of bits out to the PHY. So, the value
-     * in the "data" parameter will be shifted out to the PHY one bit at a 
+     * in the "data" parameter will be shifted out to the PHY one bit at a
      * time. In order to do this, "data" must be broken down into bits.
      */
     mask = 0x01;
@@ -2043,7 +2043,7 @@ e1000_shift_out_mdi_bits(struct e1000_hw *hw,
 *
 * hw - Struct containing variables accessed by shared code
 *
-* Bits are shifted in in MSB to LSB order. 
+* Bits are shifted in in MSB to LSB order.
 ******************************************************************************/
 static uint16_t
 e1000_shift_in_mdi_bits(struct e1000_hw *hw)
@@ -2058,7 +2058,7 @@ e1000_shift_in_mdi_bits(struct e1000_hw *hw)
      * These two bits are ignored by us and thrown away. Bits are "shifted in"
      * by raising the input to the Management Data Clock (setting the MDC bit),
      * and then reading the value of the MDIO bit.
-     */ 
+     */
     ctrl = E1000_READ_REG(hw, CTRL);
 
     /* Clear MDIO_DIR (SWDPIO1) to indicate this bit is to be used as input. */
@@ -2118,7 +2118,7 @@ e1000_read_phy_reg(struct e1000_hw *hw,
          * PHY to retrieve the desired data.
          */
         mdic = ((reg_addr << E1000_MDIC_REG_SHIFT) |
-                (phy_addr << E1000_MDIC_PHY_SHIFT) | 
+                (phy_addr << E1000_MDIC_PHY_SHIFT) |
                 (E1000_MDIC_OP_READ));
 
         E1000_WRITE_REG(hw, MDIC, mdic);
@@ -2156,7 +2156,7 @@ e1000_read_phy_reg(struct e1000_hw *hw,
          * READ operation is performed.  These two bits are thrown away
          * followed by a shift in of 16 bits which contains the desired data.
          */
-        mdic = ((reg_addr) | (phy_addr << 5) | 
+        mdic = ((reg_addr) | (phy_addr << 5) |
                 (PHY_OP_READ << 10) | (PHY_SOF << 12));
 
         e1000_shift_out_mdi_bits(hw, mdic, 14);
@@ -2200,7 +2200,7 @@ e1000_write_phy_reg(struct e1000_hw *hw,
          */
         mdic = (((uint32_t) phy_data) |
                 (reg_addr << E1000_MDIC_REG_SHIFT) |
-                (phy_addr << E1000_MDIC_PHY_SHIFT) | 
+                (phy_addr << E1000_MDIC_PHY_SHIFT) |
                 (E1000_MDIC_OP_WRITE));
 
         E1000_WRITE_REG(hw, MDIC, mdic);
@@ -2218,12 +2218,12 @@ e1000_write_phy_reg(struct e1000_hw *hw,
     } else {
         /* We'll need to use the SW defined pins to shift the write command
          * out to the PHY. We first send a preamble to the PHY to signal the
-         * beginning of the MII instruction.  This is done by sending 32 
+         * beginning of the MII instruction.  This is done by sending 32
          * consecutive "1" bits.
          */
         e1000_shift_out_mdi_bits(hw, PHY_PREAMBLE, PHY_PREAMBLE_SIZE);
 
-        /* Now combine the remaining required fields that will indicate a 
+        /* Now combine the remaining required fields that will indicate a
          * write operation. We use this method instead of calling the
          * e1000_shift_out_mdi_bits routine for each field in the command. The
          * format of a MII write instruction is as follows:
@@ -2236,6 +2236,7 @@ e1000_write_phy_reg(struct e1000_hw *hw,
 
         e1000_shift_out_mdi_bits(hw, mdic, 32);
     }
+
     return 0;
 }
 
@@ -2393,7 +2394,7 @@ e1000_phy_reset_dsp(struct e1000_hw *hw)
 {
     int32_t ret_val = -E1000_ERR_PHY;
     DEBUGFUNC("e1000_phy_reset_dsp");
-    
+
     do {
         if(e1000_write_phy_reg(hw, 29, 0x001d) < 0) break;
         if(e1000_write_phy_reg(hw, 30, 0x00c1) < 0) break;
@@ -3125,7 +3126,7 @@ e1000_validate_eeprom_checksum(struct e1000_hw *hw)
     if(checksum == (uint16_t) EEPROM_SUM) {
         return 0;
     } else {
-        DEBUGOUT("EEPROM Checksum Invalid\n");    
+        DEBUGOUT("EEPROM Checksum Invalid\n");
         return -E1000_ERR_EEPROM;
     }
 }
@@ -3431,7 +3432,7 @@ e1000_read_mac_addr(struct e1000_hw * hw)
 /******************************************************************************
  * Initializes receive address filters.
  *
- * hw - Struct containing variables accessed by shared code 
+ * hw - Struct containing variables accessed by shared code
  *
  * Places the MAC address in receive address register 0 and clears the rest
  * of the receive addresss registers. Clears the multicast table. Assumes
@@ -3476,7 +3477,7 @@ e1000_init_rx_addrs(struct e1000_hw *hw)
  *
  * The given list replaces any existing list. Clears the last 15 receive
  * address registers and the multicast table. Uses receive address registers
- * for the first 15 multicast addresses, and hashes the rest into the 
+ * for the first 15 multicast addresses, and hashes the rest into the
  * multicast table.
  *****************************************************************************/
 void
@@ -3525,7 +3526,7 @@ e1000_mc_addr_list_update(struct e1000_hw *hw,
         DEBUGOUT1(" Hash value = 0x%03X\n", hash_value);
 
         /* Place this multicast address in the RAR if there is room, *
-         * else put it in the MTA            
+         * else put it in the MTA
          */
         if(rar_used_count < E1000_RAR_ENTRIES) {
             e1000_rar_set(hw,
@@ -3543,7 +3544,7 @@ e1000_mc_addr_list_update(struct e1000_hw *hw,
  * Hashes an address to determine its location in the multicast table
  *
  * hw - Struct containing variables accessed by shared code
- * mc_addr - the multicast address to hash 
+ * mc_addr - the multicast address to hash
  *****************************************************************************/
 uint32_t
 e1000_hash_mc_addr(struct e1000_hw *hw,
@@ -3552,7 +3553,7 @@ e1000_hash_mc_addr(struct e1000_hw *hw,
     uint32_t hash_value = 0;
 
     /* The portion of the address that is used for the hash table is
-     * determined by the mc_filter_type setting.  
+     * determined by the mc_filter_type setting.
      */
     switch (hw->mc_filter_type) {
     /* [0] [1] [2] [3] [4] [5]
@@ -3595,12 +3596,12 @@ e1000_mta_set(struct e1000_hw *hw,
     uint32_t mta;
     uint32_t temp;
 
-    /* The MTA is a register array of 128 32-bit registers.  
-     * It is treated like an array of 4096 bits.  We want to set 
+    /* The MTA is a register array of 128 32-bit registers.
+     * It is treated like an array of 4096 bits.  We want to set
      * bit BitArray[hash_value]. So we figure out what register
      * the bit is in, read it, OR in the new bit, then write
-     * back the new value.  The register is determined by the 
-     * upper 7 bits of the hash value and the bit within that 
+     * back the new value.  The register is determined by the
+     * upper 7 bits of the hash value and the bit within that
      * register are determined by the lower 5 bits of the value.
      */
     hash_reg = (hash_value >> 5) & 0x7F;
@@ -3638,7 +3639,7 @@ e1000_rar_set(struct e1000_hw *hw,
     uint32_t rar_low, rar_high;
 
     /* HW expects these in little endian so we reverse the byte order
-     * from network order (big endian) to little endian              
+     * from network order (big endian) to little endian
      */
     rar_low = ((uint32_t) addr[0] |
                ((uint32_t) addr[1] << 8) |
@@ -3764,9 +3765,9 @@ int32_t
 e1000_setup_led(struct e1000_hw *hw)
 {
     uint32_t ledctl;
- 
+
     DEBUGFUNC("e1000_setup_led");
-   
+
     switch(hw->device_id) {
     case E1000_DEV_ID_82542:
     case E1000_DEV_ID_82543GC_FIBER:
@@ -3784,7 +3785,7 @@ e1000_setup_led(struct e1000_hw *hw)
         hw->ledctl_default = ledctl;
         /* Turn off LED0 */
         ledctl &= ~(E1000_LEDCTL_LED0_IVRT |
-                    E1000_LEDCTL_LED0_BLINK | 
+                    E1000_LEDCTL_LED0_BLINK |
                     E1000_LEDCTL_LED0_MODE_MASK);
         ledctl |= (E1000_LEDCTL_MODE_LED_OFF << E1000_LEDCTL_LED0_MODE_SHIFT);
         E1000_WRITE_REG(hw, LEDCTL, ledctl);
@@ -3849,7 +3850,7 @@ e1000_cleanup_led(struct e1000_hw *hw)
     }
     return 0;
 }
-    
+
 /******************************************************************************
  * Turns on the software controllable LED
  *
@@ -3957,7 +3958,7 @@ e1000_led_off(struct e1000_hw *hw)
 }
 
 /******************************************************************************
- * Clears all hardware statistics counters. 
+ * Clears all hardware statistics counters.
  *
  * hw - Struct containing variables accessed by shared code
  *****************************************************************************/
@@ -4076,7 +4077,7 @@ e1000_update_adaptive(struct e1000_hw *hw)
     DEBUGFUNC("e1000_update_adaptive");
 
     if(hw->adaptive_ifs) {
-        if((hw->collision_delta * hw->ifs_ratio) > 
+        if((hw->collision_delta * hw->ifs_ratio) >
            hw->tx_packet_delta) {
             if(hw->tx_packet_delta > MIN_NUM_XMITS) {
                 hw->in_ifs_mode = TRUE;
@@ -4089,7 +4090,7 @@ e1000_update_adaptive(struct e1000_hw *hw)
                 }
             }
         } else {
-            if((hw->in_ifs_mode == TRUE) && 
+            if((hw->in_ifs_mode == TRUE) &&
                (hw->tx_packet_delta <= MIN_NUM_XMITS)) {
                 hw->current_ifs_val = 0;
                 hw->in_ifs_mode = FALSE;
@@ -4103,7 +4104,7 @@ e1000_update_adaptive(struct e1000_hw *hw)
 
 /******************************************************************************
  * Adjusts the statistic counters when a frame is accepted by TBI_ACCEPT
- * 
+ *
  * hw - Struct containing variables accessed by shared code
  * frame_len - The length of the frame in question
  * mac_addr - The Ethernet destination address of the frame in question
@@ -4131,16 +4132,16 @@ e1000_tbi_adjust_stats(struct e1000_hw *hw,
     carry_bit = 0x80000000 & stats->gorcl;
     stats->gorcl += frame_len;
     /* If the high bit of Gorcl (the low 32 bits of the Good Octets
-     * Received Count) was one before the addition, 
-     * AND it is zero after, then we lost the carry out, 
+     * Received Count) was one before the addition,
+     * AND it is zero after, then we lost the carry out,
      * need to add one to Gorch (Good Octets Received Count High).
-     * This could be simplified if all environments supported 
+     * This could be simplified if all environments supported
      * 64-bit integers.
      */
     if(carry_bit && ((stats->gorcl & 0x80000000) == 0))
         stats->gorch++;
     /* Is this a broadcast or multicast?  Check broadcast first,
-     * since the test for a multicast frame will test positive on 
+     * since the test for a multicast frame will test positive on
      * a broadcast frame.
      */
     if((mac_addr[0] == (uint8_t) 0xff) && (mac_addr[1] == (uint8_t) 0xff))

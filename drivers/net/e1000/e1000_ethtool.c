@@ -308,8 +308,8 @@ e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		/* Fall Through */
 
 	default:
-		wol->supported = WAKE_UCAST | WAKE_MCAST
-			         | WAKE_BCAST | WAKE_MAGIC;
+		wol->supported = WAKE_UCAST | WAKE_MCAST |
+				 WAKE_BCAST | WAKE_MAGIC;
 
 		wol->wolopts = 0;
 		if(adapter->wol & E1000_WUFC_EX)
@@ -343,7 +343,7 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		/* Fall Through */
 
 	default:
-		if(wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE | WAKE_PHY))
+		if(wol->wolopts & (WAKE_PHY | WAKE_ARP | WAKE_MAGICSECURE))
 			return -EOPNOTSUPP;
 
 		adapter->wol = 0;

@@ -189,6 +189,7 @@ struct notifier_block e1000_notifier_reboot = {
 	.priority	= 0
 };
 
+
 /* Exported from other modules */
 
 extern void e1000_check_options(struct e1000_adapter *adapter);
@@ -554,6 +555,7 @@ e1000_remove(struct pci_dev *pdev)
 
 	e1000_phy_hw_reset(&adapter->hw);
 
+
 	iounmap(adapter->hw.hw_addr);
 	pci_release_regions(pdev);
 
@@ -589,7 +591,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 
 	adapter->rx_buffer_len = E1000_RXBUFFER_2048;
 	hw->max_frame_size = netdev->mtu +
-	                         ENET_HEADER_SIZE + ETHERNET_FCS_SIZE;
+			     ENET_HEADER_SIZE + ETHERNET_FCS_SIZE;
 	hw->min_frame_size = MINIMUM_ETHERNET_FRAME_SIZE;
 
 	/* identify the MAC */
@@ -810,7 +812,7 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 
 	tctl &= ~E1000_TCTL_CT;
 	tctl |= E1000_TCTL_EN | E1000_TCTL_PSP |
-	       (E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT);
+		(E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT);
 
 	E1000_WRITE_REG(&adapter->hw, TCTL, tctl);
 
@@ -880,8 +882,8 @@ e1000_setup_rctl(struct e1000_adapter *adapter)
 	rctl &= ~(3 << E1000_RCTL_MO_SHIFT);
 
 	rctl |= E1000_RCTL_EN | E1000_RCTL_BAM |
-	        E1000_RCTL_LBM_NO | E1000_RCTL_RDMTS_HALF |
-	        (adapter->hw.mc_filter_type << E1000_RCTL_MO_SHIFT);
+		E1000_RCTL_LBM_NO | E1000_RCTL_RDMTS_HALF |
+		(adapter->hw.mc_filter_type << E1000_RCTL_MO_SHIFT);
 
 	if(adapter->hw.tbi_compatibility_on == 1)
 		rctl |= E1000_RCTL_SBP;
@@ -1374,7 +1376,7 @@ e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb, int tx_flags)
 	int i;
 	uint8_t ipcss, ipcso, tucss, tucso, hdr_len;
 	uint16_t ipcse, tucse, mss;
-	
+
 	if(skb_shinfo(skb)->tso_size) {
 		hdr_len = ((skb->h.raw - skb->data) + (skb->h.th->doff << 2));
 		mss = skb_shinfo(skb)->tso_size;
@@ -1394,7 +1396,7 @@ e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb, int tx_flags)
 
 		i = adapter->tx_ring.next_to_use;
 		context_desc = E1000_CONTEXT_DESC(adapter->tx_ring, i);
-		
+
 		context_desc->lower_setup.ip_fields.ipcss  = ipcss;
 		context_desc->lower_setup.ip_fields.ipcso  = ipcso;
 		context_desc->lower_setup.ip_fields.ipcse  = cpu_to_le16(ipcse);
@@ -2534,6 +2536,7 @@ e1000_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 	}
 	return NOTIFY_DONE;
 }
+
 
 static int
 e1000_suspend(struct pci_dev *pdev, uint32_t state)

@@ -33,6 +33,7 @@
 #ifndef _E1000_HW_H_
 #define _E1000_HW_H_
 
+
 #include "e1000_osdep.h"
 
 /* Forward declarations of structures used by the shared code */
@@ -290,6 +291,7 @@ uint32_t e1000_io_read(struct e1000_hw *hw, uint32_t port);
 uint32_t e1000_read_reg_io(struct e1000_hw *hw, uint32_t offset);
 void e1000_io_write(struct e1000_hw *hw, uint32_t port, uint32_t value);
 void e1000_write_reg_io(struct e1000_hw *hw, uint32_t offset, uint32_t value);
+
 #define E1000_READ_REG_IO(a, reg) \
     e1000_read_reg_io((a), E1000_##reg)
 #define E1000_WRITE_REG_IO(a, reg, val) \
@@ -360,7 +362,7 @@ void e1000_write_reg_io(struct e1000_hw *hw, uint32_t offset, uint32_t value);
 /* This defines the bits that are set in the Interrupt Mask
  * Set/Read Register.  Each bit is documented below:
  *   o RXDMT0 = Receive Descriptor Minimum Threshold hit (ring 0)
- *   o RXSEQ  = Receive Sequence Error 
+ *   o RXSEQ  = Receive Sequence Error
  */
 #define POLL_IMS_ENABLE_MASK ( \
     E1000_IMS_RXDMT0 |         \
@@ -585,7 +587,7 @@ struct e1000_ffvt_entry {
 /* Register Set. (82543, 82544)
  *
  * Registers are defined to be 32 bits and  should be accessed as 32 bit values.
- * These registers are physically located on the NIC, but are mapped into the 
+ * These registers are physically located on the NIC, but are mapped into the
  * host memory address space.
  *
  * RW - register is both readable and writable
@@ -1374,7 +1376,7 @@ struct e1000_hw {
 #define E1000_MANC_IPV6_EN       0x00000800 /* Enable IPv6 */
 #define E1000_MANC_SNAP_EN       0x00001000 /* Accept LLC/SNAP */
 #define E1000_MANC_ARP_EN        0x00002000 /* Enable ARP Request Filtering */
-#define E1000_MANC_NEIGHBOR_EN   0x00004000 /* Enable Neighbor Discovery 
+#define E1000_MANC_NEIGHBOR_EN   0x00004000 /* Enable Neighbor Discovery
                                              * Filtering */
 #define E1000_MANC_TCO_RESET     0x00010000 /* TCO Reset Occurred */
 #define E1000_MANC_RCV_TCO_EN    0x00020000 /* Receive TCO Packets Enabled */
@@ -1555,26 +1557,26 @@ struct e1000_hw {
 
 /* The number of bits that we need to shift right to move the "pause"
  * bits from the EEPROM (bits 13:12) to the "pause" (bits 8:7) field
- * in the TXCW register 
+ * in the TXCW register
  */
 #define PAUSE_SHIFT 5
 
 /* The number of bits that we need to shift left to move the "SWDPIO"
  * bits from the EEPROM (bits 8:5) to the "SWDPIO" (bits 25:22) field
- * in the CTRL register 
+ * in the CTRL register
  */
 #define SWDPIO_SHIFT 17
 
 /* The number of bits that we need to shift left to move the "SWDPIO_EXT"
  * bits from the EEPROM word F (bits 7:4) to the bits 11:8 of The
  * Extended CTRL register.
- * in the CTRL register 
+ * in the CTRL register
  */
 #define SWDPIO__EXT_SHIFT 4
 
 /* The number of bits that we need to shift left to move the "ILOS"
  * bit from the EEPROM (bit 4) to the "ILOS" (bit 7) field
- * in the CTRL register 
+ * in the CTRL register
  */
 #define ILOS_SHIFT  3
 
@@ -1592,7 +1594,7 @@ struct e1000_hw {
 /* TBI_ACCEPT macro definition:
  *
  * This macro requires:
- *      adapter = a pointer to struct e1000_hw 
+ *      adapter = a pointer to struct e1000_hw
  *      status = the 8 bit status field of the RX descriptor with EOP set
  *      error = the 8 bit error field of the RX descriptor with EOP set
  *      length = the sum of all the length fields of the RX descriptors that
@@ -1601,7 +1603,7 @@ struct e1000_hw {
  *      max_frame_length = the maximum frame length we want to accept.
  *      min_frame_length = the minimum frame length we want to accept.
  *
- * This macro is a conditional that should be used in the interrupt 
+ * This macro is a conditional that should be used in the interrupt
  * handler's Rx processing routine when RxErrors have been detected.
  *
  * Typical use:
@@ -1748,7 +1750,7 @@ struct e1000_hw {
 #define NWAY_ER_PAGE_RXD          0x0002 /* LP is 10T   Half Duplex Capable */
 #define NWAY_ER_NEXT_PAGE_CAPS    0x0004 /* LP is 10T   Full Duplex Capable */
 #define NWAY_ER_LP_NEXT_PAGE_CAPS 0x0008 /* LP is 100TX Half Duplex Capable */
-#define NWAY_ER_PAR_DETECT_FAULT  0x0100 /* LP is 100TX Full Duplex Capable */
+#define NWAY_ER_PAR_DETECT_FAULT  0x0010 /* LP is 100TX Full Duplex Capable */
 
 /* Next Page TX Register */
 #define NPTX_MSG_CODE_FIELD 0x0001 /* NP msg code or unformatted data */
@@ -1759,7 +1761,7 @@ struct e1000_hw {
                                     * 0 = cannot comply with msg
                                     */
 #define NPTX_MSG_PAGE       0x2000 /* formatted(1)/unformatted(0) pg */
-#define NPTX_NEXT_PAGE      0x8000 /* 1 = addition NP will follow 
+#define NPTX_NEXT_PAGE      0x8000 /* 1 = addition NP will follow
                                     * 0 = sending last NP
                                     */
 
@@ -1768,13 +1770,13 @@ struct e1000_hw {
 #define LP_RNPR_TOGGLE         0x0800 /* Toggles between exchanges
                                        * of different NP
                                        */
-#define LP_RNPR_ACKNOWLDGE2    0x1000 /* 1 = will comply with msg 
+#define LP_RNPR_ACKNOWLDGE2    0x1000 /* 1 = will comply with msg
                                        * 0 = cannot comply with msg
                                        */
 #define LP_RNPR_MSG_PAGE       0x2000  /* formatted(1)/unformatted(0) pg */
 #define LP_RNPR_ACKNOWLDGE     0x4000  /* 1 = ACK / 0 = NO ACK */
 #define LP_RNPR_NEXT_PAGE      0x8000  /* 1 = addition NP will follow
-                                        * 0 = sending last NP 
+                                        * 0 = sending last NP
                                         */
 
 /* 1000BASE-T Control Register */
@@ -1821,20 +1823,20 @@ struct e1000_hw {
 #define M88E1000_PSCR_JABBER_DISABLE    0x0001 /* 1=Jabber Function disabled */
 #define M88E1000_PSCR_POLARITY_REVERSAL 0x0002 /* 1=Polarity Reversal enabled */
 #define M88E1000_PSCR_SQE_TEST          0x0004 /* 1=SQE Test enabled */
-#define M88E1000_PSCR_CLK125_DISABLE    0x0010 /* 1=CLK125 low, 
+#define M88E1000_PSCR_CLK125_DISABLE    0x0010 /* 1=CLK125 low,
                                                 * 0=CLK125 toggling
                                                 */
 #define M88E1000_PSCR_MDI_MANUAL_MODE  0x0000  /* MDI Crossover Mode bits 6:5 */
                                                /* Manual MDI configuration */
 #define M88E1000_PSCR_MDIX_MANUAL_MODE 0x0020  /* Manual MDIX configuration */
 #define M88E1000_PSCR_AUTO_X_1000T     0x0040  /* 1000BASE-T: Auto crossover,
-                                                *  100BASE-TX/10BASE-T: 
+                                                *  100BASE-TX/10BASE-T:
                                                 *  MDI Mode
                                                 */
-#define M88E1000_PSCR_AUTO_X_MODE      0x0060  /* Auto crossover enabled 
-                                                * all speeds. 
+#define M88E1000_PSCR_AUTO_X_MODE      0x0060  /* Auto crossover enabled
+                                                * all speeds.
                                                 */
-#define M88E1000_PSCR_10BT_EXT_DIST_ENABLE 0x0080 
+#define M88E1000_PSCR_10BT_EXT_DIST_ENABLE 0x0080
                                         /* 1=Enable Extended 10BASE-T distance
                                          * (Lower 10BASE-T RX Threshold)
                                          * 0=Normal 10BASE-T RX Threshold */
@@ -1875,12 +1877,12 @@ struct e1000_hw {
 #define M88E1000_EPSCR_DOWN_NO_IDLE   0x8000 /* 1=Lost lock detect enabled.
                                               * Will assert lost lock and bring
                                               * link down if idle not seen
-                                              * within 1ms in 1000BASE-T 
+                                              * within 1ms in 1000BASE-T
                                               */
 /* Number of times we will attempt to autonegotiate before downshifting if we
  * are the master */
 #define M88E1000_EPSCR_MASTER_DOWNSHIFT_MASK 0x0C00
-#define M88E1000_EPSCR_MASTER_DOWNSHIFT_1X   0x0000    
+#define M88E1000_EPSCR_MASTER_DOWNSHIFT_1X   0x0000
 #define M88E1000_EPSCR_MASTER_DOWNSHIFT_2X   0x0400
 #define M88E1000_EPSCR_MASTER_DOWNSHIFT_3X   0x0800
 #define M88E1000_EPSCR_MASTER_DOWNSHIFT_4X   0x0C00
