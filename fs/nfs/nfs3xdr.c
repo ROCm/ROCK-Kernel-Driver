@@ -793,16 +793,21 @@ nfs3_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 	}
 
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
-	if (iov->iov_len > hdrlen) {
+	if (iov->iov_len < hdrlen) {
+		printk(KERN_WARNING "NFS: READ reply header overflowed:"
+				"length %d > %d\n", hdrlen, iov->iov_len);
+       		return -errno_NFSERR_IO;
+	} else if (iov->iov_len != hdrlen) {
 		dprintk("NFS: READ header is short. iovec will be shifted.\n");
 		xdr_shift_buf(&req->rq_rcv_buf, iov->iov_len - hdrlen);
 	}
 
-	recvd = req->rq_rlen - hdrlen;
+	recvd = req->rq_received - hdrlen;
 	if (count > recvd) {
 		printk(KERN_WARNING "NFS: server cheating in read reply: "
 			"count %d > recvd %d\n", count, recvd);
 		count = recvd;
+		res->eof = 0;
 	}
 
 	if (count < res->count)
