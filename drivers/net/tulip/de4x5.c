@@ -1034,8 +1034,6 @@ static int     type5_infoblock(struct net_device *dev, u_char count, u_char *p);
 static int     compact_infoblock(struct net_device *dev, u_char count, u_char *p);
 
 #ifdef MODULE
-int  init_module(void);
-void cleanup_module(void);
 static struct net_device *unlink_modules(struct net_device *p);
 static struct net_device *insert_device(struct net_device *dev, u_long iobase,
 				     int (*init)(struct net_device *));
