@@ -116,7 +116,6 @@ void agp_free_memory(agp_memory * curr)
 	agp_free_key(curr->key);
 	vfree(curr->memory);
 	kfree(curr);
-	MOD_DEC_USE_COUNT;
 }
 
 #define ENTRIES_PER_PAGE		(PAGE_SIZE / sizeof(unsigned long))
@@ -138,17 +137,12 @@ agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 		return new;
 	}
 
-	/* We always increase the module count, since free auto-decrements it */
-	MOD_INC_USE_COUNT;
-
 	scratch_pages = (page_count + ENTRIES_PER_PAGE - 1) / ENTRIES_PER_PAGE;
 
 	new = agp_create_memory(scratch_pages);
 
-	if (new == NULL) {
-		MOD_DEC_USE_COUNT;
+	if (new == NULL)
 		return NULL;
-	}
 
 	for (i = 0; i < page_count; i++) {
 		void *addr = agp_bridge.agp_alloc_page();

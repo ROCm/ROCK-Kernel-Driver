@@ -219,36 +219,48 @@ static const drm_agp_t drm_agp = {
 
 static int agp_count=0;
 
-int agp_register_driver (struct pci_dev *dev)
+int agp_register_driver (struct agp_driver *drv)
 {
 	int ret_val;
+
+	if (drv->dev == NULL) {
+		printk (KERN_DEBUG PFX "Erk, registering with no pci_dev!\n");
+		return -EINVAL;
+	}
 
 	if (agp_count==1) {
 		printk (KERN_DEBUG PFX "Only one agpgart device currently supported.\n");
 		return -ENODEV;
 	}
 
-	ret_val = agp_backend_initialize(dev);
-	if (ret_val) {
-		agp_bridge.type = NOT_SUPPORTED;
-		return ret_val;
-	}
-	ret_val = agp_frontend_initialize();
-	if (ret_val) {
-		agp_bridge.type = NOT_SUPPORTED;
-		agp_backend_cleanup();
-		return ret_val;
-	}
+	/* Grab reference on the chipset driver. */
+	if (!try_module_get(drv->owner))
+		return -EINVAL;
 
+	ret_val = agp_backend_initialize(drv->dev);
+	if (ret_val)
+		goto err_out;
+
+	ret_val = agp_frontend_initialize();
+	if (ret_val)
+		goto frontend_err;
+
+	/* FIXME: What to do with this? */
 	inter_module_register("drm_agp", THIS_MODULE, &drm_agp);
 
 	pm_register(PM_PCI_DEV, PM_PCI_ID(agp_bridge.dev), agp_power);
-
 	agp_count++;
 	return 0;
+
+frontend_err:
+	agp_backend_cleanup();
+err_out:
+	agp_bridge.type = NOT_SUPPORTED;
+	module_put(drv->owner);
+	return ret_val;
 }
 
-int agp_unregister_driver(void)
+int agp_unregister_driver(struct agp_driver *drv)
 {
 	agp_bridge.type = NOT_SUPPORTED;
 	pm_unregister_all(agp_power);
@@ -256,6 +268,7 @@ int agp_unregister_driver(void)
 	agp_backend_cleanup();
 	inter_module_unregister("drm_agp");
 	agp_count--;
+	module_put(drv->owner);
 	return 0;
 }
 
