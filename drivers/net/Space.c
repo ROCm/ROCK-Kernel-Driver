@@ -49,7 +49,7 @@ extern int el2_probe(struct net_device *dev);
 extern int ne_probe(struct net_device *dev);
 extern int hp_probe(struct net_device *dev);
 extern int hp_plus_probe(struct net_device *dev);
-extern int express_probe(struct net_device *);
+extern struct net_device *express_probe(int unit);
 extern struct net_device *eepro_probe(int unit);
 extern int at1500_probe(struct net_device *);
 extern int at1700_probe(struct net_device *);
@@ -250,13 +250,13 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_ETH16I
 	{eth16i_probe, 0},	/* ICL EtherTeam 16i/32 */
 #endif
-#ifdef CONFIG_EEXPRESS		/* Intel EtherExpress */
-	{express_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 isa_probes2[] __initdata = {
+#ifdef CONFIG_EEXPRESS		/* Intel EtherExpress */
+	{express_probe, 0},
+#endif
 #ifdef CONFIG_EEXPRESS_PRO	/* Intel EtherExpress Pro/10 */
 	{eepro_probe, 0},
 #endif
