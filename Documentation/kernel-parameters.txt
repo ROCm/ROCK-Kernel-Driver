@@ -153,10 +153,11 @@ running once the system is up.
 
 	atascsi=	[HW,SCSI] Atari SCSI
 
-	atkbd_set=	[HW] Select keyboard code set
+	atkbd.set=	[HW] Select keyboard code set
 			Format: <int>
-
-	atkbd_reset	[HW] Reset keyboard during initialization
+	atkbd.softrepeat=
+			[HW] Use software keyboard repeat
+	atkbd.reset=	[HW] Reset keyboard during initialization
 
 	autotest	[IA64]
 
