@@ -250,10 +250,10 @@ static struct pci_device_id s2io_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, s2io_tbl);
 
 static struct pci_driver s2io_driver = {
-      name:"S2IO",
-      id_table:s2io_tbl,
-      probe:s2io_init_nic,
-      remove:__devexit_p(s2io_rem_nic),
+      .name = "S2IO",
+      .id_table = s2io_tbl,
+      .probe = s2io_init_nic,
+      .remove = __devexit_p(s2io_rem_nic),
 };
 
 /* A simplifier macro used both by init and free shared_mem Fns(). */
@@ -4603,6 +4603,9 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	struct config_param *config;
 
 
+	DBG_PRINT(ERR_DBG, "Loading S2IO driver with %s\n",
+		s2io_driver_version);
+
 	if ((ret = pci_enable_device(pdev))) {
 		DBG_PRINT(ERR_DBG,
 			  "s2io_init_nic: pci_enable_device failed\n");
@@ -4720,6 +4723,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	if (init_shared_mem(sp)) {
 		DBG_PRINT(ERR_DBG, "%s: Memory allocation failed\n",
 			  dev->name);
+		ret = -ENOMEM;
 		goto mem_alloc_failed;
 	}
 
@@ -4728,6 +4732,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	if (!sp->bar0) {
 		DBG_PRINT(ERR_DBG, "%s: S2IO: cannot remap io mem1\n",
 			  dev->name);
+		ret = -ENOMEM;
 		goto bar0_remap_failed;
 	}
 
@@ -4736,6 +4741,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	if (!sp->bar1) {
 		DBG_PRINT(ERR_DBG, "%s: S2IO: cannot remap io mem2\n",
 			  dev->name);
+		ret = -ENOMEM;
 		goto bar1_remap_failed;
 	}
 
@@ -4756,9 +4762,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	dev->set_multicast_list = &s2io_set_multicast;
 	dev->do_ioctl = &s2io_ioctl;
 	dev->change_mtu = &s2io_change_mtu;
-#ifdef SET_ETHTOOL_OPS
 	SET_ETHTOOL_OPS(dev, &netdev_ethtool_ops);
-#endif
 	/*
 	 * will use eth_mac_addr() for  dev->set_mac_address
 	 * mac address will be set every time dev->open() is called
@@ -4788,6 +4792,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	if (s2io_set_swapper(sp)) {
 		DBG_PRINT(ERR_DBG, "%s:swapper settings are wrong\n",
 			  dev->name);
+		ret = -EAGAIN;
 		goto set_swap_failed;
 	}
 
@@ -4802,6 +4807,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 		DBG_PRINT(ERR_DBG,
 			  "%s: S2IO: swapper settings are wrong\n",
 			  dev->name);
+		ret = -EAGAIN;
 		goto set_swap_failed;
 	}
 
@@ -4874,6 +4880,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 
 	if (register_netdev(dev)) {
 		DBG_PRINT(ERR_DBG, "Device registration failed\n");
+		ret = -ENODEV;
 		goto register_failed;
 	}
 
@@ -4900,7 +4907,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	pci_set_drvdata(pdev, NULL);
 	free_netdev(dev);
 
-	return -ENODEV;
+	return ret;
 }
 
 /**
