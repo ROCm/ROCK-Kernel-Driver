@@ -40,10 +40,6 @@
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 
-#ifdef CONFIG_INFINIBAND_MTHCA_SSE_DOORBELL
-#include <asm/cpufeature.h>
-#endif
-
 #include "mthca_dev.h"
 #include "mthca_config_reg.h"
 #include "mthca_cmd.h"
@@ -1116,22 +1112,6 @@ static struct pci_driver mthca_driver = {
 static int __init mthca_init(void)
 {
 	int ret;
-
-	/*
-	 * TODO: measure whether dynamically choosing doorbell code at
-	 * runtime affects our performance.  Is there a "magic" way to
-	 * choose without having to follow a function pointer every
-	 * time we ring a doorbell?
-	 */
-#ifdef CONFIG_INFINIBAND_MTHCA_SSE_DOORBELL
-	if (!cpu_has_xmm) {
-		printk(KERN_ERR PFX "mthca was compiled with SSE doorbell code, but\n");
-		printk(KERN_ERR PFX "the current CPU does not support SSE.\n");
-		printk(KERN_ERR PFX "Turn off CONFIG_INFINIBAND_MTHCA_SSE_DOORBELL "
-		       "and recompile.\n");
-		return -ENODEV;
-	}
-#endif
 
 	ret = pci_register_driver(&mthca_driver);
 	return ret < 0 ? ret : 0;

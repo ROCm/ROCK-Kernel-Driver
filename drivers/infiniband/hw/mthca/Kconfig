@@ -14,13 +14,3 @@ config INFINIBAND_MTHCA_DEBUG
 	  This option causes the mthca driver produce a bunch of debug
 	  messages.  Select this is you are developing the driver or
 	  trying to diagnose a problem.
-
-config INFINIBAND_MTHCA_SSE_DOORBELL
-	bool "SSE doorbell code"
-	depends on INFINIBAND_MTHCA && X86 && !X86_64
-	default n
-	---help---
-	  This option will have the mthca driver use SSE instructions
-	  to ring hardware doorbell registers.  This may improve
-	  performance for some workloads, but the driver will not run
-	  on processors without SSE instructions.
