@@ -476,7 +476,7 @@ rtattr_failure:
 	return -1;
 }
 
-struct tcf_proto_ops cls_tcindex_ops = {
+static struct tcf_proto_ops cls_tcindex_ops = {
 	.next		=	NULL,
 	.kind		=	"tcindex",
 	.classify	=	tcindex_classify,
@@ -491,16 +491,16 @@ struct tcf_proto_ops cls_tcindex_ops = {
 	.owner		=	THIS_MODULE,
 };
 
-
-#ifdef MODULE
-int init_module(void)
+static int __init init_tcindex(void)
 {
 	return register_tcf_proto_ops(&cls_tcindex_ops);
 }
 
-void cleanup_module(void) 
+static void __exit exit_tcindex(void) 
 {
 	unregister_tcf_proto_ops(&cls_tcindex_ops);
 }
-#endif
+
+module_init(init_tcindex)
+module_exit(exit_tcindex)
 MODULE_LICENSE("GPL");

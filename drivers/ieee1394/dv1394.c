@@ -1801,15 +1801,12 @@ static int dv1394_open(struct inode *inode, struct file *file)
 		
 	} else {
 		/* look up the card by ID */
-		
-		struct list_head *lh;
 		unsigned long flags;
 		
 		spin_lock_irqsave(&dv1394_cards_lock, flags);
 		if (!list_empty(&dv1394_cards)) {
 			struct video_card *p;
-			list_for_each(lh, &dv1394_cards) {
-				p = list_entry(lh, struct video_card, list);
+			list_for_each_entry(p, &dv1394_cards, list) {
 				if ((p->id) == ieee1394_file_to_instance(file)) {
 					video = p;
 					break;
@@ -2374,7 +2371,6 @@ static void dv1394_host_reset(struct hpsb_host *host)
 	struct ti_ohci *ohci;
 	struct video_card *video = NULL;
 	unsigned long flags;
-	struct list_head *lh;
 	
 	/* We only work with the OHCI-1394 driver */
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME))
@@ -2386,8 +2382,7 @@ static void dv1394_host_reset(struct hpsb_host *host)
 	/* find the corresponding video_cards */
 	spin_lock_irqsave(&dv1394_cards_lock, flags);
 	if (!list_empty(&dv1394_cards)) {
-		list_for_each(lh, &dv1394_cards) {
-			video = list_entry(lh, struct video_card, list);
+		list_for_each_entry(video, &dv1394_cards, list) {
 			if ((video->id >> 2) == ohci->id)
 				break;
 		}

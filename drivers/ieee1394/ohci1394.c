@@ -115,6 +115,7 @@
 #include <asm/pci-bridge.h>
 #endif
 
+#include "csr1212.h"
 #include "ieee1394.h"
 #include "ieee1394_types.h"
 #include "hosts.h"
@@ -161,7 +162,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s: fw-host%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 1097 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1131 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -495,8 +496,6 @@ static int get_nb_iso_ctx(struct ti_ohci *ohci, int reg)
 	return ctx;
 }
 
-static void ohci_init_config_rom(struct ti_ohci *ohci);
-
 /* Global initialization */
 static void ohci_initialize(struct ti_ohci *ohci)
 {
@@ -524,7 +523,8 @@ static void ohci_initialize(struct ti_ohci *ohci)
   
 	/* Enable cycle timer and cycle master and set the IRM
 	 * contender bit in our self ID packets. */
-	reg_write(ohci, OHCI1394_LinkControlSet, 0x00300000);
+	reg_write(ohci, OHCI1394_LinkControlSet, OHCI1394_LinkControl_CycleTimerEnable |
+		  OHCI1394_LinkControl_CycleMaster);
 	set_phy_reg_mask(ohci, 4, 0xc0);
 
 	/* Clear interrupt registers */
@@ -534,14 +534,12 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	/* Set up self-id dma buffer */
 	reg_write(ohci, OHCI1394_SelfIDBuffer, ohci->selfid_buf_bus);
 
-	/* enable self-id dma */
-	reg_write(ohci, OHCI1394_LinkControlSet, 0x00000200);
+	/* enable self-id and phys */
+	reg_write(ohci, OHCI1394_LinkControlSet, OHCI1394_LinkControl_RcvSelfID |
+		  OHCI1394_LinkControl_RcvPhyPkt);
 
 	/* Set the Config ROM mapping register */
 	reg_write(ohci, OHCI1394_ConfigROMmap, ohci->csr_config_rom_bus);
-
-	/* Initialize the Config ROM */
-	ohci_init_config_rom(ohci);
 
 	/* Now get our max packet size */
 	ohci->max_packet_size = 
@@ -974,11 +972,15 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 				 */
 				DBGMSG(ohci->id, "Cycle master enabled");
 				reg_write(ohci, OHCI1394_LinkControlSet, 
-					  0x00300000);
+					  OHCI1394_LinkControl_CycleTimerEnable |
+					  OHCI1394_LinkControl_CycleMaster);
 			}
 		} else {
 			/* disable cycleTimer, cycleMaster, cycleSource */
-			reg_write(ohci, OHCI1394_LinkControlClear, 0x00700000);
+			reg_write(ohci, OHCI1394_LinkControlClear,
+				  OHCI1394_LinkControl_CycleTimerEnable |
+				  OHCI1394_LinkControl_CycleMaster |
+				  OHCI1394_LinkControl_CycleSource);
 		}
 		break;
 
@@ -2211,14 +2213,12 @@ static void ohci_schedule_iso_tasklets(struct ti_ohci *ohci,
 				       quadlet_t rx_event,
 				       quadlet_t tx_event)
 {
-	struct list_head *lh;
 	struct ohci1394_iso_tasklet *t;
 	unsigned long mask;
 
 	spin_lock(&ohci->iso_tasklet_list_lock);
 
-	list_for_each(lh, &ohci->iso_tasklet_list) {
-		t = list_entry(lh, struct ohci1394_iso_tasklet, link);
+	list_for_each_entry(t, &ohci->iso_tasklet_list, link) {
 		mask = 1 << t->context;
 
 		if (t->type == OHCI_ISO_TRANSMIT && tx_event & mask)
@@ -3085,154 +3085,16 @@ alloc_dma_trm_ctx(struct ti_ohci *ohci, struct dma_trm_ctx *d,
 	return 0;
 }
 
-static u16 ohci_crc16 (u32 *ptr, int length)
+static void ohci_set_hw_config_rom(struct hpsb_host *host, quadlet_t *config_rom)
 {
-	int shift;
-	u32 crc, sum, data;
+	struct ti_ohci *ohci = host->hostdata;
 
-	crc = 0;
-	for (; length > 0; length--) {
-		data = be32_to_cpu(*ptr++);
-		for (shift = 28; shift >= 0; shift -= 4) {
-			sum = ((crc >> 12) ^ (data >> shift)) & 0x000f;
-			crc = (crc << 4) ^ (sum << 12) ^ (sum << 5) ^ sum;
-		}
-		crc &= 0xffff;
-	}
-	return crc;
+	reg_write(ohci, OHCI1394_ConfigROMhdr, be32_to_cpu(config_rom[0]));
+	reg_write(ohci, OHCI1394_BusOptions, be32_to_cpu(config_rom[2]));
+
+	memcpy(ohci->csr_config_rom_cpu, config_rom, OHCI_CONFIG_ROM_LEN);
 }
 
-/* Config ROM macro implementation influenced by NetBSD OHCI driver */
-
-struct config_rom_unit {
-	u32 *start;
-	u32 *refer;
-	int length;
-	int refunit;
-};
-
-struct config_rom_ptr {
-	u32 *data;
-	int unitnum;
-	struct config_rom_unit unitdir[10];
-};
-
-#define cf_put_1quad(cr, q) (((cr)->data++)[0] = cpu_to_be32(q))
-
-#define cf_put_4bytes(cr, b1, b2, b3, b4) \
-	(((cr)->data++)[0] = cpu_to_be32(((b1) << 24) | ((b2) << 16) | ((b3) << 8) | (b4)))
-
-#define cf_put_keyval(cr, key, val) (((cr)->data++)[0] = cpu_to_be32(((key) << 24) | (val)))
-
-static inline void cf_put_str(struct config_rom_ptr *cr, const char *str)
-{
-	int t;
-	char fourb[4];
-
-	while (str[0]) {
-		memset(fourb, 0, 4);
-		for (t = 0; t < 4 && str[t]; t++)
-			fourb[t] = str[t];
-		cf_put_4bytes(cr, fourb[0], fourb[1], fourb[2], fourb[3]);
-		str += strlen(str) < 4 ? strlen(str) : 4;
-	}
-	return;
-}
-
-static inline void cf_put_crc16(struct config_rom_ptr *cr, int unit)
-{
-	*cr->unitdir[unit].start =
-		cpu_to_be32((cr->unitdir[unit].length << 16) |
-			    ohci_crc16(cr->unitdir[unit].start + 1,
-				       cr->unitdir[unit].length));
-}
-
-static inline void cf_unit_begin(struct config_rom_ptr *cr, int unit)
-{
-	if (cr->unitdir[unit].refer != NULL) {
-		*cr->unitdir[unit].refer |=
-			cpu_to_be32 (cr->data - cr->unitdir[unit].refer);
-		cf_put_crc16(cr, cr->unitdir[unit].refunit);
-	}
-	cr->unitnum = unit;
-	cr->unitdir[unit].start = cr->data++;
-}
-
-static inline void cf_put_refer(struct config_rom_ptr *cr, char key, int unit)
-{
-	cr->unitdir[unit].refer = cr->data;
-	cr->unitdir[unit].refunit = cr->unitnum;
-	(cr->data++)[0] = cpu_to_be32(key << 24);
-}
-
-static inline void cf_unit_end(struct config_rom_ptr *cr)
-{
-	cr->unitdir[cr->unitnum].length = cr->data -
-		(cr->unitdir[cr->unitnum].start + 1);
-	cf_put_crc16(cr, cr->unitnum);
-}
-
-/* End of NetBSD derived code.  */
-
-static void ohci_init_config_rom(struct ti_ohci *ohci)
-{
-	struct config_rom_ptr cr;
-
-	memset(&cr, 0, sizeof(cr));
-	memset(ohci->csr_config_rom_cpu, 0, OHCI_CONFIG_ROM_LEN);
-
-	cr.data = ohci->csr_config_rom_cpu;
-
-	/* Bus info block */
-	cf_unit_begin(&cr, 0);
-	cf_put_1quad(&cr, reg_read(ohci, OHCI1394_BusID));
-	cf_put_1quad(&cr, reg_read(ohci, OHCI1394_BusOptions));
-	cf_put_1quad(&cr, reg_read(ohci, OHCI1394_GUIDHi));
-	cf_put_1quad(&cr, reg_read(ohci, OHCI1394_GUIDLo));
-	cf_unit_end(&cr);
-
-	DBGMSG(ohci->id, "GUID: %08x:%08x", reg_read(ohci, OHCI1394_GUIDHi),
-		reg_read(ohci, OHCI1394_GUIDLo));
-
-	/* IEEE P1212 suggests the initial ROM header CRC should only
-	 * cover the header itself (and not the entire ROM). Since we do
-	 * this, then we can make our bus_info_len the same as the CRC
-	 * length.  */
-	ohci->csr_config_rom_cpu[0] |= cpu_to_be32(
-		(be32_to_cpu(ohci->csr_config_rom_cpu[0]) & 0x00ff0000) << 8);
-	reg_write(ohci, OHCI1394_ConfigROMhdr,
-		  be32_to_cpu(ohci->csr_config_rom_cpu[0]));
-
-	/* Root directory */
-	cf_unit_begin(&cr, 1);
-	/* Vendor ID */
-	cf_put_keyval(&cr, 0x03, reg_read(ohci,OHCI1394_VendorID) & 0xFFFFFF);
-	cf_put_refer(&cr, 0x81, 2);		/* Textual description unit */
-	cf_put_keyval(&cr, 0x0c, 0x0083c0);	/* Node capabilities */
-	/* NOTE: Add other unit referers here, and append at bottom */
-	cf_unit_end(&cr);
-
-	/* Textual description - "Linux 1394" */
-	cf_unit_begin(&cr, 2);
-	cf_put_keyval(&cr, 0, 0);
-	cf_put_1quad(&cr, 0);
-	cf_put_str(&cr, "Linux OHCI-1394");
-	cf_unit_end(&cr);
-
-	ohci->csr_config_rom_length = cr.data - ohci->csr_config_rom_cpu;
-}
-
-static size_t ohci_get_rom(struct hpsb_host *host, quadlet_t **ptr)
-{
-	struct ti_ohci *ohci=host->hostdata;
-
-	DBGMSG(ohci->id, "request csr_rom address: %p",
-		ohci->csr_config_rom_cpu);
-
-	*ptr = ohci->csr_config_rom_cpu;
-
-	return ohci->csr_config_rom_length * 4;
-}
 
 static quadlet_t ohci_hw_csr_reg(struct hpsb_host *host, int reg,
                                  quadlet_t data, quadlet_t compare)
@@ -3257,7 +3119,7 @@ static quadlet_t ohci_hw_csr_reg(struct hpsb_host *host, int reg,
 static struct hpsb_host_driver ohci1394_driver = {
 	.owner =		THIS_MODULE,
 	.name =			OHCI1394_DRIVER_NAME,
-	.get_rom =		ohci_get_rom,
+	.set_hw_config_rom =	ohci_set_hw_config_rom,
 	.transmit_packet =	ohci_transmit,
 	.devctl =		ohci_devctl,
 	.isoctl =               ohci_isoctl,
@@ -3280,6 +3142,11 @@ do {						\
 static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 					const struct pci_device_id *ent)
 {
+	struct csr1212_keyval *root;
+	struct csr1212_keyval *vend_id = NULL;
+	struct csr1212_keyval *text = NULL;
+	int ret;
+
 	static int version_printed = 0;
 
 	struct hpsb_host *host;
@@ -3422,6 +3289,11 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	 * will lock up the machine.  Wait 50msec to make sure we have
 	 * full link enabled.  */
 	reg_write(ohci, OHCI1394_HCControlSet, OHCI1394_HCControl_LPS);
+
+	/* Disable and clear interrupts */
+	reg_write(ohci, OHCI1394_IntEventClear, 0xffffffff);
+	reg_write(ohci, OHCI1394_IntMaskClear, 0xffffffff);
+
 	mdelay(50);
 
 	/* Determine the number of available IR and IT contexts. */
@@ -3457,6 +3329,45 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 
 	ohci->init_state = OHCI_INIT_HAVE_IRQ;
 	ohci_initialize(ohci);
+
+	/* Setup initial root directory entries */
+	root = host->csr.rom->root_kv;
+
+	vend_id = csr1212_new_immediate(CSR1212_KV_ID_VENDOR,
+					reg_read(ohci, OHCI1394_GUIDHi) >> 8);
+	text = csr1212_new_string_descriptor_leaf("Linux 1394 - OHCI");
+
+	if (!vend_id || !text) {
+		if (vend_id) {
+			csr1212_release_keyval(vend_id);
+		}
+		if (text) {
+			csr1212_release_keyval(text);
+		}
+		FAIL(-ENOMEM, "Failed to allocate memory for mandatory ConfigROM entries!");
+	}
+
+	ret = csr1212_associate_keyval(vend_id, text);
+	csr1212_release_keyval(text);
+	if(ret != CSR1212_SUCCESS) {
+		csr1212_release_keyval(vend_id);
+		FAIL(ret, "Failed to associate text descriptor to vendor id");
+	}
+
+	ret = csr1212_attach_keyval_to_directory(root, vend_id);
+	if(ret != CSR1212_SUCCESS) {
+		csr1212_release_keyval(vend_id);
+		FAIL(ret, "Failed to attach vendor id to root directory");
+	}
+
+	host->update_config_rom = 1;
+
+	/* Set certain csr values */
+	host->csr.guid_hi = reg_read(ohci, OHCI1394_GUIDHi);
+	host->csr.guid_lo = reg_read(ohci, OHCI1394_GUIDLo);
+	host->csr.cyc_clk_acc = 100;  /* how do we determine clk accuracy? */
+	host->csr.max_rec = (reg_read(ohci, OHCI1394_BusOptions) >> 12) & 0xf;
+	host->csr.lnk_spd = reg_read(ohci, OHCI1394_BusOptions) & 0x7;
 
 	/* Tell the highlevel this host is ready */
 	hpsb_add_host(host);
@@ -3574,13 +3485,40 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 }
 
 
-#ifdef  CONFIG_PM
-static int ohci1394_pci_resume (struct pci_dev *dev)
+static int ohci1394_pci_resume (struct pci_dev *pdev)
 {
-	pci_enable_device(dev);
+#ifdef CONFIG_PMAC_PBOOK
+	{
+		struct device_node *of_node;
+
+		/* Re-enable 1394 */
+		of_node = pci_device_to_OF_node (pdev);
+		if (of_node)
+			pmac_call_feature (PMAC_FTR_1394_ENABLE, of_node, 0, 1);
+	}
+#endif
+
+	pci_enable_device(pdev);
+
 	return 0;
 }
+
+
+static int ohci1394_pci_suspend (struct pci_dev *pdev, u32 state)
+{
+#ifdef CONFIG_PMAC_PBOOK
+	{
+		struct device_node *of_node;
+
+		/* Disable 1394 */
+		of_node = pci_device_to_OF_node (pdev);
+		if (of_node)
+			pmac_call_feature(PMAC_FTR_1394_ENABLE, of_node, 0, 0);
+	}
 #endif
+
+	return 0;
+}
 
 
 #define PCI_CLASS_FIREWIRE_OHCI     ((PCI_CLASS_SERIAL_FIREWIRE << 8) | 0x10)
@@ -3604,10 +3542,8 @@ static struct pci_driver ohci1394_pci_driver = {
 	.id_table =	ohci1394_pci_tbl,
 	.probe =	ohci1394_pci_probe,
 	.remove =	ohci1394_pci_remove,
-
-#ifdef  CONFIG_PM
 	.resume =	ohci1394_pci_resume,
-#endif  /* PM */
+	.suspend =	ohci1394_pci_suspend,
 };
 
 

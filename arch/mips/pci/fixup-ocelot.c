@@ -13,12 +13,11 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
-#include <linux/version.h>
 #include <linux/init.h>
 #include <asm/pci.h>
 
 
-void __devinit gt64120_board_pcibios_fixup_bus(struct pci_bus *bus)
+void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 {
 	struct pci_bus *current_bus = bus;
 	struct pci_dev *devices;
@@ -38,8 +37,7 @@ void __devinit gt64120_board_pcibios_fixup_bus(struct pci_bus *bus)
 			 */
 			if ((devices->vendor != 0x8086) ||
 			    (devices->device != 0x1209)) {
-				panic
-				    ("gt64120_board_pcibios_fixup_bus: found "
+				panic("pcibios_fixup_bus: found "
 				     "unexpected PCI device in slot 1.");
 			}
 			devices->irq = 2;	/* irq_nr is 2 for INT0 */

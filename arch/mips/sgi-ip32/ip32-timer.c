@@ -16,18 +16,18 @@
 #include <linux/string.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
-#include <linux/mc146818rtc.h>
 #include <linux/timex.h>
 
 #include <asm/mipsregs.h>
 #include <asm/param.h>
-#include <asm/ip32/crime.h>
-#include <asm/ip32/ip32_ints.h>
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>
-#include <asm/mipsregs.h>
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/ip32/crime.h>
+#include <asm/ip32/ip32_ints.h>
+
+#include <linux/mc146818rtc.h>
 
 extern volatile unsigned long wall_jiffies;
 
@@ -47,23 +47,25 @@ static unsigned int timerhi, timerlo;
 
 static irqreturn_t cc_timer_interrupt(int irq, void *dev_id, struct pt_regs * regs);
 
+static inline uint64_t crime_time(void)
+{
+	return crime_read(CRIME_TIMER) & CRIME_TIMER_MASK;
+}
+
 void __init ip32_timer_setup (struct irqaction *irq)
 {
-	u64 crime_time;
-	u32 cc_tick;
-
+	uint64_t time;
+	unsigned int cc_tick;
 
 	write_c0_count(0);
 	irq->handler = cc_timer_interrupt;
 
 	printk("Calibrating system timer... ");
 
-	crime_time = crime_read_64(CRIME_TIME) & CRIME_TIME_MASK;
+	time = crime_time();
 	cc_tick = read_c0_count();
 
-	while ((crime_read_64 (CRIME_TIME) & CRIME_TIME_MASK) - crime_time
-		< WAIT_MS * 1000000 / CRIME_NS_PER_TICK)
-		;
+	while (crime_time() - time < WAIT_MS * 1000000 / CRIME_NS_PER_TICK) ;
 	cc_tick = read_c0_count() - cc_tick;
 	cc_interval = cc_tick / HZ * (1000 / WAIT_MS);
 	/*
@@ -75,7 +77,7 @@ void __init ip32_timer_setup (struct irqaction *irq)
 
 	printk("%d MHz CPU detected\n", (int) (cc_interval / PER_MHZ));
 
-	setup_irq (CLOCK_IRQ, irq);
+	setup_irq(CLOCK_IRQ, irq);
 #define ALLINTS (IE_IRQ0 | IE_IRQ1 | IE_IRQ2 | IE_IRQ3 | IE_IRQ4 | IE_IRQ5)
 	/* Set ourselves up for future interrupts */
 	write_c0_compare(read_c0_count() + cc_interval);
@@ -85,7 +87,7 @@ void __init ip32_timer_setup (struct irqaction *irq)
 
 static irqreturn_t cc_timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
-	u32 count;
+	unsigned int count;
 
 	/*
 	 * The cycle counter is only 32 bit which is good for about

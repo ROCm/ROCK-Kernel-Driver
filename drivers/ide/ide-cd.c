@@ -3517,7 +3517,7 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 		printk("%s: Can't allocate a cdrom structure\n", drive->name);
 		goto failed;
 	}
-	if (ide_register_subdriver(drive, &ide_cdrom_driver, IDE_SUBDRIVER_VERSION)) {
+	if (ide_register_subdriver(drive, &ide_cdrom_driver)) {
 		printk("%s: Failed to register the driver with ide.c\n",
 			drive->name);
 		kfree(info);

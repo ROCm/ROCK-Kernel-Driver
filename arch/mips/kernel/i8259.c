@@ -31,7 +31,7 @@ void disable_8259A_irq(unsigned int irq);
  * moves to arch independent land
  */
 
-static spinlock_t i8259A_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t i8259A_lock = SPIN_LOCK_UNLOCKED;
 
 static void end_8259A_irq (unsigned int irq)
 {
@@ -289,11 +289,6 @@ void __init init_8259A(int auto_eoi)
 	outb(cached_A1, 0xA1);	/* restore slave IRQ mask */
 
 	spin_unlock_irqrestore(&i8259A_lock, flags);
-}
-
-asmlinkage void i8259_do_irq(int irq, struct pt_regs regs)
-{
-	panic("i8259_do_irq: I want to be implemented");
 }
 
 /*

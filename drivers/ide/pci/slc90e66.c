@@ -319,7 +319,7 @@ static unsigned int __init init_chipset_slc90e66 (struct pci_dev *dev, const cha
 	if (!slc90e66_proc) {
 		slc90e66_proc = 1;
 		bmide_dev = dev;
-		ide_pci_register_host_proc(&slc90e66_procs[0]);
+		ide_pci_create_host_proc("slc90e66", slc90e66_get_info);
 	}
 #endif /* DISPLAY_SLC90E66_TIMINGS && CONFIG_PROC_FS */
 	return 0;

@@ -58,6 +58,6 @@ extern void prom_printf(char *fmt, ...);
 
 #endif
 
-#define IO_SPACE_BASE KSEG1
+#define IOADDR(a) (UNCAC_BASE + (a))
 
 #endif

@@ -7,17 +7,19 @@
  */
 
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 
-#include <asm/addrspace.h>
+#include <asm/io.h>
 #include <asm/bootinfo.h>
-#include <asm/ptrace.h>
 #include <asm/sgialib.h>
 #include <asm/sgi/mc.h>
 #include <asm/sgi/hpc3.h>
 #include <asm/sgi/ip22.h>
 
 struct sgimc_regs *sgimc;
+
+EXPORT_SYMBOL(sgimc);
 
 static inline unsigned long get_bank_addr(unsigned int memconfig)
 {
@@ -106,7 +108,9 @@ void __init sgimc_init(void)
 {
 	u32 tmp;
 
-	sgimc = (struct sgimc_regs *)(KSEG1 + SGIMC_BASE);
+	/* ioremap can't fail */
+	sgimc = (struct sgimc_regs *)
+		ioremap(SGIMC_BASE, sizeof(struct sgimc_regs));
 
 	printk(KERN_INFO "MC: SGI memory controller Revision %d\n",
 	       (int) sgimc->systemid & SGIMC_SYSID_MASKREV);
@@ -198,4 +202,7 @@ void __init sgimc_init(void)
 }
 
 void __init prom_meminit(void) {}
-void __init prom_free_prom_memory (void) {}
+unsigned long __init prom_free_prom_memory(void)
+{
+	return 0;
+}

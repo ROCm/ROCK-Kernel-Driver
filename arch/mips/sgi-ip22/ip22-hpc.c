@@ -6,15 +6,22 @@
  */
 
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/types.h>
 
-#include <asm/addrspace.h>
+#include <asm/io.h>
 #include <asm/sgi/hpc3.h>
 #include <asm/sgi/ioc.h>
 #include <asm/sgi/ip22.h>
 
 struct hpc3_regs *hpc3c0, *hpc3c1;
+
+EXPORT_SYMBOL(hpc3c0);
+EXPORT_SYMBOL(hpc3c1);
+
 struct sgioc_regs *sgioc;
+
+EXPORT_SYMBOL(sgioc);
 
 /* We need software copies of these because they are write only. */
 u8 sgi_ioc_reset, sgi_ioc_write;
@@ -23,8 +30,11 @@ extern char *system_type;
 
 void __init sgihpc_init(void)
 {
-	hpc3c0 = (struct hpc3_regs *)(KSEG1 + HPC3_CHIP0_BASE);
-	hpc3c1 = (struct hpc3_regs *)(KSEG1 + HPC3_CHIP1_BASE);
+	/* ioremap can't fail */
+	hpc3c0 = (struct hpc3_regs *)
+		 ioremap(HPC3_CHIP0_BASE, sizeof(struct hpc3_regs));
+	hpc3c1 = (struct hpc3_regs *)
+		 ioremap(HPC3_CHIP1_BASE, sizeof(struct hpc3_regs));
 	/* IOC lives in PBUS PIO channel 6 */
 	sgioc = (struct sgioc_regs *)hpc3c0->pbus_extregs[6];
 

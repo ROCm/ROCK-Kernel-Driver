@@ -162,7 +162,6 @@ int smbiod_retry(struct smb_sb_info *server)
 		req = list_entry(head, struct smb_request, rq_queue);
 		head = head->next;
 
-		WSET(req->rq_header, smb_uid, -1);
 		req->rq_bytes_sent = 0;
 		if (req->rq_flags & SMB_REQ_NORETRY) {
 			VERBOSE("aborting request %p on xmitq\n", req);

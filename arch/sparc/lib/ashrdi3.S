@@ -5,12 +5,10 @@
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
  */
 
-#include <asm/cprefix.h>
-
 	.text
 	.align	4
-	.globl C_LABEL(__ashrdi3)
-C_LABEL(__ashrdi3):
+	.globl __ashrdi3
+__ashrdi3:
 	tst	%o2
 	be	3f
 	 or	%g0, 32, %g2

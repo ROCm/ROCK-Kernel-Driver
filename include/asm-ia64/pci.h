@@ -97,6 +97,8 @@ struct pci_controller {
 
 	unsigned int windows;
 	struct pci_window *window;
+
+	void *platform_data;
 };
 
 #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)

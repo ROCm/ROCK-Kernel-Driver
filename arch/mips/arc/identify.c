@@ -63,7 +63,7 @@ static struct smatch mach_table[] = {
 		"SNI RM200_PCI",
 		MACH_GROUP_SNI_RM,
 		MACH_SNI_RM200_PCI,
-		0
+		PROM_FLAG_DONT_FREE_TEMP
 	}
 };
 

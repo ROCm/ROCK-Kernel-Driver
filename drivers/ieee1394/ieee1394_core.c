@@ -515,9 +515,9 @@ int hpsb_send_packet(struct hpsb_packet *packet)
         if (packet->node_id == host->node_id)
         { /* it is a local request, so handle it locally */
                 quadlet_t *data;
-                size_t size=packet->data_size+packet->header_size;
+                size_t size = packet->data_size + packet->header_size;
 
-                data = kmalloc(packet->header_size + packet->data_size, GFP_ATOMIC);
+                data = kmalloc(size, GFP_ATOMIC);
                 if (!data) {
                         HPSB_ERR("unable to allocate memory for concatenating header and data");
                         return -ENOMEM;
@@ -526,12 +526,12 @@ int hpsb_send_packet(struct hpsb_packet *packet)
                 memcpy(data, packet->header, packet->header_size);
 
                 if (packet->data_size)
-			memcpy(((u8*)data)+packet->header_size, packet->data, packet->data_size);
+			memcpy(((u8*)data) + packet->header_size, packet->data, packet->data_size);
 
                 dump_packet("send packet local:", packet->header,
                             packet->header_size);
 
-                hpsb_packet_sent(host, packet,  packet->expect_response?ACK_PENDING:ACK_COMPLETE);
+                hpsb_packet_sent(host, packet, packet->expect_response ? ACK_PENDING : ACK_COMPLETE);
                 hpsb_packet_received(host, data, size, 0);
 
                 kfree(data);
@@ -935,8 +935,7 @@ void hpsb_packet_received(struct hpsb_host *host, quadlet_t *data, size_t size,
 void abort_requests(struct hpsb_host *host)
 {
         unsigned long flags;
-        struct hpsb_packet *packet;
-        struct list_head *lh, *tlh;
+        struct hpsb_packet *packet, *packet_next;
         LIST_HEAD(llist);
 
         host->driver->devctl(host, CANCEL_REQUESTS, 0);
@@ -946,8 +945,7 @@ void abort_requests(struct hpsb_host *host)
         INIT_LIST_HEAD(&host->pending_packets);
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
-        list_for_each_safe(lh, tlh, &llist) {
-                packet = list_entry(lh, struct hpsb_packet, list);
+        list_for_each_entry_safe(packet, packet_next, &llist, list) {
                 list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_ABORTED;
@@ -959,9 +957,8 @@ void abort_timedouts(unsigned long __opaque)
 {
 	struct hpsb_host *host = (struct hpsb_host *)__opaque;
         unsigned long flags;
-        struct hpsb_packet *packet;
+        struct hpsb_packet *packet, *packet_next;
         unsigned long expire;
-        struct list_head *lh, *tlh;
         LIST_HEAD(expiredlist);
 
         spin_lock_irqsave(&host->csr.lock, flags);
@@ -970,8 +967,7 @@ void abort_timedouts(unsigned long __opaque)
 
         spin_lock_irqsave(&host->pending_pkt_lock, flags);
 
-	list_for_each_safe(lh, tlh, &host->pending_packets) {
-                packet = list_entry(lh, struct hpsb_packet, list);
+	list_for_each_entry_safe(packet, packet_next, &host->pending_packets, list) {
                 if (time_before(packet->sendtime + expire, jiffies)) {
                         list_del(&packet->list);
                         list_add(&packet->list, &expiredlist);
@@ -983,8 +979,7 @@ void abort_timedouts(unsigned long __opaque)
 
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
-        list_for_each_safe(lh, tlh, &expiredlist) {
-                packet = list_entry(lh, struct hpsb_packet, list);
+        list_for_each_entry_safe(packet, packet_next, &expiredlist, list) {
                 list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_TIMEOUT;
@@ -995,6 +990,8 @@ void abort_timedouts(unsigned long __opaque)
 
 static int __init ieee1394_init(void)
 {
+	int i;
+
 	devfs_mk_dir("ieee1394");
 
 	if (register_chrdev_region(IEEE1394_CORE_DEV, 256, "ieee1394")) {
@@ -1008,8 +1005,12 @@ static int __init ieee1394_init(void)
 					      0, 0, NULL, NULL);
 
 	bus_register(&ieee1394_bus_type);
+	for (i = 0; fw_bus_attrs[i]; i++)
+		bus_create_file(&ieee1394_bus_type, fw_bus_attrs[i]);
+	class_register(&hpsb_host_class);
 
-	init_csr();
+	if (init_csr())
+		return -ENOMEM;
 
 	if (!disable_nodemgr)
 		init_ieee1394_nodemgr();
@@ -1021,11 +1022,16 @@ static int __init ieee1394_init(void)
 
 static void __exit ieee1394_cleanup(void)
 {
+	int i;
+
 	if (!disable_nodemgr)
 		cleanup_ieee1394_nodemgr();
 
 	cleanup_csr();
 
+	class_unregister(&hpsb_host_class);
+	for (i = 0; fw_bus_attrs[i]; i++)
+		bus_remove_file(&ieee1394_bus_type, fw_bus_attrs[i]);
 	bus_unregister(&ieee1394_bus_type);
 
 	kmem_cache_destroy(hpsb_packet_cache);
@@ -1043,6 +1049,7 @@ module_exit(ieee1394_cleanup);
 EXPORT_SYMBOL(hpsb_alloc_host);
 EXPORT_SYMBOL(hpsb_add_host);
 EXPORT_SYMBOL(hpsb_remove_host);
+EXPORT_SYMBOL(hpsb_update_config_rom_image);
 
 /** ieee1394_core.c **/
 EXPORT_SYMBOL(hpsb_speedto_str);
@@ -1081,6 +1088,7 @@ EXPORT_SYMBOL(hpsb_register_highlevel);
 EXPORT_SYMBOL(hpsb_unregister_highlevel);
 EXPORT_SYMBOL(hpsb_register_addrspace);
 EXPORT_SYMBOL(hpsb_unregister_addrspace);
+EXPORT_SYMBOL(hpsb_allocate_and_register_addrspace);
 EXPORT_SYMBOL(hpsb_listen_channel);
 EXPORT_SYMBOL(hpsb_unlisten_channel);
 EXPORT_SYMBOL(hpsb_get_hostinfo);
@@ -1113,7 +1121,6 @@ EXPORT_SYMBOL(nodemgr_for_each_host);
 
 /** csr.c **/
 EXPORT_SYMBOL(hpsb_update_config_rom);
-EXPORT_SYMBOL(hpsb_get_config_rom);
 
 /** dma.c **/
 EXPORT_SYMBOL(dma_prog_region_init);
@@ -1144,3 +1151,34 @@ EXPORT_SYMBOL(hpsb_iso_packet_sent);
 EXPORT_SYMBOL(hpsb_iso_packet_received);
 EXPORT_SYMBOL(hpsb_iso_wake);
 EXPORT_SYMBOL(hpsb_iso_recv_flush);
+
+/** csr1212.c **/
+EXPORT_SYMBOL(csr1212_create_csr);
+EXPORT_SYMBOL(csr1212_init_local_csr);
+EXPORT_SYMBOL(csr1212_new_immediate);
+EXPORT_SYMBOL(csr1212_new_leaf);
+EXPORT_SYMBOL(csr1212_new_csr_offset);
+EXPORT_SYMBOL(csr1212_new_directory);
+EXPORT_SYMBOL(csr1212_associate_keyval);
+EXPORT_SYMBOL(csr1212_attach_keyval_to_directory);
+EXPORT_SYMBOL(csr1212_new_extended_immediate);
+EXPORT_SYMBOL(csr1212_new_extended_leaf);
+EXPORT_SYMBOL(csr1212_new_descriptor_leaf);
+EXPORT_SYMBOL(csr1212_new_textual_descriptor_leaf);
+EXPORT_SYMBOL(csr1212_new_string_descriptor_leaf);
+EXPORT_SYMBOL(csr1212_new_icon_descriptor_leaf);
+EXPORT_SYMBOL(csr1212_new_modifiable_descriptor_leaf);
+EXPORT_SYMBOL(csr1212_new_keyword_leaf);
+EXPORT_SYMBOL(csr1212_detach_keyval_from_directory);
+EXPORT_SYMBOL(csr1212_disassociate_keyval);
+EXPORT_SYMBOL(csr1212_release_keyval);
+EXPORT_SYMBOL(csr1212_destroy_csr);
+EXPORT_SYMBOL(csr1212_read);
+EXPORT_SYMBOL(csr1212_generate_positions);
+EXPORT_SYMBOL(csr1212_generate_layout_order);
+EXPORT_SYMBOL(csr1212_fill_cache);
+EXPORT_SYMBOL(csr1212_generate_csr_image);
+EXPORT_SYMBOL(csr1212_parse_keyval);
+EXPORT_SYMBOL(csr1212_parse_csr);
+EXPORT_SYMBOL(_csr1212_read_keyval);
+EXPORT_SYMBOL(_csr1212_destroy_keyval);

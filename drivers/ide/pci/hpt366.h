@@ -416,24 +416,6 @@ struct chipset_bus_clock_list_entry sixty_six_base_hpt374[] = {
 #define F_LOW_PCI_50      0x2d
 #define F_LOW_PCI_66      0x42
 
-#if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 hpt366_proc;
-
-static int hpt366_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t hpt366_procs[] = {
-	{
-		.name		= "hpt366",
-		.set		= 1,
-		.get_info	= hpt366_get_info,
-		.parent		= NULL,
-	},
-};
-#endif  /* defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 static void init_setup_hpt366(struct pci_dev *, ide_pci_device_t *);
 static void init_setup_hpt37x(struct pci_dev *, ide_pci_device_t *);
 static void init_setup_hpt374(struct pci_dev *, ide_pci_device_t *);

@@ -6,7 +6,9 @@
  * Copyright (C) 1994 - 1999, 2000 by Ralf Baechle and others.
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  */
+#include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -246,7 +248,8 @@ static int __init get_frame_info(struct mips_frame_info *info, void *func)
 
 	return 0;
 }
-void __init frame_info_init(void)
+
+static int __init frame_info_init(void)
 {
 	mips_frame_info_initialized =
 		!get_frame_info(&schedule_frame, schedule) &&
@@ -254,7 +257,11 @@ void __init frame_info_init(void)
 		!get_frame_info(&sleep_on_frame, sleep_on) &&
 		!get_frame_info(&sleep_on_timeout_frame, sleep_on_timeout) &&
 		!get_frame_info(&wait_for_completion_frame, wait_for_completion);
+
+	return 0;
 }
+
+arch_initcall(frame_info_init);
 
 /*
  * Return saved PC of a blocked thread.
@@ -341,3 +348,5 @@ out:
 
 	return pc;
 }
+
+EXPORT_SYMBOL(get_wchan);

@@ -4,9 +4,9 @@
 
 
 struct hpsb_address_serve {
-        struct list_head as_list; /* global list */
+        struct list_head host_list; /* per host list */
         
-        struct list_head addr_list; /* hpsb_highlevel list */
+        struct list_head hl_list; /* hpsb_highlevel list */
 
         struct hpsb_address_ops *op;
 
@@ -140,6 +140,11 @@ void hpsb_unregister_highlevel(struct hpsb_highlevel *hl);
  * It returns true for successful allocation.  There is no unregister function,
  * all address spaces are deallocated together with the hpsb_highlevel.
  */
+u64 hpsb_allocate_and_register_addrspace(struct hpsb_highlevel *hl,
+					 struct hpsb_host *host,
+					 struct hpsb_address_ops *ops,
+					 u64 size, u64 alignment,
+					 u64 start, u64 end);
 int hpsb_register_addrspace(struct hpsb_highlevel *hl, struct hpsb_host *host,
                             struct hpsb_address_ops *ops, u64 start, u64 end);
 

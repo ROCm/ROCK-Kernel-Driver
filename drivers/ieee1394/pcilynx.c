@@ -49,6 +49,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
+#include "csr1212.h"
 #include "ieee1394.h"
 #include "ieee1394_types.h"
 #include "hosts.h"
@@ -1515,6 +1516,11 @@ static int __devinit add_card(struct pci_dev *dev,
         return error; \
         } while (0)
 
+	struct csr1212_keyval *root;
+	struct csr1212_keyval *vend_id = NULL;
+	struct csr1212_keyval *text = NULL;
+	int ret;
+
 	char irq_buf[16];
 	struct hpsb_host *host;
         struct ti_lynx *lynx; /* shortcut to currently handled device */
@@ -1526,8 +1532,6 @@ static int __devinit add_card(struct pci_dev *dev,
         /* needed for i2c communication with serial eeprom */
         struct i2c_adapter i2c_adapter;
         struct i2c_algo_bit_data i2c_adapter_data;
-
-        int got_valid_bus_info_block = 0; /* set to 1, if we were able to get a valid bus info block from serial eeprom */
 
         error = -ENXIO;
 
@@ -1814,14 +1818,15 @@ static int __devinit add_card(struct pci_dev *dev,
 
         	if (i2c_bit_add_bus(&i2c_adapter) < 0)
         	{
-	        	PRINT(KERN_ERR, lynx->id,  "unable to register i2c");
+			error = -ENXIO;
+			FAIL("unable to register i2c");
         	}
         	else
         	{
                         /* do i2c stuff */
                         unsigned char i2c_cmd = 0x10;
                         struct i2c_msg msg[2] = { { 0x50, 0, 1, &i2c_cmd }, 
-                                                  { 0x50, I2C_M_RD, 20, (unsigned char*) lynx->config_rom }
+                                                  { 0x50, I2C_M_RD, 20, (unsigned char*) lynx->bus_info_block }
                                                 };
 
 
@@ -1858,16 +1863,16 @@ static int __devinit add_card(struct pci_dev *dev,
 
                                 for (i = 0; i < 5 ; i++)
                                         PRINTD(KERN_DEBUG, lynx->id, "Businfo block quadlet %i: %08x",
-					       i, be32_to_cpu(lynx->config_rom[i]));
+					       i, be32_to_cpu(lynx->bus_info_block[i]));
 
                                 /* info_length, crc_length and 1394 magic number to check, if it is really a bus info block */
-                                if (((be32_to_cpu(lynx->config_rom[0]) & 0xffff0000) == 0x04040000) &&
-                                    (lynx->config_rom[1] == __constant_cpu_to_be32(0x31333934)))
+				if (((be32_to_cpu(lynx->bus_info_block[0]) & 0xffff0000) == 0x04040000) &&
+				    (lynx->bus_info_block[1] == __constant_cpu_to_be32(0x31333934)))
                                 {
                                         PRINT(KERN_DEBUG, lynx->id, "read a valid bus info block from");
-                                        got_valid_bus_info_block = 1;
                                 } else {
-                                        PRINT(KERN_WARNING, lynx->id, "read something from serial eeprom, but it does not seem to be a valid bus info block");
+					error = -ENXIO;
+					FAIL("read something from serial eeprom, but it does not seem to be a valid bus info block");
                                 }
 
                         }
@@ -1876,28 +1881,54 @@ static int __devinit add_card(struct pci_dev *dev,
                 }
         }
 
-        if (got_valid_bus_info_block) {
-                memcpy(lynx->config_rom+5,lynx_csr_rom+5,sizeof(lynx_csr_rom)-20);
-        } else {
-                PRINT(KERN_INFO, lynx->id, "since we did not get a bus info block from serial eeprom, we use a generic one with a hard coded GUID");
-                memcpy(lynx->config_rom,lynx_csr_rom,sizeof(lynx_csr_rom));
-        }
+	host->csr.guid_hi = be32_to_cpu(lynx->bus_info_block[3]);
+	host->csr.guid_lo = be32_to_cpu(lynx->bus_info_block[4]);
+	host->csr.cyc_clk_acc = (be32_to_cpu(lynx->bus_info_block[2]) >> 16) & 0xff;
+	host->csr.max_rec = (be32_to_cpu(lynx->bus_info_block[2]) >> 12) & 0xf;
+	if (!lynx->phyic.reg_1394a)
+		host->csr.lnk_spd = (get_phy_reg(lynx, 2) & 0xc0) >> 6;
+	else
+		host->csr.lnk_spd = be32_to_cpu(lynx->bus_info_block[2]) & 0x7;
 
-        hpsb_add_host(host);
-        lynx->state = is_host;
+	/* Setup initial root directory entries */
+	root = host->csr.rom->root_kv;
 
-        return 0;
+	vend_id = csr1212_new_immediate(CSR1212_KV_ID_VENDOR,
+					be32_to_cpu(lynx->bus_info_block[3]) >> 8);
+	text = csr1212_new_string_descriptor_leaf("Linux 1394 - PCI-Lynx");
+
+	if (!vend_id || !text) {
+		if (vend_id)
+			csr1212_release_keyval(vend_id);
+		if (text)
+			csr1212_release_keyval(text);
+		error = -ENOMEM;
+		FAIL("Failed to allocate memory for mandatory ConfigROM entries!");
+	}
+
+	ret = csr1212_associate_keyval(vend_id, text);
+	csr1212_release_keyval(text);		/* no longer needed locally. */
+	if(ret != CSR1212_SUCCESS) {
+		csr1212_release_keyval(vend_id);
+		error = ret;
+		FAIL("Failed to associate text descriptor to vendor id");
+	}
+
+	ret = csr1212_attach_keyval_to_directory(root, vend_id);
+	csr1212_release_keyval(vend_id);	/* no longer needed locally. */
+	if(ret != CSR1212_SUCCESS) {
+		error = ret;
+		FAIL("Failed to attach vendor id to root directory");
+	}
+
+	host->update_config_rom = 1;
+	hpsb_add_host(host);
+	lynx->state = is_host;
+
+	return ret;
 #undef FAIL
 }
 
-
-
-static size_t get_lynx_rom(struct hpsb_host *host, quadlet_t **ptr)
-{
-        struct ti_lynx *lynx = host->hostdata;
-        *ptr = lynx->config_rom;
-        return sizeof(lynx_csr_rom);
-}
 
 static struct pci_device_id pci_table[] = {
 	{
@@ -1919,7 +1950,7 @@ static struct pci_driver lynx_pci_driver = {
 static struct hpsb_host_driver lynx_driver = {
 	.owner =	   THIS_MODULE,
 	.name =		   PCILYNX_DRIVER_NAME,
-        .get_rom =         get_lynx_rom,
+	.set_hw_config_rom = NULL,
         .transmit_packet = lynx_transmit,
         .devctl =          lynx_devctl,
 	.isoctl =          NULL,

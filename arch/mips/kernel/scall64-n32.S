@@ -14,6 +14,7 @@
 #include <asm/mipsregs.h>
 #include <asm/regdef.h>
 #include <asm/stackframe.h>
+#include <asm/thread_info.h>
 #include <asm/unistd.h>
 
 /* This duplicates the definition from <linux/sched.h> */
@@ -67,14 +68,14 @@ FEXPORT(n32_syscall_exit)
 					# signals dont change between
 					# sampling and return
 	LONG_L  a2, TI_FLAGS($28)	# current->work
-	bnez	a2, n32_syscall_exit_work
+	li	t0, _TIF_ALLWORK_MASK
+	and	t0, a2, t0
+	bnez	t0, n32_syscall_exit_work
 
-	RESTORE_SOME
-	RESTORE_SP_AND_RET
+	j	restore_partial
 
 n32_syscall_exit_work:
-	SAVE_STATIC
-	j	syscall_exit_work
+	j	syscall_exit_work_partial
 
 /* ------------------------------------------------------------------------ */
 
@@ -118,7 +119,7 @@ EXPORT(sysn32_call_table)
 	PTR	sys_newlstat
 	PTR	sys_poll
 	PTR	sys_lseek
-	PTR	sys_mmap2
+	PTR	old_mmap
 	PTR	sys_mprotect			/* 6010 */
 	PTR	sys_munmap
 	PTR	sys_brk
@@ -302,10 +303,10 @@ EXPORT(sysn32_call_table)
 	PTR	sys_lremovexattr		/* 6190 */
 	PTR	sys_fremovexattr
 	PTR	sys_tkill
-	PTR	sys_time
+	PTR	sys_ni_syscall
 	PTR	compat_sys_futex
-	PTR	sys32_sched_setaffinity		/* 6195 */
-	PTR	sys32_sched_getaffinity
+	PTR	compat_sys_sched_setaffinity	/* 6195 */
+	PTR	compat_sys_sched_getaffinity
 	PTR	sys_cacheflush
 	PTR	sys_cachectl
 	PTR	sys_sysmips
@@ -325,7 +326,7 @@ EXPORT(sysn32_call_table)
 	PTR	sys_set_tid_address
 	PTR	sys_restart_syscall
 	PTR	sys_semtimedop			/* 6215 */
-	PTR	sys_fadvise64
+	PTR	sys_fadvise64_64
 	PTR	sys_statfs64
 	PTR	sys_fstatfs64
 	PTR	sys_sendfile64

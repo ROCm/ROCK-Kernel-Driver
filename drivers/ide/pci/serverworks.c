@@ -621,7 +621,7 @@ static unsigned int __init init_chipset_svwks (struct pci_dev *dev, const char *
 
 	if (!svwks_proc) {
 		svwks_proc = 1;
-		ide_pci_register_host_proc(&svwks_procs[0]);
+		ide_pci_create_host_proc("svwks", svwks_get_info);
 	}
 #endif /* DISPLAY_SVWKS_TIMINGS && CONFIG_PROC_FS */
 

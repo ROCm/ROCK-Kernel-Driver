@@ -11,7 +11,6 @@
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
-#include <linux/mc146818rtc.h>
 #include <linux/param.h>
 #include <linux/console.h>
 #include <linux/init.h>
@@ -19,12 +18,14 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 
-#include <asm/cpu.h>
 #include <asm/bootinfo.h>
+#include <asm/cpu.h>
+#include <asm/cpu-features.h>
 #include <asm/irq.h>
 #include <asm/irq_cpu.h>
 #include <asm/mipsregs.h>
 #include <asm/reboot.h>
+#include <asm/time.h>
 #include <asm/traps.h>
 #include <asm/wbflush.h>
 
@@ -43,9 +44,14 @@
 extern void dec_machine_restart(char *command);
 extern void dec_machine_halt(void);
 extern void dec_machine_power_off(void);
-extern void dec_intr_halt(int irq, void *dev_id, struct pt_regs *regs);
+extern irqreturn_t dec_intr_halt(int irq, void *dev_id, struct pt_regs *regs);
 
 extern asmlinkage void decstation_handle_int(void);
+
+#ifdef CONFIG_BLK_DEV_INITRD
+extern unsigned long initrd_start, initrd_end;
+extern void * __rd_start, * __rd_end;
+#endif
 
 spinlock_t ioasic_ssr_lock;
 
@@ -105,28 +111,6 @@ static struct irqaction haltirq = {
 };
 
 
-void (*board_time_init)(struct irqaction *irq);
-
-
-/*
- * enable the periodic interrupts
- */
-static void __init dec_time_init(struct irqaction *irq)
-{
-	/*
-	* Here we go, enable periodic rtc interrupts.
-	*/
-
-#ifndef LOG_2_HZ
-#  define LOG_2_HZ 7
-#endif
-
-	CMOS_WRITE(RTC_REF_CLCK_32KHZ | (16 - LOG_2_HZ), RTC_REG_A);
-	CMOS_WRITE(CMOS_READ(RTC_REG_B) | RTC_PIE, RTC_REG_B);
-	setup_irq(dec_interrupt[DEC_IRQ_RTC], irq);
-}
-
-
 /*
  * Bus error (DBE/IBE exceptions and bus interrupts) handling setup.
  */
@@ -147,24 +131,28 @@ void __init dec_be_init(void)
 }
 
 
-void __init decstation_setup(void)
+extern void dec_time_init(void);
+extern void dec_timer_setup(struct irqaction *);
+
+static void __init decstation_setup(void)
 {
+#ifdef CONFIG_BLK_DEV_INITRD
+       ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+       initrd_start = (unsigned long)&__rd_start;
+       initrd_end = (unsigned long)&__rd_end;
+#endif
 	board_be_init = dec_be_init;
 	board_time_init = dec_time_init;
+	board_timer_setup = dec_timer_setup;
 
 	wbflush_setup();
 
 	_machine_restart = dec_machine_restart;
 	_machine_halt = dec_machine_halt;
 	_machine_power_off = dec_machine_power_off;
-
-#ifdef CONFIG_FB
-	conswitchp = &dummy_con;
-#endif
-
-	rtc_ops = &dec_rtc_ops;
 }
 
+early_initcall(decstation_setup);
 
 /*
  * Machine-specific initialisation for KN01, aka DS2100 (aka Pmin)

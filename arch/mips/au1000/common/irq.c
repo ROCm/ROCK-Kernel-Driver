@@ -26,6 +26,7 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  */
+#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/irq.h>
@@ -46,22 +47,9 @@
 #include <asm/io.h>
 #include <asm/mipsregs.h>
 #include <asm/system.h>
-#include <asm/au1000.h>
-
-#if defined(CONFIG_MIPS_PB1000)
-#include <asm/pb1000.h>
-#elif defined(CONFIG_MIPS_PB1500)
-#include <asm/pb1500.h>
-#elif defined(CONFIG_MIPS_PB1100)
-#include <asm/pb1100.h>
-#elif defined(CONFIG_MIPS_DB1000)
-#include <asm/db1x00.h>
-#elif defined(CONFIG_MIPS_DB1100)
-#include <asm/db1x00.h>
-#elif defined(CONFIG_MIPS_DB1500)
-#include <asm/db1x00.h>
-#else
-#error unsupported Alchemy board
+#include <asm/mach-au1x00/au1000.h>
+#ifdef CONFIG_MIPS_PB1000
+#include <asm/mach-pb1x00/pb1000.h>
 #endif
 
 #undef DEBUG_IRQ
@@ -85,8 +73,6 @@ extern void breakpoint(void);
 extern asmlinkage void au1000_IRQ(void);
 extern void set_debug_traps(void);
 extern irq_cpustat_t irq_stat [NR_CPUS];
-unsigned int local_bh_count[NR_CPUS];
-unsigned int local_irq_count[NR_CPUS];
 
 static void setup_local_irq(unsigned int irq, int type, int int_req);
 static unsigned int startup_irq(unsigned int irq);
@@ -94,10 +80,12 @@ static void end_irq(unsigned int irq_nr);
 static inline void mask_and_ack_level_irq(unsigned int irq_nr);
 static inline void mask_and_ack_rise_edge_irq(unsigned int irq_nr);
 static inline void mask_and_ack_fall_edge_irq(unsigned int irq_nr);
+static inline void mask_and_ack_either_edge_irq(unsigned int irq_nr);
 inline void local_enable_irq(unsigned int irq_nr);
 inline void local_disable_irq(unsigned int irq_nr);
 
 extern void __init init_generic_irq(void);
+void	(*board_init_irq)(void);
 
 #ifdef CONFIG_PM
 extern void counter0_irq(int irq, void *dev_id, struct pt_regs *regs);
@@ -120,6 +108,11 @@ static void setup_local_irq(unsigned int irq_nr, int type, int int_req)
 				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
 				au_writel(1<<(irq_nr-32), IC1_CFG1SET);
 				au_writel(1<<(irq_nr-32), IC1_CFG0CLR);
+				break;
+			case INTC_INT_RISE_AND_FALL_EDGE: /* 0:1:1 */
+				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
+				au_writel(1<<(irq_nr-32), IC1_CFG1SET);
+				au_writel(1<<(irq_nr-32), IC1_CFG0SET);
 				break;
 			case INTC_INT_HIGH_LEVEL: /* 1:0:1 */
 				au_writel(1<<(irq_nr-32), IC1_CFG2SET);
@@ -162,6 +155,11 @@ static void setup_local_irq(unsigned int irq_nr, int type, int int_req)
 				au_writel(1<<irq_nr, IC0_CFG2CLR);
 				au_writel(1<<irq_nr, IC0_CFG1SET);
 				au_writel(1<<irq_nr, IC0_CFG0CLR);
+				break;
+			case INTC_INT_RISE_AND_FALL_EDGE: /* 0:1:1 */
+				au_writel(1<<irq_nr, IC0_CFG2CLR);
+				au_writel(1<<irq_nr, IC0_CFG1SET);
+				au_writel(1<<irq_nr, IC0_CFG0SET);
 				break;
 			case INTC_INT_HIGH_LEVEL: /* 1:0:1 */
 				au_writel(1<<irq_nr, IC0_CFG2SET);
@@ -267,6 +265,25 @@ static inline void mask_and_ack_fall_edge_irq(unsigned int irq_nr)
 }
 
 
+static inline void mask_and_ack_either_edge_irq(unsigned int irq_nr)
+{
+	/* This may assume that we don't get interrupts from
+	 * both edges at once, or if we do, that we don't care.
+	 */
+	if (irq_nr > AU1000_LAST_INTC0_INT) {
+		au_writel(1<<(irq_nr-32), IC1_FALLINGCLR);
+		au_writel(1<<(irq_nr-32), IC1_RISINGCLR);
+		au_writel(1<<(irq_nr-32), IC1_MASKCLR);
+	}
+	else {
+		au_writel(1<<irq_nr, IC0_FALLINGCLR);
+		au_writel(1<<irq_nr, IC0_RISINGCLR);
+		au_writel(1<<irq_nr, IC0_MASKCLR);
+	}
+	au_sync();
+}
+
+
 static inline void mask_and_ack_level_irq(unsigned int irq_nr)
 {
 
@@ -352,7 +369,6 @@ static struct hw_interrupt_type rise_edge_irq_type = {
 	NULL
 };
 
-/*
 static struct hw_interrupt_type fall_edge_irq_type = {
 	"Au1000 Fall Edge",
 	startup_irq,
@@ -363,7 +379,17 @@ static struct hw_interrupt_type fall_edge_irq_type = {
 	end_irq,
 	NULL
 };
-*/
+
+static struct hw_interrupt_type either_edge_irq_type = {
+	"Au1000 Rise or Fall Edge",
+	startup_irq,
+	shutdown_irq,
+	local_enable_irq,
+	local_disable_irq,
+	mask_and_ack_either_edge_irq,
+	end_irq,
+	NULL
+};
 
 static struct hw_interrupt_type level_irq_type = {
 	"Au1000 Level",
@@ -388,6 +414,9 @@ void __init init_IRQ(void)
 {
 	int i;
 	unsigned long cp0_status;
+	au1xxx_irq_map_t *imp;
+	extern au1xxx_irq_map_t au1xxx_irq_map[];
+	extern int au1xxx_nr_irqs;
 
 	cp0_status = read_c0_status();
 	memset(irq_desc, 0, sizeof(irq_desc));
@@ -396,109 +425,54 @@ void __init init_IRQ(void)
 	init_generic_irq();
 
 	for (i = 0; i <= AU1000_MAX_INTR; i++) {
-		switch (i) {
-			case AU1000_UART0_INT:
-			case AU1000_UART3_INT:
-#ifdef CONFIG_MIPS_PB1000
-			case AU1000_UART1_INT:
-			case AU1000_UART2_INT:
+		/* default is active high, level interrupt */
+		setup_local_irq(i, INTC_INT_HIGH_LEVEL, 0);
+		irq_desc[i].handler = &level_irq_type;
+	}
 
-			case AU1000_SSI0_INT:
-			case AU1000_SSI1_INT:
-#endif
+	/* Now set up the irq mapping for the board.
+	*/
+	imp = au1xxx_irq_map;
+	for (i=0; i<au1xxx_nr_irqs; i++) {
 
-#ifdef CONFIG_MIPS_PB1100
-			case AU1000_UART1_INT:
+		setup_local_irq(imp->im_irq, imp->im_type, imp->im_request);
 
-			case AU1000_SSI0_INT:
-			case AU1000_SSI1_INT:
-#endif
-		        case AU1000_DMA_INT_BASE:
-		        case AU1000_DMA_INT_BASE+1:
-		        case AU1000_DMA_INT_BASE+2:
-		        case AU1000_DMA_INT_BASE+3:
-		        case AU1000_DMA_INT_BASE+4:
-		        case AU1000_DMA_INT_BASE+5:
-		        case AU1000_DMA_INT_BASE+6:
-		        case AU1000_DMA_INT_BASE+7:
+		switch (imp->im_type) {
 
-			case AU1000_IRDA_TX_INT:
-			case AU1000_IRDA_RX_INT:
+		case INTC_INT_HIGH_LEVEL:
+			irq_desc[imp->im_irq].handler = &level_irq_type;
+			break;
 
-			case AU1000_MAC0_DMA_INT:
-#if defined(CONFIG_MIPS_PB1000) || defined(CONFIG_MIPS_DB1000) || defined(CONFIG_MIPS_PB1500) || defined(CONFIG_MIPS_DB1500)
-			case AU1000_MAC1_DMA_INT:
-#endif
-			case AU1500_GPIO_204:
-				setup_local_irq(i, INTC_INT_HIGH_LEVEL, 0);
-				irq_desc[i].handler = &level_irq_type;
-				break;
+		case INTC_INT_LOW_LEVEL:
+			irq_desc[imp->im_irq].handler = &level_irq_type;
+			break;
 
-#ifdef CONFIG_MIPS_PB1000
-			case AU1000_GPIO_15:
-#endif
-		        case AU1000_USB_HOST_INT:
-#if defined(CONFIG_MIPS_PB1500) || defined(CONFIG_MIPS_DB1500)
-			case AU1000_PCI_INTA:
-			case AU1000_PCI_INTB:
-			case AU1000_PCI_INTC:
-			case AU1000_PCI_INTD:
-			case AU1500_GPIO_201:
-			case AU1500_GPIO_202:
-			case AU1500_GPIO_203:
-			case AU1500_GPIO_205:
-			case AU1500_GPIO_207:
-#endif
+		case INTC_INT_RISE_EDGE:
+			irq_desc[imp->im_irq].handler = &rise_edge_irq_type;
+			break;
 
-#ifdef CONFIG_MIPS_PB1100
-			case AU1000_GPIO_9: // PCMCIA Card Fully_Interted#
-			case AU1000_GPIO_10: // PCMCIA_STSCHG#
-			case AU1000_GPIO_11: // PCMCIA_IRQ#
-			case AU1000_GPIO_13: // DC_IRQ#
-			case AU1000_GPIO_23: // 2-wire SCL
-#endif
-#if defined(CONFIG_MIPS_DB1000) || defined(CONFIG_MIPS_DB1100) || defined(CONFIG_MIPS_DB1500)
-			case AU1000_GPIO_0: // PCMCIA Card 0 Fully_Interted#
-			case AU1000_GPIO_1: // PCMCIA Card 0 STSCHG#
-			case AU1000_GPIO_2: // PCMCIA Card 0 IRQ#
+		case INTC_INT_FALL_EDGE:
+			irq_desc[imp->im_irq].handler = &fall_edge_irq_type;
+			break;
 
-			case AU1000_GPIO_3: // PCMCIA Card 1 Fully_Interted#
-			case AU1000_GPIO_4: // PCMCIA Card 1 STSCHG#
-			case AU1000_GPIO_5: // PCMCIA Card 1 IRQ#
-#endif
-				setup_local_irq(i, INTC_INT_LOW_LEVEL, 0);
-				irq_desc[i].handler = &level_irq_type;
-                                break;
-			case AU1000_ACSYNC_INT:
-			case AU1000_AC97C_INT:
-			case AU1000_TOY_INT:
-			case AU1000_TOY_MATCH0_INT:
-			case AU1000_TOY_MATCH1_INT:
-		        case AU1000_USB_DEV_SUS_INT:
-		        case AU1000_USB_DEV_REQ_INT:
-			case AU1000_RTC_INT:
-			case AU1000_RTC_MATCH0_INT:
-			case AU1000_RTC_MATCH1_INT:
-			case AU1000_RTC_MATCH2_INT:
-				setup_local_irq(i, INTC_INT_RISE_EDGE, 0);
-				irq_desc[i].handler = &rise_edge_irq_type;
-				break;
+		case INTC_INT_RISE_AND_FALL_EDGE:
+			irq_desc[imp->im_irq].handler = &either_edge_irq_type;
+			break;
 
-				 // Careful if you change match 2 request!
-				 // The interrupt handler is called directly
-				 // from the low level dispatch code.
-			case AU1000_TOY_MATCH2_INT:
-				 setup_local_irq(i, INTC_INT_RISE_EDGE, 1);
-				 irq_desc[i].handler = &rise_edge_irq_type;
-				  break;
-			default: /* active high, level interrupt */
-				setup_local_irq(i, INTC_INT_HIGH_LEVEL, 0);
-				irq_desc[i].handler = &level_irq_type;
-				break;
+		default:
+			panic("Unknown au1xxx irq map");
+			break;
 		}
+		imp++;
 	}
 
 	set_c0_status(ALLINTS);
+
+	/* Board specific IRQ initialization.
+	*/
+	if (board_init_irq)
+		(*board_init_irq)();
+
 #ifdef CONFIG_KGDB
 	/* If local serial I/O used for debug port, enter kgdb at once */
 	puts("Waiting for kgdb to connect...");
@@ -516,7 +490,7 @@ void __init init_IRQ(void)
 
 void intc0_req0_irqdispatch(struct pt_regs *regs)
 {
-	int irq = 0, i;
+	int irq = 0;
 	static unsigned long intc0_req0 = 0;
 
 	intc0_req0 |= au_readl(IC0_REQ0INT);
@@ -534,43 +508,33 @@ void intc0_req0_irqdispatch(struct pt_regs *regs)
 		return;
 	}
 
-	for (i=0; i<32; i++) {
-		if ((intc0_req0 & (1<<i))) {
-			intc0_req0 &= ~(1<<i);
-			do_IRQ(irq, regs);
-			break;
-		}
-		irq++;
-	}
+	irq = au_ffs(intc0_req0) - 1;
+	intc0_req0 &= ~(1<<irq);
+	do_IRQ(irq, regs);
 }
 
 
 void intc0_req1_irqdispatch(struct pt_regs *regs)
 {
-	int irq = 0, i;
+	int irq = 0;
 	static unsigned long intc0_req1 = 0;
 
-	intc0_req1 = au_readl(IC0_REQ1INT);
+	intc0_req1 |= au_readl(IC0_REQ1INT);
 
 	if (!intc0_req1) return;
 
-	for (i=0; i<32; i++) {
-		if ((intc0_req1 & (1<<i))) {
-			intc0_req1 &= ~(1<<i);
+	irq = au_ffs(intc0_req1) - 1;
+	intc0_req1 &= ~(1<<irq);
 #ifdef CONFIG_PM
-			if (i == AU1000_TOY_MATCH2_INT) {
-				mask_and_ack_rise_edge_irq(irq);
-				counter0_irq(irq, NULL, regs);
-				local_enable_irq(irq);
-			}
-			else
+	if (irq == AU1000_TOY_MATCH2_INT) {
+		mask_and_ack_rise_edge_irq(irq);
+		counter0_irq(irq, NULL, regs);
+		local_enable_irq(irq);
+	}
+	else
 #endif
-			{
-				do_IRQ(irq, regs);
-			}
-			break;
-		}
-		irq++;
+	{
+		do_IRQ(irq, regs);
 	}
 }
 
@@ -581,51 +545,114 @@ void intc0_req1_irqdispatch(struct pt_regs *regs)
  */
 void intc1_req0_irqdispatch(struct pt_regs *regs)
 {
-	int irq = 0, i;
+	int irq = 0;
 	static unsigned long intc1_req0 = 0;
 
 	intc1_req0 |= au_readl(IC1_REQ0INT);
 
 	if (!intc1_req0) return;
 
-#if defined(CONFIG_MIPS_PB1000) && defined(DEBUG_IRQ)
-	au_writel(1, CPLD_AUX0); /* debug led 0 */
-#endif
-	for (i=0; i<32; i++) {
-		if ((intc1_req0 & (1<<i))) {
-			intc1_req0 &= ~(1<<i);
-#if defined(CONFIG_MIPS_PB1000) && defined(DEBUG_IRQ)
-			au_writel(2, CPLD_AUX0); /* turn on debug led 1  */
-			do_IRQ(irq+32, regs);
-			au_writel(0, CPLD_AUX0); /* turn off debug led 1 */
-#else
-			do_IRQ(irq+32, regs);
-#endif
-			break;
-		}
-		irq++;
-	}
-#if defined(CONFIG_MIPS_PB1000) && defined(DEBUG_IRQ)
-	au_writel(0, CPLD_AUX0);
-#endif
+	irq = au_ffs(intc1_req0) - 1;
+	intc1_req0 &= ~(1<<irq);
+	irq += 32;
+	do_IRQ(irq, regs);
 }
 
 
 void intc1_req1_irqdispatch(struct pt_regs *regs)
 {
-	int irq = 0, i;
+	int irq = 0;
 	static unsigned long intc1_req1 = 0;
 
 	intc1_req1 |= au_readl(IC1_REQ1INT);
 
 	if (!intc1_req1) return;
 
-	for (i=0; i<32; i++) {
-		if ((intc1_req1 & (1<<i))) {
-			intc1_req1 &= ~(1<<i);
-			do_IRQ(irq+32, regs);
-			break;
-		}
-		irq++;
-	}
+	irq = au_ffs(intc1_req1) - 1;
+	intc1_req1 &= ~(1<<irq);
+	irq += 32;
+	do_IRQ(irq, regs);
 }
+
+#ifdef CONFIG_PM
+
+/* Save/restore the interrupt controller state.
+ * Called from the save/restore core registers as part of the
+ * au_sleep function in power.c.....maybe I should just pm_register()
+ * them instead?
+ */
+static uint	sleep_intctl_config0[2];
+static uint	sleep_intctl_config1[2];
+static uint	sleep_intctl_config2[2];
+static uint	sleep_intctl_src[2];
+static uint	sleep_intctl_assign[2];
+static uint	sleep_intctl_wake[2];
+static uint	sleep_intctl_mask[2];
+
+void
+save_au1xxx_intctl(void)
+{
+	sleep_intctl_config0[0] = au_readl(IC0_CFG0RD);
+	sleep_intctl_config1[0] = au_readl(IC0_CFG1RD);
+	sleep_intctl_config2[0] = au_readl(IC0_CFG2RD);
+	sleep_intctl_src[0] = au_readl(IC0_SRCRD);
+	sleep_intctl_assign[0] = au_readl(IC0_ASSIGNRD);
+	sleep_intctl_wake[0] = au_readl(IC0_WAKERD);
+	sleep_intctl_mask[0] = au_readl(IC0_MASKRD);
+
+	sleep_intctl_config0[1] = au_readl(IC1_CFG0RD);
+	sleep_intctl_config1[1] = au_readl(IC1_CFG1RD);
+	sleep_intctl_config2[1] = au_readl(IC1_CFG2RD);
+	sleep_intctl_src[1] = au_readl(IC1_SRCRD);
+	sleep_intctl_assign[1] = au_readl(IC1_ASSIGNRD);
+	sleep_intctl_wake[1] = au_readl(IC1_WAKERD);
+	sleep_intctl_mask[1] = au_readl(IC1_MASKRD);
+}
+
+/* For most restore operations, we clear the entire register and
+ * then set the bits we found during the save.
+ */
+void
+restore_au1xxx_intctl(void)
+{
+	au_writel(0xffffffff, IC0_MASKCLR); au_sync();
+
+	au_writel(0xffffffff, IC0_CFG0CLR); au_sync();
+	au_writel(sleep_intctl_config0[0], IC0_CFG0SET); au_sync();
+	au_writel(0xffffffff, IC0_CFG1CLR); au_sync();
+	au_writel(sleep_intctl_config1[0], IC0_CFG1SET); au_sync();
+	au_writel(0xffffffff, IC0_CFG2CLR); au_sync();
+	au_writel(sleep_intctl_config2[0], IC0_CFG2SET); au_sync();
+	au_writel(0xffffffff, IC0_SRCCLR); au_sync();
+	au_writel(sleep_intctl_src[0], IC0_SRCSET); au_sync();
+	au_writel(0xffffffff, IC0_ASSIGNCLR); au_sync();
+	au_writel(sleep_intctl_assign[0], IC0_ASSIGNSET); au_sync();
+	au_writel(0xffffffff, IC0_WAKECLR); au_sync();
+	au_writel(sleep_intctl_wake[0], IC0_WAKESET); au_sync();
+	au_writel(0xffffffff, IC0_RISINGCLR); au_sync();
+	au_writel(0xffffffff, IC0_FALLINGCLR); au_sync();
+	au_writel(0x00000000, IC0_TESTBIT); au_sync();
+
+	au_writel(0xffffffff, IC1_MASKCLR); au_sync();
+
+	au_writel(0xffffffff, IC1_CFG0CLR); au_sync();
+	au_writel(sleep_intctl_config0[1], IC1_CFG0SET); au_sync();
+	au_writel(0xffffffff, IC1_CFG1CLR); au_sync();
+	au_writel(sleep_intctl_config1[1], IC1_CFG1SET); au_sync();
+	au_writel(0xffffffff, IC1_CFG2CLR); au_sync();
+	au_writel(sleep_intctl_config2[1], IC1_CFG2SET); au_sync();
+	au_writel(0xffffffff, IC1_SRCCLR); au_sync();
+	au_writel(sleep_intctl_src[1], IC1_SRCSET); au_sync();
+	au_writel(0xffffffff, IC1_ASSIGNCLR); au_sync();
+	au_writel(sleep_intctl_assign[1], IC1_ASSIGNSET); au_sync();
+	au_writel(0xffffffff, IC1_WAKECLR); au_sync();
+	au_writel(sleep_intctl_wake[1], IC1_WAKESET); au_sync();
+	au_writel(0xffffffff, IC1_RISINGCLR); au_sync();
+	au_writel(0xffffffff, IC1_FALLINGCLR); au_sync();
+	au_writel(0x00000000, IC1_TESTBIT); au_sync();
+
+	au_writel(sleep_intctl_mask[1], IC1_MASKSET); au_sync();
+
+	au_writel(sleep_intctl_mask[0], IC0_MASKSET); au_sync();
+}
+#endif /* CONFIG_PM */

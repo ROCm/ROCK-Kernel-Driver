@@ -971,8 +971,7 @@ static int idescsi_attach(ide_drive_t *drive)
 	drive->driver_data = host;
 	idescsi = scsihost_to_idescsi(host);
 	idescsi->drive = drive;
-	err = ide_register_subdriver (drive, &idescsi_driver,
-				      IDE_SUBDRIVER_VERSION);
+	err = ide_register_subdriver(drive, &idescsi_driver);
 	if (!err) {
 		idescsi_setup (drive, idescsi);
 		drive->disk->fops = &idescsi_ops;

@@ -26,20 +26,17 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/pci.h>
-#include <linux/ide.h>
-
 #include <linux/interrupt.h>
-#include <asm/time.h>
-
-#include <asm/cpu.h>
-#include <asm/bootinfo.h>
-#include <asm/irq.h>
-#include <asm/lasat/lasat.h>
-
 #include <linux/tty.h>
 #include <linux/serial.h>
 #include <linux/serial_core.h>
+
+#include <asm/time.h>
+#include <asm/cpu.h>
+#include <asm/bootinfo.h>
+#include <asm/irq.h>
 #include <asm/serial.h>
+#include <asm/lasat/lasat.h>
 #include <asm/lasat/serial.h>
 
 #ifdef CONFIG_PICVUE
@@ -56,13 +53,6 @@
 
 int lasat_command_line = 0;
 void lasatint_init(void);
-
-#ifdef CONFIG_BLK_DEV_IDE
-extern struct ide_ops std_ide_ops;
-extern struct ide_ops *ide_ops;
-#endif
-
-extern char arcs_cmdline[CL_SIZE];
 
 extern void lasat_reboot_setup(void);
 extern void pcisetup(void);
@@ -122,19 +112,9 @@ static struct notifier_block lasat_panic_block[] =
 	{ lasat_panic_prom_monitor, NULL, INT_MIN }
 };
 
-#ifdef CONFIG_BLK_DEV_IDE
-static int lasat_ide_default_irq(ide_ioreg_t base) {
-	return 0;
-}
-
-static ide_ioreg_t lasat_ide_default_io_base(int index) {
-	return 0;
-}
-#endif
-
 static void lasat_time_init(void)
 {
-	mips_counter_frequency = lasat_board_info.li_cpu_hz / 2;
+	mips_hpt_frequency = lasat_board_info.li_cpu_hz / 2;
 }
 
 static void lasat_timer_setup(struct irqaction *irq)
@@ -142,7 +122,7 @@ static void lasat_timer_setup(struct irqaction *irq)
 
 	write_c0_compare(
 		read_c0_count() + 
-		mips_counter_frequency / HZ);
+		mips_hpt_frequency / HZ);
 	change_c0_status(ST0_IM, IE_IRQ0 | IE_IRQ5);
 }
 
@@ -182,7 +162,7 @@ void __init serial_init(void)
 }
 #endif
 
-void __init lasat_setup(void)
+static void __init lasat_setup(void)
 {
 	int i;
 	lasat_misc  = &lasat_misc_info[mips_machtype];
@@ -193,12 +173,6 @@ void __init lasat_setup(void)
 	/* Set up panic notifier */
 	for (i = 0; i < sizeof(lasat_panic_block) / sizeof(struct notifier_block); i++)
 		notifier_chain_register(&panic_notifier_list, &lasat_panic_block[i]);
-
-#ifdef CONFIG_BLK_DEV_IDE
-	ide_ops = &std_ide_ops;
-	ide_ops->ide_default_irq = &lasat_ide_default_irq;
-	ide_ops->ide_default_io_base = &lasat_ide_default_io_base;
-#endif
 
 	lasat_reboot_setup();
 
@@ -220,4 +194,4 @@ void __init lasat_setup(void)
 	prom_printf("Lasat specific initialization complete\n");
 }
 
-
+early_initcall(lasat_setup);

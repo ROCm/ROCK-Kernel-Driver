@@ -38,7 +38,7 @@
 
 /* A few routines that create sysfs entries for the hot plug controller */
 
-static int show_ctrl (struct device *dev, char *buf)
+static ssize_t show_ctrl (struct device *dev, char *buf)
 {
 	struct pci_dev *pci_dev;
 	struct controller *ctrl;
@@ -82,7 +82,7 @@ static int show_ctrl (struct device *dev, char *buf)
 }
 static DEVICE_ATTR (ctrl, S_IRUGO, show_ctrl, NULL);
 
-static int show_dev (struct device *dev, char *buf)
+static ssize_t show_dev (struct device *dev, char *buf)
 {
 	struct pci_dev *pci_dev;
 	struct controller *ctrl;

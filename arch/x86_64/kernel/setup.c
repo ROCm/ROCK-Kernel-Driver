@@ -588,6 +588,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 
 static void __init detect_ht(void)
 {
+#ifdef CONFIG_SMP
 	extern	int phys_proc_id[NR_CPUS];
 	
 	u32 	eax, ebx, ecx, edx;
@@ -631,6 +632,7 @@ static void __init detect_ht(void)
 		printk(KERN_INFO  "CPU: Physical Processor ID: %d\n",
 		       phys_proc_id[cpu]);
 	}
+#endif
 }
 	
 #define LVL_1_INST	1

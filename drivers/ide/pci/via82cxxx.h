@@ -7,24 +7,6 @@
 
 #define DISPLAY_VIA_TIMINGS
 
-#if defined(DISPLAY_VIA_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 via_proc;
-
-static int via_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t via_procs[] = {
-	{
-		.name		= "via",
-		.set		= 1,
-		.get_info	= via_get_info,
-		.parent		= NULL,
-	},
-};
-#endif /* DISPLAY_VIA_TIMINGS && CONFIG_PROC_FS */
-
 static unsigned int init_chipset_via82cxxx(struct pci_dev *, const char *);
 static void init_hwif_via82cxxx(ide_hwif_t *);
 

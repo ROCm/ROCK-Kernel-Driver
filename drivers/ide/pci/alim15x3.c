@@ -588,7 +588,7 @@ static unsigned int __init init_chipset_ali15x3 (struct pci_dev *dev, const char
 	if (!ali_proc) {
 		ali_proc = 1;
 		bmide_dev = dev;
-		ide_pci_register_host_proc(&ali_procs[0]);
+		ide_pci_create_host_proc("ali", ali_get_info);
 	}
 #endif  /* defined(DISPLAY_ALI_TIMINGS) && defined(CONFIG_PROC_FS) */
 

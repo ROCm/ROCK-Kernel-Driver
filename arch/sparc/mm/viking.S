@@ -15,7 +15,6 @@
 #include <asm/page.h>
 #include <asm/pgtsrmmu.h>
 #include <asm/viking.h>
-#include <asm/cprefix.h>
 #include <asm/btfixup.h>
 
 #ifdef CONFIG_SMP

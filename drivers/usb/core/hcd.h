@@ -76,17 +76,14 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	unsigned		saw_irq : 1;
 	int			irq;		/* irq allocated */
 	void			*regs;		/* device memory/io */
-	struct device		*controller;	/* handle to hardware */
 
-	/* a few non-PCI controllers exist, mostly for OHCI */
-	struct pci_dev		*pdev;		/* pci is typical */
 #ifdef	CONFIG_PCI
 	int			region;		/* pci region for regs */
 	u32			pci_state [16];	/* for PM state save */
 #endif
 
 #define HCD_BUFFER_POOLS	4
-	struct pci_pool		*pool [HCD_BUFFER_POOLS];
+	struct dma_pool		*pool [HCD_BUFFER_POOLS];
 
 	int			state;
 #	define	__ACTIVE		0x01
@@ -355,7 +352,7 @@ extern int usb_register_root_hub (struct usb_device *usb_dev,
 static inline int hcd_register_root (struct usb_hcd *hcd)
 {
 	return usb_register_root_hub (
-		hcd_to_bus (hcd)->root_hub, hcd->controller);
+		hcd_to_bus (hcd)->root_hub, hcd->self.controller);
 }
 
 /*-------------------------------------------------------------------------*/

@@ -7,24 +7,6 @@
 
 #define DISPLAY_CS5520_TIMINGS
 
-#if defined(DISPLAY_CS5520_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 cs5520_proc;
-
-static int cs5520_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t cs5520_procs[] = {
-	{
-		.name		= "cs5520",
-		.set		= 1,
-		.get_info	= cs5520_get_info,
-		.parent		= NULL,
-	},
-};
-#endif  /* defined(DISPLAY_CS5520_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 static unsigned int init_chipset_cs5520(struct pci_dev *, const char *);
 static void init_hwif_cs5520(ide_hwif_t *);
 static void cs5520_init_setup_dma(struct pci_dev *dev, struct ide_pci_device_s *d, ide_hwif_t *hwif);

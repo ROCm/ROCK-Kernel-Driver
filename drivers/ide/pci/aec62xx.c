@@ -423,7 +423,7 @@ static unsigned int __init init_chipset_aec62xx (struct pci_dev *dev, const char
 
 	if (!aec62xx_proc) {
 		aec62xx_proc = 1;
-		ide_pci_register_host_proc(&aec62xx_procs[0]);
+		ide_pci_create_host_proc("aec62xx", aec62xx_get_info);
 	}
 #endif /* DISPLAY_AEC62XX_TIMINGS && CONFIG_PROC_FS */
 

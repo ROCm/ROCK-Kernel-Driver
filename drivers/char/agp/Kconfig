@@ -151,3 +151,13 @@ config AGP_UNINORTH
 	  This option gives you AGP support for Apple machines with a
 	  UniNorth bridge.
 
+config AGP_EFFICEON
+	tristate "Transmeta Efficeon support"
+	depends on AGP && X86 && !X86_64
+	help
+	  This option fives you AGP support for the Transmeta Efficeon
+	  series processors with integrated northbridges.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say Y.
+

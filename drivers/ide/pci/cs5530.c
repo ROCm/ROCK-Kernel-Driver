@@ -276,7 +276,7 @@ static unsigned int __init init_chipset_cs5530 (struct pci_dev *dev, const char 
 	if (!cs5530_proc) {
 		cs5530_proc = 1;
 		bmide_dev = dev;
-		ide_pci_register_host_proc(&cs5530_procs[0]);
+		ide_pci_create_host_proc("cs5530", cs5530_get_info);
 	}
 #endif /* DISPLAY_CS5530_TIMINGS && CONFIG_PROC_FS */
 

@@ -26,10 +26,6 @@ extern struct ctl_table core_table[];
 extern struct ctl_table ether_table[];
 #endif
 
-#ifdef CONFIG_IPV6
-extern struct ctl_table ipv6_table[];
-#endif
-
 #ifdef CONFIG_TR
 extern struct ctl_table tr_table[];
 #endif
@@ -55,14 +51,6 @@ struct ctl_table net_table[] = {
 		.procname	= "ipv4",
 		.mode		= 0555,
 		.child		= ipv4_table
-	},
-#endif
-#ifdef CONFIG_IPV6
-	{
-		.ctl_name	= NET_IPV6,
-		.procname	= "ipv6",
-		.mode		= 0555,
-		.child		= ipv6_table,
 	},
 #endif
 #ifdef CONFIG_TR

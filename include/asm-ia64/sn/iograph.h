@@ -8,6 +8,8 @@
 #ifndef _ASM_IA64_SN_IOGRAPH_H
 #define _ASM_IA64_SN_IOGRAPH_H
 
+#include <asm/sn/xtalk/xbow.h>	/* For get MAX_PORT_NUM */
+
 /*
  * During initialization, platform-dependent kernel code establishes some
  * basic elements of the hardware graph.  This file contains edge and
@@ -115,40 +117,13 @@
 #define INFO_LBL_XSWITCH_VOL		"_xswitch_volunteer"
 #define INFO_LBL_XFUNCS			"_xtalk_ops"	/* ops vector for gio providers */
 #define INFO_LBL_XWIDGET		"_xwidget"
-/* Device/Driver  Admin directive labels  */
-#define ADMIN_LBL_INTR_TARGET		"INTR_TARGET"	/* Target cpu for device interrupts*/
-#define ADMIN_LBL_INTR_SWLEVEL		"INTR_SWLEVEL"	/* Priority level of the ithread */
 
-#define	ADMIN_LBL_DMATRANS_NODE		"PCIBUS_DMATRANS_NODE" /* Node used for
-								* 32-bit Direct
-								* Mapping I/O
-								*/
-#define ADMIN_LBL_DISABLED		"DISABLE"	/* Device has been disabled */
-#define ADMIN_LBL_DETACH		"DETACH"	/* Device has been detached */
 
-#define ADMIN_LBL_THREAD_PRI		"thread_priority" 
-							/* Driver adminstrator
-							 * hint parameter for 
-							 * thread priority
-							 */
-#define ADMIN_LBL_THREAD_CLASS		"thread_class" 
-							/* Driver adminstrator
-							 * hint parameter for 
-							 * thread priority
-							 * default class
-							 */
-/* Info labels that begin with '_' cannot be overwritten by an attr_set call */
-#define INFO_LBL_RESERVED(name) ((name)[0] == '_')
-
-#if defined(__KERNEL__)
+#ifdef __KERNEL__
 void init_all_devices(void);
 #endif /* __KERNEL__ */
 
-#include <asm/sn/sgi.h>
-#include <asm/sn/xtalk/xbow.h>	/* For get MAX_PORT_NUM */
-
 int io_brick_map_widget(int, int);
-int io_path_map_widget(vertex_hdl_t);
 
 /*
  * Map a brick's widget number to a meaningful int
@@ -158,6 +133,5 @@ struct io_brick_map_s {
     int                 ibm_type;                  /* brick type */
     int                 ibm_map_wid[MAX_PORT_NUM]; /* wid to int map */
 };
-
 
 #endif /* _ASM_IA64_SN_IOGRAPH_H */

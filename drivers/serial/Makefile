@@ -5,11 +5,11 @@
 #
 
 serial-8250-y :=
+serial-8250-$(CONFIG_SERIAL_8250_ACPI) += 8250_acpi.o
 serial-8250-$(CONFIG_GSC) += 8250_gsc.o
 serial-8250-$(CONFIG_PCI) += 8250_pci.o
 serial-8250-$(CONFIG_PNP) += 8250_pnp.o
 serial-8250-$(CONFIG_SERIAL_8250_HCDP) += 8250_hcdp.o
-serial-8250-$(CONFIG_SERIAL_8250_ACPI) += 8250_acpi.o
 
 obj-$(CONFIG_SERIAL_CORE) += serial_core.o
 obj-$(CONFIG_SERIAL_21285) += 21285.o
@@ -19,6 +19,7 @@ obj-$(CONFIG_SERIAL_8250_ACORN) += 8250_acorn.o
 obj-$(CONFIG_SERIAL_ANAKIN) += anakin.o
 obj-$(CONFIG_SERIAL_AMBA) += amba.o
 obj-$(CONFIG_SERIAL_CLPS711X) += clps711x.o
+obj-$(CONFIG_SERIAL_PXA) += pxa.o
 obj-$(CONFIG_SERIAL_SA1100) += sa1100.o
 obj-$(CONFIG_SERIAL_UART00) += uart00.o
 obj-$(CONFIG_SERIAL_SUNCORE) += suncore.o

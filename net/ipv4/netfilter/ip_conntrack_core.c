@@ -1240,14 +1240,13 @@ do_kill(const struct ip_conntrack_tuple_hash *i,
 /* Bring out ya dead! */
 static struct ip_conntrack_tuple_hash *
 get_next_corpse(int (*kill)(const struct ip_conntrack *i, void *data),
-		void *data)
+		void *data, unsigned int *bucket)
 {
 	struct ip_conntrack_tuple_hash *h = NULL;
-	unsigned int i;
 
 	READ_LOCK(&ip_conntrack_lock);
-	for (i = 0; !h && i < ip_conntrack_htable_size; i++) {
-		h = LIST_FIND(&ip_conntrack_hash[i], do_kill,
+	for (; !h && *bucket < ip_conntrack_htable_size; (*bucket)++) {
+		h = LIST_FIND(&ip_conntrack_hash[*bucket], do_kill,
 			      struct ip_conntrack_tuple_hash *, kill, data);
 	}
 	if (h)
@@ -1262,9 +1261,9 @@ ip_ct_selective_cleanup(int (*kill)(const struct ip_conntrack *i, void *data),
 			void *data)
 {
 	struct ip_conntrack_tuple_hash *h;
+	unsigned int bucket = 0;
 
-	/* This is order n^2, by the way. */
-	while ((h = get_next_corpse(kill, data)) != NULL) {
+	while ((h = get_next_corpse(kill, data, &bucket)) != NULL) {
 		/* Time to push up daises... */
 		if (del_timer(&h->ctrack->timeout))
 			death_by_timeout((unsigned long)h->ctrack);

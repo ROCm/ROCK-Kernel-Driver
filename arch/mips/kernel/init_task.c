@@ -4,6 +4,7 @@
 #include <linux/init_task.h>
 #include <linux/fs.h>
 
+#include <asm/thread_info.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 
@@ -26,7 +27,8 @@ EXPORT_SYMBOL(init_mm);
  * The things we do for performance..
  */
 union thread_union init_thread_union
-	__attribute__((__section__(".data.init_task"))) =
+	__attribute__((__section__(".data.init_task"),
+	               __aligned__(THREAD_SIZE))) =
 		{ INIT_THREAD_INFO(init_task) };
 
 /*

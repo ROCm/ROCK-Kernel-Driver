@@ -1027,7 +1027,7 @@ struct Qdisc_class_ops csz_class_ops = {
 	.dump		=	csz_dump_class,
 };
 
-struct Qdisc_ops csz_qdisc_ops = {
+static struct Qdisc_ops csz_qdisc_ops = {
 	.next		=	NULL,
 	.cl_ops		=	&csz_class_ops,
 	.id		=	"csz",
@@ -1044,16 +1044,14 @@ struct Qdisc_ops csz_qdisc_ops = {
 	.owner		=	THIS_MODULE,
 };
 
-
-#ifdef MODULE
-int init_module(void)
+static int __init csz_module_init(void)
 {
 	return register_qdisc(&csz_qdisc_ops);
 }
-
-void cleanup_module(void) 
+static void __exit csz_module_exit(void) 
 {
 	unregister_qdisc(&csz_qdisc_ops);
 }
-#endif
+module_init(csz_module_init)
+module_exit(csz_module_exit)
 MODULE_LICENSE("GPL");

@@ -35,9 +35,10 @@
 #include <asm/processor.h>
 #include <asm/reboot.h>
 #include <asm/system.h>
-#include <asm/au1000.h>
+#include <asm/mach-au1x00/au1000.h>
 
 extern int au_sleep(void);
+extern void (*flush_cache_all)(void);
 
 void au1000_restart(char *command)
 {
@@ -54,6 +55,10 @@ void au1000_restart(char *command)
 		au_writel(0x00, 0xb017fffc); /* usbh_enable */
 		au_writel(0x00, 0xb0200058); /* usbd_enable */
 		au_writel(0x00, 0xb0300040); /* ir_enable */
+		au_writel(0x00, 0xb4004104); /* mac dma */
+		au_writel(0x00, 0xb4004114); /* mac dma */
+		au_writel(0x00, 0xb4004124); /* mac dma */
+		au_writel(0x00, 0xb4004134); /* mac dma */
 		au_writel(0x00, 0xb0520000); /* macen0 */
 		au_writel(0x00, 0xb0520004); /* macen1 */
 		au_writel(0x00, 0xb1000008); /* i2s_enable  */
@@ -66,6 +71,8 @@ void au1000_restart(char *command)
 		au_writel(0x00, 0xb1900020); /* sys_freqctrl0 */
 		au_writel(0x00, 0xb1900024); /* sys_freqctrl1 */
 		au_writel(0x00, 0xb1900028); /* sys_clksrc */
+		au_writel(0x10, 0xb1900060); /* sys_cpupll */
+		au_writel(0x00, 0xb1900064); /* sys_auxpll */
 		au_writel(0x00, 0xb1900100); /* sys_pininputen */
 		break;
 	case 0x01000000: /* Au1500 */
@@ -74,6 +81,10 @@ void au1000_restart(char *command)
 		asm("sync");
 		au_writel(0x00, 0xb017fffc); /* usbh_enable */
 		au_writel(0x00, 0xb0200058); /* usbd_enable */
+		au_writel(0x00, 0xb4004104); /* mac dma */
+		au_writel(0x00, 0xb4004114); /* mac dma */
+		au_writel(0x00, 0xb4004124); /* mac dma */
+		au_writel(0x00, 0xb4004134); /* mac dma */
 		au_writel(0x00, 0xb1520000); /* macen0 */
 		au_writel(0x00, 0xb1520004); /* macen1 */
 		au_writel(0x00, 0xb1100100); /* uart0_enable */
@@ -81,6 +92,8 @@ void au1000_restart(char *command)
 		au_writel(0x00, 0xb1900020); /* sys_freqctrl0 */
 		au_writel(0x00, 0xb1900024); /* sys_freqctrl1 */
 		au_writel(0x00, 0xb1900028); /* sys_clksrc */
+		au_writel(0x10, 0xb1900060); /* sys_cpupll */
+		au_writel(0x00, 0xb1900064); /* sys_auxpll */
 		au_writel(0x00, 0xb1900100); /* sys_pininputen */
 		break;
 	case 0x02000000: /* Au1100 */
@@ -90,6 +103,10 @@ void au1000_restart(char *command)
 		au_writel(0x00, 0xb017fffc); /* usbh_enable */
 		au_writel(0x00, 0xb0200058); /* usbd_enable */
 		au_writel(0x00, 0xb0300040); /* ir_enable */
+		au_writel(0x00, 0xb4004104); /* mac dma */
+		au_writel(0x00, 0xb4004114); /* mac dma */
+		au_writel(0x00, 0xb4004124); /* mac dma */
+		au_writel(0x00, 0xb4004134); /* mac dma */
 		au_writel(0x00, 0xb0520000); /* macen0 */
 		au_writel(0x00, 0xb1000008); /* i2s_enable  */
 		au_writel(0x00, 0xb1100100); /* uart0_enable */
@@ -100,6 +117,8 @@ void au1000_restart(char *command)
 		au_writel(0x00, 0xb1900020); /* sys_freqctrl0 */
 		au_writel(0x00, 0xb1900024); /* sys_freqctrl1 */
 		au_writel(0x00, 0xb1900028); /* sys_clksrc */
+		au_writel(0x10, 0xb1900060); /* sys_cpupll */
+		au_writel(0x00, 0xb1900064); /* sys_auxpll */
 		au_writel(0x00, 0xb1900100); /* sys_pininputen */
 		break;
 

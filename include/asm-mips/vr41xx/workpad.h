@@ -22,7 +22,7 @@
 /*
  * Board specific address mapping
  */
-#define VR41XX_ISA_MEM_BASE		0x100000000
+#define VR41XX_ISA_MEM_BASE		0x10000000
 #define VR41XX_ISA_MEM_SIZE		0x04000000
 
 /* VR41XX_ISA_IO_BASE includes offset from real base. */

@@ -8,7 +8,6 @@
 #ifndef _ASM_IA64_SN_INTR_H
 #define _ASM_IA64_SN_INTR_H
 
-#include <linux/config.h>
 #include <asm/sn/sn2/intr.h>
 
 extern void sn_send_IPI_phys(long, int, int);

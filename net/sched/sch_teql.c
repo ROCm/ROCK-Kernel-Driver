@@ -418,14 +418,12 @@ static int teql_master_mtu(struct net_device *dev, int new_mtu)
 	return 0;
 }
 
-static __init int teql_master_init(struct net_device *dev)
+static __init void teql_master_setup(struct net_device *dev)
 {
 	struct teql_master *master = dev->priv;
 	struct Qdisc_ops *ops = &master->qops;
 
 	master->dev	= dev;
-
-	strlcpy(ops->id, dev->name, IFNAMSIZ);
 	ops->priv_size  = sizeof(struct teql_sched_data);
 	
 	ops->enqueue	=	teql_enqueue;
@@ -436,12 +434,6 @@ static __init int teql_master_init(struct net_device *dev)
 	ops->destroy	=	teql_destroy;
 	ops->owner	=	THIS_MODULE;
 
-	return register_qdisc(ops);
-}
-
-static __init void teql_master_setup(struct net_device *dev)
-{
-	dev->init		= teql_master_init;
 	dev->open		= teql_master_open;
 	dev->hard_start_xmit	= teql_master_xmit;
 	dev->stop		= teql_master_close;
@@ -460,10 +452,10 @@ static int max_equalizers = 1;
 MODULE_PARM(max_equalizers, "i");
 MODULE_PARM_DESC(max_equalizers, "Max number of link equalizers");
 
-int __init teql_init(void)
+static int __init teql_init(void)
 {
 	int i;
-	int err = 0;
+	int err = -ENODEV;
 
 	for (i = 0; i < max_equalizers; i++) {
 		struct net_device *dev;
@@ -471,19 +463,30 @@ int __init teql_init(void)
 
 		dev = alloc_netdev(sizeof(struct teql_master),
 				  "teql%d", teql_master_setup);
-		if (!dev)
-			return -ENOMEM;
+		if (!dev) {
+			err = -ENOMEM;
+			break;
+		}
 
 		if ((err = register_netdev(dev))) {
 			free_netdev(dev);
-			goto out;
+			break;
 		}
 
 		master = dev->priv;
+
+		strlcpy(master->qops.id, dev->name, IFNAMSIZ);
+		err = register_qdisc(&master->qops);
+
+		if (err) {
+			unregister_netdev(dev);
+			free_netdev(dev);
+			break;
+		}
+
 		list_add_tail(&master->master_list, &master_dev_list);
 	}
- out:
-	return err;
+	return i ? 0 : err;
 }
 
 static void __exit teql_exit(void) 

@@ -109,17 +109,6 @@ static int xx_xx_parse_error (const char *data, unsigned long len, const char *m
 	return -EINVAL;
 }
 
-static struct proc_dir_entry * proc_ide_root = NULL;
-
-#ifdef CONFIG_BLK_DEV_IDEPCI
-#include <linux/delay.h>
-/*
- * This is the list of registered PCI chipset driver data structures.
- */
-static ide_pci_host_proc_t * ide_pci_host_proc_list;
-
-#endif /* CONFIG_BLK_DEV_IDEPCI */
-
 static int proc_ide_write_config
 	(struct file *file, const char *buffer, unsigned long count, void *data)
 {
@@ -787,27 +776,16 @@ void create_proc_ide_interfaces(void)
 	}
 }
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
-void ide_pci_register_host_proc (ide_pci_host_proc_t *p)
-{
-	ide_pci_host_proc_t *tmp;
+EXPORT_SYMBOL(create_proc_ide_interfaces);
 
-	if (!p) return;
-	p->next = NULL;
-	p->set = 1;
-	if (ide_pci_host_proc_list) {
-		tmp = ide_pci_host_proc_list;
-		while (tmp->next) tmp = tmp->next;
-		tmp->next = p;
-	} else
-		ide_pci_host_proc_list = p;
+#ifdef CONFIG_BLK_DEV_IDEPCI
+void ide_pci_create_host_proc(const char *name, get_info_t *get_info)
+{
+	create_proc_info_entry(name, 0, proc_ide_root, get_info);
 }
 
-EXPORT_SYMBOL(ide_pci_register_host_proc);
-
-#endif /* CONFIG_BLK_DEV_IDEPCI */
-
-EXPORT_SYMBOL(create_proc_ide_interfaces);
+EXPORT_SYMBOL_GPL(ide_pci_create_host_proc);
+#endif
 
 void destroy_proc_ide_interfaces(void)
 {
@@ -846,45 +824,22 @@ static struct file_operations ide_drivers_operations = {
 
 void proc_ide_create(void)
 {
-#ifdef CONFIG_BLK_DEV_IDEPCI
-	ide_pci_host_proc_t *p = ide_pci_host_proc_list;
-#endif /* CONFIG_BLK_DEV_IDEPCI */
 	struct proc_dir_entry *entry;
-	proc_ide_root = proc_mkdir("ide", 0);
-	if (!proc_ide_root) return;
+
+	if (!proc_ide_root)
+		return;
 
 	create_proc_ide_interfaces();
 
 	entry = create_proc_entry("drivers", 0, proc_ide_root);
 	if (entry)
 		entry->proc_fops = &ide_drivers_operations;
-
-#ifdef CONFIG_BLK_DEV_IDEPCI
-	while (p != NULL)
-	{
-		if (p->name != NULL && p->set == 1 && p->get_info != NULL) 
-		{
-			p->parent = proc_ide_root;
-			create_proc_info_entry(p->name, 0, p->parent, p->get_info);
-			p->set = 2;
-		}
-		p = p->next;
-	}
-#endif /* CONFIG_BLK_DEV_IDEPCI */
 }
 
 EXPORT_SYMBOL(proc_ide_create);
 
 void proc_ide_destroy(void)
 {
-#ifdef CONFIG_BLK_DEV_IDEPCI
-	ide_pci_host_proc_t *p;
-
-	for (p = ide_pci_host_proc_list; p; p = p->next) {
-		if (p->set == 2)
-			remove_proc_entry(p->name, p->parent);
-	}
-#endif /* CONFIG_BLK_DEV_IDEPCI */
 	remove_proc_entry("ide/drivers", proc_ide_root);
 	destroy_proc_ide_interfaces();
 	remove_proc_entry("ide", 0);

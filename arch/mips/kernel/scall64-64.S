@@ -71,21 +71,14 @@ syscall_exit:
 					# signals dont change between
 					# sampling and return
 	LONG_L	a2, TI_FLAGS($28)	# current->work
-	bnez	a2, n64_syscall_exit_work
+	li	t0, _TIF_ALLWORK_MASK
+	and	t0, a2, t0
+	bnez	t0, n64_syscall_exit_work
 
-	j	restore_all
-
-work_notifysig:				# deal with pending signals and
-					# notify-resume requests
-	SAVE_STATIC
-	move	a0, sp
-	li	a1, 0
-	jal	do_notify_resume	# a2 already loaded
-	RESTORE_STATIC
-	j	restore_all
+	j	restore_partial
 
 n64_syscall_exit_work:
-	j	syscall_exit_work
+	j	syscall_exit_work_partial
 
 /* ------------------------------------------------------------------------ */
 
@@ -167,8 +160,8 @@ illegal_syscall:
 	.previous
 #endif
 
-	sw	v0, PT_R2(sp)		# result
-1:
+	sd	zero, PT_R7(sp)		# success
+	sd	v0, PT_R2(sp)		# result
 
 	/* Success, so skip usual error handling garbage.  */
 	LONG_L	a2, TI_FLAGS($28)	# syscall tracing enabled?
@@ -221,7 +214,7 @@ sys_call_table:
 	PTR	sys_newlstat
 	PTR	sys_poll
 	PTR	sys_lseek
-	PTR	sys_mmap2
+	PTR	old_mmap
 	PTR	sys_mprotect			/* 5010 */
 	PTR	sys_munmap
 	PTR	sys_brk
@@ -405,7 +398,7 @@ sys_call_table:
 	PTR	sys_lremovexattr		/* 5190 */
 	PTR	sys_fremovexattr
 	PTR	sys_tkill
-	PTR	sys_time
+	PTR	sys_ni_syscall
 	PTR	sys_futex
 	PTR	sys_sched_setaffinity		/* 5195 */
 	PTR	sys_sched_getaffinity
@@ -427,7 +420,7 @@ sys_call_table:
 	PTR	sys_set_tid_address
 	PTR	sys_restart_syscall
 	PTR	sys_semtimedop
-	PTR	sys_fadvise64			/* 5215 */
+	PTR	sys_fadvise64_64		/* 5215 */
 	PTR	sys_timer_create
 	PTR	sys_timer_settime
 	PTR	sys_timer_gettime

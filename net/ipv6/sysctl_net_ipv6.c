@@ -79,7 +79,6 @@ ctl_table ipv6_table[] = {
 	{ .ctl_name = 0 }
 };
 
-#ifdef MODULE
 static struct ctl_table_header *ipv6_sysctl_header;
 
 static ctl_table ipv6_net_table[] = {
@@ -111,7 +110,6 @@ void ipv6_sysctl_unregister(void)
 {
 	unregister_sysctl_table(ipv6_sysctl_header);
 }
-#endif	/* MODULE */
 
 #endif /* CONFIG_SYSCTL */
 

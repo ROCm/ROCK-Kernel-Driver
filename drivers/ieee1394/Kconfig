@@ -1,10 +1,9 @@
 # -*- shell-script -*-
 
-menu "IEEE 1394 (FireWire) support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+menu "IEEE 1394 (FireWire) support"
 
 config IEEE1394
-	tristate "IEEE 1394 (FireWire) support (EXPERIMENTAL)"
+	tristate "IEEE 1394 (FireWire) support"
 	help
 	  IEEE 1394 describes a high performance serial bus, which is also
 	  known as FireWire(tm) or i.Link(tm) and is used for connecting all
@@ -108,10 +107,14 @@ config IEEE1394_SBP2_PHYS_DMA
 
 config IEEE1394_ETH1394
 	tristate "Ethernet over 1394"
-	depends on IEEE1394
+	depends on IEEE1394 && EXPERIMENTAL
 	help
-	  Extremely Experimental! This driver is a Linux specific way to use your
-	  IEEE1394 Host as an Ethernet type device. This is _NOT_ IP1394.
+	  This driver implements a functional majority of RFC 2734: IPv4 over
+	  1394.  It will provide IP connectivity with implementations of RFC
+	  2734 found on other operating systems.  It will not communicate with
+	  older versions of this driver found in stock kernels prior to 2.6.3.
+	  This driver is still considered experimental.  It does not yet support
+	  MCAP, therefore multicast support is significantly limited.
 
 config IEEE1394_DV1394
 	tristate "OHCI-DV I/O support"

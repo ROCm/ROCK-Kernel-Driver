@@ -1646,7 +1646,7 @@ static struct Qdisc_class_ops htb_class_ops = {
 	.dump		=	htb_dump_class,
 };
 
-struct Qdisc_ops htb_qdisc_ops = {
+static struct Qdisc_ops htb_qdisc_ops = {
 	.next		=	NULL,
 	.cl_ops		=	&htb_class_ops,
 	.id		=	"htb",
@@ -1663,15 +1663,14 @@ struct Qdisc_ops htb_qdisc_ops = {
 	.owner		=	THIS_MODULE,
 };
 
-#ifdef MODULE
-int init_module(void)
+static int __init htb_module_init(void)
 {
     return register_qdisc(&htb_qdisc_ops);
 }
-
-void cleanup_module(void) 
+static void __exit htb_module_exit(void) 
 {
     unregister_qdisc(&htb_qdisc_ops);
 }
+module_init(htb_module_init)
+module_exit(htb_module_exit)
 MODULE_LICENSE("GPL");
-#endif

@@ -972,7 +972,7 @@ static unsigned int __init init_chipset_hpt366 (struct pci_dev *dev, const char 
 
 	if (!hpt366_proc) {
 		hpt366_proc = 1;
-		ide_pci_register_host_proc(&hpt366_procs[0]);
+		ide_pci_create_host_proc("hpt366", hpt366_get_info);
 	}
 #endif /* DISPLAY_HPT366_TIMINGS && CONFIG_PROC_FS */
 

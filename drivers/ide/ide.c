@@ -474,6 +474,8 @@ struct seq_operations ide_drivers_op = {
 };
 
 #ifdef CONFIG_PROC_FS
+struct proc_dir_entry *proc_ide_root;
+
 ide_proc_entry_t generic_subdriver_entries[] = {
 	{ "capacity",	S_IFREG|S_IRUGO,	proc_ide_read_capacity,	NULL },
 	{ NULL, 0, NULL, NULL }
@@ -642,10 +644,9 @@ void ide_unregister (unsigned int index)
 		drive = &hwif->drives[unit];
 		if (!drive->present)
 			continue;
-		if (drive->usage)
+		if (drive->usage || DRIVER(drive)->busy)
 			goto abort;
-		if (DRIVER(drive)->shutdown(drive))
-			goto abort;
+		drive->dead = 1;
 	}
 	hwif->present = 0;
 	
@@ -994,9 +995,7 @@ found:
 
 	if (!initializing) {
 		probe_hwif_init(hwif);
-#ifdef CONFIG_PROC_FS
 		create_proc_ide_interfaces();
-#endif
 	}
 
 	if (hwifp)
@@ -1392,7 +1391,6 @@ void ide_add_generic_settings (ide_drive_t *drive)
 	ide_add_setting(drive,	"keepsettings",		SETTING_RW,					HDIO_GET_KEEPSETTINGS,	HDIO_SET_KEEPSETTINGS,	TYPE_BYTE,	0,	1,				1,		1,		&drive->keep_settings,		NULL);
 	ide_add_setting(drive,	"nice1",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	1,				1,		1,		&drive->nice1,			NULL);
 	ide_add_setting(drive,	"pio_mode",		SETTING_WRITE,					-1,			HDIO_SET_PIO_MODE,	TYPE_BYTE,	0,	255,				1,		1,		NULL,				set_pio_mode);
-	ide_add_setting(drive,	"slow",			SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	1,				1,		1,		&drive->slow,			NULL);
 	ide_add_setting(drive,	"unmaskirq",		drive->no_unmask ? SETTING_READ : SETTING_RW,	HDIO_GET_UNMASKINTR,	HDIO_SET_UNMASKINTR,	TYPE_BYTE,	0,	1,				1,		1,		&drive->unmask,			NULL);
 	ide_add_setting(drive,	"using_dma",		SETTING_RW,					HDIO_GET_DMA,		HDIO_SET_DMA,		TYPE_BYTE,	0,	1,				1,		1,		&drive->using_dma,		set_using_dma);
 	ide_add_setting(drive,	"init_speed",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	70,				1,		1,		&drive->init_speed,		NULL);
@@ -1786,83 +1784,9 @@ static int __initdata is_chipset_set[MAX_HWIFS];
 
 /*
  * ide_setup() gets called VERY EARLY during initialization,
- * to handle kernel "command line" strings beginning with "hdx="
- * or "ide".  Here is the complete set currently supported:
+ * to handle kernel "command line" strings beginning with "hdx=" or "ide".
  *
- * "hdx="  is recognized for all "x" from "a" to "h", such as "hdc".
- * "idex=" is recognized for all "x" from "0" to "3", such as "ide1".
- *
- * "hdx=noprobe"	: drive may be present, but do not probe for it
- * "hdx=none"		: drive is NOT present, ignore cmos and do not probe
- * "hdx=nowerr"		: ignore the WRERR_STAT bit on this drive
- * "hdx=cdrom"		: drive is present, and is a cdrom drive
- * "hdx=cyl,head,sect"	: disk drive is present, with specified geometry
- * "hdx=remap63"	: add 63 to all sector numbers (for OnTrack DM)
- * "hdx=remap"		: remap 0->1 (for EZDrive)
- * "hdx=autotune"	: driver will attempt to tune interface speed
- *				to the fastest PIO mode supported,
- *				if possible for this drive only.
- *				Not fully supported by all chipset types,
- *				and quite likely to cause trouble with
- *				older/odd IDE drives.
- * "hdx=slow"		: insert a huge pause after each access to the data
- *				port. Should be used only as a last resort.
- *
- * "hdx=swapdata"	: when the drive is a disk, byte swap all data
- * "hdx=bswap"		: same as above..........
- * "hdxlun=xx"          : set the drive last logical unit.
- * "hdx=flash"		: allows for more than one ata_flash disk to be
- *				registered. In most cases, only one device
- *				will be present.
- * "hdx=scsi"		: the return of the ide-scsi flag, this is useful for
- *				allowing ide-floppy, ide-tape, and ide-cdrom|writers
- *				to use ide-scsi emulation on a device specific option.
- * "idebus=xx"		: inform IDE driver of VESA/PCI bus speed in MHz,
- *				where "xx" is between 20 and 66 inclusive,
- *				used when tuning chipset PIO modes.
- *				For PCI bus, 25 is correct for a P75 system,
- *				30 is correct for P90,P120,P180 systems,
- *				and 33 is used for P100,P133,P166 systems.
- *				If in doubt, use idebus=33 for PCI.
- *				As for VLB, it is safest to not specify it.
- *
- * "idex=noprobe"	: do not attempt to access/use this interface
- * "idex=base"		: probe for an interface at the addr specified,
- *				where "base" is usually 0x1f0 or 0x170
- *				and "ctl" is assumed to be "base"+0x206
- * "idex=base,ctl"	: specify both base and ctl
- * "idex=base,ctl,irq"	: specify base, ctl, and irq number
- * "idex=autotune"	: driver will attempt to tune interface speed
- *				to the fastest PIO mode supported,
- *				for all drives on this interface.
- *				Not fully supported by all chipset types,
- *				and quite likely to cause trouble with
- *				older/odd IDE drives.
- * "idex=noautotune"	: driver will NOT attempt to tune interface speed
- *				This is the default for most chipsets,
- *				except the cmd640.
- * "idex=serialize"	: do not overlap operations on idex and ide(x^1)
- * "idex=four"		: four drives on idex and ide(x^1) share same ports
- * "idex=reset"		: reset interface before first use
- * "idex=dma"		: enable DMA by default on both drives if possible
- * "idex=ata66"		: informs the interface that it has an 80c cable
- *				for chipsets that are ATA-66 capable, but
- *				the ablity to bit test for detection is
- *				currently unknown.
- * "ide=reverse"	: Formerly called to pci sub-system, but now local.
- *
- * The following are valid ONLY on ide0, (except dc4030)
- * and the defaults for the base,ctl ports must not be altered.
- *
- * "ide0=dtc2278"	: probe/support DTC2278 interface
- * "ide0=ht6560b"	: probe/support HT6560B interface
- * "ide0=cmd640_vlb"	: *REQUIRED* for VLB cards with the CMD640 chip
- *			  (not for PCI -- automatically detected)
- * "ide0=qd65xx"	: probe/support qd65xx interface
- * "ide0=ali14xx"	: probe/support ali14xx chipsets (ALI M1439, M1443, M1445)
- * "ide0=umc8672"	: probe/support umc8672 chipsets
- * "idex=dc4030"	: probe/support Promise DC4030VL interface
- * "ide=doubler"	: probe/support IDE doublers on Amiga
+ * Remember to update Documentation/ide.txt if you change something here.
  */
 int __init ide_setup (char *s)
 {
@@ -1915,8 +1839,8 @@ int __init ide_setup (char *s)
 	if (s[0] == 'h' && s[1] == 'd' && s[2] >= 'a' && s[2] <= max_drive) {
 		const char *hd_words[] = {
 			"none", "noprobe", "nowerr", "cdrom", "serialize",
-			"autotune", "noautotune", "slow", "swapdata", "bswap",
-			"flash", "remap", "remap63", "scsi", NULL };
+			"autotune", "noautotune", "minus8", "swapdata", "bswap",
+			"minus11", "remap", "remap63", "scsi", NULL };
 		unit = s[2] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
@@ -1941,7 +1865,6 @@ int __init ide_setup (char *s)
 		}
 		switch (match_parm(&s[3], hd_words, vals, 3)) {
 			case -1: /* "none" */
-				drive->nobios = 1;  /* drop into "noprobe" */
 			case -2: /* "noprobe" */
 				drive->noprobe = 1;
 				goto done;
@@ -1963,15 +1886,9 @@ int __init ide_setup (char *s)
 			case -7: /* "noautotune" */
 				drive->autotune = IDE_TUNE_NOAUTO;
 				goto done;
-			case -8: /* "slow" */
-				drive->slow = 1;
-				goto done;
 			case -9: /* "swapdata" */
 			case -10: /* "bswap" */
 				drive->bswap = 1;
-				goto done;
-			case -11: /* "flash" */
-				drive->ata_flash = 1;
 				goto done;
 			case -12: /* "remap" */
 				drive->remap_0_to_1 = 1;
@@ -2251,34 +2168,6 @@ static int default_cleanup (ide_drive_t *drive)
 	return ide_unregister_subdriver(drive);
 }
 
-/*
- *	Check if we can unregister the subdriver. Called with the
- *	request lock held.
- */
- 
-static int default_shutdown(ide_drive_t *drive)
-{
-	if (drive->usage || DRIVER(drive)->busy) {
-		return 1;
-	}
-	drive->dead = 1;
-	return 0;
-}
-
-/*
- *	Default function to use for the cache flush operation. This
- *	must be replaced for disk devices (see ATA specification
- *	documents on cache flush and drive suspend rules)
- *
- *	If we have no device attached or the device is not writable
- *	this handler is sufficient.
- */
- 
-static int default_flushcache (ide_drive_t *drive)
-{
-	return 0;
-}
-
 static ide_startstop_t default_do_request (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	ide_end_request(drive, 0, 0);
@@ -2341,8 +2230,6 @@ static ide_startstop_t default_start_power_step(ide_drive_t *drive,
 static void setup_driver_defaults (ide_driver_t *d)
 {
 	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
-	if (d->shutdown == NULL)	d->shutdown = default_shutdown;
-	if (d->flushcache == NULL)	d->flushcache = default_flushcache;
 	if (d->do_request == NULL)	d->do_request = default_do_request;
 	if (d->end_request == NULL)	d->end_request = default_end_request;
 	if (d->sense == NULL)		d->sense = default_sense;
@@ -2356,15 +2243,15 @@ static void setup_driver_defaults (ide_driver_t *d)
 		d->start_power_step = default_start_power_step;
 }
 
-int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version)
+int ide_register_subdriver(ide_drive_t *drive, ide_driver_t *driver)
 {
 	unsigned long flags;
-	
-	BUG_ON(drive->driver == NULL);
-	
+
+	BUG_ON(!drive->driver);
+
 	spin_lock_irqsave(&ide_lock, flags);
-	if (version != IDE_SUBDRIVER_VERSION || !drive->present ||
-	    drive->driver != &idedefault_driver || drive->usage || drive->dead) {
+	if (!drive->present || drive->driver != &idedefault_driver ||
+	    drive->usage || drive->dead) {
 		spin_unlock_irqrestore(&ide_lock, flags);
 		return 1;
 	}
@@ -2477,12 +2364,6 @@ void ide_unregister_driver(ide_driver_t *driver)
 			printk(KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
 			BUG();
 		}
-		/* We must remove proc entries defined in this module.
-		   Otherwise we oops while accessing these entries */
-#ifdef CONFIG_PROC_FS
-		if (drive->proc)
-			ide_remove_proc_entries(drive->proc, driver->proc);
-#endif
 		ata_attach(drive);
 	}
 }
@@ -2520,6 +2401,10 @@ int __init ide_init (void)
 	bus_register(&ide_bus_type);
 
 	init_ide_data();
+
+#ifdef CONFIG_PROC_FS
+	proc_ide_root = proc_mkdir("ide", 0);
+#endif
 
 #ifdef CONFIG_BLK_DEV_ALI14XX
 	if (probe_ali14xx)

@@ -21,7 +21,7 @@
 #define TX4927_CCFG_REG         0xff1fe000
 #define TX4927_IRC_REG          0xff1ff600
 #define TX4927_CE3      0x17f00000      /* 1M */
-#define TX4927_PCIRESET_ADDR    0x1c00f006
+#define TX4927_PCIRESET_ADDR    0xbc00f006
 #define TX4927_PCI_CLK_ADDR     (KSEG1 + TX4927_CE3 + 0x00040020)
 
 #define TX4927_IMSTAT_ADDR(n)   (KSEG1 + TX4927_CE3 + 0x0004001a + (n))

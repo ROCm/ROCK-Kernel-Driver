@@ -16,13 +16,13 @@
 #include <linux/ds17287rtc.h>
 #include <linux/interrupt.h>
 
+#include <asm/addrspace.h>
 #include <asm/irq.h>
 #include <asm/reboot.h>
-#include <asm/sgialib.h>
-#include <asm/addrspace.h>
-#include <asm/types.h>
 #include <asm/system.h>
 #include <asm/wbflush.h>
+#include <asm/ip32/mace.h>
+#include <asm/ip32/crime.h>
 #include <asm/ip32/ip32_ints.h>
 
 #define POWERDOWN_TIMEOUT	120
@@ -33,7 +33,7 @@
 #define PANIC_FREQ		(HZ / 8)
 
 static struct timer_list power_timer, blink_timer, debounce_timer;
-static int shuting_down = 0, has_paniced = 0;
+static int has_paniced, shuting_down;
 
 static void ip32_machine_restart(char *command) __attribute__((noreturn));
 static void ip32_machine_halt(void) __attribute__((noreturn));
@@ -41,16 +41,13 @@ static void ip32_machine_power_off(void) __attribute__((noreturn));
 
 static void ip32_machine_restart(char *cmd)
 {
-	if (shuting_down)
-		ip32_machine_power_off();
-	ArcReboot();
+	crime_write(CRIME_CONTROL_HARD_RESET, CRIME_CONTROL);
+	while (1);
 }
 
 static inline void ip32_machine_halt(void)
 {
-	if (shuting_down)
-		ip32_machine_power_off();
-	ArcEnterInteractiveMode();
+	ip32_machine_power_off();
 }
 
 static void ip32_machine_power_off(void)
@@ -76,10 +73,7 @@ static void ip32_machine_power_off(void)
 	CMOS_WRITE(xctrl_a | DS_XCTRL4A_PAB, DS_B1_XCTRL4A);
 	CMOS_WRITE(reg_a, RTC_REG_A);
 	wbflush();
-
-	while(1) {
-	  	printk(KERN_DEBUG "Power off!\n");
-	}
+	while (1);
 }
 
 static void power_timeout(unsigned long data)
@@ -89,35 +83,33 @@ static void power_timeout(unsigned long data)
 
 static void blink_timeout(unsigned long data)
 {
-	u64 mc_led =  mace_read_64(MACEISA_FLASH_NIC_REG);
-
-	mc_led ^= MACEISA_LED_RED;
-	mace_write_64(MACEISA_FLASH_NIC_REG, mc_led);
+	unsigned long led = mace_perif_ctrl_read(misc) ^ MACEISA_LED_RED;
+	mace_perif_ctrl_write(led, misc);
 	mod_timer(&blink_timer, jiffies+data);
 }
 
 static void debounce(unsigned long data)
 {
-	volatile unsigned char reg_a,reg_c,xctrl_a;
+	volatile unsigned char reg_a, reg_c, xctrl_a;
 
 	reg_c = CMOS_READ(RTC_INTR_FLAGS);
 	CMOS_WRITE(reg_a | DS_REGA_DV0, RTC_REG_A);
 	wbflush();
 	xctrl_a = CMOS_READ(DS_B1_XCTRL4A);
-	if( (xctrl_a & DS_XCTRL4A_IFS ) || ( reg_c & RTC_IRQF ) ) {
+	if ((xctrl_a & DS_XCTRL4A_IFS) || (reg_c & RTC_IRQF )) {
 		/* Interrupt still being sent. */
 		debounce_timer.expires = jiffies + 50;
 		add_timer(&debounce_timer);
 
 		/* clear interrupt source */
-		CMOS_WRITE( xctrl_a & ~DS_XCTRL4A_IFS, DS_B1_XCTRL4A);
+		CMOS_WRITE(xctrl_a & ~DS_XCTRL4A_IFS, DS_B1_XCTRL4A);
 		CMOS_WRITE(reg_a & ~DS_REGA_DV0, RTC_REG_A);
 		return;
 	}
 	CMOS_WRITE(reg_a & ~DS_REGA_DV0, RTC_REG_A);
 
 	if (has_paniced)
-		ArcReboot();
+		ip32_machine_restart(NULL);
 
 	enable_irq(MACEISA_RTC_IRQ);
 }
@@ -147,7 +139,7 @@ static irqreturn_t ip32_rtc_int(int irq, void *dev_id, struct pt_regs *regs)
 	volatile unsigned char reg_c;
 
 	reg_c = CMOS_READ(RTC_INTR_FLAGS);
-	if( ! (reg_c & RTC_IRQF) ) {
+	if (!(reg_c & RTC_IRQF)) {
 		printk(KERN_WARNING 
 			"%s: RTC IRQ without RTC_IRQF\n", __FUNCTION__);
 	}
@@ -164,18 +156,17 @@ static irqreturn_t ip32_rtc_int(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static int panic_event(struct notifier_block *this, unsigned long event,
-                      void *ptr)
+		       void *ptr)
 {
-	u64 mc_led;
+	unsigned long led;
 
 	if (has_paniced)
 		return NOTIFY_DONE;
 	has_paniced = 1;
 
 	/* turn off the green LED */
-	mc_led = mace_read_64(MACEISA_FLASH_NIC_REG);
-	mc_led |= MACEISA_LED_GREEN;
-	mace_write_64(MACEISA_FLASH_NIC_REG, mc_led);
+	led = mace_perif_ctrl_read(misc) | MACEISA_LED_GREEN;
+	mace_perif_ctrl_write(led, misc);
 
 	blink_timer.data = PANIC_FREQ;
 	blink_timeout(PANIC_FREQ);
@@ -189,7 +180,11 @@ static struct notifier_block panic_block = {
 
 static __init int ip32_reboot_setup(void)
 {
-	u64 mc_led =  mace_read_64(MACEISA_FLASH_NIC_REG);
+	/* turn on the green led only */
+	unsigned long led = mace_perif_ctrl_read(misc);
+	led |= MACEISA_LED_RED;
+	led &= ~MACEISA_LED_GREEN;
+	mace_perif_ctrl_write(led, misc);
 
 	_machine_restart = ip32_machine_restart;
 	_machine_halt = ip32_machine_halt;
@@ -198,11 +193,6 @@ static __init int ip32_reboot_setup(void)
 	init_timer(&blink_timer);
 	blink_timer.function = blink_timeout;
 	notifier_chain_register(&panic_notifier_list, &panic_block);
-
-	/* turn on the green led only */
-	mc_led |= MACEISA_LED_RED;
-	mc_led &= ~MACEISA_LED_GREEN;
-	mace_write_64(MACEISA_FLASH_NIC_REG, mc_led);
 
 	return 0;
 }

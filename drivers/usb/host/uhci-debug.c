@@ -225,20 +225,22 @@ static int uhci_show_sc(int port, unsigned short status, char *buf, int len)
 	char *out = buf;
 
 	/* Try to make sure there's enough memory */
-	if (len < 80)
+	if (len < 160)
 		return 0;
 
-	out += sprintf(out, "  stat%d     =     %04x   %s%s%s%s%s%s%s%s\n",
+	out += sprintf(out, "  stat%d     =     %04x  %s%s%s%s%s%s%s%s%s%s\n",
 		port,
 		status,
-		(status & USBPORTSC_SUSP) ? "PortSuspend " : "",
-		(status & USBPORTSC_PR) ?   "PortReset " : "",
-		(status & USBPORTSC_LSDA) ? "LowSpeed " : "",
-		(status & USBPORTSC_RD) ?   "ResumeDetect " : "",
-		(status & USBPORTSC_PEC) ?  "EnableChange " : "",
-		(status & USBPORTSC_PE) ?   "PortEnabled " : "",
-		(status & USBPORTSC_CSC) ?  "ConnectChange " : "",
-		(status & USBPORTSC_CCS) ?  "PortConnected " : "");
+		(status & USBPORTSC_SUSP) ?	" Suspend" : "",
+		(status & USBPORTSC_OCC) ?	" OverCurrentChange" : "",
+		(status & USBPORTSC_OC) ?	" OverCurrent" : "",
+		(status & USBPORTSC_PR) ?	" Reset" : "",
+		(status & USBPORTSC_LSDA) ?	" LowSpeed" : "",
+		(status & USBPORTSC_RD) ?	" ResumeDetect" : "",
+		(status & USBPORTSC_PEC) ?	" EnableChange" : "",
+		(status & USBPORTSC_PE) ?	" Enabled" : "",
+		(status & USBPORTSC_CSC) ?	" ConnectChange" : "",
+		(status & USBPORTSC_CCS) ?	" Connected" : "");
 
 	return out - buf;
 }
@@ -321,8 +323,8 @@ static int uhci_show_urbp(struct uhci_hcd *uhci, struct urb_priv *urbp, char *bu
 	out += sprintf(out, "%s", (urbp->fsbr ? "FSBR " : ""));
 	out += sprintf(out, "%s", (urbp->fsbr_timeout ? "FSBR_TO " : ""));
 
-	if (urbp->status != -EINPROGRESS)
-		out += sprintf(out, "Status=%d ", urbp->status);
+	if (urbp->urb->status != -EINPROGRESS)
+		out += sprintf(out, "Status=%d ", urbp->urb->status);
 	//out += sprintf(out, "Inserttime=%lx ",urbp->inserttime);
 	//out += sprintf(out, "FSBRtime=%lx ",urbp->fsbrtime);
 
@@ -402,7 +404,7 @@ static int uhci_show_lists(struct uhci_hcd *uhci, char *buf, int len)
 		head = &uhci->complete_list;
 		tmp = head->next;
 		while (tmp != head) {
-			struct urb_priv *urbp = list_entry(tmp, struct urb_priv, complete_list);
+			struct urb_priv *urbp = list_entry(tmp, struct urb_priv, urb_list);
 
 			out += sprintf(out, "  %d: ", ++count);
 			out += uhci_show_urbp(uhci, urbp, out, len - (out - buf));
@@ -418,7 +420,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 {
 	unsigned long flags;
 	char *out = buf;
-	int i;
+	int i, j;
 	struct uhci_qh *qh;
 	struct uhci_td *td;
 	struct list_head *tmp, *head;
@@ -473,10 +475,11 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 			continue;
 		}
 
+		j = (i < 7) ? 7 : i+1;		/* Next skeleton */
 		if (list_empty(&qh->list)) {
 			if (i < UHCI_NUM_SKELQH - 1) {
 				if (qh->link !=
-				    (cpu_to_le32(uhci->skelqh[i + 1]->dma_handle) | UHCI_PTR_QH)) {
+				    (cpu_to_le32(uhci->skelqh[j]->dma_handle) | UHCI_PTR_QH)) {
 					show_qh_name();
 					out += sprintf(out, "    skeleton QH not linked to next skeleton QH!\n");
 				}
@@ -500,7 +503,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 
 		if (i < UHCI_NUM_SKELQH - 1) {
 			if (qh->link !=
-			    (cpu_to_le32(uhci->skelqh[i + 1]->dma_handle) | UHCI_PTR_QH))
+			    (cpu_to_le32(uhci->skelqh[j]->dma_handle) | UHCI_PTR_QH))
 				out += sprintf(out, "    last QH not linked to next skeleton!\n");
 		}
 	}

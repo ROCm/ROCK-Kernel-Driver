@@ -552,6 +552,8 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		return;
 	}
 
+	srb->result = SAM_STAT_GOOD;
+
 	/* Determine if we need to auto-sense
 	 *
 	 * I normally don't use a flag like this, but it's almost impossible
@@ -561,23 +563,14 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/*
 	 * If we're running the CB transport, which is incapable
-	 * of determining status on it's own, we need to auto-sense almost
-	 * every time.
+	 * of determining status on its own, we need to auto-sense
+	 * unless the operation involved a data-in transfer.  Devices
+	 * can signal data-in errors by stalling the bulk-in pipe.
 	 */
-	if (us->protocol == US_PR_CB || us->protocol == US_PR_DPCM_USB) {
+	if ((us->protocol == US_PR_CB || us->protocol == US_PR_DPCM_USB) &&
+			srb->sc_data_direction != SCSI_DATA_READ) {
 		US_DEBUGP("-- CB transport device requiring auto-sense\n");
 		need_auto_sense = 1;
-
-		/* There are some exceptions to this.  Notably, if this is
-		 * a UFI device and the command is REQUEST_SENSE or INQUIRY,
-		 * then it is impossible to truly determine status.
-		 */
-		if (us->subclass == US_SC_UFI &&
-		    ((srb->cmnd[0] == REQUEST_SENSE) ||
-		     (srb->cmnd[0] == INQUIRY))) {
-			US_DEBUGP("** no auto-sense for a special command\n");
-			need_auto_sense = 0;
-		}
 	}
 
 	/*
@@ -591,8 +584,8 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	}
 
 	/*
-	 * Also, if we have a short transfer on a command that can't have
-	 * a short transfer, we're going to do this.
+	 * A short transfer on a command where we don't expect it
+	 * is unusual, but it doesn't mean we need to auto-sense.
 	 */
 	if ((srb->resid > 0) &&
 	    !((srb->cmnd[0] == REQUEST_SENSE) ||
@@ -601,7 +594,6 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	      (srb->cmnd[0] == LOG_SENSE) ||
 	      (srb->cmnd[0] == MODE_SENSE_10))) {
 		US_DEBUGP("-- unexpectedly short transfer\n");
-		need_auto_sense = 1;
 	}
 
 	/* Now, if we need to do the auto-sense, let's do it */
@@ -614,6 +606,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		unsigned char old_cmd_len;
 		unsigned char old_cmnd[MAX_COMMAND_SIZE];
 		unsigned long old_serial_number;
+		int old_resid;
 
 		US_DEBUGP("Issuing auto-REQUEST_SENSE\n");
 
@@ -654,9 +647,12 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		srb->serial_number ^= 0x80000000;
 
 		/* issue the auto-sense command */
+		old_resid = srb->resid;
+		srb->resid = 0;
 		temp_result = us->transport(us->srb, us);
 
 		/* let's clean up right away */
+		srb->resid = old_resid;
 		srb->request_buffer = old_request_buffer;
 		srb->request_bufflen = old_request_bufflen;
 		srb->use_sg = old_sg;
@@ -698,26 +694,15 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		/* set the result so the higher layers expect this data */
 		srb->result = SAM_STAT_CHECK_CONDITION;
 
-		/* If things are really okay, then let's show that */
-		if ((srb->sense_buffer[2] & 0xf) == 0x0)
+		/* If things are really okay, then let's show that.  Zero
+		 * out the sense buffer so the higher layers won't realize
+		 * we did an unsolicited auto-sense. */
+		if (result == USB_STOR_TRANSPORT_GOOD &&
+				(srb->sense_buffer[2] & 0xf) == 0x0) {
 			srb->result = SAM_STAT_GOOD;
-	} else /* if (need_auto_sense) */
-		srb->result = SAM_STAT_GOOD;
-
-	/* Regardless of auto-sense, if we _know_ we have an error
-	 * condition, show that in the result code
-	 */
-	if (result == USB_STOR_TRANSPORT_FAILED)
-		srb->result = SAM_STAT_CHECK_CONDITION;
-
-	/* If we think we're good, then make sure the sense data shows it.
-	 * This is necessary because the auto-sense for some devices always
-	 * sets byte 0 == 0x70, even if there is no error
-	 */
-	if ((us->protocol == US_PR_CB || us->protocol == US_PR_DPCM_USB) && 
-	    (result == USB_STOR_TRANSPORT_GOOD) &&
-	    ((srb->sense_buffer[2] & 0xf) == 0x0))
-		srb->sense_buffer[0] = 0x0;
+			srb->sense_buffer[0] = 0x0;
+		}
+	}
 	return;
 
 	/* abort processing: the bulk-only transport requires a reset
@@ -792,6 +777,10 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 					srb->request_buffer, transfer_length,
 					srb->use_sg, &srb->resid);
 		US_DEBUGP("CBI data stage result is 0x%x\n", result);
+
+		/* if we stalled the data transfer it means command failed */
+		if (result == USB_STOR_XFER_STALLED)
+			return USB_STOR_TRANSPORT_FAILED;
 		if (result > USB_STOR_XFER_STALLED)
 			return USB_STOR_TRANSPORT_ERROR;
 	}
@@ -883,6 +872,10 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 					srb->request_buffer, transfer_length,
 					srb->use_sg, &srb->resid);
 		US_DEBUGP("CB data stage result is 0x%x\n", result);
+
+		/* if we stalled the data transfer it means command failed */
+		if (result == USB_STOR_XFER_STALLED)
+			return USB_STOR_TRANSPORT_FAILED;
 		if (result > USB_STOR_XFER_STALLED)
 			return USB_STOR_TRANSPORT_ERROR;
 	}
@@ -929,6 +922,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	unsigned int residue;
 	int result;
 	int fake_sense = 0;
+	unsigned int cswlen;
 
 	/* set up the command wrapper */
 	bcb->Signature = cpu_to_le32(US_BULK_CB_SIGN);
@@ -985,7 +979,17 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* get CSW for device status */
 	US_DEBUGP("Attempting to get CSW...\n");
 	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
-				bcs, US_BULK_CS_WRAP_LEN, NULL);
+				bcs, US_BULK_CS_WRAP_LEN, &cswlen);
+
+	/* Some broken devices add unnecessary zero-length packets to the
+	 * end of their data transfers.  Such packets show up as 0-length
+	 * CSWs.  If we encounter such a thing, try to read the CSW again.
+	 */
+	if (result == USB_STOR_XFER_SHORT && cswlen == 0) {
+		US_DEBUGP("Received 0-length CSW; retrying...\n");
+		result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+				bcs, US_BULK_CS_WRAP_LEN, &cswlen);
+	}
 
 	/* did the attempt to read the CSW fail? */
 	if (result == USB_STOR_XFER_STALLED) {

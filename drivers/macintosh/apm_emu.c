@@ -440,7 +440,7 @@ static int apm_emu_get_info(char *buf, char **start, off_t fpos, int length)
 	char *		p = buf;
 	char		charging       = 0;
 	long		charge	       = -1;
-	long		current        = 0;
+	long		amperage       = 0;
 	unsigned long	btype          = 0;
 
 	ac_line_status = ((pmu_power_flags & PMU_PWR_AC_PRESENT) != 0);
@@ -453,7 +453,7 @@ static int apm_emu_get_info(char *buf, char **start, off_t fpos, int length)
 			percentage += (pmu_batteries[i].charge * 100) /
 				pmu_batteries[i].max_charge;
 			charge += pmu_batteries[i].charge;
-			current += pmu_batteries[i].current;
+			amperage += pmu_batteries[i].amperage;
 			if (btype == 0)
 				btype = (pmu_batteries[i].flags & PMU_BATT_TYPE_MASK);
 			real_count++;
@@ -462,11 +462,11 @@ static int apm_emu_get_info(char *buf, char **start, off_t fpos, int length)
 		}
 	}
 	if (real_count) {
-		if (current < 0) {
+		if (amperage < 0) {
 			if (btype == PMU_BATT_TYPE_SMART)
-				time_units = (charge * 59) / (current * -1);
+				time_units = (charge * 59) / (amperage * -1);
 			else
-				time_units = (charge * 16440) / (current * -60);
+				time_units = (charge * 16440) / (amperage * -60);
 		}
 		percentage /= real_count;
 		if (charging > 0) {

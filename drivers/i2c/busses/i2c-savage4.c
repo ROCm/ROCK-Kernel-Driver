@@ -124,7 +124,7 @@ static int bit_savi2c_getsda(void *data)
 
 static int config_s4(struct pci_dev *dev)
 {
-	unsigned int cadr;
+	unsigned long cadr;
 
 	/* map memory */
 	cadr = dev->resource[0].start;

@@ -425,7 +425,7 @@ out:
 }
 
 
-int __init tc_filter_init(void)
+static int __init tc_filter_init(void)
 {
 	struct rtnetlink_link *link_p = rtnetlink_links[PF_UNSPEC];
 
@@ -439,31 +439,10 @@ int __init tc_filter_init(void)
 		link_p[RTM_GETTFILTER-RTM_BASE].doit = tc_ctl_tfilter;
 		link_p[RTM_GETTFILTER-RTM_BASE].dumpit = tc_dump_tfilter;
 	}
-#define INIT_TC_FILTER(name) { \
-          extern struct tcf_proto_ops cls_##name##_ops; \
-          register_tcf_proto_ops(&cls_##name##_ops); \
-	}
-
-#ifdef CONFIG_NET_CLS_U32
-	INIT_TC_FILTER(u32);
-#endif
-#ifdef CONFIG_NET_CLS_ROUTE4
-	INIT_TC_FILTER(route4);
-#endif
-#ifdef CONFIG_NET_CLS_FW
-	INIT_TC_FILTER(fw);
-#endif
-#ifdef CONFIG_NET_CLS_RSVP
-	INIT_TC_FILTER(rsvp);
-#endif
-#ifdef CONFIG_NET_CLS_TCINDEX
-	INIT_TC_FILTER(tcindex);
-#endif
-#ifdef CONFIG_NET_CLS_RSVP6
-	INIT_TC_FILTER(rsvp6);
-#endif
 	return 0;
 }
+
+subsys_initcall(tc_filter_init);
 
 EXPORT_SYMBOL(register_tcf_proto_ops);
 EXPORT_SYMBOL(unregister_tcf_proto_ops);

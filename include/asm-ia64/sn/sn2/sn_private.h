@@ -11,6 +11,7 @@
 #include <linux/wait.h>
 #include <asm/sn/nodepda.h>
 #include <asm/sn/io.h>
+#include <asm/sn/iograph.h>
 #include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/xtalk/xtalk_private.h>
 

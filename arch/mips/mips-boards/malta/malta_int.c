@@ -32,15 +32,14 @@
 
 #include <asm/i8259.h>
 #include <asm/io.h>
-#include <asm/mips-boards/generic.h>
 #include <asm/mips-boards/malta.h>
 #include <asm/mips-boards/maltaint.h>
 #include <asm/mips-boards/piix4.h>
-#include <asm/mips-boards/msc01_pci.h>
 #include <asm/gt64120.h>
+#include <asm/mips-boards/generic.h>
+#include <asm/mips-boards/msc01_pci.h>
 
 extern asmlinkage void mipsIRQ(void);
-extern int mips_pcibios_iack(void);
 
 #ifdef CONFIG_KGDB
 extern void breakpoint(void);
@@ -49,6 +48,55 @@ extern int remote_debug;
 #endif
 
 static spinlock_t mips_irq_lock = SPIN_LOCK_UNLOCKED;
+
+static inline int mips_pcibios_iack(void)
+{
+	int irq;
+        u32 dummy;
+
+	/*
+	 * Determine highest priority pending interrupt by performing
+	 * a PCI Interrupt Acknowledge cycle.
+	 */
+	switch(mips_revision_corid) {
+	case MIPS_REVISION_CORID_CORE_MSC:
+	case MIPS_REVISION_CORID_CORE_FPGA2:
+	case MIPS_REVISION_CORID_CORE_EMUL_MSC:
+	        MSC_READ(MSC01_PCI_IACK, irq);
+		irq &= 0xff;
+		break;
+	case MIPS_REVISION_CORID_QED_RM5261:
+	case MIPS_REVISION_CORID_CORE_LV:
+	case MIPS_REVISION_CORID_CORE_FPGA:
+	case MIPS_REVISION_CORID_CORE_FPGAR2:
+		irq = GT_READ(GT_PCI0_IACK_OFS);
+		irq &= 0xff;
+		break;
+	case MIPS_REVISION_CORID_BONITO64:
+	case MIPS_REVISION_CORID_CORE_20K:
+	case MIPS_REVISION_CORID_CORE_EMUL_BON:
+		/* The following will generate a PCI IACK cycle on the
+		 * Bonito controller. It's a little bit kludgy, but it
+		 * was the easiest way to implement it in hardware at
+		 * the given time.
+		 */
+		BONITO_PCIMAP_CFG = 0x20000;
+
+		/* Flush Bonito register block */
+		dummy = BONITO_PCIMAP_CFG;
+		iob();    /* sync */
+
+		irq = *(volatile u32 *)(_pcictrl_bonito_pcicfg);
+		iob();    /* sync */
+		irq &= 0xff;
+		BONITO_PCIMAP_CFG = 0;
+		break;
+	default:
+	        printk("Unknown Core card, don't know the system controller.\n");
+		return -1;
+	}
+	return irq;
+}
 
 static inline int get_int(int *irq)
 {
@@ -104,18 +152,22 @@ void corehi_irqdispatch(struct pt_regs *regs)
 , regs->cp0_epc, regs->cp0_status, regs->cp0_cause, regs->cp0_badvaddr);
         switch(mips_revision_corid) {
         case MIPS_REVISION_CORID_CORE_MSC:
+        case MIPS_REVISION_CORID_CORE_FPGA2:
+	case MIPS_REVISION_CORID_CORE_EMUL_MSC:
                 break;
         case MIPS_REVISION_CORID_QED_RM5261:
         case MIPS_REVISION_CORID_CORE_LV:
         case MIPS_REVISION_CORID_CORE_FPGA:
-                GT_READ(GT_INTRCAUSE_OFS, data);
+        case MIPS_REVISION_CORID_CORE_FPGAR2:
+                data = GT_READ(GT_INTRCAUSE_OFS);
                 printk("GT_INTRCAUSE = %08x\n", data);
-                GT_READ(0x70, data);
-                GT_READ(0x78, datahi);
-                printk("GT_CPU_ERR_ADDR = %0x2%08x\n", datahi,data);
+                data = GT_READ(0x70);
+                datahi = GT_READ(0x78);
+                printk("GT_CPU_ERR_ADDR = %02x%08x\n", datahi, data);
                 break;
         case MIPS_REVISION_CORID_BONITO64:
         case MIPS_REVISION_CORID_CORE_20K:
+        case MIPS_REVISION_CORID_CORE_EMUL_BON:
                 data = BONITO_INTISR;
                 printk("BONITO_INTISR = %08x\n", data);
                 data = BONITO_INTEN;

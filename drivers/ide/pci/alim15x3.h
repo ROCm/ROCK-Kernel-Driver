@@ -7,24 +7,6 @@
 
 #define DISPLAY_ALI_TIMINGS
 
-#if defined(DISPLAY_ALI_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 ali_proc;
-
-static int ali_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t ali_procs[] = {
-	{
-		.name		= "ali",
-		.set		= 1,
-		.get_info	= ali_get_info,
-		.parent		= NULL,
-	},
-};
-#endif /* DISPLAY_ALI_TIMINGS && CONFIG_PROC_FS */
-
 static unsigned int init_chipset_ali15x3(struct pci_dev *, const char *);
 static void init_hwif_common_ali15x3(ide_hwif_t *);
 static void init_hwif_ali15x3(ide_hwif_t *);

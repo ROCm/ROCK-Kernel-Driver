@@ -1165,7 +1165,7 @@ int __init psched_calibrate_clock(void)
 }
 #endif
 
-int __init pktsched_init(void)
+static int __init pktsched_init(void)
 {
 	struct rtnetlink_link *link_p;
 
@@ -1197,64 +1197,14 @@ int __init pktsched_init(void)
 		link_p[RTM_GETTCLASS-RTM_BASE].dumpit = tc_dump_tclass;
 	}
 
-#define INIT_QDISC(name) { \
-          extern struct Qdisc_ops name##_qdisc_ops; \
-          register_qdisc(& name##_qdisc_ops);       \
-	}
-
-	INIT_QDISC(pfifo);
-	INIT_QDISC(bfifo);
-
-#ifdef CONFIG_NET_SCH_CBQ
-	INIT_QDISC(cbq);
-#endif
-#ifdef CONFIG_NET_SCH_HTB
-	INIT_QDISC(htb);
-#endif
-#ifdef CONFIG_NET_SCH_CSZ
-	INIT_QDISC(csz);
-#endif
-#ifdef CONFIG_NET_SCH_HPFQ
-	INIT_QDISC(hpfq);
-#endif
-#ifdef CONFIG_NET_SCH_HFSC
-	INIT_QDISC(hfsc);
-#endif
-#ifdef CONFIG_NET_SCH_RED
-	INIT_QDISC(red);
-#endif
-#ifdef CONFIG_NET_SCH_GRED
-       INIT_QDISC(gred);
-#endif
-#ifdef CONFIG_NET_SCH_INGRESS
-       INIT_QDISC(ingress);
-#endif
-#ifdef CONFIG_NET_SCH_DSMARK
-       INIT_QDISC(dsmark);
-#endif
-#ifdef CONFIG_NET_SCH_SFQ
-	INIT_QDISC(sfq);
-#endif
-#ifdef CONFIG_NET_SCH_TBF
-	INIT_QDISC(tbf);
-#endif
-#ifdef CONFIG_NET_SCH_TEQL
-	teql_init();
-#endif
-#ifdef CONFIG_NET_SCH_PRIO
-	INIT_QDISC(prio);
-#endif
-#ifdef CONFIG_NET_SCH_ATM
-	INIT_QDISC(atm);
-#endif
-#ifdef CONFIG_NET_CLS
-	tc_filter_init();
-#endif
-
+	register_qdisc(&pfifo_qdisc_ops);
+	register_qdisc(&bfifo_qdisc_ops);
 	proc_net_fops_create("psched", 0, &psched_fops);
 
 	return 0;
 }
+
+subsys_initcall(pktsched_init);
 
 EXPORT_SYMBOL(qdisc_copy_stats);
 EXPORT_SYMBOL(qdisc_get_rtab);

@@ -34,46 +34,13 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
-#include <asm/au1000.h>
+#include <asm/mach-au1x00/au1000.h>
 #ifdef CONFIG_MIPS_PB1000
-#include <asm/pb1000.h>
+#include <asm/mac-pb1x00/pb1000.h>
 #endif
-#include <asm/pci_channel.h>
 
 #define PCI_ACCESS_READ  0
 #define PCI_ACCESS_WRITE 1
-
-#undef DEBUG
-#ifdef 	DEBUG
-#define	DBG(x...)	printk(x)
-#else
-#define	DBG(x...)
-#endif
-
-/* TBD */
-static struct resource pci_io_resource = {
-	"pci IO space",
-	(u32) PCI_IO_START,
-	(u32) PCI_IO_END,
-	IORESOURCE_IO
-};
-
-static struct resource pci_mem_resource = {
-	"pci memory space",
-	(u32) PCI_MEM_START,
-	(u32) PCI_MEM_END,
-	IORESOURCE_MEM
-};
-
-extern struct pci_ops au1x_pci_ops;
-
-struct pci_channel mips_pci_channels[] = {
-	{&au1x_pci_ops, &pci_io_resource, &pci_mem_resource,
-	 PCI_FIRST_DEVFN, PCI_LAST_DEVFN},
-	{(struct pci_ops *) NULL, (struct resource *) NULL,
-	 (struct resource *) NULL, (int) NULL, (int) NULL}
-};
-
 
 #ifdef CONFIG_MIPS_PB1000
 /*
@@ -101,12 +68,6 @@ static int config_access(unsigned char access_type, struct pci_dev *dev,
 		*data = au_readl(config);
 	}
 	au_sync_udelay(1);
-
-	DBG("config_access: %d bus %d dev_fn %x at %x *data %x, conf %x\n",
-	    access_type, bus, dev_fn, where, *data, config);
-
-	DBG("bridge config reg: %x (%x)\n", au_readl(PCI_BRIDGE_CONFIG),
-	    *data);
 
 	if (au_readl(PCI_BRIDGE_CONFIG) & (1 << 16)) {
 		*data = 0xffffffff;
@@ -178,20 +139,11 @@ static int config_access(unsigned char access_type, struct pci_bus *bus,
 	}
 	au_sync_udelay(2);
 
-
-	DBG("config_access: %d bus %d device %d at %x *data %x, conf %x\n",
-	    access_type, bus->number, device, where, *data, config);
-
 	/* unmap io space */
 	iounmap((void *) cfg_addr);
 
 	/* check master abort */
 	status = au_readl(Au1500_PCI_STATCMD);
-#if 0
-	if (access_type == PCI_ACCESS_READ) {
-		printk("read data: %x\n", *data);
-	}
-#endif
 	if (status & (1 << 29)) {
 		*data = 0xffffffff;
 		return -1;
@@ -268,9 +220,6 @@ write_config_word(struct pci_bus *bus, unsigned int devfn, int where,
 {
 	u32 data = 0;
 
-	if (where & 1)
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-
 	if (config_access(PCI_ACCESS_READ, bus, devfn, where, &data))
 		return -1;
 
@@ -288,9 +237,6 @@ static int
 write_config_dword(struct pci_bus *bus, unsigned int devfn, int where,
 		   u32 val)
 {
-	if (where & 3)
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-
 	if (config_access(PCI_ACCESS_WRITE, bus, devfn, where, &val))
 		return -1;
 

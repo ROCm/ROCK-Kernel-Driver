@@ -785,7 +785,7 @@ static void proc_reports_siimage (struct pci_dev *dev, u8 clocking, const char *
 
 	if (!siimage_proc) {
 		siimage_proc = 1;
-		ide_pci_register_host_proc(&siimage_procs[0]);
+		ide_pci_create_host_proc("siimage", siimage_get_info);
 	}
 #endif /* DISPLAY_SIIMAGE_TIMINGS && CONFIG_PROC_FS */
 }

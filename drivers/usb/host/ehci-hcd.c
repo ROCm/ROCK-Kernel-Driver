@@ -26,6 +26,7 @@
 
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/dmapool.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/ioport.h>
@@ -40,6 +41,7 @@
 #include <linux/reboot.h>
 #include <linux/usb.h>
 #include <linux/moduleparam.h>
+#include <linux/dma-mapping.h>
 
 #include "../core/hcd.h"
 
@@ -67,6 +69,7 @@
  *
  * HISTORY:
  *
+ * 2004-02-24 Replace pci_* with generic dma_* API calls (dsaxena@plexity.net)
  * 2003-12-29 Rewritten high speed iso transfer support (by Michal Sojka,
  *	<sojkam@centrum.cz>, updates by DB).
  *
@@ -288,13 +291,13 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 
 		/* request handoff to OS */
 		cap &= 1 << 24;
-		pci_write_config_dword (ehci->hcd.pdev, where, cap);
+		pci_write_config_dword (to_pci_dev(ehci->hcd.self.controller), where, cap);
 
 		/* and wait a while for it to happen */
 		do {
 			wait_ms (10);
 			msec -= 10;
-			pci_read_config_dword (ehci->hcd.pdev, where, &cap);
+			pci_read_config_dword (to_pci_dev(ehci->hcd.self.controller), where, &cap);
 		} while ((cap & (1 << 16)) && msec);
 		if (cap & (1 << 16)) {
 			ehci_err (ehci, "BIOS handoff failed (%d, %04x)\n",
@@ -339,7 +342,7 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 	while (temp) {
 		u32		cap;
 
-		pci_read_config_dword (ehci->hcd.pdev, temp, &cap);
+		pci_read_config_dword (to_pci_dev(ehci->hcd.self.controller), temp, &cap);
 		ehci_dbg (ehci, "capability %04x at %02x\n", cap, temp);
 		switch (cap & 0xff) {
 		case 1:			/* BIOS/SMM/... handoff */
@@ -378,7 +381,7 @@ static int ehci_start (struct usb_hcd *hcd)
 	 * periodic_size can shrink by USBCMD update if hcc_params allows.
 	 */
 	ehci->periodic_size = DEFAULT_I_TDPS;
-	if ((retval = ehci_mem_init (ehci, SLAB_KERNEL)) < 0)
+	if ((retval = ehci_mem_init (ehci, GFP_KERNEL)) < 0)
 		return retval;
 
 	/* controllers may cache some of the periodic schedule ... */
@@ -433,13 +436,13 @@ static int ehci_start (struct usb_hcd *hcd)
 		writel (0, &ehci->regs->segment);
 #if 0
 // this is deeply broken on almost all architectures
-		if (!pci_set_dma_mask (ehci->hcd.pdev, 0xffffffffffffffffULL))
+		if (!pci_set_dma_mask (to_pci_dev(ehci->hcd.self.controller), 0xffffffffffffffffULL))
 			ehci_info (ehci, "enabled 64bit PCI DMA\n");
 #endif
 	}
 
 	/* help hc dma work well with cachelines */
-	pci_set_mwi (ehci->hcd.pdev);
+	pci_set_mwi (to_pci_dev(ehci->hcd.self.controller));
 
 	/* clear interrupt enables, set irq latency */
 	temp = readl (&ehci->regs->command) & 0x0fff;
@@ -493,7 +496,7 @@ done2:
 	readl (&ehci->regs->command);	/* unblock posted write */
 
         /* PCI Serial Bus Release Number is at 0x60 offset */
-	pci_read_config_byte (hcd->pdev, 0x60, &tempbyte);
+	pci_read_config_byte(to_pci_dev(hcd->self.controller), 0x60, &tempbyte);
 	temp = HC_VERSION(readl (&ehci->caps->hc_capbase));
 	ehci_info (ehci,
 		"USB %x.%x enabled, EHCI %x.%02x, driver %s\n",
@@ -758,7 +761,7 @@ done:
  * non-error returns are a promise to giveback() the urb later
  * we drop ownership so next owner (or urb unlink) can get it
  *
- * urb + dev is in hcd_dev.urb_list
+ * urb + dev is in hcd.self.controller.urb_list
  * we're queueing TDs onto software and hardware lists
  *
  * hcd-specific init for hcpriv hasn't been done yet

@@ -18,20 +18,27 @@
 #include <asm/page-64.h>
 #endif
 
-/* PAGE_SHIFT determines the page size */
+#ifdef __KERNEL__
+
+/*
+ * PAGE_SHIFT determines the page size
+ */
+#ifdef CONFIG_PAGE_SIZE_4KB
 #define PAGE_SHIFT	12
+#endif
+#ifdef CONFIG_PAGE_SIZE_16KB
+#define PAGE_SHIFT	14
+#endif
+#ifdef CONFIG_PAGE_SIZE_64KB
+#define PAGE_SHIFT	16
+#endif
 #define PAGE_SIZE	(1UL << PAGE_SHIFT)
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 
-#ifdef __KERNEL__
-
 #ifndef __ASSEMBLY__
 
-extern void (*_clear_page)(void * page);
-extern void (*_copy_page)(void * to, void * from);
-
-#define clear_page(addr)		_clear_page((void *)(addr))
-#define copy_page(to, from)		_copy_page((void *)(to), (void *)(from))
+extern void clear_page(void * page);
+extern void copy_page(void * to, void * from);
 
 extern unsigned long shm_align_mask;
 
@@ -114,11 +121,11 @@ static __inline__ int get_order(unsigned long size)
 #ifndef CONFIG_DISCONTIGMEM
 #define pfn_to_page(pfn)	(mem_map + (pfn))
 #define page_to_pfn(page)	((unsigned long)((page) - mem_map))
-#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
-
 #define pfn_valid(pfn)		((pfn) < max_mapnr)
-#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 #endif
+
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
 #define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
 				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)

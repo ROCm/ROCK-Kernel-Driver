@@ -490,10 +490,9 @@ exit:
 	stv680->hue = 32767;
 	stv680->palette = STV_VIDEO_PALETTE;
 	stv680->depth = 24;	/* rgb24 bits */
-	swapRGB = 0;
 	if ((swapRGB_on == 0) && (swapRGB == 0))
 		PDEBUG (1, "STV(i): swapRGB is (auto) OFF");
-	else if ((swapRGB_on == 1) && (swapRGB == 1))
+	else if ((swapRGB_on == 0) && (swapRGB == 1))
 		PDEBUG (1, "STV(i): swapRGB is (auto) ON");
 	else if (swapRGB_on == 1)
 		PDEBUG (1, "STV(i): swapRGB is (forced) ON");
@@ -657,7 +656,7 @@ static void stv680_video_irq (struct urb *urb, struct pt_regs *regs)
 	/* Resubmit urb for new data */
 	urb->status = 0;
 	urb->dev = stv680->udev;
-	if (usb_submit_urb (urb, GFP_KERNEL))
+	if (usb_submit_urb (urb, GFP_ATOMIC))
 		PDEBUG (0, "STV(e): urb burned down in video irq");
 	return;
 }				/*  _video_irq  */
@@ -1252,13 +1251,10 @@ static int stv680_do_ioctl (struct inode *inode, struct file *file,
 			return -EINVAL;
 		}
 	case VIDIOCSFBUF:
-		return -EINVAL;
 	case VIDIOCGTUNER:
 	case VIDIOCSTUNER:
-		return -EINVAL;
 	case VIDIOCGFREQ:
 	case VIDIOCSFREQ:
-		return -EINVAL;
 	case VIDIOCGAUDIO:
 	case VIDIOCSAUDIO:
 		return -EINVAL;
@@ -1434,7 +1430,7 @@ static int stv680_probe (struct usb_interface *intf, const struct usb_device_id 
 	if (video_register_device (stv680->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
 		PDEBUG (0, "STV(e): video_register_device failed");
 		retval = -EIO;
-		goto error;
+		goto error_vdev;
 	}
 	PDEBUG (0, "STV(i): registered new video device: video%d", stv680->vdev->minor);
 
@@ -1442,6 +1438,8 @@ static int stv680_probe (struct usb_interface *intf, const struct usb_device_id 
 	stv680_create_sysfs_files(stv680->vdev);
 	return 0;
 
+error_vdev:
+	video_device_release(stv680->vdev);
 error:
 	kfree(stv680);
 	return retval;
@@ -1466,9 +1464,7 @@ static inline void usb_stv680_remove_disconnected (struct usb_stv *stv680)
 			kfree (stv680->sbuf[i].data);
 		}
 	for (i = 0; i < STV680_NUMSCRATCH; i++)
-		if (stv680->scratch[i].data) {
-			kfree (stv680->scratch[i].data);
-		}
+		kfree (stv680->scratch[i].data);
 	PDEBUG (0, "STV(i): %s disconnected", stv680->camera_name);
 
 	/* Free the memory */

@@ -834,13 +834,6 @@ ide_startstop_t idedisk_error (ide_drive_t *drive, const char *msg, u8 stat)
 		ide_end_drive_cmd(drive, stat, err);
 		return ide_stopped;
 	}
-#if 0
-	else if (rq->flags & REQ_DRIVE_TASKFILE) {
-		rq->errors = 1;
-		ide_end_taskfile(drive, stat, err);
-		return ide_stopped;
-	}
-#endif
 #ifdef CONFIG_IDE_TASKFILE_IO
 	/* make rq completion pointers new submission pointers */
 	blk_rq_prep_restart(rq);
@@ -1700,7 +1693,6 @@ static ide_driver_t idedisk_driver = {
 	.busy			= 0,
 	.supports_dsc_overlap	= 0,
 	.cleanup		= idedisk_cleanup,
-	.flushcache		= do_idedisk_flushcache,
 	.do_request		= ide_do_rw_disk,
 	.sense			= idedisk_dump_status,
 	.error			= idedisk_error,
@@ -1829,7 +1821,7 @@ static int idedisk_attach(ide_drive_t *drive)
 	if (drive->media != ide_disk)
 		goto failed;
 
-	if (ide_register_subdriver (drive, &idedisk_driver, IDE_SUBDRIVER_VERSION)) {
+	if (ide_register_subdriver(drive, &idedisk_driver)) {
 		printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
 		goto failed;
 	}

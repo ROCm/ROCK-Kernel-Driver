@@ -26,17 +26,17 @@
 
 #define GET_PROCESSOR_MID(reg, tmp) \
 	rd	%tbr, %reg; \
-	sethi	%hi(C_LABEL(mid_xlate)), %tmp; \
+	sethi	%hi(mid_xlate), %tmp; \
 	srl	%reg, 12, %reg; \
-	or	%tmp, %lo(C_LABEL(mid_xlate)), %tmp; \
+	or	%tmp, %lo(mid_xlate), %tmp; \
 	and	%reg, 3, %reg; \
 	ldub	[%tmp + %reg], %reg;
 
 #define GET_PROCESSOR_OFFSET(reg, tmp) \
 	GET_PROCESSOR_ID(reg) \
-	sethi	%hi(C_LABEL(cpu_offset)), %tmp; \
+	sethi	%hi(cpu_offset), %tmp; \
 	sll	%reg, 2, %reg; \
-	or	%tmp, %lo(C_LABEL(cpu_offset)), %tmp; \
+	or	%tmp, %lo(cpu_offset), %tmp; \
 	ld	[%tmp + %reg], %reg;
 
 /* All trap entry points _must_ begin with this macro or else you

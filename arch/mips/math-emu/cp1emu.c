@@ -39,6 +39,7 @@
 #include <asm/inst.h>
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>
+#include <asm/cpu-features.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/signal.h>
@@ -233,7 +234,7 @@ static int cop1Emulate(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx)
 			fpuemuprivate.stats.errors++;
 			return SIGBUS;
 		}
-		/* __computer_return_epc() will have updated cp0_epc */
+		/* __compute_return_epc() will have updated cp0_epc */
 		contpc = REG_TO_VA xcp->cp0_epc;
 		/* In order not to confuse ptrace() et al, tweak context */
 		xcp->cp0_epc = VA_TO_REG emulpc - 4;

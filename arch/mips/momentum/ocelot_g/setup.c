@@ -39,10 +39,10 @@
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
-#include <linux/mc146818rtc.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/ioport.h>
@@ -54,21 +54,16 @@
 #include <asm/time.h>
 #include <asm/bootinfo.h>
 #include <asm/page.h>
-#include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/pci.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/reboot.h>
-#include <asm/mc146818rtc.h>
-#include <linux/version.h>
 #include <linux/bootmem.h>
 #include <linux/blkdev.h>
 #include "gt64240.h"
 #include "ocelot_pld.h"
-
-extern struct rtc_ops no_rtc_ops;
 
 #ifdef CONFIG_GALILLEO_GT64240_ETH
 extern unsigned char prom_mac_addr_base[6];
@@ -120,7 +115,7 @@ void PMON_v2_setup(void)
 	gt64240_base = 0xf4000000;
 }
 
-void __init momenco_ocelot_g_setup(void)
+static void __init momenco_ocelot_g_setup(void)
 {
 	void (*l3func)(unsigned long)=KSEG1ADDR(&setup_l3cache);
 	unsigned int tmpword;
@@ -136,7 +131,6 @@ void __init momenco_ocelot_g_setup(void)
 	 * initrd_end = (ulong)ocelot_initrd_start + (ulong)ocelot_initrd_size;
 	 * initrd_below_start_ok = 1;
 	 */
-	rtc_ops = &no_rtc_ops;
 
 	/* do handoff reconfiguration */
 	PMON_v2_setup();
@@ -202,6 +196,8 @@ void __init momenco_ocelot_g_setup(void)
 	/* FIXME: Fix up the DiskOnChip mapping */
 	GT_WRITE(0x468, 0xfef73);
 }
+
+early_initcall(momenco_ocelot_g_setup);
 
 extern int rm7k_tcache_enabled;
 /*

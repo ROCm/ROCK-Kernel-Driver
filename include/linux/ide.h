@@ -698,7 +698,6 @@ typedef struct ide_drive_s {
 	u8	state;			/* retry state */
 	u8	waiting_for_dma;	/* dma currently in progress */
 	u8	unmask;			/* okay to unmask other irqs */
-	u8	slow;			/* slow data port */
 	u8	bswap;			/* byte swap data */
 	u8	dsc_overlap;		/* DSC overlap */
 	u8	nice1;			/* give potential excess bandwidth */
@@ -713,14 +712,12 @@ typedef struct ide_drive_s {
 	unsigned forced_geom	: 1;	/* 1 if hdx=c,h,s was given at boot */
 	unsigned no_unmask	: 1;	/* disallow setting unmask bit */
 	unsigned no_io_32bit	: 1;	/* disallow enabling 32bit I/O */
-	unsigned nobios		: 1;	/* do not probe bios for drive */
 	unsigned atapi_overlap	: 1;	/* ATAPI overlap (not supported) */
 	unsigned nice0		: 1;	/* give obvious excess bandwidth */
 	unsigned nice2		: 1;	/* give a share in our own bandwidth */
 	unsigned doorlocking	: 1;	/* for removable only: door lock/unlock works */
 	unsigned autotune	: 2;	/* 0=default, 1=autotune, 2=noautotune */
 	unsigned remap_0_to_1	: 1;	/* 0=noremap, 1=remap 0->1 (for EZDrive) */
-	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
 	unsigned vdma		: 1;	/* 1=doing PIO over DMA 0=doing normal DMA */
 	unsigned addressing;		/*      : 3;
@@ -1090,6 +1087,8 @@ typedef struct {
 } ide_proc_entry_t;
 
 #ifdef CONFIG_PROC_FS
+extern struct proc_dir_entry *proc_ide_root;
+
 extern void proc_ide_create(void);
 extern void proc_ide_destroy(void);
 extern void destroy_proc_ide_device(ide_hwif_t *, ide_drive_t *);
@@ -1099,6 +1098,10 @@ extern void ide_add_proc_entries(struct proc_dir_entry *, ide_proc_entry_t *, vo
 extern void ide_remove_proc_entries(struct proc_dir_entry *, ide_proc_entry_t *);
 read_proc_t proc_ide_read_capacity;
 read_proc_t proc_ide_read_geometry;
+
+#ifdef CONFIG_BLK_DEV_IDEPCI
+void ide_pci_create_host_proc(const char *, get_info_t *);
+#endif
 
 /*
  * Standard exit stuff:
@@ -1116,6 +1119,7 @@ read_proc_t proc_ide_read_geometry;
 	return len;			\
 }
 #else
+static inline void create_proc_ide_interfaces(void) { ; }
 #define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) return 0;
 #endif
 
@@ -1155,8 +1159,6 @@ enum {
 /*
  * Subdrivers support.
  */
-#define IDE_SUBDRIVER_VERSION	1
-
 typedef struct ide_driver_s {
 	struct module			*owner;
 	const char			*name;
@@ -1165,8 +1167,6 @@ typedef struct ide_driver_s {
 	unsigned busy			: 1;
 	unsigned supports_dsc_overlap	: 1;
 	int		(*cleanup)(ide_drive_t *);
-	int		(*shutdown)(ide_drive_t *);
-	int		(*flushcache)(ide_drive_t *);
 	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, sector_t);
 	int		(*end_request)(ide_drive_t *, int, int);
 	u8		(*sense)(ide_drive_t *, const char *, u8);
@@ -1440,9 +1440,6 @@ extern int wait_for_ready(ide_drive_t *, int /* timeout */);
  */
 extern ide_startstop_t do_rw_taskfile(ide_drive_t *, ide_task_t *);
 
-/* (ide_drive_t *drive, u8 stat, u8 err) */
-extern void ide_end_taskfile(ide_drive_t *, u8, u8);
-
 /*
  * Special Flagged Register Validation Caller
  */
@@ -1528,21 +1525,9 @@ extern void default_hwif_transport(ide_hwif_t *);
 
 int ide_register_driver(ide_driver_t *driver);
 void ide_unregister_driver(ide_driver_t *driver);
-int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version);
+int ide_register_subdriver(ide_drive_t *, ide_driver_t *);
 int ide_unregister_subdriver (ide_drive_t *drive);
 int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
-
-#ifdef CONFIG_PROC_FS
-typedef struct ide_pci_host_proc_s {
-	char				*name;
-	u8				set;
-	get_info_t			*get_info;
-	struct proc_dir_entry		*parent;
-	struct ide_pci_host_proc_s	*next;
-} ide_pci_host_proc_t;
-
-void ide_pci_register_host_proc(ide_pci_host_proc_t *);
-#endif /* CONFIG_PROC_FS */
 
 #define ON_BOARD		1
 #define NEVER_BOARD		0
