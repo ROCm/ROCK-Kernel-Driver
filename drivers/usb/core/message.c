@@ -319,7 +319,7 @@ int usb_sg_init (
 	/* not all host controllers use DMA (like the mainstream pci ones);
 	 * they can use PIO (sl811) or be software over another transport.
 	 */
-	dma = (dev->dev.dma_mask == 0);
+	dma = (dev->dev.dma_mask != 0);
 	if (dma)
 		io->entries = usb_buffer_map_sg (dev, pipe, sg, nents);
 	else
