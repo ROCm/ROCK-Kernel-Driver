@@ -376,7 +376,7 @@ struct dentry *ntfs_get_parent(struct dentry *child_dent)
 	ntfs_debug("Entering for inode 0x%lx.", vi->i_ino);
 	/* Get the mft record of the inode belonging to the child dentry. */
 	mrec = map_mft_record(ni);
-	if (unlikely(IS_ERR(mrec)))
+	if (IS_ERR(mrec))
 		return (struct dentry *)mrec;
 	/* Find the first file name attribute in the mft record. */
 	ctx = get_attr_search_ctx(ni, mrec);
@@ -408,7 +408,7 @@ try_next:
 	unmap_mft_record(ni);
 	/* Get the inode of the parent directory. */
 	parent_vi = ntfs_iget(vi->i_sb, parent_ino);
-	if (unlikely(IS_ERR(parent_vi) || is_bad_inode(parent_vi))) {
+	if (IS_ERR(parent_vi) || unlikely(is_bad_inode(parent_vi))) {
 		if (!IS_ERR(parent_vi))
 			iput(parent_vi);
 		ntfs_error(vi->i_sb, "Failed to get parent directory inode "
@@ -451,7 +451,7 @@ struct dentry *ntfs_get_dentry(struct super_block *sb, void *fh)
 
 	ntfs_debug("Entering for inode 0x%lx, generation 0x%x.", ino, gen);
 	vi = ntfs_iget(sb, ino);
-	if (unlikely(IS_ERR(vi))) {
+	if (IS_ERR(vi)) {
 		ntfs_error(sb, "Failed to get inode 0x%lx.", ino);
 		return (struct dentry *)vi;
 	}

@@ -145,7 +145,7 @@ xfs_qm_dqinit(
 		 dqp->q_res_icount = 0;
 		 dqp->q_res_rtbcount = 0;
 		 dqp->q_pincount = 0;
-		 dqp->q_hash = 0;
+		 dqp->q_hash = NULL;
 		 ASSERT(dqp->dq_flnext == dqp->dq_flprev);
 
 #ifdef XFS_DQUOT_TRACE

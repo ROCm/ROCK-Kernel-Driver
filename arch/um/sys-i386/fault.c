@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2002 - 2004 Jeff Dike (jdike@addtoit.com)
+ * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
@@ -7,24 +7,16 @@
 #include "sysdep/ptrace.h"
 #include "sysdep/sigcontext.h"
 
-/* These two are from asm-um/uaccess.h and linux/module.h, check them. */
-struct exception_table_entry
-{
-	unsigned long insn;
-	unsigned long fixup;
-};
+extern unsigned long search_exception_table(unsigned long addr);
 
-const struct exception_table_entry *search_exception_tables(unsigned long add);
- 
-/* Compare this to arch/i386/mm/extable.c:fixup_exception() */
 int arch_fixup(unsigned long address, void *sc_ptr)
 {
 	struct sigcontext *sc = sc_ptr;
-	const struct exception_table_entry *fixup;
+	unsigned long fixup;
 
 	fixup = search_exception_tables(address);
 	if(fixup != 0){
-		sc->eip = fixup->fixup;
+		sc->eip = fixup;
 		return(1);
 	}
 	return(0);

@@ -100,16 +100,6 @@ extern struct uml_param __uml_setup_start, __uml_setup_end;
 #define __uml_postsetup_call	__attribute__ ((unused,__section__ (".uml.postsetup.init")))
 #define __uml_exit_call		__attribute__ ((unused,__section__ (".uml.exitcall.exit")))
 
-#ifndef __KERNEL__
-
-#define __initcall(fn) static initcall_t __initcall_##fn __init_call = fn
-#define __exitcall(fn) static exitcall_t __exitcall_##fn __exit_call = fn
-
-#define __init_call __attribute__ ((unused,__section__ (".initcall.init")))
-#define __exit_call __attribute__ ((unused,__section__ (".exitcall.exit")))
-
-#endif
-
 #endif /* _LINUX_UML_INIT_H */
 
 /*

@@ -583,19 +583,25 @@ next_desc:
 	}
 
 	if (!union_header) {
-		dev_dbg(&intf->dev,"No union descriptor, giving up\n");
-		return -ENODEV;
-	}
-
-	control_interface = usb_ifnum_to_if(usb_dev, union_header->bMasterInterface0);
-	data_interface = usb_ifnum_to_if(usb_dev, (data_interface_num = union_header->bSlaveInterface0));
-	if (!control_interface || !data_interface) {
-		dev_dbg(&intf->dev,"no interfaces\n");
-		return -ENODEV;
+		if (call_interface_num > 0) {
+			dev_dbg(&intf->dev,"No union descriptor, using call management descriptor\n");
+			data_interface = usb_ifnum_to_if(usb_dev, (data_interface_num = call_interface_num));
+			control_interface = intf;
+		} else {
+			dev_dbg(&intf->dev,"No union descriptor, giving up\n");
+			return -ENODEV;
+		}
+	} else {
+		control_interface = usb_ifnum_to_if(usb_dev, union_header->bMasterInterface0);
+		data_interface = usb_ifnum_to_if(usb_dev, (data_interface_num = union_header->bSlaveInterface0));
+		if (!control_interface || !data_interface) {
+			dev_dbg(&intf->dev,"no interfaces\n");
+			return -ENODEV;
+		}
 	}
 	
-	if (data_interface_num != call_interface_num)
-		dev_dbg(&intf->dev,"Seperate call control interface. That is not fully supported.");
+		if (data_interface_num != call_interface_num)
+			dev_dbg(&intf->dev,"Seperate call control interface. That is not fully supported.");
 
 	if (usb_interface_claimed(data_interface)) { /* valid in this context */
 		dev_dbg(&intf->dev,"The data interface isn't available\n");

@@ -127,6 +127,7 @@ static struct usb_device_id ipaq_id_table [] = {
 	{ USB_DEVICE(TOSHIBA_VENDOR_ID, TOSHIBA_E740_ID) },
 	{ USB_DEVICE(TOSHIBA_VENDOR_ID, TOSHIBA_E335_ID) },
 	{ USB_DEVICE(HTC_VENDOR_ID, HTC_PRODUCT_ID) },
+	{ USB_DEVICE(HTC_VENDOR_ID, HTC_HIMALAYA_ID) },
 	{ USB_DEVICE(NEC_VENDOR_ID, NEC_PRODUCT_ID) },
 	{ USB_DEVICE(ASUS_VENDOR_ID, ASUS_A600_PRODUCT_ID) },
 	{ USB_DEVICE(ASUS_VENDOR_ID, ASUS_A620_PRODUCT_ID) },
@@ -188,6 +189,7 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 	usb_set_serial_port_data(port, priv);
 	priv->active = 0;
 	priv->queue_len = 0;
+	priv->free_len = 0;
 	INIT_LIST_HEAD(&priv->queue);
 	INIT_LIST_HEAD(&priv->freelist);
 

@@ -105,7 +105,7 @@ static int __init q40fb_probe(struct device *device)
 	info->var = q40fb_var;
 	info->fix = q40fb_fix;
 	info->fbops = &q40fb_ops;
-	info->flags = FBINFO_FLAG_DEFAULT;  /* not as module for now */
+	info->flags = FBINFO_DEFAULT;  /* not as module for now */
 	info->pseudo_palette = info->par;
 	info->par = NULL;
 	info->screen_base = (char *) q40fb_fix.smem_start;

@@ -280,8 +280,6 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	LIST_HEAD(list);
 	int i;
 
-	arch_free_page(page, order);
-
 	mod_page_state(pgfree, 1 << order);
 	for (i = 0 ; i < (1 << order) ; ++i)
 		free_pages_check(__FUNCTION__, page + i);
@@ -515,8 +513,6 @@ static void fastcall free_hot_cold_page(struct page *page, int cold)
 	struct zone *zone = page_zone(page);
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
-
-	arch_free_page(page, 0);
 
 	kernel_map_pages(page, 1, 0);
 	inc_page_state(pgfree);
@@ -1504,6 +1500,52 @@ void __init memmap_init_zone(struct page *start, unsigned long size, int nid,
 	}
 }
 
+/*
+ * Page buddy system uses "index >> (i+1)", where "index" is
+ * at most "size-1".
+ *
+ * The extra "+3" is to round down to byte size (8 bits per byte
+ * assumption). Thus we get "(size-1) >> (i+4)" as the last byte
+ * we can access.
+ *
+ * The "+1" is because we want to round the byte allocation up
+ * rather than down. So we should have had a "+7" before we shifted
+ * down by three. Also, we have to add one as we actually _use_ the
+ * last bit (it's [0,n] inclusive, not [0,n[).
+ *
+ * So we actually had +7+1 before we shift down by 3. But
+ * (n+8) >> 3 == (n >> 3) + 1 (modulo overflows, which we do not have).
+ *
+ * Finally, we LONG_ALIGN because all bitmap operations are on longs.
+ */
+unsigned long pages_to_bitmap_size(unsigned long order, unsigned long nr_pages)
+{
+	unsigned long bitmap_size;
+
+	bitmap_size = (nr_pages-1) >> (order+4);
+	bitmap_size = LONG_ALIGN(bitmap_size+1);
+
+	return bitmap_size;
+}
+
+void zone_init_free_lists(struct pglist_data *pgdat, struct zone *zone, unsigned long size)
+{
+	int order;
+	for (order = 0; ; order++) {
+		unsigned long bitmap_size;
+
+		INIT_LIST_HEAD(&zone->free_area[order].free_list);
+		if (order == MAX_ORDER-1) {
+			zone->free_area[order].map = NULL;
+			break;
+		}
+
+		bitmap_size = pages_to_bitmap_size(order, size);
+		zone->free_area[order].map =
+		  (unsigned long *) alloc_bootmem_node(pgdat, bitmap_size);
+	}
+}
+
 #ifndef __HAVE_ARCH_MEMMAP_INIT
 #define memmap_init(start, size, nid, zone, start_pfn) \
 	memmap_init_zone((start), (size), (nid), (zone), (start_pfn))
@@ -1620,43 +1662,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 		zone_start_pfn += size;
 		lmem_map += size;
 
-		for (i = 0; ; i++) {
-			unsigned long bitmap_size;
-
-			INIT_LIST_HEAD(&zone->free_area[i].free_list);
-			if (i == MAX_ORDER-1) {
-				zone->free_area[i].map = NULL;
-				break;
-			}
-
-			/*
-			 * Page buddy system uses "index >> (i+1)",
-			 * where "index" is at most "size-1".
-			 *
-			 * The extra "+3" is to round down to byte
-			 * size (8 bits per byte assumption). Thus
-			 * we get "(size-1) >> (i+4)" as the last byte
-			 * we can access.
-			 *
-			 * The "+1" is because we want to round the
-			 * byte allocation up rather than down. So
-			 * we should have had a "+7" before we shifted
-			 * down by three. Also, we have to add one as
-			 * we actually _use_ the last bit (it's [0,n]
-			 * inclusive, not [0,n[).
-			 *
-			 * So we actually had +7+1 before we shift
-			 * down by 3. But (n+8) >> 3 == (n >> 3) + 1
-			 * (modulo overflows, which we do not have).
-			 *
-			 * Finally, we LONG_ALIGN because all bitmap
-			 * operations are on longs.
-			 */
-			bitmap_size = (size-1) >> (i+4);
-			bitmap_size = LONG_ALIGN(bitmap_size+1);
-			zone->free_area[i].map = 
-			  (unsigned long *) alloc_bootmem_node(pgdat, bitmap_size);
-		}
+		zone_init_free_lists(pgdat, zone, zone->spanned_pages);
 	}
 }
 
@@ -2095,41 +2101,40 @@ void *__init alloc_large_system_hash(const char *tablename,
 				     unsigned int *_hash_shift,
 				     unsigned int *_hash_mask)
 {
-	unsigned long mem, max, log2qty, size;
+	unsigned long long max;
+	unsigned long log2qty, size;
 	void *table;
 
-	/* round applicable memory size up to nearest megabyte */
-	mem = consider_highmem ? nr_all_pages : nr_kernel_pages;
-	mem += (1UL << (20 - PAGE_SHIFT)) - 1;
-	mem >>= 20 - PAGE_SHIFT;
-	mem <<= 20 - PAGE_SHIFT;
-
-	/* limit to 1 bucket per 2^scale bytes of low memory (rounded up to
-	 * nearest power of 2 in size) */
-	if (scale > PAGE_SHIFT)
-		mem >>= (scale - PAGE_SHIFT);
-	else
-		mem <<= (PAGE_SHIFT - scale);
-
-	mem = 1UL << (long_log2(mem) + 1);
-
-	/* limit allocation size */
-	max = (1UL << (PAGE_SHIFT + MAX_SYS_HASH_TABLE_ORDER)) / bucketsize;
-	if (max > mem)
-		max = mem;
-
 	/* allow the kernel cmdline to have a say */
-	if (!numentries || numentries > max)
+	if (!numentries) {
+		/* round applicable memory size up to nearest megabyte */
+		numentries = consider_highmem ? nr_all_pages : nr_kernel_pages;
+		numentries += (1UL << (20 - PAGE_SHIFT)) - 1;
+		numentries >>= 20 - PAGE_SHIFT;
+		numentries <<= 20 - PAGE_SHIFT;
+
+		/* limit to 1 bucket per 2^scale bytes of low memory */
+		if (scale > PAGE_SHIFT)
+			numentries >>= (scale - PAGE_SHIFT);
+		else
+			numentries <<= (PAGE_SHIFT - scale);
+	}
+	/* rounded up to nearest power of 2 in size */
+	numentries = 1UL << (long_log2(numentries) + 1);
+
+	/* limit allocation size to 1/16 total memory */
+	max = ((unsigned long long)nr_all_pages << PAGE_SHIFT) >> 4;
+	do_div(max, bucketsize);
+
+	if (numentries > max)
 		numentries = max;
 
 	log2qty = long_log2(numentries);
 
 	do {
 		size = bucketsize << log2qty;
-
-		table = (void *) alloc_bootmem(size);
-
-	} while (!table && size > PAGE_SIZE);
+		table = alloc_bootmem(size);
+	} while (!table && size > PAGE_SIZE && --log2qty);
 
 	if (!table)
 		panic("Failed to allocate %s hash table\n", tablename);

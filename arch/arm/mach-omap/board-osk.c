@@ -41,6 +41,8 @@
 
 #include "common.h"
 
+extern void __init omap_init_time(void);
+
 static struct map_desc osk5912_io_desc[] __initdata = {
 { OMAP_OSK_ETHR_BASE, OMAP_OSK_ETHR_START, OMAP_OSK_ETHR_SIZE,MT_DEVICE },
 { OMAP_OSK_NOR_FLASH_BASE, OMAP_OSK_NOR_FLASH_START, OMAP_OSK_NOR_FLASH_SIZE,
@@ -94,6 +96,6 @@ MACHINE_START(OMAP_OSK, "TI-OSK")
 	BOOT_PARAMS(0x10000100)
 	MAPIO(osk_map_io)
 	INITIRQ(osk_init_irq)
-	INITTIME(omap_init_time)
 	INIT_MACHINE(osk_init)
+	INITTIME(omap_init_time)
 MACHINE_END

@@ -36,7 +36,6 @@ static inline void create_slbe(unsigned long ea, unsigned long vsid,
 
 static void slb_add_bolted(void)
 {
-#ifndef CONFIG_PPC_ISERIES
 	WARN_ON(!irqs_disabled());
 
 	/* If you change this make sure you change SLB_NUM_BOLTED
@@ -49,7 +48,6 @@ static void slb_add_bolted(void)
 		    SLB_VSID_KERNEL, 1);
 
 	asm volatile("isync":::"memory");
-#endif
 }
 
 /* Flush all user entries from the segment table of the current processor. */

@@ -4,13 +4,13 @@
  */
 
 #include <linux/skbuff.h>
+#include <linux/module.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
 #include <net/protocol.h>
 
-static int ipip_output(struct sk_buff **pskb)
+static int ipip_output(struct sk_buff *skb)
 {
-	struct sk_buff *skb = *pskb;
 	struct iphdr *iph;
 	
 	iph = skb->nh.iph;
@@ -43,6 +43,8 @@ int xfrm4_tunnel_register(struct xfrm_tunnel *handler)
 	return ret;
 }
 
+EXPORT_SYMBOL(xfrm4_tunnel_register);
+
 int xfrm4_tunnel_deregister(struct xfrm_tunnel *handler)
 {
 	int ret;
@@ -60,6 +62,8 @@ int xfrm4_tunnel_deregister(struct xfrm_tunnel *handler)
 	return ret;
 }
 
+EXPORT_SYMBOL(xfrm4_tunnel_deregister);
+
 static int ipip_rcv(struct sk_buff *skb)
 {
 	struct xfrm_tunnel *handler = ipip_handler;
@@ -68,7 +72,7 @@ static int ipip_rcv(struct sk_buff *skb)
 	if (handler && handler->handler(skb) == 0)
 		return 0;
 
-	return xfrm4_rcv_encap(skb, 0);
+	return xfrm4_rcv(skb);
 }
 
 static void ipip_err(struct sk_buff *skb, u32 info)
@@ -84,6 +88,10 @@ static int ipip_init_state(struct xfrm_state *x, void *args)
 {
 	if (!x->props.mode)
 		return -EINVAL;
+
+	if (x->encap)
+		return -EINVAL;
+
 	x->props.header_len = sizeof(struct iphdr);
 
 	return 0;

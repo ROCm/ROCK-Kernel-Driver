@@ -663,8 +663,10 @@ void* hashbin_remove_this( hashbin_t* hashbin, irda_queue_t* entry)
 	} /* Default is no-lock  */
 
 	/* Check if valid and not already removed... */
-	if((entry->q_next == NULL) || (entry->q_prev == NULL))
-		return NULL;
+	if((entry->q_next == NULL) || (entry->q_prev == NULL)) {
+		entry = NULL;
+		goto out;
+	}
 
 	/*
 	 * Locate hashbin
@@ -687,7 +689,7 @@ void* hashbin_remove_this( hashbin_t* hashbin, irda_queue_t* entry)
 	 */
 	if ( entry == hashbin->hb_current)
 		hashbin->hb_current = NULL;
-
+out:
 	/* Release lock */
 	if ( hashbin->hb_type & HB_LOCK ) {
 		spin_unlock_irqrestore(&hashbin->hb_spinlock, flags);

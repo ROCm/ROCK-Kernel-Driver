@@ -111,8 +111,29 @@
  * that hvcs_struct instances aren't added or removed during list traversal.
  * Cleaned up comment style, added spaces after commas, and broke function
  * declaration lines to be under 80 columns.
+ *
+ * 1.3.0 -> 1.3.1 In hvcs_open memset(..,0x00,..) instead of memset(..,0x3F,00).
+ * Removed braces around single statements following conditionals.  Removed '=
+ * 0' after static int declarations since these default to zero.  Removed
+ * list_for_each_safe() and replaced with list_for_each_entry() in
+ * hvcs_get_by_index().  The 'safe' version is un-needed now that the driver is
+ * using spinlocks.  Changed spin_lock_irqsave() to spin_lock() when locking
+ * hvcs_structs_lock and hvcs_pi_lock since these are not touched in an int
+ * handler.  Initialized hvcs_structs_lock and hvcs_pi_lock to
+ * SPIN_LOCK_UNLOCKED at declaration time rather than in hvcs_module_init().
+ * Added spin_lock around list_del() in destroy_hvcs_struct() to protect the
+ * list traversals from a deletion.  Removed '= NULL' from pointer declaration
+ * statements since they are initialized NULL by default.  In hvcs_probe()
+ * changed kmalloc(sizeof(*hvcsd),...) to kmalloc(sizeof(struct
+ * hvcs_struct),...) because otherwise allocation would only be the size of a
+ * pointer.  Removed wmb() instances from hvcs_try_write().  They probably
+ * aren't needed with locking in place.  Added check and cleanup for
+ * hvcs_pi_buff = kmalloc() in hvcs_module_init().  Exposed hvcs_struct.index
+ * via a sysfs attribute so that the coupling between /dev/hvcs* and a
+ * vty-server can be automatically determined.  Moved kobject_put() in hvcs_open
+ * outside of the spin_unlock_irqrestore().
  */
-#define HVCS_DRIVER_VERSION "1.3.0"
+#define HVCS_DRIVER_VERSION "1.3.1"
 
 MODULE_AUTHOR("Ryan S. Arnold <rsa@us.ibm.com>");
 MODULE_DESCRIPTION("IBM hvcs (Hypervisor Virtual Console Server) Driver");
@@ -194,7 +215,7 @@ char hvcs_driver_string[]
 	= "IBM hvcs (Hypervisor Virtual Console Server) Driver";
 
 /* Status of partner info rescan triggered via sysfs. */
-static int hvcs_rescan_status = 0;
+static int hvcs_rescan_status;
 
 static struct tty_driver *hvcs_tty_driver;
 
@@ -212,7 +233,7 @@ static int hvcs_struct_count = -1;
  * Used by the khvcsd to pick up I/O operations when the kernel_thread is
  * already awake but potentially shifted to TASK_INTERRUPTIBLE state.
  */
-static int hvcs_kicked = 0;
+static int hvcs_kicked;
 
 /* Used the the kthread construct for task operations */
 static struct task_struct *hvcs_task;
@@ -223,7 +244,7 @@ static struct task_struct *hvcs_task;
  */
 static unsigned long *hvcs_pi_buff;
 
-static spinlock_t hvcs_pi_lock;
+static spinlock_t hvcs_pi_lock = SPIN_LOCK_UNLOCKED;
 
 /* One vty-server per hvcs_struct */
 struct hvcs_struct {
@@ -263,8 +284,8 @@ struct hvcs_struct {
 	 */
 	struct kobject kobj; /* ref count & hvcs_struct lifetime */
 	int connected; /* is the vty-server currently connected to a vty? */
-	unsigned int p_unit_address; /* partner unit address */
-	unsigned int p_partition_ID; /* partner partition ID */
+	uint32_t p_unit_address; /* partner unit address */
+	uint32_t p_partition_ID; /* partner partition ID */
 	char p_location_code[CLC_LENGTH];
 	struct list_head next; /* list management */
 	struct vio_dev *vdev;
@@ -274,7 +295,7 @@ struct hvcs_struct {
 #define from_kobj(kobj) container_of(kobj, struct hvcs_struct, kobj)
 
 static struct list_head hvcs_structs = LIST_HEAD_INIT(hvcs_structs);
-static spinlock_t hvcs_structs_lock;
+static spinlock_t hvcs_structs_lock = SPIN_LOCK_UNLOCKED;
 
 static void hvcs_unthrottle(struct tty_struct *tty);
 static void hvcs_throttle(struct tty_struct *tty);
@@ -357,12 +378,11 @@ static irqreturn_t hvcs_handle_interrupt(int irq, void *dev_instance,
 		struct pt_regs *regs)
 {
 	struct hvcs_struct *hvcsd = dev_instance;
-	unsigned long flags;
 
-	spin_lock_irqsave(&hvcsd->lock, flags);
+	spin_lock(&hvcsd->lock);
 	vio_disable_interrupts(hvcsd->vdev);
 	hvcsd->todo_mask |= HVCS_SCHED_READ;
-	spin_unlock_irqrestore(&hvcsd->lock, flags);
+	spin_unlock(&hvcsd->lock);
 	hvcs_kick();
 
 	return IRQ_HANDLED;
@@ -371,7 +391,7 @@ static irqreturn_t hvcs_handle_interrupt(int irq, void *dev_instance,
 /* This function must be called with the hvcsd->lock held */
 static void hvcs_try_write(struct hvcs_struct *hvcsd)
 {
-	unsigned int unit_address = hvcsd->vdev->unit_address;
+	uint32_t unit_address = hvcsd->vdev->unit_address;
 	struct tty_struct *tty = hvcsd->tty;
 	int sent;
 
@@ -382,9 +402,9 @@ static void hvcs_try_write(struct hvcs_struct *hvcsd)
 				hvcsd->chars_in_buffer );
 		if (sent > 0) {
 			hvcsd->chars_in_buffer = 0;
-			wmb();
+			/* wmb(); */
 			hvcsd->todo_mask &= ~(HVCS_TRY_WRITE);
-			wmb();
+			/* wmb(); */
 
 			/*
 			 * We are still obligated to deliver the data to the
@@ -404,7 +424,7 @@ static void hvcs_try_write(struct hvcs_struct *hvcsd)
 
 static int hvcs_io(struct hvcs_struct *hvcsd)
 {
-	unsigned int unit_address;
+	uint32_t unit_address;
 	struct tty_struct *tty;
 	char buf[HVCS_BUFF_LEN] __ALIGNED__;
 	unsigned long flags;
@@ -461,11 +481,8 @@ static int hvcs_io(struct hvcs_struct *hvcsd)
 
 static int khvcsd(void *unused)
 {
-	struct hvcs_struct *hvcsd = NULL;
-	struct list_head *element;
-	struct list_head *safe_temp;
+	struct hvcs_struct *hvcsd;
 	int hvcs_todo_mask;
-	unsigned long structs_flags;
 
 	__set_current_state(TASK_RUNNING);
 
@@ -474,12 +491,11 @@ static int khvcsd(void *unused)
 		hvcs_kicked = 0;
 		wmb();
 
-		spin_lock_irqsave(&hvcs_structs_lock, structs_flags);
-		list_for_each_safe(element, safe_temp, &hvcs_structs) {
-			hvcsd = list_entry(element, struct hvcs_struct, next);
-				hvcs_todo_mask |= hvcs_io(hvcsd);
+		spin_lock(&hvcs_structs_lock);
+		list_for_each_entry(hvcsd, &hvcs_structs, next) {
+			hvcs_todo_mask |= hvcs_io(hvcsd);
 		}
-		spin_unlock_irqrestore(&hvcs_structs_lock, structs_flags);
+		spin_unlock(&hvcs_structs_lock);
 
 		/*
 		 * If any of the hvcs adapters want to try a write or quick read
@@ -513,6 +529,7 @@ static void destroy_hvcs_struct(struct kobject *kobj)
 	struct vio_dev *vdev;
 	unsigned long flags;
 
+	spin_lock(&hvcs_structs_lock);
 	spin_lock_irqsave(&hvcsd->lock, flags);
 
 	/* the list_del poisons the pointers */
@@ -524,7 +541,7 @@ static void destroy_hvcs_struct(struct kobject *kobj)
 				" partner vty@%X:%d connection.\n",
 				hvcsd->vdev->unit_address,
 				hvcsd->p_unit_address,
-				(unsigned int)hvcsd->p_partition_ID);
+				(uint32_t)hvcsd->p_partition_ID);
 	}
 	printk(KERN_INFO "HVCS: Destroyed hvcs_struct for vty-server@%X.\n",
 			hvcsd->vdev->unit_address);
@@ -537,6 +554,7 @@ static void destroy_hvcs_struct(struct kobject *kobj)
 	memset(&hvcsd->p_location_code[0], 0x00, CLC_LENGTH);
 
 	spin_unlock_irqrestore(&hvcsd->lock, flags);
+	spin_unlock(&hvcs_structs_lock);
 
 	hvcs_remove_device_attrs(vdev);
 
@@ -572,17 +590,15 @@ static int __devinit hvcs_probe(
 	const struct vio_device_id *id)
 {
 	struct hvcs_struct *hvcsd;
-	unsigned long structs_flags;
 
 	if (!dev || !id) {
 		printk(KERN_ERR "HVCS: probed with invalid parameter.\n");
 		return -EPERM;
 	}
 
-	hvcsd = kmalloc(sizeof(*hvcsd), GFP_KERNEL);
-	if (!hvcsd) {
+	hvcsd = kmalloc(sizeof(struct hvcs_struct), GFP_KERNEL);
+	if (!hvcsd)
 		return -ENODEV;
-	}
 
 	/* hvcsd->tty is zeroed out with the memset */
 	memset(hvcsd, 0x00, sizeof(*hvcsd));
@@ -617,11 +633,11 @@ static int __devinit hvcs_probe(
 	 * will get -ENODEV.
 	 */
 
-	spin_lock_irqsave(&hvcs_structs_lock, structs_flags);
+	spin_lock(&hvcs_structs_lock);
 
 	list_add_tail(&(hvcsd->next), &hvcs_structs);
 
-	spin_unlock_irqrestore(&hvcs_structs_lock, structs_flags);
+	spin_unlock(&hvcs_structs_lock);
 
 	hvcs_create_device_attrs(hvcsd);
 
@@ -711,20 +727,18 @@ static void hvcs_set_pi(struct hvcs_partner_info *pi, struct hvcs_struct *hvcsd)
  */
 static int hvcs_get_pi(struct hvcs_struct *hvcsd)
 {
-	/* struct hvcs_partner_info *head_pi = NULL; */
-	struct hvcs_partner_info *pi = NULL;
-	unsigned int unit_address = hvcsd->vdev->unit_address;
+	struct hvcs_partner_info *pi;
+	uint32_t unit_address = hvcsd->vdev->unit_address;
 	struct list_head head;
-	unsigned long flags;
 	int retval;
 
-	spin_lock_irqsave(&hvcs_pi_lock, flags);
+	spin_lock(&hvcs_pi_lock);
 	if (!hvcs_pi_buff) {
-		spin_unlock_irqrestore(&hvcs_pi_lock, flags);
+		spin_unlock(&hvcs_pi_lock);
 		return -EFAULT;
 	}
 	retval = hvcs_get_partner_info(unit_address, &head, hvcs_pi_buff);
-	spin_unlock_irqrestore(&hvcs_pi_lock, flags);
+	spin_unlock(&hvcs_pi_lock);
 	if (retval) {
 		printk(KERN_ERR "HVCS: Failed to fetch partner"
 			" info for vty-server@%x.\n", unit_address);
@@ -748,11 +762,10 @@ static int hvcs_get_pi(struct hvcs_struct *hvcsd)
  */
 static int hvcs_rescan_devices_list(void)
 {
-	struct hvcs_struct *hvcsd = NULL;
+	struct hvcs_struct *hvcsd;
 	unsigned long flags;
-	unsigned long structs_flags;
 
-	spin_lock_irqsave(&hvcs_structs_lock, structs_flags);
+	spin_lock(&hvcs_structs_lock);
 
 	list_for_each_entry(hvcsd, &hvcs_structs, next) {
 		spin_lock_irqsave(&hvcsd->lock, flags);
@@ -760,7 +773,7 @@ static int hvcs_rescan_devices_list(void)
 		spin_unlock_irqrestore(&hvcsd->lock, flags);
 	}
 
-	spin_unlock_irqrestore(&hvcs_structs_lock, structs_flags);
+	spin_unlock(&hvcs_structs_lock);
 
 	return 0;
 }
@@ -848,13 +861,14 @@ static int hvcs_enable_device(struct hvcs_struct *hvcsd, uint32_t unit_address,
 		unsigned int irq, struct vio_dev *vdev)
 {
 	unsigned long flags;
+	int rc;
 
 	/*
 	 * It is possible that the vty-server was removed between the time that
 	 * the conn was registered and now.
 	 */
-	if (!request_irq(irq, &hvcs_handle_interrupt,
-				SA_INTERRUPT, "ibmhvcs", hvcsd)) {
+	if (!(rc = request_irq(irq, &hvcs_handle_interrupt,
+				SA_INTERRUPT, "ibmhvcs", hvcsd))) {
 		/*
 		 * It is possible the vty-server was removed after the irq was
 		 * requested but before we have time to enable interrupts.
@@ -874,7 +888,7 @@ static int hvcs_enable_device(struct hvcs_struct *hvcsd, uint32_t unit_address,
 	hvcs_partner_free(hvcsd);
 	spin_unlock_irqrestore(&hvcsd->lock, flags);
 
-	return -ENODEV;
+	return rc;
 
 }
 
@@ -887,23 +901,18 @@ static int hvcs_enable_device(struct hvcs_struct *hvcsd, uint32_t unit_address,
  */
 struct hvcs_struct *hvcs_get_by_index(int index)
 {
-	struct hvcs_struct *hvcsd = NULL;
-	struct list_head *element;
-	struct list_head *safe_temp;
+	struct hvcs_struct *hvcsd;
 	unsigned long flags;
-	unsigned long structs_flags;
 
-	spin_lock_irqsave(&hvcs_structs_lock, structs_flags);
+	spin_lock(&hvcs_structs_lock);
 	/* We can immediately discard OOB requests */
 	if (index >= 0 && index < HVCS_MAX_SERVER_ADAPTERS) {
-		list_for_each_safe(element, safe_temp, &hvcs_structs) {
-			hvcsd = list_entry(element, struct hvcs_struct, next);
+		list_for_each_entry(hvcsd, &hvcs_structs, next) {
 			spin_lock_irqsave(&hvcsd->lock, flags);
 			if (hvcsd->index == index) {
 				kobject_get(&hvcsd->kobj);
 				spin_unlock_irqrestore(&hvcsd->lock, flags);
-				spin_unlock_irqrestore(&hvcs_structs_lock,
-						structs_flags);
+				spin_unlock(&hvcs_structs_lock);
 				return hvcsd;
 			}
 			spin_unlock_irqrestore(&hvcsd->lock, flags);
@@ -911,7 +920,7 @@ struct hvcs_struct *hvcs_get_by_index(int index)
 		hvcsd = NULL;
 	}
 
-	spin_unlock_irqrestore(&hvcs_structs_lock, structs_flags);
+	spin_unlock(&hvcs_structs_lock);
 	return hvcsd;
 }
 
@@ -921,12 +930,13 @@ struct hvcs_struct *hvcs_get_by_index(int index)
  */
 static int hvcs_open(struct tty_struct *tty, struct file *filp)
 {
-	struct hvcs_struct *hvcsd = NULL;
-	int retval = 0;
+	struct hvcs_struct *hvcsd;
+	int rc, retval = 0;
 	unsigned long flags;
 	unsigned int irq;
 	struct vio_dev *vdev;
 	unsigned long unit_address;
+	struct kobject *kobjp;
 
 	if (tty->driver_data)
 		goto fast_open;
@@ -959,7 +969,7 @@ static int hvcs_open(struct tty_struct *tty, struct file *filp)
 	 */
 	tty->low_latency = 1;
 
-	memset(&hvcsd->buffer[0], 0x3F, HVCS_BUFF_LEN);
+	memset(&hvcsd->buffer[0], 0x00, HVCS_BUFF_LEN);
 
 	/*
 	 * Save these in the spinlock for the enable operations that need them
@@ -976,10 +986,10 @@ static int hvcs_open(struct tty_struct *tty, struct file *filp)
 	 * This must be done outside of the spinlock because it requests irqs
 	 * and will grab the spinlcok and free the connection if it fails.
 	 */
-	if ((hvcs_enable_device(hvcsd, unit_address, irq, vdev))) {
+	if (((rc = hvcs_enable_device(hvcsd, unit_address, irq, vdev)))) {
 		kobject_put(&hvcsd->kobj);
 		printk(KERN_WARNING "HVCS: enable device failed.\n");
-		return -ENODEV;
+		return rc;
 	}
 
 	goto open_success;
@@ -1008,6 +1018,7 @@ open_success:
 	return 0;
 
 error_release:
+	kobjp = &hvcsd->kobj;
 	spin_unlock_irqrestore(&hvcsd->lock, flags);
 	kobject_put(&hvcsd->kobj);
 
@@ -1346,10 +1357,12 @@ static int __init hvcs_module_init(void)
 		return rc;
 	}
 
-	hvcs_structs_lock = SPIN_LOCK_UNLOCKED;
-
-	hvcs_pi_lock = SPIN_LOCK_UNLOCKED;
 	hvcs_pi_buff = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!hvcs_pi_buff) {
+		tty_unregister_driver(hvcs_tty_driver);
+		put_tty_driver(hvcs_tty_driver);
+		return -ENOMEM;
+	}
 
 	hvcs_task = kthread_run(khvcsd, NULL, "khvcsd");
 	if (IS_ERR(hvcs_task)) {
@@ -1374,8 +1387,6 @@ static int __init hvcs_module_init(void)
 
 static void __exit hvcs_module_exit(void)
 {
-	unsigned long flags;
-
 	/*
 	 * This driver receives hvcs_remove callbacks for each device upon
 	 * module removal.
@@ -1387,10 +1398,10 @@ static void __exit hvcs_module_exit(void)
 	 */
 	kthread_stop(hvcs_task);
 
-	spin_lock_irqsave(&hvcs_pi_lock, flags);
+	spin_lock(&hvcs_pi_lock);
 	kfree(hvcs_pi_buff);
 	hvcs_pi_buff = NULL;
-	spin_unlock_irqrestore(&hvcs_pi_lock, flags);
+	spin_unlock(&hvcs_pi_lock);
 
 	hvcs_remove_driver_attrs();
 
@@ -1499,7 +1510,7 @@ static ssize_t hvcs_vterm_state_store(struct device *dev, const char *buf,
 			" partner vty@%X:%d connection.\n",
 			hvcsd->vdev->unit_address,
 			hvcsd->p_unit_address,
-			(unsigned int)hvcsd->p_partition_ID);
+			(uint32_t)hvcsd->p_partition_ID);
 
 	spin_unlock_irqrestore(&hvcsd->lock, flags);
 	return count;
@@ -1520,11 +1531,27 @@ static ssize_t hvcs_vterm_state_show(struct device *dev, char *buf)
 static DEVICE_ATTR(vterm_state, S_IRUGO | S_IWUSR,
 		hvcs_vterm_state_show, hvcs_vterm_state_store);
 
+static ssize_t hvcs_index_show(struct device *dev, char *buf)
+{
+	struct vio_dev *viod = to_vio_dev(dev);
+	struct hvcs_struct *hvcsd = from_vio_dev(viod);
+	unsigned long flags;
+	int retval;
+
+	spin_lock_irqsave(&hvcsd->lock, flags);
+	retval = sprintf(buf, "%d\n", hvcsd->index);
+	spin_unlock_irqrestore(&hvcsd->lock, flags);
+	return retval;
+}
+
+static DEVICE_ATTR(index, S_IRUGO, hvcs_index_show, NULL);
+
 static struct attribute *hvcs_attrs[] = {
 	&dev_attr_partner_vtys.attr,
 	&dev_attr_partner_clcs.attr,
 	&dev_attr_current_vty.attr,
 	&dev_attr_vterm_state.attr,
+	&dev_attr_index.attr,
 	NULL,
 };
 

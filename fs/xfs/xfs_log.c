@@ -122,7 +122,6 @@ STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 /* local debug functions */
 #if defined(DEBUG) && !defined(XLOG_NOLOG)
 STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
-STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
 STATIC void	xlog_verify_grant_head(xlog_t *log, int equals);
 STATIC void	xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
 				  int count, boolean_t syncing);
@@ -130,7 +129,6 @@ STATIC void	xlog_verify_tail_lsn(xlog_t *log, xlog_in_core_t *iclog,
 				     xfs_lsn_t tail_lsn);
 #else
 #define xlog_verify_dest_ptr(a,b)
-#define xlog_verify_disk_cycle_no(a,b)
 #define xlog_verify_grant_head(a,b)
 #define xlog_verify_iclog(a,b,c,d)
 #define xlog_verify_tail_lsn(a,b,c)
@@ -356,13 +354,13 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 	if (!xlog_debug && xlog_target == log->l_targ)
 		return 0;
 #endif
-	cb->cb_next = 0;
+	cb->cb_next = NULL;
 	spl = LOG_LOCK(log);
 	abortflg = (iclog->ic_state & XLOG_STATE_IOERROR);
 	if (!abortflg) {
 		ASSERT_ALWAYS((iclog->ic_state == XLOG_STATE_ACTIVE) ||
 			      (iclog->ic_state == XLOG_STATE_WANT_SYNC));
-		cb->cb_next = 0;
+		cb->cb_next = NULL;
 		*(iclog->ic_callback_tail) = cb;
 		iclog->ic_callback_tail = &(cb->cb_next);
 	}
@@ -564,7 +562,7 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 	xlog_in_core_t	 *first_iclog;
 #endif
 	xfs_log_iovec_t  reg[1];
-	xfs_log_ticket_t tic = 0;
+	xfs_log_ticket_t tic = NULL;
 	xfs_lsn_t	 lsn;
 	int		 error;
 	SPLDECL(s);
@@ -1277,7 +1275,7 @@ xlog_commit_record(xfs_mount_t  *mp,
 	int		error;
 	xfs_log_iovec_t	reg[1];
 
-	reg[0].i_addr = 0;
+	reg[0].i_addr = NULL;
 	reg[0].i_len = 0;
 
 	ASSERT_ALWAYS(iclog);
@@ -1857,7 +1855,7 @@ xlog_state_clean_log(xlog_t *log)
 		if (iclog->ic_state == XLOG_STATE_DIRTY) {
 			iclog->ic_state	= XLOG_STATE_ACTIVE;
 			iclog->ic_offset       = 0;
-			iclog->ic_callback	= 0;   /* don't need to free */
+			iclog->ic_callback	= NULL;   /* don't need to free */
 			/*
 			 * If the number of ops in this iclog indicate it just
 			 * contains the dummy transaction, we can
@@ -2080,7 +2078,7 @@ xlog_state_do_callback(
 
 			while (cb != 0) {
 				iclog->ic_callback_tail = &(iclog->ic_callback);
-				iclog->ic_callback = 0;
+				iclog->ic_callback = NULL;
 				LOG_UNLOCK(log, s);
 
 				/* perform callbacks in the order given */
@@ -3098,7 +3096,7 @@ xlog_state_ticket_alloc(xlog_t *log)
 		log->l_ticket_cnt++;
 		log->l_ticket_tcnt++;
 	}
-	t_list->t_next = 0;
+	t_list->t_next = NULL;
 	log->l_tail = t_list;
 	LOG_UNLOCK(log, s);
 }	/* xlog_state_ticket_alloc */
@@ -3126,7 +3124,7 @@ xlog_ticket_put(xlog_t		*log,
 	/* no need to clear fields */
 #else
 	/* When we debug, it is easier if tickets are cycled */
-	ticket->t_next     = 0;
+	ticket->t_next     = NULL;
 	if (log->l_tail != 0) {
 		log->l_tail->t_next = ticket;
 	} else {
@@ -3241,33 +3239,6 @@ xlog_verify_dest_ptr(xlog_t     *log,
 	if (! good_ptr)
 		xlog_panic("xlog_verify_dest_ptr: invalid ptr");
 }	/* xlog_verify_dest_ptr */
-
-
-#ifdef DEBUG
-/* check split LR write */
-STATIC void
-xlog_verify_disk_cycle_no(xlog_t	 *log,
-			  xlog_in_core_t *iclog)
-{
-    xfs_buf_t	*bp;
-    uint	cycle_no;
-    xfs_caddr_t ptr;
-    xfs_daddr_t	i;
-
-    if (BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT) < 10) {
-	cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT);
-	bp = xlog_get_bp(log, 1);
-	ASSERT(bp);
-	for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT); i++) {
-	    xlog_bread(log, i, 1, bp);
-	    ptr = xlog_align(log, i, 1, bp);
-	    if (GET_CYCLE(ptr, ARCH_CONVERT) != cycle_no)
-		xlog_warn("XFS: xlog_verify_disk_cycle_no: bad cycle no");
-	}
-	xlog_put_bp(bp);
-    }
-}	/* xlog_verify_disk_cycle_no */
-#endif
 
 STATIC void
 xlog_verify_grant_head(xlog_t *log, int equals)

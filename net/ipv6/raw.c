@@ -48,7 +48,6 @@
 #include <net/transp_v6.h>
 #include <net/udp.h>
 #include <net/inet_common.h>
-#include <net/mipglue.h>
 
 #include <net/rawv6.h>
 #include <net/xfrm.h>
@@ -84,7 +83,7 @@ struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 			     struct in6_addr *loc_addr, struct in6_addr *rmt_addr)
 {
 	struct hlist_node *node;
-	int addr_type = ipv6_addr_type(loc_addr);
+	int is_multicast = ipv6_addr_is_multicast(loc_addr);
 
 	sk_for_each_from(sk, node)
 		if (inet_sk(sk)->num == num) {
@@ -97,7 +96,7 @@ struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 			if (!ipv6_addr_any(&np->rcv_saddr)) {
 				if (!ipv6_addr_cmp(&np->rcv_saddr, loc_addr))
 					goto found;
-				if ((addr_type & IPV6_ADDR_MULTICAST) &&
+				if (is_multicast &&
 				    inet6_mc_check(sk, loc_addr, rmt_addr))
 					goto found;
 				continue;
@@ -200,31 +199,44 @@ static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (sk->sk_state != TCP_CLOSE)
 		goto out;
 
-	if (addr_type & IPV6_ADDR_LINKLOCAL) {
-		if (addr_len >= sizeof(struct sockaddr_in6) &&
-		    addr->sin6_scope_id) {
-			/* Override any existing binding, if another one
-			 * is supplied by user.
-			 */
-			sk->sk_bound_dev_if = addr->sin6_scope_id;
-		}
-
-		/* Binding to link-local address requires an interface */
-		if (!sk->sk_bound_dev_if)
-			goto out;
-	}
-
 	/* Check if the address belongs to the host. */
 	if (addr_type != IPV6_ADDR_ANY) {
+		struct net_device *dev = NULL;
+
+		if (addr_type & IPV6_ADDR_LINKLOCAL) {
+			if (addr_len >= sizeof(struct sockaddr_in6) &&
+			    addr->sin6_scope_id) {
+				/* Override any existing binding, if another
+				 * one is supplied by user.
+				 */
+				sk->sk_bound_dev_if = addr->sin6_scope_id;
+			}
+			
+			/* Binding to link-local address requires an interface */
+			if (!sk->sk_bound_dev_if)
+				goto out;
+
+			dev = dev_get_by_index(sk->sk_bound_dev_if);
+			if (!dev) {
+				err = -ENODEV;
+				goto out;
+			}
+		}
+		
 		/* ipv4 addr of the socket is invalid.  Only the
-		 * unpecified and mapped address have a v4 equivalent.
+		 * unspecified and mapped address have a v4 equivalent.
 		 */
 		v4addr = LOOPBACK4_IPV6;
 		if (!(addr_type & IPV6_ADDR_MULTICAST))	{
 			err = -EADDRNOTAVAIL;
-			if (!ipv6_chk_addr(&addr->sin6_addr, NULL, 0))
+			if (!ipv6_chk_addr(&addr->sin6_addr, dev, 0)) {
+				if (dev)
+					dev_put(dev);
 				goto out;
+			}
 		}
+		if (dev)
+			dev_put(dev);
 	}
 
 	inet->rcv_saddr = inet->saddr = v4addr;
@@ -297,7 +309,7 @@ static inline int rawv6_rcv_skb(struct sock * sk, struct sk_buff * skb)
  *	This is next to useless... 
  *	if we demultiplex in network layer we don't need the extra call
  *	just to queue the skb... 
- *	maybe we could have the network decide uppon a hint if it 
+ *	maybe we could have the network decide upon a hint if it 
  *	should call raw_rcv for demultiplexing
  */
 int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
@@ -350,13 +362,15 @@ int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
  *	we return it, otherwise we block.
  */
 
-static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, size_t len,
+static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk,
+		  struct msghdr *msg, size_t len,
 		  int noblock, int flags, int *addr_len)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)msg->msg_name;
 	struct sk_buff *skb;
-	int copied, err;
+	size_t copied;
+	int err;
 
 	if (flags & MSG_OOB)
 		return -EOPNOTSUPP;
@@ -542,7 +556,53 @@ error:
 	return err; 
 }
 
-static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, size_t len)
+static void rawv6_probe_proto_opt(struct flowi *fl, struct msghdr *msg)
+{
+	struct iovec *iov;
+	u8 __user *type = NULL;
+	u8 __user *code = NULL;
+	int probed = 0;
+	int i;
+
+	if (!msg->msg_iov)
+		return;
+
+	for (i = 0; i < msg->msg_iovlen; i++) {
+		iov = &msg->msg_iov[i];
+		if (!iov)
+			continue;
+
+		switch (fl->proto) {
+		case IPPROTO_ICMPV6:
+			/* check if one-byte field is readable or not. */
+			if (iov->iov_base && iov->iov_len < 1)
+				break;
+
+			if (!type) {
+				type = iov->iov_base;
+				/* check if code field is readable or not. */
+				if (iov->iov_len > 1)
+					code = type + 1;
+			} else if (!code)
+				code = iov->iov_base;
+
+			if (type && code) {
+				get_user(fl->fl_icmp_type, type);
+				__get_user(fl->fl_icmp_code, code);
+				probed = 1;
+			}
+			break;
+		default:
+			probed = 1;
+			break;
+		}
+		if (probed)
+			break;
+	}
+}
+
+static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
+		   struct msghdr *msg, size_t len)
 {
 	struct ipv6_txoptions opt_space;
 	struct sockaddr_in6 * sin6 = (struct sockaddr_in6 *) msg->msg_name;
@@ -626,7 +686,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 
 	if (ipv6_addr_any(daddr)) {
 		/* 
-		 * unspecfied destination address 
+		 * unspecified destination address 
 		 * treated as error... is this correct ?
 		 */
 		fl6_sock_release(flowlabel);
@@ -660,6 +720,8 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		opt = fl6_merge_options(&opt_space, flowlabel, opt);
 
 	fl.proto = proto;
+	rawv6_probe_proto_opt(&fl, msg);
+ 
 	ipv6_addr_copy(&fl.fl6_dst, daddr);
 	if (ipv6_addr_any(&fl.fl6_src) && !ipv6_addr_any(&np->saddr))
 		ipv6_addr_copy(&fl.fl6_src, &np->saddr);
@@ -705,10 +767,7 @@ back_from_confirm:
 done:
 	ip6_dst_store(sk, dst,
 		      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
-		      &np->daddr : NULL,
-		      !ipv6_addr_cmp(&fl.fl6_src, &np->saddr) ?
-		      &np->saddr : NULL);
-
+		      &np->daddr : NULL);
 	if (err > 0)
 		err = np->recverr ? net_xmit_errno(err) : 0;
 

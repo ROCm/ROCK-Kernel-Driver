@@ -34,9 +34,10 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <string.h>
-#include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/mman.h>
 #include "kern_util.h"
@@ -46,147 +47,105 @@
 #include "init.h"
 #include "os.h"
 #include "tempfile.h"
-#include "kern_constants.h"
 
 extern struct mem_region physmem_region;
 
 #define TEMPNAME_TEMPLATE "vm_file-XXXXXX"
 
-static int create_tmp_file(unsigned long len)
+int create_mem_file(unsigned long len)
 {
-	int fd, err;
+	int fd;
 	char zero;
 
 	fd = make_tempfile(TEMPNAME_TEMPLATE, NULL, 1);
-	if(fd < 0) {
-		os_print_error(fd, "make_tempfile");
+	if (fchmod(fd, 0777) < 0){
+		perror("fchmod");
 		exit(1);
 	}
-
-	err = os_mode_fd(fd, 0777);
-	if(err < 0){
-		os_print_error(err, "os_mode_fd");
-		exit(1);
-	}
-	err = os_seek_file(fd, len);
-	if(err < 0){
-		os_print_error(err, "os_seek_file");
+	if(os_seek_file(fd, len) < 0){
+		perror("lseek");
 		exit(1);
 	}
 	zero = 0;
-	err = os_write_file(fd, &zero, 1);
-	if(err != 1){
-		os_print_error(err, "os_write_file");
+	if(write(fd, &zero, 1) != 1){
+		perror("write");
 		exit(1);
 	}
-
+	if(fcntl(fd, F_SETFD, 1) != 0)
+		perror("Setting FD_CLOEXEC failed");
 	return(fd);
 }
 
-static int have_devanon = 0;
-
-void check_devanon(void)
+int setup_region(struct mem_region *region, void *entry)
 {
-	int fd;
+	void *loc, *start;
+	char *driver;
+	int err, offset;
 
-	printk("Checking for /dev/anon on the host...");
-	fd = open("/dev/anon", O_RDWR);
-	if(fd < 0){
-		printk("Not available (open failed with errno %d)\n", errno);
-		return;
+	if(region->start != -1){
+		err = reserve_vm(region->start, 
+				 region->start + region->len, entry);
+		if(err){
+			printk("setup_region : failed to reserve "
+			       "0x%x - 0x%x for driver '%s'\n",
+			       region->start, 
+			       region->start + region->len,
+			       region->driver);
+			return(-1);
+		}
+	}
+	else region->start = get_vm(region->len);
+	if(region->start == 0){
+		if(region->driver == NULL) driver = "physmem";
+		else driver = region->driver;
+		printk("setup_region : failed to find vm for "
+		       "driver '%s' (length %d)\n", driver, region->len);
+		return(-1);
+	}
+	if(region->start == uml_physmem){
+		start = (void *) uml_reserved;
+		offset = uml_reserved - uml_physmem;
+	}
+	else {
+		start = (void *) region->start;
+		offset = 0;
 	}
 
-	printk("OK\n");
-	have_devanon = 1;
-}
-
-static int create_anon_file(unsigned long len)
-{
-	void *addr;
-	int fd;
-
-	fd = open("/dev/anon", O_RDWR);
-	if(fd < 0) {
-		os_print_error(fd, "opening /dev/anon");
+	loc = mmap(start, region->len - offset, PROT_READ | PROT_WRITE, 
+		   MAP_SHARED | MAP_FIXED, region->fd, offset);
+	if(loc != start){
+		perror("Mapping memory");
 		exit(1);
 	}
-
-	addr = mmap(NULL, len, PROT_READ | PROT_WRITE , MAP_PRIVATE, fd, 0);
-	if(addr == MAP_FAILED){
-		os_print_error((int) addr, "mapping physmem file");
-		exit(1);
-	}
-	munmap(addr, len);
-
-	return(fd);
+	return(0);
 }
-
-int create_mem_file(unsigned long len)
-{
-	int err, fd;
-
-	if(have_devanon)
-		fd = create_anon_file(len);
-	else fd = create_tmp_file(len);
-
-	err = os_set_exec_close(fd, 1);
-	if(err < 0)
-		os_print_error(err, "exec_close");
-	return(fd);
-}
-
-struct iomem_region *iomem_regions = NULL;
-int iomem_size = 0;
 
 static int __init parse_iomem(char *str, int *add)
 {
-	struct iomem_region *new;
-	struct uml_stat buf;
+	struct stat buf;
 	char *file, *driver;
-	int fd, err, size;
+	int fd;
 
 	driver = str;
 	file = strchr(str,',');
 	if(file == NULL){
-		printf("parse_iomem : failed to parse iomem\n");
-		goto out;
+		printk("parse_iomem : failed to parse iomem\n");
+		return(1);
 	}
 	*file = '\0';
 	file++;
 	fd = os_open_file(file, of_rdwr(OPENFLAGS()), 0);
 	if(fd < 0){
-		os_print_error(fd, "parse_iomem - Couldn't open io file");
-		goto out;
+		printk("parse_iomem - Couldn't open io file, errno = %d\n", 
+		       errno);
+		return(1);
 	}
-
-	err = os_stat_fd(fd, &buf);
-	if(err < 0){
-		os_print_error(err, "parse_iomem - cannot stat_fd file");
-		goto out_close;
+	if(fstat(fd, &buf) < 0) {
+		printk("parse_iomem - cannot fstat file, errno = %d\n", errno);
+		return(1);
 	}
-
-	new = malloc(sizeof(*new));
-	if(new == NULL){
-		perror("Couldn't allocate iomem_region struct");
-		goto out_close;
-	}
-
-	size = (buf.ust_size + UM_KERN_PAGE_SIZE) & ~(UM_KERN_PAGE_SIZE - 1);
-
-	*new = ((struct iomem_region) { .next		= iomem_regions,
-					.driver		= driver,
-					.fd		= fd,
-					.size		= size,
-					.phys		= 0,
-					.virt		= 0 });
-	iomem_regions = new;
-	iomem_size += new->size + UM_KERN_PAGE_SIZE;
-
+	add_iomem(driver, fd, buf.st_size);
 	return(0);
- out_close:
-	os_close_file(fd);
- out:
-	return(1);
 }
 
 __uml_setup("iomem=", parse_iomem,
@@ -194,52 +153,72 @@ __uml_setup("iomem=", parse_iomem,
 "    Configure <file> as an IO memory region named <name>.\n\n"
 );
 
+#ifdef notdef
+int logging = 0;
+int logging_fd = -1;
+
+int logging_line = 0;
+char logging_buf[256];
+
+void log(char *fmt, ...)
+{
+	va_list ap;
+	struct timeval tv;
+	struct openflags flags;
+
+	if(logging == 0) return;
+	if(logging_fd < 0){
+		flags = of_create(of_trunc(of_rdrw(OPENFLAGS())));
+		logging_fd = os_open_file("log", flags, 0644);
+	}
+	gettimeofday(&tv, NULL);
+	sprintf(logging_buf, "%d\t %u.%u  ", logging_line++, tv.tv_sec, 
+		tv.tv_usec);
+	va_start(ap, fmt);
+	vsprintf(&logging_buf[strlen(logging_buf)], fmt, ap);
+	va_end(ap);
+	write(logging_fd, logging_buf, strlen(logging_buf));
+}
+#endif
+
+int map_memory(unsigned long virt, unsigned long phys, unsigned long len, 
+	       int r, int w, int x)
+{
+	struct mem_region *region = phys_region(phys);
+
+	return(os_map_memory((void *) virt, region->fd, phys_offset(phys), len,
+			     r, w, x));
+}
+
 int protect_memory(unsigned long addr, unsigned long len, int r, int w, int x,
 		   int must_succeed)
 {
-	int err;
-
-	err = os_protect_memory((void *) addr, len, r, w, x);
-	if(err < 0){
+	if(os_protect_memory((void *) addr, len, r, w, x) < 0){
                 if(must_succeed)
-			panic("protect failed, err = %d", -err);
-		else return(err);
+                        panic("protect failed, errno = %d", errno);
+                else return(-errno);
 	}
 	return(0);
 }
 
-#if 0
-/* Debugging facility for dumping stuff out to the host, avoiding the timing
- * problems that come with printf and breakpoints.
- * Enable in case of emergency.
- */
-
-int logging = 1;
-int logging_fd = -1;
-
-int logging_line = 0;
-char logging_buf[512];
-
-void log(char *fmt, ...)
+unsigned long find_iomem(char *driver, unsigned long *len_out)
 {
-        va_list ap;
-        struct timeval tv;
-        struct openflags flags;
+	struct mem_region *region;
+	int i, n;
 
-        if(logging == 0) return;
-        if(logging_fd < 0){
-                flags = of_create(of_trunc(of_rdwr(OPENFLAGS())));
-                logging_fd = os_open_file("log", flags, 0644);
-        }
-        gettimeofday(&tv, NULL);
-        sprintf(logging_buf, "%d\t %u.%u  ", logging_line++, tv.tv_sec, 
-                tv.tv_usec);
-        va_start(ap, fmt);
-        vsprintf(&logging_buf[strlen(logging_buf)], fmt, ap);
-        va_end(ap);
-        write(logging_fd, logging_buf, strlen(logging_buf));
+	n = nregions();
+	for(i = 0; i < n; i++){
+		region = regions[i];
+		if(region == NULL) continue;
+		if((region->driver != NULL) &&
+		   !strcmp(region->driver, driver)){
+			*len_out = region->len;
+			return(region->start);
+		}
+	}
+	*len_out = 0;
+	return 0;
 }
-#endif
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

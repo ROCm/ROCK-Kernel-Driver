@@ -17,7 +17,6 @@
 #include <linux/nfs_page.h>
 #include <linux/lockd/bind.h>
 #include <linux/smp_lock.h>
-#include <linux/nfs_mount.h>
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
@@ -46,7 +45,7 @@ static inline int
 nfs3_rpc_call_wrapper(struct rpc_clnt *clnt, u32 proc, void *argp, void *resp, int flags)
 {
 	struct rpc_message msg = {
-		.rpc_proc	= &clnt->cl_procinfo[proc],
+		.rpc_proc	= &nfs3_procedures[proc],
 		.rpc_argp	= argp,
 		.rpc_resp	= resp,
 	};
@@ -67,18 +66,6 @@ nfs3_async_handle_jukebox(struct rpc_task *task)
 	rpc_restart_call(task);
 	rpc_delay(task, NFS_JUKEBOX_RETRY_TIME);
 	return 1;
-}
-
-static struct rpc_cred *
-nfs_cred(struct inode *inode, struct file *filp)
-{
-	struct rpc_cred *cred = NULL;
-
-	if (filp)
-		cred = (struct rpc_cred *)filp->private_data;
-	if (!cred)
-		cred = NFS_I(inode)->mm_cred;
-	return cred;
 }
 
 /*
@@ -105,14 +92,15 @@ nfs3_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
  * One function for each procedure in the NFS protocol.
  */
 static int
-nfs3_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
+nfs3_proc_getattr(struct nfs_server *server, struct nfs_fh *fhandle,
+		struct nfs_fattr *fattr)
 {
 	int	status;
 
 	dprintk("NFS call  getattr\n");
 	fattr->valid = 0;
-	status = rpc_call(NFS_CLIENT(inode), NFS3PROC_GETATTR,
-			  NFS_FH(inode), fattr, 0);
+	status = rpc_call(server->client, NFS3PROC_GETATTR,
+			  fhandle, fattr, 0);
 	dprintk("NFS reply getattr\n");
 	return status;
 }
@@ -165,8 +153,7 @@ nfs3_proc_lookup(struct inode *dir, struct qstr *name,
 	return status;
 }
 
-static int
-nfs3_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
+static int nfs3_proc_access(struct inode *inode, struct nfs_access_entry *entry)
 {
 	struct nfs_fattr	fattr;
 	struct nfs3_accessargs	arg = {
@@ -179,9 +166,10 @@ nfs3_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
 		.rpc_proc	= &nfs3_procedures[NFS3PROC_ACCESS],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
-		.rpc_cred	= cred
+		.rpc_cred	= entry->cred
 	};
-	int	status;
+	int mode = entry->mask;
+	int status;
 
 	dprintk("NFS call  access\n");
 	fattr.valid = 0;
@@ -201,10 +189,16 @@ nfs3_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
 	}
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
 	nfs_refresh_inode(inode, &fattr);
-	dprintk("NFS reply access\n");
-
-	if (status == 0 && (arg.access & res.access) != arg.access)
-		status = -EACCES;
+	if (status == 0) {
+		entry->mask = 0;
+		if (res.access & NFS3_ACCESS_READ)
+			entry->mask |= MAY_READ;
+		if (res.access & (NFS3_ACCESS_MODIFY | NFS3_ACCESS_EXTEND | NFS3_ACCESS_DELETE))
+			entry->mask |= MAY_WRITE;
+		if (res.access & (NFS3_ACCESS_LOOKUP|NFS3_ACCESS_EXECUTE))
+			entry->mask |= MAY_EXEC;
+	}
+	dprintk("NFS reply access, status = %d\n", status);
 	return status;
 }
 
@@ -228,8 +222,7 @@ nfs3_proc_readlink(struct inode *inode, struct page *page)
 	return status;
 }
 
-static int
-nfs3_proc_read(struct nfs_read_data *rdata, struct file *filp)
+static int nfs3_proc_read(struct nfs_read_data *rdata)
 {
 	int			flags = rdata->flags;
 	struct inode *		inode = rdata->inode;
@@ -238,13 +231,13 @@ nfs3_proc_read(struct nfs_read_data *rdata, struct file *filp)
 		.rpc_proc	= &nfs3_procedures[NFS3PROC_READ],
 		.rpc_argp	= &rdata->args,
 		.rpc_resp	= &rdata->res,
+		.rpc_cred	= rdata->cred,
 	};
 	int			status;
 
 	dprintk("NFS call  read %d @ %Ld\n", rdata->args.count,
 			(long long) rdata->args.offset);
 	fattr->valid = 0;
-	msg.rpc_cred = nfs_cred(inode, filp);
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, flags);
 	if (status >= 0)
 		nfs_refresh_inode(inode, fattr);
@@ -252,8 +245,7 @@ nfs3_proc_read(struct nfs_read_data *rdata, struct file *filp)
 	return status;
 }
 
-static int
-nfs3_proc_write(struct nfs_write_data *wdata, struct file *filp)
+static int nfs3_proc_write(struct nfs_write_data *wdata)
 {
 	int			rpcflags = wdata->flags;
 	struct inode *		inode = wdata->inode;
@@ -262,13 +254,13 @@ nfs3_proc_write(struct nfs_write_data *wdata, struct file *filp)
 		.rpc_proc	= &nfs3_procedures[NFS3PROC_WRITE],
 		.rpc_argp	= &wdata->args,
 		.rpc_resp	= &wdata->res,
+		.rpc_cred	= wdata->cred,
 	};
 	int			status;
 
 	dprintk("NFS call  write %d @ %Ld\n", wdata->args.count,
 			(long long) wdata->args.offset);
 	fattr->valid = 0;
-	msg.rpc_cred = nfs_cred(inode, filp);
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, rpcflags);
 	if (status >= 0)
 		nfs_refresh_inode(inode, fattr);
@@ -276,8 +268,7 @@ nfs3_proc_write(struct nfs_write_data *wdata, struct file *filp)
 	return status < 0? status : wdata->res.count;
 }
 
-static int
-nfs3_proc_commit(struct nfs_write_data *cdata, struct file *filp)
+static int nfs3_proc_commit(struct nfs_write_data *cdata)
 {
 	struct inode *		inode = cdata->inode;
 	struct nfs_fattr *	fattr = cdata->res.fattr;
@@ -285,13 +276,13 @@ nfs3_proc_commit(struct nfs_write_data *cdata, struct file *filp)
 		.rpc_proc	= &nfs3_procedures[NFS3PROC_COMMIT],
 		.rpc_argp	= &cdata->args,
 		.rpc_resp	= &cdata->res,
+		.rpc_cred	= cdata->cred,
 	};
 	int			status;
 
 	dprintk("NFS call  commit %d @ %Ld\n", cdata->args.count,
 			(long long) cdata->args.offset);
 	fattr->valid = 0;
-	msg.rpc_cred = nfs_cred(inode, filp);
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
 	if (status >= 0)
 		nfs_refresh_inode(inode, fattr);
@@ -535,6 +526,8 @@ nfs3_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
 	};
 	int			status;
 
+	if (path->len > NFS3_MAXPATHLEN)
+		return -ENAMETOOLONG;
 	dprintk("NFS call  symlink %s -> %s\n", name->name, path->name);
 	dir_attr.valid = 0;
 	fattr->valid = 0;
@@ -719,252 +712,6 @@ nfs3_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
 	return status;
 }
 
-#ifdef CONFIG_NFS_ACL
-static int
-nfs3_proc_checkacls(struct inode *inode)
-{
-	struct nfs_server *server = NFS_SERVER(inode);
-	struct nfs_fattr fattr;
-	struct nfs3_getaclargs args = { };
-	struct nfs3_getaclres res = { &fattr };
-	int status;
-
-	if (!(server->flags & NFSACL) || (server->flags & NFS_MOUNT_NOACL))
-		return -EOPNOTSUPP;
-
-	args.fh = NFS_FH(inode);
-	args.mask = NFS3_ACLCNT | NFS3_DFACLCNT;
-
-	dprintk("NFS call getacl\n");
-	status = rpc_call(server->acl_client, NFS3PROC_GETACL,
-			  &args, &res, 0);
-	dprintk("NFS reply getacl: %d\n", status);
-
-	if (status) {
-		if (status == -ENOSYS) {
-			dprintk("NFS_ACL extension not supported; disabling\n");
-			server->flags &= ~NFSACL;
-			status = -EOPNOTSUPP;
-		} else if (status == -ENOTSUPP)
-			status = -EOPNOTSUPP;
-		goto getout;
-	}
-	if ((args.mask & res.mask) != args.mask) {
-		status = -EIO;
-		goto getout;
-	}
-
-	status = nfs_refresh_inode(inode, &fattr);
-
-getout:
-	posix_acl_release(res.acl_access);
-	posix_acl_release(res.acl_default);
-
-	if (!status) {
-		/* The (count > 4) test will exclude ACL entries from the list
-		   of names even if their ACL_GROUP_ENTRY and ACL_MASK have
-		   different permissions. Getacl still returns these as
-		   four-entry ACLs, instead of minimal (three-entry) ACLs. */
-		   
-		if ((args.mask & NFS3_ACLCNT) && res.acl_access_count > 4)
-			status |= ACL_TYPE_ACCESS;
-		if ((args.mask & NFS3_DFACLCNT) && res.acl_default_count > 0)
-			status |= ACL_TYPE_DEFAULT;
-	}
-	return status;
-}
-#endif  /* CONFIG_NFS_ACL */
-
-#ifdef CONFIG_NFS_ACL
-static struct posix_acl *
-nfs3_proc_getacl(struct inode *inode, int type)
-{
-	struct nfs_server *server = NFS_SERVER(inode);
-	struct nfs_fattr fattr;
-	struct page *pages[NFSACL_MAXPAGES] = { };
-	struct nfs3_getaclargs args = {
-		/* The xdr layer may allocate pages here. */
-		.pages =	pages,
-	};
-	struct nfs3_getaclres res = {
-		.fattr =	&fattr,
-	};
-	struct posix_acl *acl = NULL;
-	int status, count;
-
-	if (!(server->flags & NFSACL) || (server->flags & NFS_MOUNT_NOACL))
-		return ERR_PTR(-EOPNOTSUPP);
-
-	args.fh = NFS_FH(inode);
-	switch(type) {
-		case ACL_TYPE_ACCESS:
-			args.mask = NFS3_ACLCNT|NFS3_ACL;
-			break;
-
-		case ACL_TYPE_DEFAULT:
-			if (!S_ISDIR(inode->i_mode))
-				return NULL;
-			args.mask = NFS3_DFACLCNT|NFS3_DFACL;
-			break;
-
-		default:
-			return ERR_PTR(-EINVAL);
-	}
-
-	dprintk("NFS call getacl\n");
-	status = rpc_call(server->acl_client, NFS3PROC_GETACL,
-			  &args, &res, 0);
-	dprintk("NFS reply getacl: %d\n", status);
-
-	/* pages may have been allocated at the xdr layer. */
-	for (count = 0; count < NFSACL_MAXPAGES && args.pages[count]; count++)
-		__free_page(args.pages[count]);
-
-	if (status) {
-		if (status == -ENOSYS) {
-			dprintk("NFS_ACL extension not supported; disabling\n");
-			server->flags &= ~NFSACL;
-			status = -EOPNOTSUPP;
-		} else if (status == -ENOTSUPP)
-			status = -EOPNOTSUPP;
-		goto getout;
-	}
-	if ((args.mask & res.mask) != args.mask) {
-		status = -EIO;
-		goto getout;
-	}
-
-	if (type == ACL_TYPE_ACCESS) {
-		if (res.acl_access) {
-			mode_t mode = inode->i_mode;
-			if (!posix_acl_equiv_mode(res.acl_access, &mode) &&
-			    inode->i_mode == mode) {
-				posix_acl_release(res.acl_access);
-				res.acl_access = NULL;
-			}
-		}
-		acl = res.acl_access;
-		res.acl_access = NULL;
-	} else {
-		acl = res.acl_default;
-		res.acl_default = NULL;
-	}
-
-	status = nfs_refresh_inode(inode, &fattr);
-
-getout:
-	posix_acl_release(res.acl_access);
-	posix_acl_release(res.acl_default);
-
-	if (status) {
-		posix_acl_release(acl);
-		acl = ERR_PTR(status);
-	}
-	return acl;
-}
-#endif  /* CONFIG_NFS_ACL */
-
-#ifdef CONFIG_NFS_ACL
-static int
-nfs3_proc_setacl(struct inode *inode, int type, struct posix_acl *acl)
-{
-	struct nfs_server *server = NFS_SERVER(inode);
-	struct nfs_fattr fattr;
-	struct page *pages[NFSACL_MAXPAGES] = { };
-	struct nfs3_setaclargs args = {
-		.pages = pages,
-	};
-	int status, count;
-
-	if (!(server->flags & NFSACL) || (server->flags & NFS_MOUNT_NOACL))
-		return -EOPNOTSUPP;
-
-	/* We are doing this here, because XDR marshalling can only
-	   return -ENOMEM. */
-	if (acl && acl->a_count > NFS3_ACL_MAX_ENTRIES)
-		return -ENOSPC;
-	args.inode = inode;
-	args.mask = NFS3_ACL|NFS3_DFACL;
-	if (S_ISDIR(inode->i_mode)) {
-		switch(type) {
-			case ACL_TYPE_ACCESS:
-				args.acl_access = acl;
-				args.acl_default = NFS_PROTO(inode)->getacl(
-					inode, ACL_TYPE_DEFAULT);
-				status = PTR_ERR(args.acl_default);
-				if (IS_ERR(args.acl_default)) {
-					args.acl_default = NULL;
-					goto cleanup;
-				}
-				break;
-
-			case ACL_TYPE_DEFAULT:
-				args.acl_access = NFS_PROTO(inode)->getacl(
-					inode, ACL_TYPE_ACCESS);
-				status = PTR_ERR(args.acl_access);
-				if (IS_ERR(args.acl_access)) {
-					args.acl_access = NULL;
-					goto cleanup;
-				}
-				args.acl_default = acl;
-				break;
-
-			default:
-				status = -EINVAL;
-				goto cleanup;
-		}
-	} else {
-		status = -EINVAL;
-		if (type != ACL_TYPE_ACCESS)
-			goto cleanup;
-		args.mask = NFS3_ACL;
-		args.acl_access = acl;
-	}
-	if (args.acl_access == NULL) {
-		args.acl_access = posix_acl_from_mode(inode->i_mode,
-						      GFP_KERNEL);
-		status = PTR_ERR(args.acl_access);
-		if (IS_ERR(args.acl_access)) {
-			args.acl_access = NULL;
-			goto cleanup;
-		}
-	}
-	args.mask = NFS3_ACL | (args.acl_default ? NFS3_DFACL : 0);
-
-	dprintk("NFS call setacl\n");
-	status = rpc_call(server->acl_client, NFS3PROC_SETACL,
-			  &args, &fattr, 0);
-	dprintk("NFS reply setacl: %d\n", status);
-
-	/* pages may have been allocated at the xdr layer. */
-	for (count = 0; count < NFSACL_MAXPAGES && args.pages[count]; count++)
-		__free_page(args.pages[count]);
-
-	if (status) {
-		if (status == -ENOSYS) {
-			dprintk("NFS_ACL SETACL RPC not supported"
-				"(will not retry)\n");
-			server->flags &= ~NFSACL;
-			status = -EOPNOTSUPP;
-		} else if (status == -ENOTSUPP)
-			status = -EOPNOTSUPP;
-	} else {
-		/* Force an attribute cache update if the file mode
-		 * has changed. */
-		if (inode->i_mode != fattr.mode)
-			NFS_CACHEINV(inode);
-		status = nfs_refresh_inode(inode, &fattr);
-	}
-
-cleanup:
-	if (args.acl_access != acl)
-		posix_acl_release(args.acl_access);
-	if (args.acl_default != acl)
-		posix_acl_release(args.acl_default);
-	return status;
-}
-#endif  /* CONFIG_NFS_ACL */
-
 extern u32 *nfs3_decode_dirent(u32 *, struct nfs_entry *, int);
 
 static void
@@ -1079,27 +826,6 @@ nfs3_proc_commit_setup(struct nfs_write_data *data, int how)
 	rpc_call_setup(task, &msg, 0);
 }
 
-/*
- * Set up the nfspage struct with the right credentials
- */
-void
-nfs3_request_init(struct nfs_page *req, struct file *filp)
-{
-	req->wb_cred = get_rpccred(nfs_cred(req->wb_inode, filp));
-}
-
-static int
-nfs3_request_compatible(struct nfs_page *req, struct file *filp, struct page *page)
-{
-	if (req->wb_file != filp)
-		return 0;
-	if (req->wb_page != page)
-		return 0;
-	if (req->wb_cred != nfs_file_cred(filp))
-		return 0;
-	return 1;
-}
-
 static int
 nfs3_proc_lock(struct file *filp, int cmd, struct file_lock *fl)
 {
@@ -1139,12 +865,5 @@ struct nfs_rpc_ops	nfs_v3_clientops = {
 	.commit_setup	= nfs3_proc_commit_setup,
 	.file_open	= nfs_open,
 	.file_release	= nfs_release,
-	.request_init	= nfs3_request_init,
-	.request_compatible = nfs3_request_compatible,
 	.lock		= nfs3_proc_lock,
-#ifdef CONFIG_NFS_ACL
-	.getacl		= nfs3_proc_getacl,
-	.setacl		= nfs3_proc_setacl,
-	.checkacls	= nfs3_proc_checkacls,
-#endif  /* CONFIG_NFS_ACL */
 };

@@ -28,6 +28,7 @@ struct timer_opts{
 
 extern struct timer_opts* select_timer(void);
 extern void clock_fallback(void);
+void setup_pit_timer(void);
 
 /* Modifiers for buggy PIT handling */
 

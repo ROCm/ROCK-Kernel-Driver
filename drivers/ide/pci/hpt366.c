@@ -958,7 +958,7 @@ static int __devinit init_hpt37x(struct pci_dev *dev)
 			/* Unsupported */
 		} else if (pll == F_LOW_PCI_50) {
 			if (hpt_minimum_revision(dev,8))
-				pci_set_drvdata(dev, NULL);
+				pci_set_drvdata(dev, (void *) fifty_base_hpt370a);
 			else if (hpt_minimum_revision(dev,5))
 				pci_set_drvdata(dev, (void *) fifty_base_hpt372);
 			else if (hpt_minimum_revision(dev,4))
@@ -991,11 +991,6 @@ static int __devinit init_hpt37x(struct pci_dev *dev)
 	if (pci_get_drvdata(dev)) 
 		goto init_hpt37X_done;
 	
-	if (hpt_minimum_revision(dev,8))
-	{
-		printk(KERN_ERR "HPT374: Only 33MHz PCI timings are supported.\n");
-		return -EOPNOTSUPP;
-	}
 	/*
 	 * adjust PLL based upon PCI clock, enable it, and wait for
 	 * stabilization.
@@ -1403,7 +1398,7 @@ static struct pci_device_id hpt366_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, hpt366_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "HPT366 IDE",
+	.name		= "HPT366_IDE",
 	.id_table	= hpt366_pci_tbl,
 	.probe		= hpt366_init_one,
 };

@@ -53,7 +53,6 @@
 #include <net/ip6_route.h>
 #include <net/ip6_checksum.h>
 #include <net/inet_ecn.h>
-#include <net/mipglue.h>
 #include <net/protocol.h>
 #include <net/xfrm.h>
 #include <net/addrconf.h>
@@ -678,30 +677,17 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	if (saddr == NULL) {
 		saddr = &fl.fl6_src;
 		ipv6_addr_copy(&np->rcv_saddr, saddr);
-
-#ifdef CONFIG_IPV6_SUBTREES
-// KK : Whole code looks like null stmt, dst_lookup fixed this for us.
-                ipv6_addr_copy(&fl.fl6_src, saddr);
-
-		 dst_release(dst);
-                dst = ip6_route_output(sk, &fl);
-
-                if ((err = dst->error) != 0) {
-                        dst_release(dst);
-                        goto failure;
-                }
-#endif
 	}
 
 	/* set the source address */
 	ipv6_addr_copy(&np->saddr, saddr);
 	inet->rcv_saddr = LOOPBACK4_IPV6;
 
-	ip6_dst_store(sk, dst, NULL, NULL);
+	ip6_dst_store(sk, dst, NULL);
 	sk->sk_route_caps = dst->dev->features &
 		~(NETIF_F_IP_CSUM | NETIF_F_TSO);
 
-	tp->ext_header_len = tcp_v6_get_mipv6_header_len();
+	tp->ext_header_len = 0;
 	if (np->opt)
 		tp->ext_header_len = np->opt->opt_flen + np->opt->opt_nflen;
 	tp->ext2_header_len = dst->header_len;
@@ -1354,7 +1340,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	atomic_inc(&inet6_sock_nr);
 #endif
 
-	ip6_dst_store(newsk, dst, NULL, NULL);
+	ip6_dst_store(newsk, dst, NULL);
 	newsk->sk_route_caps = dst->dev->features &
 		~(NETIF_F_IP_CSUM | NETIF_F_TSO);
 
@@ -1407,7 +1393,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 			sock_kfree_s(sk, opt, opt->tot_len);
 	}
 
-	newtp->ext_header_len = tcp_v6_get_mipv6_header_len();
+	newtp->ext_header_len = 0;
 	if (newnp->opt)
 		newtp->ext_header_len = newnp->opt->opt_nflen +
 					newnp->opt->opt_flen;
@@ -1747,7 +1733,7 @@ static int tcp_v6_rebuild_header(struct sock *sk)
 			return err;
 		}
 
-		ip6_dst_store(sk, dst, NULL, NULL);
+		ip6_dst_store(sk, dst, NULL);
 		sk->sk_route_caps = dst->dev->features &
 			~(NETIF_F_IP_CSUM | NETIF_F_TSO);
 		tcp_sk(sk)->ext2_header_len = dst->header_len;
@@ -1789,7 +1775,7 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 			return err;
 		}
 
-		ip6_dst_store(sk, dst, NULL, NULL);
+		ip6_dst_store(sk, dst, NULL);
 		sk->sk_route_caps = dst->dev->features &
 			~(NETIF_F_IP_CSUM | NETIF_F_TSO);
 		tcp_sk(sk)->ext2_header_len = dst->header_len;

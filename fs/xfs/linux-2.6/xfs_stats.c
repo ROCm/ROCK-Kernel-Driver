@@ -119,9 +119,9 @@ xfs_read_xfsstats(
 void
 xfs_init_procfs(void)
 {
-	if (!proc_mkdir("fs/xfs", 0))
+	if (!proc_mkdir("fs/xfs", NULL))
 		return;
-	create_proc_read_entry("fs/xfs/stat", 0, 0, xfs_read_xfsstats, NULL);
+	create_proc_read_entry("fs/xfs/stat", 0, NULL, xfs_read_xfsstats, NULL);
 }
 
 void

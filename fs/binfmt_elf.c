@@ -1224,6 +1224,7 @@ struct elf_thread_status
 	struct list_head list;
 	struct elf_prstatus prstatus;	/* NT_PRSTATUS */
 	elf_fpregset_t fpu;		/* NT_PRFPREG */
+	struct task_struct *thread;
 #ifdef ELF_CORE_COPY_XFPREGS
 	elf_fpxregset_t xfpu;		/* NT_PRXFPREG */
 #endif
@@ -1236,18 +1237,10 @@ struct elf_thread_status
  * we need to keep a linked list of every threads pr_status and then
  * create a single section for them in the final core file.
  */
-static int elf_dump_thread_status(long signr, struct task_struct * p, struct list_head * thread_list)
+static int elf_dump_thread_status(long signr, struct elf_thread_status *t)
 {
-
-	struct elf_thread_status *t;
 	int sz = 0;
-
-	t = kmalloc(sizeof(*t), GFP_ATOMIC);
-	if (!t)
-		return 0;
-	memset(t, 0, sizeof(*t));
-
-	INIT_LIST_HEAD(&t->list);
+	struct task_struct *p = t->thread;
 	t->num_notes = 0;
 
 	fill_prstatus(&t->prstatus, p, signr);
@@ -1270,7 +1263,6 @@ static int elf_dump_thread_status(long signr, struct task_struct * p, struct lis
 		sz += notesize(&t->notes[2]);
 	}
 #endif	
-	list_add(&t->list, thread_list);
 	return sz;
 }
 
@@ -1341,22 +1333,32 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 		goto cleanup;
 #endif
 
-	/* capture the status of all other threads */
 	if (signr) {
+		struct elf_thread_status *tmp;
 		read_lock(&tasklist_lock);
 		do_each_thread(g,p)
 			if (current->mm == p->mm && current != p) {
-				int sz = elf_dump_thread_status(signr, p, &thread_list);
-				if (!sz) {
+				tmp = kmalloc(sizeof(*tmp), GFP_ATOMIC);
+				if (!tmp) {
 					read_unlock(&tasklist_lock);
 					goto cleanup;
-				} else
-					thread_status_size += sz;
+				}
+				memset(tmp, 0, sizeof(*tmp));
+				INIT_LIST_HEAD(&tmp->list);
+				tmp->thread = p;
+				list_add(&tmp->list, &thread_list);
 			}
 		while_each_thread(g,p);
 		read_unlock(&tasklist_lock);
-	}
+		list_for_each(t, &thread_list) {
+			struct elf_thread_status *tmp;
+			int sz;
 
+			tmp = list_entry(t, struct elf_thread_status, list);
+			sz = elf_dump_thread_status(signr, tmp);
+			thread_status_size += sz;
+		}
+	}
 	/* now collect the dump for the current */
 	memset(prstatus, 0, sizeof(*prstatus));
 	fill_prstatus(prstatus, current, signr);

@@ -51,7 +51,6 @@
 #include <net/udp.h>
 #include <net/raw.h>
 #include <net/inet_common.h>
-#include <net/mipglue.h>
 
 #include <net/ip6_checksum.h>
 #include <net/xfrm.h>
@@ -833,9 +832,7 @@ do_append_data:
 	if (dst)
 		ip6_dst_store(sk, dst,
 			      !ipv6_addr_cmp(&fl->fl6_dst, &np->daddr) ?
-			      &np->daddr : NULL,
-			      !ipv6_addr_cmp(&fl->fl6_src, &np->saddr) ?
-			      &np->saddr : NULL);
+			      &np->daddr : NULL);
 	if (err > 0)
 		err = np->recverr ? net_xmit_errno(err) : 0;
 	release_sock(sk);

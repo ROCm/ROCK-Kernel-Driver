@@ -1954,9 +1954,9 @@ static int usb_audio_open_mixdev(struct inode *inode, struct file *file)
 	struct usb_audio_state *s;
 
 	down(&open_sem);
-	for (devs = audiodevs.next; devs != &audiodevs; devs = devs->next) {
+	list_for_each(devs, &audiodevs) {
 		s = list_entry(devs, struct usb_audio_state, audiodev);
-		for (mdevs = s->mixerlist.next; mdevs != &s->mixerlist; mdevs = mdevs->next) {
+		list_for_each(mdevs, &s->mixerlist) {
 			ms = list_entry(mdevs, struct usb_mixerdev, list);
 			if (ms->dev_mixer == minor)
 				goto mixer_found;
@@ -2640,9 +2640,9 @@ static int usb_audio_open(struct inode *inode, struct file *file)
 
 	for (;;) {
 		down(&open_sem);
-		for (devs = audiodevs.next; devs != &audiodevs; devs = devs->next) {
+		list_for_each(devs, &audiodevs) {
 			s = list_entry(devs, struct usb_audio_state, audiodev);
-			for (adevs = s->audiolist.next; adevs != &s->audiolist; adevs = adevs->next) {
+			list_for_each(adevs, &s->audiolist) {
 				as = list_entry(adevs, struct usb_audiodev, list);
 				if (!((as->dev_audio ^ minor) & ~0xf))
 					goto device_found;
@@ -3831,7 +3831,7 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 	usb_set_intfdata (intf, NULL);
 
 	/* deregister all audio and mixer devices, so no new processes can open this device */
-	for(list = s->audiolist.next; list != &s->audiolist; list = list->next) {
+	list_for_each(list, &s->audiolist) {
 		as = list_entry(list, struct usb_audiodev, list);
 		usbin_disc(as);
 		usbout_disc(as);
@@ -3843,7 +3843,7 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 		}
 		as->dev_audio = -1;
 	}
-	for(list = s->mixerlist.next; list != &s->mixerlist; list = list->next) {
+	list_for_each(list, &s->mixerlist) {
 		ms = list_entry(list, struct usb_mixerdev, list);
 		if (ms->dev_mixer >= 0) {
 			unregister_sound_mixer(ms->dev_mixer);

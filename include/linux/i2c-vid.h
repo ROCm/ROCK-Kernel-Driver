@@ -35,12 +35,15 @@
     to avoid floating point in the kernel.
 */
 
+int i2c_which_vrm(void);
+
 #define DEFAULT_VRM	82
 
 static inline int vid_from_reg(int val, int vrm)
 {
 	switch(vrm) {
-
+	case  0:
+		return 0;
 	case 91:		/* VRM 9.1 */
 	case 90:		/* VRM 9.0 */
 		return(val == 0x1f ? 0 :

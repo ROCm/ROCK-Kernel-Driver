@@ -48,7 +48,7 @@ struct ocp_fs_i2c_data {
 
 /* Flags for I2C */
 #define FS_I2C_SEPARATE_DFSRR	0x02
-#define FS_I2C_32BIT		0x01
+#define FS_I2C_CLOCK_5200	0x01
 
 #endif	/* __ASM_FS_OCP_H__ */
 #endif	/* __KERNEL__ */

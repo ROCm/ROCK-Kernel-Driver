@@ -654,7 +654,7 @@ mpage_writepages(struct address_space *mapping,
 		scanned = 1;
 	}
 retry:
-	while (!done && (index <= end) && 
+	while (!done && (index <= end) &&
 			(nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
 			PAGECACHE_TAG_DIRTY,
 			min(end - index, (pgoff_t)PAGEVEC_SIZE-1) + 1))) {

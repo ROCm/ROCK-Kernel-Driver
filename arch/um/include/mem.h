@@ -1,18 +1,19 @@
 /* 
- * Copyright (C) 2002, 2003 Jeff Dike (jdike@addtoit.com)
+ * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
 #ifndef __MEM_H__
 #define __MEM_H__
 
-#include "linux/types.h"
+struct vm_reserved {
+	struct list_head list;
+	unsigned long start;
+	unsigned long end;
+};
 
-extern int phys_mapping(unsigned long phys, __u64 *offset_out);
-extern int physmem_subst_mapping(void *virt, int fd, __u64 offset, int w);
-extern int is_remapped(const void *virt, int fd, __u64 offset);
-extern int physmem_remove_mapping(void *virt);
-extern void physmem_forget_descriptor(int fd);
+extern void set_usable_vm(unsigned long start, unsigned long end);
+extern void set_kmem_end(unsigned long new);
 
 #endif
 

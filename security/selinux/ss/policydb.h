@@ -251,7 +251,6 @@ struct policydb {
 extern int policydb_init(struct policydb *p);
 extern int policydb_index_classes(struct policydb *p);
 extern int policydb_index_others(struct policydb *p);
-extern int constraint_expr_destroy(struct constraint_expr *expr);
 extern void policydb_destroy(struct policydb *p);
 extern int policydb_load_isids(struct policydb *p, struct sidtab *s);
 extern int policydb_context_isvalid(struct policydb *p, struct context *c);

@@ -9,7 +9,7 @@
 # for more details.
 #
 
-extra-y := head.o init_task.o vmlinux.lds.s
+extra-y := head.o init_task.o vmlinux.lds
 
 obj-y += intv.o entry.o process.o syscalls.o time.o semaphore.o setup.o \
 	 signal.o irq.o mach.o ptrace.o bug.o

@@ -40,7 +40,6 @@
 #define NEXTHDR_ICMP		58	/* ICMP for IPv6. */
 #define NEXTHDR_NONE		59	/* No next header */
 #define NEXTHDR_DEST		60	/* Destination options header. */
-#define NEXTHDR_MH		0xd2	/* Mobility header */
 
 #define NEXTHDR_MAX		255
 
@@ -193,12 +192,9 @@ struct ipv6_txoptions
 	__u16			opt_flen;	/* after fragment hdr */
 	__u16			opt_nflen;	/* before fragment hdr */
 
-	__u8			mipv6_flags;	/* flags set by MIPv6 */
-
 	struct ipv6_opt_hdr	*hopopt;
 	struct ipv6_opt_hdr	*dst0opt;
-	struct ipv6_rt_hdr	*srcrt;	/* Routing Header Type 0 */
-	struct ipv6_rt_hdr	*srcrt2; /* Routing Header Type 2 */
+	struct ipv6_rt_hdr	*srcrt;	/* Routing Header */
 	struct ipv6_opt_hdr	*auth;
 	struct ipv6_opt_hdr	*dst1opt;
 
@@ -334,22 +330,6 @@ static inline int ipv6_addr_any(const struct in6_addr *a)
 {
 	return ((a->s6_addr32[0] | a->s6_addr32[1] | 
 		 a->s6_addr32[2] | a->s6_addr32[3] ) == 0); 
-}
-
-static inline int ipv6_prefix_cmp(const struct in6_addr *p1,
-				  const struct in6_addr *p2, int plen)
-{
-	int b = plen&0x7;
-	int o = plen>>3;
-	int res = 0;
-
-	if (o > 0) 
-		res = memcmp(&p1->s6_addr[0], &p2->s6_addr[0], o);
-	if (res == 0 && b > 0) {
-		__u8 m = (0xff00 >> b) & 0xff;
-		res = (p1->s6_addr[o] & m) - (p2->s6_addr[o] & m);  
-	}
-	return res;
 }
 
 /*

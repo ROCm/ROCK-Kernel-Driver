@@ -23,7 +23,6 @@
  *						and moved to net/core.
  *	Pekka Savola			:	RFC2461 validation
  *	YOSHIFUJI Hideaki @USAGI	:	Verify ND options properly
- *	Ville Nuorvala			:	RFC2461 fixes to proxy ND
  */
 
 /* Set to 3 to get tracing... */
@@ -76,7 +75,6 @@
 #include <net/ip6_route.h>
 #include <net/addrconf.h>
 #include <net/icmp.h>
-#include <net/mipglue.h>
 
 #include <net/flow.h>
 #include <net/ip6_checksum.h>
@@ -230,10 +228,6 @@ static struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
 			if (ndopts->nd_opt_array[nd_opt->nd_opt_type] == 0)
 				ndopts->nd_opt_array[nd_opt->nd_opt_type] = nd_opt;
 			break;
-		case ND_OPT_RTR_ADV_INTERVAL:
-		case ND_OPT_HOME_AGENT_INFO:
-			/* These two are handled by the MIPv6 code */
-			break;
 		default:
 			/*
 			 * Unknown options must be silently ignored,
@@ -385,7 +379,7 @@ static void inline ndisc_update(struct neighbour *neigh,
 	write_unlock_bh(&neigh->lock);
 }
 
-void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
+static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 		   struct in6_addr *daddr, struct in6_addr *solicited_addr,
 	 	   int router, int solicited, int override, int inc_opt) 
 {
@@ -909,13 +903,6 @@ static void ndisc_recv_na(struct sk_buff *skb)
 
 	if ((ifp = ipv6_get_ifaddr(&msg->target, dev, 1))) {
 		if (ifp->flags & IFA_F_TENTATIVE) {
-			if (!msg->icmph.icmp6_override && 
-			    ndisc_mip_mn_ha_probe(ifp, lladdr)) {
-				addrconf_dad_completed(ifp);
-				in6_ifa_put(ifp);
-				return;
-			}
-
 			addrconf_dad_failure(ifp);
 			return;
 		}
@@ -993,7 +980,6 @@ ignore:
 #endif
 		neigh_release(neigh);
 	}
-	ndisc_check_mipv6_dad(&msg->target);
 }
 
 static void ndisc_recv_rs(struct sk_buff *skb)
@@ -1060,7 +1046,6 @@ static void ndisc_router_discovery(struct sk_buff *skb)
         struct ra_msg *ra_msg = (struct ra_msg *) skb->h.raw;
 	struct neighbour *neigh;
 	struct inet6_dev *in6_dev;
-	int change_rtr;
 	struct rt6_info *rt;
 	int lifetime;
 	struct ndisc_options ndopts;
@@ -1092,7 +1077,6 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 			   skb->dev->name);
 		return;
 	}
-	change_rtr = ndisc_mipv6_ra_rcv(skb);
 	if (in6_dev->cnf.forwarding || !in6_dev->cnf.accept_ra) {
 		in6_dev_put(in6_dev);
 		return;
@@ -1133,7 +1117,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 		rt = NULL;
 	}
 
-	if (rt == NULL && lifetime && change_rtr) {
+	if (rt == NULL && lifetime) {
 		ND_PRINTK3(KERN_DEBUG
 			   "ICMPv6 RA: adding default router.\n");
 
@@ -1264,8 +1248,6 @@ out:
 	if (rt)
 		dst_release(&rt->u.dst);
 	in6_dev_put(in6_dev);
-
-	ndisc_mipv6_change_router(change_rtr);
 }
 
 static void ndisc_redirect_rcv(struct sk_buff *skb)
@@ -1653,5 +1635,3 @@ void ndisc_cleanup(void)
 	sock_release(ndisc_socket);
 	ndisc_socket = NULL; /* For safety. */
 }
-
-EXPORT_SYMBOL(ndisc_send_na);

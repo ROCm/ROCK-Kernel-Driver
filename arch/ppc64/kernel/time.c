@@ -48,6 +48,7 @@
 #include <linux/time.h>
 #include <linux/init.h>
 #include <linux/profile.h>
+#include <linux/cpu.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>
@@ -285,8 +286,20 @@ int timer_interrupt(struct pt_regs * regs)
 	while (lpaca->next_jiffy_update_tb <= (cur_tb = get_tb())) {
 
 #ifdef CONFIG_SMP
-		smp_local_timer_interrupt(regs);
+		/*
+		 * We cannot disable the decrementer, so in the period
+		 * between this cpu's being marked offline in cpu_online_map
+		 * and calling stop-self, it is taking timer interrupts.
+		 * Avoid calling into the scheduler rebalancing code if this
+		 * is the case.
+		 */
+		if (!cpu_is_offline(cpu))
+			smp_local_timer_interrupt(regs);
 #endif
+		/*
+		 * No need to check whether cpu is offline here; boot_cpuid
+		 * should have been fixed up by now.
+		 */
 		if (cpu == boot_cpuid) {
 			write_seqlock(&xtime_lock);
 			tb_last_stamp = lpaca->next_jiffy_update_tb;

@@ -578,6 +578,7 @@ CONFIG_SERIAL_NONSTANDARD=y
 # CONFIG_N_HDLC is not set
 # CONFIG_STALDRV is not set
 CONFIG_FETCHOP=y
+CONFIG_SGI_SNSC=y
 
 #
 # Serial drivers

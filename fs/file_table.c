@@ -106,52 +106,6 @@ fail:
 
 EXPORT_SYMBOL(get_empty_filp);
 
-/*
- * Clear and initialize a (private) struct file for the given dentry,
- * allocate the security structure, and call the open function (if any).  
- * The file should be released using close_private_file.
- */
-int open_private_file(struct file *filp, struct dentry *dentry, int flags)
-{
-	int error;
-	memset(filp, 0, sizeof(*filp));
-	eventpoll_init_file(filp);
-	filp->f_flags  = flags;
-	filp->f_mode   = ((flags+1) & O_ACCMODE) | FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE;
-	atomic_set(&filp->f_count, 1);
-	filp->f_dentry = dentry;
-	filp->f_mapping = dentry->d_inode->i_mapping;
-	filp->f_uid    = current->fsuid;
-	filp->f_gid    = current->fsgid;
-	filp->f_op     = dentry->d_inode->i_fop;
-	INIT_LIST_HEAD(&filp->f_list);
-	error = security_file_alloc(filp);
-	if (!error)
-		if (filp->f_op && filp->f_op->open) {
-			error = filp->f_op->open(dentry->d_inode, filp);
-			if (error)
-				security_file_free(filp);
-		}
-	return error;
-}
-
-EXPORT_SYMBOL(open_private_file);
-
-/*
- * Release a private file by calling the release function (if any) and
- * freeing the security structure.
- */
-void close_private_file(struct file *file)
-{
-	struct inode * inode = file->f_dentry->d_inode;
-
-	if (file->f_op && file->f_op->release)
-		file->f_op->release(inode, file);
-	security_file_free(file);
-}
-
-EXPORT_SYMBOL(close_private_file);
-
 void fastcall fput(struct file *file)
 {
 	if (atomic_dec_and_test(&file->f_count))

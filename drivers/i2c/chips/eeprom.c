@@ -45,7 +45,7 @@ static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 SENSORS_INSMOD_1(eeprom);
 
 static int checksum = 0;
-MODULE_PARM(checksum, "i");
+module_param(checksum, bool, 0);
 MODULE_PARM_DESC(checksum, "Only accept eeproms whose checksum is correct");
 
 

@@ -236,7 +236,7 @@ static struct pci_device_id ns87415_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, ns87415_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "NS87415IDE",
+	.name		= "NS87415_IDE",
 	.id_table	= ns87415_pci_tbl,
 	.probe		= ns87415_init_one,
 };

@@ -78,6 +78,7 @@
 
 #define HTC_VENDOR_ID		0x0bb4
 #define HTC_PRODUCT_ID		0x00ce
+#define HTC_HIMALAYA_ID		0x0a02
 
 #define NEC_VENDOR_ID		0x0409
 #define NEC_PRODUCT_ID		0x00d5

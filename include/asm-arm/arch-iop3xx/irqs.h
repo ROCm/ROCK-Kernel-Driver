@@ -15,11 +15,7 @@
 /*
  * Whic iop3xx implementation is this?
  */
-#ifdef CONFIG_ARCH_IOP310
-
-#include "iop310-irqs.h"
-
-#else
+#ifdef CONFIG_ARCH_IOP321
 
 #include "iop321-irqs.h"
 

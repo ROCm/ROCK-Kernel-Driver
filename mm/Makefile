@@ -12,8 +12,6 @@ obj-y			:= bootmem.o filemap.o mempool.o oom_kill.o fadvise.o \
 			   readahead.o slab.o swap.o truncate.o vmscan.o \
 			   $(mmu-y)
 
-obj-$(CONFIG_SWAP)	+= page_io.o swap_state.o swapfile.o
+obj-$(CONFIG_SWAP)	+= page_io.o swap_state.o swapfile.o thrash.o
 obj-$(CONFIG_HUGETLBFS)	+= hugetlb.o
-obj-$(CONFIG_PROC_MM)	+= proc_mm.o
 obj-$(CONFIG_NUMA) 	+= mempolicy.o
-obj-$(CONFIG_PROC_MM)	+= proc_mm.o

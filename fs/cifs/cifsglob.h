@@ -126,7 +126,7 @@ struct TCP_Server_Info {
 	enum protocolEnum protocolType;	
 	char versionMajor;
 	char versionMinor;
-	int svlocal:1;		/* local server or remote */
+	unsigned svlocal:1;	/* local server or remote */
 	atomic_t socketUseCount; /* number of open cifs sessions on socket */
 	atomic_t inFlight;  /* number of requests on the wire to server */
 	enum statusEnum tcpStatus; /* what we think the status is */
@@ -222,7 +222,7 @@ struct cifsTconInfo {
 	FILE_SYSTEM_DEVICE_INFO fsDevInfo;
 	FILE_SYSTEM_ATTRIBUTE_INFO fsAttrInfo;	/* ok if file system name truncated */
 	FILE_SYSTEM_UNIX_INFO fsUnixInfo;
-	int retry:1;
+	unsigned retry:1;
 	/* BB add field for back pointer to sb struct? */
 };
 
@@ -250,10 +250,10 @@ struct cifsFileInfo {
 	/* lock scope id (0 if none) */
 	struct file * pfile; /* needed for writepage */
 	struct inode * pInode; /* needed for oplock break */
-	int endOfSearch:1;	/* we have reached end of search */
-	int closePend:1;	/* file is marked to close */
-	int emptyDir:1;
-	int invalidHandle:1;  /* file closed via session abend */
+	unsigned endOfSearch:1;	/* we have reached end of search */
+	unsigned closePend:1;	/* file is marked to close */
+	unsigned emptyDir:1;
+	unsigned invalidHandle:1;  /* file closed via session abend */
 	struct semaphore fh_sem; /* prevents reopen race after dead ses*/
 	char * search_resume_name;
 	unsigned int resume_name_length;
@@ -272,9 +272,9 @@ struct cifsInodeInfo {
 	__u32 cifsAttrs; /* e.g. DOS archive bit, sparse, compressed, system */
 	atomic_t inUse;	 /* num concurrent users (local openers cifs) of file*/
 	unsigned long time;	/* jiffies of last update/check of inode */
-	int clientCanCacheRead:1; /* read oplock */
-	int clientCanCacheAll:1;  /* read and writebehind oplock */
-	int oplockPending:1;
+	unsigned clientCanCacheRead:1; /* read oplock */
+	unsigned clientCanCacheAll:1;  /* read and writebehind oplock */
+	unsigned oplockPending:1;
 	struct inode vfs_inode;
 };
 

@@ -858,7 +858,7 @@ vac_hwflush_patch1_on:		addcc	%l7, -PAGE_SIZE, %l7
 vac_hwflush_patch2_on:		sta	%g0, [%l3 + %l7] ASI_HWFLUSHSEG
 
 	.globl	invalid_segment_patch1, invalid_segment_patch2
-	.globl	num_context_patch1, num_context_patch2
+	.globl	num_context_patch1
 	.globl	vac_linesize_patch, vac_hwflush_patch1
 	.globl	vac_hwflush_patch2
 

@@ -73,6 +73,7 @@ qeth_eyecatcher(void)
 #include <linux/reboot.h>
 #include <asm/qeth.h>
 #include <linux/mii.h>
+#include <linux/rcupdate.h>
 
 #include "qeth.h"
 #include "qeth_mpc.h"
@@ -4733,9 +4734,10 @@ qeth_free_vlan_addresses4(struct qeth_card *card, unsigned short vid)
 	QETH_DBF_TEXT(trace, 4, "frvaddr4");
 	if (!card->vlangrp)
 		return;
-	in_dev = in_dev_get(card->vlangrp->vlan_devices[vid]);
+	rcu_read_lock();
+	in_dev = __in_dev_get(card->vlangrp->vlan_devices[vid]);
 	if (!in_dev)
-		return;
+		goto out;
 	for (ifa = in_dev->ifa_list; ifa; ifa = ifa->ifa_next){
 		addr = qeth_get_addr_buffer(QETH_PROT_IPV4);
 		if (addr){
@@ -4746,7 +4748,8 @@ qeth_free_vlan_addresses4(struct qeth_card *card, unsigned short vid)
 				kfree(addr);
 		}
 	}
-	in_dev_put(in_dev);
+out:
+	rcu_read_unlock();
 }
 
 static void
@@ -4918,9 +4921,9 @@ qeth_add_vlan_mc(struct qeth_card *card)
 		in_dev = in_dev_get(vg->vlan_devices[i]);
 		if (!in_dev)
 			continue;
-		read_lock(&in_dev->lock);
+		read_lock(&in_dev->mc_list_lock);
 		qeth_add_mc(card,in_dev);
-		read_unlock(&in_dev->lock);
+		read_unlock(&in_dev->mc_list_lock);
 		in_dev_put(in_dev);
 	}
 #endif
@@ -4935,10 +4938,10 @@ qeth_add_multicast_ipv4(struct qeth_card *card)
 	in4_dev = in_dev_get(card->dev);
 	if (in4_dev == NULL)
 		return;
-	read_lock(&in4_dev->lock);
+	read_lock(&in4_dev->mc_list_lock);
 	qeth_add_mc(card, in4_dev);
 	qeth_add_vlan_mc(card);
-	read_unlock(&in4_dev->lock);
+	read_unlock(&in4_dev->mc_list_lock);
 	in_dev_put(in4_dev);
 }
 

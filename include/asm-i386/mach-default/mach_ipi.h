@@ -1,8 +1,8 @@
 #ifndef __ASM_MACH_IPI_H
 #define __ASM_MACH_IPI_H
 
-inline void send_IPI_mask_bitmask(cpumask_t mask, int vector);
-inline void __send_IPI_shortcut(unsigned int shortcut, int vector);
+void send_IPI_mask_bitmask(cpumask_t mask, int vector);
+void __send_IPI_shortcut(unsigned int shortcut, int vector);
 
 static inline void send_IPI_mask(cpumask_t mask, int vector)
 {

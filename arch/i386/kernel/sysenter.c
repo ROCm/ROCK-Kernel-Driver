@@ -24,7 +24,7 @@ extern asmlinkage void sysenter_entry(void);
 void enable_sep_cpu(void *info)
 {
 	int cpu = get_cpu();
-	struct tss_struct *tss = init_tss + cpu;
+	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 
 	tss->ss1 = __KERNEL_CS;
 	tss->esp1 = sizeof(struct tss_struct) + (unsigned long) tss;

@@ -392,9 +392,28 @@ void iounmap(void *addr)
 	return;
 }
 
+static int iounmap_subset_regions(void *addr, unsigned long size)
+{
+	struct vm_struct *area;
+
+	/* Check whether subsets of this region exist */
+	area = im_get_area((unsigned long) addr, size, IM_REGION_SUPERSET);
+	if (area == NULL)
+		return 1;
+
+	while (area) {
+		iounmap(area->addr);
+		area = im_get_area((unsigned long) addr, size,
+				IM_REGION_SUPERSET);
+	}
+
+	return 0;
+}
+
 int iounmap_explicit(void *addr, unsigned long size)
 {
 	struct vm_struct *area;
+	int rc;
 	
 	/* addr could be in EEH or IO region, map it to IO region regardless.
 	 */
@@ -407,9 +426,16 @@ int iounmap_explicit(void *addr, unsigned long size)
 	area = im_get_area((unsigned long) addr, size, 
 			    IM_REGION_EXISTS | IM_REGION_SUBSET);
 	if (area == NULL) {
-		printk(KERN_ERR "%s() cannot unmap nonexistent range 0x%lx\n",
-				__FUNCTION__, (unsigned long) addr);
-		return 1;
+		/* Determine whether subset regions exist.  If so, unmap */
+		rc = iounmap_subset_regions(addr, size);
+		if (rc) {
+			printk(KERN_ERR
+			       "%s() cannot unmap nonexistent range 0x%lx\n",
+ 				__FUNCTION__, (unsigned long) addr);
+			return 1;
+		}
+	} else {
+		iounmap(area->addr);
 	}
 
 	iounmap(area->addr);

@@ -301,6 +301,7 @@ static struct notifier_block sc1200wdt_notifier =
 static struct file_operations sc1200wdt_fops =
 {
 	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
 	.write		= sc1200wdt_write,
 	.ioctl		= sc1200wdt_ioctl,
 	.open		= sc1200wdt_open,

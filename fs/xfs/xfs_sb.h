@@ -250,9 +250,9 @@ int xfs_sb_good_version(xfs_sb_t *sbp);
 	((((sbp)->sb_versionnum >= XFS_SB_VERSION_1) && \
 	  ((sbp)->sb_versionnum <= XFS_SB_VERSION_3)) || \
 	   ((XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_4) && \
-	    !(((sbp)->sb_versionnum & ~XFS_SB_VERSION_OKREALBITS) && \
-	      ((sbp)->sb_versionnum & XFS_SB_VERSION_MOREBITSBIT) && \
-	      ((sbp)->sb_features2 & ~XFS_SB_VERSION2_OKREALBITS))
+	    !(((sbp)->sb_versionnum & ~XFS_SB_VERSION_OKREALBITS) || \
+	      (((sbp)->sb_versionnum & XFS_SB_VERSION_MOREBITSBIT) && \
+	       ((sbp)->sb_features2 & ~XFS_SB_VERSION2_OKREALBITS)))
 
 #ifdef __KERNEL__
 #define	XFS_SB_GOOD_VERSION(sbp)	\

@@ -330,7 +330,7 @@ static int netstat_seq_show(struct seq_file *seq, void *v)
 {
 	int i;
 
-	seq_puts(seq, "\nTcpExt:");
+	seq_puts(seq, "TcpExt:");
 	for (i = 0; snmp4_net_list[i].name != NULL; i++)
 		seq_printf(seq, " %s", snmp4_net_list[i].name);
 

@@ -18,9 +18,9 @@ unsigned long __do_user_copy(void *to, const void *from, int n,
 {
 	unsigned long *faddrp = (unsigned long *) fault_addr, ret;
 
-	sigjmp_buf jbuf;
+	jmp_buf jbuf;
 	*fault_catcher = &jbuf;
-	if(sigsetjmp(jbuf, 1) == 0){
+	if(setjmp(jbuf) == 0){
 		(*op)(to, from, n);
 		ret = 0;
 		*faulted_out = 0;

@@ -23,8 +23,11 @@
 #include <asm/arch/clocks.h>
 #include <asm/arch/gpio.h>
 #include <asm/arch/mux.h>
+#include <asm/arch/fpga.h>
 
 #include "common.h"
+
+extern void __init omap_init_time(void);
 
 void omap_perseus2_init_irq(void)
 {
@@ -33,14 +36,14 @@ void omap_perseus2_init_irq(void)
 
 static struct resource smc91x_resources[] = {
 	[0] = {
-		.start	= OMAP730_FPGA_ETHR_START,	/* Physical */
-		.end	= OMAP730_FPGA_ETHR_START + SZ_4K,
+		.start	= H2P2_DBG_FPGA_ETHR_START,	/* Physical */
+		.end	= H2P2_DBG_FPGA_ETHR_START + SZ_4K,
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= 0,
+		.start	= INT_730_MPU_EXT_NIRQ,
 		.end	= 0,
-		.flags	= INT_ETHER,
+		.flags	= IORESOURCE_IRQ,
 	},
 };
 
@@ -62,7 +65,7 @@ static void __init omap_perseus2_init(void)
 
 /* Only FPGA needs to be mapped here. All others are done with ioremap */
 static struct map_desc omap_perseus2_io_desc[] __initdata = {
-	{OMAP730_FPGA_BASE, OMAP730_FPGA_START, OMAP730_FPGA_SIZE,
+	{H2P2_DBG_FPGA_BASE, H2P2_DBG_FPGA_START, H2P2_DBG_FPGA_SIZE,
 	 MT_DEVICE},
 };
 
@@ -111,6 +114,6 @@ MACHINE_START(OMAP_PERSEUS2, "OMAP730 Perseus2")
 	BOOT_PARAMS(0x10000100)
 	MAPIO(omap_perseus2_map_io)
 	INITIRQ(omap_perseus2_init_irq)
-	INITTIME(omap_init_time)
 	INIT_MACHINE(omap_perseus2_init)
+	INITTIME(omap_init_time)
 MACHINE_END

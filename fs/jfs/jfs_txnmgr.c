@@ -165,7 +165,6 @@ struct {
  * external references
  */
 extern int lmGroupCommit(struct jfs_log *, struct tblock *);
-extern void lmSync(struct jfs_log *);
 extern int jfs_commit_inode(struct inode *, int);
 extern int jfs_stop_threads;
 

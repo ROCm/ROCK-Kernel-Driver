@@ -6,9 +6,9 @@
  */
 #include <linux/compiler-gcc.h>
 
-#define inline			__inline__ __attribute__((always_inline))
-#define __inline__		__inline__ __attribute__((always_inline))
-#define __inline		__inline__ __attribute__((always_inline))
+#define inline			inline		__attribute__((always_inline))
+#define __inline__		__inline__	__attribute__((always_inline))
+#define __inline		__inline	__attribute__((always_inline))
 #define __deprecated		__attribute__((deprecated))
 #define __attribute_used__	__attribute__((__used__))
 #define __attribute_pure__	__attribute__((pure))

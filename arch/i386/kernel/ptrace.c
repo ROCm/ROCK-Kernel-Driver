@@ -15,7 +15,6 @@
 #include <linux/user.h>
 #include <linux/security.h>
 #include <linux/audit.h>
-#include <linux/proc_mm.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -148,6 +147,7 @@ void ptrace_disable(struct task_struct *child)
 { 
 	long tmp;
 
+	clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 	tmp = get_stack_long(child, EFL_OFFSET) & ~TRAP_FLAG;
 	put_stack_long(child, EFL_OFFSET, tmp);
 }
@@ -371,6 +371,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		else {
 			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		}
+		clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 		child->exit_code = data;
 	/* make sure the single step bit is not set. */
 		tmp = get_stack_long(child, EFL_OFFSET) & ~TRAP_FLAG;
@@ -392,6 +393,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		if (child->state == TASK_ZOMBIE)	/* already dead */
 			break;
 		child->exit_code = SIGKILL;
+		clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 		/* make sure the single step bit is not set. */
 		tmp = get_stack_long(child, EFL_OFFSET) & ~TRAP_FLAG;
 		put_stack_long(child, EFL_OFFSET, tmp);
@@ -412,6 +414,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		}
 		tmp = get_stack_long(child, EFL_OFFSET) | TRAP_FLAG;
 		put_stack_long(child, EFL_OFFSET, tmp);
+		set_tsk_thread_flag(child, TIF_SINGLESTEP);
 		child->exit_code = data;
 		/* give it a chance to run. */
 		wake_up_process(child);
@@ -510,56 +513,6 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 					(struct user_desc __user *) data);
 		break;
 
-#ifdef CONFIG_PROC_MM
-	case PTRACE_FAULTINFO: {
-		struct ptrace_faultinfo fault;
-
-		fault = ((struct ptrace_faultinfo) 
-			{ .is_write	= child->thread.error_code,
-			  .addr		= child->thread.cr2 });
-		ret = copy_to_user((unsigned long *) data, &fault, 
-				   sizeof(fault));
-		if(ret)
-			break;
-		break;
-	}
-
-	case PTRACE_SIGPENDING:
-		ret = copy_to_user((unsigned long *) data, 
-				   &child->pending.signal,
-				   sizeof(child->pending.signal));
-		break;
-
-	case PTRACE_LDT: {
-		struct ptrace_ldt ldt;
-
-		if(copy_from_user(&ldt, (unsigned long *) data, 
-				  sizeof(ldt))){
-			ret = -EIO;
-			break;
-		}
-		ret = modify_ldt(child->mm, ldt.func, ldt.ptr, ldt.bytecount);
-		break;
-	}
-
-	case PTRACE_SWITCH_MM: {
-		struct mm_struct *old = child->mm;
-		struct mm_struct *new = proc_mm_get_mm(data);
-
-		if(IS_ERR(new)){
-			ret = PTR_ERR(new);
-			break;
-		}
-
-		atomic_inc(&new->mm_users);
-		child->mm = new;
-		child->active_mm = new;
-		mmput(old);
-		ret = 0;
-		break;
-	}
-#endif
-
 	default:
 		ret = ptrace_request(child, request, addr, data);
 		break;
@@ -586,14 +539,15 @@ void do_syscall_trace(struct pt_regs *regs, int entryexit)
 			audit_syscall_exit(current, regs->eax);
 	}
 
-	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+	if (!test_thread_flag(TIF_SYSCALL_TRACE) &&
+	    !test_thread_flag(TIF_SINGLESTEP))
 		return;
 	if (!(current->ptrace & PT_PTRACED))
 		return;
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
-	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
-				 ? 0x80 : 0));
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) &&
+				 !test_thread_flag(TIF_SINGLESTEP) ? 0x80 : 0));
 
 	/*
 	 * this isn't the same as continuing with a signal, but it will do

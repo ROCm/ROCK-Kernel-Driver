@@ -176,7 +176,7 @@ int inet_rtm_newrule(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg)
 	table_id = rtm->rtm_table;
 	if (table_id == RT_TABLE_UNSPEC) {
 		struct fib_table *table;
-		if (rtm->rtm_type == RTN_UNICAST || rtm->rtm_type == RTN_NAT) {
+		if (rtm->rtm_type == RTN_UNICAST) {
 			if ((table = fib_empty_table()) == NULL)
 				return -ENOBUFS;
 			table_id = table->tb_id;
@@ -251,26 +251,6 @@ u32 fib_rules_map_destination(u32 daddr, struct fib_result *res)
 	return (daddr&~mask)|res->fi->fib_nh->nh_gw;
 }
 
-u32 fib_rules_policy(u32 saddr, struct fib_result *res, unsigned *flags)
-{
-	struct fib_rule *r = res->r;
-
-	if (r->r_action == RTN_NAT) {
-		int addrtype = inet_addr_type(r->r_srcmap);
-
-		if (addrtype == RTN_NAT) {
-			/* Packet is from  translated source; remember it */
-			saddr = (saddr&~r->r_srcmask)|r->r_srcmap;
-			*flags |= RTCF_SNAT;
-		} else if (addrtype == RTN_LOCAL || r->r_srcmap == 0) {
-			/* Packet is from masqueraded source; remember it */
-			saddr = r->r_srcmap;
-			*flags |= RTCF_MASQ;
-		}
-	}
-	return saddr;
-}
-
 #ifdef CONFIG_NET_CLS_ROUTE
 u32 fib_rules_tclass(struct fib_result *res)
 {
@@ -334,7 +314,6 @@ FRprintk("Lookup: %u.%u.%u.%u <- %u.%u.%u.%u ",
 FRprintk("tb %d r %d ", r->r_table, r->r_action);
 		switch (r->r_action) {
 		case RTN_UNICAST:
-		case RTN_NAT:
 			policy = r;
 			break;
 		case RTN_UNREACHABLE:

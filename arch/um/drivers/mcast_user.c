@@ -23,7 +23,6 @@
 #include "kern_util.h"
 #include "user_util.h"
 #include "user.h"
-#include "os.h"
 
 #define MAX_PACKET (ETH_MAX_PACKET + ETH_HEADER_OTHER)
 
@@ -63,8 +62,7 @@ static int mcast_open(void *data)
 		goto out;
 	}
 
-	fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (fd < 0){
+	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
 		printk("mcast_open : data socket failed, errno = %d\n", 
 		       errno);
 		fd = -ENOMEM;
@@ -74,7 +72,7 @@ static int mcast_open(void *data)
 	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
 		printk("mcast_open: SO_REUSEADDR failed, errno = %d\n",
 			errno);
-		os_close_file(fd);
+		close(fd);
 		fd = -EINVAL;
 		goto out;
 	}
@@ -84,7 +82,7 @@ static int mcast_open(void *data)
 		       sizeof(pri->ttl)) < 0) {
 		printk("mcast_open: IP_MULTICAST_TTL failed, error = %d\n",
 			errno);
-		os_close_file(fd);
+		close(fd);
 		fd = -EINVAL;
 		goto out;
 	}
@@ -93,7 +91,7 @@ static int mcast_open(void *data)
 	if (setsockopt(fd, SOL_IP, IP_MULTICAST_LOOP, &yes, sizeof(yes)) < 0) {
 		printk("mcast_open: IP_MULTICAST_LOOP failed, error = %d\n",
 			errno);
-		os_close_file(fd);
+		close(fd);
 		fd = -EINVAL;
 		goto out;
 	}
@@ -101,7 +99,7 @@ static int mcast_open(void *data)
 	/* bind socket to mcast address */
 	if (bind(fd, (struct sockaddr *) sin, sizeof(*sin)) < 0) {
 		printk("mcast_open : data bind failed, errno = %d\n", errno);
-		os_close_file(fd);
+		close(fd);
 		fd = -EINVAL;
 		goto out;
 	}		
@@ -117,7 +115,7 @@ static int mcast_open(void *data)
 		       "interface on the host.\n");
 		printk("eth0 should be configured in order to use the "
 		       "multicast transport.\n");
-		os_close_file(fd);
+		close(fd);
 		fd = -EINVAL;
 	}
 
@@ -139,7 +137,7 @@ static void mcast_close(int fd, void *data)
 			errno);
 	}
 
-	os_close_file(fd);
+	close(fd);
 }
 
 int mcast_user_write(int fd, void *buf, int len, struct mcast_data *pri)

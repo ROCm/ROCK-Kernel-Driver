@@ -132,6 +132,7 @@ int iSeries_idle(void)
 int default_idle(void)
 {
 	long oldval;
+	unsigned int cpu = smp_processor_id();
 
 	while (1) {
 		oldval = test_and_clear_thread_flag(TIF_NEED_RESCHED);
@@ -139,7 +140,7 @@ int default_idle(void)
 		if (!oldval) {
 			set_thread_flag(TIF_POLLING_NRFLAG);
 
-			while (!need_resched()) {
+			while (!need_resched() && !cpu_is_offline(cpu)) {
 				barrier();
 				HMT_low();
 			}
@@ -151,8 +152,7 @@ int default_idle(void)
 		}
 
 		schedule();
-		if (cpu_is_offline(smp_processor_id()) &&
-				system_state == SYSTEM_RUNNING)
+		if (cpu_is_offline(cpu) && system_state == SYSTEM_RUNNING)
 			cpu_die();
 	}
 
@@ -169,8 +169,9 @@ int dedicated_idle(void)
 	struct paca_struct *lpaca = get_paca(), *ppaca;
 	unsigned long start_snooze;
 	unsigned long *smt_snooze_delay = &__get_cpu_var(smt_snooze_delay);
+	unsigned int cpu = smp_processor_id();
 
-	ppaca = &paca[smp_processor_id() ^ 1];
+	ppaca = &paca[cpu ^ 1];
 
 	while (1) {
 		/* Indicate to the HV that we are idle.  Now would be
@@ -182,7 +183,7 @@ int dedicated_idle(void)
 			set_thread_flag(TIF_POLLING_NRFLAG);
 			start_snooze = __get_tb() +
 				*smt_snooze_delay * tb_ticks_per_usec;
-			while (!need_resched()) {
+			while (!need_resched() && !cpu_is_offline(cpu)) {
 				/* need_resched could be 1 or 0 at this 
 				 * point.  If it is 0, set it to 0, so
 				 * an IPI/Prod is sent.  If it is 1, keep
@@ -241,8 +242,7 @@ int dedicated_idle(void)
 		HMT_medium();
 		lpaca->lppaca.xIdle = 0;
 		schedule();
-		if (cpu_is_offline(smp_processor_id()) &&
-				system_state == SYSTEM_RUNNING)
+		if (cpu_is_offline(cpu) && system_state == SYSTEM_RUNNING)
 			cpu_die();
 	}
 	return 0;

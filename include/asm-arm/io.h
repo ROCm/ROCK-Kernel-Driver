@@ -271,10 +271,12 @@ extern void __iounmap(void *addr);
 #ifndef __arch_ioremap
 #define ioremap(cookie,size)		__ioremap(cookie,size,0,1)
 #define ioremap_nocache(cookie,size)	__ioremap(cookie,size,0,1)
+#define ioremap_cached(cookie,size)	__ioremap(cookie,size,L_PTE_CACHEABLE,1)
 #define iounmap(cookie)			__iounmap(cookie)
 #else
 #define ioremap(cookie,size)		__arch_ioremap((cookie),(size),0,1)
 #define ioremap_nocache(cookie,size)	__arch_ioremap((cookie),(size),0,1)
+#define ioremap_cached(cookie,size)	__arch_ioremap((cookie),(size),L_PTE_CACHEABLE,1)
 #define iounmap(cookie)			__arch_iounmap(cookie)
 #endif
 

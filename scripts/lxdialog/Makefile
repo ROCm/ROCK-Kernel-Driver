@@ -15,8 +15,8 @@ endif
 endif
 endif
 
-host-progs	:= lxdialog
-always		:= ncurses $(host-progs)
+hostprogs-y	:= lxdialog
+always		:= ncurses $(hostprogs-y)
 
 lxdialog-objs := checklist.o menubox.o textbox.o yesno.o inputbox.o \
 		 util.o lxdialog.o msgbox.o

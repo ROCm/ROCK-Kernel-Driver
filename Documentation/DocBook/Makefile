@@ -185,9 +185,7 @@ clean-files := $(DOCBOOKS) \
 	$(patsubst %.sgml, %.9,    $(DOCBOOKS)) \
 	$(C-procfs-example)
 
-ifneq ($(wildcard $(patsubst %.html,%,$(HTML))),)
-clean-rule := rm -rf $(wildcard $(patsubst %.html,%,$(HTML)))
-endif
+clean-dirs := $(patsubst %.sgml,%,$(DOCBOOKS))
 
 #man put files in man subdir - traverse down
 subdir- := man/

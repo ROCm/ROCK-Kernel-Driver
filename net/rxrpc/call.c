@@ -929,7 +929,6 @@ static void rxrpc_call_receive_packet(struct rxrpc_call *call)
 {
 	struct rxrpc_message *msg;
 	struct list_head *_p;
-	uint32_t data32;
 
 	_enter("%p", call);
 
@@ -986,22 +985,21 @@ static void rxrpc_call_receive_packet(struct rxrpc_call *call)
 			break;
 
 			/* deal with abort packets */
-		case RXRPC_PACKET_TYPE_ABORT:
-			data32 = 0;
-			if (skb_copy_bits(msg->pkt, msg->offset,
-					  &data32, sizeof(data32)) < 0) {
-				printk("Rx Received short ABORT packet\n");
-			}
-			else {
-				data32 = ntohl(data32);
-			}
+		case RXRPC_PACKET_TYPE_ABORT: {
+			uint32_t _dbuf, *dp;
 
-			_proto("Rx Received Call ABORT { data=%d }", data32);
+			dp = skb_header_pointer(msg->pkt, msg->offset,
+						sizeof(_dbuf), &_dbuf);
+			if (dp == NULL)
+				printk("Rx Received short ABORT packet\n");
+
+			_proto("Rx Received Call ABORT { data=%d }",
+			       (dp ? ntohl(*dp) : 0));
 
 			spin_lock(&call->lock);
 			call->app_call_state	= RXRPC_CSTATE_ERROR;
 			call->app_err_state	= RXRPC_ESTATE_PEER_ABORT;
-			call->app_abort_code	= data32;
+			call->app_abort_code	= (dp ? ntohl(*dp) : 0);
 			call->app_errno		= -ECONNABORTED;
 			call->app_mark		= RXRPC_APP_MARK_EOF;
 			call->app_read_buf	= NULL;
@@ -1013,7 +1011,7 @@ static void rxrpc_call_receive_packet(struct rxrpc_call *call)
 			spin_unlock(&call->lock);
 			call->app_error_func(call);
 			break;
-
+		}
 		default:
 			/* deal with other packet types */
 			_proto("Rx Unsupported packet type %u (#%u)",
@@ -1271,7 +1269,7 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call,
 static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call,
 					  struct rxrpc_message *msg)
 {
-	struct rxrpc_ackpacket ack;
+	struct rxrpc_ackpacket _ack, *ap;
 	rxrpc_serial_t serial;
 	rxrpc_seq_t seq;
 	int ret;
@@ -1279,33 +1277,34 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call,
 	_enter("%p{%u},%p{%u}", call, ntohl(call->call_id), msg, msg->seq);
 
 	/* extract the basic ACK record */
-	if (skb_copy_bits(msg->pkt, msg->offset, &ack, sizeof(ack)) < 0) {
+	ap = skb_header_pointer(msg->pkt, msg->offset, sizeof(_ack), &_ack);
+	if (ap == NULL) {
 		printk("Rx Received short ACK packet\n");
 		return;
 	}
-	msg->offset += sizeof(ack);
+	msg->offset += sizeof(_ack);
 
-	serial = ack.serial;
-	seq = ntohl(ack.firstPacket);
+	serial = ap->serial;
+	seq = ntohl(ap->firstPacket);
 
 	_proto("Rx Received ACK %%%d { b=%hu m=%hu f=%u p=%u s=%u r=%s n=%u }",
 	       ntohl(msg->hdr.serial),
-	       ntohs(ack.bufferSpace),
-	       ntohs(ack.maxSkew),
+	       ntohs(ap->bufferSpace),
+	       ntohs(ap->maxSkew),
 	       seq,
-	       ntohl(ack.previousPacket),
+	       ntohl(ap->previousPacket),
 	       ntohl(serial),
-	       rxrpc_acks[ack.reason],
+	       rxrpc_acks[ap->reason],
 	       call->ackr.nAcks
 	       );
 
 	/* check the other side isn't ACK'ing a sequence number I haven't sent
 	 * yet */
-	if (ack.nAcks > 0 &&
+	if (ap->nAcks > 0 &&
 	    (seq > call->snd_seq_count ||
-	     seq + ack.nAcks - 1 > call->snd_seq_count)) {
+	     seq + ap->nAcks - 1 > call->snd_seq_count)) {
 		printk("Received ACK (#%u-#%u) for unsent packet\n",
-		       seq, seq + ack.nAcks - 1);
+		       seq, seq + ap->nAcks - 1);
 		rxrpc_call_abort(call, -EINVAL);
 		_leave("");
 		return;
@@ -1354,7 +1353,7 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call,
 		}
 	}
 
-	switch (ack.reason) {
+	switch (ap->reason) {
 		/* deal with negative/positive acknowledgement of data
 		 * packets */
 	case RXRPC_ACK_REQUESTED:
@@ -1366,14 +1365,14 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call,
 	case RXRPC_ACK_OUT_OF_SEQUENCE:
 	case RXRPC_ACK_EXCEEDS_WINDOW:
 		call->snd_resend_cnt = 0;
-		ret = rxrpc_call_record_ACK(call, msg, seq, ack.nAcks);
+		ret = rxrpc_call_record_ACK(call, msg, seq, ap->nAcks);
 		if (ret < 0)
 			rxrpc_call_abort(call, ret);
 		break;
 
 		/* respond to ping packets immediately */
 	case RXRPC_ACK_PING:
-		rxrpc_call_generate_ACK(call, &msg->hdr, &ack);
+		rxrpc_call_generate_ACK(call, &msg->hdr, ap);
 		break;
 
 		/* only record RTT on ping response packets */
@@ -1386,7 +1385,7 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call,
 			rttmsg = NULL;
 			spin_lock(&call->lock);
 			if (call->snd_ping &&
-			    call->snd_ping->hdr.serial == ack.serial) {
+			    call->snd_ping->hdr.serial == ap->serial) {
 				rttmsg = call->snd_ping;
 				call->snd_ping = NULL;
 			}
@@ -1402,7 +1401,7 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call,
 		break;
 
 	default:
-		printk("Unsupported ACK reason %u\n", ack.reason);
+		printk("Unsupported ACK reason %u\n", ap->reason);
 		break;
 	}
 

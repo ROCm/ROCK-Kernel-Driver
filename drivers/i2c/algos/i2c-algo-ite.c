@@ -52,21 +52,15 @@
 #define	PM_IBSR		IT8172_PCI_IO_BASE + IT_PM_DSR + 0x04 
 #define GPIO_CCR	IT8172_PCI_IO_BASE + IT_GPCCR
 
-/* ----- global defines ----------------------------------------------- */
-#define DEB(x) if (i2c_debug>=1) x
 #define DEB2(x) if (i2c_debug>=2) x
 #define DEB3(x) if (i2c_debug>=3) x /* print several statistical values*/
-#define DEBPROTO(x) if (i2c_debug>=9) x;
- 	/* debug the protocol by showing transferred bits */
 #define DEF_TIMEOUT 16
 
 
-/* ----- global variables ---------------------------------------------	*/
-
 /* module parameters:
  */
-static int i2c_debug=1;
-static int iic_test=0;	/* see if the line-setting functions work	*/
+static int i2c_debug;
+static int iic_test;	/* see if the line-setting functions work	*/
 
 /* --- setting states on the bus with the right timing: ---------------	*/
 
@@ -804,8 +798,8 @@ MODULE_AUTHOR("MontaVista Software <www.mvista.com>");
 MODULE_DESCRIPTION("ITE iic algorithm");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(iic_test, "i");
-MODULE_PARM(i2c_debug,"i");
+module_param(iic_test, bool, 0);
+module_param(i2c_debug, int, S_IRUGO | S_IWUSR);
 
 MODULE_PARM_DESC(iic_test, "Test if the I2C bus is available");
 MODULE_PARM_DESC(i2c_debug,

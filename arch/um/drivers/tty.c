@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <termios.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
 #include "chan_user.h"
@@ -29,8 +30,7 @@ void *tty_chan_init(char *str, int device, struct chan_opts *opts)
 	}
 	str++;
 
-	data = um_kmalloc(sizeof(*data)); 
-	if(data == NULL) 
+	if((data = um_kmalloc(sizeof(*data))) == NULL) 
 		return(NULL);
 	*data = ((struct tty_chan) { .dev 	= str,
 				     .raw 	= opts->raw });
@@ -41,18 +41,13 @@ void *tty_chan_init(char *str, int device, struct chan_opts *opts)
 int tty_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct tty_chan *data = d;
-	int fd, err;
+	int fd;
 
 	fd = os_open_file(data->dev, of_set_rw(OPENFLAGS(), input, output), 0);
 	if(fd < 0) return(fd);
 	if(data->raw){
-		CATCH_EINTR(err = tcgetattr(fd, &data->tt));
-		if(err)
-			return(err);
-
-		err = raw(fd);
-		if(err)
-			return(err);
+		tcgetattr(fd, &data->tt);
+		raw(fd, 0);
 	}
 
 	*dev_out = data->dev;

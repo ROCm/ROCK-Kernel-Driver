@@ -52,6 +52,8 @@ struct w1_reg_num
 #define W1_READ_PSUPPLY		0xB4
 #define W1_MATCH_ROM		0x55
 
+#define W1_SLAVE_ACTIVE		(1<<0)
+
 struct w1_slave
 {
 	struct module		*owner;
@@ -60,11 +62,15 @@ struct w1_slave
 	struct w1_reg_num	reg_num;
 	atomic_t		refcnt;
 	u8			rom[9];
+	u32			flags;
 
 	struct w1_master	*master;
 	struct w1_family 	*family;
 	struct device 		dev;
 	struct completion 	dev_released;
+
+	struct bin_attribute 	attr_bin;
+	struct device_attribute	attr_name, attr_val;
 };
 
 struct w1_bus_master
@@ -73,6 +79,16 @@ struct w1_bus_master
 
 	u8			(*read_bit)(unsigned long);
 	void			(*write_bit)(unsigned long, u8);
+  	
+	u8			(*read_byte)(unsigned long);
+  	void			(*write_byte)(unsigned long, u8);
+  	
+	u8			(*read_block)(unsigned long, u8 *, int);
+	void			(*write_block)(unsigned long, u8 *, int);
+	
+  	u8			(*touch_bit)(unsigned long, u8);
+  
+  	u8			(*reset_bus)(unsigned long);
 };
 
 struct w1_master
@@ -106,6 +122,9 @@ struct w1_master
 	u32			seq, groups;
 	struct sock 		*nls;
 };
+
+int w1_create_master_attributes(struct w1_master *);
+void w1_destroy_master_attributes(struct w1_master *);
 
 #endif /* __KERNEL__ */
 

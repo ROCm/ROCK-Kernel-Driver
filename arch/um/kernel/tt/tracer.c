@@ -39,17 +39,16 @@ int is_tracer_winch(int pid, int fd, void *data)
 		return(0);
 
 	register_winch_irq(tracer_winch[0], fd, -1, data);
-	return(1);
+	return(0);
 }
 
 static void tracer_winch_handler(int sig)
 {
-	int n;
 	char c = 1;
 
-	n = os_write_file(tracer_winch[1], &c, sizeof(c));
-	if(n != sizeof(c))
-		printk("tracer_winch_handler - write failed, err = %d\n", -n);
+	if(write(tracer_winch[1], &c, sizeof(c)) != sizeof(c))
+		printk("tracer_winch_handler - write failed, errno = %d\n",
+		       errno);
 }
 
 /* Called only by the tracing thread during initialization */
@@ -59,8 +58,9 @@ static void setup_tracer_winch(void)
 	int err;
 
 	err = os_pipe(tracer_winch, 1, 1);
-	if(err < 0){
-		printk("setup_tracer_winch : os_pipe failed, err = %d\n", -err);
+	if(err){
+		printk("setup_tracer_winch : os_pipe failed, errno = %d\n", 
+		       -err);
 		return;
 	}
 	signal(SIGWINCH, tracer_winch_handler);
@@ -130,8 +130,8 @@ static void sleeping_process_signal(int pid, int sig)
 	case SIGTSTP:
 		if(ptrace(PTRACE_CONT, pid, 0, sig) < 0)
 			tracer_panic("sleeping_process_signal : Failed to "
-				     "continue pid %d, signal = %d, "
-				     "errno = %d\n", pid, sig, errno);
+				     "continue pid %d, errno = %d\n", pid,
+				     sig);
 		break;
 
 	/* This happens when the debugger (e.g. strace) is doing system call 
@@ -145,7 +145,7 @@ static void sleeping_process_signal(int pid, int sig)
 		if(ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0)
 			tracer_panic("sleeping_process_signal : Failed to "
 				     "PTRACE_SYSCALL pid %d, errno = %d\n",
-				     pid, errno);
+				     pid, sig);
 		break;
 	case SIGSTOP:
 		break;
@@ -192,7 +192,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 	printf("tracing thread pid = %d\n", tracing_pid);
 
 	pid = clone(signal_tramp, sp, CLONE_FILES | SIGCHLD, init_proc);
-	CATCH_EINTR(n = waitpid(pid, &status, WUNTRACED));
+	n = waitpid(pid, &status, WUNTRACED);
 	if(n < 0){
 		printf("waitpid on idle thread failed, errno = %d\n", errno);
 		exit(1);
@@ -218,7 +218,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 			err = attach(debugger_parent);
 			if(err){
 				printf("Failed to attach debugger parent %d, "
-				       "errno = %d\n", debugger_parent, -err);
+				       "errno = %d\n", debugger_parent, err);
 				debugger_parent = -1;
 			}
 			else {
@@ -233,8 +233,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 	}
 	set_cmdline("(tracing thread)");
 	while(1){
-		CATCH_EINTR(pid = waitpid(-1, &status, WUNTRACED));
-		if(pid <= 0){
+		if((pid = waitpid(-1, &status, WUNTRACED)) <= 0){
 			if(errno != ECHILD){
 				printf("wait failed - errno = %d\n", errno);
 			}
@@ -402,7 +401,7 @@ static int __init uml_debug_setup(char *line, int *add)
 		
 		if(!strcmp(line, "go"))	debug_stop = 0;
 		else if(!strcmp(line, "parent")) debug_parent = 1;
-		else printf("Unknown debug option : '%s'\n", line);
+		else printk("Unknown debug option : '%s'\n", line);
 
 		line = next;
 	}

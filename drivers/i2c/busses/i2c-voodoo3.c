@@ -224,7 +224,7 @@ static void __devexit voodoo3_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver voodoo3_driver = {
-	.name		= "voodoo3 smbus",
+	.name		= "voodoo3_smbus",
 	.id_table	= voodoo3_ids,
 	.probe		= voodoo3_probe,
 	.remove		= __devexit_p(voodoo3_remove),

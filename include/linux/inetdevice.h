@@ -3,6 +3,8 @@
 
 #ifdef __KERNEL__
 
+#include <linux/rcupdate.h>
+
 struct ipv4_devconf
 {
 	int	accept_redirects;
@@ -31,13 +33,13 @@ extern struct ipv4_devconf ipv4_devconf;
 
 struct in_device
 {
-	struct net_device		*dev;
+	struct net_device	*dev;
 	atomic_t		refcnt;
-	rwlock_t		lock;
 	int			dead;
 	struct in_ifaddr	*ifa_list;	/* IP ifaddr chain		*/
+	rwlock_t		mc_list_lock;
 	struct ip_mc_list	*mc_list;	/* IP multicast filter chain    */
-	rwlock_t		mc_lock;	/* for mc_tomb */
+	spinlock_t		mc_tomb_lock;
 	struct ip_mc_list	*mc_tomb;
 	unsigned long		mr_v1_seen;
 	unsigned long		mr_v2_seen;
@@ -50,6 +52,7 @@ struct in_device
 
 	struct neigh_parms	*arp_parms;
 	struct ipv4_devconf	cnf;
+	struct rcu_head		rcu_head;
 };
 
 #define IN_DEV_FORWARD(in_dev)		((in_dev)->cnf.forwarding)
@@ -80,6 +83,7 @@ struct in_ifaddr
 {
 	struct in_ifaddr	*ifa_next;
 	struct in_device	*ifa_dev;
+	struct rcu_head		rcu_head;
 	u32			ifa_local;
 	u32			ifa_address;
 	u32			ifa_mask;
@@ -133,19 +137,16 @@ static __inline__ int bad_mask(u32 mask, u32 addr)
 
 #define endfor_ifa(in_dev) }
 
-extern rwlock_t inetdev_lock;
-
-
 static __inline__ struct in_device *
 in_dev_get(const struct net_device *dev)
 {
 	struct in_device *in_dev;
 
-	read_lock(&inetdev_lock);
+	rcu_read_lock();
 	in_dev = dev->ip_ptr;
 	if (in_dev)
 		atomic_inc(&in_dev->refcnt);
-	read_unlock(&inetdev_lock);
+	rcu_read_unlock();
 	return in_dev;
 }
 
@@ -157,8 +158,7 @@ __in_dev_get(const struct net_device *dev)
 
 extern void in_dev_finish_destroy(struct in_device *idev);
 
-static __inline__ void
-in_dev_put(struct in_device *idev)
+static inline void in_dev_put(struct in_device *idev)
 {
 	if (atomic_dec_and_test(&idev->refcnt))
 		in_dev_finish_destroy(idev);

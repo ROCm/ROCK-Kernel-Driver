@@ -9,6 +9,7 @@
  *		IPv6 support
  */
 
+#include <linux/module.h>
 #include <linux/string.h>
 #include <net/inet_ecn.h>
 #include <net/ip.h>
@@ -25,11 +26,11 @@ static inline void ipip6_ecn_decapsulate(struct sk_buff *skb)
 		IP6_ECN_set_ce(inner_iph);
 }
 
-int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
+int xfrm6_rcv_spi(struct sk_buff **pskb, unsigned int *nhoffp, u32 spi)
 {
 	struct sk_buff *skb = *pskb;
 	int err;
-	u32 spi, seq;
+	u32 seq;
 	struct sec_decap_state xfrm_vec[XFRM_MAX_DEPTH];
 	struct xfrm_state *x;
 	int xfrm_nr = 0;
@@ -40,7 +41,8 @@ int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	nhoff = *nhoffp;
 	nexthdr = skb->nh.raw[nhoff];
 
-	if ((err = xfrm_parse_spi(skb, nexthdr, &spi, &seq)) != 0)
+	seq = 0;
+	if (!spi && (err = xfrm_parse_spi(skb, nexthdr, &spi, &seq)) != 0)
 		goto drop;
 	
 	do {
@@ -136,4 +138,11 @@ drop:
 		xfrm_state_put(xfrm_vec[xfrm_nr].xvec);
 	kfree_skb(skb);
 	return -1;
+}
+
+EXPORT_SYMBOL(xfrm6_rcv_spi);
+
+int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
+{
+	return xfrm6_rcv_spi(pskb, nhoffp, 0);
 }

@@ -53,12 +53,14 @@ struct cpu_id
 enum {
 	CPU_BANIAS,
 	CPU_DOTHAN_A1,
+	CPU_DOTHAN_A2,
 	CPU_DOTHAN_B0,
 };
 
 static const struct cpu_id cpu_ids[] = {
 	[CPU_BANIAS]	= { 6,  9, 5 },
 	[CPU_DOTHAN_A1]	= { 6, 13, 1 },
+	[CPU_DOTHAN_A2]	= { 6, 13, 2 },
 	[CPU_DOTHAN_B0]	= { 6, 13, 6 },
 };
 #define N_IDS	(sizeof(cpu_ids)/sizeof(cpu_ids[0]))
@@ -221,6 +223,7 @@ static struct cpu_model models[] =
 
 	/* NULL model_name is a wildcard */
 	{ &cpu_ids[CPU_DOTHAN_A1], NULL, 0, NULL },
+	{ &cpu_ids[CPU_DOTHAN_A2], NULL, 0, NULL },
 	{ &cpu_ids[CPU_DOTHAN_B0], NULL, 0, NULL },
 
 	{ NULL, }

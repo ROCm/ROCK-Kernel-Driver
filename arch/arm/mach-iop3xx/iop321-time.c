@@ -79,7 +79,7 @@ extern int setup_arm_irq(int, struct irqaction*);
 void __init iop321_init_time(void)
 {
 	u32 timer_ctl;
-	u32 latch = LATCH;
+/*	u32 latch = LATCH; */
 
 	gettimeoffset = iop321_gettimeoffset;
 	setup_irq(IRQ_IOP321_TIMER0, &iop321_timer_irq);

@@ -34,9 +34,9 @@
 #define AD_DMAWAVICC	0x98	/* WAV interrupt current count */
 #define AD_DMAWAVIBC	0x9c	/* WAV interrupt base count */
 #define AD_DMARESCTRL	0xa0	/* RES PCI control/status */
-#define AD_DMAADCCTRL	0xa8	/* RES PCI control/status */
-#define AD_DMASYNCTRL	0xb0	/* RES PCI control/status */
-#define AD_DMAWAVCTRL	0xb8	/* RES PCI control/status */
+#define AD_DMAADCCTRL	0xa8	/* ADC PCI control/status */
+#define AD_DMASYNCTRL	0xb0	/* SYN PCI control/status */
+#define AD_DMAWAVCTRL	0xb8	/* WAV PCI control/status */
 #define AD_DMADISR	0xc0	/* PCI DMA intr status */
 #define AD_DMACHSS	0xc4	/* PCI DMA channel stop status */
 

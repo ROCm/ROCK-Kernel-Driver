@@ -342,7 +342,6 @@ handle_modversions(struct module *mod, struct elf_info *info,
 			crc = (unsigned int) sym->st_value;
 			add_exported_symbol(symname + strlen(CRC_PFX),
 					    mod, &crc);
-			modversions = 1;
 		}
 		break;
 	case SHN_UNDEF:
@@ -708,7 +707,6 @@ read_dump(const char *fname)
 
 		if (!(mod = find_module(modname))) {
 			if (is_vmlinux(modname)) {
-				modversions = 1;
 				have_vmlinux = 1;
 			}
 			mod = new_module(NOFAIL(strdup(modname)));
@@ -756,10 +754,13 @@ main(int argc, char **argv)
 	char *supp = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "i:o:s:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:mo:s:")) != -1) {
 		switch(opt) {
 			case 'i':
 				dump_read = optarg;
+				break;
+			case 'm':
+				modversions = 1;
 				break;
 			case 'o':
 				dump_write = optarg;

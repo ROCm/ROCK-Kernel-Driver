@@ -214,6 +214,8 @@ struct usb_hub {
 
 	u8			power_budget;	/* in 2mA units; or zero */
 
+	unsigned		quiescing:1;
+
 	unsigned		has_indicators:1;
 	enum hub_led_mode	indicator[USB_MAXCHILDREN];
 	struct work_struct	leds;

@@ -37,6 +37,7 @@
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
+#include <linux/i2c-vid.h>
 #include <asm/io.h>
 
 
@@ -47,7 +48,7 @@ static unsigned int normal_isa[] = { 0x0290, I2C_CLIENT_ISA_END };
 static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
-SENSORS_INSMOD_1(it87);
+SENSORS_INSMOD_2(it87, it8712);
 
 #define	REG	0x2e	/* The register to read/write */
 #define	DEV	0x07	/* Register: Logical device select */
@@ -163,8 +164,6 @@ static inline u8 FAN_TO_REG(long rpm, int div)
 					((val)+500)/1000),-128,127))
 #define TEMP_FROM_REG(val) (((val)>0x80?(val)-0x100:(val))*1000)
 
-#define VID_FROM_REG(val) ((val)==0x1f?0:(val)>=0x10?510-(val)*10:\
-				205-(val)*5)
 #define ALARMS_FROM_REG(val) (val)
 
 static int DIV_TO_REG(int val)
@@ -201,6 +200,7 @@ struct it87_data {
 	u8 sensor;		/* Register value */
 	u8 fan_div[3];		/* Register encoding, shifted right */
 	u8 vid;			/* Register encoding, combined */
+	int vrm;
 	u32 alarms;		/* Register encoding, combined */
 };
 
@@ -543,6 +543,38 @@ static ssize_t show_alarms(struct device *dev, char *buf)
 }
 static DEVICE_ATTR(alarms, S_IRUGO | S_IWUSR, show_alarms, NULL);
 
+static ssize_t
+show_vrm_reg(struct device *dev, char *buf)
+{
+	struct it87_data *data = it87_update_device(dev);
+	return sprintf(buf, "%ld\n", (long) data->vrm);
+}
+static ssize_t
+store_vrm_reg(struct device *dev, const char *buf, size_t count)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct it87_data *data = i2c_get_clientdata(client);
+	u32 val;
+
+	val = simple_strtoul(buf, NULL, 10);
+	data->vrm = val;
+
+	return count;
+}
+static DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm_reg, store_vrm_reg);
+#define device_create_file_vrm(client) \
+device_create_file(&client->dev, &dev_attr_vrm)
+
+static ssize_t
+show_vid_reg(struct device *dev, char *buf)
+{
+	struct it87_data *data = it87_update_device(dev);
+	return sprintf(buf, "%ld\n", (long) vid_from_reg(data->vid, data->vrm));
+}
+static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL);
+#define device_create_file_vid(client) \
+device_create_file(&client->dev, &dev_attr_in0_ref)
+
 /* This function is called when:
      * it87_driver is inserted (when this module is loaded), for each
        available adapter
@@ -659,7 +691,11 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	if (kind <= 0) {
 		i = it87_read_value(new_client, IT87_REG_CHIPID);
 		if (i == 0x90) {
+			u16 val;
 			kind = it87;
+			val = (superio_inb(DEVID) << 8) |
+			superio_inb(DEVID + 1);
+			if (val == IT8712F_DEVID) kind = it8712;
 		}
 		else {
 			if (kind == 0)
@@ -674,6 +710,8 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	if (kind == it87) {
 		name = "it87";
+	} else if (kind == it8712) {
+		name = "it8712";
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */
@@ -740,6 +778,12 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_fan2_div);
 	device_create_file(&new_client->dev, &dev_attr_fan3_div);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
+
+	if (data->type == it8712) {
+		device_create_file_vrm(new_client);
+		device_create_file_vid(new_client);
+		data->vrm = i2c_which_vrm();
+	}
 
 	return 0;
 
@@ -910,7 +954,11 @@ static struct it87_data *it87_update_device(struct device *dev)
 			(it87_read_value(client, IT87_REG_ALARM3) << 16);
 
 		data->sensor = it87_read_value(client, IT87_REG_TEMP_ENABLE);
-
+		/* The 8705 does not have VID capability */
+		if (data->type == it8712) {
+			data->vid = it87_read_value(client, IT87_REG_VID);
+			data->vid &= 0x1f;
+		}
 		data->last_updated = jiffies;
 		data->valid = 1;
 	}
@@ -938,9 +986,9 @@ static void __exit sm_it87_exit(void)
 
 MODULE_AUTHOR("Chris Gauthron <chrisg@0-in.com>");
 MODULE_DESCRIPTION("IT8705F, IT8712F, Sis950 driver");
-MODULE_PARM(update_vbat, "i");
+module_param(update_vbat, bool, 0);
 MODULE_PARM_DESC(update_vbat, "Update vbat if set else return powerup value");
-MODULE_PARM(reset, "i");
+module_param(reset, bool, 0);
 MODULE_PARM_DESC(reset, "Reset the chip's registers, default no");
 MODULE_LICENSE("GPL");
 

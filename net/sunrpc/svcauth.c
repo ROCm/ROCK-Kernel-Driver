@@ -156,25 +156,47 @@ static inline int auth_domain_match(struct auth_domain *tmp, struct auth_domain 
 {
 	return strcmp(tmp->name, item->name) == 0;
 }
-DefineCacheLookup(struct auth_domain,
-		  h,
-		  auth_domain_lookup,
-		  (struct auth_domain *item, int set),
-		  /* no setup */,
-		  &auth_domain_cache,
-		  auth_domain_hash(item),
-		  auth_domain_match(tmp, item),
-		  kfree(new); if(!set) {
-			if (new)
-				write_unlock(&auth_domain_cache.hash_lock);
-			else
-				read_unlock(&auth_domain_cache.hash_lock);
-			return NULL;
-		  }
-		  new=item; atomic_inc(&new->h.refcnt),
-		  /* no update */,
-		  0 /* no inplace updates */
-		  )
+
+struct auth_domain *
+auth_domain_lookup(struct auth_domain *item, int set)
+{
+	struct auth_domain *tmp = NULL;
+	struct cache_head **hp, **head;
+	head = &auth_domain_cache.hash_table[auth_domain_hash(item)];
+
+	if (set)
+		write_lock(&auth_domain_cache.hash_lock);
+	else
+		read_lock(&auth_domain_cache.hash_lock);
+	for (hp=head; *hp != NULL; hp = &tmp->h.next) {
+		tmp = container_of(*hp, struct auth_domain, h);
+		if (!auth_domain_match(tmp, item))
+			continue;
+		cache_get(&tmp->h);
+		if (!set)
+			goto out_noset;
+		*hp = tmp->h.next;
+		tmp->h.next = NULL;
+		clear_bit(CACHE_HASHED, &tmp->h.flags);
+		auth_domain_drop(&tmp->h, &auth_domain_cache);
+		goto out_set;
+	}
+	/* Didn't find anything */
+	if (!set)
+		goto out_noset;
+	auth_domain_cache.entries++;
+out_set:
+	set_bit(CACHE_HASHED, &item->h.flags);
+	item->h.next = *head;
+	*head = &item->h;
+	write_unlock(&auth_domain_cache.hash_lock);
+	cache_fresh(&auth_domain_cache, &item->h, item->h.expiry_time);
+	cache_get(&item->h);
+	return item;
+out_noset:
+	read_unlock(&auth_domain_cache.hash_lock);
+	return tmp;
+}
 
 struct auth_domain *auth_domain_find(char *name)
 {

@@ -47,12 +47,10 @@ void *port_init(char *str, int device, struct chan_opts *opts)
 		return(NULL);
 	}
 
-	kern_data = port_data(port);
-	if(kern_data == NULL) 
+	if((kern_data = port_data(port)) == NULL) 
 		return(NULL);
 
-	data = um_kmalloc(sizeof(*data));
-	if(data == NULL) 
+	if((data = um_kmalloc(sizeof(*data))) == NULL) 
 		goto err;
 
 	*data = ((struct port_chan) { .raw  		= opts->raw,
@@ -76,17 +74,12 @@ void port_free(void *d)
 int port_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct port_chan *data = d;
-	int fd, err;
+	int fd;
 
 	fd = port_wait(data->kernel_data);
 	if((fd >= 0) && data->raw){
-		CATCH_EINTR(err = tcgetattr(fd, &data->tt));
-		if(err)
-			return(err);
-
-		err = raw(fd);
-		if(err)
-			return(err);
+		tcgetattr(fd, &data->tt);
+		raw(fd, 0);
 	}
 	*dev_out = data->dev;
 	return(fd);
@@ -97,7 +90,7 @@ void port_close(int fd, void *d)
 	struct port_chan *data = d;
 
 	port_remove_dev(data->kernel_data);
-	os_close_file(fd);
+	close(fd);
 }
 
 int port_console_write(int fd, const char *buf, int n, void *d)
@@ -123,17 +116,11 @@ struct chan_ops port_ops = {
 int port_listen_fd(int port)
 {
 	struct sockaddr_in addr;
-	int fd, err, arg;
+	int fd, err;
 
 	fd = socket(PF_INET, SOCK_STREAM, 0);
 	if(fd == -1) 
 		return(-errno);
-
-	arg = 1;
-	if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &arg, sizeof(arg)) < 0){
-		err = -errno;
-		goto out;
-	}
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
@@ -143,14 +130,10 @@ int port_listen_fd(int port)
 		goto out;
 	}
   
-	if(listen(fd, 1) < 0){
+	if((listen(fd, 1) < 0) || (os_set_fd_block(fd, 0))){
 		err = -errno;
 		goto out;
 	}
-
-	err = os_set_fd_block(fd, 0);
-	if(err < 0)
-		goto out;
 
 	return(fd);
  out:
@@ -170,10 +153,10 @@ void port_pre_exec(void *arg)
 	dup2(data->sock_fd, 0);
 	dup2(data->sock_fd, 1);
 	dup2(data->sock_fd, 2);
-	os_close_file(data->sock_fd);
+	close(data->sock_fd);
 	dup2(data->pipe_fd, 3);
 	os_shutdown_socket(3, 1, 0);
-	os_close_file(data->pipe_fd);
+	close(data->pipe_fd);
 }
 
 int port_connection(int fd, int *socket, int *pid_out)
@@ -183,12 +166,11 @@ int port_connection(int fd, int *socket, int *pid_out)
 			 "/usr/lib/uml/port-helper", NULL };
 	struct port_pre_exec_data data;
 
-	new = os_accept_connection(fd);
-	if(new < 0)
-		return(new);
+	if((new = os_accept_connection(fd)) < 0)
+		return(-errno);
 
 	err = os_pipe(socket, 0, 0);
-	if(err < 0) 
+	if(err) 
 		goto out_close;
 
 	data = ((struct port_pre_exec_data)
@@ -204,11 +186,11 @@ int port_connection(int fd, int *socket, int *pid_out)
 
  out_shutdown:
 	os_shutdown_socket(socket[0], 1, 1);
-	os_close_file(socket[0]);
+	close(socket[0]);
 	os_shutdown_socket(socket[1], 1, 1);	
-	os_close_file(socket[1]);
+	close(socket[1]);
  out_close:
-	os_close_file(new);
+	close(new);
 	return(err);
 }
 

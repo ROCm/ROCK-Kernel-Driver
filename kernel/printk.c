@@ -110,13 +110,6 @@ struct console_cmdline
 static struct console_cmdline console_cmdline[MAX_CMDLINECONSOLES];
 static int preferred_console = -1;
 
-#ifdef CONFIG_EVLOG
-extern int evl_kbufread(char *, size_t);
-#ifdef CONFIG_EVLOG_FWPRINTK
-extern int evl_fwd_printk(const char *fmt, va_list args, const char *msg);
-#endif
-#endif
-
 /* Flag: console code may call schedule() */
 static int console_may_schedule;
 
@@ -248,7 +241,6 @@ __setup("log_buf_len=", log_buf_len_setup);
  *	8 -- Set level of messages printed to console
  *	9 -- Return number of unread characters in the log buffer
  *     10 -- Return size of the log buffer
- *	20 -- Read from event logging buffer 
  */
 int do_syslog(int type, char __user * buf, int len)
 {
@@ -370,17 +362,6 @@ int do_syslog(int type, char __user * buf, int len)
 		break;
 	case 10:	/* Size of the log buffer */
 		error = log_buf_len;
-		break;
-	case 20:
-#ifdef CONFIG_EVLOG
-		error = verify_area(VERIFY_WRITE, buf, len);
-		if (error) {
-			goto out;
-		}
-		error = evl_kbufread(buf, len);
-#else
-		error = -EIO;
-#endif
 		break;
 	default:
 		error = -EINVAL;
@@ -541,6 +522,17 @@ static void zap_locks(void)
 asmlinkage int printk(const char *fmt, ...)
 {
 	va_list args;
+	int r;
+
+	va_start(args, fmt);
+	r = vprintk(fmt, args);
+	va_end(args);
+
+	return r;
+}
+
+asmlinkage int vprintk(const char *fmt, va_list args)
+{
 	unsigned long flags;
 	int printed_len;
 	char *p;
@@ -554,12 +546,7 @@ asmlinkage int printk(const char *fmt, ...)
 	spin_lock_irqsave(&logbuf_lock, flags);
 
 	/* Emit the output into the temporary buffer */
-	va_start(args, fmt);
 	printed_len = vscnprintf(printk_buf, sizeof(printk_buf), fmt, args);
-#ifdef CONFIG_EVLOG_FWPRINTK
-	(void) evl_fwd_printk(fmt, args, printk_buf);
-#endif
-	va_end(args);
 
 	/*
 	 * Copy the output into log_buf.  If the caller didn't provide
@@ -611,6 +598,7 @@ out:
 	return printed_len;
 }
 EXPORT_SYMBOL(printk);
+EXPORT_SYMBOL(vprintk);
 
 /**
  * acquire_console_sem - lock the console system for exclusive use.

@@ -52,17 +52,10 @@ static int op_ppc64_setup(void)
 
 static void op_ppc64_shutdown(void)
 {
-	/*
-	 * We need to be sure we have cleared all pending exceptions before
-	 * removing the interrupt handler. For the moment we play it safe and
-	 * leave it in
-	 */
-#if 0
 	mb();
 
 	/* Remove our interrupt handler. We may be removing this module. */
 	perf_irq = save_perf_irq;
-#endif
 }
 
 static void op_ppc64_cpu_start(void *dummy)
@@ -90,6 +83,14 @@ static int op_ppc64_create_files(struct super_block *sb, struct dentry *root)
 {
 	int i;
 
+	/*
+	 * There is one mmcr0, mmcr1 and mmcra for setting the events for
+	 * all of the counters.
+	 */
+	oprofilefs_create_ulong(sb, root, "mmcr0", &sys.mmcr0);
+	oprofilefs_create_ulong(sb, root, "mmcr1", &sys.mmcr1);
+	oprofilefs_create_ulong(sb, root, "mmcra", &sys.mmcra);
+
 	for (i = 0; i < model->num_counters; ++i) {
 		struct dentry *dir;
 		char buf[3];
@@ -111,6 +112,10 @@ static int op_ppc64_create_files(struct super_block *sb, struct dentry *root)
 
 	oprofilefs_create_ulong(sb, root, "enable_kernel", &sys.enable_kernel);
 	oprofilefs_create_ulong(sb, root, "enable_user", &sys.enable_user);
+
+	/* Default to tracing both kernel and user */
+	sys.enable_kernel = 1;
+	sys.enable_user = 1;
 
 	return 0;
 }

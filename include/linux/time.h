@@ -41,7 +41,7 @@ struct timezone {
  * Have the 32 bit jiffies value wrap 5 minutes after boot
  * so jiffies wrap bugs show up earlier.
  */
-#define INITIAL_JIFFIES ((unsigned long)(0))
+#define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))
 
 /*
  * Change timeval to jiffies, trying to avoid the
@@ -348,6 +348,7 @@ extern long do_utimes(char __user * filename, struct timeval * times);
 struct itimerval;
 extern int do_setitimer(int which, struct itimerval *value, struct itimerval *ovalue);
 extern int do_getitimer(int which, struct itimerval *value);
+extern void getnstimeofday (struct timespec *tv);
 
 static inline void
 set_normalized_timespec (struct timespec *ts, time_t sec, long nsec)

@@ -28,12 +28,12 @@ AFLAGS		+= -m64
 UTS_MACHINE	:= s390x
 endif
 
-cflags-$(CONFIG_MARCH_G5)   += $(call check_gcc,-march=g5,)
-cflags-$(CONFIG_MARCH_Z900) += $(call check_gcc,-march=z900,)
-cflags-$(CONFIG_MARCH_Z990) += $(call check_gcc,-march=z990,)
+cflags-$(CONFIG_MARCH_G5)   += $(call cc-option,-march=g5)
+cflags-$(CONFIG_MARCH_Z900) += $(call cc-option,-march=z900)
+cflags-$(CONFIG_MARCH_Z990) += $(call cc-option,-march=z990)
 
 CFLAGS		+= $(cflags-y)
-CFLAGS		+= $(call check_gcc,-finline-limit=10000,)
+CFLAGS		+= $(call cc-option,-finline-limit=10000)
 CFLAGS 		+= -pipe -fno-strength-reduce -Wno-sign-compare 
 CFLAGS		+= -mbackchain
 

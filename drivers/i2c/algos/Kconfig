@@ -27,6 +27,17 @@ config I2C_ALGOPCF
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-algo-pcf.
 
+config I2C_ALGOPCA
+	tristate "I2C PCA 9564 interfaces"
+	depends on I2C
+	help
+	  This allows you to use a range of I2C adapters called PCA adapters.
+	  Say Y if you own an I2C adapter belonging to this class and then say
+	  Y to the specific driver for you adapter below.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-algo-pca.
+
 config I2C_ALGOITE
 	tristate "ITE I2C Algorithm"
 	depends on MIPS_ITE8172 && I2C

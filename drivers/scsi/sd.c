@@ -715,7 +715,7 @@ static int sd_sync_cache(struct scsi_device *sdp)
 			if (driver_byte(res) & DRIVER_SENSE)
 				scsi_print_req_sense("sd", sreq);
 	}
-	
+
 	scsi_release_request(sreq);
 	return res;
 }
@@ -1564,14 +1564,13 @@ static void sd_shutdown(struct device *dev)
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
 
 	if (!sdkp)
-               return;         /* this can happen */
+		return;         /* this can happen */
 
 	if (!sdkp->WCE)
 		return;
 
 	printk(KERN_NOTICE "Synchronizing SCSI cache for disk %s: \n",
 			sdkp->disk->disk_name);
-
 	sd_sync_cache(sdp);
 }	
 

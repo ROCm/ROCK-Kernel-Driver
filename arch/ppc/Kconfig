@@ -49,7 +49,7 @@ config 6xx
 	  There are four types of PowerPC chips supported.  The more common
 	  types (601, 603, 604, 740, 750, 7400), the Motorola embedded
 	  versions (821, 823, 850, 855, 860, 52xx, 8260), the IBM embedded
-	  versions (403 and 405) and the high end 64 bit Power processors 
+	  versions (403 and 405) and the high end 64 bit Power processors
 	  (POWER 3, POWER4, and IBM 970 also known as G5)
 	  Unless you are building a kernel for one of the embedded processor
 	  systems, 64 bit IBM RS/6000 or an Apple G5, choose 6xx.
@@ -626,7 +626,7 @@ config EMBEDDEDBOOT
 	bool
 	depends on 8xx || 8260
 	default y
-	
+
 config PPC_MPC52xx
 	bool
 
@@ -1043,13 +1043,13 @@ config PCI_8260
 	bool
 	depends on PCI && 8260 && !8272
 	default y
-	
+
 config 8260_PCI9
 	bool "  Enable workaround for MPC826x erratum PCI 9"
 	depends on PCI_8260
 	default y
 
-choice 
+choice
 	prompt "  IDMA channel for PCI 9 workaround"
 	depends on 8260_PCI9
 
@@ -1228,128 +1228,7 @@ source "lib/Kconfig"
 
 source "arch/ppc/oprofile/Kconfig"
 
-menu "Kernel hacking"
-
-config DEBUG_KERNEL
-	bool "Kernel debugging"
-
-config DEBUG_SLAB
-	bool "Debug memory allocations"
-	depends on DEBUG_KERNEL
-
-config MAGIC_SYSRQ
-	bool "Magic SysRq key"
-	depends on DEBUG_KERNEL
-	help
-	  If you say Y here, you will have some control over the system even
-	  if the system crashes for example during kernel debugging (e.g., you
-	  will be able to flush the buffer cache to disk, reboot the system
-	  immediately or dump some status information). This is accomplished
-	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
-	  also works on a serial console (on PC hardware at least), if you
-	  send a BREAK and then within 5 seconds a command keypress. The
-	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
-	  unless you really know what this hack does.
-
-config DEBUG_SPINLOCK
-	bool "Spinlock debugging"
-	depends on DEBUG_KERNEL
-	help
-	  Say Y here and to CONFIG_SMP to include code to check for missing
-	  spinlock initialization and some other common spinlock errors.
-
-config DEBUG_HIGHMEM
-	bool "Highmem debugging"
-	depends on DEBUG_KERNEL && HIGHMEM
-	help
-	  This options enables additional error checking for high memory
-	  systems.  Disable for production systems.
-
-config DEBUG_SPINLOCK_SLEEP
-	bool "Sleep-inside-spinlock checking"
-	depends on DEBUG_KERNEL
-	help
-	  If you say Y here, various routines which may sleep will become very
-	  noisy if they are called with a spinlock held.
-
-config KGDB
-	bool "Include kgdb kernel debugger"
-	depends on DEBUG_KERNEL && (BROKEN || PPC_GEN550 || 4xx)
-	select DEBUG_INFO
-	help
-	  Include in-kernel hooks for kgdb, the Linux kernel source level
-	  debugger.  See <http://kgdb.sourceforge.net/> for more information.
-	  Unless you are intending to debug the kernel, say N here.
-
-choice
-	prompt "Serial Port"
-	depends on KGDB
-	default KGDB_TTYS1
-
-config KGDB_TTYS0
-	bool "ttyS0"
-
-config KGDB_TTYS1
-	bool "ttyS1"
-
-config KGDB_TTYS2
-	bool "ttyS2"
-
-config KGDB_TTYS3
-	bool "ttyS3"
-
-endchoice
-
-config KGDB_CONSOLE
-	bool "Enable serial console thru kgdb port"
-	depends on KGDB && 8xx || CPM2
-	help
-	  If you enable this, all serial console messages will be sent
-	  over the gdb stub.
-	  If unsure, say N.
-
-config XMON
-	bool "Include xmon kernel debugger"
-	depends on DEBUG_KERNEL
-	help
-	  Include in-kernel hooks for the xmon kernel monitor/debugger.
-	  Unless you are intending to debug the kernel, say N here.
-
-config BDI_SWITCH
-	bool "Include BDI-2000 user context switcher"
-	depends on DEBUG_KERNEL
-	help
-	  Include in-kernel support for the Abatron BDI2000 debugger.
-	  Unless you are intending to debug the kernel with one of these
-	  machines, say N here.
-
-config DEBUG_INFO
-	bool "Compile the kernel with debug info"
-	depends on DEBUG_KERNEL
-	help
-          If you say Y here the resulting kernel image will include
-	  debugging info resulting in a larger kernel image.
-	  Say Y here only if you plan to use some sort of debugger to
-	  debug the kernel.
-	  If you don't debug the kernel, you can say N.
-
-config BOOTX_TEXT
-	bool "Support for early boot text console (BootX or OpenFirmware only)"
-	depends PPC_OF
-	help
-	  Say Y here to see progress messages from the boot firmware in text
-	  mode. Requires either BootX or Open Firmware.
-
-config SERIAL_TEXT_DEBUG
-	bool "Support for early boot texts over serial port"
-	depends on 4xx || GT64260 || LOPEC || PPLUS || PRPMC800 || PPC_GEN550 || PPC_MPC52xx
-
-config PPC_OCP
-	bool
-	depends on IBM_OCP || FSL_OCP
-	default y
-
-endmenu
+source "arch/ppc/Kconfig.debug"
 
 source "security/Kconfig"
 

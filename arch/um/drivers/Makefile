@@ -1,5 +1,5 @@
 # 
-# Copyright (C) 2000, 2002, 2003 Jeff Dike (jdike@karaya.com)
+# Copyright (C) 2000, 2002 Jeff Dike (jdike@karaya.com)
 # Licensed under the GPL
 #
 
@@ -15,19 +15,13 @@ mcast-objs := mcast_kern.o mcast_user.o
 #pcap-objs := pcap_kern.o pcap_user.o $(PCAP)
 net-objs := net_kern.o net_user.o
 mconsole-objs := mconsole_kern.o mconsole_user.o
-hostaudio-objs := hostaudio_kern.o
+hostaudio-objs := hostaudio_kern.o hostaudio_user.o
 ubd-objs := ubd_kern.o ubd_user.o
 port-objs := port_kern.o port_user.o
 harddog-objs := harddog_kern.o harddog_user.o
-x11-objs := x11_kern.o x11_user.o \
-	../../../drivers/video/cfbfillrect.o \
-	../../../drivers/video/cfbcopyarea.o \
-	../../../drivers/video/cfbimgblt.o 
 
 obj-y = 
-obj-$(CONFIG_STDERR_CONSOLE) += stderr_console.o
-obj-$(CONFIG_STDIO_CONSOLE) += stdio_console.o $(CHAN_OBJS)
-obj-$(CONFIG_SSL) += ssl.o $(CHAN_OBJS)
+obj-$(CONFIG_SSL) += ssl.o 
 obj-$(CONFIG_UML_NET_SLIP) += slip.o
 obj-$(CONFIG_UML_NET_SLIRP) += slirp.o
 obj-$(CONFIG_UML_NET_DAEMON) += daemon.o 
@@ -43,17 +37,27 @@ obj-$(CONFIG_NULL_CHAN) += null.o
 obj-$(CONFIG_PORT_CHAN) += port.o
 obj-$(CONFIG_PTY_CHAN) += pty.o
 obj-$(CONFIG_TTY_CHAN) += tty.o 
-obj-$(CONFIG_X11_FB) += x11.o
 obj-$(CONFIG_XTERM_CHAN) += xterm.o xterm_kern.o
 obj-$(CONFIG_UML_WATCHDOG) += harddog.o
-obj-$(CONFIG_BLK_DEV_COW) += cow_kern.o
-obj-$(CONFIG_BLK_DEV_COW_COMMON) += cow_user.o
+
+obj-y += stdio_console.o $(CHAN_OBJS)
 
 USER_SINGLE_OBJS = $(foreach f,$(patsubst %.o,%,$(obj-y) $(obj-m)),$($(f)-objs))
 
 USER_OBJS := $(filter %_user.o,$(obj-y) $(obj-m) $(USER_SINGLE_OBJS)) fd.o \
 	null.o pty.o tty.o xterm.o
-USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
+USER_OBJS := $(foreach file,$(USER_OBJS),arch/um/drivers/$(file))
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
+
+clean:
+
+modules:
+
+fastdep:
+
+dep:
+
+archmrproper: clean
+

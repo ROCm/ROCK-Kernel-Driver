@@ -1749,10 +1749,8 @@ struct reiserfs_transaction_handle {
   int t_blocks_allocated ;      /* number of blocks this writer allocated */
   unsigned long t_trans_id ;    /* sanity check, equals the current trans id */
   void *t_handle_save ;		/* save existing current->journal_info */
-  int displace_new_blocks:1;	/* if new block allocation occurres, that block
+  unsigned displace_new_blocks:1; /* if new block allocation occurres, that block
 				   should be displaced from others */
-  int t_aborted : 1;            /* If this handle has been aborted */
-  struct list_head t_list;
 } ;
 
 /* used to keep track of ordered and tail writes, attached to the buffer
@@ -1812,14 +1810,12 @@ int journal_mark_freed(struct reiserfs_transaction_handle *, struct super_block 
 int journal_transaction_should_end(struct reiserfs_transaction_handle *, int) ;
 int reiserfs_in_journal(struct super_block *p_s_sb, int bmap_nr, int bit_nr, int searchall, b_blocknr_t *next) ;
 int journal_begin(struct reiserfs_transaction_handle *, struct super_block *p_s_sb, unsigned long) ;
-int journal_join_abort(struct reiserfs_transaction_handle *, struct super_block *p_s_sb, unsigned long) ;
-void reiserfs_journal_abort (struct super_block *sb, int errno);
-void reiserfs_abort (struct super_block *sb, int errno, const char *fmt, ...);
+
 int reiserfs_allocate_list_bitmaps(struct super_block *s, struct reiserfs_list_bitmap *, int) ;
 
 void add_save_link (struct reiserfs_transaction_handle * th,
 					struct inode * inode, int truncate);
-int remove_save_link (struct inode * inode, int truncate);
+void remove_save_link (struct inode * inode, int truncate);
 
 /* objectid.c */
 __u32 reiserfs_get_unused_objectid (struct reiserfs_transaction_handle *th);
@@ -1915,8 +1911,8 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 
 void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 				 struct inode *inode, struct key * key);
-int reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inode * p_s_inode);
-int reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
+void reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inode * p_s_inode);
+void reiserfs_do_truncate (struct reiserfs_transaction_handle *th, 
 			   struct  inode * p_s_inode, struct page *, 
 			   int update_timestamps);
 
@@ -1930,7 +1926,7 @@ int reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 void padd_item (char * item, int total_length, int length);
 
 /* inode.c */
-int restart_transaction(struct reiserfs_transaction_handle *th, struct inode *inode, struct path *path);
+void restart_transaction(struct reiserfs_transaction_handle *th, struct inode *inode, struct path *path);
 void reiserfs_read_locked_inode(struct inode * inode, struct reiserfs_iget_args *args) ;
 int reiserfs_find_actor(struct inode * inode, void *p) ;
 int reiserfs_init_locked_inode(struct inode * inode, void *p) ;
@@ -1945,7 +1941,7 @@ int reiserfs_encode_fh( struct dentry *dentry, __u32 *data, int *lenp,
 						int connectable );
 
 int reiserfs_prepare_write(struct file *, struct page *, unsigned, unsigned) ;
-int reiserfs_truncate_file(struct inode *, int update_timestamps) ;
+void reiserfs_truncate_file(struct inode *, int update_timestamps) ;
 void make_cpu_key (struct cpu_key * cpu_key, struct inode * inode, loff_t offset,
 		   int type, int key_length);
 void make_le_item_head (struct item_head * ih, const struct cpu_key * key, 
@@ -2144,9 +2140,9 @@ struct buffer_head * get_FEB (struct tree_balance *);
     int prealloc_size;			/* is set in determine_prealloc_size() function, used by underlayed
 					 * function that do actual allocation */
 
-    int formatted_node:1;		/* the allocator uses different polices for getting disk space for
+    unsigned formatted_node:1;		/* the allocator uses different polices for getting disk space for
 					 * formatted/unformatted blocks with/without preallocation */
-    int preallocate:1;
+    unsigned preallocate:1;
 };
 
 typedef struct __reiserfs_blocknr_hint reiserfs_blocknr_hint_t;

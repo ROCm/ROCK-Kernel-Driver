@@ -99,11 +99,13 @@ ip_nat_fn(unsigned int hooknum,
                    hash table yet).  We must not let this through, in
                    case we're doing NAT to the same network. */
 		if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP) {
-			struct icmphdr hdr;
+			struct icmphdr _hdr, *hp;
 
-			if (skb_copy_bits(*pskb, (*pskb)->nh.iph->ihl*4,
-					  &hdr, sizeof(hdr)) == 0
-			    && hdr.type == ICMP_REDIRECT)
+			hp = skb_header_pointer(*pskb,
+						(*pskb)->nh.iph->ihl*4,
+						sizeof(_hdr), &_hdr);
+			if (hp != NULL &&
+			    hp->type == ICMP_REDIRECT)
 				return NF_DROP;
 		}
 		return NF_ACCEPT;

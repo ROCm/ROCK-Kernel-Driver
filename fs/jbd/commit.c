@@ -640,12 +640,20 @@ wait_for_iobuf:
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
 		int ret;
+		int barrier_done = 0;
 
 		set_buffer_dirty(bh);
-		if (journal->j_flags & JFS_BARRIER)
+		if (journal->j_flags & JFS_BARRIER) {
 			set_buffer_ordered(bh);
+			barrier_done = 1;
+		}
 		ret = sync_dirty_buffer(bh);
-		if (ret == -EOPNOTSUPP && (journal->j_flags & JFS_BARRIER)) {
+		/* is it possible for another commit to fail at roughly
+		 * the same time as this one?  If so, we don't want to
+		 * trust the barrier flag in the super, but instead want
+		 * to remember if we sent a barrier request
+		 */
+		if (ret == -EOPNOTSUPP && barrier_done) {
 			char b[BDEVNAME_SIZE];
 
 			printk(KERN_WARNING

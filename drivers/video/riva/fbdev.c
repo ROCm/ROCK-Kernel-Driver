@@ -111,177 +111,87 @@ static int rivafb_blank(int blank, struct fb_info *info);
  *
  * ------------------------------------------------------------------------- */
 
-enum riva_chips {
-	CH_RIVA_128 = 0,
-	CH_RIVA_TNT,
-	CH_RIVA_TNT2,
-	CH_RIVA_UTNT2,
-	CH_RIVA_VTNT2,
-	CH_RIVA_UVTNT2,
-	CH_RIVA_ITNT2,
-	CH_GEFORCE_SDR,
-	CH_GEFORCE_DDR,
-	CH_QUADRO,
-	CH_GEFORCE2_MX,
-	CH_GEFORCE2_MX2,
-	CH_GEFORCE2_GO,
-	CH_QUADRO2_MXR,
-	CH_GEFORCE2_GTS,
-	CH_GEFORCE2_GTS2,
-	CH_GEFORCE2_ULTRA,
-	CH_QUADRO2_PRO,
-	CH_GEFORCE4_MX_460,
-	CH_GEFORCE4_MX_440,
-	CH_GEFORCE4_MX_420,
-	CH_GEFORCE4_440_GO,
-	CH_GEFORCE4_420_GO,
-	CH_GEFORCE4_420_GO_M32,
-	CH_QUADRO4_500XGL,
-	CH_GEFORCE4_440_GO_M64,
-	CH_QUADRO4_200,
-	CH_QUADRO4_550XGL,
-	CH_QUADRO4_500_GOGL,
-	CH_IGEFORCE2,
-	CH_GEFORCE3,
-	CH_GEFORCE3_1,
-	CH_GEFORCE3_2,
-	CH_QUADRO_DDC,
-	CH_GEFORCE4_TI_4600,
-	CH_GEFORCE4_TI_4400,
-	CH_GEFORCE4_TI_4200,
-	CH_QUADRO4_900XGL,
-	CH_QUADRO4_750XGL,
-	CH_QUADRO4_700XGL
-};
-
-/* directly indexed by riva_chips enum, above */
-static struct riva_chip_info {
-	const char *name;
-	unsigned arch_rev;
-} riva_chip_info[] __initdata = {
-	{ "RIVA-128", NV_ARCH_03 },
-	{ "RIVA-TNT", NV_ARCH_04 },
-	{ "RIVA-TNT2", NV_ARCH_04 },
-	{ "RIVA-UTNT2", NV_ARCH_04 },
-	{ "RIVA-VTNT2", NV_ARCH_04 },
-	{ "RIVA-UVTNT2", NV_ARCH_04 },
-	{ "RIVA-ITNT2", NV_ARCH_04 },
-	{ "GeForce-SDR", NV_ARCH_10 },
-	{ "GeForce-DDR", NV_ARCH_10 },
-	{ "Quadro", NV_ARCH_10 },
-	{ "GeForce2-MX", NV_ARCH_10 },
-	{ "GeForce2-MX", NV_ARCH_10 },
-	{ "GeForce2-GO", NV_ARCH_10 },
-	{ "Quadro2-MXR", NV_ARCH_10 },
-	{ "GeForce2-GTS", NV_ARCH_10 },
-	{ "GeForce2-GTS", NV_ARCH_10 },
-	{ "GeForce2-ULTRA", NV_ARCH_10 },
-	{ "Quadro2-PRO", NV_ARCH_10 },
-	{ "GeForce4-MX-460", NV_ARCH_10 },
-	{ "GeForce4-MX-440", NV_ARCH_10 },
-	{ "GeForce4-MX-420", NV_ARCH_10 },
-	{ "GeForce4-440-GO", NV_ARCH_10 },
-	{ "GeForce4-420-GO", NV_ARCH_10 },
-	{ "GeForce4-420-GO-M32", NV_ARCH_10 },
-	{ "Quadro4-500-XGL", NV_ARCH_10 },
-	{ "GeForce4-440-GO-M64", NV_ARCH_10 },
-	{ "Quadro4-200", NV_ARCH_10 },
-	{ "Quadro4-550-XGL", NV_ARCH_10 },
-	{ "Quadro4-500-GOGL", NV_ARCH_10 },
-	{ "GeForce2", NV_ARCH_10 },
-	{ "GeForce3", NV_ARCH_20 }, 
-	{ "GeForce3 Ti 200", NV_ARCH_20 },
-	{ "GeForce3 Ti 500", NV_ARCH_20 },
-	{ "Quadro DDC", NV_ARCH_20 },
-	{ "GeForce4 Ti 4600", NV_ARCH_20 },
-	{ "GeForce4 Ti 4400", NV_ARCH_20 },
-	{ "GeForce4 Ti 4200", NV_ARCH_20 },
-	{ "Quadro4-900-XGL", NV_ARCH_20 },
-	{ "Quadro4-750-XGL", NV_ARCH_20 },
-	{ "Quadro4-700-XGL", NV_ARCH_20 }
-};
-
 static struct pci_device_id rivafb_pci_tbl[] = {
 	{ PCI_VENDOR_ID_NVIDIA_SGS, PCI_DEVICE_ID_NVIDIA_SGS_RIVA128,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_RIVA_128 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_TNT,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_RIVA_TNT },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_TNT2,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_RIVA_TNT2 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_UTNT2,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_RIVA_UTNT2 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_VTNT2,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_RIVA_VTNT2 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_UVTNT2,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_RIVA_VTNT2 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_ITNT2,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_RIVA_ITNT2 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE_SDR,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE_SDR },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE_DDR,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE_DDR },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE2_MX,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE2_MX },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE2_MX2,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE2_MX2 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE2_GO,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE2_GO },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO2_MXR,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO2_MXR },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE2_GTS,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE2_GTS },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE2_GTS2,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE2_GTS2 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE2_ULTRA,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE2_ULTRA },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO2_PRO,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO2_PRO },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE4_MX_460,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE4_MX_460 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE4_MX_440,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE4_MX_440 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE4_MX_420,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE4_MX_420 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE4_440_GO,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE4_440_GO },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE4_420_GO,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE4_420_GO },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE4_420_GO_M32,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE4_420_GO_M32 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO4_500XGL,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO4_500XGL },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE4_440_GO_M64,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE4_440_GO_M64 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO4_200,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO4_200 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO4_550XGL,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO4_550XGL },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO4_500_GOGL,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO4_500_GOGL },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_IGEFORCE2,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_IGEFORCE2 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE3,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE3 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE3_1,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE3_1 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE3_2,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE3_2 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO_DDC,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO_DDC },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE4_TI_4600,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE4_TI_4600 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE4_TI_4400,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE4_TI_4400 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE4_TI_4200,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE4_TI_4200 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
  	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO4_900XGL,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO4_900XGL },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO4_750XGL,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO4_750XGL },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO4_700XGL,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO4_700XGL },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0, } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, rivafb_pci_tbl);
@@ -293,7 +203,6 @@ MODULE_DEVICE_TABLE(pci, rivafb_pci_tbl);
  * ------------------------------------------------------------------------- */
 
 /* command line data, set in rivafb_setup() */
-static u32 pseudo_palette[17];
 static int flatpanel __initdata = -1; /* Autodetect later */
 static int forceCRTC __initdata = -1;
 #ifdef CONFIG_MTRR
@@ -303,14 +212,13 @@ static int nomtrr __initdata = 0;
 static char *mode_option __initdata = NULL;
 static int  strictmode       = 0;
 
-static struct fb_fix_screeninfo rivafb_fix = {
-	.id		= "nVidia",
+static struct fb_fix_screeninfo __initdata rivafb_fix = {
 	.type		= FB_TYPE_PACKED_PIXELS,
 	.xpanstep	= 1,
 	.ypanstep	= 1,
 };
 
-static struct fb_var_screeninfo rivafb_default_var = {
+static struct fb_var_screeninfo __initdata rivafb_default_var = {
 	.xres		= 640,
 	.yres		= 480,
 	.xres_virtual	= 640,
@@ -606,7 +514,7 @@ static void riva_rclut(RIVA_HW_INST *chip,
 		       unsigned char *green, unsigned char *blue)
 {
 	
-	VGA_WR08(chip->PDIO, 0x3c8, regnum);
+	VGA_WR08(chip->PDIO, 0x3c7, regnum);
 	*red = VGA_RD08(chip->PDIO, 0x3c9);
 	*green = VGA_RD08(chip->PDIO, 0x3c9);
 	*blue = VGA_RD08(chip->PDIO, 0x3c9);
@@ -1090,13 +998,15 @@ static int rivafb_open(struct fb_info *info, int user)
 
 	NVTRACE_ENTER();
 	if (!cnt) {
+#ifdef CONFIG_X86
 		memset(&par->state, 0, sizeof(struct vgastate));
 		par->state.flags = VGA_SAVE_MODE  | VGA_SAVE_FONTS;
 		/* save the DAC for Riva128 */
 		if (par->riva.Architecture == NV_ARCH_03)
 			par->state.flags |= VGA_SAVE_CMAP;
 		save_vga(&par->state);
-
+#endif
+		riva_common_setup(par);
 		RivaGetConfig(&par->riva, par->Chipset);
 		/* vgaHWunlock() + riva unlock (0x7F) */
 		CRTCout(par, 0x11, 0xFF);
@@ -1121,7 +1031,9 @@ static int rivafb_release(struct fb_info *info, int user)
 		par->riva.LockUnlock(&par->riva, 0);
 		par->riva.LoadStateExt(&par->riva, &par->initial_state.ext);
 		riva_load_state(par, &par->initial_state);
+#ifdef CONFIG_X86
 		restore_vga(&par->state);
+#endif
 		par->riva.LockUnlock(&par->riva, 1);
 	}
 	atomic_dec(&par->ref_count);
@@ -1131,7 +1043,8 @@ static int rivafb_release(struct fb_info *info, int user)
 
 static int rivafb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	struct fb_monspecs *specs = &info->monspecs;
+	struct fb_videomode *mode;
+	struct riva_par *par = (struct riva_par *) info->par;
 	int nom, den;		/* translating from pixels->bytes */
 	int mode_valid = 0;
 	
@@ -1148,6 +1061,9 @@ static int rivafb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		/* fall through */
 	case 16:
 		var->bits_per_pixel = 16;
+		/* The Riva128 supports RGB555 only */
+		if (par->riva.Architecture == NV_ARCH_03)
+			var->green.length = 5;
 		if (var->green.length == 5) {
 			/* 0rrrrrgg gggbbbbb */
 			var->red.offset = 10;
@@ -1190,62 +1106,21 @@ static int rivafb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 			mode_valid = 1;
 	}
 
-	/* find best mode from modedb */
-	if (!mode_valid && specs->modedb_len) {
-		int i, best, best_refresh, best_x, best_y, diff_x, diff_y;
-
-		best_refresh = best = best_x = best_y = 0;
-		diff_x = diff_y = -1;
-
-		for (i = 0; i < specs->modedb_len; i++) {
-			if (var->xres <= specs->modedb[i].xres &&
-			    !(specs->modedb[i].flag & FB_MODE_IS_CALCULATED) &&
-			    specs->modedb[i].xres - var->xres < diff_x) {
-				best_x = specs->modedb[i].xres;
-				diff_x = best_x - var->xres;
-			}
-			if (!diff_x) break;
-		}
-
-		if (diff_x != -1) {
-			for (i = 0; i < specs->modedb_len; i++) {
-				if (best_x == specs->modedb[i].xres &&
-				    var->yres <= specs->modedb[i].yres &&
-				    !(specs->modedb[i].flag &
-				      FB_MODE_IS_CALCULATED) &&
-				    specs->modedb[i].yres-var->yres < diff_y) {
-					best_y = specs->modedb[i].yres;
-					diff_y = best_y - var->yres;
-				}
-				if (!diff_y) break;
-			}
-		}
-
-		if (diff_y != -1) {
-			for (i = 0; i < specs->modedb_len; i++) {
-				if (best_x == specs->modedb[i].xres &&
-				    best_y == specs->modedb[i].yres &&
-				    !(specs->modedb[i].flag &
-				      FB_MODE_IS_CALCULATED) &&
-				    specs->modedb[i].refresh > best_refresh) {
-					best_refresh=specs->modedb[i].refresh;
-					best = i;
-				}
-			}
-		}
-
-		if (best_refresh) {
-			riva_update_var(var, &specs->modedb[best]);
-			mode_valid = 1;
-		}
-	}
-
 	/* calculate modeline if supported by monitor */
 	if (!mode_valid && info->monspecs.gtf) {
 		if (!fb_get_mode(FB_MAXTIMINGS, 0, var, info))
 			mode_valid = 1;
 	}
-	if (!mode_valid && info->monspecs.modedb_len)
+
+	if (!mode_valid) {
+		mode = fb_find_best_mode(var, &info->monspecs.modelist);
+		if (mode) {
+			riva_update_var(var, mode);
+			mode_valid = 1;
+		}
+	}
+
+	if (!mode_valid && !list_empty(&info->monspecs.modelist))
 		return -EINVAL;
 
 	if (var->xres_virtual < var->xres)
@@ -1280,12 +1155,6 @@ static int rivafb_set_par(struct fb_info *info)
 	struct riva_par *par = (struct riva_par *) info->par;
 
 	NVTRACE_ENTER();
-	riva_common_setup(par);
-	RivaGetConfig(&par->riva, par->Chipset);
-	/* vgaHWunlock() + riva unlock (0x7F) */
-	CRTCout(par, 0x11, 0xFF);
-	par->riva.LockUnlock(&par->riva, 0);
-
 	riva_load_video_mode(info);
 	riva_setup_accel(info);
 	
@@ -1293,6 +1162,7 @@ static int rivafb_set_par(struct fb_info *info)
 	info->fix.line_length = (info->var.xres_virtual * (info->var.bits_per_pixel >> 3));
 	info->fix.visual = (info->var.bits_per_pixel == 8) ?
 				FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
+
 	NVTRACE_LEAVE();
 	return 0;
 }
@@ -1413,12 +1283,37 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	int i;
 
 	if (regno >= riva_get_cmap_len(&info->var))
-		return -EINVAL;
+			return -EINVAL;
 
 	if (info->var.grayscale) {
 		/* gray = 0.30*R + 0.59*G + 0.11*B */
 		red = green = blue =
 		    (red * 77 + green * 151 + blue * 28) >> 8;
+	}
+
+	if (regno < 16 && info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
+		((u32 *) info->pseudo_palette)[regno] =
+			(regno << info->var.red.offset) |
+			(regno << info->var.green.offset) |
+			(regno << info->var.blue.offset);
+		/*
+		 * The Riva128 2D engine requires color information in
+		 * TrueColor format even if framebuffer is in DirectColor
+		 */
+		if (par->riva.Architecture == NV_ARCH_03) {
+			switch (info->var.bits_per_pixel) {
+			case 16:
+				par->palette[regno] = ((red & 0xf800) >> 1) |
+					((green & 0xf800) >> 6) |
+					((blue & 0xf800) >> 11);
+				break;
+			case 32:
+				par->palette[regno] = ((red & 0xff00) << 8) |
+					((green & 0xff00)) |
+					((blue & 0xff00) >> 8);
+				break;
+			}
+		}
 	}
 
 	switch (info->var.bits_per_pixel) {
@@ -1428,45 +1323,27 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		break;
 	case 16:
 		if (info->var.green.length == 5) {
-			if (regno < 16) {
-				/* 0rrrrrgg gggbbbbb */
-				((u32 *)info->pseudo_palette)[regno] =
-					((red & 0xf800) >> 1) |
-					((green & 0xf800) >> 6) |
-					((blue & 0xf800) >> 11);
-			}
-			for (i = 0; i < 8; i++) 
+			for (i = 0; i < 8; i++) {
 				riva_wclut(chip, regno*8+i, red >> 8,
 					   green >> 8, blue >> 8);
+			}
 		} else {
 			u8 r, g, b;
 
-			if (regno < 16) {
-				/* rrrrrggg gggbbbbb */
-				((u32 *)info->pseudo_palette)[regno] =
-					((red & 0xf800) >> 0) |
-					((green & 0xf800) >> 5) |
-					((blue & 0xf800) >> 11);
-			}
 			if (regno < 32) {
 				for (i = 0; i < 8; i++) {
-					riva_wclut(chip, regno*8+i, red >> 8, 
-						   green >> 8, blue >> 8);
+					riva_wclut(chip, regno*8+i,
+						   red >> 8, green >> 8,
+						   blue >> 8);
 				}
 			}
-			for (i = 0; i < 4; i++) {
-				riva_rclut(chip, regno*2+i, &r, &g, &b);
-				riva_wclut(chip, regno*4+i, r, green >> 8, b);
-			}
+			riva_rclut(chip, regno*4, &r, &g, &b);
+			for (i = 0; i < 4; i++)
+				riva_wclut(chip, regno*4+i, r,
+					   green >> 8, b);
 		}
 		break;
 	case 32:
-		if (regno < 16) {
-			((u32 *)info->pseudo_palette)[regno] =
-				((red & 0xff00) << 8) |
-				((green & 0xff00)) | ((blue & 0xff00) >> 8);
-			
-		}
 		riva_wclut(chip, regno, red >> 8, green >> 8, blue >> 8);
 		break;
 	default:
@@ -1495,8 +1372,12 @@ static void rivafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect
 
 	if (info->var.bits_per_pixel == 8)
 		color = rect->color;
-	else
-		color = ((u32 *)info->pseudo_palette)[rect->color];
+	else {
+		if (par->riva.Architecture != NV_ARCH_03)
+			color = ((u32 *)info->pseudo_palette)[rect->color];
+		else
+			color = par->palette[rect->color];
+	}
 
 	switch (rect->rop) {
 	case ROP_XOR:
@@ -1592,14 +1473,16 @@ static void rivafb_imageblit(struct fb_info *info,
 		bgx = image->bg_color;
 		break;
 	case 16:
-		fgx = ((u32 *)info->pseudo_palette)[image->fg_color];
-		bgx = ((u32 *)info->pseudo_palette)[image->bg_color];
+	case 32:
+		if (par->riva.Architecture != NV_ARCH_03) {
+			fgx = ((u32 *)info->pseudo_palette)[image->fg_color];
+			bgx = ((u32 *)info->pseudo_palette)[image->bg_color];
+		} else {
+			fgx = par->palette[image->fg_color];
+			bgx = par->palette[image->bg_color];
+		}
 		if (info->var.green.length == 6)
 			convert_bgcolor_16(&bgx);	
-		break;
-	case 32:
-		fgx = ((u32 *)info->pseudo_palette)[image->fg_color];
-		bgx = ((u32 *)info->pseudo_palette)[image->bg_color];
 		break;
 	}
 
@@ -1769,6 +1652,7 @@ static struct fb_ops riva_fb_ops = {
 static int __devinit riva_set_fbinfo(struct fb_info *info)
 {
 	unsigned int cmap_len;
+	struct riva_par *par = (struct riva_par *) info->par;
 
 	NVTRACE_ENTER();
 	info->flags = FBINFO_DEFAULT
@@ -1781,7 +1665,8 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 	info->var = rivafb_default_var;
 	info->fix.visual = (info->var.bits_per_pixel == 8) ?
 				FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
-	info->pseudo_palette = pseudo_palette;
+
+	info->pseudo_palette = par->pseudo_palette;
 
 	cmap_len = riva_get_cmap_len(&info->var);
 	fb_alloc_cmap(&info->cmap, cmap_len, 0);	
@@ -1796,7 +1681,7 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 }
 
 #ifdef CONFIG_PPC_OF
-static int riva_get_EDID_OF(struct fb_info *info, struct pci_dev *pd)
+static int __devinit riva_get_EDID_OF(struct fb_info *info, struct pci_dev *pd)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 	struct device_node *dp;
@@ -1828,7 +1713,28 @@ static int riva_get_EDID_OF(struct fb_info *info, struct pci_dev *pd)
 }
 #endif /* CONFIG_PPC_OF */
 
-static void riva_update_default_var(struct fb_var_screeninfo *var, struct fb_info *info)
+#ifdef CONFIG_FB_RIVA_I2C
+static int __devinit riva_get_EDID_i2c(struct fb_info *info)
+{
+	struct riva_par *par = (struct riva_par *) info->par;
+	int i;
+
+	NVTRACE_ENTER();
+	riva_create_i2c_busses(par);
+	for (i = par->bus; i >= 1; i--) {
+		riva_probe_i2c_connector(par, i, &par->EDID);
+		if (par->EDID) {
+			printk("rivafb: Found EDID Block from BUS %i\n", i);
+			break;
+		}
+	}
+	NVTRACE_LEAVE();
+	return (par->EDID) ? 1 : 0;
+}
+#endif /* CONFIG_FB_RIVA_I2C */
+
+static void __devinit riva_update_default_var(struct fb_var_screeninfo *var,
+					      struct fb_info *info)
 {
 	struct fb_monspecs *specs = &info->monspecs;
 	struct fb_videomode modedb;
@@ -1862,41 +1768,28 @@ static void riva_update_default_var(struct fb_var_screeninfo *var, struct fb_inf
 }
 
 
-static void riva_get_EDID(struct fb_info *info, struct pci_dev *pdev)
+static void __devinit riva_get_EDID(struct fb_info *info, struct pci_dev *pdev)
 {
-	struct riva_par *par;
-	int i;
-
 	NVTRACE_ENTER();
 #ifdef CONFIG_PPC_OF
 	if (!riva_get_EDID_OF(info, pdev))
 		printk("rivafb: could not retrieve EDID from OF\n");
-#else
-	/* XXX use other methods later */
-#ifdef CONFIG_FB_RIVA_I2C
-
-	par = (struct riva_par *) info->par;
-	riva_create_i2c_busses(par);
-	for (i = par->bus; i >= 1; i--) {
-		riva_probe_i2c_connector(par, i, &par->EDID);
-		if (par->EDID) {
-			printk("rivafb: Found EDID Block from BUS %i\n", i);
-			break;
-		}
-	}
-	riva_delete_i2c_busses(par);
-#endif
+#elif CONFIG_FB_RIVA_I2C
+	if (!riva_get_EDID_i2c(info))
+		printk("rivafb: could not retrieve EDID from DDC/I2C\n");
 #endif
 	NVTRACE_LEAVE();
 }
 
 
-static void riva_get_edidinfo(struct fb_info *info)
+static void __devinit riva_get_edidinfo(struct fb_info *info)
 {
 	struct fb_var_screeninfo *var = &rivafb_default_var;
 	struct riva_par *par = (struct riva_par *) info->par;
 
 	fb_edid_to_monspecs(par->EDID, &info->monspecs);
+	fb_videomode_to_modelist(info->monspecs.modedb, info->monspecs.modedb_len,
+				 &info->monspecs.modelist);
 	riva_update_default_var(var, info);
 
 	/* if user specified flatpanel, we respect that */
@@ -1910,16 +1803,52 @@ static void riva_get_edidinfo(struct fb_info *info)
  *
  * ------------------------------------------------------------------------- */
 
+static u32 __devinit riva_get_arch(struct pci_dev *pd)
+{
+    	u32 arch = 0;
+
+	switch (pd->device & 0x0ff0) {
+		case 0x0100:   /* GeForce 256 */
+		case 0x0110:   /* GeForce2 MX */
+		case 0x0150:   /* GeForce2 */
+		case 0x0170:   /* GeForce4 MX */
+		case 0x0180:   /* GeForce4 MX (8x AGP) */
+		case 0x01A0:   /* nForce */
+		case 0x01F0:   /* nForce2 */
+		     arch =  NV_ARCH_10;
+		     break;
+		case 0x0200:   /* GeForce3 */
+		case 0x0250:   /* GeForce4 Ti */
+		case 0x0280:   /* GeForce4 Ti (8x AGP) */
+		     arch =  NV_ARCH_20;
+		     break;
+		case 0x0300:   /* GeForceFX 5800 */
+		case 0x0310:   /* GeForceFX 5600 */
+		case 0x0320:   /* GeForceFX 5200 */
+		case 0x0330:   /* GeForceFX 5900 */
+		case 0x0340:   /* GeForceFX 5700 */
+		     arch =  NV_ARCH_30;
+		     break;
+		case 0x0020:   /* TNT, TNT2 */
+		     arch =  NV_ARCH_04;
+		     break;
+		case 0x0010:   /* Riva128 */
+		     arch =  NV_ARCH_03;
+		     break;
+		default:   /* unknown architecture */
+		     break;
+	}
+	return arch;
+}
+
 static int __devinit rivafb_probe(struct pci_dev *pd,
 			     	const struct pci_device_id *ent)
 {
-	struct riva_chip_info *rci = &riva_chip_info[ent->driver_data];
 	struct riva_par *default_par;
 	struct fb_info *info;
 
 	NVTRACE_ENTER();
 	assert(pd != NULL);
-	assert(rci != NULL);
 
 	info = kmalloc(sizeof(struct fb_info), GFP_KERNEL);
 	if (!info)
@@ -1948,12 +1877,27 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 		goto err_out_request;
 	}
 
-	strcat(rivafb_fix.id, rci->name);
-	default_par->riva.Architecture = rci->arch_rev;
+	default_par->riva.Architecture = riva_get_arch(pd);
 
 	default_par->Chipset = (pd->vendor << 16) | pd->device;
 	printk(KERN_INFO PFX "nVidia device/chipset %X\n",default_par->Chipset);
 	
+#ifdef CONFIG_PCI_NAMES
+	printk(KERN_INFO PFX "%s\n", pd->pretty_name);
+#endif
+
+	if(default_par->riva.Architecture == 0) {
+		printk(KERN_ERR PFX "unknown NV_ARCH\n");
+		goto err_out_kfree1;
+	}
+	if(default_par->riva.Architecture == NV_ARCH_10 ||
+	   default_par->riva.Architecture == NV_ARCH_20 ||
+	   default_par->riva.Architecture == NV_ARCH_30) {
+		sprintf(rivafb_fix.id, "NV%x", (pd->device & 0x0ff0) >> 4);
+	} else {
+		sprintf(rivafb_fix.id, "NV%x", default_par->riva.Architecture);
+	}
+
 	default_par->FlatPanel = flatpanel;
 	if (flatpanel == 1)
 		printk(KERN_INFO PFX "flatpanel support enabled\n");
@@ -2015,7 +1959,6 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 
 	rivafb_fix.smem_len = riva_get_memlen(default_par) * 1024;
 	default_par->dclk_max = riva_get_maxdclk(default_par) * 1000;
-
 	info->screen_base = ioremap(rivafb_fix.smem_start,
 				    rivafb_fix.smem_len);
 	if (!info->screen_base) {
@@ -2048,6 +1991,10 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 		goto err_out_iounmap_fb;
 	}
 
+	fb_destroy_modedb(info->monspecs.modedb);
+	info->monspecs.modedb_len = 0;
+	info->monspecs.modedb = NULL;
+
 	if (register_framebuffer(info) < 0) {
 		printk(KERN_ERR PFX
 			"error registering riva framebuffer\n");
@@ -2057,10 +2004,9 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	pci_set_drvdata(pd, info);
 
 	printk(KERN_INFO PFX
-		"PCI nVidia NV%x framebuffer ver %s (%s, %dMB @ 0x%lX)\n",
-		default_par->riva.Architecture,
-		RIVAFB_VERSION,
+		"PCI nVidia %s framebuffer ver %s (%dMB @ 0x%lX)\n",
 		info->fix.id,
+		RIVAFB_VERSION,
 		info->fix.smem_len / (1024 * 1024),
 		info->fix.smem_start);
 #ifdef CONFIG_PMAC_BACKLIGHT
@@ -2072,6 +2018,9 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	return 0;
 
 err_out_iounmap_fb:
+#ifdef CONFIG_FB_RIVA_I2C
+	riva_delete_i2c_busses((struct riva_par *) info->par);
+#endif
 	iounmap(info->screen_base);
 err_out_free_base1:
 	if (default_par->riva.Architecture == NV_ARCH_03) 
@@ -2101,6 +2050,12 @@ static void __exit rivafb_remove(struct pci_dev *pd)
 	if (!info)
 		return;
 
+#ifdef CONFIG_FB_RIVA_I2C
+	riva_delete_i2c_busses(par);
+	if (par->EDID)
+		kfree(par->EDID);
+#endif
+
 	unregister_framebuffer(info);
 #ifdef CONFIG_MTRR
 	if (par->mtrr.vram_valid)
@@ -2114,7 +2069,6 @@ static void __exit rivafb_remove(struct pci_dev *pd)
 		iounmap((caddr_t)par->riva.PRAMIN);
 	pci_release_regions(pd);
 	pci_disable_device(pd);
-	fb_destroy_modedb(info->monspecs.modedb);
 	kfree(info->pixmap.addr);
 	kfree(par);
 	kfree(info);
@@ -2177,7 +2131,7 @@ static struct pci_driver rivafb_driver = {
  *
  * ------------------------------------------------------------------------- */
 
-int __init rivafb_init(void)
+int __devinit rivafb_init(void)
 {
 	if (pci_register_driver(&rivafb_driver) > 0)
 		return 0;

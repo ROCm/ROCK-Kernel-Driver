@@ -246,7 +246,6 @@ int	xfs_attr_shortform_getvalue(struct xfs_da_args *args);
 int	xfs_attr_shortform_to_leaf(struct xfs_da_args *args);
 int	xfs_attr_shortform_remove(struct xfs_da_args *remove);
 int	xfs_attr_shortform_list(struct xfs_attr_list_context *context);
-int	xfs_attr_shortform_replace(struct xfs_da_args *args);
 int	xfs_attr_shortform_allfit(struct xfs_dabuf *bp, struct xfs_inode *dp);
 
 /*

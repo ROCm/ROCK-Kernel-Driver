@@ -1,3 +1,3 @@
 /*
- *  linux/include/asm-arm/arch-iop80310/param.h
+ *  linux/include/asm-arm/arch-iop3xx/param.h
  */

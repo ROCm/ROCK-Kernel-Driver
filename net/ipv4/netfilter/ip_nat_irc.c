@@ -27,6 +27,7 @@
 #include <linux/netfilter_ipv4/ip_nat_rule.h>
 #include <linux/netfilter_ipv4/ip_conntrack_irc.h>
 #include <linux/netfilter_ipv4/ip_conntrack_helper.h>
+#include <linux/moduleparam.h>
 
 #if 0
 #define DEBUGP printk
@@ -41,7 +42,7 @@ static int ports_c;
 MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
 MODULE_DESCRIPTION("IRC (DCC) NAT helper");
 MODULE_LICENSE("GPL");
-MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
+module_param_array(ports, int, ports_c, 0400);
 MODULE_PARM_DESC(ports, "port numbers of IRC servers");
 
 /* protects irc part of conntracks */
@@ -235,11 +236,10 @@ static int __init init(void)
 	struct ip_nat_helper *hlpr;
 	char *tmpname;
 
-	if (ports[0] == 0) {
-		ports[0] = IRC_PORT;
-	}
+	if (ports_c == 0)
+		ports[ports_c++] = IRC_PORT;
 
-	for (i = 0; (i < MAX_PORTS) && ports[i] != 0; i++) {
+	for (i = 0; i < ports_c; i++) {
 		hlpr = &ip_nat_irc_helpers[i];
 		hlpr->tuple.dst.protonum = IPPROTO_TCP;
 		hlpr->tuple.src.u.tcp.port = htons(ports[i]);
@@ -269,7 +269,6 @@ static int __init init(void)
 			fini();
 			return 1;
 		}
-		ports_c++;
 	}
 	return ret;
 }

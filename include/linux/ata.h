@@ -42,6 +42,7 @@ enum {
 	ATA_ID_SERNO_OFS	= 10,
 	ATA_ID_MAJOR_VER	= 80,
 	ATA_ID_PIO_MODES	= 64,
+	ATA_ID_MWDMA_MODES	= 63,
 	ATA_ID_UDMA_MODES	= 88,
 	ATA_ID_PIO4		= (1 << 1),
 
@@ -133,13 +134,20 @@ enum {
 	XFER_UDMA_2		= 0x42,
 	XFER_UDMA_1		= 0x41,
 	XFER_UDMA_0		= 0x40,
+	XFER_MW_DMA_2		= 0x22,
+	XFER_MW_DMA_1		= 0x21,
+	XFER_MW_DMA_0		= 0x20,
 	XFER_PIO_4		= 0x0C,
 	XFER_PIO_3		= 0x0B,
+	XFER_PIO_2		= 0x0A,
+	XFER_PIO_1		= 0x09,
+	XFER_PIO_0		= 0x08,
 
 	/* ATAPI stuff */
 	ATAPI_PKT_DMA		= (1 << 0),
 	ATAPI_DMADIR		= (1 << 2),	/* ATAPI data dir:
 						   0=to device, 1=to host */
+	ATAPI_CDB_LEN		= 16,
 
 	/* cable types */
 	ATA_CBL_NONE		= 0,
@@ -169,8 +177,14 @@ enum ata_tf_protocols {
 	ATA_PROT_PIO,		/* PIO single sector */
 	ATA_PROT_PIO_MULT,	/* PIO multiple sector */
 	ATA_PROT_DMA,		/* DMA */
-	ATA_PROT_ATAPI,		/* packet command */
+	ATA_PROT_ATAPI,		/* packet command, PIO data xfer*/
+	ATA_PROT_ATAPI_NODATA,	/* packet command, no data */
 	ATA_PROT_ATAPI_DMA,	/* packet command with special DMA sauce */
+};
+
+enum ata_ioctls {
+	ATA_IOC_GET_IO32	= 0x309,
+	ATA_IOC_SET_IO32	= 0x324,
 };
 
 /* core structures */
@@ -178,7 +192,7 @@ enum ata_tf_protocols {
 struct ata_prd {
 	u32			addr;
 	u32			flags_len;
-} __attribute__((packed));
+};
 
 struct ata_taskfile {
 	unsigned long		flags;		/* ATA_TFLAG_xxx */
@@ -206,6 +220,8 @@ struct ata_taskfile {
 #define ata_id_is_ata(dev)	(((dev)->id[0] & (1 << 15)) == 0)
 #define ata_id_rahead_enabled(dev) ((dev)->id[85] & (1 << 6))
 #define ata_id_wcache_enabled(dev) ((dev)->id[85] & (1 << 5))
+#define ata_id_has_flush(dev) ((dev)->id[83] & (1 << 12))
+#define ata_id_has_flush_ext(dev) ((dev)->id[83] & (1 << 13))
 #define ata_id_has_lba48(dev)	((dev)->id[83] & (1 << 10))
 #define ata_id_has_wcache(dev)	((dev)->id[82] & (1 << 5))
 #define ata_id_has_pm(dev)	((dev)->id[82] & (1 << 3))
@@ -220,9 +236,20 @@ struct ata_taskfile {
 	  ((u64) dev->id[(n) + 1] << 16) |	\
 	  ((u64) dev->id[(n) + 0]) )
 
+static inline int atapi_cdb_len(u16 *dev_id)
+{
+	u16 tmp = dev_id[0] & 0x3;
+	switch (tmp) {
+	case 0:		return 12;
+	case 1:		return 16;
+	default:	return -1;
+	}
+}
+
 static inline int is_atapi_taskfile(struct ata_taskfile *tf)
 {
 	return (tf->protocol == ATA_PROT_ATAPI) ||
+	       (tf->protocol == ATA_PROT_ATAPI_NODATA) ||
 	       (tf->protocol == ATA_PROT_ATAPI_DMA);
 }
 

@@ -1473,7 +1473,7 @@ static int __devinit sstfb_probe(struct pci_dev *pdev,
 	f_ddprintk("membase_phys: %#lx\n", fix->smem_start);
 	f_ddprintk("fbbase_virt: %p\n", info->screen_base);
 
-	info->flags	= FBINFO_FLAG_DEFAULT;
+	info->flags	= FBINFO_DEFAULT;
 	info->fbops	= &sstfb_ops;
 	info->currcon	= -1;
 	info->pseudo_palette = &all->pseudo_palette;

@@ -29,6 +29,7 @@
 #include <linux/fs.h>
 #include <linux/cpu.h>
 #include <linux/security.h>
+#include <linux/swap.h>
 #include <linux/syscalls.h>
 #include <linux/jiffies.h>
 #include <linux/futex.h>
@@ -338,7 +339,6 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 		tmp->vm_mm = mm;
 		tmp->vm_next = NULL;
 		anon_vma_link(tmp);
-		vma_prio_tree_init(tmp);
 		file = tmp->vm_file;
 		if (file) {
 			struct inode *inode = file->f_dentry->d_inode;
@@ -476,6 +476,7 @@ void mmput(struct mm_struct *mm)
 		spin_unlock(&mmlist_lock);
 		exit_aio(mm);
 		exit_mmap(mm);
+		put_swap_token(mm);
 		mmdrop(mm);
 	}
 }

@@ -1067,7 +1067,7 @@ out:
 	return ret;
 }
 
-struct timeout {
+struct aio_timeout {
 	struct timer_list	timer;
 	int			timed_out;
 	struct task_struct	*p;
@@ -1075,13 +1075,13 @@ struct timeout {
 
 static void timeout_func(unsigned long data)
 {
-	struct timeout *to = (struct timeout *)data;
+	struct aio_timeout *to = (struct aio_timeout *)data;
 
 	to->timed_out = 1;
 	wake_up_process(to->p);
 }
 
-static inline void init_timeout(struct timeout *to)
+static inline void init_timeout(struct aio_timeout *to)
 {
 	init_timer(&to->timer);
 	to->timer.data = (unsigned long)to;
@@ -1090,7 +1090,7 @@ static inline void init_timeout(struct timeout *to)
 	to->p = current;
 }
 
-static inline void set_timeout(long start_jiffies, struct timeout *to,
+static inline void set_timeout(long start_jiffies, struct aio_timeout *to,
 			       const struct timespec *ts)
 {
 	to->timer.expires = start_jiffies + timespec_to_jiffies(ts);
@@ -1100,7 +1100,7 @@ static inline void set_timeout(long start_jiffies, struct timeout *to,
 		to->timed_out = 1;
 }
 
-static inline void clear_timeout(struct timeout *to)
+static inline void clear_timeout(struct aio_timeout *to)
 {
 	del_singleshot_timer_sync(&to->timer);
 }
@@ -1116,8 +1116,8 @@ static int read_events(struct kioctx *ctx,
 	int			ret;
 	int			i = 0;
 	struct io_event		ent;
-	struct timeout		to;
-	int 			event_loop = 0; /* testing only */
+	struct aio_timeout	to;
+	int			event_loop = 0; /* testing only */
 	int			retry = 0;
 
 	/* needed to zero any padding within an entry (there shouldn't be 
@@ -1126,6 +1126,7 @@ static int read_events(struct kioctx *ctx,
 	memset(&ent, 0, sizeof(ent));
 retry:
 	ret = 0;
+
 	while (likely(i < nr)) {
 		ret = aio_read_evt(ctx, &ent);
 		if (unlikely(ret <= 0))
@@ -1356,10 +1357,16 @@ static ssize_t aio_pwrite(struct kiocb *iocb)
 	ssize_t ret = 0;
 
 	ret = file->f_op->aio_write(iocb, iocb->ki_buf,
-				iocb->ki_left, iocb->ki_pos);
+		iocb->ki_left, iocb->ki_pos);
 
+	/*
+	 * TBD: Even if iocb->ki_left = 0, could we need to
+	 * wait for data to be sync'd ? Or can we assume
+	 * that aio_fdsync/aio_fsync would be called explicitly
+	 * as required.
+	 */
 	if (ret > 0) {
-		iocb->ki_buf += iocb->ki_buf ? ret : 0;
+		iocb->ki_buf += ret;
 		iocb->ki_left -= ret;
 
 		ret = -EIOCBRETRY;
@@ -1367,9 +1374,8 @@ static ssize_t aio_pwrite(struct kiocb *iocb)
 
 	/* This means we must have transferred all that we could */
 	/* No need to retry anymore */
-	if ((ret == 0) || (iocb->ki_left == 0)) {
+	if (ret == 0)
 		ret = iocb->ki_nbytes - iocb->ki_left;
-	}
 
 	return ret;
 }

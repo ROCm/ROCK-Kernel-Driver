@@ -783,7 +783,7 @@ static void batch_entropy_process(void *private_)
 struct timer_rand_state {
 	__u32		last_time;
 	__s32		last_delta,last_delta2;
-	int		dont_count_entropy:1;
+	unsigned	dont_count_entropy:1;
 };
 
 static struct timer_rand_state keyboard_timer_state;
@@ -1542,6 +1542,7 @@ static int __init rand_initialize(void)
 	clear_entropy_store(random_state);
 	clear_entropy_store(sec_random_state);
 	init_std_data(random_state);
+	init_std_data(sec_random_state);
 #ifdef CONFIG_SYSCTL
 	sysctl_init_random(random_state);
 #endif

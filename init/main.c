@@ -31,6 +31,7 @@
 #include <linux/tty.h>
 #include <linux/gfp.h>
 #include <linux/percpu.h>
+#include <linux/kmod.h>
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
 #include <linux/workqueue.h>
@@ -97,7 +98,11 @@ extern void free_initmem(void);
 extern void populate_rootfs(void);
 extern void driver_init(void);
 extern void prepare_namespace(void);
-extern void usermodehelper_init(void);
+#ifdef	CONFIG_ACPI
+extern void acpi_early_init(void);
+#else
+static inline void acpi_early_init(void) { }
+#endif
 
 #ifdef CONFIG_TC
 extern void tc_init(void);
@@ -560,6 +565,8 @@ asmlinkage void __init start_kernel(void)
 	proc_root_init();
 #endif
 	check_bugs();
+
+	acpi_early_init(); /* before LAPIC and SMP init */
 
 	/* 
 	 *	We count on the initial thread going ok 

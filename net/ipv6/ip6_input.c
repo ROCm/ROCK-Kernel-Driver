@@ -167,10 +167,9 @@ resubmit:
 		ipv6_raw_deliver(skb, nexthdr);
 
 	hash = nexthdr & (MAX_INET_PROTOS - 1);
-	if ((ipprot = inet6_protos[hash]) != NULL) {
+	if ((ipprot = rcu_dereference(inet6_protos[hash])) != NULL) {
 		int ret;
 		
-		smp_read_barrier_depends();
 		if (ipprot->flags & INET6_PROTO_FINAL) {
 			struct ipv6hdr *hdr;	
 
@@ -268,5 +267,3 @@ int ip6_mc_input(struct sk_buff *skb)
 
 	return 0;
 }
-
-EXPORT_SYMBOL(ip6_input);

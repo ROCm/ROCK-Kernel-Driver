@@ -167,6 +167,13 @@ static inline void locks_free_lock(struct file_lock *fl)
 	if (!list_empty(&fl->fl_link))
 		panic("Attempting to free lock on active lock list");
 
+	if (fl->fl_ops) {
+		if (fl->fl_ops->fl_release_private)
+			fl->fl_ops->fl_release_private(fl);
+		fl->fl_ops = NULL;
+	}
+	fl->fl_lmops = NULL;
+
 	kmem_cache_free(filelock_cache, fl);
 }
 
@@ -183,9 +190,8 @@ void locks_init_lock(struct file_lock *fl)
 	fl->fl_flags = 0;
 	fl->fl_type = 0;
 	fl->fl_start = fl->fl_end = 0;
-	fl->fl_notify = NULL;
-	fl->fl_insert = NULL;
-	fl->fl_remove = NULL;
+	fl->fl_ops = NULL;
+	fl->fl_lmops = NULL;
 }
 
 EXPORT_SYMBOL(locks_init_lock);
@@ -217,10 +223,10 @@ void locks_copy_lock(struct file_lock *new, struct file_lock *fl)
 	new->fl_type = fl->fl_type;
 	new->fl_start = fl->fl_start;
 	new->fl_end = fl->fl_end;
-	new->fl_notify = fl->fl_notify;
-	new->fl_insert = fl->fl_insert;
-	new->fl_remove = fl->fl_remove;
-	new->fl_u = fl->fl_u;
+	new->fl_ops = fl->fl_ops;
+	new->fl_lmops = fl->fl_lmops;
+	if (fl->fl_ops && fl->fl_ops->fl_copy_lock)
+		fl->fl_ops->fl_copy_lock(new, fl);
 }
 
 EXPORT_SYMBOL(locks_copy_lock);
@@ -321,9 +327,8 @@ static int flock_to_posix_lock(struct file *filp, struct file_lock *fl,
 	fl->fl_pid = current->tgid;
 	fl->fl_file = filp;
 	fl->fl_flags = FL_POSIX;
-	fl->fl_notify = NULL;
-	fl->fl_insert = NULL;
-	fl->fl_remove = NULL;
+	fl->fl_ops = NULL;
+	fl->fl_lmops = NULL;
 
 	return assign_type(fl, l->l_type);
 }
@@ -361,9 +366,8 @@ static int flock64_to_posix_lock(struct file *filp, struct file_lock *fl,
 	fl->fl_pid = current->tgid;
 	fl->fl_file = filp;
 	fl->fl_flags = FL_POSIX;
-	fl->fl_notify = NULL;
-	fl->fl_insert = NULL;
-	fl->fl_remove = NULL;
+	fl->fl_ops = NULL;
+	fl->fl_lmops = NULL;
 
 	switch (l->l_type) {
 	case F_RDLCK:
@@ -397,9 +401,8 @@ static int lease_alloc(struct file *filp, int type, struct file_lock **flp)
 	}
 	fl->fl_start = 0;
 	fl->fl_end = OFFSET_MAX;
-	fl->fl_notify = NULL;
-	fl->fl_insert = NULL;
-	fl->fl_remove = NULL;
+	fl->fl_ops = NULL;
+	fl->fl_lmops = NULL;
 
 	*flp = fl;
 	return 0;
@@ -414,14 +417,15 @@ static inline int locks_overlap(struct file_lock *fl1, struct file_lock *fl2)
 }
 
 /*
- * Check whether two locks have the same owner.  The apparently superfluous
- * check for fl_pid enables us to distinguish between locks set by lockd.
+ * Check whether two locks have the same owner.
  */
 static inline int
 posix_same_owner(struct file_lock *fl1, struct file_lock *fl2)
 {
-	return (fl1->fl_owner == fl2->fl_owner) &&
-		(fl1->fl_pid == fl2->fl_pid);
+	if (fl1->fl_lmops && fl1->fl_lmops->fl_compare_owner)
+		return fl2->fl_lmops == fl1->fl_lmops &&
+			fl1->fl_lmops->fl_compare_owner(fl1, fl2);
+	return fl1->fl_owner == fl2->fl_owner;
 }
 
 /* Remove waiter from blocker's block list.
@@ -472,8 +476,8 @@ static void locks_wake_up_blocks(struct file_lock *blocker)
 		struct file_lock *waiter = list_entry(blocker->fl_block.next,
 				struct file_lock, fl_block);
 		__locks_delete_block(waiter);
-		if (waiter->fl_notify)
-			waiter->fl_notify(waiter);
+		if (waiter->fl_lmops && waiter->fl_lmops->fl_notify)
+			waiter->fl_lmops->fl_notify(waiter);
 		else
 			wake_up(&waiter->fl_wait);
 	}
@@ -490,8 +494,8 @@ static void locks_insert_lock(struct file_lock **pos, struct file_lock *fl)
 	fl->fl_next = *pos;
 	*pos = fl;
 
-	if (fl->fl_insert)
-		fl->fl_insert(fl);
+	if (fl->fl_ops && fl->fl_ops->fl_insert)
+		fl->fl_ops->fl_insert(fl);
 }
 
 /*
@@ -514,8 +518,8 @@ static void locks_delete_lock(struct file_lock **thisfl_p)
 		fl->fl_fasync = NULL;
 	}
 
-	if (fl->fl_remove)
-		fl->fl_remove(fl);
+	if (fl->fl_ops && fl->fl_ops->fl_remove)
+		fl->fl_ops->fl_remove(fl);
 
 	locks_wake_up_blocks(fl);
 	locks_free_lock(fl);
@@ -631,24 +635,15 @@ int posix_locks_deadlock(struct file_lock *caller_fl,
 				struct file_lock *block_fl)
 {
 	struct list_head *tmp;
-	fl_owner_t caller_owner, blocked_owner;
-	unsigned int	 caller_pid, blocked_pid;
-
-	caller_owner = caller_fl->fl_owner;
-	caller_pid = caller_fl->fl_pid;
-	blocked_owner = block_fl->fl_owner;
-	blocked_pid = block_fl->fl_pid;
 
 next_task:
-	if (caller_owner == blocked_owner && caller_pid == blocked_pid)
+	if (posix_same_owner(caller_fl, block_fl))
 		return 1;
 	list_for_each(tmp, &blocked_list) {
 		struct file_lock *fl = list_entry(tmp, struct file_lock, fl_link);
-		if ((fl->fl_owner == blocked_owner)
-		    && (fl->fl_pid == blocked_pid)) {
+		if (posix_same_owner(fl, block_fl)) {
 			fl = fl->fl_next;
-			blocked_owner = fl->fl_owner;
-			blocked_pid = fl->fl_pid;
+			block_fl = fl;
 			goto next_task;
 		}
 	}
@@ -910,6 +905,34 @@ int posix_lock_file(struct file *filp, struct file_lock *fl)
 {
 	return __posix_lock_file(filp->f_dentry->d_inode, fl);
 }
+
+/**
+ * posix_lock_file_wait - Apply a POSIX-style lock to a file
+ * @filp: The file to apply the lock to
+ * @fl: The lock to be applied
+ *
+ * Add a POSIX style lock to a file.
+ * We merge adjacent & overlapping locks whenever possible.
+ * POSIX locks are sorted by owner task, then by starting address
+ */
+int posix_lock_file_wait(struct file *filp, struct file_lock *fl)
+{
+	int error;
+	might_sleep ();
+	for (;;) {
+		error = __posix_lock_file(filp->f_dentry->d_inode, fl);
+		if ((error != -EAGAIN) || !(fl->fl_flags & FL_SLEEP))
+			break;
+		error = wait_event_interruptible(fl->fl_wait, !fl->fl_next);
+		if (!error)
+			continue;
+
+		locks_delete_block(fl);
+		break;
+	}
+	return error;
+}
+EXPORT_SYMBOL(posix_lock_file_wait);
 
 /**
  * locks_mandatory_locked - Check for an active lock
@@ -1422,7 +1445,6 @@ int fcntl_getlk(struct file *filp, struct flock __user *l)
 	error = -EFAULT;
 	if (!copy_to_user(l, &flock, sizeof(flock)))
 		error = 0;
-  
 out:
 	return error;
 }
@@ -1489,8 +1511,7 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock __user *l)
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
 		error = filp->f_op->lock(filp, cmd, file_lock);
-		if (error < 0)
-			goto out;
+		goto out;
 	}
 
 	for (;;) {
@@ -1624,8 +1645,7 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 __user *l)
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
 		error = filp->f_op->lock(filp, cmd, file_lock);
-		if (error < 0)
-			goto out;
+		goto out;
 	}
 
 	for (;;) {
@@ -1672,10 +1692,12 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 	lock.fl_owner = owner;
 	lock.fl_pid = current->tgid;
 	lock.fl_file = filp;
+	lock.fl_ops = NULL;
+	lock.fl_lmops = NULL;
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
 		filp->f_op->lock(filp, F_SETLK, &lock);
-		/* Ignore any error -- we must remove the locks anyway */
+		goto out;
 	}
 
 	/* Can't use posix_lock_file here; we need to remove it no matter
@@ -1684,13 +1706,16 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 	lock_kernel();
 	while (*before != NULL) {
 		struct file_lock *fl = *before;
-		if (IS_POSIX(fl) && (fl->fl_owner == owner)) {
+		if (IS_POSIX(fl) && posix_same_owner(fl, &lock)) {
 			locks_delete_lock(before);
 			continue;
 		}
 		before = &fl->fl_next;
 	}
 	unlock_kernel();
+out:
+	if (lock.fl_ops && lock.fl_ops->fl_release_private)
+		lock.fl_ops->fl_release_private(&lock);
 }
 
 EXPORT_SYMBOL(locks_remove_posix);

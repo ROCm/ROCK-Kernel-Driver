@@ -372,13 +372,13 @@ static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 	ni->seq_no = 0;
 	atomic_set(&ni->count, 1);
 	ni->vol = NTFS_SB(sb);
-	init_run_list(&ni->run_list);
+	init_runlist(&ni->runlist);
 	init_MUTEX(&ni->mrec_lock);
 	ni->page = NULL;
 	ni->page_ofs = 0;
 	ni->attr_list_size = 0;
 	ni->attr_list = NULL;
-	init_run_list(&ni->attr_list_rl);
+	init_runlist(&ni->attr_list_rl);
 	ni->itype.index.bmp_ino = NULL;
 	ni->itype.index.block_size = 0;
 	ni->itype.index.vcn_size = 0;
@@ -622,7 +622,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	si = (STANDARD_INFORMATION*)((char*)ctx->attr +
 			le16_to_cpu(ctx->attr->data.resident.value_offset));
 
-	/* Transfer information from the standard information into vfs_ino. */
+	/* Transfer information from the standard information into vi. */
 	/*
 	 * Note: The i_?times do not quite map perfectly onto the NTFS times,
 	 * but they are close enough, and in the end it doesn't really matter
@@ -680,7 +680,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 				goto unm_err_out;
 			}
 			/*
-			 * Setup the run list. No need for locking as we have
+			 * Setup the runlist. No need for locking as we have
 			 * exclusive access to the inode at this time.
 			 */
 			ni->attr_list_rl.rl = decompress_mapping_pairs(vol,
@@ -900,7 +900,7 @@ skip_attr_list_load:
 		ctx = NULL;
 		/* Get the index bitmap attribute inode. */
 		bvi = ntfs_attr_iget(vi, AT_BITMAP, I30, 4);
-		if (unlikely(IS_ERR(bvi))) {
+		if (IS_ERR(bvi)) {
 			ntfs_error(vi->i_sb, "Failed to get bitmap attribute.");
 			err = PTR_ERR(bvi);
 			goto unm_err_out;
@@ -1552,7 +1552,7 @@ static int ntfs_read_locked_index_inode(struct inode *base_vi, struct inode *vi)
 	ctx = NULL;
 	/* Get the index bitmap attribute inode. */
 	bvi = ntfs_attr_iget(base_vi, AT_BITMAP, ni->name, ni->name_len);
-	if (unlikely(IS_ERR(bvi))) {
+	if (IS_ERR(bvi)) {
 		ntfs_error(vi->i_sb, "Failed to get bitmap attribute.");
 		err = PTR_ERR(bvi);
 		goto unm_err_out;
@@ -1628,7 +1628,7 @@ err_out:
  * We solve these problems by starting with the $DATA attribute before anything
  * else and iterating using lookup_attr($DATA) over all extents. As each extent
  * is found, we decompress_mapping_pairs() including the implied
- * merge_run_lists(). Each step of the iteration necessarily provides
+ * merge_runlists(). Each step of the iteration necessarily provides
  * sufficient information for the next step to complete.
  *
  * This should work but there are two possible pit falls (see inline comments
@@ -1757,7 +1757,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 						"You should run chkdsk.");
 				goto put_err_out;
 			}
-			/* Setup the run list. */
+			/* Setup the runlist. */
 			ni->attr_list_rl.rl = decompress_mapping_pairs(vol,
 					ctx->attr, NULL);
 			if (IS_ERR(ni->attr_list_rl.rl)) {
@@ -1861,7 +1861,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 	attr = NULL;
 	next_vcn = last_vcn = highest_vcn = 0;
 	while (lookup_attr(AT_DATA, NULL, 0, 0, next_vcn, NULL, 0, ctx)) {
-		run_list_element *nrl;
+		runlist_element *nrl;
 
 		/* Cache the current attribute. */
 		attr = ctx->attr;
@@ -1885,18 +1885,18 @@ int ntfs_read_inode_mount(struct inode *vi)
 		}
 		/*
 		 * Decompress the mapping pairs array of this extent and merge
-		 * the result into the existing run list. No need for locking
+		 * the result into the existing runlist. No need for locking
 		 * as we have exclusive access to the inode at this time and we
 		 * are a mount in progress task, too.
 		 */
-		nrl = decompress_mapping_pairs(vol, attr, ni->run_list.rl);
+		nrl = decompress_mapping_pairs(vol, attr, ni->runlist.rl);
 		if (IS_ERR(nrl)) {
 			ntfs_error(sb, "decompress_mapping_pairs() failed with "
 					"error code %ld. $MFT is corrupt.",
 					PTR_ERR(nrl));
 			goto put_err_out;
 		}
-		ni->run_list.rl = nrl;
+		ni->runlist.rl = nrl;
 
 		/* Are we in the first extent? */
 		if (!next_vcn) {
@@ -1932,7 +1932,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 			}
 			vol->nr_mft_records = ll;
 			/*
-			 * We have got the first extent of the run_list for
+			 * We have got the first extent of the runlist for
 			 * $MFT which means it is now relatively safe to call
 			 * the normal ntfs_read_inode() function.
 			 * Complete reading the inode, this will actually
@@ -2001,7 +2001,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 		goto put_err_out;
 	}
 	if (highest_vcn && highest_vcn != last_vcn - 1) {
-		ntfs_error(sb, "Failed to load the complete run list "
+		ntfs_error(sb, "Failed to load the complete runlist "
 				"for $MFT/$DATA. Driver bug or "
 				"corrupt $MFT. Run chkdsk.");
 		ntfs_debug("highest_vcn = 0x%llx, last_vcn - 1 = 0x%llx",
@@ -2073,12 +2073,12 @@ void ntfs_put_inode(struct inode *vi)
 void __ntfs_clear_inode(ntfs_inode *ni)
 {
 	/* Free all alocated memory. */
-	down_write(&ni->run_list.lock);
-	if (ni->run_list.rl) {
-		ntfs_free(ni->run_list.rl);
-		ni->run_list.rl = NULL;
+	down_write(&ni->runlist.lock);
+	if (ni->runlist.rl) {
+		ntfs_free(ni->runlist.rl);
+		ni->runlist.rl = NULL;
 	}
-	up_write(&ni->run_list.lock);
+	up_write(&ni->runlist.lock);
 
 	if (ni->attr_list) {
 		ntfs_free(ni->attr_list);
@@ -2314,34 +2314,38 @@ trunc_err:
  * marking the page (and in this case mft record) dirty but we do not implement
  * this yet as write_mft_record() largely ignores the @sync parameter and
  * always performs synchronous writes.
+ *
+ * Return 0 on success and -errno on error.
  */
-void ntfs_write_inode(struct inode *vi, int sync)
+int ntfs_write_inode(struct inode *vi, int sync)
 {
+	s64 nt;
 	ntfs_inode *ni = NTFS_I(vi);
-#if 0
 	attr_search_context *ctx;
-#endif
 	MFT_RECORD *m;
+	STANDARD_INFORMATION *si;
 	int err = 0;
+	BOOL modified = FALSE;
 
 	ntfs_debug("Entering for %sinode 0x%lx.", NInoAttr(ni) ? "attr " : "",
 			vi->i_ino);
 	/*
 	 * Dirty attribute inodes are written via their real inodes so just
-	 * clean them here.  TODO:  Take care of access time updates.
+	 * clean them here.  Access time updates are taken care off when the
+	 * real inode is written.
 	 */
 	if (NInoAttr(ni)) {
 		NInoClearDirty(ni);
-		return;
+		ntfs_debug("Done.");
+		return 0;
 	}
 	/* Map, pin, and lock the mft record belonging to the inode. */
 	m = map_mft_record(ni);
-	if (unlikely(IS_ERR(m))) {
+	if (IS_ERR(m)) {
 		err = PTR_ERR(m);
 		goto err_out;
 	}
-#if 0
-	/* Obtain the standard information attribute. */
+	/* Update the access times in the standard information attribute. */
 	ctx = get_attr_search_ctx(ni, m);
 	if (unlikely(!ctx)) {
 		err = -ENOMEM;
@@ -2353,28 +2357,50 @@ void ntfs_write_inode(struct inode *vi, int sync)
 		err = -ENOENT;
 		goto unm_err_out;
 	}
-	// TODO:  Update the access times in the standard information attribute
-	// which is now in ctx->attr.
-	// - Probably want to have use sops->dirty_inode() to set a flag that
-	//   we need to update the times here rather than having to blindly do
-	//   it every time.  Or even don't do it here at all and do it in
-	//   sops->dirty_inode() instead.  Problem with this would be that
-	//   sops->dirty_inode() must be atomic under certain circumstances
-	//   and mapping mft records and such like is not atomic.
-	// - For atime updates also need to check whether they are enabled in
-	//   the superblock flags.
-	ntfs_warning(vi->i_sb, "Access time updates not implement yet.");
+	si = (STANDARD_INFORMATION*)((u8*)ctx->attr +
+			le16_to_cpu(ctx->attr->data.resident.value_offset));
+	/* Update the access times if they have changed. */
+	nt = utc2ntfs(vi->i_mtime);
+	if (si->last_data_change_time != nt) {
+		ntfs_debug("Updating mtime for inode 0x%lx: old = 0x%llx, "
+				"new = 0x%llx", vi->i_ino,
+				sle64_to_cpu(si->last_data_change_time),
+				sle64_to_cpu(nt));
+		si->last_data_change_time = nt;
+		modified = TRUE;
+	}
+	nt = utc2ntfs(vi->i_ctime);
+	if (si->last_mft_change_time != nt) {
+		ntfs_debug("Updating ctime for inode 0x%lx: old = 0x%llx, "
+				"new = 0x%llx", vi->i_ino,
+				sle64_to_cpu(si->last_mft_change_time),
+				sle64_to_cpu(nt));
+		si->last_mft_change_time = nt;
+		modified = TRUE;
+	}
+	nt = utc2ntfs(vi->i_atime);
+	if (si->last_access_time != nt) {
+		ntfs_debug("Updating atime for inode 0x%lx: old = 0x%llx, "
+				"new = 0x%llx", vi->i_ino,
+				sle64_to_cpu(si->last_access_time),
+				sle64_to_cpu(nt));
+		si->last_access_time = nt;
+		modified = TRUE;
+	}
 	/*
-	 * We just modified the mft record containing the standard information
-	 * attribute.  So need to mark the mft record dirty, too, but we do it
-	 * manually so that mark_inode_dirty() is not called again.
-	 * TODO:  Only do this if there was a change in any of the times!
+	 * If we just modified the standard information attribute we need to
+	 * mark the mft record it is in dirty.  We do this manually so that
+	 * mark_inode_dirty() is not called which would redirty the inode and
+	 * hence result in an infinite loop of trying to write the inode.
+	 * There is no need to mark the base inode nor the base mft record
+	 * dirty, since we are going to write this mft record below in any case
+	 * and the base mft record may actually not have been modified so it
+	 * might not need to be written out.
 	 */
-	if (!NInoTestSetDirty(ctx->ntfs_ino))
+	if (modified && !NInoTestSetDirty(ctx->ntfs_ino))
 		__set_page_dirty_nobuffers(ctx->ntfs_ino->page);
 	put_attr_search_ctx(ctx);
-#endif
-	/* Write this base mft record. */
+	/* Now the access times are updated, write the base mft record. */
 	if (NInoDirty(ni))
 		err = write_mft_record(ni, m, sync);
 	/* Write all attached extent mft records. */
@@ -2391,7 +2417,7 @@ void ntfs_write_inode(struct inode *vi, int sync)
 				MFT_RECORD *tm = map_mft_record(tni);
 				int ret;
 
-				if (unlikely(IS_ERR(tm))) {
+				if (IS_ERR(tm)) {
 					if (!err || err == -ENOMEM)
 						err = PTR_ERR(tm);
 					continue;
@@ -2410,11 +2436,9 @@ void ntfs_write_inode(struct inode *vi, int sync)
 	if (unlikely(err))
 		goto err_out;
 	ntfs_debug("Done.");
-	return;
-#if 0
+	return 0;
 unm_err_out:
 	unmap_mft_record(ni);
-#endif
 err_out:
 	if (err == -ENOMEM) {
 		ntfs_warning(vi->i_sb, "Not enough memory to write inode.  "
@@ -2426,7 +2450,31 @@ err_out:
 				"as bad.  You should run chkdsk.", -err);
 		make_bad_inode(vi);
 	}
-	return;
+	return err;
+}
+
+/**
+ * ntfs_write_inode_vfs - write out a dirty inode
+ * @vi:		inode to write out
+ * @sync:	if true, write out synchronously
+ *
+ * Write out a dirty inode to disk including any extent inodes if present.
+ *
+ * If @sync is true, commit the inode to disk and wait for io completion.  This
+ * is done using write_mft_record().
+ *
+ * If @sync is false, just schedule the write to happen but do not wait for i/o
+ * completion.  In 2.6 kernels, scheduling usually happens just by virtue of
+ * marking the page (and in this case mft record) dirty but we do not implement
+ * this yet as write_mft_record() largely ignores the @sync parameter and
+ * always performs synchronous writes.
+ *
+ * This functions does not have a return value which is the required behaviour
+ * for the VFS super_operations ->dirty_inode function.
+ */
+void ntfs_write_inode_vfs(struct inode *vi, int sync)
+{
+	ntfs_write_inode(vi, sync);
 }
 
 #endif /* NTFS_RW */

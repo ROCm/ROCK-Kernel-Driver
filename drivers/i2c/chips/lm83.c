@@ -83,8 +83,10 @@ SENSORS_INSMOD_1(lm83);
  * The LM83 uses signed 8-bit values.
  */
 
-#define TEMP_FROM_REG(val)	((val > 127 ? val-256 : val) * 1000)
-#define TEMP_TO_REG(val)	((val < 0 ? val+256 : val) / 1000)
+#define TEMP_FROM_REG(val)	(((val) > 127 ? (val) - 0x100 : (val)) * 1000)
+#define TEMP_TO_REG(val)	((val) <= -50000 ? -50 + 0x100 : (val) >= 127000 ? 127 : \
+				 (val) > -500 ? ((val)+500) / 1000 : \
+				 ((val)-500) / 1000 + 0x100)
 
 static const u8 LM83_REG_R_TEMP[] = {
 	LM83_REG_R_LOCAL_TEMP,
@@ -178,7 +180,7 @@ static ssize_t set_temp_##suffix(struct device *dev, const char *buf, \
 { \
 	struct i2c_client *client = to_i2c_client(dev); \
 	struct lm83_data *data = i2c_get_clientdata(client); \
-	data->value = TEMP_TO_REG(simple_strtoul(buf, NULL, 10)); \
+	data->value = TEMP_TO_REG(simple_strtol(buf, NULL, 10)); \
 	i2c_smbus_write_byte_data(client, reg, data->value); \
 	return count; \
 }
@@ -206,8 +208,11 @@ static DEVICE_ATTR(temp3_max, S_IWUSR | S_IRUGO, show_temp_high3,
     set_temp_high3);
 static DEVICE_ATTR(temp4_max, S_IWUSR | S_IRUGO, show_temp_high4,
     set_temp_high4);
-static DEVICE_ATTR(temp_crit, S_IWUSR | S_IRUGO, show_temp_crit,
+static DEVICE_ATTR(temp1_crit, S_IRUGO, show_temp_crit, NULL);
+static DEVICE_ATTR(temp2_crit, S_IRUGO, show_temp_crit, NULL);
+static DEVICE_ATTR(temp3_crit, S_IWUSR | S_IRUGO, show_temp_crit,
     set_temp_crit);
+static DEVICE_ATTR(temp4_crit, S_IRUGO, show_temp_crit, NULL);
 static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
 
 /*
@@ -259,6 +264,11 @@ static int lm83_detect(struct i2c_adapter *adapter, int address, int kind)
 	 * means that the driver was loaded with the force parameter and a
 	 * given kind of chip is requested, so both the detection and the
 	 * identification steps are skipped. */
+
+	/* Default to an LM83 if forced */
+	if (kind == 0)
+		kind = lm83;
+
 	if (kind < 0) { /* detection */
 		if (((i2c_smbus_read_byte_data(new_client, LM83_REG_R_STATUS1)
 		    & 0xA8) != 0x00) ||
@@ -322,7 +332,10 @@ static int lm83_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_temp2_max);
 	device_create_file(&new_client->dev, &dev_attr_temp3_max);
 	device_create_file(&new_client->dev, &dev_attr_temp4_max);
-	device_create_file(&new_client->dev, &dev_attr_temp_crit);
+	device_create_file(&new_client->dev, &dev_attr_temp1_crit);
+	device_create_file(&new_client->dev, &dev_attr_temp2_crit);
+	device_create_file(&new_client->dev, &dev_attr_temp3_crit);
+	device_create_file(&new_client->dev, &dev_attr_temp4_crit);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 
 	return 0;

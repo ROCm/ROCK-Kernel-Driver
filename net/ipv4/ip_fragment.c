@@ -169,14 +169,18 @@ static void ipfrag_secret_rebuild(unsigned long dummy)
 atomic_t ip_frag_mem = ATOMIC_INIT(0);	/* Memory used for fragments */
 
 /* Memory Tracking Functions. */
-static __inline__ void frag_kfree_skb(struct sk_buff *skb)
+static __inline__ void frag_kfree_skb(struct sk_buff *skb, int *work)
 {
+	if (work)
+		*work -= skb->truesize;
 	atomic_sub(skb->truesize, &ip_frag_mem);
 	kfree_skb(skb);
 }
 
-static __inline__ void frag_free_queue(struct ipq *qp)
+static __inline__ void frag_free_queue(struct ipq *qp, int *work)
 {
+	if (work)
+		*work -= sizeof(struct ipq);
 	atomic_sub(sizeof(struct ipq), &ip_frag_mem);
 	kfree(qp);
 }
@@ -195,7 +199,7 @@ static __inline__ struct ipq *frag_alloc_queue(void)
 /* Destruction primitives. */
 
 /* Complete destruction of ipq. */
-static void ip_frag_destroy(struct ipq *qp)
+static void ip_frag_destroy(struct ipq *qp, int *work)
 {
 	struct sk_buff *fp;
 
@@ -207,18 +211,18 @@ static void ip_frag_destroy(struct ipq *qp)
 	while (fp) {
 		struct sk_buff *xp = fp->next;
 
-		frag_kfree_skb(fp);
+		frag_kfree_skb(fp, work);
 		fp = xp;
 	}
 
 	/* Finally, release the queue descriptor itself. */
-	frag_free_queue(qp);
+	frag_free_queue(qp, work);
 }
 
-static __inline__ void ipq_put(struct ipq *ipq)
+static __inline__ void ipq_put(struct ipq *ipq, int *work)
 {
 	if (atomic_dec_and_test(&ipq->refcnt))
-		ip_frag_destroy(ipq);
+		ip_frag_destroy(ipq, work);
 }
 
 /* Kill ipq entry. It is not destroyed immediately,
@@ -243,10 +247,13 @@ static void ip_evictor(void)
 {
 	struct ipq *qp;
 	struct list_head *tmp;
+	int work;
 
-	for(;;) {
-		if (atomic_read(&ip_frag_mem) <= sysctl_ipfrag_low_thresh)
-			return;
+	work = atomic_read(&ip_frag_mem) - sysctl_ipfrag_low_thresh;
+	if (work <= 0)
+		return;
+
+	while (work > 0) {
 		read_lock(&ipfrag_lock);
 		if (list_empty(&ipq_lru_list)) {
 			read_unlock(&ipfrag_lock);
@@ -262,7 +269,7 @@ static void ip_evictor(void)
 			ipq_kill(qp);
 		spin_unlock(&qp->lock);
 
-		ipq_put(qp);
+		ipq_put(qp, &work);
 		IP_INC_STATS_BH(IPSTATS_MIB_REASMFAILS);
 	}
 }
@@ -294,7 +301,7 @@ static void ip_expire(unsigned long arg)
 	}
 out:
 	spin_unlock(&qp->lock);
-	ipq_put(qp);
+	ipq_put(qp, NULL);
 }
 
 /* Creation primitives. */
@@ -317,7 +324,7 @@ static struct ipq *ip_frag_intern(unsigned int hash, struct ipq *qp_in)
 			atomic_inc(&qp->refcnt);
 			write_unlock(&ipfrag_lock);
 			qp_in->last_in |= COMPLETE;
-			ipq_put(qp_in);
+			ipq_put(qp_in, NULL);
 			return qp;
 		}
 	}
@@ -506,7 +513,7 @@ static void ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 				qp->fragments = next;
 
 			qp->meat -= free_it->len;
-			frag_kfree_skb(free_it);
+			frag_kfree_skb(free_it, NULL);
 		}
 	}
 
@@ -657,7 +664,7 @@ struct sk_buff *ip_defrag(struct sk_buff *skb)
 			ret = ip_frag_reasm(qp, dev);
 
 		spin_unlock(&qp->lock);
-		ipq_put(qp);
+		ipq_put(qp, NULL);
 		return ret;
 	}
 

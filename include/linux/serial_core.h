@@ -89,9 +89,6 @@
 /* MPC52xx type numbers */
 #define PORT_MPC52xx	59
 
-/* IBM icom */
-#define PORT_ICOM	55
-
 #ifdef __KERNEL__
 
 #include <linux/config.h>

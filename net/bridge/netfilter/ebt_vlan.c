@@ -21,13 +21,14 @@
 #include <linux/if_ether.h>
 #include <linux/if_vlan.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/netfilter_bridge/ebtables.h>
 #include <linux/netfilter_bridge/ebt_vlan.h>
 
-static unsigned char debug;
+static int debug;
 #define MODULE_VERS "0.6"
 
-MODULE_PARM(debug, "0-1b");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "debug=1 is turn on debug messages");
 MODULE_AUTHOR("Nick Fedchik <nick@fedchik.org.ua>");
 MODULE_DESCRIPTION("802.1Q match module (ebtables extension), v"
@@ -48,7 +49,7 @@ ebt_filter_vlan(const struct sk_buff *skb,
 		const void *data, unsigned int datalen)
 {
 	struct ebt_vlan_info *info = (struct ebt_vlan_info *) data;
-	struct vlan_hdr frame;
+	struct vlan_hdr _frame, *fp;
 
 	unsigned short TCI;	/* Whole TCI, given from parsed frame */
 	unsigned short id;	/* VLAN ID, given from frame TCI */
@@ -56,7 +57,8 @@ ebt_filter_vlan(const struct sk_buff *skb,
 	/* VLAN encapsulated Type/Length field, given from orig frame */
 	unsigned short encap;
 
-	if (skb_copy_bits(skb, 0, &frame, sizeof(frame)))
+	fp = skb_header_pointer(skb, 0, sizeof(_frame), &_frame);
+	if (fp == NULL)
 		return EBT_NOMATCH;
 
 	/* Tag Control Information (TCI) consists of the following elements:
@@ -66,10 +68,10 @@ ebt_filter_vlan(const struct sk_buff *skb,
 	 * (CFI) is a single bit flag value. Currently ignored.
 	 * - VLAN Identifier (VID). The VID is encoded as
 	 * an unsigned binary number. */
-	TCI = ntohs(frame.h_vlan_TCI);
+	TCI = ntohs(fp->h_vlan_TCI);
 	id = TCI & VLAN_VID_MASK;
 	prio = (TCI >> 13) & 0x7;
-	encap = frame.h_vlan_encapsulated_proto;
+	encap = fp->h_vlan_encapsulated_proto;
 
 	/* Checking VLAN Identifier (VID) */
 	if (GET_BITMASK(EBT_VLAN_ID))

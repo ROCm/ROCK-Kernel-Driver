@@ -67,7 +67,7 @@ nlm_lookup_file(struct svc_rqst *rqstp, struct nlm_file **result,
 	down(&nlm_file_sema);
 
 	for (file = nlm_files[hash]; file; file = file->f_next)
-		if (!memcmp(&file->f_handle, f, sizeof(*f)))
+		if (!nfs_compare_fh(&file->f_handle, f))
 			goto found;
 
 	dprintk("lockd: creating file for (%08x %08x %08x %08x %08x %08x)\n",
@@ -124,7 +124,7 @@ out_free:
 static inline void
 nlm_delete_file(struct nlm_file *file)
 {
-	struct inode *inode = file->f_file.f_dentry->d_inode;
+	struct inode *inode = file->f_file->f_dentry->d_inode;
 	struct nlm_file	**fp, *f;
 
 	dprintk("lockd: closing file %s/%ld\n",
@@ -133,7 +133,7 @@ nlm_delete_file(struct nlm_file *file)
 	while ((f = *fp) != NULL) {
 		if (f == file) {
 			*fp = file->f_next;
-			nlmsvc_ops->fclose(&file->f_file);
+			nlmsvc_ops->fclose(file->f_file);
 			kfree(file);
 			return;
 		}
@@ -176,7 +176,7 @@ again:
 			lock.fl_type  = F_UNLCK;
 			lock.fl_start = 0;
 			lock.fl_end   = OFFSET_MAX;
-			if (posix_lock_file(&file->f_file, &lock) < 0) {
+			if (posix_lock_file(file->f_file, &lock) < 0) {
 				printk("lockd: unlock failure in %s:%d\n",
 						__FILE__, __LINE__);
 				return 1;
@@ -230,7 +230,7 @@ nlm_traverse_files(struct nlm_host *host, int action)
 			if (!file->f_blocks && !file->f_locks
 			 && !file->f_shares && !file->f_count) {
 				*fp = file->f_next;
-				nlmsvc_ops->fclose(&file->f_file);
+				nlmsvc_ops->fclose(file->f_file);
 				kfree(file);
 			} else {
 				fp = &file->f_next;
@@ -303,16 +303,7 @@ nlmsvc_invalidate_all(void)
 	while ((host = nlm_find_client()) != NULL) {
 		nlmsvc_free_host_resources(host);
 		host->h_expires = 0;
-		/* Do not unmonitor the host */
-		if (host->h_nsmhandle)
-			host->h_nsmhandle->sm_sticky = 1;
-		if (atomic_read(&host->h_count) != 1) {
-			/* Whatever is holding references to this host,
-			 * it seems likely we're going to leak memory
-			 * or worse */
-			printk(KERN_WARNING "lockd: host still in use "
-				"after nlmsvc_free_host_resources!");
-		}
+		host->h_killed = 1;
 		nlm_release_host(host);
 	}
 }

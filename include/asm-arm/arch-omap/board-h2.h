@@ -31,5 +31,15 @@
 
 /* Placeholder for H2 specific defines */
 
+/* At OMAP1610 Innovator the Ethernet is directly connected to CS1 */
+#define OMAP1610_ETHR_BASE		0xE8000000
+#define OMAP1610_ETHR_SIZE		SZ_4K
+#define OMAP1610_ETHR_START		0x04000000
+
+/* Intel STRATA NOR flash at CS3 */
+#define OMAP1610_NOR_FLASH_BASE		0xD8000000
+#define OMAP1610_NOR_FLASH_SIZE		SZ_32M
+#define OMAP1610_NOR_FLASH_START	0x0C000000
+
 #endif /*  __ASM_ARCH_OMAP_H2_H */
 

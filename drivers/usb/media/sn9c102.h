@@ -31,6 +31,7 @@
 #include <linux/types.h>
 #include <linux/param.h>
 #include <linux/rwsem.h>
+#include <asm/semaphore.h>
 
 #include "sn9c102_sensor.h"
 
@@ -51,8 +52,8 @@
 #define SN9C102_MODULE_AUTHOR   "(C) 2004 Luca Risolia"
 #define SN9C102_AUTHOR_EMAIL    "<luca.risolia@studio.unibo.it>"
 #define SN9C102_MODULE_LICENSE  "GPL"
-#define SN9C102_MODULE_VERSION  "1:1.01-beta"
-#define SN9C102_MODULE_VERSION_CODE  KERNEL_VERSION(1, 0, 1)
+#define SN9C102_MODULE_VERSION  "1:1.07"
+#define SN9C102_MODULE_VERSION_CODE  KERNEL_VERSION(1, 0, 7)
 
 SN9C102_ID_TABLE;
 SN9C102_SENSOR_TABLE;

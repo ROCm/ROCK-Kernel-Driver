@@ -52,10 +52,6 @@ void pci_common_init(struct hw_pci *);
 /*
  * PCI controllers
  */
-extern int iop310_setup(int nr, struct pci_sys_data *);
-extern struct pci_bus *iop310_scan_bus(int nr, struct pci_sys_data *);
-extern void iop310_init(void);
-
 extern int iop321_setup(int nr, struct pci_sys_data *);
 extern struct pci_bus *iop321_scan_bus(int nr, struct pci_sys_data *);
 extern void iop321_init(void);

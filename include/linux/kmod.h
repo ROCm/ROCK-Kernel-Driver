@@ -35,6 +35,7 @@ static inline int request_module(const char * name, ...) { return -ENOSYS; }
 
 #define try_then_request_module(x, mod...) ((x) ?: (request_module(mod), (x)))
 extern int call_usermodehelper(char *path, char *argv[], char *envp[], int wait);
+extern void usermodehelper_init(void);
 
 #ifdef CONFIG_HOTPLUG
 extern char hotplug_path [];

@@ -1,9 +1,10 @@
 all: mk_ptregs
 
 mk_ptregs : mk_ptregs.o
-	$(HOSTCC) -o mk_ptregs mk_ptregs.o
+	$(CC) -o mk_ptregs mk_ptregs.o
 
 mk_ptregs.o : mk_ptregs.c
-	$(HOSTCC) -c $< 
+	$(CC) -c $< 
 
-clean-files := mk_ptregs *.o *~
+clean : 
+	$(RM) -f mk_ptregs *.o *~

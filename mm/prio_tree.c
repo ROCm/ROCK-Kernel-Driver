@@ -312,9 +312,7 @@ static void prio_tree_remove(struct prio_tree_root *root,
  * 'm' is the number of prio_tree_nodes that overlap the interval X.
  */
 
-static struct prio_tree_node *prio_tree_left(
-		struct prio_tree_root *root, struct prio_tree_iter *iter,
-		unsigned long radix_index, unsigned long heap_index,
+static struct prio_tree_node *prio_tree_left(struct prio_tree_iter *iter,
 		unsigned long *r_index, unsigned long *h_index)
 {
 	if (prio_tree_left_empty(iter->cur))
@@ -322,7 +320,7 @@ static struct prio_tree_node *prio_tree_left(
 
 	GET_INDEX(iter->cur->left, *r_index, *h_index);
 
-	if (radix_index <= *h_index) {
+	if (iter->r_index <= *h_index) {
 		iter->cur = iter->cur->left;
 		iter->mask >>= 1;
 		if (iter->mask) {
@@ -336,7 +334,7 @@ static struct prio_tree_node *prio_tree_left(
 				iter->mask = ULONG_MAX;
 			} else {
 				iter->size_level = 1;
-				iter->mask = 1UL << (root->index_bits - 1);
+				iter->mask = 1UL << (iter->root->index_bits - 1);
 			}
 		}
 		return iter->cur;
@@ -345,9 +343,7 @@ static struct prio_tree_node *prio_tree_left(
 	return NULL;
 }
 
-static struct prio_tree_node *prio_tree_right(
-		struct prio_tree_root *root, struct prio_tree_iter *iter,
-		unsigned long radix_index, unsigned long heap_index,
+static struct prio_tree_node *prio_tree_right(struct prio_tree_iter *iter,
 		unsigned long *r_index, unsigned long *h_index)
 {
 	unsigned long value;
@@ -360,12 +356,12 @@ static struct prio_tree_node *prio_tree_right(
 	else
 		value = iter->value | iter->mask;
 
-	if (heap_index < value)
+	if (iter->h_index < value)
 		return NULL;
 
 	GET_INDEX(iter->cur->right, *r_index, *h_index);
 
-	if (radix_index <= *h_index) {
+	if (iter->r_index <= *h_index) {
 		iter->cur = iter->cur->right;
 		iter->mask >>= 1;
 		iter->value = value;
@@ -380,7 +376,7 @@ static struct prio_tree_node *prio_tree_right(
 				iter->mask = ULONG_MAX;
 			} else {
 				iter->size_level = 1;
-				iter->mask = 1UL << (root->index_bits - 1);
+				iter->mask = 1UL << (iter->root->index_bits - 1);
 			}
 		}
 		return iter->cur;
@@ -405,10 +401,10 @@ static struct prio_tree_node *prio_tree_parent(struct prio_tree_iter *iter)
 	return iter->cur;
 }
 
-static inline int overlap(unsigned long radix_index, unsigned long heap_index,
+static inline int overlap(struct prio_tree_iter *iter,
 		unsigned long r_index, unsigned long h_index)
 {
-	return heap_index >= r_index && radix_index <= h_index;
+	return iter->h_index >= r_index && iter->r_index <= h_index;
 }
 
 /*
@@ -418,35 +414,33 @@ static inline int overlap(unsigned long radix_index, unsigned long heap_index,
  * heap_index]. Note that always radix_index <= heap_index. We do a pre-order
  * traversal of the tree.
  */
-static struct prio_tree_node *prio_tree_first(struct prio_tree_root *root,
-		struct prio_tree_iter *iter, unsigned long radix_index,
-		unsigned long heap_index)
+static struct prio_tree_node *prio_tree_first(struct prio_tree_iter *iter)
 {
+	struct prio_tree_root *root;
 	unsigned long r_index, h_index;
 
 	INIT_PRIO_TREE_ITER(iter);
 
+	root = iter->root;
 	if (prio_tree_empty(root))
 		return NULL;
 
 	GET_INDEX(root->prio_tree_node, r_index, h_index);
 
-	if (radix_index > h_index)
+	if (iter->r_index > h_index)
 		return NULL;
 
 	iter->mask = 1UL << (root->index_bits - 1);
 	iter->cur = root->prio_tree_node;
 
 	while (1) {
-		if (overlap(radix_index, heap_index, r_index, h_index))
+		if (overlap(iter, r_index, h_index))
 			return iter->cur;
 
-		if (prio_tree_left(root, iter, radix_index, heap_index,
-					&r_index, &h_index))
+		if (prio_tree_left(iter, &r_index, &h_index))
 			continue;
 
-		if (prio_tree_right(root, iter, radix_index, heap_index,
-					&r_index, &h_index))
+		if (prio_tree_right(iter, &r_index, &h_index))
 			continue;
 
 		break;
@@ -459,21 +453,16 @@ static struct prio_tree_node *prio_tree_first(struct prio_tree_root *root,
  *
  * Get the next prio_tree_node that overlaps with the input interval in iter
  */
-static struct prio_tree_node *prio_tree_next(struct prio_tree_root *root,
-		struct prio_tree_iter *iter, unsigned long radix_index,
-		unsigned long heap_index)
+static struct prio_tree_node *prio_tree_next(struct prio_tree_iter *iter)
 {
 	unsigned long r_index, h_index;
 
 repeat:
-	while (prio_tree_left(root, iter, radix_index,
-				heap_index, &r_index, &h_index)) {
-		if (overlap(radix_index, heap_index, r_index, h_index))
+	while (prio_tree_left(iter, &r_index, &h_index))
+		if (overlap(iter, r_index, h_index))
 			return iter->cur;
-	}
 
-	while (!prio_tree_right(root, iter, radix_index,
-				heap_index, &r_index, &h_index)) {
+	while (!prio_tree_right(iter, &r_index, &h_index)) {
 	    	while (!prio_tree_root(iter->cur) &&
 				iter->cur->parent->right == iter->cur)
 			prio_tree_parent(iter);
@@ -484,7 +473,7 @@ repeat:
 		prio_tree_parent(iter);
 	}
 
-	if (overlap(radix_index, heap_index, r_index, h_index))
+	if (overlap(iter, r_index, h_index))
 		return iter->cur;
 
 	goto repeat;
@@ -538,6 +527,9 @@ void vma_prio_tree_add(struct vm_area_struct *vma, struct vm_area_struct *old)
 	BUG_ON(RADIX_INDEX(vma) != RADIX_INDEX(old));
 	BUG_ON(HEAP_INDEX(vma) != HEAP_INDEX(old));
 
+	vma->shared.vm_set.head = NULL;
+	vma->shared.vm_set.parent = NULL;
+
 	if (!old->shared.vm_set.parent)
 		list_add(&vma->shared.vm_set.list,
 				&old->shared.vm_set.list);
@@ -556,6 +548,8 @@ void vma_prio_tree_insert(struct vm_area_struct *vma,
 {
 	struct prio_tree_node *ptr;
 	struct vm_area_struct *old;
+
+	vma->shared.vm_set.head = NULL;
 
 	ptr = prio_tree_insert(root, &vma->shared.prio_tree_node);
 	if (ptr != &vma->shared.prio_tree_node) {
@@ -617,8 +611,7 @@ void vma_prio_tree_remove(struct vm_area_struct *vma,
  * page in the given range of contiguous file pages.
  */
 struct vm_area_struct *vma_prio_tree_next(struct vm_area_struct *vma,
-		struct prio_tree_root *root, struct prio_tree_iter *iter,
-		pgoff_t begin, pgoff_t end)
+					struct prio_tree_iter *iter)
 {
 	struct prio_tree_node *ptr;
 	struct vm_area_struct *next;
@@ -627,7 +620,7 @@ struct vm_area_struct *vma_prio_tree_next(struct vm_area_struct *vma,
 		/*
 		 * First call is with NULL vma
 		 */
-		ptr = prio_tree_first(root, iter, begin, end);
+		ptr = prio_tree_first(iter);
 		if (ptr) {
 			next = prio_tree_entry(ptr, struct vm_area_struct,
 						shared.prio_tree_node);
@@ -652,7 +645,7 @@ struct vm_area_struct *vma_prio_tree_next(struct vm_area_struct *vma,
 		}
 	}
 
-	ptr = prio_tree_next(root, iter, begin, end);
+	ptr = prio_tree_next(iter);
 	if (ptr) {
 		next = prio_tree_entry(ptr, struct vm_area_struct,
 					shared.prio_tree_node);

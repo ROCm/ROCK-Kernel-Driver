@@ -72,6 +72,8 @@ MODULE_PARM_DESC (usbfs_snoop, "true to log all usbfs traffic");
 	} while (0)
 
 
+#define	MAX_USBFS_BUFFER_SIZE	16384
+
 static inline int connected (struct usb_device *dev)
 {
 	return dev->state != USB_STATE_NOTATTACHED;
@@ -555,8 +557,10 @@ static int proc_control(struct dev_state *ps, void __user *arg)
 		snoop(&dev->dev, "control read: bRequest=%02x bRrequestType=%02x wValue=%04x wIndex=%04x\n", 
 			ctrl.bRequest, ctrl.bRequestType, ctrl.wValue, ctrl.wIndex);
 
+		up(&dev->serialize);
 		i = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0), ctrl.bRequest, ctrl.bRequestType,
 				       ctrl.wValue, ctrl.wIndex, tbuf, ctrl.wLength, tmo);
+		down(&dev->serialize);
 		if ((i > 0) && ctrl.wLength) {
 			if (usbfs_snoop) {
 				dev_info(&dev->dev, "control read: data ");
@@ -584,8 +588,10 @@ static int proc_control(struct dev_state *ps, void __user *arg)
 				printk ("%02x ", (unsigned char)(tbuf)[j]);
 			printk("\n");
 		}
+		up(&dev->serialize);
 		i = usb_control_msg(dev, usb_sndctrlpipe(dev, 0), ctrl.bRequest, ctrl.bRequestType,
 				       ctrl.wValue, ctrl.wIndex, tbuf, ctrl.wLength, tmo);
+		down(&dev->serialize);
 	}
 	free_page((unsigned long)tbuf);
 	if (i<0) {
@@ -619,6 +625,8 @@ static int proc_bulk(struct dev_state *ps, void __user *arg)
 	if (!usb_maxpacket(dev, pipe, !(bulk.ep & USB_DIR_IN)))
 		return -EINVAL;
 	len1 = bulk.len;
+	if (len1 > MAX_USBFS_BUFFER_SIZE)
+		return -EINVAL;
 	if (!(tbuf = kmalloc(len1, GFP_KERNEL)))
 		return -ENOMEM;
 	tmo = (bulk.timeout * HZ + 999) / 1000;
@@ -627,7 +635,9 @@ static int proc_bulk(struct dev_state *ps, void __user *arg)
 			kfree(tbuf);
 			return -EINVAL;
 		}
+		up(&dev->serialize);
 		i = usb_bulk_msg(dev, pipe, tbuf, len1, &len2, tmo);
+		down(&dev->serialize);
 		if (!i && len2) {
 			if (copy_to_user(bulk.data, tbuf, len2)) {
 				kfree(tbuf);
@@ -641,7 +651,9 @@ static int proc_bulk(struct dev_state *ps, void __user *arg)
 				return -EFAULT;
 			}
 		}
+		up(&dev->serialize);
 		i = usb_bulk_msg(dev, pipe, tbuf, len1, &len2, tmo);
+		down(&dev->serialize);
 	}
 	kfree(tbuf);
 	if (i < 0) {
@@ -849,7 +861,7 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 
 	case USBDEVFS_URB_TYPE_BULK:
 		uurb.number_of_packets = 0;
-		if (uurb.buffer_length > 16384)
+		if (uurb.buffer_length > MAX_USBFS_BUFFER_SIZE)
 			return -EINVAL;
 		if (!access_ok((uurb.endpoint & USB_DIR_IN) ? VERIFY_WRITE : VERIFY_READ, uurb.buffer, uurb.buffer_length))
 			return -EFAULT;
@@ -891,7 +903,7 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 			interval = 1 << min (15, ep_desc->bInterval - 1);
 		else
 			interval = ep_desc->bInterval;
-		if (uurb.buffer_length > 16384)
+		if (uurb.buffer_length > MAX_USBFS_BUFFER_SIZE)
 			return -EINVAL;
 		if (!access_ok((uurb.endpoint & USB_DIR_IN) ? VERIFY_WRITE : VERIFY_READ, uurb.buffer, uurb.buffer_length))
 			return -EFAULT;

@@ -23,6 +23,7 @@
 #include <linux/bootmem.h>
 #include <linux/module.h>
 #include <linux/mm.h>
+#include <linux/list.h>
 
 #include <asm/processor.h>
 #include <asm/io.h>
@@ -55,16 +56,9 @@ unsigned int pcibios_assign_all_busses(void)
 unsigned long isa_io_base;	/* NULL if no ISA bus */
 unsigned long pci_io_base;
 
-void pcibios_name_device(struct pci_dev* dev);
-void pcibios_final_fixup(void);
-static void fixup_broken_pcnet32(struct pci_dev* dev);
-static void fixup_windbond_82c105(struct pci_dev* dev);
-extern void fixup_k2_sata(struct pci_dev* dev);
-
 void iSeries_pcibios_init(void);
 
-struct pci_controller *hose_head;
-struct pci_controller **hose_tail = &hose_head;
+LIST_HEAD(hose_list);
 
 struct pci_dma_ops pci_dma_ops;
 EXPORT_SYMBOL(pci_dma_ops);
@@ -74,20 +68,6 @@ int global_phb_number;		/* Global phb counter */
 /* Cached ISA bridge dev. */
 struct pci_dev *ppc64_isabridge_dev = NULL;
 
-struct pci_fixup pcibios_fixups[] = {
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_TRIDENT,		PCI_ANY_ID,
-	  fixup_broken_pcnet32 },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_WINBOND,		PCI_DEVICE_ID_WINBOND_82C105,
-	  fixup_windbond_82c105 },
-	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,    			PCI_ANY_ID,
-	  pcibios_name_device },
-#ifdef CONFIG_PPC_PMAC
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SERVERWORKS,	0x0240,
-	  fixup_k2_sata },
-#endif
-	{ 0 }
-};
-
 static void fixup_broken_pcnet32(struct pci_dev* dev)
 {
 	if ((dev->class>>8 == PCI_CLASS_NETWORK_ETHERNET)) {
@@ -96,6 +76,7 @@ static void fixup_broken_pcnet32(struct pci_dev* dev)
 		pci_name_device(dev);
 	}
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_TRIDENT, PCI_ANY_ID, fixup_broken_pcnet32);
 
 static void fixup_windbond_82c105(struct pci_dev* dev)
 {
@@ -118,6 +99,7 @@ static void fixup_windbond_82c105(struct pci_dev* dev)
 			dev->resource[i].flags &= ~IORESOURCE_IO;
 	}
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_82C105, fixup_windbond_82c105);
 
 void 
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
@@ -239,9 +221,9 @@ pci_alloc_pci_controller(enum phb_types controller_type)
 		memcpy(hose->what,model,7);
         hose->type = controller_type;
         hose->global_number = global_phb_number++;
-        
-        *hose_tail = hose;
-        hose_tail = &hose->next;
+
+	list_add_tail(&hose->list_node, &hose_list);
+
         return hose;
 }
 
@@ -281,7 +263,7 @@ static void __init pcibios_claim_of_setup(void)
 
 static int __init pcibios_init(void)
 {
-	struct pci_controller *hose;
+	struct pci_controller *hose, *tmp;
 	struct pci_bus *bus;
 
 #ifdef CONFIG_PPC_ISERIES
@@ -292,7 +274,7 @@ static int __init pcibios_init(void)
 	printk("PCI: Probing PCI hardware\n");
 
 	/* Scan all of the recorded PCI controllers.  */
-	for (hose = hose_head; hose; hose = hose->next) {
+	list_for_each_entry_safe(hose, tmp, &hose_list, list_node) {
 		hose->last_busno = 0xff;
 		bus = pci_scan_bus(hose->first_busno, hose->ops,
 				   hose->arch_data);

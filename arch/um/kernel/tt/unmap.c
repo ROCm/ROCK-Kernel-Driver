@@ -3,7 +3,10 @@
  * Licensed under the GPL
  */
 
+#include <stdio.h>
+#include <errno.h>
 #include <sys/mman.h>
+#include "user.h"
 
 int switcheroo(int fd, int prot, void *from, void *to, int size)
 {

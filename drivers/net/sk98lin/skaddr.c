@@ -892,7 +892,7 @@ SK_AC	*pAC,		/* adapter context */
 SK_IOC	IoC,		/* I/O context */
 SK_U32	PortNumber)	/* Port Number */
 {
-	int ReturnCode;
+	int ReturnCode = 0;
 #if (!defined(SK_SLIM) || defined(DEBUG))
 	if (PortNumber >= (SK_U32) pAC->GIni.GIMacsFound) {
 		return (SK_ADDR_ILLEGAL_PORT);
@@ -1424,7 +1424,7 @@ SK_IOC	IoC,			/* I/O context */
 SK_U32	PortNumber,		/* port whose promiscuous mode changes */
 int		NewPromMode)	/* new promiscuous mode */
 {
-	int ReturnCode;
+	int ReturnCode = 0;
 #if (!defined(SK_SLIM) || defined(DEBUG))
 	if (PortNumber >= (SK_U32) pAC->GIni.GIMacsFound) {
 		return (SK_ADDR_ILLEGAL_PORT);

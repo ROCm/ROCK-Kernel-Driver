@@ -118,7 +118,7 @@ void omap_set_dma_constant_fill(int lch, u32 color)
 	u16 w;
 
 #ifdef CONFIG_DEBUG_KERNEL
-	if (omap_dma_in_1510_mode) {
+	if (omap_dma_in_1510_mode()) {
 		printk(KERN_ERR "OMAP DMA constant fill not available in 1510 mode.");
 		BUG();
 		return;
@@ -141,7 +141,7 @@ void omap_set_dma_transparent_copy(int lch, u32 color)
 	u16 w;
 
 #ifdef CONFIG_DEBUG_KERNEL
-	if (omap_dma_in_1510_mode) {
+	if (omap_dma_in_1510_mode()) {
 		printk(KERN_ERR "OMAP DMA transparent copy not available in 1510 mode.");
 		BUG();
 	}
@@ -266,46 +266,78 @@ void omap_set_dma_dest_burst_mode(int lch, int burst_mode)
 	omap_writew(w, OMAP_DMA_CSDP(lch));
 }
 
-void omap_start_dma(int lch)
+static inline void init_intr(int lch)
 {
 	u16 w;
-
-	if (!omap_dma_in_1510_mode()) {
-		int next_lch;
-
-		next_lch = dma_chan[lch].next_lch;
-
-		/* Enable the queue, if needed so. */
-		if (next_lch != -1) {
-			/* Clear the STOP_LNK bits */
-			w = omap_readw(OMAP_DMA_CLNK_CTRL(lch));
-			w &= ~(1 << 14);
-			omap_writew(w, OMAP_DMA_CLNK_CTRL(lch));
-			w = omap_readw(OMAP_DMA_CLNK_CTRL(next_lch));
-			w &= ~(1 << 14);
-			omap_writew(w, OMAP_DMA_CLNK_CTRL(next_lch));
-
-			/* And set the ENABLE_LNK bits */
-			omap_writew(next_lch | (1 << 15),
-				    OMAP_DMA_CLNK_CTRL(lch));
-			/* The loop case */
-			if (dma_chan[next_lch].next_lch == lch)
-				omap_writew(lch | (1 << 15),
-					    OMAP_DMA_CLNK_CTRL(next_lch));
-
-			/* Read CSR to make sure it's cleared. */
-			w = omap_readw(OMAP_DMA_CSR(next_lch));
-			/* Enable some nice interrupts. */
-			omap_writew(dma_chan[next_lch].enabled_irqs,
-				    OMAP_DMA_CICR(next_lch));
-			dma_chan[next_lch].flags |= OMAP_DMA_ACTIVE;
-		}
-	}
 
 	/* Read CSR to make sure it's cleared. */
 	w = omap_readw(OMAP_DMA_CSR(lch));
 	/* Enable some nice interrupts. */
 	omap_writew(dma_chan[lch].enabled_irqs, OMAP_DMA_CICR(lch));
+	dma_chan[lch].flags |= OMAP_DMA_ACTIVE;
+}
+
+static inline void enable_lnk(int lch)
+{
+	u16 w;
+
+	/* Clear the STOP_LNK bits */
+	w = omap_readw(OMAP_DMA_CLNK_CTRL(lch));
+	w &= ~(1 << 14);
+	omap_writew(w, OMAP_DMA_CLNK_CTRL(lch));
+
+	/* And set the ENABLE_LNK bits */
+	if (dma_chan[lch].next_lch != -1)
+		omap_writew(dma_chan[lch].next_lch | (1 << 15),
+			    OMAP_DMA_CLNK_CTRL(lch));
+}
+
+static inline void disable_lnk(int lch)
+{
+	u16 w;
+
+	/* Disable interrupts */
+	omap_writew(0, OMAP_DMA_CICR(lch));
+
+	/* Set the STOP_LNK bit */
+	w = omap_readw(OMAP_DMA_CLNK_CTRL(lch));
+	w |= (1 << 14);
+	w = omap_writew(w, OMAP_DMA_CLNK_CTRL(lch));
+
+	dma_chan[lch].flags &= ~OMAP_DMA_ACTIVE;
+}
+
+void omap_start_dma(int lch)
+{
+	u16 w;
+
+	if (!omap_dma_in_1510_mode() && dma_chan[lch].next_lch != -1) {
+		int next_lch, cur_lch;
+		char dma_chan_link_map[OMAP_LOGICAL_DMA_CH_COUNT];
+
+		dma_chan_link_map[lch] = 1;
+		/* Set the link register of the first channel */
+		enable_lnk(lch);
+
+		memset(dma_chan_link_map, 0, sizeof(dma_chan_link_map));
+		cur_lch = dma_chan[lch].next_lch;
+		do {
+			next_lch = dma_chan[cur_lch].next_lch;
+
+                        /* The loop case: we've been here already */
+			if (dma_chan_link_map[cur_lch])
+				break;
+			/* Mark the current channel */
+			dma_chan_link_map[cur_lch] = 1;
+
+			enable_lnk(cur_lch);
+			init_intr(cur_lch);
+
+			cur_lch = next_lch;
+		} while (next_lch != -1);
+	}
+
+	init_intr(lch);
 
 	w = omap_readw(OMAP_DMA_CCR(lch));
 	w |= OMAP_DMA_CCR_EN;
@@ -316,37 +348,34 @@ void omap_start_dma(int lch)
 void omap_stop_dma(int lch)
 {
 	u16 w;
-	int next_lch;
 
+	if (!omap_dma_in_1510_mode() && dma_chan[lch].next_lch != -1) {
+		int next_lch, cur_lch = lch;
+		char dma_chan_link_map[OMAP_LOGICAL_DMA_CH_COUNT];
+
+		memset(dma_chan_link_map, 0, sizeof(dma_chan_link_map));
+		do {
+			/* The loop case: we've been here already */
+			if (dma_chan_link_map[cur_lch])
+				break;
+			/* Mark the current channel */
+			dma_chan_link_map[cur_lch] = 1;
+
+			disable_lnk(cur_lch);
+
+			next_lch = dma_chan[cur_lch].next_lch;
+			cur_lch = next_lch;
+		} while (next_lch != -1);
+
+		return;
+	}
 	/* Disable all interrupts on the channel */
 	omap_writew(0, OMAP_DMA_CICR(lch));
 
-	if (omap_dma_in_1510_mode()) {
-		w = omap_readw(OMAP_DMA_CCR(lch));
-		w &= ~OMAP_DMA_CCR_EN;
-		omap_writew(w, OMAP_DMA_CCR(lch));
-		dma_chan[lch].flags &= ~OMAP_DMA_ACTIVE;
-		return;
-	}
-
-	next_lch = dma_chan[lch].next_lch;
-
-	/*
-	 * According to thw HW spec, enabling the STOP_LNK bit
-	 * resets the CCR_EN bit at the same time.
-	 */
-	w = omap_readw(OMAP_DMA_CLNK_CTRL(lch));
-	w |= (1 << 14);
-	w = omap_writew(w, OMAP_DMA_CLNK_CTRL(lch));
+	w = omap_readw(OMAP_DMA_CCR(lch));
+	w &= ~OMAP_DMA_CCR_EN;
+	omap_writew(w, OMAP_DMA_CCR(lch));
 	dma_chan[lch].flags &= ~OMAP_DMA_ACTIVE;
-
-	if (next_lch != -1) {
-		omap_writew(0, OMAP_DMA_CICR(next_lch));
-		w = omap_readw(OMAP_DMA_CLNK_CTRL(next_lch));
-		w |= (1 << 14);
-		w = omap_writew(w, OMAP_DMA_CLNK_CTRL(next_lch));
-		dma_chan[next_lch].flags &= ~OMAP_DMA_ACTIVE;
-	}
 }
 
 void omap_enable_dma_irq(int lch, u16 bits)
@@ -445,7 +474,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
 	chan->data = data;
 	chan->enabled_irqs = OMAP_DMA_TOUT_IRQ | OMAP_DMA_DROP_IRQ | OMAP_DMA_BLOCK_IRQ;
 
-	if (cpu_is_omap1610() || cpu_is_omap5912()) {
+	if (cpu_is_omap1610() || cpu_is_omap5912() || cpu_is_omap730() || cpu_is_omap1710()) {
 		/* If the sync device is set, configure it dynamically. */
 		if (dev_id != 0) {
 			set_gdma_dev(free_ch + 1, dev_id);
@@ -533,7 +562,6 @@ void omap_dma_unlink_lch (int lch_head, int lch_queue)
 	}
 
 	dma_chan[lch_head].next_lch = -1;
-	dma_chan[lch_queue].next_lch = -1;
 }
 
 
@@ -713,7 +741,7 @@ static int __init omap_init_dma(void)
 		printk(KERN_INFO "DMA support for OMAP1510 initialized\n");
 		dma_chan_count = 9;
 		enable_1510_mode = 1;
-	} else if (cpu_is_omap1610() || cpu_is_omap5912()) {
+	} else if (cpu_is_omap1610() || cpu_is_omap5912() || cpu_is_omap730() || cpu_is_omap1710()) {
 		printk(KERN_INFO "OMAP DMA hardware version %d\n",
 		       omap_readw(OMAP_DMA_HW_ID));
 		printk(KERN_INFO "DMA capabilities: %08x:%08x:%04x:%04x:%04x\n",
@@ -771,6 +799,8 @@ EXPORT_SYMBOL(omap_request_dma);
 EXPORT_SYMBOL(omap_free_dma);
 EXPORT_SYMBOL(omap_start_dma);
 EXPORT_SYMBOL(omap_stop_dma);
+EXPORT_SYMBOL(omap_enable_dma_irq);
+EXPORT_SYMBOL(omap_disable_dma_irq);
 
 EXPORT_SYMBOL(omap_set_dma_transfer_params);
 EXPORT_SYMBOL(omap_set_dma_constant_fill);

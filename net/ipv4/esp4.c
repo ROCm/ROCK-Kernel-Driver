@@ -17,10 +17,10 @@ struct esp_decap_data {
 	__u8		proto;
 };
 
-int esp_output(struct sk_buff **pskb)
+static int esp_output(struct sk_buff *skb)
 {
 	int err;
-	struct dst_entry *dst = (*pskb)->dst;
+	struct dst_entry *dst = skb->dst;
 	struct xfrm_state *x  = dst->xfrm;
 	struct iphdr *top_iph;
 	struct ip_esp_hdr *esph;
@@ -33,13 +33,13 @@ int esp_output(struct sk_buff **pskb)
 	int nfrags;
 
 	/* Strip IP+ESP header. */
-	__skb_pull(*pskb, (*pskb)->h.raw - (*pskb)->data);
+	__skb_pull(skb, skb->h.raw - skb->data);
 	/* Now skb is pure payload to encrypt */
 
 	err = -ENOMEM;
 
 	/* Round to block size */
-	clen = (*pskb)->len;
+	clen = skb->len;
 
 	esp = x->data;
 	alen = esp->auth.icv_trunc_len;
@@ -49,22 +49,22 @@ int esp_output(struct sk_buff **pskb)
 	if (esp->conf.padlen)
 		clen = (clen + esp->conf.padlen-1)&~(esp->conf.padlen-1);
 
-	if ((nfrags = skb_cow_data(*pskb, clen-(*pskb)->len+alen, &trailer)) < 0)
+	if ((nfrags = skb_cow_data(skb, clen-skb->len+alen, &trailer)) < 0)
 		goto error;
 
 	/* Fill padding... */
 	do {
 		int i;
-		for (i=0; i<clen-(*pskb)->len - 2; i++)
+		for (i=0; i<clen-skb->len - 2; i++)
 			*(u8*)(trailer->tail + i) = i+1;
 	} while (0);
-	*(u8*)(trailer->tail + clen-(*pskb)->len - 2) = (clen - (*pskb)->len)-2;
-	pskb_put(*pskb, trailer, clen - (*pskb)->len);
+	*(u8*)(trailer->tail + clen-skb->len - 2) = (clen - skb->len)-2;
+	pskb_put(skb, trailer, clen - skb->len);
 
-	__skb_push(*pskb, (*pskb)->data - (*pskb)->nh.raw);
-	top_iph = (*pskb)->nh.iph;
-	esph = (struct ip_esp_hdr *)((*pskb)->nh.raw + top_iph->ihl*4);
-	top_iph->tot_len = htons((*pskb)->len + alen);
+	__skb_push(skb, skb->data - skb->nh.raw);
+	top_iph = skb->nh.iph;
+	esph = (struct ip_esp_hdr *)(skb->nh.raw + top_iph->ihl*4);
+	top_iph->tot_len = htons(skb->len + alen);
 	*(u8*)(trailer->tail - 1) = top_iph->protocol;
 
 	/* this is non-NULL only with UDP Encapsulation */
@@ -76,7 +76,7 @@ int esp_output(struct sk_buff **pskb)
 		uh = (struct udphdr *)esph;
 		uh->source = encap->encap_sport;
 		uh->dest = encap->encap_dport;
-		uh->len = htons((*pskb)->len + alen - top_iph->ihl*4);
+		uh->len = htons(skb->len + alen - top_iph->ihl*4);
 		uh->check = 0;
 
 		switch (encap->encap_type) {
@@ -109,7 +109,7 @@ int esp_output(struct sk_buff **pskb)
 			if (!sg)
 				goto error;
 		}
-		skb_to_sgvec(*pskb, sg, esph->enc_data+esp->conf.ivlen-(*pskb)->data, clen);
+		skb_to_sgvec(skb, sg, esph->enc_data+esp->conf.ivlen-skb->data, clen);
 		crypto_cipher_encrypt(tfm, sg, sg, clen);
 		if (unlikely(sg != &esp->sgbuf[0]))
 			kfree(sg);
@@ -121,9 +121,9 @@ int esp_output(struct sk_buff **pskb)
 	}
 
 	if (esp->auth.icv_full_len) {
-		esp->auth.icv(esp, *pskb, (u8*)esph-(*pskb)->data,
+		esp->auth.icv(esp, skb, (u8*)esph-skb->data,
 		              sizeof(struct ip_esp_hdr) + esp->conf.ivlen+clen, trailer->tail);
-		pskb_put(*pskb, trailer, alen);
+		pskb_put(skb, trailer, alen);
 	}
 
 	ip_send_check(top_iph);
@@ -139,7 +139,7 @@ error:
  * expensive, so we only support truncated data, which is the recommended
  * and common case.
  */
-int esp_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
+static int esp_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
 	struct iphdr *iph;
 	struct ip_esp_hdr *esph;
@@ -246,7 +246,7 @@ out:
 	return -EINVAL;
 }
 
-int esp_post_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
+static int esp_post_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
   
 	if (x->encap) {
@@ -320,7 +320,7 @@ static u32 esp4_get_max_size(struct xfrm_state *x, int mtu)
 	return mtu + x->props.header_len + esp->auth.icv_trunc_len;
 }
 
-void esp4_err(struct sk_buff *skb, u32 info)
+static void esp4_err(struct sk_buff *skb, u32 info)
 {
 	struct iphdr *iph = (struct iphdr*)skb->data;
 	struct ip_esp_hdr *esph = (struct ip_esp_hdr*)(skb->data+(iph->ihl<<2));
@@ -338,7 +338,7 @@ void esp4_err(struct sk_buff *skb, u32 info)
 	xfrm_state_put(x);
 }
 
-void esp_destroy(struct xfrm_state *x)
+static void esp_destroy(struct xfrm_state *x)
 {
 	struct esp_data *esp = x->data;
 
@@ -364,7 +364,7 @@ void esp_destroy(struct xfrm_state *x)
 	kfree(esp);
 }
 
-int esp_init_state(struct xfrm_state *x, void *args)
+static int esp_init_state(struct xfrm_state *x, void *args)
 {
 	struct esp_data *esp = NULL;
 
@@ -436,6 +436,7 @@ int esp_init_state(struct xfrm_state *x, void *args)
 
 		switch (encap->encap_type) {
 		default:
+			goto error;
 		case UDP_ENCAP_ESPINUDP:
 			x->props.header_len += sizeof(struct udphdr);
 			break;
@@ -449,15 +450,9 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	return 0;
 
 error:
-	if (esp) {
-		if (esp->auth.tfm)
-			crypto_free_tfm(esp->auth.tfm);
-		if (esp->auth.work_icv)
-			kfree(esp->auth.work_icv);
-		if (esp->conf.tfm)
-			crypto_free_tfm(esp->conf.tfm);
-		kfree(esp);
-	}
+	x->data = esp;
+	esp_destroy(x);
+	x->data = NULL;
 	return -EINVAL;
 }
 

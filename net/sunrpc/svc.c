@@ -223,27 +223,22 @@ svc_register(struct svc_serv *serv, int proto, unsigned short port)
 
 	progp = serv->sv_program;
 
+	dprintk("RPC: svc_register(%s, %s, %d)\n",
+		progp->pg_name, proto == IPPROTO_UDP? "udp" : "tcp", port);
+
 	if (!port)
 		clear_thread_flag(TIF_SIGPENDING);
 
-	while (progp) {
-		dprintk("RPC: svc_register(%s, %s, %d)\n",
-			progp->pg_name,
-			proto == IPPROTO_UDP?  "udp" : "tcp",
-			port);
-
-		for (i = 0; i < progp->pg_nvers; i++) {
-			if (progp->pg_vers[i] == NULL)
-				continue;
-			error = rpc_register(progp->pg_prog, i, proto, port, &dummy);
-			if (error < 0)
-				break;
-			if (port && !dummy) {
-				error = -EACCES;
-				break;
-			}
+	for (i = 0; i < progp->pg_nvers; i++) {
+		if (progp->pg_vers[i] == NULL)
+			continue;
+		error = rpc_register(progp->pg_prog, i, proto, port, &dummy);
+		if (error < 0)
+			break;
+		if (port && !dummy) {
+			error = -EACCES;
+			break;
 		}
-		progp = progp->pg_next;
 	}
 
 	if (!port) {
@@ -270,6 +265,7 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	u32			*statp;
 	u32			dir, prog, vers, proc,
 				auth_stat, rpc_stat;
+	int			auth_res;
 
 	rpc_stat = rpc_success;
 
@@ -311,12 +307,17 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	rqstp->rq_vers = vers = ntohl(svc_getu32(argv));	/* version number */
 	rqstp->rq_proc = proc = ntohl(svc_getu32(argv));	/* procedure number */
 
+	progp = serv->sv_program;
 	/*
 	 * Decode auth data, and add verifier to reply buffer.
 	 * We do this before anything else in order to get a decent
 	 * auth verifier.
 	 */
-	switch (svc_authenticate(rqstp, &auth_stat)) {
+	if (progp->pg_authenticate != NULL)
+		auth_res = progp->pg_authenticate(rqstp, &auth_stat);
+	else
+		auth_res = svc_authenticate(rqstp, &auth_stat);
+	switch (auth_res) {
 	case SVC_OK:
 		break;
 	case SVC_GARBAGE:

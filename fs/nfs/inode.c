@@ -39,6 +39,8 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
+#include "delegation.h"
+
 #define NFSDBG_FACILITY		NFSDBG_VFS
 #define NFS_PARANOIA 1
 
@@ -57,7 +59,6 @@ static struct inode *nfs_alloc_inode(struct super_block *sb);
 static void nfs_destroy_inode(struct inode *);
 static void nfs_write_inode(struct inode *,int);
 static void nfs_delete_inode(struct inode *);
-static void nfs_put_super(struct super_block *);
 static void nfs_clear_inode(struct inode *);
 static void nfs_umount_begin(struct super_block *);
 static int  nfs_statfs(struct super_block *, struct kstatfs *);
@@ -68,7 +69,6 @@ static struct super_operations nfs_sops = {
 	.destroy_inode	= nfs_destroy_inode,
 	.write_inode	= nfs_write_inode,
 	.delete_inode	= nfs_delete_inode,
-	.put_super	= nfs_put_super,
 	.statfs		= nfs_statfs,
 	.clear_inode	= nfs_clear_inode,
 	.umount_begin	= nfs_umount_begin,
@@ -104,21 +104,6 @@ struct rpc_program		nfs_program = {
 	.pipe_dir_name		= "/nfs",
 };
 
-#ifdef CONFIG_NFS_ACL
-static struct rpc_stat		nfsacl_rpcstat = { &nfsacl_program };
-static struct rpc_version *	nfsacl_version[] = {
-	[3]			= &nfsacl_version3,
-};
-
-struct rpc_program		nfsacl_program = {
-	.name =			"nfsacl",
-	.number =		NFS3_ACL_PROGRAM,
-	.nrvers =		sizeof(nfsacl_version) / sizeof(nfsacl_version[0]),
-	.version =		nfsacl_version,
-	.stats =		&nfsacl_rpcstat,
-};
-#endif  /* CONFIG_NFS_ACL */
-
 static inline unsigned long
 nfs_fattr_to_ino_t(struct nfs_fattr *fattr)
 {
@@ -138,8 +123,9 @@ nfs_delete_inode(struct inode * inode)
 {
 	dprintk("NFS: delete_inode(%s/%ld)\n", inode->i_sb->s_id, inode->i_ino);
 
+	nfs_wb_all(inode);
 	/*
-	 * The following can never actually happen...
+	 * The following should never happen...
 	 */
 	if (nfs_have_writebacks(inode)) {
 		printk(KERN_ERR "nfs_delete_inode: inode %ld has pending RPC requests\n", inode->i_ino);
@@ -156,39 +142,14 @@ static void
 nfs_clear_inode(struct inode *inode)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
-	struct rpc_cred *cred = nfsi->mm_cred;
+	struct rpc_cred *cred;
 
-	if (cred)
-		put_rpccred(cred);
+	nfs_wb_all(inode);
+	BUG_ON (!list_empty(&nfsi->open_files));
 	cred = nfsi->cache_access.cred;
 	if (cred)
 		put_rpccred(cred);
 	BUG_ON(atomic_read(&nfsi->data_updates) != 0);
-}
-
-void
-nfs_put_super(struct super_block *sb)
-{
-	struct nfs_server *server = NFS_SB(sb);
-
-	nfs4_renewd_prepare_shutdown(server);
-
-	if (server->client != NULL)
-		rpc_shutdown_client(server->client);
-#ifdef CONFIG_NFS_ACL
-	if (server->acl_client != NULL)
-		rpc_shutdown_client(server->acl_client);
-#endif  /* CONFIG_NFS_ACL */
-	if (server->client_sys != NULL)
-		rpc_shutdown_client(server->client_sys);
-
-	if (!(server->flags & NFS_MOUNT_NONLM))
-		lockd_down();	/* release rpc.lockd */
-	rpciod_down();		/* release rpciod */
-
-	destroy_nfsv4_state(server);
-
-	kfree(server->hostname);
 }
 
 void
@@ -200,10 +161,6 @@ nfs_umount_begin(struct super_block *sb)
 	/* -EIO all pending I/O */
 	if ((rpc = server->client) != NULL)
 		rpc_killall_tasks(rpc);
-#ifdef CONFIG_NFS_ACL
-	if (server->acl_client != NULL)
-		rpc_killall_tasks(server->acl_client);
-#endif  /* CONFIG_NFS_ACL */
 }
 
 
@@ -337,6 +294,11 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	if (sb->s_blocksize == 0)
 		sb->s_blocksize = nfs_block_bits(server->wsize,
 							 &sb->s_blocksize_bits);
+	server->wtmult = nfs_block_bits(fsinfo.wtmult, NULL);
+
+	if (sb->s_blocksize == 0)
+		sb->s_blocksize = nfs_block_bits(server->wsize,
+							 &sb->s_blocksize_bits);
 
 	server->dtsize = nfs_block_size(fsinfo.dtpref, NULL);
 	if (server->dtsize > PAGE_CACHE_SIZE)
@@ -370,9 +332,7 @@ out_no_root:
  * Create an RPC client handle.
  */
 static struct rpc_clnt *
-__nfs_create_client(struct nfs_server *server,
-		    const struct nfs_mount_data *data,
-		    struct rpc_program *program)
+nfs_create_client(struct nfs_server *server, const struct nfs_mount_data *data)
 {
 	struct rpc_timeout	timeparms;
 	struct rpc_xprt		*xprt = NULL;
@@ -397,7 +357,7 @@ __nfs_create_client(struct nfs_server *server,
 		printk(KERN_WARNING "NFS: cannot create RPC transport.\n");
 		return (struct rpc_clnt *)xprt;
 	}
-	clnt = rpc_create_client(xprt, server->hostname, program,
+	clnt = rpc_create_client(xprt, server->hostname, &nfs_program,
 				 server->rpc_ops->version, data->pseudoflavor);
 	if (IS_ERR(clnt)) {
 		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
@@ -416,12 +376,6 @@ out_fail:
 	return clnt;
 }
 
-static struct rpc_clnt *
-nfs_create_client(struct nfs_server *server, const struct nfs_mount_data *data)
-{
-	return __nfs_create_client(server, data, &nfs_program);
-}
-
 /*
  * The way this works is that the mount process passes a structure
  * in the data argument which contains the server's IP address
@@ -432,7 +386,6 @@ static int
 nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 {
 	struct nfs_server	*server;
-	int			err = -EIO;
 	rpc_authflavor_t	authflavor;
 
 	server           = NFS_SB(sb);
@@ -451,10 +404,14 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 	server->acdirmin = data->acdirmin*HZ;
 	server->acdirmax = data->acdirmax*HZ;
 
+	/* Start lockd here, before we might error out */
+	if (!(server->flags & NFS_MOUNT_NONLM))
+		lockd_up();
+
 	server->namelen  = data->namlen;
 	server->hostname = kmalloc(strlen(data->hostname) + 1, GFP_KERNEL);
 	if (!server->hostname)
-		goto out_fail;
+		return -ENOMEM;
 	strcpy(server->hostname, data->hostname);
 
 	/* Check NFS protocol revision and initialize RPC op vector
@@ -465,11 +422,11 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 		server->caps |= NFS_CAP_READDIRPLUS;
 		if (data->version < 4) {
 			printk(KERN_NOTICE "NFS: NFSv3 not supported by mount program.\n");
-			goto out_fail;
+			return -EIO;
 		}
 #else
 		printk(KERN_NOTICE "NFS: NFSv3 not supported.\n");
-		goto out_fail;
+		return -EIO;
 #endif
 	} else {
 		server->rpc_ops = &nfs_v2_clientops;
@@ -484,39 +441,18 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 	/* Create RPC client handles */
 	server->client = nfs_create_client(server, data);
 	if (IS_ERR(server->client))
-		goto out_fail;
-#ifdef CONFIG_NFS_ACL
-	if (server->flags & NFS_MOUNT_VER3) {
-		server->acl_client = __nfs_create_client(server, data,
-							 &nfsacl_program);
-		if (server->acl_client == NULL)
-			goto out_shutdown;
-		/* Initially assume the nfsacl program is supported */
-		server->flags |= NFSACL;
-	}
-#endif  /* CONFIG_NFS_ACL */
+		return PTR_ERR(server->client);
 	/* RFC 2623, sec 2.3.2 */
 	if (authflavor != RPC_AUTH_UNIX) {
 		server->client_sys = rpc_clone_client(server->client);
-		if (server->client_sys == NULL)
-			goto out_shutdown;
+		if (IS_ERR(server->client_sys))
+			return PTR_ERR(server->client_sys);
 		if (!rpcauth_create(RPC_AUTH_UNIX, server->client_sys))
-			goto out_shutdown;
+			return -ENOMEM;
 	} else {
 		atomic_inc(&server->client->cl_count);
 		server->client_sys = server->client;
 	}
-
-	/* Fire up rpciod if not yet running */
-	if (rpciod_up() != 0) {
-		printk(KERN_WARNING "NFS: couldn't start rpciod!\n");
-		goto out_shutdown;
-	}
-
-	sb->s_op = &nfs_sops;
-	err = nfs_sb_init(sb, authflavor);
-	if (err != 0)
-		goto out_noinit;
 
 	if (server->flags & NFS_MOUNT_VER3) {
 		if (server->namelen == 0 || server->namelen > NFS3_MAXNAMLEN)
@@ -526,25 +462,8 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 			server->namelen = NFS2_MAXNAMLEN;
 	}
 
-	/* Check whether to start the lockd process */
-	if (!(server->flags & NFS_MOUNT_NONLM))
-		lockd_up();
-	return 0;
-out_noinit:
-	rpciod_down();
-out_shutdown:
-	if (server->client)
-		rpc_shutdown_client(server->client);
-#ifdef CONFIG_NFS_ACL
-	if (server->acl_client)
-		rpc_shutdown_client(server->acl_client);
-#endif  /* CONFIG_NFS_ACL */
-	if (server->client_sys)
-		rpc_shutdown_client(server->client_sys);
-out_fail:
-	if (server->hostname)
-		kfree(server->hostname);
-	return err;
+	sb->s_op = &nfs_sops;
+	return nfs_sb_init(sb, authflavor);
 }
 
 static int
@@ -567,6 +486,7 @@ nfs_statfs(struct super_block *sb, struct kstatfs *buf)
 	if (error < 0)
 		goto out_err;
 
+	buf->f_frsize = server->wtmult;
 	buf->f_bsize = sb->s_blocksize;
 	blockbits = sb->s_blocksize_bits;
 	blockres = (1 << blockbits) - 1;
@@ -684,7 +604,7 @@ nfs_find_actor(struct inode *inode, void *opaque)
 
 	if (NFS_FILEID(inode) != fattr->fileid)
 		return 0;
-	if (memcmp(NFS_FH(inode), fh, sizeof(struct nfs_fh)) != 0)
+	if (nfs_compare_fh(NFS_FH(inode), fh))
 		return 0;
 	if (is_bad_inode(inode))
 		return 0;
@@ -695,27 +615,15 @@ static int
 nfs_init_locked(struct inode *inode, void *opaque)
 {
 	struct nfs_find_desc	*desc = (struct nfs_find_desc *)opaque;
-	struct nfs_fh		*fh = desc->fh;
 	struct nfs_fattr	*fattr = desc->fattr;
 
 	NFS_FILEID(inode) = fattr->fileid;
-	memcpy(NFS_FH(inode), fh, sizeof(struct nfs_fh));
+	nfs_copy_fh(NFS_FH(inode), desc->fh);
 	return 0;
 }
 
 /* Don't use READDIRPLUS on directories that we believe are too large */
 #define NFS_LIMIT_READDIRPLUS (8*PAGE_SIZE)
-
-#ifdef CONFIG_NFS_ACL
-static struct inode_operations nfs_special_inode_operations = {
-	.getattr =	nfs_getattr,
-	.setattr =	nfs_setattr,
-	.listxattr =	nfs_listxattr,
-	.getxattr =	nfs_getxattr,
-	.setxattr =	nfs_setxattr,
-	.removexattr =	nfs_removexattr,
-};
-#endif  /* CONFIG_NFS_ACL */
 
 /*
  * This is our front-end to iget that looks up inodes by file handle
@@ -770,12 +678,8 @@ nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 				NFS_FLAGS(inode) |= NFS_INO_ADVISE_RDPLUS;
 		} else if (S_ISLNK(inode->i_mode))
 			inode->i_op = &nfs_symlink_inode_operations;
-		else {
-#ifdef CONFIG_NFS_ACL
-			inode->i_op = &nfs_special_inode_operations;
-#endif  /* CONFIG_NFS_ACL */
+		else
 			init_special_inode(inode, inode->i_mode, fattr->rdev);
-		}
 
 		nfsi->read_cache_jiffies = fattr->timestamp;
 		inode->i_atime = fattr->atime;
@@ -916,53 +820,114 @@ int nfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 	return err;
 }
 
+struct nfs_open_context *alloc_nfs_open_context(struct dentry *dentry, struct rpc_cred *cred)
+{
+	struct nfs_open_context *ctx;
+
+	ctx = (struct nfs_open_context *)kmalloc(sizeof(*ctx), GFP_KERNEL);
+	if (ctx != NULL) {
+		atomic_set(&ctx->count, 1);
+		ctx->dentry = dget(dentry);
+		ctx->cred = get_rpccred(cred);
+		ctx->state = NULL;
+		ctx->lockowner = current->files;
+		ctx->error = 0;
+		init_waitqueue_head(&ctx->waitq);
+	}
+	return ctx;
+}
+
+struct nfs_open_context *get_nfs_open_context(struct nfs_open_context *ctx)
+{
+	if (ctx != NULL)
+		atomic_inc(&ctx->count);
+	return ctx;
+}
+
+void put_nfs_open_context(struct nfs_open_context *ctx)
+{
+	if (atomic_dec_and_test(&ctx->count)) {
+		if (ctx->state != NULL)
+			nfs4_close_state(ctx->state, ctx->mode);
+		if (ctx->cred != NULL)
+			put_rpccred(ctx->cred);
+		dput(ctx->dentry);
+		kfree(ctx);
+	}
+}
+
 /*
  * Ensure that mmap has a recent RPC credential for use when writing out
  * shared pages
  */
-void
-nfs_set_mmcred(struct inode *inode, struct rpc_cred *cred)
+void nfs_file_set_open_context(struct file *filp, struct nfs_open_context *ctx)
 {
-	struct rpc_cred **p = &NFS_I(inode)->mm_cred,
-			*oldcred = *p;
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct nfs_inode *nfsi = NFS_I(inode);
 
-	*p = get_rpccred(cred);
-	if (oldcred)
-		put_rpccred(oldcred);
+	filp->private_data = get_nfs_open_context(ctx);
+	spin_lock(&inode->i_lock);
+	list_add(&ctx->list, &nfsi->open_files);
+	spin_unlock(&inode->i_lock);
+}
+
+struct nfs_open_context *nfs_find_open_context(struct inode *inode, int mode)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct nfs_open_context *pos, *ctx = NULL;
+
+	spin_lock(&inode->i_lock);
+	list_for_each_entry(pos, &nfsi->open_files, list) {
+		if ((pos->mode & mode) == mode) {
+			ctx = get_nfs_open_context(pos);
+			break;
+		}
+	}
+	spin_unlock(&inode->i_lock);
+	return ctx;
+}
+
+void nfs_file_clear_open_context(struct file *filp)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct nfs_open_context *ctx = (struct nfs_open_context *)filp->private_data;
+
+	if (ctx) {
+		filp->private_data = NULL;
+		spin_lock(&inode->i_lock);
+		list_del(&ctx->list);
+		spin_unlock(&inode->i_lock);
+		put_nfs_open_context(ctx);
+	}
 }
 
 /*
- * These are probably going to contain hooks for
- * allocating and releasing RPC credentials for
- * the file. I'll have to think about Tronds patch
- * a bit more..
+ * These allocate and release file read/write context information.
  */
 int nfs_open(struct inode *inode, struct file *filp)
 {
-	struct rpc_auth *auth;
+	struct nfs_open_context *ctx;
 	struct rpc_cred *cred;
 
-	auth = NFS_CLIENT(inode)->cl_auth;
-	cred = rpcauth_lookupcred(auth, 0);
-	filp->private_data = cred;
-	if ((filp->f_mode & FMODE_WRITE) != 0) {
-		nfs_set_mmcred(inode, cred);
+	if ((cred = rpcauth_lookupcred(NFS_CLIENT(inode)->cl_auth, 0)) == NULL)
+		return -ENOMEM;
+	ctx = alloc_nfs_open_context(filp->f_dentry, cred);
+	put_rpccred(cred);
+	if (ctx == NULL)
+		return -ENOMEM;
+	ctx->mode = filp->f_mode;
+	nfs_file_set_open_context(filp, ctx);
+	put_nfs_open_context(ctx);
+	if ((filp->f_mode & FMODE_WRITE) != 0)
 		nfs_begin_data_update(inode);
-	}
 	return 0;
 }
 
 int nfs_release(struct inode *inode, struct file *filp)
 {
-	struct rpc_cred *cred;
-
-	lock_kernel();
 	if ((filp->f_mode & FMODE_WRITE) != 0)
 		nfs_end_data_update(inode);
-	cred = nfs_file_cred(filp);
-	if (cred)
-		put_rpccred(cred);
-	unlock_kernel();
+	nfs_file_clear_open_context(filp);
 	return 0;
 }
 
@@ -1003,7 +968,7 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 
 	/* Protect against RPC races by saving the change attribute */
 	verifier = nfs_save_change_attribute(inode);
-	status = NFS_PROTO(inode)->getattr(inode, &fattr);
+	status = NFS_PROTO(inode)->getattr(server, NFS_FH(inode), &fattr);
 	if (status) {
 		dfprintk(PAGECACHE, "nfs_revalidate_inode: (%s/%Ld) getattr failed, error=%d\n",
 			 inode->i_sb->s_id,
@@ -1059,6 +1024,30 @@ out:
 	return status;
 }
 
+int nfs_attribute_timeout(struct inode *inode)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+
+	if (nfs_have_delegation(inode, FMODE_READ))
+		return 0;
+	return time_after(jiffies, nfsi->read_cache_jiffies+nfsi->attrtimeo);
+}
+
+/**
+ * nfs_revalidate_inode - Revalidate the inode attributes
+ * @server - pointer to nfs_server struct
+ * @inode - pointer to inode struct
+ *
+ * Updates inode attribute information by retrieving the data from the server.
+ */
+int nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
+{
+	if (!(NFS_FLAGS(inode) & (NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA))
+			&& !nfs_attribute_timeout(inode))
+		return NFS_STALE(inode) ? -ESTALE : 0;
+	return __nfs_revalidate_inode(server, inode);
+}
+
 /**
  * nfs_begin_data_update
  * @inode - pointer to inode
@@ -1080,11 +1069,13 @@ void nfs_end_data_update(struct inode *inode)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 
-	/* Mark the attribute cache for revalidation */
-	nfsi->flags |= NFS_INO_INVALID_ATTR;
-	/* Directories and symlinks: invalidate page cache too */
-	if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
-		nfsi->flags |= NFS_INO_INVALID_DATA;
+	if (!nfs_have_delegation(inode, FMODE_READ)) {
+		/* Mark the attribute cache for revalidation */
+		nfsi->flags |= NFS_INO_INVALID_ATTR;
+		/* Directories and symlinks: invalidate page cache too */
+		if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
+			nfsi->flags |= NFS_INO_INVALID_DATA;
+	}
 	nfsi->cache_change_attribute ++;
 	atomic_dec(&nfsi->data_updates);
 }
@@ -1124,6 +1115,10 @@ int nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	struct nfs_inode *nfsi = NFS_I(inode);
 	loff_t cur_size, new_isize;
 	int data_unstable;
+
+	/* Do we hold a delegation? */
+	if (nfs_have_delegation(inode, FMODE_READ))
+		return 0;
 
 	/* Are we in the process of updating data on the server? */
 	data_unstable = nfs_caches_unstable(inode);
@@ -1322,7 +1317,8 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr, unsign
 	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)
 				|| S_ISLNK(inode->i_mode)))
 		invalid &= ~NFS_INO_INVALID_DATA;
-	nfsi->flags |= invalid;
+	if (!nfs_have_delegation(inode, FMODE_READ))
+		nfsi->flags |= invalid;
 
 	return 0;
  out_changed:
@@ -1362,7 +1358,7 @@ static int nfs_compare_super(struct super_block *sb, void *data)
 		return 0;
 	if (old->addr.sin_port != server->addr.sin_port)
 		return 0;
-	return !memcmp(&old->fh, &server->fh, sizeof(struct nfs_fh));
+	return !nfs_compare_fh(&old->fh, &server->fh);
 }
 
 static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
@@ -1387,9 +1383,7 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 	init_nfsv4_state(server);
 
 	root = &server->fh;
-	memcpy(root, &data->root, sizeof(*root));
-	if (root->size < sizeof(root->data))
-		memset(root->data+root->size, 0, sizeof(root->data)-root->size);
+	nfs_copy_fh(root, (struct nfs_fh *) &data->root);
 
 	if (data->version != NFS_MOUNT_VERSION) {
 		if (data->version < 3)
@@ -1401,7 +1395,6 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 			data->bsize  = 0;
 		if (data->version < 4) {
 			data->flags &= ~NFS_MOUNT_VER3;
-			memset(root, 0, sizeof(*root));
 			root->size = NFS2_FHSIZE;
 			memcpy(root->data, data->old_root.data, NFS2_FHSIZE);
 		}
@@ -1431,6 +1424,13 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 
 	s->s_flags = flags;
 
+	/* Fire up rpciod if not yet running */
+	if (rpciod_up() != 0) {
+		printk(KERN_WARNING "NFS: couldn't start rpciod!\n");
+		kfree(server);
+		return ERR_PTR(-EIO);
+	}
+
 	error = nfs_fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 	if (error) {
 		up_write(&s->s_umount);
@@ -1444,7 +1444,25 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 static void nfs_kill_super(struct super_block *s)
 {
 	struct nfs_server *server = NFS_SB(s);
+
 	kill_anon_super(s);
+
+	nfs4_renewd_prepare_shutdown(server);
+
+	if (server->client != NULL && !IS_ERR(server->client))
+		rpc_shutdown_client(server->client);
+	if (server->client_sys != NULL && !IS_ERR(server->client_sys))
+		rpc_shutdown_client(server->client_sys);
+
+	if (!(server->flags & NFS_MOUNT_NONLM))
+		lockd_down();	/* release rpc.lockd */
+
+	rpciod_down();		/* release rpciod */
+
+	destroy_nfsv4_state(server);
+
+	if (server->hostname != NULL)
+		kfree(server->hostname);
 	kfree(server);
 }
 
@@ -1460,12 +1478,12 @@ static struct file_system_type nfs_fs_type = {
 
 static void nfs4_clear_inode(struct inode *);
 
+
 static struct super_operations nfs4_sops = { 
 	.alloc_inode	= nfs_alloc_inode,
 	.destroy_inode	= nfs_destroy_inode,
 	.write_inode	= nfs_write_inode,
 	.delete_inode	= nfs_delete_inode,
-	.put_super	= nfs_put_super,
 	.statfs		= nfs_statfs,
 	.clear_inode	= nfs4_clear_inode,
 	.umount_begin	= nfs_umount_begin,
@@ -1481,6 +1499,12 @@ static void nfs4_clear_inode(struct inode *inode)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 
+	/* If we are holding a delegation, return it! */
+	if (nfsi->delegation != NULL)
+		nfs_inode_return_delegation(inode);
+	/* First call standard NFS clear_inode() code */
+	nfs_clear_inode(inode);
+	/* Now clear out any remaining state */
 	while (!list_empty(&nfsi->open_states)) {
 		struct nfs4_state *state;
 		
@@ -1495,8 +1519,6 @@ static void nfs4_clear_inode(struct inode *inode)
 		BUG_ON(atomic_read(&state->count) != 1);
 		nfs4_close_state(state, state->state);
 	}
-	/* Now call standard NFS clear_inode() code */
-	nfs_clear_inode(inode);
 }
 
 
@@ -1556,7 +1578,7 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	clp = nfs4_get_client(&server->addr.sin_addr);
 	if (!clp) {
 		printk(KERN_WARNING "NFS: failed to create NFS4 client.\n");
-		goto out_fail;
+		return -EIO;
 	}
 
 	/* Now create transport and client */
@@ -1594,8 +1616,13 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		memcpy(clp->cl_ipaddr, server->ip_addr, sizeof(clp->cl_ipaddr));
 		nfs_idmap_new(clp);
 	}
-	if (list_empty(&clp->cl_superblocks))
-		clear_bit(NFS4CLNT_OK, &clp->cl_state);
+	if (list_empty(&clp->cl_superblocks)) {
+		err = nfs4_init_client(clp);
+		if (err != 0) {
+			up_write(&clp->cl_sem);
+			goto out_fail;
+		}
+	}
 	list_add_tail(&server->nfs4_siblings, &clp->cl_superblocks);
 	clnt = rpc_clone_client(clp->cl_rpcclient);
 	if (!IS_ERR(clnt))
@@ -1605,45 +1632,29 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 
 	if (IS_ERR(clnt)) {
 		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
-		err = PTR_ERR(clnt);
-		goto out_remove_list;
+		return PTR_ERR(clnt);
 	}
 
 	clnt->cl_intr     = (server->flags & NFS4_MOUNT_INTR) ? 1 : 0;
 	clnt->cl_softrtry = (server->flags & NFS4_MOUNT_SOFT) ? 1 : 0;
 	server->client    = clnt;
 
-	err = -ENOMEM;
 	if (server->nfs4_state->cl_idmap == NULL) {
 		printk(KERN_WARNING "NFS: failed to create idmapper.\n");
-		goto out_shutdown;
+		return -ENOMEM;
 	}
 
 	if (clnt->cl_auth->au_flavor != authflavour) {
 		if (rpcauth_create(authflavour, clnt) == NULL) {
 			printk(KERN_WARNING "NFS: couldn't create credcache!\n");
-			goto out_shutdown;
+			return -ENOMEM;
 		}
-	}
-
-	/* Fire up rpciod if not yet running */
-	if (rpciod_up() != 0) {
-		printk(KERN_WARNING "NFS: couldn't start rpciod!\n");
-		goto out_shutdown;
 	}
 
 	sb->s_op = &nfs4_sops;
 	err = nfs_sb_init(sb, authflavour);
 	if (err == 0)
 		return 0;
-	rpciod_down();
-out_shutdown:
-	rpc_shutdown_client(server->client);
-out_remove_list:
-	down_write(&server->nfs4_state->cl_sem);
-	list_del_init(&server->nfs4_siblings);
-	up_write(&server->nfs4_state->cl_sem);
-	destroy_nfsv4_state(server);
 out_fail:
 	if (clp)
 		nfs4_put_client(clp);
@@ -1749,6 +1760,13 @@ static struct super_block *nfs4_get_sb(struct file_system_type *fs_type,
 
 	s->s_flags = flags;
 
+	/* Fire up rpciod if not yet running */
+	if (rpciod_up() != 0) {
+		printk(KERN_WARNING "NFS: couldn't start rpciod!\n");
+		s = ERR_PTR(-EIO);
+		goto out_free;
+	}
+
 	error = nfs4_fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 	if (error) {
 		up_write(&s->s_umount);
@@ -1768,22 +1786,31 @@ out_free:
 	return s;
 }
 
+static void nfs4_kill_super(struct super_block *sb)
+{
+	nfs_return_all_delegations(sb);
+	nfs_kill_super(sb);
+}
+
 static struct file_system_type nfs4_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "nfs4",
 	.get_sb		= nfs4_get_sb,
-	.kill_sb	= nfs_kill_super,
+	.kill_sb	= nfs4_kill_super,
 	.fs_flags	= FS_ODD_RENAME|FS_REVAL_DOT|FS_BINARY_MOUNTDATA,
 };
 
-#define nfs4_zero_state(nfsi) \
+#define nfs4_init_once(nfsi) \
 	do { \
 		INIT_LIST_HEAD(&(nfsi)->open_states); \
+		nfsi->delegation = NULL; \
+		nfsi->delegation_state = 0; \
+		init_rwsem(&nfsi->rwsem); \
 	} while(0)
 #define register_nfs4fs() register_filesystem(&nfs4_fs_type)
 #define unregister_nfs4fs() unregister_filesystem(&nfs4_fs_type)
 #else
-#define nfs4_zero_state(nfsi) \
+#define nfs4_init_once(nfsi) \
 	do { } while (0)
 #define register_nfs4fs() (0)
 #define unregister_nfs4fs()
@@ -1805,8 +1832,6 @@ static struct inode *nfs_alloc_inode(struct super_block *sb)
 	if (!nfsi)
 		return NULL;
 	nfsi->flags = 0;
-	nfsi->mm_cred = NULL;
-	nfs4_zero_state(nfsi);
 	return &nfsi->vfs_inode;
 }
 
@@ -1822,14 +1847,17 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
 		inode_init_once(&nfsi->vfs_inode);
+		spin_lock_init(&nfsi->req_lock);
 		INIT_LIST_HEAD(&nfsi->dirty);
 		INIT_LIST_HEAD(&nfsi->commit);
+		INIT_LIST_HEAD(&nfsi->open_files);
 		INIT_RADIX_TREE(&nfsi->nfs_page_tree, GFP_ATOMIC);
 		atomic_set(&nfsi->data_updates, 0);
 		nfsi->ndirty = 0;
 		nfsi->ncommit = 0;
 		nfsi->npages = 0;
 		init_waitqueue_head(&nfsi->nfs_i_wait);
+		nfs4_init_once(nfsi);
 	}
 }
  

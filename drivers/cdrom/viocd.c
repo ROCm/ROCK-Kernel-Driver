@@ -469,10 +469,10 @@ static int viocd_lock_door(struct cdrom_device_info *cdi, int locking)
 }
 
 static int viocd_packet(struct cdrom_device_info *cdi,
-		struct cdrom_generic_command *cgc)
+		struct packet_command *cgc)
 {
 	unsigned int buflen = cgc->buflen;
-	int ret = -ENOTTY;
+	int ret = -EIO;
 
 	switch (cgc->cmd[0]) {
 	case GPCMD_READ_DISC_INFO:
@@ -490,6 +490,12 @@ static int viocd_packet(struct cdrom_device_info *cdi,
 		}
 		break;
 	default:
+		if (cgc->sense) {
+			/* indicate Unknown code */
+			cgc->sense->sense_key = 0x05;
+			cgc->sense->asc = 0x20;
+			cgc->sense->ascq = 0x00;
+		}
 		break;
 	}
 
@@ -605,7 +611,7 @@ static int __init find_capability(const char *type)
 {
 	struct capability_entry *entry;
 
-	for (entry = capability_table; entry->type; ++entry)
+	for(entry = capability_table; entry->type; ++entry)
 		if(!strncmp(entry->type, type, 4))
 			break;
 	return entry->capability;

@@ -803,7 +803,7 @@ static struct pci_device_id piix_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, piix_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "PIIX IDE",
+	.name		= "PIIX_IDE",
 	.id_table	= piix_pci_tbl,
 	.probe		= piix_init_one,
 };

@@ -395,7 +395,7 @@ struct pneigh_entry * pneigh_lookup(struct neigh_table *tbl, const void *pkey,
 	if (!creat)
 		goto out;
 
-	n = kmalloc(sizeof(*n) + key_len, GFP_ATOMIC);
+	n = kmalloc(sizeof(*n) + key_len, pneigh_alloc_flag());
 	if (!n)
 		goto out;
 
@@ -1974,7 +1974,6 @@ EXPORT_SYMBOL(__neigh_update);
 EXPORT_SYMBOL(neigh_update);
 EXPORT_SYMBOL(neigh_update_hhs);
 EXPORT_SYMBOL(pneigh_enqueue);
-EXPORT_SYMBOL(pneigh_delete);
 EXPORT_SYMBOL(pneigh_lookup);
 
 #ifdef CONFIG_ARPD

@@ -128,6 +128,8 @@ static inline void flush_altivec_to_thread(struct task_struct *t)
 }
 #endif
 
+extern int mem_init_done;	/* set on boot once kmalloc can be called */
+
 /* EBCDIC -> ASCII conversion for [0-9A-Z] on iSeries */
 extern unsigned char e2a(unsigned char);
 

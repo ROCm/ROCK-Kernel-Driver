@@ -47,22 +47,30 @@ struct nlm_host {
 	unsigned short		h_reclaiming : 1,
 				h_server     : 1, /* server side, not client side */
 				h_inuse      : 1,
-				h_rebooted   : 1;
+				h_killed     : 1,
+				h_monitored  : 1;
 	wait_queue_head_t	h_gracewait;	/* wait while reclaiming */
 	u32			h_state;	/* pseudo-state counter */
 	u32			h_nsmstate;	/* true remote NSM state */
+	u32			h_pidcount;	/* Pseudopids */
 	atomic_t		h_count;	/* reference count */
 	struct semaphore	h_sema;		/* mutex for pmap binding */
 	unsigned long		h_nextrebind;	/* next portmap call */
 	unsigned long		h_expires;	/* eligible for GC */
-	struct nsm_handle *	h_nsmhandle;	/* for kernel statd */
+	struct list_head	h_lockowners;	/* Lockowners for the client */
+	spinlock_t		h_lock;
 };
 
-struct nsm_handle {
-	atomic_t		sm_count;
-	struct sockaddr_in	sm_addr;
-	unsigned int		sm_monitored : 1,
-				sm_sticky : 1;	/* don't unmonitor */
+/*
+ * Map an fl_owner_t into a unique 32-bit "pid"
+ */
+struct nlm_lockowner {
+	struct list_head list;
+	atomic_t count;
+
+	struct nlm_host *host;
+	fl_owner_t owner;
+	uint32_t pid;
 };
 
 /*
@@ -84,7 +92,7 @@ struct nlm_rqst {
 struct nlm_file {
 	struct nlm_file *	f_next;		/* linked list */
 	struct nfs_fh		f_handle;	/* NFS file handle */
-	struct file		f_file;		/* VFS file pointer */
+	struct file *		f_file;		/* VFS file pointer */
 	struct nlm_share *	f_shares;	/* DOS shares */
 	struct nlm_block *	f_blocks;	/* blocked locks */
 	unsigned int		f_locks;	/* guesstimate # of locks */
@@ -128,9 +136,6 @@ extern struct svc_procedure	nlmsvc_procedures[];
 #ifdef CONFIG_LOCKD_V4
 extern struct svc_procedure	nlmsvc_procedures4[];
 #endif
-#ifdef CONFIG_STATD
-extern struct svc_procedure	nsmsvc_procedures[];
-#endif
 extern int			nlmsvc_grace_period;
 extern unsigned long		nlmsvc_timeout;
 
@@ -160,7 +165,6 @@ struct nlm_host * nlm_get_host(struct nlm_host *);
 void		  nlm_release_host(struct nlm_host *);
 void		  nlm_shutdown_hosts(void);
 extern struct nlm_host *nlm_find_client(void);
-extern void	  nlm_host_rebooted(struct sockaddr_in *, u32);
 
 
 /*
@@ -191,7 +195,7 @@ void		  nlmsvc_invalidate_all(void);
 static __inline__ struct inode *
 nlmsvc_file_inode(struct nlm_file *file)
 {
-	return file->f_file.f_dentry->d_inode;
+	return file->f_file->f_dentry->d_inode;
 }
 
 /*
@@ -215,6 +219,8 @@ nlm_compare_locks(struct file_lock *fl1, struct file_lock *fl2)
 	     && fl1->fl_end   == fl2->fl_end
 	     &&(fl1->fl_type  == fl2->fl_type || fl2->fl_type == F_UNLCK);
 }
+
+extern struct lock_manager_operations nlmsvc_lock_operations;
 
 #endif /* __KERNEL__ */
 

@@ -38,7 +38,7 @@ void cache_init(struct cache_head *h)
 	time_t now = get_seconds();
 	h->next = NULL;
 	h->flags = 0;
-	atomic_set(&h->refcnt, 0);
+	atomic_set(&h->refcnt, 1);
 	h->expiry_time = now + CACHE_NEW_EXPIRY;
 	h->last_refresh = now;
 }
@@ -400,9 +400,10 @@ void cache_flush(void)
 
 void cache_purge(struct cache_detail *detail)
 {
-	detail->flush_time = get_seconds()+1;
+	detail->flush_time = LONG_MAX;
 	detail->nextcheck = get_seconds();
 	cache_flush();
+	detail->flush_time = 1;
 }
 
 

@@ -507,9 +507,9 @@ xfs_reserve_blocks(
 	__uint64_t              *inval,
 	xfs_fsop_resblks_t      *outval)
 {
-	__uint64_t              lcounter, delta;
-	__uint64_t              request;
-	unsigned long s;
+	__int64_t		lcounter, delta;
+	__uint64_t		request;
+	unsigned long		s;
 
 	/* If inval is null, report current values and return */
 
@@ -536,8 +536,7 @@ xfs_reserve_blocks(
 		mp->m_resblks = request;
 	} else {
 		delta = request - mp->m_resblks;
-		lcounter = mp->m_sb.sb_fdblocks;
-		lcounter -= delta;
+		lcounter = mp->m_sb.sb_fdblocks - delta;
 		if (lcounter < 0) {
 			/* We can't satisfy the request, just get what we can */
 			mp->m_resblks += mp->m_sb.sb_fdblocks;

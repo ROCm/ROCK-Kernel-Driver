@@ -8,8 +8,7 @@
 
 	.text
 	.align 4
-	.global __strncmp, strncmp
-__strncmp:
+	.global strncmp
 strncmp:
 	brlez,pn %o2, 3f
 	 lduba	[%o0] (ASI_PNF), %o3

@@ -1659,7 +1659,7 @@ out:
  * if it cannot handle the case of removing a directory
  * that is still in use by something else..
  */
-static void d_unhash(struct dentry *dentry)
+void dentry_unhash(struct dentry *dentry)
 {
 	dget(dentry);
 	spin_lock(&dcache_lock);
@@ -1689,7 +1689,7 @@ int vfs_rmdir(struct inode *dir, struct dentry *dentry)
 	DQUOT_INIT(dir);
 
 	down(&dentry->d_inode->i_sem);
-	d_unhash(dentry);
+	dentry_unhash(dentry);
 	if (d_mountpoint(dentry))
 		error = -EBUSY;
 	else {
@@ -2032,7 +2032,7 @@ int vfs_rename_dir(struct inode *old_dir, struct dentry *old_dentry,
 	target = new_dentry->d_inode;
 	if (target) {
 		down(&target->i_sem);
-		d_unhash(new_dentry);
+		dentry_unhash(new_dentry);
 	}
 	if (d_mountpoint(old_dentry)||d_mountpoint(new_dentry))
 		error = -EBUSY;
@@ -2410,4 +2410,5 @@ EXPORT_SYMBOL(vfs_rename);
 EXPORT_SYMBOL(vfs_rmdir);
 EXPORT_SYMBOL(vfs_symlink);
 EXPORT_SYMBOL(vfs_unlink);
+EXPORT_SYMBOL(dentry_unhash);
 EXPORT_SYMBOL(generic_readlink);

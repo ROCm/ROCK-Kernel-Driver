@@ -401,8 +401,6 @@ struct sonypi_device {
 #define SONYPI_ACPI_ACTIVE 0
 #endif /* CONFIG_ACPI */
 
-extern int verbose;
-
 static inline int sonypi_ec_write(u8 addr, u8 value) {
 #ifdef CONFIG_ACPI_EC
 	if (SONYPI_ACPI_ACTIVE)

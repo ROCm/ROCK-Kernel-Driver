@@ -1044,6 +1044,8 @@ void pmac_pci_fixup_cardbus(struct pci_dev* dev)
 	}
 }
 
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_TI, PCI_ANY_ID, pmac_pci_fixup_cardbus);
+
 void pmac_pci_fixup_pciata(struct pci_dev* dev)
 {
        u8 progif = 0;
@@ -1084,6 +1086,8 @@ void pmac_pci_fixup_pciata(struct pci_dev* dev)
 			printk(KERN_ERR "Rewrite of PROGIF failed !\n");
 	}
 }
+DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, pmac_pci_fixup_pciata);
+
 
 /*
  * Disable second function on K2-SATA, it's broken
@@ -1114,3 +1118,4 @@ void __pmac pmac_pci_fixup_k2_sata(struct pci_dev* dev)
 		}
 	}
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_SERVERWORKS, 0x0240, pmac_pci_fixup_k2_sata);

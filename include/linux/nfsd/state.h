@@ -218,7 +218,7 @@ struct nfs4_stateid {
 	struct nfs4_stateowner      * st_stateowner;
 	struct nfs4_file            * st_file;
 	stateid_t                     st_stateid;
-	struct file                   st_vfs_file;
+	struct file                 * st_vfs_file;
 	int                           st_vfs_set;
 	unsigned long                 st_access_bmap;
 	unsigned long                 st_deny_bmap;

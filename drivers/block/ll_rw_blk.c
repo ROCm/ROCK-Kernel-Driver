@@ -154,6 +154,8 @@ struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 	return ret;
 }
 
+EXPORT_SYMBOL(blk_get_backing_dev_info);
+
 void blk_queue_activity_fn(request_queue_t *q, activity_fn *fn, void *data)
 {
 	q->activity_fn = fn;
@@ -285,7 +287,7 @@ void blk_queue_ordered(request_queue_t *q, int flag)
 EXPORT_SYMBOL(blk_queue_ordered);
 
 /**
- * blk_queue_ordered - set function for issuing a flush
+ * blk_queue_issue_flush_fn - set function for issuing a flush
  * @q:     the request queue
  * @iff:   the function to be called issuing the flush
  *
@@ -521,15 +523,14 @@ struct request *blk_queue_find_tag(request_queue_t *q, int tag)
 EXPORT_SYMBOL(blk_queue_find_tag);
 
 /**
- * blk_queue_free_tags - release tag maintenance info
+ * __blk_queue_free_tags - release tag maintenance info
  * @q:  the request queue for the device
  *
  *  Notes:
  *    blk_cleanup_queue() will take care of calling this function, if tagging
- *    has been used. So there's usually no need to call this directly, unless
- *    tagging is just being disabled but the queue remains in function.
+ *    has been used. So there's no need to call this directly.
  **/
-void blk_queue_free_tags(request_queue_t *q)
+static void __blk_queue_free_tags(request_queue_t *q)
 {
 	struct blk_queue_tag *bqt = q->queue_tags;
 
@@ -553,12 +554,27 @@ void blk_queue_free_tags(request_queue_t *q)
 	q->queue_flags &= ~(1 << QUEUE_FLAG_QUEUED);
 }
 
+/**
+ * blk_queue_free_tags - release tag maintenance info
+ * @q:  the request queue for the device
+ *
+ *  Notes:
+ *	This is used to disabled tagged queuing to a device, yet leave
+ *	queue in function.
+ **/
+void blk_queue_free_tags(request_queue_t *q)
+{
+	clear_bit(QUEUE_FLAG_QUEUED, &q->queue_flags);
+}
+
 EXPORT_SYMBOL(blk_queue_free_tags);
 
 static int
 init_tag_map(request_queue_t *q, struct blk_queue_tag *tags, int depth)
 {
 	int bits, i;
+	struct request **tag_index;
+	unsigned long *tag_map;
 
 	if (depth > q->nr_requests * 2) {
 		depth = q->nr_requests * 2;
@@ -566,32 +582,31 @@ init_tag_map(request_queue_t *q, struct blk_queue_tag *tags, int depth)
 				__FUNCTION__, depth);
 	}
 
-	tags->tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
-	if (!tags->tag_index)
+	tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
+	if (!tag_index)
 		goto fail;
 
 	bits = (depth / BLK_TAGS_PER_LONG) + 1;
-	tags->tag_map = kmalloc(bits * sizeof(unsigned long), GFP_ATOMIC);
-	if (!tags->tag_map)
+	tag_map = kmalloc(bits * sizeof(unsigned long), GFP_ATOMIC);
+	if (!tag_map)
 		goto fail;
 
-	memset(tags->tag_index, 0, depth * sizeof(struct request *));
-	memset(tags->tag_map, 0, bits * sizeof(unsigned long));
+	memset(tag_index, 0, depth * sizeof(struct request *));
+	memset(tag_map, 0, bits * sizeof(unsigned long));
 	tags->max_depth = depth;
 	tags->real_max_depth = bits * BITS_PER_LONG;
+	tags->tag_index = tag_index;
+	tags->tag_map = tag_map;
 
 	/*
 	 * set the upper bits if the depth isn't a multiple of the word size
 	 */
 	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
-		__set_bit(i, tags->tag_map);
+		__set_bit(i, tag_map);
 
-	INIT_LIST_HEAD(&tags->busy_list);
-	tags->busy = 0;
-	atomic_set(&tags->refcnt, 1);
 	return 0;
 fail:
-	kfree(tags->tag_index);
+	kfree(tag_index);
 	return -ENOMEM;
 }
 
@@ -603,13 +618,26 @@ fail:
 int blk_queue_init_tags(request_queue_t *q, int depth,
 			struct blk_queue_tag *tags)
 {
-	if (!tags) {
+	int rc;
+
+	BUG_ON(tags && q->queue_tags && tags != q->queue_tags);
+
+	if (!tags && !q->queue_tags) {
 		tags = kmalloc(sizeof(struct blk_queue_tag), GFP_ATOMIC);
 		if (!tags)
 			goto fail;
 
 		if (init_tag_map(q, tags, depth))
 			goto fail;
+
+		INIT_LIST_HEAD(&tags->busy_list);
+		tags->busy = 0;
+		atomic_set(&tags->refcnt, 1);
+	} else if (q->queue_tags) {
+		if ((rc = blk_queue_resize_tags(q, depth)))
+			return rc;
+		set_bit(QUEUE_FLAG_QUEUED, &q->queue_flags);
+		return 0;
 	} else
 		atomic_inc(&tags->refcnt);
 
@@ -1374,8 +1402,8 @@ void blk_cleanup_queue(request_queue_t * q)
 	if (rl->rq_pool)
 		mempool_destroy(rl->rq_pool);
 
-	if (blk_queue_tagged(q))
-		blk_queue_free_tags(q);
+	if (q->queue_tags)
+		__blk_queue_free_tags(q);
 
 	kmem_cache_free(requestq_cachep, q);
 }
@@ -1964,10 +1992,11 @@ int blk_execute_rq(request_queue_t *q, struct gendisk *bd_disk,
 	}
 
 	rq->flags |= REQ_NOMERGE;
-	rq->waiting = &wait;
+	if (!rq->waiting)
+		rq->waiting = &wait;
 	elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
 	generic_unplug_device(q);
-	wait_for_completion(&wait);
+	wait_for_completion(rq->waiting);
 	rq->waiting = NULL;
 
 	if (rq->errors)
@@ -1979,16 +2008,14 @@ int blk_execute_rq(request_queue_t *q, struct gendisk *bd_disk,
 EXPORT_SYMBOL(blk_execute_rq);
 
 /**
- * blk_issue_flush - queue a flush
+ * blkdev_issue_flush - queue a flush
  * @bdev:	blockdev to issue flush for
  * @error_sector:	error sector
- * @wait:	completion event
  *
  * Description:
  *    Issue a flush for the block device in question. Caller can supply
  *    room for storing the error offset in case of a flush error, if they
- *    wish to. Passing in @wait makes the interface async, caller must
- *    wait_for_completion() on its own.
+ *    wish to.  Caller must run wait_for_completion() on its own.
  */
 int blkdev_issue_flush(struct block_device *bdev, sector_t *error_sector)
 {

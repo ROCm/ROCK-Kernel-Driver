@@ -344,7 +344,6 @@ int hfsplus_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 /* options.c */
 int parse_options(char *, struct hfsplus_sb_info *);
 void fill_defaults(struct hfsplus_sb_info *);
-void fill_current(struct hfsplus_sb_info *, struct hfsplus_sb_info *);
 
 /* tables.c */
 extern u16 case_fold_table[];

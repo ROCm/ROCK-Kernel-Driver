@@ -2,7 +2,6 @@
 #define _LINUX_NFS_XDR_H
 
 #include <linux/sunrpc/xprt.h>
-#include <linux/nfsacl.h>
 
 struct nfs4_fsid {
 	__u64 major;
@@ -100,20 +99,21 @@ struct nfs4_change_info {
  * Arguments to the open call.
  */
 struct nfs_openargs {
-	struct nfs_fh *         fh;
+	const struct nfs_fh *	fh;
 	__u32                   seqid;
-	__u32                   share_access;
+	int			open_flags;
 	__u64                   clientid;
 	__u32                   id;
-	__u32                   opentype;
-	__u32                   createmode;
 	union {
 		struct iattr *  attrs;    /* UNCHECKED, GUARDED */
 		nfs4_verifier   verifier; /* EXCLUSIVE */
+		nfs4_stateid	delegation;		/* CLAIM_DELEGATE_CUR */
+		int		delegation_type;	/* CLAIM_PREVIOUS */
 	} u;
 	const struct qstr *	name;
 	const struct nfs_server *server;	 /* Needed for ID mapping */
 	const u32 *		bitmask;
+	__u32			claim;
 };
 
 struct nfs_openres {
@@ -123,13 +123,17 @@ struct nfs_openres {
 	__u32                   rflags;
 	struct nfs_fattr *      f_attr;
 	const struct nfs_server *server;
+	int			delegation_type;
+	nfs4_stateid		delegation;
+	__u32			do_recall;
+	__u64			maxsize;
 };
 
 /*
  * Arguments to the open_confirm call.
  */
 struct nfs_open_confirmargs {
-	struct nfs_fh *         fh;
+	const struct nfs_fh *	fh;
 	nfs4_stateid            stateid;
 	__u32                   seqid;
 };
@@ -139,26 +143,13 @@ struct nfs_open_confirmres {
 };
 
 /*
- * Arguments to the open_reclaim call.
- */
-struct nfs_open_reclaimargs {
-	struct nfs_fh *		fh;
-	__u64			clientid;
-	__u32			seqid;
-	__u32			id;
-	__u32			share_access;
-	__u32			claim;
-	const __u32 *		bitmask;
-};
-
-/*
  * Arguments to the close call.
  */
 struct nfs_closeargs {
 	struct nfs_fh *         fh;
 	nfs4_stateid            stateid;
 	__u32                   seqid;
-	__u32			share_access;
+	int			open_flags;
 };
 
 struct nfs_closeres {
@@ -225,6 +216,11 @@ struct nfs_lockres {
 	const struct nfs_server *	server;
 };
 
+struct nfs4_delegreturnargs {
+	const struct nfs_fh *fhandle;
+	const nfs4_stateid *stateid;
+};
+
 /*
  * Arguments to the read call.
  */
@@ -236,8 +232,7 @@ struct nfs_lockres {
 
 struct nfs_readargs {
 	struct nfs_fh *		fh;
-	fl_owner_t		lockowner;
-	struct nfs4_state *	state;
+	struct nfs_open_context *context;
 	__u64			offset;
 	__u32			count;
 	unsigned int		pgbase;
@@ -260,8 +255,7 @@ struct nfs_readres {
 
 struct nfs_writeargs {
 	struct nfs_fh *		fh;
-	fl_owner_t		lockowner;
-	struct nfs4_state *	state;
+	struct nfs_open_context *context;
 	__u64			offset;
 	__u32			count;
 	enum nfs3_stable_how	stable;
@@ -357,20 +351,6 @@ struct nfs_readdirargs {
 	struct nfs_fh *		fh;
 	__u32			cookie;
 	unsigned int		count;
-	struct page **		pages;
-};
-
-struct nfs3_getaclargs {
-	struct nfs_fh *		fh;
-	int			mask;
-	struct page **		pages;
-};
-
-struct nfs3_setaclargs {
-	struct inode *		inode;
-	int			mask;
-	struct posix_acl *	acl_access;
-	struct posix_acl *	acl_default;
 	struct page **		pages;
 };
 
@@ -495,15 +475,6 @@ struct nfs3_readdirres {
 	int			plus;
 };
 
-struct nfs3_getaclres {
-	struct nfs_fattr *	fattr;
-	int			mask;
-	unsigned int		acl_access_count;
-	unsigned int		acl_default_count;
-	struct posix_acl *	acl_access;
-	struct posix_acl *	acl_default;
-};
-
 #ifdef CONFIG_NFS_V4
 
 typedef u64 clientid4;
@@ -621,13 +592,15 @@ struct nfs4_rename_res {
 };
 
 struct nfs4_setclientid {
-	nfs4_verifier			sc_verifier;      /* request */
-	char *				sc_name;	  /* request */
+	const nfs4_verifier *		sc_verifier;      /* request */
+	unsigned int			sc_name_len;
+	char				sc_name[32];	  /* request */
 	u32				sc_prog;          /* request */
+	unsigned int			sc_netid_len;
 	char				sc_netid[4];	  /* request */
+	unsigned int			sc_uaddr_len;
 	char				sc_uaddr[24];     /* request */
 	u32				sc_cb_ident;      /* request */
-	struct nfs4_client *		sc_state;	  /* response */
 };
 
 struct nfs4_statfs_arg {
@@ -681,6 +654,8 @@ struct nfs_write_data {
 	void (*complete) (struct nfs_write_data *, int);
 };
 
+struct nfs_access_entry;
+
 /*
  * RPC procedure vector for NFSv2/NFSv3 demuxing
  */
@@ -691,16 +666,17 @@ struct nfs_rpc_ops {
 
 	int	(*getroot) (struct nfs_server *, struct nfs_fh *,
 			    struct nfs_fsinfo *);
-	int	(*getattr) (struct inode *, struct nfs_fattr *);
+	int	(*getattr) (struct nfs_server *, struct nfs_fh *,
+			    struct nfs_fattr *);
 	int	(*setattr) (struct dentry *, struct nfs_fattr *,
 			    struct iattr *);
 	int	(*lookup)  (struct inode *, struct qstr *,
 			    struct nfs_fh *, struct nfs_fattr *);
-	int	(*access)  (struct inode *, struct rpc_cred *, int);
+	int	(*access)  (struct inode *, struct nfs_access_entry *);
 	int	(*readlink)(struct inode *, struct page *);
-	int	(*read)    (struct nfs_read_data *, struct file *);
-	int	(*write)   (struct nfs_write_data *, struct file *);
-	int	(*commit)  (struct nfs_write_data *, struct file *);
+	int	(*read)    (struct nfs_read_data *);
+	int	(*write)   (struct nfs_write_data *);
+	int	(*commit)  (struct nfs_write_data *);
 	struct inode *	(*create)  (struct inode *, struct qstr *,
 			    struct iattr *, int);
 	int	(*remove)  (struct inode *, struct qstr *);
@@ -732,14 +708,7 @@ struct nfs_rpc_ops {
 	void	(*commit_setup) (struct nfs_write_data *, int how);
 	int	(*file_open)   (struct inode *, struct file *);
 	int	(*file_release) (struct inode *, struct file *);
-	void	(*request_init)(struct nfs_page *, struct file *);
-	int	(*request_compatible)(struct nfs_page *, struct file *, struct page *);
 	int	(*lock)(struct file *, int, struct file_lock *);
-#ifdef CONFIG_NFS_ACL
-	struct posix_acl * (*getacl)(struct inode *, int);
-	int	(*setacl)(struct inode *, int, struct posix_acl *);
-	int	(*checkacls)(struct inode *inode);
-#endif  /* CONFIG_NFS_ACL */
 };
 
 /*
@@ -760,8 +729,5 @@ extern struct rpc_version	nfs_version3;
 extern struct rpc_version	nfs_version4;
 extern struct rpc_program	nfs_program;
 extern struct rpc_stat		nfs_rpcstat;
-
-extern struct rpc_version	nfsacl_version3;
-extern struct rpc_program	nfsacl_program;
 
 #endif

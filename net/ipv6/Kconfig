@@ -1,16 +1,6 @@
 #
 # IPv6 configuration
 # 
-config IPV6_SUBTREES
-	bool "IPv6: Subtree support (EXPERIMENTAL)"
-	depends on IPV6
-	---help---
-	  This is needed for Mobility to work correctly, when the home
-	  address of the mobile node is used as it's source address,
-	  the route lookup will find the tunnel device as it is first
-	  doing a route lookup based on source address and then the
-	  destination address.
-
 config IPV6_PRIVACY
 	bool "IPv6: Privacy Extensions (RFC 3041) support"
 	depends on IPV6
@@ -62,6 +52,7 @@ config INET6_IPCOMP
 	tristate "IPv6: IPComp transformation"
 	depends on IPV6
 	select XFRM
+	select INET6_TUNNEL
 	select CRYPTO
 	select CRYPTO_DEFLATE
 	---help---
@@ -70,13 +61,23 @@ config INET6_IPCOMP
 
 	  If unsure, say Y.
 
-config IPV6_TUNNEL
-	tristate "IPv6: IPv6-in-IPv6 tunnel (EXPERIMENTAL)"
+config INET6_TUNNEL
+	tristate "IPv6: tunnel transformation"
 	depends on IPV6
+	select XFRM
 	---help---
-	  Support for IPv6-in-IPv6 tunnels described in RFC 2473. This is
-	  needed for mobility to work.
+	  Support for generic IPv6-in-IPv6 tunnel transformation, which is
+	  required by the IPv6-in-IPv6 tunneling module as well as tunnel mode
+	  IPComp.
+	  
+	  If unsure, say Y.
+
+config IPV6_TUNNEL
+	tristate "IPv6: IPv6-in-IPv6 tunnel"
+	depends on IPV6
+	select INET6_TUNNEL
+	---help---
+	  Support for IPv6-in-IPv6 tunnels described in RFC 2473.
 
 	  If unsure, say N.
 
-source net/ipv6/mobile_ip6/Kconfig

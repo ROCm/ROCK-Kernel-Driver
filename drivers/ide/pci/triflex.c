@@ -242,7 +242,7 @@ static struct pci_device_id triflex_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, triflex_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "TRIFLEX IDE",
+	.name		= "TRIFLEX_IDE",
 	.id_table	= triflex_pci_tbl,
 	.probe		= triflex_init_one,
 };

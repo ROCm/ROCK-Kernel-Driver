@@ -129,10 +129,10 @@ void *traverse_pci_devices(struct device_node *start, traverse_func pre,
  */
 static void *traverse_all_pci_devices(traverse_func pre)
 {
-	struct pci_controller *phb;
+	struct pci_controller *phb, *tmp;
 	void *ret;
 
-	for (phb = hose_head; phb; phb = phb->next)
+	list_for_each_entry_safe(phb, tmp, &hose_list, list_node)
 		if ((ret = traverse_pci_devices(phb->arch_data, pre, phb))
 				!= NULL)
 			return ret;

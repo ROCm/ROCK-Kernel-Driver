@@ -138,7 +138,6 @@ static inline void autofs4_copy_atime(struct file *src, struct file *dst)
 }
 
 struct inode *autofs4_get_inode(struct super_block *, struct autofs_info *);
-struct autofs_info *autofs4_init_inf(struct autofs_sb_info *, mode_t mode);
 void autofs4_free_ino(struct autofs_info *);
 
 /* Expiration */

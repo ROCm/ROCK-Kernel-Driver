@@ -48,12 +48,7 @@ static void __init pci_fixup_ide_bases(struct pci_dev *d)
 		}
 	}
 }
-
-/* Add future fixups here... */
-struct pci_fixup pcibios_fixups[] = {
-	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,	PCI_ANY_ID,	pci_fixup_ide_bases },
-	{ 0 }
-};
+DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, pci_fixup_ide_bases);
 
 char * __init pcibios_setup(char *str)
 {

@@ -36,6 +36,11 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Evgeniy Polyakov <johnpol@2ka.mipt.ru>");
 MODULE_DESCRIPTION("Driver for 1-wire Dallas network protocol, temperature family.");
 
+static u8 bad_roms[][9] = {
+				{0xaa, 0x00, 0x4b, 0x46, 0xff, 0xff, 0x0c, 0x10, 0x87}, 
+				{}
+			};
+
 static ssize_t w1_therm_read_name(struct device *, char *);
 static ssize_t w1_therm_read_temp(struct device *, char *);
 static ssize_t w1_therm_read_bin(struct kobject *, char *, loff_t, size_t);
@@ -69,14 +74,24 @@ static ssize_t w1_therm_read_temp(struct device *dev, char *buf)
 	return sprintf(buf, "%d\n", temp * 1000);
 }
 
+static int w1_therm_check_rom(u8 rom[9])
+{
+	int i;
+
+	for (i=0; i<sizeof(bad_roms)/9; ++i)
+		if (!memcmp(bad_roms[i], rom, 9))
+			return 1;
+
+	return 0;
+}
+
 static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, size_t count)
 {
 	struct w1_slave *sl = container_of(container_of(kobj, struct device, kobj),
 			      			struct w1_slave, dev);
 	struct w1_master *dev = sl->master;
 	u8 rom[9], crc, verdict;
-	size_t icount;
-	int i;
+	int i, max_trying = 10;
 	u16 temp;
 
 	atomic_inc(&sl->refcnt);
@@ -89,10 +104,10 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 		count = 0;
 		goto out;
 	}
-	if (off + count > W1_SLAVE_DATA_SIZE)
-		count = W1_SLAVE_DATA_SIZE - off;
-
-	icount = count;
+	if (off + count > W1_SLAVE_DATA_SIZE) {
+		count = 0;
+		goto out;
+	}
 
 	memset(buf, 0, count);
 	memset(rom, 0, sizeof(rom));
@@ -100,56 +115,54 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 	count = 0;
 	verdict = 0;
 	crc = 0;
-	if (!w1_reset_bus(dev)) {
-		u64 id = *(u64 *) & sl->reg_num;
-		int count = 0;
 
-		w1_write_8(dev, W1_MATCH_ROM);
-		for (i = 0; i < 8; ++i)
-			w1_write_8(dev, (id >> i * 8) & 0xff);
+	while (max_trying--) {
+		if (!w1_reset_bus (dev)) {
+			int count = 0;
+			u8 match[9] = {W1_MATCH_ROM, };
 
-		w1_write_8(dev, W1_CONVERT_TEMP);
+			memcpy(&match[1], (u64 *) & sl->reg_num, 8);
+			
+			w1_write_block(dev, match, 9);
 
-		while (dev->bus_master->read_bit(dev->bus_master->data) == 0
-		       && count < 10) {
-			w1_delay(1);
-			count++;
-		}
+			w1_write_8(dev, W1_CONVERT_TEMP);
 
-		if (count < 10) {
-			if (!w1_reset_bus(dev)) {
-				w1_write_8(dev, W1_MATCH_ROM);
-				for (i = 0; i < 8; ++i)
-					w1_write_8(dev,
-						   (id >> i * 8) & 0xff);
+			if (count < 10) {
+				if (!w1_reset_bus(dev)) {
+					w1_write_block(dev, match, 9);
 
-				w1_write_8(dev, W1_READ_SCRATCHPAD);
-				for (i = 0; i < 9; ++i)
-					rom[i] = w1_read_8(dev);
+					w1_write_8(dev, W1_READ_SCRATCHPAD);
+					if ((count = w1_read_block(dev, rom, 9)) != 9) {
+						dev_warn(&dev->dev, "w1_read_block() returned %d instead of 9.\n", count);
+					}
 
-				crc = w1_calc_crc8(rom, 8);
+					crc = w1_calc_crc8(rom, 8);
 
-				if (rom[8] == crc && rom[0])
-					verdict = 1;
+					if (rom[8] == crc && rom[0])
+						verdict = 1;
+				}
 			}
+			else
+				dev_warn(&dev->dev,
+					  "18S20 doesn't respond to CONVERT_TEMP.\n");
 		}
-		else
-			dev_warn(&dev->dev,
-				  "18S20 doesn't respond to CONVERT_TEMP.\n");
+
+		if (!w1_therm_check_rom(rom))
+			break;
 	}
 
 	for (i = 0; i < 9; ++i)
-		count += snprintf(buf + count, icount - count, "%02x ", rom[i]);
-	count += snprintf(buf + count, icount - count, ": crc=%02x %s\n",
+		count += sprintf(buf + count, "%02x ", rom[i]);
+	count += sprintf(buf + count, ": crc=%02x %s\n",
 			   crc, (verdict) ? "YES" : "NO");
 	if (verdict)
 		memcpy(sl->rom, rom, sizeof(sl->rom));
 	for (i = 0; i < 9; ++i)
-		count += snprintf(buf + count, icount - count, "%02x ", sl->rom[i]);
+		count += sprintf(buf + count, "%02x ", sl->rom[i]);
 	temp = 0;
 	temp <<= sl->rom[1] / 2;
 	temp |= sl->rom[0] / 2;
-	count += snprintf(buf + count, icount - count, "t=%u\n", temp);
+	count += sprintf(buf + count, "t=%u\n", temp);
 out:
 	up(&dev->mutex);
 out_dec:

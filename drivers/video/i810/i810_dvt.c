@@ -193,19 +193,19 @@ struct mode_registers std_modes[] = {
 
 void round_off_xres(u32 *xres) 
 {
-	if (*xres < 800) 
+	if (*xres <= 640)
 		*xres = 640;
-	if (*xres < 1024 && *xres >= 800) 
+	else if (*xres <= 800)
 		*xres = 800;
-	if (*xres < 1152 && *xres >= 1024)
+	else if (*xres <= 1024)
 		*xres = 1024;
-	if (*xres < 1280 && *xres >= 1152)
+	else if (*xres <= 1152)
 		*xres = 1152;
-	if (*xres < 1600 && *xres >= 1280)
+	else if (*xres <= 1280)
 		*xres = 1280;
-	if (*xres >= 1600)
+	else
 		*xres = 1600;
-}		
+}
 
 inline void round_off_yres(u32 *xres, u32 *yres)
 {

@@ -519,9 +519,9 @@ unsigned long __init find_and_init_phbs(void)
 	return 0;
 }
 
+#if 0
 void pcibios_name_device(struct pci_dev *dev)
 {
-#if 0
 	struct device_node *dn;
 
 	/*
@@ -541,8 +541,9 @@ void pcibios_name_device(struct pci_dev *dev)
 			}
 		}
 	}
-#endif
 }   
+DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, pcibios_name_device);
+#endif
 
 void __devinit pcibios_fixup_device_resources(struct pci_dev *dev,
 					   struct pci_bus *bus)
@@ -728,9 +729,9 @@ EXPORT_SYMBOL(remap_bus_range);
 
 static void phbs_fixup_io(void)
 {
-	struct pci_controller *hose;
+	struct pci_controller *hose, *tmp;
 
-	for (hose=hose_head;hose;hose=hose->next) 
+	list_for_each_entry_safe(hose, tmp, &hose_list, list_node)
 		remap_bus_range(hose->bus);
 }
 
@@ -763,8 +764,8 @@ struct pci_controller*
 pci_find_hose_for_OF_device(struct device_node *node)
 {
 	while (node) {
-		struct pci_controller *hose;
-		for (hose=hose_head;hose;hose=hose->next)
+		struct pci_controller *hose, *tmp;
+		list_for_each_entry_safe(hose, tmp, &hose_list, list_node)
 			if (hose->arch_data == node)
 				return hose;
 		node=node->parent;

@@ -84,8 +84,6 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
-#include <net/mipglue.h>
-
 /* Set to 3 to get tracing... */
 #define ACONF_DEBUG 2
 
@@ -137,7 +135,7 @@ static int addrconf_ifdown(struct net_device *dev, int how);
 
 static void addrconf_dad_start(struct inet6_ifaddr *ifp, int flags);
 static void addrconf_dad_timer(unsigned long data);
-void addrconf_dad_completed(struct inet6_ifaddr *ifp);
+static void addrconf_dad_completed(struct inet6_ifaddr *ifp);
 static void addrconf_rs_timer(unsigned long data);
 static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifa);
 
@@ -518,6 +516,8 @@ void inet6_ifa_finish_destroy(struct inet6_ifaddr *ifp)
 		printk("Freeing alive inet6 address %p\n", ifp);
 		return;
 	}
+	dst_release(&ifp->rt->u.dst);
+
 	inet6_ifa_count--;
 	kfree(ifp);
 }
@@ -528,25 +528,33 @@ static struct inet6_ifaddr *
 ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	      int scope, unsigned flags)
 {
-	struct inet6_ifaddr *ifa;
+	struct inet6_ifaddr *ifa = NULL;
+	struct rt6_info *rt;
 	int hash;
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+	int err = 0;
 
 	spin_lock_bh(&lock);
 
 	/* Ignore adding duplicate addresses on an interface */
 	if (ipv6_chk_same_addr(addr, idev->dev)) {
-		spin_unlock_bh(&lock);
 		ADBG(("ipv6_add_addr: already assigned\n"));
-		return ERR_PTR(-EEXIST);
+		err = -EEXIST;
+		goto out;
 	}
 
 	ifa = kmalloc(sizeof(struct inet6_ifaddr), GFP_ATOMIC);
 
 	if (ifa == NULL) {
-		spin_unlock_bh(&lock);
 		ADBG(("ipv6_add_addr: malloc failed\n"));
-		return ERR_PTR(-ENOBUFS);
+		err = -ENOBUFS;
+		goto out;
+	}
+
+	rt = addrconf_dst_alloc(idev, addr, 0);
+	if (IS_ERR(rt)) {
+		err = PTR_ERR(rt);
+		goto out;
 	}
 
 	memset(ifa, 0, sizeof(struct inet6_ifaddr));
@@ -563,9 +571,8 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	read_lock(&addrconf_lock);
 	if (idev->dead) {
 		read_unlock(&addrconf_lock);
-		spin_unlock_bh(&lock);
-		kfree(ifa);
-		return ERR_PTR(-ENODEV);	/*XXX*/
+		err = -ENODEV;	/*XXX*/
+		goto out;
 	}
 
 	inet6_ifa_count++;
@@ -599,12 +606,20 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	}
 #endif
 
+	ifa->rt = rt;
+
 	in6_ifa_hold(ifa);
 	write_unlock_bh(&idev->lock);
 	read_unlock(&addrconf_lock);
+out:
 	spin_unlock_bh(&lock);
 
-	notifier_call_chain(&inet6addr_chain,NETDEV_UP,ifa);
+	if (unlikely(err == 0))
+		notifier_call_chain(&inet6addr_chain, NETDEV_UP, ifa);
+	else {
+		kfree(ifa);
+		ifa = ERR_PTR(err);
+	}
 
 	return ifa;
 }
@@ -902,7 +917,6 @@ int ipv6_dev_get_saddr(struct net_device *daddr_dev,
 			}
 
 			/* XXX: Rule 4: Prefer home address */
-			/* Not implemented here */
 
 			/* Rule 5: Prefer outgoing interface */
 			if (daddr_dev == NULL || daddr_dev == dev)
@@ -969,12 +983,6 @@ int ipv6_dev_get_saddr(struct net_device *daddr_dev,
 	} else {
 		err = -EADDRNOTAVAIL;
 	}
-
-	/* The home address is always used as source address in
-	 * MIPL mobile IPv6
-	 */
-	addrconf_get_mipv6_home_address(NULL, saddr);
-
 	return err;
 }
 
@@ -1630,8 +1638,7 @@ ok:
 				spin_unlock(&ifp->lock);
 
 				if (!(flags&IFA_F_TENTATIVE))
-					ipv6_ifa_notify((flags&IFA_F_DEPRECATED) ?
-							0 : RTM_NEWADDR, ifp);
+					ipv6_ifa_notify(0, ifp);
 			} else
 				spin_unlock(&ifp->lock);
 
@@ -1837,28 +1844,6 @@ int addrconf_del_ifaddr(void __user *arg)
 	return err;
 }
 
-int addrconf_add_ifaddr_kernel(struct in6_ifreq *ireq)
-{
-	int err;
-	
-	rtnl_lock();
-	err = inet6_addr_add(ireq->ifr6_ifindex, &ireq->ifr6_addr,
-			ireq->ifr6_prefixlen);
-	rtnl_unlock();
-	return err;
-}
-
-int addrconf_del_ifaddr_kernel(struct in6_ifreq *ireq)
-{
-	int err;
-	
-	rtnl_lock();
-	err = inet6_addr_del(ireq->ifr6_ifindex, &ireq->ifr6_addr,
-			ireq->ifr6_prefixlen);
-	rtnl_unlock();
-	return err;
-}
-
 static void sit_add_v4_addrs(struct inet6_dev *idev)
 {
 	struct inet6_ifaddr * ifp;
@@ -2057,9 +2042,6 @@ static void addrconf_ip6_tnl_config(struct net_device *dev)
 	struct inet6_dev *idev;
 
 	ASSERT_RTNL();
-
-	if (!dev->generate_eui64) 
-		dev->generate_eui64 = ipv6_generate_eui64;
 
 	if ((idev = addrconf_add_dev(dev)) == NULL) {
 		printk(KERN_DEBUG "init ip6-ip6: add_dev failed\n");
@@ -2381,7 +2363,7 @@ static void addrconf_dad_timer(unsigned long data)
 	in6_ifa_put(ifp);
 }
 
-void addrconf_dad_completed(struct inet6_ifaddr *ifp)
+static void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 {
 	struct net_device *	dev = ifp->idev->dev;
 
@@ -2390,7 +2372,6 @@ void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 	 */
 
 	ipv6_ifa_notify(RTM_NEWADDR, ifp);
-	notifier_call_chain(&inet6addr_chain,NETDEV_UP,ifp);
 
 	/* If added prefix is link local and forwarding is off,
 	   start sending router solicitations.
@@ -2701,19 +2682,7 @@ inet6_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	if (rta[IFA_LOCAL-1]) {
 		if (pfx && memcmp(pfx, RTA_DATA(rta[IFA_LOCAL-1]), sizeof(*pfx)))
 			return -EINVAL;
-		if (ifm->ifa_flags & IFA_F_HOMEADDR && !rta[IFA_HOMEAGENT-1])
-			return -EINVAL;
 		pfx = RTA_DATA(rta[IFA_LOCAL-1]);
-	}
-	if (rta[IFA_HOMEAGENT-1]) {
-		struct in6_addr *ha;
-		if (pfx == NULL || !(ifm->ifa_flags & IFA_F_HOMEADDR))
-			return -EINVAL;
-		if (RTA_PAYLOAD(rta[IFA_HOMEAGENT-1]) < sizeof(*ha))
-			return -EINVAL;
-		ha = RTA_DATA(rta[IFA_HOMEAGENT-1]);
-		addrconf_set_mipv6_mn_home(ifm->ifa_index, pfx, ifm->ifa_prefixlen,
-					   ha, ifm->ifa_prefixlen);
 	}
 
 	if (pfx == NULL)
@@ -3201,7 +3170,9 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 
 	switch (event) {
 	case RTM_NEWADDR:
-		ip6_rt_addr_add(&ifp->addr, ifp->idev->dev, 0);
+		dst_hold(&ifp->rt->u.dst);
+		if (ip6_ins_rt(ifp->rt, NULL, NULL))
+			dst_release(&ifp->rt->u.dst);
 		break;
 	case RTM_DELADDR:
 		addrconf_leave_solict(ifp->idev->dev, &ifp->addr);
@@ -3212,8 +3183,11 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 			if (!ipv6_addr_any(&addr))
 				ipv6_dev_ac_dec(ifp->idev->dev, &addr);
 		}
-		if (!ipv6_chk_addr(&ifp->addr, ifp->idev->dev, 1))
-			ip6_rt_addr_del(&ifp->addr, ifp->idev->dev);
+		dst_hold(&ifp->rt->u.dst);
+		if (ip6_del_rt(ifp->rt, NULL, NULL))
+			dst_free(&ifp->rt->u.dst);
+		else
+			dst_release(&ifp->rt->u.dst);
 		break;
 	}
 }
@@ -3690,8 +3664,3 @@ void __exit addrconf_cleanup(void)
 	proc_net_remove("if_inet6");
 #endif
 }
-
-EXPORT_SYMBOL(ipv6_get_ifaddr);
-EXPORT_SYMBOL(ipv6_get_lladdr);
-EXPORT_SYMBOL(addrconf_add_ifaddr_kernel);
-EXPORT_SYMBOL(addrconf_del_ifaddr_kernel);

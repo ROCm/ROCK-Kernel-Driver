@@ -20,18 +20,6 @@
 #define MAX_ORDER CONFIG_FORCE_MAX_ZONEORDER
 #endif
 
-/*
- * system hash table size limits
- * - on large memory machines, we may want to allocate a bigger hash than that
- *   permitted by MAX_ORDER, so we allocate with the bootmem allocator, and are
- *   limited to this size
- */
-#if MAX_ORDER > 14
-#define MAX_SYS_HASH_TABLE_ORDER MAX_ORDER
-#else
-#define MAX_SYS_HASH_TABLE_ORDER 14
-#endif
-
 struct free_area {
 	struct list_head	free_list;
 	unsigned long		*map;

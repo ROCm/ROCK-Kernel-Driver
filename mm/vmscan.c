@@ -32,6 +32,7 @@
 #include <linux/topology.h>
 #include <linux/cpu.h>
 #include <linux/notifier.h>
+#include <linux/rwsem.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -122,7 +123,7 @@ int vm_swappiness = 60;
 static long total_memory;
 
 static LIST_HEAD(shrinker_list);
-static DECLARE_MUTEX(shrinker_sem);
+static DECLARE_RWSEM(shrinker_rwsem);
 
 /*
  * Add a shrinker callback to be called from the vm
@@ -136,9 +137,9 @@ struct shrinker *set_shrinker(int seeks, shrinker_t theshrinker)
 	        shrinker->shrinker = theshrinker;
 	        shrinker->seeks = seeks;
 	        shrinker->nr = 0;
-	        down(&shrinker_sem);
+	        down_write(&shrinker_rwsem);
 	        list_add(&shrinker->list, &shrinker_list);
-	        up(&shrinker_sem);
+	        up_write(&shrinker_rwsem);
 	}
 	return shrinker;
 }
@@ -149,13 +150,13 @@ EXPORT_SYMBOL(set_shrinker);
  */
 void remove_shrinker(struct shrinker *shrinker)
 {
-	down(&shrinker_sem);
+	down_write(&shrinker_rwsem);
 	list_del(&shrinker->list);
-	up(&shrinker_sem);
+	up_write(&shrinker_rwsem);
 	kfree(shrinker);
 }
 EXPORT_SYMBOL(remove_shrinker);
- 
+
 #define SHRINK_BATCH 128
 /*
  * Call the shrink functions to age shrinkable caches
@@ -179,11 +180,15 @@ static int shrink_slab(unsigned long scanned, unsigned int gfp_mask,
 {
 	struct shrinker *shrinker;
 
-	if (down_trylock(&shrinker_sem))
+	if (scanned == 0)
+		return 0;
+
+	if (!down_read_trylock(&shrinker_rwsem))
 		return 0;
 
 	list_for_each_entry(shrinker, &shrinker_list, list) {
 		unsigned long long delta;
+		unsigned long total_scan;
 
 		delta = (4 * scanned) / shrinker->seeks;
 		delta *= (*shrinker->shrinker)(0, gfp_mask);
@@ -192,23 +197,25 @@ static int shrink_slab(unsigned long scanned, unsigned int gfp_mask,
 		if (shrinker->nr < 0)
 			shrinker->nr = LONG_MAX;	/* It wrapped! */
 
-		if (shrinker->nr <= SHRINK_BATCH)
-			continue;
-		while (shrinker->nr) {
-			long this_scan = shrinker->nr;
+		total_scan = shrinker->nr;
+		shrinker->nr = 0;
+
+		while (total_scan >= SHRINK_BATCH) {
+			long this_scan = SHRINK_BATCH;
 			int shrink_ret;
 
-			if (this_scan > 128)
-				this_scan = 128;
 			shrink_ret = (*shrinker->shrinker)(this_scan, gfp_mask);
-			mod_page_state(slabs_scanned, this_scan);
-			shrinker->nr -= this_scan;
 			if (shrink_ret == -1)
 				break;
+			mod_page_state(slabs_scanned, this_scan);
+			total_scan -= this_scan;
+
 			cond_resched();
 		}
+
+		shrinker->nr += total_scan;
 	}
-	up(&shrinker_sem);
+	up_read(&shrinker_rwsem);
 	return 0;
 }
 

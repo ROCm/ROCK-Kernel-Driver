@@ -2823,48 +2823,50 @@ static void selinux_task_to_inode(struct task_struct *p,
 static int selinux_parse_skb_ipv4(struct sk_buff *skb, struct avc_audit_data *ad)
 {
 	int offset, ihlen, ret;
-	struct iphdr iph;
+	struct iphdr _iph, *ih;
 
 	offset = skb->nh.raw - skb->data;
-	ret = skb_copy_bits(skb, offset, &iph, sizeof(iph));
-	if (ret)
+	ih = skb_header_pointer(skb, offset, sizeof(_iph), &_iph);
+	if (ih == NULL)
 		goto out;
 
-	ihlen = iph.ihl * 4;
-	if (ihlen < sizeof(iph))
+	ihlen = ih->ihl * 4;
+	if (ihlen < sizeof(_iph))
 		goto out;
 
-	ad->u.net.v4info.saddr = iph.saddr;
-	ad->u.net.v4info.daddr = iph.daddr;
+	ad->u.net.v4info.saddr = ih->saddr;
+	ad->u.net.v4info.daddr = ih->daddr;
 
-	switch (iph.protocol) {
+	switch (ih->protocol) {
         case IPPROTO_TCP: {
-        	struct tcphdr tcph;
+        	struct tcphdr _tcph, *th;
 
-        	if (ntohs(iph.frag_off) & IP_OFFSET)
+        	if (ntohs(ih->frag_off) & IP_OFFSET)
         		break;
 
 		offset += ihlen;
-		if (skb_copy_bits(skb, offset, &tcph, sizeof(tcph)) < 0)
+		th = skb_header_pointer(skb, offset, sizeof(_tcph), &_tcph);
+		if (th == NULL)
 			break;
 
-		ad->u.net.sport = tcph.source;
-		ad->u.net.dport = tcph.dest;
+		ad->u.net.sport = th->source;
+		ad->u.net.dport = th->dest;
 		break;
         }
         
         case IPPROTO_UDP: {
-        	struct udphdr udph;
+        	struct udphdr _udph, *uh;
         	
-        	if (ntohs(iph.frag_off) & IP_OFFSET)
+        	if (ntohs(ih->frag_off) & IP_OFFSET)
         		break;
         		
 		offset += ihlen;
-        	if (skb_copy_bits(skb, offset, &udph, sizeof(udph)) < 0)
-        		break;	
+        	uh = skb_header_pointer(skb, offset, sizeof(_udph), &_udph);
+		if (uh == NULL)
+			break;	
 
-        	ad->u.net.sport = udph.source;
-        	ad->u.net.dport = udph.dest;
+        	ad->u.net.sport = uh->source;
+        	ad->u.net.dport = uh->dest;
         	break;
         }
 
@@ -2882,18 +2884,18 @@ static int selinux_parse_skb_ipv6(struct sk_buff *skb, struct avc_audit_data *ad
 {
 	u8 nexthdr;
 	int ret, offset;
-	struct ipv6hdr ipv6h;
+	struct ipv6hdr _ipv6h, *ip6;
 
 	offset = skb->nh.raw - skb->data;
-	ret = skb_copy_bits(skb, offset, &ipv6h, sizeof(ipv6h));
-	if (ret)
+	ip6 = skb_header_pointer(skb, offset, sizeof(_ipv6h), &_ipv6h);
+	if (ip6 == NULL)
 		goto out;
 
-	ipv6_addr_copy(&ad->u.net.v6info.saddr, &ipv6h.saddr);
-	ipv6_addr_copy(&ad->u.net.v6info.daddr, &ipv6h.daddr);
+	ipv6_addr_copy(&ad->u.net.v6info.saddr, &ip6->saddr);
+	ipv6_addr_copy(&ad->u.net.v6info.daddr, &ip6->daddr);
 
-	nexthdr = ipv6h.nexthdr;
-	offset += sizeof(ipv6h);
+	nexthdr = ip6->nexthdr;
+	offset += sizeof(_ipv6h);
 	offset = ipv6_skip_exthdr(skb, offset, &nexthdr,
 				  skb->tail - skb->head - offset);
 	if (offset < 0)
@@ -2901,24 +2903,26 @@ static int selinux_parse_skb_ipv6(struct sk_buff *skb, struct avc_audit_data *ad
 
 	switch (nexthdr) {
 	case IPPROTO_TCP: {
-        	struct tcphdr tcph;
+        	struct tcphdr _tcph, *th;
 
-		if (skb_copy_bits(skb, offset, &tcph, sizeof(tcph)) < 0)
+		th = skb_header_pointer(skb, offset, sizeof(_tcph), &_tcph);
+		if (th == NULL)
 			break;
 
-		ad->u.net.sport = tcph.source;
-		ad->u.net.dport = tcph.dest;
+		ad->u.net.sport = th->source;
+		ad->u.net.dport = th->dest;
 		break;
 	}
 
 	case IPPROTO_UDP: {
-		struct udphdr udph;
+		struct udphdr _udph, *uh;
 
-		if (skb_copy_bits(skb, offset, &udph, sizeof(udph)) < 0)
+		uh = skb_header_pointer(skb, offset, sizeof(_udph), &_udph);
+		if (uh == NULL)
 			break;
 
-		ad->u.net.sport = udph.source;
-		ad->u.net.dport = udph.dest;
+		ad->u.net.sport = uh->source;
+		ad->u.net.dport = uh->dest;
 		break;
 	}
 

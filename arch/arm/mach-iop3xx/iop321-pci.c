@@ -158,6 +158,7 @@ iop321_write_config(struct pci_bus *bus, unsigned int devfn, int where,
 			: "r" (value), "r" (addr),
 			  "r" (IOP321_OCCAR), "r" (IOP321_OCCDR));
 	}
+    return PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops iop321_ops = {

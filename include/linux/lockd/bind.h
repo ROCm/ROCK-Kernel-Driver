@@ -20,7 +20,7 @@ struct svc_rqst;
 struct nlmsvc_binding {
 	u32			(*fopen)(struct svc_rqst *,
 						struct nfs_fh *,
-						struct file *);
+						struct file **);
 	void			(*fclose)(struct file *);
 };
 

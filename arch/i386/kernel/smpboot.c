@@ -17,7 +17,7 @@
  *	Fixes
  *		Felix Koop	:	NR_CPUS used properly
  *		Jose Renau	:	Handle single CPU case.
- *		Alan Cox	:	By repeated request 8) - Total BogoMIP report.
+ *		Alan Cox	:	By repeated request 8) - Total BogoMIPS report.
  *		Greg Wright	:	Fix for kernel stacks panic.
  *		Erich Boleyn	:	MP v1.4 and additional changes.
  *	Matthias Sattler	:	Changes for 2.1 kernel map.

@@ -244,8 +244,7 @@ static s32 nforce2_access(struct i2c_adapter * adap, u16 addr,
 		temp = inb_p(NVIDIA_SMB_STS);
 	}
 	if (~temp & NVIDIA_SMB_STS_DONE) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(HZ/100);
+		msleep(10);
 		temp = inb_p(NVIDIA_SMB_STS);
 	}
 
@@ -384,7 +383,7 @@ static void __devexit nforce2_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver nforce2_driver = {
-	.name		= "nForce2 SMBus",
+	.name		= "nForce2_smbus",
 	.id_table	= nforce2_ids,
 	.probe		= nforce2_probe,
 	.remove		= __devexit_p(nforce2_remove),

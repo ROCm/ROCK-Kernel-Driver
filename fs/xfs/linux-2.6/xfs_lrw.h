@@ -74,11 +74,11 @@ struct xfs_iomap;
 #define	XFS_IOMAP_ALLOC_MAP	25
 #define	XFS_IOMAP_UNWRITTEN	26
 extern void xfs_rw_enter_trace(int, struct xfs_iocore *,
-			const struct iovec *, size_t, loff_t, int);
+				void *, size_t, loff_t, int);
 extern void xfs_inval_cached_trace(struct xfs_iocore *,
-			xfs_off_t, xfs_off_t, xfs_off_t, xfs_off_t);
+				xfs_off_t, xfs_off_t, xfs_off_t, xfs_off_t);
 #else
-#define xfs_rw_enter_trace(tag, io, iovec, segs, offset, ioflags)
+#define xfs_rw_enter_trace(tag, io, data, size, offset, ioflags)
 #define xfs_inval_cached_trace(io, offset, len, first, last)
 #endif
 
@@ -104,7 +104,7 @@ extern ssize_t xfs_write(struct bhv_desc *, struct kiocb *,
 				loff_t *, int, struct cred *);
 extern ssize_t xfs_sendfile(struct bhv_desc *, struct file *,
 				loff_t *, int, size_t, read_actor_t,
-				void *, struct cred *);
+				void __user *, struct cred *);
 
 extern int xfs_dev_is_read_only(struct xfs_mount *, char *);
 

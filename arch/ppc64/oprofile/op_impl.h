@@ -19,6 +19,12 @@
 /* freeze counters. set to 1 on a perfmon exception */
 #define MMCR0_FC	(1UL << (31 - 0))
 
+/* freeze in supervisor state */
+#define MMCR0_KERNEL_DISABLE (1UL << (31 - 1))
+
+/* freeze in problem state */
+#define MMCR0_PROBLEM_DISABLE (1UL << (31 - 2))
+
 /* freeze counters while MSR mark = 1 */
 #define MMCR0_FCM1	(1UL << (31 - 3))
 
@@ -28,14 +34,14 @@
 /* freeze counters on enabled condition or event */
 #define MMCR0_FCECE	(1UL << (31 - 6))
 
-/* performance monitor alert has occurred, set to 0 after handling exception */
-#define MMCR0_PMAO	(1UL << (31 - 24))
-
 /* PMC1 count enable*/
 #define MMCR0_PMC1INTCONTROL	(1UL << (31 - 16))
 
 /* PMCn count enable*/
 #define MMCR0_PMCNINTCONTROL	(1UL << (31 - 17))
+
+/* performance monitor alert has occurred, set to 0 after handling exception */
+#define MMCR0_PMAO	(1UL << (31 - 24))
 
 /* state of MSR HV when SIAR set */
 #define MMCRA_SIHV	(1UL << (63 - 35))
@@ -60,6 +66,9 @@ struct op_counter_config {
 
 /* System-wide configuration as set via oprofilefs.  */
 struct op_system_config {
+	unsigned long mmcr0;
+	unsigned long mmcr1;
+	unsigned long mmcra;
 	unsigned long enable_kernel;
 	unsigned long enable_user;
 };

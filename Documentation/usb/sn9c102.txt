@@ -142,7 +142,7 @@ Description:    Debugging information level, from 0 to 3:
                 1 = critical errors
                 2 = significant informations
                 3 = more verbose messages
-                Level 3 is useful for testing only, when just one device
+                Level 3 is useful for testing only, when only one device
                 is used.
 Default:        2
 -------------------------------------------------------------------------------
@@ -153,12 +153,10 @@ Default:        2
 It is possible to read and write both the SN9C10[12] and the image sensor
 registers by using the "sysfs" filesystem interface.
 
-Every time a supported device is recognized, read-only files named "redblue"
-and "green" are created in the /sys/class/video4linux/videoX directory. You can
-set the red, blue and green channel's gain by writing the desired value to
-them. The value may range from 0 to 15 for each channel; this means that
-"redblue" accepts 8-bit values, where the low 4 bits are reserved for red and
-the others for blue.
+Every time a supported device is recognized, a read-only file named "green" is
+created in the /sys/class/video4linux/videoX directory. You can set the green
+channel's gain by writing the desired value to it. The value may range from 0
+to 15.
 
 There are other four entries in the directory above for each registered camera:
 "reg", "val", "i2c_reg" and "i2c_val". The first two files control the
@@ -217,6 +215,7 @@ Kernel messages will always tell you whether this is the case:
 Model       Manufacturer
 -----       ------------
 PAS106B     PixArt Imaging Inc.
+PAS202BCB   PixArt Imaging Inc.
 TAS5110C1B  Taiwan Advanced Sensor Corporation
 TAS5130D1B  Taiwan Advanced Sensor Corporation
 
@@ -239,8 +238,8 @@ have created for this purpose, which is present in "sn9c102_sensor.h"
 (documentation is included there). As an example, have a look at the code in
 "sn9c102_pas106b.c", which uses the mentioned interface.
 
-At the moment, not yet supported image sensors are: PAS202B (VGA),
-HV7131[D|E1] (VGA), MI03 (VGA), OV7620 (VGA).
+At the moment, not yet supported image sensors are: HV7131[D|E1] (VGA),
+MI03 (VGA), OV7620 (VGA).
 
 
 10. Note for V4L2 developers
@@ -273,4 +272,6 @@ I would thank the following persons:
 
 - Stefano Mozzi, who donated 45 EU;
 - Luca Capello for the donation of a webcam;
-- Mizuno Takafumi for the donation of a webcam.
+- Mizuno Takafumi for the donation of a webcam;
+- Carlos Eduardo Medaglia Dyonisio, who added the support for the PAS202BCB
+  image sensor.

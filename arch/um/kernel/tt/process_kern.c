@@ -62,7 +62,7 @@ void *switch_to_tt(void *prev, void *next, void *last)
 	reading = 0;
 	err = os_write_file(to->thread.mode.tt.switch_pipe[1], &c, sizeof(c));
 	if(err != sizeof(c))
-		panic("write of switch_pipe failed, err = %d", -err);
+		panic("write of switch_pipe failed, errno = %d", -err);
 
 	reading = 1;
 	if((from->state == TASK_ZOMBIE) || (from->state == TASK_DEAD))
@@ -104,92 +104,50 @@ void *switch_to_tt(void *prev, void *next, void *last)
 
 void release_thread_tt(struct task_struct *task)
 {
-	int pid = task->thread.mode.tt.extern_pid;
-
-	if(os_getpid() != pid)
-		os_kill_process(pid, 0);
+	os_kill_process(task->thread.mode.tt.extern_pid, 0);
 }
 
 void exit_thread_tt(void)
 {
-	os_close_file(current->thread.mode.tt.switch_pipe[0]);
-	os_close_file(current->thread.mode.tt.switch_pipe[1]);
-}
-
-void suspend_new_thread(int fd)
-{
-	int err;
-	char c;
-
-	os_stop_process(os_getpid());
-	err = os_read_file(fd, &c, sizeof(c));
-	if(err != sizeof(c))
-		panic("read failed in suspend_new_thread, err = %d", -err);
+	close(current->thread.mode.tt.switch_pipe[0]);
+	close(current->thread.mode.tt.switch_pipe[1]);
 }
 
 void schedule_tail(task_t *prev);
 
 static void new_thread_handler(int sig)
 {
-	unsigned long disable;
 	int (*fn)(void *);
 	void *arg;
 
 	fn = current->thread.request.u.thread.proc;
 	arg = current->thread.request.u.thread.arg;
-
 	UPT_SC(&current->thread.regs.regs) = (void *) (&sig + 1);
-	disable = (1 << (SIGVTALRM - 1)) | (1 << (SIGALRM - 1)) |
-		(1 << (SIGIO - 1)) | (1 << (SIGPROF - 1));
-	SC_SIGMASK(UPT_SC(&current->thread.regs.regs)) &= ~disable;
-
 	suspend_new_thread(current->thread.mode.tt.switch_pipe[0]);
 
-	force_flush_all();
-	if(current->thread.prev_sched != NULL)
-		schedule_tail(current->thread.prev_sched);
-	current->thread.prev_sched = NULL;
-
+	block_signals();
 	init_new_thread_signals(1);
+#ifdef CONFIG_SMP
+	schedule_tail(current->thread.prev_sched);
+#endif
 	enable_timer();
 	free_page(current->thread.temp_stack);
 	set_cmdline("(kernel thread)");
+	force_flush_all();
 
+	current->thread.prev_sched = NULL;
 	change_sig(SIGUSR1, 1);
 	change_sig(SIGVTALRM, 1);
 	change_sig(SIGPROF, 1);
-	local_irq_enable();
+	unblock_signals();
 	if(!run_kernel_thread(fn, arg, &current->thread.exec_buf))
 		do_exit(0);
-	
-	/* XXX No set_user_mode here because a newly execed process will
-	 * immediately segfault on its non-existent IP, coming straight back
-	 * to the signal handler, which will call set_user_mode on its way
-	 * out.  This should probably change since it's confusing.
-	 */
 }
 
 static int new_thread_proc(void *stack)
 {
-	/* local_irq_disable is needed to block out signals until this thread is
-	 * properly scheduled.  Otherwise, the tracing thread will get mighty 
-	 * upset about any signals that arrive before that.  
-	 * This has the complication that it sets the saved signal mask in
-	 * the sigcontext to block signals.  This gets restored when this
-	 * thread (or a descendant, since they get a copy of this sigcontext)
-	 * returns to userspace.
-	 * So, this is compensated for elsewhere.
-	 * XXX There is still a small window until local_irq_disable() actually 
-	 * finishes where signals are possible - shouldn't be a problem in 
-	 * practice since SIGIO hasn't been forwarded here yet, and the 
-	 * local_irq_disable should finish before a SIGVTALRM has time to be 
-	 * delivered.
-	 */
-
-	local_irq_disable();
 	init_new_thread_stack(stack, new_thread_handler);
 	os_usr1_process(os_getpid());
-	change_sig(SIGUSR1, 1);
 	return(0);
 }
 
@@ -198,7 +156,7 @@ static int new_thread_proc(void *stack)
  * itself with a SIGUSR1.  set_user_mode has to be run with SIGUSR1 off,
  * so it is blocked before it's called.  They are re-enabled on sigreturn
  * despite the fact that they were blocked when the SIGUSR1 was issued because
- * copy_thread copies the parent's sigcontext, including the signal mask
+ * copy_thread copies the parent's signcontext, including the signal mask
  * onto the signal frame.
  */
 
@@ -207,33 +165,35 @@ void finish_fork_handler(int sig)
  	UPT_SC(&current->thread.regs.regs) = (void *) (&sig + 1);
 	suspend_new_thread(current->thread.mode.tt.switch_pipe[0]);
 
-	force_flush_all();
-	if(current->thread.prev_sched != NULL)
-		schedule_tail(current->thread.prev_sched);
-	current->thread.prev_sched = NULL;
-
+#ifdef CONFIG_SMP	
+	schedule_tail(NULL);
+#endif
 	enable_timer();
 	change_sig(SIGVTALRM, 1);
 	local_irq_enable();
+	force_flush_all();
 	if(current->mm != current->parent->mm)
 		protect_memory(uml_reserved, high_physmem - uml_reserved, 1, 
 			       1, 0, 1);
-	task_protections((unsigned long) current_thread);
+	task_protections((unsigned long) current->thread_info);
+
+	current->thread.prev_sched = NULL;
 
 	free_page(current->thread.temp_stack);
-	local_irq_disable();
 	change_sig(SIGUSR1, 0);
 	set_user_mode(current);
 }
 
+static int sigusr1 = SIGUSR1;
+
 int fork_tramp(void *stack)
 {
+	int sig = sigusr1;
+
 	local_irq_disable();
-	arch_init_thread();
 	init_new_thread_stack(stack, finish_fork_handler);
 
-	os_usr1_process(os_getpid());
-	change_sig(SIGUSR1, 1);
+	kill(os_getpid(), sig);
 	return(0);
 }
 
@@ -253,9 +213,9 @@ int copy_thread_tt(int nr, unsigned long clone_flags, unsigned long sp,
 	}
 
 	err = os_pipe(p->thread.mode.tt.switch_pipe, 1, 1);
-	if(err < 0){
-		printk("copy_thread : pipe failed, err = %d\n", -err);
-		goto out;
+	if(err){
+		printk("copy_thread : pipe failed, errno = %d\n", -err);
+		return(err);
 	}
 
 	stack = alloc_stack(0, 0);
@@ -267,7 +227,8 @@ int copy_thread_tt(int nr, unsigned long clone_flags, unsigned long sp,
 
 	clone_flags &= CLONE_VM;
 	p->thread.temp_stack = stack;
-	new_pid = start_fork_tramp(p->thread_info, stack, clone_flags, tramp);
+	new_pid = start_fork_tramp((void *) p->thread.kernel_stack, stack,
+				   clone_flags, tramp);
 	if(new_pid < 0){
 		printk(KERN_ERR "copy_thread : clone failed - errno = %d\n", 
 		       -new_pid);
@@ -285,30 +246,19 @@ int copy_thread_tt(int nr, unsigned long clone_flags, unsigned long sp,
 	current->thread.request.op = OP_FORK;
 	current->thread.request.u.fork.pid = new_pid;
 	os_usr1_process(os_getpid());
-
-	/* Enable the signal and then disable it to ensure that it is handled
-	 * here, and nowhere else.
-	 */
-	change_sig(SIGUSR1, 1);
-
-	change_sig(SIGUSR1, 0);
-	err = 0;
- out:
-	return(err);
+	return(0);
 }
 
 void reboot_tt(void)
 {
 	current->thread.request.op = OP_REBOOT;
 	os_usr1_process(os_getpid());
-	change_sig(SIGUSR1, 1);
 }
 
 void halt_tt(void)
 {
 	current->thread.request.op = OP_HALT;
 	os_usr1_process(os_getpid());
-	change_sig(SIGUSR1, 1);
 }
 
 void kill_off_processes_tt(void)
@@ -335,9 +285,6 @@ void initial_thread_cb_tt(void (*proc)(void *), void *arg)
 		current->thread.request.u.cb.proc = proc;
 		current->thread.request.u.cb.arg = arg;
 		os_usr1_process(os_getpid());
-		change_sig(SIGUSR1, 1);
-
-		change_sig(SIGUSR1, 0);
 	}
 }
 
@@ -430,8 +377,8 @@ static void mprotect_kernel_mem(int w)
 
 	pages = (1 << CONFIG_KERNEL_STACK_ORDER);
 
-	start = (unsigned long) current_thread + PAGE_SIZE;
-	end = (unsigned long) current_thread + PAGE_SIZE * pages;
+	start = (unsigned long) current->thread_info + PAGE_SIZE;
+	end = (unsigned long) current + PAGE_SIZE * pages;
 	protect_memory(uml_reserved, start - uml_reserved, 1, w, 1, 1);
 	protect_memory(end, high_physmem - end, 1, w, 1, 1);
 
@@ -507,9 +454,8 @@ void set_init_pid(int pid)
 
 	init_task.thread.mode.tt.extern_pid = pid;
 	err = os_pipe(init_task.thread.mode.tt.switch_pipe, 1, 1);
-	if(err)
-		panic("Can't create switch pipe for init_task, errno = %d", 
-		      -err);
+	if(err)	panic("Can't create switch pipe for init_task, errno = %d", 
+		      err);
 }
 
 int singlestepping_tt(void *t)
@@ -533,9 +479,9 @@ int start_uml_tt(void)
 	void *sp;
 	int pages;
 
-	pages = (1 << CONFIG_KERNEL_STACK_ORDER);
-	sp = (void *) ((unsigned long) init_task.thread_info) + 
-		pages * PAGE_SIZE - sizeof(unsigned long);
+	pages = (1 << CONFIG_KERNEL_STACK_ORDER) - 2;
+	sp = (void *) init_task.thread.kernel_stack + pages * PAGE_SIZE - 
+		sizeof(unsigned long);
 	return(tracer(start_kernel_proc, sp));
 }
 

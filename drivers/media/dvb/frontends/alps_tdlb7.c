@@ -54,9 +54,6 @@ static int debug = 0;
 /* starting point for firmware in file 'Sc_main.mc' */
 #define SP8870_FIRMWARE_OFFSET 0x0A
 
-
-static int errno;
-
 static struct dvb_frontend_info tdlb7_info = {
 	.name			= "Alps TDLB7",
 	.type			= FE_OFDM,

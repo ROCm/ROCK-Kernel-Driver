@@ -1299,9 +1299,10 @@ static void CalcStateExt
             break;
     }
 
-    /* Paul Richards: below if block borks things in kernel for some reason */
-    /* if((bpp != 8) && (chip->Architecture != NV_ARCH_03))
-    state->general |= 0x00000030; */
+     /* Paul Richards: below if block borks things in kernel for some reason */
+     /* Tony: Below is needed to set hardware in DirectColor */
+    if((bpp != 8) && (chip->Architecture != NV_ARCH_03))
+	    state->general |= 0x00000030;
 
     state->vpll     = (p << 16) | (n << 8) | m;
     state->repaint0 = (((width/8)*pixelDepth) & 0x700) >> 3;

@@ -345,30 +345,13 @@ static int usbfs_unlink (struct inode *dir, struct dentry *dentry)
 	return 0;
 }
 
-static void d_unhash(struct dentry *dentry)
-{
-	dget(dentry);
-	spin_lock(&dcache_lock);
-	switch (atomic_read(&dentry->d_count)) {
-	default:
-		spin_unlock(&dcache_lock);
-		shrink_dcache_parent(dentry);
-		spin_lock(&dcache_lock);
-		if (atomic_read(&dentry->d_count) != 2)
-			break;
-	case 2:
-		__d_drop(dentry);
-	}
-	spin_unlock(&dcache_lock);
-}
-
 static int usbfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	int error = -ENOTEMPTY;
 	struct inode * inode = dentry->d_inode;
 
 	down(&inode->i_sem);
-	d_unhash(dentry);
+	dentry_unhash(dentry);
 	if (usbfs_empty(dentry)) {
 		dentry->d_inode->i_nlink -= 2;
 		dput(dentry);

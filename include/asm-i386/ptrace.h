@@ -82,26 +82,4 @@ enum EFLAGS {
 #define instruction_pointer(regs) ((regs)->eip)
 #endif
 
-/*For SKAS3 support.*/
-#ifndef _LINUX_PTRACE_STRUCT_DEF
-#define _LINUX_PTRACE_STRUCT_DEF
-
-#define PTRACE_FAULTINFO	  52
-#define PTRACE_SIGPENDING	  53
-#define PTRACE_LDT		  54
-#define PTRACE_SWITCH_MM 	  55
-
-struct ptrace_faultinfo {
-	int is_write;
-	unsigned long addr;
-};
-
-struct ptrace_ldt {
-	int func;
-  	void *ptr;
-	unsigned long bytecount;
-};
-
-#endif /*ifndef _LINUX_PTRACE_STRUCT_DEF*/
-
 #endif

@@ -154,12 +154,6 @@ static spinlock_t all_mddevs_lock = SPIN_LOCK_UNLOCKED;
 		tmp = tmp->next;})					\
 		)
 
-static int md_fail_request (request_queue_t *q, struct bio *bio)
-{
-	bio_io_error(bio, bio->bi_size);
-	return 0;
-}
-
 int md_flush_mddev(mddev_t *mddev, sector_t *error_sector)
 {
 	struct list_head *tmp;
@@ -191,6 +185,12 @@ static int md_flush_all(request_queue_t *q, struct gendisk *disk,
 	mddev_t *mddev = q->queuedata;
 
 	return md_flush_mddev(mddev, error_sector);
+}
+
+static int md_fail_request (request_queue_t *q, struct bio *bio)
+{
+	bio_io_error(bio, bio->bi_size);
+	return 0;
 }
 
 static inline mddev_t *mddev_get(mddev_t *mddev)

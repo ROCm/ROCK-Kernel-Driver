@@ -52,6 +52,9 @@ struct si_sm_io
            state machine shouldn't touch these. */
 	void *info;
 	void *addr;
+	int  regspacing;
+	int  regsize;
+	int  regshift;
 };
 
 /* Results of SMI events. */

@@ -153,17 +153,9 @@ static void qtd_copy_status (
 			usb_pipein (urb->pipe) ? "in" : "out",
 			token, urb->status);
 
-		/* stall indicates some recovery action is needed */
-		if (urb->status == -EPIPE) {
-			int	pipe = urb->pipe;
-
-			if (!usb_pipecontrol (pipe))
-				usb_endpoint_halt (urb->dev,
-					usb_pipeendpoint (pipe),
-					usb_pipeout (pipe));
-
 		/* if async CSPLIT failed, try cleaning out the TT buffer */
-		} else if (urb->dev->tt && !usb_pipeint (urb->pipe)
+		if (urb->status != -EPIPE
+				&& urb->dev->tt && !usb_pipeint (urb->pipe)
 				&& ((token & QTD_STS_MMF) != 0
 					|| QTD_CERR(token) == 0)
 				&& (!ehci_is_ARC(ehci)

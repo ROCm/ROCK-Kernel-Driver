@@ -19,8 +19,6 @@
 #include "linux/inetdevice.h"
 #include "linux/ctype.h"
 #include "linux/bootmem.h"
-#include "linux/ethtool.h"
-#include "asm/uaccess.h"
 #include "user_util.h"
 #include "kern_util.h"
 #include "net_kern.h"
@@ -28,7 +26,6 @@
 #include "mconsole_kern.h"
 #include "init.h"
 #include "irq_user.h"
-#include "irq_kern.h"
 
 static spinlock_t opened_lock = SPIN_LOCK_UNLOCKED;
 LIST_HEAD(opened);
@@ -40,8 +37,7 @@ static int uml_net_rx(struct net_device *dev)
 	struct sk_buff *skb;
 
 	/* If we can't allocate memory, try again next round. */
-	skb = dev_alloc_skb(dev->mtu);
-	if (skb == NULL) {
+	if ((skb = dev_alloc_skb(dev->mtu)) == NULL) {
 		lp->stats.rx_dropped++;
 		return 0;
 	}
@@ -65,14 +61,14 @@ static int uml_net_rx(struct net_device *dev)
 	return pkt_len;
 }
 
-irqreturn_t uml_net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+void uml_net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct uml_net_private *lp = dev->priv;
 	int err;
 
 	if(!netif_running(dev))
-		return(IRQ_NONE);
+		return;
 
 	spin_lock(&lp->lock);
 	while((err = uml_net_rx(dev)) > 0) ;
@@ -87,7 +83,6 @@ irqreturn_t uml_net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
  out:
 	spin_unlock(&lp->lock);
-	return(IRQ_HANDLED);
 }
 
 static int uml_net_open(struct net_device *dev)
@@ -129,7 +124,6 @@ static int uml_net_open(struct net_device *dev)
 	spin_lock(&opened_lock);
 	list_add(&lp->list, &opened);
 	spin_unlock(&opened_lock);
-	while((err = uml_net_rx(dev)) > 0) ; /* clear buffer */
  out:
 	spin_unlock(&lp->lock);
 	return(err);
@@ -243,30 +237,7 @@ static int uml_net_change_mtu(struct net_device *dev, int new_mtu)
 
 static int uml_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	static const struct ethtool_drvinfo info = {
-		.cmd     = ETHTOOL_GDRVINFO,
-		.driver  = "uml virtual ethernet",
-		.version = "42",
-	};
-	void *useraddr;
-	u32 ethcmd;
-
-	switch (cmd) {
-	case SIOCETHTOOL:
-		useraddr = ifr->ifr_data;
-		if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-			return -EFAULT;
-		switch (ethcmd) {
-		case ETHTOOL_GDRVINFO:
-			if (copy_to_user(useraddr, &info, sizeof(info)))
-				return -EFAULT;
-			return 0;
-		default:
-			return -EOPNOTSUPP;
-		}
-	default:
-		return -EINVAL;
-	}
+	return(-EINVAL);
 }
 
 void uml_net_user_timer_expire(unsigned long _conn)
@@ -279,6 +250,37 @@ void uml_net_user_timer_expire(unsigned long _conn)
 #endif
 }
 
+/*
+ * default do nothing hard header packet routines for struct net_device init.
+ * real ethernet transports will overwrite with real routines.
+ */
+static int uml_net_hard_header(struct sk_buff *skb, struct net_device *dev,
+                 unsigned short type, void *daddr, void *saddr, unsigned len)
+{
+	return(0); /* no change */
+}
+
+static int uml_net_rebuild_header(struct sk_buff *skb)
+{
+	return(0); /* ignore */ 
+}
+
+static int uml_net_header_cache(struct neighbour *neigh, struct hh_cache *hh)
+{
+	return(-1); /* fail */
+}
+
+static void uml_net_header_cache_update(struct hh_cache *hh,
+                 struct net_device *dev, unsigned char * haddr)
+{
+	/* ignore */
+}
+
+static int uml_net_header_parse(struct sk_buff *skb, unsigned char *haddr)
+{
+	return(0); /* nothing */
+}
+
 static spinlock_t devices_lock = SPIN_LOCK_UNLOCKED;
 static struct list_head devices = LIST_HEAD_INIT(devices);
 
@@ -288,7 +290,7 @@ static int eth_configure(int n, void *init, char *mac,
 	struct uml_net *device;
 	struct net_device *dev;
 	struct uml_net_private *lp;
-	int save, err, size;
+	int err, size;
 
 	size = transport->private_size + sizeof(struct uml_net_private) + 
 		sizeof(((struct uml_net_private *) 0)->user);
@@ -330,6 +332,12 @@ static int eth_configure(int n, void *init, char *mac,
 	snprintf(dev->name, sizeof(dev->name), "eth%d", n);
 	device->dev = dev;
 
+        dev->hard_header = uml_net_hard_header;
+        dev->rebuild_header = uml_net_rebuild_header;
+        dev->hard_header_cache = uml_net_header_cache;
+        dev->header_cache_update= uml_net_header_cache_update;
+        dev->hard_header_parse = uml_net_header_parse;
+
 	(*transport->kern->init)(dev, init);
 
 	dev->mtu = transport->user->max_packet;
@@ -356,29 +364,21 @@ static int eth_configure(int n, void *init, char *mac,
 	}
 	lp = dev->priv;
 
-	/* lp.user is the first four bytes of the transport data, which
-	 * has already been initialized.  This structure assignment will
-	 * overwrite that, so we make sure that .user gets overwritten with
-	 * what it already has.
-	 */
-	save = lp->user[0];
-	*lp = ((struct uml_net_private) 
-		{ .list  		= LIST_HEAD_INIT(lp->list),
-		  .lock 		= SPIN_LOCK_UNLOCKED,
-		  .dev 			= dev,
-		  .fd 			= -1,
-		  .mac 			= { 0xfe, 0xfd, 0x0, 0x0, 0x0, 0x0},
-		  .have_mac 		= device->have_mac,
-		  .protocol 		= transport->kern->protocol,
-		  .open 		= transport->user->open,
-		  .close 		= transport->user->close,
-		  .remove 		= transport->user->remove,
-		  .read 		= transport->kern->read,
-		  .write 		= transport->kern->write,
-		  .add_address 		= transport->user->add_address,
-		  .delete_address  	= transport->user->delete_address,
-		  .set_mtu 		= transport->user->set_mtu,
-		  .user  		= { save } });
+	INIT_LIST_HEAD(&lp->list);
+	spin_lock_init(&lp->lock);
+	lp->dev = dev;
+	lp->fd = -1;
+	lp->mac = { 0xfe, 0xfd, 0x0, 0x0, 0x0, 0x0 };
+	lp->have_mac = device->have_mac;
+	lp->protocol = transport->kern->protocol;
+	lp->open = transport->user->open;
+	lp->close = transport->user->close;
+	lp->remove = transport->user->remove;
+	lp->read = transport->kern->read;
+	lp->write = transport->kern->write;
+	lp->add_address = transport->user->add_address;
+	lp->delete_address = transport->user->delete_address;
+	lp->set_mtu = transport->user->set_mtu;
 
 	init_timer(&lp->tl);
 	lp->tl.function = uml_net_user_timer_expire;
@@ -611,8 +611,7 @@ static int net_remove(char *str)
 	unregister_netdev(dev);
 
 	list_del(&device->list);
-	kfree(device);
-	free_netdev(dev);
+	free_netdev(device);
 	return(0);
 }
 

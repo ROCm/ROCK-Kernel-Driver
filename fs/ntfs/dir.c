@@ -95,7 +95,7 @@ MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 	BUG_ON(NInoAttr(dir_ni));
 	/* Get hold of the mft record for the directory. */
 	m = map_mft_record(dir_ni);
-	if (unlikely(IS_ERR(m))) {
+	if (IS_ERR(m)) {
 		ntfs_error(sb, "map_mft_record() failed with error code %ld.",
 				-PTR_ERR(m));
 		return ERR_MREF(PTR_ERR(m));
@@ -1170,7 +1170,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		goto skip_index_root;
 	/* Get hold of the mft record for the directory. */
 	m = map_mft_record(ndir);
-	if (unlikely(IS_ERR(m))) {
+	if (IS_ERR(m)) {
 		err = PTR_ERR(m);
 		m = NULL;
 		goto err_out;
@@ -1261,7 +1261,7 @@ skip_index_root:
 	if (unlikely(!bmp_vi)) {
 		ntfs_debug("Inode 0x%lx, regetting index bitmap.", vdir->i_ino);
 		bmp_vi = ntfs_attr_iget(vdir, AT_BITMAP, I30, 4);
-		if (unlikely(IS_ERR(bmp_vi))) {
+		if (IS_ERR(bmp_vi)) {
 			ntfs_error(sb, "Failed to get bitmap attribute.");
 			err = PTR_ERR(bmp_vi);
 			goto err_out;
@@ -1286,7 +1286,7 @@ get_next_bmp_page:
 			((PAGE_CACHE_SIZE * 8) - 1));
 	bmp_page = ntfs_map_page(bmp_mapping,
 			bmp_pos >> (3 + PAGE_CACHE_SHIFT));
-	if (unlikely(IS_ERR(bmp_page))) {
+	if (IS_ERR(bmp_page)) {
 		ntfs_error(sb, "Reading index bitmap failed.");
 		err = PTR_ERR(bmp_page);
 		bmp_page = NULL;
@@ -1327,7 +1327,7 @@ find_next_index_buffer:
 		 * reading it from disk if necessary.
 		 */
 		ia_page = ntfs_map_page(ia_mapping, ia_pos >> PAGE_CACHE_SHIFT);
-		if (unlikely(IS_ERR(ia_page))) {
+		if (IS_ERR(ia_page)) {
 			ntfs_error(sb, "Reading index allocation data failed.");
 			err = PTR_ERR(ia_page);
 			ia_page = NULL;
@@ -1495,10 +1495,69 @@ static int ntfs_dir_open(struct inode *vi, struct file *filp)
 	return 0;
 }
 
+#ifdef NTFS_RW
+
+/**
+ * ntfs_dir_fsync - sync a directory to disk
+ * @filp:	directory to be synced
+ * @dentry:	dentry describing the directory to sync
+ * @datasync:	if non-zero only flush user data and not metadata
+ *
+ * Data integrity sync of a directory to disk.  Used for fsync, fdatasync, and
+ * msync system calls.  This function is based on file.c::ntfs_file_fsync().
+ *
+ * Write the mft record and all associated extent mft records as well as the
+ * $INDEX_ALLOCATION and $BITMAP attributes and then sync the block device.
+ *
+ * If @datasync is true, we do not wait on the inode(s) to be written out
+ * but we always wait on the page cache pages to be written out.
+ *
+ * Note: In the past @filp could be NULL so we ignore it as we don't need it
+ * anyway.
+ *
+ * Locking: Caller must hold i_sem on the inode.
+ *
+ * TODO: We should probably also write all attribute/index inodes associated
+ * with this inode but since we have no simple way of getting to them we ignore
+ * this problem for now.  We do write the $BITMAP attribute if it is present
+ * which is the important one for a directory so things are not too bad.
+ */
+static int ntfs_dir_fsync(struct file *filp, struct dentry *dentry,
+		int datasync)
+{
+	struct inode *vi = dentry->d_inode;
+	ntfs_inode *ni = NTFS_I(vi);
+	int err, ret;
+
+	ntfs_debug("Entering for inode 0x%lx.", vi->i_ino);
+	BUG_ON(!S_ISDIR(vi->i_mode));
+	if (NInoIndexAllocPresent(ni) && ni->itype.index.bmp_ino)
+		write_inode_now(ni->itype.index.bmp_ino, !datasync);
+	ret = ntfs_write_inode(vi, 1);
+	write_inode_now(vi, !datasync);
+	err = sync_blockdev(vi->i_sb->s_bdev);
+	if (unlikely(err && !ret))
+		ret = err;
+	if (likely(!ret))
+		ntfs_debug("Done.");
+	else
+		ntfs_warning(vi->i_sb, "Failed to f%ssync inode 0x%lx.  Error "
+				"%u.", datasync ? "data" : "", vi->i_ino, -ret);
+	return ret;
+}
+
+#endif /* NTFS_RW */
+
 struct file_operations ntfs_dir_ops = {
 	.llseek		= generic_file_llseek,	/* Seek inside directory. */
 	.read		= generic_read_dir,	/* Return -EISDIR. */
 	.readdir	= ntfs_readdir,		/* Read directory contents. */
+#ifdef NTFS_RW
+	.fsync		= ntfs_dir_fsync,	/* Sync a directory to disk. */
+	/*.aio_fsync	= ,*/			/* Sync all outstanding async
+						   i/o operations on a kiocb. */
+#endif /* NTFS_RW */
+	/*.ioctl	= ,*/			/* Perform function on the
+						   mounted filesystem. */
 	.open		= ntfs_dir_open,	/* Open directory. */
 };
-

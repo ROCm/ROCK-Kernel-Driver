@@ -67,8 +67,6 @@ struct dvb_frontend_info sp887x_info = {
                 FE_CAN_RECOVER
 };
 
-static int errno;
-
 static
 int i2c_writebytes (struct dvb_frontend *fe, u8 addr, u8 *buf, u8 len)
 {

@@ -9,9 +9,6 @@
  */
 struct nfs_server {
 	struct rpc_clnt *	client;		/* RPC client handle */
-#ifdef CONFIG_NFS_ACL
-	struct rpc_clnt *	acl_client;	/* ACL RPC client handle */
-#endif  /* CONFIG_NFS_ACL */
 	struct rpc_clnt *	client_sys;	/* 2nd handle for FSINFO */
 	struct nfs_rpc_ops *	rpc_ops;	/* NFS protocol vector */
 	struct backing_dev_info	backing_dev_info;
@@ -21,6 +18,7 @@ struct nfs_server {
 	unsigned int		rpages;		/* read size (in pages) */
 	unsigned int		wsize;		/* write size */
 	unsigned int		wpages;		/* write size (in pages) */
+	unsigned int		wtmult;		/* server disk block size */
 	unsigned int		dtsize;		/* readdir size */
 	unsigned int		bsize;		/* server block size */
 	unsigned int		acregmin;	/* attr cache timeouts */

@@ -410,20 +410,21 @@ int ip_fw_chk(struct sk_buff **pskb,
 			dprintf1("TCP ");
 			/* ports stay 0xFFFF if it is not the first fragment */
 			if (!offset) {
-				struct tcphdr tcph;
+				struct tcphdr _tcph, *th;
 
-				if (skb_copy_bits(*pskb,
-						  (*pskb)->nh.iph->ihl * 4,
-						  &tcph, sizeof(tcph)))
+				th = skb_header_pointer(*pskb,
+							(*pskb)->nh.iph->ihl*4,
+							sizeof(_tcph), &_tcph);
+				if (th == NULL)
 					return FW_BLOCK;
 
-				src_port = ntohs(tcph.source);
-				dst_port = ntohs(tcph.dest);
+				src_port = ntohs(th->source);
+				dst_port = ntohs(th->dest);
 
-				if(!tcph.ack && !tcph.rst)
+				if(!th->ack && !th->rst)
 					/* We do NOT have ACK, value TRUE */
 					notcpack = 1;
-				if(!tcph.syn || !notcpack)
+				if(!th->syn || !notcpack)
 					/* We do NOT have SYN, value TRUE */
 					notcpsyn = 1;
 			}
@@ -433,29 +434,32 @@ int ip_fw_chk(struct sk_buff **pskb,
 			dprintf1("UDP ");
 			/* ports stay 0xFFFF if it is not the first fragment */
 			if (!offset) {
-				struct udphdr udph;
+				struct udphdr _udph, *uh;
 
-				if (skb_copy_bits(*pskb,
-						  (*pskb)->nh.iph->ihl * 4,
-						  &udph, sizeof(udph)))
+				uh = skb_header_pointer(*pskb,
+							(*pskb)->nh.iph->ihl*4,
+							sizeof(_udph), &_udph);
+				if (uh == NULL)
 					return FW_BLOCK;
 
-				src_port = ntohs(udph.source);
-				dst_port = ntohs(udph.dest);
+				src_port = ntohs(uh->source);
+				dst_port = ntohs(uh->dest);
 			}
 			prt = IP_FW_F_UDP;
 			break;
 		case IPPROTO_ICMP:
 			/* icmp_type stays 255 if it is not the first fragment */
 			if (!offset) {
-				struct icmphdr icmph;
+				struct icmphdr _icmph, *ic;
 
-				if (skb_copy_bits(*pskb,
-						  (*pskb)->nh.iph->ihl * 4,
-						  &icmph, sizeof(icmph)))
+				ic = skb_header_pointer(*pskb,
+							(*pskb)->nh.iph->ihl*4,
+							sizeof(_icmph),
+							&_icmph);
+				if (ic == NULL)
 					return FW_BLOCK;
 
-				icmp_type = (__u16) icmph.type;
+				icmp_type = (__u16) ic->type;
 			}
 			dprintf2("ICMP:%d ", icmp_type);
 			prt = IP_FW_F_ICMP;

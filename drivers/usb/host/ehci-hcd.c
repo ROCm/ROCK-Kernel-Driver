@@ -289,7 +289,7 @@ static void ehci_watchdog (unsigned long param)
 static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 {
 	if (cap & (1 << 16)) {
-		int msec = 500;
+		int msec = 5000;
 		struct pci_dev *pdev = to_pci_dev(ehci->hcd.self.controller);
 
 		/* request handoff to OS */
@@ -303,10 +303,11 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 			pci_read_config_dword(pdev, where, &cap);
 		} while ((cap & (1 << 16)) && msec);
 		if (cap & (1 << 16)) {
-			ehci_err (ehci, "BIOS handoff failed (%d, %04x)\n"
-				" Devices connected to this controller will not work correctly.\n"
-				" Complain to your BIOS vendor.\n", /* Really! */
+			ehci_err (ehci, "BIOS handoff failed (%d, %04x)\n",
 				where, cap);
+			// some BIOS versions seem buggy...
+			// return 1;
+			ehci_warn (ehci, "continuing after BIOS bug...\n");
 			return 0;
 		} 
 		ehci_dbg (ehci, "BIOS handoff succeeded\n");

@@ -64,8 +64,6 @@
 #include <net/addrconf.h>
 #include <net/icmp.h>
 
-#include <net/mipglue.h>
-
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
@@ -141,10 +139,12 @@ static int is_ineligible(struct sk_buff *skb)
 	if (ptr < 0)
 		return 0;
 	if (nexthdr == IPPROTO_ICMPV6) {
-		u8 type;
-		if (skb_copy_bits(skb, ptr+offsetof(struct icmp6hdr, icmp6_type),
-				  &type, 1)
-		    || !(type & ICMPV6_INFOMSG_MASK))
+		u8 _type, *tp;
+		tp = skb_header_pointer(skb,
+			ptr+offsetof(struct icmp6hdr, icmp6_type),
+			sizeof(_type), &_type);
+		if (tp == NULL ||
+		    !(*tp & ICMPV6_INFOMSG_MASK))
 			return 1;
 	}
 	return 0;
@@ -202,12 +202,13 @@ static inline int icmpv6_xrlim_allow(struct sock *sk, int type,
 
 static __inline__ int opt_unrec(struct sk_buff *skb, __u32 offset)
 {
-	u8 optval;
+	u8 _optval, *op;
 
 	offset += skb->nh.raw - skb->data;
-	if (skb_copy_bits(skb, offset, &optval, 1))
+	op = skb_header_pointer(skb, offset, sizeof(_optval), &_optval);
+	if (op == NULL)
 		return 1;
-	return (optval&0xC0) == 0x80;
+	return (*op & 0xC0) == 0x80;
 }
 
 int icmpv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct icmp6hdr *thdr, int len)
@@ -394,8 +395,6 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 
 	idev = in6_dev_get(skb->dev);
 
-	icmpv6_handle_mipv6_homeaddr(skb);
-
 	err = ip6_append_data(sk, icmpv6_getfrag, &msg,
 			      len + sizeof(struct icmp6hdr),
 			      sizeof(struct icmp6hdr),
@@ -534,8 +533,7 @@ static void icmpv6_notify(struct sk_buff *skb, int type, int code, u32 info)
 	hash = nexthdr & (MAX_INET_PROTOS - 1);
 
 	rcu_read_lock();
-	ipprot = inet6_protos[hash];
-	smp_read_barrier_depends();
+	ipprot = rcu_dereference(inet6_protos[hash]);
 	if (ipprot && ipprot->err_handler)
 		ipprot->err_handler(skb, NULL, type, code, inner_offset, info);
 	rcu_read_unlock();
@@ -623,13 +621,13 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 		rt6_pmtu_discovery(&orig_hdr->daddr, &orig_hdr->saddr, dev,
 				   ntohl(hdr->icmp6_mtu));
 
-		icmpv6_notify(skb, type, hdr->icmp6_code, hdr->icmp6_mtu);
-		break;
+		/*
+		 *	Drop through to notify
+		 */
 
 	case ICMPV6_DEST_UNREACH:
-	case ICMPV6_PARAMPROB:
-		mipv6_icmp_rcv(skb);
 	case ICMPV6_TIME_EXCEED:
+	case ICMPV6_PARAMPROB:
 		icmpv6_notify(skb, type, hdr->icmp6_code, hdr->icmp6_mtu);
 		break;
 
@@ -653,13 +651,10 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	case ICMPV6_NI_QUERY:
 	case ICMPV6_NI_REPLY:
 	case ICMPV6_MLD2_REPORT:
-		break;
-
 	case ICMPV6_DHAAD_REQUEST:
 	case ICMPV6_DHAAD_REPLY:
 	case ICMPV6_MOBILE_PREFIX_SOL:
 	case ICMPV6_MOBILE_PREFIX_ADV:
-		mipv6_icmp_rcv(skb);
 		break;
 
 	default:
@@ -820,4 +815,3 @@ ctl_table ipv6_icmp_table[] = {
 };
 #endif
 
-EXPORT_SYMBOL(icmpv6_push_pending_frames);

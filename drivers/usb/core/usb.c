@@ -93,6 +93,8 @@ int usb_probe_interface(struct device *dev)
 
 	if (!driver->probe)
 		return error;
+	if (interface_to_usbdev(intf)->state == USB_STATE_SUSPENDED)
+		return -EHOSTUNREACH;
 
 	id = usb_match_id (intf, driver->id_table);
 	if (id) {

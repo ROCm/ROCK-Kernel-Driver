@@ -67,7 +67,8 @@ static void ide_fill_flush_cmd(ide_drive_t *drive, struct request *rq)
 	rq->buffer = buf;
 	rq->buffer[0] = WIN_FLUSH_CACHE;
 
-	if (ide_id_has_flush_cache_ext(drive->id))
+	if (ide_id_has_flush_cache_ext(drive->id) &&
+	    (drive->capacity64 >= (1UL << 28)))
 		rq->buffer[0] = WIN_FLUSH_CACHE_EXT;
 }
 
@@ -135,6 +136,10 @@ static int __ide_end_request(ide_drive_t *drive, struct request *rq,
 
 	if (!end_that_request_first(rq, uptodate, nr_sectors)) {
 		add_disk_randomness(rq->rq_disk);
+
+		if (blk_rq_tagged(rq))
+			blk_queue_end_tag(drive->queue, rq);
+
 		blkdev_dequeue_request(rq);
 		HWGROUP(drive)->rq = NULL;
 		end_that_request_last(rq);
@@ -146,14 +151,14 @@ static int __ide_end_request(ide_drive_t *drive, struct request *rq,
 /**
  *	ide_end_request		-	complete an IDE I/O
  *	@drive: IDE device for the I/O
- *	@uptodate: 
+ *	@uptodate:
  *	@nr_sectors: number of sectors completed
  *
  *	This is our end_request wrapper function. We complete the I/O
  *	update random number input and dequeue the request, which if
  *	it was tagged may be out of order.
  */
- 
+
 int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 {
 	struct request *rq;
@@ -181,7 +186,6 @@ int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 	spin_unlock_irqrestore(&ide_lock, flags);
 	return ret;
 }
-
 EXPORT_SYMBOL(ide_end_request);
 
 /**
@@ -226,7 +230,7 @@ u64 ide_get_error_location(ide_drive_t *drive, char *args)
 	hcyl = args[5];
 	lcyl = args[4];
 	sect = args[3];
-	
+
 	if (ide_id_has_flush_cache_ext(drive->id)) {
 		low = (hcyl << 16) | (lcyl << 8) | sect;
 		HWIF(drive)->OUTB(drive->ctl|0x80, IDE_CONTROL_REG);
@@ -281,7 +285,7 @@ static void ide_complete_barrier(ide_drive_t *drive, struct request *rq,
 	 */
 	if (!blk_barrier_postflush(rq))
 		elv_requeue_request(drive->queue, real_rq);
-	
+
 	/*
 	 * drive aborted flush command, assume FLUSH_CACHE_* doesn't
 	 * work and disable barrier support

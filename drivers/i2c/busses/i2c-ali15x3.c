@@ -126,8 +126,8 @@
 
 /* If force_addr is set to anything different from 0, we forcibly enable
    the device at the given address. */
-static int force_addr = 0;
-MODULE_PARM(force_addr, "i");
+static u16 force_addr = 0;
+module_param(force_addr, ushort, 0);
 MODULE_PARM_DESC(force_addr,
 		 "Initialize the base address of the i2c controller");
 
@@ -509,7 +509,7 @@ static void __devexit ali15x3_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver ali15x3_driver = {
-	.name		= "ali15x3 smbus",
+	.name		= "ali15x3_smbus",
 	.id_table	= ali15x3_ids,
 	.probe		= ali15x3_probe,
 	.remove		= __devexit_p(ali15x3_remove),

@@ -412,7 +412,7 @@ static void tcx_init_one(struct sbus_dev *sdev)
 		all->par.mmap_map[i].poff = sdev->reg_addrs[j].phys_addr;
 	}
 
-	all->info.flags = FBINFO_FLAG_DEFAULT;
+	all->info.flags = FBINFO_DEFAULT;
 	all->info.fbops = &tcx_ops;
 #ifdef CONFIG_SPARC32
 	all->info.screen_base = (char *)

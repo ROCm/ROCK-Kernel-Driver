@@ -366,49 +366,6 @@ void reiserfs_panic (struct super_block * sb, const char * fmt, ...)
 	 reiserfs_bdevname (sb), error_buf);
 }
 
-static void
-do_handle_error (struct super_block *sb, int errno)
-{
-    if (reiserfs_error_panic (sb)) {
-        panic ("REISERFS: panic (device %s): Panic forced after error\n",
-               reiserfs_bdevname (sb));
-    }
-
-    if (reiserfs_error_ro (sb)) {
-        printk (KERN_CRIT "REISERFS: error (device %s): Re-mounting fs "
-                "readonly\n", reiserfs_bdevname (sb));
-        reiserfs_journal_abort (sb, errno);
-    }
-}
-
-void
-reiserfs_error (struct super_block * sb, int errno, const char *fmt, ...)
-{
-    do_reiserfs_warning (fmt);
-    printk (KERN_CRIT "REISERFS: error (device %s): %s\n",
-            reiserfs_bdevname (sb), error_buf);
-    do_handle_error (sb, errno);
-}
-
-void
-reiserfs_abort (struct super_block *sb, int errno, const char *fmt, ...)
-{
-    do_reiserfs_warning (fmt);
-
-    if (reiserfs_error_panic (sb)) {
-        panic (KERN_CRIT "REISERFS: panic (device %s): %s\n",
-               reiserfs_bdevname (sb), error_buf);
-    }
-
-    if (sb->s_flags & MS_RDONLY)
-        return;
-
-    printk (KERN_CRIT "REISERFS: abort (device %s): %s\n",
-            reiserfs_bdevname (sb), error_buf);
-
-    sb->s_flags |= MS_RDONLY;
-    reiserfs_journal_abort (sb, errno);
-}
 
 void print_virtual_node (struct virtual_node * vn)
 {

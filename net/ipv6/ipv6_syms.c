@@ -46,14 +46,3 @@ EXPORT_SYMBOL(ip6_flush_pending_frames);
 EXPORT_SYMBOL(ip6_push_pending_frames);
 EXPORT_SYMBOL(ipv6_push_nfrag_opts);
 EXPORT_SYMBOL(ip6_dst_lookup);
-
-EXPORT_SYMBOL(addrconf_add_ifaddr);
-EXPORT_SYMBOL(addrconf_del_ifaddr);
-EXPORT_SYMBOL(inet6_ifa_finish_destroy);
-EXPORT_SYMBOL(nd_tbl);
-EXPORT_SYMBOL(ndisc_send_ns);
-EXPORT_SYMBOL(ndisc_send_rs);
-EXPORT_SYMBOL(rt6_get_dflt_router);
-EXPORT_SYMBOL(rt6_lock);
-EXPORT_SYMBOL(rt6_purge_dflt_routers);
-EXPORT_SYMBOL(fib6_clean_tree);

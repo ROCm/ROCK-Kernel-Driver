@@ -45,6 +45,7 @@
 
 #include <asm/atomic.h>
 #include <linux/skbuff.h>
+#include <linux/netdevice.h>
 
 #include <linux/config.h>
 
@@ -58,6 +59,8 @@
 #endif
 #define NUD_VALID	(NUD_PERMANENT|NUD_NOARP|NUD_REACHABLE|NUD_PROBE|NUD_STALE|NUD_DELAY)
 #define NUD_CONNECTED	(NUD_PERMANENT|NUD_NOARP|NUD_REACHABLE)
+
+struct neighbour;
 
 struct neigh_parms
 {

@@ -63,7 +63,4 @@ struct nfs_mount_data {
 #define NFS_MOUNT_SECFLAVOUR	0x2000	/* 5 */
 #define NFS_MOUNT_FLAGMASK	0xFFFF
 
-/* Feature flag for the NFS_ACL protocol extension */
-#define NFSACL			0x10000
-
 #endif

@@ -74,8 +74,6 @@ extern struct kmem_zone *xfs_acl_zone;
 
 extern int xfs_acl_inherit(struct vnode *, struct vattr *, xfs_acl_t *);
 extern int xfs_acl_iaccess(struct xfs_inode *, mode_t, cred_t *);
-extern int xfs_acl_get(struct vnode *, xfs_acl_t *, xfs_acl_t *);
-extern int xfs_acl_set(struct vnode *, xfs_acl_t *, xfs_acl_t *);
 extern int xfs_acl_vtoacl(struct vnode *, xfs_acl_t *, xfs_acl_t *);
 extern int xfs_acl_vhasacl_access(struct vnode *);
 extern int xfs_acl_vhasacl_default(struct vnode *);
@@ -95,7 +93,7 @@ extern int xfs_acl_vremove(struct vnode *vp, int);
 #define _ACL_XFS_IACCESS(i,m,c) (XFS_IFORK_Q(i) ? xfs_acl_iaccess(i,m,c) : -1)
 
 #define _ACL_ALLOC(a)		((a) = kmem_zone_alloc(xfs_acl_zone, KM_SLEEP))
-#define _ACL_FREE(a)		((a)? kmem_zone_free(xfs_acl_zone, (a)) : 0)
+#define _ACL_FREE(a)		((a)? kmem_zone_free(xfs_acl_zone, (a)):(void)0)
 
 #else
 #define xfs_acl_zone_init(zone,name)

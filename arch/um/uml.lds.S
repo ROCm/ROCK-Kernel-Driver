@@ -9,6 +9,7 @@ SECTIONS
 {
   . = START + SIZEOF_HEADERS;
 
+  . = ALIGN(4096);
   __binary_start = .;
 #ifdef MODE_TT
   .thread_private : {
@@ -25,16 +26,11 @@ SECTIONS
   . = ALIGN(4096);		/* Init code and data */
   _stext = .;
   __init_begin = .;
-  .init.text : { 
-	_sinittext = .;
-	*(.init.text)
-	_einittext = .;
-  }
+  .text.init : { *(.text.init) }
   . = ALIGN(4096);
   .text      :
   {
     *(.text)
-    SCHED_TEXT
     /* .gnu.warning sections are handled specially by elf32.em.  */
     *(.gnu.warning)
     *(.gnu.linkonce.t*)
@@ -42,7 +38,7 @@ SECTIONS
 
   #include "asm/common.lds.S"
 
-  init.data : { *(init.data) }
+  .data.init : { *(.data.init) }
   .data    :
   {
     . = ALIGN(KERNEL_STACK_SIZE);		/* init_task */

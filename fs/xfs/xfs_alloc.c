@@ -665,7 +665,7 @@ xfs_alloc_ag_vextent_exact(
 	 * Allocate/initialize a cursor for the by-number freespace btree.
 	 */
 	bno_cur = xfs_btree_init_cursor(args->mp, args->tp, args->agbp,
-		args->agno, XFS_BTNUM_BNO, 0, 0);
+		args->agno, XFS_BTNUM_BNO, NULL, 0);
 	/*
 	 * Lookup bno and minlen in the btree (minlen is irrelevant, really).
 	 * Look for the closest free block <= bno, it must contain bno
@@ -721,7 +721,7 @@ xfs_alloc_ag_vextent_exact(
 	 * Allocate/initialize a cursor for the by-size btree.
 	 */
 	cnt_cur = xfs_btree_init_cursor(args->mp, args->tp, args->agbp,
-		args->agno, XFS_BTNUM_CNT, 0, 0);
+		args->agno, XFS_BTNUM_CNT, NULL, 0);
 	ASSERT(args->agbno + args->len <=
 		INT_GET(XFS_BUF_TO_AGF(args->agbp)->agf_length,
 			ARCH_CONVERT));
@@ -788,7 +788,7 @@ xfs_alloc_ag_vextent_near(
 	 * Get a cursor for the by-size btree.
 	 */
 	cnt_cur = xfs_btree_init_cursor(args->mp, args->tp, args->agbp,
-		args->agno, XFS_BTNUM_CNT, 0, 0);
+		args->agno, XFS_BTNUM_CNT, NULL, 0);
 	ltlen = 0;
 	bno_cur_lt = bno_cur_gt = NULL;
 	/*
@@ -916,7 +916,7 @@ xfs_alloc_ag_vextent_near(
 		 * Set up a cursor for the by-bno tree.
 		 */
 		bno_cur_lt = xfs_btree_init_cursor(args->mp, args->tp,
-			args->agbp, args->agno, XFS_BTNUM_BNO, 0, 0);
+			args->agbp, args->agno, XFS_BTNUM_BNO, NULL, 0);
 		/*
 		 * Fix up the btree entries.
 		 */
@@ -944,7 +944,7 @@ xfs_alloc_ag_vextent_near(
 	 * Allocate and initialize the cursor for the leftward search.
 	 */
 	bno_cur_lt = xfs_btree_init_cursor(args->mp, args->tp, args->agbp,
-		args->agno, XFS_BTNUM_BNO, 0, 0);
+		args->agno, XFS_BTNUM_BNO, NULL, 0);
 	/*
 	 * Lookup <= bno to find the leftward search's starting point.
 	 */
@@ -956,7 +956,7 @@ xfs_alloc_ag_vextent_near(
 		 * search.
 		 */
 		bno_cur_gt = bno_cur_lt;
-		bno_cur_lt = 0;
+		bno_cur_lt = NULL;
 	}
 	/*
 	 * Found something.  Duplicate the cursor for the rightward search.
@@ -1301,7 +1301,7 @@ xfs_alloc_ag_vextent_size(
 	 * Allocate and initialize a cursor for the by-size btree.
 	 */
 	cnt_cur = xfs_btree_init_cursor(args->mp, args->tp, args->agbp,
-		args->agno, XFS_BTNUM_CNT, 0, 0);
+		args->agno, XFS_BTNUM_CNT, NULL, 0);
 	bno_cur = NULL;
 	/*
 	 * Look for an entry >= maxlen+alignment-1 blocks.
@@ -1406,7 +1406,7 @@ xfs_alloc_ag_vextent_size(
 	 * Allocate and initialize a cursor for the by-block tree.
 	 */
 	bno_cur = xfs_btree_init_cursor(args->mp, args->tp, args->agbp,
-		args->agno, XFS_BTNUM_BNO, 0, 0);
+		args->agno, XFS_BTNUM_BNO, NULL, 0);
 	if ((error = xfs_alloc_fixup_trees(cnt_cur, bno_cur, fbno, flen,
 			rbno, rlen, XFSA_FIXUP_CNT_OK)))
 		goto error0;
@@ -1553,7 +1553,7 @@ xfs_free_ag_extent(
 	/*
 	 * Allocate and initialize a cursor for the by-block btree.
 	 */
-	bno_cur = xfs_btree_init_cursor(mp, tp, agbp, agno, XFS_BTNUM_BNO, 0,
+	bno_cur = xfs_btree_init_cursor(mp, tp, agbp, agno, XFS_BTNUM_BNO, NULL,
 		0);
 	cnt_cur = NULL;
 	/*
@@ -1613,7 +1613,7 @@ xfs_free_ag_extent(
 	/*
 	 * Now allocate and initialize a cursor for the by-size tree.
 	 */
-	cnt_cur = xfs_btree_init_cursor(mp, tp, agbp, agno, XFS_BTNUM_CNT, 0,
+	cnt_cur = xfs_btree_init_cursor(mp, tp, agbp, agno, XFS_BTNUM_CNT, NULL,
 		0);
 	/*
 	 * Have both left and right contiguous neighbors.

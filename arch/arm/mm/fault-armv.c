@@ -80,7 +80,7 @@ static void __flush_dcache_page(struct page *page)
 {
 	struct address_space *mapping = page_mapping(page);
 	struct mm_struct *mm = current->active_mm;
-	struct vm_area_struct *mpnt = NULL;
+	struct vm_area_struct *mpnt;
 	struct prio_tree_iter iter;
 	unsigned long offset;
 	pgoff_t pgoff;
@@ -97,8 +97,7 @@ static void __flush_dcache_page(struct page *page)
 	pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
 
 	flush_dcache_mmap_lock(mapping);
-	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap,
-					&iter, pgoff, pgoff)) != NULL) {
+	vma_prio_tree_foreach(mpnt, &iter, &mapping->i_mmap, pgoff, pgoff) {
 		/*
 		 * If this VMA is not in our MM, we can ignore it.
 		 */
@@ -128,7 +127,7 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 {
 	struct address_space *mapping = page_mapping(page);
 	struct mm_struct *mm = vma->vm_mm;
-	struct vm_area_struct *mpnt = NULL;
+	struct vm_area_struct *mpnt;
 	struct prio_tree_iter iter;
 	unsigned long offset;
 	pgoff_t pgoff;
@@ -145,8 +144,7 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 	 * cache coherency.
 	 */
 	flush_dcache_mmap_lock(mapping);
-	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap,
-					&iter, pgoff, pgoff)) != NULL) {
+	vma_prio_tree_foreach(mpnt, &iter, &mapping->i_mmap, pgoff, pgoff) {
 		/*
 		 * If this VMA is not in our MM, we can ignore it.
 		 * Note that we intentionally mask out the VMA

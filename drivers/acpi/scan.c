@@ -370,6 +370,7 @@ acpi_bus_driver_init (
 static int acpi_driver_attach(struct acpi_driver * drv)
 {
 	struct list_head * node, * next;
+	int count = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_driver_attach");
 
@@ -384,6 +385,7 @@ static int acpi_driver_attach(struct acpi_driver * drv)
 		if (!acpi_bus_match(dev, drv)) {
 			if (!acpi_bus_driver_init(dev, drv)) {
 				atomic_inc(&drv->references);
+				count++;
 				ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found driver [%s] for device [%s]\n",
 						  drv->name, dev->pnp.bus_id));
 			}
@@ -391,7 +393,7 @@ static int acpi_driver_attach(struct acpi_driver * drv)
 		spin_lock(&acpi_device_lock);
 	}
 	spin_unlock(&acpi_device_lock);
-	return_VALUE(0);
+	return_VALUE(count);
 }
 
 static int acpi_driver_detach(struct acpi_driver * drv)
@@ -422,28 +424,30 @@ static int acpi_driver_detach(struct acpi_driver * drv)
  * acpi_bus_register_driver 
  * ------------------------ 
  * Registers a driver with the ACPI bus.  Searches the namespace for all
- * devices that match the driver's criteria and binds.
+ * devices that match the driver's criteria and binds.  Returns the
+ * number of devices that were claimed by the driver, or a negative
+ * error status for failure.
  */
 int
 acpi_bus_register_driver (
 	struct acpi_driver	*driver)
 {
-	int error = 0;
+	int count;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_register_driver");
 
 	if (acpi_disabled)
 		return_VALUE(-ENODEV);
 
-	if (driver) {
-		spin_lock(&acpi_device_lock);
-		list_add_tail(&driver->node, &acpi_bus_drivers);
-		spin_unlock(&acpi_device_lock);
-		acpi_driver_attach(driver);
-	} else
-		error = -EINVAL;
+	if (!driver)
+		return_VALUE(-EINVAL);
 
-	return_VALUE(error);
+	spin_lock(&acpi_device_lock);
+	list_add_tail(&driver->node, &acpi_bus_drivers);
+	spin_unlock(&acpi_device_lock);
+	count = acpi_driver_attach(driver);
+
+	return_VALUE(count);
 }
 
 

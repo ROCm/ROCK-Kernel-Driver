@@ -1248,12 +1248,13 @@ static int idedisk_issue_flush(request_queue_t *q, struct gendisk *disk,
 
 	memset(rq->cmd, 0, sizeof(rq->cmd));
 
-	if ((drive->id->cfs_enable_2 & 0x2400) == 0x2400)
+	if (ide_id_has_flush_cache_ext(drive->id) &&
+	    (drive->capacity64 >= (1UL << 28)))
 		rq->cmd[0] = WIN_FLUSH_CACHE_EXT;
 	else
 		rq->cmd[0] = WIN_FLUSH_CACHE;
 
-	
+
 	rq->flags |= REQ_DRIVE_TASK | REQ_SOFTBARRIER;
 	rq->buffer = rq->cmd;
 
@@ -1612,9 +1613,9 @@ static void idedisk_setup (ide_drive_t *drive)
 	 * decide if we can sanely support flushes and barriers on
 	 * this drive. unfortunately not all drives advertise FLUSH_CACHE
 	 * support even if they support it. So assume FLUSH_CACHE is there
-	 * if write back caching is enabled. LBA48 drives are newer, so
-	 * expect it to flag support properly. We can safely support
-	 * FLUSH_CACHE on lba48, if capacity doesn't exceed lba28
+	 * always. LBA48 drives are newer, so expect it to flag support
+	 * properly. We can safely support FLUSH_CACHE on lba48, if capacity
+	 * doesn't exceed lba28
 	 */
 	barrier = 1;
 	if (drive->addressing == 1) {
@@ -1622,7 +1623,8 @@ static void idedisk_setup (ide_drive_t *drive)
 			barrier = 0;
 	}
 
-	printk("%s: cache flushes %ssupported\n", drive->name, barrier ? "" : "not ");
+	printk("%s: cache flushes %ssupported\n",
+		drive->name, barrier ? "" : "not ");
 	if (barrier) {
 		blk_queue_ordered(drive->queue, 1);
 		blk_queue_issue_flush_fn(drive->queue, idedisk_issue_flush);

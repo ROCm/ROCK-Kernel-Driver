@@ -26,7 +26,7 @@ obj-$(CONFIG_QSORT)	+= qsort.o
 obj-$(CONFIG_ZLIB_INFLATE) += zlib_inflate/
 obj-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate/
 
-host-progs	:= gen_crc32table
+hostprogs-y	:= gen_crc32table
 clean-files	:= crc32table.h
 
 $(obj)/crc32.o: $(obj)/crc32table.h

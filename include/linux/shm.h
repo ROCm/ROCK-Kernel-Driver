@@ -84,6 +84,7 @@ struct shmid_kernel /* private to the kernel */
 	time_t			shm_ctim;
 	pid_t			shm_cprid;
 	pid_t			shm_lprid;
+	struct user_struct	*mlock_user;
 };
 
 /* shm_mode upper byte flags */

@@ -302,17 +302,8 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	return ret;
 }
 
-void syscall_trace(union uml_pt_regs *regs, int entryexit)
+void syscall_trace(void)
 {
-	if (unlikely(current->audit_context)) {
-		if (!entryexit)
-			audit_syscall_entry(current, regs->orig_eax,
-					    regs->ebx, regs->ecx,
-					    regs->edx, regs->esi);
-		else
-			audit_syscall_exit(current, regs->eax);
-	}
-
 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
 		return;
 	if (!(current->ptrace & PT_PTRACED))
@@ -320,8 +311,11 @@ void syscall_trace(union uml_pt_regs *regs, int entryexit)
 
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
-	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
-				 ? 0x80 : 0));
+ 	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+ 					? 0x80 : 0);
+	current->state = TASK_STOPPED;
+	notify_parent(current, SIGCHLD);
+	schedule();
 
 	/*
 	 * this isn't the same as continuing with a signal, but it will do

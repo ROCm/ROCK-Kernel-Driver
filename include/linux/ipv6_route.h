@@ -25,8 +25,6 @@
 #define RTF_FLOW	0x02000000	/* flow significant route	*/
 #define RTF_POLICY	0x04000000	/* policy route			*/
 
-#define RTF_MOBILENODE	0x10000000	/* for routing to Mobile Node	*/
-
 #define RTF_LOCAL	0x80000000
 
 struct in6_rtmsg {

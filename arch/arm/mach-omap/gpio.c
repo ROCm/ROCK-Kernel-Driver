@@ -94,7 +94,7 @@ struct gpio_bank {
 #define METHOD_GPIO_1610	2
 #define METHOD_GPIO_730		3
 
-#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912)
+#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710) || defined(CONFIG_ARCH_OMAP5912)
 static struct gpio_bank gpio_bank_1610[5] = {
 	{ OMAP_MPUIO_BASE,     INT_MPUIO,	    IH_MPUIO_BASE,     METHOD_MPUIO},
 	{ OMAP1610_GPIO1_BASE, INT_GPIO_BANK1,	    IH_GPIO_BASE,      METHOD_GPIO_1610 },
@@ -113,7 +113,7 @@ static struct gpio_bank gpio_bank_1510[2] = {
 
 #ifdef CONFIG_ARCH_OMAP730
 static struct gpio_bank gpio_bank_730[7] = {
-	{ OMAP_MPUIO_BASE,     INT_MPUIO,	    IH_MPUIO_BASE,	METHOD_MPUIO },
+	{ OMAP_MPUIO_BASE,     INT_730_MPUIO,	    IH_MPUIO_BASE,	METHOD_MPUIO },
 	{ OMAP730_GPIO1_BASE,  INT_GPIO_BANK1,	    IH_GPIO_BASE,	METHOD_GPIO_730 },
 	{ OMAP730_GPIO2_BASE,  INT_730_GPIO_BANK2,  IH_GPIO_BASE + 32,	METHOD_GPIO_730 },
 	{ OMAP730_GPIO3_BASE,  INT_730_GPIO_BANK3,  IH_GPIO_BASE + 64,	METHOD_GPIO_730 },
@@ -135,8 +135,8 @@ static inline struct gpio_bank *get_gpio_bank(int gpio)
 		return &gpio_bank[1];
 	}
 #endif
-#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912)
-	if (cpu_is_omap1610() || cpu_is_omap5912()) {
+#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710) || defined(CONFIG_ARCH_OMAP5912)
+	if (cpu_is_omap1610() || cpu_is_omap1710() || cpu_is_omap5912()) {
 		if (OMAP_GPIO_IS_MPUIO(gpio))
 			return &gpio_bank[0];
 		return &gpio_bank[1 + (gpio >> 4)];
@@ -172,8 +172,8 @@ static inline int gpio_valid(int gpio)
 	if (cpu_is_omap1510() && gpio < 16)
 		return 0;
 #endif
-#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912)
-	if ((cpu_is_omap1610() || cpu_is_omap5912()) && gpio < 64)
+#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710) || defined(CONFIG_ARCH_OMAP5912)
+	if ((cpu_is_omap1610() || cpu_is_omap1710() || cpu_is_omap5912()) && gpio < 64)
 		return 0;
 #endif
 #ifdef CONFIG_ARCH_OMAP730
@@ -554,7 +554,7 @@ static void gpio_irq_handler(unsigned int irq, struct irqdesc *desc,
 	if (bank->method == METHOD_GPIO_1510)
 		isr_reg = bank->base + OMAP1510_GPIO_INT_STATUS;
 #endif
-#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912)
+#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710) || defined(CONFIG_ARCH_OMAP5912)
 	if (bank->method == METHOD_GPIO_1610)
 		isr_reg = bank->base + OMAP1610_GPIO_IRQSTATUS1;
 #endif
@@ -588,7 +588,7 @@ static void gpio_ack_irq(unsigned int irq)
 	if (bank->method == METHOD_GPIO_1510)
 		__raw_writew(1 << (gpio & 0x0f), bank->base + OMAP1510_GPIO_INT_STATUS);
 #endif
-#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912)
+#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710) || defined(CONFIG_ARCH_OMAP5912)
 	if (bank->method == METHOD_GPIO_1610)
 		__raw_writew(1 << (gpio & 0x0f), bank->base + OMAP1610_GPIO_IRQSTATUS1);
 #endif
@@ -629,7 +629,7 @@ static void mpuio_mask_irq(unsigned int irq)
 	unsigned int gpio = OMAP_MPUIO(irq - IH_MPUIO_BASE);
 	struct gpio_bank *bank = get_gpio_bank(gpio);
 
-	_set_gpio_irqenable(bank, gpio, 0);
+	_set_gpio_irqenable(bank, get_gpio_index(gpio), 0);
 }
 
 static void mpuio_unmask_irq(unsigned int irq)
@@ -637,7 +637,7 @@ static void mpuio_unmask_irq(unsigned int irq)
 	unsigned int gpio = OMAP_MPUIO(irq - IH_MPUIO_BASE);
 	struct gpio_bank *bank = get_gpio_bank(gpio);
 
-	_set_gpio_irqenable(bank, gpio, 1);
+	_set_gpio_irqenable(bank, get_gpio_index(gpio), 1);
 }
 
 static struct irqchip gpio_irq_chip = {
@@ -668,8 +668,8 @@ static int __init _omap_gpio_init(void)
 		gpio_bank = gpio_bank_1510;
 	}
 #endif
-#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912)
-	if (cpu_is_omap1610() || cpu_is_omap5912()) {
+#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710) || defined(CONFIG_ARCH_OMAP5912)
+	if (cpu_is_omap1610() || cpu_is_omap1710() || cpu_is_omap5912()) {
 		int rev;
 
 		gpio_bank_count = 5;
@@ -702,7 +702,7 @@ static int __init _omap_gpio_init(void)
 			__raw_writew(0x0000, bank->base + OMAP1510_GPIO_INT_STATUS);
 		}
 #endif
-#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912)
+#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710) || defined(CONFIG_ARCH_OMAP5912)
 		if (bank->method == METHOD_GPIO_1610) {
 			__raw_writew(0x0000, bank->base + OMAP1610_GPIO_IRQENABLE1);
 			__raw_writew(0xffff, bank->base + OMAP1610_GPIO_IRQSTATUS1);
@@ -731,7 +731,7 @@ static int __init _omap_gpio_init(void)
 
 	/* Enable system clock for GPIO module.
 	 * The CAM_CLK_CTRL *is* really the right place. */
-	if (cpu_is_omap1610())
+	if (cpu_is_omap1610() || cpu_is_omap1710())
 		omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04, ULPD_CAM_CLK_CTRL);
 
 	return 0;

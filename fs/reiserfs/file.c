@@ -35,8 +35,6 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
 {
 
     struct reiserfs_transaction_handle th ;
-    int err;
-    int jbegin_failure = 0;
 
     if (!S_ISREG (inode->i_mode))
 	BUG ();
@@ -51,58 +49,26 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
     
     reiserfs_write_lock(inode->i_sb);
     down (&inode->i_sem); 
-    /* freeing preallocation only involves relogging blocks that
-     * are already in the current transaction.  preallocation gets
-     * freed at the end of each transaction, so it is impossible for
-     * us to log any additional blocks
-     */
-    err = journal_begin(&th, inode->i_sb, 1);
-    if (err) {
-	/* uh oh, we can't allow the inode to go away while there
-	 * is still preallocation blocks pending.  Try to join the
-	 * aborted transaction
-	 */
-	jbegin_failure = err;
-	err = journal_join_abort(&th, inode->i_sb, 1);
-
-	if (err) {
-	    /* hmpf, our choices here aren't good.  We can pin the inode
-	     * which will disallow unmount from every happening, we can
-	     * do nothing, which will corrupt random memory on unmount,
-	     * or we can forcibly remove the file from the preallocation
-	     * list, which will leak blocks on disk.  Lets pin the inode
-	     * and let the admin know what is going on.
-	     */
-	    igrab(inode);
-	    reiserfs_warning(inode->i_sb, "pinning inode %lu because the "
-	                     "preallocation can't be freed");
-	    goto out;
-	}
-    }
+    journal_begin(&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3) ;
     reiserfs_update_inode_transaction(inode) ;
 
 #ifdef REISERFS_PREALLOCATE
     reiserfs_discard_prealloc (&th, inode);
 #endif
-    err = journal_end(&th, inode->i_sb, 1);
+    journal_end(&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3) ;
 
-    /* copy back the error code from journal_begin */
-    if (!err)
-        err = jbegin_failure;
-
-    if (!err && atomic_read(&inode->i_count) <= 1 &&
+    if (atomic_read(&inode->i_count) <= 1 &&
 	(REISERFS_I(inode)->i_flags & i_pack_on_close_mask) &&
         tail_has_to_be_packed (inode)) {
 	/* if regular file is released by last holder and it has been
 	   appended (we append by unformatted node only) or its direct
 	   item(s) had to be converted, then it may have to be
 	   indirect2direct converted */
-	err = reiserfs_truncate_file(inode, 0) ;
+	reiserfs_truncate_file(inode, 0) ;
     }
-out:
     up (&inode->i_sem); 
     reiserfs_write_unlock(inode->i_sb);
-    return err;
+    return 0;
 }
 
 static void reiserfs_vfs_truncate_file(struct inode *inode) {
@@ -131,10 +97,8 @@ static int reiserfs_sync_file(
   reiserfs_write_lock(p_s_inode->i_sb);
   barrier_done = reiserfs_commit_for_inode(p_s_inode);
   reiserfs_write_unlock(p_s_inode->i_sb);
-  if (barrier_done != 1 && reiserfs_barrier_flush(p_s_inode->i_sb))
+  if (barrier_done != 1)
       blkdev_issue_flush(p_s_inode->i_sb->s_bdev, NULL);
-  if (barrier_done < 0)
-    return barrier_done;
   return ( n_err < 0 ) ? -EIO : 0;
 }
 
@@ -182,6 +146,7 @@ int reiserfs_allocate_blocks_for_region(
 				 // of the fact that we already prepared
 				 // current block for journal
     int will_prealloc = 0;
+
     RFALSE(!blocks_to_allocate, "green-9004: tried to allocate zero blocks?");
 
     /* only preallocate if this is a small write */
@@ -201,9 +166,7 @@ int reiserfs_allocate_blocks_for_region(
     /* If we came here, it means we absolutely need to open a transaction,
        since we need to allocate some blocks */
     reiserfs_write_lock(inode->i_sb); // Journaling stuff and we need that.
-    res = journal_begin(th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3 + 1); // Wish I know if this number enough
-    if (res)
-        goto error_exit;
+    journal_begin(th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3 + 1); // Wish I know if this number enough
     reiserfs_update_inode_transaction(inode) ;
 
     /* Look for the in-tree position of our write, need path for block allocator */
@@ -231,9 +194,7 @@ int reiserfs_allocate_blocks_for_region(
 	    /* We flush the transaction in case of no space. This way some
 	       blocks might become free */
 	    SB_JOURNAL(inode->i_sb)->j_must_wait = 1;
-	    res = restart_transaction(th, inode, &path);
-            if (res)
-                goto error_exit;
+	    restart_transaction(th, inode, &path);
 
 	    /* We might have scheduled, so search again */
 	    res = search_for_position_by_key(inode->i_sb, &key, &path);
@@ -361,14 +322,8 @@ int reiserfs_allocate_blocks_for_region(
 		}
 		/* Now we want to check if transaction is too full, and if it is
 		   we restart it. This will also free the path. */
-		if (journal_transaction_should_end(th, th->t_blocks_allocated)) {
-		    res = restart_transaction(th, inode, &path);
-                    if (res) {
-                        pathrelse (&path);
-                        kfree(zeros);
-                        goto error_exit;
-                    }
-                }
+		if (journal_transaction_should_end(th, th->t_blocks_allocated))
+		    restart_transaction(th, inode, &path);
 
 		/* Well, need to recalculate path and stuff */
 		set_cpu_key_k_offset( &key, cpu_key_k_offset(&key) + (to_paste << inode->i_blkbits));
@@ -394,7 +349,6 @@ int reiserfs_allocate_blocks_for_region(
     // we are going to overwrite, so there is nothing to scan through for holes.
     for ( curr_block = 0, itempos = path.pos_in_item ; curr_block < blocks_to_allocate && res == POSITION_FOUND ; ) {
 retry:
-
 	if ( itempos >= ih_item_len(ih)/UNFM_P_SIZE ) {
 	    /* We run out of data in this indirect item, let's look for another
 	       one. */
@@ -572,14 +526,8 @@ error_exit_free_blocks:
 	reiserfs_free_block(th, inode, le32_to_cpu(allocated_blocks[i]), 1);
 
 error_exit:
-    if (th->t_trans_id) {
-        int err;
-        // update any changes we made to blk count
-        mark_inode_dirty(inode);
-        err = journal_end(th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3 + 1);
-        if (err)
-            res = err;
-    }
+    reiserfs_update_sd(th, inode); // update any changes we made to blk count
+    journal_end(th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3 + 1);
     reiserfs_write_unlock(inode->i_sb);
     kfree(allocated_blocks);
 
@@ -655,15 +603,12 @@ int reiserfs_commit_page(struct inode *inode, struct page *page,
     int bh_per_page = PAGE_CACHE_SIZE / s->s_blocksize;
     struct reiserfs_transaction_handle th;
     th.t_trans_id = 0;
-    int ret = 0;
 
     blocksize = 1 << inode->i_blkbits;
 
     if (logit) {
 	reiserfs_write_lock(s);
-	ret = journal_begin(&th, s, bh_per_page + 1);
-	if (ret)
-	    goto drop_write_lock;
+	journal_begin(&th, s, bh_per_page + 1);
 	reiserfs_update_inode_transaction(inode);
     }
     for(bh = head = page_buffers(page), block_start = 0;
@@ -695,8 +640,7 @@ int reiserfs_commit_page(struct inode *inode, struct page *page,
 	}
     }
     if (logit) {
-	ret = journal_end(&th, s, bh_per_page + 1);
-drop_write_lock:
+	journal_end(&th, s, bh_per_page + 1);
 	reiserfs_write_unlock(s);
     }
     /*
@@ -707,7 +651,7 @@ drop_write_lock:
      */
     if (!partial)
 	SetPageUptodate(page);
-    return ret;
+    return 0;
 }
 
 
@@ -762,8 +706,7 @@ int reiserfs_submit_file_region_for_write(
 
 	if (th->t_trans_id) {
 	    reiserfs_write_lock(inode->i_sb);
-	    // this sets the proper flags for O_SYNC to trigger a commit
-	    mark_inode_dirty(inode);
+	    reiserfs_update_sd(th, inode); // And update on-disk metadata
 	    reiserfs_write_unlock(inode->i_sb);
 	} else
 	    inode->i_sb->s_op->dirty_inode(inode);
@@ -773,10 +716,8 @@ int reiserfs_submit_file_region_for_write(
     if (th->t_trans_id) {
 	reiserfs_write_lock(inode->i_sb);
 	if (!sd_update)
-	    mark_inode_dirty(inode);
-	status = journal_end(th, th->t_super, th->t_blocks_allocated);
-        if (status)
-            retval = status;
+	    reiserfs_update_sd(th, inode);
+	journal_end(th, th->t_super, th->t_blocks_allocated);
 	reiserfs_write_unlock(inode->i_sb);
     }
     th->t_trans_id = 0;
@@ -1159,7 +1100,6 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
     size_t already_written = 0; // Number of bytes already written to the file.
     loff_t pos; // Current position in the file.
     size_t res; // return value of various functions that we call.
-    int err = 0;
     struct inode *inode = file->f_dentry->d_inode; // Inode of the file that we are writing to.
 				/* To simplify coding at this time, we store
 				   locked pages in array for now */
@@ -1191,40 +1131,24 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
 	       If we will crash while doing direct io, finish_unfinished will
 	       cut the garbage from the file end. */
 	    reiserfs_write_lock(inode->i_sb);
-	    err = journal_begin(&th, inode->i_sb,  JOURNAL_PER_BALANCE_CNT );
-            if (err) {
-                reiserfs_write_unlock (inode->i_sb);
-                return err;
-            }
+	    journal_begin(&th, inode->i_sb,  JOURNAL_PER_BALANCE_CNT );
 	    reiserfs_update_inode_transaction(inode);
 	    add_save_link (&th, inode, 1 /* Truncate */);
+	    journal_end(&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT );
+	    reiserfs_write_unlock(inode->i_sb);
 	    after_file_end = 1;
-	    err = journal_end(&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT );
-            reiserfs_write_unlock(inode->i_sb);
-            if (err)
-                return err;
 	}
 	result = generic_file_write(file, buf, count, ppos);
 
 	if ( after_file_end ) { /* Now update i_size and remove the savelink */
 	    struct reiserfs_transaction_handle th;
 	    reiserfs_write_lock(inode->i_sb);
-	    err = journal_begin(&th, inode->i_sb, 1);
-            if (err) {
-                reiserfs_write_unlock (inode->i_sb);
-                return err;
-            }
+	    journal_begin(&th, inode->i_sb, 1);
 	    reiserfs_update_inode_transaction(inode);
-	    mark_inode_dirty(inode);
-	    err = journal_end(&th, inode->i_sb, 1);
-            if (err) {
-                reiserfs_write_unlock (inode->i_sb);
-                return err;
-            }
-	    err = remove_save_link (inode, 1/* truncate */);
+	    reiserfs_update_sd(&th, inode);
+	    journal_end(&th, inode->i_sb, 1);
+	    remove_save_link (inode, 1/* truncate */);
 	    reiserfs_write_unlock(inode->i_sb);
-            if (err)
-                return err;
 	}
 
 	return result;
@@ -1373,12 +1297,8 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
     /* this is only true on error */
     if (th.t_trans_id) {
         reiserfs_write_lock(inode->i_sb);
-	err = journal_end(&th, th.t_super, th.t_blocks_allocated);
+	journal_end(&th, th.t_super, th.t_blocks_allocated);
         reiserfs_write_unlock(inode->i_sb);
-        if (err) {
-            res = err;
-            goto out;
-        }
     }
 
     if ((file->f_flags & O_SYNC) || IS_SYNC(inode))

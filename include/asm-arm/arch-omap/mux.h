@@ -135,6 +135,10 @@ typedef enum {
 	UART3_CLKREQ,
 	UART3_BCLK,	/* 12MHz clock out */
 
+	/* PWT & PWL */
+	PWT,
+	PWL,
+
 	/* USB master generic */
 	R18_USB_VBUS,
 	R18_1510_USB_GPIO0,
@@ -154,6 +158,7 @@ typedef enum {
 	USB1_RCV,
 	USB1_SPEED,
 	R13_1610_USB1_SPEED,
+	R13_1710_USB1_SE0,
 
 	/* USB2 master */
 	USB2_SUSP,
@@ -168,6 +173,10 @@ typedef enum {
 	R18_1510_GPIO0,
 	R19_1510_GPIO1,
 	M14_1510_GPIO2,
+
+	/* OMAP-1710 GPIO */
+	R18_1710_GPIO0,
+	W15_1710_GPIO40,
 
 	/* MPUIO */
 	MPUIO2,
@@ -225,6 +234,7 @@ typedef enum {
 	P10_1610_GPIO22,
 	V5_1610_GPIO24,
 	AA20_1610_GPIO_41,
+	W19_1610_GPIO48,
 
 	/* OMAP-1610 uWire */
 	V19_1610_UWIRE_SCLK,
@@ -241,6 +251,11 @@ typedef enum {
 	MMC_DAT0,
 	MMC_CLK,
 	MMC_DAT3,
+
+	/* OMAP-1710 MMC CMDDIR and DATDIR0 */
+	M15_1710_MMC_CLKI,
+	P19_1710_MMC_CMDDIR,
+	P20_1710_MMC_DATDIR0,
 
 	/* OMAP-1610 USB0 alternate pin configuration */
 	W9_USB0_TXEN,
@@ -317,6 +332,10 @@ MUX_CFG("UART3_RTS",		 5,   15,    2,	  0,  25,   0,	 NA,	 0,  0)
 MUX_CFG("UART3_CLKREQ",		 9,   27,    0,	  2,   5,   0,	 NA,	 0,  0)
 MUX_CFG("UART3_BCLK",		 A,    0,    0,	  2,   6,   0,	 NA,	 0,  0)
 
+/* PWT & PWL, conflicts with UART3 */
+MUX_CFG("PWT",		 	 6,    0,    2,	  0,  30,   0,	 NA,	 0,  0)
+MUX_CFG("PWL",		 	 6,    3,    1,	  0,  31,   1,	 NA,	 0,  0)
+
 /* USB internal master generic */
 MUX_CFG("R18_USB_VBUS",		 7,    9,    2,	  1,  11,   0,	 NA,	 0,  1)
 MUX_CFG("R18_1510_USB_GPIO0",	 7,    9,    0,	  1,  11,   1,	 NA,	 0,  1)
@@ -336,6 +355,7 @@ MUX_CFG("USB1_VM",		 A,    6,    1,	  2,   8,   0,	 NA,	 0,  1)
 MUX_CFG("USB1_RCV",		 A,    9,    1,	  2,   9,   0,	 NA,	 0,  1)
 MUX_CFG("USB1_SPEED",		 A,   12,    2,	  2,  10,   0,	 NA,	 0,  1)
 MUX_CFG("R13_1610_USB1_SPEED",	 A,   12,    5,	  2,  10,   0,	 NA,	 0,  1)
+MUX_CFG("R13_1710_USB1_SEO",	 A,   12,    5,   2,  10,   0,   NA,     0,  1)
 
 /* USB2 master */
 MUX_CFG("USB2_SUSP",		 B,    3,    1,	  2,  17,   0,	 NA,	 0,  1)
@@ -347,9 +367,13 @@ MUX_CFG("USB2_SE0",		 C,   24,    2,	  3,   2,   0,	 NA,	 0,  1)
 MUX_CFG("USB2_TXD",		 C,   27,    2,	  3,   3,   0,	 NA,	 0,  1)
 
 /* OMAP-1510 GPIO */
-MUX_CFG("R18_1510_GPIO0",	 7,    9,   0,	  1,  11,   1,	  0,	 0,  1)
-MUX_CFG("R19_1510_GPIO1",	 7,    6,   0,	  1,  10,   1,	  0,	 0,  1)
-MUX_CFG("M14_1510_GPIO2",	 7,    3,   0,	  1,   9,   1,	  0,	 0,  1)
+MUX_CFG("R18_1510_GPIO0",	 7,    9,    0,   1,  11,   1,    0,     0,  1)
+MUX_CFG("R19_1510_GPIO1",	 7,    6,    0,   1,  10,   1,    0,     0,  1)
+MUX_CFG("M14_1510_GPIO2",	 7,    3,    0,   1,   9,   1,    0,     0,  1)
+
+/* OMAP-1710 GPIO */
+MUX_CFG("R18_1710_GPIO0",	 7,    9,    0,   1,  11,   1,    1,     1,  1)
+MUX_CFG("W15_1710_GPIO40",	 9,   27,    7,   2,   5,   1,    2,     1,  1)
 
 /* MPUIO */
 MUX_CFG("MPUIO2",		 7,   18,    0,	  1,   1,   1,	 NA,	 0,  1)
@@ -408,6 +432,7 @@ MUX_CFG("N19_1610_GPIO13",	 6,   12,    0,	  1,   2,   0,	  1,	 1,  1)
 MUX_CFG("P10_1610_GPIO22",	 C,    0,    7,	  2,  26,   0,	  2,	 1,  1)
 MUX_CFG("V5_1610_GPIO24",	 B,   15,    7,	  2,  21,   0,	  2,	 1,  1)
 MUX_CFG("AA20_1610_GPIO_41",	 9,    9,    7,	  1,  31,   0,	  1,	 1,  1)
+MUX_CFG("W19_1610_GPIO48",	 8,   15,    7,   1,  23,   1,    1,     0,  1)
 
 /* OMAP-1610 uWire */
 MUX_CFG("V19_1610_UWIRE_SCLK",	 8,    6,    0,	  1,  20,   0,	  1,	 1,  1)
@@ -417,13 +442,16 @@ MUX_CFG("N14_1610_UWIRE_CS0",	 8,    9,    1,	  1,  21,   0,	  1,	 1,  1)
 MUX_CFG("P15_1610_UWIRE_CS3",	 8,   12,    1,	  1,  22,   0,	  1,	 1,  1)
 MUX_CFG("N15_1610_UWIRE_CS1",	 7,   18,    2,	  1,  14,   0,	 NA,	 0,  1)
 
-/* First MMC interface, same on 1510 and 1610 */
+/* First MMC interface, same on 1510, 1610 and 1710 */
 MUX_CFG("MMC_CMD",		 A,   27,    0,	  2,  15,   1,	  2,	 1,  1)
 MUX_CFG("MMC_DAT1",		 A,   24,    0,	  2,  14,   1,	  2,	 1,  1)
 MUX_CFG("MMC_DAT2",		 A,   18,    0,	  2,  12,   1,	  2,	 1,  1)
 MUX_CFG("MMC_DAT0",		 B,    0,    0,	  2,  16,   1,	  2,	 1,  1)
 MUX_CFG("MMC_CLK",		 A,   21,    0,	 NA,   0,   0,	 NA,	 0,  1)
 MUX_CFG("MMC_DAT3",		10,   15,    0,	  3,   8,   1,	  3,	 1,  1)
+MUX_CFG("M15_1710_MMC_CLKI",	 6,   21,    2,   0,   0,   0,   NA,     0,  1)
+MUX_CFG("P19_1710_MMC_CMDDIR",	 6,   24,    6,   0,   0,   0,   NA,     0,  1)
+MUX_CFG("P20_1710_MMC_DATDIR0",	 6,   27,    5,   0,   0,   0,   NA,     0,  1)
 
 /* OMAP-1610 USB0 alternate configuration */
 MUX_CFG("W9_USB0_TXEN",		 B,   9,     5,	  2,  19,   0,	  2,	 0,  1)

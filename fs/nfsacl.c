@@ -237,16 +237,15 @@ nfsacl_decode(struct xdr_buf *buf, unsigned int base, unsigned int *aclcnt,
 	err = xdr_decode_array2(buf, base + 4, &nfsacl_desc.desc);
 	if (err)
 		return err;
-	if (pacl) {
-		if (entries != nfsacl_desc.desc.array_len ||
-		    posix_acl_from_nfsacl(nfsacl_desc.acl) != 0) {
-			posix_acl_release(nfsacl_desc.acl);
-			return -EINVAL;
-		}
-		*pacl = nfsacl_desc.acl;
+	if (entries != nfsacl_desc.desc.array_len ||
+	    posix_acl_from_nfsacl(nfsacl_desc.acl) != 0) {
+		posix_acl_release(nfsacl_desc.acl);
+		return -EINVAL;
 	}
 	if (aclcnt)
 		*aclcnt = entries;
+	if (pacl)
+		*pacl = nfsacl_desc.acl;
 	return 8 + nfsacl_desc.desc.elem_size *
 		   nfsacl_desc.desc.array_len;
 }

@@ -62,10 +62,10 @@ typedef struct pmac_ide_hwif {
 	int				irq;
 	int				kind;
 	int				aapl_bus_id;
-	int				cable_80 : 1;
-	int				mediabay : 1;
-	int				broken_dma : 1;
-	int				broken_dma_warn : 1;
+	unsigned			cable_80 : 1;
+	unsigned			mediabay : 1;
+	unsigned			broken_dma : 1;
+	unsigned			broken_dma_warn : 1;
 	struct device_node*		node;
 	struct macio_dev		*mdev;
 	u32				timings[4];

@@ -45,7 +45,7 @@ xfs_stats_clear_proc_handler(
 	ctl_table	*ctl,
 	int		write,
 	struct file	*filp,
-	void		*buffer,
+	void		__user *buffer,
 	size_t		*lenp,
 	loff_t		*ppos)
 {

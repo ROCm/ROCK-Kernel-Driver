@@ -759,11 +759,5 @@ extern int ibmphp_configure_card (struct pci_func *, u8);
 extern int ibmphp_unconfigure_card (struct slot **, int);
 extern struct hotplug_slot_ops ibmphp_hotplug_slot_ops;
 
-static inline void long_delay (int delay)
-{
-	set_current_state (TASK_INTERRUPTIBLE);
-	schedule_timeout (delay);
-}
-
 #endif				//__IBMPHP_H
 

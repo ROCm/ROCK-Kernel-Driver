@@ -16,8 +16,6 @@
 #include "linux/module.h"
 #include "linux/init.h"
 #include "linux/capability.h"
-#include "linux/vmalloc.h"
-#include "linux/spinlock.h"
 #include "asm/unistd.h"
 #include "asm/mman.h"
 #include "asm/segment.h"
@@ -25,6 +23,7 @@
 #include "asm/pgtable.h"
 #include "asm/processor.h"
 #include "asm/tlbflush.h"
+#include "asm/spinlock.h"
 #include "asm/uaccess.h"
 #include "asm/user.h"
 #include "user_util.h"
@@ -53,12 +52,17 @@ struct cpu_task cpu_tasks[NR_CPUS] = { [0 ... NR_CPUS - 1] = { -1, NULL } };
 
 struct task_struct *get_task(int pid, int require)
 {
-        struct task_struct *ret;
+        struct task_struct *task, *ret;
 
+        ret = NULL;
         read_lock(&tasklist_lock);
-	ret = find_task_by_pid(pid);
+        for_each_process(task){
+                if(task->pid == pid){
+                        ret = task;
+                        break;
+                }
+        }
         read_unlock(&tasklist_lock);
-
         if(require && (ret == NULL)) panic("get_task couldn't find a task\n");
         return(ret);
 }
@@ -91,8 +95,7 @@ unsigned long alloc_stack(int order, int atomic)
 	int flags = GFP_KERNEL;
 
 	if(atomic) flags |= GFP_ATOMIC;
-	page = __get_free_pages(flags, order);
-	if(page == 0)
+	if((page = __get_free_pages(flags, order)) == 0)
 		return(0);
 	stack_protections(page);
 	return(page);
@@ -100,15 +103,13 @@ unsigned long alloc_stack(int order, int atomic)
 
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
-	int pid;
+	struct task_struct *p;
 
 	current->thread.request.u.thread.proc = fn;
 	current->thread.request.u.thread.arg = arg;
-	pid = do_fork(CLONE_VM | CLONE_UNTRACED | flags, 0, NULL, 0, NULL, 
-		      NULL);
-	if(pid < 0)
-		panic("do_fork failed in kernel_thread, errno = %d", pid);
-	return(pid);
+	p = do_fork(CLONE_VM | flags, 0, NULL, 0, NULL, NULL);
+	if(IS_ERR(p)) panic("do_fork failed in kernel_thread");
+	return(p->pid);
 }
 
 void switch_mm(struct mm_struct *prev, struct mm_struct *next, 
@@ -128,7 +129,7 @@ void set_current(void *t)
 		{ external_pid(task), task });
 }
 
-void *_switch_to(void *prev, void *next, void *last)
+void *switch_to(void *prev, void *next, void *last)
 {
 	return(CHOOSE_MODE(switch_to_tt(prev, next), 
 			   switch_to_skas(prev, next)));
@@ -148,7 +149,7 @@ void release_thread(struct task_struct *task)
 void exit_thread(void)
 {
 	CHOOSE_MODE(exit_thread_tt(), exit_thread_skas());
-	unprotect_stack((unsigned long) current_thread);
+	unprotect_stack((unsigned long) current->thread_info);
 }
  
 void *get_current(void)
@@ -156,15 +157,13 @@ void *get_current(void)
 	return(current);
 }
 
-void prepare_to_copy(struct task_struct *tsk)
-{
-}
-
 int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		unsigned long stack_top, struct task_struct * p, 
 		struct pt_regs *regs)
 {
 	p->thread = (struct thread_struct) INIT_THREAD;
+	p->thread.kernel_stack = 
+		(unsigned long) p->thread_info + 2 * PAGE_SIZE;
 	return(CHOOSE_MODE_PROC(copy_thread_tt, copy_thread_skas, nr, 
 				clone_flags, sp, stack_top, p, regs));
 }
@@ -191,7 +190,7 @@ int current_pid(void)
 
 void default_idle(void)
 {
-	uml_idle_timer();
+	idle_timer();
 
 	atomic_inc(&init_mm.mm_count);
 	current->mm = &init_mm;
@@ -300,11 +299,6 @@ void *um_kmalloc_atomic(int size)
 	return(kmalloc(size, GFP_ATOMIC));
 }
 
-void *um_vmalloc(int size)
-{
-	return(vmalloc(size));
-}
-
 unsigned long get_fault_addr(void)
 {
 	return((unsigned long) current->thread.fault_addr);
@@ -324,7 +318,8 @@ int user_context(unsigned long sp)
 	unsigned long stack;
 
 	stack = sp & (PAGE_MASK << CONFIG_KERNEL_STACK_ORDER);
-	return(stack != (unsigned long) current_thread);
+	stack += 2 * PAGE_SIZE;
+	return(stack != current->thread.kernel_stack);
 }
 
 extern void remove_umid_dir(void);
@@ -372,15 +367,10 @@ int clear_user_proc(void *buf, int size)
 	return(clear_user(buf, size));
 }
 
-int strlen_user_proc(char *str)
-{
-	return(strlen_user(str));
-}
-
 int smp_sigio_handler(void)
 {
 #ifdef CONFIG_SMP
-	int cpu = current_thread->cpu;
+	int cpu = current->thread_info->cpu;
 	IPI_handler(cpu);
 	if(cpu != 0)
 		return(1);
@@ -395,7 +385,7 @@ int um_in_interrupt(void)
 
 int cpu(void)
 {
-	return(current_thread->cpu);
+	return(current->thread_info->cpu);
 }
 
 /*

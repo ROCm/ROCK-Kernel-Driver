@@ -57,4 +57,11 @@ config IPMI_WATCHDOG
        help
          This enables the IPMI watchdog timer.
 
+config IPMI_POWEROFF
+       tristate 'IPMI Poweroff'
+       depends on IPMI_HANDLER
+       help
+         This enables a function to power off the system with IPMI if
+	 the IPMI management controller is capable of this.
+
 endmenu

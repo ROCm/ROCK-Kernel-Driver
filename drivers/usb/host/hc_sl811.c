@@ -106,14 +106,14 @@ int SL11StartXaction (hci_t * hci, __u8 addr, __u8 epaddr, int pid, int len,
 
 static int sofWaitCnt = 0;
 
-MODULE_PARM (urb_debug, "i");
+module_param(urb_debug, int, 0);
 MODULE_PARM_DESC (urb_debug, "debug urb messages, default is 0 (no)");
 
-MODULE_PARM (base_addr, "i");
+module_param(base_addr, int, 0);
 MODULE_PARM_DESC (base_addr, "sl811 base address 0xd3800000");
-MODULE_PARM (data_reg_addr, "i");
+module_param(data_reg_addr, int, 0);
 MODULE_PARM_DESC (data_reg_addr, "sl811 data register address 0xd3810000");
-MODULE_PARM (irq, "i");
+module_param(irq, int, 0);
 MODULE_PARM_DESC (irq, "IRQ 34 (default)");
 
 static int hc_reset (hci_t * hci);

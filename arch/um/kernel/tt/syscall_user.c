@@ -33,7 +33,7 @@ void syscall_handler_tt(int sig, union uml_pt_regs *regs)
 	SC_START_SYSCALL(sc);
 
 	index = record_syscall_start(syscall);
-	syscall_trace(regs, 1);
+	syscall_trace();
 	result = execute_syscall(regs);
 
 	/* regs->sc may have changed while the system call ran (there may
@@ -46,7 +46,7 @@ void syscall_handler_tt(int sig, union uml_pt_regs *regs)
 	   (result == -ERESTARTNOINTR))
 		do_signal(result);
 
-	syscall_trace(regs, 0);
+	syscall_trace();
 	record_syscall_end(index, result);
 }
 
