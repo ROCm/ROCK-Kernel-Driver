@@ -49,6 +49,9 @@ extern int mac_floppy_init(void);
  */
 static kmem_cache_t *request_cachep;
 
+/*
+ * plug management
+ */
 static struct list_head blk_plug_list;
 static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
@@ -297,6 +300,27 @@ void blk_queue_assign_lock(request_queue_t *q, spinlock_t *lock)
 }
 
 /**
+ * blk_queue_find_tag - find a request by its tag and queue
+ *
+ * @q:	 The request queue for the device
+ * @tag: The tag of the request
+ *
+ * Notes:
+ *    Should be used when a device returns a tag and you want to match
+ *    it with a request.
+ *
+ *    no locks need be held.
+ **/
+struct request *blk_queue_find_tag(request_queue_t *q, int tag)
+{
+	struct blk_queue_tag *bqt = q->queue_tags;
+
+	if(unlikely(bqt == NULL || bqt->max_depth < tag))
+		return NULL;
+
+	return bqt->tag_index[tag];
+}
+/**
  * blk_queue_free_tags - release tag maintenance info
  * @q:  the request queue for the device
  *
@@ -429,10 +453,12 @@ void blk_queue_end_tag(request_queue_t *q, struct request *rq)
  *  Description:
  *    This can either be used as a stand-alone helper, or possibly be
  *    assigned as the queue &prep_rq_fn (in which case &struct request
- *    automagically gets a tag assigned). Note that this function assumes
- *    that only REQ_CMD requests can be queued! The request will also be
- *    removed from the request queue, so it's the drivers responsibility to
- *    readd it if it should need to be restarted for some reason.
+ *    automagically gets a tag assigned). Note that this function
+ *    assumes that any type of request can be queued! if this is not
+ *    true for your device, you must check the request type before
+ *    calling this function.  The request will also be removed from
+ *    the request queue, so it's the drivers responsibility to readd
+ *    it if it should need to be restarted for some reason.
  *
  *  Notes:
  *   queue lock must be held.
@@ -443,8 +469,12 @@ int blk_queue_start_tag(request_queue_t *q, struct request *rq)
 	unsigned long *map = bqt->tag_map;
 	int tag = 0;
 
-	if (unlikely(!(rq->flags & REQ_CMD)))
-		return 1;
+	if (unlikely((rq->flags & REQ_QUEUED))) {
+		printk(KERN_ERR 
+		       "request %p for device [02%x:02%x] already tagged %d",
+		       rq, major(rq->rq_dev), minor(rq->rq_dev), rq->tag);
+		BUG();
+	}
 
 	for (map = bqt->tag_map; *map == -1UL; map++) {
 		tag += BLK_TAGS_PER_LONG;
@@ -794,18 +824,12 @@ static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
  * force the transfer to start only after we have put all the requests
  * on the list.
  *
- * This is called with interrupts off and no requests on the queue.
- * (and with the request spinlock acquired)
+ * This is called with interrupts off and no requests on the queue and
+ * with the queue lock held.
  */
 void blk_plug_device(request_queue_t *q)
 {
-	/*
-	 * common case
-	 */
-	if (!elv_queue_empty(q))
-		return;
-
-	if (!test_and_set_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags)) {
+	if (!blk_queue_plugged(q)) {
 		spin_lock(&blk_plug_lock);
 		list_add_tail(&q->plug_list, &blk_plug_list);
 		spin_unlock(&blk_plug_lock);
@@ -813,14 +837,27 @@ void blk_plug_device(request_queue_t *q)
 }
 
 /*
+ * remove the queue from the plugged list, if present. called with
+ * queue lock held and interrupts disabled.
+ */
+inline int blk_remove_plug(request_queue_t *q)
+{
+	if (blk_queue_plugged(q)) {
+		spin_lock(&blk_plug_lock);
+		list_del_init(&q->plug_list);
+		spin_unlock(&blk_plug_lock);
+		return 1;
+	}
+
+	return 0;
+}
+
+/*
  * remove the plug and let it rip..
  */
 static inline void __generic_unplug_device(request_queue_t *q)
 {
-	/*
-	 * not plugged
-	 */
-	if (!test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
+	if (!blk_remove_plug(q))
 		return;
 
 	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
@@ -848,11 +885,10 @@ static inline void __generic_unplug_device(request_queue_t *q)
 void generic_unplug_device(void *data)
 {
 	request_queue_t *q = data;
-	unsigned long flags;
 
-	spin_lock_irqsave(q->queue_lock, flags);
+	spin_lock_irq(q->queue_lock);
 	__generic_unplug_device(q);
-	spin_unlock_irqrestore(q->queue_lock, flags);
+	spin_unlock_irq(q->queue_lock);
 }
 
 /**
@@ -895,17 +931,9 @@ void blk_stop_queue(request_queue_t *q)
 	unsigned long flags;
 
 	spin_lock_irqsave(q->queue_lock, flags);
-
-	/*
-	 * remove from the plugged list, queue must not be called.
-	 */
-	if (test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags)) {
-		spin_lock(&blk_plug_lock);
-		list_del(&q->plug_list);
-		spin_unlock(&blk_plug_lock);
-	}
-
+	blk_remove_plug(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
+
 	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
 }
 
@@ -941,12 +969,7 @@ void blk_run_queues(void)
 	while (!list_empty(&local_plug_list)) {
 		request_queue_t *q = blk_plug_entry(local_plug_list.next);
 
-		BUG_ON(test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags));
-
-		spin_lock_irq(q->queue_lock);
-		list_del(&q->plug_list);
-		__generic_unplug_device(q);
-		spin_unlock_irq(q->queue_lock);
+		q->unplug_fn(q);
 	}
 }
 
@@ -1089,6 +1112,7 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	q->front_merge_fn      	= ll_front_merge_fn;
 	q->merge_requests_fn	= ll_merge_requests_fn;
 	q->prep_rq_fn		= NULL;
+	q->unplug_fn		= generic_unplug_device;
 	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER);
 	q->queue_lock		= lock;
 
@@ -1386,10 +1410,12 @@ again:
 	req = NULL;
 	insert_here = q->queue_head.prev;
 
-	if (blk_queue_empty(q) || barrier) {
+	if (blk_queue_empty(q)) {
 		blk_plug_device(q);
 		goto get_rq;
 	}
+	if (barrier)
+		goto get_rq;
 
 	el_ret = elv_merge(q, &req, bio);
 	switch (el_ret) {
@@ -2011,6 +2037,8 @@ EXPORT_SYMBOL(blk_queue_bounce_limit);
 EXPORT_SYMBOL(generic_make_request);
 EXPORT_SYMBOL(blkdev_release_request);
 EXPORT_SYMBOL(generic_unplug_device);
+EXPORT_SYMBOL(blk_plug_device);
+EXPORT_SYMBOL(blk_remove_plug);
 EXPORT_SYMBOL(blk_attempt_remerge);
 EXPORT_SYMBOL(blk_max_low_pfn);
 EXPORT_SYMBOL(blk_max_pfn);
@@ -2032,6 +2060,7 @@ EXPORT_SYMBOL(blk_put_request);
 
 EXPORT_SYMBOL(blk_queue_prep_rq);
 
+EXPORT_SYMBOL(blk_queue_find_tag);
 EXPORT_SYMBOL(blk_queue_init_tags);
 EXPORT_SYMBOL(blk_queue_free_tags);
 EXPORT_SYMBOL(blk_queue_start_tag);
