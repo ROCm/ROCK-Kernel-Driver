@@ -144,6 +144,7 @@ do {						\
  */
 #ifdef CONFIG_BOOKE
 #define DBSR_IC		0x08000000	/* Instruction Completion */
+#define DBSR_BT		0x04000000	/* Branch Taken */
 #define DBSR_TIE	0x01000000	/* Trap Instruction Event */
 #endif
 #ifdef CONFIG_40x

@@ -44,13 +44,28 @@
 #define LOAD_MSR_KERNEL(r, x)	li r,(x)
 #endif
 
-#ifdef CONFIG_4xx
+#ifdef CONFIG_BOOKE
+#define	COR	r8
+#define BOOKE_LOAD_COR	lis COR,crit_save@ha
+#define BOOKE_REST_COR	mfspr COR,SPRG2
+#define BOOKE_SAVE_COR	mtspr SPRG2,COR
+#else
+#define COR	0
+#define BOOKE_LOAD_COR
+#define BOOKE_REST_COR
+#define BOOKE_SAVE_COR
+#endif
+
+#if defined(CONFIG_40x) || defined(CONFIG_BOOKE)
 	.globl	crit_transfer_to_handler
 crit_transfer_to_handler:
-	lwz	r0,crit_r10@l(0)
+	BOOKE_SAVE_COR
+	BOOKE_LOAD_COR
+	lwz	r0,crit_r10@l(COR)
 	stw	r0,GPR10(r11)
-	lwz	r0,crit_r11@l(0)
+	lwz	r0,crit_r11@l(COR)
 	stw	r0,GPR11(r11)
+	BOOKE_REST_COR
 	/* fall through */
 #endif
 
@@ -695,12 +710,14 @@ ret_from_crit_exc:
 	mtlr	r11
 	lwz	r10,_CCR(r1)
 	mtcrf	0xff,r10
+#ifdef CONFIG_40x
 	/* avoid any possible TLB misses here by turning off MSR.DR, we
 	 * assume the instructions here are mapped by a pinned TLB entry */
 	li	r10,MSR_IR
 	mtmsr	r10
 	isync
 	tophys(r1, r1)
+#endif
 	lwz	r9,_DEAR(r1)
 	lwz	r10,_ESR(r1)
 	mtspr	SPRN_DEAR,r9
@@ -711,27 +728,30 @@ ret_from_crit_exc:
 	mtspr	CSRR1,r12
 	lwz	r9,GPR9(r1)
 	lwz	r12,GPR12(r1)
-	lwz	r10,crit_sprg0@l(0)
+	BOOKE_SAVE_COR
+	BOOKE_LOAD_COR
+	lwz	r10,crit_sprg0@l(COR)
 	mtspr	SPRN_SPRG0,r10
-	lwz	r10,crit_sprg1@l(0)
+	lwz	r10,crit_sprg1@l(COR)
 	mtspr	SPRN_SPRG1,r10
-	lwz	r10,crit_sprg4@l(0)
+	lwz	r10,crit_sprg4@l(COR)
 	mtspr	SPRN_SPRG4,r10
-	lwz	r10,crit_sprg5@l(0)
+	lwz	r10,crit_sprg5@l(COR)
 	mtspr	SPRN_SPRG5,r10
-	lwz	r10,crit_sprg6@l(0)
+	lwz	r10,crit_sprg6@l(COR)
 	mtspr	SPRN_SPRG6,r10
-	lwz	r10,crit_sprg7@l(0)
+	lwz	r10,crit_sprg7@l(COR)
 	mtspr	SPRN_SPRG7,r10
-	lwz	r10,crit_srr0@l(0)
+	lwz	r10,crit_srr0@l(COR)
 	mtspr	SRR0,r10
-	lwz	r10,crit_srr1@l(0)
+	lwz	r10,crit_srr1@l(COR)
 	mtspr	SRR1,r10
-	lwz	r10,crit_pid@l(0)
+	lwz	r10,crit_pid@l(COR)
 	mtspr	SPRN_PID,r10
 	lwz	r10,GPR10(r1)
 	lwz	r11,GPR11(r1)
 	lwz	r1,GPR1(r1)
+	BOOKE_REST_COR
 	PPC405_ERR77_SYNC
 	rfci
 	b	.		/* prevent prefetch past rfci */
