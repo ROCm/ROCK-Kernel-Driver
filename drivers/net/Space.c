@@ -12,18 +12,15 @@
  *		Donald J. Becker, <becker@scyld.com>
  *
  * Changelog:
+ *		Stephen Hemminger (09/2003)
+ *		- get rid of pre-linked dev list, dynamic device allocation
  *		Paul Gortmaker (03/2002)
-		- struct init cleanup, enable multiple ISA autoprobes.
+ *		- struct init cleanup, enable multiple ISA autoprobes.
  *		Arnaldo Carvalho de Melo <acme@conectiva.com.br> - 09/1999
  *		- fix sbni: s/device/net_device/
  *		Paul Gortmaker (06/98): 
  *		 - sort probes in a sane way, make sure all (safe) probes
  *		   get run once & failed autoprobes don't autoprobe again.
- *
- *	FIXME:
- *		Phase out placeholder dev entries put in the linked list
- *		here in favour of drivers using init_etherdev(NULL, ...)
- *		combined with a single find_all_devs() function (for 2.3)
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
