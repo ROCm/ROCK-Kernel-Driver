@@ -46,10 +46,7 @@ obj-$(CONFIG_PRPMC800)		+= prpmc800_setup.o prpmc800_pci.o
 obj-$(CONFIG_SANDPOINT)		+= sandpoint_setup.o sandpoint_pci.o
 obj-$(CONFIG_SPRUCE)		+= spruce_setup.o spruce_pci.o
 obj-$(CONFIG_ZX4500)		+= zx4500_setup.o zx4500_pci.o
-obj-$(CONFIG_PPC_ISERIES)	+= iSeries_setup.o iSeries_time.o \
-					iSeries_dma.o iSeries_pic.o
 
 ifeq ($(CONFIG_SMP),y)
 obj-$(CONFIG_ALL_PPC)		+= pmac_smp.o chrp_smp.o
-obj-$(CONFIG_PPC_ISERIES)	+= iSeries_smp.o
 endif

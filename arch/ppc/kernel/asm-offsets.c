@@ -25,13 +25,6 @@
 #include <asm/cputable.h>
 #include <asm/thread_info.h>
 
-#ifdef CONFIG_PPC_ISERIES
-#include <asm/iSeries/Paca.h>
-#include <asm/iSeries/ItLpPaca.h>
-#include <asm/iSeries/ItLpQueue.h>
-#include <asm/iSeries/HvLpEvent.h>
-#endif /* CONFIG_PPC_ISERIES */
-
 #define DEFINE(sym, val) \
 	asm volatile("\n->" #sym " %0 " #val : : "i" (val))
 
@@ -123,35 +116,6 @@ main(void)
 	DEFINE(CPU_SPEC_PVR_VALUE, offsetof(struct cpu_spec, pvr_value));
 	DEFINE(CPU_SPEC_FEATURES, offsetof(struct cpu_spec, cpu_features));
 	DEFINE(CPU_SPEC_SETUP, offsetof(struct cpu_spec, cpu_setup));
-
-#ifdef CONFIG_PPC_ISERIES
-	DEFINE(PACAPROCENABLED, offsetof(struct Paca, xProcEnabled));
-	DEFINE(PACAPACAINDEX, offsetof(struct Paca, xPacaIndex));
-	DEFINE(PACAPROCSTART, offsetof(struct Paca, xProcStart));
-	DEFINE(PACAKSAVE, offsetof(struct Paca, xKsave));
-	DEFINE(PACASAVEDMSR, offsetof(struct Paca, xSavedMsr));
-	DEFINE(PACASAVEDLR, offsetof(struct Paca, xSavedLr));
-	DEFINE(PACACONTEXTOVERFLOW, offsetof(struct Paca, xContextOverflow));
-	DEFINE(PACAR21, offsetof(struct Paca, xR21));
-	DEFINE(PACAR22, offsetof(struct Paca, xR22));
-	DEFINE(PACALPQUEUE, offsetof(struct Paca, lpQueuePtr));
-	DEFINE(PACALPPACA, offsetof(struct Paca, xLpPaca));
-	DEFINE(PACA_STRUCT_SIZE, sizeof(struct Paca));
-	DEFINE(LPREGSAV, offsetof(struct Paca, xRegSav));
-	DEFINE(PACADEFAULTDECR, offsetof(struct Paca, default_decr));
-	DEFINE(LPPACAANYINT, offsetof(struct ItLpPaca, xRsvd));
-	DEFINE(LPPACASRR0, offsetof(struct ItLpPaca, xSavedSrr0));
-	DEFINE(LPPACASRR1, offsetof(struct ItLpPaca, xSavedSrr1));
-	DEFINE(LPPACADECRINT, offsetof(struct ItLpPaca, xDecrInt));
-	DEFINE(LPPACAIPIINT, offsetof(struct ItLpPaca, xIpiCnt));
-	DEFINE(LPQCUREVENTPTR, offsetof(struct ItLpQueue, xSlicCurEventPtr));
-	DEFINE(LPQOVERFLOW, offsetof(struct ItLpQueue, xPlicOverflowIntPending));
-	DEFINE(LPQINUSEWORD, offsetof(struct ItLpQueue, xInUseWord));
-	DEFINE(LPEVENTFLAGS, offsetof(struct HvLpEvent, xFlags));
-	DEFINE(CONTEXT, offsetof(struct mm_struct, context));
-	DEFINE(_SOFTE, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, mq));
-	DEFINE(PACA_EXT_INTS, offsetof(struct Paca, ext_ints));
-#endif /* CONFIG_PPC_ISERIES */
 
 	DEFINE(NUM_USER_SEGMENTS, TASK_SIZE>>28);
 	return 0;

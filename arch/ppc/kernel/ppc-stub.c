@@ -866,7 +866,7 @@ kgdb_output_string (const char* s, unsigned int count)
 	return 1;
  }
 
-#if defined(CONFIG_6xx) || defined(CONFIG_POWER3) || defined(CONFIG_ISERIES)
+#if defined(CONFIG_6xx) || defined(CONFIG_POWER3)
 
 /* This is used on arches which don't have a serial driver that maps
  * the ports for us */

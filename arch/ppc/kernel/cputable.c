@@ -33,7 +33,7 @@ extern void __setup_cpu_8xx(unsigned long offset, int cpu_nr, struct cpu_spec* s
 extern void __setup_cpu_generic(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 
 #define CLASSIC_PPC (!defined(CONFIG_8xx) && !defined(CONFIG_4xx) && \
-		     !defined(CONFIG_POWER3) && !defined(CONFIG_PPC_ISERIES))
+		     !defined(CONFIG_POWER3))
 
 /* This table only contains "desktop" CPUs, it need to be filled with embedded
  * ones as well...

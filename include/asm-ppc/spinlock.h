@@ -37,12 +37,10 @@ static inline void _raw_spin_lock(spinlock_t *lock)
 
 	__asm__ __volatile__(
 	"b	1f		# spin_lock\n\
-2:"	HMT_PRIO_LOW
-"	lwzx	%0,0,%1\n\
+2:	lwzx	%0,0,%1\n\
 	cmpwi	0,%0,0\n\
-	bne+	2b\n"
-	HMT_PRIO_MED
-"1:	lwarx	%0,0,%1\n\
+	bne+	2b\n\
+1:	lwarx	%0,0,%1\n\
 	cmpwi	0,%0,0\n\
 	bne-	2b\n"
 	PPC405_ERR77(0,%1)
@@ -107,12 +105,10 @@ static __inline__ void _raw_read_lock(rwlock_t *rw)
 
 	__asm__ __volatile__(
 	"b	2f		# read_lock\n\
-1:"	HMT_PRIO_LOW
-"	lwzx	%0,0,%1\n\
+1:	lwzx	%0,0,%1\n\
 	cmpwi	0,%0,0\n\
-	blt+	1b\n"
-	HMT_PRIO_MED
-"2:	lwarx	%0,0,%1\n\
+	blt+	1b\n\
+2:	lwarx	%0,0,%1\n\
 	addic.	%0,%0,1\n\
 	ble-	1b\n"
 	PPC405_ERR77(0,%1)
@@ -146,12 +142,10 @@ static __inline__ void _raw_write_lock(rwlock_t *rw)
 
 	__asm__ __volatile__(
 	"b	2f		# write_lock\n\
-1:"	HMT_PRIO_LOW
-"  	lwzx	%0,0,%1\n\
+1:  	lwzx	%0,0,%1\n\
 	cmpwi	0,%0,0\n\
-	bne+	1b\n"
-	HMT_PRIO_MED
-"2:	lwarx	%0,0,%1\n\
+	bne+	1b\n\
+2:	lwarx	%0,0,%1\n\
 	cmpwi	0,%0,0\n\
 	bne-	1b\n"
 	PPC405_ERR77(0,%1)

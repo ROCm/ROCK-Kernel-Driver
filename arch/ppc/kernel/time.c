@@ -87,11 +87,6 @@ unsigned tb_last_stamp;
 
 extern unsigned long wall_jiffies;
 
-#ifdef CONFIG_PPC_ISERIES
-extern u64 get_tb64(void);
-extern u64 next_jiffy_update_tb[];
-#endif
-
 static long time_offset;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
@@ -110,8 +105,6 @@ static inline int tb_delta(unsigned *jiffy_stamp) {
 	}
 	return delta;
 }
-
-#ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_time.c */
 
 extern unsigned long prof_cpu_mask;
 extern unsigned int * prof_buffer;
@@ -213,7 +206,6 @@ void timer_interrupt(struct pt_regs * regs)
 
 	irq_exit();
 }
-#endif /* CONFIG_PPC_ISERIES */
 
 /*
  * This version of gettimeofday has microsecond resolution.
@@ -226,11 +218,7 @@ void do_gettimeofday(struct timeval *tv)
 	read_lock_irqsave(&xtime_lock, flags);
 	sec = xtime.tv_sec;
 	usec = (xtime.tv_nsec / 1000);
-#ifdef CONFIG_PPC_ISERIES
-	delta = tb_ticks_per_jiffy - ( next_jiffy_update_tb[0] - get_tb64() );
-#else
 	delta = tb_ticks_since(tb_last_stamp);
-#endif
 #ifdef CONFIG_SMP
 	/* As long as timebases are not in sync, gettimeofday can only
 	 * have jiffy resolution on SMP.

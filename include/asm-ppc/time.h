@@ -13,10 +13,6 @@
 #include <linux/mc146818rtc.h>
 #include <linux/threads.h>
 
-#ifdef CONFIG_PPC_ISERIES
-#include <asm/iSeries/Paca.h>
-#include <asm/iSeries/HvCall.h>
-#endif
 #include <asm/processor.h>
 
 /* time.c */
@@ -53,24 +49,6 @@ static __inline__ void set_dec(unsigned int val)
 	return;		/* Have to let it auto-reload */
 #elif defined(CONFIG_8xx_CPU6)
 	set_dec_cpu6(val);
-#elif defined(CONFIG_PPC_ISERIES)
-/*
- * Add code here to set the virtual decrementer in 
- * ItLpPaca if we have shared processors and to
- * invoke the hypervisor as needed.
- */
-	struct Paca * paca;
-	int cur_dec;
-	
-	paca = (struct Paca *)mfspr(SPRG1);
-	if ( paca->xLpPaca.xSharedProc ) {
-		paca->xLpPaca.xVirtualDecr = val;
-		cur_dec = get_dec();
-		if ( cur_dec > val )
-			HvCall_setVirtualDecr();
-	}
-	else
-		mtspr(SPRN_DEC, val);
 #else
 	mtspr(SPRN_DEC, val);
 #endif

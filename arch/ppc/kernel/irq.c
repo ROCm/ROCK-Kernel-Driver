@@ -502,7 +502,6 @@ out:
 	spin_unlock(&desc->lock);
 }
 
-#ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_pic.c */
 void do_IRQ(struct pt_regs *regs)
 {
 	int irq, first = 1;
@@ -525,7 +524,6 @@ void do_IRQ(struct pt_regs *regs)
 		ppc_spurious_interrupts++;
         irq_exit();
 }
-#endif /* CONFIG_PPC_ISERIES */
 
 unsigned long probe_irq_on (void)
 {

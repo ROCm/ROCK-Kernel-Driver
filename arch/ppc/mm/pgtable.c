@@ -119,7 +119,6 @@ void pte_free(struct page *pte)
 	__free_page(pte);
 }
 
-#ifndef CONFIG_PPC_ISERIES
 void *
 ioremap(unsigned long addr, unsigned long size)
 {
@@ -219,7 +218,6 @@ void iounmap(void *addr)
 	if (addr > high_memory && (unsigned long) addr < ioremap_bot)
 		vunmap((void *) (PAGE_MASK & (unsigned long)addr));
 }
-#endif /* CONFIG_PPC_ISERIES */
 
 int
 map_page(unsigned long va, unsigned long pa, int flags)

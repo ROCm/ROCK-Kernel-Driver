@@ -562,29 +562,6 @@ n:
 
 #define proc_trap()  	asm volatile("trap")
 
-#ifdef CONFIG_PPC_ISERIES
-/* Macros for adjusting thread priority (hardware multi-threading) */
-#define	HMT_PRIO_LOW	"or 1,1,1\n"	/* low prio, used for spin loops */
-#define HMT_PRIO_MED	"or 2,2,2\n"	/* medium prio, for normal code */
-#define HMT_PRIO_HIGH	"or 3,3,3\n"	/* high priority */
-
-#define HMT_low()	asm volatile("or 1,1,1")
-#define HMT_medium()	asm volatile("or 2,2,2")
-#define HMT_high()	asm volatile("or 3,3,3")
-
-/* iSeries CTRL register (for runlatch) */
-
-#define CTRLT		0x098
-#define CTRLF		0x088
-#define RUNLATCH	0x0001
-
-#else /* !CONFIG_PPC_ISERIES */
-#define	HMT_PRIO_LOW
-#define HMT_PRIO_MED
-#define HMT_PRIO_HIGH
-
-#endif /* CONFIG_PPC_ISERIES */
-
 /* Segment Registers */
 
 #define SR0	0

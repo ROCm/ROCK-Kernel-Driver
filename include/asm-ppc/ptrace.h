@@ -37,8 +37,6 @@ struct pt_regs {
 	unsigned long result; 		/* Result of a system call */
 };
 
-/* iSeries uses mq field for soft enable flag */
-#define softEnable mq
 #endif /* __ASSEMBLY__ */
 
 #ifdef __KERNEL__

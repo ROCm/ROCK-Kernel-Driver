@@ -37,7 +37,6 @@ ifdef CONFIG_MORE_COMPILE_OPTIONS
 endif
 
 head-y				:= head.o
-head-$(CONFIG_PPC_ISERIES)	:= iSeries_head.o
 head-$(CONFIG_8xx)		:= head_8xx.o
 head-$(CONFIG_4xx)		:= head_4xx.o
 head-$(CONFIG_440)		:= head_44x.o
@@ -53,7 +52,6 @@ core-$(CONFIG_4xx)		+= arch/ppc/platforms/4xx/
 core-$(CONFIG_MATH_EMULATION)	+= arch/ppc/math-emu/
 core-$(CONFIG_XMON)		+= arch/ppc/xmon/
 core-$(CONFIG_APUS)		+= arch/ppc/amiga/
-core-$(CONFIG_PPC_ISERIES)	+= arch/ppc/iSeries/
 drivers-$(CONFIG_8xx)		+= arch/ppc/8xx_io/
 drivers-$(CONFIG_4xx)		+= arch/ppc/4xx_io/
 drivers-$(CONFIG_8260)		+= arch/ppc/8260_io/
@@ -116,5 +114,4 @@ endif
 
 CLEAN_FILES +=	include/asm-$(ARCH)/offsets.h.tmp \
 		include/asm-$(ARCH)/offsets.h \
-		arch/$(ARCH)/kernel/asm-offsets.s \
-		arch/$(ARCH)/iSeries/ReleaseData.h
+		arch/$(ARCH)/kernel/asm-offsets.s

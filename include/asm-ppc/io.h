@@ -42,21 +42,6 @@ extern unsigned long isa_io_base;
 extern unsigned long isa_mem_base;
 extern unsigned long pci_dram_offset;
 
-#if defined(CONFIG_PPC_ISERIES)
-#include <asm/iSeries.h>
-#if defined(CONFIG_PCI)
-  #include <asm/iSeries/iSeries_io.h>
-  #endif  /* defined(CONFIG_PCI) */
-#endif /* CONFIG_PPC_ISERIES */
-
-#if defined(CONFIG_PPC_ISERIES) && defined(CONFIG_PCI)
-#define readb(addr)	     iSeries_Readb((u32*)(addr))
-#define readw(addr)	     iSeries_Readw((u32*)(addr))
-#define readl(addr)	     iSeries_Readl((u32*)(addr))
-#define writeb(data, addr)   iSeries_Writeb(data,(u32*)(addr))
-#define writew(data, addr)   iSeries_Writew(data,(u32*)(addr))
-#define writel(data, addr)   iSeries_Writel(data,(u32*)(addr))
-#else
 #define readb(addr) in_8((volatile u8 *)(addr))
 #define writeb(b,addr) out_8((volatile u8 *)(addr), (b))
 #if defined(CONFIG_APUS)
@@ -69,8 +54,7 @@ extern unsigned long pci_dram_offset;
 #define readl(addr) in_le32((volatile u32 *)(addr))
 #define writew(b,addr) out_le16((volatile u16 *)(addr),(b))
 #define writel(b,addr) out_le32((volatile u32 *)(addr),(b))
-#endif
-#endif  /* CONFIG_PPC_ISERIES && defined(CONFIG_PCI) */
+#endif /* CONFIG_APUS */
 
 
 #define __raw_readb(addr)	(*(volatile unsigned char *)(addr))
@@ -165,14 +149,6 @@ __do_out_asm(outl, "stwbrx")
 #define inl(port)		in_be32((u32 *)((port)+_IO_BASE))
 #define outl(val, port)		out_be32((u32 *)((port)+_IO_BASE), (val))
 
-#elif defined(CONFIG_PPC_ISERIES) && defined(CONFIG_PCI)
-#define inb(addr)	     iSeries_Readb((u32*)(addr))
-#define inw(addr)	     iSeries_Readw((u32*)(addr))
-#define inl(addr)	     iSeries_Readl((u32*)(addr))
-#define outb(data,addr)	     iSeries_Writeb(data,(u32*)(addr))
-#define outw(data,addr)	     iSeries_Writew(data,(u32*)(addr))
-#define outl(data,addr)	     iSeries_Writel(data,(u32*)(addr))
-
 #else /* not APUS or ALL_PPC */
 #define inb(port)		in_8((u8 *)((port)+_IO_BASE))
 #define outb(val, port)		out_8((u8 *)((port)+_IO_BASE), (val))
@@ -214,13 +190,8 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
 #define IO_SPACE_LIMIT ~0
 
 #define memset_io(a,b,c)       memset((void *)(a),(b),(c))
-#ifdef CONFIG_PPC_ISERIES
-#define memcpy_fromio(a,b,c) iSeries_memcpy_fromio((void *)(a), (void *)(b), (c))
-#define memcpy_toio(a,b,c) iSeries_memcpy_toio((void *)(a), (void *)(b), (c))
-#else
 #define memcpy_fromio(a,b,c)   memcpy((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
-#endif
 
 #ifdef __KERNEL__
 /*

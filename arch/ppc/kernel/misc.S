@@ -136,7 +136,6 @@ _GLOBAL(identify_cpu)
  * r3 = data offset (not changed)
  */
 _GLOBAL(do_cpu_ftr_fixups)
-#ifndef CONFIG_PPC_ISERIES
 	/* Get CPU 0 features */
 	addis	r6,r3,cur_cpu_spec@ha
 	addi	r6,r6,cur_cpu_spec@l
@@ -180,9 +179,6 @@ _GLOBAL(do_cpu_ftr_fixups)
 	sync			/* additional sync needed on g4 */
 	isync
 	b	1b
-#else /* CONFIG_PPC_ISERIES */
-	blr
-#endif /* CONFIG_PPC_ISERIES */
 
 /*
  * call_setup_cpu - call the setup_cpu function for this cpu
@@ -205,7 +201,6 @@ _GLOBAL(call_setup_cpu)
 	mr	r4,r24
 	bctr
 
-#ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_misc.S */
 /* void local_save_flags_ptr(unsigned long *flags) */
 _GLOBAL(local_save_flags_ptr)
 	mfmsr	r4
@@ -333,7 +328,6 @@ _GLOBAL(local_irq_enable)
 	nop
 	nop
 _GLOBAL(local_irq_enable_end)
-#endif /* CONFIG_PPC_ISERIES */
 
 /*
  * complement mask on the msr then "or" some values on.
@@ -487,7 +481,6 @@ _GLOBAL(flush_instruction_cache)
 	isync
 	blr
 
-#ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_misc.S */
 /*
  * Write any modified data cache blocks out to memory
  * and invalidate the corresponding instruction cache blocks.
@@ -751,7 +744,6 @@ _GLOBAL(copy_page)
 #endif
 	bdnz	1b
 	blr
-#endif /* CONFIG_PPC_ISERIES */
 
 /*
  * void atomic_clear_mask(atomic_t mask, atomic_t *addr)

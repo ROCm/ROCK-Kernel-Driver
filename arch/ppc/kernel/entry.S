@@ -8,7 +8,6 @@
  *  rewritten by Paul Mackerras.
  *    Copyright (C) 1996 Paul Mackerras.
  *  MPC8xx modifications Copyright (C) 1997 Dan Malek (dmalek@jlc.net).
- *  Adaptations for iSeries Lpar by Mike Corrigan & Dave Boutcher
  *
  *  This file contains the system call entry code, context switch
  *  code, and exception/interrupt return code for PowerPC.
@@ -31,14 +30,10 @@
 #include <asm/thread_info.h>
 #include <asm/ppc_asm.h>
 #include <asm/offsets.h>
-#ifdef	CONFIG_PPC_ISERIES
-#include "iSeries_asm.h"
-#endif /* CONFIG_PPC_ISERIES */
 
 #undef SHOW_SYSCALLS
 #undef SHOW_SYSCALLS_TASK
 
-#ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_head.S */
 /*
  * This code finishes saving the registers to the exception frame
  * and jumps to the appropriate handler for the exception, turning
@@ -115,7 +110,6 @@ stack_ovf:
 	mtspr	SRR1,r10
 	SYNC
 	RFI
-#endif /* CONFIG_PPC_ISERIES */
 
 /*
  * Handle a system call.
@@ -384,8 +378,7 @@ ppc_clone:
  * On entry, r3 points to the THREAD for the current task, r4
  * points to the THREAD for the new task.
  *
- * This routine is always called with interrupts disabled
- * (soft disabled for iSeries).
+ * This routine is always called with interrupts disabled.
  *
  * Note: there are two ways to get to the "going out" portion
  * of this code; either by coming in via the entry (_switch)

@@ -77,9 +77,6 @@ config POWER3
 config 8xx
 	bool "8xx"
 
-config PPC_ISERIES
-	bool "iSeries"
-
 endchoice
 
 config 4xx
@@ -105,7 +102,7 @@ config GENERIC_ISA_DMA
 
 config PPC64BRIDGE
 	bool
-	depends on PPC_ISERIES || POWER3
+	depends on POWER3
 	default y
 
 config ALL_PPC
@@ -855,8 +852,7 @@ config MCA
 
 config PCI
 	bool "PCI support" if 4xx || 8260
-	default y if !4xx && !8260 && !8xx && !APUS && !PPC_ISERIES
-	default PCI_ISERIES if !4xx && !8260 && !8xx && !APUS && PPC_ISERIES
+	default y if !4xx && !8260 && !8xx && !APUS
 	default PCI_PERMEDIA if !4xx && !8260 && !8xx && APUS
 	default PCI_QSPAN if !4xx && !8260 && 8xx
 	help
@@ -879,10 +875,6 @@ config PCI_QSPAN
 config PCI_PERMEDIA
 	bool "PCI for Permedia2"
 	depends on !4xx && !8xx && APUS
-
-config PCI_ISERIES
-	bool "IBM iSeries Native I/O Support"
-	depends on !4xx && !8260 && !8xx && !APUS && PPC_ISERIES
 
 # only elf supported, a.out is not -- Cort
 config KCORE_ELF
@@ -1423,78 +1415,7 @@ source "drivers/isdn/Kconfig"
 
 source "drivers/video/Kconfig"
 
-menu "iSeries device drivers"
-	depends on PPC_ISERIES
-
-config VIOCONS
-	tristate "iSeries Virtual Console Support"
-
-config VIODASD
-	tristate "iSeries Virtual I/O disk support"
-
-config VIODASD_IDE
-	bool "iSeries Virtual disk IDE emulation"
-	depends on VIODASD
-
-config VIOCD
-	tristate "iSeries Virtual I/O CD support"
-
-config VIOCD_AZTECH
-	bool "iSeries Virtual CD Aztech emulation"
-	depends on VIOCD
-
-config VIOTAPE
-	tristate "iSeries Virtual Tape Support"
-
-config VETH
-	tristate "iSeries Virtual Ethernet driver support"
-
-config VIOPATH
-	bool
-	depends on VIOCONS || VIODASD || VIOTAPE || VIOCD
-	default y
-
-config CD_NO_IDESCSI
-	bool
-	depends on VIOCD=y
-	default y
-	---help---
-	  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
-	  here, otherwise N. Read the CD-ROM-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
-
-	  Note that the answer to this question doesn't directly affect the
-	  kernel: saying N will just cause the configurator to skip all
-	  the questions about these CD-ROM drives. If you are unsure what you
-	  have, say Y and find out whether you have one of the following
-	  drives.
-
-	  For each of these drivers, a file Documentation/cdrom/{driver_name}
-	  exists. Especially in cases where you do not know exactly which kind
-	  of drive you have you should read there. Most of these drivers use a
-	  file drivers/cdrom/{driver_name}.h where you can define your
-	  interface parameters and switch some internal goodies.
-
-	  All these CD-ROM drivers are also usable as a module ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want). If you want to compile them as module, say M instead of Y and
-	  read <file:Documentation/modules.txt>.
-
-	  If you want to use any of these CD-ROM drivers, you also have to
-	  answer Y or M to "ISO 9660 CD-ROM file system support" below (this
-	  answer will get "defaulted" for you if you enable any of the Linux
-	  CD-ROM drivers).
-
-config BLK_DEV_IDECD
-	tristate
-	depends on VIOCD=y
-	default y
-
-endmenu
-
-
 menu "Old CD-ROM drivers (not SCSI, not IDE)"
-	depends on !PPC_ISERIES
 
 config CD_NO_IDESCSI
 	bool "Support non-SCSI/IDE/ATAPI CDROM drives"
@@ -1830,4 +1751,3 @@ endmenu
 source "security/Kconfig"
 
 source "crypto/Kconfig"
-

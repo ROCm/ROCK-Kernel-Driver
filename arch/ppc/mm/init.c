@@ -55,10 +55,6 @@
 #endif
 #define MAX_LOW_MEM	CONFIG_LOWMEM_SIZE
 
-#ifdef CONFIG_PPC_ISERIES
-extern void create_virtual_bus_tce_table(void);
-#endif
-
 mmu_gather_t mmu_gathers[NR_CPUS];
 
 unsigned long total_memory;
@@ -474,10 +470,6 @@ void __init mem_init(void)
 	if (agp_special_page)
 		printk(KERN_INFO "AGP special page: 0x%08lx\n", agp_special_page);
 #endif /* defined(CONFIG_ALL_PPC) */
-
-#ifdef CONFIG_PPC_ISERIES
-	create_virtual_bus_tce_table();
-#endif /* CONFIG_PPC_ISERIES */
 
 	/* Make sure all our pagetable pages have page->mapping
 	   and page->index set correctly. */

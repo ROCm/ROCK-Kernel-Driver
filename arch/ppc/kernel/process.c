@@ -44,9 +44,6 @@
 #include <asm/mmu.h>
 #include <asm/prom.h>
 #include <asm/hardirq.h>
-#ifdef CONFIG_PPC_ISERIES
-#include <asm/iSeries/Paca.h>
-#endif
 
 int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs);
 extern unsigned long _get_SP(void);
@@ -365,9 +362,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	sp -= STACK_FRAME_OVERHEAD;
 	p->thread.ksp = sp;
 	kregs->nip = (unsigned long)ret_from_fork;
-#ifdef CONFIG_PPC_ISERIES
-	kregs->softEnable = ((struct Paca *)mfspr(SPRG1))->xProcEnabled;
-#endif	
 
 	/*
 	 * copy fpu info - assume lazy fpu switch now always
@@ -408,6 +402,7 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 	regs->link = 0;
 	regs->xer = 0;
 	regs->ccr = 0;
+	regs->mq = 0;
 	regs->nip = nip;
 	regs->gpr[1] = sp;
 	regs->msr = MSR_USER;
