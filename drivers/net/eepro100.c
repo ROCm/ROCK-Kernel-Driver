@@ -546,9 +546,10 @@ static int __devinit eepro100_init_one (struct pci_dev *pdev,
 		const struct pci_device_id *ent)
 {
 	void __iomem *ioaddr;
-	int irq;
+	int irq, pci_bar;
 	int acpi_idle_state = 0, pm;
 	static int cards_found /* = 0 */;
+	unsigned long pci_base;
 
 #ifndef MODULE
 	/* when built-in, we only print version if device is found */
@@ -582,14 +583,13 @@ static int __devinit eepro100_init_one (struct pci_dev *pdev,
 	}
 
 	irq = pdev->irq;
-	if (use_io)
-		ioaddr = pci_iomap(pdev, 1, pci_resource_len(pdev, 1));
-	else
-		ioaddr = pci_iomap(pdev, 0, pci_resource_len(pdev, 0));
+	pci_bar = use_io ? 1 : 0;
+	pci_base = pci_resource_start(pdev, pci_bar);
 	if (DEBUG & NETIF_MSG_PROBE)
 		printk("Found Intel i82557 PCI Speedo at %#lx, IRQ %d.\n",
-			   pci_resource_start(pdev, 1), irq);
+		       pci_base, irq);
 
+	ioaddr = pci_iomap(pdev, pci_bar, 0);
 	if (!ioaddr) {
 		printk (KERN_ERR "eepro100: cannot remap IO\n");
 		goto err_out_free_mmio_region;
