@@ -1128,14 +1128,9 @@ int pcmcia_get_next_window(window_handle_t *win, win_req_t *req)
 
 #ifdef CONFIG_CARDBUS
 
-struct pci_bus *pcmcia_lookup_bus(client_handle_t handle)
+struct pci_bus *pcmcia_lookup_bus(struct pcmcia_socket *s)
 {
-	struct pcmcia_socket *s;
-
-	if (CHECK_HANDLE(handle))
-		return NULL;
-	s = SOCKET(handle);
-	if (!(s->state & SOCKET_CARDBUS))
+	if (!s || !(s->state & SOCKET_CARDBUS))
 		return NULL;
 
 	return s->cb_dev->subordinate;

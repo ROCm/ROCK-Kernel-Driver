@@ -446,7 +446,6 @@ int pcmcia_resume_card(struct pcmcia_socket *skt);
 int pcmcia_eject_card(struct pcmcia_socket *skt);
 int pcmcia_insert_card(struct pcmcia_socket *skt);
 int pcmcia_report_error(client_handle_t handle, error_info_t *err);
-struct pci_bus *pcmcia_lookup_bus(client_handle_t handle);
 
 #ifdef CONFIG_PCMCIA_OBSOLETE
 int pcmcia_get_first_client(client_handle_t *handle, client_req_t *req);

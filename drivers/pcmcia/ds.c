@@ -627,6 +627,8 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 
 /*====================================================================*/
 
+extern struct pci_bus *pcmcia_lookup_bus(struct pcmcia_socket *s);
+
 static int get_device_info(struct pcmcia_bus_socket *s, bind_info_t *bind_info, int first)
 {
     socket_bind_t *b;
@@ -640,7 +642,7 @@ static int get_device_info(struct pcmcia_bus_socket *s, bind_info_t *bind_info, 
     {
 	struct pci_bus *bus;
 
-	bus = pcmcia_lookup_bus(s->handle);
+	bus = pcmcia_lookup_bus(s->parent);
 	if (bus) {
 	    	struct list_head *list;
 		struct pci_dev *dev = NULL;
