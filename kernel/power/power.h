@@ -9,7 +9,7 @@
 #endif
 
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#ifdef CONFIG_PM_DISK
 extern int pm_suspend_disk(void);
 
 #else

@@ -10,7 +10,7 @@
 #include <linux/init.h>
 #include <linux/pm.h>
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#ifdef CONFIG_PM
 /* page backup entry */
 typedef struct pbe {
 	unsigned long address;		/* address of the copy */
@@ -53,11 +53,17 @@ extern suspend_pagedir_t *pagedir_nosave __nosavedata;
 extern void do_suspend_lowlevel(int resume);
 extern void do_suspend_lowlevel_s4bios(int resume);
 
-extern int software_suspend(void);
+#endif /* CONFIG_PM */
+
+#ifdef CONFIG_SOFTWARE_SUSPEND
+
+extern unsigned char software_suspend_enabled;
+
+extern void software_suspend(void);
 #else	/* CONFIG_SOFTWARE_SUSPEND */
-static inline int software_suspend(void)
+static inline void software_suspend(void)
 {
-	return -EPERM;
+	printk("Warning: fake suspend called\n");
 }
 #endif	/* CONFIG_SOFTWARE_SUSPEND */
 

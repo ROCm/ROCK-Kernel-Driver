@@ -62,3 +62,31 @@ config PM_DISK
 	  More information can be found in Documentation/power/.
 
 	  If unsure, Say N.
+
+config PM_DISK_PARTITION
+	string "Default resume partition"
+	default ""
+	---help---
+	  The default resume partition is the partition that the pmdisk suspend-
+	  to-disk implementation will look for a suspended disk image. 
+
+	  The partition specified here will be different for almost every user. 
+	  It should be a valid swap partition (at least for now) that is turned
+	  on before suspending. 
+
+	  The partition specified can be overridden by specifying:
+
+		pmdisk=/dev/<other device> 
+
+	  which will set the resume partition to the device specified. 
+
+	  One may also do: 
+
+		pmdisk=off
+
+	  to inform the kernel not to perform a resume transition. 
+
+	  Note there is currently not a way to specify which device to save the
+	  suspended image to. It will simply pick the first available swap 
+	  device.
+

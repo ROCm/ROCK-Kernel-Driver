@@ -1,37 +1,21 @@
 /*
- * linux/kernel/suspend.c
+ * kernel/power/pmdisk.c - Suspend-to-disk implmentation
  *
- * This file is to realize architecture-independent
- * machine suspend feature using pretty near only high-level routines
+ * This STD implementation is initially derived from swsusp (suspend-to-swap).
+ * The original copyright on that was: 
  *
  * Copyright (C) 1998-2001 Gabor Kuti <seasons@fornax.hu>
  * Copyright (C) 1998,2001,2002 Pavel Machek <pavel@suse.cz>
  *
- * I'd like to thank the following people for their work:
+ * The additional parts are: 
  * 
- * Pavel Machek <pavel@ucw.cz>:
- * Modifications, defectiveness pointing, being with me at the very beginning,
- * suspend to swap space, stop all tasks. Port to 2.4.18-ac and 2.5.17.
+ * Copyright (C) 2003 Patrick Mochel
+ * Copyright (C) 2003 Open Source Development Lab
+ * 
+ * This file is released under the GPLv2. 
  *
- * Steve Doddi <dirk@loth.demon.co.uk>: 
- * Support the possibility of hardware state restoring.
+ * For more information, please see the text files in Documentation/power/
  *
- * Raph <grey.havens@earthling.net>:
- * Support for preserving states of network devices and virtual console
- * (including X and svgatextmode)
- *
- * Kurt Garloff <garloff@suse.de>:
- * Straightened the critical function in order to prevent compilers from
- * playing tricks with local variables.
- *
- * Andreas Mohr <a.mohr@mailto.de>
- *
- * Alex Badea <vampire@go.ro>:
- * Fixed runaway init
- *
- * More state savers are welcome. Especially for the scsi layer...
- *
- * For TODOs,FIXMEs also look in Documentation/swsusp.txt
  */
 
 #include <linux/mm.h>
@@ -48,7 +32,7 @@
 #include "power.h"
 
 
-extern int swsusp_arch_suspend(int resume);
+extern int pmdisk_arch_suspend(int resume);
 
 #define __ADDRESS(x)  ((unsigned long) phys_to_virt(x))
 #define ADDRESS(x) __ADDRESS((x) << PAGE_SHIFT)
@@ -63,10 +47,12 @@ extern int is_head_of_free_region(struct page *);
 static int pagedir_order_check;
 static int nr_copy_pages_check;
 
-static char resume_file[256];			/* For resume= kernel option */
+/* For resume= kernel option */
+static char resume_file[256] = CONFIG_PM_DISK_PARTITION;
+
 static dev_t resume_device;
 /* Local variables that should not be affected by save */
-unsigned int nr_copy_pages __nosavedata = 0;
+unsigned int pmdisk_pages __nosavedata = 0;
 
 /* Suspend pagedir is allocated before final copy, therefore it
    must be freed after resume 
@@ -77,7 +63,7 @@ unsigned int nr_copy_pages __nosavedata = 0;
    allocated at time of resume, that travels through memory not to
    collide with anything.
  */
-suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
+suspend_pagedir_t *pm_pagedir_nosave __nosavedata = NULL;
 static suspend_pagedir_t *pagedir_save;
 static int pagedir_order __nosavedata = 0;
 
@@ -136,9 +122,9 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 	/* FIXME: Is this bogus? --RR */
 	sh->num_cpus = num_online_cpus();
 	sh->page_size = PAGE_SIZE;
-	sh->suspend_pagedir = pagedir_nosave;
-	BUG_ON (pagedir_save != pagedir_nosave);
-	sh->num_pbes = nr_copy_pages;
+	sh->suspend_pagedir = pm_pagedir_nosave;
+	BUG_ON (pagedir_save != pm_pagedir_nosave);
+	sh->num_pbes = pmdisk_pages;
 	/* TODO: needed? mounted fs' last mounted date comparison
 	 * [so they haven't been mounted since last suspend.
 	 * Maybe it isn't.] [we'd need to do this for _all_ fs-es]
@@ -248,13 +234,13 @@ static int write_suspend_image(void)
 {
 	int i;
 	swp_entry_t entry, prev = { 0 };
-	int nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
+	int nr_pgdir_pages = SUSPEND_PD_PAGES(pmdisk_pages);
 	union diskpage *cur,  *buffer = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
 	unsigned long address;
 	struct page *page;
 
-	printk( "Writing data to swap (%d pages): ", nr_copy_pages );
-	for (i=0; i<nr_copy_pages; i++) {
+	printk( "Writing data to swap (%d pages): ", pmdisk_pages );
+	for (i=0; i<pmdisk_pages; i++) {
 		if (!(i%100))
 			printk( "." );
 		if (!(entry = get_swap_page()).val)
@@ -263,16 +249,16 @@ static int write_suspend_image(void)
 		if (swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
 			panic("\nPage %d: not enough swapspace on suspend device", i );
 	    
-		address = (pagedir_nosave+i)->address;
+		address = (pm_pagedir_nosave+i)->address;
 		page = virt_to_page(address);
 		rw_swap_page_sync(WRITE, entry, page);
-		(pagedir_nosave+i)->swap_address = entry;
+		(pm_pagedir_nosave+i)->swap_address = entry;
 	}
 	printk( "|\n" );
 	printk( "Writing pagedir (%d pages): ", nr_pgdir_pages);
 	for (i=0; i<nr_pgdir_pages; i++) {
-		cur = (union diskpage *)((char *) pagedir_nosave)+i;
-		BUG_ON ((char *) cur != (((char *) pagedir_nosave) + i*PAGE_SIZE));
+		cur = (union diskpage *)((char *) pm_pagedir_nosave)+i;
+		BUG_ON ((char *) cur != (((char *) pm_pagedir_nosave) + i*PAGE_SIZE));
 		printk( "." );
 		if (!(entry = get_swap_page()).val) {
 			printk(KERN_CRIT "Not enough swapspace when writing pgdir\n" );
@@ -416,7 +402,7 @@ static suspend_pagedir_t *create_suspend_pagedir(int nr_copy_pages)
 }
 
 
-int swsusp_suspend(void)
+int pmdisk_suspend(void)
 {
 	struct sysinfo i;
 	unsigned int nr_needed_pages = 0;
@@ -424,12 +410,12 @@ int swsusp_suspend(void)
 	read_swapfiles();
 	drain_local_pages();
 
-	pagedir_nosave = NULL;
+	pm_pagedir_nosave = NULL;
 	printk( "/critical section: Counting pages to copy" );
-	nr_copy_pages = count_and_copy_data_pages(NULL);
-	nr_needed_pages = nr_copy_pages + PAGES_FOR_IO;
+	pmdisk_pages = count_and_copy_data_pages(NULL);
+	nr_needed_pages = pmdisk_pages + PAGES_FOR_IO;
 	
-	printk(" (pages needed: %d+%d=%d free: %d)\n",nr_copy_pages,PAGES_FOR_IO,nr_needed_pages,nr_free_pages());
+	printk(" (pages needed: %d+%d=%d free: %d)\n",pmdisk_pages,PAGES_FOR_IO,nr_needed_pages,nr_free_pages());
 	if(nr_free_pages() < nr_needed_pages) {
 		printk(KERN_CRIT "%sCouldn't get enough free pages, on %d pages short\n",
 		       name_suspend, nr_needed_pages-nr_free_pages());
@@ -445,18 +431,18 @@ int swsusp_suspend(void)
 	}
 
 	PRINTK( "Alloc pagedir\n" ); 
-	pagedir_save = pagedir_nosave = create_suspend_pagedir(nr_copy_pages);
-	if(!pagedir_nosave) {
+	pagedir_save = pm_pagedir_nosave = create_suspend_pagedir(pmdisk_pages);
+	if(!pm_pagedir_nosave) {
 		/* Shouldn't happen */
 		printk(KERN_CRIT "%sCouldn't allocate enough pages\n",name_suspend);
 		panic("Really should not happen");
 		return 1;
 	}
-	nr_copy_pages_check = nr_copy_pages;
+	nr_copy_pages_check = pmdisk_pages;
 	pagedir_order_check = pagedir_order;
 
 	drain_local_pages();	/* During allocating of suspend pagedir, new cold pages may appear. Kill them */
-	if (nr_copy_pages != count_and_copy_data_pages(pagedir_nosave))	/* copy */
+	if (pmdisk_pages != count_and_copy_data_pages(pm_pagedir_nosave))	/* copy */
 		BUG();
 
 	/*
@@ -465,7 +451,7 @@ int swsusp_suspend(void)
 	 * touch swap space! Except we must write out our image of course.
 	 */
 
-	printk( "critical section/: done (%d pages copied)\n", nr_copy_pages );
+	printk( "critical section/: done (%d pages copied)\n", pmdisk_pages );
 	return 0;
 }
 
@@ -498,9 +484,9 @@ static int suspend_save_image(void)
  * Magic happens here
  */
 
-int swsusp_resume(void)
+int pmdisk_resume(void)
 {
-	BUG_ON (nr_copy_pages_check != nr_copy_pages);
+	BUG_ON (nr_copy_pages_check != pmdisk_pages);
 	BUG_ON (pagedir_order_check != pagedir_order);
 	
 	/* Even mappings of "global" things (vmalloc) need to be fixed */
@@ -508,19 +494,19 @@ int swsusp_resume(void)
 	return 0;
 }
 
-/* swsusp_arch_suspend() is implemented in arch/?/power/swsusp.S,
+/* pmdisk_arch_suspend() is implemented in arch/?/power/pmdisk.S,
    and basically does:
 
 	if (!resume) {
 		save_processor_state();
 		SAVE_REGISTERS
-		return swsusp_suspend();
+		return pmdisk_suspend();
 	}
 	GO_TO_SWAPPER_PAGE_TABLES
 	COPY_PAGES_BACK
 	RESTORE_REGISTERS
 	restore_processor_state();
-	return swsusp_resume();
+	return pmdisk_resume();
 
  */
 
@@ -540,7 +526,7 @@ static void __init copy_pagedir(suspend_pagedir_t *to, suspend_pagedir_t *from)
 	}
 }
 
-#define does_collide(addr) does_collide_order(pagedir_nosave, addr, 0)
+#define does_collide(addr) does_collide_order(pm_pagedir_nosave, addr, 0)
 
 /*
  * Returns true if given address/order collides with any orig_address 
@@ -551,7 +537,7 @@ static int __init does_collide_order(suspend_pagedir_t *pagedir,
 	int i;
 	unsigned long addre = addr + (PAGE_SIZE<<order);
 	
-	for(i=0; i < nr_copy_pages; i++)
+	for(i=0; i < pmdisk_pages; i++)
 		if((pagedir+i)->orig_address >= addr &&
 			(pagedir+i)->orig_address < addre)
 			return 1;
@@ -567,7 +553,7 @@ static int __init check_pagedir(void)
 {
 	int i;
 
-	for(i=0; i < nr_copy_pages; i++) {
+	for(i=0; i < pmdisk_pages; i++) {
 		unsigned long addr;
 
 		do {
@@ -576,7 +562,7 @@ static int __init check_pagedir(void)
 				return -ENOMEM;
 		} while (does_collide(addr));
 
-		(pagedir_nosave+i)->address = addr;
+		(pm_pagedir_nosave+i)->address = addr;
 	}
 	return 0;
 }
@@ -587,7 +573,7 @@ static int __init relocate_pagedir(void)
 	 * We have to avoid recursion (not to overflow kernel stack),
 	 * and that's why code looks pretty cryptic 
 	 */
-	suspend_pagedir_t *new_pagedir, *old_pagedir = pagedir_nosave;
+	suspend_pagedir_t *new_pagedir, *old_pagedir = pm_pagedir_nosave;
 	void **eaten_memory = NULL;
 	void **c = eaten_memory, *m, *f;
 
@@ -611,7 +597,7 @@ static int __init relocate_pagedir(void)
 	if (!m)
 		return -ENOMEM;
 
-	pagedir_nosave = new_pagedir = m;
+	pm_pagedir_nosave = new_pagedir = m;
 	copy_pagedir(new_pagedir, old_pagedir);
 
 	c = eaten_memory;
@@ -770,11 +756,11 @@ static int __init read_suspend_image(void)
 		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
 	else if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)) ||
 		 (!memcmp("SWAPSPACE2",cur->swh.magic.magic,10))) {
-		printk(KERN_ERR "swsusp: Partition is normal swap space\n");
+		printk(KERN_ERR "pmdisk: Partition is normal swap space\n");
 		error = -EINVAL;
 		goto Done;
 	} else {
-		printk(KERN_ERR "swsusp: Invalid partition type.\n");
+		printk(KERN_ERR "pmdisk: Invalid partition type.\n");
 		error = -EINVAL;
 		goto Done;
 	}
@@ -796,12 +782,12 @@ static int __init read_suspend_image(void)
 	next = next_entry(cur);
 
 	pagedir_save = cur->sh.suspend_pagedir;
-	nr_copy_pages = cur->sh.num_pbes;
-	nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
+	pmdisk_pages = cur->sh.num_pbes;
+	nr_pgdir_pages = SUSPEND_PD_PAGES(pmdisk_pages);
 	pagedir_order = get_bitmask_order(nr_pgdir_pages);
 
-	pagedir_nosave = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, pagedir_order);
-	if (!pagedir_nosave) {
+	pm_pagedir_nosave = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, pagedir_order);
+	if (!pm_pagedir_nosave) {
 		error = -ENOMEM;
 		goto Done;
 	}
@@ -811,7 +797,7 @@ static int __init read_suspend_image(void)
 	/* We get pages in reverse order of saving! */
 	for (i=nr_pgdir_pages-1; i>=0; i--) {
 		BUG_ON (!next.val);
-		cur = (union diskpage *)((char *) pagedir_nosave)+i;
+		cur = (union diskpage *)((char *) pm_pagedir_nosave)+i;
 		error = read_page(swp_offset(next), cur);
 		if (error)
 			goto FreePagedir;
@@ -824,15 +810,15 @@ static int __init read_suspend_image(void)
 	if ((error = check_pagedir()))
 		goto FreePagedir;
 
-	printk( "Reading image data (%d pages): ", nr_copy_pages );
-	for(i=0; i < nr_copy_pages; i++) {
-		swp_entry_t swap_address = (pagedir_nosave+i)->swap_address;
+	printk( "Reading image data (%d pages): ", pmdisk_pages );
+	for(i=0; i < pmdisk_pages; i++) {
+		swp_entry_t swap_address = (pm_pagedir_nosave+i)->swap_address;
 		if (!(i%100))
 			printk( "." );
 		/* You do not need to check for overlaps...
 		   ... check_pagedir already did this work */
 		error = read_page(swp_offset(swap_address),
-				  (char *)((pagedir_nosave+i)->address));
+				  (char *)((pm_pagedir_nosave+i)->address));
 		if (error)
 			goto FreePagedir;
 	}
@@ -841,52 +827,52 @@ static int __init read_suspend_image(void)
 	free_page((unsigned long)cur);
 	return error;
  FreePagedir:
-	free_pages((unsigned long)pagedir_nosave,pagedir_order);
+	free_pages((unsigned long)pm_pagedir_nosave,pagedir_order);
 	goto Done;
 }
 
 /**
- *	swsusp_save - Snapshot memory
+ *	pmdisk_save - Snapshot memory
  */
 
-int swsusp_save(void) 
+int pmdisk_save(void) 
 {
 	int error;
 
 #if defined (CONFIG_HIGHMEM) || defined (COFNIG_DISCONTIGMEM)
-	printk("swsusp is not supported with high- or discontig-mem.\n");
+	printk("pmdisk is not supported with high- or discontig-mem.\n");
 	return -EPERM;
 #endif
 	if ((error = arch_prepare_suspend()))
 		return error;
 	local_irq_disable();
-	error = swsusp_arch_suspend(0);
+	error = pmdisk_arch_suspend(0);
 	local_irq_enable();
 	return error;
 }
 
 
 /**
- *	swsusp_write - Write saved memory image to swap.
+ *	pmdisk_write - Write saved memory image to swap.
  *
- *	swsusp_arch_suspend(0) returns after system is resumed.
+ *	pmdisk_arch_suspend(0) returns after system is resumed.
  *
- *	swsusp_arch_suspend() copies all "used" memory to "free" memory,
+ *	pmdisk_arch_suspend() copies all "used" memory to "free" memory,
  *	then unsuspends all device drivers, and writes memory to disk
  *	using normal kernel mechanism.
  */
 
-int swsusp_write(void)
+int pmdisk_write(void)
 {
 	return suspend_save_image();
 }
 
 
 /**
- *	swsusp_read - Read saved image from swap.
+ *	pmdisk_read - Read saved image from swap.
  */
 
-int __init swsusp_read(void)
+int __init pmdisk_read(void)
 {
 	int error;
 	char b[BDEVNAME_SIZE];
@@ -895,7 +881,7 @@ int __init swsusp_read(void)
 		return -ENOENT;
 
 	resume_device = name_to_dev_t(resume_file);
-	printk("swsusp: Resume From Partition: %s, Device: %s\n", 
+	printk("pmdisk: Resume From Partition: %s, Device: %s\n", 
 	       resume_file, __bdevname(resume_device, b));
 
 	resume_bdev = open_by_devnum(resume_device, FMODE_READ, BDEV_RAW);
@@ -916,54 +902,41 @@ int __init swsusp_read(void)
 
 
 /**
- *	swsusp_restore - Replace running kernel with saved image.
+ *	pmdisk_restore - Replace running kernel with saved image.
  */
 
-int __init swsusp_restore(void)
+int __init pmdisk_restore(void)
 {
 	int error;
 	local_irq_disable();
-	error = swsusp_arch_suspend(1);
+	error = pmdisk_arch_suspend(1);
 	local_irq_enable();
 	return error;
 }
 
 
 /**
- *	swsusp_free - Free memory allocated to hold snapshot.
+ *	pmdisk_free - Free memory allocated to hold snapshot.
  */
 
-int swsusp_free(void)
+int pmdisk_free(void)
 {
 	PRINTK( "Freeing prev allocated pagedir\n" );
 	free_suspend_pagedir((unsigned long) pagedir_save);
 	return 0;
 }
 
-
-int software_suspend(void)
+static int __init pmdisk_setup(char *str)
 {
-	struct pm_ops swsusp_ops = {
-		.pm_disk_mode	= PM_DISK_SHUTDOWN,
-	};
-
-	pm_set_ops(&swsusp_ops);
-	return pm_suspend(PM_SUSPEND_DISK);
-}
-
-static int __init resume_setup(char *str)
-{
-	if (strlen(str))
-		strncpy(resume_file, str, 255);
+	if (strlen(str)) {
+		if (!strcmp(str,"off"))
+			resume_file[0] = '\0';
+		else
+			strncpy(resume_file, str, 255);
+	} else
+		resume_file[0] = '\0';
 	return 1;
 }
 
-static int __init noresume_setup(char *str)
-{
-	resume_file[0] = '\0';
-	return 1;
-}
-
-__setup("noresume", noresume_setup);
-__setup("resume=", resume_setup);
+__setup("pmdisk=", pmdisk_setup);
 
