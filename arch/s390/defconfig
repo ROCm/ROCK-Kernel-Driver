@@ -269,7 +269,14 @@ CONFIG_NET_ETHERNET=y
 CONFIG_LCS=m
 CONFIG_CTC=m
 CONFIG_IUCV=m
-CONFIG_CCWGROUP=m
+CONFIG_QETH=y
+
+#
+# Gigabit Ethernet default settings
+#
+# CONFIG_QETH_IPV6 is not set
+# CONFIG_QETH_PERF_STATS is not set
+CONFIG_CCWGROUP=y
 
 #
 # File systems

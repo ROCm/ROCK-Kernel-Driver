@@ -30,9 +30,56 @@ config IUCV
 	  vehicle networking under VM or VIF.  This option is also available
 	  as a module which will be called iucv.ko. If unsure, say "Y".
 
+
+config QETH
+	tristate "Gigabit Ethernet device support"
+	depends on NETDEVICES && IP_MULTICAST && QDIO
+	help
+	  This driver supports the IBM S/390 and zSeries OSA Express adapters
+	  in QDIO mode (all media types), HiperSockets interfaces and VM GuestLAN
+	  interfaces in QDIO and HIPER mode.
+	
+	  For details please refer to the documentation provided by IBM at   
+	  <http://www10.software.ibm.com/developerworks/opensource/linux390>
+
+	  This driver is also available as a module (code which can be
+	  inserted in and removed from the running kernel whenever you
+	  want). If you want to compile it as a module, say 'M' here and
+	  read file Documentation/modules.txt.
+
+
+comment "Gigabit Ethernet default settings"
+	depends on QETH
+
+# FIXME IPV6=m && QETH=y
+config QETH_IPV6
+	bool "IPv6 support for gigabit ethernet"
+	depends on QETH && IPV6
+	help
+	  If CONFIG_QETH is switched on, this option will include IPv6
+	  support in the qeth device driver.
+
+# FIXME VLAN_8021Q=m && QETH=y
+config QETH_VLAN
+	bool "VLAN support for gigabit ethernet"
+	depends on QETH && VLAN_8021Q
+	help
+	  If CONFIG_QETH is switched on, this option will include IEEE
+	  802.1q VLAN support in the qeth device driver.
+
+config QETH_PERF_STATS
+	bool "Performance statistics in /proc"
+	depends on QETH
+	help
+	  When switched on, this option will add a file in the proc-fs
+	  (/proc/qeth_perf_stats) containing performance statistics. It
+	  may slightly impact performance, so this is only recommended for
+	  internal tuning of the device driver.
+
 config CCWGROUP
  	tristate
- 	depends on LCS || CTC
-	default m if LCS!=y && CTC!=y
-	default y if LCS=y || CTC=y
+ 	depends on LCS || CTC  || QETH
+	default m if LCS!=y && CTC!=y && QETH!=y
+	default y if LCS=y || CTC=y || QETH=y
+
 endmenu
