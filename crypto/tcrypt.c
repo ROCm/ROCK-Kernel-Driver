@@ -326,7 +326,7 @@ void test_des(void)
 		printk("test %d:\n", i + 1);
 
 		key = des_tv[i].key;
-		
+	
 		tfm->crt_flags = CRYPTO_WEAK_KEY_CHECK;
 		ret = crypto_cipher_setkey(tfm, key, 8);
 		if (ret) {

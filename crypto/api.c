@@ -106,7 +106,7 @@ static inline void crypto_alg_put(struct crypto_alg *alg)
 	/* XXX: dec refcount */
 }
 
-struct crypto_alg *crypto_alg_lookup(__u32 algid)
+struct crypto_alg *crypto_alg_lookup(u32 algid)
 {
 	struct list_head *p;
 	struct crypto_alg *alg = NULL;
@@ -150,7 +150,7 @@ static void crypto_init_ops(struct crypto_tfm *tfm)
 /*
  * Todo: try and load the module if the lookup fails.
  */
-struct crypto_tfm *crypto_alloc_tfm(__u32 id)
+struct crypto_tfm *crypto_alloc_tfm(u32 id)
 {
 	struct crypto_tfm *tfm = NULL;
 	struct crypto_alg *alg;

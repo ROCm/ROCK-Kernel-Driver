@@ -21,13 +21,13 @@
 #include <linux/crypto.h>
 #include "internal.h"
 
-typedef void (cryptfn_t)(void *, __u8 *, __u8 *);
-typedef void (procfn_t)(struct crypto_tfm *, __u8 *, cryptfn_t, int enc);
+typedef void (cryptfn_t)(void *, u8 *, u8 *);
+typedef void (procfn_t)(struct crypto_tfm *, u8 *, cryptfn_t, int enc);
 
-static inline void xor_64(__u8 *a, const __u8 *b)
+static inline void xor_64(u8 *a, const u8 *b)
 {
-	((__u32 *)a)[0] ^= ((__u32 *)b)[0];
-	((__u32 *)a)[1] ^= ((__u32 *)b)[1];
+	((u32 *)a)[0] ^= ((u32 *)b)[0];
+	((u32 *)a)[1] ^= ((u32 *)b)[1];
 }
 
 static inline size_t sglen(struct scatterlist *sg, size_t nsg)
@@ -45,7 +45,7 @@ static inline size_t sglen(struct scatterlist *sg, size_t nsg)
  * Do not call this unless the total length of all of the fragments 
  * has been verified as multiple of the block size.
  */
-static int copy_chunks(struct crypto_tfm *tfm, __u8 *buf,
+static int copy_chunks(struct crypto_tfm *tfm, u8 *buf,
                        struct scatterlist *sg, int sgidx,
                        int rlen, int *last, int in)
 {
@@ -84,14 +84,14 @@ static int copy_chunks(struct crypto_tfm *tfm, __u8 *buf,
 	return i - sgidx - 2 + aligned;
 }
 
-static inline int gather_chunks(struct crypto_tfm *tfm, __u8 *buf,
+static inline int gather_chunks(struct crypto_tfm *tfm, u8 *buf,
                                 struct scatterlist *sg,
                                 int sgidx, int rlen, int *last)
 {
 	return copy_chunks(tfm, buf, sg, sgidx, rlen, last, 1);
 }
 
-static inline int scatter_chunks(struct crypto_tfm *tfm, __u8 *buf,
+static inline int scatter_chunks(struct crypto_tfm *tfm, u8 *buf,
                                  struct scatterlist *sg,
                                  int sgidx, int rlen, int *last)
 {
@@ -105,13 +105,18 @@ static inline int scatter_chunks(struct crypto_tfm *tfm, __u8 *buf,
  * decrypt across possibly multiple page boundaries via a temporary
  * block, then continue processing with a chunk offset until the end
  * of a frag is block aligned.
+ *
+ * The code is further complicated by having to remap a page after
+ * processing a block then yielding.  The data will be offset from the
+ * start of page at the scatterlist offset, the chunking offset (coff)
+ * and the block offset (boff).
  */
 static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
                  size_t nsg, cryptfn_t crfn, procfn_t prfn, int enc)
 {
 	int i, coff;
 	size_t bsize = crypto_tfm_blocksize(tfm);
-	__u8 tmp[CRYPTO_MAX_BLOCK_SIZE];
+	u8 tmp[CRYPTO_MAX_BLOCK_SIZE];
 
 	if (sglen(sg, nsg) % bsize) {
 		tfm->crt_flags |= CRYPTO_BAD_BLOCK_LEN;
@@ -119,7 +124,7 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
 	}
 
 	for (i = 0, coff = 0; i < nsg; i++) {
-		int n = 0;
+		int n = 0, boff = 0;
 		int len = sg[i].length - coff;
 		char *p = crypto_kmap(tfm, sg[i].page) + sg[i].offset + coff;
 
@@ -135,8 +140,12 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
 				prfn(tfm, p, crfn, enc);
 				crypto_kunmap(tfm, sg[i].page, p);
 				crypto_yield(tfm);
-				p = crypto_kmap(tfm, sg[i].page) + sg[i].offset + coff;
-				p += bsize;
+				
+				/* remap and point to recalculated offset */
+				boff += bsize;
+				p = crypto_kmap(tfm, sg[i].page)
+					+ sg[i].offset + coff + boff;
+				
 				len -= bsize;
 				
 				/* End of frag with no remnant? */
@@ -153,7 +162,7 @@ unmapped:
 }
 
 static void cbc_process(struct crypto_tfm *tfm,
-                        __u8 *block, cryptfn_t fn, int enc)
+                        u8 *block, cryptfn_t fn, int enc)
 {
 	if (enc) {
 		xor_64(tfm->crt_cipher.cit_iv, block);
@@ -161,7 +170,7 @@ static void cbc_process(struct crypto_tfm *tfm,
 		memcpy(tfm->crt_cipher.cit_iv, block,
 		       crypto_tfm_blocksize(tfm));
 	} else {
-		__u8 buf[CRYPTO_MAX_BLOCK_SIZE];
+		u8 buf[CRYPTO_MAX_BLOCK_SIZE];
 		
 		fn(tfm->crt_ctx, buf, block);
 		xor_64(buf, tfm->crt_cipher.cit_iv);
@@ -171,13 +180,13 @@ static void cbc_process(struct crypto_tfm *tfm,
 	}
 }
 
-static void ecb_process(struct crypto_tfm *tfm, __u8 *block,
+static void ecb_process(struct crypto_tfm *tfm, u8 *block,
                         cryptfn_t fn, int enc)
 {
 	fn(tfm->crt_ctx, block, block);
 }
 
-static int setkey(struct crypto_tfm *tfm, const __u8 *key, size_t keylen)
+static int setkey(struct crypto_tfm *tfm, const u8 *key, size_t keylen)
 {
 	return tfm->__crt_alg->cra_cipher.cia_setkey(tfm->crt_ctx, key,
 	                                             keylen, &tfm->crt_flags);

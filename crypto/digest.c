@@ -39,14 +39,14 @@ static void update(struct crypto_tfm *tfm, struct scatterlist *sg, size_t nsg)
 	return;
 }
 
-static void final(struct crypto_tfm *tfm, __u8 *out)
+static void final(struct crypto_tfm *tfm, u8 *out)
 {
 	tfm->__crt_alg->cra_digest.dia_final(tfm->crt_ctx, out);
 	return;
 }
 
 static void digest(struct crypto_tfm *tfm,
-                   struct scatterlist *sg, size_t nsg, __u8 *out)
+                   struct scatterlist *sg, size_t nsg, u8 *out)
 {
 	int i;
 
@@ -63,8 +63,8 @@ static void digest(struct crypto_tfm *tfm,
 	return;
 }
 
-static void hmac(struct crypto_tfm *tfm, __u8 *key, size_t keylen,
-                 struct scatterlist *sg, size_t nsg, __u8 *out)
+static void hmac(struct crypto_tfm *tfm, u8 *key, size_t keylen,
+                 struct scatterlist *sg, size_t nsg, u8 *out)
 {
 	int i;
 	struct scatterlist tmp;

@@ -50,20 +50,20 @@ static inline u32 rol(u32 value, u32 bits)
 #define R4(v,w,x,y,z,i) z+=(w^x^y)+blk(i)+0xCA62C1D6+rol(v,5);w=rol(w,30);
 
 struct sha1_ctx {
-        __u64 count;
-        __u32 state[5];
-        __u8 buffer[64];
+        u64 count;
+        u32 state[5];
+        u8 buffer[64];
 };
 
 /* Hash a single 512-bit block. This is the core of the algorithm. */
-static void sha1_transform(__u32 *state, const char *in)
+static void sha1_transform(u32 *state, const u8 *in)
 {
-	__u32 a, b, c, d, e;
-	__u32 block32[16];
+	u32 a, b, c, d, e;
+	u32 block32[16];
 
 	/* convert/copy data to workspace */
-	for (a = 0; a < sizeof(block32)/sizeof(__u32); a++)
-	  block32[a] = be32_to_cpu (((const __u32 *)in)[a]);
+	for (a = 0; a < sizeof(block32)/sizeof(u32); a++)
+	  block32[a] = be32_to_cpu (((const u32 *)in)[a]);
 
 	/* Copy context->state[] to working vars */
 	a = state[0];
@@ -116,7 +116,7 @@ static void sha1_init(void *ctx)
 	*sctx = initstate;
 }
 
-static void sha1_update(void *ctx, const __u8 *data, size_t len)
+static void sha1_update(void *ctx, const u8 *data, size_t len)
 {
 	struct sha1_ctx *sctx = ctx;
 	unsigned i, j;
@@ -138,13 +138,13 @@ static void sha1_update(void *ctx, const __u8 *data, size_t len)
 
 
 /* Add padding and return the message digest. */
-static void sha1_final(void* ctx, __u8 *out)
+static void sha1_final(void* ctx, u8 *out)
 {
 	struct sha1_ctx *sctx = ctx;
-	__u32 i, j, index, padlen;
-	__u64 t;
-	__u8 bits[8] = { 0, };
-	const static __u8 padding[64] = { 0x80, };
+	u32 i, j, index, padlen;
+	u64 t;
+	u8 bits[8] = { 0, };
+	const static u8 padding[64] = { 0x80, };
 
 	t = sctx->count;
 	bits[7] = 0xff & t; t>>=8;
@@ -166,7 +166,7 @@ static void sha1_final(void* ctx, __u8 *out)
 
 	/* Store state in digest */
 	for (i = j = 0; i < 5; i++, j += 4) {
-		__u32 t2 = sctx->state[i];
+		u32 t2 = sctx->state[i];
 		out[j+3] = t2 & 0xff; t2>>=8;
 		out[j+2] = t2 & 0xff; t2>>=8;
 		out[j+1] = t2 & 0xff; t2>>=8;

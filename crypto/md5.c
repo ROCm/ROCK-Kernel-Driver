@@ -36,14 +36,14 @@
 	(w += f(x, y, z) + in, w = (w<<s | w>>(32-s)) + x)
 
 struct md5_ctx {
-	__u32 hash[MD5_HASH_WORDS];
-	__u32 block[MD5_BLOCK_WORDS];
-	__u64 byte_count;
+	u32 hash[MD5_HASH_WORDS];
+	u32 block[MD5_BLOCK_WORDS];
+	u64 byte_count;
 };
 
-static inline void md5_transform(__u32 *hash, __u32 const *in)
+static inline void md5_transform(u32 *hash, u32 const *in)
 {
-	register __u32 a, b, c, d;
+	register u32 a, b, c, d;
 
 	a = hash[0];
 	b = hash[1];
@@ -125,7 +125,7 @@ static inline void md5_transform(__u32 *hash, __u32 const *in)
 }
 
 /* XXX: this stuff can be optimized */
-static inline void le32_to_cpu_array(__u32 *buf, unsigned words)
+static inline void le32_to_cpu_array(u32 *buf, unsigned words)
 {
 	while (words--) {
 		__le32_to_cpus(buf);
@@ -133,7 +133,7 @@ static inline void le32_to_cpu_array(__u32 *buf, unsigned words)
 	}
 }
 
-static inline void cpu_to_le32_array(__u32 *buf, unsigned words)
+static inline void cpu_to_le32_array(u32 *buf, unsigned words)
 {
 	while (words--) {
 		__cpu_to_le32s(buf);
@@ -143,7 +143,7 @@ static inline void cpu_to_le32_array(__u32 *buf, unsigned words)
 
 static inline void md5_transform_helper(struct md5_ctx *ctx)
 {
-	le32_to_cpu_array(ctx->block, sizeof(ctx->block) / sizeof(__u32));
+	le32_to_cpu_array(ctx->block, sizeof(ctx->block) / sizeof(u32));
 	md5_transform(ctx->hash, ctx->block);
 }
 
@@ -158,10 +158,10 @@ static void md5_init(void *ctx)
 	mctx->byte_count = 0;
 }
 
-static void md5_update(void *ctx, const __u8 *data, size_t len)
+static void md5_update(void *ctx, const u8 *data, size_t len)
 {
 	struct md5_ctx *mctx = ctx;
-	const __u32 avail = sizeof(mctx->block) - (mctx->byte_count & 0x3f);
+	const u32 avail = sizeof(mctx->block) - (mctx->byte_count & 0x3f);
 
 	mctx->byte_count += len;
 
@@ -188,7 +188,7 @@ static void md5_update(void *ctx, const __u8 *data, size_t len)
 	memcpy(mctx->block, data, len);
 }
 
-static void md5_final(void *ctx, __u8 *out)
+static void md5_final(void *ctx, u8 *out)
 {
 	struct md5_ctx *mctx = ctx;
 	const int offset = mctx->byte_count & 0x3f;
@@ -197,7 +197,7 @@ static void md5_final(void *ctx, __u8 *out)
 
 	*p++ = 0x80;
 	if (padding < 0) {
-		memset(p, 0x00, padding + sizeof (__u64));
+		memset(p, 0x00, padding + sizeof (u64));
 		md5_transform_helper(mctx);
 		p = (char *)mctx->block;
 		padding = 56;
@@ -207,9 +207,9 @@ static void md5_final(void *ctx, __u8 *out)
 	mctx->block[14] = mctx->byte_count << 3;
 	mctx->block[15] = mctx->byte_count >> 29;
 	le32_to_cpu_array(mctx->block, (sizeof(mctx->block) -
-	                  sizeof(__u64)) / sizeof(__u32));
+	                  sizeof(u64)) / sizeof(u32));
 	md5_transform(mctx->hash, mctx->block);
-	cpu_to_le32_array(mctx->hash, sizeof(mctx->hash) / sizeof(__u32));
+	cpu_to_le32_array(mctx->hash, sizeof(mctx->hash) / sizeof(u32));
 	memcpy(out, mctx->hash, sizeof(mctx->hash));
 	memset(mctx, 0, sizeof(mctx));
 }

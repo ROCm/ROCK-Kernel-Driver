@@ -67,17 +67,16 @@ struct scatterlist;
 struct cipher_alg {
 	size_t cia_keysize;
 	size_t cia_ivsize;
-	int (*cia_setkey)(void *ctx, const __u8 *key, size_t keylen,
-	                  int *flags);
-	void (*cia_encrypt)(void *ctx, __u8 *dst, __u8 *src);
-	void (*cia_decrypt)(void *ctx, __u8 *dst, __u8 *src);
+	int (*cia_setkey)(void *ctx, const u8 *key, size_t keylen, int *flags);
+	void (*cia_encrypt)(void *ctx, u8 *dst, u8 *src);
+	void (*cia_decrypt)(void *ctx, u8 *dst, u8 *src);
 };
 
 struct digest_alg {
 	size_t dia_digestsize;
 	void (*dia_init)(void *ctx);
-	void (*dia_update)(void *ctx, const __u8 *data, size_t len);
-	void (*dia_final)(void *ctx, __u8 *out);
+	void (*dia_update)(void *ctx, const u8 *data, size_t len);
+	void (*dia_final)(void *ctx, u8 *out);
 };
 
 struct compress_alg {
@@ -91,7 +90,7 @@ struct compress_alg {
 
 struct crypto_alg {
 	struct list_head cra_list;
-	__u32 cra_id;
+	u32 cra_id;
 	size_t cra_blocksize;
 	size_t cra_ctxsize;
 	char cra_name[CRYPTO_MAX_ALG_NAME];
@@ -116,9 +115,8 @@ struct crypto_tfm;
  */
 struct cipher_tfm {
 	void *cit_iv;
-	__u32 cit_mode;
-	int (*cit_setkey)(struct crypto_tfm *tfm, const __u8 *key,
-	                  size_t keylen);
+	u32 cit_mode;
+	int (*cit_setkey)(struct crypto_tfm *tfm, const u8 *key, size_t keylen);
 	int (*cit_encrypt)(struct crypto_tfm *tfm,
 	                   struct scatterlist *sg, size_t nsg);
 	int (*cit_decrypt)(struct crypto_tfm *tfm,
@@ -129,11 +127,11 @@ struct digest_tfm {
 	void (*dit_init)(struct crypto_tfm *tfm);
 	void (*dit_update)(struct crypto_tfm *tfm,
 	                   struct scatterlist *sg, size_t nsg);
-	void (*dit_final)(struct crypto_tfm *tfm, __u8 *out);
+	void (*dit_final)(struct crypto_tfm *tfm, u8 *out);
 	void (*dit_digest)(struct crypto_tfm *tfm, struct scatterlist *sg,
-	                   size_t nsg, __u8 *out);
-	void (*dit_hmac)(struct crypto_tfm *tfm, __u8 *key, size_t keylen,
-	                 struct scatterlist *sg, size_t nsg, __u8 *out);
+	                   size_t nsg, u8 *out);
+	void (*dit_hmac)(struct crypto_tfm *tfm, u8 *key, size_t keylen,
+	                 struct scatterlist *sg, size_t nsg, u8 *out);
 };
 
 struct compress_tfm {
@@ -164,7 +162,7 @@ struct crypto_tfm {
  * Will try an load a module based on the name if not present
  * in the kernel.  Increments its algorithm refcount.
  */
-struct crypto_tfm *crypto_alloc_tfm(__u32 id);
+struct crypto_tfm *crypto_alloc_tfm(u32 id);
 
 /*
  * Frees the transform and decrements its algorithm's recount.
@@ -185,28 +183,28 @@ static inline void crypto_digest_update(struct crypto_tfm *tfm,
 	tfm->crt_digest.dit_update(tfm, sg, nsg);
 }
 
-static inline void crypto_digest_final(struct crypto_tfm *tfm, __u8 *out)
+static inline void crypto_digest_final(struct crypto_tfm *tfm, u8 *out)
 {
 	tfm->crt_digest.dit_final(tfm, out);
 }
 
 static inline void crypto_digest_digest(struct crypto_tfm *tfm,
                                         struct scatterlist *sg,
-                                        size_t nsg, __u8 *out)
+                                        size_t nsg, u8 *out)
 {
 	tfm->crt_digest.dit_digest(tfm, sg, nsg, out);
 }
                                         
-static inline void crypto_digest_hmac(struct crypto_tfm *tfm, __u8 *key,
+static inline void crypto_digest_hmac(struct crypto_tfm *tfm, u8 *key,
                                       size_t keylen, struct scatterlist *sg,
-                                      size_t nsg, __u8 *out)
+                                      size_t nsg, u8 *out)
                                       
 {
 	tfm->crt_digest.dit_hmac(tfm, key, keylen, sg, nsg, out);
 }
 
 static inline int crypto_cipher_setkey(struct crypto_tfm *tfm,
-                                       const __u8 *key, size_t keylen)
+                                       const u8 *key, size_t keylen)
 {
 	return tfm->crt_cipher.cit_setkey(tfm, key, keylen);
 }
@@ -224,7 +222,7 @@ static inline int crypto_cipher_decrypt(struct crypto_tfm *tfm,
 }
 
 static inline void crypto_cipher_copy_iv(struct crypto_tfm *tfm,
-                                         __u8 *src, size_t len)
+                                         u8 *src, size_t len)
 {
 	memcpy(tfm->crt_cipher.cit_iv, src, len);
 }
@@ -257,7 +255,7 @@ static inline char *crypto_tfm_name(struct crypto_tfm *tfm)
 	return tfm->__crt_alg->cra_name;
 }
 
-static inline __u32 crypto_tfm_type(struct crypto_tfm *tfm)
+static inline u32 crypto_tfm_type(struct crypto_tfm *tfm)
 {
 	return tfm->__crt_alg->cra_id & CRYPTO_TYPE_MASK;
 }
