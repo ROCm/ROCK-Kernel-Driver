@@ -43,6 +43,7 @@
 #include <asm/iommu.h>
 #include <asm/pci-bridge.h>
 #include <asm/iSeries/iSeries_pci.h>
+#include <asm/iSeries/vio.h>
 
 #include <asm/machdep.h>
 
@@ -58,11 +59,6 @@ static struct iSeries_Device_Node vio_dev_node  = { .LogicalSlot = 0xFF, .iommu_
 static struct pci_dev _veth_dev = { .sysdata = &veth_dev_node };
 static struct pci_dev _vio_dev  = { .sysdata = &vio_dev_node, .dev.bus = &pci_bus_type  };
 
-/*
- * I wonder what the deal is with these.  Nobody uses them.  Why do they
- * exist? Why do we export them to modules? Why is this comment here, and
- * why didn't I just delete them?
- */
 struct pci_dev *iSeries_veth_dev = &_veth_dev;
 struct device *iSeries_vio_dev = &_vio_dev.dev;
 

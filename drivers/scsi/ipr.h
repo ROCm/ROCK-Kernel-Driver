@@ -139,6 +139,7 @@
 #define IPR_80MBs_SCSI_RATE		((80 * 10) / (IPR_DEFAULT_BUS_WIDTH / 8))
 #define IPR_U160_SCSI_RATE	((160 * 10) / (IPR_DEFAULT_BUS_WIDTH / 8))
 #define IPR_U320_SCSI_RATE	((320 * 10) / (IPR_DEFAULT_BUS_WIDTH / 8))
+#define IPR_MAX_SCSI_RATE(width) ((320 * 10) / ((width) / 8))
 
 #define IPR_IOA_RES_HANDLE				0xffffffff
 #define IPR_IOA_RES_ADDR				0x00ffffff

@@ -1315,7 +1315,7 @@ static u32 ipr_get_max_scsi_speed(struct ipr_ioa_cfg *ioa_cfg, u8 bus, u8 bus_wi
 {
 	struct ipr_resource_entry *res;
 	const struct ipr_ses_table_entry *ste;
-	u32 max_xfer_rate = IPR_U320_SCSI_RATE;
+	u32 max_xfer_rate = IPR_MAX_SCSI_RATE(bus_width);
 
 	/* Loop through each config table entry in the config table buffer */
 	list_for_each_entry(res, &ioa_cfg->used_res_q, queue) {
@@ -4202,6 +4202,7 @@ static void ipr_modify_ioafp_mode_page_28(struct ipr_ioa_cfg *ioa_cfg,
 		bus->extended_reset_delay = IPR_EXTENDED_RESET_DELAY;
 		bus->bus_width = bus_attr->bus_width;
 		bus->max_xfer_rate = cpu_to_be32(bus_attr->max_xfer_rate);
+		bus->flags &= ~IPR_SCSI_ATTR_QAS_MASK;
 		if (bus_attr->qas_enabled)
 			bus->flags |= IPR_SCSI_ATTR_ENABLE_QAS;
 		else
@@ -5105,7 +5106,7 @@ static void ipr_reset_ioa_job(struct ipr_cmnd *ipr_cmd)
 		}
 
 		if (ioasc) {
-			dev_dbg(&ioa_cfg->pdev->dev,
+			dev_err(&ioa_cfg->pdev->dev,
 				"0x%02X failed with IOASC: 0x%08X\n",
 				ipr_cmd->ioarcb.cmd_pkt.cdb[0], ioasc);
 

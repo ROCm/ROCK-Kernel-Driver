@@ -420,6 +420,18 @@ rtas_halt(void)
         rtas_power_off();
 }
 
+void
+rtas_os_term(void)
+{
+	long status;
+	char *str = "OS panic";
+
+	status = rtas_call(rtas_token("ibm,os-term"), 1, 1, NULL, __pa(str));
+	if (status != 0)
+		printk(KERN_EMERG "ibm,os-term call failed %ld\n", status);
+}
+
+
 unsigned long rtas_rmo_buf = 0;
 
 asmlinkage int ppc_rtas(struct rtas_args __user *uargs)

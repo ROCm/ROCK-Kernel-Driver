@@ -260,7 +260,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 	/* init generic 'struct device' fields: */
 	viodev->dev.parent = &vio_bus_device->dev;
 	viodev->dev.bus = &vio_bus_type;
-	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%lx", viodev->unit_address);
+	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%x", viodev->unit_address);
 	viodev->dev.release = vio_dev_release;
 
 	/* register with generic device framework */
@@ -283,6 +283,21 @@ void __devinit vio_unregister_device(struct vio_dev *viodev)
 	device_unregister(&viodev->dev);
 }
 EXPORT_SYMBOL(vio_unregister_device);
+
+/**
+ * vio_get_attribute: - get attribute for virtual device
+ * @vdev:	The vio device to get property.
+ * @which:	The property/attribute to be extracted.
+ * @length:	Pointer to length of returned data size (unused if NULL).
+ *
+ * Calls prom.c's get_property() to return the value of the
+ * attribute specified by the preprocessor constant @which
+*/
+const void * vio_get_attribute(struct vio_dev *vdev, void* which, int* length)
+{
+	return get_property((struct device_node *)vdev->archdata, (char*)which, length);
+}
+EXPORT_SYMBOL(vio_get_attribute);
 
 /* vio_find_name() - internal because only vio.c knows how we formatted the
  * kobject name
@@ -307,11 +322,11 @@ static struct vio_dev *vio_find_name(const char *kobj_name)
  */
 struct vio_dev *vio_find_node(struct device_node *vnode)
 {
-	unsigned int *unit_address;
+	uint32_t *unit_address;
 	char kobj_name[BUS_ID_SIZE];
 
 	/* construct the kobject name from the device node */
-	unit_address = (unsigned int *)get_property(vnode, "reg", NULL);
+	unit_address = (uint32_t *)get_property(vnode, "reg", NULL);
 	if (!unit_address)
 		return NULL;
 	snprintf(kobj_name, BUS_ID_SIZE, "%x", *unit_address);
@@ -319,21 +334,6 @@ struct vio_dev *vio_find_node(struct device_node *vnode)
 	return vio_find_name(kobj_name);
 }
 EXPORT_SYMBOL(vio_find_node);
-
-/**
- * vio_get_attribute: - get attribute for virtual device
- * @vdev:	The vio device to get property.
- * @which:	The property/attribute to be extracted.
- * @length:	Pointer to length of returned data size (unused if NULL).
- *
- * Calls prom.c's get_property() to return the value of the
- * attribute specified by the preprocessor constant @which
-*/
-const void * vio_get_attribute(struct vio_dev *vdev, void* which, int* length)
-{
-	return get_property((struct device_node *)vdev->archdata, (char*)which, length);
-}
-EXPORT_SYMBOL(vio_get_attribute);
 
 /**
  * vio_build_iommu_table: - gets the dma information from OF and builds the TCE tree.

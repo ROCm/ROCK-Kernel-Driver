@@ -528,7 +528,7 @@ static int ibmveth_open(struct net_device *netdev)
 	if((rc = request_irq(netdev->irq, &ibmveth_interrupt, 0, netdev->name, netdev)) != 0) {
 		ibmveth_error_printk("unable to request irq 0x%x, rc %d\n", netdev->irq, rc);
 		do {
-			h_free_logical_lan(adapter->vdev->unit_address);
+			rc = h_free_logical_lan(adapter->vdev->unit_address);
 		} while H_isLongBusy(rc);
 
 		ibmveth_cleanup(adapter);

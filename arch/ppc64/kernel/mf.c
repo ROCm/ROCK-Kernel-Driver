@@ -39,10 +39,8 @@
 #include <asm/iSeries/iSeries_proc.h>
 #include <asm/uaccess.h>
 #include <linux/dma-mapping.h>
-#include <linux/device.h>
 #include <linux/bcd.h>
-
-extern struct device *iSeries_vio_dev;
+#include <asm/iSeries/vio.h>
 
 /*
  * This is the structure layout for the Machine Facilites LPAR event

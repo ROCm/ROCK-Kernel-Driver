@@ -45,6 +45,7 @@
 #include <asm/iSeries/iSeries_irq.h>
 #include <asm/iSeries/iSeries_pci.h>
 #include <asm/iSeries/mf.h>
+#include <asm/iSeries/vio.h>
 
 #include "iSeries_IoMmTable.h"
 #include "pci.h"
@@ -56,8 +57,6 @@ extern unsigned long iSeries_Base_Io_Memory;
 extern struct iommu_table *tceTables[256];
 
 extern void iSeries_MmIoTest(void);
-
-extern struct device* iSeries_vio_dev;
 
 /*
  * Forward declares of prototypes. 

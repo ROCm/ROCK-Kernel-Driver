@@ -35,7 +35,6 @@
 #include <linux/vmalloc.h>
 #include <linux/string.h>
 #include <linux/proc_fs.h>
-#include <linux/device.h>
 #include <linux/dma-mapping.h>
 #include <linux/wait.h>
 
@@ -48,8 +47,6 @@
 #include <asm/iSeries/mf.h>
 #include <asm/iSeries/iSeries_proc.h>
 #include <asm/iSeries/vio.h>
-
-extern struct device *iSeries_vio_dev;
 
 /* Status of the path to each other partition in the system.
  * This is overkill, since we will only ever establish connections

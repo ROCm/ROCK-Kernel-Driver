@@ -894,7 +894,7 @@ static int scsi_eh_try_stu(struct scsi_cmnd *scmd)
  *
  * Notes:
  *    If commands are failing due to not ready, initializing command required,
- *	try revalidating the device, which will end up sending a start unit. 
+ *	sending a start unit, if we are allowed to.
  **/
 static int scsi_eh_stu(struct Scsi_Host *shost,
 			      struct list_head *work_q,

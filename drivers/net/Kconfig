@@ -1676,25 +1676,23 @@ config VIA_RHINE
 	select CRC32
 	select MII
 	help
-	  If you have a VIA "rhine" based network card (Rhine-I (3043),
-	  Rhine-2 (VT86c100A) or Rhine-III (VT6105)), say Y here.
+	  If you have a VIA "Rhine" based network card (Rhine-I (VT86C100A),
+	  Rhine-II (VT6102), or Rhine-III (VT6105)), say Y here. Rhine-type
+	  Ethernet functions can also be found integrated on South Bridges
+	  (e.g. VT8235).
 
-	  To compile this driver as a module, choose M here and read
-	  <file:Documentation/networking/net-modules.txt>. The module
+	  To compile this driver as a module, choose M here. The module
 	  will be called via-rhine.
 
 config VIA_RHINE_MMIO
-	bool "Use MMIO instead of PIO (EXPERIMENTAL)"
-	depends on VIA_RHINE && EXPERIMENTAL
+	bool "Use MMIO instead of PIO"
+	depends on VIA_RHINE
 	help
 	  This instructs the driver to use PCI shared memory (MMIO) instead of
 	  programmed I/O ports (PIO). Enabling this gives an improvement in
 	  processing time in parts of the driver.
 
-	  It is not known if this works reliably on all "rhine" based cards,
-	  but it has been tested successfully on some DFE-530TX adapters.
-
-	  If unsure, say N.
+	  If unsure, say Y.
 
 config LAN_SAA9730
 	bool "Philips SAA9730 Ethernet support (EXPERIMENTAL)"

@@ -127,4 +127,8 @@ enum viorc {
 	viorc_openRejected = 0x0301
 };
 
+struct device;
+
+extern struct device *iSeries_vio_dev;
+
 #endif /* _ISERIES_VIO_H */
