@@ -24,6 +24,8 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
+#include <linux/config.h>
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -35,6 +37,9 @@
 #include <linux/acpi.h>
 #ifdef CONFIG_X86_IO_APIC
 #include <asm/mpspec.h>
+#endif
+#ifdef CONFIG_IOSAPIC
+# include <asm/iosapic.h>
 #endif
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
@@ -369,6 +374,10 @@ acpi_pci_irq_enable (
 		irq_mask |= (1 << dev->irq);
 		eisa_set_level_irq(dev->irq);
 	}
+#endif
+#ifdef CONFIG_IOSAPIC
+	if (acpi_irq_model == ACPI_IRQ_MODEL_IOSAPIC)
+		iosapic_enable_intr(dev->irq);
 #endif
 
 	return_VALUE(dev->irq);
