@@ -430,16 +430,9 @@ static inline void nfs_renew_times(struct dentry * dentry)
 }
 
 static inline
-int nfs_lookup_verify_inode(struct inode *inode, int flags)
+int nfs_lookup_verify_inode(struct inode *inode)
 {
-	struct nfs_server *server = NFS_SERVER(inode);
-	/*
-	 * If we're interested in close-to-open cache consistency,
-	 * then we revalidate the inode upon lookup.
-	 */
-	if (!(server->flags & NFS_MOUNT_NOCTO) && !(flags & LOOKUP_CONTINUE))
-		NFS_CACHEINV(inode);
-	return nfs_revalidate_inode(server, inode);
+	return nfs_revalidate_inode(NFS_SERVER(inode), inode);
 }
 
 /*
@@ -497,7 +490,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 
 	/* Force a full look up iff the parent directory has changed */
 	if (nfs_check_verifier(dir, dentry)) {
-		if (nfs_lookup_verify_inode(inode, flags))
+		if (nfs_lookup_verify_inode(inode))
 			goto out_bad;
 		goto out_valid;
 	}
