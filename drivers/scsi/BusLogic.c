@@ -26,10 +26,8 @@
 */
 
 
-#define BusLogic_DriverVersion		"2.1.15"
-#define BusLogic_DriverDate		"17 August 1998"
-
-#error Please convert me to Documentation/DMA-mapping.txt
+#define BusLogic_DriverVersion		"2.1.16"
+#define BusLogic_DriverDate		"18 July 2002"
 
 #include <linux/version.h>
 #include <linux/module.h>
@@ -48,6 +46,7 @@
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/system.h>
+/* #include <scsi/scsicam.h> This include file is currently busted */
 #include "scsi.h"
 #include "hosts.h"
 #include "sd.h"
@@ -225,15 +224,19 @@ static void BusLogic_UnregisterHostAdapter(BusLogic_HostAdapter_T *HostAdapter)
 */
 
 static void BusLogic_InitializeCCBs(BusLogic_HostAdapter_T *HostAdapter,
-				    void *BlockPointer, int BlockSize)
+				    void *BlockPointer, int BlockSize,
+				    dma_addr_t BlockPointerHandle)
 {
   BusLogic_CCB_T *CCB = (BusLogic_CCB_T *) BlockPointer;
+  unsigned int offset = 0;
   memset(BlockPointer, 0, BlockSize);
-  CCB->AllocationGroupHead = true;
+  CCB->AllocationGroupHead = BlockPointerHandle;
+  CCB->AllocationGroupSize = BlockSize;
   while ((BlockSize -= sizeof(BusLogic_CCB_T)) >= 0)
     {
       CCB->Status = BusLogic_CCB_Free;
       CCB->HostAdapter = HostAdapter;
+      CCB->DMA_Handle = (BusLogic_BusAddress_T)BlockPointerHandle + offset;
       if (BusLogic_FlashPointHostAdapterP(HostAdapter))
 	{
 	  CCB->CallbackFunction = BusLogic_QueueCompletedCCB;
@@ -245,6 +248,7 @@ static void BusLogic_InitializeCCBs(BusLogic_HostAdapter_T *HostAdapter,
       HostAdapter->All_CCBs = CCB;
       HostAdapter->AllocatedCCBs++;
       CCB++;
+      offset += sizeof(BusLogic_CCB_T);
     }
 }
 
@@ -256,19 +260,20 @@ static void BusLogic_InitializeCCBs(BusLogic_HostAdapter_T *HostAdapter,
 static boolean BusLogic_CreateInitialCCBs(BusLogic_HostAdapter_T *HostAdapter)
 {
   int BlockSize = BusLogic_CCB_AllocationGroupSize * sizeof(BusLogic_CCB_T);
+  void *BlockPointer;
+  dma_addr_t BlockPointerHandle;
   while (HostAdapter->AllocatedCCBs < HostAdapter->InitialCCBs)
     {
-      void *BlockPointer = kmalloc(BlockSize,
-				   (HostAdapter->BounceBuffersRequired
-				    ? GFP_ATOMIC | GFP_DMA
-				    : GFP_ATOMIC));
+      BlockPointer = pci_alloc_consistent(HostAdapter->PCI_Device, BlockSize,
+					  &BlockPointerHandle);
       if (BlockPointer == NULL)
 	{
 	  BusLogic_Error("UNABLE TO ALLOCATE CCB GROUP - DETACHING\n",
 			 HostAdapter);
 	  return false;
 	}
-      BusLogic_InitializeCCBs(HostAdapter, BlockPointer, BlockSize);
+      BusLogic_InitializeCCBs(HostAdapter, BlockPointer, BlockSize,
+			      BlockPointerHandle);
     }
   return true;
 }
@@ -280,15 +285,25 @@ static boolean BusLogic_CreateInitialCCBs(BusLogic_HostAdapter_T *HostAdapter)
 
 static void BusLogic_DestroyCCBs(BusLogic_HostAdapter_T *HostAdapter)
 {
-  BusLogic_CCB_T *NextCCB = HostAdapter->All_CCBs, *CCB;
+  BusLogic_CCB_T *NextCCB = HostAdapter->All_CCBs, *CCB, *Last_CCB = NULL;
   HostAdapter->All_CCBs = NULL;
   HostAdapter->Free_CCBs = NULL;
   while ((CCB = NextCCB) != NULL)
     {
       NextCCB = CCB->NextAll;
       if (CCB->AllocationGroupHead)
-	kfree(CCB);
+	{
+	  if (Last_CCB)
+	    pci_free_consistent(HostAdapter->PCI_Device,
+				Last_CCB->AllocationGroupSize, Last_CCB,
+			 	Last_CCB->AllocationGroupHead);
+	  Last_CCB = CCB;
+	}
     }
+  if (Last_CCB)
+    pci_free_consistent(HostAdapter->PCI_Device,
+			Last_CCB->AllocationGroupSize, Last_CCB,
+		 	Last_CCB->AllocationGroupHead);
 }
 
 
@@ -305,15 +320,16 @@ static void BusLogic_CreateAdditionalCCBs(BusLogic_HostAdapter_T *HostAdapter,
 {
   int BlockSize = BusLogic_CCB_AllocationGroupSize * sizeof(BusLogic_CCB_T);
   int PreviouslyAllocated = HostAdapter->AllocatedCCBs;
+  void *BlockPointer;
+  dma_addr_t BlockPointerHandle;
   if (AdditionalCCBs <= 0) return;
   while (HostAdapter->AllocatedCCBs - PreviouslyAllocated < AdditionalCCBs)
     {
-      void *BlockPointer = kmalloc(BlockSize,
-				   (HostAdapter->BounceBuffersRequired
-				    ? GFP_ATOMIC | GFP_DMA
-				    : GFP_ATOMIC));
+      BlockPointer = pci_alloc_consistent(HostAdapter->PCI_Device, BlockSize,
+					  &BlockPointerHandle);
       if (BlockPointer == NULL) break;
-      BusLogic_InitializeCCBs(HostAdapter, BlockPointer, BlockSize);
+      BusLogic_InitializeCCBs(HostAdapter, BlockPointer, BlockSize,
+			      BlockPointerHandle);
     }
   if (HostAdapter->AllocatedCCBs > PreviouslyAllocated)
     {
@@ -379,6 +395,21 @@ static BusLogic_CCB_T *BusLogic_AllocateCCB(BusLogic_HostAdapter_T
 static void BusLogic_DeallocateCCB(BusLogic_CCB_T *CCB)
 {
   BusLogic_HostAdapter_T *HostAdapter = CCB->HostAdapter;
+  if (CCB->Command->use_sg != 0)
+    {
+      pci_unmap_sg(HostAdapter->PCI_Device,
+		   (SCSI_ScatterList_T *)CCB->Command->request_buffer,
+		   CCB->Command->use_sg,
+		   scsi_to_pci_dma_dir(CCB->Command->sc_data_direction));
+    }
+  else if (CCB->Command->request_bufflen != 0)
+    {
+      pci_unmap_single(HostAdapter->PCI_Device, CCB->DataPointer,
+		       CCB->DataLength,
+		       scsi_to_pci_dma_dir(CCB->Command->sc_data_direction));
+    }
+  pci_unmap_single(HostAdapter->PCI_Device, CCB->SenseDataPointer,
+		   CCB->SenseDataLength, PCI_DMA_FROMDEVICE);
   CCB->Command = NULL;
   CCB->Status = BusLogic_CCB_Free;
   CCB->Next = HostAdapter->Free_CCBs;
@@ -431,8 +462,8 @@ static int BusLogic_Command(BusLogic_HostAdapter_T *HostAdapter,
   */
   if (!HostAdapter->IRQ_ChannelAcquired)
     {
-      save_flags(ProcessorFlags);
-      cli();
+      local_irq_save(ProcessorFlags);
+      local_irq_disable();
     }
   /*
     Wait for the Host Adapter Ready bit to be set and the Command/Parameter
@@ -624,7 +655,7 @@ static int BusLogic_Command(BusLogic_HostAdapter_T *HostAdapter,
   */
 Done:
   if (!HostAdapter->IRQ_ChannelAcquired)
-    restore_flags(ProcessorFlags);
+    local_irq_restore(ProcessorFlags);
   return Result;
 }
 
@@ -643,6 +674,7 @@ static void BusLogic_AppendProbeAddressISA(BusLogic_IO_Address_T IO_Address)
   ProbeInfo->HostAdapterType = BusLogic_MultiMaster;
   ProbeInfo->HostAdapterBusType = BusLogic_ISA_Bus;
   ProbeInfo->IO_Address = IO_Address;
+  ProbeInfo->PCI_Device = NULL;
 }
 
 
@@ -769,8 +801,8 @@ static int BusLogic_InitializeMultiMasterProbeInfo(BusLogic_HostAdapter_T
       BusLogic_HostAdapter_T *HostAdapter = PrototypeHostAdapter;
       BusLogic_PCIHostAdapterInformation_T PCIHostAdapterInformation;
       BusLogic_ModifyIOAddressRequest_T ModifyIOAddressRequest;
-      unsigned char Bus = PCI_Device->bus->number;
-      unsigned char Device = PCI_Device->devfn >> 3;
+      unsigned char Bus;
+      unsigned char Device;
       unsigned int IRQ_Channel;
       unsigned long BaseAddress0;
       unsigned long BaseAddress1;
@@ -779,7 +811,12 @@ static int BusLogic_InitializeMultiMasterProbeInfo(BusLogic_HostAdapter_T
 
       if (pci_enable_device(PCI_Device))
       	continue;
+
+      if (pci_set_dma_mask(PCI_Device, (u64)0xffffffff))
+	continue;
       
+      Bus = PCI_Device->bus->number;
+      Device = PCI_Device->devfn >> 3;
       IRQ_Channel = PCI_Device->irq;
       IO_Address  = BaseAddress0 = pci_resource_start(PCI_Device, 0);
       PCI_Address = BaseAddress1 = pci_resource_start(PCI_Device, 1);
@@ -889,6 +926,7 @@ static int BusLogic_InitializeMultiMasterProbeInfo(BusLogic_HostAdapter_T
 	  PrimaryProbeInfo->Bus = Bus;
 	  PrimaryProbeInfo->Device = Device;
 	  PrimaryProbeInfo->IRQ_Channel = IRQ_Channel;
+	  PrimaryProbeInfo->PCI_Device = PCI_Device;
 	  PCIMultiMasterCount++;
 	}
       else if (BusLogic_ProbeInfoCount < BusLogic_MaxHostAdapters)
@@ -902,6 +940,7 @@ static int BusLogic_InitializeMultiMasterProbeInfo(BusLogic_HostAdapter_T
 	  ProbeInfo->Bus = Bus;
 	  ProbeInfo->Device = Device;
 	  ProbeInfo->IRQ_Channel = IRQ_Channel;
+	  ProbeInfo->PCI_Device = PCI_Device;
 	  NonPrimaryPCIMultiMasterCount++;
 	  PCIMultiMasterCount++;
 	}
@@ -978,13 +1017,21 @@ static int BusLogic_InitializeMultiMasterProbeInfo(BusLogic_HostAdapter_T
 				       PCI_DEVICE_ID_BUSLOGIC_MULTIMASTER_NC,
 				       PCI_Device)) != NULL)
     {
-      unsigned char Bus = PCI_Device->bus->number;
-      unsigned char Device = PCI_Device->devfn >> 3;
-      unsigned int IRQ_Channel = PCI_Device->irq;
-      BusLogic_IO_Address_T IO_Address = pci_resource_start(PCI_Device, 0);
+      unsigned char Bus;
+      unsigned char Device;
+      unsigned int IRQ_Channel;
+      BusLogic_IO_Address_T IO_Address;
 
       if (pci_enable_device(PCI_Device))
-		continue;
+	continue;
+
+      if (pci_set_dma_mask(PCI_Device, (u64)0xffffffff))
+	continue;
+
+      Bus = PCI_Device->bus->number;
+      Device = PCI_Device->devfn >> 3;
+      IRQ_Channel = PCI_Device->irq;
+      IO_Address = pci_resource_start(PCI_Device, 0);
 
       if (IO_Address == 0 || IRQ_Channel == 0) continue;
       for (i = 0; i < BusLogic_ProbeInfoCount; i++)
@@ -998,6 +1045,7 @@ static int BusLogic_InitializeMultiMasterProbeInfo(BusLogic_HostAdapter_T
 	      ProbeInfo->Bus = Bus;
 	      ProbeInfo->Device = Device;
 	      ProbeInfo->IRQ_Channel = IRQ_Channel;
+	      ProbeInfo->PCI_Device = PCI_Device;
 	      break;
 	    }
 	}
@@ -1025,17 +1073,25 @@ static int BusLogic_InitializeFlashPointProbeInfo(BusLogic_HostAdapter_T
 				       PCI_DEVICE_ID_BUSLOGIC_FLASHPOINT,
 				       PCI_Device)) != NULL)
     {
-      unsigned char Bus = PCI_Device->bus->number;
-      unsigned char Device = PCI_Device->devfn >> 3;
-      unsigned int IRQ_Channel = PCI_Device->irq;
-      unsigned long BaseAddress0 = pci_resource_start(PCI_Device, 0);
-      unsigned long BaseAddress1 = pci_resource_start(PCI_Device, 1);
-      BusLogic_IO_Address_T IO_Address = BaseAddress0;
-      BusLogic_PCI_Address_T PCI_Address = BaseAddress1;
+      unsigned char Bus;
+      unsigned char Device;
+      unsigned int IRQ_Channel;
+      unsigned long BaseAddress0;
+      unsigned long BaseAddress1;
+      BusLogic_IO_Address_T IO_Address;
+      BusLogic_PCI_Address_T PCI_Address;
 
       if (pci_enable_device(PCI_Device))
-		continue;
+	continue;
 
+      if (pci_set_dma_mask(PCI_Device, (u64)0xffffffff))
+	continue;
+
+      Bus = PCI_Device->bus->number;
+      Device = PCI_Device->devfn >> 3;
+      IRQ_Channel = PCI_Device->irq;
+      IO_Address = BaseAddress0 = pci_resource_start(PCI_Device, 0);
+      PCI_Address = BaseAddress1 = pci_resource_start(PCI_Device, 1);
 #ifndef CONFIG_SCSI_OMIT_FLASHPOINT
       if (pci_resource_flags(PCI_Device, 0) & IORESOURCE_MEM)
 	{
@@ -1080,6 +1136,7 @@ static int BusLogic_InitializeFlashPointProbeInfo(BusLogic_HostAdapter_T
 	  ProbeInfo->Bus = Bus;
 	  ProbeInfo->Device = Device;
 	  ProbeInfo->IRQ_Channel = IRQ_Channel;
+	  ProbeInfo->PCI_Device = PCI_Device;
 	  FlashPointCount++;
 	}
       else BusLogic_Warning("BusLogic: Too many Host Adapters "
@@ -2299,6 +2356,16 @@ static void BusLogic_ReleaseResources(BusLogic_HostAdapter_T *HostAdapter)
   */
   if (HostAdapter->DMA_ChannelAcquired)
     free_dma(HostAdapter->DMA_Channel);
+  /*
+    Release any allocated memory structs not released elsewhere
+  */
+  if (HostAdapter->MailboxSpace)
+    pci_free_consistent(HostAdapter->PCI_Device, HostAdapter->MailboxSize,
+			HostAdapter->MailboxSpace,
+			HostAdapter->MailboxSpaceHandle);
+  HostAdapter->MailboxSpace = NULL;
+  HostAdapter->MailboxSpaceHandle = 0;
+  HostAdapter->MailboxSize = 0;
 }
 
 
@@ -2341,6 +2408,12 @@ static boolean BusLogic_InitializeHostAdapter(BusLogic_HostAdapter_T
   /*
     Initialize the Outgoing and Incoming Mailbox pointers.
   */
+  HostAdapter->MailboxSize = HostAdapter->MailboxCount *
+    (sizeof(BusLogic_OutgoingMailbox_T) + sizeof(BusLogic_IncomingMailbox_T));
+  HostAdapter->MailboxSpace = pci_alloc_consistent(HostAdapter->PCI_Device,
+    HostAdapter->MailboxSize, &HostAdapter->MailboxSpaceHandle);
+  if (HostAdapter->MailboxSpace == NULL)
+    return BusLogic_Failure(HostAdapter, "MAILBOX ALLOCATION");
   HostAdapter->FirstOutgoingMailbox =
     (BusLogic_OutgoingMailbox_T *) HostAdapter->MailboxSpace;
   HostAdapter->LastOutgoingMailbox =
@@ -2351,6 +2424,7 @@ static boolean BusLogic_InitializeHostAdapter(BusLogic_HostAdapter_T
   HostAdapter->LastIncomingMailbox =
     HostAdapter->FirstIncomingMailbox + HostAdapter->MailboxCount - 1;
   HostAdapter->NextIncomingMailbox = HostAdapter->FirstIncomingMailbox;
+
   /*
     Initialize the Outgoing and Incoming Mailbox structures.
   */
@@ -2363,7 +2437,7 @@ static boolean BusLogic_InitializeHostAdapter(BusLogic_HostAdapter_T
   */
   ExtendedMailboxRequest.MailboxCount = HostAdapter->MailboxCount;
   ExtendedMailboxRequest.BaseMailboxAddress =
-    Virtual_to_Bus(HostAdapter->FirstOutgoingMailbox);
+    (BusLogic_BusAddress_T) HostAdapter->MailboxSpaceHandle;
   if (BusLogic_Command(HostAdapter, BusLogic_InitializeExtendedMailbox,
 		       &ExtendedMailboxRequest,
 		       sizeof(ExtendedMailboxRequest), NULL, 0) < 0)
@@ -2838,7 +2912,8 @@ int BusLogic_DetectHostAdapter(SCSI_Host_Template_T *HostTemplate)
 			     HostAdapter->AddressCount,
 			     HostAdapter->FullModelName)) {
 		  printk(KERN_WARNING "BusLogic: Release and re-register of "
-			 "port 0x%04lx failed \n", HostAdapter->IO_Address);
+			 "port 0x%04lx failed \n",
+			 (unsigned long)HostAdapter->IO_Address);
 		  BusLogic_DestroyCCBs(HostAdapter);
 		  BusLogic_ReleaseResources(HostAdapter);
 		  BusLogic_UnregisterHostAdapter(HostAdapter);
@@ -3013,6 +3088,13 @@ static void BusLogic_ScanIncomingMailboxes(BusLogic_HostAdapter_T *HostAdapter)
   while ((CompletionCode = NextIncomingMailbox->CompletionCode) !=
 	 BusLogic_IncomingMailboxFree)
     {
+      /*
+        We are only allowed to do this because we limit our architectures we
+        run on to machines where bus_to_virt() actually works.  There *needs*
+        to be a dma_addr_to_virt() in the new PCI DMA mapping interface to
+        replace bus_to_virt() or else this code is going to become very
+        innefficient.
+      */
       BusLogic_CCB_T *CCB = (BusLogic_CCB_T *)
 	Bus_to_Virtual(NextIncomingMailbox->CCB);
       if (CompletionCode != BusLogic_AbortedCommandNotFound)
@@ -3285,7 +3367,6 @@ static void BusLogic_InterruptHandler(int IRQ_Channel,
       BusLogic_ResetHostAdapter(HostAdapter, NULL, 0);
       HostAdapter->HostAdapterExternalReset = false;
       HostAdapter->HostAdapterInternalError = false;
-      scsi_mark_host_reset(HostAdapter->SCSI_Host);
     }
   /*
     Release exclusive access to Host Adapter.
@@ -3315,7 +3396,7 @@ static boolean BusLogic_WriteOutgoingMailbox(BusLogic_HostAdapter_T
 	the Host Adapter is operating asynchronously and the locking code
 	does not protect against simultaneous access by the Host Adapter.
       */
-      NextOutgoingMailbox->CCB = Virtual_to_Bus(CCB);
+      NextOutgoingMailbox->CCB = CCB->DMA_Handle;
       NextOutgoingMailbox->ActionCode = ActionCode;
       BusLogic_StartMailboxCommand(HostAdapter);
       if (++NextOutgoingMailbox > HostAdapter->LastOutgoingMailbox)
@@ -3354,7 +3435,6 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
   void *BufferPointer = Command->request_buffer;
   int BufferLength = Command->request_bufflen;
   int SegmentCount = Command->use_sg;
-  ProcessorFlags_T ProcessorFlags;
   BusLogic_CCB_T *CCB;
   /*
     SCSI REQUEST_SENSE commands will be executed automatically by the Host
@@ -3368,10 +3448,6 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
       return 0;
     }
   /*
-    Acquire exclusive access to Host Adapter.
-  */
-  BusLogic_AcquireHostAdapterLock(HostAdapter, &ProcessorFlags);
-  /*
     Allocate a CCB from the Host Adapter's free list.  In the unlikely event
     that there are none available and memory allocation fails, wait 1 second
     and try again.  If that fails, the Host Adapter is probably hung so signal
@@ -3380,40 +3456,55 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
   CCB = BusLogic_AllocateCCB(HostAdapter);
   if (CCB == NULL)
     {
+      BusLogic_ReleaseHostAdapterLock(HostAdapter);
       BusLogic_Delay(1);
+      BusLogic_AcquireHostAdapterLock(HostAdapter);
       CCB = BusLogic_AllocateCCB(HostAdapter);
       if (CCB == NULL)
 	{
 	  Command->result = DID_ERROR << 16;
 	  CompletionRoutine(Command);
-	  goto Done;
+	  return 0;
 	}
     }
   /*
     Initialize the fields in the BusLogic Command Control Block (CCB).
   */
-  if (SegmentCount == 0)
+  if (SegmentCount == 0 && BufferLength != 0)
     {
       CCB->Opcode = BusLogic_InitiatorCCB;
       CCB->DataLength = BufferLength;
-      CCB->DataPointer = Virtual_to_Bus(BufferPointer);
+      CCB->DataPointer =
+	pci_map_single(HostAdapter->PCI_Device, BufferPointer, BufferLength,
+		       scsi_to_pci_dma_dir(Command->sc_data_direction));
+    }
+  else if (SegmentCount != 0)
+    {
+      SCSI_ScatterList_T *ScatterList = (SCSI_ScatterList_T *) BufferPointer;
+      int Segment, Count;
+
+      Count = pci_map_sg(HostAdapter->PCI_Device, ScatterList, SegmentCount,
+			 scsi_to_pci_dma_dir(Command->sc_data_direction));
+      CCB->Opcode = BusLogic_InitiatorCCB_ScatterGather;
+      CCB->DataLength = Count * sizeof(BusLogic_ScatterGatherSegment_T);
+      if (BusLogic_MultiMasterHostAdapterP(HostAdapter))
+	CCB->DataPointer = (unsigned int)CCB->DMA_Handle +
+			    ((unsigned int)&CCB->ScatterGatherList - 
+			     (unsigned int)CCB);
+      else CCB->DataPointer = Virtual_to_32Bit_Virtual(CCB->ScatterGatherList);
+      for (Segment = 0; Segment < Count; Segment++)
+	{
+	  CCB->ScatterGatherList[Segment].SegmentByteCount =
+	    sg_dma_len(ScatterList+Segment);
+	  CCB->ScatterGatherList[Segment].SegmentDataPointer =
+	    sg_dma_address(ScatterList+Segment);
+	}
     }
   else
     {
-      SCSI_ScatterList_T *ScatterList = (SCSI_ScatterList_T *) BufferPointer;
-      int Segment;
-      CCB->Opcode = BusLogic_InitiatorCCB_ScatterGather;
-      CCB->DataLength = SegmentCount * sizeof(BusLogic_ScatterGatherSegment_T);
-      if (BusLogic_MultiMasterHostAdapterP(HostAdapter))
-	CCB->DataPointer = Virtual_to_Bus(CCB->ScatterGatherList);
-      else CCB->DataPointer = Virtual_to_32Bit_Virtual(CCB->ScatterGatherList);
-      for (Segment = 0; Segment < SegmentCount; Segment++)
-	{
-	  CCB->ScatterGatherList[Segment].SegmentByteCount =
-	    ScatterList[Segment].length;
-	  CCB->ScatterGatherList[Segment].SegmentDataPointer =
-	    Virtual_to_Bus(ScatterList[Segment].address);
-	}
+      CCB->Opcode = BusLogic_InitiatorCCB;
+      CCB->DataLength = BufferLength;
+      CCB->DataPointer = 0;
     }
   switch (CDB[0])
     {
@@ -3440,7 +3531,6 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
       break;
     }
   CCB->CDB_Length = CDB_Length;
-  CCB->SenseDataLength = sizeof(Command->sense_buffer);
   CCB->HostAdapterStatus = 0;
   CCB->TargetDeviceStatus = 0;
   CCB->TargetID = TargetID;
@@ -3507,7 +3597,11 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
 	}
     }
   memcpy(CCB->CDB, CDB, CDB_Length);
-  CCB->SenseDataPointer = Virtual_to_Bus(&Command->sense_buffer);
+  CCB->SenseDataLength = sizeof(Command->sense_buffer);
+  CCB->SenseDataPointer = pci_map_single(HostAdapter->PCI_Device,
+					 Command->sense_buffer,
+					 CCB->SenseDataLength,
+					 PCI_DMA_FROMDEVICE);
   CCB->Command = Command;
   Command->scsi_done = CompletionRoutine;
   if (BusLogic_MultiMasterHostAdapterP(HostAdapter))
@@ -3523,9 +3617,11 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
       if (!BusLogic_WriteOutgoingMailbox(
 	     HostAdapter, BusLogic_MailboxStartCommand, CCB))
 	{
+	  BusLogic_ReleaseHostAdapterLock(HostAdapter);
 	  BusLogic_Warning("Unable to write Outgoing Mailbox - "
 			   "Pausing for 1 second\n", HostAdapter);
 	  BusLogic_Delay(1);
+	  BusLogic_AcquireHostAdapterLock(HostAdapter);
 	  if (!BusLogic_WriteOutgoingMailbox(
 		 HostAdapter, BusLogic_MailboxStartCommand, CCB))
 	    {
@@ -3553,11 +3649,6 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
       if (CCB->Status == BusLogic_CCB_Completed)
 	BusLogic_ProcessCompletedCCBs(HostAdapter);
     }
-  /*
-    Release exclusive access to Host Adapter.
-  */
-Done:
-  BusLogic_ReleaseHostAdapterLock(HostAdapter, &ProcessorFlags);
   return 0;
 }
 
@@ -3571,15 +3662,10 @@ int BusLogic_AbortCommand(SCSI_Command_T *Command)
   BusLogic_HostAdapter_T *HostAdapter =
     (BusLogic_HostAdapter_T *) Command->host->hostdata;
   int TargetID = Command->target;
-  ProcessorFlags_T ProcessorFlags;
   BusLogic_CCB_T *CCB;
   int Result;
   BusLogic_IncrementErrorCounter(
     &HostAdapter->TargetStatistics[TargetID].CommandAbortsRequested);
-  /*
-    Acquire exclusive access to Host Adapter.
-  */
-  BusLogic_AcquireHostAdapterLock(HostAdapter, &ProcessorFlags);
   /*
     If this Command has already completed, then no Abort is necessary.
   */
@@ -3587,8 +3673,7 @@ int BusLogic_AbortCommand(SCSI_Command_T *Command)
     {
       BusLogic_Warning("Unable to Abort Command to Target %d - "
 		       "Already Completed\n", HostAdapter, TargetID);
-      Result = SCSI_ABORT_NOT_RUNNING;
-      goto Done;
+      return SCSI_ABORT_NOT_RUNNING;
     }
   /*
     Attempt to find an Active CCB for this Command.  If no Active CCB for this
@@ -3600,22 +3685,19 @@ int BusLogic_AbortCommand(SCSI_Command_T *Command)
     {
       BusLogic_Warning("Unable to Abort Command to Target %d - "
 		       "No CCB Found\n", HostAdapter, TargetID);
-      Result = SCSI_ABORT_NOT_RUNNING;
-      goto Done;
+      return SCSI_ABORT_NOT_RUNNING;
     }
   else if (CCB->Status == BusLogic_CCB_Completed)
     {
       BusLogic_Warning("Unable to Abort Command to Target %d - "
 		       "CCB Completed\n", HostAdapter, TargetID);
-      Result = SCSI_ABORT_NOT_RUNNING;
-      goto Done;
+      return SCSI_ABORT_NOT_RUNNING;
     }
   else if (CCB->Status == BusLogic_CCB_Reset)
     {
       BusLogic_Warning("Unable to Abort Command to Target %d - "
 		       "CCB Reset\n", HostAdapter, TargetID);
-      Result = SCSI_ABORT_PENDING;
-      goto Done;
+      return SCSI_ABORT_PENDING;
     }
   if (BusLogic_MultiMasterHostAdapterP(HostAdapter))
     {
@@ -3676,11 +3758,6 @@ int BusLogic_AbortCommand(SCSI_Command_T *Command)
 	  Result = SCSI_ABORT_SUCCESS;
 	}
     }
-  /*
-    Release exclusive access to Host Adapter.
-  */
-Done:
-  BusLogic_ReleaseHostAdapterLock(HostAdapter, &ProcessorFlags);
   return Result;
 }
 
@@ -3694,7 +3771,6 @@ static int BusLogic_ResetHostAdapter(BusLogic_HostAdapter_T *HostAdapter,
 				     SCSI_Command_T *Command,
 				     unsigned int ResetFlags)
 {
-  ProcessorFlags_T ProcessorFlags;
   BusLogic_CCB_T *CCB;
   int TargetID, Result;
   boolean HardReset;
@@ -3715,10 +3791,6 @@ static int BusLogic_ResetHostAdapter(BusLogic_HostAdapter_T *HostAdapter,
 		      .HostAdapterResetsRequested);
       HardReset = true;
     }
-  /*
-    Acquire exclusive access to Host Adapter.
-  */
-  BusLogic_AcquireHostAdapterLock(HostAdapter, &ProcessorFlags);
   /*
     If this is an Asynchronous Reset and this Command has already completed,
     then no Reset is necessary.
@@ -3804,7 +3876,11 @@ static int BusLogic_ResetHostAdapter(BusLogic_HostAdapter_T *HostAdapter,
     already been marked Reset and so a reentrant call will return Pending.
   */
   if (HardReset)
-    BusLogic_Delay(HostAdapter->BusSettleTime);
+    {
+      BusLogic_ReleaseHostAdapterLock(HostAdapter);
+      BusLogic_Delay(HostAdapter->BusSettleTime);
+      BusLogic_AcquireHostAdapterLock(HostAdapter);
+    }
   /*
     If this is a Synchronous Reset, perform completion processing for
     the Command being Reset.
@@ -3837,11 +3913,7 @@ static int BusLogic_ResetHostAdapter(BusLogic_HostAdapter_T *HostAdapter,
       HostAdapter->LastResetCompleted[TargetID] = jiffies;
     }
   Result = SCSI_RESET_SUCCESS | SCSI_RESET_HOST_RESET;
-  /*
-    Release exclusive access to Host Adapter.
-  */
 Done:
-  BusLogic_ReleaseHostAdapterLock(HostAdapter, &ProcessorFlags);
   return Result;
 }
 
@@ -3857,14 +3929,9 @@ static int BusLogic_SendBusDeviceReset(BusLogic_HostAdapter_T *HostAdapter,
 {
   int TargetID = Command->target;
   BusLogic_CCB_T *CCB, *XCCB;
-  ProcessorFlags_T ProcessorFlags;
   int Result = -1;
   BusLogic_IncrementErrorCounter(
     &HostAdapter->TargetStatistics[TargetID].BusDeviceResetsRequested);
-  /*
-    Acquire exclusive access to Host Adapter.
-  */
-  BusLogic_AcquireHostAdapterLock(HostAdapter, &ProcessorFlags);
   /*
     If this is an Asynchronous Reset and this Command has already completed,
     then no Reset is necessary.
@@ -4026,10 +4093,6 @@ static int BusLogic_SendBusDeviceReset(BusLogic_HostAdapter_T *HostAdapter,
 Done:
   if (Result < 0)
     Result = BusLogic_ResetHostAdapter(HostAdapter, Command, ResetFlags);
-  /*
-    Release exclusive access to Host Adapter.
-  */
-  BusLogic_ReleaseHostAdapterLock(HostAdapter, &ProcessorFlags);
   return Result;
 }
 
@@ -4109,8 +4172,8 @@ int BusLogic_ResetCommand(SCSI_Command_T *Command, unsigned int ResetFlags)
   table, then the translation inferred from the partition table will be used by
   the BIOS, and a warning may be displayed.
 */
-
-int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, struct block_device *bdev,
+unsigned char *scsi_bios_ptable(struct block_device *);
+int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, struct block_device *Device,
 				int *Parameters)
 {
   BusLogic_HostAdapter_T *HostAdapter =
@@ -4138,7 +4201,7 @@ int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, struct block_device *bdev,
     }
   DiskParameters->Cylinders =
     Disk->capacity / (DiskParameters->Heads * DiskParameters->Sectors);
-  buf = scsi_bios_ptable(bdev);
+  buf = scsi_bios_ptable(Device);
   if (buf == NULL) return 0;
   /*
     If the boot sector partition table flag is valid, search for a partition
