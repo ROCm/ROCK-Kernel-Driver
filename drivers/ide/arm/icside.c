@@ -28,19 +28,19 @@
 
 #define ICS_ARCIN_V5_INTRSTAT		0x0000
 #define ICS_ARCIN_V5_INTROFFSET		0x0004
-#define ICS_ARCIN_V5_IDEOFFSET		0xa00
-#define ICS_ARCIN_V5_IDEALTOFFSET	0xae0
-#define ICS_ARCIN_V5_IDESTEPPING	4
+#define ICS_ARCIN_V5_IDEOFFSET		0x2800
+#define ICS_ARCIN_V5_IDEALTOFFSET	0x2b80
+#define ICS_ARCIN_V5_IDESTEPPING	6
 
-#define ICS_ARCIN_V6_IDEOFFSET_1	0x800
+#define ICS_ARCIN_V6_IDEOFFSET_1	0x2000
 #define ICS_ARCIN_V6_INTROFFSET_1	0x2200
 #define ICS_ARCIN_V6_INTRSTAT_1		0x2290
-#define ICS_ARCIN_V6_IDEALTOFFSET_1	0x8e0
-#define ICS_ARCIN_V6_IDEOFFSET_2	0xc00
+#define ICS_ARCIN_V6_IDEALTOFFSET_1	0x2380
+#define ICS_ARCIN_V6_IDEOFFSET_2	0x3000
 #define ICS_ARCIN_V6_INTROFFSET_2	0x3200
 #define ICS_ARCIN_V6_INTRSTAT_2		0x3290
-#define ICS_ARCIN_V6_IDEALTOFFSET_2	0xce0
-#define ICS_ARCIN_V6_IDESTEPPING	4
+#define ICS_ARCIN_V6_IDEALTOFFSET_2	0x3380
+#define ICS_ARCIN_V6_IDESTEPPING	6
 
 struct cardinfo {
 	unsigned int dataoffset;
@@ -571,24 +571,30 @@ found:
 }
 
 static ide_hwif_t *
-icside_setup(unsigned long base, struct cardinfo *info, struct expansion_card *ec)
+icside_setup(void __iomem *base, struct cardinfo *info, struct expansion_card *ec)
 {
-	unsigned long port = base + info->dataoffset;
+	unsigned long port = (unsigned long)base + info->dataoffset;
 	ide_hwif_t *hwif;
 
-	hwif = icside_find_hwif(base);
+	hwif = icside_find_hwif(port);
 	if (hwif) {
 		int i;
 
 		memset(&hwif->hw, 0, sizeof(hw_regs_t));
+
+		/*
+		 * Ensure we're using MMIO
+		 */
+		default_hwif_mmiops(hwif);
+		hwif->mmio = 2;
 
 		for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
 			hwif->hw.io_ports[i] = port;
 			hwif->io_ports[i] = port;
 			port += 1 << info->stepping;
 		}
-		hwif->hw.io_ports[IDE_CONTROL_OFFSET] = base + info->ctrloffset;
-		hwif->io_ports[IDE_CONTROL_OFFSET] = base + info->ctrloffset;
+		hwif->hw.io_ports[IDE_CONTROL_OFFSET] = (unsigned long)base + info->ctrloffset;
+		hwif->io_ports[IDE_CONTROL_OFFSET] = (unsigned long)base + info->ctrloffset;
 		hwif->hw.irq  = ec->irq;
 		hwif->irq     = ec->irq;
 		hwif->noprobe = 0;
@@ -602,11 +608,9 @@ icside_setup(unsigned long base, struct cardinfo *info, struct expansion_card *e
 static int __init
 icside_register_v5(struct icside_state *state, struct expansion_card *ec)
 {
-	unsigned long slot_port;
 	ide_hwif_t *hwif;
 	void __iomem *base;
 
-	slot_port = ecard_address(ec, ECARD_MEMC, 0);
 	base = ioremap(ecard_resource_start(ec, ECARD_RES_MEMC),
 		       ecard_resource_len(ec, ECARD_RES_MEMC));
 	if (!base)
@@ -624,7 +628,7 @@ icside_register_v5(struct icside_state *state, struct expansion_card *ec)
 	 */
 	icside_irqdisable_arcin_v5(ec, 0);
 
-	hwif = icside_setup(slot_port, &icside_cardinfo_v5, ec);
+	hwif = icside_setup(base, &icside_cardinfo_v5, ec);
 	if (!hwif) {
 		iounmap(base);
 		return -ENODEV;
@@ -638,16 +642,10 @@ icside_register_v5(struct icside_state *state, struct expansion_card *ec)
 static int __init
 icside_register_v6(struct icside_state *state, struct expansion_card *ec)
 {
-	unsigned long slot_port, port;
 	ide_hwif_t *hwif, *mate;
 	void __iomem *ioc_base, *easi_base;
 	unsigned int sel = 0;
 	int ret;
-
-	slot_port = ecard_address(ec, ECARD_IOC, ECARD_FAST);
-	port      = ecard_address(ec, ECARD_EASI, ECARD_FAST);
-	if (port == 0)
-		port = slot_port;
 
 	ioc_base = ioremap(ecard_resource_start(ec, ECARD_RES_IOCFAST),
 			   ecard_resource_len(ec, ECARD_RES_IOCFAST));
@@ -688,8 +686,8 @@ icside_register_v6(struct icside_state *state, struct expansion_card *ec)
 	/*
 	 * Find and register the interfaces.
 	 */
-	hwif = icside_setup(port, &icside_cardinfo_v6_1, ec);
-	mate = icside_setup(port, &icside_cardinfo_v6_2, ec);
+	hwif = icside_setup(easi_base, &icside_cardinfo_v6_1, ec);
+	mate = icside_setup(easi_base, &icside_cardinfo_v6_2, ec);
 
 	if (!hwif || !mate) {
 		ret = -ENODEV;
