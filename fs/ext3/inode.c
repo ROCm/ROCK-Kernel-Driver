@@ -1431,7 +1431,7 @@ static int ext3_direct_IO(int rw, struct file *file,
 		}
 	}
 
-	ret = generic_direct_IO(rw, inode, iov, offset,
+	ret = generic_direct_IO(rw, inode, inode->i_sb->s_bdev, iov, offset,
 				nr_segs, ext3_direct_io_get_blocks);
 
 out_stop:

@@ -608,7 +608,7 @@ void kick_iocb(struct kiocb *iocb)
 	}
 
 	if (!kiocbTryKick(iocb)) {
-		long flags;
+		unsigned long flags;
 		spin_lock_irqsave(&ctx->ctx_lock, flags);
 		list_add_tail(&iocb->ki_run_list, &ctx->run_list);
 		spin_unlock_irqrestore(&ctx->ctx_lock, flags);

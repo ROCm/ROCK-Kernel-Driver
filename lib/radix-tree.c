@@ -282,17 +282,9 @@ radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
 			break;
 		nr_found = __lookup(root, results + ret, cur_index,
 				max_items - ret, &next_index, max_index);
-		if (nr_found == 0) {
-			 if (!(cur_index & RADIX_TREE_MAP_MASK))
-				break;
-			/*
-			 * It could be that there simply were no items to the
-			 * right of `cur_index' in the leaf node.  So we still
-			 * need to search for additional nodes to the right of
-			 * this one.
-			 */
-		}
 		ret += nr_found;
+		if (next_index == max_index)
+			break;
 		cur_index = next_index;
 	}
 out:

@@ -986,6 +986,10 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		goto out_fail;
 
 	blocksize = sb_min_blocksize(sb, EXT3_MIN_BLOCK_SIZE);
+	if (!blocksize) {
+		printk(KERN_ERR "EXT3-fs: unable to set blocksize\n");
+		goto out_fail;
+	}
 
 	/*
 	 * The ext3 superblock will not be buffer aligned for other than 1kB

@@ -6,7 +6,7 @@
  *                   Abramo Bagnara <abramo@alsa-project.org>,
  *                   Markus Gruber <gruber@eikon.tum.de>
  * 
- * Rewritted from sonicvibes.c source.
+ * Rewritten from sonicvibes.c source.
  *
  *  TODO:
  *    Rewrite better spinlocks
@@ -38,7 +38,7 @@
     This is due to playback interrupts not generated.
     I suspect a timing issue.
   - Sometimes the interrupt handler is invoked wrongly during playback.
-    This generate some harmless "Unexpected hw_pointer: wrong interrupt
+    This generates some harmless "Unexpected hw_pointer: wrong interrupt
     acknowledge".
     I've seen that using small period sizes.
     Reproducible with:
@@ -81,19 +81,19 @@ MODULE_DEVICES("{{ESS,ES1938},"
 #define PCI_DEVICE_ID_ESS_ES1938	0x1969
 #endif
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for ESS Solo-1 soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for ESS Solo-1 soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable ESS Solo-1 soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for ESS Solo-1 soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for ESS Solo-1 soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable ESS Solo-1 soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 
 #define SLIO_REG(chip, x) ((chip)->io_port + ESSIO_REG_##x)
 
@@ -573,7 +573,7 @@ static int snd_es1938_playback1_trigger(snd_pcm_substream_t * substream,
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 		/* According to the documentation this should be:
-		   0x13 but that value may random swap stereo channels */
+		   0x13 but that value may randomly swap stereo channels */
 		snd_es1938_mixer_write(chip, ESSSB_IREG_AUDIO2CONTROL1, 0x93);
 		outb(0x0a, SLIO_REG(chip, AUDIO2MODE));
 		chip->active |= DAC2;
@@ -1582,7 +1582,7 @@ static int __init snd_es1938_mixer(snd_pcm_t *pcm)
        
 
 static int __devinit snd_es1938_probe(struct pci_dev *pci,
-				      const struct pci_device_id *id)
+				      const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -1593,12 +1593,12 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 	for (idx = 0; idx < 5; idx++) {
@@ -1701,7 +1701,7 @@ module_exit(alsa_card_es1938_exit)
 
 #ifndef MODULE
 
-/* format is: snd-es1938=snd_enable,snd_index,snd_id */
+/* format is: snd-es1938=enable,index,id */
 
 static int __init alsa_card_es1938_setup(char *str)
 {
@@ -1709,9 +1709,9 @@ static int __init alsa_card_es1938_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

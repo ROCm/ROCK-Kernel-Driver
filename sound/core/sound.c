@@ -36,32 +36,32 @@
 
 #define SNDRV_OS_MINORS 256
 
-int snd_major = CONFIG_SND_MAJOR;
-static int snd_cards_limit = SNDRV_CARDS;
-int snd_device_mode = S_IFCHR | S_IRUGO | S_IWUGO;
-int snd_device_gid = 0;
-int snd_device_uid = 0;
+int major = CONFIG_SND_MAJOR;
+static int cards_limit = SNDRV_CARDS;
+int device_mode = S_IFCHR | S_IRUGO | S_IWUGO;
+int device_gid = 0;
+int device_uid = 0;
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture driver for soundcards.");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_SUPPORTED_DEVICE("sound");
-MODULE_PARM(snd_major, "i");
-MODULE_PARM_DESC(snd_major, "Major # for sound driver.");
-MODULE_PARM_SYNTAX(snd_major, "default:116,skill:devel");
-MODULE_PARM(snd_cards_limit, "i");
-MODULE_PARM_DESC(snd_cards_limit, "Count of soundcards installed in the system.");
-MODULE_PARM_SYNTAX(snd_cards_limit, "default:8,skill:advanced");
-MODULE_PARM(snd_device_mode, "i");
-MODULE_PARM_DESC(snd_device_mode, "Device file permission mask for sound dynamic device filesystem.");
-MODULE_PARM_SYNTAX(snd_device_mode, "default:0666,base:8");
-MODULE_PARM(snd_device_gid, "i");
-MODULE_PARM_DESC(snd_device_gid, "Device file GID for sound dynamic device filesystem.");
-MODULE_PARM_SYNTAX(snd_device_gid, "default:0");
-MODULE_PARM(snd_device_uid, "i");
-MODULE_PARM_DESC(snd_device_uid, "Device file UID for sound dynamic device filesystem.");
-MODULE_PARM_SYNTAX(snd_device_uid, "default:0");
+MODULE_PARM(major, "i");
+MODULE_PARM_DESC(major, "Major # for sound driver.");
+MODULE_PARM_SYNTAX(major, "default:116,skill:devel");
+MODULE_PARM(cards_limit, "i");
+MODULE_PARM_DESC(cards_limit, "Count of soundcards installed in the system.");
+MODULE_PARM_SYNTAX(cards_limit, "default:8,skill:advanced");
+MODULE_PARM(device_mode, "i");
+MODULE_PARM_DESC(device_mode, "Device file permission mask for sound dynamic device filesystem.");
+MODULE_PARM_SYNTAX(device_mode, "default:0666,base:8");
+MODULE_PARM(device_gid, "i");
+MODULE_PARM_DESC(device_gid, "Device file GID for sound dynamic device filesystem.");
+MODULE_PARM_SYNTAX(device_gid, "default:0");
+MODULE_PARM(device_uid, "i");
+MODULE_PARM_DESC(device_uid, "Device file UID for sound dynamic device filesystem.");
+MODULE_PARM_SYNTAX(device_uid, "default:0");
 
 int snd_ecards_limit;
 
@@ -302,7 +302,7 @@ static int __init alsa_sound_init(void)
 #endif
 	int card;
 
-	snd_ecards_limit = snd_cards_limit;
+	snd_ecards_limit = cards_limit;
 	for (card = 0; card < SNDRV_CARDS; card++)
 		INIT_LIST_HEAD(&snd_minors_hash[card]);
 #ifdef CONFIG_SND_OSSEMUL
@@ -316,8 +316,8 @@ static int __init alsa_sound_init(void)
 	devfs_handle = devfs_mk_dir(NULL, "snd", NULL);
 #endif
 #endif
-	if (register_chrdev(snd_major, "alsa", &snd_fops)) {
-		snd_printk(KERN_ERR "unable to register native major device number %d\n", snd_major);
+	if (register_chrdev(major, "alsa", &snd_fops)) {
+		snd_printk(KERN_ERR "unable to register native major device number %d\n", major);
 		return -EIO;
 	}
 #ifdef CONFIG_SND_DEBUG_MEMORY
@@ -333,10 +333,10 @@ static int __init alsa_sound_init(void)
 	snd_info_minor_register();
 #endif
 #ifdef CONFIG_DEVFS_FS
-	for (controlnum = 0; controlnum < snd_cards_limit; controlnum++) {
+	for (controlnum = 0; controlnum < cards_limit; controlnum++) {
 		sprintf(controlname, "snd/controlC%d", controlnum);
 		devfs_register(NULL, controlname, DEVFS_FL_DEFAULT,
-				snd_major, controlnum<<5, snd_device_mode | S_IFCHR,
+				major, controlnum<<5, device_mode | S_IFCHR,
 				&snd_fops, NULL);
 	}
 #endif
@@ -355,7 +355,7 @@ static void __exit alsa_sound_exit(void)
 	char controlname[24];
 	short controlnum;
 
-	for (controlnum = 0; controlnum < snd_cards_limit; controlnum++) {
+	for (controlnum = 0; controlnum < cards_limit; controlnum++) {
 		sprintf(controlname, "snd/controlC%d", controlnum);
 		devfs_find_and_unregister(NULL, controlname, 0, 0, DEVFS_SPECIAL_CHR, 0);
 	}
@@ -371,8 +371,8 @@ static void __exit alsa_sound_exit(void)
 #ifdef CONFIG_SND_DEBUG_MEMORY
 	snd_memory_done();
 #endif
-	if (unregister_chrdev(snd_major, "alsa") != 0)
-		snd_printk(KERN_ERR "unable to unregister major device number %d\n", snd_major);
+	if (unregister_chrdev(major, "alsa") != 0)
+		snd_printk(KERN_ERR "unable to unregister major device number %d\n", major);
 #ifdef CONFIG_DEVFS_FS
 	devfs_unregister(devfs_handle);
 #endif

@@ -31,6 +31,7 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm/topology.h>
+#include <asm/div64.h>
 
 #include <linux/swapops.h>
 
@@ -85,7 +86,7 @@ struct shrinker {
 	shrinker_t		shrinker;
 	struct list_head	list;
 	int			seeks;	/* seeks to recreate an obj */
-	int			nr;	/* objs pending delete */
+	long			nr;	/* objs pending delete */
 };
 
 static LIST_HEAD(shrinker_list);
@@ -121,7 +122,7 @@ void remove_shrinker(struct shrinker *shrinker)
 	kfree(shrinker);
 }
  
-#define SHRINK_BATCH 32
+#define SHRINK_BATCH 128
 /*
  * Call the shrink functions to age shrinkable caches
  *
@@ -134,29 +135,27 @@ void remove_shrinker(struct shrinker *shrinker)
  * slab to avoid swapping.
  *
  * FIXME: do not do for zone highmem
+ *
+ * We do weird things to avoid (scanned*seeks*entries) overflowing 32 bits.
  */
-static int shrink_slab(int scanned,  unsigned int gfp_mask)
+static int shrink_slab(long scanned,  unsigned int gfp_mask)
 {
-	struct list_head *lh;
-	int pages;
+	struct shrinker *shrinker;
+	long pages;
 
 	if (down_trylock(&shrinker_sem))
 		return 0;
 
 	pages = nr_used_zone_pages();
-	list_for_each(lh, &shrinker_list) {
-		struct shrinker *shrinker;
-		int entries;
-		unsigned long delta;
+	list_for_each_entry(shrinker, &shrinker_list, list) {
+		long long delta;
 
-		shrinker = list_entry(lh, struct shrinker, list);
-		entries = (*shrinker->shrinker)(0, gfp_mask);
-		if (!entries)
-			continue;
-		delta = scanned * shrinker->seeks * entries;
-		shrinker->nr += delta / (pages + 1);
+		delta = scanned * shrinker->seeks;
+		delta *= (*shrinker->shrinker)(0, gfp_mask);
+		do_div(delta, pages + 1);
+		shrinker->nr += delta;
 		if (shrinker->nr > SHRINK_BATCH) {
-			int nr = shrinker->nr;
+			long nr = shrinker->nr;
 
 			shrinker->nr = 0;
 			(*shrinker->shrinker)(nr, gfp_mask);
@@ -824,7 +823,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 	int i;
 
 	for (priority = DEF_PRIORITY; priority; priority--) {
-		int success = 1;
+		int all_zones_ok = 1;
 
 		for (i = 0; i < pgdat->nr_zones; i++) {
 			struct zone *zone = pgdat->node_zones + i;
@@ -832,20 +831,24 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 			int max_scan;
 			int to_reclaim;
 
-			to_reclaim = zone->pages_high - zone->free_pages;
-			if (nr_pages && to_free > 0)
+			if (nr_pages && to_free > 0) {	/* Software suspend */
 				to_reclaim = min(to_free, SWAP_CLUSTER_MAX*8);
-			if (to_reclaim <= 0)
-				continue;
-			success = 0;
+			} else {			/* Zone balancing */
+				to_reclaim = zone->pages_high-zone->free_pages;
+				if (to_reclaim <= 0)
+					continue;
+			}
+			all_zones_ok = 0;
 			max_scan = zone->nr_inactive >> priority;
 			if (max_scan < to_reclaim * 2)
 				max_scan = to_reclaim * 2;
+			if (max_scan < SWAP_CLUSTER_MAX)
+				max_scan = SWAP_CLUSTER_MAX;
 			to_free -= shrink_zone(zone, max_scan, GFP_KSWAPD,
 					to_reclaim, &nr_mapped, ps, priority);
 			shrink_slab(max_scan + nr_mapped, GFP_KSWAPD);
 		}
-		if (success)
+		if (all_zones_ok)
 			break;
 		blk_congestion_wait(WRITE, HZ/4);
 	}

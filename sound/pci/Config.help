@@ -74,6 +74,9 @@ CONFIG_SND_FM801
 
 CONFIG_SND_ICE1712
   Say 'Y' or 'M' to include support for ICE1712 (Envy24) based soundcards.
+  Currently supported hardware is: MidiMan M Audio - Delta 1010(LT), Dio 2496,
+  Delta 66/44, Audiophile 24/96; Hoontech SoundTrack DSP 24 (Value);
+  TerraTec - EWX 24/96, EWS 88MT, EWS 88D, DMX 6Fire.
 
 CONFIG_SND_INTEL8X0
   Say 'Y' or 'M' to include support for Intel8x0 based soundcards,

@@ -21,8 +21,13 @@ struct dmi_header
 	u16	handle;
 };
 
+#undef DMI_DEBUG
+
+#ifdef DMI_DEBUG
+#define dmi_printk(x) printk x
+#else
 #define dmi_printk(x)
-//#define dmi_printk(x) printk x
+#endif
 
 static char * __init dmi_string(struct dmi_header *dm, u8 s)
 {
@@ -832,7 +837,9 @@ fail:
 
 static void __init dmi_decode(struct dmi_header *dm)
 {
+#ifdef DMI_DEBUG
 	u8 *data = (u8 *)dm;
+#endif
 	
 	switch(dm->type)
 	{

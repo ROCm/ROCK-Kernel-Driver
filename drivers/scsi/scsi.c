@@ -123,12 +123,6 @@ struct scsi_host_sg_pool scsi_sg_pools[SG_MEMPOOL_NR] = {
  */
 unsigned long scsi_pid;
 Scsi_Cmnd *last_cmnd;
-/* Command group 3 is reserved and should never be used.  */
-const unsigned char scsi_command_size[8] =
-{
-	6, 10, 10, 12,
-	16, 12, 10, 10
-};
 static unsigned long serial_number;
 
 struct softscsi_data {

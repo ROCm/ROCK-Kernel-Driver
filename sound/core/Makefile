@@ -91,7 +91,7 @@ obj-$(CONFIG_SND_EMU10K1) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep
 obj-$(CONFIG_SND_KORG1212) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_NM256) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_RME9652) += snd-pcm.o snd-timer.o snd.o
-obj-$(CONFIG_SND_HDSP) += snd-pcm.o snd-timer.o snd.o
+obj-$(CONFIG_SND_HDSP) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_TRIDENT) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_YMFPCI) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_POWERMAC) += snd-pcm.o snd-timer.o snd.o
@@ -100,10 +100,7 @@ ifeq ($(CONFIG_SND_SB16_CSP),y)
   obj-$(CONFIG_SND_SB16) += snd-hwdep.o
   obj-$(CONFIG_SND_SBAWE) += snd-hwdep.o
 endif
-obj-$(CONFIG_SND_USB_AUDIO) += snd-pcm.o snd-timer.o snd.o
-ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
-obj-$(CONFIG_SND_USB_AUDIO) += snd-rawmidi.o
-endif
+obj-$(CONFIG_SND_USB_AUDIO) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 
 obj-m := $(sort $(obj-m))
 

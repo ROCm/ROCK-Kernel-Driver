@@ -59,6 +59,14 @@ static inline int bad_range(struct zone *zone, struct page *page)
 	return 0;
 }
 
+static void bad_page(const char *function, struct page *page)
+{
+	printk("Bad page state at %s\n", function);
+	printk("flags:0x%08lx mapping:%p mapped:%d count:%d\n",
+		page->flags, page->mapping,
+		page_mapped(page), page_count(page));
+}
+
 /*
  * Freeing function for a buddy system allocator.
  *
@@ -91,16 +99,19 @@ void __free_pages_ok (struct page *page, unsigned int order)
 
 	mod_page_state(pgfree, 1<<order);
 
-	BUG_ON(PageLRU(page));
-	BUG_ON(PagePrivate(page));
-	BUG_ON(page->mapping != NULL);
-	BUG_ON(PageLocked(page));
-	BUG_ON(PageActive(page));
-	BUG_ON(PageWriteback(page));
-	BUG_ON(page->pte.direct != 0);
+	if (	page_mapped(page) ||
+		page->mapping != NULL ||
+		page_count(page) != 0 ||
+		(page->flags & (
+			1 << PG_lru	|
+			1 << PG_private |
+			1 << PG_locked	|
+			1 << PG_active	|
+			1 << PG_writeback )))
+		bad_page(__FUNCTION__, page);
+
 	if (PageDirty(page))
 		ClearPageDirty(page);
-	BUG_ON(page_count(page) != 0);
 
 	if (unlikely(current->flags & PF_FREE_PAGES)) {
 		if (!current->nr_local_pages && !in_interrupt()) {
@@ -181,14 +192,17 @@ expand(struct zone *zone, struct page *page,
  */
 static inline void prep_new_page(struct page *page)
 {
-	BUG_ON(page->mapping);
-	BUG_ON(PagePrivate(page));
-	BUG_ON(PageLocked(page));
-	BUG_ON(PageLRU(page));
-	BUG_ON(PageActive(page));
-	BUG_ON(PageDirty(page));
-	BUG_ON(PageWriteback(page));
-	BUG_ON(page->pte.direct != 0);
+	if (	page->mapping ||
+		page_mapped(page) ||
+		(page->flags & (
+			1 << PG_private	|
+			1 << PG_locked	|
+			1 << PG_lru	|
+			1 << PG_active	|
+			1 << PG_dirty	|
+			1 << PG_writeback )))
+		bad_page(__FUNCTION__, page);
+
 	page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
 			1 << PG_referenced | 1 << PG_arch_1 |
 			1 << PG_checked);
