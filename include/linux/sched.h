@@ -447,6 +447,14 @@ extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
 # define set_cpus_allowed(p, new_mask) do { } while (0)
 #endif
 
+#ifdef CONFIG_NUMA
+extern void sched_balance_exec(void);
+extern void node_nr_running_init(void);
+#else
+#define sched_balance_exec()   {}
+#define node_nr_running_init() {}
+#endif
+
 extern void set_user_nice(task_t *p, long nice);
 extern int task_prio(task_t *p);
 extern int task_nice(task_t *p);
