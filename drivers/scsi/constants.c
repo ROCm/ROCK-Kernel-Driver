@@ -1004,16 +1004,14 @@ print_sense_internal(const char * devclass,
 #endif
 }
 
-void print_sense(const char * devclass, Scsi_Cmnd * SCpnt)
+void print_sense(const char *devclass, struct scsi_cmnd *cmd)
 {
-	print_sense_internal(devclass, SCpnt->sense_buffer,
-			     SCpnt->request);
+	print_sense_internal(devclass, cmd->sense_buffer, cmd->request);
 }
 
-void print_req_sense(const char * devclass, Scsi_Request * SRpnt)
+void print_req_sense(const char *devclass, struct scsi_request *sreq)
 {
-	print_sense_internal(devclass, SRpnt->sr_sense_buffer,
-			     SRpnt->sr_request);
+	print_sense_internal(devclass, sreq->sr_sense_buffer, sreq->sr_request);
 }
 
 #if (CONSTANTS & CONST_MSG) 
@@ -1116,13 +1114,13 @@ int print_msg (const unsigned char *msg) {
     return len;
 }
 
-void print_Scsi_Cmnd (Scsi_Cmnd *cmd) {
+void print_Scsi_Cmnd(struct scsi_cmnd *cmd) {
     printk("scsi%d : destination target %d, lun %d\n", 
 	   cmd->device->host->host_no, 
 	   cmd->device->id, 
 	   cmd->device->lun);
     printk("        command = ");
-    print_command (cmd->cmnd);
+    print_command(cmd->cmnd);
 }
 
 #if (CONSTANTS & CONST_HOST)
