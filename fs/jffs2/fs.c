@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001, 2002 Red Hat, Inc.
+ * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: fs.c,v 1.24 2003/04/29 09:52:58 dwmw2 Exp $
+ * $Id: fs.c,v 1.32 2003/10/11 11:47:23 dwmw2 Exp $
  *
  */
 
@@ -21,7 +21,158 @@
 #include <linux/pagemap.h>
 #include <linux/slab.h>
 #include <linux/vfs.h>
+#include <linux/crc32.h>
 #include "nodelist.h"
+
+
+static int jffs2_do_setattr (struct inode *inode, struct iattr *iattr)
+{
+	struct jffs2_full_dnode *old_metadata, *new_metadata;
+	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
+	struct jffs2_sb_info *c = JFFS2_SB_INFO(inode->i_sb);
+	struct jffs2_raw_inode *ri;
+	unsigned short dev;
+	unsigned char *mdata = NULL;
+	int mdatalen = 0;
+	unsigned int ivalid;
+	uint32_t phys_ofs, alloclen;
+	int ret;
+	D1(printk(KERN_DEBUG "jffs2_setattr(): ino #%lu\n", inode->i_ino));
+	ret = inode_change_ok(inode, iattr);
+	if (ret) 
+		return ret;
+
+	/* Special cases - we don't want more than one data node
+	   for these types on the medium at any time. So setattr
+	   must read the original data associated with the node
+	   (i.e. the device numbers or the target name) and write
+	   it out again with the appropriate data attached */
+	if (S_ISBLK(inode->i_mode) || S_ISCHR(inode->i_mode)) {
+		/* For these, we don't actually need to read the old node */
+		dev = old_encode_dev(inode->i_rdev);
+		mdata = (char *)&dev;
+		mdatalen = sizeof(dev);
+		D1(printk(KERN_DEBUG "jffs2_setattr(): Writing %d bytes of kdev_t\n", mdatalen));
+	} else if (S_ISLNK(inode->i_mode)) {
+		mdatalen = f->metadata->size;
+		mdata = kmalloc(f->metadata->size, GFP_USER);
+		if (!mdata)
+			return -ENOMEM;
+		ret = jffs2_read_dnode(c, f->metadata, mdata, 0, mdatalen);
+		if (ret) {
+			kfree(mdata);
+			return ret;
+		}
+		D1(printk(KERN_DEBUG "jffs2_setattr(): Writing %d bytes of symlink target\n", mdatalen));
+	}
+
+	ri = jffs2_alloc_raw_inode();
+	if (!ri) {
+		if (S_ISLNK(inode->i_mode))
+			kfree(mdata);
+		return -ENOMEM;
+	}
+		
+	ret = jffs2_reserve_space(c, sizeof(*ri) + mdatalen, &phys_ofs, &alloclen, ALLOC_NORMAL);
+	if (ret) {
+		jffs2_free_raw_inode(ri);
+		if (S_ISLNK(inode->i_mode & S_IFMT))
+			 kfree(mdata);
+		return ret;
+	}
+	down(&f->sem);
+	ivalid = iattr->ia_valid;
+	
+	ri->magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
+	ri->nodetype = cpu_to_je16(JFFS2_NODETYPE_INODE);
+	ri->totlen = cpu_to_je32(sizeof(*ri) + mdatalen);
+	ri->hdr_crc = cpu_to_je32(crc32(0, ri, sizeof(struct jffs2_unknown_node)-4));
+
+	ri->ino = cpu_to_je32(inode->i_ino);
+	ri->version = cpu_to_je32(++f->highest_version);
+
+	ri->uid = cpu_to_je16((ivalid & ATTR_UID)?iattr->ia_uid:inode->i_uid);
+	ri->gid = cpu_to_je16((ivalid & ATTR_GID)?iattr->ia_gid:inode->i_gid);
+
+	if (ivalid & ATTR_MODE)
+		if (iattr->ia_mode & S_ISGID &&
+		    !in_group_p(je16_to_cpu(ri->gid)) && !capable(CAP_FSETID))
+			ri->mode = cpu_to_jemode(iattr->ia_mode & ~S_ISGID);
+		else 
+			ri->mode = cpu_to_jemode(iattr->ia_mode);
+	else
+		ri->mode = cpu_to_jemode(inode->i_mode);
+
+
+	ri->isize = cpu_to_je32((ivalid & ATTR_SIZE)?iattr->ia_size:inode->i_size);
+	ri->atime = cpu_to_je32(I_SEC((ivalid & ATTR_ATIME)?iattr->ia_atime:inode->i_atime));
+	ri->mtime = cpu_to_je32(I_SEC((ivalid & ATTR_MTIME)?iattr->ia_mtime:inode->i_mtime));
+	ri->ctime = cpu_to_je32(I_SEC((ivalid & ATTR_CTIME)?iattr->ia_ctime:inode->i_ctime));
+
+	ri->offset = cpu_to_je32(0);
+	ri->csize = ri->dsize = cpu_to_je32(mdatalen);
+	ri->compr = JFFS2_COMPR_NONE;
+	if (ivalid & ATTR_SIZE && inode->i_size < iattr->ia_size) {
+		/* It's an extension. Make it a hole node */
+		ri->compr = JFFS2_COMPR_ZERO;
+		ri->dsize = cpu_to_je32(iattr->ia_size - inode->i_size);
+		ri->offset = cpu_to_je32(inode->i_size);
+	}
+	ri->node_crc = cpu_to_je32(crc32(0, ri, sizeof(*ri)-8));
+	if (mdatalen)
+		ri->data_crc = cpu_to_je32(crc32(0, mdata, mdatalen));
+	else
+		ri->data_crc = cpu_to_je32(0);
+
+	new_metadata = jffs2_write_dnode(c, f, ri, mdata, mdatalen, phys_ofs, ALLOC_NORMAL);
+	if (S_ISLNK(inode->i_mode))
+		kfree(mdata);
+	
+	if (IS_ERR(new_metadata)) {
+		jffs2_complete_reservation(c);
+		jffs2_free_raw_inode(ri);
+		up(&f->sem);
+		return PTR_ERR(new_metadata);
+	}
+	/* It worked. Update the inode */
+	inode->i_atime = ITIME(je32_to_cpu(ri->atime));
+	inode->i_ctime = ITIME(je32_to_cpu(ri->ctime));
+	inode->i_mtime = ITIME(je32_to_cpu(ri->mtime));
+	inode->i_mode = jemode_to_cpu(ri->mode);
+	inode->i_uid = je16_to_cpu(ri->uid);
+	inode->i_gid = je16_to_cpu(ri->gid);
+
+
+	old_metadata = f->metadata;
+
+	if (ivalid & ATTR_SIZE && inode->i_size > iattr->ia_size) {
+		vmtruncate(inode, iattr->ia_size);
+		jffs2_truncate_fraglist (c, &f->fragtree, iattr->ia_size);
+	}
+
+	if (ivalid & ATTR_SIZE && inode->i_size < iattr->ia_size) {
+		jffs2_add_full_dnode_to_inode(c, f, new_metadata);
+		inode->i_size = iattr->ia_size;
+		f->metadata = NULL;
+	} else {
+		f->metadata = new_metadata;
+	}
+	if (old_metadata) {
+		jffs2_mark_node_obsolete(c, old_metadata->raw);
+		jffs2_free_full_dnode(old_metadata);
+	}
+	jffs2_free_raw_inode(ri);
+
+	up(&f->sem);
+	jffs2_complete_reservation(c);
+
+	return 0;
+}
+
+int jffs2_setattr(struct dentry *dentry, struct iattr *iattr)
+{
+	return jffs2_do_setattr(dentry->d_inode, iattr);
+}
 
 int jffs2_statfs(struct super_block *sb, struct kstatfs *buf)
 {
@@ -38,8 +189,8 @@ int jffs2_statfs(struct super_block *sb, struct kstatfs *buf)
 	spin_lock(&c->erase_completion_lock);
 
 	avail = c->dirty_size + c->free_size;
-	if (avail > c->sector_size * JFFS2_RESERVED_BLOCKS_WRITE)
-		avail -= c->sector_size * JFFS2_RESERVED_BLOCKS_WRITE;
+	if (avail > c->sector_size * c->resv_blocks_write)
+		avail -= c->sector_size * c->resv_blocks_write;
 	else
 		avail = 0;
 
@@ -149,7 +300,7 @@ void jffs2_read_inode (struct inode *inode)
 	case S_IFIFO:
 		inode->i_op = &jffs2_file_inode_operations;
 		init_special_inode(inode, inode->i_mode,
-			old_decode_dev(je16_to_cpu(rdev)));
+				   old_decode_dev((je16_to_cpu(rdev))));
 		break;
 
 	default:
@@ -161,6 +312,27 @@ void jffs2_read_inode (struct inode *inode)
 	D1(printk(KERN_DEBUG "jffs2_read_inode() returning\n"));
 }
 
+void jffs2_dirty_inode(struct inode *inode)
+{
+	struct iattr iattr;
+
+	if (!(inode->i_state & I_DIRTY_DATASYNC)) {
+		D1(printk(KERN_DEBUG "jffs2_dirty_inode() not calling setattr() for ino #%lu\n", inode->i_ino));
+		return;
+	}
+
+	D1(printk(KERN_DEBUG "jffs2_dirty_inode() calling setattr() for ino #%lu\n", inode->i_ino));
+
+	iattr.ia_valid = ATTR_MODE|ATTR_UID|ATTR_GID|ATTR_ATIME|ATTR_MTIME|ATTR_CTIME;
+	iattr.ia_mode = inode->i_mode;
+	iattr.ia_uid = inode->i_uid;
+	iattr.ia_gid = inode->i_gid;
+	iattr.ia_atime = inode->i_atime;
+	iattr.ia_mtime = inode->i_mtime;
+	iattr.ia_ctime = inode->i_ctime;
+
+	jffs2_do_setattr(inode, &iattr);
+}
 
 int jffs2_remount_fs (struct super_block *sb, int *flags, char *data)
 {
@@ -194,6 +366,7 @@ void jffs2_write_super (struct super_block *sb)
 	D1(printk(KERN_DEBUG "jffs2_write_super()\n"));
 	jffs2_garbage_collect_trigger(c);
 	jffs2_erase_pending_blocks(c);
+	jffs2_flush_wbuf_gc(c, 0);
 }
 
 
@@ -288,25 +461,10 @@ int jffs2_do_fill_super(struct super_block *sb, void *data, int silent)
 	/* Joern -- stick alignment for weird 8-byte-page flash here */
 
 	if (jffs2_cleanmarker_oob(c)) {
-		/* Cleanmarker is out-of-band, so inline size zero */
-		c->cleanmarker_size = 0;
-	}
-
-	if (c->mtd->type == MTD_NANDFLASH) {
-		/* Initialise write buffer */
-		c->wbuf_pagesize = c->mtd->oobblock;
-		c->wbuf_ofs = 0xFFFFFFFF;
-		c->wbuf = kmalloc(c->wbuf_pagesize, GFP_KERNEL);
-		if (!c->wbuf)
-			return -ENOMEM;
-
-		/* Initialise process for timed wbuf flush */
-		INIT_WORK(&c->wbuf_task,(void*) jffs2_wbuf_process, (void *)c);
-
-		/* Initialise timer for timed wbuf flush */
-		init_timer(&c->wbuf_timer);
-		c->wbuf_timer.function = jffs2_wbuf_timeout;
-		c->wbuf_timer.data = (unsigned long) c;
+		/* NAND (or other bizarre) flash... do setup accordingly */
+		ret = jffs2_nand_flash_setup(c);
+		if (ret)
+			return ret;
 	}
 
 	c->inocache_list = kmalloc(INOCACHE_HASHSIZE * sizeof(struct jffs2_inode_cache *), GFP_KERNEL);
@@ -352,7 +510,7 @@ int jffs2_do_fill_super(struct super_block *sb, void *data, int silent)
  out_inohash:
 	kfree(c->inocache_list);
  out_wbuf:
-	if (c->wbuf)
-		kfree(c->wbuf);
+	jffs2_nand_flash_cleanup(c);
+
 	return ret;
 }

@@ -37,7 +37,8 @@ enum sel_inos {
 	SEL_ACCESS,	/* compute access decision */
 	SEL_CREATE,	/* compute create labeling decision */
 	SEL_RELABEL,	/* compute relabeling decision */
-	SEL_USER	/* compute reachable user contexts */
+	SEL_USER,	/* compute reachable user contexts */
+	SEL_POLICYVERS	/* return policy version for this kernel */
 };
 
 static ssize_t sel_read_enforce(struct file *filp, char *buf,
@@ -123,6 +124,46 @@ out:
 static struct file_operations sel_enforce_ops = {
 	.read		= sel_read_enforce,
 	.write		= sel_write_enforce,
+};
+
+static ssize_t sel_read_policyvers(struct file *filp, char *buf,
+                                   size_t count, loff_t *ppos)
+{
+	char *page;
+	ssize_t length;
+	ssize_t end;
+
+	if (count < 0 || count > PAGE_SIZE)
+		return -EINVAL;
+	if (!(page = (char*)__get_free_page(GFP_KERNEL)))
+		return -ENOMEM;
+	memset(page, 0, PAGE_SIZE);
+
+	length = snprintf(page, PAGE_SIZE, "%u", POLICYDB_VERSION);
+	if (length < 0) {
+		free_page((unsigned long)page);
+		return length;
+	}
+
+	if (*ppos >= length) {
+		free_page((unsigned long)page);
+		return 0;
+	}
+	if (count + *ppos > length)
+		count = length - *ppos;
+	end = count + *ppos;
+	if (copy_to_user(buf, (char *) page + *ppos, count)) {
+		count = -EFAULT;
+		goto out;
+	}
+	*ppos = end;
+out:
+	free_page((unsigned long)page);
+	return count;
+}
+
+static struct file_operations sel_policyvers_ops = {
+	.read		= sel_read_policyvers,
 };
 
 static ssize_t sel_write_load(struct file * file, const char * buf,
@@ -568,6 +609,7 @@ static int sel_fill_super(struct super_block * sb, void * data, int silent)
 		[SEL_CREATE] = {"create", &transaction_ops, S_IRUGO|S_IWUGO},
 		[SEL_RELABEL] = {"relabel", &transaction_ops, S_IRUGO|S_IWUGO},
 		[SEL_USER] = {"user", &transaction_ops, S_IRUGO|S_IWUGO},
+		[SEL_POLICYVERS] = {"policyvers", &sel_policyvers_ops, S_IRUGO},
 		/* last one */ {""}
 	};
 	return simple_fill_super(sb, SELINUX_MAGIC, selinux_files);

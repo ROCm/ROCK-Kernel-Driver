@@ -484,6 +484,7 @@ try_dma_modes:
 		} else {
 			goto no_dma_set;
 		}
+		return hwif->ide_dma_on(drive);
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
 no_dma_set:
@@ -491,7 +492,8 @@ no_dma_set:
 		//	hwif->tuneproc(drive, 5);
 		return hwif->ide_dma_off_quietly(drive);
 	}
-	return hwif->ide_dma_on(drive);
+	/* IORDY not supported */
+	return 0;
 }
 
 /* This can go soon */

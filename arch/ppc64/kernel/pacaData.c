@@ -64,7 +64,7 @@ struct systemcfg *systemcfg;
 		(&paca[number].exception_stack[0]) - EXC_FRAME_SIZE,	    \
 }
 
-struct paca_struct paca[NR_CPUS] __page_aligned = {
+struct paca_struct paca[] __page_aligned = {
 #ifdef CONFIG_PPC_ISERIES
 	PACAINITDATA( 0, 1, &xItLpQueue, 0, STAB0_VIRT_ADDR),
 #else

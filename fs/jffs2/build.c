@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001, 2002 Red Hat, Inc.
+ * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.46 2003/04/29 17:12:26 gleixner Exp $
+ * $Id: build.c,v 1.52 2003/10/09 00:38:38 dwmw2 Exp $
  *
  */
 
@@ -228,6 +228,58 @@ int jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *c, struct jffs2_inod
 	return ret;
 }
 
+static void jffs2_calc_trigger_levels(struct jffs2_sb_info *c)
+{
+	uint32_t size;
+
+	/* Deletion should almost _always_ be allowed. We're fairly
+	   buggered once we stop allowing people to delete stuff
+	   because there's not enough free space... */
+	c->resv_blocks_deletion = 2;
+
+	/* Be conservative about how much space we need before we allow writes. 
+	   On top of that which is required for deletia, require an extra 2%
+	   of the medium to be available, for overhead caused by nodes being
+	   split across blocks, etc. */
+
+	size = c->flash_size / 50; /* 2% of flash size */
+	size += c->nr_blocks * 100; /* And 100 bytes per eraseblock */
+	size += c->sector_size - 1; /* ... and round up */
+
+	c->resv_blocks_write = c->resv_blocks_deletion + (size / c->sector_size);
+
+	/* When do we let the GC thread run in the background */
+
+	c->resv_blocks_gctrigger = c->resv_blocks_write + 1;
+
+	/* When do we allow garbage collection to merge nodes to make 
+	   long-term progress at the expense of short-term space exhaustion? */
+	c->resv_blocks_gcmerge = c->resv_blocks_deletion + 1;
+
+	/* When do we allow garbage collection to eat from bad blocks rather
+	   than actually making progress? */
+	c->resv_blocks_gcbad = 0;//c->resv_blocks_deletion + 2;
+
+	/* If there's less than this amount of dirty space, don't bother
+	   trying to GC to make more space. It'll be a fruitless task */
+	c->nospc_dirty_size = c->sector_size + (c->flash_size / 100);
+
+	D1(printk(KERN_DEBUG "JFFS2 trigger levels (size %d KiB, block size %d KiB, %d blocks)\n",
+		  c->flash_size / 1024, c->sector_size / 1024, c->nr_blocks));
+	D1(printk(KERN_DEBUG "Blocks required to allow deletion:    %d (%d KiB)\n",
+		  c->resv_blocks_deletion, c->resv_blocks_deletion*c->sector_size/1024));
+	D1(printk(KERN_DEBUG "Blocks required to allow writes:      %d (%d KiB)\n",
+		  c->resv_blocks_write, c->resv_blocks_write*c->sector_size/1024));
+	D1(printk(KERN_DEBUG "Blocks required to quiesce GC thread: %d (%d KiB)\n",
+		  c->resv_blocks_gctrigger, c->resv_blocks_gctrigger*c->sector_size/1024));
+	D1(printk(KERN_DEBUG "Blocks required to allow GC merges:   %d (%d KiB)\n",
+		  c->resv_blocks_gcmerge, c->resv_blocks_gcmerge*c->sector_size/1024));
+	D1(printk(KERN_DEBUG "Blocks required to GC bad blocks:     %d (%d KiB)\n",
+		  c->resv_blocks_gcbad, c->resv_blocks_gcbad*c->sector_size/1024));
+	D1(printk(KERN_DEBUG "Amount of dirty space required to GC: %d bytes\n",
+		  c->nospc_dirty_size));
+} 
+
 int jffs2_do_mount_fs(struct jffs2_sb_info *c)
 {
 	int i;
@@ -276,5 +328,8 @@ int jffs2_do_mount_fs(struct jffs2_sb_info *c)
 		kfree(c->blocks);
 		return -EIO;
 	}
+
+	jffs2_calc_trigger_levels(c);
+
 	return 0;
 }

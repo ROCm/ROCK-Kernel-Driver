@@ -34,12 +34,15 @@ struct pci_dev;
 #define HAVE_ARCH_PCI_MWI 1
 static inline int pcibios_prep_mwi(struct pci_dev *dev)
 {
-	/* 
-	 * pSeries firmware sets cacheline size and hardware treats
-	 * MWI the same as memory write, so we dont change cacheline size
-	 * or the MWI bit.
+	/*
+	 * We would like to avoid touching the cacheline size or MWI bit
+	 * but we cant do that with the current pcibios_prep_mwi 
+	 * interface. pSeries firmware sets the cacheline size (which is not
+	 * the cpu cacheline size in all cases) and hardware treats MWI 
+	 * the same as memory write. So we dont touch the cacheline size
+	 * here and allow the generic code to set the MWI bit.
 	 */
-	return 1;
+	return 0;
 }
 
 extern unsigned int pcibios_assign_all_busses(void);

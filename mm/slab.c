@@ -862,7 +862,7 @@ static void store_stackinfo(kmem_cache_t *cachep, unsigned long *addr, unsigned 
 		unsigned long *sptr = &caller;
 		unsigned long svalue;
 
-		while (((long) sptr & (THREAD_SIZE-1)) != 0) {
+		while (!kstack_end(sptr)) {
 			svalue = *sptr++;
 			if (kernel_text_address(svalue)) {
 				*addr++=svalue;

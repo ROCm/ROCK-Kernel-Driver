@@ -97,9 +97,9 @@ static int of_device_probe(struct device *dev)
 static int of_device_remove(struct device *dev)
 {
 	struct of_device * of_dev = to_of_device(dev);
-	struct of_platform_driver * drv = to_of_platform_driver(of_dev->dev.driver);
+	struct of_platform_driver * drv = to_of_platform_driver(dev->driver);
 
-	if (drv && drv->remove)
+	if (dev->driver && drv->remove)
 		drv->remove(of_dev);
 	return 0;
 }
@@ -107,10 +107,10 @@ static int of_device_remove(struct device *dev)
 static int of_device_suspend(struct device *dev, u32 state)
 {
 	struct of_device * of_dev = to_of_device(dev);
-	struct of_platform_driver * drv = to_of_platform_driver(of_dev->dev.driver);
+	struct of_platform_driver * drv = to_of_platform_driver(dev->driver);
 	int error = 0;
 
-	if (drv && drv->suspend)
+	if (dev->driver && drv->suspend)
 		error = drv->suspend(of_dev, state);
 	return error;
 }
@@ -118,10 +118,10 @@ static int of_device_suspend(struct device *dev, u32 state)
 static int of_device_resume(struct device * dev)
 {
 	struct of_device * of_dev = to_of_device(dev);
-	struct of_platform_driver * drv = to_of_platform_driver(of_dev->dev.driver);
+	struct of_platform_driver * drv = to_of_platform_driver(dev->driver);
 	int error = 0;
 
-	if (drv && drv->resume)
+	if (dev->driver && drv->resume)
 		error = drv->resume(of_dev);
 	return error;
 }

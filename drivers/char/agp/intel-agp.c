@@ -1232,8 +1232,8 @@ static int find_i830(u16 device)
 	return 1;
 }
 
-static int __init agp_intel_probe(struct pci_dev *pdev,
-				  const struct pci_device_id *ent)
+static int __devinit agp_intel_probe(struct pci_dev *pdev,
+				     const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
 	char *name = "(unknown)";

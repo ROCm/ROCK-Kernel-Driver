@@ -726,3 +726,22 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	__hash_page(ea, pte_val(pte) & (_PAGE_USER|_PAGE_RW), vsid, ptep,
 		    0x300, local);
 }
+
+kmem_cache_t *zero_cache;
+
+static void zero_ctor(void *pte, kmem_cache_t *cache, unsigned long flags)
+{
+	memset(pte, 0, PAGE_SIZE);
+}
+
+void pgtable_cache_init(void)
+{
+	zero_cache = kmem_cache_create("zero",
+				PAGE_SIZE,
+				0,
+				SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN,
+				zero_ctor,
+				NULL);
+	if (!zero_cache)
+		panic("pgtable_cache_init(): could not create zero_cache!\n");
+}

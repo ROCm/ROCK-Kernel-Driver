@@ -218,7 +218,6 @@ do {									\
 extern unsigned long __copy_tofrom_user(void *to, const void *from,
 					unsigned long size);
 
-/* XXX should zero destination if fault happened */
 static inline unsigned long
 __copy_from_user(void *to, const void __user *from, unsigned long n)
 {

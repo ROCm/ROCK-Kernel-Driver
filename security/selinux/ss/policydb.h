@@ -225,7 +225,6 @@ extern int policydb_read(struct policydb *p, void *fp);
 
 #define PERM_SYMTAB_SIZE 32
 
-#define POLICYDB_VERSION 15
 #define POLICYDB_CONFIG_MLS    1
 
 #define OBJECT_R "object_r"

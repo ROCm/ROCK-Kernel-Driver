@@ -166,7 +166,7 @@ via_calibrate_decr(void)
 {
 	struct device_node *vias;
 	volatile unsigned char *via;
-	int count = VIA_TIMER_FREQ_6 / HZ;
+	int count = VIA_TIMER_FREQ_6 / 100;
 	unsigned int dstart, dend;
 
 	vias = find_devices("via-cuda");
@@ -196,7 +196,7 @@ via_calibrate_decr(void)
 		;
 	dend = get_dec();
 
-	tb_ticks_per_jiffy = (dstart - dend) / 6;
+	tb_ticks_per_jiffy = (dstart - dend) / (6 * (HZ/100));
 	tb_to_us = mulhwu_scale_factor(dstart - dend, 60000);
 
 	printk(KERN_INFO "via_calibrate_decr: ticks per jiffy = %u (%u ticks)\n",
@@ -260,7 +260,9 @@ pmac_calibrate_decr(void)
 	 * calibration. That's better since the VIA itself seems
 	 * to be slightly off. --BenH
 	 */
-	if (!machine_is_compatible("MacRISC2"))
+	if (!machine_is_compatible("MacRISC2") &&
+	    !machine_is_compatible("MacRISC3") &&
+	    !machine_is_compatible("MacRISC4"))
 		if (via_calibrate_decr())
 			return;
 

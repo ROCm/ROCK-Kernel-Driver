@@ -394,10 +394,7 @@ extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
 #define io_remap_page_range remap_page_range 
 
-/*
- * No page table caches to initialise
- */
-#define pgtable_cache_init()	do { } while (0)
+void pgtable_cache_init(void);
 
 extern void hpte_init_pSeries(void);
 extern void hpte_init_iSeries(void);

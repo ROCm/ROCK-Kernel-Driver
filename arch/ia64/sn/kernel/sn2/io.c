@@ -11,6 +11,8 @@
 
 #include <asm/sn/sn2/io.h>
 
+#ifdef CONFIG_IA64_GENERIC
+
 #undef __sn_inb
 #undef __sn_inw
 #undef __sn_inl
@@ -81,3 +83,5 @@ __sn_readq (void *addr)
 {
 	return ___sn_readq (addr);
 }
+
+#endif

@@ -778,9 +778,6 @@ static int visor_probe (struct usb_serial *serial, const struct usb_device_id *i
 			serial->dev->actconfig->desc.bConfigurationValue);
 		return -ENODEV;
 	}
-	dbg("%s - reset config", __FUNCTION__);
-	retval = usb_reset_configuration (serial->dev);
-
 
 	if (id->driver_info) {
 		startup = (void *)id->driver_info;

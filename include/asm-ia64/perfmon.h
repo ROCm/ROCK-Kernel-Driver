@@ -38,7 +38,6 @@
  */
 #define PFM_FL_NOTIFY_BLOCK    	 0x01	/* block task on user level notifications */
 #define PFM_FL_SYSTEM_WIDE	 0x02	/* create a system wide context */
-#define PFM_FL_UNSECURE		 0x04   /* allow unsecure monitoring for non self-monitoring task */
 #define PFM_FL_OVFL_NO_MSG	 0x80   /* do not post overflow/end messages for notification */
 
 /*
@@ -162,8 +161,6 @@ typedef union {
  */
 #define PFM_VERSION_MAJ		 2U
 #define PFM_VERSION_MIN		 0U
-#define PFM_SMPL_HDR_VERSION_MAJ 2U
-#define PFM_SMPL_HDR_VERSION_MIN 0U
 #define PFM_VERSION		 (((PFM_VERSION_MAJ&0xffff)<<16)|(PFM_VERSION_MIN & 0xffff))
 #define PFM_VERSION_MAJOR(x)	 (((x)>>16) & 0xffff)
 #define PFM_VERSION_MINOR(x)	 ((x) & 0xffff)
@@ -194,9 +191,8 @@ extern void pfm_handle_work(void);
 /*
  * Reset PMD register flags
  */
-#define PFM_PMD_NO_RESET	0
+#define PFM_PMD_SHORT_RESET	0
 #define PFM_PMD_LONG_RESET	1
-#define PFM_PMD_SHORT_RESET	2
 
 typedef union {
 	unsigned int val;
@@ -223,7 +219,7 @@ typedef struct {
 } pfm_ovfl_arg_t;
 
 
-typedef struct _pfm_buffer_fmt_t {
+typedef struct {
 	char		*fmt_name;
 	pfm_uuid_t	fmt_uuid;
 	size_t		fmt_arg_size;
@@ -237,8 +233,7 @@ typedef struct _pfm_buffer_fmt_t {
 	int		(*fmt_restart_active)(struct task_struct *task, pfm_ovfl_ctrl_t *ctrl, void *buf, struct pt_regs *regs);
 	int		(*fmt_exit)(struct task_struct *task, void *buf, struct pt_regs *regs);
 
-	struct _pfm_buffer_fmt_t *fmt_next;
-	struct _pfm_buffer_fmt_t *fmt_prev;
+	struct list_head fmt_list;
 } pfm_buffer_fmt_t;
 
 extern int pfm_register_buffer_fmt(pfm_buffer_fmt_t *fmt);

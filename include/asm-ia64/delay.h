@@ -67,14 +67,15 @@ ia64_get_itc (void)
 	return result;
 }
 
+extern void ia64_delay_loop (unsigned long loops);
+
 static __inline__ void
 __delay (unsigned long loops)
 {
-	if (loops < 1)
+	if (unlikely(loops < 1))
 		return;
 
-	while (loops--)
-		ia64_nop(0);
+	ia64_delay_loop (loops - 1);
 }
 
 static __inline__ void

@@ -51,10 +51,8 @@ struct thread_info {
 #define THREAD_ORDER		2
 #define THREAD_SIZE		(PAGE_SIZE << THREAD_ORDER)
 #define THREAD_SHIFT		(PAGE_SHIFT + THREAD_ORDER)
-
-#define alloc_thread_info(tsk) ((struct thread_info *) \
-				__get_free_pages(GFP_KERNEL, THREAD_ORDER))
-#define free_thread_info(ti)	free_pages((unsigned long) (ti), THREAD_ORDER)
+#define alloc_thread_info(task)	((struct thread_info *)kmalloc(THREAD_SIZE, GFP_KERNEL))
+#define free_thread_info(ti)	kfree(ti)
 #define get_thread_info(ti)	get_task_struct((ti)->task)
 #define put_thread_info(ti)	put_task_struct((ti)->task)
 

@@ -125,6 +125,7 @@ csum_partial (const unsigned char *buff, int len, unsigned int sum)
 	return(sum);
 }
 
+EXPORT_SYMBOL(csum_partial);
 
 
 /*

@@ -3,11 +3,11 @@
  *
  * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: symlink.c,v 1.11 2002/07/23 17:00:45 dwmw2 Exp $
+ * $Id: symlink.c,v 1.12 2003/10/04 08:33:07 dwmw2 Exp $
  *
  */
 

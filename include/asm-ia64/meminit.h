@@ -7,6 +7,8 @@
  * for more details.
  */
 
+#include <linux/config.h>
+
 /*
  * Entries defined so far:
  * 	- boot param structure itself
@@ -32,10 +34,27 @@ extern void reserve_memory (void);
 extern void find_initrd (void);
 extern int filter_rsvd_memory (unsigned long start, unsigned long end, void *arg);
 
+/*
+ * For rounding an address to the next IA64_GRANULE_SIZE or order
+ */
+#define GRANULEROUNDDOWN(n)	((n) & ~(IA64_GRANULE_SIZE-1))
+#define GRANULEROUNDUP(n)	(((n)+IA64_GRANULE_SIZE-1) & ~(IA64_GRANULE_SIZE-1))
+#define ORDERROUNDDOWN(n)	((n) & ~((PAGE_SIZE<<MAX_ORDER)-1))
+
 #ifdef CONFIG_DISCONTIGMEM
-extern void call_pernode_memory (unsigned long start, unsigned long end, void *arg);
+  extern void call_pernode_memory (unsigned long start, unsigned long len, void *func);
+#else
+# define call_pernode_memory(start, len, func)	(*func)(start, len, 0)
 #endif
 
 #define IGNORE_PFN0	1	/* XXX fix me: ignore pfn 0 until TLB miss handler is updated... */
+
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+# define LARGE_GAP	0x40000000 /* Use virtual mem map if hole is > than this */
+  extern unsigned long vmalloc_end;
+  extern struct page *vmem_map;
+  extern int find_largest_hole (u64 start, u64 end, void *arg);
+  extern int create_mem_map_page_table (u64 start, u64 end, void *arg);
+#endif
 
 #endif /* meminit_h */

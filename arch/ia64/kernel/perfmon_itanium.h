@@ -81,6 +81,8 @@ pfm_ita_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 	 */
 	if (cnum == 13 && ((*val & 0x1) == 0UL) && ctx->ctx_fl_using_dbreg == 0) {
 
+		DPRINT(("pmc[%d]=0x%lx has active pmc13.ta cleared, clearing ibr\n", cnum, *val));
+
 		/* don't mix debug with perfmon */
 		if (task && (task->thread.flags & IA64_THREAD_DBG_VALID) != 0) return -EINVAL;
 
@@ -97,6 +99,8 @@ pfm_ita_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 	 * before they are written (fl_using_dbreg==0) to avoid picking up stale information.
 	 */
 	if (cnum == 11 && ((*val >> 28)& 0x1) == 0 && ctx->ctx_fl_using_dbreg == 0) {
+
+		DPRINT(("pmc[%d]=0x%lx has active pmc11.pt cleared, clearing dbr\n", cnum, *val));
 
 		/* don't mix debug with perfmon */
 		if (task && (task->thread.flags & IA64_THREAD_DBG_VALID) != 0) return -EINVAL;

@@ -220,7 +220,7 @@ extern __inline__ unsigned long swap_pil(unsigned long __new_psr)
 		"wr	%0, %2, %%psr\n\t"
 		"nop; nop; nop;\n"
 		"1:\n"
-		: "=r" (retval)
+		: "=&r" (retval)
 		: "r" (__new_psr), "i" (PSR_PIL)
 		: "g1", "g2", "memory", "cc");
 
@@ -298,7 +298,8 @@ extern __inline__ unsigned long xchg_u32(__volatile__ unsigned long *m, unsigned
 #ifdef CONFIG_SMP
 	__asm__ __volatile__("swap [%2], %0"
 			     : "=&r" (val)
-			     : "0" (val), "r" (m));
+			     : "0" (val), "r" (m)
+			     : "memory");
 	return val;
 #else
 	register unsigned long *ptr asm("g1");

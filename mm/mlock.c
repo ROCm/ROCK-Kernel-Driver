@@ -154,9 +154,9 @@ static int do_mlockall(int flags)
 		newflags = vma->vm_flags | VM_LOCKED;
 		if (!(flags & MCL_CURRENT))
 			newflags &= ~VM_LOCKED;
-		error = mlock_fixup(vma, vma->vm_start, vma->vm_end, newflags);
-		if (error)
-			break;
+
+		/* Ignore errors */
+		mlock_fixup(vma, vma->vm_start, vma->vm_end, newflags);
 	}
 	return error;
 }

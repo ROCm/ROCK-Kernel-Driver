@@ -122,7 +122,8 @@ static int ethtool_get_drvinfo(struct net_device *dev, void *useraddr)
 		info.n_stats = ops->get_stats_count(dev);
 	if (ops->get_regs_len)
 		info.regdump_len = ops->get_regs_len(dev);
-	/* XXX: eeprom? */
+	if (ops->get_eeprom_len)
+		info.eedump_len = ops->get_eeprom_len(dev);
 
 	if (copy_to_user(useraddr, &info, sizeof(info)))
 		return -EFAULT;
@@ -245,29 +246,34 @@ static int ethtool_get_link(struct net_device *dev, void *useraddr)
 static int ethtool_get_eeprom(struct net_device *dev, void *useraddr)
 {
 	struct ethtool_eeprom eeprom;
+	struct ethtool_ops *ops = dev->ethtool_ops;
 	u8 *data;
-	int len, ret;
+	int ret;
 
-	if (!dev->ethtool_ops->get_eeprom)
+	if (!ops->get_eeprom || !ops->get_eeprom_len)
 		return -EOPNOTSUPP;
 
 	if (copy_from_user(&eeprom, useraddr, sizeof(eeprom)))
 		return -EFAULT;
 
-	len = eeprom.len;
 	/* Check for wrap and zero */
-	if (eeprom.offset + len <= eeprom.offset)
+	if (eeprom.offset + eeprom.len <= eeprom.offset)
 		return -EINVAL;
 
-	data = kmalloc(len, GFP_USER);
+	/* Check for exceeding total eeprom len */
+	if (eeprom.offset + eeprom.len > ops->get_eeprom_len(dev))
+		return -EINVAL;
+
+	data = kmalloc(eeprom.len, GFP_USER);
 	if (!data)
 		return -ENOMEM;
 
-	if (copy_from_user(data, useraddr + sizeof(eeprom), len))
-		return -EFAULT;
+	ret = -EFAULT;
+	if (copy_from_user(data, useraddr + sizeof(eeprom), eeprom.len))
+		goto out;
 
-	ret = dev->ethtool_ops->get_eeprom(dev, &eeprom, data);
-	if (!ret)
+	ret = ops->get_eeprom(dev, &eeprom, data);
+	if (ret)
 		goto out;
 
 	ret = -EFAULT;
@@ -285,32 +291,37 @@ static int ethtool_get_eeprom(struct net_device *dev, void *useraddr)
 static int ethtool_set_eeprom(struct net_device *dev, void *useraddr)
 {
 	struct ethtool_eeprom eeprom;
+	struct ethtool_ops *ops = dev->ethtool_ops;
 	u8 *data;
-	int len, ret;
+	int ret;
 
-	if (!dev->ethtool_ops->set_eeprom)
+	if (!ops->set_eeprom || !ops->get_eeprom_len)
 		return -EOPNOTSUPP;
 
 	if (copy_from_user(&eeprom, useraddr, sizeof(eeprom)))
 		return -EFAULT;
 
-	len = eeprom.len;
 	/* Check for wrap and zero */
-	if (eeprom.offset + len <= eeprom.offset)
+	if (eeprom.offset + eeprom.len <= eeprom.offset)
 		return -EINVAL;
 
-	data = kmalloc(len, GFP_USER);
+	/* Check for exceeding total eeprom len */
+	if (eeprom.offset + eeprom.len > ops->get_eeprom_len(dev))
+		return -EINVAL;
+
+	data = kmalloc(eeprom.len, GFP_USER);
 	if (!data)
 		return -ENOMEM;
 
-	if (copy_from_user(data, useraddr + sizeof(eeprom), len))
-		return -EFAULT;
+	ret = -EFAULT;
+	if (copy_from_user(data, useraddr + sizeof(eeprom), eeprom.len))
+		goto out;
 
-	ret = dev->ethtool_ops->set_eeprom(dev, &eeprom, data);
+	ret = ops->set_eeprom(dev, &eeprom, data);
 	if (ret)
 		goto out;
 
-	if (copy_to_user(useraddr + sizeof(eeprom), data, len))
+	if (copy_to_user(useraddr + sizeof(eeprom), data, eeprom.len))
 		ret = -EFAULT;
 
  out:
