@@ -52,8 +52,6 @@
 
 #include "ide-timing.h"
 
-extern void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq);
-
 #define IDE_PMAC_DEBUG
 
 #define DMA_WAIT_TIMEOUT	50
