@@ -9,9 +9,6 @@
 #ifndef _ASM_SN_KSYS_ELSC_H
 #define _ASM_SN_KSYS_ELSC_H
 
-#include <linux/config.h>
-#include <asm/sn/ksys/l1.h>
-
 /*
  * Error codes
  *

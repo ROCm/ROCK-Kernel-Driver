@@ -35,7 +35,6 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/vmalloc.h>
-#include <asm/current.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
@@ -44,7 +43,6 @@
 #include <asm/sn/sgi.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/invent.h>
-#include <linux/devfs_fs_kernel.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/types.h>
 #include <asm/sn/pci/bridge.h>
@@ -62,6 +60,7 @@
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
+#include <asm/sn/sn2/shub_mmr.h>
 
 int irq_to_bit_pos(int irq);
 static void force_interrupt(int irq);

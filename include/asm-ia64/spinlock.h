@@ -166,7 +166,7 @@ do {										\
 #define _raw_write_lock(l)								\
 ({											\
 	__u64 ia64_val, ia64_set_val = ia64_dep_mi(-1, 0, 31, 1);			\
-	__u32 ia64_write_lock_ptr = (__u32 *) (l);					\
+	__u32 *ia64_write_lock_ptr = (__u32 *) (l);					\
 	do {										\
 		while (*ia64_write_lock_ptr)						\
 			ia64_barrier();							\
