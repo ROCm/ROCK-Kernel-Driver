@@ -1272,8 +1272,9 @@ void d_move(struct dentry * dentry, struct dentry * target)
  * @buflen: buffer length
  *
  * Convert a dentry into an ASCII path name. If the entry has been deleted
- * the string " (deleted)" is appended. Note that this is ambiguous. Returns
- * the buffer.
+ * the string " (deleted)" is appended. Note that this is ambiguous.
+ *
+ * Returns the buffer or an error code if the path was too long.
  *
  * "buflen" should be positive. Caller holds the dcache_lock.
  */

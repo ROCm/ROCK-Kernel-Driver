@@ -485,7 +485,6 @@ static int cmdline_read_proc(char *page, char **start, off_t off,
 	int len;
 
 	len = sprintf(page, "%s\n", saved_command_line);
-	len = strlen(page);
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 

@@ -1105,7 +1105,6 @@ static void __init init_setup_hpt374 (struct pci_dev *dev, ide_pci_device_t *d)
 		    (findev->device == dev->device) &&
 		    ((findev->devfn - dev->devfn) == 1) &&
 		    (PCI_FUNC(findev->devfn) & 1)) {
-			u8 irq = 0, irq2 = 0;
 			if (findev->irq != dev->irq) {
 				/* FIXME: we need a core pci_set_interrupt() */
 				findev->irq = dev->irq;

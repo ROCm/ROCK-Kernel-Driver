@@ -15,6 +15,7 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/slab.h>
 
 #ifdef CONFIG_PNP_DEBUG
 	#define DEBUG
