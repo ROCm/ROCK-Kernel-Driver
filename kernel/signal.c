@@ -22,6 +22,7 @@
 #include <linux/security.h>
 #include <linux/syscalls.h>
 #include <linux/ptrace.h>
+#include <linux/suspend.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -2221,6 +2222,8 @@ sys_rt_sigtimedwait(const sigset_t __user *uthese,
 		if (timeout)
 			ret = -EINTR;
 	}
+	if (current->flags & PF_FREEZE)
+		refrigerator(1);
 
 	return ret;
 }
