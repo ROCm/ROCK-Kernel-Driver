@@ -93,6 +93,8 @@ EXPORT_SYMBOL(__clear_user);
 EXPORT_SYMBOL(__strncpy_from_user);
 EXPORT_SYMBOL(__strnlen_user);
 
+EXPORT_SYMBOL(clear_user_page);
+
 #ifdef CONFIG_MSCHUNKS
 EXPORT_SYMBOL(msChunks);
 #endif
