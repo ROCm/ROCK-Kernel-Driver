@@ -1,5 +1,6 @@
 /*
- * AGPGART module version 0.99
+ * AGPGART module version 0.100
+ * Copyright (C) 2002 Dave Jones
  * Copyright (C) 1999 Jeff Hartmann
  * Copyright (C) 1999 Precision Insight, Inc.
  * Copyright (C) 1999 Xi Graphics, Inc.
@@ -46,6 +47,7 @@ void agp_generic_destroy_page(void *addr);
 int agp_generic_suspend(void);
 void agp_generic_resume(void);
 void agp_free_key(int key);
+int agp_num_entries(void);
 
 #define PFX "agpgart: "
 

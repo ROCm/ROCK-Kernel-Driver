@@ -203,6 +203,40 @@ static int agp_return_size(void)
 	return current_size;
 }
 
+int agp_num_entries(void)
+{
+	int num_entries;
+	void *temp;
+
+	temp = agp_bridge.current_size;
+
+	switch (agp_bridge.size_type) {
+	case U8_APER_SIZE:
+		num_entries = A_SIZE_8(temp)->num_entries;
+		break;
+	case U16_APER_SIZE:
+		num_entries = A_SIZE_16(temp)->num_entries;
+		break;
+	case U32_APER_SIZE:
+		num_entries = A_SIZE_32(temp)->num_entries;
+		break;
+	case LVL2_APER_SIZE:
+		num_entries = A_SIZE_LVL2(temp)->num_entries;
+		break;
+	case FIXED_APER_SIZE:
+		num_entries = A_SIZE_FIX(temp)->num_entries;
+		break;
+	default:
+		num_entries = 0;
+		break;
+	}
+
+	num_entries -= agp_memory_reserved>>PAGE_SHIFT;
+	if (num_entries<0)
+		num_entries = 0;
+	return num_entries;
+}
+
 /* Routine to copy over information structure */
 
 int agp_copy_info(agp_kern_info * info)
@@ -712,4 +746,6 @@ EXPORT_SYMBOL(agp_generic_remove_memory);
 EXPORT_SYMBOL(agp_generic_alloc_by_type);
 EXPORT_SYMBOL(agp_generic_free_by_type);
 EXPORT_SYMBOL(global_cache_flush);
+
+EXPORT_SYMBOL_GPL(agp_num_entries);
 
