@@ -416,7 +416,7 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 	unsigned long flags;
 
 	/* FAILed message */
-	if (unlikely(le32_to_cpu(&msg->u.head[0]) & (1 << 13))) {
+	if (unlikely(le32_to_cpu(msg->u.head[0]) & (1 << 13))) {
 		struct i2o_message *pmsg;
 		u32 pm;
 
@@ -430,10 +430,10 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 		 * better be on the safe side since no one really follows
 		 * the spec to the book :)
 		 */
-		pm = le32_to_cpu(&msg->body[3]);
+		pm = le32_to_cpu(msg->body[3]);
 		pmsg = i2o_msg_in_to_virt(c, pm);
 
-		req = i2o_cntxt_list_get(c, le32_to_cpu(&pmsg->u.s.tcntxt));
+		req = i2o_cntxt_list_get(c, le32_to_cpu(pmsg->u.s.tcntxt));
 		if (unlikely(!req)) {
 			printk(KERN_ERR "block-osm: NULL reply received!\n");
 			return -1;
@@ -448,7 +448,7 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 		spin_lock_irqsave(q->queue_lock, flags);
 
 		while (end_that_request_chunk(req, !req->errors,
-					      le32_to_cpu(&pmsg->body[1]))) ;
+					      le32_to_cpu(pmsg->body[1]))) ;
 		end_that_request_last(req);
 
 		dev->open_queue_depth--;
@@ -463,7 +463,7 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 		return -1;
 	}
 
-	req = i2o_cntxt_list_get(c, le32_to_cpu(&msg->u.s.tcntxt));
+	req = i2o_cntxt_list_get(c, le32_to_cpu(msg->u.s.tcntxt));
 	if (unlikely(!req)) {
 		printk(KERN_ERR "block-osm: NULL reply received!\n");
 		return -1;
@@ -486,7 +486,7 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 		       "I2O Block: Data transfer to deleted device!\n");
 		spin_lock_irqsave(q->queue_lock, flags);
 		while (end_that_request_chunk
-		       (req, !req->errors, le32_to_cpu(&msg->body[1]))) ;
+		       (req, !req->errors, le32_to_cpu(msg->body[1]))) ;
 		end_that_request_last(req);
 
 		dev->open_queue_depth--;
@@ -502,7 +502,7 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 	 *      request in the context.
 	 */
 
-	st = le32_to_cpu(&msg->body[0]) >> 24;
+	st = le32_to_cpu(msg->body[0]) >> 24;
 
 	if (st != 0) {
 		int err;
@@ -523,7 +523,7 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 			"Volume has changed, waiting for acknowledgement"
 		};
 
-		err = le32_to_cpu(&msg->body[0]) & 0xffff;
+		err = le32_to_cpu(msg->body[0]) & 0xffff;
 
 		/*
 		 *      Device not ready means two things. One is that the
@@ -538,17 +538,17 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 		 */
 
 		printk(KERN_ERR "/dev/%s error: %s", dev->gd->disk_name,
-		       bsa_errors[le32_to_cpu(&msg->body[0]) & 0xffff]);
-		if (le32_to_cpu(&msg->body[0]) & 0x00ff0000)
+		       bsa_errors[le32_to_cpu(msg->body[0]) & 0xffff]);
+		if (le32_to_cpu(msg->body[0]) & 0x00ff0000)
 			printk(KERN_ERR " - DDM attempted %d retries",
-			       (le32_to_cpu(&msg->body[0]) >> 16) & 0x00ff);
+			       (le32_to_cpu(msg->body[0]) >> 16) & 0x00ff);
 		printk(KERN_ERR ".\n");
 		req->errors++;
 	} else
 		req->errors = 0;
 
 	if (!end_that_request_chunk
-	    (req, !req->errors, le32_to_cpu(&msg->body[1]))) {
+	    (req, !req->errors, le32_to_cpu(msg->body[1]))) {
 		add_disk_randomness(req->rq_disk);
 		spin_lock_irqsave(q->queue_lock, flags);
 

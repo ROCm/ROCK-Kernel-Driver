@@ -323,11 +323,11 @@ static void i2o_exec_lct_modified(struct i2o_controller *c)
 static int i2o_exec_reply(struct i2o_controller *c, u32 m,
 			  struct i2o_message *msg)
 {
-	if (le32_to_cpu(&msg->u.head[0]) & MSG_FAIL) {	// Fail bit is set
+	if (le32_to_cpu(msg->u.head[0]) & MSG_FAIL) {	// Fail bit is set
 		struct i2o_message *pmsg;	/* preserved message */
 		u32 pm;
 
-		pm = le32_to_cpu(&msg->body[3]);
+		pm = le32_to_cpu(msg->body[3]);
 
 		pmsg = i2o_msg_in_to_virt(c, pm);
 
@@ -340,10 +340,10 @@ static int i2o_exec_reply(struct i2o_controller *c, u32 m,
 		return -1;
 	}
 
-	if (le32_to_cpu(&msg->u.s.tcntxt) & 0x80000000)
+	if (le32_to_cpu(msg->u.s.tcntxt) & 0x80000000)
 		return i2o_msg_post_wait_complete(c, m, msg);
 
-	if ((le32_to_cpu(&msg->u.head[1]) >> 24) == I2O_CMD_LCT_NOTIFY) {
+	if ((le32_to_cpu(msg->u.head[1]) >> 24) == I2O_CMD_LCT_NOTIFY) {
 		struct work_struct *work;
 
 		pr_debug("%s: LCT notify received\n", c->name);
