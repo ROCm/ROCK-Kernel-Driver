@@ -485,12 +485,11 @@ out:
 }
 
 /*
- * i8042_enable_mux_mode checks whether the controller has an active
- * multiplexor and puts the chip into Multiplexed (as opposed to
- * Legacy) mode.
+ * i8042_set_mux_mode checks whether the controller has an active
+ * multiplexor and puts the chip into Multiplexed (1) or Legacy (0) mode.
  */
 
-static int i8042_enable_mux_mode(unsigned char *mux_version)
+static int i8042_set_mux_mode(unsigned int mode, unsigned char *mux_version)
 {
 
 	unsigned char param;
@@ -509,11 +508,11 @@ static int i8042_enable_mux_mode(unsigned char *mux_version)
 	param = 0xf0;
 	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0x0f)
 		return -1;
-	param = 0x56;
+	param = mode ? 0x56 : 0xf6;
 	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0xa9)
 		return -1;
-	param = 0xa4;
-	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == 0x5b)
+	param = mode ? 0xa4 : 0xa5;
+	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == (mode ? 0x5b : 0x5a))
 		return -1;
 
 	if (mux_version)
@@ -567,11 +566,11 @@ static int __init i8042_check_mux(void)
 {
 	unsigned char mux_version;
 
-	if (i8042_enable_mux_mode(&mux_version))
+	if (i8042_set_mux_mode(1, &mux_version))
 		return -1;
 
-	/* Workaround for broken chips which seem to support MUX, but in reality don't. */
-	/* They all report version 10.12 */
+	/* Workaround for interference with USB Legacy emulation */
+	/* that causes a v10.12 MUX to be found. */
 	if (mux_version == 0xAC)
 		return -1;
 
@@ -799,12 +798,21 @@ static int i8042_controller_init(void)
  */
 void i8042_controller_reset(void)
 {
-	if (i8042_reset) {
-		unsigned char param;
+	unsigned char param;
 
+/*
+ * Reset the controller if requested.
+ */
+
+	if (i8042_reset)
 		if (i8042_command(&param, I8042_CMD_CTL_TEST))
 			printk(KERN_ERR "i8042.c: i8042 controller reset timeout.\n");
-	}
+
+/*
+ * Disable MUX mode if present.
+ */
+
+	i8042_set_mux_mode(0, NULL);
 
 /*
  * Restore the original control register setting.
@@ -912,7 +920,8 @@ static int i8042_resume(struct device *dev, u32 level)
 	}
 
 	if (i8042_mux_present)
-		if (i8042_enable_mux_mode(NULL) || i8042_enable_mux_ports()) {
+		if (i8042_set_mux_mode(1, NULL) ||
+		    i8042_enable_mux_ports(&i8042_aux_values)) {
 			printk(KERN_WARNING "i8042: failed to resume active multiplexor, mouse won't work.\n");
 		}
 

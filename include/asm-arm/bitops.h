@@ -224,8 +224,8 @@ extern void _change_bit_be(int nr, volatile unsigned long * p);
 extern int _test_and_set_bit_be(int nr, volatile unsigned long * p);
 extern int _test_and_clear_bit_be(int nr, volatile unsigned long * p);
 extern int _test_and_change_bit_be(int nr, volatile unsigned long * p);
-extern int _find_first_zero_bit_be(void * p, unsigned size);
-extern int _find_next_zero_bit_be(void * p, int size, int offset);
+extern int _find_first_zero_bit_be(const void * p, unsigned size);
+extern int _find_next_zero_bit_be(const void * p, int size, int offset);
 extern int _find_first_bit_be(const unsigned long *p, unsigned size);
 extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
 

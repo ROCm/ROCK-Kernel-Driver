@@ -33,6 +33,7 @@
 
 #include <asm/arch/pxa-regs.h>
 #include <asm/arch/mainstone.h>
+#include <asm/arch/audio.h>
 #include <asm/arch/pxafb.h>
 #include <asm/arch/mmc.h>
 
@@ -120,6 +121,44 @@ static struct platform_device smc91x_device = {
 	.resource	= smc91x_resources,
 };
 
+static int mst_audio_startup(snd_pcm_substream_t *substream, void *priv)
+{
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		MST_MSCWR2 &= ~MST_MSCWR2_AC97_SPKROFF;
+	return 0;
+}
+
+static void mst_audio_shutdown(snd_pcm_substream_t *substream, void *priv)
+{
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		MST_MSCWR2 |= MST_MSCWR2_AC97_SPKROFF;
+}
+
+static long mst_audio_suspend_mask;
+
+static void mst_audio_suspend(void *priv)
+{
+	mst_audio_suspend_mask = MST_MSCWR2;
+	MST_MSCWR2 |= MST_MSCWR2_AC97_SPKROFF;
+}
+
+static void mst_audio_resume(void *priv)
+{
+	MST_MSCWR2 &= mst_audio_suspend_mask | ~MST_MSCWR2_AC97_SPKROFF;
+}
+
+static pxa2xx_audio_ops_t mst_audio_ops = {
+	.startup	= mst_audio_startup,
+	.shutdown	= mst_audio_shutdown,
+	.suspend	= mst_audio_suspend,
+	.resume		= mst_audio_resume,
+};
+
+static struct platform_device mst_audio_device = {
+	.name		= "pxa2xx-ac97",
+	.id		= -1,
+	.dev		= { .platform_data = &mst_audio_ops },
+};
 
 static void mainstone_backlight_power(int on)
 {
@@ -228,7 +267,14 @@ static struct pxamci_platform_data mainstone_mci_platform_data = {
 
 static void __init mainstone_init(void)
 {
+	/*
+	 * On Mainstone, we route AC97_SYSCLK via GPIO45 to
+	 * the audio daughter card
+	 */
+	pxa_gpio_mode(GPIO45_SYSCLK_AC97_MD);
+
 	platform_device_register(&smc91x_device);
+	platform_device_register(&mst_audio_device);
 
 	/* reading Mainstone's "Virtual Configuration Register"
 	   might be handy to select LCD type here */

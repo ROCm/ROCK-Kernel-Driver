@@ -185,7 +185,9 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 			break;
 
 		case HID_UP_LED:
-			map_led((usage->hid - 1) & 0xf);
+			if (usage->hid - 1 >= LED_MAX)
+				goto ignore;
+			map_led(usage->hid - 1);
 			break;
 
 		case HID_UP_DIGITIZER:
@@ -231,7 +233,6 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 
 		case HID_UP_CONSUMER:	/* USB HUT v1.1, pages 56-62 */
 
-			set_bit(EV_REP, input->evbit);
 			switch (usage->hid & HID_USAGE) {
 				case 0x000: goto ignore;
 				case 0x034: map_key_clear(KEY_SLEEP);		break;
@@ -268,6 +269,7 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 				case 0x226: map_key_clear(KEY_STOP);		break;
 				case 0x227: map_key_clear(KEY_REFRESH);		break;
 				case 0x22a: map_key_clear(KEY_BOOKMARKS);	break;
+				case 0x238: map_rel(REL_HWHEEL);		break;
 				default:    goto unknown;
 			}
 			break;
@@ -288,9 +290,13 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 				case 0x084: map_key_clear(KEY_FINANCE);		break;
 				case 0x085: map_key_clear(KEY_SPORT);		break;
 				case 0x086: map_key_clear(KEY_SHOP);	        break;
-				default:    goto unknown;
+				default:    goto ignore;
 			}
 			break;
+
+		case HID_UP_MSVENDOR:
+
+			goto ignore;
 			
 		case HID_UP_PID:
 
@@ -397,10 +403,11 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 	if (!input)
 		return;
 
+	input_regs(input, regs);
+	input_event(input, EV_MSC, MSC_SCAN, usage->hid);
+
 	if (!usage->type)
 		return;
-
-	input_regs(input, regs);
 
 	if (((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK_5) && (usage->hid == 0x00090005))
 		|| ((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK_7) && (usage->hid == 0x00090007))) {
@@ -568,13 +575,16 @@ int hidinput_connect(struct hid_device *hid)
 				hidinput->input.id.product = le16_to_cpu(dev->descriptor.idProduct);
 				hidinput->input.id.version = le16_to_cpu(dev->descriptor.bcdDevice);
 				hidinput->input.dev = &hid->intf->dev;
+
+				set_bit(EV_MSC, hidinput->input.evbit);
+				set_bit(MSC_SCAN, hidinput->input.mscbit);
 			}
 
 			for (i = 0; i < report->maxfield; i++)
 				for (j = 0; j < report->field[i]->maxusage; j++)
 					hidinput_configure_usage(hidinput, report->field[i],
 								 report->field[i]->usage + j);
-
+			
 			if (hid->quirks & HID_QUIRK_MULTI_INPUT) {
 				/* This will leave hidinput NULL, so that it
 				 * allocates another one if we have more inputs on

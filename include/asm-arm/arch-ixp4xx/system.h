@@ -31,13 +31,12 @@ static inline void arch_reset(char mode)
 		/* set the "key" register to enable access to
 		 * "timer" and "enable" registers
 		 */
-		*IXP4XX_OSWK = 0x482e; 	    
+		*IXP4XX_OSWK = IXP4XX_WDT_KEY;
 
-		/* write 0 to the timer register for an immidiate reset */
+		/* write 0 to the timer register for an immediate reset */
 		*IXP4XX_OSWT = 0;
 
-		/* disable watchdog interrupt, enable reset, enable count */
-		*IXP4XX_OSWE = 0x3;
+		*IXP4XX_OSWE = IXP4XX_WDT_RESET_ENABLE | IXP4XX_WDT_COUNT_ENABLE;
 	}
 }
 

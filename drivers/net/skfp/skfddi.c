@@ -169,8 +169,6 @@ static int num_boards;	/* total number of adapters configured */
 #define PRINTK(s, args...)
 #endif				// DRIVERDEBUG
 
-#define PRIV(dev) (&(((struct s_smc *)dev->priv)->os))
-
 /*
  * =================
  * = skfp_init_one =
@@ -205,7 +203,6 @@ static int skfp_init_one(struct pci_dev *pdev,
 {
 	struct net_device *dev;
 	struct s_smc *smc;	/* board pointer */
-	unsigned long port, len;
 	void __iomem *mem;
 	int err;
 
@@ -216,62 +213,43 @@ static int skfp_init_one(struct pci_dev *pdev,
 
 	err = pci_enable_device(pdev);
 	if (err)
-		goto err_out1;
+		return err;
 
-
-#ifdef MEM_MAPPED_IO
-	if (!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {
-		printk(KERN_ERR "skfp: region is not an MMIO resource\n");
-		err = -EIO;
-		goto err_out1;
-	}
-	port = pci_resource_start(pdev, 0);
-	len = pci_resource_len(pdev, 0);
-
-	if (len < 0x4000) {
-		printk(KERN_ERR "skfp: Invalid PCI region size: %lu\n", len);
-		err = -EIO;
-		goto err_out1;
-	}
-#else
-	if (!(pci_resource_flags(pdev, 1) & IO_RESOURCE_IO)) {
-		printk(KERN_ERR "skfp: region is not PIO resource\n");
-		err = -EIO;
-		goto err_out1;
-	}
-
-	port = pci_resource_start(pdev, 1);
-	len = pci_resource_len(pdev, 1);
-	if (len < FP_IO_LEN) {
-		printk(KERN_ERR "skfp: Invalid PCI region size: %d\n",
-		       io_len);
-		err = -EIO;
-		goto err_out1;
-	}
-#endif
 	err = pci_request_regions(pdev, "skfddi");
 	if (err)
 		goto err_out1;
 
 	pci_set_master(pdev);
 
-	dev = alloc_fddidev(sizeof(struct s_smc));
-	if (!dev) {
-		printk(KERN_ERR "skfp: Unable to allocate fddi device, "
-				"FDDI adapter will be disabled.\n");
-		err = -ENOMEM;
+#ifdef MEM_MAPPED_IO
+	if (!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {
+		printk(KERN_ERR "skfp: region is not an MMIO resource\n");
+		err = -EIO;
 		goto err_out2;
 	}
 
-#ifdef MEM_MAPPED_IO
-	mem = ioremap(port, len);
+	mem = ioremap(pci_resource_start(pdev, 0), 0x4000);
 #else
-	mem =ioport_map(port, len);
+	if (!(pci_resource_flags(pdev, 1) & IO_RESOURCE_IO)) {
+		printk(KERN_ERR "skfp: region is not PIO resource\n");
+		err = -EIO;
+		goto err_out2;
+	}
+
+	mem = ioport_map(pci_resource_start(pdev, 1), FP_IO_LEN);
 #endif
 	if (!mem) {
 		printk(KERN_ERR "skfp:  Unable to map register, "
 				"FDDI adapter will be disabled.\n");
 		err = -EIO;
+		goto err_out2;
+	}
+
+	dev = alloc_fddidev(sizeof(struct s_smc));
+	if (!dev) {
+		printk(KERN_ERR "skfp: Unable to allocate fddi device, "
+				"FDDI adapter will be disabled.\n");
+		err = -ENOMEM;
 		goto err_out3;
 	}
 
@@ -289,7 +267,7 @@ static int skfp_init_one(struct pci_dev *pdev,
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	/* Initialize board structure with bus-specific info */
-	smc = (struct s_smc *) dev->priv;
+	smc = netdev_priv(dev);
 	smc->os.dev = dev;
 	smc->os.bus_type = SK_BUS_TYPE_PCI;
 	smc->os.pdev = *pdev;
@@ -331,16 +309,17 @@ err_out5:
 	pci_free_consistent(pdev, MAX_FRAME_SIZE,
 			    smc->os.LocalRxBuffer, smc->os.LocalRxBufferDMA);
 err_out4:
-#ifdef MEM_MAPPED_IO
-	iounmap(smc->hw.iop);
-#else
-	ioport_unmap(smc->hw.iop);
-#endif
-err_out3:
 	free_netdev(dev);
+err_out3:
+#ifdef MEM_MAPPED_IO
+	iounmap(mem);
+#else
+	ioport_unmap(mem);
+#endif
 err_out2:
 	pci_release_regions(pdev);
 err_out1:
+	pci_disable_device(pdev);
 	return err;
 }
 
@@ -350,7 +329,7 @@ err_out1:
 static void __devexit skfp_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *p = pci_get_drvdata(pdev);
-	struct s_smc *lp = p->priv;
+	struct s_smc *lp = netdev_priv(p);
 
 	unregister_netdev(p);
 
@@ -376,6 +355,7 @@ static void __devexit skfp_remove_one(struct pci_dev *pdev)
 	pci_release_regions(pdev);
 	free_netdev(p);
 
+	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 }
 
@@ -406,8 +386,8 @@ static void __devexit skfp_remove_one(struct pci_dev *pdev)
  */
 static  int skfp_driver_init(struct net_device *dev)
 {
-	struct s_smc *smc = (struct s_smc *) dev->priv;
-	skfddi_priv *bp = PRIV(dev);
+	struct s_smc *smc = netdev_priv(dev);
+	skfddi_priv *bp = &smc->os;
 	int err = -EIO;
 
 	PRINTK(KERN_INFO "entering skfp_driver_init\n");
@@ -513,7 +493,7 @@ fail:
  */
 static int skfp_open(struct net_device *dev)
 {
-	struct s_smc *smc = (struct s_smc *) dev->priv;
+	struct s_smc *smc = netdev_priv(dev);
 	int err;
 
 	PRINTK(KERN_INFO "entering skfp_open\n");
@@ -580,8 +560,8 @@ static int skfp_open(struct net_device *dev)
  */
 static int skfp_close(struct net_device *dev)
 {
-	struct s_smc *smc = (struct s_smc *) dev->priv;
-	skfddi_priv *bp = PRIV(dev);
+	struct s_smc *smc = netdev_priv(dev);
+	skfddi_priv *bp = &smc->os;
 
 	CLI_FBI();
 	smt_reset_defaults(smc, 1);
@@ -640,15 +620,15 @@ irqreturn_t skfp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct s_smc *smc;	/* private board structure pointer */
-	skfddi_priv *bp = PRIV(dev);
-
+	skfddi_priv *bp;
 
 	if (dev == NULL) {
 		printk("%s: irq %d for unknown device\n", dev->name, irq);
 		return IRQ_NONE;
 	}
 
-	smc = (struct s_smc *) dev->priv;
+	smc = netdev_priv(dev);
+	bp = &smc->os;
 
 	// IRQs enabled or disabled ?
 	if (inpd(ADDR(B0_IMSK)) == 0) {
@@ -710,7 +690,7 @@ irqreturn_t skfp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  */
 struct net_device_stats *skfp_ctl_get_stats(struct net_device *dev)
 {
-	struct s_smc *bp = (struct s_smc *) dev->priv;
+	struct s_smc *bp = netdev_priv(dev);
 
 	/* Fill the bp->stats structure with driver-maintained counters */
 
@@ -874,7 +854,8 @@ struct net_device_stats *skfp_ctl_get_stats(struct net_device *dev)
  */
 static void skfp_ctl_set_multicast_list(struct net_device *dev)
 {
-	skfddi_priv *bp = PRIV(dev);
+	struct s_smc *smc = netdev_priv(dev);
+	skfddi_priv *bp = &smc->os;
 	unsigned long Flags;
 
 	spin_lock_irqsave(&bp->DriverLock, Flags);
@@ -887,7 +868,7 @@ static void skfp_ctl_set_multicast_list(struct net_device *dev)
 
 static void skfp_ctl_set_multicast_list_wo_lock(struct net_device *dev)
 {
-	struct s_smc *smc = (struct s_smc *) dev->priv;
+	struct s_smc *smc = netdev_priv(dev);
 	struct dev_mc_list *dmi;	/* ptr to multicast addr entry */
 	int i;
 
@@ -970,9 +951,9 @@ static void skfp_ctl_set_multicast_list_wo_lock(struct net_device *dev)
  */
 static int skfp_ctl_set_mac_address(struct net_device *dev, void *addr)
 {
-	struct s_smc *smc = (struct s_smc *) dev->priv;
+	struct s_smc *smc = netdev_priv(dev);
 	struct sockaddr *p_sockaddr = (struct sockaddr *) addr;
-	skfddi_priv *bp = (skfddi_priv *) & smc->os;
+	skfddi_priv *bp = &smc->os;
 	unsigned long Flags;
 
 
@@ -1010,12 +991,14 @@ static int skfp_ctl_set_mac_address(struct net_device *dev, void *addr)
 
 static int skfp_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	skfddi_priv *lp = PRIV(dev);
+	struct s_smc *smc = netdev_priv(dev);
+	skfddi_priv *lp = &smc->os;
 	struct s_skfp_ioctl ioc;
 	int status = 0;
 
 	if (copy_from_user(&ioc, rq->ifr_data, sizeof(struct s_skfp_ioctl)))
 		return -EFAULT;
+
 	switch (ioc.cmd) {
 	case SKFP_GET_STATS:	/* Get the driver statistics */
 		ioc.len = sizeof(lp->MacStat);
@@ -1088,7 +1071,8 @@ static int skfp_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
  */
 static int skfp_send_pkt(struct sk_buff *skb, struct net_device *dev)
 {
-	skfddi_priv *bp = PRIV(dev);
+	struct s_smc *smc = netdev_priv(dev);
+	skfddi_priv *bp = &smc->os;
 
 	PRINTK(KERN_INFO "skfp_send_pkt\n");
 
@@ -1115,7 +1099,7 @@ static int skfp_send_pkt(struct sk_buff *skb, struct net_device *dev)
 	}
 	bp->QueueSkb--;
 	skb_queue_tail(&bp->SendSkbQueue, skb);
-	send_queued_packets((struct s_smc *) dev->priv);
+	send_queued_packets(netdev_priv(dev));
 	if (bp->QueueSkb == 0) {
 		netif_stop_queue(dev);
 	}
@@ -1150,7 +1134,7 @@ static int skfp_send_pkt(struct sk_buff *skb, struct net_device *dev)
  */
 static void send_queued_packets(struct s_smc *smc)
 {
-	skfddi_priv *bp = (skfddi_priv *) & smc->os;
+	skfddi_priv *bp = &smc->os;
 	struct sk_buff *skb;
 	unsigned char fc;
 	int queue;
@@ -1322,7 +1306,7 @@ static void ResetAdapter(struct s_smc *smc)
  ************************/
 void llc_restart_tx(struct s_smc *smc)
 {
-	skfddi_priv *bp = (skfddi_priv *) & smc->os;
+	skfddi_priv *bp = &smc->os;
 
 	PRINTK(KERN_INFO "[llc_restart_tx]\n");
 
@@ -1506,7 +1490,7 @@ void dma_complete(struct s_smc *smc, volatile union s_fp_descr *descr, int flag)
 	 * unmap first, the hardware module could read inconsistent data.
 	 */
 	if (flag & DMA_WR) {
-		skfddi_priv *bp = (skfddi_priv *) & smc->os;
+		skfddi_priv *bp = &smc->os;
 		volatile struct s_smt_fp_rxd *r = &descr->r;
 
 		/* If SKB is NULL, we used the local buffer. */
@@ -1620,7 +1604,7 @@ void dump_data(unsigned char *Data, int length)
 void mac_drv_rx_complete(struct s_smc *smc, volatile struct s_smt_fp_rxd *rxd,
 			 int frag_count, int len)
 {
-	skfddi_priv *bp = (skfddi_priv *) & smc->os;
+	skfddi_priv *bp = &smc->os;
 	struct sk_buff *skb;
 	unsigned char *virt, *cp;
 	unsigned short ri;
@@ -1752,7 +1736,7 @@ void mac_drv_requeue_rxd(struct s_smc *smc, volatile struct s_smt_fp_rxd *rxd,
 
 		printk("fddi: Multi-fragment requeue!\n");
 
-	MaxFrameSize = ((skfddi_priv *) & smc->os)->MaxFrameSize;
+	MaxFrameSize = smc->os.MaxFrameSize;
 	src_rxd = rxd;
 	for (; frag_count > 0; frag_count--) {
 		next_rxd = src_rxd->rxd_next;
@@ -1828,7 +1812,7 @@ void mac_drv_fill_rxd(struct s_smc *smc)
 	// Walk through the list of free receive buffers, passing receive
 	// buffers to the HWM as long as RXDs are available.
 
-	MaxFrameSize = ((skfddi_priv *) & smc->os)->MaxFrameSize;
+	MaxFrameSize = smc->os.MaxFrameSize;
 	// Check if there is any RXD left.
 	while (HWM_GET_RX_FREE(smc) > 0) {
 		PRINTK(KERN_INFO ".\n");
@@ -1897,7 +1881,7 @@ void mac_drv_clear_rxd(struct s_smc *smc, volatile struct s_smt_fp_rxd *rxd,
 	for (; frag_count > 0; frag_count--) {
 		skb = rxd->rxd_os.skb;
 		if (skb != NULL) {
-			skfddi_priv *bp = (skfddi_priv *) & smc->os;
+			skfddi_priv *bp = &smc->os;
 			int MaxFrameSize = bp->MaxFrameSize;
 
 			pci_unmap_single(&bp->pdev, rxd->rxd_os.dma_addr,
@@ -1964,7 +1948,7 @@ int mac_drv_rx_init(struct s_smc *smc, int len, int fc,
 	memcpy(skb->data, look_ahead, len);
 
 	// deliver frame to system
-	skb->protocol = fddi_type_trans(skb, ((skfddi_priv *) & smc->os)->dev);
+	skb->protocol = fddi_type_trans(skb, smc->os.dev);
 	skb->dev->last_rx = jiffies;
 	netif_rx(skb);
 

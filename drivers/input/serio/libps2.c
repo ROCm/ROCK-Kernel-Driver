@@ -223,7 +223,8 @@ void ps2_init(struct ps2dev *ps2dev, struct serio *serio)
 }
 
 /*
- * ps2_handle_ack()
+ * ps2_handle_ack() is supposed to be used in interrupt handler
+ * to properly process ACK/NAK of a command from a PS/2 device.
  */
 
 int ps2_handle_ack(struct ps2dev *ps2dev, unsigned char data)
@@ -250,8 +251,9 @@ int ps2_handle_ack(struct ps2dev *ps2dev, unsigned char data)
 			}
 			/* Fall through */
 		default:
-			return 1;
+			return 0;
 	}
+
 
 	if (!ps2dev->nak && ps2dev->cmdcnt)
 		ps2dev->flags |= PS2_FLAG_CMD | PS2_FLAG_CMD1;
@@ -259,9 +261,17 @@ int ps2_handle_ack(struct ps2dev *ps2dev, unsigned char data)
 	ps2dev->flags &= ~PS2_FLAG_ACK;
 	wake_up_interruptible(&ps2dev->wait);
 
-	return data == PS2_RET_ACK || data == PS2_RET_NAK;
+	if (data != PS2_RET_ACK)
+		ps2_handle_response(ps2dev, data);
+
+	return 1;
 }
 
+/*
+ * ps2_handle_response() is supposed to be used in interrupt handler
+ * to properly store device's response to a command and notify process
+ * waiting for completion of the command.
+ */
 
 int ps2_handle_response(struct ps2dev *ps2dev, unsigned char data)
 {
