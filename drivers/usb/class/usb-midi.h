@@ -54,6 +54,10 @@
 #define USB_VENDOR_ID_STEINBERG		0x0763
 #define USBMIDI_STEINBERG_USB2MIDI	0x1001
 
+/* Mark of the Unicorn MIDI Devices */
+#define USB_VENDOR_ID_MOTU		0x07fd
+#define USBMIDI_MOTU_FASTLANE		0x0001
+
 /* ------------------------------------------------------------------------- */
 /* Supported devices */
 
@@ -101,8 +105,15 @@ static struct usb_midi_device usb_midi_devices[] = {
   { /* Roland SC8850 */
     "Roland SC8850",
     USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_SC8850, 2, -1,
-    { { 0x81, 15 }, {-1, -1} }, /** cables 0,1,2, and 3 **/
-    { { 0x01, 15 }, {-1, -1} },
+    { { 0x81, 0x3f }, {-1, -1} },
+    { { 0x01, 0x3f }, {-1, -1} },
+  },
+
+  { /* Roland SC8820 */
+    "Roland SC8820",
+    USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_SC8820, 2, -1,
+    { { 0x81, 0x13 }, {-1, -1} },
+    { { 0x01, 0x13 }, {-1, -1} },
   },
 
   { /* Roland SC8820 */
@@ -123,6 +134,12 @@ static struct usb_midi_device usb_midi_devices[] = {
     USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_PC300, 2, -1, 
     { { 0x81, 1 }, {-1, -1} },
     { { 0x01, 1 }, {-1, -1} },
+  },
+  { /* MOTU Fastlane USB */
+    "MOTU Fastlane USB",
+    USB_VENDOR_ID_MOTU, USBMIDI_MOTU_FASTLANE, 1, 0,
+    { { 0x82, 3 }, {-1, -1} },
+    { { 0x02, 3 }, {-1, -1} },
   }
 };
 
@@ -138,7 +155,9 @@ static struct usb_device_id usb_midi_ids [] = {
 	{ USB_DEVICE( USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_UA100G ) },
 	{ USB_DEVICE( USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_PC300 ) },
 	{ USB_DEVICE( USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_SC8850 ) },
+	{ USB_DEVICE( USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_SC8820 ) },
 	{ USB_DEVICE( USB_VENDOR_ID_YAMAHA, USBMIDI_YAMAHA_MU1000 ) },
+	{ USB_DEVICE( USB_VENDOR_ID_MOTU,   USBMIDI_MOTU_FASTLANE ) },
 /*	{ USB_DEVICE( USB_VENDOR_ID_STEINBERG, USBMIDI_STEINBERG_USB2MIDI ) },*/
 	{ } /* Terminating entry */
 };
