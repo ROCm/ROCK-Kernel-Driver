@@ -374,7 +374,6 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 			nsect = msect;
 		pBuf = rq->buffer + task_rq_offset(rq);
 		taskfile_input_data(drive, pBuf, nsect * SECTOR_WORDS);
-		rq->errors = 0;
 		rq->current_nr_sectors -= nsect;
 		msect -= nsect;
 
@@ -439,7 +438,6 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 		rq = HWGROUP(drive)->rq;
 		pBuf = rq->buffer + task_rq_offset(rq);
 		taskfile_output_data(drive, pBuf, SECTOR_WORDS);
-		rq->errors = 0;
 		rq->current_nr_sectors--;
 	}
 	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
@@ -523,7 +521,6 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 		taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
 		rq->current_nr_sectors -= nsect;
 	} while (msect);
-	rq->errors = 0;
 	if (HWGROUP(drive)->handler == NULL)
 		ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
 	return ide_started;
@@ -536,9 +533,10 @@ EXPORT_SYMBOL(task_mulout_intr);
 static void task_sectors(ide_drive_t *drive, struct request *rq,
 			 unsigned nsect, unsigned rw)
 {
-	if (rq->cbio)	/* fs request */
+	if (rq->cbio) {	/* fs request */
+		rq->errors = 0;
 		task_bio_sectors(drive, rq, nsect, rw);
-	else		/* task request */
+	} else		/* task request */
 		task_buffer_sectors(drive, rq, nsect, rw);
 }
 
@@ -547,7 +545,6 @@ static inline void task_bio_multi_sectors(ide_drive_t *drive,
 {
 	unsigned int nsect, msect = drive->mult_count;
 
-	rq->errors = 0;
 	do {
 		nsect = rq->current_nr_sectors;
 		if (nsect > msect)
@@ -565,9 +562,10 @@ static inline void task_bio_multi_sectors(ide_drive_t *drive,
 static void task_multi_sectors(ide_drive_t *drive,
 			       struct request *rq, unsigned rw)
 {
-	if (rq->cbio)	/* fs request */
+	if (rq->cbio) {	/* fs request */
+		rq->errors = 0;
 		task_bio_multi_sectors(drive, rq, rw);
-	else		/* task request */
+	} else		/* task request */
 		task_buffer_multi_sectors(drive, rq, rw);
 }
 
@@ -620,7 +618,6 @@ finish_rq:
 		return ide_stopped;
 	}
 
-	rq->errors = 0;
 	task_sectors(drive, rq, 1, IDE_PIO_IN);
 
 	/* If it was the last datablock check status and finish transfer. */
@@ -724,8 +721,6 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 
 	/* Still data left to transfer. */
 	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
-
-	rq->errors = 0;
 	task_sectors(drive, rq, 1, IDE_PIO_OUT);
 
 	return ide_started;
