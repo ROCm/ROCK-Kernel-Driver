@@ -110,7 +110,6 @@ static int sg_allow_dio = SG_ALLOW_DIO_DEF;
 
 #define SG_DEV_ARR_LUMP 6	/* amount to over allocate sg_dev_arr by */
 
-static int sg_init(void);
 static int sg_attach(Scsi_Device *);
 static int sg_detect(Scsi_Device *);
 static void sg_detach(Scsi_Device *);
@@ -126,7 +125,6 @@ static struct Scsi_Device_Template sg_template = {
 	.tag = "sg",
 	.scsi_type = 0xff,
 	.detect = sg_detect,
-	.init = sg_init,
 	.attach = sg_attach,
 	.detach = sg_detach
 };
@@ -235,6 +233,9 @@ static int sg_last_dev(void);
 #endif
 
 static Sg_device **sg_dev_arr = NULL;
+static int sg_dev_noticed;
+static int sg_dev_max;
+static int sg_nr_dev;
 
 #define SZ_SG_HEADER sizeof(struct sg_header)
 #define SZ_SG_IO_HDR sizeof(sg_io_hdr_t)
@@ -1340,57 +1341,8 @@ static struct file_operations sg_fops = {
 static int
 sg_detect(Scsi_Device * scsidp)
 {
-	sg_template.dev_noticed++;
+	sg_dev_noticed++;
 	return 1;
-}
-
-/* Driver initialization */
-static int
-sg_init()
-{
-	static int sg_registered = 0;
-	unsigned long iflags;
-	int tmp_dev_max;
-	Sg_device **tmp_da;
-
-	if ((sg_template.dev_noticed == 0) || sg_dev_arr)
-		return 0;
-
-	SCSI_LOG_TIMEOUT(3, printk("sg_init\n"));
-
-	write_lock_irqsave(&sg_dev_arr_lock, iflags);
-	tmp_dev_max = sg_template.dev_noticed + SG_DEV_ARR_LUMP;
-	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
-
-	tmp_da = (Sg_device **)vmalloc(
-				tmp_dev_max * sizeof(Sg_device *));
-	if (NULL == tmp_da) {
-		printk(KERN_ERR "sg_init: no space for sg_dev_arr\n");
-		return 1;
-	}
-	write_lock_irqsave(&sg_dev_arr_lock, iflags);
-
-	if (!sg_registered) {
-		if (register_chrdev(SCSI_GENERIC_MAJOR, "sg", &sg_fops)) {
-			printk(KERN_ERR
-			       "Unable to get major %d for generic SCSI device\n",
-			       SCSI_GENERIC_MAJOR);
-			write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
-			vfree((char *) tmp_da);
-			return 1;
-		}
-		sg_registered++;
-	}
-
-	memset(tmp_da, 0, tmp_dev_max * sizeof (Sg_device *));
-	sg_template.dev_max = tmp_dev_max;
-	sg_dev_arr = tmp_da;
-
-	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
-#ifdef CONFIG_PROC_FS
-	sg_proc_init();
-#endif				/* CONFIG_PROC_FS */
-	return 0;
 }
 
 #ifndef MODULE
@@ -1444,36 +1396,37 @@ sg_attach(Scsi_Device * scsidp)
 
 	if (!disk)
 		return 1;
+	if (scsi_slave_attach(scsidp))
+		return 1;
 	write_lock_irqsave(&sg_dev_arr_lock, iflags);
-	if (sg_template.nr_dev >= sg_template.dev_max) {	/* try to resize */
+	if (sg_nr_dev >= sg_dev_max) {	/* try to resize */
 		Sg_device **tmp_da;
-		int tmp_dev_max = sg_template.nr_dev + SG_DEV_ARR_LUMP;
+		int tmp_dev_max = sg_nr_dev + SG_DEV_ARR_LUMP;
 
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 		tmp_da = (Sg_device **)vmalloc(
 				tmp_dev_max * sizeof(Sg_device *));
 		if (NULL == tmp_da) {
-			scsidp->attached--;
 			printk(KERN_ERR
 			       "sg_attach: device array cannot be resized\n");
 			put_disk(disk);
+			scsi_slave_detach(scsidp);
 			return 1;
 		}
 		write_lock_irqsave(&sg_dev_arr_lock, iflags);
 		memset(tmp_da, 0, tmp_dev_max * sizeof (Sg_device *));
 		memcpy(tmp_da, sg_dev_arr,
-		       sg_template.dev_max * sizeof (Sg_device *));
+		       sg_dev_max * sizeof (Sg_device *));
 		vfree((char *) sg_dev_arr);
 		sg_dev_arr = tmp_da;
-		sg_template.dev_max = tmp_dev_max;
+		sg_dev_max = tmp_dev_max;
 	}
 
 find_empty_slot:
-	for (k = 0; k < sg_template.dev_max; k++)
+	for (k = 0; k < sg_dev_max; k++)
 		if (!sg_dev_arr[k])
 			break;
 	if (k > SG_MAX_DEVS_MASK) {
-		scsidp->attached--;
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 		printk(KERN_WARNING
 		       "Unable to attach sg device <%d, %d, %d, %d>"
@@ -1483,9 +1436,10 @@ find_empty_slot:
 		if (NULL != sdp)
 			vfree((char *) sdp);
 		put_disk(disk);
+		scsi_slave_detach(scsidp);
 		return 1;
 	}
-	if (k < sg_template.dev_max) {
+	if (k < sg_dev_max) {
 		if (NULL == sdp) {
 			write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 			sdp = (Sg_device *)vmalloc(sizeof(Sg_device));
@@ -1496,10 +1450,10 @@ find_empty_slot:
 	} else
 		sdp = NULL;
 	if (NULL == sdp) {
-		scsidp->attached--;
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 		printk(KERN_ERR "sg_attach: Sg_device cannot be allocated\n");
 		put_disk(disk);
+		scsi_slave_detach(scsidp);
 		return 1;
 	}
 
@@ -1527,7 +1481,7 @@ find_empty_slot:
 	sdp->sg_driverfs_dev.parent = &scsidp->sdev_driverfs_dev;
 	sdp->sg_driverfs_dev.bus = &scsi_driverfs_bus_type;
 
-	sg_template.nr_dev++;
+	sg_nr_dev++;
 	sg_dev_arr[k] = sdp;
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 
@@ -1570,7 +1524,7 @@ sg_detach(Scsi_Device * scsidp)
 		return;
 	delay = 0;
 	write_lock_irqsave(&sg_dev_arr_lock, iflags);
-	for (k = 0; k < sg_template.dev_max; k++) {
+	for (k = 0; k < sg_dev_max; k++) {
 		sdp = sg_dev_arr[k];
 		if ((NULL == sdp) || (sdp->device != scsidp))
 			continue;	/* dirty but lowers nesting */
@@ -1607,9 +1561,9 @@ sg_detach(Scsi_Device * scsidp)
 			SCSI_LOG_TIMEOUT(3, printk("sg_detach: dev=%d\n", k));
 			sg_dev_arr[k] = NULL;
 		}
-		scsidp->attached--;
-		sg_template.nr_dev--;
-		sg_template.dev_noticed--;	/* from <dan@lectra.fr> */
+		scsi_slave_detach(scsidp);
+		sg_nr_dev--;
+		sg_dev_noticed--;	/* from <dan@lectra.fr> */
 		break;
 	}
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
@@ -1643,9 +1597,21 @@ MODULE_PARM_DESC(def_reserved_size, "size of buffer reserved for each fd");
 static int __init
 init_sg(void)
 {
+	int rc;
+
 	if (def_reserved_size >= 0)
 		sg_big_buff = def_reserved_size;
-	return scsi_register_device(&sg_template);
+
+	rc = register_chrdev(SCSI_GENERIC_MAJOR, "sg", &sg_fops);
+	if (rc)
+		return rc;
+	rc = scsi_register_device(&sg_template);
+	if (rc)
+		return rc;
+#ifdef CONFIG_PROC_FS
+	sg_proc_init();
+#endif				/* CONFIG_PROC_FS */
+	return 0;
 }
 
 static void __exit
@@ -1660,7 +1626,7 @@ exit_sg(void)
 		vfree((char *) sg_dev_arr);
 		sg_dev_arr = NULL;
 	}
-	sg_template.dev_max = 0;
+	sg_dev_max = 0;
 }
 
 static int
@@ -2552,7 +2518,7 @@ sg_remove_sfp(Sg_device * sdp, Sg_fd * sfp)
 		if (sdp->detached && (NULL == sdp->headfp)) {
 			int k, maxd;
 
-			maxd = sg_template.dev_max;
+			maxd = sg_dev_max;
 			for (k = 0; k < maxd; ++k) {
 				if (sdp == sg_dev_arr[k])
 					break;
@@ -2684,7 +2650,7 @@ sg_last_dev()
 	unsigned long iflags;
 
 	read_lock_irqsave(&sg_dev_arr_lock, iflags);
-	for (k = sg_template.dev_max - 1; k >= 0; --k)
+	for (k = sg_dev_max - 1; k >= 0; --k)
 		if (sg_dev_arr[k] && sg_dev_arr[k]->device)
 			break;
 	read_unlock_irqrestore(&sg_dev_arr_lock, iflags);
@@ -2700,7 +2666,7 @@ sg_get_dev(int dev)
 
 	if (sg_dev_arr && (dev >= 0)) {
 		read_lock_irqsave(&sg_dev_arr_lock, iflags);
-		if (dev < sg_template.dev_max)
+		if (dev < sg_dev_max)
 			sdp = sg_dev_arr[dev];
 		read_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 	}
@@ -2982,7 +2948,7 @@ sg_proc_debug_info(char *buffer, int *len, off_t * begin,
 	}
 	max_dev = sg_last_dev();
 	PRINT_PROC("dev_max(currently)=%d max_active_device=%d (origin 1)\n",
-		   sg_template.dev_max, max_dev);
+		   sg_dev_max, max_dev);
 	PRINT_PROC(" def_reserved_size=%d\n", sg_big_buff);
 	for (j = 0; j < max_dev; ++j) {
 		if ((sdp = sg_get_dev(j))) {
