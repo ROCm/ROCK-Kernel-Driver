@@ -341,11 +341,11 @@ vm_info(char *page)
 		return 0;
 	}
 
-	p += sprintf(p, "\nTLB walker                     : %s implemented\n" \
+	p += sprintf(p, "\nTLB walker                     : %simplemented\n" \
 			"Number of DTR                  : %d\n" \
 			"Number of ITR                  : %d\n" \
 			"TLB insertable page sizes      : ",
-			vm_info_1.pal_vm_info_1_s.vw ? "\b":"not",
+			vm_info_1.pal_vm_info_1_s.vw ? "" : "not ",
 			vm_info_1.pal_vm_info_1_s.max_dtr_entry+1,
 			vm_info_1.pal_vm_info_1_s.max_itr_entry+1);
 
