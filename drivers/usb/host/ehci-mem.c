@@ -142,6 +142,10 @@ static void qh_put (struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 static void ehci_mem_cleanup (struct ehci_hcd *ehci)
 {
+	if (ehci->async)
+		qh_put (ehci, ehci->async);
+	ehci->async = 0;
+
 	/* PCI consistent memory and pools */
 	if (ehci->qtd_pool)
 		pci_pool_destroy (ehci->qtd_pool);
@@ -183,20 +187,20 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 			32 /* byte alignment (for hw parts) */,
 			4096 /* can't cross 4K */);
 	if (!ehci->qtd_pool) {
-		dbg ("no qtd pool");
-		ehci_mem_cleanup (ehci);
-		return -ENOMEM;
+		goto fail;
 	}
 
-	/* QH for control/bulk/intr transfers */
+	/* QHs for control/bulk/intr transfers */
 	ehci->qh_pool = pci_pool_create ("ehci_qh", ehci->hcd.pdev,
 			sizeof (struct ehci_qh),
 			32 /* byte alignment (for hw parts) */,
 			4096 /* can't cross 4K */);
 	if (!ehci->qh_pool) {
-		dbg ("no qh pool");
-		ehci_mem_cleanup (ehci);
-		return -ENOMEM;
+		goto fail;
+	}
+	ehci->async = ehci_qh_alloc (ehci, flags);
+	if (!ehci->async) {
+		goto fail;
 	}
 
 	/* ITD for high speed ISO transfers */
@@ -205,9 +209,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 			32 /* byte alignment (for hw parts) */,
 			4096 /* can't cross 4K */);
 	if (!ehci->itd_pool) {
-		dbg ("no itd pool");
-		ehci_mem_cleanup (ehci);
-		return -ENOMEM;
+		goto fail;
 	}
 
 	/* SITD for full/low speed split ISO transfers */
@@ -216,9 +218,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 			32 /* byte alignment (for hw parts) */,
 			4096 /* can't cross 4K */);
 	if (!ehci->sitd_pool) {
-		dbg ("no sitd pool");
-		ehci_mem_cleanup (ehci);
-		return -ENOMEM;
+		goto fail;
 	}
 
 	/* Hardware periodic table */
@@ -227,9 +227,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 			ehci->periodic_size * sizeof (u32),
 			&ehci->periodic_dma);
 	if (ehci->periodic == 0) {
-		dbg ("no hw periodic table");
-		ehci_mem_cleanup (ehci);
-		return -ENOMEM;
+		goto fail;
 	}
 	for (i = 0; i < ehci->periodic_size; i++)
 		ehci->periodic [i] = EHCI_LIST_END;
@@ -237,11 +235,14 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 	/* software shadow of hardware table */
 	ehci->pshadow = kmalloc (ehci->periodic_size * sizeof (void *), flags);
 	if (ehci->pshadow == 0) {
-		dbg ("no shadow periodic table");
-		ehci_mem_cleanup (ehci);
-		return -ENOMEM;
+		goto fail;
 	}
 	memset (ehci->pshadow, 0, ehci->periodic_size * sizeof (void *));
 
 	return 0;
+
+fail:
+	ehci_dbg (ehci, "couldn't init memory\n");
+	ehci_mem_cleanup (ehci);
+	return -ENOMEM;
 }

@@ -17,6 +17,13 @@
  */
 
 #include <linux/config.h>
+
+#ifdef CONFIG_USB_DEBUG
+	#define DEBUG
+#else
+	#undef DEBUG
+#endif
+
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
@@ -30,12 +37,6 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>
-
-#ifdef CONFIG_USB_DEBUG
-	#define DEBUG
-#else
-	#undef DEBUG
-#endif
 
 #include <linux/usb.h>
 
@@ -70,6 +71,7 @@
  *
  * HISTORY:
  *
+ * 2002-11-29	Correct handling for hw async_next register.
  * 2002-08-06	Handling for bulk and interrupt transfers is mostly shared;
  *	only scheduling is different, no arbitrary limitations.
  * 2002-07-25	Sanity check PCI reads, mostly for better cardbus support,
@@ -92,7 +94,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2002-Sep-23"
+#define DRIVER_VERSION "2002-Nov-29"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -114,7 +116,7 @@ static const char	hcd_name [] = "ehci-hcd";
 #define	EHCI_TUNE_MULT_TT	1
 
 #define EHCI_WATCHDOG_JIFFIES	(HZ/100)	/* arbitrary; ~10 msec */
-#define EHCI_ASYNC_JIFFIES	(HZ/3)		/* async idle timeout */
+#define EHCI_ASYNC_JIFFIES	(HZ/20)		/* async idle timeout */
 
 /* Initial IRQ latency:  lower than default */
 static int log2_irq_thresh = 0;		// 0 to 6
@@ -215,7 +217,7 @@ static void ehci_ready (struct ehci_hcd *ehci)
 
 	/* wait for any schedule enables/disables to take effect */
 	temp = 0;
-	if (ehci->async)
+	if (ehci->async->qh_next.qh)
 		temp = STS_ASS;
 	if (ehci->next_uframe != -1)
 		temp |= STS_PSS;
@@ -360,7 +362,6 @@ static int ehci_start (struct usb_hcd *hcd)
 	else					// N microframes cached
 		ehci->i_thresh = 2 + HCC_ISOC_THRES (hcc_params);
 
-	ehci->async = 0;
 	ehci->reclaim = 0;
 	ehci->next_uframe = -1;
 
@@ -373,6 +374,21 @@ static int ehci_start (struct usb_hcd *hcd)
 	}
 	writel (INTR_MASK, &ehci->regs->intr_enable);
 	writel (ehci->periodic_dma, &ehci->regs->frame_list);
+
+	/*
+	 * dedicate a qh for the async ring head, since we couldn't unlink
+	 * a 'real' qh without stopping the async schedule [4.8].  use it
+	 * as the 'reclamation list head' too.
+	 */
+	ehci->async->qh_next.qh = 0;
+	ehci->async->hw_next = QH_NEXT (ehci->async->qh_dma);
+	ehci->async->hw_info1 = cpu_to_le32 (QH_HEAD);
+	ehci->async->hw_token = cpu_to_le32 (QTD_STS_HALT);
+	ehci->async->hw_qtd_next = EHCI_LIST_END;
+	ehci->async->qh_state = QH_STATE_LINKED;
+	ehci_qtd_free (ehci, ehci->async->dummy);
+	ehci->async->dummy = 0;
+	writel ((u32)ehci->async->qh_dma, &ehci->regs->async_next);
 
 	/*
 	 * hcc_params controls whether ehci->regs->segment must (!!!)

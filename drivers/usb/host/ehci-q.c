@@ -678,33 +678,33 @@ done:
 static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
 	u32		dma = QH_NEXT (qh->qh_dma);
-	struct ehci_qh	*q;
+	struct ehci_qh	*head;
 
-	if (unlikely (!(q = ehci->async))) {
+	/* (re)start the async schedule? */
+	head = ehci->async;
+	if (ehci->async_idle)
+		del_timer (&ehci->watchdog);
+	else if (!head->qh_next.qh) {
 		u32	cmd = readl (&ehci->regs->command);
 
-		/* in case a clear of CMD_ASE didn't take yet */
-		(void) handshake (&ehci->regs->status, STS_ASS, 0, 150);
-
-		qh->hw_info1 |= __constant_cpu_to_le32 (QH_HEAD); /* [4.8] */
-		qh->qh_next.qh = qh;
-		qh->hw_next = dma;
-		wmb ();
-		ehci->async = qh;
-		writel ((u32)qh->qh_dma, &ehci->regs->async_next);
-		cmd |= CMD_ASE | CMD_RUN;
-		writel (cmd, &ehci->regs->command);
-		ehci->hcd.state = USB_STATE_RUNNING;
-		/* posted write need not be known to HC yet ... */
-	} else {
-		/* splice right after "start" of ring */
-		qh->hw_info1 &= ~__constant_cpu_to_le32 (QH_HEAD); /* [4.8] */
-		qh->qh_next = q->qh_next;
-		qh->hw_next = q->hw_next;
-		wmb ();
-		q->qh_next.qh = qh;
-		q->hw_next = dma;
+		if (!(cmd & CMD_ASE)) {
+			/* in case a clear of CMD_ASE didn't take yet */
+			(void) handshake (&ehci->regs->status, STS_ASS, 0, 150);
+			cmd |= CMD_ASE | CMD_RUN;
+			writel (cmd, &ehci->regs->command);
+			ehci->hcd.state = USB_STATE_RUNNING;
+			/* posted write need not be known to HC yet ... */
+		}
 	}
+
+	/* splice right after start */
+	qh->qh_next = head->qh_next;
+	qh->hw_next = head->hw_next;
+	wmb ();
+
+	head->qh_next.qh = qh;
+	head->hw_next = dma;
+
 	qh->qh_state = QH_STATE_LINKED;
 	/* qtd completions reported later by interrupt */
 
@@ -897,6 +897,14 @@ static void end_unlink_async (struct ehci_hcd *ehci)
 		qh_link_async (ehci, qh);
 	else
 		qh_put (ehci, qh);		// refcount from async list
+
+	/* it's not free to turn the async schedule on/off, so we leave it
+	 * active but idle for a while once it empties.
+	 */
+	if (!ehci->async->qh_next.qh && !timer_pending (&ehci->watchdog)) {
+		ehci->async_idle = 1;
+		mod_timer (&ehci->watchdog, jiffies + EHCI_ASYNC_JIFFIES);
+	}
 }
 
 /* makes sure the async qh will become idle */
@@ -909,7 +917,6 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 #ifdef DEBUG
 	if (ehci->reclaim
-			|| !ehci->async
 			|| qh->qh_state != QH_STATE_LINKED
 #ifdef CONFIG_SMP
 // this macro lies except on SMP compiles
@@ -919,30 +926,19 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		BUG ();
 #endif
 
-	qh->qh_state = QH_STATE_UNLINK;
-	ehci->reclaim = qh = qh_get (qh);
-
-	// dbg_qh ("start unlink", ehci, qh);
-
-	/* Remove the last QH (qhead)?  Stop async schedule first. */
-	if (unlikely (qh == ehci->async && qh->qh_next.qh == qh)) {
+	/* stop async schedule right now? */
+	if (unlikely (qh == ehci->async)) {
 		/* can't get here without STS_ASS set */
 		if (ehci->hcd.state != USB_STATE_HALT) {
 			writel (cmd & ~CMD_ASE, &ehci->regs->command);
-			(void) handshake (&ehci->regs->status, STS_ASS, 0, 150);
-#if 0
-			// one VT8235 system wants to die with STS_FATAL
-			// unless this qh is leaked here. others seem ok...
-			qh = qh_get (qh);
-			dbg_qh ("async/off", ehci, qh);
-#endif
+			wmb ();
+			// handshake later, if we need to
 		}
-		qh->qh_next.qh = ehci->async = 0;
-
-		ehci->reclaim_ready = 1;
-		tasklet_schedule (&ehci->tasklet);
 		return;
 	} 
+
+	qh->qh_state = QH_STATE_UNLINK;
+	ehci->reclaim = qh = qh_get (qh);
 
 	if (unlikely (ehci->hcd.state == USB_STATE_HALT)) {
 		ehci->reclaim_ready = 1;
@@ -951,13 +947,9 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	}
 
 	prev = ehci->async;
-	while (prev->qh_next.qh != qh && prev->qh_next.qh != ehci->async)
+	while (prev->qh_next.qh != qh)
 		prev = prev->qh_next.qh;
 
-	if (qh->hw_info1 & __constant_cpu_to_le32 (QH_HEAD)) {
-		ehci->async = prev;
-		prev->hw_info1 |= __constant_cpu_to_le32 (QH_HEAD);
-	}
 	prev->hw_next = qh->hw_next;
 	prev->qh_next = qh->qh_next;
 	wmb ();
@@ -979,7 +971,7 @@ scan_async (struct ehci_hcd *ehci)
 	unsigned		count;
 
 rescan:
-	qh = ehci->async;
+	qh = ehci->async->qh_next.qh;
 	count = 0;
 	if (likely (qh != 0)) {
 		do {
@@ -991,25 +983,17 @@ rescan:
 				/* concurrent unlink could happen here */
 				count += qh_completions (ehci, qh);
 				qh_put (ehci, qh);
+				goto rescan;
 			}
 
 			/* unlink idle entries, reducing HC PCI usage as
-			 * well as HCD schedule-scanning costs.  removing
-			 * the last qh is deferred, since it's costly.
+			 * well as HCD schedule-scanning costs.
 			 *
 			 * FIXME don't unlink idle entries so quickly; it
 			 * can penalize (common) half duplex protocols.
 			 */
 			if (list_empty (&qh->qtd_list) && !ehci->reclaim) {
-				if (qh->qh_next.qh != qh) {
-					// dbg ("irq/empty");
-					start_unlink_async (ehci, qh);
-				} else if (!timer_pending (&ehci->watchdog)) {
-					/* can't use IAA for last entry */
-					ehci->async_idle = 1;
-					mod_timer (&ehci->watchdog,
-						jiffies + EHCI_ASYNC_JIFFIES);
-				}
+				start_unlink_async (ehci, qh);
 			}
 
 			/* keep latencies down: let any irqs in */
@@ -1021,8 +1005,6 @@ rescan:
 			}
 
 			qh = qh->qh_next.qh;
-			if (!qh)		/* unlinked? */
-				goto rescan;
-		} while (qh != ehci->async);
+		} while (qh);
 	}
 }

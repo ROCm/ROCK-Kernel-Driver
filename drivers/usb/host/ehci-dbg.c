@@ -18,6 +18,17 @@
 
 /* this file is part of ehci-hcd.c */
 
+#define ehci_dbg(ehci, fmt, args...) \
+	dev_dbg (*(ehci)->hcd.controller, fmt, ## args )
+
+#ifdef EHCI_VERBOSE_DEBUG
+#define ehci_vdbg(ehci, fmt, args...) \
+	dev_dbg (*(ehci)->hcd.controller, fmt, ## args )
+#else
+#define ehci_vdbg(ehci, fmt, args...) do { } while (0)
+#endif
+
+
 #ifdef EHCI_VERBOSE_DEBUG
 #	define vdbg dbg
 #else
@@ -338,12 +349,8 @@ show_async (struct device *dev, char *buf, size_t count, loff_t off)
 	 * one QH per line, and TDs we know about
 	 */
 	spin_lock_irqsave (&ehci->lock, flags);
-	if (ehci->async) {
-		qh = ehci->async;
-		do {
-			qh_lines (qh, &next, &size);
-		} while ((qh = qh->qh_next.qh) != ehci->async);
-	}
+	for (qh = ehci->async->qh_next.qh; qh; qh = qh->qh_next.qh)
+		qh_lines (qh, &next, &size);
 	if (ehci->reclaim) {
 		temp = snprintf (next, size, "\nreclaim =\n");
 		size -= temp;
