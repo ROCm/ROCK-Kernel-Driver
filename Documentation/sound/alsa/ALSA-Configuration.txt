@@ -27,6 +27,13 @@ the card supports).  You don't need to configure the PnP via
 isapnptools.
 
 
+Creating ALSA devices
+=====================
+
+Use the MAKEDEV.snd script located in the directory named scripts
+in the linux kernel tree.
+
+
 Module parameters
 =================
 
