@@ -1625,13 +1625,13 @@ EXPORT_SYMBOL(msleep);
  */
 unsigned long msleep_interruptible(unsigned int msecs)
 {
-       unsigned long timeout = msecs_to_jiffies(msecs);
+	unsigned long timeout = msecs_to_jiffies(msecs);
 
-       while (timeout && !signal_pending(current)) {
-               set_current_state(TASK_INTERRUPTIBLE);
-               timeout = schedule_timeout(timeout);
-       }
-       return jiffies_to_msecs(timeout);
+	while (timeout && !signal_pending(current)) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		timeout = schedule_timeout(timeout);
+	}
+	return jiffies_to_msecs(timeout);
 }
 
 EXPORT_SYMBOL(msleep_interruptible);
