@@ -83,9 +83,9 @@
 #include <linux/kmod.h>
 #endif
 
-#if defined(CONFIG_NET_RADIO) || defined(CONFIG_NET_PCMCIA_RADIO)
+#ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
-#endif	/* CONFIG_NET_RADIO || CONFIG_NET_PCMCIA_RADIO */
+#endif	/* CONFIG_NET_RADIO */
 
 #include <asm/uaccess.h>
 
