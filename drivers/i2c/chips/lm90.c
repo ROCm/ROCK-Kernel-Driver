@@ -185,7 +185,7 @@ struct lm90_data {
 	s16 temp_input2, temp_low2, temp_high2; /* remote, combined */
 	s8 temp_crit1, temp_crit2;
 	u8 temp_hyst;
-	u16 alarms; /* bitvector, combined */
+	u8 alarms; /* bitvector */
 };
 
 /*
