@@ -23,6 +23,12 @@
 
 #define PTRACE_SYSCALL		  24
 
+/* 0x4200-0x4300 are reserved for architecture-independent additions.  */
+#define PTRACE_SETOPTIONS	0x4200
+
+/* options set using PTRACE_SETOPTIONS */
+#define PTRACE_O_TRACESYSGOOD	0x00000001
+
 #include <asm/ptrace.h>
 #include <linux/sched.h>
 
@@ -32,6 +38,7 @@ extern int ptrace_attach(struct task_struct *tsk);
 extern int ptrace_detach(struct task_struct *, unsigned int);
 extern void ptrace_disable(struct task_struct *);
 extern int ptrace_check_attach(struct task_struct *task, int kill);
+extern int ptrace_request(struct task_struct *child, long request, long addr, long data);
 extern void __ptrace_link(struct task_struct *child,
 				struct task_struct *new_parent);
 extern void __ptrace_unlink(struct task_struct *child);
