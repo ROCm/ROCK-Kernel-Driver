@@ -31,6 +31,7 @@
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
+#include <linux/init.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
@@ -44,8 +45,7 @@ unsigned long rom_length;
 unsigned long memory_start;
 unsigned long memory_end;
 
-char command_line[512];
-char saved_command_line[512];
+char command_line[COMMAND_LINE_SIZE];
 
 /* setup some dummy routines */
 static void dummy_waitbut(void)

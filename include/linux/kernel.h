@@ -54,6 +54,16 @@ void __might_sleep(char *file, int line);
 #define might_sleep_if(cond) do {} while (0)
 #endif
 
+#define abs(x) ({				\
+		int __x = (x);			\
+		(__x < 0) ? -__x : __x;		\
+	})
+
+#define labs(x) ({				\
+		long __x = (x);			\
+		(__x < 0) ? -__x : __x;		\
+	})
+
 extern struct notifier_block *panic_notifier_list;
 NORET_TYPE void panic(const char * fmt, ...)
 	__attribute__ ((NORET_AND format (printf, 1, 2)));
@@ -61,7 +71,6 @@ asmlinkage NORET_TYPE void do_exit(long error_code)
 	ATTRIB_NORET;
 NORET_TYPE void complete_and_exit(struct completion *, long)
 	ATTRIB_NORET;
-extern int abs(int);
 extern unsigned long simple_strtoul(const char *,char **,unsigned int);
 extern long simple_strtol(const char *,char **,unsigned int);
 extern unsigned long long simple_strtoull(const char *,char **,unsigned int);

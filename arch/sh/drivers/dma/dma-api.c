@@ -3,23 +3,24 @@
  *
  * SuperH-specific DMA management API
  *
- * Copyright (C) 2003  Paul Mundt
+ * Copyright (C) 2003, 2004  Paul Mundt
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
- */ 
+ */
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/proc_fs.h>
+#include <linux/list.h>
 #include <asm/dma.h>
 
-struct dma_info dma_info[MAX_DMA_CHANNELS] = { { 0, } };
 spinlock_t dma_spin_lock = SPIN_LOCK_UNLOCKED;
+static LIST_HEAD(registered_dmac_list);
 
-/* 
+/*
  * A brief note about the reasons for this API as it stands.
  *
  * For starters, the old ISA DMA API didn't work for us for a number of
@@ -54,122 +55,211 @@ spinlock_t dma_spin_lock = SPIN_LOCK_UNLOCKED;
 
 struct dma_info *get_dma_info(unsigned int chan)
 {
-	return dma_info + chan;
+	struct list_head *pos, *tmp;
+	unsigned int total = 0;
+
+	/*
+	 * Look for each DMAC's range to determine who the owner of
+	 * the channel is.
+	 */
+	list_for_each_safe(pos, tmp, &registered_dmac_list) {
+		struct dma_info *info = list_entry(pos, struct dma_info, list);
+
+		total += info->nr_channels;
+		if (chan > total)
+			continue;
+
+		return info;
+	}
+
+	return NULL;
+}
+
+struct dma_channel *get_dma_channel(unsigned int chan)
+{
+	struct dma_info *info = get_dma_info(chan);
+
+	if (!info)
+		return ERR_PTR(-EINVAL);
+
+	return info->channels + chan;
 }
 
 int get_dma_residue(unsigned int chan)
 {
 	struct dma_info *info = get_dma_info(chan);
+	struct dma_channel *channel = &info->channels[chan];
 
 	if (info->ops->get_residue)
-		return info->ops->get_residue(info);
-	
+		return info->ops->get_residue(channel);
+
 	return 0;
 }
 
 int request_dma(unsigned int chan, const char *dev_id)
 {
 	struct dma_info *info = get_dma_info(chan);
+	struct dma_channel *channel = &info->channels[chan];
 
-	down(&info->sem);
+	down(&channel->sem);
 
 	if (!info->ops || chan >= MAX_DMA_CHANNELS) {
-		up(&info->sem);
+		up(&channel->sem);
 		return -EINVAL;
 	}
-	
-	atomic_set(&info->busy, 1);
 
-	info->dev_id = dev_id;
+	atomic_set(&channel->busy, 1);
 
-	up(&info->sem);
+	strlcpy(channel->dev_id, dev_id, sizeof(channel->dev_id));
+
+	up(&channel->sem);
 
 	if (info->ops->request)
-		return info->ops->request(info);
-	
+		return info->ops->request(channel);
+
 	return 0;
 }
 
 void free_dma(unsigned int chan)
 {
 	struct dma_info *info = get_dma_info(chan);
+	struct dma_channel *channel = &info->channels[chan];
 
 	if (info->ops->free)
-		info->ops->free(info);
-	
-	atomic_set(&info->busy, 0);
+		info->ops->free(channel);
+
+	atomic_set(&channel->busy, 0);
 }
 
 void dma_wait_for_completion(unsigned int chan)
 {
 	struct dma_info *info = get_dma_info(chan);
+	struct dma_channel *channel = &info->channels[chan];
 
-	if (info->tei_capable) {
-		wait_event(info->wait_queue, (info->ops->get_residue(info) == 0));
+	if (channel->flags & DMA_TEI_CAPABLE) {
+		wait_event(channel->wait_queue,
+			   (info->ops->get_residue(channel) == 0));
 		return;
 	}
 
-	while (info->ops->get_residue(info))
+	while (info->ops->get_residue(channel))
 		cpu_relax();
 }
 
 void dma_configure_channel(unsigned int chan, unsigned long flags)
 {
 	struct dma_info *info = get_dma_info(chan);
+	struct dma_channel *channel = &info->channels[chan];
 
 	if (info->ops->configure)
-		info->ops->configure(info, flags);
+		info->ops->configure(channel, flags);
 }
 
 int dma_xfer(unsigned int chan, unsigned long from,
 	     unsigned long to, size_t size, unsigned int mode)
 {
 	struct dma_info *info = get_dma_info(chan);
+	struct dma_channel *channel = &info->channels[chan];
 
-	info->sar	= from;
-	info->dar	= to;
-	info->count	= size;
-	info->mode	= mode;
+	channel->sar	= from;
+	channel->dar	= to;
+	channel->count	= size;
+	channel->mode	= mode;
 
-	return info->ops->xfer(info);
+	return info->ops->xfer(channel);
 }
 
 #ifdef CONFIG_PROC_FS
 static int dma_read_proc(char *buf, char **start, off_t off,
 			 int len, int *eof, void *data)
 {
-	struct dma_info *info;
+	struct list_head *pos, *tmp;
 	char *p = buf;
-	int i;
 
-	for (i = 0, info = dma_info; i < MAX_DMA_CHANNELS; i++, info++) {
-		if (!atomic_read(&info->busy))
-			continue;
+	if (list_empty(&registered_dmac_list))
+		return 0;
 
-		p += sprintf(p, "%2d: %14s    %s\n", i,
-			     info->ops->name, info->dev_id);
+	/*
+	 * Iterate over each registered DMAC
+	 */
+	list_for_each_safe(pos, tmp, &registered_dmac_list) {
+		struct dma_info *info = list_entry(pos, struct dma_info, list);
+		int i;
+
+		/*
+		 * Iterate over each channel
+		 */
+		for (i = 0; i < info->nr_channels; i++) {
+			struct dma_channel *channel = info->channels + i;
+
+			if (!(channel->flags & DMA_CONFIGURED))
+				continue;
+
+			p += sprintf(p, "%2d: %14s    %s\n", i,
+				     info->name, channel->dev_id);
+		}
 	}
 
 	return p - buf;
 }
 #endif
 
-int __init register_dmac(struct dma_ops *ops)
+
+int __init register_dmac(struct dma_info *info)
 {
 	int i;
 
-	printk("DMA: Registering %s handler.\n", ops->name);
+	INIT_LIST_HEAD(&info->list);
 
-	for (i = 0; i < MAX_DMA_CHANNELS; i++) {
-		struct dma_info *info = get_dma_info(i);
+	printk(KERN_INFO "DMA: Registering %s handler (%d channels).\n",
+	       info->name, info->nr_channels);
 
-		info->chan = i;
+	BUG_ON((info->flags & DMAC_CHANNELS_CONFIGURED) && !info->channels);
 
-		init_MUTEX(&info->sem);
-		init_waitqueue_head(&info->wait_queue);
+	/*
+	 * Don't touch pre-configured channels
+	 */
+	if (!(info->flags & DMAC_CHANNELS_CONFIGURED)) {
+		unsigned int size;
+
+		size = sizeof(struct dma_channel) * info->nr_channels;
+
+		info->channels = kmalloc(size, GFP_KERNEL);
+		if (!info->channels)
+			return -ENOMEM;
+
+		memset(info->channels, 0, size);
 	}
 
+	for (i = 0; i < info->nr_channels; i++) {
+		struct dma_channel *chan = info->channels + i;
+
+		chan->chan = i;
+
+		memcpy(chan->dev_id, "Unused", 7);
+
+		if (info->flags & DMAC_CHANNELS_TEI_CAPABLE)
+			chan->flags |= DMA_TEI_CAPABLE;
+
+		init_MUTEX(&chan->sem);
+		init_waitqueue_head(&chan->wait_queue);
+
+#ifdef CONFIG_SYSFS
+		dma_create_sysfs_files(chan);
+#endif
+	}
+
+	list_add(&info->list, &registered_dmac_list);
+
 	return 0;
+}
+
+void __exit unregister_dmac(struct dma_info *info)
+{
+	if (!(info->flags & DMAC_CHANNELS_CONFIGURED))
+		kfree(info->channels);
+
+	list_del(&info->list);
 }
 
 static int __init dma_api_init(void)
@@ -191,8 +281,11 @@ MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(request_dma);
 EXPORT_SYMBOL(free_dma);
+EXPORT_SYMBOL(register_dmac);
+EXPORT_SYMBOL(unregister_dmac);
 EXPORT_SYMBOL(get_dma_residue);
 EXPORT_SYMBOL(get_dma_info);
+EXPORT_SYMBOL(get_dma_channel);
 EXPORT_SYMBOL(dma_xfer);
 EXPORT_SYMBOL(dma_wait_for_completion);
 EXPORT_SYMBOL(dma_configure_channel);

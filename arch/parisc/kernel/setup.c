@@ -45,8 +45,6 @@
 #include <asm/pdc_chassis.h>
 #include <asm/io.h>
 
-#define COMMAND_LINE_SIZE 1024
-char	saved_command_line[COMMAND_LINE_SIZE];
 char	command_line[COMMAND_LINE_SIZE];
 
 /* Intended for ccio/sba/cpu statistics under /proc/bus/{runway|gsc} */

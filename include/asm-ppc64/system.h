@@ -128,8 +128,6 @@ static inline void flush_altivec_to_thread(struct task_struct *t)
 }
 #endif
 
-extern int abs(int);
-
 extern struct task_struct *__switch_to(struct task_struct *,
 				       struct task_struct *);
 #define switch_to(prev, next, last)	((last) = __switch_to((prev), (next)))

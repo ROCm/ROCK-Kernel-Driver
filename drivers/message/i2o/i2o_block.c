@@ -861,6 +861,7 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
 	struct i2ob_device *dev = disk->private_data;
+	void __user *argp = (void __user *)arg;
 
 	/* Anyone capable of this syscall can do *real bad* things */
 
@@ -873,13 +874,13 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 			i2o_block_biosparam(get_capacity(disk), 
 					&g.cylinders, &g.heads, &g.sectors);
 			g.start = get_start_sect(inode->i_bdev);
-			return copy_to_user((void *)arg,&g, sizeof(g))?-EFAULT:0;
+			return copy_to_user(argp, &g, sizeof(g))?-EFAULT:0;
 		}
 		
 		case BLKI2OGRSTRAT:
-			return put_user(dev->rcache, (int *)arg);
+			return put_user(dev->rcache, (int __user *)argp);
 		case BLKI2OGWSTRAT:
-			return put_user(dev->wcache, (int *)arg);
+			return put_user(dev->wcache, (int __user *)argp);
 		case BLKI2OSRSTRAT:
 			if(arg<0||arg>CACHE_SMARTFETCH)
 				return -EINVAL;

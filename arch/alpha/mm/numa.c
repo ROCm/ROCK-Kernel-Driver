@@ -371,7 +371,7 @@ show_mem(void)
 
 	printk("\nMem-info:\n");
 	show_free_areas();
-	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
+	printk("Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
 	for (nid = 0; nid < numnodes; nid++) {
 		struct page * lmem_map = node_mem_map(nid);
 		i = node_spanned_pages(nid);

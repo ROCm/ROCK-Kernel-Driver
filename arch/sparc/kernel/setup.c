@@ -244,8 +244,7 @@ extern unsigned short ram_flags;
 
 extern int root_mountflags;
 
-char saved_command_line[256];
-char reboot_command[256];
+char reboot_command[COMMAND_LINE_SIZE];
 enum sparc_cpu sparc_cpu_model;
 
 struct tt_entry *sparc_ttable;

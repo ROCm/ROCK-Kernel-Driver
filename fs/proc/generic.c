@@ -17,6 +17,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/idr.h>
+#include <linux/namei.h>
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
 
@@ -321,21 +322,14 @@ static void release_inode_number(unsigned int inum)
 	spin_unlock(&proc_inum_lock);
 }
 
-static int
-proc_readlink(struct dentry *dentry, char __user *buffer, int buflen)
-{
-	char *s = PDE(dentry->d_inode)->data;
-	return vfs_readlink(dentry, buffer, buflen, s);
-}
-
 static int proc_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-	char *s = PDE(dentry->d_inode)->data;
-	return vfs_follow_link(nd, s);
+	nd_set_link(nd, PDE(dentry->d_inode)->data);
+	return 0;
 }
 
 static struct inode_operations proc_link_inode_operations = {
-	.readlink	= proc_readlink,
+	.readlink	= generic_readlink,
 	.follow_link	= proc_follow_link,
 };
 

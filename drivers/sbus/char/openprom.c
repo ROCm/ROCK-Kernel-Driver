@@ -149,7 +149,6 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 	char buffer[OPROMMAXPARAM+1], *buf;
 	struct openpromio *opp;
 	int bufsize, len, error = 0;
-	extern char saved_command_line[];
 	static int cnt;
 
 	if (cmd == OPROMSETOPT)

@@ -833,30 +833,14 @@ typedef struct ide_dma_ops_s {
 #define ide_rq_offset(rq) \
 	(((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
 
-/*
- * taskfiles really should use hard_cur_sectors as well!
- */
-#define task_rq_offset(rq) \
-	(((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE)
-
 static inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
 {
-	/*
-	 * fs request
-	 */
-	if (rq->bio)
-		return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
-
-	/*
-	 * task request
-	 */
-	return rq->buffer + task_rq_offset(rq);
+	return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
 }
 
 static inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned long *flags)
 {
-	if (rq->bio)
-		bio_kunmap_irq(buffer, flags);
+	bio_kunmap_irq(buffer, flags);
 }
 #endif /* !CONFIG_IDE_TASKFILE_IO */
 
@@ -1415,42 +1399,32 @@ extern void atapi_output_bytes(ide_drive_t *, void *, u32);
 extern void taskfile_input_data(ide_drive_t *, void *, u32);
 extern void taskfile_output_data(ide_drive_t *, void *, u32);
 
-#ifdef CONFIG_IDE_TASKFILE_IO
-
 #define IDE_PIO_IN	0
 #define IDE_PIO_OUT	1
 
-static inline void task_sectors(ide_drive_t *drive, struct request *rq,
-				unsigned nsect, int rw)
+static inline void __task_sectors(ide_drive_t *drive, char *buf,
+				  unsigned nsect, unsigned rw)
 {
-	unsigned long flags;
-	unsigned int bio_rq;
-	char *buf;
-
-	/*
-	 * bio_rq flag is needed because we can call
-	 * rq_unmap_buffer() with rq->cbio == NULL
-	 */
-	bio_rq = rq->cbio ? 1 : 0;
-
-	if (bio_rq)
-		buf = rq_map_buffer(rq, &flags);	/* fs request */
-	else
-		buf = rq->buffer + blk_rq_offset(rq);	/* task request */
-
 	/*
 	 * IRQ can happen instantly after reading/writing
 	 * last sector of the datablock.
 	 */
-	process_that_request_first(rq, nsect);
-
 	if (rw == IDE_PIO_OUT)
 		taskfile_output_data(drive, buf, nsect * SECTOR_WORDS);
 	else
 		taskfile_input_data(drive, buf, nsect * SECTOR_WORDS);
+}
 
-	if (bio_rq)
-		rq_unmap_buffer(buf, &flags);
+#ifdef CONFIG_IDE_TASKFILE_IO
+static inline void task_bio_sectors(ide_drive_t *drive, struct request *rq,
+				    unsigned nsect, unsigned rw)
+{
+	unsigned long flags;
+	char *buf = rq_map_buffer(rq, &flags);
+
+	process_that_request_first(rq, nsect);
+	__task_sectors(drive, buf, nsect, rw);
+	rq_unmap_buffer(buf, &flags);
 }
 #endif /* CONFIG_IDE_TASKFILE_IO */
 

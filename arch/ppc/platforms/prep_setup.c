@@ -76,7 +76,6 @@ extern void rs_nvram_write_val(int addr,
 extern void ibm_prep_init(void);
 
 extern void prep_find_bridges(void);
-extern char saved_command_line[];
 
 int _prep_type;
 

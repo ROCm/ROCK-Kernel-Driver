@@ -518,7 +518,6 @@ static int filesystems_read_proc(char *page, char **start, off_t off,
 static int cmdline_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
-	extern char saved_command_line[];
 	int len;
 
 	len = sprintf(page, "%s\n", saved_command_line);

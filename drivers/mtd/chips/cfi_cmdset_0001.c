@@ -378,7 +378,7 @@ static int get_chip(struct map_info *map, struct flchip *chip, unsigned long adr
 				chip->state = FL_ERASING;
 				chip->oldstate = FL_READY;
 				printk(KERN_ERR "Chip not ready after erase "
-				       "suspended: status = 0x%x\n", status);
+				       "suspended: status = 0x%llx\n", status);
 				return -EIO;
 			}
 
@@ -963,7 +963,7 @@ static inline int do_write_buffer(struct map_info *map, struct flchip *chip,
 	   So we must check here and reset those bits if they're set. Otherwise
 	   we're just pissing in the wind */
 	if (status & CMD(0x30)) {
-		printk(KERN_WARNING "SR.4 or SR.5 bits set in buffer write (status %x). Clearing.\n", status);
+		printk(KERN_WARNING "SR.4 or SR.5 bits set in buffer write (status %llx). Clearing.\n", status);
 		cfi_write(map, CMD(0x50), cmd_adr);
 		cfi_write(map, CMD(0x70), cmd_adr);
 	}

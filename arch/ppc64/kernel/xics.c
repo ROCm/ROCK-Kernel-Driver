@@ -240,14 +240,13 @@ static unsigned int real_irq_to_virt(unsigned int real_irq)
 static int get_irq_server(unsigned int irq)
 {
 	cpumask_t cpumask = irq_affinity[irq];
-	cpumask_t allcpus = CPU_MASK_ALL;
 	cpumask_t tmp = CPU_MASK_NONE;
 	unsigned int server;
 
 #ifdef CONFIG_IRQ_ALL_CPUS
 	/* For the moment only implement delivery to all cpus or one cpu */
 	if (smp_threads_ready) {
-		if (cpus_equal(cpumask, allcpus)) {
+		if (cpus_equal(cpumask, CPU_MASK_ALL)) {
 			server = default_distrib_server;
 		} else {
 			cpus_and(tmp, cpu_online_map, cpumask);
@@ -276,7 +275,7 @@ static int get_irq_server(unsigned int irq)
 static void xics_enable_irq(unsigned int virq)
 {
 	unsigned int irq;
-	long call_status;
+	int call_status;
 	unsigned int server;
 
 	irq = virt_irq_to_real(irq_offset_down(virq));
@@ -288,7 +287,7 @@ static void xics_enable_irq(unsigned int virq)
 				DEFAULT_PRIORITY);
 	if (call_status != 0) {
 		printk(KERN_ERR "xics_enable_irq: irq=%x: ibm_set_xive "
-		       "returned %lx\n", irq, call_status);
+		       "returned %x\n", irq, call_status);
 		return;
 	}
 
@@ -296,14 +295,14 @@ static void xics_enable_irq(unsigned int virq)
 	call_status = rtas_call(ibm_int_on, 1, 1, NULL, irq);
 	if (call_status != 0) {
 		printk(KERN_ERR "xics_enable_irq: irq=%x: ibm_int_on "
-		       "returned %lx\n", irq, call_status);
+		       "returned %x\n", irq, call_status);
 		return;
 	}
 }
 
 static void xics_disable_real_irq(unsigned int irq)
 {
-	long call_status;
+	int call_status;
 	unsigned int server;
 
 	if (irq == XICS_IPI)
@@ -312,7 +311,7 @@ static void xics_disable_real_irq(unsigned int irq)
 	call_status = rtas_call(ibm_int_off, 1, 1, NULL, irq);
 	if (call_status != 0) {
 		printk(KERN_ERR "xics_disable_real_irq: irq=%x: "
-		       "ibm_int_off returned %lx\n", irq, call_status);
+		       "ibm_int_off returned %x\n", irq, call_status);
 		return;
 	}
 
@@ -321,7 +320,7 @@ static void xics_disable_real_irq(unsigned int irq)
 	call_status = rtas_call(ibm_set_xive, 3, 1, NULL, irq, server, 0xff);
 	if (call_status != 0) {
 		printk(KERN_ERR "xics_disable_irq: irq=%x: ibm_set_xive(0xff)"
-		       " returned %lx\n", irq, call_status);
+		       " returned %x\n", irq, call_status);
 		return;
 	}
 }
@@ -613,26 +612,25 @@ void xics_request_IPIs(void)
 static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 {
 	unsigned int irq;
-	long status;
-	unsigned long xics_status[2];
+	int status;
+	int xics_status[2];
 	unsigned long newmask;
-	cpumask_t allcpus = CPU_MASK_ALL;
 	cpumask_t tmp = CPU_MASK_NONE;
 
 	irq = virt_irq_to_real(irq_offset_down(virq));
 	if (irq == XICS_IPI || irq == NO_IRQ)
 		return;
 
-	status = rtas_call(ibm_get_xive, 1, 3, (void *)&xics_status, irq);
+	status = rtas_call(ibm_get_xive, 1, 3, xics_status, irq);
 
 	if (status) {
 		printk(KERN_ERR "xics_set_affinity: irq=%d ibm,get-xive "
-		       "returns %ld\n", irq, status);
+		       "returns %d\n", irq, status);
 		return;
 	}
 
 	/* For the moment only implement delivery to all cpus or one cpu */
-	if (cpus_equal(cpumask, allcpus)) {
+	if (cpus_equal(cpumask, CPU_MASK_ALL)) {
 		newmask = default_distrib_server;
 	} else {
 		cpus_and(tmp, cpu_online_map, cpumask);
@@ -646,7 +644,7 @@ static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 
 	if (status) {
 		printk(KERN_ERR "xics_set_affinity irq=%d ibm,set-xive "
-		       "returns %ld\n", irq, status);
+		       "returns %d\n", irq, status);
 		return;
 	}
 }
@@ -657,10 +655,10 @@ static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 void xics_migrate_irqs_away(void)
 {
 	int set_indicator = rtas_token("set-indicator");
-	const unsigned long giqs = 9005UL; /* Global Interrupt Queue Server */
-	unsigned long status = 0;
+	const unsigned int giqs = 9005UL; /* Global Interrupt Queue Server */
+	int status = 0;
 	unsigned int irq, cpu = smp_processor_id();
-	unsigned long xics_status[2];
+	int xics_status[2];
 	unsigned long flags;
 
 	BUG_ON(set_indicator == RTAS_UNKNOWN_SERVICE);
@@ -671,7 +669,7 @@ void xics_migrate_irqs_away(void)
 
 	/* Refuse any new interrupts... */
 	rtas_call(set_indicator, 3, 1, &status, giqs,
-		  hard_smp_processor_id(), 0UL);
+		  hard_smp_processor_id(), 0);
 	WARN_ON(status != 0);
 
 	/* Allow IPIs again... */
@@ -694,11 +692,10 @@ void xics_migrate_irqs_away(void)
 
 		spin_lock_irqsave(&desc->lock, flags);
 
-		status = rtas_call(ibm_get_xive, 1, 3, (void *)&xics_status,
-				   irq);
+		status = rtas_call(ibm_get_xive, 1, 3, xics_status, irq);
 		if (status) {
 			printk(KERN_ERR "migrate_irqs_away: irq=%d "
-					"ibm,get-xive returns %ld\n",
+					"ibm,get-xive returns %d\n",
 					irq, status);
 			goto unlock;
 		}
@@ -721,7 +718,7 @@ void xics_migrate_irqs_away(void)
 				irq, xics_status[0], xics_status[1]);
 		if (status)
 			printk(KERN_ERR "migrate_irqs_away irq=%d "
-					"ibm,set-xive returns %ld\n",
+					"ibm,set-xive returns %d\n",
 					irq, status);
 
 unlock:

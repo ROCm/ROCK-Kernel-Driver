@@ -325,7 +325,7 @@ int request_irq(unsigned int irq,
 
 	action->handler = handler;
 	action->flags = irqflags;
-	action->mask = 0;
+	cpus_clear(action->mask);
 	action->name = devname;
 	action->next = NULL;
 	action->dev_id = dev_id;
@@ -389,7 +389,7 @@ static void write_err_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 }
 
 static struct irqaction irq0  =
-{ write_err_interrupt, SA_INTERRUPT, 0, "bus write error", NULL, NULL};
+{ write_err_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "bus write error", NULL, NULL};
 
 void __init init_IRQ(void)
 {

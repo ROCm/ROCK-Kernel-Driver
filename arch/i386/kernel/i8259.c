@@ -332,7 +332,7 @@ static irqreturn_t math_error_irq(int cpl, void *dev_id, struct pt_regs *regs)
  * New motherboards sometimes make IRQ 13 be a PCI interrupt,
  * so allow interrupt sharing.
  */
-static struct irqaction fpu_irq = { math_error_irq, 0, 0, "fpu", NULL, NULL };
+static struct irqaction fpu_irq = { math_error_irq, 0, CPU_MASK_NONE, "fpu", NULL, NULL };
 
 void __init init_ISA_irqs (void)
 {

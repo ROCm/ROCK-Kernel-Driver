@@ -129,8 +129,11 @@ static void __init find_max_pfn_node(int nid)
 }
 
 /* 
- * Allocate memory for the pg_data_t via a crude pre-bootmem method
- * We ought to relocate these onto their own node later on during boot.
+ * Allocate memory for the pg_data_t for this node via a crude pre-bootmem
+ * method.  For node zero take this from the bottom of memory, for
+ * subsequent nodes place them at node_remap_start_vaddr which contains
+ * node local data in physically node local memory.  See setup_memory()
+ * for details.
  */
 static void __init allocate_pgdat(int nid)
 {

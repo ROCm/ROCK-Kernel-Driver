@@ -394,7 +394,7 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	unsigned int year, mon, day, hour, min, sec;
-	unsigned long *ret = kmalloc(4*8, GFP_KERNEL);
+	int ret[8];
 	int n, sn, error;
 	char stkbuf[40];  /* its small, its on stack */
 
@@ -411,7 +411,6 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 		n = scnprintf (stkbuf, sizeof(stkbuf), "%lu\n",
 				mktime(year, mon, day, hour, min, sec));
 	}
-	kfree(ret);
 
 	sn = strlen (stkbuf) +1;
 	if (*ppos >= sn)
@@ -434,7 +433,6 @@ static int ppc_rtas_sensor_read(char * buf, char ** start, off_t off,
 		int count, int *eof, void *data)
 {
 	int i,j,n;
-	unsigned long ret;
 	int state, error;
 	char *buffer;
 	int get_sensor_state = rtas_token("get-sensor-state");
@@ -464,11 +462,10 @@ static int ppc_rtas_sensor_read(char * buf, char ** start, off_t off,
 		/* A sensor may have multiple instances */
 		while (j >= 0) {
 
-			error =	rtas_call(get_sensor_state, 2, 2, &ret, 
+			error =	rtas_call(get_sensor_state, 2, 2, &state, 
 				  	  sensors.sensor[i].token, 
 				  	  sensors.sensor[i].quant - j);
 
-			state = (int) ret;
 			n += ppc_rtas_process_sensor(sensors.sensor[i], state, 
 					     	     error, buffer+n );
 			n += sprintf (buffer+n, "\n");

@@ -11,6 +11,7 @@
 
 #include <linux/config.h>
 #include <linux/seq_file.h>
+#include <linux/init.h>
 #include <linux/dma-mapping.h>
 
 struct pt_regs;
@@ -112,9 +113,7 @@ struct machdep_calls {
 };
 
 extern struct machdep_calls ppc_md;
-#define COMMAND_LINE_SIZE 512
 extern char cmd_line[COMMAND_LINE_SIZE];
-extern char saved_command_line[COMMAND_LINE_SIZE];
 
 /* Functions to produce codes on the leds.
  * The SRC code should be unique for the message category and should

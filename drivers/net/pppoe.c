@@ -691,7 +691,7 @@ static int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 		if (put_user(po->pppoe_dev->mtu -
 			     sizeof(struct pppoe_hdr) -
 			     PPP_HDRLEN,
-			     (int *) arg))
+			     (int __user *) arg))
 			break;
 		err = 0;
 		break;
@@ -702,7 +702,7 @@ static int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 			break;
 
 		err = -EFAULT;
-		if (get_user(val,(int *) arg))
+		if (get_user(val,(int __user *) arg))
 			break;
 
 		if (val < (po->pppoe_dev->mtu
@@ -715,7 +715,7 @@ static int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 
 	case PPPIOCSFLAGS:
 		err = -EFAULT;
-		if (get_user(val, (int *) arg))
+		if (get_user(val, (int __user *) arg))
 			break;
 		err = 0;
 		break;
@@ -736,7 +736,7 @@ static int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 		   PPPoE address to which frames are forwarded to */
 		err = -EFAULT;
 		if (copy_from_user(&po->pppoe_relay,
-				   (void*)arg,
+				   (void __user *)arg,
 				   sizeof(struct sockaddr_pppox)))
 			break;
 

@@ -4,7 +4,7 @@
 /*
  *  Driver for HAL2 sound processors
  *  Copyright (c) 1999 Ulf Carlsson <ulfc@bun.falkenberg.se>
- *  Copyright (c) 2001 Ladislav Michl <ladis@psi.cz>
+ *  Copyright (c) 2001, 2002, 2003 Ladislav Michl <ladis@linux-mips.org>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as 
@@ -22,15 +22,9 @@
  */
 
 #include <asm/addrspace.h>
-#include <asm/sgi/sgihpc.h>
+#include <asm/sgi/hpc3.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
-
-#define H2_HAL2_BASE		0x58000
-#define H2_CTL_PIO		(H2_HAL2_BASE + 0 * 0x400)
-#define H2_AES_PIO		(H2_HAL2_BASE + 1 * 0x400)
-#define H2_VOL_PIO		(H2_HAL2_BASE + 2 * 0x400)
-#define H2_SYN_PIO		(H2_HAL2_BASE + 3 * 0x400)
 
 /* Indirect status register */
 
@@ -207,122 +201,48 @@
 #define H2I_UTIME_2_LD		0xffff		/* seconds, LSB's */
 #define H2I_UTIME_3_LD		0xffff		/* seconds, MSB's */
 
-typedef volatile u32 hal2_reg_t;
-
-typedef struct stru_hal2_ctl_regs hal2_ctl_regs_t;
-struct stru_hal2_ctl_regs {
-	hal2_reg_t _unused0[4];
-	hal2_reg_t isr;			/* 0x10 Status Register */
-	hal2_reg_t _unused1[3];
-	hal2_reg_t rev;			/* 0x20 Revision Register */
-	hal2_reg_t _unused2[3];
-	hal2_reg_t iar;			/* 0x30 Indirect Address Register */
-	hal2_reg_t _unused3[3];
-	hal2_reg_t idr0;		/* 0x40 Indirect Data Register 0 */
-	hal2_reg_t _unused4[3];
-	hal2_reg_t idr1;		/* 0x50 Indirect Data Register 1 */
-	hal2_reg_t _unused5[3];
-	hal2_reg_t idr2;		/* 0x60 Indirect Data Register 2 */
-	hal2_reg_t _unused6[3];
-	hal2_reg_t idr3;		/* 0x70 Indirect Data Register 3 */
+struct hal2_ctl_regs {
+	u32 _unused0[4];
+	volatile u32 isr;		/* 0x10 Status Register */
+	u32 _unused1[3];
+	volatile u32 rev;		/* 0x20 Revision Register */
+	u32 _unused2[3];
+	volatile u32 iar;		/* 0x30 Indirect Address Register */
+	u32 _unused3[3];
+	volatile u32 idr0;		/* 0x40 Indirect Data Register 0 */
+	u32 _unused4[3];
+	volatile u32 idr1;		/* 0x50 Indirect Data Register 1 */
+	u32 _unused5[3];
+	volatile u32 idr2;		/* 0x60 Indirect Data Register 2 */
+	u32 _unused6[3];
+	volatile u32 idr3;		/* 0x70 Indirect Data Register 3 */
 };
 
-typedef struct stru_hal2_aes_regs hal2_aes_regs_t;
-struct stru_hal2_aes_regs {
-	hal2_reg_t rx_stat[2];		/* Status registers */
-	hal2_reg_t rx_cr[2];		/* Control registers */
-	hal2_reg_t rx_ud[4];		/* User data window */
-	hal2_reg_t rx_st[24];		/* Channel status data */
+struct hal2_aes_regs {
+	volatile u32 rx_stat[2];	/* Status registers */
+	volatile u32 rx_cr[2];		/* Control registers */
+	volatile u32 rx_ud[4];		/* User data window */
+	volatile u32 rx_st[24];		/* Channel status data */
 	
-	hal2_reg_t tx_stat[1];		/* Status register */
-	hal2_reg_t tx_cr[3];		/* Control registers */
-	hal2_reg_t tx_ud[4];		/* User data window */
-	hal2_reg_t tx_st[24];		/* Channel status data */
+	volatile u32 tx_stat[1];	/* Status register */
+	volatile u32 tx_cr[3];		/* Control registers */
+	volatile u32 tx_ud[4];		/* User data window */
+	volatile u32 tx_st[24];		/* Channel status data */
 };
 
-typedef struct stru_hal2_vol_regs hal2_vol_regs_t;
-struct stru_hal2_vol_regs {
-	hal2_reg_t right;		/* 0x00 Right volume */
-	hal2_reg_t left;		/* 0x04 Left volume */
+struct hal2_vol_regs {
+	volatile u32 right;		/* Right volume */
+	volatile u32 left;		/* Left volume */
 };
 
-typedef struct stru_hal2_syn_regs hal2_syn_regs_t;
-struct stru_hal2_syn_regs {
-	hal2_reg_t _unused0[2];
-	hal2_reg_t page;		/* DOC Page register */
-	hal2_reg_t regsel;		/* DOC Register selection */
-	hal2_reg_t dlow;		/* DOC Data low */
-	hal2_reg_t dhigh;		/* DOC Data high */
-	hal2_reg_t irq;			/* IRQ Status */
-	hal2_reg_t dram;		/* DRAM Access */
+struct hal2_syn_regs {
+	u32 _unused0[2];
+	volatile u32 page;		/* DOC Page register */
+	volatile u32 regsel;		/* DOC Register selection */
+	volatile u32 dlow;		/* DOC Data low */
+	volatile u32 dhigh;		/* DOC Data high */
+	volatile u32 irq;		/* IRQ Status */
+	volatile u32 dram;		/* DRAM Access */
 };
 
-/* HAL2 specific structures */
-
-typedef struct stru_hal2_pbus hal2_pbus_t;
-struct stru_hal2_pbus {
-	struct hpc3_pbus_dmacregs *pbus;
-	int pbusnr;
-	unsigned int ctrl;		/* Current state of pbus->pbdma_ctrl */
-};
-
-typedef struct stru_hal2_binfo hal2_binfo_t;
-typedef struct stru_hal2_buffer hal2_buf_t;
-struct stru_hal2_binfo {
-	volatile struct hpc_dma_desc desc;
-	hal2_buf_t *next;		/* pointer to next buffer */
-	int cnt;			/* bytes in buffer */
-};
-#define H2_BUFFER_SIZE	(PAGE_SIZE - \
-		((sizeof(hal2_binfo_t) - 1) / 8 + 1) * 8)
-struct stru_hal2_buffer {
-	hal2_binfo_t info;
-	char data[H2_BUFFER_SIZE] __attribute__((aligned(8)));
-};
-
-typedef struct stru_hal2_codec hal2_codec_t;
-struct stru_hal2_codec {
-	hal2_buf_t *head;
-	hal2_buf_t *tail; 
-	hal2_pbus_t pbus;
-	unsigned int format;		/* Audio data format */
-	int voices;			/* mono/stereo */
-	unsigned int sample_rate;
-	unsigned int master;		/* Master frequency */
-	unsigned short mod;		/* MOD value */
-	unsigned short inc;		/* INC value */
-
-	wait_queue_head_t dma_wait;
-	spinlock_t lock;
-	struct semaphore sem;
-
-	int usecount;			/* recording and playback are 
-					 * independent */
-};
-
-#define H2_MIX_OUTPUT_ATT	0
-#define H2_MIX_INPUT_GAIN	1
-#define H2_MIXERS		2
-typedef struct stru_hal2_mixer hal2_mixer_t;
-struct stru_hal2_mixer {
-	int modcnt;
-	unsigned int volume[H2_MIXERS];
-};
-
-typedef struct stru_hal2_card hal2_card_t;
-struct stru_hal2_card {
-	int dev_dsp;			/* audio device */
-	int dev_mixer;			/* mixer device */
-	int dev_midi;			/* midi device */
-	
-	hal2_ctl_regs_t *ctl_regs;	/* HAL2 ctl registers */
-	hal2_aes_regs_t *aes_regs;	/* HAL2 vol registers */
-	hal2_vol_regs_t *vol_regs;	/* HAL2 aes registers */
-	hal2_syn_regs_t *syn_regs;	/* HAL2 syn registers */
-
-	hal2_codec_t dac;
-	hal2_codec_t adc;
-	hal2_mixer_t mixer;
-};
-
-#endif				/* __HAL2_H */
+#endif	/* __HAL2_H */

@@ -12,6 +12,9 @@ From kernel/suspend.c:
  *				...you'd better find out how to get along
  *				   without your data.
  *
+ * If you change kernel command line between suspend and resume...
+ *			        ...prepare for nasty fsck or worse.
+ *
  * (*) pm interface support is needed to make it safe.
 
 You need to append resume=/dev/your_swap_partition to kernel command

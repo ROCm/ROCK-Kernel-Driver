@@ -171,7 +171,7 @@ static void gen_rtc_interrupt(unsigned long arg)
 /*
  *	Now all the various file operations that we export.
  */
-static ssize_t gen_rtc_read(struct file *file, char *buf,
+static ssize_t gen_rtc_read(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
 	DECLARE_WAITQUEUE(wait, current);
@@ -200,10 +200,10 @@ static ssize_t gen_rtc_read(struct file *file, char *buf,
 	/* first test allows optimizer to nuke this case for 32-bit machines */
 	if (sizeof (int) != sizeof (long) && count == sizeof (unsigned int)) {
 		unsigned int uidata = data;
-		retval = put_user(uidata, (unsigned long *)buf);
+		retval = put_user(uidata, (unsigned long __user *)buf);
 	}
 	else {
-		retval = put_user(data, (unsigned long *)buf);
+		retval = put_user(data, (unsigned long __user *)buf);
 	}
 	if (!retval)
 		retval = sizeof(unsigned long);
@@ -278,6 +278,7 @@ static int gen_rtc_ioctl(struct inode *inode, struct file *file,
 {
 	struct rtc_time wtime;
 	struct rtc_pll_info pll;
+	void __user *argp = (void __user *)arg;
 
 	switch (cmd) {
 
@@ -285,13 +286,12 @@ static int gen_rtc_ioctl(struct inode *inode, struct file *file,
 	    if (get_rtc_pll(&pll))
 	 	    return -EINVAL;
 	    else
-		    return copy_to_user((void *)arg, &pll, sizeof pll) ? -EFAULT : 0;
+		    return copy_to_user(argp, &pll, sizeof pll) ? -EFAULT : 0;
 
 	case RTC_PLL_SET:
 		if (!capable(CAP_SYS_TIME))
 			return -EACCES;
-		if (copy_from_user(&pll, (struct rtc_pll_info*)arg,
-				   sizeof(pll)))
+		if (copy_from_user(&pll, argp, sizeof(pll)))
 			return -EFAULT;
 	    return set_rtc_pll(&pll);
 
@@ -307,7 +307,7 @@ static int gen_rtc_ioctl(struct inode *inode, struct file *file,
 		memset(&wtime, 0, sizeof(wtime));
 		get_rtc_time(&wtime);
 
-		return copy_to_user((void *)arg, &wtime, sizeof(wtime)) ? -EFAULT : 0;
+		return copy_to_user(argp, &wtime, sizeof(wtime)) ? -EFAULT : 0;
 
 	case RTC_SET_TIME:	/* Set the RTC */
 	    {
@@ -317,8 +317,7 @@ static int gen_rtc_ioctl(struct inode *inode, struct file *file,
 		if (!capable(CAP_SYS_TIME))
 			return -EACCES;
 
-		if (copy_from_user(&wtime, (struct rtc_time *)arg,
-				   sizeof(wtime)))
+		if (copy_from_user(&wtime, argp, sizeof(wtime)))
 			return -EFAULT;
 
 		year = wtime.tm_year + 1900;

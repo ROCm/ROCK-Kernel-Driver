@@ -50,9 +50,7 @@ extern cpumask_t cpu_online_map;
 extern int smp_num_cpus;
 #define cpu_possible_map	cpu_present_mask
 
-#define cpu_online(cpu)		cpu_isset(cpu, cpu_online_map)
-
-extern int smp_call_function_on_cpu(void (*func) (void *info), void *info,int retry, int wait, unsigned long cpu);
+int smp_call_function_on_cpu(void (*func) (void *info), void *info,int retry, int wait, cpumask_t cpu);
 
 #else /* CONFIG_SMP */
 

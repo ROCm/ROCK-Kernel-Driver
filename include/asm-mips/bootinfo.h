@@ -12,6 +12,7 @@
 #define _ASM_BOOTINFO_H
 
 #include <linux/types.h>
+#include <asm/setup.h>
 
 /*
  * The MACH_GROUP_ IDs are the equivalent to PCI vendor IDs; the remaining
@@ -209,7 +210,7 @@
 #define MACH_GROUP_TITAN       22	/* PMC-Sierra Titan		*/
 #define  MACH_TITAN_YOSEMITE	1	/* PMC-Sierra Yosemite		*/
 
-#define CL_SIZE			(256)
+#define CL_SIZE			COMMAND_LINE_SIZE
 
 const char *get_system_type(void);
 

@@ -10,12 +10,16 @@ struct open_intent {
 	int	create_mode;
 };
 
+enum { MAX_NESTED_LINKS = 5 };
+
 struct nameidata {
 	struct dentry	*dentry;
 	struct vfsmount *mnt;
 	struct qstr	last;
 	unsigned int	flags;
 	int		last_type;
+	unsigned	depth;
+	char *saved_names[MAX_NESTED_LINKS + 1];
 
 	/* Intent data */
 	union {
@@ -66,5 +70,15 @@ extern int follow_up(struct vfsmount **, struct dentry **);
 
 extern struct dentry *lock_rename(struct dentry *, struct dentry *);
 extern void unlock_rename(struct dentry *, struct dentry *);
+
+static inline void nd_set_link(struct nameidata *nd, char *path)
+{
+	nd->saved_names[nd->depth] = path;
+}
+
+static inline char *nd_get_link(struct nameidata *nd)
+{
+	return nd->saved_names[nd->depth];
+}
 
 #endif /* _LINUX_NAMEI_H */

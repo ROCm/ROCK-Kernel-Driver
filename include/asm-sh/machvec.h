@@ -17,6 +17,7 @@
 #include <asm/machtypes.h>
 #include <asm/machvec_init.h>
 
+struct device;
 struct timeval;
 
 struct sh_machine_vector
@@ -62,6 +63,9 @@ struct sh_machine_vector
 	void (*mv_init_pci)(void);
 
 	void (*mv_heartbeat)(void);
+
+	void *(*mv_consistent_alloc)(struct device *, size_t, dma_addr_t *, int);
+	void (*mv_consistent_free)(struct device *, size_t, void *, dma_addr_t);
 };
 
 extern struct sh_machine_vector sh_mv;

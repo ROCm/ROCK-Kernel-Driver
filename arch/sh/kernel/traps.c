@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.16 2004/03/16 00:10:54 lethal Exp $
+/* $Id: traps.c,v 1.17 2004/05/02 01:46:30 sugioka Exp $
  *
  *  linux/arch/sh/traps.c
  *
@@ -559,7 +559,7 @@ int is_dsp_inst(struct pt_regs *regs)
 	 * Safe guard if DSP mode is already enabled or we're lacking
 	 * the DSP altogether.
 	 */
-	if (!test_bit(CPU_HAS_DSP, &(cpu_data->flags)) || (regs->sr & SR_DSP))
+	if (!(cpu_data->flags & CPU_HAS_DSP) || (regs->sr & SR_DSP))
 		return 0;
 
 	get_user(inst, ((unsigned short *) regs->pc));
@@ -636,7 +636,7 @@ void __init trap_init(void)
 		= (void *)do_illegal_slot_inst;
 
 #ifdef CONFIG_CPU_SH4
-	if (!test_bit(CPU_HAS_FPU, &(cpu_data->flags))) {
+	if (!(cpu_data->flags & CPU_HAS_FPU)) {
 		/* For SH-4 lacking an FPU, treat floating point instructions
 		   as reserved. */
 		/* entry 64 corresponds to EXPEVT=0x800 */

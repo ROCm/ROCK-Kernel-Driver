@@ -68,6 +68,9 @@ register struct thread_info *__current_thread_info __asm__("$28");
 #if defined(CONFIG_PAGE_SIZE_4KB) && defined(CONFIG_MIPS64)
 #define THREAD_SIZE_ORDER (2)
 #endif
+#ifdef CONFIG_PAGE_SIZE_8KB
+#define THREAD_SIZE_ORDER (1)
+#endif
 #ifdef CONFIG_PAGE_SIZE_16KB
 #define THREAD_SIZE_ORDER (0)
 #endif

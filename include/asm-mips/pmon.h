@@ -17,6 +17,9 @@ struct callvectors {
 	int	(*printf) (const char*, ...);		/*	20 */
 	void	(*cacheflush) (void);			/*	24 */
 	char*	(*gets) (char*);			/*	28 */
+	int	(*cpustart) (int, void *, int, int);	/*	32 */
 };
+
+extern struct callvectors *debug_vectors;
 
 #endif /* _ASM_PMON_H */
