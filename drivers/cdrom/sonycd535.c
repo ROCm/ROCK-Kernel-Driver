@@ -344,8 +344,7 @@ static inline void
 sony_sleep(void)
 {
 	if (sony535_irq_used <= 0) {	/* poll */
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(0);
+		yield();
 	} else {	/* Interrupt driven */
 		cli();
 		enable_interrupts();
