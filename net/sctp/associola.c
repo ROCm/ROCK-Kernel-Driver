@@ -642,7 +642,7 @@ __u16 __sctp_association_get_next_ssn(sctp_association_t *asoc, __u16 sid)
 int sctp_cmp_addr_exact(const union sctp_addr *ss1,
 			const union sctp_addr *ss2)
 {
-	struct sctp_func *af;
+	struct sctp_af *af;
 
 	af = sctp_get_af_specific(ss1->sa.sa_family);
 	if (!af)
