@@ -10,12 +10,12 @@ fi
 if [ "$CONFIG_USB_UHCI_HCD" != "y" ]; then
    dep_tristate '  UHCI HCD Alternate (most Intel and VIA) support (EXPERIMENTAL)' CONFIG_USB_UHCI_HCD_ALT $CONFIG_USB $CONFIG_EXPERIMENTAL
 fi
-if [ "$CONFIG_USB_UHCI_ALT" != "y" ]; then
-   dep_tristate '  UHCI (Intel PIIX4, VIA, ...) support' CONFIG_USB_UHCI $CONFIG_USB
-fi
-if [ "$CONFIG_USB_UHCI" != "y" ]; then
-   dep_tristate '  UHCI Alternate Driver (JE) support' CONFIG_USB_UHCI_ALT $CONFIG_USB
-else
-   define_bool CONFIG_USB_UHCI_ALT n
-fi
+#if [ "$CONFIG_USB_UHCI_ALT" != "y" ]; then
+#   dep_tristate '  UHCI (Intel PIIX4, VIA, ...) support' CONFIG_USB_UHCI $CONFIG_USB
+#fi
+#if [ "$CONFIG_USB_UHCI" != "y" ]; then
+#   dep_tristate '  UHCI Alternate Driver (JE) support' CONFIG_USB_UHCI_ALT $CONFIG_USB
+#else
+#   define_bool CONFIG_USB_UHCI_ALT n
+#fi
 #dep_tristate '  OHCI (Compaq, iMacs, OPTi, SiS, ALi, ...) support' CONFIG_USB_OHCI $CONFIG_USB
