@@ -653,12 +653,18 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 	case VIDIOCSWIN:
 		{
 
-			struct video_window *vw = (struct video_window *) arg;
-			DBG("VIDIOCSWIN %d x %d\n", vw->width, vw->height);
+			struct video_window vw;
 
-			if ( vw->width != 320 || vw->height != 240 )
+			if (copy_from_user(&vw, arg, sizeof(vw))) {
 				retval = -EFAULT;
+				break;
+			}
+
+			DBG("VIDIOCSWIN %d x %d\n", vw->width, vw->height);
 			
+			if ( vw.width != 320 || vw.height != 240 )
+				retval = -EFAULT;
+
 			break;
 		}
 
