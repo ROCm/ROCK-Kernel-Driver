@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -35,16 +35,22 @@ int jfs_strfromUCS_le(char *to, const wchar_t * from,	/* LITTLE ENDIAN */
 	int i;
 	int outlen = 0;
 
-	for (i = 0; (i < len) && from[i]; i++) {
-		int charlen;
-		charlen =
-		    codepage->uni2char(le16_to_cpu(from[i]), &to[outlen],
-				       NLS_MAX_CHARSET_SIZE);
-		if (charlen > 0) {
-			outlen += charlen;
-		} else {
-			to[outlen++] = '?';
+	if (codepage) {
+		for (i = 0; (i < len) && from[i]; i++) {
+			int charlen;
+			charlen =
+			    codepage->uni2char(le16_to_cpu(from[i]),
+					       &to[outlen],
+					       NLS_MAX_CHARSET_SIZE);
+			if (charlen > 0)
+				outlen += charlen;
+			else
+				to[outlen++] = '?';
 		}
+	} else {
+		for (i = 0; (i < len) && from[i]; i++)
+			to[i] = (char) (le16_to_cpu(from[i]));
+		outlen = i;
 	}
 	to[outlen] = 0;
 	return outlen;
@@ -62,14 +68,22 @@ int jfs_strtoUCS(wchar_t * to,
 	int charlen;
 	int i;
 
-	for (i = 0; len && *from; i++, from += charlen, len -= charlen) {
-		charlen = codepage->char2uni(from, len, &to[i]);
-		if (charlen < 1) {
-			jfs_err("jfs_strtoUCS: char2uni returned %d.", charlen);
-			jfs_err("charset = %s, char = 0x%x",
-				codepage->charset, (unsigned char) *from);
-			return charlen;
+	if (codepage) {
+		for (i = 0; len && *from; i++, from += charlen, len -= charlen)
+		{
+			charlen = codepage->char2uni(from, len, &to[i]);
+			if (charlen < 1) {
+				jfs_err("jfs_strtoUCS: char2uni returned %d.",
+					charlen);
+				jfs_err("charset = %s, char = 0x%x",
+					codepage->charset,
+					(unsigned char) *from);
+				return charlen;
+			}
 		}
+	} else {
+		for (i = 0; (i < len) && from[i]; i++)
+			to[i] = (wchar_t) from[i];
 	}
 
 	to[i] = 0;
