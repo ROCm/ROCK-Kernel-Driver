@@ -4499,13 +4499,29 @@ struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *asoc,
 	if (asoc) {
 		vtag = asoc->peer.i.init_tag;
 	} else {
-		/* Special case the INIT as there is no vtag yet. */
-		if (SCTP_CID_INIT == chunk->chunk_hdr->type) {
+		/* Special case the INIT and stale COOKIE_ECHO as there is no
+		 * vtag yet.
+		 */
+		switch(chunk->chunk_hdr->type) {
+		case SCTP_CID_INIT:
+		{
 			sctp_init_chunk_t *init;
+
 			init = (sctp_init_chunk_t *)chunk->chunk_hdr;
 			vtag = ntohl(init->init_hdr.init_tag);
-		} else {
+			break;
+		}
+		case SCTP_CID_COOKIE_ECHO:
+		{
+			sctp_signed_cookie_t *cookie;
+
+			cookie = chunk->subh.cookie_hdr;
+			vtag = cookie->c.peer_vtag;
+			break;
+		}
+		default:	
 			vtag = ntohl(chunk->sctp_hdr->vtag);
+			break;
 		}
 	}
 
