@@ -346,6 +346,13 @@ static void hbtick_init_tick(unsigned long offset)
 
 	tick_disable_protection();
 
+	/* XXX This seems to be necessary to 'jumpstart' Hummingbird
+	 * XXX into actually sending STICK interrupts.  I think because
+	 * XXX of how we store %tick_cmpr in head.S this somehow resets the
+	 * XXX {TICK + STICK} interrupt mux.  -DaveM
+	 */
+	__hbird_write_stick(__hbird_read_stick());
+
 	val = __hbird_read_stick() & ~(1UL << 63);
 	__hbird_write_compare(val + offset);
 }
