@@ -88,66 +88,6 @@ static irqreturn_t aac_rx_intr(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 /**
- *	aac_rx_enable_interrupt	-	Enable event reporting
- *	@dev: Adapter
- *	@event: Event to enable
- *
- *	Enable event reporting from the i960 for a given event.
- */
- 
-static void aac_rx_enable_interrupt(struct aac_dev * dev, u32 event)
-{
-	switch (event) {
-
-	case HostNormCmdQue:
-		dev->irq_mask &= ~(OUTBOUNDDOORBELL_1);
-		break;
-
-	case HostNormRespQue:
-		dev->irq_mask &= ~(OUTBOUNDDOORBELL_2);
-		break;
-
-	case AdapNormCmdNotFull:
-		dev->irq_mask &= ~(OUTBOUNDDOORBELL_3);
-		break;
-
-	case AdapNormRespNotFull:
-		dev->irq_mask &= ~(OUTBOUNDDOORBELL_4);
-		break;
-	}
-}
-
-/**
- *	aac_rx_disable_interrupt	-	Disable event reporting
- *	@dev: Adapter
- *	@event: Event to enable
- *
- *	Disable event reporting from the i960 for a given event.
- */
-
-static void aac_rx_disable_interrupt(struct aac_dev *dev, u32 event)
-{
-	switch (event) {
-
-	case HostNormCmdQue:
-		dev->irq_mask |= (OUTBOUNDDOORBELL_1);
-		break;
-
-	case HostNormRespQue:
-		dev->irq_mask |= (OUTBOUNDDOORBELL_2);
-		break;
-
-	case AdapNormCmdNotFull:
-		dev->irq_mask |= (OUTBOUNDDOORBELL_3);
-		break;
-
-	case AdapNormRespNotFull:
-		dev->irq_mask |= (OUTBOUNDDOORBELL_4);
-		break;
-	}
-}
-
-/**
  *	rx_sync_cmd	-	send a command and wait
  *	@dev: Adapter
  *	@command: Command to execute
@@ -454,8 +394,6 @@ int aac_rx_init(struct aac_dev *dev)
 	 *	Fill in the function dispatch table.
 	 */
 	dev->a_ops.adapter_interrupt = aac_rx_interrupt_adapter;
-	dev->a_ops.adapter_enable_int = aac_rx_enable_interrupt;
-	dev->a_ops.adapter_disable_int = aac_rx_disable_interrupt;
 	dev->a_ops.adapter_notify = aac_rx_notify_adapter;
 	dev->a_ops.adapter_sync_cmd = rx_sync_cmd;
 	dev->a_ops.adapter_check_health = aac_rx_check_health;

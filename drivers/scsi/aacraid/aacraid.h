@@ -421,8 +421,6 @@ struct adapter_ops
 {
 	void (*adapter_interrupt)(struct aac_dev *dev);
 	void (*adapter_notify)(struct aac_dev *dev, u32 event);
-	void (*adapter_enable_int)(struct aac_dev *dev, u32 event);
-	void (*adapter_disable_int)(struct aac_dev *dev, u32 event);
 	int  (*adapter_sync_cmd)(struct aac_dev *dev, u32 command, u32 p1, u32 *status);
 	int  (*adapter_check_health)(struct aac_dev *dev);
 };
@@ -881,23 +879,12 @@ struct aac_dev
 	u8			dac_support;
 };
 
-#define AllocateAndMapFibSpace(dev, MapFibContext) \
-	(dev)->a_ops.AllocateAndMapFibSpace(dev, MapFibContext)
-
-#define UnmapAndFreeFibSpace(dev, MapFibContext) \
-	(dev)->a_ops.UnmapAndFreeFibSpace(dev, MapFibContext)
-
 #define aac_adapter_interrupt(dev) \
 	(dev)->a_ops.adapter_interrupt(dev)
 
 #define aac_adapter_notify(dev, event) \
 	(dev)->a_ops.adapter_notify(dev, event)
 
-#define aac_adapter_enable_int(dev, event) \
-	(dev)->a_ops.adapter_enable_int(dev, event)
-
-#define aac_adapter_disable_int(dev, event) \
-	dev->a_ops.adapter_disable_int(dev, event)
 
 #define aac_adapter_check_health(dev) \
 	(dev)->a_ops.adapter_check_health(dev)
