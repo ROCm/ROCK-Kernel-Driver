@@ -430,7 +430,6 @@ struct Scsi_Host {
 
 	unsigned unchecked_isa_dma:1;
 	unsigned use_clustering:1;
-	unsigned highmem_io:1;
 	unsigned use_blk_tcq:1;
 
 	/*
