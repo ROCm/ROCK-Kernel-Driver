@@ -53,27 +53,26 @@ NET_Y		:= $(patsubst %/, %/built-in.o, $(net-y))
 LIBS_Y		:= $(patsubst %/, %/lib.a, $(libs-y))
 export INIT_Y CORE_Y DRIVERS_Y NET_Y LIBS_Y HEAD
 
-image: vmlinux
-	$(MAKE) -C arch/sparc/boot image
+makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/$(ARCH)/boot $(1)
+
+image tftpboot.img: vmlinux
+	$(call makeboot,arch/sparc/boot/$@)
 
 archclean:
-	rm -f $(TOPDIR)/vmlinux.aout
-	-$(MAKE) -C arch/sparc/boot clean
+	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/$(ARCH)/boot
 
 archmrproper:
-	rm -f $(TOPDIR)/include/asm-sparc/asm_offsets.h
 
 prepare: include/asm-$(ARCH)/asm_offsets.h
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
-include/asm-$(ARCH)/asm_offsets.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
-	@$(generate-asm-offsets.h) < $< > $@
-
-include/asm-$(ARCH)/asm_offsets.h: include/asm-$(ARCH)/asm_offsets.h.tmp
+include/asm-$(ARCH)/asm_offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 	@echo -n '  Generating $@'
+	@$(generate-asm-offsets.h) < $< > $@.tmp
 	@$(update-if-changed)
 
-tftpboot.img:
-	$(MAKE) -C arch/sparc/boot tftpboot.img
+CLEAN_FILES +=	include/asm-$(ARCH)/asm_offsets.h.tmp	\
+		include/asm-$(ARCH)/asm_offsets.h	\
+		arch/$(ARCH)/kernel/asm-offsets.s

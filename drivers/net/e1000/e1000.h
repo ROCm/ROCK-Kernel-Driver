@@ -113,6 +113,7 @@ struct e1000_adapter;
 #define E1000_DEFAULT_PBA    0x00000030
 
 #define AUTO_ALL_MODES       0
+#define E1000_EEPROM_APME    4
 
 /* only works for sizes that are powers of 2 */
 #define E1000_ROUNDUP(i, size) ((i) = (((i) + (size) - 1) & ~((size) - 1)))

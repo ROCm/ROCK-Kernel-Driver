@@ -141,15 +141,6 @@ typedef struct sigaltstack_32 {
 	compat_size_t ss_size;
 } stack_32_t;
 
-struct flock32 {
-	short l_type;
-	short l_whence;
-	compat_off_t l_start;
-	compat_off_t l_len;
-	compat_pid_t l_pid;
-	short __unused;
-};
-
 struct sigcontext32 {
 	unsigned int	_unused[4];
 	int		signal;

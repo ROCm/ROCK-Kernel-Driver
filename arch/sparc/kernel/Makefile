@@ -2,15 +2,13 @@
 # Makefile for the linux kernel.
 #
 
-SH = $(CONFIG_SHELL)
-
 EXTRA_TARGETS	:= head.o init_task.o
 
-EXTRA_AFLAGS := -ansi
+EXTRA_AFLAGS	:= -ansi
 
 export-objs := sparc_ksyms.o
 IRQ_OBJS := irq.o sun4m_irq.o sun4c_irq.o sun4d_irq.o
-obj-y    := entry.o wof.o wuf.o etrap.o rtrap.o traps.o ${IRQ_OBJS} \
+obj-y    := entry.o wof.o wuf.o etrap.o rtrap.o traps.o $(IRQ_OBJS) \
 	    process.o signal.o ioport.o setup.o idprom.o \
 	    sys_sparc.o sunos_asm.o systbls.o \
 	    time.o windows.o cpu.o devices.o sclow.o \

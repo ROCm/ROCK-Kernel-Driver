@@ -986,7 +986,7 @@ choice
 	optional
 	depends on SCSI && PCI
 
-source "drivers/scsi/aic7xxx/Kconfig"
+source "drivers/scsi/aic7xxx/Kconfig.aic7xxx"
 
 config SCSI_AIC7XXX_OLD
 	tristate "Old driver"

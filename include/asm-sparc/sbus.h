@@ -121,4 +121,15 @@ extern void sbus_unmap_sg(struct sbus_dev *, struct scatterlist *, int, int);
 extern void sbus_dma_sync_single(struct sbus_dev *, dma_addr_t, size_t, int);
 extern void sbus_dma_sync_sg(struct sbus_dev *, struct scatterlist *, int, int);
 
+/* Eric Brower (ebrower@usa.net)
+ * Translate SBus interrupt levels to ino values--
+ * this is used when converting sbus "interrupts" OBP 
+ * node values to "intr" node values, and is platform 
+ * dependent.  If only we could call OBP with 
+ * "sbus-intr>cpu (sbint -- ino)" from kernel...
+ * See .../drivers/sbus/sbus.c for details.
+ */
+BTFIXUPDEF_CALL(unsigned int, sbint_to_irq, struct sbus_dev *sdev, unsigned int)
+#define sbint_to_irq(sdev, sbint) BTFIXUP_CALL(sbint_to_irq)(sdev, sbint)
+
 #endif /* !(_SPARC_SBUS_H) */

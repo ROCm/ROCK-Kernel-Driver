@@ -904,6 +904,9 @@ static int irda_usb_net_init(struct net_device *dev)
 {
 	IRDA_DEBUG(1, "%s()\n", __FUNCTION__);
 	
+	/* Keep track of module usage */
+	SET_MODULE_OWNER(dev);
+
 	/* Set up to be a normal IrDA network device driver */
 	irda_device_setup(dev);
 
@@ -974,7 +977,6 @@ static int irda_usb_net_open(struct net_device *netdev)
 		irda_usb_submit(self, NULL, self->rx_urb[i]);
 
 	/* Ready to play !!! */
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -1025,8 +1027,6 @@ static int irda_usb_net_close(struct net_device *netdev)
 	if (self->irlap)
 		irlap_close(self->irlap);
 	self->irlap = NULL;
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }

@@ -230,7 +230,6 @@ struct e1000_option {
 	} arg;
 };
 
-
 static int __devinit
 e1000_validate_option(int *value, struct e1000_option *opt)
 {
@@ -273,7 +272,7 @@ e1000_validate_option(int *value, struct e1000_option *opt)
 	default:
 		BUG();
 	}
-		
+
 	printk(KERN_INFO "Invalid %s specified (%i) %s\n",
 	       opt->name, *value, opt->err);
 	*value = opt->def;
@@ -298,7 +297,7 @@ e1000_check_options(struct e1000_adapter *adapter)
 {
 	int bd = adapter->bd_number;
 	if(bd >= E1000_MAX_NIC) {
-		printk(KERN_NOTICE 
+		printk(KERN_NOTICE
 		       "Warning: no configuration for board #%i\n", bd);
 		printk(KERN_NOTICE "Using defaults for all values\n");
 		bd = E1000_MAX_NIC;
@@ -314,7 +313,7 @@ e1000_check_options(struct e1000_adapter *adapter)
 		};
 		struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 		e1000_mac_type mac_type = adapter->hw.mac_type;
-		opt.arg.r.max = mac_type < e1000_82544 ? 
+		opt.arg.r.max = mac_type < e1000_82544 ?
 			MAX_TXD : MAX_82544_TXD;
 
 		tx_ring->count = TxDescriptors[bd];
@@ -344,13 +343,13 @@ e1000_check_options(struct e1000_adapter *adapter)
 			.err  = "defaulting to Enabled",
 			.def  = OPTION_ENABLED
 		};
-		
+
 		int rx_csum = XsumRX[bd];
 		e1000_validate_option(&rx_csum, &opt);
 		adapter->rx_csum = rx_csum;
 	}
 	{ /* Flow Control */
-		
+
 		struct e1000_opt_list fc_list[] =
 			{{ e1000_fc_none,    "Flow Control Disabled" },
 			 { e1000_fc_rx_pause,"Flow Control Receive Only" },
@@ -478,9 +477,10 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 
 	{ /* Speed */
 		struct e1000_opt_list speed_list[] = {{          0, "" },
-		                                      {   SPEED_10, "" },
-		                                      {  SPEED_100, "" },
-		                                      { SPEED_1000, "" }};
+						      {   SPEED_10, "" },
+						      {  SPEED_100, "" },
+						      { SPEED_1000, "" }};
+
 		struct e1000_option opt = {
 			.type = list_option,
 			.name = "Speed",
@@ -494,8 +494,9 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 	}
 	{ /* Duplex */
 		struct e1000_opt_list dplx_list[] = {{           0, "" },
-		                                     { HALF_DUPLEX, "" },
-		                                     { FULL_DUPLEX, "" }};
+						     { HALF_DUPLEX, "" },
+						     { FULL_DUPLEX, "" }};
+
 		struct e1000_option opt = {
 			.type = list_option,
 			.name = "Duplex",
@@ -572,7 +573,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		printk(KERN_INFO "Half Duplex specified without Speed\n");
 		printk(KERN_INFO "Using Autonegotiation at Half Duplex only\n");
 		adapter->hw.autoneg = 1;
-		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF | 
+		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF |
 		                                 ADVERTISE_100_HALF;
 		break;
 	case FULL_DUPLEX:

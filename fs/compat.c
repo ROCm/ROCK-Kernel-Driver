@@ -16,6 +16,7 @@
 #include <linux/errno.h>
 #include <linux/time.h>
 #include <linux/fs.h>
+#include <linux/fcntl.h>
 
 #include <asm/uaccess.h>
 
@@ -69,4 +70,34 @@ asmlinkage long compat_sys_newfstat(unsigned int fd,
 	if (!error)
 		error = cp_compat_stat(&stat, statbuf);
 	return error;
+}
+
+int get_compat_flock(struct flock *kfl, struct compat_flock *ufl)
+{
+	int err;
+
+	if (!access_ok(VERIFY_READ, ufl, sizeof(*ufl)))
+		return -EFAULT;
+
+	err = __get_user(kfl->l_type, &ufl->l_type);
+	err |= __get_user(kfl->l_whence, &ufl->l_whence);
+	err |= __get_user(kfl->l_start, &ufl->l_start);
+	err |= __get_user(kfl->l_len, &ufl->l_len);
+	err |= __get_user(kfl->l_pid, &ufl->l_pid);
+	return err;
+}
+
+int put_compat_flock(struct flock *kfl, struct compat_flock *ufl)
+{
+	int err;
+
+	if (!access_ok(VERIFY_WRITE, ufl, sizeof(*ufl)))
+		return -EFAULT;
+
+	err = __put_user(kfl->l_type, &ufl->l_type);
+	err |= __put_user(kfl->l_whence, &ufl->l_whence);
+	err |= __put_user(kfl->l_start, &ufl->l_start);
+	err |= __put_user(kfl->l_len, &ufl->l_len);
+	err |= __put_user(kfl->l_pid, &ufl->l_pid);
+	return err;
 }

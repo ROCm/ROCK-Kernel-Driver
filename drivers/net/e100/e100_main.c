@@ -46,6 +46,21 @@
 
 /* Change Log
  *
+ * 2.1.29	12/20/02
+ *   o Bug fix: Device command timeout due to SMBus processing during init
+ *   o Bug fix: Not setting/clearing I (Interrupt) bit in tcb correctly
+ *   o Bug fix: Not using EEPROM WoL setting as default in ethtool
+ *   o Bug fix: Not able to set autoneg on using ethtool when interface down
+ *   o Bug fix: Not able to change speed/duplex using ethtool/mii
+ *     when interface up
+ *   o Bug fix: Ethtool shows autoneg on when forced to 100/Full
+ *   o Bug fix: Compiler error when CONFIG_PROC_FS not defined
+ *   o Bug fix: 2.5.44 e100 doesn't load with preemptive kernel enabled
+ *     (sleep while holding spinlock)
+ *   o Bug fix: 2.1.24-k1 doesn't display complete statistics
+ *   o Bug fix: System panic due to NULL watchdog timer dereference during
+ *     ifconfig down, rmmod and insmod
+ *
  * 2.1.24       10/7/02
  *   o Bug fix: Wrong files under /proc/net/PRO_LAN_Adapters/ when interface
  *     name is changed
@@ -56,21 +71,6 @@
  *   o Removed misleading printks
  *
  * 2.1.12       8/2/02
- *   o Feature: ethtool register dump
- *   o Bug fix: Driver passes wrong name to /proc/interrupts
- *   o Bug fix: Ethernet bridging not working 
- *   o Bug fix: Promiscuous mode is not working
- *   o Bug fix: Checked return value from copy_from_user (William Stinson,
- *     wstinson@infonie.fr)
- *   o Bug fix: ARP wake on LAN fails
- *   o Bug fix: mii-diag does not update driver level's speed, duplex and
- *     re-configure flow control
- *   o Bug fix: Ethtool shows wrong speed/duplex when not connected
- *   o Bug fix: Ethtool shows wrong speed/duplex when reconnected if forced 
- *     speed/duplex
- *   o Bug fix: PHY loopback diagnostic fails
- *
- * 2.1.6        7/5/02
  */
  
 #include <linux/config.h>
@@ -135,7 +135,7 @@ static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-char e100_driver_version[]="2.1.24-k2";
+char e100_driver_version[]="2.1.29-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -224,7 +224,7 @@ static void e100_check_options(int board, struct e100_private *bdp);
 static void e100_set_int_option(int *, int, int, int, int, char *);
 static void e100_set_bool_option(struct e100_private *bdp, int, u32, int,
 				 char *);
-unsigned char e100_wait_exec_cmplx(struct e100_private *, u32, u8);
+unsigned char e100_wait_exec_cmplx(struct e100_private *, u32, u8, u8);
 void e100_exec_cmplx(struct e100_private *, u32, u8);
 
 /**
@@ -443,9 +443,21 @@ e100_wait_exec_simple(struct e100_private *bdp, u8 scb_cmd_low)
 	if (!e100_wait_scb(bdp)) {
 		printk(KERN_DEBUG "e100: %s: e100_wait_exec_simple: failed\n",
 		       bdp->device->name);
+#ifdef E100_CU_DEBUG		
+		printk(KERN_ERR "e100: %s: Last command (%x/%x) "
+			"timeout\n", bdp->device->name, 
+			bdp->last_cmd, bdp->last_sub_cmd);
+		printk(KERN_ERR "e100: %s: Current simple command (%x) "
+			"can't be executed\n", 
+			bdp->device->name, scb_cmd_low);
+#endif		
 		return false;
 	}
 	e100_exec_cmd(bdp, scb_cmd_low);
+#ifdef E100_CU_DEBUG	
+	bdp->last_cmd = scb_cmd_low;
+	bdp->last_sub_cmd = 0;
+#endif	
 	return true;
 }
 
@@ -458,12 +470,24 @@ e100_exec_cmplx(struct e100_private *bdp, u32 phys_addr, u8 cmd)
 }
 
 unsigned char
-e100_wait_exec_cmplx(struct e100_private *bdp, u32 phys_addr, u8 cmd)
+e100_wait_exec_cmplx(struct e100_private *bdp, u32 phys_addr, u8 cmd, u8 sub_cmd)
 {
 	if (!e100_wait_scb(bdp)) {
+#ifdef E100_CU_DEBUG		
+		printk(KERN_ERR "e100: %s: Last command (%x/%x) "
+			"timeout\n", bdp->device->name, 
+			bdp->last_cmd, bdp->last_sub_cmd);
+		printk(KERN_ERR "e100: %s: Current complex command "
+			"(%x/%x) can't be executed\n", 
+			bdp->device->name, cmd, sub_cmd);
+#endif		
 		return false;
 	}
 	e100_exec_cmplx(bdp, phys_addr, cmd);
+#ifdef E100_CU_DEBUG	
+	bdp->last_cmd = cmd;
+	bdp->last_sub_cmd = sub_cmd;
+#endif	
 	return true;
 }
 
@@ -494,18 +518,23 @@ e100_wait_cus_idle(struct e100_private *bdp)
 }
 
 /**
- * e100_dis_intr - disable interrupts
+ * e100_disable_clear_intr - disable and clear/ack interrupts
  * @bdp: atapter's private data struct
  *
  * This routine disables interrupts at the hardware, by setting
  * the M (mask) bit in the adapter's CSR SCB command word.
+ * It also clear/ack interrupts.
  */
 static inline void
-e100_dis_intr(struct e100_private *bdp)
+e100_disable_clear_intr(struct e100_private *bdp)
 {
+	u16 intr_status;
 	/* Disable interrupts on our PCI board by setting the mask bit */
 	writeb(SCB_INT_MASK, &bdp->scb->scb_cmd_hi);
-	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
+	intr_status = readw(&bdp->scb->scb_status);
+	/* ack and clear intrs */
+	writew(intr_status, &bdp->scb->scb_status);
+	readw(&bdp->scb->scb_status);
 }
 
 /**
@@ -623,7 +652,7 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	cal_checksum = e100_eeprom_calculate_chksum(bdp);
 	read_checksum = e100_eeprom_read(bdp, (bdp->eeprom_size - 1));
 	if (cal_checksum != read_checksum) {
-                printk(KERN_ERR "e100: Corrupted EERPROM on instance #%d\n",
+                printk(KERN_ERR "e100: Corrupted EEPROM on instance #%d\n",
 		       e100nics);
                 rc = -ENODEV;
                 goto err_pci;
@@ -673,12 +702,17 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 		       bdp->device->name);
 	}
 
-	/* Disabling all WOLs as initialization */
-	bdp->wolsupported = bdp->wolopts = 0;
-	if (bdp->rev_id >= D101A4_REV_ID) {
-		bdp->wolsupported = WAKE_PHY | WAKE_MAGIC;
+	bdp->wolsupported = 0;
+	bdp->wolopts = 0;
+	
+	/* Check if WoL is enabled on EEPROM */
+	if (e100_eeprom_read(bdp, EEPROM_ID_WORD) & BIT_5) {
+		if (bdp->rev_id >= D101A4_REV_ID)
+			bdp->wolsupported = WAKE_PHY | WAKE_MAGIC;
 		if (bdp->rev_id >= D101MA_REV_ID)
 			bdp->wolsupported |= WAKE_UCAST | WAKE_ARP;
+		/* Magic Packet WoL is enabled on device by default */
+		/* if EEPROM WoL bit is TRUE                        */
 		bdp->wolopts = WAKE_MAGIC;
 	}
 
@@ -953,12 +987,12 @@ e100_open(struct net_device *dev)
 		goto err_exit;
 	}
 
-	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE)) {
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE, 0)) {
 		rc = -EAGAIN;
 		goto err_exit;
 	}
 
-	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE)) {
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE, 0)) {
 		rc = -EAGAIN;
 		goto err_exit;
 	}
@@ -1235,7 +1269,8 @@ e100_init(struct e100_private *bdp)
 		printk(KERN_ERR "e100: hw init failed\n");
 		return false;
 	}
-	e100_dis_intr(bdp);
+	/* Interrupts are enabled after device reset */
+	e100_disable_clear_intr(bdp);
 
 	return true;
 }
@@ -1303,10 +1338,10 @@ e100_hw_init(struct e100_private *bdp, u32 reset_cmd)
 	e100_sw_reset(bdp, reset_cmd);
 
 	/* Load the CU BASE (set to 0, because we use linear mode) */
-	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE))
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE, 0))
 		return false;
 
-	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE))
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE, 0))
 		return false;
 
 	/* Load interrupt microcode  */
@@ -1590,6 +1625,12 @@ e100_watchdog(struct net_device *dev)
 {
 	struct e100_private *bdp = dev->priv;
 
+#ifdef E100_CU_DEBUG
+	if (e100_cu_unknown_state(bdp)) {
+		printk(KERN_ERR "e100: %s: CU unknown state in e100_watchdog\n",
+			dev->name);
+	}
+#endif	
 	if (!netif_running(dev)) {
 		return;
 	}
@@ -1646,7 +1687,8 @@ e100_watchdog(struct net_device *dev)
 		if (netif_running(dev))
 			netif_wake_queue(dev);
 	} else {
-		netif_stop_queue(dev);
+		if (netif_running(dev))
+			netif_stop_queue(dev);
 	}
 
 	rmb();
@@ -1774,11 +1816,8 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 		return;
 	}
 
-	/* disable intr before we ack & after identifying the intr as ours */
-	e100_dis_intr(bdp);
-
-	writew(intr_status, &bdp->scb->scb_status);	/* ack intrs */
-	readw(&bdp->scb->scb_status);
+	/* disable and ack intr */
+	e100_disable_clear_intr(bdp);
 
 	/* the device is closed, don't continue or else bad things may happen. */
 	if (!netif_running(dev)) {
@@ -2208,10 +2247,11 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
  *
  * e100_start_cu must be called while holding the tx_lock ! 
  */
-void
+u8
 e100_start_cu(struct e100_private *bdp, tcb_t *tcb)
 {
 	unsigned long lock_flag;
+	u8 ret = true;
 
 	spin_lock_irqsave(&(bdp->bd_lock), lock_flag);
 	switch (bdp->next_cu_cmd) {
@@ -2242,12 +2282,13 @@ e100_start_cu(struct e100_private *bdp, tcb_t *tcb)
 			       "e100: %s: cu_start: timeout waiting for cu\n",
 			       bdp->device->name);
 		if (!e100_wait_exec_cmplx(bdp, (u32) (tcb->tcb_phys),
-					  SCB_CUC_START)) {
+					  SCB_CUC_START, CB_TRANSMIT)) {
 			printk(KERN_DEBUG
 			       "e100: %s: cu_start: timeout waiting for scb\n",
 			       bdp->device->name);
 			e100_exec_cmplx(bdp, (u32) (tcb->tcb_phys),
 					SCB_CUC_START);
+			ret = false;
 		}
 
 		bdp->next_cu_cmd = RESUME_WAIT;
@@ -2259,6 +2300,7 @@ e100_start_cu(struct e100_private *bdp, tcb_t *tcb)
 	bdp->last_tcb = tcb;
 
 	spin_unlock_irqrestore(&(bdp->bd_lock), lock_flag);
+	return ret;
 }
 
 /* ====================================================================== */
@@ -2306,8 +2348,9 @@ e100_selftest(struct e100_private *bdp, u32 *st_timeout, u32 *st_result)
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ / 100 + 1);
 
-	/* disable interrupts since the're now enabled */
-	e100_dis_intr(bdp);
+	/* disable interrupts since they are enabled */
+	/* after device reset during selftest        */
+	e100_disable_clear_intr(bdp);
 
 	/* if The First Self Test DWORD Still Zero, We've timed out. If the
 	 * second DWORD is not zero then we have an error. */
@@ -2405,7 +2448,7 @@ e100_start_ru(struct e100_private *bdp)
 
 	spin_lock(&bdp->bd_lock);
 
-	if (!e100_wait_exec_cmplx(bdp, rx_struct->dma_addr, SCB_RUC_START)) {
+	if (!e100_wait_exec_cmplx(bdp, rx_struct->dma_addr, SCB_RUC_START, 0)) {
 		printk(KERN_DEBUG
 		       "e100: %s: start_ru: wait_scb failed\n", 
 		       bdp->device->name);
@@ -2473,7 +2516,7 @@ e100_clr_cntrs(struct e100_private *bdp)
 	*pcmd_complete = 0;
 	wmb();
 
-	if (!e100_wait_exec_cmplx(bdp, bdp->stat_cnt_phys, SCB_CUC_DUMP_ADDR))
+	if (!e100_wait_exec_cmplx(bdp, bdp->stat_cnt_phys, SCB_CUC_DUMP_ADDR, 0))
 		return false;
 
 	/* wait 10 microseconds for the command to complete */
@@ -2595,8 +2638,10 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 	unsigned long lock_flag;
 	unsigned long expiration_time;
 	unsigned char rc = true;
+	u8 sub_cmd;
 
 	ntcb_hdr = (cb_header_t *) command->non_tx_cmd;	/* get hdr of non tcb cmd */
+	sub_cmd = cpu_to_le16(ntcb_hdr->cb_cmd);
 
 	/* Set the Command Block to be the last command block */
 	ntcb_hdr->cb_cmd |= __constant_cpu_to_le16(CB_EL_BIT);
@@ -2629,7 +2674,7 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 
 	spin_lock_irqsave(&bdp->bd_lock, lock_flag);
 
-	if (!e100_wait_exec_cmplx(bdp, command->dma_addr, SCB_CUC_START)) {
+	if (!e100_wait_exec_cmplx(bdp, command->dma_addr, SCB_CUC_START, sub_cmd)) {
 		spin_unlock_irqrestore(&(bdp->bd_lock), lock_flag);
 		rc = false;
 		goto exit;
@@ -2649,6 +2694,10 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 			yield();
 			spin_lock_bh(&(bdp->bd_non_tx_lock));
 		} else {
+#ifdef E100_CU_DEBUG			
+			printk(KERN_ERR "e100: %s: non-TX command (%x) "
+				"timeout\n", bdp->device->name, sub_cmd);
+#endif			
 			rc = false;
 			goto exit;
 		}
@@ -2694,7 +2743,12 @@ e100_sw_reset(struct e100_private *bdp, u32 reset_cmd)
 	}
 
 	/* Mask off our interrupt line -- its unmasked after reset */
-	e100_dis_intr(bdp);
+	e100_disable_clear_intr(bdp);
+#ifdef E100_CU_DEBUG	
+	bdp->last_cmd = 0;
+	bdp->last_sub_cmd = 0;
+#endif	
+
 }
 
 /**
@@ -2894,19 +2948,6 @@ e100_D101M_checksum(struct e100_private *bdp, struct sk_buff *skb)
 void __devinit
 e100_print_brd_conf(struct e100_private *bdp)
 {
-	if (netif_carrier_ok(bdp->device)) {
-		printk(KERN_NOTICE
-		       "  Mem:0x%08lx  IRQ:%d  Speed:%d Mbps  Dx:%s\n",
-		       (unsigned long) bdp->device->mem_start,
-		       bdp->device->irq, bdp->cur_line_speed,
-		       (bdp->cur_dplx_mode == FULL_DUPLEX) ? "Full" : "Half");
-	} else {
-		printk(KERN_NOTICE
-		       "  Mem:0x%08lx  IRQ:%d  Speed:%d Mbps  Dx:%s\n",
-		       (unsigned long) bdp->device->mem_start,
-		       bdp->device->irq, 0, "N/A");
-	}
-
 	/* Print the string if checksum Offloading was enabled */
 	if (bdp->flags & DF_CSUM_OFFLOAD)
 		printk(KERN_NOTICE "  Hardware receive checksums enabled\n");
@@ -3005,8 +3046,13 @@ err:
 void
 e100_isolate_driver(struct e100_private *bdp)
 {
-	if (netif_running(bdp->device)) {
-		e100_dis_intr(bdp);
+
+	/* Check if interface is up                              */
+	/* NOTE: Can't use netif_running(bdp->device) because    */
+	/* dev_close clears __LINK_STATE_START before calling    */
+	/* e100_close (aka dev->stop)                            */
+	if (bdp->device->flags & IFF_UP) {
+		e100_disable_clear_intr(bdp);
 		del_timer_sync(&bdp->watchdog_timer);
 		del_timer_sync(&bdp->hwi_timer);
 		/* If in middle of cable diag, */
@@ -3045,63 +3091,51 @@ e100_tcb_add_C_bit(struct e100_private *bdp)
 }
 
 /* 
- * Procedure:   e100_hw_reset_recover
+ * Procedure:   e100_configure_device
  *
- * Description: This routine will recover the hw after reset.
+ * Description: This routine will configure device
  *
  * Arguments:
  *      bdp - Ptr to this card's e100_bdconfig structure
- *        reset_cmd - s/w reset or selective reset. 
  *
  * Returns:
  *        true upon success
  *        false upon failure
  */
 unsigned char
-e100_hw_reset_recover(struct e100_private *bdp, u32 reset_cmd)
+e100_configure_device(struct e100_private *bdp)
 {
-	bdp->last_tcb = NULL;
-	if (reset_cmd == PORT_SOFTWARE_RESET) {
+	/*load CU & RU base */
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE, 0))
+		return false;
 
-		/*load CU & RU base */
-		if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE)) {
-			return false;
-		}
+	if (e100_load_microcode(bdp))
+		bdp->flags |= DF_UCODE_LOADED;
 
-		if (e100_load_microcode(bdp)) {
-			bdp->flags |= DF_UCODE_LOADED;
-		}
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE, 0))
+		return false;
 
-		if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE)) {
-			return false;
-		}
+	/* Issue the load dump counters address command */
+	if (!e100_wait_exec_cmplx(bdp, bdp->stat_cnt_phys, SCB_CUC_DUMP_ADDR, 0))
+		return false;
 
-		/* Issue the load dump counters address command */
-		if (!e100_wait_exec_cmplx(bdp, bdp->stat_cnt_phys,
-					  SCB_CUC_DUMP_ADDR)) {
-			return false;
-		}
+	if (!e100_setup_iaaddr(bdp, bdp->device->dev_addr)) {
+		printk(KERN_ERR "e100: e100_configure_device: "
+			"setup iaaddr failed\n");
+		return false;
+	}
 
-		if (!e100_setup_iaaddr(bdp, bdp->device->dev_addr)) {
-			printk(KERN_ERR
-			       "e100: e100_hw_reset_recover: "
-			       "setup iaaddr failed\n");
-			return false;
-		}
+	e100_set_multi_exec(bdp->device);
 
-		e100_set_multi_exec(bdp->device);
-
-		/* Change for 82558 enhancement */
-		/* If 82558/9 and if the user has enabled flow control, set up * the
-		 * Flow Control Reg. in the CSR */
-		if ((bdp->flags & IS_BACHELOR)
-		    && (bdp->params.b_params & PRM_FC)) {
-			writeb(DFLT_FC_THLD,
-			       &bdp->scb->scb_ext.d101_scb.scb_fc_thld);
-			writeb(DFLT_FC_CMD,
-			       &bdp->scb->scb_ext.d101_scb.scb_fc_xon_xoff);
-		}
-
+	/* Change for 82558 enhancement                                */
+	/* If 82558/9 and if the user has enabled flow control, set up */
+	/* flow Control Reg. in the CSR                                */
+	if ((bdp->flags & IS_BACHELOR)
+	    && (bdp->params.b_params & PRM_FC)) {
+		writeb(DFLT_FC_THLD,
+			&bdp->scb->scb_ext.d101_scb.scb_fc_thld);
+		writeb(DFLT_FC_CMD,
+			&bdp->scb->scb_ext.d101_scb.scb_fc_xon_xoff);
 	}
 
 	e100_force_config(bdp);
@@ -3115,7 +3149,7 @@ e100_deisolate_driver(struct e100_private *bdp, u8 full_reset)
 	u32 cmd = full_reset ? PORT_SOFTWARE_RESET : PORT_SELECTIVE_RESET;
 	e100_sw_reset(bdp, cmd);
 	if (cmd == PORT_SOFTWARE_RESET) {
-		if (!e100_hw_reset_recover(bdp, cmd))
+		if (!e100_configure_device(bdp))
 			printk(KERN_ERR "e100: e100_deisolate_driver:" 
 		       		" device configuration failed\n");
 	} 
@@ -3253,10 +3287,8 @@ static int
 e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 {
 	struct e100_private *bdp;
-	int current_duplex;
 	int e100_new_speed_duplex;
 	int ethtool_new_speed_duplex;
-	int speed_duplex_change_required;
 	struct ethtool_cmd ecmd;
 
 	if (!capable(CAP_NET_ADMIN)) {
@@ -3264,19 +3296,8 @@ e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 	}
 
 	bdp = dev->priv;
-	if (netif_running(dev)) {
-		return -EBUSY;
-	}
 	if (copy_from_user(&ecmd, ifr->ifr_data, sizeof (ecmd))) {
 		return -EFAULT;
-	}
-	current_duplex =
-		(bdp->cur_dplx_mode == HALF_DUPLEX) ? DUPLEX_HALF : DUPLEX_FULL;
-	speed_duplex_change_required = (ecmd.speed != bdp->cur_line_speed)
-		|| (ecmd.duplex != current_duplex);
-
-	if ((ecmd.autoneg == AUTONEG_ENABLE) && speed_duplex_change_required) {
-		return -EINVAL;
 	}
 
 	if ((ecmd.autoneg == AUTONEG_ENABLE)
@@ -3284,44 +3305,39 @@ e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 		bdp->params.e100_speed_duplex = E100_AUTONEG;
 		e100_set_speed_duplex(bdp);
 	} else {
-		if (speed_duplex_change_required) {
-			if (ecmd.speed == SPEED_10) {
-				if (ecmd.duplex == DUPLEX_HALF) {
-					e100_new_speed_duplex =
-						E100_SPEED_10_HALF;
-					ethtool_new_speed_duplex =
-						SUPPORTED_10baseT_Half;
-
-				} else {
-					e100_new_speed_duplex =
-						E100_SPEED_10_FULL;
-					ethtool_new_speed_duplex =
-						SUPPORTED_10baseT_Full;
-				}
-
-			} else {
-				if (ecmd.duplex == DUPLEX_HALF) {
-					e100_new_speed_duplex =
-						E100_SPEED_100_HALF;
-					ethtool_new_speed_duplex =
-						SUPPORTED_100baseT_Half;
-
-				} else {
-					e100_new_speed_duplex =
-						E100_SPEED_100_FULL;
-					ethtool_new_speed_duplex =
-						SUPPORTED_100baseT_Full;
-				}
-			}
-
-			if (bdp->speed_duplex_caps & ethtool_new_speed_duplex) {
-				bdp->params.e100_speed_duplex =
-					e100_new_speed_duplex;
-				e100_set_speed_duplex(bdp);
-			} else {
-				return -EOPNOTSUPP;
-			}
+		if (ecmd.speed == SPEED_10) {
+			if (ecmd.duplex == DUPLEX_HALF) {
+				e100_new_speed_duplex =
+					E100_SPEED_10_HALF;
+				ethtool_new_speed_duplex =
+					SUPPORTED_10baseT_Half;
+			} else { 
+				e100_new_speed_duplex =
+					E100_SPEED_10_FULL;
+				ethtool_new_speed_duplex =
+					SUPPORTED_10baseT_Full;
+			} 
+		} else { 
+			if (ecmd.duplex == DUPLEX_HALF) {
+				e100_new_speed_duplex =
+					E100_SPEED_100_HALF;
+				ethtool_new_speed_duplex =
+					SUPPORTED_100baseT_Half;
+			} else { 
+				e100_new_speed_duplex =
+					E100_SPEED_100_FULL;
+				ethtool_new_speed_duplex =
+					SUPPORTED_100baseT_Full;
+			} 
 		}
+
+		if (bdp->speed_duplex_caps & ethtool_new_speed_duplex) {
+			bdp->params.e100_speed_duplex =
+				e100_new_speed_duplex;
+			e100_set_speed_duplex(bdp);
+		} else {
+			return -EOPNOTSUPP;
+		} 
 	}
 
 	return 0;
@@ -3838,9 +3854,6 @@ e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	case SIOCSMIIREG:
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		if (netif_running(dev)) {
-			return -EBUSY;
-		}
 		/* If reg = 0 && change speed/duplex */
 		if (data_ptr->reg_num == 0 && 
 			(data_ptr->val_in == (BMCR_ANENABLE | BMCR_ANRESTART) /* restart cmd */
@@ -3860,10 +3873,9 @@ e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					bdp->params.e100_speed_duplex = E100_SPEED_10_HALF;
 				e100_set_speed_duplex(bdp);
 		}
-		else {
-			e100_mdi_write(bdp, data_ptr->reg_num, bdp->phy_addr,
-			       data_ptr->val_in);
-		}
+		else 
+			/* Only allows changing speed/duplex */
+			return -EINVAL;
 		
 		break;
 
@@ -3960,6 +3972,8 @@ e100_non_tx_background(unsigned long ptr)
 	struct e100_private *bdp = (struct e100_private *) ptr;
 	nxmit_cb_entry_t *active_command;
 	int restart = true;
+	cb_header_t *non_tx_cmd;
+	u8 sub_cmd;
 
 	spin_lock_bh(&(bdp->bd_non_tx_lock));
 
@@ -3987,6 +4001,15 @@ e100_non_tx_background(unsigned long ptr)
 		    && time_before(jiffies, active_command->expiration_time)) {
 			goto exit;
 		} else {
+			non_tx_cmd = (cb_header_t *) active_command->non_tx_cmd;
+			sub_cmd = CB_CMD_MASK & le16_to_cpu(non_tx_cmd->cb_cmd);
+#ifdef E100_CU_DEBUG			
+			if (!(non_tx_cmd->cb_status 
+			    & __constant_cpu_to_le16(CB_STATUS_COMPLETE)))
+				printk(KERN_ERR "e100: %s: Queued "
+					"command (%x) timeout\n", 
+					bdp->device->name, sub_cmd);
+#endif			
 			list_del(&(active_command->list_elem));
 			e100_free_non_tx_cmd(bdp, active_command);
 		}
@@ -4009,9 +4032,10 @@ e100_non_tx_background(unsigned long ptr)
 		bdp->non_tx_command_state = E100_WAIT_NON_TX_FINISH;
 		active_command = list_entry(bdp->non_tx_cmd_list.next,
 					    nxmit_cb_entry_t, list_elem);
+		sub_cmd = ((cb_header_t *) active_command->non_tx_cmd)->cb_cmd;
 		spin_lock_irq(&(bdp->bd_lock));
 		e100_wait_exec_cmplx(bdp, active_command->dma_addr,
-				     SCB_CUC_START);
+				     SCB_CUC_START, sub_cmd);
 		spin_unlock_irq(&(bdp->bd_lock));
 		active_command->expiration_time = jiffies + HZ;
 		cmd_type = CB_CMD_MASK &
@@ -4084,9 +4108,11 @@ e100_suspend(struct pci_dev *pcid, u32 state)
 	e100_isolate_driver(bdp);
 	pci_save_state(pcid, bdp->pci_state);
 
+	/* Enable or disable WoL */
+	e100_do_wol(pcid, bdp);
+	
 	/* If wol is enabled */
 	if (bdp->wolopts) {
-		e100_do_wol(pcid, bdp);
 		pci_enable_wake(pcid, 3, 1);	/* Enable PME for power state D3 */
 		pci_set_power_state(pcid, 3);	/* Set power state to D3.        */
 	} else {
@@ -4102,17 +4128,13 @@ e100_resume(struct pci_dev *pcid)
 {
 	struct net_device *netdev = pci_get_drvdata(pcid);
 	struct e100_private *bdp = netdev->priv;
-	u8 full_reset = false;
 
 	pci_set_power_state(pcid, 0);
 	pci_enable_wake(pcid, 0, 0);	/* Clear PME status and disable PME */
 	pci_restore_state(pcid, bdp->pci_state);
 
-	if (bdp->wolopts & (WAKE_UCAST | WAKE_ARP)) {
-		full_reset = true;
-	}
-
-	e100_deisolate_driver(bdp, full_reset);
+	/* Also do device full reset because device was in D3 state */
+	e100_deisolate_driver(bdp, true);
 
 	return 0;
 }
@@ -4239,3 +4261,20 @@ static void e100_hwi_restore(struct e100_private *bdp)
 	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, control);
 	return;
 }
+
+#ifdef E100_CU_DEBUG
+unsigned char
+e100_cu_unknown_state(struct e100_private *bdp)
+{
+	u8 scb_cmd_low;
+	u16 scb_status;
+	scb_cmd_low = bdp->scb->scb_cmd_low;
+	scb_status = le16_to_cpu(bdp->scb->scb_status);
+	/* If CU is active and executing unknown cmd */
+	if (scb_status & SCB_CUS_ACTIVE && scb_cmd_low & SCB_CUC_UNKNOWN)
+		return true;
+	else
+		return false;
+}
+#endif
+

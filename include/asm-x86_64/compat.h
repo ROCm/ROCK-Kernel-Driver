@@ -54,4 +54,12 @@ struct compat_stat {
 	u32		__unused5;
 };
 
+struct compat_flock {
+	short		l_type;
+	short		l_whence;
+	compat_off_t	l_start;
+	compat_off_t	l_len;
+	compat_pid_t	l_pid;
+};
+
 #endif /* _ASM_X86_64_COMPAT_H */

@@ -8,12 +8,14 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
-#include <linux/cache.h>
 #include <asm/asi.h>
 #include <asm/starfire.h>
 #include <asm/spitfire.h>
 
 #ifndef __ASSEMBLY__
+
+#include <linux/cache.h>
+
 /* PROM provided per-processor information we need
  * to start them all up.
  */

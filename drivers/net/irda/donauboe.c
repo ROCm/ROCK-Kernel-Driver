@@ -1388,6 +1388,9 @@ toshoboe_net_init (struct net_device *dev)
 {
   IRDA_DEBUG (4, "%s()\n", __FUNCTION__);
 
+  /* Keep track of module usage */
+  SET_MODULE_OWNER(dev);
+
   /* Setup to be a normal IrDA network device driver */
   irda_device_setup (dev);
 
@@ -1435,8 +1438,6 @@ toshoboe_net_open (struct net_device *dev)
 
   self->irdad = 1;
 
-  MOD_INC_USE_COUNT;
-
   return 0;
 }
 
@@ -1466,8 +1467,6 @@ toshoboe_net_close (struct net_device *dev)
     {
       toshoboe_stopchip (self);
     }
-
-  MOD_DEC_USE_COUNT;
 
   return 0;
 }

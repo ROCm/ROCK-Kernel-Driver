@@ -252,6 +252,15 @@ unsigned int sun4d_build_irq(struct sbus_dev *sdev, int irq)
 		return irq;
 }
 
+unsigned int sun4d_sbint_to_irq(struct sbus_dev *sdev, unsigned int sbint)
+{
+	if (sbint >= sizeof(sbus_to_pil)) {
+		printk(KERN_ERR "%s: bogus SBINT %d\n", sdev->prom_name, sbint);
+		BUG();
+	}
+	return sun4d_build_irq(sdev, sbus_to_pil[sbint]);
+}
+
 int sun4d_request_irq(unsigned int irq,
 		void (*handler)(int, void *, struct pt_regs *),
 		unsigned long irqflags, const char * devname, void *dev_id)
@@ -541,6 +550,7 @@ void __init sun4d_init_IRQ(void)
 {
 	local_irq_disable();
 
+	BTFIXUPSET_CALL(sbint_to_irq, sun4d_sbint_to_irq, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(enable_irq, sun4d_enable_irq, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(disable_irq, sun4d_disable_irq, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(clear_clock_irq, sun4d_clear_clock_irq, BTFIXUPCALL_NORM);

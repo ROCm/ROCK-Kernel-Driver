@@ -29,7 +29,7 @@
 #include "e100_config.h"
 
 extern u16 e100_eeprom_read(struct e100_private *, u16);
-extern int e100_wait_exec_cmplx(struct e100_private *, u32,u8);
+extern int e100_wait_exec_cmplx(struct e100_private *, u32,u8, u8);
 extern void e100_phy_reset(struct e100_private *bdp);
 extern void e100_phy_autoneg(struct e100_private *bdp);
 extern void e100_phy_set_loopback(struct e100_private *bdp);
@@ -95,11 +95,9 @@ e100_run_diag(struct net_device *dev, u64 *test_info, u32 flags)
 		test_info [E100_EEPROM_TEST_FAIL] = true;
 	}
 
-	e100_deisolate_driver(bdp, false);
-
-	/*Let card recover from the test*/
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ * 2);
+    	e100_deisolate_driver(bdp, false);
 
 	return flags | (test_result ? 0 : ETH_TEST_FL_FAILED);
 }
@@ -128,7 +126,7 @@ e100_diag_selftest(struct net_device *dev)
 		}
 	}
 
-	e100_hw_reset_recover(bdp,PORT_SOFTWARE_RESET);
+	e100_configure_device(bdp);
 
 	return retval;
 }
@@ -166,13 +164,19 @@ e100_diag_loopback (struct net_device *dev)
 {
 	u8 rc = 0;
 
+	printk(KERN_DEBUG "%s: PHY loopback test starts\n", dev->name);
+	e100_sw_reset(dev->priv, PORT_SELECTIVE_RESET);
 	if (!e100_diag_one_loopback(dev, PHY_LOOPBACK)) {
 		rc |= PHY_LOOPBACK;
 	}
+	printk(KERN_DEBUG "%s: PHY loopback test ends\n", dev->name);
 
+	printk(KERN_DEBUG "%s: MAC loopback test starts\n", dev->name);
+	e100_sw_reset(dev->priv, PORT_SELECTIVE_RESET);
 	if (!e100_diag_one_loopback(dev, MAC_LOOPBACK)) {
 		rc |= MAC_LOOPBACK;
 	}
+	printk(KERN_DEBUG "%s: MAC loopback test ends\n", dev->name);
 
 	return rc;
 }
@@ -341,12 +345,12 @@ static void
 e100_diag_loopback_cu_ru_exec(struct e100_private *bdp)
 {
 	/*load CU & RU base */ 
-	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE))
-		printk("e100: SCB_CUC_LOAD_BASE failed\n");
-	if(!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE))
-		printk("e100: SCB_RUC_LOAD_BASE failed!\n");
-	if(!e100_wait_exec_cmplx(bdp, bdp->loopback.dma_handle, SCB_RUC_START))
-		printk("e100: SCB_RUC_START failed!\n");
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE, 0))
+		printk(KERN_ERR "e100: SCB_CUC_LOAD_BASE failed\n");
+	if(!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE, 0))
+		printk(KERN_ERR "e100: SCB_RUC_LOAD_BASE failed!\n");
+	if(!e100_wait_exec_cmplx(bdp, bdp->loopback.dma_handle, SCB_RUC_START, 0))
+		printk(KERN_ERR "e100: SCB_RUC_START failed!\n");
 
 	bdp->next_cu_cmd = START_WAIT;
 	e100_start_cu(bdp, bdp->loopback.tcb);
