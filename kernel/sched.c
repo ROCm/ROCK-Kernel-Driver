@@ -3146,12 +3146,12 @@ recheck:
 	}
 	array = p->array;
 	if (array)
-		deactivate_task(p, task_rq(p));
+		deactivate_task(p, rq);
 	retval = 0;
 	oldprio = p->prio;
 	__setscheduler(p, policy, lp.sched_priority);
 	if (array) {
-		__activate_task(p, task_rq(p));
+		__activate_task(p, rq);
 		/*
 		 * Reschedule if we are currently running on this runqueue and
 		 * our priority decreased, or if we are not currently running on
