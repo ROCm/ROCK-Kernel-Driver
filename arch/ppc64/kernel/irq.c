@@ -173,10 +173,8 @@ inline void synchronize_irq(unsigned int irq)
 	if (!irq_desc[irq].action)
 		return;
 
-	while (irq_desc[irq].status & IRQ_INPROGRESS) {
-		barrier();
+	while (irq_desc[irq].status & IRQ_INPROGRESS)
 		cpu_relax();
-	}
 }
 
 #endif /* CONFIG_SMP */
