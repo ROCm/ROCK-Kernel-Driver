@@ -74,7 +74,7 @@ static struct i2c_driver lm75_driver = {
 	.detach_client	= lm75_detach_client,
 };
 
-static int lm75_id = 0;
+static int lm75_id;
 
 #define show(value)	\
 static ssize_t show_##value(struct device *dev, char *buf)		\

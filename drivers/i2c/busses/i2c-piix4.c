@@ -459,6 +459,8 @@ static struct pci_device_id piix4_ids[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, piix4_ids);
+
 static int __devinit piix4_probe(struct pci_dev *dev,
 				const struct pci_device_id *id)
 {

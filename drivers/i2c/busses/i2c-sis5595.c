@@ -371,6 +371,8 @@ static struct pci_device_id sis5595_ids[] __devinitdata = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, sis5595_ids);
+
 static int __devinit sis5595_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	if (sis5595_setup(dev)) {

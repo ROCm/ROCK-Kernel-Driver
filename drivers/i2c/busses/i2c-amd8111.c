@@ -336,6 +336,8 @@ static struct pci_device_id amd8111_ids[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, amd8111_ids);
+
 static int __devinit amd8111_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	struct amd_smbus *smbus;

@@ -376,6 +376,19 @@ config I2C_SIS96X
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-sis96x.
 
+config I2C_STUB
+	tristate "I2C/SMBus Test Stub"
+	depends on I2C && EXPERIMENTAL && 'm'
+	default 'n'
+	help
+	  This module may be useful to developers of SMBus client drivers,
+	  especially for certain kinds of sensor chips.
+
+	  If you do build this module, be sure to read the notes and warnings
+	  in Documentation/i2c/i2c-stub.
+
+	  If you don't know what to do here, definitely say N.
+
 config I2C_VIA
 	tristate "VIA 82C586B"
 	depends on I2C && PCI && EXPERIMENTAL

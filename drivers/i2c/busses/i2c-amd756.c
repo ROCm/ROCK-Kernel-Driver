@@ -320,6 +320,8 @@ static struct pci_device_id amd756_ids[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, amd756_ids);
+
 static int __devinit amd756_probe(struct pci_dev *pdev,
 				  const struct pci_device_id *id)
 {

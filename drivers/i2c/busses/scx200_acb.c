@@ -503,6 +503,12 @@ static int  __init scx200_acb_create(int base, int index)
 	return rc;
 }
 
+static struct pci_device_id scx200[] = {
+	{ PCI_DEVICE(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SCx200_BRIDGE) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SC1100_BRIDGE) },
+	{ },
+};
+
 static int __init scx200_acb_init(void)
 {
 	int i;
@@ -511,12 +517,7 @@ static int __init scx200_acb_init(void)
 	pr_debug(NAME ": NatSemi SCx200 ACCESS.bus Driver\n");
 
 	/* Verify that this really is a SCx200 processor */
-	if (pci_find_device(PCI_VENDOR_ID_NS,
-			    PCI_DEVICE_ID_NS_SCx200_BRIDGE,
-			    NULL) == NULL
-	    && pci_find_device(PCI_VENDOR_ID_NS,
-			       PCI_DEVICE_ID_NS_SC1100_BRIDGE,
-			       NULL) == NULL)
+	if (pci_dev_present(scx200) == 0)
 		return -ENODEV;
 
 	rc = -ENXIO;

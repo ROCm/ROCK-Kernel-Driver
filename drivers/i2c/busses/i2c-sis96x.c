@@ -278,6 +278,8 @@ static struct pci_device_id sis96x_ids[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, sis96x_ids);
+
 static int __devinit sis96x_probe(struct pci_dev *dev,
 				const struct pci_device_id *id)
 {

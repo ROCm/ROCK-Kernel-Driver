@@ -99,6 +99,8 @@ static struct pci_device_id vt586b_ids[] __devinitdata = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, vt586b_ids);
+
 static int __devinit vt586b_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	u16 base;

@@ -59,19 +59,28 @@ static ssize_t w1_therm_read_name(struct device *dev, char *buf)
 	return sprintf(buf, "%s\n", sl->name);
 }
 
+static inline int w1_convert_temp(u8 rom[9])
+{
+	int t, h;
+	
+	if (rom[1] == 0)
+		t = ((s32)rom[0] >> 1)*1000;
+	else
+		t = 1000*(-1*(s32)(0x100-rom[0]) >> 1);
+	
+	t -= 250;
+	h = 1000*((s32)rom[7] - (s32)rom[6]);
+	h /= (s32)rom[7];
+	t += h;
+
+	return t;
+}
+
 static ssize_t w1_therm_read_temp(struct device *dev, char *buf)
 {
 	struct w1_slave *sl = container_of(dev, struct w1_slave, dev);
-	s16 temp;
 
-	/* 
-	 * Must be more precise.
-	 */
-	temp = 0;
-	temp <<= sl->rom[1] / 2;
-	temp |= sl->rom[0] / 2;
-
-	return sprintf(buf, "%d\n", temp * 1000);
+	return sprintf(buf, "%d\n", w1_convert_temp(sl->rom));
 }
 
 static int w1_therm_check_rom(u8 rom[9])
@@ -92,7 +101,6 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 	struct w1_master *dev = sl->master;
 	u8 rom[9], crc, verdict;
 	int i, max_trying = 10;
-	u16 temp;
 
 	atomic_inc(&sl->refcnt);
 	if (down_interruptible(&sl->master->mutex)) {
@@ -120,6 +128,7 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 		if (!w1_reset_bus (dev)) {
 			int count = 0;
 			u8 match[9] = {W1_MATCH_ROM, };
+			unsigned long tm;
 
 			memcpy(&match[1], (u64 *) & sl->reg_num, 8);
 			
@@ -127,24 +136,29 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 
 			w1_write_8(dev, W1_CONVERT_TEMP);
 
-			if (count < 10) {
-				if (!w1_reset_bus(dev)) {
-					w1_write_block(dev, match, 9);
+			tm = jiffies + msecs_to_jiffies(750);
+			while(time_before(jiffies, tm)) {
+				set_current_state(TASK_INTERRUPTIBLE);
+				schedule_timeout(tm-jiffies);
 
-					w1_write_8(dev, W1_READ_SCRATCHPAD);
-					if ((count = w1_read_block(dev, rom, 9)) != 9) {
-						dev_warn(&dev->dev, "w1_read_block() returned %d instead of 9.\n", count);
-					}
-
-					crc = w1_calc_crc8(rom, 8);
-
-					if (rom[8] == crc && rom[0])
-						verdict = 1;
-				}
+				if (signal_pending(current))
+					flush_signals(current);
 			}
-			else
-				dev_warn(&dev->dev,
-					  "18S20 doesn't respond to CONVERT_TEMP.\n");
+
+			if (!w1_reset_bus (dev)) {
+				w1_write_block(dev, match, 9);
+				
+				w1_write_8(dev, W1_READ_SCRATCHPAD);
+				if ((count = w1_read_block(dev, rom, 9)) != 9) {
+					dev_warn(&dev->dev, "w1_read_block() returned %d instead of 9.\n", count);
+				}
+
+				crc = w1_calc_crc8(rom, 8);
+
+				if (rom[8] == crc && rom[0])
+					verdict = 1;
+
+			}
 		}
 
 		if (!w1_therm_check_rom(rom))
@@ -157,12 +171,13 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 			   crc, (verdict) ? "YES" : "NO");
 	if (verdict)
 		memcpy(sl->rom, rom, sizeof(sl->rom));
+	else
+		dev_warn(&dev->dev, "18S20 doesn't respond to CONVERT_TEMP.\n");
+
 	for (i = 0; i < 9; ++i)
 		count += sprintf(buf + count, "%02x ", sl->rom[i]);
-	temp = 0;
-	temp <<= sl->rom[1] / 2;
-	temp |= sl->rom[0] / 2;
-	count += sprintf(buf + count, "t=%u\n", temp);
+	
+	count += sprintf(buf + count, "t=%d\n", w1_convert_temp(rom));
 out:
 	up(&dev->mutex);
 out_dec:

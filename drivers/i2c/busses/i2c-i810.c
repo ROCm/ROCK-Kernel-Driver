@@ -70,7 +70,7 @@
 #define CYCLE_DELAY		10
 #define TIMEOUT			(HZ / 2)
 
-static void *ioaddr;
+static void __iomem *ioaddr;
 
 /* The i810 GPIO registers have individual masks for each bit
    so we never have to read before writing. Nice. */
@@ -200,6 +200,8 @@ static struct pci_device_id i810_ids[] __devinitdata = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82845G_IG) },
 	{ 0, },
 };
+
+MODULE_DEVICE_TABLE (pci, i810_ids);
 
 static int __devinit i810_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
