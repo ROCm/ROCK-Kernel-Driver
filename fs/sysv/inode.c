@@ -131,9 +131,9 @@ static inline void write3byte(struct sysv_sb_info *sbi,
 }
 
 static struct inode_operations sysv_symlink_inode_operations = {
-	readlink:	page_readlink,
-	follow_link:	page_follow_link,
-	getattr:	sysv_getattr,
+	.readlink	= page_readlink,
+	.follow_link	= page_follow_link,
+	.getattr	= sysv_getattr,
 };
 
 void sysv_set_inode(struct inode *inode, dev_t rdev)
@@ -311,14 +311,14 @@ static void init_once(void *p, kmem_cache_t *cachep, unsigned long flags)
 }
 
 struct super_operations sysv_sops = {
-	alloc_inode:	sysv_alloc_inode,
-	destroy_inode:	sysv_destroy_inode,
-	read_inode:	sysv_read_inode,
-	write_inode:	sysv_write_inode,
-	delete_inode:	sysv_delete_inode,
-	put_super:	sysv_put_super,
-	write_super:	sysv_write_super,
-	statfs:		sysv_statfs,
+	.alloc_inode	= sysv_alloc_inode,
+	.destroy_inode	= sysv_destroy_inode,
+	.read_inode	= sysv_read_inode,
+	.write_inode	= sysv_write_inode,
+	.delete_inode	= sysv_delete_inode,
+	.put_super	= sysv_put_super,
+	.write_super	= sysv_write_super,
+	.statfs		= sysv_statfs,
 };
 
 int __init sysv_init_icache(void)

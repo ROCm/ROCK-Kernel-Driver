@@ -20,17 +20,17 @@
  * the coh filesystem.
  */
 struct file_operations sysv_file_operations = {
-	llseek:		generic_file_llseek,
-	read:		generic_file_read,
-	write:		generic_file_write,
-	mmap:		generic_file_mmap,
-	fsync:		sysv_sync_file,
-	sendfile:	generic_file_sendfile,
+	.llseek		= generic_file_llseek,
+	.read		= generic_file_read,
+	.write		= generic_file_write,
+	.mmap		= generic_file_mmap,
+	.fsync		= sysv_sync_file,
+	.sendfile	= generic_file_sendfile,
 };
 
 struct inode_operations sysv_file_inode_operations = {
-	truncate:	sysv_truncate,
-	getattr:	sysv_getattr,
+	.truncate	= sysv_truncate,
+	.getattr	= sysv_getattr,
 };
 
 int sysv_sync_file(struct file * file, struct dentry *dentry, int datasync)

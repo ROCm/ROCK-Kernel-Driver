@@ -61,7 +61,7 @@ static int sysv_hash(struct dentry *dentry, struct qstr *qstr)
 }
 
 struct dentry_operations sysv_dentry_operations = {
-	d_hash:		sysv_hash,
+	.d_hash		= sysv_hash,
 };
 
 static struct dentry *sysv_lookup(struct inode * dir, struct dentry * dentry)
@@ -308,14 +308,14 @@ out:
  * directories can handle most operations...
  */
 struct inode_operations sysv_dir_inode_operations = {
-	create:		sysv_create,
-	lookup:		sysv_lookup,
-	link:		sysv_link,
-	unlink:		sysv_unlink,
-	symlink:	sysv_symlink,
-	mkdir:		sysv_mkdir,
-	rmdir:		sysv_rmdir,
-	mknod:		sysv_mknod,
-	rename:		sysv_rename,
-	getattr:	sysv_getattr,
+	.create		= sysv_create,
+	.lookup		= sysv_lookup,
+	.link		= sysv_link,
+	.unlink		= sysv_unlink,
+	.symlink	= sysv_symlink,
+	.mkdir		= sysv_mkdir,
+	.rmdir		= sysv_rmdir,
+	.mknod		= sysv_mknod,
+	.rename		= sysv_rename,
+	.getattr	= sysv_getattr,
 };
