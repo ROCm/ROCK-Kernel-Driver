@@ -415,8 +415,6 @@ static struct clgenfb_info boards[MAX_NUM_BOARDS];	/* the boards */
 static unsigned clgen_def_mode = 1;
 static int noaccel = 0;
 
-static int release_io_ports = 0;
-
 
 
 /*
@@ -2413,6 +2411,8 @@ static void __init get_prep_addrs (unsigned long *display, unsigned long *regist
 
 
 #ifdef CONFIG_PCI
+static int release_io_ports = 0;
+
 /* Pulled the logic from XFree86 Cirrus driver to get the memory size,
  * based on the DRAM bandwidth bit and DRAM bank switching bit.  This
  * works with 1MB, 2MB and 4MB configurations (which the Motorola boards
@@ -2635,11 +2635,11 @@ static void __exit clgen_zorro_unmap (struct clgenfb_info *info)
 	release_mem_region(info->board_addr, info->board_size);
 
 	if (info->btype == BT_PICASSO4) {
-		iounmap (info->board_addr);
-		iounmap (info->fbmem_phys);
+		iounmap ((void *)info->board_addr);
+		iounmap ((void *)info->fbmem_phys);
 	} else {
 		if (info->board_addr > 0x01000000)
-			iounmap (info->board_addr);
+			iounmap ((void *)info->board_addr);
 	}
 }
 

@@ -203,7 +203,7 @@ extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 
 /* Platform specific MWI support. */
 #define HAVE_ARCH_PCI_MWI
-extern int pcibios_set_mwi(struct pci_dev *dev);
+extern int pcibios_prep_mwi(struct pci_dev *dev);
 
 #endif /* __KERNEL__ */
 
