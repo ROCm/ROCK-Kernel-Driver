@@ -13,6 +13,18 @@ obj-$(CONFIG_LOGO_SUPERH_MONO)		+= logo_superh_mono.o
 obj-$(CONFIG_LOGO_SUPERH_VGA16)		+= logo_superh_vga16.o
 obj-$(CONFIG_LOGO_SUPERH_CLUT224)	+= logo_superh_clut224.o
 
+# Dependencies on generated files need to be listed explicitly
+
+$(obj)/%_mono.o: $(src)/%_mono.c
+
+$(obj)/%_vga16.o: $(src)/%_vga16.c
+
+$(obj)/%_clut224.o: $(src)/%_clut224.c
+
+$(obj)/%_gray256.o: $(src)/%_gray256.c
+
+# How to generate them
+
 $(obj)/%_mono.c:	$(src)/%_mono.pbm
 		$(objtree)/scripts/pnmtologo -t mono -n $*_mono -o $@ $<
 
