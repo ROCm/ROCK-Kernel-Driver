@@ -186,6 +186,7 @@ setup_netjet_u(struct IsdnCard *card)
 				printk(KERN_WARNING "NETspider-U: No IO-Adr for PCI card found\n");
 				return(0);
 			}
+			cs->hw.njet.pdev = dev_netjet;
 		} else {
 			printk(KERN_WARNING "NETspider-U: No PCI card found\n");
 			return(0);

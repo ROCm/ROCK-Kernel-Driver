@@ -184,6 +184,7 @@ setup_netjet_s(struct IsdnCard *card)
 				printk(KERN_WARNING "NETjet-S: No IO-Adr for PCI card found\n");
 				return(0);
 			}
+			cs->hw.njet.pdev = dev_netjet;
 		} else {
 			printk(KERN_WARNING "NETjet-S: No PCI card found\n");
 			return(0);
