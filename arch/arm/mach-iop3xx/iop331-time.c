@@ -99,6 +99,9 @@ iop331_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	asm volatile("mcr p6, 0, %0, c3, c1, 0" : : "r" (0xffffffff));
 #else
 	do_timer(regs);
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(regs));
+#endif
 #endif
 
 	return IRQ_HANDLED;
