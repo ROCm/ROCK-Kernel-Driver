@@ -43,7 +43,7 @@ config VIDEO_SELECT
 	  about the Video mode selection support. If unsure, say N.
 
 config MDA_CONSOLE
-	depends on !M68K
+	depends on !M68K && ISA
 	tristate "MDA text console (dual-headed) (EXPERIMENTAL)"
 	---help---
 	  Say Y here if you have an old MDA or monochrome Hercules graphics
