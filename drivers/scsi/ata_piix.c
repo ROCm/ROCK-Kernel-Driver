@@ -28,17 +28,24 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"ata_piix"
-#define DRV_VERSION	"1.01"
+#define DRV_VERSION	"1.02"
 
 enum {
 	PIIX_IOCFG		= 0x54, /* IDE I/O configuration register */
+	ICH5_PMR		= 0x90, /* port mapping register */
 	ICH5_PCS		= 0x92,	/* port control and status */
 
 	PIIX_FLAG_CHECKINTR	= (1 << 29), /* make sure PCI INTx enabled */
 	PIIX_FLAG_COMBINED	= (1 << 30), /* combined mode possible */
 
-	PIIX_COMB_PRI		= (1 << 0), /* combined mode, PATA primary */
-	PIIX_COMB_SEC		= (1 << 1), /* combined mode, PATA secondary */
+	/* combined mode.  if set, PATA is channel 0.
+	 * if clear, PATA is channel 1.
+	 */
+	PIIX_COMB_PATA_P0	= (1 << 1),
+	PIIX_COMB		= (1 << 2), /* combined mode enabled? */
+
+	PIIX_PORT_PRESENT	= (1 << 0),
+	PIIX_PORT_ENABLED	= (1 << 4),
 
 	PIIX_80C_PRI		= (1 << 5) | (1 << 4),
 	PIIX_80C_SEC		= (1 << 7) | (1 << 6),
@@ -53,7 +60,6 @@ static int piix_init_one (struct pci_dev *pdev,
 
 static void piix_pata_phy_reset(struct ata_port *ap);
 static void piix_sata_phy_reset(struct ata_port *ap);
-static void piix_sata_port_disable(struct ata_port *ap);
 static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev,
 			      unsigned int pio);
 static void piix_set_udmamode (struct ata_port *ap, struct ata_device *adev,
@@ -137,7 +143,7 @@ static struct ata_port_operations piix_pata_ops = {
 };
 
 static struct ata_port_operations piix_sata_ops = {
-	.port_disable		= piix_sata_port_disable,
+	.port_disable		= ata_port_disable,
 	.set_piomode		= piix_set_piomode,
 	.set_udmamode		= piix_set_udmamode,
 
@@ -259,54 +265,48 @@ static void piix_pata_phy_reset(struct ata_port *ap)
 }
 
 /**
- *	piix_pcs_probe - Probe SATA port configuration and status register
- *	@ap: Port to probe
- *	@have_port: (output) Non-zero if SATA port is enabled
- *	@have_device: (output) Non-zero if SATA phy indicates device present
+ *	piix_sata_probe - Probe PCI device for present SATA devices
+ *	@pdev: PCI device to probe
  *
  *	Reads SATA PCI device's PCI config register Port Configuration
  *	and Status (PCS) to determine port and device availability.
  *
  *	LOCKING:
  *	None (inherited from caller).
+ *
+ *	RETURNS:
+ *	Non-zero if device detected, zero otherwise.
  */
-static void piix_pcs_probe (struct ata_port *ap, unsigned int *have_port,
-			    unsigned int *have_device)
+static int piix_sata_probe (struct ata_port *ap)
 {
 	struct pci_dev *pdev = ap->host_set->pdev;
-	u16 pcs;
+	int combined = (ap->flags & ATA_FLAG_SLAVE_POSS);
+	int orig_mask, mask, i;
+	u8 pcs;
 
-	pci_read_config_word(pdev, ICH5_PCS, &pcs);
+	mask = (PIIX_PORT_PRESENT << ap->port_no) |
+	       (PIIX_PORT_ENABLED << ap->port_no);
 
-	/* is SATA port enabled? */
-	if (pcs & (1 << ap->port_no)) {
-		*have_port = 1;
+	pci_read_config_byte(pdev, ICH5_PCS, &pcs);
+	orig_mask = (int) pcs & 0xff;
 
-		if (pcs & (1 << (ap->port_no + 4)))
-			*have_device = 1;
+	/* TODO: this is vaguely wrong for ICH6 combined mode,
+	 * where only two of the four SATA ports are mapped
+	 * onto a single ATA channel.  It is also vaguely inaccurate
+	 * for ICH5, which has only two ports.  However, this is ok,
+	 * as further device presence detection code will handle
+	 * any false positives produced here.
+	 */
+
+	for (i = 0; i < 4; i++) {
+		mask = (PIIX_PORT_PRESENT << i) | (PIIX_PORT_ENABLED << i);
+
+		if ((orig_mask & mask) == mask)
+			if (combined || (i == ap->port_no))
+				return 1;
 	}
-}
 
-/**
- *	piix_pcs_disable - Disable SATA port
- *	@ap: Port to disable
- *
- *	Disable SATA phy for specified port.
- *
- *	LOCKING:
- *	None (inherited from caller).
- */
-static void piix_pcs_disable (struct ata_port *ap)
-{
-	struct pci_dev *pdev = ap->host_set->pdev;
-	u16 pcs;
-
-	pci_read_config_word(pdev, ICH5_PCS, &pcs);
-
-	if (pcs & (1 << ap->port_no)) {
-		pcs &= ~(1 << ap->port_no);
-		pci_write_config_word(pdev, ICH5_PCS, pcs);
-	}
+	return 0;
 }
 
 /**
@@ -321,8 +321,6 @@ static void piix_pcs_disable (struct ata_port *ap)
 
 static void piix_sata_phy_reset(struct ata_port *ap)
 {
-	unsigned int have_port = 0, have_dev = 0;
-
 	if (!pci_test_config_bits(ap->host_set->pdev,
 				  &piix_enable_bits[ap->port_no])) {
 		ata_port_disable(ap);
@@ -330,21 +328,9 @@ static void piix_sata_phy_reset(struct ata_port *ap)
 		return;
 	}
 
-	piix_pcs_probe(ap, &have_port, &have_dev);
-
-	/* if port not enabled, exit */
-	if (!have_port) {
+	if (!piix_sata_probe(ap)) {
 		ata_port_disable(ap);
-		printk(KERN_INFO "ata%u: SATA port disabled. ignoring.\n",
-		       ap->id);
-		return;
-	}
-
-	/* if port enabled but no device, disable port and exit */
-	if (!have_dev) {
-		piix_sata_port_disable(ap);
-		printk(KERN_INFO "ata%u: SATA port has no device. disabling.\n",
-		       ap->id);
+		printk(KERN_INFO "ata%u: SATA port has no device.\n", ap->id);
 		return;
 	}
 
@@ -353,22 +339,6 @@ static void piix_sata_phy_reset(struct ata_port *ap)
 	ata_port_probe(ap);
 
 	ata_bus_reset(ap);
-}
-
-/**
- *	piix_sata_port_disable - Disable SATA port
- *	@ap: Port to disable.
- *
- *	Disable SATA port.
- *
- *	LOCKING:
- *	None (inherited from caller).
- */
-
-static void piix_sata_port_disable(struct ata_port *ap)
-{
-	ata_port_disable(ap);
-	piix_pcs_disable(ap);
 }
 
 /**
@@ -493,31 +463,6 @@ static void piix_set_udmamode (struct ata_port *ap, struct ata_device *adev,
 	}
 }
 
-/**
- *	piix_probe_combined - Determine if PATA and SATA are combined
- *	@pdev: PCI device to examine
- *	@mask: (output) zero, %PIIX_COMB_PRI or %PIIX_COMB_SEC
- *
- *	Determine if BIOS has secretly stuffed a PATA port into our
- *	otherwise-beautiful SATA PCI device.
- *
- *	LOCKING:
- *	Inherited from PCI layer (may sleep).
- */
-static void piix_probe_combined (struct pci_dev *pdev, unsigned int *mask)
-{
-	u8 tmp;
-
-	pci_read_config_byte(pdev, 0x90, &tmp); /* combined mode reg */
-	tmp &= 0x6; 	/* interesting bits 2:1, PATA primary/secondary */
-
-	/* backwards from what one might expect */
-	if (tmp == 0x4)	/* bits 10x */
-		*mask |= PIIX_COMB_SEC;
-	if (tmp == 0x6)	/* bits 11x */
-		*mask |= PIIX_COMB_PRI;
-}
-
 /* move to PCI layer, integrate w/ MSI stuff */
 static void pci_enable_intx(struct pci_dev *pdev)
 {
@@ -550,7 +495,7 @@ static int piix_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	static int printed_version;
 	struct ata_port_info *port_info[2];
 	unsigned int combined = 0, n_ports = 1;
-	unsigned int pata_comb = 0, sata_comb = 0;
+	unsigned int pata_chan = 0, sata_chan = 0;
 
 	if (!printed_version++)
 		printk(KERN_DEBUG DRV_NAME " version " DRV_VERSION "\n");
@@ -561,8 +506,19 @@ static int piix_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	port_info[0] = &piix_port_info[ent->driver_data];
 	port_info[1] = NULL;
-	if (port_info[0]->host_flags & PIIX_FLAG_COMBINED)
-		piix_probe_combined(pdev, &combined);
+
+	if (port_info[0]->host_flags & PIIX_FLAG_COMBINED) {
+		u8 tmp;
+		pci_read_config_byte(pdev, ICH5_PMR, &tmp);
+
+		if (tmp & PIIX_COMB) {
+			combined = 1;
+			if (tmp & PIIX_COMB_PATA_P0)
+				sata_chan = 1;
+			else
+				pata_chan = 1;
+		}
+	}
 
 	/* On ICH5, some BIOSen disable the interrupt using the
 	 * PCI_COMMAND_INTX_DISABLE bit added in PCI 2.3.
@@ -573,15 +529,10 @@ static int piix_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (port_info[0]->host_flags & PIIX_FLAG_CHECKINTR)
 		pci_enable_intx(pdev);
 
-	if (combined & PIIX_COMB_PRI)
-		sata_comb = 1;
-	else if (combined & PIIX_COMB_SEC)
-		pata_comb = 1;
-
-	if (pata_comb || sata_comb) {
-		port_info[sata_comb] = &piix_port_info[ent->driver_data];
-		port_info[sata_comb]->host_flags |= ATA_FLAG_SLAVE_POSS; /* sigh */
-		port_info[pata_comb] = &piix_port_info[ich5_pata]; /*ich5-specific*/
+	if (combined) {
+		port_info[sata_chan] = &piix_port_info[ent->driver_data];
+		port_info[sata_chan]->host_flags |= ATA_FLAG_SLAVE_POSS;
+		port_info[pata_chan] = &piix_port_info[ich5_pata];
 		n_ports++;
 
 		printk(KERN_WARNING DRV_NAME ": combined mode detected\n");

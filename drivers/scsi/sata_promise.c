@@ -28,6 +28,7 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/sched.h>
 #include "scsi.h"
 #include "hosts.h"
 #include <linux/libata.h>
@@ -45,6 +46,7 @@ enum {
 	PDC_INT_SEQMASK		= 0x40,	/* Mask of asserted SEQ INTs */
 	PDC_TBG_MODE		= 0x41,	/* TBG mode */
 	PDC_FLASH_CTL		= 0x44, /* Flash control register */
+	PDC_PCI_CTL		= 0x48, /* PCI control and status register */
 	PDC_CTLSTAT		= 0x60,	/* IDE control and status register */
 	PDC_SATA_PLUG_CSR	= 0x6C, /* SATA Plug control/status reg */
 	PDC_SLEW_CTL		= 0x470, /* slew rate control reg */
@@ -76,6 +78,8 @@ enum {
 	board_2037x		= 0,	/* FastTrak S150 TX2plus */
 	board_20319		= 1,	/* FastTrak S150 TX4 */
 	board_20621		= 2,	/* FastTrak S150 SX4 */
+
+	PDC_HAS_PATA		= (1 << 1), /* PDC20375 has PATA */
 
 	PDC_FLAG_20621		= (1 << 30), /* we have a 20621 */
 	PDC_HDMA_RESET		= (1 << 11), /* HDMA reset */
@@ -390,12 +394,11 @@ static inline unsigned int pdc_pkt_header(struct ata_taskfile *tf,
 	 * and seq id (byte 2)
 	 */
 	switch (tf->protocol) {
-	case ATA_PROT_DMA_READ:
-		buf32[0] = cpu_to_le32(PDC_PKT_READ);
-		break;
-
-	case ATA_PROT_DMA_WRITE:
-		buf32[0] = 0;
+	case ATA_PROT_DMA:
+		if (!(tf->flags & ATA_TFLAG_WRITE))
+			buf32[0] = cpu_to_le32(PDC_PKT_READ);
+		else
+			buf32[0] = 0;
 		break;
 
 	case ATA_PROT_NODATA:
@@ -554,7 +557,7 @@ static inline unsigned int pdc20621_ata_pkt(struct ata_taskfile *tf,
 	/*
 	 * Set up ATA packet
 	 */
-	if (tf->protocol == ATA_PROT_DMA_READ)
+	if ((tf->protocol == ATA_PROT_DMA) && (!(tf->flags & ATA_TFLAG_WRITE)))
 		buf[i++] = PDC_PKT_READ;
 	else if (tf->protocol == ATA_PROT_NODATA)
 		buf[i++] = PDC_PKT_NODATA;
@@ -606,7 +609,7 @@ static inline void pdc20621_host_pkt(struct ata_taskfile *tf, u8 *buf,
 	/*
 	 * Set up Host DMA packet
 	 */
-	if (tf->protocol == ATA_PROT_DMA_READ)
+	if ((tf->protocol == ATA_PROT_DMA) && (!(tf->flags & ATA_TFLAG_WRITE)))
 		tmp = PDC_PKT_READ;
 	else
 		tmp = 0;
@@ -768,7 +771,7 @@ static void pdc20621_dma_start(struct ata_queued_cmd *qc)
 	struct ata_host_set *host_set = ap->host_set;
 	unsigned int port_no = ap->port_no;
 	void *mmio = host_set->mmio_base;
-	unsigned int rw = (qc->flags & ATA_QCFLAG_WRITE);
+	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
 	u8 seq = (u8) (port_no + 1);
 	unsigned int doing_hdma = 0, port_ofs;
 
@@ -821,8 +824,9 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 
 	VPRINTK("ENTER\n");
 
-	switch (qc->tf.protocol) {
-	case ATA_PROT_DMA_READ:
+	if ((qc->tf.protocol == ATA_PROT_DMA) &&	/* read */
+	    (!(qc->tf.flags & ATA_TFLAG_WRITE))) {
+
 		/* step two - DMA from DIMM to host */
 		if (doing_hdma) {
 			VPRINTK("ata%u: read hdma, 0x%x 0x%x\n", ap->id,
@@ -843,9 +847,9 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 					   port_ofs + PDC_DIMM_HOST_PKT);
 		}
 		handled = 1;
-		break;
 
-	case ATA_PROT_DMA_WRITE:
+	} else if (qc->tf.protocol == ATA_PROT_DMA) {	/* write */
+
 		/* step one - DMA from host to DIMM */
 		if (doing_hdma) {
 			u8 seq = (u8) (port_no + 1);
@@ -868,21 +872,20 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 			pdc20621_pop_hdma(qc);
 		}
 		handled = 1;
-		break;
 
-	case ATA_PROT_NODATA:   /* command completion, but no data xfer */
+	/* command completion, but no data xfer */
+	} else if (qc->tf.protocol == ATA_PROT_NODATA) {
+
 		status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
 		DPRINTK("BUS_NODATA (drv_stat 0x%X)\n", status);
 		ata_qc_complete(qc, status, 0);
 		handled = 1;
-		break;
 
-        default:
-                ap->stats.idle_irq++;
-                break;
-        }
+	} else {
+		ap->stats.idle_irq++;
+	}
 
-        return handled;
+	return handled;
 }
 
 static irqreturn_t pdc20621_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
@@ -999,8 +1002,7 @@ static void pdc_eng_timeout(struct ata_port *ap)
 	qc->scsidone = scsi_finish_command;
 
 	switch (qc->tf.protocol) {
-	case ATA_PROT_DMA_READ:
-	case ATA_PROT_DMA_WRITE:
+	case ATA_PROT_DMA:
 		printk(KERN_ERR "ata%u: DMA timeout\n", ap->id);
 		ata_qc_complete(ata_qc_from_tag(ap, ap->active_tag),
 			        ata_wait_idle(ap) | ATA_ERR, 0);
@@ -1036,8 +1038,7 @@ static inline unsigned int pdc_host_intr( struct ata_port *ap,
 	unsigned int handled = 0;
 
 	switch (qc->tf.protocol) {
-	case ATA_PROT_DMA_READ:
-	case ATA_PROT_DMA_WRITE:
+	case ATA_PROT_DMA:
 		pdc_dma_complete(ap, qc);
 		handled = 1;
 		break;
@@ -1130,16 +1131,14 @@ static void pdc_dma_start(struct ata_queued_cmd *qc)
 
 static void pdc_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	if ((tf->protocol != ATA_PROT_DMA_READ) &&
-	    (tf->protocol != ATA_PROT_DMA_WRITE))
+	if (tf->protocol != ATA_PROT_DMA)
 		ata_tf_load_mmio(ap, tf);
 }
 
 
 static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	if ((tf->protocol != ATA_PROT_DMA_READ) &&
-	    (tf->protocol != ATA_PROT_DMA_WRITE))
+	if (tf->protocol != ATA_PROT_DMA)
 		ata_exec_command_mmio(ap, tf);
 }
 
@@ -1610,14 +1609,18 @@ static void pdc_host_init(unsigned int chip_id, struct ata_probe_ent *pe)
 	u32 tmp;
 
 	if (chip_id == board_20621)
-		return;
+		BUG();
 
-	/* change FIFO_SHD to 8 dwords. Promise driver does this...
-	 * dunno why.
+	/*
+	 * Except for the hotplug stuff, this is voodoo from the
+	 * Promise driver.  Label this entire section
+	 * "TODO: figure out why we do this"
 	 */
+
+	/* change FIFO_SHD to 8 dwords, enable BMR_BURST */
 	tmp = readl(mmio + PDC_FLASH_CTL);
-	if ((tmp & (1 << 16)) == 0)
-		writel(tmp | (1 << 16), mmio + PDC_FLASH_CTL);
+	tmp |= 0x12000;	/* bit 16 (fifo 8 dw) and 13 (bmr burst?) */
+	writel(tmp, mmio + PDC_FLASH_CTL);
 
 	/* clear plug/unplug flags for all ports */
 	tmp = readl(mmio + PDC_SATA_PLUG_CSR);
@@ -1627,13 +1630,17 @@ static void pdc_host_init(unsigned int chip_id, struct ata_probe_ent *pe)
 	tmp = readl(mmio + PDC_SATA_PLUG_CSR);
 	writel(tmp | 0xff0000, mmio + PDC_SATA_PLUG_CSR);
 
-	/* reduce TBG clock to 133 Mhz. FIXME: why? */
+	/* reduce TBG clock to 133 Mhz. */
 	tmp = readl(mmio + PDC_TBG_MODE);
 	tmp &= ~0x30000; /* clear bit 17, 16*/
 	tmp |= 0x10000;  /* set bit 17:16 = 0:1 */
 	writel(tmp, mmio + PDC_TBG_MODE);
 
-	/* adjust slew rate control register. FIXME: why? */
+	readl(mmio + PDC_TBG_MODE);	/* flush */
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(msecs_to_jiffies(10));
+
+	/* adjust slew rate control register. */
 	tmp = readl(mmio + PDC_SLEW_CTL);
 	tmp &= 0xFFFFF03F; /* clear bit 11 ~ 6 */
 	tmp  |= 0x00000900; /* set bit 11-9 = 100b , bit 8-6 = 100 */
