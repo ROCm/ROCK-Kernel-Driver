@@ -137,6 +137,7 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 		}
 		map->offset = (unsigned long)map->handle;
 		if ( map->flags & _DRM_CONTAINS_LOCK ) {
+			dev->sigdata.lock =
 			dev->lock.hw_lock = map->handle; /* Pointer to lock */
 		}
 		break;

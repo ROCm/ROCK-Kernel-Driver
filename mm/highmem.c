@@ -472,6 +472,7 @@ void check_highmem_ptes(void)
 {
 	int idx, type;
 
+	preempt_disable();
 	for (type = 0; type < KM_TYPE_NR; type++) {
 		idx = type + KM_TYPE_NR*smp_processor_id();
 		if (!pte_none(*(kmap_pte-idx))) {
@@ -479,6 +480,7 @@ void check_highmem_ptes(void)
 			BUG();
 		}
 	}
+	preempt_enable();
 }
 #endif
 
