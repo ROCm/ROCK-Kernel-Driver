@@ -471,7 +471,8 @@ static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 unsigned char eddnr;
 struct edd_info edd[EDDNR];
 /**
- * copy_edd() - Copy the BIOS EDD information into a safe place.
+ * copy_edd() - Copy the BIOS EDD information
+ *              from empty_zero_page into a safe place.
  *
  */
 static inline void copy_edd(void)
