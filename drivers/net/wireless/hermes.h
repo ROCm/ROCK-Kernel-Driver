@@ -124,22 +124,22 @@
 /*
  * Command codes
  */
-/*--- Controller Commands --------------------------*/
+/*--- Controller Commands ----------------------------*/
 #define		HERMES_CMD_INIT			(0x0000)
 #define		HERMES_CMD_ENABLE		(0x0001)
 #define		HERMES_CMD_DISABLE		(0x0002)
 #define		HERMES_CMD_DIAG			(0x0003)
 
-/*--- Buffer Mgmt Commands --------------------------*/
+/*--- Buffer Mgmt Commands ---------------------------*/
 #define		HERMES_CMD_ALLOC		(0x000A)
 #define		HERMES_CMD_TX			(0x000B)
 #define		HERMES_CMD_CLRPRST		(0x0012)
 
-/*--- Regulate Commands --------------------------*/
+/*--- Regulate Commands ------------------------------*/
 #define		HERMES_CMD_NOTIFY		(0x0010)
 #define		HERMES_CMD_INQUIRE		(0x0011)
 
-/*--- Configure Commands --------------------------*/
+/*--- Configure Commands -----------------------------*/
 #define		HERMES_CMD_ACCESS		(0x0021)
 #define		HERMES_CMD_DOWNLD		(0x0022)
 
@@ -312,9 +312,11 @@ typedef struct hermes {
 #define hermes_write_regn(hw, name, val) hermes_write_reg((hw), HERMES_##name, (val))
 
 /* Function prototypes */
-void hermes_struct_init(hermes_t *hw, ulong address, int io_space, int reg_spacing);
+void hermes_struct_init(hermes_t *hw, ulong address, int io_space,
+			int reg_spacing);
 int hermes_init(hermes_t *hw);
-int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0, hermes_response_t *resp);
+int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0,
+		      hermes_response_t *resp);
 int hermes_allocate(hermes_t *hw, u16 size, u16 *fid);
 
 int hermes_bap_pread(hermes_t *hw, int bap, void *buf, unsigned len,

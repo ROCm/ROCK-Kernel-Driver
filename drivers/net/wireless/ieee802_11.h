@@ -76,4 +76,3 @@ struct ieee802_11_hdr {
 #define IEEE802_11_SCTL_SEQ		0xFFF0
 
 #endif /* _IEEE802_11_H */
-

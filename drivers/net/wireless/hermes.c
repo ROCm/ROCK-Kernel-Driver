@@ -390,7 +390,6 @@ static int hermes_bap_seek(hermes_t *hw, int bap, u16 id, u16 offset)
 		return -EIO;
 	}
 
-
 	return 0;
 }
 

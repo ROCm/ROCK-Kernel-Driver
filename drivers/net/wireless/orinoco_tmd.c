@@ -78,8 +78,7 @@
 
 static char dev_info[] = "orinoco_tmd";
 
-#define COR_VALUE     (COR_LEVEL_REQ | COR_FUNC_ENA | COR_FUNC_ENA) /* Enable PC card with level triggered irqs and irq requests */
-
+#define COR_VALUE	(COR_LEVEL_REQ | COR_FUNC_ENA | COR_FUNC_ENA) /* Enable PC card with interrupt in level trigger */
 
 static int orinoco_tmd_init_one(struct pci_dev *pdev,
 				const struct pci_device_id *ent)
@@ -115,6 +114,7 @@ static int orinoco_tmd_init_one(struct pci_dev *pdev,
 		goto fail;
 	}
 
+	/* Allocate network device */
 	dev = alloc_orinocodev(0, NULL);
 	if (! dev) {
 		err = -ENOMEM;
@@ -126,16 +126,16 @@ static int orinoco_tmd_init_one(struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
-	printk(KERN_DEBUG
-	       "Detected Orinoco/Prism2 TMD device at %s irq:%d, io addr:0x%lx\n",
-	       pci_name(pdev), pdev->irq, pccard_ioaddr);
+	printk(KERN_DEBUG "Detected Orinoco/Prism2 TMD device "
+	       "at %s irq:%d, io addr:0x%lx\n", pci_name(pdev), pdev->irq,
+	       pccard_ioaddr);
 
 	hermes_struct_init(&(priv->hw), dev->base_addr,
 			HERMES_IO, HERMES_16BIT_REGSPACING);
 	pci_set_drvdata(pdev, dev);
 
-	err = request_irq(pdev->irq, orinoco_interrupt, SA_SHIRQ, dev->name,
-			  dev);
+	err = request_irq(pdev->irq, orinoco_interrupt, SA_SHIRQ,
+			  dev->name, dev);
 	if (err) {
 		printk(KERN_ERR "orinoco_tmd: Error allocating IRQ %d.\n",
 		       pdev->irq);
@@ -148,9 +148,9 @@ static int orinoco_tmd_init_one(struct pci_dev *pdev,
 	if (err)
 		goto fail;
 
-	return 0;		/* succeeded */
+	return 0;
 
- fail:	
+ fail:
 	printk(KERN_DEBUG "orinoco_tmd: init_one(), FAIL!\n");
 
 	if (dev) {

@@ -219,8 +219,7 @@ orinoco_cs_attach(void)
  * are freed.  Otherwise, the structures will be freed when the device
  * is released.
  */
-static void
-orinoco_cs_detach(dev_link_t * link)
+static void orinoco_cs_detach(dev_link_t *link)
 {
 	dev_link_t **linkp;
 	struct net_device *dev = link->priv;
@@ -258,8 +257,9 @@ orinoco_cs_detach(dev_link_t * link)
  * device available to the system.
  */
 
-#define CS_CHECK(fn, ret) \
-do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
+#define CS_CHECK(fn, ret) do { \
+		last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; \
+	} while (0)
 
 static void
 orinoco_cs_config(dev_link_t *link)
@@ -297,7 +297,8 @@ orinoco_cs_config(dev_link_t *link)
 	link->state |= DEV_CONFIG;
 
 	/* Look up the current Vcc */
-	CS_CHECK(GetConfigurationInfo, pcmcia_get_configuration_info(handle, &conf));
+	CS_CHECK(GetConfigurationInfo,
+		 pcmcia_get_configuration_info(handle, &conf));
 	link->conf.Vcc = conf.Vcc;
 
 	/*
@@ -401,8 +402,9 @@ orinoco_cs_config(dev_link_t *link)
 			pcmcia_release_io(link->handle, &link->io);
 		last_ret = pcmcia_get_next_tuple(handle, &tuple);
 		if (last_ret  == CS_NO_MORE_ITEMS) {
-			printk(KERN_ERR "GetNextTuple().  No matching CIS configuration, "
-			       "maybe you need the ignore_cis_vcc=1 parameter.\n");
+			printk(KERN_ERR "GetNextTuple().  No matching "
+			       "CIS configuration, maybe you need the "
+			       "ignore_cis_vcc=1 parameter.\n");
 			goto cs_failed;
 		}
 	}
@@ -440,7 +442,8 @@ orinoco_cs_config(dev_link_t *link)
 	 * the I/O windows and the interrupt mapping, and putting the
 	 * card and host interface into "Memory and IO" mode.
 	 */
-	CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
+	CS_CHECK(RequestConfiguration,
+		 pcmcia_request_configuration(link->handle, &link->conf));
 
 	/* Ok, we have the configuration, prepare to register the netdev */
 	dev->base_addr = link->io.BasePort1;
@@ -659,4 +662,3 @@ exit_orinoco_cs(void)
 
 module_init(init_orinoco_cs);
 module_exit(exit_orinoco_cs);
-

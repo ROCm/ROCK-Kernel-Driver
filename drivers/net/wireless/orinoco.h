@@ -12,6 +12,7 @@
 #include <linux/netdevice.h>
 #include <linux/wireless.h>
 #include <linux/version.h>
+
 #include "hermes.h"
 
 /* To enable debug messages */
@@ -49,7 +50,6 @@ struct orinoco_private {
 	/* Hardware control variables */
 	hermes_t hw;
 	u16 txfid;
-
 
 	/* Capabilities of the hardware/firmware */
 	int firmware_type;
@@ -99,6 +99,10 @@ extern int orinoco_debug;
 
 #define TRACE_ENTER(devname) DEBUG(2, "%s: -> %s()\n", devname, __FUNCTION__);
 #define TRACE_EXIT(devname)  DEBUG(2, "%s: <- %s()\n", devname, __FUNCTION__);
+
+/********************************************************************/
+/* Exported prototypes                                              */
+/********************************************************************/
 
 extern struct net_device *alloc_orinocodev(int sizeof_card,
 					   int (*hard_reset)(struct orinoco_private *));

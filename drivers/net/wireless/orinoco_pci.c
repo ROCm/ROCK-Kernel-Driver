@@ -206,18 +206,17 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 	if (! pci_iorange)
 		goto fail;
 
-	/* Usual setup of structures */
+	/* Allocate network device */
 	dev = alloc_orinocodev(0, NULL);
 	if (! dev) {
 		err = -ENOMEM;
 		goto fail;
 	}
-	priv = netdev_priv(dev);
 
+	priv = netdev_priv(dev);
 	dev->base_addr = (unsigned long) pci_ioaddr;
 	dev->mem_start = pci_iorange;
 	dev->mem_end = pci_iorange + pci_iolen - 1;
-
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
@@ -238,6 +237,7 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 		goto fail;
 	}
 	dev->irq = pdev->irq;
+
 	/* Perform a COR reset to start the card */
 	if(orinoco_pci_cor_reset(priv) != 0) {
 		printk(KERN_ERR "%s: Failed to start the card\n", dev->name);
@@ -255,7 +255,8 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 		goto fail;
 	}
 
-        return 0;               /* succeeded */
+	return 0;
+
  fail:
 	if (dev) {
 		if (dev->irq)
@@ -279,7 +280,7 @@ static void __devexit orinoco_pci_remove_one(struct pci_dev *pdev)
 
 	unregister_netdev(dev);
 
-        if (dev->irq)
+	if (dev->irq)
 		free_irq(dev->irq, dev);
 
 	if (priv->hw.iobase)
@@ -357,7 +358,9 @@ static int orinoco_pci_resume(struct pci_dev *pdev)
 }
 
 static struct pci_device_id orinoco_pci_pci_id_table[] = {
+	/* Intersil Prism 3 */
 	{0x1260, 0x3872, PCI_ANY_ID, PCI_ANY_ID,},
+	/* Intersil Prism 2.5 */
 	{0x1260, 0x3873, PCI_ANY_ID, PCI_ANY_ID,},
 	{0,},
 };

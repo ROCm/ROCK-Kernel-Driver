@@ -1,7 +1,7 @@
 /* orinoco_plx.c 0.13e
  * 
  * Driver for Prism II devices which would usually be driven by orinoco_cs,
- * but are connected to the PCI bus by a PLX9052. 
+ * but are connected to the PCI bus by a PLX9052.
  *
  * Copyright (C) 2001 Daniel Barlow <dan AT telent.net>
  *
@@ -33,77 +33,80 @@
  * drop me mail with the id and "it works"/"it doesn't work".
  *
  * Note: if everything gets detected fine but it doesn't actually send
- * or receive packets, your first port of call should probably be to   
+ * or receive packets, your first port of call should probably be to
  * try newer firmware in the card.  Especially if you're doing Ad-Hoc
- * modes
+ * modes.
  *
  * The actual driving is done by orinoco.c, this is just resource
  * allocation stuff.  The explanation below is courtesy of Ryan Niemi
  * on the linux-wlan-ng list at
  * http://archives.neohapsis.com/archives/dev/linux-wlan/2001-q1/0026.html
-
-The PLX9052-based cards (WL11000 and several others) are a different
-beast than the usual PCMCIA-based PRISM2 configuration expected by
-wlan-ng. Here's the general details on how the WL11000 PCI adapter
-works:
-
- - Two PCI I/O address spaces, one 0x80 long which contains the PLX9052
-   registers, and one that's 0x40 long mapped to the PCMCIA slot I/O
-   address space.
-
- - One PCI memory address space, mapped to the PCMCIA memory space
-   (containing the CIS).
-
-After identifying the I/O and memory space, you can read through the
-memory space to confirm the CIS's device ID or manufacturer ID to make
-sure it's the expected card. Keep in mind that the PCMCIA spec specifies
-the CIS as the lower 8 bits of each word read from the CIS, so to read the
-bytes of the CIS, read every other byte (0,2,4,...). Passing that test,
-you need to enable the I/O address space on the PCMCIA card via the PCMCIA
-COR register. This is the first byte following the CIS. In my case
-(which may not have any relation to what's on the PRISM2 cards), COR was
-at offset 0x800 within the PCI memory space. Write 0x41 to the COR
-register to enable I/O mode and to select level triggered interrupts. To
-confirm you actually succeeded, read the COR register back and make sure
-it actually got set to 0x41, incase you have an unexpected card inserted.
-
-Following that, you can treat the second PCI I/O address space (the one
-that's not 0x80 in length) as the PCMCIA I/O space.
-
-Note that in the Eumitcom's source for their drivers, they register the
-interrupt as edge triggered when registering it with the Windows kernel. I
-don't recall how to register edge triggered on Linux (if it can be done at
-all). But in some experimentation, I don't see much operational
-difference between using either interrupt mode. Don't mess with the
-interrupt mode in the COR register though, as the PLX9052 wants level
-triggers with the way the serial EEPROM configures it on the WL11000.
-
-There's some other little quirks related to timing that I bumped into, but
-I don't recall right now. Also, there's two variants of the WL11000 I've
-seen, revision A1 and T2. These seem to differ slightly in the timings
-configured in the wait-state generator in the PLX9052. There have also
-been some comments from Eumitcom that cards shouldn't be hot swapped,
-apparently due to risk of cooking the PLX9052. I'm unsure why they
-believe this, as I can't see anything in the design that would really
-cause a problem, except for crashing drivers not written to expect it. And
-having developed drivers for the WL11000, I'd say it's quite tricky to
-write code that will successfully deal with a hot unplug. Very odd things
-happen on the I/O side of things. But anyway, be warned. Despite that,
-I've hot-swapped a number of times during debugging and driver development
-for various reasons (stuck WAIT# line after the radio card's firmware
-locks up).
-
-Hope this is enough info for someone to add PLX9052 support to the wlan-ng
-card. In the case of the WL11000, the PCI ID's are 0x1639/0x0200, with
-matching subsystem ID's. Other PLX9052-based manufacturers other than
-Eumitcom (or on cards other than the WL11000) may have different PCI ID's.
-
-If anyone needs any more specific info, let me know. I haven't had time
-to implement support myself yet, and with the way things are going, might
-not have time for a while..
-
----end of mail---
-*/
+ *
+ * The PLX9052-based cards (WL11000 and several others) are a
+ * different beast than the usual PCMCIA-based PRISM2 configuration
+ * expected by wlan-ng.  Here's the general details on how the WL11000
+ * PCI adapter works:
+ *
+ * - Two PCI I/O address spaces, one 0x80 long which contains the
+ * PLX9052 registers, and one that's 0x40 long mapped to the PCMCIA
+ * slot I/O address space.
+ *
+ * - One PCI memory address space, mapped to the PCMCIA memory space
+ * (containing the CIS).
+ *
+ * After identifying the I/O and memory space, you can read through
+ * the memory space to confirm the CIS's device ID or manufacturer ID
+ * to make sure it's the expected card.  qKeep in mind that the PCMCIA
+ * spec specifies the CIS as the lower 8 bits of each word read from
+ * the CIS, so to read the bytes of the CIS, read every other byte
+ * (0,2,4,...). Passing that test, you need to enable the I/O address
+ * space on the PCMCIA card via the PCMCIA COR register. This is the
+ * first byte following the CIS. In my case (which may not have any
+ * relation to what's on the PRISM2 cards), COR was at offset 0x800
+ * within the PCI memory space. Write 0x41 to the COR register to
+ * enable I/O mode and to select level triggered interrupts. To
+ * confirm you actually succeeded, read the COR register back and make
+ * sure it actually got set to 0x41, incase you have an unexpected
+ * card inserted.
+ *
+ * Following that, you can treat the second PCI I/O address space (the
+ * one that's not 0x80 in length) as the PCMCIA I/O space.
+ *
+ * Note that in the Eumitcom's source for their drivers, they register
+ * the interrupt as edge triggered when registering it with the
+ * Windows kernel. I don't recall how to register edge triggered on
+ * Linux (if it can be done at all). But in some experimentation, I
+ * don't see much operational difference between using either
+ * interrupt mode. Don't mess with the interrupt mode in the COR
+ * register though, as the PLX9052 wants level triggers with the way
+ * the serial EEPROM configures it on the WL11000.
+ *
+ * There's some other little quirks related to timing that I bumped
+ * into, but I don't recall right now. Also, there's two variants of
+ * the WL11000 I've seen, revision A1 and T2. These seem to differ
+ * slightly in the timings configured in the wait-state generator in
+ * the PLX9052. There have also been some comments from Eumitcom that
+ * cards shouldn't be hot swapped, apparently due to risk of cooking
+ * the PLX9052. I'm unsure why they believe this, as I can't see
+ * anything in the design that would really cause a problem, except
+ * for crashing drivers not written to expect it. And having developed
+ * drivers for the WL11000, I'd say it's quite tricky to write code
+ * that will successfully deal with a hot unplug. Very odd things
+ * happen on the I/O side of things. But anyway, be warned. Despite
+ * that, I've hot-swapped a number of times during debugging and
+ * driver development for various reasons (stuck WAIT# line after the
+ * radio card's firmware locks up).
+ *
+ * Hope this is enough info for someone to add PLX9052 support to the
+ * wlan-ng card. In the case of the WL11000, the PCI ID's are
+ * 0x1639/0x0200, with matching subsystem ID's. Other PLX9052-based
+ * manufacturers other than Eumitcom (or on cards other than the
+ * WL11000) may have different PCI ID's.
+ *
+ * If anyone needs any more specific info, let me know. I haven't had
+ * time to implement support myself yet, and with the way things are
+ * going, might not have time for a while..
+ */
 
 #include <linux/config.h>
 
@@ -134,11 +137,11 @@ not have time for a while..
 
 static char dev_info[] = "orinoco_plx";
 
-#define COR_OFFSET    (0x3e0 / 2)	/* COR attribute offset of Prism2 PC card */
-#define COR_VALUE     (COR_LEVEL_REQ | COR_FUNC_ENA) /* Enable PC card with interrupt in level trigger */
+#define COR_OFFSET	(0x3e0/2) /* COR attribute offset of Prism2 PC card */
+#define COR_VALUE	(COR_LEVEL_REQ | COR_FUNC_ENA) /* Enable PC card with interrupt in level trigger */
 
-#define PLX_INTCSR       0x4c /* Interrupt Control and Status Register */
-#define PLX_INTCSR_INTEN (1<<6) /* Interrupt Enable bit */
+#define PLX_INTCSR		0x4c /* Interrupt Control & Status Register */
+#define PLX_INTCSR_INTEN	(1<<6) /* Interrupt Enable bit */
 
 static const u16 cis_magic[] = {
 	0x0001, 0x0003, 0x0000, 0x0000, 0x00ff, 0x0017, 0x0004, 0x0067
@@ -223,6 +226,7 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 		goto fail;
 	}
 
+	/* Allocate network device */
 	dev = alloc_orinocodev(0, NULL);
 	if (! dev) {
 		err = -ENOMEM;
@@ -234,15 +238,16 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
-	printk(KERN_DEBUG
-	       "Detected Orinoco/Prism2 PLX device at %s irq:%d, io addr:0x%lx\n",
-	       pci_name(pdev), pdev->irq, pccard_ioaddr);
+	printk(KERN_DEBUG "Detected Orinoco/Prism2 PLX device "
+	       "at %s irq:%d, io addr:0x%lx\n", pci_name(pdev), pdev->irq,
+	       pccard_ioaddr);
 
-	hermes_struct_init(&(priv->hw), dev->base_addr,
-			HERMES_IO, HERMES_16BIT_REGSPACING);
+	hermes_struct_init(&(priv->hw), dev->base_addr, HERMES_IO,
+			   HERMES_16BIT_REGSPACING);
 	pci_set_drvdata(pdev, dev);
 
-	err = request_irq(pdev->irq, orinoco_interrupt, SA_SHIRQ, dev->name, dev);
+	err = request_irq(pdev->irq, orinoco_interrupt, SA_SHIRQ,
+			  dev->name, dev);
 	if (err) {
 		printk(KERN_ERR "orinoco_plx: Error allocating IRQ %d.\n", pdev->irq);
 		err = -EBUSY;
@@ -254,9 +259,9 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 	if (err)
 		goto fail;
 
-	return 0;		/* succeeded */
+	return 0;
 
- fail:	
+ fail:
 	printk(KERN_DEBUG "orinoco_plx: init_one(), FAIL!\n");
 
 	if (dev) {
@@ -305,7 +310,7 @@ static struct pci_device_id orinoco_plx_pci_id_table[] = {
 	{0x15e8, 0x0130, PCI_ANY_ID, PCI_ANY_ID,},	/* Correga  - does this work? */
 	{0x1638, 0x1100, PCI_ANY_ID, PCI_ANY_ID,},	/* SMC EZConnect SMC2602W,
 							   Eumitcom PCI WL11000,
-							   Addtron AWA-100*/
+							   Addtron AWA-100 */
 	{0x16ab, 0x1100, PCI_ANY_ID, PCI_ANY_ID,},	/* Global Sun Tech GL24110P */
 	{0x16ab, 0x1101, PCI_ANY_ID, PCI_ANY_ID,},	/* Reported working, but unknown */
 	{0x16ab, 0x1102, PCI_ANY_ID, PCI_ANY_ID,},	/* Linksys WDT11 */
