@@ -55,7 +55,6 @@
 #define UNW_HASH_SIZE		(1 << UNW_LOG_HASH_SIZE)
 
 #define UNW_STATS	0	/* WARNING: this disabled interrupts for long time-spans!! */
-#define UNW_DEBUG	0
 
 #ifdef UNW_DEBUG
   static unsigned int unw_debug_level = UNW_DEBUG;
