@@ -55,11 +55,13 @@ static const struct cpu_id cpu_id_banias = {
 
 struct cpu_model
 {
+	const struct cpu_id *cpu_id;
 	const char	*model_name;
 	unsigned	max_freq; /* max clock in kHz */
 
 	struct cpufreq_frequency_table *op_points; /* clock/voltage pairs */
 };
+static int centrino_verify_cpu_id(struct cpuinfo_x86 *c, const struct cpu_id *x);
 
 /* Operating points for current CPU */
 static struct cpu_model *centrino_model;
@@ -82,8 +84,8 @@ static struct cpu_model *centrino_model;
  * M.
  */
 
-/* Ultra Low Voltage Intel Pentium M processor 900MHz */
-static struct cpufreq_frequency_table op_900[] =
+/* Ultra Low Voltage Intel Pentium M processor 900MHz (Banias) */
+static struct cpufreq_frequency_table banias_900[] =
 {
 	OP(600,  844),
 	OP(800,  988),
@@ -91,8 +93,8 @@ static struct cpufreq_frequency_table op_900[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Ultra Low Voltage Intel Pentium M processor 1000MHz */
-static struct cpufreq_frequency_table op_1000[] =
+/* Ultra Low Voltage Intel Pentium M processor 1000MHz (Banias) */
+static struct cpufreq_frequency_table banias_1000[] =
 {
 	OP(600,  844),
 	OP(800,  972),
@@ -101,8 +103,8 @@ static struct cpufreq_frequency_table op_1000[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Low Voltage Intel Pentium M processor 1.10GHz */
-static struct cpufreq_frequency_table op_1100[] =
+/* Low Voltage Intel Pentium M processor 1.10GHz (Banias) */
+static struct cpufreq_frequency_table banias_1100[] =
 {
 	OP( 600,  956),
 	OP( 800, 1020),
@@ -113,8 +115,8 @@ static struct cpufreq_frequency_table op_1100[] =
 };
 
 
-/* Low Voltage Intel Pentium M processor 1.20GHz */
-static struct cpufreq_frequency_table op_1200[] =
+/* Low Voltage Intel Pentium M processor 1.20GHz (Banias) */
+static struct cpufreq_frequency_table banias_1200[] =
 {
 	OP( 600,  956),
 	OP( 800, 1004),
@@ -125,8 +127,8 @@ static struct cpufreq_frequency_table op_1200[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Intel Pentium M processor 1.30GHz */
-static struct cpufreq_frequency_table op_1300[] = 
+/* Intel Pentium M processor 1.30GHz (Banias) */
+static struct cpufreq_frequency_table banias_1300[] = 
 {
 	OP( 600,  956),
 	OP( 800, 1260),
@@ -136,8 +138,8 @@ static struct cpufreq_frequency_table op_1300[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Intel Pentium M processor 1.40GHz */
-static struct cpufreq_frequency_table op_1400[] = 
+/* Intel Pentium M processor 1.40GHz (Banias) */
+static struct cpufreq_frequency_table banias_1400[] = 
 {
 	OP( 600,  956),
 	OP( 800, 1180),
@@ -147,8 +149,8 @@ static struct cpufreq_frequency_table op_1400[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Intel Pentium M processor 1.50GHz */
-static struct cpufreq_frequency_table op_1500[] = 
+/* Intel Pentium M processor 1.50GHz (Banias) */
+static struct cpufreq_frequency_table banias_1500[] = 
 {
 	OP( 600,  956),
 	OP( 800, 1116),
@@ -159,8 +161,8 @@ static struct cpufreq_frequency_table op_1500[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Intel Pentium M processor 1.60GHz */
-static struct cpufreq_frequency_table op_1600[] = 
+/* Intel Pentium M processor 1.60GHz (Banias) */
+static struct cpufreq_frequency_table banias_1600[] = 
 {
 	OP( 600,  956),
 	OP( 800, 1036),
@@ -171,8 +173,8 @@ static struct cpufreq_frequency_table op_1600[] =
 	{ .frequency = CPUFREQ_TABLE_END }
 };
 
-/* Intel Pentium M processor 1.70GHz */
-static struct cpufreq_frequency_table op_1700[] =
+/* Intel Pentium M processor 1.70GHz (Banias) */
+static struct cpufreq_frequency_table banias_1700[] =
 {
 	OP( 600,  956),
 	OP( 800, 1004),
@@ -184,26 +186,31 @@ static struct cpufreq_frequency_table op_1700[] =
 };
 #undef OP
 
-#define _CPU(max, name)	\
-	{ "Intel(R) Pentium(R) M processor " name "MHz", (max)*1000, op_##max }
-#define CPU(max)	_CPU(max, #max)
+#define _BANIAS(cpuid, max, name)	\
+{	.cpu_id		= cpuid,	\
+	.model_name	= "Intel(R) Pentium(R) M processor " name "MHz", \
+	.max_freq	= (max)*1000,	\
+	.op_points	= banias_##max,	\
+}
+#define BANIAS(max)	_BANIAS(&cpu_id_banias, max, #max)
 
 /* CPU models, their operating frequency range, and freq/voltage
    operating points */
 static struct cpu_model models[] = 
 {
-       _CPU( 900, " 900"),
-	CPU(1000),
-	CPU(1100),
-	CPU(1200),
-	CPU(1300),
-	CPU(1400),
-	CPU(1500),
-	CPU(1600),
-	CPU(1700),
+	_BANIAS(&cpu_id_banias, 900, " 900"),
+	BANIAS(1000),
+	BANIAS(1100),
+	BANIAS(1200),
+	BANIAS(1300),
+	BANIAS(1400),
+	BANIAS(1500),
+	BANIAS(1600),
+	BANIAS(1700),
 	{ 0, }
 };
-#undef CPU
+#undef _BANIAS
+#undef BANIAS
 
 static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 {
@@ -211,7 +218,8 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 	struct cpu_model *model;
 
 	for(model = models; model->model_name != NULL; model++)
-		if (strcmp(cpu->x86_model_id, model->model_name) == 0)
+		if ((strcmp(cpu->x86_model_id, model->model_name) == 0) &&
+		    (!centrino_verify_cpu_id(cpu, model->cpu_id)))
 			break;
 	if (model->model_name == NULL) {
 		printk(KERN_INFO PFX "no support for CPU model \"%s\": "
