@@ -3059,7 +3059,7 @@ static void ali_ac97_set(struct trident_card *card, int secondary, u8 reg, u16 v
         ncount = 10;
 	while(1) {
 		wcontrol = inw(TRID_REG(card, ALI_AC97_WRITE));
-		if(!wcontrol & 0x8000)
+		if(!(wcontrol & 0x8000))
 			break;
 		if(ncount <= 0)
 			break;
