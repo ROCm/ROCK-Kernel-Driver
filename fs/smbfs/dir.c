@@ -33,22 +33,22 @@ static int smb_rename(struct inode *, struct dentry *,
 
 struct file_operations smb_dir_operations =
 {
-	read:		generic_read_dir,
-	readdir:	smb_readdir,
-	ioctl:		smb_ioctl,
-	open:		smb_dir_open,
+	.read		= generic_read_dir,
+	.readdir	= smb_readdir,
+	.ioctl		= smb_ioctl,
+	.open		= smb_dir_open,
 };
 
 struct inode_operations smb_dir_inode_operations =
 {
-	create:		smb_create,
-	lookup:		smb_lookup,
-	unlink:		smb_unlink,
-	mkdir:		smb_mkdir,
-	rmdir:		smb_rmdir,
-	rename:		smb_rename,
-	getattr:	smb_getattr,
-	setattr:	smb_notify_change,
+	.create		= smb_create,
+	.lookup		= smb_lookup,
+	.unlink		= smb_unlink,
+	.mkdir		= smb_mkdir,
+	.rmdir		= smb_rmdir,
+	.rename		= smb_rename,
+	.getattr	= smb_getattr,
+	.setattr	= smb_notify_change,
 };
 
 /*
@@ -257,16 +257,16 @@ static int smb_delete_dentry(struct dentry *);
 
 static struct dentry_operations smbfs_dentry_operations =
 {
-	d_revalidate:	smb_lookup_validate,
-	d_hash:		smb_hash_dentry,
-	d_compare:	smb_compare_dentry,
-	d_delete:	smb_delete_dentry,
+	.d_revalidate	= smb_lookup_validate,
+	.d_hash		= smb_hash_dentry,
+	.d_compare	= smb_compare_dentry,
+	.d_delete	= smb_delete_dentry,
 };
 
 static struct dentry_operations smbfs_dentry_operations_case =
 {
-	d_revalidate:	smb_lookup_validate,
-	d_delete:	smb_delete_dentry,
+	.d_revalidate	= smb_lookup_validate,
+	.d_delete	= smb_delete_dentry,
 };
 
 
