@@ -409,7 +409,7 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 
 #ifdef CONFIG_PPC_PSERIES
-	/* Hack -- add console=ttySn,9600 if necessary */
+	/* Hack -- add console=ttySn if necessary */
 	if(strstr(cmd_line, "console=") == NULL) {
 		struct device_node *prom_stdout = find_path_device(of_stdout_device);
 		u32 *reg;
@@ -423,10 +423,10 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 					reg = (u32 *)get_property(prom_stdout, "reg", &i);
 					if (i > 8) {
 						switch (reg[1]) {
-							case 0x3f8: val = "ttyS0,9600"; break;
-							case 0x2f8: val = "ttyS1,9600"; break;
-							case 0x898: val = "ttyS2,9600"; break;
-							case 0x890: val = "ttyS3,9600"; break;
+							case 0x3f8: val = "ttyS0"; break;
+							case 0x2f8: val = "ttyS1"; break;
+							case 0x898: val = "ttyS2"; break;
+							case 0x890: val = "ttyS3"; break;
 						}
 					}
 				} else if (strcmp(name, "vty") == 0) {

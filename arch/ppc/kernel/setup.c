@@ -454,7 +454,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 
 #ifdef CONFIG_SERIAL_CORE_CONSOLE
-	/* Hack -- add console=ttySn,9600 if necessary */
+	/* Hack -- add console=ttySn if necessary */
 	if(strstr(cmd_line, "console=") == NULL) {
 		extern char *of_stdout_device;
 		struct device_node *prom_stdout;
