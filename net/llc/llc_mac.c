@@ -28,7 +28,6 @@
 #define dprintk(args...)
 #endif
 
-static int fix_up_incoming_skb(struct sk_buff *skb);
 static void llc_station_rcv(struct sk_buff *skb);
 
 /*
@@ -84,6 +83,38 @@ out:
 }
 
 /**
+ *	llc_fixup_skb - initializes skb pointers
+ *	@skb: This argument points to incoming skb
+ *
+ *	Initializes internal skb pointer to start of network layer by deriving
+ *	length of LLC header; finds length of LLC control field in LLC header
+ *	by looking at the two lowest-order bits of the first control field
+ *	byte; field is either 3 or 4 bytes long.
+ */
+static inline int llc_fixup_skb(struct sk_buff *skb)
+{
+	u8 llc_len = 2;
+	struct llc_pdu_sn *pdu;
+
+	if (!pskb_may_pull(skb, sizeof(*pdu)))
+		return 0;
+
+	pdu = (struct llc_pdu_sn *)skb->data;
+	if ((pdu->ctrl_1 & LLC_PDU_TYPE_MASK) == LLC_PDU_TYPE_U)
+		llc_len = 1;
+	llc_len += 2;
+	skb->h.raw += llc_len;
+	skb_pull(skb, llc_len);
+	if (skb->protocol == htons(ETH_P_802_2)) {
+		u16 pdulen = ((struct ethhdr *)skb->mac.raw)->h_proto,
+		    data_size = ntohs(pdulen) - llc_len;
+
+		skb_trim(skb, data_size);
+	}
+	return 1;
+}
+
+/**
  *	llc_rcv - 802.2 entry point from net lower layers
  *	@skb: received pdu
  *	@dev: device that receive pdu
@@ -106,23 +137,23 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 	 * When the interface is in promisc. mode, drop all the crap that it
 	 * receives, do not try to analyse it.
 	 */
-	if (skb->pkt_type == PACKET_OTHERHOST) {
+	if (unlikely(skb->pkt_type == PACKET_OTHERHOST)) {
 		dprintk("%s: PACKET_OTHERHOST\n", __FUNCTION__);
 		goto drop;
 	}
 	skb = skb_share_check(skb, GFP_ATOMIC);
-	if (!skb)
+	if (unlikely(!skb))
 		goto out;
-	if (!fix_up_incoming_skb(skb))
+	if (unlikely(!llc_fixup_skb(skb)))
 		goto drop;
 	pdu = llc_pdu_sn_hdr(skb);
-	if (!pdu->dsap) { /* NULL DSAP, refer to station */
+	if (unlikely(!pdu->dsap)) { /* NULL DSAP, refer to station */
 		dprintk("%s: calling llc_station_rcv!\n", __FUNCTION__);
 		llc_station_rcv(skb);
 		goto out;
 	}
 	sap = llc_sap_find(pdu->dsap);
-	if (!sap) {/* unknown SAP */
+	if (unlikely(!sap)) {/* unknown SAP */
 		dprintk("%s: llc_sap_find(%02X) failed!\n", __FUNCTION__,
 		        pdu->dsap);
 		goto drop;
@@ -144,38 +175,6 @@ out:
 drop:
 	kfree_skb(skb);
 	goto out;
-}
-
-/**
- *	fix_up_incoming_skb - initializes skb pointers
- *	@skb: This argument points to incoming skb
- *
- *	Initializes internal skb pointer to start of network layer by deriving
- *	length of LLC header; finds length of LLC control field in LLC header
- *	by looking at the two lowest-order bits of the first control field
- *	byte; field is either 3 or 4 bytes long.
- */
-static int fix_up_incoming_skb(struct sk_buff *skb)
-{
-	u8 llc_len = 2;
-	struct llc_pdu_sn *pdu;
-
-	if (!pskb_may_pull(skb, sizeof(*pdu)))
-		return 0;
-
-	pdu = (struct llc_pdu_sn *)skb->data;
-	if ((pdu->ctrl_1 & LLC_PDU_TYPE_MASK) == LLC_PDU_TYPE_U)
-		llc_len = 1;
-	llc_len += 2;
-	skb->h.raw += llc_len;
-	skb_pull(skb, llc_len);
-	if (skb->protocol == htons(ETH_P_802_2)) {
-		u16 pdulen = ((struct ethhdr *)skb->mac.raw)->h_proto,
-		    data_size = ntohs(pdulen) - llc_len;
-
-		skb_trim(skb, data_size);
-	}
-	return 1;
 }
 
 /*
