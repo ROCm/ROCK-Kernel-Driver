@@ -64,7 +64,6 @@
  */
 static int clock_division_ratio = WTCSR_CKS_4096;
 
-#define msecs_to_jiffies(msecs)	(jiffies + (HZ * msecs + 9999) / 10000)
 #define next_ping_period(cks)	msecs_to_jiffies(cks - 4)
 
 static unsigned long shwdt_is_open;
