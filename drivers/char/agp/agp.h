@@ -278,12 +278,12 @@ extern int agp_try_unsupported_boot;
 /* Chipset independant registers (from AGP Spec) */
 #define AGP_APBASE	0x10
 
-#define AGPSTAT			0x4
-#define AGPCMD			0x8
-#define AGPNISTAT		0xc
+#define AGPSTAT		0x4
+#define AGPCMD		0x8
+#define AGPNISTAT	0xc
 #define AGPCTRL                 0x10
-#define AGPNEPG			0x16
-#define AGPNICMD		0x20
+#define AGPNEPG		0x16
+#define AGPNICMD	0x20
 
 #define AGP_MAJOR_VERSION_SHIFT	(20)
 #define AGP_MINOR_VERSION_SHIFT	(16)
@@ -307,4 +307,4 @@ extern int agp_try_unsupported_boot;
 #define AGPSTAT3_8X		(1<<1)
 #define AGPSTAT3_4X		(1)
 
-#endif				/* _AGP_BACKEND_PRIV_H */
+#endif	/* _AGP_BACKEND_PRIV_H */
