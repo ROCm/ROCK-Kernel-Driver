@@ -2187,8 +2187,8 @@ static void deactivate_block_device(struct vdev *vdev)
 		schedule_timeout(HZ / 4);	/* 1/4 second */
 	}
 
-	close_bdev_excl(vdev->b.bdev);
 	vdev->disabled = 1;
+	close_bdev_excl(vdev->b.bdev);
 }
 
 
@@ -2366,56 +2366,45 @@ static ssize_t vscsi_target_store(struct kobject * kobj, struct attribute * attr
 		return -EPERM;
 	}
 
-	spin_lock_irqsave(&adapter->lock, flags);
-
 	if (attr == &vscsi_target_type_attr) {
 		if (buf[0] == 'B' ||  buf[0] == 'b')
 			vdev->type = 'B';
 		else if (buf[0] == 'S' || buf[0] == 's') {
 			// TODO
-			spin_unlock_irqrestore(&adapter->lock, flags);
 			err ("SCSI mode not supported yet\n");		
 			return -EINVAL;
-		} else {
-			spin_unlock_irqrestore(&adapter->lock, flags);
+		} else 
 			return -EINVAL;
-		}
 	} else if (attr == &vscsi_target_device_attr) {
 		int i;
+		spin_lock_irqsave(&adapter->lock, flags);
 		i  = strlcpy(vdev->b.device_name, buf, TARGET_MAX_NAME_LEN);
 		for (; i >= 0; i--)
 			if (vdev->b.device_name[i] == '\n')
 				vdev->b.device_name[i] = '\0';
+		spin_unlock_irqrestore(&adapter->lock, flags);
 	} else if (attr == &vscsi_target_active_attr) {
 		if (value) {
 			int rc;
 			if (!vdev->disabled) {
-				spin_unlock_irqrestore(&adapter->lock, flags);
 				warn("Warning: Target was already active\n");
 				return -EINVAL;
 			}
 			if (vdev->type == '\0') {
-				spin_unlock_irqrestore(&adapter->lock, flags);
 				err("Error: Type not specified\n");
 				return -EPERM;
 			}
 			rc = activate_block_device(vdev);
 			if (rc) {
-				spin_unlock_irqrestore(&adapter->lock, flags);
 				err("Error opening block device=%d\n", rc);
 				return rc;
 			}
-		} else {
+		} else 
 			deactivate_block_device(vdev);
-		}
 	} else if (attr == &vscsi_target_ro_attr)
 		vdev->b.ro = value > 0 ? 1 : 0;
-	else {
-		spin_unlock_irqrestore(&adapter->lock, flags);
+	else 
 		BUG();
-	}
-
-	spin_unlock_irqrestore(&adapter->lock, flags);
 
 	return count;
 }
