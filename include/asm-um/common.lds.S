@@ -36,10 +36,6 @@
   .init.setup : { *(.init.setup) }
   __setup_end = .;
 
-  __start___param = .;
-  __param : { *(__param) }
-  __stop___param = .;
-
   . = ALIGN(32);
   __per_cpu_start = . ; 
   .data.percpu : { *(.data.percpu) }
