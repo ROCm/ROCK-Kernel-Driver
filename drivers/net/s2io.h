@@ -466,19 +466,46 @@ typedef struct _RxD_t {
 #define RXD_GET_L4_CKSUM(val)   ((u16)(val) & 0xFFFF)
 
 	u64 Control_2;
+#ifndef CONFIG_2BUFF_MODE
 #define MASK_BUFFER0_SIZE       vBIT(0xFFFF,0,16)
 #define SET_BUFFER0_SIZE(val)   vBIT(val,0,16)
+#else
+#define MASK_BUFFER0_SIZE       vBIT(0xFF,0,16)
+#define MASK_BUFFER1_SIZE       vBIT(0xFFFF,16,16)
+#define MASK_BUFFER2_SIZE       vBIT(0xFFFF,32,16)
+#define SET_BUFFER0_SIZE(val)   vBIT(val,8,8)
+#define SET_BUFFER1_SIZE(val)   vBIT(val,16,16)
+#define SET_BUFFER2_SIZE(val)   vBIT(val,32,16)
+#endif
+
 #define MASK_VLAN_TAG           vBIT(0xFFFF,48,16)
 #define SET_VLAN_TAG(val)       vBIT(val,48,16)
 #define SET_NUM_TAG(val)       vBIT(val,16,32)
 
+#ifndef CONFIG_2BUFF_MODE
 #define RXD_GET_BUFFER0_SIZE(Control_2) (u64)((Control_2 & vBIT(0xFFFF,0,16)))
+#else
+#define RXD_GET_BUFFER0_SIZE(Control_2) (u8)((Control_2 & MASK_BUFFER0_SIZE) \
+							>> 48)
+#define RXD_GET_BUFFER1_SIZE(Control_2) (u16)((Control_2 & MASK_BUFFER1_SIZE) \
+							>> 32)
+#define RXD_GET_BUFFER2_SIZE(Control_2) (u16)((Control_2 & MASK_BUFFER2_SIZE) \
+							>> 16)
+#define BUF0_LEN	40
+#define BUF1_LEN	1
+#endif
+
 	u64 Buffer0_ptr;
+#ifdef CONFIG_2BUFF_MODE
+	u64 Buffer1_ptr;
+	u64 Buffer2_ptr;
+#endif
 } RxD_t;
 
 /* Structure that represents the Rx descriptor block which contains 
  * 128 Rx descriptors.
  */
+#ifndef CONFIG_2BUFF_MODE
 typedef struct _RxD_block {
 #define MAX_RXDS_PER_BLOCK             127
 	RxD_t rxd[MAX_RXDS_PER_BLOCK];
@@ -492,6 +519,27 @@ typedef struct _RxD_block {
 					 * the upper 32 bits should 
 					 * be 0 */
 } RxD_block_t;
+#else
+typedef struct _RxD_block {
+#define MAX_RXDS_PER_BLOCK             85
+	RxD_t rxd[MAX_RXDS_PER_BLOCK];
+
+#define END_OF_BLOCK    0xFEFFFFFFFFFFFFFFULL
+	u64 reserved_1;		/* 0xFEFFFFFFFFFFFFFF to mark last Rxd 
+				 * in this blk */
+	u64 pNext_RxD_Blk_physical;	/* Phy ponter to next blk. */
+} RxD_block_t;
+#define SIZE_OF_BLOCK	4096
+
+/* Structure to hold virtual addresses of Buf0 and Buf1 in 
+ * 2buf mode. */
+typedef struct bufAdd {
+	void *ba_0_org;
+	void *ba_1_org;
+	void *ba_0;
+	void *ba_1;
+} buffAdd_t;
+#endif
 
 /* Structure which stores all the MAC control parameters */
 
@@ -677,6 +725,10 @@ typedef struct s2io_nic {
 #define	LINK_DOWN	1
 #define	LINK_UP		2
 
+#ifdef CONFIG_2BUFF_MODE
+	/* Buffer Address store. */
+	buffAdd_t **ba[MAX_RX_RINGS];
+#endif
 	int task_flag;
 } nic_t;
 
@@ -802,7 +854,12 @@ void s2io_closer(void);
 static void s2io_tx_watchdog(struct net_device *dev);
 static void s2io_tasklet(unsigned long dev_addr);
 static void s2io_set_multicast(struct net_device *dev);
+#ifndef CONFIG_2BUFF_MODE
 static int rx_osm_handler(nic_t * sp, u16 len, RxD_t * rxdp, int ring_no);
+#else
+static int rx_osm_handler(nic_t * sp, RxD_t * rxdp, int ring_no,
+			  buffAdd_t * ba);
+#endif
 void s2io_link(nic_t * sp, int link);
 void s2io_reset(nic_t * sp);
 #ifdef CONFIG_S2IO_NAPI
