@@ -23,6 +23,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
 #include <linux/module.h>
+#include <linux/sysdev.h>
 
 #include <asm/smp.h>
 #include <asm/mtrr.h>
@@ -180,7 +181,6 @@ void enable_lapic_nmi_watchdog(void)
 
 #ifdef CONFIG_PM
 
-#include <linux/device.h>
 static int nmi_pm_active; /* nmi_active before suspend */
 
 static int lapic_nmi_suspend(struct sys_device *dev, u32 state)
