@@ -37,12 +37,10 @@ this code that are retained.
 The macro `FLOATX80' must be defined to enable the extended double-precision
 floating-point format `floatx80'.  If this macro is not defined, the
 `floatx80' type will not be defined, and none of the functions that either
-input or output the `floatx80' type will be defined.  The same applies to
-the `FLOAT128' macro and the quadruple-precision format `float128'.
+input or output the `floatx80' type will be defined.
 -------------------------------------------------------------------------------
 */
 #define FLOATX80
-/* #define FLOAT128 */
 
 /*
 -------------------------------------------------------------------------------
@@ -51,17 +49,10 @@ Software IEC/IEEE floating-point types.
 */
 typedef unsigned long int float32;
 typedef unsigned long long float64;
-#ifdef FLOATX80
 typedef struct {
     unsigned short high;
     unsigned long long low;
 } floatx80;
-#endif
-#ifdef FLOAT128
-typedef struct {
-    unsigned long long high, low;
-} float128;
-#endif
 
 /*
 -------------------------------------------------------------------------------
@@ -131,9 +122,6 @@ float64 int32_to_float64( signed int );
 #ifdef FLOATX80
 floatx80 int32_to_floatx80( signed int );
 #endif
-#ifdef FLOAT128
-float128 int32_to_float128( signed int );
-#endif
 
 /*
 -------------------------------------------------------------------------------
@@ -145,9 +133,6 @@ signed int float32_to_int32_round_to_zero( float32 );
 float64 float32_to_float64( float32 );
 #ifdef FLOATX80
 floatx80 float32_to_floatx80( float32 );
-#endif
-#ifdef FLOAT128
-float128 float32_to_float128( float32 );
 #endif
 
 /*
@@ -181,9 +166,6 @@ float32 float64_to_float32( float64 );
 #ifdef FLOATX80
 floatx80 float64_to_floatx80( float64 );
 #endif
-#ifdef FLOAT128
-float128 float64_to_float128( float64 );
-#endif
 
 /*
 -------------------------------------------------------------------------------
@@ -216,9 +198,6 @@ signed int floatx80_to_int32( floatx80 );
 signed int floatx80_to_int32_round_to_zero( floatx80 );
 float32 floatx80_to_float32( floatx80 );
 float64 floatx80_to_float64( floatx80 );
-#ifdef FLOAT128
-float128 floatx80_to_float128( floatx80 );
-#endif
 
 /*
 -------------------------------------------------------------------------------
@@ -247,43 +226,6 @@ char floatx80_eq_signaling( floatx80, floatx80 );
 char floatx80_le_quiet( floatx80, floatx80 );
 char floatx80_lt_quiet( floatx80, floatx80 );
 char floatx80_is_signaling_nan( floatx80 );
-
-#endif
-
-#ifdef FLOAT128
-
-/*
--------------------------------------------------------------------------------
-Software IEC/IEEE quadruple-precision conversion routines.
--------------------------------------------------------------------------------
-*/
-signed int float128_to_int32( float128 );
-signed int float128_to_int32_round_to_zero( float128 );
-float32 float128_to_float32( float128 );
-float64 float128_to_float64( float128 );
-#ifdef FLOATX80
-floatx80 float128_to_floatx80( float128 );
-#endif
-
-/*
--------------------------------------------------------------------------------
-Software IEC/IEEE quadruple-precision operations.
--------------------------------------------------------------------------------
-*/
-float128 float128_round_to_int( float128 );
-float128 float128_add( float128, float128 );
-float128 float128_sub( float128, float128 );
-float128 float128_mul( float128, float128 );
-float128 float128_div( float128, float128 );
-float128 float128_rem( float128, float128 );
-float128 float128_sqrt( float128 );
-char float128_eq( float128, float128 );
-char float128_le( float128, float128 );
-char float128_lt( float128, float128 );
-char float128_eq_signaling( float128, float128 );
-char float128_le_quiet( float128, float128 );
-char float128_lt_quiet( float128, float128 );
-char float128_is_signaling_nan( float128 );
 
 #endif
 

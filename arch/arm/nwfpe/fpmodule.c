@@ -21,6 +21,8 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
+#include "fpa11.h"
+
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/config.h>
@@ -36,7 +38,6 @@
 #include "softfloat.h"
 #include "fpopcode.h"
 #include "fpmodule.h"
-#include "fpa11.h"
 #include "fpa11.inl"
 
 /* kernel symbols required for signal handling */
@@ -83,6 +84,11 @@ static int __init fpe_init(void)
 {
   if (sizeof(FPA11) > sizeof(union fp_state)) {
     printk(KERN_ERR "nwfpe: bad structure size\n");
+    return -EINVAL;
+  }
+
+  if (sizeof(FPREG) != 12) {
+    printk(KERN_ERR "nwfpe: bad register size\n");
     return -EINVAL;
   }
 

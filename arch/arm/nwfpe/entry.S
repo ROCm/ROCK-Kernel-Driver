@@ -52,8 +52,6 @@ This routine does three things:
 
 1) The kernel has created a struct pt_regs on the stack and saved the
 user registers into it.  See /usr/include/asm/proc/ptrace.h for details.
-The emulator code uses userRegisters as the base of an array of words
-from which the contents of the registers can be extracted.
 
 2) It calls EmulateAll to emulate a floating point instruction.
 EmulateAll returns 1 if the emulation was successful, or 0 if not.
@@ -72,14 +70,9 @@ several floating point instructions.  */
 
 	.globl	nwfpe_enter
 nwfpe_enter:
-	/* ?? Could put userRegisters and fpa11 into fixed regs during
-	   emulation.  This would reduce load/store overhead at the expense
-	   of stealing two regs from the register allocator.  Not sure if
-	   it's worth it.  */
-	str sp, [r10]                   @ Store the user registers pointer in the fpa11 structure.
         mov r4, lr			@ save the failure-return addresses
+	mov sl, sp
 
-	mov r0, r10
 	bl FPA11_CheckInit		@ check to see if we are initialised
 
         ldr r5, [sp, #60]	 	@ get contents of PC;
