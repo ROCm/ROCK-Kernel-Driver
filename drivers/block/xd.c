@@ -35,7 +35,7 @@
 
 #include <linux/module.h>
 #include <linux/errno.h>
-#include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
@@ -44,6 +44,7 @@
 #include <linux/hdreg.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
+#include <linux/wait.h>
 #include <linux/devfs_fs_kernel.h>
 
 #include <asm/system.h>
