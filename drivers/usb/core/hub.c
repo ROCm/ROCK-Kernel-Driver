@@ -1085,12 +1085,6 @@ static int usb_hub_thread(void *__hub)
 
 	daemonize();
 
-	/* keep others from killing us */
-	spin_lock_irq(&current->sig->siglock);
-	sigemptyset(&current->blocked);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
-
 	/* Setup a nice name */
 	strcpy(current->comm, "khubd");
 
