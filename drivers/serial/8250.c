@@ -133,6 +133,7 @@ struct uart_8250_port {
 	unsigned char		acr;
 	unsigned char		ier;
 	unsigned char		lcr;
+	unsigned char		mcr;
 	unsigned char		mcr_mask;	/* mask of user bits */
 	unsigned char		mcr_force;	/* mask of forced bits */
 	unsigned char		lsr_break_flag;
@@ -1176,7 +1177,7 @@ static void serial8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
 	if (mctrl & TIOCM_LOOP)
 		mcr |= UART_MCR_LOOP;
 
-	mcr = (mcr & up->mcr_mask) | up->mcr_force;
+	mcr = (mcr & up->mcr_mask) | up->mcr_force | up->mcr;
 
 	serial_out(up, UART_MCR, mcr);
 }
@@ -1202,6 +1203,7 @@ static int serial8250_startup(struct uart_port *port)
 	int retval;
 
 	up->capabilities = uart_config[up->port.type].flags;
+	up->mcr = 0;
 
 	if (up->port.type == PORT_16C950) {
 		/* Wake up and initialize UART */
@@ -1451,8 +1453,19 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 		else
 			fcr = UART_FCR_ENABLE_FIFO | UART_FCR_TRIGGER_8;
 	}
-	if (up->port.type == PORT_16750)
+
+	/*
+	 * TI16C750: hardware flow control and 64 byte FIFOs. When AFE is
+	 * enabled, RTS will be deasserted when the receive FIFO contains
+	 * more characters than the trigger, or the MCR RTS bit is cleared.
+	 */
+	if (up->port.type == PORT_16750) {
+		up->mcr &= ~UART_MCR_AFE;
+		if (termios->c_cflag & CRTSCTS)
+			up->mcr |= UART_MCR_AFE;
+
 		fcr |= UART_FCR7_64BYTE;
+	}
 
 	/*
 	 * Ok, we're now changing the port state.  Do it with
@@ -1514,10 +1527,17 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	} else {
 		serial_outp(up, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
 	}
+
 	serial_outp(up, UART_DLL, quot & 0xff);		/* LS of divisor */
 	serial_outp(up, UART_DLM, quot >> 8);		/* MS of divisor */
+
+	/*
+	 * LCR DLAB must be set to enable 64-byte FIFO mode. If the FCR
+	 * is written without DLAB set, this mode will be disabled.
+	 */
 	if (up->port.type == PORT_16750)
-		serial_outp(up, UART_FCR, fcr);		/* set fcr */
+		serial_outp(up, UART_FCR, fcr);
+
 	serial_outp(up, UART_LCR, cval);		/* reset DLAB */
 	up->lcr = cval;					/* Save LCR */
 	if (up->port.type != PORT_16750) {
@@ -1527,6 +1547,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 		}
 		serial_outp(up, UART_FCR, fcr);		/* set fcr */
 	}
+	serial8250_set_mctrl(&up->port, up->port.mctrl);
 	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
