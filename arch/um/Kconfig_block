@@ -43,6 +43,10 @@ config BLK_DEV_NBD
 config BLK_DEV_RAM
 	tristate "RAM disk support"
 
+config BLK_DEV_RAM_COUNT
+	int "Default number of RAM disks" if BLK_DEV_RAM
+	default "16"
+
 config BLK_DEV_RAM_SIZE
 	int "Default RAM disk size"
 	depends on BLK_DEV_RAM
