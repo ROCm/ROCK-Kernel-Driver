@@ -411,7 +411,7 @@ void input_register_device(struct input_dev *dev)
 	dev->rep[REP_PERIOD] = HZ/33;
 
 	INIT_LIST_HEAD(&dev->h_list);
-	list_add_tail(&dev->node,&input_dev_list);
+	list_add_tail(&dev->node, &input_dev_list);
 
 	list_for_each_entry(handler, &input_handler_list, node)
 		if ((id = input_match_device(handler->id_table, dev)))
@@ -471,7 +471,7 @@ void input_register_handler(struct input_handler *handler)
 	if (handler->fops != NULL)
 		input_table[handler->minor >> 5] = handler;
 
-	list_add_tail(&handler->node,&input_handler_list);
+	list_add_tail(&handler->node, &input_handler_list);
 	
 	list_for_each_entry(dev, &input_dev_list, node)
 		if ((id = input_match_device(handler->id_table, dev)))

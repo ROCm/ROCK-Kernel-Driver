@@ -332,7 +332,8 @@ static int atkbd_set_3(struct atkbd *atkbd)
  * Try to set the set we want.
  */
 
-	if (atkbd_command(atkbd, &atkbd_set, ATKBD_CMD_SSCANSET))
+	param[0] = atkbd_set;
+	if (atkbd_command(atkbd, param, ATKBD_CMD_SSCANSET))
 		return 2;
 
 /*

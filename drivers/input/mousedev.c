@@ -215,6 +215,8 @@ static int mousedev_release(struct inode * inode, struct file * file)
 static int mousedev_open(struct inode * inode, struct file * file)
 {
 	struct mousedev_list *list;
+	struct input_handle *handle;
+	struct mousedev *mousedev;
 	int i;
 
 #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX
@@ -237,19 +239,14 @@ static int mousedev_open(struct inode * inode, struct file * file)
 
 	if (!list->mousedev->open++) {
 		if (list->mousedev->minor == MOUSEDEV_MIX) {
-			struct list_head * node;
-			list_for_each(node,&mousedev_handler.h_list) {
-				struct input_handle *handle = to_handle_h(node);
-				struct mousedev *mousedev = handle->private;
-				if (!mousedev->open)
-					if (mousedev->exist)	
-						input_open_device(handle);
+			list_for_each_entry(handle, &mousedev_handler.h_list, h_node) {
+				mousedev = handle->private;
+				if (!mousedev->open && mousedev->exist)	
+					input_open_device(handle);
 			}
-		} else {
-			if (!mousedev_mix.open)
-				if (list->mousedev->exist)	
-					input_open_device(&list->mousedev->handle);
-		}
+		} else 
+			if (!mousedev_mix.open && list->mousedev->exist)	
+				input_open_device(&list->mousedev->handle);
 	}
 
 	return 0;
@@ -496,6 +493,7 @@ static int __init mousedev_init(void)
 	input_register_handler(&mousedev_handler);
 
 	memset(&mousedev_mix, 0, sizeof(struct mousedev));
+	INIT_LIST_HEAD(&mousedev_mix.list);
 	init_waitqueue_head(&mousedev_mix.wait);
 	mousedev_table[MOUSEDEV_MIX] = &mousedev_mix;
 	mousedev_mix.exist = 1;
