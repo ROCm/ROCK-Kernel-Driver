@@ -22,10 +22,7 @@
 #include <linux/slab.h>
 #include <linux/serial.h>
 
-/* 2.4.6 compatibility cruft - to be removed with the old serial.c code */
-#define pci_board __pci_board
 #include <linux/serialP.h>
-#undef pci_board
 
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
@@ -771,7 +768,8 @@ static void __devexit pci_remove_one(struct pci_dev *dev)
 		for (i = 0; i < priv->nr; i++)
 			unregister_serial(priv->line[i]);
 
-		priv->board->init_fn(dev, priv->board, 0);
+		if (priv->board->init_fn)
+			priv->board->init_fn(dev, priv->board, 0);
 
 		pci_disable_device(dev);
 
