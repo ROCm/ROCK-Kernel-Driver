@@ -60,6 +60,14 @@ xmit_complete_b(struct BCState *bcs)
 
 /* called with the card lock held */
 static inline void
+xmit_complete_d(struct IsdnCardState *cs)
+{
+	dev_kfree_skb_irq(cs->tx_skb);
+	cs->tx_skb = NULL;
+}
+
+/* called with the card lock held */
+static inline void
 xmit_ready_b(struct BCState *bcs)
 {
 	bcs->tx_skb = skb_dequeue(&bcs->squeue);
@@ -158,7 +166,7 @@ xmit_restart_b(struct BCState *bcs)
 	bcs->count = 0;
 }
 
-/* Useful for HSCX work-alike's */
+/* Useful for HSCX/ISAC work-alike's */
 /* ---------------------------------------------------------------------- */
 
 /* XPR - transmit pool ready */
@@ -177,6 +185,28 @@ xmit_xpr_b(struct BCState *bcs)
 		bcs->count = 0;
 	}
 	xmit_ready_b(bcs);
+}
+
+/* XPR - transmit pool ready */
+/* called with the card lock held */
+static inline void
+xmit_xpr_d(struct IsdnCardState *cs)
+{
+	if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
+		del_timer(&cs->dbusytimer);
+	if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
+		sched_d_event(cs, D_CLEARBUSY);
+	/* current frame? */
+	if (cs->tx_skb) {
+		/* last frame not done yet? */
+		if (cs->tx_skb->len) {
+			cs->DC_Send_Data(cs);
+			return;
+		}
+		xmit_complete_d(cs);
+		cs->tx_cnt = 0;
+	}
+	xmit_ready_d(cs);
 }
 
 /* XDU - transmit data underrun */

@@ -355,23 +355,8 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		W6692_empty_fifo(cs, W_D_FIFO_THRESH);
 	}
 	if (val & W_INT_D_XFR) {	/* XFR */
-		if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
-			del_timer(&cs->dbusytimer);
-		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			sched_d_event(cs, D_CLEARBUSY);
-		if (cs->tx_skb) {
-			if (cs->tx_skb->len) {
-				W6692_fill_fifo(cs);
-				goto afterXFR;
-			} else {
-				dev_kfree_skb_irq(cs->tx_skb);
-				cs->tx_cnt = 0;
-				cs->tx_skb = NULL;
-			}
-		}
-		xmit_ready_d(cs);
+		xmit_xpr_d(cs);
 	}
-      afterXFR:
 	if (val & (W_INT_XINT0 | W_INT_XINT1)) {	/* XINT0/1 - never */
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "W6692 spurious XINT!");

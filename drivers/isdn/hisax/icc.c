@@ -223,23 +223,8 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 			debugl1(cs, "ICC RSC interrupt");
 	}
 	if (val & 0x10) {	/* XPR */
-		if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
-			del_timer(&cs->dbusytimer);
-		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			sched_d_event(cs, D_CLEARBUSY);
-		if (cs->tx_skb) {
-			if (cs->tx_skb->len) {
-				icc_fill_fifo(cs);
-				goto afterXPR;
-			} else {
-				dev_kfree_skb_irq(cs->tx_skb);
-				cs->tx_cnt = 0;
-				cs->tx_skb = NULL;
-			}
-		}
-		xmit_ready_d(cs);
+		xmit_xpr_d(cs);
 	}
-      afterXPR:
 	if (val & 0x04) {	/* CISQ */
 		exval = cs->readisac(cs, ICC_CIR0);
 		if (cs->debug & L1_DEB_ISAC)

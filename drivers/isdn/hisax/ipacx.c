@@ -416,25 +416,9 @@ dch_int(struct IsdnCardState *cs)
 	  cs->writeisac(cs, IPACX_CMDRD, 0x40); //RRES
 	}
   
-  if (istad &0x10) {  // XPR
-		if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
-			del_timer(&cs->dbusytimer);
-		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			sched_d_event(cs, D_CLEARBUSY);
-    if (cs->tx_skb) {
-      if (cs->tx_skb->len) {
-        dch_fill_fifo(cs);
-        goto afterXPR;
-      }
-      else {
-        dev_kfree_skb_irq(cs->tx_skb);
-        cs->tx_skb = NULL;
-        cs->tx_cnt = 0;
-      }
-    }
-    xmit_ready(cs);
-  }  
-  afterXPR:
+	if (istad &0x10) {  // XPR
+		xmit_xpr_d(cs);
+	}  
 
 	if (istad &0x0C) {  // XDU or XMR
 		if (cs->debug &L1_DEB_WARN) debugl1(cs, "dch_int(): XDU");

@@ -1049,28 +1049,8 @@ hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			receive_dmsg(cs);
 		}
 		if (val & 0x04) {	/* dframe transmitted */
-			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
-				del_timer(&cs->dbusytimer);
-			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				sched_d_event(cs, D_CLEARBUSY);
-			if (cs->tx_skb) {
-				if (cs->tx_skb->len) {
-					if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-						hfcpci_fill_dfifo(cs);
-						test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-					} else {
-						debugl1(cs, "hfcpci_fill_dfifo irq blocked");
-					}
-					goto afterXPR;
-				} else {
-					dev_kfree_skb_irq(cs->tx_skb);
-					cs->tx_cnt = 0;
-					cs->tx_skb = NULL;
-				}
-			}
-			xmit_ready_d(cs);
+			xmit_xpr_d(cs);
 		}
-	      afterXPR:
 		if (cs->hw.hfcpci.int_s1 && count--) {
 			val = cs->hw.hfcpci.int_s1;
 			cs->hw.hfcpci.int_s1 = 0;
