@@ -147,6 +147,7 @@ _GLOBAL(__secondary_hold)
 	/* Relocation is off & we are located at an address less */
 	/* than 0x100, so only need to grab low order offset.    */
 	std     r24,__secondary_hold_acknowledge@l(0)
+	sync
 
 	/* All secondary cpu's wait here until told to start. */
 100:    ld      r4,__secondary_hold_spinloop@l(0)
