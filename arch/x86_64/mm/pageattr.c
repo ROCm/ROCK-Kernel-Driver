@@ -180,7 +180,7 @@ int change_page_attr(struct page *page, int numpages, pgprot_t prot)
 			unsigned long addr2;
 			addr2 = __START_KERNEL_map + page_to_phys(page);
 			err = __change_page_attr(addr2, page, prot, 
-						 PAGE_KERNEL_EXECUTABLE);
+						 PAGE_KERNEL_EXEC);
 		} 
 	} 	
 	up_write(&init_mm.mmap_sem); 

@@ -490,6 +490,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	char passed_fileno[6];
 	struct files_struct *files;
 	int executable_stack = EXSTACK_DEFAULT;
+	unsigned long def_flags = 0;
 	
 	/* Get the exec-header */
 	elf_ex = *((struct elfhdr *) bprm->buf);
@@ -621,7 +622,10 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 				executable_stack = EXSTACK_ENABLE_X;
 			else
 				executable_stack = EXSTACK_DISABLE_X;
+			break;
 		}
+	if (i == elf_ex.e_phnum)
+		def_flags |= VM_EXEC | VM_MAYEXEC;
 
 	/* Some simple consistency checks for the interpreter */
 	if (elf_interpreter) {
@@ -689,6 +693,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	current->mm->end_code = 0;
 	current->mm->mmap = NULL;
 	current->flags &= ~PF_FORKNOEXEC;
+	current->mm->def_flags = def_flags;
 
 	/* Do this immediately, since STACK_TOP as used in setup_arg_pages
 	   may depend on the personality.  */
