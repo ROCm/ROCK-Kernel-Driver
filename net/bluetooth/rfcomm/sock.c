@@ -210,7 +210,7 @@ static void rfcomm_sock_kill(struct sock *sk)
 
 	/* Kill poor orphan */
 	bt_sock_unlink(&rfcomm_sk_list, sk);
-	sock_set_Flag(sk, SOCK_DEAD);
+	sock_set_flag(sk, SOCK_DEAD);
 	sock_put(sk);
 }
 
