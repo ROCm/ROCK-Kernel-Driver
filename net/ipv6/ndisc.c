@@ -1366,11 +1366,11 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 
 	hlen = 0;
 
-	skb_reserve(skb, (dev->hard_header_len + 15) & ~15);
+	skb_reserve(buff, (dev->hard_header_len + 15) & ~15);
 	ip6_nd_hdr(sk, buff, dev, &saddr_buf, &skb->nh.ipv6h->saddr,
 		   IPPROTO_ICMPV6, len);
 
-	skb->h.raw = (unsigned char*) icmph = (struct icmp6hdr *) skb_put(buff, len);
+	buff->h.raw = (unsigned char*) icmph = (struct icmp6hdr *) skb_put(buff, len);
 
 	memset(icmph, 0, sizeof(struct icmp6hdr));
 	icmph->icmp6_type = NDISC_REDIRECT;
@@ -1408,9 +1408,9 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 					     len, IPPROTO_ICMPV6,
 					     csum_partial((u8 *) icmph, len, 0));
 
-	skb->dst = dst;
+	buff->dst = dst;
 	idev = in6_dev_get(dst->dev);
-	dst_output(skb);
+	dst_output(buff);
 
 	ICMP6_INC_STATS(idev, Icmp6OutRedirects);
 	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
