@@ -162,11 +162,11 @@ cryptoloop_transfer_cbc(struct loop_device *lo, int cmd, char *raw_buf,
 		iv[0] = cpu_to_le32(IV & 0xffffffff);
 
 		sg_in.page = virt_to_page(in);
-		sg_in.offset = (unsigned long)in & ~PAGE_MASK;
+		sg_in.offset = offset_in_page(in);
 		sg_in.length = sz;
 
 		sg_out.page = virt_to_page(out);
-		sg_out.offset = (unsigned long)out & ~PAGE_MASK;
+		sg_out.offset = offset_in_page(out);
 		sg_out.length = sz;
 
 		encdecfunc(tfm, &sg_out, &sg_in, sz, (u8 *)iv);

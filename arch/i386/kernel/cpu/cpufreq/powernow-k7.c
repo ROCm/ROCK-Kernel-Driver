@@ -230,8 +230,8 @@ static void change_speed (unsigned int index)
 
 	freqs.cpu = 0;
 
-	cfid = fidvidstatus.bits.CFID;
 	rdmsrl (MSR_K7_FID_VID_STATUS, fidvidstatus.val);
+	cfid = fidvidstatus.bits.CFID;
 	freqs.old = fsb * fid_codes[cfid] * 100;
 	freqs.new = powernow_table[index].frequency;
 

@@ -383,10 +383,8 @@ static void irda_device_destructor(struct net_device *dev)
  *    This function should be used by low level device drivers in a similar way
  *    as ether_setup() is used by normal network device drivers
  */
-int irda_device_setup(struct net_device *dev)
+void irda_device_setup(struct net_device *dev)
 {
-	ASSERT(dev != NULL, return -1;);
-
         dev->hard_header_len = 0;
         dev->addr_len        = 0;
 
@@ -399,7 +397,6 @@ int irda_device_setup(struct net_device *dev)
 
 	dev->mtu = 2048;
 	dev->flags = IFF_NOARP;
-	return 0;
 }
 
 /*

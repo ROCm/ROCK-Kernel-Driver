@@ -689,7 +689,7 @@ portably refer to any piece of memory.  If you have a cpu pointer
 and offset using something like this:
 
 	struct page *page = virt_to_page(ptr);
-	unsigned long offset = ((unsigned long)ptr & ~PAGE_MASK);
+	unsigned long offset = offset_in_page(ptr);
 
 Here are the interfaces:
 

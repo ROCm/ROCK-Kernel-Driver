@@ -69,7 +69,6 @@ int pnp_register_protocol(struct pnp_protocol *protocol)
 
 	protocol->number = nodenum;
 	sprintf(protocol->dev.bus_id, "pnp%d", nodenum);
-	strlcpy(protocol->dev.name,protocol->name,DEVICE_NAME_SIZE);
 	return device_register(&protocol->dev);
 }
 

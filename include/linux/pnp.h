@@ -19,6 +19,7 @@
 #define PNP_MAX_DMA		2
 #define PNP_MAX_DEVICES		8
 #define PNP_ID_LEN		8
+#define PNP_NAME_LEN		50
 
 struct pnp_protocol;
 struct pnp_dev;
@@ -133,6 +134,7 @@ struct pnp_card {
 	struct pnp_protocol * protocol;
 	struct pnp_id * id;		/* contains supported EISA IDs*/
 
+	char name[PNP_NAME_LEN];	/* contains a human-readable name */
 	unsigned char	pnpver;		/* Plug & Play version */
 	unsigned char	productver;	/* product version */
 	unsigned int	serial;		/* serial number */
@@ -187,6 +189,7 @@ struct pnp_dev {
 	struct pnp_option * dependent;
 	struct pnp_resource_table res;
 
+	char name[PNP_NAME_LEN];	/* contains a human-readable name */
 	unsigned short	regs;		/* ISAPnP: supported registers */
 	int 		flags;		/* used by protocols */
 	struct proc_dir_entry *procent;	/* device entry in /proc/bus/isapnp */
@@ -204,7 +207,7 @@ struct pnp_dev {
 	for((dev) = card_to_pnp_dev((card)->devices.next); \
 	(dev) != card_to_pnp_dev(&(card)->devices); \
 	(dev) = card_to_pnp_dev((dev)->card_list.next))
-#define pnp_dev_name(dev) (dev)->dev.name
+#define pnp_dev_name(dev) (dev)->name
 
 static inline void *pnp_get_drvdata (struct pnp_dev *pdev)
 {

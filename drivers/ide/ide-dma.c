@@ -255,7 +255,7 @@ static int ide_raw_build_sglist (ide_drive_t *drive, struct request *rq)
 #endif
 		memset(&sg[nents], 0, sizeof(*sg));
 		sg[nents].page = virt_to_page(virt_addr);
-		sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
+		sg[nents].offset = offset_in_page(virt_addr);
 		sg[nents].length = 128  * SECTOR_SIZE;
 		nents++;
 		virt_addr = virt_addr + (128 * SECTOR_SIZE);
@@ -263,7 +263,7 @@ static int ide_raw_build_sglist (ide_drive_t *drive, struct request *rq)
 	}
 	memset(&sg[nents], 0, sizeof(*sg));
 	sg[nents].page = virt_to_page(virt_addr);
-	sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
+	sg[nents].offset = offset_in_page(virt_addr);
 	sg[nents].length =  sector_count  * SECTOR_SIZE;
 	nents++;
 

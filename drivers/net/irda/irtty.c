@@ -39,9 +39,6 @@
 #include <net/irda/wrapper.h>
 #include <net/irda/irda_device.h>
 
-static hashbin_t *irtty = NULL;
-static struct tty_ldisc irda_ldisc;
-
 static int qos_mtt_bits = 0x03;      /* 5 ms or more */
 
 /* Network device fuction prototypes */
@@ -55,7 +52,8 @@ static struct net_device_stats *irtty_net_get_stats(struct net_device *dev);
 /* Line discipline function prototypes */
 static int  irtty_open(struct tty_struct *tty);
 static void irtty_close(struct tty_struct *tty);
-static int  irtty_ioctl(struct tty_struct *, void *, int, void *);
+static int  irtty_ioctl(struct tty_struct *, struct file *, 
+			unsigned int, unsigned long);
 static int  irtty_receive_room(struct tty_struct *tty);
 static void irtty_write_wakeup(struct tty_struct *tty);
 static void irtty_receive_buf(struct tty_struct *, const unsigned char *, 
@@ -69,37 +67,22 @@ static int  irtty_raw_read(struct net_device *dev, __u8 *buf, int len);
 static int  irtty_set_mode(struct net_device *dev, int mode);
 static int  irtty_change_speed(struct irda_task *task);
 
-char *driver_name = "irtty";
+static struct tty_ldisc irda_ldisc = {
+	.owner = THIS_MODULE,
+	.magic = TTY_LDISC_MAGIC,
+	.name = "irda",
+	.open = irtty_open,
+	.close = irtty_close,
+	.ioctl = irtty_ioctl,
+	.receive_buf  = irtty_receive_buf,
+	.receive_room = irtty_receive_room,
+	.write_wakeup = irtty_write_wakeup,
+};
 
 int __init irtty_init(void)
 {
 	int status;
 
-	/* Probably no need to lock here because all operations done in
-	 * open()/close() which are already safe - Jean II */
-	irtty = hashbin_new( HB_NOLOCK);
-	if ( irtty == NULL) {
-		printk( KERN_WARNING "IrDA: Can't allocate irtty hashbin!\n");
-		return -ENOMEM;
-	}
-
-	/* Fill in our line protocol discipline, and register it */
-	memset(&irda_ldisc, 0, sizeof( irda_ldisc));
-
-	irda_ldisc.magic = TTY_LDISC_MAGIC;
- 	irda_ldisc.name  = "irda";
-	irda_ldisc.flags = 0;
-	irda_ldisc.open  = irtty_open;
-	irda_ldisc.close = irtty_close;
-	irda_ldisc.read  = NULL;
-	irda_ldisc.write = NULL;
-	irda_ldisc.ioctl = (int (*)(struct tty_struct *, struct file *,
-				    unsigned int, unsigned long)) irtty_ioctl;
- 	irda_ldisc.poll  = NULL;
-	irda_ldisc.receive_buf  = irtty_receive_buf;
-	irda_ldisc.receive_room = irtty_receive_room;
-	irda_ldisc.write_wakeup = irtty_write_wakeup;
-	
 	if ((status = tty_register_ldisc(N_IRDA, &irda_ldisc)) != 0) {
 		ERROR("IrDA: can't register line discipline (err = %d)\n", 
 		      status);
@@ -124,12 +107,6 @@ static void __exit irtty_cleanup(void)
 		      __FUNCTION__, ret);
 	}
 
-	/*
-	 *  The TTY should care of deallocating the instances by using the
-	 *  callback to irtty_close(), therefore we do give any deallocation
-	 *  function to hashbin_destroy().
-	 */
-	hashbin_delete(irtty, NULL);
 }
 
 /* 
@@ -171,8 +148,6 @@ static int irtty_open(struct tty_struct *tty)
 
 	/* Give self a name */
 	strcpy(name, tty->name);
-
-	hashbin_insert(irtty, (irda_queue_t *) self, (int) self, NULL);
 
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
@@ -251,8 +226,6 @@ static int irtty_open(struct tty_struct *tty)
 
 	MESSAGE("IrDA: Registered device %s\n", dev->name);
 
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -285,8 +258,6 @@ static void irtty_close(struct tty_struct *tty)
 	if (self->netdev)
 		unregister_netdev(self->netdev);
 	
-	self = hashbin_remove(irtty, (int) self, NULL);
-
 	/* Protect access to self->task and self->?x_buff - Jean II */
 	spin_lock_irqsave(&self->lock, flags);
 
@@ -305,8 +276,6 @@ static void irtty_close(struct tty_struct *tty)
 	spin_unlock_irqrestore(&self->lock, flags);
 	
 	kfree(self);
-	
- 	MOD_DEC_USE_COUNT;
 }
 
 /*
@@ -487,7 +456,8 @@ static int irtty_change_speed(struct irda_task *task)
  *     The Swiss army knife of system calls :-)
  *
  */
-static int irtty_ioctl(struct tty_struct *tty, void *file, int cmd, void *arg)
+static int irtty_ioctl(struct tty_struct *tty, struct file *file, 
+		       unsigned int cmd, unsigned long arg)
 {
 	dongle_t *dongle;
 	struct irtty_info info;
@@ -511,8 +481,7 @@ static int irtty_ioctl(struct tty_struct *tty, void *file, int cmd, void *arg)
 	case TCGETS:
 	case TCGETA:
 		/* Unsure about locking here, to check - Jean II */
-		return n_tty_ioctl(tty, (struct file *) file, cmd, 
-				   (unsigned long) arg);
+		return n_tty_ioctl(tty, (struct file *) file, cmd, arg);
 		break;
 	case IRTTY_IOCTDONGLE:
 		/* Initialize dongle */
@@ -543,7 +512,7 @@ static int irtty_ioctl(struct tty_struct *tty, void *file, int cmd, void *arg)
 		memset(&info, 0, sizeof(struct irtty_info)); 
 		strncpy(info.name, self->netdev->name, 5);
 
-		if (copy_to_user(arg, &info, sizeof(struct irtty_info)))
+		if (copy_to_user((void *) arg, &info, sizeof(struct irtty_info)))
 			return -EFAULT;
 		break;
 	default:
@@ -938,7 +907,6 @@ static int irtty_net_open(struct net_device *dev)
 {
 	struct irtty_cb *self = (struct irtty_cb *) dev->priv;
 	struct tty_struct *tty = self->tty;
-	char hwname[16];
 
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRTTY_MAGIC, return -1;);
@@ -951,16 +919,11 @@ static int irtty_net_open(struct net_device *dev)
 	/* Make sure we can receive more data */
 	irtty_stop_receiver(self, FALSE);
 
-	/* Give self a hardware name */
-	sprintf(hwname, "%s", tty->name);
-
 	/* 
 	 * Open new IrLAP layer instance, now that everything should be
 	 * initialized properly 
 	 */
-	self->irlap = irlap_open(dev, &self->qos, hwname);
-
-	MOD_INC_USE_COUNT;
+	self->irlap = irlap_open(dev, &self->qos, tty->name);
 
 	return 0;
 }
@@ -982,8 +945,6 @@ static int irtty_net_close(struct net_device *dev)
 	if (self->irlap)
 		irlap_close(self->irlap);
 	self->irlap = NULL;
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }
