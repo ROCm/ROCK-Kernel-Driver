@@ -173,8 +173,7 @@ static struct autofs_info *autofs4_mkroot(struct autofs_sb_info *sbi)
 	return ino;
 }
 
-struct super_block *autofs4_read_super(struct super_block *s, void *data,
-				      int silent)
+int autofs4_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct inode * root_inode;
 	struct dentry * root;
@@ -251,7 +250,7 @@ struct super_block *autofs4_read_super(struct super_block *s, void *data,
 	 * Success! Install the root dentry now to indicate completion.
 	 */
 	s->s_root = root;
-	return s;
+	return 0;
 	
 	/*
 	 * Failure ... clean up.
@@ -278,7 +277,7 @@ fail_iput:
 fail_free:
 	kfree(sbi);
 fail_unlock:
-	return NULL;
+	return -EINVAL;
 }
 
 static int autofs4_statfs(struct super_block *sb, struct statfs *buf)
