@@ -2049,7 +2049,7 @@ handle_one_block:
 	while ((count > 0) && (chan->slop_len < chan->frag_size)) {
 		size_t slop_left = chan->frag_size - chan->slop_len;
 		void *base = chan->pgtbl[n / (PAGE_SIZE / chan->frag_size)].cpuaddr;
-		unsigned ofs = n % (PAGE_SIZE / chan->frag_size);
+		unsigned ofs = (n % (PAGE_SIZE / chan->frag_size)) * chan->frag_size;
 
 		size = (count < slop_left) ? count : slop_left;
 		if (copy_to_user (userbuf,
