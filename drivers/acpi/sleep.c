@@ -205,8 +205,10 @@ acpi_system_suspend(
 		break;
 
 	case ACPI_STATE_S2:
+#ifdef CONFIG_SOFTWARE_SUSPEND
 	case ACPI_STATE_S3:
 		do_suspend_lowlevel(0);
+#endif
 		break;
 	}
 	local_irq_restore(flags);

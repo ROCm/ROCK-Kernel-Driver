@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdispat.h - dispatcher (parser to interpreter interface)
- *       $Revision: 54 $
+ *       $Revision: 55 $
  *
  *****************************************************************************/
 
@@ -376,6 +376,10 @@ acpi_ds_create_operands (
 
 acpi_status
 acpi_ds_resolve_operands (
+	acpi_walk_state         *walk_state);
+
+void
+acpi_ds_clear_operands (
 	acpi_walk_state         *walk_state);
 
 
