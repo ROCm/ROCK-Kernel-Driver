@@ -203,8 +203,7 @@ static irqreturn_t fb_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
 static inline int fbcon_is_inactive(struct vc_data *vc, struct fb_info *info)
 {
 	return (info->state != FBINFO_STATE_RUNNING ||
-		vt_cons[vc->vc_num]->vc_mode != KD_TEXT ||
-		(console_blanked && info->fbops->fb_blank));
+		vt_cons[vc->vc_num]->vc_mode != KD_TEXT);
 }
 
 static inline int get_color(struct vc_data *vc, struct fb_info *info,
@@ -212,6 +211,12 @@ static inline int get_color(struct vc_data *vc, struct fb_info *info,
 {
 	int depth = fb_get_color_depth(info);
 	int color = 0;
+
+	if (!info->fbops->fb_blank && console_blanked) {
+		unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
+
+		c = vc->vc_video_erase_char & charmask;
+	}
 
 	if (depth != 1)
 		color = (is_fg) ? attr_fgcol((vc->vc_hi_font_mask) ? 9 : 8, c)
@@ -223,6 +228,9 @@ static inline int get_color(struct vc_data *vc, struct fb_info *info,
 		/* 0 or 1 */
 		int fg = (info->fix.visual != FB_VISUAL_MONO01) ? 1 : 0;
 		int bg = (info->fix.visual != FB_VISUAL_MONO01) ? 0 : 1;
+
+		if (!info->fbops->fb_blank && console_blanked)
+			fg = bg;
 
 		color = (is_fg) ? fg : bg;
 		break;
@@ -243,6 +251,7 @@ static inline int get_color(struct vc_data *vc, struct fb_info *info,
 		color &= 7;
 		break;
 	}
+
 
 	return color;
 }
@@ -1939,9 +1948,8 @@ static int fbcon_switch(struct vc_data *vc)
 
 	update_var(vc->vc_num, info);
 	fbcon_set_palette(vc, color_table); 	
+	fbcon_clear_margins(vc, 0);
 
-	if (vt_cons[vc->vc_num]->vc_mode == KD_TEXT)
-		fbcon_clear_margins(vc, 0);
 	if (logo_shown == FBCON_LOGO_DRAW) {
 
 		logo_shown = fg_console;
@@ -2478,10 +2486,9 @@ static int fbcon_scrolldelta(struct vc_data *vc, int lines)
 	if (scrollback_current == scrollback_old)
 		return 0;
 
-	if (!info->fbops->fb_blank &&
-	    (console_blanked || vt_cons[vc->vc_num]->vc_mode != KD_TEXT
-	     || !lines))
+	if (fbcon_is_inactive(vc, info))
 		return 0;
+
 	fbcon_cursor(vc, CM_ERASE);
 
 	offset = p->yscroll - scrollback_current;
@@ -2510,7 +2517,7 @@ static int fbcon_scrolldelta(struct vc_data *vc, int lines)
 
 static int fbcon_set_origin(struct vc_data *vc)
 {
-	if (softback_lines && !console_blanked)
+	if (softback_lines)
 		fbcon_scrolldelta(vc, softback_lines);
 	return 0;
 }
