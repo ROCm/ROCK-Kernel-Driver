@@ -976,11 +976,11 @@ static void cp_reset_hw (struct cp_private *cp)
 
 static inline void cp_start_hw (struct cp_private *cp)
 {
-	cpw8(Cmd, RxOn | TxOn);
 	if (cp->board_type == RTL8169)
 		cpw16(CpCmd, PCIMulRW | RxChkSum);
 	else
 		cpw16(CpCmd, PCIMulRW | RxChkSum | CpRxOn | CpTxOn);
+	cpw8(Cmd, RxOn | TxOn);
 }
 
 static void cp_init_hw (struct cp_private *cp)
