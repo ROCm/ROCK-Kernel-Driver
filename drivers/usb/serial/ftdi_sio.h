@@ -225,6 +225,14 @@
  */
 #define FTDI_SUUNTO_SPORTS_PID	0xF680	/* Suunto Sports instrument */
 
+/*
+ * Definitions for B&B Electronics products.
+ */
+#define BANDB_VID		0x0856	/* B&B Electronics Vendor ID */
+#define BANDB_USOTL4_PID	0xAC01	/* USOTL4 Isolated RS-485 Converter */
+#define BANDB_USTL4_PID		0xAC02	/* USTL4 RS-485 Converter */
+#define BANDB_USO9ML2_PID	0xAC03	/* USO9ML2 Isolated RS-232 Converter */
+
 /* Commands */
 #define FTDI_SIO_RESET 		0 /* Reset the port */
 #define FTDI_SIO_MODEM_CTRL 	1 /* Set the modem control register */

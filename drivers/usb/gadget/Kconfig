@@ -39,6 +39,17 @@ config USB_GADGET
 	   If in doubt, say "N" and don't enable these drivers; most people
 	   don't have this kind of hardware (except maybe inside Linux PDAs).
 
+config USB_GADGET_DEBUG_FILES
+	boolean "Debugging information files"
+	depends on USB_GADGET && PROC_FS
+	help
+	   Some of the drivers in the "gadget" framework can expose
+	   debugging information in files such as /proc/driver/udc
+	   (for a peripheral controller).  The information in these
+	   files may help when you're troubleshooting or bringing up a
+	   driver on a new board.   Enable these files by choosing "Y"
+	   here.  If in doubt, or to conserve kernel memory, say "N".
+
 #
 # USB Peripheral Controller Support
 #
@@ -205,10 +216,6 @@ config USB_OTG
 	   later, when two dual-role devices talk to each other.
 
 	   Select this only if your OMAP board has a Mini-AB connector.
-
-config USB_OMAP_PROC
-	boolean "/proc/driver/udc file"
-	depends on USB_GADGET_OMAP
 
 endchoice
 

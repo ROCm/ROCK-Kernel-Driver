@@ -229,38 +229,14 @@ ohci_lh7a404_start (struct usb_hcd *hcd)
 	int		ret;
 
 	ohci_dbg (ohci, "ohci_lh7a404_start, ohci:%p", ohci);
-			
-	ohci->hcca = dma_alloc_coherent (hcd->self.controller,
-			sizeof *ohci->hcca, &ohci->hcca_dma, 0);
-	if (!ohci->hcca)
-		return -ENOMEM;
+	if ((ret = ohci_init(ohci)) < 0)
+		return ret;
 
-	ohci_dbg (ohci, "ohci_lh7a404_start, ohci->hcca:%p",
-			ohci->hcca);
-
-	memset (ohci->hcca, 0, sizeof (struct ohci_hcca));
-
-	if ((ret = ohci_mem_init (ohci)) < 0) {
+	if ((ret = ohci_run (ohci)) < 0) {
+		err ("can't start %s", ohci->hcd.self.bus_name);
 		ohci_stop (hcd);
 		return ret;
 	}
-	ohci->regs = hcd->regs;
-
-	if (hc_reset (ohci) < 0) {
-		ohci_stop (hcd);
-		return -ENODEV;
-	}
-
-	if (hc_start (ohci) < 0) {
-		err ("can't start %s", ohci->hcd.self.bus_name);
-		ohci_stop (hcd);
-		return -EBUSY;
-	}
-	create_debug_files (ohci);
-
-#ifdef	DEBUG
-	ohci_dump (ohci, 1);
-#endif /*DEBUG*/
 	return 0;
 }
 

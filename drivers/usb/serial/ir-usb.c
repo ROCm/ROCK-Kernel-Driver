@@ -322,7 +322,7 @@ static void ir_close (struct usb_serial_port *port, struct file * filp)
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
 	/* shutdown our bulk read */
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 }
 
 static int ir_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)

@@ -93,7 +93,7 @@
 #ifdef DEBUG
 #define DEBUG_ON(x)	BUG_ON(x)
 #else
-#define DEBUG_ON(x)	do { if (x); } while (0)
+#define DEBUG_ON(x)
 #endif
 
 #ifdef VERBOSE_DEBUG
@@ -518,7 +518,8 @@ static unsigned int udsl_write_cells (unsigned int howmany, struct sk_buff *skb,
 		memset (target, 0, ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER);
 		target += ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER;
 
-		DEBUG_ON (--ctrl->num_cells);
+		--ctrl->num_cells;
+		DEBUG_ON (ctrl->num_cells);
 	}
 
 	memcpy (target, ctrl->aal5_trailer, ATM_AAL5_TRAILER);
@@ -1219,9 +1220,7 @@ fail:
 static void udsl_usb_disconnect (struct usb_interface *intf)
 {
 	struct udsl_instance_data *instance = usb_get_intfdata (intf);
-	struct list_head *pos;
-	unsigned int count;
-	int result, i;
+	int i;
 
 	dbg ("udsl_usb_disconnect entered");
 
@@ -1236,25 +1235,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	tasklet_disable (&instance->receive_tasklet);
 
 	for (i = 0; i < num_rcv_urbs; i++)
-		if ((result = usb_unlink_urb (instance->receivers [i].urb)) < 0)
-			dbg ("udsl_usb_disconnect: usb_unlink_urb on receive urb %d returned %d!", i, result);
-
-	/* wait for completion handlers to finish */
-	do {
-		count = 0;
-		spin_lock_irq (&instance->receive_lock);
-		list_for_each (pos, &instance->spare_receivers)
-			DEBUG_ON (++count > num_rcv_urbs);
-		spin_unlock_irq (&instance->receive_lock);
-
-		dbg ("udsl_usb_disconnect: found %u spare receivers", count);
-
-		if (count == num_rcv_urbs)
-			break;
-
-		set_current_state (TASK_RUNNING);
-		schedule ();
-	} while (1);
+		usb_kill_urb (instance->receivers [i].urb);
 
 	/* no need to take the spinlock */
 	INIT_LIST_HEAD (&instance->filled_receive_buffers);
@@ -1272,25 +1253,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	tasklet_disable (&instance->send_tasklet);
 
 	for (i = 0; i < num_snd_urbs; i++)
-		if ((result = usb_unlink_urb (instance->senders [i].urb)) < 0)
-			dbg ("udsl_usb_disconnect: usb_unlink_urb on send urb %d returned %d!", i, result);
-
-	/* wait for completion handlers to finish */
-	do {
-		count = 0;
-		spin_lock_irq (&instance->send_lock);
-		list_for_each (pos, &instance->spare_senders)
-			DEBUG_ON (++count > num_snd_urbs);
-		spin_unlock_irq (&instance->send_lock);
-
-		dbg ("udsl_usb_disconnect: found %u spare senders", count);
-
-		if (count == num_snd_urbs)
-			break;
-
-		set_current_state (TASK_RUNNING);
-		schedule ();
-	} while (1);
+		usb_kill_urb (instance->senders [i].urb);
 
 	/* no need to take the spinlock */
 	INIT_LIST_HEAD (&instance->spare_senders);

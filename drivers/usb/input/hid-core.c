@@ -1258,8 +1258,10 @@ int hid_wait_io(struct hid_device *hid)
 	add_wait_queue(&hid->wait, &wait);
 
 	while (timeout && (test_bit(HID_CTRL_RUNNING, &hid->iofl) ||
-			   test_bit(HID_OUT_RUNNING, &hid->iofl)))
+			   test_bit(HID_OUT_RUNNING, &hid->iofl))) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		timeout = schedule_timeout(timeout);
+	}
 
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&hid->wait, &wait);
@@ -1348,9 +1350,9 @@ void hid_init_reports(struct hid_device *hid)
 	while (ret) {
 		err |= ret;
 		if (test_bit(HID_CTRL_RUNNING, &hid->iofl))
-			usb_unlink_urb(hid->urbctrl);
+			usb_kill_urb(hid->urbctrl);
 		if (test_bit(HID_OUT_RUNNING, &hid->iofl))
-			usb_unlink_urb(hid->urbout);
+			usb_kill_urb(hid->urbout);
 		ret = hid_wait_io(hid);
 	}
 
@@ -1453,10 +1455,11 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_DEVICE_ID_1_PHIDGETSERVO_20	0x8101
 #define USB_DEVICE_ID_4_PHIDGETSERVO_20	0x8104
 
-#define USB_VENDOR_ID_CODEMERCS		0x07c0
-#define USB_DEVICE_ID_CODEMERCS_IOW40	0x1500
-#define USB_DEVICE_ID_CODEMERCS_IOW24	0x1501
-
+#define USB_VENDOR_ID_CODEMERCS        0x07c0
+#define USB_DEVICE_ID_CODEMERCS_IOW40  0x1500
+#define USB_DEVICE_ID_CODEMERCS_IOW24  0x1501
+#define USB_DEVICE_ID_CODEMERCS_IOW48  0x1502
+#define USB_DEVICE_ID_CODEMERCS_IOW28  0x1503
 
 static struct hid_blacklist {
 	__u16 idVendor;
@@ -1539,6 +1542,11 @@ static struct hid_blacklist {
 	{ USB_VENDOR_ID_NEC, USB_DEVICE_ID_NEC_USB_GAME_PAD, HID_QUIRK_BADPAD },
 	{ USB_VENDOR_ID_SAITEK, USB_DEVICE_ID_SAITEK_RUMBLEPAD, HID_QUIRK_BADPAD },
 	{ USB_VENDOR_ID_TOPMAX, USB_DEVICE_ID_TOPMAX_COBRAPAD, HID_QUIRK_BADPAD },
+
+	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW40, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW24, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW48, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW28, HID_QUIRK_IGNORE },
 
 	{ 0, 0 }
 };
