@@ -932,13 +932,13 @@ struct ipr_cmnd {
 	dma_addr_t sense_buffer_dma;
 	unsigned short dma_use_sg;
 	dma_addr_t dma_handle;
+	struct ipr_cmnd *sibling;
 	union {
 		enum ipr_shutdown_type shutdown_type;
 		struct ipr_hostrcb *hostrcb;
 		unsigned long time_left;
 		unsigned long scratch;
 		struct ipr_resource_entry *res;
-		struct ipr_cmnd *sibling;
 		struct scsi_device *sdev;
 	} u;
 
