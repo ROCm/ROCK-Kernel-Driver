@@ -2564,6 +2564,7 @@ static struct file_operations dv1394_fops=
 
 /*** DEVFS HELPERS *********************************************************/
 
+#ifdef CONFIG_DEVFS_FS
 struct dv1394_devfs_entry *
 dv1394_devfs_find( char *name)
 {
@@ -2680,6 +2681,7 @@ dv1394_devfs_add_dir( char *name,
  err:
 	return -ENOMEM;
 }
+#endif /* CONFIG_DEVFS */
 
 void dv1394_devfs_del( char *name)
 {
@@ -2851,7 +2853,6 @@ static void dv1394_add_host (struct hpsb_host *host)
 {
 	struct ti_ohci *ohci;
 	char buf[16];
-	struct dv1394_devfs_entry *devfs_entry;
 
 	/* We only work with the OHCI-1394 driver */
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME))
@@ -2873,6 +2874,8 @@ static void dv1394_add_host (struct hpsb_host *host)
 #endif
 
 #ifdef CONFIG_DEVFS_FS
+{
+	struct dv1394_devfs_entry *devfs_entry;
 	devfs_entry = dv1394_devfs_find("dv");
 	if (devfs_entry != NULL) {
 		snprintf(buf, sizeof(buf), "host%d", ohci->id);
@@ -2880,6 +2883,7 @@ static void dv1394_add_host (struct hpsb_host *host)
 		dv1394_devfs_add_dir("NTSC", devfs_entry, NULL);
 		dv1394_devfs_add_dir("PAL", devfs_entry, NULL);
 	}
+}
 #endif
 	
 	dv1394_init(ohci, DV1394_NTSC, MODE_RECEIVE);
