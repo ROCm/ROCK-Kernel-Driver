@@ -3659,118 +3659,182 @@ void cpu_attach_domain(struct sched_domain *sd, int cpu)
 #ifdef ARCH_HAS_SCHED_DOMAIN
 extern void __init arch_init_sched_domains(void);
 #else
-static struct sched_group sched_group_cpus[NR_CPUS];
+
+#ifdef CONFIG_SCHED_SMT
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
+static struct sched_group sched_group_cpus[NR_CPUS];
+__init static int cpu_to_cpu_group(int cpu)
+{
+	return cpu;
+}
+#endif
+
+static DEFINE_PER_CPU(struct sched_domain, phys_domains);
+static struct sched_group sched_group_phys[NR_CPUS];
+__init static int cpu_to_phys_group(int cpu)
+{
+#ifdef CONFIG_SCHED_SMT
+	return first_cpu(cpu_sibling_map[cpu]);
+#else
+	return cpu;
+#endif
+}
+
 #ifdef CONFIG_NUMA
-static struct sched_group sched_group_nodes[MAX_NUMNODES];
 static DEFINE_PER_CPU(struct sched_domain, node_domains);
-static void __init arch_init_sched_domains(void)
+static struct sched_group sched_group_nodes[MAX_NUMNODES];
+__init static int cpu_to_node_group(int cpu)
+{
+	return cpu_to_node(cpu);
+}
+#endif
+
+/*
+ * init_sched_build_groups takes an array of groups, the cpumask we wish
+ * to span, and a pointer to a function which identifies what group a CPU
+ * belongs to. The return value of group_fn must be a valid index into the
+ * groups[] array, and must be >= 0 and < NR_CPUS (due to the fact that we
+ * keep track of groups covered with a cpumask_t).
+ *
+ * init_sched_build_groups will build a circular linked list of the groups
+ * covered by the given span, and will set each group's ->cpumask correctly,
+ * and ->cpu_power to 0.
+ */
+__init static void init_sched_build_groups(struct sched_group groups[],
+			cpumask_t span, int (*group_fn)(int cpu))
+{
+	struct sched_group *first = NULL, *last = NULL;
+	cpumask_t covered = CPU_MASK_NONE;
+	int i;
+
+	for_each_cpu_mask(i, span) {
+		int group = group_fn(i);
+		struct sched_group *sg = &groups[group];
+		int j;
+
+		if (cpu_isset(i, covered))
+			continue;
+
+		sg->cpumask = CPU_MASK_NONE;
+		sg->cpu_power = 0;
+
+		for_each_cpu_mask(j, span) {
+			if (group_fn(j) != group)
+				continue;
+
+			cpu_set(j, covered);
+			cpu_set(j, sg->cpumask);
+		}
+		if (!first)
+			first = sg;
+		if (last)
+			last->next = sg;
+		last = sg;
+	}
+	last->next = first;
+}
+
+__init static void arch_init_sched_domains(void)
 {
 	int i;
-	struct sched_group *first_node = NULL, *last_node = NULL;
 
 	/* Set up domains */
 	for_each_cpu(i) {
-		int node = cpu_to_node(i);
-		cpumask_t nodemask = node_to_cpumask(node);
-		struct sched_domain *node_sd = &per_cpu(node_domains, i);
-		struct sched_domain *cpu_sd = &per_cpu(cpu_domains, i);
+		int group;
+		struct sched_domain *sd = NULL, *p;
+		cpumask_t nodemask = node_to_cpumask(cpu_to_node(i));
 
-		*node_sd = SD_NODE_INIT;
-		node_sd->span = cpu_possible_map;
-		node_sd->groups = &sched_group_nodes[cpu_to_node(i)];
+#ifdef CONFIG_NUMA
+		sd = &per_cpu(node_domains, i);
+		group = cpu_to_node_group(i);
+		*sd = SD_NODE_INIT;
+		sd->span = cpu_possible_map;
+		sd->groups = &sched_group_nodes[group];
+#endif
 
-		*cpu_sd = SD_CPU_INIT;
-		cpus_and(cpu_sd->span, nodemask, cpu_possible_map);
-		cpu_sd->groups = &sched_group_cpus[i];
-		cpu_sd->parent = node_sd;
+		p = sd;
+		sd = &per_cpu(phys_domains, i);
+		group = cpu_to_phys_group(i);
+		*sd = SD_CPU_INIT;
+		sd->span = nodemask;
+		sd->parent = p;
+		sd->groups = &sched_group_phys[group];
+
+#ifdef CONFIG_SCHED_SMT
+		p = sd;
+		sd = &per_cpu(cpu_domains, i);
+		group = cpu_to_cpu_group(i);
+		*sd = SD_SIBLING_INIT;
+		sd->span = cpu_sibling_map[i];
+		sd->parent = p;
+		sd->groups = &sched_group_cpus[group];
+#endif
 	}
 
-	/* Set up groups */
+#ifdef CONFIG_SCHED_SMT
+	/* Set up CPU (sibling) groups */
+	for_each_cpu(i) {
+		if (i != first_cpu(cpu_sibling_map[i]))
+			continue;
+
+		init_sched_build_groups(sched_group_cpus, cpu_sibling_map[i],
+						&cpu_to_cpu_group);
+	}
+#endif
+
+	/* Set up physical groups */
 	for (i = 0; i < MAX_NUMNODES; i++) {
-		cpumask_t tmp = node_to_cpumask(i);
-		cpumask_t nodemask;
-		struct sched_group *first_cpu = NULL, *last_cpu = NULL;
-		struct sched_group *node = &sched_group_nodes[i];
-		int j;
+		cpumask_t nodemask = node_to_cpumask(i);
 
-		cpus_and(nodemask, tmp, cpu_possible_map);
-
+		cpus_and(nodemask, nodemask, cpu_possible_map);
 		if (cpus_empty(nodemask))
 			continue;
 
-		node->cpumask = nodemask;
-		node->cpu_power = SCHED_LOAD_SCALE * cpus_weight(node->cpumask);
+		init_sched_build_groups(sched_group_phys, nodemask,
+						&cpu_to_phys_group);
+	}
 
-		for_each_cpu_mask(j, node->cpumask) {
-			struct sched_group *cpu = &sched_group_cpus[j];
+#ifdef CONFIG_NUMA
+	/* Set up node groups */
+	init_sched_build_groups(sched_group_nodes, cpu_possible_map,
+					&cpu_to_node_group);
+#endif
 
-			cpus_clear(cpu->cpumask);
-			cpu_set(j, cpu->cpumask);
-			cpu->cpu_power = SCHED_LOAD_SCALE;
+	/* Calculate CPU power for physical packages and nodes */
+	for_each_cpu(i) {
+		int power;
+		struct sched_domain *sd;
+#ifdef CONFIG_SCHED_SMT
+		sd = &per_cpu(cpu_domains, i);
+		power = SCHED_LOAD_SCALE;
+		sd->groups->cpu_power = power;
+#endif
 
-			if (!first_cpu)
-				first_cpu = cpu;
-			if (last_cpu)
-				last_cpu->next = cpu;
-			last_cpu = cpu;
+		sd = &per_cpu(phys_domains, i);
+		power = SCHED_LOAD_SCALE + SCHED_LOAD_SCALE *
+				(cpus_weight(sd->groups->cpumask)-1) / 10;
+		sd->groups->cpu_power = power;
+
+#ifdef CONFIG_NUMA
+		if (i == first_cpu(sd->groups->cpumask)) {
+			/* Only add "power" once for each physical package. */
+			sd = &per_cpu(node_domains, i);
+			sd->groups->cpu_power += power;
 		}
-		last_cpu->next = first_cpu;
-
-		if (!first_node)
-			first_node = node;
-		if (last_node)
-			last_node->next = node;
-		last_node = node;
+#endif
 	}
-	last_node->next = first_node;
 
-	mb();
+	/* Attach the domains */
 	for_each_cpu(i) {
-		struct sched_domain *cpu_sd = &per_cpu(cpu_domains, i);
-		cpu_attach_domain(cpu_sd, i);
+		struct sched_domain *sd;
+#ifdef CONFIG_SCHED_SMT
+		sd = &per_cpu(cpu_domains, i);
+#else
+		sd = &per_cpu(phys_domains, i);
+#endif
+		cpu_attach_domain(sd, i);
 	}
 }
-
-#else /* !CONFIG_NUMA */
-static void __init arch_init_sched_domains(void)
-{
-	int i;
-	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
-
-	/* Set up domains */
-	for_each_cpu(i) {
-		struct sched_domain *cpu_sd = &per_cpu(cpu_domains, i);
-
-		*cpu_sd = SD_CPU_INIT;
-		cpu_sd->span = cpu_possible_map;
-		cpu_sd->groups = &sched_group_cpus[i];
-	}
-
-	/* Set up CPU groups */
-	for_each_cpu_mask(i, cpu_possible_map) {
-		struct sched_group *cpu = &sched_group_cpus[i];
-
-		cpus_clear(cpu->cpumask);
-		cpu_set(i, cpu->cpumask);
-		cpu->cpu_power = SCHED_LOAD_SCALE;
-
-		if (!first_cpu)
-			first_cpu = cpu;
-		if (last_cpu)
-			last_cpu->next = cpu;
-		last_cpu = cpu;
-	}
-	last_cpu->next = first_cpu;
-
-	mb(); /* domains were modified outside the lock */
-	for_each_cpu(i) {
-		struct sched_domain *cpu_sd = &per_cpu(cpu_domains, i);
-		cpu_attach_domain(cpu_sd, i);
-	}
-}
-
-#endif /* CONFIG_NUMA */
 #endif /* ARCH_HAS_SCHED_DOMAIN */
 
 #define SCHED_DOMAIN_DEBUG

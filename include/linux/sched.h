@@ -612,6 +612,9 @@ struct sched_domain {
 	unsigned int nr_balance_failed; /* initialise to 0 */
 };
 
+#ifndef ARCH_HAS_SCHED_TUNE
+#ifdef CONFIG_SCHED_SMT
+#define ARCH_HAS_SCHED_WAKE_IDLE
 /* Common values for SMT siblings */
 #define SD_SIBLING_INIT (struct sched_domain) {		\
 	.span			= CPU_MASK_NONE,	\
@@ -633,6 +636,7 @@ struct sched_domain {
 	.balance_interval	= 1,			\
 	.nr_balance_failed	= 0,			\
 }
+#endif
 
 /* Common values for CPUs */
 #define SD_CPU_INIT (struct sched_domain) {		\
@@ -675,6 +679,7 @@ struct sched_domain {
 	.nr_balance_failed	= 0,			\
 }
 #endif
+#endif /*  ARCH_HAS_SCHED_TUNE */
 
 extern void cpu_attach_domain(struct sched_domain *sd, int cpu);
 
