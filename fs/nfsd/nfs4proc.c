@@ -476,6 +476,18 @@ nfsd4_rename(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 	status = nfsd_rename(rqstp, save_fh, rename->rn_sname,
 			     rename->rn_snamelen, current_fh,
 			     rename->rn_tname, rename->rn_tnamelen);
+
+	/* the underlying filesystem returns different error's than required
+	 * by NFSv4. both save_fh and current_fh have been verified.. */
+	if (status == nfserr_isdir)
+		status = nfserr_exist;
+	else if ((status == nfserr_notdir) &&
+                  (S_ISDIR(save_fh->fh_dentry->d_inode->i_mode) &&
+                   S_ISDIR(current_fh->fh_dentry->d_inode->i_mode)))
+		status = nfserr_exist;
+	else if (status == nfserr_symlink)
+		status = nfserr_notdir;
+
 	if (!status) {
 		set_change_info(&rename->rn_sinfo, current_fh);
 		set_change_info(&rename->rn_tinfo, save_fh);
