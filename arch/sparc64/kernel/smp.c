@@ -1111,11 +1111,6 @@ void __init smp_tick_init(void)
 	boot_cpu_id = hard_smp_processor_id();
 	current_tick_offset = timer_tick_offset;
 
-	if (boot_cpu_id >= NR_CPUS) {
-		prom_printf("Serious problem, boot cpu id >= NR_CPUS\n");
-		prom_halt();
-	}
-
 	cpu_set(boot_cpu_id, cpu_online_map);
 	prof_counter(boot_cpu_id) = prof_multiplier(boot_cpu_id) = 1;
 }
@@ -1257,6 +1252,11 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __devinit smp_prepare_boot_cpu(void)
 {
+	if (hard_smp_processor_id() >= NR_CPUS) {
+		prom_printf("Serious problem, boot cpu id >= NR_CPUS\n");
+		prom_halt();
+	}
+
 	current_thread_info()->cpu = hard_smp_processor_id();
 	cpu_set(smp_processor_id(), cpu_online_map);
 	cpu_set(smp_processor_id(), phys_cpu_present_map);
