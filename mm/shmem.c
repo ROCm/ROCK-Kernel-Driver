@@ -737,6 +737,7 @@ static int shmem_getpage(struct inode *inode, unsigned long idx, struct page **p
 repeat:
 	page = find_lock_page(mapping, idx);
 	if (page) {
+		unlock_page(page);
 		*pagep = page;
 		return 0;
 	}
@@ -852,6 +853,7 @@ repeat:
 	}
 
 	/* We have the page */
+	unlock_page(page);
 	*pagep = page;
 	return 0;
 }
@@ -879,8 +881,7 @@ static struct page *shmem_holdpage(struct inode *inode, unsigned long idx)
 	}
 	spin_unlock(&info->lock);
 	if (swap.val) {
-		if (shmem_getpage(inode, idx, &page) == 0)
-			unlock_page(page);
+		(void) shmem_getpage(inode, idx, &page);
 	}
 	return page;
 }
@@ -903,7 +904,6 @@ struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int
 	if (error)
 		return (error == -ENOMEM)? NOPAGE_OOM: NOPAGE_SIGBUS;
 
-	unlock_page(page);
 	flush_page_to_ram(page);
 	return page;
 }
@@ -1101,15 +1101,9 @@ shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 		}
 
 		/*
-		 * Bring in the user page that we will copy from _first_.
-		 * Otherwise there's a nasty deadlock on copying from the
-		 * same page as we're writing to, without it being marked
-		 * up-to-date.
+		 * We don't hold page lock across copy from user -
+		 * what would it guard against? - so no deadlock here.
 		 */
-		{ volatile unsigned char dummy;
-			__get_user(dummy, buf);
-			__get_user(dummy, buf+bytes-1);
-		}
 
 		status = shmem_getpage(inode, index, &page);
 		if (status)
@@ -1131,9 +1125,7 @@ shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 			if (pos > inode->i_size)
 				inode->i_size = pos;
 		}
-unlock:
-		/* Mark it unlocked again and drop the page.. */
-		unlock_page(page);
+release:
 		page_cache_release(page);
 
 		if (status < 0)
@@ -1152,7 +1144,7 @@ out_nc:
 fail_write:
 	status = -EFAULT;
 	ClearPageUptodate(page);
-	goto unlock;
+	goto release;
 }
 
 static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_t *desc)
@@ -1194,12 +1186,10 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 		if (index == end_index) {
 			nr = inode->i_size & ~PAGE_CACHE_MASK;
 			if (nr <= offset) {
-				unlock_page(page);
 				page_cache_release(page);
 				break;
 			}
 		}
-		unlock_page(page);
 		nr -= offset;
 
 		if (!list_empty(&mapping->i_mmap_shared))
@@ -1443,7 +1433,6 @@ static int shmem_symlink(struct inode *dir, struct dentry *dentry, const char *s
 		memcpy(kaddr, symname, len);
 		kunmap(page);
 		set_page_dirty(page);
-		unlock_page(page);
 		page_cache_release(page);
 	}
 	dir->i_size += BOGO_DIRENT_SIZE;
@@ -1471,7 +1460,6 @@ static int shmem_readlink(struct dentry *dentry, char *buffer, int buflen)
 		return res;
 	res = vfs_readlink(dentry, buffer, buflen, kmap(page));
 	kunmap(page);
-	unlock_page(page);
 	page_cache_release(page);
 	return res;
 }
@@ -1484,7 +1472,6 @@ static int shmem_follow_link(struct dentry *dentry, struct nameidata *nd)
 		return res;
 	res = vfs_follow_link(nd, kmap(page));
 	kunmap(page);
-	unlock_page(page);
 	page_cache_release(page);
 	return res;
 }
