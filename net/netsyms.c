@@ -625,4 +625,10 @@ EXPORT_SYMBOL(wireless_spy_update);
 
 EXPORT_SYMBOL(linkwatch_fire_event);
 
+/* ethtool.c */
+EXPORT_SYMBOL(ethtool_op_get_link);
+EXPORT_SYMBOL(ethtool_op_get_tx_csum);
+EXPORT_SYMBOL(ethtool_op_get_sg);
+EXPORT_SYMBOL(ethtool_op_set_sg);
+
 #endif  /* CONFIG_NET */
