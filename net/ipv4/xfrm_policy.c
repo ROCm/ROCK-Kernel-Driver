@@ -397,7 +397,7 @@ out:
 struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl)
 {
 	struct xfrm_policy *pol;
-	// Not now :-) u64 now = (unsigned long)xtime.tv_sec;
+	/* Not now :-) u64 now = (unsigned long)xtime.tv_sec; */
 
 	read_lock(&xfrm_policy_lock);
 	for (pol = xfrm_policy_list[dir]; pol; pol = pol->next) {
@@ -410,6 +410,40 @@ struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl)
 	}
 	read_unlock(&xfrm_policy_lock);
 	return pol;
+}
+
+struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi *fl)
+{
+	struct xfrm_policy *pol;
+	/* Not now :-) u64 now = (unsigned long)xtime.tv_sec; */
+
+	read_lock(&xfrm_policy_lock);
+	for (pol = sk->policy[dir]; pol; pol = pol->next) {
+		struct xfrm_selector *sel = &pol->selector;
+
+		if (xfrm4_selector_match(sel, fl) /* XXX && XXX now < pol->validtime */) {
+			atomic_inc(&pol->refcnt);
+			break;
+		}
+	}
+	read_unlock(&xfrm_policy_lock);
+	return pol;
+}
+
+int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
+{
+	struct xfrm_policy *old_pol;
+
+	write_lock_bh(&xfrm_policy_lock);
+	old_pol = sk->policy[dir];
+	sk->policy[dir] = pol;
+	write_unlock_bh(&xfrm_policy_lock);
+
+	if (old_pol) {
+		xfrm_policy_kill(old_pol);
+		xfrm_pol_put(old_pol);
+	}
+	return 0;
 }
 
 /* Resolve list of templates for the flow, given policy. */
@@ -482,12 +516,13 @@ static int xfrm_bundle_ok(struct xfrm_dst *xdst, struct flowi *fl)
  * all the metrics... Shortly, bundle a bundle.
  */
 
-int
+static int
 xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm,
 		   struct flowi *fl, struct dst_entry **dst_p)
 {
 	struct dst_entry *dst, *dst_prev;
-	struct rtable *rt = (struct rtable*)(*dst_p);
+	struct rtable *rt0 = (struct rtable*)(*dst_p);
+	struct rtable *rt = rt0;
 	u32 remote = fl->fl4_dst;
 	u32 local  = fl->fl4_src;
 	int i;
@@ -507,8 +542,11 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm,
 		dst1->xfrm = xfrm[i];
 		if (!dst)
 			dst = dst1;
-		else
+		else {
 			dst_prev->child = dst1;
+			dst1->flags |= DST_NOHASH;
+			dst_clone(dst1);
+		}
 		dst_prev = dst1;
 		if (xfrm[i]->props.mode) {
 			remote = xfrm[i]->id.daddr.xfrm4_addr;
@@ -523,11 +561,11 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm,
 						       .saddr = local }
 					           }
 				         };
-		err = ip_route_output_key(&rt, &fl_tunnel);
+		err = __ip_route_output_key(&rt, &fl_tunnel);
 		if (err)
 			goto error;
-		dst_release(*dst_p);
-		*dst_p = &rt->u.dst;
+	} else {
+		dst_clone(&rt->u.dst);
 	}
 	dst_prev->child = &rt->u.dst;
 	for (dst_prev = dst; dst_prev != &rt->u.dst; dst_prev = dst_prev->child) {
@@ -537,7 +575,7 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm,
 		dst_prev->dev = rt->u.dst.dev;
 		if (rt->u.dst.dev)
 			dev_hold(rt->u.dst.dev);
-		dst_prev->flags		= DST_HOST;
+		dst_prev->flags	       |= DST_HOST;
 		dst_prev->lastuse	= jiffies;
 		dst_prev->header_len	= header_len;
 		memcpy(&dst_prev->metrics, &rt->u.dst.metrics, sizeof(dst_prev->metrics));
@@ -550,13 +588,14 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm,
 		if (rt->peer)
 			atomic_inc(&rt->peer->refcnt);
 		x->u.rt.peer = rt->peer;
+		/* Sheit... I remember I did this right. Apparently,
+		 * it was magically lost, so this code needs audit */
 		x->u.rt.rt_flags = rt->rt_flags;
 		x->u.rt.rt_type = rt->rt_type;
-		x->u.rt.rt_src = rt->rt_src;
-		x->u.rt.rt_src = rt->rt_src;
-		x->u.rt.rt_dst = rt->rt_dst;
+		x->u.rt.rt_src = rt0->rt_src;
+		x->u.rt.rt_dst = rt0->rt_dst;
 		x->u.rt.rt_gateway = rt->rt_gateway;
-		x->u.rt.rt_spec_dst = rt->rt_spec_dst;
+		x->u.rt.rt_spec_dst = rt0->rt_spec_dst;
 		header_len -= x->u.dst.xfrm->props.header_len;
 	}
 	*dst_p = dst;
@@ -583,18 +622,24 @@ int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 	int err;
 	u32 genid;
 
-	/* To accelerate a bit...  */
-	if ((rt->u.dst.flags & DST_NOXFRM) || !xfrm_policy_list[XFRM_POLICY_OUT])
-		return 0;
-
 	fl->oif = rt->u.dst.dev->ifindex;
 	fl->fl4_src = rt->rt_src;
 
 restart:
 	genid = xfrm_policy_genid;
-	policy = flow_lookup(XFRM_POLICY_OUT, fl);
-	if (!policy)
-		return 0;
+	policy = NULL;
+	if (sk && sk->policy[1])
+		policy = xfrm_sk_policy_lookup(sk, XFRM_POLICY_OUT, fl);
+
+	if (!policy) {
+		/* To accelerate a bit...  */
+		if ((rt->u.dst.flags & DST_NOXFRM) || !xfrm_policy_list[XFRM_POLICY_OUT])
+			return 0;
+
+		policy = flow_lookup(XFRM_POLICY_OUT, fl);
+		if (!policy)
+			return 0;
+	}
 
 	switch (policy->action) {
 	case XFRM_POLICY_BLOCK:
@@ -677,14 +722,13 @@ restart:
 			write_unlock_bh(&policy->lock);
 
 			xfrm_pol_put(policy);
-			if (dst) {
-				dst_release(dst);
+			if (dst)
 				dst_free(dst);
-			}
 			goto restart;
 		}
 		dst->next = policy->bundles;
 		policy->bundles = dst;
+		dst_clone(dst);
 		write_unlock_bh(&policy->lock);
 	}
 	*dst_p = dst;
@@ -773,7 +817,7 @@ _decode_session(struct sk_buff *skb, struct flowi *fl)
 	fl->fl4_src = iph->saddr;
 }
 
-int __xfrm_policy_check(int dir, struct sk_buff *skb)
+int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb)
 {
 	struct xfrm_policy *pol;
 	struct flowi fl;
@@ -789,7 +833,12 @@ int __xfrm_policy_check(int dir, struct sk_buff *skb)
 		}
 	}
 
-	pol = flow_lookup(dir, &fl);
+	pol = NULL;
+	if (sk && sk->policy[dir])
+		pol =xfrm_sk_policy_lookup(sk, dir, &fl);
+
+	if (!pol)
+		pol = flow_lookup(dir, &fl);
 
 	if (!pol)
 		return 1;
@@ -925,10 +974,13 @@ static int xfrm4_get_mss(struct dst_entry *dst, u32 mtu)
 		do {
 			struct xfrm_state *x = d->xfrm;
 			if (x) {
-				if (x->type->get_max_size)
+				spin_lock_bh(&x->lock);
+				if (x->km.state == XFRM_STATE_VALID &&
+				    x->type && x->type->get_max_size)
 					m = x->type->get_max_size(d->xfrm, m);
 				else
 					m += x->props.header_len;
+				spin_unlock_bh(&x->lock);
 			}
 		} while ((d = d->child) != NULL);
 

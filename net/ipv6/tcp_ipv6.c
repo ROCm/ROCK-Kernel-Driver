@@ -1638,8 +1638,6 @@ static int tcp_v6_rcv(struct sk_buff *skb)
 		goto no_tcp_socket;
 
 process:
-	if(!ipsec_sk_policy(sk,skb))
-		goto discard_and_relse;
 	if(sk->state == TCP_TIME_WAIT)
 		goto do_time_wait;
 

@@ -286,7 +286,6 @@ EXPORT_SYMBOL(dlci_ioctl_hook);
 EXPORT_SYMBOL(xfrm_policy_alloc);
 EXPORT_SYMBOL(__xfrm_policy_destroy);
 EXPORT_SYMBOL(xfrm_policy_lookup);
-EXPORT_SYMBOL(xfrm_bundle_create);
 EXPORT_SYMBOL(xfrm_lookup);
 EXPORT_SYMBOL(__xfrm_policy_check);
 EXPORT_SYMBOL(__xfrm_route_forward);

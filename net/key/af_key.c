@@ -1080,38 +1080,6 @@ static int pfkey_acquire(struct sock *sk, struct sk_buff *skb, struct sadb_msg *
 }
 
 
-static int pfkey_update(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr, void **ext_hdrs)
-{
-	struct sk_buff *resp_skb;
-	int err;
-
-	if (!ext_hdrs[SADB_EXT_SA-1] ||
-	    !present_and_same_family(ext_hdrs[SADB_EXT_ADDRESS_SRC-1],
-				     ext_hdrs[SADB_EXT_ADDRESS_DST-1]))
-		return -EINVAL;
-
-	if (hdr->sadb_msg_satype == SADB_SATYPE_ESP &&
-	    !ext_hdrs[SADB_EXT_KEY_ENCRYPT-1])
-		return -EINVAL;
-
-	if (hdr->sadb_msg_satype == SADB_SATYPE_AH &&
-	    !ext_hdrs[SADB_EXT_KEY_AUTH-1])
-		return -EINVAL;
-
-	if (!!ext_hdrs[SADB_EXT_LIFETIME_HARD-1] !=
-	    !!ext_hdrs[SADB_EXT_LIFETIME_SOFT-1])
-		return -EINVAL;
-
-	/* XXX Implement XXX */
-	resp_skb = NULL;
-	err = -EOPNOTSUPP;
-
-	if (!err)
-		pfkey_broadcast(resp_skb, GFP_KERNEL, BROADCAST_ONE, sk);
-
-	return err;
-}
-
 static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr, void **ext_hdrs)
 {
 	struct sk_buff *out_skb;
@@ -1125,7 +1093,7 @@ static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr,
 
 	/* XXX there is race condition */
 	x1 = pfkey_xfrm_state_lookup(hdr, ext_hdrs);
-	if (x1 != NULL) {
+	if (x1 && hdr->sadb_msg_type == SADB_ADD) {
 		x->km.state = XFRM_STATE_DEAD;
 		xfrm_state_put(x);
 		xfrm_state_put(x1);
@@ -1133,6 +1101,11 @@ static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr,
 	}
 
 	xfrm_state_insert(x);
+
+	if (x1 && hdr->sadb_msg_type != SADB_ADD) {
+		xfrm_state_delete(x1);
+		xfrm_state_put(x1);
+	}
 
 	out_skb = pfkey_xfrm_state2msg(x, 0, 3);
 	if (IS_ERR(out_skb))
@@ -1166,7 +1139,6 @@ static int pfkey_delete(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 		return -ESRCH;
 
 	xfrm_state_delete(x);
-
 	xfrm_state_put(x);
 
 	pfkey_broadcast(skb_clone(skb, GFP_KERNEL), GFP_KERNEL, 
@@ -1382,7 +1354,7 @@ parse_ipsecrequest(struct xfrm_policy *xp, struct sadb_x_ipsecrequest *rq)
 	struct sockaddr_in *addr;
 
 	if (xp->xfrm_nr >= XFRM_MAX_DEPTH)
-		return -EINVAL;
+		return -ELOOP;
 
 	if (rq->sadb_x_ipsecrequest_mode == 0)
 		return -EINVAL;
@@ -1408,7 +1380,7 @@ parse_ipsecrequests(struct xfrm_policy *xp, struct sadb_x_policy *pol)
 	int len = pol->sadb_x_policy_len*8 - sizeof(struct sadb_x_policy);
 	struct sadb_x_ipsecrequest *rq = (void*)(pol+1);
 
-	while (len > sizeof(struct sadb_x_ipsecrequest)) {
+	while (len >= sizeof(struct sadb_x_ipsecrequest)) {
 		if ((err = parse_ipsecrequest(xp, rq)) < 0)
 			return err;
 		len -= rq->sadb_x_ipsecrequest_len;
@@ -1647,7 +1619,7 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	pfkey_broadcast(out_skb, GFP_ATOMIC, BROADCAST_ALL, sk);
 	return 0;
 
-	out:
+out:
 	kfree(xp);
 	return err;
 }
@@ -1823,7 +1795,7 @@ typedef int (*pfkey_handler)(struct sock *sk, struct sk_buff *skb,
 static pfkey_handler pfkey_funcs[SADB_MAX + 1] = {
 	[SADB_RESERVED]		= pfkey_reserved,
 	[SADB_GETSPI]		= pfkey_getspi,
-	[SADB_UPDATE]		= pfkey_update,
+	[SADB_UPDATE]		= pfkey_add,
 	[SADB_ADD]		= pfkey_add,
 	[SADB_DELETE]		= pfkey_delete,
 	[SADB_GET]		= pfkey_get,
@@ -2084,6 +2056,58 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 	return 0;
 }
 
+static struct xfrm_policy *pfkey_compile_policy(int opt, u8 *data, int len, int *dir)
+{
+	struct xfrm_policy *xp;
+	struct sadb_x_policy *pol = (struct sadb_x_policy*)data;
+
+	if (opt != IP_IPSEC_POLICY) {
+		*dir = -EOPNOTSUPP;
+		return NULL;
+	}
+
+	*dir = -EINVAL;
+
+	if (len < sizeof(struct sadb_x_policy) ||
+	    pol->sadb_x_policy_len*8 > len ||
+	    pol->sadb_x_policy_type > IPSEC_POLICY_BYPASS ||
+	    (!pol->sadb_x_policy_dir || pol->sadb_x_policy_dir > IPSEC_DIR_OUTBOUND))
+		return NULL;
+
+	xp = xfrm_policy_alloc();
+	if (xp == NULL) {
+		*dir = -ENOBUFS;
+		return NULL;
+	}
+
+	xp->index = pol->sadb_x_policy_id;
+	xp->action = (pol->sadb_x_policy_type == IPSEC_POLICY_DISCARD ?
+		      XFRM_POLICY_BLOCK : XFRM_POLICY_ALLOW);
+
+	xp->curlft.add_time = (unsigned long)xtime.tv_sec;
+	xp->curlft.use_time = (unsigned long)xtime.tv_sec;
+	xp->lft.soft_byte_limit = -1;
+	xp->lft.hard_byte_limit = -1;
+	xp->lft.soft_packet_limit = -1;
+	xp->lft.hard_packet_limit = -1;
+	xp->lft.soft_add_expires_seconds = -1;
+	xp->lft.hard_add_expires_seconds = -1;
+	xp->lft.soft_use_expires_seconds = -1;
+	xp->lft.hard_use_expires_seconds = -1;
+
+	xp->xfrm_nr = 0;
+	if (pol->sadb_x_policy_type == IPSEC_POLICY_IPSEC &&
+	    (*dir = parse_ipsecrequests(xp, pol)) < 0)
+		goto out;
+
+	*dir = pol->sadb_x_policy_dir-1;
+	return xp;
+
+out:
+	kfree(xp);
+	return NULL;
+}
+
 static int pfkey_sendmsg(struct kiocb *kiocb,
 			 struct socket *sock, struct msghdr *msg, int len,
 			 struct scm_cookie *scm)
@@ -2246,7 +2270,8 @@ static struct xfrm_mgr pfkeyv2_mgr =
 {
 	.id		= "pfkeyv2",
 	.notify		= pfkey_send_notify,
-	.acquire	= pfkey_send_acquire
+	.acquire	= pfkey_send_acquire,
+	.compile_policy	= pfkey_compile_policy,
 };
 
 static void __exit ipsec_pfkey_exit(void)

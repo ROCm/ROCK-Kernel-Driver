@@ -508,6 +508,43 @@ int km_query(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *pol)
 	return err;
 }
 
+int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen)
+{
+	int err;
+	u8 *data;
+	struct xfrm_mgr *km;
+	struct xfrm_policy *pol = NULL;
+
+	if (optlen <= 0 || optlen > PAGE_SIZE)
+		return -EMSGSIZE;
+
+	data = kmalloc(optlen, GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
+
+	err = -EFAULT;
+	if (copy_from_user(data, optval, optlen))
+		goto out;
+
+	err = -EINVAL;
+	read_lock(&xfrm_km_lock);
+	list_for_each_entry(km, &xfrm_km_list, list) {
+		pol = km->compile_policy(optname, data, optlen, &err);
+		if (err >= 0)
+			break;
+	}
+	read_unlock(&xfrm_km_lock);
+
+	if (err >= 0) {
+		xfrm_sk_policy_insert(sk, err, pol);
+		err = 0;
+	}
+
+out:
+	kfree(data);
+	return err;
+}
+
 int xfrm_register_km(struct xfrm_mgr *km)
 {
 	write_lock_bh(&xfrm_km_lock);

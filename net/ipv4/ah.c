@@ -176,12 +176,13 @@ int ah_output(struct sk_buff *skb)
 	iph = skb->nh.iph;
 	if (x->props.mode) {
 		top_iph = (struct iphdr*)skb_push(skb, x->props.header_len);
-		top_iph->ihl = 4;
-		top_iph->version = 5;
+		top_iph->ihl = 5;
+		top_iph->version = 4;
 		top_iph->tos = 0;
 		top_iph->tot_len = htons(skb->len);
-		top_iph->id = inet_getid(((struct rtable*)dst)->peer, 0);
 		top_iph->frag_off = 0;
+		if (!(iph->frag_off&htons(IP_DF)))
+			__ip_select_ident(top_iph, dst, 0);
 		top_iph->ttl = 0;
 		top_iph->protocol = IPPROTO_AH;
 		top_iph->check = 0;
@@ -379,6 +380,7 @@ static struct xfrm_type ah_type =
 static struct inet_protocol ah4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	ah4_err,
+	.no_policy	=	1,
 };
 
 int __init ah4_init(void)

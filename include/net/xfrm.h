@@ -312,6 +312,7 @@ struct xfrm_mgr
 	char			*id;
 	int			(*notify)(struct xfrm_state *x, int event);
 	int			(*acquire)(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *xp, int dir);
+	struct xfrm_policy	*(*compile_policy)(int opt, u8 *data, int len, int *dir);
 };
 
 extern int xfrm_register_km(struct xfrm_mgr *km);
@@ -397,13 +398,16 @@ secpath_put(struct sec_path *sp)
 		__secpath_destroy(sp);
 }
 
-extern int __xfrm_policy_check(int dir, struct sk_buff *skb);
+extern int __xfrm_policy_check(struct sock *, int dir, struct sk_buff *skb);
 
-static inline int xfrm_policy_check(int dir, struct sk_buff *skb)
+static inline int xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb)
 {
+	if (sk && sk->policy[XFRM_POLICY_IN])
+		return __xfrm_policy_check(sk, dir, skb);
+		
 	return	!xfrm_policy_list[dir] ||
 		(skb->dst->flags & DST_NOPOLICY) ||
-		__xfrm_policy_check(dir, skb);
+		__xfrm_policy_check(sk, dir, skb);
 }
 
 extern int __xfrm_route_forward(struct sk_buff *skb);
@@ -431,6 +435,7 @@ extern int xfrm_replay_check(struct xfrm_state *x, u32 seq);
 extern void xfrm_replay_advance(struct xfrm_state *x, u32 seq);
 extern int xfrm_check_selectors(struct xfrm_state **x, int n, struct flowi *fl);
 extern int xfrm4_rcv(struct sk_buff *skb);
+extern int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen);
 
 struct xfrm_policy *xfrm_policy_alloc(void);
 extern int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*), void *);
@@ -439,12 +444,12 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl);
 struct xfrm_policy *xfrm_policy_delete(int dir, struct xfrm_selector *sel);
 struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete);
 void xfrm_policy_flush(void);
-int xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm,
-		   struct flowi *fl, struct dst_entry **dst_p);
 void xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi);
 struct xfrm_state * xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr);
 extern void xfrm_policy_flush(void);
 extern void xfrm_policy_kill(struct xfrm_policy *);
+extern int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol);
+extern struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi *fl);
 
 extern wait_queue_head_t *km_waitq;
 extern void km_warn_expired(struct xfrm_state *x);

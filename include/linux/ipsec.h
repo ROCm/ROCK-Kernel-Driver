@@ -43,15 +43,4 @@ enum {
 
 #define IPSEC_REPLAYWSIZE  32
 
-#ifdef __KERNEL__
-struct sock;
-struct sk_buff;
-
-static __inline__ int ipsec_sk_policy(struct sock *sk, struct sk_buff *skb)
-{
-	return 1;
-}
-#endif
-
-
 #endif	/* _LINUX_IPSEC_H */

@@ -187,33 +187,13 @@ esp_hmac_digest(struct esp_data *esp, struct sk_buff *skb, int offset,
 		int len, u8 *auth_data)
 {
 	struct crypto_tfm *tfm = esp->auth.tfm;
-	int i;
-	char tmp_digest[crypto_tfm_alg_digestsize(tfm)];
-	char pad[crypto_tfm_alg_blocksize(tfm)];
+	char digest[crypto_tfm_alg_digestsize(tfm)];
 
 	memset(auth_data, 0, esp->auth.authlen);
-
-	memset(pad, 0, sizeof(pad));
-	memcpy(pad, esp->auth.key, esp->auth.key_len);
-	for (i = 0; i < crypto_tfm_alg_blocksize(tfm); i++)
-		pad[i] ^= 0x36;
-
-	crypto_digest_init(tfm);
-	tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, pad, sizeof(pad));
+ 	crypto_hmac_init(tfm, esp->auth.key, &esp->auth.key_len);
 	skb_digest_walk(skb, tfm, offset, len);
-	tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, skb->data+offset, len);
-	crypto_digest_final(tfm, tmp_digest);
-
-	memset(pad, 0, sizeof(pad));
-	memcpy(pad, esp->auth.key, esp->auth.key_len);
-
-	for (i = 0; i < crypto_tfm_alg_blocksize(tfm); i++)
-		pad[i] ^= 0x5c;
-
-	crypto_digest_init(tfm);
-	tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, pad, sizeof(pad));
-	tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, tmp_digest, crypto_tfm_alg_digestsize(tfm));
-	crypto_digest_final(tfm, auth_data);
+	crypto_hmac_final(tfm, esp->auth.key, &esp->auth.key_len, digest);
+	memcpy(auth_data, digest, crypto_tfm_alg_digestsize(tfm));
 }
 
 /* Check that skb data bits are writable. If they are not, copy data
@@ -390,12 +370,13 @@ int esp_output(struct sk_buff *skb)
 		top_iph = (struct iphdr*)skb_push(skb, x->props.header_len);
 		esph = (struct ip_esp_hdr*)(top_iph+1);
 		*(u8*)(trailer->tail - 1) = IPPROTO_IP;
-		top_iph->ihl = 4;
-		top_iph->version = 5;
+		top_iph->ihl = 5;
+		top_iph->version = 4;
 		top_iph->tos = iph->tos;	/* DS disclosed */
 		top_iph->tot_len = htons(skb->len + esp->auth.authlen);
-		top_iph->id = inet_getid(((struct rtable*)dst)->peer, 0);
 		top_iph->frag_off = iph->frag_off&htons(IP_DF);
+		if (!(top_iph->frag_off))
+			ip_select_ident(top_iph, dst, 0);
 		top_iph->ttl = iph->ttl;	/* TTL disclosed */
 		top_iph->protocol = IPPROTO_ESP;
 		top_iph->check = 0;
@@ -668,6 +649,7 @@ static struct xfrm_type esp_type =
 static struct inet_protocol esp4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	esp4_err,
+	.no_policy	=	1,
 };
 
 int __init esp4_init(void)

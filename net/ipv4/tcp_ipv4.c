@@ -64,11 +64,11 @@
 #include <net/tcp.h>
 #include <net/ipv6.h>
 #include <net/inet_common.h>
+#include <net/xfrm.h>
 
 #include <linux/inet.h>
 #include <linux/ipv6.h>
 #include <linux/stddef.h>
-#include <linux/ipsec.h>
 
 extern int sysctl_ip_dynaddr;
 extern int sysctl_ip_default_ttl;
@@ -1299,7 +1299,7 @@ static struct dst_entry* tcp_v4_route_req(struct sock *sk,
 				       { .sport = inet_sk(sk)->sport,
 					 .dport = req->rmt_port } } };
 
-	if (ip_route_output_key(&rt, &fl)) {
+	if (ip_route_output_flow(&rt, &fl, sk, 0)) {
 		IP_INC_STATS_BH(IpOutNoRoutes);
 		return NULL;
 	}
@@ -1796,11 +1796,11 @@ int tcp_v4_rcv(struct sk_buff *skb)
 		goto no_tcp_socket;
 
 process:
-	if (!ipsec_sk_policy(sk, skb))
-		goto discard_and_relse;
-
 	if (sk->state == TCP_TIME_WAIT)
 		goto do_time_wait;
+
+	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb))
+		goto discard_and_relse;
 
 	skb->dev = NULL;
 
@@ -1818,6 +1818,9 @@ process:
 	return ret;
 
 no_tcp_socket:
+	if (!xfrm_policy_check(NULL, XFRM_POLICY_IN, skb))
+		goto discard_it;
+
 	if (skb->len < (th->doff << 2) || tcp_checksum_complete(skb)) {
 bad_packet:
 		TCP_INC_STATS_BH(TcpInErrs);
@@ -1835,6 +1838,9 @@ discard_and_relse:
 	goto discard_it;
 
 do_time_wait:
+	if (!xfrm_policy_check(NULL, XFRM_POLICY_IN, skb))
+		goto discard_and_relse;
+
 	if (skb->len < (th->doff << 2) || tcp_checksum_complete(skb)) {
 		TCP_INC_STATS_BH(TcpInErrs);
 		goto discard_and_relse;
@@ -1950,7 +1956,7 @@ int tcp_v4_rebuild_header(struct sock *sk)
 					       { .sport = inet->sport,
 						 .dport = inet->dport } } };
 						
-		err = ip_route_output_key(&rt, &fl);
+		err = ip_route_output_flow(&rt, &fl, sk, 0);
 	}
 	if (!err) {
 		__sk_dst_set(sk, &rt->u.dst);
