@@ -49,6 +49,9 @@
 static void calculate_ofrag(struct woinst *);
 static void calculate_ifrag(struct wiinst *);
 
+static void emu10k1_waveout_bh(unsigned long refdata);
+static void emu10k1_wavein_bh(unsigned long refdata);
+
 /* Audio file operations */
 static ssize_t emu10k1_audio_read(struct file *file, char __user *buffer, size_t count, loff_t * ppos)
 {
@@ -1032,7 +1035,7 @@ static struct page *emu10k1_mm_nopage (struct vm_area_struct * vma, unsigned lon
 	return dmapage;
 }
 
-struct vm_operations_struct emu10k1_mm_ops = {
+static struct vm_operations_struct emu10k1_mm_ops = {
 	.nopage         = emu10k1_mm_nopage,
 };
 
@@ -1506,7 +1509,7 @@ static void calculate_ifrag(struct wiinst *wiinst)
 	return;
 }
 
-void emu10k1_wavein_bh(unsigned long refdata)
+static void emu10k1_wavein_bh(unsigned long refdata)
 {
 	struct emu10k1_wavedevice *wave_dev = (struct emu10k1_wavedevice *) refdata;
 	struct wiinst *wiinst = wave_dev->wiinst;
@@ -1537,7 +1540,7 @@ void emu10k1_wavein_bh(unsigned long refdata)
 	return;
 }
 
-void emu10k1_waveout_bh(unsigned long refdata)
+static void emu10k1_waveout_bh(unsigned long refdata)
 {
 	struct emu10k1_wavedevice *wave_dev = (struct emu10k1_wavedevice *) refdata;
 	struct woinst *woinst = wave_dev->woinst;

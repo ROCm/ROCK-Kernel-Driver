@@ -309,8 +309,8 @@ static void emu10k1_unregister_devices(struct emu10k1_card *card)
 	unregister_sound_dsp(card->audio_dev);
 }
 
-int emu10k1_info_proc (char *page, char **start, off_t off,
-		    int count, int *eof, void *data)
+static int emu10k1_info_proc (char *page, char **start, off_t off,
+			      int count, int *eof, void *data)
 {
 	struct emu10k1_card *card = data;
 	int len = 0;

@@ -649,7 +649,7 @@ static struct mixer_operations pss_mixer_operations =
 	.ioctl	= pss_mixer_ioctl
 };
 
-void disable_all_emulations(void)
+static void disable_all_emulations(void)
 {
 	outw(0x0000, REG(CONF_PSS));	/* 0x0400 enables joystick */
 	outw(0x0000, REG(CONF_WSS));
@@ -658,7 +658,7 @@ void disable_all_emulations(void)
 	outw(0x0000, REG(CONF_CDROM));
 }
 
-void configure_nonsound_components(void)
+static void configure_nonsound_components(void)
 {
 	/* Configure Joystick port */
 

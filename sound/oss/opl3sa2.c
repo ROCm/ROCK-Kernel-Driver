@@ -177,9 +177,6 @@ static int __initdata loopback	= -1;
 static int __initdata isapnp = 1;
 static int __initdata multiple = 1;
 
-/* PnP devices */
-struct pnp_dev* opl3sa2_dev[OPL3SA2_CARDS_MAX];
-
 /* Whether said devices have been activated */
 static int opl3sa2_activated[OPL3SA2_CARDS_MAX];
 #else
@@ -775,7 +772,7 @@ static void __exit unload_opl3sa2(struct address_info* hw_config, int card)
 }
 
 #ifdef CONFIG_PNP
-struct pnp_device_id pnp_opl3sa2_list[] = {
+static struct pnp_device_id pnp_opl3sa2_list[] = {
 	{.id = "YMH0021", .driver_data = 0},
 	{.id = ""}
 };

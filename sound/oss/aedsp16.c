@@ -438,7 +438,7 @@ struct	d_hcfg {
 	int cdrombase;
 };
 
-struct d_hcfg decoded_hcfg __initdata = {0, };
+static struct d_hcfg decoded_hcfg __initdata = {0, };
 
 #endif /* CONFIG_SC6600 */
 
@@ -610,7 +610,7 @@ void __init aedsp16_pinfo(void) {
 }
 #endif
 
-void __init aedsp16_hard_decode(void) {
+static void __init aedsp16_hard_decode(void) {
 
 	DBG((" aedsp16_hard_decode: 0x%x, 0x%x\n", hard_cfg[0], hard_cfg[1]));
 
@@ -654,7 +654,7 @@ void __init aedsp16_hard_decode(void) {
 	DBG(("success.\n"));
 }
 
-void __init aedsp16_hard_encode(void) {
+static void __init aedsp16_hard_encode(void) {
 
 	DBG((" aedsp16_hard_encode: 0x%x, 0x%x\n", hard_cfg[0], hard_cfg[1]));
 
@@ -1252,7 +1252,7 @@ static void __init uninit_aedsp16_mpu(void)
 	DBG(("done.\n"));
 }
 
-int __init init_aedsp16(void)
+static int __init init_aedsp16(void)
 {
 	int initialized = FALSE;
 
@@ -1294,7 +1294,7 @@ int __init init_aedsp16(void)
 	return initialized;
 }
 
-void __init uninit_aedsp16(void)
+static void __init uninit_aedsp16(void)
 {
 	if (ae_config.mss_base != -1)
 		uninit_aedsp16_mss();

@@ -157,14 +157,14 @@ int wf_raw;     /* we normally check for "raw state" to firmware
 		   board and load the firmware anyway.
 		*/
 		   
-int fx_raw = 1; /* if this is zero, we'll leave the FX processor in
-		   whatever state it is when the driver is loaded.
-		   The default is to download the microprogram and
-		   associated coefficients to set it up for "default"
-		   operation, whatever that means.
-		*/
+static int fx_raw = 1; /* if this is zero, we'll leave the FX processor in
+		          whatever state it is when the driver is loaded.
+		          The default is to download the microprogram and
+		          associated coefficients to set it up for "default"
+		          operation, whatever that means.
+		       */
 
-int debug_default;      /* you can set this to control debugging
+static int debug_default;  /* you can set this to control debugging
 			      during driver loading. it takes any combination
 			      of the WF_DEBUG_* flags defined in
 			      wavefront.h
@@ -172,33 +172,35 @@ int debug_default;      /* you can set this to control debugging
 
 /* XXX this needs to be made firmware and hardware version dependent */
 
-char *ospath = "/etc/sound/wavefront.os"; /* where to find a processed
-					     version of the WaveFront OS
-					  */
+static char *ospath = "/etc/sound/wavefront.os"; /* where to find a processed
+					            version of the WaveFront OS
+					          */
 
-int wait_polls = 2000;	/* This is a number of tries we poll the status register
-			   before resorting to sleeping. WaveFront being an ISA
-			   card each poll takes about 1.2us. So before going to
-			   sleep we wait up to 2.4ms in a loop.
-			*/
+static int wait_polls = 2000; /* This is a number of tries we poll the
+				 status register before resorting to sleeping.
+				 WaveFront being an ISA card each poll takes
+				 about 1.2us. So before going to
+			         sleep we wait up to 2.4ms in a loop.
+			     */
 
-int sleep_length = HZ/100; /* This says how long we're going to sleep between polls.
-			      10ms sounds reasonable for fast response.
-			   */
+static int sleep_length = HZ/100; /* This says how long we're going to
+				     sleep between polls.
+			             10ms sounds reasonable for fast response.
+			          */
 
-int sleep_tries = 50;       /* Wait for status 0.5 seconds total. */
+static int sleep_tries = 50;       /* Wait for status 0.5 seconds total. */
 
-int reset_time = 2;        /* hundreths of a second we wait after a HW reset for
+static int reset_time = 2; /* hundreths of a second we wait after a HW reset for
 			      the expected interrupt.
 			   */
 
-int ramcheck_time = 20;    /* time in seconds to wait while ROM code
-			      checks on-board RAM.
-			   */
+static int ramcheck_time = 20;    /* time in seconds to wait while ROM code
+			             checks on-board RAM.
+			          */
 
-int osrun_time = 10;       /* time in seconds we wait for the OS to
-			      start running.
-			   */
+static int osrun_time = 10;  /* time in seconds we wait for the OS to
+			        start running.
+			     */
 
 module_param(wf_raw, int, 0);
 module_param(fx_raw, int, 0);
@@ -2036,7 +2038,7 @@ wavefront_oss_ioctl (int devno, unsigned int cmd, void __user * arg)
 	}
 }
 
-int
+static int
 wavefront_oss_load_patch (int devno, int format, const char __user *addr,
 			  int offs, int count, int pmgr_flag)
 {
@@ -2165,7 +2167,7 @@ wavefrontintr(int irq, void *dev_id, struct pt_regs *dummy)
 7 Unused
 */
 
-int
+static int
 wavefront_interrupt_bits (int irq)
 
 {
@@ -2193,7 +2195,7 @@ wavefront_interrupt_bits (int irq)
 	return bits;
 }
 
-void
+static void
 wavefront_should_cause_interrupt (int val, int port, int timeout)
 
 {
@@ -2894,16 +2896,6 @@ int __init detect_wffx (void)
 
 	return 0;
 }	
-
-int __init attach_wffx (void)
-{
-	if ((dev.fx_mididev = sound_alloc_mididev ()) < 0) {
-		printk (KERN_WARNING LOGNAME "cannot install FX Midi driver\n");
-		return -1;
-	}
-
-	return 0;
-}
 
 void
 wffx_mute (int onoff)

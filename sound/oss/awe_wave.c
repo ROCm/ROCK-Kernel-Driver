@@ -207,8 +207,8 @@ static awe_chan_info channels[AWE_MAX_CHANNELS];
 #define AWE_DEFAULT_MEM_SIZE	-1	/* autodetect */
 #endif
 
-int io = AWE_DEFAULT_BASE_ADDR; /* Emu8000 base address */
-int memsize = AWE_DEFAULT_MEM_SIZE; /* memory size in Kbytes */
+static int io = AWE_DEFAULT_BASE_ADDR; /* Emu8000 base address */
+static int memsize = AWE_DEFAULT_MEM_SIZE; /* memory size in Kbytes */
 #ifdef CONFIG_PNP
 static int isapnp = -1;
 #else
@@ -6113,12 +6113,12 @@ awe_detect(void)
 	return 0;
 }
 
-int __init attach_awe(void)
+static int __init attach_awe(void)
 {
 	return awe_detect() ? 0 : -ENODEV;
 }
 
-void __exit unload_awe(void)
+static void __exit unload_awe(void)
 {
 	pnp_unregister_driver(&awe_pnp_driver);
 	awe_dettach_device();

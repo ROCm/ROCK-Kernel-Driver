@@ -157,7 +157,7 @@ static int samplerates[9] = {
  * attempted.
  */
 
-int
+static int
 nm256_setInfo (int dev, struct nm256_info *card)
 {
     int x;
@@ -1673,7 +1673,7 @@ MODULE_DEVICE_TABLE(pci, nm256_pci_tbl);
 MODULE_LICENSE("GPL");
 
 
-struct pci_driver nm256_pci_driver = {
+static struct pci_driver nm256_pci_driver = {
 	.name		= "nm256_audio",
 	.id_table	= nm256_pci_tbl,
 	.probe		= nm256_probe,

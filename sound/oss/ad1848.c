@@ -123,9 +123,9 @@ ad1848_port_info;
 static struct address_info cfg;
 static int nr_ad1848_devs;
 
-int deskpro_xl;
-int deskpro_m;
-int soundpro;
+static int deskpro_xl;
+static int deskpro_m;
+static int soundpro;
 
 static volatile signed char irq2dev[17] = {
 	-1, -1, -1, -1, -1, -1, -1, -1,
@@ -2922,7 +2922,7 @@ MODULE_PARM_DESC(isapnp,	"When set to 0, Plug & Play support will be disabled");
 MODULE_PARM_DESC(isapnpjump,	"Jumps to a specific slot in the driver's PnP table. Use the source, Luke.");
 MODULE_PARM_DESC(reverse,	"When set to 1, will reverse ISAPnP search order");
 
-struct pnp_dev	*ad1848_dev  = NULL;
+static struct pnp_dev	*ad1848_dev  = NULL;
 
 /* Please add new entries at the end of the table */
 static struct {

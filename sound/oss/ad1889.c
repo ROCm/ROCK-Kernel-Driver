@@ -294,8 +294,8 @@ static inline void ad1889_trigger_playback(ad1889_dev_t *dev)
 	ad1889_start_wav(&dev->state[AD_WAV_STATE]);
 }
 
-int ad1889_read_proc (char *page, char **start, off_t off,
-		      int count, int *eof, void *data)
+static int ad1889_read_proc (char *page, char **start, off_t off,
+			     int count, int *eof, void *data)
 {
 	char *out = page;
 	int len, i;

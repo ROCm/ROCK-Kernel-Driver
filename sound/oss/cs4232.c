@@ -54,7 +54,6 @@
 
 #include "sound_config.h"
 
-#include "cs4232.h"
 #include "ad1848.h"
 #include "mpu401.h"
 
@@ -78,7 +77,7 @@ static int mpu_base, mpu_irq;
 static int synth_base, synth_irq;
 static int mpu_detected;
 
-int probe_cs4232_mpu(struct address_info *hw_config)
+static int probe_cs4232_mpu(struct address_info *hw_config)
 {
 	/*
 	 *	Just write down the config values.

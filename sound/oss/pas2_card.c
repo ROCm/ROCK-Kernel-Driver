@@ -240,8 +240,6 @@ static int __init config_pas_hw(struct address_info *hw_config)
 	mix_write(0x80 | 5, 0x078B);
 	mix_write(5, 0x078B);
 
-#if !defined(DISABLE_SB_EMULATION)
-
 	{
 		struct address_info *sb_config;
 
@@ -279,9 +277,6 @@ static int __init config_pas_hw(struct address_info *hw_config)
 		else
 			pas_write(0x00, 0xF788);
 	}
-#else
-	pas_write(0x00, 0xF788);
-#endif
 
 	if (!ok)
 		printk(KERN_WARNING "PAS16: Driver not enabled\n");
@@ -349,11 +344,6 @@ static void __init attach_pas_card(struct address_info *hw_config)
 		if (config_pas_hw(hw_config))
 		{
 			pas_pcm_init(hw_config);
-
-#if !defined(MODULE) && !defined(DISABLE_SB_EMULATION)
-			sb_dsp_disable_midi(pas_sb_base);	/* No MIDI capability */
-#endif
-
 			pas_midi_init();
 			pas_init_mixer();
 		}

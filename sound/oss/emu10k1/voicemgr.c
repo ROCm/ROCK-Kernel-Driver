@@ -39,7 +39,8 @@
 #define PITCH_67882 0x00005a82
 #define PITCH_57081 0x00004c1c
 
-u32 emu10k1_select_interprom(struct emu10k1_card *card, struct emu_voice *voice)
+static u32 emu10k1_select_interprom(struct emu10k1_card *card,
+				    struct emu_voice *voice)
 {
 	if(voice->pitch_target==PITCH_48000)
 		return CCCA_INTERPROM_0;
