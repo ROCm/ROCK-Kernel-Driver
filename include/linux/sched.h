@@ -499,7 +499,8 @@ extern void cpu_attach_domain(struct sched_domain *sd, int cpu);
 	.cache_hot_time		= 0,			\
 	.cache_nice_tries	= 0,			\
 	.per_cpu_gain		= 25,			\
-	.flags			= SD_BALANCE_NEWIDLE	\
+	.flags			= SD_LOAD_BALANCE	\
+				| SD_BALANCE_NEWIDLE	\
 				| SD_BALANCE_EXEC	\
 				| SD_WAKE_AFFINE	\
 				| SD_WAKE_IDLE		\
@@ -522,7 +523,8 @@ extern void cpu_attach_domain(struct sched_domain *sd, int cpu);
 	.cache_hot_time		= (5*1000/2),		\
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
-	.flags			= SD_BALANCE_NEWIDLE	\
+	.flags			= SD_LOAD_BALANCE	\
+				| SD_BALANCE_NEWIDLE	\
 				| SD_BALANCE_EXEC	\
 				| SD_WAKE_AFFINE	\
 				| SD_WAKE_BALANCE,	\
@@ -543,7 +545,8 @@ extern void cpu_attach_domain(struct sched_domain *sd, int cpu);
 	.cache_hot_time		= (10*1000),		\
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
-	.flags			= SD_BALANCE_EXEC	\
+	.flags			= SD_LOAD_BALANCE	\
+				| SD_BALANCE_EXEC	\
 				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
