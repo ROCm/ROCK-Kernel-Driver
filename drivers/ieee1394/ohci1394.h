@@ -149,8 +149,6 @@ struct ohci1394_iso_tasklet {
 };
 
 struct ti_ohci {
-        int id; /* sequential card number */
-
         struct pci_dev *dev;
 
 	enum { 
