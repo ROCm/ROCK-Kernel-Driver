@@ -1216,7 +1216,7 @@ static int __init read_suspend_image(void)
 }
 
 /**
- *	pmdisk_read - Read saved image from swap.
+ *	swsusp_read - Read saved image from swap.
  */
 
 int __init swsusp_read(void)
@@ -1240,6 +1240,6 @@ int __init swsusp_read(void)
 	if (!error)
 		pr_debug("Reading resume file was successful\n");
 	else
-		pr_debug("pmdisk: Error %d resuming\n", error);
+		pr_debug("swsusp: Error %d resuming\n", error);
 	return error;
 }
