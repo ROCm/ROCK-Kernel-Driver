@@ -533,6 +533,8 @@ static void dummy_perf(struct pt_regs *regs)
 
 void (*perf_irq)(struct pt_regs *) = dummy_perf;
 
+EXPORT_SYMBOL(perf_irq);
+
 void
 PerformanceMonitorException(struct pt_regs *regs)
 {

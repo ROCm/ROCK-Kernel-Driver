@@ -750,6 +750,8 @@ out:
 	return ret;
 }
 
+EXPORT_SYMBOL(smp_call_function);
+
 void smp_call_function_interrupt(void)
 {
 	void (*func) (void *info);

@@ -37,6 +37,8 @@ struct rtas_t rtas = {
 	.lock = SPIN_LOCK_UNLOCKED
 };
 
+EXPORT_SYMBOL(rtas);
+
 char rtas_err_buf[RTAS_ERROR_LOG_MAX];
 
 spinlock_t rtas_data_buf_lock = SPIN_LOCK_UNLOCKED;
