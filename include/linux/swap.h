@@ -131,6 +131,7 @@ extern struct page * read_swap_cache_async(swp_entry_t);
 extern void oom_kill(void);
 
 /* linux/mm/swapfile.c */
+extern int total_swap_pages;
 extern unsigned int nr_swapfiles;
 extern struct swap_info_struct swap_info[];
 extern int is_swap_partition(kdev_t);

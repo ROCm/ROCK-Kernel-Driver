@@ -1101,6 +1101,10 @@ void swapin_readahead(swp_entry_t entry)
 	return;
 }
 
+/* Swap 80% full? Release the pages as they are paged in.. */
+#define vm_swap_full() \
+	(swapper_space.nrpages*5 > total_swap_pages*4)
+
 /*
  * We hold the mm semaphore and the page_table_lock on entry and exit.
  */
@@ -1158,10 +1162,12 @@ static int do_swap_page(struct mm_struct * mm,
 	swap_free(entry);
 	mark_page_accessed(page);
 	if (exclusive_swap_page(page)) {
-		if (vma->vm_flags & VM_WRITE)
-			pte = pte_mkwrite(pte);
-		pte = pte_mkdirty(pte);
-		delete_from_swap_cache(page);
+		if (write_access || vm_swap_full()) {
+			pte = pte_mkdirty(pte);
+			if (vma->vm_flags & VM_WRITE)
+				pte = pte_mkwrite(pte);
+			delete_from_swap_cache(page);
+		}
 	}
 	UnlockPage(page);
 

@@ -22,12 +22,58 @@
 
 #include <asm/uaccess.h>
 
+#define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
+
+static inline unsigned int blksize_bits(unsigned int size)
+{
+	unsigned int bits = 8;
+	do {
+		bits++;
+		size >>= 1;
+	} while (size > 256);
+	return bits;
+}
+
+static inline unsigned int block_size(kdev_t dev)
+{
+	int retval = BLOCK_SIZE;
+	int major = MAJOR(dev);
+
+	if (blksize_size[major]) {
+		int minor = MINOR(dev);
+		if (blksize_size[major][minor])
+			retval = blksize_size[major][minor];
+	}
+	return retval;
+}
+
+static unsigned int max_block(kdev_t dev)
+{
+	unsigned int retval = ~0U;
+	int major = MAJOR(dev);
+
+	if (blk_size[major]) {
+		int minor = MINOR(dev);
+		unsigned int blocks = blk_size[major][minor];
+		if (blocks) {
+			unsigned int size = block_size(dev);
+			unsigned int sizebits = blksize_bits(size);
+			blocks += (size-1) >> BLOCK_SIZE_BITS;
+			retval = blocks << (BLOCK_SIZE_BITS - sizebits);
+			if (sizebits > BLOCK_SIZE_BITS)
+				retval = blocks >> (sizebits - BLOCK_SIZE_BITS);
+		}
+	}
+	return retval;
+}
+
+
 static inline int blkdev_get_block(struct inode * inode, long iblock, struct buffer_head * bh_result)
 {
 	int err;
 
 	err = -EIO;
-	if (iblock >= buffered_blk_size(inode->i_rdev) >> (BUFFERED_BLOCKSIZE_BITS - BLOCK_SIZE_BITS))
+	if (iblock >= max_block(inode->i_rdev))
 		goto out;
 
 	bh_result->b_blocknr = iblock;
@@ -38,47 +84,23 @@ static inline int blkdev_get_block(struct inode * inode, long iblock, struct buf
 	return err;
 }
 
-static int blkdev_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize)
-{
-	int i, nr_blocks, retval, dev = inode->i_rdev;
-	unsigned long * blocks = iobuf->blocks;
-
-	if (blocksize != BUFFERED_BLOCKSIZE)
-		BUG();
-
-	nr_blocks = iobuf->length >> BUFFERED_BLOCKSIZE_BITS;
-	/* build the blocklist */
-	for (i = 0; i < nr_blocks; i++, blocknr++) {
-		struct buffer_head bh;
-
-		retval = blkdev_get_block(inode, blocknr, &bh);
-		if (retval)
-			goto out;
-
-		blocks[i] = bh.b_blocknr;
-	}
-
-	retval = brw_kiovec(rw, 1, &iobuf, dev, iobuf->blocks, blocksize);
-
- out:
-	return retval;
-}
-
 static int blkdev_writepage(struct page * page)
 {
 	int err, i;
+	unsigned int blocksize;
 	unsigned long block;
 	struct buffer_head *bh, *head;
 	struct inode *inode = page->mapping->host;
 
 	if (!PageLocked(page))
 		BUG();
+	blocksize = block_size(inode->i_rdev);	
 
 	if (!page->buffers)
-		create_empty_buffers(page, inode->i_rdev, BUFFERED_BLOCKSIZE);
+		create_empty_buffers(page, inode->i_rdev, blocksize);
 	head = page->buffers;
 
-	block = page->index << (PAGE_CACHE_SHIFT - BUFFERED_BLOCKSIZE_BITS);
+	block = page->index << (PAGE_CACHE_SHIFT - blksize_bits(blocksize));
 
 	bh = head;
 	i = 0;
@@ -132,19 +154,21 @@ static int blkdev_readpage(struct file * file, struct page * page)
 	struct inode *inode = page->mapping->host;
 	kdev_t dev = inode->i_rdev;
 	unsigned long iblock, lblock;
-	struct buffer_head *bh, *head, *arr[1 << (PAGE_CACHE_SHIFT - BUFFERED_BLOCKSIZE_BITS)];
-	unsigned int blocks;
+	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
+	unsigned int blocks, blocksize, blocksize_bits;
 	int nr, i;
 
 	if (!PageLocked(page))
 		PAGE_BUG(page);
+	blocksize = block_size(dev);
+	blocksize_bits = blksize_bits(blocksize);
 	if (!page->buffers)
-		create_empty_buffers(page, dev, BUFFERED_BLOCKSIZE);
+		create_empty_buffers(page, dev, blocksize);
 	head = page->buffers;
 
-	blocks = PAGE_CACHE_SIZE >> BUFFERED_BLOCKSIZE_BITS;
-	iblock = page->index << (PAGE_CACHE_SHIFT - BUFFERED_BLOCKSIZE_BITS);
-	lblock = buffered_blk_size(dev) >> (BUFFERED_BLOCKSIZE_BITS - BLOCK_SIZE_BITS);
+	blocks = PAGE_CACHE_SIZE >> blocksize_bits;
+	iblock = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
+	lblock = max_block(dev);
 	bh = head;
 	nr = 0;
 	i = 0;
@@ -159,7 +183,7 @@ static int blkdev_readpage(struct file * file, struct page * page)
 					continue;
 			}
 			if (!buffer_mapped(bh)) {
-				memset(kmap(page) + i * BUFFERED_BLOCKSIZE, 0, BUFFERED_BLOCKSIZE);
+				memset(kmap(page) + i * blocksize, 0, blocksize);
 				flush_dcache_page(page);
 				kunmap(page);
 				set_bit(BH_Uptodate, &bh->b_state);
@@ -206,19 +230,21 @@ static int __blkdev_prepare_write(struct inode *inode, struct page *page,
 	unsigned long block;
 	int err = 0;
 	struct buffer_head *bh, *head, *wait[2], **wait_bh=wait;
-	kmap(page);
+	unsigned int blocksize, blocksize_bits;
 
+	blocksize = block_size(dev);
+	blocksize_bits = blksize_bits(blocksize);
 	if (!page->buffers)
-		create_empty_buffers(page, dev, BUFFERED_BLOCKSIZE);
+		create_empty_buffers(page, dev, blocksize);
 	head = page->buffers;
 
-	block = page->index << (PAGE_CACHE_SHIFT - BUFFERED_BLOCKSIZE_BITS);
+	block = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
 
 	for(bh = head, block_start = 0; bh != head || !block_start;
 	    block++, block_start=block_end, bh = bh->b_this_page) {
 		if (!bh)
 			BUG();
-		block_end = block_start + BUFFERED_BLOCKSIZE;
+		block_end = block_start + blocksize;
 		if (block_end <= from)
 			continue;
 		if (block_start >= to)
@@ -258,7 +284,6 @@ static int blkdev_prepare_write(struct file *file, struct page *page, unsigned f
 	int err = __blkdev_prepare_write(inode, page, from, to);
 	if (err) {
 		ClearPageUptodate(page);
-		kunmap(page);
 	}
 	return err;
 }
@@ -269,11 +294,13 @@ static int __blkdev_commit_write(struct inode *inode, struct page *page,
 	unsigned block_start, block_end;
 	int partial = 0, need_balance_dirty = 0;
 	struct buffer_head *bh, *head;
+	unsigned int blocksize;
 
+	blocksize = block_size(inode->i_rdev);
 	for(bh = head = page->buffers, block_start = 0;
 	    bh != head || !block_start;
 	    block_start=block_end, bh = bh->b_this_page) {
-		block_end = block_start + BUFFERED_BLOCKSIZE;
+		block_end = block_start + blocksize;
 		if (block_end <= from || block_start >= to) {
 			if (!buffer_uptodate(bh))
 				partial = 1;
@@ -305,7 +332,6 @@ static int blkdev_commit_write(struct file *file, struct page *page,
 {
 	struct inode *inode = page->mapping->host;
 	__blkdev_commit_write(inode,page,from,to);
-	kunmap(page);
 	return 0;
 }
 
@@ -797,8 +823,6 @@ int blkdev_put(struct block_device *bdev, int kind)
 				invalidate_buffers(bd_inode->i_rdev);
 			}
 			lock_super(sb);
-			if (sb->s_flags & MS_RDONLY)
-				update_buffers(bd_inode->i_rdev);
 			unlock_super(sb);
 			drop_super(sb);
 		}
@@ -837,7 +861,6 @@ struct address_space_operations def_blk_aops = {
 	sync_page: block_sync_page,
 	prepare_write: blkdev_prepare_write,
 	commit_write: blkdev_commit_write,
-	direct_IO: blkdev_direct_IO,
 };
 
 struct file_operations def_blk_fops = {

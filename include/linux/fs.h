@@ -46,10 +46,6 @@ struct poll_table_struct;
 #define BLOCK_SIZE_BITS 10
 #define BLOCK_SIZE (1<<BLOCK_SIZE_BITS)
 
-/* buffer header fixed size for the blkdev I/O through pagecache */
-#define BUFFERED_BLOCKSIZE_BITS 10
-#define BUFFERED_BLOCKSIZE (1 << BUFFERED_BLOCKSIZE_BITS)
-
 /* And dynamically-tunable limits and defaults: */
 struct files_stat_struct {
 	int nr_files;		/* read only */
@@ -1174,14 +1170,9 @@ extern int invalidate_device(kdev_t, int);
 extern void invalidate_inode_pages(struct inode *);
 extern void invalidate_inode_pages2(struct address_space *);
 extern void invalidate_inode_buffers(struct inode *);
-#define invalidate_buffers(dev)	__invalidate_buffers((dev), 0, 0)
-#define destroy_buffers(dev)	__invalidate_buffers((dev), 1, 0)
-#define update_buffers(dev)			\
-do {						\
-	__invalidate_buffers((dev), 0, 1);	\
-	__invalidate_buffers((dev), 0, 2);	\
-} while (0)
-extern void __invalidate_buffers(kdev_t dev, int, int);
+#define invalidate_buffers(dev)	__invalidate_buffers((dev), 0)
+#define destroy_buffers(dev)	__invalidate_buffers((dev), 1)
+extern void __invalidate_buffers(kdev_t dev, int);
 extern void sync_inodes(kdev_t);
 extern void sync_unlocked_inodes(void);
 extern void write_inode_now(struct inode *, int);
@@ -1367,7 +1358,6 @@ extern int block_sync_page(struct page *);
 int generic_block_bmap(struct address_space *, long, get_block_t *);
 int generic_commit_write(struct file *, struct page *, unsigned, unsigned);
 int block_truncate_page(struct address_space *, loff_t, get_block_t *);
-extern int generic_direct_IO(int, struct inode *, struct kiobuf *, unsigned long, int, get_block_t *);
 extern void create_empty_buffers(struct page *, kdev_t, unsigned long);
 
 extern int waitfor_one_page(struct page*);

@@ -96,7 +96,8 @@ struct bh_free_head {
 };
 static struct bh_free_head free_list[NR_SIZES];
 
-static int grow_buffers(int size);
+static void truncate_buffers(kdev_t dev);
+static int grow_buffers(kdev_t dev, int block, int size);
 static void __refile_buffer(struct buffer_head *);
 
 /* This is used by some architectures to estimate available memory. */
@@ -559,59 +560,28 @@ static void __insert_into_queues(struct buffer_head *bh)
 	__insert_into_lru_list(bh, bh->b_list);
 }
 
-/* This function must only run if there are no other
- * references _anywhere_ to this buffer head.
- */
-static void put_last_free(struct buffer_head * bh)
-{
-	struct bh_free_head *head = &free_list[BUFSIZE_INDEX(bh->b_size)];
-	struct buffer_head **bhp = &head->list;
-
-	bh->b_state = 0;
-
-	spin_lock(&head->lock);
-	bh->b_dev = B_FREE;
-	if(!*bhp) {
-		*bhp = bh;
-		bh->b_prev_free = bh;
-	}
-	bh->b_next_free = *bhp;
-	bh->b_prev_free = (*bhp)->b_prev_free;
-	(*bhp)->b_prev_free->b_next_free = bh;
-	(*bhp)->b_prev_free = bh;
-	spin_unlock(&head->lock);
-}
-
-/*
- * Why like this, I hear you say... The reason is race-conditions.
- * As we don't lock buffers (unless we are reading them, that is),
- * something might happen to it while we sleep (ie a read-error
- * will force it bad). This shouldn't really happen currently, but
- * the code is ready.
- */
-static inline struct buffer_head * __get_hash_table(kdev_t dev, int block, int size)
-{
-	struct buffer_head *bh = hash(dev, block);
-
-	for (; bh; bh = bh->b_next)
-		if (bh->b_blocknr == block	&&
-		    bh->b_size    == size	&&
-		    bh->b_dev     == dev)
-			break;
-	if (bh)
-		get_bh(bh);
-
-	return bh;
-}
-
 struct buffer_head * get_hash_table(kdev_t dev, int block, int size)
 {
-	struct buffer_head *bh;
+	struct buffer_head *bh, **p = &hash(dev, block);
 
 	read_lock(&hash_table_lock);
-	bh = __get_hash_table(dev, block, size);
-	read_unlock(&hash_table_lock);
 
+	for (;;) {
+		bh = *p;
+		if (!bh)
+			break;
+		p = &bh->b_next;
+		if (bh->b_blocknr != block)
+			continue;
+		if (bh->b_size != size)
+			continue;
+		if (bh->b_dev != dev)
+			continue;
+		get_bh(bh);
+		break;
+	}
+
+	read_unlock(&hash_table_lock);
 	return bh;
 }
 
@@ -688,7 +658,7 @@ int inode_has_buffers(struct inode *inode)
    we think the disk contains more recent information than the buffercache.
    The update == 1 pass marks the buffers we need to update, the update == 2
    pass does the actual I/O. */
-void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers, int update)
+void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
 {
 	int i, nlist, slept;
 	struct buffer_head * bh, * bh_next;
@@ -722,33 +692,18 @@ void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers, int update)
 			/* All buffers in the lru lists are mapped */
 			if (!buffer_mapped(bh))
 				BUG();
+			if (buffer_dirty(bh))
+				printk("invalidate: dirty buffer\n");
 			if (!atomic_read(&bh->b_count)) {
 				if (destroy_dirty_buffers || !buffer_dirty(bh)) {
 					remove_inode_queue(bh);
+#if 0
 					__remove_from_queues(bh);
 					put_last_free(bh);
+#endif
 				}
-			} else if (update) {
-				if ((update == 2) ^ buffer_uptodate(bh)  &&
-				    (update == 2) ^ buffer_req(bh)) {
-					write_unlock(&hash_table_lock);
-					atomic_inc(&bh->b_count);
-					spin_unlock(&lru_list_lock);
-
-					if (update == 2) {
-						ll_rw_block(READ, 1, &bh);
-						wait_on_buffer(bh);
-					} else {
-						lock_buffer(bh);
-						clear_bit(BH_Uptodate, &bh->b_state);
-						clear_bit(BH_Req, &bh->b_state);
-						unlock_buffer(bh);
-					}						
-
-					atomic_dec(&bh->b_count);
-					goto retry;
-				}
-			}
+			} else
+				printk("invalidate: busy buffer\n");
 
 			write_unlock(&hash_table_lock);
 			if (slept)
@@ -759,13 +714,14 @@ out:
 	spin_unlock(&lru_list_lock);
 	if (slept)
 		goto retry;
+
+	/* Get rid of the page cache */
+	truncate_buffers(dev);
 }
 
 void set_blocksize(kdev_t dev, int size)
 {
 	extern int *blksize_size[];
-	int i, nlist, slept;
-	struct buffer_head * bh, * bh_next;
 
 	if (!blksize_size[MAJOR(dev)])
 		return;
@@ -780,60 +736,10 @@ void set_blocksize(kdev_t dev, int size)
 	}
 	if (blksize_size[MAJOR(dev)][MINOR(dev)] == size)
 		return;
+
 	sync_buffers(dev, 2);
 	blksize_size[MAJOR(dev)][MINOR(dev)] = size;
-
- retry:
-	slept = 0;
-	spin_lock(&lru_list_lock);
-	for(nlist = 0; nlist < NR_LIST; nlist++) {
-		bh = lru_list[nlist];
-		if (!bh)
-			continue;
-		for (i = nr_buffers_type[nlist]; i > 0 ; bh = bh_next, i--) {
-			bh_next = bh->b_next_free;
-			if (bh->b_dev != dev || bh->b_size == size)
-				continue;
-			/* Unhashed? */
-			if (!bh->b_pprev)
-				continue;
-			if (buffer_locked(bh)) {
-				get_bh(bh);
-				spin_unlock(&lru_list_lock);
-				wait_on_buffer(bh);
-				slept = 1;
-				spin_lock(&lru_list_lock);
-				put_bh(bh);
-			}
-
-			write_lock(&hash_table_lock);
-			if (!atomic_read(&bh->b_count)) {
-				if (buffer_dirty(bh))
-					printk(KERN_WARNING
-					       "set_blocksize: dev %s buffer_dirty %lu size %hu\n",
-					       kdevname(dev), bh->b_blocknr, bh->b_size);
-				remove_inode_queue(bh);
-				__remove_from_queues(bh);
-				put_last_free(bh);
-			} else {
-				if (atomic_set_buffer_clean(bh))
-					__refile_buffer(bh);
-				clear_bit(BH_Uptodate, &bh->b_state);
-				printk(KERN_WARNING
-				       "set_blocksize: "
-				       "b_count %d, dev %s, block %lu, from %p\n",
-				       atomic_read(&bh->b_count), bdevname(bh->b_dev),
-				       bh->b_blocknr, __builtin_return_address(0));
-			}
-			write_unlock(&hash_table_lock);
-			if (slept)
-				goto out;
-		}
-	}
- out:
-	spin_unlock(&lru_list_lock);
-	if (slept)
-		goto retry;
+	invalidate_buffers(dev);
 }
 
 static void free_more_memory(void)
@@ -1137,57 +1043,16 @@ void invalidate_inode_buffers(struct inode *inode)
  */
 struct buffer_head * getblk(kdev_t dev, int block, int size)
 {
-	struct buffer_head * bh;
-	int isize;
+	for (;;) {
+		struct buffer_head * bh;
 
-repeat:
-	spin_lock(&lru_list_lock);
-	write_lock(&hash_table_lock);
-	bh = __get_hash_table(dev, block, size);
-	if (bh)
-		goto out;
+		bh = get_hash_table(dev, block, size);
+		if (bh)
+			return bh;
 
-	isize = BUFSIZE_INDEX(size);
-	spin_lock(&free_list[isize].lock);
-	bh = free_list[isize].list;
-	if (bh) {
-		__remove_from_free_list(bh, isize);
-		atomic_set(&bh->b_count, 1);
+		if (!grow_buffers(dev, block, size))
+			free_more_memory();
 	}
-	spin_unlock(&free_list[isize].lock);
-
-	/*
-	 * OK, FINALLY we know that this buffer is the only one of
-	 * its kind, we hold a reference (b_count>0), it is unlocked,
-	 * and it is clean.
-	 */
-	if (bh) {
-		init_buffer(bh, NULL, NULL);
-		bh->b_dev = dev;
-		bh->b_blocknr = block;
-		bh->b_state = 1 << BH_Mapped;
-
-		/* Insert the buffer into the regular lists */
-		__insert_into_queues(bh);
-	out:
-		write_unlock(&hash_table_lock);
-		spin_unlock(&lru_list_lock);
-		touch_buffer(bh);
-		return bh;
-	}
-
-	/*
-	 * If we block while refilling the free list, somebody may
-	 * create the buffer first ... search the hashes again.
-	 */
-	write_unlock(&hash_table_lock);
-	spin_unlock(&lru_list_lock);
-
-	if (!grow_buffers(size))
-		free_more_memory();
-
-	/* FIXME: getblk should fail if there's no enough memory */
-	goto repeat;
 }
 
 /* -1 -> no need to flush
@@ -1313,22 +1178,7 @@ void __brelse(struct buffer_head * buf)
  */
 void __bforget(struct buffer_head * buf)
 {
-	/* grab the lru lock here to block bdflush. */
-	spin_lock(&lru_list_lock);
-	write_lock(&hash_table_lock);
-	if (!atomic_dec_and_test(&buf->b_count) || buffer_locked(buf))
-		goto in_use;
-	__hash_unlink(buf);
-	write_unlock(&hash_table_lock);
-	remove_inode_queue(buf);
-	__remove_from_lru_list(buf, buf->b_list);
-	spin_unlock(&lru_list_lock);
-	put_last_free(buf);
-	return;
-
- in_use:
-	write_unlock(&hash_table_lock);
-	spin_unlock(&lru_list_lock);
+	__brelse(buf);
 }
 
 /**
@@ -1524,17 +1374,17 @@ no_grow:
 	goto try_again;
 }
 
-static void unmap_buffer(struct buffer_head * bh)
+/*
+ * Called when truncating a buffer on a page completely.
+ *
+ * We can avoid IO by marking it clean.
+ * FIXME!! FIXME!! FIXME!! We need to unmap it too,
+ * so that the filesystem won't write to it. There's
+ * some bug somewhere..
+ */
+static void discard_buffer(struct buffer_head * bh)
 {
-	if (buffer_mapped(bh)) {
-		mark_buffer_clean(bh);
-		lock_buffer(bh);
-		clear_bit(BH_Uptodate, &bh->b_state);
-		clear_bit(BH_Mapped, &bh->b_state);
-		clear_bit(BH_Req, &bh->b_state);
-		clear_bit(BH_New, &bh->b_state);
-		unlock_buffer(bh);
-	}
+	mark_buffer_clean(bh);
 }
 
 /*
@@ -1564,7 +1414,7 @@ int discard_bh_page(struct page *page, unsigned long offset, int drop_pagecache)
 		 * is this block fully flushed?
 		 */
 		if (offset <= curr_off)
-			unmap_buffer(bh);
+			discard_buffer(bh);
 		curr_off = next_off;
 		bh = next;
 	} while (bh != head);
@@ -2141,47 +1991,6 @@ int generic_block_bmap(struct address_space *mapping, long block, get_block_t *g
 	return tmp.b_blocknr;
 }
 
-int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize, get_block_t * get_block)
-{
-	int i, nr_blocks, retval;
-	unsigned long * blocks = iobuf->blocks;
-
-	nr_blocks = iobuf->length / blocksize;
-	/* build the blocklist */
-	for (i = 0; i < nr_blocks; i++, blocknr++) {
-		struct buffer_head bh;
-
-		bh.b_state = 0;
-		bh.b_dev = inode->i_dev;
-		bh.b_size = blocksize;
-
-		retval = get_block(inode, blocknr, &bh, rw == READ ? 0 : 1);
-		if (retval)
-			goto out;
-
-		if (rw == READ) {
-			if (buffer_new(&bh))
-				BUG();
-			if (!buffer_mapped(&bh)) {
-				/* there was an hole in the filesystem */
-				blocks[i] = -1UL;
-				continue;
-			}
-		} else {
-			if (buffer_new(&bh))
-				unmap_underlying_metadata(&bh);
-			if (!buffer_mapped(&bh))
-				BUG();
-		}
-		blocks[i] = bh.b_blocknr;
-	}
-
-	retval = brw_kiovec(rw, 1, &iobuf, inode->i_dev, iobuf->blocks, blocksize);
-
- out:
-	return retval;
-}
-
 /*
  * IO completion routine for a buffer_head being used for kiobuf IO: we
  * can't dispatch the kiobuf callback until io_count reaches 0.  
@@ -2448,66 +2257,124 @@ fail:
 }
 
 /*
+ * Create the page-cache page that contains the requested block
+ */
+static struct page * grow_dev_page(struct block_device *bdev, unsigned long index, int size)
+{
+	struct page * page;
+
+	page = find_or_create_page(bdev->bd_inode->i_mapping, index, GFP_NOFS);
+	if (IS_ERR(page))
+		return NULL;
+
+	if (!PageLocked(page))
+		BUG();
+
+	if (!page->buffers) {
+		struct buffer_head *bh, *tail;
+		struct buffer_head *head = create_buffers(page, size, 0);
+		if (!head)
+			goto failed;
+
+		bh = head;
+		do {
+			tail = bh;
+			bh = bh->b_this_page;
+		} while (bh);
+		tail->b_this_page = head;
+		page->buffers = head;
+		page_cache_get(page);
+		atomic_inc(&buffermem_pages);
+	}
+	return page;
+
+failed:
+	UnlockPage(page);
+	page_cache_release(page);
+	return NULL;
+}
+
+static void hash_page_buffers(struct page *page, kdev_t dev, int block, int size)
+{
+	struct buffer_head *head = page->buffers;
+	struct buffer_head *bh = head;
+	unsigned int uptodate;
+
+	uptodate = 1 << BH_Mapped;
+	if (Page_Uptodate(page))
+		uptodate |= 1 << BH_Uptodate;
+
+	spin_lock(&lru_list_lock);
+	write_lock(&hash_table_lock);
+	do {
+		if (!(bh->b_state & (1 << BH_Mapped))) {
+			init_buffer(bh, NULL, NULL);
+			bh->b_dev = dev;
+			bh->b_blocknr = block;
+			bh->b_state = uptodate;
+		}
+
+		/* Insert the buffer into the regular lists */
+		if (!bh->b_pprev) {
+			__insert_into_queues(bh);
+		}
+
+		block++;
+		bh = bh->b_this_page;
+	} while (bh != head);
+	write_unlock(&hash_table_lock);
+	spin_unlock(&lru_list_lock);
+}
+
+/*
  * Try to increase the number of buffers available: the size argument
  * is used to determine what kind of buffers we want.
  */
-static int grow_buffers(int size)
+static int grow_buffers(kdev_t dev, int block, int size)
 {
 	struct page * page;
-	struct buffer_head *bh, *tmp;
-	struct buffer_head * insert_point;
-	int isize;
+	struct block_device *bdev;
+	unsigned long index;
+	int sizebits;
 
 	if ((size & 511) || (size > PAGE_SIZE)) {
 		printk(KERN_ERR "VFS: grow_buffers: size = %d\n",size);
 		return 0;
 	}
+	sizebits = -1;
+	do {
+		sizebits++;
+	} while ((size << sizebits) < PAGE_SIZE);
 
-	page = alloc_page(GFP_NOFS);
-	if (!page)
-		goto out;
-	LockPage(page);
-	bh = create_buffers(page, size, 0);
-	if (!bh)
-		goto no_buffer_head;
+	index = block >> sizebits;
+	block = index << sizebits;
 
-	isize = BUFSIZE_INDEX(size);
-
-	spin_lock(&free_list[isize].lock);
-	insert_point = free_list[isize].list;
-	tmp = bh;
-	while (1) {
-		if (insert_point) {
-			tmp->b_next_free = insert_point->b_next_free;
-			tmp->b_prev_free = insert_point;
-			insert_point->b_next_free->b_prev_free = tmp;
-			insert_point->b_next_free = tmp;
-		} else {
-			tmp->b_prev_free = tmp;
-			tmp->b_next_free = tmp;
-		}
-		insert_point = tmp;
-		if (tmp->b_this_page)
-			tmp = tmp->b_this_page;
-		else
-			break;
+	bdev = bdget(kdev_t_to_nr(dev));
+	if (!bdev) {
+		printk("No block device for %s\n", kdevname(dev));
+		BUG();
 	}
-	tmp->b_this_page = bh;
-	free_list[isize].list = bh;
-	spin_unlock(&free_list[isize].lock);
 
-	page->buffers = bh;
-	page->flags &= ~(1 << PG_referenced);
-	lru_cache_add(page);
-	UnlockPage(page);
-	atomic_inc(&buffermem_pages);
-	return 1;
+	/* Create a page with the proper size buffers.. */
+	page = grow_dev_page(bdev, index, size);
 
-no_buffer_head:
+	/* This is "wrong" - talk to Al Viro */
+	atomic_dec(&bdev->bd_count);
+	if (!page)
+		return 0;
+
+	/* Hash in the buffers on the hash list */
+	hash_page_buffers(page, dev, block, size);
 	UnlockPage(page);
 	page_cache_release(page);
-out:
-	return 0;
+	return 1;
+}
+
+static void truncate_buffers(kdev_t dev)
+{
+	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
+	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
+	atomic_dec(&bdev->bd_count);
 }
 
 static int sync_page_buffers(struct buffer_head *bh, unsigned int gfp_mask)
