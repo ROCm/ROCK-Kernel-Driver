@@ -124,6 +124,6 @@ asmlinkage int sys_iopl(unsigned long unused)
 	}
 	regs->eflags = (regs->eflags & 0xffffcfff) | (level << 12);
 	/* Make sure we return the long way (not sysenter) */
-	set_thread_flag(TIF_SIGPENDING);
+	set_thread_flag(TIF_IRET);
 	return 0;
 }
