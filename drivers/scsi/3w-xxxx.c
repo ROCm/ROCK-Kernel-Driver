@@ -607,7 +607,7 @@ static int tw_aen_read_queue(TW_Device_Extension *tw_dev, int request_id)
 	/* Now post the command packet */
 	if ((status_reg_value & TW_STATUS_COMMAND_QUEUE_FULL) == 0) {
 		dprintk(KERN_WARNING "3w-xxxx: tw_aen_read_queue(): Post succeeded.\n");
-		tw_dev->srb[request_id] = 0; /* Flag internal command */
+		tw_dev->srb[request_id] = NULL; /* Flag internal command */
 		tw_dev->state[request_id] = TW_S_POSTED;
 		outl(command_que_value, TW_COMMAND_QUEUE_REG_ADDR(tw_dev));
 	} else {
@@ -2166,7 +2166,7 @@ static irqreturn_t tw_interrupt(int irq, void *dev_instance,
 				/* Check for bad response */
 				if (command_packet->status != 0) {
 					/* If internal command, don't error, don't fill sense */
-					if (tw_dev->srb[request_id] == 0) {
+					if (tw_dev->srb[request_id] == NULL) {
 						tw_decode_sense(tw_dev, request_id, 0);
 					} else {
 						error = tw_decode_sense(tw_dev, request_id, 1);
@@ -2175,7 +2175,7 @@ static irqreturn_t tw_interrupt(int irq, void *dev_instance,
 
 				/* Check for correct state */
 				if (tw_dev->state[request_id] != TW_S_POSTED) {
-					if (tw_dev->srb[request_id] != 0) {
+					if (tw_dev->srb[request_id] != NULL) {
 						printk(KERN_WARNING "3w-xxxx: scsi%d: Received a request id that wasn't posted.\n", tw_dev->host->host_no);
 						error = 1;
 					}
@@ -2184,7 +2184,7 @@ static irqreturn_t tw_interrupt(int irq, void *dev_instance,
 				dprintk(KERN_NOTICE "3w-xxxx: tw_interrupt(): Response queue request id: %d.\n", request_id);
 
 				/* Check for internal command completion */
-				if (tw_dev->srb[request_id] == 0) {
+				if (tw_dev->srb[request_id] == NULL) {
 					dprintk(KERN_WARNING "3w-xxxx: tw_interrupt(): Found internally posted command.\n");
 					/* Check for chrdev ioctl completion */
 					if (request_id != tw_dev->chrdev_request_id) {
