@@ -159,14 +159,7 @@ typedef struct {
   isdn_mppp_stats stats;
 } ippp_bundle;
 
-#define NUM_RCV_BUFFS     64
-
-struct ippp_buf_queue {
-  struct ippp_buf_queue *next;
-  struct ippp_buf_queue *last;
-  char *buf;                 /* NULL here indicates end of queue */
-  int len;
-};
+#define IPPP_MAX_RQ_LEN     8
 
 /* The data structure for one CCP reset transaction */
 enum ippp_ccp_reset_states {
@@ -201,9 +194,7 @@ struct ippp_ccp_reset {
 struct ippp_struct {
   struct ippp_struct *next_link;
   int state;
-  struct ippp_buf_queue rq[NUM_RCV_BUFFS]; /* packet queue for isdn_ppp_read() */
-  struct ippp_buf_queue *first;  /* pointer to (current) first packet */
-  struct ippp_buf_queue *last;   /* pointer to (current) last used packet in queue */
+  struct sk_buff_head rq;
   wait_queue_head_t wq;
   struct task_struct *tk;
   unsigned int mpppcfg;

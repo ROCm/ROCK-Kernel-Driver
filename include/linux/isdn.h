@@ -294,8 +294,8 @@ struct isdn_netif_ops {
 	unsigned short		flags;	/* interface flags (a la BSD)	*/
 	unsigned short		type;	/* interface hardware type	*/
 	unsigned char		addr_len;/* hardware address length	*/
-	void                    (*receive)(struct isdn_net_dev_s *p,
-					   struct isdn_net_local_s *olp,
+	void                    (*receive)(struct isdn_net_local_s *lp,
+					   struct isdn_net_dev_s *idev,
 					   struct sk_buff *skb);
 	void                    (*connected)(struct isdn_net_local_s *lp);
 	void                    (*disconnected)(struct isdn_net_local_s *lp);
@@ -329,26 +329,17 @@ typedef struct isdn_net_local_s {
   u_char                 l2_proto;     /* Layer-2-protocol                 */
   u_char                 l3_proto;     /* Layer-3-protocol                 */
 
-  int                    sqfull;       /* Flag: netdev-queue overloaded    */
-  ulong                  sqfull_stamp; /* Start-Time of overload           */
   ulong                  slavedelay;   /* Dynamic bundling delaytime       */
   int                    triggercps;   /* BogoCPS needed for trigger slave */
   struct list_head       phone[2];     /* List of remote-phonenumbers      */
 				       /* phone[0] = Incoming Numbers      */
 				       /* phone[1] = Outgoing Numbers      */
-  struct net_device      *master;      /* Ptr to Master device for slaves  */
-  struct net_device      *slave;       /* Ptr to Slave device for masters  */
-  struct isdn_net_local_s *next;       /* Ptr to next link in bundle       */
-  struct isdn_net_local_s *last;       /* Ptr to last link in bundle       */
   struct isdn_net_dev_s  *netdev;      /* Ptr to netdev                    */
-  struct sk_buff_head    super_tx_queue; /* List of supervisory frames to  */
-	                               /* be transmitted asap              */
-  atomic_t frame_cnt;                  /* number of frames currently       */
-                        	       /* queued in HL driver              */    
-                                       /* Ptr to orig. hard_header_cache   */
-  spinlock_t             xmit_lock;    /* used to protect the xmit path of */
-                                       /* a particular channel (including  */
-                                       /* the frame_cnt                    */
+
+  struct isdn_net_dev_s  *queue;      /* circular list of all bundled
+					  channels, which are currently
+					  online                           */
+  spinlock_t queue_lock;               /* lock to protect queue            */
 
 #ifdef CONFIG_ISDN_X25
   struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
@@ -361,9 +352,11 @@ typedef struct isdn_net_local_s {
   ulong cisco_last_slarp_in;		/* jiffie of last keepalive packet we received */
   char cisco_line_state;		/* state of line according to keepalive packets */
   char cisco_debserint;			/* debugging flag of cisco hdlc with slarp */
-  struct timer_list cisco_timer;
-  struct tq_struct tqueue;
-  struct isdn_netif_ops   *ops;
+  struct timer_list       cisco_timer;
+
+  struct isdn_netif_ops  *ops;
+
+  struct net_device       dev;          /* interface to upper levels        */
 } isdn_net_local;
 
 /* the interface itself */
@@ -386,6 +379,8 @@ typedef struct isdn_net_dev_s {
   int                    cps;          /* current speed of this interface  */
   int                    transcount;   /* byte-counter for cps-calculation */
   int                    last_jiffies; /* when transcount was reset        */
+  int                    sqfull;       /* Flag: netdev-queue overloaded    */
+  ulong                  sqfull_stamp; /* Start-Time of overload           */
 
   struct timer_list      hup_timer;    /* auto hangup timer                */
   int                    huptimer;     /* Timeout-counter for auto-hangup  */
@@ -397,13 +392,24 @@ typedef struct isdn_net_dev_s {
   int                    pppbind;      /* ippp device for bindings         */
   int			 ppp_slot;     /* PPPD device slot number          */
 
-  isdn_net_local         *queue;       /* circular list of all bundled
-					  channels, which are currently
-					  online                           */
-  spinlock_t queue_lock;               /* lock to protect queue            */
+  spinlock_t             xmit_lock;    /* used to protect the xmit path of */
+                                       /* a particular channel (including  */
+                                       /* the frame_cnt                    */
+  struct sk_buff_head    super_tx_queue; /* List of supervisory frames to  */
+	                               /* be transmitted asap              */
+  atomic_t               frame_cnt;    /* number of frames currently       */
+                        	       /* queued in HL driver              */
+  struct tq_struct       tqueue;
+
+  isdn_net_local        *master;       /* Ptr to Master device for slaves  */
+  struct isdn_net_dev_s *slave;        /* Ptr to Slave device for masters  */
+
+  struct isdn_net_dev_s *next;         /* Ptr to next link in bundle       */
+  struct isdn_net_dev_s *last;         /* Ptr to last link in bundle       */
+
+
   char                   name[10];     /* Name of device                   */
   struct list_head global_list;        /* global list of all isdn_net_devs */
-  struct net_device dev;               /* interface to upper levels        */
 #ifdef CONFIG_ISDN_PPP
   ippp_bundle * pb;		/* pointer to the common bundle structure
    			         * with the per-bundle data */

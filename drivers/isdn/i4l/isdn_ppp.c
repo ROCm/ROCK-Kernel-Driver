@@ -23,7 +23,7 @@
 /* Prototypes */
 static int isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot);
 static int isdn_ppp_closewait(int slot);
-static void isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp,
+static void isdn_ppp_push_higher(isdn_net_local *lp, isdn_net_dev *idev,
 				 struct sk_buff *skb, int proto);
 static int isdn_ppp_if_get_unit(char *namebuf);
 static int isdn_ppp_set_compressor(struct ippp_struct *is,struct isdn_ppp_comp_data *);
@@ -59,10 +59,10 @@ static void isdn_ppp_ccp_reset_ack_rcvd(struct ippp_struct *is,
 static ippp_bundle * isdn_ppp_bundle_arr = NULL;
  
 static int isdn_ppp_mp_bundle_array_init(void);
-static int isdn_ppp_mp_init( isdn_net_local * lp, ippp_bundle * add_to );
-static void isdn_ppp_mp_receive(isdn_net_dev * net_dev, isdn_net_local * lp, 
-							struct sk_buff *skb);
-static void isdn_ppp_mp_cleanup( isdn_net_local * lp );
+static int isdn_ppp_mp_init(isdn_net_local *lp, ippp_bundle *add_to);
+static void isdn_ppp_mp_receive(isdn_net_local *lp, isdn_net_dev *idev, 
+				struct sk_buff *skb);
+static void isdn_ppp_mp_cleanup(isdn_net_local *lp );
 
 static int isdn_ppp_bundle(struct ippp_struct *, int unit);
 #endif	/* CONFIG_ISDN_MPP */
@@ -118,7 +118,7 @@ isdn_ppp_free(isdn_net_local * lp)
 #ifdef CONFIG_ISDN_MPP
 	spin_lock(&lp->netdev->pb->lock);
 #endif
-	isdn_net_rm_from_bundle(lp);
+	isdn_net_rm_from_bundle(idev);
 #ifdef CONFIG_ISDN_MPP
 	if (lp->netdev->pb->ref_ct == 1)	/* last link in queue? */
 		isdn_ppp_mp_cleanup(lp);
@@ -314,8 +314,6 @@ isdn_ppp_open(struct inode *ino, struct file *file)
 	is->maxcid = 16;        /* VJ: maxcid */
 	is->tk = current;
 	init_waitqueue_head(&is->wq);
-	is->first = is->rq + NUM_RCV_BUFFS - 1;	/* receive queue */
-	is->last = is->rq;
 	is->minor = minor;
 #ifdef CONFIG_ISDN_PPP_VJ
 	/*
@@ -337,7 +335,6 @@ static int
 isdn_ppp_release(struct inode *ino, struct file *file)
 {
 	uint minor = minor(ino->i_rdev) - ISDN_MINOR_PPP;
-	int i;
 	struct ippp_struct *is;
 
 	lock_kernel();
@@ -356,14 +353,7 @@ isdn_ppp_release(struct inode *ino, struct file *file)
 		is->state &= ~IPPP_CONNECT;
 		isdn_net_hangup(is->idev);
 	}
-	for (i = 0; i < NUM_RCV_BUFFS; i++) {
-		if (is->rq[i].buf) {
-			kfree(is->rq[i].buf);
-			is->rq[i].buf = NULL;
-		}
-	}
-	is->first = is->rq + NUM_RCV_BUFFS - 1;	/* receive queue */
-	is->last = is->rq;
+	skb_queue_purge(&is->rq);
 
 #ifdef CONFIG_ISDN_PPP_VJ
 /* TODO: if this was the previous master: link the slcomp to the new master */
@@ -487,7 +477,7 @@ isdn_ppp_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned 
 			if (val & SC_ENABLE_IP && !(is->pppcfg & SC_ENABLE_IP) && (is->state & IPPP_CONNECT)) {
 				if (idev) {
 					/* OK .. we are ready to send buffers */
-					netif_wake_queue(&idev->dev);
+					netif_wake_queue(&idev->local.dev);
 				}
 			}
 			is->pppcfg = val;
@@ -595,12 +585,8 @@ static unsigned int
 isdn_ppp_poll(struct file *file, poll_table * wait)
 {
 	unsigned int mask;
-	struct ippp_buf_queue *bf;
-	struct ippp_buf_queue *bl;
-	unsigned long flags;
 	struct ippp_struct *is;
 
-	lock_kernel();
 	is = file->private_data;
 
 	if (is->debug & 0x2)
@@ -622,21 +608,15 @@ isdn_ppp_poll(struct file *file, poll_table * wait)
 	/* we're always ready to send .. */
 	mask = POLLOUT | POLLWRNORM;
 
-	save_flags(flags);
-	cli();
-	bl = is->last;
-	bf = is->first;
 	/*
 	 * if IPPP_NOBLOCK is set we return even if we have nothing to read
 	 */
-	if (bf->next != bl || (is->state & IPPP_NOBLOCK)) {
+	if (!skb_queue_empty(&is->rq) || is->state & IPPP_NOBLOCK) {
 		is->state &= ~IPPP_NOBLOCK;
 		mask |= POLLIN | POLLRDNORM;
 	}
-	restore_flags(flags);
 
  out:
-	unlock_kernel();
 	return mask;
 }
 
@@ -647,10 +627,8 @@ isdn_ppp_poll(struct file *file, poll_table * wait)
 static int
 isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
 {
-	struct ippp_buf_queue *bf,
-	*bl;
-	unsigned long flags;
-	unsigned char *nbuf;
+	struct sk_buff *skb;
+	unsigned char *p;
 	struct ippp_struct *is;
 
 	if (slot < 0 || slot >= ISDN_MAX_CHANNELS) {
@@ -663,36 +641,23 @@ isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
 		printk(KERN_DEBUG "ippp: device not activated.\n");
 		return 0;
 	}
-	nbuf = (unsigned char *) kmalloc(len + 4, GFP_ATOMIC);
-	if (!nbuf) {
+	if (skb_queue_len(&is->rq) > IPPP_MAX_RQ_LEN) {
+		printk(KERN_WARNING "ippp: Queue is full\n");
+		return 0;
+	}
+	skb = dev_alloc_skb(len + 4);
+	if (!skb) {
 		printk(KERN_WARNING "ippp: Can't alloc buf\n");
 		return 0;
 	}
-	nbuf[0] = PPP_ALLSTATIONS;
-	nbuf[1] = PPP_UI;
-	nbuf[2] = proto >> 8;
-	nbuf[3] = proto & 0xff;
-	memcpy(nbuf + 4, buf, len);
+	p = skb_put(skb, 4);
+	p += put_u8(p, PPP_ALLSTATIONS);
+	p += put_u8(p, PPP_UI);
+	p += put_u16(p, proto);
+	memcpy(skb_put(skb, len), buf, len);
 
-	save_flags(flags);
-	cli();
-
-	bf = is->first;
-	bl = is->last;
-
-	if (bf == bl) {
-		printk(KERN_WARNING "ippp: Queue is full; discarding first buffer\n");
-		bf = bf->next;
-		kfree(bf->buf);
-		is->first = bf;
-	}
-	bl->buf = (char *) nbuf;
-	bl->len = len + 4;
-
-	is->last = bl->next;
-	restore_flags(flags);
-
-		wake_up_interruptible(&is->wq);
+	skb_queue_tail(&is->rq, skb);
+	wake_up_interruptible(&is->wq);
 
 	return len;
 }
@@ -706,54 +671,36 @@ static ssize_t
 isdn_ppp_read(struct file *file, char *buf, size_t count, loff_t *off)
 {
 	struct ippp_struct *is;
-	struct ippp_buf_queue *b;
-	unsigned long flags;
-	unsigned char *save_buf;
+	struct sk_buff *skb;
 	int retval;
 
 	if (off != &file->f_pos)
 		return -ESPIPE;
 	
-	lock_kernel();
-
 	is = file->private_data;
 
 	if (!(is->state & IPPP_OPEN)) {
 		retval = 0;
 		goto out;
 	}
-	retval = verify_area(VERIFY_WRITE, (void *) buf, count);
-	if (retval)
-		goto out;
-
-	save_flags(flags);
-	cli();
-
-	b = is->first->next;
-	save_buf = b->buf;
-	if (!save_buf) {
-		restore_flags(flags);
+	skb = skb_dequeue(&is->rq);
+	if (!skb) {
 		retval = -EAGAIN;
 		goto out;
 	}
-	if (b->len < count)
-		count = b->len;
-	b->buf = NULL;
-	is->first = b;
-
-	restore_flags(flags);
-
-	if (copy_to_user(buf, save_buf, count)) {
-		kfree(save_buf);
-		retval = -EFAULT;
-		goto out;
+	if (skb->len > count) {
+		retval = -EMSGSIZE;
+		goto out_free;
 	}
-	kfree(save_buf);
+	if (copy_to_user(buf, skb->data, skb->len)) {
+		retval = -EFAULT;
+		goto out_free;
+	}
+	retval = skb->len;
 
-	retval = count;
-
+ out_free:
+	dev_kfree_skb(skb);
  out:
-	unlock_kernel();
 	return retval;
 }
 
@@ -834,7 +781,7 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 
 			isdn_ppp_send_ccp(idev,&idev->local,skb); /* keeps CCP/compression states in sync */
 
-			isdn_net_write_super(&idev->local, skb);
+			isdn_net_write_super(idev, skb);
 		}
 	}
 	retval = count;
@@ -881,15 +828,7 @@ isdn_ppp_init(void)
 		}
 		memset((char *) ippp_table[i], 0, sizeof(struct ippp_struct));
 		ippp_table[i]->state = 0;
-		ippp_table[i]->first = ippp_table[i]->rq + NUM_RCV_BUFFS - 1;
-		ippp_table[i]->last = ippp_table[i]->rq;
-
-		for (j = 0; j < NUM_RCV_BUFFS; j++) {
-			ippp_table[i]->rq[j].buf = NULL;
-			ippp_table[i]->rq[j].last = ippp_table[i]->rq +
-			    (NUM_RCV_BUFFS + j - 1) % NUM_RCV_BUFFS;
-			ippp_table[i]->rq[j].next = ippp_table[i]->rq + (j + 1) % NUM_RCV_BUFFS;
-		}
+		skb_queue_head_init(&ippp_table[i]->rq);
 	}
 	return 0;
 }
@@ -963,10 +902,9 @@ static int isdn_ppp_strip_proto(struct sk_buff *skb)
 /*
  * handler for incoming packets on a syncPPP interface
  */
-static void isdn_ppp_receive(isdn_net_dev *net_dev, isdn_net_local *lp, 
+static void isdn_ppp_receive(isdn_net_local *lp, isdn_net_dev *idev, 
 			     struct sk_buff *skb)
 {
-	isdn_net_dev *idev = lp->netdev;
 	struct ippp_struct *is;
 	int slot;
 	int proto;
@@ -976,7 +914,7 @@ static void isdn_ppp_receive(isdn_net_dev *net_dev, isdn_net_local *lp,
 	 * huptimer on LCP packets.
 	 */
 	if (PPP_PROTOCOL(skb->data) != PPP_LCP)
-		isdn_net_reset_huptimer(net_dev,lp->netdev);
+		isdn_net_reset_huptimer(lp, idev);
 
 	slot = idev->ppp_slot;
 	if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
@@ -1012,12 +950,12 @@ static void isdn_ppp_receive(isdn_net_dev *net_dev, isdn_net_local *lp,
 	
  	if (!(is->mpppcfg & SC_REJ_MP_PROT)) { // we agreed to receive MPPP
   		if (proto == PPP_MP) {
-  			isdn_ppp_mp_receive(net_dev, lp, skb);
+  			isdn_ppp_mp_receive(lp, idev, skb);
  			return;
  		}
  	} 
 #endif
- 	isdn_ppp_push_higher(net_dev, lp, skb, proto);
+ 	isdn_ppp_push_higher(lp, idev, skb, proto);
 }
 
 /*
@@ -1026,10 +964,10 @@ static void isdn_ppp_receive(isdn_net_dev *net_dev, isdn_net_local *lp,
  * note: net_dev has to be master net_dev
  */
 static void
-isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff *skb, int proto)
+isdn_ppp_push_higher(isdn_net_local *lp, isdn_net_dev *idev,
+		     struct sk_buff *skb, int proto)
 {
-	isdn_net_dev *idev = lp->netdev;
-	struct net_device *dev = &net_dev->dev;
+	struct net_device *dev = &lp->dev;
  	struct ippp_struct *is, *mis;
 	int slot;
 
@@ -1041,8 +979,8 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 	}
 	is = ippp_table[slot];
  	
- 	if (lp->master) { // FIXME?
- 		slot = ((isdn_net_local *) (lp->master->priv))->netdev->ppp_slot;
+ 	if (idev->master) { // FIXME?
+ 		slot = idev->master->netdev->ppp_slot;
  		if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
  			printk(KERN_ERR "isdn_ppp_push_higher: master->ppp_slot(%d)\n",
 			       slot);
@@ -1079,12 +1017,12 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 		case PPP_VJC_UNCOMP:
 			if (is->debug & 0x20)
 				printk(KERN_DEBUG "isdn_ppp: VJC_UNCOMP\n");
-			if (net_dev->ppp_slot < 0) {
+			if (lp->netdev->ppp_slot < 0) {
 				printk(KERN_ERR "%s: net_dev->ppp_slot(%d) out of range\n",
-				       __FUNCTION__ , net_dev->ppp_slot);
+				       __FUNCTION__ , lp->netdev->ppp_slot);
 				goto drop_packet;
 			}
-			if (slhc_remember(ippp_table[net_dev->ppp_slot]->slcomp, skb->data, skb->len) <= 0) {
+			if (slhc_remember(ippp_table[lp->netdev->ppp_slot]->slcomp, skb->data, skb->len) <= 0) {
 				printk(KERN_WARNING "isdn_ppp: received illegal VJC_UNCOMP frame!\n");
 				goto drop_packet;
 			}
@@ -1105,12 +1043,12 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 				}
 				skb_put(skb, skb_old->len + 128);
 				memcpy(skb->data, skb_old->data, skb_old->len);
-				if (net_dev->ppp_slot < 0) {
+				if (lp->netdev->ppp_slot < 0) {
 					printk(KERN_ERR "%s: net_dev->ppp_slot(%d) out of range\n",
-					       __FUNCTION__ , net_dev->ppp_slot);
+					       __FUNCTION__ , lp->netdev->ppp_slot);
 					goto drop_packet;
 				}
-				pkt_len = slhc_uncompress(ippp_table[net_dev->ppp_slot]->slcomp,
+				pkt_len = slhc_uncompress(ippp_table[lp->netdev->ppp_slot]->slcomp,
 						skb->data, skb_old->len);
 				kfree_skb(skb_old);
 				if (pkt_len < 0)
@@ -1123,7 +1061,7 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 #endif
 		case PPP_CCP:
 		case PPP_CCPFRAG:
-			isdn_ppp_receive_ccp(net_dev,lp,skb,proto);
+			isdn_ppp_receive_ccp(lp->netdev,lp,skb,proto);
 			/* Dont pop up ResetReq/Ack stuff to the daemon any
 			   longer - the job is done already */
 			if(skb->data[0] == CCP_RESETREQ ||
@@ -1146,7 +1084,7 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 	return;
 
  drop_packet:
-	net_dev->local.stats.rx_dropped++;
+	lp->stats.rx_dropped++;
 	kfree_skb(skb);
 }
 
@@ -1187,14 +1125,14 @@ static unsigned char *isdn_ppp_skb_push(struct sk_buff **skb_p,int len)
 int
 isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
-	isdn_net_local *lp,*mlp;
+	isdn_net_local *mlp;
 	isdn_net_dev *idev;
 	isdn_net_dev *nd;
 	unsigned int proto = PPP_IP;     /* 0x21 */
 	struct ippp_struct *ipt,*ipts;
 	int slot;
 
-	mlp = (isdn_net_local *) (netdev->priv);
+	mlp = netdev->priv;
 	nd = mlp->netdev;       /* get master lp */
 
 	slot = nd->ppp_slot;
@@ -1226,13 +1164,12 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 			return 0;
 	}
 
-	lp = isdn_net_get_locked_lp(nd);
-	if (!lp) {
+	idev = isdn_net_get_locked_dev(mlp);
+	if (!idev) {
 		printk(KERN_WARNING "%s: all channels busy - requeuing!\n", netdev->name);
 		return 1;
 	}
 	/* we have our lp locked from now on */
-	idev = lp->netdev;
 	slot = idev->ppp_slot;
 	if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
 		printk(KERN_ERR "isdn_ppp_xmit: lp->ppp_slot(%d)\n",
@@ -1385,10 +1322,10 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 		isdn_ppp_frame_log("xmit", skb->data, skb->len, 32,ipt->unit,idev->ppp_slot);
 	}
 	
-	isdn_net_writebuf_skb(lp, skb);
+	isdn_net_writebuf_skb(idev, skb);
 
  unlock:
-	spin_unlock_bh(&lp->xmit_lock);
+	spin_unlock_bh(&idev->xmit_lock);
 	return 0;
 }
 
@@ -1459,7 +1396,7 @@ static int isdn_ppp_mp_init( isdn_net_local * lp, ippp_bundle * add_to )
 		is->mp_seqno = 0;
 		if ((lp->netdev->pb = isdn_ppp_mp_bundle_alloc()) == NULL)
 			return -ENOMEM;
-		lp->next = lp->last = lp;	/* nobody else in a queue */
+		idev->next = idev->last = idev;	/* nobody else in a queue */
 		lp->netdev->pb->frags = NULL;
 		lp->netdev->pb->frames = 0;
 		lp->netdev->pb->seq = LONG_MAX;
@@ -1479,12 +1416,12 @@ static void isdn_ppp_mp_reassembly( isdn_net_dev * net_dev, isdn_net_local * lp,
 static void isdn_ppp_mp_free_skb( ippp_bundle * mp, struct sk_buff * skb );
 static void isdn_ppp_mp_print_recv_pkt( int slot, struct sk_buff * skb );
 
-static void isdn_ppp_mp_receive(isdn_net_dev * net_dev, isdn_net_local * lp, 
-							struct sk_buff *skb)
+static void isdn_ppp_mp_receive(isdn_net_local *lp, isdn_net_dev *dev, 
+				struct sk_buff *skb)
 {
 	isdn_net_dev *idev = lp->netdev;
 	struct ippp_struct *is;
-	isdn_net_local * lpq;
+	isdn_net_dev *qdev;
 	ippp_bundle * mp;
 	isdn_mppp_stats * stats;
 	struct sk_buff * newfrag, * frag, * start, *nextf;
@@ -1492,8 +1429,8 @@ static void isdn_ppp_mp_receive(isdn_net_dev * net_dev, isdn_net_local * lp,
 	unsigned long flags;
 	int slot;
 
-	spin_lock_irqsave(&net_dev->pb->lock, flags);
-    	mp = net_dev->pb;
+	spin_lock_irqsave(&lp->netdev->pb->lock, flags);
+    	mp = lp->netdev->pb;
         stats = &mp->stats;
 	slot = idev->ppp_slot;
 	if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
@@ -1531,8 +1468,8 @@ static void isdn_ppp_mp_receive(isdn_net_dev * net_dev, isdn_net_local * lp,
 	
 	/* find the minimum received sequence number over all links */
 	is->last_link_seqno = minseq = newseq;
-	for (lpq = net_dev->queue;;) {
-		slot = lpq->netdev->ppp_slot;
+	for (qdev = lp->queue;;) {
+		slot = qdev->ppp_slot;
 		if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
 			printk(KERN_ERR "%s: lpq->ppp_slot(%d)\n",
 			       __FUNCTION__ ,slot);
@@ -1541,7 +1478,7 @@ static void isdn_ppp_mp_receive(isdn_net_dev * net_dev, isdn_net_local * lp,
 			if (MP_LT(lls, minseq))
 				minseq = lls;
 		}
-		if ((lpq = lpq->next) == net_dev->queue)
+		if ((qdev = qdev->next) == lp->queue)
 			break;
 	}
 	if (MP_LT(minseq, mp->seq))
@@ -1631,7 +1568,7 @@ static void isdn_ppp_mp_receive(isdn_net_dev * net_dev, isdn_net_local * lp,
     		if (start != NULL && (MP_FLAGS(frag) & MP_END_FRAG)) {
       			minseq = mp->seq = (thisseq+1) & MP_LONGSEQ_MASK;
       			/* Reassemble the packet then dispatch it */
-			isdn_ppp_mp_reassembly(net_dev, lp, start, nextf);
+			isdn_ppp_mp_reassembly(lp->netdev, lp, start, nextf);
       
       			start = NULL;
       			frag = NULL;
@@ -1808,7 +1745,7 @@ void isdn_ppp_mp_reassembly( isdn_net_dev * net_dev, isdn_net_local * lp,
 		}
 	}
    	proto = isdn_ppp_strip_proto(skb);
-	isdn_ppp_push_higher(net_dev, lp, skb, proto);
+	isdn_ppp_push_higher(lp, idev, skb, proto);
 }
 
 static void isdn_ppp_mp_free_skb(ippp_bundle * mp, struct sk_buff * skb)
@@ -1844,7 +1781,7 @@ isdn_ppp_bundle(struct ippp_struct *is, int unit)
     	spin_lock_irqsave(&p->pb->lock, flags);
 
 	nidev = is->idev;
-	idev = p->queue->netdev;
+	idev = p->local.queue;
 	if( nidev->ppp_slot < 0 || nidev->ppp_slot >= ISDN_MAX_CHANNELS ||
 	    idev ->ppp_slot < 0 || idev ->ppp_slot >= ISDN_MAX_CHANNELS ) {
 		printk(KERN_ERR "ippp_bundle: binding to invalid slot %d\n",
@@ -1854,7 +1791,7 @@ isdn_ppp_bundle(struct ippp_struct *is, int unit)
 		goto out;
  	}
 
-	isdn_net_add_to_bundle(p, &nidev->local);
+	isdn_net_add_to_bundle(&p->local, nidev);
 
 	ippp_table[nidev->ppp_slot]->unit = ippp_table[idev->ppp_slot]->unit;
 
@@ -1978,7 +1915,7 @@ isdn_ppp_dial_slave(char *name)
 #ifdef CONFIG_ISDN_MPP
 	isdn_net_dev *idev;
 	isdn_net_local *lp;
-	struct net_device *sdev;
+	isdn_net_dev *sdev;
 
 	idev = isdn_net_findif(name);
 	if (!idev)
@@ -1988,17 +1925,16 @@ isdn_ppp_dial_slave(char *name)
 	if (!isdn_net_bound(idev))
 		return 5;
 
-	sdev = lp->slave;
+	sdev = idev->slave;
 	while (sdev) {
-		isdn_net_local *mlp = (isdn_net_local *) sdev->priv;
-		if (!isdn_net_bound(mlp->netdev))
+		if (!isdn_net_bound(sdev))
 			break;
-		sdev = mlp->slave;
+		sdev = sdev->slave;
 	}
 	if (!sdev)
 		return 2;
 
-	isdn_net_dial_req((isdn_net_local *) sdev->priv);
+	isdn_net_dial_req(sdev);
 	return 0;
 #else
 	return -1;
@@ -2009,35 +1945,20 @@ int
 isdn_ppp_hangup_slave(char *name)
 {
 #ifdef CONFIG_ISDN_MPP
-	isdn_net_dev *idev;
-	isdn_net_local *lp, *mlp = NULL;
-	struct net_device *sdev;
+	isdn_net_dev *idev, *sdev;
 
 	idev = isdn_net_findif(name);
 	if (!idev)
 		return 1;
-	lp = &idev->local;
+
 	if (!isdn_net_bound(idev))
 		return 5;
 
-	sdev = lp->slave;
-	while (sdev) {
-		mlp = (isdn_net_local *) sdev->priv;
-
-		if (mlp->slave) { /* find last connected link in chain */
-			isdn_net_local *nlp = (isdn_net_local *) mlp->slave->priv;
-
-			if (!isdn_net_bound(nlp->netdev))
-				break;
-		} else if (isdn_net_bound(mlp->netdev))
-			break;
-		
-		sdev = mlp->slave;
-	}
-	if (!sdev)
+	sdev = idev->slave;
+	if (!sdev || !isdn_net_bound(sdev))
 		return 2;
 
-	isdn_net_hangup(mlp->netdev);
+	isdn_net_hangup(sdev);
 	return 0;
 #else
 	return -1;
@@ -2139,7 +2060,7 @@ static void isdn_ppp_ccp_xmit_reset(struct ippp_struct *is, int proto,
 	printk(KERN_DEBUG "Sending CCP Frame:\n");
 	isdn_ppp_frame_log("ccp-xmit", skb->data, skb->len, 32, is->unit,idev->ppp_slot);
 
-	isdn_net_write_super(&idev->local, skb);
+	isdn_net_write_super(idev, skb);
 }
 
 /* Allocate the reset state vector */
@@ -2557,8 +2478,8 @@ static void isdn_ppp_receive_ccp(isdn_net_dev *net_dev, isdn_net_local *lp,
 	is = ippp_table[idev->ppp_slot];
 	isdn_ppp_frame_log("ccp-rcv", skb->data, skb->len, 32, is->unit,idev->ppp_slot);
 
-	if(lp->master) {
-		int slot = ((isdn_net_local *) (lp->master->priv))->netdev->ppp_slot;
+	if (idev->master) {
+		int slot = idev->master->netdev->ppp_slot;
 		if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
 			printk(KERN_ERR "%s: slot(%d) out of range\n",
 			       __FUNCTION__ , slot);
@@ -2745,8 +2666,8 @@ static void isdn_ppp_send_ccp(isdn_net_dev *net_dev, isdn_net_local *lp, struct 
 	printk(KERN_DEBUG "Received CCP frame from daemon:\n");
 	isdn_ppp_frame_log("ccp-xmit", skb->data, skb->len, 32, is->unit,idev->ppp_slot);
 
-	if (lp->master) {
-		slot = ((isdn_net_local *) (lp->master->priv))->netdev->ppp_slot;
+	if (idev->master) {
+		slot = idev->master->netdev->ppp_slot;
 		if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
 			printk(KERN_ERR "%s: slot(%d) out of range\n",
 			       __FUNCTION__ , slot);
