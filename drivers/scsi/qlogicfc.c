@@ -694,7 +694,7 @@ static inline void isp2x00_disable_irqs(struct Scsi_Host *host)
 int isp2x00_detect(Scsi_Host_Template * tmpt)
 {
 	int hosts = 0;
-	int wait_time;
+	unsigned long wait_time;
 	struct Scsi_Host *host = NULL;
 	struct isp2x00_hostdata *hostdata;
 	struct pci_dev *pdev;

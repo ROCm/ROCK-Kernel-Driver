@@ -981,7 +981,7 @@ dgrs_download(struct net_device *dev0)
 {
 	DGRS_PRIV	*priv0 = (DGRS_PRIV *) dev0->priv;
 	int		is;
-	int		i;
+	unsigned long	i;
 
 	static int	iv2is[16] = {
 				0, 0, 0, ES4H_IS_INT3,
@@ -1140,7 +1140,7 @@ int __init
 dgrs_probe1(struct net_device *dev)
 {
 	DGRS_PRIV	*priv = (DGRS_PRIV *) dev->priv;
-	int		i;
+	unsigned long	i;
 	int		rc;
 
 	printk("%s: Digi RightSwitch io=%lx mem=%lx irq=%d plx=%lx dma=%lx\n",
