@@ -65,7 +65,7 @@ static int adpt_device_reset(Scsi_Cmnd* cmd);
 #include "dpt/dpti_i2o.h"
 #include "dpt/dpti_ioctl.h"
 
-#define DPT_I2O_VERSION "2.4 Build 5"
+#define DPT_I2O_VERSION "2.4 Build 5go"
 #define DPT_VERSION     2
 #define DPT_REVISION    '4'
 #define DPT_SUBREVISION '5'
@@ -272,7 +272,7 @@ struct sg_simple_element {
 static void adpt_i2o_sys_shutdown(void);
 static int adpt_init(void);
 static int adpt_i2o_build_sys_table(void);
-static void adpt_isr(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t adpt_isr(int irq, void *dev_id, struct pt_regs *regs);
 #ifdef REBOOT_NOTIFIER
 static int adpt_reboot_event(struct notifier_block *n, ulong code, void *p);
 #endif
