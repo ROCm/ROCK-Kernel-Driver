@@ -327,6 +327,7 @@ if (!retval) {
      talk to the device, the release function in the driver is called. In this
      function we decrement our private usage count and wait for possible
      pending writes:
+  </para>
   <programlisting>
 /* decrement our usage count for the device */
 --skel->open_count;
