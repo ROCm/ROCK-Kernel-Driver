@@ -1114,9 +1114,6 @@ void neigh_parms_release(struct neigh_table *tbl, struct neigh_parms *parms)
 		if (*p == parms) {
 			*p = parms->next;
 			write_unlock_bh(&tbl->lock);
-#ifdef CONFIG_SYSCTL
-			neigh_sysctl_unregister(parms);
-#endif
 			kfree(parms);
 			return;
 		}
@@ -1179,9 +1176,6 @@ int neigh_table_clear(struct neigh_table *tbl)
 		}
 	}
 	write_unlock(&neigh_tbl_lock);
-#ifdef CONFIG_SYSCTL
-	neigh_sysctl_unregister(&tbl->parms);
-#endif
 	return 0;
 }
 

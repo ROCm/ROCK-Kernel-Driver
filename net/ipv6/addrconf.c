@@ -1893,10 +1893,11 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 	/* Shot the device (if unregistered) */
 
 	if (how == 1) {
-		neigh_parms_release(&nd_tbl, idev->nd_parms);
 #ifdef CONFIG_SYSCTL
 		addrconf_sysctl_unregister(&idev->cnf);
+		neigh_sysctl_unregister(&idev->nd_parms);
 #endif
+		neigh_parms_release(&nd_tbl, idev->nd_parms);
 		in6_dev_put(idev);
 	}
 	return 0;
