@@ -979,7 +979,7 @@ static void get_udp_sock(struct sock *sp, char *tmpbuf, int i)
 	destp = ntohs(inet->dport);
 	srcp  = ntohs(inet->sport);
 	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
-		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %ld %d %p",
+		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
 		i, src, srcp, dest, destp, sp->state, 
 		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
 		0, 0L, 0,
