@@ -26,8 +26,6 @@
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 
-#include <video/fbcon.h>
-
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/uaccess.h>
@@ -197,8 +195,6 @@ static struct fb_ops clps7111fb_ops = {
 	.fb_check_var	= clps7111fb_check_var,
 	.fb_set_par	= clps7111fb_set_par,
 	.fb_set_var	= gen_set_var,
-	.fb_set_cmap	= gen_set_cmap,
-	.fb_get_cmap	= gen_get_cmap,
 	.fb_setcolreg	= clps7111fb_setcolreg,
 	.fb_blank	= clps7111fb_blank,
 	.fb_fillrect	= cfb_fillrect,
@@ -261,11 +257,11 @@ int __init clps711xfb_init(void)
 {
 	int err = -ENOMEM;
 
-	cfb = kmalloc(sizeof(*cfb) + sizeof(struct display), GFP_KERNEL);
+	cfb = kmalloc(sizeof(*cfb), GFP_KERNEL);
 	if (!cfb)
 		goto out;
 
-	memset(cfb, 0, sizeof(*cfb) + sizeof(struct display));
+	memset(cfb, 0, sizeof(*cfb));
 	memset((void *)PAGE_OFFSET, 0, 0x14000);
 
 	cfb->currcon		= -1;
@@ -276,22 +272,19 @@ int __init clps711xfb_init(void)
 	cfb->fix.smem_len	= 0x14000;
 	cfb->fix.type	= FB_TYPE_PACKED_PIXELS;
 
-	cfb->var.xres	 = 640;
-	cfb->var.xres_virtual = 640;
-	cfb->var.yres	 = 240;
-	cfb->var.yres_virtual = 240;
+	cfb->var.xres 		= 640;
+	cfb->var.xres_virtual 	= 640;
+	cfb->var.yres 		= 240;
+	cfb->var.yres_virtual 	= 240;
 	cfb->var.bits_per_pixel = 4;
-	cfb->var.grayscale   = 1;
+	cfb->var.grayscale   	= 1;
 	cfb->var.activate	= FB_ACTIVATE_NOW;
-	cfb->var.height	= -1;
-	cfb->var.width	= -1;
+	cfb->var.height		= -1;
+	cfb->var.width		= -1;
 
 	cfb->fbops		= &clps7111fb_ops;
-	cfb->changevar	= NULL;
-	cfb->switch_con	= gen_switch;
-	cfb->updatevar	= gen_update_var;
+	cfb->updatevar		= gen_update_var;
 	cfb->flags		= FBINFO_FLAG_DEFAULT;
-	cfb->disp		= (struct display *)(cfb + 1);
 
 	fb_alloc_cmap(&cfb->cmap, CMAP_SIZE, 0);
 
