@@ -63,7 +63,8 @@ CONFIG_USB_KBD
   to use the generic HID driver for your USB keyboard and prefer
   to use the keyboard in its limited Boot Protocol mode instead.
 
-  This is almost certainly not what you want.
+  This is almost certainly not what you want.  This is mostly
+  useful for embedded applications or simple keyboards.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -77,7 +78,8 @@ CONFIG_USB_MOUSE
   to use the generic HID driver for your USB keyboard and prefer
   to use the keyboard in its limited Boot Protocol mode instead.
 
-  This is almost certainly not what you want.
+  This is almost certainly not what you want.  This is mostly
+  useful for embedded applications or simple mice.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
