@@ -323,7 +323,7 @@ static void bw2_init_one(struct sbus_dev *sdev)
 		resp = &res;
 		all->info.var.xres = all->info.var.xres_virtual = 1152;
 		all->info.var.yres = all->info.var.yres_virtual = 900;
-		all->info.bits_per_pixel = 1;
+		all->info.var.bits_per_pixel = 1;
 		linebytes = 1152 / 8;
 	} else
 #else
@@ -337,6 +337,10 @@ static void bw2_init_one(struct sbus_dev *sdev)
 					       all->info.var.xres);
 	}
 #endif
+	all->info.var.red.length = all->info.var.green.length =
+		all->info.var.blue.length = all_info.var.bits_per_pixel;
+	all->info.var.red.offset = all->info.var.green.offset =
+		all->info.var.blue.offset = 0;
 
 	all->par.regs = (struct bw2_regs *)
 		sbus_ioremap(resp, BWTWO_REGISTER_OFFSET,

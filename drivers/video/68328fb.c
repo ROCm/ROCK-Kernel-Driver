@@ -199,6 +199,15 @@ static int mc68x328fb_check_var(struct fb_var_screeninfo *var,
 	 */
 	switch (var->bits_per_pixel) {
 	case 1:
+		var->red.offset = 0;
+		var->red.length = 1;
+		var->green.offset = 0;
+		var->green.length = 1;
+		var->blue.offset = 0;
+		var->blue.length = 1;
+		var->transp.offset = 0;
+		var->transp.length = 0;
+		break;
 	case 8:
 		var->red.offset = 0;
 		var->red.length = 8;
@@ -452,6 +461,10 @@ int __init mc68x328fb_init(void)
 		get_line_length(mc68x328fb_default.xres_virtual, mc68x328fb_default.bits_per_pixel);
 	fb_info.fix.visual = (mc68x328fb_default.bits_per_pixel) == 1 ?
 		MC68X328FB_MONO_VISUAL : FB_VISUAL_PSEUDOCOLOR;
+	if (fb_info.var.bits_per_pixel == 1) {
+		fb_info.var.red.length = fb_info.var.green.length = fb_info.var.blue.length = 1;
+		fb_info.var.red.offset = fb_info.var.green.offset = fb_info.var.blue.offset = 0;
+	}
 	fb_info.pseudo_palette = &mc68x328fb_pseudo_palette;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 

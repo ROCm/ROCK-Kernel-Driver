@@ -1298,6 +1298,7 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 	    case 1:
 		fix->type = FB_TYPE_PLANES;	/* well, sort of */
 		fix->visual = FB_VISUAL_MONO10;
+		var->red.length = var->green.length = var->blue.length = 1;
 		break;
 	    case 8:
 		fix->type = FB_TYPE_PACKED_PIXELS;

@@ -60,6 +60,9 @@ static struct fb_var_screeninfo tx3912fb_var = {
 	.blue =		{ 0, 2, 0 },
 #else
 	.bits_per_pixel =4,
+	.red =		{ 0, 4, 0 },	/* ??? */
+	.green =	{ 0, 4, 0 },
+	.blue =		{ 0, 4, 0 },
 #endif
 	.activate =	FB_ACTIVATE_NOW,
 	.width =	-1,
