@@ -940,6 +940,7 @@ elevator_t iosched_deadline = {
 	.elevator_exit_fn =		deadline_exit,
 
 	.elevator_ktype =		&deadline_ktype,
+	.elevator_name =		"deadline",
 };
 
 EXPORT_SYMBOL(iosched_deadline);

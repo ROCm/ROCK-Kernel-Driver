@@ -68,11 +68,13 @@ ENTRY(trap)
 	addql	#4,%sp
 	jra	ret_from_exception
 
-	| schedule_tail is only used with CONFIG_SMP
+	| After a fork we jump here directly from resume,
+	| so that %d1 contains the previous task
+	| schedule_tail now used regardless of CONFIG_SMP
 ENTRY(ret_from_fork)
-#ifdef CONFIG_SMP
+	movel	%d1,%sp@-
 	jsr	schedule_tail
-#endif
+	addql	#4,%sp
 	jra	ret_from_exception
 
 badsys:

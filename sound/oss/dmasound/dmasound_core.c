@@ -1210,6 +1210,8 @@ static int sq_ioctl(struct inode *inode, struct file *file, u_int cmd,
 			shared_resources_initialised = 0 ;
 		return result ;
 		break ;
+	case SOUND_PCM_READ_RATE:
+		return IOCTL_OUT(arg, dmasound.soft.speed);
 	case SNDCTL_DSP_SPEED:
 		/* changing this on the fly will have weird effects on the sound.
 		   Where there are rate conversions implemented in soft form - it

@@ -754,8 +754,8 @@ static void NCR5380_print_status (struct Scsi_Host *instance)
 static
 char *lprint_Scsi_Cmnd (Scsi_Cmnd *cmd, char *pos, char *buffer, int length);
 
-static int NCR5380_proc_info (struct Scsi_Host *instance, char *buffer, char **start, off_t offset,
-			      int length, int inout)
+int NCR5380_proc_info (struct Scsi_Host *instance, char *buffer, char **start,
+		       off_t offset, int length, int inout)
 {
     char *pos = buffer;
     struct NCR5380_hostdata *hostdata;

@@ -852,11 +852,6 @@ void show_trace(unsigned long *stack)
 	printk("\n");
 }
 
-void show_trace_task(struct task_struct *tsk)
-{
-	show_trace((unsigned long *)tsk->thread.esp0);
-}
-
 void show_registers(struct pt_regs *regs)
 {
 	struct frame *fp = (struct frame *)regs;
@@ -915,7 +910,7 @@ void show_registers(struct pt_regs *regs)
 	default:
 	    printk("\n");
 	}
-	show_stack((unsigned long *)addr);
+	show_stack(NULL, (unsigned long *)addr);
 
 	printk("Code: ");
 	for (i = 0; i < 10; i++)
@@ -923,13 +918,17 @@ void show_registers(struct pt_regs *regs)
 	printk ("\n");
 }
 
-extern void show_stack(unsigned long *stack)
+extern void show_stack(struct task_struct *task, unsigned long *stack)
 {
 	unsigned long *endstack;
 	int i;
 
-	if (!stack)
-		stack = (unsigned long *)&stack;
+	if (!stack) {
+		if (task)
+			stack = (unsigned long *)task->thread.esp0;
+		else
+			stack = (unsigned long *)&stack;
+	}
 	endstack = (unsigned long *)(((unsigned long)stack + THREAD_SIZE - 1) & -THREAD_SIZE);
 
 	printk("Stack from %08lx:", (unsigned long)stack);
@@ -1124,7 +1123,7 @@ void die_if_kernel (char *str, struct pt_regs *fp, int nr)
 
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 		current->comm, current->pid, PAGE_SIZE+(unsigned long)current);
-	show_stack((unsigned long *)fp);
+	show_stack(NULL, (unsigned long *)fp);
 	do_exit(SIGSEGV);
 }
 

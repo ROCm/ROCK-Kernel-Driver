@@ -113,7 +113,8 @@ static void sun3x_82072_fd_outb(unsigned char value, int port)
 }
 
 
-asmlinkage void sun3xflop_hardint(int irq, void *dev_id, struct pt_regs * regs)
+asmlinkage irqreturn_t sun3xflop_hardint(int irq, void *dev_id,
+					 struct pt_regs * regs)
 {
 	register unsigned char st;
 
@@ -127,7 +128,7 @@ asmlinkage void sun3xflop_hardint(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 	if(!doing_pdma) {
 		floppy_interrupt(irq, dev_id, regs);
-		return;
+		return IRQ_HANDLED;
 	}
 
 //	printk("doing pdma\n");// st %x\n", sun_fdc->status_82072);
@@ -151,7 +152,7 @@ asmlinkage void sun3xflop_hardint(int irq, void *dev_id, struct pt_regs * regs)
 			if((st & 0x80) == 0) {
 				virtual_dma_count = lcount;
 				virtual_dma_addr = lptr;
-				return;
+				return IRQ_HANDLED;
 			}
 
 			if((st & 0x20) == 0)
@@ -176,7 +177,7 @@ asmlinkage void sun3xflop_hardint(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 //	printk("st=%02x\n", st);
 	if(st == 0x20)
-		return;
+		return IRQ_HANDLED;
 	if(!(st & 0x20)) {
 		virtual_dma_residue += virtual_dma_count;
 		virtual_dma_count=0;
@@ -191,7 +192,7 @@ asmlinkage void sun3xflop_hardint(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 
 		floppy_interrupt(irq, dev_id, regs);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	
@@ -199,6 +200,7 @@ asmlinkage void sun3xflop_hardint(int irq, void *dev_id, struct pt_regs * regs)
 	if(!virtual_dma_count)
 		dma_wait++;
 #endif
+	return IRQ_HANDLED;
 }
 
 static int sun3xflop_request_irq(void)

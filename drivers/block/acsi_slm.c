@@ -999,7 +999,7 @@ int slm_init( void )
 		return -EBUSY;
 	}
 	
-	if (!(SLMBuffer = atari_stram_alloc( SLM_BUFFER_SIZE, NULL, "SLM" ))) {
+	if (!(SLMBuffer = atari_stram_alloc( SLM_BUFFER_SIZE, "SLM" ))) {
 		printk( KERN_ERR "Unable to get SLM ST-Ram buffer.\n" );
 		unregister_chrdev( ACSI_MAJOR, "slm" );
 		return -ENOMEM;
