@@ -459,6 +459,7 @@ int radeon_do_cp_idle( drm_radeon_private_t *dev_priv )
 	RADEON_WAIT_UNTIL_IDLE();
 
 	ADVANCE_RING();
+	COMMIT_RING();
 
 	return radeon_do_wait_for_idle( dev_priv );
 }
@@ -483,6 +484,7 @@ static void radeon_do_cp_start( drm_radeon_private_t *dev_priv )
 	RADEON_WAIT_UNTIL_IDLE();
 
 	ADVANCE_RING();
+	COMMIT_RING();
 }
 
 /* Reset the Command Processor.  This will not flush any pending

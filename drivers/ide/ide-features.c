@@ -189,17 +189,19 @@ int ide_driveid_update(struct ata_device *drive)
 	SELECT_MASK(drive->channel, drive, 1);
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);
-	ide_delay_50ms();
+	mdelay(50);
 	OUT_BYTE(WIN_IDENTIFY, IDE_COMMAND_REG);
 	timeout = jiffies + WAIT_WORSTCASE;
 	do {
-		if (0 < (signed long)(jiffies - timeout)) {
+		if (time_after(jiffies, timeout)) {
 			SELECT_MASK(drive->channel, drive, 0);
 			return 0;	/* drive timed-out */
 		}
-		ide_delay_50ms();	/* give drive a breather */
+		mdelay(50);	/* give drive a breather */
 	} while (IN_BYTE(IDE_ALTSTATUS_REG) & BUSY_STAT);
-	ide_delay_50ms();	/* wait for IRQ and DRQ_STAT */
+
+	mdelay(50);	/* wait for IRQ and DRQ_STAT */
+
 	if (!OK_STAT(GET_STAT(),DRQ_STAT,BAD_R_STAT)) {
 		SELECT_MASK(drive->channel, drive, 0);
 		printk("%s: CHECK for good STATUS\n", drive->name);

@@ -490,6 +490,9 @@ repeat:
 	ei->i_flags = EXT3_I(dir)->i_flags & ~EXT3_INDEX_FL;
 	if (S_ISLNK(mode))
 		ei->i_flags &= ~(EXT3_IMMUTABLE_FL|EXT3_APPEND_FL);
+	/* dirsync only applies to directories */
+	if (!S_ISDIR(mode))
+		ei->i_flags &= ~EXT3_DIRSYNC_FL;
 #ifdef EXT3_FRAGMENTS
 	ei->i_faddr = 0;
 	ei->i_frag_no = 0;
@@ -506,7 +509,9 @@ repeat:
 	
 	if (ei->i_flags & EXT3_SYNC_FL)
 		inode->i_flags |= S_SYNC;
-	if (IS_SYNC(inode))
+	if (ei->i_flags & EXT3_DIRSYNC_FL)
+		inode->i_flags |= S_DIRSYNC;
+	if (IS_DIRSYNC(inode))
 		handle->h_sync = 1;
 	insert_inode_hash(inode);
 	inode->i_generation = sb->u.ext3_sb.s_next_generation++;

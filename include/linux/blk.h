@@ -293,19 +293,14 @@ static void floppy_off(unsigned int nr);
 #if !defined(IDE_DRIVER)
 
 #ifndef CURRENT
-#define CURRENT elv_next_request(&blk_dev[MAJOR_NR].request_queue)
+# define CURRENT elv_next_request(&blk_dev[MAJOR_NR].request_queue)
 #endif
 #ifndef QUEUE
-#define QUEUE (&blk_dev[MAJOR_NR].request_queue)
-#endif
-#ifndef QUEUE_EMPTY
-#define QUEUE_EMPTY blk_queue_empty(QUEUE)
+# define QUEUE (&blk_dev[MAJOR_NR].request_queue)
 #endif
 #ifndef DEVICE_NAME
-#define DEVICE_NAME "unknown"
+# define DEVICE_NAME "unknown"
 #endif
-
-#define CURRENT_DEV DEVICE_NR(CURRENT->rq_dev)
 
 #ifdef DEVICE_INTR
 static void (*DEVICE_INTR)(void) = NULL;

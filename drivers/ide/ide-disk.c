@@ -361,8 +361,8 @@ static int idedisk_open (struct inode *inode, struct file *filp, struct ata_devi
 
 		/*
 		 * Ignore the return code from door_lock, since the open() has
-		 * already succeeded, and the door_lock is irrelevant at this
-		 * point.
+		 * already succeeded once, and the door_lock is irrelevant at this
+		 * time.
 		 */
 
 		if (drive->doorlocking && ide_raw_taskfile(drive, &args))
@@ -1196,7 +1196,7 @@ static void idedisk_attach(struct ata_device *drive)
 	channel = drive->channel;
 	unit = drive - channel->drives;
 
-	ide_revalidate_disk(mk_kdev(channel->major, unit << PARTN_BITS));
+	ata_revalidate(mk_kdev(channel->major, unit << PARTN_BITS));
 }
 
 static void __exit idedisk_exit(void)

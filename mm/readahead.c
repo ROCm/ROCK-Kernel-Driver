@@ -31,6 +31,25 @@ static inline unsigned long get_min_readahead(struct file *file)
 	return (VM_MIN_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 }
 
+static int
+read_pages(struct address_space *mapping,
+		struct list_head *pages, unsigned nr_pages)
+{
+	unsigned page_idx;
+
+	if (mapping->a_ops->readpages)
+		return mapping->a_ops->readpages(mapping, pages, nr_pages);
+
+	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
+		struct page *page = list_entry(pages->prev, struct page, list);
+		list_del(&page->list);
+		if (!add_to_page_cache_unique(page, mapping, page->index))
+			mapping->a_ops->readpage(NULL, page);
+		page_cache_release(page);
+	}
+	return 0;
+}
+
 /*
  * Readahead design.
  *
@@ -148,24 +167,9 @@ void do_page_cache_readahead(struct file *file,
 	 * uptodate then the caller will launch readpage again, and
 	 * will then handle the error.
 	 */
-	for (page_idx = 0; page_idx < nr_to_really_read; page_idx++) {
-		if (list_empty(&page_pool))
-			BUG();
-		page = list_entry(page_pool.prev, struct page, list);
-		list_del(&page->list);
-		if (!add_to_page_cache_unique(page, mapping, page->index))
-			mapping->a_ops->readpage(file, page);
-		page_cache_release(page);
-	}
-
-	/*
-	 * Do this now, rather than at the next wait_on_page_locked().
-	 */
-	run_task_queue(&tq_disk);
-
-	if (!list_empty(&page_pool))
-		BUG();
-
+	read_pages(mapping, &page_pool, nr_to_really_read);
+	blk_run_queues();
+	BUG_ON(!list_empty(&page_pool));
 	return;
 }
 

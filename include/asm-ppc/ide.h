@@ -100,7 +100,7 @@ static __inline__ void ide_init_default_hwifs(void)
 			continue;
 		ide_init_hwif_ports(&hw, base, 0, NULL);
 		hw.irq = ide_default_irq(base);
-		ide_register_hw(&hw, NULL);
+		ide_register_hw(&hw);
 	}
 #endif
 }

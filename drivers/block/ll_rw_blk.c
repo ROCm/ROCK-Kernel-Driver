@@ -49,6 +49,9 @@ extern int mac_floppy_init(void);
  */
 static kmem_cache_t *request_cachep;
 
+static struct list_head blk_plug_list;
+static spinlock_t blk_plug_lock = SPIN_LOCK_UNLOCKED;
+
 /*
  * The "disk" task queue is used to start the actual requests
  * after a plug
@@ -791,8 +794,12 @@ void blk_plug_device(request_queue_t *q)
 	if (!elv_queue_empty(q))
 		return;
 
-	if (!test_and_set_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
-		queue_task(&q->plug_tq, &tq_disk);
+	if (test_and_set_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
+		return;
+
+	spin_lock(&blk_plug_lock);
+	list_add_tail(&q->plug.list, &blk_plug_list);
+	spin_unlock(&blk_plug_lock);
 }
 
 /*
@@ -803,8 +810,13 @@ static inline void __generic_unplug_device(request_queue_t *q)
 	/*
 	 * not plugged
 	 */
-	if (!test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
+	if (!__test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
 		return;
+
+	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
+		printk("queue was stopped\n");
+		return;
+	}
 
 	/*
 	 * was plugged, fire request_fn if queue has stuff to do
@@ -815,7 +827,7 @@ static inline void __generic_unplug_device(request_queue_t *q)
 
 /**
  * generic_unplug_device - fire a request queue
- * @q:    The &request_queue_t in question
+ * @data:    The &request_queue_t in question
  *
  * Description:
  *   Linux uses plugging to build bigger requests queues before letting
@@ -827,12 +839,65 @@ static inline void __generic_unplug_device(request_queue_t *q)
  **/
 void generic_unplug_device(void *data)
 {
+	request_queue_t *q = data;
+
+	tasklet_schedule(&q->plug.task);
+}
+
+/*
+ * the plug tasklet
+ */
+static void blk_task_run(unsigned long data)
+{
 	request_queue_t *q = (request_queue_t *) data;
 	unsigned long flags;
 
 	spin_lock_irqsave(q->queue_lock, flags);
 	__generic_unplug_device(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
+}
+
+/*
+ * clear top flag and schedule tasklet for execution
+ */
+void blk_start_queue(request_queue_t *q)
+{
+	if (test_and_clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
+		tasklet_enable(&q->plug.task);
+
+	tasklet_schedule(&q->plug.task);
+}
+
+/*
+ * set stop bit and disable any pending tasklet
+ */
+void blk_stop_queue(request_queue_t *q)
+{
+	if (!test_and_set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
+		tasklet_disable(&q->plug.task);
+}
+
+/*
+ * the equivalent of the previous tq_disk run
+ */
+void blk_run_queues(void)
+{
+	struct list_head *tmp, *n;
+	unsigned long flags;
+
+	/*
+	 * we could splice to the stack prior to running
+	 */
+	spin_lock_irqsave(&blk_plug_lock, flags);
+	list_for_each_safe(tmp, n, &blk_plug_list) {
+		request_queue_t *q = list_entry(tmp, request_queue_t,plug.list);
+
+		if (!test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
+			list_del(&q->plug.list);
+			tasklet_schedule(&q->plug.task);
+		}
+	}
+	spin_unlock_irqrestore(&blk_plug_lock, flags);
 }
 
 static int __blk_cleanup_queue(struct request_list *list)
@@ -974,9 +1039,6 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	q->front_merge_fn      	= ll_front_merge_fn;
 	q->merge_requests_fn	= ll_merge_requests_fn;
 	q->prep_rq_fn		= NULL;
-	q->plug_tq.sync		= 0;
-	q->plug_tq.routine	= &generic_unplug_device;
-	q->plug_tq.data		= q;
 	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER);
 	q->queue_lock		= lock;
 
@@ -987,6 +1049,10 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 
 	blk_queue_max_hw_segments(q, MAX_HW_SEGMENTS);
 	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
+
+	INIT_LIST_HEAD(&q->plug.list);
+	tasklet_init(&q->plug.task, blk_task_run, (unsigned long) q);
+
 	return 0;
 }
 
@@ -1867,6 +1933,8 @@ int __init blk_dev_init(void)
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
 
+	INIT_LIST_HEAD(&blk_plug_list);
+
 #if defined(CONFIG_IDE) && defined(CONFIG_BLK_DEV_HD)
 	hd_init();
 #endif
@@ -1889,6 +1957,7 @@ EXPORT_SYMBOL(blkdev_release_request);
 EXPORT_SYMBOL(generic_unplug_device);
 EXPORT_SYMBOL(blk_attempt_remerge);
 EXPORT_SYMBOL(blk_max_low_pfn);
+EXPORT_SYMBOL(blk_max_pfn);
 EXPORT_SYMBOL(blk_queue_max_sectors);
 EXPORT_SYMBOL(blk_queue_max_phys_segments);
 EXPORT_SYMBOL(blk_queue_max_hw_segments);
@@ -1902,6 +1971,8 @@ EXPORT_SYMBOL(submit_bio);
 EXPORT_SYMBOL(blk_queue_assign_lock);
 EXPORT_SYMBOL(blk_phys_contig_segment);
 EXPORT_SYMBOL(blk_hw_contig_segment);
+EXPORT_SYMBOL(blk_get_request);
+EXPORT_SYMBOL(blk_put_request);
 
 EXPORT_SYMBOL(blk_queue_prep_rq);
 
@@ -1910,3 +1981,7 @@ EXPORT_SYMBOL(blk_queue_free_tags);
 EXPORT_SYMBOL(blk_queue_start_tag);
 EXPORT_SYMBOL(blk_queue_end_tag);
 EXPORT_SYMBOL(blk_queue_invalidate_tags);
+
+EXPORT_SYMBOL(blk_start_queue);
+EXPORT_SYMBOL(blk_stop_queue);
+EXPORT_SYMBOL(blk_run_queues);

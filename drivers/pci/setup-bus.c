@@ -228,10 +228,8 @@ pbus_size_io(struct pci_bus *bus)
 			struct resource *r = &dev->resource[i];
 			unsigned long r_size;
 
-			if (!(r->flags & IORESOURCE_IO))
+			if (r->parent || !(r->flags & IORESOURCE_IO))
 				continue;
-			if (r->parent)
-				BUG();
 			r_size = r->end - r->start + 1;
 
 			if (r_size < 0x400)
@@ -283,10 +281,8 @@ pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long type)
 			struct resource *r = &dev->resource[i];
 			unsigned long r_size;
 
-			if ((r->flags & mask) != type)
+			if (r->parent || (r->flags & mask) != type)
 				continue;
-			if (r->parent)
-				BUG();
 			r_size = r->end - r->start + 1;
 			/* For bridges size != alignment */
 			align = (i < PCI_BRIDGE_RESOURCES) ? r_size : r->start;

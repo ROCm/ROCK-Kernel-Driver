@@ -714,6 +714,7 @@ do {									\
 			   n, __FUNCTION__ );				\
 	}								\
 	if ( dev_priv->ring.space <= (n) * sizeof(u32) ) {		\
+                COMMIT_RING();						\
 		radeon_wait_ring( dev_priv, (n) * sizeof(u32) );	\
 	}								\
 	_nr = n; dev_priv->ring.space -= (n) * sizeof(u32);		\
@@ -727,7 +728,6 @@ do {									\
 		DRM_INFO( "ADVANCE_RING() wr=0x%06x tail=0x%06x\n",	\
 			  write, dev_priv->ring.tail );			\
 	}								\
-	radeon_flush_write_combine();					\
 	if (((dev_priv->ring.tail + _nr) & mask) != write) {		\
 		DRM_ERROR( 						\
 			"ADVANCE_RING(): mismatch: nr: %x write: %x\n",	\
@@ -735,7 +735,10 @@ do {									\
 			write);						\
 	} else								\
 		dev_priv->ring.tail = write;				\
-	RADEON_WRITE( RADEON_CP_RB_WPTR, write );			\
+} while (0)
+
+#define COMMIT_RING() do {					    \
+	RADEON_WRITE( RADEON_CP_RB_WPTR, dev_priv->ring.tail );		    \
 } while (0)
 
 #define OUT_RING( x ) do {						\
@@ -751,6 +754,30 @@ do {									\
 	OUT_RING( CP_PACKET0( reg, 0 ) );				\
 	OUT_RING( val );						\
 } while (0)
+
+
+#define OUT_RING_USER_TABLE( tab, sz ) do {			\
+	int _size = (sz);					\
+	int *_tab = (tab);					\
+								\
+	if (write + _size > mask) {				\
+		int i = (mask+1) - write;			\
+		if (__copy_from_user( (int *)(ring+write),	\
+				      _tab, i*4 ))		\
+			return -EFAULT;				\
+		write = 0;					\
+		_size -= i;					\
+		_tab += i;					\
+	}							\
+								\
+	if (_size && __copy_from_user( (int *)(ring+write),	\
+			               _tab, _size*4 ))		\
+		return -EFAULT;					\
+								\
+	write += _size;						\
+	write &= mask;						\
+} while (0)
+
 
 #define RADEON_PERFORMANCE_BOXES	0
 

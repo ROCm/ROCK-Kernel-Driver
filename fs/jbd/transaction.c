@@ -709,8 +709,9 @@ repeat:
 							    GFP_NOFS);
 				lock_journal(journal);
 				if (!frozen_buffer) {
-					printk(KERN_EMERG __FUNCTION__
-						"OOM for frozen_buffer\n");
+					printk(KERN_EMERG
+					       "%s: OOM for frozen_buffer\n",
+					       __FUNCTION__);
 					JBUFFER_TRACE(jh, "oom!");
 					error = -ENOMEM;
 					spin_lock(&journal_datalist_lock);
@@ -906,8 +907,9 @@ int journal_get_undo_access (handle_t *handle, struct buffer_head *bh)
 		jh->b_committed_data = jbd_kmalloc(jh2bh(jh)->b_size, 
 						   GFP_NOFS);
 		if (!jh->b_committed_data) {
-			printk(KERN_EMERG __FUNCTION__
-				": No memory for committed data!\n");
+			printk(KERN_EMERG
+			       "%s: No memory for committed data!\n",
+			       __FUNCTION__);
 			err = -ENOMEM;
 			goto out;
 		}

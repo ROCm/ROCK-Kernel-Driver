@@ -58,8 +58,11 @@ struct atapi_packet_command {
 	} s;
 };
 
-
-extern void atapi_discard_data(struct ata_device *drive, unsigned int bcount);
-extern void atapi_write_zeros(struct ata_device *drive, unsigned int bcount);
-
 extern void atapi_init_pc(struct atapi_packet_command *pc);
+
+extern void atapi_discard_data(struct ata_device *, unsigned int);
+extern void atapi_write_zeros(struct ata_device *, unsigned int);
+
+extern void atapi_read(struct ata_device *, u8 *, unsigned int);
+extern void atapi_write(struct ata_device *, u8 *, unsigned int);
+

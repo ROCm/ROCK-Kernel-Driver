@@ -8,6 +8,7 @@
 #include <linux/list.h>
 #include <linux/pagemap.h>
 #include <linux/backing-dev.h>
+#include <linux/interrupt.h>
 
 #include <asm/scatterlist.h>
 
@@ -136,6 +137,11 @@ struct blk_queue_tag {
 	int max_depth;
 };
 
+struct blk_plug {
+	struct list_head list;
+	struct tasklet_struct task;
+};
+
 /*
  * Default nr free requests per queue, ll_rw_blk will scale it down
  * according to available RAM at init time
@@ -177,10 +183,7 @@ struct request_queue
 	unsigned long		bounce_pfn;
 	int			bounce_gfp;
 
-	/*
-	 * This is used to remove the plug when tq_disk runs.
-	 */
-	struct tq_struct	plug_tq;
+	struct blk_plug		plug;
 
 	/*
 	 * various queue flags, see QUEUE_* below
@@ -217,6 +220,7 @@ struct request_queue
 #define QUEUE_FLAG_PLUGGED	0	/* queue is plugged */
 #define QUEUE_FLAG_CLUSTER	1	/* cluster several segments into 1 */
 #define QUEUE_FLAG_QUEUED	2	/* uses generic tag queueing */
+#define QUEUE_FLAG_STOPPED	3	/* queue is stopped */
 
 #define blk_queue_plugged(q)	test_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
 #define blk_mark_plugged(q)	set_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
@@ -303,6 +307,8 @@ extern void blk_recount_segments(request_queue_t *, struct bio *);
 extern inline int blk_phys_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern inline int blk_hw_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern int block_ioctl(struct block_device *, unsigned int, unsigned long);
+extern void blk_start_queue(request_queue_t *q);
+extern void blk_stop_queue(request_queue_t *q);
 
 /*
  * get ready for proper ref counting

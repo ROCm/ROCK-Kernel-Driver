@@ -591,7 +591,7 @@ static void fd_error(void)
 {
 	printk("FDC1772: fd_error\n");
 	/*panic("fd1772: fd_error"); *//* DAG tmp */
-	if (QUEUE_EMPTY)
+	if (blk_queue_empty(QUEUE))
 		return;
 	CURRENT->errors++;
 	if (CURRENT->errors >= MAX_ERRORS) {
@@ -1114,16 +1114,6 @@ static void finish_fdc_done(int dummy)
 static int fd_ref[4];
 static int fd_device[4];
 
-/*
- * Current device number. Taken either from the block header or from the
- * format request descriptor.
- */
-#define CURRENT_DEVICE (CURRENT->rq_dev)
-
-/* Current error count. */
-#define CURRENT_ERRORS (CURRENT->errors)
-
-
 /* dummy for blk.h */
 static void floppy_off(unsigned int nr)
 {
@@ -1145,7 +1135,7 @@ static int check_floppy_change(dev_t dev)
 {
 	unsigned int drive = (dev & 0x03);
 
-	if (MAJOR(dev) != MAJOR_NR) {
+	if (major(dev) != MAJOR_NR) {
 		printk("floppy_changed: not a floppy\n");
 		return 0;
 	}
@@ -1205,7 +1195,7 @@ static void setup_req_params(int drive)
 	ReqData = ReqBuffer + 512 * ReqCnt;
 
 #ifdef TRACKBUFFER
-	read_track = (ReqCmd == READ && CURRENT_ERRORS == 0);
+	read_track = (ReqCmd == READ && CURRENT->errors == 0);
 #endif
 
 	DPRINT(("Request params: Si=%d Tr=%d Se=%d Data=%08lx\n", ReqSide,
@@ -1220,24 +1210,21 @@ static void redo_fd_request(void)
 
 	DPRINT(("redo_fd_request: CURRENT=%08lx CURRENT->rq_dev=%04x CURRENT->sector=%ld\n",
 		(unsigned long) CURRENT, CURRENT ? CURRENT->rq_dev : 0,
-		!QUEUE_EMPTY ? CURRENT->sector : 0));
-
-	if (!QUEUE_EMPTY && CURRENT->rq_status == RQ_INACTIVE)
-		goto the_end;
+		!blk_queue_empty(QUEUE) ? CURRENT->sector : 0));
 
 repeat:
 
-	if (QUEUE_EMPTY)
+	if (blk_queue_empty(QUEUE))
 		goto the_end;
 
-	if (MAJOR(CURRENT->rq_dev) != MAJOR_NR)
+	if (major(CURRENT->rq_dev) != MAJOR_NR)
 		panic(DEVICE_NAME ": request list destroyed");
 
 	if (CURRENT->bh) {
 		if (!buffer_locked(CURRENT->bh))
 			panic(DEVICE_NAME ": block not locked");
 	}
-	device = MINOR(CURRENT_DEVICE);
+	device = minor(CURRENT->rq_dev);
 	drive = device & 3;
 	type = device >> 2;
 	floppy = &unit[drive];
@@ -1343,7 +1330,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 	int drive, device;
 
 	device = inode->i_rdev;
-	drive = MINOR(device);
+	drive = minor(device);
 	switch (cmd) {
 	case FDFMTBEG:
 		return 0;
@@ -1502,8 +1489,8 @@ static int floppy_open(struct inode *inode, struct file *filp)
 		DPRINT(("Weird, open called with filp=0\n"));
 		return -EIO;
 	}
-	drive = MINOR(inode->i_rdev) & 3;
-	if ((MINOR(inode->i_rdev) >> 2) > NUM_DISK_TYPES)
+	drive = minor(inode->i_rdev) & 3;
+	if ((minor(inode->i_rdev) >> 2) > NUM_DISK_TYPES)
 		return -ENXIO;
 
 	old_dev = fd_device[drive];
@@ -1543,7 +1530,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 
 static int floppy_release(struct inode *inode, struct file *filp)
 {
-	int drive = MINOR(inode->i_rdev) & 3;
+	int drive = minor(inode->i_rdev) & 3;
 
 	if (fd_ref[drive] < 0)
 		fd_ref[drive] = 0;

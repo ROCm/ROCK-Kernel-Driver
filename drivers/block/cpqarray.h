@@ -104,7 +104,7 @@ struct ctlr_info {
 	cmdlist_t *cmpQ;
 	cmdlist_t *cmd_pool;
 	dma_addr_t cmd_pool_dhandle;
-	__u32	*cmd_pool_bits;
+	unsigned long *cmd_pool_bits;
 	spinlock_t lock;
 
 	unsigned int Qdepth;

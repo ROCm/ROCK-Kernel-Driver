@@ -2918,14 +2918,8 @@ static void redo_fd_request(void)
 	if (current_drive < N_DRIVE)
 		floppy_off(current_drive);
 
-	if (!QUEUE_EMPTY && CURRENT->rq_status == RQ_INACTIVE){
-		CLEAR_INTR;
-		unlock_fdc();
-		return;
-	}
-
-	while(1){
-		if (QUEUE_EMPTY) {
+	for (;;) {
+		if (blk_queue_empty(QUEUE)) {
 			CLEAR_INTR;
 			unlock_fdc();
 			return;
@@ -3900,7 +3894,7 @@ static int __floppy_read_block_0(struct block_device *bdev)
 	bio.bi_end_io = floppy_rb0_complete;
 
 	submit_bio(READ, &bio);
-	run_task_queue(&tq_disk);
+	generic_unplug_device(bdev_get_queue(bdev));
 	process_fd_request();
 	wait_for_completion(&complete);
 

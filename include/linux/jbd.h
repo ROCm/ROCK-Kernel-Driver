@@ -226,12 +226,13 @@ void buffer_assertion_failure(struct buffer_head *bh);
 #endif		/* JBD_ASSERTIONS */
 
 enum jbd_state_bits {
-	BH_JWrite
-	  = BH_PrivateStart,	/* 1 if being written to log (@@@ DEBUGGING) */
-	BH_Freed,		/* 1 if buffer has been freed (truncated) */
-	BH_Revoked,		/* 1 if buffer has been revoked from the log */
-	BH_RevokeValid,		/* 1 if buffer revoked flag is valid */
-	BH_JBDDirty,		/* 1 if buffer is dirty but journaled */
+	BH_JBD			/* Has an attached ext3 journal_head */
+	  = BH_PrivateStart,	
+	BH_JWrite,		/* Being written to log (@@@ DEBUGGING) */
+	BH_Freed,		/* Has been freed (truncated) */
+	BH_Revoked,		/* Has been revoked from the log */
+	BH_RevokeValid,		/* Revoked flag is valid */
+	BH_JBDDirty,		/* Is dirty but journaled */
 };
 
 BUFFER_FNS(JBD, jbd)

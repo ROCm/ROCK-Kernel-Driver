@@ -234,12 +234,17 @@ static void hexdump(u8 *x, int len)
 	printk("]\n");
 }
 
+static inline idescsi_scsi_t *idescsi_private(struct Scsi_Host *host)
+{
+	return (idescsi_scsi_t*) &host[1];
+}
+
 static int idescsi_end_request(struct ata_device *drive, struct request *rq, int uptodate)
 {
-	idescsi_scsi_t *scsi = drive->driver_data;
+	struct Scsi_Host *host = drive->driver_data;
+	idescsi_scsi_t *scsi = idescsi_private(host);
 	struct atapi_packet_command *pc = (struct atapi_packet_command *) rq->special;
 	int log = test_bit(IDESCSI_LOG_CMD, &scsi->log);
-	struct Scsi_Host *host;
 	u8 *scsi_buf;
 	unsigned long flags;
 
@@ -289,20 +294,21 @@ static inline unsigned long get_timeout(struct atapi_packet_command *pc)
  */
 static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request *rq)
 {
-	idescsi_scsi_t *scsi = drive->driver_data;
+	struct Scsi_Host *host = drive->driver_data;
+	idescsi_scsi_t *scsi = idescsi_private(host);
 	byte status, ireason;
 	int bcount;
-	struct atapi_packet_command *pc = scsi->pc;
+	struct atapi_packet_command *pc=scsi->pc;
 	unsigned int temp;
 
 #if IDESCSI_DEBUG_LOG
 	printk (KERN_INFO "ide-scsi: Reached idescsi_pc_intr interrupt handler\n");
-#endif
+#endif /* IDESCSI_DEBUG_LOG */
 
-	if (test_and_clear_bit(PC_DMA_IN_PROGRESS, &pc->flags)) {
+	if (test_and_clear_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
 #if IDESCSI_DEBUG_LOG
 		printk ("ide-scsi: %s: DMA complete\n", drive->name);
-#endif
+#endif /* IDESCSI_DEBUG_LOG */
 		pc->actually_transferred=pc->request_transfer;
 		udma_stop(drive);
 	}
@@ -372,7 +378,8 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 
 static ide_startstop_t idescsi_transfer_pc(struct ata_device *drive, struct request *rq)
 {
-	idescsi_scsi_t *scsi = drive->driver_data;
+	struct Scsi_Host *host = drive->driver_data;
+	idescsi_scsi_t *scsi = idescsi_private(host);
 	struct atapi_packet_command *pc = scsi->pc;
 	byte ireason;
 	ide_startstop_t startstop;
@@ -397,7 +404,8 @@ static ide_startstop_t idescsi_transfer_pc(struct ata_device *drive, struct requ
 static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request *rq,
 		struct atapi_packet_command *pc)
 {
-	idescsi_scsi_t *scsi = drive->driver_data;
+	struct Scsi_Host *host = drive->driver_data;
+	idescsi_scsi_t *scsi = idescsi_private(host);
 	int bcount;
 	int dma_ok = 0;
 
@@ -463,36 +471,14 @@ static void idescsi_ide_release(struct inode *inode, struct file *filp, struct a
 	MOD_DEC_USE_COUNT;
 }
 
-static struct ata_device *idescsi_drives[MAX_HWIFS * MAX_DRIVES];
-static int idescsi_initialized = 0;
-
-/*
- *	Driver initialization.
- */
-static void idescsi_setup(struct ata_device *drive, idescsi_scsi_t *scsi, int id)
+static int idescsi_cleanup (struct ata_device *drive)
 {
-	idescsi_drives[id] = drive;
-	drive->driver_data = scsi;
-	drive->ready_stat = 0;
-	memset (scsi, 0, sizeof (idescsi_scsi_t));
-	scsi->drive = drive;
-	if (drive->id && (drive->id->config & 0x0060) == 0x20)
-		set_bit (IDESCSI_DRQ_INTERRUPT, &scsi->flags);
-	set_bit(IDESCSI_TRANSFORM, &scsi->transform);
-	clear_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
-#if IDESCSI_DEBUG_LOG
-	set_bit(IDESCSI_LOG_CMD, &scsi->log);
-#endif
-}
+	struct Scsi_Host *host = drive->driver_data;
 
-static int idescsi_cleanup(struct ata_device *drive)
-{
-	idescsi_scsi_t *scsi = drive->driver_data;
-
-	if (ide_unregister_subdriver (drive))
+	if (ide_unregister_subdriver (drive)) {
 		return 1;
-	drive->driver_data = NULL;
-	kfree (scsi);
+	}
+	scsi_unregister(host);
 	return 0;
 }
 
@@ -522,73 +508,9 @@ static struct ata_operations idescsi_driver = {
 	capacity:		NULL,
 };
 
-static void idescsi_attach(struct ata_device *drive)
-{
-	idescsi_scsi_t *scsi;
-	int i, id;
-	char *req;
-	struct ata_channel *channel;
-	int unit;
-
-	if (idescsi_initialized)
-		return;
-	idescsi_initialized = 1;
-	for (i = 0; i < MAX_HWIFS * MAX_DRIVES; i++)
-		idescsi_drives[i] = NULL;
-
-	req = drive->driver_req;
-	if (req[0] != '\0' && strcmp(req, "ide-scsi"))
-		return;
-
-	if ((scsi = (idescsi_scsi_t *) kmalloc (sizeof (idescsi_scsi_t), GFP_KERNEL)) == NULL) {
-		printk(KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
-		return;
-	}
-	if (ide_register_subdriver (drive, &idescsi_driver)) {
-		printk(KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
-		kfree (scsi);
-		return;
-	}
-	for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++);
-	idescsi_setup (drive, scsi, id);
-
-	channel = drive->channel;
-	unit = drive - channel->drives;
-
-	ide_revalidate_disk(mk_kdev(channel->major, unit << PARTN_BITS));
-}
-
 int idescsi_detect (Scsi_Host_Template *host_template)
 {
-	struct Scsi_Host *host;
-	int id;
-	int last_lun = 0;
-
-	host_template->proc_name = "ide-scsi";
-	host = scsi_register(host_template, 0);
-	if(host == NULL)
-		return 0;
-
-	for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++)
-		last_lun = max(last_lun, idescsi_drives[id]->last_lun);
-	host->max_id = id;
-	host->max_lun = last_lun + 1;
-	host->can_queue = host->cmd_per_lun * id;
-	return 1;
-}
-
-int idescsi_release (struct Scsi_Host *host)
-{
-	struct ata_device *drive;
-	int id;
-
-	for (id = 0; id < MAX_HWIFS * MAX_DRIVES; id++) {
-		drive = idescsi_drives[id];
-		if (drive) {
-			MOD_DEC_USE_COUNT;
-		}
-	}
-	return 0;
+	return register_ata_driver(&idescsi_driver);
 }
 
 const char *idescsi_info (struct Scsi_Host *host)
@@ -598,8 +520,7 @@ const char *idescsi_info (struct Scsi_Host *host)
 
 int idescsi_ioctl (Scsi_Device *dev, int cmd, void *arg)
 {
-	struct ata_device *drive = idescsi_drives[dev->id];
-	idescsi_scsi_t *scsi = drive->driver_data;
+	idescsi_scsi_t *scsi = idescsi_private(dev->host);
 
 	if (cmd == SG_SET_TRANSFORM) {
 		if (arg)
@@ -693,7 +614,8 @@ static inline struct bio *idescsi_dma_bio(struct ata_device *drive, struct atapi
 
 static inline int should_transform(struct ata_device *drive, Scsi_Cmnd *cmd)
 {
-	idescsi_scsi_t *scsi = drive->driver_data;
+	struct Scsi_Host *host = drive->driver_data;
+	idescsi_scsi_t *scsi = idescsi_private(host);
 
 	if (major(cmd->request.rq_dev) == SCSI_GENERIC_MAJOR)
 		return test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
@@ -702,16 +624,11 @@ static inline int should_transform(struct ata_device *drive, Scsi_Cmnd *cmd)
 
 int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 {
-	struct ata_device *drive = idescsi_drives[cmd->target];
-	idescsi_scsi_t *scsi;
+	idescsi_scsi_t *scsi = idescsi_private(cmd->host);
+	struct ata_device *drive = scsi->drive;
 	struct request *rq = NULL;
 	struct atapi_packet_command *pc = NULL;
 
-	if (!drive) {
-		printk (KERN_ERR "ide-scsi: drive id %d not present\n", cmd->target);
-		goto abort;
-	}
-	scsi = drive->driver_data;
 	pc = kmalloc(sizeof(*pc), GFP_ATOMIC);
 	rq = kmalloc(sizeof(*rq), GFP_ATOMIC);
 	if (rq == NULL || pc == NULL) {
@@ -774,7 +691,8 @@ int idescsi_device_reset (Scsi_Cmnd *cmd)
 
 int idescsi_bios (Disk *disk, kdev_t dev, int *parm)
 {
-	struct ata_device *drive = idescsi_drives[disk->device->id];
+	idescsi_scsi_t *scsi = idescsi_private(disk->device->host);
+	struct ata_device *drive = scsi->drive;
 
 	if (drive->bios_cyl && drive->bios_head && drive->bios_sect) {
 		parm[0] = drive->bios_head;
@@ -788,7 +706,10 @@ static Scsi_Host_Template idescsi_template = {
 	module:		THIS_MODULE,
 	name:		"idescsi",
 	detect:		idescsi_detect,
-	release:	idescsi_release,
+	release:	NULL, /* unregister_ata_driver is always
+				 called before scsi_unregister_host,
+				 there never controllers left to
+				 release by that point. */
 	info:		idescsi_info,
 	ioctl:		idescsi_ioctl,
 	queuecommand:	idescsi_queue,
@@ -801,33 +722,65 @@ static Scsi_Host_Template idescsi_template = {
 	cmd_per_lun:	5,
 	use_clustering:	DISABLE_CLUSTERING,
 	emulated:	1,
+	proc_name:	"ide-scsi",
 };
 
-
-static int __init idescsi_init(void)
+/*
+ *	Driver initialization.
+ */
+static void idescsi_attach(struct ata_device *drive)
 {
-	int ret;
-	ret = ata_driver_module(&idescsi_driver);
-	scsi_register_host(&idescsi_template);
-	return 0;
+	idescsi_scsi_t *scsi;
+	struct Scsi_Host *host;
+
+
+	if (drive->type == ATA_DISK)
+		return;
+
+	host = scsi_register(&idescsi_template, sizeof(idescsi_scsi_t));
+
+	if(host == NULL) {
+		printk (KERN_ERR
+			"ide-scsi: %s: Can't allocate a scsi host structure\n",
+			drive->name);
+		return;
+	}
+
+	host->max_lun = drive->last_lun + 1;
+
+	if (ide_register_subdriver (drive, &idescsi_driver)) {
+		printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
+		scsi_unregister(host);
+		return;
+	}
+
+	drive->driver_data = host;
+	drive->ready_stat = 0;
+
+	scsi = idescsi_private(host);
+	memset (scsi, 0, sizeof (idescsi_scsi_t));
+	scsi->drive = drive;
+
+	if (drive->id && (drive->id->config & 0x0060) == 0x20)
+		set_bit (IDESCSI_DRQ_INTERRUPT, &scsi->flags);
+	set_bit(IDESCSI_TRANSFORM, &scsi->transform);
+	clear_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
+#if IDESCSI_DEBUG_LOG
+	set_bit(IDESCSI_LOG_CMD, &scsi->log);
+#endif
+}
+
+static int __init init_idescsi_module(void)
+{
+	return scsi_register_host(&idescsi_template);
 }
 
 static void __exit exit_idescsi_module(void)
 {
-	scsi_unregister_host(&idescsi_template);
-
-#if 0
-	/* FIXME: what about this cleanup stuff here? This all should be done
-	 * on close time perhaps? */
-
-	if (idescsi_cleanup (drive)) {
-		printk ("%s: exit_idescsi_module() called while still busy\n", drive->name);
-	}
-#endif
-
 	unregister_ata_driver(&idescsi_driver);
+	scsi_unregister_host(&idescsi_template);
 }
 
-module_init(idescsi_init);
+module_init(init_idescsi_module);
 module_exit(exit_idescsi_module);
 MODULE_LICENSE("GPL");

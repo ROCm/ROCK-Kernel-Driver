@@ -380,16 +380,17 @@ empty:
 	return 0;
 }
 
-static int FASTCALL(shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask, int priority));
-static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask, int priority)
+static int
+shrink_cache(int nr_pages, zone_t *classzone,
+		unsigned int gfp_mask, int priority, int max_scan)
 {
 	struct list_head * entry;
 	struct address_space *mapping;
-	int max_scan = nr_inactive_pages / priority;
 	int max_mapped = nr_pages << (9 - priority);
 
 	spin_lock(&pagemap_lru_lock);
-	while (--max_scan >= 0 && (entry = inactive_list.prev) != &inactive_list) {
+	while (--max_scan >= 0 &&
+			(entry = inactive_list.prev) != &inactive_list) {
 		struct page * page;
 
 		if (need_resched()) {
@@ -619,17 +620,25 @@ static int shrink_caches(zone_t * classzone, int priority, unsigned int gfp_mask
 {
 	int chunk_size = nr_pages;
 	unsigned long ratio;
+	struct page_state ps;
+	int max_scan;
 
 	nr_pages -= kmem_cache_reap(gfp_mask);
 	if (nr_pages <= 0)
 		return 0;
 
 	nr_pages = chunk_size;
-	/* try to keep the active list 2/3 of the size of the cache */
-	ratio = (unsigned long) nr_pages * nr_active_pages / ((nr_inactive_pages + 1) * 2);
-	refill_inactive(ratio);
 
-	nr_pages = shrink_cache(nr_pages, classzone, gfp_mask, priority);
+	/*
+	 * Try to keep the active list 2/3 of the size of the cache
+	 */
+	get_page_state(&ps);
+	ratio = (unsigned long)nr_pages * ps.nr_active /
+				((ps.nr_inactive | 1) * 2);
+	refill_inactive(ratio);
+	max_scan = ps.nr_inactive / priority;
+	nr_pages = shrink_cache(nr_pages, classzone,
+				gfp_mask, priority, max_scan);
 	if (nr_pages <= 0)
 		return 0;
 
@@ -794,10 +803,8 @@ int kswapd(void *unused)
 		add_wait_queue(&kswapd_wait, &wait);
 
 		mb();
-		if (kswapd_can_sleep()) {
+		if (kswapd_can_sleep())
 			schedule();
-		}
-		
 
 		__set_current_state(TASK_RUNNING);
 		remove_wait_queue(&kswapd_wait, &wait);
@@ -808,7 +815,7 @@ int kswapd(void *unused)
 		 * up on a more timely basis.
 		 */
 		kswapd_balance();
-		run_task_queue(&tq_disk);
+		blk_run_queues();
 	}
 }
 

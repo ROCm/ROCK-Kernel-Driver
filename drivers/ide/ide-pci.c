@@ -27,10 +27,6 @@
 
 #include "pcihost.h"
 
-/* Missing PCI device IDs: */
-#define PCI_VENDOR_ID_HINT 0x3388
-#define PCI_DEVICE_ID_HINT 0x8013
-
 /*
  * This is the list of registered PCI chipset driver data structures.
  */
@@ -355,7 +351,7 @@ controller_ok:
 		base = port ? 0x170 : 0x1f0;
 
 	if ((ch = lookup_channel(base, d->bootable, dev->name)) == NULL)
-		return -ENOMEM;	/* no room in ide_hwifs[] */
+		return -ENOMEM;	/* no room */
 
 	if (ch->io_ports[IDE_DATA_OFFSET] != base) {
 		ide_init_hwif_ports(&ch->hw, base, (ctl | 2), NULL);
@@ -756,7 +752,7 @@ static struct ata_pci_device chipsets[] __initdata = {
 	},
 	{
 		vendor: PCI_VENDOR_ID_HINT,
-		device: PCI_DEVICE_ID_HINT,
+		device: PCI_DEVICE_ID_HINT_VXPROII_IDE,
 		bootable: ON_BOARD
 	},
 	{

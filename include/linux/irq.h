@@ -76,4 +76,4 @@ extern void no_action(int cpl, void *dev_id, struct pt_regs *regs);
 
 #endif
 
-#endif /* __asm_h */
+#endif /* __irq_h */

@@ -1146,6 +1146,8 @@ void stop_airo_card( struct net_device *dev, int freeres )
 	kfree( dev );
 }
 
+EXPORT_SYMBOL(stop_airo_card);
+
 static int add_airo_dev( struct net_device *dev );
 
 struct net_device *init_airo_card( unsigned short irq, int port, int is_pcmcia )
@@ -1239,7 +1241,9 @@ err_out_free:
 	return NULL;
 }
 
-int waitbusy (struct airo_info *ai) {
+EXPORT_SYMBOL(init_airo_card);
+
+static int waitbusy (struct airo_info *ai) {
 	int delay = 0;
 	while ((IN4500 (ai, COMMAND) & COMMAND_BUSY) & (delay < 10000)) {
 		udelay (10);
@@ -1283,7 +1287,9 @@ int reset_airo_card( struct net_device *dev ) {
 	return 0;
 }
 
-int wll_header_parse(struct sk_buff *skb, unsigned char *haddr)
+EXPORT_SYMBOL(reset_airo_card);
+
+static int wll_header_parse(struct sk_buff *skb, unsigned char *haddr)
 {
 	memcpy(haddr, skb->mac.raw + 10, ETH_ALEN);
 	return ETH_ALEN;

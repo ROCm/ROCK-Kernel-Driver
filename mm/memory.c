@@ -69,7 +69,7 @@ static inline void copy_cow_page(struct page * from, struct page * to, unsigned 
 	copy_user_highpage(to, from, address);
 }
 
-mem_map_t * mem_map;
+struct page *mem_map;
 
 /*
  * Note: this doesn't free the actual pages themselves. That

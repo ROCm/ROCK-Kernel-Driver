@@ -1047,9 +1047,15 @@ int dev_queue_xmit(struct sk_buff *skb)
 		int cpu = smp_processor_id();
 
 		if (dev->xmit_lock_owner != cpu) {
+			/*
+			 * The spin_lock effectivly does a preempt lock, but 
+			 * we are about to drop that...
+			 */
+			preempt_disable();
 			spin_unlock(&dev->queue_lock);
 			spin_lock(&dev->xmit_lock);
 			dev->xmit_lock_owner = cpu;
+			preempt_enable();
 
 			if (!netif_queue_stopped(dev)) {
 				if (netdev_nit)

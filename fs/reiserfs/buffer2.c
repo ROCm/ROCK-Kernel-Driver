@@ -32,7 +32,7 @@ void wait_buffer_until_released (const struct buffer_head * bh)
 			bh, repeat_counter, buffer_journaled(bh) ? ' ' : '!',
 			buffer_journal_dirty(bh) ? ' ' : '!');
     }
-    run_task_queue(&tq_disk);
+    blk_run_queues();
     yield();
   }
   if (repeat_counter > 30000000) {

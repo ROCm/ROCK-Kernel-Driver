@@ -93,7 +93,8 @@
 #define FB_ACCEL_IGS_CYBER2010	34	/* CyberPro 2010		*/
 #define FB_ACCEL_IGS_CYBER5000	35	/* CyberPro 5000		*/
 #define FB_ACCEL_SIS_GLAMOUR    36	/* SiS 300/630/540              */
-
+#define FB_ACCEL_3DLABS_PERMEDIA3 37	/* 3Dlabs Permedia 3		*/
+#define FB_ACCEL_ATI_RADEON	38	/* ATI Radeon family		*/
 
 #define FB_ACCEL_NEOMAGIC_NM2070 90	/* NeoMagic NM2070              */
 #define FB_ACCEL_NEOMAGIC_NM2090 91	/* NeoMagic NM2090              */
@@ -168,6 +169,9 @@ struct fb_bitfield {
 #define FB_VMODE_YWRAP		256	/* ywrap instead of panning     */
 #define FB_VMODE_SMOOTH_XPAN	512	/* smooth xpan possible (internally used) */
 #define FB_VMODE_CONUPDATE	512	/* don't update x/yoffset	*/
+
+#define PICOS2KHZ(a) (1000000000UL/(a))
+#define KHZ2PICOS(a) (1000000000UL/(a))
 
 struct fb_var_screeninfo {
 	__u32 xres;			/* visible resolution		*/

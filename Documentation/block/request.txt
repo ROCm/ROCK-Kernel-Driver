@@ -1,7 +1,7 @@
 
 struct request documentation
 
-Jens Axboe <axboe@suse.de> 070102
+Jens Axboe <axboe@suse.de> 27/05/02
 
 1.0
 Index
@@ -68,6 +68,8 @@ unsigned int current_nr_sectors	DB	Number of sectors in first segment
 					of request
 
 unsigned int hard_cur_sectors	B	Used to keep current_nr_sectors sane
+
+int tag				DB	TCQ tag, if assigned
 
 void *special			D	Free to be used by driver
 

@@ -1187,13 +1187,13 @@ setup_rt_frame32(struct pt_regs *regs, struct sigregs32 *frame,
  * OK, we're invoking a handler
  */
 static void
-handle_signal32(unsigned long sig, struct k_sigaction *ka,
-	      siginfo_t *info, sigset_t *oldset, struct pt_regs * regs,
-	      unsigned int *newspp, unsigned int frame)
+handle_signal32(unsigned long sig, siginfo_t *info, sigset_t *oldset,
+	struct pt_regs * regs, unsigned int *newspp, unsigned int frame)
 {
 	struct sigcontext32_struct *sc;
 	struct rt_sigframe_32 *rt_stack_frame;
 	siginfo_t32 siginfo32bit;
+	struct k_sigaction *ka = &current->sig->action[sig-1];
 
 	if (regs->trap == 0x0C00 /* System Call! */
 	    && ((int)regs->result == -ERESTARTNOHAND ||
@@ -1337,113 +1337,22 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 	siginfo_t info;
 	struct k_sigaction *ka;
 	unsigned int frame, newsp;
+	int signr;
 
 	if (!oldset)
 		oldset = &current->blocked;
 
 	newsp = frame = 0;
 
-	for (;;) {
-		unsigned long signr;
-		
-		spin_lock_irq(&current->sigmask_lock);
-		signr = dequeue_signal(&current->blocked, &info);
-		spin_unlock_irq(&current->sigmask_lock);
-		ifppcdebug(PPCDBG_SYS32) {
-			if (signr)
-				udbg_printf("do_signal32 - processing signal=%2lx - pid=%ld, comm=%s \n", signr, current->pid, current->comm);
-		}
-
-		if (!signr)
-			break;
-
-		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
-			/* Let the debugger run.  */
-			current->exit_code = signr;
-			current->state = TASK_STOPPED;
-			notify_parent(current, SIGCHLD);
-			schedule();
-
-			/* We're back.  Did the debugger cancel the sig?  */
-			if (!(signr = current->exit_code))
-				continue;
-			current->exit_code = 0;
-
-			/* The debugger continued.  Ignore SIGSTOP.  */
-			if (signr == SIGSTOP)
-				continue;
-
-			/* Update the siginfo structure.  Is this good?  */
-			if (signr != info.si_signo) {
-				info.si_signo = signr;
-				info.si_errno = 0;
-				info.si_code = SI_USER;
-				info.si_pid = current->parent->pid;
-				info.si_uid = current->parent->uid;
-			}
-
-			/* If the (new) signal is now blocked, requeue it.  */
-			if (sigismember(&current->blocked, signr)) {
-				send_sig_info(signr, &info, current);
-				continue;
-			}
-		}
-
+	signr = get_signal_to_deliver(&info, regs);
+	if (signr > 0) {
 		ka = &current->sig->action[signr-1];
-
-		if (ka->sa.sa_handler == SIG_IGN) {
-			if (signr != SIGCHLD)
-				continue;
-			/* Check for SIGCHLD: it's special.  */
-			while (sys_wait4(-1, NULL, WNOHANG, NULL) > 0)
-				/* nothing */;
-			continue;
-		}
-
-		if (ka->sa.sa_handler == SIG_DFL) {
-			int exit_code = signr;
-
-			/* Init gets no signals it doesn't want.  */
-			if (current->pid == 1)
-				continue;
-
-			switch (signr) {
-			case SIGCONT: case SIGCHLD: case SIGWINCH:
-				continue;
-
-			case SIGTSTP: case SIGTTIN: case SIGTTOU:
-				if (is_orphaned_pgrp(current->pgrp))
-					continue;
-				/* FALLTHRU */
-
-			case SIGSTOP:
-				current->state = TASK_STOPPED;
-				current->exit_code = signr;
-				if (!(current->parent->sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
-					notify_parent(current, SIGCHLD);
-				schedule();
-				continue;
-
-			case SIGQUIT: case SIGILL: case SIGTRAP:
-			case SIGABRT: case SIGFPE: case SIGSEGV:
-			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
-				if (do_coredump(signr, regs))
-					exit_code |= 0x80;
-				/* FALLTHRU */
-
-			default:
-				sig_exit(signr, exit_code, &info);
-				/* NOTREACHED */
-			}
-		}
 
 		PPCDBG(PPCDBG_SIGNAL, " do signal :sigaction flags = %lx \n" ,ka->sa.sa_flags);
 		PPCDBG(PPCDBG_SIGNAL, " do signal :on sig stack  = %lx \n" ,on_sig_stack(regs->gpr[1]));
 		PPCDBG(PPCDBG_SIGNAL, " do signal :reg1  = %lx \n" ,regs->gpr[1]);
 		PPCDBG(PPCDBG_SIGNAL, " do signal :alt stack  = %lx \n" ,current->sas_ss_sp);
 		PPCDBG(PPCDBG_SIGNAL, " do signal :alt stack size  = %lx \n" ,current->sas_ss_size);
-
-
 
 		if ( (ka->sa.sa_flags & SA_ONSTACK)
 		     && (! on_sig_stack(regs->gpr[1])))
@@ -1454,8 +1363,7 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 		newsp = frame = newsp - sizeof(struct sigregs32);
 
 		/* Whee!  Actually deliver the signal.  */
-		handle_signal32(signr, ka, &info, oldset, regs, &newsp, frame);
-		break;
+		handle_signal32(signr, &info, oldset, regs, &newsp, frame);
 	}
 
 	if (regs->trap == 0x0C00 /* System Call! */ &&
@@ -1468,9 +1376,8 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 	}
 
 	if (newsp == frame)
-	{
 		return 0;		/* no signals delivered */
-	}
+
 	// Invoke correct stack setup routine 
 	if (ka->sa.sa_flags & SA_SIGINFO) 
 		setup_rt_frame32(regs, (struct sigregs32*)(u64)frame, newsp);

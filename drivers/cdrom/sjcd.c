@@ -1074,16 +1074,20 @@ static void sjcd_invalidate_buffers(void)
  * When Linux gets variable block sizes this will probably go away.
  */
 
-#define CURRENT_IS_VALID                                      \
-    ( !QUEUE_EMPTY && major( CURRENT->rq_dev ) == MAJOR_NR && \
-      CURRENT->cmd == READ && CURRENT->sector != -1 )
+static int current_valid(void)
+{
+        return !blk_queue_empty(QUEUE) &&
+	        major(CURRENT->rq_dev) == MAJOR_NR &&
+		CURRENT->cmd == READ &&
+		CURRENT->sector != -1;
+}
 
 static void sjcd_transfer(void)
 {
 #if defined( SJCD_TRACE )
 	printk("SJCD: transfer:\n");
 #endif
-	if (CURRENT_IS_VALID) {
+	if (current_valid()) {
 		while (CURRENT->nr_sectors) {
 			int i, bn = CURRENT->sector / 4;
 			for (i = 0;
@@ -1239,7 +1243,7 @@ static void sjcd_poll(void)
 					}
 				}
 
-				if (CURRENT_IS_VALID) {
+				if (current_valid()) {
 					struct sjcd_play_msf msf;
 
 					sjcd_next_bn = CURRENT->sector / 4;
@@ -1307,7 +1311,7 @@ static void sjcd_poll(void)
 					    ("SJCD: read block %d failed, maybe audio disk? Giving up\n",
 					     sjcd_next_bn);
 #endif
-					if (CURRENT_IS_VALID)
+					if (current_valid())
 						end_request(0);
 #if defined( SJCD_TRACE )
 					printk
@@ -1332,7 +1336,7 @@ static void sjcd_poll(void)
 				 * Otherwise cdrom hangs up. Check to see if we have something to copy
 				 * to.
 				 */
-				if (!CURRENT_IS_VALID
+				if (!current_valid()
 				    && sjcd_buf_in == sjcd_buf_out) {
 #if defined( SJCD_TRACE )
 					printk
@@ -1373,7 +1377,7 @@ static void sjcd_poll(void)
 					 * OK, request seems to be precessed. Continue transferring...
 					 */
 					if (!sjcd_transfer_is_active) {
-						while (CURRENT_IS_VALID) {
+						while (current_valid()) {
 							/*
 							 * Continue transferring.
 							 */
@@ -1387,7 +1391,7 @@ static void sjcd_poll(void)
 								break;
 						}
 					}
-					if (CURRENT_IS_VALID &&
+					if (current_valid() &&
 					    (CURRENT->sector / 4 <
 					     sjcd_next_bn
 					     || CURRENT->sector / 4 >
@@ -1450,7 +1454,7 @@ static void sjcd_poll(void)
 					sjcd_toc_uptodate = 0;
 					sjcd_invalidate_buffers();
 				}
-				if (CURRENT_IS_VALID) {
+				if (current_valid()) {
 					if (sjcd_status_valid)
 						sjcd_transfer_state =
 						    SJCD_S_READ;
@@ -1476,7 +1480,7 @@ static void sjcd_poll(void)
 
 	if (--sjcd_transfer_timeout == 0) {
 		printk("SJCD: timeout in state %d\n", sjcd_transfer_state);
-		while (CURRENT_IS_VALID)
+		while (current_valid())
 			end_request(0);
 		sjcd_send_cmd(SCMD_STOP);
 		sjcd_transfer_state = SJCD_S_IDLE;
@@ -1497,7 +1501,7 @@ static void do_sjcd_request(request_queue_t * q)
 	       CURRENT->sector, CURRENT->nr_sectors);
 #endif
 	sjcd_transfer_is_active = 1;
-	while (CURRENT_IS_VALID) {
+	while (current_valid()) {
 		sjcd_transfer();
 		if (CURRENT->nr_sectors == 0)
 			end_request(1);
@@ -1508,7 +1512,7 @@ static void do_sjcd_request(request_queue_t * q)
 					if (sjcd_update_toc() < 0) {
 						printk
 						    ("SJCD: transfer: discard\n");
-						while (CURRENT_IS_VALID)
+						while (current_valid())
 							end_request(0);
 						break;
 					}

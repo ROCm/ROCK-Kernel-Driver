@@ -288,7 +288,7 @@ static void __do_gscd_request(unsigned long dummy)
 	block = CURRENT->sector;
 	nsect = CURRENT->nr_sectors;
 
-	if (QUEUE_EMPTY || CURRENT->sector == -1)
+	if (CURRENT->sector == -1)
 		goto out;
 
 	if (CURRENT->cmd != READ) {

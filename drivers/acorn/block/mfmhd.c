@@ -756,7 +756,7 @@ static void request_done(int uptodate)
 		/* No - its the end of the line */
 		/* end_request's should have happened at the end of sector DMAs */
 		/* Turns Drive LEDs off - may slow it down? */
-		if (QUEUE_EMPTY)
+		if (blk_queue_empty(QUEUE))
 			issue_command(CMD_CKV, block, 2);
 
 		Busy = 0;

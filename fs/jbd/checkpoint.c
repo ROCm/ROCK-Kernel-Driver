@@ -179,7 +179,7 @@ static void __flush_batch(struct buffer_head **bhs, int *batch_count)
 
 	spin_unlock(&journal_datalist_lock);
 	ll_rw_block(WRITE, *batch_count, bhs);
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 	spin_lock(&journal_datalist_lock);
 	for (i = 0; i < *batch_count; i++) {
 		struct buffer_head *bh = bhs[i];

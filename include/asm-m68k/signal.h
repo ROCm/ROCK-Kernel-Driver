@@ -215,6 +215,8 @@ extern __inline__ int sigfindinword(unsigned long word)
 	return word ^ 31;
 }
 
+#define HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+
 #endif /* __KERNEL__ */
 
 #endif /* _M68K_SIGNAL_H */

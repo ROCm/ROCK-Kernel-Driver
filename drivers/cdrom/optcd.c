@@ -973,11 +973,13 @@ static int update_toc(void)
 
 /* Request handling */
 
-
-#define CURRENT_VALID \
-	(!QUEUE_EMPTY && major(CURRENT -> rq_dev) == MAJOR_NR \
-	 && CURRENT -> cmd == READ && CURRENT -> sector != -1)
-
+static int current_valid(void)
+{
+        return !blk_queue_empty(QUEUE) &&
+	        major(CURRENT->rq_dev) == MAJOR_NR &&
+		CURRENT->cmd == READ &&
+		CURRENT->sector != -1;
+}
 
 /* Buffers for block size conversion. */
 #define NOBUF		-1
@@ -1006,7 +1008,7 @@ static void transfer(void)
 	printk(KERN_DEBUG "optcd: executing transfer\n");
 #endif
 
-	if (!CURRENT_VALID)
+	if (!current_valid())
 		return;
 	while (CURRENT -> nr_sectors) {
 		int bn = CURRENT -> sector / 4;
@@ -1092,7 +1094,7 @@ static void poll(unsigned long data)
 				" Giving up\n", next_bn);
 			if (transfer_is_active)
 				loop_again = 0;
-			if (CURRENT_VALID)
+			if (current_valid())
 				end_request(0);
 			tries = 5;
 		}
@@ -1126,7 +1128,7 @@ static void poll(unsigned long data)
 				break;
 			if (send_cmd(COMDRVST)) {
 				state = S_IDLE;
-				while (CURRENT_VALID)
+				while (current_valid())
 					end_request(0);
 				return;
 			}
@@ -1153,11 +1155,11 @@ static void poll(unsigned long data)
 					? "door open"
 					: "disk removed");
 				state = S_IDLE;
-				while (CURRENT_VALID)
+				while (current_valid())
 					end_request(0);
 				return;
 			}
-			if (!CURRENT_VALID) {
+			if (!current_valid()) {
 				state = S_STOP;
 				loop_again = 1;
 				break;
@@ -1208,7 +1210,7 @@ static void poll(unsigned long data)
 						tries = 0;
 						break;
 					}
-					if (CURRENT_VALID)
+					if (current_valid())
 						end_request(0);
 					tries = 5;
 				}
@@ -1219,7 +1221,7 @@ static void poll(unsigned long data)
 				break;
 			default:	/* DTEN low */
 				tries = 5;
-				if (!CURRENT_VALID && buf_in == buf_out) {
+				if (!current_valid() && buf_in == buf_out) {
 					state = S_STOP;
 					loop_again = 1;
 					break;
@@ -1272,7 +1274,7 @@ static void poll(unsigned long data)
 						N_BUFS ? 0 : buf_in + 1;
 				}
 				if (!transfer_is_active) {
-					while (CURRENT_VALID) {
+					while (current_valid()) {
 						transfer();
 						if (CURRENT -> nr_sectors == 0)
 							end_request(1);
@@ -1281,7 +1283,7 @@ static void poll(unsigned long data)
 					}
 				}
 
-				if (CURRENT_VALID
+				if (current_valid()
 				    && (CURRENT -> sector / 4 < next_bn ||
 				    CURRENT -> sector / 4 >
 				     next_bn + N_BUFS)) {
@@ -1305,7 +1307,7 @@ static void poll(unsigned long data)
 			flush_data();
 			if (send_cmd(COMDRVST)) {
 				state = S_IDLE;
-				while (CURRENT_VALID)
+				while (current_valid())
 					end_request(0);
 				return;
 			}
@@ -1320,7 +1322,7 @@ static void poll(unsigned long data)
 				toc_uptodate = 0;
 				opt_invalidate_buffers();
 			}
-			if (CURRENT_VALID) {
+			if (current_valid()) {
 				if (status >= 0) {
 					state = S_READ;
 					loop_again = 1;
@@ -1346,7 +1348,7 @@ static void poll(unsigned long data)
 		state = S_STOP;
 		if (exec_cmd(COMSTOP) < 0) {
 			state = S_IDLE;
-			while (CURRENT_VALID)
+			while (current_valid())
 				end_request(0);
 			return;
 		}
@@ -1368,7 +1370,7 @@ static void do_optcd_request(request_queue_t * q)
 	}
 
 	transfer_is_active = 1;
-	while (CURRENT_VALID) {
+	while (current_valid()) {
 		transfer();	/* First try to transfer block from buffers */
 		if (CURRENT -> nr_sectors == 0) {
 			end_request(1);
@@ -1377,7 +1379,7 @@ static void do_optcd_request(request_queue_t * q)
 			if (state == S_IDLE) {
 				/* %% Should this block the request queue?? */
 				if (update_toc() < 0) {
-					while (CURRENT_VALID)
+					while (current_valid())
 						end_request(0);
 					break;
 				}

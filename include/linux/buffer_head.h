@@ -23,7 +23,7 @@ enum bh_state_bits {
 	BH_Async_Read,	/* Is under end_buffer_async_read I/O */
 	BH_Async_Write,	/* Is under end_buffer_async_write I/O */
 
-	BH_JBD,		/* Has an attached ext3 journal_head */
+	BH_Boundary,	/* Block is followed by a discontiguity */
 	BH_PrivateStart,/* not a state bit, but the first bit available
 			 * for private allocation by other entities
 			 */
@@ -106,6 +106,7 @@ BUFFER_FNS(Mapped, mapped)
 BUFFER_FNS(New, new)
 BUFFER_FNS(Async_Read, async_read)
 BUFFER_FNS(Async_Write, async_write)
+BUFFER_FNS(Boundary, boundary)
 
 /*
  * FIXME: this is used only by bh_kmap, which is used only by RAID5.
@@ -160,6 +161,7 @@ int inode_has_buffers(struct inode *);
 void invalidate_inode_buffers(struct inode *);
 int fsync_buffers_list(spinlock_t *lock, struct list_head *);
 int sync_mapping_buffers(struct address_space *mapping);
+void unmap_underlying_metadata(struct block_device *bdev, sector_t block);
 
 void mark_buffer_async_read(struct buffer_head *bh);
 void mark_buffer_async_write(struct buffer_head *bh);

@@ -15,7 +15,9 @@ obj-$(CONFIG_ISDN_CAPI_CAPIFS)		+= capifs.o
 
 # Multipart objects.
 
-kernelcapi-objs	:= kcapi.o capiutil.o capilib.o
+kernelcapi-y				:= kcapi.o capiutil.o capilib.o
+kernelcapi-$(CONFIG_PROC_FS)		+= kcapi_proc.o
+kernelcapi-objs				:= $(kernelcapi-y)
 
 # The global Rules.make.
 
