@@ -115,6 +115,12 @@
 /* #define IDEFLOPPY_DEBUG(fmt, args...) printk(KERN_INFO fmt, ## args) */
 #define IDEFLOPPY_DEBUG( fmt, args... )
 
+#ifndef IDEFLOPPY_DEBUG_LOG
+#define debug_log(fmt, args... ) do {} while(0)
+#else
+#define debug_log printk
+#endif
+
 
 /*
  *	Some drives require a longer irq timeout.
@@ -543,9 +549,7 @@ static int idefloppy_do_end_request(ide_drive_t *drive, int uptodate, int nsecs)
 	struct request *rq = HWGROUP(drive)->rq;
 	int error;
 
-#if IDEFLOPPY_DEBUG_LOG
-	printk(KERN_INFO "Reached idefloppy_end_request\n");
-#endif /* IDEFLOPPY_DEBUG_LOG */
+	debug_log(KERN_INFO "Reached idefloppy_end_request\n");
 
 	switch (uptodate) {
 		case 0: error = IDEFLOPPY_ERROR_GENERAL; break;
@@ -627,7 +631,6 @@ static void idefloppy_output_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, un
 	}
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 static void idefloppy_update_buffers (ide_drive_t *drive, idefloppy_pc_t *pc)
 {
 	struct request *rq = pc->rq;
@@ -636,7 +639,6 @@ static void idefloppy_update_buffers (ide_drive_t *drive, idefloppy_pc_t *pc)
 	while ((bio = rq->bio) != NULL)
 		idefloppy_do_end_request(drive, 1, 0);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /*
  *	idefloppy_queue_pc_head generates a new packet command request in front
@@ -682,25 +684,22 @@ static void idefloppy_analyze_error (ide_drive_t *drive,idefloppy_request_sense_
 	floppy->ascq = result->ascq;
 	floppy->progress_indication = result->sksv[0] & 0x80 ?
 		(u16)get_unaligned((u16 *)(result->sksv+1)):0x10000;
-#if IDEFLOPPY_DEBUG_LOG
 	if (floppy->failed_pc)
-		printk(KERN_INFO "ide-floppy: pc = %x, sense key = %x, "
+		debug_log(KERN_INFO "ide-floppy: pc = %x, sense key = %x, "
 			"asc = %x, ascq = %x\n", floppy->failed_pc->c[0],
 			result->sense_key, result->asc, result->ascq);
 	else
-		printk(KERN_INFO "ide-floppy: sense key = %x, asc = %x, "
+		debug_log(KERN_INFO "ide-floppy: sense key = %x, asc = %x, "
 			"ascq = %x\n", result->sense_key,
 			result->asc, result->ascq);
-#endif /* IDEFLOPPY_DEBUG_LOG */
 }
 
 static void idefloppy_request_sense_callback (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 
-#if IDEFLOPPY_DEBUG_LOG
-	printk(KERN_INFO "ide-floppy: Reached %s\n", __FUNCTION__);
-#endif /* IDEFLOPPY_DEBUG_LOG */
+	debug_log(KERN_INFO "ide-floppy: Reached %s\n", __FUNCTION__);
+	
 	if (!floppy->pc->error) {
 		idefloppy_analyze_error(drive,(idefloppy_request_sense_result_t *) floppy->pc->buffer);
 		idefloppy_do_end_request(drive, 1, 0);
@@ -717,9 +716,7 @@ static void idefloppy_pc_callback (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	
-#if IDEFLOPPY_DEBUG_LOG
-	printk (KERN_INFO "ide-floppy: Reached %s\n", __FUNCTION__);
-#endif /* IDEFLOPPY_DEBUG_LOG */
+	debug_log(KERN_INFO "ide-floppy: Reached %s\n", __FUNCTION__);
 
 	idefloppy_do_end_request(drive, floppy->pc->error ? 0 : 1, 0);
 }
@@ -781,12 +778,9 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 	struct request *rq = pc->rq;
 	unsigned int temp;
 
-#if IDEFLOPPY_DEBUG_LOG
-	printk(KERN_INFO "ide-floppy: Reached %s interrupt handler\n",
+	debug_log(KERN_INFO "ide-floppy: Reached %s interrupt handler\n",
 		__FUNCTION__);
-#endif /* IDEFLOPPY_DEBUG_LOG */	
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_bit(PC_DMA_IN_PROGRESS, &pc->flags)) {
 		if (HWIF(drive)->ide_dma_end(drive)) {
 			set_bit(PC_DMA_ERROR, &pc->flags);
@@ -794,30 +788,23 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 			pc->actually_transferred = pc->request_transfer;
 			idefloppy_update_buffers(drive, pc);
 		}
-#if IDEFLOPPY_DEBUG_LOG
-		printk (KERN_INFO "ide-floppy: DMA finished\n");
-#endif /* IDEFLOPPY_DEBUG_LOG */
+		debug_log(KERN_INFO "ide-floppy: DMA finished\n");
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	/* Clear the interrupt */
 	status.all = HWIF(drive)->INB(IDE_STATUS_REG);
 
 	if (!status.b.drq) {			/* No more interrupts */
-#if IDEFLOPPY_DEBUG_LOG
-		printk(KERN_INFO "Packet command completed, %d bytes "
+		debug_log(KERN_INFO "Packet command completed, %d bytes "
 			"transferred\n", pc->actually_transferred);
-#endif /* IDEFLOPPY_DEBUG_LOG */
 		clear_bit(PC_DMA_IN_PROGRESS, &pc->flags);
 
 		local_irq_enable();
 
 		if (status.b.check || test_bit(PC_DMA_ERROR, &pc->flags)) {
 			/* Error detected */
-#if IDEFLOPPY_DEBUG_LOG
-			printk(KERN_INFO "ide-floppy: %s: I/O error\n",
+			debug_log(KERN_INFO "ide-floppy: %s: I/O error\n",
 				drive->name);
-#endif /* IDEFLOPPY_DEBUG_LOG */
 			rq->errors++;
 			if (pc->c[0] == IDEFLOPPY_REQUEST_SENSE_CMD) {
 				printk(KERN_ERR "ide-floppy: I/O error in "
@@ -836,14 +823,14 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 		pc->callback(drive);
 		return ide_stopped;
 	}
-#ifdef CONFIG_BLK_DEV_IDEDMA
+
 	if (test_and_clear_bit(PC_DMA_IN_PROGRESS, &pc->flags)) {
 		printk(KERN_ERR "ide-floppy: The floppy wants to issue "
 			"more interrupts in DMA mode\n");
 		(void) HWIF(drive)->ide_dma_off(drive);
 		return ide_do_reset(drive);
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+
 	/* Get the number of bytes to transfer */
 	bcount.b.high = HWIF(drive)->INB(IDE_BCOUNTH_REG);
 	bcount.b.low = HWIF(drive)->INB(IDE_BCOUNTL_REG);
@@ -879,11 +866,9 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 						NULL);
 				return ide_started;
 			}
-#if IDEFLOPPY_DEBUG_LOG
-			printk(KERN_NOTICE "ide-floppy: The floppy wants to "
+			debug_log(KERN_NOTICE "ide-floppy: The floppy wants to "
 				"send us more data than expected - "
 				"allowing transfer\n");
-#endif /* IDEFLOPPY_DEBUG_LOG */
 		}
 	}
 	if (test_bit(PC_WRITING, &pc->flags)) {
@@ -1047,9 +1032,8 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 		pc->callback(drive);
 		return ide_stopped;
 	}
-#if IDEFLOPPY_DEBUG_LOG
-	printk(KERN_INFO "Retry number - %d\n",pc->retries);
-#endif /* IDEFLOPPY_DEBUG_LOG */
+
+	debug_log(KERN_INFO "Retry number - %d\n",pc->retries);
 
 	pc->retries++;
 	/* We haven't transferred any data yet */
@@ -1057,13 +1041,11 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 	pc->current_position = pc->buffer;
 	bcount.all = min(pc->request_transfer, 63 * 1024);
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit(PC_DMA_ERROR, &pc->flags)) {
 		(void) HWIF(drive)->ide_dma_off(drive);
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	feature.all = 0;
-#ifdef CONFIG_BLK_DEV_IDEDMA
+
 	if (test_bit(PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma) {
 		if (test_bit(PC_WRITING, &pc->flags)) {
 			feature.b.dma = !HWIF(drive)->ide_dma_write(drive);
@@ -1071,7 +1053,6 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 			feature.b.dma = !HWIF(drive)->ide_dma_read(drive);
 		}
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	if (IDE_CONTROL_REG)
 		HWIF(drive)->OUTB(drive->ctl, IDE_CONTROL_REG);
@@ -1081,12 +1062,10 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 	HWIF(drive)->OUTB(bcount.b.low, IDE_BCOUNTL_REG);
 	HWIF(drive)->OUTB(drive->select.all, IDE_SELECT_REG);
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (feature.b.dma) {	/* Begin DMA, if necessary */
 		set_bit(PC_DMA_IN_PROGRESS, &pc->flags);
 		(void) (HWIF(drive)->ide_dma_begin(drive));
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	/* Can we transfer the packet when we get the interrupt or wait? */
 	if (test_bit(IDEFLOPPY_ZIP_DRIVE, &floppy->flags)) {
@@ -1116,9 +1095,7 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 
 static void idefloppy_rw_callback (ide_drive_t *drive)
 {
-#if IDEFLOPPY_DEBUG_LOG	
-	printk (KERN_INFO "ide-floppy: Reached idefloppy_rw_callback\n");
-#endif /* IDEFLOPPY_DEBUG_LOG */
+	debug_log(KERN_INFO "ide-floppy: Reached idefloppy_rw_callback\n");
 
 	idefloppy_do_end_request(drive, 1, 0);
 	return;
@@ -1126,10 +1103,8 @@ static void idefloppy_rw_callback (ide_drive_t *drive)
 
 static void idefloppy_create_prevent_cmd (idefloppy_pc_t *pc, int prevent)
 {
-#if IDEFLOPPY_DEBUG_LOG
-	printk(KERN_INFO "ide-floppy: creating prevent removal command, "
+	debug_log(KERN_INFO "ide-floppy: creating prevent removal command, "
 		"prevent = %d\n", prevent);
-#endif /* IDEFLOPPY_DEBUG_LOG */
 
 	idefloppy_init_pc(pc);
 	pc->c[0] = IDEFLOPPY_PREVENT_REMOVAL_CMD;
@@ -1212,11 +1187,9 @@ static void idefloppy_create_rw_cmd (idefloppy_floppy_t *floppy, idefloppy_pc_t 
 	int blocks = rq->nr_sectors / floppy->bs_factor;
 	int cmd = rq_data_dir(rq);
 
-#if IDEFLOPPY_DEBUG_LOG
-	printk("create_rw1%d_cmd: block == %d, blocks == %d\n",
+	debug_log("create_rw1%d_cmd: block == %d, blocks == %d\n",
 		2 * test_bit (IDEFLOPPY_USE_READ12, &floppy->flags),
 		block, blocks);
-#endif /* IDEFLOPPY_DEBUG_LOG */
 
 	idefloppy_init_pc(pc);
 	if (test_bit(IDEFLOPPY_USE_READ12, &floppy->flags)) {
@@ -1262,14 +1235,12 @@ static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request 
 	idefloppy_pc_t *pc;
 	unsigned long block = (unsigned long)block_s;
 
-#if IDEFLOPPY_DEBUG_LOG
-	printk(KERN_INFO "rq_status: %d, dev: %s, flags: %lx, errors: %d\n",
+	debug_log(KERN_INFO "rq_status: %d, dev: %s, flags: %lx, errors: %d\n",
 			rq->rq_status, rq->rq_disk->disk_name,
 			rq->flags, rq->errors);
-	printk(KERN_INFO "sector: %ld, nr_sectors: %ld, "
-			"current_nr_sectors: %ld\n", (long)rq->sector,
+	debug_log(KERN_INFO "sector: %ld, nr_sectors: %ld, "
+			"current_nr_sectors: %d\n", (long)rq->sector,
 			rq->nr_sectors, rq->current_nr_sectors);
-#endif /* IDEFLOPPY_DEBUG_LOG */
 
 	if (rq->errors >= ERROR_MAX) {
 		if (floppy->failed_pc != NULL)
@@ -1473,10 +1444,10 @@ static int idefloppy_get_capacity (ide_drive_t *drive)
 		}
 		}
 		if (!i) {
-			IDEFLOPPY_DEBUG( "Descriptor 0 Code: %d\n",
+			debug_log( "Descriptor 0 Code: %d\n",
 				descriptor->dc);
 		}
-		IDEFLOPPY_DEBUG( "Descriptor %d: %dkB, %d blocks, %d "
+		debug_log( "Descriptor %d: %dkB, %d blocks, %d "
 			"sector size\n", i, blocks * length / 1024, blocks,
 			length);
 	}
@@ -1909,9 +1880,7 @@ static int idefloppy_open(struct inode *inode, struct file *filp)
 
 	drive->usage++;
 	
-#if IDEFLOPPY_DEBUG_LOG
-	printk(KERN_INFO "Reached idefloppy_open\n");
-#endif /* IDEFLOPPY_DEBUG_LOG */
+	debug_log(KERN_INFO "Reached idefloppy_open\n");
 
 	if (drive->usage == 1) {
 		clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
@@ -1958,9 +1927,7 @@ static int idefloppy_release(struct inode *inode, struct file *filp)
 	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
 	idefloppy_pc_t pc;
 	
-#if IDEFLOPPY_DEBUG_LOG
-	printk (KERN_INFO "Reached idefloppy_release\n");
-#endif /* IDEFLOPPY_DEBUG_LOG */
+	debug_log(KERN_INFO "Reached idefloppy_release\n");
 
 	if (drive->usage == 1) {
 		idefloppy_floppy_t *floppy = drive->driver_data;
