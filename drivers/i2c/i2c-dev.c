@@ -447,7 +447,7 @@ static int i2cdev_attach_adapter(struct i2c_adapter *adap)
 
 	/* register this i2c device with the driver core */
 	i2c_dev->adap = adap;
-	if (adap->dev.parent == &legacy_bus)
+	if (adap->dev.parent == &platform_bus)
 		i2c_dev->class_dev.dev = &adap->dev;
 	else
 		i2c_dev->class_dev.dev = adap->dev.parent;
