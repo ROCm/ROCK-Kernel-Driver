@@ -86,7 +86,6 @@
 
 /* host controllers we manage */
 LIST_HEAD (usb_bus_list);
-EXPORT_SYMBOL_GPL (usb_bus_list);
 
 /* used when allocating bus numbers */
 #define USB_MAXBUS		64
@@ -97,10 +96,9 @@ static struct usb_busmap busmap;
 
 /* used when updating list of hcds */
 DECLARE_MUTEX (usb_bus_list_lock);	/* exported only for usbfs */
-EXPORT_SYMBOL_GPL (usb_bus_list_lock);
 
 /* used when updating hcd data */
-static spinlock_t hcd_data_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hcd_data_lock);
 
 /* wait queue for synchronous unlinks */
 DECLARE_WAIT_QUEUE_HEAD(usb_kill_urb_queue);
@@ -526,7 +524,7 @@ static void rh_report_status (unsigned long ptr)
 	/* do nothing if the urb's been unlinked */
 	if (!urb->dev
 			|| urb->status != -EINPROGRESS
-			|| (hcd = urb->dev->bus->hcpriv) == 0) {
+			|| (hcd = urb->dev->bus->hcpriv) == NULL) {
 		spin_unlock (&urb->lock);
 		local_irq_restore (flags);
 		return;
@@ -1542,7 +1540,6 @@ void usb_hc_died (struct usb_hcd *hcd)
 	usb_set_device_state(hcd->self.root_hub, USB_STATE_NOTATTACHED);
 	mod_timer(&hcd->rh_timer, jiffies);
 }
-EXPORT_SYMBOL (usb_hc_died);
 
 /*-------------------------------------------------------------------------*/
 
