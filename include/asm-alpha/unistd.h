@@ -331,19 +331,19 @@
 #define __NR_removexattr		391
 #define __NR_lremovexattr		392
 #define __NR_fremovexattr		393
-#define __NR_futex		394
-#define __NR_sched_setaffinity	395     
-#define __NR_sched_getaffinity	396
-#define __NR_tuxcall		397
-#define __NR_io_setup		398
-#define __NR_io_destroy		399
-#define __NR_io_getevents	400
-#define __NR_io_submit		401
-#define __NR_io_cancel		402
-#define __NR_alloc_hugepages	403
-#define __NR_free_hugepages	404
-#define __NR_exit_group		405
-
+#define __NR_futex			394
+#define __NR_sched_setaffinity		395     
+#define __NR_sched_getaffinity		396
+#define __NR_tuxcall			397
+#define __NR_io_setup			398
+#define __NR_io_destroy			399
+#define __NR_io_getevents		400
+#define __NR_io_submit			401
+#define __NR_io_cancel			402
+#define __NR_alloc_hugepages		403
+#define __NR_free_hugepages		404
+#define __NR_exit_group			405
+#define NR_SYSCALLS			406
 
 #if defined(__GNUC__)
 
@@ -598,7 +598,7 @@ static inline pid_t waitpid(int pid, int * wait_stat, int flags)
 	return sys_wait4(pid, wait_stat, flags, NULL);
 }
 
-#endif
+#endif /* __KERNEL_SYSCALLS__ */
 
 /*
  * "Conditional" syscalls

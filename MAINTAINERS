@@ -738,7 +738,7 @@ S:	Maintained
 
 IBM ServeRAID RAID DRIVER
 P:	Jack Hammer
-P:	Dave Jeffrey	
+P:	Dave Jeffery
 M:	ipslinux@adaptec.com
 W:	http://www.developer.ibm.com/welcome/netfinity/serveraid.html
 S:	Supported 

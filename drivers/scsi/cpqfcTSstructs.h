@@ -21,7 +21,6 @@
 #define CPQFCTSSTRUCTS_H
 
 #include <linux/timer.h>  // timer declaration in our host data
-#include <linux/tqueue.h> // task queue sched
 #include <asm/atomic.h>
 #include "cpqfcTSioctl.h"
 

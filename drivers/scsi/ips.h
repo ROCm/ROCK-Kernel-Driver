@@ -1,9 +1,12 @@
 /*****************************************************************************/
-/* ips.h -- driver for the IBM ServeRAID controller                          */
+/* ips.h -- driver for the Adaptec / IBM ServeRAID controller                */
 /*                                                                           */
 /* Written By: Keith Mitchell, IBM Corporation                               */
+/*             Jack Hammer, Adaptec, Inc.                                    */
+/*             David Jeffery, Adaptec, Inc.                                  */
 /*                                                                           */
 /* Copyright (C) 1999 IBM Corporation                                        */
+/* Copyright (C) 2003 Adaptec, Inc.                                          */ 
 /*                                                                           */
 /* This program is free software; you can redistribute it and/or modify      */
 /* it under the terms of the GNU General Public License as published by      */
@@ -40,7 +43,7 @@
 /* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA */
 /*                                                                           */
 /* Bugs/Comments/Suggestions should be mailed to:                            */
-/*      ipslinux@us.ibm.com                                                  */
+/*      ipslinux@adaptec.com                                                 */
 /*                                                                           */
 /*****************************************************************************/
 
@@ -84,32 +87,10 @@
                                          ((IPS_IS_TROMBONE(ha) || IPS_IS_CLARINET(ha)) && \
                                           (ips_force_memio))) ? 1 : 0)
 
-   #ifndef VIRT_TO_BUS
-      #define VIRT_TO_BUS(x)           (uint32_t) virt_to_bus((void *) x)
-   #endif
-
    #ifndef MDELAY
       #define MDELAY mdelay
    #endif
-
-   #ifndef verify_area_20
-      #define verify_area_20(t,a,sz)   (0) /* success */
-   #endif
-
-   #ifndef DECLARE_MUTEX_LOCKED
-      #define DECLARE_MUTEX_LOCKED(sem) struct semaphore sem = MUTEX_LOCKED;
-   #endif
    
-   /*
-    * Lock macros
-    */
-   #define IPS_SCB_LOCK(cpu_flags)      spin_lock_irqsave(&ha->scb_lock, cpu_flags)
-   #define IPS_SCB_UNLOCK(cpu_flags)    spin_unlock_irqrestore(&ha->scb_lock, cpu_flags)
-   #define IPS_QUEUE_LOCK(queue)        spin_lock_irqsave(&(queue)->lock, (queue)->cpu_flags)
-   #define IPS_QUEUE_UNLOCK(queue)      spin_unlock_irqrestore(&(queue)->lock, (queue)->cpu_flags)
-   #define IPS_HA_LOCK(cpu_flags)       spin_lock_irqsave(&ha->ips_lock, cpu_flags)
-   #define IPS_HA_UNLOCK(cpu_flags)     spin_unlock_irqrestore(&ha->ips_lock, cpu_flags)
-
    /*
     * Adapter address map equates
     */
@@ -1063,8 +1044,6 @@ typedef struct ips_scb_queue {
    struct ips_scb *head;
    struct ips_scb *tail;
    int             count;
-   unsigned long   cpu_flags;
-   spinlock_t      lock;
 } ips_scb_queue_t;
 
 /*
@@ -1074,13 +1053,10 @@ typedef struct ips_wait_queue {
    Scsi_Cmnd      *head;
    Scsi_Cmnd      *tail;
    int             count;
-   unsigned long   cpu_flags;
-   spinlock_t      lock;
 } ips_wait_queue_t;
 
 typedef struct ips_copp_wait_item {
    Scsi_Cmnd                 *scsi_cmd;
-   struct semaphore          *sem;
    struct ips_copp_wait_item *next;
 } ips_copp_wait_item_t;
 
@@ -1088,8 +1064,6 @@ typedef struct ips_copp_queue {
    struct ips_copp_wait_item *head;
    struct ips_copp_wait_item *tail;
    int                        count;
-   unsigned long              cpu_flags;
-   spinlock_t                 lock;
 } ips_copp_queue_t;
 
 /* forward decl for host structure */
@@ -1138,7 +1112,6 @@ typedef struct ips_ha {
    char              *ioctl_data;         /* IOCTL data area            */
    uint32_t           ioctl_datasize;     /* IOCTL data size            */
    uint32_t           cmd_in_progress;    /* Current command in progress*/
-   unsigned long      flags;              /* HA flags                   */
    uint8_t            waitflag;           /* are we waiting for cmd     */
    uint8_t            active;
    int                ioctl_reset;        /* IOCTL Requested Reset Flag */
@@ -1158,11 +1131,6 @@ typedef struct ips_ha {
    char              *ioremap_ptr;        /* ioremapped memory pointer  */
    ips_hw_func_t      func;               /* hw function pointers       */
    struct pci_dev    *pcidev;             /* PCI device handle          */
-   spinlock_t         scb_lock;
-   spinlock_t         copp_lock;
-   spinlock_t         ips_lock;
-   struct semaphore   ioctl_sem;          /* Semaphore for new IOCTL's  */
-   struct semaphore   flash_ioctl_sem;    /* Semaphore for Flashing     */
    char              *flash_data;         /* Save Area for flash data   */
    u8                 flash_order;        /* Save Area for flash size order  */
    u32                flash_datasize;   /* Save Area for flash data size */
@@ -1195,7 +1163,6 @@ typedef struct ips_scb {
    Scsi_Cmnd        *scsi_cmd;
    struct ips_scb   *q_next;
    ips_scb_callback  callback;
-   struct semaphore *sem;
    uint32_t          sg_busaddr;
    int               sg_count;
 } ips_scb_t;

@@ -998,15 +998,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 		sprintf(disk->disk_name,"hd%c",'a'+hwif->index*MAX_DRIVES+unit);
 		disk->minor_shift = PARTN_BITS; 
 		disk->fops = ide_fops;
-
-		snprintf(disk->disk_dev.bus_id,BUS_ID_SIZE,"%u.%u",
-			 hwif->index,unit);
-		snprintf(disk->disk_dev.name,DEVICE_NAME_SIZE,
-			 "%s","IDE Drive");
-		disk->disk_dev.parent = &hwif->gendev;
-		disk->disk_dev.bus = &ide_bus_type;
-		if (hwif->drives[unit].present)
-			device_register(&disk->disk_dev);
 		hwif->drives[unit].disk = disk;
 	}
 
@@ -1020,6 +1011,20 @@ static void init_gendisk (ide_hwif_t *hwif)
 		if (hwif->drives[unit].present)
 			hwif->drives[unit].de = devfs_mk_dir(ide_devfs_handle, name, NULL);
 	}
+	
+	for (unit = 0; unit < units; ++unit) {
+		ide_drive_t * drive = &hwif->drives[unit];
+
+		snprintf(drive->gendev.bus_id,BUS_ID_SIZE,"%u.%u",
+			 hwif->index,unit);
+		snprintf(drive->gendev.name,DEVICE_NAME_SIZE,
+			 "%s","IDE Drive");
+		drive->gendev.parent = &hwif->gendev;
+		drive->gendev.bus = &ide_bus_type;
+		if (drive->present)
+			device_register(&drive->gendev);
+	}
+
 	return;
 
 err_kmalloc_gd:
