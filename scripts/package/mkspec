@@ -57,14 +57,14 @@ fi
 echo "%build"
 
 if ! $PREBUILT; then
-echo "make clean && make"
+echo "make clean && make %{_smp_mflags}"
 echo ""
 fi
 
 echo "%install"
 echo 'mkdir -p $RPM_BUILD_ROOT/boot $RPM_BUILD_ROOT/lib $RPM_BUILD_ROOT/lib/modules'
 
-echo 'INSTALL_MOD_PATH=$RPM_BUILD_ROOT make modules_install'
+echo 'INSTALL_MOD_PATH=$RPM_BUILD_ROOT make %{_smp_mflags} modules_install'
 echo 'cp $KBUILD_IMAGE $RPM_BUILD_ROOT'"/boot/vmlinuz-$KERNELRELEASE"
 
 echo 'cp System.map $RPM_BUILD_ROOT'"/boot/System.map-$KERNELRELEASE"
