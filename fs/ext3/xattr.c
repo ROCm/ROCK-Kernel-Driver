@@ -1066,7 +1066,6 @@ ext3_xattr_delete_inode(handle_t *handle, struct inode *inode)
 {
 	struct buffer_head *bh = NULL;
 
-	down_write(&EXT3_I(inode)->xattr_sem);
 	if (!EXT3_I(inode)->i_file_acl)
 		goto cleanup;
 	bh = sb_bread(inode->i_sb, EXT3_I(inode)->i_file_acl);
@@ -1088,7 +1087,6 @@ ext3_xattr_delete_inode(handle_t *handle, struct inode *inode)
 
 cleanup:
 	brelse(bh);
-	up_write(&EXT3_I(inode)->xattr_sem);
 }
 
 /*
