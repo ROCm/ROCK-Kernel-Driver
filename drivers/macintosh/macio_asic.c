@@ -23,10 +23,13 @@
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 
+#define DEBUG
+
+#define MAX_NODE_NAME_SIZE (BUS_ID_SIZE - 12)
+
 static struct macio_chip      *macio_on_hold;
 
-static int
-macio_bus_match(struct device *dev, struct device_driver *drv) 
+static int macio_bus_match(struct device *dev, struct device_driver *drv) 
 {
 	struct macio_dev * macio_dev = to_macio_device(dev);
 	struct macio_driver * macio_drv = to_macio_driver(drv);
@@ -85,41 +88,42 @@ static int macio_device_probe(struct device *dev)
 static int macio_device_remove(struct device *dev)
 {
 	struct macio_dev * macio_dev = to_macio_device(dev);
-	struct macio_driver * drv = to_macio_driver(macio_dev->ofdev.dev.driver);
+	struct macio_driver * drv = to_macio_driver(dev->driver);
 
-	if (drv && drv->remove)
+	if (dev->driver && drv->remove)
 		drv->remove(macio_dev);
 	macio_dev_put(macio_dev);
 
 	return 0;
 }
 
+static void macio_device_shutdown(struct device *dev)
+{
+	struct macio_dev * macio_dev = to_macio_device(dev);
+	struct macio_driver * drv = to_macio_driver(dev->driver);
+
+	if (dev->driver && drv->shutdown)
+		drv->shutdown(macio_dev);
+}
+
 static int macio_device_suspend(struct device *dev, u32 state)
 {
 	struct macio_dev * macio_dev = to_macio_device(dev);
-	struct macio_driver * drv;
-	int error = 0;
+	struct macio_driver * drv = to_macio_driver(dev->driver);
 
-	if (macio_dev->ofdev.dev.driver == NULL)
-		return 0;
-	drv = to_macio_driver(macio_dev->ofdev.dev.driver);
-	if (drv->suspend)
-		error = drv->suspend(macio_dev, state);
-	return error;
+	if (dev->driver && drv->suspend)
+		return drv->suspend(macio_dev, state);
+	return 0;
 }
 
 static int macio_device_resume(struct device * dev)
 {
 	struct macio_dev * macio_dev = to_macio_device(dev);
-	struct macio_driver * drv;
-	int error = 0;
+	struct macio_driver * drv = to_macio_driver(dev->driver);
 
-	if (macio_dev->ofdev.dev.driver == NULL)
-		return 0;
-	drv = to_macio_driver(macio_dev->ofdev.dev.driver);
-	if (drv->resume)
-		error = drv->resume(macio_dev);
-	return error;
+	if (dev->driver && drv->resume)
+		return drv->resume(macio_dev);
+	return 0;
 }
 
 struct bus_type macio_bus_type = {
@@ -129,8 +133,7 @@ struct bus_type macio_bus_type = {
        .resume	= macio_device_resume,
 };
 
-static int __init
-macio_bus_driver_init(void)
+static int __init macio_bus_driver_init(void)
 {
 	return bus_register(&macio_bus_type);
 }
@@ -155,6 +158,58 @@ static void macio_release_dev(struct device *dev)
 }
 
 /**
+ * macio_resource_quirks - tweak or skip some resources for a device
+ * @np: pointer to the device node
+ * @res: resulting resource
+ * @index: index of resource in node
+ *
+ * If this routine returns non-null, then the resource is completely
+ * skipped.
+ */
+static int macio_resource_quirks(struct device_node *np, struct resource *res, int index)
+{
+	if (res->flags & IORESOURCE_MEM) {
+		/* Grand Central has too large resource 0 on some machines */
+		if (index == 0 && !strcmp(np->name, "gc")) {
+			np->addrs[0].size = 0x20000;
+			res->end = res->start + 0x1ffff;
+		}
+		/* Airport has bogus resource 2 */
+		if (index >= 2 && !strcmp(np->name, "radio"))
+			return 1;
+		/* DBDMAs may have bogus sizes */
+		if ((res->start & 0x0001f000) == 0x00008000) {
+			np->addrs[index].size = 0x100;
+			res->end = res->start + 0xff;
+		}
+		/* ESCC parent eats child resources. We could have added a level of hierarchy,
+		 * but I don't really feel the need for it */
+		if (!strcmp(np->name, "escc"))
+			return 1;
+		/* ESCC has bogus resources >= 3 */
+		if (index >= 3 && !(strcmp(np->name, "ch-a") && strcmp(np->name, "ch-b")))
+			return 1;
+		/* Media bay has too many resources, keep only first one */
+		if (index > 0 && !strcmp(np->name, "media-bay"))
+			return 1;
+		/* Some older IDE resources have bogus sizes */
+		if (!(strcmp(np->name, "IDE") && strcmp(np->name, "ATA") &&
+		      strcmp(np->type, "ide") && strcmp(np->type, "ata"))) {
+			if (index == 0 && np->addrs[0].size > 0x1000) {
+				np->addrs[0].size = 0x1000;
+				res->end = res->start + 0xfff;
+			}
+			if (index == 1 && np->addrs[1].size > 0x100) {
+				np->addrs[1].size = 0x100;
+				res->end = res->start + 0xff;
+			}
+		}
+	}
+	return 0;
+}
+
+
+/**
  * macio_add_one_device - Add one device from OF node to the device tree
  * @chip: pointer to the macio_chip holding the device
  * @np: pointer to the device node in the OF tree
@@ -164,9 +219,11 @@ static void macio_release_dev(struct device *dev)
  * be exposed to the bay driver some way...
  */
 static struct macio_dev * macio_add_one_device(struct macio_chip *chip, struct device *parent,
-		     struct device_node *np, struct macio_dev *in_bay)
+					       struct device_node *np, struct macio_dev *in_bay,
+					       struct resource *parent_res)
 {
 	struct macio_dev *dev;
+	int i, j;
 	u32 *reg;
 	
 	if (np == NULL)
@@ -186,22 +243,76 @@ static struct macio_dev * macio_add_one_device(struct macio_chip *chip, struct d
 	dev->ofdev.dev.bus = &macio_bus_type;
 	dev->ofdev.dev.release = macio_release_dev;
 
+#ifdef DEBUG
+	printk("preparing mdev @%p, ofdev @%p, dev @%p, kobj @%p\n",
+	       dev, &dev->ofdev, &dev->ofdev.dev, &dev->ofdev.dev.kobj);
+#endif
+
 	/* MacIO itself has a different reg, we use it's PCI base */
 	if (np == chip->of_node) {
-		sprintf(dev->ofdev.dev.bus_id, "%1d.%08lx:%.8s", chip->lbus.index,
+		sprintf(dev->ofdev.dev.bus_id, "%1d.%08lx:%.*s", chip->lbus.index,
 #ifdef CONFIG_PCI
 			pci_resource_start(chip->lbus.pdev, 0),
 #else
 			0, /* NuBus may want to do something better here */
 #endif
-			np->name);
+			MAX_NODE_NAME_SIZE, np->name);
 	} else {
 		reg = (u32 *)get_property(np, "reg", NULL);
-		sprintf(dev->ofdev.dev.bus_id, "%1d.%08x:%.8s", chip->lbus.index,
-			reg ? *reg : 0, np->name);
+		sprintf(dev->ofdev.dev.bus_id, "%1d.%08x:%.*s", chip->lbus.index,
+			reg ? *reg : 0, MAX_NODE_NAME_SIZE, np->name);
 	}
 
+	/* For now, we use pre-parsed entries in the device-tree for
+	 * interrupt routing and addresses, but we should change that
+	 * to dynamically parsed entries and so get rid of most of the
+	 * clutter in struct device_node
+	 */
+	for (i = j = 0; i < np->n_intrs; i++) {
+		struct resource *res = &dev->interrupt[j];
+
+		if (j >= MACIO_DEV_COUNT_IRQS)
+			break;
+		res->start = np->intrs[i].line;
+		res->flags = IORESOURCE_IO;
+		if (np->intrs[j].sense)
+			res->flags |= IORESOURCE_IRQ_LOWLEVEL;
+		else
+			res->flags |= IORESOURCE_IRQ_HIGHEDGE;
+		res->name = dev->ofdev.dev.bus_id;
+		if (macio_resource_quirks(np, res, i))
+			memset(res, 0, sizeof(struct resource));
+		else
+			j++;
+	}
+	dev->n_interrupts = j;
+	for (i = j = 0; i < np->n_addrs; i++) {
+		struct resource *res = &dev->resource[j];
+		
+		if (j >= MACIO_DEV_COUNT_RESOURCES)
+			break;
+		res->start = np->addrs[i].address;
+		res->end = np->addrs[i].address + np->addrs[i].size - 1;
+		res->flags = IORESOURCE_MEM;
+		res->name = dev->ofdev.dev.bus_id;
+		if (macio_resource_quirks(np, res, i))
+			memset(res, 0, sizeof(struct resource));
+		else {
+			j++;
+			/* Currently, we consider failure as harmless, this may
+			 * change in the future, once I've found all the device
+			 * tree bugs in older machines & worked around them
+			 */
+			if (insert_resource(parent_res, res))
+       				printk(KERN_WARNING "Can't request resource %d for MacIO"
+				       " device %s\n", i, dev->ofdev.dev.bus_id);
+		}
+	}
+	dev->n_resources = j;
+
 	if (of_device_register(&dev->ofdev) != 0) {
+		printk(KERN_DEBUG"macio: device registration error for %s!\n",
+		       dev->ofdev.dev.bus_id);
 		kfree(dev);
 		return NULL;
 	}
@@ -234,25 +345,30 @@ static void macio_pci_add_devices(struct macio_chip *chip)
 	struct device_node *np, *pnode;
 	struct macio_dev *rdev, *mdev, *mbdev = NULL, *sdev = NULL;
 	struct device *parent = NULL;
+	struct resource *root_res = &iomem_resource;
 	
 	/* Add a node for the macio bus itself */
 #ifdef CONFIG_PCI
-	if (chip->lbus.pdev)
+	if (chip->lbus.pdev) {
 		parent = &chip->lbus.pdev->dev;
+		root_res = &chip->lbus.pdev->resource[0];
+	}
 #endif
 	pnode = of_node_get(chip->of_node);
 	if (pnode == NULL)
 		return;
 
-	rdev = macio_add_one_device(chip, parent, pnode, NULL);
+	/* Add macio itself to hierarchy */
+	rdev = macio_add_one_device(chip, parent, pnode, NULL, root_res);
 	if (rdev == NULL)
 		return;
+	root_res = &rdev->resource[0];
 
 	/* First scan 1st level */
 	for (np = NULL; (np = of_get_next_child(pnode, np)) != NULL;) {
 		if (!macio_skip_device(np)) {
 			of_node_get(np);
-			mdev = macio_add_one_device(chip, &rdev->ofdev.dev, np, NULL);
+			mdev = macio_add_one_device(chip, &rdev->ofdev.dev, np, NULL, root_res);
 			if (mdev == NULL)
 				of_node_put(np);
 			else if (strncmp(np->name, "media-bay", 9) == 0)
@@ -267,17 +383,20 @@ static void macio_pci_add_devices(struct macio_chip *chip)
 		for (np = NULL; (np = of_get_next_child(mbdev->ofdev.node, np)) != NULL;)
 			if (!macio_skip_device(np)) {
 				of_node_get(np);
-				if (macio_add_one_device(chip, &mbdev->ofdev.dev, np, mbdev) == NULL)
+				if (macio_add_one_device(chip, &mbdev->ofdev.dev, np, mbdev,
+							 root_res) == NULL)
 					of_node_put(np);
 			}
 	/* Add serial ports if any */
-	if (sdev)
+	if (sdev) {
 		for (np = NULL; (np = of_get_next_child(sdev->ofdev.node, np)) != NULL;)
 			if (!macio_skip_device(np)) {
 				of_node_get(np);
-				if (macio_add_one_device(chip, &sdev->ofdev.dev, np, NULL) == NULL)
+				if (macio_add_one_device(chip, &sdev->ofdev.dev, np, NULL,
+							 root_res) == NULL)
 					of_node_put(np);
 			}
+	}
 }
 
 
@@ -294,6 +413,7 @@ int macio_register_driver(struct macio_driver *drv)
 	drv->driver.bus = &macio_bus_type;
 	drv->driver.probe = macio_device_probe;
 	drv->driver.remove = macio_device_remove;
+	drv->driver.shutdown = macio_device_shutdown;
 
 	/* register with core */
 	count = driver_register(&drv->driver);
@@ -308,6 +428,97 @@ void macio_unregister_driver(struct macio_driver *drv)
 {
 	driver_unregister(&drv->driver);
 }
+
+/**
+ *	macio_request_resource - Request an MMIO resource
+ * 	@dev: pointer to the device holding the resource
+ *	@resource_no: resource number to request
+ *	@name: resource name
+ *
+ *	Mark  memory region number @resource_no associated with MacIO
+ *	device @dev as being reserved by owner @name.  Do not access
+ *	any address inside the memory regions unless this call returns
+ *	successfully.
+ *
+ *	Returns 0 on success, or %EBUSY on error.  A warning
+ *	message is also printed on failure.
+ */
+int macio_request_resource(struct macio_dev *dev, int resource_no, const char *name)
+{
+	if (macio_resource_len(dev, resource_no) == 0)
+		return 0;
+		
+	if (!request_mem_region(macio_resource_start(dev, resource_no),
+				macio_resource_len(dev, resource_no),
+				name))
+		goto err_out;
+	
+	return 0;
+
+err_out:
+	printk (KERN_WARNING "MacIO: Unable to reserve resource #%d:%lx@%lx"
+		" for device %s\n",
+		resource_no,
+		macio_resource_len(dev, resource_no),
+		macio_resource_start(dev, resource_no),
+		dev->ofdev.dev.bus_id);
+	return -EBUSY;
+}
+
+/**
+ * macio_release_resource - Release an MMIO resource
+ * @dev: pointer to the device holding the resource
+ * @resource_no: resource number to release
+ */
+void macio_release_resource(struct macio_dev *dev, int resource_no)
+{
+	if (macio_resource_len(dev, resource_no) == 0)
+		return;
+	release_mem_region(macio_resource_start(dev, resource_no),
+			   macio_resource_len(dev, resource_no));
+}
+
+/**
+ *	macio_request_resources - Reserve all memory resources
+ *	@dev: MacIO device whose resources are to be reserved
+ *	@name: Name to be associated with resource.
+ *
+ *	Mark all memory regions associated with MacIO device @dev as
+ *	being reserved by owner @name.  Do not access any address inside
+ *	the memory regions unless this call returns successfully.
+ *
+ *	Returns 0 on success, or %EBUSY on error.  A warning
+ *	message is also printed on failure.
+ */
+int macio_request_resources(struct macio_dev *dev, const char *name)
+{
+	int i;
+	
+	for (i = 0; i < dev->n_resources; i++)
+		if (macio_request_resource(dev, i, name))
+			goto err_out;
+	return 0;
+
+err_out:
+	while(--i >= 0)
+		macio_release_resource(dev, i);
+		
+	return -EBUSY;
+}
+
+/**
+ *	macio_release_resources - Release reserved memory resources
+ *	@dev: MacIO device whose resources were previously reserved
+ */
+
+void macio_release_resources(struct macio_dev *dev)
+{
+	int i;
+	
+	for (i = 0; i < dev->n_resources; i++)
+		macio_release_resource(dev, i);
+}
+
 
 #ifdef CONFIG_PCI
 
@@ -416,3 +627,7 @@ EXPORT_SYMBOL(macio_register_driver);
 EXPORT_SYMBOL(macio_unregister_driver);
 EXPORT_SYMBOL(macio_dev_get);
 EXPORT_SYMBOL(macio_dev_put);
+EXPORT_SYMBOL(macio_request_resource);
+EXPORT_SYMBOL(macio_release_resource);
+EXPORT_SYMBOL(macio_request_resources);
+EXPORT_SYMBOL(macio_release_resources);

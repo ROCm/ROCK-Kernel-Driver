@@ -9,7 +9,7 @@ extern struct bus_type macio_bus_type;
 struct macio_driver;
 struct macio_chip;
 
-#define MACIO_DEV_COUNT_RESOURCE	8
+#define MACIO_DEV_COUNT_RESOURCES	8
 #define MACIO_DEV_COUNT_IRQS		8
 
 /*
@@ -38,12 +38,81 @@ struct macio_dev
 	struct macio_bus	*bus;		/* macio bus this device is on */
 	struct macio_dev	*media_bay;	/* Device is part of a media bay */
 	struct of_device	ofdev;
+	int			n_resources;
+	struct resource		resource[MACIO_DEV_COUNT_RESOURCES];
+	int			n_interrupts;
+	struct resource		interrupt[MACIO_DEV_COUNT_IRQS];
 };
 #define	to_macio_device(d) container_of(d, struct macio_dev, ofdev.dev)
 #define	of_to_macio_device(d) container_of(d, struct macio_dev, ofdev)
 
 extern struct macio_dev *macio_dev_get(struct macio_dev *dev);
 extern void macio_dev_put(struct macio_dev *dev);
+
+/*
+ * Accessors to resources & interrupts and other device
+ * fields
+ */
+
+static inline int macio_resource_count(struct macio_dev *dev)
+{
+	return dev->n_resources;
+}
+
+static inline unsigned long macio_resource_start(struct macio_dev *dev, int resource_no)
+{
+	return dev->resource[resource_no].start;
+}
+
+static inline unsigned long macio_resource_end(struct macio_dev *dev, int resource_no)
+{
+	return dev->resource[resource_no].end;
+}
+
+static inline unsigned long macio_resource_len(struct macio_dev *dev, int resource_no)
+{
+	struct resource *res = &dev->resource[resource_no];
+	if (res->start == 0 || res->end == 0 || res->end < res->start)
+		return 0;
+	return res->end - res->start + 1;
+}
+
+extern int macio_request_resource(struct macio_dev *dev, int resource_no, const char *name);
+extern void macio_release_resource(struct macio_dev *dev, int resource_no);
+extern int macio_request_resources(struct macio_dev *dev, const char *name);
+extern void macio_release_resources(struct macio_dev *dev);
+
+static inline int macio_irq_count(struct macio_dev *dev)
+{
+	return dev->n_interrupts;
+}
+
+static inline int macio_irq(struct macio_dev *dev, int irq_no)
+{
+	return dev->interrupt[irq_no].start;
+}
+
+static inline void macio_set_drvdata(struct macio_dev *dev, void *data)
+{
+	dev_set_drvdata(&dev->ofdev.dev, data);
+}
+
+static inline void* macio_get_drvdata(struct macio_dev *dev)
+{
+	return dev_get_drvdata(&dev->ofdev.dev);
+}
+
+static inline struct device_node *macio_get_of_node(struct macio_dev *mdev)
+{
+	return mdev->ofdev.node;
+}
+
+#ifdef CONFIG_PCI
+static inline struct pci_dev *macio_get_pci_dev(struct macio_dev *mdev)
+{
+	return mdev->bus->pdev;
+}
+#endif
 
 /*
  * A driver for a mac-io chip based device
