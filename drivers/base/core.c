@@ -98,19 +98,22 @@ static int device_attach(struct device * dev)
 
 static void device_detach(struct device * dev)
 {
+	struct device_driver * drv; 
+
 	if (dev->driver) {
-		write_lock(&dev->driver->lock);
-		list_del_init(&dev->driver_list);
-		write_unlock(&dev->driver->lock);
-
-		/* detach from driver */
-		if (dev->driver->remove)
-			dev->driver->remove(dev);
-		put_driver(dev->driver);
-
 		lock_device(dev);
+		drv = dev->driver;
 		dev->driver = NULL;
 		unlock_device(dev);
+
+		write_lock(&drv->lock);
+		list_del_init(&dev->driver_list);
+		write_unlock(&drv->lock);
+
+		/* detach from driver */
+		if (drv->remove)
+			drv->remove(dev);
+		put_driver(drv);
 	}
 }
 
