@@ -512,6 +512,23 @@ xfs_free_buftarg(
 	kfree(btp);
 }
 
+void
+xfs_size_buftarg(
+	xfs_buftarg_t		*btp,
+	unsigned int		blocksize,
+	unsigned int		sectorsize)
+{
+	btp->pbr_bsize = blocksize;
+	btp->pbr_sshift = ffs(sectorsize) - 1;
+	btp->pbr_smask = sectorsize - 1;
+
+	if (set_blocksize(btp->pbr_bdev, sectorsize)) {
+		printk(KERN_WARNING
+			"XFS: Cannot set_blocksize to %u on device 0x%x\n",
+			sectorsize, btp->pbr_dev);
+	}
+}
+
 xfs_buftarg_t *
 xfs_alloc_buftarg(
 	struct block_device	*bdev)
@@ -523,7 +540,7 @@ xfs_alloc_buftarg(
 	btp->pbr_dev =  bdev->bd_dev;
 	btp->pbr_bdev = bdev;
 	btp->pbr_mapping = bdev->bd_inode->i_mapping;
-	btp->pbr_blocksize = PAGE_CACHE_SIZE;
+	xfs_size_buftarg(btp, PAGE_CACHE_SIZE, bdev_hardsect_size(bdev));
 
 	switch (MAJOR(btp->pbr_dev)) {
 	case MD_MAJOR:

@@ -91,7 +91,8 @@ static struct {
     { offsetof(xfs_sb_t, sb_unit),	 0 },
     { offsetof(xfs_sb_t, sb_width),	 0 },
     { offsetof(xfs_sb_t, sb_dirblklog),	 0 },
-    { offsetof(xfs_sb_t, sb_dummy),	 1 },
+    { offsetof(xfs_sb_t, sb_logsectlog), 0 },
+    { offsetof(xfs_sb_t, sb_logsectsize),0 },
     { offsetof(xfs_sb_t, sb_logsunit),	 0 },
     { sizeof(xfs_sb_t),			 0 }
 };
@@ -119,6 +120,7 @@ xfs_mount_init(void)
 	spinlock_init(&mp->m_freeze_lock, "xfs_freeze");
 	init_sv(&mp->m_wait_unfreeze, SV_DEFAULT, "xfs_freeze", 0);
 	atomic_set(&mp->m_active_trans, 0);
+	mp->m_cxfstype = XFS_CXFS_NOT;
 
 	return mp;
 }	/* xfs_mount_init */
@@ -213,13 +215,26 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
+	if (!sbp->sb_logsectlog)
+		sbp->sb_logsectlog = sbp->sb_sectlog;
+	if (!sbp->sb_logsectsize)
+		sbp->sb_logsectsize = sbp->sb_sectsize;
+
 	/*
 	 * More sanity checking. These were stolen directly from
 	 * xfs_repair.
 	 */
-	if (sbp->sb_blocksize <= 0					||
-	    sbp->sb_agcount <= 0					||
-	    sbp->sb_sectsize <= 0					||
+	if (sbp->sb_agcount <= 0					||
+	    sbp->sb_sectsize < XFS_MIN_SECTORSIZE			||
+	    sbp->sb_sectsize > XFS_MAX_SECTORSIZE			||
+	    sbp->sb_sectlog < XFS_MIN_SECTORSIZE_LOG			||
+	    sbp->sb_sectlog > XFS_MAX_SECTORSIZE_LOG			||
+	    sbp->sb_logsectsize < XFS_MIN_SECTORSIZE			||
+	    sbp->sb_logsectsize > XFS_MAX_SECTORSIZE			||
+	    sbp->sb_logsectlog < XFS_MIN_SECTORSIZE_LOG			||
+	    sbp->sb_logsectlog > XFS_MAX_SECTORSIZE_LOG			||
+	    sbp->sb_blocksize < XFS_MIN_BLOCKSIZE			||
+	    sbp->sb_blocksize > XFS_MAX_BLOCKSIZE			||
 	    sbp->sb_blocklog < XFS_MIN_BLOCKSIZE_LOG			||
 	    sbp->sb_blocklog > XFS_MAX_BLOCKSIZE_LOG			||
 	    sbp->sb_inodesize < XFS_DINODE_MIN_SIZE			||
@@ -232,7 +247,7 @@ xfs_mount_validate_sb(
 	}
 
 	/*
-	 * sanity check ag count, size fields against data size field
+	 * Sanity check AG count, size fields against data size field
 	 */
 	if (sbp->sb_dblocks == 0 ||
 	    sbp->sb_dblocks >
@@ -268,7 +283,8 @@ xfs_mount_validate_sb(
 			PAGE_SIZE);
 		return XFS_ERROR(EWRONGFS);
 	}
-	return (0);
+
+	return 0;
 }
 
 void
@@ -467,6 +483,7 @@ xfs_mount_common(xfs_mount_t *mp, xfs_sb_t *sbp)
 	mp->m_maxagi = mp->m_sb.sb_agcount;
 	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
 	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
+	mp->m_sectbb_log = sbp->sb_sectlog - BBSHIFT;
 	mp->m_agno_log = xfs_highbit32(sbp->sb_agcount - 1) + 1;
 	mp->m_agino_log = sbp->sb_inopblog + sbp->sb_agblklog;
 	mp->m_litino = sbp->sb_inodesize -
@@ -755,7 +772,9 @@ xfs_mountfs(
 		goto error1;
 	}
 	if (!noio) {
-		error = xfs_read_buf(mp, mp->m_ddev_targp, d - 1, 1, 0, &bp);
+		error = xfs_read_buf(mp, mp->m_ddev_targp,
+				     d - XFS_FSS_TO_BB(mp, 1),
+				     XFS_FSS_TO_BB(mp, 1), 0, &bp);
 		if (!error) {
 			xfs_buf_relse(bp);
 		} else {
@@ -775,7 +794,9 @@ xfs_mountfs(
 			error = XFS_ERROR(E2BIG);
 			goto error1;
 		}
-		error = xfs_read_buf(mp, mp->m_logdev_targp, d - 1, 1, 0, &bp);
+		error = xfs_read_buf(mp, mp->m_logdev_targp,
+				     d - XFS_LOGS_TO_BB(mp, 1),
+				     XFS_LOGS_TO_BB(mp, 1), 0, &bp);
 		if (!error) {
 			xfs_buf_relse(bp);
 		} else {

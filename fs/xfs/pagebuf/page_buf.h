@@ -136,7 +136,9 @@ typedef struct pb_target {
 	dev_t			pbr_dev;
 	struct block_device	*pbr_bdev;
 	struct address_space	*pbr_mapping;
-	unsigned int		pbr_blocksize;
+	unsigned int		pbr_bsize;
+	unsigned int		pbr_sshift;
+	size_t			pbr_smask;
 } pb_target_t;
 
 /*
