@@ -27,5 +27,3 @@ int
 isdn_ppp_strip_proto(struct sk_buff *skb);
 
 #define IPPP_MAX_HEADER 10
-
-
