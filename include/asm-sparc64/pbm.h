@@ -70,6 +70,13 @@ struct pci_iommu {
 	 */
 	u32		lowest_consistent_map;
 
+	/* In order to deal with some buggy third-party PCI bridges that
+	 * do wrong prefetching, we never mark valid mappings as invalid.
+	 * Instead we point them at this dummy page.
+	 */
+	unsigned long	dummy_page;
+	unsigned long	dummy_page_pa;
+
 	/* If PBM_NCLUSTERS is ever decreased to 4 or lower,
 	 * or if largest supported page_table_sz * 8K goes above
 	 * 2GB, you must increase the size of the type of
@@ -92,6 +99,8 @@ struct pci_iommu {
 	 */
 	u32 dma_addr_mask;
 };
+
+extern void pci_iommu_table_init(struct pci_iommu *, int);
 
 /* This describes a PCI bus module's streaming buffer. */
 struct pci_strbuf {
