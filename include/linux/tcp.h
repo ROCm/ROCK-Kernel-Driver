@@ -183,6 +183,9 @@ struct tcp_info
 	__u32	tcpi_snd_cwnd;
 	__u32	tcpi_advmss;
 	__u32	tcpi_reordering;
+
+	__u32	tcpi_rcv_rtt;
+	__u32	tcpi_rcv_space;
 };
 
 #ifdef __KERNEL__
@@ -351,11 +354,11 @@ struct tcp_opt {
 	__u8	urg_mode;	/* In urgent mode		*/
 	__u32	snd_up;		/* Urgent pointer		*/
 
-	/* The syn_wait_lock is necessary only to avoid tcp_get_info having
+	/* The syn_wait_lock is necessary only to avoid proc interface having
 	 * to grab the main lock sock while browsing the listening hash
 	 * (otherwise it's deadlock prone).
-	 * This lock is acquired in read mode only from tcp_get_info() and
-	 * it's acquired in write mode _only_ from code that is actively
+	 * This lock is acquired in read mode only from listening_get_next()
+	 * and it's acquired in write mode _only_ from code that is actively
 	 * changing the syn_wait_queue. All readers that are holding
 	 * the master sock lock don't need to grab this lock in read mode
 	 * too as the syn_wait_queue writes are always protected from
