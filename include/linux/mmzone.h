@@ -120,7 +120,8 @@ struct zone {
 	 * rarely used fields:
 	 */
 	char			*name;
-	unsigned long		size;
+	unsigned long		spanned_pages;	/* total size, including holes */
+	unsigned long		present_pages;	/* amount of memory (excluding holes) */
 } ____cacheline_maxaligned_in_smp;
 
 #define ZONE_DMA		0

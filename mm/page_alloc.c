@@ -48,7 +48,7 @@ static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
  */
 static inline int bad_range(struct zone *zone, struct page *page)
 {
-	if (page_to_pfn(page) >= zone->zone_start_pfn + zone->size)
+	if (page_to_pfn(page) >= zone->zone_start_pfn + zone->spanned_pages)
 		return 1;
 	if (page_to_pfn(page) < zone->zone_start_pfn)
 		return 1;
@@ -509,7 +509,7 @@ static unsigned int nr_free_zone_pages(int offset)
 		struct zone *zone;
 
 		for (zone = *zonep++; zone; zone = *zonep++) {
-			unsigned long size = zone->size;
+			unsigned long size = zone->present_pages;
 			unsigned long high = zone->pages_high;
 			if (size > high)
 				sum += size - high;
@@ -681,7 +681,7 @@ void show_free_areas(void)
 			struct zone *zone = &pgdat->node_zones[type];
  			unsigned long nr, flags, order, total = 0;
 
-			if (!zone->size)
+			if (!zone->present_pages)
 				continue;
 
 			spin_lock_irqsave(&zone->lock, flags);
@@ -710,7 +710,7 @@ static int __init build_zonelists_node(pg_data_t *pgdat, struct zonelist *zoneli
 		BUG();
 	case ZONE_HIGHMEM:
 		zone = pgdat->node_zones + ZONE_HIGHMEM;
-		if (zone->size) {
+		if (zone->present_pages) {
 #ifndef CONFIG_HIGHMEM
 			BUG();
 #endif
@@ -718,11 +718,11 @@ static int __init build_zonelists_node(pg_data_t *pgdat, struct zonelist *zoneli
 		}
 	case ZONE_NORMAL:
 		zone = pgdat->node_zones + ZONE_NORMAL;
-		if (zone->size)
+		if (zone->present_pages)
 			zonelist->zones[j++] = zone;
 	case ZONE_DMA:
 		zone = pgdat->node_zones + ZONE_DMA;
-		if (zone->size)
+		if (zone->present_pages)
 			zonelist->zones[j++] = zone;
 	}
 
@@ -866,7 +866,8 @@ void __init free_area_init_core(pg_data_t *pgdat,
 			realsize -= zholes_size[j];
 
 		printk("  %s zone: %lu pages\n", zone_names[j], realsize);
-		zone->size = size;
+		zone->spanned_pages = size;
+		zone->present_pages = realsize;
 		zone->name = zone_names[j];
 		spin_lock_init(&zone->lock);
 		spin_lock_init(&zone->lru_lock);
@@ -1034,7 +1035,7 @@ static int frag_show(struct seq_file *m, void *arg)
 	int order;
 
 	for (zone = node_zones; zone - node_zones < MAX_NR_ZONES; ++zone) {
-		if (!zone->size)
+		if (!zone->present_pages)
 			continue;
 
 		spin_lock_irqsave(&zone->lock, flags);
