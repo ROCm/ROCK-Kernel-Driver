@@ -780,7 +780,7 @@ void hpte_init_pSeries(void)
  */
 int hash_page(unsigned long ea, unsigned long access)
 {
-	void * pgdir = NULL;
+	void *pgdir;
 	unsigned long va, vsid, vpn;
 	unsigned long newpp, hash_ind, prpn;
 	unsigned long hpteflags;
@@ -870,8 +870,6 @@ int hash_page(unsigned long ea, unsigned long access)
 	 * pte we fetch will not change
 	 */
 	spin_lock(&hash_table_lock);
-	
-	old_pte = *ptep;
 
 	/*
 	 * At this point we have found a pte (which was present).
@@ -894,6 +892,7 @@ int hash_page(unsigned long ea, unsigned long access)
 	 *	page is currently not DIRTY. 
 	 */
 
+	old_pte = *ptep;
 	new_pte = old_pte;
 	/* If the attempted access was a store */
 	if (access & _PAGE_RW)

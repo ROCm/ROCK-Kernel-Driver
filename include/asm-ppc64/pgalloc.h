@@ -87,7 +87,6 @@ pte_free(pte_t *pte)
 
 #define pte_free_kernel(pte)	pte_free(pte)
 
+#define check_pgt_cache()	do { } while (0)
+
 #endif /* _PPC64_PGALLOC_H */
-
-
-
