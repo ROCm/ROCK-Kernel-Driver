@@ -481,6 +481,8 @@ int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 	if ((nfrags = skb_cow_data(skb, 0, &trailer)) < 0)
 		goto out;
 
+	skb->ip_summed = CHECKSUM_NONE;
+
 	esph = (struct ip_esp_hdr*)skb->data;
 	iph = skb->nh.iph;
 
