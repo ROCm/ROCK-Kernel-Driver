@@ -96,7 +96,7 @@ static struct gatt_mask via_generic_masks[] =
 };
 
 
-static void __init via_kt400_enable(u32 mode)
+static void via_kt400_enable(u32 mode)
 {
 	if ((agp_generic_agp_3_0_enable(mode))==FALSE)
 		printk (KERN_INFO PFX "agp_generic_agp_3_0_enable() failed\n");
