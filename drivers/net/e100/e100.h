@@ -121,7 +121,6 @@
 #define E100_DEFAULT_CPUSAVER_BUNDLE_MAX	6
 #define E100_DEFAULT_CPUSAVER_INTERRUPT_DELAY	0x600
 #define E100_DEFAULT_BUNDLE_SMALL_FR		false
-#define E100_DEFAULT_RX_CONGESTION_CONTROL	true
 
 /* end of configurables */
 
@@ -146,8 +145,6 @@ struct driver_stats {
 	unsigned long xmt_tco_pkts;
 	unsigned long rcv_tco_pkts;
 	unsigned long rx_intr_pkts;
-	unsigned long rx_tasklet_pkts;
-	unsigned long poll_intr_switch;
 };
 
 /* TODO: kill me when we can do C99 */
@@ -838,7 +835,6 @@ typedef struct _bd_dma_able_t {
 #define PRM_FC           0x00000004
 #define PRM_IFS          0x00000008
 #define PRM_BUNDLE_SMALL 0x00000010
-#define PRM_RX_CONG      0x00000020
 
 struct cfg_params {
 	int e100_speed_duplex;
@@ -847,7 +843,6 @@ struct cfg_params {
 	int IntDelay;
 	int BundleMax;
 	int ber;
-	int PollingMaxWork;
 	u32 b_params;
 };
 struct ethtool_lpbk_data{
@@ -948,8 +943,6 @@ struct e100_private {
 	struct timer_list hwi_timer;	/* hwi timer id */
 
 	u32 speed_duplex_caps;	/* adapter's speed/duplex capabilities */
-
-	struct tasklet_struct polling_tasklet;
 
 	/* WOL params for ethtool */
 	u32 wolsupported;

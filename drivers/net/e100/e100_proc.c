@@ -249,8 +249,6 @@ static e100_proc_entry e100_proc_list[] = {
 	{"Rx_TCO_Packets",        read_gen_ulong, 0, bdp_drv_off(rcv_tco_pkts)},
 	{"\n",},
 	{"Rx_Interrupt_Packets",  read_gen_ulong, 0, bdp_drv_off(rx_intr_pkts)},
-	{"Rx_Polling_Packets",    read_gen_ulong, 0, bdp_drv_off(rx_tasklet_pkts)},
-	{"Polling_Interrupt_Switch", read_gen_ulong, 0, bdp_drv_off(poll_intr_switch)},
 	{"Identify_Adapter", 0, write_blink_led_timer, 0},
 	{"", 0, 0, 0}
 };
