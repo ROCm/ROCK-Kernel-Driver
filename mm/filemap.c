@@ -606,7 +606,7 @@ EXPORT_SYMBOL(grab_cache_page_nowait);
  * - note the struct file * is only passed for the use of readpage
  */
 void do_generic_mapping_read(struct address_space *mapping,
-			     struct file_ra_state *ra,
+			     struct file_ra_state *_ra,
 			     struct file * filp,
 			     loff_t *ppos,
 			     read_descriptor_t * desc,
@@ -616,6 +616,7 @@ void do_generic_mapping_read(struct address_space *mapping,
 	unsigned long index, offset;
 	struct page *cached_page;
 	int error;
+	struct file_ra_state ra = *_ra;
 
 	cached_page = NULL;
 	index = *ppos >> PAGE_CACHE_SHIFT;
@@ -638,13 +639,13 @@ void do_generic_mapping_read(struct address_space *mapping,
 		}
 
 		cond_resched();
-		page_cache_readahead(mapping, ra, filp, index);
+		page_cache_readahead(mapping, &ra, filp, index);
 
 		nr = nr - offset;
 find_page:
 		page = find_get_page(mapping, index);
 		if (unlikely(page == NULL)) {
-			handle_ra_miss(mapping, ra, index);
+			handle_ra_miss(mapping, &ra, index);
 			goto no_cached_page;
 		}
 		if (!PageUptodate(page))
@@ -745,6 +746,8 @@ no_cached_page:
 		cached_page = NULL;
 		goto readpage;
 	}
+
+	*_ra = ra;
 
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
 	if (cached_page)
