@@ -38,7 +38,7 @@
  * Structure and data for smp_call_function(). This is designed to minimise
  * static memory requirements. It also looks cleaner.
  */
-static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(call_lock);
 
 struct call_data_struct {
 	void (*func) (void *info);
@@ -53,7 +53,7 @@ static struct call_data_struct *call_data;
 /*
  * For flush_cache_all()
  */
-static spinlock_t flushcache_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(flushcache_lock);
 static volatile unsigned long flushcache_cpumask = 0;
 
 /*
@@ -63,7 +63,7 @@ static volatile cpumask_t flush_cpumask;
 static struct mm_struct *flush_mm;
 static struct vm_area_struct *flush_vma;
 static volatile unsigned long flush_va;
-static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(tlbstate_lock);
 #define FLUSH_ALL 0xffffffff
 
 DECLARE_PER_CPU(int, prof_multiplier);
