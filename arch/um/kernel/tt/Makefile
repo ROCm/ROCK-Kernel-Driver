@@ -14,8 +14,6 @@ export-objs = ksyms.o
 USER_OBJS := $(filter %_user.o,$(obj-y)) gdb.o time.o tracer.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
-include $(TOPDIR)/Rules.make
-
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
 
