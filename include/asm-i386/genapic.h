@@ -59,6 +59,7 @@ struct genapic {
 
 	unsigned (*get_apic_id)(unsigned long x);
 	unsigned long apic_id_mask; 
+	unsigned int (*cpu_mask_to_apicid)(unsigned long cpumask);
 	
 	/* ipi */
 	void (*send_IPI_mask)(int mask, int vector);
@@ -95,6 +96,7 @@ struct genapic {
 	APICFUNC(mps_oem_check), \
 	APICFUNC(get_apic_id), \
 	.apic_id_mask = APIC_ID_MASK, \
+	APICFUNC(cpu_mask_to_apicid), \
 	APICFUNC(acpi_madt_oem_check), \
 	APICFUNC(send_IPI_mask), \
 	APICFUNC(send_IPI_allbutself), \
