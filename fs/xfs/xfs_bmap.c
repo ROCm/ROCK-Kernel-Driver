@@ -5478,7 +5478,7 @@ int						/* error code */
 xfs_getbmap(
 	bhv_desc_t		*bdp,		/* XFS behavior descriptor*/
 	struct getbmap		*bmv,		/* user bmap structure */
-	void			*ap,		/* pointer to user's array */
+	void __user		*ap,		/* pointer to user's array */
 	int			interface)	/* interface flags */
 {
 	__int64_t		bmvend;		/* last block requested */
@@ -5667,8 +5667,8 @@ xfs_getbmap(
 					(__int64_t)(bmvend - bmv->bmv_offset));
 				bmv->bmv_entries++;
 				ap = (interface & BMV_IF_EXTENDED) ?
-					(void *)((struct getbmapx *)ap + 1) :
-					(void *)((struct getbmap *)ap + 1);
+					(void __user *)((struct getbmapx __user *)ap + 1) :
+					(void __user *)((struct getbmap __user *)ap + 1);
 			}
 		}
 	} while (nmap && nexleft && bmv->bmv_length);

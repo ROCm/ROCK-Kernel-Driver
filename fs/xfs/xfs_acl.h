@@ -95,7 +95,7 @@ extern int xfs_acl_vremove(struct vnode *vp, int);
 #define _ACL_XFS_IACCESS(i,m,c) (XFS_IFORK_Q(i) ? xfs_acl_iaccess(i,m,c) : -1)
 
 #define _ACL_ALLOC(a)		((a) = kmem_zone_alloc(xfs_acl_zone, KM_SLEEP))
-#define _ACL_FREE(a)		((a)? kmem_zone_free(xfs_acl_zone, (a)) : 0)
+#define _ACL_FREE(a)		((a)? kmem_zone_free(xfs_acl_zone, (a)):(void)0)
 
 #else
 #define xfs_acl_zone_init(zone,name)

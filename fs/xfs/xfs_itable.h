@@ -40,7 +40,7 @@
  */
 typedef int (*bulkstat_one_pf)(struct xfs_mount	*mp,
 			       xfs_ino_t	ino,
-			       void		*buffer,
+			       char __user	*buffer,
 			       int		ubsize,
 			       void		*private_data,
 			       xfs_daddr_t	bno,
@@ -73,7 +73,7 @@ xfs_bulkstat(
 	bulkstat_one_pf formatter,	/* func that'd fill a single buf */
 	void		*private_data,	/* private data for formatter */
 	size_t		statstruct_size,/* sizeof struct that we're filling */
-	xfs_caddr_t	ubuffer,	/* buffer with inode stats */
+	char __user	*ubuffer,	/* buffer with inode stats */
 	int		flags,		/* flag to control access method */
 	int		*done);		/* 1 if there're more stats to get */
 
@@ -81,14 +81,14 @@ int
 xfs_bulkstat_single(
 	xfs_mount_t		*mp,
 	xfs_ino_t		*lastinop,
-	xfs_caddr_t		buffer,
+	char __user		*buffer,
 	int			*done);
 
 int
 xfs_bulkstat_one(
 	xfs_mount_t		*mp,
 	xfs_ino_t		ino,
-	void			*buffer,
+	char __user		*buffer,
 	int			ubsize,
 	void			*private_data,
 	xfs_daddr_t		bno,
@@ -101,6 +101,6 @@ xfs_inumbers(
 	xfs_mount_t		*mp,	/* mount point for filesystem */
 	xfs_ino_t		*last,	/* last inode returned */
 	int			*count,	/* size of buffer/count returned */
-	xfs_caddr_t		buffer);/* buffer with inode descriptions */
+	xfs_inogrp_t __user	*buffer);/* buffer with inode descriptions */
 
 #endif	/* __XFS_ITABLE_H__ */
