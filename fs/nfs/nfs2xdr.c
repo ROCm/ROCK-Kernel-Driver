@@ -107,7 +107,7 @@ xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 	fattr->du.nfs2.blocksize = ntohl(*p++);
 	fattr->rdev = ntohl(*p++);
 	fattr->du.nfs2.blocks = ntohl(*p++);
-	fattr->fsid = ntohl(*p++);
+	fattr->fsid_u.nfs3 = ntohl(*p++);
 	fattr->fileid = ntohl(*p++);
 	p = xdr_decode_time(p, &fattr->atime);
 	p = xdr_decode_time(p, &fattr->mtime);

@@ -173,7 +173,7 @@ xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 	/* Turn remote device info into Linux-specific dev_t */
 	fattr->rdev = ntohl(*p++) << MINORBITS;
 	fattr->rdev |= ntohl(*p++) & MINORMASK;
-	p = xdr_decode_hyper(p, &fattr->fsid);
+	p = xdr_decode_hyper(p, &fattr->fsid_u.nfs3);
 	p = xdr_decode_hyper(p, &fattr->fileid);
 	p = xdr_decode_time3(p, &fattr->atime);
 	p = xdr_decode_time3(p, &fattr->mtime);
