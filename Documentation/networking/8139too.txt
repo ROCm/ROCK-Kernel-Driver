@@ -93,6 +93,8 @@ Tested Adapters
 ---------------
 AOpen ALN-325C
 AT-2500TX 10/100 PCI Fast Ethernet Network Adapter Card
+Cnet CNF401 'SinglePoint' 10/100 Base-TX
+Genius GF 100TXR4 Fast Ethernet 10/100M PCI Network Card
 KTI KF-230TX
 KTI KF-230TX/2
 Lantech FastNet TX
