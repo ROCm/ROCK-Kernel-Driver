@@ -28,6 +28,7 @@
 
 #include <asm/io.h>
 #include <asm/kregs.h>
+#include <asm/meminit.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/mca.h>
