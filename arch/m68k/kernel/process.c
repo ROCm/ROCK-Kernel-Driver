@@ -399,7 +399,7 @@ unsigned long get_wchan(struct task_struct *p)
 	stack_page = (unsigned long)(p->thread_info);
 	fp = ((struct switch_stack *)p->thread.ksp)->a6;
 	do {
-		if (fp < stack_page+sizeof(struct task_struct) ||
+		if (fp < stack_page+sizeof(struct thread_info) ||
 		    fp >= 8184+stack_page)
 			return 0;
 		pc = ((unsigned long *)fp)[1];
