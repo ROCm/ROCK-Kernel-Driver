@@ -35,8 +35,9 @@ extern void do_BUG(const char *file, int line);
 
 extern void _clear_page(void *page);
 #define clear_page(X)	_clear_page((void *)(X))
-extern void clear_user_page(void *page, unsigned long vaddr);
-extern void copy_user_page(void *to, void *from, unsigned long vaddr);
+struct page;
+extern void clear_user_page(void *addr, unsigned long vaddr, struct page *page);
+extern void copy_user_page(void *to, void *from, unsigned long vaddr, struct page *topage);
 
 /* GROSS, defining this makes gcc pass these types as aggregates,
  * and thus on the stack, turn this crap off... -DaveM
