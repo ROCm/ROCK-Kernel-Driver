@@ -38,9 +38,10 @@ int snd_ac97_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo);
 int snd_ac97_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);
 int snd_ac97_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);
 int snd_ac97_try_bit(ac97_t * ac97, int reg, int bit);
-int snd_ac97_remove_ctl(ac97_t *ac97, const char *name);
-int snd_ac97_rename_ctl(ac97_t *ac97, const char *src, const char *dst);
-int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2);
+int snd_ac97_remove_ctl(ac97_t *ac97, const char *name, const char *suffix);
+int snd_ac97_rename_ctl(ac97_t *ac97, const char *src, const char *dst, const char *suffix);
+int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2, const char *suffix);
+void snd_ac97_rename_vol_ctl(ac97_t *ac97, const char *src, const char *dst);
 
 /* ac97_proc.c */
 void snd_ac97_bus_proc_init(ac97_bus_t * ac97);

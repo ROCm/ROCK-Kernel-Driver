@@ -108,10 +108,10 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x41445375, 0xffffffff, "AD1985",		patch_ad1985,	NULL },
 { 0x414c4300, 0xffffff00, "ALC100/100P", 	NULL,		NULL },
 { 0x414c4710, 0xfffffff0, "ALC200/200P",	NULL,		NULL },
+{ 0x414c4721, 0xffffffff, "ALC650D",		NULL,	NULL }, /* already patched */
+{ 0x414c4722, 0xffffffff, "ALC650E",		NULL,	NULL }, /* already patched */
+{ 0x414c4723, 0xffffffff, "ALC650F",		NULL,	NULL }, /* already patched */
 { 0x414c4720, 0xfffffff0, "ALC650",		patch_alc650,	NULL },
-{ 0x414c4721, 0xfffffff0, "ALC650D",		patch_alc650,	NULL },
-{ 0x414c4722, 0xfffffff0, "ALC650E",		patch_alc650,	NULL },
-{ 0x414c4723, 0xfffffff0, "ALC650F",		patch_alc650,	NULL },
 { 0x414c4760, 0xfffffff0, "ALC655",		patch_alc655,	NULL },
 { 0x414c4780, 0xfffffff0, "ALC658",		patch_alc655,	NULL },
 { 0x414c4730, 0xffffffff, "ALC101",		NULL,		NULL },
@@ -398,7 +398,7 @@ static int snd_ac97_ad18xx_update_pcm_bits(ac97_t *ac97, int codec, unsigned sho
 	int change;
 	unsigned short old, new, cfg;
 
-	down(&ac97->spec.ad18xx.mutex);
+	down(&ac97->mutex);
 	spin_lock(&ac97->reg_lock);
 	old = ac97->spec.ad18xx.pcmreg[codec];
 	new = (old & ~mask) | value;
@@ -418,7 +418,7 @@ static int snd_ac97_ad18xx_update_pcm_bits(ac97_t *ac97, int codec, unsigned sho
 				 cfg | 0x7000);
 	} else
 		spin_unlock(&ac97->reg_lock);
-	up(&ac97->spec.ad18xx.mutex);
+	up(&ac97->mutex);
 	return change;
 }
 
@@ -1120,6 +1120,7 @@ static void snd_ac97_change_volume_params1(ac97_t * ac97, int reg, unsigned char
 	snd_ac97_write_cache(ac97, reg, 0x8000);
 }
 
+/* check the volume resolution of center/lfe */
 static void snd_ac97_change_volume_params2(ac97_t * ac97, int reg, int shift, unsigned char *max)
 {
 	unsigned short val, val1;
@@ -1135,6 +1136,7 @@ static void snd_ac97_change_volume_params2(ac97_t * ac97, int reg, int shift, un
 	snd_ac97_write_cache(ac97, reg, 0x8080);
 }
 
+/* check whether the volume resolution is 4 or 5 bits */
 static void snd_ac97_change_volume_params3(ac97_t * ac97, int reg, unsigned char *max)
 {
 	unsigned short val, val1;
@@ -1148,6 +1150,18 @@ static void snd_ac97_change_volume_params3(ac97_t * ac97, int reg, unsigned char
 	}
 	/* reset volume to zero */
 	snd_ac97_write_cache(ac97, reg, 0x8000);
+}
+
+/* check whether the volume is mono or stereo */
+static int snd_ac97_is_stereo_vol(ac97_t *ac97, int reg)
+{
+	unsigned short val, val1, val2;
+	val = snd_ac97_read(ac97, reg);
+	val1 = val | 0x8000 | (0x01 << 8);
+	snd_ac97_write(ac97, reg, val1);
+	val2 = snd_ac97_read(ac97, reg);
+	snd_ac97_write(ac97, reg, val); /* restore */
+	return val1 == val2;
 }
 
 static inline int printable(unsigned int x)
@@ -1239,6 +1253,8 @@ static int snd_ac97_cmix_new(snd_card_t *card, const char *pfx, int reg, int che
 }
 
 
+static unsigned int snd_ac97_determine_spdif_rates(ac97_t *ac97);
+
 static int snd_ac97_mixer_build(ac97_t * ac97)
 {
 	snd_card_t *card = ac97->bus->card;
@@ -1293,11 +1309,8 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 	}
 
 	/* build headphone controls */
-	if (snd_ac97_try_volume_mix(ac97, AC97_HEADPHONE) || ac97->id == AC97_ID_STAC9708) {
-		const char *name = ac97->id == AC97_ID_STAC9708 ? 
-			"Sigmatel Surround Playback" :
-			"Headphone Playback";
-		if ((err = snd_ac97_cmix_new(card, name, AC97_HEADPHONE, 1, ac97)) < 0)
+	if (snd_ac97_try_volume_mix(ac97, AC97_HEADPHONE)) {
+		if ((err = snd_ac97_cmix_new(card, "Headphone Playback", AC97_HEADPHONE, 1, ac97)) < 0)
 			return err;
 	}
 	
@@ -1332,7 +1345,8 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 		for (idx = 0; idx < 2; idx++)
 			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_pc_beep[idx], ac97))) < 0)
 				return err;
-		snd_ac97_write_cache(ac97, AC97_PC_BEEP, 0x801e);
+		snd_ac97_write_cache(ac97, AC97_PC_BEEP,
+				     snd_ac97_read(ac97, AC97_PC_BEEP) | 0x801e);
 	}
 	
 	/* build Phone controls */
@@ -1349,15 +1363,26 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 	
 	/* build MIC controls */
 	snd_ac97_change_volume_params3(ac97, AC97_MIC, &max);
-	for (idx = 0; idx < 3; idx++) {
-		if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_mic[idx], ac97))) < 0)
+	if (snd_ac97_is_stereo_vol(ac97, AC97_MIC)) {
+		/* build stereo mic */
+		if ((err = snd_ac97_cmute_new(card, "Mic Playback Switch", AC97_MIC, ac97)) < 0)
 			return err;
-		if (idx == 1) {		// volume
-			kctl->private_value &= ~(0xff << 16);
-			kctl->private_value |= (int)max << 16;
+		if ((err = snd_ac97_cvol_new(card, "Mic Playback Volume", AC97_MIC, max, ac97)) < 0)
+			return err;
+		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_mic[2], ac97))) < 0)
+			return err;
+	} else {
+		/* build mono mic */
+		for (idx = 0; idx < 3; idx++) {
+			if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_mic[idx], ac97))) < 0)
+				return err;
+			if (idx == 1) {		// volume
+				kctl->private_value &= ~(0xff << 16);
+				kctl->private_value |= (int)max << 16;
+			}
 		}
+		snd_ac97_write_cache(ac97, AC97_MIC, 0x8000 | max);
 	}
-	snd_ac97_write_cache(ac97, AC97_MIC, 0x8000 | max);
 
 	/* build Line controls */
 	if ((err = snd_ac97_cmix_new(card, "Line Playback", AC97_LINE, 0, ac97)) < 0)
@@ -1520,6 +1545,7 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 			/* set default PCM S/PDIF params */
 			/* consumer,PCM audio,no copyright,no preemphasis,PCM coder,original,48000Hz */
 			snd_ac97_write_cache(ac97, AC97_SPDIF, 0x2a20);
+			ac97->rates[AC97_RATES_SPDIF] = snd_ac97_determine_spdif_rates(ac97);
 		}
 		ac97->spdif_status = SNDRV_PCM_DEFAULT_CON_SPDIF;
 	}
@@ -1675,7 +1701,7 @@ static int ac97_reset_wait(ac97_t *ac97, int timeout, int with_modem)
 		if (snd_ac97_read(ac97, AC97_REC_GAIN) == 0x8a05)
 			return 0;
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/100);
+		schedule_timeout(1);
 	} while (time_after_eq(end_time, jiffies));
 	return -ENODEV;
 }
@@ -1774,6 +1800,7 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 	ac97->bus = bus;
 	bus->codec[ac97->num] = ac97;
 	spin_lock_init(&ac97->reg_lock);
+	init_MUTEX(&ac97->mutex);
 
 	if (ac97->pci) {
 		pci_read_config_word(ac97->pci, PCI_SUBSYSTEM_VENDOR_ID, &ac97->subsystem_vendor);
@@ -1789,8 +1816,12 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 		bus->wait(ac97);
 	else {
 		udelay(50);
-		if (ac97_reset_wait(ac97, HZ/2, 0) < 0 &&
-		    ac97_reset_wait(ac97, HZ/2, 1) < 0) {
+		err = -ENXIO;
+		if (! (ac97->scaps & AC97_SCAP_SKIP_AUDIO))
+			err = ac97_reset_wait(ac97, HZ/2, 0);
+		if (err < 0 && ! (ac97->scaps & AC97_SCAP_SKIP_MODEM))
+			err = ac97_reset_wait(ac97, HZ/2, 1);
+		if (err < 0) {
 			snd_printk(KERN_WARNING "AC'97 %d does not respond - RESET\n", ac97->num);
 			/* proceed anyway - it's often non-critical */
 		}
@@ -1803,20 +1834,6 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 		snd_ac97_free(ac97);
 		return -EIO;
 	}
-	/* AC97 audio codec chip revision detection. */
-	/* Currently only Realtek ALC650 detection implemented. */
-	switch(ac97->id & 0xfffffff0) {
-	case 0x414c4720:        /* ALC650 */
-		reg = snd_ac97_read(ac97, AC97_ALC650_REVISION);
-		if (((reg & 0x3f) >= 0) && ((reg & 0x3f) < 3))
-			ac97->id = 0x414c4720;          /* Old version */
-		else if (((reg & 0x3f) >= 3) && ((reg & 0x3f) < 0x10))
-			ac97->id = 0x414c4721;          /* D version */
-		else if ((reg&0x30) == 0x10)
-			ac97->id = 0x414c4722;          /* E version */
-		else if ((reg&0x30) == 0x20)
-			ac97->id = 0x414c4723;          /* F version */
-        }
 	
 	/* test for AC'97 */
 	if (!(ac97->scaps & AC97_SCAP_SKIP_AUDIO) && !(ac97->scaps & AC97_SCAP_AUDIO)) {
@@ -1865,9 +1882,9 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 			if ((snd_ac97_read(ac97, AC97_POWERDOWN) & 0x0f) == 0x0f)
 				goto __ready_ok;
 			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/10);
+			schedule_timeout(1);
 		} while (time_after_eq(end_time, jiffies));
-		snd_printk(KERN_ERR "AC'97 %d analog subsections not ready\n", ac97->num);
+		snd_printk(KERN_WARNING "AC'97 %d analog subsections not ready\n", ac97->num);
 	}
 
 	/* FIXME: add powerdown control */
@@ -1898,9 +1915,9 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 			if ((snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS) & tmp) == tmp)
 				goto __ready_ok;
 			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/10);
+			schedule_timeout(1);
 		} while (time_after_eq(end_time, jiffies));
-		snd_printk(KERN_ERR "MC'97 %d converters and GPIO not ready (0x%x)\n", ac97->num, snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS));
+		snd_printk(KERN_WARNING "MC'97 %d converters and GPIO not ready (0x%x)\n", ac97->num, snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS));
 	}
 	
       __ready_ok:
@@ -1919,12 +1936,7 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 	}
 	if (ac97->ext_id & AC97_EI_SPDIF) {
 		/* codec specific code (patch) should override these values */
-		if (ac97->flags & AC97_CS_SPDIF)
-			ac97->rates[AC97_RATES_SPDIF] = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_44100;
-		else if (ac97->id == AC97_ID_CM9739)
-			ac97->rates[AC97_RATES_SPDIF] = SNDRV_PCM_RATE_48000;
-		else
-			ac97->rates[AC97_RATES_SPDIF] = snd_ac97_determine_spdif_rates(ac97);
+		ac97->rates[AC97_RATES_SPDIF] = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_32000;
 	}
 	if (ac97->ext_id & AC97_EI_VRM) {	/* MIC VRA support */
 		snd_ac97_determine_rates(ac97, AC97_PCM_MIC_ADC_RATE, 0, &ac97->rates[AC97_RATES_MIC_ADC]);
@@ -1942,8 +1954,8 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 	/* additional initializations */
 	if (bus->init)
 		bus->init(ac97);
-	snd_ac97_get_name(ac97, ac97->id, name, 0);
-	snd_ac97_get_name(NULL, ac97->id, name, 0);  // ac97->id might be changed in the special setup code
+	snd_ac97_get_name(ac97, ac97->id, name, !ac97_is_audio(ac97));
+	snd_ac97_get_name(NULL, ac97->id, name, !ac97_is_audio(ac97));  // ac97->id might be changed in the special setup code
 	if (ac97_is_audio(ac97)) {
 		if (card->mixername[0] == '\0') {
 			strcpy(card->mixername, name);
@@ -2151,42 +2163,57 @@ __reset_ready:
 
 /*
  */
-int snd_ac97_remove_ctl(ac97_t *ac97, const char *name)
+static void set_ctl_name(char *dst, const char *src, const char *suffix)
+{
+	if (suffix)
+		sprintf(dst, "%s %s", src, suffix);
+	else
+		strcpy(dst, src);
+}	
+
+int snd_ac97_remove_ctl(ac97_t *ac97, const char *name, const char *suffix)
 {
 	snd_ctl_elem_id_t id;
 	memset(&id, 0, sizeof(id));
-	strcpy(id.name, name);
+	set_ctl_name(id.name, name, suffix);
 	id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
 	return snd_ctl_remove_id(ac97->bus->card, &id);
 }
 
-static snd_kcontrol_t *ctl_find(ac97_t *ac97, const char *name)
+static snd_kcontrol_t *ctl_find(ac97_t *ac97, const char *name, const char *suffix)
 {
 	snd_ctl_elem_id_t sid;
 	memset(&sid, 0, sizeof(sid));
-	strcpy(sid.name, name);
+	set_ctl_name(sid.name, name, suffix);
 	sid.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
 	return snd_ctl_find_id(ac97->bus->card, &sid);
 }
 
-int snd_ac97_rename_ctl(ac97_t *ac97, const char *src, const char *dst)
+int snd_ac97_rename_ctl(ac97_t *ac97, const char *src, const char *dst, const char *suffix)
 {
-	snd_kcontrol_t *kctl = ctl_find(ac97, src);
+	snd_kcontrol_t *kctl = ctl_find(ac97, src, suffix);
 	if (kctl) {
-		strcpy(kctl->id.name, dst);
+		set_ctl_name(kctl->id.name, dst, suffix);
 		return 0;
 	}
 	return -ENOENT;
 }
 
-int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2)
+/* rename both Volume and Switch controls - don't check the return value */
+void snd_ac97_rename_vol_ctl(ac97_t *ac97, const char *src, const char *dst)
+{
+	snd_ac97_rename_ctl(ac97, src, dst, "Switch");
+	snd_ac97_rename_ctl(ac97, src, dst, "Volume");
+}
+
+int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2, const char *suffix)
 {
 	snd_kcontrol_t *kctl1, *kctl2;
-	kctl1 = ctl_find(ac97, s1);
-	kctl2 = ctl_find(ac97, s2);
+	kctl1 = ctl_find(ac97, s1, suffix);
+	kctl2 = ctl_find(ac97, s2, suffix);
 	if (kctl1 && kctl2) {
-		strcpy(kctl1->id.name, s2);
-		strcpy(kctl2->id.name, s1);
+		set_ctl_name(kctl1->id.name, s2, suffix);
+		set_ctl_name(kctl2->id.name, s1, suffix);
 		return 0;
 	}
 	return -ENOENT;
@@ -2194,26 +2221,22 @@ int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2)
 
 static int swap_headphone(ac97_t *ac97, int remove_master)
 {
-	/* FIXME: error checks.. */
 	if (remove_master) {
-		if (ctl_find(ac97, "Headphone Playback Switch") == NULL)
+		if (ctl_find(ac97, "Headphone Playback Switch", NULL) == NULL)
 			return 0;
-		snd_ac97_remove_ctl(ac97, "Master Playback Switch");
-		snd_ac97_remove_ctl(ac97, "Master Playback Volume");
-	} else {
-		snd_ac97_rename_ctl(ac97, "Master Playback Switch", "Line-Out Playback Switch");
-		snd_ac97_rename_ctl(ac97, "Master Playback Volume", "Line-Out Playback Volume");
-	}
-	snd_ac97_rename_ctl(ac97, "Headphone Playback Switch", "Master Playback Switch");
-	snd_ac97_rename_ctl(ac97, "Headphone Playback Volume", "Master Playback Volume");
+		snd_ac97_remove_ctl(ac97, "Master Playback", "Switch");
+		snd_ac97_remove_ctl(ac97, "Master Playback", "Volume");
+	} else
+		snd_ac97_rename_vol_ctl(ac97, "Master Playback", "Line-Out Playback");
+	snd_ac97_rename_vol_ctl(ac97, "Headphone Playback", "Master Playback");
 	return 0;
 }
 
 static int swap_surround(ac97_t *ac97)
 {
 	/* FIXME: error checks.. */
-	snd_ac97_swap_ctl(ac97, "Master Playback Switch", "Surround Playback Switch");
-	snd_ac97_swap_ctl(ac97, "Master Playback Volume", "Surround Playback Volume");
+	snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Switch");
+	snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Volume");
 	return 0;
 }
 

@@ -441,6 +441,7 @@ struct _snd_ac97 {
 	unsigned short subsystem_vendor;
 	unsigned short subsystem_device;
 	spinlock_t reg_lock;
+	struct semaphore mutex;	/* mutex for AD18xx multi-codecs and paging (2.3) */
 	unsigned short num;	/* number of codec: 0 = primary, 1 = secondary */
 	unsigned short addr;	/* physical address of codec [0-3] */
 	unsigned int id;	/* identification of codec */
@@ -461,7 +462,6 @@ struct _snd_ac97 {
 			unsigned short id[3];		// codec IDs (lower 16-bit word)
 			unsigned short pcmreg[3];	// PCM registers
 			unsigned short codec_cfg[3];	// CODEC_CFG bits
-			struct semaphore mutex;
 		} ad18xx;
 		unsigned int dev_flags;		/* device specific */
 	} spec;

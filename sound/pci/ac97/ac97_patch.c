@@ -204,7 +204,7 @@ static int patch_yamaha_ymf753_3d(ac97_t * ac97)
 	if ((err = snd_ctl_add(ac97->bus->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
 		return err;
 	strcpy(kctl->id.name, "3D Control - Wide");
-	kctl->private_value = AC97_3D_CONTROL | (9 << 8) | (7 << 16);
+	kctl->private_value = AC97_SINGLE_VALUE(AC97_3D_CONTROL, 9, 7, 0);
 	snd_ac97_write_cache(ac97, AC97_3D_CONTROL, 0x0000);
 	if ((err = snd_ctl_add(ac97->bus->card, snd_ac97_cnew(&snd_ac97_ymf753_controls_speaker, ac97))) < 0)
 		return err;
@@ -315,7 +315,7 @@ static int patch_sigmatel_stac9700_3d(ac97_t * ac97)
 	if ((err = snd_ctl_add(ac97->bus->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
 		return err;
 	strcpy(kctl->id.name, "3D Control Sigmatel - Depth");
-	kctl->private_value = AC97_3D_CONTROL | (3 << 16);
+	kctl->private_value = AC97_SINGLE_VALUE(AC97_3D_CONTROL, 2, 3, 0);
 	snd_ac97_write_cache(ac97, AC97_3D_CONTROL, 0x0000);
 	return 0;
 }
@@ -328,11 +328,11 @@ static int patch_sigmatel_stac9708_3d(ac97_t * ac97)
 	if ((err = snd_ctl_add(ac97->bus->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
 		return err;
 	strcpy(kctl->id.name, "3D Control Sigmatel - Depth");
-	kctl->private_value = AC97_3D_CONTROL | (3 << 16);
+	kctl->private_value = AC97_SINGLE_VALUE(AC97_3D_CONTROL, 0, 3, 0);
 	if ((err = snd_ctl_add(ac97->bus->card, kctl = snd_ac97_cnew(&snd_ac97_controls_3d[0], ac97))) < 0)
 		return err;
 	strcpy(kctl->id.name, "3D Control Sigmatel - Rear Depth");
-	kctl->private_value = AC97_3D_CONTROL | (2 << 8) | (3 << 16);
+	kctl->private_value = AC97_SINGLE_VALUE(AC97_3D_CONTROL, 2, 3, 0);
 	snd_ac97_write_cache(ac97, AC97_3D_CONTROL, 0x0000);
 	return 0;
 }
@@ -373,16 +373,22 @@ static struct snd_ac97_build_ops patch_sigmatel_stac9700_ops = {
 	.build_specific	= patch_sigmatel_stac97xx_specific
 };
 
-static struct snd_ac97_build_ops patch_sigmatel_stac9708_ops = {
-	.build_3d	= patch_sigmatel_stac9708_3d,
-	.build_specific	= patch_sigmatel_stac97xx_specific
-};
-
 int patch_sigmatel_stac9700(ac97_t * ac97)
 {
 	ac97->build_ops = &patch_sigmatel_stac9700_ops;
 	return 0;
 }
+
+static int patch_sigmatel_stac9708_specific(ac97_t *ac97)
+{
+	snd_ac97_rename_vol_ctl(ac97, "Headphone Playback", "Sigmatel Surround Playback");
+	return patch_sigmatel_stac97xx_specific(ac97);
+}
+
+static struct snd_ac97_build_ops patch_sigmatel_stac9708_ops = {
+	.build_3d	= patch_sigmatel_stac9708_3d,
+	.build_specific	= patch_sigmatel_stac9708_specific
+};
 
 int patch_sigmatel_stac9708(ac97_t * ac97)
 {
@@ -467,11 +473,11 @@ static int snd_ac97_stac9758_output_jack_get(snd_kcontrol_t *kcontrol, snd_ctl_e
 	int shift = kcontrol->private_value;
 	unsigned short val;
 
-	val = ac97->regs[AC97_SIGMATEL_OUTSEL];
-	if (!((val >> shift) & 4))
+	val = ac97->regs[AC97_SIGMATEL_OUTSEL] >> shift;
+	if (!(val & 4))
 		ucontrol->value.enumerated.item[0] = 0;
 	else
-		ucontrol->value.enumerated.item[0] = 1 + ((val >> shift) & 3);
+		ucontrol->value.enumerated.item[0] = 1 + (val & 3);
 	return 0;
 }
 
@@ -480,6 +486,7 @@ static int snd_ac97_stac9758_output_jack_put(snd_kcontrol_t *kcontrol, snd_ctl_e
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	int shift = kcontrol->private_value;
 	unsigned short val;
+	int ret;
 
 	if (ucontrol->value.enumerated.item[0] > 4)
 		return -EINVAL;
@@ -487,8 +494,12 @@ static int snd_ac97_stac9758_output_jack_put(snd_kcontrol_t *kcontrol, snd_ctl_e
 		val = 0;
 	else
 		val = 4 | (ucontrol->value.enumerated.item[0] - 1);
-	return snd_ac97_update_bits(ac97, AC97_SIGMATEL_OUTSEL,
-				    7 << shift, val << shift);
+	down(&ac97->mutex);
+	snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, AC97_PAGE_VENDOR);
+	ret = snd_ac97_update_bits(ac97, AC97_SIGMATEL_OUTSEL,
+				   7 << shift, val << shift);
+	up(&ac97->mutex);
+	return ret;
 }
 
 static int snd_ac97_stac9758_input_jack_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -520,9 +531,14 @@ static int snd_ac97_stac9758_input_jack_put(snd_kcontrol_t *kcontrol, snd_ctl_el
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 	int shift = kcontrol->private_value;
+	int ret;
 
-	return snd_ac97_update_bits(ac97, AC97_SIGMATEL_INSEL, 7 << shift,
-				    ucontrol->value.enumerated.item[0] << shift);
+	down(&ac97->mutex);
+	snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, AC97_PAGE_VENDOR);
+	ret = snd_ac97_update_bits(ac97, AC97_SIGMATEL_INSEL, 7 << shift,
+				   ucontrol->value.enumerated.item[0] << shift);
+	up(&ac97->mutex);
+	return ret;
 }
 
 static int snd_ac97_stac9758_phonesel_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
@@ -549,9 +565,14 @@ static int snd_ac97_stac9758_phonesel_get(snd_kcontrol_t *kcontrol, snd_ctl_elem
 static int snd_ac97_stac9758_phonesel_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	int ret;
 
-	return snd_ac97_update_bits(ac97, AC97_SIGMATEL_IOMISC, 3,
-				    ucontrol->value.enumerated.item[0]);
+	down(&ac97->mutex);
+	snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, AC97_PAGE_VENDOR);
+	ret = snd_ac97_update_bits(ac97, AC97_SIGMATEL_IOMISC, 3,
+				   ucontrol->value.enumerated.item[0]);
+	up(&ac97->mutex);
+	return ret;
 }
 
 #define STAC9758_OUTPUT_JACK(xname, shift) \
@@ -596,6 +617,14 @@ static int patch_sigmatel_stac9758_specific(ac97_t *ac97)
 				   ARRAY_SIZE(snd_ac97_sigmatel_stac9758_controls));
 	if (err < 0)
 		return err;
+	/* DAC-A direct */
+	snd_ac97_rename_vol_ctl(ac97, "Headphone Playback", "Front Playback");
+	/* DAC-A to Mix = PCM */
+	/* DAC-B direct = Surround */
+	/* DAC-B to Mix */
+	snd_ac97_rename_vol_ctl(ac97, "Video Playback", "Surround Mix Playback");
+	/* DAC-C direct = Center/LFE */
+
 	return 0;
 }
 
@@ -613,16 +642,16 @@ int patch_sigmatel_stac9758(ac97_t * ac97)
 		AC97_SIGMATEL_VARIOUS
 	};
 	static unsigned short def_regs[4] = {
-		/* OUTSEL */ 0xd794,
+		/* OUTSEL */ 0xd794, /* CL:CL, SR:SR, LO:MX, LI:DS, MI:DS */
 		/* IOMISC */ 0x2001,
-		/* INSEL */ 0x0201,
+		/* INSEL */ 0x0201, /* LI:LI, MI:M1 */
 		/* VARIOUS */ 0x0040
 	};
 	static unsigned short m675_regs[4] = {
-		/* OUTSEL */ 0x9040,
-		/* IOMISC */ 0x2102,
-		/* INSEL */ 0x0203,
-		/* VARIOUS */ 0x0041
+		/* OUTSEL */ 0x9040, /* CL:FR, SR:FR, LO:DS, LI:FR, MI:DS */
+		/* IOMISC */ 0x2102, /* HP amp on */
+		/* INSEL */ 0x0203, /* LI:LI, MI:FR */
+		/* VARIOUS */ 0x0041 /* stereo mic */
 	};
 	unsigned short *pregs = def_regs;
 	int i;
@@ -635,6 +664,8 @@ int patch_sigmatel_stac9758(ac97_t * ac97)
 
 	// patch for SigmaTel
 	ac97->build_ops = &patch_sigmatel_stac9758_ops;
+	/* FIXME: assume only page 0 for writing cache */
+	snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, AC97_PAGE_VENDOR);
 	for (i = 0; i < 4; i++)
 		snd_ac97_write_cache(ac97, regs[i], pregs[i]);
 
@@ -654,8 +685,10 @@ static int patch_cirrus_build_spdif(ac97_t * ac97)
 {
 	int err;
 
+	/* con mask, pro mask, default */
 	if ((err = patch_build_controls(ac97, &snd_ac97_controls_spdif[0], 3)) < 0)
 		return err;
+	/* switch, spsa */
 	if ((err = patch_build_controls(ac97, &snd_ac97_cirrus_controls_spdif[0], 1)) < 0)
 		return err;
 	switch (ac97->id & AC97_ID_CS_MASK) {
@@ -714,8 +747,10 @@ static int patch_conexant_build_spdif(ac97_t * ac97)
 {
 	int err;
 
+	/* con mask, pro mask, default */
 	if ((err = patch_build_controls(ac97, &snd_ac97_controls_spdif[0], 3)) < 0)
 		return err;
+	/* switch */
 	if ((err = patch_build_controls(ac97, &snd_ac97_conexant_controls_spdif[0], 1)) < 0)
 		return err;
 	/* set default PCM S/PDIF params */
@@ -734,6 +769,7 @@ int patch_conexant(ac97_t * ac97)
 	ac97->build_ops = &patch_conexant_ops;
 	ac97->flags |= AC97_CX_SPDIF;
         ac97->ext_id |= AC97_EI_SPDIF;	/* force the detection of spdif */
+	ac97->rates[AC97_RATES_SPDIF] = SNDRV_PCM_RATE_48000; /* 48k only */
 	return 0;
 }
 
@@ -820,8 +856,6 @@ int patch_ad1881(ac97_t * ac97)
 	unsigned short codecs[3];
 	unsigned short val;
 	int idx, num;
-
-	init_MUTEX(&ac97->spec.ad18xx.mutex);
 
 	val = snd_ac97_read(ac97, AC97_AD_SERIAL_CFG);
 	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, val);
@@ -1114,10 +1148,8 @@ static const snd_kcontrol_new_t snd_ac97_ad1888_controls[] = {
 static int patch_ad1888_specific(ac97_t *ac97)
 {
 	/* rename 0x04 as "Master" and 0x02 as "Master Surround" */
-	snd_ac97_rename_ctl(ac97, "Master Playback Switch", "Master Surround Playback Switch");
-	snd_ac97_rename_ctl(ac97, "Master Playback Volume", "Master Surround Playback Volume");
-	snd_ac97_rename_ctl(ac97, "Headphone Playback Switch", "Master Playback Switch");
-	snd_ac97_rename_ctl(ac97, "Headphone Playback Volume", "Master Playback Volume");
+	snd_ac97_rename_vol_ctl(ac97, "Master Playback", "Master Surround Playback");
+	snd_ac97_rename_vol_ctl(ac97, "Headphone Playback", "Master Playback");
 	return patch_build_controls(ac97, snd_ac97_ad1888_controls, ARRAY_SIZE(snd_ac97_ad1888_controls));
 }
 
@@ -1302,6 +1334,17 @@ int patch_alc650(ac97_t * ac97)
 	unsigned short val;
 
 	ac97->build_ops = &patch_alc650_ops;
+
+	/* determine the revision */
+	val = snd_ac97_read(ac97, AC97_ALC650_REVISION) & 0x3f;
+	if (val < 3)
+		ac97->id = 0x414c4720;          /* Old version */
+	else if (val < 0x10)
+		ac97->id = 0x414c4721;          /* D version */
+	else if (val < 0x20)
+		ac97->id = 0x414c4722;          /* E version */
+	else if (val < 0x30)
+		ac97->id = 0x414c4723;          /* F version */
 
 	/* revision E or F */
 	/* FIXME: what about revision D ? */
@@ -1599,8 +1642,10 @@ int patch_cm9739(ac97_t * ac97)
 		/* enable spdif in */
 		snd_ac97_write_cache(ac97, AC97_CM9739_SPDIF_CTRL,
 				     snd_ac97_read(ac97, AC97_CM9739_SPDIF_CTRL) | 0x01);
+		ac97->rates[AC97_RATES_SPDIF] = SNDRV_PCM_RATE_48000; /* 48k only */
 	} else {
 		ac97->ext_id &= ~AC97_EI_SPDIF; /* disable extended-id */
+		ac97->rates[AC97_RATES_SPDIF] = 0;
 	}
 
 	/* set-up multi channel */
