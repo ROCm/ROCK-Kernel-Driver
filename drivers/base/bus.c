@@ -24,7 +24,47 @@ static LIST_HEAD(bus_driver_list);
 #define to_bus(obj) container_of(obj,struct bus_type,subsys.kobj)
 
 /*
- * sysfs bindings for buses
+ * sysfs bindings for drivers
+ */
+
+#define to_drv_attr(_attr) container_of(_attr,struct driver_attribute,attr)
+#define to_driver(obj) container_of(obj, struct device_driver, kobj)
+
+
+static ssize_t
+drv_attr_show(struct kobject * kobj, struct attribute * attr,
+	      char * buf, size_t count, loff_t off)
+{
+	struct driver_attribute * drv_attr = to_drv_attr(attr);
+	struct device_driver * drv = to_driver(kobj);
+	ssize_t ret = 0;
+
+	if (drv_attr->show)
+		ret = drv_attr->show(drv,buf,count,off);
+	return ret;
+}
+
+static ssize_t
+drv_attr_store(struct kobject * kobj, struct attribute * attr,
+	       const char * buf, size_t count, loff_t off)
+{
+	struct driver_attribute * drv_attr = to_drv_attr(attr);
+	struct device_driver * drv = to_driver(kobj);
+	ssize_t ret = 0;
+
+	if (drv_attr->store)
+		ret = drv_attr->store(drv,buf,count,off);
+	return ret;
+}
+
+static struct sysfs_ops driver_sysfs_ops = {
+	.show	= drv_attr_show,
+	.store	= drv_attr_store,
+};
+
+
+/*
+ * sysfs bindings for drivers
  */
 
 
@@ -156,6 +196,7 @@ static void attach(struct device * dev)
 	pr_debug("bound device '%s' to driver '%s'\n",
 		 dev->bus_id,dev->driver->name);
 	list_add_tail(&dev->driver_list,&dev->driver->devices);
+	sysfs_create_link(&dev->driver->kobj,&dev->kobj,dev->kobj.name);
 }
 
 static int bus_match(struct device * dev, struct device_driver * drv)
@@ -226,6 +267,7 @@ static int driver_attach(struct device_driver * drv)
 static void detach(struct device * dev, struct device_driver * drv)
 {
 	if (drv) {
+		sysfs_remove_link(&drv->kobj,dev->kobj.name);
 		list_del_init(&dev->driver_list);
 		devclass_remove_device(dev);
 		if (drv->remove)
@@ -304,7 +346,6 @@ int bus_add_driver(struct device_driver * drv)
 		list_add_tail(&drv->bus_list,&bus->drivers);
 		driver_attach(drv);
 		up_write(&bus->rwsem);
-		driver_make_dir(drv);
 	}
 	return 0;
 }
@@ -360,6 +401,7 @@ int bus_register(struct bus_type * bus)
 
 	snprintf(bus->drvsubsys.kobj.name,KOBJ_NAME_LEN,"drivers");
 	bus->drvsubsys.parent = &bus->subsys;
+	bus->drvsubsys.sysfs_ops = &driver_sysfs_ops;
 	subsystem_register(&bus->drvsubsys);
 
 	spin_lock(&device_lock);

@@ -123,6 +123,7 @@ struct device_driver {
 	atomic_t		refcount;
 	u32			present;
 
+	struct kobject		kobj;
 	struct list_head	bus_list;
 	struct list_head	class_list;
 	struct list_head	devices;
