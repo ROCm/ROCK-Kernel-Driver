@@ -33,6 +33,7 @@
 #include <linux/smp_lock.h>
 #include <linux/seq_file.h>
 #include <linux/mount.h>
+#include <linux/nfs_idmap.h>
 #include <linux/vfs.h>
 
 #include <asm/system.h>
@@ -152,6 +153,11 @@ nfs_put_super(struct super_block *sb)
 	struct nfs_server *server = NFS_SB(sb);
 	struct rpc_clnt	*rpc;
 
+#ifdef CONFIG_NFS_V4
+	if (server->idmap != NULL)
+		nfs_idmap_delete(server);
+#endif /* CONFIG_NFS_V4 */
+
 	if ((rpc = server->client) != NULL)
 		rpc_shutdown_client(rpc);
 
@@ -160,6 +166,7 @@ nfs_put_super(struct super_block *sb)
 	rpciod_down();		/* release rpciod */
 
 	destroy_nfsv4_state(server);
+
 	kfree(server->hostname);
 }
 
@@ -1362,11 +1369,16 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	if (create_nfsv4_state(server, data))
 		goto out_shutdown;
 
+	if ((server->idmap = nfs_idmap_new(server)) == NULL)
+		printk(KERN_WARNING "NFS: couldn't start IDmap\n");
+
 	err = nfs_sb_init(sb);
 	if (err == 0)
 		return 0;
 	rpciod_down();
 	destroy_nfsv4_state(server);
+	if (server->idmap != NULL)
+		nfs_idmap_delete(server);
 out_shutdown:
 	rpc_shutdown_client(server->client);
 out_fail:
