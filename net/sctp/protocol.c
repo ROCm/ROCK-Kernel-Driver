@@ -64,6 +64,9 @@ struct sctp_globals sctp_globals;
 struct proc_dir_entry	*proc_net_sctp;
 DEFINE_SNMP_STAT(struct sctp_mib, sctp_statistics);
 
+struct idr sctp_assocs_id;
+spinlock_t sctp_assocs_id_lock = SPIN_LOCK_UNLOCKED;
+
 /* This is the global socket data structure used for responding to
  * the Out-of-the-blue (OOTB) packets.  A control sock will be created
  * for this socket at the initialization time.
@@ -721,7 +724,7 @@ static void sctp_inet_event_msgname(struct sctp_ulpevent *event, char *msgname,
 	if (msgname) {
 		struct sctp_association *asoc;
 
-		asoc = event->sndrcvinfo.sinfo_assoc_id;
+		asoc = event->asoc;
 		sctp_inet_msgname(msgname, addr_len);
 		sin = (struct sockaddr_in *)msgname;
 		sinfrom = &asoc->peer.primary_addr.v4;
@@ -1048,6 +1051,9 @@ __init int sctp_init(void)
 	/* Initialize default stream count setup information. */
 	sctp_max_instreams    		= SCTP_DEFAULT_INSTREAMS;
 	sctp_max_outstreams   		= SCTP_DEFAULT_OUTSTREAMS;
+
+	/* Initialize handle used for association ids. */
+	idr_init(&sctp_assocs_id);
 
 	/* Size and allocate the association hash table.
 	 * The methodology is similar to that of the tcp hash tables.

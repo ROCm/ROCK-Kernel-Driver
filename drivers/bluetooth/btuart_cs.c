@@ -308,7 +308,7 @@ static irqreturn_t btuart_interrupt(int irq, void *dev_inst, struct pt_regs *reg
 	int boguscount = 0;
 	int iir, lsr;
 
-	if (!info) {
+	if (!info || !info->hdev) {
 		BT_ERR("Call of irq %d for unknown device", irq);
 		return IRQ_NONE;
 	}
@@ -504,6 +504,27 @@ int btuart_open(btuart_info_t *info)
 	info->rx_count = 0;
 	info->rx_skb = NULL;
 
+	/* Initialize HCI device */
+	hdev = hci_alloc_dev();
+	if (!hdev) {
+		BT_ERR("Can't allocate HCI device");
+		return -ENOMEM;
+	}
+
+	info->hdev = hdev;
+
+	hdev->type = HCI_PCCARD;
+	hdev->driver_data = info;
+
+	hdev->open     = btuart_hci_open;
+	hdev->close    = btuart_hci_close;
+	hdev->flush    = btuart_hci_flush;
+	hdev->send     = btuart_hci_send_frame;
+	hdev->destruct = btuart_hci_destruct;
+	hdev->ioctl    = btuart_hci_ioctl;
+
+	hdev->owner = THIS_MODULE;
+
 	spin_lock_irqsave(&(info->lock), flags);
 
 	/* Reset UART */
@@ -527,30 +548,10 @@ int btuart_open(btuart_info_t *info)
 	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout(HZ);
 
-
-	/* Initialize and register HCI device */
-	hdev = hci_alloc_dev();
-	if (!hdev) {
-		BT_ERR("Can't allocate HCI device");
-		return -ENOMEM;
-	}
-
-	info->hdev = hdev;
-
-	hdev->type = HCI_PCCARD;
-	hdev->driver_data = info;
-
-	hdev->open = btuart_hci_open;
-	hdev->close = btuart_hci_close;
-	hdev->flush = btuart_hci_flush;
-	hdev->send = btuart_hci_send_frame;
-	hdev->destruct = btuart_hci_destruct;
-	hdev->ioctl = btuart_hci_ioctl;
-
-	hdev->owner = THIS_MODULE;
-	
+	/* Register HCI device */
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
+		info->hdev = NULL;
 		hci_free_dev(hdev);
 		return -ENODEV;
 	}
@@ -564,6 +565,9 @@ int btuart_close(btuart_info_t *info)
 	unsigned long flags;
 	unsigned int iobase = info->link.io.BasePort1;
 	struct hci_dev *hdev = info->hdev;
+
+	if (!hdev)
+		return -ENODEV;
 
 	btuart_hci_close(hdev);
 

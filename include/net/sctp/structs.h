@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
@@ -1282,11 +1282,8 @@ struct sctp_association {
 	/* Associations on the same socket. */
 	struct list_head asocs;
 
-	/* This is a signature that lets us know that this is a
-	 * struct sctp_association data structure.  Used for mapping an
-	 * association id to an association.
-	 */
-	__u32 eyecatcher;
+	/* association id. */
+	sctp_assoc_t assoc_id;
 
 	/* This is our parent endpoint.	 */
 	struct sctp_endpoint *ep;

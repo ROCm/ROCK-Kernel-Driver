@@ -64,13 +64,13 @@ MODULE_DESCRIPTION("iptables userspace logging module");
 #define ULOG_MAXNLGROUPS	32		/* numer of nlgroups */
 
 #if 0
-#define DEBUGP(format, args...)	printk(__FILE__ ":" __FUNCTION__ ":" \
-				       format, ## args)
+#define DEBUGP(format, args...) printk("%s:%s:" format, \
+                                       __FILE__, __FUNCTION__ , ## args)
 #else
 #define DEBUGP(format, args...)
 #endif
 
-#define PRINTR(format, args...) do { if (net_ratelimit()) printk(format, ## args); } while (0)
+#define PRINTR(format, args...) do { if (net_ratelimit()) printk(format , ## args); } while (0)
 
 static unsigned int nlbufsiz = 4096;
 MODULE_PARM(nlbufsiz, "i");

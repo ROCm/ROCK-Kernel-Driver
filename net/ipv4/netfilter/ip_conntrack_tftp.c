@@ -33,8 +33,8 @@ MODULE_PARM_DESC(ports, "port numbers of tftp servers");
 #endif
 
 #if 0
-#define DEBUGP(format, args...) printk(__FILE__ ":" __FUNCTION__ ": " \
-				       format, ## args)
+#define DEBUGP(format, args...) printk("%s:%s:" format, \
+                                       __FILE__, __FUNCTION__ , ## args)
 #else
 #define DEBUGP(format, args...)
 #endif
@@ -70,6 +70,13 @@ static int tftp_help(struct sk_buff *skb,
 		DUMP_TUPLE(&exp.tuple);
 		DUMP_TUPLE(&exp.mask);
 		ip_conntrack_expect_related(ct, &exp);
+		break;
+	case TFTP_OPCODE_DATA:
+	case TFTP_OPCODE_ACK:
+		DEBUGP("Data/ACK opcode\n");
+		break;
+	case TFTP_OPCODE_ERROR:
+		DEBUGP("Error opcode\n");
 		break;
 	default:
 		DEBUGP("Unknown opcode\n");

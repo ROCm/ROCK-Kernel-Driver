@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -590,8 +590,7 @@ struct sctp_ulpevent *sctp_ulpevent_make_rcvmsg(struct sctp_association *asoc,
 						struct sctp_chunk *chunk,
 						int gfp)
 {
-	struct sctp_ulpevent *event;
-	struct sctp_sndrcvinfo *info;
+	struct sctp_ulpevent *event = NULL;
 	struct sk_buff *skb;
 	size_t padding, len;
 
@@ -624,101 +623,21 @@ struct sctp_ulpevent *sctp_ulpevent_make_rcvmsg(struct sctp_association *asoc,
 	/* Initialize event with flags 0.  */
 	sctp_ulpevent_init(event, 0);
 
-	event->iif = sctp_chunk_iif(chunk);
-
 	sctp_ulpevent_receive_data(event, asoc);
 
-	info = (struct sctp_sndrcvinfo *) &event->sndrcvinfo;
-
-	/* Sockets API Extensions for SCTP
-	 * Section 5.2.2 SCTP Header Information Structure (SCTP_SNDRCV)
-	 *
-	 * sinfo_stream: 16 bits (unsigned integer)
-	 *
-	 * For recvmsg() the SCTP stack places the message's stream number in
-	 * this value.
-	 */
-	info->sinfo_stream = ntohs(chunk->subh.data_hdr->stream);
-
-	/* Sockets API Extensions for SCTP
-	 * Section 5.2.2 SCTP Header Information Structure (SCTP_SNDRCV)
-	 *
-	 * sinfo_ssn: 16 bits (unsigned integer)
-	 *
-	 * For recvmsg() this value contains the stream sequence number that
-	 * the remote endpoint placed in the DATA chunk.  For fragmented
-	 * messages this is the same number for all deliveries of the message
-	 * (if more than one recvmsg() is needed to read the message).
-	 */
-	info->sinfo_ssn = ntohs(chunk->subh.data_hdr->ssn);
-
-        /* Sockets API Extensions for SCTP
-	 * Section 5.2.2 SCTP Header Information Structure (SCTP_SNDRCV)
-	 *
-	 * sinfo_ppid: 32 bits (unsigned integer)
-	 *
-	 * In recvmsg() this value is
-	 * the same information that was passed by the upper layer in the peer
-	 * application.  Please note that byte order issues are NOT accounted
-	 * for and this information is passed opaquely by the SCTP stack from
-	 * one end to the other.
-	 */
-	info->sinfo_ppid = chunk->subh.data_hdr->ppid;
-
-	/* Sockets API Extensions for SCTP
-	 * Section 5.2.2 SCTP Header Information Structure (SCTP_SNDRCV)
-	 *
-	 * sinfo_flags: 16 bits (unsigned integer)
-	 *
-	 * This field may contain any of the following flags and is composed of
-	 * a bitwise OR of these values.
-	 *
-	 * recvmsg() flags:
-	 *
-	 * MSG_UNORDERED - This flag is present when the message was sent
-	 *                 non-ordered.
-	 */
+	event->stream = ntohs(chunk->subh.data_hdr->stream);
+	event->ssn = ntohs(chunk->subh.data_hdr->ssn);
+	event->ppid = chunk->subh.data_hdr->ppid;
 	if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED) {
-		info->sinfo_flags |= MSG_UNORDERED;
-
-		/* sinfo_cumtsn: 32 bit (unsigned integer)
-		 *
-		 * This field will hold the current cumulative TSN as
-		 * known by the underlying SCTP layer.  Note this field is
-		 * ignored when sending and only valid for a receive
-		 * operation when sinfo_flags are set to MSG_UNORDERED.
-		 */
-		info->sinfo_cumtsn = sctp_tsnmap_get_ctsn(&asoc->peer.tsn_map);
+		event->flags |= MSG_UNORDERED;
+		event->cumtsn = sctp_tsnmap_get_ctsn(&asoc->peer.tsn_map);
 	}
-
-	/* Note:  For reassembly, we need to have the fragmentation bits.
-	 * For now, merge these into the msg_flags, since those bit
-	 * possitions are not used.
-	 */
+	event->tsn = ntohl(chunk->subh.data_hdr->tsn);
 	event->msg_flags |= chunk->chunk_hdr->flags;
-
-	/* With 04 draft, tsn moves into sndrcvinfo. */
-	info->sinfo_tsn = ntohl(chunk->subh.data_hdr->tsn);
-
-	/* Context is not used on receive. */
-	info->sinfo_context = 0;
-
-	/* Sockets API Extensions for SCTP
-	 * Section 5.2.2 SCTP Header Information Structure (SCTP_SNDRCV)
-	 *
-	 * sinfo_assoc_id: sizeof (sctp_assoc_t)
-	 *
-	 * The association handle field, sinfo_assoc_id, holds the identifier
-	 * for the association announced in the COMMUNICATION_UP notification.
-	 * All notifications for a given association have the same identifier.
-	 * Ignored for TCP-style sockets.
-	 */
-	info->sinfo_assoc_id = sctp_assoc2id(asoc);
-
-	return event;
+	event->iif = sctp_chunk_iif(chunk);
 
 fail:
-	return NULL;
+	return event;
 }
 
 /* Create a partial delivery related event.
@@ -797,11 +716,77 @@ __u16 sctp_ulpevent_get_notification_type(const struct sctp_ulpevent *event)
 void sctp_ulpevent_read_sndrcvinfo(const struct sctp_ulpevent *event,
 				   struct msghdr *msghdr)
 {
-	if (!sctp_ulpevent_is_notification(event)) {
-		put_cmsg(msghdr, IPPROTO_SCTP, SCTP_SNDRCV,
-			 sizeof(struct sctp_sndrcvinfo),
-			 (void *) &event->sndrcvinfo);
-	}
+	struct sctp_sndrcvinfo sinfo;
+
+	if (sctp_ulpevent_is_notification(event))
+		return;
+
+	/* Sockets API Extensions for SCTP
+ 	 * Section 5.2.2 SCTP Header Information Structure (SCTP_SNDRCV)
+ 	 *
+ 	 * sinfo_stream: 16 bits (unsigned integer)
+ 	 *
+ 	 * For recvmsg() the SCTP stack places the message's stream number in
+ 	 * this value.
+ 	*/
+	sinfo.sinfo_stream = event->stream;
+	/* sinfo_ssn: 16 bits (unsigned integer)
+	 *
+	 * For recvmsg() this value contains the stream sequence number that
+	 * the remote endpoint placed in the DATA chunk.  For fragmented
+	 * messages this is the same number for all deliveries of the message
+	 * (if more than one recvmsg() is needed to read the message).
+	 */
+	sinfo.sinfo_ssn = event->ssn;
+	/* sinfo_ppid: 32 bits (unsigned integer)
+	 *
+	 * In recvmsg() this value is
+	 * the same information that was passed by the upper layer in the peer
+	 * application.  Please note that byte order issues are NOT accounted
+	 * for and this information is passed opaquely by the SCTP stack from
+	 * one end to the other.
+	 */
+	sinfo.sinfo_ppid = event->ppid;
+	/* sinfo_flags: 16 bits (unsigned integer)
+	 *
+	 * This field may contain any of the following flags and is composed of
+	 * a bitwise OR of these values.
+	 *
+	 * recvmsg() flags:
+	 *
+	 * MSG_UNORDERED - This flag is present when the message was sent
+	 *                 non-ordered.
+	 */
+	sinfo.sinfo_flags = event->flags;
+	/* sinfo_tsn: 32 bit (unsigned integer)
+	 *
+	 * For the receiving side, this field holds a TSN that was 
+	 * assigned to one of the SCTP Data Chunks.
+	 */
+	sinfo.sinfo_tsn = event->tsn;
+	/* sinfo_cumtsn: 32 bit (unsigned integer)
+	 *
+	 * This field will hold the current cumulative TSN as
+	 * known by the underlying SCTP layer.  Note this field is
+	 * ignored when sending and only valid for a receive
+	 * operation when sinfo_flags are set to MSG_UNORDERED.
+	 */
+	sinfo.sinfo_cumtsn = event->cumtsn;
+	/* sinfo_assoc_id: sizeof (sctp_assoc_t)
+	 *
+	 * The association handle field, sinfo_assoc_id, holds the identifier
+	 * for the association announced in the COMMUNICATION_UP notification.
+	 * All notifications for a given association have the same identifier.
+	 * Ignored for one-to-one style sockets.
+	 */
+	sinfo.sinfo_assoc_id = sctp_assoc2id(event->asoc);
+
+	/* These fields are not used while receiving. */
+	sinfo.sinfo_context = 0;
+	sinfo.sinfo_timetolive = 0;
+
+	put_cmsg(msghdr, IPPROTO_SCTP, SCTP_SNDRCV,
+		 sizeof(struct sctp_sndrcvinfo), (void *)&sinfo);
 }
 
 /* Stub skb destructor.  */
@@ -831,14 +816,14 @@ static inline void sctp_ulpevent_set_owner(struct sctp_ulpevent *event,
 	sctp_association_hold((struct sctp_association *)asoc);
 	skb = sctp_event2skb(event);
 	skb->sk = asoc->base.sk;
-	event->sndrcvinfo.sinfo_assoc_id = sctp_assoc2id(asoc);
+	event->asoc = (struct sctp_association *)asoc;
 	skb->destructor = sctp_stub_rfree;
 }
 
 /* A simple destructor to give up the reference to the association. */
 static inline void sctp_ulpevent_release_owner(struct sctp_ulpevent *event)
 {
-	sctp_association_put(event->sndrcvinfo.sinfo_assoc_id);
+	sctp_association_put(event->asoc);
 }
 
 /* Do accounting for bytes received and hold a reference to the association
@@ -880,8 +865,7 @@ static void sctp_ulpevent_release_data(struct sctp_ulpevent *event)
 	 */
 
 	skb = sctp_event2skb(event);
-	sctp_assoc_rwnd_increase(event->sndrcvinfo.sinfo_assoc_id,
-				 skb_headlen(skb));
+	sctp_assoc_rwnd_increase(event->asoc, skb_headlen(skb));
 
 	/* Don't forget the fragments. */
 	for (frag = skb_shinfo(skb)->frag_list; frag; frag = frag->next) {
