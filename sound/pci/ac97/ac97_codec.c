@@ -2442,6 +2442,8 @@ int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk, int override)
 			continue;
 		if ((! quirk->mask && quirk->device == ac97->subsystem_device) ||
 		    quirk->device == (quirk->mask & ac97->subsystem_device)) {
+			if (quirk->codec_id && quirk->codec_id != ac97->id)
+				continue;
 			snd_printdd("ac97 quirk for %s (%04x:%04x)\n", quirk->name, ac97->subsystem_vendor, ac97->subsystem_device);
 			result = apply_quirk(ac97, quirk->type);
 			if (result < 0)
