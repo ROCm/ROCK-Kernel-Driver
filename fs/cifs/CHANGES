@@ -3,6 +3,8 @@ Version 1.17
 Update number of blocks in file so du command is happier (in Linux a fake
 blocksize of 512 is required for calculating number of blocks in inode).
 Fix prepare write of partial pages to read in data from server if possible.
+Fix race on tcpStatus field between unmount and reconnection code, causing
+cifsd process sometimes to hang around forever.
 
 Version 1.16
 ------------

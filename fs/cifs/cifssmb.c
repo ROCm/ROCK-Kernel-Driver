@@ -383,8 +383,11 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 			 smb_buffer_response, &length, 0);
 	if (ses->server) {
 		atomic_dec(&ses->server->socketUseCount);
-		if (atomic_read(&ses->server->socketUseCount) == 0)
+		if (atomic_read(&ses->server->socketUseCount) == 0) {
+			spin_lock(&GlobalMid_Lock);
 			ses->server->tcpStatus = CifsExiting;
+			spin_unlock(&GlobalMid_Lock);
+		}
 	}
 	if (pSMB)
 		cifs_buf_release(pSMB);

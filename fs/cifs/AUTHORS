@@ -32,3 +32,5 @@ Rene Scharfe, Martin Josefsson, Alexander Wild, Anthony Liguori,
 Lars Muller, Urban Widmark, Massimiliano Ferrero, Howard Owen,
 Olaf Kirch, Kieron Briggs and others. 
 
+And thanks to the IBM LTC and Power test teams and SuSE testers for
+finding multiple bugs during excellent stress test runs.
