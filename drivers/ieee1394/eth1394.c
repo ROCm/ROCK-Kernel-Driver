@@ -375,8 +375,8 @@ static void ether1394_reset_priv (struct net_device *dev, int set_mtu)
 	}
 }
 
-/* This function is called by register_netdev */
-static int ether1394_init_dev (struct net_device *dev)
+/* This function is called right before register_netdev */
+static void ether1394_init_dev (struct net_device *dev)
 {
 	/* Our functions */
 	dev->open		= ether1394_open;
@@ -403,8 +403,6 @@ static int ether1394_init_dev (struct net_device *dev)
 	dev->type		= ARPHRD_IEEE1394;
 
 	ether1394_reset_priv (dev, 1);
-
-	return 0;
 }
 
 /*
@@ -437,8 +435,6 @@ static void ether1394_add_host (struct hpsb_host *host)
 
 	SET_MODULE_OWNER(dev);
 
-	dev->init = ether1394_init_dev;
-
 	priv = (struct eth1394_priv *)dev->priv;
 
 	spin_lock_init(&priv->lock);
@@ -458,6 +454,8 @@ static void ether1394_add_host (struct hpsb_host *host)
 				 host->driver->name, host->id);
 		goto out;
         }
+
+	ether1394_init_dev(dev);
 
 	if (register_netdev (dev)) {
 		ETH1394_PRINT (KERN_ERR, dev->name, "Error registering network driver\n");
@@ -483,7 +481,7 @@ static void ether1394_add_host (struct hpsb_host *host)
 
 out:
 	if (dev != NULL)
-		kfree(dev);
+		free_netdev(dev);
 	if (hi)
 		hpsb_destroy_hostinfo(&eth1394_highlevel, host);
 
