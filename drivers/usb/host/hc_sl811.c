@@ -1343,15 +1343,11 @@ static int __init hci_hcd_init (void)
  *****************************************************************/
 static void __exit hci_hcd_cleanup (void)
 {
-	struct list_head *hci_l;
-	hci_t *hci;
+	hci_t *hci, *tmp;
 
 	DBGFUNC ("Enter hci_hcd_cleanup\n");
-	for (hci_l = hci_hcd_list.next; hci_l != &hci_hcd_list;) {
-		hci = list_entry (hci_l, hci_t, hci_hcd_list);
-		hci_l = hci_l->next;
+	list_for_each_entry_safe(hci, tmp, &hci_hcd_list, hci_hcd_list)
 		hc_release_hci (hci);
-	}
 }
 
 module_init (hci_hcd_init);

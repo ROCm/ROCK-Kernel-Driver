@@ -1977,7 +1977,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	/* chase the port close */
 	TIChasePort (edge_port);
 
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 
 	/* assuming we can still talk to the device,
 	 * send a close port command to it */
@@ -1992,7 +1992,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	--edge_port->edge_serial->num_ports_open;
 	if (edge_port->edge_serial->num_ports_open <= 0) {
 		/* last port is now closed, let's shut down our interrupt urb */
-		usb_unlink_urb (port->serial->port[0]->interrupt_in_urb);
+		usb_kill_urb(port->serial->port[0]->interrupt_in_urb);
 		edge_port->edge_serial->num_ports_open = 0;
 	}
 	edge_port->close_pending = 0;
@@ -2126,7 +2126,7 @@ static void edge_throttle (struct usb_serial_port *port)
 		status = TIClearRts (edge_port);
 	}
 
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 }
 
 static void edge_unthrottle (struct usb_serial_port *port)

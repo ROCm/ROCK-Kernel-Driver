@@ -1243,7 +1243,7 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	edge_port->openPending = FALSE;
 
 	if (edge_port->write_urb) {
-		usb_unlink_urb (edge_port->write_urb);
+		usb_kill_urb(edge_port->write_urb);
 	}
 
 	if (edge_port->write_urb) {
@@ -2448,8 +2448,8 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	if (status) {
 		/* something went wrong */
 		dbg("%s - usb_submit_urb(write bulk) failed", __FUNCTION__);
-		usb_unlink_urb (urb);
-		usb_free_urb   (urb);
+		usb_kill_urb(urb);
+		usb_free_urb(urb);
 		return status;
 	}
 

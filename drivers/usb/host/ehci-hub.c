@@ -81,7 +81,7 @@ static int ehci_hub_suspend (struct usb_hcd *hcd)
 }
 
 
-/* caller owns root->serialize, and should reset/reinit on error */
+/* caller has locked the root hub, and should reset/reinit on error */
 static int ehci_hub_resume (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);

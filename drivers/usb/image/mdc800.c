@@ -543,9 +543,9 @@ static void mdc800_usb_disconnect (struct usb_interface *intf)
 
 		mdc800->state=NOT_CONNECTED;
 
-		usb_unlink_urb (mdc800->irq_urb);
-		usb_unlink_urb (mdc800->write_urb);
-		usb_unlink_urb (mdc800->download_urb);
+		usb_kill_urb(mdc800->irq_urb);
+		usb_kill_urb(mdc800->write_urb);
+		usb_kill_urb(mdc800->download_urb);
 
 		mdc800->dev = NULL;
 		usb_set_intfdata(intf, NULL);
@@ -649,9 +649,9 @@ static int mdc800_device_release (struct inode* inode, struct file *file)
 	down (&mdc800->io_lock);
 	if (mdc800->open && (mdc800->state != NOT_CONNECTED))
 	{
-		usb_unlink_urb (mdc800->irq_urb);
-		usb_unlink_urb (mdc800->write_urb);
-		usb_unlink_urb (mdc800->download_urb);
+		usb_kill_urb(mdc800->irq_urb);
+		usb_kill_urb(mdc800->write_urb);
+		usb_kill_urb(mdc800->download_urb);
 		mdc800->open=0;
 	}
 	else
@@ -856,7 +856,7 @@ static ssize_t mdc800_device_write (struct file *file, const char __user *buf, s
 			mdc800->written = 0;
 			if (mdc800->state == WORKING)
 			{
-				usb_unlink_urb (mdc800->write_urb);
+				usb_kill_urb(mdc800->write_urb);
 				up (&mdc800->io_lock);
 				return -EIO;
 			}

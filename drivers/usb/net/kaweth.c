@@ -668,7 +668,7 @@ static int kaweth_open(struct net_device *net)
 		INTBUFFERSIZE,
 		int_callback,
 		kaweth,
-		8);
+		250); /* overriding the descriptor */
 	kaweth->irq_urb->transfer_dma = kaweth->intbufferhandle;
 	kaweth->irq_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 

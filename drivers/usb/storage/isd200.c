@@ -1052,12 +1052,6 @@ static int isd200_get_inquiry_data( struct us_data *us )
 				/* Standard IDE interface only supports disks */
 				info->InquiryData.DeviceType = DIRECT_ACCESS_DEVICE;
 
-				/* Fix-up the return data from an INQUIRY command to show 
-				 * ANSI SCSI rev 2 so we don't confuse the SCSI layers above us
-				 * in Linux.
-				 */
-				info->InquiryData.Versions = 0x2;
-
 				/* The length must be at least 36 (5 + 31) */
 				info->InquiryData.AdditionalLength = 0x1F;
 

@@ -490,6 +490,18 @@ static void ub_id_put(int id)
  */
 static void ub_cleanup(struct ub_dev *sc)
 {
+
+	/*
+	 * If we zero disk->private_data BEFORE put_disk, we have to check
+	 * for NULL all over the place in open, release, check_media and
+	 * revalidate, because the block level semaphore is well inside the
+	 * put_disk. But we cannot zero after the call, because *disk is gone.
+	 * The sd.c is blatantly racy in this area.
+	 */
+	/* disk->private_data = NULL; */
+	put_disk(sc->disk);
+	sc->disk = NULL;
+
 	ub_id_put(sc->id);
 	kfree(sc);
 }
@@ -786,16 +798,15 @@ static int ub_scsi_cmd_start(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
-	sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
-	add_timer(&sc->work_timer);
-
 	if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
 		/* XXX Clear stalls */
 		printk("ub: cmd #%d start failed (%d)\n", cmd->tag, rc); /* P3 */
-		del_timer(&sc->work_timer);
 		ub_complete(&sc->work_done);
 		return rc;
 	}
+
+	sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+	add_timer(&sc->work_timer);
 
 	cmd->state = UB_CMDST_CMD;
 	ub_cmdtr_state(sc, cmd);
@@ -968,17 +979,16 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		sc->work_urb.error_count = 0;
 		sc->work_urb.status = 0;
 
-		sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
-		add_timer(&sc->work_timer);
-
 		if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
 			/* XXX Clear stalls */
 			printk("ub: data #%d submit failed (%d)\n", cmd->tag, rc); /* P3 */
-			del_timer(&sc->work_timer);
 			ub_complete(&sc->work_done);
 			ub_state_done(sc, cmd, rc);
 			return;
 		}
+
+		sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+		add_timer(&sc->work_timer);
 
 		cmd->state = UB_CMDST_DATA;
 		ub_cmdtr_state(sc, cmd);
@@ -1063,19 +1073,18 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 			sc->work_urb.error_count = 0;
 			sc->work_urb.status = 0;
 
-			sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
-			add_timer(&sc->work_timer);
-
 			rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC);
 			if (rc != 0) {
 				/* XXX Clear stalls */
 				printk("%s: CSW #%d submit failed (%d)\n",
 				   sc->name, cmd->tag, rc); /* P3 */
-				del_timer(&sc->work_timer);
 				ub_complete(&sc->work_done);
 				ub_state_done(sc, cmd, rc);
 				return;
 			}
+
+			sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+			add_timer(&sc->work_timer);
 			return;
 		}
 
@@ -1186,17 +1195,16 @@ static void ub_state_stat(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
-	sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
-	add_timer(&sc->work_timer);
-
 	if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
 		/* XXX Clear stalls */
 		printk("ub: CSW #%d submit failed (%d)\n", cmd->tag, rc); /* P3 */
-		del_timer(&sc->work_timer);
 		ub_complete(&sc->work_done);
 		ub_state_done(sc, cmd, rc);
 		return;
 	}
+
+	sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+	add_timer(&sc->work_timer);
 
 	cmd->stat_count = 0;
 	cmd->state = UB_CMDST_STAT;
@@ -1217,9 +1225,17 @@ static void ub_state_sense(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		goto error;
 	}
 
+	/*
+	 * ``If the allocation length is eighteen or greater, and a device
+	 * server returns less than eithteen bytes of data, the application
+	 * client should assume that the bytes not transferred would have been
+	 * zeroes had the device server returned those bytes.''
+	 */
 	memset(&sc->top_sense, 0, UB_SENSE_SIZE);
+
 	scmd = &sc->top_rqs_cmd;
 	scmd->cdb[0] = REQUEST_SENSE;
+	scmd->cdb[4] = UB_SENSE_SIZE;
 	scmd->cdb_len = 6;
 	scmd->dir = UB_DIR_READ;
 	scmd->state = UB_CMDST_INIT;
@@ -1271,14 +1287,13 @@ static int ub_submit_clear_stall(struct ub_dev *sc, struct ub_scsi_cmd *cmd,
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
-	sc->work_timer.expires = jiffies + UB_CTRL_TIMEOUT;
-	add_timer(&sc->work_timer);
-
 	if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
-		del_timer(&sc->work_timer);
 		ub_complete(&sc->work_done);
 		return rc;
 	}
+
+	sc->work_timer.expires = jiffies + UB_CTRL_TIMEOUT;
+	add_timer(&sc->work_timer);
 	return 0;
 }
 
@@ -1289,6 +1304,9 @@ static void ub_top_sense_done(struct ub_dev *sc, struct ub_scsi_cmd *scmd)
 	unsigned char *sense = scmd->data;
 	struct ub_scsi_cmd *cmd;
 
+	/*
+	 * Ignoring scmd->act_len, because the buffer was pre-zeroed.
+	 */
 	ub_cmdtr_sense(sc, scmd, sense);
 
 	if ((cmd = ub_cmdq_peek(sc)) == NULL) {
@@ -1407,7 +1425,15 @@ static int ub_bd_open(struct inode *inode, struct file *filp)
 	if (sc->removable || sc->readonly)
 		check_disk_change(inode->i_bdev);
 
-	/* XXX sd.c and floppy.c bail on open if media is not present. */
+	/*
+	 * The sd.c considers ->media_present and ->changed not equivalent,
+	 * under some pretty murky conditions (a failure of READ CAPACITY).
+	 * We may need it one day.
+	 */
+	if (sc->removable && sc->changed && !(filp->f_flags & O_NDELAY)) {
+		rc = -ENOMEDIUM;
+		goto err_open;
+	}
 
 	if (sc->readonly && (filp->f_mode & FMODE_WRITE)) {
 		rc = -EROFS;
@@ -1492,8 +1518,11 @@ static int ub_bd_revalidate(struct gendisk *disk)
 	printk(KERN_INFO "%s: device %u capacity nsec %ld bsize %u\n",
 	    sc->name, sc->dev->devnum, sc->capacity.nsec, sc->capacity.bsize);
 
+	/* XXX Support sector size switching like in sr.c */
+	// blk_queue_hardsect_size(q, sc->capacity.bsize);
 	set_capacity(disk, sc->capacity.nsec);
 	// set_disk_ro(sdkp->disk, sc->readonly);
+
 	return 0;
 }
 
@@ -1725,28 +1754,22 @@ static int ub_probe_clear_stall(struct ub_dev *sc, int stalled_pipe)
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
+	if ((rc = usb_submit_urb(&sc->work_urb, GFP_KERNEL)) != 0) {
+		printk(KERN_WARNING
+		     "%s: Unable to submit a probe clear (%d)\n", sc->name, rc);
+		return rc;
+	}
+
 	init_timer(&timer);
 	timer.function = ub_probe_timeout;
 	timer.data = (unsigned long) &compl;
 	timer.expires = jiffies + UB_CTRL_TIMEOUT;
 	add_timer(&timer);
 
-	if ((rc = usb_submit_urb(&sc->work_urb, GFP_KERNEL)) != 0) {
-		printk(KERN_WARNING
-		     "%s: Unable to submit a probe clear (%d)\n", sc->name, rc);
-		del_timer_sync(&timer);
-		return rc;
-	}
-
 	wait_for_completion(&compl);
 
 	del_timer_sync(&timer);
-	/*
-	 * Most of the time, URB was done and dev set to NULL, and so
-	 * the unlink bounces out with ENODEV. We do not call usb_kill_urb
-	 * because we still think about a backport to 2.4.
-	 */
-	usb_unlink_urb(&sc->work_urb);
+	usb_kill_urb(&sc->work_urb);
 
 	/* reset the endpoint toggle */
 	usb_settoggle(sc->dev, endp, usb_pipeout(sc->last_pipe), 0);
@@ -2004,17 +2027,6 @@ static void ub_disconnect(struct usb_interface *intf)
 		del_gendisk(disk);
 	if (q)
 		blk_cleanup_queue(q);
-
-	/*
-	 * If we zero disk->private_data BEFORE put_disk, we have to check
-	 * for NULL all over the place in open, release, check_media and
-	 * revalidate, because the block level semaphore is well inside the
-	 * put_disk. But we cannot zero after the call, because *disk is gone.
-	 * The sd.c is blatantly racy in this area.
-	 */
-	/* disk->private_data = NULL; */
-	put_disk(disk);
-	sc->disk = NULL;
 
 	/*
 	 * We really expect blk_cleanup_queue() to wait, so no amount

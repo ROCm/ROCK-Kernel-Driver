@@ -56,7 +56,7 @@ static void hid_pid_exit(struct hid_device* hid)
     struct hid_ff_pid *private = hid->ff_private;
     
     if (private->urbffout) {
-	usb_unlink_urb(private->urbffout);
+	usb_kill_urb(private->urbffout);
 	usb_free_urb(private->urbffout);
     }
 }

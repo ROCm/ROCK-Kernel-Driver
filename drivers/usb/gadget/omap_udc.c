@@ -1200,7 +1200,8 @@ static void pullup_enable(struct omap_udc *udc)
 {
 	UDC_SYSCON1_REG |= UDC_PULLUP_EN;
 #ifndef CONFIG_USB_OTG
-	OTG_CTRL_REG |= OTG_BSESSVLD;
+	if (!cpu_is_omap15xx())
+		OTG_CTRL_REG |= OTG_BSESSVLD;
 #endif
 	UDC_IRQ_EN_REG = UDC_DS_CHG_IE;
 }
@@ -1208,7 +1209,8 @@ static void pullup_enable(struct omap_udc *udc)
 static void pullup_disable(struct omap_udc *udc)
 {
 #ifndef CONFIG_USB_OTG
-	OTG_CTRL_REG &= ~OTG_BSESSVLD;
+	if (!cpu_is_omap15xx())
+		OTG_CTRL_REG &= ~OTG_BSESSVLD;
 #endif
 	UDC_IRQ_EN_REG = UDC_DS_CHG_IE;
 	UDC_SYSCON1_REG &= ~UDC_PULLUP_EN;
@@ -1688,7 +1690,7 @@ static void devstate_irq(struct omap_udc *udc, u16 irq_src)
 		}
 		change &= ~UDC_SUS;
 	}
-	if (change & OTG_FLAGS) {
+	if (!cpu_is_omap15xx() && (change & OTG_FLAGS)) {
 		update_otg(udc);
 		change &= ~OTG_FLAGS;
 	}
@@ -2036,34 +2038,14 @@ static char *trx_mode(unsigned m)
 	}
 }
 
-static int proc_udc_show(struct seq_file *s, void *_)
+static int proc_otg_show(struct seq_file *s)
 {
 	u32		tmp;
-	struct omap_ep	*ep;
-	unsigned long	flags;
 
-	spin_lock_irqsave(&udc->lock, flags);
-
-	seq_printf(s, "%s, version: " DRIVER_VERSION
-#ifdef	USE_ISO
-		" (iso)"
-#endif
-		"%s\n",
-		driver_desc,
-		use_dma ?  " (dma)" : "");
-
-	tmp = UDC_REV_REG & 0xff; 
-	seq_printf(s,
-		"UDC rev %d.%d, OTG rev %d.%d, fifo mode %d, gadget %s\n"
-		"hmc %d, transceiver %08x %s\n",
+	tmp = OTG_REV_REG;
+	seq_printf(s, "OTG rev %d.%d, transceiver_ctrl %08x\n",
 		tmp >> 4, tmp & 0xf,
-		OTG_REV_REG >> 4, OTG_REV_REG & 0xf,
-		fifo_mode,
-		udc->driver ? udc->driver->driver.name : "(none)",
-		HMC, USB_TRANSCEIVER_CTRL_REG,
-		udc->transceiver ? udc->transceiver->label : "");
-
-	/* OTG controller registers */
+		USB_TRANSCEIVER_CTRL_REG);
 	tmp = OTG_SYSCON_1_REG;
 	seq_printf(s, "otg_syscon1 %08x usb2 %s, usb1 %s, usb0 %s,"
 			FOURBITS "\n", tmp,
@@ -2117,6 +2099,37 @@ static int proc_udc_show(struct seq_file *s, void *_)
 	seq_printf(s, "otg_outctrl %04x" "\n", tmp);
 	tmp = OTG_TEST_REG;
 	seq_printf(s, "otg_test    %04x" "\n", tmp);
+}
+
+static int proc_udc_show(struct seq_file *s, void *_)
+{
+	u32		tmp;
+	struct omap_ep	*ep;
+	unsigned long	flags;
+
+	spin_lock_irqsave(&udc->lock, flags);
+
+	seq_printf(s, "%s, version: " DRIVER_VERSION
+#ifdef	USE_ISO
+		" (iso)"
+#endif
+		"%s\n",
+		driver_desc,
+		use_dma ?  " (dma)" : "");
+
+	tmp = UDC_REV_REG & 0xff; 
+	seq_printf(s,
+		"UDC rev %d.%d, fifo mode %d, gadget %s\n"
+		"hmc %d, transceiver %s\n",
+		tmp >> 4, tmp & 0xf,
+		fifo_mode,
+		udc->driver ? udc->driver->driver.name : "(none)",
+		HMC,
+		udc->transceiver ? udc->transceiver->label : "");
+
+	/* OTG controller registers */
+	if (!cpu_is_omap15xx())
+		proc_otg_show(s);
 
 	tmp = UDC_SYSCON1_REG;
 	seq_printf(s, "\nsyscon1     %04x" EIGHTBITS "\n", tmp,
@@ -2496,41 +2509,51 @@ static int __init omap_udc_probe(struct device *dev)
 		return -EBUSY;
 	}
 
-	INFO("OMAP UDC rev %d.%d, OTG rev %d.%d, %s receptacle\n",
+	INFO("OMAP UDC rev %d.%d, %s receptacle\n",
 		UDC_REV_REG >> 4, UDC_REV_REG & 0xf,
-		OTG_REV_REG >> 4, OTG_REV_REG & 0xf,
 		config->otg ? "Mini-AB" : "B/Mini-B");
 
 	/* use the mode given to us by board init code */
-	hmc = HMC;
-	switch (hmc) {
-	case 3:
-	case 11:
-	case 19:
-	case 25:
-		xceiv = otg_get_transceiver();
-		if (!xceiv) {
-			DBG("external transceiver not registered!\n");
-			goto cleanup0;
-		}
-		type = xceiv->label;
-		break;
-	case 0:			/* POWERUP DEFAULT == 0 */
-	case 4:
-	case 12:
-	case 20:
-		type = "INTEGRATED";
-		break;
-	case 21:			/* internal loopback */
-		type = "(loopback)";
-		break;
-	case 14:			/* transceiverless */
-		type = "(none)";
-		break;
+	if (cpu_is_omap15xx()) {
+		hmc = HMC_1510;
+		type = "(unknown)";
 
-	default:
-		ERR("unrecognized UDC HMC mode %d\n", hmc);
-		return -ENODEV;
+		/* FIXME may need a GPIO-0 handler to call
+		 * usb_gadget_vbus_{dis,}connect() on us...
+		 */
+	} else {
+		hmc = HMC_1610;
+		switch (hmc) {
+		case 3:
+		case 11:
+		case 19:
+		case 25:
+			xceiv = otg_get_transceiver();
+			if (!xceiv) {
+				DBG("external transceiver not registered!\n");
+				if (config->otg)
+					goto cleanup0;
+				type = "(unknown external)";
+			} else
+				type = xceiv->label;
+			break;
+		case 0:			/* POWERUP DEFAULT == 0 */
+		case 4:
+		case 12:
+		case 20:
+			type = "INTEGRATED";
+			break;
+		case 21:			/* internal loopback */
+			type = "(loopback)";
+			break;
+		case 14:			/* transceiverless */
+			type = "(none)";
+			break;
+
+		default:
+			ERR("unrecognized UDC HMC mode %d\n", hmc);
+			return -ENODEV;
+		}
 	}
 	INFO("hmc mode %d, transceiver %s\n", hmc, type);
 
@@ -2671,13 +2694,6 @@ static struct device_driver udc_driver = {
 
 static int __init udc_init(void)
 {
-	/* should work on many OMAP systems with at most minor changes,
-	 * but the 1510 doesn't have an OTG controller.
-	 */
-	if (cpu_is_omap1510()) {
-		DBG("no OMAP1510 support yet\n");
-		return -ENODEV;
-	}
 	INFO("%s, version: " DRIVER_VERSION "%s\n", driver_desc,
 		use_dma ?  " (dma)" : "");
 	return driver_register(&udc_driver);

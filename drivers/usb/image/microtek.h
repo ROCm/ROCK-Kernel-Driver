@@ -31,6 +31,7 @@ struct mts_desc {
 	struct mts_desc *prev;
 
 	struct usb_device *usb_dev;
+	struct usb_interface *usb_intf;
 
 	/* Endpoint addresses */
 	u8 ep_out;

@@ -36,13 +36,16 @@
 /* If you edit this file, please try to keep it sorted first by VendorID,
  * then by ProductID.
  *
- * If you want to add an entry for this file, please send the following
- * to greg@kroah.com:
- *	- patch that adds the entry for your device which includes your
- *	  email address right above the entry.
+ * If you want to add an entry for this file, be sure to include the
+ * following information:
+ *	- a patch that adds the entry for your device, including your
+ *	  email address right above the entry (plus maybe a brief
+ *	  explanation of the reason for the entry),
  *	- a copy of /proc/bus/usb/devices with your device plugged in
  *	  running with this patch.
- *
+ * Send your submission to either Phil Dibowitz <phil@ipom.com> or
+ * Alan Stern <stern@rowland.harvard.edu>, and don't forget to CC: the
+ * USB development list <linux-usb-devel@lists.sourceforge.net>.
  */
 
 UNUSUAL_DEV(  0x03ee, 0x6901, 0x0000, 0x0100,
@@ -67,16 +70,6 @@ UNUSUAL_DEV(  0x03f0, 0x0307, 0x0001, 0x0001,
 		"CD-Writer+ CD-4e",
 		US_SC_8070, US_PR_SCM_ATAPI, init_8200e, 0), 
 #endif
-
-/* <torsten.scherer@uni-bielefeld.de>: I don't know the name of the bridge
- * manufacturer, but I've got an external USB drive by the Revoltec company
- * that needs this. otherwise the drive is recognized as /dev/sda, but any
- * access to it blocks indefinitely.
- */
-UNUSUAL_DEV(  0x0402, 0x5621, 0x0103, 0x0103,
-		"Revoltec",
-		"USB/IDE Bridge (ATA/ATAPI)",
-		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
 
 /* Deduced by Jonathan Woithe <jwoithe@physics.adelaide.edu.au>
  * Entry needed for flags: US_FL_FIX_INQUIRY because initial inquiry message
@@ -179,6 +172,16 @@ UNUSUAL_DEV(  0x04da, 0x0d05, 0x0000, 0x0000,
 		"Sharp CE-CW05",
 		"CD-R/RW Drive",
 		US_SC_8070, US_PR_CB, NULL, 0),
+
+/* Reported by Adriaan Penning <a.penning@luon.net>
+ * Note that these cameras report "Medium not present" after
+ * ALLOW_MEDIUM_REMOVAL, so they also need to be marked
+ * NOT_LOCKABLE in the SCSI blacklist (and the vendor is MATSHITA). */
+UNUSUAL_DEV(  0x04da, 0x2372, 0x0000, 0x9999,
+		"Panasonic",
+		"DMC-LCx Camera",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
 
 /* Most of the following entries were developed with the help of
  * Shuttle/SCM directly.
