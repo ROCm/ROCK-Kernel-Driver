@@ -1082,15 +1082,22 @@ static void schizo_safarierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 #define SCHIZO_PCIA_CTRL	(SCHIZO_PBM_A_REGS_OFF + 0x2000UL)
 #define SCHIZO_PCIB_CTRL	(SCHIZO_PBM_B_REGS_OFF + 0x2000UL)
-#define SCHIZO_PCICTRL_BUNUS	(1UL << 63UL)
+#define SCHIZO_PCICTRL_BUS_UNUS	(1UL << 63UL)
 #define SCHIZO_PCICTRL_ESLCK	(1UL << 51UL)
+#define SCHIZO_PCICTRL_ERRSLOT	(7UL << 48UL)
 #define SCHIZO_PCICTRL_TTO_ERR	(1UL << 38UL)
 #define SCHIZO_PCICTRL_RTRY_ERR	(1UL << 37UL)
 #define SCHIZO_PCICTRL_DTO_ERR	(1UL << 36UL)
 #define SCHIZO_PCICTRL_SBH_ERR	(1UL << 35UL)
 #define SCHIZO_PCICTRL_SERR	(1UL << 34UL)
+#define SCHIZO_PCICTRL_PCISPD	(1UL << 33UL)
+#define SCHIZO_PCICTRL_PTO	(3UL << 24UL)
+#define SCHIZO_PCICTRL_DTO_INT	(1UL << 19UL)
 #define SCHIZO_PCICTRL_SBH_INT	(1UL << 18UL)
 #define SCHIZO_PCICTRL_EEN	(1UL << 17UL)
+#define SCHIZO_PCICTRL_PARK	(1UL << 16UL)
+#define SCHIZO_PCICTRL_PCIRST	(1UL <<  8UL)
+#define SCHIZO_PCICTRL_ARB	(0x3fUL << 0UL)
 
 static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 {
@@ -1167,7 +1174,7 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 	 * bits for each PBM.
 	 */
 	tmp = schizo_read(base + SCHIZO_PCIA_CTRL);
-	tmp |= (SCHIZO_PCICTRL_BUNUS |
+	tmp |= (SCHIZO_PCICTRL_BUS_UNUS |
 		SCHIZO_PCICTRL_ESLCK |
 		SCHIZO_PCICTRL_TTO_ERR |
 		SCHIZO_PCICTRL_RTRY_ERR |
@@ -1179,7 +1186,7 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 	schizo_write(base + SCHIZO_PCIA_CTRL, tmp);
 
 	tmp = schizo_read(base + SCHIZO_PCIB_CTRL);
-	tmp |= (SCHIZO_PCICTRL_BUNUS |
+	tmp |= (SCHIZO_PCICTRL_BUS_UNUS |
 		SCHIZO_PCICTRL_ESLCK |
 		SCHIZO_PCICTRL_TTO_ERR |
 		SCHIZO_PCICTRL_RTRY_ERR |
@@ -1742,6 +1749,22 @@ static void schizo_pbm_init(struct pci_controller_info *p,
 	schizo_pbm_strbuf_init(p, pbm, is_pbm_a);
 }
 
+#define SCHIZO_PCIA_IRQ_RETRY	(SCHIZO_PBM_A_REGS_OFF + 0x1a00UL)
+#define SCHIZO_PCIB_IRQ_RETRY	(SCHIZO_PBM_B_REGS_OFF + 0x1a00UL)
+#define  SCHIZO_IRQ_RETRY_INF	 0xffUL
+
+#define SCHIZO_PCIA_DIAG	(SCHIZO_PBM_A_REGS_OFF + 0x2020UL)
+#define SCHIZO_PCIB_DIAG	(SCHIZO_PBM_B_REGS_OFF + 0x2020UL)
+#define  SCHIZO_PCIDIAG_D_BADECC	(1UL << 10UL) /* Disable BAD ECC errors */
+#define  SCHIZO_PCIDIAG_D_BYPASS	(1UL <<  9UL) /* Disable MMU bypass mode */
+#define  SCHIZO_PCIDIAG_D_TTO		(1UL <<  8UL) /* Disable TTO errors */
+#define  SCHIZO_PCIDIAG_D_RTRYARB	(1UL <<  7UL) /* Disable retry arbitration */
+#define  SCHIZO_PCIDIAG_D_RETRY		(1UL <<  6UL) /* Disable retry limit */
+#define  SCHIZO_PCIDIAG_D_INTSYNC	(1UL <<  5UL) /* Disable interrupt/DMA synch */
+#define  SCHIZO_PCIDIAG_I_DMA_PARITY	(1UL <<  3UL) /* Invert DMA parity */
+#define  SCHIZO_PCIDIAG_I_PIOD_PARITY	(1UL <<  2UL) /* Invert PIO data parity */
+#define  SCHIZO_PCIDIAG_I_PIOA_PARITY	(1UL <<  1U)L /* Invert PIO address parity */
+
 static void schizo_controller_hwinit(struct pci_controller_info *p)
 {
 	unsigned long pbm_a_base, pbm_b_base;
@@ -1751,17 +1774,37 @@ static void schizo_controller_hwinit(struct pci_controller_info *p)
 	pbm_b_base = p->controller_regs + SCHIZO_PBM_B_REGS_OFF;
 
 	/* Set IRQ retry to infinity. */
-	schizo_write(pbm_a_base + 0x1a00UL, 0xff);
-	schizo_write(pbm_b_base + 0x1a00UL, 0xff);
+	schizo_write(p->controller_regs + SCHIZO_PCIA_IRQ_RETRY,
+		     SCHIZO_IRQ_RETRY_INF);
+	schizo_write(p->controller_regs + SCHIZO_PCIB_IRQ_RETRY,
+		     SCHIZO_IRQ_RETRY_INF);
 
-	/* Enable arbiter for all PCI slots. */
-	tmp = schizo_read(pbm_a_base + 0x2000UL);
-	tmp |= 0x3fUL;
-	schizo_write(pbm_a_base + 0x2000UL, tmp);
+	/* Enable arbiter for all PCI slots.  Also, disable PCI interval
+	 * timer so that DTO (Discard TimeOuts) are not reported because
+	 * some Schizo revisions report them erroneously.
+	 */
 
-	tmp = schizo_read(pbm_b_base + 0x2000UL);
-	tmp |= 0x3fUL;
-	schizo_write(pbm_b_base + 0x2000UL, tmp);
+	tmp = schizo_read(p->controller_regs + SCHIZO_PCIA_CTRL);
+	tmp |= SCHIZO_PCICTRL_ARB;
+	tmp &= ~SCHIZO_PCICTRL_PTO;
+	schizo_write(p->controller_regs + SCHIZO_PCIA_CTRL, tmp);
+
+	tmp = schizo_read(p->controller_regs + SCHIZO_PCIB_CTRL);
+	tmp |= SCHIZO_PCICTRL_ARB;
+	tmp &= ~SCHIZO_PCICTRL_PTO;
+	schizo_write(p->controller_regs + SCHIZO_PCIB_CTRL, tmp);
+
+	/* Disable TTO error reporting (won't happen anyway since we
+	 * disabled the PCI interval timer above) and retry arbitration
+	 * (can cause hangs in some Schizo revisions).
+	 */
+	tmp = schizo_read(p->controller_regs + SCHIZO_PCIA_DIAG);
+	tmp |= (SCHIZO_PCIDIAG_D_TTO | SCHIZO_PCIDIAG_D_RTRYARB);
+	schizo_write(p->controller_regs + SCHIZO_PCIA_DIAG, tmp);
+
+	tmp = schizo_read(p->controller_regs + SCHIZO_PCIB_DIAG);
+	tmp |= (SCHIZO_PCIDIAG_D_TTO | SCHIZO_PCIDIAG_D_RTRYARB);
+	schizo_write(p->controller_regs + SCHIZO_PCIB_DIAG, tmp);
 }
 
 void __init schizo_init(int node, char *model_name)
