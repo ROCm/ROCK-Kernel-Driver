@@ -452,7 +452,7 @@ insert_bpts()
 		}
 	}
 
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_DABR) && dabr.enabled)
+	if (dabr.enabled)
 		set_dabr(dabr.address);
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR) && iabr.enabled)
 		set_iabr(iabr.address);
@@ -465,8 +465,7 @@ remove_bpts()
 	struct bpt *bp;
 	unsigned instr;
 
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_DABR))
-		set_dabr(0);
+	set_dabr(0);
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR))
 		set_iabr(0);
 
@@ -751,10 +750,6 @@ bpt_cmds(void)
 	cmd = inchar();
 	switch (cmd) {
 	case 'd':	/* bd - hardware data breakpoint */
-		if (!(cur_cpu_spec->cpu_features & CPU_FTR_DABR)) {
-			printf("Not implemented on this cpu\n");
-			break;
-		}
 		mode = 7;
 		cmd = inchar();
 		if (cmd == 'r')
