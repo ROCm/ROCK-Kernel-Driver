@@ -757,7 +757,7 @@ repeat:
 
 static int pd_next_buf(void)
 {
-	long saved_flags;
+	unsigned long saved_flags;
 
 	pd_count--;
 	pd_run--;
@@ -777,7 +777,7 @@ static int pd_next_buf(void)
 
 static inline void next_request(int success)
 {
-	long saved_flags;
+	unsigned long saved_flags;
 
 	spin_lock_irqsave(&pd_lock, saved_flags);
 	end_request(pd_req, success);

@@ -77,7 +77,7 @@ static int ps2esdi_out_cmd_blk(u_short * cmd_blk);
 
 static void ps2esdi_prep_dma(char *buffer, u_short length, u_char dma_xmode);
 
-static void ps2esdi_interrupt_handler(int irq, void *dev_id,
+static irqreturn_t ps2esdi_interrupt_handler(int irq, void *dev_id,
 				      struct pt_regs *regs);
 static void (*current_int_handler) (u_int) = NULL;
 static void ps2esdi_normal_interrupt_handler(u_int);
@@ -681,7 +681,7 @@ static void ps2esdi_prep_dma(char *buffer, u_short length, u_char dma_xmode)
 
 
 
-static void ps2esdi_interrupt_handler(int irq, void *dev_id,
+static irqreturn_t ps2esdi_interrupt_handler(int irq, void *dev_id,
 				      struct pt_regs *regs)
 {
 	u_int int_ret_code;
@@ -695,8 +695,9 @@ static void ps2esdi_interrupt_handler(int irq, void *dev_id,
 		} else
 			printk("%s: help ! No interrupt handler.\n", DEVICE_NAME);
 	} else {
-		return;
+		return IRQ_NONE;
 	}
+	return IRQ_HANDLED;
 }
 
 static void ps2esdi_initial_reset_int_handler(u_int int_ret_code)

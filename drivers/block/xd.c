@@ -446,17 +446,20 @@ static void xd_recalibrate (u_char drive)
 }
 
 /* xd_interrupt_handler: interrupt service routine */
-static void xd_interrupt_handler(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t xd_interrupt_handler(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	if (inb(XD_STATUS) & STAT_INTERRUPT) {							/* check if it was our device */
 #ifdef DEBUG_OTHER
 		printk("xd_interrupt_handler: interrupt detected\n");
 #endif /* DEBUG_OTHER */
 		outb(0,XD_CONTROL);								/* acknowledge interrupt */
-		wake_up(&xd_wait_int);								/* and wake up sleeping processes */
+		wake_up(&xd_wait_int);	/* and wake up sleeping processes */
+		return IRQ_HANDLED;
 	}
 	else
 		printk("xd: unexpected interrupt\n");
+	return IRQ_NONE;
 }
 
 /* xd_setup_dma: set up the DMA controller for a data transfer */
