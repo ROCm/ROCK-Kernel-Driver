@@ -1588,17 +1588,19 @@ CIFSSMBQueryReparseLinkInfo(const int xid, struct cifsTconInfo *tcon,
 
 #ifdef CONFIG_CIFS_POSIX
 
+/*Convert an Access Control Entry from wire format to local POSIX xattr format*/
 static void cifs_convert_ace(posix_acl_xattr_entry * ace, struct cifs_posix_ace * cifs_ace)
 {
 	/* u8 cifs fields do not need le conversion */
-	ace->e_perm = (u16)cifs_ace->cifs_e_perm; 
-	ace->e_tag  = (u16)cifs_ace->cifs_e_tag;
-	ace->e_id   = (u32)le32_to_cpu(cifs_ace->cifs_uid);
+	ace->e_perm = (__u16)cifs_ace->cifs_e_perm; 
+	ace->e_tag  = (__u16)cifs_ace->cifs_e_tag;
+	ace->e_id   = (__u32)le64_to_cpu(cifs_ace->cifs_uid);
 	/* cFYI(1,("perm %d tag %d id %d",ace->e_perm,ace->e_tag,ace->e_id)); */
 
 	return;
 }
 
+/* Convert ACL from CIFS POSIX wire format to local Linux POSIX ACL xattr */
 static int cifs_copy_posix_acl(char * trgt,char * src, const int buflen,const int acl_type,const int size_of_data_area)
 {
 	int size =  0;
@@ -1650,6 +1652,68 @@ static int cifs_copy_posix_acl(char * trgt,char * src, const int buflen,const in
 		}
 	}
 	return size;
+}
+
+__u16 convert_ace_to_cifs_ace(struct cifs_posix_ace * cifs_ace,
+			const posix_acl_xattr_entry * local_ace)
+{
+	__u16 rc = 0; /* 0 = ACL converted ok */
+
+	cifs_ace->cifs_e_perm = (__u8)cpu_to_le16(local_ace->e_perm);
+	cifs_ace->cifs_e_tag =  (__u8)cpu_to_le16(local_ace->e_tag);
+	/* BB is there a better way to handle the large uid? */
+	if(local_ace->e_id == -1) {
+	/* Probably no need to le convert -1 on any arch but can not hurt */
+		cifs_ace->cifs_uid = cpu_to_le64(-1);
+	} else 
+		cifs_ace->cifs_uid = (__u64)cpu_to_le32(local_ace->e_id);
+        /*cFYI(1,("perm %d tag %d id %d",ace->e_perm,ace->e_tag,ace->e_id));*/
+	return rc;
+}
+
+/* Convert ACL from local Linux POSIX xattr to CIFS POSIX ACL wire format */
+__u16 ACL_to_cifs_posix(char * parm_data,const char * pACL,const int buflen,
+		const int acl_type)
+{
+	__u16 rc = 0;
+        struct cifs_posix_acl * cifs_acl = (struct cifs_posix_acl *)parm_data;
+        posix_acl_xattr_header * local_acl = (posix_acl_xattr_header *)pACL;
+	int count;
+	int i;
+
+	if((buflen == 0) || (pACL == NULL) || (cifs_acl == NULL))
+		return 0;
+
+	count = posix_acl_xattr_count((size_t)buflen);
+	cFYI(1,("setting acl with %d entries from buf of length %d and version of %d",
+		count,buflen,local_acl->a_version));
+	if(local_acl->a_version != 2) {
+		cFYI(1,("unknown POSIX ACL version %d",local_acl->a_version));
+		return 0;
+	}
+	cifs_acl->version = cpu_to_le16(1);
+	if(acl_type == ACL_TYPE_ACCESS) 
+		cifs_acl->access_entry_count = count;
+	else if(acl_type == ACL_TYPE_DEFAULT)
+		cifs_acl->default_entry_count = count;
+	else {
+		cFYI(1,("unknown ACL type %d",acl_type));
+		return 0;
+	}
+	for(i=0;i<count;i++) {
+		rc = convert_ace_to_cifs_ace(&cifs_acl->ace_array[i],
+					&local_acl->a_entries[i]);
+		if(rc != 0) {
+			/* ACE not converted */
+			break;
+		}
+	}
+	if(rc == 0) {
+		rc = (__u16)(count * sizeof(struct cifs_posix_ace));
+		rc += sizeof(struct cifs_posix_acl);
+		/* BB add check to make sure ACL does not overflow SMB */
+	}
+	return rc;
 }
 
 int
@@ -1713,14 +1777,14 @@ queryAclRetry:
 	pSMB->Reserved4 = 0;
 	pSMB->hdr.smb_buf_length += byte_count;
 	pSMB->ByteCount = cpu_to_le16(byte_count);
-                                                                                                                               
+
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 		(struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
 		cFYI(1, ("Send error in Query POSIX ACL = %d", rc));
 	} else {
 		/* decode response */
-                                                                                                                               
+ 
 		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
 		if (rc || (pSMBr->ByteCount < 2))
 		/* BB also check enough total bytes returned */
@@ -1739,6 +1803,87 @@ queryAclRetry:
 		goto queryAclRetry;
 	return rc;
 }
+
+int
+CIFSSMBSetPosixACL(const int xid, struct cifsTconInfo *tcon,
+                        const unsigned char *fileName,
+                        const char *local_acl, const int buflen, const int acl_type,
+                        const struct nls_table *nls_codepage)
+{
+	struct smb_com_transaction2_spi_req *pSMB = NULL;
+	struct smb_com_transaction2_spi_rsp *pSMBr = NULL;
+	char *parm_data;
+	int name_len;
+	int rc = 0;
+	int bytes_returned = 0;
+	__u16 params, byte_count, data_count, param_offset, offset;
+
+	cFYI(1, ("In SetPosixACL (Unix) for path %s", fileName));
+setAclRetry:
+	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
+                      (void **) &pSMBr);
+	if (rc)
+		return rc;
+                                                                                                               	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
+		name_len =
+			cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, 530
+				/* BB fixme find define for this maxpathcomponent */
+				, nls_codepage);
+		name_len++;     /* trailing null */
+		name_len *= 2;
+	} else {                /* BB improve the check for buffer overruns BB */
+		name_len = strnlen(fileName, 530);
+		name_len++;     /* trailing null */
+		strncpy(pSMB->FileName, fileName, name_len);
+	}
+	params = 6 + name_len;
+	pSMB->MaxParameterCount = cpu_to_le16(2);
+	pSMB->MaxDataCount = cpu_to_le16(1000); /* BB find max SMB size from sess */
+	pSMB->MaxSetupCount = 0;
+	pSMB->Reserved = 0;
+	pSMB->Flags = 0;
+	pSMB->Timeout = 0;
+	pSMB->Reserved2 = 0;
+	param_offset = offsetof(struct smb_com_transaction2_spi_req,
+                                     InformationLevel) - 4;
+	offset = param_offset + params;
+	parm_data = ((char *) &pSMB->hdr.Protocol) + offset;
+	pSMB->ParameterOffset = cpu_to_le16(param_offset);
+
+	/* convert to on the wire format for POSIX ACL */
+	data_count = ACL_to_cifs_posix(parm_data,local_acl,buflen,acl_type);
+
+	if(data_count == 0) {
+		rc = -EOPNOTSUPP;
+		goto setACLerrorExit;
+	}
+	pSMB->DataOffset = cpu_to_le16(offset);
+	pSMB->SetupCount = 1;
+	pSMB->Reserved3 = 0;
+	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
+	pSMB->InformationLevel = cpu_to_le16(SMB_SET_POSIX_ACL);
+	byte_count = 3 /* pad */  + params + data_count;
+	pSMB->DataCount = cpu_to_le16(data_count);
+	pSMB->TotalDataCount = pSMB->DataCount;
+	pSMB->ParameterCount = cpu_to_le16(params);
+	pSMB->TotalParameterCount = pSMB->ParameterCount;
+	pSMB->Reserved4 = 0;
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
+	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
+                         (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+	if (rc) {
+		cFYI(1, ("Set POSIX ACL returned %d", rc));
+	}
+
+setACLerrorExit:
+	if (pSMB)
+		cifs_buf_release(pSMB);
+                                                                                                            	if (rc == -EAGAIN)
+		goto setAclRetry;
+                                                                                                           	return rc;
+}
+
 #endif
 
 int
@@ -1908,6 +2053,7 @@ UnixQPathInfoRetry:
 	return rc;
 }
 
+#ifdef CIFS_EXPERIMENTAL  /* function unused at present */
 int
 CIFSFindSingle(const int xid, struct cifsTconInfo *tcon,
 	       const char *searchName, FILE_ALL_INFO * findData,
@@ -1986,6 +2132,7 @@ findUniqueRetry:
 
 	return rc;
 }
+#endif /* CIFS_EXPERIMENTAL */
 
 int
 CIFSFindFirst(const int xid, struct cifsTconInfo *tcon,

@@ -141,12 +141,23 @@ int cifs_setxattr(struct dentry * direntry, const char * ea_name,
 		rc = CIFSSMBSetEA(xid,pTcon,full_path,ea_name,ea_value,
 			(__u16)value_size, cifs_sb->local_nls);
 	} else {
-		if(strncmp(ea_name,POSIX_ACL_XATTR_ACCESS,strlen(POSIX_ACL_XATTR_ACCESS) == 0)) {
+		int temp; 
+		temp = strncmp(ea_name,POSIX_ACL_XATTR_ACCESS,
+			strlen(POSIX_ACL_XATTR_ACCESS));
+		if (temp == 0) {
 			cFYI(1,("set POSIX ACL not supported yet"));
+			rc = CIFSSMBSetPosixACL(xid, pTcon,full_path,ea_value,
+				(const int)value_size, ACL_TYPE_ACCESS,
+				cifs_sb->local_nls);
+			cFYI(1,("set POSIX ACL rc %d",rc)); /* BB removeme BB */
 		} else if(strncmp(ea_name,POSIX_ACL_XATTR_DEFAULT,strlen(POSIX_ACL_XATTR_DEFAULT)) == 0) {
 			cFYI(1,("set default POSIX ACL not supported yet"));
+			rc = CIFSSMBSetPosixACL(xid, pTcon,full_path,ea_value,
+				(const int)value_size, ACL_TYPE_DEFAULT,
+				cifs_sb->local_nls);
+			cFYI(1,("set POSIX default ACL rc %d",rc)); /* BB removeme BB */
 		} else {
-			cFYI(1,("illegal xattr name request %s (only user namespace supported)",ea_name));
+			cFYI(1,("illegal xattr request %s (only user namespace supported)",ea_name));
 		  /* BB what if no namespace prefix? */
 		  /* Should we just pass them to server, except for 
 		  system and perhaps security prefixes? */

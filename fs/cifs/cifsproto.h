@@ -237,5 +237,8 @@ extern int CIFSSMBGetPosixACL(const int xid, struct cifsTconInfo *tcon,
 		const unsigned char *searchName,
 		char *acl_inf, const int buflen,const int acl_type,
 		const struct nls_table *nls_codepage);
-
+extern int CIFSSMBSetPosixACL(const int xid, struct cifsTconInfo *tcon,
+		const unsigned char *fileName,
+		const char *local_acl, const int buflen, const int acl_type,
+		const struct nls_table *nls_codepage);
 #endif			/* _CIFSPROTO_H */
