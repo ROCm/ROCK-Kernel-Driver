@@ -121,7 +121,10 @@ struct capability_entry {
 };
 
 static struct capability_entry capability_table[] __initdata = {
-	{ "6330", CDC_LOCK | CDC_DVD_RAM },
+	{ "6330", CDC_LOCK | CDC_DVD_RAM | CDC_RAM },
+	{ "6331", CDC_LOCK | CDC_DVD_RAM | CDC_RAM },
+	{ "6333", CDC_LOCK | CDC_DVD_RAM | CDC_RAM },
+	{ "632A", CDC_LOCK | CDC_DVD_RAM | CDC_RAM },
 	{ "6321", CDC_LOCK },
 	{ "632B", 0 },
 	{ NULL  , CDC_LOCK },
@@ -332,10 +335,19 @@ static int send_request(struct request *req)
 	struct disk_info *diskinfo = req->rq_disk->private_data;
 	u64 len;
 	dma_addr_t dmaaddr;
+	int direction;
+	u16 cmd;
 	struct scatterlist sg;
 
 	BUG_ON(req->nr_phys_segments > 1);
-	BUG_ON(rq_data_dir(req) != READ);
+
+	if (rq_data_dir(req) == READ) {
+		direction = DMA_FROM_DEVICE;
+		cmd = viomajorsubtype_cdio | viocdread;
+	} else {
+		direction = DMA_TO_DEVICE;
+		cmd = viomajorsubtype_cdio | viocdwrite;
+	}
 
         if (blk_rq_map_sg(req->q, req, &sg) == 0) {
 		printk(VIOCD_KERN_WARNING
@@ -343,7 +355,7 @@ static int send_request(struct request *req)
 		return -1;
 	}
 
-	if (dma_map_sg(diskinfo->dev, &sg, 1, DMA_FROM_DEVICE) == 0) {
+	if (dma_map_sg(diskinfo->dev, &sg, 1, direction) == 0) {
 		printk(VIOCD_KERN_WARNING "error allocating sg tce\n");
 		return -1;
 	}
@@ -351,8 +363,7 @@ static int send_request(struct request *req)
 	len = sg_dma_len(&sg);
 
 	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
-			HvLpEvent_Type_VirtualIo,
-			viomajorsubtype_cdio | viocdread,
+			HvLpEvent_Type_VirtualIo, cmd,
 			HvLpEvent_AckInd_DoAck,
 			HvLpEvent_AckType_ImmediateAck,
 			viopath_sourceinst(viopath_hostLp),
@@ -457,6 +468,41 @@ static int viocd_lock_door(struct cdrom_device_info *cdi, int locking)
 	return 0;
 }
 
+static int viocd_packet(struct cdrom_device_info *cdi,
+		struct packet_command *cgc)
+{
+	unsigned int buflen = cgc->buflen;
+	int ret = -EIO;
+
+	switch (cgc->cmd[0]) {
+	case GPCMD_READ_DISC_INFO:
+		{
+			disc_information *di = (disc_information *)cgc->buffer;
+
+			if (buflen >= 2) {
+				di->disc_information_length = cpu_to_be16(1);
+				ret = 0;
+			}
+			if (buflen >= 3)
+				di->erasable =
+					(cdi->ops->capability & ~cdi->mask
+					 & (CDC_DVD_RAM | CDC_RAM)) != 0;
+		}
+		break;
+	default:
+		if (cgc->sense) {
+			/* indicate Unknown code */
+			cgc->sense->sense_key = 0x05;
+			cgc->sense->asc = 0x20;
+			cgc->sense->ascq = 0x00;
+		}
+		break;
+	}
+
+	cgc->stat = ret;
+	return ret;
+}
+
 /* This routine handles incoming CD LP events */
 static void vio_handle_cd_event(struct HvLpEvent *event)
 {
@@ -510,6 +556,7 @@ return_complete:
 	case viocdclose:
 		break;
 
+	case viocdwrite:
 	case viocdread:
 		/*
 		 * Since this is running in interrupt mode, we need to
@@ -518,7 +565,8 @@ return_complete:
 		di = &viocd_diskinfo[bevent->disk];
 		spin_lock_irqsave(&viocd_reqlock, flags);
 		dma_unmap_single(di->dev, bevent->token, bevent->len,
-				DMA_FROM_DEVICE);
+				((event->xSubtype & VIOMINOR_SUBTYPE_MASK) == viocdread)
+				?  DMA_FROM_DEVICE : DMA_TO_DEVICE);
 		req = (struct request *)bevent->event.xCorrelationToken;
 		rwreq--;
 
@@ -555,7 +603,8 @@ static struct cdrom_device_ops viocd_dops = {
 	.release = viocd_release,
 	.media_changed = viocd_media_changed,
 	.lock_door = viocd_lock_door,
-	.capability = CDC_CLOSE_TRAY | CDC_OPEN_TRAY | CDC_LOCK | CDC_SELECT_SPEED | CDC_SELECT_DISC | CDC_MULTI_SESSION | CDC_MCN | CDC_MEDIA_CHANGED | CDC_PLAY_AUDIO | CDC_RESET | CDC_IOCTLS | CDC_DRIVE_STATUS | CDC_GENERIC_PACKET | CDC_CD_R | CDC_CD_RW | CDC_DVD | CDC_DVD_R | CDC_DVD_RAM
+	.generic_packet = viocd_packet,
+	.capability = CDC_CLOSE_TRAY | CDC_OPEN_TRAY | CDC_LOCK | CDC_SELECT_SPEED | CDC_SELECT_DISC | CDC_MULTI_SESSION | CDC_MCN | CDC_MEDIA_CHANGED | CDC_PLAY_AUDIO | CDC_RESET | CDC_IOCTLS | CDC_DRIVE_STATUS | CDC_GENERIC_PACKET | CDC_CD_R | CDC_CD_RW | CDC_DVD | CDC_DVD_R | CDC_DVD_RAM | CDC_RAM
 };
 
 static int __init find_capability(const char *type)
