@@ -447,7 +447,7 @@ define generate-asm-offsets.h
 	 echo " *"; \
 	 echo " */"; \
 	 echo ""; \
-	 sed -ne "/^->/{s:^->\([^ ]*\) [\$$#]\([^ ]*\) \(.*\):#define \1 \2 /* \3 */:; s:->::; p;}"; \
+	 sed -ne "/^->/{s:^->\([^ ]*\) [\$$#]*\([^ ]*\) \(.*\):#define \1 \2 /* \3 */:; s:->::; p;}"; \
 	 echo ""; \
 	 echo "#endif" )
 endef
