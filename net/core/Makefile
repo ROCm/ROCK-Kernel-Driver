@@ -10,7 +10,8 @@ obj-y += sysctl_net_core.o
 endif
 endif
 
-obj-$(CONFIG_NET) += flow.o dev.o dev_mcast.o dst.o neighbour.o rtnetlink.o utils.o link_watch.o filter.o
+obj-$(CONFIG_NET) += flow.o dev.o net-sysfs.o dev_mcast.o dst.o neighbour.o \
+		     rtnetlink.o utils.o link_watch.o filter.o
 
 obj-$(CONFIG_NETFILTER) += netfilter.o
 obj-$(CONFIG_NET_DIVERT) += dv.o
