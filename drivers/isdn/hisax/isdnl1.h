@@ -76,10 +76,48 @@ xmit_data_req_b(struct BCState *bcs, struct sk_buff *skb)
 	if (bcs->tx_skb) {
 		skb_queue_tail(&bcs->squeue, skb);
 	} else {
-		bcs->tx_skb = skb;
 		set_bit(BC_FLG_BUSY, &bcs->Flag);
+		bcs->tx_skb = skb;
 		bcs->count = 0;
 		bcs->cs->BC_Send_Data(bcs);
 	}
 	spin_unlock_irqrestore(&cs->lock, flags);
+}
+
+static inline void
+xmit_pull_ind_b(struct BCState *bcs, struct sk_buff *skb)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cs->lock, flags);
+	if (bcs->tx_skb) {
+		WARN_ON(1);
+	} else {
+		set_bit(BC_FLG_BUSY, &bcs->Flag);
+		bcs->tx_skb = skb;
+		bcs->count = 0;
+		bcs->cs->BC_Send_Data(bcs);
+	}
+	spin_unlock_irqrestore(&cs->lock, flags);
+}
+
+/* If busy, the PH_PULL | CONFIRM scheduling is handled under
+ * the card lock by xmit_ready_b() above, so no race */
+static inline void
+xmit_pull_req_b(struct PStack *st, struct sk_buff *skb)
+{
+	struct BCState *bcs = st->l1.bcs;
+	struct IsdnCardState *cs = bcs->cs;
+	unsigned long flags;
+	int busy = 0;
+
+	spin_lock_irqsave(&cs->lock, flags);
+	if (bcs->tx_skb) {
+		set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+		busy = 1;
+	}
+	spin_unlock_irqrestore(&cs->lock, flags);
+	if (!busy)
+		L1L2(st, PH_PULL | CONFIRM, NULL);
 }

@@ -106,15 +106,11 @@ WaitForBusy(struct IsdnCardState *cs)
 static inline int
 WaitNoBusy(struct IsdnCardState *cs)
 {
-	long flags;
 	int to = 130;
 
 	while ((ReadReg(cs, HFCD_STATUS, HFCD_STATUS) & HFCD_BUSY) && to) {
-		save_flags(flags);
-		sti();
 		udelay(1);
 		to--;
-		restore_flags(flags);
 	}
 	if (!to) 
 		printk(KERN_WARNING "HiSax: WaitNoBusy timeout\n");
@@ -501,30 +497,16 @@ static void
 hfc_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
 			xmit_data_req(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | INDICATION):
-			if (st->l1.bcs->tx_skb) {
-				printk(KERN_WARNING "hfc_l2l1: this shouldn't happen\n");
-				break;
-			}
-			save_flags(flags);
-			cli();
-/*			test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-*/			st->l1.bcs->tx_skb = skb;
-			st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
-			restore_flags(flags);
+			xmit_pull_ind_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | REQUEST):
-			if (!st->l1.bcs->tx_skb) {
-				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				L1L2(st, PH_PULL | CONFIRM, NULL);
-			} else
-				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+			xmit_pull_req_b(st, skb);
 			break;
 		case (PH_ACTIVATE | REQUEST):
 			test_and_set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);

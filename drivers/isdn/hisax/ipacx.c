@@ -527,21 +527,10 @@ bch_l2l1(struct PStack *st, int pr, void *arg)
 			xmit_data_req_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | INDICATION):
-			if (st->l1.bcs->tx_skb) {
-				printk(KERN_WARNING "HiSax bch_l2l1(): this shouldn't happen\n");
-				break;
-			}
-			set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-			st->l1.bcs->tx_skb = skb;
-			st->l1.bcs->count = 0;
-			ipacx_fill_fifo(st->l1.bcs);
+			xmit_pull_ind_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | REQUEST):
-			if (!st->l1.bcs->tx_skb) {
-				clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				st->l2.l1l2(st, PH_PULL | CONFIRM, NULL);
-			} else
-				set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+			xmit_pull_req_b(st, skb);
 			break;
 		case (PH_ACTIVATE | REQUEST):
 			set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
