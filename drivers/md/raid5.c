@@ -371,7 +371,7 @@ static void raid5_end_read_request (struct bio * bi)
 		set_bit(R5_UPTODATE, &sh->dev[i].flags);
 #endif		
 	} else {
-		md_error(conf->mddev, bi->bi_bdev);
+		md_error(conf->mddev, conf->disks[i].bdev);
 		clear_bit(R5_UPTODATE, &sh->dev[i].flags);
 	}
 #if 0
@@ -407,7 +407,7 @@ static void raid5_end_write_request (struct bio *bi)
 
 	spin_lock_irqsave(&conf->device_lock, flags);
 	if (!uptodate)
-		md_error(conf->mddev, bi->bi_bdev);
+		md_error(conf->mddev, conf->disks[i].bdev);
 	
 	clear_bit(R5_LOCKED, &sh->dev[i].flags);
 	set_bit(STRIPE_HANDLE, &sh->state);

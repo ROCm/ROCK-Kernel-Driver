@@ -128,7 +128,8 @@ void multipath_end_request(struct bio *bio)
 {
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	struct multipath_bh * mp_bh = (struct multipath_bh *)(bio->bi_private);
-
+	multipath_conf_t *conf;
+	struct block_device *bdev;
 	if (uptodate) {
 		multipath_end_bh_io(mp_bh, uptodate);
 		return;
@@ -136,9 +137,11 @@ void multipath_end_request(struct bio *bio)
 	/*
 	 * oops, IO error:
 	 */
-	md_error (mp_bh->mddev, bio->bi_bdev);
+	conf = mddev_to_conf(mp_bh->mddev);
+	bdev = conf->multipaths[mp_bh->path].bdev;
+	md_error (mp_bh->mddev, bdev);
 	printk(KERN_ERR "multipath: %s: rescheduling sector %lu\n", 
-		 bdev_partition_name(bio->bi_bdev), bio->bi_sector);
+		 bdev_partition_name(bdev), bio->bi_sector);
 	multipath_reschedule_retry(mp_bh);
 	return;
 }
@@ -174,7 +177,8 @@ static int multipath_make_request (request_queue_t *q, struct bio * bio)
 	/*
 	 * read balancing logic:
 	 */
-	multipath = conf->multipaths + multipath_read_balance(conf);
+	mp_bh->path = multipath_read_balance(conf);
+	multipath = conf->multipaths + mp_bh->path;
 
 	mp_bh->bio = *bio;
 	mp_bh->bio.bi_bdev = multipath->bdev;

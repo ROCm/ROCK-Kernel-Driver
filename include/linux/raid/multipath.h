@@ -48,6 +48,7 @@ struct multipath_bh {
 	mddev_t			*mddev;
 	struct bio		*master_bio;
 	struct bio		bio;
+	int			path;
 	struct multipath_bh	*next_mp; /* next for retry */
 };
 #endif

@@ -251,13 +251,21 @@ static void end_request(struct bio *bio)
 {
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	r1bio_t * r1_bio = (r1bio_t *)(bio->bi_private);
-	int i;
-
+	int mirror;
+	conf_t *conf = mddev_to_conf(r1_bio->mddev);
+	
+	if (r1_bio->cmd == READ || r1_bio->cmd == READA)
+		mirror = r1_bio->read_disk;
+	else {
+		for (mirror = 0; mirror < MD_SB_DISKS; mirror++)
+			if (r1_bio->write_bios[mirror] == bio)
+				break;
+	}
 	/*
 	 * this branch is our 'one mirror IO has finished' event handler:
 	 */
 	if (!uptodate)
-		md_error(r1_bio->mddev, bio->bi_bdev);
+		md_error(r1_bio->mddev, conf->mirrors[mirror].bdev);
 	else
 		/*
 		 * Set R1BIO_Uptodate in our master bio, so that
@@ -270,10 +278,10 @@ static void end_request(struct bio *bio)
 		 */
 		set_bit(R1BIO_Uptodate, &r1_bio->state);
 
+	update_head_pos(mirror, r1_bio);
 	if ((r1_bio->cmd == READ) || (r1_bio->cmd == READA)) {
 		if (!r1_bio->read_bio)
 			BUG();
-		update_head_pos(r1_bio->read_disk, r1_bio);
 		/*
 		 * we have only one bio on the read side
 		 */
@@ -295,14 +303,6 @@ static void end_request(struct bio *bio)
 	/*
 	 * WRITE:
 	 *
-	 * First, find the disk this bio belongs to.
-	 */
-	for (i = 0; i < MD_SB_DISKS; i++)
-		if (r1_bio->write_bios[i] == bio) {
-			update_head_pos(i, r1_bio);
-			break;
-		}
-	/*
 	 * Let's see if all mirrored write operations have finished
 	 * already.
 	 */
@@ -911,6 +911,7 @@ static void end_sync_read(struct bio *bio)
 {
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	r1bio_t * r1_bio = (r1bio_t *)(bio->bi_private);
+	conf_t *conf = mddev_to_conf(r1_bio->mddev);
 
 	if (r1_bio->read_bio != bio)
 		BUG();
@@ -921,7 +922,8 @@ static void end_sync_read(struct bio *bio)
 	 * We don't do much here, just schedule handling by raid1d
 	 */
 	if (!uptodate)
-		md_error (r1_bio->mddev, bio->bi_bdev);
+		md_error(r1_bio->mddev,
+			 conf->mirrors[r1_bio->read_disk].bdev);
 	else
 		set_bit(R1BIO_Uptodate, &r1_bio->state);
 	reschedule_retry(r1_bio);
@@ -932,19 +934,20 @@ static void end_sync_write(struct bio *bio)
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	r1bio_t * r1_bio = (r1bio_t *)(bio->bi_private);
 	mddev_t *mddev = r1_bio->mddev;
+	conf_t *conf = mddev_to_conf(mddev);
 	int i;
-
-	if (!uptodate)
-		md_error(mddev, bio->bi_bdev);
+	int mirror=0;
 
 	for (i = 0; i < MD_SB_DISKS; i++)
 		if (r1_bio->write_bios[i] == bio) {
-			update_head_pos(i, r1_bio);
+			mirror = i;
 			break;
 		}
+	if (!uptodate)
+		md_error(mddev, conf->mirrors[mirror].bdev);
+	update_head_pos(mirror, r1_bio);
 
 	if (atomic_dec_and_test(&r1_bio->remaining)) {
-		conf_t *conf = mddev_to_conf(mddev);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, uptodate);
 		resume_device(conf);
 		put_buf(r1_bio);
