@@ -3815,7 +3815,7 @@ static int usb_audio_probe(struct usb_interface *intf,
 	}
 	s = usb_audio_parsecontrol(dev, buffer, buflen, intf->altsetting->desc.bInterfaceNumber);
 	if (s) {
-		dev_set_drvdata (&intf->dev, s);
+		usb_set_intfdata (intf, s);
 		return 0;
 	}
 	return -ENODEV;
@@ -3826,7 +3826,7 @@ static int usb_audio_probe(struct usb_interface *intf,
 
 static void usb_audio_disconnect(struct usb_interface *intf)
 {
-	struct usb_audio_state *s = dev_get_drvdata (&intf->dev);
+	struct usb_audio_state *s = usb_get_intfdata (intf);
 	struct list_head *list;
 	struct usb_audiodev *as;
 	struct usb_mixerdev *ms;
@@ -3846,7 +3846,7 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 	down(&open_sem);
 	list_del_init(&s->audiodev);
 	s->usbdev = NULL;
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 
 	/* deregister all audio and mixer devices, so no new processes can open this device */
 	for(list = s->audiolist.next; list != &s->audiolist; list = list->next) {
