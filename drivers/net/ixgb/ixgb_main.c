@@ -1892,9 +1892,8 @@ ixgb_clean_rx_irq(struct ixgb_adapter *adapter)
 		if (adapter->vlgrp
 		    && (rx_desc->status & IXGB_RX_DESC_STATUS_VP)) {
 			vlan_hwaccel_receive_skb(skb, adapter->vlgrp,
-						 le16_to_cpu(rx_desc->
-							     special &
-							     IXGB_RX_DESC_SPECIAL_VLAN_MASK));
+				le16_to_cpu(rx_desc->special) &
+					IXGB_RX_DESC_SPECIAL_VLAN_MASK);
 		} else {
 			netif_receive_skb(skb);
 		}
@@ -1902,9 +1901,8 @@ ixgb_clean_rx_irq(struct ixgb_adapter *adapter)
 		if (adapter->vlgrp
 		    && (rx_desc->status & IXGB_RX_DESC_STATUS_VP)) {
 			vlan_hwaccel_rx(skb, adapter->vlgrp,
-					le16_to_cpu(rx_desc->
-						    special &
-						    IXGB_RX_DESC_SPECIAL_VLAN_MASK));
+				le16_to_cpu(rx_desc->special) &
+					IXGB_RX_DESC_SPECIAL_VLAN_MASK);
 		} else {
 			netif_rx(skb);
 		}
