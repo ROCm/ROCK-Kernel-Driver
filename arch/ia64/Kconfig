@@ -33,6 +33,10 @@ config TIME_INTERPOLATION
 	bool
 	default y
 
+config EFI
+	bool
+	default y
+
 choice
 	prompt "IA-64 processor type"
 	default ITANIUM
@@ -394,11 +398,6 @@ config IA64_PALINFO
 	  To use this option, you have to ensure that the "/proc file system
 	  support" (CONFIG_PROC_FS) is enabled, too.
 
-
-config EFI
-	bool
-	depends on !IA64_HP_SIM
-	default y
 
 config EFI_VARS
 	tristate "/proc/efi/vars support"
