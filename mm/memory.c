@@ -43,6 +43,7 @@
 #include <linux/iobuf.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
+#include <linux/vcache.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>
@@ -463,7 +464,7 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned 
  * Do a quick page-table lookup for a single page.
  * mm->page_table_lock must be held.
  */
-static inline struct page *
+struct page *
 follow_page(struct mm_struct *mm, unsigned long address, int write) 
 {
 	pgd_t *pgd;
@@ -494,7 +495,7 @@ follow_page(struct mm_struct *mm, unsigned long address, int write)
 	}
 
 out:
-	return 0;
+	return NULL;
 }
 
 /* 
@@ -973,6 +974,7 @@ static inline void establish_pte(struct vm_area_struct * vma, unsigned long addr
 static inline void break_cow(struct vm_area_struct * vma, struct page * new_page, unsigned long address, 
 		pte_t *page_table)
 {
+	invalidate_vcache(address, vma->vm_mm, new_page);
 	flush_page_to_ram(new_page);
 	flush_cache_page(vma, address);
 	establish_pte(vma, address, page_table, pte_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot))));
