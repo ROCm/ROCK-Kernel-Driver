@@ -70,8 +70,7 @@ flush_tlb_other(struct mm_struct *mm)
 }
 
 /* We need to flush the userspace icache after setting breakpoints in
-   ptrace.  I don't think it's needed in do_swap_page, or do_no_page,
-   but I don't know how to get rid of it either.
+   ptrace.
 
    Instead of indiscriminately using imb, take advantage of the fact
    that icache entries are tagged with the ASN and load a new mm context.  */
@@ -79,7 +78,8 @@ flush_tlb_other(struct mm_struct *mm)
 
 #ifndef CONFIG_SMP
 static inline void
-flush_icache_page(struct vm_area_struct *vma, struct page *page)
+flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
+			unsigned long addr, int len)
 {
 	if (vma->vm_flags & VM_EXEC) {
 		struct mm_struct *mm = vma->vm_mm;
@@ -90,8 +90,12 @@ flush_icache_page(struct vm_area_struct *vma, struct page *page)
 	}
 }
 #else
-extern void flush_icache_page(struct vm_area_struct *vma, struct page *page);
+extern void flush_icache_user_range(struct vm_area_struct *vma,
+		struct page *page, unsigned long addr, int len);
 #endif
+
+/* this is used only in do_no_page and do_swap_page */
+#define flush_icache_page(vma, page)	flush_icache_user_range((vma), (page), 0, 0)
 
 /*
  * Flush just one page in the current TLB set.

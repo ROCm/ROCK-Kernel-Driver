@@ -348,6 +348,7 @@ BTFIXUPDEF_CALL(pte_t *, pte_offset, pmd_t *, unsigned long)
 extern unsigned int pg_iobits;
 
 #define flush_icache_page(vma, pg)      do { } while(0)
+#define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 
 /* Certain architectures need to do special things when pte's
  * within a page table are directly modified.  Thus, the following

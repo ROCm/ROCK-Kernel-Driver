@@ -106,6 +106,9 @@ extern inline void flush_cache_mm(struct mm_struct *mm) {
 #define flush_icache_range(start, end) \
         __flush_icache_range(start, end - start)
 
+#define flush_icache_user_range(vma, page, addr, len) \
+	flush_icache_page((vma), (page))
+
 #define flush_icache_page(vma, page) \
 	__flush_icache_range(page_address(page), PAGE_SIZE)
 

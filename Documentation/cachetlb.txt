@@ -341,6 +341,17 @@ Here is the new interface:
 	If the icache does not snoop stores then this routine will need
 	to flush it.
 
+  void flush_icache_user_range(struct vm_area_struct *vma,
+			struct page *page, unsigned long addr, int len)
+	This is called when the kernel stores into addresses that are
+	part of the address space of a user process (which may be some
+	other process than the current process).  The addr argument
+	gives the virtual address in that process's address space,
+	page is the page which is being modified, and len indicates
+	how many bytes have been modified.  The modified region must
+	not cross a page boundary.  Currently this is only called from
+	kernel/ptrace.c.
+
   void flush_icache_page(struct vm_area_struct *vma, struct page *page)
 	All the functionality of flush_icache_page can be implemented in
 	flush_dcache_page and update_mmu_cache. In 2.5 the hope is to

@@ -43,6 +43,8 @@ extern void (*_flush_page_to_ram)(struct page * page);
 #define flush_page_to_ram(page)		_flush_page_to_ram(page)
 
 #define flush_icache_range(start, end)	_flush_cache_l1()
+#define flush_icache_user_range(vma, page, addr, len)	\
+					flush_icache_page((vma), (page))
 
 #define flush_icache_page(vma, page)					\
 do {									\
@@ -66,6 +68,8 @@ extern void andes_flush_icache_page(unsigned long);
 #define flush_cache_page(vma,page)	do { } while(0)
 #define flush_page_to_ram(page)		do { } while(0)
 #define flush_icache_range(start, end)	_flush_cache_l1()
+#define flush_icache_user_range(vma, page, addr, len)	\
+					flush_icache_page((vma), (page))
 #define flush_icache_page(vma, page)					\
 do {									\
 	if ((vma)->vm_flags & VM_EXEC)					\
