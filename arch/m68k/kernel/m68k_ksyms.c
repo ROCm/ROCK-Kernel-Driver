@@ -49,6 +49,7 @@ EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(kernel_set_cachemode);
 #endif /* !CONFIG_SUN3 */
 EXPORT_SYMBOL(m68k_debug_device);
+EXPORT_SYMBOL(mach_hwclk);
 EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(strnlen);
