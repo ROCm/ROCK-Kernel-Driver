@@ -38,7 +38,6 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/timer.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -1477,10 +1476,6 @@ static dev_link_t *nsp_cs_attach(void)
 	link = &info->link;
 	link->priv = info;
 
-	/* Initialize the dev_link_t structure */
-	link->release.function	 = &nsp_cs_release;
-	link->release.data	 = (u_long)link;
-
 	/* The io structure describes IO port mapping */
 	link->io.NumPorts1	 = 0x10;
 	link->io.Attributes1	 = IO_DATA_PATH_WIDTH_AUTO;
@@ -1558,9 +1553,8 @@ static void nsp_cs_detach(dev_link_t *link)
 		return;
 	}
 
-	del_timer(&link->release);
 	if (link->state & DEV_CONFIG) {
-		nsp_cs_release((u_long)link);
+		nsp_cs_release(link);
 		if (link->state & DEV_STALE_CONFIG) {
 			link->state |= DEV_STALE_LINK;
 			return;
@@ -1780,7 +1774,7 @@ static void nsp_cs_config(dev_link_t *link)
 
 cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
-	nsp_cs_release((u_long)link);
+	nsp_cs_release(link);
 	return;
 
 } /* nsp_cs_config */
@@ -1792,9 +1786,8 @@ cs_failed:
     device, and release the PCMCIA configuration.  If the device is
     still open, this will be postponed until it is closed.
 ======================================================================*/
-static void nsp_cs_release(u_long arg)
+static void nsp_cs_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *)arg;
 	scsi_info_t *info = link->priv;
 
 	DEBUG(0, "%s(0x%p)\n", __FUNCTION__, link);
@@ -1866,7 +1859,7 @@ static int nsp_cs_event(event_t		       event,
 		link->state &= ~DEV_PRESENT;
 		if (link->state & DEV_CONFIG) {
 			((scsi_info_t *)link->priv)->stop = 1;
-			mod_timer(&link->release, jiffies + HZ/20);
+			nsp_cs_release(link);
 		}
 		break;
 
@@ -1933,7 +1926,7 @@ static void __exit nsp_cs_exit(void)
 	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG) {
-			nsp_cs_release((u_long)dev_list);
+			nsp_cs_release(dev_list);
 		}
 		nsp_cs_detach(dev_list);
 	}

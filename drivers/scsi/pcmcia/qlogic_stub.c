@@ -37,7 +37,6 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/timer.h>
 #include <linux/ioport.h>
 #include <asm/io.h>
 #include <scsi/scsi.h>
@@ -90,7 +89,7 @@ typedef struct scsi_info_t {
 	unsigned short manf_id;
 } scsi_info_t;
 
-static void qlogic_release(u_long arg);
+static void qlogic_release(dev_link_t *link);
 static int qlogic_event(event_t event, int priority, event_callback_args_t * args);
 
 static dev_link_t *qlogic_attach(void);
@@ -117,10 +116,6 @@ static dev_link_t *qlogic_attach(void)
 	memset(info, 0, sizeof(*info));
 	link = &info->link;
 	link->priv = info;
-	init_timer(&link->release);
-	link->release.function = &qlogic_release;
-	link->release.data = (u_long) link;
-
 	link->io.NumPorts1 = 16;
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
 	link->io.IOAddrLines = 10;
@@ -170,9 +165,8 @@ static void qlogic_detach(dev_link_t * link)
 	if (*linkp == NULL)
 		return;
 
-	del_timer_sync(&link->release);
 	if (link->state & DEV_CONFIG) {
-		qlogic_release((u_long) link);
+		qlogic_release(link);
 		if (link->state & DEV_STALE_CONFIG) {
 			link->state |= DEV_STALE_LINK;
 			return;
@@ -279,16 +273,15 @@ out:
 
 cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
-	qlogic_release((u_long) link);
+	qlogic_release(link);
 	return;
 
 }				/* qlogic_config */
 
 /*====================================================================*/
 
-static void qlogic_release(u_long arg)
+static void qlogic_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *) arg;
 	scsi_info_t *info = link->priv;
 
 	DEBUG(0, "qlogic_release(0x%p)\n", link);
@@ -319,7 +312,7 @@ static int qlogic_event(event_t event, int priority, event_callback_args_t * arg
 	case CS_EVENT_CARD_REMOVAL:
 		link->state &= ~DEV_PRESENT;
 		if (link->state & DEV_CONFIG)
-			mod_timer(&link->release, jiffies + HZ / 20);
+			qlogic_release(link);
 		break;
 	case CS_EVENT_CARD_INSERTION:
 		link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;

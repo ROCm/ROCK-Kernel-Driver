@@ -896,12 +896,13 @@ cciss_scsi_do_inquiry(ctlr_info_t *c, unsigned char *scsi3addr,
 	spin_lock_irqsave(CCISS_LOCK(c->ctlr), flags);
 	cp = scsi_cmd_alloc(c);
 	spin_unlock_irqrestore(CCISS_LOCK(c->ctlr), flags);
-	ei = cp->err_info; 
 
 	if (cp == NULL) {			/* trouble... */
 		printk("cmd_alloc returned NULL!\n");
 		return -1;
 	}
+
+	ei = cp->err_info; 
 
 	cdb[0] = CISS_INQUIRY;
 	cdb[1] = 0;

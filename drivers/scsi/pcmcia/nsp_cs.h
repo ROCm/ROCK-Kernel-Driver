@@ -272,7 +272,7 @@ typedef struct _nsp_hw_data {
 
 
 
-static void        nsp_cs_release(u_long arg);
+static void        nsp_cs_release(dev_link_t *link);
 static int         nsp_cs_event(event_t event, int priority, event_callback_args_t *args);
 static dev_link_t *nsp_cs_attach(void);
 static void        nsp_cs_detach(dev_link_t *);
