@@ -72,12 +72,9 @@ static int usb_parse_endpoint(struct usb_host_endpoint *endpoint, unsigned char 
 	return buffer - buffer0;
 }
 
-static void usb_release_intf(struct device *dev)
+static void usb_free_intf(struct usb_interface *intf)
 {
-	struct usb_interface *intf;
 	int j;
-
-	intf = to_usb_interface(dev);
 
 	if (intf->altsetting) {
 		for (j = 0; j < intf->num_altsetting; j++) {
@@ -235,8 +232,6 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer, int si
 			return -ENOMEM;
 		}
 		memset(interface, 0, sizeof(struct usb_interface));
-		interface->dev.release = usb_release_intf;
-		device_initialize(&interface->dev);
 	}
 
 	/* Go through the descriptors, checking their length and counting the
@@ -374,7 +369,7 @@ void usb_destroy_configuration(struct usb_device *dev)
 			struct usb_interface *ifp = cf->interface[i];
 
 			if (ifp)
-				put_device(&ifp->dev);
+				usb_free_intf(ifp);
 		}
 	}
 	kfree(dev->config);
