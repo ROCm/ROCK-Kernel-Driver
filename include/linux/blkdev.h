@@ -100,6 +100,9 @@ struct io_context *get_io_context(int gfp_flags);
 void copy_io_context(struct io_context **pdst, struct io_context **psrc);
 void swap_io_context(struct io_context **ioc1, struct io_context **ioc2);
 
+struct request;
+typedef void (rq_end_io_fn)(struct request *);
+
 struct request_list {
 	int count[2];
 	int starved[2];
@@ -185,6 +188,12 @@ struct request {
 	 * For Power Management requests
 	 */
 	struct request_pm_state *pm;
+
+	/*
+	 * completion callback. end_io_data should be folded in with waiting
+	 */
+	rq_end_io_fn *end_io;
+	void *end_io_data;
 };
 
 /*
@@ -518,10 +527,10 @@ extern void blk_unregister_queue(struct gendisk *disk);
 extern void register_disk(struct gendisk *dev);
 extern void generic_make_request(struct bio *bio);
 extern void blk_put_request(struct request *);
+extern void blk_end_sync_rq(struct request *rq);
 extern void blk_attempt_remerge(request_queue_t *, struct request *);
 extern void __blk_attempt_remerge(request_queue_t *, struct request *);
 extern struct request *blk_get_request(request_queue_t *, int, int);
-extern void blk_put_request(struct request *);
 extern void blk_insert_request(request_queue_t *, struct request *, int, void *, int);
 extern void blk_requeue_request(request_queue_t *, struct request *);
 extern void blk_plug_device(request_queue_t *);

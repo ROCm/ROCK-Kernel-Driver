@@ -1751,6 +1751,9 @@ rq_starved:
 	rq->data_len = 0;
 	rq->data = NULL;
 	rq->sense = NULL;
+	rq->end_io = NULL;
+	rq->end_io_data = NULL;
+
 out:
 	put_io_context(ioc);
 	return rq;
@@ -2016,8 +2019,8 @@ int blk_execute_rq(request_queue_t *q, struct gendisk *bd_disk,
 	}
 
 	rq->flags |= REQ_NOMERGE;
-	if (!rq->waiting)
-		rq->waiting = &wait;
+	rq->waiting = &wait;
+	rq->end_io = blk_end_sync_rq;
 	elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
 	generic_unplug_device(q);
 	wait_for_completion(rq->waiting);
@@ -2169,7 +2172,7 @@ void disk_round_stats(struct gendisk *disk)
 /*
  * queue lock must be held
  */
-void __blk_put_request(request_queue_t *q, struct request *req)
+static void __blk_put_request(request_queue_t *q, struct request *req)
 {
 	struct request_list *rl = req->rl;
 
@@ -2214,6 +2217,25 @@ void blk_put_request(struct request *req)
 }
 
 EXPORT_SYMBOL(blk_put_request);
+
+/**
+ * blk_end_sync_rq - executes a completion event on a request
+ * @rq: request to complete
+ */
+void blk_end_sync_rq(struct request *rq)
+{
+	struct completion *waiting = rq->waiting;
+
+	rq->waiting = NULL;
+	__blk_put_request(rq->q, rq);
+
+	/*
+	 * complete last, if this is a stack request the process (and thus
+	 * the rq pointer) could be invalid right after this complete()
+	 */
+	complete(waiting);
+}
+EXPORT_SYMBOL(blk_end_sync_rq);
 
 /**
  * blk_congestion_wait - wait for a queue to become uncongested
@@ -2987,7 +3009,6 @@ EXPORT_SYMBOL(end_that_request_chunk);
 void end_that_request_last(struct request *req)
 {
 	struct gendisk *disk = req->rq_disk;
-	struct completion *waiting = req->waiting;
 
 	if (unlikely(laptop_mode) && blk_fs_request(req))
 		laptop_io_completion();
@@ -3007,10 +3028,10 @@ void end_that_request_last(struct request *req)
 		disk_round_stats(disk);
 		disk->in_flight--;
 	}
-	__blk_put_request(req->q, req);
-	/* Do this LAST! The structure may be freed immediately afterwards */
-	if (waiting)
-		complete(waiting);
+	if (req->end_io)
+		req->end_io(req);
+	else
+		__blk_put_request(req->q, req);
 }
 
 EXPORT_SYMBOL(end_that_request_last);

@@ -1644,6 +1644,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	if (must_wait) {
 		rq->ref_count++;
 		rq->waiting = &wait;
+		rq->end_io = blk_end_sync_rq;
 	}
 
 	spin_lock_irqsave(&ide_lock, flags);
