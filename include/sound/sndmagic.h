@@ -79,6 +79,7 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define trident_t_magic				0xa15a1201
 #define es1938_t_magic				0xa15a1301
 #define cs46xx_t_magic				0xa15a1401
+#define cs46xx_pcm_t_magic			0xa15a1402
 #define ensoniq_t_magic				0xa15a1501
 #define sonicvibes_t_magic			0xa15a1601
 #define mpu401_t_magic				0xa15a1701

@@ -149,7 +149,7 @@ static queue_t *queue_new(int owner, int locked)
 static void queue_delete(queue_t *q)
 {
 	/* stop and release the timer */
-	snd_seq_timer_stop(q->timer);
+	snd_seq_timer_stop(q->timer, 0);
 	snd_seq_timer_close(q);
 	/* wait until access free */
 	snd_use_lock_sync(&q->use_lock);
@@ -348,7 +348,7 @@ static void snd_seq_check_queue_in_tasklet(unsigned long private_data)
 /* enqueue a event to singe queue */
 int snd_seq_enqueue_event(snd_seq_event_cell_t *cell, int atomic, int hop)
 {
-	int dest;
+	int dest, err;
 	queue_t *q;
 
 	snd_assert(cell != NULL, return -EINVAL);
@@ -373,12 +373,18 @@ int snd_seq_enqueue_event(snd_seq_event_cell_t *cell, int atomic, int hop)
 	/* enqueue event in the real-time or midi queue */
 	switch (cell->event.flags & SNDRV_SEQ_TIME_STAMP_MASK) {
 	case SNDRV_SEQ_TIME_STAMP_TICK:
-		snd_seq_prioq_cell_in(q->tickq, cell);
+		err = snd_seq_prioq_cell_in(q->tickq, cell);
 		break;
 
 	case SNDRV_SEQ_TIME_STAMP_REAL:
-		snd_seq_prioq_cell_in(q->timeq, cell);
+	default:
+		err = snd_seq_prioq_cell_in(q->timeq, cell);
 		break;
+	}
+
+	if (err < 0) {
+		queuefree(q); /* unlock */
+		return err;
 	}
 
 	/* trigger dispatching */
@@ -601,7 +607,7 @@ void snd_seq_queue_client_termination(int client)
 		spin_unlock_irqrestore(&q->owner_lock, flags);
 		if (q->owner == client) {
 			if (q->timer->running)
-				snd_seq_timer_stop(q->timer);
+				snd_seq_timer_stop(q->timer, 0);
 			snd_seq_timer_reset(q->timer);
 		}
 		queuefree(q);
@@ -711,17 +717,17 @@ void snd_seq_queue_process_event(queue_t *q, snd_seq_event_t *ev, int from_timer
 	case SNDRV_SEQ_EVENT_START:
 		snd_seq_prioq_leave(q->tickq, ev->source.client, 1);
 		snd_seq_prioq_leave(q->timeq, ev->source.client, 1);
-		snd_seq_timer_start(q->timer);
-		queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
+		if (! snd_seq_timer_start(q->timer, atomic))
+			queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
 		break;
 
 	case SNDRV_SEQ_EVENT_CONTINUE:
-		snd_seq_timer_continue(q->timer);
-		queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
+		if (! snd_seq_timer_continue(q->timer, atomic))
+			queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
 		break;
 
 	case SNDRV_SEQ_EVENT_STOP:
-		snd_seq_timer_stop(q->timer);
+		snd_seq_timer_stop(q->timer, atomic);
 		queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
 		break;
 

@@ -89,7 +89,7 @@ void snd_seq_timer_delete(seq_timer_t **tmr)
 	t->running = 0;
 
 	/* reset time */
-	snd_seq_timer_stop(t);
+	snd_seq_timer_stop(t, 0);
 	snd_seq_timer_reset(t);
 
 	kfree(t);
@@ -313,14 +313,18 @@ int snd_seq_timer_close(queue_t *q)
 	return 0;
 }
 
-void snd_seq_timer_stop(seq_timer_t * tmr)
+int snd_seq_timer_stop(seq_timer_t * tmr, int in_callback)
 {
 	if (! tmr->timeri)
-		return;
+		return -EINVAL;
 	if (!tmr->running)
-		return;
+		return 0;
 	tmr->running = 0;
-	snd_timer_stop(tmr->timeri);
+	if (in_callback)
+		snd_timer_del(tmr->timeri);
+	else
+		snd_timer_stop(tmr->timeri);
+	return 0;
 }
 
 static int initialize_timer(seq_timer_t *tmr)
@@ -345,34 +349,36 @@ static int initialize_timer(seq_timer_t *tmr)
 	return 0;
 }
 
-void snd_seq_timer_start(seq_timer_t * tmr)
+int snd_seq_timer_start(seq_timer_t * tmr, int in_callback)
 {
 	if (! tmr->timeri)
-		return;
+		return -EINVAL;
 	if (tmr->running)
-		snd_seq_timer_stop(tmr);
+		snd_seq_timer_stop(tmr, in_callback);
 	snd_seq_timer_reset(tmr);
 	if (initialize_timer(tmr) < 0)
-		return;
+		return -EINVAL;
 	snd_timer_start(tmr->timeri, tmr->ticks);
 	tmr->running = 1;
 	do_gettimeofday(&tmr->last_update);
+	return 0;
 }
 
-void snd_seq_timer_continue(seq_timer_t * tmr)
+int snd_seq_timer_continue(seq_timer_t * tmr, int in_callback)
 {
 	if (! tmr->timeri)
-		return;
+		return -EINVAL;
 	if (tmr->running)
-		return;
+		return -EBUSY;
 	if (! tmr->initialized) {
 		snd_seq_timer_reset(tmr);
 		if (initialize_timer(tmr) < 0)
-			return;
+			return -EINVAL;
 	}
 	snd_timer_start(tmr->timeri, tmr->ticks);
 	tmr->running = 1;
 	do_gettimeofday(&tmr->last_update);
+	return 0;
 }
 
 /* return current 'real' time. use timeofday() to get better granularity. */

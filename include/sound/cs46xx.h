@@ -26,6 +26,7 @@
 #include "pcm.h"
 #include "rawmidi.h"
 #include "ac97_codec.h"
+#include "cs46xx_dsp_spos.h"
 
 #ifndef PCI_VENDOR_ID_CIRRUS
 #define PCI_VENDOR_ID_CIRRUS            0x1013
@@ -936,9 +937,10 @@
 #define SERACC_CHIP_TYPE_MASK                  0x00000001
 #define SERACC_CHIP_TYPE_1_03                  0x00000000
 #define SERACC_CHIP_TYPE_2_0                   0x00000001
-#define SERACC_TWO_CODECS                       0x00000002
-#define SERACC_MDM                              0x00000004
-#define SERACC_HSP                              0x00000008
+#define SERACC_TWO_CODECS                      0x00000002
+#define SERACC_MDM                             0x00000004
+#define SERACC_HSP                             0x00000008
+#define SERACC_ODT                             0x00000010 /* only CS4630 */
 #endif
 
 /*
@@ -1626,11 +1628,37 @@
 #define SAVE_REG_MAX             0x10
 #define POWER_DOWN_ALL         0x7f0f
 
+/* maxinum number of AC97 codecs connected, AC97 2.0 defined 4 */
+#define MAX_NR_AC97				4
+#define CS46XX_PRIMARY_CODEC_INDEX		0
+#define CS46XX_SECONDARY_CODEC_INDEX		1
+#define CS46XX_SECONDARY_CODEC_OFFSET		0x80
+
 /*
  *
  */
 
 typedef struct _snd_cs46xx cs46xx_t;
+
+typedef struct _snd_cs46xx_pcm_t {
+	unsigned char *hw_area;
+	dma_addr_t hw_addr;	/* PCI bus address, not accessible */
+	unsigned long hw_size;
+  
+	unsigned int ctl;
+	unsigned int shift;	/* Shift count to trasform frames in bytes */
+	unsigned int sw_bufsize;
+	unsigned int sw_data;	/* Offset to next dst (or src) in sw ring buffer */
+	unsigned int sw_io;
+	int sw_ready;		/* Bytes ready to be transferred to/from hw */
+	unsigned int hw_data;	/* Offset to next dst (or src) in hw ring buffer */
+	unsigned int hw_io;	/* Ring buffer hw pointer */
+	int hw_ready;		/* Bytes ready for play (or captured) in hw ring buffer */
+	size_t appl_ptr;	/* Last seen appl_ptr */
+	snd_pcm_substream_t *substream;
+
+	pcm_channel_descriptor_t * pcm_channel;
+} cs46xx_pcm_t;
 
 typedef struct {
 	char name[24];
@@ -1674,10 +1702,11 @@ struct _snd_cs46xx {
 		int hw_ready;		/* Bytes ready for play (or captured) in hw ring buffer */
 		size_t appl_ptr;	/* Last seen appl_ptr */
 		snd_pcm_substream_t *substream;
-	} play, capt;
+	} capt;
 
 
-	ac97_t *ac97;
+	int nr_ac97_codecs;
+	ac97_t *ac97[MAX_NR_AC97];
 
 	struct pci_dev *pci;
 	snd_card_t *card;
@@ -1703,6 +1732,13 @@ struct _snd_cs46xx {
 
 #ifdef CONFIG_PM
 	struct pm_dev *pm_dev;
+#endif
+
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
+	dsp_spos_instance_t * dsp_spos_instance;
+#else /* for compatibility */
+	cs46xx_pcm_t *playback_pcm;
+	unsigned int play_ctl;
 #endif
 };
 
