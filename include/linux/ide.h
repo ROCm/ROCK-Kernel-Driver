@@ -934,9 +934,9 @@ typedef struct hwgroup_s {
 		/* BOOL: protects all fields below */
 	volatile int busy;
 		/* BOOL: wake us up on timer expiry */
-	int sleeping	: 1;
+	unsigned int sleeping	: 1;
 		/* BOOL: polling active & poll_timeout field valid */
-	int polling	: 1;
+	unsigned int polling	: 1;
 		/* current drive */
 	ide_drive_t *drive;
 		/* ptr to current hwif in linked-list */
