@@ -1207,7 +1207,7 @@ static void isofs_read_inode(struct inode * inode)
 	struct iso_directory_record * tmpde = NULL;
 	unsigned int de_len;
 	unsigned long offset;
-	int volume_seq_no, i;
+	int i;
 	struct iso_inode_info *ei = ISOFS_I(inode);
 
 	bh = sb_bread(inode->i_sb, block);
@@ -1347,9 +1347,6 @@ static void isofs_read_inode(struct inode * inode)
 		test_and_set_uid(&inode->i_uid, sbi->s_uid);
 		test_and_set_gid(&inode->i_gid, sbi->s_gid);
 	}
-
-	/* get the volume sequence number */
-	volume_seq_no = isonum_723 (de->volume_sequence_number) ;
 
 	/* Install the inode operations vector */
 	if (S_ISREG(inode->i_mode)) {
