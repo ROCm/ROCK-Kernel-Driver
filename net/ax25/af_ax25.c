@@ -2003,8 +2003,6 @@ EXPORT_SYMBOL(asc2ax);
 EXPORT_SYMBOL(null_ax25_address);
 EXPORT_SYMBOL(ax25_display_timer);
 
-static char banner[] __initdata = KERN_INFO "NET4: G4KLX/GW4PTS AX.25 for Linux. Version 0.37 for Linux NET4.0\n";
-
 static int __init ax25_init(void)
 {
 	sock_register(&ax25_family_ops);
@@ -2016,7 +2014,6 @@ static int __init ax25_init(void)
 	proc_net_fops_create("ax25", S_IRUGO, &ax25_info_fops);
 	proc_net_fops_create("ax25_calls", S_IRUGO, &ax25_uid_fops);
 
-	printk(banner);
 	return 0;
 }
 module_init(ax25_init);

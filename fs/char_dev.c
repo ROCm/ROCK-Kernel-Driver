@@ -265,7 +265,7 @@ int chrdev_open(struct inode * inode, struct file * filp)
 		struct kobject *kobj;
 		int idx;
 		spin_unlock(&cdev_lock);
-		kobj = kobj_lookup(cdev_map, kdev_t_to_nr(inode->i_rdev), &idx);
+		kobj = kobj_lookup(cdev_map, inode->i_rdev, &idx);
 		if (!kobj)
 			return -ENODEV;
 		new = container_of(kobj, struct cdev, kobj);
@@ -327,27 +327,6 @@ void cdev_purge(struct cdev *cdev)
 struct file_operations def_chr_fops = {
 	.open = chrdev_open,
 };
-
-const char *cdevname(kdev_t dev)
-{
-	static char buffer[40];
-	const char *name = "unknown-char";
-	unsigned int major = major(dev);
-	unsigned int minor = minor(dev);
-	int i = major_to_index(major);
-	struct char_device_struct *cd;
-
-	read_lock(&chrdevs_lock);
-	for (cd = chrdevs[i]; cd; cd = cd->next)
-		if (cd->major == major)
-			break;
-	if (cd)
-		name = cd->name;
-	sprintf(buffer, "%s(%d,%d)", name, major, minor);
-	read_unlock(&chrdevs_lock);
-
-	return buffer;
-}
 
 static struct kobject *exact_match(dev_t dev, int *part, void *data)
 {

@@ -74,7 +74,6 @@
 
 #define VERSION(ver,rel,seq) (((ver)<<16) | ((rel)<<8) | (seq))
 #if LINUX_VERSION_CODE < VERSION(2,5,0)
-# define minor(x) MINOR(x)
 # define need_resched() (current->need_resched)
 #endif
 

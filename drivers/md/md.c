@@ -50,7 +50,6 @@
 
 #define MAJOR_NR MD_MAJOR
 #define MD_DRIVER
-#define DEVICE_NR(device) (minor(device))
 
 #define DEBUG 0
 #define dprintk(x...) ((void)(DEBUG && printk(x)))

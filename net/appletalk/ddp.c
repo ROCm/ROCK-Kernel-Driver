@@ -1888,8 +1888,6 @@ EXPORT_SYMBOL(aarp_send_ddp);
 EXPORT_SYMBOL(atrtr_get_dev);
 EXPORT_SYMBOL(atalk_find_dev_addr);
 
-static char atalk_banner[] __initdata =
-	KERN_INFO "NET4: AppleTalk 0.20 for Linux NET4.0\n";
 static char atalk_err_snap[] __initdata =
 	KERN_CRIT "Unable to register DDP with SNAP.\n";
 
@@ -1908,7 +1906,6 @@ static int __init atalk_init(void)
 	aarp_proto_init();
 	atalk_proc_init();
 	atalk_register_sysctl();
-	printk(atalk_banner);
 	return 0;
 }
 module_init(atalk_init);
@@ -1939,5 +1936,5 @@ module_exit(atalk_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Alan Cox <Alan.Cox@linux.org>");
-MODULE_DESCRIPTION("AppleTalk 0.20 for Linux NET4.0\n");
+MODULE_DESCRIPTION("AppleTalk 0.20\n");
 MODULE_ALIAS_NETPROTO(PF_APPLETALK);

@@ -11,6 +11,7 @@
 #include <linux/config.h>
 #include <linux/pm.h>
 #include <linux/device.h>
+#include <linux/sysdev.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 
@@ -36,18 +37,25 @@ int suspend(void)
 	if (ret != 0)
 		goto out;
 
-	device_suspend(3);
+	ret = device_suspend(3);
+	if (ret)
+		goto resume_legacy;
 
 	local_irq_disable();
 	leds_event(led_stop);
 
+	sysdev_suspend(3);
+
 	ret = pm_do_suspend();
+
+	sysdev_resume();
 
 	leds_event(led_start);
 	local_irq_enable();
 
 	device_resume();
 
+ resume_legacy:
 	pm_send_all(PM_RESUME, (void *)0);
 
  out:

@@ -1687,7 +1687,7 @@ static void	printinode(struct inode *ip)
 	kdb_printf(
 		" i_mode = 0x%x  i_nlink = %d  i_rdev = 0x%x i_state = 0x%lx\n",
 					ip->i_mode, ip->i_nlink,
-					kdev_t_to_nr(ip->i_rdev), ip->i_state);
+					ip->i_rdev, ip->i_state);
 
 	kdb_printf(" i_hash.nxt = 0x%p i_hash.prv = 0x%p\n",
 					ip->i_hash.next, ip->i_hash.prev);

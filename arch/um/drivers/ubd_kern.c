@@ -55,9 +55,6 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 		     unsigned int cmd, unsigned long arg);
 
 #define MAX_DEV (8)
-#define MAX_MINOR (MAX_DEV << UBD_SHIFT)
-
-#define DEVICE_NR(n) (minor(n) >> UBD_SHIFT)
 
 static struct block_device_operations ubd_blops = {
         .owner		= THIS_MODULE,

@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001-2003 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -40,6 +40,7 @@
  *    Sridhar Samudrala     <sri@us.ibm.com>
  *    Ardelle Fan           <ardelle.fan@intel.com>
  *    Ryan Layer            <rmlayer@us.ibm.com>
+ *    Kevin Gao             <kevin.gao@intel.com> 
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -145,6 +146,7 @@ int sctp_primitive_SHUTDOWN(struct sctp_association *, void *arg);
 int sctp_primitive_ABORT(struct sctp_association *, void *arg);
 int sctp_primitive_SEND(struct sctp_association *, void *arg);
 int sctp_primitive_REQUESTHEARTBEAT(struct sctp_association *, void *arg);
+int sctp_primitive_ASCONF(struct sctp_association *, void *arg);
 
 /*
  * sctp/crc32c.c
@@ -404,6 +406,12 @@ static inline struct list_head *sctp_list_dequeue(struct list_head *list)
 	return result;
 }
 
+/* Tests if the list has one and only one entry. */
+static inline int sctp_list_single_entry(struct list_head *head)
+{
+	return ((head->next != head) && (head->next == head->prev));
+}
+
 /* Calculate the size (in bytes) occupied by the data of an iovec.  */
 static inline size_t get_user_iov_size(struct iovec *iov, int iovlen)
 {
@@ -519,6 +527,19 @@ static inline int ipver2af(__u8 ipver)
 	case 4:
 	        return  AF_INET;
 	case 6:
+		return AF_INET6;
+	default:
+		return 0;
+	};
+}
+
+/* Convert from an address parameter type to an address family.  */
+static inline int param_type2af(__u16 type)
+{
+	switch (type) {
+	case SCTP_PARAM_IPV4_ADDRESS:
+	        return  AF_INET;
+	case SCTP_PARAM_IPV6_ADDRESS:
 		return AF_INET6;
 	default:
 		return 0;

@@ -594,6 +594,9 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, mk
 	uint32_t writtenlen;
 	int ret;
 
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
+
 	ri = jffs2_alloc_raw_inode();
 	if (!ri)
 		return -ENOMEM;
@@ -601,7 +604,7 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, mk
 	c = JFFS2_SB_INFO(dir_i->i_sb);
 	
 	if (S_ISBLK(mode) || S_ISCHR(mode)) {
-		dev = cpu_to_je16((MAJOR(rdev) << 8) | MINOR(rdev));
+		dev = cpu_to_je16(old_encode_dev(rdev));
 		devlen = sizeof(dev);
 	}
 	

@@ -373,7 +373,7 @@ struct inode {
 	unsigned int		i_nlink;
 	uid_t			i_uid;
 	gid_t			i_gid;
-	kdev_t			i_rdev;
+	dev_t			i_rdev;
 	loff_t			i_size;
 	struct timespec		i_atime;
 	struct timespec		i_mtime;
@@ -469,12 +469,12 @@ static inline void i_size_write(struct inode *inode, loff_t i_size)
 
 static inline unsigned iminor(struct inode *inode)
 {
-	return minor(inode->i_rdev);
+	return MINOR(inode->i_rdev);
 }
 
 static inline unsigned imajor(struct inode *inode)
 {
-	return major(inode->i_rdev);
+	return MAJOR(inode->i_rdev);
 }
 
 struct fown_struct {
@@ -1156,7 +1156,6 @@ extern struct block_device *lookup_bdev(const char *);
 extern struct block_device *open_bdev_excl(const char *, int, int, void *);
 extern void close_bdev_excl(struct block_device *, int);
 
-extern const char * cdevname(kdev_t);
 extern void init_special_inode(struct inode *, umode_t, dev_t);
 
 /* Invalid inode operations -- fs/bad_inode.c */
@@ -1390,6 +1389,9 @@ struct tree_descr { char *name; struct file_operations *ops; int mode; };
 extern int simple_fill_super(struct super_block *, int, struct tree_descr *);
 extern int simple_pin_fs(char *name, struct vfsmount **mount, int *count);
 extern void simple_release_fs(struct vfsmount **mount, int *count);
+extern int old_valid_dev(dev_t);
+extern u16 old_encode_dev(dev_t);
+extern dev_t old_decode_dev(u16);
 
 extern int inode_change_ok(struct inode *, struct iattr *);
 extern int inode_setattr(struct inode *, struct iattr *);

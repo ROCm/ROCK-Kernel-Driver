@@ -1460,17 +1460,6 @@ static int rp_ioctl(struct tty_struct *tty, struct file *file,
 	return 0;
 }
 
-#if (defined(ROCKET_DEBUG_FLOW) || defined(ROCKET_DEBUG_THROTTLE))
-static char *rp_tty_name(struct tty_struct *tty, char *buf)
-{
-	if (tty)
-		sprintf(buf, "%s%d", TTY_DRIVER_NAME(tty), MINOR(tty->device) - TTY_DRIVER_MINOR_START(tty) + TTY_DRIVER_NAME_BASE);
-	else
-		strcpy(buf, "NULL tty");
-	return buf;
-}
-#endif
-
 static void rp_send_xchar(struct tty_struct *tty, char ch)
 {
 	struct r_port *info = (struct r_port *) tty->driver_data;
@@ -1490,10 +1479,9 @@ static void rp_throttle(struct tty_struct *tty)
 {
 	struct r_port *info = (struct r_port *) tty->driver_data;
 	CHANNEL_t *cp;
-#ifdef ROCKET_DEBUG_THROTTLE
-	char buf[64];
 
-	printk(KERN_INFO "throttle %s: %d....\n", rp_tty_name(tty, buf),
+#ifdef ROCKET_DEBUG_THROTTLE
+	printk(KERN_INFO "throttle %s: %d....\n", tty->name,
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
@@ -1512,9 +1500,7 @@ static void rp_unthrottle(struct tty_struct *tty)
 	struct r_port *info = (struct r_port *) tty->driver_data;
 	CHANNEL_t *cp;
 #ifdef ROCKET_DEBUG_THROTTLE
-	char buf[64];
-
-	printk(KERN_INFO "unthrottle %s: %d....\n", rp_tty_name(tty, buf),
+	printk(KERN_INFO "unthrottle %s: %d....\n", tty->name,
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
@@ -1539,10 +1525,9 @@ static void rp_unthrottle(struct tty_struct *tty)
 static void rp_stop(struct tty_struct *tty)
 {
 	struct r_port *info = (struct r_port *) tty->driver_data;
-#ifdef ROCKET_DEBUG_FLOW
-	char buf[64];
 
-	printk(KERN_INFO "stop %s: %d %d....\n", rp_tty_name(tty, buf),
+#ifdef ROCKET_DEBUG_FLOW
+	printk(KERN_INFO "stop %s: %d %d....\n", tty->name,
 	       info->xmit_cnt, info->xmit_fifo_room);
 #endif
 
@@ -1556,10 +1541,9 @@ static void rp_stop(struct tty_struct *tty)
 static void rp_start(struct tty_struct *tty)
 {
 	struct r_port *info = (struct r_port *) tty->driver_data;
-#ifdef ROCKET_DEBUG_FLOW
-	char buf[64];
 
-	printk(KERN_INFO "start %s: %d %d....\n", rp_tty_name(tty, buf),
+#ifdef ROCKET_DEBUG_FLOW
+	printk(KERN_INFO "start %s: %d %d....\n", tty->name,
 	       info->xmit_cnt, info->xmit_fifo_room);
 #endif
 

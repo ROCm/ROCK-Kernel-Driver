@@ -138,4 +138,7 @@ struct tty_ldisc {
 
 #define LDISC_FLAG_DEFINED	0x00000001
 
+#define MODULE_ALIAS_LDISC(ldisc) \
+	MODULE_ALIAS("tty-ldisc-" __stringify(ldisc))
+
 #endif /* _LINUX_TTY_LDISC_H */

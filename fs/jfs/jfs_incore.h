@@ -93,6 +93,7 @@ struct jfs_inode_info {
 			unchar _inline_ea[128];	/* 128: inline extended attr */
 		} link;
 	} u;
+	u32 dev;	/* will die when we get wide dev_t */
 	struct inode	vfs_inode;
 };
 #define i_xtroot u.file._xtroot
@@ -143,7 +144,7 @@ struct jfs_sb_info {
 	short		nbperpage;	/* blocks per page		*/
 	short		l2nbperpage;	/* log2 blocks per page	*/
 	short		l2niperblk;	/* log2 inodes per page	*/
-	u32		logdev;		/* external log device	*/
+	dev_t		logdev;		/* external log device	*/
 	uint		aggregate;	/* volume identifier in log record */
 	pxd_t		logpxd;		/* pxd describing log	*/
 	pxd_t		fsckpxd;	/* pxd describing fsck wkspc */

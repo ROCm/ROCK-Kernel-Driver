@@ -220,7 +220,6 @@ static void ncp_set_attr(struct inode *inode, struct ncp_entry_info *nwinfo)
 	inode->i_nlink = 1;
 	inode->i_uid = server->m.uid;
 	inode->i_gid = server->m.gid;
-	inode->i_rdev = NODEV;
 	inode->i_blksize = NCP_BLOCK_SIZE;
 
 	ncp_update_dates(inode, &nwinfo->i);
@@ -262,7 +261,8 @@ ncp_iget(struct super_block *sb, struct ncp_entry_info *info)
 			inode->i_fop = &ncp_dir_operations;
 #ifdef CONFIG_NCPFS_NFS_NS
 		} else if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode) || S_ISFIFO(inode->i_mode) || S_ISSOCK(inode->i_mode)) {
-			init_special_inode(inode, inode->i_mode, info->i.nfs.rdev);
+			init_special_inode(inode, inode->i_mode,
+				old_decode_dev(info->i.nfs.rdev));
 #endif
 #if defined(CONFIG_NCPFS_EXTRAS) || defined(CONFIG_NCPFS_NFS_NS)
 		} else if (S_ISLNK(inode->i_mode)) {

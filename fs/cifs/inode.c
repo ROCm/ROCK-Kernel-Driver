@@ -154,7 +154,7 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		} else {
 			cFYI(1, (" Init special inode "));
 			init_special_inode(inode, inode->i_mode,
-					   kdev_t_to_nr(inode->i_rdev));
+					   inode->i_rdev);
 		}
 	}
 	FreeXid(xid);
@@ -298,7 +298,7 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 			inode->i_op = &cifs_symlink_inode_ops;
 		} else {
 			init_special_inode(inode, inode->i_mode,
-					   kdev_t_to_nr(inode->i_rdev));
+					   inode->i_rdev);
 		}
 	}
 	if(buf)

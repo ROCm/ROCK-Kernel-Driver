@@ -430,7 +430,8 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 		"xor %%ah, %%ah\n"
 		"1:"
 		: "=a" (ret),
-		  "=b" (map)
+		  "=b" (map),
+		  "+m" (opt)
 		: "0" (PCIBIOS_GET_ROUTING_OPTIONS),
 		  "1" (0),
 		  "D" ((long) &opt),

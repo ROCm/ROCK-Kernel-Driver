@@ -68,7 +68,7 @@ static int blk_do_rq(request_queue_t *q, struct block_device *bdev,
 
 	rq->flags |= REQ_NOMERGE;
 	rq->waiting = &wait;
-	elv_add_request(q, rq, 1, 1);
+	elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
 	generic_unplug_device(q);
 	wait_for_completion(&wait);
 

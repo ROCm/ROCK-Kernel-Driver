@@ -1,7 +1,7 @@
 #ifndef _LINUX_ELEVATOR_H
 #define _LINUX_ELEVATOR_H
 
-typedef int (elevator_merge_fn) (request_queue_t *, struct list_head **,
+typedef int (elevator_merge_fn) (request_queue_t *, struct request **,
 				 struct bio *);
 
 typedef void (elevator_merge_req_fn) (request_queue_t *, struct request *, struct request *);
@@ -10,7 +10,7 @@ typedef void (elevator_merged_fn) (request_queue_t *, struct request *);
 
 typedef struct request *(elevator_next_req_fn) (request_queue_t *);
 
-typedef void (elevator_add_req_fn) (request_queue_t *, struct request *, struct list_head *);
+typedef void (elevator_add_req_fn) (request_queue_t *, struct request *, int);
 typedef int (elevator_queue_empty_fn) (request_queue_t *);
 typedef void (elevator_remove_req_fn) (request_queue_t *, struct request *);
 typedef void (elevator_requeue_req_fn) (request_queue_t *, struct request *);
@@ -62,7 +62,7 @@ struct elevator_s
  */
 extern void elv_add_request(request_queue_t *, struct request *, int, int);
 extern void __elv_add_request(request_queue_t *, struct request *, int, int);
-extern int elv_merge(request_queue_t *, struct list_head **, struct bio *);
+extern int elv_merge(request_queue_t *, struct request **, struct bio *);
 extern void elv_merge_requests(request_queue_t *, struct request *,
 			       struct request *);
 extern void elv_merged_request(request_queue_t *, struct request *);
@@ -78,9 +78,6 @@ extern int elv_may_queue(request_queue_t *, int);
 extern void elv_completed_request(request_queue_t *, struct request *);
 extern int elv_set_request(request_queue_t *, struct request *, int);
 extern void elv_put_request(request_queue_t *, struct request *);
-
-#define __elv_add_request_pos(q, rq, pos)	\
-	(q)->elevator.elevator_add_req_fn((q), (rq), (pos))
 
 /*
  * noop I/O scheduler. always merges, always inserts new request at tail
@@ -110,5 +107,12 @@ extern inline int elv_try_last_merge(request_queue_t *, struct bio *);
 #define ELEVATOR_NO_MERGE	0
 #define ELEVATOR_FRONT_MERGE	1
 #define ELEVATOR_BACK_MERGE	2
+
+/*
+ * Insertion selection
+ */
+#define ELEVATOR_INSERT_FRONT	1
+#define ELEVATOR_INSERT_BACK	2
+#define ELEVATOR_INSERT_SORT	3
 
 #endif

@@ -1603,7 +1603,7 @@ static int ext3_load_journal(struct super_block * sb,
 {
 	journal_t *journal;
 	int journal_inum = le32_to_cpu(es->s_journal_inum);
-	dev_t journal_dev = le32_to_cpu(es->s_journal_dev);
+	dev_t journal_dev = old_decode_dev(le32_to_cpu(es->s_journal_dev));
 	int err = 0;
 	int really_read_only;
 

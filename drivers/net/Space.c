@@ -97,15 +97,9 @@ extern int macsonic_probe(struct net_device *dev);
 extern int mac8390_probe(struct net_device *dev);
 extern int mac89x0_probe(struct net_device *dev);
 extern int mc32_probe(struct net_device *dev);
-#ifdef CONFIG_SDLA
 extern struct net_device *sdla_init(void);
-#endif
-#ifdef CONFIG_COPS
 extern struct net_device *cops_probe(int unit);
-#endif
-#ifdef CONFIG_LTPC
 extern struct net_device *ltpc_probe(void);
-#endif
   
 /* Detachable devices ("pocket adaptors") */
 extern int de620_probe(struct net_device *);

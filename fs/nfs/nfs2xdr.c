@@ -106,6 +106,7 @@ xdr_decode_time(u32 *p, struct timespec *timep)
 static u32 *
 xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 {
+	u32 rdev;
 	fattr->type = (enum nfs_ftype) ntohl(*p++);
 	fattr->mode = ntohl(*p++);
 	fattr->nlink = ntohl(*p++);
@@ -113,7 +114,7 @@ xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 	fattr->gid = ntohl(*p++);
 	fattr->size = ntohl(*p++);
 	fattr->du.nfs2.blocksize = ntohl(*p++);
-	fattr->rdev = ntohl(*p++);
+	rdev = ntohl(*p++);
 	fattr->du.nfs2.blocks = ntohl(*p++);
 	fattr->fsid_u.nfs3 = ntohl(*p++);
 	fattr->fileid = ntohl(*p++);
@@ -121,7 +122,8 @@ xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 	p = xdr_decode_time(p, &fattr->mtime);
 	p = xdr_decode_time(p, &fattr->ctime);
 	fattr->valid |= NFS_ATTR_FATTR;
-	if (fattr->type == NFCHR && fattr->rdev == NFS2_FIFO_DEV) {
+	fattr->rdev = old_decode_dev(rdev);
+	if (fattr->type == NFCHR && rdev == NFS2_FIFO_DEV) {
 		fattr->type = NFFIFO;
 		fattr->mode = (fattr->mode & ~S_IFMT) | S_IFIFO;
 		fattr->rdev = 0;

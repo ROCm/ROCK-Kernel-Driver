@@ -29,7 +29,6 @@
 #define MAJOR_NR MD_MAJOR
 #define MD_DRIVER
 #define MD_PERSONALITY
-#define DEVICE_NR(device) (minor(device))
 
 #define MAX_WORK_PER_DISK 128
 

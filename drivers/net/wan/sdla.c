@@ -1633,11 +1633,25 @@ static void setup_sdla(struct net_device *dev)
 	dev->mtu		= SDLA_MAX_MTU;
 }
 
+static int frad_registered;
+
 struct net_device * __init sdla_init(void)
 {
 	struct net_device *dev;
 	struct frad_local *flp;
 	int err = -ENOMEM;
+
+	if (!frad_registered) {
+		err = register_frad(devname);
+		if (err) {
+			printk(KERN_ERR "%s: frad registration failed %d\n",
+			       devname, err);
+			return ERR_PTR(err);
+		}
+		frad_registered = 1;
+		printk("%s.\n", version);
+	}
+		
 
 	dev = alloc_netdev(sizeof(struct frad_local), "sdla0", setup_sdla);
 	if (!dev)
@@ -1677,39 +1691,35 @@ out:
 	return ERR_PTR(err);
 }
 
-int __init sdla_c_setup(void)
-{
-	printk("%s.\n", version);
-	register_frad(devname);
-	return 0;
-}
-
 #ifdef MODULE
 static struct net_device *sdla0;
-#endif /* MODULE */
 
 static int __init init_sdla(void)
 {
 	int result = 0;
 
-	sdla_c_setup();
-#ifdef MODULE
 	sdla0 = sdla_init();
 	if (IS_ERR(sdla0))
 		result = PTR_ERR(sdla0);
-#endif
+
 	return result;
 }
 
 static void __exit exit_sdla(void)
 {
-#ifdef MODULE
+	struct frad_local *flp;
+
 	unregister_netdev(sdla0);
 	if (sdla0->irq)
 		free_irq(sdla0->irq, sdla0);
+
+	flp = sdla0->priv;
+	del_timer_sync(&flp->timer);
 	free_netdev(sdla0);
-#endif
+	
+	unregister_frad(devname);
 }
+#endif
 
 MODULE_LICENSE("GPL");
 

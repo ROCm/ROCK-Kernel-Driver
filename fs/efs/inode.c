@@ -117,7 +117,7 @@ void efs_read_inode(struct inode *inode) {
 	 * to see whether odev contains 65535. if this is the case then we
 	 * should then do device = be32_to_cpu(efs_inode->di_u.di_dev.ndev).
 	 */
-    	device = be16_to_cpu(efs_inode->di_u.di_dev.odev);
+    	device = old_decode_dev(be16_to_cpu(efs_inode->di_u.di_dev.odev));
 
 	/* get the number of extents for this object */
 	in->numextents = be16_to_cpu(efs_inode->di_numextents);

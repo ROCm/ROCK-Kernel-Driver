@@ -186,7 +186,7 @@ static int impd1_probe(struct device *dev)
 		memset(d, 0, sizeof(struct amba_device));
 
 		snprintf(d->dev.bus_id, sizeof(d->dev.bus_id),
-			 "lm%x:%5.5x", pdev->id, idev->offset >> 12);
+			 "lm%x:%5.5lx", pdev->id, idev->offset >> 12);
 
 		d->dev.parent	= &pdev->dev;
 		d->res.start	= res->start + idev->offset;

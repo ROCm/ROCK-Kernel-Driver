@@ -580,7 +580,7 @@ acpi_cpufreq_cpu_init (
 		if (perf->states[i].transition_latency > policy->cpuinfo.transition_latency)
 			policy->cpuinfo.transition_latency = perf->states[i].transition_latency;
 	}
-	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
+	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cur = perf->states[pr->limit.state.px].core_frequency * 1000;
 
 	/* table init */
