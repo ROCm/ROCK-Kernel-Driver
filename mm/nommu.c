@@ -130,6 +130,11 @@ void *__vmalloc(unsigned long size, int gfp_mask, pgprot_t prot)
 	return kmalloc(size, gfp_mask & ~__GFP_HIGHMEM);
 }
 
+struct page * vmalloc_to_page(void *addr)
+{
+	return virt_to_page(addr);
+}
+
 long vread(char *buf, char *addr, unsigned long count)
 {
 	memcpy(buf, addr, count);
@@ -544,6 +549,17 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
 {
 	return NULL;
+}
+
+struct page * follow_page(struct mm_struct *mm, unsigned long addr, int write)
+{
+	return NULL;
+}
+
+int remap_page_range(struct vm_area_struct *vma, unsigned long from,
+		unsigned long to, unsigned long size, pgprot_t prot)
+{
+	return -EPERM;
 }
 
 unsigned long get_unmapped_area(struct file *file, unsigned long addr,

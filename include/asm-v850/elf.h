@@ -81,7 +81,7 @@ typedef struct user_fpu_struct elf_fpregset_t;
 
 #define ELF_PLATFORM  (NULL)
 
-#define ELF_PLAT_INIT(_r)						      \
+#define ELF_PLAT_INIT(_r, load_addr)					      \
   do {									      \
 	 _r->gpr[0] =  _r->gpr[1] =  _r->gpr[2] =  _r->gpr[3] =		      \
 	 _r->gpr[4] =  _r->gpr[5] =  _r->gpr[6] =  _r->gpr[7] =		      \

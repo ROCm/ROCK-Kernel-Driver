@@ -24,6 +24,7 @@
 #include <linux/cache.h>
 #include <linux/module.h>
 #include <linux/mount.h>
+#include <linux/file.h>
 #include <asm/uaccess.h>
 #include <linux/security.h>
 
@@ -1574,7 +1575,7 @@ void __init vfs_caches_init(unsigned long mempages)
 
 	filp_cachep = kmem_cache_create("filp", 
 			sizeof(struct file), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
+			SLAB_HWCACHE_ALIGN, filp_ctor, filp_dtor);
 	if(!filp_cachep)
 		panic("Cannot create filp SLAB cache");
 

@@ -83,16 +83,9 @@ struct pci_hba_data *parisc_pci_hba[PCI_HBA_MAX];
 u##size in##type (int addr) \
 { \
 	int b = PCI_PORT_HBA(addr); \
-	u##size d = (u##size) -1; \
 	EISA_IN(size); \
-	ASSERT(pci_port); /* make sure services are defined */ \
-	ASSERT(parisc_pci_hba[b]); /* make sure ioaddr are "fixed up" */ \
-	if (parisc_pci_hba[b] == NULL) { \
-		printk(KERN_WARNING "\nPCI or EISA Host Bus Adapter %d not registered. in" #size "(0x%x) returning -1\n", b, addr); \
-	} else { \
-		d = pci_port->in##type(parisc_pci_hba[b], PCI_PORT_ADDR(addr)); \
-	} \
-	return d; \
+	if (!parisc_pci_hba[b]) return (u##size) -1; \
+	return pci_port->in##type(parisc_pci_hba[b], PCI_PORT_ADDR(addr)); \
 }
 
 PCI_PORT_IN(b,  8)
@@ -105,7 +98,7 @@ void out##type (u##size d, int addr) \
 { \
 	int b = PCI_PORT_HBA(addr); \
 	EISA_OUT(size); \
-	ASSERT(pci_port); \
+	if (!parisc_pci_hba[b]) return; \
 	pci_port->out##type(parisc_pci_hba[b], PCI_PORT_ADDR(addr), d); \
 }
 
@@ -318,9 +311,6 @@ void __devinit pcibios_resource_to_bus(
 EXPORT_SYMBOL(pcibios_resource_to_bus);
 #endif
 
-#define MAX(val1, val2)   ((val1) > (val2) ? (val1) : (val2))
-
-
 /*
 ** pcibios align resources() is called everytime generic PCI code
 ** wants to generate a new address. The process of looking for
@@ -349,7 +339,7 @@ pcibios_align_resource(void *data, struct resource *res,
 	align = (res->flags & IORESOURCE_IO) ? PCIBIOS_MIN_IO : PCIBIOS_MIN_MEM;
 
 	/* Align to largest of MIN or input size */
-	mask = MAX(alignment, align) - 1;
+	mask = max(alignment, align) - 1;
 	res->start += mask;
 	res->start &= ~mask;
 

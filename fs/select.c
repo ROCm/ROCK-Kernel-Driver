@@ -235,7 +235,7 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 		}
 		__timeout = schedule_timeout(__timeout);
 	}
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 
 	poll_freewait(&table);
 
@@ -425,7 +425,7 @@ static int do_poll(unsigned int nfds,  struct poll_list *list,
 			break;
 		timeout = schedule_timeout(timeout);
 	}
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 	return count;
 }
 

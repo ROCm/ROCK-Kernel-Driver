@@ -310,7 +310,7 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 #endif
 
 #if CACHE_FLUSHING_IS_NOT_BROKEN
-	flush_icache_range((unsigned long) &frame->tramp[0],
+	flush_user_icache_range((unsigned long) &frame->tramp[0],
 			   (unsigned long) &frame->tramp[4]);
 #else
 	/* It should *always* be cache line-aligned, but the compiler
@@ -395,7 +395,7 @@ static long
 handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	      struct pt_regs *regs, int in_syscall)
 {
-	struct k_sigaction *ka = &current->sig->action[sig-1];
+	struct k_sigaction *ka = &current->sighand->action[sig-1];
 
 	DBG(("handle_signal(sig=%ld, ka=%p, info=%p, oldset=%p, regs=%p)\n",
 	       sig, ka, info, oldset, regs));
@@ -451,7 +451,7 @@ do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall)
 		oldset->sig[0], oldset->sig[1]));
 
 
-	signr = get_signal_to_deliver(&info, regs);
+	signr = get_signal_to_deliver(&info, regs, NULL);
 	if (signr > 0) {
 		/* Restart a system call if necessary. */
 		if (in_syscall) {
@@ -463,7 +463,7 @@ do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall)
 				break;
 
 			case -ERESTARTSYS:
-				ka = &current->sig->action[signr-1];
+				ka = &current->sighand->action[signr-1];
 				if (!(ka->sa.sa_flags & SA_RESTART)) {
 					DBG(("ERESTARTSYS: putting -EINTR\n"));
 					regs->gr[28] = -EINTR;

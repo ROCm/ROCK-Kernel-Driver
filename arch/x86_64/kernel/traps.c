@@ -325,11 +325,12 @@ void die(const char * str, struct pt_regs * regs, long err)
 {
 	int cpu;
 	struct die_args args = { regs, str, err };
+	static int die_counter;
 	console_verbose();
 	notifier_call_chain(&die_chain,  DIE_DIE, &args); 
 	bust_spinlocks(1);
 	handle_BUG(regs); 
-	printk("%s: %04lx\n", str, err & 0xffff);
+	printk("%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
 	cpu = safe_smp_processor_id(); 
 	/* racy, but better than risking deadlock. */ 
 	local_irq_disable();
