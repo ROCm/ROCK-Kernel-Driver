@@ -78,7 +78,7 @@ static void bad_page(const char *function, struct page *page)
 		function, current->comm, page);
 	printk(KERN_EMERG "flags:0x%08lx mapping:%p mapcount:%d count:%d\n",
 		(unsigned long)page->flags, page->mapping,
-		(int)page->mapcount, page_count(page));
+		page_mapcount(page), page_count(page));
 	printk(KERN_EMERG "Backtrace:\n");
 	dump_stack();
 	printk(KERN_EMERG "Trying to fix it up, but a reboot is needed\n");
@@ -87,12 +87,11 @@ static void bad_page(const char *function, struct page *page)
 			1 << PG_lru	|
 			1 << PG_active	|
 			1 << PG_dirty	|
-			1 << PG_maplock |
 			1 << PG_swapcache |
 			1 << PG_writeback);
 	set_page_count(page, 0);
+	reset_page_mapcount(page);
 	page->mapping = NULL;
-	page->mapcount = 0;
 }
 
 #ifndef CONFIG_HUGETLB_PAGE
@@ -228,7 +227,6 @@ static inline void free_pages_check(const char *function, struct page *page)
 			1 << PG_active	|
 			1 << PG_reclaim	|
 			1 << PG_slab	|
-			1 << PG_maplock |
 			1 << PG_swapcache |
 			1 << PG_writeback )))
 		bad_page(function, page);
@@ -350,7 +348,6 @@ static void prep_new_page(struct page *page, int order)
 			1 << PG_active	|
 			1 << PG_dirty	|
 			1 << PG_reclaim	|
-			1 << PG_maplock |
 			1 << PG_swapcache |
 			1 << PG_writeback )))
 		bad_page(__FUNCTION__, page);
@@ -512,6 +509,8 @@ static void fastcall free_hot_cold_page(struct page *page, int cold)
 
 	kernel_map_pages(page, 1, 0);
 	inc_page_state(pgfree);
+	if (PageAnon(page))
+		page->mapping = NULL;
 	free_pages_check(__FUNCTION__, page);
 	pcp = &zone->pageset[get_cpu()].pcp[cold];
 	local_irq_save(flags);
@@ -1389,6 +1388,7 @@ void __init memmap_init_zone(unsigned long size, int nid, unsigned long zone,
 	for (page = start; page < (start + size); page++) {
 		set_page_zone(page, NODEZONE(nid, zone));
 		set_page_count(page, 0);
+		reset_page_mapcount(page);
 		SetPageReserved(page);
 		INIT_LIST_HEAD(&page->lru);
 #ifdef WANT_PAGE_VIRTUAL

@@ -201,10 +201,9 @@ struct page {
 	page_flags_t flags;		/* Atomic flags, some possibly
 					 * updated asynchronously */
 	atomic_t _count;		/* Usage count, see below. */
-	unsigned int mapcount;		/* Count of ptes mapped in mms,
+	atomic_t _mapcount;		/* Count of ptes mapped in mms,
 					 * to show when page is mapped
-					 * & limit reverse map searches,
-					 * protected by PG_maplock.
+					 * & limit reverse map searches.
 					 */
 	unsigned long private;		/* Mapping-private opaque data:
 					 * usually used for buffer_heads
@@ -478,11 +477,26 @@ static inline pgoff_t page_index(struct page *page)
 }
 
 /*
+ * The atomic page->_mapcount, like _count, starts from -1:
+ * so that transitions both from it and to it can be tracked,
+ * using atomic_inc_and_test and atomic_add_negative(-1).
+ */
+static inline void reset_page_mapcount(struct page *page)
+{
+	atomic_set(&(page)->_mapcount, -1);
+}
+
+static inline int page_mapcount(struct page *page)
+{
+	return atomic_read(&(page)->_mapcount) + 1;
+}
+
+/*
  * Return true if this page is mapped into pagetables.
  */
 static inline int page_mapped(struct page *page)
 {
-	return page->mapcount != 0;
+	return atomic_read(&(page)->_mapcount) >= 0;
 }
 
 /*
