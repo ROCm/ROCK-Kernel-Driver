@@ -830,10 +830,9 @@ out_bad:
 
 static inline int
 gss_wrap_req_integ(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
-			kxdrproc_t encode, void *rqstp, u32 *p, void *obj)
+		kxdrproc_t encode, struct rpc_rqst *rqstp, u32 *p, void *obj)
 {
-	struct rpc_rqst	*req = (struct rpc_rqst *)rqstp;
-	struct xdr_buf	*snd_buf = &req->rq_snd_buf;
+	struct xdr_buf	*snd_buf = &rqstp->rq_snd_buf;
 	struct xdr_buf	integ_buf;
 	u32             *integ_len = NULL;
 	struct xdr_netobj mic;
@@ -844,7 +843,7 @@ gss_wrap_req_integ(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
 
 	integ_len = p++;
 	offset = (u8 *)p - (u8 *)snd_buf->head[0].iov_base;
-	*p++ = htonl(req->rq_seqno);
+	*p++ = htonl(rqstp->rq_seqno);
 
 	status = encode(rqstp, p, obj);
 	if (status)
@@ -919,10 +918,9 @@ out:
 
 static inline int
 gss_unwrap_resp_integ(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
-		kxdrproc_t decode, void *rqstp, u32 **p, void *obj)
+		struct rpc_rqst *rqstp, u32 **p)
 {
-	struct rpc_rqst *req = (struct rpc_rqst *)rqstp;
-	struct xdr_buf	*rcv_buf = &req->rq_rcv_buf;
+	struct xdr_buf	*rcv_buf = &rqstp->rq_rcv_buf;
 	struct xdr_buf integ_buf;
 	struct xdr_netobj mic;
 	u32 data_offset, mic_offset;
@@ -937,7 +935,7 @@ gss_unwrap_resp_integ(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
 	mic_offset = integ_len + data_offset;
 	if (mic_offset > rcv_buf->len)
 		return status;
-	if (ntohl(*(*p)++) != req->rq_seqno)
+	if (ntohl(*(*p)++) != rqstp->rq_seqno)
 		return status;
 
 	if (xdr_buf_subsegment(rcv_buf, &integ_buf, data_offset,
@@ -975,8 +973,7 @@ gss_unwrap_resp(struct rpc_task *task,
 		case RPC_GSS_SVC_NONE:
 			goto out_decode;
 		case RPC_GSS_SVC_INTEGRITY:
-			status = gss_unwrap_resp_integ(cred, ctx, decode,
-							rqstp, &p, obj);
+			status = gss_unwrap_resp_integ(cred, ctx, rqstp, &p);
 			if (status)
 				goto out;
 			break;
