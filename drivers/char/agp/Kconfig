@@ -52,7 +52,7 @@ config AGP_INTEL
 
 config AGP_VIA
 	tristate "VIA chipset support"
-	depends on AGP && X86 & !X86_64
+	depends on AGP && X86 && !X86_64
 	help
 	  This option gives you AGP support for the GLX component of the
 	  XFree86 4.x on VIA MPV3/Apollo Pro chipsets.
