@@ -1427,7 +1427,7 @@ static int revalidate_allvol(kdev_t dev)
 	 */
 	for (i = 0; i < NWD; i++) {
 		struct gendisk *disk = ida_gendisk[ctlr][i];
-		if (disk->flags & GENDH_FL_UP)
+		if (disk->flags & GENHD_FL_UP)
 			del_gendisk(disk);
 	}
 	memset(hba[ctlr]->drv,            0, sizeof(drv_info_t)*NWD);
