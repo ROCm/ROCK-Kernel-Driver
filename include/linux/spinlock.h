@@ -581,4 +581,7 @@ static inline int bit_spin_is_locked(int bitnum, unsigned long *addr)
 #endif
 }
 
+#define DEFINE_SPINLOCK(x) spinlock_t x = SPIN_LOCK_UNLOCKED
+#define DEFINE_RWLOCK(x) rwlock_t x = RW_LOCK_UNLOCKED
+
 #endif /* __LINUX_SPINLOCK_H */
