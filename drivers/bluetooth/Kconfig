@@ -75,6 +75,17 @@ config BT_HCIBCM203X
 	  Say Y here to compile support for HCI BCM203x devices into the
 	  kernel or say M to compile it as module (bcm203x).
 
+config BT_HCIBPA10X
+	tristate "HCI BPA10x USB driver"
+	depends on USB
+	help
+	  Bluetooth HCI BPA10x USB driver.
+	  This driver provides support for the Digianswer BPA 100/105 Bluetooth
+	  sniffer devices.
+
+	  Say Y here to compile support for HCI BPA10x devices into the
+	  kernel or say M to compile it as module (bpa10x).
+
 config BT_HCIBFUSB
 	tristate "HCI BlueFRITZ! USB driver"
 	depends on USB
