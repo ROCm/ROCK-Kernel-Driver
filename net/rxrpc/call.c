@@ -53,20 +53,25 @@ const char *rxrpc_call_error_states[] = {
 };
 
 const char *rxrpc_pkts[] = {
-	"?00", "data", "ack", "busy", "abort", "ackall", "chall", "resp", "debug",
+	"?00",
+	"data", "ack", "busy", "abort", "ackall", "chall", "resp", "debug",
 	"?09", "?10", "?11", "?12", "?13", "?14", "?15"
 };
 
 const char *rxrpc_acks[] = {
-	"---", "REQ", "DUP", "SEQ", "WIN", "MEM", "PNG", "PNR", "DLY", "IDL", "-?-"
+	"---", "REQ", "DUP", "SEQ", "WIN", "MEM", "PNG", "PNR", "DLY", "IDL",
+	"-?-"
 };
 
 static const char _acktype[] = "NA-";
 
 static void rxrpc_call_receive_packet(struct rxrpc_call *call);
-static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc_message *msg);
-static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call, struct rxrpc_message *msg);
-static void rxrpc_call_definitively_ACK(struct rxrpc_call *call, rxrpc_seq_t higest);
+static void rxrpc_call_receive_data_packet(struct rxrpc_call *call,
+					   struct rxrpc_message *msg);
+static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call,
+					  struct rxrpc_message *msg);
+static void rxrpc_call_definitively_ACK(struct rxrpc_call *call,
+					rxrpc_seq_t higest);
 static void rxrpc_call_resend(struct rxrpc_call *call, rxrpc_seq_t highest);
 static int __rxrpc_call_read_data(struct rxrpc_call *call);
 
@@ -75,7 +80,7 @@ static int rxrpc_call_record_ACK(struct rxrpc_call *call,
 				 rxrpc_seq_t seq,
 				 size_t count);
 #define _state(call) \
-	_debug("[[[ state %s ]]]",rxrpc_call_states[call->app_call_state]);
+	_debug("[[[ state %s ]]]", rxrpc_call_states[call->app_call_state]);
 
 static void rxrpc_call_default_attn_func(struct rxrpc_call *call)
 {
@@ -103,7 +108,7 @@ static void __rxrpc_call_acks_timeout(unsigned long _call)
 {
 	struct rxrpc_call *call = (struct rxrpc_call *) _call;
 
-	_debug("ACKS TIMEOUT %05lu",jiffies - call->cjif);
+	_debug("ACKS TIMEOUT %05lu", jiffies - call->cjif);
 
 	call->flags |= RXRPC_CALL_ACKS_TIMO;
 	rxrpc_krxiod_queue_call(call);
@@ -113,7 +118,7 @@ static void __rxrpc_call_rcv_timeout(unsigned long _call)
 {
 	struct rxrpc_call *call = (struct rxrpc_call *) _call;
 
-	_debug("RCV TIMEOUT %05lu",jiffies - call->cjif);
+	_debug("RCV TIMEOUT %05lu", jiffies - call->cjif);
 
 	call->flags |= RXRPC_CALL_RCV_TIMO;
 	rxrpc_krxiod_queue_call(call);
@@ -133,15 +138,18 @@ static void __rxrpc_call_ackr_timeout(unsigned long _call)
 /*
  * calculate a timeout based on an RTT value
  */
-static inline unsigned long __rxrpc_rtt_based_timeout(struct rxrpc_call *call, unsigned long val)
+static inline unsigned long __rxrpc_rtt_based_timeout(struct rxrpc_call *call,
+						      unsigned long val)
 {
-	unsigned long expiry = call->conn->peer->rtt / (1000000/HZ);
+	unsigned long expiry = call->conn->peer->rtt / (1000000 / HZ);
 
 	expiry += 10;
-	if (expiry<HZ/25) expiry = HZ/25;
-	if (expiry>HZ) expiry = HZ;
+	if (expiry < HZ / 25)
+		expiry = HZ / 25;
+	if (expiry > HZ)
+		expiry = HZ;
 
-	_leave(" = %lu jiffies",expiry);
+	_leave(" = %lu jiffies", expiry);
 	return jiffies + expiry;
 } /* end __rxrpc_rtt_based_timeout() */
 
@@ -154,7 +162,7 @@ static inline int __rxrpc_create_call(struct rxrpc_connection *conn,
 {
 	struct rxrpc_call *call;
 
-	_enter("%p",conn);
+	_enter("%p", conn);
 
 	/* allocate and initialise a call record */
 	call = (struct rxrpc_call *) get_zeroed_page(GFP_KERNEL);
@@ -163,7 +171,7 @@ static inline int __rxrpc_create_call(struct rxrpc_connection *conn,
 		return -ENOMEM;
 	}
 
-	atomic_set(&call->usage,1);
+	atomic_set(&call->usage, 1);
 
 	init_waitqueue_head(&call->waitq);
 	spin_lock_init(&call->lock);
@@ -200,7 +208,7 @@ static inline int __rxrpc_create_call(struct rxrpc_connection *conn,
 
 	call->cjif = jiffies;
 
-	_leave(" = 0 (%p)",call);
+	_leave(" = 0 (%p)", call);
 
 	*_call = call;
 
@@ -217,34 +225,37 @@ int rxrpc_create_call(struct rxrpc_connection *conn,
 		      rxrpc_call_aemap_func_t aemap,
 		      struct rxrpc_call **_call)
 {
-	DECLARE_WAITQUEUE(myself,current);
+	DECLARE_WAITQUEUE(myself, current);
 
 	struct rxrpc_call *call;
 	int ret, cix, loop;
 
-	_enter("%p",conn);
+	_enter("%p", conn);
 
 	/* allocate and initialise a call record */
-	ret = __rxrpc_create_call(conn,&call);
-	if (ret<0) {
-		_leave(" = %d",ret);
+	ret = __rxrpc_create_call(conn, &call);
+	if (ret < 0) {
+		_leave(" = %d", ret);
 		return ret;
 	}
 
 	call->app_call_state = RXRPC_CSTATE_CLNT_SND_ARGS;
-	if (attn) call->app_attn_func = attn;
-	if (error) call->app_error_func = error;
-	if (aemap) call->app_aemap_func = aemap;
+	if (attn)
+		call->app_attn_func = attn;
+	if (error)
+		call->app_error_func = error;
+	if (aemap)
+		call->app_aemap_func = aemap;
 
 	_state(call);
 
 	spin_lock(&conn->lock);
 	set_current_state(TASK_INTERRUPTIBLE);
-	add_wait_queue(&conn->chanwait,&myself);
+	add_wait_queue(&conn->chanwait, &myself);
 
  try_again:
 	/* try to find an unused channel */
-	for (cix=0; cix<4; cix++)
+	for (cix = 0; cix < 4; cix++)
 		if (!conn->channels[cix])
 			goto obtained_chan;
 
@@ -263,14 +274,15 @@ int rxrpc_create_call(struct rxrpc_connection *conn,
 
 	/* got a channel - now attach to the connection */
  obtained_chan:
-	remove_wait_queue(&conn->chanwait,&myself);
+	remove_wait_queue(&conn->chanwait, &myself);
 	set_current_state(TASK_RUNNING);
 
 	/* concoct a unique call number */
  next_callid:
 	call->call_id = htonl(++conn->call_counter);
-	for (loop=0; loop<4; loop++)
-		if (conn->channels[loop] && conn->channels[loop]->call_id==call->call_id)
+	for (loop = 0; loop < 4; loop++)
+		if (conn->channels[loop] &&
+		    conn->channels[loop]->call_id == call->call_id)
 			goto next_callid;
 
 	rxrpc_get_connection(conn);
@@ -281,24 +293,23 @@ int rxrpc_create_call(struct rxrpc_connection *conn,
 	spin_unlock(&conn->lock);
 
 	down_write(&rxrpc_calls_sem);
-	list_add_tail(&call->call_link,&rxrpc_calls);
+	list_add_tail(&call->call_link, &rxrpc_calls);
 	up_write(&rxrpc_calls_sem);
 
 	__RXACCT(atomic_inc(&rxrpc_call_count));
 	*_call = call;
 
-	_leave(" = 0 (call=%p cix=%u)",call,cix);
+	_leave(" = 0 (call=%p cix=%u)", call, cix);
 	return 0;
 
  error_unwait:
-	remove_wait_queue(&conn->chanwait,&myself);
+	remove_wait_queue(&conn->chanwait, &myself);
 	set_current_state(TASK_RUNNING);
 	spin_unlock(&conn->lock);
 
-	free_page((unsigned long)call);
-	_leave(" = %d",ret);
+	free_page((unsigned long) call);
+	_leave(" = %d", ret);
 	return ret;
-
 } /* end rxrpc_create_call() */
 
 /*****************************************************************************/
@@ -315,18 +326,18 @@ int rxrpc_incoming_call(struct rxrpc_connection *conn,
 
 	cix = ntohl(msg->hdr.cid) & RXRPC_CHANNELMASK;
 
-	_enter("%p,%u,%u",conn,ntohl(msg->hdr.callNumber),cix);
+	_enter("%p,%u,%u", conn, ntohl(msg->hdr.callNumber), cix);
 
 	/* allocate and initialise a call record */
-	ret = __rxrpc_create_call(conn,&call);
-	if (ret<0) {
-		_leave(" = %d",ret);
+	ret = __rxrpc_create_call(conn, &call);
+	if (ret < 0) {
+		_leave(" = %d", ret);
 		return ret;
 	}
 
 	call->pkt_rcv_count = 1;
 	call->app_call_state = RXRPC_CSTATE_SRVR_RCV_OPID;
-	call->app_mark = sizeof(u32);
+	call->app_mark = sizeof(uint32_t);
 
 	_state(call);
 
@@ -348,20 +359,20 @@ int rxrpc_incoming_call(struct rxrpc_connection *conn,
 
 	spin_unlock(&conn->lock);
 
-	if (ret<0) {
-		free_page((unsigned long)call);
+	if (ret < 0) {
+		free_page((unsigned long) call);
 		call = NULL;
 	}
 
-	if (ret==0) {
+	if (ret == 0) {
 		down_write(&rxrpc_calls_sem);
-		list_add_tail(&call->call_link,&rxrpc_calls);
+		list_add_tail(&call->call_link, &rxrpc_calls);
 		up_write(&rxrpc_calls_sem);
 		__RXACCT(atomic_inc(&rxrpc_call_count));
 		*_call = call;
 	}
 
-	_leave(" = %d [%p]",ret,call);
+	_leave(" = %d [%p]", ret, call);
 	return ret;
 } /* end rxrpc_incoming_call() */
 
@@ -377,10 +388,11 @@ void rxrpc_put_call(struct rxrpc_call *call)
 	_enter("%p{u=%d}",call,atomic_read(&call->usage));
 
 	/* sanity check */
-	if (atomic_read(&call->usage)<=0)
+	if (atomic_read(&call->usage) <= 0)
 		BUG();
 
-	/* to prevent a race, the decrement and the de-list must be effectively atomic */
+	/* to prevent a race, the decrement and the de-list must be effectively
+	 * atomic */
 	spin_lock(&conn->lock);
 	if (likely(!atomic_dec_and_test(&call->usage))) {
 		spin_unlock(&conn->lock);
@@ -388,7 +400,7 @@ void rxrpc_put_call(struct rxrpc_call *call)
 		return;
 	}
 
-	if (conn->channels[ntohl(call->chan_ix)]==call)
+	if (conn->channels[ntohl(call->chan_ix)] == call)
 		conn->channels[ntohl(call->chan_ix)] = NULL;
 
 	spin_unlock(&conn->lock);
@@ -412,25 +424,29 @@ void rxrpc_put_call(struct rxrpc_call *call)
 		rxrpc_put_message(call->snd_ping);
 
 	while (!list_empty(&call->acks_pendq)) {
-		msg = list_entry(call->acks_pendq.next,struct rxrpc_message,link);
+		msg = list_entry(call->acks_pendq.next,
+				 struct rxrpc_message, link);
 		list_del(&msg->link);
 		rxrpc_put_message(msg);
 	}
 
 	while (!list_empty(&call->rcv_receiveq)) {
-		msg = list_entry(call->rcv_receiveq.next,struct rxrpc_message,link);
+		msg = list_entry(call->rcv_receiveq.next,
+				 struct rxrpc_message, link);
 		list_del(&msg->link);
 		rxrpc_put_message(msg);
 	}
 
 	while (!list_empty(&call->app_readyq)) {
-		msg = list_entry(call->app_readyq.next,struct rxrpc_message,link);
+		msg = list_entry(call->app_readyq.next,
+				 struct rxrpc_message, link);
 		list_del(&msg->link);
 		rxrpc_put_message(msg);
 	}
 
 	while (!list_empty(&call->app_unreadyq)) {
-		msg = list_entry(call->app_unreadyq.next,struct rxrpc_message,link);
+		msg = list_entry(call->app_unreadyq.next,
+				 struct rxrpc_message, link);
 		list_del(&msg->link);
 		rxrpc_put_message(msg);
 	}
@@ -442,7 +458,7 @@ void rxrpc_put_call(struct rxrpc_call *call)
 	up_write(&rxrpc_calls_sem);
 
 	__RXACCT(atomic_dec(&rxrpc_call_count));
-	free_page((unsigned long)call);
+	free_page((unsigned long) call);
 
 	_leave(" [destroyed]");
 } /* end rxrpc_put_call() */
@@ -451,7 +467,8 @@ void rxrpc_put_call(struct rxrpc_call *call)
 /*
  * actually generate a normal ACK
  */
-static inline int __rxrpc_call_gen_normal_ACK(struct rxrpc_call *call, rxrpc_seq_t seq)
+static inline int __rxrpc_call_gen_normal_ACK(struct rxrpc_call *call,
+					      rxrpc_seq_t seq)
 {
 	struct rxrpc_message *msg;
 	struct iovec diov[3];
@@ -478,35 +495,36 @@ static inline int __rxrpc_call_gen_normal_ACK(struct rxrpc_call *call, rxrpc_seq
 
 	diov[0].iov_len  = sizeof(struct rxrpc_ackpacket);
 	diov[0].iov_base = &call->ackr;
-	diov[1].iov_len  = (call->ackr_pend_cnt+3);
+	diov[1].iov_len  = call->ackr_pend_cnt + 3;
 	diov[1].iov_base = call->ackr_array;
 	diov[2].iov_len  = sizeof(aux);
 	diov[2].iov_base = &aux;
 
 	/* build and send the message */
-	ret = rxrpc_conn_newmsg(call->conn,call,RXRPC_PACKET_TYPE_ACK,3,diov,GFP_KERNEL,&msg);
-	if (ret<0)
+	ret = rxrpc_conn_newmsg(call->conn,call, RXRPC_PACKET_TYPE_ACK,
+				3, diov, GFP_KERNEL, &msg);
+	if (ret < 0)
 		goto out;
 
 	msg->seq = seq;
 	msg->hdr.seq = htonl(seq);
 	msg->hdr.flags |= RXRPC_SLOW_START_OK;
 
-	ret = rxrpc_conn_sendmsg(call->conn,msg);
+	ret = rxrpc_conn_sendmsg(call->conn, msg);
 	rxrpc_put_message(msg);
-	if (ret<0)
+	if (ret < 0)
 		goto out;
 	call->pkt_snd_count++;
 
 	/* count how many actual ACKs there were at the front */
-	for (delta=0; delta<call->ackr_pend_cnt; delta++)
-		if (call->ackr_array[delta]!=RXRPC_ACK_TYPE_ACK)
+	for (delta = 0; delta < call->ackr_pend_cnt; delta++)
+		if (call->ackr_array[delta] != RXRPC_ACK_TYPE_ACK)
 			break;
 
 	call->ackr_pend_cnt -= delta; /* all ACK'd to this point */
 
 	/* crank the ACK window around */
-	if (delta==0) {
+	if (delta == 0) {
 		/* un-ACK'd window */
 	}
 	else if (delta < RXRPC_CALL_ACK_WINDOW_SIZE) {
@@ -528,22 +546,26 @@ static inline int __rxrpc_call_gen_normal_ACK(struct rxrpc_call *call, rxrpc_seq
 		/* fully ACK'd window
 		 * - just clear the whole thing
 		 */
-		memset(&call->ackr_array,RXRPC_ACK_TYPE_NACK,sizeof(call->ackr_array));
+		memset(&call->ackr_array,
+		       RXRPC_ACK_TYPE_NACK,
+		       sizeof(call->ackr_array));
 	}
 
 	/* clear this ACK */
-	memset(&call->ackr,0,sizeof(call->ackr));
+	memset(&call->ackr, 0, sizeof(call->ackr));
 
  out:
-	if (!call->app_call_state) printk("___ STATE 0 ___\n");
+	if (!call->app_call_state)
+		printk("___ STATE 0 ___\n");
 	return ret;
 } /* end __rxrpc_call_gen_normal_ACK() */
 
 /*****************************************************************************/
 /*
- * note the reception of a packet in the call's ACK records and generate an appropriate ACK packet
- * if necessary
- * - returns 0 if packet should be processed, 1 if packet should be ignored and -ve on an error
+ * note the reception of a packet in the call's ACK records and generate an
+ * appropriate ACK packet if necessary
+ * - returns 0 if packet should be processed, 1 if packet should be ignored
+ *   and -ve on an error
  */
 static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
 				   struct rxrpc_header *hdr,
@@ -555,19 +577,20 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
 	int ret = 0, err;
 	u8 special_ACK, do_ACK, force;
 
-	_enter("%p,%p { seq=%d tp=%d fl=%02x }",call,hdr,ntohl(hdr->seq),hdr->type,hdr->flags);
+	_enter("%p,%p { seq=%d tp=%d fl=%02x }",
+	       call, hdr, ntohl(hdr->seq), hdr->type, hdr->flags);
 
 	seq = ntohl(hdr->seq);
 	offset = seq - call->ackr_win_bot;
 	do_ACK = RXRPC_ACK_DELAY;
 	special_ACK = 0;
-	force = (seq==1);
+	force = (seq == 1);
 
 	if (call->ackr_high_seq < seq)
 		call->ackr_high_seq = seq;
 
 	/* deal with generation of obvious special ACKs first */
-	if (ack && ack->reason==RXRPC_ACK_PING) {
+	if (ack && ack->reason == RXRPC_ACK_PING) {
 		special_ACK = RXRPC_ACK_PING_RESPONSE;
 		ret = 1;
 		goto gen_ACK;
@@ -594,9 +617,9 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
 	/* okay... it's a normal data packet inside the ACK window */
 	call->ackr_array[offset] = RXRPC_ACK_TYPE_ACK;
 
-	if (offset<call->ackr_pend_cnt) {
+	if (offset < call->ackr_pend_cnt) {
 	}
-	else if (offset>call->ackr_pend_cnt) {
+	else if (offset > call->ackr_pend_cnt) {
 		do_ACK = RXRPC_ACK_OUT_OF_SEQUENCE;
 		call->ackr_pend_cnt = offset;
 		goto gen_ACK;
@@ -616,8 +639,8 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
 	}
 
 	/* re-ACK packets previously received out-of-order */
-	for (offset++; offset<RXRPC_CALL_ACK_WINDOW_SIZE; offset++)
-		if (call->ackr_array[offset]!=RXRPC_ACK_TYPE_ACK)
+	for (offset++; offset < RXRPC_CALL_ACK_WINDOW_SIZE; offset++)
+		if (call->ackr_array[offset] != RXRPC_ACK_TYPE_ACK)
 			break;
 
 	call->ackr_pend_cnt = offset;
@@ -629,55 +652,61 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
  gen_ACK:
 	_debug("%05lu ACKs pend=%u norm=%s special=%s%s",
 	       jiffies - call->cjif,
-	       call->ackr_pend_cnt,rxrpc_acks[do_ACK],rxrpc_acks[special_ACK],
+	       call->ackr_pend_cnt,
+	       rxrpc_acks[do_ACK],
+	       rxrpc_acks[special_ACK],
 	       force ? " immediate" :
-	       do_ACK==RXRPC_ACK_REQUESTED ? " merge-req" :
+	       do_ACK == RXRPC_ACK_REQUESTED ? " merge-req" :
 	       hdr->flags & RXRPC_LAST_PACKET ? " finalise" :
 	       " defer"
 	       );
 
 	/* send any pending normal ACKs if need be */
-	if (call->ackr_pend_cnt>0) {
+	if (call->ackr_pend_cnt > 0) {
 		/* fill out the appropriate form */
-		call->ackr.bufferSpace		= htons(RXRPC_CALL_ACK_WINDOW_SIZE);
-		call->ackr.maxSkew		= htons(min(call->ackr_high_seq - seq,65535U));
-		call->ackr.firstPacket		= htonl(call->ackr_win_bot);
-		call->ackr.previousPacket	= call->ackr_prev_seq;
-		call->ackr.serial		= hdr->serial;
-		call->ackr.nAcks		= call->ackr_pend_cnt;
+		call->ackr.bufferSpace	= htons(RXRPC_CALL_ACK_WINDOW_SIZE);
+		call->ackr.maxSkew	= htons(min(call->ackr_high_seq - seq,
+						    65535U));
+		call->ackr.firstPacket	= htonl(call->ackr_win_bot);
+		call->ackr.previousPacket = call->ackr_prev_seq;
+		call->ackr.serial	= hdr->serial;
+		call->ackr.nAcks	= call->ackr_pend_cnt;
 
-		if (do_ACK==RXRPC_ACK_REQUESTED)
+		if (do_ACK == RXRPC_ACK_REQUESTED)
 			call->ackr.reason = do_ACK;
 
 		/* generate the ACK immediately if necessary */
 		if (special_ACK || force) {
-			err = __rxrpc_call_gen_normal_ACK(call,do_ACK==RXRPC_ACK_DELAY ? 0 : seq);
-			if (err<0) {
+			err = __rxrpc_call_gen_normal_ACK(
+				call, do_ACK == RXRPC_ACK_DELAY ? 0 : seq);
+			if (err < 0) {
 				ret = err;
 				goto out;
 			}
 		}
 	}
 
-	if (call->ackr.reason==RXRPC_ACK_REQUESTED)
+	if (call->ackr.reason == RXRPC_ACK_REQUESTED)
 		call->ackr_dfr_seq = seq;
 
-	/* start the ACK timer if not running if there are any pending deferred ACKs */
-	if (call->ackr_pend_cnt>0 &&
-	    call->ackr.reason!=RXRPC_ACK_REQUESTED &&
+	/* start the ACK timer if not running if there are any pending deferred
+	 * ACKs */
+	if (call->ackr_pend_cnt > 0 &&
+	    call->ackr.reason != RXRPC_ACK_REQUESTED &&
 	    !timer_pending(&call->ackr_dfr_timo)
 	    ) {
 		unsigned long timo;
 
 		timo = rxrpc_call_dfr_ack_timeout + jiffies;
 
-		_debug("START ACKR TIMER for cj=%lu",timo-call->cjif);
+		_debug("START ACKR TIMER for cj=%lu", timo-call->cjif);
 
 		spin_lock(&call->lock);
-		mod_timer(&call->ackr_dfr_timo,timo);
+		mod_timer(&call->ackr_dfr_timo, timo);
 		spin_unlock(&call->lock);
 	}
-	else if ((call->ackr_pend_cnt==0 || call->ackr.reason==RXRPC_ACK_REQUESTED) &&
+	else if ((call->ackr_pend_cnt == 0 ||
+		  call->ackr.reason == RXRPC_ACK_REQUESTED) &&
 		 timer_pending(&call->ackr_dfr_timo)
 		 ) {
 		/* stop timer if no pending ACKs */
@@ -689,21 +718,25 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
 	if (special_ACK) {
 		struct rxrpc_ackpacket ack;
 		struct iovec diov[2];
-		u8 acks[1] = { RXRPC_ACK_TYPE_ACK };
+		uint8_t acks[1] = { RXRPC_ACK_TYPE_ACK };
 
 		/* fill out the appropriate form */
-		ack.bufferSpace		= htons(RXRPC_CALL_ACK_WINDOW_SIZE);
-		ack.maxSkew		= htons(min(call->ackr_high_seq - seq,65535U));
-		ack.firstPacket		= htonl(call->ackr_win_bot);
-		ack.previousPacket	= call->ackr_prev_seq;
-		ack.serial		= hdr->serial;
-		ack.reason		= special_ACK;
-		ack.nAcks		= 0;
-		//ack.nAcks = special_ACK==RXRPC_ACK_OUT_OF_SEQUENCE ? 0 : hdr->seq ? 1 : 0;
+		ack.bufferSpace	= htons(RXRPC_CALL_ACK_WINDOW_SIZE);
+		ack.maxSkew	= htons(min(call->ackr_high_seq - seq,65535U));
+		ack.firstPacket	= htonl(call->ackr_win_bot);
+		ack.previousPacket = call->ackr_prev_seq;
+		ack.serial	= hdr->serial;
+		ack.reason	= special_ACK;
+		ack.nAcks	= 0;
 
-		_proto("Rx Sending s-ACK { m=%hu f=#%u p=#%u s=%%%u r=%s n=%u }",
-		       ntohs(ack.maxSkew),ntohl(ack.firstPacket),ntohl(ack.previousPacket),
-		       ntohl(ack.serial),rxrpc_acks[ack.reason],ack.nAcks);
+		_proto("Rx Sending s-ACK"
+		       " { m=%hu f=#%u p=#%u s=%%%u r=%s n=%u }",
+		       ntohs(ack.maxSkew),
+		       ntohl(ack.firstPacket),
+		       ntohl(ack.previousPacket),
+		       ntohl(ack.serial),
+		       rxrpc_acks[ack.reason],
+		       ack.nAcks);
 
 		diov[0].iov_len  = sizeof(struct rxrpc_ackpacket);
 		diov[0].iov_base = &ack;
@@ -711,11 +744,11 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
 		diov[1].iov_base = acks;
 
 		/* build and send the message */
-		err = rxrpc_conn_newmsg(call->conn,call,RXRPC_PACKET_TYPE_ACK,
-					hdr->seq ? 2 : 1,diov,
+		err = rxrpc_conn_newmsg(call->conn,call, RXRPC_PACKET_TYPE_ACK,
+					hdr->seq ? 2 : 1, diov,
 					GFP_KERNEL,
 					&msg);
-		if (err<0) {
+		if (err < 0) {
 			ret = err;
 			goto out;
 		}
@@ -724,9 +757,9 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
 		msg->hdr.seq = htonl(seq);
 		msg->hdr.flags |= RXRPC_SLOW_START_OK;
 
-		err = rxrpc_conn_sendmsg(call->conn,msg);
+		err = rxrpc_conn_sendmsg(call->conn, msg);
 		rxrpc_put_message(msg);
-		if (err<0) {
+		if (err < 0) {
 			ret = err;
 			goto out;
 		}
@@ -737,7 +770,7 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
 	if (hdr->seq)
 		call->ackr_prev_seq = hdr->seq;
 
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 	return ret;
 } /* end rxrpc_call_generate_ACK() */
 
@@ -748,7 +781,7 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
  */
 void rxrpc_call_do_stuff(struct rxrpc_call *call)
 {
-	_enter("%p{flags=%lx}",call,call->flags);
+	_enter("%p{flags=%lx}", call, call->flags);
 
 	/* handle packet reception */
 	if (call->flags & RXRPC_CALL_RCV_PKT) {
@@ -761,19 +794,19 @@ void rxrpc_call_do_stuff(struct rxrpc_call *call)
 	if (call->flags & RXRPC_CALL_ACKS_TIMO) {
 		_debug("- overdue ACK timeout");
 		call->flags &= ~RXRPC_CALL_ACKS_TIMO;
-		rxrpc_call_resend(call,call->snd_seq_count);
+		rxrpc_call_resend(call, call->snd_seq_count);
 	}
 
 	/* handle lack of reception */
 	if (call->flags & RXRPC_CALL_RCV_TIMO) {
 		_debug("- reception timeout");
 		call->flags &= ~RXRPC_CALL_RCV_TIMO;
-		rxrpc_call_abort(call,-EIO);
+		rxrpc_call_abort(call, -EIO);
 	}
 
 	/* handle deferred ACKs */
 	if (call->flags & RXRPC_CALL_ACKR_TIMO ||
-	    (call->ackr.nAcks>0 && call->ackr.reason==RXRPC_ACK_REQUESTED)
+	    (call->ackr.nAcks > 0 && call->ackr.reason == RXRPC_ACK_REQUESTED)
 	    ) {
 		_debug("- deferred ACK timeout: cj=%05lu r=%s n=%u",
 		       jiffies - call->cjif,
@@ -782,9 +815,10 @@ void rxrpc_call_do_stuff(struct rxrpc_call *call)
 
 		call->flags &= ~RXRPC_CALL_ACKR_TIMO;
 
-		if (call->ackr.nAcks>0 && call->app_call_state!=RXRPC_CSTATE_ERROR) {
+		if (call->ackr.nAcks > 0 &&
+		    call->app_call_state != RXRPC_CSTATE_ERROR) {
 			/* generate ACK */
-			__rxrpc_call_gen_normal_ACK(call,call->ackr_dfr_seq);
+			__rxrpc_call_gen_normal_ACK(call, call->ackr_dfr_seq);
 			call->ackr_dfr_seq = 0;
 		}
 	}
@@ -807,10 +841,11 @@ static int __rxrpc_call_abort(struct rxrpc_call *call, int errno)
 	int ret;
 	u32 _error;
 
-	_enter("%p{%08x},%p{%d},%d",conn,ntohl(conn->conn_id),call,ntohl(call->call_id),errno);
+	_enter("%p{%08x},%p{%d},%d",
+	       conn, ntohl(conn->conn_id), call, ntohl(call->call_id), errno);
 
 	/* if this call is already aborted, then just wake up any waiters */
-	if (call->app_call_state==RXRPC_CSTATE_ERROR) {
+	if (call->app_call_state == RXRPC_CSTATE_ERROR) {
 		spin_unlock(&call->lock);
 		call->app_error_func(call);
 		_leave(" = 0");
@@ -820,12 +855,12 @@ static int __rxrpc_call_abort(struct rxrpc_call *call, int errno)
 	rxrpc_get_call(call);
 
 	/* change the state _with_ the lock still held */
-	call->app_call_state = RXRPC_CSTATE_ERROR;
-	call->app_err_state = RXRPC_ESTATE_LOCAL_ABORT;
-	call->app_errno = errno;
-	call->app_mark = RXRPC_APP_MARK_EOF;
-	call->app_read_buf = NULL;
-	call->app_async_read = 0;
+	call->app_call_state	= RXRPC_CSTATE_ERROR;
+	call->app_err_state	= RXRPC_ESTATE_LOCAL_ABORT;
+	call->app_errno		= errno;
+	call->app_mark		= RXRPC_APP_MARK_EOF;
+	call->app_read_buf	= NULL;
+	call->app_async_read	= 0;
 
 	_state(call);
 
@@ -840,22 +875,25 @@ static int __rxrpc_call_abort(struct rxrpc_call *call, int errno)
 	del_timer_sync(&call->ackr_dfr_timo);
 
 	if (rxrpc_call_is_ack_pending(call))
-		__rxrpc_call_gen_normal_ACK(call,0);
+		__rxrpc_call_gen_normal_ACK(call, 0);
 
-	/* send the abort packet only if we actually traded some other packets */
+	/* send the abort packet only if we actually traded some other
+	 * packets */
 	ret = 0;
 	if (call->pkt_snd_count || call->pkt_rcv_count) {
 		/* actually send the abort */
-		_proto("Rx Sending Call ABORT { data=%d }",call->app_abort_code);
+		_proto("Rx Sending Call ABORT { data=%d }",
+		       call->app_abort_code);
 
 		_error = htonl(call->app_abort_code);
 
 		diov[0].iov_len  = sizeof(_error);
 		diov[0].iov_base = &_error;
 
-		ret = rxrpc_conn_newmsg(conn,call,RXRPC_PACKET_TYPE_ABORT,1,diov,GFP_KERNEL,&msg);
-		if (ret==0) {
-			ret = rxrpc_conn_sendmsg(conn,msg);
+		ret = rxrpc_conn_newmsg(conn, call, RXRPC_PACKET_TYPE_ABORT,
+					1, diov, GFP_KERNEL, &msg);
+		if (ret == 0) {
+			ret = rxrpc_conn_sendmsg(conn, msg);
 			rxrpc_put_message(msg);
 		}
 	}
@@ -865,8 +903,7 @@ static int __rxrpc_call_abort(struct rxrpc_call *call, int errno)
 
 	rxrpc_put_call(call);
 
-	_leave(" = %d",ret);
-
+	_leave(" = %d", ret);
 	return ret;
 } /* end __rxrpc_call_abort() */
 
@@ -879,7 +916,7 @@ int rxrpc_call_abort(struct rxrpc_call *call, int error)
 {
 	spin_lock(&call->lock);
 
-	return __rxrpc_call_abort(call,error);
+	return __rxrpc_call_abort(call, error);
 
 } /* end rxrpc_call_abort() */
 
@@ -891,11 +928,12 @@ static void rxrpc_call_receive_packet(struct rxrpc_call *call)
 {
 	struct rxrpc_message *msg;
 	struct list_head *_p;
-	u32 data32;
+	uint32_t data32;
 
-	_enter("%p",call);
+	_enter("%p", call);
 
-	rxrpc_get_call(call); /* must not go away too soon if aborted by app-layer */
+	rxrpc_get_call(call); /* must not go away too soon if aborted by
+			       * app-layer */
 
 	while (!list_empty(&call->rcv_receiveq)) {
 		/* try to get next packet */
@@ -907,9 +945,10 @@ static void rxrpc_call_receive_packet(struct rxrpc_call *call)
 		}
 		spin_unlock(&call->lock);
 
-		if (!_p) break;
+		if (!_p)
+			break;
 
-		msg = list_entry(_p,struct rxrpc_message,link);
+		msg = list_entry(_p, struct rxrpc_message, link);
 
 		_proto("Rx %05lu Received %s packet (%%%u,#%u,%c%c%c%c%c)",
 		       jiffies - call->cjif,
@@ -927,9 +966,10 @@ static void rxrpc_call_receive_packet(struct rxrpc_call *call)
 			/* deal with data packets */
 		case RXRPC_PACKET_TYPE_DATA:
 			/* ACK the packet if necessary */
-			switch (rxrpc_call_generate_ACK(call,&msg->hdr,NULL)) {
+			switch (rxrpc_call_generate_ACK(call, &msg->hdr,
+							NULL)) {
 			case 0: /* useful packet */
-				rxrpc_call_receive_data_packet(call,msg);
+				rxrpc_call_receive_data_packet(call, msg);
 				break;
 			case 1: /* duplicate or out-of-window packet */
 				break;
@@ -941,29 +981,30 @@ static void rxrpc_call_receive_packet(struct rxrpc_call *call)
 
 			/* deal with ACK packets */
 		case RXRPC_PACKET_TYPE_ACK:
-			rxrpc_call_receive_ack_packet(call,msg);
+			rxrpc_call_receive_ack_packet(call, msg);
 			break;
 
 			/* deal with abort packets */
 		case RXRPC_PACKET_TYPE_ABORT:
 			data32 = 0;
-			if (skb_copy_bits(msg->pkt,msg->offset,&data32,sizeof(data32))<0) {
+			if (skb_copy_bits(msg->pkt, msg->offset,
+					  &data32, sizeof(data32)) < 0) {
 				printk("Rx Received short ABORT packet\n");
 			}
 			else {
 				data32 = ntohl(data32);
 			}
 
-			_proto("Rx Received Call ABORT { data=%d }",data32);
+			_proto("Rx Received Call ABORT { data=%d }", data32);
 
 			spin_lock(&call->lock);
-			call->app_call_state = RXRPC_CSTATE_ERROR;
-			call->app_err_state = RXRPC_ESTATE_PEER_ABORT;
-			call->app_abort_code = data32;
-			call->app_errno = -ECONNABORTED;
-			call->app_mark = RXRPC_APP_MARK_EOF;
-			call->app_read_buf = NULL;
-			call->app_async_read = 0;
+			call->app_call_state	= RXRPC_CSTATE_ERROR;
+			call->app_err_state	= RXRPC_ESTATE_PEER_ABORT;
+			call->app_abort_code	= data32;
+			call->app_errno		= -ECONNABORTED;
+			call->app_mark		= RXRPC_APP_MARK_EOF;
+			call->app_read_buf	= NULL;
+			call->app_async_read	= 0;
 
 			/* ask the app to translate the error code */
 			call->app_aemap_func(call);
@@ -974,7 +1015,8 @@ static void rxrpc_call_receive_packet(struct rxrpc_call *call)
 
 		default:
 			/* deal with other packet types */
-			_proto("Rx Unsupported packet type %u (#%u)",msg->hdr.type,msg->seq);
+			_proto("Rx Unsupported packet type %u (#%u)",
+			       msg->hdr.type, msg->seq);
 			break;
 		}
 
@@ -990,14 +1032,18 @@ static void rxrpc_call_receive_packet(struct rxrpc_call *call)
 /*
  * process next data packet
  * - as the next data packet arrives:
- *   - it is queued on app_readyq _if_ it is the next one expected (app_ready_seq+1)
+ *   - it is queued on app_readyq _if_ it is the next one expected
+ *     (app_ready_seq+1)
  *   - it is queued on app_unreadyq _if_ it is not the next one expected
- *   - if a packet placed on app_readyq completely fills a hole leading up to the first packet
- *     on app_unreadyq, then packets now in sequence are tranferred to app_readyq
- * - the application layer can only see packets on app_readyq (app_ready_qty bytes)
+ *   - if a packet placed on app_readyq completely fills a hole leading up to
+ *     the first packet on app_unreadyq, then packets now in sequence are
+ *     tranferred to app_readyq
+ * - the application layer can only see packets on app_readyq
+ *   (app_ready_qty bytes)
  * - the application layer is prodded every time a new packet arrives
  */
-static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc_message *msg)
+static void rxrpc_call_receive_data_packet(struct rxrpc_call *call,
+					   struct rxrpc_message *msg)
 {
 	const struct rxrpc_operation *optbl, *op;
 	struct rxrpc_message *pmsg;
@@ -1005,22 +1051,23 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc
 	int ret, lo, hi, rmtimo;
 	u32 opid;
 
-	_enter("%p{%u},%p{%u}",call,ntohl(call->call_id),msg,msg->seq);
+	_enter("%p{%u},%p{%u}", call, ntohl(call->call_id), msg, msg->seq);
 
 	rxrpc_get_message(msg);
 
-	/* add to the unready queue if we'd have to create a hole in the ready queue otherwise */
-	if (msg->seq != call->app_ready_seq+1) {
-		_debug("Call add packet %d to unreadyq",msg->seq);
+	/* add to the unready queue if we'd have to create a hole in the ready
+	 * queue otherwise */
+	if (msg->seq != call->app_ready_seq + 1) {
+		_debug("Call add packet %d to unreadyq", msg->seq);
 
 		/* insert in seq order */
 		list_for_each(_p,&call->app_unreadyq) {
-			pmsg = list_entry(_p,struct rxrpc_message,link);
-			if (pmsg->seq>msg->seq)
+			pmsg = list_entry(_p, struct rxrpc_message, link);
+			if (pmsg->seq > msg->seq)
 				break;
 		}
 
-		list_add_tail(&msg->link,_p);
+		list_add_tail(&msg->link, _p);
 
 		_leave(" [unreadyq]");
 		return;
@@ -1028,33 +1075,35 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc
 
 	/* next in sequence - simply append into the call's ready queue */
 	_debug("Call add packet %d to readyq (+%Zd => %Zd bytes)",
-	       msg->seq,msg->dsize,call->app_ready_qty);
+	       msg->seq, msg->dsize, call->app_ready_qty);
 
 	spin_lock(&call->lock);
 	call->app_ready_seq = msg->seq;
 	call->app_ready_qty += msg->dsize;
-	list_add_tail(&msg->link,&call->app_readyq);
+	list_add_tail(&msg->link, &call->app_readyq);
 
 	/* move unready packets to the readyq if we got rid of a hole */
 	while (!list_empty(&call->app_unreadyq)) {
-		pmsg = list_entry(call->app_unreadyq.next,struct rxrpc_message,link);
+		pmsg = list_entry(call->app_unreadyq.next,
+				  struct rxrpc_message, link);
 
-		if (pmsg->seq != call->app_ready_seq+1)
+		if (pmsg->seq != call->app_ready_seq + 1)
 			break;
 
 		/* next in sequence - just move list-to-list */
 		_debug("Call transfer packet %d to readyq (+%Zd => %Zd bytes)",
-		       pmsg->seq,pmsg->dsize,call->app_ready_qty);
+		       pmsg->seq, pmsg->dsize, call->app_ready_qty);
 
 		call->app_ready_seq = pmsg->seq;
 		call->app_ready_qty += pmsg->dsize;
 		list_del_init(&pmsg->link);
-		list_add_tail(&pmsg->link,&call->app_readyq);
+		list_add_tail(&pmsg->link, &call->app_readyq);
 	}
 
 	/* see if we've got the last packet yet */
 	if (!list_empty(&call->app_readyq)) {
-		pmsg = list_entry(call->app_readyq.prev,struct rxrpc_message,link);
+		pmsg = list_entry(call->app_readyq.prev,
+				  struct rxrpc_message, link);
 		if (pmsg->hdr.flags & RXRPC_LAST_PACKET) {
 			call->app_last_rcv = 1;
 			_debug("Last packet on readyq");
@@ -1068,25 +1117,27 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc
 		_leave(" [error]");
 		return;
 
-		/* extract the operation ID from an incoming call if that's not yet been done */
+		/* extract the operation ID from an incoming call if that's not
+		 * yet been done */
 	case RXRPC_CSTATE_SRVR_RCV_OPID:
 		spin_unlock(&call->lock);
 
 		/* handle as yet insufficient data for the operation ID */
-		if (call->app_ready_qty<4) {
+		if (call->app_ready_qty < 4) {
 			if (call->app_last_rcv)
-				rxrpc_call_abort(call,-EINVAL); /* trouble - last packet seen */
+				/* trouble - last packet seen */
+				rxrpc_call_abort(call, -EINVAL);
 
 			_leave("");
 			return;
 		}
 
 		/* pull the operation ID out of the buffer */
-		ret = rxrpc_call_read_data(call,&opid,sizeof(opid),0);
-		if (ret<0) {
-			printk("Unexpected error from read-data: %d\n",ret);
-			if (call->app_call_state!=RXRPC_CSTATE_ERROR)
-				rxrpc_call_abort(call,ret);
+		ret = rxrpc_call_read_data(call, &opid, sizeof(opid), 0);
+		if (ret < 0) {
+			printk("Unexpected error from read-data: %d\n", ret);
+			if (call->app_call_state != RXRPC_CSTATE_ERROR)
+				rxrpc_call_abort(call, ret);
 			_leave("");
 			return;
 		}
@@ -1097,38 +1148,42 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc
 		lo = 0;
 		hi = call->conn->service->ops_end - optbl;
 
-		while (lo<hi) {
-			int mid = (hi+lo) / 2;
+		while (lo < hi) {
+			int mid = (hi + lo) / 2;
 			op = &optbl[mid];
-			if (call->app_opcode==op->id)
+			if (call->app_opcode == op->id)
 				goto found_op;
-			if (call->app_opcode>op->id)
-				lo = mid+1;
+			if (call->app_opcode > op->id)
+				lo = mid + 1;
 			else
 				hi = mid;
 		}
 
 		/* search failed */
 		kproto("Rx Client requested operation %d from %s service",
-		       call->app_opcode,call->conn->service->name);
-		rxrpc_call_abort(call,-EINVAL);
+		       call->app_opcode, call->conn->service->name);
+		rxrpc_call_abort(call, -EINVAL);
 		_leave(" [inval]");
 		return;
 
 	found_op:
 		_proto("Rx Client requested operation %s from %s service",
-		       op->name,call->conn->service->name);
+		       op->name, call->conn->service->name);
 
-		/* we're now waiting for the argument block (unless the call was aborted) */
+		/* we're now waiting for the argument block (unless the call
+		 * was aborted) */
 		spin_lock(&call->lock);
-		if (call->app_call_state==RXRPC_CSTATE_SRVR_RCV_OPID ||
-		    call->app_call_state==RXRPC_CSTATE_SRVR_SND_REPLY) {
+		if (call->app_call_state == RXRPC_CSTATE_SRVR_RCV_OPID ||
+		    call->app_call_state == RXRPC_CSTATE_SRVR_SND_REPLY) {
 			if (!call->app_last_rcv)
-				call->app_call_state = RXRPC_CSTATE_SRVR_RCV_ARGS;
-			else if (call->app_ready_qty>0)
-				call->app_call_state = RXRPC_CSTATE_SRVR_GOT_ARGS;
+				call->app_call_state =
+					RXRPC_CSTATE_SRVR_RCV_ARGS;
+			else if (call->app_ready_qty > 0)
+				call->app_call_state =
+					RXRPC_CSTATE_SRVR_GOT_ARGS;
 			else
-				call->app_call_state = RXRPC_CSTATE_SRVR_SND_REPLY;
+				call->app_call_state =
+					RXRPC_CSTATE_SRVR_SND_REPLY;
 			call->app_mark = op->asize;
 			call->app_user = op->user;
 		}
@@ -1166,20 +1221,21 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc
 
 	default:
 		/* deal with data reception in an unexpected state */
-		printk("Unexpected state [[[ %u ]]]\n",call->app_call_state);
-		__rxrpc_call_abort(call,-EBADMSG);
+		printk("Unexpected state [[[ %u ]]]\n", call->app_call_state);
+		__rxrpc_call_abort(call, -EBADMSG);
 		_leave("");
 		return;
 	}
 
-	if (call->app_call_state==RXRPC_CSTATE_CLNT_RCV_REPLY && call->app_last_rcv)
+	if (call->app_call_state == RXRPC_CSTATE_CLNT_RCV_REPLY &&
+	    call->app_last_rcv)
 		BUG();
 
 	/* otherwise just invoke the data function whenever we can satisfy its desire for more
 	 * data
 	 */
 	_proto("Rx Received Op Data: st=%u qty=%Zu mk=%Zu%s",
-	       call->app_call_state,call->app_ready_qty,call->app_mark,
+	       call->app_call_state, call->app_ready_qty, call->app_mark,
 	       call->app_last_rcv ? " last-rcvd" : "");
 
 	spin_lock(&call->lock);
@@ -1196,8 +1252,8 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc
 	case -ECONNABORTED:
 		spin_unlock(&call->lock);
 		break;
-	default:			
-		__rxrpc_call_abort(call,ret);
+	default:
+		__rxrpc_call_abort(call, ret);
 		break;
 	}
 
@@ -1211,17 +1267,18 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call, struct rxrpc
 /*
  * received an ACK packet
  */
-static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call, struct rxrpc_message *msg)
+static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call,
+					  struct rxrpc_message *msg)
 {
 	struct rxrpc_ackpacket ack;
 	rxrpc_serial_t serial;
 	rxrpc_seq_t seq;
 	int ret;
 
-	_enter("%p{%u},%p{%u}",call,ntohl(call->call_id),msg,msg->seq);
+	_enter("%p{%u},%p{%u}", call, ntohl(call->call_id), msg, msg->seq);
 
 	/* extract the basic ACK record */
-	if (skb_copy_bits(msg->pkt,msg->offset,&ack,sizeof(ack))<0) {
+	if (skb_copy_bits(msg->pkt, msg->offset, &ack, sizeof(ack)) < 0) {
 		printk("Rx Received short ACK packet\n");
 		return;
 	}
@@ -1241,10 +1298,14 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call, struct rxrpc_
 	       call->ackr.nAcks
 	       );
 
-	/* check the other side isn't ACK'ing a sequence number I haven't sent yet */
-	if (ack.nAcks>0 && (seq > call->snd_seq_count || seq+ack.nAcks-1 > call->snd_seq_count)) {
-		printk("Received ACK (#%u-#%u) for unsent packet\n",seq,seq+ack.nAcks-1);
-		rxrpc_call_abort(call,-EINVAL);
+	/* check the other side isn't ACK'ing a sequence number I haven't sent
+	 * yet */
+	if (ack.nAcks > 0 &&
+	    (seq > call->snd_seq_count ||
+	     seq + ack.nAcks - 1 > call->snd_seq_count)) {
+		printk("Received ACK (#%u-#%u) for unsent packet\n",
+		       seq, seq + ack.nAcks - 1);
+		rxrpc_call_abort(call, -EINVAL);
 		_leave("");
 		return;
 	}
@@ -1255,7 +1316,7 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call, struct rxrpc_
 
 		/* find the prompting packet */
 		spin_lock(&call->lock);
-		if (call->snd_ping && call->snd_ping->hdr.serial==serial) {
+		if (call->snd_ping && call->snd_ping->hdr.serial == serial) {
 			/* it was a ping packet */
 			rttmsg = call->snd_ping;
 			call->snd_ping = NULL;
@@ -1263,22 +1324,28 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call, struct rxrpc_
 
 			if (rttmsg) {
 				rttmsg->rttdone = 1;
-				rxrpc_peer_calculate_rtt(call->conn->peer,rttmsg,msg);
+				rxrpc_peer_calculate_rtt(call->conn->peer,
+							 rttmsg, msg);
 				rxrpc_put_message(rttmsg);
 			}
 		}
 		else {
 			struct list_head *_p;
 
-			/* it ought to be a data packet - look in the pending ACK list */
-			list_for_each(_p,&call->acks_pendq) {
-				rttmsg = list_entry(_p,struct rxrpc_message,link);
-				if (rttmsg->hdr.serial==serial) {
+			/* it ought to be a data packet - look in the pending
+			 * ACK list */
+			list_for_each(_p, &call->acks_pendq) {
+				rttmsg = list_entry(_p, struct rxrpc_message,
+						    link);
+				if (rttmsg->hdr.serial == serial) {
 					if (rttmsg->rttdone)
-						break; /* never do RTT twice without resending */
+						/* never do RTT twice without
+						 * resending */
+						break;
 
 					rttmsg->rttdone = 1;
-					rxrpc_peer_calculate_rtt(call->conn->peer,rttmsg,msg);
+					rxrpc_peer_calculate_rtt(
+						call->conn->peer, rttmsg, msg);
 					break;
 				}
 			}
@@ -1287,24 +1354,25 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call, struct rxrpc_
 	}
 
 	switch (ack.reason) {
-		/* deal with negative/positive acknowledgement of data packets */
+		/* deal with negative/positive acknowledgement of data
+		 * packets */
 	case RXRPC_ACK_REQUESTED:
 	case RXRPC_ACK_DELAY:
 	case RXRPC_ACK_IDLE:
-		rxrpc_call_definitively_ACK(call,seq-1);
+		rxrpc_call_definitively_ACK(call, seq - 1);
 
 	case RXRPC_ACK_DUPLICATE:
 	case RXRPC_ACK_OUT_OF_SEQUENCE:
 	case RXRPC_ACK_EXCEEDS_WINDOW:
 		call->snd_resend_cnt = 0;
-		ret = rxrpc_call_record_ACK(call,msg,seq,ack.nAcks);
-		if (ret<0)
-			rxrpc_call_abort(call,ret);
+		ret = rxrpc_call_record_ACK(call, msg, seq, ack.nAcks);
+		if (ret < 0)
+			rxrpc_call_abort(call, ret);
 		break;
 
 		/* respond to ping packets immediately */
 	case RXRPC_ACK_PING:
-		rxrpc_call_generate_ACK(call,&msg->hdr,&ack);
+		rxrpc_call_generate_ACK(call, &msg->hdr, &ack);
 		break;
 
 		/* only record RTT on ping response packets */
@@ -1312,10 +1380,12 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call, struct rxrpc_
 		if (call->snd_ping) {
 			struct rxrpc_message *rttmsg;
 
-			/* only do RTT stuff if the response matches the retained ping */
+			/* only do RTT stuff if the response matches the
+			 * retained ping */
 			rttmsg = NULL;
 			spin_lock(&call->lock);
-			if (call->snd_ping && call->snd_ping->hdr.serial==ack.serial) {
+			if (call->snd_ping &&
+			    call->snd_ping->hdr.serial == ack.serial) {
 				rttmsg = call->snd_ping;
 				call->snd_ping = NULL;
 			}
@@ -1323,14 +1393,15 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call, struct rxrpc_
 
 			if (rttmsg) {
 				rttmsg->rttdone = 1;
-				rxrpc_peer_calculate_rtt(call->conn->peer,rttmsg,msg);
+				rxrpc_peer_calculate_rtt(call->conn->peer,
+							 rttmsg, msg);
 				rxrpc_put_message(rttmsg);
 			}
 		}
 		break;
 
 	default:
-		printk("Unsupported ACK reason %u\n",ack.reason);
+		printk("Unsupported ACK reason %u\n", ack.reason);
 		break;
 	}
 
@@ -1339,38 +1410,44 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call, struct rxrpc_
 
 /*****************************************************************************/
 /*
- * record definitive ACKs for all messages up to and including the one with the 'highest' seq
+ * record definitive ACKs for all messages up to and including the one with the
+ * 'highest' seq
  */
-static void rxrpc_call_definitively_ACK(struct rxrpc_call *call, rxrpc_seq_t highest)
+static void rxrpc_call_definitively_ACK(struct rxrpc_call *call,
+					rxrpc_seq_t highest)
 {
 	struct rxrpc_message *msg;
 	int now_complete;
 
-	_enter("%p{ads=%u},%u",call,call->acks_dftv_seq,highest);
+	_enter("%p{ads=%u},%u", call, call->acks_dftv_seq, highest);
 
-	while (call->acks_dftv_seq<highest) {
+	while (call->acks_dftv_seq < highest) {
 		call->acks_dftv_seq++;
 
-		_proto("Definitive ACK on packet #%u",call->acks_dftv_seq);
+		_proto("Definitive ACK on packet #%u", call->acks_dftv_seq);
 
-		/* discard those at front of queue until message with highest ACK is found */
+		/* discard those at front of queue until message with highest
+		 * ACK is found */
 		spin_lock(&call->lock);
 		msg = NULL;
 		if (!list_empty(&call->acks_pendq)) {
-			msg = list_entry(call->acks_pendq.next,struct rxrpc_message,link);
+			msg = list_entry(call->acks_pendq.next,
+					 struct rxrpc_message, link);
 			list_del_init(&msg->link); /* dequeue */
-			if (msg->state==RXRPC_MSG_SENT)
+			if (msg->state == RXRPC_MSG_SENT)
 				call->acks_pend_cnt--;
 		}
 		spin_unlock(&call->lock);
 
 		/* insanity check */
 		if (!msg)
-			panic("%s(): acks_pendq unexpectedly empty\n",__FUNCTION__);
+			panic("%s(): acks_pendq unexpectedly empty\n",
+			      __FUNCTION__);
 
-		if (msg->seq!=call->acks_dftv_seq)
-			panic("%s(): Packet #%u expected at front of acks_pendq (#%u found)\n",
-			      __FUNCTION__,call->acks_dftv_seq,msg->seq);
+		if (msg->seq != call->acks_dftv_seq)
+			panic("%s(): Packet #%u expected at front of acks_pendq"
+			      " (#%u found)\n",
+			      __FUNCTION__, call->acks_dftv_seq, msg->seq);
 
 		/* discard the message */
 		msg->state = RXRPC_MSG_DONE;
@@ -1380,8 +1457,8 @@ static void rxrpc_call_definitively_ACK(struct rxrpc_call *call, rxrpc_seq_t hig
 	/* if all sent packets are definitively ACK'd then prod any sleepers just in case */
 	now_complete = 0;
 	spin_lock(&call->lock);
-	if (call->acks_dftv_seq==call->snd_seq_count) {
-		if (call->app_call_state!=RXRPC_CSTATE_COMPLETE) {
+	if (call->acks_dftv_seq == call->snd_seq_count) {
+		if (call->app_call_state != RXRPC_CSTATE_COMPLETE) {
 			call->app_call_state = RXRPC_CSTATE_COMPLETE;
 			_state(call);
 			now_complete = 1;
@@ -1417,13 +1494,15 @@ static int rxrpc_call_record_ACK(struct rxrpc_call *call,
 	u8 acks[16];
 
 	_enter("%p{apc=%u ads=%u},%p,%u,%Zu",
-	       call,call->acks_pend_cnt,call->acks_dftv_seq,msg,seq,count);
+	       call, call->acks_pend_cnt, call->acks_dftv_seq,
+	       msg, seq, count);
 
-	/* handle re-ACK'ing of definitively ACK'd packets (may be out-of-order ACKs) */
-	if (seq<=call->acks_dftv_seq) {
+	/* handle re-ACK'ing of definitively ACK'd packets (may be out-of-order
+	 * ACKs) */
+	if (seq <= call->acks_dftv_seq) {
 		unsigned delta = call->acks_dftv_seq - seq;
 
-		if (count<=delta) {
+		if (count <= delta) {
 			_leave(" = 0 [all definitively ACK'd]");
 			return 0;
 		}
@@ -1435,14 +1514,14 @@ static int rxrpc_call_record_ACK(struct rxrpc_call *call,
 
 	highest = seq + count - 1;
 	resend = 0;
-	while (count>0) {
+	while (count > 0) {
 		/* extract up to 16 ACK slots at a time */
-		chunk = min(count,sizeof(acks));
+		chunk = min(count, sizeof(acks));
 		count -= chunk;
 
-		memset(acks,2,sizeof(acks));
+		memset(acks, 2, sizeof(acks));
 
-		if (skb_copy_bits(msg->pkt,msg->offset,&acks,chunk)<0) {
+		if (skb_copy_bits(msg->pkt, msg->offset, &acks, chunk) < 0) {
 			printk("Rx Received short ACK packet\n");
 			_leave(" = -EINVAL");
 			return -EINVAL;
@@ -1450,7 +1529,7 @@ static int rxrpc_call_record_ACK(struct rxrpc_call *call,
 		msg->offset += chunk;
 
 		/* check that the ACK set is valid */
-		for (ix=0; ix<chunk; ix++) {
+		for (ix = 0; ix < chunk; ix++) {
 			switch (acks[ix]) {
 			case RXRPC_ACK_TYPE_ACK:
 				break;
@@ -1458,14 +1537,16 @@ static int rxrpc_call_record_ACK(struct rxrpc_call *call,
 				resend = 1;
 				break;
 			default:
-				printk("Rx Received unsupported ACK state %u\n",acks[ix]);
+				printk("Rx Received unsupported ACK state"
+				       " %u\n", acks[ix]);
 				_leave(" = -EINVAL");
 				return -EINVAL;
 			}
 		}
 
-		_proto("Rx ACK of packets #%u-#%u [%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c] (pend=%u)",
-		       seq,(unsigned)(seq+chunk-1),
+		_proto("Rx ACK of packets #%u-#%u "
+		       "[%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c] (pend=%u)",
+		       seq, (unsigned) (seq + chunk - 1),
 		       _acktype[acks[0x0]],
 		       _acktype[acks[0x1]],
 		       _acktype[acks[0x2]],
@@ -1485,53 +1566,60 @@ static int rxrpc_call_record_ACK(struct rxrpc_call *call,
 		       call->acks_pend_cnt
 		       );
 
-		/* mark the packets in the ACK queue as being provisionally ACK'd */
+		/* mark the packets in the ACK queue as being provisionally
+		 * ACK'd */
 		ix = 0;
 		spin_lock(&call->lock);
 
 		/* find the first packet ACK'd/NAK'd here */
-		list_for_each(_p,&call->acks_pendq) {
-			dmsg = list_entry(_p,struct rxrpc_message,link);
-			if (dmsg->seq==seq)
+		list_for_each(_p, &call->acks_pendq) {
+			dmsg = list_entry(_p, struct rxrpc_message, link);
+			if (dmsg->seq == seq)
 				goto found_first;
-			_debug("- %u: skipping #%u",ix,dmsg->seq);
+			_debug("- %u: skipping #%u", ix, dmsg->seq);
 		}
 		goto bad_queue;
 
 	found_first:
 		do {
 			_debug("- %u: processing #%u (%c) apc=%u",
-			       ix,dmsg->seq,_acktype[acks[ix]],call->acks_pend_cnt);
+			       ix, dmsg->seq, _acktype[acks[ix]],
+			       call->acks_pend_cnt);
 
-			if (acks[ix]==RXRPC_ACK_TYPE_ACK) {
-				if (dmsg->state==RXRPC_MSG_SENT) call->acks_pend_cnt--;
+			if (acks[ix] == RXRPC_ACK_TYPE_ACK) {
+				if (dmsg->state == RXRPC_MSG_SENT)
+					call->acks_pend_cnt--;
 				dmsg->state = RXRPC_MSG_ACKED;
 			}
 			else {
-				if (dmsg->state==RXRPC_MSG_ACKED) call->acks_pend_cnt++;
+				if (dmsg->state == RXRPC_MSG_ACKED)
+					call->acks_pend_cnt++;
 				dmsg->state = RXRPC_MSG_SENT;
 			}
 			ix++;
 			seq++;
 
 			_p = dmsg->link.next;
-			dmsg = list_entry(_p,struct rxrpc_message,link);
-		} while(ix<chunk && _p!=&call->acks_pendq && dmsg->seq==seq);
+			dmsg = list_entry(_p, struct rxrpc_message, link);
+		} while(ix < chunk &&
+			_p != &call->acks_pendq &&
+			dmsg->seq == seq);
 
-		if (ix<chunk)
+		if (ix < chunk)
 			goto bad_queue;
 
 		spin_unlock(&call->lock);
 	}
 
 	if (resend)
-		rxrpc_call_resend(call,highest);
+		rxrpc_call_resend(call, highest);
 
-	/* if all packets are provisionally ACK'd, then wake up anyone who's waiting for that */
+	/* if all packets are provisionally ACK'd, then wake up anyone who's
+	 * waiting for that */
 	now_complete = 0;
 	spin_lock(&call->lock);
-	if (call->acks_pend_cnt==0) {
-		if (call->app_call_state==RXRPC_CSTATE_SRVR_RCV_FINAL_ACK) {
+	if (call->acks_pend_cnt == 0) {
+		if (call->app_call_state == RXRPC_CSTATE_SRVR_RCV_FINAL_ACK) {
 			call->app_call_state = RXRPC_CSTATE_COMPLETE;
 			_state(call);
 		}
@@ -1547,19 +1635,21 @@ static int rxrpc_call_record_ACK(struct rxrpc_call *call,
 		call->app_attn_func(call);
 	}
 
-	_leave(" = 0 (apc=%u)",call->acks_pend_cnt);
+	_leave(" = 0 (apc=%u)", call->acks_pend_cnt);
 	return 0;
 
  bad_queue:
-	panic("%s(): acks_pendq in bad state (packet #%u absent)\n",__FUNCTION__,seq);
+	panic("%s(): acks_pendq in bad state (packet #%u absent)\n",
+	      __FUNCTION__, seq);
 
 } /* end rxrpc_call_record_ACK() */
 
 /*****************************************************************************/
 /*
  * transfer data from the ready packet queue to the asynchronous read buffer
- * - since this func is the only one going to look at packets queued on app_readyq, we don't need
- *   a lock to modify or access them, only to modify the queue pointers
+ * - since this func is the only one going to look at packets queued on
+ *   app_readyq, we don't need a lock to modify or access them, only to modify
+ *   the queue pointers
  * - called with call->lock held
  * - the buffer must be in kernel space
  * - returns:
@@ -1575,16 +1665,20 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 	int ret;
 
 	_enter("%p{as=%d buf=%p qty=%Zu/%Zu}",
-	       call,call->app_async_read,call->app_read_buf,call->app_ready_qty,call->app_mark);
+	       call,
+	       call->app_async_read, call->app_read_buf,
+	       call->app_ready_qty, call->app_mark);
 
 	/* check the state */
 	switch (call->app_call_state) {
 	case RXRPC_CSTATE_SRVR_RCV_ARGS:
 	case RXRPC_CSTATE_CLNT_RCV_REPLY:
 		if (call->app_last_rcv) {
-			printk("%s(%p,%p,%Zd): Inconsistent call state (%s, last pkt)",
-			      __FUNCTION__,call,call->app_read_buf,call->app_mark,
-			      rxrpc_call_states[call->app_call_state]);
+			printk("%s(%p,%p,%Zd):"
+			       " Inconsistent call state (%s, last pkt)",
+			       __FUNCTION__,
+			       call, call->app_read_buf, call->app_mark,
+			       rxrpc_call_states[call->app_call_state]);
 			BUG();
 		}
 		break;
@@ -1596,9 +1690,11 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 
 	case RXRPC_CSTATE_SRVR_SND_REPLY:
 		if (!call->app_last_rcv) {
-			printk("%s(%p,%p,%Zd): Inconsistent call state (%s, not last pkt)",
-			      __FUNCTION__,call,call->app_read_buf,call->app_mark,
-			      rxrpc_call_states[call->app_call_state]);
+			printk("%s(%p,%p,%Zd):"
+			       " Inconsistent call state (%s, not last pkt)",
+			       __FUNCTION__,
+			       call, call->app_read_buf, call->app_mark,
+			       rxrpc_call_states[call->app_call_state]);
 			BUG();
 		}
 		_debug("Trying to read data from call in SND_REPLY state");
@@ -1609,13 +1705,14 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 		return -ECONNABORTED;
 
 	default:
-		printk("reading in unexpected state [[[ %u ]]]\n",call->app_call_state);
+		printk("reading in unexpected state [[[ %u ]]]\n",
+		       call->app_call_state);
 		BUG();
 	}
 
 	/* handle the case of not having an async buffer */
 	if (!call->app_async_read) {
-		if (call->app_mark==RXRPC_APP_MARK_EOF) {
+		if (call->app_mark == RXRPC_APP_MARK_EOF) {
 			ret = call->app_last_rcv ? 0 : -EAGAIN;
 		}
 		else {
@@ -1628,28 +1725,33 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 			}
 		}
 
-		_leave(" = %d [no buf]",ret);
+		_leave(" = %d [no buf]", ret);
 		return 0;
 	}
 
-	while (!list_empty(&call->app_readyq) && call->app_mark>0) {
-		msg = list_entry(call->app_readyq.next,struct rxrpc_message,link);
+	while (!list_empty(&call->app_readyq) && call->app_mark > 0) {
+		msg = list_entry(call->app_readyq.next,
+				 struct rxrpc_message, link);
 
 		/* drag as much data as we need out of this packet */
-		qty = min(call->app_mark,msg->dsize);
+		qty = min(call->app_mark, msg->dsize);
 
-		_debug("reading %Zu from skb=%p off=%lu",qty,msg->pkt,msg->offset);
+		_debug("reading %Zu from skb=%p off=%lu",
+		       qty, msg->pkt, msg->offset);
 
 		if (call->app_read_buf)
-			if (skb_copy_bits(msg->pkt,msg->offset,call->app_read_buf,qty)<0)
-				panic("%s: Failed to copy data from packet: (%p,%p,%Zd)",
-				      __FUNCTION__,call,call->app_read_buf,qty);
+			if (skb_copy_bits(msg->pkt, msg->offset,
+					  call->app_read_buf, qty) < 0)
+				panic("%s: Failed to copy data from packet:"
+				      " (%p,%p,%Zd)",
+				      __FUNCTION__,
+				      call, call->app_read_buf, qty);
 
 		/* if that packet is now empty, discard it */
 		call->app_ready_qty -= qty;
 		msg->dsize -= qty;
 
-		if (msg->dsize==0) {
+		if (msg->dsize == 0) {
 			list_del_init(&msg->link);
 			rxrpc_put_message(msg);
 		}
@@ -1658,10 +1760,11 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 		}
 
 		call->app_mark -= qty;
-		if (call->app_read_buf) call->app_read_buf += qty;
+		if (call->app_read_buf)
+			call->app_read_buf += qty;
 	}
 
-	if (call->app_mark==0) {
+	if (call->app_mark == 0) {
 		call->app_async_read = 0;
 		call->app_mark = RXRPC_APP_MARK_EOF;
 		call->app_read_buf = NULL;
@@ -1695,7 +1798,8 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 	}
 
 	if (call->app_last_rcv) {
-		_debug("Insufficient data (%Zu/%Zu)",call->app_ready_qty,call->app_mark);
+		_debug("Insufficient data (%Zu/%Zu)",
+		       call->app_ready_qty, call->app_mark);
 		call->app_async_read = 0;
 		call->app_mark = RXRPC_APP_MARK_EOF;
 		call->app_read_buf = NULL;
@@ -1710,22 +1814,26 @@ static int __rxrpc_call_read_data(struct rxrpc_call *call)
 
 /*****************************************************************************/
 /*
- * attempt to read the specified amount of data from the call's ready queue into the buffer
- * provided
- * - since this func is the only one going to look at packets queued on app_readyq, we don't need
- *   a lock to modify or access them, only to modify the queue pointers
+ * attempt to read the specified amount of data from the call's ready queue
+ * into the buffer provided
+ * - since this func is the only one going to look at packets queued on
+ *   app_readyq, we don't need a lock to modify or access them, only to modify
+ *   the queue pointers
  * - if the buffer pointer is NULL, then data is merely drained, not copied
- * - if flags&RXRPC_CALL_READ_BLOCK, then the function will wait until there is enough data or an
- *   error will be generated
- *   - note that the caller must have added the calling task to the call's wait queue beforehand
- * - if flags&RXRPC_CALL_READ_ALL, then an error will be generated if this function doesn't read
- *   all available data
+ * - if flags&RXRPC_CALL_READ_BLOCK, then the function will wait until there is
+ *   enough data or an error will be generated
+ *   - note that the caller must have added the calling task to the call's wait
+ *     queue beforehand
+ * - if flags&RXRPC_CALL_READ_ALL, then an error will be generated if this
+ *   function doesn't read all available data
  */
-int rxrpc_call_read_data(struct rxrpc_call *call, void *buffer, size_t size, int flags)
+int rxrpc_call_read_data(struct rxrpc_call *call,
+			 void *buffer, size_t size, int flags)
 {
 	int ret;
 
-	_enter("%p{arq=%Zu},%p,%Zd,%x",call,call->app_ready_qty,buffer,size,flags);
+	_enter("%p{arq=%Zu},%p,%Zd,%x",
+	       call, call->app_ready_qty, buffer, size, flags);
 
 	spin_lock(&call->lock);
 
@@ -1744,9 +1852,10 @@ int rxrpc_call_read_data(struct rxrpc_call *call, void *buffer, size_t size, int
 	ret = __rxrpc_call_read_data(call);
 	switch (ret) {
 	case 0:
-		if (flags&RXRPC_CALL_READ_ALL && (!call->app_last_rcv || call->app_ready_qty>0)) {
+		if (flags & RXRPC_CALL_READ_ALL &&
+		    (!call->app_last_rcv || call->app_ready_qty > 0)) {
 			_leave(" = -EBADMSG");
-			__rxrpc_call_abort(call,-EBADMSG);
+			__rxrpc_call_abort(call, -EBADMSG);
 			return -EBADMSG;
 		}
 
@@ -1757,18 +1866,18 @@ int rxrpc_call_read_data(struct rxrpc_call *call, void *buffer, size_t size, int
 
 	case -ECONNABORTED:
 		spin_unlock(&call->lock);
-		_leave(" = %d [aborted]",ret);
+		_leave(" = %d [aborted]", ret);
 		return ret;
 
-	default:			
-		__rxrpc_call_abort(call,ret);
-		_leave(" = %d",ret);
+	default:
+		__rxrpc_call_abort(call, ret);
+		_leave(" = %d", ret);
 		return ret;
 
 	case -EAGAIN:
 		spin_unlock(&call->lock);
 
-		if (!(flags&RXRPC_CALL_READ_BLOCK)) {
+		if (!(flags & RXRPC_CALL_READ_BLOCK)) {
 			_leave(" = -EAGAIN");
 			return -EAGAIN;
 		}
@@ -1789,7 +1898,7 @@ int rxrpc_call_read_data(struct rxrpc_call *call, void *buffer, size_t size, int
 			return -EINTR;
 		}
 
-		if (call->app_call_state==RXRPC_CSTATE_ERROR) {
+		if (call->app_call_state == RXRPC_CSTATE_ERROR) {
 			_leave(" = -ECONNABORTED");
 			return -ECONNABORTED;
 		}
@@ -1804,8 +1913,8 @@ int rxrpc_call_read_data(struct rxrpc_call *call, void *buffer, size_t size, int
 /*
  * write data to a call
  * - the data may not be sent immediately if it doesn't fill a buffer
- * - if we can't queue all the data for buffering now, siov[] will have been adjusted to take
- *   account of what has been sent
+ * - if we can't queue all the data for buffering now, siov[] will have been
+ *   adjusted to take account of what has been sent
  */
 int rxrpc_call_write_data(struct rxrpc_call *call,
 			  size_t sioc,
@@ -1821,7 +1930,9 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 	char *buf;
 	int ret;
 
-	_enter("%p,%Zu,%p,%02x,%x,%d,%p",call,sioc,siov,rxhdr_flags,alloc_flags,dup_data,size_sent);
+	_enter("%p,%Zu,%p,%02x,%x,%d,%p",
+	       call, sioc, siov, rxhdr_flags, alloc_flags, dup_data,
+	       size_sent);
 
 	*size_sent = 0;
 	size = 0;
@@ -1840,8 +1951,9 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 
 	/* calculate how much data we've been given */
 	sptr = siov;
-	for (; sioc>0; sptr++, sioc--) {
-		if (!sptr->iov_len) continue;
+	for (; sioc > 0; sptr++, sioc--) {
+		if (!sptr->iov_len)
+			continue;
 
 		if (!sptr->iov_base)
 			goto out;
@@ -1849,27 +1961,30 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 		size += sptr->iov_len;
 	}
 
-	_debug("- size=%Zu mtu=%Zu",size,call->conn->mtu_size);
+	_debug("- size=%Zu mtu=%Zu", size, call->conn->mtu_size);
 
 	do {
 		/* make sure there's a message under construction */
 		if (!call->snd_nextmsg) {
 			/* no - allocate a message with no data yet attached */
-			ret = rxrpc_conn_newmsg(call->conn,call,RXRPC_PACKET_TYPE_DATA,
-						0,NULL,alloc_flags,&call->snd_nextmsg);
-			if (ret<0)
+			ret = rxrpc_conn_newmsg(call->conn, call,
+						RXRPC_PACKET_TYPE_DATA,
+						0, NULL, alloc_flags,
+						&call->snd_nextmsg);
+			if (ret < 0)
 				goto out;
-			_debug("- allocated new message [ds=%Zu]",call->snd_nextmsg->dsize);
+			_debug("- allocated new message [ds=%Zu]",
+			       call->snd_nextmsg->dsize);
 		}
 
 		msg = call->snd_nextmsg;
 		msg->hdr.flags |= rxhdr_flags;
 
 		/* deal with zero-length terminal packet */
-		if (size==0) {
+		if (size == 0) {
 			if (rxhdr_flags & RXRPC_LAST_PACKET) {
 				ret = rxrpc_call_flush(call);
-				if (ret<0)
+				if (ret < 0)
 					goto out;
 			}
 			break;
@@ -1877,24 +1992,27 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 
 		/* work out how much space current packet has available */
 		space = call->conn->mtu_size - msg->dsize;
-		chunk = min(space,size);
+		chunk = min(space, size);
 
-		_debug("- [before] space=%Zu chunk=%Zu",space,chunk);
+		_debug("- [before] space=%Zu chunk=%Zu", space, chunk);
 
 		while (!siov->iov_len)
 			siov++;
 
-		/* if we are going to have to duplicate the data then coalesce it too */
+		/* if we are going to have to duplicate the data then coalesce
+		 * it too */
 		if (dup_data) {
 			/* don't allocate more that 1 page at a time */
-			if (chunk>PAGE_SIZE)
+			if (chunk > PAGE_SIZE)
 				chunk = PAGE_SIZE;
 
 			/* allocate a data buffer and attach to the message */
-			buf = kmalloc(chunk,alloc_flags);
+			buf = kmalloc(chunk, alloc_flags);
 			if (unlikely(!buf)) {
-				if (msg->dsize==sizeof(struct rxrpc_header)) {
-					/* discard an empty msg and wind back the seq counter */
+				if (msg->dsize ==
+				    sizeof(struct rxrpc_header)) {
+					/* discard an empty msg and wind back
+					 * the seq counter */
 					rxrpc_put_message(msg);
 					call->snd_nextmsg = NULL;
 					call->snd_seq_count--;
@@ -1905,7 +2023,7 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 			}
 
 			tmp = msg->dcount++;
-			set_bit(tmp,&msg->dfree);
+			set_bit(tmp, &msg->dfree);
 			msg->data[tmp].iov_base = buf;
 			msg->data[tmp].iov_len = chunk;
 			msg->dsize += chunk;
@@ -1913,9 +2031,9 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 			size -= chunk;
 
 			/* load the buffer with data */
-			while (chunk>0) {
-				tmp = min(chunk,siov->iov_len);
-				memcpy(buf,siov->iov_base,tmp);
+			while (chunk > 0) {
+				tmp = min(chunk, siov->iov_len);
+				memcpy(buf, siov->iov_base, tmp);
 				buf += tmp;
 				siov->iov_base += tmp;
 				siov->iov_len -= tmp;
@@ -1926,7 +2044,8 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 		}
 		else {
 			/* we want to attach the supplied buffers directly */
-			while (chunk>0 && msg->dcount<RXRPC_MSG_MAX_IOCS) {
+			while (chunk > 0 &&
+			       msg->dcount < RXRPC_MSG_MAX_IOCS) {
 				tmp = msg->dcount++;
 				msg->data[tmp].iov_base = siov->iov_base;
 				msg->data[tmp].iov_len = siov->iov_len;
@@ -1938,20 +2057,20 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 			}
 		}
 
-		_debug("- [loaded] chunk=%Zu size=%Zu",chunk,size);
+		_debug("- [loaded] chunk=%Zu size=%Zu", chunk, size);
 
 		/* dispatch the message when full, final or requesting ACK */
-		if (msg->dsize>=call->conn->mtu_size || rxhdr_flags) {
+		if (msg->dsize >= call->conn->mtu_size || rxhdr_flags) {
 			ret = rxrpc_call_flush(call);
-			if (ret<0)
+			if (ret < 0)
 				goto out;
 		}
 
-	} while(size>0);
+	} while(size > 0);
 
 	ret = 0;
  out:
-	_leave(" = %d (%Zd queued, %Zd rem)",ret,*size_sent,size);
+	_leave(" = %d (%Zd queued, %Zd rem)", ret, *size_sent, size);
 	return ret;
 
 } /* end rxrpc_call_write_data() */
@@ -1965,7 +2084,7 @@ int rxrpc_call_flush(struct rxrpc_call *call)
 	struct rxrpc_message *msg;
 	int ret = 0;
 
-	_enter("%p",call);
+	_enter("%p", call);
 
 	rxrpc_get_call(call);
 
@@ -1983,25 +2102,28 @@ int rxrpc_call_flush(struct rxrpc_call *call)
 		}
 
 		_proto("Sending DATA message { ds=%Zu dc=%u df=%02lu }",
-		       msg->dsize,msg->dcount,msg->dfree);
+		       msg->dsize, msg->dcount, msg->dfree);
 
 		/* queue and adjust call state */
 		spin_lock(&call->lock);
-		list_add_tail(&msg->link,&call->acks_pendq);
+		list_add_tail(&msg->link, &call->acks_pendq);
 
-		/* decide what to do depending on current state and if this is the last packet */
+		/* decide what to do depending on current state and if this is
+		 * the last packet */
 		ret = -EINVAL;
 		switch (call->app_call_state) {
 		case RXRPC_CSTATE_SRVR_SND_REPLY:
 			if (msg->hdr.flags & RXRPC_LAST_PACKET) {
-				call->app_call_state = RXRPC_CSTATE_SRVR_RCV_FINAL_ACK;
+				call->app_call_state =
+					RXRPC_CSTATE_SRVR_RCV_FINAL_ACK;
 				_state(call);
 			}
 			break;
 
 		case RXRPC_CSTATE_CLNT_SND_ARGS:
 			if (msg->hdr.flags & RXRPC_LAST_PACKET) {
-				call->app_call_state = RXRPC_CSTATE_CLNT_RCV_REPLY;
+				call->app_call_state =
+					RXRPC_CSTATE_CLNT_RCV_REPLY;
 				_state(call);
 			}
 			break;
@@ -2016,19 +2138,20 @@ int rxrpc_call_flush(struct rxrpc_call *call)
 		call->acks_pend_cnt++;
 
 		mod_timer(&call->acks_timeout,
-			  __rxrpc_rtt_based_timeout(call,rxrpc_call_acks_timeout));
+			  __rxrpc_rtt_based_timeout(call,
+						    rxrpc_call_acks_timeout));
 
 		spin_unlock(&call->lock);
 
-		ret = rxrpc_conn_sendmsg(call->conn,msg);
-		if (ret==0)
+		ret = rxrpc_conn_sendmsg(call->conn, msg);
+		if (ret == 0)
 			call->pkt_snd_count++;
 	}
 
  out:
 	rxrpc_put_call(call);
 
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 	return ret;
 
 } /* end rxrpc_call_flush() */
@@ -2043,14 +2166,16 @@ static void rxrpc_call_resend(struct rxrpc_call *call, rxrpc_seq_t highest)
 	struct list_head *_p;
 	rxrpc_seq_t seq = 0;
 
-	_enter("%p,%u",call,highest);
+	_enter("%p,%u", call, highest);
 
 	_proto("Rx Resend required");
 
 	/* handle too many resends */
-	if (call->snd_resend_cnt>=rxrpc_call_max_resend) {
-		_debug("Aborting due to too many resends (rcv=%d)",call->pkt_rcv_count);
-		rxrpc_call_abort(call,call->pkt_rcv_count>0?-EIO:-ETIMEDOUT);
+	if (call->snd_resend_cnt >= rxrpc_call_max_resend) {
+		_debug("Aborting due to too many resends (rcv=%d)",
+		       call->pkt_rcv_count);
+		rxrpc_call_abort(call,
+				 call->pkt_rcv_count > 0 ? -EIO : -ETIMEDOUT);
 		_leave("");
 		return;
 	}
@@ -2059,35 +2184,38 @@ static void rxrpc_call_resend(struct rxrpc_call *call, rxrpc_seq_t highest)
 	call->snd_resend_cnt++;
 	for (;;) {
 		/* determine which the next packet we might need to ACK is */
-		if (seq<=call->acks_dftv_seq)
+		if (seq <= call->acks_dftv_seq)
 			seq = call->acks_dftv_seq;
 		seq++;
 
-		if (seq>highest)
+		if (seq > highest)
 			break;
 
 		/* look for the packet in the pending-ACK queue */
-		list_for_each(_p,&call->acks_pendq) {
-			msg = list_entry(_p,struct rxrpc_message,link);
-			if (msg->seq==seq)
+		list_for_each(_p, &call->acks_pendq) {
+			msg = list_entry(_p, struct rxrpc_message, link);
+			if (msg->seq == seq)
 				goto found_msg;
 		}
 
-		panic("%s(%p,%d): Inconsistent pending-ACK queue (ds=%u sc=%u sq=%u)\n",
-		      __FUNCTION__,call,highest,call->acks_dftv_seq,call->snd_seq_count,seq);
+		panic("%s(%p,%d):"
+		      " Inconsistent pending-ACK queue (ds=%u sc=%u sq=%u)\n",
+		      __FUNCTION__, call, highest,
+		      call->acks_dftv_seq, call->snd_seq_count, seq);
 
 	found_msg:
-		if (msg->state!=RXRPC_MSG_SENT)
+		if (msg->state != RXRPC_MSG_SENT)
 			continue; /* only un-ACK'd packets */
 
 		rxrpc_get_message(msg);
 		spin_unlock(&call->lock);
 
-		/* send each message again (and ignore any errors we might incur) */
+		/* send each message again (and ignore any errors we might
+		 * incur) */
 		_proto("Resending DATA message { ds=%Zu dc=%u df=%02lu }",
-		       msg->dsize,msg->dcount,msg->dfree);
+		       msg->dsize, msg->dcount, msg->dfree);
 
-		if (rxrpc_conn_sendmsg(call->conn,msg)==0)
+		if (rxrpc_conn_sendmsg(call->conn, msg) == 0)
 			call->pkt_snd_count++;
 
 		rxrpc_put_message(msg);
@@ -2096,7 +2224,8 @@ static void rxrpc_call_resend(struct rxrpc_call *call, rxrpc_seq_t highest)
 	}
 
 	/* reset the timeout */
-	mod_timer(&call->acks_timeout,__rxrpc_rtt_based_timeout(call,rxrpc_call_acks_timeout));
+	mod_timer(&call->acks_timeout,
+		  __rxrpc_rtt_based_timeout(call, rxrpc_call_acks_timeout));
 
 	spin_unlock(&call->lock);
 
@@ -2109,10 +2238,10 @@ static void rxrpc_call_resend(struct rxrpc_call *call, rxrpc_seq_t highest)
  */
 void rxrpc_call_handle_error(struct rxrpc_call *call, int local, int errno)
 {
-	_enter("%p{%u},%d",call,ntohl(call->call_id),errno);
+	_enter("%p{%u},%d", call, ntohl(call->call_id), errno);
 
 	/* if this call is already aborted, then just wake up any waiters */
-	if (call->app_call_state==RXRPC_CSTATE_ERROR) {
+	if (call->app_call_state == RXRPC_CSTATE_ERROR) {
 		call->app_error_func(call);
 	}
 	else {
@@ -2124,10 +2253,10 @@ void rxrpc_call_handle_error(struct rxrpc_call *call, int local, int errno)
 			call->app_err_state = RXRPC_ESTATE_LOCAL_ERROR;
 		else
 			call->app_err_state = RXRPC_ESTATE_REMOTE_ERROR;
-		call->app_errno = errno;
-		call->app_mark = RXRPC_APP_MARK_EOF;
-		call->app_read_buf = NULL;
-		call->app_async_read = 0;
+		call->app_errno		= errno;
+		call->app_mark		= RXRPC_APP_MARK_EOF;
+		call->app_read_buf	= NULL;
+		call->app_async_read	= 0;
 
 		/* map the error */
 		call->app_aemap_func(call);

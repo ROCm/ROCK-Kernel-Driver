@@ -32,7 +32,7 @@ MODULE_DESCRIPTION("Rx RPC implementation");
 MODULE_AUTHOR("Red Hat, Inc.");
 MODULE_LICENSE("GPL");
 
-u32 rxrpc_epoch;
+uint32_t rxrpc_epoch;
 
 /*****************************************************************************/
 /*
@@ -101,11 +101,16 @@ static void __exit rxrpc_cleanup(void)
 {
 	kenter("");
 
-	__RXACCT(printk("Outstanding Messages   : %d\n",atomic_read(&rxrpc_message_count)));
-	__RXACCT(printk("Outstanding Calls      : %d\n",atomic_read(&rxrpc_call_count)));
-	__RXACCT(printk("Outstanding Connections: %d\n",atomic_read(&rxrpc_connection_count)));
-	__RXACCT(printk("Outstanding Peers      : %d\n",atomic_read(&rxrpc_peer_count)));
-	__RXACCT(printk("Outstanding Transports : %d\n",atomic_read(&rxrpc_transport_count)));
+	__RXACCT(printk("Outstanding Messages   : %d\n",
+			atomic_read(&rxrpc_message_count)));
+	__RXACCT(printk("Outstanding Calls      : %d\n",
+			atomic_read(&rxrpc_call_count)));
+	__RXACCT(printk("Outstanding Connections: %d\n",
+			atomic_read(&rxrpc_connection_count)));
+	__RXACCT(printk("Outstanding Peers      : %d\n",
+			atomic_read(&rxrpc_peer_count)));
+	__RXACCT(printk("Outstanding Transports : %d\n",
+			atomic_read(&rxrpc_transport_count)));
 
 	rxrpc_krxsecd_kill();
 	rxrpc_krxiod_kill();
@@ -117,11 +122,61 @@ static void __exit rxrpc_cleanup(void)
 	rxrpc_proc_cleanup();
 #endif
 
-	__RXACCT(printk("Outstanding Messages   : %d\n",atomic_read(&rxrpc_message_count)));
-	__RXACCT(printk("Outstanding Calls      : %d\n",atomic_read(&rxrpc_call_count)));
-	__RXACCT(printk("Outstanding Connections: %d\n",atomic_read(&rxrpc_connection_count)));
-	__RXACCT(printk("Outstanding Peers      : %d\n",atomic_read(&rxrpc_peer_count)));
-	__RXACCT(printk("Outstanding Transports : %d\n",atomic_read(&rxrpc_transport_count)));
+	__RXACCT(printk("Outstanding Messages   : %d\n",
+			atomic_read(&rxrpc_message_count)));
+	__RXACCT(printk("Outstanding Calls      : %d\n",
+			atomic_read(&rxrpc_call_count)));
+	__RXACCT(printk("Outstanding Connections: %d\n",
+			atomic_read(&rxrpc_connection_count)));
+	__RXACCT(printk("Outstanding Peers      : %d\n",
+			atomic_read(&rxrpc_peer_count)));
+	__RXACCT(printk("Outstanding Transports : %d\n",
+			atomic_read(&rxrpc_transport_count)));
 
 	kleave("");
 } /* end rxrpc_cleanup() */
+
+/*****************************************************************************/
+/*
+ * clear the dead space between task_struct and kernel stack
+ * - called by supplying -finstrument-functions to gcc
+ */
+#if 0
+void __cyg_profile_func_enter (void *this_fn, void *call_site)
+__attribute__((no_instrument_function));
+
+void __cyg_profile_func_enter (void *this_fn, void *call_site)
+{
+       asm volatile("  movl    %%esp,%%edi     \n"
+                    "  andl    %0,%%edi        \n"
+                    "  addl    %1,%%edi        \n"
+                    "  movl    %%esp,%%ecx     \n"
+                    "  subl    %%edi,%%ecx     \n"
+                    "  shrl    $2,%%ecx        \n"
+                    "  movl    $0xedededed,%%eax     \n"
+                    "  rep stosl               \n"
+                    :
+                    : "i"(~(THREAD_SIZE-1)), "i"(sizeof(struct thread_info))
+                    : "eax", "ecx", "edi", "memory", "cc"
+                    );
+}
+
+void __cyg_profile_func_exit(void *this_fn, void *call_site)
+__attribute__((no_instrument_function));
+
+void __cyg_profile_func_exit(void *this_fn, void *call_site)
+{
+       asm volatile("  movl    %%esp,%%edi     \n"
+                    "  andl    %0,%%edi        \n"
+                    "  addl    %1,%%edi        \n"
+                    "  movl    %%esp,%%ecx     \n"
+                    "  subl    %%edi,%%ecx     \n"
+                    "  shrl    $2,%%ecx        \n"
+                    "  movl    $0xdadadada,%%eax     \n"
+                    "  rep stosl               \n"
+                    :
+                    : "i"(~(THREAD_SIZE-1)), "i"(sizeof(struct thread_info))
+                    : "eax", "ecx", "edi", "memory", "cc"
+                    );
+}
+#endif

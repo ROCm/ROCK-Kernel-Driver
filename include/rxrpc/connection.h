@@ -34,6 +34,7 @@ struct rxrpc_connection
 	struct list_head	link;		/* link in peer's list */
 	struct list_head	proc_link;	/* link in proc list */
 	struct list_head	err_link;	/* link in ICMP error processing list */
+	struct list_head	id_link;	/* link in ID grant list */
 	struct sockaddr_in	addr;		/* remote address */
 	struct rxrpc_call	*channels[4];	/* channels (active calls) */
 	wait_queue_head_t	chanwait;	/* wait for channel to become available */
@@ -44,19 +45,19 @@ struct rxrpc_connection
 	rxrpc_serial_t		serial_counter;	/* packet serial number counter */
 
 	/* the following should all be in net order */
-	u32			in_epoch;	/* peer's epoch */
-	u32			out_epoch;	/* my epoch */
-	u32			conn_id;	/* connection ID, appropriately shifted */
-	u16			service_id;	/* service ID */
-	u8			security_ix;	/* security ID */
-	u8			in_clientflag;	/* RXRPC_CLIENT_INITIATED if we are server */
-	u8			out_clientflag;	/* RXRPC_CLIENT_INITIATED if we are client */
+	uint32_t		in_epoch;	/* peer's epoch */
+	uint32_t		out_epoch;	/* my epoch */
+	uint32_t		conn_id;	/* connection ID, appropriately shifted */
+	uint16_t		service_id;	/* service ID */
+	uint8_t			security_ix;	/* security ID */
+	uint8_t			in_clientflag;	/* RXRPC_CLIENT_INITIATED if we are server */
+	uint8_t			out_clientflag;	/* RXRPC_CLIENT_INITIATED if we are client */
 };
 
 extern int rxrpc_create_connection(struct rxrpc_transport *trans,
-				   u16 port,
-				   u32 addr,
-				   unsigned short service_id,
+				   uint16_t port,
+				   uint32_t addr,
+				   uint16_t service_id,
 				   void *security,
 				   struct rxrpc_connection **_conn);
 

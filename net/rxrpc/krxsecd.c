@@ -36,7 +36,8 @@ static volatile int rxrpc_krxsecd_die;
 
 static atomic_t rxrpc_krxsecd_qcount;
 
-/* queue of unprocessed inbound messages with seqno #1 and RXRPC_CLIENT_INITIATED flag set */
+/* queue of unprocessed inbound messages with seqno #1 and
+ * RXRPC_CLIENT_INITIATED flag set */
 static LIST_HEAD(rxrpc_krxsecd_initmsgq);
 static spinlock_t rxrpc_krxsecd_initmsgq_lock = SPIN_LOCK_UNLOCKED;
 
@@ -48,13 +49,19 @@ static void rxrpc_krxsecd_process_incoming_call(struct rxrpc_message *msg);
  */
 static int rxrpc_krxsecd(void *arg)
 {
-	DECLARE_WAITQUEUE(krxsecd,current);
+	DECLARE_WAITQUEUE(krxsecd, current);
 
 	int die;
 
-	printk("Started krxsecd %d\n",current->pid);
+	printk("Started krxsecd %d\n", current->pid);
 
 	daemonize("krxsecd");
+
+	/* only certain signals are of interest */
+	spin_lock_irq(&current->sighand->siglock);
+	siginitsetinv(&current->blocked, 0);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
 
 	/* loop around waiting for work to do */
 	do {
@@ -63,7 +70,7 @@ static int rxrpc_krxsecd(void *arg)
 		if (!atomic_read(&rxrpc_krxsecd_qcount)) {
 			set_current_state(TASK_INTERRUPTIBLE);
 
-			add_wait_queue(&rxrpc_krxsecd_sleepq,&krxsecd);
+			add_wait_queue(&rxrpc_krxsecd_sleepq, &krxsecd);
 
 			for (;;) {
 				set_current_state(TASK_INTERRUPTIBLE);
@@ -75,7 +82,7 @@ static int rxrpc_krxsecd(void *arg)
 				schedule();
 			}
 
-			remove_wait_queue(&rxrpc_krxsecd_sleepq,&krxsecd);
+			remove_wait_queue(&rxrpc_krxsecd_sleepq, &krxsecd);
 			set_current_state(TASK_RUNNING);
 		}
 		die = rxrpc_krxsecd_die;
@@ -91,7 +98,7 @@ static int rxrpc_krxsecd(void *arg)
 
 			if (!list_empty(&rxrpc_krxsecd_initmsgq)) {
 				msg = list_entry(rxrpc_krxsecd_initmsgq.next,
-						 struct rxrpc_message,link);
+						 struct rxrpc_message, link);
 				list_del_init(&msg->link);
 				atomic_dec(&rxrpc_krxsecd_qcount);
 			}
@@ -112,7 +119,7 @@ static int rxrpc_krxsecd(void *arg)
 	} while (!die);
 
 	/* and that's all */
-	complete_and_exit(&rxrpc_krxsecd_dead,0);
+	complete_and_exit(&rxrpc_krxsecd_dead, 0);
 
 } /* end rxrpc_krxsecd() */
 
@@ -122,7 +129,7 @@ static int rxrpc_krxsecd(void *arg)
  */
 int __init rxrpc_krxsecd_init(void)
 {
-	return kernel_thread(rxrpc_krxsecd,NULL,0);
+	return kernel_thread(rxrpc_krxsecd, NULL, 0);
 
 } /* end rxrpc_krxsecd_init() */
 
@@ -154,11 +161,11 @@ void rxrpc_krxsecd_clear_transport(struct rxrpc_transport *trans)
 	/* move all the messages for this transport onto a temp list */
 	spin_lock(&rxrpc_krxsecd_initmsgq_lock);
 
-	list_for_each_safe(_p,_n,&rxrpc_krxsecd_initmsgq) {
-		msg = list_entry(_p,struct rxrpc_message,link);
-		if (msg->trans==trans) {
+	list_for_each_safe(_p, _n, &rxrpc_krxsecd_initmsgq) {
+		msg = list_entry(_p, struct rxrpc_message, link);
+		if (msg->trans == trans) {
 			list_del(&msg->link);
-			list_add_tail(&msg->link,&tmp);
+			list_add_tail(&msg->link, &tmp);
 			atomic_dec(&rxrpc_krxsecd_qcount);
 		}
 	}
@@ -167,7 +174,7 @@ void rxrpc_krxsecd_clear_transport(struct rxrpc_transport *trans)
 
 	/* zap all messages on the temp list */
 	while (!list_empty(&tmp)) {
-		msg = list_entry(tmp.next,struct rxrpc_message,link);
+		msg = list_entry(tmp.next, struct rxrpc_message, link);
 		list_del_init(&msg->link);
 		rxrpc_put_message(msg);
 	}
@@ -181,14 +188,14 @@ void rxrpc_krxsecd_clear_transport(struct rxrpc_transport *trans)
  */
 void rxrpc_krxsecd_queue_incoming_call(struct rxrpc_message *msg)
 {
-	_enter("%p",msg);
+	_enter("%p", msg);
 
 	/* queue for processing by krxsecd */
 	spin_lock(&rxrpc_krxsecd_initmsgq_lock);
 
 	if (!rxrpc_krxsecd_die) {
 		rxrpc_get_message(msg);
-		list_add_tail(&msg->link,&rxrpc_krxsecd_initmsgq);
+		list_add_tail(&msg->link, &rxrpc_krxsecd_initmsgq);
 		atomic_inc(&rxrpc_krxsecd_qcount);
 	}
 
@@ -212,10 +219,10 @@ void rxrpc_krxsecd_process_incoming_call(struct rxrpc_message *msg)
 	unsigned short sid;
 	int ret;
 
-	_enter("%p{tr=%p}",msg,trans);
+	_enter("%p{tr=%p}", msg, trans);
 
-	ret = rxrpc_incoming_call(msg->conn,msg,&call);
-	if (ret<0)
+	ret = rxrpc_incoming_call(msg->conn, msg, &call);
+	if (ret < 0)
 		goto out;
 
 	/* find the matching service on the transport */
@@ -223,11 +230,11 @@ void rxrpc_krxsecd_process_incoming_call(struct rxrpc_message *msg)
 	srv = NULL;
 
 	spin_lock(&trans->lock);
-	list_for_each(_p,&trans->services) {
-		srv = list_entry(_p,struct rxrpc_service,link);
-		if (srv->service_id==sid && try_module_get(srv->owner)) {
+	list_for_each(_p, &trans->services) {
+		srv = list_entry(_p, struct rxrpc_service, link);
+		if (srv->service_id == sid && try_module_get(srv->owner)) {
 			/* found a match (made sure it won't vanish) */
-			_debug("found service '%s'",srv->name);
+			_debug("found service '%s'", srv->name);
 			call->owner = srv->owner;
 			break;
 		}
@@ -238,7 +245,7 @@ void rxrpc_krxsecd_process_incoming_call(struct rxrpc_message *msg)
 	 * - the func must inc the call's usage count to keep it
 	 */
 	ret = -ENOENT;
-	if (_p!=&trans->services) {
+	if (_p != &trans->services) {
 		/* attempt to accept the call */
 		call->conn->service = srv;
 		call->app_attn_func = srv->attn_func;
@@ -248,19 +255,20 @@ void rxrpc_krxsecd_process_incoming_call(struct rxrpc_message *msg)
 		ret = srv->new_call(call);
 
 		/* send an abort if an error occurred */
-		if (ret<0) {
-			rxrpc_call_abort(call,ret);
+		if (ret < 0) {
+			rxrpc_call_abort(call, ret);
 		}
 		else {
 			/* formally receive and ACK the new packet */
-			ret = rxrpc_conn_receive_call_packet(call->conn,call,msg);
+			ret = rxrpc_conn_receive_call_packet(call->conn,
+							     call, msg);
 		}
 	}
 
 	rxrpc_put_call(call);
  out:
-	if (ret<0)
-		rxrpc_trans_immediate_abort(trans,msg,ret);
+	if (ret < 0)
+		rxrpc_trans_immediate_abort(trans, msg, ret);
 
-	_leave(" (%d)",ret);
+	_leave(" (%d)", ret);
 } /* end rxrpc_krxsecd_process_incoming_call() */

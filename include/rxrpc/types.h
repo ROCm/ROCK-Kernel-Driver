@@ -19,8 +19,8 @@
 #include <linux/spinlock.h>
 #include <asm/atomic.h>
 
-typedef unsigned	rxrpc_seq_t;	/* Rx message sequence number */
-typedef unsigned	rxrpc_serial_t;	/* Rx message serial number */
+typedef uint32_t	rxrpc_seq_t;	/* Rx message sequence number */
+typedef uint32_t	rxrpc_serial_t;	/* Rx message serial number */
 
 struct rxrpc_call;
 struct rxrpc_connection;
