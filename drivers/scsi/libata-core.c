@@ -43,6 +43,7 @@
 #include <linux/libata.h>
 #include <asm/io.h>
 #include <asm/semaphore.h>
+#include <asm/byteorder.h>
 
 #include "libata.h"
 
@@ -58,6 +59,7 @@ static int ata_choose_xfer_mode(struct ata_port *ap,
 				u8 *xfer_mode_out,
 				unsigned int *xfer_shift_out);
 static int ata_qc_complete_noop(struct ata_queued_cmd *qc, u8 drv_stat);
+static void swap_buf_le16(u16 *buf, unsigned int buf_words);
 
 static unsigned int ata_unique_id = 1;
 static struct workqueue_struct *ata_wq;
@@ -1031,6 +1033,8 @@ retry:
 		}
 		goto err_out;
 	}
+
+	swap_buf_le16(dev->id, ATA_ID_WORDS);
 
 	/* print device capabilities */
 	printk(KERN_DEBUG "ata%u: dev %u cfg "
@@ -2062,6 +2066,16 @@ static void ata_pio_complete (struct ata_port *ap)
 	ata_qc_complete(qc, drv_stat);
 }
 
+static void swap_buf_le16(u16 *buf, unsigned int buf_words)
+{
+#ifdef __BIG_ENDIAN
+	unsigned int i;
+
+	for (i = 0; i < words; i++)
+		buf[i] = le16_to_cpu(buf[i]);
+#endif /* __BIG_ENDIAN */
+}
+
 static void ata_mmio_data_xfer(struct ata_port *ap, unsigned char *buf,
 			       unsigned int buflen, int write_data)
 {
@@ -2072,22 +2086,22 @@ static void ata_mmio_data_xfer(struct ata_port *ap, unsigned char *buf,
 
 	if (write_data) {
 		for (i = 0; i < words; i++)
-			writew(buf16[i], mmio);
+			writew(le16_to_cpu(buf16[i]), mmio);
 	} else {
 		for (i = 0; i < words; i++)
-			buf16[i] = readw(mmio);
+			buf16[i] = cpu_to_le16(readw(mmio));
 	}
 }
 
 static void ata_pio_data_xfer(struct ata_port *ap, unsigned char *buf,
 			      unsigned int buflen, int write_data)
 {
-	unsigned int dwords = buflen >> 2;
+	unsigned int dwords = buflen >> 1;
 
 	if (write_data)
-		outsl(ap->ioaddr.data_addr, buf, dwords);
+		outsw(ap->ioaddr.data_addr, buf, dwords);
 	else
-		insl(ap->ioaddr.data_addr, buf, dwords);
+		insw(ap->ioaddr.data_addr, buf, dwords);
 }
 
 static void ata_data_xfer(struct ata_port *ap, unsigned char *buf,
