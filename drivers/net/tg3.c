@@ -4878,8 +4878,15 @@ static void __tg3_set_rx_mode(struct net_device *dev)
 
 	rx_mode = tp->rx_mode & ~(RX_MODE_PROMISC |
 				  RX_MODE_KEEP_VLAN_TAG);
+#if TG3_VLAN_TAG_USED
 	if (!tp->vlgrp)
 		rx_mode |= RX_MODE_KEEP_VLAN_TAG;
+#else
+	/* By definition, VLAN is disabled always in this
+	 * case.
+	 */
+	rx_mode |= RX_MODE_KEEP_VLAN_TAG;
+#endif
 
 	if (dev->flags & IFF_PROMISC) {
 		/* Promiscuous mode. */
