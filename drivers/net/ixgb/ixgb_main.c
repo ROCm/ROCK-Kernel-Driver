@@ -633,8 +633,8 @@ static int ixgb_setup_tx_resources(struct ixgb_adapter *adapter)
 	int size;
 
 	size = sizeof(struct ixgb_buffer) * txdr->count;
-	txdr->buffer_info = kmalloc(size, GFP_KERNEL);
 	if (!txdr->buffer_info) {
+	txdr->buffer_info = vmalloc(size);
 		return -ENOMEM;
 	}
 	memset(txdr->buffer_info, 0, size);
@@ -646,7 +646,7 @@ static int ixgb_setup_tx_resources(struct ixgb_adapter *adapter)
 
 	txdr->desc = pci_alloc_consistent(pdev, txdr->size, &txdr->dma);
 	if (!txdr->desc) {
-		kfree(txdr->buffer_info);
+		vfree(txdr->buffer_info);
 		return -ENOMEM;
 	}
 	memset(txdr->desc, 0, txdr->size);
@@ -722,8 +722,8 @@ static int ixgb_setup_rx_resources(struct ixgb_adapter *adapter)
 	int size;
 
 	size = sizeof(struct ixgb_buffer) * rxdr->count;
-	rxdr->buffer_info = kmalloc(size, GFP_KERNEL);
 	if (!rxdr->buffer_info) {
+	rxdr->buffer_info = vmalloc(size);
 		return -ENOMEM;
 	}
 	memset(rxdr->buffer_info, 0, size);
@@ -736,7 +736,7 @@ static int ixgb_setup_rx_resources(struct ixgb_adapter *adapter)
 	rxdr->desc = pci_alloc_consistent(pdev, rxdr->size, &rxdr->dma);
 
 	if (!rxdr->desc) {
-		kfree(rxdr->buffer_info);
+		vfree(rxdr->buffer_info);
 		return -ENOMEM;
 	}
 	memset(rxdr->desc, 0, rxdr->size);
@@ -853,7 +853,7 @@ static void ixgb_free_tx_resources(struct ixgb_adapter *adapter)
 
 	ixgb_clean_tx_ring(adapter);
 
-	kfree(adapter->tx_ring.buffer_info);
+	vfree(adapter->tx_ring.buffer_info);
 	adapter->tx_ring.buffer_info = NULL;
 
 	pci_free_consistent(pdev, adapter->tx_ring.size,
@@ -919,7 +919,7 @@ static void ixgb_free_rx_resources(struct ixgb_adapter *adapter)
 
 	ixgb_clean_rx_ring(adapter);
 
-	kfree(rx_ring->buffer_info);
+	vfree(rx_ring->buffer_info);
 	rx_ring->buffer_info = NULL;
 
 	pci_free_consistent(pdev, rx_ring->size, rx_ring->desc, rx_ring->dma);
