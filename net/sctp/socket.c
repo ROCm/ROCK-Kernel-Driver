@@ -820,7 +820,32 @@ SCTP_STATIC int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 
 	/* If a msg_name has been specified, assume this is to be used.  */
 	if (msg_name) {
+		/* Look for a matching association on the endpoint. */
 		asoc = sctp_endpoint_lookup_assoc(ep, &to, &transport);
+		if (!asoc) {
+			struct list_head *pos;
+			struct sockaddr_storage_list *addr;
+			sctp_bind_addr_t *bp = &ep->base.bind_addr;
+
+			sctp_read_lock(&ep->base.addr_lock);
+
+			/* If we could not find a matching association on
+			 * the endpoint, make sure that there is no peeled-
+			 * off association.
+			 */ 
+			list_for_each(pos, &bp->address_list) {
+				addr = list_entry(pos,
+						  struct sockaddr_storage_list,
+						  list);
+				if (sctp_has_association(&addr->a, &to)) {
+					err = -EINVAL;
+					sctp_read_unlock(&ep->base.addr_lock);
+					goto out_unlock;
+				}
+			}
+
+			sctp_read_unlock(&ep->base.addr_lock);
+		}
 	} else {
 		/* For a peeled-off socket, ignore any associd specified by
 		 * the user with SNDRCVINFO.
@@ -1583,6 +1608,8 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 	sctp_endpoint_t *newep;
 	sctp_opt_t *oldsp = sctp_sk(oldsk);
 	sctp_opt_t *newsp;
+	struct sk_buff *skb, *tmp;
+	sctp_ulpevent_t *event;
 	int err = 0;
 
 	/* An association cannot be branched off from an already peeled-off
@@ -1612,6 +1639,17 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 	 */
 	newsp->ep = newep;
 
+	/* Move any messages in the old socket's receive queue that are for the
+	 * peeled off association to the new socket's receive queue.
+	 */
+	sctp_skb_for_each(skb, &oldsk->receive_queue, tmp) {
+		event = (sctp_ulpevent_t *)skb->cb;
+		if (event->asoc == assoc) {
+			__skb_unlink(skb, skb->list);
+			__skb_queue_tail(&newsk->receive_queue, skb);
+		}
+	}
+
 	/* Set the type of socket to indicate that it is peeled off from the
 	 * original socket.
 	 */
@@ -1629,39 +1667,46 @@ static inline int sctp_getsockopt_peeloff(struct sock *sk, int len, char *optval
 {
 	sctp_peeloff_arg_t peeloff;
 	struct socket *newsock;
-	int err, sd;
+	int retval = 0;
 	sctp_association_t *assoc;
 
 	if (len != sizeof(sctp_peeloff_arg_t))
 		return -EINVAL;
 	if (copy_from_user(&peeloff, optval, len))
 		return -EFAULT;
+
+	sctp_lock_sock(sk);
+
 	assoc = sctp_id2assoc(sk, peeloff.associd);
-	if (NULL == assoc)
-		return -EINVAL;
+	if (NULL == assoc) {
+		retval = -EINVAL;
+		goto out_unlock;
+	}
 
 	SCTP_DEBUG_PRINTK("%s: sk: %p assoc: %p\n", __FUNCTION__, sk, assoc);
 
-	err = sctp_do_peeloff(assoc, &newsock);
-	if (err < 0)
-		return err;
+	retval = sctp_do_peeloff(assoc, &newsock);
+	if (retval < 0)
+		goto out_unlock;
 
 	/* Map the socket to an unused fd that can be returned to the user.  */
-	sd = sock_map_fd(newsock);
-	if (sd < 0) {
+	retval = sock_map_fd(newsock);
+	if (retval < 0) {
 		sock_release(newsock);
-		return sd;
+		goto out_unlock;
 	}
 
 	SCTP_DEBUG_PRINTK("%s: sk: %p assoc: %p newsk: %p sd: %d\n",
-			  __FUNCTION__, sk, assoc, newsock->sk, sd);
+			  __FUNCTION__, sk, assoc, newsock->sk, retval);
 
 	/* Return the fd mapped to the new socket.  */
-	peeloff.sd = sd;
+	peeloff.sd = retval;
 	if (copy_to_user(optval, &peeloff, len))
-		return -EFAULT;
+		retval = -EFAULT;
 
-	return 0;
+out_unlock:
+	sctp_release_sock(sk);
+	return retval;
 }
 
 SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
