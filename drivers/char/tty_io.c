@@ -2116,9 +2116,6 @@ static void tty_register_devfs(struct tty_driver *driver, unsigned minor)
 		return;
 	}
 
-	if (IS_TTY_DEV(dev) || IS_PTMX_DEV(dev)) 
-		mode |= S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
-
 	sprintf(buf, driver->name, idx + driver->name_base);
 	devfs_register(NULL, buf, 0, driver->major, minor, mode,
 		       &tty_fops, NULL);
@@ -2255,12 +2252,7 @@ void __init console_init(void)
 	}
 }
 
-static struct tty_driver dev_tty_driver, dev_syscons_driver;
-#ifdef CONFIG_UNIX98_PTYS
-static struct tty_driver dev_ptmx_driver;
-#endif
 #ifdef CONFIG_VT
-static struct tty_driver dev_console_driver;
 extern int vty_init(void);
 #endif
 
@@ -2282,64 +2274,37 @@ postcore_initcall(tty_devclass_init);
  */
 void __init tty_init(void)
 {
-	/*
-	 * dev_tty_driver and dev_console_driver are actually magic
-	 * devices which get redirected at open time.  Nevertheless,
-	 * we register them so that register_chrdev is called
-	 * appropriately.
-	 */
-	memset(&dev_tty_driver, 0, sizeof(struct tty_driver));
-	dev_tty_driver.magic = TTY_DRIVER_MAGIC;
-	dev_tty_driver.owner = THIS_MODULE;
-	dev_tty_driver.driver_name = "/dev/tty";
-	dev_tty_driver.name = dev_tty_driver.driver_name + 5;
-	dev_tty_driver.name_base = 0;
-	dev_tty_driver.major = TTYAUX_MAJOR;
-	dev_tty_driver.minor_start = 0;
-	dev_tty_driver.num = 1;
-	dev_tty_driver.type = TTY_DRIVER_TYPE_SYSTEM;
-	dev_tty_driver.subtype = SYSTEM_TYPE_TTY;
-	
-	if (tty_register_driver(&dev_tty_driver))
+	if (register_chrdev_region(TTYAUX_MAJOR, 0, 1,
+				   "/dev/tty", &tty_fops) < 0)
 		panic("Couldn't register /dev/tty driver\n");
 
-	dev_syscons_driver = dev_tty_driver;
-	dev_syscons_driver.owner = THIS_MODULE;
-	dev_syscons_driver.driver_name = "/dev/console";
-	dev_syscons_driver.name = dev_syscons_driver.driver_name + 5;
-	dev_syscons_driver.major = TTYAUX_MAJOR;
-	dev_syscons_driver.minor_start = 1;
-	dev_syscons_driver.type = TTY_DRIVER_TYPE_SYSTEM;
-	dev_syscons_driver.subtype = SYSTEM_TYPE_SYSCONS;
+	devfs_register (NULL, "tty", 0, TTYAUX_MAJOR, 0,
+			S_IFCHR | S_IRUGO | S_IWUGO, &tty_fops, NULL);
 
-	if (tty_register_driver(&dev_syscons_driver))
+	if (register_chrdev_region(TTYAUX_MAJOR, 1, 1,
+				   "/dev/console", &tty_fops) < 0)
 		panic("Couldn't register /dev/console driver\n");
 
-#ifdef CONFIG_UNIX98_PTYS
-	dev_ptmx_driver = dev_tty_driver;
-	dev_ptmx_driver.owner = THIS_MODULE;
-	dev_ptmx_driver.driver_name = "/dev/ptmx";
-	dev_ptmx_driver.name = dev_ptmx_driver.driver_name + 5;
-	dev_ptmx_driver.major= TTYAUX_MAJOR;
-	dev_ptmx_driver.minor_start = 2;
-	dev_ptmx_driver.type = TTY_DRIVER_TYPE_SYSTEM;
-	dev_ptmx_driver.subtype = SYSTEM_TYPE_SYSPTMX;
+	devfs_register (NULL, "console", 0, TTYAUX_MAJOR, 1,
+			S_IFCHR | S_IRUSR | S_IWUSR, &tty_fops, NULL);
 
-	if (tty_register_driver(&dev_ptmx_driver))
+#ifdef CONFIG_UNIX98_PTYS
+	if (register_chrdev_region(TTYAUX_MAJOR, 2, 1,
+				   "/dev/ptmx", &tty_fops) < 0)
 		panic("Couldn't register /dev/ptmx driver\n");
+
+	devfs_register (NULL, "ptmx", 0, TTYAUX_MAJOR, 2,
+			S_IFCHR | S_IRUGO | S_IWUGO, &tty_fops, NULL);
 #endif
 	
 #ifdef CONFIG_VT
-	dev_console_driver = dev_tty_driver;
-	dev_console_driver.owner = THIS_MODULE;
-	dev_console_driver.driver_name = "/dev/vc/0";
-	dev_console_driver.name = dev_console_driver.driver_name + 5;
-	dev_console_driver.major = TTY_MAJOR;
-	dev_console_driver.type = TTY_DRIVER_TYPE_SYSTEM;
-	dev_console_driver.subtype = SYSTEM_TYPE_CONSOLE;
-
-	if (tty_register_driver(&dev_console_driver))
+	if (register_chrdev_region(TTY_MAJOR, 0, 1,
+				   "/dev/vc/0", &tty_fops) < 0)
 		panic("Couldn't register /dev/tty0 driver\n");
+
+	devfs_register (NULL, "vc/0", 0, TTY_MAJOR, 0,
+			S_IFCHR | S_IRUSR | S_IWUSR, &tty_fops, NULL);
+
 	vty_init();
 #endif
 

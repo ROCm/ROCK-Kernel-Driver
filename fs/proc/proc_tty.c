@@ -32,6 +32,26 @@ static struct proc_dir_entry *proc_tty_ldisc, *proc_tty_driver;
 static int show_tty_driver(struct seq_file *m, void *v)
 {
 	struct tty_driver *p = v;
+ 
+	if (&p->tty_drivers == tty_drivers.next) {
+		/* pseudo-drivers first */
+		seq_printf(m, "%-20s /dev/%-8s ", "/dev/tty", "tty");
+		seq_printf(m, "%3d %7d ", TTYAUX_MAJOR, 0);
+		seq_printf(m, "system:/dev/tty\n");
+		seq_printf(m, "%-20s /dev/%-8s ", "/dev/console", "console");
+		seq_printf(m, "%3d %7d ", TTYAUX_MAJOR, 1);
+		seq_printf(m, "system:console\n");
+#ifdef CONFIG_UNIX98_PTYS
+		seq_printf(m, "%-20s /dev/%-8s ", "/dev/ptmx", "ptmx");
+		seq_printf(m, "%3d %7d ", TTYAUX_MAJOR, 2);
+		seq_printf(m, "system\n");
+#endif
+#ifdef CONFIG_VT
+		seq_printf(m, "%-20s /dev/%-8s ", "/dev/vc/0", "vc/0");
+		seq_printf(m, "%3d %7d ", TTY_MAJOR, 0);
+		seq_printf(m, "system:vtmaster\n");
+#endif
+	}
 
 	seq_printf(m, "%-20s ", p->driver_name ? p->driver_name : "unknown");
 	seq_printf(m, "/dev/%-8s ", p->name);
