@@ -1,13 +1,13 @@
 /* -*- linux-c -*- */
 
 /* 
- * Driver for USB Scanners (linux-2.4.12)
+ * Driver for USB Scanners (linux-2.4.18)
  *
- * Copyright (C) 1999, 2000, 2001 David E. Nelson
+ * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  *
  * Portions may be copyright Brad Keryan and Michael Gee.
  *
- * David E. Nelson (dnelson@jump.net)
+ * Brian Beattie <beattie@beattie-home.net>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -302,11 +302,24 @@
  *
  * 05/21/02 Currently maintained by Brian Beattie <beattie@beattie-home.net>
  *
+ * 0.4.8  5/30/2002
+ *    - Added Mustek BearPaw 2400 TA.  Thanks to Sergey
+ *      Vlasov <vsu@mivlgu.murom.ru>.
+ *    - Added Mustek 1200UB Plus and Mustek BearPaw 1200 CU ID's.  These use
+ *      the Grandtech GT-6801 chip. Thanks to Henning
+ *      Meier-Geinitz <henning@meier-geinitz.de>.
+ *    - Increased Epson timeout to 60 secs as requested from 
+ *      Karl Heinz Kremer <khk@khk.net>.
+ *    - Changed maintainership from David E. Nelson to Brian
+ *      Beattie <beattie@beattie-home.net>.
+ *
  * TODO
+ *    - Remove the 2/3 endpoint limitation
  *    - Performance
  *    - Select/poll methods
  *    - More testing
  *    - Proper registry/assignment for LM9830 ioctl's
+ *    - More general usage ioctl's
  *
  *
  *  Thanks to:
@@ -322,6 +335,8 @@
  *    - All the folks who chimed in with reports and suggestions.
  *    - All the developers that are working on USB SANE backends or other
  *      applications to use USB scanners.
+ *    - Thanks to Greg KH <greg@kroah.com> for setting up Brian Beattie
+ *      to be the new USB Scanner maintainer.
  *
  *  Performance:
  *
@@ -1035,7 +1050,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 
 	switch (dev->descriptor.idVendor) { /* Scanner specific read timeout parameters */
 	case 0x04b8:		/* Seiko/Epson */
-		scn->rd_nak_timeout = HZ * 40;
+		scn->rd_nak_timeout = HZ * 60;
 		break;
 	case 0x055f:		/* Mustek */
 	case 0x0400:		/* Another Mustek */

@@ -1,9 +1,9 @@
 /*
- * Driver for USB Scanners (linux-2.4.12)
+ * Driver for USB Scanners (linux-2.4.18)
  *
- * Copyright (C) 1999, 2000, 2001 David E. Nelson
+ * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  *
- * David E. Nelson (dnelson@jump.net)
+ * Brian Beattie <beattie@beattie-home.net>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -51,7 +51,7 @@
 
 static __s32 vendor=-1, product=-1, read_timeout=0;
 
-MODULE_AUTHOR("David E. Nelson, dnelson@jump.net, http://www.jump.net/~dnelson");
+MODULE_AUTHOR("Brian Beattie, beattie@beattie-home.net");
 MODULE_DESCRIPTION(DRIVER_DESC" "DRIVER_VERSION);
 MODULE_LICENSE("GPL");
 
@@ -144,6 +144,8 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x0400, 0x1001) }, /* BearPaw 2400 */
 	{ USB_DEVICE(0x055f, 0x0008) }, /* 1200 CU Plus */
 	{ USB_DEVICE(0x0ff5, 0x0010) }, /* BearPaw 1200F */
+	{ USB_DEVICE(0x055f, 0x0218) }, /* BearPaw 2400 TA */
+	{ USB_DEVICE(0x05d8, 0x4002) }, /* 1200 CU and 1200 UB Plus */
 	/* Plustek */
 	{ USB_DEVICE(0x07b3, 0x0017) }, /* OpticPro UT12 */
 	{ USB_DEVICE(0x07b3, 0x0011) }, /* OpticPro UT24 */
