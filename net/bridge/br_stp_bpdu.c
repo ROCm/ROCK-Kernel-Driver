@@ -132,18 +132,23 @@ void br_send_tcn_bpdu(struct net_bridge_port *p)
 
 static unsigned char header[6] = {0x42, 0x42, 0x03, 0x00, 0x00, 0x00};
 
-/* called under bridge lock */
+/* NO locks */
 void br_stp_handle_bpdu(struct sk_buff *skb)
 {
 	unsigned char *buf;
 	struct net_bridge_port *p;
+	struct net_bridge *br;
 
 	buf = skb->mac.raw + 14;
 	p = skb->dev->br_port;
-	if (!p->br->stp_enabled || memcmp(buf, header, 6)) {
-		kfree_skb(skb);
-		return;
-	}
+	br = p->br;
+
+	write_lock_bh(&br->lock);
+	if (p->state == BR_STATE_DISABLED 
+	    || !(br->dev.flags & IFF_UP)
+	    || !br->stp_enabled 
+	    || memcmp(buf, header, 6)) 
+		goto out;
 
 	if (buf[6] == BPDU_TYPE_CONFIG) {
 		struct br_config_bpdu bpdu;
@@ -178,16 +183,14 @@ void br_stp_handle_bpdu(struct sk_buff *skb)
 		bpdu.hello_time = br_get_ticks(buf+34);
 		bpdu.forward_delay = br_get_ticks(buf+36);
 
-		kfree_skb(skb);
 		br_received_config_bpdu(p, &bpdu);
-		return;
+		goto out;
 	}
 
 	if (buf[6] == BPDU_TYPE_TCN) {
 		br_received_tcn_bpdu(p);
-		kfree_skb(skb);
-		return;
+		goto out;
 	}
-
-	kfree_skb(skb);
+ out:
+	write_unlock_bh(&br->lock);
 }

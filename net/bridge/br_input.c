@@ -167,13 +167,8 @@ err_nolock:
 	return 0;
 
 handle_special_frame:
-	if (!dest[5]) {
-		br_stp_handle_bpdu(skb);
-		read_unlock(&br->lock);
-		return 0;
-	}
-
-	kfree_skb(skb);
 	read_unlock(&br->lock);
-	return 0;
+	if (!dest[5]) 
+		br_stp_handle_bpdu(skb);
+	goto err_nolock;
 }

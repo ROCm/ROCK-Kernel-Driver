@@ -22,7 +22,7 @@
 
 
 
-/* called under ioctl_lock or bridge lock */
+/* called under bridge lock */
 int br_is_root_bridge(struct net_bridge *br)
 {
 	return !memcmp(&br->bridge_id, &br->designated_root, 8);
@@ -35,7 +35,7 @@ int br_is_designated_port(struct net_bridge_port *p)
 		(p->designated_port == p->port_id);
 }
 
-/* called under ioctl_lock or bridge lock */
+/* called under bridge lock */
 struct net_bridge_port *br_get_port(struct net_bridge *br, int port_no)
 {
 	struct net_bridge_port *p;
@@ -419,18 +419,13 @@ static void br_topology_change_acknowledge(struct net_bridge_port *p)
 	br_transmit_config(p);
 }
 
-/* lock-safe */
+/* called under bridge lock */
 void br_received_config_bpdu(struct net_bridge_port *p, struct br_config_bpdu *bpdu)
 {
 	struct net_bridge *br;
 	int was_root;
 
-	if (p->state == BR_STATE_DISABLED)
-		return;
-
 	br = p->br;
-	read_lock(&br->lock);
-
 	was_root = br_is_root_bridge(br);
 	if (br_supersedes_port_info(p, bpdu)) {
 		br_record_config_information(p, bpdu);
@@ -455,21 +450,16 @@ void br_received_config_bpdu(struct net_bridge_port *p, struct br_config_bpdu *b
 	} else if (br_is_designated_port(p)) {		
 		br_reply(p);		
 	}
-
-	read_unlock(&br->lock);
 }
 
-/* lock-safe */
+/* called under bridge lock */
 void br_received_tcn_bpdu(struct net_bridge_port *p)
 {
-	read_lock(&p->br->lock);
-	if (p->state != BR_STATE_DISABLED &&
-	    br_is_designated_port(p)) {
+	if (br_is_designated_port(p)) {
 		printk(KERN_INFO "%s: received tcn bpdu on port %i(%s)\n",
 		       p->br->dev.name, p->port_no, p->dev->name);
 
 		br_topology_change_detection(p->br);
 		br_topology_change_acknowledge(p);
 	}
-	read_unlock(&p->br->lock);
 }
