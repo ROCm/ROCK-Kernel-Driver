@@ -967,6 +967,16 @@ void __init mp_override_legacy_irq (
 	 * If an existing [IOAPIC.PIN -> IRQ] routing entry exists we override it.
 	 * Otherwise create a new entry (e.g. gsi == 2).
 	 */
+	if (es7000_plat) {
+		for (i = 0; i < mp_irq_entries; i++) {
+			if ((mp_irqs[i].mpc_srcbus == intsrc.mpc_srcbus)
+				&& (mp_irqs[i].mpc_dstirq == intsrc.mpc_dstirq)) {
+				mp_irqs[i] = intsrc;
+				found = 1;
+				break;
+			}
+		}
+	} else
 	for (i = 0; i < mp_irq_entries; i++) {
 		if ((mp_irqs[i].mpc_srcbus == intsrc.mpc_srcbus) 
 			&& (mp_irqs[i].mpc_srcbusirq == intsrc.mpc_srcbusirq)) {

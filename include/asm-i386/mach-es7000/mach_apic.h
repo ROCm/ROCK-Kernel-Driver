@@ -39,7 +39,7 @@ static inline cpumask_t target_cpus(void)
 #endif
 
 #define APIC_BROADCAST_ID	(0xff)
-#define NO_IOAPIC_CHECK (0)
+#define NO_IOAPIC_CHECK (1)
 
 static inline unsigned long check_apicid_used(physid_mask_t bitmap, int apicid)
 { 
@@ -169,7 +169,11 @@ static inline unsigned int cpu_mask_to_apicid(cpumask_const_t cpumask)
 	num_bits_set = cpus_weight_const(cpumask);
 	/* Return id to all */
 	if (num_bits_set == NR_CPUS)
+#if defined CONFIG_ES7000_CLUSTERED_APIC
 		return 0xFF;
+#else
+		return cpu_to_logical_apicid(0);
+#endif
 	/* 
 	 * The cpus in the mask must all be on the apic cluster.  If are not 
 	 * on the same apicid cluster return default value of TARGET_CPUS. 
@@ -182,7 +186,11 @@ static inline unsigned int cpu_mask_to_apicid(cpumask_const_t cpumask)
 			if (apicid_cluster(apicid) != 
 					apicid_cluster(new_apicid)){
 				printk ("%s: Not a valid mask!\n",__FUNCTION__);
+#if defined CONFIG_ES7000_CLUSTERED_APIC
 				return 0xFF;
+#else
+				return cpu_to_logical_apicid(0);
+#endif
 			}
 			apicid = new_apicid;
 			cpus_found++;

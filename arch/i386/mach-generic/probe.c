@@ -17,6 +17,7 @@
 
 extern struct genapic apic_summit;
 extern struct genapic apic_bigsmp;
+extern struct genapic apic_es7000;
 extern struct genapic apic_default;
 
 struct genapic *genapic = &apic_default;
@@ -24,6 +25,7 @@ struct genapic *genapic = &apic_default;
 struct genapic *apic_probe[] __initdata = { 
 	&apic_summit,
 	&apic_bigsmp, 
+	&apic_es7000,
 	&apic_default,	/* must be last */
 	NULL,
 };
