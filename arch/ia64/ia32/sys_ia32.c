@@ -1591,7 +1591,7 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 	put_task_struct(child);
   out:
 	unlock_kernel();
-	return audit_result(ret);
+	return audit_lresult(ret);
 }
 
 /*

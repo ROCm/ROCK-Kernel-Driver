@@ -1447,7 +1447,7 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 	put_task_struct(child);
   out:
 	unlock_kernel();
-	return audit_result(ret);
+	return audit_lresult(ret);
 }
 
 /* "asmlinkage" so the input arguments are preserved... */

@@ -822,7 +822,7 @@ out_success:
 			    msgsz = -EFAULT;
 		}
 		free_msg(msg);
-		return audit_result(msgsz);
+		return audit_lresult(msgsz);
 	} else
 	{
 		/* no message waiting. Prepare for pipelined

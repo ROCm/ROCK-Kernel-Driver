@@ -486,7 +486,7 @@ out_tsk:
 	put_task_struct(child);
 out:
 	unlock_kernel();
-	return audit_result(ret);
+	return audit_lresult(ret);
 }
 
 asmlinkage void syscall_trace(struct pt_regs *regs)
