@@ -1237,11 +1237,11 @@ static int snd_pcm_playback_drain(snd_pcm_substream_t * substream)
 	add_wait_queue(&runtime->sleep, &wait);
 	while (1) {
 		long tout;
-		set_current_state(TASK_INTERRUPTIBLE);
 		if (signal_pending(current)) {
 			state = SIGNALED;
 			break;
 		}
+		set_current_state(TASK_INTERRUPTIBLE);
 		snd_pcm_stream_unlock_irq(substream);
 		tout = schedule_timeout(10 * HZ);
 		snd_pcm_stream_lock_irq(substream);
@@ -1254,7 +1254,6 @@ static int snd_pcm_playback_drain(snd_pcm_substream_t * substream)
 			break;
 		}
 	}
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&runtime->sleep, &wait);
 
 	switch (state) {
@@ -1961,12 +1960,11 @@ int snd_pcm_open(struct inode *inode, struct file *file)
 	}
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&pcm->open_wait, &wait);
+	down(&pcm->open_mutex);
 	while (1) {
-		down(&pcm->open_mutex);
 		err = snd_pcm_open_file(file, pcm, device >= SNDRV_MINOR_PCM_CAPTURE ? SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK, &pcm_file);
 		if (err >= 0)
 			break;
-		up(&pcm->open_mutex);
 		if (err == -EAGAIN) {
 			if (file->f_flags & O_NONBLOCK) {
 				err = -EBUSY;
@@ -1975,13 +1973,14 @@ int snd_pcm_open(struct inode *inode, struct file *file)
 		} else
 			break;
 		set_current_state(TASK_INTERRUPTIBLE);
+		up(&pcm->open_mutex);
 		schedule();
+		down(&pcm->open_mutex);
 		if (signal_pending(current)) {
 			err = -ERESTARTSYS;
 			break;
 		}
 	}
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&pcm->open_wait, &wait);
 	if (err < 0)
 		goto __error;

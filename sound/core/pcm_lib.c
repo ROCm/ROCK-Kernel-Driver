@@ -2106,11 +2106,11 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 			init_waitqueue_entry(&wait, current);
 			add_wait_queue(&runtime->sleep, &wait);
 			while (1) {
-				set_current_state(TASK_INTERRUPTIBLE);
 				if (signal_pending(current)) {
 					state = SIGNALED;
 					break;
 				}
+				set_current_state(TASK_INTERRUPTIBLE);
 				snd_pcm_stream_unlock_irq(substream);
 				tout = schedule_timeout(10 * HZ);
 				snd_pcm_stream_lock_irq(substream);
@@ -2139,7 +2139,6 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 				}
 			}
 		       _end_loop:
-			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&runtime->sleep, &wait);
 
 			switch (state) {
@@ -2401,11 +2400,11 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 			init_waitqueue_entry(&wait, current);
 			add_wait_queue(&runtime->sleep, &wait);
 			while (1) {
-				set_current_state(TASK_INTERRUPTIBLE);
 				if (signal_pending(current)) {
 					state = SIGNALED;
 					break;
 				}
+				set_current_state(TASK_INTERRUPTIBLE);
 				snd_pcm_stream_unlock_irq(substream);
 				tout = schedule_timeout(10 * HZ);
 				snd_pcm_stream_lock_irq(substream);
@@ -2435,7 +2434,6 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 				}
 			}
 		       _end_loop:
-			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&runtime->sleep, &wait);
 
 			switch (state) {

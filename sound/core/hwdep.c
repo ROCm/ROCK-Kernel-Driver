@@ -129,13 +129,14 @@ static int snd_hwdep_open(struct inode *inode, struct file * file)
 		} else
 			break;
 		set_current_state(TASK_INTERRUPTIBLE);
+		up(&hw->open_mutex);
 		schedule();
+		down(&hw->open_mutex);
 		if (signal_pending(current)) {
 			err = -ERESTARTSYS;
 			break;
 		}
 	}
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&hw->open_wait, &wait);
 	if (err >= 0) {
 		err = snd_card_file_add(hw->card, file);
