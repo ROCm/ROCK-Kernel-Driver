@@ -2213,6 +2213,7 @@ request_sense:
 	SCpnt->SCp.this_residual = sizeof(SCpnt->sense_buffer);
 	SCpnt->SCp.Message = 0;
 	SCpnt->SCp.Status = 0;
+	SCpnt->request_bufflen = sizeof(SCpnt->sense_buffer);
 	SCpnt->sc_data_direction = SCSI_DATA_READ;
 	SCpnt->use_sg = 0;
 	SCpnt->tag = 0;
