@@ -2666,6 +2666,26 @@ err_out:
 	goto out;
 }
 
+int ata_port_start (struct ata_port *ap)
+{
+	struct pci_dev *pdev = ap->host_set->pdev;
+
+	ap->prd = pci_alloc_consistent(pdev, ATA_PRD_TBL_SZ, &ap->prd_dma);
+	if (!ap->prd)
+		return -ENOMEM;
+	
+	DPRINTK("prd alloc, virt %p, dma %x\n", ap->prd, ap->prd_dma);
+
+	return 0;
+}
+
+void ata_port_stop (struct ata_port *ap)
+{
+	struct pci_dev *pdev = ap->host_set->pdev;
+
+	pci_free_consistent(pdev, ATA_PRD_TBL_SZ, ap->prd, ap->prd_dma);
+}
+
 /**
  *	ata_host_remove -
  *	@ap:
@@ -2685,7 +2705,7 @@ static void ata_host_remove(struct ata_port *ap, unsigned int do_unregister)
 
 	ata_thread_kill(ap);	/* FIXME: check return val */
 
-	pci_free_consistent(ap->host_set->pdev, ATA_PRD_TBL_SZ, ap->prd, ap->prd_dma);
+	ap->ops->port_stop(ap);
 }
 
 /**
@@ -2766,9 +2786,9 @@ static struct ata_port * ata_host_add(struct ata_probe_ent *ent,
 				      struct ata_host_set *host_set,
 				      unsigned int port_no)
 {
-	struct pci_dev *pdev = ent->pdev;
 	struct Scsi_Host *host;
 	struct ata_port *ap;
+	int rc;
 
 	DPRINTK("ENTER\n");
 	host = scsi_host_alloc(ent->sht, sizeof(struct ata_port));
@@ -2779,10 +2799,9 @@ static struct ata_port * ata_host_add(struct ata_probe_ent *ent,
 
 	ata_host_init(ap, host, host_set, ent, port_no);
 
-	ap->prd = pci_alloc_consistent(pdev, ATA_PRD_TBL_SZ, &ap->prd_dma);
-	if (!ap->prd)
+	rc = ap->ops->port_start(ap);
+	if (rc)
 		goto err_out;
-	DPRINTK("prd alloc, virt %p, dma %x\n", ap->prd, ap->prd_dma);
 
 	ap->thr_pid = kernel_thread(ata_thread, ap, CLONE_FS | CLONE_FILES);
 	if (ap->thr_pid < 0) {
@@ -2794,7 +2813,7 @@ static struct ata_port * ata_host_add(struct ata_probe_ent *ent,
 	return ap;
 
 err_out_free:
-	pci_free_consistent(ap->host_set->pdev, ATA_PRD_TBL_SZ, ap->prd, ap->prd_dma);
+	ap->ops->port_stop(ap);
 
 err_out:
 	scsi_host_put(host);
@@ -3276,6 +3295,8 @@ EXPORT_SYMBOL_GPL(ata_check_status_pio);
 EXPORT_SYMBOL_GPL(ata_check_status_mmio);
 EXPORT_SYMBOL_GPL(ata_exec_command_pio);
 EXPORT_SYMBOL_GPL(ata_exec_command_mmio);
+EXPORT_SYMBOL_GPL(ata_port_start);
+EXPORT_SYMBOL_GPL(ata_port_stop);
 EXPORT_SYMBOL_GPL(ata_interrupt);
 EXPORT_SYMBOL_GPL(ata_fill_sg);
 EXPORT_SYMBOL_GPL(ata_bmdma_start_pio);

@@ -105,6 +105,8 @@ static struct ata_port_operations pdc_sata_ops = {
 	.irq_handler		= pdc_interrupt,
 	.scr_read		= pdc_sata_scr_read,
 	.scr_write		= pdc_sata_scr_write,
+	.port_start		= ata_port_start,
+	.port_stop		= ata_port_stop,
 };
 
 static struct ata_port_operations pdc_20621_ops = {
@@ -121,6 +123,8 @@ static struct ata_port_operations pdc_20621_ops = {
 	.fill_sg		= ata_fill_sg,
 	.eng_timeout		= pdc_eng_timeout,
 	.irq_handler		= pdc_interrupt,
+	.port_start		= ata_port_start,
+	.port_stop		= ata_port_stop,
 };
 
 static struct ata_port_info pdc_port_info[] = {
