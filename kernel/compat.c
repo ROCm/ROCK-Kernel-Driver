@@ -373,6 +373,12 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t * stat_addr, int options,
 	}
 }
 
+/* for maximum compatability, we allow programs to use a single (compat)
+ * unsigned long bitmask if all cpus will fit.  If not, you have to have
+ * at least the kernel size available.
+ */
+#define USE_COMPAT_ULONG_CPUMASK (NR_CPUS <= 8*sizeof(compat_ulong_t))
+
 asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid, 
 					     unsigned int len,
 					     compat_ulong_t *user_mask_ptr)
@@ -381,15 +387,50 @@ asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid,
 	mm_segment_t old_fs;
 	int ret;
 
-	memset(&kernel_mask,0,sizeof(kernel_mask));
-	if (copy_from_user(&kernel_mask, user_mask_ptr, min((unsigned int)sizeof(kernel_mask),len)))
-		return -EFAULT;
+	if (USE_COMPAT_ULONG_CPUMASK) {
+		compat_ulong_t user_mask;
+
+		if (len < sizeof(user_mask))
+			return -EINVAL;
+
+		if (get_user(user_mask, user_mask_ptr))
+			return -EFAULT;
+
+		kernel_mask = cpus_promote(user_mask);
+	} else {
+		if (len < sizeof(kernel_mask))
+			return -EINVAL;
+
+		if (!access_ok(VERIFY_READ, user_mask_ptr, sizeof(kernel_mask)))
+			return -EFAULT;
+		else {
+			int i, j;
+			unsigned long *k, m;
+			compat_ulong_t um;
+
+			k = &cpus_coerce(kernel_mask);
+
+			for (i=0; i < sizeof(kernel_mask)/sizeof(m); i++) {
+				m = 0;
+
+				for (j = 0; j < sizeof(m)/sizeof(um); j++ ) {
+					if (__get_user(um, user_mask_ptr))
+						return -EFAULT;
+					user_mask_ptr++;
+					m <<= 4*sizeof(um);
+					m <<= 4*sizeof(um);
+					m |= um;
+				}
+				*k++ = m;
+			}
+		}
+	}
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 	ret = sys_sched_setaffinity(pid,
 				    sizeof(kernel_mask),
-				    (unsigned long*)&kernel_mask);
+				    (unsigned long *)&kernel_mask);
 	set_fs(old_fs);
 
 	return ret;
@@ -402,17 +443,45 @@ asmlinkage int compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 	mm_segment_t old_fs;
 	int ret;
 
+	if (len < (USE_COMPAT_ULONG_CPUMASK ? sizeof(compat_ulong_t)
+				: sizeof(kernel_mask)))
+		return -EINVAL;
+
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 	ret = sys_sched_getaffinity(pid,
 				    sizeof(kernel_mask),
-				    (unsigned long*)&kernel_mask);
+				    (unsigned long *)&kernel_mask);
 	set_fs(old_fs);
 
 	if (ret > 0) {
-	    	ret = min(len,(unsigned int)sizeof(kernel_mask));
-		if (copy_to_user(user_mask_ptr, &kernel_mask, ret))
-			return -EFAULT;
+		if (USE_COMPAT_ULONG_CPUMASK) {
+			ret = sizeof(compat_ulong_t);
+			if (put_user(cpus_coerce(kernel_mask), user_mask_ptr))
+				return -EFAULT;
+		} else {
+			int i, j, err;
+			unsigned long *k, m;
+			compat_ulong_t um;
+
+			err = access_ok(VERIFY_WRITE, user_mask_ptr, ret);
+
+			k = &cpus_coerce(kernel_mask);
+
+			for (i=0; i < sizeof(kernel_mask)/sizeof(m) && !err; i++) {
+				m = *k++;
+
+				for (j = 0; j < sizeof(m)/sizeof(compat_ulong_t) && !err; j++ ) {
+					um = m;
+					err |= __put_user(um, user_mask_ptr);
+					user_mask_ptr++;
+					m >>= 4*sizeof(compat_ulong_t);
+					m >>= 4*sizeof(compat_ulong_t);
+				}
+			}
+			if (err)
+				ret = -EFAULT;
+		}
 	}
 
 	return ret;
