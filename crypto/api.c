@@ -23,7 +23,7 @@
 #include "internal.h"
 
 static LIST_HEAD(crypto_alg_list);
-static struct rw_semaphore crypto_alg_sem;
+static DECLARE_RWSEM(crypto_alg_sem);
 
 static inline int crypto_alg_get(struct crypto_alg *alg)
 {
@@ -38,23 +38,18 @@ static inline void crypto_alg_put(struct crypto_alg *alg)
 
 struct crypto_alg *crypto_alg_lookup(char *name)
 {
-	struct list_head *p;
-	struct crypto_alg *alg = NULL;
+	struct crypto_alg *q, *alg = NULL;
 	
 	down_read(&crypto_alg_sem);
 	
-	list_for_each(p, &crypto_alg_list) {
-		struct crypto_alg *q =
-			list_entry(p, struct crypto_alg, cra_list);
-
+	list_for_each_entry(q, &crypto_alg_list, cra_list) {
 		if (!(strcmp(q->cra_name, name))) {
-
 			if (crypto_alg_get(q))
 				alg = q;
 			break;
 		}
 	}
-
+	
 	up_read(&crypto_alg_sem);
 	return alg;
 }
@@ -62,9 +57,6 @@ struct crypto_alg *crypto_alg_lookup(char *name)
 static int crypto_init_flags(struct crypto_tfm *tfm, u32 flags)
 {
 	tfm->crt_flags = 0;
-	
-	if (flags & CRYPTO_TFM_REQ_ATOMIC)
-		tfm->crt_flags |= CRYPTO_TFM_REQ_ATOMIC;
 	
 	switch (crypto_tfm_alg_type(tfm)) {
 	case CRYPTO_ALG_TYPE_CIPHER:
@@ -164,23 +156,35 @@ void crypto_free_tfm(struct crypto_tfm *tfm)
 	kfree(tfm);
 }
 
+static inline int crypto_alg_blocksize_check(struct crypto_alg *alg)
+{
+	return ((alg->cra_flags & CRYPTO_ALG_TYPE_MASK)
+			== CRYPTO_ALG_TYPE_CIPHER &&
+	         alg->cra_blocksize > CRYPTO_MAX_CIPHER_BLOCK_SIZE);
+}
+
 int crypto_register_alg(struct crypto_alg *alg)
 {
 	int ret = 0;
-	struct list_head *p;
+	struct crypto_alg *q;
 	
 	down_write(&crypto_alg_sem);
 	
-	list_for_each(p, &crypto_alg_list) {
-		struct crypto_alg *q =
-			list_entry(p, struct crypto_alg, cra_list);
-		
+	list_for_each_entry(q, &crypto_alg_list, cra_list) {
 		if (!(strcmp(q->cra_name, alg->cra_name))) {
 			ret = -EEXIST;
 			goto out;
 		}
 	}
-	list_add_tail(&alg->cra_list, &crypto_alg_list);
+	
+	if (crypto_alg_blocksize_check(alg)) {
+		printk(KERN_WARNING "%s: blocksize %Zd exceeds max. "
+		       "size %Zd\n", __FUNCTION__, alg->cra_blocksize,
+		       CRYPTO_MAX_CIPHER_BLOCK_SIZE);
+		ret = -EINVAL;
+	}
+	else
+		list_add_tail(&alg->cra_list, &crypto_alg_list);
 out:	
 	up_write(&crypto_alg_sem);
 	return ret;
@@ -189,14 +193,14 @@ out:
 int crypto_unregister_alg(struct crypto_alg *alg)
 {
 	int ret = -ENOENT;
-	struct list_head *p;
+	struct crypto_alg *q;
 	
 	BUG_ON(!alg->cra_module);
 	
 	down_write(&crypto_alg_sem);
-	list_for_each(p, &crypto_alg_list) {
-		if (alg == (void *)p) {
-			list_del(p);
+	list_for_each_entry(q, &crypto_alg_list, cra_list) {
+		if (alg == q) {
+			list_del(&alg->cra_list);
 			ret = 0;
 			goto out;
 		}
@@ -282,7 +286,6 @@ static int __init init_crypto(void)
 	struct proc_dir_entry *proc;
 	
 	printk(KERN_INFO "Initializing Cryptographic API\n");
-	init_rwsem(&crypto_alg_sem);
 	proc = create_proc_entry("crypto", 0, NULL);
 	if (proc)
 		proc->proc_fops = &proc_crypto_ops;

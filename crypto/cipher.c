@@ -71,14 +71,14 @@ static int copy_chunks(struct crypto_tfm *tfm, u8 *buf,
 			clen = rlen;
 		}
 
-		p = crypto_kmap(tfm, sg[i].page) + sg[i].offset + coff;
+		p = crypto_kmap(sg[i].page) + sg[i].offset + coff;
 		
 		if (in)
 			memcpy(&buf[copied], p, clen);
 		else
 			memcpy(p, &buf[copied], clen);
 		
-		crypto_kunmap(tfm, p);
+		crypto_kunmap(p);
 		*last = aligned ? 0 : clen;
 		copied += clen;
 	}
@@ -118,7 +118,7 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
 {
 	int i, coff;
 	size_t bsize = crypto_tfm_alg_blocksize(tfm);
-	u8 tmp[CRYPTO_MAX_BLOCK_SIZE];
+	u8 tmp[CRYPTO_MAX_CIPHER_BLOCK_SIZE];
 
 	if (sglen(sg, nsg) % bsize) {
 		tfm->crt_flags |= CRYPTO_TFM_RES_BAD_BLOCK_LEN;
@@ -128,11 +128,11 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
 	for (i = 0, coff = 0; i < nsg; i++) {
 		int n = 0, boff = 0;
 		int len = sg[i].length - coff;
-		char *p = crypto_kmap(tfm, sg[i].page) + sg[i].offset + coff;
+		char *p = crypto_kmap(sg[i].page) + sg[i].offset + coff;
 
 		while (len) {
 			if (len < bsize) {
-				crypto_kunmap(tfm, p);
+				crypto_kunmap(p);
 				n = gather_chunks(tfm, tmp, sg, i, len, &coff);
 				prfn(tfm, tmp, crfn, enc);
 				scatter_chunks(tfm, tmp, sg, i, len, &coff);
@@ -140,13 +140,13 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
 				goto unmapped;
 			} else {
 				prfn(tfm, p, crfn, enc);
-				crypto_kunmap(tfm, p);
+				crypto_kunmap(p);
 				crypto_yield(tfm);
 				
 				/* remap and point to recalculated offset */
 				boff += bsize;
-				p = crypto_kmap(tfm, sg[i].page)
-					+ sg[i].offset + coff + boff;
+				p = crypto_kmap(sg[i].page)
+				    + sg[i].offset + coff + boff;
 				
 				len -= bsize;
 				
@@ -155,7 +155,7 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
 					coff = 0;
 			}
 		}
-		crypto_kunmap(tfm, p);	
+		crypto_kunmap(p);	
 unmapped:
 		i += n;
 
@@ -172,7 +172,7 @@ static void cbc_process(struct crypto_tfm *tfm,
 		memcpy(tfm->crt_cipher.cit_iv, block,
 		       crypto_tfm_alg_blocksize(tfm));
 	} else {
-		u8 buf[CRYPTO_MAX_BLOCK_SIZE];
+		u8 buf[CRYPTO_MAX_CIPHER_BLOCK_SIZE];
 		
 		fn(tfm->crt_ctx, buf, block);
 		xor_64(buf, tfm->crt_cipher.cit_iv);

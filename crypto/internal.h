@@ -17,31 +17,21 @@
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
 
-static inline void *crypto_kmap(struct crypto_tfm *tfm, struct page *page)
+static inline void *crypto_kmap(struct page *page)
 {
-	if (tfm->crt_flags & CRYPTO_TFM_REQ_ATOMIC) {
-#ifdef CONFIG_HIGHMEM	/* XXX: remove this after the api change */
-		local_bh_disable();
-#endif
-		return kmap_atomic(page, KM_CRYPTO_SOFTIRQ);
-	} else
-		return kmap_atomic(page, KM_CRYPTO_USER);
+	return kmap_atomic(page, in_softirq() ?
+	                   KM_CRYPTO_SOFTIRQ : KM_CRYPTO_USER);
 }
 
-static inline void crypto_kunmap(struct crypto_tfm *tfm, void *vaddr)
+static inline void crypto_kunmap(void *vaddr)
 {
-	if (tfm->crt_flags & CRYPTO_TFM_REQ_ATOMIC) {
-		kunmap_atomic(vaddr, KM_CRYPTO_SOFTIRQ);
-#ifdef CONFIG_HIGHMEM	/* XXX: remove this after the api change */
-		local_bh_enable();
-#endif
-	} else
-		kunmap_atomic(vaddr, KM_CRYPTO_USER);
+	return kunmap_atomic(vaddr, in_softirq() ?
+	                     KM_CRYPTO_SOFTIRQ : KM_CRYPTO_USER);
 }
 
 static inline void crypto_yield(struct crypto_tfm *tfm)
 {
-	if (!(tfm->crt_flags & CRYPTO_TFM_REQ_ATOMIC))
+	if (!in_softirq())
 		cond_resched();
 }
 

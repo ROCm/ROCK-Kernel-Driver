@@ -739,7 +739,7 @@ test_des(void)
 	 */
 	i = 7;
 	key = des_tv[i].key;
-	tfm->crt_flags = CRYPTO_TFM_REQ_ATOMIC;
+	tfm->crt_flags = 0;
 
 	ret = crypto_cipher_setkey(tfm, key, 8);
 	if (ret) {
@@ -985,7 +985,6 @@ test_des(void)
 	for (i = 0; i < DES_CBC_ENC_TEST_VECTORS; i++) {
 		printk("test %d:\n", i + 1);
 
-		tfm->crt_flags |= CRYPTO_TFM_REQ_ATOMIC;
 		key = des_tv[i].key;
 
 		ret = crypto_cipher_setkey(tfm, key, 8);

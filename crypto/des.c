@@ -1260,6 +1260,7 @@ static struct crypto_alg des_alg = {
 	.cra_blocksize	=	DES_BLOCK_SIZE,
 	.cra_ctxsize	=	sizeof(struct des_ctx),
 	.cra_module	=	THIS_MODULE,
+	.cra_list	=	LIST_HEAD_INIT(des_alg.cra_list),
 	.cra_u		=	{ .cipher = {
 	.cia_keysize	=	DES_KEY_SIZE,
 	.cia_ivsize	=	DES_BLOCK_SIZE,
@@ -1274,6 +1275,7 @@ static struct crypto_alg des3_ede_alg = {
 	.cra_blocksize	=	DES3_EDE_BLOCK_SIZE,
 	.cra_ctxsize	=	sizeof(struct des3_ede_ctx),
 	.cra_module	=	THIS_MODULE,
+	.cra_list	=	LIST_HEAD_INIT(des3_ede_alg.cra_list),
 	.cra_u		=	{ .cipher = {
 	.cia_keysize	=	DES3_EDE_KEY_SIZE,
 	.cia_ivsize	=	DES3_EDE_BLOCK_SIZE,
@@ -1285,9 +1287,6 @@ static struct crypto_alg des3_ede_alg = {
 static int __init init(void)
 {
 	int ret = 0;
-	
-	INIT_LIST_HEAD(&des_alg.cra_list);
-	INIT_LIST_HEAD(&des3_ede_alg.cra_list);
 	
 	ret = crypto_register_alg(&des_alg);
 	if (ret < 0)

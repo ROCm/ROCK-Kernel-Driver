@@ -183,6 +183,7 @@ static struct crypto_alg alg = {
 	.cra_blocksize	=	SHA1_HMAC_BLOCK_SIZE,
 	.cra_ctxsize	=	sizeof(struct sha1_ctx),
 	.cra_module	=	THIS_MODULE,
+	.cra_list       =       LIST_HEAD_INIT(alg.cra_list),
 	.cra_u		=	{ .digest = {
 	.dia_digestsize	=	SHA1_DIGEST_SIZE,
 	.dia_init   	= 	sha1_init,
@@ -192,7 +193,6 @@ static struct crypto_alg alg = {
 
 static int __init init(void)
 {
-	INIT_LIST_HEAD(&alg.cra_list);
 	return crypto_register_alg(&alg);
 }
 
