@@ -15,6 +15,17 @@
 #include <linux/config.h>
 #include <asm/arch/memory.h>
 
+/*
+ * The module space lives between the addresses given by TASK_SIZE
+ * and PAGE_OFFSET - it must be within 32MB of the kernel text.
+ */
+#define MODULE_END	(PAGE_OFFSET)
+#define MODULE_START	(MODULE_END - 16*1048576)
+
+#if TASK_SIZE > MODULE_START
+#error Top of user space clashes with start of module space
+#endif
+
 #ifndef __ASSEMBLY__
 
 /*
