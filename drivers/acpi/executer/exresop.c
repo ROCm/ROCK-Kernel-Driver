@@ -345,13 +345,6 @@ acpi_ex_resolve_operands (
 			type_needed = ACPI_TYPE_EVENT;
 			break;
 
-		case ARGI_REGION:
-
-			/* Need an operand of type ACPI_TYPE_REGION */
-
-			type_needed = ACPI_TYPE_REGION;
-			break;
-
 		case ARGI_PACKAGE:   /* Package */
 
 			/* Need an operand of type ACPI_TYPE_PACKAGE */
@@ -458,6 +451,37 @@ acpi_ex_resolve_operands (
 			goto next_operand;
 
 
+		case ARGI_BUFFER_OR_STRING:
+
+			/* Need an operand of type STRING or BUFFER */
+
+			switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
+			case ACPI_TYPE_STRING:
+			case ACPI_TYPE_BUFFER:
+
+				/* Valid operand */
+			   break;
+
+			case ACPI_TYPE_INTEGER:
+
+				/* Highest priority conversion is to type Buffer */
+
+				status = acpi_ex_convert_to_buffer (obj_desc, stack_ptr, walk_state);
+				if (ACPI_FAILURE (status)) {
+					return_ACPI_STATUS (status);
+				}
+				break;
+
+			default:
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Needed [Integer/String/Buffer], found [%s] %p\n",
+					acpi_ut_get_object_type_name (obj_desc), obj_desc));
+
+				return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
+			}
+			goto next_operand;
+
+
 		case ARGI_DATAOBJECT:
 			/*
 			 * ARGI_DATAOBJECT is only used by the size_of operator.
@@ -477,7 +501,7 @@ acpi_ex_resolve_operands (
 
 			default:
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-					"Needed [Buf/Str/Pkg], found [%s] %p\n",
+					"Needed [Buffer/String/Package/Reference], found [%s] %p\n",
 					acpi_ut_get_object_type_name (obj_desc), obj_desc));
 
 				return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
@@ -499,7 +523,30 @@ acpi_ex_resolve_operands (
 
 			default:
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-					"Needed [Buf/Str/Pkg], found [%s] %p\n",
+					"Needed [Buffer/String/Package], found [%s] %p\n",
+					acpi_ut_get_object_type_name (obj_desc), obj_desc));
+
+				return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
+			}
+			goto next_operand;
+
+
+		case ARGI_REGION_OR_FIELD:
+
+			/* Need an operand of type ACPI_TYPE_REGION or a FIELD in a region */
+
+			switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
+			case ACPI_TYPE_REGION:
+			case ACPI_TYPE_LOCAL_REGION_FIELD:
+			case ACPI_TYPE_LOCAL_BANK_FIELD:
+			case ACPI_TYPE_LOCAL_INDEX_FIELD:
+
+				/* Valid operand */
+				break;
+
+			default:
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Needed [Region/region_field], found [%s] %p\n",
 					acpi_ut_get_object_type_name (obj_desc), obj_desc));
 
 				return_ACPI_STATUS (AE_AML_OPERAND_TYPE);

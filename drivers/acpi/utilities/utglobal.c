@@ -358,14 +358,16 @@ struct acpi_fixed_event_info        acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVE
 
 const char                *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
 {
-	"system_memory",
-	"system_iO",
+/*! [Begin] no source code translation (keep these ASL Keywords as-is) */
+	"SystemMemory",
+	"SystemIO",
 	"PCI_Config",
-	"embedded_control",
+	"EmbeddedControl",
 	"SMBus",
 	"CMOS",
 	"PCIBARTarget",
-	"data_table",
+	"DataTable"
+/*! [End] no source code translation !*/
 };
 
 
@@ -381,7 +383,7 @@ acpi_ut_get_region_name (
 
 	else if (space_id >= ACPI_NUM_PREDEFINED_REGIONS)
 	{
-		return ("invalid_space_iD");
+		return ("invalid_space_id");
 	}
 
 	return ((char *) acpi_gbl_region_types[space_id]);
