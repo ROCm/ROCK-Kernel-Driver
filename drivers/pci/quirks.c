@@ -1164,6 +1164,10 @@ static void __devinit quirk_intel_ide_combined(struct pci_dev *pdev)
 	case 0x2653:
 		ich = 6;
 		break;
+	case 0x27c0:
+	case 0x27c4:
+		ich = 7;
+		break;
 	default:
 		/* we do not handle this PCI device */
 		return;
@@ -1183,7 +1187,7 @@ static void __devinit quirk_intel_ide_combined(struct pci_dev *pdev)
 		else
 			return;			/* not in combined mode */
 	} else {
-		WARN_ON(ich != 6);
+		WARN_ON((ich != 6) && (ich != 7));
 		tmp &= 0x3;  /* interesting bits 1:0 */
 		if (tmp & (1 << 0))
 			comb = (1 << 2);	/* PATA port 0, SATA port 1 */
