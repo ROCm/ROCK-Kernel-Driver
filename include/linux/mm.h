@@ -19,9 +19,6 @@ extern unsigned long max_mapnr;
 extern unsigned long num_physpages;
 extern void * high_memory;
 extern int page_cluster;
-/* The inactive_clean lists are per zone. */
-extern struct list_head active_list;
-extern struct list_head inactive_list;
 
 #include <asm/page.h>
 #include <asm/pgtable.h>

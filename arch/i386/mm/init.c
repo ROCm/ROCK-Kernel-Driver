@@ -215,19 +215,14 @@ void __init permanent_kmaps_init(pgd_t *pgd_base)
 
 void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
 {
-	if (!page_is_ram(pfn)) {
+	if (page_is_ram(pfn) && !(bad_ppro && page_kills_ppro(pfn))) {
+		ClearPageReserved(page);
+		set_bit(PG_highmem, &page->flags);
+		set_page_count(page, 1);
+		__free_page(page);
+		totalhigh_pages++;
+	} else
 		SetPageReserved(page);
-		return;
-	}
-	if (bad_ppro && page_kills_ppro(pfn)) {
-		SetPageReserved(page);
-		return;
-	}
-	ClearPageReserved(page);
-	set_bit(PG_highmem, &page->flags);
-	atomic_set(&page->count, 1);
-	__free_page(page);
-	totalhigh_pages++;
 }
 
 #ifndef CONFIG_DISCONTIGMEM

@@ -151,8 +151,8 @@ struct zonelist {
  * On NUMA machines, each NUMA node would have a pg_data_t to describe
  * it's memory layout.
  *
- * XXX: we need to move the global memory statistics (active_list, ...)
- *      into the pg_data_t to properly support NUMA.
+ * Memory statistics and page replacement data structures are maintained on a
+ * per-zone basis.
  */
 struct bootmem_data;
 typedef struct pglist_data {
