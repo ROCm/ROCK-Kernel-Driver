@@ -946,6 +946,13 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
 		return;
 
+#ifdef CONFIG_BOOTSPLASH
+	if (info->splash_data) {
+		splash_putc(info->splash_data, vc, info, c, ypos, xpos);
+		return;
+	}
+#endif
+	
 	image.dx = xpos * vc->vc_font.width;
 	image.dy = real_y(p, ypos) * vc->vc_font.height;
 	image.width = vc->vc_font.width;

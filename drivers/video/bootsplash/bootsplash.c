@@ -30,7 +30,7 @@
 
 extern struct fb_ops vesafb_ops;
 
-#define SPLASH_VERSION "3.1.5-2004/03/18"
+#define SPLASH_VERSION "3.1.6-2004/03/31"
 
 /* These errors have to match fbcon-jpegdec.h */
 static unsigned char *jpg_errors[] = {
