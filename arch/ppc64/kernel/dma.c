@@ -131,27 +131,3 @@ void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
 		BUG();
 }
 EXPORT_SYMBOL(dma_unmap_sg);
-
-void dma_sync_single(struct device *dev, dma_addr_t dma_handle, size_t size,
-		enum dma_data_direction direction)
-{
-	if (dev->bus == &pci_bus_type)
-		pci_dma_sync_single(to_pci_dev(dev), dma_handle, size, (int)direction);
-	else if (dev->bus == &vio_bus_type)
-		vio_dma_sync_single(to_vio_dev(dev), dma_handle, size, direction);
-	else
-		BUG();
-}
-EXPORT_SYMBOL(dma_sync_single);
-
-void dma_sync_sg(struct device *dev, struct scatterlist *sg, int nelems,
-		enum dma_data_direction direction)
-{
-	if (dev->bus == &pci_bus_type)
-		pci_dma_sync_sg(to_pci_dev(dev), sg, nelems, (int)direction);
-	else if (dev->bus == &vio_bus_type)
-		vio_dma_sync_sg(to_vio_dev(dev), sg, nelems, direction);
-	else
-		BUG();
-}
-EXPORT_SYMBOL(dma_sync_sg);
