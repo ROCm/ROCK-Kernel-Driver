@@ -76,7 +76,7 @@ void tlb_batch_add(pte_t *ptep, pte_t orig)
 
 		/* A real file page? */
 		mapping = page_mapping(page);
-		if (!mapping || mapping == &swapper_space)
+		if (!mapping)
 			goto no_cache_flush;
 
 		paddr = (unsigned long) page_address(page);
