@@ -594,20 +594,8 @@ err_out:
 
 /*---------- SPPP/HDLC netdevice ---------- */
 
-static void sppp_channel_init(struct channel_data *chan)
+static void cosa_setup(struct net_device *d)
 {
-	struct net_device *d;
-	chan->if_ptr = &chan->pppdev;
-	chan->pppdev.dev = kmalloc(sizeof(struct net_device), GFP_KERNEL);
-	memset(chan->pppdev.dev, 0, sizeof(struct net_device));
-	sppp_attach(&chan->pppdev);
-	d=chan->pppdev.dev;
-	strcpy(d->name, chan->name);
-	d->base_addr = chan->cosa->datareg;
-	d->irq = chan->cosa->irq;
-	d->dma = chan->cosa->dma;
-	d->priv = chan;
-	d->init = NULL;
 	d->open = cosa_sppp_open;
 	d->stop = cosa_sppp_close;
 	d->hard_start_xmit = cosa_sppp_tx;
@@ -615,19 +603,38 @@ static void sppp_channel_init(struct channel_data *chan)
 	d->get_stats = cosa_net_stats;
 	d->tx_timeout = cosa_sppp_timeout;
 	d->watchdog_timeo = TX_TIMEOUT;
+}
+
+static void sppp_channel_init(struct channel_data *chan)
+{
+	struct net_device *d;
+	chan->if_ptr = &chan->pppdev;
+	d = alloc_netdev(0, chan->name, cosa_setup);
+	if (!d) {
+		printk(KERN_WARNING "%s: alloc_netdev failed.\n", chan->name);
+		return;
+	}
+	chan->pppdev.dev = d;
+	sppp_attach(&chan->pppdev);
+	d->base_addr = chan->cosa->datareg;
+	d->irq = chan->cosa->irq;
+	d->dma = chan->cosa->dma;
+	d->priv = chan;
 	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
-		sppp_detach(chan->pppdev.dev);
-		free_netdev(chan->pppdev.dev);
+		sppp_detach(d);
+		free_netdev(d);
+		chan->pppdev.dev = NULL;
 		return;
 	}
 }
 
 static void sppp_channel_delete(struct channel_data *chan)
 {
-	sppp_detach(chan->pppdev.dev);
 	unregister_netdev(chan->pppdev.dev);
+	sppp_detach(chan->pppdev.dev);
 	free_netdev(chan->pppdev.dev);
+	chan->pppdev.dev = NULL;
 }
 
 static int cosa_sppp_open(struct net_device *d)

@@ -229,7 +229,7 @@ struct net_device *mace_probe(int unit)
 	
 	if (checksum != 0xFF) {
 		free_netdev(dev);
-		return -ENODEV;
+		return ERR_PTR(-ENODEV);
 	}
 
 	memset(&mp->stats, 0, sizeof(mp->stats));

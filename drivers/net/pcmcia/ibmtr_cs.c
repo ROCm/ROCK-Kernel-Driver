@@ -257,11 +257,8 @@ static void ibmtr_detach(dev_link_t *link)
 	struct tok_info *ti = (struct tok_info *)dev->priv;
 	del_timer_sync(&(ti->tr_timer));
     }
-    if (link->state & DEV_CONFIG) {
+    if (link->state & DEV_CONFIG)
         ibmtr_release(link);
-        if (link->state & DEV_STALE_CONFIG)
-            return;
-    }
 
     if (link->handle)
         pcmcia_deregister_client(link->handle);
@@ -410,13 +407,6 @@ static void ibmtr_release(dev_link_t *link)
 
     DEBUG(0, "ibmtr_release(0x%p)\n", link);
 
-    if (link->open) {
-	DEBUG(1, "ibmtr_cs: release postponed, '%s' "
-	      "still open\n", info->node.dev_name);
-        link->state |= DEV_STALE_CONFIG;
-        return;
-    }
-
     pcmcia_release_configuration(link->handle);
     pcmcia_release_io(link->handle, &link->io);
     pcmcia_release_irq(link->handle, &link->irq);
@@ -428,9 +418,6 @@ static void ibmtr_release(dev_link_t *link)
     }
 
     link->state &= ~DEV_CONFIG;
-
-    if (link->state & DEV_STALE_CONFIG)
-	    ibmtr_detach(link);
 }
 
 /*======================================================================

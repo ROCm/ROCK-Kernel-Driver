@@ -72,7 +72,7 @@
 #define NESM_STOP_PG	0x80	/* Last page +1 of RX ring */
 
 
-int apne_probe(struct net_device *dev);
+struct net_device * __init apne_probe(int unit);
 static int apne_probe1(struct net_device *dev, int ioaddr);
 
 static int apne_open(struct net_device *dev);
@@ -572,8 +572,6 @@ static struct net_device *apne_dev;
 
 int init_module(void)
 {
-	int err;
-
 	apne_dev = apne_probe(-1);
 	if (IS_ERR(apne_dev))
 		return PTR_ERR(apne_dev);

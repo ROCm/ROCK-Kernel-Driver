@@ -55,6 +55,7 @@ static int fifo=0x8;	/* don't change */
 
 #define DEBUG       /* debug on */
 #define SYSBUSVAL 0 /* 16 Bit */
+#define SUN3_82586_TOTAL_SIZE	PAGE_SIZE
 
 #define sun3_attn586()  {*(volatile unsigned char *)(dev->base_addr) |= IEOB_ATTEN; *(volatile unsigned char *)(dev->base_addr) &= ~IEOB_ATTEN;}
 #define sun3_reset586() {*(volatile unsigned char *)(dev->base_addr) = 0; udelay(100); *(volatile unsigned char *)(dev->base_addr) = IEOB_NORSET;}
@@ -298,7 +299,7 @@ struct net_device * __init sun3_82586_probe(int unit)
 	if (found)
 		return ERR_PTR(-ENODEV);
 	
-	ioaddr = (unsigned long)ioremap(IE_OBIO, PAGE_SIZE);
+	ioaddr = (unsigned long)ioremap(IE_OBIO, SUN3_82586_TOTAL_SIZE);
 	if (!ioaddr)
 		return ERR_PTR(-ENOMEM);
 	found = 1;
@@ -327,7 +328,7 @@ out2:
 out1:
 	free_netdev(dev);
 out:
-	iounmap(ioaddr);
+	iounmap((void *)ioaddr);
 	return ERR_PTR(err);
 }
 
@@ -1163,8 +1164,8 @@ void cleanup_module(void)
 	unsigned long ioaddr = dev_sun3_82586->base_addr;
 	unregister_netdev(dev_sun3_82586);
 	release_region(ioaddr, SUN3_82586_TOTAL_SIZE);
-	iounmap(ioaddr);
-	free_netdev(dev);
+	iounmap((void *)ioaddr);
+	free_netdev(dev_sun3_82586);
 }
 #endif /* MODULE */
 
