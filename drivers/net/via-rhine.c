@@ -616,7 +616,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 {
 	struct net_device *dev;
 	struct rhine_private *rp;
-	int i, option;
+	int i, option, rc;
 	int chip_id = (int) ent->driver_data;
 	static int card_idx = -1;
 	long ioaddr;
@@ -638,11 +638,13 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	option = card_idx < MAX_UNITS ? options[card_idx] : 0;
 	io_size = rhine_chip_info[chip_id].io_size;
 
-	if (pci_enable_device(pdev))
+	rc = pci_enable_device(pdev);
+	if (rc)
 		goto err_out;
 
 	/* this should always be supported */
-	if (pci_set_dma_mask(pdev, 0xffffffff)) {
+	rc = pci_set_dma_mask(pdev, 0xffffffff);
+	if (rc) {
 		printk(KERN_ERR "32-bit PCI DMA addresses not supported by "
 		       "the card!?\n");
 		goto err_out;
@@ -651,6 +653,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	/* sanity check */
 	if ((pci_resource_len(pdev, 0) < io_size) ||
 	    (pci_resource_len(pdev, 1) < io_size)) {
+		rc = -EIO;
 		printk(KERN_ERR "Insufficient PCI resources, aborting\n");
 		goto err_out;
 	}
@@ -662,6 +665,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 
 	dev = alloc_etherdev(sizeof(*rp));
 	if (dev == NULL) {
+		rc = -ENOMEM;
 		printk(KERN_ERR "init_ethernet failed for card #%d\n",
 		       card_idx);
 		goto err_out;
@@ -669,7 +673,8 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
-	if (pci_request_regions(pdev, shortname))
+	rc = pci_request_regions(pdev, shortname);
+	if (rc)
 		goto err_out_free_netdev;
 
 #ifdef USE_MMIO
@@ -678,6 +683,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 
 	ioaddr = (long) ioremap(memaddr, io_size);
 	if (!ioaddr) {
+		rc = -EIO;
 		printk(KERN_ERR "ioremap failed for device %s, region 0x%X "
 		       "@ 0x%lX\n", pci_name(pdev), io_size, memaddr);
 		goto err_out_free_res;
@@ -690,6 +696,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 		unsigned char a = inb(ioaddr0+reg);
 		unsigned char b = readb(ioaddr+reg);
 		if (a != b) {
+			rc = -EIO;
 			printk(KERN_ERR "MMIO do not match PIO [%02x] "
 			       "(%02x != %02x)\n", reg, a, b);
 			goto err_out_unmap;
@@ -736,6 +743,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 		dev->dev_addr[i] = readb(ioaddr + StationAddr + i);
 
 	if (!is_valid_ether_addr(dev->dev_addr)) {
+		rc = -EIO;
 		printk(KERN_ERR "Invalid MAC address for card #%d\n", card_idx);
 		goto err_out_unmap;
 	}
@@ -787,8 +795,8 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 		dev->features |= NETIF_F_SG|NETIF_F_HW_CSUM;
 
 	/* dev->name not defined before register_netdev()! */
-	i = register_netdev(dev);
-	if (i)
+	rc = register_netdev(dev);
+	if (rc)
 		goto err_out_unmap;
 
 	/* The lower four bits are the media type. */
@@ -871,7 +879,7 @@ err_out_free_res:
 err_out_free_netdev:
 	free_netdev(dev);
 err_out:
-	return -ENODEV;
+	return rc;
 }
 
 static int alloc_ring(struct net_device* dev)
