@@ -57,14 +57,5 @@ config FCC_QS6612
 	bool "QS6612"
 
 endchoice
-
-comment "Generic MPC8260 Options"
-
-config DCACHE_DISABLE
-	bool "Disable data cache"
-	help
-	  This option allows you to run the kernel with data cache disabled.
-	  Say Y if you experience CPM lock-ups.
-
 endmenu
 
