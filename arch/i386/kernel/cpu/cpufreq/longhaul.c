@@ -37,7 +37,7 @@
 #ifdef DEBUG
 #define dprintk(msg...) printk(msg)
 #else
-#define dprintk(msg...) do { } while(0);
+#define dprintk(msg...) do { } while(0)
 #endif
 
 static unsigned int numscales=16, numvscales;

@@ -121,7 +121,7 @@ pipe_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 		kill_fasync(PIPE_FASYNC_WRITERS(*inode), SIGIO, POLL_OUT);
 	}
 	if (ret > 0)
-		UPDATE_ATIME(inode);
+		update_atime(inode);
 	return ret;
 }
 

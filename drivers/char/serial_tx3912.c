@@ -41,8 +41,6 @@ static int rs_get_CD (void * ptr);
 static void rs_shutdown_port (void * ptr); 
 static int rs_set_real_termios (void *ptr);
 static int rs_chars_in_buffer (void * ptr); 
-static void rs_hungup (void *ptr);
-static void rs_close (void *ptr);
 
 /*
  * Used by generic serial driver to access hardware
@@ -56,8 +54,6 @@ static struct real_driver rs_real_driver = {
 	.shutdown_port         = rs_shutdown_port,  
 	.set_real_termios      = rs_set_real_termios,  
 	.chars_in_buffer       = rs_chars_in_buffer, 
-	.close                 = rs_close, 
-	.hungup                = rs_hungup,
 }; 
 
 /*
@@ -579,9 +575,6 @@ static int rs_open  (struct tty_struct * tty, struct file * filp)
 
 	rs_dprintk (TX3912_UART_DEBUG_OPEN, "before inc_use_count (count=%d.\n", 
 	            port->gs.count);
-	if (port->gs.count == 1) {
-		MOD_INC_USE_COUNT;
-	}
 	rs_dprintk (TX3912_UART_DEBUG_OPEN, "after inc_use_count\n");
 
 	/* Jim: Initialize port hardware here */
@@ -595,7 +588,6 @@ static int rs_open  (struct tty_struct * tty, struct file * filp)
 	            retval, port->gs.count);
 
 	if (retval) {
-		MOD_DEC_USE_COUNT;
 		port->gs.count--;
 		return retval;
 	}
@@ -620,32 +612,6 @@ static int rs_open  (struct tty_struct * tty, struct file * filp)
 
 }
 
-
-
-static void rs_close (void *ptr)
-{
-	func_enter ();
-
-	/* Anything to do here? */
-
-	MOD_DEC_USE_COUNT;
-	func_exit ();
-}
-
-
-/* I haven't the foggiest why the decrement use count has to happen
-   here. The whole linux serial drivers stuff needs to be redesigned.
-   My guess is that this is a hack to minimize the impact of a bug
-   elsewhere. Thinking about it some more. (try it sometime) Try
-   running minicom on a serial port that is driven by a modularized
-   driver. Have the modem hangup. Then remove the driver module. Then
-   exit minicom.  I expect an "oops".  -- REW */
-static void rs_hungup (void *ptr)
-{
-	func_enter ();
-	MOD_DEC_USE_COUNT;
-	func_exit ();
-}
 
 static int rs_ioctl (struct tty_struct * tty, struct file * filp, 
                      unsigned int cmd, unsigned long arg)
@@ -839,6 +805,7 @@ static int rs_init_drivers(void)
 
 	memset(&rs_driver, 0, sizeof(rs_driver));
 	rs_driver.magic = TTY_DRIVER_MAGIC;
+	rs_driver.owner = THIS_MODULE;
 	rs_driver.driver_name = "serial";
 	rs_driver.name = "ttyS";
 	rs_driver.major = TTY_MAJOR;

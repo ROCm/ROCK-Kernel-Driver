@@ -323,13 +323,7 @@ MODULE_DEVICE_TABLE (usb, scanner_device_ids);
    USB - Vivid III */
 #define SCN_CLASS_SCANJET 16
 
-#ifdef CONFIG_USB_DYNAMIC_MINORS
-#define SCN_MAX_MNR 256
-#define SCN_BASE_MNR 0
-#else
-#define SCN_MAX_MNR 16		/* We're allocated 16 minors */
 #define SCN_BASE_MNR 48		/* USB Scanners start at minor 48 */
-#endif
 
 static DECLARE_MUTEX (scn_mutex); /* Initializes to unlocked */
 

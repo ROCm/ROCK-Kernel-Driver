@@ -27,6 +27,7 @@
 #define MUX_MAJOR		11	/* PA-RISC only */
 #define QIC02_TAPE_MAJOR	12
 #define XT_DISK_MAJOR		13
+#define INPUT_MAJOR		13
 #define SOUND_MAJOR		14
 #define CDU31A_CDROM_MAJOR	15
 #define JOYSTICK_MAJOR		15

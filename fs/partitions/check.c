@@ -38,7 +38,7 @@
 #include "ultrix.h"
 #include "efi.h"
 
-#if CONFIG_BLK_DEV_MD
+#ifdef CONFIG_BLK_DEV_MD
 extern void md_autodetect_dev(dev_t dev);
 #endif
 
@@ -96,19 +96,6 @@ static int (*check_part[])(struct parsed_partitions *, struct block_device *) = 
 
 char *disk_name(struct gendisk *hd, int part, char *buf)
 {
-#ifdef CONFIG_DEVFS_FS
-	if (hd->devfs_name[0] != '\0') {
-		if (part)
-			snprintf(buf, BDEVNAME_SIZE, "%s/part%d",
-					hd->devfs_name, part);
-		else if (hd->minors != 1)
-			snprintf(buf, BDEVNAME_SIZE, "%s/disc", hd->devfs_name);
-		else
-			snprintf(buf, BDEVNAME_SIZE, "%s", hd->devfs_name);
-		return buf;
-	}
-#endif
-
 	if (!part)
 		snprintf(buf, BDEVNAME_SIZE, "%s", hd->disk_name);
 	else if (isdigit(hd->disk_name[strlen(hd->disk_name)-1]))
@@ -353,7 +340,7 @@ void register_disk(struct gendisk *disk)
 			if (!size)
 				continue;
 			add_partition(disk, j, from, size);
-#if CONFIG_BLK_DEV_MD
+#ifdef CONFIG_BLK_DEV_MD
 			if (!state->parts[j].flags)
 				continue;
 			md_autodetect_dev(bdev->bd_dev+j);
@@ -387,7 +374,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 		if (!size)
 			continue;
 		add_partition(disk, p, from, size);
-#if CONFIG_BLK_DEV_MD
+#ifdef CONFIG_BLK_DEV_MD
 		if (state->parts[p].flags)
 			md_autodetect_dev(bdev->bd_dev+p);
 #endif
@@ -443,53 +430,3 @@ void del_gendisk(struct gendisk *disk)
 	}
 	kobject_del(&disk->kobj);
 }
-
-struct dev_name {
-	struct list_head list;
-	dev_t dev;
-	char namebuf[BDEVNAME_SIZE];
-	char *name;
-};
-
-static LIST_HEAD(device_names);
-
-char *partition_name(dev_t dev)
-{
-	struct gendisk *hd;
-	static char nomem [] = "<nomem>";
-	char b[BDEVNAME_SIZE];
-	struct dev_name *dname;
-	struct list_head *tmp;
-	int part;
-
-	list_for_each(tmp, &device_names) {
-		dname = list_entry(tmp, struct dev_name, list);
-		if (dname->dev == dev)
-			return dname->name;
-	}
-
-	dname = kmalloc(sizeof(*dname), GFP_KERNEL);
-
-	if (!dname)
-		return nomem;
-	/*
-	 * ok, add this new device name to the list
-	 */
-	hd = get_gendisk(dev, &part);
-	dname->name = NULL;
-	if (hd) {
-		dname->name = disk_name(hd, part, dname->namebuf);
-		module_put(hd->fops->owner);
-		put_disk(hd);
-	}
-	if (!dname->name) {
-		sprintf(dname->namebuf, "[dev %s]", __bdevname(dev, b));
-		dname->name = dname->namebuf;
-	}
-
-	dname->dev = dev;
-	list_add(&dname->list, &device_names);
-
-	return dname->name;
-}
-

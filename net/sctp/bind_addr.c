@@ -52,16 +52,17 @@
 #include <net/sctp/sm.h>
 
 /* Forward declarations for internal helpers. */
-static int sctp_copy_one_addr(sctp_bind_addr_t *, union sctp_addr *,
+static int sctp_copy_one_addr(struct sctp_bind_addr *, union sctp_addr *,
 			      sctp_scope_t scope, int gfp, int flags);
-static void sctp_bind_addr_clean(sctp_bind_addr_t *);
+static void sctp_bind_addr_clean(struct sctp_bind_addr *);
 
 /* First Level Abstractions. */
 
 /* Copy 'src' to 'dest' taking 'scope' into account.  Omit addresses
  * in 'src' which have a broader scope than 'scope'.
  */
-int sctp_bind_addr_copy(sctp_bind_addr_t *dest, const sctp_bind_addr_t *src,
+int sctp_bind_addr_copy(struct sctp_bind_addr *dest, 
+			const struct sctp_bind_addr *src,
 			sctp_scope_t scope, int gfp, int flags)
 {
 	struct sockaddr_storage_list *addr;
@@ -80,6 +81,22 @@ int sctp_bind_addr_copy(sctp_bind_addr_t *dest, const sctp_bind_addr_t *src,
 			goto out;
 	}
 
+	/* If there are no addresses matching the scope and
+	 * this is global scope, try to get a link scope address, with
+	 * the assumption that we must be sitting behind a NAT.
+	 */
+	if (list_empty(&dest->address_list) && (SCTP_SCOPE_GLOBAL == scope)) {
+		list_for_each(pos, &src->address_list) {
+			addr = list_entry(pos, struct sockaddr_storage_list,
+					  list);
+			error = sctp_copy_one_addr(dest, &addr->a,
+						   SCTP_SCOPE_LINK, gfp,
+						   flags);
+			if (error < 0)
+				goto out;
+		}
+	}
+
 out:
 	if (error)
 		sctp_bind_addr_clean(dest);
@@ -88,11 +105,11 @@ out:
 }
 
 /* Create a new SCTP_bind_addr from nothing.  */
-sctp_bind_addr_t *sctp_bind_addr_new(int gfp)
+struct sctp_bind_addr *sctp_bind_addr_new(int gfp)
 {
-	sctp_bind_addr_t *retval;
+	struct sctp_bind_addr *retval;
 
-	retval = t_new(sctp_bind_addr_t, gfp);
+	retval = t_new(struct sctp_bind_addr, gfp);
 	if (!retval)
 		goto nomem;
 
@@ -107,7 +124,7 @@ nomem:
 /* Initialize the SCTP_bind_addr structure for either an endpoint or
  * an association.
  */
-void sctp_bind_addr_init(sctp_bind_addr_t *bp, __u16 port)
+void sctp_bind_addr_init(struct sctp_bind_addr *bp, __u16 port)
 {
 	bp->malloced = 0;
 
@@ -116,7 +133,7 @@ void sctp_bind_addr_init(sctp_bind_addr_t *bp, __u16 port)
 }
 
 /* Dispose of the address list. */
-static void sctp_bind_addr_clean(sctp_bind_addr_t *bp)
+static void sctp_bind_addr_clean(struct sctp_bind_addr *bp)
 {
 	struct sockaddr_storage_list *addr;
 	struct list_head *pos, *temp;
@@ -131,7 +148,7 @@ static void sctp_bind_addr_clean(sctp_bind_addr_t *bp)
 }
 
 /* Dispose of an SCTP_bind_addr structure  */
-void sctp_bind_addr_free(sctp_bind_addr_t *bp)
+void sctp_bind_addr_free(struct sctp_bind_addr *bp)
 {
 	/* Empty the bind address list. */
 	sctp_bind_addr_clean(bp);
@@ -143,7 +160,7 @@ void sctp_bind_addr_free(sctp_bind_addr_t *bp)
 }
 
 /* Add an address to the bind address list in the SCTP_bind_addr structure. */
-int sctp_add_bind_addr(sctp_bind_addr_t *bp, union sctp_addr *new,
+int sctp_add_bind_addr(struct sctp_bind_addr *bp, union sctp_addr *new,
 		       int gfp)
 {
 	struct sockaddr_storage_list *addr;
@@ -171,7 +188,7 @@ int sctp_add_bind_addr(sctp_bind_addr_t *bp, union sctp_addr *new,
 /* Delete an address from the bind address list in the SCTP_bind_addr
  * structure.
  */
-int sctp_del_bind_addr(sctp_bind_addr_t *bp, union sctp_addr *del_addr)
+int sctp_del_bind_addr(struct sctp_bind_addr *bp, union sctp_addr *del_addr)
 {
 	struct list_head *pos, *temp;
 	struct sockaddr_storage_list *addr;
@@ -196,7 +213,7 @@ int sctp_del_bind_addr(sctp_bind_addr_t *bp, union sctp_addr *del_addr)
  *
  * The second argument is the return value for the length.
  */
-union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
+union sctp_params sctp_bind_addrs_to_raw(const struct sctp_bind_addr *bp,
 					 int *addrs_len, int gfp)
 {
 	union sctp_params addrparms;
@@ -212,6 +229,14 @@ union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
 	/* Allocate enough memory at once. */
 	list_for_each(pos, &bp->address_list) {
 		len += sizeof(sctp_addr_param_t);
+	}
+
+	/* Don't even bother embedding an address if there
+	 * is only one.
+	 */
+	if (len == sizeof(sctp_addr_param_t)) {
+		retval.v = NULL;
+		goto end_raw;
 	}
 
 	retval.v = kmalloc(len, gfp);
@@ -237,7 +262,7 @@ end_raw:
  * Create an address list out of the raw address list format (IPv4 and IPv6
  * address parameters).
  */
-int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
+int sctp_raw_to_bind_addrs(struct sctp_bind_addr *bp, __u8 *raw_addr_list,
 			   int addrs_len, __u16 port, int gfp)
 {
 	sctp_addr_param_t *rawaddr;
@@ -283,7 +308,8 @@ int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
  ********************************************************************/
 
 /* Does this contain a specified address?  Allow wildcarding. */
-int sctp_bind_addr_match(sctp_bind_addr_t *bp, const union sctp_addr *addr,
+int sctp_bind_addr_match(struct sctp_bind_addr *bp, 
+			 const union sctp_addr *addr,
 			 struct sctp_opt *opt)
 {
 	struct sockaddr_storage_list *laddr;
@@ -299,7 +325,8 @@ int sctp_bind_addr_match(sctp_bind_addr_t *bp, const union sctp_addr *addr,
 }
 
 /* Copy out addresses from the global local address list. */
-static int sctp_copy_one_addr(sctp_bind_addr_t *dest, union sctp_addr *addr,
+static int sctp_copy_one_addr(struct sctp_bind_addr *dest, 
+			      union sctp_addr *addr,
 			      sctp_scope_t scope, int gfp, int flags)
 {
 	struct sctp_protocol *proto = sctp_get_protocol();

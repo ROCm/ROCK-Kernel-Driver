@@ -64,8 +64,8 @@ static void svc_disconnect(struct atm_vcc *vcc)
 
 	DPRINTK("svc_disconnect %p\n",vcc);
 	if (test_bit(ATM_VF_REGIS,&vcc->flags)) {
-		sigd_enq(vcc,as_close,NULL,NULL,NULL);
 		add_wait_queue(&vcc->sleep,&wait);
+		sigd_enq(vcc,as_close,NULL,NULL,NULL);
 		while (!test_bit(ATM_VF_RELEASED,&vcc->flags) && sigd) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule();
@@ -74,7 +74,7 @@ static void svc_disconnect(struct atm_vcc *vcc)
 	}
 	/* beware - socket is still in use by atmsigd until the last
 	   as_indicate has been answered */
-	while ((skb = skb_dequeue(&vcc->listenq))) {
+	while ((skb = skb_dequeue(&vcc->sk->receive_queue))) {
 		DPRINTK("LISTEN REL\n");
 		sigd_enq2(NULL,as_reject,vcc,NULL,NULL,&vcc->qos,0);
 		dev_kfree_skb(skb);
@@ -124,8 +124,8 @@ static int svc_bind(struct socket *sock,struct sockaddr *sockaddr,
 	if (!test_bit(ATM_VF_HASQOS,&vcc->flags)) return -EBADFD;
 	vcc->local = *addr;
 	vcc->reply = WAITING;
-	sigd_enq(vcc,as_bind,NULL,NULL,&vcc->local);
 	add_wait_queue(&vcc->sleep,&wait);
+	sigd_enq(vcc,as_bind,NULL,NULL,&vcc->local);
 	while (vcc->reply == WAITING && sigd) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule();
@@ -169,12 +169,13 @@ static int svc_connect(struct socket *sock,struct sockaddr *sockaddr,
 		    !vcc->qos.rxtp.traffic_class) return -EINVAL;
 		vcc->remote = *addr;
 		vcc->reply = WAITING;
+		add_wait_queue(&vcc->sleep,&wait);
 		sigd_enq(vcc,as_connect,NULL,NULL,&vcc->remote);
 		if (flags & O_NONBLOCK) {
+			remove_wait_queue(&vcc->sleep,&wait);
 			sock->state = SS_CONNECTING;
 			return -EINPROGRESS;
 		}
-		add_wait_queue(&vcc->sleep,&wait);
 		error = 0;
 		while (vcc->reply == WAITING && sigd) {
 			set_current_state(TASK_INTERRUPTIBLE);
@@ -243,8 +244,8 @@ static int svc_listen(struct socket *sock,int backlog)
 	/* let server handle listen on unbound sockets */
 	if (test_bit(ATM_VF_SESSION,&vcc->flags)) return -EINVAL;
 	vcc->reply = WAITING;
-	sigd_enq(vcc,as_listen,NULL,NULL,&vcc->local);
 	add_wait_queue(&vcc->sleep,&wait);
+	sigd_enq(vcc,as_listen,NULL,NULL,&vcc->local);
 	while (vcc->reply == WAITING && sigd) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule();
@@ -252,7 +253,7 @@ static int svc_listen(struct socket *sock,int backlog)
 	remove_wait_queue(&vcc->sleep,&wait);
 	if (!sigd) return -EUNATCH;
 	set_bit(ATM_VF_LISTEN,&vcc->flags);
-	vcc->backlog_quota = backlog > 0 ? backlog : ATM_BACKLOG_DEFAULT;
+	vcc->sk->max_ack_backlog = backlog > 0 ? backlog : ATM_BACKLOG_DEFAULT;
 	return vcc->reply;
 }
 
@@ -276,7 +277,7 @@ static int svc_accept(struct socket *sock,struct socket *newsock,int flags)
 		DECLARE_WAITQUEUE(wait,current);
 
 		add_wait_queue(&old_vcc->sleep,&wait);
-		while (!(skb = skb_dequeue(&old_vcc->listenq)) && sigd) {
+		while (!(skb = skb_dequeue(&old_vcc->sk->receive_queue)) && sigd) {
 			if (test_bit(ATM_VF_RELEASED,&old_vcc->flags)) break;
 			if (test_bit(ATM_VF_CLOSE,&old_vcc->flags)) {
 				error = old_vcc->reply;
@@ -305,7 +306,7 @@ static int svc_accept(struct socket *sock,struct socket *newsock,int flags)
 		error = atm_connect(newsock,msg->pvc.sap_addr.itf,
 		    msg->pvc.sap_addr.vpi,msg->pvc.sap_addr.vci);
 		dev_kfree_skb(skb);
-		old_vcc->backlog_quota++;
+		old_vcc->sk->ack_backlog--;
 		if (error) {
 			sigd_enq2(NULL,as_reject,old_vcc,NULL,NULL,
 			    &old_vcc->qos,error);
@@ -313,8 +314,8 @@ static int svc_accept(struct socket *sock,struct socket *newsock,int flags)
 		}
 		/* wait should be short, so we ignore the non-blocking flag */
 		new_vcc->reply = WAITING;
-		sigd_enq(new_vcc,as_accept,old_vcc,NULL,NULL);
 		add_wait_queue(&new_vcc->sleep,&wait);
+		sigd_enq(new_vcc,as_accept,old_vcc,NULL,NULL);
 		while (new_vcc->reply == WAITING && sigd) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule();
@@ -347,8 +348,8 @@ int svc_change_qos(struct atm_vcc *vcc,struct atm_qos *qos)
 	DECLARE_WAITQUEUE(wait,current);
 
 	vcc->reply = WAITING;
-	sigd_enq2(vcc,as_modify,NULL,NULL,&vcc->local,qos,0);
 	add_wait_queue(&vcc->sleep,&wait);
+	sigd_enq2(vcc,as_modify,NULL,NULL,&vcc->local,qos,0);
 	while (vcc->reply == WAITING && !test_bit(ATM_VF_RELEASED,&vcc->flags)
 	    && sigd) {
 		set_current_state(TASK_UNINTERRUPTIBLE);

@@ -361,6 +361,9 @@ struct swap_info_struct;
  * 	Check permission before setting the extended attributes
  * 	@value identified by @name for @dentry.
  * 	Return 0 if permission is granted.
+ * @inode_post_setxattr:
+ * 	Update inode security field after successful setxattr operation.
+ * 	@value identified by @name for @dentry.
  * @inode_getxattr:
  * 	Check permission before obtaining the extended attributes
  * 	identified by @name for @dentry.
@@ -1036,6 +1039,8 @@ struct security_operations {
         void (*inode_delete) (struct inode *inode);
 	int (*inode_setxattr) (struct dentry *dentry, char *name, void *value,
 			       size_t size, int flags);
+	void (*inode_post_setxattr) (struct dentry *dentry, char *name, void *value,
+				     size_t size, int flags);
 	int (*inode_getxattr) (struct dentry *dentry, char *name);
 	int (*inode_listxattr) (struct dentry *dentry);
 	int (*inode_removexattr) (struct dentry *dentry, char *name);
@@ -1464,6 +1469,12 @@ static inline int security_inode_setxattr (struct dentry *dentry, char *name,
 	return security_ops->inode_setxattr (dentry, name, value, size, flags);
 }
 
+static inline void security_inode_post_setxattr (struct dentry *dentry, char *name,
+						void *value, size_t size, int flags)
+{
+	security_ops->inode_post_setxattr (dentry, name, value, size, flags);
+}
+
 static inline int security_inode_getxattr (struct dentry *dentry, char *name)
 {
 	return security_ops->inode_getxattr (dentry, name);
@@ -1718,7 +1729,7 @@ static inline int security_shm_shmctl (struct shmid_kernel * shp, int cmd)
 }
 
 static inline int security_shm_shmat (struct shmid_kernel * shp, 
-				      char *shmaddr, int shmflg)
+				      char __user *shmaddr, int shmflg)
 {
 	return security_ops->shm_shmat(shp, shmaddr, shmflg);
 }
@@ -2063,6 +2074,10 @@ static inline int security_inode_setxattr (struct dentry *dentry, char *name,
 	return 0;
 }
 
+static inline void security_inode_post_setxattr (struct dentry *dentry, char *name,
+						 void *value, size_t size, int flags)
+{ }
+
 static inline int security_inode_getxattr (struct dentry *dentry, char *name)
 {
 	return 0;
@@ -2307,7 +2322,7 @@ static inline int security_shm_shmctl (struct shmid_kernel * shp, int cmd)
 }
 
 static inline int security_shm_shmat (struct shmid_kernel * shp, 
-				      char *shmaddr, int shmflg)
+				      char __user *shmaddr, int shmflg)
 {
 	return 0;
 }

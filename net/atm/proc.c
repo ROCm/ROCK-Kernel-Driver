@@ -57,10 +57,12 @@ static ssize_t proc_spec_atm_read(struct file *file,char *buf,size_t count,
     loff_t *pos);
 
 static struct file_operations proc_dev_atm_operations = {
+	.owner =	THIS_MODULE,
 	.read =		proc_dev_atm_read,
 };
 
 static struct file_operations proc_spec_atm_operations = {
+	.owner =	THIS_MODULE,
 	.read =		proc_spec_atm_read,
 };
 

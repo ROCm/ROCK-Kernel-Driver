@@ -774,6 +774,7 @@ static int packet_release(struct socket *sock)
 		 */
 		dev_remove_pack(&po->prot_hook);
 		po->running = 0;
+		po->num = 0;
 		__sock_put(sk);
 	}
 
@@ -819,9 +820,12 @@ static int packet_do_bind(struct sock *sk, struct net_device *dev, int protocol)
 
 	spin_lock(&po->bind_lock);
 	if (po->running) {
-		dev_remove_pack(&po->prot_hook);
 		__sock_put(sk);
 		po->running = 0;
+		po->num = 0;
+		spin_unlock(&po->bind_lock);
+		dev_remove_pack(&po->prot_hook);
+		spin_lock(&po->bind_lock);
 	}
 
 	po->num = protocol;
@@ -1374,7 +1378,7 @@ static int packet_notifier(struct notifier_block *this, unsigned long msg, void 
 			if (dev->ifindex == po->ifindex) {
 				spin_lock(&po->bind_lock);
 				if (po->running) {
-					dev_remove_pack(&po->prot_hook);
+					__dev_remove_pack(&po->prot_hook);
 					__sock_put(sk);
 					po->running = 0;
 					sk->err = ENETDOWN;
@@ -1618,9 +1622,14 @@ static int packet_set_ring(struct sock *sk, struct tpacket_req *req, int closing
 
 	/* Detach socket from network */
 	spin_lock(&po->bind_lock);
-	if (po->running)
-		dev_remove_pack(&po->prot_hook);
+	if (po->running) {
+		__dev_remove_pack(&po->prot_hook);
+		po->num = 0;
+		po->running = 0;
+	}
 	spin_unlock(&po->bind_lock);
+		
+	synchronize_net();
 
 	err = -EBUSY;
 	if (closing || atomic_read(&po->mapped) == 0) {

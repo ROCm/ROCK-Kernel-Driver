@@ -74,6 +74,7 @@
 #include <linux/atm.h>
 #include <linux/atmdev.h>
 #include <linux/crc32.h>
+#include <linux/init.h>
 
 /*
 #define DEBUG 1

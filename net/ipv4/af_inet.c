@@ -94,7 +94,6 @@
 #include <linux/inet.h>
 #include <linux/igmp.h>
 #include <linux/netdevice.h>
-#include <linux/brlock.h>
 #include <net/ip.h>
 #include <net/protocol.h>
 #include <net/arp.h>
@@ -129,7 +128,8 @@ static kmem_cache_t *raw4_sk_cachep;
 /* The inetsw table contains everything that inet_create needs to
  * build a new socket.
  */
-struct list_head inetsw[SOCK_MAX];
+static struct list_head inetsw[SOCK_MAX];
+static spinlock_t inetsw_lock = SPIN_LOCK_UNLOCKED;
 
 /* New destruction routine */
 
@@ -337,8 +337,8 @@ static int inet_create(struct socket *sock, int protocol)
 
 	/* Look for the requested type/protocol pair. */
 	answer = NULL;
-	br_read_lock_bh(BR_NETPROTO_LOCK);
-	list_for_each(p, &inetsw[sock->type]) {
+	rcu_read_lock();
+	list_for_each_rcu(p, &inetsw[sock->type]) {
 		answer = list_entry(p, struct inet_protosw, list);
 
 		/* Check the non-wild match. */
@@ -356,7 +356,6 @@ static int inet_create(struct socket *sock, int protocol)
 		}
 		answer = NULL;
 	}
-	br_read_unlock_bh(BR_NETPROTO_LOCK);
 
 	err = -ESOCKTNOSUPPORT;
 	if (!answer)
@@ -373,6 +372,7 @@ static int inet_create(struct socket *sock, int protocol)
 	sk->no_check = answer->no_check;
 	if (INET_PROTOSW_REUSE & answer->flags)
 		sk->reuse = 1;
+	rcu_read_unlock();
 
 	inet = inet_sk(sk);
 
@@ -427,6 +427,7 @@ static int inet_create(struct socket *sock, int protocol)
 out:
 	return err;
 out_sk_free:
+	rcu_read_unlock();
 	sk_free(sk);
 	goto out;
 }
@@ -926,6 +927,7 @@ struct proto_ops inet_dgram_ops = {
 struct net_proto_family inet_family_ops = {
 	.family = PF_INET,
 	.create = inet_create,
+	.owner	= THIS_MODULE,
 };
 
 
@@ -978,7 +980,7 @@ void inet_register_protosw(struct inet_protosw *p)
 	int protocol = p->protocol;
 	struct list_head *last_perm;
 
-	br_write_lock_bh(BR_NETPROTO_LOCK);
+	spin_lock_bh(&inetsw_lock);
 
 	if (p->type > SOCK_MAX)
 		goto out_illegal;
@@ -1007,9 +1009,12 @@ void inet_register_protosw(struct inet_protosw *p)
 	 * non-permanent entry.  This means that when we remove this entry, the 
 	 * system automatically returns to the old behavior.
 	 */
-	list_add(&p->list, last_perm);
+	list_add_rcu(&p->list, last_perm);
 out:
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	spin_unlock_bh(&inetsw_lock);
+
+	synchronize_net();
+
 	return;
 
 out_permanent:
@@ -1031,9 +1036,11 @@ void inet_unregister_protosw(struct inet_protosw *p)
 		       "Attempt to unregister permanent protocol %d.\n",
 		       p->protocol);
 	} else {
-		br_write_lock_bh(BR_NETPROTO_LOCK);
-		list_del(&p->list);
-		br_write_unlock_bh(BR_NETPROTO_LOCK);
+		spin_lock_bh(&inetsw_lock);
+		list_del_rcu(&p->list);
+		spin_unlock_bh(&inetsw_lock);
+
+		synchronize_net();
 	}
 }
 

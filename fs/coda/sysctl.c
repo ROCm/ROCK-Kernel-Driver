@@ -244,7 +244,7 @@ void coda_sysctl_clean()
 	}
 #endif
 
-#if CONFIG_PROC_FS
+#ifdef CONFIG_PROC_FS
         remove_proc_entry("cache_inv_stats", proc_fs_coda);
         remove_proc_entry("vfs_stats", proc_fs_coda);
 	remove_proc_entry("coda", proc_root_fs);

@@ -443,9 +443,7 @@
 
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Wireless extensions */
-#if WIRELESS_EXT > 12
-#include <net/iw_handler.h>
-#endif	/* WIRELESS_EXT > 12 */
+#include <net/iw_handler.h>		/* New driver API */
 #endif
 
 /* Pcmcia headers that we need */
@@ -527,13 +525,6 @@ static const char *version = "wavelan_cs.c : v24 (SMP + wireless extensions) 11/
 
 /* ------------------------ PRIVATE IOCTL ------------------------ */
 
-/* Wireless Extension Backward compatibility - Jean II
- * If the new wireless device private ioctl range is not defined,
- * default to standard device private ioctl range */
-#ifndef SIOCIWFIRSTPRIV
-#define SIOCIWFIRSTPRIV	SIOCDEVPRIVATE
-#endif /* SIOCIWFIRSTPRIV */
-
 #define SIOCSIPQTHR	SIOCIWFIRSTPRIV		/* Set quality threshold */
 #define SIOCGIPQTHR	SIOCIWFIRSTPRIV + 1	/* Get quality threshold */
 #define SIOCSIPROAM     SIOCIWFIRSTPRIV + 2	/* Set roaming state */
@@ -605,16 +596,6 @@ typedef struct iw_freq		iw_freq;
 typedef struct net_local	net_local;
 typedef struct timer_list	timer_list;
 
-#if WIRELESS_EXT <= 12
-/* Wireless extensions backward compatibility */
-/* Part of iw_handler prototype we need */
-struct iw_request_info
-{
-	__u16		cmd;		/* Wireless Extension command */
-	__u16		flags;		/* More to come ;-) */
-};
-#endif	/* WIRELESS_EXT <= 12 */
-
 /* Basic types */
 typedef u_char		mac_addr[WAVELAN_ADDR_SIZE];	/* Hardware address */
 
@@ -647,13 +628,10 @@ struct net_local
 
 #ifdef WIRELESS_EXT
   iw_stats	wstats;		/* Wireless specific stats */
+
+  struct iw_spy_data	spy_data;
 #endif
 
-#ifdef WIRELESS_SPY
-  int		spy_number;		/* Number of addresses to spy */
-  mac_addr	spy_address[IW_MAX_SPY];	/* The addresses to spy */
-  iw_qual	spy_stat[IW_MAX_SPY];		/* Statistics gathered */
-#endif	/* WIRELESS_SPY */
 #ifdef HISTOGRAM
   int		his_number;		/* Number of intervals */
   u_char	his_range[16];		/* Boundaries of interval ]n-1; n] */
@@ -686,11 +664,6 @@ void wv_roam_init(struct net_device *dev);
 void wv_roam_cleanup(struct net_device *dev);
 #endif	/* WAVELAN_ROAMING */
 
-/* ----------------------- MISC SUBROUTINES ------------------------ */
-static void
-	cs_error(client_handle_t,	/* Report error to cardmgr */
-		 int,
-		 int);
 /* ----------------- MODEM MANAGEMENT SUBROUTINES ----------------- */
 static inline u_char		/* data */
 	hasr_read(u_long);	/* Read the host interface : base address */
@@ -791,7 +764,7 @@ static void
 	wv_pcmcia_release(u_long),	/* Remove a device */
 	wv_flush_stale_links(void);	/* "detach" all possible devices */
 /* ---------------------- INTERRUPT HANDLING ---------------------- */
-static void
+static irqreturn_t
 	wavelan_interrupt(int,	/* Interrupt handler */
 			  void *,
 			  struct pt_regs *);

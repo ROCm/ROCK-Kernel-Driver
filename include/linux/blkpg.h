@@ -54,10 +54,4 @@ struct blkpg_partition {
 	char volname[BLKPG_VOLNAMELTH];	/* volume label */
 };
 
-#ifdef __KERNEL__
-
-extern char * partition_name(dev_t dev);
-
-#endif /* __KERNEL__ */
-
 #endif /* _LINUX_BLKPG_H */

@@ -1352,7 +1352,6 @@ sg_attach(Scsi_Device * scsidp)
 	struct gendisk *disk;
 	Sg_device *sdp = NULL;
 	unsigned long iflags;
-	char devfs_name[64];
 	int k, error;
 
 	disk = alloc_disk(1);
@@ -1447,11 +1446,9 @@ find_empty_slot:
 	device_create_file(&sdp->sg_driverfs_dev, &dev_attr_type);
 	device_create_file(&sdp->sg_driverfs_dev, &dev_attr_kdev);
 
-	sprintf(devfs_name, "%s/generic", scsidp->devfs_name);
-	devfs_register(NULL, devfs_name, 0,
-			SCSI_GENERIC_MAJOR, k,
+	devfs_mk_cdev(MKDEV(SCSI_GENERIC_MAJOR, k),
 			S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
-			&sg_fops, sdp);
+			"%s/generic", scsidp->devfs_name);
 
 	switch (scsidp->type) {
 	case TYPE_DISK:

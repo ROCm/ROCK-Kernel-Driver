@@ -56,7 +56,7 @@ cifs_dump_mem(char *label, void *data, int length)
 	}
 }
 
-#if CONFIG_PROC_FS
+#ifdef CONFIG_PROC_FS
 int
 cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		     int count, int *eof, void *data)

@@ -71,7 +71,6 @@ struct dn_dev_parms {
 #define DN_DEV_MPOINT 4
 	int state;                /* Initial state                      */
 	int forwarding;	          /* 0=EndNode, 1=L1Router, 2=L2Router  */
-	unsigned short blksize;   /* Block Size                         */
 	unsigned long t2;         /* Default value of t2                */
 	unsigned long t3;         /* Default value of t3                */
 	int priority;             /* Priority to be a router            */

@@ -204,7 +204,6 @@ lec_send(struct atm_vcc *vcc, struct sk_buff *skb, struct lec_priv *priv)
 	if (atm_may_send(vcc, skb->len)) {
 		atomic_add(skb->truesize, &vcc->sk->wmem_alloc);
 	        ATM_SKB(skb)->vcc = vcc;
-	        ATM_SKB(skb)->iovcnt = 0;
 	        ATM_SKB(skb)->atm_options = vcc->atm_options;
 		priv->stats.tx_packets++;
 		priv->stats.tx_bytes += skb->len;
@@ -302,7 +301,7 @@ lec_send_packet(struct sk_buff *skb, struct net_device *dev)
 #endif
         min_frame_size = LEC_MINIMUM_8023_SIZE;
         if (skb->len < min_frame_size) {
-                if (skb->truesize < min_frame_size) {
+                if ((skb->len + skb_tailroom(skb)) < min_frame_size) {
                         skb2 = skb_copy_expand(skb, 0,
                             min_frame_size - skb->truesize, GFP_ATOMIC);
                                 dev_kfree_skb(skb);
@@ -399,7 +398,7 @@ lec_atm_send(struct atm_vcc *vcc, struct sk_buff *skb)
         int i;
         char *tmp; /* FIXME */
 
-	atomic_sub(skb->truesize+ATM_PDU_OVHD, &vcc->sk->wmem_alloc);
+	atomic_sub(skb->truesize, &vcc->sk->wmem_alloc);
         mesg = (struct atmlec_msg *)skb->data;
         tmp = skb->data;
         tmp += sizeof(struct atmlec_msg);
@@ -715,6 +714,7 @@ lec_push(struct atm_vcc *vcc, struct sk_buff *skb)
                 skb->protocol = eth_type_trans(skb, dev);
                 priv->stats.rx_packets++;
                 priv->stats.rx_bytes += skb->len;
+                memset(ATM_SKB(skb), 0, sizeof(struct atm_skb_data));
                 netif_rx(skb);
         }
 }

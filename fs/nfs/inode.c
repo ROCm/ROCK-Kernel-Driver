@@ -682,7 +682,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		 * such as stat(2) */
 		inode->i_ino = hash;
 
-		/* We can't support UPDATE_ATIME(), since the server will reset it */
+		/* We can't support update_atime(), since the server will reset it */
 		inode->i_flags |= S_NOATIME;
 		inode->i_mode = fattr->mode;
 		/* Why so? Because we want revalidate for devices/FIFOs, and

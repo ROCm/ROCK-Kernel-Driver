@@ -220,14 +220,6 @@ static struct {
 	},
 };
 
-static void __init make_devfs_entries (const char *name, int minor)
-{
-	devfs_register (NULL, name, DEVFS_FL_DEFAULT,
-			NETLINK_MAJOR, minor,
-			S_IFCHR | S_IRUSR | S_IWUSR,
-			&netlink_fops, NULL);
-}
-
 int __init init_netlink(void)
 {
 	int i;
@@ -236,18 +228,20 @@ int __init init_netlink(void)
 		printk(KERN_ERR "netlink: unable to get major %d\n", NETLINK_MAJOR);
 		return -EIO;
 	}
+
 	devfs_mk_dir("netlink");
+
 	/*  Someone tell me the official names for the uppercase ones  */
 	for (i = 0; i < sizeof(entries)/sizeof(entries[0]); i++) {
-		char name[20];
-		sprintf(name, "netlink/%s", entries[i].name);
-		make_devfs_entries(name, entries[i].minor);
+		devfs_mk_cdev(MKDEV(NETLINK_MAJOR, entries[i].minor),
+			S_IFCHR|S_IRUSR|S_IWUSR, "netlink/%s", entries[i].name);
 	}
+
 	for (i = 0; i < 16; i++) {
-		char name[20];
-		sprintf(name, "netlink/tap%d", i);
-		make_devfs_entries(name, i + 16);
+		devfs_mk_cdev(MKDEV(NETLINK_MAJOR, i + 16),
+			S_IFCHR|S_IRUSR|S_IWUSR, "netlink/tap%d", i);
 	}
+
 	return 0;
 }
 

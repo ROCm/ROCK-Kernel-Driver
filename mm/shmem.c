@@ -1013,7 +1013,7 @@ static int shmem_mmap(struct file *file, struct vm_area_struct *vma)
 	ops = &shmem_vm_ops;
 	if (!inode->i_sb || !S_ISREG(inode->i_mode))
 		return -EACCES;
-	UPDATE_ATIME(inode);
+	update_atime(inode);
 	vma->vm_ops = ops;
 	return 0;
 }
@@ -1114,7 +1114,7 @@ shmem_prepare_write(struct file *file, struct page *page, unsigned offset, unsig
 }
 
 static ssize_t
-shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	struct inode	*inode = file->f_dentry->d_inode;
 	loff_t		pos;
@@ -1307,10 +1307,10 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 	}
 
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
-	UPDATE_ATIME(inode);
+	update_atime(inode);
 }
 
-static ssize_t shmem_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+static ssize_t shmem_file_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	read_descriptor_t desc;
 
@@ -1333,7 +1333,7 @@ static ssize_t shmem_file_read(struct file *filp, char *buf, size_t count, loff_
 }
 
 static ssize_t shmem_file_sendfile(struct file *in_file, loff_t *ppos,
-			 size_t count, read_actor_t actor, void *target)
+			 size_t count, read_actor_t actor, void __user *target)
 {
 	read_descriptor_t desc;
 
@@ -1519,7 +1519,7 @@ static int shmem_symlink(struct inode *dir, struct dentry *dentry, const char *s
 	return 0;
 }
 
-static int shmem_readlink_inline(struct dentry *dentry, char *buffer, int buflen)
+static int shmem_readlink_inline(struct dentry *dentry, char __user *buffer, int buflen)
 {
 	return vfs_readlink(dentry, buffer, buflen, (const char *)SHMEM_I(dentry->d_inode));
 }
@@ -1529,7 +1529,7 @@ static int shmem_follow_link_inline(struct dentry *dentry, struct nameidata *nd)
 	return vfs_follow_link(nd, (const char *)SHMEM_I(dentry->d_inode));
 }
 
-static int shmem_readlink(struct dentry *dentry, char *buffer, int buflen)
+static int shmem_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 {
 	struct page *page = NULL;
 	int res = shmem_getpage(dentry->d_inode, 0, &page, SGP_READ);

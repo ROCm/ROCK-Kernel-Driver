@@ -1310,7 +1310,7 @@ void __init srmmu_paging_init(void)
 	flush_tlb_all();
 	poke_srmmu();
 
-#if CONFIG_SUN_IO
+#ifdef CONFIG_SUN_IO
 	srmmu_allocate_ptable_skeleton(sparc_iomap.start, IOBASE_END);
 	srmmu_allocate_ptable_skeleton(DVMA_VADDR, DVMA_END);
 #endif

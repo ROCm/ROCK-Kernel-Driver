@@ -14,6 +14,7 @@
  *	YOSHIFUJI Hideaki @USAGI and:	Support IPV6_V6ONLY socket option, which
  *	Alexey Kuznetsov		allow both IPv4 and IPv6 sockets to bind
  *					a single port at the same time.
+ *      Kazunori MIYAZAWA @USAGI:       change process style to use ip6_append_data
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -575,7 +576,7 @@ static struct sock *udp_v6_mcast_next(struct sock *sk,
 	for(; s; s = s->next) {
 		struct inet_opt *inet = inet_sk(s);
 
-		if (inet->num == num) {
+		if (inet->num == num && sk->family == PF_INET6) {
 			struct ipv6_pinfo *np = inet6_sk(s);
 			if (inet->dport) {
 				if (inet->dport != rmt_port)
@@ -738,96 +739,117 @@ discard:
 	kfree_skb(skb);
 	return(0);	
 }
+/*
+ * Throw away all pending data and cancel the corking. Socket is locked.
+ */
+static void udp_v6_flush_pending_frames(struct sock *sk)
+{
+	struct udp_opt *up = udp_sk(sk);
+
+	if (up->pending) {
+		up->pending = 0;
+		ip6_flush_pending_frames(sk);
+        }
+}
 
 /*
  *	Sending
  */
 
-struct udpv6fakehdr 
+static int udp_v6_push_pending_frames(struct sock *sk, struct udp_opt *up)
 {
-	struct udphdr	uh;
-	struct iovec	*iov;
-	__u32		wcheck;
-	__u32		pl_len;
-	struct in6_addr *daddr;
-};
+	struct sk_buff *skb;
+	struct udphdr *uh;
+	struct ipv6_pinfo *np = inet6_sk(sk);
+	struct flowi *fl = np->cork.fl;
+	int err = 0;
 
-/*
- *	with checksum
- */
+	/* Grab the skbuff where UDP header space exists. */
+	if ((skb = skb_peek(&sk->write_queue)) == NULL)
+		goto out;
 
-static int udpv6_getfrag(const void *data, struct in6_addr *addr,
-			 char *buff, unsigned int offset, unsigned int len)
-{
-	struct udpv6fakehdr *udh = (struct udpv6fakehdr *) data;
-	char *dst;
-	int final = 0;
-	int clen = len;
+	/*
+	 * Create a UDP header
+	 */
+	uh = skb->h.uh;
+	uh->source = fl->fl_ip_sport;
+	uh->dest = fl->fl_ip_dport;
+	uh->len = htons(up->len);
+	uh->check = 0;
 
-	dst = buff;
+	if (sk->no_check == UDP_CSUM_NOXMIT) {
+		skb->ip_summed = CHECKSUM_NONE;
+		goto send;
+	}
 
-	if (offset) {
-		offset -= sizeof(struct udphdr);
+	if (skb_queue_len(&sk->write_queue) == 1) {
+		skb->csum = csum_partial((char *)uh,
+				sizeof(struct udphdr), skb->csum);
+		uh->check = csum_ipv6_magic(fl->fl6_src,
+					    fl->fl6_dst,
+					    up->len, fl->proto, skb->csum);
 	} else {
-		dst += sizeof(struct udphdr);
-		final = 1;
-		clen -= sizeof(struct udphdr);
-	}
+		u32 tmp_csum = 0;
 
-	if (csum_partial_copy_fromiovecend(dst, udh->iov, offset,
-					   clen, &udh->wcheck))
-		return -EFAULT;
-
-	if (final) {
-		struct in6_addr *daddr;
-		
-		udh->wcheck = csum_partial((char *)udh, sizeof(struct udphdr),
-					   udh->wcheck);
-
-		if (udh->daddr) {
-			daddr = udh->daddr;
-		} else {
-			/*
-			 *	use packet destination address
-			 *	this should improve cache locality
-			 */
-			daddr = addr + 1;
+		skb_queue_walk(&sk->write_queue, skb) {
+			tmp_csum = csum_add(tmp_csum, skb->csum);
 		}
-		udh->uh.check = csum_ipv6_magic(addr, daddr,
-						udh->pl_len, IPPROTO_UDP,
-						udh->wcheck);
-		if (udh->uh.check == 0)
-			udh->uh.check = -1;
+		tmp_csum = csum_partial((char *)uh,
+				sizeof(struct udphdr), tmp_csum);
+                tmp_csum = csum_ipv6_magic(fl->fl6_src,
+					   fl->fl6_dst,
+					   up->len, fl->proto, tmp_csum);
+                uh->check = tmp_csum;
 
-		memcpy(buff, udh, sizeof(struct udphdr));
 	}
-	return 0;
+	if (uh->check == 0)
+		uh->check = -1;
+
+send:
+	err = ip6_push_pending_frames(sk);
+out:
+	up->len = 0;
+	up->pending = 0;
+	return err;
 }
 
-static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, int ulen)
+static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, int len)
 {
 	struct ipv6_txoptions opt_space;
-	struct udpv6fakehdr udh;
+	struct udp_opt *up = udp_sk(sk);
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) msg->msg_name;
+	struct in6_addr *daddr, *saddr = NULL;
 	struct ipv6_txoptions *opt = NULL;
 	struct ip6_flowlabel *flowlabel = NULL;
 	struct flowi fl;
+	struct dst_entry *dst;
 	int addr_len = msg->msg_namelen;
-	struct in6_addr *daddr;
-	int len = ulen + sizeof(struct udphdr);
+	int ulen = len;
 	int addr_type;
 	int hlimit = -1;
-	
+	int corkreq = up->corkflag || msg->msg_flags&MSG_MORE;
 	int err;
 	
 	/* Rough check on arithmetic overflow,
 	   better check is made in ip6_build_xmit
 	   */
-	if (ulen < 0 || ulen > INT_MAX - sizeof(struct udphdr))
+	if (len < 0 || len > INT_MAX - sizeof(struct udphdr))
 		return -EMSGSIZE;
 	
+	if (up->pending) {
+		/*
+		 * There are pending frames.
+		 * The socket lock must be held while it's corked.
+		 */
+		lock_sock(sk);
+		if (likely(up->pending))
+			goto do_append_data;
+		release_sock(sk);
+	}
+	ulen += sizeof(struct udphdr);
+
 	fl.fl6_flowlabel = 0;
 	fl.oif = 0;
 
@@ -835,7 +857,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		if (sin6->sin6_family == AF_INET) {
 			if (__ipv6_only_sock(sk))
 				return -ENETUNREACH;
-			return udp_sendmsg(iocb, sk, msg, ulen);
+			return udp_sendmsg(iocb, sk, msg, len);
 		}
 
 		if (addr_len < SIN6_LEN_RFC2133)
@@ -847,7 +869,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		if (sin6->sin6_port == 0)
 			return -EINVAL;
 
-		udh.uh.dest = sin6->sin6_port;
+		up->dport = sin6->sin6_port;
 		daddr = &sin6->sin6_addr;
 
 		if (np->sndflow) {
@@ -873,7 +895,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		if (sk->state != TCP_ESTABLISHED)
 			return -ENOTCONN;
 
-		udh.uh.dest = inet->dport;
+		up->dport = inet->dport;
 		daddr = &np->daddr;
 		fl.fl6_flowlabel = np->flow_label;
 	}
@@ -888,15 +910,14 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = daddr->s6_addr32[3];
-		sin.sin_port = udh.uh.dest;
+		sin.sin_port = up->dport;
 		msg->msg_name = (struct sockaddr *)(&sin);
 		msg->msg_namelen = sizeof(sin);
 		fl6_sock_release(flowlabel);
 
-		return udp_sendmsg(iocb, sk, msg, ulen);
+		return udp_sendmsg(iocb, sk, msg, len);
 	}
 
-	udh.daddr = NULL;
 	if (!fl.oif)
 		fl.oif = sk->bound_dev_if;
 	fl.fl6_src = NULL;
@@ -922,33 +943,172 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		opt = np->opt;
 	if (flowlabel)
 		opt = fl6_merge_options(&opt_space, flowlabel, opt);
-	if (opt && opt->srcrt)
-		udh.daddr = daddr;
-
-	udh.uh.source = inet->sport;
-	udh.uh.len = len < 0x10000 ? htons(len) : 0;
-	udh.uh.check = 0;
-	udh.iov = msg->msg_iov;
-	udh.wcheck = 0;
-	udh.pl_len = len;
 
 	fl.proto = IPPROTO_UDP;
 	fl.fl6_dst = daddr;
 	if (fl.fl6_src == NULL && !ipv6_addr_any(&np->saddr))
 		fl.fl6_src = &np->saddr;
-	fl.fl_ip_dport = udh.uh.dest;
-	fl.fl_ip_sport = udh.uh.source;
+	fl.fl_ip_dport = up->dport;
+	fl.fl_ip_sport = inet->sport;
+	
+	/* merge ip6_build_xmit from ip6_output */
+	if (opt && opt->srcrt) {
+		struct rt0_hdr *rt0 = (struct rt0_hdr *) opt->srcrt;
+		fl.fl6_dst = rt0->addr;
+	}
 
-	err = ip6_build_xmit(sk, udpv6_getfrag, &udh, &fl, len, opt, hlimit,
-			     msg->msg_flags);
+	if (!fl.oif && ipv6_addr_is_multicast(fl.nl_u.ip6_u.daddr))
+		fl.oif = np->mcast_oif;
 
+	err = ip6_dst_lookup(sk, &dst, &fl, &saddr);
+	if (err) goto out;
+
+	if (hlimit < 0) {
+		if (ipv6_addr_is_multicast(fl.fl6_dst))
+			hlimit = np->mcast_hops;
+		else
+			hlimit = np->hop_limit;
+		if (hlimit < 0)
+			hlimit = ((struct rt6_info*)dst)->rt6i_hoplimit;
+	}
+
+	if (msg->msg_flags&MSG_CONFIRM)
+		goto do_confirm;
+back_from_confirm:
+
+	lock_sock(sk);
+	if (unlikely(up->pending)) {
+		/* The socket is already corked while preparing it. */
+		/* ... which is an evident application bug. --ANK */
+		release_sock(sk);
+
+		NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "udp cork app bug 2\n"));
+		err = -EINVAL;
+		goto out;
+	}
+
+	up->pending = 1;
+
+do_append_data:
+	up->len += ulen;
+	err = ip6_append_data(sk, ip_generic_getfrag, msg->msg_iov, ulen, sizeof(struct udphdr),
+			      hlimit, opt, &fl, (struct rt6_info*)dst,
+			      corkreq ? msg->msg_flags|MSG_MORE : msg->msg_flags);
+	if (err)
+		udp_v6_flush_pending_frames(sk);
+	else if (!corkreq)
+		err = udp_v6_push_pending_frames(sk, up);
+
+	ip6_dst_store(sk, dst, fl.nl_u.ip6_u.daddr == &np->daddr ? &np->daddr : NULL);
+	if (err > 0)
+		err = np->recverr ? net_xmit_errno(err) : 0;
+	release_sock(sk);
+out:
 	fl6_sock_release(flowlabel);
+	if (saddr) kfree(saddr);
+	if (!err) {
+		UDP6_INC_STATS_USER(UdpOutDatagrams);
+		return len;
+	}
+	return err;
 
-	if (err < 0)
-		return err;
+do_confirm:
+	dst_confirm(dst);
+	if (!(msg->msg_flags&MSG_PROBE) || len)
+		goto back_from_confirm;
+	err = 0;
+	goto out;
+}
 
-	UDP6_INC_STATS_USER(UdpOutDatagrams);
-	return ulen;
+static int udpv6_destroy_sock(struct sock *sk)
+{
+	lock_sock(sk);
+	udp_v6_flush_pending_frames(sk);
+	release_sock(sk);
+
+	inet6_destroy_sock(sk);
+
+	return 0;
+}
+
+/*
+ *	Socket option code for UDP
+ */
+static int udpv6_setsockopt(struct sock *sk, int level, int optname, 
+			  char *optval, int optlen)
+{
+	struct udp_opt *up = udp_sk(sk);
+	int val;
+	int err = 0;
+
+	if (level != SOL_UDP)
+		return ipv6_setsockopt(sk, level, optname, optval, optlen);
+
+	if(optlen<sizeof(int))
+		return -EINVAL;
+
+	if (get_user(val, (int *)optval))
+		return -EFAULT;
+
+	switch(optname) {
+	case UDP_CORK:
+		if (val != 0) {
+			up->corkflag = 1;
+		} else {
+			up->corkflag = 0;
+			lock_sock(sk);
+			udp_v6_push_pending_frames(sk, up);
+			release_sock(sk);
+		}
+		break;
+		
+	case UDP_ENCAP:
+		up->encap_type = val;
+		break;
+
+	default:
+		err = -ENOPROTOOPT;
+		break;
+	};
+
+	return err;
+}
+
+static int udpv6_getsockopt(struct sock *sk, int level, int optname, 
+			  char *optval, int *optlen)
+{
+	struct udp_opt *up = udp_sk(sk);
+	int val, len;
+
+	if (level != SOL_UDP)
+		return ipv6_getsockopt(sk, level, optname, optval, optlen);
+
+	if(get_user(len,optlen))
+		return -EFAULT;
+
+	len = min_t(unsigned int, len, sizeof(int));
+	
+	if(len < 0)
+		return -EINVAL;
+
+	switch(optname) {
+	case UDP_CORK:
+		val = up->corkflag;
+		break;
+
+	case UDP_ENCAP:
+		val = up->encap_type;
+		break;
+
+	default:
+		return -ENOPROTOOPT;
+	};
+
+  	if(put_user(len, optlen))
+  		return -EFAULT;
+	if(copy_to_user(optval, &val,len))
+		return -EFAULT;
+  	return 0;
 }
 
 static struct inet6_protocol udpv6_protocol = {
@@ -1038,9 +1198,9 @@ struct proto udpv6_prot = {
 	.connect =	udpv6_connect,
 	.disconnect =	udp_disconnect,
 	.ioctl =	udp_ioctl,
-	.destroy =	inet6_destroy_sock,
-	.setsockopt =	ipv6_setsockopt,
-	.getsockopt =	ipv6_getsockopt,
+	.destroy =	udpv6_destroy_sock,
+	.setsockopt =	udpv6_setsockopt,
+	.getsockopt =	udpv6_getsockopt,
 	.sendmsg =	udpv6_sendmsg,
 	.recvmsg =	udpv6_recvmsg,
 	.backlog_rcv =	udpv6_queue_rcv_skb,

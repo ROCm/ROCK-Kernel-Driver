@@ -20,6 +20,8 @@
  *          Steve Whitehouse : /proc/sys/net/decnet/conf/<sys>/forwarding
  *          Steve Whitehouse : Removed timer1 - it's a user space issue now
  *         Patrick Caulfield : Fixed router hello message format
+ *          Steve Whitehouse : Got rid of constant sizes for blksize for
+ *                             devices. All mtu based now.
  */
 
 #include <linux/config.h>
@@ -28,6 +30,7 @@
 #include <linux/net.h>
 #include <linux/netdevice.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/timer.h>
 #include <linux/string.h>
 #include <linux/if_arp.h>
@@ -72,16 +75,13 @@ static void rtmsg_ifa(int event, struct dn_ifaddr *ifa);
 static int dn_eth_up(struct net_device *);
 static void dn_eth_down(struct net_device *);
 static void dn_send_brd_hello(struct net_device *dev, struct dn_ifaddr *ifa);
-#if 0
 static void dn_send_ptp_hello(struct net_device *dev, struct dn_ifaddr *ifa);
-#endif
 
 static struct dn_dev_parms dn_dev_list[] =  {
 {
 	.type =		ARPHRD_ETHER, /* Ethernet */
 	.mode =		DN_DEV_BCAST,
 	.state =	DN_DEV_S_RU,
-	.blksize =	1498,
 	.t2 =		1,
 	.t3 =		10,
 	.name =		"ethernet",
@@ -94,7 +94,6 @@ static struct dn_dev_parms dn_dev_list[] =  {
 	.type =		ARPHRD_IPGRE, /* DECnet tunneled over GRE in IP */
 	.mode =		DN_DEV_BCAST,
 	.state =	DN_DEV_S_RU,
-	.blksize =	1400,
 	.t2 =		1,
 	.t3 =		10,
 	.name =		"ipgre",
@@ -106,7 +105,6 @@ static struct dn_dev_parms dn_dev_list[] =  {
 	.type =		ARPHRD_X25, /* Bog standard X.25 */
 	.mode =		DN_DEV_UCAST,
 	.state =	DN_DEV_S_DS,
-	.blksize =	230,
 	.t2 =		1,
 	.t3 =		120,
 	.name =		"x25",
@@ -119,7 +117,6 @@ static struct dn_dev_parms dn_dev_list[] =  {
 	.type =		ARPHRD_PPP, /* DECnet over PPP */
 	.mode =		DN_DEV_BCAST,
 	.state =	DN_DEV_S_RU,
-	.blksize =	230,
 	.t2 =		1,
 	.t3 =		10,
 	.name =		"ppp",
@@ -127,24 +124,20 @@ static struct dn_dev_parms dn_dev_list[] =  {
 	.timer3 =	dn_send_brd_hello,
 },
 #endif
-#if 0
 {
 	.type =		ARPHRD_DDCMP, /* DECnet over DDCMP */
 	.mode =		DN_DEV_UCAST,
 	.state =	DN_DEV_S_DS,
-	.blksize =	230,
 	.t2 =		1,
 	.t3 =		120,
 	.name =		"ddcmp",
 	.ctl_name =	NET_DECNET_CONF_DDCMP,
 	.timer3 =	dn_send_ptp_hello,
 },
-#endif
 {
 	.type =		ARPHRD_LOOPBACK, /* Loopback interface - always last */
 	.mode =		DN_DEV_BCAST,
 	.state =	DN_DEV_S_RU,
-	.blksize =	1498,
 	.t2 =		1,
 	.t3 =		10,
 	.name =		"loopback",
@@ -253,6 +246,21 @@ static struct dn_dev_sysctl_table {
 		.child = dn_dev_sysctl.dn_dev_proto_dir
 	}, {0}}
 };
+
+static inline __u16 mtu2blksize(struct net_device *dev)
+{
+	u32 blksize = dev->mtu;
+	if (blksize > 0xffff)
+		blksize = 0xffff;
+
+	if (dev->type == ARPHRD_ETHER ||
+	    dev->type == ARPHRD_PPP ||
+	    dev->type == ARPHRD_IPGRE ||
+	    dev->type == ARPHRD_LOOPBACK)
+		blksize -= 2;
+
+	return (__u16)blksize;
+}
 
 static void dn_dev_sysctl_register(struct net_device *dev, struct dn_dev_parms *parms)
 {
@@ -553,7 +561,6 @@ int dn_dev_ioctl(unsigned int cmd, void *arg)
 	struct dn_dev *dn_db;
 	struct net_device *dev;
 	struct dn_ifaddr *ifa = NULL, **ifap = NULL;
-	int exclusive = 0;
 	int ret = 0;
 
 	if (copy_from_user(ifr, arg, DN_IFREQ_SIZE))
@@ -572,12 +579,12 @@ int dn_dev_ioctl(unsigned int cmd, void *arg)
 				return -EACCES;
 			if (sdn->sdn_family != AF_DECnet)
 				return -EINVAL;
-			rtnl_lock();
-			exclusive = 1;
 			break;
 		default:
 			return -EINVAL;
 	}
+
+	rtnl_lock();
 
 	if ((dev = __dev_get_by_name(ifr->ifr_name)) == NULL) {
 		ret = -ENODEV;
@@ -618,15 +625,13 @@ int dn_dev_ioctl(unsigned int cmd, void *arg)
 			ret = dn_dev_set_ifa(dev, ifa);
 	}
 done:
-	if (exclusive)
-		rtnl_unlock();
+	rtnl_unlock();
 
 	return ret;
 rarok:
 	if (copy_to_user(arg, ifr, DN_IFREQ_SIZE))
-		return -EFAULT;
-
-	return 0;
+		ret = -EFAULT;
+	goto done;
 }
 
 static struct dn_dev *dn_dev_by_index(int ifindex)
@@ -858,7 +863,7 @@ static void dn_send_endnode_hello(struct net_device *dev, struct dn_ifaddr *ifa)
         memcpy(msg->tiver, dn_eco_version, 3);
 	dn_dn2eth(msg->id, ifa->ifa_local);
         msg->iinfo   = DN_RT_INFO_ENDN;
-        msg->blksize = dn_htons(dn_db->parms.blksize);
+        msg->blksize = dn_htons(mtu2blksize(dev));
         msg->area    = 0x00;
         memset(msg->seed, 0, 8);
         memcpy(msg->neighbor, dn_hiord, ETH_ALEN);
@@ -920,10 +925,10 @@ static void dn_send_router_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 	unsigned short *pktlen;
 	char *src;
 
-	if (dn_db->parms.blksize < (26 + 7))
+	if (mtu2blksize(dev) < (26 + 7))
 		return;
 
-	n = dn_db->parms.blksize - 26;
+	n = mtu2blksize(dev) - 26;
 	n /= 7;
 
 	if (n > 32)
@@ -946,7 +951,7 @@ static void dn_send_router_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 	ptr += ETH_ALEN;
 	*ptr++ = dn_db->parms.forwarding == 1 ? 
 			DN_RT_INFO_L1RT : DN_RT_INFO_L2RT;
-	*((unsigned short *)ptr) = dn_htons(dn_db->parms.blksize);
+	*((unsigned short *)ptr) = dn_htons(mtu2blksize(dev));
 	ptr += 2;
 	*ptr++ = dn_db->parms.priority; /* Priority */ 
 	*ptr++ = 0; /* Area: Reserved */
@@ -990,16 +995,13 @@ static void dn_send_brd_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 		dn_send_router_hello(dev, ifa);
 }
 
-#if 0
 static void dn_send_ptp_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 {
 	int tdlen = 16;
 	int size = dev->hard_header_len + 2 + 4 + tdlen;
 	struct sk_buff *skb = dn_alloc_skb(NULL, size, GFP_ATOMIC);
-	struct dn_dev *dn_db = dev->dn_ptr;
 	int i;
 	unsigned char *ptr;
-	struct dn_neigh *dn = (struct dn_neigh *)dn_db->router;
 	char src[ETH_ALEN];
 
 	if (skb == NULL)
@@ -1020,7 +1022,6 @@ static void dn_send_ptp_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 	dn_dn2eth(src, ifa->ifa_local);
 	dn_rt_finish_output(skb, dn_rt_all_rt_mcast, src);
 }
-#endif
 
 static int dn_eth_up(struct net_device *dev)
 {
@@ -1332,6 +1333,63 @@ int dnet_gifconf(struct net_device *dev, char *buf, int len)
 
 
 #ifdef CONFIG_PROC_FS
+static inline struct net_device *dn_dev_get_next(struct seq_file *seq, struct net_device *dev)
+{
+	do {
+		dev = dev->next;
+	} while(dev && !dev->dn_ptr);
+
+	return dev;
+}
+
+static struct net_device *dn_dev_get_idx(struct seq_file *seq, loff_t pos)
+{
+	struct net_device *dev;
+
+	dev = dev_base;
+	if (dev && !dev->dn_ptr)
+		dev = dn_dev_get_next(seq, dev);
+	if (pos) {
+		while(dev && (dev = dn_dev_get_next(seq, dev)))
+			--pos;
+	}
+	return dev;
+}
+
+static void *dn_dev_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	if (*pos) {
+		struct net_device *dev;
+		read_lock(&dev_base_lock);
+		dev = dn_dev_get_idx(seq, *pos - 1);
+		if (dev == NULL)
+			read_unlock(&dev_base_lock);
+		return dev;
+	}
+	return (void*)1;
+}
+
+static void *dn_dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct net_device *dev = v;
+	loff_t one = 1;
+
+	if (v == (void*)1) {
+		dev = dn_dev_seq_start(seq, &one);
+	} else {
+		dev = dn_dev_get_next(seq, dev);
+		if (dev == NULL)
+			read_unlock(&dev_base_lock);
+	}
+	++*pos;
+	return dev;
+}
+
+static void dn_dev_seq_stop(struct seq_file *seq, void *v)
+{
+	if (v && v != (void*)1)
+		read_unlock(&dev_base_lock);
+}
 
 static char *dn_type2asc(char type)
 {
@@ -1347,55 +1405,49 @@ static char *dn_type2asc(char type)
 	return "?";
 }
 
-static int decnet_dev_get_info(char *buffer, char **start, off_t offset, int length)
+static int dn_dev_seq_show(struct seq_file *seq, void *v)
 {
-        struct dn_dev *dn_db;
-	struct net_device *dev;
-        int len = 0;
-        off_t pos = 0;
-        off_t begin = 0;
-	char peer_buf[DN_ASCBUF_LEN];
-	char router_buf[DN_ASCBUF_LEN];
+	if (v == (void*)1)
+        	seq_puts(seq, "Name     Flags T1   Timer1 T3   Timer3 BlkSize Pri State DevType    Router Peer\n");
+	else {
+		struct net_device *dev = v;
+		char peer_buf[DN_ASCBUF_LEN];
+		char router_buf[DN_ASCBUF_LEN];
+		struct dn_dev *dn_db = dev->dn_ptr;
 
-
-        len += sprintf(buffer, "Name     Flags T1   Timer1 T3   Timer3 BlkSize Pri State DevType    Router Peer\n");
-
-	read_lock(&dev_base_lock);
-        for (dev = dev_base; dev; dev = dev->next) {
-		if ((dn_db = (struct dn_dev *)dev->dn_ptr) == NULL)
-			continue;
-
-                len += sprintf(buffer + len, "%-8s %1s     %04u %04u   %04lu %04lu   %04hu    %03d %02x    %-10s %-7s %-7s\n",
+                seq_printf(seq, "%-8s %1s     %04u %04u   %04lu %04lu"
+				"   %04hu    %03d %02x    %-10s %-7s %-7s\n",
                              	dev->name ? dev->name : "???",
                              	dn_type2asc(dn_db->parms.mode),
                              	0, 0,
 				dn_db->t3, dn_db->parms.t3,
-				dn_db->parms.blksize,
+				mtu2blksize(dev),
 				dn_db->parms.priority,
 				dn_db->parms.state, dn_db->parms.name,
 				dn_db->router ? dn_addr2asc(dn_ntohs(*(dn_address *)dn_db->router->primary_key), router_buf) : "",
 				dn_db->peer ? dn_addr2asc(dn_ntohs(*(dn_address *)dn_db->peer->primary_key), peer_buf) : "");
-
-
-                pos = begin + len;
-
-                if (pos < offset) {
-                        len   = 0;
-                        begin = pos;
-                }
-                if (pos > offset + length)
-                        break;
-        }
-
-	read_unlock(&dev_base_lock);
-
-        *start = buffer + (offset - begin);
-        len   -= (offset - begin);
-
-        if (len > length) len = length;
-
-        return(len);
+	}
+	return 0;
 }
+
+static struct seq_operations dn_dev_seq_ops = {
+	.start	= dn_dev_seq_start,
+	.next	= dn_dev_seq_next,
+	.stop	= dn_dev_seq_stop,
+	.show	= dn_dev_seq_show,
+};
+
+static int dn_dev_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &dn_dev_seq_ops);
+}
+
+static struct file_operations dn_dev_seq_fops = {
+	.open	 = dn_dev_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = seq_release,
+};
 
 #endif /* CONFIG_PROC_FS */
 
@@ -1448,9 +1500,7 @@ void __init dn_dev_init(void)
 
 	rtnetlink_links[PF_DECnet] = dnet_rtnetlink_table;
 
-#ifdef CONFIG_PROC_FS
-	proc_net_create("decnet_dev", 0, decnet_dev_get_info);
-#endif /* CONFIG_PROC_FS */
+	proc_net_fops_create("decnet_dev", S_IRUGO, &dn_dev_seq_fops);
 
 #ifdef CONFIG_SYSCTL
 	{

@@ -252,8 +252,13 @@ looped_back:
 		return 1;
 	}
 
-	if (hdr->type != IPV6_SRCRT_TYPE_0 || (hdr->hdrlen & 0x01)) {
-		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, hdr->type != IPV6_SRCRT_TYPE_0 ? 2 : 1);
+	if (hdr->type != IPV6_SRCRT_TYPE_0) {
+		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, (&hdr->type) - skb->nh.raw);
+		return -1;
+	}
+	
+	if (hdr->hdrlen & 0x01) {
+		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, (&hdr->hdrlen) - skb->nh.raw);
 		return -1;
 	}
 

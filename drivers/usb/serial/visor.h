@@ -1,7 +1,7 @@
 /*
  * USB HandSpring Visor driver
  *
- *	Copyright (C) 1999 - 2002
+ *	Copyright (C) 1999 - 2003
  *	    Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify

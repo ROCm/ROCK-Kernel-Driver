@@ -886,6 +886,10 @@ add_swap_extent(struct swap_info_struct *sis, unsigned long start_page,
  * requirements, they are simply tossed out - we will never use those blocks
  * for swapping.
  *
+ * For S_ISREG swapfiles we hold i_sem across the life of the swapon.  This
+ * prevents root from shooting her foot off by ftruncating an in-use swapfile,
+ * which will scribble on the fs.
+ *
  * The amount of disk space which a single swap extent represents varies.
  * Typically it is in the 1-4 megabyte range.  So we can have hundreds of
  * extents in the list.  To avoid much list walking, we cache the previous
@@ -1095,6 +1099,8 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 		bdev = swap_file->f_dentry->d_inode->i_bdev;
 		set_blocksize(bdev, p->old_block_size);
 		bd_release(bdev);
+	} else {
+		up(&swap_file->f_dentry->d_inode->i_mapping->host->i_sem);
 	}
 	filp_close(swap_file, NULL);
 	err = 0;
@@ -1228,6 +1234,8 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	int swapfilesize;
 	unsigned short *swap_map;
 	struct page *page = NULL;
+	struct inode *inode;
+	struct inode *downed_inode = NULL;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
@@ -1274,38 +1282,41 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	}
 
 	p->swap_file = swap_file;
+	inode = swap_file->f_dentry->d_inode;
+	mapping = swap_file->f_dentry->d_inode->i_mapping;
+
+	error = -EBUSY;
+	for (i = 0; i < nr_swapfiles; i++) {
+		struct swap_info_struct *q = &swap_info[i];
+
+		if (i == type || !q->swap_file)
+			continue;
+		if (mapping == q->swap_file->f_dentry->d_inode->i_mapping)
+			goto bad_swap;
+	}
 
 	error = -EINVAL;
-	if (S_ISBLK(swap_file->f_dentry->d_inode->i_mode)) {
-		bdev = swap_file->f_dentry->d_inode->i_bdev;
+	if (S_ISBLK(inode->i_mode)) {
+		bdev = inode->i_bdev;
 		error = bd_claim(bdev, sys_swapon);
 		if (error < 0) {
 			bdev = NULL;
 			goto bad_swap;
 		}
 		p->old_block_size = block_size(bdev);
-		error = set_blocksize(swap_file->f_dentry->d_inode->i_bdev,
-				      PAGE_SIZE);
+		error = set_blocksize(inode->i_bdev, PAGE_SIZE);
 		if (error < 0)
 			goto bad_swap;
 		p->bdev = bdev;
-	} else if (S_ISREG(swap_file->f_dentry->d_inode->i_mode)) {
-		p->bdev = swap_file->f_dentry->d_inode->i_sb->s_bdev;
+	} else if (S_ISREG(inode->i_mode)) {
+		p->bdev = inode->i_sb->s_bdev;
+		downed_inode = mapping->host;
+		down(&downed_inode->i_sem);
 	} else {
 		goto bad_swap;
 	}
 
-	mapping = swap_file->f_dentry->d_inode->i_mapping;
 	swapfilesize = mapping->host->i_size >> PAGE_SHIFT;
-
-	error = -EBUSY;
-	for (i = 0 ; i < nr_swapfiles ; i++) {
-		struct swap_info_struct *q = &swap_info[i];
-		if (i == type || !q->swap_file)
-			continue;
-		if (mapping == q->swap_file->f_dentry->d_inode->i_mapping)
-			goto bad_swap;
-	}
 
 	/*
 	 * Read the swap header.
@@ -1452,6 +1463,8 @@ out:
 	}
 	if (name)
 		putname(name);
+	if (error && downed_inode)
+		up(&downed_inode->i_sem);
 	return error;
 }
 

@@ -15,7 +15,7 @@
  *	liability nor provide warranty for any of this software. This material
  *	is provided as is and at no charge.
  *
- *	Portions Copyright (c) 2000-2002 Conectiva, Inc. <acme@conectiva.com.br>
+ *	Portions Copyright (c) 2000-2003 Conectiva, Inc. <acme@conectiva.com.br>
  *	Neither Arnaldo Carvalho de Melo nor Conectiva, Inc. admit liability nor
  *	provide warranty for any of this software. This material is provided
  *	"AS-IS" and at no charge.
@@ -81,10 +81,10 @@ static struct datalink_proto *pSNAP_datalink;
 
 static struct proto_ops ipx_dgram_ops;
 
-struct ipx_route *ipx_routes;
+LIST_HEAD(ipx_routes);
 rwlock_t ipx_routes_lock = RW_LOCK_UNLOCKED;
 
-struct ipx_interface *ipx_interfaces;
+LIST_HEAD(ipx_interfaces);
 spinlock_t ipx_interfaces_lock = SPIN_LOCK_UNLOCKED;
 
 struct ipx_interface *ipx_primary_net;
@@ -95,11 +95,21 @@ static struct ipx_interface *ipx_internal_net;
 atomic_t ipx_sock_nr;
 #endif
 
+struct ipx_interface *ipx_interfaces_head(void)
+{
+	struct ipx_interface *rc = NULL;
+
+	if (!list_empty(&ipx_interfaces))
+		rc = list_entry(ipx_interfaces.next,
+				struct ipx_interface, node);
+	return rc;
+}
+
 static void ipxcfg_set_auto_select(char val)
 {
 	ipxcfg_auto_select_primary = val;
 	if (val && !ipx_primary_net)
-		ipx_primary_net = ipx_interfaces;
+		ipx_primary_net = ipx_interfaces_head();
 }
 
 static int ipxcfg_get_config_data(struct ipx_config_data *arg)
@@ -197,17 +207,21 @@ static struct ipx_route *ipxrtr_lookup(__u32 net);
 
 static void ipxitf_clear_primary_net(void)
 {
-	ipx_primary_net = ipxcfg_auto_select_primary ? ipx_interfaces : NULL;
+	ipx_primary_net = NULL;
+	if (ipxcfg_auto_select_primary)
+		ipx_primary_net = ipx_interfaces_head();
 }
 
 static struct ipx_interface *__ipxitf_find_using_phys(struct net_device *dev,
 						      unsigned short datalink)
 {
-	struct ipx_interface *i = ipx_interfaces;
+	struct ipx_interface *i;
 
-	while (i && (i->if_dev != dev || i->if_dlink_type != datalink))
-		i = i->if_next;
-
+	list_for_each_entry(i, &ipx_interfaces, node)
+		if (i->if_dev == dev && i->if_dlink_type == datalink)
+			goto out;
+	i = NULL;
+out:
 	return i;
 }
 
@@ -229,16 +243,20 @@ static struct ipx_interface *ipxitf_find_using_net(__u32 net)
 	struct ipx_interface *i;
 
 	spin_lock_bh(&ipx_interfaces_lock);
-	if (net)
-		for (i = ipx_interfaces; i && i->if_netnum != net;
-		     i = i->if_next)
-		;
-	else
-		i = ipx_primary_net;
-	if (i)
-		ipxitf_hold(i);
-	spin_unlock_bh(&ipx_interfaces_lock);
+	if (net) {
+		list_for_each_entry(i, &ipx_interfaces, node)
+			if (i->if_netnum == net)
+				goto hold;
+		i = NULL;
+		goto unlock;
+	}
 
+	i = ipx_primary_net;
+	if (i)
+hold:
+		ipxitf_hold(i);
+unlock:
+	spin_unlock_bh(&ipx_interfaces_lock);
 	return i;
 }
 
@@ -342,15 +360,7 @@ static void __ipxitf_down(struct ipx_interface *intrfc)
 	spin_unlock_bh(&intrfc->if_sklist_lock);
 
 	/* remove this interface from list */
-	if (intrfc == ipx_interfaces)
-		ipx_interfaces = intrfc->if_next;
-	else {
-		struct ipx_interface *i = ipx_interfaces;
-		while (i && i->if_next != intrfc)
-		     i = i->if_next;
-		if (i && i->if_next == intrfc)
-			i->if_next = intrfc->if_next;
-	}
+	list_del(&intrfc->node);
 
 	/* remove this interface from *special* networks */
 	if (intrfc == ipx_primary_net)
@@ -361,6 +371,7 @@ static void __ipxitf_down(struct ipx_interface *intrfc)
 	if (intrfc->if_dev)
 		dev_put(intrfc->if_dev);
 	kfree(intrfc);
+	module_put(THIS_MODULE);
 }
 
 static void ipxitf_down(struct ipx_interface *intrfc)
@@ -380,16 +391,13 @@ static int ipxitf_device_event(struct notifier_block *notifier,
 		goto out;
 
 	spin_lock_bh(&ipx_interfaces_lock);
-	for (i = ipx_interfaces; i;) {
-		tmp = i->if_next;
+	list_for_each_entry_safe(i, tmp, &ipx_interfaces, node)
 		if (i->if_dev == dev) {
 			if (event == NETDEV_UP)
 				ipxitf_hold(i);
 			else
 				__ipxitf_put(i);
 		}
-		i = tmp;
-	}
 	spin_unlock_bh(&ipx_interfaces_lock);
 out:
 	return NOTIFY_DONE;
@@ -872,7 +880,7 @@ static int ipxitf_pprop(struct ipx_interface *intrfc, struct sk_buff *skb)
 	IPX_SKB_CB(skb)->last_hop.netnum = intrfc->if_netnum;
 	/* xmit on all other interfaces... */
 	spin_lock_bh(&ipx_interfaces_lock);
-	for (ifcs = ipx_interfaces; ifcs; ifcs = ifcs->if_next) {
+	list_for_each_entry(ifcs, &ipx_interfaces, node) {
 		/* Except unconfigured interfaces */
 		if (!ifcs->if_netnum)
 			continue;
@@ -902,16 +910,8 @@ out:
 
 static void ipxitf_insert(struct ipx_interface *intrfc)
 {
-	intrfc->if_next = NULL;
 	spin_lock_bh(&ipx_interfaces_lock);
-	if (!ipx_interfaces)
-		ipx_interfaces = intrfc;
-	else {
-		struct ipx_interface *i = ipx_interfaces;
-		while (i->if_next)
-			i = i->if_next;
-		i->if_next = intrfc;
-	}
+	list_add_tail(&intrfc->node, &ipx_interfaces);
 	spin_unlock_bh(&ipx_interfaces_lock);
 
 	if (ipxcfg_auto_select_primary && !ipx_primary_net)
@@ -937,6 +937,7 @@ static struct ipx_interface *ipxitf_alloc(struct net_device *dev, __u32 netnum,
 		intrfc->if_sklist 	= NULL;
 		atomic_set(&intrfc->refcnt, 1);
 		spin_lock_init(&intrfc->if_sklist_lock);
+		__module_get(THIS_MODULE);
 	}
 
 	return intrfc;
@@ -1278,12 +1279,14 @@ static struct ipx_route *ipxrtr_lookup(__u32 net)
 	struct ipx_route *r;
 
 	read_lock_bh(&ipx_routes_lock);
-	for (r = ipx_routes; r && r->ir_net != net; r = r->ir_next)
-		;
-	if (r)
-		ipxrtr_hold(r);
+	list_for_each_entry(r, &ipx_routes, node)
+		if (r->ir_net == net) {
+			ipxrtr_hold(r);
+			goto unlock;
+		}
+	r = NULL;
+unlock:
 	read_unlock_bh(&ipx_routes_lock);
-
 	return r;
 }
 
@@ -1306,8 +1309,7 @@ static int ipxrtr_add_route(__u32 network, struct ipx_interface *intrfc,
 		atomic_set(&rt->refcnt, 1);
 		ipxrtr_hold(rt);
 		write_lock_bh(&ipx_routes_lock);
-		rt->ir_next	= ipx_routes;
-		ipx_routes	= rt;
+		list_add(&rt->node, &ipx_routes);
 		write_unlock_bh(&ipx_routes_lock);
 	} else {
 		rc = -EEXIST;
@@ -1334,16 +1336,14 @@ out:
 
 static void ipxrtr_del_routes(struct ipx_interface *intrfc)
 {
-	struct ipx_route **r, *tmp;
+	struct ipx_route *r, *tmp;
 
 	write_lock_bh(&ipx_routes_lock);
-	for (r = &ipx_routes; (tmp = *r) != NULL;) {
-		if (tmp->ir_intrfc == intrfc) {
-			*r = tmp->ir_next;
-			ipxrtr_put(tmp);
-		} else
-			r = &(tmp->ir_next);
-	}
+	list_for_each_entry_safe(r, tmp, &ipx_routes, node)
+		if (r->ir_intrfc == intrfc) {
+			list_del(&r->node);
+			ipxrtr_put(r);
+		}
 	write_unlock_bh(&ipx_routes_lock);
 }
 
@@ -1364,26 +1364,21 @@ out:
 
 static int ipxrtr_delete(long net)
 {
-	struct ipx_route **r;
-	struct ipx_route *tmp;
+	struct ipx_route *r, *tmp;
 	int rc;
 
 	write_lock_bh(&ipx_routes_lock);
-	for (r = &ipx_routes; (tmp = *r) != NULL;) {
-		if (tmp->ir_net == net) {
+	list_for_each_entry_safe(r, tmp, &ipx_routes, node)
+		if (r->ir_net == net) {
 			/* Directly connected; can't lose route */
 			rc = -EPERM;
-			if (!tmp->ir_routed)
+			if (!r->ir_routed)
 				goto out;
-
-			*r = tmp->ir_next;
-			ipxrtr_put(tmp);
+			list_del(&r->node);
+			ipxrtr_put(r);
 			rc = 0;
 			goto out;
 		}
-
-		r = &(tmp->ir_next);
-	}
 	rc = -ENOENT;
 out:
 	write_unlock_bh(&ipx_routes_lock);
@@ -2267,9 +2262,9 @@ extern void destroy_8023_client(struct datalink_proto *);
 static unsigned char ipx_8022_type = 0xE0;
 static unsigned char ipx_snap_id[5] = { 0x0, 0x0, 0x0, 0x81, 0x37 };
 static char ipx_banner[] __initdata =
-	KERN_INFO "NET4: Linux IPX 0.50 for NET4.0\n"
+	KERN_INFO "NET4: Linux IPX 0.51 for NET4.0\n"
 	KERN_INFO "IPX Portions Copyright (c) 1995 Caldera, Inc.\n" \
-	KERN_INFO "IPX Portions Copyright (c) 2000-2002 Conectiva, Inc.\n";
+	KERN_INFO "IPX Portions Copyright (c) 2000-2003 Conectiva, Inc.\n";
 static char ipx_EII_err_msg[] __initdata =
 	KERN_CRIT "IPX: Unable to register with Ethernet II\n";
 static char ipx_8023_err_msg[] __initdata =
@@ -2317,6 +2312,10 @@ static void __exit ipx_proto_finito(void)
 	 * when a interface is created we increment the module usage count, so
 	 * the module will only be unloaded when there are no more interfaces
 	 */
+	if (unlikely(!list_empty(&ipx_interfaces)))
+		BUG();
+	if (unlikely(!list_empty(&ipx_routes)))
+		BUG();
 
 	ipx_proc_exit();
 	ipx_unregister_sysctl();

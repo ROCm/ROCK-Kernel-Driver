@@ -94,7 +94,9 @@ static int ipcomp_input(struct xfrm_state *x,
 	memcpy(&tmp_iph, iph, iph->ihl * 4);
 	nexthdr = *(u8 *)skb->data;
 	skb_pull(skb, sizeof(struct ipcomp_hdr));
+	skb->nh.raw += sizeof(struct ipcomp_hdr);
 	memcpy(skb->nh.raw, &tmp_iph, tmp_iph.iph.ihl * 4);
+	iph = skb->nh.iph;
 	iph->tot_len = htons(ntohs(iph->tot_len) - sizeof(struct ipcomp_hdr));
 	iph->protocol = nexthdr;
 	skb->h.raw = skb->data;
@@ -267,6 +269,67 @@ static void ipcomp4_err(struct sk_buff *skb, u32 info)
 	xfrm_state_put(x);
 }
 
+/* We always hold one tunnel user reference to indicate a tunnel */ 
+static struct xfrm_state *ipcomp_tunnel_create(struct xfrm_state *x)
+{
+	struct xfrm_state *t;
+	
+	t = xfrm_state_alloc();
+	if (t == NULL)
+		goto out;
+
+	t->id.proto = IPPROTO_IPIP;
+	t->id.spi = x->props.saddr.a4;
+	t->id.daddr.a4 = x->id.daddr.a4;
+	memcpy(&t->sel, &x->sel, sizeof(t->sel));
+	t->props.family = AF_INET;
+	t->props.mode = 1;
+	t->props.saddr.a4 = x->props.saddr.a4;
+	
+	t->type = xfrm_get_type(IPPROTO_IPIP, t->props.family);
+	if (t->type == NULL)
+		goto error;
+		
+	if (t->type->init_state(t, NULL))
+		goto error;
+
+	t->km.state = XFRM_STATE_VALID;
+	atomic_set(&t->tunnel_users, 1);
+out:
+	return t;
+
+error:
+	xfrm_state_put(t);
+	t = NULL;
+	goto out;
+}
+
+/*
+ * Must be protected by xfrm_cfg_sem.  State and tunnel user references are
+ * always incremented on success.
+ */
+static int ipcomp_tunnel_attach(struct xfrm_state *x)
+{
+	int err = 0;
+	struct xfrm_state *t;
+
+	t = xfrm_state_lookup((xfrm_address_t *)&x->id.daddr.a4,
+	                      x->props.saddr.a4, IPPROTO_IPIP, AF_INET);
+	if (!t) {
+		t = ipcomp_tunnel_create(x);
+		if (!t) {
+			err = -EINVAL;
+			goto out;
+		}
+		xfrm_state_insert(t);
+		xfrm_state_hold(t);
+	}
+	x->tunnel = t;
+	atomic_inc(&t->tunnel_users);
+out:
+	return err;
+}
+
 static void ipcomp_free_data(struct ipcomp_data *ipcd)
 {
 	if (ipcd->tfm)
@@ -305,6 +368,12 @@ static int ipcomp_init_state(struct xfrm_state *x, void *args)
 	ipcd->tfm = crypto_alloc_tfm(x->calg->alg_name, 0);
 	if (!ipcd->tfm)
 		goto error;
+
+	if (x->props.mode) {
+		err = ipcomp_tunnel_attach(x);
+		if (err)
+			goto error;
+	}
 
 	calg_desc = xfrm_calg_get_byname(x->calg->alg_name);
 	BUG_ON(!calg_desc);

@@ -317,7 +317,7 @@ static void xirc2ps_detach(dev_link_t *);
  * less on other parts of the kernel.
  */
 
-static void xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 /*
  * The dev_info variable is the "key" that is used to match up this
@@ -1296,7 +1296,7 @@ xirc2ps_event(event_t event, int priority,
 /****************
  * This is the Interrupt service route.
  */
-static void
+static irqreturn_t
 xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct net_device *dev = (struct net_device *)dev_id;
@@ -1305,14 +1305,14 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     u_char saved_page;
     unsigned bytes_rcvd;
     unsigned int_status, eth_status, rx_status, tx_status;
-    unsigned rsr, pktlen;
+    unsigned rsr, pktlen, handled = 1;
     ulong start_ticks = jiffies; /* fixme: jiffies rollover every 497 days
 				  * is this something to worry about?
 				  * -- on a laptop?
 				  */
 
     if (!netif_device_present(dev))
-	return;
+	return IRQ_NONE;
 
     ioaddr = dev->base_addr;
     if (lp->mohawk) { /* must disable the interrupt */
@@ -1330,6 +1330,7 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
   loop_entry:
     if (int_status == 0xff) { /* card may be ejected */
 	DEBUG(3, "%s: interrupt %d for dead card\n", dev->name, irq);
+	handled = 0;
 	goto leave;
     }
     eth_status = GetByte(XIRCREG_ESR);
@@ -1514,6 +1515,7 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
      * force an interrupt with this command:
      *	  PutByte(XIRCREG_CR, EnableIntr|ForceIntr);
      */
+    return IRQ_RETVAL(handled);
 } /* xirc2ps_interrupt */
 
 /*====================================================================*/

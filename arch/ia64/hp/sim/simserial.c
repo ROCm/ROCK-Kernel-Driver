@@ -103,7 +103,8 @@ static struct serial_uart_config uart_config[] = {
 	{ 0, 0}
 };
 
-static struct tty_driver hp_serial_driver, callout_driver;
+struct tty_driver hp_simserial_driver;
+static struct tty_driver callout_driver;
 static int serial_refcount;
 
 static struct async_struct *IRQ_ports[NR_IRQS];
@@ -184,7 +185,7 @@ static  void receive_chars(struct tty_struct *tty, struct pt_regs *regs)
 /*
  * This is the serial driver's interrupt routine for a single port
  */
-static void rs_interrupt_single(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t rs_interrupt_single(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct async_struct * info;
 
@@ -195,13 +196,14 @@ static void rs_interrupt_single(int irq, void *dev_id, struct pt_regs * regs)
 	info = IRQ_ports[irq];
 	if (!info || !info->tty) {
 		printk(KERN_INFO "simrs_interrupt_single: info|tty=0 info=%p problem\n", info);
-		return;
+		return IRQ_NONE;
 	}
 	/*
 	 * pretty simple in our case, because we only get interrupts
 	 * on inbound traffic
 	 */
 	receive_chars(info->tty, regs);
+	return IRQ_HANDLED;
 }
 
 /*
@@ -768,7 +770,7 @@ startup(struct async_struct *info)
 {
 	unsigned long flags;
 	int	retval=0;
-	void (*handler)(int, void *, struct pt_regs *);
+	irqreturn_t (*handler)(int, void *, struct pt_regs *);
 	struct serial_state *state= info->state;
 	unsigned long page;
 
@@ -808,8 +810,7 @@ startup(struct async_struct *info)
 		} else
 			handler = rs_interrupt_single;
 
-		retval = request_irq(state->irq, handler, IRQ_T(info),
-				     "simserial", NULL);
+		retval = request_irq(state->irq, handler, IRQ_T(info), "simserial", NULL);
 		if (retval) {
 			if (capable(CAP_SYS_ADMIN)) {
 				if (info->tty)
@@ -1028,43 +1029,43 @@ simrs_init (void)
 
 	/* Initialize the tty_driver structure */
 
-	memset(&hp_serial_driver, 0, sizeof(struct tty_driver));
-	hp_serial_driver.magic = TTY_DRIVER_MAGIC;
-	hp_serial_driver.driver_name = "simserial";
-	hp_serial_driver.name = "ttyS";
-	hp_serial_driver.major = TTY_MAJOR;
-	hp_serial_driver.minor_start = 64;
-	hp_serial_driver.num = 1;
-	hp_serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	hp_serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	hp_serial_driver.init_termios = tty_std_termios;
-	hp_serial_driver.init_termios.c_cflag =
+	memset(&hp_simserial_driver, 0, sizeof(struct tty_driver));
+	hp_simserial_driver.magic = TTY_DRIVER_MAGIC;
+	hp_simserial_driver.driver_name = "simserial";
+	hp_simserial_driver.name = "ttyS";
+	hp_simserial_driver.major = TTY_MAJOR;
+	hp_simserial_driver.minor_start = 64;
+	hp_simserial_driver.num = 1;
+	hp_simserial_driver.type = TTY_DRIVER_TYPE_SERIAL;
+	hp_simserial_driver.subtype = SERIAL_TYPE_NORMAL;
+	hp_simserial_driver.init_termios = tty_std_termios;
+	hp_simserial_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	hp_serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	hp_serial_driver.refcount = &serial_refcount;
-	hp_serial_driver.table = serial_table;
-	hp_serial_driver.termios = serial_termios;
-	hp_serial_driver.termios_locked = serial_termios_locked;
+	hp_simserial_driver.flags = TTY_DRIVER_REAL_RAW;
+	hp_simserial_driver.refcount = &serial_refcount;
+	hp_simserial_driver.table = serial_table;
+	hp_simserial_driver.termios = serial_termios;
+	hp_simserial_driver.termios_locked = serial_termios_locked;
 
-	hp_serial_driver.open = rs_open;
-	hp_serial_driver.close = rs_close;
-	hp_serial_driver.write = rs_write;
-	hp_serial_driver.put_char = rs_put_char;
-	hp_serial_driver.flush_chars = rs_flush_chars;
-	hp_serial_driver.write_room = rs_write_room;
-	hp_serial_driver.chars_in_buffer = rs_chars_in_buffer;
-	hp_serial_driver.flush_buffer = rs_flush_buffer;
-	hp_serial_driver.ioctl = rs_ioctl;
-	hp_serial_driver.throttle = rs_throttle;
-	hp_serial_driver.unthrottle = rs_unthrottle;
-	hp_serial_driver.send_xchar = rs_send_xchar;
-	hp_serial_driver.set_termios = rs_set_termios;
-	hp_serial_driver.stop = rs_stop;
-	hp_serial_driver.start = rs_start;
-	hp_serial_driver.hangup = rs_hangup;
-	hp_serial_driver.break_ctl = rs_break;
-	hp_serial_driver.wait_until_sent = rs_wait_until_sent;
-	hp_serial_driver.read_proc = rs_read_proc;
+	hp_simserial_driver.open = rs_open;
+	hp_simserial_driver.close = rs_close;
+	hp_simserial_driver.write = rs_write;
+	hp_simserial_driver.put_char = rs_put_char;
+	hp_simserial_driver.flush_chars = rs_flush_chars;
+	hp_simserial_driver.write_room = rs_write_room;
+	hp_simserial_driver.chars_in_buffer = rs_chars_in_buffer;
+	hp_simserial_driver.flush_buffer = rs_flush_buffer;
+	hp_simserial_driver.ioctl = rs_ioctl;
+	hp_simserial_driver.throttle = rs_throttle;
+	hp_simserial_driver.unthrottle = rs_unthrottle;
+	hp_simserial_driver.send_xchar = rs_send_xchar;
+	hp_simserial_driver.set_termios = rs_set_termios;
+	hp_simserial_driver.stop = rs_stop;
+	hp_simserial_driver.start = rs_start;
+	hp_simserial_driver.hangup = rs_hangup;
+	hp_simserial_driver.break_ctl = rs_break;
+	hp_simserial_driver.wait_until_sent = rs_wait_until_sent;
+	hp_simserial_driver.read_proc = rs_read_proc;
 
 	/*
 	 * Let's have a little bit of fun !
@@ -1087,14 +1088,14 @@ simrs_init (void)
 	 * The callout device is just like normal device except for
 	 * major number and the subtype code.
 	 */
-	callout_driver = hp_serial_driver;
+	callout_driver = hp_simserial_driver;
 	callout_driver.name = "cua";
 	callout_driver.major = TTYAUX_MAJOR;
 	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
 	callout_driver.read_proc = 0;
 	callout_driver.proc_entry = 0;
 
-	if (tty_register_driver(&hp_serial_driver))
+	if (tty_register_driver(&hp_simserial_driver))
 		panic("Couldn't register simserial driver\n");
 
 	if (tty_register_driver(&callout_driver))

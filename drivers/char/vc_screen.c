@@ -469,40 +469,27 @@ static struct file_operations vcs_fops = {
 	.open		= vcs_open,
 };
 
-void vcs_make_devfs (unsigned int index, int unregister)
+void vcs_make_devfs(struct tty_struct *tty)
 {
-#ifdef CONFIG_DEVFS_FS
-
-	if (unregister) {
-		devfs_remove("vcc/%u", index + 1);
-		devfs_remove("vcc/a%u", index + 1);
-	} else {
-		char name[16];
-		sprintf(name, "vcc/%u", index + 1);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-				VCS_MAJOR, index + 1,
-				S_IFCHR | S_IRUSR | S_IWUSR, &vcs_fops, NULL);
-		sprintf(name, "vcc/a%u", index + 1);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-				VCS_MAJOR, index + 129,
-				S_IFCHR | S_IRUSR | S_IWUSR, &vcs_fops, NULL);
-	}
-#endif /* CONFIG_DEVFS_FS */
+	devfs_mk_cdev(MKDEV(VCS_MAJOR, tty->index + 1),
+			S_IFCHR|S_IRUSR|S_IWUSR,
+			"vcc/%u", tty->index + 1);
+	devfs_mk_cdev(MKDEV(VCS_MAJOR, tty->index + 129),
+			S_IFCHR|S_IRUSR|S_IWUSR,
+			"vcc/a%u", tty->index + 1);
+}
+void vcs_remove_devfs(struct tty_struct *tty)
+{
+	devfs_remove("vcc/%u", tty->index + 1);
+	devfs_remove("vcc/a%u", tty->index + 1);
 }
 
 int __init vcs_init(void)
 {
-	int error;
+	if (register_chrdev(VCS_MAJOR, "vcs", &vcs_fops))
+		panic("unable to get major %d for vcs device", VCS_MAJOR);
 
-	error = register_chrdev(VCS_MAJOR, "vcs", &vcs_fops);
-
-	if (error)
-		printk("unable to get major %d for vcs device", VCS_MAJOR);
-
-	devfs_register(NULL, "vcc/0", DEVFS_FL_DEFAULT, VCS_MAJOR, 0,
-			S_IFCHR | S_IRUSR | S_IWUSR, &vcs_fops, NULL);
-	devfs_register(NULL, "vcc/a", DEVFS_FL_DEFAULT, VCS_MAJOR, 128,
-			S_IFCHR | S_IRUSR | S_IWUSR, &vcs_fops, NULL);
-
-	return error;
+	devfs_mk_cdev(MKDEV(VCS_MAJOR, 0), S_IFCHR|S_IRUSR|S_IWUSR, "vcc/0");
+	devfs_mk_cdev(MKDEV(VCS_MAJOR, 128), S_IFCHR|S_IRUSR|S_IWUSR, "vcc/a0");
+	return 0;
 }

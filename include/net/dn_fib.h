@@ -1,6 +1,9 @@
 #ifndef _NET_DN_FIB_H
 #define _NET_DN_FIB_H
 
+/* WARNING: The ordering of these elements must match ordering
+ *          of RTA_* rtnetlink attribute numbers.
+ */
 struct dn_kern_rta
 {
         void            *rta_dst;
@@ -13,8 +16,10 @@ struct dn_kern_rta
         struct rtattr   *rta_mx;
         struct rtattr   *rta_mp;
         unsigned char   *rta_protoinfo;
-        unsigned char   *rta_flow;
+        u32             *rta_flow;
         struct rta_cacheinfo *rta_ci;
+	struct rta_session *rta_sess;
+	u8		*rta_hoplimit;
 };
 
 struct dn_fib_res {
@@ -101,10 +106,6 @@ struct dn_fib_table {
 	int (*lookup)(struct dn_fib_table *t, const struct flowi *fl,
 			struct dn_fib_res *res);
 	int (*flush)(struct dn_fib_table *t);
-#ifdef CONFIG_PROC_FS
-	int (*get_info)(struct dn_fib_table *table, char *buf,
-			int first, int count);
-#endif /* CONFIG_PROC_FS */
 	int (*dump)(struct dn_fib_table *t, struct sk_buff *skb, struct netlink_callback *cb);
 
 	unsigned char data[0];
@@ -183,6 +184,9 @@ static inline void dn_fib_res_put(struct dn_fib_res *res)
 extern struct dn_fib_table *dn_fib_tables[];
 
 #else /* Endnode */
+
+#define dn_fib_init() (0)
+#define dn_fib_cleanup() (0)
 
 #define dn_fib_lookup(fl, res) (-ESRCH)
 #define dn_fib_info_put(fi) do { } while(0)

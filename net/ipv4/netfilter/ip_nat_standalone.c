@@ -71,10 +71,6 @@ ip_nat_fn(unsigned int hooknum,
 	/* maniptype == SRC for postrouting. */
 	enum ip_nat_manip_type maniptype = HOOK2MANIP(hooknum);
 
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
-
 	/* We never see fragments: conntrack defrags on pre-routing
 	   and local-out, and ip_nat_out protects post-routing. */
 	IP_NF_ASSERT(!((*pskb)->nh.iph->frag_off
@@ -95,12 +91,14 @@ ip_nat_fn(unsigned int hooknum,
 		/* Exception: ICMP redirect to new connection (not in
                    hash table yet).  We must not let this through, in
                    case we're doing NAT to the same network. */
-		struct iphdr *iph = (*pskb)->nh.iph;
-		struct icmphdr *hdr = (struct icmphdr *)
-			((u_int32_t *)iph + iph->ihl);
-		if (iph->protocol == IPPROTO_ICMP
-		    && hdr->type == ICMP_REDIRECT)
-			return NF_DROP;
+		if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP) {
+			struct icmphdr hdr;
+
+			if (skb_copy_bits(*pskb, (*pskb)->nh.iph->ihl*4,
+					  &hdr, sizeof(hdr)) == 0
+			    && hdr.type == ICMP_REDIRECT)
+				return NF_DROP;
+		}
 		return NF_ACCEPT;
 	}
 
@@ -108,8 +106,11 @@ ip_nat_fn(unsigned int hooknum,
 	case IP_CT_RELATED:
 	case IP_CT_RELATED+IP_CT_IS_REPLY:
 		if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP) {
-			return icmp_reply_translation(*pskb, ct, hooknum,
-						      CTINFO2DIR(ctinfo));
+			if (!icmp_reply_translation(pskb, ct, hooknum,
+						    CTINFO2DIR(ctinfo)))
+				return NF_DROP;
+			else
+				return NF_ACCEPT;
 		}
 		/* Fall thru... (Only ICMPs can be IP_CT_IS_REPLY) */
 	case IP_CT_NEW:
@@ -174,10 +175,6 @@ ip_nat_out(unsigned int hooknum,
 	   const struct net_device *out,
 	   int (*okfn)(struct sk_buff *))
 {
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
-
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr)
 	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr))
@@ -212,10 +209,6 @@ ip_nat_local_fn(unsigned int hooknum,
 {
 	u_int32_t saddr, daddr;
 	unsigned int ret;
-
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
 
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr)
@@ -387,4 +380,5 @@ EXPORT_SYMBOL(ip_nat_cheat_check);
 EXPORT_SYMBOL(ip_nat_mangle_tcp_packet);
 EXPORT_SYMBOL(ip_nat_mangle_udp_packet);
 EXPORT_SYMBOL(ip_nat_used_tuple);
+EXPORT_SYMBOL(skb_ip_make_writable);
 MODULE_LICENSE("GPL");

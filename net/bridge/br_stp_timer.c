@@ -20,51 +20,59 @@
 #include "br_private.h"
 #include "br_private_stp.h"
 
-static void dump_bridge_id(bridge_id *id)
-{
-	printk("%.2x%.2x.%.2x:%.2x:%.2x:%.2x:%.2x:%.2x", id->prio[0],
-	       id->prio[1], id->addr[0], id->addr[1], id->addr[2], id->addr[3],
-	       id->addr[4], id->addr[5]);
-}
-
 /* called under bridge lock */
-static int br_is_designated_for_some_port(struct net_bridge *br)
+static int br_is_designated_for_some_port(const struct net_bridge *br)
 {
 	struct net_bridge_port *p;
 
 	list_for_each_entry(p, &br->port_list, list) {
 		if (p->state != BR_STATE_DISABLED &&
-		    !memcmp(&p->designated_bridge, &br->bridge_id, 8))
+		    !memcmp(&p->designated_bridge, &br->bridge_id, 8)) 
 			return 1;
 	}
 
 	return 0;
 }
 
-/* called under bridge lock */
-static void br_hello_timer_expired(struct net_bridge *br)
+static void br_hello_timer_expired(unsigned long arg)
 {
-	br_config_bpdu_generation(br);
-	br_timer_set(&br->hello_timer, jiffies);
+	struct net_bridge *br = (struct net_bridge *)arg;
+	
+	pr_debug("%s: hello timer expired\n", br->dev.name);
+	spin_lock_bh(&br->lock);
+	if (br->dev.flags & IFF_UP) {
+		br_config_bpdu_generation(br);
+
+		br->hello_timer.expires = jiffies + br->hello_time;
+		add_timer(&br->hello_timer);
+	}
+	spin_unlock_bh(&br->lock);
 }
 
-/* called under bridge lock */
-static void br_message_age_timer_expired(struct net_bridge_port *p)
+static void br_message_age_timer_expired(unsigned long arg)
 {
-	struct net_bridge *br;
+	struct net_bridge_port *p = (struct net_bridge_port *) arg;
+	struct net_bridge *br = p->br;
+	const bridge_id *id = &p->designated_bridge;
 	int was_root;
 
-	br = p->br;
-	printk(KERN_INFO "%s: ", br->dev.name);
-	printk("neighbour ");
-	dump_bridge_id(&p->designated_bridge);
-	printk(" lost on port %i(%s)\n", p->port_no, p->dev->name);
+	if (p->state == BR_STATE_DISABLED)
+		return;
+
+	
+	pr_info("%s: neighbor %.2x%.2x.%.2x:%.2x:%.2x:%.2x:%.2x:%.2x lost on port %d(%s)\n",
+		br->dev.name, 
+		id->prio[0], id->prio[1], 
+		id->addr[0], id->addr[1], id->addr[2], 
+		id->addr[3], id->addr[4], id->addr[5],
+		p->port_no, p->dev->name);
 
 	/*
 	 * According to the spec, the message age timer cannot be
 	 * running when we are the root bridge. So..  this was_root
 	 * check is redundant. I'm leaving it in for now, though.
 	 */
+	spin_lock_bh(&br->lock);
 	was_root = br_is_root_bridge(br);
 
 	br_become_designated_port(p);
@@ -72,107 +80,101 @@ static void br_message_age_timer_expired(struct net_bridge_port *p)
 	br_port_state_selection(br);
 	if (br_is_root_bridge(br) && !was_root)
 		br_become_root_bridge(br);
+	spin_unlock_bh(&br->lock);
 }
 
-/* called under bridge lock */
-static void br_forward_delay_timer_expired(struct net_bridge_port *p)
+static void br_forward_delay_timer_expired(unsigned long arg)
 {
+	struct net_bridge_port *p = (struct net_bridge_port *) arg;
+	struct net_bridge *br = p->br;
+
+	pr_debug("%s: %d(%s) forward delay timer\n",
+		 br->dev.name, p->port_no, p->dev->name);
+	spin_lock_bh(&br->lock);
 	if (p->state == BR_STATE_LISTENING) {
-		printk(KERN_INFO "%s: port %i(%s) entering %s state\n",
-		       p->br->dev.name, p->port_no, p->dev->name, "learning");
-
 		p->state = BR_STATE_LEARNING;
-		br_timer_set(&p->forward_delay_timer, jiffies);
+		p->forward_delay_timer.expires = jiffies + br->forward_delay;
+		add_timer(&p->forward_delay_timer);
 	} else if (p->state == BR_STATE_LEARNING) {
-		printk(KERN_INFO "%s: port %i(%s) entering %s state\n",
-		       p->br->dev.name, p->port_no, p->dev->name, "forwarding");
-
 		p->state = BR_STATE_FORWARDING;
-		if (br_is_designated_for_some_port(p->br))
-			br_topology_change_detection(p->br);
+		if (br_is_designated_for_some_port(br))
+			br_topology_change_detection(br);
 	}
+	br_log_state(p);
+	spin_unlock_bh(&br->lock);
 }
 
-/* called under bridge lock */
-static void br_tcn_timer_expired(struct net_bridge *br)
+static void br_tcn_timer_expired(unsigned long arg)
 {
-	printk(KERN_INFO "%s: retransmitting tcn bpdu\n", br->dev.name);
-	br_transmit_tcn(br);
-	br_timer_set(&br->tcn_timer, jiffies);
+	struct net_bridge *br = (struct net_bridge *) arg;
+
+	pr_debug("%s: tcn timer expired\n", br->dev.name);
+	spin_lock_bh(&br->lock);
+	if (br->dev.flags & IFF_UP) {
+		br_transmit_tcn(br);
+	
+		br->tcn_timer.expires = jiffies + br->bridge_hello_time;
+		add_timer(&br->tcn_timer);
+	}
+	spin_unlock_bh(&br->lock);
 }
 
-/* called under bridge lock */
-static void br_topology_change_timer_expired(struct net_bridge *br)
+static void br_topology_change_timer_expired(unsigned long arg)
 {
+	struct net_bridge *br = (struct net_bridge *) arg;
+
+	pr_debug("%s: topo change timer expired\n", br->dev.name);
+	spin_lock_bh(&br->lock);
 	br->topology_change_detected = 0;
 	br->topology_change = 0;
+	spin_unlock_bh(&br->lock);
 }
 
-/* called under bridge lock */
-static void br_hold_timer_expired(struct net_bridge_port *p)
+static void br_hold_timer_expired(unsigned long arg)
 {
+	struct net_bridge_port *p = (struct net_bridge_port *) arg;
+
+	pr_debug("%s: %d(%s) hold timer expired\n", 
+		 p->br->dev.name,  p->port_no, p->dev->name);
+
+	spin_lock_bh(&p->br->lock);
 	if (p->config_pending)
 		br_transmit_config(p);
+	spin_unlock_bh(&p->br->lock);
 }
 
-/* called under bridge lock */
-static void br_check_port_timers(struct net_bridge_port *p)
+static inline void br_timer_init(struct timer_list *timer,
+			  void (*_function)(unsigned long),
+			  unsigned long _data)
 {
-	if (br_timer_has_expired(&p->message_age_timer, p->br->max_age)) {
-		br_timer_clear(&p->message_age_timer);
-		br_message_age_timer_expired(p);
-	}
-
-	if (br_timer_has_expired(&p->forward_delay_timer, p->br->forward_delay)) {
-		br_timer_clear(&p->forward_delay_timer);
-		br_forward_delay_timer_expired(p);
-	}
-
-	if (br_timer_has_expired(&p->hold_timer, BR_HOLD_TIME)) {
-		br_timer_clear(&p->hold_timer);
-		br_hold_timer_expired(p);
-	}
+	init_timer(timer);
+	timer->function = _function;
+	timer->data = _data;
 }
 
-/* called under bridge lock */
-static void br_check_timers(struct net_bridge *br)
+void br_stp_timer_init(struct net_bridge *br)
 {
-	struct net_bridge_port *p;
+	br_timer_init(&br->hello_timer, br_hello_timer_expired,
+		      (unsigned long) br);
 
-	if (br_timer_has_expired(&br->gc_timer, br->gc_interval)) {
-		br_timer_set(&br->gc_timer, jiffies);
-		br_fdb_cleanup(br);
-	}
+	br_timer_init(&br->tcn_timer, br_tcn_timer_expired, 
+		      (unsigned long) br);
 
-	if (br_timer_has_expired(&br->hello_timer, br->hello_time)) {
-		br_timer_clear(&br->hello_timer);
-		br_hello_timer_expired(br);
-	}
+	br_timer_init(&br->topology_change_timer,
+		      br_topology_change_timer_expired,
+		      (unsigned long) br);
 
-	if (br_timer_has_expired(&br->tcn_timer, br->bridge_hello_time)) {
-		br_timer_clear(&br->tcn_timer);
-		br_tcn_timer_expired(br);
-	}
-
-	if (br_timer_has_expired(&br->topology_change_timer, br->bridge_forward_delay + br->bridge_max_age)) {
-		br_timer_clear(&br->topology_change_timer);
-		br_topology_change_timer_expired(br);
-	}
-
-	list_for_each_entry(p, &br->port_list, list) {
-		if (p->state != BR_STATE_DISABLED)
-			br_check_port_timers(p);
-	}
+	br_timer_init(&br->gc_timer, br_fdb_cleanup, (unsigned long) br);
 }
 
-void br_tick(unsigned long __data)
+void br_stp_port_timer_init(struct net_bridge_port *p)
 {
-	struct net_bridge *br = (struct net_bridge *)__data;
+	br_timer_init(&p->message_age_timer, br_message_age_timer_expired,
+		      (unsigned long) p);
 
-	if (spin_trylock_bh(&br->lock)) {
-		br_check_timers(br);
-		spin_unlock_bh(&br->lock);
-	}
-	br->tick.expires = jiffies + 1;
-	add_timer(&br->tick);
-}
+	br_timer_init(&p->forward_delay_timer, br_forward_delay_timer_expired,
+		      (unsigned long) p);
+		      
+	br_timer_init(&p->hold_timer, br_hold_timer_expired,
+		      (unsigned long) p);
+}	

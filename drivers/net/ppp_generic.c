@@ -57,7 +57,9 @@
 #define NP_IPV6	1		/* Internet Protocol V6 */
 #define NP_IPX	2		/* IPX protocol */
 #define NP_AT	3		/* Appletalk protocol */
-#define NUM_NP	4		/* Number of NPs. */
+#define NP_MPLS_UC 4		/* MPLS unicast */
+#define NP_MPLS_MC 5		/* MPLS multicast */
+#define NUM_NP	6		/* Number of NPs. */
 
 #define MPHDRLEN	6	/* multilink protocol header length */
 #define MPHDRLEN_SSN	4	/* ditto with short sequence numbers */
@@ -281,6 +283,10 @@ static inline int proto_to_npindex(int proto)
 		return NP_IPX;
 	case PPP_AT:
 		return NP_AT;
+	case PPP_MPLS_UC:
+		return NP_MPLS_UC;
+	case PPP_MPLS_MC:
+		return NP_MPLS_MC;
 	}
 	return -EINVAL;
 }
@@ -291,6 +297,8 @@ static const int npindex_to_proto[NUM_NP] = {
 	PPP_IPV6,
 	PPP_IPX,
 	PPP_AT,
+	PPP_MPLS_UC,
+	PPP_MPLS_MC,
 };
 	
 /* Translates an ethertype into an NP index */
@@ -306,6 +314,10 @@ static inline int ethertype_to_npindex(int ethertype)
 	case ETH_P_PPPTALK:
 	case ETH_P_ATALK:
 		return NP_AT;
+	case ETH_P_MPLS_UC:
+		return NP_MPLS_UC;
+	case ETH_P_MPLS_MC:
+		return NP_MPLS_MC;
 	}
 	return -1;
 }
@@ -316,6 +328,8 @@ static const int npindex_to_ethertype[NUM_NP] = {
 	ETH_P_IPV6,
 	ETH_P_IPX,
 	ETH_P_PPPTALK,
+	ETH_P_MPLS_UC,
+	ETH_P_MPLS_MC,
 };
 
 /*
@@ -784,11 +798,14 @@ int __init ppp_init(void)
 
 	printk(KERN_INFO "PPP generic driver version " PPP_VERSION "\n");
 	err = register_chrdev(PPP_MAJOR, "ppp", &ppp_device_fops);
-	if (err)
+	if (!err) {
+		err = devfs_mk_cdev(MKDEV(PPP_MAJOR, 0),
+				S_IFCHR|S_IRUSR|S_IWUSR, "ppp");
+	}
+
+	if (!err)
 		printk(KERN_ERR "failed to register PPP device (%d)\n", err);
-	devfs_register(NULL, "ppp", DEVFS_FL_DEFAULT, PPP_MAJOR, 0,
-		       S_IFCHR | S_IRUSR | S_IWUSR, &ppp_device_fops, NULL);
-	return 0;
+	return err;
 }
 
 /*

@@ -2,13 +2,13 @@
 #define _ASM_IA64_MACHVEC_HPZX1_h
 
 extern ia64_mv_setup_t dig_setup;
-extern ia64_mv_pci_alloc_consistent sba_alloc_consistent;
-extern ia64_mv_pci_free_consistent sba_free_consistent;
-extern ia64_mv_pci_map_single sba_map_single;
-extern ia64_mv_pci_unmap_single sba_unmap_single;
-extern ia64_mv_pci_map_sg sba_map_sg;
-extern ia64_mv_pci_unmap_sg sba_unmap_sg;
-extern ia64_mv_pci_dma_supported sba_dma_supported;
+extern ia64_mv_dma_alloc_coherent	sba_alloc_coherent;
+extern ia64_mv_dma_free_coherent	sba_free_coherent;
+extern ia64_mv_dma_map_single		sba_map_single;
+extern ia64_mv_dma_unmap_single		sba_unmap_single;
+extern ia64_mv_dma_map_sg		sba_map_sg;
+extern ia64_mv_dma_unmap_sg		sba_unmap_sg;
+extern ia64_mv_dma_supported		sba_dma_supported;
 
 /*
  * This stuff has dual use!
@@ -19,15 +19,15 @@ extern ia64_mv_pci_dma_supported sba_dma_supported;
  */
 #define platform_name			"hpzx1"
 #define platform_setup			dig_setup
-#define platform_pci_dma_init		((ia64_mv_pci_dma_init *) machvec_noop)
-#define platform_pci_alloc_consistent	sba_alloc_consistent
-#define platform_pci_free_consistent	sba_free_consistent
-#define platform_pci_map_single		sba_map_single
-#define platform_pci_unmap_single	sba_unmap_single
-#define platform_pci_map_sg		sba_map_sg
-#define platform_pci_unmap_sg		sba_unmap_sg
-#define platform_pci_dma_sync_single	((ia64_mv_pci_dma_sync_single *) machvec_noop)
-#define platform_pci_dma_sync_sg	((ia64_mv_pci_dma_sync_sg *) machvec_noop)
-#define platform_pci_dma_supported	sba_dma_supported
+#define platform_dma_init		((ia64_mv_dma_init *) machvec_noop)
+#define platform_dma_alloc_coherent	sba_alloc_coherent
+#define platform_dma_free_coherent	sba_free_coherent
+#define platform_dma_map_single		sba_map_single
+#define platform_dma_unmap_single	sba_unmap_single
+#define platform_dma_map_sg		sba_map_sg
+#define platform_dma_unmap_sg		sba_unmap_sg
+#define platform_dma_sync_single	((ia64_mv_dma_sync_single *) machvec_memory_fence)
+#define platform_dma_sync_sg		((ia64_mv_dma_sync_sg *) machvec_memory_fence)
+#define platform_dma_supported		sba_dma_supported
 
 #endif /* _ASM_IA64_MACHVEC_HPZX1_h */

@@ -118,12 +118,8 @@
 #define TO_READ_FROM_IRQ 		TO_DEFAULT_COMMAND
 #define TO_GET_READY			TO_DEFAULT_COMMAND
 
-#ifdef CONFIG_USB_DYNAMIC_MINORS
-#define MDC800_DEVICE_MINOR_BASE 0
-#else
 /* Minor Number of the device (create with mknod /dev/mustek c 180 32) */
 #define MDC800_DEVICE_MINOR_BASE 32
-#endif
 
 
 /**************************************************************************
@@ -401,6 +397,13 @@ static void mdc800_usb_download_notify (struct urb *urb, struct pt_regs *res)
 
 static struct usb_driver mdc800_usb_driver;
 static struct file_operations mdc800_device_ops;
+static struct usb_class_driver mdc800_class = {
+	.name =		"usb/mdc800%d",
+	.fops =		&mdc800_device_ops,
+	.mode =		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+	.minor_base =	MDC800_DEVICE_MINOR_BASE,
+};
+
 
 /*
  * Callback to search the Mustek MDC800 on the USB Bus
@@ -477,8 +480,8 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 
 	down (&mdc800->io_lock);
 
-	retval = usb_register_dev (&mdc800_device_ops, MDC800_DEVICE_MINOR_BASE, 1, &mdc800->minor);
-	if (retval && (retval != -ENODEV)) {
+	retval = usb_register_dev(intf, &mdc800_class);
+	if (retval) {
 		err ("Not able to get a minor for this device.");
 		return -ENODEV;
 	}
@@ -540,7 +543,7 @@ static void mdc800_usb_disconnect (struct usb_interface *intf)
 		if (mdc800->state == NOT_CONNECTED)
 			return;
 
-		usb_deregister_dev (1, mdc800->minor);
+		usb_deregister_dev(intf, &mdc800_class);
 
 		mdc800->state=NOT_CONNECTED;
 

@@ -509,7 +509,6 @@ static void sch_atm_dequeue(unsigned long data)
 			memcpy(skb_push(skb,flow->hdr_len),flow->hdr,
 			    flow->hdr_len);
 			atomic_add(skb->truesize,&flow->vcc->sk->wmem_alloc);
-			ATM_SKB(skb)->iovcnt = 0;
 			/* atm.atm_options are already set by atm_tc_enqueue */
 			(void) flow->vcc->send(flow->vcc,skb);
 		}

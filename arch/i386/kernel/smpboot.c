@@ -1153,7 +1153,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	zap_low_mappings();
 }
 
-void __init smp_intr_init()
+void __init smp_intr_init(void)
 {
 	/*
 	 * IRQ0 must be given a fixed assignment and initialized,

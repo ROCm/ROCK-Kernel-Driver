@@ -311,7 +311,7 @@ void __init reserve_bootmem_node (pg_data_t *pgdat, unsigned long physaddr, unsi
 
 void __init free_bootmem_node (pg_data_t *pgdat, unsigned long physaddr, unsigned long size)
 {
-	return(free_bootmem_core(pgdat->bdata, physaddr, size));
+	free_bootmem_core(pgdat->bdata, physaddr, size);
 }
 
 unsigned long __init free_all_bootmem_node (pg_data_t *pgdat)
@@ -336,7 +336,7 @@ void __init reserve_bootmem (unsigned long addr, unsigned long size)
 
 void __init free_bootmem (unsigned long addr, unsigned long size)
 {
-	return(free_bootmem_core(contig_page_data.bdata, addr, size));
+	free_bootmem_core(contig_page_data.bdata, addr, size);
 }
 
 unsigned long __init free_all_bootmem (void)

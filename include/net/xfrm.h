@@ -123,6 +123,12 @@ struct xfrm_state
 	/* Data for encapsulator */
 	struct xfrm_encap_tmpl	*encap;
 
+	/* IPComp needs an IPIP tunnel for handling uncompressed packets */
+	struct xfrm_state	*tunnel;
+
+	/* If a tunnel, number of users + 1 */
+	atomic_t		tunnel_users;
+
 	/* State for replay detection */
 	struct xfrm_replay_state replay;
 
@@ -195,6 +201,8 @@ extern int xfrm_state_register_afinfo(struct xfrm_state_afinfo *afinfo);
 extern int xfrm_state_unregister_afinfo(struct xfrm_state_afinfo *afinfo);
 extern struct xfrm_state_afinfo *xfrm_state_get_afinfo(unsigned short family);
 extern void xfrm_state_put_afinfo(struct xfrm_state_afinfo *afinfo);
+
+extern void xfrm_state_delete_tunnel(struct xfrm_state *x);
 
 struct xfrm_decap_state;
 struct xfrm_type
@@ -336,7 +344,7 @@ extern struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
 
 static inline void xfrm_pol_hold(struct xfrm_policy *policy)
 {
-	if (policy)
+	if (likely(policy != NULL))
 		atomic_inc(&policy->refcnt);
 }
 
@@ -697,6 +705,11 @@ xfrm_state_addr_check(struct xfrm_state *x,
 		return __xfrm6_state_addr_check(x, daddr, saddr);
 	}
 	return 0;
+}
+
+static inline int xfrm_state_kern(struct xfrm_state *x)
+{
+	return atomic_read(&x->tunnel_users);
 }
 
 /*

@@ -8,7 +8,7 @@
  * addresses.  Thus, we need to be careful not to let the user to
  * trick us into accessing kernel memory that would normally be
  * inaccessible.  This code is also fairly performance sensitive,
- * so we want to spend as little time doing saftey checks as
+ * so we want to spend as little time doing safety checks as
  * possible.
  *
  * To make matters a bit more interesting, these macros sometimes also

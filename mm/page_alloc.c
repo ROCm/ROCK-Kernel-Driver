@@ -537,6 +537,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	int i;
 	int cold;
 	int do_retry;
+	struct reclaim_state reclaim_state;
 
 	if (wait)
 		might_sleep();
@@ -608,7 +609,12 @@ rebalance:
 		goto nopage;
 
 	current->flags |= PF_MEMALLOC;
+	reclaim_state.reclaimed_slab = 0;
+	current->reclaim_state = &reclaim_state;
+
 	try_to_free_pages(classzone, gfp_mask, order);
+
+	current->reclaim_state = NULL;
 	current->flags &= ~PF_MEMALLOC;
 
 	/* go through the zonelist yet one more time */
@@ -786,7 +792,7 @@ unsigned int nr_free_pagecache_pages(void)
 	return nr_free_zone_pages(GFP_HIGHUSER & GFP_ZONEMASK);
 }
 
-#if CONFIG_HIGHMEM
+#ifdef CONFIG_HIGHMEM
 unsigned int nr_free_highpages (void)
 {
 	pg_data_t *pgdat;

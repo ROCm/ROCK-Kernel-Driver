@@ -382,6 +382,7 @@ out_kfree:
 }
 
 static struct file_operations rt_cache_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open	 = rt_cache_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
@@ -431,16 +432,17 @@ static __inline__ int rt_valuable(struct rtable *rth)
 		rth->u.dst.expires;
 }
 
-static int rt_may_expire(struct rtable *rth, int tmo1, int tmo2)
+static int rt_may_expire(struct rtable *rth, unsigned long tmo1, unsigned long tmo2)
 {
-	int age;
+	unsigned long age;
 	int ret = 0;
 
 	if (atomic_read(&rth->u.dst.__refcnt))
 		goto out;
 
 	ret = 1;
-	if (rth->u.dst.expires && (long)(rth->u.dst.expires - jiffies) <= 0)
+	if (rth->u.dst.expires &&
+	    time_after_eq(jiffies, rth->u.dst.expires))
 		goto out;
 
 	age = jiffies - rth->u.dst.lastuse;
@@ -462,7 +464,7 @@ static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
 
 	for (t = ip_rt_gc_interval << rt_hash_log; t >= 0;
 	     t -= ip_rt_gc_timeout) {
-		unsigned tmo = ip_rt_gc_timeout;
+		unsigned long tmo = ip_rt_gc_timeout;
 
 		i = (i + 1) & rt_hash_mask;
 		rthp = &rt_hash_table[i].chain;
@@ -471,7 +473,7 @@ static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
 		while ((rth = *rthp) != NULL) {
 			if (rth->u.dst.expires) {
 				/* Entry is expired even if it is in use */
-				if ((long)(now - rth->u.dst.expires) <= 0) {
+				if (time_before_eq(now, rth->u.dst.expires)) {
 					tmo >>= 1;
 					rthp = &rth->u.rt_next;
 					continue;
@@ -489,7 +491,7 @@ static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
 		spin_unlock(&rt_hash_table[i].lock);
 
 		/* Fallback loop breaker. */
-		if ((jiffies - now) > 0)
+		if (time_after(jiffies, now))
 			break;
 	}
 	rover = i;
@@ -591,7 +593,7 @@ static void rt_secret_rebuild(unsigned long dummy)
 
 static int rt_garbage_collect(void)
 {
-	static unsigned expire = RT_GC_TIMEOUT;
+	static unsigned long expire = RT_GC_TIMEOUT;
 	static unsigned long last_gc;
 	static int rover;
 	static int equilibrium;
@@ -643,7 +645,7 @@ static int rt_garbage_collect(void)
 		int i, k;
 
 		for (i = rt_hash_mask, k = rover; i >= 0; i--) {
-			unsigned tmo = expire;
+			unsigned long tmo = expire;
 
 			k = (k + 1) & rt_hash_mask;
 			rthp = &rt_hash_table[k].chain;
@@ -689,7 +691,7 @@ static int rt_garbage_collect(void)
 
 		if (atomic_read(&ipv4_dst_ops.entries) < ip_rt_max_size)
 			goto out;
-	} while (!in_softirq() && jiffies - now < 1);
+	} while (!in_softirq() && time_before_eq(jiffies, now));
 
 	if (atomic_read(&ipv4_dst_ops.entries) < ip_rt_max_size)
 		goto out;
@@ -1067,7 +1069,7 @@ void ip_rt_send_redirect(struct sk_buff *skb)
 	/* No redirected packets during ip_rt_redirect_silence;
 	 * reset the algorithm.
 	 */
-	if (jiffies - rt->u.dst.rate_last > ip_rt_redirect_silence)
+	if (time_after(jiffies, rt->u.dst.rate_last + ip_rt_redirect_silence))
 		rt->u.dst.rate_tokens = 0;
 
 	/* Too many ignored redirects; do not send anything
@@ -1081,8 +1083,9 @@ void ip_rt_send_redirect(struct sk_buff *skb)
 	/* Check for load limit; set rate_last to the latest sent
 	 * redirect.
 	 */
-	if (jiffies - rt->u.dst.rate_last >
-	    (ip_rt_redirect_load << rt->u.dst.rate_tokens)) {
+	if (time_after(jiffies,
+		       (rt->u.dst.rate_last +
+			(ip_rt_redirect_load << rt->u.dst.rate_tokens)))) {
 		icmp_send(skb, ICMP_REDIRECT, ICMP_REDIR_HOST, rt->rt_gateway);
 		rt->u.dst.rate_last = jiffies;
 		++rt->u.dst.rate_tokens;

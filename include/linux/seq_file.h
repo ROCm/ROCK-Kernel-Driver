@@ -29,7 +29,7 @@ struct seq_operations {
 };
 
 int seq_open(struct file *, struct seq_operations *);
-ssize_t seq_read(struct file *, char *, size_t, loff_t *);
+ssize_t seq_read(struct file *, char __user *, size_t, loff_t *);
 loff_t seq_lseek(struct file *, loff_t, int);
 int seq_release(struct inode *, struct file *);
 int seq_escape(struct seq_file *, const char *, const char *);
@@ -60,5 +60,6 @@ int seq_printf(struct seq_file *, const char *, ...)
 
 int single_open(struct file *, int (*)(struct seq_file *, void *), void *);
 int single_release(struct inode *, struct file *);
+int seq_release_private(struct inode *, struct file *);
 #endif
 #endif

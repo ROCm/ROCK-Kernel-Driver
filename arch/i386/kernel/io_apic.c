@@ -280,7 +280,9 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
 extern unsigned long irq_affinity[NR_IRQS];
 
 static int __cacheline_aligned pending_irq_balance_apicid[NR_IRQS];
-static int irqbalance_disabled = NO_BALANCE_IRQ;
+
+#define IRQBALANCE_CHECK_ARCH -999
+static int irqbalance_disabled = IRQBALANCE_CHECK_ARCH;
 static int physical_balance = 0;
 
 struct irq_cpu_info {
@@ -342,8 +344,10 @@ static inline void balance_irq(int cpu, int irq)
 	unsigned long allowed_mask;
 	unsigned int new_cpu;
 		
-	if (irqbalance_disabled)
+	if (irqbalance_disabled == IRQBALANCE_CHECK_ARCH && NO_BALANCE_IRQ)
 		return;
+	else if (irqbalance_disabled) 
+		return; 
 
 	allowed_mask = cpu_online_map & irq_affinity[irq];
 	new_cpu = move(cpu, allowed_mask, now, 1);

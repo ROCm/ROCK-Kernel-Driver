@@ -803,7 +803,7 @@ void probe_hwif (ide_hwif_t *hwif)
 		return;
 
 	if ((hwif->chipset != ide_4drives || !hwif->mate || !hwif->mate->present) &&
-#if CONFIG_BLK_DEV_PDC4030
+#ifdef CONFIG_BLK_DEV_PDC4030
 	    (hwif->chipset != ide_pdc4030 || hwif->channel == 0) &&
 #endif /* CONFIG_BLK_DEV_PDC4030 */
 	    (hwif_check_regions(hwif))) {
@@ -1235,7 +1235,7 @@ struct gendisk *ata_probe(dev_t dev, int *part, void *data)
 			(void) request_module("ide-disk");
 		if (drive->scsi)
 			(void) request_module("ide-scsi");
-		if (drive->media == ide_cdrom)
+		if (drive->media == ide_cdrom || drive->media == ide_optical)
 			(void) request_module("ide-cd");
 		if (drive->media == ide_tape)
 			(void) request_module("ide-tape");

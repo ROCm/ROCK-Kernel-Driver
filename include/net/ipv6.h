@@ -316,6 +316,26 @@ extern int			ip6_build_xmit(struct sock *sk,
 					       struct ipv6_txoptions *opt,
 					       int hlimit, int flags);
 
+extern int			ip6_append_data(struct sock *sk,
+						int getfrag(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb),
+		    				void *from,
+						int length,
+						int transhdrlen,
+		      				int hlimit,
+						struct ipv6_txoptions *opt,
+						struct flowi *fl,
+						struct rt6_info *rt,
+						unsigned int flags);
+
+extern int			ip6_push_pending_frames(struct sock *sk);
+
+extern void			ip6_flush_pending_frames(struct sock *sk);
+
+extern int			ip6_dst_lookup(struct sock *sk,
+					       struct dst_entry **dst,
+					       struct flowi *fl,
+					       struct in6_addr **saddr);
+
 /*
  *	skb processing functions
  */

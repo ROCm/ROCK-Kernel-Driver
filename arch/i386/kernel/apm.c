@@ -226,6 +226,7 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/desc.h>
+#include <asm/suspend.h>
 
 #include "io_ports.h"
 
@@ -1212,7 +1213,9 @@ static int suspend(int vetoable)
 	spin_unlock(&i8253_lock);
 	write_sequnlock_irq(&xtime_lock);
 
+	save_processor_state();
 	err = set_system_power_state(APM_STATE_SUSPEND);
+	restore_processor_state();
 
 	write_seqlock_irq(&xtime_lock);
 	spin_lock(&i8253_lock);

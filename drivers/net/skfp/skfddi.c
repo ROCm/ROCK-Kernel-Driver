@@ -539,6 +539,8 @@ static void init_dev(struct net_device *dev, u_long iobase)
 	dev->header_cache_update = NULL;	/* not supported */
 	dev->change_mtu = NULL;	/* set in fddi_setup() */
 
+	SET_MODULE_OWNER(dev);
+
 	/* Initialize remaining device structure information */
 	fddi_setup(dev);
 }				// init_device
@@ -791,8 +793,6 @@ static int skfp_open(struct net_device *dev)
 	smt_online(smc, 1);
 	STI_FBI();
 
-	MOD_INC_USE_COUNT;
-
 	/* Clear local multicast address tables */
 	mac_clear_multicast(smc);
 
@@ -853,8 +853,6 @@ static int skfp_close(struct net_device *dev)
 		bp->QueueSkb++;
 		dev_kfree_skb(skb);
 	}
-
-	MOD_DEC_USE_COUNT;
 
 	return (0);
 }				// skfp_close

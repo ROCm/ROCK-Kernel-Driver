@@ -334,19 +334,16 @@ static struct i2c_algorithm saa7134_algo = {
 
 static struct i2c_adapter saa7134_adap_template = {
 	.owner         = THIS_MODULE,
+	I2C_DEVNAME("saa7134"),
 	.id            = I2C_ALGO_SAA7134,
+	.class         = I2C_ADAP_CLASS_TV_ANALOG,
 	.algo          = &saa7134_algo,
 	.client_register = attach_inform,
-	.dev		= {
-		.name	= "saa7134",
-	},
 };
 
 static struct i2c_client saa7134_client_template = {
-        .id   = -1,
-	.dev	= {
-		.name	= "saa7134 internal",
-	},
+	I2C_DEVNAME("saa7134 internal"),
+        .id        = -1,
 };
 
 /* ----------------------------------------------------------- */
@@ -399,22 +396,13 @@ saa7134_i2c_scan(struct saa7134_dev *dev)
 void saa7134_i2c_call_clients(struct saa7134_dev *dev,
 			      unsigned int cmd, void *arg)
 {
-	int i;
-
-	for (i = 0; i < I2C_CLIENT_MAX; i++) {
-		if (NULL == dev->i2c_adap.clients[i])
-			continue;
-		if (NULL == dev->i2c_adap.clients[i]->driver->command)
-			continue;
-		dev->i2c_adap.clients[i]->driver->command
-			(dev->i2c_adap.clients[i],cmd,arg);
-	}
+	i2c_clients_command(&dev->i2c_adap, cmd, arg);
 }
 
 int saa7134_i2c_register(struct saa7134_dev *dev)
 {
 	dev->i2c_adap = saa7134_adap_template;
-	strncpy(dev->i2c_adap.dev.name, dev->name, DEVICE_NAME_SIZE);
+	strcpy(dev->i2c_adap.dev.name,dev->name);
 	dev->i2c_adap.algo_data = dev;
 	i2c_add_adapter(&dev->i2c_adap);
 	

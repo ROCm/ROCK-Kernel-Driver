@@ -38,6 +38,13 @@ extern void ia64_tlb_init (void);
 
 unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
 
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+# define LARGE_GAP	0x40000000	/* Use virtual mem map if hole is > than this */
+  unsigned long vmalloc_end = VMALLOC_END_INIT;
+  static struct page *vmem_map;
+  static unsigned long num_dma_physpages;
+#endif
+
 static int pgt_cache_water[2] = { 25, 50 };
 
 void
@@ -48,13 +55,13 @@ check_pgt_cache (void)
 	low = pgt_cache_water[0];
 	high = pgt_cache_water[1];
 
-	if (pgtable_cache_size > high) {
+	if (pgtable_cache_size > (u64) high) {
 		do {
 			if (pgd_quicklist)
 				free_page((unsigned long)pgd_alloc_one_fast(0));
 			if (pmd_quicklist)
 				free_page((unsigned long)pmd_alloc_one_fast(0, 0));
-		} while (pgtable_cache_size > low);
+		} while (pgtable_cache_size > (u64) low);
 	}
 }
 
@@ -337,6 +344,139 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_tlb_init();
 }
 
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+
+static int
+create_mem_map_page_table (u64 start, u64 end, void *arg)
+{
+	unsigned long address, start_page, end_page;
+	struct page *map_start, *map_end;
+	pgd_t *pgd;
+	pmd_t *pmd;
+	pte_t *pte;
+
+	map_start = vmem_map + (__pa(start) >> PAGE_SHIFT);
+	map_end   = vmem_map + (__pa(end) >> PAGE_SHIFT);
+
+	start_page = (unsigned long) map_start & PAGE_MASK;
+	end_page = PAGE_ALIGN((unsigned long) map_end);
+
+	for (address = start_page; address < end_page; address += PAGE_SIZE) {
+		pgd = pgd_offset_k(address);
+		if (pgd_none(*pgd))
+			pgd_populate(&init_mm, pgd, alloc_bootmem_pages(PAGE_SIZE));
+		pmd = pmd_offset(pgd, address);
+
+		if (pmd_none(*pmd))
+			pmd_populate_kernel(&init_mm, pmd, alloc_bootmem_pages(PAGE_SIZE));
+		pte = pte_offset_kernel(pmd, address);
+
+		if (pte_none(*pte))
+			set_pte(pte, pfn_pte(__pa(alloc_bootmem_pages(PAGE_SIZE)) >> PAGE_SHIFT,
+					     PAGE_KERNEL));
+	}
+	return 0;
+}
+
+struct memmap_init_callback_data {
+	struct page *start;
+	struct page *end;
+	int nid;
+	unsigned long zone;
+};
+
+static int
+virtual_memmap_init (u64 start, u64 end, void *arg)
+{
+	struct memmap_init_callback_data *args;
+	struct page *map_start, *map_end;
+
+	args = (struct memmap_init_callback_data *) arg;
+
+	map_start = vmem_map + (__pa(start) >> PAGE_SHIFT);
+	map_end   = vmem_map + (__pa(end) >> PAGE_SHIFT);
+
+	if (map_start < args->start)
+		map_start = args->start;
+	if (map_end > args->end)
+		map_end = args->end;
+
+	/*
+	 * We have to initialize "out of bounds" struct page elements that fit completely
+	 * on the same pages that were allocated for the "in bounds" elements because they
+	 * may be referenced later (and found to be "reserved").
+	 */
+	map_start -= ((unsigned long) map_start & (PAGE_SIZE - 1)) / sizeof(struct page);
+	map_end += ((PAGE_ALIGN((unsigned long) map_end) - (unsigned long) map_end)
+		    / sizeof(struct page));
+
+	if (map_start < map_end)
+		memmap_init_zone(map_start, (unsigned long) (map_end - map_start),
+				 args->nid, args->zone, page_to_pfn(map_start));
+	return 0;
+}
+
+void
+memmap_init (struct page *start, unsigned long size, int nid,
+	     unsigned long zone, unsigned long start_pfn)
+{
+	if (!vmem_map)
+		memmap_init_zone(start, size, nid, zone, start_pfn);
+	else {
+		struct memmap_init_callback_data args;
+
+		args.start = start;
+		args.end = start + size;
+		args.nid = nid;
+		args.zone = zone;
+
+		efi_memmap_walk(virtual_memmap_init, &args);
+	}
+}
+
+int
+ia64_pfn_valid (unsigned long pfn)
+{
+	char byte;
+
+	return __get_user(byte, (char *) pfn_to_page(pfn)) == 0;
+}
+
+static int
+count_dma_pages (u64 start, u64 end, void *arg)
+{
+	unsigned long *count = arg;
+
+	if (end <= MAX_DMA_ADDRESS)
+		*count += (end - start) >> PAGE_SHIFT;
+	return 0;
+}
+
+static int
+find_largest_hole (u64 start, u64 end, void *arg)
+{
+	u64 *max_gap = arg;
+
+	static u64 last_end = PAGE_OFFSET;
+
+	/* NOTE: this algorithm assumes efi memmap table is ordered */
+
+	if (*max_gap < (start - last_end))
+		*max_gap = start - last_end;
+	last_end = end;
+	return 0;
+}
+#endif /* CONFIG_VIRTUAL_MEM_MAP */
+
+static int
+count_pages (u64 start, u64 end, void *arg)
+{
+	unsigned long *count = arg;
+
+	*count += (end - start) >> PAGE_SHIFT;
+	return 0;
+}
+
 /*
  * Set up the page tables.
  */
@@ -348,18 +488,70 @@ paging_init (void)
 	extern void discontig_paging_init(void);
 
 	discontig_paging_init();
+	efi_memmap_walk(count_pages, &num_physpages);
 }
 #else /* !CONFIG_DISCONTIGMEM */
 void
 paging_init (void)
 {
-	unsigned long max_dma, zones_size[MAX_NR_ZONES];
+	unsigned long max_dma;
+	unsigned long zones_size[MAX_NR_ZONES];
+#  ifdef CONFIG_VIRTUAL_MEM_MAP
+	unsigned long zholes_size[MAX_NR_ZONES];
+	unsigned long max_gap;
+#  endif
 
 	/* initialize mem_map[] */
 
 	memset(zones_size, 0, sizeof(zones_size));
 
+	num_physpages = 0;
+	efi_memmap_walk(count_pages, &num_physpages);
+
 	max_dma = virt_to_phys((void *) MAX_DMA_ADDRESS) >> PAGE_SHIFT;
+
+#  ifdef CONFIG_VIRTUAL_MEM_MAP
+	memset(zholes_size, 0, sizeof(zholes_size));
+
+	num_dma_physpages = 0;
+	efi_memmap_walk(count_dma_pages, &num_dma_physpages);
+
+	if (max_low_pfn < max_dma) {
+		zones_size[ZONE_DMA] = max_low_pfn;
+		zholes_size[ZONE_DMA] = max_low_pfn - num_dma_physpages;
+	} else {
+		zones_size[ZONE_DMA] = max_dma;
+		zholes_size[ZONE_DMA] = max_dma - num_dma_physpages;
+		if (num_physpages > num_dma_physpages) {
+			zones_size[ZONE_NORMAL] = max_low_pfn - max_dma;
+			zholes_size[ZONE_NORMAL] = ((max_low_pfn - max_dma)
+						    - (num_physpages - num_dma_physpages));
+		}
+	}
+
+	max_gap = 0;
+	efi_memmap_walk(find_largest_hole, (u64 *)&max_gap);
+	if (max_gap < LARGE_GAP) {
+		vmem_map = (struct page *) 0;
+		free_area_init_node(0, &contig_page_data, NULL, zones_size, 0, zholes_size);
+		mem_map = contig_page_data.node_mem_map;
+	}
+	else {
+		unsigned long map_size;
+
+		/* allocate virtual_mem_map */
+
+		map_size = PAGE_ALIGN(max_low_pfn * sizeof(struct page));
+		vmalloc_end -= map_size;
+		vmem_map = (struct page *) vmalloc_end;
+		efi_memmap_walk(create_mem_map_page_table, 0);
+
+		free_area_init_node(0, &contig_page_data, vmem_map, zones_size, 0, zholes_size);
+
+		mem_map = contig_page_data.node_mem_map;
+		printk("Virtual mem_map starts at 0x%p\n", mem_map);
+	}
+#  else /* !CONFIG_VIRTUAL_MEM_MAP */
 	if (max_low_pfn < max_dma)
 		zones_size[ZONE_DMA] = max_low_pfn;
 	else {
@@ -367,17 +559,9 @@ paging_init (void)
 		zones_size[ZONE_NORMAL] = max_low_pfn - max_dma;
 	}
 	free_area_init(zones_size);
+#  endif /* !CONFIG_VIRTUAL_MEM_MAP */
 }
 #endif /* !CONFIG_DISCONTIGMEM */
-
-static int
-count_pages (u64 start, u64 end, void *arg)
-{
-	unsigned long *count = arg;
-
-	*count += (end - start) >> PAGE_SHIFT;
-	return 0;
-}
 
 static int
 count_reserved_pages (u64 start, u64 end, void *arg)
@@ -406,7 +590,7 @@ mem_init (void)
 	 * any drivers that may need the PCI DMA interface are initialized or bootmem has
 	 * been freed.
 	 */
-	platform_pci_dma_init();
+	platform_dma_init();
 #endif
 
 #ifndef CONFIG_DISCONTIGMEM
@@ -414,9 +598,6 @@ mem_init (void)
 		BUG();
 	max_mapnr = max_low_pfn;
 #endif
-
-	num_physpages = 0;
-	efi_memmap_walk(count_pages, &num_physpages);
 
 	high_memory = __va(max_low_pfn * PAGE_SIZE);
 
@@ -445,7 +626,7 @@ mem_init (void)
 	num_pgt_pages = nr_free_pages() / PTRS_PER_PGD + NUM_TASKS;
 	if (num_pgt_pages > nr_free_pages() / 10)
 		num_pgt_pages = nr_free_pages() / 10;
-	if (num_pgt_pages > pgt_cache_water[1])
+	if (num_pgt_pages > (u64) pgt_cache_water[1])
 		pgt_cache_water[1] = num_pgt_pages;
 
 	/* install the gate page in the global page table: */

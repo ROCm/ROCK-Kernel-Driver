@@ -98,7 +98,7 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 	struct atm_vcc *session_vcc;
 
 	msg = (struct atmsvc_msg *) skb->data;
-	atomic_sub(skb->truesize+ATM_PDU_OVHD,&vcc->sk->wmem_alloc);
+	atomic_sub(skb->truesize, &vcc->sk->wmem_alloc);
 	DPRINTK("sigd_send %d (0x%lx)\n",(int) msg->type,
 	  (unsigned long) msg->vcc);
 	vcc = *(struct atm_vcc **) &msg->vcc;
@@ -129,12 +129,12 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 		case as_indicate:
 			vcc = *(struct atm_vcc **) &msg->listen_vcc;
 			DPRINTK("as_indicate!!!\n");
-			if (!vcc->backlog_quota) {
+			if (vcc->sk->ack_backlog == vcc->sk->max_ack_backlog) {
 				sigd_enq(0,as_reject,vcc,NULL,NULL);
 				return 0;
 			}
-			vcc->backlog_quota--;
-			skb_queue_tail(&vcc->listenq,skb);
+			vcc->sk->ack_backlog++;
+			skb_queue_tail(&vcc->sk->receive_queue,skb);
 			if (vcc->callback) {
 				DPRINTK("waking vcc->sleep 0x%p\n",
 				    &vcc->sleep);

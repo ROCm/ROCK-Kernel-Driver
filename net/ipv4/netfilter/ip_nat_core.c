@@ -13,6 +13,8 @@
 #include <net/icmp.h>
 #include <net/ip.h>
 #include <net/tcp.h>  /* For tcp_prot in getorigdst */
+#include <linux/icmp.h>
+#include <linux/udp.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_nat_lock)
 #define ASSERT_WRITE_LOCK(x) MUST_BE_WRITE_LOCKED(&ip_nat_lock)
@@ -698,14 +700,29 @@ void place_in_hashes(struct ip_conntrack *conntrack,
 	list_prepend(&byipsproto[ipsprotohash], &info->byipsproto);
 }
 
-static void
-manip_pkt(u_int16_t proto, struct iphdr *iph, size_t len,
+/* Returns true if succeeded. */
+static int
+manip_pkt(u_int16_t proto,
+	  struct sk_buff **pskb,
+	  unsigned int iphdroff,
 	  const struct ip_conntrack_manip *manip,
-	  enum ip_nat_manip_type maniptype,
-	  __u32 *nfcache)
+	  enum ip_nat_manip_type maniptype)
 {
-	*nfcache |= NFC_ALTERED;
-	find_nat_proto(proto)->manip_pkt(iph, len, manip, maniptype);
+	struct iphdr *iph;
+
+	(*pskb)->nfcache |= NFC_ALTERED;
+	if (!skb_ip_make_writable(pskb, iphdroff+sizeof(iph)))
+		return 0;
+
+	iph = (void *)(*pskb)->data + iphdroff;
+
+	/* Manipulate protcol part. */
+	if (!find_nat_proto(proto)->manip_pkt(pskb,
+					      iphdroff + iph->ihl*4,
+					      manip, maniptype))
+		return 0;
+
+	iph = (void *)(*pskb)->data + iphdroff;
 
 	if (maniptype == IP_NAT_MANIP_SRC) {
 		iph->check = ip_nat_cheat_check(~iph->saddr, manip->ip,
@@ -716,17 +733,7 @@ manip_pkt(u_int16_t proto, struct iphdr *iph, size_t len,
 						iph->check);
 		iph->daddr = manip->ip;
 	}
-#if 0
-	if (ip_fast_csum((u8 *)iph, iph->ihl) != 0)
-		DEBUGP("IP: checksum on packet bad.\n");
-
-	if (proto == IPPROTO_TCP) {
-		void *th = (u_int32_t *)iph + iph->ihl;
-		if (tcp_v4_check(th, len - 4*iph->ihl, iph->saddr, iph->daddr,
-				 csum_partial((char *)th, len-4*iph->ihl, 0)))
-			DEBUGP("TCP: checksum on packet bad\n");
-	}
-#endif
+	return 1;
 }
 
 static inline int exp_for_packet(struct ip_conntrack_expect *exp,
@@ -754,25 +761,13 @@ do_bindings(struct ip_conntrack *ct,
 	unsigned int i;
 	struct ip_nat_helper *helper;
 	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
-	int is_tcp = (*pskb)->nh.iph->protocol == IPPROTO_TCP;
+	int proto = (*pskb)->nh.iph->protocol;
 
 	/* Need nat lock to protect against modification, but neither
 	   conntrack (referenced) and helper (deleted with
 	   synchronize_bh()) can vanish. */
 	READ_LOCK(&ip_nat_lock);
 	for (i = 0; i < info->num_manips; i++) {
-		/* raw socket (tcpdump) may have clone of incoming
-                   skb: don't disturb it --RR */
-		if (skb_cloned(*pskb) && !(*pskb)->sk) {
-			struct sk_buff *nskb = skb_copy(*pskb, GFP_ATOMIC);
-			if (!nskb) {
-				READ_UNLOCK(&ip_nat_lock);
-				return NF_DROP;
-			}
-			kfree_skb(*pskb);
-			*pskb = nskb;
-		}
-
 		if (info->manips[i].direction == dir
 		    && info->manips[i].hooknum == hooknum) {
 			DEBUGP("Mangling %p: %s to %u.%u.%u.%u %u\n",
@@ -781,12 +776,12 @@ do_bindings(struct ip_conntrack *ct,
 			       ? "SRC" : "DST",
 			       NIPQUAD(info->manips[i].manip.ip),
 			       htons(info->manips[i].manip.u.all));
-			manip_pkt((*pskb)->nh.iph->protocol,
-				  (*pskb)->nh.iph,
-				  (*pskb)->len,
-				  &info->manips[i].manip,
-				  info->manips[i].maniptype,
-				  &(*pskb)->nfcache);
+			if (!manip_pkt(proto, pskb, 0,
+				       &info->manips[i].manip,
+				       info->manips[i].maniptype)) {
+				READ_UNLOCK(&ip_nat_lock);
+				return NF_DROP;
+			}
 		}
 	}
 	helper = info->helper;
@@ -839,12 +834,14 @@ do_bindings(struct ip_conntrack *ct,
 		
 		/* Adjust sequence number only once per packet 
 		 * (helper is called at all hooks) */
-		if (is_tcp && (hooknum == NF_IP_POST_ROUTING
-			       || hooknum == NF_IP_LOCAL_IN)) {
+		if (proto == IPPROTO_TCP
+		    && (hooknum == NF_IP_POST_ROUTING
+			|| hooknum == NF_IP_LOCAL_IN)) {
 			DEBUGP("ip_nat_core: adjusting sequence number\n");
 			/* future: put this in a l4-proto specific function,
 			 * and call this function here. */
-			ip_nat_seq_adjust(*pskb, ct, ctinfo);
+			if (!ip_nat_seq_adjust(pskb, ct, ctinfo))
+				ret = NF_DROP;
 		}
 
 		return ret;
@@ -855,39 +852,54 @@ do_bindings(struct ip_conntrack *ct,
 	/* not reached */
 }
 
-unsigned int
-icmp_reply_translation(struct sk_buff *skb,
+int
+icmp_reply_translation(struct sk_buff **pskb,
 		       struct ip_conntrack *conntrack,
 		       unsigned int hooknum,
 		       int dir)
 {
-	struct iphdr *iph = skb->nh.iph;
-	struct icmphdr *hdr = (struct icmphdr *)((u_int32_t *)iph + iph->ihl);
-	struct iphdr *inner = (struct iphdr *)(hdr + 1);
-	size_t datalen = skb->len - ((void *)inner - (void *)iph);
+	struct {
+		struct icmphdr icmp;
+		struct iphdr ip;
+	} *inside;
 	unsigned int i;
 	struct ip_nat_info *info = &conntrack->nat.info;
+	int hdrlen;
 
-	IP_NF_ASSERT(skb->len >= iph->ihl*4 + sizeof(struct icmphdr));
+	if (!skb_ip_make_writable(pskb,(*pskb)->nh.iph->ihl*4+sizeof(*inside)))
+		return 0;
+	inside = (void *)(*pskb)->data + (*pskb)->nh.iph->ihl*4;
+
+	/* We're actually going to mangle it beyond trivial checksum
+	   adjustment, so make sure the current checksum is correct. */
+	if ((*pskb)->ip_summed != CHECKSUM_UNNECESSARY) {
+		hdrlen = (*pskb)->nh.iph->ihl * 4;
+		if ((u16)csum_fold(skb_checksum(*pskb, hdrlen,
+						(*pskb)->len - hdrlen, 0)))
+			return 0;
+	}
+
 	/* Must be RELATED */
-	IP_NF_ASSERT(skb->nfct - (struct ip_conntrack *)skb->nfct->master
+	IP_NF_ASSERT((*pskb)->nfct
+		     - (struct ip_conntrack *)(*pskb)->nfct->master
 		     == IP_CT_RELATED
-		     || skb->nfct - (struct ip_conntrack *)skb->nfct->master
+		     || (*pskb)->nfct
+		     - (struct ip_conntrack *)(*pskb)->nfct->master
 		     == IP_CT_RELATED+IP_CT_IS_REPLY);
 
 	/* Redirects on non-null nats must be dropped, else they'll
            start talking to each other without our translation, and be
            confused... --RR */
-	if (hdr->type == ICMP_REDIRECT) {
+	if (inside->icmp.type == ICMP_REDIRECT) {
 		/* Don't care about races here. */
 		if (info->initialized
 		    != ((1 << IP_NAT_MANIP_SRC) | (1 << IP_NAT_MANIP_DST))
 		    || info->num_manips != 0)
-			return NF_DROP;
+			return 0;
 	}
 
 	DEBUGP("icmp_reply_translation: translating error %p hook %u dir %s\n",
-	       skb, hooknum, dir == IP_CT_DIR_ORIGINAL ? "ORIG" : "REPLY");
+	       *pskb, hooknum, dir == IP_CT_DIR_ORIGINAL ? "ORIG" : "REPLY");
 	/* Note: May not be from a NAT'd host, but probably safest to
 	   do translation always as if it came from the host itself
 	   (even though a "host unreachable" coming from the host
@@ -918,11 +930,13 @@ icmp_reply_translation(struct sk_buff *skb,
 			       ? "DST" : "SRC",
 			       NIPQUAD(info->manips[i].manip.ip),
 			       ntohs(info->manips[i].manip.u.udp.port));
-			manip_pkt(inner->protocol, inner,
-				  skb->len - ((void *)inner - (void *)iph),
-				  &info->manips[i].manip,
-				  !info->manips[i].maniptype,
-				  &skb->nfcache);
+			if (!manip_pkt(inside->ip.protocol, pskb,
+				       (*pskb)->nh.iph->ihl*4
+				       + sizeof(inside->icmp),
+				       &info->manips[i].manip,
+				       !info->manips[i].maniptype))
+				goto unlock_fail;
+
 			/* Outer packet needs to have IP header NATed like
 	                   it's a reply. */
 
@@ -932,22 +946,86 @@ icmp_reply_translation(struct sk_buff *skb,
 			       info->manips[i].maniptype == IP_NAT_MANIP_SRC
 			       ? "SRC" : "DST",
 			       NIPQUAD(info->manips[i].manip.ip));
-			manip_pkt(0, iph, skb->len,
-				  &info->manips[i].manip,
-				  info->manips[i].maniptype,
-				  &skb->nfcache);
+			if (!manip_pkt(0, pskb, 0,
+				       &info->manips[i].manip,
+				       info->manips[i].maniptype))
+				goto unlock_fail;
 		}
 	}
 	READ_UNLOCK(&ip_nat_lock);
 
-	/* Since we mangled inside ICMP packet, recalculate its
-	   checksum from scratch.  (Hence the handling of incorrect
-	   checksums in conntrack, so we don't accidentally fix one.)  */
-	hdr->checksum = 0;
-	hdr->checksum = ip_compute_csum((unsigned char *)hdr,
-					sizeof(*hdr) + datalen);
+	hdrlen = (*pskb)->nh.iph->ihl * 4;
 
-	return NF_ACCEPT;
+	inside = (void *)(*pskb)->data + (*pskb)->nh.iph->ihl*4;
+
+	inside->icmp.checksum = 0;
+	inside->icmp.checksum = csum_fold(skb_checksum(*pskb, hdrlen,
+						       (*pskb)->len - hdrlen,
+						       0));
+	return 1;
+
+ unlock_fail:
+	READ_UNLOCK(&ip_nat_lock);
+	return 0;
+}
+
+int skb_ip_make_writable(struct sk_buff **pskb, unsigned int writable_len)
+{
+	struct sk_buff *nskb;
+	unsigned int iplen;
+
+	if (writable_len > (*pskb)->len)
+		return 0;
+
+	/* Not exclusive use of packet?  Must copy. */
+	if (skb_shared(*pskb) || skb_cloned(*pskb))
+		goto copy_skb;
+
+	/* Alexey says IP hdr is always modifiable and linear, so ok. */
+	if (writable_len <= (*pskb)->nh.iph->ihl*4)
+		return 1;
+
+	iplen = writable_len - (*pskb)->nh.iph->ihl*4;
+
+	/* DaveM says protocol headers are also modifiable. */
+	switch ((*pskb)->nh.iph->protocol) {
+	case IPPROTO_TCP: {
+		struct tcphdr hdr;
+		if (skb_copy_bits(*pskb, (*pskb)->nh.iph->ihl*4,
+				  &hdr, sizeof(hdr)) != 0)
+			goto copy_skb;
+		if (writable_len <= (*pskb)->nh.iph->ihl*4 + hdr.doff*4)
+			goto pull_skb;
+		goto copy_skb;
+	}
+	case IPPROTO_UDP:
+		if (writable_len<=(*pskb)->nh.iph->ihl*4+sizeof(struct udphdr))
+			goto pull_skb;
+		goto copy_skb;
+	case IPPROTO_ICMP:
+		if (writable_len
+		    <= (*pskb)->nh.iph->ihl*4 + sizeof(struct icmphdr))
+			goto pull_skb;
+		goto copy_skb;
+	/* Insert other cases here as desired */
+	}
+
+copy_skb:
+	nskb = skb_copy(*pskb, GFP_ATOMIC);
+	if (!nskb)
+		return 0;
+	BUG_ON(skb_is_nonlinear(nskb));
+
+	/* Rest of kernel will get very unhappy if we pass it a
+	   suddenly-orphaned skbuff */
+	if ((*pskb)->sk)
+		skb_set_owner_w(nskb, (*pskb)->sk);
+	kfree_skb(*pskb);
+	*pskb = nskb;
+	return 1;
+
+pull_skb:
+	return pskb_may_pull(*pskb, writable_len);
 }
 
 int __init ip_nat_init(void)

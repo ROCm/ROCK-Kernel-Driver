@@ -19,7 +19,7 @@ void prom_halt(void)
 {
 	bc_disable();
 	cli();
-#if CONFIG_SCSI_SGIWD93
+#ifdef CONFIG_SCSI_SGIWD93
 	reset_wd33c93(sgiwd93_host);
 #endif
 	romvec->halt();
@@ -29,7 +29,7 @@ void prom_powerdown(void)
 {
 	bc_disable();
 	cli();
-#if CONFIG_SCSI_SGIWD93
+#ifdef CONFIG_SCSI_SGIWD93
 	reset_wd33c93(sgiwd93_host);
 #endif
 	romvec->pdown();
@@ -40,7 +40,7 @@ void prom_restart(void)
 {
 	bc_disable();
 	cli();
-#if CONFIG_SCSI_SGIWD93
+#ifdef CONFIG_SCSI_SGIWD93
 	reset_wd33c93(sgiwd93_host);
 #endif
 	romvec->restart();
@@ -50,7 +50,7 @@ void prom_reboot(void)
 {
 	bc_disable();
 	cli();
-#if CONFIG_SCSI_SGIWD93
+#ifdef CONFIG_SCSI_SGIWD93
 	reset_wd33c93(sgiwd93_host);
 #endif
 	romvec->reboot();
@@ -60,7 +60,7 @@ void ArcEnterInteractiveMode(void)
 {
 	bc_disable();
 	cli();
-#if CONFIG_SCSI_SGIWD93
+#ifdef CONFIG_SCSI_SGIWD93
 	reset_wd33c93(sgiwd93_host);
 #endif
 	romvec->imode();

@@ -40,7 +40,6 @@
 #include <linux/mm.h>
 #include <linux/capability.h>
 #include <linux/highuid.h>
-#include <linux/brlock.h>
 #include <linux/fs.h>
 #include <linux/uio.h>
 #include <linux/tty.h>
@@ -429,17 +428,6 @@ EXPORT_SYMBOL(del_timer_sync);
 #endif
 EXPORT_SYMBOL(mod_timer);
 
-#ifdef CONFIG_SMP
-
-/* Big-Reader lock implementation */
-EXPORT_SYMBOL(__brlock_array);
-#ifndef __BRLOCK_USE_ATOMICS
-EXPORT_SYMBOL(__br_write_locks);
-#endif
-EXPORT_SYMBOL(__br_write_lock);
-EXPORT_SYMBOL(__br_write_unlock);
-#endif
-
 #ifdef HAVE_DISABLE_HLT
 EXPORT_SYMBOL(disable_hlt);
 EXPORT_SYMBOL(enable_hlt);
@@ -459,7 +447,7 @@ EXPORT_SYMBOL(iomem_resource);
 EXPORT_SYMBOL(complete_and_exit);
 EXPORT_SYMBOL(default_wake_function);
 EXPORT_SYMBOL(__wake_up);
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL_GPL(__wake_up_sync); /* internal use only */
 #endif
 EXPORT_SYMBOL(wake_up_process);
@@ -477,10 +465,10 @@ EXPORT_SYMBOL(__cond_resched);
 EXPORT_SYMBOL(set_user_nice);
 EXPORT_SYMBOL(task_nice);
 EXPORT_SYMBOL_GPL(idle_cpu);
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL_GPL(set_cpus_allowed);
 #endif
-#if CONFIG_SMP || CONFIG_PREEMPT
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 EXPORT_SYMBOL(kernel_flag);
 #endif
 EXPORT_SYMBOL(jiffies);
@@ -540,6 +528,7 @@ EXPORT_SYMBOL(seq_read);
 EXPORT_SYMBOL(seq_lseek);
 EXPORT_SYMBOL(single_open);
 EXPORT_SYMBOL(single_release);
+EXPORT_SYMBOL(seq_release_private);
 
 /* Program loader interfaces */
 #ifdef CONFIG_MMU
@@ -578,8 +567,6 @@ EXPORT_SYMBOL(fs_overflowgid);
 /* all busmice */
 EXPORT_SYMBOL(fasync_helper);
 EXPORT_SYMBOL(kill_fasync);
-
-EXPORT_SYMBOL(partition_name);
 
 /* binfmt_aout */
 EXPORT_SYMBOL(get_write_access);

@@ -1210,7 +1210,7 @@ addrconf_prefix_route(struct in6_addr *pfx, int plen, struct net_device *dev,
 	if (dev->type == ARPHRD_SIT && (dev->flags&IFF_POINTOPOINT))
 		rtmsg.rtmsg_flags |= RTF_NONEXTHOP;
 
-	ip6_route_add(&rtmsg, NULL);
+	ip6_route_add(&rtmsg, NULL, NULL);
 }
 
 /* Create "default" multicast route to the interface */
@@ -1227,7 +1227,7 @@ static void addrconf_add_mroute(struct net_device *dev)
 	rtmsg.rtmsg_ifindex = dev->ifindex;
 	rtmsg.rtmsg_flags = RTF_UP|RTF_ADDRCONF;
 	rtmsg.rtmsg_type = RTMSG_NEWROUTE;
-	ip6_route_add(&rtmsg, NULL);
+	ip6_route_add(&rtmsg, NULL, NULL);
 }
 
 static void sit_route_add(struct net_device *dev)
@@ -1244,7 +1244,7 @@ static void sit_route_add(struct net_device *dev)
 	rtmsg.rtmsg_flags	= RTF_UP|RTF_NONEXTHOP;
 	rtmsg.rtmsg_ifindex	= dev->ifindex;
 
-	ip6_route_add(&rtmsg, NULL);
+	ip6_route_add(&rtmsg, NULL, NULL);
 }
 
 static void addrconf_add_lroute(struct net_device *dev)
@@ -1336,7 +1336,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 	if (rt && ((rt->rt6i_flags & (RTF_GATEWAY | RTF_DEFAULT)) == 0)) {
 		if (rt->rt6i_flags&RTF_EXPIRES) {
 			if (pinfo->onlink == 0 || valid_lft == 0) {
-				ip6_del_rt(rt, NULL);
+				ip6_del_rt(rt, NULL, NULL);
 				rt = NULL;
 			} else {
 				rt->rt6i_expires = rt_expires;
@@ -1960,7 +1960,7 @@ static void addrconf_rs_timer(unsigned long data)
 
 		rtmsg.rtmsg_ifindex = ifp->idev->dev->ifindex;
 
-		ip6_route_add(&rtmsg, NULL);
+		ip6_route_add(&rtmsg, NULL, NULL);
 	}
 
 out:

@@ -1117,7 +1117,7 @@ int irlap_proc_read(char *buf, char **start, off_t offset, int len)
 		len += sprintf(buf+len, "  win size: %d, ",
 			       self->window_size);
 		len += sprintf(buf+len, "win: %d, ", self->window);
-#if CONFIG_IRDA_DYNAMIC_WINDOW
+#ifdef CONFIG_IRDA_DYNAMIC_WINDOW
 		len += sprintf(buf+len, "line capacity: %d, ",
 			       self->line_capacity);
 		len += sprintf(buf+len, "bytes left: %d\n", self->bytes_left);

@@ -1963,8 +1963,7 @@ write_brdctl(struct ahc_softc *ahc, uint8_t value)
 }
 
 static uint8_t
-read_brdctl(ahc)
-	struct 	ahc_softc *ahc;
+read_brdctl(struct ahc_softc *ahc)
 {
 	uint8_t brdctl;
 	uint8_t value;

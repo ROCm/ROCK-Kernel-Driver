@@ -444,6 +444,8 @@ static void SMP_TIMER_NAME(tcp_twkill)(unsigned long dummy)
 
 	while((tw = tcp_tw_death_row[tcp_tw_death_row_slot]) != NULL) {
 		tcp_tw_death_row[tcp_tw_death_row_slot] = tw->next_death;
+		if (tw->next_death)
+			tw->next_death->pprev_death = tw->pprev_death;
 		tw->pprev_death = NULL;
 		spin_unlock(&tw_death_lock);
 
@@ -758,6 +760,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 			tcp_reset_keepalive_timer(newsk, keepalive_time_when(newtp));
 		newsk->socket = NULL;
 		newsk->sleep = NULL;
+		newsk->owner = NULL;
 
 		newtp->tstamp_ok = req->tstamp_ok;
 		if((newtp->sack_ok = req->sack_ok) != 0) {

@@ -325,7 +325,7 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 	{
 		/* Real hardware Econet.  We're not worthy etc. */
 #ifdef CONFIG_ECONET_NATIVE
-		atomic_inc(&dev->refcnt);
+		dev_hold(dev);
 		
 		skb = sock_alloc_send_skb(sk, len+dev->hard_header_len+15, 
 					  msg->msg_flags & MSG_DONTWAIT, &err);

@@ -319,7 +319,7 @@ setup_niccy(struct IsdnCard *card)
 			return 0;
 		return 1;
 	} else {
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 		if ((niccy_dev = pci_find_device(PCI_VENDOR_ID_SATSAGEM,
 			PCI_DEVICE_ID_SATSAGEM_NICCY, niccy_dev))) {
 			if (niccy_pci_probe(card->cs, niccy_dev) < 0)

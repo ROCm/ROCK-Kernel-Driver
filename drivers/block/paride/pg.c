@@ -652,11 +652,8 @@ static int __init pg_init(void)
 	devfs_mk_dir ("pg");
 	for (unit=0; unit<PG_UNITS; unit++)
 		if (PG.present) {
-			char name[16];
-			sprintf(name, "pg/%u", unit);
-			devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			       major, unit, S_IFCHR | S_IRUSR | S_IWUSR,
-			       &pg_fops, NULL);
+			devfs_mk_cdev(MKDEV(major, unit),
+				S_IFCHR | S_IRUSR | S_IWUSR, "pg/%u", unit);
 		}
 	return 0;
 }

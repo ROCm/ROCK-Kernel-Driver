@@ -43,8 +43,8 @@
 
 #include "sigframe.h"
 
-static void
-do_show_stack (struct unw_frame_info *info, void *arg)
+void
+ia64_do_show_stack (struct unw_frame_info *info, void *arg)
 {
 	unsigned long ip, sp, bsp;
 	char buf[80];			/* don't make it so big that it overflows the stack! */
@@ -57,7 +57,7 @@ do_show_stack (struct unw_frame_info *info, void *arg)
 
 		unw_get_sp(info, &sp);
 		unw_get_bsp(info, &bsp);
-		snprintf(buf, sizeof(buf), " [<%016lx>] %%s sp=0x%016lx bsp=0x%016lx\n",
+		snprintf(buf, sizeof(buf), " [<%016lx>] %%s\n\t\t\t\tsp=%016lx bsp=%016lx\n",
 			 ip, sp, bsp);
 		print_symbol(buf, ip);
 	} while (unw_unwind(info) >= 0);
@@ -73,12 +73,12 @@ void
 show_stack (struct task_struct *task)
 {
 	if (!task)
-		unw_init_running(do_show_stack, 0);
+		unw_init_running(ia64_do_show_stack, 0);
 	else {
 		struct unw_frame_info info;
 
 		unw_init_from_blocked_task(&info, task);
-		do_show_stack(&info, 0);
+		ia64_do_show_stack(&info, 0);
 	}
 }
 
@@ -123,8 +123,8 @@ show_regs (struct pt_regs *regs)
 
 	if (user_mode(regs)) {
 		/* print the stacked registers */
-		unsigned long val, sof, *bsp, ndirty;
-		int i, is_nat = 0;
+		unsigned long val, *bsp, ndirty;
+		int i, sof, is_nat = 0;
 
 		sof = regs->cr_ifs & 0x7f;	/* size of frame */
 		ndirty = (regs->loadrs >> 19);
@@ -135,7 +135,7 @@ show_regs (struct pt_regs *regs)
 			       ((i == sof - 1) || (i % 3) == 2) ? "\n" : " ");
 		}
 	} else
-		show_stack(0);
+		show_stack(NULL);
 }
 
 void
@@ -379,6 +379,7 @@ copy_thread (int nr, unsigned long clone_flags,
 #	define THREAD_FLAGS_TO_SET	0
 	p->thread.flags = ((current->thread.flags & ~THREAD_FLAGS_TO_CLEAR)
 			   | THREAD_FLAGS_TO_SET);
+	p->thread.last_fph_cpu = -1;
 #ifdef CONFIG_IA32_SUPPORT
 	/*
 	 * If we're cloning an IA32 task then save the IA32 extra

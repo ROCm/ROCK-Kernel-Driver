@@ -4380,10 +4380,7 @@ static Scsi_Host_Template driver_template = {
 	.sg_tablesize		= SG_ALL,
 	.cmd_per_lun		= 1,
 	.use_clustering		= ENABLE_CLUSTERING,
-/* Sparc32's iommu code cannot handle highmem pages yet. */
-#ifdef CONFIG_SPARC64
 	.highmem_io		= 1,
-#endif
 };
 
 #include "scsi_module.c"

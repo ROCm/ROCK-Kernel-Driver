@@ -243,7 +243,6 @@ extern void bttv_i2c_call(unsigned int card, unsigned int cmd, void *arg);
 
 
 /* i2c */
-#define I2C_CLIENTS_MAX 16
 extern void bttv_bit_setscl(void *data, int state);
 extern void bttv_bit_setsda(void *data, int state);
 extern void bttv_call_i2c_clients(struct bttv *btv, unsigned int cmd, void *arg);

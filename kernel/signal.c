@@ -761,7 +761,7 @@ specific_send_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 
 	if (!irqs_disabled())
 		BUG();
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	if (!spin_is_locked(&t->sighand->siglock))
 		BUG();
 #endif
@@ -846,7 +846,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	unsigned int mask;
 	int ret = 0;
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	if (!spin_is_locked(&p->sighand->siglock))
 		BUG();
 #endif
@@ -1146,6 +1146,7 @@ int
 send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	int ret;
+	unsigned long flags;
 
 	/*
 	 * We need the tasklist lock even for the specific
@@ -1154,9 +1155,9 @@ send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	 * going away or changing from under us.
 	 */
 	read_lock(&tasklist_lock);  
-	spin_lock_irq(&p->sighand->siglock);
+	spin_lock_irqsave(&p->sighand->siglock, flags);
 	ret = specific_send_sig_info(sig, info, p);
-	spin_unlock_irq(&p->sighand->siglock);
+	spin_unlock_irqrestore(&p->sighand->siglock, flags);
 	read_unlock(&tasklist_lock);
 	return ret;
 }

@@ -15,33 +15,9 @@ struct notifier_block;
 #include <linux/netfilter_ipv4/compat_firewall.h>
 #include <linux/netfilter_ipv4/ip_conntrack.h>
 #include <linux/netfilter_ipv4/ip_conntrack_core.h>
+#include "ip_fw_compat.h"
 
 static struct firewall_ops *fwops;
-
-/* From ip_fw_compat_redir.c */
-extern unsigned int
-do_redirect(struct sk_buff *skb,
-	    const struct net_device *dev,
-	    u_int16_t redirpt);
-
-extern void
-check_for_redirect(struct sk_buff *skb);
-
-extern void
-check_for_unredirect(struct sk_buff *skb);
-
-/* From ip_fw_compat_masq.c */
-extern unsigned int
-do_masquerade(struct sk_buff **pskb, const struct net_device *dev);
-
-extern unsigned int
-check_for_masq_error(struct sk_buff *pskb);
-
-extern unsigned int
-check_for_demasq(struct sk_buff **pskb);
-
-extern int __init masq_init(void);
-extern void masq_cleanup(void);
 
 /* They call these; we do what they want. */
 int register_firewall(int pf, struct firewall_ops *fw)
@@ -167,7 +143,7 @@ fw_in(unsigned int hooknum,
 			/* Handle ICMP errors from client here */
 			if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP
 			    && (*pskb)->nfct)
-				check_for_masq_error(*pskb);
+				check_for_masq_error(pskb);
 		}
 		return NF_ACCEPT;
 

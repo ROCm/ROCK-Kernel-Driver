@@ -170,7 +170,7 @@ out:
 static int do_vm86_irq_handling(int subfunction, int irqnumber);
 static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk);
 
-asmlinkage int sys_vm86old(struct vm86_struct * v86)
+asmlinkage int sys_vm86old(struct vm86_struct __user * v86)
 {
 	struct kernel_vm86_struct info; /* declare this _on top_,
 					 * this avoids wasting of stack space.
@@ -199,7 +199,7 @@ out:
 }
 
 
-asmlinkage int sys_vm86(unsigned long subfunction, struct vm86plus_struct * v86)
+asmlinkage int sys_vm86(unsigned long subfunction, struct vm86plus_struct __user * v86)
 {
 	struct kernel_vm86_struct info; /* declare this _on top_,
 					 * this avoids wasting of stack space.
@@ -239,7 +239,7 @@ asmlinkage int sys_vm86(unsigned long subfunction, struct vm86plus_struct * v86)
 		goto out;
 	info.regs32 = (struct pt_regs *) &subfunction;
 	info.vm86plus.is_vm86pus = 1;
-	tsk->thread.vm86_info = (struct vm86_struct *)v86;
+	tsk->thread.vm86_info = (struct vm86_struct __user *)v86;
 	do_sys_vm86(&info, tsk);
 	ret = 0;	/* we never return here */
 out:

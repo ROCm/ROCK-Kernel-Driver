@@ -50,7 +50,7 @@ with pcmcia-cs.
 
 o  Gnu C                  2.95.3                  # gcc --version
 o  Gnu make               3.78                    # make --version
-o  binutils               2.9.5.0.25              # ld -v
+o  binutils               2.12                    # ld -v
 o  util-linux             2.10o                   # fdformat --version
 o  module-init-tools      0.9.9                   # depmod -V
 o  e2fsprogs              1.29                    # tune2fs

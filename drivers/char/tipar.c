@@ -421,8 +421,6 @@ tipar_setup(char *str)
 static int
 tipar_register(int nr, struct parport *port)
 {
-	char name[32];
-
 	/* Register our module into parport */
 	table[nr].dev = parport_register_device(port, "tipar",
 						NULL, NULL, NULL, 0,
@@ -432,13 +430,9 @@ tipar_register(int nr, struct parport *port)
 		return 1;
 
 	/* Use devfs, tree: /dev/ticables/par/[0..2] */
-	sprintf(name, "ticables/par/%d", nr);
-	printk
-	    ("tipar: registering to devfs : major = %d, minor = %d, node = %s\n",
-	     TISER_MAJOR, (TIPAR_MINOR + nr), name);
-	devfs_register(NULL, name, DEVFS_FL_DEFAULT, TIPAR_MAJOR,
-		       TIPAR_MINOR + nr, S_IFCHR | S_IRUGO | S_IWUGO,
-		       &tipar_fops, NULL);
+	devfs_mk_cdev(MKDEV(TIPAR_MAJOR, TIPAR_MINOR + nr),
+			S_IFCHR | S_IRUGO | S_IWUGO,
+			"ticables/par/%d", nr);
 
 	/* Display informations */
 	printk(KERN_INFO "tipar%d: using %s (%s).\n", nr, port->name,

@@ -420,10 +420,8 @@ static int DIVA_INIT_FUNCTION divas_maint_register_chrdev(void)
 		       DRIVERLNAME);
 		return (0);
 	}
-	devfs_register(NULL, "DivasMAINT", DEVFS_FL_DEFAULT, major, 0,
-		       S_IFCHR | S_IRUSR | S_IWUSR, &divas_maint_fops,
-		       NULL);
 
+	devfs_mk_cdev(MKDEV(major, 0), S_IFCHR|S_IRUSR|S_IWUSR, DivasMAINT);
 	return (1);
 }
 

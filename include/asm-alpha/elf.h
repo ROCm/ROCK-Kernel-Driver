@@ -2,6 +2,49 @@
 #define __ASM_ALPHA_ELF_H
 
 /*
+ * Alpha ELF relocation types
+ */
+#define R_ALPHA_NONE            0       /* No reloc */
+#define R_ALPHA_REFLONG         1       /* Direct 32 bit */
+#define R_ALPHA_REFQUAD         2       /* Direct 64 bit */
+#define R_ALPHA_GPREL32         3       /* GP relative 32 bit */
+#define R_ALPHA_LITERAL         4       /* GP relative 16 bit w/optimization */
+#define R_ALPHA_LITUSE          5       /* Optimization hint for LITERAL */
+#define R_ALPHA_GPDISP          6       /* Add displacement to GP */
+#define R_ALPHA_BRADDR          7       /* PC+4 relative 23 bit shifted */
+#define R_ALPHA_HINT            8       /* PC+4 relative 16 bit shifted */
+#define R_ALPHA_SREL16          9       /* PC relative 16 bit */
+#define R_ALPHA_SREL32          10      /* PC relative 32 bit */
+#define R_ALPHA_SREL64          11      /* PC relative 64 bit */
+#define R_ALPHA_GPRELHIGH       17      /* GP relative 32 bit, high 16 bits */
+#define R_ALPHA_GPRELLOW        18      /* GP relative 32 bit, low 16 bits */
+#define R_ALPHA_GPREL16         19      /* GP relative 16 bit */
+#define R_ALPHA_COPY            24      /* Copy symbol at runtime */
+#define R_ALPHA_GLOB_DAT        25      /* Create GOT entry */
+#define R_ALPHA_JMP_SLOT        26      /* Create PLT entry */
+#define R_ALPHA_RELATIVE        27      /* Adjust by program base */
+#define R_ALPHA_BRSGP		28
+#define R_ALPHA_TLSGD           29
+#define R_ALPHA_TLS_LDM         30
+#define R_ALPHA_DTPMOD64        31
+#define R_ALPHA_GOTDTPREL       32
+#define R_ALPHA_DTPREL64        33
+#define R_ALPHA_DTPRELHI        34
+#define R_ALPHA_DTPRELLO        35
+#define R_ALPHA_DTPREL16        36
+#define R_ALPHA_GOTTPREL        37
+#define R_ALPHA_TPREL64         38
+#define R_ALPHA_TPRELHI         39
+#define R_ALPHA_TPRELLO         40
+#define R_ALPHA_TPREL16         41
+
+#define SHF_ALPHA_GPREL		0x10000000
+
+/* Legal values for e_flags field of Elf64_Ehdr.  */
+
+#define EF_ALPHA_32BIT		1	/* All addresses are below 2GB */
+
+/*
  * ELF register definitions..
  */
 

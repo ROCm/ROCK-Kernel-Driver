@@ -465,7 +465,7 @@ static int __init
 init_cifs(void)
 {
 	int rc = 0;
-#if CONFIG_PROC_FS
+#ifdef CONFIG_PROC_FS
 	cifs_proc_init();
 #endif
 	INIT_LIST_HEAD(&GlobalServerList);	/* BB not implemented yet */
@@ -503,7 +503,7 @@ init_cifs(void)
 		}
 		cifs_destroy_inodecache();
 	}
-#if CONFIG_PROC_FS
+#ifdef CONFIG_PROC_FS
 	cifs_proc_clean();
 #endif
 	return rc;
@@ -513,7 +513,7 @@ static void __exit
 exit_cifs(void)
 {
 	cFYI(0, ("In unregister ie exit_cifs"));
-#if CONFIG_PROC_FS
+#ifdef CONFIG_PROC_FS
 	cifs_proc_clean();
 #endif
 	unregister_filesystem(&cifs_fs_type);

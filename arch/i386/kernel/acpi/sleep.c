@@ -75,7 +75,7 @@ void __init acpi_reserve_bootmem(void)
 		printk(KERN_ERR "ACPI: Wakeup code way too big, S3 disabled.\n");
 		return;
 	}
-#if CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE
 	printk(KERN_ERR "ACPI: S3 and PAE do not like each other for now, S3 disabled.\n");
 	return;
 #endif

@@ -817,29 +817,15 @@ static int tuner_attach(struct i2c_adapter *adap, int addr, int kind)
 
 static int tuner_probe(struct i2c_adapter *adap)
 {
-	int rc;
-
 	if (0 != addr) {
 		normal_i2c_range[0] = addr;
 		normal_i2c_range[1] = addr;
 	}
 	this_adap = 0;
-	switch (adap->id) {
-	case I2C_ALGO_BIT | I2C_HW_B_BT848:
-	case I2C_ALGO_BIT | I2C_HW_B_RIVA:
-	case I2C_ALGO_SAA7134:
-	case I2C_ALGO_SAA7146:
-		printk("tuner: probing %s i2c adapter [id=0x%x]\n",
-		       adap->dev.name,adap->id);
-		rc = i2c_probe(adap, &addr_data, tuner_attach);
-		break;
-	default:
-		printk("tuner: ignoring %s i2c adapter [id=0x%x]\n",
-		       adap->dev.name,adap->id);
-		rc = 0;
-		/* nothing */
-	}
-	return rc;
+
+	if (adap->class & I2C_ADAP_CLASS_TV_ANALOG)
+		return i2c_probe(adap, &addr_data, tuner_attach);
+	return 0;
 }
 
 static int tuner_detach(struct i2c_client *client)

@@ -529,7 +529,7 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 	unsigned char reason = inb(0x61);
 
 	if (!(reason & 0xc0)) {
-#if CONFIG_X86_LOCAL_APIC
+#ifdef CONFIG_X86_LOCAL_APIC
 		/*
 		 * Ok, so this is none of the documented NMI sources,
 		 * so it must be the NMI watchdog.

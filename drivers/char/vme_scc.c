@@ -129,6 +129,7 @@ static int scc_init_drivers(void)
 
 	memset(&scc_driver, 0, sizeof(scc_driver));
 	scc_driver.magic = TTY_DRIVER_MAGIC;
+	scc_driver.owner = THIS_MODULE;
 	scc_driver.driver_name = "scc";
 #ifdef CONFIG_DEVFS_FS
 	scc_driver.name = "tts/";
@@ -795,7 +796,6 @@ static void scc_hungup(void *ptr)
 {
 	scc_disable_tx_interrupts(ptr);
 	scc_disable_rx_interrupts(ptr);
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -803,7 +803,6 @@ static void scc_close(void *ptr)
 {
 	scc_disable_tx_interrupts(ptr);
 	scc_disable_rx_interrupts(ptr);
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -938,13 +937,9 @@ static int scc_open (struct tty_struct * tty, struct file * filp)
 		return retval;
 	}
 	port->gs.flags |= GS_ACTIVE;
-	if (port->gs.count == 1) {
-		MOD_INC_USE_COUNT;
-	}
 	retval = gs_block_til_ready(port, filp);
 
 	if (retval) {
-		MOD_DEC_USE_COUNT;
 		port->gs.count--;
 		return retval;
 	}

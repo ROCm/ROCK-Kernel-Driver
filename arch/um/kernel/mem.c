@@ -124,7 +124,7 @@ void set_kmem_end(unsigned long new)
 	kmem_top = new;
 }
 
-#if CONFIG_HIGHMEM
+#ifdef CONFIG_HIGHMEM
 /* Changed during early boot */
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
@@ -329,7 +329,7 @@ void paging_init(void)
 	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
 	fixrange_init(vaddr, FIXADDR_TOP, swapper_pg_dir);
 
-#if CONFIG_HIGHMEM
+#ifdef CONFIG_HIGHMEM
 	init_highmem();
 	setup_highmem(highmem);
 #endif

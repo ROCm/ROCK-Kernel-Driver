@@ -76,6 +76,7 @@
 #include	<linux/config.h>
 #include	<linux/slab.h>
 #include	<linux/mm.h>
+#include	<linux/swap.h>
 #include	<linux/cache.h>
 #include	<linux/interrupt.h>
 #include	<linux/init.h>
@@ -567,11 +568,40 @@ static inline struct array_cache *ac_data(kmem_cache_t *cachep)
 	return cachep->array[smp_processor_id()];
 }
 
-/* Initialisation - setup the `cache' cache. */
+/* Initialisation.
+ * Called after the gfp() functions have been enabled, and before smp_init().
+ */
 void __init kmem_cache_init(void)
 {
 	size_t left_over;
+	struct cache_sizes *sizes;
+	struct cache_names *names;
 
+	/*
+	 * Fragmentation resistance on low memory - only use bigger
+	 * page orders on machines with more than 32MB of memory.
+	 */
+	if (num_physpages > (32 << 20) >> PAGE_SHIFT)
+		slab_break_gfp_order = BREAK_GFP_ORDER_HI;
+
+	
+	/* Bootstrap is tricky, because several objects are allocated
+	 * from caches that do not exist yet:
+	 * 1) initialize the cache_cache cache: it contains the kmem_cache_t
+	 *    structures of all caches, except cache_cache itself: cache_cache
+	 *    is statically allocated.
+	 *    Initially an __init data area is used for the head array, it's
+	 *    replaced with a kmalloc allocated array at the end of the bootstrap.
+	 * 2) Create the first kmalloc cache.
+	 *    The kmem_cache_t for the new cache is allocated normally. An __init
+	 *    data area is used for the head array.
+	 * 3) Create the remaining kmalloc caches, with minimally sized head arrays.
+	 * 4) Replace the __init data head arrays for cache_cache and the first
+	 *    kmalloc cache with kmalloc allocated arrays.
+	 * 5) Resize the head arrays of the kmalloc caches to their final sizes.
+	 */
+
+	/* 1) create the cache_cache */
 	init_MUTEX(&cache_chain_sem);
 	INIT_LIST_HEAD(&cache_chain);
 	list_add(&cache_cache.next, &cache_chain);
@@ -585,27 +615,10 @@ void __init kmem_cache_init(void)
 	cache_cache.colour = left_over/cache_cache.colour_off;
 	cache_cache.colour_next = 0;
 
-	/* Register a cpu startup notifier callback
-	 * that initializes ac_data for all new cpus
-	 */
-	register_cpu_notifier(&cpucache_notifier);
-}
 
-
-/* Initialisation - setup remaining internal and general caches.
- * Called after the gfp() functions have been enabled, and before smp_init().
- */
-void __init kmem_cache_sizes_init(void)
-{
-	struct cache_sizes *sizes = malloc_sizes;
-	struct cache_names *names = cache_names;
-
-	/*
-	 * Fragmentation resistance on low memory - only use bigger
-	 * page orders on machines with more than 32MB of memory.
-	 */
-	if (num_physpages > (32 << 20) >> PAGE_SHIFT)
-		slab_break_gfp_order = BREAK_GFP_ORDER_HI;
+	/* 2+3) create the kmalloc caches */
+	sizes = malloc_sizes;
+	names = cache_names;
 
 	while (sizes->cs_size) {
 		/* For performance, all the general caches are L1 aligned.
@@ -634,10 +647,7 @@ void __init kmem_cache_sizes_init(void)
 		sizes++;
 		names++;
 	}
-	/*
-	 * The generic caches are running - time to kick out the
-	 * bootstrap cpucaches.
-	 */
+	/* 4) Replace the bootstrap head arrays */
 	{
 		void * ptr;
 		
@@ -656,29 +666,42 @@ void __init kmem_cache_sizes_init(void)
 		malloc_sizes[0].cs_cachep->array[smp_processor_id()] = ptr;
 		local_irq_enable();
 	}
+
+	/* 5) resize the head arrays to their final sizes */
+	{
+		kmem_cache_t *cachep;
+		down(&cache_chain_sem);
+		list_for_each_entry(cachep, &cache_chain, next)
+			enable_cpucache(cachep);
+		up(&cache_chain_sem);
+	}
+
+	/* Done! */
+	g_cpucache_up = FULL;
+
+	/* Register a cpu startup notifier callback
+	 * that initializes ac_data for all new cpus
+	 */
+	register_cpu_notifier(&cpucache_notifier);
+	
+
+	/* The reap timers are started later, with a module init call:
+	 * That part of the kernel is not yet operational.
+	 */
 }
 
 int __init cpucache_init(void)
 {
-	kmem_cache_t *cachep;
 	int cpu;
 
-	down(&cache_chain_sem);
-	g_cpucache_up = FULL;
-
-	list_for_each_entry(cachep, &cache_chain, next)
-		enable_cpucache(cachep);
-	
 	/* 
 	 * Register the timers that return unneeded
 	 * pages to gfp.
 	 */
-
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		if (cpu_online(cpu))
 			start_cpu_timer(cpu);
 	}
-	up(&cache_chain_sem);
 
 	return 0;
 }
@@ -712,6 +735,7 @@ static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
 {
 	unsigned long i = (1<<cachep->gfporder);
 	struct page *page = virt_to_page(addr);
+	const unsigned long nr_freed = i;
 
 	/* free_pages() does not clear the type bit - we do that.
 	 * The pages have been unlinked from their cache-slab,
@@ -720,9 +744,11 @@ static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
 	 */
 	while (i--) {
 		ClearPageSlab(page);
-		dec_page_state(nr_slab);
 		page++;
 	}
+	sub_page_state(nr_slab, nr_freed);
+	if (current->reclaim_state)
+		current->reclaim_state->reclaimed_slab += nr_freed;
 	free_pages((unsigned long)addr, cachep->gfporder);
 }
 
@@ -914,12 +940,19 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	}
 
 #if FORCED_DEBUG
-	if ((size < (PAGE_SIZE>>3)) && !(flags & SLAB_MUST_HWCACHE_ALIGN))
-		/*
-		 * do not red zone large object, causes severe
-		 * fragmentation.
-		 */
+	/*
+	 * Enable redzoning and last user accounting, except
+	 * - for caches with forced alignment: redzoning would violate the
+	 *   alignment
+	 * - for caches with large objects, if the increased size would
+	 *   increase the object size above the next power of two: caches
+	 *   with object sizes just above a power of two have a significant
+	 *   amount of internal fragmentation
+	 */
+	if ((size < (PAGE_SIZE>>3) || fls(size-1) == fls(size-1+3*BYTES_PER_WORD))
+			&& !(flags & SLAB_MUST_HWCACHE_ALIGN)) {
 		flags |= SLAB_RED_ZONE|SLAB_STORE_USER;
+	}
 	flags |= SLAB_POISON;
 #endif
 #endif
@@ -1756,10 +1789,12 @@ __free_block(kmem_cache_t *cachep, void **objpp, int nr_objects)
 		slabp = GET_PAGE_SLAB(virt_to_page(objp));
 		list_del(&slabp->list);
 		objnr = (objp - slabp->s_mem) / cachep->objsize;
+		check_slabp(cachep, slabp);
 		slab_bufctl(slabp)[objnr] = slabp->free;
 		slabp->free = objnr;
 		STATS_DEC_ACTIVE(cachep);
 		slabp->inuse--;
+		check_slabp(cachep, slabp);
 
 		/* fixup slab chains */
 		if (slabp->inuse == 0) {
@@ -2413,7 +2448,7 @@ struct seq_operations slabinfo_op = {
  * @count: data len
  * @data: unused
  */
-ssize_t slabinfo_write(struct file *file, const char *buffer,
+ssize_t slabinfo_write(struct file *file, const char __user *buffer,
 				size_t count, loff_t *ppos)
 {
 	char kbuf[MAX_SLABINFO_WRITE+1], *tmp;

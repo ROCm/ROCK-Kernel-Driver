@@ -155,7 +155,7 @@ void ptrace_disable(struct task_struct *child)
  */
 static int
 ptrace_get_thread_area(struct task_struct *child,
-		       int idx, struct user_desc *user_desc)
+		       int idx, struct user_desc __user *user_desc)
 {
 	struct user_desc info;
 	struct desc_struct *desc;
@@ -206,7 +206,7 @@ ptrace_get_thread_area(struct task_struct *child,
  */
 static int
 ptrace_set_thread_area(struct task_struct *child,
-		       int idx, struct user_desc *user_desc)
+		       int idx, struct user_desc __user *user_desc)
 {
 	struct user_desc info;
 	struct desc_struct *desc;
@@ -458,7 +458,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = 0;
 		if (!child->used_math)
 			init_fpu(child);
-		get_fpregs((struct user_i387_struct *)data, child);
+		get_fpregs((struct user_i387_struct __user *)data, child);
 		break;
 	}
 
@@ -469,7 +469,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			break;
 		}
 		child->used_math = 1;
-		set_fpregs(child, (struct user_i387_struct *)data);
+		set_fpregs(child, (struct user_i387_struct __user *)data);
 		ret = 0;
 		break;
 	}
@@ -482,7 +482,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		}
 		if (!child->used_math)
 			init_fpu(child);
-		ret = get_fpxregs((struct user_fxsr_struct *)data, child);
+		ret = get_fpxregs((struct user_fxsr_struct __user *)data, child);
 		break;
 	}
 
@@ -493,18 +493,18 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			break;
 		}
 		child->used_math = 1;
-		ret = set_fpxregs(child, (struct user_fxsr_struct *)data);
+		ret = set_fpxregs(child, (struct user_fxsr_struct __user *)data);
 		break;
 	}
 
 	case PTRACE_GET_THREAD_AREA:
 		ret = ptrace_get_thread_area(child,
-					     addr, (struct user_desc *) data);
+					     addr, (struct user_desc __user *) data);
 		break;
 
 	case PTRACE_SET_THREAD_AREA:
 		ret = ptrace_set_thread_area(child,
-					     addr, (struct user_desc *) data);
+					     addr, (struct user_desc __user *) data);
 		break;
 
 	default:

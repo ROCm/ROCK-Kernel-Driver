@@ -137,7 +137,7 @@ GLOBAL_ENTRY(do_csum)
 	mov saved_pr=pr		// preserve predicates (rotation)
 (p6)	br.ret.spnt.many rp	// return if zero or negative length
 
-	mov hmask=-1		// intialize head mask
+	mov hmask=-1		// initialize head mask
 	tbit.nz p15,p0=buf,0	// is buf an odd address?
 	and first1=-8,buf	// 8-byte align down address of first1 element
 

@@ -168,8 +168,8 @@ static int sound_insert_unit(struct sound_unit **list, struct file_operations *f
 	else
 		sprintf(s->name, "sound/%s%d", name, r / SOUND_STEP);
 
-	devfs_register(NULL, s->name, 0, SOUND_MAJOR, s->unit_minor,
-			S_IFCHR | mode, fops, NULL);
+	devfs_mk_cdev(MKDEV(SOUND_MAJOR, s->unit_minor),
+			S_IFCHR | mode, s->name);
 	return r;
 
  fail:

@@ -280,7 +280,7 @@ out:
  * must be owner or have write permission.
  * Else, update from *times, must be owner or super user.
  */
-long do_utimes(char __user * filename, struct timeval __user * times)
+long do_utimes(char __user * filename, struct timeval * times)
 {
 	int error;
 	struct nameidata nd;

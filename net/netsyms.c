@@ -228,13 +228,11 @@ EXPORT_SYMBOL(destroy_EII_client);
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 EXPORT_SYMBOL(dev_change_flags);
 #endif
-EXPORT_SYMBOL(vlan_ioctl_set);
 
 EXPORT_SYMBOL(scm_detach_fds);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);
-EXPORT_SYMBOL(brioctl_set);
 #endif
 
 #ifdef CONFIG_NET_DIVERT
@@ -285,11 +283,6 @@ EXPORT_SYMBOL(unregister_inetaddr_notifier);
 /* needed for ip_gre -cw */
 EXPORT_SYMBOL(ip_statistics);
 
-#ifdef CONFIG_DLCI_MODULE
-extern int (*dlci_ioctl_hook)(unsigned int, void *);
-EXPORT_SYMBOL(dlci_ioctl_hook);
-#endif
-
 EXPORT_SYMBOL(xfrm_user_policy);
 EXPORT_SYMBOL(km_waitq);
 EXPORT_SYMBOL(km_new_mapping);
@@ -311,6 +304,7 @@ EXPORT_SYMBOL(xfrm_state_register_afinfo);
 EXPORT_SYMBOL(xfrm_state_unregister_afinfo);
 EXPORT_SYMBOL(xfrm_state_get_afinfo);
 EXPORT_SYMBOL(xfrm_state_put_afinfo);
+EXPORT_SYMBOL(xfrm_state_delete_tunnel);
 EXPORT_SYMBOL(xfrm_replay_check);
 EXPORT_SYMBOL(xfrm_replay_advance);
 EXPORT_SYMBOL(xfrm_check_selectors);
@@ -473,6 +467,8 @@ EXPORT_SYMBOL(sysctl_tcp_tw_recycle);
 EXPORT_SYMBOL(sysctl_max_syn_backlog);
 #endif
 
+EXPORT_SYMBOL(ip_generic_getfrag);
+
 #endif
 
 EXPORT_SYMBOL(tcp_read_sock);
@@ -577,6 +573,7 @@ EXPORT_SYMBOL(netif_rx);
 EXPORT_SYMBOL(netif_receive_skb);
 EXPORT_SYMBOL(dev_add_pack);
 EXPORT_SYMBOL(dev_remove_pack);
+EXPORT_SYMBOL(__dev_remove_pack);
 EXPORT_SYMBOL(dev_get);
 EXPORT_SYMBOL(dev_alloc);
 EXPORT_SYMBOL(dev_alloc_name);
@@ -673,10 +670,13 @@ EXPORT_SYMBOL(register_gifconf);
 EXPORT_SYMBOL(softnet_data);
 
 #ifdef CONFIG_NET_RADIO
-/* Don't include the whole header mess for a single function */
-union iwreq_data;
-extern void wireless_send_event(struct net_device *dev, unsigned int cmd, union iwreq_data *wrqu, char *extra);
+#include <net/iw_handler.h>		/* Wireless Extensions driver API */
 EXPORT_SYMBOL(wireless_send_event);
+EXPORT_SYMBOL(iw_handler_set_spy);
+EXPORT_SYMBOL(iw_handler_get_spy);
+EXPORT_SYMBOL(iw_handler_set_thrspy);
+EXPORT_SYMBOL(iw_handler_get_thrspy);
+EXPORT_SYMBOL(wireless_spy_update);
 #endif	/* CONFIG_NET_RADIO */
 
 EXPORT_SYMBOL(linkwatch_fire_event);

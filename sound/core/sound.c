@@ -323,13 +323,8 @@ int __exit snd_minor_info_done(void)
 
 static int __init alsa_sound_init(void)
 {
-#ifdef CONFIG_DEVFS_FS
 	short controlnum;
-	char controlname[24];
-#endif
-#ifdef CONFIG_SND_OSSEMUL
-	int err;
-#endif
+	int err = 0;
 	int card;
 
 	snd_ecards_limit = cards_limit;
@@ -356,21 +351,19 @@ static int __init alsa_sound_init(void)
 #ifdef CONFIG_SND_OSSEMUL
 	snd_info_minor_register();
 #endif
-#ifdef CONFIG_DEVFS_FS
+
 	for (controlnum = 0; controlnum < cards_limit; controlnum++) {
-		sprintf(controlname, "snd/controlC%d", controlnum);
-		devfs_register(NULL, controlname, DEVFS_FL_DEFAULT,
-				major, controlnum<<5, device_mode | S_IFCHR,
-				&snd_fops, NULL);
+		devfs_mk_cdev(MKDEV(major, controlnum<<5),
+			device_mode | S_IFCHR, "snd/controlC%d", controlnum);
 	}
-#endif
+
 #ifndef MODULE
 	printk(KERN_INFO "Advanced Linux Sound Architecture Driver Version " CONFIG_SND_VERSION CONFIG_SND_DATE ".\n");
 #endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) && defined(CONFIG_APM)
 	pm_init();
 #endif
-	return 0;
+	return err;
 }
 
 static void __exit alsa_sound_exit(void)

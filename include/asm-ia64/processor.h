@@ -39,6 +39,14 @@
 #define TASK_SIZE		(current->thread.task_size)
 
 /*
+ * MM_VM_SIZE(mm) gives the maximum address (plus 1) which may contain a mapping for
+ * address-space MM.  Note that with 32-bit tasks, this is still DEFAULT_TASK_SIZE,
+ * because the kernel may have installed helper-mappings above TASK_SIZE.  For example,
+ * for x86 emulation, the LDT and GDT are mapped above TASK_SIZE.
+ */
+#define MM_VM_SIZE(mm)		DEFAULT_TASK_SIZE
+
+/*
  * This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
@@ -291,7 +299,7 @@ struct thread_struct {
 
 #define start_thread(regs,new_ip,new_sp) do {							\
 	set_fs(USER_DS);									\
-	regs->cr_ipsr = ((regs->cr_ipsr | (IA64_PSR_BITS_TO_SET | IA64_PSR_CPL | IA64_PSR_SP))	\
+	regs->cr_ipsr = ((regs->cr_ipsr | (IA64_PSR_BITS_TO_SET | IA64_PSR_CPL))		\
 			 & ~(IA64_PSR_BITS_TO_CLEAR | IA64_PSR_RI | IA64_PSR_IS));		\
 	regs->cr_iip = new_ip;									\
 	regs->ar_rsc = 0xf;		/* eager mode, privilege level 3 */			\

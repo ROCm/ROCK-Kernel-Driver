@@ -3,11 +3,15 @@
 
 #define APIC_DFR_VALUE	(APIC_DFR_FLAT)
 
+static inline unsigned long target_cpus(void)
+{ 
 #ifdef CONFIG_SMP
- #define TARGET_CPUS (cpu_online_map)
+	return cpu_online_map;
 #else
- #define TARGET_CPUS 0x01
+	return 1; 
 #endif
+} 
+#define TARGET_CPUS (target_cpus())
 
 #define NO_BALANCE_IRQ (0)
 #define esr_disable (0)
@@ -16,13 +20,15 @@
 #define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
 
 #define APIC_BROADCAST_ID      0x0F
-#define check_apicid_used(bitmap, apicid) (bitmap & (1 << apicid))
-#define check_apicid_present(bit) (phys_cpu_present_map & (1 << bit))
 
-static inline int apic_id_registered(void)
+static inline unsigned long check_apicid_used(unsigned long bitmap, int apicid) 
+{ 
+	return (bitmap & (1UL << apicid)); 
+} 
+
+static inline unsigned long check_apicid_present(int bit) 
 {
-	return (test_bit(GET_APIC_ID(apic_read(APIC_ID)), 
-						&phys_cpu_present_map));
+	return (phys_cpu_present_map & (1UL << bit));
 }
 
 /*
@@ -42,7 +48,7 @@ static inline void init_apic_ldr(void)
 	apic_write_around(APIC_LDR, val);
 }
 
-static inline ulong ioapic_phys_id_map(ulong phys_map)
+static inline unsigned long ioapic_phys_id_map(unsigned long phys_map)
 {
 	return phys_map;
 }
@@ -97,6 +103,21 @@ static inline void setup_portio_remap(void)
 static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 {
 	return test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map);
+}
+
+#define		APIC_ID_MASK		(0xF<<24)
+
+static inline unsigned get_apic_id(unsigned long x) 
+{ 
+	return (((x)>>24)&0xF);
+} 
+
+#define		GET_APIC_ID(x)	get_apic_id(x)
+
+static inline int apic_id_registered(void)
+{
+	return (test_bit(GET_APIC_ID(apic_read(APIC_ID)), 
+						&phys_cpu_present_map));
 }
 
 #endif /* __ASM_MACH_APIC_H */

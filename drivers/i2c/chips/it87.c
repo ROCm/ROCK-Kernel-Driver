@@ -3,7 +3,7 @@
              monitoring.
 
     Supports: IT8705F  Super I/O chip w/LPC interface
-              IT8712F  Super I/O chup w/LPC interface & SMbus
+              IT8712F  Super I/O chip w/LPC interface & SMbus
               Sis950   A clone of the IT8705F
 
     Copyright (c) 2001 Chris Gauthron <chrisg@0-in.com> 
@@ -80,17 +80,17 @@ static int temp_type = 0x2a;
 
 /* Monitors: 9 voltage (0 to 7, battery), 3 temp (1 to 3), 3 fan (1 to 3) */
 
-#define IT87_REG_FAN(nr)       (0x0c + (nr))
-#define IT87_REG_FAN_MIN(nr)   (0x0f + (nr))
+#define IT87_REG_FAN(nr)       (0x0d + (nr))
+#define IT87_REG_FAN_MIN(nr)   (0x10 + (nr))
 #define IT87_REG_FAN_CTRL      0x13
 
 #define IT87_REG_VIN(nr)       (0x20 + (nr))
-#define IT87_REG_TEMP(nr)      (0x28 + (nr))
+#define IT87_REG_TEMP(nr)      (0x29 + (nr))
 
 #define IT87_REG_VIN_MAX(nr)   (0x30 + (nr) * 2)
 #define IT87_REG_VIN_MIN(nr)   (0x31 + (nr) * 2)
-#define IT87_REG_TEMP_HIGH(nr) (0x3e + (nr) * 2)
-#define IT87_REG_TEMP_LOW(nr)  (0x3f + (nr) * 2)
+#define IT87_REG_TEMP_HIGH(nr) (0x40 + ((nr) * 2))
+#define IT87_REG_TEMP_LOW(nr)  (0x41 + ((nr) * 2))
 
 #define IT87_REG_I2C_ADDR      0x48
 
@@ -99,46 +99,8 @@ static int temp_type = 0x2a;
 
 #define IT87_REG_CHIPID        0x58
 
-static inline u8 IN_TO_REG(long val, int inNum)
-{
-	/* to avoid floating point, we multiply everything by 100.
-	 val is guaranteed to be positive, so we can achieve the effect of 
-	 rounding by (...*10+5)/10.  Note that the *10 is hidden in the 
-	 /250 (which should really be /2500).
-	 At the end, we need to /100 because we *100 everything and we need
-	 to /10 because of the rounding thing, so we /1000.   */
-	if (inNum <= 1)
-		return (u8)
-		    SENSORS_LIMIT(((val * 210240 - 13300) / 250 + 5) / 1000, 
-				  0, 255);
-	else if (inNum == 2)
-		return (u8)
-		    SENSORS_LIMIT(((val * 157370 - 13300) / 250 + 5) / 1000, 
-				  0, 255);
-	else if (inNum == 3)
-		return (u8)
-		    SENSORS_LIMIT(((val * 101080 - 13300) / 250 + 5) / 1000, 
-				  0, 255);
-	else
-		return (u8) SENSORS_LIMIT(((val * 41714 - 13300) / 250 + 5)
-					  / 1000, 0, 255);
-}
-
-static inline long IN_FROM_REG(u8 val, int inNum)
-{
-	/* to avoid floating point, we multiply everything by 100.
-	 val is guaranteed to be positive, so we can achieve the effect of
-	 rounding by adding 0.5.  Or, to avoid fp math, we do (...*10+5)/10.
-	 We need to scale with *100 anyway, so no need to /100 at the end. */
-	if (inNum <= 1)
-		return (long) (((250000 * val + 13300) / 210240 * 10 + 5) /10);
-	else if (inNum == 2)
-		return (long) (((250000 * val + 13300) / 157370 * 10 + 5) /10);
-	else if (inNum == 3)
-		return (long) (((250000 * val + 13300) / 101080 * 10 + 5) /10);
-	else
-		return (long) (((250000 * val + 13300) / 41714 * 10 + 5) /10);
-}
+#define IN_TO_REG(val)  (SENSORS_LIMIT((((val) * 10 + 8)/16),0,255))
+#define IN_FROM_REG(val) (((val) *  16) / 10)
 
 static inline u8 FAN_TO_REG(long rpm, int div)
 {
@@ -159,7 +121,14 @@ static inline u8 FAN_TO_REG(long rpm, int div)
 				205-(val)*5)
 #define ALARMS_FROM_REG(val) (val)
 
-#define DIV_TO_REG(val) ((val)==8?3:(val)==4?2:(val)==1?0:1)
+static int log2(int val)
+{
+	int answer = 0;
+	while ((val >>= 1))
+		answer++;
+	return answer;
+}
+#define DIV_TO_REG(val) log2(val)
 #define DIV_FROM_REG(val) (1 << (val))
 
 /* Initial limits. Use the config file to set better limits. */
@@ -238,6 +207,7 @@ struct it87_data {
 	u8 temp[3];		/* Register value */
 	u8 temp_high[3];	/* Register value */
 	u8 temp_low[3];		/* Register value */
+	u8 sensor;		/* Register value */
 	u8 fan_div[3];		/* Register encoding, shifted right */
 	u8 vid;			/* Register encoding, combined */
 	u32 alarms;		/* Register encoding, combined */
@@ -252,7 +222,7 @@ static int it87_read_value(struct i2c_client *client, u8 register);
 static int it87_write_value(struct i2c_client *client, u8 register,
 			u8 value);
 static void it87_update_client(struct i2c_client *client);
-static void it87_init_client(struct i2c_client *client);
+static void it87_init_client(struct i2c_client *client, struct it87_data *data);
 
 
 static struct i2c_driver it87_driver = {
@@ -271,7 +241,7 @@ static ssize_t show_in(struct device *dev, char *buf, int nr)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	it87_update_client(client);
-	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in[nr], nr)*10 );
+	return sprintf(buf, "%d\n", IN_FROM_REG(data->in[nr])*10 );
 }
 
 static ssize_t show_in_min(struct device *dev, char *buf, int nr)
@@ -279,7 +249,7 @@ static ssize_t show_in_min(struct device *dev, char *buf, int nr)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	it87_update_client(client);
-	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in_min[nr], nr)*10 );
+	return sprintf(buf, "%d\n", IN_FROM_REG(data->in_min[nr])*10 );
 }
 
 static ssize_t show_in_max(struct device *dev, char *buf, int nr)
@@ -287,7 +257,7 @@ static ssize_t show_in_max(struct device *dev, char *buf, int nr)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	it87_update_client(client);
-	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in_max[nr], nr)*10 );
+	return sprintf(buf, "%d\n", IN_FROM_REG(data->in_max[nr])*10 );
 }
 
 static ssize_t set_in_min(struct device *dev, const char *buf, 
@@ -296,7 +266,7 @@ static ssize_t set_in_min(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	unsigned long val = simple_strtoul(buf, NULL, 10)/10;
-	data->in_min[nr] = IN_TO_REG(val,nr);
+	data->in_min[nr] = IN_TO_REG(val);
 	it87_write_value(client, IT87_REG_VIN_MIN(nr), 
 			data->in_min[nr]);
 	return count;
@@ -307,7 +277,7 @@ static ssize_t set_in_max(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	unsigned long val = simple_strtoul(buf, NULL, 10)/10;
-	data->in_max[nr] = IN_TO_REG(val,nr);
+	data->in_max[nr] = IN_TO_REG(val);
 	it87_write_value(client, IT87_REG_VIN_MAX(nr), 
 			data->in_max[nr]);
 	return count;
@@ -319,6 +289,9 @@ static ssize_t							\
 {								\
 	return show_in(dev, buf, 0x##offset);			\
 }								\
+static DEVICE_ATTR(in_input##offset, S_IRUGO, show_in##offset, NULL)
+
+#define limit_in_offset(offset)					\
 static ssize_t							\
 	show_in##offset##_min (struct device *dev, char *buf)	\
 {								\
@@ -339,17 +312,28 @@ static ssize_t set_in##offset##_max (struct device *dev,	\
 {								\
 	return set_in_max(dev, buf, count, 0x##offset);		\
 }								\
-static DEVICE_ATTR(in_input##offset, S_IRUGO, show_in##offset, NULL) 	\
 static DEVICE_ATTR(in_min##offset, S_IRUGO | S_IWUSR, 		\
 		show_in##offset##_min, set_in##offset##_min)	\
 static DEVICE_ATTR(in_max##offset, S_IRUGO | S_IWUSR, 		\
 		show_in##offset##_max, set_in##offset##_max)
 
 show_in_offset(0);
+limit_in_offset(0);
 show_in_offset(1);
+limit_in_offset(1);
 show_in_offset(2);
+limit_in_offset(2);
 show_in_offset(3);
+limit_in_offset(3);
 show_in_offset(4);
+limit_in_offset(4);
+show_in_offset(5);
+limit_in_offset(5);
+show_in_offset(6);
+limit_in_offset(6);
+show_in_offset(7);
+limit_in_offset(7);
+show_in_offset(8);
 
 /* 3 temperatures */
 static ssize_t show_temp(struct device *dev, char *buf, int nr)
@@ -357,7 +341,7 @@ static ssize_t show_temp(struct device *dev, char *buf, int nr)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	it87_update_client(client);
-	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp[nr])*10 );
+	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp[nr])*100 );
 }
 /* more like overshoot temperature */
 static ssize_t show_temp_max(struct device *dev, char *buf, int nr)
@@ -365,7 +349,7 @@ static ssize_t show_temp_max(struct device *dev, char *buf, int nr)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	it87_update_client(client);
-	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_high[nr])*10);
+	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_high[nr])*100);
 }
 /* more like hysteresis temperature */
 static ssize_t show_temp_min(struct device *dev, char *buf, int nr)
@@ -373,14 +357,14 @@ static ssize_t show_temp_min(struct device *dev, char *buf, int nr)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	it87_update_client(client);
-	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_low[nr])*10);
+	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_low[nr])*100);
 }
 static ssize_t set_temp_max(struct device *dev, const char *buf, 
 		size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
-	int val = simple_strtol(buf, NULL, 10)/10;
+	int val = simple_strtol(buf, NULL, 10)/100;
 	data->temp_high[nr] = TEMP_TO_REG(val);
 	it87_write_value(client, IT87_REG_TEMP_HIGH(nr), data->temp_high[nr]);
 	return count;
@@ -390,7 +374,7 @@ static ssize_t set_temp_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
-	int val = simple_strtol(buf, NULL, 10)/10;
+	int val = simple_strtol(buf, NULL, 10)/100;
 	data->temp_low[nr] = TEMP_TO_REG(val);
 	it87_write_value(client, IT87_REG_TEMP_LOW(nr), data->temp_low[nr]);
 	return count;
@@ -430,7 +414,52 @@ show_temp_offset(1);
 show_temp_offset(2);
 show_temp_offset(3);
 
-/* 2 Fans */
+/* more like overshoot temperature */
+static ssize_t show_sensor(struct device *dev, char *buf, int nr)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct it87_data *data = i2c_get_clientdata(client);
+	it87_update_client(client);
+	if (data->sensor & (1 << nr))
+	    return sprintf(buf, "1\n");
+	if (data->sensor & (8 << nr))
+	    return sprintf(buf, "2\n");
+	return sprintf(buf, "0\n");
+}
+static ssize_t set_sensor(struct device *dev, const char *buf, 
+		size_t count, int nr)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct it87_data *data = i2c_get_clientdata(client);
+	int val = simple_strtol(buf, NULL, 10);
+
+	data->sensor &= ~(1 << nr);
+	data->sensor &= ~(8 << nr);
+	if (val == 1)
+	    data->sensor |= 1 << nr;
+	else if (val == 2)
+	    data->sensor |= 8 << nr;
+	it87_write_value(client, IT87_REG_TEMP_ENABLE, data->sensor);
+	return count;
+}
+#define show_sensor_offset(offset)					\
+static ssize_t show_sensor_##offset (struct device *dev, char *buf)	\
+{									\
+	return show_sensor(dev, buf, 0x##offset - 1);			\
+}									\
+static ssize_t set_sensor_##offset (struct device *dev, 		\
+		const char *buf, size_t count) 				\
+{									\
+	return set_sensor(dev, buf, count, 0x##offset - 1);		\
+}									\
+static DEVICE_ATTR(sensor##offset, S_IRUGO | S_IWUSR,	 		\
+		show_sensor_##offset, set_sensor_##offset)
+
+show_sensor_offset(1);
+show_sensor_offset(2);
+show_sensor_offset(3);
+
+/* 3 Fans */
 static ssize_t show_fan(struct device *dev, char *buf, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -461,7 +490,7 @@ static ssize_t set_fan_min(struct device *dev, const char *buf,
 	struct it87_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
 	data->fan_min[nr] = FAN_TO_REG(val, DIV_FROM_REG(data->fan_div[nr]));
-	it87_write_value(client, IT87_REG_FAN_MIN(nr+1), data->fan_min[nr]);
+	it87_write_value(client, IT87_REG_FAN_MIN(nr), data->fan_min[nr]);
 	return count;
 }
 static ssize_t set_fan_div(struct device *dev, const char *buf, 
@@ -470,10 +499,34 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
-	int old = it87_read_value(client, IT87_REG_FAN_DIV);
-	data->fan_div[nr] = DIV_TO_REG(val);
-	old = (old & 0x0f) | (data->fan_div[1] << 6) | (data->fan_div[0] << 4);
-	it87_write_value(client, IT87_REG_FAN_DIV, old);
+	int i, min[3];
+	u8 old = it87_read_value(client, IT87_REG_FAN_DIV);
+
+	for (i = 0; i < 3; i++)
+		min[i] = FAN_FROM_REG(data->fan_min[i], DIV_FROM_REG(data->fan_div[i]));
+
+	switch (nr) {
+	case 0:
+	case 1:
+		data->fan_div[nr] = DIV_TO_REG(val);
+		break;
+	case 2:
+		if (val < 8)
+			data->fan_div[nr] = 1;
+		else
+			data->fan_div[nr] = 3;
+	}
+	val = old & 0x100;
+	val |= (data->fan_div[0] & 0x07);
+	val |= (data->fan_div[1] & 0x07) << 3;
+	if (data->fan_div[2] == 3)
+		val |= 0x1 << 6;
+	it87_write_value(client, IT87_REG_FAN_DIV, val);
+
+	for (i = 0; i < 3; i++) {
+		data->fan_min[i]=FAN_TO_REG(min[i], DIV_FROM_REG(data->fan_div[i]));
+		it87_write_value(client, IT87_REG_FAN_MIN(i), data->fan_min[i]);
+	}
 	return count;
 }
 
@@ -508,6 +561,7 @@ static DEVICE_ATTR(fan_div##offset, S_IRUGO | S_IWUSR, 			\
 
 show_fan_offset(1);
 show_fan_offset(2);
+show_fan_offset(3);
 
 /* Alarm */
 static ssize_t show_alarm(struct device *dev, char *buf)
@@ -525,6 +579,8 @@ static DEVICE_ATTR(alarm, S_IRUGO | S_IWUSR, show_alarm, NULL);
      * when a new adapter is inserted (and it87_driver is still present) */
 static int it87_attach_adapter(struct i2c_adapter *adapter)
 {
+	if (!(adapter->class & I2C_ADAP_CLASS_SMBUS))
+		return 0;
 	return i2c_detect(adapter, &addr_data, it87_detect);
 }
 
@@ -574,6 +630,7 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 			}
 		}
 	}
+	memset (new_client, 0x00, sizeof(struct i2c_client) + sizeof(struct it87_data));
 
 	/* OK. For now, we presume we have a valid client. We now create the
 	   client structure, even though we cannot fill it completely yet.
@@ -585,6 +642,8 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 		err = -ENOMEM;
 		goto ERROR1;
 	}
+	memset(new_client, 0x00, sizeof(struct i2c_client) +
+				 sizeof(struct it87_data));
 
 	data = (struct it87_data *) (new_client + 1);
 	if (is_isa)
@@ -652,16 +711,26 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_in_input2);
 	device_create_file(&new_client->dev, &dev_attr_in_input3);
 	device_create_file(&new_client->dev, &dev_attr_in_input4);
+	device_create_file(&new_client->dev, &dev_attr_in_input5);
+	device_create_file(&new_client->dev, &dev_attr_in_input6);
+	device_create_file(&new_client->dev, &dev_attr_in_input7);
+	device_create_file(&new_client->dev, &dev_attr_in_input8);
 	device_create_file(&new_client->dev, &dev_attr_in_min0);
 	device_create_file(&new_client->dev, &dev_attr_in_min1);
 	device_create_file(&new_client->dev, &dev_attr_in_min2);
 	device_create_file(&new_client->dev, &dev_attr_in_min3);
 	device_create_file(&new_client->dev, &dev_attr_in_min4);
+	device_create_file(&new_client->dev, &dev_attr_in_min5);
+	device_create_file(&new_client->dev, &dev_attr_in_min6);
+	device_create_file(&new_client->dev, &dev_attr_in_min7);
 	device_create_file(&new_client->dev, &dev_attr_in_max0);
 	device_create_file(&new_client->dev, &dev_attr_in_max1);
 	device_create_file(&new_client->dev, &dev_attr_in_max2);
 	device_create_file(&new_client->dev, &dev_attr_in_max3);
 	device_create_file(&new_client->dev, &dev_attr_in_max4);
+	device_create_file(&new_client->dev, &dev_attr_in_max5);
+	device_create_file(&new_client->dev, &dev_attr_in_max6);
+	device_create_file(&new_client->dev, &dev_attr_in_max7);
 	device_create_file(&new_client->dev, &dev_attr_temp_input1);
 	device_create_file(&new_client->dev, &dev_attr_temp_input2);
 	device_create_file(&new_client->dev, &dev_attr_temp_input3);
@@ -671,16 +740,22 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_temp_min1);
 	device_create_file(&new_client->dev, &dev_attr_temp_min2);
 	device_create_file(&new_client->dev, &dev_attr_temp_min3);
+	device_create_file(&new_client->dev, &dev_attr_sensor1);
+	device_create_file(&new_client->dev, &dev_attr_sensor2);
+	device_create_file(&new_client->dev, &dev_attr_sensor3);
 	device_create_file(&new_client->dev, &dev_attr_fan_input1);
 	device_create_file(&new_client->dev, &dev_attr_fan_input2);
+	device_create_file(&new_client->dev, &dev_attr_fan_input3);
 	device_create_file(&new_client->dev, &dev_attr_fan_min1);
 	device_create_file(&new_client->dev, &dev_attr_fan_min2);
+	device_create_file(&new_client->dev, &dev_attr_fan_min3);
 	device_create_file(&new_client->dev, &dev_attr_fan_div1);
 	device_create_file(&new_client->dev, &dev_attr_fan_div2);
+	device_create_file(&new_client->dev, &dev_attr_fan_div3);
 	device_create_file(&new_client->dev, &dev_attr_alarm);
 
 	/* Initialize the IT87 chip */
-	it87_init_client(new_client);
+	it87_init_client(new_client, data);
 	return 0;
 
 ERROR1:
@@ -753,70 +828,70 @@ static int it87_write_value(struct i2c_client *client, u8 reg, u8 value)
 }
 
 /* Called when we have found a new IT87. It should set limits, etc. */
-static void it87_init_client(struct i2c_client *client)
+static void it87_init_client(struct i2c_client *client, struct it87_data *data)
 {
 	/* Reset all except Watchdog values and last conversion values
 	   This sets fan-divs to 2, among others */
 	it87_write_value(client, IT87_REG_CONFIG, 0x80);
 	it87_write_value(client, IT87_REG_VIN_MIN(0),
-			 IN_TO_REG(IT87_INIT_IN_MIN_0, 0));
+			 IN_TO_REG(IT87_INIT_IN_MIN_0));
 	it87_write_value(client, IT87_REG_VIN_MAX(0),
-			 IN_TO_REG(IT87_INIT_IN_MAX_0, 0));
+			 IN_TO_REG(IT87_INIT_IN_MAX_0));
 	it87_write_value(client, IT87_REG_VIN_MIN(1),
-			 IN_TO_REG(IT87_INIT_IN_MIN_1, 1));
+			 IN_TO_REG(IT87_INIT_IN_MIN_1));
 	it87_write_value(client, IT87_REG_VIN_MAX(1),
-			 IN_TO_REG(IT87_INIT_IN_MAX_1, 1));
+			 IN_TO_REG(IT87_INIT_IN_MAX_1));
 	it87_write_value(client, IT87_REG_VIN_MIN(2),
-			 IN_TO_REG(IT87_INIT_IN_MIN_2, 2));
+			 IN_TO_REG(IT87_INIT_IN_MIN_2));
 	it87_write_value(client, IT87_REG_VIN_MAX(2),
-			 IN_TO_REG(IT87_INIT_IN_MAX_2, 2));
+			 IN_TO_REG(IT87_INIT_IN_MAX_2));
 	it87_write_value(client, IT87_REG_VIN_MIN(3),
-			 IN_TO_REG(IT87_INIT_IN_MIN_3, 3));
+			 IN_TO_REG(IT87_INIT_IN_MIN_3));
 	it87_write_value(client, IT87_REG_VIN_MAX(3),
-			 IN_TO_REG(IT87_INIT_IN_MAX_3, 3));
+			 IN_TO_REG(IT87_INIT_IN_MAX_3));
 	it87_write_value(client, IT87_REG_VIN_MIN(4),
-			 IN_TO_REG(IT87_INIT_IN_MIN_4, 4));
+			 IN_TO_REG(IT87_INIT_IN_MIN_4));
 	it87_write_value(client, IT87_REG_VIN_MAX(4),
-			 IN_TO_REG(IT87_INIT_IN_MAX_4, 4));
+			 IN_TO_REG(IT87_INIT_IN_MAX_4));
 	it87_write_value(client, IT87_REG_VIN_MIN(5),
-			 IN_TO_REG(IT87_INIT_IN_MIN_5, 5));
+			 IN_TO_REG(IT87_INIT_IN_MIN_5));
 	it87_write_value(client, IT87_REG_VIN_MAX(5),
-			 IN_TO_REG(IT87_INIT_IN_MAX_5, 5));
+			 IN_TO_REG(IT87_INIT_IN_MAX_5));
 	it87_write_value(client, IT87_REG_VIN_MIN(6),
-			 IN_TO_REG(IT87_INIT_IN_MIN_6, 6));
+			 IN_TO_REG(IT87_INIT_IN_MIN_6));
 	it87_write_value(client, IT87_REG_VIN_MAX(6),
-			 IN_TO_REG(IT87_INIT_IN_MAX_6, 6));
+			 IN_TO_REG(IT87_INIT_IN_MAX_6));
 	it87_write_value(client, IT87_REG_VIN_MIN(7),
-			 IN_TO_REG(IT87_INIT_IN_MIN_7, 7));
+			 IN_TO_REG(IT87_INIT_IN_MIN_7));
 	it87_write_value(client, IT87_REG_VIN_MAX(7),
-			 IN_TO_REG(IT87_INIT_IN_MAX_7, 7));
+			 IN_TO_REG(IT87_INIT_IN_MAX_7));
 	/* Note: Battery voltage does not have limit registers */
-	it87_write_value(client, IT87_REG_FAN_MIN(1),
+	it87_write_value(client, IT87_REG_FAN_MIN(0),
 			 FAN_TO_REG(IT87_INIT_FAN_MIN_1, 2));
-	it87_write_value(client, IT87_REG_FAN_MIN(2),
+	it87_write_value(client, IT87_REG_FAN_MIN(1),
 			 FAN_TO_REG(IT87_INIT_FAN_MIN_2, 2));
-	it87_write_value(client, IT87_REG_FAN_MIN(3),
+	it87_write_value(client, IT87_REG_FAN_MIN(2),
 			 FAN_TO_REG(IT87_INIT_FAN_MIN_3, 2));
-	it87_write_value(client, IT87_REG_TEMP_HIGH(1),
+	it87_write_value(client, IT87_REG_TEMP_HIGH(0),
 			 TEMP_TO_REG(IT87_INIT_TEMP_HIGH_1));
-	it87_write_value(client, IT87_REG_TEMP_LOW(1),
+	it87_write_value(client, IT87_REG_TEMP_LOW(0),
 			 TEMP_TO_REG(IT87_INIT_TEMP_LOW_1));
-	it87_write_value(client, IT87_REG_TEMP_HIGH(2),
+	it87_write_value(client, IT87_REG_TEMP_HIGH(1),
 			 TEMP_TO_REG(IT87_INIT_TEMP_HIGH_2));
-	it87_write_value(client, IT87_REG_TEMP_LOW(2),
+	it87_write_value(client, IT87_REG_TEMP_LOW(1),
 			 TEMP_TO_REG(IT87_INIT_TEMP_LOW_2));
-	it87_write_value(client, IT87_REG_TEMP_HIGH(3),
+	it87_write_value(client, IT87_REG_TEMP_HIGH(2),
 			 TEMP_TO_REG(IT87_INIT_TEMP_HIGH_3));
-	it87_write_value(client, IT87_REG_TEMP_LOW(3),
+	it87_write_value(client, IT87_REG_TEMP_LOW(2),
 			 TEMP_TO_REG(IT87_INIT_TEMP_LOW_3));
 
 	/* Enable voltage monitors */
 	it87_write_value(client, IT87_REG_VIN_ENABLE, 0xff);
 
 	/* Enable Temp1-Temp3 */
-	it87_write_value(client, IT87_REG_TEMP_ENABLE,
-			(it87_read_value(client, IT87_REG_TEMP_ENABLE) & 0xc0)
-			| (temp_type & 0x3f));
+	data->sensor = (it87_read_value(client, IT87_REG_TEMP_ENABLE) & 0xc0);
+	data->sensor |= temp_type & 0x3f;
+	it87_write_value(client, IT87_REG_TEMP_ENABLE, data->sensor);
 
 	/* Enable fans */
 	it87_write_value(client, IT87_REG_FAN_CTRL,
@@ -860,18 +935,18 @@ static void it87_update_client(struct i2c_client *client)
 		data->in_min[8] = 0;
 		data->in_max[8] = 255;
 
-		for (i = 1; i <= 3; i++) {
-			data->fan[i - 1] =
+		for (i = 0; i < 3; i++) {
+			data->fan[i] =
 			    it87_read_value(client, IT87_REG_FAN(i));
-			data->fan_min[i - 1] =
+			data->fan_min[i] =
 			    it87_read_value(client, IT87_REG_FAN_MIN(i));
 		}
-		for (i = 1; i <= 3; i++) {
-			data->temp[i - 1] =
+		for (i = 0; i < 3; i++) {
+			data->temp[i] =
 			    it87_read_value(client, IT87_REG_TEMP(i));
-			data->temp_high[i - 1] =
+			data->temp_high[i] =
 			    it87_read_value(client, IT87_REG_TEMP_HIGH(i));
-			data->temp_low[i - 1] =
+			data->temp_low[i] =
 			    it87_read_value(client, IT87_REG_TEMP_LOW(i));
 		}
 
@@ -887,7 +962,7 @@ static void it87_update_client(struct i2c_client *client)
 		i = it87_read_value(client, IT87_REG_FAN_DIV);
 		data->fan_div[0] = i & 0x07;
 		data->fan_div[1] = (i >> 3) & 0x07;
-		data->fan_div[2] = 1;
+		data->fan_div[2] = (i & 0x40) ? 3 : 1;
 
 		data->alarms =
 			it87_read_value(client, IT87_REG_ALARM1) |

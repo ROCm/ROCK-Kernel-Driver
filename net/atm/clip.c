@@ -127,6 +127,8 @@ static void idle_timer_check(unsigned long dummy)
 			struct atmarp_entry *entry = NEIGH2ENTRY(n);
 			struct clip_vcc *clip_vcc;
 
+			write_lock(&n->lock);
+
 			for (clip_vcc = entry->vccs; clip_vcc;
 			    clip_vcc = clip_vcc->next)
 				if (clip_vcc->idle_timeout &&
@@ -141,6 +143,7 @@ static void idle_timer_check(unsigned long dummy)
 			if (entry->vccs ||
 			    time_before(jiffies, entry->expires)) {
 				np = &n->next;
+				write_unlock(&n->lock);
 				continue;
 			}
 			if (atomic_read(&n->refcnt) > 1) {
@@ -152,11 +155,13 @@ static void idle_timer_check(unsigned long dummy)
 				     NULL) 
 					dev_kfree_skb(skb);
 				np = &n->next;
+				write_unlock(&n->lock);
 				continue;
 			}
 			*np = n->next;
 			DPRINTK("expired neigh %p\n",n);
 			n->dead = 1;
+			write_unlock(&n->lock);
 			neigh_release(n);
 		}
 	}
@@ -218,6 +223,7 @@ void clip_push(struct atm_vcc *vcc,struct sk_buff *skb)
 	clip_vcc->last_use = jiffies;
 	PRIV(skb->dev)->stats.rx_packets++;
 	PRIV(skb->dev)->stats.rx_bytes += skb->len;
+	memset(ATM_SKB(skb), 0, sizeof(struct atm_skb_data));
 	netif_rx(skb);
 }
 
@@ -427,7 +433,6 @@ static int clip_start_xmit(struct sk_buff *skb,struct net_device *dev)
 		((u16 *) here)[3] = skb->protocol;
 	}
 	atomic_add(skb->truesize,&vcc->sk->wmem_alloc);
-	ATM_SKB(skb)->iovcnt = 0;
 	ATM_SKB(skb)->atm_options = vcc->atm_options;
 	entry->vccs->last_use = jiffies;
 	DPRINTK("atm_skb(%p)->vcc(%p)->dev(%p)\n",skb,vcc,vcc->dev);

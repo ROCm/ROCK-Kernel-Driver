@@ -17,10 +17,21 @@ static __inline__ struct ipx_interface *ipx_get_interface_idx(loff_t pos)
 {
 	struct ipx_interface *i;
 
-	for (i = ipx_interfaces; pos && i; i = i->if_next)
-		--pos;
-
+	list_for_each_entry(i, &ipx_interfaces, node)
+		if (!pos--)
+			goto out;
+	i = NULL;
+out:
 	return i;
+}
+
+static struct ipx_interface *ipx_interfaces_next(struct ipx_interface *i)
+{
+	struct ipx_interface *rc = NULL;
+
+	if (i->node.next != &ipx_interfaces)
+		rc = list_entry(i->node.next, struct ipx_interface, node);
+	return rc;
 }
 
 static void *ipx_seq_interface_start(struct seq_file *seq, loff_t *pos)
@@ -36,15 +47,10 @@ static void *ipx_seq_interface_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct ipx_interface *i;
 
 	++*pos;
-	if (v == (void *)1) {
-		i = NULL;
-		if (ipx_interfaces)
-			i = ipx_interfaces;
-		goto out;
-	}
-	i = v;
-	i = i->if_next;
-out:
+	if (v == (void *)1)
+		i = ipx_interfaces_head();
+	else
+		i = ipx_interfaces_next(v);
 	return i;
 }
 
@@ -83,13 +89,33 @@ out:
 	return 0;
 }
 
+static struct ipx_route *ipx_routes_head(void)
+{
+	struct ipx_route *rc = NULL;
+
+	if (!list_empty(&ipx_routes))
+		rc = list_entry(ipx_routes.next, struct ipx_route, node);
+	return rc;
+}
+
+static struct ipx_route *ipx_routes_next(struct ipx_route *r)
+{
+	struct ipx_route *rc = NULL;
+
+	if (r->node.next != &ipx_routes)
+		rc = list_entry(r->node.next, struct ipx_route, node);
+	return rc;
+}
+
 static __inline__ struct ipx_route *ipx_get_route_idx(loff_t pos)
 {
 	struct ipx_route *r;
 
-	for (r = ipx_routes; pos && r; r = r->ir_next)
-		--pos;
-
+	list_for_each_entry(r, &ipx_routes, node)
+		if (!pos--)
+			goto out;
+	r = NULL;
+out:
 	return r;
 }
 
@@ -105,15 +131,10 @@ static void *ipx_seq_route_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct ipx_route *r;
 
 	++*pos;
-	if (v == (void *)1) {
-		r = NULL;
-		if (ipx_routes)
-			r = ipx_routes;
-		goto out;
-	}
-	r = v;
-	r = r->ir_next;
-out:
+	if (v == (void *)1)
+		r = ipx_routes_head();
+	else
+		r = ipx_routes_next(v);
 	return r;
 }
 
@@ -149,7 +170,9 @@ static __inline__ struct sock *ipx_get_socket_idx(loff_t pos)
 	struct sock *s = NULL;
 	struct ipx_interface *i;
 
-	for (i = ipx_interfaces; pos && i; i = i->if_next) {
+	list_for_each_entry(i, &ipx_interfaces, node) {
+		if (!pos)
+			break;
 		spin_lock_bh(&i->if_sklist_lock);
 		for (s = i->if_sklist; pos && s; s = s->next)
 			--pos;
@@ -181,11 +204,12 @@ static void *ipx_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 	++*pos;
 	if (v == (void *)1) {
 		sk = NULL;
-		if (!ipx_interfaces)
+		i = ipx_interfaces_head();
+		if (!i)
 			goto out;
-		sk = ipx_interfaces->if_sklist;
+		sk = i->if_sklist;
 		if (sk)
-			spin_lock_bh(&ipx_interfaces->if_sklist_lock);
+			spin_lock_bh(&i->if_sklist_lock);
 		goto out;
 	}
 	sk = v;
@@ -198,9 +222,9 @@ static void *ipx_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 	spin_unlock_bh(&i->if_sklist_lock);
 	sk = NULL;
 	for (;;) {
-		if (!i->if_next)
+		i = ipx_interfaces_next(i);
+		if (!i)
 			break;
-		i = i->if_next;
 		spin_lock_bh(&i->if_sklist_lock);
 		if (i->if_sklist) {
 			sk = i->if_sklist;
@@ -295,6 +319,7 @@ static int ipx_seq_socket_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations ipx_seq_interface_fops = {
+	.owner		= THIS_MODULE,
 	.open           = ipx_seq_interface_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
@@ -302,6 +327,7 @@ static struct file_operations ipx_seq_interface_fops = {
 };
 
 static struct file_operations ipx_seq_route_fops = {
+	.owner		= THIS_MODULE,
 	.open           = ipx_seq_route_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
@@ -309,6 +335,7 @@ static struct file_operations ipx_seq_route_fops = {
 };
 
 static struct file_operations ipx_seq_socket_fops = {
+	.owner		= THIS_MODULE,
 	.open           = ipx_seq_socket_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,

@@ -441,24 +441,17 @@ MODULE_PARM(ipmi_major, "i");
 
 static void ipmi_new_smi(int if_num)
 {
-	char name[10];
-
-	if (if_num > MAX_DEVICES)
-		return;
-
-	snprintf(name, sizeof(name), "ipmidev/%d", if_num);
-
-	devfs_register(NULL, name, 0, ipmi_major, if_num,
-			S_IFCHR | S_IRUSR | S_IWUSR,
-			&ipmi_fops, NULL);
+	if (if_num <= MAX_DEVICES) {
+		devfs_mk_cdev(MKDEV(ipmi_major, if_num),
+				S_IFCHR | S_IRUSR | S_IWUSR,
+				"ipmidev/%d", if_num);
+	}
 }
 
 static void ipmi_smi_gone(int if_num)
 {
-	if (if_num > MAX_DEVICES)
-		return;
-
-	devfs_remove("ipmidev/%d", if_num);
+	if (if_num <= MAX_DEVICES)
+		devfs_remove("ipmidev/%d", if_num);
 }
 
 static struct ipmi_smi_watcher smi_watcher =

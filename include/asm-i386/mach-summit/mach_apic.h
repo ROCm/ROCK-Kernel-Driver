@@ -1,7 +1,13 @@
 #ifndef __ASM_MACH_APIC_H
 #define __ASM_MACH_APIC_H
 
+#include <linux/config.h>
+
+#ifdef CONFIG_X86_GENERICARCH
+#define x86_summit 1	/* must be an constant expressiona for generic arch */
+#else
 extern int x86_summit;
+#endif
 
 #define esr_disable (x86_summit ? 1 : 0)
 #define NO_BALANCE_IRQ (0)
@@ -9,20 +15,34 @@ extern int x86_summit;
 #define XAPIC_DEST_CPUS_MASK    0x0Fu
 #define XAPIC_DEST_CLUSTER_MASK 0xF0u
 
-#define xapic_phys_to_log_apicid(phys_apic) ( (1ul << ((phys_apic) & 0x3)) |\
-		((phys_apic) & XAPIC_DEST_CLUSTER_MASK) )
+static inline unsigned long xapic_phys_to_log_apicid(int phys_apic) 
+{
+	return ( (1ul << ((phys_apic) & 0x3)) |
+		 ((phys_apic) & XAPIC_DEST_CLUSTER_MASK) );
+}
 
 #define APIC_DFR_VALUE	(x86_summit ? APIC_DFR_CLUSTER : APIC_DFR_FLAT)
-#define TARGET_CPUS	(x86_summit ? XAPIC_DEST_CPUS_MASK : cpu_online_map)
+
+static inline unsigned long target_cpus(void)
+{
+	return (x86_summit ? XAPIC_DEST_CPUS_MASK : cpu_online_map);
+} 
+#define TARGET_CPUS	(target_cpus())
 
 #define INT_DELIVERY_MODE (x86_summit ? dest_Fixed : dest_LowestPrio)
 #define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
 
-#define APIC_BROADCAST_ID     (x86_summit ? 0xFF : 0x0F)
-#define check_apicid_used(bitmap, apicid) (x86_summit ? 0 : (bitmap & (1 << apicid)))
+#define APIC_BROADCAST_ID     (0x0F)
+static inline unsigned long check_apicid_used(unsigned long bitmap, int apicid) 
+{ 
+	return (x86_summit ? 0 : (bitmap & (1 << apicid)));
+} 
 
 /* we don't use the phys_cpu_present_map to indicate apicid presence */
-#define check_apicid_present(bit) (x86_summit ? 1 : (phys_cpu_present_map & (1 << bit))) 
+static inline unsigned long check_apicid_present(int bit) 
+{
+	return (x86_summit ? 1 : (phys_cpu_present_map & (1 << bit)));
+}
 
 extern u8 bios_cpu_apicid[];
 
@@ -112,5 +132,14 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 	else
 		return test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map);
 }
+
+#define		APIC_ID_MASK		(0xFF<<24)
+
+static inline unsigned get_apic_id(unsigned long x) 
+{ 
+	return (((x)>>24)&0xFF);
+} 
+
+#define		GET_APIC_ID(x)	get_apic_id(x)
 
 #endif /* __ASM_MACH_APIC_H */

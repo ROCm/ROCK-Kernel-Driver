@@ -1205,7 +1205,6 @@ static void amdtp_add_host(struct hpsb_host *host)
 {
 	struct amdtp_host *ah;
 	int minor;
-	char name[16];
 
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME) != 0)
 		return;
@@ -1223,13 +1222,11 @@ static void amdtp_add_host(struct hpsb_host *host)
 
 	minor = IEEE1394_MINOR_BLOCK_AMDTP * 16 + ah->ohci->id;
 
-	sprintf(name, "amdtp/%d", ah->ohci->id);
-
 	INIT_LIST_HEAD(&ah->stream_list);
 	spin_lock_init(&ah->stream_list_lock);
 
-	devfs_register(NULL, name, 0, IEEE1394_MAJOR, minor,
-		       S_IFCHR | S_IRUSR | S_IWUSR, &amdtp_fops, NULL);
+	devfs_mk_cdev(MKDEV(IEEE1394_MAJOR, minor),
+			S_IFCHR|S_IRUSR|S_IWUSR, "amdtp/%d", ah->ohci->id);
 }
 
 static void amdtp_remove_host(struct hpsb_host *host)

@@ -524,7 +524,7 @@ static void show_tsk_stack(struct task_struct *tsk, unsigned long sp)
 	while (count < 16 && sp > prev_sp && sp < stack_top && (sp & 3) == 0) {
 		if (count == 0) {
 			printk("Call trace:");
-#if CONFIG_KALLSYMS
+#ifdef CONFIG_KALLSYMS
 			printk("\n");
 #endif
 		} else {
@@ -534,7 +534,7 @@ static void show_tsk_stack(struct task_struct *tsk, unsigned long sp)
 			} else
 				ret = *(unsigned long *)(sp + 4);
 			printk(" [%08lx] ", ret);
-#if CONFIG_KALLSYMS
+#ifdef CONFIG_KALLSYMS
 			print_symbol("%s", ret);
 			printk("\n");
 #endif

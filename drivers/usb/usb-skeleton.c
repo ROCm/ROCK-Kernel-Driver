@@ -1,7 +1,7 @@
 /*
- * USB Skeleton driver - 1.0
+ * USB Skeleton driver - 1.1
  *
- * Copyright (c) 2001-2002 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (c) 2001-2003 Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
@@ -18,6 +18,7 @@
  *
  * History:
  *
+ * 2003-05-06 - 1.1 - changes due to usb core changes with usb_register_dev()
  * 2003-02-25 - 1.0 - fix races involving urb->status, unlink_urb(), and
  *			disconnect.  Fix transfer amount in read().  Use
  *			macros instead of magic numbers in probe().  Change
@@ -47,7 +48,6 @@
 #include <linux/module.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
-#include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 
@@ -87,12 +87,8 @@ static struct usb_device_id skel_table [] = {
 MODULE_DEVICE_TABLE (usb, skel_table);
 
 
-#ifdef CONFIG_USB_DYNAMIC_MINORS
-#define USB_SKEL_MINOR_BASE	0
-#else
 /* Get a minor range for your devices from the usb maintainer */
 #define USB_SKEL_MINOR_BASE	192
-#endif
 
 /* Structure to hold all of our device specific stuff */
 struct usb_skel {
@@ -153,16 +149,6 @@ static struct file_operations skel_fops = {
 	 * This also means that the kernel can decrement
 	 * the use-counter again before calling release()
 	 * or should the open() function fail.
-	 *
-	 * Not all device structures have an "owner" field
-	 * yet. "struct file_operations" and "struct net_device"
-	 * do, while "struct tty_driver" does not. If the struct
-	 * has an "owner" field, then initialize it to the value
-	 * THIS_MODULE and the kernel will handle all module
-	 * locking for you automatically. Otherwise, you must
-	 * increment the use-counter in the open() function
-	 * and decrement it again in the release() function
-	 * yourself.
 	 */
 	.owner =	THIS_MODULE,
 
@@ -173,6 +159,16 @@ static struct file_operations skel_fops = {
 	.release =	skel_release,
 };
 
+/* 
+ * usb class driver info in order to get a minor number from the usb core,
+ * and to have the device registered with devfs and the driver core
+ */
+static struct usb_class_driver skell_class = {
+	.name =		"usb/skel%d",
+	.fops =		&skel_fops,
+	.mode =		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH,
+	.minor_base =	USB_SKEL_MINOR_BASE,
+};
 
 /* usb specific object needed to register this driver with the usb subsystem */
 static struct usb_driver skel_driver = {
@@ -236,8 +232,7 @@ static int skel_open (struct inode *inode, struct file *file)
 	/* prevent disconnects */
 	down (&disconnect_sem);
 
-	interface = usb_find_interface (&skel_driver,
-					mk_kdev(USB_MAJOR, subminor));
+	interface = usb_find_interface (&skel_driver, subminor);
 	if (!interface) {
 		err ("%s - error, can't find device for minor %d",
 		     __FUNCTION__, subminor);
@@ -508,7 +503,6 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	struct usb_skel *dev = NULL;
 	struct usb_host_interface *iface_desc;
 	struct usb_endpoint_descriptor *endpoint;
-	int minor;
 	size_t buffer_size;
 	int i;
 	int retval;
@@ -521,7 +515,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 		return -ENODEV;
 	}
 
-	retval = usb_register_dev (&skel_fops, USB_SKEL_MINOR_BASE, 1, &minor);
+	retval = usb_register_dev (intf, &skel_class);
 	if (retval) {
 		/* something prevented us from registering this driver */
 		err ("Not able to get a minor for this device.");
@@ -539,7 +533,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	init_MUTEX (&dev->sem);
 	dev->udev = udev;
 	dev->interface = interface;
-	dev->minor = minor;
+	dev->minor = intf->minor;
 
 	/* set up the endpoint information */
 	/* check out the endpoints */
@@ -606,21 +600,8 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 		goto error;
 	}
 
-	/* initialize the devfs node for this device and register it */
-	sprintf(name, "usb/skel%d", dev->minor);
-
-	devfs = devfs_register(NULL, name,
-				     DEVFS_FL_DEFAULT, USB_MAJOR,
-				     dev->minor,
-				     S_IFCHR | S_IRUSR | S_IWUSR |
-				     S_IRGRP | S_IWGRP | S_IROTH,
-				     &skel_fops, NULL);
-
 	/* let the user know what node this device is now attached to */
 	info ("USB Skeleton device now attached to USBSkel-%d", dev->minor);
-
-	/* add device id so the device works when advertised */
-	interface->kdev = mk_kdev(USB_MAJOR, dev->minor);
 
 	goto exit;
 
@@ -629,7 +610,7 @@ error:
 	dev = NULL;
 
 exit_minor:
-	usb_deregister_dev (1, minor);
+	usb_deregister_dev (intf, &skel_class);
 
 exit:
 	if (dev) {
@@ -667,16 +648,13 @@ static void skel_disconnect(struct usb_interface *interface)
 
 	down (&dev->sem);
 
-	/* remove device id to disable open() */
-	interface->kdev = NODEV;
+	/* disable open() */
+	interface->minor = -1;
 
 	minor = dev->minor;
 
-	/* remove our devfs node */
-	devfs_remove("usb/skel%d", dev->minor);
-
-	/* give back our dynamic minor */
-	usb_deregister_dev (1, minor);
+	/* give back our minor */
+	usb_deregister_dev (intf, &skel_class);
 
 	/* terminate an ongoing write */
 	if (atomic_read (&dev->write_busy)) {

@@ -744,86 +744,6 @@ out:
         return err;
 }
 
-#ifdef CONFIG_PROC_FS
-
-static unsigned dn_fib_flag_trans(int type, int dead, u16 mask, struct dn_fib_info *fi)
-{
-	static unsigned type2flags[RTN_MAX+1] = {
-		0, 0, 0, 0, 0, 0, 0, RTF_REJECT, RTF_REJECT, 0, 0, 0
-	};
-	unsigned flags = type2flags[type];
-
-	if (fi && fi->fib_nh->nh_gw)
-		flags |= RTF_GATEWAY;
-	if (mask == 0xFFFF)
-		flags |= RTF_HOST;
-	if (dead)
-		flags |= RTF_UP;
-	return flags;
-}
-
-static void dn_fib_node_get_info(int type, int dead, struct dn_fib_info *fi, u16 prefix, u16 mask, char *buffer)
-{
-	int len;
-	unsigned flags = dn_fib_flag_trans(type, dead, mask, fi);
-
-	if (fi) {
-		len = sprintf(buffer, "%s\t%04x\t%04x\t%04x\t%d\t%u\t%d\t%04x\t%d\t%u\t%u",
-				fi->dn_fib_dev ? fi->dn_fib_dev->name : "*", prefix,
-				fi->fib_nh->nh_gw, flags, 0, 0, fi->fib_priority,
-				mask, 0, 0, 0);
-	} else {
-		len = sprintf(buffer, "*\t%04x\t%04x\t%04x\t%d\t%u\t%d\t%04x\t%d\t%u\t%u",
-					prefix, 0,
-					flags, 0, 0, 0,
-					mask, 0, 0, 0);
-	}
-	memset(buffer+len, ' ', 127-len);
-	buffer[127] = '\n';
-}
-
-static int dn_fib_table_get_info(struct dn_fib_table *tb, char *buffer, int first, int count)
-{
-	struct dn_hash *table = (struct dn_hash *)tb->data;
-	struct dn_zone *dz;
-	int pos = 0;
-	int n = 0;
-
-	read_lock(&dn_fib_tables_lock);
-	for(dz = table->dh_zone_list; dz; dz = dz->dz_next) {
-		int i;
-		struct dn_fib_node *f;
-		int maxslot = dz->dz_divisor;
-		struct dn_fib_node **fp = dz->dz_hash;
-
-		if (dz->dz_nent == 0)
-			continue;
-
-		if (pos + dz->dz_nent < first) {
-			pos += dz->dz_nent;
-			continue;
-		}
-
-		for(i = 0; i < maxslot; i++, fp++) {
-			for(f = *fp; f ; f = f->fn_next) {
-				if (++pos <= first)
-					continue;
-				dn_fib_node_get_info(f->fn_type,
-						f->fn_state & DN_S_ZOMBIE,
-						DN_FIB_INFO(f),
-						dz_prefix(f->fn_key, dz),
-						DZ_MASK(dz), buffer);
-				buffer += 128;
-				if (++n >= count)
-					goto out;
-			}
-		}
-	}
-out:
-	read_unlock(&dn_fib_tables_lock);
-	return n;
-}
-#endif /* CONFIG_PROC_FS */
 
 struct dn_fib_table *dn_fib_get_table(int n, int create)
 {
@@ -855,9 +775,6 @@ struct dn_fib_table *dn_fib_get_table(int n, int create)
         t->delete = dn_fib_table_delete;
         t->lookup = dn_fib_table_lookup;
         t->flush  = dn_fib_table_flush;
-#ifdef CONFIG_PROC_FS
-	t->get_info = dn_fib_table_get_info;
-#endif
         t->dump = dn_fib_table_dump;
 	memset(t->data, 0, sizeof(struct dn_hash));
         dn_fib_tables[n] = t;

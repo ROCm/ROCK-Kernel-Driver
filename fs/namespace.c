@@ -24,7 +24,6 @@
 #include <asm/uaccess.h>
 
 extern struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
-extern int do_remount_sb(struct super_block *sb, int flags, void * data);
 extern int __init init_rootfs(void);
 extern int __init fs_subsys_init(void);
 
@@ -326,7 +325,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 		down_write(&sb->s_umount);
 		if (!(sb->s_flags & MS_RDONLY)) {
 			lock_kernel();
-			retval = do_remount_sb(sb, MS_RDONLY, 0);
+			retval = do_remount_sb(sb, MS_RDONLY, 0, 0);
 			unlock_kernel();
 		}
 		up_write(&sb->s_umount);
@@ -555,7 +554,7 @@ static int do_remount(struct nameidata *nd,int flags,int mnt_flags,void *data)
 		return -EINVAL;
 
 	down_write(&sb->s_umount);
-	err = do_remount_sb(sb, flags, data);
+	err = do_remount_sb(sb, flags, data, 0);
 	if (!err)
 		nd->mnt->mnt_flags=mnt_flags;
 	up_write(&sb->s_umount);
