@@ -139,7 +139,7 @@ icmp_error_message(struct sk_buff *skb,
 	struct {
 		struct icmphdr icmp;
 		struct iphdr ip;
-	} inside;
+	} _in, *inside;
 	struct ip_conntrack_protocol *innerproto;
 	struct ip_conntrack_tuple_hash *h;
 	int dataoff;
@@ -147,21 +147,22 @@ icmp_error_message(struct sk_buff *skb,
 	IP_NF_ASSERT(skb->nfct == NULL);
 
 	/* Not enough header? */
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &inside, sizeof(inside))!=0)
+	inside = skb_header_pointer(skb, skb->nh.iph->ihl*4, sizeof(_in), &_in);
+	if (inside == NULL)
 		return NF_ACCEPT;
 
 	/* Ignore ICMP's containing fragments (shouldn't happen) */
-	if (inside.ip.frag_off & htons(IP_OFFSET)) {
+	if (inside->ip.frag_off & htons(IP_OFFSET)) {
 		DEBUGP("icmp_error_track: fragment of proto %u\n",
-		       inside.ip.protocol);
+		       inside->ip.protocol);
 		return NF_ACCEPT;
 	}
 
-	innerproto = ip_ct_find_proto(inside.ip.protocol);
-	dataoff = skb->nh.iph->ihl*4 + sizeof(inside.icmp) + inside.ip.ihl*4;
+	innerproto = ip_ct_find_proto(inside->ip.protocol);
+	dataoff = skb->nh.iph->ihl*4 + sizeof(inside->icmp) + inside->ip.ihl*4;
 	/* Are they talking about one of our connections? */
-	if (!ip_ct_get_tuple(&inside.ip, skb, dataoff, &origtuple, innerproto)) {
-		DEBUGP("icmp_error: ! get_tuple p=%u", inside.ip.protocol);
+	if (!ip_ct_get_tuple(&inside->ip, skb, dataoff, &origtuple, innerproto)) {
+		DEBUGP("icmp_error: ! get_tuple p=%u", inside->ip.protocol);
 		return NF_ACCEPT;
 	}
 
@@ -205,10 +206,11 @@ static int
 icmp_error(struct sk_buff *skb, enum ip_conntrack_info *ctinfo,
 	   unsigned int hooknum)
 {
-	struct icmphdr icmph;
+	struct icmphdr _ih, *icmph;
 
 	/* Not enough header? */
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &icmph, sizeof(icmph))!=0) {
+	icmph = skb_header_pointer(skb, skb->nh.iph->ihl*4, sizeof(_ih), &_ih);
+	if (icmph == NULL) {
 		if (LOG_INVALID(IPPROTO_ICMP))
 			nf_log_packet(PF_INET, 0, skb, NULL, NULL,
 				      "ip_ct_icmp: short packet ");
@@ -245,7 +247,7 @@ checksum_skipped:
 	 *	RFC 1122: 3.2.2  Unknown ICMP messages types MUST be silently
 	 *		  discarded.
 	 */
-	if (icmph.type > NR_ICMP_TYPES) {
+	if (icmph->type > NR_ICMP_TYPES) {
 		if (LOG_INVALID(IPPROTO_ICMP))
 			nf_log_packet(PF_INET, 0, skb, NULL, NULL,
 				      "ip_ct_icmp: invalid ICMP type ");
@@ -253,11 +255,11 @@ checksum_skipped:
 	}
 
 	/* Need to track icmp error message? */
-	if (icmph.type != ICMP_DEST_UNREACH
-	    && icmph.type != ICMP_SOURCE_QUENCH
-	    && icmph.type != ICMP_TIME_EXCEEDED
-	    && icmph.type != ICMP_PARAMETERPROB
-	    && icmph.type != ICMP_REDIRECT)
+	if (icmph->type != ICMP_DEST_UNREACH
+	    && icmph->type != ICMP_SOURCE_QUENCH
+	    && icmph->type != ICMP_TIME_EXCEEDED
+	    && icmph->type != ICMP_PARAMETERPROB
+	    && icmph->type != ICMP_REDIRECT)
 		return NF_ACCEPT;
 
 	return icmp_error_message(skb, ctinfo, hooknum);
