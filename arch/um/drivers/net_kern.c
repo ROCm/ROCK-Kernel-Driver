@@ -39,7 +39,6 @@ static int uml_net_rx(struct net_device *dev)
 	/* If we can't allocate memory, try again next round. */
 	if ((skb = dev_alloc_skb(dev->mtu)) == NULL) {
 		lp->stats.rx_dropped++;
-		reactivate_fd(lp->fd, UM_ETH_IRQ);
 		return 0;
 	}
 
@@ -48,7 +47,6 @@ static int uml_net_rx(struct net_device *dev)
 	skb->mac.raw = skb->data;
 	pkt_len = (*lp->read)(lp->fd, &skb, lp);
 
-	reactivate_fd(lp->fd, UM_ETH_IRQ);
 	if (pkt_len > 0) {
 		skb_trim(skb, pkt_len);
 		skb->protocol = (*lp->protocol)(skb);
@@ -69,18 +67,22 @@ void uml_net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct uml_net_private *lp = dev->priv;
 	int err;
 
-	if (netif_running(dev)) {
-		spin_lock(&lp->lock);
-		while((err = uml_net_rx(dev)) > 0) ;
-		if(err < 0) {
-			printk(KERN_ERR 
-			       "Device '%s' read returned %d, shutting it "
-			       "down\n", dev->name, err);
-			dev->flags &= ~IFF_UP;
-			dev_close(dev);
-		}
-		spin_unlock(&lp->lock);
+	if(!netif_running(dev))
+		return;
+
+	spin_lock(&lp->lock);
+	while((err = uml_net_rx(dev)) > 0) ;
+	if(err < 0) {
+		printk(KERN_ERR 
+		       "Device '%s' read returned %d, shutting it down\n", 
+		       dev->name, err);
+		dev_close(dev);
+		goto out;
 	}
+	reactivate_fd(lp->fd, UM_ETH_IRQ);
+
+ out:
+	spin_unlock(&lp->lock);
 }
 
 static int uml_net_open(struct net_device *dev)
@@ -250,6 +252,37 @@ void uml_net_user_timer_expire(unsigned long _conn)
 #endif
 }
 
+/*
+ * default do nothing hard header packet routines for struct net_device init.
+ * real ethernet transports will overwrite with real routines.
+ */
+static int uml_net_hard_header(struct sk_buff *skb, struct net_device *dev,
+                 unsigned short type, void *daddr, void *saddr, unsigned len)
+{
+	return(0); /* no change */
+}
+
+static int uml_net_rebuild_header(struct sk_buff *skb)
+{
+	return(0); /* ignore */ 
+}
+
+static int uml_net_header_cache(struct neighbour *neigh, struct hh_cache *hh)
+{
+	return(-1); /* fail */
+}
+
+static void uml_net_header_cache_update(struct hh_cache *hh,
+                 struct net_device *dev, unsigned char * haddr)
+{
+	/* ignore */
+}
+
+static int uml_net_header_parse(struct sk_buff *skb, unsigned char *haddr)
+{
+	return(0); /* nothing */
+}
+
 static spinlock_t devices_lock = SPIN_LOCK_UNLOCKED;
 static struct list_head devices = LIST_HEAD_INIT(devices);
 
@@ -261,20 +294,24 @@ static int eth_configure(int n, void *init, char *mac,
 	struct uml_net_private *lp;
 	int save, err, size;
 
+	size = transport->private_size + sizeof(struct uml_net_private) + 
+		sizeof(((struct uml_net_private *) 0)->user);
+
 	device = kmalloc(sizeof(*device), GFP_KERNEL);
 	if(device == NULL){
 		printk(KERN_ERR "eth_configure failed to allocate uml_net\n");
 		return(1);
 	}
 
+	*device = ((struct uml_net) { .list 	= LIST_HEAD_INIT(device->list),
+				      .dev 	= NULL,
+				      .index	= n,
+				      .mac	= { [ 0 ... 5 ] = 0 },
+				      .have_mac	= 0 });
+
 	spin_lock(&devices_lock);
 	list_add(&device->list, &devices);
 	spin_unlock(&devices_lock);
-
-	device->index = n;
-
-	size = transport->private_size + sizeof(struct uml_net_private) + 
-		sizeof(((struct uml_net_private *) 0)->user);
 
 	if(setup_etheraddr(mac, device->mac))
 		device->have_mac = 1;
@@ -290,9 +327,17 @@ static int eth_configure(int n, void *init, char *mac,
 		printk(KERN_ERR "eth_configure: failed to allocate device\n");
 		return(1);
 	}
+	memset(dev, 0, sizeof(*dev) + size);
+
 	snprintf(dev->name, sizeof(dev->name), "eth%d", n);
 	dev->priv = (void *) &dev[1];
 	device->dev = dev;
+
+        dev->hard_header = uml_net_hard_header;
+        dev->rebuild_header = uml_net_rebuild_header;
+        dev->hard_header_cache = uml_net_header_cache;
+        dev->header_cache_update= uml_net_header_cache_update;
+        dev->hard_header_parse = uml_net_header_parse;
 
 	(*transport->kern->init)(dev, init);
 
@@ -308,32 +353,6 @@ static int eth_configure(int n, void *init, char *mac,
 	dev->do_ioctl = uml_net_ioctl;
 	dev->watchdog_timeo = (HZ >> 1);
 	dev->irq = UM_ETH_IRQ;
-	dev->init = NULL;
-	dev->master = NULL;
-	dev->neigh_setup = NULL;
-	dev->owner = NULL;
-	dev->state = 0;
-	dev->next_sched = 0;
-	dev->get_wireless_stats = 0;
-	dev->wireless_handlers = 0;
-	dev->gflags = 0;
-	dev->mc_list = NULL;
-	dev->mc_count = 0;
-	dev->promiscuity = 0;
-	dev->atalk_ptr = NULL;
-	dev->ip_ptr = NULL;
-	dev->dn_ptr = NULL;
-	dev->ip6_ptr = NULL;
-	dev->ec_ptr = NULL;
-	atomic_set(&dev->refcnt, 0);
-	dev->features = 0;
-	dev->uninit = NULL;
-	dev->destructor = NULL;
-	dev->set_config = NULL;
-	dev->accept_fastpath = 0;
-	dev->br_port = 0;
- 	dev->mem_start = 0;
- 	dev->mem_end = 0;
 
 	rtnl_lock();
 	err = register_netdevice(dev);
@@ -372,6 +391,7 @@ static int eth_configure(int n, void *init, char *mac,
 
 	if(transport->user->init) 
 		(*transport->user->init)(&lp->user, dev);
+
 	if(device->have_mac)
 		set_ether_mac(dev, device->mac);
 	return(0);
@@ -486,7 +506,6 @@ void register_transport(struct transport *new)
 			kfree(init);
 		}
 		list_del(&eth->list);
-		return;
 	}
 }
 
@@ -580,7 +599,7 @@ static int net_remove(char *str)
 	int n;
 
 	n = simple_strtoul(str, &end, 0);
-	if(*end != '\0')
+	if((*end != '\0') || (end == str))
 		return(-1);
 
 	device = find_device(n);
