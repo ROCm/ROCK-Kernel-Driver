@@ -83,3 +83,81 @@ int sbusfb_mmap_helper(struct sbus_mmap_map *map,
 
 	return 0;
 }
+EXPORT_SYMBOL(sbusfb_mmap_helper);
+
+int sbusfb_ioctl_helper(unsigned long cmd, struct fb_info *info,
+			int type, int fb_depth, unsigned long fb_size)
+{
+	switch(cmd) {
+	case FBIOGTYPE: {
+		struct fbtype *f = (struct fbtype *) arg;
+
+		if (put_user(type, &f->fb_type) ||
+		    __put_user(info->var.yres, &f->fb_height) ||
+		    __put_user(info->var.xres, &f->fb_width) ||
+		    __put_user(fb_depth, &f->fb_depth) ||
+		    __put_user(0, &f->fb_cmsize) ||
+		    __put_user(fb_size, &f->fb_cmsize))
+			return -EFAULT;
+		return 0;
+	}
+	case FBIOPUTCMAP_SPARC: {
+		struct fbcmap *c = (struct fbcmap *) arg;
+		struct fb_cmap cmap;
+		u16 red, green, blue;
+		unsigned char *ured, *ugreen, *ublue;
+		int index, count, i, err;
+
+		if (get_user(index, &c->index) ||
+		    __get_user(count, &c->count) ||
+		    __get_user(ured, &c->red) ||
+		    __get_user(ugreen, &c->green) ||
+		    __get_user(ublue, &c->blue))
+			return -EFAULT;
+
+		cmap.len = 1;
+		cmap.red = &red;
+		cmap.green = &green;
+		cmap.blue = &blue;
+		for (i = 0; i < count; i++) {
+			if (get_user(red, &ured[i]) ||
+			    get_user(green, &ugreen[i]) ||
+			    get_user(blue, &ublue[i]))
+				return -EFAULT;
+
+			cmap.start = index + i;
+			err = fb_set_cmap(&cmap, 0, info);
+			if (err)
+				break;
+		}
+		return err;
+	}
+	case FBIOGETCMAP_SPARC: {
+		struct fbcmap *c = (struct fbcmap *) arg;
+		unsigned char *ured, *ugreen, *ublue;
+		struct fb_cmap *cmap = &info->cmap;
+		int index, count, i, err;
+
+		if (get_user(index, &c->index) ||
+		    __get_user(count, &c->count) ||
+		    __get_user(ured, &c->red) ||
+		    __get_user(ugreen, &c->green) ||
+		    __get_user(ublue, &c->blue))
+			return -EFAULT;
+
+		if (index + count > cmap->len)
+			return -EINVAL;
+
+		for (i = 0; i < count; i++) {
+			if (put_user(cmap->red[index + i], &ured[i]) ||
+			    put_user(cmap->green[index + i], &ugreen[i]) ||
+			    put_user(cmap->blue[index + i], &ublue[i]))
+				return -EFAULT;
+		}
+		return err;
+	}
+	default:
+		return -EINVAL;
+	};
+}
+EXPORT_SYMBOL(sbusfb_ioctl_helper);

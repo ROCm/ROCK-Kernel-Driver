@@ -20,6 +20,7 @@
 #include <asm/io.h>
 #include <asm/upa.h>
 #include <asm/oplib.h>
+#include <asm/fbio.h>
 
 #include "sbuslib.h"
 
@@ -37,6 +38,8 @@ static void ffb_fillrect(struct fb_info *, struct fb_fillrect *);
 static void ffb_copyarea(struct fb_info *, struct fb_copyarea *);
 static int ffb_sync(struct fb_info *);
 static int ffb_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
+static int ffb_ioctl(struct inode *, struct file *, unsigned int,
+		     unsigned long, struct fb_info *);
 
 /*
  *  Frame buffer operations
@@ -51,6 +54,7 @@ static struct fb_ops ffb_ops = {
 	.fb_imageblit		= ffb_imageblit,
 	.fb_sync		= ffb_sync,
 	.fb_mmap		= ffb_mmap,
+	.fb_ioctl		= ffb_ioctl,
 
 	/* XXX Use FFB hw cursor once fb cursor API is better understood... */
 	.fb_cursor		= soft_cursor,
@@ -777,6 +781,15 @@ static int ffb_mmap(struct fb_info *info, struct file *file, struct vm_area_stru
 	return sbusfb_mmap_helper(ffb_mmap_map,
 				  par->physbase, par->fbsize,
 				  0, vma);
+}
+
+static int ffb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+		     unsigned long arg, struct fb_info *info)
+{
+	struct ffb_par *par = (struct ffb_par *) info->par;
+
+	return sbusfb_ioctl_helper(cmd, info,
+				   FBTYPE_CREATOR, 24, par->fbsize);
 }
 
 /*

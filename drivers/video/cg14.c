@@ -321,7 +321,8 @@ static int cg14_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		break;
 
 	default:
-		ret = -EINVAL;
+		ret = sbusfb_ioctl_helper(cmd, info,
+					  FBTYPE_MDICOLOR, 24, par->fbsize);
 		break;
 	};
 

@@ -34,6 +34,8 @@ static int tcx_setcolreg(unsigned, unsigned, unsigned, unsigned,
 static int tcx_blank(int, struct fb_info *);
 
 static int tcx_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
+static int tcx_ioctl(struct inode *, struct file *, unsigned int,
+		     unsigned long, struct fb_info *);
 
 /*
  *  Frame buffer operations
@@ -47,6 +49,7 @@ static struct fb_ops tcx_ops = {
 	.fb_copyarea		= cfb_copyarea,
 	.fb_imageblit		= cfb_imageblit,
 	.fb_mmap		= tcx_mmap,
+	.fb_ioctl		= tcx_ioctl,
 	.fb_cursor		= soft_cursor,
 };
 
@@ -259,6 +262,17 @@ static int tcx_mmap(struct fb_info *info, struct file *file, struct vm_area_stru
 				  par->physbase, par->fbsize,
 				  par->sdev->reg_addrs[0].which_io,
 				  vma);
+}
+
+static int tcx_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+		     unsigned long arg, struct fb_info *info)
+{
+	struct tcx_par *par = (struct tcx_par *) info->par;
+
+	return sbusfb_ioctl_helper(cmd, info,
+				   FBTYPE_TCXCOLOR,
+				   (par->lowdepth ? 8 : 24),
+				   par->fbsize);
 }
 
 /*

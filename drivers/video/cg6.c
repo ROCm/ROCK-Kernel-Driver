@@ -37,6 +37,8 @@ static void cg6_imageblit(struct fb_info *, struct fb_image *);
 static void cg6_fillrect(struct fb_info *, struct fb_fillrect *);
 static int cg6_sync(struct fb_info *);
 static int cg6_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
+static int cg6_ioctl(struct inode *, struct file *, unsigned int,
+		     unsigned long, struct fb_info *);
 
 /*
  *  Frame buffer operations
@@ -51,6 +53,7 @@ static struct fb_ops cg6_ops = {
 	.fb_imageblit		= cg6_imageblit,
 	.fb_sync		= cg6_sync,
 	.fb_mmap		= cg6_mmap,
+	.fb_ioctl		= cg6_ioctl,
 	.fb_cursor		= soft_cursor,
 };
 
@@ -496,6 +499,15 @@ static int cg6_mmap(struct fb_info *info, struct file *file, struct vm_area_stru
 				  par->physbase, par->fbsize,
 				  par->sdev->reg_addrs[0].which_io,
 				  vma);
+}
+
+static int cg6_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+		     unsigned long arg, struct fb_info *info)
+{
+	struct cg6_par *par = (struct cg6_par *) info->par;
+
+	return sbusfb_ioctl_helper(cmd, info,
+				   FBTYPE_SUNFAST_COLOR, 8, par->fbsize);
 }
 
 /*

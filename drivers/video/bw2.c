@@ -36,6 +36,8 @@
 static int bw2_blank(int, struct fb_info *);
 
 static int bw2_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
+static int bw2_ioctl(struct inode *, struct file *, unsigned int,
+		     unsigned long, struct fb_info *);
 
 /*
  *  Frame buffer operations
@@ -48,6 +50,7 @@ static struct fb_ops bw2_ops = {
 	.fb_copyarea		= cfb_copyarea,
 	.fb_imageblit		= cfb_imageblit,
 	.fb_mmap		= bw2_mmap,
+	.fb_ioctl		= bw2_ioctl,
 	.fb_cursor		= soft_cursor,
 };
 
@@ -173,6 +176,15 @@ static int bw2_mmap(struct fb_info *info, struct file *file, struct vm_area_stru
 				   par->sdev->reg_addrs[0].which_io :
 				   0),
 				  vma);
+}
+
+static int bw2_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+		     unsigned long arg, struct fb_info *info)
+{
+	struct bw2_par *par = (struct bw2_par *) info->par;
+
+	return sbusfb_ioctl_helper(cmd, info,
+				   FBTYPE_SUN2BW, 1, par->fbsize);
 }
 
 /*
