@@ -249,7 +249,7 @@ adb_probe_task(void *x)
 	strcpy(current->comm, "kadbprobe");
 
 	sigfillset(&blocked);
-	sicprocmask(SIG_BLOCK, &blocked, NULL);	
+	sigprocmask(SIG_BLOCK, &blocked, NULL);	
 	flush_signals(current);
 
 	printk(KERN_INFO "adb: starting probe task...\n");
