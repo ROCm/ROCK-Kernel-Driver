@@ -1246,6 +1246,8 @@ acornfb_detect_monitortype(void)
 
 /*
  * This enables the unused memory to be freed on older Acorn machines.
+ * We are freeing memory on behalf of the architecture initialisation
+ * code here.
  */
 static inline void
 free_unused_pages(unsigned int virtual_start, unsigned int virtual_end)
@@ -1268,7 +1270,7 @@ free_unused_pages(unsigned int virtual_start, unsigned int virtual_end)
 		 */
 		page = virt_to_page(virtual_start);
 		ClearPageReserved(page);
-		atomic_set(&page->count, 1);
+		set_page_count(page, 1);
 		free_page(virtual_start);
 
 		virtual_start += PAGE_SIZE;
