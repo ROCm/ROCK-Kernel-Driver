@@ -151,7 +151,7 @@ mark_nodevertex_as_node(vertex_hdl_t vhdl, cnodeid_t cnodeid)
 		(void)hwgraph_edge_add( hwgraph_all_cnodes,
 					vhdl,
 					cnodeid_buffer);
-		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, hwgraph_all_cnodes, NULL, "Creating path vhdl1\n"));
+		HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, hwgraph_all_cnodes, NULL, "Creating path vhdl1\n");
 	}
 }
 

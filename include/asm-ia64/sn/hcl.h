@@ -14,10 +14,10 @@
 extern vertex_hdl_t hwgraph_root;
 extern vertex_hdl_t linux_busnum;
 
-void hwgraph_debug(char *, char *, int, vertex_hdl_t, vertex_hdl_t, char *, ...);
+void hwgraph_debug(char *, const char *, int, vertex_hdl_t, vertex_hdl_t, char *, ...);
 
 #if 1
-#define HWGRAPH_DEBUG(args) hwgraph_debug args ;
+#define HWGRAPH_DEBUG(args...) hwgraph_debug(args)
 #else   
 #define HWGRAPH_DEBUG(args)
 #endif  
