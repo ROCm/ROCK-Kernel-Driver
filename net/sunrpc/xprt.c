@@ -1042,11 +1042,6 @@ tcp_state_change(struct sock *sk)
 	case TCP_SYN_RECV:
 		break;
 	default:
-		if (net_ratelimit()) {
-			printk(KERN_NOTICE "NFS server %u.%u.%u.%u %s connection\n",
-					NIPQUAD(xprt->addr.sin_addr.s_addr),
-					xprt_connected(xprt)? "closed" : "refused");
-		}
 		xprt_disconnect(xprt, 0);
 		break;
 	}
