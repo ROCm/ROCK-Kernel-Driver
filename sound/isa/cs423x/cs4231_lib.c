@@ -685,7 +685,7 @@ static void snd_cs4231_init(cs4231_t *chip)
 
 	snd_cs4231_mce_down(chip);
 
-#ifdef SNDRV_DEBUGq_MCE
+#ifdef SNDRV_DEBUG_MCE
 	snd_printk("init: (1)\n");
 #endif
 	snd_cs4231_mce_up(chip);
