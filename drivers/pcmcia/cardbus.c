@@ -279,12 +279,12 @@ int cb_alloc(socket_info_t * s)
 		pci_readw(dev, PCI_DEVICE_ID, &dev->device);
 		dev->hdr_type = hdr & 0x7f;
 
+		pci_setup_device(dev);
+
 		dev->dev.parent = bus->dev;
 		strcpy(dev->dev.name, dev->name);
 		strcpy(dev->dev.bus_id, dev->slot_name);
 		device_register(&dev->dev);
-
-		pci_setup_device(dev);
 
 		/* FIXME: Do we need to enable the expansion ROM? */
 		for (r = 0; r < 7; r++) {

@@ -128,7 +128,7 @@ nlm_delete_file(struct nlm_file *file)
 	struct nlm_file	**fp, *f;
 
 	dprintk("lockd: closing file %s/%ld\n",
-		kdevname(inode->i_dev), inode->i_ino);
+		inode->i_sb->s_id, inode->i_ino);
 	fp = nlm_files + file->f_hash;
 	while ((f = *fp) != NULL) {
 		if (f == file) {

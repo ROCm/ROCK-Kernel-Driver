@@ -1410,8 +1410,8 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 		oldlen = cd.buflen;
 
 		/*
-		dprintk("nfsd: f_op->readdir(%x/%ld @ %d) buflen = %d (%d)\n",
-			file.f_inode->i_dev, file.f_inode->i_ino,
+		dprintk("nfsd: f_op->readdir(%s/%ld @ %d) buflen = %d (%d)\n",
+			file.f_inode->i_sb->s_id, file.f_inode->i_ino,
 			(int) file.f_pos, (int) oldlen, (int) cd.buflen);
 		 */
 		err = file.f_op->readdir(&file, &cd, (filldir_t) func);
