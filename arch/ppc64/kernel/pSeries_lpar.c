@@ -36,18 +36,6 @@
 #include <asm/tlb.h>
 #include <asm/hvcall.h>
 
-
-long plpar_pte_enter(unsigned long flags,
-		     unsigned long ptex,
-		     unsigned long new_pteh, unsigned long new_ptel,
-		     unsigned long *old_pteh_ret, unsigned long *old_ptel_ret)
-{
-	unsigned long dummy, ret;
-	ret = plpar_hcall(H_ENTER, flags, ptex, new_pteh, new_ptel,
-			   old_pteh_ret, old_ptel_ret, &dummy);
-	return(ret);
-}
-
 long plpar_pte_remove(unsigned long flags,
 		      unsigned long ptex,
 		      unsigned long avpn,
@@ -83,7 +71,6 @@ long plpar_tce_get(unsigned long liobn,
 			   tce_ret, &dummy, &dummy);
 }
 
-
 long plpar_tce_put(unsigned long liobn,
 		   unsigned long ioba,
 		   unsigned long tceval)
@@ -104,10 +91,9 @@ long plpar_put_term_char(unsigned long termno,
 			 unsigned long len,
 			 const char *buffer)
 {
-	unsigned long dummy;
 	unsigned long *lbuf = (unsigned long *)buffer;  /* ToDo: alignment? */
-	return plpar_hcall(H_PUT_TERM_CHAR, termno, len,
-			   lbuf[0], lbuf[1], &dummy, &dummy, &dummy);
+	return plpar_hcall_norets(H_PUT_TERM_CHAR, termno, len, lbuf[0],
+				  lbuf[1]);
 }
 
 static void tce_build_pSeriesLP(struct TceTable *tbl, long tcenum, 
@@ -287,12 +273,11 @@ int hvc_get_chars(int index, char *buf, int count)
 
 int hvc_put_chars(int index, const char *buf, int count)
 {
-	unsigned long dummy;
 	unsigned long *lbuf = (unsigned long *) buf;
 	long ret;
 
-	ret = plpar_hcall(H_PUT_TERM_CHAR, index, count, lbuf[0], lbuf[1],
-			  &dummy, &dummy, &dummy);
+	ret = plpar_hcall_norets(H_PUT_TERM_CHAR, index, count, lbuf[0],
+				 lbuf[1]);
 	if (ret == H_Success)
 		return count;
 	if (ret == H_Busy)
@@ -318,7 +303,6 @@ int hvc_count(int *start_termno)
 
 
 
-
 long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 			      unsigned long va, unsigned long prpn,
 			      int secondary, unsigned long hpteflags,
@@ -329,6 +313,7 @@ long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 	unsigned long flags;
 	unsigned long slot;
 	HPTE lhpte;
+	unsigned long dummy0, dummy1;
 
 	/* Fill in the local HPTE with absolute rpn, avpn and flags */
 	lhpte.dw1.dword1      = 0;
@@ -348,7 +333,6 @@ long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 
 	/* Now fill in the actual HPTE */
 	/* Set CEC cookie to 0         */
-	/* Large page = 0              */
 	/* Zero page = 0               */
 	/* I-cache Invalidate = 0      */
 	/* I-cache synchronize = 0     */
@@ -359,19 +343,8 @@ long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 	if (hpteflags & (_PAGE_GUARDED|_PAGE_NO_CACHE))
 		lhpte.dw1.flags.flags &= ~_PAGE_COHERENT;
 
-	__asm__ __volatile__ (
-		H_ENTER_r3
-		"mr    4, %2\n"
-                "mr    5, %3\n"
-                "mr    6, %4\n"
-                "mr    7, %5\n"
-                HSC    
-                "mr    %0, 3\n"
-                "mr    %1, 4\n"
-		: "=r" (lpar_rc), "=r" (slot)
-		: "r" (flags), "r" (hpte_group), "r" (lhpte.dw0.dword0),
-		"r" (lhpte.dw1.dword1)
-		: "r3", "r4", "r5", "r6", "r7", "cc");
+	lpar_rc = plpar_hcall(H_ENTER, flags, hpte_group, lhpte.dw0.dword0,
+			      lhpte.dw1.dword1, &slot, &dummy0, &dummy1);
 
 	if (lpar_rc == H_PTEG_Full)
 		return -1;

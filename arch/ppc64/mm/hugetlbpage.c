@@ -37,7 +37,56 @@ static spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 
 static int htlbpage_free; /* = 0 */
 static int htlbpage_total; /* = 0 */
-static LIST_HEAD(htlbpage_freelist);
+static struct list_head hugepage_freelists[MAX_NUMNODES];
+
+static void enqueue_huge_page(struct page *page)
+{
+	list_add(&page->list,
+		&hugepage_freelists[page_zone(page)->zone_pgdat->node_id]);
+}
+
+/* XXX make this a sysctl */
+unsigned long largepage_roundrobin = 1;
+
+static struct page *dequeue_huge_page(void)
+{
+	static int nid = 0;
+	struct page *page = NULL;
+	int i;
+
+	if (!largepage_roundrobin)
+		nid = numa_node_id();
+
+	for (i = 0; i < numnodes; i++) {
+		if (!list_empty(&hugepage_freelists[nid]))
+			break;
+		nid = (nid + 1) % numnodes;
+	}
+
+	if (!list_empty(&hugepage_freelists[nid])) {
+		page = list_entry(hugepage_freelists[nid].next, struct page, list);
+		list_del(&page->list);
+	}
+
+	if (largepage_roundrobin)
+		nid = (nid + 1) % numnodes;
+
+	return page;
+}
+
+static struct page *alloc_fresh_huge_page(void)
+{
+	static int nid = 0;
+	struct page *page;
+
+	page = alloc_pages_node(nid, GFP_HIGHUSER, HUGETLB_PAGE_ORDER);
+	if (!page)
+		return NULL;
+
+	nid = page_zone(page)->zone_pgdat->node_id;
+	nid = (nid + 1) % numnodes;
+	return page;
+}
 
 /* HugePTE layout:
  *
@@ -103,13 +152,12 @@ static struct page *alloc_hugetlb_page(void)
 	struct page *page;
 
 	spin_lock(&htlbpage_lock);
-	if (list_empty(&htlbpage_freelist)) {
+	page = dequeue_huge_page();
+	if (!page) {
 		spin_unlock(&htlbpage_lock);
 		return NULL;
 	}
 
-	page = list_entry(htlbpage_freelist.next, struct page, list);
-	list_del(&page->list);
 	htlbpage_free--;
 	spin_unlock(&htlbpage_lock);
 	set_page_count(page, 1);
@@ -365,7 +413,7 @@ static void free_huge_page(struct page *page)
 	INIT_LIST_HEAD(&page->list);
 
 	spin_lock(&htlbpage_lock);
-	list_add(&page->list, &htlbpage_freelist);
+	enqueue_huge_page(page);
 	htlbpage_free++;
 	spin_unlock(&htlbpage_lock);
 }
@@ -604,9 +652,11 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 	if (!in_hugepage_area(mm->context, ea))
 		return -1;
 
+	ea &= ~(HPAGE_SIZE-1);
+
 	/* We have to find the first hugepte in the batch, since
 	 * that's the one that will store the HPTE flags */
-	ptep = hugepte_offset(mm, ea & ~(HPAGE_SIZE-1));
+	ptep = hugepte_offset(mm, ea);
 
 	/* Search the Linux page table for a match with va */
 	va = (vsid << 28) | (ea & 0x0fffffff);
@@ -675,6 +725,10 @@ repeat:
 		hugepte_val(new_pte) &= ~_HUGEPAGE_HPTEFLAGS;
 		hugepte_val(new_pte) |= _HUGEPAGE_HASHPTE;
 
+		/* Add in WIMG bits */
+		/* XXX We should store these in the pte */
+		hpteflags |= _PAGE_COHERENT;
+
 		slot = ppc_md.hpte_insert(hpte_group, va, prpn, 0,
 					  hpteflags, 0, 1);
 
@@ -695,7 +749,7 @@ repeat:
 		}
 
 		if (unlikely(slot == -2))
-			panic("hash_page: pte_insert failed\n");
+			panic("hash_huge_page: pte_insert failed\n");
 
 		hugepte_val(new_pte) |= (slot<<5) & _HUGEPAGE_GROUP_IX;
 
@@ -768,11 +822,11 @@ int set_hugetlb_mem_size(int count)
 		return htlbpage_total;
 	if (lcount > 0) {	/* Increase the mem size. */
 		while (lcount--) {
-			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
+			page = alloc_fresh_huge_page();
 			if (page == NULL)
 				break;
 			spin_lock(&htlbpage_lock);
-			list_add(&page->list, &htlbpage_freelist);
+			enqueue_huge_page(page);
 			htlbpage_free++;
 			htlbpage_total++;
 			spin_unlock(&htlbpage_lock);
@@ -813,12 +867,15 @@ static int __init hugetlb_init(void)
 	struct page *page;
 
 	if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE) {
+		for (i = 0; i < MAX_NUMNODES; ++i)
+			INIT_LIST_HEAD(&hugepage_freelists[i]);
+
 		for (i = 0; i < htlbpage_max; ++i) {
-			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
+			page = alloc_fresh_huge_page();
 			if (!page)
 				break;
 			spin_lock(&htlbpage_lock);
-			list_add(&page->list, &htlbpage_freelist);
+			enqueue_huge_page(page);
 			spin_unlock(&htlbpage_lock);
 		}
 		htlbpage_max = htlbpage_free = htlbpage_total = i;
@@ -827,7 +884,7 @@ static int __init hugetlb_init(void)
 		htlbpage_max = 0;
 		printk("CPU does not support HugeTLB\n");
 	}
-	
+
 	return 0;
 }
 module_init(hugetlb_init);
