@@ -93,7 +93,7 @@ static const char name_resume[] = "Resume Machine: ";
  * Saving part...
  */
 
-static __inline__ int fill_suspend_header(struct suspend_header *sh)
+static void fill_suspend_header(struct suspend_header *sh)
 {
 	memset((char *)sh, 0, sizeof(*sh));
 
@@ -111,8 +111,8 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 	 * [so they haven't been mounted since last suspend.
 	 * Maybe it isn't.] [we'd need to do this for _all_ fs-es]
 	 */
-	return 0;
 }
+
 
 /* We memorize in swapfile_used what swap devices are used for suspension */
 #define SWAPFILE_UNUSED    0
@@ -126,23 +126,25 @@ static int mark_swapfiles(swp_entry_t prev)
 {
 	swp_entry_t entry;
 	union diskpage *cur;
-	struct page *page;
+	int error;
+
+	printk( "S" );
 
 	if (root_swap == 0xFFFF)  /* ignored */
 		return -EINVAL;
 
-	page = alloc_page(GFP_ATOMIC);
-	if (!page)
+	cur = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
+	if (!cur)
 		return -ENOMEM;
-	cur = page_address(page);
+
 	/* XXX: this is dirty hack to get first page of swap file */
 	entry = swp_entry(root_swap, 0);
-	rw_swap_page_sync(READ, entry, page);
+	rw_swap_page_sync(READ, entry, virt_to_page((unsigned long)cur));
 
 	if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)))
-		memcpy(cur->swh.magic.magic,"S1SUSP....",10);
+		memcpy(cur->swh.magic.magic,"P1DISK....",10);
 	else if ((!memcmp("SWAPSPACE2",cur->swh.magic.magic,10)))
-		memcpy(cur->swh.magic.magic,"S2SUSP....",10);
+		memcpy(cur->swh.magic.magic,"P2DISK....",10);
 	else {
 		pr_debug("pmdisk: Partition is not swap space.\n");
 		return -ENODEV;
@@ -153,9 +155,10 @@ static int mark_swapfiles(swp_entry_t prev)
 
 	/* link.next lies *no more* in last 4/8 bytes of magic */
 
-	rw_swap_page_sync(WRITE, entry, page);
-	__free_page(page);
-	return 0;
+	error = rw_swap_page_sync(WRITE, entry, 
+				  virt_to_page((unsigned long)cur));
+	free_page((unsigned long)cur);
+	return error;
 }
 
 static void read_swapfiles(void) /* This is called before saving image */
@@ -207,78 +210,189 @@ static void lock_swapdevices(void)
 	swap_list_unlock();
 }
 
-static int write_suspend_image(void)
+
+
+/**
+ *	write_swap_page - Write one page to a fresh swap location.
+ *	@addr:	Address we're writing.
+ *	@loc:	Place to store the entry we used.
+ *
+ *	Allocate a new swap entry and 'sync' it. Note we discard -EIO
+ *	errors. That is an artifact left over from swsusp. It did not 
+ *	check the return of rw_swap_page_sync() at all, since most pages
+ *	written back to swap would return -EIO.
+ *	This is a partial improvement, since we will at least return other
+ *	errors, though we need to eventually fix the damn code.
+ */
+
+static int write_swap_page(unsigned long addr, swp_entry_t * loc)
 {
+	swp_entry_t entry;
+	int error = 0;
+
+	entry = get_swap_page();
+	if (swp_offset(entry) && 
+	    swapfile_used[swp_type(entry)] == SWAPFILE_SUSPEND) {
+		error = rw_swap_page_sync(WRITE, entry,
+					  virt_to_page(addr));
+		if (error == -EIO)
+			error = 0;
+		if (!error)
+			*loc = entry;
+	} else
+		error = -ENOSPC;
+	return error;
+}
+
+
+/**
+ *	free_data - Free the swap entries used by the saved image.
+ *
+ *	Walk the list of used swap entries and free each one. 
+ */
+
+static void free_data(void)
+{
+	swp_entry_t entry;
 	int i;
-	swp_entry_t entry, prev = { 0 };
-	int nr_pgdir_pages = SUSPEND_PD_PAGES(pmdisk_pages);
-	union diskpage *cur,  *buffer = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
-	unsigned long address;
-	struct page *page;
+
+	for (i = 0; i < pmdisk_pages; i++) {
+		entry = (pm_pagedir_nosave + i)->swap_address;
+		if (entry.val)
+			swap_free(entry);
+		else
+			break;
+		(pm_pagedir_nosave + i)->swap_address = (swp_entry_t){0};
+	}
+}
+
+
+/**
+ *	write_data - Write saved image to swap.
+ *
+ *	Walk the list of pages in the image and sync each one to swap.
+ */
+
+static int write_data(void)
+{
+	int error = 0;
+	int i;
 
 	printk( "Writing data to swap (%d pages): ", pmdisk_pages );
-	for (i=0; i<pmdisk_pages; i++) {
+	for (i = 0; i < pmdisk_pages && !error; i++) {
 		if (!(i%100))
 			printk( "." );
-		if (!(entry = get_swap_page()).val)
-			panic("\nNot enough swapspace when writing data" );
-		
-		if (swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
-			panic("\nPage %d: not enough swapspace on suspend device", i );
-	    
-		address = (pm_pagedir_nosave+i)->address;
-		page = virt_to_page(address);
-		rw_swap_page_sync(WRITE, entry, page);
-		(pm_pagedir_nosave+i)->swap_address = entry;
+		error = write_swap_page((pm_pagedir_nosave+i)->address,
+					&((pm_pagedir_nosave+i)->swap_address));
 	}
 	printk( "|\n" );
+	return error;
+}
+
+
+/**
+ *	free_pagedir - Free pages used by the page directory.
+ */
+
+static void free_pagedir(void)
+{
+	int num = SUSPEND_PD_PAGES(pmdisk_pages);
+	union diskpage * cur;
+	swp_entry_t entry;
+	int i;
+
+	for (i = 0; i < num; i++) {
+		cur = (union diskpage *)((char *) pm_pagedir_nosave)+i;
+		entry = cur->link.next;
+		if (entry.val)
+			swap_free(entry);
+	}
+}
+
+
+/**
+ *	write_pagedir - Write the array of pages holding the page directory.
+ *	@last:	Last swap entry we write (needed for header).
+ */
+
+static int write_pagedir(swp_entry_t * last)
+{
+	int nr_pgdir_pages = SUSPEND_PD_PAGES(pmdisk_pages);
+	union diskpage *cur;
+	swp_entry_t prev = {0};
+	int error = 0;
+	int i;
+
 	printk( "Writing pagedir (%d pages): ", nr_pgdir_pages);
-	for (i=0; i<nr_pgdir_pages; i++) {
+	for (i = 0; i < nr_pgdir_pages && !error; i++) {
 		cur = (union diskpage *)((char *) pm_pagedir_nosave)+i;
 		BUG_ON ((char *) cur != (((char *) pm_pagedir_nosave) + i*PAGE_SIZE));
 		printk( "." );
-		if (!(entry = get_swap_page()).val) {
-			printk(KERN_CRIT "Not enough swapspace when writing pgdir\n" );
-			panic("Don't know how to recover");
-			free_page((unsigned long) buffer);
-			return -ENOSPC;
-		}
 
-		if(swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
-			panic("\nNot enough swapspace for pagedir on suspend device" );
-
-		BUG_ON (sizeof(swp_entry_t) != sizeof(long));
-		BUG_ON (PAGE_SIZE % sizeof(struct pbe));
-
-		cur->link.next = prev;				
-		page = virt_to_page((unsigned long)cur);
-		rw_swap_page_sync(WRITE, entry, page);
-		prev = entry;
+		cur->link.next = prev;
+		error = write_swap_page((unsigned long)cur,&prev);
 	}
+	*last = prev;
+	return error;
+}
+
+
+/**
+ *	write_header - Fill and write the suspend header.
+ *	@entry:	Location of the last swap entry used.
+ *
+ *	Allocate a page, fill header, write header. 
+ *
+ *	@entry is the location of the last pagedir entry written on 
+ *	entrance. On exit, it contains the location of the header. 
+ */
+
+static int write_header(swp_entry_t * entry)
+{
+	union diskpage * buffer;
+	int error;
+
+	buffer = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
+	if (!buffer)
+		return -ENOMEM;
+
 	printk("H");
-	BUG_ON (sizeof(struct suspend_header) > PAGE_SIZE-sizeof(swp_entry_t));
-	BUG_ON (sizeof(union diskpage) != PAGE_SIZE);
-	if (!(entry = get_swap_page()).val)
-		panic( "\nNot enough swapspace when writing header" );
-	if (swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
-		panic("\nNot enough swapspace for header on suspend device" );
-
-	cur = (void *) buffer;
-	if (fill_suspend_header(&cur->sh))
-		panic("\nOut of memory while writing header");
-		
-	cur->link.next = prev;
-
-	page = virt_to_page((unsigned long)cur);
-	rw_swap_page_sync(WRITE, entry, page);
-	prev = entry;
-
-	printk( "S" );
-	mark_swapfiles(prev);
-	printk( "|\n" );
-
+	fill_suspend_header(&buffer->sh);
+	buffer->link.next = *entry;
+	error = write_swap_page((unsigned long)buffer,entry);
 	free_page((unsigned long) buffer);
-	return 0;
+	return error;
+}
+
+
+/**
+ *	write_suspend_image - Write entire image and metadata.
+ *
+ */
+
+static int write_suspend_image(void)
+{
+	int error;
+	swp_entry_t prev = { 0 };
+
+	if ((error = write_data()))
+		goto FreeData;
+
+	if ((error = write_pagedir(&prev)))
+		goto FreePagedir;
+
+	if ((error = write_header(&prev)))
+		goto FreePagedir;
+
+	error = mark_swapfiles(prev);
+	printk( "|\n" );
+ Done:
+	return error;
+ FreePagedir:
+	free_pagedir();
+ FreeData:
+	free_data();
+	goto Done;
 }
 
 /* if pagedir_p != NULL it also copies the counted pages */
@@ -359,7 +473,7 @@ static suspend_pagedir_t *create_suspend_pagedir(int nr_copy_pages)
 	p = pagedir = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD, pagedir_order);
 	if(!pagedir)
 		return NULL;
-
+	memset(p,0,pagedir_order * PAGE_SIZE);
 	page = virt_to_page(pagedir);
 	for(i=0; i < 1<<pagedir_order; i++)
 		SetPageNosave(page++);
@@ -728,9 +842,9 @@ static int __init read_suspend_image(void)
 	 */
 	next = next_entry(cur);
 
-	if (!memcmp("S1",cur->swh.magic.magic,2))
+	if (!memcmp("P1",cur->swh.magic.magic,2))
 		memcpy(cur->swh.magic.magic,"SWAP-SPACE",10);
-	else if (!memcmp("S2",cur->swh.magic.magic,2))
+	else if (!memcmp("P2",cur->swh.magic.magic,2))
 		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
 	else if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)) ||
 		 (!memcmp("SWAPSPACE2",cur->swh.magic.magic,10))) {
