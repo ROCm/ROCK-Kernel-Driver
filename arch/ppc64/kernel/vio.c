@@ -26,7 +26,9 @@
 #include <asm/vio.h>
 #include <asm/hvcall.h>
 #include <asm/iSeries/vio.h>
+#include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/HvCallXm.h>
+#include <asm/iSeries/HvLpConfig.h>
 
 #define DBGENTER() pr_debug("%s entered\n", __FUNCTION__)
 
@@ -48,19 +50,11 @@ static struct vio_dev *__init vio_register_device_iseries(char *type,
 static struct iommu_table veth_iommu_table;
 static struct iommu_table vio_iommu_table;
 
-static struct vio_dev _veth_dev = {
-	.iommu_table = &veth_iommu_table,
-	.dev.bus = &vio_bus_type
-};
 static struct vio_dev _vio_dev  = {
 	.iommu_table = &vio_iommu_table,
 	.dev.bus = &vio_bus_type
 };
-
-struct vio_dev *iSeries_veth_dev = &_veth_dev;
 struct device *iSeries_vio_dev = &_vio_dev.dev;
-
-EXPORT_SYMBOL(iSeries_veth_dev);
 EXPORT_SYMBOL(iSeries_vio_dev);
 
 #define device_is_compatible(a, b)	1
@@ -227,6 +221,18 @@ static void probe_bus_pseries(void)
 #ifdef CONFIG_PPC_ISERIES
 static void probe_bus_iseries(void)
 {
+	HvLpIndexMap vlan_map = HvLpConfig_getVirtualLanIndexMap();
+	struct vio_dev *viodev;
+	int i;
+
+	vlan_map = HvLpConfig_getVirtualLanIndexMap();
+	for (i = 0; i < HVMAXARCHITECTEDVIRTUALLANS; i++) {
+		if ((vlan_map & (0x8000 >> i)) == 0)
+			continue;
+		viodev = vio_register_device_iseries("vlan", i);
+		/* veth is special and has it own iommu_table */
+		viodev->iommu_table = &veth_iommu_table;
+	}
 }
 #endif
 
