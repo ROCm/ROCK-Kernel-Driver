@@ -1153,9 +1153,7 @@ dgrs_probe1(struct net_device *dev)
 	 */
 	rc = dgrs_download(dev);
 	if (rc)
-	{
-		return rc;
-	}
+		goto err_out;
 
 	/*
 	 * Get ether address of board
@@ -1169,7 +1167,8 @@ dgrs_probe1(struct net_device *dev)
 	if (dev->dev_addr[0] & 1)
 	{
 		printk("%s: Illegal Ethernet Address\n", dev->name);
-		return (-ENXIO);
+		rc = -ENXIO;
+		goto err_out;
 	}
 
 	/*
@@ -1178,9 +1177,10 @@ dgrs_probe1(struct net_device *dev)
 	 */
 	if (priv->plxreg)
 		OUTL(dev->base_addr + PLX_LCL2PCI_DOORBELL, 1);
+	
 	rc = request_irq(dev->irq, &dgrs_intr, SA_SHIRQ, "RightSwitch", dev);
 	if (rc)
-		return (rc);
+		goto err_out;
 
 	priv->intrcnt = 0;
 	for (i = jiffies + 2*HZ + HZ/2; time_after(i, jiffies); )
@@ -1191,16 +1191,22 @@ dgrs_probe1(struct net_device *dev)
 	}
 	if (priv->intrcnt < 2)
 	{
-		printk("%s: Not interrupting on IRQ %d (%d)\n",
+		printk(KERN_ERR "%s: Not interrupting on IRQ %d (%d)\n",
 				dev->name, dev->irq, priv->intrcnt);
-		return (-ENXIO);
+		rc = -ENXIO;
+		goto err_free_irq;
 	}
 
 	/*
 	 *	Register the /proc/ioports information...
 	 */
-	request_region(dev->base_addr, 256, "RightSwitch");
-
+	if (!request_region(dev->base_addr, 256, "RightSwitch")) {
+		printk(KERN_ERR "%s: io 0x%3lX, which is busy.\n", dev->name,
+				dev->base_addr);
+		rc = -EBUSY;
+		goto err_free_irq;
+	}
+	
 	/*
 	 *	Entry points...
 	 */
@@ -1211,7 +1217,12 @@ dgrs_probe1(struct net_device *dev)
 	dev->set_multicast_list = &dgrs_set_multicast_list;
 	dev->do_ioctl = &dgrs_ioctl;
 
-	return (0);
+	return rc;
+
+err_free_irq:
+	free_irq(dev->irq, dev);
+err_out:
+       	return rc;
 }
 
 int __init 
