@@ -424,7 +424,7 @@ void irlan_disconnect_indication(void *instance, void *sap, LM_REASON reason,
 		IRDA_DEBUG(2, __FUNCTION__ "(), IrLMP connect failed\n");
 		break;
 	default:
-		ERROR(__FUNCTION__ "(), Unknown disconnect reason\n");
+		ERROR("%s(), Unknown disconnect reason\n", __FUNCTION__);
 		break;
 	}
 	
