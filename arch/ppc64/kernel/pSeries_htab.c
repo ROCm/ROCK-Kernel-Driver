@@ -103,7 +103,7 @@ long pSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
 
 	__asm__ __volatile__ ("ptesync" : : : "memory");
 
-	return i;
+	return i | (secondary << 3);
 }
 
 static long pSeries_hpte_remove(unsigned long hpte_group)
@@ -300,7 +300,7 @@ static void pSeries_flush_hash_range(unsigned long context,
 	int i, j;
 	HPTE *hptep;
 	Hpte_dword0 dw0;
-	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[smp_processor_id()];
+	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
 
 	/* XXX fix for large ptes */
 	unsigned long large = 0;

@@ -12,6 +12,7 @@
 #define INCLUDES
 #include "compat_ioctl.c"
 #include <linux/ncp_fs.h>
+#include <linux/syscalls.h>
 #include <asm/fbio.h>
 #include <asm/kbio.h>
 #include <asm/vuid_event.h>

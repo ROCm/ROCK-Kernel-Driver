@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/ccwgroup.c
  *  bus driver for ccwgroup
- *   $Revision: 1.19 $
+ *   $Revision: 1.24 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *                       IBM Corporation
@@ -164,6 +164,7 @@ ccwgroup_create(struct device *root,
 		return -ENOMEM;
 
 	memset(gdev, 0, sizeof(*gdev) + argc*sizeof(gdev->cdev[0]));
+	atomic_set(&gdev->onoff, 0);
 
 	for (i = 0; i < argc; i++) {
 		gdev->cdev[i] = get_ccwdev_by_busid(cdrv, argv[i]);
@@ -242,18 +243,24 @@ ccwgroup_set_online(struct ccwgroup_device *gdev)
 	struct ccwgroup_driver *gdrv;
 	int ret;
 
-	if (gdev->state == CCWGROUP_ONLINE)
-		return 0;
-
-	if (!gdev->dev.driver)
-		return -EINVAL;
-
+	if (atomic_compare_and_swap(0, 1, &gdev->onoff))
+		return -EAGAIN;
+	if (gdev->state == CCWGROUP_ONLINE) {
+		ret = 0;
+		goto out;
+	}
+	if (!gdev->dev.driver) {
+		ret = -EINVAL;
+		goto out;
+	}
 	gdrv = to_ccwgroupdrv (gdev->dev.driver);
 	if ((ret = gdrv->set_online(gdev)))
-		return ret;
+		goto out;
 
 	gdev->state = CCWGROUP_ONLINE;
-	return 0;
+ out:
+	atomic_set(&gdev->onoff, 0);
+	return ret;
 }
 
 static int
@@ -262,40 +269,52 @@ ccwgroup_set_offline(struct ccwgroup_device *gdev)
 	struct ccwgroup_driver *gdrv;
 	int ret;
 
-	if (gdev->state == CCWGROUP_OFFLINE)
-		return 0;
-
-	if (!gdev->dev.driver)
-		return -EINVAL;
-
+	if (atomic_compare_and_swap(0, 1, &gdev->onoff))
+		return -EAGAIN;
+	if (gdev->state == CCWGROUP_OFFLINE) {
+		ret = 0;
+		goto out;
+	}
+	if (!gdev->dev.driver) {
+		ret = -EINVAL;
+		goto out;
+	}
 	gdrv = to_ccwgroupdrv (gdev->dev.driver);
 	if ((ret = gdrv->set_offline(gdev)))
-		return ret;
+		goto out;
 
 	gdev->state = CCWGROUP_OFFLINE;
-	return 0;
+ out:
+	atomic_set(&gdev->onoff, 0);
+	return ret;
 }
 
 static ssize_t
 ccwgroup_online_store (struct device *dev, const char *buf, size_t count)
 {
 	struct ccwgroup_device *gdev;
+	struct ccwgroup_driver *gdrv;
 	unsigned int value;
+	int ret;
 
 	gdev = to_ccwgroupdev(dev);
 	if (!dev->driver)
 		return count;
 
-	value = simple_strtoul(buf, 0, 0);
+	gdrv = to_ccwgroupdrv (gdev->dev.driver);
+	if (!try_module_get(gdrv->owner))
+		return -EINVAL;
 
+	value = simple_strtoul(buf, 0, 0);
+	ret = count;
 	if (value == 1)
 		ccwgroup_set_online(gdev);
 	else if (value == 0)
 		ccwgroup_set_offline(gdev);
 	else
-		return -EINVAL;
-
-	return count;
+		ret = -EINVAL;
+	module_put(gdrv->owner);
+	return ret;
 }
 
 static ssize_t
@@ -324,7 +343,7 @@ ccwgroup_probe (struct device *dev)
 	if ((ret = device_create_file(dev, &dev_attr_online)))
 		return ret;
 
-	pr_debug("%s: device %s\n", __func__, gdev->dev.name);
+	pr_debug("%s: device %s\n", __func__, gdev->dev.bus_id);
 	ret = gdrv->probe ? gdrv->probe(gdev) : -ENODEV;
 	if (ret)
 		device_remove_file(dev, &dev_attr_online);
@@ -341,7 +360,7 @@ ccwgroup_remove (struct device *dev)
 	gdev = to_ccwgroupdev(dev);
 	gdrv = to_ccwgroupdrv(dev->driver);
 
-	pr_debug("%s: device %s\n", __func__, gdev->dev.name);
+	pr_debug("%s: device %s\n", __func__, gdev->dev.bus_id);
 
 	device_remove_file(dev, &dev_attr_online);
 

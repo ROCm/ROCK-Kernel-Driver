@@ -589,7 +589,7 @@ EXPORT_SYMBOL(execute_drive_cmd);
 ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 {
 	ide_startstop_t startstop;
-	unsigned long block;
+	sector_t block;
 
 	BUG_ON(!(rq->flags & REQ_STARTED));
 

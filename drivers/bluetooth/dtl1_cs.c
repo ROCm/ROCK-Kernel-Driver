@@ -77,7 +77,7 @@ typedef struct dtl1_info_t {
 	dev_link_t link;
 	dev_node_t node;
 
-	struct hci_dev hdev;
+	struct hci_dev *hdev;
 
 	spinlock_t lock;		/* For serializing operations */
 
@@ -188,7 +188,7 @@ static void dtl1_write_wakeup(dtl1_info_t *info)
 			skb_queue_head(&(info->txq), skb);
 		}
 
-		info->hdev.stat.byte_tx += len;
+		info->hdev->stat.byte_tx += len;
 
 	} while (test_bit(XMIT_WAKEUP, &(info->tx_state)));
 
@@ -233,7 +233,7 @@ static void dtl1_receive(dtl1_info_t *info)
 	iobase = info->link.io.BasePort1;
 
 	do {
-		info->hdev.stat.byte_rx++;
+		info->hdev->stat.byte_rx++;
 
 		/* Allocate packet */
 		if (info->rx_skb == NULL)
@@ -277,7 +277,7 @@ static void dtl1_receive(dtl1_info_t *info)
 				case 0x83:
 				case 0x84:
 					/* send frame to the HCI layer */
-					info->rx_skb->dev = (void *)&(info->hdev);
+					info->rx_skb->dev = (void *) info->hdev;
 					info->rx_skb->pkt_type &= 0x0f;
 					hci_recv_frame(info->rx_skb);
 					break;
@@ -508,8 +508,13 @@ int dtl1_open(dtl1_info_t *info)
 
 
 	/* Initialize and register HCI device */
+	hdev = hci_alloc_dev();
+	if (!hdev) {
+		printk(KERN_WARNING "dtl1_cs: Can't allocate HCI device.\n");
+		return -ENOMEM;
+	}
 
-	hdev = &(info->hdev);
+	info->hdev = hdev;
 
 	hdev->type = HCI_PCCARD;
 	hdev->driver_data = info;
@@ -522,9 +527,10 @@ int dtl1_open(dtl1_info_t *info)
 	hdev->ioctl = dtl1_hci_ioctl;
 
 	hdev->owner = THIS_MODULE;
-	
+
 	if (hci_register_dev(hdev) < 0) {
-		printk(KERN_WARNING "dtl1_cs: Can't register HCI device %s.\n", hdev->name);
+		printk(KERN_WARNING "dtl1_cs: Can't register HCI device.\n");
+		hci_free_dev(hdev);
 		return -ENODEV;
 	}
 
@@ -536,7 +542,7 @@ int dtl1_close(dtl1_info_t *info)
 {
 	unsigned long flags;
 	unsigned int iobase = info->link.io.BasePort1;
-	struct hci_dev *hdev = &(info->hdev);
+	struct hci_dev *hdev = info->hdev;
 
 	dtl1_hci_close(hdev);
 
@@ -552,6 +558,8 @@ int dtl1_close(dtl1_info_t *info)
 
 	if (hci_unregister_dev(hdev) < 0)
 		printk(KERN_WARNING "dtl1_cs: Can't unregister HCI device %s.\n", hdev->name);
+
+	hci_free_dev(hdev);
 
 	return 0;
 }
@@ -741,7 +749,7 @@ void dtl1_config(dev_link_t *link)
 	if (dtl1_open(info) != 0)
 		goto failed;
 
-	strcpy(info->node.dev_name, info->hdev.name);
+	strcpy(info->node.dev_name, info->hdev->name);
 	link->dev = &info->node;
 	link->state &= ~DEV_CONFIG_PENDING;
 

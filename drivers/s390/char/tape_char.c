@@ -20,6 +20,7 @@
 
 #include "tape.h"
 #include "tape_std.h"
+#include "tape_class.h"
 
 #define PRINTK_HEADER "TAPE_CHAR: "
 
@@ -47,20 +48,50 @@ static struct file_operations tape_fops =
 
 static int tapechar_major = TAPECHAR_MAJOR;
 
+struct cdev *
+tapechar_register_tape_dev(struct tape_device *device, char *name, int i)
+{
+	struct cdev *	cdev;
+	char		devname[11];
+
+	sprintf(devname, "%s%i", name, i / 2);
+	cdev = register_tape_dev(
+		&device->cdev->dev,
+		MKDEV(tapechar_major, i),
+		&tape_fops,
+		devname
+	);
+
+	return ((IS_ERR(cdev)) ? NULL : cdev);
+}
+
 /*
  * This function is called for every new tapedevice
  */
 int
 tapechar_setup_device(struct tape_device * device)
 {
-	tape_hotplug_event(device, tapechar_major, TAPE_HOTPLUG_CHAR_ADD);
+	device->nt = tapechar_register_tape_dev(
+			device,
+			"ntibm",
+			device->first_minor
+	);
+	device->rt = tapechar_register_tape_dev(
+			device,
+			"rtibm",
+			device->first_minor + 1
+	);
+
 	return 0;
 }
 
 void
 tapechar_cleanup_device(struct tape_device *device)
 {
-	tape_hotplug_event(device, tapechar_major, TAPE_HOTPLUG_CHAR_REMOVE);
+	unregister_tape_dev(device->rt);
+	device->rt = NULL;
+	unregister_tape_dev(device->nt);
+	device->nt = NULL;
 }
 
 /*
@@ -461,20 +492,17 @@ tapechar_ioctl(struct inode *inp, struct file *filp,
 int
 tapechar_init (void)
 {
-	int rc;
+	dev_t	dev;
 
-	/* Register the tape major number to the kernel */
-	rc = register_chrdev(tapechar_major, "tape", &tape_fops);
-	if (rc < 0) {
-		PRINT_ERR("can't get major %d\n", tapechar_major);
-		DBF_EVENT(3, "TCHAR:initfail\n");
-		return rc;
-	}
-	if (tapechar_major == 0)
-		tapechar_major = rc;  /* accept dynamic major number */
-	PRINT_ERR("Tape gets major %d for char device\n", tapechar_major);
-	DBF_EVENT(3, "Tape gets major %d for char device\n", rc);
-	DBF_EVENT(3, "TCHAR:init ok\n");
+	if (alloc_chrdev_region(&dev, 0, 256, "tape") != 0)
+		return -1;
+
+	tapechar_major = MAJOR(dev);
+	PRINT_INFO("tape gets major %d for character devices\n", MAJOR(dev));
+
+#ifdef TAPE390_INTERNAL_CLASS
+	tape_setup_class();
+#endif
 	return 0;
 }
 
@@ -484,5 +512,10 @@ tapechar_init (void)
 void
 tapechar_exit(void)
 {
-	unregister_chrdev (tapechar_major, "tape");
+#ifdef TAPE390_INTERNAL_CLASS
+	tape_cleanup_class();
+#endif
+	PRINT_INFO("tape releases major %d for character devices\n",
+		tapechar_major);
+	unregister_chrdev_region(MKDEV(tapechar_major, 0), 256);
 }

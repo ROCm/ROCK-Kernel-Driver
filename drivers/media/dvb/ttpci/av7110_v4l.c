@@ -191,7 +191,7 @@ int av7110_dvb_c_switch(struct saa7146_fh *fh)
 
 	if (0 != av7110->current_input) {
 		adswitch = 1;
-		band = 0x68; /* analog band */
+		band = 0x60; /* analog band */
 		source = SAA7146_HPS_SOURCE_PORT_B;
 		sync = SAA7146_HPS_SYNC_PORT_B;
 		memcpy(standard, analog_standard, sizeof(struct saa7146_standard) * 2);
@@ -204,7 +204,7 @@ int av7110_dvb_c_switch(struct saa7146_fh *fh)
 		msp_writereg(av7110, MSP_WR_DSP, 0x0007, 0x4f00); // SCART 1 volume
 	} else {
 		adswitch = 0;
-		band = 0x28; /* digital band */
+		band = 0x20; /* digital band */
 		source = SAA7146_HPS_SOURCE_PORT_A;
 		sync = SAA7146_HPS_SYNC_PORT_A;
 		memcpy(standard, dvb_standard, sizeof(struct saa7146_standard) * 2);
@@ -638,7 +638,7 @@ static struct saa7146_standard standard[] = {
 static struct saa7146_standard analog_standard[] = {
 	{
 		.name	= "PAL",	.id		= V4L2_STD_PAL_BG,
-		.v_offset	= 0x18 /* 0 */ ,	.v_field	= 288,		.v_calc	= 576,
+		.v_offset	= 0x1b,	.v_field	= 288,		.v_calc	= 576,
 		.h_offset	= 0x08,	.h_pixels	= 708,		.h_calc	= 709,
 		.v_max_out	= 576,	.h_max_out	= 768,
 	}, {

@@ -484,7 +484,7 @@ nfssvc_encode_entry(struct readdir_cd *ccd, const char *name,
 
 	slen = XDR_QUADLEN(namlen);
 	if ((buflen = cd->buflen - slen - 4) < 0) {
-		cd->common.err = nfserr_readdir_nospc;
+		cd->common.err = nfserr_toosmall;
 		return -EINVAL;
 	}
 	*p++ = xdr_one;				/* mark entry present */

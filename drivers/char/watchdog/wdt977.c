@@ -365,5 +365,7 @@ static void __exit nwwatchdog_exit(void)
 module_init(nwwatchdog_init);
 module_exit(nwwatchdog_exit);
 
+MODULE_AUTHOR("Woody Suwalski <woody@netwinder.org>");
 MODULE_DESCRIPTION("W83977AF Watchdog driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);

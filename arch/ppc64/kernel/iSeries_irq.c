@@ -55,19 +55,18 @@ static hw_irq_controller iSeries_IRQ_handler = {
 	.end = iSeries_end_IRQ
 };
 
-void iSeries_init_irq_desc(irq_desc_t *desc)
-{
-	desc->handler = &iSeries_IRQ_handler;
-}
+/* This maps virtual irq numbers to real irqs */
+unsigned int virt_irq_to_real_map[NR_IRQS];
+
+/* The next available virtual irq number */
+/* Note: the pcnet32 driver assumes irq numbers < 2 aren't valid. :( */
+static int next_virtual_irq = 2;
 
 /* This is called by init_IRQ.  set in ppc_md.init_IRQ by iSeries_setup.c */
 void __init iSeries_init_IRQ(void)
 {
 	/* Register PCI event handler and open an event path */
-	PPCDBG(PPCDBG_BUSWALK,
-			"Register PCI event handler and open an event path\n");
 	XmPciLpEvent_init();
-	return;
 }
 
 /*
@@ -78,25 +77,32 @@ void __init iSeries_init_IRQ(void)
 int __init iSeries_allocate_IRQ(HvBusNumber busNumber,
 		HvSubBusNumber subBusNumber, HvAgentId deviceId)
 {
+	unsigned int realirq, virtirq;
 	u8 idsel = (deviceId >> 4);
 	u8 function = deviceId & 7;
 
-	return ((busNumber - 1) << 6) + ((idsel - 1) << 3) + function + 1;
+	virtirq = next_virtual_irq++;
+	realirq = ((busNumber - 1) << 6) + ((idsel - 1) << 3) + function;
+	virt_irq_to_real_map[virtirq] = realirq;
+
+	irq_desc[virtirq].handler = &iSeries_IRQ_handler;
+	return virtirq;
 }
 
-#define IRQ_TO_BUS(irq)		(((((irq) - 1) >> 6) & 0xff) + 1)
-#define IRQ_TO_IDSEL(irq)	(((((irq) - 1) >> 3) & 7) + 1)
-#define IRQ_TO_FUNC(irq)	(((irq) - 1) & 7)
+#define REAL_IRQ_TO_BUS(irq)	((((irq) >> 6) & 0xff) + 1)
+#define REAL_IRQ_TO_IDSEL(irq)	((((irq) >> 3) & 7) + 1)
+#define REAL_IRQ_TO_FUNC(irq)	((irq) & 7)
 
 /* This is called by iSeries_activate_IRQs */
 static unsigned int iSeries_startup_IRQ(unsigned int irq)
 {
 	u32 bus, deviceId, function, mask;
 	const u32 subBus = 0;
+	unsigned int rirq = virt_irq_to_real_map[irq];
 
-	bus = IRQ_TO_BUS(irq);
-	function = IRQ_TO_FUNC(irq);
-	deviceId = (IRQ_TO_IDSEL(irq) << 4) + function;
+	bus = REAL_IRQ_TO_BUS(rirq);
+	function = REAL_IRQ_TO_FUNC(rirq);
+	deviceId = (REAL_IRQ_TO_IDSEL(rirq) << 4) + function;
 
 	/* Link the IRQ number to the bridge */
 	HvCallXm_connectBusUnit(bus, subBus, deviceId, irq);
@@ -104,15 +110,8 @@ static unsigned int iSeries_startup_IRQ(unsigned int irq)
 	/* Unmask bridge interrupts in the FISR */
 	mask = 0x01010000 << function;
 	HvCallPci_unmaskFisr(bus, subBus, deviceId, mask);
-	PPCDBG(PPCDBG_BUSWALK, "iSeries_activate_IRQ 0x%02X.%02X.%02X  Irq:0x%02X\n",
-				bus, subBus, deviceId, irq);
 	return 0;
 }
-
-/*
- * Temporary hack
- */
-#define get_irq_desc(irq)	&irq_desc[(irq)]
 
 /*
  * This is called out of iSeries_fixup to activate interrupt
@@ -124,7 +123,7 @@ void __init iSeries_activate_IRQs()
 	unsigned long flags;
 
 	for (irq = 0; irq < NR_IRQS; irq++) {
-		irq_desc_t *desc = get_irq_desc(irq);
+		irq_desc_t *desc = &irq_desc[irq];
 
 		if (desc && desc->handler && desc->handler->startup) {
 			spin_lock_irqsave(&desc->lock, flags);
@@ -139,11 +138,12 @@ static void iSeries_shutdown_IRQ(unsigned int irq)
 {
 	u32 bus, deviceId, function, mask;
 	const u32 subBus = 0;
+	unsigned int rirq = virt_irq_to_real_map[irq];
 
 	/* irq should be locked by the caller */
-	bus = IRQ_TO_BUS(irq);
-	function = IRQ_TO_FUNC(irq);
-	deviceId = (IRQ_TO_IDSEL(irq) << 4) + function;
+	bus = REAL_IRQ_TO_BUS(rirq);
+	function = REAL_IRQ_TO_FUNC(rirq);
+	deviceId = (REAL_IRQ_TO_IDSEL(rirq) << 4) + function;
 
 	/* Invalidate the IRQ number in the bridge */
 	HvCallXm_connectBusUnit(bus, subBus, deviceId, 0);
@@ -161,11 +161,12 @@ static void iSeries_disable_IRQ(unsigned int irq)
 {
 	u32 bus, deviceId, function, mask;
 	const u32 subBus = 0;
+	unsigned int rirq = virt_irq_to_real_map[irq];
 
 	/* The IRQ has already been locked by the caller */
-	bus = IRQ_TO_BUS(irq);
-	function = IRQ_TO_FUNC(irq);
-	deviceId = (IRQ_TO_IDSEL(irq) << 4) + function;
+	bus = REAL_IRQ_TO_BUS(rirq);
+	function = REAL_IRQ_TO_FUNC(rirq);
+	deviceId = (REAL_IRQ_TO_IDSEL(rirq) << 4) + function;
 
 	/* Mask secondary INTA   */
 	mask = 0x80000000;
@@ -182,11 +183,12 @@ static void iSeries_enable_IRQ(unsigned int irq)
 {
 	u32 bus, deviceId, function, mask;
 	const u32 subBus = 0;
+	unsigned int rirq = virt_irq_to_real_map[irq];
 
 	/* The IRQ has already been locked by the caller */
-	bus = IRQ_TO_BUS(irq);
-	function = IRQ_TO_FUNC(irq);
-	deviceId = (IRQ_TO_IDSEL(irq) << 4) + function;
+	bus = REAL_IRQ_TO_BUS(rirq);
+	function = REAL_IRQ_TO_FUNC(rirq);
+	deviceId = (REAL_IRQ_TO_IDSEL(rirq) << 4) + function;
 
 	/* Unmask secondary INTA */
 	mask = 0x80000000;

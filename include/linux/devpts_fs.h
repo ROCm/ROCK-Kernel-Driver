@@ -11,22 +11,22 @@
  * ------------------------------------------------------------------------- */
 
 #ifndef _LINUX_DEVPTS_FS_H
-#define _LINUX_DEVPTS_FS_H 1
+#define _LINUX_DEVPTS_FS_H
 
 #include <linux/errno.h>
 
-#if CONFIG_UNIX98_PTYS
+#ifdef CONFIG_UNIX98_PTYS
 
-int devpts_pty_new(struct tty_struct *); /* mknod in devpts */
-struct tty_struct *devpts_get_tty(int);	 /* get tty structure */
-void devpts_pty_kill(int);		 /* unlink */
+int devpts_pty_new(struct tty_struct *tty);      /* mknod in devpts */
+struct tty_struct *devpts_get_tty(int number);	 /* get tty structure */
+void devpts_pty_kill(int number);		 /* unlink */
 
 #else
 
 /* Dummy stubs in the no-pty case */
-static inline int devpts_pty_new(struct tty_struct *) { return -EINVAL; }
-static inline struct tty_struct *devpts_get_tty(int)  { return NULL; }
-static inline void devpts_pty_kill(int) { }
+static inline int devpts_pty_new(struct tty_struct *tty) { return -EINVAL; }
+static inline struct tty_struct *devpts_get_tty(int number) { return NULL; }
+static inline void devpts_pty_kill(int number) { }
 
 #endif
 

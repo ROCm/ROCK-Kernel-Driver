@@ -1361,18 +1361,6 @@ int ide_raw_taskfile (ide_drive_t *drive, ide_task_t *args, u8 *buf)
 }
 
 EXPORT_SYMBOL(ide_raw_taskfile);
-	
-#ifdef CONFIG_IDE_TASK_IOCTL_DEBUG
-char * ide_ioctl_verbose (unsigned int cmd)
-{
-	return("unknown");
-}
-
-char * ide_task_cmd_verbose (u8 task)
-{
-	return("unknown");
-}
-#endif /* CONFIG_IDE_TASK_IOCTL_DEBUG */
 
 #define MAX_DMA		(256*SECTOR_WORDS)
 
@@ -1448,13 +1436,6 @@ int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 	args.tf_out_flags = req_task->out_flags;
 	args.data_phase   = req_task->data_phase;
 	args.command_type = req_task->req_cmd;
-
-#ifdef CONFIG_IDE_TASK_IOCTL_DEBUG
-	DTF("%s: ide_ioctl_cmd %s:  ide_task_cmd %s\n",
-		drive->name,
-		ide_ioctl_verbose(cmd),
-		ide_task_cmd_verbose(args.tfRegister[IDE_COMMAND_OFFSET]));
-#endif /* CONFIG_IDE_TASK_IOCTL_DEBUG */
 
 	drive->io_32bit = 0;
 	switch(req_task->data_phase) {

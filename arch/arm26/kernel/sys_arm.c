@@ -21,6 +21,7 @@
 #include <linux/msg.h>
 #include <linux/shm.h>
 #include <linux/stat.h>
+#include <linux/syscalls.h>
 #include <linux/mman.h>
 #include <linux/fs.h>
 #include <linux/file.h>
@@ -138,7 +139,6 @@ out:
  * Perform the select(nd, in, out, ex, tv) and mmap() system
  * calls.
  */
-extern asmlinkage int sys_select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 
 struct sel_arg_struct {
 	unsigned long n;

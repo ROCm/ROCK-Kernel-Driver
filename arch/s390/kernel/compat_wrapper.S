@@ -567,13 +567,15 @@ compat_sys_sigprocmask_wrapper:
 
 	.globl  sys32_init_module_wrapper 
 sys32_init_module_wrapper:
-	llgtr	%r2,%r2			# const char *
-	llgtr	%r3,%r3			# struct module *
+	llgtr	%r2,%r2			# void *
+	llgfr	%r3,%r3			# unsigned long
+	llgtr	%r4,%r4			# char *
 	jg	sys32_init_module	# branch to system call
 
 	.globl  sys32_delete_module_wrapper 
 sys32_delete_module_wrapper:
 	llgtr	%r2,%r2			# const char *
+	llgfr	%r3,%r3			# unsigned int
 	jg	sys32_delete_module	# branch to system call
 
 	.globl  sys32_quotactl_wrapper 

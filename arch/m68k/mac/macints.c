@@ -132,7 +132,6 @@
 #include <asm/mac_psc.h>
 #include <asm/hwtest.h>
 #include <asm/errno.h>
-
 #include <asm/macints.h>
 
 #define DEBUG_SPURIOUS

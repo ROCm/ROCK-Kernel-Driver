@@ -518,7 +518,6 @@ static void __init dc390_check_for_safe_settings (void)
 }
 
 
-#ifndef CONFIG_SCSI_DC390T_NOGENSUPP
 int __initdata tmscsim_def[] = {7, 0 /* 10MHz */,
 		PARITY_CHK_ | SEND_START_ | EN_DISCONNECT_
 		| SYNC_NEGO_ | TAG_QUEUEING_,
@@ -546,7 +545,6 @@ static void __init dc390_fill_with_defaults (void)
 	if (tmscsim[4] >   5) tmscsim[4] =   4;
 	if (tmscsim[5] > 180) tmscsim[5] = 180;
 }
-#endif
 
 /* Override defaults on cmdline:
  * tmscsim: AdaptID, MaxSpeed (Index), DevMode (Bitmapped), AdaptMode (Bitmapped)
@@ -2105,10 +2103,6 @@ static int __init DC390_init (PSHT psht, ULONG io_port, UCHAR Irq, PDEVDECL, UCH
     
     if (dc390_CheckEEpromCheckSum (PDEV, index))
     {
-#ifdef CONFIG_SCSI_DC390T_NOGENSUPP
-	printk (KERN_ERR "DC390_init: No EEPROM found!\n");
-	return( -1 );
-#else
 	int speed;
 	dc390_adapname = "AM53C974";
 	printk (KERN_INFO "DC390_init: No EEPROM found! Trying default settings ...\n");
@@ -2120,7 +2114,6 @@ static int __init DC390_init (PSHT psht, ULONG io_port, UCHAR Irq, PDEVDECL, UCH
 		" DevMode=0x%02x, AdaptMode=0x%02x, TaggedCmnds=%i (%i), DelayReset=%is\n", 
 		tmscsim[0], tmscsim[1], speed/10, speed%10,
 		(UCHAR)tmscsim[2], (UCHAR)tmscsim[3], tmscsim[4], 2 << (tmscsim[4]), tmscsim[5]);
-#endif
     }
     else
     {

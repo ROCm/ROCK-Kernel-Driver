@@ -8,6 +8,7 @@
 #include "linux/version.h"
 #include "linux/sys.h"
 #include "linux/swap.h"
+#include "linux/syscalls.h"
 #include "linux/sysctl.h"
 #include "asm/signal.h"
 #include "sysdep/syscalls.h"
@@ -268,9 +269,9 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_creat ] = sys_creat,
 	[ __NR_link ] = sys_link,
 	[ __NR_unlink ] = sys_unlink,
+	[ __NR_execve ] = (syscall_handler_t *) sys_execve,
 
 	/* declared differently in kern_util.h */
-	[ __NR_execve ] = (syscall_handler_t *) sys_execve,
 	[ __NR_chdir ] = sys_chdir,
 	[ __NR_time ] = um_time,
 	[ __NR_mknod ] = sys_mknod,

@@ -11,7 +11,6 @@ obj-y		:= arch.o compat.o dma.o entry-armv.o entry-common.o irq.o   \
 		   time.o traps.o
 
 obj-$(CONFIG_APM)		+= apm.o
-obj-$(CONFIG_PM)		+= pm.o
 obj-$(CONFIG_ARCH_ACORN)	+= ecard.o time-acorn.o
 obj-$(CONFIG_ARCH_CLPS7500)	+= time-acorn.o
 obj-$(CONFIG_FOOTBRIDGE)	+= isa.o
@@ -30,7 +29,7 @@ obj-$(CONFIG_DEBUG_LL)	+= debug.o
 
 extra-y := $(head-y) init_task.o vmlinux.lds.s
 
-# Spell out some dependencies that `make dep' doesn't spot
+# Spell out some dependencies that aren't automatically figured out
 $(obj)/entry-armv.o: 	$(obj)/entry-header.S include/asm-arm/constants.h
 $(obj)/entry-common.o: 	$(obj)/entry-header.S include/asm-arm/constants.h \
 			$(obj)/calls.S

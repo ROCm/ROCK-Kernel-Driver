@@ -31,6 +31,9 @@ cutype:	    The control unit type / model.
 
 devtype:    The device type / model, if applicable.
 
+availability: Can be 'good' or 'boxed'; 'no path' or 'no device' for
+	      disconnected devices.
+
 online:     An interface to set the device online and offline.
 	    In the special case of the device being disconnected (see the
 	    notify function under 1.2), piping 0 to online will focibly delete
@@ -216,9 +219,17 @@ mind that most drivers will need to implement both a ccwgroup and a ccw driver
 
 Channel paths show up, like subchannels, under the channel subsystem root (css0)
 and are called 'chp0.<chpid>'. They have no driver and do not belong to any bus.
+Please note, that unlike /proc/chpids in 2.4, the channel path objects reflect
+only the logical state and not the physical state, since we cannot track the
+latter consistently due to lacking machine support (we don't need to be aware
+of anyway).
 
-status - Can be 'online', 'logically offline' or 'n/a'.
+status - Can be 'online' or 'offline'.
 	 Piping 'on' or 'off' sets the chpid logically online/offline.
+	 Piping 'on' to an online chpid triggers path reprobing for all devices
+	 the chpid connects to. This can be used to force the kernel to re-use
+	 a channel path the user knows to be online, but the machine hasn't
+	 created a machine check for.
 
 
 3. System devices

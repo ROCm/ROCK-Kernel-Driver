@@ -8,6 +8,7 @@
  */
 
 #include <linux/signal.h>	/* argh, msdos_fs.h isn't self-contained... */
+#include <linux/syscalls.h>
 #include "ia32priv.h"
   
 #define	INCLUDES
@@ -25,8 +26,6 @@
 	set_fs(_old_fs);				\
 	_ret;						\
 })
-
-asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
 
 #define CODE
 #include "compat_ioctl.c"

@@ -103,6 +103,7 @@ static spinlock_t iosapic_lock = SPIN_LOCK_UNLOCKED;
 
 static struct iosapic_intr_info {
 	char		*addr;		/* base address of IOSAPIC */
+	u32		low32;		/* current value of low word of Redirection table entry */
 	unsigned int	gsi_base;	/* first GSI assigned to this IOSAPIC */
 	char		rte_index;	/* IOSAPIC RTE index (-1 => not an IOSAPIC interrupt) */
 	unsigned char	dmode	: 3;	/* delivery mode (see iosapic.h) */
@@ -213,6 +214,7 @@ set_rte (unsigned int vector, unsigned int dest)
 	writel(high32, addr + IOSAPIC_WINDOW);
 	writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
 	writel(low32, addr + IOSAPIC_WINDOW);
+	iosapic_intr_info[vector].low32 = low32;
 }
 
 static void
@@ -239,9 +241,10 @@ mask_irq (unsigned int irq)
 	spin_lock_irqsave(&iosapic_lock, flags);
 	{
 		writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
-		low32 = readl(addr + IOSAPIC_WINDOW);
 
-		low32 |= (1 << IOSAPIC_MASK_SHIFT);    /* set only the mask bit */
+		/* set only the mask bit */
+		low32 = iosapic_intr_info[vec].low32 |= IOSAPIC_MASK;
+
 		writel(low32, addr + IOSAPIC_WINDOW);
 	}
 	spin_unlock_irqrestore(&iosapic_lock, flags);
@@ -264,9 +267,7 @@ unmask_irq (unsigned int irq)
 	spin_lock_irqsave(&iosapic_lock, flags);
 	{
 		writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
-		low32 = readl(addr + IOSAPIC_WINDOW);
-
-		low32 &= ~(1 << IOSAPIC_MASK_SHIFT);    /* clear only the mask bit */
+		low32 = iosapic_intr_info[vec].low32 &= ~IOSAPIC_MASK;
 		writel(low32, addr + IOSAPIC_WINDOW);
 	}
 	spin_unlock_irqrestore(&iosapic_lock, flags);
@@ -307,9 +308,7 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 	{
 		/* get current delivery mode by reading the low32 */
 		writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
-		low32 = readl(addr + IOSAPIC_WINDOW);
-
-		low32 &= ~(7 << IOSAPIC_DELIVERY_SHIFT);
+		low32 = iosapic_intr_info[vec].low32 & ~(7 << IOSAPIC_DELIVERY_SHIFT);
 		if (redir)
 		        /* change delivery mode to lowest priority */
 			low32 |= (IOSAPIC_LOWEST_PRIORITY << IOSAPIC_DELIVERY_SHIFT);
@@ -317,6 +316,7 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 		        /* change delivery mode to fixed */
 			low32 |= (IOSAPIC_FIXED << IOSAPIC_DELIVERY_SHIFT);
 
+		iosapic_intr_info[vec].low32 = low32;
 		writel(IOSAPIC_RTE_HIGH(rte_index), addr + IOSAPIC_REG_SELECT);
 		writel(high32, addr + IOSAPIC_WINDOW);
 		writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.92 $
+ *   $Revision: 1.105 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -27,30 +27,20 @@
 #define CHPID_LONGS (256 / (8 * sizeof(long))) /* 256 chpids */
 static struct channel_path *chps[NR_CHPIDS];
 
-static int new_channel_path(int chpid, int status);
+static void *sei_page;
 
-static inline void
-set_chp_online(int chp, int onoff)
-{
-	chps[chp]->state.online = onoff;
-}
+static int new_channel_path(int chpid);
 
 static inline void
 set_chp_logically_online(int chp, int onoff)
 {
-	chps[chp]->state.logically_online = onoff;
+	chps[chp]->state = onoff;
 }
 
 static int
 get_chp_status(int chp)
 {
-	int ret;
-
-	if (!chps[chp])
-		return 0;
-	ret = chps[chp]->state.online ? CHP_ONLINE : CHP_STANDBY;
-	return (chps[chp]->state.logically_online ?
-		ret : ret | CHP_LOGICALLY_OFFLINE);
+	return (chps[chp] ? chps[chp]->state : -ENODEV);
 }
 
 void
@@ -60,11 +50,23 @@ chsc_validate_chpids(struct subchannel *sch)
 
 	for (chp = 0; chp <= 7; chp++) {
 		mask = 0x80 >> chp;
-		if (get_chp_status(sch->schib.pmcw.chpid[chp])
-		    &  CHP_LOGICALLY_OFFLINE)
+		if (!get_chp_status(sch->schib.pmcw.chpid[chp]))
 			/* disable using this path */
 			sch->opm &= ~mask;
 	}
+}
+
+void
+chpid_is_actually_online(int chp)
+{
+	int state;
+
+	state = get_chp_status(chp);
+	if (state < 0)
+		new_channel_path(chp);
+	else
+		WARN_ON(!state);
+	/* FIXME: should notify other subchannels here */
 }
 
 /* FIXME: this is _always_ called for every subchannel. shouldn't we
@@ -204,8 +206,8 @@ css_get_ssd_info(struct subchannel *sch)
 		/* Allocate channel path structures, if needed. */
 		for (j = 0; j < 8; j++) {
 			chpid = sch->ssd_info.chpid[j];
-			if (chpid && !get_chp_status(chpid))
-			    new_channel_path(chpid, CHP_ONLINE);
+			if (chpid && (get_chp_status(chpid) < 0))
+			    new_channel_path(chpid);
 		}
 	}
 	return ret;
@@ -218,6 +220,7 @@ s390_subchannel_remove_chpid(struct device *dev, void *data)
 	int mask;
 	struct subchannel *sch;
 	__u8 *chpid;
+	struct schib schib;
 
 	sch = to_subchannel(dev);
 	chpid = data;
@@ -230,7 +233,13 @@ s390_subchannel_remove_chpid(struct device *dev, void *data)
 	mask = 0x80 >> j;
 	spin_lock(&sch->lock);
 
-	stsch(sch->irq, &sch->schib);
+	stsch(sch->irq, &schib);
+	if (!schib.pmcw.dnv)
+		goto out_unreg;
+	memcpy(&sch->schib, &schib, sizeof(struct schib));
+	/* Check for single path devices. */
+	if (sch->schib.pmcw.pim == 0x80)
+		goto out_unreg;
 	if (sch->vpm == mask)
 		goto out_unreg;
 
@@ -275,12 +284,9 @@ out_unlock:
 	return 0;
 out_unreg:
 	spin_unlock(&sch->lock);
-	if (sch->driver && sch->driver->notify &&
-	    sch->driver->notify(&sch->dev, CIO_NO_PATH))
-		return 0;
-	device_unregister(&sch->dev);
-	sch->schib.pmcw.intparm = 0;
-	cio_modify(sch);
+	sch->lpm = 0;
+	/* We can't block here. */
+	device_call_nopath_notify(sch);
 	return 0;
 }
 
@@ -292,10 +298,8 @@ s390_set_chpid_offline( __u8 chpid)
 	sprintf(dbf_txt, "chpr%x", chpid);
 	CIO_TRACE_EVENT(2, dbf_txt);
 
-	if (!get_chp_status(chpid))
-		return;	 /* we didn't know the chpid anyway */
-
-	set_chp_online(chpid, 0);
+	if (get_chp_status(chpid) <= 0)
+		return;
 
 	bus_for_each_dev(&css_bus_type, NULL, &chpid,
 			 s390_subchannel_remove_chpid);
@@ -303,15 +307,11 @@ s390_set_chpid_offline( __u8 chpid)
 
 static int
 s390_process_res_acc_sch(u8 chpid, __u16 fla, u32 fla_mask,
-			 struct subchannel *sch, void *page)
+			 struct subchannel *sch)
 {
 	int found;
 	int chp;
 	int ccode;
-	
-	/* Update our ssd_info */
-	if (chsc_get_sch_desc_irq(sch, page))
-		return 0;
 	
 	found = 0;
 	for (chp = 0; chp <= 7; chp++)
@@ -340,14 +340,12 @@ s390_process_res_acc_sch(u8 chpid, __u16 fla, u32 fla_mask,
 	return 0x80 >> chp;
 }
 
-static void
+static int
 s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 {
 	struct subchannel *sch;
-	int irq;
-	int ret;
+	int irq, rc;
 	char dbf_txt[15];
-	void *page;
 
 	sprintf(dbf_txt, "accpr%x", chpid);
 	CIO_TRACE_EVENT( 2, dbf_txt);
@@ -364,18 +362,17 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 	 * will we have to do.
 	 */
 
-	if (get_chp_status(chpid) & CHP_LOGICALLY_OFFLINE)
-		return; /* no need to do the rest */
+	if (!get_chp_status(chpid))
+		return 0; /* no need to do the rest */
 
-	page = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
-	if (!page)
-		return;
-
+	rc = 0;
 	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
-		int chp_mask;
+		int chp_mask, old_lpm;
 
 		sch = get_subchannel_by_schid(irq);
 		if (!sch) {
+			struct schib schib;
+			int ret;
 			/*
 			 * We don't know the device yet, but since a path
 			 * may be available now to the device we'll have
@@ -384,18 +381,29 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 			 * that beast may be on we'll have to do a stsch
 			 * on all devices, grr...
 			 */
-			ret = css_probe_device(irq);
-			if (ret == -ENXIO)
+			if (stsch(irq, &schib)) {
 				/* We're through */
+				if (need_rescan)
+					rc = -EAGAIN;
 				break;
+			}
+			if (need_rescan) {
+				rc = -EAGAIN;
+				continue;
+			}
+			/* Put it on the slow path. */
+			ret = css_enqueue_subchannel_slow(irq);
+			if (ret) {
+				css_clear_subchannel_slow_list();
+				need_rescan = 1;
+			}
+			rc = -EAGAIN;
 			continue;
 		}
 	
 		spin_lock_irq(&sch->lock);
 
-		chp_mask = s390_process_res_acc_sch(chpid, fla, fla_mask,
-						    sch, page);
-		clear_page(page);
+		chp_mask = s390_process_res_acc_sch(chpid, fla, fla_mask, sch);
 
 		if (chp_mask == 0) {
 
@@ -406,21 +414,22 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 			else
 				continue;
 		}
-
+		old_lpm = sch->lpm;
 		sch->lpm = ((sch->schib.pmcw.pim &
 			     sch->schib.pmcw.pam &
 			     sch->schib.pmcw.pom)
 			    | chp_mask) & sch->opm;
-
-		if (sch->driver && sch->driver->verify)
+		spin_unlock_irq(&sch->lock);
+		if (!old_lpm && sch->lpm)
+			device_trigger_reprobe(sch);
+		else if (sch->driver && sch->driver->verify)
 			sch->driver->verify(&sch->dev);
 
-		spin_unlock_irq(&sch->lock);
 		put_device(&sch->dev);
 		if (fla_mask != 0)
 			break;
 	}
-	free_page((unsigned long)page);
+	return rc;
 }
 
 static int
@@ -453,10 +462,10 @@ __get_chpid_from_lir(void *data)
 	return (u16) (lir->indesc[0]&0x000000ff);
 }
 
-void
+int
 chsc_process_crw(void)
 {
-	int chpid;
+	int chpid, ret;
 	struct {
 		struct chsc_header request;
 		u32 reserved1;
@@ -476,21 +485,20 @@ chsc_process_crw(void)
 		/* ccdf has to be big enough for a link-incident record */
 	} *sei_area;
 
+	if (!sei_page)
+		return 0;
 	/*
 	 * build the chsc request block for store event information
 	 * and do the call
+	 * This function is only called by the machine check handler thread,
+	 * so we don't need locking for the sei_page.
 	 */
-	sei_area = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
-
-	if (!sei_area) {
-		CIO_CRW_EVENT(0, "No memory for sei area!\n");
-		return;
-	}
+	sei_area = sei_page;
 
 	CIO_TRACE_EVENT( 2, "prcss");
-
+	ret = 0;
 	do {
-		int ccode;
+		int ccode, status;
 		memset(sei_area, 0, sizeof(*sei_area));
 
 		sei_area->request = (struct chsc_header) {
@@ -500,7 +508,7 @@ chsc_process_crw(void)
 
 		ccode = chsc(sei_area);
 		if (ccode > 0)
-			goto out;
+			return 0;
 
 		switch (sei_area->response.code) {
 			/* for debug purposes, check for problems */
@@ -511,19 +519,19 @@ chsc_process_crw(void)
 		case 0x0002:
 			CIO_CRW_EVENT(2,
 				      "chsc_process_crw: invalid command!\n");
-			goto out;
+			return 0;
 		case 0x0003:
 			CIO_CRW_EVENT(2, "chsc_process_crw: error in chsc "
 				      "request block!\n");
-			goto out;
+			return 0;
 		case 0x0005:
 			CIO_CRW_EVENT(2, "chsc_process_crw: no event "
 				      "information stored\n");
-			goto out;
+			return 0;
 		default:
 			CIO_CRW_EVENT(2, "chsc_process_crw: chsc response %d\n",
 				      sei_area->response.code);
-			goto out;
+			return 0;
 		}
 
 		/* Check if we might have lost some information. */
@@ -561,24 +569,27 @@ chsc_process_crw(void)
 			pr_debug("Validity flags: %x\n", sei_area->vf);
 			
 			/* allocate a new channel path structure, if needed */
-			if (chps[sei_area->rsid] == NULL)
-				new_channel_path(sei_area->rsid, CHP_ONLINE);
-			else
-				set_chp_online(sei_area->rsid, 1);
-			
+			status = get_chp_status(sei_area->rsid);
+			if (status < 0)
+				new_channel_path(sei_area->rsid);
+			else if (!status)
+				return 0;
 			if ((sei_area->vf & 0x80) == 0) {
 				pr_debug("chpid: %x\n", sei_area->rsid);
-				s390_process_res_acc(sei_area->rsid, 0, 0);
+				ret = s390_process_res_acc(sei_area->rsid,
+							   0, 0);
 			} else if ((sei_area->vf & 0xc0) == 0x80) {
 				pr_debug("chpid: %x link addr: %x\n",
 					 sei_area->rsid, sei_area->fla);
-				s390_process_res_acc(sei_area->rsid,
-						     sei_area->fla, 0xff00);
+				ret = s390_process_res_acc(sei_area->rsid,
+							   sei_area->fla,
+							   0xff00);
 			} else if ((sei_area->vf & 0xc0) == 0xc0) {
 				pr_debug("chpid: %x full link addr: %x\n",
 					 sei_area->rsid, sei_area->fla);
-				s390_process_res_acc(sei_area->rsid,
-						     sei_area->fla, 0xffff);
+				ret = s390_process_res_acc(sei_area->rsid,
+							   sei_area->fla,
+							   0xffff);
 			}
 			pr_debug("\n");
 			
@@ -590,33 +601,47 @@ chsc_process_crw(void)
 			break;
 		}
 	} while (sei_area->flags & 0x80);
-
-out:
-	free_page((unsigned long)sei_area);
+	return ret;
 }
 
-static void
+static int
 chp_add(int chpid)
 {
 	struct subchannel *sch;
-	int irq, ret;
+	int irq, ret, rc;
 	char dbf_txt[15];
 
-	if (get_chp_status(chpid) & CHP_LOGICALLY_OFFLINE)
-		return; /* no need to do the rest */
+	if (!get_chp_status(chpid))
+		return 0; /* no need to do the rest */
 	
 	sprintf(dbf_txt, "cadd%x", chpid);
 	CIO_TRACE_EVENT(2, dbf_txt);
 
+	rc = 0;
 	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
 		int i;
 
 		sch = get_subchannel_by_schid(irq);
 		if (!sch) {
-			ret = css_probe_device(irq);
-			if (ret == -ENXIO)
+			struct schib schib;
+
+			if (stsch(irq, &schib)) {
 				/* We're through */
-				return;
+				if (need_rescan)
+					rc = -EAGAIN;
+				break;
+			}
+			if (need_rescan) {
+				rc = -EAGAIN;
+				continue;
+			}
+			/* Put it on the slow path. */
+			ret = css_enqueue_subchannel_slow(irq);
+			if (ret) {
+				css_clear_subchannel_slow_list();
+				need_rescan = 1;
+			}
+			rc = -EAGAIN;
 			continue;
 		}
 	
@@ -626,13 +651,13 @@ chp_add(int chpid)
 				if (stsch(sch->irq, &sch->schib) != 0) {
 					/* Endgame. */
 					spin_unlock(&sch->lock);
-					return;
+					return rc;
 				}
 				break;
 			}
 		if (i==8) {
 			spin_unlock(&sch->lock);
-			return;
+			return rc;
 		}
 		sch->lpm = ((sch->schib.pmcw.pim &
 			     sch->schib.pmcw.pam &
@@ -645,70 +670,80 @@ chp_add(int chpid)
 		spin_unlock(&sch->lock);
 		put_device(&sch->dev);
 	}
+	return rc;
 }
 
 /* 
  * Handling of crw machine checks with channel path source.
  */
-void
+int
 chp_process_crw(int chpid, int on)
 {
 	if (on == 0) {
 		/* Path has gone. We use the link incident routine.*/
 		s390_set_chpid_offline(chpid);
-	} else {
-		/* 
-		 * Path has come. Allocate a new channel path structure,
-		 * if needed. 
-		 */
-		if (chps[chpid] == NULL)
-			new_channel_path(chpid, CHP_ONLINE);
-		else
-			set_chp_online(chpid, 1);
-		/* Avoid the extra overhead in process_rec_acc. */
-		chp_add(chpid);
+		return 0; /* De-register is async anyway. */
 	}
+	/*
+	 * Path has come. Allocate a new channel path structure,
+	 * if needed.
+	 */
+	if (get_chp_status(chpid) < 0)
+		new_channel_path(chpid);
+	/* Avoid the extra overhead in process_rec_acc. */
+	return chp_add(chpid);
 }
 
-static inline void
+static inline int
 __check_for_io_and_kill(struct subchannel *sch, int index)
 {
 	int cc;
 
 	cc = stsch(sch->irq, &sch->schib);
 	if (cc)
-		return;
-	if (sch->schib.scsw.actl && sch->schib.pmcw.lpum == (0x80 >> index))
+		return 0;
+	if (sch->schib.scsw.actl && sch->schib.pmcw.lpum == (0x80 >> index)) {
 		device_set_waiting(sch);
+		return 1;
+	}
+	return 0;
 }
 
 static inline void
 __s390_subchannel_vary_chpid(struct subchannel *sch, __u8 chpid, int on)
 {
-	int chp;
+	int chp, old_lpm;
 
 	if (!sch->ssd_info.valid)
 		return;
 	
+	old_lpm = sch->lpm;
 	for (chp = 0; chp < 8; chp++) {
-		if (sch->ssd_info.chpid[chp] == chpid) {
-			if (on) {
-				sch->opm |= (0x80 >> chp);
-				sch->lpm |= (0x80 >> chp);
-			} else {
-				sch->opm &= ~(0x80 >> chp);
-				sch->lpm &= ~(0x80 >> chp);
-				/*
-				 * Give running I/O a grace period in which it
-				 * can successfully terminate, even using the
-				 * just varied off path. Then kill it.
-				 */
-				__check_for_io_and_kill(sch, chp);
-			}
-			if (sch->driver && sch->driver->verify)
+		if (sch->ssd_info.chpid[chp] != chpid)
+			continue;
+
+		if (on) {
+			sch->opm |= (0x80 >> chp);
+			sch->lpm |= (0x80 >> chp);
+			if (!old_lpm)
+				device_trigger_reprobe(sch);
+			else if (sch->driver && sch->driver->verify)
 				sch->driver->verify(&sch->dev);
-			break;
+		} else {
+			sch->opm &= ~(0x80 >> chp);
+			sch->lpm &= ~(0x80 >> chp);
+			/*
+			 * Give running I/O a grace period in which it
+			 * can successfully terminate, even using the
+			 * just varied off path. Then kill it.
+			 */
+			if (!__check_for_io_and_kill(sch, chp) && !sch->lpm)
+				/* Get over with it now. */
+				device_call_nopath_notify(sch);
+			else if (sch->driver && sch->driver->verify)
+				sch->driver->verify(&sch->dev);
 		}
+		break;
 	}
 }
 
@@ -738,6 +773,11 @@ s390_subchannel_vary_chpid_on(struct device *dev, void *data)
 	return 0;
 }
 
+extern void css_trigger_slow_path(void);
+typedef void (*workfunc)(void *);
+static DECLARE_WORK(varyonoff_work, (workfunc)css_trigger_slow_path,
+		    NULL);
+
 /*
  * Function: s390_vary_chpid
  * Varies the specified chpid online or offline
@@ -746,21 +786,20 @@ static int
 s390_vary_chpid( __u8 chpid, int on)
 {
 	char dbf_text[15];
-	int status;
+	int status, irq, ret;
+	struct subchannel *sch;
 
 	sprintf(dbf_text, on?"varyon%x":"varyoff%x", chpid);
 	CIO_TRACE_EVENT( 2, dbf_text);
 
 	status = get_chp_status(chpid);
-	if (!status) {
+	if (status < 0) {
 		printk(KERN_ERR "Can't vary unknown chpid %02X\n", chpid);
 		return -EINVAL;
 	}
 
-	if ((on && !(status & CHP_LOGICALLY_OFFLINE)) ||
-	    (!on && (status & CHP_LOGICALLY_OFFLINE))) {
-		printk(KERN_ERR "chpid %x is "
-		       "already %sline\n", chpid, on ? "on" : "off");
+	if (!on && !status) {
+		printk(KERN_ERR "chpid %x is already offline\n", chpid);
 		return -EINVAL;
 	}
 
@@ -773,6 +812,30 @@ s390_vary_chpid( __u8 chpid, int on)
 	bus_for_each_dev(&css_bus_type, NULL, &chpid, on ?
 			 s390_subchannel_vary_chpid_on :
 			 s390_subchannel_vary_chpid_off);
+	if (!on)
+		return 0;
+	/* Scan for new devices on varied on path. */
+	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
+		struct schib schib;
+
+		sch = get_subchannel_by_schid(irq);
+		if (sch)
+			continue;
+		if (stsch(irq, &schib))
+			/* We're through */
+			break;
+		if (need_rescan)
+			continue;
+		/* Put it on the slow path. */
+		ret = css_enqueue_subchannel_slow(irq);
+		if (ret) {
+			css_clear_subchannel_slow_list();
+			need_rescan = 1;
+		}
+		continue;
+	}
+	if (need_rescan || css_slow_subchannels_exist())
+		schedule_work(&varyonoff_work);
 	return 0;
 }
 
@@ -783,16 +846,11 @@ static ssize_t
 chp_status_show(struct device *dev, char *buf)
 {
 	struct channel_path *chp = container_of(dev, struct channel_path, dev);
-	int state;
 
 	if (!chp)
 		return 0;
-	state = get_chp_status(chp->id);
-	if (state & CHP_STANDBY)
-		return sprintf(buf, "n/a\n");
-	return (state & CHP_LOGICALLY_OFFLINE) ?
-		sprintf(buf, "logically offline\n") :
-		sprintf(buf, "online\n");
+	return (get_chp_status(chp->id) ? sprintf(buf, "online\n") :
+		sprintf(buf, "offline\n"));
 }
 
 static ssize_t
@@ -835,7 +893,7 @@ chp_release(struct device *dev)
  * This replaces /proc/chpids.
  */
 static int
-new_channel_path(int chpid, int status)
+new_channel_path(int chpid)
 {
 	struct channel_path *chp;
 	int ret;
@@ -849,19 +907,7 @@ new_channel_path(int chpid, int status)
 
 	/* fill in status, etc. */
 	chp->id = chpid;
-	switch (status) {
-	case CHP_STANDBY:
-		chp->state.online = 0;
-		chp->state.logically_online = 1;
-		break;
-	case CHP_LOGICALLY_OFFLINE:
-		chp->state.logically_online = 0;
-		chp->state.online = 1;
-		break;
-	case CHP_ONLINE:
-		chp->state.online = 1;
-		chp->state.logically_online = 1;
-	}
+	chp->state = 1;
 	chp->dev = (struct device) {
 		.parent  = &css_bus_device,
 		.release = chp_release,
@@ -882,3 +928,14 @@ new_channel_path(int chpid, int status)
 	return ret;
 }
 
+static int __init
+chsc_alloc_sei_area(void)
+{
+	sei_page = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
+	if (!sei_page)
+		printk(KERN_WARNING"Can't allocate page for processing of " \
+		       "chsc machine checks!\n");
+	return (sei_page ? 0 : -ENOMEM);
+}
+
+subsys_initcall(chsc_alloc_sei_area);

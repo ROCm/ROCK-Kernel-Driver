@@ -16,6 +16,7 @@
 #include <linux/msg.h>
 #include <linux/shm.h>
 #include <linux/stat.h>
+#include <linux/syscalls.h>
 #include <linux/mman.h>
 #include <linux/utsname.h>
 #include <linux/smp.h>
@@ -77,8 +78,6 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 			addr = COLOUR_ALIGN(addr);
 	}
 }
-
-extern asmlinkage unsigned long sys_brk(unsigned long brk);
 
 asmlinkage unsigned long sparc_brk(unsigned long brk)
 {
@@ -426,7 +425,7 @@ sparc_sigaction (int sig, const struct old_sigaction __user *act,
 	return ret;
 }
 
-asmlinkage int
+asmlinkage long
 sys_rt_sigaction(int sig,
 		 const struct sigaction __user *act,
 		 struct sigaction __user *oact,

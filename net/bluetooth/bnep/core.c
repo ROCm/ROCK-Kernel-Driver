@@ -29,8 +29,6 @@
  * $Id: core.c,v 1.20 2002/08/04 21:23:58 maxk Exp $
  */ 
 
-#define __KERNEL_SYSCALLS__
-
 #include <linux/config.h>
 #include <linux/module.h>
 

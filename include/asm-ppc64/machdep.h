@@ -15,7 +15,7 @@
 struct pt_regs;
 struct pci_bus;	
 struct device_node;
-struct TceTable;
+struct iommu_table;
 struct rtc_time;
 
 #ifdef CONFIG_SMP
@@ -53,12 +53,15 @@ struct machdep_calls {
 					    unsigned long number,
 					    int local);
 
-	void		(*tce_build)(struct TceTable * tbl,
-				     long tcenum,
+	void		(*tce_build)(struct iommu_table * tbl,
+				     long index,
+				     long npages,
 				     unsigned long uaddr,
 				     int direction);
-	void		(*tce_free_one)(struct TceTable *tbl,
-				        long tcenum);    
+	void		(*tce_free)(struct iommu_table *tbl,
+				    long index,
+				    long npages);
+	void		(*tce_flush)(struct iommu_table *tbl);
 
 	void		(*setup_arch)(void);
 	/* Optional, may be NULL. */

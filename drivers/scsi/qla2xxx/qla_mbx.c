@@ -1421,7 +1421,7 @@ qla2x00_get_port_database(scsi_qla_host_t *ha, fc_port_t *fcport, uint8_t opt)
 	mcp->in_mb = MBX_0;
 	mcp->buf_size = PORT_DATABASE_SIZE;
 	mcp->flags = MBX_DMA_IN;
-	mcp->tov =  ha->login_timeout * 2;
+	mcp->tov = (ha->login_timeout * 2) + (ha->login_timeout / 2);
 	rval = qla2x00_mailbox_command(ha, mcp);
 
 	if (rval == QLA_SUCCESS) {
@@ -1774,8 +1774,7 @@ qla2x00_send_sns(scsi_qla_host_t *ha, dma_addr_t sns_phys_address,
 	mcp->in_mb = MBX_0|MBX_1;
 	mcp->buf_size = buf_size;
 	mcp->flags = MBX_DMA_OUT|MBX_DMA_IN;
-	/*mcp->tov = ha->retry_count * ha->login_timeout * 2;*/
-	mcp->tov =  ha->login_timeout * 2;
+	mcp->tov = (ha->login_timeout * 2) + (ha->login_timeout / 2);
 	rval = qla2x00_mailbox_command(ha, mcp);
 
 	if (rval != QLA_SUCCESS) {
@@ -1836,8 +1835,7 @@ qla2x00_login_fabric(scsi_qla_host_t *ha, uint16_t loop_id, uint8_t domain,
 	mcp->mb[3] = area << 8 | al_pa;
 
 	mcp->in_mb = MBX_7|MBX_6|MBX_2|MBX_1|MBX_0;
-	/*mcp->tov = ha->retry_count * ha->login_timeout * 2;*/
-	mcp->tov = ha->login_timeout * 2;
+	mcp->tov = (ha->login_timeout * 2) + (ha->login_timeout / 2);
 	mcp->flags = 0;
 	rval = qla2x00_mailbox_command(ha, mcp);
 
@@ -1909,7 +1907,7 @@ qla2x00_login_local_device(scsi_qla_host_t *ha, uint16_t loop_id,
 	mcp->mb[2] = opt;
 	mcp->out_mb = MBX_2|MBX_1|MBX_0;
  	mcp->in_mb = MBX_7|MBX_6|MBX_1|MBX_0;
-	mcp->tov =  ha->login_timeout * 2;
+	mcp->tov = (ha->login_timeout * 2) + (ha->login_timeout / 2);
 	mcp->flags = 0;
 	rval = qla2x00_mailbox_command(ha, mcp);
 
@@ -2412,7 +2410,7 @@ qla2x00_get_fcal_position_map(scsi_qla_host_t *ha, char *pos_map)
 	mcp->in_mb = MBX_1|MBX_0;
 	mcp->buf_size = FCAL_MAP_SIZE;
 	mcp->flags = MBX_DMA_IN;
-	mcp->tov =  ha->login_timeout * 2;
+	mcp->tov = (ha->login_timeout * 2) + (ha->login_timeout / 2);
 	rval = qla2x00_mailbox_command(ha, mcp);
 
 	if (rval == QLA_SUCCESS) {

@@ -553,80 +553,6 @@ config MAC_SCC
 	tristate "Macintosh serial support"
 	depends on MAC
 
-config ADB
-	bool "Apple Desktop Bus (ADB) support"
-	depends on MAC
-	help
-	  Apple Desktop Bus (ADB) support is for support of devices which
-	  are connected to an ADB port.  ADB devices tend to have 4 pins.
-	  If you have an Apple Macintosh prior to the iMac, or a
-	  "Blue and White G3", you probably want to say Y here.  Otherwise
-	  say N.
-
-config ADB_MACII
-	bool "Include Mac II ADB driver"
-	depends on ADB
-	help
-	  Say Y here if want your kernel to support Macintosh systems that use
-	  the Mac II style ADB.  This includes the II, IIx, IIcx, SE/30, IIci,
-	  Quadra 610, Quadra 650, Quadra 700, Quadra 800, Centris 610 and
-	  Centris 650.
-
-config ADB_MACIISI
-	bool "Include Mac IIsi ADB driver"
-	depends on ADB
-	help
-	  Say Y here if want your kernel to support Macintosh systems that use
-	  the Mac IIsi style ADB.  This includes the IIsi, IIvi, IIvx, Classic
-	  II, LC, LC II, LC III, Performa 460, and the Performa 600.
-
-config ADB_CUDA
-	bool "Include CUDA ADB driver"
-	depends on ADB
-	help
-	  This provides support for CUDA based Power Macintosh systems.  This
-	  includes most OldWorld PowerMacs, the first generation iMacs, the
-	  Blue&White G3 and the Yikes G4 (PCI Graphics).  All later models
-	  should use CONFIG_ADB_PMU instead.
-
-	  If unsure say Y.
-
-config ADB_IOP
-	bool "Include IOP (IIfx/Quadra 9x0) ADB driver"
-	depends on ADB
-	help
-	  The I/O Processor (IOP) is an Apple custom IC designed to provide
-	  intelligent support for I/O controllers.  It is described at
-	  <http://www.angelfire.com/ca2/dev68k/iopdesc.html> to enable direct
-	  support for it, say 'Y' here.
-
-config ADB_PMU68K
-	bool "Include PMU (Powerbook) ADB driver"
-	depends on ADB
-	help
-	  Say Y here if want your kernel to support the m68k based Powerbooks.
-	  This includes the PowerBook 140, PowerBook 145, PowerBook 150,
-	  PowerBook 160, PowerBook 165, PowerBook 165c, PowerBook 170,
-	  PowerBook 180, PowerBook, 180c, PowerBook 190cs, PowerBook 520,
-	  PowerBook Duo 210, PowerBook Duo 230, PowerBook Duo 250,
-	  PowerBook Duo 270c, PowerBook Duo 280 and PowerBook Duo 280c.
-
-config INPUT_ADBHID
-	bool "Use input layer for ADB devices"
-	depends on MAC && INPUT=y
-	---help---
-	  Say Y here if you want to have ADB (Apple Desktop Bus) HID devices
-	  such as keyboards, mice, joysticks, or graphic tablets handled by
-	  the input layer.  If you say Y here, make sure to say Y to the
-	  corresponding drivers "Keyboard support" (CONFIG_INPUT_KEYBDEV),
-	  "Mouse Support" (CONFIG_INPUT_MOUSEDEV) and "Event interface
-	  support" (CONFIG_INPUT_EVDEV) as well.
-
-	  If you say N here, you still have the option of using the old ADB
-	  keyboard and mouse drivers.
-
-	  If unsure, say Y.
-
 config MAC_HID
 	bool
 	depends on INPUT_ADBHID
@@ -645,18 +571,6 @@ config MAC_ADBKEYCODES
 	  argument.
 
 	  If unsure, say Y here.
-
-config MAC_EMUMOUSEBTN
-	bool "Support for mouse button 2+3 emulation"
-	depends on INPUT_ADBHID
-	help
-	  This provides generic support for emulating the 2nd and 3rd mouse
-	  button with keypresses.  If you say Y here, the emulation is still
-	  disabled by default.  The emulation is controlled by these sysctl
-	  entries:
-	  /proc/sys/dev/mac_hid/mouse_button_emulation
-	  /proc/sys/dev/mac_hid/mouse_button2_keycode
-	  /proc/sys/dev/mac_hid/mouse_button3_keycode
 
 config ADB_KEYBOARD
 	bool "Support for ADB keyboard (old driver)"

@@ -1468,8 +1468,7 @@ static int __init dgrs_eisa_probe (struct device *gendev)
 	int 	rc = -ENODEV; /* Not EISA configured */
 
 	if (!request_region(io, 256, "RightSwitch")) {
-		printk(KERN_ERR "%s: io 0x%3lX, which is busy.\n", dev->name,
-				dev->base_addr);
+		printk(KERN_ERR "dgrs: eisa io 0x%x, which is busy.\n", io);
 		return -EBUSY;
 	}
 

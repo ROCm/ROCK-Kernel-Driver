@@ -44,10 +44,10 @@ static int acpi_system_sleep_open_fs(struct inode *inode, struct file *file)
 	return single_open(file, acpi_system_sleep_seq_show, PDE(inode)->data);
 }
 
-static int
+static ssize_t
 acpi_system_write_sleep (
 	struct file		*file,
-	const char		*buffer,
+	const char __user	*buffer,
 	size_t			count,
 	loff_t			*ppos)
 {
@@ -189,10 +189,10 @@ get_date_field (
 }
 
 
-static int
+static ssize_t
 acpi_system_write_alarm (
 	struct file		*file,
-	const char		*buffer,
+	const char __user	*buffer,
 	size_t			count,
 	loff_t			*ppos)
 {

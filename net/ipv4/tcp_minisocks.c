@@ -427,7 +427,7 @@ static u32 twkill_thread_slots;
 static int tcp_do_twkill_work(int slot, unsigned int quota)
 {
 	struct tcp_tw_bucket *tw;
-	struct hlist_node *node, *safe;
+	struct hlist_node *node;
 	unsigned int killed;
 	int ret;
 
@@ -439,8 +439,8 @@ static int tcp_do_twkill_work(int slot, unsigned int quota)
 	 */
 	killed = 0;
 	ret = 0;
-	tw_for_each_inmate(tw, node, safe,
-			   &tcp_tw_death_row[slot]) {
+rescan:
+	tw_for_each_inmate(tw, node, &tcp_tw_death_row[slot]) {
 		__tw_del_dead_node(tw);
 		spin_unlock(&tw_death_lock);
 		tcp_timewait_kill(tw);
@@ -451,6 +451,14 @@ static int tcp_do_twkill_work(int slot, unsigned int quota)
 			ret = 1;
 			break;
 		}
+
+		/* While we dropped tw_death_lock, another cpu may have
+		 * killed off the next TW bucket in the list, therefore
+		 * do a fresh re-read of the hlist head node with the
+		 * lock reacquired.  We still use the hlist traversal
+		 * macro in order to get the prefetches.
+		 */
+		goto rescan;
 	}
 
 	tcp_tw_count -= killed;
@@ -637,7 +645,7 @@ void tcp_twcal_tick(unsigned long dummy)
 			struct hlist_node *node, *safe;
 			struct tcp_tw_bucket *tw;
 
-			tw_for_each_inmate(tw, node, safe,
+			tw_for_each_inmate_safe(tw, node, safe,
 					   &tcp_twcal_row[slot]) {
 				__tw_del_dead_node(tw);
 				tcp_timewait_kill(tw);

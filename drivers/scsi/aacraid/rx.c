@@ -56,7 +56,7 @@ static irqreturn_t aac_rx_intr(int irq, void *dev_id, struct pt_regs *regs)
 	 *	This allows us to only service interrupts that have 
 	 *	been enabled.
 	 */
-	mask = ~(rx_readb(dev, MUnit.OIMR));
+	mask = ~(dev->OIMR);
 	/* Check to see if this is our interrupt.  If it isn't just return */
 	if (intstat & mask) 
 	{
@@ -179,7 +179,7 @@ static int rx_sync_cmd(struct aac_dev *dev, u32 command, u32 p1, u32 *status)
 	/*
 	 *	Disable doorbell interrupts
 	 */
-	rx_writeb(dev, MUnit.OIMR, rx_readb(dev, MUnit.OIMR) | 0x04);
+	rx_writeb(dev, MUnit.OIMR, dev->OIMR |= 0x04);
 	/*
 	 *	Force the completion of the mask register write before issuing
 	 *	the interrupt.
@@ -220,7 +220,7 @@ static int rx_sync_cmd(struct aac_dev *dev, u32 command, u32 p1, u32 *status)
 		/*
 		 *	Restore interrupt mask even though we timed out
 		 */
-		rx_writeb(dev, MUnit.OIMR, rx_readl(dev, MUnit.OIMR) & 0xfb);
+		rx_writeb(dev, MUnit.OIMR, dev->OIMR &= 0xfb);
 		return -ETIMEDOUT;
 	}
 	/*
@@ -234,7 +234,7 @@ static int rx_sync_cmd(struct aac_dev *dev, u32 command, u32 p1, u32 *status)
 	/*
 	 *	Restore interrupt mask
 	 */
-	rx_writeb(dev, MUnit.OIMR, rx_readl(dev, MUnit.OIMR) & 0xfb);
+	rx_writeb(dev, MUnit.OIMR, dev->OIMR &= 0xfb);
 	return 0;
 
 }
@@ -318,11 +318,43 @@ static void aac_rx_start_adapter(struct aac_dev *dev)
 	rx_writeb(dev, MUnit.OIMR, 0xff);
 	rx_writel(dev, MUnit.ODR, 0xffffffff);
 //	rx_writeb(dev, MUnit.OIMR, ~(u8)OUTBOUND_DOORBELL_INTERRUPT_MASK);
-	rx_writeb(dev, MUnit.OIMR, 0xfb);
+	rx_writeb(dev, MUnit.OIMR, dev->OIMR = 0xfb);
 
 	// We can only use a 32 bit address here
 	rx_sync_cmd(dev, INIT_STRUCT_BASE_ADDRESS, (u32)(ulong)dev->init_pa, &status);
 }
+
+/**
+ *	aac_rx_check_health
+ *	@dev: device to check if healthy
+ *
+ *	Will attempt to determine if the specified adapter is alive and
+ *	capable of handling requests, returning 0 if alive.
+ */
+static int aac_rx_check_health(struct aac_dev *dev)
+{
+	long status = rx_readl(dev, IndexRegs.Mailbox[7]);
+
+	/*
+	 *	Check to see if the board failed any self tests.
+	 */
+	if (status & SELF_TEST_FAILED)
+		return -1;
+	/*
+	 *	Check to see if the board panic'd while booting.
+	 */
+	if (status & KERNEL_PANIC)
+		return -2;
+	/*
+	 *	Wait for the adapter to be up and running. Wait up to 3 minutes
+	 */
+	if (!(status & KERNEL_UP_AND_RUNNING))
+		return -3;
+	/*
+	 *	Everything is OK
+	 */
+	return 0;
+} /* aac_rx_check_health */
 
 /**
  *	aac_rx_init	-	initialize an i960 based AAC card

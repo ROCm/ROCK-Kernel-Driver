@@ -1802,7 +1802,7 @@ static int hrz_send (struct atm_vcc * atm_vcc, struct sk_buff * skb) {
 
 /********** reset a card **********/
 
-static void __init hrz_reset (const hrz_dev * dev) {
+static void hrz_reset (const hrz_dev * dev) {
   u32 control_0_reg = rd_regl (dev, CONTROL_0_REG);
   
   // why not set RESET_HORIZON to one and wait for the card to

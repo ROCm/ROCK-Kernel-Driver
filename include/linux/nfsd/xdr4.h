@@ -54,10 +54,10 @@ typedef struct {
 
 struct nfsd4_change_info {
 	u32		atomic;
-	u32		before_size;
-	u32		before_ctime;
-	u32		after_size;
-	u32		after_ctime;
+	u32		before_ctime_sec;
+	u32		before_ctime_nsec;
+	u32		after_ctime_sec;
+	u32		after_ctime_nsec;
 };
 
 struct nfsd4_access {
@@ -263,6 +263,10 @@ struct nfsd4_readdir {
 	u32 *			offset;
 };
 
+struct nfsd4_release_lockowner {
+	clientid_t        rl_clientid;
+	struct xdr_netobj rl_owner;
+};
 struct nfsd4_readlink {
 	struct svc_rqst *rl_rqstp;          /* request */
 	struct svc_fh *	rl_fhp;             /* request */
@@ -359,6 +363,7 @@ struct nfsd4_op {
 		struct nfsd4_setclientid_confirm setclientid_confirm;
 		struct nfsd4_verify		verify;
 		struct nfsd4_write		write;
+		struct nfsd4_release_lockowner	release_lockowner;
 	} u;
 	struct nfs4_replay *			replay;
 };
@@ -375,7 +380,9 @@ struct nfsd4_compoundargs {
 		struct tmpbuf *next;
 		void *buf;
 	}				*to_free;
-	
+
+	struct svc_rqst			*rqstp;
+
 	u32				taglen;
 	char *				tag;
 	u32				minorversion;
@@ -404,10 +411,10 @@ set_change_info(struct nfsd4_change_info *cinfo, struct svc_fh *fhp)
 {
 	BUG_ON(!fhp->fh_pre_saved || !fhp->fh_post_saved);
 	cinfo->atomic = 1;
-	cinfo->before_size = fhp->fh_pre_size;
-	cinfo->before_ctime = fhp->fh_pre_ctime.tv_sec;
-	cinfo->after_size = fhp->fh_post_size;
-	cinfo->after_ctime = fhp->fh_post_ctime.tv_sec;
+	cinfo->before_ctime_sec = fhp->fh_pre_ctime.tv_sec;
+	cinfo->before_ctime_nsec = fhp->fh_pre_ctime.tv_nsec;
+	cinfo->after_ctime_sec = fhp->fh_post_ctime.tv_sec;
+	cinfo->after_ctime_nsec = fhp->fh_post_ctime.tv_nsec;
 }
 
 int nfs4svc_encode_voidres(struct svc_rqst *, u32 *, void *);
@@ -419,7 +426,7 @@ void nfsd4_encode_operation(struct nfsd4_compoundres *, struct nfsd4_op *);
 void nfsd4_encode_replay(struct nfsd4_compoundres *resp, struct nfsd4_op *op);
 int nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		       struct dentry *dentry, u32 *buffer, int *countp, 
-		       u32 *bmval);
+		       u32 *bmval, struct svc_rqst *);
 extern int nfsd4_setclientid(struct svc_rqst *rqstp, 
 		struct nfsd4_setclientid *setclid);
 extern int nfsd4_setclientid_confirm(struct svc_rqst *rqstp, 
@@ -439,6 +446,9 @@ extern int nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 		struct nfsd4_lockt *lockt);
 extern int nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, 
 		struct nfsd4_locku *locku);
+extern int
+nfsd4_release_lockowner(struct svc_rqst *rqstp,
+		struct nfsd4_release_lockowner *rlockowner);
 #endif
 
 /*

@@ -65,7 +65,6 @@ static char cardname[] = "Proteon 1392\0";
 
 struct net_device *proteon_probe(int unit);
 static int proteon_open(struct net_device *dev);
-static int proteon_close(struct net_device *dev);
 static void proteon_read_eeprom(struct net_device *dev);
 static unsigned short proteon_setnselout_pins(struct net_device *dev);
 
@@ -117,21 +116,15 @@ nodev:
 	return -ENODEV;
 }
 
-struct net_device * __init proteon_probe(int unit)
+static int __init setup_card(struct net_device *dev)
 {
-	struct net_device *dev = alloc_trdev(sizeof(struct net_local));
 	struct net_local *tp;
         static int versionprinted;
 	const unsigned *port;
 	int j,err = 0;
 
 	if (!dev)
-		return ERR_PTR(-ENOMEM);
-
-	if (unit >= 0) {
-		sprintf(dev->name, "tr%d", unit);
-		netdev_boot_setup_check(dev);
-	}
+		return -ENOMEM;
 
 	SET_MODULE_OWNER(dev);
 	if (dev->base_addr)	/* probe specific location */
@@ -178,7 +171,7 @@ struct net_device * __init proteon_probe(int unit)
 	tp->tmspriv = NULL;
 
 	dev->open = proteon_open;
-	dev->stop = proteon_close;
+	dev->stop = tms380tr_close;
 
 	if (dev->irq == 0)
 	{
@@ -257,7 +250,7 @@ struct net_device * __init proteon_probe(int unit)
 	if (err)
 		goto out;
 
-	return dev;
+	return 0;
 out:
 	free_dma(dev->dma);
 out2:
@@ -266,6 +259,29 @@ out3:
 	tmsdev_term(dev);
 out4:
 	release_region(dev->base_addr, PROTEON_IO_EXTENT); 
+	return err;
+}
+
+struct net_device * __init proteon_probe(int unit)
+{
+	struct net_device *dev = alloc_trdev(sizeof(struct net_local));
+	int err = 0;
+
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+
+	if (unit >= 0) {
+		sprintf(dev->name, "tr%d", unit);
+		netdev_boot_setup_check(dev);
+	}
+
+	err = setup_card(dev);
+	if (err)
+		goto out;
+
+	return dev;
+
+out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
@@ -333,14 +349,7 @@ static int proteon_open(struct net_device *dev)
 	val |= i;
 	outb(val, dev->base_addr + 0x13);
 
-	tms380tr_open(dev);
-	return 0;
-}
-
-static int proteon_close(struct net_device *dev)
-{
-	tms380tr_close(dev);
-	return 0;
+	return tms380tr_open(dev);
 }
 
 #ifdef MODULE
@@ -359,45 +368,25 @@ MODULE_PARM(dma, "1-" __MODULE_STRING(ISATR_MAX_ADAPTERS) "i");
 
 static struct net_device *proteon_dev[ISATR_MAX_ADAPTERS];
 
-static struct net_device * __init setup_card(unsigned long io, unsigned irq, unsigned char dma)
-{
-	struct net_device *dev = alloc_trdev(sizeof(struct net_local));
-	int err;
-
-	if (!dev)
-		return ERR_PTR(-ENOMEM);
-
-	dev->irq = irq;
-	dev->dma = dma;
-	err = proteon_probe1(dev, io);
-	if (err) 
-		goto out;
-		
-	err = register_netdev(dev);
-	if (err)
-		goto out1;
-	return dev;
- out1:
-	release_region(dev->base_addr, PROTEON_IO_EXTENT);
-	free_irq(dev->irq, dev);
-	free_dma(dev->dma);
-	tmsdev_term(dev);
- out:
-	free_netdev(dev);
-	return ERR_PTR(err);
-}
-
 int init_module(void)
 {
 	struct net_device *dev;
-	int i, num = 0;
+	int i, num = 0, err = 0;
 
 	for (i = 0; i < ISATR_MAX_ADAPTERS ; i++) {
-		dev = io[0] ? setup_card(io[i], irq[i], dma[i])
-			: proteon_probe(-1);
-		if (!IS_ERR(dev)) {
+		dev = alloc_trdev(sizeof(struct net_local));
+		if (!dev)
+			continue;
+
+		dev->base_addr = io[i];
+		dev->irq = irq[i];
+		dev->dma = dma[i];
+		err = setup_card(dev);
+		if (!err) {
 			proteon_dev[i] = dev;
 			++num;
+		} else {
+			free_netdev(dev);
 		}
 	}
 

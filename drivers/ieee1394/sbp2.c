@@ -2801,6 +2801,8 @@ static Scsi_Host_Template scsi_driver_template = {
 
 static int sbp2_module_init(void)
 {
+	int ret;
+
 	SBP2_DEBUG("sbp2_module_init");
 
 	printk(KERN_INFO "sbp2: %s\n", version);
@@ -2819,7 +2821,12 @@ static int sbp2_module_init(void)
 	/* Register our high level driver with 1394 stack */
 	hpsb_register_highlevel(&sbp2_highlevel);
 
-	hpsb_register_protocol(&sbp2_driver);
+	ret = hpsb_register_protocol(&sbp2_driver);
+	if (ret) {
+		SBP2_ERR("Failed to register protocol");
+		hpsb_unregister_highlevel(&sbp2_highlevel);
+		return ret;
+	}
 
 	return 0;
 }

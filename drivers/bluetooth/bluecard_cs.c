@@ -72,7 +72,7 @@ typedef struct bluecard_info_t {
 	dev_link_t link;
 	dev_node_t node;
 
-	struct hci_dev hdev;
+	struct hci_dev *hdev;
 
 	spinlock_t lock;		/* For serializing operations */
 	struct timer_list timer;	/* For LED control */
@@ -333,7 +333,7 @@ static void bluecard_write_wakeup(bluecard_info_t *info)
 			skb_queue_head(&(info->txq), skb);
 		}
 
-		info->hdev.stat.byte_tx += len;
+		info->hdev->stat.byte_tx += len;
 
 		/* Change buffer */
 		change_bit(XMIT_BUFFER_NUMBER, &(info->tx_state));
@@ -404,7 +404,7 @@ static void bluecard_receive(bluecard_info_t *info, unsigned int offset)
 
 		if (info->rx_state == RECV_WAIT_PACKET_TYPE) {
 
-			info->rx_skb->dev = (void *)&(info->hdev);
+			info->rx_skb->dev = (void *) info->hdev;
 			info->rx_skb->pkt_type = buf[i];
 
 			switch (info->rx_skb->pkt_type) {
@@ -440,7 +440,7 @@ static void bluecard_receive(bluecard_info_t *info, unsigned int offset)
 			default:
 				/* unknown packet */
 				printk(KERN_WARNING "bluecard_cs: Unknown HCI packet with type 0x%02x received.\n", info->rx_skb->pkt_type);
-				info->hdev.stat.err_rx++;
+				info->hdev->stat.err_rx++;
 
 				kfree_skb(info->rx_skb);
 				info->rx_skb = NULL;
@@ -495,7 +495,7 @@ static void bluecard_receive(bluecard_info_t *info, unsigned int offset)
 
 	}
 
-	info->hdev.stat.byte_rx += len;
+	info->hdev->stat.byte_rx += len;
 }
 
 
@@ -778,8 +778,13 @@ int bluecard_open(bluecard_info_t *info)
 
 
 	/* Initialize and register HCI device */
+	hdev = hci_alloc_dev();
+	if (!hdev) {
+		printk(KERN_WARNING "bluecard_cs: Can't allocate HCI device.\n");
+		return -ENOMEM;
+	}
 
-	hdev = &(info->hdev);
+	info->hdev = hdev;
 
 	hdev->type = HCI_PCCARD;
 	hdev->driver_data = info;
@@ -794,7 +799,8 @@ int bluecard_open(bluecard_info_t *info)
 	hdev->owner = THIS_MODULE;
 	
 	if (hci_register_dev(hdev) < 0) {
-		printk(KERN_WARNING "bluecard_cs: Can't register HCI device %s.\n", hdev->name);
+		printk(KERN_WARNING "bluecard_cs: Can't register HCI device.\n");
+		hci_free_dev(hdev);
 		return -ENODEV;
 	}
 
@@ -805,7 +811,7 @@ int bluecard_open(bluecard_info_t *info)
 int bluecard_close(bluecard_info_t *info)
 {
 	unsigned int iobase = info->link.io.BasePort1;
-	struct hci_dev *hdev = &(info->hdev);
+	struct hci_dev *hdev = info->hdev;
 
 	bluecard_hci_close(hdev);
 
@@ -820,6 +826,8 @@ int bluecard_close(bluecard_info_t *info)
 
 	if (hci_unregister_dev(hdev) < 0)
 		printk(KERN_WARNING "bluecard_cs: Can't unregister HCI device %s.\n", hdev->name);
+
+	hci_free_dev(hdev);
 
 	return 0;
 }
@@ -988,7 +996,7 @@ void bluecard_config(dev_link_t *link)
 	if (bluecard_open(info) != 0)
 		goto failed;
 
-	strcpy(info->node.dev_name, info->hdev.name);
+	strcpy(info->node.dev_name, info->hdev->name);
 	link->dev = &info->node;
 	link->state &= ~DEV_CONFIG_PENDING;
 

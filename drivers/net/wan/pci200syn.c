@@ -451,10 +451,10 @@ static struct pci_device_id pci200_pci_tbl[] __devinitdata = {
 
 
 static struct pci_driver pci200_pci_driver = {
-	name:	  "PCI200SYN",
-	id_table: pci200_pci_tbl,
-	probe:	  pci200_pci_init_one,
-	remove:	  pci200_pci_remove_one,
+	.name		= "PCI200SYN",
+	.id_table	= pci200_pci_tbl,
+	.probe		= pci200_pci_init_one,
+	.remove		= pci200_pci_remove_one,
 };
 
 

@@ -21,6 +21,7 @@ enum dev_state {
 	/* special states for devices gone not operational */
 	DEV_STATE_DISCONNECTED,
 	DEV_STATE_DISCONNECTED_SENSE_ID,
+	DEV_STATE_CMFCHANGE,
 	/* last element! */
 	NR_DEV_STATES
 };
@@ -101,9 +102,10 @@ void ccw_device_disband_done(struct ccw_device *, int);
 
 int ccw_device_call_handler(struct ccw_device *);
 
-void ccw_device_add_stlck(void *);
 int ccw_device_stlck(struct ccw_device *);
 
 /* qdio needs this. */
 void ccw_device_set_timeout(struct ccw_device *, int);
+
+void retry_set_schib(struct ccw_device *cdev);
 #endif

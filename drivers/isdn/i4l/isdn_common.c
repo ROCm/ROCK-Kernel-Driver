@@ -1707,14 +1707,14 @@ isdn_close(struct inode *ino, struct file *filep)
 
 static struct file_operations isdn_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		isdn_read,
-	write:		isdn_write,
-	poll:		isdn_poll,
-	ioctl:		isdn_ioctl,
-	open:		isdn_open,
-	release:	isdn_close,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= isdn_read,
+	.write		= isdn_write,
+	.poll		= isdn_poll,
+	.ioctl		= isdn_ioctl,
+	.open		= isdn_open,
+	.release	= isdn_close,
 };
 
 char *

@@ -120,6 +120,9 @@ int gss_mech_unregister_all(void);
  * reference count. */
 struct gss_api_mech * gss_mech_get_by_OID(struct xdr_netobj *);
 
+/* Similar, but get by name like "krb5", "spkm", etc., instead of OID. */
+struct gss_api_mech *gss_mech_get_by_name(char *);
+
 /* Just increments the mechanism's reference count and returns its input: */
 struct gss_api_mech * gss_mech_get(struct gss_api_mech *);
 

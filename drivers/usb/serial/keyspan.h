@@ -359,19 +359,19 @@ static const struct keyspan_device_details usa19w_device_details = {
 };
 
 static const struct keyspan_device_details usa19hs_device_details = {
-	product_id:		keyspan_usa19hs_product_id,
-	msg_format:		msg_usa90,
-	num_ports:		1,
-	indat_endp_flip:	0,
-	outdat_endp_flip:	0,
-	indat_endpoints:	{0x81},
-	outdat_endpoints:	{0x01},
-	inack_endpoints:	{-1},
-	outcont_endpoints:	{0x02},
-	instat_endpoint:	0x82,
-	glocont_endpoint:	-1,
-	calculate_baud_rate:	keyspan_usa19hs_calc_baud,
-	baudclk:		KEYSPAN_USA19HS_BAUDCLK,
+	.product_id		= keyspan_usa19hs_product_id,
+	.msg_format		= msg_usa90,
+	.num_ports		= 1,
+	.indat_endp_flip	= 0,
+	.outdat_endp_flip	= 0,
+	.indat_endpoints	= {0x81},
+	.outdat_endpoints	= {0x01},
+	.inack_endpoints	= {-1},
+	.outcont_endpoints	= {0x02},
+	.instat_endpoint	= 0x82,
+	.glocont_endpoint	= -1,
+	.calculate_baud_rate	= keyspan_usa19hs_calc_baud,
+	.baudclk		= KEYSPAN_USA19HS_BAUDCLK,
 };
 
 static const struct keyspan_device_details usa28_device_details = {

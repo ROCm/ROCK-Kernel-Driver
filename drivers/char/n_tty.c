@@ -40,7 +40,6 @@
 #include <linux/tty.h>
 #include <linux/timer.h>
 #include <linux/ctype.h>
-#include <linux/kd.h>
 #include <linux/mm.h>
 #include <linux/string.h>
 #include <linux/slab.h>
@@ -1091,7 +1090,7 @@ do_it_again:
 			set_bit(TTY_DONT_FLIP, &tty->flags);
 			continue;
 		}
-		current->state = TASK_RUNNING;
+		__set_current_state(TASK_RUNNING);
 
 		/* Deal with packet mode. */
 		if (tty->packet && b == buf) {
@@ -1170,7 +1169,7 @@ do_it_again:
 	if (!waitqueue_active(&tty->read_wait))
 		tty->minimum_to_wake = minimum;
 
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 	size = b - buf;
 	if (size) {
 		retval = size;
@@ -1246,7 +1245,7 @@ static ssize_t write_chan(struct tty_struct * tty, struct file * file,
 		schedule();
 	}
 break_out:
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 	remove_wait_queue(&tty->write_wait, &wait);
 	return (b - buf) ? b - buf : retval;
 }

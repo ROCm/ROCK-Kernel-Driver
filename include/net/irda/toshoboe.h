@@ -146,7 +146,6 @@ struct toshoboe_cb
 
     chipio_t io;                /* IrDA controller information */
 
-    __u32 flags;                /* Interface flags */
     __u32 new_speed;
 
     struct pci_dev *pdev;       /*PCI device */

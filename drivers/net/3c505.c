@@ -106,6 +106,7 @@
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
+#include <linux/delay.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>

@@ -314,8 +314,8 @@ running once the system is up.
 	dtc3181e=	[HW,SCSI]
 
 	earlyprintk=	[x86, x86_64]
-			early_printk=vga
-			early_printk=serial[,ttySn[,baudrate]]
+			earlyprintk=vga
+			earlyprintk=serial[,ttySn[,baudrate]]
 
 			Append ,keep to not disable it when the real console
 			takes over.

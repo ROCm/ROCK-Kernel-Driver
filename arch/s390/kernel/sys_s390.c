@@ -21,6 +21,7 @@
 #include <linux/msg.h>
 #include <linux/shm.h>
 #include <linux/stat.h>
+#include <linux/syscalls.h>
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
@@ -124,8 +125,6 @@ asmlinkage __SYS_RETTYPE old_mmap(struct mmap_arg_struct *arg)
 out:
 	return error;
 }
-
-extern asmlinkage int sys_select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 
 #ifndef CONFIG_ARCH_S390X
 struct sel_arg_struct {
@@ -290,14 +289,12 @@ asmlinkage int sys_olduname(struct oldold_utsname * name)
 	return error;
 }
 
-asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
+asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
 {
 	return -ENOSYS;
 }
 
 #else /* CONFIG_ARCH_S390X */
-
-extern asmlinkage int sys_newuname(struct new_utsname * name);
 
 asmlinkage int s390x_newuname(struct new_utsname * name)
 {
@@ -309,8 +306,6 @@ asmlinkage int s390x_newuname(struct new_utsname * name)
 	}
 	return ret;
 }
-
-extern asmlinkage long sys_personality(unsigned long);
 
 asmlinkage int s390x_personality(unsigned long personality)
 {
@@ -331,8 +326,6 @@ asmlinkage int s390x_personality(unsigned long personality)
  */
 #ifndef CONFIG_ARCH_S390X
 
-extern asmlinkage long sys_fadvise64(int, loff_t, size_t, int);
-
 asmlinkage long
 s390_fadvise64(int fd, u32 offset_high, u32 offset_low, size_t len, int advice)
 {
@@ -341,8 +334,6 @@ s390_fadvise64(int fd, u32 offset_high, u32 offset_low, size_t len, int advice)
 }
 
 #endif
-
-extern asmlinkage long sys_fadvise64_64(int, loff_t, loff_t, int);
 
 struct fadvise64_64_args {
 	int fd;

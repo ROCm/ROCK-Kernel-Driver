@@ -784,7 +784,7 @@ int scsi_retry_command(struct scsi_cmnd *cmd)
          */
 	memset(cmd->sense_buffer, 0, sizeof(cmd->sense_buffer));
 
-	return scsi_dispatch_cmd(cmd);
+	return scsi_queue_insert(cmd, SCSI_MLQUEUE_EH_RETRY);
 }
 
 /*
@@ -847,6 +847,7 @@ void scsi_finish_command(struct scsi_cmnd *cmd)
 
 	cmd->done(cmd);
 }
+EXPORT_SYMBOL(scsi_finish_command);
 
 /*
  * Function:	scsi_adjust_queue_depth()

@@ -2610,24 +2610,32 @@ static void __exit dv1394_exit_module(void)
 
 static int __init dv1394_init_module(void)
 {
+	int ret;
+
 	cdev_init(&dv1394_cdev, &dv1394_fops);
 	dv1394_cdev.owner = THIS_MODULE;
 	kobject_set_name(&dv1394_cdev.kobj, "dv1394");
-	if (cdev_add(&dv1394_cdev, IEEE1394_DV1394_DEV, 16)) {
+	ret = cdev_add(&dv1394_cdev, IEEE1394_DV1394_DEV, 16);
+	if (ret) {
 		printk(KERN_ERR "dv1394: unable to register character device\n");
-		return -EIO;
+		return ret;
 	}
 
 	devfs_mk_dir("ieee1394/dv");
 
 	hpsb_register_highlevel(&dv1394_highlevel);
 
-	hpsb_register_protocol(&dv1394_driver);
+	ret = hpsb_register_protocol(&dv1394_driver);
+	if (ret) {
+		printk(KERN_ERR "dv1394: failed to register protocol\n");
+		hpsb_unregister_highlevel(&dv1394_highlevel);
+		devfs_remove("ieee1394/dv");
+		cdev_del(&dv1394_cdev);
+		return ret;
+	}
 
 #ifdef CONFIG_COMPAT
 	{
-		int ret;
-
 		/* First compatible ones */
 		ret = register_ioctl32_conversion(DV1394_IOC_SHUTDOWN, NULL);
 		ret |= register_ioctl32_conversion(DV1394_IOC_SUBMIT_FRAMES, NULL);

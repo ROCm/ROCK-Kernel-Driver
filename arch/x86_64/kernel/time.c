@@ -24,7 +24,9 @@
 #include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/device.h>
+#include <linux/sysdev.h>
 #include <linux/bcd.h>
+#include <linux/kallsyms.h>
 #include <asm/pgtable.h>
 #include <asm/vsyscall.h>
 #include <asm/timex.h>
@@ -43,6 +45,8 @@ extern int using_apic_timer;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
+
+static int nohpet __initdata = 0;
 
 #undef HPET_HACK_ENABLE_DANGEROUS
 
@@ -217,14 +221,22 @@ static void set_rtc_mmss(unsigned long nowtime)
 		real_minutes += 30;		/* correct for half hour time zone */
 	real_minutes %= 60;
 
-	if (abs(real_minutes - cmos_minutes) < 30) {
+#if 0
+	/* AMD 8111 is a really bad time keeper and hits this regularly. 
+	   It probably was an attempt to avoid screwing up DST, but ignore
+	   that for now. */	   
+	if (abs(real_minutes - cmos_minutes) >= 30) {
+		printk(KERN_WARNING "time.c: can't update CMOS clock "
+		       "from %d to %d\n", cmos_minutes, real_minutes);
+	} else
+#endif
+
+	{
 			BIN_TO_BCD(real_seconds);
 			BIN_TO_BCD(real_minutes);
 		CMOS_WRITE(real_seconds, RTC_SECONDS);
 		CMOS_WRITE(real_minutes, RTC_MINUTES);
-	} else
-		printk(KERN_WARNING "time.c: can't update CMOS clock "
-		       "from %d to %d\n", cmos_minutes, real_minutes);
+	}
 
 /*
  * The following flags have to be released exactly in this order, otherwise the
@@ -342,11 +354,11 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	if (lost) {
-		if (report_lost_ticks)
+		if (report_lost_ticks) {
 			printk(KERN_WARNING "time.c: Lost %ld timer "
-			       "tick(s)! (rip %016lx)\n",
-			       (offset - vxtime.last) / hpet_tick - 1,
-			       regs->rip);
+			       "tick(s)! ", lost);
+			print_symbol("rip %s)\n", regs->rip);
+		}
 		jiffies += lost;
 	}
 
@@ -388,8 +400,19 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-/* RED-PEN: calculation is done in 32bits with multiply for performance
-   and could overflow, it may be better (but slower)to use an 64bit division. */
+static unsigned int cyc2ns_scale;
+#define CYC2NS_SCALE_FACTOR 10 /* 2^10, carefully chosen */
+
+static inline void set_cyc2ns_scale(unsigned long cpu_mhz)
+{
+	cyc2ns_scale = (1000 << CYC2NS_SCALE_FACTOR)/cpu_mhz;
+}
+
+static inline unsigned long long cycles_2_ns(unsigned long long cyc)
+{
+	return (cyc * cyc2ns_scale) >> CYC2NS_SCALE_FACTOR;
+}
+
 unsigned long long sched_clock(void)
 {
 	unsigned long a = 0;
@@ -409,7 +432,7 @@ unsigned long long sched_clock(void)
 	   purposes. */
 
 	rdtscll(a);
-	return (a * vxtime.tsc_quot) >> 32;
+	return cycles_2_ns(a);
 }
 
 unsigned long get_cmos_time(void)
@@ -516,6 +539,8 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 		vxtime.tsc_quot = (1000L << 32) / cpu_khz;
 	}
 	
+	set_cyc2ns_scale(cpu_khz_ref / 1000);
+
 	return 0;
 }
  
@@ -683,6 +708,8 @@ void __init time_init(void)
 		       "at %#lx.\n", hpet_address);
         }
 #endif
+	if (nohpet)
+		vxtime.hpet_address = 0;
 
 	xtime.tv_sec = get_cmos_time();
 	xtime.tv_nsec = 0;
@@ -712,6 +739,8 @@ void __init time_init(void)
 	rdtscll_sync(&vxtime.last_tsc);
 	setup_irq(0, &irq0);
 
+	set_cyc2ns_scale(cpu_khz / 1000);
+
 #ifdef CONFIG_CPU_FREQ
 	cpufreq_register_notifier(&time_cpufreq_notifier_block, 
 				  CPUFREQ_TRANSITION_NOTIFIER);
@@ -735,6 +764,51 @@ void __init time_init_smp(void)
 }
 
 __setup("report_lost_ticks", time_setup);
+
+static long clock_cmos_diff;
+
+static int time_suspend(struct sys_device *dev, u32 state)
+{
+	/*
+	 * Estimate time zone so that set_time can update the clock
+	 */
+	clock_cmos_diff = -get_cmos_time();
+	clock_cmos_diff += get_seconds();
+	return 0;
+}
+
+static int time_resume(struct sys_device *dev)
+{
+	unsigned long sec = get_cmos_time() + clock_cmos_diff;
+	write_seqlock_irq(&xtime_lock);
+	xtime.tv_sec = sec;
+	xtime.tv_nsec = 0;
+	write_sequnlock_irq(&xtime_lock);
+	return 0;
+}
+
+static struct sysdev_class pit_sysclass = {
+	.resume = time_resume,
+	.suspend = time_suspend,
+	set_kset_name("pit"),
+};
+
+
+/* XXX this driverfs stuff should probably go elsewhere later -john */
+static struct sys_device device_i8253 = {
+	.id	= 0,
+	.cls	= &pit_sysclass,
+};
+
+static int time_init_device(void)
+{
+	int error = sysdev_class_register(&pit_sysclass);
+	if (!error)
+		error = sys_device_register(&device_i8253);
+	return error;
+}
+
+device_initcall(time_init_device);
 
 #ifdef CONFIG_HPET_EMULATE_RTC
 /* HPET in LegacyReplacement Mode eats up RTC interrupt line. When, HPET
@@ -961,3 +1035,11 @@ irqreturn_t hpet_rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 #endif
+
+static int __init nohpet_setup(char *s) 
+{ 
+	nohpet = 1;
+	return 0;
+} 
+
+__setup("nohpet", nohpet_setup);

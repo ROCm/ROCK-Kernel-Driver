@@ -30,14 +30,6 @@
 #define	L1_CACHE_ALIGN(x)       (((x)+(L1_CACHE_BYTES-1))&~(L1_CACHE_BYTES-1))
 #define	L1_CACHE_PAGES		8
 
-#ifdef MODULE
-#define __cacheline_aligned __attribute__((__aligned__(L1_CACHE_BYTES)))
-#else
-#define __cacheline_aligned					\
-  __attribute__((__aligned__(L1_CACHE_BYTES),			\
-		 __section__(".data.cacheline_aligned")))
-#endif
-
 #ifndef __ASSEMBLY__
 extern void clean_dcache_range(unsigned long start, unsigned long stop);
 extern void flush_dcache_range(unsigned long start, unsigned long stop);

@@ -35,13 +35,12 @@
 
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 #include <asm/errno.h>
 #include <asm/ioctl.h>
 #include <asm/termios.h>
 #include <asm/uaccess.h>
 
-int sys_ioctl(unsigned int, unsigned int, unsigned long);
- 
 static int hpux_ioctl_t(int fd, unsigned long cmd, unsigned long arg)
 {
 	int result = -EOPNOTSUPP;

@@ -120,6 +120,7 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 	 * 16 (without this, it would be ~240, which could easily lead
 	 * to kernel stack overflows).
 	 */
+	irq_enter();
 	saved_tpr = ia64_getreg(_IA64_REG_CR_TPR);
 	ia64_srlz_d();
 	while (vector != IA64_SPURIOUS_INT_VECTOR) {
@@ -143,8 +144,7 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 	 * handler needs to be able to wait for further keyboard interrupts, which can't
 	 * come through until ia64_eoi() has been done.
 	 */
-	if (local_softirq_pending())
-		do_softirq();
+	irq_exit();
 }
 
 #ifdef CONFIG_SMP

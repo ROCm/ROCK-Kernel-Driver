@@ -513,7 +513,7 @@ irqreturn_t ei_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		}
 	}
 	spin_unlock(&ei_local->page_lock);
-	return IRQ_HANDLED;
+	return IRQ_RETVAL(nr_serviced > 0);
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER

@@ -41,7 +41,7 @@ static void __rxrpc_conn_timeout(rxrpc_timer_t *timer)
 }
 
 static const struct rxrpc_timer_ops rxrpc_conn_timer_ops = {
-	timed_out:	__rxrpc_conn_timeout,
+	.timed_out	= __rxrpc_conn_timeout,
 };
 
 /*****************************************************************************/

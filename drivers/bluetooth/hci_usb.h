@@ -112,7 +112,7 @@ struct _urb *_urb_dequeue(struct _urb_queue *q);
 #endif
 
 struct hci_usb {
-	struct hci_dev		hdev;
+	struct hci_dev		*hdev;
 
 	unsigned long		state;
 	

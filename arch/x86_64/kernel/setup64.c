@@ -191,7 +191,7 @@ void pda_init(int cpu)
 
 char boot_exception_stacks[N_EXCEPTION_STACKS * EXCEPTION_STKSZ];
 
-void syscall_init(void)
+void __init syscall_init(void)
 {
 	/* 
 	 * LSTAR and STAR live in a bit strange symbiosis.
@@ -209,6 +209,16 @@ void syscall_init(void)
 	wrmsrl(MSR_SYSCALL_MASK, EF_TF|EF_DF|EF_IE|0x3000); 
 }
 
+void __init check_efer(void)
+{
+	unsigned long efer;
+
+	rdmsrl(MSR_EFER, efer); 
+        if (!(efer & EFER_NX) || do_not_nx) { 
+                __supported_pte_mask &= ~_PAGE_NX; 
+        }       
+}
+
 /*
  * cpu_init() initializes state that is per-CPU. Some data is already
  * initialized (naturally) in the bootstrap process, such as the GDT
@@ -224,7 +234,7 @@ void __init cpu_init (void)
 	int cpu = smp_processor_id();
 #endif
 	struct tss_struct * t = &init_tss[cpu];
-	unsigned long v, efer; 
+	unsigned long v; 
 	char *estacks = NULL; 
 	struct task_struct *me;
 
@@ -270,10 +280,7 @@ void __init cpu_init (void)
 	wrmsrl(MSR_KERNEL_GS_BASE, 0);
 	barrier(); 
 
-	rdmsrl(MSR_EFER, efer); 
-        if (!(efer & EFER_NX) || do_not_nx) { 
-                __supported_pte_mask &= ~_PAGE_NX; 
-        }       
+	check_efer();
 
 	/*
 	 * set up and load the per-CPU TSS

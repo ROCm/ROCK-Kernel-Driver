@@ -585,7 +585,7 @@ __armv3_cache_off:
  * On entry,
  *  r6 = processor ID
  * On exit,
- *  r1, r2, r3, r12 corrupted
+ *  r1, r2, r3, r11, r12 corrupted
  * This routine must preserve:
  *  r0, r4, r5, r6, r7
  */
@@ -595,9 +595,25 @@ cache_clean_flush:
 		b	call_cache_fn
 
 __armv4_cache_flush:
-		bic	r1, pc, #31
-		add	r2, r1, #65536		@ 2x the largest dcache size
-1:		ldr	r3, [r1], #32		@ s/w flush D cache
+		mov	r2, #64*1024		@ default: 32K dcache size (*2)
+		mov	r11, #32		@ default: 32 byte line size
+		mrc	p15, 0, r3, c0, c0, 1	@ read cache type
+		teq	r3, r6			@ cache ID register present?
+		beq	no_cache_id
+		mov	r1, r3, lsr #18
+		and	r1, r1, #7
+		mov	r2, #1024
+		mov	r2, r2, lsl r1		@ base dcache size *2
+		tst	r3, #1 << 14		@ test M bit
+		addne	r2, r2, r2, lsr #1	@ +1/2 size if M == 1
+		mov	r3, r3, lsr #12
+		and	r3, r3, #3
+		mov	r11, #8
+		mov	r11, r11, lsl r3	@ cache line size in bytes
+no_cache_id:
+		bic	r1, pc, #63		@ align to longest cache line
+		add	r2, r1, r2
+1:		ldr	r3, [r1], r11		@ s/w flush D cache
 		teq	r1, r2
 		bne	1b
 

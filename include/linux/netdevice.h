@@ -531,11 +531,6 @@ extern struct net_device	*__dev_get_by_flags(unsigned short flags,
 						    unsigned short mask);
 extern struct net_device	*dev_get_by_name(const char *name);
 extern struct net_device	*__dev_get_by_name(const char *name);
-extern struct net_device        *__dev_alloc(const char *name, int *err);
-static inline __deprecated struct net_device *dev_alloc(const char *name, int *err)
-{
-	return __dev_alloc(name, err);
-}
 extern int		dev_alloc_name(struct net_device *dev, const char *name);
 extern int		dev_open(struct net_device *dev);
 extern int		dev_close(struct net_device *dev);

@@ -71,10 +71,10 @@ static struct usb_driver hci_usb_driver;
 
 static struct usb_device_id bluetooth_ids[] = {
 	/* Broadcom BCM2033 without firmware */
-	{ USB_DEVICE(0x0a5c, 0x2033), driver_info: HCI_IGNORE },
+	{ USB_DEVICE(0x0a5c, 0x2033), .driver_info = HCI_IGNORE },
 
 	/* Digianswer device */
-	{ USB_DEVICE(0x08fd, 0x0001), driver_info: HCI_DIGIANSWER },
+	{ USB_DEVICE(0x08fd, 0x0001), .driver_info = HCI_DIGIANSWER },
 
 	/* Generic Bluetooth USB device */
 	{ USB_DEVICE_INFO(HCI_DEV_CLASS, HCI_DEV_SUBCLASS, HCI_DEV_PROTOCOL) },
@@ -108,8 +108,8 @@ struct _urb *_urb_alloc(int isoc, int gfp)
 struct _urb *_urb_dequeue(struct _urb_queue *q)
 {
 	struct _urb *_urb = NULL;
-        unsigned long flags;
-        spin_lock_irqsave(&q->lock, flags);
+	unsigned long flags;
+	spin_lock_irqsave(&q->lock, flags);
 	{
 		struct list_head *head = &q->head;
 		struct list_head *next = head->next;
@@ -165,9 +165,9 @@ static int hci_usb_intr_rx_submit(struct hci_usb *husb)
 	int err, pipe, interval, size;
 	void *buf;
 
-	BT_DBG("%s", husb->hdev.name);
+	BT_DBG("%s", husb->hdev->name);
 
-        size = husb->intr_in_ep->desc.wMaxPacketSize;
+	size = husb->intr_in_ep->desc.wMaxPacketSize;
 
 	buf = kmalloc(size, GFP_ATOMIC);
 	if (!buf)
@@ -189,7 +189,7 @@ static int hci_usb_intr_rx_submit(struct hci_usb *husb)
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err) {
 		BT_ERR("%s intr rx submit failed urb %p err %d",
-				husb->hdev.name, urb, err);
+				husb->hdev->name, urb, err);
 		_urb_unlink(_urb);
 		_urb_free(_urb);
 		kfree(buf);
@@ -218,15 +218,15 @@ static int hci_usb_bulk_rx_submit(struct hci_usb *husb)
 
 	urb  = &_urb->urb;
 	pipe = usb_rcvbulkpipe(husb->udev, husb->bulk_in_ep->desc.bEndpointAddress);
-        usb_fill_bulk_urb(urb, husb->udev, pipe, buf, size, hci_usb_rx_complete, husb);
-        urb->transfer_flags = 0;
+	usb_fill_bulk_urb(urb, husb->udev, pipe, buf, size, hci_usb_rx_complete, husb);
+	urb->transfer_flags = 0;
 
-	BT_DBG("%s urb %p", husb->hdev.name, urb);
+	BT_DBG("%s urb %p", husb->hdev->name, urb);
 
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err) {
 		BT_ERR("%s bulk rx submit failed urb %p err %d",
-				husb->hdev.name, urb, err);
+				husb->hdev->name, urb, err);
 		_urb_unlink(_urb);
 		_urb_free(_urb);
 		kfree(buf);
@@ -243,7 +243,7 @@ static int hci_usb_isoc_rx_submit(struct hci_usb *husb)
 	void *buf;
 
 	mtu  = husb->isoc_in_ep->desc.wMaxPacketSize;
-        size = mtu * HCI_MAX_ISOC_FRAMES;
+	size = mtu * HCI_MAX_ISOC_FRAMES;
 
 	buf = kmalloc(size, GFP_ATOMIC);
 	if (!buf)
@@ -264,18 +264,20 @@ static int hci_usb_isoc_rx_submit(struct hci_usb *husb)
 	urb->pipe     = usb_rcvisocpipe(husb->udev, husb->isoc_in_ep->desc.bEndpointAddress);
 	urb->complete = hci_usb_rx_complete;
 
+	urb->interval = husb->isoc_in_ep->desc.bInterval;
+
 	urb->transfer_buffer_length = size;
 	urb->transfer_buffer = buf;
 	urb->transfer_flags  = URB_ISO_ASAP;
 
 	__fill_isoc_desc(urb, size, mtu);
 
-	BT_DBG("%s urb %p", husb->hdev.name, urb);
+	BT_DBG("%s urb %p", husb->hdev->name, urb);
 
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err) {
 		BT_ERR("%s isoc rx submit failed urb %p err %d",
-				husb->hdev.name, urb, err);
+				husb->hdev->name, urb, err);
 		_urb_unlink(_urb);
 		_urb_free(_urb);
 		kfree(buf);
@@ -333,7 +335,7 @@ static void hci_usb_unlink_urbs(struct hci_usb *husb)
 {
 	int i;
 
-	BT_DBG("%s", husb->hdev.name);
+	BT_DBG("%s", husb->hdev->name);
 
 	for (i=0; i < 4; i++) {
 		struct _urb *_urb;
@@ -343,7 +345,7 @@ static void hci_usb_unlink_urbs(struct hci_usb *husb)
 		while ((_urb = _urb_dequeue(&husb->pending_q[i]))) {
 			urb = &_urb->urb;
 			BT_DBG("%s unlinking _urb %p type %d urb %p", 
-					husb->hdev.name, _urb, _urb->type, urb);
+					husb->hdev->name, _urb, _urb->type, urb);
 			usb_unlink_urb(urb);
 			_urb_queue_tail(__completed_q(husb, _urb->type), _urb);
 		}
@@ -352,7 +354,7 @@ static void hci_usb_unlink_urbs(struct hci_usb *husb)
 		while ((_urb = _urb_dequeue(&husb->completed_q[i]))) {
 			urb = &_urb->urb;
 			BT_DBG("%s freeing _urb %p type %d urb %p",
-					husb->hdev.name, _urb, _urb->type, urb);
+					husb->hdev->name, _urb, _urb->type, urb);
 			if (urb->setup_packet)
 				kfree(urb->setup_packet);
 			if (urb->transfer_buffer)
@@ -393,13 +395,13 @@ static int __tx_submit(struct hci_usb *husb, struct _urb *_urb)
 	struct urb *urb = &_urb->urb;
 	int err;
 
-	BT_DBG("%s urb %p type %d", husb->hdev.name, urb, _urb->type);
+	BT_DBG("%s urb %p type %d", husb->hdev->name, urb, _urb->type);
 	
 	_urb_queue_tail(__pending_q(husb, _urb->type), _urb);
 	err = usb_submit_urb(urb, GFP_ATOMIC);
 	if (err) {
 		BT_ERR("%s tx submit failed urb %p type %d err %d",
-				husb->hdev.name, urb, _urb->type, err);
+				husb->hdev->name, urb, _urb->type, err);
 		_urb_unlink(_urb);
 		_urb_queue_tail(__completed_q(husb, _urb->type), _urb);
 	} else
@@ -415,8 +417,8 @@ static inline int hci_usb_send_ctrl(struct hci_usb *husb, struct sk_buff *skb)
 	struct urb *urb;
 
 	if (!_urb) {
-	       	_urb = _urb_alloc(0, GFP_ATOMIC);
-	       	if (!_urb)
+		_urb = _urb_alloc(0, GFP_ATOMIC);
+		if (!_urb)
 			return -ENOMEM;
 		_urb->type = skb->pkt_type;
 
@@ -438,7 +440,7 @@ static inline int hci_usb_send_ctrl(struct hci_usb *husb, struct sk_buff *skb)
 	usb_fill_control_urb(urb, husb->udev, usb_sndctrlpipe(husb->udev, 0),
 		(void *) dr, skb->data, skb->len, hci_usb_tx_complete, husb);
 
-	BT_DBG("%s skb %p len %d", husb->hdev.name, skb, skb->len);
+	BT_DBG("%s skb %p len %d", husb->hdev->name, skb, skb->len);
 	
 	_urb->priv = skb;
 	return __tx_submit(husb, _urb);
@@ -451,8 +453,8 @@ static inline int hci_usb_send_bulk(struct hci_usb *husb, struct sk_buff *skb)
 	int pipe;
 
 	if (!_urb) {
-	       	_urb = _urb_alloc(0, GFP_ATOMIC);
-	       	if (!_urb)
+		_urb = _urb_alloc(0, GFP_ATOMIC);
+		if (!_urb)
 			return -ENOMEM;
 		_urb->type = skb->pkt_type;
 	}
@@ -463,7 +465,7 @@ static inline int hci_usb_send_bulk(struct hci_usb *husb, struct sk_buff *skb)
 			hci_usb_tx_complete, husb);
 	urb->transfer_flags = URB_ZERO_PACKET;
 
-	BT_DBG("%s skb %p len %d", husb->hdev.name, skb, skb->len);
+	BT_DBG("%s skb %p len %d", husb->hdev->name, skb, skb->len);
 
 	_urb->priv = skb;
 	return __tx_submit(husb, _urb);
@@ -474,27 +476,29 @@ static inline int hci_usb_send_isoc(struct hci_usb *husb, struct sk_buff *skb)
 {
 	struct _urb *_urb = __get_completed(husb, skb->pkt_type);
 	struct urb *urb;
-	
+
 	if (!_urb) {
-	       	_urb = _urb_alloc(HCI_MAX_ISOC_FRAMES, GFP_ATOMIC);
-	       	if (!_urb)
+		_urb = _urb_alloc(HCI_MAX_ISOC_FRAMES, GFP_ATOMIC);
+		if (!_urb)
 			return -ENOMEM;
 		_urb->type = skb->pkt_type;
 	}
 
-	BT_DBG("%s skb %p len %d", husb->hdev.name, skb, skb->len);
+	BT_DBG("%s skb %p len %d", husb->hdev->name, skb, skb->len);
 
 	urb = &_urb->urb;
-	
+
 	urb->context  = husb;
 	urb->dev      = husb->udev;
 	urb->pipe     = usb_sndisocpipe(husb->udev, husb->isoc_out_ep->desc.bEndpointAddress);
 	urb->complete = hci_usb_tx_complete;
 	urb->transfer_flags = URB_ISO_ASAP;
 
+	urb->interval = husb->isoc_out_ep->desc.bInterval;
+
 	urb->transfer_buffer = skb->data;
 	urb->transfer_buffer_length = skb->len;
-	
+
 	__fill_isoc_desc(urb, skb->len, husb->isoc_out_ep->desc.wMaxPacketSize);
 
 	_urb->priv = skb;
@@ -507,7 +511,7 @@ static void hci_usb_tx_process(struct hci_usb *husb)
 	struct sk_buff_head *q;
 	struct sk_buff *skb;
 
-	BT_DBG("%s", husb->hdev.name);
+	BT_DBG("%s", husb->hdev->name);
 
 	do {
 		clear_bit(HCI_USB_TX_WAKEUP, &husb->state);
@@ -601,9 +605,9 @@ static int hci_usb_send_frame(struct sk_buff *skb)
 
 static inline int __recv_frame(struct hci_usb *husb, int type, void *data, int count)
 {
-	BT_DBG("%s type %d data %p count %d", husb->hdev.name, type, data, count);
+	BT_DBG("%s type %d data %p count %d", husb->hdev->name, type, data, count);
 
-	husb->hdev.stat.byte_rx += count;
+	husb->hdev->stat.byte_rx += count;
 
 	while (count) {
 		struct sk_buff *skb = __reassembly(husb, type);
@@ -643,10 +647,10 @@ static inline int __recv_frame(struct hci_usb *husb, int type, void *data, int c
 				
 			skb = bt_skb_alloc(len, GFP_ATOMIC);
 			if (!skb) {
-				BT_ERR("%s no memory for the packet", husb->hdev.name);
+				BT_ERR("%s no memory for the packet", husb->hdev->name);
 				return -ENOMEM;
 			}
-			skb->dev = (void *) &husb->hdev;
+			skb->dev = (void *) husb->hdev;
 			skb->pkt_type = type;
 	
 			__reassembly(husb, type) = skb;
@@ -679,7 +683,7 @@ static void hci_usb_rx_complete(struct urb *urb, struct pt_regs *regs)
 {
 	struct _urb *_urb = container_of(urb, struct _urb, urb);
 	struct hci_usb *husb = (void *) urb->context;
-	struct hci_dev *hdev = &husb->hdev;
+	struct hci_dev *hdev = husb->hdev;
 	int    err, count = urb->actual_length;
 
 	BT_DBG("%s urb %p type %d status %d count %d flags %x", hdev->name, urb,
@@ -714,7 +718,7 @@ static void hci_usb_rx_complete(struct urb *urb, struct pt_regs *regs)
 		err = __recv_frame(husb, _urb->type, urb->transfer_buffer, count);
 		if (err < 0) { 
 			BT_ERR("%s corrupted packet: type %d count %d",
-					husb->hdev.name, _urb->type, count);
+					husb->hdev->name, _urb->type, count);
 			hdev->stat.err_rx++;
 		}
 	}
@@ -732,7 +736,7 @@ static void hci_usb_tx_complete(struct urb *urb, struct pt_regs *regs)
 {
 	struct _urb *_urb = container_of(urb, struct _urb, urb);
 	struct hci_usb *husb = (void *) urb->context;
-	struct hci_dev *hdev = &husb->hdev;
+	struct hci_dev *hdev = husb->hdev;
 
 	BT_DBG("%s urb %p status %d flags %x", hdev->name, urb,
 			urb->status, urb->transfer_flags);
@@ -904,9 +908,15 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	}
 
 	/* Initialize and register HCI device */
-	hdev = &husb->hdev;
+	hdev = hci_alloc_dev();
+	if (!hdev) {
+		BT_ERR("Can't allocate HCI device");
+		goto probe_error;
+	}
 
-	hdev->type  = HCI_USB;
+	husb->hdev = hdev;
+
+	hdev->type = HCI_USB;
 	hdev->driver_data = husb;
 	SET_HCIDEV_DEV(hdev, &intf->dev);
 
@@ -920,6 +930,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
+		hci_free_dev(hdev);
 		goto probe_error;
 	}
 
@@ -936,7 +947,7 @@ done:
 static void hci_usb_disconnect(struct usb_interface *intf)
 {
 	struct hci_usb *husb = usb_get_intfdata(intf);
-	struct hci_dev *hdev = &husb->hdev;
+	struct hci_dev *hdev = husb->hdev;
 
 	if (!husb)
 		return;
@@ -951,6 +962,8 @@ static void hci_usb_disconnect(struct usb_interface *intf)
 
 	if (hci_unregister_dev(hdev) < 0)
 		BT_ERR("Can't unregister HCI device %s", hdev->name);
+
+	hci_free_dev(hdev);
 }
 
 static struct usb_driver hci_usb_driver = {

@@ -18,6 +18,7 @@
 #include <linux/file.h>
 #include <linux/icmpv6.h>
 #include <linux/socket.h>
+#include <linux/syscalls.h>
 #include <linux/filter.h>
 #include <linux/compat.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
@@ -304,9 +305,6 @@ void scm_detach_fds_compat(struct msghdr *kmsg, struct scm_cookie *scm)
 	__scm_destroy(scm);
 }
 
-extern asmlinkage long sys_setsockopt(int fd, int level, int optname,
-				     char *optval, int optlen);
-
 /*
  * For now, we assume that the compatibility and native version
  * of struct ipt_entry are the same - sfr.  FIXME
@@ -471,9 +469,6 @@ asmlinkage long compat_sys_setsockopt(int fd, int level, int optname,
 	return sys_setsockopt(fd, level, optname, optval, optlen);
 }
 
-extern asmlinkage long sys_getsockopt(int fd, int level, int optname,
-				       void * optval, int *optlen);
-
 static int do_get_sock_timeout(int fd, int level, int optname, char *optval,
 		int *optlen)
 {
@@ -516,22 +511,6 @@ static unsigned char nas[18]={AL(0),AL(3),AL(3),AL(3),AL(2),AL(3),
 				AL(3),AL(3),AL(4),AL(4),AL(4),AL(6),
 				AL(6),AL(2),AL(5),AL(5),AL(3),AL(3)};
 #undef AL
-
-extern asmlinkage long sys_bind(int, struct sockaddr *, int);
-extern asmlinkage long sys_connect(int, struct sockaddr *, int);
-extern asmlinkage long sys_accept(int, struct sockaddr *, int *); 
-extern asmlinkage long sys_getsockname(int, struct sockaddr *, int *);
-extern asmlinkage long sys_getpeername(int, struct sockaddr *, int *);
-extern asmlinkage long sys_send(int, void *, size_t, unsigned);
-extern asmlinkage long sys_sendto(int, void *, size_t, unsigned,
-		struct sockaddr *, int);
-extern asmlinkage long sys_recv(int, void *, size_t, unsigned);
-extern asmlinkage long sys_recvfrom(int, void *, size_t, unsigned,
-		struct sockaddr *, int *);
-extern asmlinkage long sys_socket(int, int, int);
-extern asmlinkage long sys_socketpair(int, int, int, int [2]);
-extern asmlinkage long sys_shutdown(int, int);
-extern asmlinkage long sys_listen(int, int);
 
 asmlinkage long compat_sys_sendmsg(int fd, struct compat_msghdr *msg, unsigned flags)
 {

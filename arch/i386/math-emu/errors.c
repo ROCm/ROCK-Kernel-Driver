@@ -291,7 +291,7 @@ static struct {
 	      0x242  in div_Xsig.S
  */
 
-void FPU_exception(int n)
+asmlinkage void FPU_exception(int n)
 {
   int i, int_type;
 

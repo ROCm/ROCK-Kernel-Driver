@@ -163,6 +163,9 @@ static inline int get_order(unsigned long size)
 
 #define __pa(x) ((unsigned long)(x)-PAGE_OFFSET)
 
+/* Not 100% correct, for use by /dev/mem only */
+extern int page_is_ram(unsigned long physaddr);
+
 #endif /* __ASSEMBLY__ */
 
 #ifdef MODULE

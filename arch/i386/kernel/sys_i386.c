@@ -15,6 +15,7 @@
 #include <linux/msg.h>
 #include <linux/shm.h>
 #include <linux/stat.h>
+#include <linux/syscalls.h>
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
@@ -105,8 +106,6 @@ out:
 	return err;
 }
 
-
-extern asmlinkage int sys_select(int, fd_set __user *, fd_set __user *, fd_set __user *, struct timeval __user *);
 
 struct sel_arg_struct {
 	unsigned long n;

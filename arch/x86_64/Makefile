@@ -37,10 +37,8 @@ LDFLAGS		:= -m elf_x86_64
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux := -e stext
 
-check_gcc = $(shell if $(CC) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1 ; then echo "$(1)"; else echo "$(2)"; fi)
-
 cflags-$(CONFIG_MK8) += $(call check_gcc,-march=k8,)
-cflags-$(CONFIG_MPSC) += $(call check_gcc,-march=pentium4,)
+cflags-$(CONFIG_MPSC) += $(call check_gcc,-march=prescott,)
 CFLAGS += $(cflags-y)
 
 CFLAGS += -mno-red-zone
@@ -49,16 +47,15 @@ CFLAGS += -pipe
 # this makes reading assembly source easier, but produces worse code
 # actually it makes the kernel smaller too.
 CFLAGS += -fno-reorder-blocks	
-# should lower this a lot and see how much .text is saves	
-# CFLAGS += -finline-limit=2000
 CFLAGS += -Wno-sign-compare
-# don't enable this when you use kgdb:
 ifneq ($(CONFIG_DEBUG_INFO),y)
 CFLAGS += -fno-asynchronous-unwind-tables
+# -fweb shrinks the kernel a bit, but the difference is very small
+# it also messes up debugging, so don't use it for now.
+#CFLAGS += $(call check_gcc,-fweb,)
 endif
-
-# Enable unit-at-a-time mode when possible. It shrinks the
-# kernel considerably.
+# -funit-at-a-time shrinks the kernel .text considerably
+# unfortunately it makes reading oopses harder.
 CFLAGS += $(call check_gcc,-funit-at-a-time,)
 
 head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o

@@ -705,5 +705,8 @@ static void __exit pcwatchdog_exit(void)
 module_init(pcwatchdog_init);
 module_exit(pcwatchdog_exit);
 
+MODULE_AUTHOR("Ken Hollis <kenji@bitgate.com>");
+MODULE_DESCRIPTION("Berkshire ISA-PC Watchdog driver");
 MODULE_LICENSE("GPL");
-
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
+MODULE_ALIAS_MISCDEV(TEMP_MINOR);

@@ -69,14 +69,14 @@ void saa7146_set_gpio(struct saa7146_dev *dev, u8 pin, u8 data)
 /* This DEBI code is based on the saa7146 Stradis driver by Nathan Laredo */
 int saa7146_wait_for_debi_done(struct saa7146_dev *dev)
 {
-	int start;
+	unsigned long start;
 
 	/* wait for registers to be programmed */
 	start = jiffies;
 	while (1) {
                 if (saa7146_read(dev, MC2) & 2)
                         break;
-		if (jiffies-start > HZ/20) {
+		if (time_after(jiffies, start + HZ/20)) {
 			DEB_S(("timed out while waiting for registers getting programmed\n"));
 			return -ETIMEDOUT;
 		}
@@ -88,7 +88,7 @@ int saa7146_wait_for_debi_done(struct saa7146_dev *dev)
 		if (!(saa7146_read(dev, PSR) & SPCI_DEBI_S))
 			break;
 		saa7146_read(dev, MC2);
-		if (jiffies-start > HZ/4) {
+		if (time_after(jiffies, start + HZ/4)) {
 			DEB_S(("timed out while waiting for transfer completion\n"));
 			return -ETIMEDOUT;
 		}

@@ -16,6 +16,7 @@
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
 #include <asm/sn/sn_private.h>
+#include <asm/sn/sn_sal.h>
 
 extern pcibr_info_t     pcibr_info_get(vertex_hdl_t);
 extern int              pcibr_widget_to_bus(vertex_hdl_t pcibr_vhdl);
@@ -58,6 +59,411 @@ void do_pcibr_config_set(cfg_p, unsigned, unsigned, uint64_t);
 int max_splittrans_to_numbuf[MAX_SPLIT_TABLE] = {1, 2, 3, 4, 8, 12, 16, 32};
 int max_readcount_to_bufsize[MAX_READCNT_TABLE] = {512, 1024, 2048, 4096 };
 
+#ifdef CONFIG_HOTPLUG_PCI_SGI
+
+/*
+ * PCI slot manipulation errors from the system controller, and their
+ * associated descriptions
+ */
+#define SYSCTL_REQERR_BASE	(-106000)
+#define SYSCTL_PCI_ERROR_BASE	(SYSCTL_REQERR_BASE - 100)
+#define SYSCTL_PCIX_ERROR_BASE	(SYSCTL_REQERR_BASE - 3000)
+
+struct sysctl_pci_error_s {
+
+    int	 	error;
+    char	*msg;
+
+} sysctl_pci_errors[] = {
+
+#define SYSCTL_PCI_UNINITIALIZED	(SYSCTL_PCI_ERROR_BASE - 0)
+    { SYSCTL_PCI_UNINITIALIZED, "module not initialized" },
+
+#define SYSCTL_PCI_UNSUPPORTED_BUS	(SYSCTL_PCI_ERROR_BASE - 1)
+    { SYSCTL_PCI_UNSUPPORTED_BUS, "unsupported bus" },
+
+#define SYSCTL_PCI_UNSUPPORTED_SLOT	(SYSCTL_PCI_ERROR_BASE - 2)
+    { SYSCTL_PCI_UNSUPPORTED_SLOT, "unsupported slot" },
+
+#define SYSCTL_PCI_POWER_NOT_OKAY	(SYSCTL_PCI_ERROR_BASE - 3)
+    { SYSCTL_PCI_POWER_NOT_OKAY, "slot power not okay" },
+
+#define SYSCTL_PCI_CARD_NOT_PRESENT	(SYSCTL_PCI_ERROR_BASE - 4)
+    { SYSCTL_PCI_CARD_NOT_PRESENT, "card not present" },
+
+#define SYSCTL_PCI_POWER_LIMIT		(SYSCTL_PCI_ERROR_BASE - 5)
+    { SYSCTL_PCI_POWER_LIMIT, "power limit reached - some cards not powered up" },
+
+#define SYSCTL_PCI_33MHZ_ON_66MHZ	(SYSCTL_PCI_ERROR_BASE - 6)
+    { SYSCTL_PCI_33MHZ_ON_66MHZ, "cannot add a 33 MHz card to an active 66 MHz bus" },
+
+#define SYSCTL_PCI_INVALID_ORDER	(SYSCTL_PCI_ERROR_BASE - 7)
+    { SYSCTL_PCI_INVALID_ORDER, "invalid reset order" },
+
+#define SYSCTL_PCI_DOWN_33MHZ		(SYSCTL_PCI_ERROR_BASE - 8)
+    { SYSCTL_PCI_DOWN_33MHZ, "cannot power down a 33 MHz card on an active bus" },
+
+#define SYSCTL_PCI_RESET_33MHZ		(SYSCTL_PCI_ERROR_BASE - 9)
+    { SYSCTL_PCI_RESET_33MHZ, "cannot reset a 33 MHz card on an active bus" },
+
+#define SYSCTL_PCI_SLOT_NOT_UP		(SYSCTL_PCI_ERROR_BASE - 10)
+    { SYSCTL_PCI_SLOT_NOT_UP, "cannot reset a slot that is not powered up" },
+
+#define SYSCTL_PCIX_UNINITIALIZED	(SYSCTL_PCIX_ERROR_BASE - 0)
+    { SYSCTL_PCIX_UNINITIALIZED, "module not initialized" },
+
+#define SYSCTL_PCIX_UNSUPPORTED_BUS	(SYSCTL_PCIX_ERROR_BASE - 1)
+    { SYSCTL_PCIX_UNSUPPORTED_BUS, "unsupported bus" },
+
+#define SYSCTL_PCIX_UNSUPPORTED_SLOT	(SYSCTL_PCIX_ERROR_BASE - 2)
+    { SYSCTL_PCIX_UNSUPPORTED_SLOT, "unsupported slot" },
+
+#define SYSCTL_PCIX_POWER_NOT_OKAY	(SYSCTL_PCIX_ERROR_BASE - 3)
+    { SYSCTL_PCIX_POWER_NOT_OKAY, "slot power not okay" },
+
+#define SYSCTL_PCIX_CARD_NOT_PRESENT	(SYSCTL_PCIX_ERROR_BASE - 4)
+    { SYSCTL_PCIX_CARD_NOT_PRESENT, "card not present" },
+
+#define SYSCTL_PCIX_POWER_LIMIT		(SYSCTL_PCIX_ERROR_BASE - 5)
+    { SYSCTL_PCIX_POWER_LIMIT, "power limit reached - some cards not powered up" },
+
+#define SYSCTL_PCIX_33MHZ_ON_66MHZ	(SYSCTL_PCIX_ERROR_BASE - 6)
+    { SYSCTL_PCIX_33MHZ_ON_66MHZ, "cannot add a 33 MHz card to an active 66 MHz bus" },
+
+#define SYSCTL_PCIX_PCI_ON_PCIX		(SYSCTL_PCIX_ERROR_BASE - 7)
+    { SYSCTL_PCIX_PCI_ON_PCIX, "cannot add a PCI card to an active PCIX bus" },
+
+#define SYSCTL_PCIX_ANYTHING_ON_133MHZ		(SYSCTL_PCIX_ERROR_BASE - 8)
+    { SYSCTL_PCIX_ANYTHING_ON_133MHZ, "cannot add any card to an active 133MHz PCIX bus" },
+
+#define SYSCTL_PCIX_X66MHZ_ON_X100MHZ		(SYSCTL_PCIX_ERROR_BASE - 9)
+    { SYSCTL_PCIX_X66MHZ_ON_X100MHZ, "cannot add a PCIX 66MHz card to an active 100MHz PCIX bus" },
+
+#define SYSCTL_PCIX_INVALID_ORDER	(SYSCTL_PCIX_ERROR_BASE - 10)
+    { SYSCTL_PCIX_INVALID_ORDER, "invalid reset order" },
+
+#define SYSCTL_PCIX_DOWN_33MHZ		(SYSCTL_PCIX_ERROR_BASE - 11)
+    { SYSCTL_PCIX_DOWN_33MHZ, "cannot power down a 33 MHz card on an active bus" },
+
+#define SYSCTL_PCIX_RESET_33MHZ		(SYSCTL_PCIX_ERROR_BASE - 12)
+    { SYSCTL_PCIX_RESET_33MHZ, "cannot reset a 33 MHz card on an active bus" },
+
+#define SYSCTL_PCIX_SLOT_NOT_UP		(SYSCTL_PCIX_ERROR_BASE - 13)
+    { SYSCTL_PCIX_SLOT_NOT_UP, "cannot reset a slot that is not powered up" },
+
+#define SYSCTL_PCIX_INVALID_BUS_SETTING	(SYSCTL_PCIX_ERROR_BASE - 14)
+    { SYSCTL_PCIX_INVALID_BUS_SETTING, "invalid bus type/speed selection (PCIX<66MHz, PCI>66MHz)" },
+
+#define SYSCTL_PCIX_INVALID_DEPENDENT_SLOT (SYSCTL_PCIX_ERROR_BASE - 15)
+    { SYSCTL_PCIX_INVALID_DEPENDENT_SLOT, "invalid dependent slot in PCI slot configuration" },
+
+#define SYSCTL_PCIX_SHARED_IDSELECT	(SYSCTL_PCIX_ERROR_BASE - 16)
+    { SYSCTL_PCIX_SHARED_IDSELECT, "cannot enable two slots sharing the same IDSELECT" },
+
+#define SYSCTL_PCIX_SLOT_DISABLED	(SYSCTL_PCIX_ERROR_BASE - 17)
+    { SYSCTL_PCIX_SLOT_DISABLED, "slot is disabled" },
+
+}; /* end sysctl_pci_errors[] */
+
+/*
+ * look up an error message for PCI operations that fail
+ */
+static void
+sysctl_pci_error_lookup(int error, char *err_msg)
+{
+    int i;
+    struct sysctl_pci_error_s *e = sysctl_pci_errors;
+    
+    for (i = 0; 
+	 i < (sizeof(sysctl_pci_errors) / sizeof(*e));
+	 i++, e++ )
+    {
+	if (e->error == error)
+	{
+	    strcpy(err_msg, e->msg);
+	    return;
+	}
+    }
+
+    sprintf(err_msg, "unrecognized PCI error type");
+}
+
+/*
+ * pcibr_slot_attach
+ *	This is a place holder routine to keep track of all the
+ *	slot-specific initialization that needs to be done.
+ *	This is usually called when we want to initialize a new
+ * 	PCI card on the bus.
+ */
+int
+pcibr_slot_attach(vertex_hdl_t pcibr_vhdl,
+		  pciio_slot_t slot,
+		  int          drv_flags,
+		  char        *l1_msg,
+                  int         *sub_errorp)
+{
+    pcibr_soft_t  pcibr_soft = pcibr_soft_get(pcibr_vhdl);
+    int		  error;
+
+    if (!(pcibr_soft->bs_slot[slot].slot_status & PCI_SLOT_POWER_ON)) {
+	uint64_t speed;
+	uint64_t mode;
+
+        /* Power-up the slot */
+        error = pcibr_slot_pwr(pcibr_vhdl, slot, PCI_REQ_SLOT_POWER_ON, l1_msg);
+
+        if (error) {
+            if (sub_errorp)
+                *sub_errorp = error;
+            return(PCI_L1_ERR);
+        } else {
+            pcibr_soft->bs_slot[slot].slot_status &= ~PCI_SLOT_POWER_MASK;
+            pcibr_soft->bs_slot[slot].slot_status |= PCI_SLOT_POWER_ON;
+        }
+
+	/* The speed/mode of the bus may have changed due to the hotplug */
+	speed = pcireg_speed_get(pcibr_soft);
+	mode = pcireg_mode_get(pcibr_soft);
+	pcibr_soft->bs_bridge_mode = ((speed << 1) | mode);
+
+        /*
+         * Allow cards like the Alteon Gigabit Ethernet Adapter to complete
+         * on-card initialization following the slot reset
+         */
+        set_current_state (TASK_INTERRUPTIBLE);
+        schedule_timeout (HZ);
+
+        /* Find out what is out there */
+        error = pcibr_slot_info_init(pcibr_vhdl, slot);
+
+        if (error) {
+            if (sub_errorp)
+                *sub_errorp = error;
+            return(PCI_SLOT_INFO_INIT_ERR);
+        }
+
+        /* Set up the address space for this slot in the PCI land */
+
+        error = pcibr_slot_addr_space_init(pcibr_vhdl, slot);
+
+        if (error) {
+            if (sub_errorp)
+                *sub_errorp = error;
+            return(PCI_SLOT_ADDR_INIT_ERR);
+        }
+
+	/* Allocate the PCI-X Read Buffer Attribute Registers (RBARs)*/
+	if (IS_PCIX(pcibr_soft)) {
+	    int tmp_slot;
+
+	    /* Recalculate the RBARs for all the devices on the bus.  Only
+	     * return an error if we error for the given 'slot'
+	     */
+	    pcibr_soft->bs_pcix_rbar_inuse = 0;
+	    pcibr_soft->bs_pcix_rbar_avail = NUM_RBAR;
+	    pcibr_soft->bs_pcix_rbar_percent_allowed = 
+					pcibr_pcix_rbars_calc(pcibr_soft);
+	    for (tmp_slot = pcibr_soft->bs_min_slot;
+			tmp_slot < PCIBR_NUM_SLOTS(pcibr_soft); ++tmp_slot) {
+		if (tmp_slot == slot)
+		    continue;	/* skip this 'slot', we do it below */
+                (void)pcibr_slot_pcix_rbar_init(pcibr_soft, tmp_slot);
+	    }
+
+	    error = pcibr_slot_pcix_rbar_init(pcibr_soft, slot);
+	    if (error) {
+		if (sub_errorp)
+		    *sub_errorp = error;
+		return(PCI_SLOT_RBAR_ALLOC_ERR);
+	    }
+	}
+
+        /* Setup the device register */
+        error = pcibr_slot_device_init(pcibr_vhdl, slot);
+
+        if (error) {
+            if (sub_errorp)
+                *sub_errorp = error;
+            return(PCI_SLOT_DEV_INIT_ERR);
+        }
+
+        /* Setup host/guest relations */
+        error = pcibr_slot_guest_info_init(pcibr_vhdl, slot);
+
+        if (error) {
+            if (sub_errorp)
+                *sub_errorp = error;
+            return(PCI_SLOT_GUEST_INIT_ERR);
+        }
+
+        /* Initial RRB management */
+        error = pcibr_slot_initial_rrb_alloc(pcibr_vhdl, slot);
+
+        if (error) {
+            if (sub_errorp)
+                *sub_errorp = error;
+            return(PCI_SLOT_RRB_ALLOC_ERR);
+        }
+
+    }
+
+    /* Call the device attach */
+    error = pcibr_slot_call_device_attach(pcibr_vhdl, slot, drv_flags);
+
+    if (error) {
+        if (sub_errorp)
+            *sub_errorp = error;
+        if (error == EUNATCH)
+            return(PCI_NO_DRIVER);
+        else
+            return(PCI_SLOT_DRV_ATTACH_ERR);
+    }
+
+    return(0);
+}
+
+/*
+ * pcibr_slot_enable
+ *	Enable the PCI slot for a hot-plug insert.
+ */
+int
+pcibr_slot_enable(vertex_hdl_t pcibr_vhdl, struct pcibr_slot_enable_req_s *req_p)
+{
+    pcibr_soft_t                   pcibr_soft = pcibr_soft_get(pcibr_vhdl);
+    pciio_slot_t                   slot = req_p->req_device;
+    int                            error = 0;
+
+    /* Make sure that we are dealing with a bridge device vertex */
+    if (!pcibr_soft) {
+        return(PCI_NOT_A_BRIDGE);
+    }
+
+    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HOTPLUG, pcibr_vhdl,
+                "pcibr_slot_enable: pcibr_soft=0x%lx, slot=%d, req_p=0x%lx\n",
+                pcibr_soft, slot, req_p));
+
+    /* Check for the valid slot */
+    if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
+        return(PCI_NOT_A_SLOT);
+
+    if (pcibr_soft->bs_slot[slot].slot_status & PCI_SLOT_ENABLE_CMPLT) {
+        error = PCI_SLOT_ALREADY_UP;
+        goto enable_unlock;
+    }
+
+    error = pcibr_slot_attach(pcibr_vhdl, slot, NULL,
+                              req_p->req_resp.resp_l1_msg,
+			      &req_p->req_resp.resp_sub_errno);
+
+    req_p->req_resp.resp_l1_msg[PCI_L1_QSIZE] = '\0';
+
+    enable_unlock:
+
+    return(error);
+}
+
+/*
+ * pcibr_slot_disable
+ *	Disable the PCI slot for a hot-plug removal.
+ */
+int
+pcibr_slot_disable(vertex_hdl_t pcibr_vhdl, struct pcibr_slot_disable_req_s *req_p)
+{
+    pcibr_soft_t                   pcibr_soft = pcibr_soft_get(pcibr_vhdl);
+    pciio_slot_t                   slot = req_p->req_device;
+    int                            error = 0;
+    pciio_slot_t                   tmp_slot;
+
+    /* Make sure that we are dealing with a bridge device vertex */
+    if (!pcibr_soft) {
+        return(PCI_NOT_A_BRIDGE);
+    }
+
+    PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_HOTPLUG, pcibr_vhdl,
+                "pcibr_slot_disable: pcibr_soft=0x%lx, slot=%d, req_p=0x%lx\n",
+                pcibr_soft, slot, req_p));
+
+    /* Check for valid slot */
+    if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
+        return(PCI_NOT_A_SLOT);
+
+    if ((pcibr_soft->bs_slot[slot].slot_status & PCI_SLOT_DISABLE_CMPLT) ||
+       ((pcibr_soft->bs_slot[slot].slot_status & PCI_SLOT_STATUS_MASK) == 0)) {
+        error = PCI_SLOT_ALREADY_DOWN;
+        /*
+         * RJR - Should we invoke an L1 slot power-down command just in case
+         *       a previous shut-down failed to power-down the slot?
+         */
+        goto disable_unlock;
+    }
+
+    /* Do not allow the last 33 MHz card to be removed */
+    if (IS_33MHZ(pcibr_soft)) {
+        for (tmp_slot = pcibr_soft->bs_first_slot;
+             tmp_slot <= pcibr_soft->bs_last_slot; tmp_slot++)
+            if (tmp_slot != slot)
+                if (pcibr_soft->bs_slot[tmp_slot].slot_status & PCI_SLOT_POWER_ON) {
+                    error++;
+                    break;
+                }
+        if (!error) {
+            error = PCI_EMPTY_33MHZ;
+            goto disable_unlock;
+        }
+    }
+
+    if (req_p->req_action == PCI_REQ_SLOT_ELIGIBLE)
+	return(0);
+
+    error = pcibr_slot_detach(pcibr_vhdl, slot, 1,
+                              req_p->req_resp.resp_l1_msg,
+			      &req_p->req_resp.resp_sub_errno);
+
+    req_p->req_resp.resp_l1_msg[PCI_L1_QSIZE] = '\0';
+
+    disable_unlock:
+
+    return(error);
+}
+
+/*
+ * pcibr_slot_pwr
+ *      Power-up or power-down a PCI slot.  This routines makes calls to
+ *      the L1 system controller driver which requires "external" slot#.
+ */
+int
+pcibr_slot_pwr(vertex_hdl_t pcibr_vhdl,
+               pciio_slot_t slot,
+               int          up,
+	       char        *err_msg)
+{
+    pcibr_soft_t        pcibr_soft = pcibr_soft_get(pcibr_vhdl);
+    nasid_t             nasid;
+    u64			connection_type;
+    int			rv;
+
+    nasid = NASID_GET(pcibr_soft->bs_base);
+    connection_type = SAL_SYSCTL_IO_XTALK;
+
+    rv = (int) ia64_sn_sysctl_iobrick_pci_op
+	(nasid,
+	 connection_type,
+	 (u64) pcibr_widget_to_bus(pcibr_vhdl),
+	 PCIBR_DEVICE_TO_SLOT(pcibr_soft, slot),
+	 (up ? SAL_SYSCTL_PCI_POWER_UP : SAL_SYSCTL_PCI_POWER_DOWN));
+
+    if (!rv) {
+	/* everything's okay; no error message */
+	*err_msg = '\0';
+    }
+    else {
+	/* there was a problem; look up an appropriate error message */
+	sysctl_pci_error_lookup(rv, err_msg);
+    }
+    return rv;
+}
+
+#endif /* CONFIG_HOTPLUG_PCI_SGI */
 
 /*
  * pcibr_slot_info_init
@@ -114,7 +520,9 @@ pcibr_slot_info_init(vertex_hdl_t 	pcibr_vhdl,
 	return -ENODEV;
 
     slotp = &pcibr_soft->bs_slot[slot];
+#ifdef CONFIG_HOTPLUG_PCI_SGI
     slotp->slot_status |= SLOT_POWER_UP;
+#endif
 
     vendor = 0xFFFF & idword;
     device = 0xFFFF & (idword >> 16);
@@ -1019,6 +1427,7 @@ pcibr_slot_call_device_attach(vertex_hdl_t pcibr_vhdl,
 
     }				/* next func */
 
+#ifdef CONFIG_HOTPLUG_PCI_SGI
     if (error) {
 	if ((error != ENODEV) && (error != EUNATCH) && (error != EPERM)) {
 	    pcibr_soft->bs_slot[slot].slot_status &= ~SLOT_STATUS_MASK;
@@ -1028,7 +1437,7 @@ pcibr_slot_call_device_attach(vertex_hdl_t pcibr_vhdl,
         pcibr_soft->bs_slot[slot].slot_status &= ~SLOT_STATUS_MASK;
         pcibr_soft->bs_slot[slot].slot_status |= SLOT_STARTUP_CMPLT;
     }
-        
+#endif	/* CONFIG_HOTPLUG_PCI_SGI */
     return error;
 }
 
@@ -1103,7 +1512,7 @@ pcibr_slot_call_device_detach(vertex_hdl_t pcibr_vhdl,
 
     }				/* next func */
 
-
+#ifdef CONFIG_HOTPLUG_PCI_SGI
     if (error) {
 	if ((error != ENODEV) && (error != EUNATCH) && (error != EPERM)) {
 	    pcibr_soft->bs_slot[slot].slot_status &= ~SLOT_STATUS_MASK;
@@ -1115,9 +1524,11 @@ pcibr_slot_call_device_detach(vertex_hdl_t pcibr_vhdl,
         pcibr_soft->bs_slot[slot].slot_status &= ~SLOT_STATUS_MASK;
         pcibr_soft->bs_slot[slot].slot_status |= SLOT_SHUTDOWN_CMPLT;
     }
-        
+#endif	/* CONFIG_HOTPLUG_PCI_SGI */
     return error;
 }
+
+
 
 /*
  * pcibr_slot_detach

@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.61 $	 $Date: 2003/12/02 15:18:50 $
+ *    $Revision: 1.67 $	 $Date: 2004/02/26 18:26:50 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.61 $"
+#define VERSION_LCS_C  "$Revision: 1.67 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 
@@ -100,7 +100,7 @@ lcs_register_debug_facility(void)
 	debug_register_view(lcs_dbf_setup, &debug_hex_ascii_view);
 	debug_set_level(lcs_dbf_setup, 5);
 	debug_register_view(lcs_dbf_trace, &debug_hex_ascii_view);
-	debug_set_level(lcs_dbf_trace, 3);
+	debug_set_level(lcs_dbf_trace, 5);
 	return 0;
 }
 
@@ -141,8 +141,11 @@ lcs_free_channel(struct lcs_channel *channel)
 	int cnt;
 
 	LCS_DBF_TEXT(3, setup, "ichfree");
-	for (cnt = 0; cnt < LCS_NUM_BUFFS; cnt++)
-		kfree(channel->iob[cnt].data);
+	for (cnt = 0; cnt < LCS_NUM_BUFFS; cnt++) {
+		if (channel->iob[cnt].data != NULL)
+			kfree(channel->iob[cnt].data);
+		channel->iob[cnt].data = NULL;
+	}
 }
 
 /**
@@ -360,7 +363,8 @@ lcs_cleanup_card(struct lcs_card *card)
 		kfree(ipm_list);
 	}
 #endif
-	free_netdev(card->dev);
+	if (card->dev != NULL)
+		free_netdev(card->dev);
 	/* Cleanup channels. */
 	lcs_cleanup_channel(&card->write);
 	lcs_cleanup_channel(&card->read);
@@ -672,6 +676,7 @@ lcs_send_lancmd(struct lcs_card *card, struct lcs_buffer *buffer,
 	struct lcs_cmd *cmd;
 	struct timer_list timer;
 	int rc;
+	char buf[16];
 
 	cmd = (struct lcs_cmd *) buffer->data;
 	cmd->sequence_no = ++card->sequence_no;
@@ -695,6 +700,9 @@ lcs_send_lancmd(struct lcs_card *card, struct lcs_buffer *buffer,
 	add_timer(&timer);
 	wait_event(reply.wait_q, reply.received);
 	del_timer(&timer);
+	LCS_DBF_TEXT(5, trace, "sendcmd");
+	sprintf(buf, "rc:%d", reply.rc);
+	LCS_DBF_TEXT(5, trace, buf);
 	return reply.rc ? -EIO : 0;
 }
 
@@ -794,7 +802,7 @@ lcs_send_startlan(struct lcs_card *card, __u8 initiator)
 	struct lcs_buffer *buffer;
 	struct lcs_cmd *cmd;
 
-	LCS_DBF_TEXT(2, trace, "cmdstpln");
+	LCS_DBF_TEXT(2, trace, "cmdstaln");
 	buffer = lcs_get_lancmd(card, LCS_STD_CMD_SIZE);
 	cmd = (struct lcs_cmd *) buffer->data;
 	cmd->cmd_code = LCS_CMD_STARTLAN;
@@ -1042,7 +1050,8 @@ lcs_irq(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 	LCS_DBF_TEXT(5, trace, dbf_text);
 
 	/* How far in the ccw chain have we processed? */
-	if (channel->state != CH_STATE_INIT) {
+	if ((channel->state != CH_STATE_INIT) &&
+	    (irb->scsw.fctl & SCSW_FCTL_START_FUNC)) {
 		index = (struct ccw1 *) __va((addr_t) irb->scsw.cpa) 
 			- channel->ccws;
 		if ((irb->scsw.actl & SCSW_ACTL_SUSPENDED) ||
@@ -1066,9 +1075,14 @@ lcs_irq(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 		/* CCW execution stopped on a suspend bit. */
 		channel->state = CH_STATE_SUSPENDED;
 
-	if (irb->scsw.fctl & SCSW_FCTL_HALT_FUNC)
+	if (irb->scsw.fctl & SCSW_FCTL_HALT_FUNC) {
+		if (irb->scsw.cc != 0) {
+			ccw_device_halt(channel->ccwdev, (addr_t) channel);
+			return;
+		}
 		/* The channel has been stopped by halt_IO. */
 		channel->state = CH_STATE_HALTED;
+	}
 
 	/* Do the rest in the tasklet. */
 	tasklet_schedule(&channel->irq_tasklet);
@@ -1267,7 +1281,7 @@ lcs_startlan(struct lcs_card *card)
 		else
 			rc = lcs_send_startlan(card, LCS_INITIATOR_TCPIP);
 	} else {
-                for (i = 0; i <= card->max_port_no; i++) {
+                for (i = 0; i <= 16; i++) {
                         card->portno = i;
                         if (card->lan_type != LCS_FRAME_TYPE_AUTO)
                                 rc = lcs_send_startlan(card,
@@ -1291,7 +1305,7 @@ lcs_startlan(struct lcs_card *card)
 static int
 lcs_detect(struct lcs_card *card)
 {
-	int rc;
+	int rc = 0;
 
 	LCS_DBF_TEXT(3, setup," lcsdetct");
 	/* start/reset card */
@@ -1790,7 +1804,6 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 	if (rc) {
 		LCS_DBF_TEXT(3, setup, "errinit");
 		PRINT_ERR("LCS card Initialization failed\n");
-		lcs_free_card(card);
 		return rc;
 	}
 
@@ -1798,7 +1811,6 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 	if (rc) {
 		lcs_stopcard(card);
 		lcs_cleanup_card(card);
-		lcs_free_card(card);
 		return -ENODEV;
 	}
 	switch (card->lan_type) {
@@ -1859,7 +1871,6 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 	return 0;
 out:
 	lcs_cleanup_card(card);
-	lcs_free_card(card);
 	return -ENODEV;
 }
 
@@ -1915,6 +1926,7 @@ lcs_remove_device(struct ccwgroup_device *ccwgdev)
  * LCS ccwgroup driver registration
  */
 static struct ccwgroup_driver lcs_group_driver = {
+	.owner       = THIS_MODULE,
 	.name        = "lcs",
 	.max_slaves  = 2,
 	.driver_id   = 0xD3C3E2,
@@ -1932,9 +1944,9 @@ __init lcs_init_module(void)
 {
 	int rc;
 
-	LCS_DBF_TEXT(0, setup, "lcsinit");
 	PRINT_INFO("Loading %s\n",version);
 	rc = lcs_register_debug_facility();
+	LCS_DBF_TEXT(0, setup, "lcsinit");
 	if (rc) {
 		PRINT_ERR("Initialization failed\n");
 		return rc;

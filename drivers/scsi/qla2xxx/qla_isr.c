@@ -828,6 +828,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 	uint8_t		lscsi_status;
 	uint32_t	resid;
 	uint8_t		sense_sz = 0;
+	uint16_t	rsp_info_len;
 
 	/* Fast path completion. */
 	if (le16_to_cpu(pkt->comp_status) == CS_COMPLETE &&
@@ -915,6 +916,24 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 
 			qla2x00_extend_timeout(cp, EXTEND_CMD_TIMEOUT);
 			add_to_retry_queue(ha, sp);
+			return;
+		}
+	}
+
+	/* Check for any FCP transport errors. */
+	if (scsi_status & SS_RESPONSE_INFO_LEN_VALID) {
+		rsp_info_len = le16_to_cpu(pkt->rsp_info_len);
+		if (rsp_info_len > 3 && pkt->rsp_info[3]) {
+			DEBUG2(printk("scsi(%ld:%d:%d:%d) FCP I/O protocol "
+			    "failure (%x/%02x%02x%02x%02x%02x%02x%02x%02x)..."
+			    "retrying command\n", ha->host_no, b, t, l,
+			    rsp_info_len, pkt->rsp_info[0], pkt->rsp_info[1],
+			    pkt->rsp_info[2], pkt->rsp_info[3],
+			    pkt->rsp_info[4], pkt->rsp_info[5],
+			    pkt->rsp_info[6], pkt->rsp_info[7]));
+
+			cp->result = DID_BUS_BUSY << 16;
+			add_to_done_queue(ha, sp);
 			return;
 		}
 	}

@@ -62,6 +62,7 @@
 #include <linux/if_tun.h>
 #include <linux/ctype.h>
 #include <linux/ioctl32.h>
+#include <linux/syscalls.h>
 #include <linux/ncp_fs.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
@@ -1457,6 +1458,7 @@ static int cdrom_do_generic_command(unsigned int fd, unsigned int cmd, unsigned 
 	struct cdrom_generic_command *cgc;
 	struct cdrom_generic_command32 *cgc32;
 	unsigned char dir;
+	int itmp;
 
 	cgc = compat_alloc_user_space(sizeof(*cgc));
 	cgc32 = compat_ptr(arg);
@@ -1468,12 +1470,16 @@ static int cdrom_do_generic_command(unsigned int fd, unsigned int cmd, unsigned 
 	    __cgc_do_ptr((void **) &cgc->sense, &cgc32->sense))
 		return -EFAULT;
 
-	if (get_user(dir, &cgc->data_direction) ||
-	    put_user(dir, &cgc32->data_direction))
+	if (get_user(dir, &cgc32->data_direction) ||
+	    put_user(dir, &cgc->data_direction))
 		return -EFAULT;
 
-	if (copy_in_user(&cgc->quiet, &cgc32->quiet,
-			 2 * sizeof(int)))
+	if (get_user(itmp, &cgc32->quiet) ||
+	    put_user(itmp, &cgc->quiet))
+		return -EFAULT;
+
+	if (get_user(itmp, &cgc32->timeout) ||
+	    put_user(itmp, &cgc->timeout))
 		return -EFAULT;
 
 	if (__cgc_do_ptr(&cgc->reserved[0], &cgc32->reserved[0]))

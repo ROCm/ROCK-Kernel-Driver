@@ -758,11 +758,11 @@ static int nxt6000_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		}
 	
 		case FE_INIT:
-		case FE_RESET:
-		
 			nxt6000_reset(fe);
 			nxt6000_setup(fe);
+		break;
 
+	case FE_RESET:
 			break;
 		
 		case FE_SET_FRONTEND:

@@ -35,7 +35,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_sil"
-#define DRV_VERSION	"0.52"
+#define DRV_VERSION	"0.53"
 
 enum {
 	sil_3112		= 0,
@@ -44,6 +44,11 @@ enum {
 	SIL_SYSCFG		= 0x48,
 	SIL_MASK_IDE0_INT	= (1 << 22),
 	SIL_MASK_IDE1_INT	= (1 << 23),
+	SIL_MASK_IDE2_INT	= (1 << 24),
+	SIL_MASK_IDE3_INT	= (1 << 25),
+	SIL_MASK_2PORT		= SIL_MASK_IDE0_INT | SIL_MASK_IDE1_INT,
+	SIL_MASK_4PORT		= SIL_MASK_2PORT |
+				  SIL_MASK_IDE2_INT | SIL_MASK_IDE3_INT,
 
 	SIL_IDE0_TF		= 0x80,
 	SIL_IDE0_CTL		= 0x8A,
@@ -59,6 +64,7 @@ enum {
 	SIL_IDE2_CTL		= 0x28A,
 	SIL_IDE2_BMDMA		= 0x200,
 	SIL_IDE2_SCR		= 0x300,
+	SIL_INTR_STEERING	= (1 << 1),
 
 	SIL_IDE3_TF		= 0x2C0,
 	SIL_IDE3_CTL		= 0x2CA,
@@ -121,7 +127,7 @@ static Scsi_Host_Template sil_sht = {
 	.eh_strategy_handler	= ata_scsi_error,
 	.can_queue		= ATA_DEF_QUEUE,
 	.this_id		= ATA_SHT_THIS_ID,
-	.sg_tablesize		= ATA_MAX_PRD,
+	.sg_tablesize		= LIBATA_MAX_PRD,
 	.max_sectors		= ATA_MAX_SECTORS,
 	.cmd_per_lun		= ATA_SHT_CMD_PER_LUN,
 	.emulated		= ATA_SHT_EMULATED,
@@ -304,7 +310,7 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	unsigned long base;
 	void *mmio_base;
 	int rc;
-	u32 tmp;
+	u32 tmp, irq_mask;
 
 	if (!printed_version++)
 		printk(KERN_DEBUG DRV_NAME " version " DRV_VERSION "\n");
@@ -365,14 +371,6 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	probe_ent->port[1].scr_addr = base + SIL_IDE1_SCR;
 	ata_std_ports(&probe_ent->port[1]);
 
-	/* make sure IDE0/1 interrupts are not masked */
-	tmp = readl(mmio_base + SIL_SYSCFG);
-	if (tmp & (SIL_MASK_IDE0_INT | SIL_MASK_IDE1_INT)) {
-		tmp &= ~(SIL_MASK_IDE0_INT | SIL_MASK_IDE1_INT);
-		writel(tmp, mmio_base + SIL_SYSCFG);
-		readl(mmio_base + SIL_SYSCFG);	/* flush */
-	}
-
 	if (ent->driver_data == sil_3114) {
 		probe_ent->port[2].cmd_addr = base + SIL_IDE2_TF;
 		probe_ent->port[2].ctl_addr = base + SIL_IDE2_CTL;
@@ -385,6 +383,25 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		probe_ent->port[3].bmdma_addr = base + SIL_IDE3_BMDMA;
 		probe_ent->port[3].scr_addr = base + SIL_IDE3_SCR;
 		ata_std_ports(&probe_ent->port[3]);
+
+		irq_mask = SIL_MASK_4PORT;
+
+		/* flip the magic "make 4 ports work" bit */
+		tmp = readl(mmio_base + SIL_IDE2_BMDMA);
+		if ((tmp & SIL_INTR_STEERING) == 0)
+			writel(tmp | SIL_INTR_STEERING,
+			       mmio_base + SIL_IDE2_BMDMA);
+
+	} else {
+		irq_mask = SIL_MASK_2PORT;
+	}
+
+	/* make sure IDE0/1/2/3 interrupts are not masked */
+	tmp = readl(mmio_base + SIL_SYSCFG);
+	if (tmp & irq_mask) {
+		tmp &= ~irq_mask;
+		writel(tmp, mmio_base + SIL_SYSCFG);
+		readl(mmio_base + SIL_SYSCFG);	/* flush */
 	}
 
 	pci_set_master(pdev);

@@ -95,7 +95,7 @@ clean-files	:= libkconfig.so lkc_defs.h qconf.moc .tmp_qtcheck \
 HOSTCFLAGS_lex.zconf.o	:= -I$(src)
 HOSTCFLAGS_zconf.tab.o	:= -I$(src)
 
-HOSTLOADLIBES_qconf	= -L$(QTDIR)/lib -Wl,-rpath,$(QTDIR)/lib -l$(QTLIB) -ldl
+HOSTLOADLIBES_qconf	= -L$(QTDIR)/lib -L$(QTDIR)/lib64 -Wl,-rpath,$(QTDIR)/lib -l$(QTLIB) -ldl
 HOSTCXXFLAGS_qconf.o	= -I$(QTDIR)/include 
 
 HOSTLOADLIBES_gconf	= `pkg-config gtk+-2.0 gmodule-2.0 libglade-2.0 --libs`

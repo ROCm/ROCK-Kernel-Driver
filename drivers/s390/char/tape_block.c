@@ -259,9 +259,6 @@ tapeblock_setup_device(struct tape_device * device)
 	INIT_WORK(&blkdat->requeue_task, tapeblock_requeue,
 		tape_get_device_reference(device));
 
-	/* Will vanish */
-	tape_hotplug_event(device, tapeblock_major, TAPE_HOTPLUG_BLOCK_ADD);
-
 	return 0;
 
 cleanup_queue:
@@ -274,8 +271,6 @@ cleanup_queue:
 void
 tapeblock_cleanup_device(struct tape_device *device)
 {
-	tape_hotplug_event(device, tapeblock_major, TAPE_HOTPLUG_BLOCK_REMOVE);
-
 	flush_scheduled_work();
 	device->blk_data.requeue_task.data = tape_put_device(device);
 

@@ -40,6 +40,19 @@ DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 pgd_t swapper_pg_dir[PTRS_PER_PGD] __attribute__((__aligned__(PAGE_SIZE)));
 char  empty_zero_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 
+void diag10(unsigned long addr)
+{
+        if (addr >= 0x7ff00000)
+                return;
+#ifdef __s390x__
+        asm volatile ("sam31\n\t"
+                      "diag %0,%0,0x10\n\t"
+                      "sam64" : : "a" (addr) );
+#else
+        asm volatile ("diag %0,%0,0x10" : : "a" (addr) );
+#endif
+}
+
 void show_mem(void)
 {
         int i, total = 0, reserved = 0;
