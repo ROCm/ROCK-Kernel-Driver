@@ -43,7 +43,7 @@
 #include <asm/pci-bridge.h>
 #endif /* CONFIG_ALL_PPC */
 
-#define DRV_NAME	"ata_k2"
+#define DRV_NAME	"sata_svw"
 #define DRV_VERSION	"1.03"
 
 

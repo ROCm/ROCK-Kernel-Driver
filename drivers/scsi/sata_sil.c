@@ -34,11 +34,16 @@
 #include "hosts.h"
 #include <linux/libata.h>
 
-#define DRV_NAME	"ata_sil"
-#define DRV_VERSION	"0.51"
+#define DRV_NAME	"sata_sil"
+#define DRV_VERSION	"0.52"
 
 enum {
 	sil_3112		= 0,
+	sil_3114		= 1,
+
+	SIL_SYSCFG		= 0x48,
+	SIL_MASK_IDE0_INT	= (1 << 22),
+	SIL_MASK_IDE1_INT	= (1 << 23),
 
 	SIL_IDE0_TF		= 0x80,
 	SIL_IDE0_CTL		= 0x8A,
@@ -49,6 +54,16 @@ enum {
 	SIL_IDE1_CTL		= 0xCA,
 	SIL_IDE1_BMDMA		= 0x08,
 	SIL_IDE1_SCR		= 0x180,
+
+	SIL_IDE2_TF		= 0x280,
+	SIL_IDE2_CTL		= 0x28A,
+	SIL_IDE2_BMDMA		= 0x200,
+	SIL_IDE2_SCR		= 0x300,
+
+	SIL_IDE3_TF		= 0x2C0,
+	SIL_IDE3_CTL		= 0x2CA,
+	SIL_IDE3_BMDMA		= 0x208,
+	SIL_IDE3_SCR		= 0x380,
 };
 
 static void sil_set_piomode (struct ata_port *ap, struct ata_device *adev,
@@ -62,6 +77,8 @@ static void sil_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
 
 static struct pci_device_id sil_pci_tbl[] = {
 	{ 0x1095, 0x3112, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sil_3112 },
+	{ 0x1095, 0x0240, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sil_3112 },
+	{ 0x1095, 0x3114, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sil_3114 },
 	{ }	/* terminate list */
 };
 
@@ -113,6 +130,14 @@ static struct ata_port_operations sil_ops = {
 
 static struct ata_port_info sil_port_info[] = {
 	/* sil_3112 */
+	{
+		.sht		= &sil_sht,
+		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY |
+				  ATA_FLAG_SRST | ATA_FLAG_MMIO,
+		.pio_mask	= 0x03,			/* pio3-4 */
+		.udma_mask	= 0x7f,			/* udma0-6; FIXME */
+		.port_ops	= &sil_ops,
+	}, /* sil_3114 */
 	{
 		.sht		= &sil_sht,
 		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY |
@@ -236,6 +261,7 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	unsigned long base;
 	void *mmio_base;
 	int rc;
+	u32 tmp;
 
 	if (!printed_version++)
 		printk(KERN_DEBUG DRV_NAME " version " DRV_VERSION "\n");
@@ -267,7 +293,7 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	probe_ent->pdev = pdev;
 	probe_ent->port_ops = sil_port_info[ent->driver_data].port_ops;
 	probe_ent->sht = sil_port_info[ent->driver_data].sht;
-	probe_ent->n_ports = 2;
+	probe_ent->n_ports = (ent->driver_data == sil_3114) ? 4 : 2;
 	probe_ent->pio_mask = sil_port_info[ent->driver_data].pio_mask;
 	probe_ent->udma_mask = sil_port_info[ent->driver_data].udma_mask;
        	probe_ent->irq = pdev->irq;
@@ -295,6 +321,28 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	probe_ent->port[1].bmdma_addr = base + SIL_IDE1_BMDMA;
 	probe_ent->port[1].scr_addr = base + SIL_IDE1_SCR;
 	ata_std_ports(&probe_ent->port[1]);
+
+	/* make sure IDE0/1 interrupts are not masked */
+	tmp = readl(mmio_base + SIL_SYSCFG);
+	if (tmp & (SIL_MASK_IDE0_INT | SIL_MASK_IDE1_INT)) {
+		tmp &= ~(SIL_MASK_IDE0_INT | SIL_MASK_IDE1_INT);
+		writel(tmp, mmio_base + SIL_SYSCFG);
+		readl(mmio_base + SIL_SYSCFG);	/* flush */
+	}
+
+	if (ent->driver_data == sil_3114) {
+		probe_ent->port[2].cmd_addr = base + SIL_IDE2_TF;
+		probe_ent->port[2].ctl_addr = base + SIL_IDE2_CTL;
+		probe_ent->port[2].bmdma_addr = base + SIL_IDE2_BMDMA;
+		probe_ent->port[2].scr_addr = base + SIL_IDE2_SCR;
+		ata_std_ports(&probe_ent->port[2]);
+
+		probe_ent->port[3].cmd_addr = base + SIL_IDE3_TF;
+		probe_ent->port[3].ctl_addr = base + SIL_IDE3_CTL;
+		probe_ent->port[3].bmdma_addr = base + SIL_IDE3_BMDMA;
+		probe_ent->port[3].scr_addr = base + SIL_IDE3_SCR;
+		ata_std_ports(&probe_ent->port[3]);
+	}
 
 	pci_set_master(pdev);
 
