@@ -37,9 +37,9 @@ void isac_init(struct isac *isac);
 void isac_d_l2l1(struct hisax_if *hisax_d_if, int pr, void *arg);
 
 void isac_setup(struct isac *isac);
-void isac_interrupt(struct isac *isac);
+void isac_irq(struct isac *isac);
 
 void isacsx_setup(struct isac *isac);
-void isacsx_interrupt(struct isac *isac);
+void isacsx_irq(struct isac *isac);
 
 #endif

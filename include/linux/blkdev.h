@@ -15,21 +15,32 @@ typedef struct request_queue request_queue_t;
 struct elevator_s;
 typedef struct elevator_s elevator_t;
 
+struct request_list {
+	unsigned int count;
+	struct list_head free;
+	wait_queue_head_t wait;
+};
+
 struct request {
 	struct list_head queuelist; /* looking for ->queue? you must _not_
 				     * access it directly, use
 				     * blkdev_dequeue_request! */
 	int elevator_sequence;
 
-	int inactive; /* driver hasn't seen it yet */
+	unsigned char cmd[16];
+
+	unsigned long flags;		/* see REQ_ bits below */
 
 	int rq_status;	/* should split this into a few status bits */
 	kdev_t rq_dev;
-	int cmd;		/* READ or WRITE */
 	int errors;
 	sector_t sector;
 	unsigned long nr_sectors;
-	unsigned long hard_sector, hard_nr_sectors;
+	unsigned long hard_sector;	/* the hard_* are block layer
+					 * internals, no driver should
+					 * touch them
+					 */
+	unsigned long hard_nr_sectors;
 	unsigned short nr_segments;
 	unsigned short nr_hw_segments;
 	unsigned int current_nr_sectors;
@@ -39,7 +50,48 @@ struct request {
 	struct completion *waiting;
 	struct bio *bio, *biotail;
 	request_queue_t *q;
+	struct request_list *rl;
 };
+
+/*
+ * first three bits match BIO_RW* bits, important
+ */
+enum rq_flag_bits {
+	__REQ_RW,	/* not set, read. set, write */
+	__REQ_RW_AHEAD,	/* READA */
+	__REQ_BARRIER,	/* may not be passed */
+	__REQ_CMD,	/* is a regular fs rw request */
+	__REQ_NOMERGE,	/* don't touch this for merging */
+	__REQ_STARTED,	/* drive already may have started this one */
+	__REQ_DONTPREP,	/* don't call prep for this one */
+	/*
+	 * for IDE
+ 	*/
+	__REQ_DRIVE_CMD,
+	__REQ_DRIVE_TASK,
+
+	__REQ_PC,	/* packet command (special) */
+	__REQ_BLOCK_PC,	/* queued down pc from block layer */
+	__REQ_SENSE,	/* sense retrival */
+
+	__REQ_SPECIAL,	/* driver special command */
+
+	__REQ_NR_BITS,	/* stops here */
+};
+
+#define REQ_RW		(1 << __REQ_RW)
+#define REQ_RW_AHEAD	(1 << __REQ_RW_AHEAD)
+#define REQ_BARRIER	(1 << __REQ_BARRIER)
+#define REQ_CMD		(1 << __REQ_CMD)
+#define REQ_NOMERGE	(1 << __REQ_NOMERGE)
+#define REQ_STARTED	(1 << __REQ_STARTED)
+#define REQ_DONTPREP	(1 << __REQ_DONTPREP)
+#define REQ_DRIVE_CMD	(1 << __REQ_DRIVE_CMD)
+#define REQ_DRIVE_TASK	(1 << __REQ_DRIVE_TASK)
+#define REQ_PC		(1 << __REQ_PC)
+#define REQ_SENSE	(1 << __REQ_SENSE)
+#define REQ_BLOCK_PC	(1 << __REQ_BLOCK_PC)
+#define REQ_SPECIAL	(1 << __REQ_SPECIAL)
 
 #include <linux/elevator.h>
 
@@ -50,6 +102,7 @@ typedef int (merge_requests_fn) (request_queue_t *, struct request *,
 typedef void (request_fn_proc) (request_queue_t *q);
 typedef request_queue_t * (queue_proc) (kdev_t dev);
 typedef int (make_request_fn) (request_queue_t *q, struct bio *bio);
+typedef int (prep_rq_fn) (request_queue_t *, struct request *);
 typedef void (unplug_device_fn) (void *q);
 
 enum blk_queue_state {
@@ -62,12 +115,6 @@ enum blk_queue_state {
  * according to available RAM at init time
  */
 #define QUEUE_NR_REQUESTS	8192
-
-struct request_list {
-	unsigned int count;
-	struct list_head free;
-	wait_queue_head_t wait;
-};
 
 struct request_queue
 {
@@ -82,17 +129,18 @@ struct request_queue
 	struct list_head	queue_head;
 	elevator_t		elevator;
 
-	request_fn_proc		* request_fn;
-	merge_request_fn	* back_merge_fn;
-	merge_request_fn	* front_merge_fn;
-	merge_requests_fn	* merge_requests_fn;
-	make_request_fn		* make_request_fn;
+	request_fn_proc		*request_fn;
+	merge_request_fn	*back_merge_fn;
+	merge_request_fn	*front_merge_fn;
+	merge_requests_fn	*merge_requests_fn;
+	make_request_fn		*make_request_fn;
+	prep_rq_fn		*prep_rq_fn;
 
 	/*
 	 * The queue owner gets to use this for whatever they like.
 	 * ll_rw_blk doesn't touch it.
 	 */
-	void			* queuedata;
+	void			*queuedata;
 
 	/*
 	 * queue needs bounce pages for pages above this limit
@@ -138,12 +186,11 @@ struct request_queue
 #define QUEUE_FLAG_CLUSTER	2	/* cluster several segments into 1 */
 
 #define blk_queue_plugged(q)	test_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
-
 #define blk_mark_plugged(q)	set_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
-
 #define blk_queue_empty(q)	elv_queue_empty(q)
-
 #define list_entry_rq(ptr)	list_entry((ptr), struct request, queuelist)
+
+#define rq_data_dir(rq)		((rq)->flags & 1)
 
 /*
  * noop, requests are automagically marked as active/inactive by I/O
@@ -152,20 +199,6 @@ struct request_queue
 #define blk_queue_headactive(q, head_active)
 
 extern unsigned long blk_max_low_pfn, blk_max_pfn;
-
-#define __elv_next_request(q)	(q)->elevator.elevator_next_req_fn((q))
-
-extern inline struct request *elv_next_request(request_queue_t *q)
-{
-	struct request *rq = __elv_next_request(q);
-
-	if (rq) {
-		rq->inactive = 0;
-		wmb();
-	}
-
-	return rq;
-}
 
 #define BLK_BOUNCE_HIGH	(blk_max_low_pfn << PAGE_SHIFT)
 #define BLK_BOUNCE_ANY	(blk_max_pfn << PAGE_SHIFT)
@@ -186,7 +219,8 @@ extern inline void blk_queue_bounce(request_queue_t *q, struct bio **bio)
 #endif /* CONFIG_HIGHMEM */
 
 #define rq_for_each_bio(bio, rq)	\
-	for (bio = (rq)->bio; bio; bio = bio->bi_next)
+	if ((rq->bio))			\
+		for (bio = (rq)->bio; bio; bio = bio->bi_next)
 
 struct blk_dev_struct {
 	/*
@@ -219,6 +253,11 @@ extern void generic_make_request(struct bio *bio);
 extern inline request_queue_t *blk_get_queue(kdev_t dev);
 extern void blkdev_release_request(struct request *);
 extern void blk_attempt_remerge(request_queue_t *, struct request *);
+extern struct request *blk_get_request(request_queue_t *, int, int);
+extern void blk_put_request(struct request *);
+extern void blk_plug_device(request_queue_t *);
+
+extern int block_ioctl(kdev_t, unsigned int, unsigned long);
 
 /*
  * Access functions for manipulating queue properties
@@ -233,6 +272,7 @@ extern void blk_queue_max_segment_size(request_queue_t *q, unsigned int);
 extern void blk_queue_hardsect_size(request_queue_t *q, unsigned short);
 extern void blk_queue_segment_boundary(request_queue_t *q, unsigned long);
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
+extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(void *);
 
 extern int * blk_size[MAX_BLKDEV];
@@ -256,8 +296,7 @@ extern int * max_readahead[MAX_BLKDEV];
 #define blkdev_next_request(req) blkdev_entry_to_request((req)->queuelist.next)
 #define blkdev_prev_request(req) blkdev_entry_to_request((req)->queuelist.prev)
 
-extern void drive_stat_acct (kdev_t dev, int rw,
-					unsigned long nr_sectors, int new_io);
+extern void drive_stat_acct(struct request *, int, int);
 
 extern inline void blk_clear(int major)
 {

@@ -858,7 +858,7 @@ repeat:
                 goto repeat;
         }
 
-	pd_cmd = CURRENT->cmd;
+	pd_cmd = rq_data_dir(CURRENT);
         pd_buf = CURRENT->buffer;
         pd_retries = 0;
 
@@ -884,7 +884,7 @@ static void pd_next_buf( int unit )
 /* paranoia */
 
 	if (QUEUE_EMPTY ||
-	    (CURRENT->cmd != pd_cmd) ||
+	    (rq_data_dir(CURRENT) != pd_cmd) ||
 	    (MINOR(CURRENT->rq_dev) != pd_dev) ||
 	    (CURRENT->rq_status == RQ_INACTIVE) ||
 	    (CURRENT->sector != pd_block)) 

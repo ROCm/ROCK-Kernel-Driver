@@ -354,21 +354,17 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 			this_count = this_count >> 3;
 		}
 	}
-	switch (SCpnt->request.cmd) {
-	case WRITE:
+	if (rq_data_dir(&SCpnt->request) == WRITE) {
 		if (!dpnt->device->writeable) {
 			return 0;
 		}
 		SCpnt->cmnd[0] = WRITE_6;
 		SCpnt->sc_data_direction = SCSI_DATA_WRITE;
-		break;
-	case READ:
+	} else if (rq_data_dir(&SCpnt->request) == READ) {
 		SCpnt->cmnd[0] = READ_6;
 		SCpnt->sc_data_direction = SCSI_DATA_READ;
-		break;
-	default:
-		panic("Unknown sd command %d\n", SCpnt->request.cmd);
-	}
+	} else
+		panic("Unknown sd command %lx\n", SCpnt->request.flags);
 
 	SCSI_LOG_HLQUEUE(2, printk("%s : %s %d/%ld 512 byte blocks.\n",
 				   nbuff,

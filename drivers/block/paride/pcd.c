@@ -768,7 +768,7 @@ static void do_pcd_request (request_queue_t * q)
         while (1) {
 	    if (QUEUE_EMPTY || (CURRENT->rq_status == RQ_INACTIVE)) return;
 	    INIT_REQUEST;
-	    if (CURRENT->cmd == READ) {
+	    if (rq_data_dir(CURRENT) == READ) {
 		unit = MINOR(CURRENT->rq_dev);
 		if (unit != pcd_unit) {
 			pcd_bufblk = -1;

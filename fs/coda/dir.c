@@ -103,8 +103,6 @@ static struct dentry *coda_lookup(struct inode *dir, struct dentry *entry)
 	const char *name = entry->d_name.name;
 	size_t length = entry->d_name.len;
 	
-        ENTRY;
-
 	if ( length > CODA_MAXNAMLEN ) {
 	        printk("name too long: lookup, %s (%*s)\n", 
 		       coda_i2s(dir), (int)length, name);
@@ -154,7 +152,6 @@ exit:
 		d_drop(entry);
 		coda_flag_inode(res_inode, C_VATTR);
 	}
-        EXIT;
         return NULL;
 }
 
@@ -163,7 +160,6 @@ int coda_permission(struct inode *inode, int mask)
 {
         int error;
  
-        ENTRY;
 	coda_vfs_stat.permission++;
 
         if ( mask == 0 )
@@ -217,7 +213,6 @@ static int coda_create(struct inode *dir, struct dentry *de, int mode)
 	struct ViceFid newfid;
 	struct coda_vattr attrs;
 
-	ENTRY;
 	coda_vfs_stat.create++;
 
 	CDEBUG(D_INODE, "name: %s, length %d, mode %o\n", name, length, mode);
@@ -300,7 +295,6 @@ static int coda_mkdir(struct inode *dir, struct dentry *de, int mode)
 	int error;
 	struct ViceFid newfid;
 
-	ENTRY;
 	coda_vfs_stat.mkdir++;
 
 	if (coda_isroot(dir) && coda_iscontrol(name, len))
@@ -344,7 +338,6 @@ static int coda_link(struct dentry *source_de, struct inode *dir_inode,
 	int len = de->d_name.len;
 	int error;
 
-        ENTRY;
 	coda_vfs_stat.link++;
 
 	if (coda_isroot(dir_inode) && coda_iscontrol(name, len))
@@ -368,7 +361,6 @@ static int coda_link(struct dentry *source_de, struct inode *dir_inode,
         
 out:
 	CDEBUG(D_INODE, "link result %d\n",error);
-	EXIT;
 	return(error);
 }
 
@@ -381,7 +373,6 @@ static int coda_symlink(struct inode *dir_inode, struct dentry *de,
 	int symlen;
         int error=0;
         
-        ENTRY;
 	coda_vfs_stat.symlink++;
 
 	if (coda_isroot(dir_inode) && coda_iscontrol(name, len))
@@ -406,7 +397,6 @@ static int coda_symlink(struct inode *dir_inode, struct dentry *de,
 		coda_dir_changed(dir_inode, 0);
 
         CDEBUG(D_INODE, "in symlink result %d\n",error);
-        EXIT;
         return error;
 }
 
@@ -417,7 +407,6 @@ int coda_unlink(struct inode *dir, struct dentry *de)
 	const char *name = de->d_name.name;
 	int len = de->d_name.len;
 
-	ENTRY;
 	coda_vfs_stat.unlink++;
 
         CDEBUG(D_INODE, " %s in %s, dirino %ld\n", name , 
@@ -441,7 +430,6 @@ int coda_rmdir(struct inode *dir, struct dentry *de)
 	int len = de->d_name.len;
         int error;
 
-	ENTRY;
 	coda_vfs_stat.rmdir++;
 
 	if (!d_unhashed(de))
@@ -471,7 +459,6 @@ static int coda_rename(struct inode *old_dir, struct dentry *old_dentry,
         int link_adjust = 0;
         int error;
 
-	ENTRY;
 	coda_vfs_stat.rename++;
 
         CDEBUG(D_INODE, "old: %s, (%d length), new: %s"
@@ -499,7 +486,6 @@ static int coda_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 	CDEBUG(D_INODE, "result %d\n", error); 
 
-	EXIT;
 	return error;
 }
 
@@ -513,7 +499,6 @@ int coda_readdir(struct file *file, void *dirent,  filldir_t filldir)
 	struct file *cfile, fakefile;
 	struct coda_inode_info *cii = ITOC(inode);
 
-        ENTRY;
 	coda_vfs_stat.readdir++;
 
         cfile = cii->c_container;
@@ -534,7 +519,6 @@ int coda_readdir(struct file *file, void *dirent,  filldir_t filldir)
 		result = vfs_readdir(file, filldir, dirent);
         }
 
-        EXIT;
 	return result;
 }
 
@@ -549,6 +533,7 @@ static void coda_prepare_fakefile(struct file *coda_file,
 	fake_file->f_pos = coda_file->f_pos;
 	fake_file->f_version = coda_file->f_version;
 	fake_file->f_op = cont_dentry->d_inode->i_fop;
+	fake_file->f_flags = coda_file->f_flags;
 	return ;
 }
 
@@ -576,8 +561,6 @@ static int coda_venus_readdir(struct file *filp, void *getdent,
         struct venus_dirent *vdirent;
         int string_offset = (int) (&((struct venus_dirent *)(0))->d_name);
 	int i;
-
-        ENTRY;        
 
         CODA_ALLOC(buff, char *, DIR_BUFSIZE);
         if ( !buff ) { 
@@ -664,7 +647,6 @@ static int coda_dentry_revalidate(struct dentry *de, int flags)
 {
 	struct inode *inode = de->d_inode;
 	struct coda_inode_info *cii;
-	ENTRY;
 
 	if (!inode)
 		return 1;
@@ -740,7 +722,6 @@ int coda_revalidate_inode(struct dentry *dentry)
 	struct inode *inode = dentry->d_inode;
 	struct coda_inode_info *cii = ITOC(inode);
 
-	ENTRY;
 	CDEBUG(D_INODE, "revalidating: %*s/%*s\n", 
 	       dentry->d_name.len, dentry->d_name.name,
 	       dentry->d_parent->d_name.len, dentry->d_parent->d_name.name);

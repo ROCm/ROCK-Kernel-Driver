@@ -384,7 +384,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 #endif /* CONFIG_BLK_DEV_PDC4030 */
 #ifdef DEBUG
 		printk("%s: %sing: LBAsect=%ld, sectors=%ld, buffer=0x%08lx\n",
-			drive->name, (rq->cmd==READ)?"read":"writ",
+			drive->name, (rq_data_dir(rq)==READ)?"read":"writ",
 			block, rq->nr_sectors, (unsigned long) rq->buffer);
 #endif
 		OUT_BYTE(block,IDE_SECTOR_REG);
@@ -403,7 +403,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 		OUT_BYTE(head|drive->select.all,IDE_SELECT_REG);
 #ifdef DEBUG
 		printk("%s: %sing: CHS=%d/%d/%d, sectors=%ld, buffer=0x%08lx\n",
-			drive->name, (rq->cmd==READ)?"read":"writ", cyl,
+			drive->name, (rq_data_dir(rq)==READ)?"read":"writ", cyl,
 			head, sect, rq->nr_sectors, (unsigned long) rq->buffer);
 #endif
 	}
@@ -413,7 +413,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 		return do_pdc4030_io (drive, rq);
 	}
 #endif /* CONFIG_BLK_DEV_PDC4030 */
-	if (rq->cmd == READ) {
+	if (rq_data_dir(rq) == READ) {
 #ifdef CONFIG_BLK_DEV_IDEDMA
 		if (drive->using_dma && !(HWIF(drive)->dmaproc(ide_dma_read, drive)))
 			return ide_started;
@@ -422,7 +422,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 		OUT_BYTE(drive->mult_count ? WIN_MULTREAD : WIN_READ, IDE_COMMAND_REG);
 		return ide_started;
 	}
-	if (rq->cmd == WRITE) {
+	if (rq_data_dir(rq) == WRITE) {
 		ide_startstop_t startstop;
 #ifdef CONFIG_BLK_DEV_IDEDMA
 		if (drive->using_dma && !(HWIF(drive)->dmaproc(ide_dma_write, drive)))
@@ -464,7 +464,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 		}
 		return ide_started;
 	}
-	printk(KERN_ERR "%s: bad command: %d\n", drive->name, rq->cmd);
+	printk(KERN_ERR "%s: bad command: %lx\n", drive->name, rq->flags);
 	ide_end_request(0, HWGROUP(drive));
 	return ide_stopped;
 }

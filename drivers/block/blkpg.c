@@ -194,7 +194,7 @@ int blkpg_ioctl(kdev_t dev, struct blkpg_ioctl_arg *arg)
 /*
  * Common ioctl's for block devices
  */
-
+extern int block_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg);
 int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 {
 	request_queue_t *q;
@@ -204,6 +204,10 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 
 	if (!dev)
 		return -EINVAL;
+
+	intval = block_ioctl(dev, cmd, arg);
+	if (intval != -ENOTTY)
+		return intval;
 
 	switch (cmd) {
 		case BLKROSET:

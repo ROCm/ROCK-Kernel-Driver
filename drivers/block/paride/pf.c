@@ -859,7 +859,7 @@ repeat:
                 goto repeat;
         }
 
-	pf_cmd = CURRENT->cmd;
+	pf_cmd = rq_data_dir(CURRENT);
         pf_buf = CURRENT->buffer;
         pf_retries = 0;
 
@@ -885,7 +885,7 @@ static void pf_next_buf( int unit )
 /* paranoia */
 
 	if (QUEUE_EMPTY ||
-	    (CURRENT->cmd != pf_cmd) ||
+	    (rq_data_dir(CURRENT) != pf_cmd) ||
 	    (DEVICE_NR(CURRENT->rq_dev) != pf_unit) ||
 	    (CURRENT->rq_status == RQ_INACTIVE) ||
 	    (CURRENT->sector != pf_block)) 

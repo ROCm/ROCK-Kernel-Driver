@@ -533,8 +533,8 @@ static void cdrom_queue_request_sense(ide_drive_t *drive,
 	/* stuff the sense request in front of our current request */
 	rq = &info->request_sense_request;
 	ide_init_drive_cmd(rq);
-	rq->cmd = REQUEST_SENSE_COMMAND;
-	rq->buffer = (char *) pc;
+	rq->flags = REQ_SENSE;
+	rq->special = (char *) pc;
 	rq->waiting = wait;
 	(void) ide_do_drive_cmd(drive, rq, ide_preempt);
 }
@@ -544,17 +544,17 @@ static void cdrom_end_request (int uptodate, ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
 
-	if (rq->cmd == REQUEST_SENSE_COMMAND && uptodate) {
-		struct packet_command *pc = (struct packet_command *) rq->buffer;
+	if ((rq->flags & REQ_SENSE) && uptodate) {
+		struct packet_command *pc = (struct packet_command *) rq->special;
 		cdrom_analyze_sense_data(drive,
 			(struct packet_command *) pc->sense,
 			(struct request_sense *) (pc->buffer - pc->c[4]));
 	}
-	if (rq->cmd == READ || rq->cmd == WRITE)
-		if (!rq->current_nr_sectors)
-			uptodate = 1;
 
-	ide_end_request (uptodate, HWGROUP(drive));
+	if ((rq->flags & REQ_CMD) && !rq->current_nr_sectors)
+		uptodate = 1;
+
+	ide_end_request(uptodate, HWGROUP(drive));
 }
 
 
@@ -584,21 +584,20 @@ static int cdrom_decode_status (ide_startstop_t *startstop, ide_drive_t *drive,
 		return 1;
 	}
 
-	if (rq->cmd == REQUEST_SENSE_COMMAND) {
+	if (rq->flags & REQ_SENSE) {
 		/* We got an error trying to get sense info
 		   from the drive (probably while trying
 		   to recover from a former error).  Just give up. */
 
-		pc = (struct packet_command *) rq->buffer;
+		pc = (struct packet_command *) rq->special;
 		pc->stat = 1;
 		cdrom_end_request (1, drive);
 		*startstop = ide_error (drive, "request sense failure", stat);
 		return 1;
-
-	} else if (rq->cmd == PACKET_COMMAND) {
+	} else if (rq->flags & REQ_PC) {
 		/* All other functions, except for READ. */
 		struct completion *wait = NULL;
-		pc = (struct packet_command *) rq->buffer;
+		pc = (struct packet_command *) rq->special;
 
 		/* Check for tray open. */
 		if (sense_key == NOT_READY) {
@@ -632,7 +631,7 @@ static int cdrom_decode_status (ide_startstop_t *startstop, ide_drive_t *drive,
 
 		if ((stat & ERR_STAT) != 0)
 			cdrom_queue_request_sense(drive, wait, pc->sense, pc);
-	} else {
+	} else if (rq->flags & REQ_CMD) {
 		/* Handle errors from READ and WRITE requests. */
 
 		if (sense_key == NOT_READY) {
@@ -671,7 +670,8 @@ static int cdrom_decode_status (ide_startstop_t *startstop, ide_drive_t *drive,
 		   queue a request sense command. */
 		if ((stat & ERR_STAT) != 0)
 			cdrom_queue_request_sense(drive, NULL, NULL, NULL);
-	}
+	} else
+		blk_dump_rq_flags(rq, "ide-cd bad flags");
 
 	/* Retry, or handle the next request. */
 	*startstop = ide_stopped;
@@ -681,7 +681,6 @@ static int cdrom_decode_status (ide_startstop_t *startstop, ide_drive_t *drive,
 static int cdrom_timer_expiry(ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	struct packet_command *pc = (struct packet_command *) rq->buffer;
 	unsigned long wait = 0;
 
 	/*
@@ -690,7 +689,7 @@ static int cdrom_timer_expiry(ide_drive_t *drive)
 	 * this, but not all commands/drives support that. Let
 	 * ide_timer_expiry keep polling us for these.
 	 */
-	switch (pc->c[0]) {
+	switch (rq->cmd[0]) {
 		case GPCMD_BLANK:
 		case GPCMD_FORMAT_UNIT:
 		case GPCMD_RESERVE_RZONE_TRACK:
@@ -700,6 +699,7 @@ static int cdrom_timer_expiry(ide_drive_t *drive)
 			wait = 0;
 			break;
 	}
+
 	return wait;
 }
 
@@ -1116,11 +1116,7 @@ static ide_startstop_t cdrom_start_read_continuation (ide_drive_t *drive)
 		(65534 / CD_FRAMESIZE) : 65535);
 
 	/* Set up the command */
-	memset (&pc.c, 0, sizeof (pc.c));
-	pc.c[0] = GPCMD_READ_10;
-	pc.c[7] = (nframes >> 8);
-	pc.c[8] = (nframes & 0xff);
-	put_unaligned(cpu_to_be32(frame), (unsigned int *) &pc.c[2]);
+	memcpy(pc.c, rq->cmd, sizeof(pc.c));
 	pc.timeout = WAIT_CMD;
 
 	/* Send the command to the drive and return. */
@@ -1170,7 +1166,7 @@ static ide_startstop_t cdrom_start_seek_continuation (ide_drive_t *drive)
 		sector -= nskip;
 	frame = sector / SECTORS_PER_FRAME;
 
-	memset (&pc.c, 0, sizeof (pc.c));
+	memset(rq->cmd, 0, sizeof(rq->cmd));
 	pc.c[0] = GPCMD_SEEK;
 	put_unaligned(cpu_to_be32(frame), (unsigned int *) &pc.c[2]);
 
@@ -1188,8 +1184,11 @@ static ide_startstop_t cdrom_start_seek (ide_drive_t *drive, unsigned int block)
 	return cdrom_start_packet_command (drive, 0, cdrom_start_seek_continuation);
 }
 
-/* Fix up a possibly partially-processed request so that we can
-   start it over entirely */
+/*
+ * Fix up a possibly partially-processed request so that we can
+ * start it over entirely -- remember to call prep_rq_fn again since we
+ * may have changed the layout
+ */
 static void restore_request (struct request *rq)
 {
 	if (rq->buffer != bio_data(rq->bio)) {
@@ -1201,6 +1200,7 @@ static void restore_request (struct request *rq)
 	rq->hard_cur_sectors = rq->current_nr_sectors = bio_sectors(rq->bio);
 	rq->hard_nr_sectors = rq->nr_sectors;
 	rq->hard_sector = rq->sector;
+	rq->q->prep_rq_fn(rq->q, rq);
 }
 
 /*
@@ -1210,18 +1210,7 @@ static ide_startstop_t cdrom_start_read (ide_drive_t *drive, unsigned int block)
 {
 	struct cdrom_info *info = drive->driver_data;
 	struct request *rq = HWGROUP(drive)->rq;
-	int minor = MINOR (rq->rq_dev);
 
-	/* If the request is relative to a partition, fix it up to refer to the
-	   absolute address.  */
-	if (minor & PARTN_MASK) {
-		rq->sector = block;
-		minor &= ~PARTN_MASK;
-		rq->rq_dev = MKDEV(MAJOR(rq->rq_dev), minor);
-	}
-
-	/* We may be retrying this request after an error.  Fix up
-	   any weirdness which might be present in the request packet. */
 	restore_request(rq);
 
 	/* Satisfy whatever we can of this request from our cached sector. */
@@ -1258,7 +1247,7 @@ static ide_startstop_t cdrom_pc_intr (ide_drive_t *drive)
 {
 	int ireason, len, stat, thislen;
 	struct request *rq = HWGROUP(drive)->rq;
-	struct packet_command *pc = (struct packet_command *)rq->buffer;
+	struct packet_command *pc = (struct packet_command *) rq->special;
 	ide_startstop_t startstop;
 
 	/* Check for errors. */
@@ -1354,7 +1343,7 @@ static ide_startstop_t cdrom_pc_intr (ide_drive_t *drive)
 static ide_startstop_t cdrom_do_pc_continuation (ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	struct packet_command *pc = (struct packet_command *)rq->buffer;
+	struct packet_command *pc = (struct packet_command *) rq->special;
 
 	if (!pc->timeout)
 		pc->timeout = WAIT_CMD;
@@ -1368,7 +1357,7 @@ static ide_startstop_t cdrom_do_packet_command (ide_drive_t *drive)
 {
 	int len;
 	struct request *rq = HWGROUP(drive)->rq;
-	struct packet_command *pc = (struct packet_command *)rq->buffer;
+	struct packet_command *pc = (struct packet_command *) rq->special;
 	struct cdrom_info *info = drive->driver_data;
 
 	info->dma = 0;
@@ -1407,8 +1396,8 @@ int cdrom_queue_packet_command(ide_drive_t *drive, struct packet_command *pc)
 	/* Start of retry loop. */
 	do {
 		ide_init_drive_cmd (&req);
-		req.cmd = PACKET_COMMAND;
-		req.buffer = (char *)pc;
+		req.flags = REQ_PC;
+		req.special = (char *) pc;
 		if (ide_do_drive_cmd (drive, &req, ide_wait)) {
 			printk("%s: do_drive_cmd returned stat=%02x,err=%02x\n",
 				drive->name, req.buffer[0], req.buffer[1]);
@@ -1583,18 +1572,10 @@ static ide_startstop_t cdrom_start_write_cont(ide_drive_t *drive)
 	nframes = rq->nr_sectors >> 2;
 	frame = rq->sector >> 2;
 
-	memset(&pc.c, 0, sizeof(pc.c));
-	/*
-	 * we might as well use WRITE_12, but none of the device I have
-	 * support the streaming feature anyway, so who cares.
-	 */
-	pc.c[0] = GPCMD_WRITE_10;
+	memcpy(pc.c, rq->cmd, sizeof(pc.c));
 #if 0	/* the immediate bit */
 	pc.c[1] = 1 << 3;
 #endif
-	pc.c[7] = (nframes >> 8) & 0xff;
-	pc.c[8] = nframes & 0xff;
-	put_unaligned(cpu_to_be32(frame), (unsigned int *)&pc.c[2]);
 	pc.timeout = 2 * WAIT_CMD;
 
 	return cdrom_transfer_packet_command(drive, &pc, cdrom_write_intr);
@@ -1631,6 +1612,28 @@ static ide_startstop_t cdrom_start_write(ide_drive_t *drive, struct request *rq)
 	return cdrom_start_packet_command(drive, 32768, cdrom_start_write_cont);
 }
 
+/*
+ * just wrap this around cdrom_do_packet_command
+ */
+static int cdrom_do_block_pc(ide_drive_t *drive, struct request *rq)
+{
+	struct packet_command pc;
+	ide_startstop_t startstop;
+
+	memset(&pc, 0, sizeof(pc));
+	memcpy(pc.c, rq->cmd, sizeof(pc.c));
+	pc.quiet = 1;
+	pc.timeout = 60 * HZ;
+	rq->special = (char *) &pc;
+
+	startstop = cdrom_do_packet_command(drive);
+	if (pc.stat)
+		rq->errors++;
+
+	return startstop;
+}
+
+
 /****************************************************************************
  * cdrom driver request routine.
  */
@@ -1640,50 +1643,45 @@ ide_do_rw_cdrom (ide_drive_t *drive, struct request *rq, unsigned long block)
 	ide_startstop_t action;
 	struct cdrom_info *info = drive->driver_data;
 
-	switch (rq->cmd) {
-		case WRITE:
-		case READ: {
-			if (CDROM_CONFIG_FLAGS(drive)->seeking) {
-				unsigned long elpased = jiffies - info->start_seek;
-				int stat = GET_STAT();
+	if (rq->flags & REQ_CMD) {
+		if (CDROM_CONFIG_FLAGS(drive)->seeking) {
+			unsigned long elpased = jiffies - info->start_seek;
+			int stat = GET_STAT();
 
-				if ((stat & SEEK_STAT) != SEEK_STAT) {
-					if (elpased < IDECD_SEEK_TIMEOUT) {
-						ide_stall_queue(drive, IDECD_SEEK_TIMER);
-						return ide_stopped;
-					}
-					printk ("%s: DSC timeout\n", drive->name);
+			if ((stat & SEEK_STAT) != SEEK_STAT) {
+				if (elpased < IDECD_SEEK_TIMEOUT) {
+					ide_stall_queue(drive, IDECD_SEEK_TIMER);
+					return ide_stopped;
 				}
-				CDROM_CONFIG_FLAGS(drive)->seeking = 0;
+				printk ("%s: DSC timeout\n", drive->name);
 			}
-			if (IDE_LARGE_SEEK(info->last_block, block, IDECD_SEEK_THRESHOLD) && drive->dsc_overlap)
-				action = cdrom_start_seek (drive, block);
-			else {
-				if (rq->cmd == READ)
-					action = cdrom_start_read(drive, block);
-				else
-					action = cdrom_start_write(drive, rq);
-			}
-			info->last_block = block;
-			return action;
+			CDROM_CONFIG_FLAGS(drive)->seeking = 0;
 		}
-
-		case PACKET_COMMAND:
-		case REQUEST_SENSE_COMMAND: {
-			return cdrom_do_packet_command(drive);
+		if (IDE_LARGE_SEEK(info->last_block, block, IDECD_SEEK_THRESHOLD) && drive->dsc_overlap)
+			action = cdrom_start_seek (drive, block);
+		else {
+			if (rq_data_dir(rq) == READ)
+				action = cdrom_start_read(drive, block);
+			else
+				action = cdrom_start_write(drive, rq);
 		}
-
-		case RESET_DRIVE_COMMAND: {
-			cdrom_end_request(1, drive);
-			return ide_do_reset(drive);
-		}
-
-		default: {
-			printk("ide-cd: bad cmd %d\n", rq->cmd);
-			cdrom_end_request(0, drive);
-			return ide_stopped;
-		}
+		info->last_block = block;
+		return action;
+	} else if (rq->flags & (REQ_PC | REQ_SENSE)) {
+		return cdrom_do_packet_command(drive);
+	} else if (rq->flags & REQ_SPECIAL) {
+		/*
+		 * right now this can only be a reset...
+		 */
+		cdrom_end_request(1, drive);
+		return ide_do_reset(drive);
+	} else if (rq->flags & REQ_BLOCK_PC) {
+		return cdrom_do_block_pc(drive, rq);
 	}
+
+	blk_dump_rq_flags(rq, "ide-cd bad flags");
+	cdrom_end_request(0, drive);
+	return ide_stopped;
 }
 
 
@@ -2151,6 +2149,7 @@ static int ide_cdrom_packet(struct cdrom_device_info *cdi,
 	return cgc->stat;
 }
 
+
 static
 int ide_cdrom_dev_ioctl (struct cdrom_device_info *cdi,
 			 unsigned int cmd, unsigned long arg)
@@ -2284,7 +2283,7 @@ int ide_cdrom_reset (struct cdrom_device_info *cdi)
 	int ret;
 
 	ide_init_drive_cmd (&req);
-	req.cmd = RESET_DRIVE_COMMAND;
+	req.flags = REQ_SPECIAL;
 	ret = ide_do_drive_cmd(drive, &req, ide_wait);
 
 	/*
@@ -2673,6 +2672,7 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	 */
 	set_device_ro(MKDEV(HWIF(drive)->major, minor), 1);
 	set_blocksize(MKDEV(HWIF(drive)->major, minor), CD_FRAMESIZE);
+	blk_queue_hardsect_size(&drive->queue, CD_FRAMESIZE);
 
 	drive->special.all	= 0;
 	drive->ready_stat	= 0;

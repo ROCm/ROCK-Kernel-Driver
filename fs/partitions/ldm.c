@@ -26,6 +26,7 @@
 #include <linux/types.h>
 #include <asm/unaligned.h>
 #include <asm/byteorder.h>
+#include <linux/pagemap.h>
 #include <linux/genhd.h>
 #include <linux/blkdev.h>
 #include <linux/slab.h>

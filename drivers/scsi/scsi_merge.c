@@ -225,7 +225,7 @@ static inline int scsi_new_mergeable(request_queue_t * q,
 
 static inline int scsi_new_segment(request_queue_t * q,
 				   struct request * req,
-				   struct Scsi_Host *SHpnt)
+				   struct bio *bio)
 {
 	/*
 	 * pci_map_sg won't be able to map these two
@@ -234,11 +234,11 @@ static inline int scsi_new_segment(request_queue_t * q,
 	 */
 	if (req->nr_hw_segments >= q->max_segments)
 		return 0;
-	else if (req->nr_segments >= q->max_segments)
+	else if (req->nr_segments + bio->bi_vcnt > q->max_segments)
 		return 0;
 
-	req->nr_hw_segments++;
-	req->nr_segments++;
+	req->nr_hw_segments += bio->bi_vcnt;
+	req->nr_segments += bio->bi_vcnt;
 	return 1;
 }
 
@@ -246,16 +246,16 @@ static inline int scsi_new_segment(request_queue_t * q,
 
 static inline int scsi_new_segment(request_queue_t * q,
 				   struct request * req,
-				   struct Scsi_Host *SHpnt)
+				   struct bio *bio)
 {
-	if (req->nr_segments >= q->max_segments)
+	if (req->nr_segments + bio->bi_vcnt > q->max_segments)
 		return 0;
 
 	/*
 	 * This will form the start of a new segment.  Bump the 
 	 * counter.
 	 */
-	req->nr_segments++;
+	req->nr_segments += bio->bi_vcnt;
 	return 1;
 }
 #endif
@@ -297,8 +297,6 @@ __inline static int __scsi_back_merge_fn(request_queue_t * q,
 					 struct bio *bio,
 					 int dma_host)
 {
-	Scsi_Device *SDpnt = q->queuedata;
-
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors)
 		return 0;
 	else if (!BIO_SEG_BOUNDARY(q, req->biotail, bio))
@@ -306,9 +304,9 @@ __inline static int __scsi_back_merge_fn(request_queue_t * q,
 
 #ifdef DMA_CHUNK_SIZE
 	if (MERGEABLE_BUFFERS(req->biotail, bio))
-		return scsi_new_mergeable(q, req, SDpnt->host);
+		return scsi_new_mergeable(q, req, q->queuedata);
 #endif
-	return scsi_new_segment(q, req, SDpnt->host);
+	return scsi_new_segment(q, req, bio);
 }
 
 __inline static int __scsi_front_merge_fn(request_queue_t * q,
@@ -316,8 +314,6 @@ __inline static int __scsi_front_merge_fn(request_queue_t * q,
 					  struct bio *bio,
 					  int dma_host)
 {
-	Scsi_Device *SDpnt = q->queuedata;
-
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors)
 		return 0;
 	else if (!BIO_SEG_BOUNDARY(q, bio, req->bio))
@@ -325,9 +321,9 @@ __inline static int __scsi_front_merge_fn(request_queue_t * q,
 
 #ifdef DMA_CHUNK_SIZE
 	if (MERGEABLE_BUFFERS(bio, req->bio))
-		return scsi_new_mergeable(q, req, SDpnt->host);
+		return scsi_new_mergeable(q, req, q->queuedata);
 #endif
-	return scsi_new_segment(q, req, SDpnt->host);
+	return scsi_new_segment(q, req, bio);
 }
 
 /*
@@ -686,10 +682,9 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 				}
 				break;
 			}
-			if (req->cmd == WRITE) {
+			if (rq_data_dir(req) == WRITE)
 				memcpy(sgpnt[i].address, bbpnt[i],
 				       sgpnt[i].length);
-			}
 		}
 	}
 	return 1;
@@ -778,7 +773,7 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 					return 0;
 				}
 			}
-			if (req->cmd == WRITE) {
+			if (rq_data_dir(req) == WRITE) {
 				unsigned long flags;
 				char *buf = bio_kmap_irq(bio, &flags);
 				memcpy(buff, buf, this_count << 9);

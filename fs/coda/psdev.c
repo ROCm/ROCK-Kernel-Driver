@@ -292,7 +292,6 @@ static int coda_psdev_open(struct inode * inode, struct file * file)
 {
         struct venus_comm *vcp;
 	int idx;
-        ENTRY;
 
 	lock_kernel();
 	idx = MINOR(inode->i_rdev);
@@ -319,7 +318,6 @@ static int coda_psdev_open(struct inode * inode, struct file * file)
 
 	CDEBUG(D_PSDEV, "device %i - inuse: %d\n", idx, vcp->vc_inuse);
 
-	EXIT;
 	unlock_kernel();
         return 0;
 }
@@ -330,7 +328,6 @@ static int coda_psdev_release(struct inode * inode, struct file * file)
         struct venus_comm *vcp = (struct venus_comm *) file->private_data;
         struct upc_req *req;
 	struct list_head *lh, *next;
-	ENTRY;
 
 	lock_kernel();
 	if ( !vcp->vc_inuse ) {
@@ -371,7 +368,6 @@ static int coda_psdev_release(struct inode * inode, struct file * file)
         }
 	CDEBUG(D_PSDEV, "Done.\n");
 
-	EXIT;
 	unlock_kernel();
 	return 0;
 }
@@ -410,6 +406,7 @@ static int init_coda_psdev(void)
 
 
 MODULE_AUTHOR("Peter J. Braam <braam@cs.cmu.edu>");
+MODULE_LICENSE("GPL");
 
 static int __init init_coda(void)
 {
@@ -435,8 +432,6 @@ static int __init init_coda(void)
 static void __exit exit_coda(void)
 {
         int err;
-
-        ENTRY;
 
 	err = unregister_filesystem(&coda_fs_type);
         if ( err != 0 ) {

@@ -8,56 +8,12 @@
 #include <linux/compiler.h>
 
 /*
- * Initialization functions.
+ * get rid of this next...
  */
-extern int isp16_init(void);
-extern int cdu31a_init(void);
-extern int acsi_init(void);
-extern int mcd_init(void);
-extern int mcdx_init(void);
-extern int sbpcd_init(void);
-extern int aztcd_init(void);
-extern int sony535_init(void);
-extern int gscd_init(void);
-extern int cm206_init(void);
-extern int optcd_init(void);
-extern int sjcd_init(void);
-extern int cdi_init(void);
-extern int hd_init(void);
 extern int ide_init(void);
-extern int xd_init(void);
-extern int mfm_init(void);
-extern int loop_init(void);
-extern int md_init(void);
-extern int ap_init(void);
-extern int ddv_init(void);
-extern int z2_init(void);
-extern int swim3_init(void);
-extern int swimiop_init(void);
-extern int amiga_floppy_init(void);
-extern int atari_floppy_init(void);
-extern int ez_init(void);
-extern int bpcd_init(void);
-extern int ps2esdi_init(void);
-extern int jsfd_init(void);
-extern int viodasd_init(void);
-extern int viocd_init(void);
-
-#if defined(CONFIG_ARCH_S390)
-extern int dasd_init(void);
-extern int xpram_init(void);
-extern int tapeblock_init(void);
-#endif /* CONFIG_ARCH_S390 */
 
 extern void set_device_ro(kdev_t dev,int flag);
-void add_blkdev_randomness(int major);
-
-extern int floppy_init(void);
-extern void rd_load(void);
-extern int rd_init(void);
-extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
-extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
-extern int rd_image_start;	/* starting block # of image */
+extern void add_blkdev_randomness(int major);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 
@@ -69,8 +25,6 @@ extern int initrd_below_start_ok; /* 1 if it is not an error if initrd_start < m
 void initrd_init(void);
 
 #endif
-
-		 
 /*
  * end_request() and friends. Must be called with the request queue spinlock
  * acquired. All functions called within end_request() _must_be_ atomic.
@@ -81,13 +35,50 @@ void initrd_init(void);
  * code duplication in drivers.
  */
 
+extern int end_that_request_first(struct request *, int, int);
+extern void end_that_request_last(struct request *);
+
 static inline void blkdev_dequeue_request(struct request *req)
 {
 	list_del(&req->queuelist);
 }
 
-int end_that_request_first(struct request *, int uptodate, int nr_sectors);
-void end_that_request_last(struct request *);
+#define __elv_next_request(q)	(q)->elevator.elevator_next_req_fn((q))
+
+extern inline struct request *elv_next_request(request_queue_t *q)
+{
+	struct request *rq;
+
+	while ((rq = __elv_next_request(q))) {
+		rq->flags |= REQ_STARTED;
+
+		if ((rq->flags & REQ_DONTPREP) || !q->prep_rq_fn)
+			break;
+
+		/*
+		 * all ok, break and return it
+		 */
+		if (!q->prep_rq_fn(q, rq))
+			break;
+
+		/*
+		 * prep said no-go, kill it
+		 */
+		blkdev_dequeue_request(rq);
+		if (end_that_request_first(rq, 0, rq->nr_sectors))
+			BUG();
+
+		end_that_request_last(rq);
+	}
+
+	return rq;
+}
+
+extern inline void elv_add_request(request_queue_t *q, struct request *rq)
+{
+	blk_plug_device(q);
+	q->elevator.elevator_add_req_fn(q, rq, q->queue_head.prev);
+}
 
 #if defined(MAJOR_NR) || defined(IDE_DRIVER)
 
@@ -364,15 +355,15 @@ static void (DEVICE_REQUEST)(request_queue_t *);
 #define CLEAR_INTR
 #endif
 
-#define INIT_REQUEST \
-	if (QUEUE_EMPTY) { \
-		CLEAR_INTR; \
-		return;	 \
-	} \
-	if (MAJOR(CURRENT->rq_dev) != MAJOR_NR) \
-		panic(DEVICE_NAME ": request list destroyed"); \
-	if (!CURRENT->bio) \
-		panic(DEVICE_NAME ": no bio"); \
+#define INIT_REQUEST						\
+	if (QUEUE_EMPTY) {					\
+		CLEAR_INTR;					\
+		return;						\
+	}							\
+	if (MAJOR(CURRENT->rq_dev) != MAJOR_NR) 		\
+		panic(DEVICE_NAME ": request list destroyed");	\
+	if (!CURRENT->bio)					\
+		panic(DEVICE_NAME ": no bio");			\
 
 #endif /* !defined(IDE_DRIVER) */
 

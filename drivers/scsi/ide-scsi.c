@@ -267,7 +267,7 @@ static void idescsi_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 	u8 *scsi_buf;
 	unsigned long flags;
 
-	if (rq->cmd != IDESCSI_PC_RQ) {
+	if (!(rq->flags & REQ_SPECIAL)) {
 		ide_end_request (uptodate, hwgroup);
 		return;
 	}
@@ -463,10 +463,10 @@ static ide_startstop_t idescsi_do_request (ide_drive_t *drive, struct request *r
 	printk (KERN_INFO "sector: %ld, nr_sectors: %ld, current_nr_sectors: %ld\n",rq->sector,rq->nr_sectors,rq->current_nr_sectors);
 #endif /* IDESCSI_DEBUG_LOG */
 
-	if (rq->cmd == IDESCSI_PC_RQ) {
+	if (rq->flags & REQ_SPECIAL) {
 		return idescsi_issue_pc (drive, (idescsi_pc_t *) rq->buffer);
 	}
-	printk (KERN_ERR "ide-scsi: %s: unsupported command in request queue (%x)\n", drive->name, rq->cmd);
+	blk_dump_rq_flags(rq, "ide-scsi: unsup command");
 	idescsi_end_request (0,HWGROUP (drive));
 	return ide_stopped;
 }
@@ -804,7 +804,7 @@ int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 	ide_init_drive_cmd (rq);
 	rq->buffer = (char *) pc;
 	rq->bio = idescsi_dma_bio (drive, pc);
-	rq->cmd = IDESCSI_PC_RQ;
+	rq->flags = REQ_SPECIAL;
 	spin_unlock(&cmd->host->host_lock);
 	(void) ide_do_drive_cmd (drive, rq, ide_end);
 	spin_lock_irq(&cmd->host->host_lock);

@@ -307,7 +307,7 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
  * Release buffers and URBs for the interrupt and control
  * endpoint.
  */
-void __devexit st5481_release_usb(struct st5481_adapter *adapter)
+void st5481_release_usb(struct st5481_adapter *adapter)
 {
 	struct st5481_intr *intr = &adapter->intr;
 	struct st5481_ctrl *ctrl = &adapter->ctrl;
@@ -443,7 +443,7 @@ st5481_setup_isocpipes(struct urb* urb[2], struct usb_device *dev,
 	return retval;
 }
 
-void __devexit st5481_release_isocpipes(struct urb* urb[2])
+void st5481_release_isocpipes(struct urb* urb[2])
 {
 	int j;
 
@@ -547,7 +547,7 @@ int __devinit st5481_setup_in(struct st5481_in *in)
 	return retval;
 }
 
-void __devexit st5481_release_in(struct st5481_in *in)
+void st5481_release_in(struct st5481_in *in)
 {
 	DBG(2,"");
 

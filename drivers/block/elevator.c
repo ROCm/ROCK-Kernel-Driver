@@ -58,7 +58,7 @@ inline int bio_rq_in_between(struct bio *bio, struct request *rq,
 
 	next_rq = list_entry(next, struct request, queuelist);
 
-	BUG_ON(!next_rq->inactive);
+	BUG_ON(next_rq->flags & REQ_STARTED);
 
 	/*
 	 * if the device is different (not a normal case) just check if
@@ -93,14 +93,21 @@ inline int bio_rq_in_between(struct bio *bio, struct request *rq,
 /*
  * can we safely merge with this request?
  */
-inline int elv_rq_merge_ok(request_queue_t *q, struct request *rq,
-			   struct bio *bio)
+inline int elv_rq_merge_ok(struct request *rq, struct bio *bio)
 {
-	if (bio_data_dir(bio) == rq->cmd) {
-		if (rq->rq_dev == bio->bi_dev && !rq->waiting
-		    && !rq->special && rq->inactive)
-			return 1;
-	}
+	/*
+	 * different data direction or already started, don't merge
+	 */
+	if (bio_data_dir(bio) != rq_data_dir(rq))
+		return 0;
+	if (rq->flags & REQ_NOMERGE)
+		return 0;
+
+	/*
+	 * same device and no special stuff set, merge is ok
+	 */
+	if (rq->rq_dev == bio->bi_dev && !rq->waiting && !rq->special)
+		return 1;
 
 	return 0;
 }
@@ -124,14 +131,12 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 		 */
 		if (__rq->elevator_sequence-- <= 0)
 			break;
-
-		if (unlikely(__rq->waiting || __rq->special))
-			continue;
-		if (unlikely(!__rq->inactive))
+		if (__rq->flags & (REQ_BARRIER | REQ_STARTED))
 			break;
+
 		if (!*req && bio_rq_in_between(bio, __rq, &q->queue_head))
 			*req = __rq;
-		if (!elv_rq_merge_ok(q, __rq, bio))
+		if (!elv_rq_merge_ok(__rq, bio))
 			continue;
 
 		if (__rq->elevator_sequence < count)
@@ -218,11 +223,10 @@ int elevator_noop_merge(request_queue_t *q, struct request **req,
 
 		prefetch(list_entry_rq(entry->prev));
 
-		if (unlikely(__rq->waiting || __rq->special))
-			continue;
-		if (unlikely(!__rq->inactive))
+		if (__rq->flags & (REQ_BARRIER | REQ_STARTED))
 			break;
-		if (!elv_rq_merge_ok(q, __rq, bio))
+
+		if (!elv_rq_merge_ok(__rq, bio))
 			continue;
 
 		/*

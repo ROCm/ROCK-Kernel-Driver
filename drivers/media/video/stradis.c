@@ -45,7 +45,6 @@
 #include <asm/uaccess.h>
 #include <linux/vmalloc.h>
 #include <linux/videodev.h>
-#include <linux/i2c-old.h>
 
 #include "saa7146.h"
 #include "saa7146reg.h"
@@ -142,13 +141,12 @@ static void I2CWipe(struct saa7146 *saa)
 	     !(saaread(SAA7146_MC2) & SAA7146_MC2_UPLD_I2C); i++)
 		schedule();
 }
+
 /* read I2C */
-static int I2CRead(struct i2c_bus *bus, unsigned char addr,
+static int I2CRead(struct saa7146 *saa, unsigned char addr,
 		   unsigned char subaddr, int dosub)
 {
-	struct saa7146 *saa = (struct saa7146 *) bus->data;
 	int i;
-
 
 	if (saaread(SAA7146_I2C_STATUS) & 0x3c)
 		I2CWipe(saa);
@@ -194,17 +192,12 @@ static int I2CRead(struct i2c_bus *bus, unsigned char addr,
 		printk("i2c read timeout\n");
 	return ((saaread(SAA7146_I2C_TRANSFER) >> 24) & 0xff);
 }
-static int I2CReadOld(struct i2c_bus *bus, unsigned char addr)
-{
-	return I2CRead(bus, addr, 0, 0);
-}
 
 /* set both to write both bytes, reset it to write only b1 */
 
-static int I2CWrite(struct i2c_bus *bus, unsigned char addr, unsigned char b1,
+static int I2CWrite(struct saa7146 *saa, unsigned char addr, unsigned char b1,
 		    unsigned char b2, int both)
 {
-	struct saa7146 *saa = (struct saa7146 *) bus->data;
 	int i;
 	u32 data;
 
@@ -226,15 +219,14 @@ static int I2CWrite(struct i2c_bus *bus, unsigned char addr, unsigned char b1,
 	return 0;
 }
 
-static void attach_inform(struct i2c_bus *bus, int id)
+static void attach_inform(struct saa7146 *saa, int id)
 {
-	struct saa7146 *saa = (struct saa7146 *) bus->data;
 	int i;
 
 	DEBUG(printk(KERN_DEBUG "stradis%d: i2c: device found=%02x\n", saa->nr, id));
 	if (id == 0xa0)	{ /* we have rev2 or later board, fill in info */
 		for (i = 0; i < 64; i++)
-			saa->boardcfg[i] = I2CRead(bus, 0xa0, i, 1);
+			saa->boardcfg[i] = I2CRead(saa, 0xa0, i, 1);
 #ifdef USE_RESCUE_EEPROM_SDM275
 		if (saa->boardcfg[0] != 0) {
 			printk("stradis%d: WARNING: EEPROM STORED VALUES HAVE BEEN IGNORED\n", saa->nr);
@@ -250,34 +242,19 @@ static void attach_inform(struct i2c_bus *bus, int id)
 	}
 }
 
-static void detach_inform(struct i2c_bus *bus, int id)
+static void detach_inform(struct saa7146 *saa, int id)
 {
-	struct saa7146 *saa = (struct saa7146 *) bus->data;
 	int i;
 	i = saa->nr;
 }
 
-static void I2CBusScan(struct i2c_bus *bus)
+static void I2CBusScan(struct saa7146 *saa)
 {
 	int i;
 	for (i = 0; i < 0xff; i += 2)
-		if ((I2CRead(bus, i, 0, 0)) >= 0)
-			attach_inform(bus, i);
+		if ((I2CRead(saa, i, 0, 0)) >= 0)
+			attach_inform(saa, i);
 }
-
-static struct i2c_bus saa7146_i2c_bus_template =
-{
-	"saa7146",
-	I2C_BUSID_BT848,
-	NULL,
-	SPIN_LOCK_UNLOCKED,
-	attach_inform,
-	detach_inform,
-	NULL,
-	NULL,
-	I2CReadOld,
-	I2CWrite,
-};
 
 static int debiwait_maxwait = 0;
 
@@ -664,10 +641,8 @@ static int ibm_send_command(struct saa7146 *saa,
 
 static void cs4341_setlevel(struct saa7146 *saa, int left, int right)
 {
-	I2CWrite(&(saa->i2c), 0x22, 0x03,
-		 left > 94 ? 94 : left, 2);
-	I2CWrite(&(saa->i2c), 0x22, 0x04,
-		 right > 94 ? 94 : right, 2);
+	I2CWrite(saa, 0x22, 0x03, left > 94 ? 94 : left, 2);
+	I2CWrite(saa, 0x22, 0x04, right > 94 ? 94 : right, 2);
 }
 
 static void initialize_cs4341(struct saa7146 *saa)
@@ -676,15 +651,15 @@ static void initialize_cs4341(struct saa7146 *saa)
 	for (i = 0; i < 200; i++) {
 		/* auto mute off, power on, no de-emphasis */
 		/* I2S data up to 24-bit 64xFs internal SCLK */
-		I2CWrite(&(saa->i2c), 0x22, 0x01, 0x11, 2);
+		I2CWrite(saa, 0x22, 0x01, 0x11, 2);
 		/* ATAPI mixer settings */
-		I2CWrite(&(saa->i2c), 0x22, 0x02, 0x49, 2);
+		I2CWrite(saa, 0x22, 0x02, 0x49, 2);
 		/* attenuation left 3db */
-		I2CWrite(&(saa->i2c), 0x22, 0x03, 0x00, 2);
+		I2CWrite(saa, 0x22, 0x03, 0x00, 2);
 		/* attenuation right 3db */
-		I2CWrite(&(saa->i2c), 0x22, 0x04, 0x00, 2);
-		I2CWrite(&(saa->i2c), 0x22, 0x01, 0x10, 2);
-		if (I2CRead(&(saa->i2c), 0x22, 0x02, 1) == 0x49)
+		I2CWrite(saa, 0x22, 0x04, 0x00, 2);
+		I2CWrite(saa, 0x22, 0x01, 0x10, 2);
+		if (I2CRead(saa, 0x22, 0x02, 1) == 0x49)
 			break;
 		schedule();
 	}
@@ -701,10 +676,10 @@ static void initialize_cs8420(struct saa7146 *saa, int pro)
 	else
 		sequence = mode8420con;
 	for (i = 0; i < INIT8420LEN; i++)
-		I2CWrite(&(saa->i2c), 0x20, init8420[i * 2],
+		I2CWrite(saa, 0x20, init8420[i * 2],
 			 init8420[i * 2 + 1], 2);
 	for (i = 0; i < MODE8420LEN; i++)
-		I2CWrite(&(saa->i2c), 0x20, sequence[i * 2],
+		I2CWrite(saa, 0x20, sequence[i * 2],
 			 sequence[i * 2 + 1], 2);
 	printk("stradis%d: CS8420 initialized\n", saa->nr);
 }
@@ -722,39 +697,39 @@ static void initialize_saa7121(struct saa7146 *saa, int dopal)
 	for (i = 0; i < INIT7121LEN; i++) {
 		if (NewCard) {	/* handle new card encoder differences */
 			if (sequence[i*2] == 0x3a)
-				I2CWrite(&(saa->i2c), 0x88, 0x3a, 0x13, 2);
+				I2CWrite(saa, 0x88, 0x3a, 0x13, 2);
 			else if (sequence[i*2] == 0x6b)
-				I2CWrite(&(saa->i2c), 0x88, 0x6b, 0x20, 2);
+				I2CWrite(saa, 0x88, 0x6b, 0x20, 2);
 			else if (sequence[i*2] == 0x6c)
-				I2CWrite(&(saa->i2c), 0x88, 0x6c,
+				I2CWrite(saa, 0x88, 0x6c,
 					 dopal ? 0x09 : 0xf5, 2);
 			else if (sequence[i*2] == 0x6d)
-				I2CWrite(&(saa->i2c), 0x88, 0x6d,
+				I2CWrite(saa, 0x88, 0x6d,
 					 dopal ? 0x20 : 0x00, 2);
 			else if (sequence[i*2] == 0x7a)
-				I2CWrite(&(saa->i2c), 0x88, 0x7a,
+				I2CWrite(saa, 0x88, 0x7a,
 					 dopal ? (PALFirstActive - 1) :
 					 (NTSCFirstActive - 4), 2);
 			else if (sequence[i*2] == 0x7b)
-				I2CWrite(&(saa->i2c), 0x88, 0x7b,
+				I2CWrite(saa, 0x88, 0x7b,
 					 dopal ? PALLastActive :
 					 NTSCLastActive, 2);
-			else I2CWrite(&(saa->i2c), 0x88, sequence[i * 2],
+			else I2CWrite(saa, 0x88, sequence[i * 2],
 				 sequence[i * 2 + 1], 2);
 		} else {
 			if (sequence[i*2] == 0x6b && mod)
-				I2CWrite(&(saa->i2c), 0x88, 0x6b, 
+				I2CWrite(saa, 0x88, 0x6b, 
 					(sequence[i * 2 + 1] ^ 0x09), 2);
 			else if (sequence[i*2] == 0x7a)
-				I2CWrite(&(saa->i2c), 0x88, 0x7a,
+				I2CWrite(saa, 0x88, 0x7a,
 					 dopal ? (PALFirstActive - 1) :
 					 (NTSCFirstActive - 4), 2);
 			else if (sequence[i*2] == 0x7b)
-				I2CWrite(&(saa->i2c), 0x88, 0x7b,
+				I2CWrite(saa, 0x88, 0x7b,
 					 dopal ? PALLastActive :
 					 NTSCLastActive, 2);
 			else
-				I2CWrite(&(saa->i2c), 0x88, sequence[i * 2],
+				I2CWrite(saa, 0x88, sequence[i * 2],
 					 sequence[i * 2 + 1], 2);
 		}
 	}
@@ -2060,10 +2035,7 @@ static int configure_saa7146(struct pci_dev *dev, int num)
 	if (!saa->saa7146_mem)
 		return -EIO;
 
-	memcpy(&(saa->i2c), &saa7146_i2c_bus_template, sizeof(struct i2c_bus));
 	memcpy(&saa->video_dev, &saa_template, sizeof(saa_template));
-	sprintf(saa->i2c.name, "stradis%d", num);
-	saa->i2c.data = saa;
 	saawrite(0, SAA7146_IER);	/* turn off all interrupts */
 	result = request_irq(saa->irq, saa7146_irq,
 		       SA_SHIRQ | SA_INTERRUPT, "stradis", (void *) saa);
@@ -2082,10 +2054,6 @@ static int configure_saa7146(struct pci_dev *dev, int num)
 		iounmap(saa->saa7146_mem);
 		return -1;
 	}
-#if 0
-	/* i2c generic interface is currently BROKEN */
-	i2c_register_bus(&saa->i2c);
-#endif
 	return 0;
 }
 
@@ -2176,7 +2144,7 @@ static int init_saa7146(int i)
 	saawrite(4, SAA7146_PAGE2); /* dma direction: read, no byteswap */
 	saawrite(((SAA7146_MC2_UPLD_DMA2) << 16) | SAA7146_MC2_UPLD_DMA2,
 		 SAA7146_MC2);
-	I2CBusScan(&(saa->i2c));
+	I2CBusScan(saa);
 	return 0;
 }
 
@@ -2194,10 +2162,6 @@ static void release_saa(void)
 		saawrite(0, SAA7146_MC2);
 		saawrite(0, SAA7146_IER);
 		saawrite(0xffffffffUL, SAA7146_ISR);
-#if 0
-		/* unregister i2c_bus */
-		i2c_unregister_bus((&saa->i2c));
-#endif
 
 		/* disable PCI bus-mastering */
 		pci_read_config_byte(saa->dev, PCI_COMMAND, &command);

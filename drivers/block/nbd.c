@@ -149,30 +149,41 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 
 void nbd_send_req(struct socket *sock, struct request *req)
 {
-	int result;
+	int result, rw, i, flags;
 	struct nbd_request request;
 	unsigned long size = req->nr_sectors << 9;
 
 	DEBUG("NBD: sending control, ");
 	request.magic = htonl(NBD_REQUEST_MAGIC);
-	request.type = htonl(req->cmd);
+	request.type = htonl(req->flags);
 	request.from = cpu_to_be64( (u64) req->sector << 9);
 	request.len = htonl(size);
 	memcpy(request.handle, &req, sizeof(req));
 
-	result = nbd_xmit(1, sock, (char *) &request, sizeof(request), req->cmd == WRITE ? MSG_MORE : 0);
+	rw = rq_data_dir(req);
+
+	result = nbd_xmit(1, sock, (char *) &request, sizeof(request), rw & WRITE ? MSG_MORE : 0);
 	if (result <= 0)
 		FAIL("Sendmsg failed for control.");
 
-	if (req->cmd == WRITE) {
-		struct bio *bio = req->bio;
-		DEBUG("data, ");
-		do {
-			result = nbd_xmit(1, sock, bio_data(bio), bio->bi_size, bio->bi_next == NULL ? 0 : MSG_MORE);
-			if (result <= 0)
-				FAIL("Send data failed.");
-			bio = bio->bi_next;
-		} while(bio);
+	if (rw & WRITE) {
+		struct bio *bio;
+		/*
+		 * we are really probing at internals to determine
+		 * whether to set MSG_MORE or not...
+		 */
+		rq_for_each_bio(bio, req) {
+			struct bio_vec *bvec;
+			bio_for_each_segment(bvec, bio, i) {
+				flags = 0;
+				if ((i < (bio->bi_vcnt - 1)) || bio->bi_next)
+					flags = MSG_MORE;
+				DEBUG("data, ");
+				result = nbd_xmit(1, sock, page_address(bvec->bv_page) + bvec->bv_offset, bvec->bv_len, flags);
+				if (result <= 0)
+					FAIL("Send data failed.");
+			}
+		}
 	}
 	return;
 
@@ -204,7 +215,7 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 		HARDFAIL("Not enough magic.");
 	if (ntohl(reply.error))
 		FAIL("Other side returned error.");
-	if (req->cmd == READ) {
+	if (rq_data_dir(req) == READ) {
 		struct bio *bio = req->bio;
 		DEBUG("data, ");
 		do {
@@ -321,10 +332,13 @@ static void do_nbd_request(request_queue_t * q)
 		if (dev >= MAX_NBD)
 			FAIL("Minor too big.");		/* Probably can not happen */
 #endif
+		if (!(req->flags & REQ_CMD))
+			goto error_out;
+
 		lo = &nbd_dev[dev];
 		if (!lo->file)
 			FAIL("Request when not-ready.");
-		if ((req->cmd == WRITE) && (lo->flags & NBD_READ_ONLY))
+		if ((rq_data_dir(req) == WRITE) && (lo->flags & NBD_READ_ONLY))
 			FAIL("Write on read-only");
 #ifdef PARANOIA
 		if (lo->magic != LO_MAGIC)
@@ -374,7 +388,7 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 	switch (cmd) {
 	case NBD_DISCONNECT:
 	        printk("NBD_DISCONNECT\n") ;
-                sreq.cmd=2 ; /* shutdown command */
+		sreq.flags = REQ_SPECIAL; /* FIXME: interpet as shutdown cmd */
                 if (!lo->sock) return -EINVAL ;
                 nbd_send_req(lo->sock,&sreq) ;
                 return 0 ;

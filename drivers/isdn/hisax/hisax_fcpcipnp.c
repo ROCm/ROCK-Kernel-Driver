@@ -533,7 +533,7 @@ static inline void hdlc_xpr_irq(struct fritz_bcs *bcs)
 	dev_kfree_skb_irq(skb);
 }
 
-static void hdlc_irq(struct fritz_bcs *bcs, u32 stat)
+static void hdlc_irq_one(struct fritz_bcs *bcs, u32 stat)
 {
 	DBG(0x10, "ch%d stat %#x", bcs->channel, stat);
 	if (stat & HDLC_INT_RPR) {
@@ -550,7 +550,7 @@ static void hdlc_irq(struct fritz_bcs *bcs, u32 stat)
 	}
 }
 
-static inline void hdlc_interrupt(struct fritz_adapter *adapter)
+static inline void hdlc_irq(struct fritz_adapter *adapter)
 {
 	int nr;
 	u32 stat;
@@ -559,7 +559,7 @@ static inline void hdlc_interrupt(struct fritz_adapter *adapter)
 		stat = adapter->read_hdlc_status(adapter, nr);
 		DBG(0x10, "HDLC %c stat %#x", 'A' + nr, stat);
 		if (stat & HDLC_INT_MASK)
-			hdlc_irq(&adapter->bcs[nr], stat);
+			hdlc_irq_one(&adapter->bcs[nr], stat);
 	}
 }
 
@@ -642,10 +642,10 @@ static void fcpci2_irq(int intno, void *dev, struct pt_regs *regs)
 		return;
 	DBG(2, "STATUS0 %#x", val);
 	if (val & AVM_STATUS0_IRQ_ISAC)
-		isacsx_interrupt(&adapter->isac);
+		isacsx_irq(&adapter->isac);
 
 	if (val & AVM_STATUS0_IRQ_HDLC)
-		hdlc_interrupt(adapter);
+		hdlc_irq(adapter);
 }
 
 static void fcpci_irq(int intno, void *dev, struct pt_regs *regs)
@@ -659,10 +659,10 @@ static void fcpci_irq(int intno, void *dev, struct pt_regs *regs)
 		return;
 	DBG(2, "sval %#x", sval);
 	if (!(sval & AVM_STATUS0_IRQ_ISAC))
-		isac_interrupt(&adapter->isac);
+		isac_irq(&adapter->isac);
 
 	if (!(sval & AVM_STATUS0_IRQ_HDLC))
-		hdlc_interrupt(adapter);
+		hdlc_irq(adapter);
 }
 
 // ----------------------------------------------------------------------

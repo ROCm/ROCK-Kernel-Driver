@@ -10,9 +10,9 @@
 
 O_TARGET := block.o
 
-export-objs	:= elevator.o ll_rw_blk.o blkpg.o loop.o DAC960.o genhd.o
+export-objs	:= elevator.o ll_rw_blk.o blkpg.o loop.o DAC960.o genhd.o block_ioctl.o
 
-obj-y	:= elevator.o ll_rw_blk.o blkpg.o genhd.o
+obj-y	:= elevator.o ll_rw_blk.o blkpg.o genhd.o block_ioctl.o
 
 obj-$(CONFIG_MAC_FLOPPY)	+= swim3.o
 obj-$(CONFIG_BLK_DEV_FD)	+= floppy.o

@@ -99,7 +99,6 @@ static struct super_block * coda_read_super(struct super_block *sb,
         ViceFid fid;
         int error;
 	int idx;
-	ENTRY;
 
 	idx = get_device_index((struct coda_mount_data *) data);
 
@@ -112,19 +111,16 @@ static struct super_block * coda_read_super(struct super_block *sb,
 	vc = &coda_comms[idx];
 	if (!vc->vc_inuse) {
 		printk("coda_read_super: No pseudo device\n");
-		EXIT;  
 		return NULL;
 	}
 
         if ( vc->vc_sb ) {
 		printk("coda_read_super: Device already mounted\n");
-		EXIT;  
 		return NULL;
 	}
 
 	sbi = kmalloc(sizeof(struct coda_sb_info), GFP_KERNEL);
 	if(!sbi) {
-		EXIT;  
 		return NULL;
 	}
 
@@ -159,11 +155,9 @@ static struct super_block * coda_read_super(struct super_block *sb,
 	printk("coda_read_super: rootinode is %ld dev %d\n", 
 	       root->i_ino, root->i_dev);
 	sb->s_root = d_alloc_root(root);
-	EXIT;  
         return sb;
 
  error:
-	EXIT;  
 	if (sbi) {
 		kfree(sbi);
 		if(vc)
@@ -179,16 +173,12 @@ static void coda_put_super(struct super_block *sb)
 {
         struct coda_sb_info *sbi;
 
-        ENTRY;
-
 	sbi = coda_sbp(sb);
 	sbi->sbi_vcomm->vc_sb = NULL;
         list_del_init(&sbi->sbi_cihead);
 
 	printk("Coda: Bye bye.\n");
 	kfree(sbi);
-
-	EXIT;
 }
 
 /* all filling in of inodes postponed until lookup */
@@ -196,7 +186,6 @@ static void coda_read_inode(struct inode *inode)
 {
 	struct coda_sb_info *sbi = coda_sbp(inode->i_sb);
 	struct coda_inode_info *cii;
-	ENTRY;
 
         if (!sbi) BUG();
 
@@ -229,7 +218,6 @@ static void coda_clear_inode(struct inode *inode)
 {
 	struct coda_inode_info *cii = ITOC(inode);
 
-        ENTRY;
         CDEBUG(D_SUPER, " inode->ino: %ld, count: %d\n", 
 	       inode->i_ino, atomic_read(&inode->i_count));        
 	CDEBUG(D_DOWNCALL, "clearing inode: %ld, %x\n", inode->i_ino, cii->c_flags);
@@ -244,8 +232,6 @@ static void coda_clear_inode(struct inode *inode)
 	cii_free(inode->u.generic_ip);
 	inode->u.generic_ip = NULL;
 #endif
-
-	EXIT;
 }
 
 int coda_notify_change(struct dentry *de, struct iattr *iattr)
@@ -254,7 +240,6 @@ int coda_notify_change(struct dentry *de, struct iattr *iattr)
         struct coda_vattr vattr;
         int error;
 	
-	ENTRY;
         memset(&vattr, 0, sizeof(vattr)); 
 
         coda_iattr_to_vattr(iattr, &vattr);
@@ -270,7 +255,6 @@ int coda_notify_change(struct dentry *de, struct iattr *iattr)
 	}
 	CDEBUG(D_SUPER, "inode.i_mode %o, error %d\n", inode->i_mode, error);
 
-	EXIT;
 	return error;
 }
 

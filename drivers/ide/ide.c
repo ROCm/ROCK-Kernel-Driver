@@ -151,6 +151,7 @@
 #include <linux/ide.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/completion.h>
+#include <linux/cdrom.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -562,8 +563,7 @@ inline int __ide_end_request(ide_hwgroup_t *hwgroup, int uptodate, int nr_secs)
 	spin_lock_irqsave(&ide_lock, flags);
 	rq = hwgroup->rq;
 
-	if (rq->inactive)
-		BUG();
+	BUG_ON(!(rq->flags & REQ_STARTED));
 
 	/*
 	 * small hack to eliminate locking from ide_end_request to grab
@@ -878,7 +878,7 @@ void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err)
 	spin_lock_irqsave(&ide_lock, flags);
 	rq = HWGROUP(drive)->rq;
 
-	if (rq->cmd == IDE_DRIVE_CMD) {
+	if (rq->flags & REQ_DRIVE_CMD) {
 		byte *args = (byte *) rq->buffer;
 		rq->errors = !OK_STAT(stat,READY_STAT,BAD_STAT);
 		if (args) {
@@ -886,7 +886,7 @@ void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err)
 			args[1] = err;
 			args[2] = IN_BYTE(IDE_NSECTOR_REG);
 		}
-	} else if (rq->cmd == IDE_DRIVE_TASK) {
+	} else if (rq->flags & REQ_DRIVE_TASK) {
 		byte *args = (byte *) rq->buffer;
 		rq->errors = !OK_STAT(stat,READY_STAT,BAD_STAT);
 		if (args) {
@@ -901,8 +901,6 @@ void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err)
 	}
 
 	spin_lock(DRIVE_LOCK(drive));
-	if (rq->inactive)
-		BUG();
 	blkdev_dequeue_request(rq);
 	HWGROUP(drive)->rq = NULL;
 	end_that_request_last(rq);
@@ -1010,7 +1008,7 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat)
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 		return ide_stopped;
 	/* retry only "normal" I/O: */
-	if (rq->cmd == IDE_DRIVE_CMD || rq->cmd == IDE_DRIVE_TASK) {
+	if (!(rq->flags & REQ_CMD)) {
 		rq->errors = 1;
 		ide_end_drive_cmd(drive, stat, err);
 		return ide_stopped;
@@ -1030,7 +1028,7 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat)
 			else if (err & TRK0_ERR)	/* help it find track zero */
 				rq->errors |= ERROR_RECAL;
 		}
-		if ((stat & DRQ_STAT) && rq->cmd != WRITE)
+		if ((stat & DRQ_STAT) && rq_data_dir(rq) == READ)
 			try_to_flush_leftover_data(drive);
 	}
 	if (GET_STAT() & (BUSY_STAT|DRQ_STAT))
@@ -1177,7 +1175,7 @@ int ide_wait_stat (ide_startstop_t *startstop, ide_drive_t *drive, byte good, by
 static ide_startstop_t execute_drive_cmd (ide_drive_t *drive, struct request *rq)
 {
 	byte *args = rq->buffer;
-	if (args && rq->cmd == IDE_DRIVE_TASK) {
+	if (args && (rq->flags & REQ_DRIVE_TASK)) {
 		byte sel;
 #ifdef DEBUG
 		printk("%s: DRIVE_TASK_CMD data=x%02x cmd=0x%02x fr=0x%02x ns=0x%02x sc=0x%02x lcyl=0x%02x hcyl=0x%02x sel=0x%02x\n",
@@ -1234,8 +1232,7 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 	unsigned int minor = MINOR(rq->rq_dev), unit = minor >> PARTN_BITS;
 	ide_hwif_t *hwif = HWIF(drive);
 
-	if (rq->inactive)
-		BUG();
+	BUG_ON(!(rq->flags & REQ_STARTED));
 
 #ifdef DEBUG
 	printk("%s: start_request: current=0x%08lx\n", hwif->name, (unsigned long) rq);
@@ -1259,7 +1256,7 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 	block    = rq->sector;
 
 	/* Strange disk manager remap */
-	if ((rq->cmd == READ || rq->cmd == WRITE) &&
+	if ((rq->flags & REQ_CMD) && 
 	    (drive->media == ide_disk || drive->media == ide_floppy)) {
 		block += drive->sect0;
 	}
@@ -1279,9 +1276,9 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 		return startstop;
 	}
 	if (!drive->special.all) {
-		if (rq->cmd == IDE_DRIVE_CMD || rq->cmd == IDE_DRIVE_TASK) {
+		if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK))
 			return execute_drive_cmd(drive, rq);
-		}
+
 		if (drive->driver != NULL) {
 			return (DRIVER(drive)->do_request(drive, rq, block));
 		}
@@ -1831,7 +1828,7 @@ ide_drive_t *get_info_ptr (kdev_t i_rdev)
 void ide_init_drive_cmd (struct request *rq)
 {
 	memset(rq, 0, sizeof(*rq));
-	rq->cmd = IDE_DRIVE_CMD;
+	rq->flags = REQ_DRIVE_CMD;
 }
 
 /*
@@ -2612,7 +2609,7 @@ int ide_wait_cmd_task (ide_drive_t *drive, byte *buf)
 	struct request rq;
 
 	ide_init_drive_cmd(&rq);
-	rq.cmd = IDE_DRIVE_TASK;
+	rq.flags = REQ_DRIVE_TASK;
 	rq.buffer = buf;
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
@@ -2835,6 +2832,13 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 		case BLKBSZGET:
 		case BLKBSZSET:
 			return blk_ioctl(inode->i_rdev, cmd, arg);
+
+		/*
+		 * uniform packet command handling
+		 */
+		case CDROMEJECT:
+		case CDROMCLOSETRAY:
+			return block_ioctl(inode->i_rdev, cmd, arg);
 
 		case HDIO_GET_BUSSTATE:
 			if (!capable(CAP_SYS_ADMIN))

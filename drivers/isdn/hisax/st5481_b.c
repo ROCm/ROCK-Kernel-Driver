@@ -275,7 +275,7 @@ static int __devinit st5481_setup_b_out(struct st5481_bcs *bcs)
 				      usb_b_out_complete, bcs);
 }
 
-static void __devexit st5481_release_b_out(struct st5481_bcs *bcs)
+static void st5481_release_b_out(struct st5481_bcs *bcs)
 {
 	struct st5481_b_out *b_out = &bcs->b_out;
 
@@ -316,7 +316,7 @@ int __devinit st5481_setup_b(struct st5481_bcs *bcs)
 /*
  * Release buffers and URBs for the B channels
  */
-void __devexit st5481_release_b(struct st5481_bcs *bcs)
+void st5481_release_b(struct st5481_bcs *bcs)
 {
 	DBG(4,"");
 

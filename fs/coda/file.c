@@ -102,7 +102,6 @@ int coda_open(struct inode *i, struct file *f)
 	struct coda_inode_info *cii;
 
 	lock_kernel();
-	ENTRY;
 	coda_vfs_stat.open++;
 
 	CDEBUG(D_SPECIAL, "OPEN inode number: %ld, count %d, flags %o.\n", 
@@ -140,7 +139,6 @@ int coda_open(struct inode *i, struct file *f)
 	       fh->f_dentry->d_inode->i_ino,
 	       atomic_read(&fh->f_dentry->d_inode->i_count),
                fh->f_dentry->d_inode->i_op);
-	EXIT;
 	unlock_kernel();
 	return 0;
 }
@@ -155,7 +153,6 @@ int coda_flush(struct file *file)
 	struct inode *cinode, *inode;
 	int err = 0, fcnt;
 
-	ENTRY;
 	coda_vfs_stat.flush++;
 
 	/* No need to make an upcall when we have not made any modifications
@@ -200,7 +197,6 @@ int coda_release(struct inode *i, struct file *f)
 	int err = 0;
 
 	lock_kernel();
-	ENTRY;
 	coda_vfs_stat.release++;
  
 	if (!use_coda_close) {
@@ -244,7 +240,6 @@ int coda_fsync(struct file *file, struct dentry *dentry, int datasync)
 	struct inode *cinode, *inode = dentry->d_inode;
 	struct coda_inode_info *cii = ITOC(inode);
 	int err = 0;
-	ENTRY;
 
 	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
 	      S_ISLNK(inode->i_mode)))

@@ -38,20 +38,26 @@ struct bio_vec {
 };
 
 /*
+ * weee, c forward decl...
+ */
+struct bio;
+typedef int (bio_end_io_t) (struct bio *, int);
+typedef void (bio_destructor_t) (struct bio *);
+
+/*
  * main unit of I/O for the block layer and lower layers (ie drivers and
  * stacking drivers)
  */
 struct bio {
 	sector_t		bi_sector;
 	struct bio		*bi_next;	/* request queue link */
-	atomic_t		bi_cnt;		/* pin count */
 	kdev_t			bi_dev;		/* will be block device */
 	unsigned long		bi_flags;	/* status, command, etc */
 	unsigned long		bi_rw;		/* bottom bits READ/WRITE,
 						 * top bits priority
 						 */
 
-	unsigned int		bi_vcnt;	/* how may bio_vec's */
+	unsigned int		bi_vcnt;	/* how many bio_vec's */
 	unsigned int		bi_idx;		/* current index into bvl_vec */
 	unsigned int		bi_size;	/* total size in bytes */
 	unsigned int		bi_max;		/* max bvl_vecs we can hold,
@@ -59,10 +65,12 @@ struct bio {
 
 	struct bio_vec		*bi_io_vec;	/* the actual vec list */
 
-	int (*bi_end_io)(struct bio *bio, int nr_sectors);
+	bio_end_io_t		*bi_end_io;
+	atomic_t		bi_cnt;		/* pin count */
+
 	void			*bi_private;
 
-	void (*bi_destructor)(struct bio *);	/* destructor */
+	bio_destructor_t	*bi_destructor;	/* destructor */
 };
 
 /*
@@ -83,13 +91,13 @@ struct bio {
  */
 #define BIO_RW		0
 #define BIO_RW_AHEAD	1
-#define BIO_BARRIER	2
+#define BIO_RW_BARRIER	2
 
 /*
  * various member access, note that bio_data should of course not be used
  * on highmem page vectors
  */
-#define bio_iovec_idx(bio, idx)	(&((bio)->bi_io_vec[(bio)->bi_idx]))
+#define bio_iovec_idx(bio, idx)	(&((bio)->bi_io_vec[(idx)]))
 #define bio_iovec(bio)		bio_iovec_idx((bio), (bio)->bi_idx)
 #define bio_page(bio)		bio_iovec((bio))->bv_page
 #define __bio_offset(bio, idx)	bio_iovec_idx((bio), (idx))->bv_offset
@@ -118,16 +126,13 @@ struct bio {
 /*
  * merge helpers etc
  */
-#define __BVEC_END(bio) bio_iovec_idx((bio), (bio)->bi_idx - 1)
+#define __BVEC_END(bio) bio_iovec_idx((bio), (bio)->bi_vcnt - 1)
 #define BIO_CONTIG(bio, nxt) \
-	(bvec_to_phys(__BVEC_END((bio)) + (bio)->bi_size) == bio_to_phys((nxt)))
+	(bvec_to_phys(__BVEC_END((bio))) + (bio)->bi_size == bio_to_phys((nxt)))
 #define __BIO_SEG_BOUNDARY(addr1, addr2, mask) \
 	(((addr1) | (mask)) == (((addr2) - 1) | (mask)))
 #define BIO_SEG_BOUNDARY(q, b1, b2) \
 	__BIO_SEG_BOUNDARY(bvec_to_phys(__BVEC_END((b1))), bio_to_phys((b2)) + (b2)->bi_size, (q)->seg_boundary_mask)
-
-typedef int (bio_end_io_t) (struct bio *, int);
-typedef void (bio_destructor_t) (struct bio *);
 
 #define bio_io_error(bio) bio_endio((bio), 0, bio_sectors((bio)))
 

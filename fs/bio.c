@@ -74,7 +74,7 @@ static inline struct bio *__bio_pool_get(void)
 	struct bio *bio;
 
 	if ((bio = bio_pool)) {
-		BUG_ON(bio_pool_free <= 0);
+		BIO_BUG_ON(bio_pool_free <= 0);
 		bio_pool = bio->bi_next;
 		bio->bi_next = NULL;
 		bio_pool_free--;
@@ -90,7 +90,7 @@ static inline struct bio *bio_pool_get(void)
 
 	spin_lock_irqsave(&bio_lock, flags);
 	bio = __bio_pool_get();
-	BUG_ON(!bio && bio_pool_free);
+	BIO_BUG_ON(!bio && bio_pool_free);
 	spin_unlock_irqrestore(&bio_lock, flags);
 
 	return bio;
@@ -121,8 +121,7 @@ static inline void bio_pool_put(struct bio *bio)
 	}
 }
 
-#define BIO_CAN_WAIT(gfp_mask)	\
-	(((gfp_mask) & (__GFP_WAIT | __GFP_IO)) == (__GFP_WAIT | __GFP_IO))
+#define BIO_CAN_WAIT(gfp_mask)	((gfp_mask) & __GFP_WAIT)
 
 static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, int *idx)
 {
@@ -198,13 +197,15 @@ void bio_destructor(struct bio *bio)
 {
 	struct biovec_pool *bp = &bvec_list[bio->bi_max];
 
-	BUG_ON(bio->bi_max >= BIOVEC_NR_POOLS);
+	BIO_BUG_ON(bio->bi_max >= BIOVEC_NR_POOLS);
 
 	/*
 	 * cloned bio doesn't own the veclist
 	 */
-	if (!(bio->bi_flags & (1 << BIO_CLONED)))
+	if (!(bio->bi_flags & (1 << BIO_CLONED))) {
 		kmem_cache_free(bp->bp_cachep, bio->bi_io_vec);
+		wake_up_nr(&bp->bp_wait, 1);
+	}
 
 	bio_pool_put(bio);
 }
@@ -212,13 +213,13 @@ void bio_destructor(struct bio *bio)
 inline void bio_init(struct bio *bio)
 {
 	bio->bi_next = NULL;
-	atomic_set(&bio->bi_cnt, 1);
 	bio->bi_flags = 0;
 	bio->bi_rw = 0;
 	bio->bi_vcnt = 0;
 	bio->bi_idx = 0;
 	bio->bi_size = 0;
 	bio->bi_end_io = NULL;
+	atomic_set(&bio->bi_cnt, 1);
 }
 
 static inline struct bio *__bio_alloc(int gfp_mask, bio_destructor_t *dest)
@@ -301,6 +302,7 @@ struct bio *bio_alloc(int gfp_mask, int nr_iovecs)
  */
 static inline void bio_free(struct bio *bio)
 {
+	bio->bi_next = NULL;
 	bio->bi_destructor(bio);
 }
 
@@ -314,16 +316,13 @@ static inline void bio_free(struct bio *bio)
  **/
 void bio_put(struct bio *bio)
 {
-	BUG_ON(!atomic_read(&bio->bi_cnt));
+	BIO_BUG_ON(!atomic_read(&bio->bi_cnt));
 
 	/*
 	 * last put frees it
 	 */
-	if (atomic_dec_and_test(&bio->bi_cnt)) {
-		BUG_ON(bio->bi_next);
-
+	if (atomic_dec_and_test(&bio->bi_cnt))
 		bio_free(bio);
-	}
 }
 
 /**
@@ -459,33 +458,10 @@ static int bio_end_io_page(struct bio *bio)
 static int bio_end_io_kio(struct bio *bio, int nr_sectors)
 {
 	struct kiobuf *kio = (struct kiobuf *) bio->bi_private;
-	int uptodate, done;
 
-	done = 0;
-	uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
-	do {
-		int sectors = bio->bi_io_vec[bio->bi_idx].bv_len >> 9;
-
-		nr_sectors -= sectors;
-
-		bio->bi_idx++;
-
-		done = !end_kio_request(kio, uptodate);
-
-		if (bio->bi_idx == bio->bi_vcnt)
-			done = 1;
-
-	} while (!done && nr_sectors > 0);
-
-	/*
-	 * all done
-	 */
-	if (done) {
-		bio_put(bio);
-		return 0;
-	}
-
-	return 1;
+	end_kio_request(kio, test_bit(BIO_UPTODATE, &bio->bi_flags));
+	bio_put(bio);
+	return 0;
 }
 
 /*
@@ -553,7 +529,7 @@ void ll_rw_kio(int rw, struct kiobuf *kio, kdev_t dev, sector_t sector)
 	max_bytes = get_max_sectors(dev) << 9;
 	max_segments = get_max_segments(dev);
 	if ((max_bytes >> PAGE_SHIFT) < (max_segments + 1))
-		max_segments = (max_bytes >> PAGE_SHIFT) + 1;
+		max_segments = (max_bytes >> PAGE_SHIFT);
 
 	if (max_segments > BIO_MAX_PAGES)
 		max_segments = BIO_MAX_PAGES;
@@ -566,14 +542,12 @@ void ll_rw_kio(int rw, struct kiobuf *kio, kdev_t dev, sector_t sector)
 	offset = kio->offset & ~PAGE_MASK;
 	size = kio->length;
 
-	/*
-	 * set I/O count to number of pages for now
-	 */
-	atomic_set(&kio->io_count, total_nr_pages);
+	atomic_set(&kio->io_count, 1);
 
 	map_i = 0;
 
 next_chunk:
+	atomic_inc(&kio->io_count);
 	if ((nr_pages = total_nr_pages) > max_segments)
 		nr_pages = max_segments;
 
@@ -638,6 +612,8 @@ queue_io:
 out:
 	if (err)
 		kio->errno = err;
+
+	end_kio_request(kio, !err);
 }
 
 int bio_endio(struct bio *bio, int uptodate, int nr_sectors)

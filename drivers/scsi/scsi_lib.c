@@ -72,13 +72,12 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
 
 	ASSERT_LOCK(&q->queue_lock, 0);
 
-	rq->cmd = SPECIAL;
+	rq->flags = REQ_SPECIAL | REQ_NOMERGE | REQ_BARRIER;
 	rq->special = data;
 	rq->q = NULL;
 	rq->bio = rq->biotail = NULL;
 	rq->nr_segments = 0;
 	rq->elevator_sequence = 0;
-	rq->inactive = 0;
 
 	/*
 	 * We have the option of inserting the head or the tail of the queue.
@@ -262,6 +261,9 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 		 * the bad sector.
 		 */
 		SCpnt->request.special = (void *) SCpnt;
+#if 0
+		SCpnt->request.flags |= REQ_SPECIAL;
+#endif
 		list_add(&SCpnt->request.queuelist, &q->queue_head);
 	}
 
@@ -544,7 +546,7 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 		if (bbpnt) {
 			for (i = 0; i < SCpnt->use_sg; i++) {
 				if (bbpnt[i]) {
-					if (SCpnt->request.cmd == READ) {
+					if (rq_data_dir(req) == READ) {
 						memcpy(bbpnt[i],
 						       sgpnt[i].address,
 						       sgpnt[i].length);
@@ -556,7 +558,7 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 		scsi_free(SCpnt->buffer, SCpnt->sglist_len);
 	} else {
 		if (SCpnt->buffer != req->buffer) {
-			if (req->cmd == READ) {
+			if (rq_data_dir(req) == READ) {
 				unsigned long flags;
 				char *to = bio_kmap_irq(req->bio, &flags);
 
@@ -901,8 +903,7 @@ void scsi_request_fn(request_queue_t * q)
 			break;
 
 		/*
-		 * get next queueable request. cur_rq would be set if we
-		 * previously had to abort for some reason
+		 * get next queueable request.
 		 */
 		req = elv_next_request(q);
 
@@ -916,7 +917,7 @@ void scsi_request_fn(request_queue_t * q)
 		 * these two cases differently.  We differentiate by looking
 		 * at request.cmd, as this tells us the real story.
 		 */
-		if (req->cmd == SPECIAL) {
+		if (req->flags & REQ_SPECIAL) {
 			STpnt = NULL;
 			SCpnt = (Scsi_Cmnd *) req->special;
 			SRpnt = (Scsi_Request *) req->special;
@@ -929,7 +930,7 @@ void scsi_request_fn(request_queue_t * q)
 				scsi_init_cmd_from_req(SCpnt, SRpnt);
 			}
 
-		} else {
+		} else if (req->flags & REQ_CMD) {
 			SRpnt = NULL;
 			STpnt = scsi_get_request_dev(req);
 			if (!STpnt) {
@@ -938,7 +939,7 @@ void scsi_request_fn(request_queue_t * q)
 			/*
 			 * Now try and find a command block that we can use.
 			 */
-			if( req->special != NULL ) {
+			if (req->special) {
 				SCpnt = (Scsi_Cmnd *) req->special;
 				/*
 				 * We need to recount the number of
@@ -959,6 +960,9 @@ void scsi_request_fn(request_queue_t * q)
 			 */
 			if (!SCpnt)
 				break;
+		} else {
+			blk_dump_rq_flags(req, "SCSI bad req");
+			break;
 		}
 
 		/*
@@ -997,7 +1001,7 @@ void scsi_request_fn(request_queue_t * q)
 		req = NULL;
 		spin_unlock_irq(&q->queue_lock);
 
-		if (SCpnt->request.cmd != SPECIAL) {
+		if (SCpnt->request.flags & REQ_CMD) {
 			/*
 			 * This will do a couple of things:
 			 *  1) Fill in the actual SCSI command.
@@ -1010,9 +1014,9 @@ void scsi_request_fn(request_queue_t * q)
 			 * some kinds of consistency checking may cause the	
 			 * request to be rejected immediately.
 			 */
-			if (STpnt == NULL) {
-				STpnt = scsi_get_request_dev(req);
-			}
+			if (STpnt == NULL)
+				STpnt = scsi_get_request_dev(&SCpnt->request);
+
 			/* 
 			 * This sets up the scatter-gather table (allocating if
 			 * required).  Hosts that need bounce buffers will also

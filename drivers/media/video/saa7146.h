@@ -74,7 +74,6 @@ struct saa7146
         unsigned int nr;
 	unsigned long irq;          /* IRQ used by SAA7146 card */
 	unsigned short id;
-	struct i2c_bus i2c;
 	struct pci_dev *dev;
 	unsigned char revision;
 	unsigned char boardcfg[64];	/* 64 bytes of config from eeprom */

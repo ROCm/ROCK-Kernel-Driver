@@ -359,7 +359,6 @@ int coda_upcall_stats_get_info( char * buffer, char ** start, off_t offset,
 	char tmpbuf[80];
 	int tmplen = 0;
 
-	ENTRY;
 	/* this works as long as we are below 1024 characters! */
 	if ( offset < 80 ) 
 		len += sprintf( buffer,"%-79s\n",	"Coda upcall statistics");
@@ -392,7 +391,7 @@ int coda_upcall_stats_get_info( char * buffer, char ** start, off_t offset,
 		len = length;
 	if ( len < 0 )
 		len = 0;
-	EXIT;
+
 	return len;
 }
 

@@ -1149,6 +1149,16 @@ S: 77 Clarence Mews
 S: London SE16 1GD
 S: United Kingdom
 
+N: Jan Harkes
+E: jaharkes@cs.cmu.edu
+W: http://www.coda.cs.cmu.edu/
+D: Coda file system
+S: Computer Science Department
+S: Carnegie Mellon University
+S: 5000 Forbes Avenue
+S: Pittsburgh, Pennsylvania 15213
+S: USA
+
 N: Kai Harrekilde-Petersen
 E: kai.harrekilde@get2net.dk
 D: Original author of the ftape-HOWTO, i82078 fdc detection code.

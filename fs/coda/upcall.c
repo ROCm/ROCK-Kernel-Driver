@@ -80,7 +80,6 @@ int venus_rootfid(struct super_block *sb, ViceFid *fidp)
         union inputArgs *inp;
         union outputArgs *outp;
         int insize, outsize, error;
-	ENTRY;
 
         insize = SIZE(root);
         UPARG(CODA_ROOT);
@@ -96,7 +95,6 @@ int venus_rootfid(struct super_block *sb, ViceFid *fidp)
 	}
 
 	CODA_FREE(inp, insize);
-        EXIT;
 	return error;
 }
 
@@ -106,7 +104,6 @@ int venus_getattr(struct super_block *sb, struct ViceFid *fid,
         union inputArgs *inp;
         union outputArgs *outp;
         int insize, outsize, error;
-	ENTRY;
 
         insize = SIZE(getattr); 
 	UPARG(CODA_GETATTR);
@@ -117,7 +114,6 @@ int venus_getattr(struct super_block *sb, struct ViceFid *fid,
 	*attr = outp->coda_getattr.attr;
 
 	CODA_FREE(inp, insize);
-        EXIT;
         return error;
 }
 
@@ -432,7 +428,6 @@ int venus_readlink(struct super_block *sb, struct ViceFid *fid,
 	}
         
         CDEBUG(D_INODE, " result %d\n",error);
-        EXIT;
         CODA_FREE(inp, insize);
         return error;
 }
@@ -462,7 +457,6 @@ int venus_link(struct super_block *sb, struct ViceFid *fid,
         error = coda_upcall(coda_sbp(sb), insize, &outsize, inp);
 
         CDEBUG(D_INODE, " result %d\n",error);
-        EXIT;
 	CODA_FREE(inp, insize);
         return error;
 }
@@ -499,7 +493,6 @@ int venus_symlink(struct super_block *sb, struct ViceFid *fid,
 	error = coda_upcall(coda_sbp(sb), insize, &outsize, inp);
 
         CDEBUG(D_INODE, " result %d\n",error);
-        EXIT;
 	CODA_FREE(inp, insize);
         return error;
 }
@@ -536,7 +529,6 @@ int venus_access(struct super_block *sb, struct ViceFid *fid, int mask)
 	error = coda_upcall(coda_sbp(sb), insize, &outsize, inp);
 
 	CODA_FREE(inp, insize);
-        EXIT;
 	return error;
 }
 
@@ -633,7 +625,6 @@ int venus_statfs(struct super_block *sb, struct statfs *sfs)
 	}
 
         CDEBUG(D_INODE, " result %d\n",error);
-        EXIT;
         CODA_FREE(inp, insize);
         return error;
 }
@@ -721,8 +712,6 @@ static int coda_upcall(struct coda_sb_info *sbi,
 	union outputArgs *out;
 	struct upc_req *req;
 	int error = 0;
-
-	ENTRY;
 
 	vcommp = sbi->sbi_vcomm;
 	if ( !vcommp->vc_inuse ) {

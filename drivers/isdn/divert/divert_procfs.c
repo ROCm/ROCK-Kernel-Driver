@@ -168,7 +168,7 @@ isdn_divert_close(struct inode *ino, struct file *filep)
 			divert_info_head = divert_info_head->next;
 			kfree(inf);
 		}
-	spin_unlock_irq( &divert_info_lock, flags );
+	spin_unlock_irqrestore( &divert_info_lock, flags );
 	return (0);
 }				/* isdn_divert_close */
 
@@ -261,6 +261,7 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 #ifdef CONFIG_PROC_FS
 static struct file_operations isdn_fops =
 {
+	owner:          THIS_MODULE,
 	llseek:         no_llseek,
 	read:           isdn_divert_read,
 	write:          isdn_divert_write,

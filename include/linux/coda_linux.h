@@ -92,12 +92,6 @@ void coda_sysctl_clean(void);
     printk(format, ## a); }                                       \
 } while (0)
 
-#define ENTRY    \
-    if(coda_print_entry) printk("Process %d entered %s\n",current->pid,__FUNCTION__)
-
-#define EXIT    \
-    if(coda_print_entry) printk("Process %d leaving %s\n",current->pid,__FUNCTION__)
-
 #define CODA_ALLOC(ptr, cast, size)                                       \
 do {                                                                      \
     if (size < PAGE_SIZE) {                                               \

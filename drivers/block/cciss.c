@@ -1252,9 +1252,9 @@ queue:
 	c->Request.Type.Type =  TYPE_CMD; // It is a command. 
 	c->Request.Type.Attribute = ATTR_SIMPLE; 
 	c->Request.Type.Direction = 
-		(creq->cmd == READ) ? XFER_READ: XFER_WRITE; 
+		(rq_data_dir(creq) == READ) ? XFER_READ: XFER_WRITE; 
 	c->Request.Timeout = 0; // Don't time out	
-	c->Request.CDB[0] = (creq->cmd == READ) ? CCISS_READ : CCISS_WRITE;
+	c->Request.CDB[0] = (rq_data_dir(creq) == READ) ? CCISS_READ : CCISS_WRITE;
 	start_blk = creq->sector;
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "ciss: sector =%d nr_sectors=%d\n",(int) creq->sector,
@@ -1869,7 +1869,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
         blk_init_queue(q, do_cciss_request);
         blk_queue_headactive(q, 0);		
 	blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
-	q->max_segments = MAXSGENTRIES;
+	blk_queue_max_segments(q, MAXSGENTRIES);
 	blk_queue_max_sectors(q, 512);
 
 	/* fill in the other Kernel structs */

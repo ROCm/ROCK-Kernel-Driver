@@ -285,6 +285,14 @@ P:	Nils Faerber (port to kernel 2.4)
 M:	Nils Faerber <nils@kernelconcepts.de>
 S:	Maintained
 
+CODA FILE SYSTEM
+P:	Jan Harkes
+M:	jaharkes@cs.cmu.edu
+M:	coda@cs.cmu.edu
+L:	codalist@coda.cs.cmu.edu
+W:	http://www.coda.cs.cmu.edu/
+S:	Maintained
+
 COMPAQ FIBRE CHANNEL 64-bit/66MHz PCI non-intelligent HBA
 P:      Amy Vanzant-Hodge 
 M:      Amy Vanzant-Hodge (fibrechannel@compaq.com)

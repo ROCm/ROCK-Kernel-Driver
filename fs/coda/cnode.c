@@ -102,8 +102,6 @@ int coda_cnode_make(struct inode **inode, ViceFid *fid, struct super_block *sb)
         struct coda_vattr attr;
         int error;
         
-        ENTRY;
-
 	/* We get inode numbers from Venus -- see venus source */
 	error = venus_getattr(sb, fid, &attr);
 	if ( error ) {
@@ -111,21 +109,18 @@ int coda_cnode_make(struct inode **inode, ViceFid *fid, struct super_block *sb)
 		   "coda_cnode_make: coda_getvattr returned %d for %s.\n", 
 		   error, coda_f2s(fid));
 	    *inode = NULL;
-	    EXIT;
 	    return error;
 	} 
 
 	*inode = coda_iget(sb, fid, &attr);
 	if ( IS_ERR(*inode) ) {
 		printk("coda_cnode_make: coda_iget failed\n");
-		EXIT;
                 return PTR_ERR(*inode);
         }
 
 	CDEBUG(D_DOWNCALL, "Done making inode: ino %ld, count %d with %s\n",
 		(*inode)->i_ino, atomic_read(&(*inode)->i_count), 
 		coda_f2s(&ITOC(*inode)->c_fid));
-        EXIT;
 	return 0;
 }
 
@@ -154,7 +149,6 @@ struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb)
 	ino_t nr;
 	struct inode *inode;
 	struct coda_inode_info *cii;
-	ENTRY;
 
 	if ( !sb ) {
 		printk("coda_fid_to_inode: no sb!\n");

@@ -247,7 +247,7 @@
 
 /* Define this to remove _all_ the debugging messages */
 /* #define ERRLOGMASK CD_NOTHING */
-#define ERRLOGMASK (CD_WARNING)
+#define ERRLOGMASK CD_WARNING
 /* #define ERRLOGMASK (CD_WARNING|CD_OPEN|CD_COUNT_TRACKS|CD_CLOSE) */
 /* #define ERRLOGMASK (CD_WARNING|CD_REG_UNREG|CD_DO_IOCTL|CD_OPEN|CD_CLOSE|CD_COUNT_TRACKS) */
 

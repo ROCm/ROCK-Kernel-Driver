@@ -29,7 +29,6 @@
 void coda_cache_enter(struct inode *inode, int mask)
 {
 	struct coda_inode_info *cii = ITOC(inode);
-        ENTRY;
 
         if ( !coda_cred_ok(&cii->c_cached_cred) ) {
                 coda_load_creds(&cii->c_cached_cred);
@@ -42,7 +41,6 @@ void coda_cache_enter(struct inode *inode, int mask)
 void coda_cache_clear_inode(struct inode *inode)
 {
 	struct coda_inode_info *cii = ITOC(inode);
-	ENTRY;
         cii->c_cached_perm = 0;
 }
 
@@ -53,7 +51,6 @@ void coda_cache_clear_all(struct super_block *sb, struct coda_cred *cred)
         struct coda_inode_info *cii;
         struct list_head *tmp;
 
-        ENTRY;
         sbi = coda_sbp(sb);
         if (!sbi) BUG();
 
@@ -119,7 +116,6 @@ void coda_flag_inode_children(struct inode *inode, int flag)
 {
 	struct dentry *alias_de;
 
-	ENTRY;
 	if ( !inode || !S_ISDIR(inode->i_mode)) 
 		return; 
 

@@ -149,7 +149,8 @@ get_partition_list(char *page, char **start, off_t offset, int count)
 	char buf[64];
 	int len, n;
 
-	len = sprintf(page, "major minor  #blocks  name\n\n");
+	len = sprintf(page, "major minor   #blocks  start_sect   nr_sects  "
+			"name\n\n");
 	read_lock(&gendisk_lock);
 	for (gp = gendisk_head; gp; gp = gp->next) {
 		for (n = 0; n < (gp->nr_real << gp->minor_shift); n++) {
@@ -157,8 +158,10 @@ get_partition_list(char *page, char **start, off_t offset, int count)
 				continue;
 
 			len += snprintf(page + len, 63,
-					"%4d  %4d %10d %s\n",
+					"%4d  %4d %10d  %10lu %10lu  %s\n",
 					gp->major, n, gp->sizes[n],
+					gp->part[n].start_sect,
+					gp->part[n].nr_sects,
 					disk_name(gp, n, buf));
 			if (len < offset)
 				offset -= len, len = 0;

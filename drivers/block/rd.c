@@ -485,7 +485,6 @@ static struct block_device_operations rd_bd_op = {
 	ioctl:		rd_ioctl,
 };
 
-#ifdef MODULE
 /* Before freeing the module, invalidate all of the protected buffers! */
 static void __exit rd_cleanup (void)
 {
@@ -503,7 +502,6 @@ static void __exit rd_cleanup (void)
 	unregister_blkdev( MAJOR_NR, "ramdisk" );
 	blk_clear(MAJOR_NR);
 }
-#endif
 
 /* This is the registration and initialization section of the RAM disk driver */
 int __init rd_init (void)

@@ -2319,7 +2319,7 @@ static void request_done(int uptodate)
 			DPRINT("request list destroyed in floppy request done\n");
 
 	} else {
-		if (CURRENT->cmd == WRITE) {
+		if (rq_data_dir(CURRENT) == WRITE) {
 			/* record write error information */
 			DRWE->write_errors++;
 			if (DRWE->write_errors == 1) {
@@ -2621,10 +2621,10 @@ static int make_raw_rw_request(void)
 	raw_cmd->flags = FD_RAW_SPIN | FD_RAW_NEED_DISK | FD_RAW_NEED_DISK |
 		FD_RAW_NEED_SEEK;
 	raw_cmd->cmd_count = NR_RW;
-	if (CURRENT->cmd == READ){
+	if (rq_data_dir(CURRENT) == READ) {
 		raw_cmd->flags |= FD_RAW_READ;
 		COMMAND = FM_MODE(_floppy,FD_READ);
-	} else if (CURRENT->cmd == WRITE){
+	} else if (rq_data_dir(CURRENT) == WRITE){
 		raw_cmd->flags |= FD_RAW_WRITE;
 		COMMAND = FM_MODE(_floppy,FD_WRITE);
 	} else {
@@ -2974,7 +2974,7 @@ static void do_fd_request(request_queue_t * q)
 
 	if (usage_count == 0) {
 		printk("warning: usage count=0, CURRENT=%p exiting\n", CURRENT);
-		printk("sect=%ld cmd=%d\n", CURRENT->sector, CURRENT->cmd);
+		printk("sect=%ld flags=%lx\n", CURRENT->sector, CURRENT->flags);
 		return;
 	}
 	if (fdc_busy){

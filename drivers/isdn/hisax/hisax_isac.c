@@ -601,7 +601,7 @@ static inline void isac_exi_interrupt(struct isac *isac)
 	}
 }
 
-void isac_interrupt(struct isac *isac)
+void isac_irq(struct isac *isac)
 {
 	unsigned char val;
 
@@ -741,7 +741,7 @@ static inline void isacsx_icd_interrupt(struct isac *isac)
 	}
 }
 
-void isacsx_interrupt(struct isac *isac)
+void isacsx_irq(struct isac *isac)
 {
 	unsigned char val;
 
@@ -887,10 +887,10 @@ EXPORT_SYMBOL(isac_init);
 EXPORT_SYMBOL(isac_d_l2l1);
 
 EXPORT_SYMBOL(isacsx_setup);
-EXPORT_SYMBOL(isacsx_interrupt);
+EXPORT_SYMBOL(isacsx_irq);
 
 EXPORT_SYMBOL(isac_setup);
-EXPORT_SYMBOL(isac_interrupt);
+EXPORT_SYMBOL(isac_irq);
 
 module_init(hisax_isac_init);
 module_exit(hisax_isac_exit);

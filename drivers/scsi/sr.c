@@ -388,7 +388,12 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 		return 0;
 	}
 
-	if ((SCpnt->request.cmd == WRITE) && !scsi_CDs[dev].device->writeable)
+	if (!(SCpnt->request.flags & REQ_CMD)) {
+		blk_dump_rq_flags(&SCpnt->request, "sr unsup command");
+		return 0;
+	}
+
+	if (rq_data_dir(&SCpnt->request) == WRITE && !scsi_CDs[dev].device->writeable)
 		return 0;
 
 	/*
@@ -408,7 +413,18 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 		return 0;
 	}
 
-	block = SCpnt->request.sector / (s_size >> 9);
+	if (rq_data_dir(&SCpnt->request) == WRITE) {
+		if (!scsi_CDs[dev].device->writeable)
+			return 0;
+		SCpnt->cmnd[0] = WRITE_10;
+		SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+	} else if (rq_data_dir(&SCpnt->request) == READ) {
+		SCpnt->cmnd[0] = READ_10;
+		SCpnt->sc_data_direction = SCSI_DATA_READ;
+	} else {
+		blk_dump_rq_flags(&SCpnt->request, "Unknown sr command");
+		return 0;
+	}
 
 	/*
 	 * request doesn't start on hw block boundary, add scatter pads
@@ -419,19 +435,6 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 
 	this_count = (SCpnt->request_bufflen >> 9) / (s_size >> 9);
 
-	switch (SCpnt->request.cmd) {
-	case WRITE:
-		SCpnt->cmnd[0] = WRITE_10;
-		SCpnt->sc_data_direction = SCSI_DATA_WRITE;
-		break;
-	case READ:
-		SCpnt->cmnd[0] = READ_10;
-		SCpnt->sc_data_direction = SCSI_DATA_READ;
-		break;
-	default:
-		printk("Unknown sr command %d\n", SCpnt->request.cmd);
-		return 0;
-	}
 
 	SCSI_LOG_HLQUEUE(2, printk("sr%d : %s %d/%ld 512 byte blocks.\n",
                                    devm,
@@ -440,6 +443,8 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 
 	SCpnt->cmnd[1] = (SCpnt->device->scsi_level <= SCSI_2) ?
 			 ((SCpnt->lun << 5) & 0xe0) : 0;
+
+	block = SCpnt->request.sector / (s_size >> 9);
 
 	if (this_count > 0xffff)
 		this_count = 0xffff;
