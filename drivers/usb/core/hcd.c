@@ -446,8 +446,13 @@ error:
 	}
 	if (urb->status) {
 		urb->actual_length = 0;
-		dev_dbg (hcd->self.controller, "CTRL: TypeReq=0x%x val=0x%x idx=0x%x len=%d ==> %d\n",
-			typeReq, wValue, wIndex, wLength, urb->status);
+		if (urb->status != -EPIPE) {
+			dev_dbg (hcd->self.controller,
+				"CTRL: TypeReq=0x%x val=0x%x "
+				"idx=0x%x len=%d ==> %d\n",
+				typeReq, wValue, wIndex,
+				wLength, urb->status);
+		}
 	}
 	if (bufp) {
 		if (urb->transfer_buffer_length < len)

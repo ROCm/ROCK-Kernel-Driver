@@ -411,6 +411,8 @@ static int releaseintf(struct dev_state *ps, unsigned int ifnum)
 
 static int checkintf(struct dev_state *ps, unsigned int ifnum)
 {
+	if (ps->dev->state != USB_STATE_CONFIGURED)
+		return -EHOSTUNREACH;
 	if (ifnum >= 8*sizeof(ps->ifclaimed))
 		return -EINVAL;
 	if (test_bit(ifnum, &ps->ifclaimed))
@@ -450,6 +452,8 @@ static int check_ctrlrecip(struct dev_state *ps, unsigned int requesttype, unsig
 {
 	int ret = 0;
 
+	if (ps->dev->state != USB_STATE_CONFIGURED)
+		return -EHOSTUNREACH;
 	if (USB_TYPE_VENDOR == (USB_TYPE_MASK & requesttype))
 		return 0;
 
@@ -595,7 +599,7 @@ static int proc_control(struct dev_state *ps, void __user *arg)
 		usb_lock_device(dev);
 	}
 	free_page((unsigned long)tbuf);
-	if (i<0) {
+	if (i<0 && i != -EPIPE) {
 		dev_printk(KERN_DEBUG, &dev->dev, "usbfs: USBDEVFS_CONTROL "
 			   "failed cmd %s rqt %u rq %u len %u ret %d\n",
 			   current->comm, ctrl.bRequestType, ctrl.bRequest,
@@ -1131,7 +1135,7 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 	}
 
 	if (ps->dev->state != USB_STATE_CONFIGURED)
-		retval = -ENODEV;
+		retval = -EHOSTUNREACH;
 	else if (!(intf = usb_ifnum_to_if (ps->dev, ctrl.ifno)))
                retval = -EINVAL;
 	else switch (ctrl.ioctl_code) {
