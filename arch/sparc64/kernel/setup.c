@@ -688,6 +688,7 @@ static int __init topology_init(void)
 	sparc64_cpus = kmalloc(NR_CPUS * sizeof(struct cpu), GFP_KERNEL);
 	if (!sparc64_cpus)
 		return -ENOMEM;
+	memset(sparc64_cpus, 0, NR_CPUS * sizeof(struct cpu));
 	for (i = 0; i < NR_CPUS; i++) {
 		if (cpu_possible(i))
 			register_cpu(&sparc64_cpus[i], i, NULL);

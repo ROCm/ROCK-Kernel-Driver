@@ -1,6 +1,7 @@
 #undef DEBUG
 
 extern struct semaphore device_sem;
+extern struct semaphore devclass_sem;
 
 extern int bus_add_device(struct device * dev);
 extern void bus_remove_device(struct device * dev);

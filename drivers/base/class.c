@@ -13,6 +13,8 @@
 #define to_class_attr(_attr) container_of(_attr,struct devclass_attribute,attr)
 #define to_class(obj) container_of(obj,struct device_class,subsys.kset.kobj)
 
+DECLARE_MUTEX(devclass_sem);
+
 static ssize_t
 devclass_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 {
@@ -163,29 +165,34 @@ int devclass_add_device(struct device * dev)
 	struct device_class * cls;
 	int error = 0;
 
+	down(&devclass_sem);
 	if (dev->driver) {
 		cls = get_devclass(dev->driver->devclass);
-		if (cls) {
-			down_write(&cls->subsys.rwsem);
-			pr_debug("device class %s: adding device %s\n",
-				 cls->name,dev->name);
-			if (cls->add_device) 
-				error = cls->add_device(dev);
-			if (!error) {
-				enum_device(cls,dev);
-				interface_add_dev(dev);
-			}
 
-			list_add_tail(&dev->class_list,&cls->devices.list);
+		if (!cls)
+			goto Done;
 
-			/* notify userspace (call /sbin/hotplug) */
-			class_hotplug (dev, "add");
-
-			up_write(&cls->subsys.rwsem);
-			if (error)
-				put_devclass(cls);
+		pr_debug("device class %s: adding device %s\n",
+			 cls->name,dev->name);
+		if (cls->add_device) 
+			error = cls->add_device(dev);
+		if (error) {
+			put_devclass(cls);
+			goto Done;
 		}
+
+		down_write(&cls->subsys.rwsem);
+		enum_device(cls,dev);
+		list_add_tail(&dev->class_list,&cls->devices.list);
+		/* notify userspace (call /sbin/hotplug) */
+		class_hotplug (dev, "add");
+
+		up_write(&cls->subsys.rwsem);
+
+		interface_add_dev(dev);
 	}
+ Done:
+	up(&devclass_sem);
 	return error;
 }
 
@@ -193,26 +200,33 @@ void devclass_remove_device(struct device * dev)
 {
 	struct device_class * cls;
 
+	down(&devclass_sem);
 	if (dev->driver) {
 		cls = dev->driver->devclass;
-		if (cls) {
-			down_write(&cls->subsys.rwsem);
-			pr_debug("device class %s: removing device %s\n",
-				 cls->name,dev->name);
-			interface_remove_dev(dev);
-			unenum_device(cls,dev);
+		if (!cls) 
+			goto Done;
 
-			list_del(&dev->class_list);
+		interface_remove_dev(dev);
 
-			/* notify userspace (call /sbin/hotplug) */
-			class_hotplug (dev, "remove");
+		down_write(&cls->subsys.rwsem);
+		pr_debug("device class %s: removing device %s\n",
+			 cls->name,dev->name);
 
-			if (cls->remove_device)
-				cls->remove_device(dev);
-			up_write(&cls->subsys.rwsem);
-			put_devclass(cls);
-		}
+		unenum_device(cls,dev);
+
+		list_del(&dev->class_list);
+
+		/* notify userspace (call /sbin/hotplug) */
+		class_hotplug (dev, "remove");
+
+		up_write(&cls->subsys.rwsem);
+
+		if (cls->remove_device)
+			cls->remove_device(dev);
+		put_devclass(cls);
 	}
+ Done:
+	up(&devclass_sem);
 }
 
 struct device_class * get_devclass(struct device_class * cls)
@@ -252,12 +266,10 @@ void devclass_unregister(struct device_class * cls)
 	subsystem_unregister(&cls->subsys);
 }
 
-static int __init class_subsys_init(void)
+int __init classes_init(void)
 {
 	return subsystem_register(&class_subsys);
 }
-
-core_initcall(class_subsys_init);
 
 EXPORT_SYMBOL(devclass_create_file);
 EXPORT_SYMBOL(devclass_remove_file);

@@ -73,7 +73,7 @@ extern void kset_unregister(struct kset * k);
 
 static inline struct kset * to_kset(struct kobject * kobj)
 {
-	return container_of(kobj,struct kset,kobj);
+	return kobj ? container_of(kobj,struct kset,kobj) : NULL;
 }
 
 static inline struct kset * kset_get(struct kset * k)

@@ -41,9 +41,29 @@ void platform_device_unregister(struct platform_device * pdev)
 	if (pdev)
 		device_unregister(&pdev->dev);
 }
-	
+
+
+/**
+ *	platform_match - bind platform device to platform driver.
+ *	@dev:	device.
+ *	@drv:	driver.
+ *
+ *	Platform device IDs are assumed to be encoded like this: 
+ *	"<name><instance>", where <name> is a short description of the 
+ *	type of device, like "pci" or "floppy", and <instance> is the 
+ *	enumerated instance of the device, like '0' or '42'.
+ *	Driver IDs are simply "<name>". 
+ *	So, extract the <name> from the device, and compare it against 
+ *	the name of the driver. Return whether they match or not.
+ */
+
 static int platform_match(struct device * dev, struct device_driver * drv)
 {
+	char name[BUS_ID_SIZE];
+
+	if (sscanf(dev->bus_id,"%s",name))
+		return (strcmp(name,drv->name) == 0);
+
 	return 0;
 }
 
@@ -52,13 +72,11 @@ struct bus_type platform_bus_type = {
 	.match		= platform_match,
 };
 
-static int __init platform_bus_init(void)
+int __init platform_bus_init(void)
 {
 	device_register(&legacy_bus);
 	return bus_register(&platform_bus_type);
 }
-
-postcore_initcall(platform_bus_init);
 
 EXPORT_SYMBOL(platform_device_register);
 EXPORT_SYMBOL(platform_device_unregister);

@@ -27,30 +27,6 @@
  * driver. It also registers as a SCSI lower-level driver in order to accept
  * SCSI commands for transport using SBP-2.
  *
- *
- * Driver Loading:
- *
- * Currently, the SBP-2 driver is supported only as a module. Because the 
- * Linux SCSI stack is not Plug-N-Play aware, module load order is 
- * important. Assuming the SCSI core drivers are either built into the 
- * kernel or already loaded as modules, you should load the IEEE-1394 modules 
- * in the following order:
- *
- * 	ieee1394 (e.g. insmod ieee1394)
- *	ohci1394 (e.g. insmod ohci1394)
- *	sbp2 (e.g. insmod sbp2)
- *
- * The SBP-2 driver will attempt to discover any attached SBP-2 devices when first
- * loaded, or after any IEEE-1394 bus reset (e.g. a hot-plug). It will then print 
- * out a debug message indicating if it was able to discover a SBP-2 device.
- *
- * Currently, the SBP-2 driver will catch any attached SBP-2 devices during the
- * initial scsi bus scan (when the driver is first loaded). To add or remove
- * SBP-2 devices "after" this initial scan (i.e. if you plug-in or un-plug a 
- * device after the SBP-2 driver is loaded), you must either use the scsi procfs
- * add-single-device, remove-single-device, or a shell script such as 
- * rescan-scsi-bus.sh.
- *
  * The easiest way to add/detect new SBP-2 devices is to run the shell script
  * rescan-scsi-bus.sh (or re-load the SBP-2 driver). This script may be 
  * found at:
@@ -135,14 +111,6 @@
  *
  *	- Error Handling: SCSI aborts and bus reset requests are handled somewhat
  *	  but the code needs additional debugging.
- *
- *	- Module: The SBP-2 driver is currently only supported as a module. It would not take
- *	  much work to allow it to be compiled into the kernel, but you'd have to 
- *	  add some init code to the kernel to support this... and modules are much
- *	  more flexible anyway.   ;-)
- *
- *	- Hot-plugging: Interaction with the SCSI stack and support for hot-plugging could
- *	  stand some improvement.
  *
  *
  * History:
@@ -295,10 +263,11 @@
  *	04/23/02 - Fix for Sony CD-ROM drives. Only send fetch agent reset to sbp2 device if it
  *		   returns the dead bit in status. Thanks to Chandan (chandan@toad.net) for this one.
  *	04/27/02 - Fix sbp2 login problem on SMP systems, enable real spinlocks by default. (JSG)
- *	06/09/02 - Don't force 36-bute SCSI inquiry, but leave in a define for badly behaved devices. (JSG)   
+ *	06/09/02 - Don't force 36-byte SCSI inquiry, but leave in a define for badly behaved devices. (JSG)   
  *	02/04/03 - Fixed a SMP deadlock (don't hold sbp2_command_lock while calling sbp2scsi_complete_command).
  *		   Also save/restore irq flags in sbp2scsi_complete_command  - Sancho Dauskardt <sda@bdit.de>
  *	02/06/03 - Removed spinlock debugging; use kernel stuff instead (sda)
+ *	02/10/03 - Adopt to new hot-plug aware SCSI inferface (hch@lst.de)
  *
  */
 
@@ -350,7 +319,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 779 $ James Goodwin <jamesg@filanet.com>";
+	"$Rev: 797 $ James Goodwin <jamesg@filanet.com>";
 
 /*
  * Module load parameter definitions
@@ -497,6 +466,15 @@ static u32 global_outstanding_dmas = 0;
  * Globals
  */
 
+static void sbp2scsi_complete_all_commands(struct sbp2scsi_host_info *hi,
+					   struct scsi_id_instance_data *scsi_id,
+					   u32 status);
+
+static void sbp2scsi_complete_command(struct sbp2scsi_host_info *hi,
+				      struct scsi_id_instance_data *scsi_id,
+				      u32 scsi_status, Scsi_Cmnd *SCpnt,
+				      void (*done)(Scsi_Cmnd *));
+	
 static Scsi_Host_Template scsi_driver_template;
 
 static u8 sbp2_speedto_maxrec[] = { 0x7, 0x8, 0x9 };
@@ -822,7 +800,7 @@ static void sbp2util_free_command_dma(struct sbp2_command_info *command)
 {
 	struct sbp2scsi_host_info *hi;
 	
-	hi = (struct sbp2scsi_host_info *) command->Current_SCpnt->device->host->hostdata[0];
+	hi = (struct sbp2scsi_host_info *)&command->Current_SCpnt->device->host->hostdata;
 
 	if (hi == NULL) {
 		printk(KERN_ERR "%s: hi == NULL\n", __FUNCTION__);
@@ -870,59 +848,6 @@ static void sbp2util_mark_command_completed(struct scsi_id_instance_data *scsi_i
 /*********************************************
  * IEEE-1394 core driver stack related section
  *********************************************/
-
-/*
- * This function is called at SCSI init in order to register our driver
- * with the IEEE-1394 stack.
- */
-int sbp2_init(void)
-{
-	SBP2_DEBUG("sbp2_init");
-
-	/*
-	 * Register our high level driver with 1394 stack
-	 */
-	sbp2_hl_handle = hpsb_register_highlevel(SBP2_DEVICE_NAME, &sbp2_hl_ops);
-
-	if (sbp2_hl_handle == NULL) {
-		SBP2_ERR("sbp2 failed to register with ieee1394 highlevel");
-		return(-ENOMEM);
-	}
-
-	/*
-	 * Register our sbp2 status address space...
-	 */
-	hpsb_register_addrspace(sbp2_hl_handle, &sbp2_ops, SBP2_STATUS_FIFO_ADDRESS,
-				SBP2_STATUS_FIFO_ADDRESS + 
-				SBP2_STATUS_FIFO_ENTRY_TO_OFFSET(SBP2SCSI_MAX_SCSI_IDS+1));
-
-	/*
-	 * Handle data movement if physical dma is not enabled/supported on host controller
-	 */
-#ifdef CONFIG_IEEE1394_SBP2_PHYS_DMA
-	hpsb_register_addrspace(sbp2_hl_handle, &sbp2_physdma_ops, 0x0ULL, 0xfffffffcULL);
-#endif
-
-	hpsb_register_protocol(&sbp2_driver);
-
-	return 0;
-}
-
-/*
- * This function is called from cleanup module, or during shut-down, in
- * order to unregister our driver.
- */
-void sbp2_cleanup(void)
-{
-	SBP2_DEBUG("sbp2_cleanup");
-
-	hpsb_unregister_protocol(&sbp2_driver);
-
-	if (sbp2_hl_handle) {
-		hpsb_unregister_highlevel(sbp2_hl_handle);
-		sbp2_hl_handle = NULL;
-	}
-}
 
 static int sbp2_probe(struct unit_directory *ud)
 {
@@ -999,35 +924,44 @@ static void sbp2_add_host(struct hpsb_host *host)
 {
 	struct sbp2scsi_host_info *hi;
 	unsigned long flags;
+	struct Scsi_Host *scsi_host;
 
 	SBP2_DEBUG("sbp2_add_host");
 
-	/* Allocate some memory for our host info structure */
-	hi = (struct sbp2scsi_host_info *)kmalloc(sizeof(struct sbp2scsi_host_info),
-						  in_interrupt() ? SLAB_ATOMIC : SLAB_KERNEL);
-
-	if (hi == NULL) {
-		SBP2_ERR("out of memory in sbp2_add_host");
+	/* Register our host with the SCSI stack. */
+	scsi_host = scsi_register (&scsi_driver_template, sizeof(struct sbp2scsi_host_info));
+	if (!scsi_host) {
+		SBP2_ERR("failed to register scsi host");
 		return;
 	}
 
-	/* Initialize some host stuff */
+	hi = (struct sbp2scsi_host_info *)&scsi_host->hostdata;
 	memset(hi, 0, sizeof(struct sbp2scsi_host_info));
+
+	hi->scsi_host = scsi_host;
 	INIT_LIST_HEAD(&hi->list);
 	hi->host = host;
 	hi->sbp2_command_lock = SPIN_LOCK_UNLOCKED;
+	hi->scsi_host->max_id = SBP2SCSI_MAX_SCSI_IDS;
 
 	spin_lock_irqsave(&sbp2_host_info_lock, flags);
 	list_add_tail(&hi->list, &sbp2_host_info_list);
 	spin_unlock_irqrestore(&sbp2_host_info_lock, flags);
 
-	/* Register our host with the SCSI stack. */
-	hi->scsi_host = scsi_register (&scsi_driver_template, sizeof(void *));
-	if (hi->scsi_host) {
-		hi->scsi_host->hostdata[0] = (unsigned long)hi;
-		hi->scsi_host->max_id = SBP2SCSI_MAX_SCSI_IDS;
+	/*
+	 * XXX(hch): Hopefully the ieee1394 code will be converted
+	 * to the driver model at some point.  Until that happens
+	 * we'll have to pass in NULL here.
+	 */
+	if (scsi_add_host(hi->scsi_host, NULL)) {
+		SBP2_ERR("failed to add scsi host");
+
+		spin_lock_irqsave(&sbp2_host_info_lock, flags);
+		list_del(&hi->list);
+		spin_unlock_irqrestore(&sbp2_host_info_lock, flags);
+
+		scsi_unregister(hi->scsi_host);
 	}
-	scsi_driver_template.present++;
 
 	return;
 }
@@ -1079,16 +1013,15 @@ static void sbp2_remove_host(struct hpsb_host *host)
 	SBP2_DEBUG("sbp2_remove_host");
 
 	spin_lock_irqsave(&sbp2_host_info_lock, flags);
-
 	hi = sbp2_find_host_info(host);
-	if (hi != NULL) {
+	if (hi)
 		list_del(&hi->list);
-		kfree(hi);
-	}
-	else
-		SBP2_ERR("attempt to remove unknown host %p", host);
-
 	spin_unlock_irqrestore(&sbp2_host_info_lock, flags);
+
+	if (hi) {
+		scsi_remove_host(hi->scsi_host);
+		scsi_unregister(hi->scsi_host);
+	}
 }
 
 /*
@@ -1098,6 +1031,7 @@ static void sbp2_remove_host(struct hpsb_host *host)
 static int sbp2_start_device(struct sbp2scsi_host_info *hi, struct unit_directory *ud)
 {
 	struct scsi_id_instance_data *scsi_id = NULL;
+	struct scsi_device *sdev;
 	struct node_entry *ne;
 	int i;
 
@@ -1203,7 +1137,7 @@ alloc_fail_first:
 	/*
 	 * Find an empty spot to stick our scsi id instance data. 
 	 */
-	for (i = 0; i < SBP2SCSI_MAX_SCSI_IDS; i++) {
+	for (i = 0; i < hi->scsi_host->max_id; i++) {
 		if (!hi->scsi_id[i]) {
 			hi->scsi_id[i] = scsi_id;
 			scsi_id->id = i;
@@ -1224,7 +1158,7 @@ alloc_fail_first:
 	/*
 	 * Make sure we are not out of space
 	 */
-	if (i == SBP2SCSI_MAX_SCSI_IDS) {
+	if (i == hi->scsi_host->max_id) {
 		SBP2_ERR("No slots left for SBP-2 device");
 		sbp2_remove_device(hi, scsi_id);
 		return -EBUSY;
@@ -1256,6 +1190,13 @@ alloc_fail_first:
 	 */
 	sbp2_max_speed_and_size(hi, scsi_id);
 
+	/* Add this device to the scsi layer now */
+	sdev = scsi_add_device(hi->scsi_host, 0, scsi_id->id, 0);
+	if (IS_ERR(sdev)) {
+		SBP2_ERR("scsi_add_device failed");
+		return PTR_ERR(sdev);
+	}
+
 	return 0;
 }
 
@@ -1265,12 +1206,20 @@ alloc_fail_first:
 static void sbp2_remove_device(struct sbp2scsi_host_info *hi, 
 			       struct scsi_id_instance_data *scsi_id)
 {
+	struct scsi_device *sdev = scsi_find_device(hi->scsi_host, 0, scsi_id->id, 0);
+
 	SBP2_DEBUG("sbp2_remove_device");
 
 	/* Complete any pending commands with selection timeout */
 	sbp2scsi_complete_all_commands(hi, scsi_id, DID_NO_CONNECT);
-       			
+
+	/* Remove it from the scsi layer now */
+	if (scsi_remove_device(sdev))
+		SBP2_ERR("scsi_remove_device failed");
+
 	sbp2util_remove_command_orb_pool(scsi_id, hi);
+
+	hi->scsi_id[scsi_id->id] = NULL;
 
 	if (scsi_id->login_response) {
 		pci_free_consistent(hi->host->pdev,
@@ -1305,7 +1254,7 @@ static void sbp2_remove_device(struct sbp2scsi_host_info *hi,
 	}
 
 	SBP2_DEBUG("SBP-2 device removed, SCSI ID = %d", scsi_id->id);
-	hi->scsi_id[scsi_id->id] = NULL;
+
 	kfree(scsi_id);
 }
 
@@ -1793,8 +1742,8 @@ static int sbp2_max_speed_and_size(struct sbp2scsi_host_info *hi, struct scsi_id
 	SBP2_DEBUG("sbp2_max_speed_and_size");
 
 	/* Initial setting comes from the hosts speed map */
-	scsi_id->speed_code = hi->host->speed_map[(hi->host->node_id & NODE_MASK) * 64
-						  + (scsi_id->ne->nodeid & NODE_MASK)];
+	scsi_id->speed_code = hi->host->speed_map[NODEID_TO_NODE(hi->host->node_id) * 64
+						  + NODEID_TO_NODE(scsi_id->ne->nodeid)];
 
 	/* Bump down our speed if the user requested it */
 	if (scsi_id->speed_code > sbp2_max_speed) {
@@ -2661,7 +2610,7 @@ static int sbp2scsi_queuecommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	/*
 	 * Pull our host info and scsi id instance data from the scsi command
 	 */
-	hi = (struct sbp2scsi_host_info *) SCpnt->device->host->hostdata[0];
+	hi = (struct sbp2scsi_host_info *) &SCpnt->device->host->hostdata;
 
 	if (!hi) {
 		SBP2_ERR("sbp2scsi_host_info is NULL - this is bad!");
@@ -2766,8 +2715,10 @@ static void sbp2scsi_complete_all_commands(struct sbp2scsi_host_info *hi,
  *
  * This can be called in interrupt context.
  */
-static void sbp2scsi_complete_command(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id, u32 scsi_status,
-				      Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
+static void sbp2scsi_complete_command(struct sbp2scsi_host_info *hi,
+				      struct scsi_id_instance_data *scsi_id,
+				      u32 scsi_status, Scsi_Cmnd *SCpnt,
+				      void (*done)(Scsi_Cmnd *))
 {
 	unsigned long flags;
 
@@ -2888,7 +2839,7 @@ static void sbp2scsi_complete_command(struct sbp2scsi_host_info *hi, struct scsi
  */
 static int sbp2scsi_abort (Scsi_Cmnd *SCpnt) 
 {
-	struct sbp2scsi_host_info *hi = (struct sbp2scsi_host_info *) SCpnt->device->host->hostdata[0];
+	struct sbp2scsi_host_info *hi = (struct sbp2scsi_host_info *)&SCpnt->device->host->hostdata;
 	struct scsi_id_instance_data *scsi_id = hi->scsi_id[SCpnt->device->id];
 	struct sbp2_command_info *command;
 	unsigned long flags;
@@ -2938,7 +2889,7 @@ static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
  */
 static int sbp2scsi_reset (Scsi_Cmnd *SCpnt) 
 {
-	struct sbp2scsi_host_info *hi = (struct sbp2scsi_host_info *) SCpnt->device->host->hostdata[0];
+	struct sbp2scsi_host_info *hi = (struct sbp2scsi_host_info *)&SCpnt->device->host->hostdata;
 	struct scsi_id_instance_data *scsi_id = hi->scsi_id[SCpnt->device->id];
 
 	SBP2_ERR("reset requested");
@@ -2951,93 +2902,81 @@ static int sbp2scsi_reset (Scsi_Cmnd *SCpnt)
 	return(SUCCESS);
 }
 
-/*
- * Called by scsi stack to get bios parameters (used by fdisk, and at boot).
- */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,43)
-static int sbp2scsi_biosparam (struct scsi_device *sdev,
-                struct block_device *dev, sector_t capacity, int geom[])
-{
-#else
-static int sbp2scsi_biosparam (Scsi_Disk *disk, kdev_t dev, int geom[])
-{
-        unsigned capacity = disk->capacity;
-#endif
-	int heads, sectors, cylinders;
-
-	SBP2_DEBUG("Request for bios parameters");
-
-	heads = 64;
-	sectors = 32;
-	cylinders = (int)capacity / (heads * sectors);
-
-	if (cylinders > 1024) {
-		heads = 255;
-		sectors = 63;
-		cylinders = (int)capacity / (heads * sectors);
-	}
-
-	geom[0] = heads;
-	geom[1] = sectors;
-	geom[2] = cylinders;
-
-	return(0);
-}
-
-/*
- * Called by scsi stack after scsi driver is registered
- */
-static int sbp2scsi_detect (Scsi_Host_Template *tpnt) 
-{
-	SBP2_DEBUG("sbp2scsi_detect");
-
-	/*
-	 * Call sbp2_init to register with the ieee1394 stack. This
-	 * results in a callback to sbp2_add_host for each ieee1394
-	 * host controller currently registered, and for each of those
-	 * we register a scsi host with the scsi stack.
-	 */
-	
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	spin_unlock_irq(&io_request_lock);
-	sbp2_init();
-	spin_lock_irq(&io_request_lock);
-#else
-	sbp2_init();
-#endif
-
-	/* We return the number of hosts registered. */
-	return scsi_driver_template.present;
-}
-
-
-/*
- * Called for contents of procfs
- */
 static const char *sbp2scsi_info (struct Scsi_Host *host)
 {
-	struct sbp2scsi_host_info *hi = sbp2_find_host_info_scsi(host);
-	static char info[1024];
-
-	if (!hi) /* shouldn't happen, but... */
-        	return "IEEE-1394 SBP-2 protocol driver";
-
-	sprintf(info, "IEEE-1394 SBP-2 protocol driver (host: %s)\n%s\n"
-		"SBP-2 module load options:\n"
-		"- Max speed supported: %s\n"
-		"- Max sectors per I/O supported: %d\n"
-                "- Serialized I/O (debug): %s\n"
-		"- Exclusive login: %s",
-		hi->host->driver->name,
-		version,
-		hpsb_speedto_str[sbp2_max_speed],
-		sbp2_max_sectors,
-		sbp2_serialize_io ? "yes" : "no",
-		sbp2_exclusive_login ? "yes" : "no");
-
-	return info;
+        return "SCSI emulation for for IEEE-1394 Storage Devices";
 }
 
+/* Called for contents of procfs */
+#define SPRINTF(args...) \
+        do { if (pos < buffer+length) pos += sprintf(pos, ## args); } while (0)
+
+static int sbp2scsi_proc_info(char *buffer, char **start, off_t offset,
+			      int length, int hostno, int inout)
+{
+	Scsi_Device *scd;
+	struct Scsi_Host *host;
+	struct sbp2scsi_host_info *hi;
+	char *pos = buffer;
+
+	/* if someone is sending us data, just throw it away */
+	if (inout)
+		return length;
+
+	host = scsi_host_hn_get(hostno);
+	if (!host)  /* if we couldn't find it, we return an error */
+		return -ESRCH;
+
+	hi = sbp2_find_host_info_scsi(host);
+	if (!hi) /* shouldn't happen, but... */
+		return -ESRCH;
+
+	SPRINTF("Host scsi%d             : SBP-2 IEEE-1394 (%s)\n", hostno,
+		hi->host->driver->name);
+	SPRINTF("Driver version         : %s\n", version);
+
+	SPRINTF("\nModule options         :\n");
+	SPRINTF("  sbp2_max_speed       : %s\n", hpsb_speedto_str[sbp2_max_speed]);
+	SPRINTF("  sbp2_max_sectors     : %d\n", sbp2_max_sectors);
+	SPRINTF("  sbp2_serialize_io    : %s\n", sbp2_serialize_io ? "yes" : "no");
+	SPRINTF("  sbp2_exclusive_login : %s\n", sbp2_exclusive_login ? "yes" : "no");
+
+	SPRINTF("\nAttached devices       : %s\n", !list_empty(&host->my_devices) ?
+		"" : "none");
+
+	list_for_each_entry (scd, &host->my_devices, siblings) {
+		int i;
+
+		SPRINTF("  [Channel: %02d, Id: %02d, Lun: %02d]  ", scd->channel,
+			scd->id, scd->lun);
+		SPRINTF("%s ", (scd->type < MAX_SCSI_DEVICE_CODE) ?
+			scsi_device_types[(short) scd->type] : "Unknown device");
+
+		for (i = 0; (i < 8) && (scd->vendor[i] >= 0x20); i++)
+			SPRINTF("%c", scd->vendor[i]);
+
+		SPRINTF(" ");
+
+		for (i = 0; (i < 16) && (scd->model[i] >= 0x20); i++)
+			SPRINTF("%c", scd->model[i]);
+
+		SPRINTF("\n");
+	}
+
+	SPRINTF("\n");
+
+	/* release the reference count on this host */
+	scsi_host_put(host);
+	/* Calculate start of next buffer, and return value. */
+	*start = buffer + offset;
+
+	if ((pos - buffer) < offset)
+		return (0);
+	else if ((pos - buffer - offset) < length)
+		return (pos - buffer - offset);
+	else
+		return (length);
+}
 
 MODULE_AUTHOR("James Goodwin <jamesg@filanet.com>");
 MODULE_DESCRIPTION("IEEE-1394 SBP-2 protocol driver");
@@ -3046,25 +2985,23 @@ MODULE_LICENSE("GPL");
 
 /* SCSI host template */
 static Scsi_Host_Template scsi_driver_template = {
-	.name =			"IEEE-1394 SBP-2 protocol driver",
-	.info =			sbp2scsi_info,
-	.detect =		sbp2scsi_detect,
-	.queuecommand =		sbp2scsi_queuecommand,
-	.eh_abort_handler =	sbp2scsi_abort,
-	.eh_device_reset_handler =sbp2scsi_reset,
-	.eh_bus_reset_handler =	sbp2scsi_reset,
-	.eh_host_reset_handler =sbp2scsi_reset,
-	.bios_param =		sbp2scsi_biosparam,
-	.this_id =		-1,
-	.sg_tablesize =		SG_ALL,
-	.use_clustering =	ENABLE_CLUSTERING,
-	.cmd_per_lun =		SBP2_MAX_CMDS_PER_LUN,
-	.can_queue = 		SBP2_MAX_SCSI_QUEUE,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	.use_new_eh_code =	TRUE,
-#endif
-	.emulated =		1,
-	.proc_name =		SBP2_DEVICE_NAME,
+	.module =			THIS_MODULE,
+	.name =				"SBP-2 IEEE-1394",
+	.proc_name =			SBP2_DEVICE_NAME,
+	.info =				sbp2scsi_info,
+	.proc_info =			sbp2scsi_proc_info,
+	.queuecommand =			sbp2scsi_queuecommand,
+	.eh_abort_handler =		sbp2scsi_abort,
+	.eh_device_reset_handler =	sbp2scsi_reset,
+	.eh_bus_reset_handler =		sbp2scsi_reset,
+	.eh_host_reset_handler =	sbp2scsi_reset,
+	.this_id =			-1,
+	.sg_tablesize =			SG_ALL,
+	.use_clustering =		ENABLE_CLUSTERING,
+	.cmd_per_lun =			SBP2_MAX_CMDS_PER_LUN,
+	.can_queue = 			SBP2_MAX_SCSI_QUEUE,
+	.emulated =			1,
+	.highmem_io =			1,
 };
 
 static int sbp2_module_init(void)
@@ -3084,23 +3021,36 @@ static int sbp2_module_init(void)
 	 */
 	scsi_driver_template.max_sectors = sbp2_max_sectors;
 
+
 	/*
-	 * Ideally we would register our scsi_driver_template with the
-	 * scsi stack and after that register with the ieee1394 stack
-	 * and process the add_host callbacks. However, the detect
-	 * function in the scsi host template requires that we find at
-	 * least one host, so we "nest" the registrations by calling
-	 * sbp2_init from the detect function.
+	 * Register our high level driver with 1394 stack
 	 */
-	scsi_driver_template.module = THIS_MODULE;
-	if (SCSI_REGISTER_HOST(&scsi_driver_template) ||
-	    !scsi_driver_template.present) {
-		SBP2_ERR("Please load the lower level IEEE-1394 driver "
-			 "(e.g. ohci1394) before sbp2...");
-		sbp2_cleanup();
-		return -ENODEV;
+	sbp2_hl_handle = hpsb_register_highlevel(SBP2_DEVICE_NAME,
+						 &sbp2_hl_ops);
+	if (!sbp2_hl_handle) {
+		SBP2_ERR("sbp2 failed to register with ieee1394 highlevel");
+		return(-ENOMEM);
 	}
 
+	/*
+	 * Register our sbp2 status address space...
+	 */
+	hpsb_register_addrspace(sbp2_hl_handle, &sbp2_ops,
+				SBP2_STATUS_FIFO_ADDRESS,
+				SBP2_STATUS_FIFO_ADDRESS + 
+				SBP2_STATUS_FIFO_ENTRY_TO_OFFSET(
+					SBP2SCSI_MAX_SCSI_IDS+1));
+
+	/*
+	 * Handle data movement if physical dma is not enabled/supported
+	 * on host controller
+	 */
+#ifdef CONFIG_IEEE1394_SBP2_PHYS_DMA
+	hpsb_register_addrspace(sbp2_hl_handle, &sbp2_physdma_ops,
+			0x0ULL, 0xfffffffcULL);
+#endif
+
+	hpsb_register_protocol(&sbp2_driver);
 	return 0;
 }
 
@@ -3108,17 +3058,9 @@ static void __exit sbp2_module_exit(void)
 {
 	SBP2_DEBUG("sbp2_module_exit");
 
-	/*
-	 * On module unload we unregister with the ieee1394 stack
-	 * which results in remove_host callbacks for all ieee1394
-	 * host controllers.  In the callbacks we unregister the
-	 * corresponding scsi hosts.
-	 */
-	sbp2_cleanup();
-
-	if (SCSI_UNREGISTER_HOST(&scsi_driver_template))
-		SBP2_ERR("sbp2_module_exit: couldn't unregister scsi driver");
-
+	hpsb_unregister_protocol(&sbp2_driver);
+	if (sbp2_hl_handle)
+		hpsb_unregister_highlevel(sbp2_hl_handle);
 }
 
 module_init(sbp2_module_init);
