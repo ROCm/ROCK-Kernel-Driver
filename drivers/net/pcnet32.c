@@ -720,6 +720,8 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     lp->name = chipname;
     lp->shared_irq = shared;
     lp->mii_if.full_duplex = fdx;
+    lp->mii_if.phy_id_mask = 0x1f;
+    lp->mii_if.reg_num_mask = 0x1f;
     lp->dxsuflo = dxsuflo;
     lp->ltint = ltint;
     lp->mii = mii;
@@ -1625,12 +1627,18 @@ static int pcnet32_ethtool_ioctl (struct net_device *dev, void *useraddr)
 	}
 	/* restart autonegotiation */
 	case ETHTOOL_NWAY_RST: {
-		return mii_nway_restart(&lp->mii_if);
+		int r;
+		spin_lock_irq(&lp->lock);
+		r = mii_nway_restart(&lp->mii_if);
+		spin_unlock_irq(&lp->lock);
+		return r;
 	}
 	/* get link status */
 	case ETHTOOL_GLINK: {
 		struct ethtool_value edata = {ETHTOOL_GLINK};
+		spin_lock_irq(&lp->lock);
 		edata.data = mii_link_ok(&lp->mii_if);
+		spin_unlock_irq(&lp->lock);
 		if (copy_to_user(useraddr, &edata, sizeof(edata)))
 			return -EFAULT;
 		return 0;
@@ -1661,45 +1669,37 @@ static int pcnet32_ethtool_ioctl (struct net_device *dev, void *useraddr)
 
 static int pcnet32_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-    unsigned long ioaddr = dev->base_addr;
     struct pcnet32_private *lp = dev->priv;	 
     struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
-    int phyaddr = lp->a.read_bcr (ioaddr, 33);
+    int rc;
+    unsigned long flags;
 
     if (cmd == SIOCETHTOOL)
 	return pcnet32_ethtool_ioctl(dev, (void *) rq->ifr_data);
 
+    /* SIOC[GS]MIIxxx ioctls */
     if (lp->mii) {
-	switch(cmd) {
-	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-	    data->phy_id = (phyaddr >> 5) & 0x1f;
-	    /* Fall Through */
-	case SIOCGMIIREG:		/* Read MII PHY register. */
-	    lp->a.write_bcr (ioaddr, 33, ((data->phy_id & 0x1f) << 5) | (data->reg_num & 0x1f));
-	    data->val_out = lp->a.read_bcr (ioaddr, 34);
-	    lp->a.write_bcr (ioaddr, 33, phyaddr);
-	    return 0;
-	case SIOCSMIIREG:		/* Write MII PHY register. */
-	    if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
-	    lp->a.write_bcr (ioaddr, 33, ((data->phy_id & 0x1f) << 5) | (data->reg_num & 0x1f));
-	    lp->a.write_bcr (ioaddr, 34, data->val_in);
-	    lp->a.write_bcr (ioaddr, 33, phyaddr);
-	    return 0;
-	default:
-	    return -EOPNOTSUPP;
-	}
+	spin_lock_irqsave(&lp->lock, flags);
+	rc = generic_mii_ioctl(&lp->mii_if, data, cmd, NULL);
+	spin_unlock_irqrestore(&lp->lock, flags);
+    } else {
+	rc = -EOPNOTSUPP;
     }
-    return -EOPNOTSUPP;
+
+    return rc;
 }
 
 static void pcnet32_watchdog(struct net_device *dev)
 {
     struct pcnet32_private *lp = dev->priv;
+    unsigned long flags;
 
     /* Print the link status if it has changed */
-    if (lp->mii)
+    if (lp->mii) {
+	spin_lock_irqsave(&lp->lock, flags);
 	mii_check_media (&lp->mii_if, 1, 0);
+	spin_unlock_irqrestore(&lp->lock, flags);
+    }
 
     mod_timer (&(lp->watchdog_timer), PCNET32_WATCHDOG_TIMEOUT);
 }
