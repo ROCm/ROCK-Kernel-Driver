@@ -1559,7 +1559,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		inode_init_once(&nfsi->vfs_inode);
 		INIT_LIST_HEAD(&nfsi->dirty);
 		INIT_LIST_HEAD(&nfsi->commit);
-		INIT_LIST_HEAD(&nfsi->writeback);
+		INIT_RADIX_TREE(&nfsi->nfs_page_tree, GFP_ATOMIC);
 		nfsi->ndirty = 0;
 		nfsi->ncommit = 0;
 		nfsi->npages = 0;

@@ -165,7 +165,7 @@ struct nfs_inode {
 	 */
 	struct list_head	dirty;
 	struct list_head	commit;
-	struct list_head	writeback;
+	struct radix_tree_root	nfs_page_tree;
 
 	unsigned int		ndirty,
 				ncommit,
@@ -356,7 +356,7 @@ nfs_commit_file(struct inode *inode, struct file *file, unsigned long offset,
 static inline int
 nfs_have_writebacks(struct inode *inode)
 {
-	return !list_empty(&NFS_I(inode)->writeback);
+	return NFS_I(inode)->npages != 0;
 }
 
 static inline int

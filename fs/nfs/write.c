@@ -301,19 +301,21 @@ out:
 /*
  * Insert a write request into an inode
  */
-static inline void
+static inline int
 nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
-	if (!list_empty(&req->wb_hash))
-		return;
-	if (!NFS_WBACK_BUSY(req))
-		printk(KERN_ERR "NFS: unlocked request attempted hashed!\n");
-	if (list_empty(&nfsi->writeback))
+	int error;
+
+	error = radix_tree_insert(&nfsi->nfs_page_tree, req->wb_index, req);
+	BUG_ON(error == -EEXIST);
+	if (error)
+		return error;
+	if (!nfsi->npages)
 		igrab(inode);
 	nfsi->npages++;
-	list_add(&req->wb_hash, &nfsi->writeback);
 	req->wb_count++;
+	return 0;
 }
 
 /*
@@ -324,21 +326,14 @@ nfs_inode_remove_request(struct nfs_page *req)
 {
 	struct nfs_inode *nfsi;
 	struct inode *inode;
+
+	BUG_ON (!NFS_WBACK_BUSY(req));
 	spin_lock(&nfs_wreq_lock);
-	if (list_empty(&req->wb_hash)) {
-		spin_unlock(&nfs_wreq_lock);
-		return;
-	}
-	if (!NFS_WBACK_BUSY(req))
-		printk(KERN_ERR "NFS: unlocked request attempted unhashed!\n");
 	inode = req->wb_inode;
-	list_del(&req->wb_hash);
-	INIT_LIST_HEAD(&req->wb_hash);
 	nfsi = NFS_I(inode);
+	radix_tree_delete(&nfsi->nfs_page_tree, req->wb_index);
 	nfsi->npages--;
-	if ((nfsi->npages == 0) != list_empty(&nfsi->writeback))
-		printk(KERN_ERR "NFS: desynchronized value of nfs_i.npages.\n");
-	if (list_empty(&nfsi->writeback)) {
+	if (!nfsi->npages) {
 		spin_unlock(&nfs_wreq_lock);
 		iput(inode);
 	} else
@@ -354,19 +349,12 @@ static inline struct nfs_page *
 _nfs_find_request(struct inode *inode, unsigned long index)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
-	struct list_head	*head, *next;
+	struct nfs_page *req;
 
-	head = &nfsi->writeback;
-	next = head->next;
-	while (next != head) {
-		struct nfs_page *req = nfs_inode_wb_entry(next);
-		next = next->next;
-		if (req->wb_index != index)
-			continue;
+	req = (struct nfs_page*)radix_tree_lookup(&nfsi->nfs_page_tree, index);
+	if (req)
 		req->wb_count++;
-		return req;
-	}
-	return NULL;
+	return req;
 }
 
 static struct nfs_page *
@@ -437,8 +425,8 @@ static int
 nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_start, unsigned int npages)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
-	struct list_head	*p, *head;
-	unsigned long		idx_end;
+	struct nfs_page *req;
+	unsigned long		idx_end, next;
 	unsigned int		res = 0;
 	int			error;
 
@@ -448,21 +436,17 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 		idx_end = idx_start + npages - 1;
 
 	spin_lock(&nfs_wreq_lock);
-	head = &nfsi->writeback;
-	p = head->next;
-	while (p != head) {
-		struct nfs_page *req = nfs_inode_wb_entry(p);
+	next = idx_start;
+	while (radix_tree_gang_lookup(&nfsi->nfs_page_tree, (void **)&req, next, 1)) {
+		if (req->wb_index > idx_end)
+			break;
 
-		p = p->next;
-
+		next = req->wb_index + 1;
 		if (file && req->wb_file != file)
 			continue;
-
-		if (req->wb_index < idx_start || req->wb_index > idx_end)
-			continue;
-
 		if (!NFS_WBACK_BUSY(req))
 			continue;
+
 		req->wb_count++;
 		spin_unlock(&nfs_wreq_lock);
 		error = nfs_wait_on_request(req);
@@ -470,7 +454,7 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 		if (error < 0)
 			return error;
 		spin_lock(&nfs_wreq_lock);
-		p = head->next;
+		next = idx_start;
 		res++;
 	}
 	spin_unlock(&nfs_wreq_lock);
@@ -664,8 +648,14 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 		}
 
 		if (new) {
+			int error;
 			nfs_lock_request_dontget(new);
-			nfs_inode_add_request(inode, new);
+			error = nfs_inode_add_request(inode, new);
+			if (error) {
+				spin_unlock(&nfs_wreq_lock);
+				nfs_unlock_request(new);
+				return ERR_PTR(error);
+			}
 			spin_unlock(&nfs_wreq_lock);
 			nfs_mark_request_dirty(new);
 			return new;
