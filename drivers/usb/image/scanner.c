@@ -349,6 +349,7 @@
  * 0.4.11  2003-02-25
  *    - Added vendor/product ids for Artec, Avision, Brother, Medion, Primax,
  *      Prolink, Fujitsu, Plustek, and SYSCAN scanners.
+ *    - Fixed generation of devfs names if dynamic minors are disabled.
  *
  * TODO
  *    - Performance
@@ -1056,7 +1057,7 @@ probe_scanner(struct usb_interface *intf,
 	scn->scn_minor = scn_minor;
 	scn->isopen = 0;
 
-	sprintf(name, "scanner%d", scn->scn_minor);
+	sprintf(name, "scanner%d", scn->scn_minor - SCN_BASE_MNR);
 	
 	scn->devfs = devfs_register(usb_devfs_handle, name,
 				    DEVFS_FL_DEFAULT, USB_MAJOR,
