@@ -1215,10 +1215,9 @@ static int process_iso (struct uhci_hcd *uhci, struct urb *urb, int mode)
 // called with urb_list_lock set
 static int process_urb (struct uhci_hcd *uhci, struct list_head *p)
 {
-	struct urb *urb, *urbt;	
-	struct usb_device *usb_dev;
+	struct urb *urb;	
 	urb_priv_t *priv;
-	int type, n, ret = 0;
+	int type, ret = 0;
 
 	priv=list_entry (p,  urb_priv_t, urb_list);
 	urb=priv->urb;
@@ -1251,40 +1250,11 @@ static int process_urb (struct uhci_hcd *uhci, struct list_head *p)
 		uhci_free_priv(uhci, urb, urb->hcpriv);
 
 		if (type != PIPE_INTERRUPT) {  // process_interrupt does completion on its own		
-			// FIXME: How to detect killed URBs in a ring?			
-
-			if (type == PIPE_ISOCHRONOUS) {
-				for (n=0, urbt = urb->next; urbt && (urbt != urb) && (n<MAX_NEXT_COUNT); urbt = urbt->next, n++)
-					continue;
-
-				if (urbt && (n<MAX_NEXT_COUNT)) {
-					usb_dev=urb->dev;
-					urb->dev = NULL;
-					spin_unlock(&uhci->urb_list_lock);
-					if (urb->complete)
-						urb->complete (urb);
-
-					urb->dev=usb_dev;
-					uhci_urb_enqueue(&uhci->hcd, urb, GFP_ATOMIC); // FIXME memflags!
-					spin_lock(&uhci->urb_list_lock);					
-				}
-				else {
-					spin_unlock(&uhci->urb_list_lock);
-					dbg("giveback iso urb %p, status %i, length %i\n", 
-					    urb, urb->status, urb->transfer_buffer_length);
-
-					usb_hcd_giveback_urb(&uhci->hcd, urb);
-					spin_lock(&uhci->urb_list_lock);
-				}
-			}
-			else {
-				spin_unlock(&uhci->urb_list_lock);
-				dbg("giveback urb %p, status %i, length %i\n", 
-				    urb, urb->status, urb->transfer_buffer_length);
-
-				usb_hcd_giveback_urb(&uhci->hcd, urb);
-				spin_lock(&uhci->urb_list_lock);
-			}
+			spin_unlock(&uhci->urb_list_lock);
+			dbg("giveback urb %p, status %i, length %i\n", 
+			    urb, urb->status, urb->transfer_buffer_length);
+			usb_hcd_giveback_urb(&uhci->hcd, urb);
+			spin_lock(&uhci->urb_list_lock);
 		}
 	}
 	return ret;
