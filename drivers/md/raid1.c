@@ -866,7 +866,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		 * Nowhere to write this to... I guess we
 		 * must be done
 		 */
-		printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), r1_bio->sector);
+		printk(KERN_ALERT "raid1: sync aborting as there is nowhere to write sector %lu\n", r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
 		resume_device(conf);
 		put_buf(r1_bio);
