@@ -126,6 +126,7 @@ struct device_node {
 	struct	interrupt_info *intrs;
 	char	*full_name;
 	int	busno;			/* for pci devices */
+	int	bussubno;		/* for pci devices */
 	int	devfn;			/* for pci devices */
 	struct  pci_controller *phb;	/* for pci devices */
 	struct	TceTable *tce_table;	/* for phb's or bridges */

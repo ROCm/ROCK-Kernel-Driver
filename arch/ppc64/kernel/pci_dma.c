@@ -708,10 +708,10 @@ void create_tce_tables_for_busesLP(struct list_head *bus_list)
 		 */
 		dma_window = (u32 *)get_property(busdn, "ibm,dma-window", 0);
 		if (dma_window) {
-			/* Busno hasn't been copied yet.
+			/* Bussubno hasn't been copied yet.
 			 * Do it now because getTceTableParmsPSeriesLP needs it.
 			 */
-			busdn->busno = bus->number;
+			busdn->bussubno = bus->number;
 			create_pci_bus_tce_table((unsigned long)busdn);
 		} else
 			create_tce_tables_for_busesLP(&bus->children);
@@ -966,12 +966,12 @@ static void getTceTableParmsPSeriesLP(struct pci_controller *phb,
 		panic("PCI_DMA: getTceTableParmsPSeriesLP: device %s has no ibm,dma-window property!\n", dn->full_name);
 	}
 
-	newTceTable->busNumber = dn->busno;
+	newTceTable->busNumber = dn->bussubno;
 	newTceTable->size = (((((unsigned long)dma_window[4] << 32) | (unsigned long)dma_window[5]) >> PAGE_SHIFT) << 3) >> PAGE_SHIFT;
 	newTceTable->startOffset = ((((unsigned long)dma_window[2] << 32) | (unsigned long)dma_window[3]) >> 12);
 	newTceTable->base = 0;
 	newTceTable->index = dma_window[0];
-	PPCDBG(PPCDBG_TCEINIT, "getTceTableParmsPSeriesLP for bus 0x%lx:\n", dn->busno);
+	PPCDBG(PPCDBG_TCEINIT, "getTceTableParmsPSeriesLP for bus 0x%lx:\n", dn->bussubno);
 	PPCDBG(PPCDBG_TCEINIT, "\tDevice = %s\n", dn->full_name);
 	PPCDBG(PPCDBG_TCEINIT, "\tnewTceTable->index       = 0x%lx\n", newTceTable->index);
 	PPCDBG(PPCDBG_TCEINIT, "\tnewTceTable->startOffset = 0x%lx\n", newTceTable->startOffset);
@@ -1121,7 +1121,7 @@ void pci_unmap_single( struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size
  	/* Client asked for way to much space.  This is checked later anyway */
 	/* It is easier to debug here for the drivers than in the tce tables.*/
  	if(order >= NUM_TCE_LEVELS) {
- 		printk("PCI_DMA: pci_unmap_single size to large: 0x%lx \n",size);
+ 		printk("PCI_DMA: pci_unmap_single 0x%lx size to large: 0x%lx \n",dma_handle,size);
  		return;
  	}
 	
@@ -1377,10 +1377,11 @@ void pci_unmap_sg( struct pci_dev *hwdev, struct scatterlist *sg, int nelms, int
 	PPCDBG(PPCDBG_TCE, "pci_unmap_sg:\n");
 	PPCDBG(PPCDBG_TCE, "\thwdev = 0x%16.16lx, sg = 0x%16.16lx, direction = 0x%16.16lx, nelms = 0x%16.16lx\n", hwdev, sg, direction, nelms);	
 
-	if ( direction == PCI_DMA_NONE )
+	if ( direction == PCI_DMA_NONE || nelms == 0 )
 		BUG();
 
 	dma_start_page = sg->dma_address & PAGE_MASK;
+ 	dma_end_page   = 0;
 	for ( i=nelms; i>0; --i ) {
 		unsigned k = i - 1;
 		if ( sg[k].dma_length ) {
@@ -1396,6 +1397,7 @@ void pci_unmap_sg( struct pci_dev *hwdev, struct scatterlist *sg, int nelms, int
  	/* Client asked for way to much space.  This is checked later anyway */
 	/* It is easier to debug here for the drivers than in the tce tables.*/
  	if(order >= NUM_TCE_LEVELS) {
+ 		printk("PCI_DMA: dma_start_page:0x%lx  dma_end_page:0x%lx\n",dma_start_page,dma_end_page);
 		printk("PCI_DMA: pci_unmap_sg size to large: 0x%x \n",(numTces << PAGE_SHIFT));
  		return;
  	}

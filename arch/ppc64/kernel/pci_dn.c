@@ -74,9 +74,6 @@ update_dn_pci_info(struct device_node *dn, void *data)
 static void * __init
 write_OF_bars(struct device_node *dn, void *data)
 {
-	int i;
-	u32 oldbar, newbar, newbartest;
-	u8  config_offset;
 	char *name = get_property(dn, "name", 0);
 	char *device_type = get_property(dn, "device_type", 0);
 	char devname[128];
@@ -95,21 +92,25 @@ write_OF_bars(struct device_node *dn, void *data)
 		return NULL;
 	}
 
-#ifndef CONFIG_PPC_ISERIES 
+#ifndef CONFIG_PPC_ISERIES
+	int i;
+	u32 oldbar, newbar, newbartest;
+	u8 config_offset;
+
 	for (i = 0; i < dn->n_addrs; i++) {
 		newbar = dn->addrs[i].address;
 		config_offset = dn->addrs[i].space & 0xff;
-		if (ppc_md.pcibios_read_config_dword(dn, config_offset, &oldbar) != PCIBIOS_SUCCESSFUL) {
+		if (ppc_md.pcibios_read_config(dn, config_offset, 4, &oldbar) != PCIBIOS_SUCCESSFUL) {
 			printk(KERN_WARNING "write_OF_bars %s: read BAR%d failed\n", devname, i);
 			continue;
 		}
 		/* Need to update this BAR. */
-		if (ppc_md.pcibios_write_config_dword(dn, config_offset, newbar) != PCIBIOS_SUCCESSFUL) {
+		if (ppc_md.pcibios_write_config(dn, config_offset, 4, newbar) != PCIBIOS_SUCCESSFUL) {
 			printk(KERN_WARNING "write_OF_bars %s: write BAR%d with 0x%08x failed (old was 0x%08x)\n", devname, i, newbar, oldbar);
 			continue;
 		}
 		/* sanity check */
-		if (ppc_md.pcibios_read_config_dword(dn, config_offset, &newbartest) != PCIBIOS_SUCCESSFUL) {
+		if (ppc_md.pcibios_read_config(dn, config_offset, 4, &newbartest) != PCIBIOS_SUCCESSFUL) {
 			printk(KERN_WARNING "write_OF_bars %s: sanity test read BAR%d failed?\n", devname, i);
 			continue;
 		}
@@ -214,7 +215,6 @@ void *traverse_all_pci_devices(traverse_func pre)
 	return NULL;
 }
 
-
 /* Traversal func that looks for a <busno,devfcn> value.
  * If found, the device_node is returned (thus terminating the traversal).
  */
@@ -223,6 +223,7 @@ is_devfn_node(struct device_node *dn, void *data)
 {
 	int busno = ((unsigned long)data >> 8) & 0xff;
 	int devfn = ((unsigned long)data) & 0xff;
+
 	return (devfn == dn->devfn && busno == dn->busno) ? dn : NULL;
 }
 

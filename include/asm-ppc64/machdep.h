@@ -31,9 +31,6 @@ struct smp_ops_t {
 #endif
 
 struct machdep_calls {
-	/* High use functions in the first cachelines, low use functions
-	 * follow.  DRENG collect profile data.
-	 */
 	void            (*hpte_invalidate)(unsigned long slot,
 					   unsigned long va,
 					   int large,
@@ -104,12 +101,8 @@ struct machdep_calls {
 	int		(*udbg_getc_poll)(void);
 
 	/* PCI interfaces */
-	int (*pcibios_read_config_byte)(struct device_node *dn, int offset, u8 *val);
-	int (*pcibios_read_config_word)(struct device_node *dn, int offset, u16 *val);
-	int (*pcibios_read_config_dword)(struct device_node *dn, int offset, u32 *val);
-	int (*pcibios_write_config_byte)(struct device_node *dn, int offset, u8 val);
-	int (*pcibios_write_config_word)(struct device_node *dn, int offset, u16 val);
-	int (*pcibios_write_config_dword)(struct device_node *dn, int offset, u32 val);
+	int (*pcibios_read_config)(struct device_node *dn, int where, int size, u32 *val);
+	int (*pcibios_write_config)(struct device_node *dn, int where, int size, u32 val);
 
 	/* Called after scanning the bus, before allocating
 	 * resources
