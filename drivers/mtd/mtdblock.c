@@ -490,13 +490,7 @@ int mtdblock_thread(void *dummy)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < 0x20300
-#define RQFUNC_ARG void
-#else
-#define RQFUNC_ARG request_queue_t *q
-#endif
-
-static void mtdblock_request(RQFUNC_ARG)
+static void mtdblock_request(request_queue *q)
 {
 	/* Don't do anything, except wake the thread if necessary */
 	wake_up(&thr_wq);
@@ -522,10 +516,8 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 		return put_user((u64)mtdblk->mtd->size, (u64 *)arg);
 		
 	case BLKFLSBUF:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
 		if(!capable(CAP_SYS_ADMIN))
 			return -EACCES;
-#endif
 		fsync_bdev(inode->i_bdev);
 		invalidate_bdev(inode->i_bdev, 0);
 		down(&mtdblk->cache_sem);
@@ -540,16 +532,6 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 	}
 }
 
-#if LINUX_VERSION_CODE < 0x20326
-static struct file_operations mtd_fops =
-{
-	open: mtdblock_open,
-	ioctl: mtdblock_ioctl,
-	release: mtdblock_release,
-	read: block_read,
-	write: block_write
-};
-#else
 static struct block_device_operations mtd_fops = 
 {
 	owner: THIS_MODULE,
@@ -557,7 +539,6 @@ static struct block_device_operations mtd_fops =
 	release: mtdblock_release,
 	ioctl: mtdblock_ioctl
 };
-#endif
 
 #ifdef CONFIG_DEVFS_FS
 /* Notification that a new device has been added. Create the devfs entry for
