@@ -977,6 +977,12 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* DATA STAGE */
 	/* send/receive data payload, if there is any */
+
+	/* Genesys Logic interface chips need a 100us delay between the
+	 * command phase and the data phase */
+	if (us->pusb_dev->descriptor.idVendor == USB_VENDOR_ID_GENESYS)
+		udelay(100);
+
 	if (transfer_length) {
 		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
 				us->recv_bulk_pipe : us->send_bulk_pipe;
