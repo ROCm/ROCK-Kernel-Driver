@@ -110,12 +110,6 @@ ip_nat_fn(unsigned int hooknum,
 		}
 		/* Fall thru... (Only ICMPs can be IP_CT_IS_REPLY) */
 	case IP_CT_NEW:
-#ifdef CONFIG_IP_NF_NAT_LOCAL
-		/* LOCAL_IN hook doesn't have a chain and thus doesn't care
-		 * about new packets -HW */
-		if (hooknum == NF_IP_LOCAL_IN)
-			return NF_ACCEPT;
-#endif
 		info = &ct->nat.info;
 
 		WRITE_LOCK(&ip_nat_lock);
@@ -131,6 +125,12 @@ ip_nat_fn(unsigned int hooknum,
 				ret = call_expect(master_ct(ct), pskb, 
 						  hooknum, ct, info);
 			} else {
+#ifdef CONFIG_IP_NF_NAT_LOCAL
+				/* LOCAL_IN hook doesn't have a chain!  */
+				if (hooknum == NF_IP_LOCAL_IN) {
+					ret = NF_ACCEPT;
+				} else
+#endif
 				ret = ip_nat_rule_find(pskb, hooknum, in, out,
 						       ct, info);
 			}
