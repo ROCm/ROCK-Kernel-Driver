@@ -681,7 +681,7 @@ static void compute_block(struct stripe_head *sh, int dd_idx)
 	}
 	if (count != 1)
 		xor_block(count, STRIPE_SIZE, ptr);
-	set_bit(R5_UPTODATE, &sh->dev[i].flags);
+	set_bit(R5_UPTODATE, &sh->dev[dd_idx].flags);
 }
 
 static void compute_parity(struct stripe_head *sh, int method)
@@ -1519,7 +1519,7 @@ static int run (mddev_t *mddev)
 		       mddev->raid_disks-mddev->degraded, mddev->raid_disks, conf->algorithm);
 	else
 		printk(KERN_ALERT "raid5: raid level %d set md%d active with %d out of %d devices, algorithm %d\n", conf->level, mdidx(mddev),
-		       mddev->raid_disks = mddev->degraded, mddev->raid_disks, conf->algorithm);
+		       mddev->raid_disks - mddev->degraded, mddev->raid_disks, conf->algorithm);
 
 	print_raid5_conf(conf);
 

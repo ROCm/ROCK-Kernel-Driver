@@ -594,10 +594,10 @@ static void export_rdev(mdk_rdev_t * rdev)
 		MD_BUG();
 	free_disk_sb(rdev);
 	list_del_init(&rdev->same_set);
-	unlock_rdev(rdev);
 #ifndef MODULE
 	md_autodetect_dev(rdev->bdev->bd_dev);
 #endif
+	unlock_rdev(rdev);
 	rdev->faulty = 0;
 	kfree(rdev);
 }

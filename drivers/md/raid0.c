@@ -87,7 +87,7 @@ static int create_strip_zones (mddev_t *mddev)
 	cnt = 0;
 	smallest = NULL;
 	ITERATE_RDEV(mddev, rdev1, tmp1) {
-		int j = rdev1->sb->this_disk.raid_disk;
+		int j = rdev1->raid_disk;
 
 		if (j < 0 || j >= mddev->raid_disks) {
 			printk("raid0: bad disk number %d - aborting!\n", j);
