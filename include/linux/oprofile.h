@@ -48,7 +48,7 @@ struct oprofile_operations {
  *
  * If an error occurs, the fields should be left untouched.
  */
-void oprofile_arch_init(struct oprofile_operations * ops);
+int oprofile_arch_init(struct oprofile_operations * ops);
  
 /**
  * One-time exit/cleanup for the arch.

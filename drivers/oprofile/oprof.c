@@ -153,11 +153,11 @@ out:
 
 static int __init oprofile_init(void)
 {
-	int err = 0;
+	int err;
 
-	oprofile_arch_init(&oprofile_ops);
+	err = oprofile_arch_init(&oprofile_ops);
 
-	if (timer) {
+	if (err < 0 || timer) {
 		printk(KERN_INFO "oprofile: using timer interrupt.\n");
 		oprofile_timer_init(&oprofile_ops);
 	}

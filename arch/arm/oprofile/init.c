@@ -12,11 +12,15 @@
 #include <linux/errno.h>
 #include "op_arm_model.h"
 
-void __init oprofile_arch_init(struct oprofile_operations *ops)
+int __init oprofile_arch_init(struct oprofile_operations *ops)
 {
+	int ret = -ENODEV;
+
 #ifdef CONFIG_CPU_XSCALE
-	pmu_init(ops, &op_xscale_spec);
+	ret = pmu_init(ops, &op_xscale_spec);
 #endif
+
+	return ret;
 }
 
 void oprofile_arch_exit(void)
