@@ -85,9 +85,12 @@
 #include <linux/list.h>
 #include <asm/hvconsole.h>
 
+#define HVCS_MODULE_VERSION "1.0.3"
+
 MODULE_AUTHOR("Ryan S. Arnold <rsa@us.ibm.com>");
 MODULE_DESCRIPTION("IBM hvcs (Hypervisor Virtual Console Server) Driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(HVCS_MODULE_VERSION);
 
 /* Since the Linux TTY code does not currently (2-04-2004) support
  * dynamic addition of tty derived devices and we shouldn't
