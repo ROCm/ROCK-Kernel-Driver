@@ -67,8 +67,6 @@
 #include <asm/prom.h>
 #include <asm/sections.h>
 
-void smp_local_timer_interrupt(struct pt_regs *);
-
 u64 jiffies_64 __cacheline_aligned_in_smp = INITIAL_JIFFIES;
 
 EXPORT_SYMBOL(jiffies_64);
@@ -258,8 +256,6 @@ int timer_interrupt(struct pt_regs * regs)
 	lpaca->lppaca.xIntDword.xFields.xDecrInt = 0;
 
 	while (lpaca->next_jiffy_update_tb <= (cur_tb = get_tb())) {
-
-#ifdef CONFIG_SMP
 		/*
 		 * We cannot disable the decrementer, so in the period
 		 * between this cpu's being marked offline in cpu_online_map
@@ -268,8 +264,7 @@ int timer_interrupt(struct pt_regs * regs)
 		 * is the case.
 		 */
 		if (!cpu_is_offline(cpu))
-			smp_local_timer_interrupt(regs);
-#endif
+			update_process_times(user_mode(regs));
 		/*
 		 * No need to check whether cpu is offline here; boot_cpuid
 		 * should have been fixed up by now.
@@ -278,9 +273,6 @@ int timer_interrupt(struct pt_regs * regs)
 			write_seqlock(&xtime_lock);
 			tb_last_stamp = lpaca->next_jiffy_update_tb;
 			do_timer(regs);
-#ifndef CONFIG_SMP
-			update_process_times(user_mode(regs));
-#endif
 			timer_sync_xtime( cur_tb );
 			timer_check_rtc();
 			write_sequnlock(&xtime_lock);

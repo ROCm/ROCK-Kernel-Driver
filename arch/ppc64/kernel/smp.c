@@ -157,11 +157,6 @@ static void __init smp_space_timers(unsigned int max_cpus)
 	}
 }
 
-void smp_local_timer_interrupt(struct pt_regs * regs)
-{
-	update_process_times(user_mode(regs));
-}
-
 void smp_message_recv(int msg, struct pt_regs *regs)
 {
 	switch(msg) {
