@@ -1,6 +1,17 @@
 #
 # EISA configuration
 #
+config EISA_VLB_PRIMING
+	bool "Vesa Local Bus priming"
+	depends on X86_PC && EISA
+	default n
+	---help---
+	  Activate this option if your system contains a Vesa Local
+	  Bus (VLB) card that identify itself as an EISA card (such as
+	  the Adaptec AHA-284x).
+
+	  When in doubt, say N.
+
 config EISA_PCI_EISA
 	bool "Generic PCI/EISA bridge"
 	depends on PCI && EISA
@@ -12,9 +23,12 @@ config EISA_PCI_EISA
 
 	  When in doubt, say Y.
 
+# Using EISA_VIRTUAL_ROOT on something other than an Alpha or
+# an X86_PC may lead to crashes...
+
 config EISA_VIRTUAL_ROOT
 	bool "EISA virtual root device"
-	depends on EISA
+	depends on EISA && (ALPHA || X86_PC)
 	default y
 	---help---
 	  Activate this option if your system only have EISA bus
