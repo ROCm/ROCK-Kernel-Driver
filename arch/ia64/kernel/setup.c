@@ -34,14 +34,15 @@
 #include <linux/initrd.h>
 
 #include <asm/ia32.h>
+#include <asm/machvec.h>
+#include <asm/mca.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
-#include <asm/machvec.h>
 #include <asm/processor.h>
 #include <asm/sal.h>
-#include <asm/system.h>
-#include <asm/mca.h>
 #include <asm/smp.h>
+#include <asm/system.h>
+#include <asm/unistd.h>
 
 #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
 # error "struct cpuinfo_ia64 too big!"

@@ -671,7 +671,8 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 		ptr = (unsigned long *) ((unsigned long) &child->thread.fph + addr);
 	} else if ((addr >= PT_F10) && (addr < PT_F11 + 16)) {
 		/* scratch registers untouched by kernel (saved in pt_regs) */
-		ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, f10) + addr - PT_F10);
+		ptr = (unsigned long *)
+			((long) pt + offsetof(struct pt_regs, f10) + addr - PT_F10);
 	} else if (addr >= PT_F12 && addr < PT_F15 + 16) {
 		/* scratch registers untouched by kernel (saved in switch_stack) */
 		ptr = (unsigned long *) ((long) sw + (addr - PT_NAT_BITS - 32));
@@ -814,14 +815,17 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r1));
 			break;
 
-		       case PT_R2:  case PT_R3:
-			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r2) + addr - PT_R2);
+		      case PT_R2:  case PT_R3:
+			ptr = (unsigned long *)
+				((long) pt + offsetof(struct pt_regs, r2) + addr - PT_R2);
 			break;
 		      case PT_R8:  case PT_R9:  case PT_R10: case PT_R11:
-			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r8)+  addr - PT_R8);
+			ptr = (unsigned long *)
+				((long) pt + offsetof(struct pt_regs, r8)+  addr - PT_R8);
 			break;
 		      case PT_R12: case PT_R13:
-			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r12)+  addr - PT_R12);
+			ptr = (unsigned long *)
+				((long) pt + offsetof(struct pt_regs, r12)+  addr - PT_R12);
 			break;
 		      case PT_R14:
 			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r14));
@@ -833,7 +837,8 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 		      case PT_R20: case PT_R21: case PT_R22: case PT_R23:
 		      case PT_R24: case PT_R25: case PT_R26: case PT_R27:
 		      case PT_R28: case PT_R29: case PT_R30: case PT_R31:
-			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, r16) + addr - PT_R16);
+			ptr = (unsigned long *)
+				((long) pt + offsetof(struct pt_regs, r16) + addr - PT_R16);
 			break;
 		      case PT_B0:
 			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, b0));
@@ -846,10 +851,12 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 			break;
 		      case PT_F6:  case PT_F6+8: case PT_F7: case PT_F7+8:
 		      case PT_F8:  case PT_F8+8: case PT_F9: case PT_F9+8:
-			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, f6) + addr - PT_F6);
+			ptr = (unsigned long *)
+				((long) pt + offsetof(struct pt_regs, f6) + addr - PT_F6);
 			break;
 		      case PT_AR_BSPSTORE:
-			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, ar_bspstore));
+			ptr = (unsigned long *)
+				((long) pt + offsetof(struct pt_regs, ar_bspstore));
 			break;
 		      case PT_AR_RSC:
 			ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, ar_rsc));
@@ -881,7 +888,8 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 			return -1;
 		}
 	} else if (addr <= PT_AR_SSD) {
-		ptr = (unsigned long *) ((long) pt + offsetof(struct pt_regs, ar_csd) + addr - PT_AR_CSD);
+		ptr = (unsigned long *)
+			((long) pt + offsetof(struct pt_regs, ar_csd) + addr - PT_AR_CSD);
 	} else {
 		/* access debug registers */
 
