@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/config.h>
 #include <linux/init.h>
+#include <linux/workqueue.h>
 #include "hisax_if.h"
 #include "hisax.h"
 #include "isdnl1.h"
@@ -509,7 +510,7 @@ dch_init(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "HiSax: IPACX ISDN driver v0.1.0\n");
 
-	INIT_WORK(&cs->tqueue, (void *)(void *) dch_bh);
+	INIT_WORK(&cs->tqueue, (void *)(void *) dch_bh, cs);
 	cs->setstack_d      = dch_setstack;
   
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;

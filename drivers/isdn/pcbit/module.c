@@ -14,7 +14,6 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
-#include <linux/tqueue.h>
 #include <linux/skbuff.h>
 
 #include <linux/isdnif.h>
