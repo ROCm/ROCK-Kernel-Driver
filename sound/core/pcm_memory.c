@@ -224,9 +224,13 @@ static int snd_pcm_lib_preallocate_pages1(snd_pcm_substream_t *substream,
  */
 static inline void setup_pcm_id(snd_pcm_substream_t *subs)
 {
-	if (! subs->dma_device.id)
+	if (! subs->dma_device.id) {
 		subs->dma_device.id = subs->pcm->device << 16 |
 			subs->stream << 8 | (subs->number + 1);
+		if (subs->dma_device.type == SNDRV_DMA_TYPE_CONTINUOUS ||
+		    subs->dma_device.dev == NULL)
+			subs->dma_device.id |= (subs->pcm->card->number + 1) << 24;
+	}
 }
 
 /**
