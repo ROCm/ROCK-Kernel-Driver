@@ -152,63 +152,14 @@ DRIVERS-$(CONFIG_ISDN) += drivers/isdn/vmlinux-obj.o
 DRIVERS := $(DRIVERS-y)
 
 
-# files removed with 'make clean'
-CLEAN_FILES = \
-	kernel/ksyms.lst include/linux/compile.h \
-	vmlinux System.map \
-	.tmp* \
-	drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c \
-	drivers/char/conmakehash \
-	drivers/char/drm/*-mod.c \
-	drivers/pci/devlist.h drivers/pci/classlist.h drivers/pci/gen-devlist \
-	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
-	sound/oss/bin2hex sound/oss/hex2hex \
-	drivers/atm/fore200e_mkfirm drivers/atm/{pca,sba}*{.bin,.bin1,.bin2} \
-	drivers/scsi/aic7xxx/aicasm/aicasm_gram.c \
-	drivers/scsi/aic7xxx/aicasm/aicasm_scan.c \
-	drivers/scsi/aic7xxx/aicasm/y.tab.h \
-	drivers/scsi/aic7xxx/aicasm/aicasm \
-	drivers/scsi/53c700_d.h \
-	net/khttpd/make_times_h \
-	net/khttpd/times.h \
-	submenu*
-# directories removed with 'make clean'
-CLEAN_DIRS = \
-	modules
-
-# files removed with 'make mrproper'
-MRPROPER_FILES = \
-	include/linux/autoconf.h include/linux/version.h \
-	drivers/net/hamradio/soundmodem/sm_tbl_{afsk1200,afsk2666,fsk9600}.h \
-	drivers/net/hamradio/soundmodem/sm_tbl_{hapn4800,psk4800}.h \
-	drivers/net/hamradio/soundmodem/sm_tbl_{afsk2400_7,afsk2400_8}.h \
-	drivers/net/hamradio/soundmodem/gentbl \
-	sound/oss/*_boot.h sound/oss/.*.boot \
-	sound/oss/msndinit.c \
-	sound/oss/msndperm.c \
-	sound/oss/pndsperm.c \
-	sound/oss/pndspini.c \
-	drivers/atm/fore200e_*_fw.c drivers/atm/.fore200e_*.fw \
-	.version .config* config.in config.old \
-	scripts/tkparse scripts/kconfig.tk scripts/kconfig.tmp \
-	scripts/lxdialog/*.o scripts/lxdialog/lxdialog \
-	.menuconfig.log \
-	include/asm \
-	.hdepend scripts/mkdep scripts/split-include scripts/docproc \
-	$(TOPDIR)/include/linux/modversions.h \
-	kernel.spec
-
-# directories removed with 'make mrproper'
-MRPROPER_DIRS = \
-	include/config \
-	$(TOPDIR)/include/linux/modules
-
-
 include arch/$(ARCH)/Makefile
 
 export	CPPFLAGS CFLAGS CFLAGS_KERNEL AFLAGS AFLAGS_KERNEL
 
 export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
+
+# Build vmlinux / boot target
+# ---------------------------------------------------------------------------
 
 Version: dummy
 	@rm -f include/linux/compile.h
@@ -227,12 +178,15 @@ vmlinux: include/linux/version.h $(CONFIGURATION) init/main.o init/version.o ini
 		-o vmlinux
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 
-symlinks:
-	rm -f include/asm
-	( cd include ; ln -sf asm-$(ARCH) asm)
-	@if [ ! -d include/linux/modules ]; then \
-		mkdir include/linux/modules; \
-	fi
+# 	Handle descending into subdirectories listed in $(SUBDIRS)
+
+linuxsubdirs: $(patsubst %, _dir_%, $(SUBDIRS))
+
+$(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
+	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" -C $(patsubst _dir_%, %, $@)
+
+# Configuration
+# ---------------------------------------------------------------------------
 
 oldconfig: symlinks
 	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
@@ -248,14 +202,22 @@ menuconfig: include/linux/version.h symlinks
 config: symlinks
 	$(CONFIG_SHELL) scripts/Configure arch/$(ARCH)/config.in
 
+# make asm->asm-$(ARCH) symlink
+
+symlinks:
+	rm -f include/asm
+	( cd include ; ln -sf asm-$(ARCH) asm)
+	@if [ ! -d include/linux/modules ]; then \
+		mkdir include/linux/modules; \
+	fi
+
+# split autoconf.h into include/linux/config/*
+
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
 	scripts/split-include include/linux/autoconf.h include/config
 	@ touch include/config/MARKER
 
-linuxsubdirs: $(patsubst %, _dir_%, $(SUBDIRS))
-
-$(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" -C $(patsubst _dir_%, %, $@)
+# Generate some files
 
 $(TOPDIR)/include/linux/version.h: include/linux/version.h
 $(TOPDIR)/include/linux/compile.h: include/linux/compile.h
@@ -290,6 +252,10 @@ include/linux/version.h: ./Makefile
 
 comma	:= ,
 
+# ---------------------------------------------------------------------------
+# Build files in init
+# FIXME should be moved to init/Makefile
+
 init/version.o: init/version.c include/linux/compile.h include/config/MARKER
 	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) -DUTS_MACHINE='"$(ARCH)"' -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c -o init/version.o init/version.c
 
@@ -299,22 +265,35 @@ init/main.o: init/main.c include/config/MARKER
 init/do_mounts.o: init/do_mounts.c include/config/MARKER
 	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) $(PROFILING) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c -o $*.o $<
 
-fs lib mm ipc kernel drivers net sound: dummy
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
+# ---------------------------------------------------------------------------
+# Generate dependencies
 
-TAGS: dummy
-	{ find include/asm-${ARCH} -name '*.h' -print ; \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
-	find $(SUBDIRS) init -name '*.[ch]' ; } | grep -v SCCS | etags -
+depend dep: dep-files
 
-# Exuberant ctags works better with -I
-tags: dummy
-	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
-	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
-	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
+dep-files: scripts/mkdep archdep include/linux/version.h
+	scripts/mkdep -- init/*.c > .depend
+	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > .hdepend
+	$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS)) _FASTDEP_ALL_SUB_DIRS="$(SUBDIRS)"
+ifdef CONFIG_MODVERSIONS
+	$(MAKE) update-modverfile
+endif
+
+# FIXME MODVERFILE is unused
+
+ifdef CONFIG_MODVERSIONS
+MODVERFILE := $(TOPDIR)/include/linux/modversions.h
+else
+MODVERFILE :=
+endif
+export	MODVERFILE
+
+# ---------------------------------------------------------------------------
+# Modules
 
 ifdef CONFIG_MODULES
+
+#	Build modules
+
 ifdef CONFIG_MODVERSIONS
 MODFLAGS += -DMODVERSIONS -include $(HPATH)/linux/modversions.h
 endif
@@ -325,6 +304,8 @@ modules: $(patsubst %, _mod_%, $(SUBDIRS))
 .PHONY: $(patsubst %, _mod_%, $(SUBDIRS))
 $(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER
 	$(MAKE) -C $(patsubst _mod_%, %, $@) CFLAGS="$(CFLAGS) $(MODFLAGS)" MAKING_MODULES=1 modules
+
+#	Install modules
 
 .PHONY: modules_install
 modules_install: _modinst_ $(patsubst %, _modinst_%, $(SUBDIRS)) _modinst_post
@@ -354,9 +335,11 @@ _modinst_post:
 $(patsubst %, _modinst_%, $(SUBDIRS)) :
 	$(MAKE) -C $(patsubst _modinst_%, %, $@) modules_install
 
-# modules disabled....
+else # CONFIG_MODULES
 
-else
+# ---------------------------------------------------------------------------
+# Modules not configured
+
 modules modules_install: dummy
 	@echo
 	@echo "The present kernel configuration has modules disabled."
@@ -364,62 +347,12 @@ modules modules_install: dummy
 	@echo "Then build a kernel with module support enabled."
 	@echo
 	@exit 1
-endif
 
-clean:	archclean
-	find . \( -name '*.[oas]' -o -name core -o -name '.*.flags' \) -type f -print \
-		| grep -v lxdialog/ | xargs rm -f
-	rm -f $(CLEAN_FILES)
-	rm -rf $(CLEAN_DIRS)
-	$(MAKE) -C Documentation/DocBook clean
+endif # CONFIG_MODULES
 
-mrproper: clean archmrproper
-	find . \( -size 0 -o -name .depend \) -type f -print | xargs rm -f
-	rm -f $(MRPROPER_FILES)
-	rm -rf $(MRPROPER_DIRS)
-	$(MAKE) -C Documentation/DocBook mrproper
+# ---------------------------------------------------------------------------
 
-distclean: mrproper
-	rm -f core `find . \( -not -type d \) -and \
-		\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
-		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
-		-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f -print` TAGS tags
-
-backup: mrproper
-	cd .. && tar cf - linux/ | gzip -9 > backup.gz
-	sync
-
-sgmldocs psdocs pdfdocs htmldocs:
-	$(MAKE) -C Documentation/DocBook $@
-
-sums:
-	find . -type f -print | sort | xargs sum > .SUMS
-
-dep-files: scripts/mkdep archdep include/linux/version.h
-	scripts/mkdep -- init/*.c > .depend
-	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > .hdepend
-	$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS)) _FASTDEP_ALL_SUB_DIRS="$(SUBDIRS)"
-ifdef CONFIG_MODVERSIONS
-	$(MAKE) update-modverfile
-endif
-
-ifdef CONFIG_MODVERSIONS
-MODVERFILE := $(TOPDIR)/include/linux/modversions.h
-else
-MODVERFILE :=
-endif
-export	MODVERFILE
-
-depend dep: dep-files
-
-checkconfig:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkconfig.pl
-
-checkhelp:
-	find * -name [cC]onfig.in -print | sort | xargs $(PERL) -w scripts/checkhelp.pl
-
-checkincludes:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
+# FIXME unused
 
 ifdef CONFIGURATION
 ..$(CONFIGURATION):
@@ -443,9 +376,8 @@ endif
 
 include Rules.make
 
-#
-# This generates dependencies for the .h files.
-#
+# Build helpers in scripts/
+# FIXME: do that in scripts/Makefile?
 
 scripts/mkdep: scripts/mkdep.c
 	$(HOSTCC) $(HOSTCFLAGS) -o scripts/mkdep scripts/mkdep.c
@@ -453,21 +385,103 @@ scripts/mkdep: scripts/mkdep.c
 scripts/split-include: scripts/split-include.c
 	$(HOSTCC) $(HOSTCFLAGS) -o scripts/split-include scripts/split-include.c
 
-#
+# Cleaning up
+# ---------------------------------------------------------------------------
+
+#	files removed with 'make clean'
+CLEAN_FILES += \
+	kernel/ksyms.lst include/linux/compile.h \
+	vmlinux System.map \
+	.tmp* \
+	drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c \
+	drivers/char/conmakehash \
+	drivers/char/drm/*-mod.c \
+	drivers/pci/devlist.h drivers/pci/classlist.h drivers/pci/gen-devlist \
+	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
+	sound/oss/bin2hex sound/oss/hex2hex \
+	drivers/atm/fore200e_mkfirm drivers/atm/{pca,sba}*{.bin,.bin1,.bin2} \
+	drivers/scsi/aic7xxx/aicasm/aicasm_gram.c \
+	drivers/scsi/aic7xxx/aicasm/aicasm_scan.c \
+	drivers/scsi/aic7xxx/aicasm/y.tab.h \
+	drivers/scsi/aic7xxx/aicasm/aicasm \
+	drivers/scsi/53c700_d.h \
+	net/khttpd/make_times_h \
+	net/khttpd/times.h \
+	submenu*
+
+# 	directories removed with 'make clean'
+CLEAN_DIRS += \
+	modules
+
+# 	files removed with 'make mrproper'
+MRPROPER_FILES += \
+	include/linux/autoconf.h include/linux/version.h \
+	drivers/net/hamradio/soundmodem/sm_tbl_{afsk1200,afsk2666,fsk9600}.h \
+	drivers/net/hamradio/soundmodem/sm_tbl_{hapn4800,psk4800}.h \
+	drivers/net/hamradio/soundmodem/sm_tbl_{afsk2400_7,afsk2400_8}.h \
+	drivers/net/hamradio/soundmodem/gentbl \
+	sound/oss/*_boot.h sound/oss/.*.boot \
+	sound/oss/msndinit.c \
+	sound/oss/msndperm.c \
+	sound/oss/pndsperm.c \
+	sound/oss/pndspini.c \
+	drivers/atm/fore200e_*_fw.c drivers/atm/.fore200e_*.fw \
+	.version .config* config.in config.old \
+	scripts/tkparse scripts/kconfig.tk scripts/kconfig.tmp \
+	scripts/lxdialog/*.o scripts/lxdialog/lxdialog \
+	.menuconfig.log \
+	include/asm \
+	.hdepend scripts/mkdep scripts/split-include scripts/docproc \
+	$(TOPDIR)/include/linux/modversions.h \
+	kernel.spec
+
+# 	directories removed with 'make mrproper'
+MRPROPER_DIRS += \
+	include/config \
+	$(TOPDIR)/include/linux/modules
+
+
+clean:	archclean
+	find . \( -name '*.[oas]' -o -name core -o -name '.*.flags' \) -type f -print \
+		| grep -v lxdialog/ | xargs rm -f
+	rm -f $(CLEAN_FILES)
+	rm -rf $(CLEAN_DIRS)
+	$(MAKE) -C Documentation/DocBook clean
+
+mrproper: clean archmrproper
+	find . \( -size 0 -o -name .depend \) -type f -print | xargs rm -f
+	rm -f $(MRPROPER_FILES)
+	rm -rf $(MRPROPER_DIRS)
+	$(MAKE) -C Documentation/DocBook mrproper
+
+distclean: mrproper
+	rm -f core `find . \( -not -type d \) -and \
+		\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
+		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
+		-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f -print` TAGS tags
+
+# Assorted miscellaneous targets
+# ---------------------------------------------------------------------------
+
+# Documentation targets
+
+sgmldocs psdocs pdfdocs htmldocs:
+	$(MAKE) -C Documentation/DocBook $@
+
+
 # RPM target
 #
 #	If you do a make spec before packing the tarball you can rpm -ta it
-#
+
 spec:
 	. scripts/mkspec >kernel.spec
 
-#
 #	Build a tar ball, generate an rpm from it and pack the result
 #	There arw two bits of magic here
 #	1) The use of /. to avoid tar packing just the symlink
 #	2) Removing the .dep files as they have source paths in them that
 #	   will become invalid
-#
+
 rpm:	clean spec
 	find . \( -size 0 -o -name .depend -o -name .hdepend \) -type f -print | xargs rm -f
 	set -e; \
@@ -479,3 +493,49 @@ rpm:	clean spec
 	. scripts/mkversion > .version ; \
 	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
 	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
+
+# Scripts to check various things for consistency
+
+checkconfig:
+	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkconfig.pl
+
+checkhelp:
+	find * -name [cC]onfig.in -print | sort | xargs $(PERL) -w scripts/checkhelp.pl
+
+checkincludes:
+	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
+
+# Generate tags for editors
+
+TAGS: dummy
+	{ find include/asm-${ARCH} -name '*.h' -print ; \
+	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
+	find $(SUBDIRS) init -name '*.[ch]' ; } | grep -v SCCS | etags -
+
+# 	Exuberant ctags works better with -I
+tags: dummy
+	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
+	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
+	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
+	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
+
+# Targets which will only descend into one subdir, not trying
+# to link vmlinux afterwards
+# FIXME: anybody still using this?
+
+fs lib mm ipc kernel drivers net sound: dummy
+	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
+
+# Make a backup
+# FIXME anybody still using this?
+
+backup: mrproper
+	cd .. && tar cf - linux/ | gzip -9 > backup.gz
+	sync
+
+# Make checksums
+# FIXME anybody still using this?
+
+sums:
+	find . -type f -print | sort | xargs sum > .SUMS
+
