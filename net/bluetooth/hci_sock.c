@@ -439,7 +439,7 @@ drop:
 	goto done;
 }
 
-int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optval, int len)
+int hci_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int len)
 {
 	struct hci_ufilter uf = { .opcode = 0 };
 	struct sock *sk = sock->sk;
@@ -451,7 +451,7 @@ int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optva
 
 	switch (optname) {
 	case HCI_DATA_DIR:
-		if (get_user(opt, (int *)optval)) {
+		if (get_user(opt, (int __user *)optval)) {
 			err = -EFAULT;
 			break;
 		}
@@ -463,7 +463,7 @@ int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optva
 		break;
 
 	case HCI_TIME_STAMP:
-		if (get_user(opt, (int *)optval)) {
+		if (get_user(opt, (int __user *)optval)) {
 			err = -EFAULT;
 			break;
 		}
@@ -506,7 +506,7 @@ int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optva
 	return err;
 }
 
-int hci_sock_getsockopt(struct socket *sock, int level, int optname, char *optval, int *optlen)
+int hci_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
 {
 	struct hci_ufilter uf;
 	struct sock *sk = sock->sk;

@@ -297,7 +297,7 @@ void nr_destroy_socket(struct sock *sk)
  */
 
 static int nr_setsockopt(struct socket *sock, int level, int optname,
-	char *optval, int optlen)
+	char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	nr_cb *nr = nr_sk(sk);
@@ -309,7 +309,7 @@ static int nr_setsockopt(struct socket *sock, int level, int optname,
 	if (optlen < sizeof(int))
 		return -EINVAL;
 
-	if (get_user(opt, (int *)optval))
+	if (get_user(opt, (int __user *)optval))
 		return -EFAULT;
 
 	switch (optname) {
@@ -349,7 +349,7 @@ static int nr_setsockopt(struct socket *sock, int level, int optname,
 }
 
 static int nr_getsockopt(struct socket *sock, int level, int optname,
-	char *optval, int *optlen)
+	char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	nr_cb *nr = nr_sk(sk);

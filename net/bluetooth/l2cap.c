@@ -735,7 +735,7 @@ static int l2cap_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 	return err;
 }
 
-static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen)
+static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	struct l2cap_options opts;
@@ -758,7 +758,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
 		break;
 
 	case L2CAP_LM:
-		if (get_user(opt, (u32 *)optval)) {
+		if (get_user(opt, (u32 __user *)optval)) {
 			err = -EFAULT;
 			break;
 		}
@@ -775,7 +775,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
 	return err;
 }
 
-static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, char *optval, int *optlen)
+static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	struct l2cap_options opts;
@@ -800,7 +800,7 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
 		break;
 
 	case L2CAP_LM:
-		if (put_user(l2cap_pi(sk)->link_mode, (u32 *)optval))
+		if (put_user(l2cap_pi(sk)->link_mode, (u32 __user *)optval))
 			err = -EFAULT;
 		break;
 

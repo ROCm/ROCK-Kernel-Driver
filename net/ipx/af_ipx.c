@@ -1285,7 +1285,7 @@ const char *ipx_device_name(struct ipx_interface *intrfc)
  * socket object. */
 
 static int ipx_setsockopt(struct socket *sock, int level, int optname,
-			  char *optval, int optlen)
+			  char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	int opt;
@@ -1295,7 +1295,7 @@ static int ipx_setsockopt(struct socket *sock, int level, int optname,
 		goto out;
 
 	rc = -EFAULT;
-	if (get_user(opt, (unsigned int *)optval))
+	if (get_user(opt, (unsigned int __user *)optval))
 		goto out;
 
 	rc = -ENOPROTOOPT;
@@ -1309,7 +1309,7 @@ out:
 }
 
 static int ipx_getsockopt(struct socket *sock, int level, int optname,
-	char *optval, int *optlen)
+	char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	int val = 0;

@@ -722,14 +722,14 @@ struct tcp_func {
 	int			(*setsockopt)		(struct sock *sk, 
 							 int level, 
 							 int optname, 
-							 char *optval, 
+							 char __user *optval, 
 							 int optlen);
 
 	int			(*getsockopt)		(struct sock *sk, 
 							 int level, 
 							 int optname, 
-							 char *optval, 
-							 int *optlen);
+							 char __user *optval, 
+							 int __user *optlen);
 
 
 	void			(*addr2sockaddr)	(struct sock *sk,
@@ -873,10 +873,11 @@ extern unsigned int		tcp_poll(struct file * file, struct socket *sock, struct po
 extern void			tcp_write_space(struct sock *sk); 
 
 extern int			tcp_getsockopt(struct sock *sk, int level, 
-					       int optname, char *optval, 
-					       int *optlen);
+					       int optname,
+					       char __user *optval, 
+					       int __user *optlen);
 extern int			tcp_setsockopt(struct sock *sk, int level, 
-					       int optname, char *optval, 
+					       int optname, char __user *optval, 
 					       int optlen);
 extern void			tcp_set_keepalive(struct sock *sk, int val);
 extern int			tcp_recvmsg(struct kiocb *iocb, struct sock *sk,

@@ -2278,7 +2278,7 @@ out:
 /*
  *	Socket option code for TCP.
  */
-int tcp_setsockopt(struct sock *sk, int level, int optname, char *optval,
+int tcp_setsockopt(struct sock *sk, int level, int optname, char __user *optval,
 		   int optlen)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -2292,7 +2292,7 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char *optval,
 	if (optlen < sizeof(int))
 		return -EINVAL;
 
-	if (get_user(val, (int *)optval))
+	if (get_user(val, (int __user *)optval))
 		return -EFAULT;
 
 	lock_sock(sk);
@@ -2442,8 +2442,8 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char *optval,
 	return err;
 }
 
-int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
-		   int *optlen)
+int tcp_getsockopt(struct sock *sk, int level, int optname, char __user *optval,
+		   int __user *optlen)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	int val, len;

@@ -216,7 +216,7 @@ void inet_sock_release(struct sock *sk)
  *	Set socket options on an inet socket.
  */
 int inet_setsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int optlen)
+		    char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 
@@ -232,7 +232,7 @@ int inet_setsockopt(struct socket *sock, int level, int optname,
  */
 
 int inet_getsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int *optlen)
+		    char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 

@@ -1026,7 +1026,7 @@ static int udpv6_destroy_sock(struct sock *sk)
  *	Socket option code for UDP
  */
 static int udpv6_setsockopt(struct sock *sk, int level, int optname, 
-			  char *optval, int optlen)
+			  char __user *optval, int optlen)
 {
 	struct udp_opt *up = udp_sk(sk);
 	int val;
@@ -1038,7 +1038,7 @@ static int udpv6_setsockopt(struct sock *sk, int level, int optname,
 	if(optlen<sizeof(int))
 		return -EINVAL;
 
-	if (get_user(val, (int *)optval))
+	if (get_user(val, (int __user *)optval))
 		return -EFAULT;
 
 	switch(optname) {
@@ -1066,7 +1066,7 @@ static int udpv6_setsockopt(struct sock *sk, int level, int optname,
 }
 
 static int udpv6_getsockopt(struct sock *sk, int level, int optname, 
-			  char *optval, int *optlen)
+			  char __user *optval, int __user *optlen)
 {
 	struct udp_opt *up = udp_sk(sk);
 	int val, len;

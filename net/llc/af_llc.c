@@ -881,7 +881,7 @@ static int llc_ui_ioctl(struct socket *sock, unsigned int cmd,
  *	Set various connection specific parameters.
  */
 static int llc_ui_setsockopt(struct socket *sock, int level, int optname,
-			     char *optval, int optlen)
+			     char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	struct llc_opt *llc = llc_sk(sk);
@@ -890,7 +890,7 @@ static int llc_ui_setsockopt(struct socket *sock, int level, int optname,
 	lock_sock(sk);
 	if (level != SOL_LLC || optlen != sizeof(int))
 		goto out;
-	rc = get_user(opt, (int *)optval);
+	rc = get_user(opt, (int __user *)optval);
 	if (rc)
 		goto out;
 	rc = -EINVAL;
@@ -956,7 +956,7 @@ out:
  *	Get connection specific socket information.
  */
 static int llc_ui_getsockopt(struct socket *sock, int level, int optname,
-			     char *optval, int *optlen)
+			     char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	struct llc_opt *llc = llc_sk(sk);
