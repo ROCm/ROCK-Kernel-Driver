@@ -398,7 +398,7 @@ static int sa1100_startup(struct uart_port *port)
 	 * Allocate the IRQ
 	 */
 	retval = request_irq(sport->port.irq, sa1100_int, 0,
-			     "serial_sa1100", sport);
+			     "sa11x0-uart", sport);
 	if (retval)
 		return retval;
 
@@ -568,7 +568,7 @@ static int sa1100_request_port(struct uart_port *port)
 	struct sa1100_port *sport = (struct sa1100_port *)port;
 
 	return request_mem_region(sport->port.mapbase, UART_PORT_SIZE,
-			"serial_sa1100") != NULL ? 0 : -EBUSY;
+			"sa11x0-uart") != NULL ? 0 : -EBUSY;
 }
 
 /*
@@ -858,42 +858,69 @@ static struct uart_driver sa1100_reg = {
 	.cons			= SA1100_CONSOLE,
 };
 
-static int sa1100_serial_suspend(struct device *dev, u32 state, u32 level)
+static int sa1100_serial_suspend(struct device *_dev, u32 state, u32 level)
 {
-	int i;
+	struct sa1100_port *sport = dev_get_drvdata(_dev);
 
-	for (i = 0; i < NR_PORTS; i++)
-		uart_suspend_port(&sa1100_reg, &sa1100_ports[i].port, level);
+	if (sport)
+		uart_suspend_port(&sa1100_reg, &sport->port, level);
 
 	return 0;
 }
 
-static int sa1100_serial_resume(struct device *dev, u32 level)
+static int sa1100_serial_resume(struct device *_dev, u32 level)
 {
+	struct sa1100_port *sport = dev_get_drvdata(_dev);
+
+	if (sport)
+		uart_resume_port(&sa1100_reg, &sport->port, level);
+
+	return 0;
+}
+
+static int sa1100_serial_probe(struct device *_dev)
+{
+	struct platform_device *dev = to_platform_device(_dev);
+	struct resource *res = dev->resource;
 	int i;
 
-	for (i = 0; i < NR_PORTS; i++)
-		uart_resume_port(&sa1100_reg, &sa1100_ports[i].port, level);
+	for (i = 0; i < dev->num_resources; i++, res++)
+		if (res->flags & IORESOURCE_MEM)
+			break;
+
+	if (i < dev->num_resources) {
+		for (i = 0; i < NR_PORTS; i++) {
+			if (sa1100_ports[i].port.mapbase != res->start)
+				continue;
+
+			uart_add_one_port(&sa1100_reg, &sa1100_ports[i].port);
+			dev_set_drvdata(_dev, &sa1100_ports[i]);
+			break;
+		}
+	}
+
+	return 0;
+}
+
+static int sa1100_serial_remove(struct device *_dev)
+{
+	struct sa1100_port *sport = dev_get_drvdata(_dev);
+
+	dev_set_drvdata(_dev, NULL);
+
+	if (sport)
+		uart_remove_one_port(&sa1100_reg, &sport->port);
 
 	return 0;
 }
 
 static struct device_driver sa11x0_serial_driver = {
-	.name		= "sa11x0_serial",
-	.bus		= &system_bus_type,
+	.name		= "sa11x0-uart",
+	.bus		= &platform_bus_type,
+	.probe		= sa1100_serial_probe,
+	.remove		= sa1100_serial_remove,
 	.suspend	= sa1100_serial_suspend,
 	.resume		= sa1100_serial_resume,
-};
-
-/*
- * This "device" covers _all_ ISA 8250-compatible serial devices.
- */
-static struct sys_device sa11x0_serial_devs = {
-	.name		= "sa11x0_serial",
-	.id		= 0,
-	.dev = {
-		.driver	= &sa11x0_serial_driver,
-	},
 };
 
 static int __init sa1100_serial_init(void)
@@ -902,27 +929,20 @@ static int __init sa1100_serial_init(void)
 
 	printk(KERN_INFO "Serial: SA11x0 driver $Revision: 1.50 $\n");
 
-	driver_register(&sa11x0_serial_driver);
-	sys_device_register(&sa11x0_serial_devs);
-
 	sa1100_init_ports();
+
 	ret = uart_register_driver(&sa1100_reg);
 	if (ret == 0) {
-		int i;
-
-		for (i = 0; i < NR_PORTS; i++)
-			uart_add_one_port(&sa1100_reg, &sa1100_ports[i].port);
+		ret = driver_register(&sa11x0_serial_driver);
+		if (ret)
+			uart_unregister_driver(&sa1100_reg);
 	}
 	return ret;
 }
 
 static void __exit sa1100_serial_exit(void)
 {
-	int i;
-
-	for (i = 0; i < NR_PORTS; i++)
-		uart_remove_one_port(&sa1100_reg, &sa1100_ports[i].port);
-
+	driver_unregister(&sa11x0_serial_driver);
 	uart_unregister_driver(&sa1100_reg);
 }
 
