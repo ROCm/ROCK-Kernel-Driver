@@ -281,6 +281,8 @@ struct ethtool_stats {
 #define ETHTOOL_GSTRINGS	0x0000001b /* get specified string set */
 #define ETHTOOL_PHYS_ID		0x0000001c /* identify the NIC */
 #define ETHTOOL_GSTATS		0x0000001d /* get NIC-specific statistics */
+#define ETHTOOL_GTSO		0x0000001e /* Get TSO enable (ethtool_value) */
+#define ETHTOOL_STSO		0x0000001f /* Set TSO enable (ethtool_value) */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET
