@@ -516,6 +516,12 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	ohci->max_packet_size =
 		1<<(((reg_read(ohci, OHCI1394_BusOptions)>>12)&0xf)+1);
 
+	if (ohci->max_packet_size < 512) {
+		HPSB_WARNING("warning: Invalid max packet size of %d, setting to 512",
+			     ohci->max_packet_size);
+		ohci->max_packet_size = 512;
+	}
+		
 	/* Don't accept phy packets into AR request context */
 	reg_write(ohci, OHCI1394_LinkControlClear, 0x00000400);
 
