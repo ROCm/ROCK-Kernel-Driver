@@ -28,7 +28,8 @@ O_TARGET := video.o
 export-objs     :=	i2c-old.o videodev.o bttv-if.o cpia.o video-buf.o
 
 list-multi	:=	bttv.o zoran.o
-bttv-objs	:=	bttv-driver.o bttv-cards.o bttv-if.o
+bttv-objs	:=	bttv-driver.o bttv-cards.o bttv-if.o \
+			bttv-risc.o bttv-vbi.o
 zoran-objs      :=	zr36120.o zr36120_i2c.o zr36120_mem.o
 
 obj-$(CONFIG_VIDEO_DEV) += videodev.o
