@@ -215,15 +215,12 @@ vmlinux: $(CONFIGURATION) $(vmlinux-objs) dummy
 #	The actual objects are generated when descending, 
 #	make sure no implicit rule kicks in
 
-$(sort $(vmlinux-objs)): linuxsubdirs ;
+$(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
-.PHONY: linuxsubdirs
-linuxsubdirs: $(patsubst %, _dir_%, $(SUBDIRS))
-
-$(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
-	@$(MAKE) -C $(patsubst _dir_%, %, $@)
+$(SUBDIRS): dummy include/linux/version.h include/config/MARKER
+	@$(MAKE) -C $@
 
 # Configuration
 # ---------------------------------------------------------------------------
@@ -488,13 +485,6 @@ tags: dummy
 	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
 	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
-
-# Targets which will only descend into one subdir, not trying
-# to link vmlinux afterwards
-# FIXME: anybody still using this?
-
-fs lib mm ipc kernel drivers net sound: dummy
-	$(MAKE) $(subst $@, _dir_$@, $@)
 
 # Make a backup
 # FIXME anybody still using this?

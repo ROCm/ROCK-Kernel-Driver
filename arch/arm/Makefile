@@ -212,9 +212,6 @@ vmlinux: arch/arm/vmlinux.lds
 arch/arm/vmlinux.lds: $(LDSCRIPT) dummy
 	@sed 's/TEXTADDR/$(TEXTADDR)/;s/DATAADDR/$(DATAADDR)/' $(LDSCRIPT) >$@
 
-arch/arm/kernel arch/arm/mm arch/arm/lib: dummy
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
-
 bzImage zImage zinstall Image bootpImage install: vmlinux
 	@$(MAKEBOOT) $@
 

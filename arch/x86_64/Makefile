@@ -70,15 +70,6 @@ endif
 
 CORE_FILES += $(core-y)
 
-arch/x86_64/tools: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=arch/x86_64/tools 
-
-arch/x86_64/kernel: dummy 
-	$(MAKE) linuxsubdirs SUBDIRS=arch/x86_64/kernel
-
-arch/x86_64/mm: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=arch/x86_64/mm
-
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
 vmlinux: arch/x86_64/vmlinux.lds
