@@ -67,6 +67,7 @@ struct mqueue_inode_info {
 
 	struct sigevent notify;
 	pid_t notify_owner;
+ 	struct user_struct *user;	/* user who created, for accouting */
 	struct sock *notify_sock;
 	struct sk_buff *notify_cookie;
 
@@ -114,6 +115,9 @@ static struct inode *mqueue_get_inode(struct super_block *sb, int mode,
 
 		if (S_ISREG(mode)) {
 			struct mqueue_inode_info *info;
+			struct task_struct *p = current;
+			struct user_struct *u = p->user;
+			unsigned long mq_bytes, mq_msg_tblsz;
 
 			inode->i_fop = &mqueue_file_operations;
 			inode->i_size = FILENT_SIZE;
@@ -123,8 +127,10 @@ static struct inode *mqueue_get_inode(struct super_block *sb, int mode,
 			init_waitqueue_head(&info->wait_q);
 			INIT_LIST_HEAD(&info->e_wait_q[0].list);
 			INIT_LIST_HEAD(&info->e_wait_q[1].list);
+			info->messages = NULL;
 			info->notify_owner = 0;
 			info->qsize = 0;
+			info->user = NULL;	/* set when all is ok */
 			memset(&info->attr, 0, sizeof(info->attr));
 			info->attr.mq_maxmsg = DFLT_MSGMAX;
 			info->attr.mq_msgsize = DFLT_MSGSIZEMAX;
@@ -132,12 +138,29 @@ static struct inode *mqueue_get_inode(struct super_block *sb, int mode,
 				info->attr.mq_maxmsg = attr->mq_maxmsg;
 				info->attr.mq_msgsize = attr->mq_msgsize;
 			}
-			info->messages = kmalloc(info->attr.mq_maxmsg * sizeof(struct msg_msg *), GFP_KERNEL);
-			if (!info->messages) {
-				make_bad_inode(inode);
-				iput(inode);
-				inode = NULL;
+			mq_msg_tblsz = info->attr.mq_maxmsg * sizeof(struct msg_msg *);
+			mq_bytes = (mq_msg_tblsz +
+				(info->attr.mq_maxmsg * info->attr.mq_msgsize));
+
+			spin_lock(&mq_lock);
+			if (u->mq_bytes + mq_bytes < u->mq_bytes ||
+		 	    u->mq_bytes + mq_bytes >
+			    p->rlim[RLIMIT_MSGQUEUE].rlim_cur) {
+				spin_unlock(&mq_lock);
+				goto out_inode;
 			}
+			u->mq_bytes += mq_bytes;
+			spin_unlock(&mq_lock);
+
+			info->messages = kmalloc(mq_msg_tblsz, GFP_KERNEL);
+			if (!info->messages) {
+				spin_lock(&mq_lock);
+				u->mq_bytes -= mq_bytes;
+				spin_unlock(&mq_lock);
+				goto out_inode;
+			}
+			/* all is ok */
+			info->user = get_uid(u);
 		} else if (S_ISDIR(mode)) {
 			inode->i_nlink++;
 			/* Some things misbehave if size == 0 on a directory */
@@ -147,6 +170,10 @@ static struct inode *mqueue_get_inode(struct super_block *sb, int mode,
 		}
 	}
 	return inode;
+out_inode:
+	make_bad_inode(inode);
+	iput(inode);
+	return NULL;
 }
 
 static int mqueue_fill_super(struct super_block *sb, void *data, int silent)
@@ -205,6 +232,8 @@ static void mqueue_destroy_inode(struct inode *inode)
 static void mqueue_delete_inode(struct inode *inode)
 {
 	struct mqueue_inode_info *info;
+	struct user_struct *user;
+	unsigned long mq_bytes;
 	int i;
 
 	if (S_ISDIR(inode->i_mode)) {
@@ -220,10 +249,15 @@ static void mqueue_delete_inode(struct inode *inode)
 
 	clear_inode(inode);
 
-	if (info->messages) {
+	mq_bytes = (info->attr.mq_maxmsg * sizeof(struct msg_msg *) +
+		   (info->attr.mq_maxmsg * info->attr.mq_msgsize));
+	user = info->user;
+	if (user) {
 		spin_lock(&mq_lock);
+		user->mq_bytes -= mq_bytes;
 		queues_count--;
 		spin_unlock(&mq_lock);
+		free_uid(user);
 	}
 }
 
