@@ -1751,42 +1751,44 @@ ret_sys_call:
 	ldx		[%sp + PTREGS_OFF + PT_V9_TNPC], %l1 ! pc = npc
 	sra		%o0, 0, %o0
 	mov		%ulo(TSTATE_XCARRY | TSTATE_ICARRY), %g2
-	cmp		%o0, -ENOIOCTLCMD
 	sllx		%g2, 32, %g2
+
+	/* Check if force_successful_syscall_return()
+	 * was invoked.
+	 */
+	ldx		[%curptr + TI_FLAGS], %l0
+	andcc		%l0, _TIF_SYSCALL_SUCCESS, %g0
+	be,pt		%icc, 1f
+	 andn		%l0, _TIF_SYSCALL_SUCCESS, %l0
+	ba,pt		%xcc, 80f
+	 stx		%l0, [%curptr + TI_FLAGS]
+
+1:
+	cmp		%o0, -ENOIOCTLCMD
 	bgeu,pn		%xcc, 1f
 	 andcc		%l0, _TIF_SYSCALL_TRACE, %l6	
 80:
-	andn		%g3, %g2, %g3		/* System call success, clear Carry condition code. */
+	/* System call success, clear Carry condition code. */
+	andn		%g3, %g2, %g3
 	stx		%g3, [%sp + PTREGS_OFF + PT_V9_TSTATE]	
 	bne,pn		%icc, linux_syscall_trace2
-	 add		%l1, 0x4, %l2				         ! npc = npc+4
+	 add		%l1, 0x4, %l2			! npc = npc+4
 	stx		%l1, [%sp + PTREGS_OFF + PT_V9_TPC]
 	ba,pt		%xcc, rtrap_clr_l6
 	 stx		%l2, [%sp + PTREGS_OFF + PT_V9_TNPC]
 
 1:
-	/* Really a failure?  Check if force_successful_syscall_return()
-	 * was invoked.
-	 */
-	ldx		[%curptr + TI_FLAGS], %l0		! Load
-	andcc		%l0, _TIF_SYSCALL_SUCCESS, %g0
-	be,pt		%icc, 1f
-	 andcc		%l0, _TIF_SYSCALL_TRACE, %l6	
-	andn		%l0, _TIF_SYSCALL_SUCCESS, %l0
-	ba,pt		%xcc, 80b
-	 stx		%l0, [%curptr + TI_FLAGS]
-
 	/* System call failure, set Carry condition code.
 	 * Also, get abs(errno) to return to the process.
 	 */
-1:
+	andcc		%l0, _TIF_SYSCALL_TRACE, %l6	
 	sub		%g0, %o0, %o0
 	or		%g3, %g2, %g3
 	stx		%o0, [%sp + PTREGS_OFF + PT_V9_I0]
 	mov		1, %l6
 	stx		%g3, [%sp + PTREGS_OFF + PT_V9_TSTATE]
 	bne,pn		%icc, linux_syscall_trace2
-	 add		%l1, 0x4, %l2				         !npc = npc+4
+	 add		%l1, 0x4, %l2			! npc = npc+4
 	stx		%l1, [%sp + PTREGS_OFF + PT_V9_TPC]
 
 	b,pt		%xcc, rtrap
