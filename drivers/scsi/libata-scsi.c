@@ -32,6 +32,10 @@
 
 #include "libata.h"
 
+static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
+			      struct scsi_cmnd *cmd,
+			      void (*done)(struct scsi_cmnd *));
+
 
 /**
  *	ata_std_bios_param - generic bios head/sector/cylinder calculator
@@ -268,7 +272,7 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 }
 
 /**
- *	ata_scsi_rw_queue -
+ *	ata_scsi_translate -
  *	@ap:
  *	@dev:
  *	@cmd:
@@ -278,7 +282,7 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
  *	spin_lock_irqsave(host_set lock)
  */
 
-static void ata_scsi_rw_queue(struct ata_port *ap, struct ata_device *dev,
+static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
 			      struct scsi_cmnd *cmd,
 			      void (*done)(struct scsi_cmnd *))
 {
@@ -977,6 +981,21 @@ static inline int ata_scsi_xlat_possible(u8 cmd)
 	return 0;
 }
 
+static inline void ata_scsi_dump_cdb(struct ata_port *ap,
+				     struct scsi_cmnd *cmd)
+{
+#ifdef ATA_DEBUG
+	u8 *scsicmd = cmd->cmnd;
+
+	DPRINTK("CDB (%u:%d,%d,%d) %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+		ap->id,
+		cmd->device->channel, cmd->device->id, cmd->device->lun,
+		scsicmd[0], scsicmd[1], scsicmd[2], scsicmd[3],
+		scsicmd[4], scsicmd[5], scsicmd[6], scsicmd[7],
+		scsicmd[8]);
+#endif
+}
+
 /**
  *	ata_scsi_queuecmd - Issue SCSI cdb to libata-managed device
  *	@cmd: SCSI command to be sent
@@ -998,19 +1017,12 @@ static inline int ata_scsi_xlat_possible(u8 cmd)
 
 int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
-	u8 *scsicmd = cmd->cmnd;
 	struct ata_port *ap;
 	struct ata_device *dev;
-	struct ata_scsi_args args;
 
 	ap = (struct ata_port *) &cmd->device->host->hostdata[0];
 
-	DPRINTK("CDB (%u:%d,%d,%d) %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		ap->id,
-		cmd->device->channel, cmd->device->id, cmd->device->lun,
-		scsicmd[0], scsicmd[1], scsicmd[2], scsicmd[3],
-		scsicmd[4], scsicmd[5], scsicmd[6], scsicmd[7],
-		scsicmd[8]);
+	ata_scsi_dump_cdb(ap, cmd);
 
 	dev = ata_scsi_find_dev(ap, cmd);
 	if (unlikely(!dev)) {
@@ -1019,24 +1031,38 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 		goto out_unlock;
 	}
 
-	/* fast path */
 	if (dev->class == ATA_DEV_ATA) {
-		if (ata_scsi_xlat_possible(scsicmd[0])) {
-			ata_scsi_rw_queue(ap, dev, cmd, done);
-			goto out_unlock;
-		}
-
-		/* otherwise fall through to slow path */
-
-	} else {
-		assert (dev->class == ATA_DEV_ATAPI);
+		if (ata_scsi_xlat_possible(cmd->cmnd[0]))
+			ata_scsi_translate(ap, dev, cmd, done);
+		else
+			ata_scsi_simulate(ap, dev, cmd, done);
+	} else
 		atapi_scsi_queuecmd(ap, dev, cmd, done);
-		goto out_unlock;
-	}
 
-	/*
-	 * slow path
-	 */
+out_unlock:
+	return 0;
+}
+
+/**
+ *	ata_scsi_simulate - simulate SCSI command on ATA device
+ *	@ap: Port to which ATA device is attached.
+ *	@dev: Target device for CDB.
+ *	@cmd: SCSI command being sent to device.
+ *	@done: SCSI command completion function.
+ *
+ *	Interprets and directly executes a select list of SCSI commands
+ *	that can be handled internally.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ */
+
+static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
+			      struct scsi_cmnd *cmd,
+			      void (*done)(struct scsi_cmnd *))
+{
+	struct ata_scsi_args args;
+	u8 *scsicmd = cmd->cmnd;
 
 	args.ap = ap;
 	args.dev = dev;
@@ -1105,8 +1131,5 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 			ata_bad_scsiop(cmd, done);
 			break;
 	}
-
-out_unlock:
-	return 0;
 }
 
