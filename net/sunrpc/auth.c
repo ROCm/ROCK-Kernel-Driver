@@ -8,6 +8,7 @@
 
 #include <linux/types.h>
 #include <linux/sched.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/socket.h>
@@ -65,6 +66,8 @@ rpcauth_create(rpc_authflavor_t pseudoflavor, struct rpc_clnt *clnt)
 
 	if (flavor >= RPC_AUTH_MAXFLAVOR || !(ops = auth_flavors[flavor]))
 		return NULL;
+	if (!try_module_get(ops->owner))
+		return NULL;
 	clnt->cl_auth = ops->create(clnt, pseudoflavor);
 	return clnt->cl_auth;
 }
@@ -73,6 +76,8 @@ void
 rpcauth_destroy(struct rpc_auth *auth)
 {
 	auth->au_ops->destroy(auth);
+	module_put(auth->au_ops->owner);
+	kfree(auth);
 }
 
 static spinlock_t rpc_credcache_lock = SPIN_LOCK_UNLOCKED;

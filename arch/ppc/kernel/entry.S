@@ -30,6 +30,7 @@
 #include <asm/thread_info.h>
 #include <asm/ppc_asm.h>
 #include <asm/offsets.h>
+#include <asm/unistd.h>
 
 #undef SHOW_SYSCALLS
 #undef SHOW_SYSCALLS_TASK

@@ -801,17 +801,6 @@ static int lynx_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
                 break;
 
-        case MODIFY_USAGE:
-		if (arg) {
-			if (try_module_get(THIS_MODULE))
-				retval = 1;
-		} else {
-			module_put(THIS_MODULE);
-			retval = 1;
-		}
-
-                break;
-
         case ISO_LISTEN_CHANNEL:
                 spin_lock_irqsave(&lynx->iso_rcv.lock, flags);
                 
@@ -1904,6 +1893,7 @@ static struct pci_driver lynx_pci_driver = {
 };
 
 static struct hpsb_host_driver lynx_driver = {
+	.owner =	   THIS_MODULE,
 	.name =		   PCILYNX_DRIVER_NAME,
         .get_rom =         get_lynx_rom,
         .transmit_packet = lynx_transmit,

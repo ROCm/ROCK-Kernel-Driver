@@ -49,7 +49,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptbase.c,v 1.125 2002/12/03 21:26:32 pdelaney Exp $
+ *  $Id: mptbase.c,v 1.126 2002/12/16 15:28:45 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -123,8 +123,10 @@ MODULE_LICENSE("GPL");
 /*
  *  cmd line parameters
  */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,59)
 MODULE_PARM(PortIo, "0-1i");
 MODULE_PARM_DESC(PortIo, "[0]=Use mmap, 1=Use port io");
+#endif
 static int PortIo = 0;
 
 #ifdef MFCNT
@@ -580,8 +582,6 @@ mpt_base_reply(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *reply)
 		dcprintk((MYIOC_s_INFO_FMT "config_complete (mf=%p,mr=%p)\n",
 				ioc->name, mf, reply));
 
-		DBG_DUMP_REPLY_FRAME(reply)
-
 		pCfg = * ((CONFIGPARMS **)((u8 *) mf + ioc->req_sz - sizeof(void *)));
 
 		if (pCfg) {
@@ -686,7 +686,7 @@ mpt_register(MPT_CALLBACK cbfunc, MPT_DRIVER_CLASS dclass)
 			MptEvHandlers[i] = NULL;
 			last_drv_idx = i;
 			if (cbfunc != mpt_base_reply) {
-				MOD_INC_USE_COUNT;
+				mpt_inc_use_count();
 			}
 			break;
 		}
@@ -706,7 +706,7 @@ mpt_register(MPT_CALLBACK cbfunc, MPT_DRIVER_CLASS dclass)
 void
 mpt_deregister(int cb_idx)
 {
-	if (cb_idx && (cb_idx < MPT_MAX_PROTOCOL_DRIVERS)) {
+	if ((cb_idx >= 0) && (cb_idx < MPT_MAX_PROTOCOL_DRIVERS)) {
 		MptCallbacks[cb_idx] = NULL;
 		MptDriverClass[cb_idx] = MPTUNKNOWN_DRIVER;
 		MptEvHandlers[cb_idx] = NULL;
@@ -716,7 +716,7 @@ mpt_deregister(int cb_idx)
 			isense_idx++;
 
 		if (cb_idx != mpt_base_index) {
-			MOD_DEC_USE_COUNT;
+			mpt_dec_use_count();
 		}
 	}
 }
@@ -2107,9 +2107,7 @@ MakeIocReady(MPT_ADAPTER *ioc, int force, int sleepFlag)
 	 *  Loop here waiting for IOC to come READY.
 	 */
 	ii = 0;
-	cntdn = HZ * 15;
-	if (sleepFlag != CAN_SLEEP)
-		cntdn *= 10;	/* 1500 iterations @ 1msec per */
+	cntdn = ((sleepFlag == CAN_SLEEP) ? HZ : 1000) * 15;	/* 15 seconds */
 
 	while ((ioc_state = mpt_GetIocState(ioc, 1)) != MPI_IOC_STATE_READY) {
 		if (ioc_state == MPI_IOC_STATE_OPERATIONAL) {
@@ -2483,9 +2481,7 @@ SendIocInit(MPT_ADAPTER *ioc, int sleepFlag)
 	 *  LoopInit and TargetDiscovery!
 	 */
 	count = 0;
-	cntdn = HZ * 60;					/* chg'd from 30 to 60 seconds */
-	if (sleepFlag != CAN_SLEEP)
-		cntdn *= 10;					/* scale for 1msec delays */
+	cntdn = ((sleepFlag == CAN_SLEEP) ? HZ : 1000) * 60;	/* 60 seconds */
 	state = mpt_GetIocState(ioc, 1);
 	while (state != MPI_IOC_STATE_OPERATIONAL && --cntdn) {
 		if (sleepFlag == CAN_SLEEP) {
@@ -3478,10 +3474,8 @@ SendIocReset(MPT_ADAPTER *ioc, u8 reset_type, int sleepFlag)
 
 	/* FW ACK'd request, wait for READY state
 	 */
-	cntdn = HZ * 15;
 	count = 0;
-	if (sleepFlag != CAN_SLEEP)
-		cntdn *= 10;	/* 1500 iterations @ 1msec per */
+	cntdn = ((sleepFlag == CAN_SLEEP) ? HZ : 1000) * 15;	/* 15 seconds */
 
 	while ((state = mpt_GetIocState(ioc, 1)) != MPI_IOC_STATE_READY) {
 		cntdn--;
@@ -3640,9 +3634,6 @@ PrimeIocFifos(MPT_ADAPTER *ioc)
 	}
 	spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 
-#ifdef MFCNT
-	ioc->mfcnt = 0;
-#endif
 
 	if (ioc->sense_buf_pool == NULL) {
 		sz = (ioc->req_depth * MPT_SENSE_BUFFER_ALLOC);
@@ -3822,9 +3813,11 @@ mpt_handshake_req_reply_wait(MPT_ADAPTER *ioc, int reqBytes, u32 *req,
 static int
 WaitForDoorbellAck(MPT_ADAPTER *ioc, int howlong, int sleepFlag)
 {
-	int cntdn = HZ * howlong;
+	int cntdn;
 	int count = 0;
 	u32 intstat;
+
+	cntdn = ((sleepFlag == CAN_SLEEP) ? HZ : 1000) * howlong;
 
 	if (sleepFlag == CAN_SLEEP) {
 		while (--cntdn) {
@@ -3836,7 +3829,6 @@ WaitForDoorbellAck(MPT_ADAPTER *ioc, int howlong, int sleepFlag)
 			count++;
 		}
 	} else {
-		cntdn *= 10; /* convert to msec */
 		while (--cntdn) {
 			intstat = CHIPREG_READ32(&ioc->chip->IntStatus);
 			if (! (intstat & MPI_HIS_IOP_DOORBELL_STATUS))
@@ -3844,7 +3836,6 @@ WaitForDoorbellAck(MPT_ADAPTER *ioc, int howlong, int sleepFlag)
 			mdelay (1);
 			count++;
 		}
-		count /= 10;
 	}
 
 	if (cntdn) {
@@ -3873,10 +3864,11 @@ WaitForDoorbellAck(MPT_ADAPTER *ioc, int howlong, int sleepFlag)
 static int
 WaitForDoorbellInt(MPT_ADAPTER *ioc, int howlong, int sleepFlag)
 {
-	int cntdn = HZ * howlong;
+	int cntdn;
 	int count = 0;
 	u32 intstat;
 
+	cntdn = ((sleepFlag == CAN_SLEEP) ? HZ : 1000) * howlong;
 	if (sleepFlag == CAN_SLEEP) {
 		while (--cntdn) {
 			intstat = CHIPREG_READ32(&ioc->chip->IntStatus);
@@ -3887,7 +3879,6 @@ WaitForDoorbellInt(MPT_ADAPTER *ioc, int howlong, int sleepFlag)
 			count++;
 		}
 	} else {
-		cntdn *= 10; /* convert to msec */
 		while (--cntdn) {
 			intstat = CHIPREG_READ32(&ioc->chip->IntStatus);
 			if (intstat & MPI_HIS_DOORBELL_INTERRUPT)
@@ -3895,7 +3886,6 @@ WaitForDoorbellInt(MPT_ADAPTER *ioc, int howlong, int sleepFlag)
 			mdelay(1);
 			count++;
 		}
-		count /= 10;
 	}
 
 	if (cntdn) {
@@ -4953,7 +4943,6 @@ mpt_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 		/* Search the configQ for internal commands.
 		 * Flush the Q, and wake up all suspended threads.
 		 */
-#if 1
 		spin_lock_irqsave(&ioc->FreeQlock, flags);
 		if (! Q_IS_EMPTY(&ioc->configQ)){
 			pCfg = (CONFIGPARMS *)ioc->configQ.head;
@@ -4970,23 +4959,6 @@ mpt_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 			} while (pCfg != (CONFIGPARMS *)&ioc->configQ);
 		}
 		spin_unlock_irqrestore(&ioc->FreeQlock, flags);
-#else
-		while (1) {
-			spin_lock_irqsave(&ioc->FreeQlock, flags);
-			if (! Q_IS_EMPTY(&ioc->configQ)){
-				spin_unlock_irqrestore(&ioc->FreeQlock, flags);
-				break;
-			}
-			pCfg = (CONFIGPARMS *)ioc->configQ.head;
-
-			Q_DEL_ITEM(&pCfg->linkage);
-			spin_unlock_irqrestore(&ioc->FreeQlock, flags);
-
-			pCfg->status = MPT_CONFIG_ERROR;
-			pCfg->wait_done = 1;
-			wake_up(&mpt_waitq);
-		}
-#endif
 	}
 
 	return 1;		/* currently means nothing really */
@@ -5845,7 +5817,7 @@ mpt_register_ascqops_strings(void *ascqTable, int ascqtbl_sz, const char **opsTa
 		isense_idx = last_drv_idx;
 		r = 1;
 	}
-	MOD_INC_USE_COUNT;
+	mpt_inc_use_count();
 	return r;
 }
 
@@ -5864,7 +5836,7 @@ mpt_deregister_ascqops_strings(void)
 	mpt_ScsiOpcodesPtr = NULL;
 	printk(KERN_INFO MYNAM ": English readable SCSI-3 strings disabled)-:\n");
 	isense_idx = -1;
-	MOD_DEC_USE_COUNT;
+	mpt_dec_use_count();
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
