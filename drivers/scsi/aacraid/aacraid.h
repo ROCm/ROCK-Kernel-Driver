@@ -1307,6 +1307,31 @@ struct aac_mount {
 	struct aac_mntent mnt[1];
 };
 
+#define CT_READ_NAME 130
+struct aac_get_name {
+	u32		command;	/* VM_ContainerConfig */
+	u32		type;		/* CT_READ_NAME */
+	u32		cid;
+	u32		parm1;
+	u32		parm2;
+	u32		parm3;
+	u32		parm4;
+	u32		count;	/* sizeof(((struct aac_get_name_resp *)NULL)->data) */
+};
+
+#define CT_OK        218
+struct aac_get_name_resp {
+	u32		dummy0;
+	u32		dummy1;
+	u32		status;	/* CT_OK */
+	u32		parm1;
+	u32		parm2;
+	u32		parm3;
+	u32		parm4;
+	u32		parm5;
+	u8		data[16];
+};
+
 /*
  * The following command is sent to shut down each container.
  */
