@@ -33,9 +33,9 @@
 /* #define DEBUG */
 
 #ifdef DEBUG
-#define DPRINTK(D) do{ printk("pid %d: ", current->pid); printk D; } while(0)
+#define DPRINTK(fmt,args...) do { printk(KERN_DEBUG "pid %d: %s: " fmt "\n" , current->pid , __FUNCTION__ , ##args); } while(0)
 #else
-#define DPRINTK(D) do {} while(0)
+#define DPRINTK(fmt,args...) do {} while(0)
 #endif
 
 #define AUTOFS_SUPER_MAGIC 0x0187

@@ -50,8 +50,8 @@ static int autofs4_check_mount(struct vfsmount *mnt, struct dentry *dentry)
 {
 	int status = 0;
 
-	DPRINTK(("autofs4_check_mount: dentry %p %.*s\n",
-		 dentry, (int)dentry->d_name.len, dentry->d_name.name));
+	DPRINTK("dentry %p %.*s",
+		dentry, (int)dentry->d_name.len, dentry->d_name.name);
 
 	mntget(mnt);
 	dget(dentry);
@@ -70,7 +70,7 @@ static int autofs4_check_mount(struct vfsmount *mnt, struct dentry *dentry)
 	if (may_umount_tree(mnt) == 0)
 		status = 1;
 done:
-	DPRINTK(("autofs4_check_mount: returning = %d\n", status));
+	DPRINTK("returning = %d", status);
 	mntput(mnt);
 	dput(dentry);
 	return status;
@@ -88,8 +88,8 @@ static int autofs4_check_tree(struct vfsmount *mnt,
 	struct dentry *this_parent = top;
 	struct list_head *next;
 
-	DPRINTK(("autofs4_check_tree: parent %p %.*s\n",
-		 top, (int)top->d_name.len, top->d_name.name));
+	DPRINTK("parent %p %.*s",
+		top, (int)top->d_name.len, top->d_name.name);
 
 	/* Negative dentry - give up */
 	if (!simple_positive(top))
@@ -112,8 +112,8 @@ resume:
 			continue;
 		}
 
-		DPRINTK(("autofs4_check_tree: dentry %p %.*s\n",
-			 dentry, (int)dentry->d_name.len, dentry->d_name.name));
+		DPRINTK("dentry %p %.*s",
+			dentry, (int)dentry->d_name.len, dentry->d_name.name);
 
 		if (!simple_empty_nolock(dentry)) {
 			this_parent = dentry;
@@ -154,8 +154,8 @@ struct dentry *autofs4_check_leaves(struct vfsmount *mnt,
 	struct dentry *this_parent = parent;
 	struct list_head *next;
 
-	DPRINTK(("autofs4_check_leaves: parent %p %.*s\n",
-		parent, (int)parent->d_name.len, parent->d_name.name));
+	DPRINTK("parent %p %.*s",
+		parent, (int)parent->d_name.len, parent->d_name.name);
 
 	spin_lock(&dcache_lock);
 repeat:
@@ -170,8 +170,8 @@ resume:
 			continue;
 		}
 
-		DPRINTK(("autofs4_check_leaves: dentry %p %.*s\n",
-			dentry, (int)dentry->d_name.len, dentry->d_name.name));
+		DPRINTK("dentry %p %.*s",
+			dentry, (int)dentry->d_name.len, dentry->d_name.name);
 
 		if (!list_empty(&dentry->d_subdirs)) {
 			this_parent = dentry;
@@ -250,8 +250,8 @@ static struct dentry *autofs4_expire(struct super_block *sb,
 
 		/* Case 1: indirect mount or top level direct mount */
 		if (d_mountpoint(dentry)) {
-			DPRINTK(("autofs4_expire: checking mountpoint %p %.*s\n",
-			 dentry, (int)dentry->d_name.len, dentry->d_name.name));
+			DPRINTK("checking mountpoint %p %.*s",
+				dentry, (int)dentry->d_name.len, dentry->d_name.name);
 
 			/* Can we expire this guy */
 			if (!autofs4_can_expire(dentry, timeout, do_now))
@@ -289,8 +289,8 @@ next:
 	}
 
 	if ( expired ) {
-		DPRINTK(("autofs4_expire: returning %p %.*s\n",
-			 expired, (int)expired->d_name.len, expired->d_name.name));
+		DPRINTK("returning %p %.*s",
+			expired, (int)expired->d_name.len, expired->d_name.name);
 		spin_lock(&dcache_lock);
 		list_del(&expired->d_parent->d_subdirs);
 		list_add(&expired->d_parent->d_subdirs, &expired->d_child);
