@@ -21,6 +21,7 @@
 #include <asm/delay.h>
 #include <asm/desc.h>
 #include <asm/apic.h>
+#include <asm/arch_hooks.h>
 
 #include <linux/irq.h>
 
@@ -52,7 +53,7 @@ BUILD_COMMON_IRQ()
  */
 BUILD_16_IRQS(0x0)
 
-#ifdef CONFIG_X86_IO_APIC
+#ifdef CONFIG_X86_EXTRA_IRQS
 /*
  * The IO-APIC gives us many more interrupt sources. Most of these 
  * are unused but an SMP system is supposed to have enough memory ...
@@ -72,31 +73,6 @@ BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd)
 #undef BUILD_16_IRQS
 #undef BI
 
-
-/*
- * The following vectors are part of the Linux architecture, there
- * is no hardware IRQ pin equivalent for them, they are triggered
- * through the ICC by us (IPIs)
- */
-#ifdef CONFIG_SMP
-BUILD_SMP_INTERRUPT(reschedule_interrupt,RESCHEDULE_VECTOR)
-BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
-BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
-#endif
-
-/*
- * every pentium local APIC has two 'local interrupts', with a
- * soft-definable vector attached to both interrupts, one of
- * which is a timer interrupt, the other one is error counter
- * overflow. Linux uses the local APIC timer interrupt to get
- * a much simpler SMP time architecture:
- */
-#ifdef CONFIG_X86_LOCAL_APIC
-BUILD_SMP_INTERRUPT(apic_timer_interrupt,LOCAL_TIMER_VECTOR)
-BUILD_SMP_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR)
-BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
-#endif
-
 #define IRQ(x,y) \
 	IRQ##x##y##_interrupt
 
@@ -109,7 +85,7 @@ BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
 void (*interrupt[NR_IRQS])(void) = {
 	IRQLIST_16(0x0),
 
-#ifdef CONFIG_X86_IO_APIC
+#ifdef CONFIG_X86_EXTRA_IRQS
 			 IRQLIST_16(0x1), IRQLIST_16(0x2), IRQLIST_16(0x3),
 	IRQLIST_16(0x4), IRQLIST_16(0x5), IRQLIST_16(0x6), IRQLIST_16(0x7),
 	IRQLIST_16(0x8), IRQLIST_16(0x9), IRQLIST_16(0xa), IRQLIST_16(0xb),
@@ -403,15 +379,6 @@ static void math_error_irq(int cpl, void *dev_id, struct pt_regs *regs)
  */
 static struct irqaction irq13 = { math_error_irq, 0, 0, "fpu", NULL, NULL };
 
-/*
- * IRQ2 is cascade interrupt to second interrupt controller
- */
-
-#ifndef CONFIG_VISWS
-static struct irqaction irq2 = { no_action, 0, 0, "cascade", NULL, NULL};
-#endif
-
-
 void __init init_ISA_irqs (void)
 {
 	int i;
@@ -444,11 +411,8 @@ void __init init_IRQ(void)
 {
 	int i;
 
-#ifndef CONFIG_X86_VISWS_APIC
-	init_ISA_irqs();
-#else
-	init_VISWS_APIC_irqs();
-#endif
+	pre_intr_init_hook();
+
 	/*
 	 * Cover the whole vector space, no vector can escape
 	 * us. (some of these will be overridden and become
@@ -460,34 +424,7 @@ void __init init_IRQ(void)
 			set_intr_gate(vector, interrupt[i]);
 	}
 
-#ifdef CONFIG_SMP
-	/*
-	 * IRQ0 must be given a fixed assignment and initialized,
-	 * because it's used before the IO-APIC is set up.
-	 */
-	set_intr_gate(FIRST_DEVICE_VECTOR, interrupt[0]);
-
-	/*
-	 * The reschedule interrupt is a CPU-to-CPU reschedule-helper
-	 * IPI, driven by wakeup.
-	 */
-	set_intr_gate(RESCHEDULE_VECTOR, reschedule_interrupt);
-
-	/* IPI for invalidation */
-	set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
-
-	/* IPI for generic function call */
-	set_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
-#endif	
-
-#ifdef CONFIG_X86_LOCAL_APIC
-	/* self generated IPI for local APIC timer */
-	set_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
-
-	/* IPI vectors for APIC spurious and error interrupts */
-	set_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
-	set_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
-#endif
+	intr_init_hook();
 
 	/*
 	 * Set the clock to HZ Hz, we already have a valid
@@ -496,10 +433,6 @@ void __init init_IRQ(void)
 	outb_p(0x34,0x43);		/* binary, mode 2, LSB/MSB, ch 0 */
 	outb_p(LATCH & 0xff , 0x40);	/* LSB */
 	outb(LATCH >> 8 , 0x40);	/* MSB */
-
-#ifndef CONFIG_VISWS
-	setup_irq(2, &irq2);
-#endif
 
 	/*
 	 * External FPU? Set up irq13 if so, for
