@@ -1589,14 +1589,15 @@ drop:
 
 int netif_rx_ni(struct sk_buff *skb)
 {
-       int err = netif_rx(skb);
+	int err;
 
-       preempt_disable();
-       if (softirq_pending(smp_processor_id()))
-               do_softirq();
-       preempt_enable();
+	preempt_disable();
+	err = netif_rx(skb);
+	if (softirq_pending(smp_processor_id()))
+		do_softirq();
+	preempt_enable();
 
-       return err;
+	return err;
 }
 
 EXPORT_SYMBOL(netif_rx_ni);
