@@ -116,6 +116,18 @@ static struct platform_device corgifb_device = {
 
 
 /*
+ * Corgi Backlight Device
+ */
+static struct platform_device corgibl_device = {
+	.name		= "corgi-bl",
+	.dev		= {
+ 		.parent = &corgifb_device.dev,
+	},
+	.id		= -1,
+};
+
+
+/*
  * MMC/SD Device
  *
  * The card detect interrupt isn't debounced so we delay it by HZ/4
@@ -216,6 +228,7 @@ static struct platform_device *devices[] __initdata = {
 	&corgiscoop_device,
 	&corgissp_device,
 	&corgifb_device,
+	&corgibl_device,
 };
 
 static struct sharpsl_flash_param_info sharpsl_flash_param;
