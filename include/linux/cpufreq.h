@@ -20,6 +20,7 @@
 #include <linux/device.h>
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
+#include <linux/completion.h>
 
 #define CPUFREQ_NAME_LEN 16
 
@@ -71,6 +72,7 @@ struct cpufreq_policy {
 	struct kobject		kobj;
  	struct semaphore	lock;   /* CPU ->setpolicy or ->target may
 					   only be called once a time */
+	struct completion	kobj_unregister;
 };
 
 #define CPUFREQ_ADJUST          (0)

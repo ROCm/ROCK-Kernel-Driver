@@ -23,6 +23,7 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/cpu.h>
+#include <linux/completion.h>
 
 /**
  * The "cpufreq driver" - the arch- or hardware-dependend low
@@ -297,6 +298,12 @@ static ssize_t store(struct kobject * kobj, struct attribute * attr,
 	return ret;
 }
 
+static void cpufreq_sysfs_release(struct kobject * kobj)
+{
+	struct cpufreq_policy * policy = to_policy(kobj);
+	complete(&policy->kobj_unregister);
+}
+
 static struct sysfs_ops sysfs_ops = {
 	.show	= show,
 	.store	= store,
@@ -305,6 +312,7 @@ static struct sysfs_ops sysfs_ops = {
 static struct kobj_type ktype_cpufreq = {
 	.sysfs_ops	= &sysfs_ops,
 	.default_attrs	= default_attrs,
+	.release	= cpufreq_sysfs_release,
 };
 
 
@@ -343,6 +351,8 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	up(&cpufreq_driver_sem);
 
 	init_MUTEX(&policy->lock);
+	init_completion(&policy->kobj_unregister);
+
 	/* prepare interface data */
 	policy->kobj.parent = &sys_dev->kobj;
 	policy->kobj.ktype = &ktype_cpufreq;
@@ -361,8 +371,10 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	
 	/* set default policy */
 	ret = cpufreq_set_policy(&new_policy);
-	if (ret)
+	if (ret) {
 		kobject_unregister(&policy->kobj);
+		wait_for_completion(&policy->kobj_unregister);
+	}
 
  out:
 	module_put(cpufreq_driver->owner);
@@ -400,6 +412,13 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 
 	up(&cpufreq_driver_sem);
 	kobject_put(&cpufreq_driver->policy[cpu].kobj);
+
+	/* we need to make sure that the underlying kobj is actually
+	 * destroyed before we proceed e.g. with cpufreq driver module
+	 * unloading
+	 */
+	wait_for_completion(&cpufreq_driver->policy[cpu].kobj_unregister);
+
 	return 0;
 }
 
