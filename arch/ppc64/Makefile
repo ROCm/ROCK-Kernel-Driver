@@ -15,6 +15,17 @@
 
 KERNELLOAD	:= 0xc000000000000000
 
+ifeq ($(shell uname -m),ppc64)
+CHECKS		= checks
+endif
+
+HAS_BIARCH      := $(shell if $(CC) -m64 -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi;)
+ifeq ($(HAS_BIARCH),y)
+AS              := $(AS) -64
+LD              := $(LD) -m elf64ppc
+CC		:= $(CC) -m64
+endif
+
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
