@@ -1393,12 +1393,12 @@ void __init dn_dev_init(void)
 #ifdef MODULE
         if (addr[0] > 63 || addr[0] < 0) {
                 printk(KERN_ERR "DECnet: Area must be between 0 and 63");
-                return 1;
+                return;
         }
 
         if (addr[1] > 1023 || addr[1] < 0) {
                 printk(KERN_ERR "DECnet: Node must be between 0 and 1023");
-                return 1;
+                return;
         }
 
         decnet_address = dn_htons((addr[0] << 10) | addr[1]);

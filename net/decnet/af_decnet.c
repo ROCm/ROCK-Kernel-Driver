@@ -785,7 +785,7 @@ static int dn_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return -EINVAL;
 
 #if 1
-	if (!capable(CAP_NET_BIND_SERVICE) && saddr->sdn_objnum ||
+	if ((!capable(CAP_NET_BIND_SERVICE) && saddr->sdn_objnum) ||
 	    (saddr->sdn_flags & SDF_WILD))
 		return -EACCES;
 #else
