@@ -166,7 +166,7 @@ enum mp_bustype {
 };
 extern unsigned char mp_bus_id_to_type [MAX_MP_BUSSES];
 extern int mp_bus_id_to_pci_bus [MAX_MP_BUSSES];
-extern cpumask_t mp_bus_to_cpumask [MAX_MP_BUSSES];
+extern cpumask_t pci_bus_to_cpumask [256];
 
 extern unsigned int boot_cpu_physical_apicid;
 extern int smp_found_config;
