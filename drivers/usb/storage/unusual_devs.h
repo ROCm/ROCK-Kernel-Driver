@@ -634,19 +634,13 @@ UNUSUAL_DEV(  0x07c4, 0xa400, 0x0000, 0xffff,
  * - Some cameras with idProduct=0x1001 and bcdDevice=0x1000 have
  *   bInterfaceProtocol=0x00 (US_PR_CBI) while others have 0x01 (US_PR_CB).
  *   So don't remove the US_PR_CB override!
+ * - Cameras with bcdDevice=0x9009 require the US_SC_8070 override.
  */
-UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
+UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9999,
 		"Casio",
 		"QV DigitalCamera",
-		US_SC_DEVICE, US_PR_CB, NULL,
+		US_SC_8070, US_PR_CB, NULL,
 		US_FL_NEED_OVERRIDE | US_FL_FIX_INQUIRY ),
-
-/* Later Casio cameras apparently tell the truth */
-UNUSUAL_DEV( 0x07cf, 0x1001, 0x9010, 0x9999,
-		"Casio",
-		"QV DigitalCamera",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_INQUIRY ),
 
 /* Submitted by Hartmut Wahl <hwahl@hwahl.de>*/
 UNUSUAL_DEV( 0x0839, 0x000a, 0x0001, 0x0001,
