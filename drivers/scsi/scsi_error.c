@@ -514,7 +514,7 @@ static int scsi_send_eh_cmnd(struct scsi_cmnd *scmd, int timeout)
 	 * actually did complete normally.
 	 */
 	if (rtn == SUCCESS) {
-		int rtn = scsi_eh_completed_normally(scmd);
+		rtn = scsi_eh_completed_normally(scmd);
 		SCSI_LOG_ERROR_RECOVERY(3,
 			printk("%s: scsi_eh_completed_normally %x\n",
 			       __FUNCTION__, rtn));
