@@ -87,7 +87,7 @@ BOOL lookup_attr(const ATTR_TYPES type, const uchar_t *name, const u32 name_len,
 		const IGNORE_CASE_BOOL ic, const VCN lowest_vcn, const u8 *val,
 		const u32 val_len, attr_search_context *ctx);
 
-extern int load_attribute_list(ntfs_volume *vol, run_list *rl, u8 *al,
+extern int load_attribute_list(ntfs_volume *vol, run_list *rl, u8 *al_start,
 		const s64 size, const s64 initialized_size);
 
 static inline s64 attribute_value_length(const ATTR_RECORD *a)
