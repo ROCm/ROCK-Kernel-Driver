@@ -159,7 +159,7 @@ static int will_become_orphaned_pgrp(int pgrp, task_t *ignored_task)
 
 	do_each_task_pid(pgrp, PIDTYPE_PGID, p) {
 		if (p == ignored_task
-				|| p->exit_state >= EXIT_ZOMBIE
+				|| p->exit_state
 				|| p->real_parent->pid == 1)
 			continue;
 		if (process_group(p->real_parent) != pgrp
@@ -517,7 +517,7 @@ static inline void choose_new_parent(task_t *p, task_t *reaper, task_t *child_re
 	 * Make sure we're not reparenting to ourselves and that
 	 * the parent is not a zombie.
 	 */
-	BUG_ON(p == reaper || reaper->state >= EXIT_ZOMBIE || reaper->exit_state >= EXIT_ZOMBIE);
+	BUG_ON(p == reaper || reaper->exit_state >= EXIT_ZOMBIE);
 	p->real_parent = reaper;
 	if (p->parent == p->real_parent)
 		BUG();
@@ -599,7 +599,7 @@ static inline void forget_original_parent(struct task_struct * father,
 			reaper = child_reaper;
 			break;
 		}
-	} while (reaper->exit_state >= EXIT_ZOMBIE);
+	} while (reaper->exit_state);
 
 	/*
 	 * There are only two places where our children can be:
@@ -1182,7 +1182,7 @@ static int wait_task_stopped(task_t *p, int delayed_group_leader, int noreap,
 	 * race with the EXIT_ZOMBIE case.
 	 */
 	exit_code = xchg(&p->exit_code, 0);
-	if (unlikely(p->exit_state >= EXIT_ZOMBIE)) {
+	if (unlikely(p->exit_state)) {
 		/*
 		 * The task resumed and then died.  Let the next iteration
 		 * catch it in EXIT_ZOMBIE.  Note that exit_code might
