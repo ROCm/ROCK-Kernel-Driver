@@ -452,7 +452,7 @@ struct sk_buff *atm_alloc_charge(struct atm_vcc *vcc,int pdu_size,
 int atm_find_ci(struct atm_vcc *vcc,short *vpi,int *vci);
 int atm_pcr_goal(struct atm_trafprm *tp);
 
-void atm_async_release_vcc(struct atm_vcc *vcc,int reply);
+void vcc_release_async(struct atm_vcc *vcc, int reply);
 
 #endif /* __KERNEL__ */
 

@@ -153,9 +153,13 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 		goto out;
 	dprintk("Path seems to be <%s>\n", buf);
 	err = 0;
-	if (len == 0)
+	if (len == 0) {
+		struct svc_expkey *ek;
 		set_bit(CACHE_NEGATIVE, &key.h.flags);
-	else {
+		ek = svc_expkey_lookup(&key, 2);
+		if (ek)
+			expkey_put(&ek->h, &svc_expkey_cache);
+	} else {
 		struct nameidata nd;
 		struct svc_expkey *ek;
 		struct svc_export *exp;

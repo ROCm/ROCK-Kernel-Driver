@@ -250,11 +250,11 @@ sparc_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 }
 
 static struct xor_block_template xor_block_SPARC = {
-	name: "SPARC",
-	do_2: sparc_2,
-	do_3: sparc_3,
-	do_4: sparc_4,
-	do_5: sparc_5,
+	.name	= "SPARC",
+	.do_2	= sparc_2,
+	.do_3	= sparc_3,
+	.do_4	= sparc_4,
+	.do_5	= sparc_5,
 };
 
 /* For grins, also test the generic routines.  */

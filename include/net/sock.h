@@ -133,7 +133,6 @@ struct sock_common {
   *	@sk_forward_alloc - space allocated forward
   *	@sk_allocation - allocation mode
   *	@sk_sndbuf - size of send buffer in bytes
-  *	@sk_prev - pointer to previous sock in the list this sock is in
   *	@sk_flags - %SO_LINGER (l_onoff), %SO_BROADCAST, %SO_KEEPALIVE, %SO_OOBINLINE settings
   *	@sk_no_check - %SO_NO_CHECK setting, wether or not checkup packets
   *	@sk_debug - %SO_DEBUG setting
@@ -206,7 +205,6 @@ struct sock {
 	int			sk_forward_alloc;
 	unsigned int		sk_allocation;
 	int			sk_sndbuf;
-	struct sock		*sk_prev;
 	unsigned long 		sk_flags;
 	char		 	sk_no_check;
 	unsigned char		sk_debug;

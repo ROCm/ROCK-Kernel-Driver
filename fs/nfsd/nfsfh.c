@@ -161,9 +161,6 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			goto out;
 		}
 
-		/* Set user creds if we haven't done so already. */
-		nfsd_setuser(rqstp, exp);
-
 		/*
 		 * Look up the dentry using the NFS file handle.
 		 */
@@ -222,6 +219,10 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	cache_get(&exp->h);
 
 	inode = dentry->d_inode;
+
+
+	/* Set user creds for this exportpoint */
+	nfsd_setuser(rqstp, exp);
 
 	/* Type check. The correct error return for type mismatches
 	 * does not seem to be generally agreed upon. SunOS seems to

@@ -25,34 +25,7 @@ source "init/Kconfig"
 
 menu "General setup"
 
-config BINFMT_ELF
-	tristate "Kernel support for ELF binaries"
-	---help---
-	  ELF (Executable and Linkable Format) is a format for libraries and
-	  executables used across different architectures and operating
-	  systems. Saying Y here will enable your kernel to run ELF binaries
-	  and enlarge it by about 13 KB. ELF support under Linux has now all
-	  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
-	  because it is portable (this does *not* mean that you will be able
-	  to run executables from different architectures or operating systems
-	  however) and makes building run-time libraries very easy. Many new
-	  executables are distributed solely in ELF format. You definitely
-	  want to say Y here.
-
-	  Information about ELF is contained in the ELF HOWTO available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-	  If you find that after upgrading from Linux kernel 1.2 and saying Y
-	  here, you still can't run any ELF binaries (they just crash), then
-	  you'll have to install the newest ELF runtime libraries, including
-	  ld.so (check the file <file:Documentation/Changes> for location and
-	  latest version).
-
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called binfmt_elf. Saying M or N here is dangerous because
-	  some crucial programs on your system might be in ELF format.
+source "fs/Kconfig.binfmt"
 
 config ETRAX_KGDB
 	bool "Use kernel gdb debugger"

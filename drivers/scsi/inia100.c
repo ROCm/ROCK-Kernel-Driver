@@ -156,11 +156,11 @@ static void inia100AppendSRBToQueue(ORC_HCS * pHCB, Scsi_Cmnd * pSRB)
 
 	spin_lock_irqsave(&(pHCB->pSRB_lock), flags);
 
-	pSRB->next = NULL;	/* Pointer to next */
+	pSRB->SCp.ptr = NULL;	/* Pointer to next */
 	if (pHCB->pSRB_head == NULL)
 		pHCB->pSRB_head = pSRB;
 	else
-		pHCB->pSRB_tail->next = pSRB;	/* Pointer to next */
+		pHCB->pSRB_tail->SCp.ptr = (char *)pSRB;	/* Pointer to next */
 	pHCB->pSRB_tail = pSRB;
 	spin_unlock_irqrestore(&(pHCB->pSRB_lock), flags);
 	return;
@@ -179,8 +179,8 @@ static Scsi_Cmnd *inia100PopSRBFromQueue(ORC_HCS * pHCB)
 	ULONG flags;
 	spin_lock_irqsave(&(pHCB->pSRB_lock), flags);
 	if ((pSRB = (Scsi_Cmnd *) pHCB->pSRB_head) != NULL) {
-		pHCB->pSRB_head = pHCB->pSRB_head->next;
-		pSRB->next = NULL;
+		pHCB->pSRB_head = (Scsi_Cmnd *) pHCB->pSRB_head->SCp.ptr;
+		pSRB->SCp.ptr = NULL;
 	}
 	spin_unlock_irqrestore(&(pHCB->pSRB_lock), flags);
 	return (pSRB);

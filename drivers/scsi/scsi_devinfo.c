@@ -3,6 +3,7 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
@@ -23,9 +24,9 @@ struct scsi_dev_info_list {
 
 
 static const char spaces[] = "                "; /* 16 of them */
-static char *scsi_dev_flags;
 static unsigned scsi_default_dev_flags;
 static LIST_HEAD(scsi_dev_info_list);
+static __init char scsi_dev_flags[256];
 
 /*
  * scsi_static_device_list: deprecated list of devices that require
@@ -180,6 +181,7 @@ static struct {
 	{"SGI", "TP9400", "*", BLIST_SPARSELUN | BLIST_LARGELUN},
 	{"SGI", "TP9500", "*", BLIST_SPARSELUN | BLIST_LARGELUN},
 	{"MYLEX", "DACARMRB", "*", BLIST_SPARSELUN | BLIST_LARGELUN},
+	{"XYRATEX", "RS", "*", BLIST_SPARSELUN | BLIST_LARGELUN},
 	{ NULL, NULL, NULL, 0 },
 };
 
@@ -450,35 +452,15 @@ out:
 	return err;
 }
 
-MODULE_PARM(scsi_dev_flags, "s");
-MODULE_PARM_DESC(scsi_dev_flags,
-	 "Given scsi_dev_flags=vendor:model:flags, add a black/white list"
-	 " entry for vendor and model with an integer value of flags"
+module_param_string(dev_flags, scsi_dev_flags, sizeof(scsi_dev_flags), 0);
+MODULE_PARM_DESC(dev_flags,
+	 "Given scsi_dev_flags=vendor:model:flags[,v:m:f] add black/white"
+	 " list entries for vendor and model with an integer value of flags"
 	 " to the scsi device info list");
-MODULE_PARM(scsi_default_dev_flags, "i");
-MODULE_PARM_DESC(scsi_default_dev_flags,
+
+module_param_named(default_dev_flags, scsi_default_dev_flags, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(default_dev_flags,
 		 "scsi default device flag integer value");
-
-static int __init setup_scsi_dev_flags(char *str)
-{
-	scsi_dev_flags = str;
-	return 1;
-}
-
-static int __init setup_scsi_default_dev_flags(char *str)
-{
-	unsigned int tmp;
-	if (get_option(&str, &tmp) == 1) {
-		scsi_default_dev_flags = tmp;
-		printk(KERN_WARNING "%s %d\n", __FUNCTION__,
-		       scsi_default_dev_flags);
-		return 1;
-	} else {
-		printk(KERN_WARNING "%s: usage scsi_default_dev_flags=intr\n",
-		       __FUNCTION__);
-		return 0;
-	}
-}
 
 /**
  * scsi_dev_info_list_delete: called from scsi.c:exit_scsi to remove
@@ -540,6 +522,3 @@ int scsi_init_devinfo(void)
 		scsi_exit_devinfo();
 	return error;
 }
-
-__setup("scsi_dev_flags=", setup_scsi_dev_flags);
-__setup("scsi_default_dev_flags=", setup_scsi_default_dev_flags);

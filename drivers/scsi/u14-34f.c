@@ -1,6 +1,36 @@
 /*
  *      u14-34f.c - Low-level driver for UltraStor 14F/34F SCSI host adapters.
  *
+ *      03 Jun 2003 Rev. 8.10 for linux-2.5.70
+ *        + Update for new IRQ API.
+ *        + Use "goto" when appropriate.
+ *        + Drop u14-34f.h.
+ *        + Update for new module_param API.
+ *        + Module parameters  can now be specified only in the
+ *          same format as the kernel boot options.
+ *
+ *             boot option    old module param 
+ *             -----------    ------------------
+ *             addr,...       io_port=addr,...
+ *             lc:[y|n]       linked_comm=[1|0]
+ *             mq:xx          max_queue_depth=xx
+ *             tm:[0|1|2]     tag_mode=[0|1|2]
+ *             et:[y|n]       ext_tran=[1|0]
+ *             of:[y|n]       have_old_firmware=[1|0]
+ *
+ *          A valid example using the new parameter format is:
+ *          modprobe u14-34f "u14-34f=0x340,0x330,lc:y,tm:0,mq:4"
+ *
+ *          which is equivalent to the old format:
+ *          modprobe u14-34f io_port=0x340,0x330 linked_comm=1 tag_mode=0 \
+ *                        max_queue_depth=4
+ *
+ *          With actual module code, u14-34f and u14_34f are equivalent
+ *          as module parameter names.
+ *
+ *      12 Feb 2003 Rev. 8.04 for linux 2.5.60
+ *        + Release irq before calling scsi_register.
+ *
  *      12 Nov 2002 Rev. 8.02 for linux 2.5.47
  *        + Release driver_lock before calling scsi_register.
  *
@@ -221,7 +251,7 @@
  *
  *          Multiple U14F and/or U34F host adapters are supported.
  *
- *  Copyright (C) 1994-2002 Dario Ballabio (ballabio_dario@emc.com)
+ *  Copyright (C) 1994-2003 Dario Ballabio (ballabio_dario@emc.com)
  *
  *  Alternate email: dario.ballabio@inwind.it, dario.ballabio@tiscalinet.it
  *
@@ -375,31 +405,8 @@
  *  the driver sets host->wish_block = TRUE for all ISA boards.
  */
 
-#include <linux/version.h>
-
-#ifndef LinuxVersionCode
-#define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
-#endif
-
-#define MAX_INT_PARAM 10
-
-#if defined(MODULE)
-#include <linux/module.h>
-
-MODULE_PARM(boot_options, "s");
-MODULE_PARM(io_port, "1-" __MODULE_STRING(MAX_INT_PARAM) "i");
-MODULE_PARM(linked_comm, "i");
-MODULE_PARM(have_old_firmware, "i");
-MODULE_PARM(link_statistics, "i");
-MODULE_PARM(max_queue_depth, "i");
-MODULE_PARM(tag_mode, "i");
-MODULE_PARM(ext_tran, "i");
-MODULE_AUTHOR("Dario Ballabio");
-
-#endif
-
+#include <linux/config.h>
 #include <linux/string.h>
-#include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
@@ -408,20 +415,42 @@ MODULE_AUTHOR("Dario Ballabio");
 #include <asm/byteorder.h>
 #include <linux/proc_fs.h>
 #include <linux/blk.h>
+#include <linux/interrupt.h>
 #include <linux/stat.h>
-#include <linux/config.h>
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ctype.h>
 #include <linux/spinlock.h>
 #include <scsi/scsicam.h>
-
+#include "scsi.h"
+#include "hosts.h"
 #include <asm/dma.h>
 #include <asm/irq.h>
 
-#include "scsi.h"
-#include "hosts.h"
-#include "u14-34f.h"
+static int u14_34f_detect(Scsi_Host_Template *);
+static int u14_34f_release(struct Scsi_Host *);
+static int u14_34f_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int u14_34f_eh_abort(Scsi_Cmnd *);
+static int u14_34f_eh_host_reset(Scsi_Cmnd *);
+static int u14_34f_bios_param(struct scsi_device *, struct block_device *,
+                              sector_t, int *);
+static int u14_34f_slave_configure(Scsi_Device *);
+
+static Scsi_Host_Template driver_template = {
+                .name                    = "UltraStor 14F/34F rev. 8.10.00 ",
+                .detect                  = u14_34f_detect,
+                .release                 = u14_34f_release,
+                .queuecommand            = u14_34f_queuecommand,
+                .eh_abort_handler        = u14_34f_eh_abort,
+                .eh_device_reset_handler = NULL,
+                .eh_bus_reset_handler    = NULL,
+                .eh_host_reset_handler   = u14_34f_eh_host_reset,
+                .bios_param              = u14_34f_bios_param,
+                .slave_configure         = u14_34f_slave_configure,
+                .this_id                 = 7,
+                .unchecked_isa_dma       = 1,
+                .use_clustering          = ENABLE_CLUSTERING
+                };
 
 #if !defined(__BIG_ENDIAN_BITFIELD) && !defined(__LITTLE_ENDIAN_BITFIELD)
 #error "Adjust your <asm/byteorder.h> defines"
@@ -610,7 +639,6 @@ static int do_trace = FALSE;
 static int setup_done = FALSE;
 static int link_statistics;
 static int ext_tran = FALSE;
-static char *boot_options;
 
 #if defined(HAVE_OLD_UX4F_FIRMWARE)
 static int have_old_firmware = TRUE;
@@ -634,6 +662,24 @@ static int linked_comm = FALSE;
 static int max_queue_depth = CONFIG_SCSI_U14_34F_MAX_TAGS;
 #else
 static int max_queue_depth = MAX_CMD_PER_LUN;
+#endif
+
+#define MAX_INT_PARAM 10
+#define MAX_BOOT_OPTIONS_SIZE 256
+static char boot_options[MAX_BOOT_OPTIONS_SIZE];
+
+#if defined(MODULE)
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+
+module_param_string(u14_34f, boot_options, MAX_BOOT_OPTIONS_SIZE, 0);
+MODULE_PARM_DESC(u14_34f, " equivalent to the \"u14-34f=...\" kernel boot " \
+"option." \
+"      Example: modprobe u14-34f \"u14_34f=0x340,0x330,lc:y,tm:0,mq:4\"");
+MODULE_AUTHOR("Dario Ballabio");
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("UltraStor 14F/34F SCSI Driver");
+
 #endif
 
 static int u14_34f_slave_configure(Scsi_Device *dev) {
@@ -802,24 +848,20 @@ static int port_detect \
 
    sprintf(name, "%s%d", driver_name, j);
 
-   if(!request_region(port_base, REGION_SIZE, driver_name)) {
+   if (!request_region(port_base, REGION_SIZE, driver_name)) {
 #if defined(DEBUG_DETECT)
       printk("%s: address 0x%03lx in use, skipping probe.\n", name, port_base);
 #endif
-      return FALSE;
+      goto fail;
       }
 
-   if (inb(port_base + REG_PRODUCT_ID1) != PRODUCT_ID1) {
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
-      }
+   spin_lock_irq(&driver_lock);
+
+   if (inb(port_base + REG_PRODUCT_ID1) != PRODUCT_ID1) goto freelock;
 
    in_byte = inb(port_base + REG_PRODUCT_ID2);
 
-   if ((in_byte & 0xf0) != PRODUCT_ID2) {
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
-      }
+   if ((in_byte & 0xf0) != PRODUCT_ID2) goto freelock;
 
    *(char *)&config_1 = inb(port_base + REG_CONFIG1);
    *(char *)&config_2 = inb(port_base + REG_CONFIG2);
@@ -833,16 +875,13 @@ static int port_detect \
              SA_INTERRUPT | ((subversion == ESA) ? SA_SHIRQ : 0),
              driver_name, (void *) &sha[j])) {
       printk("%s: unable to allocate IRQ %u, detaching.\n", name, irq);
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freelock;
       }
 
    if (subversion == ISA && request_dma(dma_channel, driver_name)) {
       printk("%s: unable to allocate DMA channel %u, detaching.\n",
              name, dma_channel);
-      free_irq(irq, &sha[j]);
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freeirq;
       }
 
    if (have_old_firmware) tpnt->use_clustering = DISABLE_CLUSTERING;
@@ -853,13 +892,7 @@ static int port_detect \
 
    if (sh[j] == NULL) {
       printk("%s: unable to register host, detaching.\n", name);
-
-      free_irq(irq, &sha[j]);
-
-      if (subversion == ISA) free_dma(dma_channel);
-
-      release_region(port_base, REGION_SIZE);
-      return FALSE;
+      goto freedma;
       }
 
    sh[j]->io_port = port_base;
@@ -938,6 +971,8 @@ static int port_detect \
    if (dma_channel == NO_DMA) sprintf(dma_name, "%s", "BMST");
    else                       sprintf(dma_name, "DMA %u", dma_channel);
 
+   spin_unlock_irq(&driver_lock);
+
    for (i = 0; i < sh[j]->can_queue; i++)
       HD(j)->cp[i].cp_dma_addr = pci_map_single(HD(j)->pdev,
             &HD(j)->cp[i], sizeof(struct mscp), PCI_DMA_BIDIRECTIONAL);
@@ -947,8 +982,7 @@ static int port_detect \
             sh[j]->sg_tablesize * sizeof(struct sg_list),
             (sh[j]->unchecked_isa_dma ? GFP_DMA : 0) | GFP_ATOMIC))) {
          printk("%s: kmalloc SGlist failed, mbox %d, detaching.\n", BN(j), i);
-         u14_34f_release(sh[j]);
-         return FALSE;
+         goto release;
          }
 
    if (max_queue_depth > MAX_TAGGED_CMD_PER_LUN)
@@ -960,7 +994,7 @@ static int port_detect \
       tag_mode = TAG_ORDERED;
 
    if (j == 0) {
-      printk("UltraStor 14F/34F: Copyright (C) 1994-2002 Dario Ballabio.\n");
+      printk("UltraStor 14F/34F: Copyright (C) 1994-2003 Dario Ballabio.\n");
       printk("%s config options -> of:%c, tm:%d, lc:%c, mq:%d, et:%c.\n",
              driver_name, YESNO(have_old_firmware), tag_mode,
              YESNO(linked_comm), max_queue_depth, YESNO(ext_tran));
@@ -979,6 +1013,20 @@ static int port_detect \
              BN(j), i, sh[j]->this_id);
 
    return TRUE;
+
+freedma:
+   if (subversion == ISA) free_dma(dma_channel);
+freeirq:
+   free_irq(irq, &sha[j]);
+freelock:
+   spin_unlock_irq(&driver_lock);
+   release_region(port_base, REGION_SIZE);
+fail:
+   return FALSE;
+
+release:
+   u14_34f_release(sh[j]);
+   return FALSE;
 }
 
 static void internal_setup(char *str, int *ints) {
@@ -1034,13 +1082,10 @@ static int option_setup(char *str) {
 
 static int u14_34f_detect(Scsi_Host_Template *tpnt) {
    unsigned int j = 0, k;
-   unsigned long spin_flags;
-
-   spin_lock_irqsave(&driver_lock, spin_flags);
 
    tpnt->proc_name = "u14-34f";
 
-   if(boot_options) option_setup(boot_options);
+   if(strlen(boot_options)) option_setup(boot_options);
 
 #if defined(MODULE)
    /* io_port could have been modified when loading as a module */
@@ -1060,7 +1105,6 @@ static int u14_34f_detect(Scsi_Host_Template *tpnt) {
       }
 
    num_boards = j;
-   spin_unlock_irqrestore(&driver_lock, spin_flags);
    return j;
 }
 
@@ -1680,7 +1724,7 @@ static void flush_dev(Scsi_Device *dev, unsigned long cursec, unsigned int j,
 
 }
 
-static void ihdlr(int irq, unsigned int j) {
+static irqreturn_t ihdlr(int irq, unsigned int j) {
    Scsi_Cmnd *SCpnt;
    unsigned int i, k, c, status, tstatus, reg, ret;
    struct mscp *spp, *cpp;
@@ -1689,7 +1733,7 @@ static void ihdlr(int irq, unsigned int j) {
        panic("%s: ihdlr, irq %d, sh[j]->irq %d.\n", BN(j), irq, sh[j]->irq);
 
    /* Check if this board need to be serviced */
-   if (!((reg = inb(sh[j]->io_port + REG_SYS_INTR)) & IRQ_ASSERTED)) return;
+   if (!((reg = inb(sh[j]->io_port + REG_SYS_INTR)) & IRQ_ASSERTED)) goto none;
 
    HD(j)->iocount++;
 
@@ -1701,7 +1745,7 @@ static void ihdlr(int irq, unsigned int j) {
       outb(CMD_CLR_INTR, sh[j]->io_port + REG_SYS_INTR);
       printk("%s: ihdlr, busy timeout error,  irq %d, reg 0x%x, count %d.\n",
              BN(j), irq, reg, HD(j)->iocount);
-      return;
+      goto none;
       }
 
    ret = inl(sh[j]->io_port + REG_ICM);
@@ -1721,23 +1765,23 @@ static void ihdlr(int irq, unsigned int j) {
    spp = cpp;
 
 #if defined(DEBUG_GENERATE_ABORTS)
-   if ((HD(j)->iocount > 500) && ((HD(j)->iocount % 500) < 3)) return;
+   if ((HD(j)->iocount > 500) && ((HD(j)->iocount % 500) < 3)) goto handled;
 #endif
 
    if (HD(j)->cp_stat[i] == IGNORE) {
       HD(j)->cp_stat[i] = FREE;
-      return;
+      goto handled;
       }
    else if (HD(j)->cp_stat[i] == LOCKED) {
       HD(j)->cp_stat[i] = FREE;
       printk("%s: ihdlr, mbox %d unlocked, count %d.\n", BN(j), i,
              HD(j)->iocount);
-      return;
+      goto handled;
       }
    else if (HD(j)->cp_stat[i] == FREE) {
       printk("%s: ihdlr, mbox %d is free, count %d.\n", BN(j), i,
              HD(j)->iocount);
-      return;
+      goto handled;
       }
    else if (HD(j)->cp_stat[i] == IN_RESET)
       printk("%s: ihdlr, mbox %d is in reset.\n", BN(j), i);
@@ -1887,23 +1931,25 @@ static void ihdlr(int irq, unsigned int j) {
    if (do_trace) printk("%s: ihdlr, exit, irq %d, count %d.\n", BN(j), irq,
                         HD(j)->iocount);
 
-   return;
+handled:
+   return IRQ_HANDLED;
+none:
+   return IRQ_NONE;
 }
 
 static irqreturn_t do_interrupt_handler(int irq, void *shap,
-					struct pt_regs *regs)
-{
+                                        struct pt_regs *regs) {
    unsigned int j;
    unsigned long spin_flags;
+   irqreturn_t ret;
 
    /* Check if the interrupt must be processed by this handler */
-   if ((j = (unsigned int)((char *)shap - sha)) >= num_boards)
-	   return IRQ_NONE;
+   if ((j = (unsigned int)((char *)shap - sha)) >= num_boards) return IRQ_NONE;
 
    spin_lock_irqsave(sh[j]->host_lock, spin_flags);
-   ihdlr(irq, j);
+   ret = ihdlr(irq, j);
    spin_unlock_irqrestore(sh[j]->host_lock, spin_flags);
-   return IRQ_HANDLED;
+   return ret;
 }
 
 static int u14_34f_release(struct Scsi_Host *shpnt) {
@@ -1930,22 +1976,8 @@ static int u14_34f_release(struct Scsi_Host *shpnt) {
    return FALSE;
 }
 
-static Scsi_Host_Template driver_template = {
-	.name         = "UltraStor 14F/34F rev. " U14_34F_VERSION " ",
-	.detect                  = u14_34f_detect,
-	.release                 = u14_34f_release,
-	.queuecommand            = u14_34f_queuecommand,
-	.eh_abort_handler        = u14_34f_eh_abort,
-	.eh_host_reset_handler   = u14_34f_eh_host_reset,
-	.bios_param              = u14_34f_bios_param,
-	.slave_configure         = u14_34f_slave_configure,
-	.this_id                 = 7,
-	.unchecked_isa_dma       = 1, 
-	.use_clustering          = ENABLE_CLUSTERING,
-};
 #include "scsi_module.c"
 
 #ifndef MODULE
 __setup("u14-34f=", option_setup);
 #endif /* end MODULE */
-MODULE_LICENSE("GPL");

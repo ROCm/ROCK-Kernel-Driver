@@ -147,12 +147,6 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 	return 0;
 }
 
-static inline int
-nfsd4_renew(clientid_t *clientid)
-{
-	return nfs_ok;
-}
-
 /*
  * filehandle-manipulating ops.
  */

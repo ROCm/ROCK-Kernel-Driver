@@ -774,23 +774,6 @@ static int aha1542_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	return 0;
 }
 
-static void internal_done(Scsi_Cmnd * SCpnt)
-{
-	SCpnt->SCp.Status++;
-}
-
-static int aha1542_command(Scsi_Cmnd * SCpnt)
-{
-	DEB(printk("aha1542_command: ..calling aha1542_queuecommand\n"));
-
-	aha1542_queuecommand(SCpnt, internal_done);
-
-	SCpnt->SCp.Status = 0;
-	while (!SCpnt->SCp.Status)
-		barrier();
-	return SCpnt->result;
-}
-
 /* Initialize mailboxes */
 static void setup_mailboxes(int bse, struct Scsi_Host *shpnt)
 {
@@ -1325,6 +1308,18 @@ unregister:
 	return count;
 }
 
+static int aha1542_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->dma_channel != 0xff)
+		free_dma(shost->dma_channel);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 static int aha1542_restart(struct Scsi_Host *shost)
 {
 	int i;
@@ -1817,7 +1812,7 @@ static Scsi_Host_Template driver_template = {
 	.proc_name		= "aha1542",
 	.name			= "Adaptec 1542",
 	.detect			= aha1542_detect,
-	.command		= aha1542_command,
+	.release		= aha1542_release,
 	.queuecommand		= aha1542_queuecommand,
 	.eh_abort_handler	= aha1542_abort,
 	.eh_device_reset_handler= aha1542_dev_reset,

@@ -156,9 +156,9 @@ static __inline__ void __tcp_inherit_port(struct sock *sk, struct sock *child)
 	struct tcp_bind_bucket *tb;
 
 	spin_lock(&head->lock);
-	tb = (struct tcp_bind_bucket *)sk->sk_prev;
+	tb = tcp_sk(sk)->bind_hash;
 	sk_add_bind_node(child, &tb->owners);
-	child->sk_prev	  = (struct sock *)tb;
+	tcp_sk(child)->bind_hash = tb;
 	spin_unlock(&head->lock);
 }
 
@@ -174,7 +174,7 @@ void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb,
 {
 	inet_sk(sk)->num = snum;
 	sk_add_bind_node(sk, &tb->owners);
-	sk->sk_prev       = (struct sock *)tb;
+	tcp_sk(sk)->bind_hash = tb;
 }
 
 static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
@@ -279,9 +279,9 @@ tb_not_found:
 		   (!sk->sk_reuse || sk->sk_state == TCP_LISTEN))
 		tb->fastreuse = 0;
 success:
-	if (!sk->sk_prev)
+	if (!tcp_sk(sk)->bind_hash)
 		tcp_bind_hash(sk, tb, snum);
-	BUG_TRAP(sk->sk_prev == (struct sock *)tb);
+	BUG_TRAP(tcp_sk(sk)->bind_hash == tb);
  	ret = 0;
 
 fail_unlock:
@@ -301,9 +301,9 @@ static void __tcp_put_port(struct sock *sk)
 	struct tcp_bind_bucket *tb;
 
 	spin_lock(&head->lock);
-	tb = (struct tcp_bind_bucket *)sk->sk_prev;
+	tb = tcp_sk(sk)->bind_hash;
 	__hlist_del(&sk->sk_bind_node);
-	sk->sk_prev = NULL;
+	tcp_sk(sk)->bind_hash = NULL;
 	inet->num = 0;
 	tcp_bucket_destroy(tb);
 	spin_unlock(&head->lock);
@@ -730,7 +730,7 @@ ok:
  	}
 
  	head  = &tcp_bhash[tcp_bhashfn(snum)];
- 	tb  = (struct tcp_bind_bucket *)sk->sk_prev;
+ 	tb  = tcp_sk(sk)->bind_hash;
 	spin_lock_bh(&head->lock);
 	if (sk_head(&tb->owners) == sk && !sk->sk_bind_node.next) {
 		__tcp_v4_hash(sk, 0);
@@ -2101,7 +2101,7 @@ static int tcp_v4_destroy_sock(struct sock *sk)
 	__skb_queue_purge(&tp->ucopy.prequeue);
 
 	/* Clean up a referenced TCP bind bucket. */
-	if (sk->sk_prev)
+	if (tp->bind_hash)
 		tcp_put_port(sk);
 
 	/* If sendmsg cached page exists, toss it. */

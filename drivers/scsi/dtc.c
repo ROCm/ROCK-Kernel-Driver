@@ -447,9 +447,20 @@ MODULE_LICENSE("GPL");
 
 #include "NCR5380.c"
 
+static int dtc_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 static Scsi_Host_Template driver_template = {
 	.name				= "DTC 3180/3280 ",
 	.detect				= dtc_detect,
+	.release			= dtc_release,
 	.queuecommand			= dtc_queue_command,
 	.eh_abort_handler		= dtc_abort,
 	.eh_bus_reset_handler		= dtc_bus_reset,

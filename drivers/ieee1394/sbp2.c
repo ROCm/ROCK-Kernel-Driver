@@ -707,7 +707,7 @@ static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host)
 		return hi;
 
 	/* Register our host with the SCSI stack. */
-	scsi_host = scsi_register (&scsi_driver_template, 0);
+	scsi_host = scsi_host_alloc(&scsi_driver_template, 0);
 	if (!scsi_host) {
 		SBP2_ERR("failed to register scsi host");
 		return NULL;
@@ -716,7 +716,7 @@ static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host)
 	hi = hpsb_create_hostinfo(&sbp2_highlevel, host, sizeof(*hi));
 	if (!hi) {
 		SBP2_ERR("failed to allocate hostinfo");
-		scsi_unregister(hi->scsi_host);
+		scsi_host_put(hi->scsi_host);
 	}
 
 	hpsb_set_hostinfo_key(&sbp2_highlevel, host, (unsigned long)scsi_host);
@@ -732,7 +732,7 @@ static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host)
 	 * enabled (scsi-host uses classdata member of the device). */
 	if (scsi_add_host(hi->scsi_host, NULL)) {
 		SBP2_ERR("failed to add scsi host");
-		scsi_unregister(hi->scsi_host);
+		scsi_host_put(hi->scsi_host);
 		hpsb_destroy_hostinfo(&sbp2_highlevel, host);
 	}
 
@@ -753,7 +753,7 @@ static void sbp2_remove_host(struct hpsb_host *host)
 
 	if (hi) {
 		scsi_remove_host(hi->scsi_host);
-		scsi_unregister(hi->scsi_host);
+		scsi_host_put(hi->scsi_host);
 	}
 }
 

@@ -109,13 +109,23 @@ static void scsi_dma_int(int, void *, struct pt_regs *);
 
 int dec_esp_detect(Scsi_Host_Template * tpnt);
 
+static int dec_esp_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, NULL);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	scsi_unregister(shost);
+	return 0;
+}
+
 static Scsi_Host_Template driver_template = {
 	.proc_name		= "esp",
 	.proc_info		= &esp_proc_info,
 	.name			= "NCR53C94",
 	.detect			= dec_esp_detect,
+	.release		= dec_esp_release,
 	.info			= esp_info,
-	.command		= esp_command,
 	.queuecommand		= esp_queue,
 	.eh_abort_handler	= esp_abort,
 	.eh_bus_reset_handler	= esp_reset,

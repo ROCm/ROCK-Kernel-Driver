@@ -487,7 +487,7 @@ int scsi_sysfs_modify_sdev_attribute(struct device_attribute ***dev_attrs,
 }
 EXPORT_SYMBOL(scsi_sysfs_modify_sdev_attribute);
 
-void scsi_sysfs_release_attributes(struct SHT *hostt)
+void scsi_sysfs_release_attributes(struct scsi_host_template *hostt)
 {
 	if(hostt->sdev_attrs != scsi_sysfs_sdev_attrs)
 		kfree(hostt->sdev_attrs);

@@ -952,8 +952,6 @@ static int bond_open(struct net_device *dev)
 		add_timer(alb_timer);
 	}
 
-	MOD_INC_USE_COUNT;
-
 	if (miimon > 0) {  /* link check interval, in milliseconds. */
 		init_timer(timer);
 		timer->expires  = jiffies + (miimon * HZ / 1000);
@@ -1027,7 +1025,6 @@ static int bond_close(struct net_device *master)
 		bond_alb_deinitialize(bond);
 	}
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -3694,6 +3691,8 @@ static int __init bond_init(struct net_device *dev)
 		kfree(bond);
 		return -ENOMEM;
 	}
+	bond->bond_proc_dir->owner = THIS_MODULE;
+
 	bond->bond_proc_info_file = 
 		create_proc_info_entry("info", 0, bond->bond_proc_dir, 
 					bond_get_info);
@@ -3705,6 +3704,7 @@ static int __init bond_init(struct net_device *dev)
 		kfree(bond);
 		return -ENOMEM;
 	}
+	bond->bond_proc_info_file->owner = THIS_MODULE;
 #endif /* CONFIG_PROC_FS */
 
 	if (first_pass == 1) {
