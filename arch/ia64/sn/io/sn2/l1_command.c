@@ -154,7 +154,7 @@ int iobrick_module_get(nasid_t nasid)
 
     return ret;
 }
-
+#ifdef CONFIG_PCI
 /*
  * iobrick_module_get_nasid() returns a module_id which has the brick
  * type encoded in bits 15-12, but this is not the true brick type...
@@ -185,7 +185,7 @@ iobrick_type_get_nasid(nasid_t nasid)
 
     return -1;    /* unknown brick */
 }
-
+#endif
 int iobrick_module_get_nasid(nasid_t nasid)
 {
     int io_moduleid;
