@@ -36,21 +36,13 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/processor.h>
+#include <asm/xmon.h>
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif
 
 extern int fix_alignment(struct pt_regs *);
 extern void bad_page_fault(struct pt_regs *, unsigned long, int sig);
-
-#ifdef CONFIG_XMON
-extern void xmon(struct pt_regs *regs);
-extern int xmon_bpt(struct pt_regs *regs);
-extern int xmon_sstep(struct pt_regs *regs);
-extern int xmon_iabr_match(struct pt_regs *regs);
-extern int xmon_dabr_match(struct pt_regs *regs);
-extern void (*xmon_fault_handler)(struct pt_regs *regs);
-#endif
 
 #ifdef CONFIG_XMON
 void (*debugger)(struct pt_regs *regs) = xmon;

@@ -68,8 +68,6 @@ void ax25_free_cb(ax25_cb *ax25)
 	}
 
 	kfree(ax25);
-
-	MOD_DEC_USE_COUNT;
 }
 
 static void ax25_free_sock(struct sock *sk)
@@ -506,8 +504,6 @@ ax25_cb *ax25_create_cb(void)
 
 	if ((ax25 = kmalloc(sizeof(*ax25), GFP_ATOMIC)) == NULL)
 		return NULL;
-
-	MOD_INC_USE_COUNT;
 
 	memset(ax25, 0x00, sizeof(*ax25));
 
@@ -1912,6 +1908,7 @@ static int ax25_get_info(char *buffer, char **start, off_t offset, int length)
 static struct net_proto_family ax25_family_ops = {
 	.family =	PF_AX25,
 	.create =	ax25_create,
+	.owner	=	THIS_MODULE,
 };
 
 static struct proto_ops ax25_proto_ops = {

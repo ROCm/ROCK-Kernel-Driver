@@ -103,14 +103,6 @@ static int parport_event(event_t event, int priority,
 static dev_info_t dev_info = "parport_cs";
 static dev_link_t *dev_list = NULL;
 
-/*====================================================================*/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
 /*======================================================================
 
     parport_attach() creates an "instance" of the driver, allocating

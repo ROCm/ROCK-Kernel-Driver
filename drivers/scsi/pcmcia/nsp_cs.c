@@ -1469,13 +1469,6 @@ static int nsp_eh_host_reset(Scsi_Cmnd *SCpnt)
   PCMCIA functions
 **********************************************************************/
 
-/*====================================================================*/
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-	error_info_t err = { func, ret };
-	CardServices(ReportError, handle, &err);
-}
-
 /*======================================================================
     nsp_cs_attach() creates an "instance" of the driver, allocating
     local data structures for one device.  The device is registered

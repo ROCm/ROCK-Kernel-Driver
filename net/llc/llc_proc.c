@@ -2,7 +2,7 @@
  * proc_llc.c - proc interface for LLC
  *
  * Copyright (c) 2001 by Jay Schulist <jschlst@samba.org>
- *		 2002 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ *		 2002-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.

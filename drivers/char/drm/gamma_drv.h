@@ -49,6 +49,7 @@ extern int gamma_dma_init( struct inode *inode, struct file *filp,
 extern int gamma_dma_copy( struct inode *inode, struct file *filp,
 			 unsigned int cmd, unsigned long arg );
 
+extern int gamma_do_cleanup_dma( drm_device_t *dev );
 extern void gamma_dma_ready(drm_device_t *dev);
 extern void gamma_dma_quiescent_single(drm_device_t *dev);
 extern void gamma_dma_quiescent_dual(drm_device_t *dev);
@@ -59,6 +60,15 @@ extern int  gamma_dma(struct inode *inode, struct file *filp,
 		      unsigned int cmd, unsigned long arg);
 extern int  gamma_find_devices(void);
 extern int  gamma_found(void);
+
+/* Gamma-specific code pulled from drm_fops.h:
+ */
+extern int	     DRM(finish)(struct inode *inode, struct file *filp,
+				 unsigned int cmd, unsigned long arg);
+extern int	     DRM(flush_unblock)(drm_device_t *dev, int context,
+					drm_lock_flags_t flags);
+extern int	     DRM(flush_block_and_flush)(drm_device_t *dev, int context,
+						drm_lock_flags_t flags);
 
 /* Gamma-specific code pulled from drm_dma.h:
  */

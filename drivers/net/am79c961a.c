@@ -40,7 +40,8 @@
 
 #include "am79c961a.h"
 
-static void am79c961_interrupt (int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t
+am79c961_interrupt (int irq, void *dev_id, struct pt_regs *regs);
 
 static unsigned int net_debug = NET_DEBUG;
 
@@ -557,22 +558,30 @@ am79c961_tx(struct net_device *dev, struct dev_priv *priv)
 	netif_wake_queue(dev);
 }
 
-static void
+static irqreturn_t
 am79c961_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct dev_priv *priv = (struct dev_priv *)dev->priv;
 	u_int status;
+	int handled = 0;
 
 	status = read_rreg(dev->base_addr, CSR0);
 	write_rreg(dev->base_addr, CSR0, status & (CSR0_TINT|CSR0_RINT|CSR0_MISS|CSR0_IENA));
 
-	if (status & CSR0_RINT)
+	if (status & CSR0_RINT) {
+		handled = 1;
 		am79c961_rx(dev, priv);
-	if (status & CSR0_TINT)
+	}
+	if (status & CSR0_TINT) {
+		handled = 1;
 		am79c961_tx(dev, priv);
-	if (status & CSR0_MISS)
+	}
+	if (status & CSR0_MISS) {
+		handled = 1;
 		priv->stats.rx_dropped ++;
+	}
+	return IRQ_RETVAL(handled);
 }
 
 /*

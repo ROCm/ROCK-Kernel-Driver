@@ -505,7 +505,7 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 		   It will not affect performance if you will follow
 		   the following simple rules:
 
-		   - if inteface is aliased, ALWAYS specify fw_viadev,
+		   - if interface is aliased, ALWAYS specify fw_viadev,
 		     so that previous check will guarantee, that we will
 		     not waste time when packet arrive on another interface.
 

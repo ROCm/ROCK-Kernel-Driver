@@ -184,7 +184,7 @@
 	procedure for solving these equations.
 	See procedure csz_update(), that is a generalization of
 	the algorithm from S. Keshav's thesis Chapter 3
-	"Efficient Implementation of Fair Queeing".
+	"Efficient Implementation of Fair Queuing".
 
 	NOTES.
 
@@ -624,7 +624,7 @@ static __inline__ int csz_enough_tokens(struct csz_sched_data *q,
 
 	toks = -toks;
 
-	/* Remeber, that we should start watchdog */
+	/* Remember, that we should start watchdog */
 	if (toks < q->wd_expires)
 		q->wd_expires = toks;
 

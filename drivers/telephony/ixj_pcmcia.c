@@ -43,15 +43,6 @@ static int ixj_event(event_t event, int priority, event_callback_args_t * args);
 static dev_info_t dev_info = "ixj_cs";
 static dev_link_t *dev_list = NULL;
 
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-	error_info_t err =
-	{
-		func, ret
-	};
-	CardServices(ReportError, handle, &err);
-}
-
 static dev_link_t *ixj_attach(void)
 {
 	client_reg_t client_reg;

@@ -11,20 +11,14 @@
 #include <asm/topology.h>
 
 
-static int memblk_add_device(struct device * dev)
-{
-	return 0;
-}
-struct device_class memblk_devclass = {
+static struct class memblk_class = {
 	.name		= "memblk",
-	.add_device	= memblk_add_device,
 };
 
 
-struct device_driver memblk_driver = {
+static struct device_driver memblk_driver = {
 	.name		= "memblk",
 	.bus		= &system_bus_type,
-	.devclass	= &memblk_devclass,
 };
 
 
@@ -51,11 +45,11 @@ int __init register_memblk_type(void)
 {
 	int error;
 
-	error = devclass_register(&memblk_devclass);
+	error = class_register(&memblk_class);
 	if (!error) {
 		error = driver_register(&memblk_driver);
 		if (error)
-			devclass_unregister(&memblk_devclass);
+			class_unregister(&memblk_class);
 	}
 	return error;
 }

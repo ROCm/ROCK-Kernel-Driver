@@ -118,7 +118,7 @@ static void link_modules(struct net_device *dev, struct net_device *tmp);
 static int skfp_driver_init(struct net_device *dev);
 static int skfp_open(struct net_device *dev);
 static int skfp_close(struct net_device *dev);
-static void skfp_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t skfp_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static struct net_device_stats *skfp_ctl_get_stats(struct net_device *dev);
 static void skfp_ctl_set_multicast_list(struct net_device *dev);
 static void skfp_ctl_set_multicast_list_wo_lock(struct net_device *dev);
@@ -896,7 +896,7 @@ static int skfp_close(struct net_device *dev)
  *   Interrupts are disabled, then reenabled at the adapter.
  */
 
-void skfp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t skfp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct s_smc *smc;	/* private board structure pointer */
@@ -905,7 +905,7 @@ void skfp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (dev == NULL) {
 		printk("%s: irq %d for unknown device\n", dev->name, irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	smc = (struct s_smc *) dev->priv;
@@ -913,12 +913,12 @@ void skfp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	// IRQs enabled or disabled ?
 	if (inpd(ADDR(B0_IMSK)) == 0) {
 		// IRQs are disabled: must be shared interrupt
-		return;
+		return IRQ_NONE;
 	}
 	// Note: At this point, IRQs are enabled.
 	if ((inpd(ISR_A) & smc->hw.is_imask) == 0) {	// IRQ?
 		// Adapter did not issue an IRQ: must be shared interrupt
-		return;
+		return IRQ_NONE;
 	}
 	CLI_FBI();		// Disable IRQs from our adapter.
 	spin_lock(&bp->DriverLock);
@@ -933,7 +933,7 @@ void skfp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&bp->DriverLock);
 	STI_FBI();		// Enable IRQs from our adapter.
 
-	return;
+	return IRQ_HANDLED;
 }				// skfp_interrupt
 
 

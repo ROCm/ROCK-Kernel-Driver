@@ -20,7 +20,7 @@
 /*
  * When a pppd instance is not active on /dev/irnet, it acts as a control
  * channel.
- * Writting allow to set up the IrDA destination of the IrNET channel,
+ * Writing allow to set up the IrDA destination of the IrNET channel,
  * and any application may be read events happening in IrNET...
  */
 
@@ -39,7 +39,7 @@ irnet_ctrl_write(irnet_socket *	ap,
 		 size_t		count)
 {
   char		command[IRNET_MAX_COMMAND];
-  char *	start;		/* Current command beeing processed */
+  char *	start;		/* Current command being processed */
   char *	next;		/* Next command to process */
   int		length;		/* Length of current command */
 

@@ -37,6 +37,7 @@ register unsigned int *user_registers asm("sl");
 
 /* includes */
 #include "fpsr.h"		/* FP control and status register definitions */
+#include "milieu.h"
 #include "softfloat.h"
 
 #define		typeNone		0x00
@@ -48,9 +49,13 @@ register unsigned int *user_registers asm("sl");
  * This must be no more and no less than 12 bytes.
  */
 typedef union tagFPREG {
-   floatx80 fExtended;
-   float64  fDouble;
-   float32  fSingle;
+	float32 fSingle;
+	float64 fDouble;
+#ifdef CONFIG_FPE_NWFPE_XP
+	floatx80 fExtended;
+#else
+	int padding[3];
+#endif
 } FPREG;
 
 /*
@@ -67,21 +72,21 @@ typedef union tagFPREG {
  * not initialise.
  */
 typedef struct tagFPA11 {
-/*   0 */  FPREG fpreg[8];		/* 8 floating point registers */
-/*  96 */  FPSR fpsr;			/* floating point status register */
-/* 100 */  FPCR fpcr;			/* floating point control register */
-/* 104 */  unsigned char fType[8];	/* type of floating point value held in
-					   floating point registers.  One of none
-					   single, double or extended. */
-/* 112 */  int initflag;		/* this is special.  The kernel guarantees
-					   to set it to 0 when a thread is launched,
-					   so we can use it to detect whether this
-					   instance of the emulator needs to be
-					   initialised. */
+/*   0 */ FPREG fpreg[8];	/* 8 floating point registers */
+/*  96 */ FPSR fpsr;		/* floating point status register */
+/* 100 */ FPCR fpcr;		/* floating point control register */
+/* 104 */ unsigned char fType[8];	/* type of floating point value held in
+					   floating point registers.  One of
+					   none, single, double or extended. */
+/* 112 */ int initflag;		/* this is special.  The kernel guarantees
+				   to set it to 0 when a thread is launched,
+				   so we can use it to detect whether this
+				   instance of the emulator needs to be
+				   initialised. */
 } FPA11;
 
 extern void SetRoundingMode(const unsigned int);
 extern void SetRoundingPrecision(const unsigned int);
-extern void nwfpe_init(union fp_state *fp);
+extern void nwfpe_init_fpa(union fp_state *fp);
 
 #endif

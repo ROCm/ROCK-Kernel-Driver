@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Tue Mar 25 16:34:29 2003
+# Last update: Sat Apr 26 11:41:41 2003
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -313,3 +313,18 @@ zodiac			ARCH_ZODIAC		ZODIAC			301
 armmodul		ARCH_ARMMODUL		ARMMODUL		302
 ketop			SA1100_KETOP		KETOP			303
 av7200			ARCH_AV7200		AV7200			304
+arch_ti925		ARCH_ARCH_TI925		ARCH_TI925		305
+acq200			ARCH_ACQ200		ACQ200			306
+pt_dafit		SA1100_PT_DAFIT		PT_DAFIT		307
+ihba			ARCH_IHBA		IHBA			308
+quinque			ARCH_QUINQUE		QUINQUE			309
+nimbraone		ARCH_NIMBRAONE		NIMBRAONE		310
+nimbra29x		ARCH_NIMBRA29X		NIMBRA29X		311
+nimbra210		ARCH_NIMBRA210		NIMBRA210		312
+hhp_d95xx		ARCH_HHP_D95XX		HHP_D95XX		313
+labarm			ARCH_LABARM		LABARM			314
+m825xx			ARCH_M825XX		M825XX			315
+m7100			SA1100_M7100		M7100			316
+nipc2			ARCH_NIPC2		NIPC2			317
+fu7202			ARCH_FU7202		FU7202			318
+adsagx			ARCH_ADSAGX		ADSAGX			319

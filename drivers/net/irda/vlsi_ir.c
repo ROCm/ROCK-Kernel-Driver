@@ -1570,7 +1570,8 @@ static int vlsi_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 
 /********************************************************/
 
-static void vlsi_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
+static irqreturn_t vlsi_interrupt(int irq, void *dev_instance,
+					struct pt_regs *regs)
 {
 	struct net_device *ndev = dev_instance;
 	vlsi_irda_dev_t *idev = ndev->priv;
@@ -1579,6 +1580,7 @@ static void vlsi_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	int 		boguscount = 32;
 	unsigned	got_act;
 	unsigned long	flags;
+	int		handled = 0;
 
 	got_act = 0;
 	iobase = ndev->base_addr;
@@ -1591,7 +1593,7 @@ static void vlsi_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 		if (!(irintr&=IRINTR_INT_MASK))		/* not our INT - probably shared */
 			break;
-
+		handled = 1;
 		if (irintr&IRINTR_RPKTINT)
 			vlsi_rx_interrupt(ndev);
 
@@ -1610,7 +1612,7 @@ static void vlsi_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 	if (boguscount <= 0)
 		printk(KERN_WARNING "%s: too much work in interrupt!\n", __FUNCTION__);
-
+	return IRQ_RETVAL(handled);
 }
 
 /********************************************************/

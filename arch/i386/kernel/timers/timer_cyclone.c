@@ -67,11 +67,11 @@ static void mark_offset_cyclone(void)
 
 	/* lost tick compensation */
 	delta = last_cyclone_low - delta;	
-	delta /=(CYCLONE_TIMER_FREQ/1000000);
+	delta /= (CYCLONE_TIMER_FREQ/1000000);
 	delta += delay_at_last_interrupt;
 	lost = delta/(1000000/HZ);
 	delay = delta%(1000000/HZ);
-	if(lost >= 2)
+	if (lost >= 2)
 		jiffies += lost-1;
 	
 	/* update the monotonic base value */
@@ -83,10 +83,12 @@ static void mark_offset_cyclone(void)
 	count = ((LATCH-1) - count) * TICK_SIZE;
 	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
 
-	/* catch corner case where tick rollover 
-	 * occured between cyclone and pit reads
+
+	/* catch corner case where tick rollover occured 
+	 * between cyclone and pit reads (as noted when 
+	 * usec delta is > 90% # of usecs/tick)
 	 */
-	if(abs(delay - delay_at_last_interrupt) > 900)
+	if (abs(delay - delay_at_last_interrupt) > (900000/HZ)) 
 		jiffies++;
 }
 

@@ -754,7 +754,7 @@ static u16 irqtx_handler(struct SKMCA_NETDEV *dev, u16 oldcsr0)
 
 /* general interrupt entry */
 
-static void irq_handler(int irq, void *device, struct pt_regs *regs)
+static irqreturn_t irq_handler(int irq, void *device, struct pt_regs *regs)
 {
 	struct SKMCA_NETDEV *dev = (struct SKMCA_NETDEV *) device;
 	u16 csr0val;
@@ -766,7 +766,7 @@ static void irq_handler(int irq, void *device, struct pt_regs *regs)
 	/* in case we're not meant... */
 
 	if ((csr0val & CSR0_INTR) == 0)
-		return;
+		return IRQ_NONE;
 
 #if (LINUX_VERSION_CODE >= 0x02032a)
 #if 0
@@ -805,6 +805,7 @@ static void irq_handler(int irq, void *device, struct pt_regs *regs)
 #else
 	dev->interrupt = 0;
 #endif
+	return IRQ_HANDLED;
 }
 
 /* ------------------------------------------------------------------------

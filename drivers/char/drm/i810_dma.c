@@ -227,11 +227,19 @@ static int i810_dma_get_buffer(drm_device_t *dev, drm_i810_dma_t *d,
 	return retcode;
 }
 
-static int i810_dma_cleanup(drm_device_t *dev)
+int i810_dma_cleanup(drm_device_t *dev)
 {
 	drm_device_dma_t *dma = dev->dma;
 
-	if(dev->dev_private) {
+#if _HAVE_DMA_IRQ
+	/* Make sure interrupts are disabled here because the uninstall ioctl
+	 * may not have been called from userspace and after dev_private
+	 * is freed, it's too late.
+	 */
+	if (dev->irq) DRM(irq_uninstall)(dev);
+#endif
+
+	if (dev->dev_private) {
 		int i;
 	   	drm_i810_private_t *dev_priv =
 	     		(drm_i810_private_t *) dev->dev_private;

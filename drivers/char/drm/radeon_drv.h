@@ -852,7 +852,7 @@ do {									\
 
 #define COMMIT_RING() do {						\
 	/* Flush writes to ring */					\
-	DRM_READMEMORYBARRIER( dev_priv->mmio );			\
+	DRM_MEMORYBARRIER();						\
 	GET_RING_HEAD( dev_priv );					\
 	RADEON_WRITE( RADEON_CP_RB_WPTR, dev_priv->ring.tail );		\
 	/* read from PCI bus to ensure correct posting */		\

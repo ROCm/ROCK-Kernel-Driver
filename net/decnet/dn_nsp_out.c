@@ -642,7 +642,7 @@ static __inline__ void dn_nsp_do_disc(struct sock *sk, unsigned char msgflg,
 	}
 
 	/*
-	 * This doesn't go via the dn_nsp_send() fucntion since we need
+	 * This doesn't go via the dn_nsp_send() function since we need
 	 * to be able to send disc packets out which have no socket
 	 * associations.
 	 */

@@ -112,4 +112,4 @@ EXPORT_SYMBOL(scsi_delete_timer);
 /*
  * sysfs support
  */
-EXPORT_SYMBOL(shost_devclass);
+EXPORT_SYMBOL(shost_class);

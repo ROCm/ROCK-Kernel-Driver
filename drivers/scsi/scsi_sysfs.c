@@ -75,30 +75,8 @@ static ssize_t scsi_host_class_name_show(struct device *dev, char *page)
 
 DEVICE_ATTR(class_name, S_IRUGO, scsi_host_class_name_show, NULL);
 
-static int scsi_host_class_add_dev(struct device * dev)
-{
-	int i;
-
-	device_create_file(dev, &dev_attr_class_name);
-	for (i = 0; i < ARRAY_SIZE(shost_attrs); i++)
-		device_create_file(dev, shost_attrs[i]);
-
-	return 0;
-}
-
-static void scsi_host_class_rm_dev(struct device * dev)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(shost_attrs); i++)
-		device_remove_file(dev, shost_attrs[i]);
-	device_remove_file(dev, &dev_attr_class_name);
-}
-
-struct device_class shost_devclass = {
+struct class shost_class = {
 	.name		= "scsi-host",
-	.add_device	= scsi_host_class_add_dev,
-	.remove_device	= scsi_host_class_rm_dev,
 };
 
 /**
@@ -136,14 +114,14 @@ static struct bus_type scsi_bus_type = {
 int scsi_sysfs_register(void)
 {
 	bus_register(&scsi_bus_type);
-	devclass_register(&shost_devclass);
+	class_register(&shost_class);
 
 	return 0;
 }
 
 void scsi_sysfs_unregister(void)
 {
-	devclass_unregister(&shost_devclass);
+	class_unregister(&shost_class);
 	bus_unregister(&scsi_bus_type);
 }
 

@@ -127,7 +127,7 @@ setup_port(struct pci_dev *dev, struct serial_struct *req,
 			return -ENOMEM;
 
 		req->io_type = UPIO_MEM;
-		req->iomap_base = port;
+		req->iomap_base = port + offset;
 		req->iomem_base = priv->remapped_bar[bar] + offset;
 		req->iomem_reg_shift = regshift;
 	} else {
@@ -2044,9 +2044,6 @@ static struct pci_driver serial_pci_driver = {
 	.suspend	= pciserial_suspend_one,
 	.resume		= pciserial_resume_one,
 	.id_table	= serial_pci_tbl,
-	.driver = {
-		.devclass = &tty_devclass,
-	},
 };
 
 static int __init serial8250_pci_init(void)

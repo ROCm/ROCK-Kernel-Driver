@@ -337,7 +337,7 @@ static int dscc4_init_ring(struct net_device *);
 static void dscc4_release_ring(struct dscc4_dev_priv *);
 static void dscc4_timer(unsigned long);
 static void dscc4_tx_timeout(struct net_device *);
-static void dscc4_irq(int irq, void *dev_id, struct pt_regs *ptregs);
+static irqreturn_t dscc4_irq(int irq, void *dev_id, struct pt_regs *ptregs);
 static int dscc4_hdlc_attach(hdlc_device *, unsigned short, unsigned short);
 static int dscc4_set_iface(struct dscc4_dev_priv *, struct net_device *);
 static inline int dscc4_set_quartz(struct dscc4_dev_priv *, int);
@@ -1315,14 +1315,14 @@ static int dscc4_set_iface(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 	return ret;
 }
 
-static void dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
+static irqreturn_t dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
 {
 	struct dscc4_dev_priv *root = token;
 	struct dscc4_pci_priv *priv;
 	struct net_device *dev;
 	u32 ioaddr, state;
 	unsigned long flags;
-	int i;
+	int i, handled = 1;
 
 	priv = root->pci_priv;
 	dev = hdlc_to_dev(&root->hdlc);
@@ -1332,8 +1332,10 @@ static void dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
 	ioaddr = dev->base_addr;
 
 	state = readl(ioaddr + GSTAR);
-	if (!state)
+	if (!state) {
+		handled = 0;
 		goto out;
+	}
 	writel(state, ioaddr + GSTAR);
 
 	if (state & Arf) {
@@ -1366,6 +1368,7 @@ static void dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
 	}
 out:
 	spin_unlock_irqrestore(&priv->lock, flags);
+	return IRQ_RETVAL(handled);
 }
 
 static inline void dscc4_tx_irq(struct dscc4_pci_priv *ppriv,

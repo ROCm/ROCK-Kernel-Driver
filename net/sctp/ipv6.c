@@ -842,10 +842,10 @@ int sctp_v6_init(void)
 	inet6_register_protosw(&sctpv6_seqpacket_protosw);
 	inet6_register_protosw(&sctpv6_stream_protosw);
 
-	/* Register the SCTP specfic PF_INET6 functions. */
+	/* Register the SCTP specific PF_INET6 functions. */
 	sctp_register_pf(&sctp_pf_inet6_specific, PF_INET6);
 
-	/* Register the SCTP specfic AF_INET6 functions. */
+	/* Register the SCTP specific AF_INET6 functions. */
 	sctp_register_af(&sctp_ipv6_specific);
 
 	/* Register notifier for inet6 address additions/deletions. */

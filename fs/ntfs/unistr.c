@@ -1,7 +1,7 @@
 /*
  * unistr.c - NTFS Unicode string handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001 Anton Altaparmakov.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -96,10 +96,12 @@ int ntfs_collate_names(const uchar_t *name1, const u32 name1_len,
 		const int err_val, const IGNORE_CASE_BOOL ic,
 		const uchar_t *upcase, const u32 upcase_len)
 {
-	u32 cnt;
-	const u32 min_len = min_t(const u32, name1_len, name2_len);
+	u32 cnt, min_len;
 	uchar_t c1, c2;
 
+	min_len = name1_len;
+	if (name1_len > name2_len)
+		min_len = name2_len;
 	for (cnt = 0; cnt < min_len; ++cnt) {
 		c1 = le16_to_cpu(*name1++);
 		c2 = le16_to_cpu(*name2++);

@@ -1,5 +1,6 @@
 
 #include <linux/percpu_counter.h>
+#include <linux/sched.h>
 
 void percpu_counter_mod(struct percpu_counter *fbc, long amount)
 {

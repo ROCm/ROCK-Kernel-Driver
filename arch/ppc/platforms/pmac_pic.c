@@ -30,8 +30,16 @@
 #include <asm/pci-bridge.h>
 #include <asm/time.h>
 #include <asm/open_pic.h>
+#include <asm/xmon.h>
 
 #include "pmac_pic.h"
+
+/*
+ * XXX this should be in xmon.h, but putting it there means xmon.h
+ * has to include <linux/interrupt.h> (to get irqreturn_t), which
+ * causes all sorts of problems.  -- paulus
+ */ 
+extern irqreturn_t xmon_irq(int, void *, struct pt_regs *);
 
 struct pmac_irq_hw {
         unsigned int    event;
@@ -177,7 +185,7 @@ struct hw_interrupt_type gatwick_pic = {
 	NULL
 };
 
-static void gatwick_action(int cpl, void *dev_id, struct pt_regs *regs)
+static irqreturn_t gatwick_action(int cpl, void *dev_id, struct pt_regs *regs)
 {
 	int irq, bits;
 	
@@ -190,16 +198,11 @@ static void gatwick_action(int cpl, void *dev_id, struct pt_regs *regs)
 		if (bits == 0)
 			continue;
 		irq += __ilog2(bits);
-		break;
+		ppc_irq_dispatch_handler(regs, irq);
+		return IRQ_HANDLED;
 	}
-	/* The previous version of this code allowed for this case, we
-	 * don't.  Put this here to check for it.
-	 * -- Cort
-	 */
-	if ( irq_desc[irq].handler != &gatwick_pic )
-		printk("gatwick irq not from gatwick pic\n");
-	else
-		ppc_irq_dispatch_handler( regs, irq );
+	printk("gatwick irq not from gatwick pic\n");
+	return IRQ_NONE;
 }
 
 int
@@ -393,7 +396,7 @@ pmac_pic_init(void)
 					nmi_irq = pswitch->intrs[0].line;
 					openpic_init_nmi_irq(nmi_irq);
 					request_irq(nmi_irq, xmon_irq, 0,
-							"NMI - XMON", 0);
+						    "NMI - XMON", 0);
 				}
 			}
 #endif	/* CONFIG_XMON */

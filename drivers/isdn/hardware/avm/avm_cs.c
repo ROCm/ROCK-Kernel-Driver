@@ -118,14 +118,6 @@ typedef struct local_info_t {
     dev_node_t	node;
 } local_info_t;
 
-/*====================================================================*/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
 /*======================================================================
 
     avmcs_attach() creates an "instance" of the driver, allocating

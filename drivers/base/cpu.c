@@ -10,22 +10,15 @@
 #include <asm/topology.h>
 
 
-static int cpu_add_device(struct device * dev)
-{
-	return 0;
-}
-struct device_class cpu_devclass = {
+struct class cpu_class = {
 	.name		= "cpu",
-	.add_device	= cpu_add_device,
 };
 
 
 struct device_driver cpu_driver = {
 	.name		= "cpu",
 	.bus		= &system_bus_type,
-	.devclass	= &cpu_devclass,
 };
-
 
 /*
  * register_cpu - Setup a driverfs device for a CPU.
@@ -35,6 +28,8 @@ struct device_driver cpu_driver = {
  */
 int __init register_cpu(struct cpu *cpu, int num, struct node *root)
 {
+	int retval;
+
 	cpu->node_id = cpu_to_node(num);
 	cpu->sysdev.name = "cpu";
 	cpu->sysdev.id = num;
@@ -42,7 +37,19 @@ int __init register_cpu(struct cpu *cpu, int num, struct node *root)
 		cpu->sysdev.root = &root->sysroot;
 	snprintf(cpu->sysdev.dev.name, DEVICE_NAME_SIZE, "CPU %u", num);
 	cpu->sysdev.dev.driver = &cpu_driver;
-	return sys_device_register(&cpu->sysdev);
+	retval = sys_device_register(&cpu->sysdev);
+	if (retval)
+		return retval;
+	memset(&cpu->sysdev.class_dev, 0x00, sizeof(struct class_device));
+	cpu->sysdev.class_dev.dev = &cpu->sysdev.dev;
+	cpu->sysdev.class_dev.class = &cpu_class;
+	snprintf(cpu->sysdev.class_dev.class_id, BUS_ID_SIZE, "cpu%d", num);
+	retval = class_device_register(&cpu->sysdev.class_dev);
+	if (retval) {
+		// FIXME cleanup sys_device_register
+		return retval;
+	}
+	return 0;
 }
 
 
@@ -50,11 +57,11 @@ int __init cpu_dev_init(void)
 {
 	int error;
 
-	error = devclass_register(&cpu_devclass);
+	error = class_register(&cpu_class);
 	if (!error) {
 		error = driver_register(&cpu_driver);
 		if (error)
-			devclass_unregister(&cpu_devclass);
+			class_unregister(&cpu_class);
 	}
 	return error;
 }

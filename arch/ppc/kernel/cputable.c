@@ -26,8 +26,7 @@ extern void __setup_cpu_750cx(unsigned long offset, int cpu_nr, struct cpu_spec*
 extern void __setup_cpu_750fx(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 extern void __setup_cpu_7400(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 extern void __setup_cpu_7410(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
-extern void __setup_cpu_7450(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
-extern void __setup_cpu_7455(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
+extern void __setup_cpu_745x(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 extern void __setup_cpu_power3(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 extern void __setup_cpu_8xx(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 extern void __setup_cpu_generic(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
@@ -168,7 +167,7 @@ struct cpu_spec	cpu_specs[] = {
     	0xffff0000, 0x70000000, "750FX",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP |
-	CPU_FTR_DUAL_PLL_750FX,
+	CPU_FTR_DUAL_PLL_750FX | CPU_FTR_HAS_HIGH_BATS,
 	COMMON_PPC,
 	32, 32,
 	__setup_cpu_750fx
@@ -216,7 +215,7 @@ struct cpu_spec	cpu_specs[] = {
 	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450,
 	COMMON_PPC | PPC_FEATURE_HAS_ALTIVEC,
 	32, 32,
-	__setup_cpu_7450
+	__setup_cpu_745x
     },
     {	/* 7450 2.1 */
     	0xffffffff, 0x80000201, "7450",
@@ -226,7 +225,7 @@ struct cpu_spec	cpu_specs[] = {
 	CPU_FTR_L3_DISABLE_NAP,
 	COMMON_PPC | PPC_FEATURE_HAS_ALTIVEC,
 	32, 32,
-	__setup_cpu_7450
+	__setup_cpu_745x
     },
     {	/* 7450 2.3 and newer */
     	0xffff0000, 0x80000000, "7450",
@@ -235,35 +234,46 @@ struct cpu_spec	cpu_specs[] = {
 	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR,
 	COMMON_PPC | PPC_FEATURE_HAS_ALTIVEC,
 	32, 32,
-	__setup_cpu_7450
+	__setup_cpu_745x
     },
     {	/* 7455 rev 1.x */
     	0xffffff00, 0x80010100, "7455",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
-	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450,
+	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_HAS_HIGH_BATS,
 	COMMON_PPC | PPC_FEATURE_HAS_ALTIVEC,
 	32, 32,
-	__setup_cpu_7455
+	__setup_cpu_745x
     },
     {	/* 7455 rev 2.0 */
     	0xffffffff, 0x80010200, "7455",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
 	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
-	CPU_FTR_L3_DISABLE_NAP,
+	CPU_FTR_L3_DISABLE_NAP | CPU_FTR_HAS_HIGH_BATS,
 	COMMON_PPC | PPC_FEATURE_HAS_ALTIVEC,
 	32, 32,
-	__setup_cpu_7455
+	__setup_cpu_745x
     },
     {	/* 7455 others */
     	0xffff0000, 0x80010000, "7455",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
 	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
-	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR,
+	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
+	CPU_FTR_HAS_HIGH_BATS,
 	COMMON_PPC | PPC_FEATURE_HAS_ALTIVEC,
 	32, 32,
-	__setup_cpu_7455
+	__setup_cpu_745x
+    },
+    {	/* 7457 */
+    	0xffff0000, 0x80020000, "7457",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
+	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP | CPU_FTR_L3CR |
+	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
+	CPU_FTR_HAS_HIGH_BATS,
+	COMMON_PPC | PPC_FEATURE_HAS_ALTIVEC,
+	32, 32,
+	__setup_cpu_745x
     },
     {	/* 82xx (8240, 8245, 8260 are all 603e cores) */
 	0x7fff0000, 0x00810000, "82xx",

@@ -10,7 +10,7 @@
 #include <linux/ioport.h>
 
 #include <asm/oplib.h>
-#include <asm/iommu.h>
+/* #include <asm/iommu.h> */ /* Unused since we use opaque iommu (|io-unit) */
 #include <asm/scatterlist.h>
 
 /* We scan which devices are on the SBus using the PROM node device

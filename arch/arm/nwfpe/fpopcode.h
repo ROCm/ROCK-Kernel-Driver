@@ -1,6 +1,7 @@
 /*
     NetWinder Floating Point Emulator
     (c) Rebel.COM, 1998,1999
+    (c) Philip Blundell, 2001
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 
@@ -186,7 +187,7 @@ TABLE 5
 #define BIT_LOAD	0x00100000
 
 /* masks for load/store */
-#define MASK_CPDT		0x0c000000  /* data processing opcode */
+#define MASK_CPDT		0x0c000000	/* data processing opcode */
 #define MASK_OFFSET		0x000000ff
 #define MASK_TRANSFER_LENGTH	0x00408000
 #define MASK_REGISTER_COUNT	MASK_TRANSFER_LENGTH
@@ -236,7 +237,7 @@ TABLE 5
 #define MONADIC_INSTRUCTION(opcode)	((opcode & BIT_MONADIC) != 0)
 
 /* instruction identification masks */
-#define MASK_CPDO		0x0e000000  /* arithmetic opcode */
+#define MASK_CPDO		0x0e000000	/* arithmetic opcode */
 #define MASK_ARITHMETIC_OPCODE	0x00f08000
 #define MASK_DESTINATION_SIZE	0x00080080
 
@@ -282,7 +283,7 @@ TABLE 5
 ===
 */
 
-#define MASK_CPRT		0x0e000010  /* register transfer opcode */
+#define MASK_CPRT		0x0e000010	/* register transfer opcode */
 #define MASK_CPRT_CODE		0x00f00000
 #define FLT_CODE		0x00000000
 #define FIX_CODE		0x00100000
@@ -366,25 +367,111 @@ TABLE 5
 /* Get the rounding mode from the opcode. */
 #define getRoundingMode(opcode)		((opcode & MASK_ROUNDING_MODE) >> 5)
 
+#ifdef CONFIG_FPE_NWFPE_XP
 static inline const floatx80 getExtendedConstant(const unsigned int nIndex)
 {
-   extern const floatx80 floatx80Constant[];
-   return floatx80Constant[nIndex];
-} 
+	extern const floatx80 floatx80Constant[];
+	return floatx80Constant[nIndex];
+}
+#endif
 
 static inline const float64 getDoubleConstant(const unsigned int nIndex)
 {
-   extern const float64 float64Constant[];
-   return float64Constant[nIndex];
-} 
+	extern const float64 float64Constant[];
+	return float64Constant[nIndex];
+}
 
 static inline const float32 getSingleConstant(const unsigned int nIndex)
 {
-   extern const float32 float32Constant[];
-   return float32Constant[nIndex];
-} 
+	extern const float32 float32Constant[];
+	return float32Constant[nIndex];
+}
 
-extern unsigned int getRegisterCount(const unsigned int opcode);
-extern unsigned int getDestinationSize(const unsigned int opcode);
+static inline unsigned int getTransferLength(const unsigned int opcode)
+{
+	unsigned int nRc;
+
+	switch (opcode & MASK_TRANSFER_LENGTH) {
+	case 0x00000000:
+		nRc = 1;
+		break;		/* single precision */
+	case 0x00008000:
+		nRc = 2;
+		break;		/* double precision */
+	case 0x00400000:
+		nRc = 3;
+		break;		/* extended precision */
+	default:
+		nRc = 0;
+	}
+
+	return (nRc);
+}
+
+static inline unsigned int getRegisterCount(const unsigned int opcode)
+{
+	unsigned int nRc;
+
+	switch (opcode & MASK_REGISTER_COUNT) {
+	case 0x00000000:
+		nRc = 4;
+		break;
+	case 0x00008000:
+		nRc = 1;
+		break;
+	case 0x00400000:
+		nRc = 2;
+		break;
+	case 0x00408000:
+		nRc = 3;
+		break;
+	default:
+		nRc = 0;
+	}
+
+	return (nRc);
+}
+
+static inline unsigned int getRoundingPrecision(const unsigned int opcode)
+{
+	unsigned int nRc;
+
+	switch (opcode & MASK_ROUNDING_PRECISION) {
+	case 0x00000000:
+		nRc = 1;
+		break;
+	case 0x00000080:
+		nRc = 2;
+		break;
+	case 0x00080000:
+		nRc = 3;
+		break;
+	default:
+		nRc = 0;
+	}
+
+	return (nRc);
+}
+
+static inline unsigned int getDestinationSize(const unsigned int opcode)
+{
+	unsigned int nRc;
+
+	switch (opcode & MASK_DESTINATION_SIZE) {
+	case 0x00000000:
+		nRc = typeSingle;
+		break;
+	case 0x00000080:
+		nRc = typeDouble;
+		break;
+	case 0x00080000:
+		nRc = typeExtended;
+		break;
+	default:
+		nRc = typeNone;
+	}
+
+	return (nRc);
+}
 
 #endif

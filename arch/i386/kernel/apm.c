@@ -1205,7 +1205,17 @@ static int suspend(int vetoable)
 	spin_lock(&i8253_lock);
 
 	get_time_diff();
+	/*
+	 * Irq spinlock must be dropped around set_system_power_state.
+	 * We'll undo any timer changes due to interrupts below.
+	 */
+	spin_unlock(&i8253_lock);
+	write_sequnlock_irq(&xtime_lock);
+
 	err = set_system_power_state(APM_STATE_SUSPEND);
+
+	write_seqlock_irq(&xtime_lock);
+	spin_lock(&i8253_lock);
 	reinit_timer();
 	set_time();
 	ignore_normal_resume = 1;

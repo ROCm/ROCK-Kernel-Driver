@@ -227,16 +227,24 @@ static int i830_dma_get_buffer(drm_device_t *dev, drm_i830_dma_t *d,
 	return retcode;
 }
 
-static int i830_dma_cleanup(drm_device_t *dev)
+int i830_dma_cleanup(drm_device_t *dev)
 {
 	drm_device_dma_t *dma = dev->dma;
 
-	if(dev->dev_private) {
+#if _HAVE_DMA_IRQ
+	/* Make sure interrupts are disabled here because the uninstall ioctl
+	 * may not have been called from userspace and after dev_private
+	 * is freed, it's too late.
+	 */
+	if (dev->irq) DRM(irq_uninstall)(dev);
+#endif
+
+	if (dev->dev_private) {
 		int i;
 	   	drm_i830_private_t *dev_priv = 
 	     		(drm_i830_private_t *) dev->dev_private;
 	   
-	   	if(dev_priv->ring.virtual_start) {
+	   	if (dev_priv->ring.virtual_start) {
 		   	DRM(ioremapfree)((void *) dev_priv->ring.virtual_start,
 					 dev_priv->ring.Size);
 		}
@@ -246,14 +254,6 @@ static int i830_dma_cleanup(drm_device_t *dev)
 					    dev_priv->dma_status_page);
 		   	/* Need to rewrite hardware status page */
 		   	I830_WRITE(0x02080, 0x1ffff000);
-		}
-
-		/* Disable interrupts here because after dev_private
-		 * is freed, it's too late.
-		 */
-		if (dev->irq) {
-			I830_WRITE16( I830REG_INT_MASK_R, 0xffff );
-			I830_WRITE16( I830REG_INT_ENABLE_R, 0x0 );
 		}
 
 	   	DRM(free)(dev->dev_private, sizeof(drm_i830_private_t), 

@@ -20,27 +20,12 @@
 #include "br_private.h"
 #include "br_private_stp.h"
 
-
-
-/* called under bridge lock */
-int br_is_root_bridge(struct net_bridge *br)
-{
-	return !memcmp(&br->bridge_id, &br->designated_root, 8);
-}
-
-/* called under bridge lock */
-int br_is_designated_port(struct net_bridge_port *p)
-{
-	return !memcmp(&p->designated_bridge, &p->br->bridge_id, 8) &&
-		(p->designated_port == p->port_id);
-}
-
 /* called under bridge lock */
 struct net_bridge_port *br_get_port(struct net_bridge *br, int port_no)
 {
 	struct net_bridge_port *p;
 
-	list_for_each_entry(p, &br->port_list, list) {
+	list_for_each_entry_rcu(p, &br->port_list, list) {
 		if (p->port_no == port_no)
 			return p;
 	}

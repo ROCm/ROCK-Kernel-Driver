@@ -1,7 +1,7 @@
 /* Masquerading compatibility layer.
 
    Note that there are no restrictions on other programs binding to
-   ports 61000:65095 (in 2.0 and 2.2 they get EADDRINUSE).  Just DONT
+   ports 61000:65095 (in 2.0 and 2.2 they get EADDRINUSE).  Just DON'T
    DO IT.
  */
 #include <linux/skbuff.h>

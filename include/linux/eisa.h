@@ -25,13 +25,15 @@ struct eisa_device_id {
 };
 
 /* There is not much we can say about an EISA device, apart from
- * signature, slot number, and base address. */
+ * signature, slot number, and base address. dma_mask is set by
+ * default to 32 bits.*/
 
 struct eisa_device {
 	struct eisa_device_id id;
 	int                   slot;
 	unsigned long         base_addr;
 	struct resource       res;
+	u64                   dma_mask;
 	struct device         dev; /* generic device */
 };
 
@@ -63,12 +65,12 @@ static inline void eisa_set_drvdata (struct eisa_device *edev, void *data)
  * busses (PA-RISC ?), so we try to handle that. */
 
 struct eisa_root_device {
-	struct list_head node;
 	struct device   *dev;	 /* Pointer to bridge device */
 	struct resource *res;
 	unsigned long    bus_base_addr;
 	int		 slots;  /* Max slot number */
 	int              bus_nr; /* Set by eisa_root_register */
+	struct resource  eisa_root_res;	/* ditto */
 };
 
 int eisa_root_register (struct eisa_root_device *root);

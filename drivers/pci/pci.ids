@@ -6207,6 +6207,9 @@
 	103e  82801BD PRO/100 VM (MOB) Ethernet Controller
 	1040  536EP Data Fax Modem
 		16be 1040  V.9X DSP Data Fax Modem
+	1048  82597EX 10GbE Ethernet Controller
+		8086 a01f  PRO/10GbE LR Server Adapter
+		8086 a11f  PRO/10GbE LR Server Adapter
 	1059  82551QM Ethernet Controller
 	1130  82815 815 Chipset Host Bridge and Memory Controller Hub
 		1025 1016  Travelmate 612 TX

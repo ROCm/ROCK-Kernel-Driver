@@ -469,24 +469,21 @@ static void dn_destruct(struct sock *sk)
 	skb_queue_purge(&scp->other_receive_queue);
 
 	dst_release(xchg(&sk->dst_cache, NULL));
-
-	MOD_DEC_USE_COUNT;
 }
 
 struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 {
-	struct sock *sk;
 	struct dn_scp *scp;
+	struct sock *sk = sk_alloc(PF_DECnet, gfp, sizeof(struct dn_sock),
+				   dn_sk_cachep);
 
-	if  ((sk = sk_alloc(PF_DECnet, gfp, sizeof(struct dn_sock), dn_sk_cachep)) == NULL) 
-		goto no_sock;
+	if  (!sk)
+		goto out;
 
-	scp = (struct dn_scp *)(sk + 1);
-	DN_SK(sk) = scp;
+	DN_SK(sk) = scp = (struct dn_scp *)(sk + 1);
 
-	if (sock) {
-			sock->ops = &dn_proto_ops;
-	}
+	if (sock)
+		sock->ops = &dn_proto_ops;
 	sock_init_data(sock, sk);
 
 	sk->backlog_rcv = dn_nsp_backlog_rcv;
@@ -543,13 +540,8 @@ struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 	scp->delack_fxn = dn_nsp_delayed_ack;
 
 	dn_start_slow_timer(sk);
-
-	MOD_INC_USE_COUNT;
-
+out:
 	return sk;
-
-no_sock:
-	return NULL;
 }
 
 /*
@@ -2238,6 +2230,7 @@ static int dn_get_info(char *buffer, char **start, off_t offset, int length)
 static struct net_proto_family	dn_family_ops = {
 	.family =	AF_DECnet,
 	.create =	dn_create,
+	.owner	=	THIS_MODULE,
 };
 
 static struct proto_ops dn_proto_ops = {
@@ -2304,7 +2297,7 @@ static int __init decnet_init(void)
 	 * Requires an audit of the code to check for memory leaks and
 	 * initialisation problems etc.
 	 */
-	MOD_INC_USE_COUNT;
+	try_module_get(THIS_MODULE);
 
 	return 0;
 

@@ -19,19 +19,22 @@
 #include <asm/uaccess.h>
 #include "br_private.h"
 
-
-/* Report time remaining in user HZ for compatibility. */
-static inline unsigned long timer_residue(const struct br_timer *timer)
-{
-	return timer->running 
-		? ((jiffies - timer->expires) * USER_HZ)/HZ 
-		: 0;
-}
-
-/* Convert API times in USER_HZ to kernel */
+/* import values in USER_HZ  */
 static inline unsigned long user_to_ticks(unsigned long utick)
 {
 	return (utick * HZ) / USER_HZ;
+}
+
+/* export values in USER_HZ */
+static inline unsigned long ticks_to_user(unsigned long tick)
+{
+	return (tick * USER_HZ) / HZ;
+}
+
+/* Report time remaining in user HZ  */
+static unsigned long timer_residue(const struct br_timer *timer)
+{
+	return ticks_to_user(timer->running ? (jiffies - timer->expires) : 0);
 }
 
 static int br_ioctl_device(struct net_bridge *br,
@@ -73,18 +76,18 @@ static int br_ioctl_device(struct net_bridge *br,
 		memcpy(&b.designated_root, &br->designated_root, 8);
 		memcpy(&b.bridge_id, &br->bridge_id, 8);
 		b.root_path_cost = br->root_path_cost;
-		b.max_age = br->max_age;
-		b.hello_time = br->hello_time;
+		b.max_age = ticks_to_user(br->max_age);
+		b.hello_time = ticks_to_user(br->hello_time);
 		b.forward_delay = br->forward_delay;
 		b.bridge_max_age = br->bridge_max_age;
 		b.bridge_hello_time = br->bridge_hello_time;
-		b.bridge_forward_delay = br->bridge_forward_delay;
+		b.bridge_forward_delay = ticks_to_user(br->bridge_forward_delay);
 		b.topology_change = br->topology_change;
 		b.topology_change_detected = br->topology_change_detected;
 		b.root_port = br->root_port;
 		b.stp_enabled = br->stp_enabled;
-		b.ageing_time = br->ageing_time;
-		b.gc_interval = br->gc_interval;
+		b.ageing_time = ticks_to_user(br->ageing_time);
+		b.gc_interval = ticks_to_user(br->gc_interval);
 		b.hello_timer_value = timer_residue(&br->hello_timer);
 		b.tcn_timer_value = timer_residue(&br->tcn_timer);
 		b.topology_change_timer_value = timer_residue(&br->topology_change_timer);

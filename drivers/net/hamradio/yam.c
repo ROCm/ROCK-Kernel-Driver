@@ -714,7 +714,7 @@ static void yam_tx_byte(struct net_device *dev, struct yam_port *yp)
 * ISR routine
 ************************************************************************************/
 
-static void yam_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t yam_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev;
 	struct yam_port *yp;
@@ -758,6 +758,7 @@ static void yam_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			}
 		}
 	}
+	return IRQ_HANDLED;
 }
 
 static int yam_net_get_info(char *buffer, char **start, off_t offset, int length)

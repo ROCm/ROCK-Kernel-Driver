@@ -435,19 +435,8 @@ static struct input_handler evdev_handler = {
 	.id_table =	evdev_ids,
 };
 
-static struct device_interface evdev_intf = {
-	.name		= "event",
-	.devclass	= &input_devclass,
-};
-
 static int __init evdev_init(void)
 {
-	int retval;
-
-	retval = interface_register(&evdev_intf);
-	if(retval < 0)
-		return retval;
-
 	input_register_handler(&evdev_handler);
 	return 0;
 }
@@ -455,7 +444,6 @@ static int __init evdev_init(void)
 static void __exit evdev_exit(void)
 {
 	input_unregister_handler(&evdev_handler);
-	interface_unregister(&evdev_intf);
 }
 
 module_init(evdev_init);

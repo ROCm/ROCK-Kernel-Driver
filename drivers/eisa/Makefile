@@ -1,5 +1,8 @@
 # Makefile for the Linux device tree
 
+# Being anal sometimes saves a crash/reboot cycle... ;-)
+EXTRA_CFLAGS    := -Werror
+
 obj-$(CONFIG_EISA)	        += eisa-bus.o
 obj-${CONFIG_EISA_PCI_EISA}     += pci_eisa.o
 

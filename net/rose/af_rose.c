@@ -124,22 +124,13 @@ int rosecmpm(rose_address *addr1, rose_address *addr2, unsigned short mask)
 	return 0;
 }
 
-static void rose_free_sock(struct sock *sk)
-{
-	sk_free(sk);
-
-	MOD_DEC_USE_COUNT;
-}
-
 static struct sock *rose_alloc_sock(void)
 {
-	struct sock *sk;
 	rose_cb *rose;
+	struct sock *sk = sk_alloc(PF_ROSE, GFP_ATOMIC, 1, NULL);
 
-	MOD_INC_USE_COUNT;
-
-	if ((sk = sk_alloc(PF_ROSE, GFP_ATOMIC, 1, NULL)) == NULL)
-		goto decmod;
+	if (!sk)
+		goto out;
 
 	rose = rose_sk(sk) = kmalloc(sizeof(*rose), GFP_ATOMIC);
 	if (!rose)
@@ -147,10 +138,11 @@ static struct sock *rose_alloc_sock(void)
 
 	memset(rose, 0x00, sizeof(*rose));
 	rose->sk = sk;
-out:	return sk;
-frees:	sk_free(sk);
+out:
+	return sk;
+frees:
+	sk_free(sk);
 	sk = NULL;
-decmod:	MOD_DEC_USE_COUNT;
 	goto out;
 }
 
@@ -380,9 +372,8 @@ void rose_destroy_socket(struct sock *sk)
 		sk->timer.function = rose_destroy_timer;
 		sk->timer.data     = (unsigned long)sk;
 		add_timer(&sk->timer);
-	} else {
-		rose_free_sock(sk);
-	}
+	} else
+		sk_free(sk);
 }
 
 /*
@@ -1428,6 +1419,7 @@ static int rose_get_info(char *buffer, char **start, off_t offset, int length)
 static struct net_proto_family rose_family_ops = {
 	.family		=	PF_ROSE,
 	.create		=	rose_create,
+	.owner		=	THIS_MODULE,
 };
 
 static struct proto_ops rose_proto_ops = {

@@ -193,6 +193,13 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 		return -EINVAL;
 
 	down( &dev->struct_sem );
+
+	/* Driver must have been initialized */
+	if ( !dev->dev_private ) {
+		up( &dev->struct_sem );
+		return -EINVAL;
+	}
+
 	if ( dev->irq ) {
 		up( &dev->struct_sem );
 		return -EBUSY;

@@ -11,20 +11,14 @@
 #include <asm/topology.h>
 
 
-static int node_add_device(struct device * dev)
-{
-	return 0;
-}
-struct device_class node_devclass = {
+static struct class node_class = {
 	.name		= "node",
-	.add_device	= node_add_device,
 };
 
 
-struct device_driver node_driver = {
+static struct device_driver node_driver = {
 	.name		= "node",
 	.bus		= &system_bus_type,
-	.devclass	= &node_devclass,
 };
 
 
@@ -93,11 +87,11 @@ int __init register_node_type(void)
 {
 	int error;
 	
-	error = devclass_register(&node_devclass);
+	error = class_register(&node_class);
 	if (!error) {
 		error = driver_register(&node_driver);
 		if (error)
-			devclass_unregister(&node_devclass);
+			class_unregister(&node_class);
 	}
 	return error;
 }

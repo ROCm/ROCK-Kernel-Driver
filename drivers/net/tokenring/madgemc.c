@@ -77,7 +77,7 @@ static void madgemc_setregpage(struct net_device *dev, int page);
 static void madgemc_setsifsel(struct net_device *dev, int val);
 static void madgemc_setint(struct net_device *dev, int val);
 
-static void madgemc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t madgemc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 /*
  * These work around paging, however they don't guarentee you're on the
@@ -457,14 +457,14 @@ int __init madgemc_probe(void)
  * exhausted all contiguous interrupts.
  *
  */
-static void madgemc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t madgemc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int pending,reg1;
 	struct net_device *dev;
 
 	if (!dev_id) {
 		printk("madgemc_interrupt: was not passed a dev_id!\n");
-		return;
+		return IRQ_NONE;
 	}
 
 	dev = (struct net_device *)dev_id;
@@ -472,7 +472,7 @@ static void madgemc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* Make sure its really us. -- the Madge way */
 	pending = inb(dev->base_addr + MC_CONTROL_REG0);
 	if (!(pending & MC_CONTROL_REG0_SINTR))
-		return; /* not our interrupt */
+		return IRQ_NONE; /* not our interrupt */
 
 	/*
 	 * Since we're level-triggered, we may miss the rising edge
@@ -496,10 +496,10 @@ static void madgemc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			pending = SIFREADW(SIFSTS); /* restart - the SIF way */
 
 		} else
-			return; 
+			return IRQ_HANDLED; 
 	} while (1);
 
-	return; /* not reachable */
+	return IRQ_HANDLED; /* not reachable */
 }
 
 /*

@@ -11,7 +11,7 @@
  *   connections.
  *
  * Copyright (c) 2001 by Jay Schulist <jschlst@samba.org>
- *		 2002 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ *		 2002-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -193,9 +193,9 @@ out:
 }
 
 /**
- *	llc_ui_autoport - provide dynamicly allocate SAP number
+ *	llc_ui_autoport - provide dynamically allocate SAP number
  *
- *	Provide the caller with a dynamicly allocated SAP number according
+ *	Provide the caller with a dynamically allocated SAP number according
  *	to the rules that are set in this function. Returns: 0, upon failure,
  *	SAP number otherwise.
  */
@@ -623,7 +623,8 @@ static int llc_ui_accept(struct socket *sock, struct socket *newsock, int flags)
 	struct sk_buff *skb;
 	int rc = -EOPNOTSUPP;
 
-	dprintk("%s: accepting on %02X\n", __FUNCTION__, llc_sk(sk)->addr.sllc_ssap);
+	dprintk("%s: accepting on %02X\n", __FUNCTION__,
+	        llc_sk(sk)->addr.sllc_ssap);
 	lock_sock(sk);
 	if (sk->type != SOCK_STREAM)
 		goto out;
@@ -634,7 +635,8 @@ static int llc_ui_accept(struct socket *sock, struct socket *newsock, int flags)
 	rc = llc_ui_wait_for_data(sk, sk->rcvtimeo);
 	if (rc)
 		goto out;
-	dprintk("%s: got a new connection on %02X\n", __FUNCTION__, llc_sk(sk)->addr.sllc_ssap);
+	dprintk("%s: got a new connection on %02X\n", __FUNCTION__,
+	        llc_sk(sk)->addr.sllc_ssap);
 	skb = skb_dequeue(&sk->receive_queue);
 	rc = -EINVAL;
 	if (!skb->sk)
@@ -692,8 +694,9 @@ static int llc_ui_recvmsg(struct kiocb *iocb, struct socket *sock,
 	timeout = sock_rcvtimeo(sk, noblock);
 	rc = llc_ui_wait_for_data(sk, timeout);
 	if (rc) {
-		dprintk("%s: llc_ui_wait_for_data failed recv in %02X from %02X\n",
-			__FUNCTION__, llc_sk(sk)->laddr.lsap, llc_sk(sk)->daddr.lsap);
+		dprintk("%s: llc_ui_wait_for_data failed recv "
+			"in %02X from %02X\n", __FUNCTION__,
+			llc_sk(sk)->laddr.lsap, llc_sk(sk)->daddr.lsap);
 		goto out;
 	}
 	skb = skb_dequeue(&sk->receive_queue);
@@ -742,7 +745,8 @@ static int llc_ui_sendmsg(struct kiocb *iocb, struct socket *sock,
 	struct sk_buff *skb;
 	int rc = -EINVAL, size = 0, copied = 0, hdrlen;
 
-	dprintk("%s: sending from %02X to %02X\n", __FUNCTION__, llc->laddr.lsap, llc->daddr.lsap);
+	dprintk("%s: sending from %02X to %02X\n", __FUNCTION__,
+		llc->laddr.lsap, llc->daddr.lsap);
 	lock_sock(sk);
 	if (addr) {
 		if (msg->msg_namelen < sizeof(*addr))
@@ -906,49 +910,49 @@ static int llc_ui_setsockopt(struct socket *sock, int level, int optname,
 		goto out;
 	rc = -EINVAL;
 	switch (optname) {
-		case LLC_OPT_RETRY:
-			if (opt > LLC_OPT_MAX_RETRY)
-				goto out;
-			llc->n2 = opt;
-			break;
-		case LLC_OPT_SIZE:
-			if (opt > LLC_OPT_MAX_SIZE)
-				goto out;
-			llc->n1 = opt;
-			break;
-		case LLC_OPT_ACK_TMR_EXP:
-			if (opt > LLC_OPT_MAX_ACK_TMR_EXP)
-				goto out;
-			llc->ack_timer.expire = opt;
-			break;
-		case LLC_OPT_P_TMR_EXP:
-			if (opt > LLC_OPT_MAX_P_TMR_EXP)
-				goto out;
-			llc->pf_cycle_timer.expire = opt;
-			break;
-		case LLC_OPT_REJ_TMR_EXP:
-			if (opt > LLC_OPT_MAX_REJ_TMR_EXP)
-				goto out;
-			llc->rej_sent_timer.expire = opt;
-			break;
-		case LLC_OPT_BUSY_TMR_EXP:
-			if (opt > LLC_OPT_MAX_BUSY_TMR_EXP)
-				goto out;
-			llc->busy_state_timer.expire = opt;
-			break;
-		case LLC_OPT_TX_WIN:
-			if (opt > LLC_OPT_MAX_WIN)
-				goto out;
-			llc->k = opt;
-			break;
-		case LLC_OPT_RX_WIN:
-			if (opt > LLC_OPT_MAX_WIN)
-				goto out;
-			llc->rw = opt;
-			break;
-		default:
-			rc = -ENOPROTOOPT;
+	case LLC_OPT_RETRY:
+		if (opt > LLC_OPT_MAX_RETRY)
 			goto out;
+		llc->n2 = opt;
+		break;
+	case LLC_OPT_SIZE:
+		if (opt > LLC_OPT_MAX_SIZE)
+			goto out;
+		llc->n1 = opt;
+		break;
+	case LLC_OPT_ACK_TMR_EXP:
+		if (opt > LLC_OPT_MAX_ACK_TMR_EXP)
+			goto out;
+		llc->ack_timer.expire = opt;
+		break;
+	case LLC_OPT_P_TMR_EXP:
+		if (opt > LLC_OPT_MAX_P_TMR_EXP)
+			goto out;
+		llc->pf_cycle_timer.expire = opt;
+		break;
+	case LLC_OPT_REJ_TMR_EXP:
+		if (opt > LLC_OPT_MAX_REJ_TMR_EXP)
+			goto out;
+		llc->rej_sent_timer.expire = opt;
+		break;
+	case LLC_OPT_BUSY_TMR_EXP:
+		if (opt > LLC_OPT_MAX_BUSY_TMR_EXP)
+			goto out;
+		llc->busy_state_timer.expire = opt;
+		break;
+	case LLC_OPT_TX_WIN:
+		if (opt > LLC_OPT_MAX_WIN)
+			goto out;
+		llc->k = opt;
+		break;
+	case LLC_OPT_RX_WIN:
+		if (opt > LLC_OPT_MAX_WIN)
+			goto out;
+		llc->rw = opt;
+		break;
+	default:
+		rc = -ENOPROTOOPT;
+		goto out;
 	}
 	rc = 0;
 out:
@@ -983,25 +987,25 @@ static int llc_ui_getsockopt(struct socket *sock, int level, int optname,
 	if (len != sizeof(int))
 		goto out;
 	switch (optname) {
-		case LLC_OPT_RETRY:
-			val = llc->n2;				break;
-		case LLC_OPT_SIZE:
-			val = llc->n1;				break;
-		case LLC_OPT_ACK_TMR_EXP:
-			val = llc->ack_timer.expire;		break;
-		case LLC_OPT_P_TMR_EXP:
-			val = llc->pf_cycle_timer.expire;	break;
-		case LLC_OPT_REJ_TMR_EXP:
-			val = llc->rej_sent_timer.expire;	break;
-		case LLC_OPT_BUSY_TMR_EXP:
-			val = llc->busy_state_timer.expire;	break;
-		case LLC_OPT_TX_WIN:
-			val = llc->k;				break;
-		case LLC_OPT_RX_WIN:
-			val = llc->rw;				break;
-		default:
-			rc = -ENOPROTOOPT;
-			goto out;
+	case LLC_OPT_RETRY:
+		val = llc->n2;				break;
+	case LLC_OPT_SIZE:
+		val = llc->n1;				break;
+	case LLC_OPT_ACK_TMR_EXP:
+		val = llc->ack_timer.expire;		break;
+	case LLC_OPT_P_TMR_EXP:
+		val = llc->pf_cycle_timer.expire;	break;
+	case LLC_OPT_REJ_TMR_EXP:
+		val = llc->rej_sent_timer.expire;	break;
+	case LLC_OPT_BUSY_TMR_EXP:
+		val = llc->busy_state_timer.expire;	break;
+	case LLC_OPT_TX_WIN:
+		val = llc->k;				break;
+	case LLC_OPT_RX_WIN:
+		val = llc->rw;				break;
+	default:
+		rc = -ENOPROTOOPT;
+		goto out;
 	}
 	rc = 0;
 	if (put_user(len, optlen) || copy_to_user(optval, &val, len))
@@ -1038,7 +1042,8 @@ static struct proto_ops llc_ui_ops = {
 };
 
 static char llc_ui_banner[] __initdata =
-	KERN_INFO "NET4.0 IEEE 802.2 BSD sockets, Jay Schulist, 2001, Arnaldo C. Melo, 2002\n";
+	KERN_INFO "NET4.0 IEEE 802.2 BSD sockets, Jay Schulist, 2001, "
+		  "Arnaldo C. Melo, 2002-2003\n";
 
 int __init llc_ui_init(void)
 {

@@ -1266,6 +1266,14 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 {
 	DRM_DEBUG( "\n" );
 
+#if _HAVE_DMA_IRQ
+	/* Make sure interrupts are disabled here because the uninstall ioctl
+	 * may not have been called from userspace and after dev_private
+	 * is freed, it's too late.
+	 */
+	if ( dev->irq ) DRM(irq_uninstall)(dev);
+#endif
+
 	if ( dev->dev_private ) {
 		drm_radeon_private_t *dev_priv = dev->dev_private;
 
@@ -1297,6 +1305,8 @@ int radeon_cp_init( DRM_IOCTL_ARGS )
 {
 	DRM_DEVICE;
 	drm_radeon_init_t init;
+
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	DRM_COPY_FROM_USER_IOCTL( init, (drm_radeon_init_t *)data, sizeof(init) );
 

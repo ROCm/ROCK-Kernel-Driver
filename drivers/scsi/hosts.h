@@ -495,7 +495,7 @@ struct Scsi_Host
         __attribute__ ((aligned (sizeof(unsigned long))));
 };
 
-#define	to_scsi_host(d)	d->class_data
+#define	to_scsi_host(d)	d->driver_data	/* Major logical breakage, but we compile again... */
 	
 /*
  * These two functions are used to allocate and free a pseudo device
@@ -607,7 +607,7 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
 extern int scsi_upper_driver_register(struct Scsi_Device_Template *);
 extern void scsi_upper_driver_unregister(struct Scsi_Device_Template *);
 
-extern struct device_class shost_devclass;
+extern struct class shost_class;
 
 #endif
 /*
