@@ -753,6 +753,7 @@ ENTRY(sys_call_table)
 	.long sys_futex		/* 240 */
 	.long sys_sched_setaffinity
 	.long sys_sched_getaffinity
+	.long sys_set_thread_area
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall

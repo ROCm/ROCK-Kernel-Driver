@@ -18,6 +18,10 @@
 #include <linux/config.h>
 #include <linux/threads.h>
 
+struct desc_struct {
+	unsigned long a,b;
+};
+
 /*
  * Default implementation of macro that returns current
  * instruction pointer ("program counter").
@@ -372,6 +376,9 @@ struct thread_struct {
 	unsigned long		v86flags, v86mask, v86mode, saved_esp0;
 /* IO permissions */
 	unsigned long	*ts_io_bitmap;
+/* TLS info and cached descriptor */
+	unsigned int tls_base, tls_limit, tls_flags;
+	struct desc_struct tls_desc;
 };
 
 #define INIT_THREAD  {						\
@@ -395,7 +402,7 @@ struct thread_struct {
 	0,0,0,0, /* esp,ebp,esi,edi */				\
 	0,0,0,0,0,0, /* es,cs,ss */				\
 	0,0,0,0,0,0, /* ds,fs,gs */				\
-	__LDT(0),0, /* ldt */					\
+	LDT_ENTRY,0, /* ldt */					\
 	0, INVALID_IO_BITMAP_OFFSET, /* tace, bitmap */		\
 	{~0, } /* ioperm */					\
 }

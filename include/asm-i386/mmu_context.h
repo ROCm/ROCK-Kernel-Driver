@@ -17,7 +17,7 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm);
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 {
-	if(cpu_tlbstate[cpu].state == TLBSTATE_OK)
+	if (cpu_tlbstate[cpu].state == TLBSTATE_OK)
 		cpu_tlbstate[cpu].state = TLBSTATE_LAZY;	
 }
 #else
@@ -40,18 +40,18 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 		/* Re-load page tables */
 		load_cr3(next->pgd);
 
-		/* load_LDT, if either the previous or next thread
-		 * has a non-default LDT.
+		/*
+		 * load the LDT, if the LDT is different:
 		 */
-		if (next->context.size+prev->context.size)
+		if (unlikely(prev->context.ldt != next->context.ldt))
 			load_LDT(&next->context);
 	}
 #ifdef CONFIG_SMP
 	else {
 		cpu_tlbstate[cpu].state = TLBSTATE_OK;
-		if(cpu_tlbstate[cpu].active_mm != next)
+		if (cpu_tlbstate[cpu].active_mm != next)
 			BUG();
-		if(!test_and_set_bit(cpu, &next->cpu_vm_mask)) {
+		if (!test_and_set_bit(cpu, &next->cpu_vm_mask)) {
 			/* We were in lazy tlb mode and leave_mm disabled 
 			 * tlb flush IPI delivery. We must reload %cr3.
 			 */
