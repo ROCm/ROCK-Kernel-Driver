@@ -1400,7 +1400,7 @@ static void uart_update_termios(struct uart_state *state)
 	struct tty_struct *tty = state->info->tty;
 	struct uart_port *port = state->port;
 
-	if (uart_console(port)) {
+	if (uart_console(port) && port->cons->cflag) {
 		tty->termios->c_cflag = port->cons->cflag;
 		port->cons->cflag = 0;
 	}
