@@ -60,6 +60,9 @@ static spinlock_t ib_mad_port_list_lock;
 static int method_in_use(struct ib_mad_mgmt_method_table **method,
 			 struct ib_mad_reg_req *mad_reg_req);
 static void remove_mad_reg_req(struct ib_mad_agent_private *priv);
+static struct ib_mad_agent_private *find_mad_agent(
+					struct ib_mad_port_private *port_priv,
+					struct ib_mad *mad, int solicited);
 static int ib_mad_post_receive_mads(struct ib_mad_qp_info *qp_info,
 				    struct ib_mad_private *mad);
 static void cancel_mads(struct ib_mad_agent_private *mad_agent_priv);
@@ -623,10 +626,12 @@ static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
 			       struct ib_smp *smp,
 			       struct ib_send_wr *send_wr)
 {
-	int ret, alloc_flags;
+	int ret, alloc_flags, solicited;
 	unsigned long flags;
 	struct ib_mad_local_private *local;
 	struct ib_mad_private *mad_priv;
+	struct ib_mad_port_private *port_priv;
+	struct ib_mad_agent_private *recv_mad_agent = NULL;
 	struct ib_device *device = mad_agent_priv->agent.device;
 	u8 port_num = mad_agent_priv->agent.port_num;
 
@@ -651,6 +656,7 @@ static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
 		goto out;
 	}
 	local->mad_priv = NULL;
+	local->recv_mad_agent = NULL;
 	mad_priv = kmem_cache_alloc(ib_mad_cache, alloc_flags);
 	if (!mad_priv) {
 		ret = -ENOMEM;
@@ -669,19 +675,41 @@ static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
 		 * there is a recv handler
 		 */
 		if (solicited_mad(&mad_priv->mad.mad) &&
-		    mad_agent_priv->agent.recv_handler)
+		    mad_agent_priv->agent.recv_handler) {
 			local->mad_priv = mad_priv;
-		else
+			local->recv_mad_agent = mad_agent_priv;
+			/*
+			 * Reference MAD agent until receive
+			 * side of local completion handled
+			 */
+			atomic_inc(&mad_agent_priv->refcount);
+		} else
 			kmem_cache_free(ib_mad_cache, mad_priv);
 		break;
 	case IB_MAD_RESULT_SUCCESS | IB_MAD_RESULT_CONSUMED:
 		kmem_cache_free(ib_mad_cache, mad_priv);
 		break;
 	case IB_MAD_RESULT_SUCCESS:
-		kmem_cache_free(ib_mad_cache, mad_priv);
-		kfree(local);
-		ret = 0;
-		goto out;
+		/* Treat like an incoming receive MAD */
+		solicited = solicited_mad(&mad_priv->mad.mad);
+		port_priv = ib_get_mad_port(mad_agent_priv->agent.device,
+					    mad_agent_priv->agent.port_num);
+		if (port_priv) {
+			mad_priv->mad.mad.mad_hdr.tid =
+				((struct ib_mad *)smp)->mad_hdr.tid;
+			recv_mad_agent = find_mad_agent(port_priv,
+						       &mad_priv->mad.mad,
+							solicited);
+		}
+		if (!port_priv || !recv_mad_agent) {
+			kmem_cache_free(ib_mad_cache, mad_priv);
+			kfree(local);
+			ret = 0;
+			goto out;
+		}
+		local->mad_priv = mad_priv;
+		local->recv_mad_agent = recv_mad_agent;
+		break;
 	default:
 		kmem_cache_free(ib_mad_cache, mad_priv);
 		kfree(local);
@@ -696,7 +724,7 @@ static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
 	local->send_wr.next = NULL;
 	local->tid = send_wr->wr.ud.mad_hdr->tid;
 	local->wr_id = send_wr->wr_id;
-	/* Reference MAD agent until local completion handled */
+	/* Reference MAD agent until send side of local completion handled */
 	atomic_inc(&mad_agent_priv->refcount);
 	/* Queue local completion to local list */
 	spin_lock_irqsave(&mad_agent_priv->lock, flags);
@@ -1996,6 +2024,7 @@ static void local_completions(void *data)
 {
 	struct ib_mad_agent_private *mad_agent_priv;
 	struct ib_mad_local_private *local;
+	struct ib_mad_agent_private *recv_mad_agent;
 	unsigned long flags;
 	struct ib_wc wc;
 	struct ib_mad_send_wc mad_send_wc;
@@ -2009,6 +2038,13 @@ static void local_completions(void *data)
 				   completion_list);
 		spin_unlock_irqrestore(&mad_agent_priv->lock, flags);
 		if (local->mad_priv) {
+			recv_mad_agent = local->recv_mad_agent;
+			if (!recv_mad_agent) {
+				printk(KERN_ERR PFX "No receive MAD agent for local completion\n");
+				kmem_cache_free(ib_mad_cache, local->mad_priv);
+				goto local_send_completion;
+			}
+
 			/*
 			 * Defined behavior is to complete response
 			 * before request
@@ -2033,15 +2069,19 @@ static void local_completions(void *data)
 			local->mad_priv->header.recv_wc.recv_buf.grh = NULL;
 			local->mad_priv->header.recv_wc.recv_buf.mad =
 						&local->mad_priv->mad.mad;
-			if (atomic_read(&mad_agent_priv->qp_info->snoop_count))
-				snoop_recv(mad_agent_priv->qp_info,
+			if (atomic_read(&recv_mad_agent->qp_info->snoop_count))
+				snoop_recv(recv_mad_agent->qp_info,
 					  &local->mad_priv->header.recv_wc,
 					   IB_MAD_SNOOP_RECVS);
-			mad_agent_priv->agent.recv_handler(
-						&mad_agent_priv->agent,
+			recv_mad_agent->agent.recv_handler(
+						&recv_mad_agent->agent,
 						&local->mad_priv->header.recv_wc);
+			spin_lock_irqsave(&recv_mad_agent->lock, flags);
+			atomic_dec(&recv_mad_agent->refcount);
+			spin_unlock_irqrestore(&recv_mad_agent->lock, flags);
 		}
 
+local_send_completion:
 		/* Complete send */
 		mad_send_wc.status = IB_WC_SUCCESS;
 		mad_send_wc.vendor_err = 0;

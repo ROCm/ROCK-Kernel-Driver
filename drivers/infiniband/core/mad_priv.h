@@ -127,6 +127,7 @@ struct ib_mad_send_wr_private {
 struct ib_mad_local_private {
 	struct list_head completion_list;
 	struct ib_mad_private *mad_priv;
+	struct ib_mad_agent_private *recv_mad_agent;
 	struct ib_send_wr send_wr;
 	struct ib_sge sg_list[IB_MAD_SEND_REQ_MAX_SG];
 	u64 wr_id;			/* client WR ID */
