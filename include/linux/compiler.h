@@ -17,7 +17,7 @@ extern void __chk_io_ptr(void __iomem *);
 # define __iomem
 # define __chk_user_ptr(x) (void)0
 # define __chk_io_ptr(x) (void)0
-#define __builtin_warning(x, ...) (1)
+# define __builtin_warning(x, y...) (1)
 #endif
 
 #ifdef __KERNEL__
