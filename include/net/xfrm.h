@@ -462,13 +462,51 @@ static __inline__ int addr_match(void *token1, void *token2, int prefixlen)
 	return 1;
 }
 
+static __inline__
+u16 xfrm_flowi_sport(struct flowi *fl)
+{
+	u16 port;
+	switch(fl->proto) {
+	case IPPROTO_TCP:
+	case IPPROTO_UDP:
+		port = fl->fl_ip_sport;
+		break;
+	case IPPROTO_ICMP:
+	case IPPROTO_ICMPV6:
+		port = htons(fl->fl_icmp_type);
+		break;
+	default:
+		port = 0;	/*XXX*/
+	}
+	return port;
+}
+
+static __inline__
+u16 xfrm_flowi_dport(struct flowi *fl)
+{
+	u16 port;
+	switch(fl->proto) {
+	case IPPROTO_TCP:
+	case IPPROTO_UDP:
+		port = fl->fl_ip_dport;
+		break;
+	case IPPROTO_ICMP:
+	case IPPROTO_ICMPV6:
+		port = htons(fl->fl_icmp_code);
+		break;
+	default:
+		port = 0;	/*XXX*/
+	}
+	return port;
+}
+
 static inline int
 __xfrm4_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 {
 	return  addr_match(&fl->fl4_dst, &sel->daddr, sel->prefixlen_d) &&
 		addr_match(&fl->fl4_src, &sel->saddr, sel->prefixlen_s) &&
-		!((fl->fl_ip_dport^sel->dport)&sel->dport_mask) &&
-		!((fl->fl_ip_sport^sel->sport)&sel->sport_mask) &&
+		!((xfrm_flowi_dport(fl) ^ sel->dport) & sel->dport_mask) &&
+		!((xfrm_flowi_sport(fl) ^ sel->sport) & sel->sport_mask) &&
 		(fl->proto == sel->proto || !sel->proto) &&
 		(fl->oif == sel->ifindex || !sel->ifindex);
 }
@@ -478,8 +516,8 @@ __xfrm6_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 {
 	return  addr_match(&fl->fl6_dst, &sel->daddr, sel->prefixlen_d) &&
 		addr_match(&fl->fl6_src, &sel->saddr, sel->prefixlen_s) &&
-		!((fl->fl_ip_dport^sel->dport)&sel->dport_mask) &&
-		!((fl->fl_ip_sport^sel->sport)&sel->sport_mask) &&
+		!((xfrm_flowi_dport(fl) ^ sel->dport) & sel->dport_mask) &&
+		!((xfrm_flowi_sport(fl) ^ sel->sport) & sel->sport_mask) &&
 		(fl->proto == sel->proto || !sel->proto) &&
 		(fl->oif == sel->ifindex || !sel->ifindex);
 }
