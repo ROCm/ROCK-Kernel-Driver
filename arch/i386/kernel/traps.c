@@ -956,8 +956,8 @@ cobalt_init(void)
 }
 #endif
 
-int EISA_bus;
 #ifdef CONFIG_EISA
+int EISA_bus;
 static struct resource eisa_id = { "EISA ID", 0xc80, 0xc83, IORESOURCE_BUSY };
 #endif
 
