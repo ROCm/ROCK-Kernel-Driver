@@ -140,6 +140,9 @@ static inline void usb_set_intfdata (struct usb_interface *intf, void *data)
 	dev_set_drvdata(&intf->dev, data);
 }
 
+struct usb_interface *usb_get_intf(struct usb_interface *intf);
+void usb_put_intf(struct usb_interface *intf);
+
 /* this maximum is arbitrary */
 #define USB_MAXINTERFACES	32
 

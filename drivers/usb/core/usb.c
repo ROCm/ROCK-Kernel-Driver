@@ -768,7 +768,7 @@ usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
  *
  * A pointer to the device with the incremented reference counter is returned.
  */
-struct usb_device *usb_get_dev (struct usb_device *dev)
+struct usb_device *usb_get_dev(struct usb_device *dev)
 {
 	if (dev)
 		get_device(&dev->dev);
@@ -786,6 +786,40 @@ void usb_put_dev(struct usb_device *dev)
 {
 	if (dev)
 		put_device(&dev->dev);
+}
+
+/**
+ * usb_get_intf - increments the reference count of the usb interface structure
+ * @intf: the interface being referenced
+ *
+ * Each live reference to a interface must be refcounted.
+ *
+ * Drivers for USB interfaces should normally record such references in
+ * their probe() methods, when they bind to an interface, and release
+ * them by calling usb_put_intf(), in their disconnect() methods.
+ *
+ * A pointer to the interface with the incremented reference counter is
+ * returned.
+ */
+struct usb_interface *usb_get_intf(struct usb_interface *intf)
+{
+	if (intf)
+		get_device(&intf->dev);
+	return intf;
+}
+
+/**
+ * usb_put_intf - release a use of the usb interface structure
+ * @intf: interface that's been decremented
+ *
+ * Must be called when a user of an interface is finished with it.  When the
+ * last user of the interface calls this function, the memory of the interface
+ * is freed.
+ */
+void usb_put_intf(struct usb_interface *intf)
+{
+	if (intf)
+		put_device(&intf->dev);
 }
 
 static struct usb_device *match_device(struct usb_device *dev,
