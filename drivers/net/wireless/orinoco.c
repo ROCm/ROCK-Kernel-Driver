@@ -1,4 +1,4 @@
-/* orinoco.c 0.07	- (formerly known as dldwd_cs.c and orinoco_cs.c)
+/* orinoco.c 0.08	- (formerly known as dldwd_cs.c and orinoco_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -190,12 +190,34 @@
  *	  Rx path, but don't make as much noise about it.
  *	o Firmware detection cleanups.
  *
+ * v0.07 -> v0.08 - 3/10/2001 - David Gibson
+ *	o Fixed a possible buffer overrun found by the Stanford checker (in
+ *	  dldwd_ioctl_setiwencode()).  Can only be called by root anyway, so not
+ *	  a big problem.
+ *	o Turned has_big_wep on for Intersil cards.  That's not true for all of them
+ *	  but we should at least let the capable ones try.
+ *	o Wait for BUSY to clear at the beginning of hermes_bap_seek().  I
+ *	  realised that my assumption that the driver's serialization
+ *	  would prevent the BAP being busy on entry was possibly false, because
+ *	  things other than seeks may make the BAP busy.
+ *	o Use "alternate" (oui 00:00:00) encapsulation by default.
+ *	  Setting use_old_encaps will mimic the old behaviour, but I
+ *	  think we will be able to eliminate this.
+ *	o Don't try to make __initdata const (the version string).
+ *	  This can't work because of the way the __initdata sectioning
+ *	   works.
+ *	o Added MODULE_LICENSE tags.
+ *	o Support for PLX (transparent PCMCIA->PCI brdge) cards.
+ *	o Improved support for Symbol firmware - we can actually tell
+ *	   the version now.
  *
  * TODO - Jean II
- *	o inline functions (lot's of candidate, need to reorder code)
+ *	o inline functions (lots of candidate, need to reorder code)
  *	o Test PrismII/Symbol cards & firmware versions
  *	o Mini-PCI support (some people have reported success - JII)
  */
+
+#include <linux/config.h>
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -227,7 +249,7 @@
 #include "hermes.h"
 #include "orinoco.h"
 
-static char version[] __initdata = "orinoco.c 0.07 (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata = "orinoco.c 0.08 (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_DESCRIPTION("Driver for Lucent Orinoco, Prism II based and similar wireless cards");
 MODULE_LICENSE("Dual MPL/GPL");
@@ -238,10 +260,8 @@ int dldwd_debug = ORINOCO_DEBUG;
 MODULE_PARM(dldwd_debug, "i");
 #endif
 
-/* FIXME: We need a better way of handling this */
-/* Set this flag to use 00:00:00 for the encapsulation oui instead of 00:00:F8 */
-static int use_alternate_encaps; /* =0 */
-MODULE_PARM(use_alternate_encaps, "i");
+int use_old_encaps = 0;
+MODULE_PARM(use_old_encaps, "i");
 
 const long channel_frequency[] = {
 	2412, 2417, 2422, 2427, 2432, 2437, 2442,
@@ -307,10 +327,11 @@ struct dldwd_frame_hdr {
 
 /* 802.2 LLL header SNAP used for SNAP encapsulation over 802.11 */
 struct p8022_hdr encaps_hdr = {
-	0xaa, 0xaa, 0x03, {0x00, 0x00, 0xf8}
-};
-struct p8022_hdr alternate_encaps_hdr = {
 	0xaa, 0xaa, 0x03, {0x00, 0x00, 0x00}
+};
+
+struct p8022_hdr old_encaps_hdr = {
+	0xaa, 0xaa, 0x03, {0x00, 0x00, 0xf8}
 };
 
 /* How many times to retry if we get an EIO reading the BAP in the Rx path */
@@ -881,7 +902,7 @@ static int dldwd_hw_get_bitratelist(dldwd_priv_t *priv, int *numrates,
 	
 	num = le16_to_cpu(list.len);
 	*numrates = num;
-	num = MIN(num, max);
+	num = min(num, max);
 
 	for (i = 0; i < num; i++) {
 		rates[i] = (p[i] & 0x7f) * 500000; /* convert to bps */
@@ -1286,7 +1307,7 @@ static void determine_firmware(struct net_device *dev)
 
 	if (sta_id.vendor == 1) {
 		/* Lucent Wavelan IEEE, Lucent Orinoco, Cabletron RoamAbout,
-		   ELSE, Meloc, HP, IBM, Dell 1150 */
+		   ELSA, Melco, HP, IBM, Dell 1150, Compaq 110/210 */
 		printk(KERN_DEBUG "%s: Looks like a Lucent/Agere firmware "
 		       "version %d.%02d\n", dev->name,
 		       sta_id.major, sta_id.minor);
@@ -1303,7 +1324,7 @@ static void determine_firmware(struct net_device *dev)
 		priv->has_big_wep = 1; /* FIXME: this is wrong - how do we tell
 					  Gold cards from the others? */
 		priv->has_mwo = (firmver >= 0x60000);
-		priv->has_pm = (firmver >= 0x40020);
+		priv->has_pm = (firmver >= 0x40020); /* Don't work in 7.52 ? */
 		priv->has_preamble = 0;
 		priv->ibss_port = 1;
 		/* Tested with Lucent firmware :
@@ -1314,27 +1335,59 @@ static void determine_firmware(struct net_device *dev)
 		/* Symbol , 3Com AirConnect, Intel, Ericsson WLAN */
 		/* Intel MAC : 00:02:B3:* */
 		/* 3Com MAC : 00:50:DA:* */
-		printk(KERN_DEBUG "%s: Looks like a Symbol firmware "
-		       "(unknown version)\n", dev->name);
+		union symbol_sta_id {
+			char raw[HERMES_SYMBOL_MAX_VER];
+			char string[HERMES_SYMBOL_MAX_VER + 1];
+		} symbol_sta_id;
 
-		/* FIXME : we need to get Symbol firmware revision.
-		 * I tried to use SYMBOL_***ARY_VER, but it didn't
-		 * returned anything proper... */
+		/* Get the Symbol firmware version */
+		err = HERMES_READ_RECORD(hw, USER_BAP,
+					 HERMES_RID_SYMBOL_SECONDARY_VER,
+					 &(symbol_sta_id.raw));
+		if (err) {
+			printk(KERN_WARNING "%s: Error %d reading Symbol firmware info. Wildly guessing capabilities...\n",
+			       dev->name, err);
+			firmver = 0;
+			symbol_sta_id.string[0] = '\0';
+		} else {
+			/* The firmware revision is a string, the format is
+			 * something like : "V2.20-01".
+			 * Quick and dirty parsing... - Jean II
+			 */
+			firmver = ((symbol_sta_id.raw[1] - '0') << 16)
+			  | ((symbol_sta_id.raw[3] - '0') << 12)
+			  | ((symbol_sta_id.raw[4] - '0') << 8)
+			  | ((symbol_sta_id.raw[6] - '0') << 4)
+			  | (symbol_sta_id.raw[7] - '0');
+
+			symbol_sta_id.string[HERMES_SYMBOL_MAX_VER] = '\0';
+		}
+
+		printk(KERN_DEBUG "%s: Looks like a Symbol firmware "
+		       "version [%s] (parsing to %X)\n", dev->name,
+		       symbol_sta_id.string, firmver);
+
 		priv->firmware_type = FIRMWARE_TYPE_SYMBOL;
 		priv->tx_rate_ctrl = 0xF;	/* 11 Mb/s auto */
 		priv->need_card_reset = 1;
 		priv->broken_reset = 0;
 		priv->broken_allocate = 1;
 		priv->has_port3 = 1;
-		priv->has_ibss = 1; /* FIXME */
-		priv->has_wep = 1; /* FIXME */
-		priv->has_big_wep = 1;	/* RID_SYMBOL_KEY_LENGTH */
+		priv->has_ibss = (firmver >= 0x20000);
+		priv->has_wep = (firmver >= 0x15012);
+		priv->has_big_wep = (firmver >= 0x20000);
 		priv->has_mwo = 0;
-		priv->has_pm = 1; /* FIXME */
-		priv->has_preamble = 0; /* FIXME */
+		priv->has_pm = (firmver >= 0x20000) && (firmver < 0x22000);
+		priv->has_preamble = (firmver >= 0x20000);
 		priv->ibss_port = 4;
-		/* Tested with Intel firmware : v15 => Jean II */
+		/* Tested with Intel firmware : 0x20015 => Jean II */
+		/* Tested with 3Com firmware : 0x15012 & 0x22001 => Jean II */
 	} else {
+		/* D-Link, Linksys, Adtron, ZoomAir, and many others...
+		 * Samsung, Compaq 100/200 and Proxim are slightly
+		 * different and less well tested */
+		/* D-Link MAC : 00:40:05:* */
+		/* Addtron MAC : 00:90:D1:* */
 		printk(KERN_DEBUG "%s: Looks like an Intersil firmware "
 		       "version %d.%02d\n", dev->name,
 		       sta_id.major, sta_id.minor);
@@ -1347,7 +1400,7 @@ static void determine_firmware(struct net_device *dev)
 		priv->has_port3 = 1;
 		priv->has_ibss = (firmver >= 0x00007); /* FIXME */
 		priv->has_wep = (firmver >= 0x00008);
-		priv->has_big_wep = 0;
+		priv->has_big_wep = priv->has_wep;
 		priv->has_mwo = 0;
 		priv->has_pm = (firmver >= 0x00007);
 		priv->has_preamble = 0;
@@ -1427,9 +1480,9 @@ dldwd_init(struct net_device *dev)
 		goto out;
 	}
 	if ( nickbuf.len )
-		len = MIN(IW_ESSID_MAX_SIZE, le16_to_cpu(nickbuf.len));
+		len = min(IW_ESSID_MAX_SIZE, le16_to_cpu(nickbuf.len));
 	else
-		len = MIN(IW_ESSID_MAX_SIZE, 2 * reclen);
+		len = min(IW_ESSID_MAX_SIZE, 2 * reclen);
 	memcpy(priv->nick, &nickbuf.val, len);
 	priv->nick[len] = '\0';
 
@@ -1556,20 +1609,12 @@ dldwd_get_wireless_stats(struct net_device *dev)
 		err = HERMES_READ_RECORD(hw, USER_BAP,
 					 HERMES_RID_COMMSQUALITY, &cq);
 		
-		le16_to_cpus(&cq.qual);
-		le16_to_cpus(&cq.signal);
-		le16_to_cpus(&cq.noise);
-		
 		DEBUG(3, "%s: Global stats = %X-%X-%X\n", dev->name,
 		      cq.qual, cq.signal, cq.noise);
 
-		/* Why are we using MIN/MAX ? We don't really care
-		 * if the value goes above max, because we export the
-		 * raw dBm values anyway. The normalisation should be done
-		 * in user space - Jean II */
-		wstats->qual.qual = MAX(MIN(cq.qual, 0x8b-0x2f), 0);
-		wstats->qual.level = MAX(MIN(cq.signal, 0x8a), 0x2f) - 0x95;
-		wstats->qual.noise = MAX(MIN(cq.noise, 0x8a), 0x2f) - 0x95;
+		wstats->qual.qual = le16_to_cpu(cq.qual);
+		wstats->qual.level = le16_to_cpu(cq.signal);
+		wstats->qual.noise = le16_to_cpu(cq.noise);
 		wstats->qual.updated = 7;
 	}
 
@@ -1593,9 +1638,9 @@ static inline void dldwd_spy_gather(struct net_device *dev,
 	 * source address with out list, and if match, get the stats... */
 	for (i = 0; i < priv->spy_number; i++)
 		if (!memcmp(mac, priv->spy_address[i], ETH_ALEN)) {
-			priv->spy_stat[i].qual = MAX(MIN(cq->qual, 0x8b-0x2f), 0);
-			priv->spy_stat[i].level = MAX(MIN(cq->signal, 0x8a), 0x2f) - 0x95;
-			priv->spy_stat[i].noise = MAX(MIN(cq->noise, 0x8a), 0x2f) - 0x95;
+			priv->spy_stat[i].qual = cq->qual;
+			priv->spy_stat[i].level = cq->signal;
+			priv->spy_stat[i].noise = cq->noise;
 			priv->spy_stat[i].updated = 7;
 		}
 }
@@ -1674,7 +1719,7 @@ dldwd_xmit(struct sk_buff *skb, struct net_device *dev)
 	dldwd_lock(priv);
 
 	/* Length of the packet body */
-	len = MAX(skb->len - ETH_HLEN, ETH_ZLEN);
+	len = max_t(int,skb->len - ETH_HLEN, ETH_ZLEN);
 
 	eh = (struct ethhdr *)skb->data;
 
@@ -1699,12 +1744,13 @@ dldwd_xmit(struct sk_buff *skb, struct net_device *dev)
 		hdr.p8023.h_proto = htons(data_len + ENCAPS_OVERHEAD);
 		
 		/* 802.2 header */
-		/* FIXME: ugh, what a hack for the 00:00:00 APs.  Need to find a better way */
-		if (use_alternate_encaps)
-			memcpy(&hdr.p8022, &alternate_encaps_hdr, sizeof(alternate_encaps_hdr));
+		if (! use_old_encaps) 
+			memcpy(&hdr.p8022, &encaps_hdr,
+			       sizeof(encaps_hdr));
 		else
-			memcpy(&hdr.p8022, &encaps_hdr, sizeof(encaps_hdr));
-
+			memcpy(&hdr.p8022, &encaps_hdr,
+			       sizeof(old_encaps_hdr));
+			
 		hdr.ethertype = eh->h_proto;
 		err  = hermes_bap_pwrite(hw, USER_BAP, &hdr, sizeof(hdr),
 					 txfid, 0);
@@ -1933,12 +1979,12 @@ static int dldwd_ioctl_setiwencode(struct net_device *dev, struct iw_point *erq)
 	uint16_t xlen = 0;
 	int err = 0;
 	char keybuf[MAX_KEY_SIZE];
-
+	
 	if (erq->pointer) {
 		/* We actually have a key to set */
-		if(erq->length > MAX_KEY_SIZE)
+		if ( (erq->length < SMALL_KEY_SIZE) || (erq->length > MAX_KEY_SIZE) )
 			return -EINVAL;
-
+		
 		if (copy_from_user(keybuf, erq->pointer, erq->length))
 			return -EFAULT;
 	}
@@ -3512,7 +3558,7 @@ dldwd_proc_get_hermes_recs(char *page, char **start, off_t requested_offset,
 
 		buf += sprintf(buf, "%-15s (0x%04x): length=%d (%d bytes)\tvalue=", record_table[i].name,
 			       rid, length, (length-1)*2);
-		len = MIN( MAX(minlen, (length-1)*2), maxlen);
+		len = min( (int)max(minlen, ((int)length-1)*2), maxlen);
 
 		switch (record_table[i].displaytype) {
 		case DISPLAY_WORDS:
@@ -3531,7 +3577,7 @@ dldwd_proc_get_hermes_recs(char *page, char **start, off_t requested_offset,
 			break;
 
 		case DISPLAY_STRING:
-			len = MIN(len, le16_to_cpu(val16[0])+2);
+			len = min(len, le16_to_cpu(val16[0])+2);
 			val8[len] = '\0';
 			buf += sprintf(buf, "\"%s\"", (char *)&val16[1]);
 			break;

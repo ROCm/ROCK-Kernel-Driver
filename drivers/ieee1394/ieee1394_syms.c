@@ -18,6 +18,7 @@
 #include "hosts.h"
 #include "ieee1394_core.h"
 #include "ieee1394_transactions.h"
+#include "ieee1394_hotplug.h"
 #include "highlevel.h"
 #include "nodemgr.h"
 
@@ -75,8 +76,12 @@ EXPORT_SYMBOL(highlevel_add_host);
 EXPORT_SYMBOL(highlevel_remove_host);
 EXPORT_SYMBOL(highlevel_host_reset);
 EXPORT_SYMBOL(highlevel_add_one_host);
+
 EXPORT_SYMBOL(hpsb_guid_get_entry);
 EXPORT_SYMBOL(hpsb_nodeid_get_entry);
 EXPORT_SYMBOL(hpsb_get_host_by_ne);
 EXPORT_SYMBOL(hpsb_guid_fill_packet);
+EXPORT_SYMBOL(hpsb_register_protocol);
+EXPORT_SYMBOL(hpsb_unregister_protocol);
+EXPORT_SYMBOL(hpsb_release_unit_directory);
 MODULE_LICENSE("GPL");

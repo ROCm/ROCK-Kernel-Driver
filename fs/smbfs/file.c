@@ -24,6 +24,7 @@
 #include <linux/smb_fs.h>
 
 #include "smb_debug.h"
+#include "proto.h"
 
 static int
 smb_fsync(struct file *file, struct dentry * dentry, int datasync)

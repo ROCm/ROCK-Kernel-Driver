@@ -17,11 +17,12 @@
 #include "check.h"
 #include "sgi.h"
 
-int sgi_partition(struct gendisk *hd, kdev_t dev, unsigned long first_sector, int current_minor)
+int sgi_partition(struct gendisk *hd, struct block_device *bdev, unsigned long first_sector, int current_minor)
 {
 	int i, csum, magic;
 	unsigned int *ui, start, blocks, cs;
-	struct buffer_head *bh;
+	Sector sect;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct sgi_disklabel {
 		int magic_mushroom;         /* Big fat spliff... */
 		short root_part_num;        /* Root partition number */
@@ -43,17 +44,15 @@ int sgi_partition(struct gendisk *hd, kdev_t dev, unsigned long first_sector, in
 	} *label;
 	struct sgi_partition *p;
 
-	if(!(bh = bread(dev, 0, get_ptable_blocksize(dev)))) {
-		if (warn_no_part) printk(KERN_WARNING "Dev %s: unable to read partition table\n", kdevname(dev));
+	label = (struct sgi_disklabel *) read_dev_sector(bdev, 0, &sect);
+	if (!label)
 		return -1;
-	}
-	label = (struct sgi_disklabel *) bh->b_data;
 	p = &label->partitions[0];
 	magic = label->magic_mushroom;
 	if(be32_to_cpu(magic) != SGI_LABEL_MAGIC) {
 		/*printk("Dev %s SGI disklabel: bad magic %08x\n",
-		       kdevname(dev), magic);*/
-		brelse(bh);
+		       bdevname(dev), magic);*/
+		put_dev_sector(sect);
 		return 0;
 	}
 	ui = ((unsigned int *) (label + 1)) - 1;
@@ -63,8 +62,8 @@ int sgi_partition(struct gendisk *hd, kdev_t dev, unsigned long first_sector, in
 	}
 	if(csum) {
 		printk(KERN_WARNING "Dev %s SGI disklabel: csum bad, label corrupted\n",
-		       kdevname(dev));
-		brelse(bh);
+		       bdevname(dev));
+		put_dev_sector(sect);
 		return 0;
 	}
 	/* All SGI disk labels have 16 partitions, disks under Linux only
@@ -81,6 +80,6 @@ int sgi_partition(struct gendisk *hd, kdev_t dev, unsigned long first_sector, in
 		current_minor++;
 	}
 	printk("\n");
-	brelse(bh);
+	put_dev_sector(sect);
 	return 1;
 }

@@ -731,8 +731,10 @@ inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
 {
 	struct super_block *sb = dentry->d_inode->i_sb;
 	
-	if (dentry == exp->ex_dentry)
+	if (dentry == exp->ex_dentry) {
+		*maxsize = 0;
 		return 0;
+	}
 
 	if (sb->s_op->dentry_to_fh) {
 		int need_parent = !S_ISDIR(dentry->d_inode->i_mode) &&

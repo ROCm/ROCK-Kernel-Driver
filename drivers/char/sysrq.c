@@ -231,12 +231,12 @@ static struct sysrq_key_op sysrq_sync_op = {
 static void sysrq_handle_mountro(int key, struct pt_regs *pt_regs,
 		struct kbd_struct *kbd, struct tty_struct *tty) {
 	emergency_sync_scheduled = EMERG_REMOUNT;
-	wakeup_bdflush(0);
+	wakeup_bdflush();
 }
 static struct sysrq_key_op sysrq_mountro_op = {
 	handler:	sysrq_handle_mountro,
 	help_msg:	"Unmount",
-	action_msg:	"Emergency Remount R/0",
+	action_msg:	"Emergency Remount R/O",
 };
 
 /* END SYNC SYSRQ HANDLERS BLOCK */

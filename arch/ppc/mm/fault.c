@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.fault.c 1.13 06/28/01 15:50:17 paulus
+ * BK Id: SCCS/s.fault.c 1.15 09/24/01 16:35:10 paulus
  */
 /*
  *  arch/ppc/mm/fault.c
@@ -150,6 +150,7 @@ good_area:
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.
 	 */
+ survive:
         switch (handle_mm_fault(mm, vma, address, is_write)) {
         case 1:
                 current->min_flt++;
@@ -195,6 +196,12 @@ bad_area:
  */
 out_of_memory:
 	up_read(&mm->mmap_sem);
+	if (current->pid == 1) {
+		current->policy |= SCHED_YIELD;
+		schedule();
+		down_read(&mm->mmap_sem);
+		goto survive;
+	}
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
@@ -346,34 +353,3 @@ get_8xx_pte(struct mm_struct *mm, unsigned long addr)
         return(retval);
 }
 #endif /* CONFIG_8xx */
-
-#if 0
-/*
- * Misc debugging functions.  Please leave them here. -- Cort
- */
-void print_pte(struct _PTE p)
-{
-	printk(
-"%08x %08x vsid: %06x h: %01x api: %02x rpn: %05x rcwimg: %d%d%d%d%d%d pp: %02x\n",
-		*((unsigned long *)(&p)), *((long *)&p+1),
-		p.vsid, p.h, p.api, p.rpn,
-		p.r,p.c,p.w,p.i,p.m,p.g,p.pp);
-}
-
-/*
- * Search the hw hash table for a mapping to the given physical
- * address. -- Cort
- */
-unsigned long htab_phys_to_va(unsigned long address)
-{
-	extern PTE *Hash, *Hash_end;
-	PTE *ptr;
-
-	for ( ptr = Hash ; ptr < Hash_end ; ptr++ )
-	{
-		if ( ptr->rpn == (address>>12) )
-			printk("phys %08lX -> va ???\n",
-			       address);
-	}
-}
-#endif

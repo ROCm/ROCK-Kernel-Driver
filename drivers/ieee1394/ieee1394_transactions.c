@@ -131,7 +131,7 @@ void fill_iso_packet(struct hpsb_packet *packet, int length, int channel,
 
         packet->header_size = 4;
         packet->data_size = length;
-        packet->type = iso;
+        packet->type = hpsb_iso;
         packet->tcode = TCODE_ISO_DATA;
 }
 
@@ -142,7 +142,7 @@ void fill_phy_packet(struct hpsb_packet *packet, quadlet_t data)
         packet->header_size = 8;
         packet->data_size = 0;
         packet->expect_response = 0;
-        packet->type = raw;             /* No CRC added */
+        packet->type = hpsb_raw;             /* No CRC added */
         packet->speed_code = SPEED_100; /* Force speed to be 100Mbps */
 }
 
@@ -488,7 +488,9 @@ struct hpsb_packet *hpsb_make_packet (struct hpsb_host *host, nodeid_t node,
         if (!packet)
                 return NULL;
 
-        if (length != 4)
+	/* Sometimes this may be called without data, just to allocate the
+	 * packet. */
+        if (length != 4 && buffer)
                 memcpy(packet->data, buffer, length);
 
 	return packet;

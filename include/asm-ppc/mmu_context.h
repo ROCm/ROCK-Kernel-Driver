@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.mmu_context.h 1.15 08/16/01 23:00:17 paulus
+ * BK Id: SCCS/s.mmu_context.h 1.18 09/26/01 16:02:49 paulus
  */
 #ifdef __KERNEL__
 #ifndef __PPC_MMU_CONTEXT_H
@@ -29,7 +29,7 @@
  * of the 32-bit virtual address (the "effective segment ID") in order
  * to spread out the entries in the MMU hash table.  Note, if this
  * function is changed then arch/ppc/mm/hashtable.S will have to be
- * changed correspondly.
+ * changed to correspond.
  */
 #define CTX_TO_VSID(ctx, va)	(((ctx) * (897 * 16) + ((va) >> 28) * 0x111) \
 				 & 0xffffff)
@@ -89,7 +89,7 @@ extern void set_context(mm_context_t context, pgd_t *pgd);
  * Bitmap of contexts in use.
  * The size of this bitmap is LAST_CONTEXT + 1 bits.
  */
-extern unsigned long context_map[(LAST_CONTEXT+1) / (8*sizeof(unsigned long))];
+extern unsigned long context_map[];
 
 /*
  * This caches the next context number that we expect to be free.

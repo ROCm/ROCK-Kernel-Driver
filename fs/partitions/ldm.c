@@ -178,10 +178,12 @@ static int parse_vblk(const u8 *buffer, const int buf_size, struct vblk *vb)
  */
 static int create_data_partitions(struct gendisk *hd,
 		const unsigned long first_sector, int first_part_minor,
-		const kdev_t dev, const struct vmdb *vm,
-		const struct privhead *ph, const struct ldmdisk *dk)
+		struct block_device *bdev, const struct vmdb *vm,
+		const struct privhead *ph, const struct ldmdisk *dk,
+		unsigned long base)
 {
-	struct buffer_head *bh;
+	Sector  sect;
+	unsigned char *data;
 	struct vblk *vb;
 	int vblk;
 	int vsize;		/* VBLK size. */
@@ -192,14 +194,14 @@ static int create_data_partitions(struct gendisk *hd,
 	if (!vb)
 		goto no_mem;
 	vsize   = vm->vblk_size;
-	if (vsize < 1 || vsize > LDM_BLOCKSIZE)
+	if (vsize < 1 || vsize > 512)
 		goto err_out;
-	perbuf  = LDM_BLOCKSIZE / vsize;
-	if (perbuf < 1 || LDM_BLOCKSIZE % vsize)
+	perbuf  = 512 / vsize;
+	if (perbuf < 1 || 512 % vsize)
 		goto err_out;
 					/* 512 == VMDB size */
-	lastbuf = (vm->last_vblk_seq - (512 / vsize)) / perbuf;
-	lastofs = (vm->last_vblk_seq - (512 / vsize)) % perbuf;
+	lastbuf = vm->last_vblk_seq / perbuf - 1;
+	lastofs = vm->last_vblk_seq % perbuf;
 	if (lastofs)
 		lastbuf++;
 	if (OFF_VBLK * LDM_BLOCKSIZE + vm->last_vblk_seq * vsize >
@@ -207,17 +209,18 @@ static int create_data_partitions(struct gendisk *hd,
 		goto err_out;
 	printk(" <");
 	for (buffer = 0; buffer < lastbuf; buffer++) {
-		if (!(bh = bread(dev, buffer + OFF_VBLK, LDM_BLOCKSIZE)))
+		data = read_dev_sector(bdev, base + 2*OFF_VBLK + buffer, &sect);
+		if (!data)
 			goto read_err;
 		for (vblk = 0; vblk < perbuf; vblk++) {
 			u8 *block;
 			
 			if (lastofs && buffer == lastbuf - 1 && vblk >= lastofs)
 				break;
-			block = bh->b_data + vsize * vblk;
-			if (block + vsize > (u8*)bh->b_data + LDM_BLOCKSIZE)
+			block = data + vsize * vblk;
+			if (block + vsize > data + 512)
 				goto brelse_out;
-			if (parse_vblk(block, LDM_BLOCKSIZE, vb) != 1)
+			if (parse_vblk(block, vsize, vb) != 1)
 				continue;
 			if (vb->vblk_type != VBLK_PART)
 				continue;
@@ -229,7 +232,7 @@ static int create_data_partitions(struct gendisk *hd,
 					vb->num_sectors) == 1)
 				first_part_minor++;
 		}
-		brelse(bh);
+		put_dev_sector(sect);
 	}
 	printk(" >\n");
 	err = 1;
@@ -237,7 +240,7 @@ out:
 	kfree(vb);
 	return err;
 brelse_out:
-	brelse(bh);
+	put_dev_sector(sect);
 	goto err_out;
 no_mem:
 	printk(LDM_CRIT "Not enough memory to allocate required buffers.\n");
@@ -326,10 +329,12 @@ static int get_vstr(const u8 *block, u8 *buffer, const int buflen)
  *
  * Return 1 on success and -1 on error, in which case @dk is undefined.
  */
-static int get_disk_objid(const kdev_t dev, const struct vmdb *vm,
-		const struct privhead *ph, struct ldmdisk *dk)
+static int get_disk_objid(struct block_device *bdev, const struct vmdb *vm,
+		const struct privhead *ph, struct ldmdisk *dk,
+		unsigned long base)
 {
-	struct buffer_head *bh;
+	Sector sect;
+	unsigned char *data;
 	u8 *disk_id;
 	int vblk;
 	int vsize;		/* VBLK size. */
@@ -340,21 +345,22 @@ static int get_disk_objid(const kdev_t dev, const struct vmdb *vm,
 	if (!disk_id)
 		goto no_mem;
 	vsize   = vm->vblk_size;
-	if (vsize < 1 || vsize > LDM_BLOCKSIZE)
+	if (vsize < 1 || vsize > 512)
 		goto err_out;
-	perbuf  = LDM_BLOCKSIZE / vsize;
-	if (perbuf < 1 || LDM_BLOCKSIZE % vsize)
+	perbuf  = 512 / vsize;
+	if (perbuf < 1 || 512 % vsize)
 		goto err_out;
 					/* 512 == VMDB size */
-	lastbuf = (vm->last_vblk_seq - (512 / vsize)) / perbuf;
-	lastofs = (vm->last_vblk_seq - (512 / vsize)) % perbuf;
+	lastbuf = vm->last_vblk_seq / perbuf - 1;
+	lastofs = vm->last_vblk_seq % perbuf;
 	if (lastofs)
 		lastbuf++;
 	if (OFF_VBLK * LDM_BLOCKSIZE + vm->last_vblk_seq * vsize >
 			ph->config_size * 512)
 		goto err_out;
 	for (buffer = 0; buffer < lastbuf; buffer++) {
-		if (!(bh = bread(dev, buffer + OFF_VBLK, LDM_BLOCKSIZE)))
+		data = read_dev_sector(bdev, base + 2*OFF_VBLK + buffer, &sect);
+		if (!data)
 			goto read_err;
 		for (vblk = 0; vblk < perbuf; vblk++) {
 			int rel_objid, rel_name, delta;
@@ -362,20 +368,19 @@ static int get_disk_objid(const kdev_t dev, const struct vmdb *vm,
 
 			if (lastofs && buffer == lastbuf - 1 && vblk >= lastofs)
 				break;
-			block = bh->b_data + vblk * vsize;
+			block = data + vblk * vsize;
 			delta = vblk * vsize + 0x18;
-			if (delta >= LDM_BLOCKSIZE)
+			if (delta >= 512)
 				goto brelse_out;
 			if (block[0x13] != VBLK_DISK)
 				continue;
 			/* Calculate relative offsets. */
 			rel_objid = 1 + block[0x18];
-			if (delta + rel_objid >= LDM_BLOCKSIZE)
+			if (delta + rel_objid >= 512)
 				goto brelse_out;
 			rel_name  = 1 + block[0x18 + rel_objid] + rel_objid;
-			if (delta + rel_name >= LDM_BLOCKSIZE ||
-			    delta + rel_name + block[0x18 + rel_name] >=
-					LDM_BLOCKSIZE)
+			if (delta + rel_name >= 512 ||
+			    delta + rel_name + block[0x18 + rel_name] >= 512)
 				goto brelse_out;
 			err = get_vstr(block + 0x18 + rel_name, disk_id,
 					DISK_ID_SIZE);
@@ -383,7 +388,7 @@ static int get_disk_objid(const kdev_t dev, const struct vmdb *vm,
 				goto brelse_out;
 			if (!strncmp(disk_id, ph->disk_id, DISK_ID_SIZE)) {
 				dk->obj_id = get_vnum(block + 0x18, &err);
-				brelse(bh);
+				put_dev_sector(sect);
 				if (err)
 					goto out;
 				strncpy(dk->disk_id, ph->disk_id,
@@ -393,14 +398,14 @@ static int get_disk_objid(const kdev_t dev, const struct vmdb *vm,
 				goto out;
 			}
 		}
-		brelse(bh);
+		put_dev_sector(sect);
 	}
 	err = -1;
 out:
 	kfree(disk_id);
 	return err;
 brelse_out:
-	brelse(bh);
+	put_dev_sector(sect);
 	goto err_out;
 no_mem:
 	printk(LDM_CRIT "Not enough memory to allocate required buffers.\n");
@@ -457,17 +462,19 @@ static int parse_vmdb(const u8 *buffer, struct vmdb *vm)
  *
  * Return 1 on success and -1 on error, in which case @vm is undefined.
  */
-static int validate_vmdb(const kdev_t dev, struct vmdb *vm)
+static int validate_vmdb(struct block_device *bdev, struct vmdb *vm, unsigned long base)
 {
-	struct buffer_head *bh;
+	Sector sect;
+	unsigned char *data;
 	int ret;
 
-	if (!(bh = bread(dev, OFF_VMDB, LDM_BLOCKSIZE))) {
+	data = read_dev_sector(bdev, base + OFF_VMDB * 2 + 1, &sect);
+	if (!data) {
 		printk(LDM_CRIT "Disk read failed in validate_vmdb.\n");
 		return -1;
 	}
-	ret = parse_vmdb(bh->b_data + 0x200, vm);
-	brelse(bh);
+	ret = parse_vmdb(data, vm);
+	put_dev_sector(sect);
 	return ret;
 }
 
@@ -553,9 +560,12 @@ static int parse_tocblock(const u8 *buffer, struct tocblock *toc)
  *
  * Return 1 on success and -1 on error, in which case @toc1 is undefined.
  */
-static int validate_tocblocks(const kdev_t devdb, struct tocblock *toc1)
+static int validate_tocblocks(struct block_device *bdev,
+			struct tocblock *toc1,
+			unsigned long base)
 {
-	struct buffer_head *bh;
+	Sector sect;
+	unsigned char *data;
 	struct tocblock *toc2 = NULL, *toc3 = NULL, *toc4 = NULL;
 	int err;
 
@@ -569,39 +579,43 @@ static int validate_tocblocks(const kdev_t devdb, struct tocblock *toc1)
 	if (!toc4)
 		goto no_mem;
 	/* Read and parse first toc. */
-	if (!(bh = bread(devdb, OFF_TOCBLOCK1, LDM_BLOCKSIZE))) {
+	data = read_dev_sector(bdev, base + OFF_TOCBLOCK1 * 2 + 1, &sect);
+	if (!data) {
 		printk(LDM_CRIT "Disk read 1 failed in validate_tocblocks.\n");
 		goto err_out;
 	}
-	err = parse_tocblock(bh->b_data + 0x0200, toc1);
-	brelse(bh);
+	err = parse_tocblock(data, toc1);
+	put_dev_sector(sect);
 	if (err != 1)
 		goto out;
 	/* Read and parse second toc. */
-	if (!(bh = bread(devdb, OFF_TOCBLOCK2, LDM_BLOCKSIZE))) {
+	data = read_dev_sector(bdev, base + OFF_TOCBLOCK2 * 2, &sect);
+	if (!data) {
 		printk(LDM_CRIT "Disk read 2 failed in validate_tocblocks.\n");
 		goto err_out;
 	}
-	err = parse_tocblock(bh->b_data, toc2);
-	brelse(bh);
+	err = parse_tocblock(data, toc2);
+	put_dev_sector(sect);
 	if (err != 1)
 		goto out;
 	/* Read and parse third toc. */
-	if (!(bh = bread(devdb, OFF_TOCBLOCK3, LDM_BLOCKSIZE))) {
+	data = read_dev_sector(bdev, base + OFF_TOCBLOCK3 * 2 + 1, &sect);
+	if (!data) {
 		printk(LDM_CRIT "Disk read 3 failed in validate_tocblocks.\n");
 		goto err_out;
 	}
-	err = parse_tocblock(bh->b_data + 0x0200, toc3);
-	brelse(bh);
+	err = parse_tocblock(data, toc3);
+	put_dev_sector(sect);
 	if (err != 1)
 		goto out;
 	/* Read and parse fourth toc. */
-	if (!(bh = bread(devdb, OFF_TOCBLOCK4, LDM_BLOCKSIZE))) {
+	data = read_dev_sector(bdev, base + OFF_TOCBLOCK4 * 2, &sect);
+	if (!data) {
 		printk(LDM_CRIT "Disk read 4 failed in validate_tocblocks.\n");
 		goto err_out;
 	}
-	err = parse_tocblock(bh->b_data, toc4);
-	brelse(bh);
+	err = parse_tocblock(data, toc4);
+	put_dev_sector(sect);
 	if (err != 1)
 		goto out;
 	/* Compare all tocs. */
@@ -665,9 +679,12 @@ static int compare_privheads(const struct privhead *ph1,
  *
  * Return 1 on succes and -1 on error.
  */
-static int validate_privheads(const kdev_t dev, const struct privhead *ph1)
+static int validate_privheads(struct block_device *bdev,
+			      const struct privhead *ph1,
+			      unsigned long base)
 {
-	struct buffer_head *bh;
+	Sector sect;
+	unsigned char *data;
 	struct privhead *ph2 = NULL, *ph3 = NULL;
 	int err;
 
@@ -677,20 +694,22 @@ static int validate_privheads(const kdev_t dev, const struct privhead *ph1)
 	ph3 = (struct privhead*)kmalloc(sizeof(*ph3), GFP_KERNEL);
 	if (!ph3)
 		goto no_mem;
-	if (!(bh = bread(dev, OFF_PRIVHEAD2, LDM_BLOCKSIZE))) {
+	data = read_dev_sector(bdev, base + OFF_PRIVHEAD2 * 2, &sect);
+	if (!data) {
 		printk(LDM_CRIT "Disk read 1 failed in validate_privheads.\n");
 		goto err_out;
 	}
-	err = parse_privhead(bh->b_data, ph2);
-	brelse(bh);
+	err = parse_privhead(data, ph2);
+	put_dev_sector(sect);
 	if (err != 1)
 		goto out;
-	if (!(bh = bread(dev, OFF_PRIVHEAD3, LDM_BLOCKSIZE))) {
+	data = read_dev_sector(bdev, base + OFF_PRIVHEAD3 * 2 + 1, &sect);
+	if (!data) {
 		printk(LDM_CRIT "Disk read 2 failed in validate_privheads.\n");
 		goto err_out;
 	}
-	err = parse_privhead(bh->b_data + 0x0200, ph3);
-	brelse(bh);
+	err = parse_privhead(data, ph3);
+	put_dev_sector(sect);
 	if (err != 1)
 		goto out;
 	err = compare_privheads(ph1, ph2);
@@ -807,27 +826,29 @@ static int parse_privhead(const u8 *buffer, struct privhead *ph)
  *
  * Return 1 on succes, 0 if device is not a dynamic disk and -1 on error.
  */
-static int create_db_partition(struct gendisk *hd, const kdev_t dev,
+static int create_db_partition(struct gendisk *hd, struct block_device *bdev,
 		const unsigned long first_sector, const int first_part_minor,
 		struct privhead *ph)
 {
-	struct buffer_head *bh;
+	Sector sect;
+	unsigned char *data;
 	int err;
 
-	if (!(bh = bread(dev, OFF_PRIVHEAD1, LDM_BLOCKSIZE))) {
+	data = read_dev_sector(bdev, OFF_PRIVHEAD1*2, &sect);
+	if (!data) {
 		printk(LDM_CRIT __FUNCTION__ "(): Device read failed.\n");
 		return -1;
 	}
-	if (BE64(bh->b_data) != MAGIC_PRIVHEAD) {
+	if (BE64(data) != MAGIC_PRIVHEAD) {
 		ldm_debug("Cannot find PRIVHEAD structure. Not a dynamic disk "
 				"or corrupt LDM database.\n");
 		return 0;
 	}
-	err = parse_privhead(bh->b_data, ph);
+	err = parse_privhead(data, ph);
 	if (err == 1)
 		err = create_partition(hd, first_part_minor, first_sector +
 				ph->config_start, ph->config_size);
-	brelse(bh);
+	put_dev_sector(sect);
 	return err;
 }
 
@@ -842,23 +863,23 @@ static int create_db_partition(struct gendisk *hd, const kdev_t dev,
  *
  * Return 1 if @dev is a dynamic disk, 0 if not and -1 on error.
  */
-static int validate_partition_table(const kdev_t dev)
+static int validate_partition_table(struct block_device *bdev)
 {
-	struct buffer_head *bh;
+	Sector sect;
+	unsigned char *data;
 	struct partition *p;
 	int i, nr_sfs;
 
-	if (!(bh = bread(dev, 0, LDM_BLOCKSIZE))) {
-		if (warn_no_part)
-			printk(LDM_ERR "Unable to read partition table.\n");
+	data = read_dev_sector(bdev, 0, &sect);
+	if (!data)
 		return -1;
-	}
-	if (*(u16*)(bh->b_data + 0x01FE) != cpu_to_le16(MSDOS_LABEL_MAGIC)) {
+
+	if (*(u16*)(data + 0x01FE) != cpu_to_le16(MSDOS_LABEL_MAGIC)) {
 		ldm_debug("No MS-DOS partition found.\n");
 		goto no_msdos_partition;
 	}
 	nr_sfs = 0;
-	p = (struct partition*)(bh->b_data + 0x01BE);
+	p = (struct partition*)(data + 0x01BE);
 	for (i = 0; i < 4; i++) {
 		if (!SYS_IND(p+i) || SYS_IND(p+i) == WIN2K_EXTENDED_PARTITION)
 			continue;
@@ -871,12 +892,12 @@ static int validate_partition_table(const kdev_t dev)
 	if (!nr_sfs)
 		goto not_dynamic_disk;
 	ldm_debug("Parsed partition table successfully.\n");
-	brelse(bh);
+	put_dev_sector(sect);
 	return 1;
 not_dynamic_disk:
 	ldm_debug("Found basic MS-DOS partition, not a dynamic disk.\n");
 no_msdos_partition:
-	brelse(bh);
+	put_dev_sector(sect);
 	return 0;
 }
 
@@ -904,67 +925,54 @@ no_msdos_partition:
  *	 0 if @dev is not a dynamic disk,
  *	-1 if an error occured.
  */
-int ldm_partition(struct gendisk *hd, kdev_t dev, unsigned long first_sector,
-		int first_part_minor)
+int ldm_partition(struct gendisk *hd, struct block_device *bdev,
+		unsigned long first_sector, int first_part_minor)
 {
-	kdev_t devdb;
 	struct privhead *ph  = NULL;
 	struct tocblock *toc = NULL;
 	struct vmdb     *vm  = NULL;
 	struct ldmdisk  *dk  = NULL;
+	unsigned long db_first;
 	int err;
 
 	if (!hd)
 		return 0;
-	err = (int)get_ptable_blocksize(dev);
-	if (err != LDM_BLOCKSIZE) {	/* 1024 bytes */
-		ldm_debug("Expected a blocksize of %d bytes, got %d instead.\n",
-				LDM_BLOCKSIZE, get_ptable_blocksize(dev));
-		return 0;
-	}
-	err = get_hardsect_size(dev); 
-	if (err != 512) {
-		ldm_debug("Expected a sector size of %d bytes, got %d "
-				"instead.\n", 512, get_hardsect_size(dev));
-		return 0;
-	}
 	/* Check the partition table. */
-	err = validate_partition_table(dev);
+	err = validate_partition_table(bdev);
 	if (err != 1)
 		return err;
 	if (!(ph = (struct privhead*)kmalloc(sizeof(*ph), GFP_KERNEL)))
 		goto no_mem;
 	/* Create the LDM database device. */
-	err = create_db_partition(hd, dev, first_sector, first_part_minor, ph);
+	err = create_db_partition(hd, bdev, first_sector, first_part_minor, ph);
 	if (err != 1)
 		goto out;
-	/* For convenience, work with the LDM database device from now on. */
-	devdb = MKDEV(MAJOR(dev), first_part_minor);
+	db_first = hd->part[first_part_minor].start_sect;
 	/* Check the backup privheads. */
-	err = validate_privheads(devdb, ph);
+	err = validate_privheads(bdev, ph, db_first);
 	if (err != 1)
 		goto out;
 	/* Check the table of contents and its backups. */
 	if (!(toc = (struct tocblock*)kmalloc(sizeof(*toc), GFP_KERNEL)))
 		goto no_mem;
-	err = validate_tocblocks(devdb, toc);
+	err = validate_tocblocks(bdev, toc, db_first);
 	if (err != 1)
 		goto out;
 	/* Check the vmdb. */
 	if (!(vm = (struct vmdb*)kmalloc(sizeof(*vm), GFP_KERNEL)))
 		goto no_mem;
-	err = validate_vmdb(devdb, vm);
+	err = validate_vmdb(bdev, vm, db_first);
 	if (err != 1)
 		goto out;
 	/* Find the object id for @dev in the LDM database. */
 	if (!(dk = (struct ldmdisk*)kmalloc(sizeof(*dk), GFP_KERNEL)))
 		goto no_mem;
-	err = get_disk_objid(devdb, vm, ph, dk);
+	err = get_disk_objid(bdev, vm, ph, dk, db_first);
 	if (err != 1)
 		goto out;
 	/* Finally, create the data partition devices. */
 	err = create_data_partitions(hd, first_sector, first_part_minor +
-			LDM_FIRST_PART_OFFSET, devdb, vm, ph, dk);
+			LDM_FIRST_PART_OFFSET, bdev, vm, ph, dk, db_first);
 	if (err == 1)
 		ldm_debug("Parsed LDM database successfully.\n");
 out:

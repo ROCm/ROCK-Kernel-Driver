@@ -20,6 +20,7 @@
 #include <asm/page.h>
 
 #include "smb_debug.h"
+#include "proto.h"
 
 /*
  * Force the next attempt to use the cache to be a timeout.

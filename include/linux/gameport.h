@@ -74,8 +74,8 @@ void gameport_rescan(struct gameport *gameport);
 void gameport_register_port(struct gameport *gameport);
 void gameport_unregister_port(struct gameport *gameport);
 #else
-void __inline__ gameport_register_port(struct gameport *gameport) { return; }
-void __inline__ gameport_unregister_port(struct gameport *gameport) { return; }
+static void __inline__ gameport_register_port(struct gameport *gameport) { return; }
+static void __inline__ gameport_unregister_port(struct gameport *gameport) { return; }
 #endif
 
 void gameport_register_device(struct gameport_dev *dev);

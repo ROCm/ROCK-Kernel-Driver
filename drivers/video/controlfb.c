@@ -51,6 +51,7 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/pgtable.h>
+#include <asm/btext.h>
 
 #include <video/fbcon.h>
 #include <video/fbcon-cfb8.h>
@@ -757,6 +758,12 @@ static void control_set_hardware(struct fb_info_control *p, struct fb_par_contro
 		console_fb_info = &p->info;
 	}
 #endif /* CONFIG_FB_COMPAT_XPMAC */
+#ifdef CONFIG_BOOTX_TEXT
+	btext_update_display(p->frame_buffer_phys + CTRLFB_OFF,
+			     p->par.xres, p->par.yres,
+			     (cmode == CMODE_32? 32: cmode == CMODE_16? 16: 8),
+			     p->par.pitch);
+#endif /* CONFIG_BOOTX_TEXT */
 }
 
 

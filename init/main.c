@@ -94,7 +94,6 @@ extern void ppc_init(void);
 extern void sysctl_init(void);
 extern void signals_init(void);
 extern int init_pcmcia_ds(void);
-extern void net_notifier_init(void);
 
 extern void free_initmem(void);
 

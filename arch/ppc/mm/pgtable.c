@@ -211,12 +211,12 @@ void __init mapin_ram(void)
 #else
 		if ((char *) v < _stext || (char *) v >= etext)
 			f |= _PAGE_RW | _PAGE_DIRTY;
-#ifndef CONFIG_8xx
+#ifdef CONFIG_PPC_STD_MMU
 		else
-			/* On the powerpc (not 8xx), no user access
+			/* On the powerpc (not all), no user access
 			   forces R/W kernel access */
 			f |= _PAGE_USER;
-#endif /* CONFIG_8xx */
+#endif /* CONFIG_PPC_STD_MMU */
 #endif /* CONFIG_KGDB */
 		map_page(v, p, f);
 		v += PAGE_SIZE;

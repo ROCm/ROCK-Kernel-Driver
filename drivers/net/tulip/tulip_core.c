@@ -15,8 +15,8 @@
 */
 
 #define DRV_NAME	"tulip"
-#define DRV_VERSION	"0.9.15-pre6"
-#define DRV_RELDATE	"July 2, 2001"
+#define DRV_VERSION	"0.9.15-pre7"
+#define DRV_RELDATE	"Oct 2, 2001"
 
 #include <linux/config.h>
 #include <linux/module.h>

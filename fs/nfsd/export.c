@@ -550,15 +550,15 @@ struct flags {
 	{ NFSEXP_INSECURE_PORT, {"insecure", ""}},
 	{ NFSEXP_ROOTSQUASH, {"root_squash", "no_root_squash"}},
 	{ NFSEXP_ALLSQUASH, {"all_squash", ""}},
-	{ NFSEXP_ASYNC, {"async", ""}},
-	{ NFSEXP_GATHERED_WRITES, {"wdelay", ""}},
+	{ NFSEXP_ASYNC, {"async", "sync"}},
+	{ NFSEXP_GATHERED_WRITES, {"wdelay", "no_wdelay"}},
 	{ NFSEXP_UIDMAP, {"uidmap", ""}},
 	{ NFSEXP_KERBEROS, { "kerberos", ""}},
 	{ NFSEXP_SUNSECURE, { "sunsecure", ""}},
 	{ NFSEXP_CROSSMNT, {"nohide", ""}},
 	{ NFSEXP_NOSUBTREECHECK, {"no_subtree_check", ""}},
 	{ NFSEXP_NOAUTHNLM, {"insecure_locks", ""}},
-#ifdef NSMFS
+#ifdef MSNFS
 	{ NFSEXP_MSNFS, {"msnfs", ""}},
 #endif
 	{ 0, {"", ""}}

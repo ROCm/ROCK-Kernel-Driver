@@ -15,6 +15,7 @@
 #define __KERNEL_SYSCALLS__
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/init.h>
 
 #include <linux/sched.h>
 #include <linux/errno.h>
@@ -55,6 +56,7 @@ static DECLARE_WAIT_QUEUE_HEAD(lockd_exit);
  */
 unsigned long			nlm_grace_period;
 unsigned long			nlm_timeout = LOCKD_DFLT_TIMEO;
+unsigned long			nlm_udpport, nlm_tcpport;
 
 static unsigned long set_grace_period(void)
 {
@@ -241,9 +243,9 @@ lockd_up(void)
 		goto out;
 	}
 
-	if ((error = svc_makesock(serv, IPPROTO_UDP, 0)) < 0 
+	if ((error = svc_makesock(serv, IPPROTO_UDP, nlm_udpport)) < 0 
 #ifdef CONFIG_NFSD_TCP
-	 || (error = svc_makesock(serv, IPPROTO_TCP, 0)) < 0
+	 || (error = svc_makesock(serv, IPPROTO_TCP, nlm_tcpport)) < 0
 #endif
 		) {
 		if (warned++ == 0) 
@@ -323,6 +325,8 @@ MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");
 MODULE_DESCRIPTION("NFS file locking service version " LOCKD_VERSION ".");
 MODULE_PARM(nlm_grace_period, "10-240l");
 MODULE_PARM(nlm_timeout, "3-20l");
+MODULE_PARM(nlm_udpport, "0-65535l");
+MODULE_PARM(nlm_tcpport, "0-65535l");
 
 int
 init_module(void)
@@ -340,6 +344,24 @@ cleanup_module(void)
 	/* FIXME: delete all NLM clients */
 	nlm_shutdown_hosts();
 }
+#else
+/* not a module, so process bootargs
+ * lockd.udpport and lockd.tcpport
+ */
+
+static int __init udpport_set(char *str)
+{
+	nlm_udpport = simple_strtoul(str, NULL, 0);
+	return 1;
+}
+static int __init tcpport_set(char *str)
+{
+	nlm_tcpport = simple_strtoul(str, NULL, 0);
+	return 1;
+}
+__setup("lockd.udpport=", udpport_set);
+__setup("lockd.tcpport=", tcpport_set);
+
 #endif
 
 /*

@@ -38,6 +38,7 @@
 #include "ieee1394_types.h"
 #include "hosts.h"
 #include "ieee1394_core.h"
+#include "highlevel.h"
 #include "pcilynx.h"
 
 
@@ -393,7 +394,7 @@ static void send_next(struct ti_lynx *lynx, int what)
         struct lynx_send_data *d;
         struct hpsb_packet *packet;
 
-        d = (what == iso ? &lynx->iso_send : &lynx->async);
+        d = (what == hpsb_iso ? &lynx->iso_send : &lynx->async);
         packet = d->queue;
 
         d->header_dma = pci_map_single(lynx->dev, packet->header,
@@ -419,13 +420,13 @@ static void send_next(struct ti_lynx *lynx, int what)
         pcl.buffer[1].pointer = d->data_dma;
 
         switch (packet->type) {
-        case async:
+        case hpsb_async:
                 pcl.buffer[0].control |= PCL_CMD_XMT;
                 break;
-        case iso:
+        case hpsb_iso:
                 pcl.buffer[0].control |= PCL_CMD_XMT | PCL_ISOMODE;
                 break;
-        case raw:
+        case hpsb_raw:
                 pcl.buffer[0].control |= PCL_CMD_UNFXMT;
                 break;
         }                
@@ -606,11 +607,11 @@ static int lynx_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
         }
 
         switch (packet->type) {
-        case async:
-        case raw:
+        case hpsb_async:
+        case hpsb_raw:
                 d = &lynx->async;
                 break;
-        case iso:
+        case hpsb_iso:
                 d = &lynx->iso_send;
                 break;
         default:
@@ -1227,7 +1228,7 @@ static void lynx_irq_handler(int irq, void *dev_id,
                 }
 
                 if (lynx->async.queue != NULL) {
-                        send_next(lynx, async);
+                        send_next(lynx, hpsb_async);
                 }
 
                 spin_unlock(&lynx->async.queue_lock);
@@ -1259,7 +1260,7 @@ static void lynx_irq_handler(int irq, void *dev_id,
                 }
 
                 if (lynx->iso_send.queue != NULL) {
-                        send_next(lynx, iso);
+                        send_next(lynx, hpsb_iso);
                 }
 
                 spin_unlock(&lynx->iso_send.queue_lock);
@@ -1368,7 +1369,7 @@ static int __devinit add_card(struct pci_dev *dev,
                 FAIL("failed to allocate host structure");
 
         lynx->state = have_host_struct;
-
+	lynx->host->hostdata = lynx;
         lynx->id = num_of_cards-1;
         lynx->dev = dev;
 	lynx->host->pdev = dev;
@@ -1500,6 +1501,9 @@ static int __devinit add_card(struct pci_dev *dev,
                 lynx->phyic.reg_1394a = 0;
                 PRINT(KERN_INFO, lynx->id, "found old 1394 PHY");
         }
+
+	/* Tell the highlevel this host is ready */
+	highlevel_add_one_host (lynx->host);
 
         return 0;
 #undef FAIL
@@ -1633,8 +1637,8 @@ MODULE_DEVICE_TABLE(pci, pci_table);
 
 static void __exit pcilynx_cleanup(void)
 {
-        pci_unregister_driver(&lynx_pcidriver);
         hpsb_unregister_lowlevel(&lynx_template);
+	pci_unregister_driver(&lynx_pcidriver);
         PRINT_G(KERN_INFO, "removed " PCILYNX_DRIVER_NAME " module");
 }
 

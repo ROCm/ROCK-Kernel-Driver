@@ -14,8 +14,31 @@
  * particular order).
  *
  * Copyright (C) 2000, David Gibson, Linuxcare Australia <hermes@gibson.dropbear.id.au>
+ * Copyright (C) 2001, David Gibson, IBM <hermes@gibson.dropbear.id.au>
  * 
- * This file distributed under the GPL, version 2.  */
+ * The contents of this file are subject to the Mozilla Public License
+ * Version 1.1 (the "License"); you may not use this file except in
+ * compliance with the License. You may obtain a copy of the License
+ * at http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
+ * the License for the specific language governing rights and
+ * limitations under the License.
+ *
+ * Alternatively, the contents of this file may be used under the
+ * terms of the GNU General Public License version 2 (the "GPL"), in
+ * which case the provisions of the GPL are applicable instead of the
+ * above.  If you wish to allow the use of your version of this file
+ * only under the terms of the GPL and not to allow others to use your
+ * version of this file under the MPL, indicate your decision by
+ * deleting the provisions above and replace them with the notice and
+ * other provisions required by the GPL.  If you do not delete the
+ * provisions above, a recipient may use your version of this file
+ * under either the MPL or the GPL.
+ */
+
+#include <linux/config.h>
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -30,10 +53,10 @@
 
 #include "hermes.h"
 
-static char version[] __initdata = "hermes.c: 1 Aug 2001 David Gibson <hermes@gibson.dropbear.id.au>";
+static char version[] __initdata = "hermes.c: 3 Oct 2001 David Gibson <hermes@gibson.dropbear.id.au>";
 MODULE_DESCRIPTION("Low-level driver helper for Lucent Hermes chipset and Prism II HFA384x wireless MAC controller");
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("Dual MPL/GPL");
 
 /* These are maximum timeouts. Most often, card wil react much faster */
 #define CMD_BUSY_TIMEOUT (100) /* In iterations of ~1us */
@@ -41,9 +64,6 @@ MODULE_LICENSE("GPL");
 #define CMD_COMPL_TIMEOUT (20000) /* in iterations of ~10us */
 #define ALLOC_COMPL_TIMEOUT (1000) /* in iterations of ~10us */
 #define BAP_BUSY_TIMEOUT (500) /* In iterations of ~1us */
-
-#define MAX(a, b) ( (a) > (b) ? (a) : (b) )
-#define MIN(a, b) ( (a) < (b) ? (a) : (b) )
 
 /*
  * Debugging helpers
@@ -292,7 +312,7 @@ int hermes_allocate(hermes_t *hw, uint16_t size, uint16_t *fid)
  * from firmware
  *
  * Callable from any context */
-static int hermes_bap_seek(hermes_t *hw, int bap, uint16_t id, uint16_t offset)
+int hermes_bap_seek(hermes_t *hw, int bap, uint16_t id, uint16_t offset)
 {
 	int sreg = bap ? HERMES_SELECT1 : HERMES_SELECT0;
 	int oreg = bap ? HERMES_OFFSET1 : HERMES_OFFSET0;
@@ -305,9 +325,14 @@ static int hermes_bap_seek(hermes_t *hw, int bap, uint16_t id, uint16_t offset)
 
 	k = BAP_BUSY_TIMEOUT;
 	reg = hermes_read_reg(hw, oreg);
+	while ((reg & HERMES_OFFSET_BUSY) & k) {
+		k--;
+		udelay(1);
+		reg = hermes_read_reg(hw, oreg);
+	}
 
 	if (reg & HERMES_OFFSET_BUSY)
-		return -EBUSY;
+		return -ETIMEDOUT;
 
 	/* Now we actually set up the transfer */
 	hermes_write_reg(hw, sreg, id);
@@ -342,7 +367,7 @@ static int hermes_bap_seek(hermes_t *hw, int bap, uint16_t id, uint16_t offset)
  *
  * Returns: < 0 on internal failure (errno), 0 on success, > 0 on error from firmware
  */
-int hermes_bap_pread(hermes_t *hw, int bap, void *buf, uint16_t len,
+int hermes_bap_pread(hermes_t *hw, int bap, void *buf, int len,
 		     uint16_t id, uint16_t offset)
 {
 	int dreg = bap ? HERMES_DATA1 : HERMES_DATA0;
@@ -356,7 +381,7 @@ int hermes_bap_pread(hermes_t *hw, int bap, void *buf, uint16_t len,
 		goto out;
 
 	/* Actually do the transfer */
-	hermes_read_data(hw, dreg, buf, len/2);
+	hermes_read_words(hw, dreg, buf, len/2);
 
  out:
 	return err;
@@ -368,7 +393,7 @@ int hermes_bap_pread(hermes_t *hw, int bap, void *buf, uint16_t len,
  *
  * Returns: < 0 on internal failure (errno), 0 on success, > 0 on error from firmware
  */
-int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, uint16_t len,
+int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, int len,
 		      uint16_t id, uint16_t offset)
 {
 	int dreg = bap ? HERMES_DATA1 : HERMES_DATA0;
@@ -382,7 +407,7 @@ int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, uint16_t len,
 		goto out;
 	
 	/* Actually do the transfer */
-	hermes_write_data(hw, dreg, buf, len/2);
+	hermes_write_words(hw, dreg, buf, len/2);
 
  out:	
 	return err;
@@ -434,17 +459,7 @@ int hermes_read_ltv(hermes_t *hw, int bap, uint16_t rid, int buflen,
 	   lengths in the records seem to be wrong, frequently */
 	count = buflen / 2;
 
-#if 0
-	if (length)
-		count = (MIN(buflen, rlength) + 1) / 2;
-	else {
-		count = buflen / 2;
-		if (rlength != buflen)
-			printk(KERN_WARNING "hermes_read_ltv(): Incorrect \
-record length %d instead of %d on RID 0x%04x\n", rlength, buflen, rid);
-	}
-#endif
-	hermes_read_data(hw, dreg, buf, count);
+	hermes_read_words(hw, dreg, buf, count);
 
  out:
 	return err;
@@ -470,7 +485,7 @@ int hermes_write_ltv(hermes_t *hw, int bap, uint16_t rid,
 
 	count = length - 1;
 
-	hermes_write_data(hw, dreg, value, count);
+	hermes_write_words(hw, dreg, value, count);
 
 	err = hermes_docmd_wait(hw, HERMES_CMD_ACCESS | HERMES_CMD_WRITE, 
 				rid, &resp);

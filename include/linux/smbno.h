@@ -39,7 +39,12 @@
 #define ERRbadshare 32          /* Share mode on file conflict with open mode */
 #define ERRlock 33              /* Lock request conflicts with existing lock */
 #define ERRfilexists 80         /* File in operation already exists */
-#define ERRundocumented1 123    /* Invalid name?? e.g. .tmp* */
+#define ERRinvalidparam 87      /* ERROR_INVALID_PARAMETER */
+#define ERRdiskfull 112         /* ERROR_DISK_FULL */
+#define ERRinvalidname 123      /* ERROR_INVALID_NAME */
+#define ERRdirnotempty 145      /* ERROR_DIR_NOT_EMPTY */
+#define ERRnotlocked 158        /* ERROR_NOT_LOCKED */
+#define ERRexists 183           /* ERROR_ALREADY_EXISTS, see also 80 */
 #define ERRbadpipe 230          /* Named pipe invalid */
 #define ERRpipebusy 231         /* All instances of pipe are busy */
 #define ERRpipeclosing 232      /* named pipe close in progress */

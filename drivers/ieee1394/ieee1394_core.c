@@ -17,6 +17,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/module.h>
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
@@ -29,6 +30,13 @@
 #include "ieee1394_transactions.h"
 #include "csr.h"
 #include "nodemgr.h"
+
+/*
+ * Disable the nodemgr detection and config rom reading functionality.
+ */
+MODULE_PARM(disable_nodemgr, "i");
+MODULE_PARM_DESC(disable_nodemgr, "Disable nodemgr functionality.");
+static int disable_nodemgr = 0;
 
 static kmem_cache_t *hpsb_packet_cache;
 
@@ -95,7 +103,7 @@ struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
         INIT_TQ_HEAD(packet->complete_tq);
         INIT_LIST_HEAD(&packet->list);
         sema_init(&packet->state_change, 0);
-        packet->state = unused;
+        packet->state = hpsb_unused;
         packet->generation = -1;
         packet->data_be = 1;
 
@@ -352,14 +360,14 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
         }
 
         if (ackcode != ACK_PENDING || !packet->expect_response) {
-                packet->state = completed;
+                packet->state = hpsb_complete;
                 up(&packet->state_change);
                 up(&packet->state_change);
                 run_task_queue(&packet->complete_tq);
                 return;
         }
 
-        packet->state = pending;
+        packet->state = hpsb_pending;
         packet->sendtime = jiffies;
 
         spin_lock_irqsave(&host->pending_pkt_lock, flags);
@@ -393,9 +401,9 @@ int hpsb_send_packet(struct hpsb_packet *packet)
                 return 0;
         }
 
-        packet->state = queued;
+        packet->state = hpsb_queued;
 
-        if (packet->type == async && packet->node_id != ALL_NODES) {
+        if (packet->type == hpsb_async && packet->node_id != ALL_NODES) {
                 packet->speed_code =
                         host->speed_map[(host->node_id & NODE_MASK) * 64
                                        + (packet->node_id & NODE_MASK)];
@@ -503,14 +511,14 @@ void handle_packet_response(struct hpsb_host *host, int tcode, quadlet_t *data,
                 break;
         }
 
-        packet->state = completed;
+        packet->state = hpsb_complete;
         up(&packet->state_change);
         run_task_queue(&packet->complete_tq);
 }
 
 
-struct hpsb_packet *create_reply_packet(struct hpsb_host *host, quadlet_t *data,
-                                        size_t dsize)
+static struct hpsb_packet *create_reply_packet(struct hpsb_host *host,
+					       quadlet_t *data, size_t dsize)
 {
         struct hpsb_packet *p;
 
@@ -522,12 +530,14 @@ struct hpsb_packet *create_reply_packet(struct hpsb_host *host, quadlet_t *data,
                 return NULL;
         }
 
-        p->type = async;
-        p->state = unused;
+        p->type = hpsb_async;
+        p->state = hpsb_unused;
         p->host = host;
         p->node_id = data[1] >> 16;
         p->tlabel = (data[0] >> 10) & 0x3f;
         p->no_waiter = 1;
+
+	p->generation = get_hpsb_generation(host);
 
         if (dsize % 4) {
                 p->data[dsize / 4] = 0;
@@ -540,8 +550,8 @@ struct hpsb_packet *create_reply_packet(struct hpsb_host *host, quadlet_t *data,
                 packet = create_reply_packet(host, data, length); \
                 if (packet == NULL) break
 
-void handle_incoming_packet(struct hpsb_host *host, int tcode, quadlet_t *data,
-                            size_t size, int write_acked)
+static void handle_incoming_packet(struct hpsb_host *host, int tcode,
+				   quadlet_t *data, size_t size, int write_acked)
 {
         struct hpsb_packet *packet;
         int length, rcode, extcode;
@@ -720,7 +730,7 @@ void abort_requests(struct hpsb_host *host)
 
         list_for_each(lh, &llist) {
                 packet = list_entry(lh, struct hpsb_packet, list);
-                packet->state = completed;
+                packet->state = hpsb_complete;
                 packet->ack_code = ACKX_ABORTED;
                 up(&packet->state_change);
                 run_task_queue(&packet->complete_tq);
@@ -732,7 +742,7 @@ void abort_timedouts(struct hpsb_host *host)
         unsigned long flags;
         struct hpsb_packet *packet;
         unsigned long expire;
-        struct list_head *lh;
+        struct list_head *lh, *next;
         LIST_HEAD(expiredlist);
 
         spin_lock_irqsave(&host->csr.lock, flags);
@@ -746,8 +756,9 @@ void abort_timedouts(struct hpsb_host *host)
 
         spin_lock_irqsave(&host->pending_pkt_lock, flags);
 
-        list_for_each(lh, &host->pending_packets) {
+	for (lh = host->pending_packets.next; lh != &host->pending_packets; lh = next) {
                 packet = list_entry(lh, struct hpsb_packet, list);
+		next = lh->next;
                 if (time_before(packet->sendtime + expire, jiffies)) {
                         list_del(&packet->list);
                         list_add(&packet->list, &expiredlist);
@@ -761,7 +772,7 @@ void abort_timedouts(struct hpsb_host *host)
 
         list_for_each(lh, &expiredlist) {
                 packet = list_entry(lh, struct hpsb_packet, list);
-                packet->state = completed;
+                packet->state = hpsb_complete;
                 packet->ack_code = ACKX_TIMEOUT;
                 up(&packet->state_change);
                 run_task_queue(&packet->complete_tq);
@@ -775,13 +786,19 @@ static int __init ieee1394_init(void)
 					      0, 0, NULL, NULL);
 	init_hpsb_highlevel();
 	init_csr();
-	init_ieee1394_nodemgr();
+	if (!disable_nodemgr)
+		init_ieee1394_nodemgr();
+	else
+		HPSB_INFO("nodemgr functionality disabled");
+
 	return 0;
 }
 
 static void __exit ieee1394_cleanup(void)
 {
-	cleanup_ieee1394_nodemgr();
+	if (!disable_nodemgr)
+		cleanup_ieee1394_nodemgr();
+
 	cleanup_csr();
 	kmem_cache_destroy(hpsb_packet_cache);
 }

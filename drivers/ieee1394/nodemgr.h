@@ -38,13 +38,23 @@ struct bus_options {
 	u16	max_rec;	/* Maximum packet size node can receive */
 };
 
-#define UNIT_DIRECTORY_VENDOR_ID    0x01
-#define UNIT_DIRECTORY_MODEL_ID     0x02
-#define UNIT_DIRECTORY_SPECIFIER_ID 0x04
-#define UNIT_DIRECTORY_VERSION      0x08
+#define UNIT_DIRECTORY_VENDOR_ID	0x01
+#define UNIT_DIRECTORY_MODEL_ID		0x02
+#define UNIT_DIRECTORY_SPECIFIER_ID	0x04
+#define UNIT_DIRECTORY_VERSION		0x08
 
+/*
+ * A unit directory corresponds to a protocol supported by the
+ * node. If a node supports eg. IP/1394 and AV/C, its config rom has a
+ * unit directory for each of these protocols.
+ * 
+ * Unit directories appear on two types of lists: for each node we
+ * maintain a list of the unit directories found in its config rom and
+ * for each driver we maintain a list of the unit directories
+ * (ie. devices) the driver manages.
+ */
 struct unit_directory {
-	struct list_head list;
+	struct node_entry *ne;  /* The node which this directory belongs to */
 	octlet_t address;	/* Address of the unit directory on the node */
 	u8 flags;		/* Indicates which entries were read */
 	quadlet_t vendor_id;
@@ -53,6 +63,20 @@ struct unit_directory {
 	char *model_name;
 	quadlet_t specifier_id;
 	quadlet_t version;
+
+	/* Groupings for arbitrary key/value pairs */
+	int arb_count;			/* Number of arbitrary key/values */
+	char arb_keys[16];		/* Up to 16 keys */
+	quadlet_t arb_values[16];	/* Same for values */
+
+	struct hpsb_protocol_driver *driver;
+	void *driver_data;
+
+	/* For linking the nodes managed by the driver, or unmanaged nodes */
+	struct list_head driver_list;
+
+	/* For linking directories belonging to a node */
+	struct list_head node_list;
 };
 
 struct node_entry {
@@ -68,6 +92,11 @@ struct node_entry {
 	u32 capabilities;	
 	struct list_head unit_directories;
 };
+
+static inline int hpsb_node_entry_valid(struct node_entry *ne)
+{
+	return atomic_read(&ne->generation) == get_hpsb_generation(ne->host);
+}
 
 /*
  * Returns a node entry (which has its reference count incremented) or NULL if

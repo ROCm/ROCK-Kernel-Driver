@@ -650,6 +650,7 @@ struct quota_mount_options
  */
 
 #define MNT_FORCE	0x00000001	/* Attempt to forcibily umount */
+#define MNT_DETACH	0x00000002	/* Just detach from the tree */
 
 #include <linux/minix_fs_sb.h>
 #include <linux/ext2_fs_sb.h>

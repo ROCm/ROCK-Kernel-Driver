@@ -137,7 +137,7 @@ an MMIO register read.
 */
 
 #define DRV_NAME	"8139too"
-#define DRV_VERSION	"0.9.18a"
+#define DRV_VERSION	"0.9.19"
 
 
 #include <linux/config.h>
@@ -620,6 +620,7 @@ static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
 static struct net_device_stats *rtl8139_get_stats (struct net_device *dev);
 static inline u32 ether_crc (int length, unsigned char *data);
 static void rtl8139_set_rx_mode (struct net_device *dev);
+static void __set_rx_mode (struct net_device *dev);
 static void rtl8139_hw_start (struct net_device *dev);
 
 #ifdef USE_IO_OPS
@@ -962,6 +963,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	dev->do_ioctl = netdev_ioctl;
 	dev->tx_timeout = rtl8139_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
+	dev->features |= NETIF_F_SG|NETIF_F_HW_CSUM;
 
 	dev->irq = pdev->irq;
 
@@ -1725,18 +1727,21 @@ static int rtl8139_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	assert (tp->tx_info[entry].mapping == 0);
 
 	tp->tx_info[entry].skb = skb;
-	if ((long) skb->data & 3) {	/* Must use alignment buffer. */
-		/* tp->tx_info[entry].mapping = 0; */
-		memcpy (tp->tx_buf[entry], skb->data, skb->len);
-		dma_addr = tp->tx_bufs_dma + (tp->tx_buf[entry] - tp->tx_bufs);
-	} else {
+	if ( !((unsigned long)skb->data & 3) && skb_shinfo(skb)->nr_frags == 0 &&
+			skb->ip_summed != CHECKSUM_HW) {
 		tp->xstats.tx_buf_mapped++;
 		tp->tx_info[entry].mapping =
 		    pci_map_single (tp->pci_dev, skb->data, skb->len,
 				    PCI_DMA_TODEVICE);
 		dma_addr = tp->tx_info[entry].mapping;
-	}
-
+	} else if (skb->len < TX_BUF_SIZE) {
+		skb_copy_and_csum_dev(skb, tp->tx_buf[entry]);
+		dma_addr = tp->tx_bufs_dma + (tp->tx_buf[entry] - tp->tx_bufs);
+	} else {
+		dev_kfree_skb(skb);
+		tp->tx_info[entry].skb = NULL;
+		return 0;
+  	}
 	/* Note: the chip doesn't have auto-pad! */
 	spin_lock_irq(&tp->lock);
 	RTL_W32_F (TxAddr0 + (entry * 4), dma_addr);
@@ -1847,8 +1852,8 @@ static void rtl8139_rx_err (u32 rx_status, struct net_device *dev,
 			    struct rtl8139_private *tp, void *ioaddr)
 {
 	u8 tmp8;
-	int tmp_work = 1000;
-
+	int tmp_work;
+    
 	DPRINTK ("%s: Ethernet frame had errors, status %8.8x.\n",
 	         dev->name, rx_status);
 	if (rx_status & RxTooLong) {
@@ -1863,33 +1868,52 @@ static void rtl8139_rx_err (u32 rx_status, struct net_device *dev,
 		tp->stats.rx_length_errors++;
 	if (rx_status & RxCRCErr)
 		tp->stats.rx_crc_errors++;
+
 	/* Reset the receiver, based on RealTek recommendation. (Bug?) */
-	tp->cur_rx = 0;
 
 	/* disable receive */
-	RTL_W8 (ChipCmd, CmdTxEnb);
-
-	/* A.C.: Reset the multicast list. */
-	rtl8139_set_rx_mode (dev);
-
-	/* XXX potentially temporary hack to
-	 * restart hung receiver */
+	RTL_W8_F (ChipCmd, CmdTxEnb);
+	tmp_work = 200;
 	while (--tmp_work > 0) {
-		barrier();
+		udelay(1);
+		tmp8 = RTL_R8 (ChipCmd);
+		if (!(tmp8 & CmdRxEnb))
+			break;
+	}
+	if (tmp_work <= 0)
+		printk (KERN_WARNING PFX "rx stop wait too long\n");
+	/* restart receive */
+	tmp_work = 200;
+	while (--tmp_work > 0) {
+		RTL_W8_F (ChipCmd, CmdRxEnb | CmdTxEnb);
+		udelay(1);
 		tmp8 = RTL_R8 (ChipCmd);
 		if ((tmp8 & CmdRxEnb) && (tmp8 & CmdTxEnb))
 			break;
-		RTL_W8 (ChipCmd, CmdRxEnb | CmdTxEnb);
 	}
-
-	/* G.S.: Re-enable receiver */
-	/* XXX temporary hack to work around receiver hang */
-	rtl8139_set_rx_mode (dev);
-
 	if (tmp_work <= 0)
 		printk (KERN_WARNING PFX "tx/rx enable wait too long\n");
-}
 
+	/* and reinitialize all rx related registers */
+	RTL_W8_F (Cfg9346, Cfg9346_Unlock);
+	/* Must enable Tx/Rx before setting transfer thresholds! */
+	RTL_W8 (ChipCmd, CmdRxEnb | CmdTxEnb);
+
+	tp->rx_config = rtl8139_rx_config | AcceptBroadcast | AcceptMyPhys;
+	RTL_W32 (RxConfig, tp->rx_config);
+	tp->cur_rx = 0;
+
+	DPRINTK("init buffer addresses\n");
+
+	/* Lock Config[01234] and BMCR register writes */
+	RTL_W8 (Cfg9346, Cfg9346_Lock);
+
+	/* init Rx ring buffer DMA address */
+	RTL_W32_F (RxBuf, tp->rx_ring_dma);
+
+	/* A.C.: Reset the multicast list. */
+	__set_rx_mode (dev);
+}
 
 static void rtl8139_rx_interrupt (struct net_device *dev,
 				  struct rtl8139_private *tp, void *ioaddr)
@@ -2312,11 +2336,10 @@ static inline u32 ether_crc (int length, unsigned char *data)
 }
 
 
-static void rtl8139_set_rx_mode (struct net_device *dev)
+static void __set_rx_mode (struct net_device *dev)
 {
 	struct rtl8139_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
-	unsigned long flags;
 	u32 mc_filter[2];	/* Multicast hash filter */
 	int i, rx_mode;
 	u32 tmp;
@@ -2353,22 +2376,28 @@ static void rtl8139_set_rx_mode (struct net_device *dev)
 		}
 	}
 
-	spin_lock_irqsave (&tp->lock, flags);
-
 	/* We can safely update without stopping the chip. */
 	tmp = rtl8139_rx_config | rx_mode;
 	if (tp->rx_config != tmp) {
-		RTL_W32 (RxConfig, tmp);
+		RTL_W32_F (RxConfig, tmp);
 		tp->rx_config = tmp;
 	}
 	RTL_W32_F (MAR0 + 0, mc_filter[0]);
 	RTL_W32_F (MAR0 + 4, mc_filter[1]);
 
-	spin_unlock_irqrestore (&tp->lock, flags);
 
 	DPRINTK ("EXIT\n");
 }
 
+static void rtl8139_set_rx_mode (struct net_device *dev)
+{
+	unsigned long flags;
+	struct rtl8139_private *tp = dev->priv;
+
+	spin_lock_irqsave (&tp->lock, flags);
+	__set_rx_mode(dev);
+	spin_unlock_irqrestore (&tp->lock, flags);
+}
 
 #ifdef CONFIG_PM
 

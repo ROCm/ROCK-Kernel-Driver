@@ -227,7 +227,7 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 #define	MAX_TOUCH_TIME_ERROR (30*60)
 	if (err
 	    && (iap->ia_valid & BOTH_TIME_SET) == BOTH_TIME_SET
-	    && iap->ia_mtime == iap->ia_ctime
+	    && iap->ia_mtime == iap->ia_atime
 	    ) {
 	    /* looks good.  now just make sure time is in the right ballpark.
 	     * solaris, at least, doesn't seem to care what the time request is

@@ -154,21 +154,18 @@ void hpsb_unlisten_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
 }
 
 
-#define DEFINE_MULTIPLEXER(Function) \
-void highlevel_##Function(struct hpsb_host *host) \
-{ \
-        struct list_head *entry,*next; \
-        void (*funcptr)(struct hpsb_host*); \
-        read_lock(&hl_drivers_lock); \
-        entry = hl_drivers.next; \
-        while (entry != &hl_drivers) { \
-        	next = entry->next; \
-                funcptr = list_entry(entry, struct hpsb_highlevel, hl_list) \
-                          ->op->Function; \
-                if (funcptr) funcptr(host); \
-                entry = next; \
-        } \
-        read_unlock(&hl_drivers_lock); \
+#define DEFINE_MULTIPLEXER(Function)			\
+void highlevel_##Function(struct hpsb_host *host)	\
+{							\
+	struct list_head *lh;				\
+	void (*funcptr)(struct hpsb_host*);		\
+	read_lock(&hl_drivers_lock);			\
+	list_for_each(lh, &hl_drivers) {		\
+		funcptr = list_entry(lh, struct hpsb_highlevel, hl_list) \
+				->op->Function;		\
+		if (funcptr) funcptr(host);		\
+	}						\
+	read_unlock(&hl_drivers_lock);			\
 }
 
 DEFINE_MULTIPLEXER(add_host)

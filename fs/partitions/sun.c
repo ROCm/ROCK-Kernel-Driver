@@ -19,11 +19,12 @@
 #include "check.h"
 #include "sun.h"
 
-int sun_partition(struct gendisk *hd, kdev_t dev, unsigned long first_sector, int first_part_minor)
+int sun_partition(struct gendisk *hd, struct block_device *bdev, unsigned long first_sector, int first_part_minor)
 {
 	int i, csum;
 	unsigned short *ush;
-	struct buffer_head *bh;
+	Sector sect;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct sun_disklabel {
 		unsigned char info[128];   /* Informative text string */
 		unsigned char spare[292];  /* Boot information etc. */
@@ -47,27 +48,25 @@ int sun_partition(struct gendisk *hd, kdev_t dev, unsigned long first_sector, in
 	struct sun_partition *p;
 	unsigned long spc;
 
-	if(!(bh = bread(dev, 0, get_ptable_blocksize(dev)))) {
-		if (warn_no_part) printk(KERN_WARNING "Dev %s: unable to read partition table\n",
-		       kdevname(dev));
+	label = (struct sun_disklabel *)read_dev_sector(bdev, 0, &sect);
+	if (!label)
 		return -1;
-	}
-	label = (struct sun_disklabel *) bh->b_data;
+
 	p = label->partitions;
 	if (be16_to_cpu(label->magic) != SUN_LABEL_MAGIC) {
 /*		printk(KERN_INFO "Dev %s Sun disklabel: bad magic %04x\n",
-		       kdevname(dev), be16_to_cpu(label->magic)); */
-		brelse(bh);
+		       bdevname(dev), be16_to_cpu(label->magic)); */
+		put_dev_sector(sect);
 		return 0;
 	}
 	/* Look at the checksum */
 	ush = ((unsigned short *) (label+1)) - 1;
-	for(csum = 0; ush >= ((unsigned short *) label);)
+	for (csum = 0; ush >= ((unsigned short *) label);)
 		csum ^= *ush--;
 	if(csum) {
 		printk("Dev %s Sun disklabel: Csum bad, label corrupted\n",
-		       kdevname(dev));
-		brelse(bh);
+		       bdevname(dev));
+		put_dev_sector(sect);
 		return 0;
 	}
 	/* All Sun disks have 8 partition entries */
@@ -83,7 +82,6 @@ int sun_partition(struct gendisk *hd, kdev_t dev, unsigned long first_sector, in
 		first_part_minor++;
 	}
 	printk("\n");
-	brelse(bh);
+	put_dev_sector(sect);
 	return 1;
 }
-

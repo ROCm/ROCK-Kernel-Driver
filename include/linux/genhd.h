@@ -13,23 +13,33 @@
 #include <linux/types.h>
 #include <linux/major.h>
 
+enum {
 /* These three have identical behaviour; use the second one if DOS fdisk gets
    confused about extended/logical partitions starting past cylinder 1023. */
-#define DOS_EXTENDED_PARTITION 5
-#define LINUX_EXTENDED_PARTITION 0x85
-#define WIN98_EXTENDED_PARTITION 0x0f
+	DOS_EXTENDED_PARTITION = 5,
+	LINUX_EXTENDED_PARTITION = 0x85,
+	WIN98_EXTENDED_PARTITION = 0x0f,
 
-#define LINUX_SWAP_PARTITION	0x82
-#define LINUX_RAID_PARTITION	0xfd	/* autodetect RAID partition */
+	LINUX_SWAP_PARTITION = 0x82,
+	LINUX_RAID_PARTITION = 0xfd,	/* autodetect RAID partition */
 
-#ifdef CONFIG_SOLARIS_X86_PARTITION
-#define SOLARIS_X86_PARTITION	LINUX_SWAP_PARTITION
-#endif
+	SOLARIS_X86_PARTITION =	LINUX_SWAP_PARTITION,
 
-#define DM6_PARTITION		0x54	/* has DDO: use xlated geom & offset */
-#define EZD_PARTITION		0x55	/* EZ-DRIVE */
-#define DM6_AUX1PARTITION	0x51	/* no DDO:  use xlated geom */
-#define DM6_AUX3PARTITION	0x53	/* no DDO:  use xlated geom */
+	DM6_PARTITION =	0x54,	/* has DDO: use xlated geom & offset */
+	EZD_PARTITION =	0x55,	/* EZ-DRIVE */
+	DM6_AUX1PARTITION = 0x51,	/* no DDO:  use xlated geom */
+	DM6_AUX3PARTITION = 0x53,	/* no DDO:  use xlated geom */
+
+	FREEBSD_PARTITION = 0xa5,    /* FreeBSD Partition ID */
+	OPENBSD_PARTITION = 0xa6,    /* OpenBSD Partition ID */
+	NETBSD_PARTITION = 0xa9,   /* NetBSD Partition ID */
+	BSDI_PARTITION = 0xb7,    /* BSDI Partition ID */
+/* Ours is not to wonder why.. */
+	BSD_PARTITION =	FREEBSD_PARTITION,
+	MINIX_PARTITION = 0x81,  /* Minix Partition ID */
+	UNIXWARE_PARTITION = 0x63,		/* Partition ID, same as */
+						/* GNU_HURD and SCO Unix */
+};
 
 struct partition {
 	unsigned char boot_ind;		/* 0x80 - active */
@@ -117,13 +127,6 @@ struct solaris_x86_vtoc {
  * BSD disklabel support by Yossi Gottlieb <yogo@math.tau.ac.il>
  * updated by Marc Espie <Marc.Espie@openbsd.org>
  */
-#define FREEBSD_PARTITION	0xa5    /* FreeBSD Partition ID */
-#define OPENBSD_PARTITION	0xa6    /* OpenBSD Partition ID */
-#define NETBSD_PARTITION	0xa9    /* NetBSD Partition ID */
-#define BSDI_PARTITION		0xb7    /* BSDI Partition ID */
-
-/* Ours is not to wonder why.. */
-#define BSD_PARTITION		FREEBSD_PARTITION
 
 /* check against BSD src/sys/sys/disklabel.h for consistency */
 
@@ -182,8 +185,6 @@ struct bsd_disklabel {
  * and Krzysztof G. Baranowski <kgb@knm.org.pl>
  */
 
-#define UNIXWARE_PARTITION     0x63		/* Partition ID, same as */
-						/* GNU_HURD and SCO Unix */
 #define UNIXWARE_DISKMAGIC     (0xCA5E600DUL)	/* The disk magic number */
 #define UNIXWARE_DISKMAGIC2    (0x600DDEEEUL)	/* The slice table magic nr */
 #define UNIXWARE_NUMSLICE      16
@@ -233,7 +234,6 @@ struct unixware_disklabel {
 #endif /* CONFIG_UNIXWARE_DISKLABEL */
 
 #ifdef CONFIG_MINIX_SUBPARTITION
-#   define MINIX_PARTITION         0x81  /* Minix Partition ID */
 #   define MINIX_NR_SUBPARTITIONS  4
 #endif /* CONFIG_MINIX_SUBPARTITION */
 

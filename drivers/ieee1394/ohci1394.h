@@ -191,15 +191,14 @@ struct ti_ohci {
 	spinlock_t event_lock;
 
 	int self_id_errors;
-        int NumBusResets;
 
 	/* video device */
 	struct video_template *video_tmpl;
 
 	/* Swap the selfid buffer? */
 	unsigned int selfid_swap:1;
-	/* Swap the payload? */
-	unsigned int payload_swap:1;
+	/* Some Apple chipset seem to swap incoming headers for us */
+	unsigned int no_swap_incoming:1;
 };
 
 static inline int cross_bound(unsigned long addr, unsigned int size)
@@ -332,14 +331,16 @@ static inline u32 reg_read(const struct ti_ohci *ohci, int offset)
 #define OHCI1394_phyRegRcvd              0x04000000
 #define OHCI1394_masterIntEnable         0x80000000
 
-#define OUTPUT_MORE                      0x00000000
-#define OUTPUT_MORE_IMMEDIATE            0x02000000
-#define OUTPUT_LAST                      0x103c0000
-#define OUTPUT_LAST_IMMEDIATE            0x123c0000
-
-#define DMA_SPEED_100                    0x0
-#define DMA_SPEED_200                    0x1
-#define DMA_SPEED_400                    0x2
+/* DMA Control flags */
+#define DMA_CTL_OUTPUT_MORE              0x00000000
+#define DMA_CTL_OUTPUT_LAST              0x10000000
+#define DMA_CTL_INPUT_MORE               0x20000000
+#define DMA_CTL_INPUT_LAST               0x30000000
+#define DMA_CTL_UPDATE                   0x08000000
+#define DMA_CTL_IMMEDIATE                0x02000000
+#define DMA_CTL_IRQ                      0x00300000
+#define DMA_CTL_BRANCH                   0x000c0000
+#define DMA_CTL_WAIT                     0x00030000
 
 #define OHCI1394_TCODE_PHY               0xE
 

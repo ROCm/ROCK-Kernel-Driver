@@ -18,6 +18,7 @@
 #include <linux/smbno.h>
 
 #include "smb_debug.h"
+#include "proto.h"
 
 static int smb_readdir(struct file *, void *, filldir_t);
 static int smb_dir_open(struct inode *, struct file *);
@@ -452,8 +453,7 @@ smb_instantiate(struct dentry *dentry, __u16 fileid, int have_id)
 	if (!inode)
 		goto out_no_inode;
 
-	if (have_id)
-	{
+	if (have_id) {
 		inode->u.smbfs_i.fileid = fileid;
 		inode->u.smbfs_i.access = SMB_O_RDWR;
 		inode->u.smbfs_i.open = server->generation;
@@ -465,8 +465,7 @@ out:
 out_no_inode:
 	error = -EACCES;
 out_close:
-	if (have_id)
-	{
+	if (have_id) {
 		PARANOIA("%s/%s failed, error=%d, closing %u\n",
 			 DENTRY_PATH(dentry), error, fileid);
 		smb_close_fileid(dentry, fileid);
@@ -562,12 +561,10 @@ smb_rename(struct inode *old_dir, struct dentry *old_dentry,
 	 */
 	if (old_dentry->d_inode)
 		smb_close(old_dentry->d_inode);
-	if (new_dentry->d_inode)
-	{
+	if (new_dentry->d_inode) {
 		smb_close(new_dentry->d_inode);
 		error = smb_proc_unlink(new_dentry);
-		if (error)
-		{
+		if (error) {
 			VERBOSE("unlink %s/%s, error=%d\n",
 				DENTRY_PATH(new_dentry), error);
 			goto out;
@@ -579,8 +576,7 @@ smb_rename(struct inode *old_dir, struct dentry *old_dentry,
 	smb_invalid_dir_cache(old_dir);
 	smb_invalid_dir_cache(new_dir);
 	error = smb_proc_mv(old_dentry, new_dentry);
-	if (!error)
-	{
+	if (!error) {
 		smb_renew_times(old_dentry);
 		smb_renew_times(new_dentry);
 	}

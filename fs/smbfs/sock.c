@@ -27,6 +27,7 @@
 #include <asm/uaccess.h>
 
 #include "smb_debug.h"
+#include "proto.h"
 
 
 static int
@@ -674,7 +675,7 @@ smb_request(struct smb_sb_info *server)
 	 */
 	if (server->rcls) {
 		int error = smb_errno(server);
-		if (error == EBADSLT) {
+		if (error == -EBADSLT) {
 			printk(KERN_ERR "smb_request: tree ID invalid\n");
 			result = error;
 			goto bad_conn;
@@ -866,7 +867,7 @@ smb_trans2_request(struct smb_sb_info *server, __u16 trans2_command,
 	 */
 	if (server->rcls) {
 		int error = smb_errno(server);
-		if (error == EBADSLT) {
+		if (error == -EBADSLT) {
 			printk(KERN_ERR "smb_request: tree ID invalid\n");
 			result = error;
 			goto bad_conn;

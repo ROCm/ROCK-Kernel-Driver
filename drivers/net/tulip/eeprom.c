@@ -148,10 +148,10 @@ subsequent_board:
 		for (i = 0; i < count; i++) {
 			unsigned char media_block = *p++;
 			int media_code = media_block & MEDIA_MASK;
-			if (media_code & 0x40)
+			if (media_block & 0x40)
 				p += 6;
 			printk(KERN_INFO "%s:  21041 media #%d, %s.\n",
-				   dev->name, media_code & 15, medianame[media_code & 15]);
+				   dev->name, media_code, medianame[media_code]);
 		}
 	} else {
 		unsigned char *p = (void *)ee_data + ee_data[27];

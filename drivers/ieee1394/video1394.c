@@ -103,7 +103,7 @@ struct dma_iso_ctx {
 	int ctxMatch;
 	wait_queue_head_t waitq;
         spinlock_t lock;
-	unsigned int syt_offset;
+    unsigned int syt_offset;
 	int flags;
 };
 
@@ -488,24 +488,27 @@ static void initialize_dma_ir_prg(struct dma_iso_ctx *d, int n, int flags)
 	int i;
 
 	/* the first descriptor will read only 4 bytes */
-	ir_prg[0].control = (0x280C << 16) | 4;
+	ir_prg[0].control = DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE |
+		DMA_CTL_BRANCH | 4;
 
 	/* set the sync flag */
 	if (flags & VIDEO1394_SYNC_FRAMES)
-		ir_prg[0].control |= 0x00030000;
+		ir_prg[0].control |= DMA_CTL_WAIT;
 
 	ir_prg[0].address = kvirt_to_bus(buf);
 	ir_prg[0].branchAddress =  (virt_to_bus(&(ir_prg[1].control)) 
 				    & 0xfffffff0) | 0x1;
 
 	/* the second descriptor will read PAGE_SIZE-4 bytes */
-	ir_prg[1].control = (0x280C << 16) | (PAGE_SIZE-4);
+	ir_prg[1].control = DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE |
+		DMA_CTL_BRANCH | (PAGE_SIZE-4);
 	ir_prg[1].address = kvirt_to_bus(buf+4);
 	ir_prg[1].branchAddress =  (virt_to_bus(&(ir_prg[2].control)) 
 				    & 0xfffffff0) | 0x1;
 	
 	for (i=2;i<d->nb_cmd-1;i++) {
-		ir_prg[i].control = (0x280C << 16) | PAGE_SIZE;
+		ir_prg[i].control = DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | 
+			DMA_CTL_BRANCH | PAGE_SIZE;
 		ir_prg[i].address = kvirt_to_bus(buf+(i-1)*PAGE_SIZE);
 
 		ir_prg[i].branchAddress =  
@@ -514,7 +517,8 @@ static void initialize_dma_ir_prg(struct dma_iso_ctx *d, int n, int flags)
 	}
 
 	/* the last descriptor will generate an interrupt */
-	ir_prg[i].control = (0x283C << 16) | d->left_size;
+	ir_prg[i].control = DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | 
+		DMA_CTL_IRQ | DMA_CTL_BRANCH | d->left_size;
 	ir_prg[i].address = kvirt_to_bus(buf+(i-1)*PAGE_SIZE);
 }
 	
@@ -691,13 +695,14 @@ static void initialize_dma_it_prg(struct dma_iso_ctx *d, int n, int sync_tag)
 	d->last_used_cmd[n] = d->nb_cmd - 1;
 	for (i=0;i<d->nb_cmd;i++) {
 				 
-		it_prg[i].begin.control = OUTPUT_MORE_IMMEDIATE | 8 ;
+		it_prg[i].begin.control = DMA_CTL_OUTPUT_MORE |
+			DMA_CTL_IMMEDIATE | 8 ;
 		it_prg[i].begin.address = 0;
 		
 		it_prg[i].begin.status = 0;
 		
 		it_prg[i].data[0] = 
-			(DMA_SPEED_100 << 16) 
+			(SPEED_100 << 16) 
 			| (/* tag */ 1 << 14)
 			| (d->channel << 8) 
 			| (TCODE_ISO_DATA << 4);
@@ -706,7 +711,7 @@ static void initialize_dma_it_prg(struct dma_iso_ctx *d, int n, int sync_tag)
 		it_prg[i].data[2] = 0;
 		it_prg[i].data[3] = 0;
 		
-		it_prg[i].end.control = 0x100c0000;
+		it_prg[i].end.control = DMA_CTL_OUTPUT_LAST | DMA_CTL_BRANCH;
 		it_prg[i].end.address =
 			kvirt_to_bus(buf+i*d->packet_size);
 
@@ -721,7 +726,8 @@ static void initialize_dma_it_prg(struct dma_iso_ctx *d, int n, int sync_tag)
 		}
 		else {
 			/* the last prg generates an interrupt */
-			it_prg[i].end.control |= 0x08300000 | d->left_size;
+			it_prg[i].end.control |= DMA_CTL_UPDATE | 
+				DMA_CTL_IRQ | d->left_size;
 			/* the last prg doesn't branch */
 			it_prg[i].begin.branchAddress = 0;
 			it_prg[i].end.branchAddress = 0;
@@ -761,7 +767,7 @@ static void initialize_dma_it_prg_var_packet_queue(
 			size = packet_sizes[i];
 		}
 		it_prg[i].data[1] = size << 16; 
-		it_prg[i].end.control = 0x100c0000;
+		it_prg[i].end.control = DMA_CTL_OUTPUT_LAST | DMA_CTL_BRANCH;
 
 		if (i < d->nb_cmd-1 && packet_sizes[i+1] != 0) {
 			it_prg[i].end.control |= size;
@@ -773,7 +779,8 @@ static void initialize_dma_it_prg_var_packet_queue(
 				 & 0xfffffff0) | 0x3;
 		} else {
 			/* the last prg generates an interrupt */
-			it_prg[i].end.control |= 0x08300000 | size;
+			it_prg[i].end.control |= DMA_CTL_UPDATE | 
+				DMA_CTL_IRQ | size;
 			/* the last prg doesn't branch */
 			it_prg[i].begin.branchAddress = 0;
 			it_prg[i].end.branchAddress = 0;
@@ -1560,7 +1567,6 @@ static int video1394_init(struct ti_ohci *ohci)
 static void remove_card(struct video_card *video)
 {
 	int i;
-	unsigned long flags;
 
 	ohci1394_unregister_video(video->ohci, &video_tmpl);
 
@@ -1581,9 +1587,7 @@ static void remove_card(struct video_card *video)
 		}
 		kfree(video->it_context);
 	}
-	spin_lock_irqsave(&video1394_cards_lock, flags);
 	list_del(&video->list);
-	spin_unlock_irqrestore(&video1394_cards_lock, flags);
 
 	kfree(video);
 }
@@ -1607,7 +1611,7 @@ static void video1394_remove_host (struct hpsb_host *host)
 			p = list_entry(lh, struct video_card, list);
 			if (p ->ohci == ohci) {
 				remove_card(p);
-				return;
+				break;
 			}
 		}
 	}

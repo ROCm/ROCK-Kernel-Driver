@@ -14,11 +14,12 @@
 
 #include "check.h"
 
-int ultrix_partition(struct gendisk *hd, kdev_t dev,
+int ultrix_partition(struct gendisk *hd, struct block_device *bdev,
                             unsigned long first_sector, int first_part_minor)
 {
 	int i;
-	struct buffer_head *bh;
+	Sector sect;
+	unsigned char *data;
 	struct ultrix_disklabel {
 		s32	pt_magic;	/* magic no. indicating part. info exits */
 		s32	pt_valid;	/* set by driver if pt is current */
@@ -31,18 +32,11 @@ int ultrix_partition(struct gendisk *hd, kdev_t dev,
 #define PT_MAGIC	0x032957	/* Partition magic number */
 #define PT_VALID	1		/* Indicates if struct is valid */
 
-#define	SBLOCK	((unsigned long)((16384 - sizeof(struct ultrix_disklabel)) \
-                  /get_ptable_blocksize(dev)))
-
-	bh = bread (dev, SBLOCK, get_ptable_blocksize(dev));
-	if (!bh) {
-		if (warn_no_part) printk (" unable to read block 0x%lx\n", SBLOCK);
+	data = read_dev_sector(bdev, (16384 - sizeof(*label))/512, &sect);
+	if (!data)
 		return -1;
-	}
 	
-	label = (struct ultrix_disklabel *)(bh->b_data
-                                            + get_ptable_blocksize(dev)
-                                            - sizeof(struct ultrix_disklabel));
+	label = (struct ultrix_disklabel *)(data + 512 - sizeof(*label));
 
 	if (label->pt_magic == PT_MAGIC && label->pt_valid == PT_VALID) {
 		for (i=0; i<8; i++, first_part_minor++)
@@ -50,11 +44,11 @@ int ultrix_partition(struct gendisk *hd, kdev_t dev,
 				add_gd_partition(hd, first_part_minor, 
 					      label->pt_part[i].pi_blkoff,
 					      label->pt_part[i].pi_nblocks);
-		brelse(bh);
+		put_dev_sector(sect);
 		printk ("\n");
 		return 1;
 	} else {
-		brelse(bh);
+		put_dev_sector(sect);
 		return 0;
 	}
 }

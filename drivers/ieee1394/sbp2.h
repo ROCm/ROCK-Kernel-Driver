@@ -36,13 +36,6 @@
 #define ORB_DIRECTION_READ_FROM_MEDIA   0x1
 #define ORB_DIRECTION_NO_DATA_TRANSFER  0x2
 
-#define SPEED_S100			0x0
-#define SPEED_S200			0x1
-#define SPEED_S400			0x2
-#define SPEED_S800			0x3
-#define SPEED_S1600			0x4
-#define SPEED_S3200			0x5
-
 /* 2^(MAX_PAYLOAD+1) = Maximum data transfer length */
 #define MAX_PAYLOAD_S100		0x7
 #define MAX_PAYLOAD_S200		0x8
@@ -232,8 +225,8 @@ struct sbp2_status_block {
  * Unit spec id and sw version entry for SBP-2 devices
  */
 
-#define SBP2_UNIT_SPEC_ID_ENTRY					0x1200609e
-#define SBP2_SW_VERSION_ENTRY					0x13010483
+#define SBP2_UNIT_SPEC_ID_ENTRY					0x0000609e
+#define SBP2_SW_VERSION_ENTRY					0x00010483
 
 /*
  * Miscellaneous general config rom related defines
@@ -243,10 +236,7 @@ struct sbp2_status_block {
 
 #define CONFIG_ROM_BASE_ADDRESS					0xfffff0000400ULL
 #define CONFIG_ROM_ROOT_DIR_BASE				0xfffff0000414ULL
-#define CONFIG_ROM_SIGNATURE_ADDRESS				0xfffff0000404ULL
 #define CONFIG_ROM_UNIT_DIRECTORY_OFFSET			0xfffff0000424ULL
-
-#define IEEE1394_CONFIG_ROM_SIGNATURE				0x31333934
 
 #define SBP2_128KB_BROKEN_FIRMWARE				0xa0b800
 #define SBP2_BROKEN_FIRMWARE_MAX_TRANSFER			0x20000
@@ -350,6 +340,8 @@ struct sbp2_command_info {
  * Information needed on a per scsi id basis (one for each sbp2 device)
  */
 struct scsi_id_instance_data {
+	/* SCSI ID */
+	int id;
 
 	/*
 	 * Various sbp2 specific structures
@@ -368,18 +360,15 @@ struct scsi_id_instance_data {
 	/*
 	 * Stuff we need to know about the sbp2 device itself
 	 */
-	u64 node_unique_id;
 	u64 sbp2_management_agent_addr;
 	u64 sbp2_command_block_agent_addr;
-	u32 node_id;
 	u32 speed_code;
 	u32 max_payload_size;
 
 	/*
 	 * Values pulled from the device's unit directory
 	 */
-	u32 sbp2_unit_spec_id;
-	u32 sbp2_unit_sw_version;
+	struct unit_directory *ud;
 	u32 sbp2_command_set_spec_id;
 	u32 sbp2_command_set;
 	u32 sbp2_unit_characteristics;
@@ -391,12 +380,6 @@ struct scsi_id_instance_data {
 	 */
 	wait_queue_head_t sbp2_login_wait;
 
-	/*
-	 * Flag noting whether the sbp2 device is currently validated (for use during
-	 * bus resets).
-	 */
-	u32 validated;
-
 	/* 
 	 * Pool of command orbs, so we can have more than overlapped command per id
 	 */
@@ -405,6 +388,8 @@ struct scsi_id_instance_data {
 	struct list_head sbp2_command_orb_completed;
 	u32 sbp2_total_command_orbs;
 
+	/* Node entry, as retrieved from NodeMgr entries */
+	struct node_entry *ne;
 };
 
 /*
@@ -425,22 +410,6 @@ struct sbp2scsi_host_info {
 	spinlock_t sbp2_request_packet_lock;
 
 	/*
-	 * Flag indicating if a bus reset (or device detection) is in progress
-	 */
-	u32 bus_reset_in_progress;
-
-	/*
-	 * We currently use a kernel thread for dealing with bus resets and sbp2
-	 * device detection. We use this to wake up the thread when needed.
-	 */
-	wait_queue_head_t sbp2_detection_wait;
-
-	/* 
-	 * PID of sbp2 detection kernel thread 
-	 */
-	int sbp2_detection_pid;
-
-	/*
 	 * Lists keeping track of inuse/free sbp2_request_packets. These structures are
 	 * used for sending out sbp2 command and agent reset packets. We initially create
 	 * a pool of request packets so that we don't have to do any kmallocs while in critical
@@ -448,13 +417,6 @@ struct sbp2scsi_host_info {
 	 */
 	struct list_head sbp2_req_inuse;
 	struct list_head sbp2_req_free;
-
-	/*
-	 * Stuff to keep track of the initial scsi bus scan (so that we don't miss it)
-	 */
-	u32 initial_scsi_bus_scan_complete;
-	Scsi_Cmnd *bus_scan_SCpnt;
-	void (*bus_scan_done)(Scsi_Cmnd *);
 
 	/*
 	 * Here is the pool of request packets. All the hpsb packets (for 1394 bus transactions)
@@ -476,9 +438,6 @@ struct sbp2scsi_host_info {
 /*
  * Various utility prototypes
  */
-static int sbp2util_read_quadlet(struct sbp2scsi_host_info *hi, nodeid_t node, u64 addr,
-				 quadlet_t *buffer);
-static int sbp2util_unit_directory(struct sbp2scsi_host_info *hi, nodeid_t node, u64 *addr);
 static int sbp2util_create_request_packet_pool(struct sbp2scsi_host_info *hi);
 static void sbp2util_remove_request_packet_pool(struct sbp2scsi_host_info *hi);
 static struct sbp2_request_packet *sbp2util_allocate_write_request_packet(struct sbp2scsi_host_info *hi,
@@ -500,23 +459,19 @@ static void sbp2util_mark_command_completed(struct scsi_id_instance_data *scsi_i
 /*
  * IEEE-1394 core driver related prototypes
  */
-static void sbp2_remove_unvalidated_devices(struct sbp2scsi_host_info *hi);
-static int sbp2_start_device(struct sbp2scsi_host_info *hi, int node_id);
-static int sbp2_check_device(struct sbp2scsi_host_info *hi, int node_id);
-static void sbp2_bus_reset_handler(void *context);
 static void sbp2_add_host(struct hpsb_host *host);
 static struct sbp2scsi_host_info *sbp2_find_host_info(struct hpsb_host *host);
 static void sbp2_remove_host(struct hpsb_host *host);
-static void sbp2_host_reset(struct hpsb_host *host);
-static int sbp2_detection_thread(void *__sbp2);
 int sbp2_init(void);
 void sbp2_cleanup(void);
-#if 0
-static int sbp2_handle_physdma_write(struct hpsb_host *host, int nodeid, quadlet_t *data,
-				     u64 addr, unsigned int length);
-static int sbp2_handle_physdma_read(struct hpsb_host *host, int nodeid, quadlet_t *data,
-				    u64 addr, unsigned int length);
-#endif
+static int sbp2_probe(struct unit_directory *ud);
+static void sbp2_disconnect(struct unit_directory *ud);
+static void sbp2_update(struct unit_directory *ud);
+static int sbp2_start_device(struct sbp2scsi_host_info *hi, 
+			     struct unit_directory *ud);
+static void sbp2_remove_device(struct sbp2scsi_host_info *hi, 
+			       struct scsi_id_instance_data *scsi_id);
+
 /*
  * SBP-2 protocol related prototypes
  */
@@ -543,7 +498,7 @@ static unsigned int sbp2_status_to_sense_data(unchar *sbp2_status, unchar *sense
 static void sbp2_check_sbp2_command(unchar *cmd);
 static void sbp2_check_sbp2_response(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id, 
 				     Scsi_Cmnd *SCpnt);
-static int sbp2_parse_unit_directory(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id);
+static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id);
 static int sbp2_set_busy_timeout(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id);
 static int sbp2_max_speed_and_size(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id);
 

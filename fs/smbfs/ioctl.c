@@ -19,6 +19,8 @@
 
 #include <asm/uaccess.h>
 
+#include "proto.h"
+
 int
 smb_ioctl(struct inode *inode, struct file *filp,
 	  unsigned int cmd, unsigned long arg)
@@ -37,9 +39,11 @@ smb_ioctl(struct inode *inode, struct file *filp,
 		break;
 
 	case SMB_IOC_NEWCONN:
-		/* require an argument == smb_conn_opt, else it is EINVAL */
-		if (!arg)
+		/* arg is smb_conn_opt, or NULL if no connection was made */
+		if (!arg) {
+			result = smb_wakeup(server);
 			break;
+		}
 
 		result = -EFAULT;
 		if (!copy_from_user(&opt, (void *)arg, sizeof(opt)))

@@ -38,7 +38,7 @@ extern int *blk_size[];
 
 int warn_no_part = 1; /*This is ugly: should make genhd removable media aware*/
 
-static int (*check_part[])(struct gendisk *hd, kdev_t dev, unsigned long first_sect, int first_minor) = {
+static int (*check_part[])(struct gendisk *hd, struct block_device *bdev, unsigned long first_sect, int first_minor) = {
 #ifdef CONFIG_ACORN_PARTITION
 	acorn_partition,
 #endif
@@ -215,54 +215,12 @@ void add_gd_partition(struct gendisk *hd, int minor, int start, int size)
 #endif
 }
 
-unsigned int get_ptable_blocksize(kdev_t dev)
-{
-	int ret = 1024;
-
-	/*
-	 * See whether the low-level driver has given us a minumum blocksize.
-	 * If so, check to see whether it is larger than the default of 1024.
-	 */
-	if (!blksize_size[MAJOR(dev)])
-		return ret;
-
-	/*
-	 * Check for certain special power of two sizes that we allow.
-	 * With anything larger than 1024, we must force the blocksize up to
-	 * the natural blocksize for the device so that we don't have to try
-	 * and read partial sectors.  Anything smaller should be just fine.
-	 */
-
-	switch (blksize_size[MAJOR(dev)][MINOR(dev)]) {
-		case 2048:
-			ret = 2048;
-			break;
-		case 4096:
-			ret = 4096;
-			break;
-		case 8192:
-			ret = 8192;
-			break;
-		case 1024:
-		case 512:
-		case 256:
-		case 0:
-			/*
-			 * These are all OK.
-			 */
-			break;
-		default:
-			panic("Strange blocksize for partition table\n");
-	}
-
-	return ret;
-}
-
 static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor)
 {
 	devfs_handle_t de = NULL;
 	static int first_time = 1;
 	unsigned long first_sector;
+	struct block_device *bdev;
 	char buf[64];
 	int i;
 
@@ -287,12 +245,23 @@ static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor
 		printk(KERN_INFO " /dev/%s:", buf + i);
 	else
 		printk(KERN_INFO " %s:", disk_name(hd, MINOR(dev), buf));
-	for (i = 0; check_part[i]; i++)
-		if (check_part[i](hd, dev, first_sector, first_part_minor))
+	bdev = bdget(kdev_t_to_nr(dev));
+	bdev->bd_inode->i_size = (loff_t)hd->part[MINOR(dev)].nr_sects << 9;
+	for (i = 0; check_part[i]; i++) {
+		int res;
+		res = check_part[i](hd, bdev, first_sector, first_part_minor);
+		if (res) {
+			if (res < 0 &&  warn_no_part)
+				printk(" unable to read partition table\n");
 			goto setup_devfs;
+		}
+	}
 
 	printk(" unknown partition table\n");
 setup_devfs:
+	invalidate_bdev(bdev, 1);
+	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
+	bdput(bdev);
 	i = first_part_minor - 1;
 	devfs_register_partitions (hd, i, hd->sizes ? 0 : 1);
 }
@@ -427,4 +396,27 @@ void grok_partitions(struct gendisk *dev, int drive, unsigned minors, long size)
 			dev->sizes[i] = dev->part[i].nr_sects >> (BLOCK_SIZE_BITS - 9);
 		blk_size[dev->major] = dev->sizes;
 	}
+}
+
+unsigned char *read_dev_sector(struct block_device *bdev, unsigned long n, Sector *p)
+{
+	struct address_space *mapping = bdev->bd_inode->i_mapping;
+	int sect = PAGE_CACHE_SIZE / 512;
+	struct page *page;
+
+	page = read_cache_page(mapping, n/sect,
+			(filler_t *)mapping->a_ops->readpage, NULL);
+	if (!IS_ERR(page)) {
+		wait_on_page(page);
+		if (!Page_Uptodate(page))
+			goto fail;
+		if (PageError(page))
+			goto fail;
+		p->v = page;
+		return (unsigned char *)page_address(page) + 512 * (n % sect);
+fail:
+		page_cache_release(page);
+	}
+	p->v = NULL;
+	return NULL;
 }

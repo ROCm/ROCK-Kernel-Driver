@@ -549,36 +549,23 @@ int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 	return res;
 }
 
-int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags, int kind)
+static int do_open(struct block_device *bdev, struct inode *inode, struct file *file)
 {
-	int ret = -ENODEV;
-	kdev_t rdev = to_kdev_t(bdev->bd_dev); /* this should become bdev */
-	down(&bdev->bd_sem);
+	int ret = -ENXIO;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
+	down(&bdev->bd_sem);
 	lock_kernel();
 	if (!bdev->bd_op)
-		bdev->bd_op = get_blkfops(MAJOR(rdev));
+		bdev->bd_op = get_blkfops(MAJOR(dev));
 	if (bdev->bd_op) {
-		/*
-		 * This crockload is due to bad choice of ->open() type.
-		 * It will go away.
-		 * For now, block device ->open() routine must _not_
-		 * examine anything in 'inode' argument except ->i_rdev.
-		 */
-		struct file fake_file = {};
-		struct dentry fake_dentry = {};
-		ret = -ENOMEM;
-		fake_file.f_mode = mode;
-		fake_file.f_flags = flags;
-		fake_file.f_dentry = &fake_dentry;
-		fake_dentry.d_inode = bdev->bd_inode;
 		ret = 0;
 		if (bdev->bd_op->open)
-			ret = bdev->bd_op->open(bdev->bd_inode, &fake_file);
+			ret = bdev->bd_op->open(inode, file);
 		if (!ret) {
 			bdev->bd_openers++;
-			bdev->bd_inode->i_size = blkdev_size(rdev);
-			bdev->bd_inode->i_blkbits = blksize_bits(block_size(rdev));
+			bdev->bd_inode->i_size = blkdev_size(dev);
+			bdev->bd_inode->i_blkbits = blksize_bits(block_size(dev));
 		} else if (!bdev->bd_openers)
 			bdev->bd_op = NULL;
 	}
@@ -589,9 +576,26 @@ int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags, int kind)
 	return ret;
 }
 
+int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags, int kind)
+{
+	/*
+	 * This crockload is due to bad choice of ->open() type.
+	 * It will go away.
+	 * For now, block device ->open() routine must _not_
+	 * examine anything in 'inode' argument except ->i_rdev.
+	 */
+	struct file fake_file = {};
+	struct dentry fake_dentry = {};
+	fake_file.f_mode = mode;
+	fake_file.f_flags = flags;
+	fake_file.f_dentry = &fake_dentry;
+	fake_dentry.d_inode = bdev->bd_inode;
+
+	return do_open(bdev, bdev->bd_inode, &fake_file);
+}
+
 int blkdev_open(struct inode * inode, struct file * filp)
 {
-	int ret;
 	struct block_device *bdev;
 
 	/*
@@ -604,29 +608,8 @@ int blkdev_open(struct inode * inode, struct file * filp)
 
 	bd_acquire(inode);
 	bdev = inode->i_bdev;
-	down(&bdev->bd_sem);
 
-	ret = -ENXIO;
-	lock_kernel();
-	if (!bdev->bd_op)
-		bdev->bd_op = get_blkfops(MAJOR(inode->i_rdev));
-
-	if (bdev->bd_op) {
-		ret = 0;
-		if (bdev->bd_op->open)
-			ret = bdev->bd_op->open(inode,filp);
-		if (!ret) {
-			bdev->bd_openers++;
-			bdev->bd_inode->i_size = blkdev_size(inode->i_rdev);
-		} else if (!bdev->bd_openers)
-			bdev->bd_op = NULL;
-	}	
-
-	unlock_kernel();
-	up(&bdev->bd_sem);
-	if (ret)
-		bdput(bdev);
-	return ret;
+	return do_open(bdev, inode, filp);
 }	
 
 int blkdev_put(struct block_device *bdev, int kind)

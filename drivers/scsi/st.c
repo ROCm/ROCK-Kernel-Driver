@@ -12,7 +12,7 @@
    Copyright 1992 - 2001 Kai Makisara
    email Kai.Makisara@metla.fi
 
-   Last modified: Sun Aug 12 12:34:28 2001 by makisara@kai.makisara.local
+   Last modified: Wed Oct  3 22:17:59 2001 by makisara@kai.makisara.local
    Some small formal changes - aeb, 950809
 
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
@@ -21,7 +21,7 @@
    error handling will be discarded.
  */
 
-static char *verstr = "20010812";
+static char *verstr = "20011003";
 
 #include <linux/module.h>
 
@@ -88,6 +88,8 @@ MODULE_PARM(max_buffers, "i");
 MODULE_PARM_DESC(max_buffers, "Maximum number of buffer allocated at initialisation (4)");
 MODULE_PARM(max_sg_segs, "i");
 MODULE_PARM_DESC(max_sg_segs, "Maximum number of scatter/gather segments to use (32)");
+
+EXPORT_NO_SYMBOLS;
 
 #ifndef MODULE
 static struct st_dev_parm {
@@ -669,6 +671,7 @@ static int st_open(struct inode *inode, struct file *filp)
 
 	if (STp->device->host->hostt->module)
 		__MOD_INC_USE_COUNT(STp->device->host->hostt->module);
+	STp->device->access_count++;
 
 	if (!scsi_block_when_processing_errors(STp->device)) {
 		retval = (-ENXIO);
@@ -909,6 +912,7 @@ static int st_open(struct inode *inode, struct file *filp)
 		STp->buffer = NULL;
 	}
 	STp->in_use = 0;
+	STp->device->access_count--;
 	if (STp->device->host->hostt->module)
 	    __MOD_DEC_USE_COUNT(STp->device->host->hostt->module);
 	return retval;
@@ -1066,6 +1070,7 @@ static int st_release(struct inode *inode, struct file *filp)
 
 	STp->in_use = 0;
 	write_unlock_irqrestore(&st_dev_arr_lock, flags);
+	STp->device->access_count--;
 	if (STp->device->host->hostt->module)
 		__MOD_DEC_USE_COUNT(STp->device->host->hostt->module);
 

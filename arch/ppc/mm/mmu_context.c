@@ -36,7 +36,7 @@
 #include <asm/mmu_context.h>
 
 mm_context_t next_mmu_context;
-unsigned long context_map[(LAST_CONTEXT+1) / (8*sizeof(unsigned long))];
+unsigned long context_map[LAST_CONTEXT / BITS_PER_LONG + 1];
 #ifdef FEW_CONTEXTS
 atomic_t nr_free_contexts;
 struct mm_struct *context_mm[LAST_CONTEXT+1];
@@ -57,7 +57,7 @@ void __init mmu_context_init(void)
 	context_map[0] = (1 << FIRST_CONTEXT) - 1;
 	next_mmu_context = FIRST_CONTEXT;
 #ifdef FEW_CONTEXTS
-	atomic_set(&nr_free_contexts, LAST_CONTEXT);
+	atomic_set(&nr_free_contexts, LAST_CONTEXT - FIRST_CONTEXT + 1);
 #endif /* FEW_CONTEXTS */
 }
 

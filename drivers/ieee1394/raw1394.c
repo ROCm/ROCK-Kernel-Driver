@@ -290,8 +290,11 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
 
-        list_for_each(lh, &reqs) {
+        lh = reqs.next;
+        while (lh != &reqs) {
                 req = list_entry(lh, struct pending_request, list);
+                lh = lh->next;
+
                 queue_complete_req(req);
         }
 }
@@ -356,8 +359,11 @@ static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
 
-        list_for_each(lh, &reqs) {
+        lh = reqs.next;
+        while (lh != &reqs) {
                 req = list_entry(lh, struct pending_request, list);
+                lh = lh->next;
+
                 queue_complete_req(req);
         }
 }
@@ -746,6 +752,8 @@ static int handle_remote_request(struct file_info *fi,
         list_add_tail(&req->list, &fi->req_pending);
         spin_unlock_irq(&fi->reqlists_lock);
 
+	packet->generation = req->req.generation;
+
         if (!hpsb_send_packet(packet)) {
                 req->req.error = RAW1394_ERROR_SEND_ERROR;
                 req->req.length = 0;
@@ -766,7 +774,7 @@ static int handle_iso_send(struct file_info *fi, struct pending_request *req,
 
         fill_iso_packet(packet, req->req.length, channel & 0x3f,
                         (req->req.misc >> 16) & 0x3, req->req.misc & 0xf);
-        packet->type = iso;
+        packet->type = hpsb_iso;
         packet->speed_code = req->req.address & 0x3;
         packet->host = fi->host;
 
@@ -786,6 +794,9 @@ static int handle_iso_send(struct file_info *fi, struct pending_request *req,
         spin_lock_irq(&fi->reqlists_lock);
         list_add_tail(&req->list, &fi->req_pending);
         spin_unlock_irq(&fi->reqlists_lock);
+
+	/* Update the generation of the packet just before sending. */
+	packet->generation = get_hpsb_generation(fi->host);
 
         if (!hpsb_send_packet(packet)) {
                 req->req.error = RAW1394_ERROR_SEND_ERROR;

@@ -31,7 +31,7 @@
  *
  */
 
-#define CLGEN_VERSION "1.9.8"
+#define CLGEN_VERSION "1.9.9"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -273,6 +273,7 @@ static const struct {
 	{ BT_ALPINE, NULL, PCI_DEVICE_ID_CIRRUS_5434_8 },
 	{ BT_ALPINE, NULL, PCI_DEVICE_ID_CIRRUS_5434_4 },
 	{ BT_ALPINE, NULL, PCI_DEVICE_ID_CIRRUS_5430 }, /* GD-5440 has identical id */
+	{ BT_ALPINE, NULL, PCI_DEVICE_ID_CIRRUS_7543 },
 	{ BT_GD5480, NULL, PCI_DEVICE_ID_CIRRUS_5480 }, /* MacPicasso probably */
 	{ BT_PICASSO4, NULL, PCI_DEVICE_ID_CIRRUS_5446 }, /* Picasso 4 is a GD5446 */
 	{ BT_LAGUNA, "CL Laguna", PCI_DEVICE_ID_CIRRUS_5462 },

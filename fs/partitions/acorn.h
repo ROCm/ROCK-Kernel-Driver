@@ -50,6 +50,6 @@ struct ptec_partition {
 };
 	
 
-int acorn_partition(struct gendisk *hd, kdev_t dev,
+int acorn_partition(struct gendisk *hd, struct block_device *bdev,
 		   unsigned long first_sect, int first_minor);
 

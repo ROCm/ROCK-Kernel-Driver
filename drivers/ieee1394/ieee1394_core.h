@@ -20,16 +20,16 @@ struct hpsb_packet {
 
         /* Async and Iso types should be clear, raw means send-as-is, do not
          * CRC!  Byte swapping shall still be done in this case. */
-        enum { async, iso, raw } __attribute__((packed)) type;
+        enum { hpsb_async, hpsb_iso, hpsb_raw } __attribute__((packed)) type;
 
         /* Okay, this is core internal and a no care for hosts.
          * queued   = queued for sending
          * pending  = sent, waiting for response
-         * completed = processing completed, successful or not
+         * complete = processing completed, successful or not
          * incoming = incoming packet
          */
         enum { 
-                unused, queued, pending, completed, incoming 
+                hpsb_unused, hpsb_queued, hpsb_pending, hpsb_complete, hpsb_incoming 
         } __attribute__((packed)) state;
 
         /* These are core internal. */

@@ -25,7 +25,7 @@
 #define DLDWD_MACPORT		0
 #define IRQ_LOOP_MAX		10
 #define TX_NICBUF_SIZE		2048
-#define TX_NICBUF_SIZE_BUG	1585		/* Bug in Intel firmware */
+#define TX_NICBUF_SIZE_BUG	1585		/* Bug in Symbol firmware */
 #define MAX_KEYS		4
 #define MAX_KEY_SIZE		14
 #define LARGE_KEY_SIZE		13
@@ -110,7 +110,7 @@ extern struct list_head dldwd_instances;
 
 #ifdef ORINOCO_DEBUG
 extern int dldwd_debug;
-#define DEBUG(n, args...) if (dldwd_debug>(n)) printk(KERN_DEBUG args)
+#define DEBUG(n, args...) do { if (dldwd_debug>(n)) printk(KERN_DEBUG args); } while(0)
 #define DEBUGMORE(n, args...) do { if (dldwd_debug>(n)) printk(args); } while (0)
 #else
 #define DEBUG(n, args...) do { } while (0)
@@ -119,9 +119,6 @@ extern int dldwd_debug;
 
 #define TRACE_ENTER(devname) DEBUG(2, "%s: -> " __FUNCTION__ "()\n", devname);
 #define TRACE_EXIT(devname)  DEBUG(2, "%s: <- " __FUNCTION__ "()\n", devname);
-
-#define MAX(a, b) ( (a) > (b) ? (a) : (b) )
-#define MIN(a, b) ( (a) < (b) ? (a) : (b) )
 
 #define RUP_EVEN(a) ( (a) % 2 ? (a) + 1 : (a) )
 

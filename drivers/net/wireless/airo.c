@@ -341,6 +341,7 @@ static int do8bitIO = 0;
 
 /* The RIDs */
 #define RID_CAPABILITIES 0xFF00
+#define RID_RSSI       0xFF04
 #define RID_CONFIG     0xFF10
 #define RID_SSID       0xFF11
 #define RID_APLIST     0xFF12
@@ -627,6 +628,16 @@ typedef struct {
   u16 atimWindow;
 } BSSListRid;
 
+typedef struct {
+  u8 rssipct;
+  u8 rssidBm;
+} tdsRssiEntry;
+
+typedef struct {
+  u16 len;
+  tdsRssiEntry x[256];
+} tdsRssiRid;
+
 #pragma pack()
 
 #define TXCTL_TXOK (1<<1) /* report if tx is ok */
@@ -774,6 +785,7 @@ struct airo_info {
 			int whichbap);
 	int (*header_parse)(struct sk_buff*, unsigned char *);
 	unsigned short *flash;
+	tdsRssiEntry *rssi;
 #ifdef WIRELESS_EXT
 	int			need_commit;	// Need to set config
 	struct iw_statistics	wstats;		// wireless stats
@@ -1076,6 +1088,8 @@ void stop_airo_card( struct net_device *dev, int freeres )
 	struct airo_info *ai = (struct airo_info*)dev->priv;
 	if (ai->flash)
 		kfree(ai->flash);
+	if (ai->rssi)
+		kfree(ai->rssi);
 	takedown_proc_entry( dev, ai );
 	if (ai->registered) {
 		unregister_netdev( dev );
@@ -1382,7 +1396,10 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 					if (!memcmp(sa,apriv->spy_address[i],6))
 					{
 						apriv->spy_stat[i].qual = hdr.rssi[0];
-						apriv->spy_stat[i].level = hdr.rssi[1];
+						if (apriv->rssi)
+							apriv->spy_stat[i].level = 0x100 - apriv->rssi[hdr.rssi[1]].rssidBm;
+						else
+							apriv->spy_stat[i].level = (hdr.rssi[1] + 321) / 2;
 						apriv->spy_stat[i].noise = 0;
 						apriv->spy_stat[i].updated = 3;
 						break;
@@ -1568,9 +1585,29 @@ static u16 setup_card(struct airo_info *ai, u8 *mac,
 	if ( config->len ) {
 		cfg = *config;
 	} else {
+		tdsRssiRid rssi_rid;
+	
 		// general configuration (read/modify/write)
 		status = readConfigRid(ai, &cfg);
 		if ( status != SUCCESS ) return ERROR;
+
+		status = PC4500_readrid(ai,RID_RSSI,&rssi_rid,sizeof(rssi_rid));
+		if ( status == SUCCESS ) {
+			if (ai->rssi || (ai->rssi = kmalloc(512, GFP_KERNEL)) != NULL)
+				memcpy(ai->rssi, (u8*)&rssi_rid + 2, 512);
+		}
+		else {
+			CapabilityRid cap_rid;
+			if (ai->rssi) {
+				kfree(ai->rssi);
+				ai->rssi = NULL;
+			}
+			status = readCapabilityRid(ai, &cap_rid);
+			if ((status == SUCCESS) && (cap_rid.softCap & 8))
+				cfg.rmode |= RXMODE_NORMALIZED_RSSI;
+			else
+				printk(KERN_WARNING "airo: unknown received signal level\n");
+		}
 		cfg.opmode = adhoc ? MODE_STA_IBSS : MODE_STA_ESS;
     
 		/* Save off the MAC */
@@ -3814,7 +3851,7 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 			/* Hum... Should put the right values there */
 			range.max_qual.qual = 10;
-			range.max_qual.level = 100;
+			range.max_qual.level = 0;
 			range.max_qual.noise = 0;
 			range.sensitivity = 65535;
 
@@ -3976,7 +4013,10 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				loseSync = 0;
 				memcpy(s[i].sa_data, BSSList.bssid, 6);
 				s[i].sa_family = ARPHRD_ETHER;
-				qual[i].level = BSSList.rssi;
+				if (local->rssi)
+					qual[i].level = 0x100 - local->rssi[BSSList.rssi].rssidBm;
+				else
+					qual[i].level = (BSSList.rssi + 321) / 2;
 				qual[i].qual = qual[i].noise = 0;
 				qual[i].updated = 2;
 				if (BSSList.index == 0xffff) break;
@@ -4190,7 +4230,10 @@ struct iw_statistics *airo_get_wireless_stats(struct net_device *dev)
 
 	/* Signal quality and co. But where is the noise level ??? */
 	local->wstats.qual.qual = status_rid.signalQuality;
-	local->wstats.qual.level = status_rid.normalizedSignalStrength;
+	if (local->rssi)
+		local->wstats.qual.level = 0x100 - local->rssi[status_rid.sigQuality].rssidBm;
+	else
+		local->wstats.qual.level = (status_rid.normalizedSignalStrength + 321) / 2;
 	local->wstats.qual.noise = 0;
 	local->wstats.qual.updated = 3;
 

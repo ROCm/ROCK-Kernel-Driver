@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.init.c 1.34 08/20/01 22:12:43 paulus
+ * BK Id: SCCS/s.init.c 1.36 09/22/01 14:03:09 paulus
  */
 /*
  *  PowerPC version 
@@ -44,11 +44,14 @@
 #include <asm/smp.h>
 #include <asm/machdep.h>
 #include <asm/btext.h>
+#include <asm/tlb.h>
 
 #include "mem_pieces.h"
 #include "mmu_decl.h"
 
 #define MAX_LOW_MEM	(0xF0000000UL - KERNELBASE)
+
+mmu_gather_t mmu_gathers[NR_CPUS];
 
 void *end_of_DRAM;
 unsigned long total_memory;

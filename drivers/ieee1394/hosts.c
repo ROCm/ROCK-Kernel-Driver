@@ -23,8 +23,8 @@
 #include "highlevel.h"
 
 
-static struct hpsb_host_template *templates = NULL;
-spinlock_t templates_lock = SPIN_LOCK_UNLOCKED;
+static LIST_HEAD(templates);
+static spinlock_t templates_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * This function calls the add_host/remove_host hooks for every host currently
@@ -32,13 +32,16 @@ spinlock_t templates_lock = SPIN_LOCK_UNLOCKED;
  */
 void hl_all_hosts(struct hpsb_highlevel *hl, int init)
 {
+	struct list_head *tlh, *hlh;
         struct hpsb_host_template *tmpl;
         struct hpsb_host *host;
 
         spin_lock(&templates_lock);
 
-        for (tmpl = templates; tmpl != NULL; tmpl = tmpl->next) {
-                for (host = tmpl->hosts; host != NULL; host = host->next) {
+	list_for_each(tlh, &templates) {
+                tmpl = list_entry(tlh, struct hpsb_host_template, list);
+		list_for_each(hlh, &tmpl->hosts) {
+			host = list_entry(hlh, struct hpsb_host, list);
                         if (host->initialized) {
                                 if (init) {
                                         if (hl->op->add_host) {
@@ -58,21 +61,24 @@ void hl_all_hosts(struct hpsb_highlevel *hl, int init)
 
 int hpsb_inc_host_usage(struct hpsb_host *host)
 {
+	struct list_head *tlh, *hlh;
         struct hpsb_host_template *tmpl;
-        struct hpsb_host *h;
         int retval = 0;
 	unsigned long flags;
 
         spin_lock_irqsave(&templates_lock, flags);
 
-        for (tmpl = templates; (tmpl != NULL) && !retval; tmpl = tmpl->next) {
-                for (h = tmpl->hosts; h != NULL; h = h->next) {
-                        if (h == host) {
-                                tmpl->devctl(h, MODIFY_USAGE, 1);
+	list_for_each(tlh, &templates) {
+                tmpl = list_entry(tlh, struct hpsb_host_template, list);
+		list_for_each(hlh, &tmpl->hosts) {
+			if (host == list_entry(hlh, struct hpsb_host, list)) {
+                                tmpl->devctl(host, MODIFY_USAGE, 1);
                                 retval = 1;
                                 break;
                         }
                 }
+		if (retval)
+			break;
         }
 
         spin_unlock_irqrestore(&templates_lock, flags);
@@ -113,32 +119,22 @@ struct hpsb_host *hpsb_get_host(struct hpsb_host_template *tmpl,
         h->speed_map = (u8 *)(h->csr.speed_map + 2);
 
         h->template = tmpl;
-        if (hd_size) {
+        if (hd_size)
                 h->hostdata = &h->embedded_hostdata[0];
-        }
 
-        if (tmpl->hosts == NULL) {
-                tmpl->hosts = h;
-        } else {
-                struct hpsb_host *last = tmpl->hosts;
-
-                while (last->next != NULL) {
-                        last = last->next;
-                }
-                last->next = h;
-        }
+	list_add_tail(&h->list, &tmpl->hosts);
 
         return h;
 }
 
 static void free_all_hosts(struct hpsb_host_template *tmpl)
 {
-        struct hpsb_host *next, *host = tmpl->hosts;
+	struct list_head *hlh, *next;
+        struct hpsb_host *host;
 
-        while (host) {
-                next = host->next;
+	list_for_each_safe(hlh, next, &tmpl->hosts) {
+		host = list_entry(hlh, struct hpsb_host, list);
                 vfree(host);
-                host = next;
         }
 }
 
@@ -146,11 +142,13 @@ static void free_all_hosts(struct hpsb_host_template *tmpl)
 static void init_hosts(struct hpsb_host_template *tmpl)
 {
         int count;
+	struct list_head *hlh;
         struct hpsb_host *host;
 
         count = tmpl->detect_hosts(tmpl);
 
-        for (host = tmpl->hosts; host != NULL; host = host->next) {
+	list_for_each(hlh, &tmpl->hosts) {
+		host = list_entry(hlh, struct hpsb_host, list);
                 if (tmpl->initialize_host(host)) {
                         host->initialized = 1;
 
@@ -166,9 +164,11 @@ static void init_hosts(struct hpsb_host_template *tmpl)
 
 static void shutdown_hosts(struct hpsb_host_template *tmpl)
 {
+	struct list_head *hlh;
         struct hpsb_host *host;
 
-        for (host = tmpl->hosts; host != NULL; host = host->next) {
+	list_for_each(hlh, &tmpl->hosts) {
+		host = list_entry(hlh, struct hpsb_host, list);
                 if (host->initialized) {
                         host->initialized = 0;
                         abort_requests(host);
@@ -188,68 +188,17 @@ static void shutdown_hosts(struct hpsb_host_template *tmpl)
 }
 
 
-static int add_template(struct hpsb_host_template *new)
-{
-        new->next = NULL;
-        new->hosts = NULL;
-        new->number_of_hosts = 0;
-
-        spin_lock(&templates_lock);
-        if (templates == NULL) {
-                templates = new;
-        } else {
-                struct hpsb_host_template *last = templates;
-                while (last->next != NULL) {
-                        last = last->next;
-                }
-                last->next = new;
-        }
-        spin_unlock(&templates_lock);
-
-        return 0;
-}
-
-static int remove_template(struct hpsb_host_template *tmpl)
-{
-        int retval = 0;
-
-        if (tmpl->number_of_hosts) {
-                HPSB_ERR("attempted to remove busy host template "
-                         "of %s at address 0x%p", tmpl->name, tmpl);
-                return 1;
-        }
-
-        spin_lock(&templates_lock);
-        if (templates == tmpl) {
-                templates = tmpl->next;
-        } else {
-                struct hpsb_host_template *t;
-
-                t = templates;
-                while (t->next != tmpl && t->next != NULL) {
-                        t = t->next;
-                }
-
-                if (t->next == NULL) {
-                        HPSB_ERR("attempted to remove unregistered host template "
-                                 "of %s at address 0x%p", tmpl->name, tmpl);
-                        retval = -1;
-                } else {
-                        t->next = tmpl->next;
-                }
-        }
-        spin_unlock(&templates_lock);
-
-        return retval;
-}
-
-
 /*
  * The following two functions are exported symbols for module usage.
  */
 int hpsb_register_lowlevel(struct hpsb_host_template *tmpl)
 {
-        add_template(tmpl);
+	INIT_LIST_HEAD(&tmpl->hosts);
+	tmpl->number_of_hosts = 0;
+
+        spin_lock(&templates_lock);
+	list_add_tail(&tmpl->list, &templates);
+        spin_unlock(&templates_lock);
 
 	/* PCI cards should be smart and use the PCI detection layer, and
 	 * not this one shot deal. detect_hosts() will be obsoleted soon. */
@@ -265,7 +214,12 @@ void hpsb_unregister_lowlevel(struct hpsb_host_template *tmpl)
 {
         shutdown_hosts(tmpl);
 
-        if (remove_template(tmpl)) {
-                HPSB_PANIC("remove_template failed on %s", tmpl->name);
-        }
+        if (tmpl->number_of_hosts)
+                HPSB_PANIC("attempted to remove busy host template "
+			   "of %s at address 0x%p", tmpl->name, tmpl);
+	else {
+		spin_lock(&templates_lock);
+		list_del(&tmpl->list);
+		spin_unlock(&templates_lock);
+	}
 }

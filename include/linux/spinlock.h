@@ -42,6 +42,7 @@
 #if (DEBUG_SPINLOCKS < 1)
 
 #define atomic_dec_and_lock(atomic,lock) atomic_dec_and_test(atomic)
+#define ATOMIC_DEC_AND_LOCK
 
 /*
  * Your basic spinlocks, allowing only a single CPU anywhere
@@ -128,7 +129,7 @@ typedef struct {
 #endif /* !SMP */
 
 /* "lock on reference count zero" */
-#ifndef atomic_dec_and_lock
+#ifndef ATOMIC_DEC_AND_LOCK
 #include <asm/atomic.h>
 extern int atomic_dec_and_lock(atomic_t *atomic, spinlock_t *lock);
 #endif

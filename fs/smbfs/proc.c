@@ -23,16 +23,18 @@
 #include <linux/smb_mount.h>
 
 #include <asm/string.h>
+#include <asm/div64.h>
 
 #include "smb_debug.h"
+#include "proto.h"
 
 
 /* Features. Undefine if they cause problems, this should perhaps be a
    config option. */
 #define SMBFS_POSIX_UNLINK 1
 
-/* Allow smb_retry to be interrupted. Not sure of the benefit ... */
-/* #define SMB_RETRY_INTR */
+/* Allow smb_retry to be interrupted. */
+#define SMB_RETRY_INTR
 
 #define SMB_VWV(packet)  ((packet) + SMB_HEADER_LEN)
 #define SMB_CMD(packet)  (*(packet+8))
@@ -42,6 +44,9 @@
 
 #define SMB_DIRINFO_SIZE 43
 #define SMB_STATUS_SIZE  21
+
+#define SMB_ST_BLKSIZE	(PAGE_SIZE)
+#define SMB_ST_BLKSHIFT	(PAGE_SHIFT)
 
 static int
 smb_proc_setattr_ext(struct smb_sb_info *, struct inode *,
@@ -137,8 +142,7 @@ out:
 	return len;
 }
 
-static int setcodepage(struct smb_sb_info *server,
-		       struct nls_table **p, char *name)
+static int setcodepage(struct nls_table **p, char *name)
 {
 	struct nls_table *nls;
 
@@ -160,16 +164,20 @@ static int setcodepage(struct smb_sb_info *server,
 /* Handles all changes to codepage settings. */
 int smb_setcodepage(struct smb_sb_info *server, struct smb_nls_codepage *cp)
 {
-	int n;
+	int n = 0;
 
 	smb_lock_server(server);
 
-	n = setcodepage(server, &server->local_nls, cp->local_name);
+	/* Don't load any nls_* at all, if no remote is requested */
+	if (!*cp->remote_name)
+		goto out;
+
+	n = setcodepage(&server->local_nls, cp->local_name);
 	if (n != 0)
 		goto out;
-	n = setcodepage(server, &server->remote_nls, cp->remote_name);
+	n = setcodepage(&server->remote_nls, cp->remote_name);
 	if (n != 0)
-		setcodepage(server, &server->local_nls, NULL);
+		setcodepage(&server->local_nls, NULL);
 
 out:
 	if (server->local_nls != NULL && server->remote_nls != NULL)
@@ -188,7 +196,7 @@ out:
 /*                                                                           */
 /*****************************************************************************/
 
-__u8 *
+static __u8 *
 smb_encode_smb_length(__u8 * p, __u32 len)
 {
 	*p = 0;
@@ -308,7 +316,9 @@ date_dos2unix(struct smb_sb_info *server, __u16 date, __u16 time)
 	int month, year;
 	time_t secs;
 
-	month = ((date >> 5) & 15) - 1;
+	/* first subtract and mask after that... Otherwise, if
+	   date == 0, bad things happen */
+	month = ((date >> 5) - 1) & 15;
 	year = date >> 9;
 	secs = (time & 31) * 2 + 60 * ((time >> 5) & 63) + (time >> 11) * 3600 + 86400 *
 	    ((date & 31) - 1 + day_n[month] + (year / 4) + year * 365 - ((year & 3) == 0 &&
@@ -327,6 +337,9 @@ date_unix2dos(struct smb_sb_info *server,
 	int day, year, nl_day, month;
 
 	unix_date = utc2local(server, unix_date);
+	if (unix_date < 315532800)
+		unix_date = 315532800;
+
 	*time = (unix_date % 60) / 2 +
 		(((unix_date / 60) % 60) << 5) +
 		(((unix_date / 3600) % 24) << 11);
@@ -350,57 +363,20 @@ date_unix2dos(struct smb_sb_info *server,
 
 /* The following are taken from fs/ntfs/util.c */
 
+#define NTFS_TIME_OFFSET ((u64)(369*365 + 89) * 24 * 3600 * 10000000)
+
 /*
  * Convert the NT UTC (based 1601-01-01, in hundred nanosecond units)
  * into Unix UTC (based 1970-01-01, in seconds).
- *
- * This is very gross because
- * 1: We must do 64-bit division on a 32-bit machine
- * 2: We can't use libgcc for long long operations in the kernel
- * 3: Floating point math in the kernel would corrupt user data
  */
 static time_t
-smb_ntutc2unixutc(struct smb_sb_info *server, u64 ntutc)
+smb_ntutc2unixutc(u64 ntutc)
 {
-	const unsigned int D = 10000000;
-	unsigned int H = (unsigned int)(ntutc >> 32);
-	unsigned int L = (unsigned int)ntutc;
-	unsigned int numerator2;
-	unsigned int lowseconds;
-	unsigned int result;
-
-	/*
-	 * It is best to subtract 0x019db1ded53e8000 first.
-	 * Then the 1601-based date becomes a 1970-based date.
-	 */
-	if (L < (unsigned)0xd53e8000) H--;
-	L -= (unsigned)0xd53e8000;
-	H -= (unsigned)0x019db1de;
-
-	/*
-	 * Now divide 64-bit numbers on a 32-bit machine :-)
-	 * With the subtraction already done, the result fits in 32 bits.
-	 * The numerator fits in 56 bits and the denominator fits
-	 * in 24 bits, so we can shift by 8 bits to make this work.
-	 */
-
-	numerator2  = (H<<8) | (L>>24);
-	result      = (numerator2 / D);   /* shifted 24 right!! */
-	lowseconds  = result << 24;
-
-	numerator2  = ((numerator2-result*D)<<8) | ((L>>16)&0xff);
-	result      = (numerator2 / D);   /* shifted 16 right!! */
-	lowseconds |= result << 16;
-
-	numerator2  = ((numerator2-result*D)<<8) | ((L>>8)&0xff);
-	result      = (numerator2 / D);   /* shifted 8 right!! */
-	lowseconds |= result << 8;
-
-	numerator2  = ((numerator2-result*D)<<8) | (L&0xff);
-	result      = (numerator2 / D);   /* not shifted */
-	lowseconds |= result;
-
-	return lowseconds;
+	/* FIXME: what about the timezone difference? */
+	/* Subtract the NTFS time offset, then convert to 1s intervals. */
+	u64 t = ntutc - NTFS_TIME_OFFSET;
+	do_div(t, 10000000);
+	return (time_t)t;
 }
 
 #if 0
@@ -409,7 +385,7 @@ static u64
 smb_unixutc2ntutc(struct smb_sb_info *server, time_t t)
 {
 	/* Note: timezone conversion is probably wrong. */
-	return ((utc2local(server, t) + (u64)(369*365+89)*24*3600) * 10000000);
+	return ((u64)utc2local(server, t)) * 10000000 + NTFS_TIME_OFFSET;
 }
 #endif
 
@@ -519,6 +495,9 @@ smb_get_wsize(struct smb_sb_info *server)
 	return size;
 }
 
+/*
+ * Convert SMB error codes to -E... errno values.
+ */
 int
 smb_errno(struct smb_sb_info *server)
 {
@@ -529,110 +508,115 @@ smb_errno(struct smb_sb_info *server)
 	VERBOSE("errcls %d  code %d  from command 0x%x\n",
 		errcls, error, SMB_CMD(server->packet));
 
-	if (errcls == ERRDOS)
-		switch (error)
-		{
+	if (errcls == ERRDOS) {
+		switch (error) {
 		case ERRbadfunc:
-			return EINVAL;
+			return -EINVAL;
 		case ERRbadfile:
 		case ERRbadpath:
-			return ENOENT;
+			return -ENOENT;
 		case ERRnofids:
-			return EMFILE;
+			return -EMFILE;
 		case ERRnoaccess:
-			return EACCES;
+			return -EACCES;
 		case ERRbadfid:
-			return EBADF;
+			return -EBADF;
 		case ERRbadmcb:
-			return EREMOTEIO;
+			return -EREMOTEIO;
 		case ERRnomem:
-			return ENOMEM;
+			return -ENOMEM;
 		case ERRbadmem:
-			return EFAULT;
+			return -EFAULT;
 		case ERRbadenv:
 		case ERRbadformat:
-			return EREMOTEIO;
+			return -EREMOTEIO;
 		case ERRbadaccess:
-			return EACCES;
+			return -EACCES;
 		case ERRbaddata:
-			return E2BIG;
+			return -E2BIG;
 		case ERRbaddrive:
-			return ENXIO;
+			return -ENXIO;
 		case ERRremcd:
-			return EREMOTEIO;
+			return -EREMOTEIO;
 		case ERRdiffdevice:
-			return EXDEV;
-		case ERRnofiles:	/* Why is this mapped to 0?? */
-			return 0;
+			return -EXDEV;
+		case ERRnofiles:
+			return -ENOENT;
 		case ERRbadshare:
-			return ETXTBSY;
+			return -ETXTBSY;
 		case ERRlock:
-			return EDEADLK;
+			return -EDEADLK;
 		case ERRfilexists:
-			return EEXIST;
-		case 87:		/* should this map to 0?? */
-			return 0;	/* Unknown error!! */
-		case 123:		/* Invalid name?? e.g. .tmp* */
-			return ENOENT;
-		case 145:		/* Win NT 4.0: non-empty directory? */
-			return ENOTEMPTY;
-			/* This next error seems to occur on an mv when
-			 * the destination exists */
-		case 183:
-			return EEXIST;
+			return -EEXIST;
+		case ERRinvalidparam:
+			return -EINVAL;
+		case ERRdiskfull:
+			return -ENOSPC;
+		case ERRinvalidname:
+			return -ENOENT;
+		case ERRdirnotempty:
+			return -ENOTEMPTY;
+		case ERRnotlocked:
+                       return -ENOLCK;
+		case ERRexists:
+			return -EEXIST;
 		default:
 			class = "ERRDOS";
 			goto err_unknown;
-	} else if (errcls == ERRSRV)
-		switch (error)
-		{
+		}
+	} else if (errcls == ERRSRV) {
+		switch (error) {
 		/* N.B. This is wrong ... EIO ? */
 		case ERRerror:
-			return ENFILE;
+			return -ENFILE;
 		case ERRbadpw:
-			return EINVAL;
+			return -EINVAL;
 		case ERRbadtype:
-			return EIO;
+			return -EIO;
 		case ERRaccess:
-			return EACCES;
+			return -EACCES;
 		/*
 		 * This is a fatal error, as it means the "tree ID"
 		 * for this connection is no longer valid. We map
 		 * to a special error code and get a new connection.
 		 */
 		case ERRinvnid:
-			return EBADSLT;
+			return -EBADSLT;
 		default:
 			class = "ERRSRV";
 			goto err_unknown;
-	} else if (errcls == ERRHRD)
-		switch (error)
-		{
+		}
+	} else if (errcls == ERRHRD) {
+		switch (error) {
 		case ERRnowrite:
-			return EROFS;
+			return -EROFS;
 		case ERRbadunit:
-			return ENODEV;
+			return -ENODEV;
 		case ERRnotready:
-			return EUCLEAN;
+			return -EUCLEAN;
 		case ERRbadcmd:
 		case ERRdata:
-			return EIO;
+			return -EIO;
 		case ERRbadreq:
-			return ERANGE;
+			return -ERANGE;
 		case ERRbadshare:
-			return ETXTBSY;
+			return -ETXTBSY;
 		case ERRlock:
-			return EDEADLK;
+			return -EDEADLK;
 		default:
 			class = "ERRHRD";
 			goto err_unknown;
-	} else if (errcls == ERRCMD)
+		}
+	} else if (errcls == ERRCMD) {
 		class = "ERRCMD";
+	} else if (errcls == SUCCESS) {
+		return 0;	/* This is the only valid 0 return */
+	}
 
 err_unknown:
 	printk(KERN_ERR "smb_errno: class %s, code %d from command 0x%x\n",
 	       class, error, SMB_CMD(server->packet));
-	return EIO;
+	return -EIO;
 }
 
 /*
@@ -749,12 +733,10 @@ smb_request_ok(struct smb_sb_info *s, int command, int wct, int bcc)
 	}
 
 	/*
-	 * Check for server errors.  The current smb_errno() routine
-	 * is squashing some error codes, but I don't think this is
-	 * correct: after a server error the packet won't be valid.
+	 * Check for server errors.
 	 */
 	if (s->rcls != 0) {
-		result = -smb_errno(s);
+		result = smb_errno(s);
 		if (!result)
 			printk(KERN_DEBUG "smb_request_ok: rcls=%d, err=%d mapped to 0\n",
 				s->rcls, s->err);
@@ -850,17 +832,23 @@ smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
 
 out:
 	smb_unlock_server(server);
-
-#ifdef SMB_RETRY_INTR
-	wake_up_interruptible(&server->wait);
-#else
-	wake_up(&server->wait);
-#endif
+	smb_wakeup(server);
 	return error;
 
 out_putf:
 	fput(filp);
 	goto out;
+}
+
+int
+smb_wakeup(struct smb_sb_info *server)
+{
+#ifdef SMB_RETRY_INTR
+	wake_up_interruptible(&server->wait);
+#else
+	wake_up(&server->wait);
+#endif
+	return 0;
 }
 
 /* smb_setup_header: We completely set up the packet. You only have to
@@ -1490,7 +1478,7 @@ smb_init_dirent(struct smb_sb_info *server, struct smb_fattr *fattr)
 	fattr->f_nlink = 1;
 	fattr->f_uid = server->mnt->uid;
 	fattr->f_gid = server->mnt->gid;
-	fattr->f_blksize = 512;
+	fattr->f_blksize = SMB_ST_BLKSIZE;
 }
 
 static void
@@ -1500,18 +1488,16 @@ smb_finish_dirent(struct smb_sb_info *server, struct smb_fattr *fattr)
 	if (fattr->attr & aDIR)
 	{
 		fattr->f_mode = server->mnt->dir_mode;
-		fattr->f_size = 512;
+		fattr->f_size = SMB_ST_BLKSIZE;
 	}
 	/* Check the read-only flag */
 	if (fattr->attr & aRONLY)
 		fattr->f_mode &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
 
+	/* How many 512 byte blocks do we need for this file? */
 	fattr->f_blocks = 0;
-	if ((fattr->f_blksize != 0) && (fattr->f_size != 0))
-	{
-		fattr->f_blocks =
-		    (fattr->f_size - 1) / fattr->f_blksize + 1;
-	}
+	if (fattr->f_size != 0)
+		fattr->f_blocks = 1 + ((fattr->f_size-1) >> 9);
 	return;
 }
 
@@ -1770,9 +1756,9 @@ smb_decode_long_dirent(struct smb_sb_info *server, char *p, int level,
 		if (len && qname->name[len-1] == '\0')
 			len--;
 
-		fattr->f_ctime = smb_ntutc2unixutc(server, LVAL(p, 8));
-		fattr->f_atime = smb_ntutc2unixutc(server, LVAL(p, 16));
-		fattr->f_mtime = smb_ntutc2unixutc(server, LVAL(p, 24));
+		fattr->f_ctime = smb_ntutc2unixutc(LVAL(p, 8));
+		fattr->f_atime = smb_ntutc2unixutc(LVAL(p, 16));
+		fattr->f_mtime = smb_ntutc2unixutc(LVAL(p, 24));
 		/* change time (32) */
 		fattr->f_size = DVAL(p, 40);
 		/* alloc size (48) */
@@ -1940,7 +1926,7 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
                 }
 
 		if (server->rcls != 0) {
-			result = -smb_errno(server);
+			result = smb_errno(server);
 			PARANOIA("name=%s, result=%d, rcls=%d, err=%d\n",
 				 mask, result, server->rcls, server->err);
 			break;
@@ -2104,7 +2090,7 @@ retry:
 	}
 	if (server->rcls != 0)
 	{ 
-		result = -smb_errno(server);
+		result = smb_errno(server);
 #ifdef SMBFS_PARANOIA
 		if (result != -ENOENT)
 			PARANOIA("error for %s, rcls=%d, err=%d\n",
@@ -2227,7 +2213,7 @@ smb_proc_getattr_trans2(struct smb_sb_info *server, struct dentry *dir,
 	{
 		VERBOSE("for %s: result=%d, rcls=%d, err=%d\n",
 			&param[6], result, server->rcls, server->err);
-		result = -smb_errno(server);
+		result = smb_errno(server);
 		goto out;
 	}
 	result = -ENOENT;
@@ -2490,7 +2476,7 @@ smb_proc_setattr_trans2(struct smb_sb_info *server,
 	}
 	result = 0;
 	if (server->rcls != 0)
-		result = -smb_errno(server);
+		result = smb_errno(server);
 
 out:
 	return result;
@@ -2559,6 +2545,7 @@ smb_proc_dskattr(struct super_block *sb, struct statfs *attr)
 	struct smb_sb_info *server = &(sb->u.smbfs_sb);
 	int result;
 	char *p;
+	long unit;
 
 	smb_lock_server(server);
 
@@ -2571,23 +2558,13 @@ smb_proc_dskattr(struct super_block *sb, struct statfs *attr)
 		goto out;
 	}
 	p = SMB_VWV(server->packet);
-	attr->f_blocks = WVAL(p, 0);
-	attr->f_bsize  = WVAL(p, 2) * WVAL(p, 4);
-	attr->f_bavail = attr->f_bfree = WVAL(p, 6);
+	unit = (WVAL(p, 2) * WVAL(p, 4)) >> SMB_ST_BLKSHIFT;
+	attr->f_blocks = WVAL(p, 0) * unit;
+	attr->f_bsize  = SMB_ST_BLKSIZE;
+	attr->f_bavail = attr->f_bfree = WVAL(p, 6) * unit;
 	result = 0;
 
 out:
-	smb_unlock_server(server);
-	return result;
-}
-
-int
-smb_proc_disconnect(struct smb_sb_info *server)
-{
-	int result;
-	smb_lock_server(server);
-	smb_setup_header(server, SMBtdis, 0, 0);
-	result = smb_request_ok(server, SMBtdis, 0, 0);
 	smb_unlock_server(server);
 	return result;
 }

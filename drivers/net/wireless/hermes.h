@@ -50,6 +50,7 @@
 #define		HERMES_FRAME_LEN_MAX		(2304)
 #define		HERMES_MAX_MULTICAST		(16)
 #define		HERMES_MAGIC			(0x7d1f)
+#define		HERMES_SYMBOL_MAX_VER		(14)
 
 /*
  * Hermes register offsets
@@ -202,24 +203,21 @@
 #define		HERMES_RID_WEP_AVAIL		(0xfd4f)
 #define		HERMES_RID_CURRENT_CHANNEL	(0xfdc1)
 #define		HERMES_RID_DATARATES		(0xfdc6)
-#define		HERMES_RID_SYMBOL_PRIMARY_VER	(0xfd03)
-#define		HERMES_RID_SYMBOL_SECONDARY_VER	(0xfd21)
+#define		HERMES_RID_SYMBOL_SECONDARY_VER	(0xfd24)
 #define		HERMES_RID_SYMBOL_KEY_LENGTH	(0xfc2B)
 
 /*
  * Frame structures and constants
  */
 
-#define __PACKED__ __attribute__ ((packed))
-
 typedef struct hermes_frame_desc {
 	/* Hermes - i.e. little-endian byte-order */
-	uint16_t status __PACKED__;
-	uint16_t res1, res2 __PACKED__;
-	uint16_t q_info __PACKED__;
-	uint16_t res3, res4 __PACKED__;
-	uint16_t tx_ctl __PACKED__;
-} hermes_frame_desc_t;
+	uint16_t status;
+	uint16_t res1, res2;
+	uint16_t q_info;
+	uint16_t res3, res4;
+	uint16_t tx_ctl;
+} __attribute__ ((packed)) hermes_frame_desc_t;
 
 #define		HERMES_RXSTAT_ERR		(0x0003)
 #define		HERMES_RXSTAT_MACPORT		(0x0700)
@@ -265,20 +263,16 @@ typedef struct hermes_multicast {
 #define hermes_read_regn(hw, name) (hermes_read_reg((hw), HERMES_##name))
 #define hermes_write_regn(hw, name, val) (hermes_write_reg((hw), HERMES_##name, (val)))
 
-/* Note that for the next two, the count is in 16-bit words, not bytes */
-#define hermes_read_data(hw, off, buf, count) (insw((hw)->iobase + (off), (buf), (count)))
-#define hermes_write_data(hw, off, buf, count) (outsw((hw)->iobase + (off), (buf), (count)))
-
 /* Function prototypes */
 void hermes_struct_init(hermes_t *hw, uint io);
 int hermes_reset(hermes_t *hw);
 int hermes_docmd_wait(hermes_t *hw, uint16_t cmd, uint16_t parm0, hermes_response_t *resp);
 int hermes_allocate(hermes_t *hw, uint16_t size, uint16_t *fid);
 
-
-int hermes_bap_pread(hermes_t *hw, int bap, void *buf, uint16_t len,
+int hermes_bap_seek(hermes_t *hw, int bap, uint16_t id, uint16_t offset);
+int hermes_bap_pread(hermes_t *hw, int bap, void *buf, int len,
 		       uint16_t id, uint16_t offset);
-int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, uint16_t len,
+int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, int len,
 			uint16_t id, uint16_t offset);
 int hermes_read_ltv(hermes_t *hw, int bap, uint16_t rid, int buflen,
 		    uint16_t *length, void *buf);
@@ -322,6 +316,10 @@ static inline int hermes_disable_port(hermes_t *hw, int port)
 
 #define HERMES_BYTES_TO_RECLEN(n) ( ((n) % 2) ? (((n)+1)/2)+1 : ((n)/2)+1 )
 #define HERMES_RECLEN_TO_BYTES(n) ( ((n)-1) * 2 )
+
+/* Note that for the next two, the count is in 16-bit words, not bytes */
+#define hermes_read_words(hw, off, buf, count) (insw((hw)->iobase + (off), (buf), (count)))
+#define hermes_write_words(hw, off, buf, count) (outsw((hw)->iobase + (off), (buf), (count)))
 
 #define HERMES_READ_RECORD(hw, bap, rid, buf) \
 	(hermes_read_ltv((hw),(bap),(rid), sizeof(*buf), NULL, (buf)))

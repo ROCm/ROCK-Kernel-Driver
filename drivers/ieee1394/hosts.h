@@ -3,6 +3,7 @@
 
 #include <linux/wait.h>
 #include <linux/tqueue.h>
+#include <linux/list.h>
 #include <asm/semaphore.h>
 
 #include "ieee1394_types.h"
@@ -13,7 +14,7 @@ struct hpsb_packet;
 
 struct hpsb_host {
 /* private fields (hosts, do not use them) */
-        struct hpsb_host *next;
+	struct list_head list;
 
         atomic_t generation;
 
@@ -109,9 +110,9 @@ enum reset_types {
 };
 
 struct hpsb_host_template {
-        struct hpsb_host_template *next;
+	struct list_head list;
 
-        struct hpsb_host *hosts;
+        struct list_head hosts;
         int number_of_hosts;
 
         /* fields above will be ignored and overwritten after registering */

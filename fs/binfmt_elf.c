@@ -76,6 +76,8 @@ static struct linux_binfmt elf_format = {
 	NULL, THIS_MODULE, load_elf_binary, load_elf_library, elf_core_dump, ELF_EXEC_PAGESIZE
 };
 
+#define BAD_ADDR(x)	((unsigned long)(x) > TASK_SIZE)
+
 static void set_brk(unsigned long start, unsigned long end)
 {
 	start = ELF_PAGEALIGN(start);
@@ -298,6 +300,8 @@ static unsigned long load_elf_interp(struct elfhdr * interp_elf_ex,
 	    	elf_type |= MAP_FIXED;
 
 	    map_addr = elf_map(interpreter, load_addr + vaddr, eppnt, elf_prot, elf_type);
+	    if (BAD_ADDR(map_addr))
+	    	goto out_close;
 
 	    if (!load_addr_set && interp_elf_ex->e_type == ET_DYN) {
 		load_addr = map_addr - ELF_PAGESTART(vaddr);
@@ -649,6 +653,8 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		}
 
 		error = elf_map(bprm->file, load_bias + vaddr, elf_ppnt, elf_prot, elf_flags);
+		if (BAD_ADDR(error))
+			continue;
 
 		if (!load_addr_set) {
 			load_addr_set = 1;
@@ -697,7 +703,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		fput(interpreter);
 		kfree(elf_interpreter);
 
-		if (elf_entry == ~0UL) {
+		if (BAD_ADDR(elf_entry)) {
 			printk(KERN_ERR "Unable to load interpreter\n");
 			kfree(elf_phdata);
 			send_sig(SIGSEGV, current, 0);

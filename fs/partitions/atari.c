@@ -33,146 +33,130 @@
      be32_to_cpu((pi)->st) <= (hdsiz) &&				     \
      be32_to_cpu((pi)->st) + be32_to_cpu((pi)->siz) <= (hdsiz))
 
-int atari_partition (struct gendisk *hd, kdev_t dev,
+static inline int OK_id(char *s)
+{
+	return  memcmp (s, "GEM", 3) == 0 || memcmp (s, "BGM", 3) == 0 ||
+		memcmp (s, "LNX", 3) == 0 || memcmp (s, "SWP", 3) == 0 ||
+		memcmp (s, "RAW", 3) == 0 ;
+}
+
+int atari_partition (struct gendisk *hd, struct block_device *bdev,
 		     unsigned long first_sector, int minor)
 {
-  int m_lim = minor + hd->max_p;
-  struct buffer_head *bh;
-  struct rootsector *rs;
-  struct partition_info *pi;
-  u32 extensect;
-  u32 hd_size;
+	int m_lim = minor + hd->max_p;
+	Sector sect;
+	struct rootsector *rs;
+	struct partition_info *pi;
+	u32 extensect;
+	u32 hd_size;
 #ifdef ICD_PARTS
-  int part_fmt = 0; /* 0:unknown, 1:AHDI, 2:ICD/Supra */
+	int part_fmt = 0; /* 0:unknown, 1:AHDI, 2:ICD/Supra */
 #endif
 
-  bh = bread (dev, 0, get_ptable_blocksize(dev));
-  if (!bh) {
-      if (warn_no_part) printk (" unable to read block 0 (partition table)\n");
-      return -1;
-  }
+	rs = (struct rootsector *) read_dev_sector(bdev, 0, &sect);
+	if (!rs)
+		return -1;
 
-  /* Verify this is an Atari rootsector: */
-  rs = (struct rootsector *) bh->b_data;
-  hd_size = hd->part[minor - 1].nr_sects;
-  if (!VALID_PARTITION(&rs->part[0], hd_size) &&
-      !VALID_PARTITION(&rs->part[1], hd_size) &&
-      !VALID_PARTITION(&rs->part[2], hd_size) &&
-      !VALID_PARTITION(&rs->part[3], hd_size)) {
-      /* if there's no valid primary partition, assume that no Atari
-	 format partition table (there's no reliable magic or the like
-	 :-() */
-      brelse(bh);
-      return 0;
-  }
+	/* Verify this is an Atari rootsector: */
+	hd_size = hd->part[minor - 1].nr_sects;
+	if (!VALID_PARTITION(&rs->part[0], hd_size) &&
+	    !VALID_PARTITION(&rs->part[1], hd_size) &&
+	    !VALID_PARTITION(&rs->part[2], hd_size) &&
+	    !VALID_PARTITION(&rs->part[3], hd_size)) {
+		/*
+		 * if there's no valid primary partition, assume that no Atari
+		 * format partition table (there's no reliable magic or the like
+	         * :-()
+		 */
+		put_dev_sector(sect);
+		return 0;
+	}
 
-  pi = &rs->part[0];
-  printk (" AHDI");
-  for (; pi < &rs->part[4] && minor < m_lim; minor++, pi++)
-    {
-      if (pi->flg & 1)
-	/* active partition */
-	{
-	  if (memcmp (pi->id, "XGM", 3) == 0)
-	    /* extension partition */
-	    {
-	      struct rootsector *xrs;
-	      struct buffer_head *xbh;
-	      ulong partsect;
+	pi = &rs->part[0];
+	printk (" AHDI");
+	for (; pi < &rs->part[4] && minor < m_lim; minor++, pi++) {
+		struct rootsector *xrs;
+		Sector sect2;
+		ulong partsect;
 
+		if ( !(pi->flg & 1) )
+			continue;
+		/* active partition */
+		if (memcmp (pi->id, "XGM", 3) != 0) {
+			/* we don't care about other id's */
+			add_gd_partition (hd, minor, be32_to_cpu(pi->st),
+					be32_to_cpu(pi->siz));
+			continue;
+		}
+		/* extension partition */
 #ifdef ICD_PARTS
-	      part_fmt = 1;
+		part_fmt = 1;
 #endif
-	      printk(" XGM<");
-	      partsect = extensect = be32_to_cpu(pi->st);
-	      while (1)
-		{
-		  xbh = bread (dev, partsect / 2, get_ptable_blocksize(dev));
-		  if (!xbh)
-		    {
-		      printk (" block %ld read failed\n", partsect);
-		      brelse(bh);
-		      return 0;
-		    }
-		  if (partsect & 1)
-		    xrs = (struct rootsector *) &xbh->b_data[512];
-		  else
-		    xrs = (struct rootsector *) &xbh->b_data[0];
+		printk(" XGM<");
+		partsect = extensect = be32_to_cpu(pi->st);
+		while (1) {
+			xrs = (struct rootsector *)read_dev_sector(bdev, partsect, &sect2);
+			if (!xrs) {
+				printk (" block %ld read failed\n", partsect);
+				put_dev_sector(sect);
+				return 0;
+			}
 
-		  /* ++roman: sanity check: bit 0 of flg field must be set */
-		  if (!(xrs->part[0].flg & 1)) {
-		    printk( "\nFirst sub-partition in extended partition is not valid!\n" );
-		    break;
-		  }
+			/* ++roman: sanity check: bit 0 of flg field must be set */
+			if (!(xrs->part[0].flg & 1)) {
+				printk( "\nFirst sub-partition in extended partition is not valid!\n" );
+				put_dev_sector(sect2);
+				break;
+			}
 
-		  add_gd_partition(hd, minor,
+			add_gd_partition(hd, minor,
 				   partsect + be32_to_cpu(xrs->part[0].st),
 				   be32_to_cpu(xrs->part[0].siz));
 
-		  if (!(xrs->part[1].flg & 1)) {
-		    /* end of linked partition list */
-		    brelse( xbh );
-		    break;
-		  }
-		  if (memcmp( xrs->part[1].id, "XGM", 3 ) != 0) {
-		    printk( "\nID of extended partition is not XGM!\n" );
-		    brelse( xbh );
-		    break;
-		  }
+			if (!(xrs->part[1].flg & 1)) {
+				/* end of linked partition list */
+				put_dev_sector(sect2);
+				break;
+			}
+			if (memcmp( xrs->part[1].id, "XGM", 3 ) != 0) {
+				printk("\nID of extended partition is not XGM!\n");
+				put_dev_sector(sect2);
+				break;
+			}
 
-		  partsect = be32_to_cpu(xrs->part[1].st) + extensect;
-		  brelse (xbh);
-		  minor++;
-		  if (minor >= m_lim) {
-		    printk( "\nMaximum number of partitions reached!\n" );
-		    break;
-		  }
+			partsect = be32_to_cpu(xrs->part[1].st) + extensect;
+			put_dev_sector(sect2);
+			minor++;
+			if (minor >= m_lim) {
+				printk( "\nMaximum number of partitions reached!\n" );
+				break;
+			}
 		}
-	      printk(" >");
-	    }
-	  else
-	    {
-	      /* we don't care about other id's */
-	      add_gd_partition (hd, minor, be32_to_cpu(pi->st),
-				be32_to_cpu(pi->siz));
-	    }
+		printk(" >");
 	}
-    }
 #ifdef ICD_PARTS
-  if ( part_fmt!=1 ) /* no extended partitions -> test ICD-format */
-  {
-    pi = &rs->icdpart[0];
-    /* sanity check: no ICD format if first partition invalid */
-    if (memcmp (pi->id, "GEM", 3) == 0 ||
-        memcmp (pi->id, "BGM", 3) == 0 ||
-        memcmp (pi->id, "LNX", 3) == 0 ||
-        memcmp (pi->id, "SWP", 3) == 0 ||
-        memcmp (pi->id, "RAW", 3) == 0 )
-    {
-      printk(" ICD<");
-      for (; pi < &rs->icdpart[8] && minor < m_lim; minor++, pi++)
-      {
-        /* accept only GEM,BGM,RAW,LNX,SWP partitions */
-        if (pi->flg & 1 && 
-            (memcmp (pi->id, "GEM", 3) == 0 ||
-             memcmp (pi->id, "BGM", 3) == 0 ||
-             memcmp (pi->id, "LNX", 3) == 0 ||
-             memcmp (pi->id, "SWP", 3) == 0 ||
-             memcmp (pi->id, "RAW", 3) == 0) )
-        {
-          part_fmt = 2;
-	  add_gd_partition (hd, minor, be32_to_cpu(pi->st),
-			    be32_to_cpu(pi->siz));
-        }
-      }
-      printk(" >");
-    }
-  }
+	if ( part_fmt!=1 ) { /* no extended partitions -> test ICD-format */
+		pi = &rs->icdpart[0];
+		/* sanity check: no ICD format if first partition invalid */
+		if (OK_id(pi->id)) {
+			printk(" ICD<");
+			for (; pi < &rs->icdpart[8] && minor < m_lim; minor++, pi++) {
+				/* accept only GEM,BGM,RAW,LNX,SWP partitions */
+				if (!((pi->flg & 1) && OK_id(pi->id)))
+					continue;
+				part_fmt = 2;
+				add_gd_partition (hd, minor,
+						be32_to_cpu(pi->st),
+						be32_to_cpu(pi->siz));
+			}
+			printk(" >");
+		}
+	}
 #endif
-  brelse (bh);
+	put_dev_sector(sect);
 
-  printk ("\n");
+	printk ("\n");
 
-  return 1;
+	return 1;
 }
 

@@ -105,13 +105,23 @@
 #include <linux/vmalloc.h>
 #include <linux/init.h>
 
+#ifdef CONFIG_ALL_PPC
+#include <asm/feature.h>
+#include <asm/prom.h>
+#include <asm/pci-bridge.h>
+#endif
+
+/* Revert to old bus reset algorithm that works on my Pismo until
+ * the new one is fixed
+ */
+#undef BUSRESET_WORKAROUND
+
 #include "ieee1394.h"
 #include "ieee1394_types.h"
 #include "hosts.h"
 #include "ieee1394_core.h"
 #include "highlevel.h"
 #include "ohci1394.h"
-
 
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
 #define OHCI1394_DEBUG
@@ -123,17 +133,17 @@
 
 #ifdef OHCI1394_DEBUG
 #define DBGMSG(card, fmt, args...) \
-printk(KERN_INFO "ohci1394_%d: " fmt "\n" , card , ## args)
+printk(KERN_INFO "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 #else
 #define DBGMSG(card, fmt, args...)
 #endif
 
 #ifdef CONFIG_IEEE1394_OHCI_DMA_DEBUG
 #define OHCI_DMA_ALLOC(fmt, args...) \
-	HPSB_ERR("ohci1394("__FUNCTION__")alloc(%d): "fmt, \
+	HPSB_ERR("%s("__FUNCTION__")alloc(%d): "fmt, OHCI1394_DRIVER_NAME, \
 		++global_outstanding_dmas, ## args)
 #define OHCI_DMA_FREE(fmt, args...) \
-	HPSB_ERR("ohci1394("__FUNCTION__")free(%d): "fmt, \
+	HPSB_ERR("%s("__FUNCTION__")free(%d): "fmt, OHCI1394_DRIVER_NAME, \
 		--global_outstanding_dmas, ## args)
 u32 global_outstanding_dmas = 0;
 #else
@@ -143,18 +153,11 @@ u32 global_outstanding_dmas = 0;
 
 /* print general (card independent) information */
 #define PRINT_G(level, fmt, args...) \
-printk(level "ohci1394: " fmt "\n" , ## args)
+printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 
 /* print card specific information */
 #define PRINT(level, card, fmt, args...) \
-printk(level "ohci1394_%d: " fmt "\n" , card , ## args)
-
-#define FAIL(fmt, args...)				\
-do {							\
-	PRINT_G(KERN_ERR, fmt , ## args);		\
-	remove_card(ohci);				\
-	return 1;					\
-} while(0)
+printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 #define PCI_CLASS_FIREWIRE_OHCI     ((PCI_CLASS_SERIAL_FIREWIRE << 8) | 0x10)
 
@@ -179,20 +182,47 @@ MODULE_PARM(attempt_root,"i");
 MODULE_PARM_DESC(attempt_root, "Attempt to make the host root.");
 static int attempt_root = 0;
 
-#ifdef __LITTLE_ENDIAN
-/* Don't waste cycles on same sex byte swaps */
-#define packet_swab(w,x,y,z)
-#define block_swab32(x,y)
-#else
-static void packet_swab(quadlet_t *data, char tcode, int len, int payload_swap);
-static __inline__ void block_swab32(quadlet_t *data, size_t size);
-#endif
-
 static unsigned int card_id_counter = 0;
 
 static void dma_trm_tasklet(unsigned long data);
 static void remove_card(struct ti_ohci *ohci);
 static void dma_trm_reset(struct dma_trm_ctx *d);
+
+#ifndef __LITTLE_ENDIAN
+/* Swap a series of quads inplace. */
+static __inline__ void block_swab32(quadlet_t *data, size_t size) {
+	while (size--)
+		data[size] = swab32(data[size]);
+}
+
+static unsigned hdr_sizes[] = 
+{
+	3,	/* TCODE_WRITEQ */
+	4,	/* TCODE_WRITEB */
+	3,	/* TCODE_WRITE_RESPONSE */
+	0,	/* ??? */
+	3,	/* TCODE_READQ */
+	4,	/* TCODE_READB */
+	3,	/* TCODE_READQ_RESPONSE */
+	4,	/* TCODE_READB_RESPONSE */
+	1,	/* TCODE_CYCLE_START (???) */
+	4,	/* TCODE_LOCK_REQUEST */
+	2,	/* TCODE_ISO_DATA */
+	4,	/* TCODE_LOCK_RESPONSE */
+};
+
+/* Swap headers */
+static inline void packet_swab(quadlet_t *data, int tcode, int len)
+{
+	if (tcode > TCODE_LOCK_RESPONSE || hdr_sizes[tcode] == 0)
+		return;
+	block_swab32(data, hdr_sizes[tcode]);
+}
+#else
+/* Don't waste cycles on same sex byte swaps */
+#define packet_swab(w,x,y)
+#define block_swab32(x,y)
+#endif /* !LITTLE_ENDIAN */
 
 /***********************************
  * IEEE-1394 functionality section *
@@ -230,7 +260,7 @@ static void set_phy_reg(struct ti_ohci *ohci, u8 addr, u8 data)
 {
 	int i;
 	unsigned long flags;
-	u32 r;
+	u32 r = 0;
 
 	spin_lock_irqsave (&ohci->phy_reg_lock, flags);
 
@@ -376,7 +406,7 @@ static int run_context(struct ti_ohci *ohci, int reg, char *msg)
 }
 
 /* Generate the dma receive prgs and start the context */
-static void initialize_dma_rcv_ctx(struct dma_rcv_ctx *d)
+static void initialize_dma_rcv_ctx(struct dma_rcv_ctx *d, int generate_irq)
 {
 	struct ti_ohci *ohci = (struct ti_ohci*)(d->ohci);
 	int i;
@@ -384,12 +414,17 @@ static void initialize_dma_rcv_ctx(struct dma_rcv_ctx *d)
 	ohci1394_stop_context(ohci, d->ctrlClear, NULL);
 
 	for (i=0; i<d->num_desc; i++) {
+		u32 c;
 		
-		d->prg_cpu[i]->control =
-                   cpu_to_le32((0x280C << 16) | d->buf_size);
+		c = DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE |
+			DMA_CTL_BRANCH;
+		if (generate_irq)
+			c |= DMA_CTL_IRQ;
+				
+		d->prg_cpu[i]->control = cpu_to_le32(c | d->buf_size);
 
 		/* End of descriptor list? */
-		if ((i+1) < d->num_desc) {
+		if (i + 1 < d->num_desc) {
 			d->prg_cpu[i]->branchAddress =
 				cpu_to_le32((d->prg_bus[i+1] & 0xfffffff0) | 0x1);
 		} else {
@@ -565,15 +600,15 @@ static int ohci_initialize(struct hpsb_host *host)
 	reg_write(ohci, OHCI1394_IRMultiChanMaskLoClear, 0xffffffff);
 
 	/* Initialize AR dma */
-	initialize_dma_rcv_ctx(ohci->ar_req_context);
-	initialize_dma_rcv_ctx(ohci->ar_resp_context);
+	initialize_dma_rcv_ctx(ohci->ar_req_context, 0);
+	initialize_dma_rcv_ctx(ohci->ar_resp_context, 0);
 
 	/* Initialize AT dma */
 	initialize_dma_trm_ctx(ohci->at_req_context);
 	initialize_dma_trm_ctx(ohci->at_resp_context);
 
 	/* Initialize IR dma */
-	initialize_dma_rcv_ctx(ohci->ir_context);
+	initialize_dma_rcv_ctx(ohci->ir_context, 1);
 
         /* Initialize IT dma */
         initialize_dma_trm_ctx(ohci->it_context);
@@ -604,7 +639,6 @@ static int ohci_initialize(struct hpsb_host *host)
 	/* Enable interrupts */
 	reg_write(ohci, OHCI1394_IntMaskSet, 
 		  OHCI1394_masterIntEnable | 
-		  OHCI1394_phyRegRcvd | 
 		  OHCI1394_busReset | 
 		  OHCI1394_selfIDComplete |
 		  OHCI1394_RSPkt |
@@ -674,9 +708,9 @@ static void insert_packet(struct ti_ohci *ohci,
 	} else 
 		d->prg_cpu[idx]->begin.status = 0;
 
-        if ( (packet->type == async) || (packet->type == raw) ) {
+        if ( (packet->type == hpsb_async) || (packet->type == hpsb_raw) ) {
 
-                if (packet->type == raw) {
+                if (packet->type == hpsb_raw) {
 			d->prg_cpu[idx]->data[0] = cpu_to_le32(OHCI1394_TCODE_PHY<<4);
                         d->prg_cpu[idx]->data[1] = packet->header[0];
                         d->prg_cpu[idx]->data[2] = packet->header[1];
@@ -689,14 +723,18 @@ static void insert_packet(struct ti_ohci *ohci,
                         d->prg_cpu[idx]->data[2] = packet->header[2];
                         d->prg_cpu[idx]->data[3] = packet->header[3];
 			packet_swab(d->prg_cpu[idx]->data, packet->tcode,
-					packet->header_size>>2, ohci->payload_swap);
+					packet->header_size>>2);
                 }
 
                 if (packet->data_size) { /* block transmit */
                         d->prg_cpu[idx]->begin.control =
-                                cpu_to_le32(OUTPUT_MORE_IMMEDIATE | 0x10);
+                                cpu_to_le32(DMA_CTL_OUTPUT_MORE |
+					    DMA_CTL_IMMEDIATE | 0x10);
                         d->prg_cpu[idx]->end.control =
-                                cpu_to_le32(OUTPUT_LAST | packet->data_size);
+                                cpu_to_le32(DMA_CTL_OUTPUT_LAST |
+					    DMA_CTL_IRQ | 
+					    DMA_CTL_BRANCH |
+					    packet->data_size);
                         /* 
                          * Check that the packet data buffer
                          * does not cross a page boundary.
@@ -716,9 +754,6 @@ static void insert_packet(struct ti_ohci *ohci,
                                                PCI_DMA_TODEVICE));
 			OHCI_DMA_ALLOC("single, block transmit packet");
 
-			if (ohci->payload_swap)
-				block_swab32(packet->data, packet->data_size >> 2);
-
                         d->prg_cpu[idx]->end.branchAddress = 0;
                         d->prg_cpu[idx]->end.status = 0;
                         if (d->branchAddrPtr) 
@@ -727,14 +762,20 @@ static void insert_packet(struct ti_ohci *ohci,
                         d->branchAddrPtr =
                                 &(d->prg_cpu[idx]->end.branchAddress);
                 } else { /* quadlet transmit */
-                        if (packet->type == raw)
-                                d->prg_cpu[idx]->begin.control = cpu_to_le32(
-                                        OUTPUT_LAST_IMMEDIATE |
-                                        (packet->header_size+4));
+                        if (packet->type == hpsb_raw)
+                                d->prg_cpu[idx]->begin.control = 
+					cpu_to_le32(DMA_CTL_OUTPUT_LAST |
+						    DMA_CTL_IMMEDIATE |
+						    DMA_CTL_IRQ | 
+						    DMA_CTL_BRANCH |
+						    (packet->header_size + 4));
                         else
-                                d->prg_cpu[idx]->begin.control = cpu_to_le32(
-                                        OUTPUT_LAST_IMMEDIATE |
-                                        packet->header_size);
+                                d->prg_cpu[idx]->begin.control =
+					cpu_to_le32(DMA_CTL_OUTPUT_LAST |
+						    DMA_CTL_IMMEDIATE |
+						    DMA_CTL_IRQ | 
+						    DMA_CTL_BRANCH |
+						    packet->header_size);
 
                         if (d->branchAddrPtr) 
                                 *(d->branchAddrPtr) =
@@ -747,19 +788,21 @@ static void insert_packet(struct ti_ohci *ohci,
                 d->prg_cpu[idx]->data[0] = packet->speed_code<<16 |
                         (packet->header[0] & 0xFFFF);
                 d->prg_cpu[idx]->data[1] = packet->header[0] & 0xFFFF0000;
-		packet_swab(d->prg_cpu[idx]->data, packet->tcode, packet->header_size>>2,
-				ohci->payload_swap);
+		packet_swab(d->prg_cpu[idx]->data, packet->tcode, packet->header_size>>2);
   
-                d->prg_cpu[idx]->begin.control = cpu_to_le32(OUTPUT_MORE_IMMEDIATE | 0x8);
-                d->prg_cpu[idx]->end.control = cpu_to_le32(
-                        OUTPUT_LAST | 0x08000000 | packet->data_size);
+                d->prg_cpu[idx]->begin.control = 
+			cpu_to_le32(DMA_CTL_OUTPUT_MORE | 
+				    DMA_CTL_IMMEDIATE | 0x8);
+                d->prg_cpu[idx]->end.control = 
+			cpu_to_le32(DMA_CTL_OUTPUT_LAST |
+				    DMA_CTL_UPDATE |
+				    DMA_CTL_IRQ |
+				    DMA_CTL_BRANCH |
+				    packet->data_size);
                 d->prg_cpu[idx]->end.address = cpu_to_le32(
 				pci_map_single(ohci->dev, packet->data,
 				packet->data_size, PCI_DMA_TODEVICE));
 		OHCI_DMA_ALLOC("single, iso transmit packet");
-
-		if (ohci->payload_swap)
-			block_swab32(packet->data, packet->data_size>>2);
 
                 d->prg_cpu[idx]->end.branchAddress = 0;
                 d->prg_cpu[idx]->end.status = 0;
@@ -947,7 +990,7 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
 		if (arg<0 || arg>63) {
 			PRINT(KERN_ERR, ohci->id, __FUNCTION__
-			      "IS0 listne channel %d is out of range", 
+			      "IS0 listen channel %d is out of range", 
 			      arg);
 			return -EFAULT;
 		}
@@ -1083,13 +1126,16 @@ static void ohci_irq_handler(int irq, void *dev_id,
 	int phyid = -1, isroot = 0;
 	unsigned long flags;
 
-	/* Read the interrupt event register. We don't clear the bus reset
-	 * here. We wait till we get a selfid complete interrupt and clear
-	 * it then, and _only_ then.  */
+	/* Read and clear the interrupt event register.  Don't clear
+	 * the busReset event, though, this is done when we get the
+	 * selfIDComplete interrupt. */
 	spin_lock_irqsave(&ohci->event_lock, flags);
 	event = reg_read(ohci, OHCI1394_IntEventClear);
-	reg_write(ohci, OHCI1394_IntEventClear,
-		  event & ~(OHCI1394_selfIDComplete | OHCI1394_busReset));
+#ifdef BUSRESET_WORKAROUND
+	reg_write(ohci, OHCI1394_IntEventClear, event);
+#else
+	reg_write(ohci, OHCI1394_IntEventClear, event & ~OHCI1394_busReset);
+#endif
 	spin_unlock_irqrestore(&ohci->event_lock, flags);
 
 	if (!event) return;
@@ -1103,24 +1149,26 @@ static void ohci_irq_handler(int irq, void *dev_id,
 		return;
 	}
 
-	/* Someone wants a bus reset. Better watch what you wish for... */
 	if (event & OHCI1394_busReset) {
+		/* The busReset event bit can't be cleared during the
+		 * selfID phase, so we disable busReset interrupts, to
+		 * avoid burying the cpu in interrupt requests. */
+		spin_lock_irqsave(&ohci->event_lock, flags);
+#ifdef BUSRESET_WORKAROUND
+		reg_write(ohci, OHCI1394_IntEventClear, OHCI1394_busReset);
+#else
+  		reg_write(ohci, OHCI1394_IntMaskClear, OHCI1394_busReset);
+#endif		
+		spin_unlock_irqrestore(&ohci->event_lock, flags);
 		if (!host->in_bus_reset) {
 			DBGMSG(ohci->id, "irq_handler: Bus reset requested%s",
 			      ((host->attempt_root || attempt_root) ?
 			      " and attempting to become root" : ""));
-			
-			/* Wait for the AT fifo to be flushed */
-			dma_trm_reset(ohci->at_req_context);
-			dma_trm_reset(ohci->at_resp_context);
 
 			/* Subsystem call */
 			hpsb_bus_reset(ohci->host);
-			
-			ohci->NumBusResets++;
 		}
-		/* Mask out everything except selfid */
-		event &= OHCI1394_selfIDComplete;
+		event &= ~OHCI1394_busReset;
 	}
 
 	/* XXX: We need a way to also queue the OHCI1394_reqTxComplete,
@@ -1234,11 +1282,12 @@ static void ohci_irq_handler(int irq, void *dev_id,
 
 				handle_selfid(ohci, host, 
 					      phyid, isroot);
-			} else 
+			} else {
 				PRINT(KERN_ERR, ohci->id, 
 				      "SelfID interrupt received, but "
 				      "NodeID is not valid: %08X",
 				      node_id);
+			}
 
 			/* Accept Physical requests from all nodes. */
 			reg_write(ohci,OHCI1394_AsReqFilterHiSet, 
@@ -1258,21 +1307,15 @@ static void ohci_irq_handler(int irq, void *dev_id,
 			PRINT(KERN_ERR, ohci->id, 
 			      "SelfID received outside of bus reset sequence");
 
-		/* Clear everything, it's a new day */
+		/* Finally, we clear the busReset event and reenable
+		 * the busReset interrupt. */
+#ifndef BUSRESET_WORKAROUND
 		spin_lock_irqsave(&ohci->event_lock, flags);
-		reg_write(ohci, OHCI1394_IntEventClear, 0xffffffff);
+		reg_write(ohci, OHCI1394_IntMaskSet, OHCI1394_busReset); 
+		reg_write(ohci, OHCI1394_IntEventClear, OHCI1394_busReset);
 		spin_unlock_irqrestore(&ohci->event_lock, flags);
-
-		event &= ~OHCI1394_selfIDComplete;
-	}
-	if (event & OHCI1394_phyRegRcvd) {
-		if (host->in_bus_reset) {
-			DBGMSG (ohci->id, "PhyControl: %08X", 
-				reg_read(ohci, OHCI1394_PhyControl));
-		} else
-			PRINT(KERN_ERR, ohci->id, 
-			      "Physical register received outside of bus reset sequence");
-		event &= ~OHCI1394_phyRegRcvd;
+#endif
+		event &= ~OHCI1394_selfIDComplete;	
 	}
 
 	/* Make sure we handle everything, just in case we accidentally
@@ -1365,14 +1408,14 @@ static void dma_rcv_tasklet (unsigned long data)
 	dma_cache_wback_inv(buf_ptr, bytes_left);
 
 	while (bytes_left > 0) {
-		tcode = (cond_le32_to_cpu(buf_ptr[0], ohci->payload_swap) >> 4) & 0xf;
+		tcode = (cond_le32_to_cpu(buf_ptr[0], ohci->no_swap_incoming) >> 4) & 0xf;
 
 		/* packet_length() will return < 4 for an error */
-		length = packet_length(d, idx, buf_ptr, offset, tcode, ohci->payload_swap);
+		length = packet_length(d, idx, buf_ptr, offset, tcode, ohci->no_swap_incoming);
 
 		if (length < 4) { /* something is wrong */
 			sprintf(msg,"Unexpected tcode 0x%x(0x%08x) in AR ctx=%d, length=%d",
-				tcode, cond_le32_to_cpu(buf_ptr[0], ohci->payload_swap),
+				tcode, cond_le32_to_cpu(buf_ptr[0], ohci->no_swap_incoming),
 				d->ctx, length);
 			ohci1394_stop_context(ohci, d->ctrlClear, msg);
 			spin_unlock_irqrestore(&d->lock, flags);
@@ -1448,19 +1491,18 @@ static void dma_rcv_tasklet (unsigned long data)
 		/* We get one phy packet to the async descriptor for each
 		 * bus reset. We always ignore it.  */
 		if (tcode != OHCI1394_TCODE_PHY) {
-			if (!ohci->payload_swap)
-				packet_swab(d->spb, tcode, (length - 4) >> 2, 0);
-
+			if (!ohci->no_swap_incoming)
+				packet_swab(d->spb, tcode, (length - 4) >> 2);
 			DBGMSG(ohci->id, "Packet received from node"
 				" %d ack=0x%02X spd=%d tcode=0x%X"
 				" length=%d ctx=%d tlabel=%d",
 				(d->spb[1]>>16)&0x3f,
-				(cond_le32_to_cpu(d->spb[length/4-1], ohci->payload_swap)>>16)&0x1f,
-				(cond_le32_to_cpu(d->spb[length/4-1], ohci->payload_swap)>>21)&0x3,
+				(cond_le32_to_cpu(d->spb[length/4-1], ohci->no_swap_incoming)>>16)&0x1f,
+				(cond_le32_to_cpu(d->spb[length/4-1], ohci->no_swap_incoming)>>21)&0x3,
 				tcode, length, d->ctx,
-				(cond_le32_to_cpu(d->spb[length/4-1], ohci->payload_swap)>>10)&0x3f);
+				(cond_le32_to_cpu(d->spb[length/4-1], ohci->no_swap_incoming)>>10)&0x3f);
 
-			ack = (((cond_le32_to_cpu(d->spb[length/4-1], ohci->payload_swap)>>16)&0x1f)
+			ack = (((cond_le32_to_cpu(d->spb[length/4-1], ohci->no_swap_incoming)>>16)&0x1f)
 				== 0x11) ? 1 : 0;
 
 			hpsb_packet_received(ohci->host, d->spb, 
@@ -1510,7 +1552,7 @@ static void dma_trm_tasklet (unsigned long data)
 	while (d->fifo_first) {
 		packet = d->fifo_first;
                 datasize = d->fifo_first->data_size;
-		if (datasize && packet->type != raw)
+		if (datasize && packet->type != hpsb_raw)
 			ack = le32_to_cpu(
 				d->prg_cpu[d->sent_ind]->end.status) >> 16;
 		else 
@@ -2032,6 +2074,14 @@ static struct hpsb_host_template ohci_template = {
 	hw_csr_reg:		ohci_hw_csr_reg,
 };
 
+
+#define FAIL(fmt, args...)			\
+do {						\
+	PRINT_G(KERN_ERR, fmt , ## args);	\
+	remove_card(ohci);			\
+	return 1;				\
+} while(0)
+
 static int __devinit ohci1394_add_one(struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	struct ti_ohci *ohci;	/* shortcut to currently handled device */
@@ -2075,10 +2125,10 @@ static int __devinit ohci1394_add_one(struct pci_dev *dev, const struct pci_devi
 	 * noByteSwapData registers to see if they were not cleared to
 	 * zero. Should this work? Obviously it's not defined what these
 	 * registers will read when they aren't supported. Bleh! */
-	if (dev->vendor == PCI_VENDOR_ID_APPLE) {
-		ohci->payload_swap = 1;
-		if (dev->device != PCI_DEVICE_ID_APPLE_UNI_N_FW)
-			ohci->selfid_swap = 1;
+	if (dev->vendor == PCI_VENDOR_ID_APPLE && 
+		dev->device == PCI_DEVICE_ID_APPLE_UNI_N_FW) {
+			ohci->no_swap_incoming = 1;
+			ohci->selfid_swap = 0;
 	} else
 		ohci->selfid_swap = 1;
 #endif
@@ -2248,6 +2298,23 @@ static void remove_card(struct ti_ohci *ohci)
 	release_mem_region (pci_resource_start(ohci->dev, 0),
 			    pci_resource_len(ohci->dev, 0));
 
+#ifdef CONFIG_ALL_PPC
+	/* On UniNorth, power down the cable and turn off the
+	 * chip clock when the module is removed to save power
+	 * on laptops. Turning it back ON is done by the arch
+	 * code when pci_enable_device() is called
+	 */
+	{
+		struct device_node* of_node;
+
+		of_node = pci_device_to_OF_node(ohci->dev);
+		if (of_node) {
+			feature_set_firewire_power(of_node, 0);
+			feature_set_firewire_cable_power(of_node, 0);
+		}
+	}
+#endif /* CONFIG_ALL_PPC */
+
 	pci_set_drvdata(ohci->dev, NULL);
 }
 
@@ -2291,68 +2358,6 @@ void ohci1394_unregister_video(struct ti_ohci *ohci,
 		MOD_DEC_USE_COUNT;
 	}
 }
-
-#ifndef __LITTLE_ENDIAN
-
-/* Swap a series of quads inplace. */
-static __inline__ void block_swab32(quadlet_t *data, size_t size) {
-	while (size--)
-		data[size] = swab32(data[size]);
-}
-
-/* Swap headers and sometimes data too */
-static void packet_swab(quadlet_t *data, char tcode, int len, int payload_swap)
-{
-	if (payload_swap) {
-		block_swab32(data, len);
-		return;
-	}
-
-        switch(tcode)
-        {
-		/* 4 quad header */
-		case TCODE_READB_RESPONSE:
-		case TCODE_LOCK_RESPONSE:
-		case TCODE_LOCK_REQUEST:
-		case TCODE_WRITEB:
-		case TCODE_READB:
-			block_swab32(data, 4);
-			break;
-
-		/* 3 quad header, 1 quad payload */
-		case TCODE_WRITEQ:
-		case TCODE_READQ_RESPONSE:
-			block_swab32(data, 3);
-			break;
-
-		/* 3 quad header */
-		case TCODE_WRITE_RESPONSE:
-		case TCODE_READQ:
-			block_swab32(data, 3);
-			break;
-
-		/* 2 quad header */
-		case TCODE_ISO_DATA:
-			block_swab32(data, 2);
-			break;
-
-		case OHCI1394_TCODE_PHY:
-			break; /* should never happen anyway */
-
-		case TCODE_CYCLE_START:
-			PRINT_G(KERN_ERR, "Unhandled tcode in packet_swab (0x%x)", tcode);
-			/* Atleast swap one quad */
-			block_swab32(data, 1);
-			break;
-                default:
-			PRINT_G(KERN_ERR, "Invalid tcode in packet_swab (0x%x)", tcode);
-                        break;
-        }
-	return;
-}
-
-#endif /* !LITTLE_ENDIAN */
-
 
 #if 0
 int ohci1394_request_channel(struct ti_ohci *ohci, int channel)
