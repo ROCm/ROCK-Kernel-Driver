@@ -1122,29 +1122,33 @@ static void tg3_setup_flow_control(struct tg3 *tp, u32 local_adv, u32 remote_adv
 	u32 old_rx_mode = tp->rx_mode;
 	u32 old_tx_mode = tp->tx_mode;
 
-	if (local_adv & ADVERTISE_PAUSE_CAP) {
-		if (local_adv & ADVERTISE_PAUSE_ASYM) {
-			if (remote_adv & LPA_PAUSE_CAP)
-				new_tg3_flags |=
-					(TG3_FLAG_RX_PAUSE |
-					 TG3_FLAG_TX_PAUSE);
-			else if (remote_adv & LPA_PAUSE_ASYM)
-				new_tg3_flags |=
-					(TG3_FLAG_RX_PAUSE);
-		} else {
-			if (remote_adv & LPA_PAUSE_CAP)
-				new_tg3_flags |=
-					(TG3_FLAG_RX_PAUSE |
-					 TG3_FLAG_TX_PAUSE);
+	if (tp->tg3_flags & TG3_FLAG_PAUSE_AUTONEG) {
+		if (local_adv & ADVERTISE_PAUSE_CAP) {
+			if (local_adv & ADVERTISE_PAUSE_ASYM) {
+				if (remote_adv & LPA_PAUSE_CAP)
+					new_tg3_flags |=
+						(TG3_FLAG_RX_PAUSE |
+					 	TG3_FLAG_TX_PAUSE);
+				else if (remote_adv & LPA_PAUSE_ASYM)
+					new_tg3_flags |=
+						(TG3_FLAG_RX_PAUSE);
+			} else {
+				if (remote_adv & LPA_PAUSE_CAP)
+					new_tg3_flags |=
+						(TG3_FLAG_RX_PAUSE |
+					 	TG3_FLAG_TX_PAUSE);
+			}
+		} else if (local_adv & ADVERTISE_PAUSE_ASYM) {
+			if ((remote_adv & LPA_PAUSE_CAP) &&
+		    	(remote_adv & LPA_PAUSE_ASYM))
+				new_tg3_flags |= TG3_FLAG_TX_PAUSE;
 		}
-	} else if (local_adv & ADVERTISE_PAUSE_ASYM) {
-		if ((remote_adv & LPA_PAUSE_CAP) &&
-		    (remote_adv & LPA_PAUSE_ASYM))
-			new_tg3_flags |= TG3_FLAG_TX_PAUSE;
-	}
 
-	tp->tg3_flags &= ~(TG3_FLAG_RX_PAUSE | TG3_FLAG_TX_PAUSE);
-	tp->tg3_flags |= new_tg3_flags;
+		tp->tg3_flags &= ~(TG3_FLAG_RX_PAUSE | TG3_FLAG_TX_PAUSE);
+		tp->tg3_flags |= new_tg3_flags;
+	} else {
+		new_tg3_flags = tp->tg3_flags;
+	}
 
 	if (new_tg3_flags & TG3_FLAG_RX_PAUSE)
 		tp->rx_mode |= RX_MODE_FLOW_CTRL_ENABLE;
@@ -6585,8 +6589,8 @@ static void tg3_get_pauseparam(struct net_device *dev, struct ethtool_pauseparam
 	struct tg3 *tp = netdev_priv(dev);
   
 	epause->autoneg = (tp->tg3_flags & TG3_FLAG_PAUSE_AUTONEG) != 0;
-	epause->rx_pause = (tp->tg3_flags & TG3_FLAG_PAUSE_RX) != 0;
-	epause->tx_pause = (tp->tg3_flags & TG3_FLAG_PAUSE_TX) != 0;
+	epause->rx_pause = (tp->tg3_flags & TG3_FLAG_RX_PAUSE) != 0;
+	epause->tx_pause = (tp->tg3_flags & TG3_FLAG_TX_PAUSE) != 0;
 }
   
 static int tg3_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam *epause)
@@ -6601,13 +6605,13 @@ static int tg3_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam 
 	else
 		tp->tg3_flags &= ~TG3_FLAG_PAUSE_AUTONEG;
 	if (epause->rx_pause)
-		tp->tg3_flags |= TG3_FLAG_PAUSE_RX;
+		tp->tg3_flags |= TG3_FLAG_RX_PAUSE;
 	else
-		tp->tg3_flags &= ~TG3_FLAG_PAUSE_RX;
+		tp->tg3_flags &= ~TG3_FLAG_RX_PAUSE;
 	if (epause->tx_pause)
-		tp->tg3_flags |= TG3_FLAG_PAUSE_TX;
+		tp->tg3_flags |= TG3_FLAG_TX_PAUSE;
 	else
-		tp->tg3_flags &= ~TG3_FLAG_PAUSE_TX;
+		tp->tg3_flags &= ~TG3_FLAG_TX_PAUSE;
 	tg3_halt(tp);
 	tg3_init_hw(tp);
 	tg3_netif_start(tp);
@@ -8340,6 +8344,9 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 
 	if (tp->tg3_flags2 & TG3_FLG2_IS_5788)
 		dev->features &= ~NETIF_F_HIGHDMA;
+
+	/* flow control autonegotiation is default behavior */
+	tp->tg3_flags |= TG3_FLAG_PAUSE_AUTONEG;
 
 	err = register_netdev(dev);
 	if (err) {
