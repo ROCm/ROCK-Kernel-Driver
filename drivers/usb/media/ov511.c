@@ -3278,19 +3278,23 @@ request_decompressor(struct usb_ov511 *ov)
 		err("Unknown bridge");
 	}
 
-	if (ov->decomp_ops) {
-		if (!ov->decomp_ops->owner) {
-			ov->decomp_ops = NULL;
-			unlock_kernel();
-			return -ENOSYS;
-		}
-		__MOD_INC_USE_COUNT(ov->decomp_ops->owner);
-		unlock_kernel();
-		return 0;
-	} else {
-		unlock_kernel();
-		return -ENOSYS;
+	if (!ov->decomp_ops)
+		goto nosys;
+
+	if (!ov->decomp_ops->owner) {
+		ov->decomp_ops = NULL;
+		goto nosys;
 	}
+	
+	if (!try_module_get(ov->decomp_ops->owner))
+		goto nosys;
+
+	unlock_kernel();
+	return 0;
+
+ nosys:
+	unlock_kernel();
+	return -ENOSYS;
 }
 
 /* Unlocks decompression module and nulls ov->decomp_ops. Safe to call even
@@ -3306,8 +3310,8 @@ release_decompressor(struct usb_ov511 *ov)
 
 	lock_kernel();
 
-	if (ov->decomp_ops && ov->decomp_ops->owner) {
-		__MOD_DEC_USE_COUNT(ov->decomp_ops->owner);
+	if (ov->decomp_ops) {
+		module_put(ov->decomp_ops->owner);
 		released = 1;
 	}
 

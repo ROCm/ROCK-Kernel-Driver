@@ -126,11 +126,8 @@ void __exit i2c_rpx_exit(void)
 	i2c_8xx_del_bus(&rpx_ops);
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Dan Malek <dmalek@jlc.net>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for MPC8xx boards");
 
 module_init(i2c_rpx_init);
 module_exit(i2c_rpx_exit);
-#endif
-

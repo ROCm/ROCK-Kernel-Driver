@@ -200,8 +200,7 @@ struct xfrm_type *xfrm_get_type(u8 proto)
 
 void xfrm_put_type(struct xfrm_type *type)
 {
-	if (type->owner)
-		__MOD_DEC_USE_COUNT(type->owner);
+	module_put(type->owner);
 }
 
 static inline unsigned long make_jiffies(long secs)

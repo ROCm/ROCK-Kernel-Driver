@@ -35,12 +35,6 @@ int use_internal_drums = 0;
 MODULE_PARM(use_internal_drums, "i");
 MODULE_PARM_DESC(use_internal_drums, "Enable internal OPL2/3 drums.");
 
-static inline void dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 int snd_opl3_synth_use_inc(opl3_t * opl3)
 {
 	if (!try_inc_mod_count(opl3->card->module))
@@ -51,7 +45,7 @@ int snd_opl3_synth_use_inc(opl3_t * opl3)
 
 void snd_opl3_synth_use_dec(opl3_t * opl3)
 {
-	dec_mod_count(opl3->card->module);
+	module_put(opl3->card->module);
 }
 
 int snd_opl3_synth_setup(opl3_t * opl3)

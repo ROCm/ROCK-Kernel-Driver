@@ -115,7 +115,7 @@ dasd_ioctl(struct inode *inp, struct file *filp,
 				if (try_inc_mod_count(ioctl->owner) != 0)
 					continue;
 				rc = ioctl->handler(bdev, no, data);
-				__MOD_DEC_USE_COUNT(ioctl->owner);
+				module_put(ioctl->owner);
 			} else
 				rc = ioctl->handler(bdev, no, data);
 			return rc;

@@ -175,8 +175,7 @@ static int busmouse_release(struct inode *inode, struct file *file)
 	if (--mse->active == 0) {
 		if (mse->ops->release)
 			ret = mse->ops->release(inode, file);
-	   	if (mse->ops->owner)
-			__MOD_DEC_USE_COUNT(mse->ops->owner);
+		module_put(mse->ops->owner);
 		mse->ready = 0;
 	}
 	unlock_kernel();
@@ -207,8 +206,8 @@ static int busmouse_open(struct inode *inode, struct file *file)
 	ret = 0;
 	if (mse->ops->open) {
 		ret = mse->ops->open(inode, file);
-		if (ret && mse->ops->owner)
-			__MOD_DEC_USE_COUNT(mse->ops->owner);
+		if (ret)
+			module_put(mse->ops->owner);
 	}
 
 	if (ret)

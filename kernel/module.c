@@ -60,6 +60,13 @@ struct sizes
 	unsigned long core_size;
 };
 
+/* Stub function for modules which don't have an initfn */
+int init_module(void)
+{
+	return 0;
+}
+EXPORT_SYMBOL(init_module);
+
 /* Find a symbol, return value and the symbol group */
 static unsigned long __find_symbol(const char *name,
 				   struct kernel_symbol_group **group)
@@ -357,6 +364,12 @@ static inline int try_force(unsigned int flags)
 }
 #endif /* CONFIG_MODULE_FORCE_UNLOAD */
 
+/* Stub function for modules which don't have an exitfn */
+void cleanup_module(void)
+{
+}
+EXPORT_SYMBOL(cleanup_module);
+
 asmlinkage long
 sys_delete_module(const char *name_user, unsigned int flags)
 {
@@ -406,7 +419,8 @@ sys_delete_module(const char *name_user, unsigned int flags)
 	}
 
 	/* If it has an init func, it must have an exit func to unload */
-	if ((mod->init && !mod->exit) || mod->unsafe) {
+	if ((mod->init != init_module && mod->exit == cleanup_module)
+	    || mod->unsafe) {
 		forced = try_force(flags);
 		if (!forced) {
 			/* This module can't be removed */
@@ -453,8 +467,7 @@ sys_delete_module(const char *name_user, unsigned int flags)
 
  destroy:
 	/* Final destruction now noone is using it. */
-	if (mod->exit)
-		mod->exit();
+	mod->exit();
 	free_module(mod);
 
  out:
@@ -474,7 +487,7 @@ static void print_unload_info(struct seq_file *m, struct module *mod)
 	if (mod->unsafe)
 		seq_printf(m, " [unsafe]");
 
-	if (mod->init && !mod->exit)
+	if (mod->init != init_module && mod->exit == cleanup_module)
 		seq_printf(m, " [permanent]");
 
 	seq_printf(m, "\n");
@@ -708,15 +721,15 @@ static void free_module(struct module *mod)
 	list_del(&mod->extable.list);
 	spin_unlock_irq(&modlist_lock);
 
-	/* These may be NULL, but that's OK */
-	module_free(mod, mod->module_init);
-	module_free(mod, mod->module_core);
-
 	/* Module unload stuff */
 	module_unload_free(mod);
 
-	/* Finally, free the module structure */
-	module_free(mod, mod);
+	/* This may be NULL, but that's OK */
+	module_free(mod, mod->module_init);
+	kfree(mod->args);
+
+	/* Finally, free the core (containing the module structure) */
+	module_free(mod, mod->module_core);
 }
 
 void *__symbol_get(const char *symbol)
@@ -771,27 +784,6 @@ static void *copy_section(const char *name,
 	return dest;
 }
 
-/* Look for the special symbols */
-static int grab_private_symbols(Elf_Shdr *sechdrs,
-				unsigned int symbolsec,
-				const char *strtab,
-				struct module *mod)
-{
-	Elf_Sym *sym = (void *)sechdrs[symbolsec].sh_offset;
-	unsigned int i;
-
-	for (i = 1; i < sechdrs[symbolsec].sh_size/sizeof(*sym); i++) {
-		if (symbol_is("__initfn", strtab + sym[i].st_name))
-			mod->init = (void *)sym[i].st_value;
-#ifdef CONFIG_MODULE_UNLOAD
-		if (symbol_is("__exitfn", strtab + sym[i].st_name))
-			mod->exit = (void *)sym[i].st_value;
-#endif
-	}
-
-	return 0;
-}
-
 /* Deal with the given section */
 static int handle_section(const char *name,
 			  Elf_Shdr *sechdrs,
@@ -809,9 +801,6 @@ static int handle_section(const char *name,
 		break;
 	case SHT_RELA:
 		ret = apply_relocate_add(sechdrs, strtab, symindex, i, mod);
-		break;
-	case SHT_SYMTAB:
-		ret = grab_private_symbols(sechdrs, i, strtab, mod);
 		break;
 	default:
 		DEBUGP("Ignoring section %u: %s\n", i,
@@ -920,9 +909,6 @@ static void simplify_symbols(Elf_Shdr *sechdrs,
 						       strtab + sym[i].st_name,
 						       mod,
 						       &ksg);
-			/* We fake up "__this_module" */
-			if (symbol_is("__this_module", strtab+sym[i].st_name))
-				sym[i].st_value = (unsigned long)mod;
 		}
 	}
 }
@@ -964,9 +950,9 @@ static struct module *load_module(void *umod,
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *sechdrs;
-	char *secstrings;
+	char *secstrings, *args;
 	unsigned int i, symindex, exportindex, strindex, setupindex, exindex,
-		modnameindex, obsparmindex;
+		modindex, obsparmindex;
 	long arglen;
 	unsigned long common_length;
 	struct sizes sizes, used;
@@ -1007,7 +993,7 @@ static struct module *load_module(void *umod,
 	exportindex = setupindex = obsparmindex = 0;
 
 	/* And these should exist, but gcc whinges if we don't init them */
-	symindex = strindex = exindex = modnameindex = 0;
+	symindex = strindex = exindex = modindex = 0;
 
 	/* Find where important sections are */
 	for (i = 1; i < hdr->e_shnum; i++) {
@@ -1015,21 +1001,19 @@ static struct module *load_module(void *umod,
 			/* Internal symbols */
 			DEBUGP("Symbol table in section %u\n", i);
 			symindex = i;
+			/* Strings */
+			strindex = sechdrs[i].sh_link;
+			DEBUGP("String table found in section %u\n", strindex);
 		} else if (strcmp(secstrings+sechdrs[i].sh_name,
-				  ".gnu.linkonce.modname") == 0) {
-			/* This module's name */
-			DEBUGP("Module name in section %u\n", i);
-			modnameindex = i;
+				  ".gnu.linkonce.this_module") == 0) {
+			/* The module struct */
+			DEBUGP("Module in section %u\n", i);
+			modindex = i;
 		} else if (strcmp(secstrings+sechdrs[i].sh_name, "__ksymtab")
 			   == 0) {
 			/* Exported symbols. */
 			DEBUGP("EXPORT table in section %u\n", i);
 			exportindex = i;
-		} else if (strcmp(secstrings + sechdrs[i].sh_name, ".strtab")
-			   == 0) {
-			/* Strings */
-			DEBUGP("String table found in section %u\n", i);
-			strindex = i;
 		} else if (strcmp(secstrings+sechdrs[i].sh_name, "__param")
 			   == 0) {
 			/* Setup parameter info */
@@ -1058,39 +1042,35 @@ static struct module *load_module(void *umod,
 #endif
 	}
 
-	if (!modnameindex) {
-		DEBUGP("Module has no name!\n");
+	if (!modindex) {
+		printk(KERN_WARNING "No module found in object\n");
 		err = -ENOEXEC;
 		goto free_hdr;
 	}
+	mod = (void *)hdr + sechdrs[modindex].sh_offset;
 
-	/* Now allocate space for the module proper, and copy name and args. */
+	/* Now copy in args */
 	err = strlen_user(uargs);
 	if (err < 0)
 		goto free_hdr;
 	arglen = err;
 
-	mod = module_alloc(sizeof(*mod) + arglen+1);
-	if (!mod) {
+	args = kmalloc(arglen+1, GFP_KERNEL);
+	if (!args) {
 		err = -ENOMEM;
 		goto free_hdr;
 	}
-	memset(mod, 0, sizeof(*mod) + arglen+1);
-	if (copy_from_user(mod->args, uargs, arglen) != 0) {
+	if (copy_from_user(args, uargs, arglen+1) != 0) {
 		err = -EFAULT;
 		goto free_mod;
 	}
-	strncpy(mod->name, (char *)hdr + sechdrs[modnameindex].sh_offset,
-		sizeof(mod->name)-1);
 
 	if (find_module(mod->name)) {
 		err = -EEXIST;
 		goto free_mod;
 	}
 
-	mod->symbols.owner = mod;
 	mod->state = MODULE_STATE_COMING;
-	module_unload_init(mod);
 
 	/* How much space will we need?  (Common area in first) */
 	common_length = read_commons(hdr, &sechdrs[symindex]);
@@ -1139,6 +1119,9 @@ static struct module *load_module(void *umod,
 			if (IS_ERR(ptr))
 				goto cleanup;
 			sechdrs[i].sh_offset = (unsigned long)ptr;
+			/* Have we just copied __this_module across? */ 
+			if (i == modindex)
+				mod = ptr;
 		} else {
 			sechdrs[i].sh_offset += (unsigned long)hdr;
 		}
@@ -1146,6 +1129,9 @@ static struct module *load_module(void *umod,
 	/* Don't use more than we allocated! */
 	if (used.init_size > mod->init_size || used.core_size > mod->core_size)
 		BUG();
+
+	/* Now we've moved module, initialize linked lists, etc. */
+	module_unload_init(mod);
 
 	/* Fix up syms, so that st_value is a pointer to location. */
 	simplify_symbols(sechdrs, symindex, strindex, mod->module_core, mod);
@@ -1183,6 +1169,7 @@ static struct module *load_module(void *umod,
 	if (err < 0)
 		goto cleanup;
 
+	mod->args = args;
 	if (obsparmindex) {
 		err = obsolete_params(mod->name, mod->args,
 				      (struct obsolete_modparm *)
@@ -1215,7 +1202,7 @@ static struct module *load_module(void *umod,
  free_core:
 	module_free(mod, mod->module_core);
  free_mod:
-	module_free(mod, mod);
+	kfree(args);
  free_hdr:
 	vfree(hdr);
 	if (err < 0) return ERR_PTR(err);
@@ -1266,7 +1253,7 @@ sys_init_module(void *umod,
 	up(&module_mutex);
 
 	/* Start the module */
-	ret = mod->init ? mod->init() : 0;
+	ret = mod->init();
 	if (ret < 0) {
 		/* Init routine failed: abort.  Try to protect us from
                    buggy refcounters. */

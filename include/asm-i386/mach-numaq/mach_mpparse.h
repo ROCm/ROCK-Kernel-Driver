@@ -1,9 +1,6 @@
 #ifndef __ASM_MACH_MPPARSE_H
 #define __ASM_MACH_MPPARSE_H
 
-static void __init smp_read_mpc_oem(struct mp_config_oemtable *oemtable,
-		        unsigned short oemsize);
-
 static inline void mpc_oem_bus_info(struct mpc_config_bus *m, char *name, 
 				struct mpc_config_translation *translation)
 {

@@ -58,12 +58,6 @@ snd_rawmidi_t *snd_rawmidi_devices[SNDRV_CARDS * SNDRV_RAWMIDI_DEVICES];
 
 static DECLARE_MUTEX(register_mutex);
 
-static inline void dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 static inline unsigned short snd_rawmidi_file_flags(struct file *file)
 {
 	switch (file->f_mode & (FMODE_READ | FMODE_WRITE)) {
@@ -345,7 +339,7 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 		snd_rawmidi_done_buffer(output);
 		kfree(output);
 	}
-	dec_mod_count(rmidi->card->module);
+	module_put(rmidi->card->module);
 	up(&rmidi->open_mutex);
       __error1:
 #ifdef LINUX_2_2
@@ -504,7 +498,7 @@ int snd_rawmidi_kernel_release(snd_rawmidi_file_t * rfile)
 		rmidi->streams[SNDRV_RAWMIDI_STREAM_OUTPUT].substream_opened--;
 	}
 	up(&rmidi->open_mutex);
-	dec_mod_count(rmidi->card->module);
+	module_put(rmidi->card->module);
 #ifdef LINUX_2_2
 	MOD_DEC_USE_COUNT;
 #endif

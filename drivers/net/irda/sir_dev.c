@@ -502,8 +502,7 @@ errout_stop:
 errout_free:
 	sirdev_free_buffers(dev);
 errout_dec:
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
+	module_put(drv->owner);
 	return -EAGAIN;
 }
 
@@ -533,11 +532,7 @@ static int sirdev_close(struct net_device *ndev)
 		drv->stop_dev(dev);
 
 	sirdev_free_buffers(dev);
-
-	lock_kernel();
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
-	unlock_kernel();
+	module_put(drv->owner);
 
 out:
 	dev->speed = 0;

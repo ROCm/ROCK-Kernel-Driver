@@ -596,12 +596,14 @@ static inline void inquire_remote_apic(int apicid)
 }
 #endif
 
-static int __init wakeup_secondary_via_NMI(int logical_apicid)
+#ifdef WAKE_SECONDARY_VIA_NMI
 /* 
- * Poke the other CPU in the eye to wake it up. Remember that the normal
+ * Poke the other CPU in the eye via NMI to wake it up. Remember that the normal
  * INIT, INIT, STARTUP sequence will reset the chip hard for us, and this
  * won't ... remember to clear down the APIC, etc later.
  */
+static int __init
+wakeup_secondary_cpu(int logical_apicid, unsigned long start_eip)
 {
 	unsigned long send_status = 0, accept_status = 0;
 	int timeout, maxlvt;
@@ -643,8 +645,11 @@ static int __init wakeup_secondary_via_NMI(int logical_apicid)
 
 	return (send_status | accept_status);
 }
+#endif	/* WAKE_SECONDARY_VIA_NMI */
 
-static int __init wakeup_secondary_via_INIT(int phys_apicid, unsigned long start_eip)
+#ifdef WAKE_SECONDARY_VIA_INIT
+static int __init
+wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
 	unsigned long send_status = 0, accept_status = 0;
 	int maxlvt, timeout, num_starts, j;
@@ -766,6 +771,7 @@ static int __init wakeup_secondary_via_INIT(int phys_apicid, unsigned long start
 
 	return (send_status | accept_status);
 }
+#endif	/* WAKE_SECONDARY_VIA_INIT */
 
 extern unsigned long cpu_initialized;
 
