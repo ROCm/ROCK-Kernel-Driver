@@ -37,6 +37,13 @@
  *  23 - APM BIOS support
  *  24 - APM BIOS support
  *  25 - APM BIOS support 
+ *
+ *  26 - unused
+ *  27 - unused
+ *  28 - unused
+ *  29 - unused
+ *  30 - unused
+ *  31 - TSS for double fault handler
  */
 #define GDT_ENTRY_TLS_ENTRIES	3
 #define GDT_ENTRY_TLS_MIN	6
@@ -64,10 +71,12 @@
 #define GDT_ENTRY_PNPBIOS_BASE		(GDT_ENTRY_KERNEL_BASE + 6)
 #define GDT_ENTRY_APMBIOS_BASE		(GDT_ENTRY_KERNEL_BASE + 11)
 
+#define GDT_ENTRY_DOUBLEFAULT_TSS	31
+
 /*
- * The GDT has 25 entries but we pad it to cacheline boundary:
+ * The GDT has 32 entries
  */
-#define GDT_ENTRIES 28
+#define GDT_ENTRIES 32
 
 #define GDT_SIZE (GDT_ENTRIES * 8)
 
