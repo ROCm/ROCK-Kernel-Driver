@@ -48,6 +48,12 @@ cflags-$(CONFIG_MWINCHIP3D)	+= -march=i586
 cflags-$(CONFIG_MCYRIXIII)	+= $(call check_gcc,-march=c3,-march=i486) $(align)-functions=0 $(align)-jumps=0 $(align)-loops=0
 cflags-$(CONFIG_MVIAC3_2)	+= $(call check_gcc,-march=c3-2,-march=i686)
 
+# m586 and genericarch is likely a distribution kernel. optimize for the
+# most common CPU (686)
+ifeq ($(CONFIG_X86_GENERICARCH),y)
+cflags-$(CONFIG_M586) += -mcpu=686
+endif
+
 CFLAGS += $(cflags-y)
 
 # Default subarch .c files
