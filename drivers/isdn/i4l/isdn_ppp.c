@@ -106,6 +106,30 @@ isdn_ppp_frame_log(char *info, char *data, int len, int maxlen,int unit,int slot
 	}
 }
 
+
+void
+isdn_ppp_push_header(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
+{
+	unsigned char *p;
+
+	if (skb_headroom(skb) < 4) {
+		isdn_BUG();
+		return;
+	}
+
+	if ((idev->pppcfg & SC_COMP_PROT) && proto <= 0xff)
+		put_u8(skb_push(skb, 1), proto);
+	else
+		put_u16(skb_push(skb, 2), proto);
+
+	if (idev->pppcfg & SC_COMP_AC)
+		return;
+
+	p = skb_push(skb, 2);	
+	p += put_u8(p, PPP_ALLSTATIONS);
+	p += put_u8(p, PPP_UI);
+}
+
 /*
  * unbind isdn_net_local <=> ippp-device
  * note: it can happen, that we hangup/free the master before the slaves
@@ -857,23 +881,29 @@ isdn_ppp_cleanup(void)
  */
 static int isdn_ppp_skip_ac(isdn_net_dev *idev, struct sk_buff *skb) 
 {
+	u8 val;
+
 	if (skb->len < 1)
 		return -1;
 
-	if (skb->data[0] == 0xff) {
-		if (skb->len < 2)
-			return -1;
-
-		if (skb->data[1] != 0x03)
-			return -1;
-
-		// skip address/control (AC) field
-		skb_pull(skb, 2);
-	} else { 
+	get_u8(skb->data, &val);
+	if (val != PPP_ALLSTATIONS) {
+		/* if AC compression was not negotiated, but no AC present,
+		   discard packet */
 		if (idev->pppcfg & SC_REJ_COMP_AC)
-			// if AC compression was not negotiated, but used, discard packet
 			return -1;
+
+		return 0;
 	}
+	if (skb->len < 2)
+		return -1;
+
+	get_u8(skb->data + 1, &val);
+	if (val != PPP_UI)
+		return -1;
+
+	/* skip address/control (AC) field */
+	skb_pull(skb, 2);
 	return 0;
 }
 
@@ -883,19 +913,21 @@ static int isdn_ppp_skip_ac(isdn_net_dev *idev, struct sk_buff *skb)
  */
 int isdn_ppp_strip_proto(struct sk_buff *skb) 
 {
-	int proto;
-	
+	u16 proto;
+	u8 val;
+
 	if (skb->len < 1)
 		return -1;
 
-	if (skb->data[0] & 0x1) {
-		// protocol field is compressed
-		proto = skb->data[0];
+	get_u8(skb->data, &val);
+	if (val & 0x1) {
+		/* protocol field is compressed */
+		proto = val;
 		skb_pull(skb, 1);
 	} else {
 		if (skb->len < 2)
 			return -1;
-		proto = ((int) skb->data[0] << 8) + skb->data[1];
+		get_u16(skb->data, &proto);
 		skb_pull(skb, 2);
 	}
 	return proto;
@@ -910,13 +942,6 @@ static void isdn_ppp_receive(isdn_net_local *lp, isdn_net_dev *idev,
 {
 	struct ipppd *is;
 	int proto;
-
-	/*
-	 * If encapsulation is syncppp, don't reset
-	 * huptimer on LCP packets.
-	 */
-	if (PPP_PROTOCOL(skb->data) != PPP_LCP)
-		idev->huptimer = 0;
 
 	is = ipppd_get(idev->ppp_slot);
 	if (!is) 
@@ -934,6 +959,10 @@ static void isdn_ppp_receive(isdn_net_local *lp, isdn_net_dev *idev,
   	proto = isdn_ppp_strip_proto(skb);
  	if (proto < 0)
 		goto err_put;
+
+	/* Don't reset huptimer on LCP packets. */
+	if (proto != PPP_LCP)
+		idev->huptimer = 0;
   
 #ifdef CONFIG_ISDN_MPP
  	if (is->compflags & SC_LINK_DECOMP_ON) {
@@ -1070,32 +1099,6 @@ isdn_ppp_push_higher(isdn_net_local *lp, isdn_net_dev *idev,
 	lp->stats.rx_dropped++;
 	kfree_skb(skb);
 }
-
-/*
- * isdn_ppp_skb_push ..
- * checks whether we have enough space at the beginning of the skb
- * and allocs a new SKB if necessary
- */
-static unsigned char *isdn_ppp_skb_push(struct sk_buff **skb_p,int len)
-{
-	struct sk_buff *skb = *skb_p;
-
-	if(skb_headroom(skb) < len) {
-		struct sk_buff *nskb = skb_realloc_headroom(skb, len);
-
-		if (!nskb) {
-			printk(KERN_ERR "isdn_ppp_skb_push: can't realloc headroom!\n");
-			dev_kfree_skb(skb);
-			return NULL;
-		}
-		printk(KERN_DEBUG "isdn_ppp_skb_push:under %d %d\n",skb_headroom(skb),len);
-		dev_kfree_skb(skb);
-		*skb_p = nskb;
-		return skb_push(nskb, len);
-	}
-	return skb_push(skb,len);
-}
-
 
 /*
  * send ppp frame .. we expect a PIDCOMPressable proto --
@@ -1258,27 +1261,7 @@ isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		skb = isdn_ppp_compress(skb,&proto,ipt,ipts,1);
 #endif
 
-	if ((idev->pppcfg & SC_COMP_PROT) && (proto <= 0xff)) {
-		unsigned char *data = isdn_ppp_skb_push(&skb,1);
-		if(!data)
-			goto put2;
-		data[0] = proto & 0xff;
-	} else {
-		unsigned char *data = isdn_ppp_skb_push(&skb,2);
-		if(!data)
-			goto put2;
-		data[0] = (proto >> 8) & 0xff;
-		data[1] = proto & 0xff;
-	}
-	if (!(idev->pppcfg & SC_COMP_AC)) {
-		unsigned char *data = isdn_ppp_skb_push(&skb,2);
-		if(!data)
-			goto put2;
-		data[0] = 0xff;    /* All Stations */
-		data[1] = 0x03;    /* Unnumbered information */
-	}
-
-	/* tx-stats are now updated via BSENT-callback */
+	isdn_ppp_push_header(idev, skb, proto);
 
 	if (ipts->debug & 0x40) {
 		printk(KERN_DEBUG "skb xmit: len: %d\n", (int) skb->len);
@@ -1287,7 +1270,6 @@ isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	
 	isdn_net_writebuf_skb(idev, skb);
 
- put2:
 	ipppd_put(ipt);
  put:
 	ipppd_put(ipts);
@@ -1966,24 +1948,19 @@ static void isdn_ppp_ccp_lp_kick_up(void *priv, unsigned int flags)
 	isdn_ppp_fill_rq(NULL, 0, PPP_COMP, idev->ppp_slot);
 }
 
-/* Send a CCP Reset-Request or Reset-Ack directly from the kernel. This is
-   getting that lengthy because there is no simple "send-this-frame-out"
-   function above but every wrapper does a bit different. Hope I guess
-   correct in this hack... */
+/* Send a CCP Reset-Request or Reset-Ack directly from the kernel. */
 
-static void isdn_ppp_ccp_xmit_reset(void *priv, int proto,
-				    unsigned char code, unsigned char id,
-				    unsigned char *data, int len)
+static void
+isdn_ppp_ccp_xmit_reset(void *priv, int proto, unsigned char code,
+			unsigned char id, unsigned char *data, int len)
 {
 	isdn_net_dev *idev = priv;
 	struct sk_buff *skb;
 	unsigned char *p;
 	int hl;
-	int cnt = 0;
 
-	/* Alloc large enough skb */
 	hl = isdn_slot_hdrlen(idev->isdn_slot);
-	skb = alloc_skb(len + hl + 16,GFP_ATOMIC);
+	skb = alloc_skb(len + hl + IPPP_MAX_HEADER, GFP_ATOMIC);
 	if(!skb) {
 		printk(KERN_WARNING
 		       "ippp: CCP cannot send reset - out of memory\n");
@@ -1991,31 +1968,18 @@ static void isdn_ppp_ccp_xmit_reset(void *priv, int proto,
 	}
 	skb_reserve(skb, hl+16);
 
-	/* We may need to stuff an address and control field first */
-	if (!(idev->pppcfg & SC_COMP_AC)) {
-		p = skb_put(skb, 2);
-		*p++ = 0xff;
-		*p++ = 0x03;
-	}
+	isdn_ppp_push_header(idev, skb, proto);
 
-	/* Stuff proto, code, id and length */
-	p = skb_put(skb, 6);
-	*p++ = (proto >> 8);
-	*p++ = (proto & 0xff);
-	*p++ = code;
-	*p++ = id;
-	cnt = 4 + len;
-	*p++ = (cnt >> 8);
-	*p++ = (cnt & 0xff);
+	p = skb_put(skb, 4);
+	p += put_u8 (p, code);
+	p += put_u8 (p, id);
+	p += put_u16(p, len + 4);
 
-	/* Now stuff remaining bytes */
-	if(len) {
-		p = skb_put(skb, len);
-		memcpy(p, data, len);
-	}
+	if (len)
+		memcpy(skb_put(skb, len), data, len);
 
-	/* skb is now ready for xmit */
-	isdn_ppp_frame_log("ccp-xmit", skb->data, skb->len, 32, -1, idev->ppp_slot);
+	isdn_ppp_frame_log("ccp-xmit", skb->data, skb->len, 32, -1,
+			   idev->ppp_slot);
 
 	isdn_net_write_super(idev, skb);
 }
