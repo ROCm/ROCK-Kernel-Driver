@@ -70,6 +70,7 @@ struct in_addr {
 #define IP_MTU		14
 #define IP_FREEBIND	15
 #define IP_IPSEC_POLICY	16
+#define IP_XFRM_POLICY	17
 
 /* BSD compatibility */
 #define IP_RECVRETOPTS	IP_RETOPTS
