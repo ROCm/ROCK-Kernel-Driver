@@ -392,6 +392,29 @@ extern	int free_hugepages(struct vm_area_struct *);
 
 
 /*
+ * Prototype to add a shrinker callback for ageable caches.
+ * 
+ * These functions are passed a count `nr_to_scan' and a gfpmask.  They should
+ * scan `nr_to_scan' objects, attempting to free them.
+ *
+ * The callback must the number of objects which remain in the cache.
+ *
+ * The callback will be passes nr_to_scan == 0 when the VM is querying the
+ * cache size, so a fastpath for that case is appropriate.
+ */
+typedef int (*shrinker_t)(int nr_to_scan, unsigned int gfp_mask);
+
+/*
+ * Add an aging callback.  The int is the number of 'seeks' it takes
+ * to recreate one of the objects that these functions age.
+ */
+
+#define DEFAULT_SEEKS 2
+struct shrinker;
+extern struct shrinker *set_shrinker(int, shrinker_t);
+extern void remove_shrinker(struct shrinker *shrinker);
+
+/*
  * If the mapping doesn't provide a set_page_dirty a_op, then
  * just fall through and assume that it wants buffer_heads.
  * FIXME: make the method unconditional.
