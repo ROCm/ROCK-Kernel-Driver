@@ -398,6 +398,21 @@ static inline int sock_flag(struct sock *sk, enum sock_flags flag)
 	return test_bit(flag, &sk->sk_flags);
 }
 
+static inline void sk_acceptq_removed(struct sock *sk)
+{
+	sk->sk_ack_backlog--;
+}
+
+static inline void sk_acceptq_added(struct sock *sk)
+{
+	sk->sk_ack_backlog++;
+}
+
+static inline int sk_acceptq_is_full(struct sock *sk)
+{
+	return sk->sk_ack_backlog > sk->sk_max_ack_backlog;
+}
+
 /* The per-socket spinlock must be held here. */
 #define sk_add_backlog(__sk, __skb)				\
 do {	if (!(__sk)->sk_backlog.tail) {				\

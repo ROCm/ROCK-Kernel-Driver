@@ -648,7 +648,7 @@ static void tcp_listen_stop (struct sock *sk)
 		local_bh_enable();
 		sock_put(child);
 
-		tcp_acceptq_removed(sk);
+		sk_acceptq_removed(sk);
 		tcp_openreq_fastfree(req);
 	}
 	BUG_TRAP(!sk->sk_ack_backlog);
@@ -2225,7 +2225,7 @@ struct sock *tcp_accept(struct sock *sk, int flags, int *err)
 		tp->accept_queue_tail = NULL;
 
  	newsk = req->sk;
-	tcp_acceptq_removed(sk);
+	sk_acceptq_removed(sk);
 	tcp_openreq_fastfree(req);
 	BUG_TRAP(newsk->sk_state != TCP_SYN_RECV);
 	release_sock(sk);
