@@ -1291,7 +1291,8 @@ static int drain_dac(struct i810_state *state, int signals_allowed)
 		 * instead of actually sleeping and waiting for an
 		 * interrupt to wake us up!
 		 */
-		__set_current_state(TASK_INTERRUPTIBLE);
+		__set_current_state(signals_allowed ?
+				    TASK_INTERRUPTIBLE : TASK_UNINTERRUPTIBLE);
 		spin_unlock_irqrestore(&state->card->lock, flags);
 
 		if (count <= 0)
