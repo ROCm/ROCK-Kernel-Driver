@@ -81,7 +81,6 @@ cifs_read_super(struct super_block *sb, void *data,
 	cifs_sb = CIFS_SB(sb);
 	if(cifs_sb == NULL)
 		return -ENOMEM;
-	cifs_sb->local_nls = load_nls_default();	/* needed for ASCII cp to Unicode converts */
 
 	rc = cifs_mount(sb, cifs_sb, data, devname);
 

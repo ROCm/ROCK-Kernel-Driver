@@ -63,7 +63,6 @@ void cred_hash1(unsigned char *out, unsigned char *in, unsigned char *key);
 void cred_hash2(unsigned char *out, unsigned char *in, unsigned char *key);
 void cred_hash3(unsigned char *out, unsigned char *in, unsigned char *key,
 		int forw);
-void SamOEMhash(unsigned char *data, unsigned char *key, int val);
 
 /*The following definitions come from  libsmb/smbencrypt.c  */
 
@@ -75,8 +74,6 @@ void SMBOWFencrypt(unsigned char passwd[16], unsigned char *c8,
 void NTLMSSPOWFencrypt(unsigned char passwd[8],
 		       unsigned char *ntlmchalresp, unsigned char p24[24]);
 void SMBNTencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24);
-int make_oem_passwd_hash(char data[516], const char *passwd,
-			 unsigned char old_pw_hash[16], int unicode);
 int decode_pw_buffer(char in_buffer[516], char *new_pwrd,
 		     int new_pwrd_size, __u32 * new_pw_len);
 
@@ -344,46 +341,6 @@ static struct data_blob LMv2_generate_response(const unsigned char ntlm_v2_hash[
 /*        data_blob_free(&lmv2_client_data); */ /* BB fix BB */
 
         return final_response;
-}
-
-int make_oem_passwd_hash(char data[516], const char *passwd,
-		     unsigned char old_pw_hash[16], int unicode)
-{
-	int new_pw_len = strlen(passwd) * (unicode ? 2 : 1);
-
-	if (new_pw_len > 512) {
-		cERROR(1,
-		       ("CIFS make_oem_passwd_hash: new password is too long."));
-		return FALSE;
-	}
-
-	/*
-	 * Now setup the data area.
-	 * We need to generate a random fill
-	 * for this area to make it harder to
-	 * decrypt. JRA.
-	 *
-	 */
-	get_random_bytes(data, sizeof (data));
-	if (unicode) {
-		/* Note that passwd should be in DOS oem character set. */
-		/*  dos_struni2( &data[512 - new_pw_len], passwd, 512); */
-		cifs_strtoUCS((wchar_t *) & data[512 - new_pw_len], passwd, 512,	/* struct nls_table */
-			      load_nls_default());
-		/* BB call unload_nls now or get nls differntly */
-	} else {
-		/* Note that passwd should be in DOS oem character set. */
-		strcpy(&data[512 - new_pw_len], passwd);
-	}
-	SIVAL(data, 512, new_pw_len);
-
-#ifdef DEBUG_PASSWORD
-	DEBUG(100, ("make_oem_passwd_hash\n"));
-	dump_data(100, data, 516);
-#endif
-	SamOEMhash((unsigned char *) data, (unsigned char *) old_pw_hash, 516);
-
-	return TRUE;
 }
 
 void

@@ -52,6 +52,7 @@ struct smb_vol {
 	char *domainname;
 	char *UNC;
 	char *UNCip;
+	char *iocharset;  /* local code page for mapping to and from Unicode */
 	char *source_rfc1001_name; /* netbios name of client */
 	uid_t linux_uid;
 	gid_t linux_gid;
@@ -432,6 +433,20 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 				cFYI(1, ("Domain name set"));
 			} else {
 				printk(KERN_WARNING "CIFS: domain name too long\n");
+				return 1;
+			}
+		} else if (strnicmp(data, "iocharset", 9) == 0) {
+			if (!value || !*value) {
+				printk(KERN_WARNING "CIFS: invalid iocharset specified\n");
+				return 1;	/* needs_arg; */
+			}
+			if (strnlen(value, 65) < 65) {
+				if(strnicmp(value,"default",7))
+					vol->iocharset = value;
+				/* if iocharset not set load_nls_default used by caller */
+				cFYI(1, ("iocharset set to %s",value));
+			} else {
+				printk(KERN_WARNING "CIFS: iocharset name too long.\n");
 				return 1;
 			}
 		} else if (strnicmp(data, "uid", 3) == 0) {
@@ -876,6 +891,19 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		       ("CIFS mount error: No UNC path (e.g. -o unc=//192.168.1.100/public) specified  "));
 		FreeXid(xid);
 		return -EINVAL;
+	}
+
+	/* this is needed for ASCII cp to Unicode converts */
+	if(volume_info.iocharset == NULL) {
+		cifs_sb->local_nls = load_nls_default();
+	/* load_nls_default can not return null */
+	} else {
+		cifs_sb->local_nls = load_nls(volume_info.iocharset);
+		if(cifs_sb->local_nls == NULL) {
+			cERROR(1,("CIFS mount error: iocharset %s not found",volume_info.iocharset));
+			FreeXid(xid);
+			return -ELIBACC;
+		}
 	}
 
 	existingCifsSes =
