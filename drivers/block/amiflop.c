@@ -55,24 +55,15 @@
 
 #include <linux/module.h>
 
-#include <linux/sched.h>
-#include <linux/fs.h>
-#include <linux/fcntl.h>
-#include <linux/kernel.h>
-#include <linux/timer.h>
 #include <linux/fd.h>
 #include <linux/hdreg.h>
-#include <linux/errno.h>
-#include <linux/types.h>
 #include <linux/delay.h>
-#include <linux/string.h>
-#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/amifdreg.h>
 #include <linux/amifd.h>
-#include <linux/ioport.h>
 #include <linux/buffer_head.h>
-#include <linux/interrupt.h>
+#include <linux/blkdev.h>
+#include <linux/elevator.h>
 
 #include <asm/setup.h>
 #include <asm/uaccess.h>
