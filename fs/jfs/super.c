@@ -548,11 +548,11 @@ static void init_once(void *foo, kmem_cache_t * cachep, unsigned long flags)
 
 	if ((flags & (SLAB_CTOR_VERIFY | SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
+		memset(jfs_ip, 0, sizeof(struct jfs_inode_info));
 		INIT_LIST_HEAD(&jfs_ip->anon_inode_list);
 		init_rwsem(&jfs_ip->rdwrlock);
 		init_MUTEX(&jfs_ip->commit_sem);
 		init_rwsem(&jfs_ip->xattr_sem);
-		jfs_ip->atlhead = 0;
 		jfs_ip->active_ag = -1;
 #ifdef CONFIG_JFS_POSIX_ACL
 		jfs_ip->i_acl = JFS_ACL_NOT_CACHED;
