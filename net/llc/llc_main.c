@@ -233,8 +233,7 @@ void __llc_sock_free(struct sock *sk, u8 free)
 	llc->state = LLC_CONN_OUT_OF_SVC;
 	/* stop all (possibly) running timers */
 	llc_conn_ac_stop_all_timers(sk, NULL);
-	/* handle return of frames on lists */
-#if 0
+#ifdef DEBUG_LLC_CONN_ALLOC
 	printk(KERN_INFO "%s: unackq=%d, txq=%d\n", __FUNCTION__,
 		skb_queue_len(&llc->pdu_unack_q),
 		skb_queue_len(&sk->write_queue));

@@ -14,7 +14,7 @@
 #include <linux/timer.h>
 #include <net/llc_if.h>
 
-#undef DEBUG_LLC_CONN_ALLOC
+#define DEBUG_LLC_CONN_ALLOC
 
 struct llc_timer {
 	struct timer_list timer;

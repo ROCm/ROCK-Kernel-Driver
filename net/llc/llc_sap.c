@@ -52,8 +52,7 @@ void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
  *	@sap: SAP
  *	@sk: pointer to connection
  *
- *	This function removes a connection from connection_list of a SAP.
- *	List locking is performed by caller (rtn_all_conns).
+ *	This function removes a connection from sk_list.list of a SAP.
  */
 void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
 {

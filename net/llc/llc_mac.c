@@ -52,7 +52,7 @@ int mac_send_pdu(struct sk_buff *skb)
 	int pri = GFP_ATOMIC, rc = -1;
 
 	if (!skb->dev) {
-		dprintk(KERN_ERR "%s: skb->dev == NULL!", __FUNCTION__);
+		dprintk("%s: skb->dev == NULL!", __FUNCTION__);
 		goto out;
 	}
 	if (skb->sk)
@@ -89,7 +89,7 @@ int mac_indicate(struct sk_buff *skb, struct net_device *dev,
 	 * receives, do not try to analyse it.
 	 */
 	if (skb->pkt_type == PACKET_OTHERHOST) {
-		dprintk(KERN_INFO "%s: PACKET_OTHERHOST\n", __FUNCTION__);
+		dprintk("%s: PACKET_OTHERHOST\n", __FUNCTION__);
 		goto drop;
 	}
 	skb = skb_share_check(skb, GFP_ATOMIC);
@@ -146,7 +146,7 @@ int mac_indicate(struct sk_buff *skb, struct net_device *dev,
 			rc = llc_pdu_router(llc_sk(sk)->sap, sk, skb,
 					    LLC_TYPE_2);
 		} else {
-			dprintk(KERN_INFO "%s: add to backlog\n", __FUNCTION__);
+			dprintk("%s: add to backlog\n", __FUNCTION__);
 			llc_set_backlog_type(skb, LLC_PACKET);
 			sk_add_backlog(sk, skb);
 			rc = 0;
