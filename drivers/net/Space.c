@@ -33,6 +33,7 @@
 #include <linux/config.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/trdevice.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/netlink.h>
@@ -397,11 +398,56 @@ static int __init ethif_probe(void)
 
 }
 
+#ifdef CONFIG_TR
+/* Token-ring device probe */
+extern int ibmtr_probe(struct net_device *);
+extern int sk_isa_probe(struct net_device *);
+extern int proteon_probe(struct net_device *);
+extern int smctr_probe(struct net_device *);
+
+static __init int trif_probe(void)
+{
+	struct net_device *dev;
+	int err = -ENODEV;
+	
+	dev = alloc_trdev(0);
+	if (!dev)
+		return -ENOMEM;
+
+	netdev_boot_setup_check(dev);
+	if (
+#ifdef CONFIG_IBMTR
+	    ibmtr_probe(dev) == 0  ||
+#endif
+#ifdef CONFIG_SKISA
+	    sk_isa_probe(dev) == 0 || 
+#endif
+#ifdef CONFIG_PROTEON
+	    proteon_probe(dev) == 0 ||
+#endif
+#ifdef CONFIG_SMCTR
+	    smctr_probe(dev) == 0 ||
+#endif
+	    0 ) 
+		err = register_netdev(dev);
+		
+	if (err)
+		free_netdev(dev);
+	return err;
+
+}
+#endif
+
 /*  Statically configured drivers -- order matters here. */
 void __init probe_old_netdevs(void)
 {
 	int num;
 
+#ifdef CONFIG_TR
+	for (num = 0; num < 8; ++num)
+		if (trif_probe())
+			break;
+#endif
 	for (num = 0; num < 8; ++num)
 		if (ethif_probe())
 			break;
@@ -427,78 +473,6 @@ static struct net_device dev_ltpc = {
 #define NEXT_DEV	(&dev_ltpc)
 #endif  /* LTPC */
 
-#ifdef CONFIG_TR
-/* Token-ring device probe */
-extern int ibmtr_probe(struct net_device *);
-extern int sk_isa_probe(struct net_device *);
-extern int proteon_probe(struct net_device *);
-extern int smctr_probe(struct net_device *);
-
-static int
-trif_probe(struct net_device *dev)
-{
-    if (1
-#ifdef CONFIG_IBMTR
-	&& ibmtr_probe(dev)
-#endif
-#ifdef CONFIG_SKISA
-	&& sk_isa_probe(dev)
-#endif
-#ifdef CONFIG_PROTEON
-	&& proteon_probe(dev)
-#endif
-#ifdef CONFIG_SMCTR
-	&& smctr_probe(dev)
-#endif
-	&& 1 ) {
-	return 1;	/* -ENODEV or -EAGAIN would be more accurate. */
-    }
-    return 0;
-}
-static struct net_device tr7_dev = {
-	.name		= "tr%d",
-	.next		= NEXT_DEV,
-	.init		= trif_probe,
-};
-static struct net_device tr6_dev = {
-	.name		= "tr%d",
-	.next		= &tr7_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr5_dev = {
-	.name		= "tr%d",
-	.next		= &tr6_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr4_dev = {
-	.name		= "tr%d",
-	.next		= &tr5_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr3_dev = {
-	.name		= "tr%d",
-	.next		= &tr4_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr2_dev = {
-	.name		= "tr%d",
-	.next		= &tr3_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr1_dev = {
-	.name		= "tr%d",
-	.next		= &tr2_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr0_dev = {
-	.name		= "tr%d",
-	.next		= &tr1_dev,
-	.init		= trif_probe,
-};
-#undef       NEXT_DEV
-#define      NEXT_DEV        (&tr0_dev)
-
-#endif 
 
 #ifdef CONFIG_SBNI
 static struct net_device sbni7_dev = {
