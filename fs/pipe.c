@@ -208,10 +208,8 @@ pipe_write(struct file *filp, const char __user *buf, size_t count, loff_t *ppos
 		wake_up_interruptible(PIPE_WAIT(*inode));
 		kill_fasync(PIPE_FASYNC_READERS(*inode), SIGIO, POLL_IN);
 	}
-	if (ret > 0) {
-		inode->i_ctime = inode->i_mtime = CURRENT_TIME;
-		mark_inode_dirty(inode);
-	}
+	if (ret > 0)
+		inode_update_time(inode, 1);	/* mtime and ctime */
 	return ret;
 }
 
