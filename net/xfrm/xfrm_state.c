@@ -221,13 +221,9 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 		if (atomic_read(&x->refcnt) > 2)
 			xfrm_flush_bundles();
 
-		/* All xfrm_state objects are created by one of two possible
-		 * paths:
-		 *
-		 * 2) xfrm_state_lookup --> xfrm_state_insert
-		 *
-		 * The xfrm_state_lookup or xfrm_state_alloc call gives a
-		 * reference, and that is what we are dropping here.
+		/* All xfrm_state objects are created by xfrm_state_alloc.
+		 * The xfrm_state_alloc call gives a reference, and that
+		 * is what we are dropping here.
 		 */
 		atomic_dec(&x->refcnt);
 	}
