@@ -13,6 +13,7 @@
 #include <linux/delay.h>
 #include <linux/irq.h>
 #include <linux/pm.h>
+#include <linux/device.h>
 #include <linux/suspend.h>
 
 #include <asm/uaccess.h>
