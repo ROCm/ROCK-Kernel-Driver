@@ -45,6 +45,7 @@
 #include <asm/idprom.h>
 #include <asm/hardirq.h>
 #include <asm/machines.h>
+#include <asm/cpudata.h>
 
 struct screen_info screen_info = {
 	0, 0,			/* orig-x, orig-y */
@@ -395,13 +396,11 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
 	return -EIO;
 }
 
-extern char *sparc_cpu_type[];
-extern char *sparc_fpu_type[];
+extern char *sparc_cpu_type;
+extern char *sparc_fpu_type;
 
 static int show_cpuinfo(struct seq_file *m, void *__unused)
 {
-	int cpuid = hard_smp_processor_id();
-
 	seq_printf(m,
 		   "cpu\t\t: %s\n"
 		   "fpu\t\t: %s\n"
@@ -411,26 +410,28 @@ static int show_cpuinfo(struct seq_file *m, void *__unused)
 		   "ncpus probed\t: %d\n"
 		   "ncpus active\t: %d\n"
 #ifndef CONFIG_SMP
-		   "BogoMips\t: %lu.%02lu\n"
+		   "CPU0Bogo\t: %lu.%02lu\n"
+		   "CPU0ClkTck\t: %ld\n"
 #endif
 		   ,
-		   sparc_cpu_type[cpuid] ? : "undetermined",
-		   sparc_fpu_type[cpuid] ? : "undetermined",
+		   sparc_cpu_type ? sparc_cpu_type : "undetermined",
+		   sparc_fpu_type ? sparc_fpu_type : "undetermined",
 		   romvec->pv_romvers,
 		   prom_rev,
 		   romvec->pv_printrev >> 16,
-		   (short) romvec->pv_printrev,
+		   romvec->pv_printrev & 0xffff,
 		   &cputypval,
-		   linux_num_cpus,
+		   num_possible_cpus(),
 		   num_online_cpus()
 #ifndef CONFIG_SMP
-		   , loops_per_jiffy/(500000/HZ),
-		   (loops_per_jiffy/(5000/HZ)) % 100
+		   , cpu_data(0).udelay_val/(500000/HZ),
+		   (cpu_data(0).udelay_val/(5000/HZ)) % 100,
+		   cpu_data(0).clock_tick
 #endif
 		);
 
 #ifdef CONFIG_SMP
-	smp_bogo_info(m);
+	smp_bogo(m);
 #endif
 	mmu_info(m);
 #ifdef CONFIG_SMP
