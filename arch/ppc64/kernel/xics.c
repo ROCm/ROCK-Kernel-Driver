@@ -258,10 +258,18 @@ void xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
 			mb();
 			smp_message_recv(PPC_MSG_RESCHEDULE, regs);
 		}
+#if 0
 		if (test_and_clear_bit(PPC_MSG_MIGRATE_TASK, &xics_ipi_message[cpu])) {
 			mb();
 			smp_message_recv(PPC_MSG_MIGRATE_TASK, regs);
 		}
+#endif
+#ifdef CONFIG_XMON
+		if (test_and_clear_bit(PPC_MSG_XMON_BREAK, &xics_ipi_message[cpu])) {
+			mb();
+			smp_message_recv(PPC_MSG_XMON_BREAK, regs);
+		}
+#endif
 	}
 }
 

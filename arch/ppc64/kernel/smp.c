@@ -360,37 +360,6 @@ void smp_local_timer_interrupt(struct pt_regs * regs)
 	}
 }
 
-static spinlock_t migration_lock = SPIN_LOCK_UNLOCKED;
-static task_t *new_task;
-
-/*
- * This function sends a 'task migration' IPI to another CPU.
- * Must be called from syscall contexts, with interrupts *enabled*.
- */
-void smp_migrate_task(int cpu, task_t *p)
-{
-	/*
-	 * The target CPU will unlock the migration spinlock:
-	 */
-	spin_lock(&migration_lock);
-	new_task = p;
-
-	smp_message_pass(cpu, PPC_MSG_MIGRATE_TASK, 0, 0);
-}
-
-/*
- * Task migration callback.
- */
-static void smp_task_migration_interrupt(void)
-{
-	task_t *p;
-
-	/* Should we ACK the IPI interrupt early? */
-	p = new_task;
-	spin_unlock(&migration_lock);
-	sched_task_migrated(p);
-}
-
 void smp_message_recv(int msg, struct pt_regs *regs)
 {
 	switch( msg ) {
@@ -401,9 +370,11 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 		/* XXX Do we have to do this? */
 		set_need_resched();
 		break;
+#if 0
 	case PPC_MSG_MIGRATE_TASK:
-		smp_task_migration_interrupt();
+		/* spare */
 		break;
+#endif
 #ifdef CONFIG_XMON
 	case PPC_MSG_XMON_BREAK:
 		xmon(regs);
