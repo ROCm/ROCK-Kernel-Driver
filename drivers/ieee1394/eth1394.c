@@ -1,7 +1,7 @@
 /*
  * eth1394.c -- Ethernet driver for Linux IEEE-1394 Subsystem
  * 
- * Copyright (C) 2001 Ben Collins <bcollins@debian.org>
+ * Copyright (C) 2001-2003 Ben Collins <bcollins@debian.org>
  *               2000 Bonin Franck <boninf@free.fr>
  *               2003 Steve Kinneberg <kinnebergsteve@acmsystems.com>
  *
@@ -33,7 +33,7 @@
  * - Add MCAP. Limited Multicast exists only to 224.0.0.1 and 224.0.0.2.
  *
  * Non-RFC 2734 related:
- * - Fix bug related to fragmented broadcast datagrams
+ * - Handle fragmented skb's coming from the networking layer.
  * - Move generic GASP reception to core 1394 code
  * - Convert kmalloc/kfree for link fragments to use kmem_cache_* instead
  * - Stability improvements
@@ -89,7 +89,7 @@
 #define TRACE() printk(KERN_ERR "%s:%s[%d] ---- TRACE\n", driver_name, __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 971 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 986 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -121,6 +121,12 @@ static const int hdr_type_len[] = {
 	sizeof (struct eth1394_sf_hdr),
 	sizeof (struct eth1394_sf_hdr)
 };
+
+/* Change this to IEEE1394_SPEED_S100 to make testing easier */
+#define ETH1394_SPEED_DEF	IEEE1394_SPEED_MAX
+
+/* For now, this needs to be 1500, so that XP works with us */
+#define ETH1394_DATA_LEN	ETH_DATA_LEN
 
 static const u16 eth1394_speedto_maxpayload[] = {
 /*     S100, S200, S400, S800, S1600, S3200 */
@@ -167,7 +173,8 @@ static void eth1394_iso_shutdown(struct eth1394_priv *priv)
 	priv->bc_state = ETHER1394_BC_CLOSED;
 
 	if (priv->iso != NULL) {
-		hpsb_iso_shutdown(priv->iso);
+		if (!in_interrupt())
+			hpsb_iso_shutdown(priv->iso);
 		priv->iso = NULL;
 	}
 }
@@ -192,8 +199,7 @@ static int ether1394_init_bc(struct net_device *dev)
 				      "Error BROADCAST_CHANNEL register valid "
 				      "bit not set, can't send IP traffic\n");
 
-			if (!in_interrupt())
-				eth1394_iso_shutdown(priv);
+			eth1394_iso_shutdown(priv);
 
 			return -EAGAIN;
 		}
@@ -202,10 +208,10 @@ static int ether1394_init_bc(struct net_device *dev)
 			 * the IEEE 1394 spec changes regarding broadcast
 			 * channels in the future. */
 
+			eth1394_iso_shutdown(priv);
+
 			if (in_interrupt())
 				return -EAGAIN;
-
-			eth1394_iso_shutdown(priv);
 
 			priv->broadcast_channel = bc & 0x3f;
 			ETH1394_PRINT(KERN_INFO, dev->name,
@@ -226,8 +232,7 @@ static int ether1394_init_bc(struct net_device *dev)
 			ETH1394_PRINT(KERN_ERR, dev->name,
 				      "Could not start data stream reception\n");
 
-			if (!in_interrupt())
-				eth1394_iso_shutdown(priv);
+			eth1394_iso_shutdown(priv);
 
 			return -EAGAIN;
 		}
@@ -244,8 +249,10 @@ static int ether1394_open (struct net_device *dev)
 	unsigned long flags;
 	int ret;
 
-	/* Set the spinlock before grabbing IRQ! */
-	priv->lock = SPIN_LOCK_UNLOCKED;
+	/* Something bad happened, don't even try */
+	if (priv->bc_state == ETHER1394_BC_CLOSED)
+		return -EAGAIN;
+
 	spin_lock_irqsave(&priv->lock, flags);
 	ret = ether1394_init_bc(dev);
 	spin_unlock_irqrestore(&priv->lock, flags);
@@ -287,9 +294,8 @@ static int ether1394_change_mtu(struct net_device *dev, int new_mtu)
 	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
 	int phy_id = NODEID_TO_NODE(priv->host->node_id);
 
-	if ((new_mtu < 68) || (new_mtu > MIN(ETH_DATA_LEN, (priv->maxpayload[phy_id] -
-					  (sizeof(union eth1394_hdr) +
-					   ETHER1394_GASP_OVERHEAD)))))
+	if ((new_mtu < 68) || (new_mtu > min(ETH1394_DATA_LEN, (int)(priv->maxpayload[phy_id] -
+					     (sizeof(union eth1394_hdr) + ETHER1394_GASP_OVERHEAD)))))
 		return -EINVAL;
 	dev->mtu = new_mtu;
 	return 0;
@@ -322,8 +328,7 @@ static void ether1394_reset_priv (struct net_device *dev, int set_mtu)
 	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
 	struct hpsb_host *host = priv->host;
 	int phy_id = NODEID_TO_NODE(host->node_id);
-	u64 guid = (u64)(((u64)be32_to_cpu(host->csr.rom[3]) << 32) |
-			  be32_to_cpu(host->csr.rom[4]));
+	u64 guid = *((u64*)&(host->csr.rom[3]));
 	u16 maxpayload = 1 << (((be32_to_cpu(host->csr.rom[2]) >> 12) & 0xf) + 1);
 
 	spin_lock_irqsave (&priv->lock, flags);
@@ -333,15 +338,8 @@ static void ether1394_reset_priv (struct net_device *dev, int set_mtu)
 	memset (priv->sspd, 0, sizeof (priv->sspd));
 	memset (priv->fifo, 0, sizeof (priv->fifo));
 
-#if 1
-/* Compile this out to make testing of fragmented broadcast datagrams
- * easier. */
-	priv->sspd[ALL_NODES] = IEEE1394_SPEED_MAX;
-	priv->maxpayload[ALL_NODES] = eth1394_speedto_maxpayload[IEEE1394_SPEED_MAX];
-#else
-	priv->sspd[ALL_NODES] = IEEE1394_SPEED_100;
-	priv->maxpayload[ALL_NODES] = eth1394_speedto_maxpayload[IEEE1394_SPEED_100];
-#endif
+	priv->sspd[ALL_NODES] = ETH1394_SPEED_DEF;
+	priv->maxpayload[ALL_NODES] = eth1394_speedto_maxpayload[priv->sspd[ALL_NODES]];
 
 	priv->bc_state = ETHER1394_BC_CHECK;
 
@@ -352,9 +350,8 @@ static void ether1394_reset_priv (struct net_device *dev, int set_mtu)
 
 	/* We'll use our maxpayload as the default mtu */
 	if (set_mtu) {
-		dev->mtu = MIN(ETH_DATA_LEN, priv->maxpayload[phy_id] -
-					     (sizeof(union eth1394_hdr) +
-					     ETHER1394_GASP_OVERHEAD));
+		dev->mtu = min(ETH1394_DATA_LEN, (int)(priv->maxpayload[phy_id] -
+			       (sizeof(union eth1394_hdr) + ETHER1394_GASP_OVERHEAD)));
 
 		/* Set our hardware address while we're at it */
 		*(u64*)dev->dev_addr = guid;
@@ -444,8 +441,8 @@ static void ether1394_add_host (struct hpsb_host *host)
 
 	priv = (struct eth1394_priv *)dev->priv;
 
-	priv->host = host;
 	spin_lock_init(&priv->lock);
+	priv->host = host;
 
 	for (i = 0; i < ALL_NODES; i++) {
                 spin_lock_init(&priv->pdg[i].lock);
@@ -501,7 +498,6 @@ static void ether1394_remove_host (struct hpsb_host *host)
 	if (hi != NULL) {
 		struct eth1394_priv *priv = (struct eth1394_priv *)hi->dev->priv;
 
-		priv->bc_state = ETHER1394_BC_CLOSED;
 		eth1394_iso_shutdown(priv);
 
 		if (hi->dev) {
@@ -1380,17 +1376,15 @@ static inline void ether1394_dg_complete(struct packet_task *ptask, int fail)
         unsigned long flags;
 		
 	/* Statistics */
+	spin_lock_irqsave(&priv->lock, flags);
 	if (fail) {
-		spin_lock_irqsave(&priv->lock, flags);
 		priv->stats.tx_dropped++;
 		priv->stats.tx_errors++;
-		spin_unlock_irqrestore(&priv->lock, flags);
 	} else {
-		spin_lock_irqsave(&priv->lock, flags);
 		priv->stats.tx_bytes += skb->len;
 		priv->stats.tx_packets++;
-		spin_unlock_irqrestore(&priv->lock, flags);
 	}
+	spin_unlock_irqrestore(&priv->lock, flags);
 
 	dev_kfree_skb_any(skb);
 	kmem_cache_free(packet_task_cache, ptask);
@@ -1460,11 +1454,9 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 		goto fail;
 	}
 
-	if (priv->bc_state == ETHER1394_BC_CHECK) {
-		if (ether1394_init_bc(dev)) {
-			spin_unlock_irqrestore (&priv->lock, flags);
-			goto fail;
-		}
+	if ((ret = ether1394_init_bc(dev))) {
+		spin_unlock_irqrestore (&priv->lock, flags);
+		goto fail;
 	}
 
 	spin_unlock_irqrestore (&priv->lock, flags);
@@ -1608,7 +1600,7 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		case ETHTOOL_GDRVINFO: {
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 971 $");
+			strcpy (info.version, "$Rev: 986 $");
 			/* FIXME XXX provide sane businfo */
 			strcpy (info.bus_info, "ieee1394");
 			if (copy_to_user (useraddr, &info, sizeof (info)))
