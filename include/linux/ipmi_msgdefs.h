@@ -53,6 +53,7 @@
 #define IPMI_SET_BMC_GLOBAL_ENABLES_CMD	0x2e
 #define IPMI_GET_BMC_GLOBAL_ENABLES_CMD	0x2f
 #define IPMI_READ_EVENT_MSG_BUFFER_CMD	0x35
+#define IPMI_GET_CHANNEL_INFO_CMD	0x42
 
 #define IPMI_NETFN_STORAGE_REQUEST		0x0a
 #define IPMI_NETFN_STORAGE_RESPONSE		0x0b
@@ -61,8 +62,39 @@
 /* The default slave address */
 #define IPMI_BMC_SLAVE_ADDR	0x20
 
-#define IPMI_MAX_MSG_LENGTH	80
+/* The BT interface on high-end HP systems supports up to 255 bytes in
+ * one transfer.  Its "virtual" BMC supports some commands that are longer
+ * than 128 bytes.  Use the full 256, plus NetFn/LUN, Cmd, cCode, plus
+ * some overhead.  It would be nice to base this on the "BT Capabilities"
+ * but that's too hard to propogate to the rest of the driver. */
+#define IPMI_MAX_MSG_LENGTH	272	/* multiple of 16 */
 
-#define IPMI_CC_NO_ERROR	0
+#define IPMI_CC_NO_ERROR		0x00
+#define IPMI_NODE_BUSY_ERR		0xc0
+#define IPMI_ERR_MSG_TRUNCATED		0xc6
+#define IPMI_LOST_ARBITRATION_ERR	0x81
+#define IPMI_ERR_UNSPECIFIED		0xff
+
+#define IPMI_CHANNEL_PROTOCOL_IPMB	1
+#define IPMI_CHANNEL_PROTOCOL_ICMB	2
+#define IPMI_CHANNEL_PROTOCOL_SMBUS	4
+#define IPMI_CHANNEL_PROTOCOL_KCS	5
+#define IPMI_CHANNEL_PROTOCOL_SMIC	6
+#define IPMI_CHANNEL_PROTOCOL_BT10	7
+#define IPMI_CHANNEL_PROTOCOL_BT15	8
+#define IPMI_CHANNEL_PROTOCOL_TMODE	9
+
+#define IPMI_CHANNEL_MEDIUM_IPMB	1
+#define IPMI_CHANNEL_MEDIUM_ICMB10	2
+#define IPMI_CHANNEL_MEDIUM_ICMB09	3
+#define IPMI_CHANNEL_MEDIUM_8023LAN	4
+#define IPMI_CHANNEL_MEDIUM_ASYNC	5
+#define IPMI_CHANNEL_MEDIUM_OTHER_LAN	6
+#define IPMI_CHANNEL_MEDIUM_PCI_SMBUS	7
+#define IPMI_CHANNEL_MEDIUM_SMBUS1	8
+#define IPMI_CHANNEL_MEDIUM_SMBUS2	9
+#define IPMI_CHANNEL_MEDIUM_USB1	10
+#define IPMI_CHANNEL_MEDIUM_USB2	11
+#define IPMI_CHANNEL_MEDIUM_SYSINTF	12
 
 #endif /* __LINUX_IPMI_MSGDEFS_H */
