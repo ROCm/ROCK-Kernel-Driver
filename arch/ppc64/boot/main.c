@@ -12,11 +12,10 @@
 #include "ppc32-types.h"
 #include "zlib.h"
 #include <linux/elf.h>
+#include <linux/string.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/bootinfo.h>
-
-void memmove(void *dst, void *im, int len);
 
 extern void *finddevice(const char *);
 extern int getprop(void *, const char *, void *, int);
