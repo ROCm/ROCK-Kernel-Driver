@@ -105,21 +105,6 @@ struct paca_struct {
 	 */
 	struct ItLpPaca lppaca __attribute__((aligned(0x80)));
 	struct ItLpRegSave reg_save;
-
-	/*
-	 * iSeries profiling support
-	 *
-	 * FIXME: do we still want this, or can we ditch it in favour
-	 * of oprofile?
-	 */
-	u32 *prof_buffer;		/* iSeries profiling buffer */
-	u32 *prof_stext;		/* iSeries start of kernel text */
-	u32 prof_multiplier;
-	u32 prof_counter;
-	u32 prof_shift;			/* iSeries shift for profile
-					 * bucket size */
-	u32 prof_len;			/* iSeries length of profile */
-	u8 prof_enabled;		/* 1=iSeries profiling enabled */
 };
 
 #endif /* _PPC64_PACA_H */

@@ -592,10 +592,7 @@ void __init smp_init_pSeries(void)
 
 void smp_local_timer_interrupt(struct pt_regs * regs)
 {
-	if (!--(get_paca()->prof_counter)) {
-		update_process_times(user_mode(regs));
-		(get_paca()->prof_counter)=get_paca()->prof_multiplier;
-	}
+	update_process_times(user_mode(regs));
 }
 
 void smp_message_recv(int msg, struct pt_regs *regs)
@@ -824,8 +821,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	/* Fixup boot cpu */
 	smp_store_cpu_info(boot_cpuid);
 	cpu_callin_map[boot_cpuid] = 1;
-	paca[boot_cpuid].prof_counter = 1;
-	paca[boot_cpuid].prof_multiplier = 1;
 
 #ifndef CONFIG_PPC_ISERIES
 	paca[boot_cpuid].next_jiffy_update_tb = tb_last_stamp = get_tb();
@@ -878,8 +873,6 @@ int __devinit __cpu_up(unsigned int cpu)
 	if (system_state == SYSTEM_BOOTING && !cpu_present(cpu))
 		return -ENOENT;
 
-	paca[cpu].prof_counter = 1;
-	paca[cpu].prof_multiplier = 1;
 	paca[cpu].default_decr = tb_ticks_per_jiffy / decr_overclock;
 
 	if (!(cur_cpu_spec->cpu_features & CPU_FTR_SLB)) {
