@@ -30,9 +30,7 @@
 #include <sound/control.h>
 #include <sound/initval.h>
 #include <linux/kmod.h>
-#ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
-#endif
 
 #define SNDRV_OS_MINORS 256
 

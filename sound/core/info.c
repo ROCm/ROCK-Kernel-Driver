@@ -29,9 +29,7 @@
 #include <sound/info.h>
 #include <sound/version.h>
 #include <linux/proc_fs.h>
-#ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
-#endif
 #include <stdarg.h>
 
 /*

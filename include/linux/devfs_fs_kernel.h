@@ -39,9 +39,9 @@
 
 typedef struct devfs_entry * devfs_handle_t;
 
-extern void devfs_remove(const char *fmt, ...) __attribute__((format (printf, 1, 2)));
-
 #ifdef CONFIG_DEVFS_FS
+
+extern void devfs_remove(const char *fmt, ...) __attribute__((format (printf, 1, 2)));
 
 struct unique_numspace
 {
