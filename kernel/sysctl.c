@@ -643,7 +643,7 @@ static ctl_table vm_table[] = {
 		.data		= &dirty_writeback_centisecs,
 		.maxlen		= sizeof(dirty_writeback_centisecs),
 		.mode		= 0644,
-		.proc_handler	= dirty_writeback_centisecs_handler,
+		.proc_handler	= &dirty_writeback_centisecs_handler,
 	},
 	{
 		.ctl_name	= VM_DIRTY_EXPIRE_CS,
