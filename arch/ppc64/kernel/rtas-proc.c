@@ -294,22 +294,24 @@ static ssize_t ppc_rtas_poweron_read(struct file * file, char * buf,
 {
 	char stkbuf[40];  /* its small, its on stack */
 	int n, sn;
+	loff_t pos = *ppos;
+	
 	if (power_on_time == 0)
 		n = scnprintf(stkbuf,sizeof(stkbuf),"Power on time not set\n");
 	else
 		n = scnprintf(stkbuf,sizeof(stkbuf),"%lu\n",power_on_time);
 
 	sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
+	if (pos != (unsigned int)pos || pos >= sn)
 		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
+	if (n > sn - pos)
+		n = sn - pos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
+	if (copy_to_user (buf, stkbuf + pos, n)) {
 		return -EFAULT;
 	}
-	*ppos += n;
+	*ppos = pos + n;
 	return n;
 }
 
@@ -341,6 +343,7 @@ static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 {
 	int sn, n = 0;
 	char *tmpbuf;
+	loff_t pos = *ppos;
 
 	if (progress_led == NULL) return 0;
 
@@ -352,20 +355,20 @@ static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 	n = sprintf (tmpbuf, "%s\n", progress_led);
 
 	sn = strlen (tmpbuf) +1;
-	if (*ppos >= sn) {
+	if (pos != (unsigned int)pos || pos >= sn) {
 		kfree (tmpbuf);
 		return 0;
 	}
-	if (n > sn - *ppos)
-		n = sn - *ppos;
+	if (n > sn - pos)
+		n = sn - pos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, tmpbuf + (*ppos), n)) {
+	if (copy_to_user (buf, tmpbuf + pos, n)) {
 		kfree (tmpbuf);
 		return -EFAULT;
 	}
 	kfree (tmpbuf);
-	*ppos += n;
+	*ppos = pos + n;
 	return n;
 }
 
@@ -409,7 +412,11 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 	unsigned long *ret = kmalloc(4*8, GFP_KERNEL);
 	int n, sn, error;
 	char stkbuf[40];  /* its small, its on stack */
+	loff_t pos = *ppos;
 
+	if(ret == NULL)
+		return -ENOMEM;
+		
 	error = rtas_call(rtas_token("get-time-of-day"), 0, 8, ret);
 	
 	year = ret[0]; mon  = ret[1]; day  = ret[2];
@@ -426,16 +433,16 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 	kfree(ret);
 
 	sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
+	if (pos != (unsigned int)pos || pos >= sn)
 		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
+	if (n > sn - pos)
+		n = sn - pos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
+	if (copy_to_user (buf, stkbuf + pos, n)) {
 		return -EFAULT;
 	}
-	*ppos += n;
+	*ppos = pos + n;
 	return n;
 }
 
@@ -846,7 +853,8 @@ static ssize_t ppc_rtas_tone_freq_write(struct file * file, const char * buf,
 	char *dest;
 	int error;
 
-	if (39 < count) count = 39;
+	if (39 < count)
+		count = 39;
 	if (copy_from_user (stkbuf, buf, count)) {
 		return -EFAULT;
 	}
@@ -871,20 +879,21 @@ static ssize_t ppc_rtas_tone_freq_read(struct file * file, char * buf,
 {
 	int n, sn;
 	char stkbuf[40];  /* its small, its on stack */
+	loff_t pos = *ppos;
 
 	n = scnprintf(stkbuf, 40, "%lu\n", rtas_tone_frequency);
 
 	sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
+	if (pos != (unsigned int)pos || pos >= sn)
 		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
+	if (n > sn - pos)
+		n = sn - pos;
 	if (n > count)
 		n = count;
-	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
+	if (copy_to_user (buf, stkbuf + pos, n)) {
 		return -EFAULT;
 	}
-	*ppos += n;
+	*ppos = pos + n;
 	return n;
 }
 /* ****************************************************************** */
@@ -925,20 +934,21 @@ static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 {
 	int n, sn;
 	char stkbuf[40];  /* its small, its on stack */
+	loff_t pos = *ppos;
 
 	n = scnprintf(stkbuf, 40, "%lu\n", rtas_tone_volume);
 
 	sn = strlen (stkbuf) +1;
-	if (*ppos >= sn)
+	if (pos != (unsigned int)pos || pos >= sn)
 		return 0;
-	if (n > sn - *ppos)
-		n = sn - *ppos;
+	if (n > sn - pos)
+		n = sn - pos;
 	if (n > count)
 		n = count;
 	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
 		return -EFAULT;
 	}
-	*ppos += n;
+	*ppos = pos + n;
 	return n;
 }
 
@@ -955,14 +965,13 @@ static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char __user *buf,
 	if (n > count)
 		n = count;
 
-	if (ppos && *ppos != 0)
+	if (*ppos != 0)
 		return 0;
 
 	if (copy_to_user(buf, kbuf, n))
 		return -EFAULT;
 
-	if (ppos)
-		*ppos = n;
+	*ppos = n;
 	
 	return n;
 }

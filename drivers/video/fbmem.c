@@ -785,7 +785,7 @@ static int fbmem_read_proc(char *buf, char **start, off_t offset,
 static ssize_t
 fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
-	unsigned long p = *ppos;
+	loff_t p;
 	struct inode *inode = file->f_dentry->d_inode;
 	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
@@ -798,35 +798,42 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 
 	if (info->fbops->fb_read)
 		return info->fbops->fb_read(file, buf, count, ppos);
+
+	down(&info->mutex);	
+	if (*ppos >= info->fix.smem_len)
+	{
+		count = 0;
+		goto error;
+	}
+	p = *ppos;
 	
-	if (p >= info->fix.smem_len)
-	    return 0;
-	if (count >= info->fix.smem_len)
-	    count = info->fix.smem_len;
-	if (count + p > info->fix.smem_len)
+	if (count > info->fix.smem_len - p)
 		count = info->fix.smem_len - p;
 	if (info->fbops->fb_sync)
 		info->fbops->fb_sync(info);
 	if (count) {
-	    char *base_addr;
+		char *base_addr;
 
-	    base_addr = info->screen_base;
-	    count -= copy_to_user(buf, base_addr+p, count);
-	    if (!count)
-		return -EFAULT;
-	    *ppos += count;
+		base_addr = info->screen_base;
+		count -= copy_to_user(buf, base_addr + p, count);
+		if (!count)
+			count = -EFAULT;
+		else
+			*ppos += count;
 	}
+error:	
+	up(&info->mutex);
 	return count;
 }
 
 static ssize_t
 fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
-	unsigned long p = *ppos;
+	loff_t p;
 	struct inode *inode = file->f_dentry->d_inode;
 	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
-	int err;
+	int err = -ENOSPC;
 
 	if (!info || !info->screen_base)
 		return -ENODEV;
@@ -837,28 +844,54 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (info->fbops->fb_write)
 		return info->fbops->fb_write(file, buf, count, ppos);
 	
-	if (p > info->fix.smem_len)
-	    return -ENOSPC;
-	if (count >= info->fix.smem_len)
-	    count = info->fix.smem_len;
+	down(&info->mutex);	
+	if (*ppos >= info->fix.smem_len)
+		goto err;
+	p = *ppos;
+	if (count > info->fix.smem_len - p)
+		count = info->fix.smem_len - p;
+		
 	err = 0;
-	if (count + p > info->fix.smem_len) {
-	    count = info->fix.smem_len - p;
-	    err = -ENOSPC;
-	}
 	if (info->fbops->fb_sync)
 		info->fbops->fb_sync(info);
 	if (count) {
-	    char *base_addr;
-
-	    base_addr = info->screen_base;
+	    char *base_addr = info->screen_base;
 	    count -= copy_from_user(base_addr+p, buf, count);
 	    *ppos += count;
 	    err = -EFAULT;
+	    if (count)
+		err = count;
 	}
-	if (count)
-		return count;
+err:
+	up(&info->mutex);
 	return err;
+}
+
+loff_t fb_llseek(struct file *file, loff_t offset, int origin)
+{
+	struct inode *inode = file->f_dentry->d_inode;
+	int fbidx = iminor(inode);
+	struct fb_info *info = registered_fb[fbidx];
+	loff_t retval;
+	
+	down(&info->mutex);
+	switch (origin) {
+		case 2:
+			offset += i_size_read(file->f_dentry->d_inode);
+			break;
+		case 1:
+			offset += file->f_pos;
+	}
+	retval = -EINVAL;
+	if (offset >= 0) {
+		if (offset != file->f_pos) {
+			file->f_pos = offset;
+			file->f_version = 0;
+		}
+		retval = offset;
+	}
+	up(&info->mutex);
+	return retval;
 }
 
 #ifdef CONFIG_KMOD
@@ -1238,6 +1271,7 @@ static struct file_operations fb_fops = {
 	.owner =	THIS_MODULE,
 	.read =		fb_read,
 	.write =	fb_write,
+	.llseek = 	fb_llseek,
 	.ioctl =	fb_ioctl,
 	.mmap =		fb_mmap,
 	.open =		fb_open,
@@ -1300,6 +1334,7 @@ register_framebuffer(struct fb_info *fb_info)
 	if (fb_info->sprite.inbuf == NULL)
 		fb_info->sprite.inbuf = sys_inbuf;
 
+	init_MUTEX(&fb_info->mutex);
 	registered_fb[i] = fb_info;
 
 	devfs_mk_cdev(MKDEV(FB_MAJOR, i),

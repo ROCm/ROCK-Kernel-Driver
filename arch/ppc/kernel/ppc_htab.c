@@ -106,8 +106,11 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 	PTE *ptr;
 #endif /* CONFIG_PPC_STD_MMU */
 	char buffer[512];
+	loff_t pos = *ppos;
 
-	if (count < 0)
+	/* FIXME - needs seek/pos locking */
+	
+	if (pos < 0)
 		return -EINVAL;
 
 	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
@@ -182,15 +185,15 @@ return_string:
 		      "Non-error misses: %lu\n"
 		      "Error misses\t: %lu\n",
 		      pte_misses, pte_errors);
-	if (*ppos >= strlen(buffer))
+	if (pos >= strlen(buffer))
 		return 0;
-	if (n > strlen(buffer) - *ppos)
-		n = strlen(buffer) - *ppos;
+	if (n > strlen(buffer) - pos)
+		n = strlen(buffer) - pos;
 	if (n > count)
 		n = count;
-	if (copy_to_user(buf, buffer + *ppos, n))
+	if (copy_to_user(buf, buffer + pos, n))
 		return -EFAULT;
-	*ppos += n;
+	*ppos = pos + n;
 	return n;
 }
 
@@ -333,13 +336,17 @@ ppc_htab_lseek(struct file * file, loff_t offset, int orig)
     lock_kernel();
     switch (orig) {
     case 0:
-	file->f_pos = offset;
-	ret = file->f_pos;
 	break;
     case 1:
-	file->f_pos += offset;
-	ret = file->f_pos;
+	offset += file->f_pos;
+    default:
+	goto error;
     }
+    if (offset >= 0) {
+	file->f_pos = offset;
+	ret = offset;
+    }
+error:
     unlock_kernel();
     return ret;
 }

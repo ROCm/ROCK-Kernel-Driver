@@ -554,6 +554,7 @@ static ssize_t proc_info_read(struct file * file, char * buf,
 	ssize_t length;
 	ssize_t end;
 	struct task_struct *task = proc_task(inode);
+	loff_t pos = *ppos;
 
 	if (count > PROC_BLOCK_SIZE)
 		count = PROC_BLOCK_SIZE;
@@ -567,14 +568,14 @@ static ssize_t proc_info_read(struct file * file, char * buf,
 		return length;
 	}
 	/* Static 4kB (or whatever) block capacity */
-	if (*ppos >= length) {
+	if (pos < 0 || pos >= length) {
 		free_page(page);
 		return 0;
 	}
-	if (count + *ppos > length)
-		count = length - *ppos;
-	end = count + *ppos;
-	if (copy_to_user(buf, (char *) page + *ppos, count))
+	if (count > length - pos)
+		count = length - pos;
+	end = count + pos;
+	if (copy_to_user(buf, (char *) page + pos, count))
 		count = -EFAULT;
 	else
 		*ppos = end;
@@ -1333,7 +1334,7 @@ static ssize_t proc_pid_attr_read(struct file * file, char * buf,
 		free_page(page);
 		return 0;
 	}
-	if (count + *ppos > length)
+	if (count > length - *ppos)
 		count = length - *ppos;
 	end = count + *ppos;
 	if (copy_to_user(buf, (char *) page + *ppos, count))

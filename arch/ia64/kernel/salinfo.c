@@ -430,6 +430,9 @@ salinfo_log_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
 	size_t size;
 	u8 *buf;
 	u64 bufsize;
+	loff_t pos = *ppos;
+	
+	/* FIXME: needs seek/parallel-lock */
 
 	if (data->state == STATE_LOG_RECORD) {
 		buf = data->log_buffer;
@@ -441,17 +444,17 @@ salinfo_log_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
 		buf = NULL;
 		bufsize = 0;
 	}
-	if (*ppos >= bufsize)
+	if (pos >= bufsize)
 		return 0;
 
-	saldata = buf + file->f_pos;
-	size = bufsize - file->f_pos;
+	saldata = buf + pos;
+	size = bufsize - pos;
 	if (size > count)
 		size = count;
 	if (copy_to_user(buffer, saldata, size))
 		return -EFAULT;
 
-	*ppos += size;
+	*ppos = pos + size;
 	return size;
 }
 

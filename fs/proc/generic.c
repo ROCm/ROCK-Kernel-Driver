@@ -53,6 +53,7 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 	ssize_t	n, count;
 	char	*start;
 	struct proc_dir_entry * dp;
+	loff_t pos = *ppos;
 
 	dp = PDE(inode);
 	if (!(page = (char*) __get_free_page(GFP_KERNEL)))
@@ -60,11 +61,13 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 
 	while ((nbytes > 0) && !eof) {
 		count = min_t(ssize_t, PROC_BLOCK_SIZE, nbytes);
-
+		if (pos != (unsigned) pos || pos > INT_MAX)
+			break;
+ 
 		start = NULL;
 		if (dp->get_info) {
 			/* Handle old net routines */
-			n = dp->get_info(page, &start, *ppos, count);
+			n = dp->get_info(page, &start, pos, count);
 			if (n < count)
 				eof = 1;
 		} else if (dp->read_proc) {
@@ -115,7 +118,7 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 			 *    requested offset advanced by the number of bytes
 			 *    absorbed.
 			 */
-			n = dp->read_proc(page, &start, *ppos,
+			n = dp->read_proc(page, &start, pos,
 					  count, &eof, dp->data);
 		} else
 			break;
@@ -134,12 +137,12 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 				       "proc_file_read: Apparent buffer overflow!\n");
 				n = PAGE_SIZE;
 			}
-			n -= *ppos;
+			n -= pos;
 			if (n <= 0)
 				break;
 			if (n > count)
 				n = count;
-			start = page + *ppos;
+			start = page + pos;
 		} else if (start < page) {
 			if (n > PAGE_SIZE) {
 				printk(KERN_ERR
@@ -172,7 +175,8 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 			break;
 		}
 
-		*ppos += start < page ? (unsigned long)start : n;
+		pos += start < page ? (unsigned long)start : n;
+		*ppos = pos;
 		nbytes -= n;
 		buf += n;
 		retval += n;
@@ -202,6 +206,7 @@ static loff_t
 proc_file_lseek(struct file *file, loff_t offset, int orig)
 {
     lock_kernel();
+    /* FIXME - need proper locking for proc/generic */
 
     switch (orig) {
     case 0:

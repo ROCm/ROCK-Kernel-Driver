@@ -140,6 +140,7 @@ __initcall(proc_ppc64_init);
 
 static loff_t page_map_seek( struct file *file, loff_t off, int whence)
 {
+	/* XXX - locking needed */
 	loff_t new;
 	struct proc_dir_entry *dp = PDE(file->f_dentry->d_inode);
 
@@ -163,10 +164,10 @@ static loff_t page_map_seek( struct file *file, loff_t off, int whence)
 
 static ssize_t page_map_read( struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 {
-	unsigned pos = *ppos;
+	loff_t pos = *ppos;
 	struct proc_dir_entry *dp = PDE(file->f_dentry->d_inode);
 
-	if ( pos >= dp->size )
+	if ( pos < 0 || pos >= dp->size )
 		return 0;
 	if ( nbytes >= dp->size )
 		nbytes = dp->size;

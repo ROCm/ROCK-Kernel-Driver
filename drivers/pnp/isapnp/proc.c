@@ -26,6 +26,9 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
+#include <asm/semaphore.h>
+
+static DECLARE_MUTEX(isapnp_mutex);	/* Don't whack two things at once */
 
 extern struct pnp_protocol isapnp_protocol;
 
@@ -35,7 +38,7 @@ static loff_t isapnp_proc_bus_lseek(struct file *file, loff_t off, int whence)
 {
 	loff_t new = -1;
 
-	lock_kernel();
+	down(&isapnp_mutex);
 	switch (whence) {
 	case 0:
 		new = off;
@@ -48,11 +51,12 @@ static loff_t isapnp_proc_bus_lseek(struct file *file, loff_t off, int whence)
 		break;
 	}
 	if (new < 0 || new > 256) {
-		unlock_kernel();
+		up(&isapnp_mutex);
 		return -EINVAL;
 	}
-	unlock_kernel();
-	return (file->f_pos = new);
+	file->f_pos = new;
+	up(&isapnp_mutex);
+	return new;
 }
 
 static ssize_t isapnp_proc_bus_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
@@ -60,19 +64,27 @@ static ssize_t isapnp_proc_bus_read(struct file *file, char *buf, size_t nbytes,
 	struct inode *ino = file->f_dentry->d_inode;
 	struct proc_dir_entry *dp = PDE(ino);
 	struct pnp_dev *dev = dp->data;
-	int pos = *ppos;
+	loff_t pos;
 	int cnt, size = 256;
 
+	down(&isapnp_mutex);
+	pos = *ppos;
 	if (pos >= size)
+	{
+		up(&isapnp_mutex);
 		return 0;
+	}
 	if (nbytes >= size)
 		nbytes = size;
-	if (pos + nbytes > size)
+	if (nbytes > size - pos)
 		nbytes = size - pos;
 	cnt = nbytes;
 
 	if (!access_ok(VERIFY_WRITE, buf, cnt))
-		return -EINVAL;
+	{
+		up(&isapnp_mutex);
+		return -EFAULT;
+	}
 
 	isapnp_cfg_begin(dev->card->number, dev->number);
 	for ( ; pos < 256 && cnt > 0; pos++, buf++, cnt--) {
@@ -83,6 +95,7 @@ static ssize_t isapnp_proc_bus_read(struct file *file, char *buf, size_t nbytes,
 	isapnp_cfg_end();
 
 	*ppos = pos;
+	up(&isapnp_mutex);
 	return nbytes;
 }
 

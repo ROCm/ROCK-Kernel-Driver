@@ -1219,7 +1219,7 @@ static ssize_t rw_checks(Scsi_Tape *STp, struct file *filp, size_t count, loff_t
 
 	if (ppos != &filp->f_pos) {
 		/* "A request was outside the capabilities of the device." */
-		retval = (-ENXIO);
+		retval = (-ESPIPE);
 		goto out;
 	}
 
@@ -3727,6 +3727,7 @@ static struct file_operations st_fops =
 	.read =		st_read,
 	.write =	st_write,
 	.ioctl =	st_ioctl,
+	.llseek =	no_llseek,
 	.open =		st_open,
 	.flush =	st_flush,
 	.release =	st_release,

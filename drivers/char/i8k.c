@@ -464,27 +464,31 @@ static int i8k_get_info(char *buffer, char **start, off_t fpos, int length)
 
 static ssize_t i8k_read(struct file *f, char *buffer, size_t len, loff_t *fpos)
 {
+    loff_t pos = *fpos;
     int n;
     char info[128];
+    
+    /* XXX - seek locking required */
 
     n = i8k_get_info(info, NULL, 0, 128);
-    if (n <= 0) {
+    if (n <= 0)
 	return n;
-    }
+	
+    if (pos < 0)
+    	return -EINVAL;
 
-    if (*fpos >= n) {
+    if (pos >= n) {
 	return 0;
     }
 
-    if ((*fpos + len) >= n) {
-	len = n - *fpos;
-    }
+    if (len > n - pos - 1)
+	    len = n - pos - 1;
 
     if (copy_to_user(buffer, info, len) != 0) {
 	return -EFAULT;
     }
 
-    *fpos += len;
+    *fpos = pos + len;
     return len;
 }
 

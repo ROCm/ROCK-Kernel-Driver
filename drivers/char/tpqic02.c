@@ -1729,6 +1729,7 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count, loff_
 	int type = iminor(filp->f_dentry->d_inode);
 	unsigned short flags = filp->f_flags;
 	unsigned long bytes_todo, bytes_done, total_bytes_done = 0;
+	loff_t pos = *ppos;
 	int stat;
 
 	if (status_zombie == YES) {
@@ -1738,7 +1739,7 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count, loff_
 
 	if (TP_DIAGS(current_type))
 		printk(TPQIC02_NAME ": request READ, minor=%x, buf=%p, count=%lx, pos=%Lx, flags=%x\n", type, buf,
-		       (long) count, filp->f_pos, flags);
+		       (long) count, pos, flags);
 
 	if (count % TAPE_BLKSIZE) {	/* Only allow mod 512 bytes at a time. */
 		tpqputs(TPQD_BLKSZ, "Wrong block size");
@@ -1802,6 +1803,7 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count, loff_
 		}
 
 		if (bytes_todo == 0) {
+			*ppos = pos;
 			return total_bytes_done;
 		}
 
@@ -1863,7 +1865,7 @@ static ssize_t qic02_tape_read(struct file *filp, char *buf, size_t count, loff_
 		if (bytes_done > 0) {
 			status_bytes_rd = YES;
 			buf += bytes_done;
-			*ppos += bytes_done;
+			pos += bytes_done;
 			total_bytes_done += bytes_done;
 			count -= bytes_done;
 		}
