@@ -404,6 +404,179 @@ struct cheetah_err_info {
 };
 #define CHAFSR_INVALID		((u64)-1L)
 
+/* This table is ordered in priority of errors and matches the
+ * AFAR overwrite policy as well.
+ */
+
+struct afsr_error_table {
+	unsigned long mask;
+	const char *name;
+};
+
+static const char CHAFSR_PERR_msg[] =
+	"System interface protocol error";
+static const char CHAFSR_IERR_msg[] =
+	"Internal processor error";
+static const char CHAFSR_ISAP_msg[] =
+	"System request parity error on incoming addresss";
+static const char CHAFSR_UCU_msg[] =
+	"Uncorrectable E-cache ECC error for ifetch/data";
+static const char CHAFSR_UCC_msg[] =
+	"SW Correctable E-cache ECC error for ifetch/data";
+static const char CHAFSR_UE_msg[] =
+	"Uncorrectable system bus data ECC error for read";
+static const char CHAFSR_EDU_msg[] =
+	"Uncorrectable E-cache ECC error for stmerge/blkld";
+static const char CHAFSR_EMU_msg[] =
+	"Uncorrectable system bus MTAG error";
+static const char CHAFSR_WDU_msg[] =
+	"Uncorrectable E-cache ECC error for writeback";
+static const char CHAFSR_CPU_msg[] =
+	"Uncorrectable ECC error for copyout";
+static const char CHAFSR_CE_msg[] =
+	"HW corrected system bus data ECC error for read";
+static const char CHAFSR_EDC_msg[] =
+	"HW corrected E-cache ECC error for stmerge/blkld";
+static const char CHAFSR_EMC_msg[] =
+	"HW corrected system bus MTAG ECC error";
+static const char CHAFSR_WDC_msg[] =
+	"HW corrected E-cache ECC error for writeback";
+static const char CHAFSR_CPC_msg[] =
+	"HW corrected ECC error for copyout";
+static const char CHAFSR_TO_msg[] =
+	"Unmapped error from system bus";
+static const char CHAFSR_BERR_msg[] =
+	"Bus error response from system bus";
+static const char CHAFSR_IVC_msg[] =
+	"HW corrected system bus data ECC error for ivec read";
+static const char CHAFSR_IVU_msg[] =
+	"Uncorrectable system bus data ECC error for ivec read";
+static struct afsr_error_table __cheetah_error_table[] = {
+	{	CHAFSR_PERR,	CHAFSR_PERR_msg		},
+	{	CHAFSR_IERR,	CHAFSR_IERR_msg		},
+	{	CHAFSR_ISAP,	CHAFSR_ISAP_msg		},
+	{	CHAFSR_UCU,	CHAFSR_UCU_msg		},
+	{	CHAFSR_UCC,	CHAFSR_UCC_msg		},
+	{	CHAFSR_UE,	CHAFSR_UE_msg		},
+	{	CHAFSR_EDU,	CHAFSR_EDU_msg		},
+	{	CHAFSR_EMU,	CHAFSR_EMU_msg		},
+	{	CHAFSR_WDU,	CHAFSR_WDU_msg		},
+	{	CHAFSR_CPU,	CHAFSR_CPU_msg		},
+	{	CHAFSR_CE,	CHAFSR_CE_msg		},
+	{	CHAFSR_EDC,	CHAFSR_EDC_msg		},
+	{	CHAFSR_EMC,	CHAFSR_EMC_msg		},
+	{	CHAFSR_WDC,	CHAFSR_WDC_msg		},
+	{	CHAFSR_CPC,	CHAFSR_CPC_msg		},
+	{	CHAFSR_TO,	CHAFSR_TO_msg		},
+	{	CHAFSR_BERR,	CHAFSR_BERR_msg		},
+	/* These two do not update the AFAR. */
+	{	CHAFSR_IVC,	CHAFSR_IVC_msg		},
+	{	CHAFSR_IVU,	CHAFSR_IVU_msg		},
+	{	0,		NULL			},
+};
+static const char CHPAFSR_DTO_msg[] =
+	"System bus unmapped error for prefetch/storequeue-read";
+static const char CHPAFSR_DBERR_msg[] =
+	"System bus error for prefetch/storequeue-read";
+static const char CHPAFSR_THCE_msg[] =
+	"Hardware corrected E-cache Tag ECC error";
+static const char CHPAFSR_TSCE_msg[] =
+	"SW handled correctable E-cache Tag ECC error";
+static const char CHPAFSR_TUE_msg[] =
+	"Uncorrectable E-cache Tag ECC error";
+static const char CHPAFSR_DUE_msg[] =
+	"System bus uncorrectable data ECC error due to prefetch/store-fill";
+static struct afsr_error_table __cheetah_plus_error_table[] = {
+	{	CHAFSR_PERR,	CHAFSR_PERR_msg		},
+	{	CHAFSR_IERR,	CHAFSR_IERR_msg		},
+	{	CHAFSR_ISAP,	CHAFSR_ISAP_msg		},
+	{	CHAFSR_UCU,	CHAFSR_UCU_msg		},
+	{	CHAFSR_UCC,	CHAFSR_UCC_msg		},
+	{	CHAFSR_UE,	CHAFSR_UE_msg		},
+	{	CHAFSR_EDU,	CHAFSR_EDU_msg		},
+	{	CHAFSR_EMU,	CHAFSR_EMU_msg		},
+	{	CHAFSR_WDU,	CHAFSR_WDU_msg		},
+	{	CHAFSR_CPU,	CHAFSR_CPU_msg		},
+	{	CHAFSR_CE,	CHAFSR_CE_msg		},
+	{	CHAFSR_EDC,	CHAFSR_EDC_msg		},
+	{	CHAFSR_EMC,	CHAFSR_EMC_msg		},
+	{	CHAFSR_WDC,	CHAFSR_WDC_msg		},
+	{	CHAFSR_CPC,	CHAFSR_CPC_msg		},
+	{	CHAFSR_TO,	CHAFSR_TO_msg		},
+	{	CHAFSR_BERR,	CHAFSR_BERR_msg		},
+	{	CHPAFSR_DTO,	CHPAFSR_DTO_msg		},
+	{	CHPAFSR_DBERR,	CHPAFSR_DBERR_msg	},
+	{	CHPAFSR_THCE,	CHPAFSR_THCE_msg	},
+	{	CHPAFSR_TSCE,	CHPAFSR_TSCE_msg	},
+	{	CHPAFSR_TUE,	CHPAFSR_TUE_msg		},
+	{	CHPAFSR_DUE,	CHPAFSR_DUE_msg		},
+	/* These two do not update the AFAR. */
+	{	CHAFSR_IVC,	CHAFSR_IVC_msg		},
+	{	CHAFSR_IVU,	CHAFSR_IVU_msg		},
+	{	0,		NULL			},
+};
+static const char JPAFSR_JETO_msg[] =
+	"System interface protocol error, hw timeout caused";
+static const char JPAFSR_SCE_msg[] =
+	"Parity error on system snoop results";
+static const char JPAFSR_JEIC_msg[] =
+	"System interface protocol error, illegal command detected";
+static const char JPAFSR_JEIT_msg[] =
+	"System interface protocol error, illegal ADTYPE detected";
+static const char JPAFSR_OM_msg[] =
+	"Out of range memory error has occurred";
+static const char JPAFSR_ETP_msg[] =
+	"Parity error on L2 cache tag SRAM";
+static const char JPAFSR_UMS_msg[] =
+	"Error due to unsupported store";
+static const char JPAFSR_RUE_msg[] =
+	"Uncorrectable ECC error from remote cache/memory";
+static const char JPAFSR_RCE_msg[] =
+	"Correctable ECC error from remote cache/memory";
+static const char JPAFSR_BP_msg[] =
+	"JBUS parity error on returned read data";
+static const char JPAFSR_WBP_msg[] =
+	"JBUS parity error on data for writeback or block store";
+static const char JPAFSR_FRC_msg[] =
+	"Foreign read to DRAM incurring correctable ECC error";
+static const char JPAFSR_FRU_msg[] =
+	"Foreign read to DRAM incurring uncorrectable ECC error";
+static struct afsr_error_table __jalapeno_error_table[] = {
+	{	JPAFSR_JETO,	JPAFSR_JETO_msg		},
+	{	JPAFSR_SCE,	JPAFSR_SCE_msg		},
+	{	JPAFSR_JEIC,	JPAFSR_JEIC_msg		},
+	{	JPAFSR_JEIT,	JPAFSR_JEIT_msg		},
+	{	CHAFSR_PERR,	CHAFSR_PERR_msg		},
+	{	CHAFSR_IERR,	CHAFSR_IERR_msg		},
+	{	CHAFSR_ISAP,	CHAFSR_ISAP_msg		},
+	{	CHAFSR_UCU,	CHAFSR_UCU_msg		},
+	{	CHAFSR_UCC,	CHAFSR_UCC_msg		},
+	{	CHAFSR_UE,	CHAFSR_UE_msg		},
+	{	CHAFSR_EDU,	CHAFSR_EDU_msg		},
+	{	JPAFSR_OM,	JPAFSR_OM_msg		},
+	{	CHAFSR_WDU,	CHAFSR_WDU_msg		},
+	{	CHAFSR_CPU,	CHAFSR_CPU_msg		},
+	{	CHAFSR_CE,	CHAFSR_CE_msg		},
+	{	CHAFSR_EDC,	CHAFSR_EDC_msg		},
+	{	JPAFSR_ETP,	JPAFSR_ETP_msg		},
+	{	CHAFSR_WDC,	CHAFSR_WDC_msg		},
+	{	CHAFSR_CPC,	CHAFSR_CPC_msg		},
+	{	CHAFSR_TO,	CHAFSR_TO_msg		},
+	{	CHAFSR_BERR,	CHAFSR_BERR_msg		},
+	{	JPAFSR_UMS,	JPAFSR_UMS_msg		},
+	{	JPAFSR_RUE,	JPAFSR_RUE_msg		},
+	{	JPAFSR_RCE,	JPAFSR_RCE_msg		},
+	{	JPAFSR_BP,	JPAFSR_BP_msg		},
+	{	JPAFSR_WBP,	JPAFSR_WBP_msg		},
+	{	JPAFSR_FRC,	JPAFSR_FRC_msg		},
+	{	JPAFSR_FRU,	JPAFSR_FRU_msg		},
+	/* These two do not update the AFAR. */
+	{	CHAFSR_IVU,	CHAFSR_IVU_msg		},
+	{	0,		NULL			},
+};
+static struct afsr_error_table *cheetah_error_table;
+static unsigned long cheetah_afsr_errors;
+
 /* This is allocated at boot time based upon the largest hardware
  * cpu ID in the system.  We allocate two entries per cpu, one for
  * TL==0 logging and one for TL >= 1 logging.
@@ -439,7 +612,7 @@ extern unsigned int cheetah_deferred_trap_vector[], cheetah_deferred_trap_vector
 
 void __init cheetah_ecache_flush_init(void)
 {
-	unsigned long largest_size, smallest_linesize, order;
+	unsigned long largest_size, smallest_linesize, order, ver;
 	char type[16];
 	int node, i;
 
@@ -516,6 +689,18 @@ void __init cheetah_ecache_flush_init(void)
 	 */
 	for (i = 0; i < 2 * NR_CPUS; i++)
 		cheetah_error_log[i].afsr = CHAFSR_INVALID;
+
+	__asm__ ("rdpr %%ver, %0" : "=r" (ver));
+	if ((ver >> 32) == 0x003e0016) {
+		cheetah_error_table = &__jalapeno_error_table[0];
+		cheetah_afsr_errors = JPAFSR_ERRORS;
+	} else if ((ver >> 32) == 0x003e0015) {
+		cheetah_error_table = &__cheetah_plus_error_table[0];
+		cheetah_afsr_errors = CHPAFSR_ERRORS;
+	} else {
+		cheetah_error_table = &__cheetah_error_table[0];
+		cheetah_afsr_errors = CHAFSR_ERRORS;
+	}
 
 	/* Now patch trap tables. */
 	memcpy(tl0_fecc, cheetah_fecc_trap_vector, (8 * 4));
@@ -757,36 +942,6 @@ static unsigned char cheetah_mtag_syntab[] = {
        NONE, NONE
 };
 
-/* This table is ordered in priority of errors and matches the
- * AFAR overwrite policy as well.
- */
-static struct {
-	unsigned long mask;
-	char *name;
-} cheetah_error_table[] = {
-	{	CHAFSR_PERR,	"System interface protocol error"			},
-	{	CHAFSR_IERR,	"Internal processor error"				},
-	{	CHAFSR_ISAP,	"System request parity error on incoming addresss"	},
-	{	CHAFSR_UCU,	"Uncorrectable E-cache ECC error for ifetch/data"	},
-	{	CHAFSR_UCC,	"SW Correctable E-cache ECC error for ifetch/data"	},
-	{	CHAFSR_UE,	"Uncorrectable system bus data ECC error for read"	},
-	{	CHAFSR_EDU,	"Uncorrectable E-cache ECC error for stmerge/blkld"	},
-	{	CHAFSR_EMU,	"Uncorrectable system bus MTAG error"			},
-	{	CHAFSR_WDU,	"Uncorrectable E-cache ECC error for writeback"		},
-	{	CHAFSR_CPU,	"Uncorrectable ECC error for copyout"			},
-	{	CHAFSR_CE,	"HW corrected system bus data ECC error for read"	},
-	{	CHAFSR_EDC,	"HW corrected E-cache ECC error for stmerge/blkld"	},
-	{	CHAFSR_EMC,	"HW corrected system bus MTAG ECC error"		},
-	{	CHAFSR_WDC,	"HW corrected E-cache ECC error for writeback"		},
-	{	CHAFSR_CPC,	"HW corrected ECC error for copyout"			},
-	{	CHAFSR_TO,	"Unmapped error from system bus"			},
-	{	CHAFSR_BERR,	"Bus error response from system bus"			},
-	/* These two do not update the AFAR. */
-	{	CHAFSR_IVC,	"HW corrected system bus data ECC error for ivec read"	},
-	{	CHAFSR_IVU,	"Uncorrectable system bus data ECC error for ivec read"	},
-	{	0,		NULL							}
-};
-
 /* Return the highest priority error conditon mentioned. */
 static __inline__ unsigned long cheetah_get_hipri(unsigned long afsr)
 {
@@ -800,7 +955,7 @@ static __inline__ unsigned long cheetah_get_hipri(unsigned long afsr)
 	return tmp;
 }
 
-static char *cheetah_get_string(unsigned long bit)
+static const char *cheetah_get_string(unsigned long bit)
 {
 	int i;
 
@@ -913,7 +1068,7 @@ static void cheetah_log_errors(struct pt_regs *regs, struct cheetah_err_info *in
 	       info->ecache_data[2],
 	       info->ecache_data[3]);
 
-	afsr = (afsr & ~hipri) & CHAFSR_ERRORS;
+	afsr = (afsr & ~hipri) & cheetah_afsr_errors;
 	while (afsr != 0UL) {
 		unsigned long bit = cheetah_get_hipri(afsr);
 
@@ -936,7 +1091,7 @@ static int cheetah_recheck_errors(struct cheetah_err_info *logp)
 	__asm__ __volatile__("ldxa [%%g0] %1, %0\n\t"
 			     : "=r" (afsr)
 			     : "i" (ASI_AFSR));
-	if ((afsr & CHAFSR_ERRORS) != 0) {
+	if ((afsr & cheetah_afsr_errors) != 0) {
 		if (logp != NULL) {
 			__asm__ __volatile__("ldxa [%%g0] %1, %0\n\t"
 					     : "=r" (afar)
@@ -1162,12 +1317,12 @@ void cheetah_cee_handler(struct pt_regs *regs, unsigned long afsr, unsigned long
 
 		flush_all = flush_line = 0;
 		if ((afsr & CHAFSR_EDC) != 0UL) {
-			if ((afsr & CHAFSR_ERRORS) == CHAFSR_EDC)
+			if ((afsr & cheetah_afsr_errors) == CHAFSR_EDC)
 				flush_line = 1;
 			else
 				flush_all = 1;
 		} else if ((afsr & CHAFSR_CPC) != 0UL) {
-			if ((afsr & CHAFSR_ERRORS) == CHAFSR_CPC)
+			if ((afsr & cheetah_afsr_errors) == CHAFSR_CPC)
 				flush_line = 1;
 			else
 				flush_all = 1;
@@ -1290,12 +1445,12 @@ void cheetah_deferred_handler(struct pt_regs *regs, unsigned long afsr, unsigned
 
 		flush_all = flush_line = 0;
 		if ((afsr & CHAFSR_EDU) != 0UL) {
-			if ((afsr & CHAFSR_ERRORS) == CHAFSR_EDU)
+			if ((afsr & cheetah_afsr_errors) == CHAFSR_EDU)
 				flush_line = 1;
 			else
 				flush_all = 1;
 		} else if ((afsr & CHAFSR_BERR) != 0UL) {
-			if ((afsr & CHAFSR_ERRORS) == CHAFSR_BERR)
+			if ((afsr & cheetah_afsr_errors) == CHAFSR_BERR)
 				flush_line = 1;
 			else
 				flush_all = 1;
