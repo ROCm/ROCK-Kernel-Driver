@@ -78,7 +78,7 @@
 	printk(KERN_ERR fmt, ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 886 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 895 $ Ben Collins <bcollins@debian.org>";
 
 /* Our ieee1394 highlevel driver */
 #define ETHER1394_DRIVER_NAME "ether1394"
@@ -340,6 +340,7 @@ static void ether1394_add_host (struct hpsb_host *host, struct hpsb_highlevel *h
 	priv = (struct eth1394_priv *)dev->priv;
 
 	priv->host = host;
+	spin_lock_init(&priv->lock);
 
 	hi = hpsb_create_hostinfo(hl, host, sizeof(*hi));
 

@@ -1616,18 +1616,6 @@ struct node_entry *hpsb_nodeid_get_entry(struct hpsb_host *host, nodeid_t nodeid
 	return ne;
 }
 
-struct node_entry *hpsb_check_nodeid(struct hpsb_host *host, nodeid_t nodeid)
-{
-	struct node_entry *ne;
-
-	if (down_trylock(&nodemgr_serialize))
-		return NULL;
-	ne = find_entry_by_nodeid(host, nodeid);
-	up(&nodemgr_serialize);
-
-	return ne;
-}
-
 /* The following four convenience functions use a struct node_entry
  * for addressing a node on the bus.  They are intended for use by any
  * process context, not just the nodemgr thread, so we need to be a

@@ -448,7 +448,7 @@ static int lock_regs(struct hpsb_host *host, int nodeid, quadlet_t *store,
                 /* bandwidth available algorithm adapted from IEEE 1394a-2000 spec */
                 if (arg > 0x1fff) {
                         *store = cpu_to_be32(old);	/* change nothing */
-                        break;
+			break;
                 }
                 data &= 0x1fff;
                 if (arg >= data) {

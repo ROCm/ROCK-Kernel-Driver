@@ -455,6 +455,10 @@ struct video_card {
 	 */
 	spinlock_t spinlock;
 
+	/* flag to prevent spurious interrupts (which OHCI seems to
+	   generate a lot :) from accessing the struct */
+	int dma_running;
+	
 	/*
 	  3) the sleeping semaphore 'sem' - this is used from process context only,
 	  to serialize various operations on the video_card. Even though only one
@@ -568,7 +572,7 @@ static inline int video_card_initialized(struct video_card *v)
 
 static int do_dv1394_init(struct video_card *video, struct dv1394_init *init);
 static int do_dv1394_init_default(struct video_card *video);
-static int do_dv1394_shutdown(struct video_card *video, int free_user_buf);
+static void do_dv1394_shutdown(struct video_card *video, int free_user_buf);
 
 
 /* NTSC empty packet rate accurate to within 0.01%, 
