@@ -71,7 +71,7 @@ static int DAC960_open(struct inode *inode, struct file *file)
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
 	DAC960_Controller_T *p = disk->queue->queuedata;
-	int drive_nr = (int)disk->private_data;
+	int drive_nr = (long)disk->private_data;
 
 	if (p->FirmwareType == DAC960_V1_Controller) {
 		if (p->V1.LogicalDriveInformation[drive_nr].
@@ -96,7 +96,7 @@ static int DAC960_ioctl(struct inode *inode, struct file *file,
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
 	DAC960_Controller_T *p = disk->queue->queuedata;
-	int drive_nr = (int)disk->private_data;
+	int drive_nr = (long)disk->private_data;
 	struct hd_geometry g, *loc = (struct hd_geometry *)arg;
 
 	if (cmd != HDIO_GETGEO || !loc)
@@ -136,7 +136,7 @@ static int DAC960_ioctl(struct inode *inode, struct file *file,
 static int DAC960_media_changed(struct gendisk *disk)
 {
 	DAC960_Controller_T *p = disk->queue->queuedata;
-	int drive_nr = (int)disk->private_data;
+	int drive_nr = (long)disk->private_data;
 
 	if (!p->LogicalDriveInitiallyAccessible[drive_nr])
 		return 1;
@@ -146,7 +146,7 @@ static int DAC960_media_changed(struct gendisk *disk)
 static int DAC960_revalidate_disk(struct gendisk *disk)
 {
 	DAC960_Controller_T *p = disk->queue->queuedata;
-	int unit = (int)disk->private_data;
+	int unit = (long)disk->private_data;
 
 	set_capacity(disk, disk_size(p, unit));
 	return 0;
@@ -1603,6 +1603,26 @@ static boolean DAC960_V1_ReadControllerConfiguration(DAC960_Controller_T
     DAC960PU/PD/PL	    3.51 and above
     DAC960PU/PD/PL/P	    2.73 and above
   */
+#if defined(CONFIG_ALPHA)
+  /*
+    DEC Alpha machines were often equipped with DAC960 cards that were
+    OEMed from Mylex, and had their own custom firmware. Version 2.70,
+    the last custom FW revision to be released by DEC for these older
+    controllers, appears to work quite well with this driver.
+
+    Cards tested successfully were several versions each of the PD and
+    PU, called by DEC the KZPSC and KZPAC, respectively, and having
+    the Manufacturer Numbers (from Mylex), usually on a sticker on the
+    back of the board, of:
+
+    KZPSC:  D040347 (1-channel) or D040348 (2-channel) or D040349 (3-channel)
+    KZPAC:  D040395 (1-channel) or D040396 (2-channel) or D040397 (3-channel)
+  */
+# define FIRMWARE_27X	"2.70"
+#else
+# define FIRMWARE_27X	"2.73"
+#endif
+
   if (Enquiry2->FirmwareID.MajorVersion == 0)
     {
       Enquiry2->FirmwareID.MajorVersion =
@@ -1622,7 +1642,7 @@ static boolean DAC960_V1_ReadControllerConfiguration(DAC960_Controller_T
 	(Controller->FirmwareVersion[0] == '3' &&
 	 strcmp(Controller->FirmwareVersion, "3.51") >= 0) ||
 	(Controller->FirmwareVersion[0] == '2' &&
-	 strcmp(Controller->FirmwareVersion, "2.73") >= 0)))
+	 strcmp(Controller->FirmwareVersion, FIRMWARE_27X) >= 0)))
     {
       DAC960_Failure(Controller, "FIRMWARE VERSION VERIFICATION");
       DAC960_Error("Firmware Version = '%s'\n", Controller,
@@ -2708,12 +2728,12 @@ DAC960_DetectController(struct pci_dev *PCI_Device,
 	  break;
   }
 
-  pci_set_drvdata(PCI_Device, (void *)((int)Controller->ControllerNumber));
+  pci_set_drvdata(PCI_Device, (void *)((long)Controller->ControllerNumber));
   for (i = 0; i < DAC960_MaxLogicalDrives; i++) {
 	Controller->disks[i] = alloc_disk(1<<DAC960_MaxPartitionsBits);
 	if (!Controller->disks[i])
 		goto Failure;
-	Controller->disks[i]->private_data = (void *)i;
+	Controller->disks[i]->private_data = (void *)((long)i);
   }
   init_waitqueue_head(&Controller->CommandWaitQueue);
   init_waitqueue_head(&Controller->HealthStatusWaitQueue);
@@ -3097,7 +3117,7 @@ DAC960_Probe(struct pci_dev *dev, const struct pci_device_id *entry)
 
 static void DAC960_Remove(struct pci_dev *PCI_Device)
 {
-  int Controller_Number = (int)pci_get_drvdata(PCI_Device);
+  int Controller_Number = (long)pci_get_drvdata(PCI_Device);
   DAC960_Controller_T *Controller = DAC960_Controllers[Controller_Number];
   if (Controller != NULL)
       DAC960_FinalizeController(Controller);
@@ -3272,7 +3292,7 @@ static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
     Command->CommandType = DAC960_WriteCommand;
   }
   Command->Completion = Request->waiting;
-  Command->LogicalDriveNumber = (int)Request->rq_disk->private_data;
+  Command->LogicalDriveNumber = (long)Request->rq_disk->private_data;
   Command->BlockNumber = Request->sector;
   Command->BlockCount = Request->nr_sectors;
   Command->Request = Request;
