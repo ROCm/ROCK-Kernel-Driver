@@ -68,13 +68,15 @@
  */
 #define MIN_TIMESLICE		( 10 * HZ / 1000)
 #define MAX_TIMESLICE		(200 * HZ / 1000)
-#define CHILD_PENALTY		50
+#define TIMESLICE_GRANULARITY	(HZ/40 ?: 1)
+#define ON_RUNQUEUE_WEIGHT	30
+#define CHILD_PENALTY		95
 #define PARENT_PENALTY		100
 #define EXIT_WEIGHT		3
 #define PRIO_BONUS_RATIO	25
 #define INTERACTIVE_DELTA	2
-#define MAX_SLEEP_AVG		(10*HZ)
-#define STARVATION_LIMIT	(10*HZ)
+#define MAX_SLEEP_AVG		(1*1000000000)
+#define STARVATION_LIMIT	HZ
 #define NODE_THRESHOLD		125
 
 /*
@@ -114,6 +116,11 @@
 
 #define TASK_INTERACTIVE(p) \
 	((p)->prio <= (p)->static_prio - DELTA(p))
+
+#define TASK_PREEMPTS_CURR(p, rq) \
+	((p)->prio < (rq)->curr->prio || \
+		((p)->prio == (rq)->curr->prio && \
+			(p)->time_slice > (rq)->curr->time_slice * 2))
 
 /*
  * BASE_TIMESLICE scales user-nice values [ -20 ... 19 ]
@@ -318,8 +325,8 @@ static int effective_prio(task_t *p)
 	if (rt_task(p))
 		return p->prio;
 
-	bonus = MAX_USER_PRIO*PRIO_BONUS_RATIO*p->sleep_avg/MAX_SLEEP_AVG/100 -
-			MAX_USER_PRIO*PRIO_BONUS_RATIO/100/2;
+	bonus = MAX_USER_PRIO*PRIO_BONUS_RATIO*(p->sleep_avg/1024)/(MAX_SLEEP_AVG/1024)/100;
+	bonus -= MAX_USER_PRIO*PRIO_BONUS_RATIO/100/2;
 
 	prio = p->static_prio - bonus;
 	if (prio < MAX_RT_PRIO)
@@ -338,24 +345,24 @@ static inline void __activate_task(task_t *p, runqueue_t *rq)
 	nr_running_inc(rq);
 }
 
-/*
- * activate_task - move a task to the runqueue and do priority recalculation
- *
- * Update all the scheduling statistics stuff. (sleep average
- * calculation, priority modifiers, etc.)
- */
-static inline void activate_task(task_t *p, runqueue_t *rq)
+static void recalc_task_prio(task_t *p, unsigned long long now)
 {
-	long sleep_time = jiffies - p->last_run - 1;
+	unsigned long long __sleep_time = now - p->timestamp;
+	unsigned long sleep_time;
+
+	if (__sleep_time > MAX_SLEEP_AVG)
+		sleep_time = MAX_SLEEP_AVG;
+	else
+		sleep_time = (unsigned long)__sleep_time;
 
 	if (sleep_time > 0) {
-		int sleep_avg;
+		unsigned long long sleep_avg;
 
 		/*
 		 * This code gives a bonus to interactive tasks.
 		 *
 		 * The boost works by updating the 'average sleep time'
-		 * value here, based on ->last_run. The more time a task
+		 * value here, based on ->timestamp. The more time a task
 		 * spends sleeping, the higher the average gets - and the
 		 * higher the priority boost gets as well.
 		 */
@@ -374,6 +381,37 @@ static inline void activate_task(task_t *p, runqueue_t *rq)
 			p->prio = effective_prio(p);
 		}
 	}
+}
+
+/*
+ * activate_task - move a task to the runqueue and do priority recalculation
+ *
+ * Update all the scheduling statistics stuff. (sleep average
+ * calculation, priority modifiers, etc.)
+ */
+static inline void activate_task(task_t *p, runqueue_t *rq)
+{
+	unsigned long long now = sched_clock();
+
+	recalc_task_prio(p, now);
+
+	/*
+	 * Tasks which were woken up by interrupts (ie. hw events)
+	 * are most likely of interactive nature. So we give them
+	 * the credit of extending their sleep time to the period
+	 * of time they spend on the runqueue, waiting for execution
+	 * on a CPU, first time around:
+	 */
+	if (in_interrupt())
+		p->activated = 2;
+	else
+	/*
+	 * Normal first-time wakeups get a credit too for on-runqueue time,
+	 * but it will be weighted down:
+	 */
+		p->activated = 1;
+	p->timestamp = now;
+
 	__activate_task(p, rq);
 }
 
@@ -500,7 +538,7 @@ repeat_lock_task:
 				__activate_task(p, rq);
 			else {
 				activate_task(p, rq);
-				if (p->prio < rq->curr->prio)
+				if (TASK_PREEMPTS_CURR(p, rq))
 					resched_task(rq->curr);
 			}
 			success = 1;
@@ -549,8 +587,8 @@ void wake_up_forked_process(task_t * p)
 	 * and children as well, to keep max-interactive tasks
 	 * from forking tasks that are max-interactive.
 	 */
-	current->sleep_avg = current->sleep_avg * PARENT_PENALTY / 100;
-	p->sleep_avg = p->sleep_avg * CHILD_PENALTY / 100;
+	current->sleep_avg = current->sleep_avg / 100 * PARENT_PENALTY;
+	p->sleep_avg = p->sleep_avg / 100 * CHILD_PENALTY;
 	p->prio = effective_prio(p);
 	set_task_cpu(p, smp_processor_id());
 
@@ -591,8 +629,7 @@ void sched_exit(task_t * p)
 	 * the sleep_avg of the parent as well.
 	 */
 	if (p->sleep_avg < p->parent->sleep_avg)
-		p->parent->sleep_avg = (p->parent->sleep_avg * EXIT_WEIGHT +
-			p->sleep_avg) / (EXIT_WEIGHT + 1);
+		p->parent->sleep_avg = p->parent->sleep_avg / (EXIT_WEIGHT + 1) * EXIT_WEIGHT + p->sleep_avg / (EXIT_WEIGHT + 1);
 }
 
 /**
@@ -994,13 +1031,8 @@ static inline void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t
 	 * Note that idle threads have a prio of MAX_PRIO, for this test
 	 * to be always true for them.
 	 */
-	if (p->prio < this_rq->curr->prio)
+	if (TASK_PREEMPTS_CURR(p, this_rq))
 		set_need_resched();
-	else {
-		if (p->prio == this_rq->curr->prio &&
-				p->time_slice > this_rq->curr->time_slice)
-			set_need_resched();
-	}
 }
 
 /*
@@ -1017,12 +1049,14 @@ static void load_balance(runqueue_t *this_rq, int idle, cpumask_t cpumask)
 	runqueue_t *busiest;
 	prio_array_t *array;
 	struct list_head *head, *curr;
+	unsigned long long now;
 	task_t *tmp;
 
 	busiest = find_busiest_queue(this_rq, this_cpu, idle, &imbalance, cpumask);
 	if (!busiest)
 		goto out;
 
+	now = sched_clock();
 	/*
 	 * We first consider expired tasks. Those will likely not be
 	 * executed in the near future, and they are most likely to
@@ -1063,7 +1097,7 @@ skip_queue:
 	 */
 
 #define CAN_MIGRATE_TASK(p,rq,this_cpu)					\
-	((idle || (jiffies - (p)->last_run > cache_decay_ticks)) &&	\
+	((idle || (((now - (p)->timestamp)>>10) > cache_decay_ticks)) &&\
 		!task_running(rq, p) &&					\
 			cpu_isset(this_cpu, (p)->cpus_allowed))
 
@@ -1180,8 +1214,7 @@ EXPORT_PER_CPU_SYMBOL(kstat);
  */
 #define EXPIRED_STARVING(rq) \
 		(STARVATION_LIMIT && ((rq)->expired_timestamp && \
-		(jiffies - (rq)->expired_timestamp >= \
-			STARVATION_LIMIT * ((rq)->nr_running) + 1)))
+		(jiffies - (rq)->expired_timestamp >= STARVATION_LIMIT)))
 
 /*
  * This function gets called by the timer code, with HZ frequency.
@@ -1231,14 +1264,11 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	spin_lock(&rq->lock);
 	/*
 	 * The task was running during this tick - update the
-	 * time slice counter and the sleep average. Note: we
-	 * do not update a thread's priority until it either
-	 * goes to sleep or uses up its timeslice. This makes
-	 * it possible for interactive tasks to use up their
-	 * timeslices at their highest priority levels.
+	 * time slice counter. Note: we do not update a thread's
+	 * priority until it either goes to sleep or uses up its
+	 * timeslice. This makes it possible for interactive tasks
+	 * to use up their timeslices at their highest priority levels.
 	 */
-	if (p->sleep_avg)
-		p->sleep_avg--;
 	if (unlikely(rt_task(p))) {
 		/*
 		 * RR tasks need a special form of timeslice management.
@@ -1262,12 +1292,33 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 		p->time_slice = task_timeslice(p);
 		p->first_time_slice = 0;
 
+		if (!rq->expired_timestamp)
+			rq->expired_timestamp = jiffies;
 		if (!TASK_INTERACTIVE(p) || EXPIRED_STARVING(rq)) {
-			if (!rq->expired_timestamp)
-				rq->expired_timestamp = jiffies;
 			enqueue_task(p, rq->expired);
 		} else
 			enqueue_task(p, rq->active);
+	} else {
+		/*
+		 * Prevent a too long timeslice allowing a task to monopolize
+		 * the CPU. We do this by splitting up the timeslice into
+		 * smaller pieces.
+		 *
+		 * Note: this does not mean the task's timeslices expire or
+		 * get lost in any way, they just might be preempted by
+		 * another task of equal priority. (one with higher
+		 * priority would have preempted this task already.) We
+		 * requeue this task to the end of the list on this priority
+		 * level, which is in essence a round-robin of tasks with
+		 * equal priority.
+		 */
+		if (!((task_timeslice(p) - p->time_slice) % TIMESLICE_GRANULARITY) &&
+			       		(p->array == rq->active)) {
+			dequeue_task(p, rq->active);
+			set_tsk_need_resched(p);
+			p->prio = effective_prio(p);
+			enqueue_task(p, rq->active);
+		}
 	}
 out_unlock:
 	spin_unlock(&rq->lock);
@@ -1286,6 +1337,8 @@ asmlinkage void schedule(void)
 	runqueue_t *rq;
 	prio_array_t *array;
 	struct list_head *queue;
+	unsigned long long now;
+	unsigned long run_time;
 	int idx;
 
 	/*
@@ -1306,7 +1359,11 @@ need_resched:
 	rq = this_rq();
 
 	release_kernel_lock(prev);
-	prev->last_run = jiffies;
+	now = sched_clock();
+	if (likely(now - prev->timestamp < MAX_SLEEP_AVG))
+		run_time = now - prev->timestamp;
+	else
+		run_time = MAX_SLEEP_AVG;
 	spin_lock_irq(&rq->lock);
 
 	/*
@@ -1356,12 +1413,30 @@ pick_next_task:
 	queue = array->queue + idx;
 	next = list_entry(queue->next, task_t, run_list);
 
+	if (next->activated) {
+		unsigned long long delta = now - next->timestamp;
+
+		if (next->activated == 1)
+			delta = delta * (ON_RUNQUEUE_WEIGHT * 128 / 100) / 128;
+
+		next->activated = 0;
+		array = next->array;
+		dequeue_task(next, array);
+		recalc_task_prio(next, next->timestamp + delta);
+		enqueue_task(next, array);
+	}
 switch_tasks:
 	prefetch(next);
 	clear_tsk_need_resched(prev);
 	RCU_qsctr(task_cpu(prev))++;
 
+	prev->sleep_avg -= run_time;
+	if ((long)prev->sleep_avg < 0)
+		prev->sleep_avg = 0;
+	prev->timestamp = now;
+
 	if (likely(prev != next)) {
+		next->timestamp = now;
 		rq->nr_switches++;
 		rq->curr = next;
 
@@ -1601,6 +1676,7 @@ void set_user_nice(task_t *p, long nice)
 	unsigned long flags;
 	prio_array_t *array;
 	runqueue_t *rq;
+	int old_prio, new_prio, delta;
 
 	if (TASK_NICE(p) == nice || nice < -20 || nice > 19)
 		return;
@@ -1609,6 +1685,12 @@ void set_user_nice(task_t *p, long nice)
 	 * the task might be in the middle of scheduling on another CPU.
 	 */
 	rq = task_rq_lock(p, &flags);
+	/*
+	 * The RT priorities are set via setscheduler(), but we still
+	 * allow the 'normal' nice value to be set - but as expected
+	 * it wont have any effect on scheduling until the task is
+	 * not SCHED_NORMAL:
+	 */
 	if (rt_task(p)) {
 		p->static_prio = NICE_TO_PRIO(nice);
 		goto out_unlock;
@@ -1616,16 +1698,20 @@ void set_user_nice(task_t *p, long nice)
 	array = p->array;
 	if (array)
 		dequeue_task(p, array);
+
+	old_prio = p->prio;
+	new_prio = NICE_TO_PRIO(nice);
+	delta = new_prio - old_prio;
 	p->static_prio = NICE_TO_PRIO(nice);
-	p->prio = NICE_TO_PRIO(nice);
+	p->prio += delta;
+
 	if (array) {
 		enqueue_task(p, array);
 		/*
-		 * If the task is running and lowered its priority,
-		 * or increased its priority then reschedule its CPU:
+		 * If the task increased its priority or is running and
+		 * lowered its priority, then reschedule its CPU:
 		 */
-		if ((NICE_TO_PRIO(nice) < p->static_prio) ||
-							task_running(rq, p))
+		if (delta < 0 || (delta > 0 && task_running(rq, p)))
 			resched_task(rq->curr);
 	}
 out_unlock:
@@ -2382,6 +2468,12 @@ static void move_task_away(struct task_struct *p, int dest_cpu)
 	local_irq_restore(flags);
 }
 
+typedef struct {
+	int cpu;
+	struct completion startup_done;
+	task_t *task;
+} migration_startup_t;
+
 /*
  * migration_thread - this is a highprio system thread that performs
  * thread migration by bumping thread off CPU then 'pushing' onto
@@ -2391,19 +2483,20 @@ static int migration_thread(void * data)
 {
 	/* Marking "param" __user is ok, since we do a set_fs(KERNEL_DS); */
 	struct sched_param __user param = { .sched_priority = MAX_RT_PRIO-1 };
-	int cpu = (long) data;
+	migration_startup_t *startup = data;
+	int cpu = startup->cpu;
 	runqueue_t *rq;
 	int ret;
 
+	startup->task = current;
+	complete(&startup->startup_done);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule();
+
+	BUG_ON(smp_processor_id() != cpu);
+
 	daemonize("migration/%d", cpu);
 	set_fs(KERNEL_DS);
-
-	/*
-	 * Either we are running on the right CPU, or there's a a
-	 * migration thread on this CPU, guaranteed (we're started
-	 * serially).
-	 */
-	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 
 	ret = setscheduler(0, SCHED_FIFO, &param);
 
@@ -2440,13 +2533,30 @@ static int migration_call(struct notifier_block *nfb,
 			  unsigned long action,
 			  void *hcpu)
 {
+	long cpu = (long) hcpu;
+	migration_startup_t startup;
+
 	switch (action) {
 	case CPU_ONLINE:
-		printk("Starting migration thread for cpu %li\n",
-		       (long)hcpu);
-		kernel_thread(migration_thread, hcpu, CLONE_KERNEL);
-		while (!cpu_rq((long)hcpu)->migration_thread)
+
+		printk("Starting migration thread for cpu %li\n", cpu);
+
+		startup.cpu = cpu;
+		startup.task = NULL;
+		init_completion(&startup.startup_done);
+
+		kernel_thread(migration_thread, &startup, CLONE_KERNEL);
+		wait_for_completion(&startup.startup_done);
+		wait_task_inactive(startup.task);
+
+		startup.task->thread_info->cpu = cpu;
+		startup.task->cpus_allowed = cpumask_of_cpu(cpu);
+
+		wake_up_process(startup.task);
+
+		while (!cpu_rq(cpu)->migration_thread)
 			yield();
+
 		break;
 	}
 	return NOTIFY_OK;

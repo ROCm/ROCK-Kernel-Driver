@@ -342,7 +342,8 @@ struct task_struct {
 	prio_array_t *array;
 
 	unsigned long sleep_avg;
-	unsigned long last_run;
+	unsigned long long timestamp;
+	int activated;
 
 	unsigned long policy;
 	cpumask_t cpus_allowed;
@@ -505,6 +506,8 @@ static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 	return 0;
 }
 #endif
+
+extern unsigned long long sched_clock(void);
 
 #ifdef CONFIG_NUMA
 extern void sched_balance_exec(void);

@@ -127,6 +127,30 @@ static unsigned long long monotonic_clock_tsc(void)
 	return base + cycles_2_ns(this_offset - last_offset);
 }
 
+/*
+ * Scheduler clock - returns current time in nanosec units.
+ */
+unsigned long long sched_clock(void)
+{
+	unsigned long long this_offset;
+
+	/*
+	 * In the NUMA case we dont use the TSC as they are not
+	 * synchronized across all CPUs.
+	 */
+#ifndef CONFIG_NUMA
+	if (unlikely(!cpu_has_tsc))
+#endif
+		return (unsigned long long)jiffies * (1000000000 / HZ);
+
+	/* Read the Time Stamp Counter */
+	rdtscll(this_offset);
+
+	/* return the value in ns */
+	return cycles_2_ns(this_offset);
+}
+
+
 static void mark_offset_tsc(void)
 {
 	unsigned long lost,delay;

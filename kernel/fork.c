@@ -925,7 +925,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	 */
 	p->first_time_slice = 1;
 	current->time_slice >>= 1;
-	p->last_run = jiffies;
+	p->timestamp = sched_clock();
 	if (!current->time_slice) {
 		/*
 	 	 * This case is rare, it happens when the parent has only
