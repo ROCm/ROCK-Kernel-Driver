@@ -2321,12 +2321,7 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const struct sctp_endpoint *ep,
 					sctp_cmd_seq_t *commands)
 {
 	struct sctp_chunk *chunk = arg;
-	sctp_datahdr_t *data_hdr;
-	struct sctp_chunk *err;
-	size_t datalen;
-	sctp_verb_t deliver;
-	int tmp;
-	__u32 tsn;
+	int error;
 
 	if (!sctp_vtag_verify(chunk, asoc)) {
 		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_BAD_TAG,
@@ -2334,157 +2329,21 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const struct sctp_endpoint *ep,
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
         }
 
-	data_hdr = chunk->subh.data_hdr = (sctp_datahdr_t *)chunk->skb->data;
-	skb_pull(chunk->skb, sizeof(sctp_datahdr_t));
-
-	tsn = ntohl(data_hdr->tsn);
-	SCTP_DEBUG_PRINTK("eat_data: TSN 0x%x.\n", tsn);
-
-	/* ASSERT:  Now skb->data is really the user data.  */
-
-	/* Process ECN based congestion.
-	 *
-	 * Since the chunk structure is reused for all chunks within
-	 * a packet, we use ecn_ce_done to track if we've already
-	 * done CE processing for this packet.
-	 *
-	 * We need to do ECN processing even if we plan to discard the
-	 * chunk later.
-	 */
-
-	if (!chunk->ecn_ce_done) {
-		struct sctp_af *af;
-		chunk->ecn_ce_done = 1;
-
-		af = sctp_get_af_specific(
-			ipver2af(chunk->skb->nh.iph->version));
-
-		if (af && af->is_ce(chunk->skb) && asoc->peer.ecn_capable) {
-			/* Do real work as sideffect. */
-			sctp_add_cmd_sf(commands, SCTP_CMD_ECN_CE,
-					SCTP_U32(tsn));
-		}
-	}
-
-	tmp = sctp_tsnmap_check(&asoc->peer.tsn_map, tsn);
-	if (tmp < 0) {
-		/* The TSN is too high--silently discard the chunk and
-		 * count on it getting retransmitted later.
-		 */
+	error = sctp_eat_data(asoc, chunk, commands );
+	switch (error) {
+	case SCTP_IERROR_NO_ERROR:
+		break;
+	case SCTP_IERROR_HIGH_TSN:
+	case SCTP_IERROR_BAD_STREAM:
 		goto discard_noforce;
-	} else if (tmp > 0) {
-		/* This is a duplicate.  Record it.  */
-		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_DUP, SCTP_U32(tsn));
+	case SCTP_IERROR_DUP_TSN:
+	case SCTP_IERROR_IGNORE_TSN:
 		goto discard_force;
+	case SCTP_IERROR_NO_DATA:
+		goto consume;
+	default:
+		BUG();
 	}
-
-	/* This is a new TSN.  */
-
-	/* Discard if there is no room in the receive window.
-	 * Actually, allow a little bit of overflow (up to a MTU).
-	 */
-	datalen = ntohs(chunk->chunk_hdr->length);
-	datalen -= sizeof(sctp_data_chunk_t);
-
-	deliver = SCTP_CMD_CHUNK_ULP;
-
-	/* Think about partial delivery. */
-	if ((datalen >= asoc->rwnd) && (!asoc->ulpq.pd_mode)) {
-
-		/* Even if we don't accept this chunk there is
-		 * memory pressure.
-		 */
-		sctp_add_cmd_sf(commands, SCTP_CMD_PART_DELIVER, SCTP_NULL());
-	}
-
-        /* Spill over rwnd a little bit.  Note: While allowed, this spill over
-	 * seems a bit troublesome in that frag_point varies based on
-	 * PMTU.  In cases, such as loopback, this might be a rather
-	 * large spill over.
-	 */
-	if (!asoc->rwnd || asoc->rwnd_over ||
-	    (datalen > asoc->rwnd + asoc->frag_point)) {
-
-		/* If this is the next TSN, consider reneging to make
-		 * room.   Note: Playing nice with a confused sender.  A
-		 * malicious sender can still eat up all our buffer
-		 * space and in the future we may want to detect and
-		 * do more drastic reneging.
-		 */
-		if (sctp_tsnmap_has_gap(&asoc->peer.tsn_map) &&
-		    (sctp_tsnmap_get_ctsn(&asoc->peer.tsn_map) + 1) == tsn) {
-			SCTP_DEBUG_PRINTK("Reneging for tsn:%u\n", tsn);
-			deliver = SCTP_CMD_RENEGE;
-		} else {
-			SCTP_DEBUG_PRINTK("Discard tsn: %u len: %Zd, "
-					  "rwnd: %d\n", tsn, datalen,
-					  asoc->rwnd);
-			goto discard_force;
-		}
-	}
-
-	/*
-	 * Section 3.3.10.9 No User Data (9)
-	 *
-	 * Cause of error
-	 * ---------------
-	 * No User Data:  This error cause is returned to the originator of a
-	 * DATA chunk if a received DATA chunk has no user data.
-	 */
-	if (unlikely(0 == datalen)) {
-		err = sctp_make_abort_no_data(asoc, chunk, tsn);
-		if (err) {
-			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
-					SCTP_CHUNK(err));
-		}
-		/* We are going to ABORT, so we might as well stop
-		 * processing the rest of the chunks in the packet.
-		 */
-		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
-		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
-				SCTP_U32(SCTP_ERROR_NO_DATA));
-		SCTP_INC_STATS(SctpAborteds);
-		SCTP_DEC_STATS(SctpCurrEstab);
-		return SCTP_DISPOSITION_CONSUME;
-	}
-
-	/* If definately accepting the DATA chunk, record its TSN, otherwise
-	 * wait for renege processing.
-	 */
-	if (SCTP_CMD_CHUNK_ULP == deliver)
-		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_TSN, SCTP_U32(tsn));
-
-	/* Note: Some chunks may get overcounted (if we drop) or overcounted
-	 * if we renege and the chunk arrives again.
-	 */
-	if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
-		SCTP_INC_STATS(SctpInUnorderChunks);
-	else
-		SCTP_INC_STATS(SctpInOrderChunks);
-
-	/* RFC 2960 6.5 Stream Identifier and Stream Sequence Number
-	 *
-	 * If an endpoint receive a DATA chunk with an invalid stream
-	 * identifier, it shall acknowledge the reception of the DATA chunk
-	 * following the normal procedure, immediately send an ERROR chunk
-	 * with cause set to "Invalid Stream Identifier" (See Section 3.3.10)
-	 * and discard the DATA chunk.
-	 */
-	if (ntohs(data_hdr->stream) >= asoc->c.sinit_max_instreams) {
-		err = sctp_make_op_error(asoc, chunk, SCTP_ERROR_INV_STRM,
-					 &data_hdr->stream,
-					 sizeof(data_hdr->stream));
-		if (err)
-			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
-					SCTP_CHUNK(err));
-		goto discard_noforce;
-	}
-
-	/* Send the data up to the user.  Note:  Schedule  the
-	 * SCTP_CMD_CHUNK_ULP cmd before the SCTP_CMD_GEN_SACK, as the SACK
-	 * chunk needs the updated rwnd.
-	 */
-	sctp_add_cmd_sf(commands, deliver, SCTP_CHUNK(chunk));
 
 	if (asoc->autoclose) {
 		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_RESTART,
@@ -2551,6 +2410,9 @@ discard_noforce:
 				SCTP_TO(SCTP_EVENT_TIMEOUT_SACK));
 	}
 	return SCTP_DISPOSITION_DISCARD;
+consume:
+	return SCTP_DISPOSITION_CONSUME;
+	
 }
 
 /*
@@ -2576,11 +2438,7 @@ sctp_disposition_t sctp_sf_eat_data_fast_4_4(const struct sctp_endpoint *ep,
 				     sctp_cmd_seq_t *commands)
 {
 	struct sctp_chunk *chunk = arg;
-	sctp_datahdr_t *data_hdr;
-	struct sctp_chunk *err;
-	size_t datalen;
-	int tmp;
-	__u32 tsn;
+	int error;
 
 	if (!sctp_vtag_verify(chunk, asoc)) {
 		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_BAD_TAG,
@@ -2588,110 +2446,23 @@ sctp_disposition_t sctp_sf_eat_data_fast_4_4(const struct sctp_endpoint *ep,
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 	}
 
-	data_hdr = chunk->subh.data_hdr = (sctp_datahdr_t *) chunk->skb->data;
-	skb_pull(chunk->skb, sizeof(sctp_datahdr_t));
 
-	tsn = ntohl(data_hdr->tsn);
-
-	SCTP_DEBUG_PRINTK("eat_data: TSN 0x%x.\n", tsn);
-
-	/* ASSERT:  Now skb->data is really the user data.  */
-
-	/* Process ECN based congestion.
-	 *
-	 * Since the chunk structure is reused for all chunks within
-	 * a packet, we use ecn_ce_done to track if we've already
-	 * done CE processing for this packet.
-	 *
-	 * We need to do ECN processing even if we plan to discard the
-	 * chunk later.
-	 */
-	if (!chunk->ecn_ce_done) {
-		struct sctp_af *af;
-		chunk->ecn_ce_done = 1;
-
-		af = sctp_get_af_specific(
-			ipver2af(chunk->skb->nh.iph->version));
-
-		if (af && af->is_ce(chunk->skb) && asoc->peer.ecn_capable) {
-			/* Do real work as sideffect. */
-			sctp_add_cmd_sf(commands, SCTP_CMD_ECN_CE,
-					SCTP_U32(tsn));
-		}
-	}
-
-	tmp = sctp_tsnmap_check(&asoc->peer.tsn_map, tsn);
-	if (tmp < 0) {
-		/* The TSN is too high--silently discard the chunk and
-		 * count on it getting retransmitted later.
-		 */
-		goto gen_shutdown;
-	} else if (tmp > 0) {
-		/* This is a duplicate.  Record it.  */
-		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_DUP, SCTP_U32(tsn));
-		goto gen_shutdown;
-	}
-
-	/* This is a new TSN.  */
-
-	datalen = ntohs(chunk->chunk_hdr->length);
-	datalen -= sizeof(sctp_data_chunk_t);
-
-	/*
-	 * Section 3.3.10.9 No User Data (9)
-	 *
-	 * Cause of error
-	 * ---------------
-	 * No User Data:  This error cause is returned to the originator of a
-	 * DATA chunk if a received DATA chunk has no user data.
-	 */
-	if (unlikely(0 == datalen)) {
-		err = sctp_make_abort_no_data(asoc, chunk, tsn);
-		if (err) {
-			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
-					SCTP_CHUNK(err));
-		}
-		/* We are going to ABORT, so we might as well stop
-		 * processing the rest of the chunks in the packet.
-		 */
-		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
-		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
-				SCTP_U32(SCTP_ERROR_NO_DATA));
-		SCTP_INC_STATS(SctpAborteds);
-		SCTP_DEC_STATS(SctpCurrEstab);
-		return SCTP_DISPOSITION_CONSUME;
-	}
-
-	/* We are accepting this DATA chunk. */
-
-	/* Record the fact that we have received this TSN.  */
-	sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_TSN, SCTP_U32(tsn));
-
-	if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
-		SCTP_INC_STATS(SctpInUnorderChunks);
-	else
-		SCTP_INC_STATS(SctpInOrderChunks);
-
-	/* RFC 2960 6.5 Stream Identifier and Stream Sequence Number
-	 *
-	 * If an endpoint receive a DATA chunk with an invalid stream
-	 * identifier, it shall acknowledge the reception of the DATA chunk
-	 * following the normal procedure, immediately send an ERROR chunk
-	 * with cause set to "Invalid Stream Identifier" (See Section 3.3.10)
-	 * and discard the DATA chunk.
-	 */
-	if (ntohs(data_hdr->stream) >= asoc->c.sinit_max_instreams) {
-		err = sctp_make_op_error(asoc, chunk, SCTP_ERROR_INV_STRM,
-					 &data_hdr->stream,
-					 sizeof(data_hdr->stream));
-		if (err) {
-			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
-					SCTP_CHUNK(err));
-		}
+	error = sctp_eat_data(asoc, chunk, commands );
+	switch (error) {
+	case SCTP_IERROR_NO_ERROR:
+	case SCTP_IERROR_HIGH_TSN:
+	case SCTP_IERROR_DUP_TSN:
+	case SCTP_IERROR_IGNORE_TSN:
+	case SCTP_IERROR_BAD_STREAM:
+		break;
+	case SCTP_IERROR_NO_DATA:
+		goto consume;
+	default:
+		BUG();
 	}
 
 	/* Go a head and force a SACK, since we are shutting down. */
-gen_shutdown:
+
 	/* Implementor's Guide.
 	 *
 	 * While in SHUTDOWN-SENT state, the SHUTDOWN sender MUST immediately
@@ -2707,6 +2478,8 @@ gen_shutdown:
 		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_RESTART,
 				SCTP_TO(SCTP_EVENT_TIMEOUT_T2_SHUTDOWN));
 	}
+
+consume:
 	return SCTP_DISPOSITION_CONSUME;
 }
 
@@ -4847,4 +4620,172 @@ void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
 		} else
 			sctp_chunk_free (err_chunk);
 	}
+}
+
+
+/* Process a data chunk */
+int sctp_eat_data(const struct sctp_association *asoc,
+		  struct sctp_chunk *chunk,
+		  sctp_cmd_seq_t *commands)
+{
+	sctp_datahdr_t *data_hdr;
+	struct sctp_chunk *err;
+	size_t datalen;
+	sctp_verb_t deliver;
+	int tmp;
+	__u32 tsn;
+
+	data_hdr = chunk->subh.data_hdr = (sctp_datahdr_t *)chunk->skb->data;
+	skb_pull(chunk->skb, sizeof(sctp_datahdr_t));
+
+	tsn = ntohl(data_hdr->tsn);
+	SCTP_DEBUG_PRINTK("eat_data: TSN 0x%x.\n", tsn);
+
+	/* ASSERT:  Now skb->data is really the user data.  */
+
+	/* Process ECN based congestion.
+	 *
+	 * Since the chunk structure is reused for all chunks within
+	 * a packet, we use ecn_ce_done to track if we've already
+	 * done CE processing for this packet.
+	 *
+	 * We need to do ECN processing even if we plan to discard the
+	 * chunk later.
+	 */
+
+	if (!chunk->ecn_ce_done) {
+		struct sctp_af *af;
+		chunk->ecn_ce_done = 1;
+
+		af = sctp_get_af_specific(
+			ipver2af(chunk->skb->nh.iph->version));
+
+		if (af && af->is_ce(chunk->skb) && asoc->peer.ecn_capable) {
+			/* Do real work as sideffect. */
+			sctp_add_cmd_sf(commands, SCTP_CMD_ECN_CE,
+					SCTP_U32(tsn));
+		}
+	}
+
+	tmp = sctp_tsnmap_check(&asoc->peer.tsn_map, tsn);
+	if (tmp < 0) {
+		/* The TSN is too high--silently discard the chunk and
+		 * count on it getting retransmitted later.
+		 */
+		return SCTP_IERROR_HIGH_TSN;
+	} else if (tmp > 0) {
+		/* This is a duplicate.  Record it.  */
+		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_DUP, SCTP_U32(tsn));
+		return SCTP_IERROR_DUP_TSN;
+	}
+
+	/* This is a new TSN.  */
+
+	/* Discard if there is no room in the receive window.
+	 * Actually, allow a little bit of overflow (up to a MTU).
+	 */
+	datalen = ntohs(chunk->chunk_hdr->length);
+	datalen -= sizeof(sctp_data_chunk_t);
+
+	deliver = SCTP_CMD_CHUNK_ULP;
+
+	/* Think about partial delivery. */
+	if ((datalen >= asoc->rwnd) && (!asoc->ulpq.pd_mode)) {
+
+		/* Even if we don't accept this chunk there is
+		 * memory pressure.
+		 */
+		sctp_add_cmd_sf(commands, SCTP_CMD_PART_DELIVER, SCTP_NULL());
+	}
+
+        /* Spill over rwnd a little bit.  Note: While allowed, this spill over
+	 * seems a bit troublesome in that frag_point varies based on
+	 * PMTU.  In cases, such as loopback, this might be a rather
+	 * large spill over.
+	 */
+	if (!asoc->rwnd || asoc->rwnd_over ||
+	    (datalen > asoc->rwnd + asoc->frag_point)) {
+
+		/* If this is the next TSN, consider reneging to make
+		 * room.   Note: Playing nice with a confused sender.  A
+		 * malicious sender can still eat up all our buffer
+		 * space and in the future we may want to detect and
+		 * do more drastic reneging.
+		 */
+		if (sctp_tsnmap_has_gap(&asoc->peer.tsn_map) &&
+		    (sctp_tsnmap_get_ctsn(&asoc->peer.tsn_map) + 1) == tsn) {
+			SCTP_DEBUG_PRINTK("Reneging for tsn:%u\n", tsn);
+			deliver = SCTP_CMD_RENEGE;
+		} else {
+			SCTP_DEBUG_PRINTK("Discard tsn: %u len: %Zd, "
+					  "rwnd: %d\n", tsn, datalen,
+					  asoc->rwnd);
+			return SCTP_IERROR_IGNORE_TSN;
+		}
+	}
+
+	/*
+	 * Section 3.3.10.9 No User Data (9)
+	 *
+	 * Cause of error
+	 * ---------------
+	 * No User Data:  This error cause is returned to the originator of a
+	 * DATA chunk if a received DATA chunk has no user data.
+	 */
+	if (unlikely(0 == datalen)) {
+		err = sctp_make_abort_no_data(asoc, chunk, tsn);
+		if (err) {
+			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
+					SCTP_CHUNK(err));
+		}
+		/* We are going to ABORT, so we might as well stop
+		 * processing the rest of the chunks in the packet.
+		 */
+		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
+		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
+				SCTP_U32(SCTP_ERROR_NO_DATA));
+		SCTP_INC_STATS(SctpAborteds);
+		SCTP_DEC_STATS(SctpCurrEstab);
+		return SCTP_IERROR_NO_DATA;
+	}
+
+	/* If definately accepting the DATA chunk, record its TSN, otherwise
+	 * wait for renege processing.
+	 */
+	if (SCTP_CMD_CHUNK_ULP == deliver)
+		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_TSN, SCTP_U32(tsn));
+
+	/* Note: Some chunks may get overcounted (if we drop) or overcounted
+	 * if we renege and the chunk arrives again.
+	 */
+	if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
+		SCTP_INC_STATS(SctpInUnorderChunks);
+	else
+		SCTP_INC_STATS(SctpInOrderChunks);
+
+	/* RFC 2960 6.5 Stream Identifier and Stream Sequence Number
+	 *
+	 * If an endpoint receive a DATA chunk with an invalid stream
+	 * identifier, it shall acknowledge the reception of the DATA chunk
+	 * following the normal procedure, immediately send an ERROR chunk
+	 * with cause set to "Invalid Stream Identifier" (See Section 3.3.10)
+	 * and discard the DATA chunk.
+	 */
+	if (ntohs(data_hdr->stream) >= asoc->c.sinit_max_instreams) {
+		err = sctp_make_op_error(asoc, chunk, SCTP_ERROR_INV_STRM,
+					 &data_hdr->stream,
+					 sizeof(data_hdr->stream));
+		if (err)
+			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
+					SCTP_CHUNK(err));
+		return SCTP_IERROR_BAD_STREAM;
+	}
+
+	/* Send the data up to the user.  Note:  Schedule  the
+	 * SCTP_CMD_CHUNK_ULP cmd before the SCTP_CMD_GEN_SACK, as the SACK
+	 * chunk needs the updated rwnd.
+	 */
+	sctp_add_cmd_sf(commands, deliver, SCTP_CHUNK(chunk));
+
+	return SCTP_IERROR_NO_ERROR;
 }
