@@ -39,6 +39,7 @@ CONFIG_KMOD=y
 #
 CONFIG_SMP=y
 CONFIG_MATHEMU=y
+CONFIG_NR_CPUS=64
 
 #
 # I/O subsystem configuration

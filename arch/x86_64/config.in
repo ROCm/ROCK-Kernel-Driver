@@ -54,6 +54,7 @@ if [ "$CONFIG_SMP" = "n" ]; then
 fi
 if [ "$CONFIG_SMP" = "y" ]; then
     define_bool CONFIG_HAVE_DEC_LOCK y
+    int  'Maximum number of CPUs (2-8)' CONFIG_NR_CPUS 8
 fi
 
 define_bool CONFIG_X86_MCE y

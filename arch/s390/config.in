@@ -21,6 +21,9 @@ comment 'Base setup'
 comment 'Processor type and features'
 bool 'Symmetric multi-processing support' CONFIG_SMP
 bool 'IEEE FPU emulation' CONFIG_MATHEMU
+if [ "$CONFIG_SMP" = "y" ]; then
+   int  'Maximum number of CPUs (2-32)' CONFIG_NR_CPUS 32
+fi
 
 comment 'I/O subsystem configuration'
 bool 'Process warning machine checks' CONFIG_MACHCHK_WARNING

@@ -491,6 +491,8 @@ fi
 bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
 if [ "$CONFIG_SMP" != "y" ]; then
    bool 'Run uncached' CONFIG_MIPS_UNCACHED
+else
+   int  'Maximum number of CPUs (2-32)' CONFIG_NR_CPUS 32
 fi
 endmenu
 

@@ -51,6 +51,7 @@ CONFIG_SMP=y
 CONFIG_HAVE_DEC_LOCK=y
 CONFIG_X86_MCE=y
 # CONFIG_X86_MCE_NONFATAL is not set
+CONFIG_NR_CPUS=8
 
 #
 # Power management options

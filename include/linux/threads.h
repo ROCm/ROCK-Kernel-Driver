@@ -8,10 +8,16 @@
  * /proc/sys/kernel/threads-max.
  */
  
+/*
+ * Maximum supported processors that can run under SMP.  This value is
+ * set via configure setting.  The maximum is equal to the size of the
+ * bitmasks used on that platform, i.e. 32 or 64.  Setting this smaller
+ * saves quite a bit of memory.
+ */
 #ifdef CONFIG_SMP
-#define NR_CPUS	32		/* Max processors that can be running in SMP */
+#define NR_CPUS		CONFIG_NR_CPUS
 #else
-#define NR_CPUS 1
+#define NR_CPUS		1
 #endif
 
 #define MIN_THREADS_LEFT_FOR_ROOT 4

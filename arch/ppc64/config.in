@@ -21,6 +21,7 @@ define_bool CONFIG_PPC64 y
 bool 'Symmetric multi-processing support' CONFIG_SMP
 if [ "$CONFIG_SMP" = "y" ]; then
   bool '  Distribute interrupts on all CPUs by default' CONFIG_IRQ_ALL_CPUS
+  int  'Maximum number of CPUs (2-64)' CONFIG_NR_CPUS 64
   if [ "$CONFIG_PPC_PSERIES" = "y" ]; then
     bool '  Hardware multithreading' CONFIG_HMT
     bool '  Discontiguous Memory Support' CONFIG_DISCONTIGMEM

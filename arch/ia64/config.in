@@ -118,6 +118,10 @@ bool 'Performance monitor support' CONFIG_PERFMON
 tristate '/proc/pal support' CONFIG_IA64_PALINFO
 tristate '/proc/efi/vars support' CONFIG_EFI_VARS
 
+if [ "$CONFIG_SMP" = "y" ]; then
+   int  'Maximum number of CPUs (2-64)' CONFIG_NR_CPUS 64
+fi
+
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 

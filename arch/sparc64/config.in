@@ -20,6 +20,10 @@ bool 'SPARC64 Huge TLB Page Support' CONFIG_HUGETLB_PAGE
 bool 'Symmetric multi-processing support' CONFIG_SMP
 bool 'Preemptible Kernel' CONFIG_PREEMPT
 
+if [ "$CONFIG_SMP" = "y" ]; then
+   int  'Maximum number of CPUs (2-64)' CONFIG_NR_CPUS 64
+fi
+
 # Identify this as a Sparc64 build
 define_bool CONFIG_SPARC64 y
 

@@ -19,6 +19,10 @@ comment 'General options'
 # bool 'Symmetric multi-processing support' CONFIG_SMP
 define_bool CONFIG_SMP n
 
+if [ "$CONFIG_SMP" = "y" ]; then
+   int  'Maximum number of CPUs (2-32)' CONFIG_NR_CPUS 32
+fi
+
 bool 'Kernel Debugger support' CONFIG_KWDB
 # define_bool CONFIG_KWDB n
 

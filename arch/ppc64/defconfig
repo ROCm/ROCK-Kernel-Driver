@@ -40,6 +40,7 @@ CONFIG_IRQ_ALL_CPUS=y
 # CONFIG_DISCONTIGMEM is not set
 # CONFIG_PREEMPT is not set
 # CONFIG_RTAS_FLASH is not set
+CONFIG_NR_CPUS=64
 
 #
 # General setup
