@@ -252,7 +252,6 @@
 
 /* Why the hell am I defining these here? */
 #define SX_TYPE_NORMAL 1
-#define SX_TYPE_CALLOUT 2
 
 
 #ifndef PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8
@@ -314,7 +313,7 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
 static int sx_init_drivers(void);
 
 
-static struct tty_driver sx_driver, sx_callout_driver;
+static struct tty_driver sx_driver;
 
 static struct tty_struct * sx_table[SX_NPORTS];
 static struct termios ** sx_termios;
@@ -1168,9 +1167,7 @@ static inline void sx_check_modem_signals (struct sx_port *port)
 			port->c_dcd = c_dcd;
 			if (sx_get_CD (port)) {
 				/* DCD went UP */
-				if( (~(port->gs.flags & ASYNC_NORMAL_ACTIVE) || 
-						 ~(port->gs.flags & ASYNC_CALLOUT_ACTIVE)) &&
-						(sx_read_channel_byte(port, hi_hstat) != HS_IDLE_CLOSED) &&
+				if ((sx_read_channel_byte(port, hi_hstat) != HS_IDLE_CLOSED) &&
 						!(port->gs.tty->termios->c_cflag & CLOCAL) ) {
 					/* Are we blocking in open?*/
 					sx_dprintk (SX_DEBUG_MODEMSIGNALS, "DCD active, unblocking open\n");
@@ -1180,9 +1177,7 @@ static inline void sx_check_modem_signals (struct sx_port *port)
 				}
 			} else {
 				/* DCD went down! */
-				if (!((port->gs.flags & ASYNC_CALLOUT_ACTIVE) &&
-				      (port->gs.flags & ASYNC_CALLOUT_NOHUP)) &&
-				    !(port->gs.tty->termios->c_cflag & CLOCAL) ) {
+				if (!(port->gs.tty->termios->c_cflag & CLOCAL) ) {
 					sx_dprintk (SX_DEBUG_MODEMSIGNALS, "DCD dropped. hanging up....\n");
 					tty_hangup (port->gs.tty);
 				} else {
@@ -1497,15 +1492,10 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	/* tty->low_latency = 1; */
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = port->gs.normal_termios;
-		else 
-			*tty->termios = port->gs.callout_termios;
+		*tty->termios = port->gs.normal_termios;
 		sx_set_real_termios (port);
 	}
 
-	port->gs.session = current->session;
-	port->gs.pgrp = current->pgrp;
 	port->c_dcd = sx_get_CD (port);
 	sx_dprintk (SX_DEBUG_OPEN, "at open: cd=%d\n", port->c_dcd);
 	func_exit();
@@ -2277,23 +2267,11 @@ static int sx_init_drivers(void)
 	sx_driver.start = gs_start;
 	sx_driver.hangup = gs_hangup;
 
-	sx_callout_driver = sx_driver;
-	sx_callout_driver.name = "cux";
-	sx_callout_driver.major = SX_CALLOUT_MAJOR;
-	sx_callout_driver.subtype = SX_TYPE_CALLOUT;
-
 	if ((error = tty_register_driver(&sx_driver))) {
 		printk(KERN_ERR "sx: Couldn't register sx driver, error = %d\n",
 		       error);
 		return 1;
 	}
-	if ((error = tty_register_driver(&sx_callout_driver))) {
-		tty_unregister_driver(&sx_driver);
-		printk(KERN_ERR "sx: Couldn't register sx callout driver, error = %d\n",
-		       error);
-		return 1;
-	}
-
 	func_exit();
 	return 0;
 }
@@ -2349,7 +2327,6 @@ static int sx_init_portstructs (int nboards, int nports)
 		board->ports = port;
 		for (j=0; j < boards[i].nports;j++) {
 			sx_dprintk (SX_DEBUG_INIT, "initing port %d\n", j);
-			port->gs.callout_termios = tty_std_termios;
 			port->gs.normal_termios	= tty_std_termios;
 			port->gs.magic = SX_MAGIC;
 			port->gs.close_delay = HZ/2;
@@ -2410,7 +2387,6 @@ static void __exit sx_release_drivers(void)
 {
 	func_enter();
 	tty_unregister_driver(&sx_driver);
-	tty_unregister_driver(&sx_callout_driver);
 	func_exit();
 }
 
