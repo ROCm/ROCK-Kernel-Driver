@@ -521,7 +521,6 @@ struct atmel_private {
 	int operating_mode, power_mode;
 	time_t last_qual;
 	int beacons_this_sec;
-	u64 last_beacon_timestamp;
 	int channel;
 	int reg_domain;
 	int tx_rate;
@@ -559,6 +558,7 @@ struct atmel_private {
 	int SSID_size, new_SSID_size;
 	u8 CurrentBSSID[6], BSSID[6];
 	u8 SSID[MAX_SSID_LENGTH], new_SSID[MAX_SSID_LENGTH];
+	u64 last_beacon_timestamp;
 	u8 rx_buf[MAX_WIRELESS_BODY];
 	
 };
