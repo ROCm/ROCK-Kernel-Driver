@@ -2931,30 +2931,22 @@ void cleanup_module(void)
 		qic02_release_resources();
 	}
 	devfs_unregister_chrdev(QIC02_TAPE_MAJOR, TPQIC02_NAME);
-	devfs_unregister(devfs_find_handle
-			 (NULL, "ntpqic11", QIC02_TAPE_MAJOR, 2,
-			  DEVFS_SPECIAL_CHR, 0));
-	devfs_unregister(devfs_find_handle
-			 (NULL, "tpqic11", QIC02_TAPE_MAJOR, 3,
-			  DEVFS_SPECIAL_CHR, 0));
-	devfs_unregister(devfs_find_handle
-			 (NULL, "ntpqic24", QIC02_TAPE_MAJOR, 4,
-			  DEVFS_SPECIAL_CHR, 0));
-	devfs_unregister(devfs_find_handle
-			 (NULL, "tpqic24", QIC02_TAPE_MAJOR, 5,
-			  DEVFS_SPECIAL_CHR, 0));
-	devfs_unregister(devfs_find_handle
-			 (NULL, "ntpqic120", QIC02_TAPE_MAJOR, 6,
-			  DEVFS_SPECIAL_CHR, 0));
-	devfs_unregister(devfs_find_handle
-			 (NULL, "tpqic120", QIC02_TAPE_MAJOR, 7,
-			  DEVFS_SPECIAL_CHR, 0));
-	devfs_unregister(devfs_find_handle
-			 (NULL, "ntpqic150", QIC02_TAPE_MAJOR, 8,
-			  DEVFS_SPECIAL_CHR, 0));
-	devfs_unregister(devfs_find_handle
-			 (NULL, "tpqic150", QIC02_TAPE_MAJOR, 9,
-			  DEVFS_SPECIAL_CHR, 0));
+	devfs_find_and_unregister(NULL, "ntpqic11", QIC02_TAPE_MAJOR, 2,
+				  DEVFS_SPECIAL_CHR, 0);
+	devfs_find_and_unregister(NULL, "tpqic11", QIC02_TAPE_MAJOR, 3,
+				  DEVFS_SPECIAL_CHR, 0);
+	devfs_find_and_unregister(NULL, "ntpqic24", QIC02_TAPE_MAJOR, 4,
+				  DEVFS_SPECIAL_CHR, 0);
+	devfs_find_and_unregister(NULL, "tpqic24", QIC02_TAPE_MAJOR, 5,
+				  DEVFS_SPECIAL_CHR, 0);
+	devfs_find_and_unregister(NULL, "ntpqic120", QIC02_TAPE_MAJOR, 6,
+				  DEVFS_SPECIAL_CHR, 0);
+	devfs_find_and_unregister(NULL, "tpqic120", QIC02_TAPE_MAJOR, 7,
+				  DEVFS_SPECIAL_CHR, 0);
+	devfs_find_and_unregister(NULL, "ntpqic150", QIC02_TAPE_MAJOR, 8,
+				  DEVFS_SPECIAL_CHR, 0);
+	devfs_find_and_unregister(NULL, "tpqic150", QIC02_TAPE_MAJOR, 9,
+				  DEVFS_SPECIAL_CHR, 0);
 }
 
 int init_module(void)
