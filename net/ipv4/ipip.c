@@ -246,6 +246,7 @@ static struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int c
 	nt = dev->priv;
 	SET_MODULE_OWNER(dev);
 	dev->init = ipip_tunnel_init;
+	dev->tx_queue_len = 1;
 	dev->destructor = free_netdev;
 	nt->parms = *parms;
 
@@ -892,6 +893,7 @@ int __init ipip_init(void)
 	}
 
 	ipip_fb_tunnel_dev->init = ipip_fb_tunnel_init;
+	ipip_fb_tunnel_dev->tx_queue_len = 1;
 
 	if ((err = register_netdev(ipip_fb_tunnel_dev)))
 	    goto fail;
