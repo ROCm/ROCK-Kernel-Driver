@@ -151,7 +151,7 @@ static int check_powernow(void)
 	}
 
 	if (!(edx & (1 << 1 | 1 << 2))) {
-		printk (" nothing.\n");
+		printk ("nothing.\n");
 		return 0;
 	}
 
