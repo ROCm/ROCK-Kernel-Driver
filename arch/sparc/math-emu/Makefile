@@ -7,7 +7,6 @@
 #
 # Note 2! The CFLAGS definition is now in the main makefile...
 
-USE_STANDARD_AS_RULE := true
 
 O_TARGET := math-emu.o
 obj-y    := math.o ashldi3.o

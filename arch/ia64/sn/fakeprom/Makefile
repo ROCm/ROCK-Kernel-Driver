@@ -6,8 +6,6 @@
 #  Copyright (c) 2000-2001 Silicon Graphics, Inc.  All rights reserved.
 #
 
-USE_STANDARD_AS_RULE := true
-
 TOPDIR=../../../..
 HPATH           = $(TOPDIR)/include
 

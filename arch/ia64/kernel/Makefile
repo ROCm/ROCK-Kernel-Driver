@@ -2,8 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-USE_STANDARD_AS_RULE := true
-
 all: kernel.o head.o init_task.o
 
 O_TARGET := kernel.o

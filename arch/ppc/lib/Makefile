@@ -4,8 +4,6 @@
 # Makefile for ppc-specific library files..
 #
 
-USE_STANDARD_AS_RULE	:= true
-
 O_TARGET		:= lib.o
 
 export-objs		:= dec_and_lock.o

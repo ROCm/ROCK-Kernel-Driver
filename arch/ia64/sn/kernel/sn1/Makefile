@@ -32,8 +32,6 @@
 # http://oss.sgi.com/projects/GenInfo/NoticeExplan
 #
 
-USE_STANDARD_AS_RULE := true
-
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 
 all: sn1.a

@@ -2,8 +2,6 @@
 # Makefile for x86_64-specific library files..
 #
 
-USE_STANDARD_AS_RULE := true
-
 L_TARGET = lib.a
 obj-y  = generic-checksum.o old-checksum.o delay.o \
 	usercopy.o getuser.o putuser.o  \

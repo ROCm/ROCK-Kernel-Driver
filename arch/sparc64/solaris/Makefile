@@ -2,7 +2,6 @@
 # Makefile for the Solaris binary emulation.
 #
 
-USE_STANDARD_AS_RULE := true
 EXTRA_AFLAGS := -ansi
 
 ifeq ($(CONFIG_SOLARIS_EMUL),m)

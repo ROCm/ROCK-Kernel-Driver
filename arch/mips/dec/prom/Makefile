@@ -8,8 +8,6 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-USE_STANDARD_AS_RULE := true
-
 EXTRA_AFLAGS := $(CFLAGS)
 
 OBJS  = init.o memory.o cmdline.o identify.o locore.o

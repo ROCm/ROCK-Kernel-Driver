@@ -15,8 +15,6 @@
 # modified by Cort (cort@cs.nmt.edu)
 #
 
-USE_STANDARD_AS_RULE		:= true
-
 TFTPIMAGE			= /tftpboot/zImage.prep
 ifeq ($(CONFIG_SMP),y)
 TFTPIMAGE			= $(TFTPBOOT).smp

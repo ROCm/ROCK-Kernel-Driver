@@ -27,8 +27,6 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-USE_STANDARD_AS_RULE := true
-
 EXTRA_AFLAGS := $(CFLAGS)
 
 O_TARGET := mipsboards.o

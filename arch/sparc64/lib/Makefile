@@ -2,7 +2,6 @@
 # Makefile for Sparc64 library files..
 #
 
-USE_STANDARD_AS_RULE := true
 EXTRA_AFLAGS := -ansi
 
 L_TARGET = lib.a
