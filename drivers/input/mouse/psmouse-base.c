@@ -418,6 +418,8 @@ static int im_explorer_detect(struct psmouse *psmouse)
 {
 	unsigned char param[2];
 
+	intellimouse_detect(psmouse);
+
 	param[0] = 200;
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
 	param[0] = 200;
