@@ -95,7 +95,7 @@ struct list_head  saa7134_devlist;
 unsigned int      saa7134_devcount;
 
 #define dprintk(fmt, arg...)	if (core_debug) \
-	printk(KERN_DEBUG "%s/core: " fmt, dev->name, ## arg)
+	printk(KERN_DEBUG "%s/core: " fmt, dev->name , ## arg)
 
 /* ------------------------------------------------------------------ */
 /* debug help functions                                               */
