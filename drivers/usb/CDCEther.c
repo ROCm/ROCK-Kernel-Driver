@@ -1144,18 +1144,18 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 	// Zero everything out.
 	memset(ether_dev, 0, sizeof(ether_dev_t));
 
-	ether_dev->rx_urb = usb_alloc_urb(0);
+	ether_dev->rx_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!ether_dev->rx_urb) {
 		kfree(ether_dev);
 		return NULL;
 	}
-	ether_dev->tx_urb = usb_alloc_urb(0);
+	ether_dev->tx_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!ether_dev->tx_urb) {
 		usb_free_urb(ether_dev->rx_urb);
 		kfree(ether_dev);
 		return NULL;
 	}
-	ether_dev->intr_urb = usb_alloc_urb(0);
+	ether_dev->intr_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!ether_dev->intr_urb) {
 		usb_free_urb(ether_dev->tx_urb);
 		usb_free_urb(ether_dev->rx_urb);

@@ -873,8 +873,8 @@ static void *kaweth_probe(
 	
 	kaweth_dbg("Initializing net device.");
 
-	kaweth->tx_urb = usb_alloc_urb(0);
-	kaweth->rx_urb = usb_alloc_urb(0);
+	kaweth->tx_urb = usb_alloc_urb(0, GFP_KERNEL);
+	kaweth->rx_urb = usb_alloc_urb(0, GFP_KERNEL);
 
 	kaweth->net = init_etherdev(0, 0);
 	if (!kaweth->net) {
@@ -977,7 +977,7 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
         set_current_state(TASK_INTERRUPTIBLE);
         add_wait_queue(&awd.wqh, &wait);
         urb->context = &awd;
-        status = usb_submit_urb(urb, GFP_KERNEL);
+        status = usb_submit_urb(urb, GFP_ATOMIC);
         if (status) {
                 // something went wrong
                 usb_free_urb(urb);
@@ -1020,7 +1020,7 @@ int kaweth_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
         int retv;
         int length;
 
-        urb = usb_alloc_urb(0);
+        urb = usb_alloc_urb(0, GFP_KERNEL);
         if (!urb)
                 return -ENOMEM;
 

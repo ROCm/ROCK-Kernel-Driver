@@ -1085,6 +1085,7 @@ void usb_inc_dev_use(struct usb_device *dev)
 /**
  * usb_alloc_urb - creates a new urb for a USB driver to use
  * @iso_packets: number of iso packets for this urb
+ * @mem_flags: the type of memory to allocate, see kmalloc() for a list of valid options for this.
  *
  * Creates an urb for the USB driver to use, initializes a few internal
  * structures, incrementes the usage counter, and returns a pointer to it.
@@ -1096,13 +1097,13 @@ void usb_inc_dev_use(struct usb_device *dev)
  *
  * The driver must call usb_free_urb() when it is finished with the urb.
  */
-struct urb *usb_alloc_urb(int iso_packets)
+struct urb *usb_alloc_urb(int iso_packets, int mem_flags)
 {
 	struct urb *urb;
 
 	urb = (struct urb *)kmalloc(sizeof(struct urb) + 
 		iso_packets * sizeof(struct usb_iso_packet_descriptor),
-		in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+		mem_flags);
 	if (!urb) {
 		err("alloc_urb: kmalloc failed");
 		return NULL;
@@ -1368,7 +1369,7 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
 	int retv;
 	int length;
 
-	urb = usb_alloc_urb(0);
+	urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!urb)
 		return -ENOMEM;
   
@@ -1456,7 +1457,7 @@ int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 	if (len < 0)
 		return -EINVAL;
 
-	urb=usb_alloc_urb(0);
+	urb=usb_alloc_urb(0, GFP_KERNEL);
 	if (!urb)
 		return -ENOMEM;
 

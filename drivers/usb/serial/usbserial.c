@@ -1203,7 +1203,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	for (i = 0; i < num_bulk_in; ++i) {
 		endpoint = bulk_in_endpoint[i];
 		port = &serial->port[i];
-		port->read_urb = usb_alloc_urb (0);
+		port->read_urb = usb_alloc_urb (0, GFP_KERNEL);
 		if (!port->read_urb) {
 			err("No free urbs available");
 			goto probe_error;
@@ -1228,7 +1228,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	for (i = 0; i < num_bulk_out; ++i) {
 		endpoint = bulk_out_endpoint[i];
 		port = &serial->port[i];
-		port->write_urb = usb_alloc_urb(0);
+		port->write_urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!port->write_urb) {
 			err("No free urbs available");
 			goto probe_error;
@@ -1254,7 +1254,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	for (i = 0; i < num_interrupt_in; ++i) {
 		endpoint = interrupt_in_endpoint[i];
 		port = &serial->port[i];
-		port->interrupt_in_urb = usb_alloc_urb(0);
+		port->interrupt_in_urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!port->interrupt_in_urb) {
 			err("No free urbs available");
 			goto probe_error;

@@ -515,7 +515,7 @@ static int usb_stor_allocate_irq(struct us_data *ss)
 	down(&(ss->irq_urb_sem));
 
 	/* allocate the URB */
-	ss->irq_urb = usb_alloc_urb(0);
+	ss->irq_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!ss->irq_urb) {
 		up(&(ss->irq_urb_sem));
 		US_DEBUGP("couldn't allocate interrupt URB");
@@ -730,7 +730,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		}
 
 		/* allocate the URB we're going to use */
-		ss->current_urb = usb_alloc_urb(0);
+		ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!ss->current_urb) {
 			usb_dec_dev_use(dev);
 			return NULL;
@@ -756,7 +756,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		memset(ss, 0, sizeof(struct us_data));
 
 		/* allocate the URB we're going to use */
-		ss->current_urb = usb_alloc_urb(0);
+		ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!ss->current_urb) {
 			kfree(ss);
 			usb_dec_dev_use(dev);

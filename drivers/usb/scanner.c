@@ -974,7 +974,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	}
 	memset (scn, 0, sizeof(struct scn_usb_data));
 
-	scn->scn_irq = usb_alloc_urb(0);
+	scn->scn_irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!scn->scn_irq) {
 		kfree(scn);
 		up(&scn_mutex);

@@ -804,7 +804,7 @@ static int stv680_start_stream (struct usb_stv *stv680)
 	}
 
 	for (i = 0; i < STV680_NUMSBUF; i++) {
-		urb = usb_alloc_urb (0);
+		urb = usb_alloc_urb (0, GFP_KERNEL);
 		if (!urb)
 			return ENOMEM;
 

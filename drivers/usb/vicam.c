@@ -884,7 +884,7 @@ static void * __devinit vicam_probe(struct usb_device *udev, unsigned int ifnum,
 	}
 	memset(vicam, 0, sizeof(*vicam));
 
-	vicam->readurb = usb_alloc_urb(0);
+	vicam->readurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!vicam->readurb) {
 		kfree(vicam);
 		return NULL;
@@ -896,13 +896,18 @@ static void * __devinit vicam_probe(struct usb_device *udev, unsigned int ifnum,
 	vicam->win.contrast = 10;
 
 	/* FIXME */
-	if (vicam_init(vicam))
+	if (vicam_init(vicam)) {
+		usb_free_urb(vicam->readurb);
+		kfree(vicam);
 		return NULL;
+	}
 	memcpy(&vicam->vdev, &vicam_template, sizeof(vicam_template));
 	memcpy(vicam->vdev.name, vicam->camera_name, strlen(vicam->camera_name));
 	
 	if (video_register_device(&vicam->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
 		err("video_register_device");
+		usb_free_urb(vicam->readurb);
+		kfree(vicam);
 		return NULL;
 	}
 

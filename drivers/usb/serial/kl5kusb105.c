@@ -280,7 +280,7 @@ static int klsi_105_startup (struct usb_serial *serial)
 
 		spin_lock_init (&priv->write_urb_pool_lock);
 		for (i=0; i<NUM_URBS; i++) {
-			struct urb* urb = usb_alloc_urb(0);
+			struct urb* urb = usb_alloc_urb(0, GFP_KERNEL);
 
 			priv->write_urb_pool[i] = urb;
 			if (urb == NULL) {

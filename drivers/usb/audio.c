@@ -2829,14 +2829,14 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 	init_waitqueue_head(&as->usbin.dma.wait);
 	init_waitqueue_head(&as->usbout.dma.wait);
 	spin_lock_init(&as->lock);
-	as->usbin.durb[0].urb = usb_alloc_urb(0);
-	as->usbin.durb[1].urb = usb_alloc_urb(0);
-	as->usbin.surb[0].urb = usb_alloc_urb(0);
-	as->usbin.surb[1].urb = usb_alloc_urb(0);
-	as->usbout.durb[0].urb = usb_alloc_urb(0);
-	as->usbout.durb[1].urb = usb_alloc_urb(0);
-	as->usbout.surb[0].urb = usb_alloc_urb(0);
-	as->usbout.surb[1].urb = usb_alloc_urb(0);
+	as->usbin.durb[0].urb = usb_alloc_urb(0, GFP_KERNEL);
+	as->usbin.durb[1].urb = usb_alloc_urb(0, GFP_KERNEL);
+	as->usbin.surb[0].urb = usb_alloc_urb(0, GFP_KERNEL);
+	as->usbin.surb[1].urb = usb_alloc_urb(0, GFP_KERNEL);
+	as->usbout.durb[0].urb = usb_alloc_urb(0, GFP_KERNEL);
+	as->usbout.durb[1].urb = usb_alloc_urb(0, GFP_KERNEL);
+	as->usbout.surb[0].urb = usb_alloc_urb(0, GFP_KERNEL);
+	as->usbout.surb[1].urb = usb_alloc_urb(0, GFP_KERNEL);
 	if ((!as->usbin.durb[0].urb) ||
 	    (!as->usbin.durb[1].urb) ||
 	    (!as->usbin.surb[0].urb) ||

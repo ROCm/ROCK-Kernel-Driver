@@ -1077,7 +1077,7 @@ uvd_t *usbvideo_AllocateDevice(usbvideo_t *cams)
 
 	down(&uvd->lock);
 	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
-		uvd->sbuf[i].urb = usb_alloc_urb(FRAMES_PER_DESC);
+		uvd->sbuf[i].urb = usb_alloc_urb(FRAMES_PER_DESC, GFP_KERNEL);
 		if (uvd->sbuf[i].urb == NULL) {
 			err("usb_alloc_urb(%d.) failed.", FRAMES_PER_DESC);
 			uvd->uvd_used = 0;

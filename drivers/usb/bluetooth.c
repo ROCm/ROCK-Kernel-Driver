@@ -1123,7 +1123,7 @@ static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
 	
 	/* create our control out urb pool */ 
 	for (i = 0; i < NUM_CONTROL_URBS; ++i) {
-		struct urb  *urb = usb_alloc_urb(0);
+		struct urb  *urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (urb == NULL) {
 			err("No free urbs available");
 			goto probe_error;
@@ -1134,7 +1134,7 @@ static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
 
 	/* set up the endpoint information */
 	endpoint = bulk_in_endpoint[0];
-	bluetooth->read_urb = usb_alloc_urb (0);
+	bluetooth->read_urb = usb_alloc_urb (0, GFP_KERNEL);
 	if (!bluetooth->read_urb) {
 		err("No free urbs available");
 		goto probe_error;
@@ -1154,7 +1154,7 @@ static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
 	
 	/* create our write urb pool */ 
 	for (i = 0; i < NUM_BULK_URBS; ++i) {
-		struct urb  *urb = usb_alloc_urb(0);
+		struct urb  *urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (urb == NULL) {
 			err("No free urbs available");
 			goto probe_error;
@@ -1170,7 +1170,7 @@ static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
 	bluetooth->bulk_out_buffer_size = endpoint->wMaxPacketSize * 2;
 
 	endpoint = interrupt_in_endpoint[0];
-	bluetooth->interrupt_in_urb = usb_alloc_urb(0);
+	bluetooth->interrupt_in_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!bluetooth->interrupt_in_urb) {
 		err("No free urbs available");
 		goto probe_error;

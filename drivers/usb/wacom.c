@@ -359,7 +359,7 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 	if (!(wacom = kmalloc(sizeof(struct wacom), GFP_KERNEL))) return NULL;
 	memset(wacom, 0, sizeof(struct wacom));
 
-	wacom->irq = usb_alloc_urb(0);
+	wacom->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!wacom->irq) {
 		kfree(wacom);
 		return NULL;

@@ -699,7 +699,7 @@ static int auerchain_control_msg (pauerchain_t acp, struct usb_device *dev, unsi
         dr = kmalloc (sizeof (struct usb_ctrlrequest), GFP_KERNEL);
 	if (!dr)
 		return -ENOMEM;
-	urb = usb_alloc_urb (0);
+	urb = usb_alloc_urb (0, GFP_KERNEL);
 	if (!urb) {
         	kfree (dr);
 		return -ENOMEM;
@@ -802,7 +802,7 @@ static int auerbuf_setup (pauerbufctl_t bcp, unsigned int numElements, unsigned 
                 if (!bep->bufp) goto bl_fail;
                 bep->dr = (struct usb_ctrlrequest *) kmalloc (sizeof (struct usb_ctrlrequest), GFP_KERNEL);
                 if (!bep->dr) goto bl_fail;
-                bep->urbp = usb_alloc_urb (0);
+                bep->urbp = usb_alloc_urb (0, GFP_KERNEL);
                 if (!bep->urbp) goto bl_fail;
                 list_add_tail (&bep->buff_list, &bcp->free_buff_list);
         }
@@ -1130,7 +1130,7 @@ static int auerswald_int_open (pauerswald_t cp)
 
 	/* allocate the urb and data buffer */
         if (!cp->inturbp) {
-                cp->inturbp = usb_alloc_urb (0);
+                cp->inturbp = usb_alloc_urb (0, GFP_KERNEL);
                 if (!cp->inturbp) {
                         ret = -ENOMEM;
                         goto intoend;

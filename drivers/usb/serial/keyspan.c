@@ -1051,7 +1051,7 @@ static struct urb *keyspan_setup_urb(struct usb_serial *serial, int endpoint,
 		return NULL;		/* endpoint not needed */
 
 	dbg (__FUNCTION__ " alloc for endpoint %d.\n", endpoint);
-	urb = usb_alloc_urb(0);		/* No ISO */
+	urb = usb_alloc_urb(0, GFP_KERNEL);		/* No ISO */
 	if (urb == NULL) {
 		dbg (__FUNCTION__ " alloc for endpoint %d failed.\n", endpoint);
 		return NULL;

@@ -1311,14 +1311,14 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 		if (endpoint->bEndpointAddress & USB_DIR_IN) {
 			if (hid->urbin)
 				continue;
-			if (!(hid->urbin = usb_alloc_urb(0)))
+			if (!(hid->urbin = usb_alloc_urb(0, GFP_KERNEL)))
 				goto fail;
 			pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
 			FILL_INT_URB(hid->urbin, dev, pipe, hid->inbuf, 0, hid_irq_in, hid, endpoint->bInterval);
 		} else {
 			if (hid->urbout)
 				continue;
-			if (!(hid->urbout = usb_alloc_urb(0)))
+			if (!(hid->urbout = usb_alloc_urb(0, GFP_KERNEL)))
 				goto fail;
 			pipe = usb_sndbulkpipe(dev, endpoint->bEndpointAddress);
 			FILL_BULK_URB(hid->urbout, dev, pipe, hid->outbuf, 0, hid_irq_out, hid);
@@ -1360,7 +1360,7 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 
 	kfree(buf);
 
-	hid->urbctrl = usb_alloc_urb(0);
+	hid->urbctrl = usb_alloc_urb(0, GFP_KERNEL);
 	FILL_CONTROL_URB(hid->urbctrl, dev, 0, (void*) &hid->cr, hid->ctrlbuf, 1, hid_ctrl, hid);
 
 	return hid;

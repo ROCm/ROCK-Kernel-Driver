@@ -547,17 +547,17 @@ static void * hci_usb_probe(struct usb_device *udev, unsigned int ifnum, const s
 	husb->udev = udev;
 	husb->bulk_out_ep_addr = bulk_out_ep->bEndpointAddress;
 
-	if (!(husb->ctrl_urb = usb_alloc_urb(0))) {
+	if (!(husb->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL))) {
 		ERR("Can't allocate: control URB");
 		goto probe_error;
 	}
 
-	if (!(husb->write_urb = usb_alloc_urb(0))) {
+	if (!(husb->write_urb = usb_alloc_urb(0, GFP_KERNEL))) {
 		ERR("Can't allocate: write URB");
 		goto probe_error;
 	}
 
-	if (!(husb->read_urb = usb_alloc_urb(0))) {
+	if (!(husb->read_urb = usb_alloc_urb(0, GFP_KERNEL))) {
 		ERR("Can't allocate: read URB");
 		goto probe_error;
 	}
@@ -578,7 +578,7 @@ static void * hci_usb_probe(struct usb_device *udev, unsigned int ifnum, const s
 	pipe = usb_rcvintpipe(udev, ep->bEndpointAddress);
 	size = usb_maxpacket(udev, pipe, usb_pipeout(pipe));
 
-	if (!(husb->intr_urb = usb_alloc_urb(0))) {
+	if (!(husb->intr_urb = usb_alloc_urb(0, GFP_KERNEL))) {
 		ERR("Can't allocate: interrupt URB");
 		goto probe_error;
 	}

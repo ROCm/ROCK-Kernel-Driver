@@ -827,7 +827,7 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 
 	ret = 0;
 	for (i = 0; i < MAX_ISO_BUFS; i++) {
-		urb = usb_alloc_urb(ISO_FRAMES_PER_DESC);
+		urb = usb_alloc_urb(ISO_FRAMES_PER_DESC, GFP_KERNEL);
 		if (urb == NULL) {
 			Err("Failed to allocate urb %d\n", i);
 			ret = -ENOMEM;

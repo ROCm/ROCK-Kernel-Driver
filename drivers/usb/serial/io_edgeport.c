@@ -1091,7 +1091,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 		}
 
 		/* Allocate a URB for the write */
-		edge_port->write_urb = usb_alloc_urb (0);
+		edge_port->write_urb = usb_alloc_urb (0, GFP_KERNEL);
 
 		if (!edge_port->write_urb) {
 			dbg(__FUNCTION__" - no memory");
@@ -2462,7 +2462,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	usb_serial_debug_data (__FILE__, __FUNCTION__, length, buffer);
 
 	/* Allocate our next urb */
-	urb = usb_alloc_urb (0);
+	urb = usb_alloc_urb (0, GFP_KERNEL);
 	if (!urb)
 		return -ENOMEM;
 
