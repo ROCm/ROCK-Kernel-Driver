@@ -385,7 +385,7 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	enable_irq(ch->irq);
 
 	if (error) {
-		ide_dump_status(drive, NULL, "set_drive_speed_status", drive->status);
+		ata_dump(drive, NULL, "set drive speed");
 		return error;
 	}
 

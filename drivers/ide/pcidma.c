@@ -58,8 +58,9 @@ ide_startstop_t ide_dma_intr(struct ata_device *drive, struct request *rq)
  * FIXME: taskfiles should be a map of pages, not a long virt address... /jens
  * FIXME: I agree with Jens --mdcki!
  */
-static int build_sglist(struct ata_channel *ch, struct request *rq)
+static int build_sglist(struct ata_device *drive, struct request *rq)
 {
+	struct ata_channel *ch = drive->channel;
 	struct scatterlist *sg = ch->sg_table;
 	int nents = 0;
 
@@ -69,7 +70,7 @@ static int build_sglist(struct ata_channel *ch, struct request *rq)
 		unsigned char *virt_addr = rq->buffer;
 		int sector_count = rq->nr_sectors;
 #else
-		nents = blk_rq_map_sg(rq->q, rq, ch->sg_table);
+		nents = blk_rq_map_sg(&drive->queue, rq, ch->sg_table);
 
 		if (nents > rq->nr_segments)
 			printk("ide-dma: received %d segments, build %d\n", rq->nr_segments, nents);
@@ -99,7 +100,7 @@ static int build_sglist(struct ata_channel *ch, struct request *rq)
 		sg[nents].length =  sector_count  * SECTOR_SIZE;
 		++nents;
 	} else {
-		nents = blk_rq_map_sg(rq->q, rq, ch->sg_table);
+		nents = blk_rq_map_sg(&drive->queue, rq, ch->sg_table);
 
 		if (rq->q && nents > rq->nr_phys_segments)
 			printk("ide-dma: received %d phys segments, build %d\n", rq->nr_phys_segments, nents);
@@ -150,7 +151,7 @@ int ata_start_dma(struct ata_device *drive, struct request *rq)
 		reading = 1 << 3;
 
 	/* try PIO instead of DMA */
-	if (!udma_new_table(ch, rq))
+	if (!udma_new_table(drive, rq))
 		return 1;
 
 	outl(ch->dmatable_dma, dma_base + 4); /* PRD table */
@@ -306,8 +307,9 @@ void udma_pci_enable(struct ata_device *drive, int on, int verbose)
  * This prepares a dma request.  Returns 0 if all went okay, returns 1
  * otherwise.  May also be invoked from trm290.c
  */
-int udma_new_table(struct ata_channel *ch, struct request *rq)
+int udma_new_table(struct ata_device *drive, struct request *rq)
 {
+	struct ata_channel *ch = drive->channel;
 	unsigned int *table = ch->dmatable_cpu;
 #ifdef CONFIG_BLK_DEV_TRM290
 	unsigned int is_trm290_chipset = (ch->chipset == ide_trm290);
@@ -318,7 +320,7 @@ int udma_new_table(struct ata_channel *ch, struct request *rq)
 	int i;
 	struct scatterlist *sg;
 
-	ch->sg_nents = i = build_sglist(ch, rq);
+	ch->sg_nents = i = build_sglist(drive, rq);
 	if (!i)
 		return 0;
 

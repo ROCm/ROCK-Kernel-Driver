@@ -94,7 +94,7 @@ static struct super_operations smb_sops =
 {
 	alloc_inode:	smb_alloc_inode,
 	destroy_inode:	smb_destroy_inode,
-	put_inode:	force_delete,
+	drop_inode:	generic_delete_inode,
 	delete_inode:	smb_delete_inode,
 	put_super:	smb_put_super,
 	statfs:		smb_statfs,

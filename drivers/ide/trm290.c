@@ -217,7 +217,7 @@ static int trm290_udma_init(struct ata_device *drive, struct request *rq)
 		writing = 0;
 	}
 
-	if (!(count = udma_new_table(ch, rq))) {
+	if (!(count = udma_new_table(drive, rq))) {
 		trm290_prepare_drive(drive, 0);	/* select PIO xfer */
 		return 1;	/* try PIO instead of DMA */
 	}

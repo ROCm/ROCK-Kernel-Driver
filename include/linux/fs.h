@@ -800,6 +800,7 @@ struct super_operations {
    	void (*dirty_inode) (struct inode *);
 	void (*write_inode) (struct inode *, int);
 	void (*put_inode) (struct inode *);
+	void (*drop_inode) (struct inode *);
 	void (*delete_inode) (struct inode *);
 	void (*put_super) (struct super_block *);
 	void (*write_super) (struct super_block *);
@@ -1183,10 +1184,10 @@ extern loff_t default_llseek(struct file *file, loff_t offset, int origin);
 
 extern void inode_init_once(struct inode *);
 extern void iput(struct inode *);
-extern void force_delete(struct inode *);
 extern struct inode * igrab(struct inode *);
 extern ino_t iunique(struct super_block *, ino_t);
 extern int inode_needs_sync(struct inode *inode);
+extern void generic_delete_inode(struct inode *inode);
 
 extern struct inode * iget5_locked(struct super_block *, unsigned long, int (*test)(struct inode *, void *), int (*set)(struct inode *, void *), void *);
 extern struct inode * iget_locked(struct super_block *, unsigned long);

@@ -1152,9 +1152,9 @@ static int adpt_i2o_post_wait(adpt_hba* pHba, u32* msg, int len, int timeout)
 	// this code is taken from kernel/sched.c:interruptible_sleep_on_timeout
 	wait.task = current;
 	init_waitqueue_entry(&wait, current);
-	wq_write_lock_irqsave(&adpt_wq_i2o_post.lock,flags);
+	spin_lock_irqsave(&adpt_wq_i2o_post.lock, flags);
 	__add_wait_queue(&adpt_wq_i2o_post, &wait);
-	wq_write_unlock(&adpt_wq_i2o_post.lock);
+	spin_unlock(&adpt_wq_i2o_post.lock);
 
 	msg[2] |= 0x80000000 | ((u32)wait_data->id);
 	timeout *= HZ;
@@ -1167,9 +1167,9 @@ static int adpt_i2o_post_wait(adpt_hba* pHba, u32* msg, int len, int timeout)
 			schedule_timeout(timeout*HZ);
 		spin_lock_irq(pHba->host->host_lock);
 	}
-	wq_write_lock_irq(&adpt_wq_i2o_post.lock);
+	spin_lock_irq(&adpt_wq_i2o_post.lock);
 	__remove_wait_queue(&adpt_wq_i2o_post, &wait);
-	wq_write_unlock_irqrestore(&adpt_wq_i2o_post.lock,flags);
+	spin_unlock_irqrestore(&adpt_wq_i2o_post.lock, flags);
 
 	if(status == -ETIMEDOUT){
 		printk(KERN_INFO"dpti%d: POST WAIT TIMEOUT\n",pHba->unit);

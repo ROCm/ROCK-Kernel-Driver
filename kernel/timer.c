@@ -13,6 +13,7 @@
  *              serialize accesses to xtime/lost_ticks).
  *                              Copyright (C) 1998  Andrea Arcangeli
  *  1999-03-10  Improved NTP compatibility by Ulrich Windl
+ *  2002-05-31	Move sys_sysinfo here and make its locking sane, Robert Love
  */
 
 #include <linux/config.h>
@@ -605,9 +606,15 @@ static unsigned long count_active_tasks(void)
  * imply that avenrun[] is the standard name for this kind of thing.
  * Nothing else seems to be standardized: the fractional size etc
  * all seem to differ on different machines.
+ *
+ * Requires xtime_lock to access.
  */
 unsigned long avenrun[3];
 
+/*
+ * calc_load - given tick count, update the avenrun load estimates.
+ * This is called while holding a write_lock on xtime_lock.
+ */
 static inline void calc_load(unsigned long ticks)
 {
 	unsigned long active_tasks; /* fixed-point */
@@ -627,7 +634,8 @@ static inline void calc_load(unsigned long ticks)
 unsigned long wall_jiffies;
 
 /*
- * This spinlock protect us from races in SMP while playing with xtime. -arca
+ * This read-write spinlock protects us from races in SMP while
+ * playing with xtime and avenrun.
  */
 rwlock_t xtime_lock = RW_LOCK_UNLOCKED;
 unsigned long last_time_offset;
@@ -649,8 +657,8 @@ static inline void update_times(void)
 		update_wall_time(ticks);
 	}
 	last_time_offset = 0;
-	write_unlock_irq(&xtime_lock);
 	calc_load(ticks);
+	write_unlock_irq(&xtime_lock);
 }
 
 void timer_bh(void)
@@ -912,3 +920,73 @@ asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 	return 0;
 }
 
+/*
+ * sys_sysinfo - fill in sysinfo struct
+ */ 
+asmlinkage long sys_sysinfo(struct sysinfo *info)
+{
+	struct sysinfo val;
+	unsigned long mem_total, sav_total;
+	unsigned int mem_unit, bitcount;
+
+	memset((char *)&val, 0, sizeof(struct sysinfo));
+
+	read_lock_irq(&xtime_lock);
+	val.uptime = jiffies / HZ;
+
+	val.loads[0] = avenrun[0] << (SI_LOAD_SHIFT - FSHIFT);
+	val.loads[1] = avenrun[1] << (SI_LOAD_SHIFT - FSHIFT);
+	val.loads[2] = avenrun[2] << (SI_LOAD_SHIFT - FSHIFT);
+
+	val.procs = nr_threads;
+	read_unlock_irq(&xtime_lock);
+
+	si_meminfo(&val);
+	si_swapinfo(&val);
+
+	/*
+	 * If the sum of all the available memory (i.e. ram + swap)
+	 * is less than can be stored in a 32 bit unsigned long then
+	 * we can be binary compatible with 2.2.x kernels.  If not,
+	 * well, in that case 2.2.x was broken anyways...
+	 *
+	 *  -Erik Andersen <andersee@debian.org>
+	 */
+
+	mem_total = val.totalram + val.totalswap;
+	if (mem_total < val.totalram || mem_total < val.totalswap)
+		goto out;
+	bitcount = 0;
+	mem_unit = val.mem_unit;
+	while (mem_unit > 1) {
+		bitcount++;
+		mem_unit >>= 1;
+		sav_total = mem_total;
+		mem_total <<= 1;
+		if (mem_total < sav_total)
+			goto out;
+	}
+
+	/*
+	 * If mem_total did not overflow, multiply all memory values by
+	 * val.mem_unit and set it to 1.  This leaves things compatible
+	 * with 2.2.x, and also retains compatibility with earlier 2.4.x
+	 * kernels...
+	 */
+
+	val.mem_unit = 1;
+	val.totalram <<= bitcount;
+	val.freeram <<= bitcount;
+	val.sharedram <<= bitcount;
+	val.bufferram <<= bitcount;
+	val.totalswap <<= bitcount;
+	val.freeswap <<= bitcount;
+	val.totalhigh <<= bitcount;
+	val.freehigh <<= bitcount;
+
+out:
+	if (copy_to_user(info, &val, sizeof(struct sysinfo)))
+		return -EFAULT;
+
+	return 0;
+}

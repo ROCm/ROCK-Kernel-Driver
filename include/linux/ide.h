@@ -610,11 +610,7 @@ extern int ide_end_request(struct ata_device *drive, struct request *, int);
 extern void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
 		unsigned long timeout, ata_expiry_t expiry);
 
-/*
- * Error reporting, in human readable form (luxurious, but a memory hog).
- */
-extern u8 ide_dump_status(struct ata_device *, struct request *rq, const char *, u8);
-
+extern u8 ata_dump(struct ata_device *, struct request *, const char *);
 extern ide_startstop_t ata_error(struct ata_device *, struct request *rq, const char *);
 
 extern void ide_fixstring(char *s, const int bytecount, const int byteswap);
@@ -799,7 +795,7 @@ extern void udma_pci_timeout(struct ata_device *drive);
 extern void udma_pci_irq_lost(struct ata_device *);
 extern int udma_pci_setup(struct ata_device *);
 
-extern int udma_new_table(struct ata_channel *, struct request *);
+extern int udma_new_table(struct ata_device *, struct request *);
 extern void udma_destroy_table(struct ata_channel *);
 extern void udma_print(struct ata_device *);
 
@@ -834,5 +830,6 @@ extern int ata_status(struct ata_device *, u8, u8);
 extern int ata_irq_enable(struct ata_device *, int);
 extern void ata_reset(struct ata_channel *);
 extern void ata_out_regfile(struct ata_device *, struct hd_drive_task_hdr *);
+extern void ata_in_regfile(struct ata_device *, struct hd_drive_task_hdr *);
 
 #endif

@@ -275,8 +275,9 @@ static void icside_maskproc(struct ata_device *drive)
 #define NR_ENTRIES 256
 #define TABLE_SIZE (NR_ENTRIES * 8)
 
-static int ide_build_sglist(struct ata_channel *ch, struct request *rq)
+static int ide_build_sglist(struct ata_device *drive, struct request *rq)
 {
+	struct ata_channel *ch = drive->channel;
 	struct scatterlist *sg = ch->sg_table;
 	int nents;
 
@@ -294,7 +295,7 @@ static int ide_build_sglist(struct ata_channel *ch, struct request *rq)
 		sg->length = rq->nr_sectors * SECTOR_SIZE;
 		nents = 1;
 	} else {
-		nents = blk_rq_map_sg(rq->q, rq, sg);
+		nents = blk_rq_map_sg(&drive->queue, rq, sg);
 
 		if (rq->q && nents > rq->nr_phys_segments)
 			printk("icside: received %d segments, build %d\n",
@@ -586,7 +587,7 @@ static void icside_dma_timeout(struct ata_device *drive)
 {
 	printk(KERN_ERR "ATA: %s: UDMA timeout occured:", drive->name);
 	ata_status(drive, 0, 0);
-	ide_dump_status(drive, NULL, "UDMA timeout", drive->status);
+	ata_dump(drive, NULL, "UDMA timeout");
 }
 
 static void icside_irq_lost(struct ata_device *drive)

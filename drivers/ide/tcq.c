@@ -247,8 +247,7 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 	OUT_BYTE(WIN_QUEUED_SERVICE, IDE_COMMAND_REG);
 
 	if (wait_altstat(drive, &stat, BUSY_STAT)) {
-		printk(KERN_ERR"%s: BUSY clear took too long\n", __FUNCTION__);
-		ide_dump_status(drive, rq, __FUNCTION__, stat);
+		ata_dump(drive, rq, "BUSY clear took too long");
 		tcq_invalidate_queue(drive);
 
 		return ide_stopped;
@@ -262,7 +261,7 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 	 * FIXME, invalidate queue
 	 */
 	if (stat & ERR_STAT) {
-		ide_dump_status(drive, rq, __FUNCTION__, stat);
+		ata_dump(drive, rq, "ERR condition");
 		tcq_invalidate_queue(drive);
 
 		return ide_stopped;
@@ -328,8 +327,7 @@ static ide_startstop_t dmaq_complete(struct ata_device *drive, struct request *r
 	 * must be end of I/O, check status and complete as necessary
 	 */
 	if (!ata_status(drive, READY_STAT, drive->bad_wstat | DRQ_STAT)) {
-		printk(KERN_ERR "%s: %s: error status %x\n", __FUNCTION__, drive->name, drive->status);
-		ide_dump_status(drive, rq, __FUNCTION__, drive->status);
+		ata_dump(drive, rq, __FUNCTION__);
 		tcq_invalidate_queue(drive);
 
 		return ide_stopped;
@@ -557,7 +555,7 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 	OUT_BYTE(args->cmd, IDE_COMMAND_REG);
 
 	if (wait_altstat(drive, &stat, BUSY_STAT)) {
-		ide_dump_status(drive, rq, "queued start", stat);
+		ata_dump(drive, rq, "queued start");
 		tcq_invalidate_queue(drive);
 		return ide_stopped;
 	}
@@ -567,7 +565,7 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 #endif
 
 	if (stat & ERR_STAT) {
-		ide_dump_status(drive, rq, "tcq_start", stat);
+		ata_dump(drive, rq, "tcq_start");
 		return ide_stopped;
 	}
 
