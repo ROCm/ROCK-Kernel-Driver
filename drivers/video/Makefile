@@ -8,7 +8,7 @@
 export-objs    	:= fbmem.o fbcmap.o fbcon.o fbmon.o modedb.o \
 		   fbcon-afb.o fbcon-ilbm.o fbcon-accel.o \
 		   fbcon-vga.o fbcon-iplan2p2.o fbcon-iplan2p4.o \
-		   fbcon-iplan2p8.o fbcon-vga-planes.o fbcon-cfb16.o \
+		   fbcon-iplan2p8.o fbcon-vga-planes.o fbcon-vga8-planes.o fbcon-cfb16.o \
 		   fbcon-cfb2.o fbcon-cfb24.o fbcon-cfb32.o fbcon-cfb4.o \
 		   fbcon-cfb8.o fbcon-mfb.o fbcon-hga.o \
 		   cyber2000fb.o sa1100fb.o fbgen.o
@@ -60,7 +60,7 @@ obj-$(CONFIG_FB_SGIVW)            += sgivwfb.o cfbfillrect.o cfbcopyarea.o cfbim
 obj-$(CONFIG_FB_3DFX)             += tdfxfb.o
 obj-$(CONFIG_FB_MAC)              += macfb.o macmodes.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o 
 obj-$(CONFIG_FB_HP300)            += hpfb.o cfbfillrect.o cfbimgblt.o
-obj-$(CONFIG_FB_OF)               += offb.o cfbfillrect.o cfbimgblit.o cfbcopyarea.o
+obj-$(CONFIG_FB_OF)               += offb.o cfbfillrect.o cfbimgblt.o cfbcopyarea.o
 obj-$(CONFIG_FB_IMSTT)            += imsttfb.o
 obj-$(CONFIG_FB_RETINAZ3)         += retz3fb.o
 obj-$(CONFIG_FB_CLGEN)            += clgenfb.o
@@ -68,7 +68,7 @@ obj-$(CONFIG_FB_TRIDENT)	  += tridentfb.o
 obj-$(CONFIG_FB_S3TRIO)           += S3triofb.o
 obj-$(CONFIG_FB_TGA)              += tgafb.o
 obj-$(CONFIG_FB_VESA)             += vesafb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o 
-obj-$(CONFIG_FB_VGA16)            += vga16fb.o fbcon-vga-planes.o
+obj-$(CONFIG_FB_VGA16)            += vga16fb.o fbcon-vga-planes.o fbcon-vga8-planes.o
 obj-$(CONFIG_FB_VIRGE)            += virgefb.o
 obj-$(CONFIG_FB_G364)             += g364fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_FM2)              += fm2fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
