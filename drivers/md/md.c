@@ -3873,8 +3873,8 @@ int init_module(void)
 static void free_device_names(void)
 {
 	while (!list_empty(&device_names)) {
-		struct dname *tmp = list_entry(device_names.next,
-					       dev_name_t, list);
+		dev_name_t *tmp = list_entry(device_names.next,
+					     dev_name_t, list);
 		list_del(&tmp->list);
 		kfree(tmp);
 	}
