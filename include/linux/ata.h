@@ -38,6 +38,7 @@ enum {
 
 	ATA_ID_WORDS		= 256,
 	ATA_ID_PROD_OFS		= 27,
+	ATA_ID_FW_REV_OFS	= 23,
 	ATA_ID_SERNO_OFS	= 10,
 	ATA_ID_MAJOR_VER	= 80,
 	ATA_ID_PIO_MODES	= 64,
@@ -205,6 +206,7 @@ struct ata_taskfile {
 #define ata_id_has_wcache(dev)	((dev)->id[82] & (1 << 5))
 #define ata_id_has_lba(dev)	((dev)->id[49] & (1 << 8))
 #define ata_id_has_dma(dev)	((dev)->id[49] & (1 << 9))
+#define ata_id_removeable(dev)	((dev)->id[0] & (1 << 7))
 #define ata_id_u32(dev,n)	\
 	(((u32) (dev)->id[(n) + 1] << 16) | ((u32) (dev)->id[(n)]))
 #define ata_id_u64(dev,n)	\

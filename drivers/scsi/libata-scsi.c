@@ -498,7 +498,9 @@ void ata_scsi_rbuf_fill(struct ata_scsi_args *args,
 unsigned int ata_scsiop_inq_std(struct ata_scsi_args *args, u8 *rbuf,
 			       unsigned int buflen)
 {
-	const u8 hdr[] = {
+	struct ata_device *dev = args->dev;
+
+	u8 hdr[] = {
 		TYPE_DISK,
 		0,
 		0x5,	/* claim SPC-3 version compatibility */
@@ -506,14 +508,20 @@ unsigned int ata_scsiop_inq_std(struct ata_scsi_args *args, u8 *rbuf,
 		96 - 4
 	};
 
+	/* set scsi removeable (RMB) bit per ata bit */
+	if (ata_id_removeable(dev))
+		hdr[1] |= (1 << 7);
+
 	VPRINTK("ENTER\n");
 
 	memcpy(rbuf, hdr, sizeof(hdr));
 
 	if (buflen > 36) {
-		memcpy(&rbuf[8], args->dev->vendor, 8);
-		memcpy(&rbuf[16], args->dev->product, 16);
-		memcpy(&rbuf[32], DRV_VERSION, 4);
+		memcpy(&rbuf[8], "ATA     ", 8);
+		ata_dev_id_string(dev, &rbuf[16], ATA_ID_PROD_OFS, 16);
+		ata_dev_id_string(dev, &rbuf[32], ATA_ID_FW_REV_OFS, 4);
+		if (rbuf[32] == 0 || rbuf[32] == ' ')
+			memcpy(&rbuf[32], "n/a ", 4);
 	}
 
 	if (buflen > 63) {

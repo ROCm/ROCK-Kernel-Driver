@@ -260,12 +260,6 @@ struct ata_device {
 	unsigned int		pio_mode;
 	unsigned int		udma_mode;
 
-	unsigned char		vendor[8];	/* space-padded, not ASCIIZ */
-	unsigned char		product[32];	/* WARNING: shorter than
-						 * ATAPI7 spec size, 40 ASCII
-						 * characters
-						 */
-
 	/* cache info about current transfer mode */
 	u8			xfer_protocol;	/* taskfile xfer protocol */
 	u8			read_cmd;	/* opcode to use on read */
@@ -398,6 +392,8 @@ extern int ata_port_start (struct ata_port *ap);
 extern void ata_port_stop (struct ata_port *ap);
 extern irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
 extern void ata_fill_sg(struct ata_queued_cmd *qc);
+extern void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
+			      unsigned int ofs, unsigned int len);
 extern void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc);
 extern void ata_bmdma_start_mmio (struct ata_queued_cmd *qc);
 extern void ata_bmdma_setup_pio (struct ata_queued_cmd *qc);

@@ -818,7 +818,7 @@ static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device)
  *	@dev: Device whose IDENTIFY DEVICE results we will examine
  *	@s: string into which data is output
  *	@ofs: offset into identify device page
- *	@len: length of string to return
+ *	@len: length of string to return. must be an even number.
  *
  *	The strings in the IDENTIFY DEVICE page are broken up into
  *	16-bit chunks.  Run through the string, and output each
@@ -845,29 +845,6 @@ void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
 		ofs++;
 		len -= 2;
 	}
-}
-
-/**
- *	ata_dev_parse_strings - Store useful IDENTIFY DEVICE page strings
- *	@dev: Device whose IDENTIFY DEVICE page info we use
- *
- *	We store 'vendor' and 'product' strings read from the device,
- *	for later use in the SCSI simulator's INQUIRY data.
- *
- *	Set these strings here, in the case of 'product', using
- *	data read from the ATA IDENTIFY DEVICE page.
- *
- *	LOCKING:
- *	caller.
- */
-
-static void ata_dev_parse_strings(struct ata_device *dev)
-{
-	assert (dev->class == ATA_DEV_ATA);
-	memcpy(dev->vendor, "ATA     ", 8);
-
-	ata_dev_id_string(dev, dev->product, ATA_ID_PROD_OFS,
-			  sizeof(dev->product));
 }
 
 /**
@@ -1126,8 +1103,6 @@ retry:
 	}
 
 	ata_dump_id(dev);
-
-	ata_dev_parse_strings(dev);
 
 	/* ATA-specific feature tests */
 	if (dev->class == ATA_DEV_ATA) {
@@ -3525,3 +3500,4 @@ EXPORT_SYMBOL_GPL(ata_scsi_error);
 EXPORT_SYMBOL_GPL(ata_scsi_slave_config);
 EXPORT_SYMBOL_GPL(ata_scsi_release);
 EXPORT_SYMBOL_GPL(ata_host_intr);
+EXPORT_SYMBOL_GPL(ata_dev_id_string);
