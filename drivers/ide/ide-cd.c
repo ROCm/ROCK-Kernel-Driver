@@ -2070,6 +2070,7 @@ static int cdrom_check_status(ide_drive_t *drive, struct request_sense *sense)
 
 	req.sense = sense;
 	req.cmd[0] = GPCMD_TEST_UNIT_READY;
+	req.flags |= REQ_QUIET;
 
 #if ! STANDARD_ATAPI
         /* the Sanyo 3 CD changer uses byte 7 of TEST_UNIT_READY to 
