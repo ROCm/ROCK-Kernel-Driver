@@ -1070,7 +1070,7 @@ irnet_data_indication(void *	instance,
  *	o attempted to connect, timeout
  *	o connected, link is broken, LAP has timeout
  *	o connected, other side close the link
- *	o connection request on the server no handled
+ *	o connection request on the server not handled
  */
 static void
 irnet_disconnect_indication(void *	instance,
@@ -1121,20 +1121,31 @@ irnet_disconnect_indication(void *	instance,
       DEBUG(IRDA_CB_INFO, "Closing our TTP connection.\n");
       irttp_close_tsap(self->tsap);
       self->tsap = NULL;
-
-      /* Cleanup & close the PPP channel, which will kill pppd and the rest */
-      if(self->ppp_open)
-	ppp_unregister_channel(&self->chan);
-      self->ppp_open = 0;
     }
-  /* Cleanup the socket in case we want to reconnect */
+  /* Cleanup the socket in case we want to reconnect in ppp_output_wakeup() */
   self->stsap_sel = 0;
   self->daddr = DEV_ADDR_ANY;
   self->tx_flow = FLOW_START;
 
-  /* Note : what should we say to ppp ?
-   * It seem the ppp_generic and pppd are happy that way and will eventually
-   * timeout gracefully, so don't bother them... */
+  /* Deal with the ppp instance if it's still alive */
+  if(self->ppp_open)
+    {
+      if(test_open)
+	{
+	  /* If we were connected, cleanup & close the PPP channel,
+	   * which will kill pppd (hangup) and the rest */
+	  ppp_unregister_channel(&self->chan);
+	  self->ppp_open = 0;
+	}
+      else
+	{
+	  /* If we were trying to connect, flush (drain) ppp_generic
+	   * Tx queue (most often we have blocked it), which will
+	   * trigger an other attempt to connect. If we are passive,
+	   * this will empty the Tx queue after last try. */
+	  ppp_output_wakeup(&self->chan);
+	}
+    }
 
   DEXIT(IRDA_TCB_TRACE, "\n");
 }
