@@ -406,7 +406,7 @@ extern void firmware_unregister(struct subsystem *);
 #define dev_dbg(dev, format, arg...)		\
 	dev_printk(KERN_DEBUG , dev , format , ## arg)
 #else
-#define dev_dbg(dev, format, arg...) do {} while (0)
+#define dev_dbg(dev, format, arg...) do { (void)(dev); } while (0)
 #endif
 
 #define dev_err(dev, format, arg...)		\
