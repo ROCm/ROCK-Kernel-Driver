@@ -43,6 +43,7 @@
 #include <linux/timer.h>
 #include <linux/string.h>
 #include <linux/pagemap.h>
+#include <linux/dma-mapping.h>
 #include <linux/bitops.h>
 #include <linux/in.h>
 #include <linux/ip.h>
