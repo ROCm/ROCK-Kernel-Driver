@@ -1175,15 +1175,9 @@ static int netdev_open(struct net_device *dev)
 	       TX_DESC_SPACING | TX_DESC_TYPE,
 	       ioaddr + TxDescCtrl);
 
-#if defined(ADDR_64BITS)
-	writel(np->queue_mem_dma >> 32, ioaddr + RxDescQHiAddr);
-	writel(np->queue_mem_dma >> 32, ioaddr + TxRingHiAddr);
-	writel(np->queue_mem_dma >> 32, ioaddr + CompletionHiAddr);
-#else
-	writel(0, ioaddr + RxDescQHiAddr);
-	writel(0, ioaddr + TxRingHiAddr);
-	writel(0, ioaddr + CompletionHiAddr);
-#endif
+	writel( (np->queue_mem_dma >> 16) >> 16, ioaddr + RxDescQHiAddr);
+	writel( (np->queue_mem_dma >> 16) >> 16, ioaddr + TxRingHiAddr);
+	writel( (np->queue_mem_dma >> 16) >> 16, ioaddr + CompletionHiAddr);
 	writel(np->rx_ring_dma, ioaddr + RxDescQAddr);
 	writel(np->tx_ring_dma, ioaddr + TxRingPtr);
 
