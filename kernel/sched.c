@@ -148,7 +148,7 @@ static struct runqueue runqueues[NR_CPUS] __cacheline_aligned;
 
 #define cpu_rq(cpu)		(runqueues + (cpu))
 #define this_rq()		cpu_rq(smp_processor_id())
-#define task_rq(p)		cpu_rq((p)->thread_info->cpu)
+#define task_rq(p)		cpu_rq(task_cpu(p))
 #define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
 #define rt_task(p)		((p)->prio < MAX_RT_PRIO)
 
@@ -284,8 +284,8 @@ static inline void resched_task(task_t *p)
 	need_resched = test_and_set_tsk_thread_flag(p,TIF_NEED_RESCHED);
 	nrpolling |= test_tsk_thread_flag(p,TIF_POLLING_NRFLAG);
 
-	if (!need_resched && !nrpolling && (p->thread_info->cpu != smp_processor_id()))
-		smp_send_reschedule(p->thread_info->cpu);
+	if (!need_resched && !nrpolling && (task_cpu(p) != smp_processor_id()))
+		smp_send_reschedule(task_cpu(p));
 	preempt_enable();
 #else
 	set_tsk_need_resched(p);
@@ -366,10 +366,10 @@ repeat_lock_task:
 		 * currently. Do not violate hard affinity.
 		 */
 		if (unlikely(sync && (rq->curr != p) &&
-			(p->thread_info->cpu != smp_processor_id()) &&
+			(task_cpu(p) != smp_processor_id()) &&
 			(p->cpus_allowed & (1UL << smp_processor_id())))) {
 
-			p->thread_info->cpu = smp_processor_id();
+			set_task_cpu(p, smp_processor_id());
 			task_rq_unlock(rq, &flags);
 			goto repeat_lock_task;
 		}
@@ -409,7 +409,7 @@ void wake_up_forked_process(task_t * p)
 		p->sleep_avg = p->sleep_avg * CHILD_PENALTY / 100;
 		p->prio = effective_prio(p);
 	}
-	p->thread_info->cpu = smp_processor_id();
+	set_task_cpu(p, smp_processor_id());
 	activate_task(p, rq);
 
 	rq_unlock(rq);
@@ -663,7 +663,7 @@ skip_queue:
 	 */
 	dequeue_task(next, array);
 	busiest->nr_running--;
-	next->thread_info->cpu = this_cpu;
+	set_task_cpu(next, this_cpu);
 	this_rq->nr_running++;
 	enqueue_task(next, this_rq->active);
 	if (next->prio < current->prio)
@@ -821,7 +821,7 @@ need_resched:
 	spin_lock_irq(&rq->lock);
 
 	/*
-	 * if entering off a kernel preemption go straight
+	 * if entering off of a kernel preemption go straight
 	 * to picking the next task.
 	 */
 	if (unlikely(preempt_get_count() & PREEMPT_ACTIVE))
@@ -906,7 +906,7 @@ need_resched:
 	schedule();
 	ti->preempt_count = 0;
 
-	/* we can miss a preemption opportunity between schedule and now */
+	/* we could miss a preemption opportunity between schedule and now */
 	barrier();
 	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
 		goto need_resched;
@@ -1630,7 +1630,7 @@ static inline void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
 
 void __init init_idle(task_t *idle, int cpu)
 {
-	runqueue_t *idle_rq = cpu_rq(cpu), *rq = cpu_rq(idle->thread_info->cpu);
+	runqueue_t *idle_rq = cpu_rq(cpu), *rq = cpu_rq(task_cpu(idle));
 	unsigned long flags;
 
 	__save_flags(flags);
@@ -1642,7 +1642,7 @@ void __init init_idle(task_t *idle, int cpu)
 	idle->array = NULL;
 	idle->prio = MAX_PRIO;
 	idle->state = TASK_RUNNING;
-	idle->thread_info->cpu = cpu;
+	set_task_cpu(idle, cpu);
 	double_rq_unlock(idle_rq, rq);
 	set_tsk_need_resched(idle);
 	__restore_flags(flags);
@@ -1751,7 +1751,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 * Can the task run on the task's current CPU? If not then
 	 * migrate the process off to a proper CPU.
 	 */
-	if (new_mask & (1UL << p->thread_info->cpu)) {
+	if (new_mask & (1UL << task_cpu(p))) {
 		task_rq_unlock(rq, &flags);
 		goto out;
 	}
@@ -1760,7 +1760,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 * it is sufficient to simply update the task's cpu field.
 	 */
 	if (!p->array && (p != rq->curr)) {
-		p->thread_info->cpu = __ffs(p->cpus_allowed);
+		set_task_cpu(p, __ffs(p->cpus_allowed));
 		task_rq_unlock(rq, &flags);
 		goto out;
 	}
@@ -1829,18 +1829,18 @@ static int migration_thread(void * bind_cpu)
 		cpu_dest = __ffs(p->cpus_allowed);
 		rq_dest = cpu_rq(cpu_dest);
 repeat:
-		cpu_src = p->thread_info->cpu;
+		cpu_src = task_cpu(p);
 		rq_src = cpu_rq(cpu_src);
 
 		local_irq_save(flags);
 		double_rq_lock(rq_src, rq_dest);
-		if (p->thread_info->cpu != cpu_src) {
+		if (task_cpu(p) != cpu_src) {
 			double_rq_unlock(rq_src, rq_dest);
 			local_irq_restore(flags);
 			goto repeat;
 		}
 		if (rq_src == rq) {
-			p->thread_info->cpu = cpu_dest;
+			set_task_cpu(p, cpu_dest);
 			if (p->array) {
 				deactivate_task(p, rq_src);
 				activate_task(p, rq_dest);
