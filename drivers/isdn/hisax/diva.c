@@ -172,7 +172,7 @@ ipac_dc_read(struct IsdnCardState *cs, u8 offset)
 static void
 ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset|0x80, value);
+	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset+0x80, value);
 }
 
 static void
@@ -364,28 +364,26 @@ static void
 diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u8 val, sval;
+	u8 sval;
 	int cnt=5;
 
-	spin_lock(&cs->lock);
 	while (((sval = bytein(cs->hw.diva.ctrl)) & DIVA_IRQ_REQ) && cnt) {
-		val = readreg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_ISTA + 0x40);
-		if (val)
-			hscx_int_main(cs, val);
-		val = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, ISAC_ISTA);
-		if (val)
-			isac_interrupt(cs, val);
-		cnt--;
+		hscxisac_irq(intno, dev_id, regs);
 	}
 	if (!cnt)
 		printk(KERN_WARNING "Diva: IRQ LOOP\n");
-	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK, 0xFF);
-	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK + 0x40, 0xFF);
-	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, ISAC_MASK, 0xFF);
-	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, ISAC_MASK, 0x0);
-	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK, 0x0);
-	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK + 0x40, 0x0);
-	spin_unlock(&cs->lock);
+}
+
+static u8
+ipac_read(struct IsdnCardState *cs, u8 offset)
+{
+	return ipac_dc_read(cs, offset - 0x80);
+}
+
+static void
+ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+{
+	ipac_dc_write(cs, offset - 0x80, value);
 }
 
 static void
@@ -399,12 +397,12 @@ diva_ipac_isa_irq(int intno, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING "Diva: Spurious interrupt!\n");
 		return;
 	}
-	ista = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_ISTA);
+	ista = ipac_read(cs, IPAC_ISTA);
 Start_IPACISA:
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
 	if (ista & 0x0f) {
-		val = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, HSCX_ISTA + 0x40);
+		val = hscx_read(cs, 1, HSCX_ISTA);
 		if (ista & 0x01)
 			val |= 0x01;
 		if (ista & 0x04)
@@ -415,7 +413,7 @@ Start_IPACISA:
 			hscx_int_main(cs, val);
 	}
 	if (ista & 0x20) {
-		val = 0xfe & readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, ISAC_ISTA + 0x80);
+		val = ipac_dc_read(cs, ISAC_ISTA) & 0xfe;
 		if (val) {
 			isac_interrupt(cs, val);
 		}
@@ -424,15 +422,28 @@ Start_IPACISA:
 		val = 0x01;
 		isac_interrupt(cs, val);
 	}
-	ista  = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_ISTA);
+	ista  = ipac_read(cs, IPAC_ISTA);
 	if ((ista & 0x3f) && icnt) {
 		icnt--;
 		goto Start_IPACISA;
 	}
 	if (!icnt)
 		printk(KERN_WARNING "DIVA IPAC IRQ LOOP\n");
-	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_MASK, 0xFF);
-	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_MASK, 0xC0);
+	
+	ipac_write(cs, IPAC_MASK, 0xFF);
+	ipac_write(cs, IPAC_MASK, 0xC0);
+}
+
+static u8
+mem_ipac_read(struct IsdnCardState *cs, u8 offset)
+{
+	return mem_ipac_dc_read(cs, offset - 0x80);
+}
+
+static void
+mem_ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+{
+	mem_ipac_dc_write(cs, offset - 0x80, value);
 }
 
 static void
@@ -441,23 +452,17 @@ diva_ipac_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 	struct IsdnCardState *cs = dev_id;
 	u8 ista,val;
 	int icnt=5;
-	u8 *cfg;
 
-	if (!cs) {
-		printk(KERN_WARNING "Diva: Spurious interrupt!\n");
-		return;
-	}
-	cfg = (u8 *) cs->hw.diva.pci_cfg;
-	val = *cfg;
+	val = readb(cs->hw.diva.pci_cfg);
 	if (!(val & PITA_INT0_STATUS))
 		return; /* other shared IRQ */
-	*cfg = PITA_INT0_STATUS; /* Reset pending INT0 */
-	ista = memreadreg(cs->hw.diva.cfg_reg, IPAC_ISTA);
+	writeb(PITA_INT0_STATUS, cs->hw.diva.pci_cfg); /* Reset pending INT0 */
+	ista = mem_ipac_read(cs, IPAC_ISTA);
 Start_IPACPCI:
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
 	if (ista & 0x0f) {
-		val = memreadreg(cs->hw.diva.cfg_reg, HSCX_ISTA + 0x40);
+		val = mem_hscx_read(cs, 1, HSCX_ISTA);
 		if (ista & 0x01)
 			val |= 0x01;
 		if (ista & 0x04)
@@ -468,7 +473,7 @@ Start_IPACPCI:
 			hscx_int_main(cs, val);
 	}
 	if (ista & 0x20) {
-		val = 0xfe & memreadreg(cs->hw.diva.cfg_reg, ISAC_ISTA + 0x80);
+		val = mem_ipac_dc_read(cs, ISAC_ISTA) & 0xfe;
 		if (val) {
 			isac_interrupt(cs, val);
 		}
@@ -477,15 +482,15 @@ Start_IPACPCI:
 		val = 0x01;
 		isac_interrupt(cs, val);
 	}
-	ista  = memreadreg(cs->hw.diva.cfg_reg, IPAC_ISTA);
+	ista  = mem_ipac_read(cs, IPAC_ISTA);
 	if ((ista & 0x3f) && icnt) {
 		icnt--;
 		goto Start_IPACPCI;
 	}
 	if (!icnt)
 		printk(KERN_WARNING "DIVA IPAC PCI IRQ LOOP\n");
-	memwritereg(cs->hw.diva.cfg_reg, IPAC_MASK, 0xFF);
-	memwritereg(cs->hw.diva.cfg_reg, IPAC_MASK, 0xC0);
+	mem_ipac_write(cs, IPAC_MASK, 0xFF);
+	mem_ipac_write(cs, IPAC_MASK, 0xC0);
 }
 
 static void
@@ -493,17 +498,11 @@ diva_ipacx_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val;
-	u8 *cfg;
 
-	if (!cs) {
-		printk(KERN_WARNING "Diva: Spurious interrupt!\n");
-		return;
-	}
-	cfg = (u8 *) cs->hw.diva.pci_cfg;
-	val = *cfg;
+	val = readb(cs->hw.diva.pci_cfg);
 	if (!(val &PITA_INT0_STATUS)) return; // other shared IRQ
 	interrupt_ipacx(cs);      // handler for chip
-	*cfg = PITA_INT0_STATUS;  // Reset PLX interrupt
+	writeb(PITA_INT0_STATUS, cs->hw.diva.pci_cfg);  // Reset PLX interrupt
 }
 
 static void
@@ -959,11 +958,11 @@ ready:
 			request_region(cs->hw.diva.cfg_reg, bytecnt, "diva isdn");
 		}
 	}
-	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Diva_card_msg;
 	if (cs->subtyp == DIVA_IPAC_ISA) {
 		diva_ipac_isa_reset(cs);
 		cs->dc_hw_ops = &ipac_dc_ops;
+		cs->bc_hw_ops = &hscx_ops;
 		cs->card_ops = &diva_ipac_isa_ops;
 		val = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_ID);
 		printk(KERN_INFO "Diva: IPAC version %x\n", val);
@@ -987,6 +986,7 @@ ready:
 		cs->hw.diva.tl.data = (long) cs;
 		init_timer(&cs->hw.diva.tl);
 		cs->dc_hw_ops = &isac_ops;
+		cs->bc_hw_ops = &hscx_ops;
 		cs->card_ops = &diva_ops;
 		ISACVersion(cs, "Diva:");
 		if (HscxVersion(cs, "Diva:")) {

@@ -252,35 +252,20 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static void
-gazel_interrupt(int intno, void *dev_id, struct pt_regs *regs)
+static u8
+ipac_read(struct IsdnCardState *cs, u8 offset)
 {
-#define MAXCOUNT 5
-	struct IsdnCardState *cs = dev_id;
-	u8 valisac, valhscx;
-	int count = 0;
-
-	spin_lock(&cs->lock);
-	do {
-		valhscx = hscx_read(cs, 1, HSCX_ISTA);
-		if (valhscx)
-			hscx_int_main(cs, valhscx);
-		valisac = isac_read(cs, ISAC_ISTA);
-		if (valisac)
-			isac_interrupt(cs, valisac);
-		count++;
-	} while ((valhscx || valisac) && (count < MAXCOUNT));
-
-	hscx_write(cs, 0, HSCX_MASK, 0xFF);
-	hscx_write(cs, 1, HSCX_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0x0);
-	hscx_write(cs, 0, HSCX_MASK, 0x0);
-	hscx_write(cs, 1, HSCX_MASK, 0x0);
-	spin_unlock(&cs->lock);
+	return isac_read(cs, offset - 0x80);
 }
 
+static void
+ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+{
+	isac_write(cs, offset - 0x80, value);
+}
 
+#define MAXCOUNT 5
+  
 static void
 gazel_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
@@ -292,7 +277,7 @@ gazel_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING "Gazel: Spurious interrupt!\n");
 		return;
 	}
-	ista = readreg_ipac(cs, IPAC_ISTA);
+	ista = ipac_read(cs, IPAC_ISTA);
 	do {
 		if (ista & 0x0f) {
 			val = hscx_read(cs, 1, HSCX_ISTA);
@@ -316,13 +301,13 @@ gazel_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			val = 0x01;
 			isac_interrupt(cs, val);
 		}
-		ista = readreg_ipac(cs, IPAC_ISTA);
+		ista = ipac_read(cs, IPAC_ISTA);
 		count++;
 	}
 	while ((ista & 0x3f) && (count < MAXCOUNT));
 
-	writereg_ipac(cs, IPAC_MASK, 0xFF);
-	writereg_ipac(cs, IPAC_MASK, 0xC0);
+	ipac_write(cs, IPAC_MASK, 0xFF);
+	ipac_write(cs, IPAC_MASK, 0xC0);
 }
 
 static void
@@ -445,7 +430,7 @@ static struct card_ops gazel_ops = {
 	.init     = gazel_init,
 	.reset    = gazel_reset,
 	.release  = gazel_release,
-	.irq_func = gazel_interrupt,
+	.irq_func = hscxisac_irq,
 };
 
 static struct card_ops gazel_ipac_ops = {

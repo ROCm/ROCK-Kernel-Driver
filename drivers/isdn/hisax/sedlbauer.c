@@ -191,13 +191,13 @@ static struct dc_hw_ops isac_ops = {
 static u8
 ipac_dc_read(struct IsdnCardState *cs, u8 offset)
 {
-	return readreg(cs, cs->hw.sedl.isac, offset|0x80);
+	return readreg(cs, cs->hw.sedl.isac, offset+0x80);
 }
 
 static void
 ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	writereg(cs, cs->hw.sedl.isac, offset|0x80, value);
+	writereg(cs, cs->hw.sedl.isac, offset+0x80, value);
 }
 
 static void
@@ -299,17 +299,26 @@ sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	hscxisac_irq(intno, dev_id, regs);
 }
 
+static u8
+ipac_read(struct IsdnCardState *cs, u8 offset)
+{
+	return ipac_dc_read(cs, offset - 0x80);
+}
+
+static void
+ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+{
+	ipac_dc_write(cs, offset - 0x80, value);
+}
+
 static void
 sedlbauer_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 ista, val, icnt = 5;
 
-	if (!cs) {
-		printk(KERN_WARNING "Sedlbauer: Spurious interrupt!\n");
-		return;
-	}
-	ista = readreg(cs, cs->hw.sedl.isac, IPAC_ISTA);
+	spin_lock(&cs->lock);
+	ista = ipac_read(cs, IPAC_ISTA);
 Start_IPAC:
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
@@ -334,7 +343,7 @@ Start_IPAC:
 		val = 0x01;
 		isac_interrupt(cs, val);
 	}
-	ista  = readreg(cs, cs->hw.sedl.isac, IPAC_ISTA);
+	ista  = ipac_read(cs, IPAC_ISTA);
 	if ((ista & 0x3f) && icnt) {
 		icnt--;
 		goto Start_IPAC;
@@ -342,8 +351,9 @@ Start_IPAC:
 	if (!icnt)
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "Sedlbauer IRQ LOOP");
-	writereg(cs, cs->hw.sedl.isac, IPAC_MASK, 0xFF);
-	writereg(cs, cs->hw.sedl.isac, IPAC_MASK, 0xC0);
+	ipac_write(cs, IPAC_MASK, 0xFF);
+	ipac_write(cs, IPAC_MASK, 0xC0);
+	spin_unlock(&cs->lock);
 }
 
 static void

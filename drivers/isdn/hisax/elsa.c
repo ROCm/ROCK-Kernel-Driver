@@ -220,7 +220,7 @@ ipac_dc_read(struct IsdnCardState *cs, u8 offset)
 static void
 ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	writereg(cs, cs->hw.elsa.isac, offset|0x80, value);
+	writereg(cs, cs->hw.elsa.isac, offset+0x80, value);
 }
 
 static void
@@ -356,6 +356,18 @@ elsa_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		byteout(cs->hw.elsa.trig, 0x00);
 }
 
+static u8
+ipac_read(struct IsdnCardState *cs, u8 offset)
+{
+	return ipac_dc_read(cs, offset - 0x80);
+}
+
+static void
+ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+{
+	ipac_dc_write(cs, offset - 0x80, value);
+}
+
 static void
 elsa_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 {
@@ -382,7 +394,7 @@ elsa_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 		}
 	}
 #endif
-	ista = readreg(cs, cs->hw.elsa.isac, IPAC_ISTA);
+	ista = ipac_read(cs, IPAC_ISTA);
 Start_IPAC:
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
@@ -407,15 +419,15 @@ Start_IPAC:
 		val = 0x01;
 		isac_interrupt(cs, val);
 	}
-	ista  = readreg(cs, cs->hw.elsa.isac, IPAC_ISTA);
+	ista  = ipac_read(cs, IPAC_ISTA);
 	if ((ista & 0x3f) && icnt) {
 		icnt--;
 		goto Start_IPAC;
 	}
 	if (!icnt)
 		printk(KERN_WARNING "ELSA IRQ LOOP\n");
-	writereg(cs, cs->hw.elsa.isac, IPAC_MASK, 0xFF);
-	writereg(cs, cs->hw.elsa.isac, IPAC_MASK, 0xC0);
+	ipac_write(cs, IPAC_MASK, 0xFF);
+	ipac_write(cs, IPAC_MASK, 0xC0);
 }
 
 static void

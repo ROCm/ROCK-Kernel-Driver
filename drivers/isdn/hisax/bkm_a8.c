@@ -87,13 +87,13 @@ writefifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
 static u8
 ipac_dc_read(struct IsdnCardState *cs, u8 offset)
 {
-	return readreg(cs, offset | 0x80);
+	return readreg(cs, offset + 0x80);
 }
 
 static void
 ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	writereg(cs, offset | 0x80, value);
+	writereg(cs, offset + 0x80, value);
 }
 
 static void
@@ -146,6 +146,18 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
+static u8
+ipac_read(struct IsdnCardState *cs, u8 offset)
+{
+	return ipac_dc_read(cs, offset - 0x80);
+}
+
+static void
+ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+{
+	ipac_dc_write(cs, offset - 0x80, value);
+}
+
 /* Set the specific ipac to active */
 static void
 set_ipac_active(struct IsdnCardState *cs, u_int active)
@@ -161,7 +173,7 @@ bkm_a8_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u8 ista, val, icnt = 5;
 
 	spin_lock(&cs->lock);
-	ista = readreg(cs, IPAC_ISTA);
+	ista = ipac_read(cs, IPAC_ISTA);
 	if (!(ista & 0x3f)) /* not this IPAC */
 		goto unlock;
       Start_IPAC:
@@ -189,7 +201,7 @@ bkm_a8_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		val = 0x01;
 		isac_interrupt(cs, val);
 	}
-	ista = readreg(cs, IPAC_ISTA);
+	ista = ipac_read(cs, IPAC_ISTA);
 	if ((ista & 0x3f) && icnt) {
 		icnt--;
 		goto Start_IPAC;
@@ -198,8 +210,8 @@ bkm_a8_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING "HiSax: %s (%s) IRQ LOOP\n",
 		       CardType[cs->typ],
 		       sct_quadro_subtypes[cs->subtyp]);
-	writereg(cs, IPAC_MASK, 0xFF);
-	writereg(cs, IPAC_MASK, 0xC0);
+	ipac_write(cs, IPAC_MASK, 0xFF);
+	ipac_write(cs, IPAC_MASK, 0xC0);
  unlock:
 	spin_unlock(&cs->lock);
 }
