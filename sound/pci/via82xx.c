@@ -1419,8 +1419,11 @@ static int __devinit snd_via686_pcm_new(via82xx_t *chip)
 
 static int snd_via8233_capture_source_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
+	/* formerly they were "Line" and "Mic", but it looks like that they
+	 * have nothing to do with the actual physical connections...
+	 */
 	static char *texts[2] = {
-		"Line", "Mic"
+		"Input1", "Input2"
 	};
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
