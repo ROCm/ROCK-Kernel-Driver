@@ -61,12 +61,6 @@ struct rcfs_magf tc_rootdesc[NR_TCROOTMF] = {
 		.i_op    = &rcfs_file_inode_operations,
 	},
 	{ 
-		.name    =  "config", 
-		.mode    = TC_FILE_MODE, 
-		.i_fop   = &config_fileops, 
-		.i_op    = &rcfs_file_inode_operations,
-	},
-	{ 
 		.name    =  "members", 
 		.mode    = TC_FILE_MODE, 
 		.i_fop   = &members_fileops,
@@ -82,6 +76,14 @@ struct rcfs_magf tc_rootdesc[NR_TCROOTMF] = {
 		.name    =  "shares", 
 		.mode    = TC_FILE_MODE,
 		.i_fop   = &shares_fileops, 
+		.i_op    = &rcfs_file_inode_operations,
+	},
+	// Config should be made available only at the root level
+	// Make sure this is the last entry, as rcfs_mkdir depends on it
+	{ 
+		.name    =  "config", 
+		.mode    = TC_FILE_MODE, 
+		.i_fop   = &config_fileops, 
 		.i_op    = &rcfs_file_inode_operations,
 	},
 };

@@ -174,7 +174,7 @@ rcfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
  	// create the default set of magic files 
 	clstype = (RCFS_I(dentry->d_inode))->core->classtype;
 	rcfs_create_magic(dentry, &(((struct rcfs_magf*)clstype->mfdesc)[1]), 
-			  clstype->mfcount-1);
+			  clstype->mfcount-2);
 
 	return retval;
 
