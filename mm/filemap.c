@@ -910,7 +910,7 @@ find_page:
 		page = radix_tree_lookup(&mapping->page_tree, index);
 		if (!page) {
 			read_unlock(&mapping->page_lock);
-			handle_ra_thrashing(filp);
+			handle_ra_miss(filp);
 			goto no_cached_page;
 		}
 		page_cache_get(page);
@@ -1289,6 +1289,7 @@ struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address
 	struct inode *inode = mapping->host;
 	struct page *page;
 	unsigned long size, pgoff, endoff;
+	int did_readahead;
 
 	pgoff = ((address - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
 	endoff = ((area->vm_end - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
@@ -1302,31 +1303,45 @@ retry_all:
 	if ((pgoff >= size) && (area->vm_mm == current->mm))
 		return NULL;
 
-	/* The "size" of the file, as far as mmap is concerned, isn't bigger than the mapping */
+	/*
+	 * The "size" of the file, as far as mmap is concerned, isn't bigger
+	 * than the mapping
+	 */
 	if (size > endoff)
 		size = endoff;
+
+	did_readahead = 0;
 
 	/*
 	 * The readahead code wants to be told about each and every page
 	 * so it can build and shrink its windows appropriately
 	 */
-	if (VM_SequentialReadHint(area))
+	if (VM_SequentialReadHint(area)) {
+		did_readahead = 1;
 		page_cache_readahead(area->vm_file, pgoff);
+	}
 
 	/*
 	 * If the offset is outside the mapping size we're off the end
 	 * of a privately mapped file, so we need to map a zero page.
 	 */
-	if ((pgoff < size) && !VM_RandomReadHint(area))
+	if ((pgoff < size) && !VM_RandomReadHint(area)) {
+		did_readahead = 1;
 		page_cache_readaround(file, pgoff);
+	}
 
 	/*
 	 * Do we have something in the page cache already?
 	 */
 retry_find:
 	page = find_get_page(mapping, pgoff);
-	if (!page)
+	if (!page) {
+		if (did_readahead) {
+			handle_ra_miss(file);
+			did_readahead = 0;
+		}
 		goto no_cached_page;
+	}
 
 	/*
 	 * Ok, found a page in the page cache, now we need to check
