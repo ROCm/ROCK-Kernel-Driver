@@ -40,31 +40,31 @@ MODULE_DEVICES("{{Analog Devices,AD1848},"
 	        "{Analog Devices,AD1847},"
 		"{Crystal Semiconductors,CS4248}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
-static long snd_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
-static int snd_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,11,12,15 */
-static int snd_dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
+static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* PnP setup */
+static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 5,7,9,11,12,15 */
+static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for AD1848 soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for AD1848 soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable AD1848 soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_port, "Port # for AD1848 driver.");
-MODULE_PARM_SYNTAX(snd_port, SNDRV_PORT12_DESC);
-MODULE_PARM(snd_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_irq, "IRQ # for AD1848 driver.");
-MODULE_PARM_SYNTAX(snd_irq, SNDRV_IRQ_DESC);
-MODULE_PARM(snd_dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dma1, "DMA1 # for AD1848 driver.");
-MODULE_PARM_SYNTAX(snd_dma1, SNDRV_DMA_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for AD1848 soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for AD1848 soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable AD1848 soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(port, "Port # for AD1848 driver.");
+MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
+MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(irq, "IRQ # for AD1848 driver.");
+MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
+MODULE_PARM(dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dma1, "DMA1 # for AD1848 driver.");
+MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
 
 static snd_card_t *snd_ad1848_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
@@ -76,26 +76,26 @@ static int __init snd_card_ad1848_probe(int dev)
 	snd_pcm_t *pcm;
 	int err;
 
-	if (snd_port[dev] == SNDRV_AUTO_PORT) {
-		snd_printk("specify snd_port\n");
+	if (port[dev] == SNDRV_AUTO_PORT) {
+		snd_printk("specify port\n");
 		return -EINVAL;
 	}
-	if (snd_irq[dev] == SNDRV_AUTO_IRQ) {
-		snd_printk("specify snd_irq\n");
+	if (irq[dev] == SNDRV_AUTO_IRQ) {
+		snd_printk("specify irq\n");
 		return -EINVAL;
 	}
-	if (snd_dma1[dev] == SNDRV_AUTO_DMA) {
-		snd_printk("specify snd_dma1\n");
+	if (dma1[dev] == SNDRV_AUTO_DMA) {
+		snd_printk("specify dma1\n");
 		return -EINVAL;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
-	if ((err = snd_ad1848_create(card, snd_port[dev],
-				     snd_irq[dev],
-				     snd_dma1[dev],
+	if ((err = snd_ad1848_create(card, port[dev],
+				     irq[dev],
+				     dma1[dev],
 				     AD1848_HW_DETECT,
 				     &chip)) < 0) {
 		snd_card_free(card);
@@ -114,7 +114,7 @@ static int __init snd_card_ad1848_probe(int dev)
 	strcpy(card->shortname, pcm->name);
 
 	sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",
-		pcm->name, chip->port, snd_irq[dev], snd_dma1[dev]);
+		pcm->name, chip->port, irq[dev], dma1[dev]);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
@@ -128,7 +128,7 @@ static int __init alsa_card_ad1848_init(void)
 {
 	int dev, cards;
 
-	for (dev = cards = 0; dev < SNDRV_CARDS && snd_enable[dev]; dev++)
+	for (dev = cards = 0; dev < SNDRV_CARDS && enable[dev]; dev++)
 		if (snd_card_ad1848_probe(dev) >= 0)
 			cards++;
 
@@ -154,8 +154,8 @@ module_exit(alsa_card_ad1848_exit)
 
 #ifndef MODULE
 
-/* format is: snd-ad1848=snd_enable,snd_index,snd_id,snd_port,
-			 snd_irq,snd_dma1 */
+/* format is: snd-ad1848=enable,index,id,port,
+			 irq,dma1 */
 
 static int __init alsa_card_ad1848_setup(char *str)
 {
@@ -163,12 +163,12 @@ static int __init alsa_card_ad1848_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_port[nr_dev]) == 2 &&
-	       get_option(&str,&snd_irq[nr_dev]) == 2 &&
-	       get_option(&str,&snd_dma1[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
+	       get_option(&str,&irq[nr_dev]) == 2 &&
+	       get_option(&str,&dma1[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

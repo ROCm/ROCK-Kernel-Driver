@@ -48,23 +48,23 @@ MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{ALI,M5451,pci},{ALI,M5451}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;
-static int snd_pcm_channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 32};
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;
+static int pcm_channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 32};
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for ALI M5451 PCI Audio.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for ALI M5451 PCI Audio.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable ALI 5451 PCI Audio.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_pcm_channels, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_pcm_channels, "PCM Channels");
-MODULE_PARM_SYNTAX(snd_pcm_channels, SNDRV_ENABLED ",default:32,allows:{{1,32}}");
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for ALI M5451 PCI Audio.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for ALI M5451 PCI Audio.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable ALI 5451 PCI Audio.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(pcm_channels, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(pcm_channels, "PCM Channels");
+MODULE_PARM_SYNTAX(pcm_channels, SNDRV_ENABLED ",default:32,allows:{{1,32}}");
 
 /*
  *  Debug part definations
@@ -2174,7 +2174,7 @@ static int __devinit snd_ali_create(snd_card_t * card,
 }
 
 static int __devinit snd_ali_probe(struct pci_dev *pci,
-				   const struct pci_device_id *id)
+				   const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -2185,16 +2185,16 @@ static int __devinit snd_ali_probe(struct pci_dev *pci,
 
         if (dev >= SNDRV_CARDS)
                 return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
-	if ((err = snd_ali_create(card, pci, snd_pcm_channels[dev], &codec)) < 0) {
+	if ((err = snd_ali_create(card, pci, pcm_channels[dev], &codec)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -2269,7 +2269,7 @@ module_exit(alsa_card_ali_exit)
 
 #ifndef MODULE
 
-/* format is: snd-ali5451=snd_enable,snd_index,snd_id,snd_pcm_channels */
+/* format is: snd-ali5451=enable,index,id,pcm_channels */
 
 static int __init alsa_card_ali_setup(char *str)
 {
@@ -2277,10 +2277,10 @@ static int __init alsa_card_ali_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,&snd_pcm_channels[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&pcm_channels[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

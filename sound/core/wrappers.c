@@ -19,19 +19,8 @@
  *
  */
 
-#ifdef ALSA_BUILD
-#include "config.h"
-#endif
-
 #include <linux/version.h>
 #include <linux/config.h>
-#ifdef ALSA_BUILD
-#if defined(CONFIG_MODVERSIONS) && !defined(__GENKSYMS__) && !defined(__DEPEND__)
-#define MODVERSIONS
-#include <linux/modversions.h>
-#include "sndversions.h"
-#endif
-#endif
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>

@@ -51,12 +51,18 @@ void snd_ice1712_ak4524_write(ice1712_t *ice, int chip,
 
 	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA);
 	tmp |= ak->add_flags;
-	if (ak->cif) {
-		tmp |= ak->codecs_mask; /* start without chip select */
-	}  else {
-		tmp &= ~ak->codecs_mask; /* chip select low */
-		snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
-		udelay(1);
+	tmp &= ~ak->mask_flags;
+	if (ak->cs_mask == ak->cs_addr) {
+		if (ak->cif) {
+			tmp |= ak->cs_mask; /* start without chip select */
+		}  else {
+			tmp &= ~ak->cs_mask; /* chip select low */
+			snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
+			udelay(1);
+		}
+	} else {
+		tmp &= ~ak->cs_mask;
+		tmp |= ak->cs_addr;
 	}
 
 	addr &= 0x07;
@@ -79,13 +85,18 @@ void snd_ice1712_ak4524_write(ice1712_t *ice, int chip,
 	else
 		ak->ipga_gain[chip][addr-4] = data;
 
-	if (ak->cif) {
-		/* assert a cs pulse to trigger */
-		tmp &= ~ak->codecs_mask;
-		snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
-		udelay(1);
+	if (ak->cs_mask == ak->cs_addr) {
+		if (ak->cif) {
+			/* assert a cs pulse to trigger */
+			tmp &= ~ak->cs_mask;
+			snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
+			udelay(1);
+		}
+		tmp |= ak->cs_mask; /* chip select high to trigger */
+	} else {
+		tmp &= ~ak->cs_mask;
+		tmp |= ak->cs_none; /* deselect address */
 	}
-	tmp |= ak->codecs_mask; /* chip select high to trigger */
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
 	udelay(1);
 

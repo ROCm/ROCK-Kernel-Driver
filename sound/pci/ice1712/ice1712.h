@@ -246,8 +246,11 @@ struct snd_ak4524 {
 	unsigned int cif: 1;
 	unsigned char data_mask;
 	unsigned char clk_mask;
-	unsigned char codecs_mask;
+	unsigned char cs_mask;
+	unsigned char cs_addr;
+	unsigned char cs_none;
 	unsigned char add_flags;
+	unsigned char mask_flags;
 	struct snd_ak4524_ops {
 		int (*start)(ice1712_t *, unsigned char *, int);
 		void (*stop)(ice1712_t *, unsigned char *);

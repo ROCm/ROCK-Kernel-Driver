@@ -26,6 +26,7 @@
 
 #define DELTA_DEVICE_DESC \
 		"{MidiMan M Audio,Delta 1010},"\
+		"{MidiMan M Audio,Delta 1010LT},"\
 		"{MidiMan M Audio,Delta DiO 2496},"\
 		"{MidiMan M Audio,Delta 66},"\
 		"{MidiMan M Audio,Delta 44},"\
@@ -46,7 +47,7 @@ extern struct snd_ice1712_card_info snd_ice1712_delta_cards[];
  *  MidiMan M-Audio Delta GPIO definitions
  */
 
-/* MidiMan M-Audio Delta1010 */
+/* MidiMan M-Audio Delta shared pins */
 #define ICE1712_DELTA_DFS 0x01		/* fast/slow sample rate mode */
 					/* (>48kHz must be 1) */
 #define ICE1712_DELTA_SPDIF_IN_STAT 0x02
@@ -116,5 +117,19 @@ extern struct snd_ice1712_card_info snd_ice1712_delta_cards[];
 #define ICE1712_DELTA_AP_CS_CODEC 0x20	/* AK4528 chip select */
 					/* low signal = select */
 
+/* MidiMan M-Audio Delta1010LT definitions */
+/* thanks to Anders Johansson <ajh@watri.uwa.edu.au> */
+/* 0x01 = DFS */
+#define ICE1712_DELTA_1010LT_CCLK	0x02	/* SPI clock (AK4524 + CS8427) */
+#define ICE1712_DELTA_1010LT_DIN	0x04	/* data input (CS8427) */
+#define ICE1712_DELTA_1010LT_DOUT	0x08	/* data output (AK4524 + CS8427) */
+#define ICE1712_DELTA_1010LT_CS		0x70	/* mask for CS address */
+#define ICE1712_DELTA_1010LT_CS_CHIP_A	0x00	/* AK4524 #0 */
+#define ICE1712_DELTA_1010LT_CS_CHIP_B	0x10	/* AK4524 #1 */
+#define ICE1712_DELTA_1010LT_CS_CHIP_C	0x20	/* AK4524 #2 */
+#define ICE1712_DELTA_1010LT_CS_CHIP_D	0x30	/* AK4524 #3 */
+#define ICE1712_DELTA_1010LT_CS_CS8427	0x40	/* CS8427 */
+#define ICE1712_DELTA_1010LT_CS_NONE	0x50	/* nothing */
+#define ICE1712_DELTA_1010LT_WORDCLOCK 0x80	/* sample clock source: 0 = Word Clock Input, 1 = S/PDIF Input ??? */
 
 #endif /* __SOUND_DELTA_H */

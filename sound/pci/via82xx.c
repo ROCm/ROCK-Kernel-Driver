@@ -46,27 +46,27 @@ MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{VIA,VT82C686A/B/C,pci},{VIA,VT8233A/B/C}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static long snd_mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
-static int snd_ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static long mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
+static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for VIA 82xx bridge.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for VIA 82xx bridge.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable audio part of VIA 82xx bridge.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_mpu_port, "MPU-401 port.");
-MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_PORT_DESC);
-MODULE_PARM(snd_ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_ac97_clock, "AC'97 codec clock (default 48000Hz).");
-MODULE_PARM_SYNTAX(snd_ac97_clock, SNDRV_ENABLED ",default:48000");
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for VIA 82xx bridge.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for VIA 82xx bridge.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable audio part of VIA 82xx bridge.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(mpu_port, "MPU-401 port.");
+MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT_DESC);
+MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
+MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:48000");
 
 
 /* pci ids */
@@ -1168,7 +1168,7 @@ static int __devinit snd_via82xx_create(snd_card_t * card,
 }
 
 static int __devinit snd_via82xx_probe(struct pci_dev *pci,
-				       const struct pci_device_id *id)
+				       const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -1179,16 +1179,16 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
-	chip_type = id->driver_data;
+	chip_type = pci_id->driver_data;
 	switch (chip_type) {
 	case TYPE_VIA686:
 		strcpy(card->driver, "VIA686A");
@@ -1204,7 +1204,7 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 		return -EINVAL;
 	}
 		
-	if ((err = snd_via82xx_create(card, pci, chip_type, snd_ac97_clock[dev], &chip)) < 0) {
+	if ((err = snd_via82xx_create(card, pci, chip_type, ac97_clock[dev], &chip)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -1243,44 +1243,44 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 		}
 		pci_write_config_byte(pci, 0x42, legacy);
 		pci_write_config_byte(pci, 0x43, legacy_cfg);
-		if (rev_h && snd_mpu_port[dev] >= 0x200) {	/* force MIDI */
+		if (rev_h && mpu_port[dev] >= 0x200) {	/* force MIDI */
 			legacy |= 0x02;	/* enable MPU */
-			pci_write_config_dword(pci, 0x18, (snd_mpu_port[dev] & 0xfffc) | 0x01);
+			pci_write_config_dword(pci, 0x18, (mpu_port[dev] & 0xfffc) | 0x01);
 		} else {
 			if (rev_h && (legacy & 0x02)) {
-				snd_mpu_port[dev] = pci_resource_start(pci, 2);
-				if (snd_mpu_port[dev] < 0x200)	/* bad value */
+				mpu_port[dev] = pci_resource_start(pci, 2);
+				if (mpu_port[dev] < 0x200)	/* bad value */
 					legacy &= ~0x02;	/* disable MIDI */
 			} else {
-				switch (snd_mpu_port[dev]) {	/* force MIDI */
+				switch (mpu_port[dev]) {	/* force MIDI */
 				case 0x300:
 				case 0x310:
 				case 0x320:
 				case 0x330:
 					legacy_cfg &= ~(3 << 2);
-					legacy_cfg |= (snd_mpu_port[dev] & 0x0030) >> 2;
+					legacy_cfg |= (mpu_port[dev] & 0x0030) >> 2;
 					legacy |= 0x02;
 					break;
 				default:			/* no, use BIOS settings */
 					if (legacy & 0x02)
-						snd_mpu_port[dev] = 0x300 + ((legacy_cfg & 0x000c) << 2);
+						mpu_port[dev] = 0x300 + ((legacy_cfg & 0x000c) << 2);
 				}
 			}
 		}
 		pci_write_config_byte(pci, 0x42, legacy);
 		pci_write_config_byte(pci, 0x43, legacy_cfg);
 		if (legacy & 0x02) {
-			if (check_region(snd_mpu_port[dev], 2)) {
-				printk(KERN_WARNING "unable to get MPU-401 port at 0x%lx, skipping\n", snd_mpu_port[dev]);
+			if (check_region(mpu_port[dev], 2)) {
+				printk(KERN_WARNING "unable to get MPU-401 port at 0x%lx, skipping\n", mpu_port[dev]);
 				legacy &= ~0x02;
 				pci_write_config_byte(pci, 0x42, legacy);
 				goto __skip_mpu;
 			}
 			if (snd_mpu401_uart_new(card, 0, MPU401_HW_VIA686A,
-						snd_mpu_port[dev], 0,
+						mpu_port[dev], 0,
 						pci->irq, 0,
 						&chip->rmidi) < 0) {
-				printk(KERN_WARNING "unable to initialize MPU-401 at 0x%lx, skipping\n", snd_mpu_port[dev]);
+				printk(KERN_WARNING "unable to initialize MPU-401 at 0x%lx, skipping\n", mpu_port[dev]);
 				legacy &= ~0x02;
 				pci_write_config_byte(pci, 0x42, legacy);
 				goto __skip_mpu;
@@ -1355,8 +1355,8 @@ module_exit(alsa_card_via82xx_exit)
 
 #ifndef MODULE
 
-/* format is: snd-via82xx=snd_enable,snd_index,snd_id,
-			  snd_mpu_port,snd_ac97_clock */
+/* format is: snd-via82xx=enable,index,id,
+			  mpu_port,ac97_clock */
 
 static int __init alsa_card_via82xx_setup(char *str)
 {
@@ -1364,11 +1364,11 @@ static int __init alsa_card_via82xx_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,&snd_ac97_clock[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
+	       get_option(&str,&ac97_clock[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

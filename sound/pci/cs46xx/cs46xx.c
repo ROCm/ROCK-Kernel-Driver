@@ -46,31 +46,31 @@ MODULE_DEVICES("{{Cirrus Logic,Sound Fusion (CS4280)},"
 		"{Cirrus Logic,Sound Fusion (CS4624)},"
 		"{Cirrus Logic,Sound Fusion (CS4630)}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static int snd_external_amp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static int snd_thinkpad[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static int snd_mmap_valid[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int external_amp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int thinkpad[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int mmap_valid[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for the CS46xx soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for the CS46xx soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable CS46xx soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_external_amp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_external_amp, "Force to enable external amplifer.");
-MODULE_PARM_SYNTAX(snd_external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-MODULE_PARM(snd_thinkpad, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_thinkpad, "Force to enable Thinkpad's CLKRUN control.");
-MODULE_PARM_SYNTAX(snd_thinkpad, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-MODULE_PARM(snd_mmap_valid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_mmap_valid, "Support OSS mmap.");
-MODULE_PARM_SYNTAX(snd_mmap_valid, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for the CS46xx soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for the CS46xx soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable CS46xx soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(external_amp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(external_amp, "Force to enable external amplifer.");
+MODULE_PARM_SYNTAX(external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM(thinkpad, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(thinkpad, "Force to enable Thinkpad's CLKRUN control.");
+MODULE_PARM_SYNTAX(thinkpad, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM(mmap_valid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(mmap_valid, "Support OSS mmap.");
+MODULE_PARM_SYNTAX(mmap_valid, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 static struct pci_device_id snd_cs46xx_ids[] __devinitdata = {
         { 0x1013, 0x6001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* CS4280 */
@@ -82,7 +82,7 @@ static struct pci_device_id snd_cs46xx_ids[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, snd_cs46xx_ids);
 
 static int __devinit snd_card_cs46xx_probe(struct pci_dev *pci,
-					   const struct pci_device_id *id)
+					   const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -91,21 +91,21 @@ static int __devinit snd_card_cs46xx_probe(struct pci_dev *pci,
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 	if ((err = snd_cs46xx_create(card, pci,
-				     snd_external_amp[dev], snd_thinkpad[dev],
+				     external_amp[dev], thinkpad[dev],
 				     &chip)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
-	chip->accept_valid = snd_mmap_valid[dev];
+	chip->accept_valid = mmap_valid[dev];
 	if ((err = snd_cs46xx_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -207,7 +207,7 @@ module_exit(alsa_card_cs46xx_exit)
 
 #ifndef MODULE
 
-/* format is: snd-cs46xx=snd_enable,snd_index,snd_id */
+/* format is: snd-cs46xx=enable,index,id */
 
 static int __init alsa_card_cs46xx_setup(char *str)
 {
@@ -215,9 +215,9 @@ static int __init alsa_card_cs46xx_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

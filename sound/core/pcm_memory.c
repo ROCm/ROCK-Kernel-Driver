@@ -27,15 +27,15 @@
 #include <sound/info.h>
 #include <sound/initval.h>
 
-static int snd_preallocate_dma = 1;
-MODULE_PARM(snd_preallocate_dma, "i");
-MODULE_PARM_DESC(snd_preallocate_dma, "Preallocate DMA memory when the PCM devices are initialized.");
-MODULE_PARM_SYNTAX(snd_preallocate_dma, SNDRV_BOOLEAN_TRUE_DESC);
+static int preallocate_dma = 1;
+MODULE_PARM(preallocate_dma, "i");
+MODULE_PARM_DESC(preallocate_dma, "Preallocate DMA memory when the PCM devices are initialized.");
+MODULE_PARM_SYNTAX(preallocate_dma, SNDRV_BOOLEAN_TRUE_DESC);
 
-static int snd_maximum_substreams = 4;
-MODULE_PARM(snd_maximum_substreams, "i");
-MODULE_PARM_DESC(snd_maximum_substreams, "Maximum substreams with preallocated DMA memory.");
-MODULE_PARM_SYNTAX(snd_maximum_substreams, SNDRV_BOOLEAN_TRUE_DESC);
+static int maximum_substreams = 4;
+MODULE_PARM(maximum_substreams, "i");
+MODULE_PARM_DESC(maximum_substreams, "Maximum substreams with preallocated DMA memory.");
+MODULE_PARM_SYNTAX(maximum_substreams, SNDRV_BOOLEAN_TRUE_DESC);
 
 static int snd_minimum_buffer = 16384;
 
@@ -168,7 +168,7 @@ static int snd_pcm_lib_preallocate_pages1(snd_pcm_substream_t *substream,
 	dma_addr_t dma_addr = 0UL;
 	snd_info_entry_t *entry;
 
-	if (!size || !snd_preallocate_dma || substream->number >= snd_maximum_substreams) {
+	if (!size || !preallocate_dma || substream->number >= maximum_substreams) {
 		size = 0;
 	} else {
 		switch (substream->dma_type) {
