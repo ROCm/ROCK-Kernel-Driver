@@ -417,14 +417,14 @@ static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
 	printk (KERN_INFO PFX "VIA %s CPU detected. Longhaul v%d supported.\n",
 					cpuname, longhaul_version);
 
-	if ((longhaul_version==2) && (dont_scale_voltage==0))
-		longhaul_setup_voltagescaling();
-
 	ret = longhaul_get_ranges();
 	if (ret != 0)
 		return ret;
 
- 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
+ 	if ((longhaul_version==2) && (dont_scale_voltage==0))
+		longhaul_setup_voltagescaling();
+
+	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
  	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	policy->cur = calc_speed (longhaul_get_cpu_mult(), fsb);
 
