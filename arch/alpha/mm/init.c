@@ -42,12 +42,8 @@ extern void die_if_kernel(char *,struct pt_regs *,long);
 
 static struct pcb_struct original_pcb;
 
-#ifndef CONFIG_SMP
-struct pgtable_cache_struct quicklists;
-#endif
-
 pgd_t *
-get_pgd_slow(void)
+pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *ret, *init;
 
@@ -69,27 +65,25 @@ get_pgd_slow(void)
 	return ret;
 }
 
-int do_check_pgt_cache(int low, int high)
+pte_t *
+pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
-	int freed = 0;
-	if(pgtable_cache_size > high) {
-		do {
-			if(pgd_quicklist) {
-				free_pgd_slow(get_pgd_fast());
-				freed++;
-			}
-			if(pmd_quicklist) {
-				pmd_free_slow(pmd_alloc_one_fast(NULL, 0));
-				freed++;
-			}
-			if(pte_quicklist) {
-				pte_free_slow(pte_alloc_one_fast(NULL, 0));
-				freed++;
-			}
-		} while(pgtable_cache_size > low);
+	pte_t *pte;
+	long timeout = 10;
+
+ retry:
+	pte = (pte_t *) __get_free_page(GFP_KERNEL);
+	if (pte)
+		clear_page(pte);
+	else if (--timeout >= 0) {
+		current->state = TASK_UNINTERRUPTIBLE;
+		schedule_timeout(HZ);
+		goto retry;
 	}
-	return freed;
+
+	return pte;
 }
+
 
 /*
  * BAD_PAGE is the page that is used for page faults when linux
@@ -145,7 +139,6 @@ show_mem(void)
 	printk("%ld reserved pages\n",reserved);
 	printk("%ld pages shared\n",shared);
 	printk("%ld pages swap cached\n",cached);
-	printk("%ld pages in page table cache\n",pgtable_cache_size);
 	show_buffers();
 }
 #endif
@@ -260,7 +253,7 @@ callback_init(void * kernel_end)
 			unsigned long paddr = crb->map[i].pa;
 			crb->map[i].va = vaddr;
 			for (j = 0; j < crb->map[i].count; ++j) {
-				set_pte(pte_offset(pmd, vaddr),
+				set_pte(pte_offset_kernel(pmd, vaddr),
 					mk_pte_phys(paddr, PAGE_KERNEL));
 				paddr += PAGE_SIZE;
 				vaddr += PAGE_SIZE;
