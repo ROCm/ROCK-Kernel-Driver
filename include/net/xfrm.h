@@ -744,6 +744,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl);
 struct xfrm_policy *xfrm_policy_delete(int dir, struct xfrm_selector *sel);
 struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete);
 void xfrm_policy_flush(void);
+u32 xfrm_get_acqseq(void);
 void xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi);
 struct xfrm_state * xfrm_find_acq(u8 mode, u16 reqid, u8 proto, 
 				  xfrm_address_t *daddr, xfrm_address_t *saddr, 
@@ -779,5 +780,8 @@ extern struct xfrm_algo_desc *xfrm_calg_get_byname(char *name);
 
 struct crypto_tfm;
 typedef void (icv_update_fn_t)(struct crypto_tfm *, struct scatterlist *, unsigned int);
+
+extern void skb_icv_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
+			 int offset, int len, icv_update_fn_t icv_update);
 
 #endif	/* _NET_XFRM_H */

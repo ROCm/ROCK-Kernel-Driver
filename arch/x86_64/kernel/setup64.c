@@ -40,7 +40,7 @@ struct desc_ptr idt_descr = { 256 * 16, (unsigned long) idt_table };
 char boot_cpu_stack[IRQSTACKSIZE] __cacheline_aligned;
 
 unsigned long __supported_pte_mask = ~0UL;
-static int do_not_nx = 0;
+static int do_not_nx = 1;
 
 static int __init nonx_setup(char *str)
 {
@@ -98,6 +98,8 @@ void pda_init(int cpu)
 	pda->cpudata_offset = 0;
 	pda->kernelstack = 
 		(unsigned long)stack_thread_info() - PDA_STACKOFFSET + THREAD_SIZE; 
+	pda->active_mm = &init_mm;
+	pda->mmu_state = 0;
 
 	if (cpu == 0) {
 		/* others are initialized in smpboot.c */
@@ -121,8 +123,6 @@ void pda_init(int cpu)
 	asm volatile("movq %0,%%cr3" :: "r" (__pa(level4))); 
 
 	pda->irqstackptr += IRQSTACKSIZE-64;
-	pda->active_mm = &init_mm;
-	pda->mmu_state = 0;
 } 
 
 #define EXCEPTION_STK_ORDER 0 /* >= N_EXCEPTION_STACKS*EXCEPTION_STKSZ */

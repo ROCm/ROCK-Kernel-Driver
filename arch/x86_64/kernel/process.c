@@ -192,6 +192,8 @@ void show_regs(struct pt_regs * regs)
 	       fs,fsindex,gs,gsindex,shadowgs); 
 	printk("CS:  %04x DS: %04x ES: %04x CR0: %016lx\n", cs, ds, es, cr0); 
 	printk("CR2: %016lx CR3: %016lx CR4: %016lx\n", cr2, cr3, cr4);
+
+	show_trace(&regs->rsp);
 }
 
 extern void load_gs_index(unsigned);
@@ -260,6 +262,14 @@ static inline u32 read_32bit_tls(struct task_struct *t, int tls)
 		(((u32)desc->base2) << 24);
 }
 
+/*
+ * This gets called before we allocate a new thread and copy
+ * the current task into it.
+ */
+void prepare_to_copy(struct task_struct *tsk)
+{
+	unlazy_fpu(tsk);
+}
 
 int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp, 
 		unsigned long unused,
@@ -294,9 +304,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	asm("movl %%es,%0" : "=m" (p->thread.es));
 	asm("movl %%ds,%0" : "=m" (p->thread.ds));
 
-	unlazy_fpu(me);	
-	p->thread.i387 = me->thread.i387;
-
 	if (unlikely(me->thread.io_bitmap_ptr != NULL)) { 
 		p->thread.io_bitmap_ptr = kmalloc((IO_BITMAP_SIZE+1)*4, GFP_KERNEL);
 		if (!p->thread.io_bitmap_ptr) 
@@ -314,7 +321,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 			err = ia32_child_tls(p, childregs); 
 		else 			
 #endif	 
-			err = do_arch_prctl(p, ARCH_SET_FS, childregs->r10); 
+			err = do_arch_prctl(p, ARCH_SET_FS, childregs->r8); 
 		if (err) 
 			goto out;
 	}

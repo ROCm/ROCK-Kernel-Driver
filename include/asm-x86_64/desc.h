@@ -8,6 +8,7 @@
 #ifndef __ASSEMBLY__
 
 #include <asm/segment.h>
+#include <asm/mmu.h>
 
 // 8 byte segment descriptor
 struct desc_struct { 

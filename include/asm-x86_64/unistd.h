@@ -520,8 +520,10 @@ __SYSCALL(__NR_clock_gettime, sys_clock_gettime)
 __SYSCALL(__NR_clock_getres, sys_clock_getres)
 #define __NR_clock_nanosleep	230
 __SYSCALL(__NR_clock_nanosleep, sys_clock_nanosleep)
+#define __NR_exit_group		231
+__SYSCALL(__NR_exit_group, sys_exit_group)
 
-#define __NR_syscall_max __NR_clock_nanosleep
+#define __NR_syscall_max __NR_exit_group
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */

@@ -624,11 +624,6 @@ static inline int netif_rx_ni(struct sk_buff *skb)
        return err;
 }
 
-static inline void dev_init_buffers(struct net_device *dev)
-{
-	/* WILL BE REMOVED IN 2.5.0 */
-}
-
 extern int netdev_finish_unregister(struct net_device *dev);
 
 static inline void dev_put(struct net_device *dev)

@@ -39,6 +39,7 @@
 #include <linux/cdrom.h>
 #include <linux/loop.h>
 #include <linux/auto_fs.h>
+#include <linux/auto_fs4.h>
 #include <linux/devfs_fs.h>
 #include <linux/tty.h>
 #include <linux/vt_kern.h>
@@ -60,6 +61,8 @@
 #include <linux/if_tun.h>
 #include <linux/dirent.h>
 #include <linux/ctype.h>
+#include <net/bluetooth/bluetooth.h>
+#include <net/bluetooth/rfcomm.h>
 #if defined(CONFIG_BLK_DEV_LVM) || defined(CONFIG_BLK_DEV_LVM_MODULE)
 /* Ugh. This header really is not clean */
 #define min min
@@ -2906,35 +2909,28 @@ static int serial_struct_ioctl(unsigned fd, unsigned cmd,  void *ptr)
 {
 	typedef struct serial_struct SS;
 	struct serial_struct32 *ss32 = ptr; 
-	int err = 0;
+	int err;
 	struct serial_struct ss; 
 	mm_segment_t oldseg = get_fs(); 
-	set_fs(KERNEL_DS);
 	if (cmd == TIOCSSERIAL) { 
-		err = -EFAULT;
 		if (copy_from_user(&ss, ss32, sizeof(struct serial_struct32)))
-			goto out;
+			return -EFAULT;
 		memmove(&ss.iomem_reg_shift, ((char*)&ss.iomem_base)+4, 
 			sizeof(SS)-offsetof(SS,iomem_reg_shift)); 
 		ss.iomem_base = (void *)((unsigned long)ss.iomem_base & 0xffffffff);
 	}
-	if (!err)
+	set_fs(KERNEL_DS);
 		err = sys_ioctl(fd,cmd,(unsigned long)(&ss)); 
-	if (cmd == TIOCGSERIAL && err >= 0) { 
-		__u32 base;
-		if (__copy_to_user(ss32,&ss,offsetof(SS,iomem_base)) ||
-		    __copy_to_user(&ss32->iomem_reg_shift,
-				   &ss.iomem_reg_shift,
-				   sizeof(SS) - offsetof(SS, iomem_reg_shift)))
-			err = -EFAULT;
-		if (ss.iomem_base > (unsigned char *)0xffffffff)
-			base = -1; 
-		else
-			base = (unsigned long)ss.iomem_base;
-		err |= __put_user(base, &ss32->iomem_base); 		
-	} 
- out:
 	set_fs(oldseg);
+	if (cmd == TIOCGSERIAL && err >= 0) { 
+		if (__copy_to_user(ss32,&ss,offsetof(SS,iomem_base)) ||
+		    __put_user((unsigned long)ss.iomem_base  >> 32 ? 
+			       0xffffffff : (unsigned)(unsigned long)ss.iomem_base,
+			       &ss32->iomem_base) ||
+		    __put_user(ss.iomem_reg_shift, &ss32->iomem_reg_shift) ||
+		    __put_user(ss.port_high, &ss32->port_high))
+			return -EFAULT;
+	} 
 	return err;	
 }
 
@@ -3045,7 +3041,14 @@ static int do_blkgetsize64(unsigned int fd, unsigned int cmd,
        return sys_ioctl(fd, BLKGETSIZE64, arg);
 }
 
+/* Bluetooth ioctls */
+#define HCIUARTSETPROTO        _IOW('U', 200, int)
+#define HCIUARTGETPROTO        _IOR('U', 201, int)
 
+#define BNEPCONNADD    _IOW('B', 200, int)
+#define BNEPCONNDEL    _IOW('B', 201, int)
+#define BNEPGETCONNLIST        _IOR('B', 210, int)
+#define BNEPGETCONNINFO        _IOR('B', 211, int)
 
 struct usbdevfs_ctrltransfer32 {
 	__u8 bRequestType;
@@ -4093,6 +4096,7 @@ COMPATIBLE_IOCTL(AUTOFS_IOC_FAIL)
 COMPATIBLE_IOCTL(AUTOFS_IOC_CATATONIC)
 COMPATIBLE_IOCTL(AUTOFS_IOC_PROTOVER)
 COMPATIBLE_IOCTL(AUTOFS_IOC_EXPIRE)
+COMPATIBLE_IOCTL(AUTOFS_IOC_EXPIRE_MULTI)
 /* DEVFS */
 COMPATIBLE_IOCTL(DEVFSDIOC_GET_PROTO_REV)
 COMPATIBLE_IOCTL(DEVFSDIOC_SET_EVENT_MASK)
@@ -4200,6 +4204,17 @@ COMPATIBLE_IOCTL(HCISETLINKMODE)
 COMPATIBLE_IOCTL(HCISETACLMTU)
 COMPATIBLE_IOCTL(HCISETSCOMTU)
 COMPATIBLE_IOCTL(HCIINQUIRY)
+COMPATIBLE_IOCTL(HCIUARTSETPROTO)
+COMPATIBLE_IOCTL(HCIUARTGETPROTO)
+COMPATIBLE_IOCTL(RFCOMMCREATEDEV)
+COMPATIBLE_IOCTL(RFCOMMRELEASEDEV)
+COMPATIBLE_IOCTL(RFCOMMGETDEVLIST)
+COMPATIBLE_IOCTL(RFCOMMGETDEVINFO)
+COMPATIBLE_IOCTL(RFCOMMSTEALDLC)
+COMPATIBLE_IOCTL(BNEPCONNADD)
+COMPATIBLE_IOCTL(BNEPCONNDEL)
+COMPATIBLE_IOCTL(BNEPGETCONNLIST)
+COMPATIBLE_IOCTL(BNEPGETCONNINFO)
 /* Misc. */
 COMPATIBLE_IOCTL(0x41545900)		/* ATYIO_CLKR */
 COMPATIBLE_IOCTL(0x41545901)		/* ATYIO_CLKW */

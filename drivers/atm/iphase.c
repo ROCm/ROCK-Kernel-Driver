@@ -2893,7 +2893,7 @@ static int ia_pkt_tx (struct atm_vcc *vcc, struct sk_buff *skb) {
         struct tx_buf_desc *buf_desc_ptr;
         int desc;
         int comp_code;
-        int total_len, pad, last;
+        int total_len;
         struct cpcs_trailer *trailer;
         struct ia_vcc *iavcc;
 
@@ -2975,9 +2975,7 @@ static int ia_pkt_tx (struct atm_vcc *vcc, struct sk_buff *skb) {
 	/* Figure out the exact length of the packet and padding required to 
            make it  aligned on a 48 byte boundary.  */
 	total_len = skb->len + sizeof(struct cpcs_trailer);  
-	last = total_len - (total_len/48)*48;  
-	pad = 48 - last;  
-	total_len = pad + total_len;  
+	total_len = ((total_len + 47) / 48) * 48;
 	IF_TX(printk("ia packet len:%d padding:%d\n", total_len, pad);)  
  
 	/* Put the packet in a tx buffer */   

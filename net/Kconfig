@@ -224,6 +224,8 @@ config IPV6
 
 source "net/ipv6/Kconfig"
 
+source "net/xfrm/Kconfig"
+
 source "net/sctp/Kconfig"
 
 config ATM

@@ -71,9 +71,6 @@ extern void openpic_init_IRQ(void);
 extern void init_ras_IRQ(void);
 
 extern void find_and_init_phbs(void);
-extern void pSeries_pcibios_fixup(void);
-extern void pSeries_pcibios_fixup_bus(struct pci_bus *bus);
-extern void iSeries_pcibios_fixup(void);
 
 extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
 extern int  pSeries_set_rtc_time(struct rtc_time *rtc_time);
@@ -201,7 +198,6 @@ void __init pSeries_init_early(void)
 
 	hpte_init_pSeries();
 	tce_init_pSeries();
-	pSeries_pcibios_init_early();
 
 #ifdef CONFIG_SMP
 	smp_init_pSeries();
@@ -243,15 +239,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		ppc_md.get_irq        = xics_get_irq;
 	}
 	ppc_md.init_ras_IRQ = init_ras_IRQ;
-
- 	#ifndef CONFIG_PPC_ISERIES
- 		ppc_md.pcibios_fixup = pSeries_pcibios_fixup;
- 		ppc_md.pcibios_fixup_bus = pSeries_pcibios_fixup_bus;
- 	#else 
- 		ppc_md.pcibios_fixup = NULL;
- 		// ppc_md.pcibios_fixup = iSeries_pcibios_fixup;
- 	#endif
-
 
 	ppc_md.init           = chrp_init2;
 

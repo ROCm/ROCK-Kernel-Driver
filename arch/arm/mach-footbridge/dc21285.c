@@ -25,10 +25,13 @@
 
 #define MAX_SLOTS		21
 
-#define PCICMD_ERROR_BITS ((PCI_STATUS_DETECTED_PARITY | \
-			PCI_STATUS_REC_MASTER_ABORT | \
-			PCI_STATUS_REC_TARGET_ABORT | \
-			PCI_STATUS_PARITY) << 16)
+#define PCICMD_ABORT		((PCI_STATUS_REC_MASTER_ABORT| \
+				  PCI_STATUS_REC_TARGET_ABORT)<<16)
+
+#define PCICMD_ERROR_BITS	((PCI_STATUS_DETECTED_PARITY | \
+				  PCI_STATUS_REC_MASTER_ABORT | \
+				  PCI_STATUS_REC_TARGET_ABORT | \
+				  PCI_STATUS_PARITY) << 16)
 
 extern int setup_arm_irq(int, struct irqaction *);
 extern void pcibios_report_status(u_int status_mask, int warn);
@@ -84,6 +87,12 @@ dc21285_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 
 	*value = v;
 
+	v = *CSR_PCICMD;
+	if (v & PCICMD_ABORT) {
+		*CSR_PCICMD = v & (0xffff|PCICMD_ABORT);
+		return -1;
+	}
+
 	return PCIBIOS_SUCCESSFUL;
 }
 
@@ -92,6 +101,7 @@ dc21285_write_config(struct pci_bus *bus, unsigned int devfn, int where,
 		     int size, u32 value)
 {
 	unsigned long addr = dc21285_base_address(bus, devfn);
+	u32 v;
 
 	if (addr)
 		switch (size) {
@@ -108,6 +118,12 @@ dc21285_write_config(struct pci_bus *bus, unsigned int devfn, int where,
 				: : "r" (value), "r" (addr), "r" (where));
 			break;
 		}
+
+	v = *CSR_PCICMD;
+	if (v & PCICMD_ABORT) {
+		*CSR_PCICMD = v & (0xffff|PCICMD_ABORT);
+		return -1;
+	}
 
 	return PCIBIOS_SUCCESSFUL;
 }
@@ -148,16 +164,16 @@ static void dc21285_abort_irq(int irq, void *dev_id, struct pt_regs *regs)
 	cmd = cmd & 0xffff;
 
 	if (status & PCI_STATUS_REC_MASTER_ABORT) {
-		printk(KERN_DEBUG "PCI: master abort: ");
-		pcibios_report_status(PCI_STATUS_REC_MASTER_ABORT, 1);
-		printk("\n");
-
+		printk(KERN_DEBUG "PCI: master abort, pc=0x%08lx\n",
+			instruction_pointer(regs));
 		cmd |= PCI_STATUS_REC_MASTER_ABORT << 16;
 	}
 
 	if (status & PCI_STATUS_REC_TARGET_ABORT) {
 		printk(KERN_DEBUG "PCI: target abort: ");
-		pcibios_report_status(PCI_STATUS_SIG_TARGET_ABORT, 1);
+		pcibios_report_status(PCI_STATUS_REC_MASTER_ABORT |
+				      PCI_STATUS_SIG_TARGET_ABORT |
+				      PCI_STATUS_REC_TARGET_ABORT, 1);
 		printk("\n");
 
 		cmd |= PCI_STATUS_REC_TARGET_ABORT << 16;
@@ -289,6 +305,38 @@ void __init dc21285_preinit(void)
 		"%s mode\n", *CSR_CLASSREV & 0xff, cfn_mode ?
 		"central function" : "addin");
 
+	if (footbridge_cfn_mode()) {
+		/*
+		 * Clear any existing errors - we aren't
+		 * interested in historical data...
+		 */
+		*CSR_SA110_CNTL	= (*CSR_SA110_CNTL & 0xffffde07) |
+				  SA110_CNTL_RXSERR;
+		*CSR_PCICMD = (*CSR_PCICMD & 0xffff) | PCICMD_ERROR_BITS;
+	}
+
+	init_timer(&serr_timer);
+	init_timer(&perr_timer);
+
+	serr_timer.data = IRQ_PCI_SERR;
+	serr_timer.function = dc21285_enable_error;
+	perr_timer.data = IRQ_PCI_PERR;
+	perr_timer.function = dc21285_enable_error;
+
+	/*
+	 * We don't care if these fail.
+	 */
+	request_irq(IRQ_PCI_SERR, dc21285_serr_irq, SA_INTERRUPT,
+		    "PCI system error", &serr_timer);
+	request_irq(IRQ_PCI_PERR, dc21285_parity_irq, SA_INTERRUPT,
+		    "PCI parity error", &perr_timer);
+	request_irq(IRQ_PCI_ABORT, dc21285_abort_irq, SA_INTERRUPT,
+		    "PCI abort", NULL);
+	request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, SA_INTERRUPT,
+		    "Discard timer", NULL);
+	request_irq(IRQ_PCI_DPERR, dc21285_dparity_irq, SA_INTERRUPT,
+		    "PCI data parity", NULL);
+
 	if (cfn_mode) {
 		static struct resource csrio;
 
@@ -324,35 +372,5 @@ void __init dc21285_preinit(void)
 
 void __init dc21285_postinit(void)
 {
-	if (footbridge_cfn_mode()) {
-		/*
-		 * Clear any existing errors - we aren't
-		 * interested in historical data...
-		 */
-		*CSR_SA110_CNTL	= (*CSR_SA110_CNTL & 0xffffde07) |
-				  SA110_CNTL_RXSERR;
-		*CSR_PCICMD = (*CSR_PCICMD & 0xffff) | PCICMD_ERROR_BITS;
-	}
-
-	/*
-	 * Initialise PCI error IRQ after we've finished probing
-	 */
-	request_irq(IRQ_PCI_ABORT,     dc21285_abort_irq,   SA_INTERRUPT, "PCI abort",       NULL);
-	request_irq(IRQ_DISCARD_TIMER, dc21285_discard_irq, SA_INTERRUPT, "Discard timer",   NULL);
-	request_irq(IRQ_PCI_DPERR,     dc21285_dparity_irq, SA_INTERRUPT, "PCI data parity", NULL);
-
-	init_timer(&serr_timer);
-	init_timer(&perr_timer);
-
-	serr_timer.data = IRQ_PCI_SERR;
-	serr_timer.function = dc21285_enable_error;
-	perr_timer.data = IRQ_PCI_PERR;
-	perr_timer.function = dc21285_enable_error;
-
-	request_irq(IRQ_PCI_SERR, dc21285_serr_irq, SA_INTERRUPT,
-		    "PCI system error", &serr_timer);
-	request_irq(IRQ_PCI_PERR, dc21285_parity_irq, SA_INTERRUPT,
-		    "PCI parity error", &perr_timer);
-
 	register_isa_ports(DC21285_PCI_MEM, DC21285_PCI_IO, 0);
 }

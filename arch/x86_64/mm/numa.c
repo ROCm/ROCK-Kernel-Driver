@@ -26,11 +26,10 @@ u8  memnodemap[NODEMAPSIZE];
 static int numa_off __initdata; 
 
 unsigned long nodes_present; 
-int maxnode;
 
 static int emunodes __initdata;
 
-int compute_hash_shift(struct node *nodes, int numnodes, u64 maxmem)
+int __init compute_hash_shift(struct node *nodes)
 {
 	int i; 
 	int shift = 24;
@@ -39,12 +38,16 @@ int compute_hash_shift(struct node *nodes, int numnodes, u64 maxmem)
 	/* When in doubt use brute force. */
 	while (shift < 48) { 
 		memset(memnodemap,0xff,sizeof(*memnodemap) * NODEMAPSIZE); 
-		early_for_all_nodes (i) { 
+		for (i = 0; i < numnodes; i++) { 
+			if (nodes[i].start == nodes[i].end) 
+				continue;
 			for (addr = nodes[i].start; 
 			     addr < nodes[i].end; 
 			     addr += (1UL << shift)) {
-				if (memnodemap[addr >> shift] != 0xff) { 
-					printk("node %d shift %d addr %Lx conflict %d\n", 
+				if (memnodemap[addr >> shift] != 0xff && 
+				    memnodemap[addr >> shift] != i) { 
+					printk(KERN_INFO 
+					    "node %d shift %d addr %Lx conflict %d\n", 
 					       i, shift, addr, memnodemap[addr>>shift]);
 					goto next; 
 				} 
@@ -101,9 +104,8 @@ void __init setup_node_bootmem(int nodeid, unsigned long start, unsigned long en
 
 	reserve_bootmem_node(NODE_DATA(nodeid), nodedata_phys, pgdat_size); 
 	reserve_bootmem_node(NODE_DATA(nodeid), bootmap_start, bootmap_pages<<PAGE_SHIFT);
-
-	if (nodeid > maxnode) 
-		maxnode = nodeid;
+	if (nodeid + 1 > numnodes) 
+		numnodes = nodeid + 1;
 	nodes_present |= (1UL << nodeid); 
 } 
 
@@ -151,6 +153,7 @@ int __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 		int i;
 		if (emunodes > MAXNODE) 
 			emunodes = MAXNODE; 
+		memset(&nodes, 0, sizeof(nodes)); 
 		printk(KERN_INFO "Faking %d nodes of size %ld MB\n", emunodes, nodesize>>20); 
 		for (i = 0; i < emunodes; i++) { 
 			unsigned long end = (i+1)*nodesize; 
@@ -160,7 +163,7 @@ int __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 			nodes[i].end = end; 
 			setup_node_bootmem(i, nodes[i].start, nodes[i].end);
 		}
-		memnode_shift = compute_hash_shift(nodes, emunodes, nodes[i-1].end); 
+		memnode_shift = compute_hash_shift(nodes); 
 		return 0;
 	} 
 

@@ -359,8 +359,13 @@ ENTRY(stub_rt_sigreturn)
 /* 0(%rsp): interrupt number */ 
 	.macro interrupt func
 	cld
+#ifdef CONFIG_X86_REMOTE_DEBUG
+	SAVE_ALL	
+	movq %rsp,%rdi
+#else		
 	SAVE_ARGS
 	leaq -ARGOFFSET(%rsp),%rdi	# arg1 for handler
+#endif	
 	testl $3,CS(%rdi)
 	je 1f
 	swapgs	
@@ -667,18 +672,6 @@ ENTRY(execve)
 	ret
 
 ENTRY(page_fault)
-#ifdef CONFIG_KDB
-        pushq %rcx
-        pushq %rdx
-        pushq %rax
-        movl  $473,%ecx
-        rdmsr
-        andl  $0xfffffffe,%eax          /* Disable last branch recording */
-        wrmsr
-        popq  %rax
-        popq  %rdx
-        popq  %rcx
-#endif 
 	errorentry do_page_fault
 
 ENTRY(coprocessor_error)

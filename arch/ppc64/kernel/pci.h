@@ -19,17 +19,13 @@ extern struct pci_controller* pci_find_hose_for_OF_device(struct device_node* no
 
 extern struct pci_controller* hose_head;
 extern struct pci_controller** hose_tail;
-/* PHB's are also in a table. */
-#define PCI_MAX_PHB 64
-extern int  global_phb_number;
-extern struct pci_controller *phbtab[];
+
+extern int global_phb_number;
 
 /*******************************************************************
  * Platform functions that are brand specific implementation. 
  *******************************************************************/
 extern unsigned long find_and_init_phbs(void);
-
-extern void   ppc64_pcibios_init(void);
 
 extern struct pci_dev *ppc64_isabridge_dev;	/* may be NULL if no ISA bus */
 
@@ -46,10 +42,6 @@ void pci_devs_phb_init(void);
 void pci_fix_bus_sysdata(void);
 struct device_node *fetch_dev_dn(struct pci_dev *dev);
 
-void iSeries_pcibios_init_early(void);
-void pSeries_pcibios_init_early(void);
-void pSeries_pcibios_init(void);
-
 /*******************************************************************
  * Helper macros for extracting data from pci structures.  
  *   PCI_GET_PHB_PTR(struct pci_dev*)    returns the Phb pointer.
@@ -59,13 +51,5 @@ void pSeries_pcibios_init(void);
 #define PCI_GET_PHB_PTR(dev)    (((struct device_node *)(dev)->sysdata)->phb)
 #define PCI_GET_PHB_NUMBER(dev) (((dev)->bus->number&0x00FFFF00)>>8)
 #define PCI_GET_BUS_NUMBER(dev) ((dev)->bus->number&0x0000FF)
-
-/*******************************************************************
- * Debugging  Routines.
- *******************************************************************/
-extern void dumpResources(struct resource* Resource);
-extern void dumpPci_Controller(struct pci_controller* phb);
-extern void dumpPci_Bus(struct pci_bus* Pci_Bus);
-extern void dumpPci_Dev(struct pci_dev* Pci_Dev);
 
 #endif /* __PPC_KERNEL_PCI_H__ */

@@ -19,15 +19,15 @@
 #include <asm/thread_info.h>
 
 extern void fpu_init(void);
-extern void init_fpu(void);
-int save_i387(struct _fpstate *buf);
+extern void init_fpu(struct task_struct *child);
+extern int save_i387(struct _fpstate *buf);
 
 static inline int need_signal_i387(struct task_struct *me) 
 { 
 	if (!me->used_math)
 		return 0;
 	me->used_math = 0; 
-	if (me->thread_info->flags & _TIF_USEDFPU)
+	if (me->thread_info->status & TS_USEDFPU)
 		return 0;
 	return 1;
 } 
@@ -39,14 +39,14 @@ static inline int need_signal_i387(struct task_struct *me)
 #define kernel_fpu_end() stts()
 
 #define unlazy_fpu(tsk) do { \
-	if ((tsk)->thread_info->flags & _TIF_USEDFPU) \
+	if ((tsk)->thread_info->status & TS_USEDFPU) \
 		save_init_fpu(tsk); \
 } while (0)
 
 #define clear_fpu(tsk) do { \
-	if ((tsk)->thread_info->flags & _TIF_USEDFPU) {		\
+	if ((tsk)->thread_info->status & TS_USEDFPU) {		\
 		asm volatile("fwait");				\
-		(tsk)->thread_info->flags &= ~_TIF_USEDFPU;	\
+		(tsk)->thread_info->status &= ~TS_USEDFPU;	\
 		stts();						\
 	}							\
 } while (0)
@@ -114,11 +114,11 @@ static inline int save_i387_checking(struct i387_fxsave_struct *fx)
 
 static inline void kernel_fpu_begin(void)
 {
-	struct task_struct *me = current;
-	if (test_tsk_thread_flag(me,TIF_USEDFPU)) {
-		asm volatile("fxsave %0 ; fnclex"
-			      : "=m" (me->thread.i387.fxsave));
-		clear_tsk_thread_flag(me, TIF_USEDFPU);
+	struct thread_info *me = current_thread_info();
+	if (me->status & TS_USEDFPU) { 
+		asm volatile("rex64 ; fxsave %0 ; fnclex"
+			      : "=m" (me->task->thread.i387.fxsave));
+		me->status &= ~TS_USEDFPU;
 		return;
 	}
 	clts();
@@ -128,7 +128,7 @@ static inline void save_init_fpu( struct task_struct *tsk )
 {
 	asm volatile( "fxsave %0 ; fnclex"
 		      : "=m" (tsk->thread.i387.fxsave));
-	tsk->thread_info->flags &= ~TIF_USEDFPU;
+	tsk->thread_info->status &= ~TS_USEDFPU;
 	stts();
 }
 
@@ -139,19 +139,5 @@ static inline int restore_i387(struct _fpstate *buf)
 {
 	return restore_fpu_checking((struct i387_fxsave_struct *)buf);
 }
-
-
-static inline void empty_fpu(struct task_struct *child)
-{
-	if (!child->used_math) {
-		/* Simulate an empty FPU. */
-		memset(&child->thread.i387.fxsave,0,sizeof(struct i387_fxsave_struct));
-		child->thread.i387.fxsave.cwd = 0x037f; 
-		child->thread.i387.fxsave.swd = 0;
-		child->thread.i387.fxsave.twd = 0; 
-		child->thread.i387.fxsave.mxcsr = 0x1f80;
-	}
-	child->used_math = 1; 
-}		
 
 #endif /* __ASM_X86_64_I387_H */

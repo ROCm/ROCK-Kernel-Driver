@@ -84,8 +84,6 @@ struct iSeries_Device_Node* find_Device_Node(struct pci_dev* PciDev);
 struct iSeries_Device_Node* get_Device_Node(struct pci_dev* PciDev);
 
 unsigned long find_and_init_phbs(void);
-void          fixup_resources(struct pci_dev *dev);
-void          iSeries_pcibios_fixup(void);
 struct        pci_controller* alloc_phb(struct device_node *dev, char *model, unsigned int addr_size_words) ;
 
 void  iSeries_Scan_PHBs_Slots(struct pci_controller* Phb);
@@ -275,7 +273,7 @@ unsigned long __init find_and_init_phbs(void)
 	return 0;
 }
 /*********************************************************************** 
- * ppc64_pcibios_init
+ * iSeries_pcibios_init
  *  
  * Chance to initialize and structures or variable before PCI Bus walk.
  *  
@@ -302,9 +300,9 @@ void iSeries_pcibios_init(void)
 	PPCDBG(PPCDBG_BUSWALK,"iSeries_pcibios_init Exit.\n"); 
 }
 /***********************************************************************
- * iSeries_pcibios_fixup(void)  
+ * pcibios_final_fixup(void)  
  ***********************************************************************/
-void __init iSeries_pcibios_fixup(void)
+void __init pcibios_final_fixup(void)
 {
 	struct pci_dev* PciDev;
 	struct iSeries_Device_Node* DeviceNode;
@@ -328,8 +326,6 @@ void __init iSeries_pcibios_fixup(void)
 
 			iSeries_allocateDeviceBars(PciDev);
 
-			PPCDBGCALL(PPCDBG_BUSWALK,dumpPci_Dev(PciDev) );
-
 			iSeries_Device_Information(PciDev,Buffer, sizeof(Buffer) );
 			printk("%d. %s\n",DeviceCount,Buffer);
 
@@ -345,11 +341,7 @@ void __init iSeries_pcibios_fixup(void)
 	mf_displaySrc(0xC9000200);
 }
 
-/***********************************************************************
- * iSeries_pcibios_fixup_bus(int Bus)
- *
- ***********************************************************************/
-void iSeries_pcibios_fixup_bus(struct pci_bus* PciBus)
+void pcibios_fixup_bus(struct pci_bus* PciBus)
 {
 	PPCDBG(PPCDBG_BUSWALK,"iSeries_pcibios_fixup_bus(0x%04X) Entry.\n",PciBus->number); 
 
@@ -357,12 +349,12 @@ void iSeries_pcibios_fixup_bus(struct pci_bus* PciBus)
 
 
 /***********************************************************************
- * fixup_resources(struct pci_dev *dev) 
+ * pcibios_fixup_resources(struct pci_dev *dev) 
  *	
  ***********************************************************************/
-void fixup_resources(struct pci_dev *PciDev)
+void pcibios_fixup_resources(struct pci_dev *PciDev)
 {
-	PPCDBG(PPCDBG_BUSWALK,"fixup_resources PciDev %p\n",PciDev);
+	PPCDBG(PPCDBG_BUSWALK,"pcibios_fixup_resources PciDev %p\n",PciDev);
 }   
 
 
@@ -910,18 +902,3 @@ void iSeries_Write_Long(u32 Data, void* IoAddress)
 	} while (CheckReturnCode("WWL",DevNode, Return.rc) != 0);
 	if(Pci_Trace_Flag == 1) PCIFR("WWL: IoAddress 0x%p = 0x%08X",IoAddress, Data);
 }
-/*
- * This is called very early before the page table is setup.
- * There are warnings here because of type mismatches.. Okay for now. AHT
- */
-void 
-iSeries_pcibios_init_early(void)
-{
-	//ppc_md.pcibios_read_config_byte   = iSeries_Node_read_config_byte;
-	//ppc_md.pcibios_read_config_word   = iSeries_Node_read_config_word;
-	//ppc_md.pcibios_read_config_dword  = iSeries_Node_read_config_dword;
-	//ppc_md.pcibios_write_config_byte  = iSeries_Node_write_config_byte;
-	//ppc_md.pcibios_write_config_word  = iSeries_Node_write_config_word;
-	//ppc_md.pcibios_write_config_dword = iSeries_Node_write_config_dword;
-}
-

@@ -2,6 +2,7 @@
  * pSeries_pci.c
  *
  * Copyright (C) 2001 Dave Engebretsen, IBM Corporation
+ * Copyright (C) 2003 Anton Blanchard <anton@au.ibm.com>, IBM
  *
  * pSeries specific routines for PCI.
  * 
@@ -50,6 +51,8 @@ static int ibm_read_pci_config;
 static int ibm_write_pci_config;
 
 static int s7a_workaround;
+
+extern unsigned long pci_probe_only;
 
 static int rtas_read_config(struct device_node *dn, int where, int size, u32 *val)
 {
@@ -371,9 +374,6 @@ struct pci_controller *alloc_phb(struct device_node *dev,
 		phb->last_busno += (phb->global_number << 8);
 	}
 
-	/* Dump PHB information for Debug */
-	PPCDBGCALL(PPCDBG_PHBINIT, dumpPci_Controller(phb));
-
 	return phb;
 }
 
@@ -423,129 +423,96 @@ unsigned long __init find_and_init_phbs(void)
 	return 0;
 }
 
-void 
-fixup_resources(struct pci_dev *dev)
+void pcibios_name_device(struct pci_dev *dev)
 {
- 	int i;
- 	struct pci_controller *phb = PCI_GET_PHB_PTR(dev);
 	struct device_node *dn;
 
-	/* Add IBM loc code (slot) as a prefix to the device names for service */
+	/*
+	 * Add IBM loc code (slot) as a prefix to the device names for service
+	 */
 	dn = pci_device_to_OF_node(dev);
 	if (dn) {
 		char *loc_code = get_property(dn, "ibm,loc-code", 0);
 		if (loc_code) {
 			int loc_len = strlen(loc_code);
 			if (loc_len < sizeof(dev->dev.name)) {
-				memmove(dev->dev.name+loc_len+1, dev->dev.name, sizeof(dev->dev.name)-loc_len-1);
+				memmove(dev->dev.name+loc_len+1, dev->dev.name,
+					sizeof(dev->dev.name)-loc_len-1);
 				memcpy(dev->dev.name, loc_code, loc_len);
 				dev->dev.name[loc_len] = ' ';
 				dev->dev.name[sizeof(dev->dev.name)-1] = '\0';
 			}
 		}
 	}
-
-	PPCDBG(PPCDBG_PHBINIT, "fixup_resources:\n"); 
-	PPCDBG(PPCDBG_PHBINIT, "\tphb                 = 0x%016LX\n", phb); 
-	PPCDBG(PPCDBG_PHBINIT, "\tphb->pci_io_offset  = 0x%016LX\n", phb->pci_io_offset); 
-	PPCDBG(PPCDBG_PHBINIT, "\tphb->pci_mem_offset = 0x%016LX\n", phb->pci_mem_offset); 
-
-	PPCDBG(PPCDBG_PHBINIT, "\tdev->dev.name   = %s\n", dev->dev.name);
-	PPCDBG(PPCDBG_PHBINIT, "\tdev->vendor:device = 0x%04X : 0x%04X\n", dev->vendor, dev->device);
-
-	if (phb == NULL)
-		return;
-
- 	for (i = 0; i <  DEVICE_COUNT_RESOURCE; ++i) {
-		PPCDBG(PPCDBG_PHBINIT, "\tdevice %x.%x[%d] (flags %x) [%lx..%lx]\n",
-			    dev->bus->number, dev->devfn, i,
-			    dev->resource[i].flags,
-			    dev->resource[i].start,
-			    dev->resource[i].end);
-
-		if ((dev->resource[i].start == 0) && (dev->resource[i].end == 0)) {
-			continue;
-		}
-		if (dev->resource[i].start > dev->resource[i].end) {
-			/* Bogus resource.  Just clear it out. */
-			dev->resource[i].start = dev->resource[i].end = 0;
-			continue;
-		}
-
-		if (dev->resource[i].flags & IORESOURCE_IO) {
-			unsigned long offset = (unsigned long)phb->io_base_virt - pci_io_base;
-			dev->resource[i].start += offset;
-			dev->resource[i].end += offset;
-			PPCDBG(PPCDBG_PHBINIT, "\t\t-> now [%lx .. %lx]\n",
-			       dev->resource[i].start, dev->resource[i].end);
-		} else if (dev->resource[i].flags & IORESOURCE_MEM) {
-			if (dev->resource[i].start == 0) {
-				/* Bogus.  Probably an unused bridge. */
-				dev->resource[i].end = 0;
-			} else {
-				dev->resource[i].start += phb->pci_mem_offset;
-				dev->resource[i].end += phb->pci_mem_offset;
-			}
-			PPCDBG(PPCDBG_PHBINIT, "\t\t-> now [%lx..%lx]\n",
-			       dev->resource[i].start, dev->resource[i].end);
-
-		} else {
-			continue;
-		}
-
- 		/* zap the 2nd function of the winbond chip */
- 		if (dev->resource[i].flags & IORESOURCE_IO
- 		    && dev->bus->number == 0 && dev->devfn == 0x81)
- 			dev->resource[i].flags &= ~IORESOURCE_IO;
- 	}
 }   
 
-void __init pSeries_pcibios_fixup_bus(struct pci_bus *bus)
+void __init pcibios_fixup_device_resources(struct pci_dev *dev,
+					   struct pci_bus *bus)
 {
-	struct pci_controller *phb = PCI_GET_PHB_PTR(bus);
+	/* Update device resources.  */
+	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
+	int i;
+
+	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+		if (dev->resource[i].flags & IORESOURCE_IO) {
+			unsigned long offset = (unsigned long)hose->io_base_virt - pci_io_base;
+			dev->resource[i].start += offset;
+			dev->resource[i].end += offset;
+		}
+                else if (dev->resource[i].flags & IORESOURCE_MEM) {
+			dev->resource[i].start += hose->pci_mem_offset;
+			dev->resource[i].end += hose->pci_mem_offset;
+		}
+        }
+}
+
+void __init pcibios_fixup_bus(struct pci_bus *bus)
+{
+	struct pci_controller *hose = PCI_GET_PHB_PTR(bus);
+	struct list_head *ln;
+
+	/* XXX or bus->parent? */
+	struct pci_dev *dev = bus->self;
 	struct resource *res;
 	int i;
 
-	if (bus->parent == NULL) {
-		/* This is a host bridge - fill in its resources */
-		phb->bus = bus;
-		bus->resource[0] = res = &phb->io_resource;
+	if (!dev) {
+		/* Root bus. */
+
+		hose->bus = bus;
+		bus->resource[0] = res = &hose->io_resource;
 		if (!res->flags)
 			BUG();	/* No I/O resource for this PHB? */
 
-		for (i = 0; i < 3; ++i) {
-			res = &phb->mem_resources[i];
-			if (!res->flags) {
-				if (i == 0)
-					BUG();	/* No memory resource for this PHB? */
-			}
-			bus->resource[i+1] = res;
-		}
-	} else {
-		/* This is a subordinate bridge */
-		pci_read_bridge_bases(bus);
+		if (request_resource(&ioport_resource, res))
+			printk(KERN_ERR "Failed to request IO"
+					"on hose %d\n", 0 /* FIXME */);
 
-		for (i = 0; i < 4; ++i) {
-			if ((res = bus->resource[i]) == NULL)
-				continue;
-			if (!res->flags)
-				continue;
-			if (res == pci_find_parent_resource(bus->self, res)) {
-				/* Transparent resource -- don't try to "fix" it. */
-				continue;
-			}
-			if (res->flags & IORESOURCE_IO) {
-				unsigned long offset = (unsigned long)phb->io_base_virt - pci_io_base;
-				res->start += offset;
-				res->end += offset;
-			} else if (phb->pci_mem_offset
-				   && (res->flags & IORESOURCE_MEM)) {
-				if (res->start < phb->pci_mem_offset) {
-					res->start += phb->pci_mem_offset;
-					res->end += phb->pci_mem_offset;
-				}
-			}
+		for (i = 0; i < 3; ++i) {
+			res = &hose->mem_resources[i];
+			if (!res->flags && i == 0)
+				BUG();	/* No memory resource for this PHB? */
+			bus->resource[i+1] = res;
+			if (res->flags && request_resource(&iomem_resource, res))
+				printk(KERN_ERR "Failed to request MEM"
+						"on hose %d\n", 0 /* FIXME */);
 		}
+	} else if (pci_probe_only &&
+		   (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
+		/* This is a subordinate bridge */
+
+		pci_read_bridge_bases(bus);
+		pcibios_fixup_device_resources(dev, bus);
+	}
+
+	/* XXX Need to check why Alpha doesnt do this - Anton */
+	if (!pci_probe_only)
+		return;
+
+	for (ln = bus->devices.next; ln != &bus->devices; ln = ln->next) {
+		struct pci_dev *dev = pci_dev_b(ln);
+		if ((dev->class >> 8) != PCI_CLASS_BRIDGE_PCI)
+			pcibios_fixup_device_resources(dev, bus);
 	}
 }
 
@@ -562,19 +529,20 @@ static void check_s7a(void)
 	}
 }
 
-void __init
-pSeries_pcibios_fixup(void)
+extern void chrp_request_regions(void);
+
+void __init pcibios_final_fixup(void)
 {
 	struct pci_dev *dev;
 
-	PPCDBG(PPCDBG_PHBINIT, "pSeries_pcibios_fixup: start\n");
-
 	check_s7a();
-	
-	pci_for_each_dev(dev) {
+
+	pci_for_each_dev(dev)
 		pci_read_irq_line(dev);
-		PPCDBGCALL(PPCDBG_PHBINIT, dumpPci_Dev(dev) );
-	}
+
+	chrp_request_regions();
+	pci_fix_bus_sysdata();
+	create_tce_tables();
 }
 
 /*********************************************************************** 
@@ -595,14 +563,4 @@ pci_find_hose_for_OF_device(struct device_node *node)
 		node=node->parent;
 	}
 	return NULL;
-}
-
-/*
- * This is called very early before the page table is setup.
- */
-void 
-pSeries_pcibios_init_early(void)
-{
-	ppc_md.pcibios_read_config = rtas_read_config;
-	ppc_md.pcibios_write_config = rtas_write_config;
 }

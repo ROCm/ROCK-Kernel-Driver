@@ -90,22 +90,6 @@ struct machdep_calls {
 	unsigned char	(*udbg_getc)(void);
 	int		(*udbg_getc_poll)(void);
 
-	/* PCI interfaces */
-	int (*pcibios_read_config)(struct device_node *dn, int where, int size,
-				   u32 *val);
-	int (*pcibios_write_config)(struct device_node *dn, int where,
-				    int size, u32 val);
-
-	/* Called after scanning the bus, before allocating
-	 * resources
-	 */
-	void (*pcibios_fixup)(void);
-
-	/* Called for each PCI bus in the system
-	 * when it's probed
-	 */
-	void (*pcibios_fixup_bus)(struct pci_bus *);
-
 #ifdef CONFIG_SMP
 	/* functions for dealing with other cpus */
 	struct smp_ops_t smp_ops;

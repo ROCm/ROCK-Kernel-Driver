@@ -316,6 +316,7 @@ EXPORT_SYMBOL(xfrm_replay_check);
 EXPORT_SYMBOL(xfrm_replay_advance);
 EXPORT_SYMBOL(xfrm_check_selectors);
 EXPORT_SYMBOL(__secpath_destroy);
+EXPORT_SYMBOL(xfrm_get_acqseq);
 EXPORT_SYMBOL(xfrm_parse_spi);
 EXPORT_SYMBOL(xfrm4_rcv);
 EXPORT_SYMBOL(xfrm_register_type);
@@ -355,13 +356,10 @@ EXPORT_SYMBOL_GPL(xfrm_calg_get_byid);
 EXPORT_SYMBOL_GPL(xfrm_aalg_get_byname);
 EXPORT_SYMBOL_GPL(xfrm_ealg_get_byname);
 EXPORT_SYMBOL_GPL(xfrm_calg_get_byname);
-#if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
-EXPORT_SYMBOL_GPL(skb_ah_walk);
-#endif
+EXPORT_SYMBOL_GPL(skb_icv_walk);
 #if defined(CONFIG_INET_ESP) || defined(CONFIG_INET_ESP_MODULE) || defined(CONFIG_INET6_ESP) || defined(CONFIG_INET6_ESP_MODULE)
 EXPORT_SYMBOL_GPL(skb_cow_data);
 EXPORT_SYMBOL_GPL(pskb_put);
-EXPORT_SYMBOL_GPL(skb_icv_walk);
 EXPORT_SYMBOL_GPL(skb_to_sgvec);
 #endif
 

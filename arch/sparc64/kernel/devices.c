@@ -17,6 +17,7 @@
 #include <asm/system.h>
 #include <asm/smp.h>
 #include <asm/spitfire.h>
+#include <asm/timer.h>
 
 /* Used to synchronize acceses to NatSemi SUPER I/O chip configure
  * operations in asm/ns87303.h
@@ -88,7 +89,6 @@ void __init device_scan(void)
 
 #ifndef CONFIG_SMP
 	{
-		extern unsigned long up_clock_tick;
 		up_clock_tick = prom_getintdefault(prom_node_cpu,
 						   "clock-frequency",
 						   0);

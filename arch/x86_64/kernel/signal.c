@@ -225,6 +225,7 @@ get_stack(struct k_sigaction *ka, struct pt_regs *regs, unsigned long size)
 	rsp = regs->rsp - 128;
 
 	/* This is the X/Open sanctioned signal stack switching.  */
+	/* RED-PEN: redzone on that stack? */
 	if (ka->sa.sa_flags & SA_ONSTACK) {
 		if (sas_ss_flags(rsp) == 0)
 			rsp = current->sas_ss_sp + current->sas_ss_size;
@@ -433,7 +434,8 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 		 * have been cleared if the watchpoint triggered
 		 * inside the kernel.
 		 */
-		__asm__("movq %0,%%db7"	: : "r" (current->thread.debugreg[7]));
+		if (current->thread.debugreg[7])
+			asm volatile("movq %0,%%db7"	: : "r" (current->thread.debugreg[7]));
 
 		/* Whee!  Actually deliver the signal.  */
 		handle_signal(signr, &info, oldset, regs);

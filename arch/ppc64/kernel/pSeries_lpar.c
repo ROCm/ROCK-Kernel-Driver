@@ -320,7 +320,6 @@ void pSeriesLP_init_early(void)
 #ifdef CONFIG_SMP
 	smp_init_pSeries();
 #endif
-	pSeries_pcibios_init_early();
 
 	/* The keyboard is not useful in the LPAR environment.
 	 * Leave all the interfaces NULL.

@@ -42,7 +42,7 @@ void __init fpu_init(void)
 
 	/* clean state in init */
 	stts();
-	clear_thread_flag(TIF_USEDFPU);
+	current_thread_info()->status = 0;
 	current->used_math = 0;
 }
 
@@ -51,13 +51,12 @@ void __init fpu_init(void)
  * so initialize it and set the mxcsr to its default.
  * remeber the current task has used the FPU.
  */
-void init_fpu(void)
+void init_fpu(struct task_struct *child)
 {
-	struct task_struct *me = current;
-	memset(&me->thread.i387.fxsave, 0, sizeof(struct i387_fxsave_struct));
-	me->thread.i387.fxsave.cwd = 0x37f;
-	me->thread.i387.fxsave.mxcsr = 0x1f80;
-	me->used_math = 1;
+	memset(&child->thread.i387.fxsave, 0, sizeof(struct i387_fxsave_struct));
+	child->thread.i387.fxsave.cwd = 0x37f;
+	child->thread.i387.fxsave.mxcsr = 0x1f80;
+	child->used_math = 1;
 }
 
 /*
@@ -81,7 +80,7 @@ int save_i387(struct _fpstate *buf)
 	if (!tsk->used_math) 
 		return 0;
 	tsk->used_math = 0; /* trigger finit */ 
-	if (test_thread_flag(TIF_USEDFPU)) { 
+	if (tsk->thread_info->status & TS_USEDFPU) {
 		err = save_i387_checking((struct i387_fxsave_struct *)buf);
 		if (err) return err;
 		stts();
@@ -99,7 +98,7 @@ int save_i387(struct _fpstate *buf)
 
 int get_fpregs(struct user_i387_struct *buf, struct task_struct *tsk)
 {
-	empty_fpu(tsk);
+	init_fpu(tsk);
 	return __copy_to_user((void *)buf, &tsk->thread.i387.fxsave,
 			       sizeof(struct user_i387_struct)) ? -EFAULT : 0;
 }

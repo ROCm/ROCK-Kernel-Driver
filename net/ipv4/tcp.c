@@ -1189,7 +1189,8 @@ new_segment:
 
 			from += copy;
 			copied += copy;
-			seglen -= copy;
+			if ((seglen -= copy) == 0 && iovlen == 0)
+				goto out;
 
 			if (skb->len != mss_now || (flags & MSG_OOB))
 				continue;

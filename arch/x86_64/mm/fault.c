@@ -57,29 +57,41 @@ void bust_spinlocks(int yes)
 	}
 }
 
+static int bad_address(void *p) 
+{ 
+	unsigned long dummy;
+	return __get_user(dummy, (unsigned long *)p);
+} 
+
 void dump_pagetable(unsigned long address)
 {
-	static char *name[] = { "PML4", "PGD", "PDE", "PTE" }; 
-	int i, shift;
-	unsigned long page;
+	pml4_t *pml4;
+	asm("movq %%cr3,%0" : "=r" (pml4));
 
-	shift = 9+9+9+12;
-	address &= ~0xFFFF000000000000UL;
-	asm("movq %%cr3,%0" : "=r" (page)); 
-	for (i = 0; i < 4; i++) { 
-		unsigned long *padr = (unsigned long *) __va(page); 
-		padr += (address >> shift) & 0x1FFU;
-		if (__get_user(page, padr)) { 
-			printk("%s: bad %p\n", name[i], padr); 
-			break;
-		}
-		printk("%s: %016lx ", name[i], page); 
-		if ((page & (1 | (1<<7))) != 1) /* Not present or 2MB page */
-			break;
-		page &= ~0xFFFUL;
-		shift -= (i == 0) ? 12 : 9;
-	} 
+	pml4 = __va((unsigned long)pml4 & PHYSICAL_PAGE_MASK); 
+	pml4 += pml4_index(address);
+	printk("PML4 %lx ", pml4_val(*pml4));
+	if (bad_address(pml4)) goto bad;
+	if (!pml4_present(*pml4)) goto ret; 
+
+	pgd_t *pgd = __pgd_offset_k((pgd_t *)pml4_page(*pml4), address); 
+	if (bad_address(pgd)) goto bad;
+	printk("PGD %lx ", pgd_val(*pgd)); 
+	if (!pgd_present(*pgd))	goto ret;
+
+	pmd_t *pmd = pmd_offset(pgd, address); 
+	if (bad_address(pmd)) goto bad;
+	printk("PMD %lx ", pmd_val(*pmd));
+	if (!pmd_present(*pmd))	goto ret;	 
+
+	pte_t *pte = pte_offset_kernel(pmd, address);
+	if (bad_address(pte)) goto bad;
+	printk("PTE %lx", pte_val(*pte)); 
+ret:
 	printk("\n");
+	return;
+bad:
+	printk("BAD\n");
 }
 
 int page_fault_trace; 
