@@ -288,7 +288,7 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 		saved_ip = tuple->src.ip;
 		other_ipp = &tuple->src.ip;
 	}
-	/* Don't do do_extra_mangle unless neccessary (overrides
+	/* Don't do do_extra_mangle unless necessary (overrides
            explicit socket bindings, for example) */
 	orig_dstip = tuple->dst.ip;
 

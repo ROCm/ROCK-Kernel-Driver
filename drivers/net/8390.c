@@ -417,7 +417,7 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
  * Handle the ether interface interrupts. We pull packets from
  * the 8390 via the card specific functions and fire them at the networking
  * stack. We also handle transmit completions and wake the transmit path if
- * neccessary. We also update the counters and do other housekeeping as
+ * necessary. We also update the counters and do other housekeeping as
  * needed.
  */
 

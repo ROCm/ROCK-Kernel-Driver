@@ -499,7 +499,7 @@ int dm_get_device(struct dm_target *ti, const char *path, sector_t start,
 }
 
 /*
- * Decrement a devices use count and remove it if neccessary.
+ * Decrement a devices use count and remove it if necessary.
  */
 void dm_put_device(struct dm_target *ti, struct dm_dev *dd)
 {

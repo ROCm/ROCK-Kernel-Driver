@@ -357,7 +357,7 @@ static int check_write_access(int req_len,
 	*volume = zft_find_volume(pos->seg_pos);
 	DUMP_VOLINFO(ft_t_noise, "", *volume);
 	zft_just_before_eof = 0;
-	/* now merge with old data if neccessary */
+	/* now merge with old data if necessary */
 	if (!zft_qic_mode && pos->seg_byte_pos != 0){
 		result = zft_fetch_segment(pos->seg_pos,
 					   zft_deblock_buf,

@@ -10866,7 +10866,7 @@ int DiagBusMaster(ULONG port)
  * Function: DiagEEPROM
  *
  * Description: Verfiy checksum and 'Key' and initialize the EEPROM if
- *              neccessary.
+ *              necessary.
  *
  *---------------------------------------------------------------------*/
 

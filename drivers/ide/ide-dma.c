@@ -196,9 +196,9 @@ EXPORT_SYMBOL_GPL(ide_dma_intr);
  *	@drive: the drive to build the DMA table for
  *	@rq: the request holding the sg list
  *
- *	Perform the PCI mapping magic neccessary to access the source or
+ *	Perform the PCI mapping magic necessary to access the source or
  *	target buffers of a request via PCI DMA. The lower layers of the
- *	kernel provide the neccessary cache management so that we can
+ *	kernel provide the necessary cache management so that we can
  *	operate in a portable fashion
  */
  
@@ -226,9 +226,9 @@ static int ide_build_sglist (ide_drive_t *drive, struct request *rq)
  *	@drive: the drive to build the DMA table for
  *	@rq: the request holding the sg list
  *
- *	Perform the PCI mapping magic neccessary to access the source or
+ *	Perform the PCI mapping magic necessary to access the source or
  *	target buffers of a taskfile request via PCI DMA. The lower layers 
- *	of the  kernel provide the neccessary cache management so that we can
+ *	of the  kernel provide the necessary cache management so that we can
  *	operate in a portable fashion
  */
  

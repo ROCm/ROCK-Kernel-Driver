@@ -521,7 +521,7 @@ hycapi_rx_capipkt
 Receive a capi-message.
 
 All B3_DATA_IND are converted to 64K-extension compatible format.
-New nccis are created if neccessary.
+New nccis are created if necessary.
 *******************************************************************/
 
 void

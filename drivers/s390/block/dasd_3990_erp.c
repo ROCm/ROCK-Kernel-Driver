@@ -197,7 +197,7 @@ dasd_3990_erp_examine(dasd_ccw_req_t * cqr, struct irb * irb)
  * DASD_3990_ERP_CLEANUP 
  *
  * DESCRIPTION
- *   Removes the already build but not neccessary ERP request and sets
+ *   Removes the already build but not necessary ERP request and sets
  *   the status of the original cqr / erp to the given (final) status
  *
  *  PARAMETER

@@ -2703,7 +2703,7 @@ static int __init rs_init(void)
  *	port exists and is in use an error is returned. If the port
  *	is not currently in the table it is added.
  *
- *	The port is then probed and if neccessary the IRQ is autodetected
+ *	The port is then probed and if necessary the IRQ is autodetected
  *	If this fails an error is returned.
  *
  *	On success the port is ready to use and the line number is returned.

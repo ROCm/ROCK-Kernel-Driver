@@ -199,7 +199,7 @@ static int help(const struct iphdr *iph, size_t len,
 			LOCK_BH(&ip_irc_lock);
 
 			/* save position of address in dcc string,
-			 * neccessary for NAT */
+			 * necessary for NAT */
 			DEBUGP("tcph->seq = %u\n", tcph->seq);
 			exp->seq = ntohl(tcph->seq) + (addr_beg_p - _data);
 			exp_irc_info->len = (addr_end_p - addr_beg_p);

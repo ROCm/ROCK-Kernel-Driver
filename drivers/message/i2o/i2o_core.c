@@ -2120,7 +2120,7 @@ static void i2o_sys_shutdown(void)
  *	@iop: controller
  *
  *	This function brings an I2O controller into HOLD state. The adapter
- *	is reset if neccessary and then the queues and resource table
+ *	is reset if necessary and then the queues and resource table
  *	are read. -1 is returned on a failure, 0 on success.
  *	
  */

@@ -245,7 +245,7 @@ oktagon_notify_reboot(struct notifier_block *this, unsigned long code, void *x)
   if((code == SYS_DOWN || code == SYS_HALT) && (esp = current_esp))
    {
     esp_bootup_reset(esp,esp->eregs);
-    udelay(500); /* Settle time. Maybe unneccessary. */
+    udelay(500); /* Settle time. Maybe unnecessary. */
    }
   return NOTIFY_DONE;
 }

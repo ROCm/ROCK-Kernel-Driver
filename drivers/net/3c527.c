@@ -1168,7 +1168,7 @@ static void mc32_update_stats(struct net_device *dev)
  * 	the stack or, if the packet is near MTU sized, we allocate
  *	another buffer and flip the old one up the stack.
  * 
- *	We must succeed in keeping a buffer on the ring. If neccessary we
+ *	We must succeed in keeping a buffer on the ring. If necessary we
  *	will toss a received packet rather than lose a ring entry. Once
  *	the first uncompleted descriptor is found, we move the
  *	End-Of-List bit to include the buffers just processed.

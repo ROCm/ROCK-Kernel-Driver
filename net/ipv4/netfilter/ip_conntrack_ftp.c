@@ -321,7 +321,7 @@ static int help(const struct iphdr *iph, size_t len,
 	if (found == -1) {
 		/* We don't usually drop packets.  After all, this is
 		   connection tracking, not packet filtering.
-		   However, it is neccessary for accurate tracking in
+		   However, it is necessary for accurate tracking in
 		   this case. */
 		if (net_ratelimit())
 			printk("conntrack_ftp: partial %s %u+%u\n",

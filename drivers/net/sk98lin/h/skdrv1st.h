@@ -72,7 +72,7 @@
  * Description:
  *
  * This is the first include file of the driver, which includes all
- * neccessary system header files and some of the GEnesis header files.
+ * necessary system header files and some of the GEnesis header files.
  * It also defines some basic items.
  *
  * Include File Hierarchy:
