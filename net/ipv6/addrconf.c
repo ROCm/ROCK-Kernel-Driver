@@ -1457,8 +1457,7 @@ ok:
 				spin_unlock(&ifp->lock);
 
 				if (!(flags&IFA_F_TENTATIVE))
-					ipv6_ifa_notify((flags&IFA_F_DEPRECATED) ?
-							0 : RTM_NEWADDR, ifp);
+					ipv6_ifa_notify(0, ifp);
 			} else
 				spin_unlock(&ifp->lock);
 
