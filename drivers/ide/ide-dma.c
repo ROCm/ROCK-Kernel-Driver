@@ -411,11 +411,13 @@ static int config_drive_for_dma (ide_drive_t *drive)
 	struct hd_driveid *id = drive->id;
 	ide_hwif_t *hwif = HWIF(drive);
 
-	if ((id->capability & 1) && hwif->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (__ide_dma_bad_drive(drive))
-			return __ide_dma_off(drive);
+	/* Consult the list of known "bad" drives */
+	if (__ide_dma_bad_drive(drive)) {
+		__ide_dma_off(drive);
+		return 1;
+	}
 
+	if ((id->capability & 1) && hwif->autodma) {
 		/*
 		 * Enable DMA on any drive that has
 		 * UltraDMA (mode 0/1/2/3/4/5/6) enabled
@@ -569,6 +571,9 @@ EXPORT_SYMBOL(__ide_dma_host_on);
  
 int __ide_dma_on (ide_drive_t *drive)
 {
+	if (__ide_dma_bad_drive(drive))
+		return 1;
+
 	drive->using_dma = 1;
 	ide_toggle_bounce(drive, 1);
 
