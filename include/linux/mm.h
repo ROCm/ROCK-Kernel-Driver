@@ -642,5 +642,33 @@ kernel_map_pages(struct page *page, int numpages, int enable)
 }
 #endif
 
+#ifndef CONFIG_ARCH_GATE_AREA
+#ifdef AT_SYSINFO_EHDR
+static inline int in_gate_area(struct task_struct *task, unsigned long addr)
+{
+	if ((addr >= FIXADDR_USER_START) && (addr < FIXADDR_USER_END))
+		return 1;
+	else
+		return 0;
+}
+
+extern struct vm_area_struct gate_vma;
+static inline struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
+{
+	return &gate_vma;
+}
+#else
+static inline int in_gate_area(struct task_struct *task, unsigned long addr)
+{
+	return 0;
+}
+
+static inline struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
+{
+	return NULL;
+}
+#endif
+#endif
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */
