@@ -30,8 +30,8 @@ static int n_siimage_devs;
 static char * print_siimage_get_info (char *buf, struct pci_dev *dev, int index)
 {
 	char *p		= buf;
-	u8 mmio		= (dev->driver_data != NULL) ? 1 : 0;
-	u32 bmdma	= (mmio) ? ((u32) dev->driver_data) :
+	u8 mmio		= (pci_get_drvdata(dev) != NULL) ? 1 : 0;
+	u32 bmdma	= (mmio) ? ((u32) pci_get_drvdata(dev)) :
 				    (pci_resource_start(dev, 4));
 
 	p += sprintf(p, "\nController: %d\n", index);
@@ -769,14 +769,14 @@ static void __init init_iops_siimage (ide_hwif_t *hwif)
 	if ((dev->device == PCI_DEVICE_ID_SII_3112) && (!(class_rev)))
 		hwif->rqsize = 16;
 
-	if (dev->driver_data == NULL)
+	if (pci_get_drvdata(dev) == NULL)
 		return;
 	init_mmio_iops_siimage(hwif);
 }
 
 static unsigned int __init ata66_siimage (ide_hwif_t *hwif)
 {
-	if (hwif->pci_dev->driver_data == NULL) {
+	if (pci_get_drvdata(hwif->pci_dev) == NULL) {
 		u8 ata66 = 0;
 		pci_read_config_byte(hwif->pci_dev, SELREG(0), &ata66);
 		return (ata66 & 0x01) ? 1 : 0;

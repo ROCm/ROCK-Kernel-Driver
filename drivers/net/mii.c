@@ -299,9 +299,9 @@ int generic_mii_ioctl(struct mii_if_info *mii_if,
 			case MII_BMCR: {
 				unsigned int new_duplex = 0;
 				if (val & (BMCR_RESET|BMCR_ANENABLE))
-					mii_if->force_media = 1;
-				else
 					mii_if->force_media = 0;
+				else
+					mii_if->force_media = 1;
 				if (mii_if->force_media &&
 				    (val & BMCR_FULLDPLX))
 					new_duplex = 1;

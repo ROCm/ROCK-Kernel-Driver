@@ -3556,7 +3556,7 @@ cpc_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 #endif
 
 	/* Set PCI drv pointer to the card structure */
-	pdev->driver_data = card;
+	pci_set_drvdata(pdev, card);
 
 	/* Set board type */
 	switch (device_id) {
@@ -3631,7 +3631,7 @@ err_release_io:
 
 static void __devexit cpc_remove_one(struct pci_dev *pdev)
 {
-	pc300_t *card = (pc300_t *) pdev->driver_data;
+	pc300_t *card = pci_get_drvdata(pdev);
 
 	if (card->hw.rambase != 0) {
 		int i;
