@@ -47,6 +47,12 @@ clear_L2_L3	:= $(srctree)/$(boot)/simple/clear.S
 # See arch/ppc/kconfig and arch/ppc/platforms/Kconfig
 # for definition of what platform each config option refer to.
 #----------------------------------------------------------------------------
+      zimage-$(CONFIG_CPCI690)		:= zImage-STRIPELF
+zimageinitrd-$(CONFIG_CPCI690)		:= zImage.initrd-STRIPELF
+     extra.o-$(CONFIG_CPCI690)		:= misc-cpci690.o mv64x60_stub.o
+         end-$(CONFIG_CPCI690)		:= cpci690
+   cacheflag-$(CONFIG_CPCI690)		:= -include $(clear_L2_L3)
+
       zimage-$(CONFIG_IBM_OPENBIOS)	:= zImage-TREE
 zimageinitrd-$(CONFIG_IBM_OPENBIOS)	:= zImage.initrd-TREE
          end-$(CONFIG_IBM_OPENBIOS)	:= treeboot

@@ -39,6 +39,7 @@ obj-$(CONFIG_PPC_CHRP)		+= open_pic.o indirect_pci.o i8259.o
 obj-$(CONFIG_PPC_PREP)		+= open_pic.o indirect_pci.o i8259.o todc_time.o
 obj-$(CONFIG_ADIR)		+= i8259.o indirect_pci.o pci_auto.o \
 					todc_time.o
+obj-$(CONFIG_CPCI690)		+= todc_time.o pci_auto.o
 obj-$(CONFIG_EBONY)		+= indirect_pci.o pci_auto.o todc_time.o
 obj-$(CONFIG_EV64260)		+= todc_time.o pci_auto.o
 obj-$(CONFIG_GEMINI)		+= open_pic.o indirect_pci.o
@@ -76,6 +77,9 @@ obj-$(CONFIG_CPM2)		+= cpm2_common.o cpm2_pic.o
 ifeq ($(CONFIG_PPC_GEN550),y)
 obj-$(CONFIG_KGDB)		+= gen550_kgdb.o gen550_dbg.o
 obj-$(CONFIG_SERIAL_TEXT_DEBUG)	+= gen550_dbg.o
+endif
+ifeq ($(CONFIG_SERIAL_MPSC_CONSOLE),y)
+obj-$(CONFIG_SERIAL_TEXT_DEBUG)	+= mv64x60_dbg.o
 endif
 obj-$(CONFIG_BOOTX_TEXT)	+= btext.o
 obj-$(CONFIG_MPC10X_BRIDGE)     += mpc10x_common.o indirect_pci.o

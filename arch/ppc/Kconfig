@@ -503,6 +503,11 @@ config APUS
 config WILLOW
 	bool "Cogent-Willow"
 
+config CPCI690
+	bool "Force-CPCI690"
+	help
+	  Select CPCI690 if configuring a Force CPCI690 cPCI board.
+
 config PCORE
 	bool "Force-PowerCore"
 
@@ -693,7 +698,7 @@ config FORCE
 
 config GT64260
 	bool
-	depends on EV64260
+	depends on EV64260 || CPCI690
 	default y
 
 config MV64X60
