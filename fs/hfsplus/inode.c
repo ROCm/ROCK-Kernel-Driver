@@ -489,26 +489,25 @@ int hfsplus_cat_read_inode(struct inode *inode, struct hfs_find_data *fd)
 
 int hfsplus_cat_write_inode(struct inode *inode)
 {
+	struct inode *main_inode = inode;
 	struct hfs_find_data fd;
 	hfsplus_cat_entry entry;
 
-	if (HFSPLUS_IS_RSRC(inode)) {
-		mark_inode_dirty(HFSPLUS_I(inode).rsrc_inode);
-		return 0;
-	}
+	if (HFSPLUS_IS_RSRC(inode))
+		main_inode = HFSPLUS_I(inode).rsrc_inode;
 
-	if (!inode->i_nlink)
+	if (!main_inode->i_nlink)
 		return 0;
 
-	if (hfs_find_init(HFSPLUS_SB(inode->i_sb).cat_tree, &fd))
+	if (hfs_find_init(HFSPLUS_SB(main_inode->i_sb).cat_tree, &fd))
 		/* panic? */
 		return -EIO;
 
-	if (hfsplus_find_cat(inode->i_sb, inode->i_ino, &fd))
+	if (hfsplus_find_cat(main_inode->i_sb, main_inode->i_ino, &fd))
 		/* panic? */
 		goto out;
 
-	if (S_ISDIR(inode->i_mode)) {
+	if (S_ISDIR(main_inode->i_mode)) {
 		struct hfsplus_cat_folder *folder = &entry.folder;
 
 		if (fd.entrylength < sizeof(struct hfsplus_cat_folder))
@@ -523,6 +522,13 @@ int hfsplus_cat_write_inode(struct inode *inode)
 		folder->valence = cpu_to_be32(inode->i_size - 2);
 		hfs_bnode_write(fd.bnode, &entry, fd.entryoffset,
 					 sizeof(struct hfsplus_cat_folder));
+	} else if (HFSPLUS_IS_RSRC(inode)) {
+		struct hfsplus_cat_file *file = &entry.file;
+		hfs_bnode_read(fd.bnode, &entry, fd.entryoffset,
+			       sizeof(struct hfsplus_cat_file));
+		hfsplus_inode_write_fork(inode, &file->rsrc_fork);
+		hfs_bnode_write(fd.bnode, &entry, fd.entryoffset,
+				sizeof(struct hfsplus_cat_file));
 	} else {
 		struct hfsplus_cat_file *file = &entry.file;
 
@@ -531,8 +537,6 @@ int hfsplus_cat_write_inode(struct inode *inode)
 		hfs_bnode_read(fd.bnode, &entry, fd.entryoffset,
 					sizeof(struct hfsplus_cat_file));
 		hfsplus_inode_write_fork(inode, &file->data_fork);
-		if (HFSPLUS_I(inode).rsrc_inode)
-			hfsplus_inode_write_fork(HFSPLUS_I(inode).rsrc_inode, &file->rsrc_fork);
 		if (S_ISREG(inode->i_mode))
 			HFSPLUS_I(inode).dev = inode->i_nlink;
 		if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))

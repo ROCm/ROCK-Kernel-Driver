@@ -386,6 +386,7 @@ void hfs_inode_write_fork(struct inode *inode, struct hfs_extent *ext,
 
 int hfs_write_inode(struct inode *inode, int unused)
 {
+	struct inode *main_inode = inode;
 	struct hfs_find_data fd;
 	hfs_cat_rec rec;
 
@@ -408,24 +409,22 @@ int hfs_write_inode(struct inode *inode, int unused)
 		}
 	}
 
-	if (HFS_IS_RSRC(inode)) {
-		mark_inode_dirty(HFS_I(inode)->rsrc_inode);
-		return 0;
-	}
+	if (HFS_IS_RSRC(inode))
+		main_inode = HFS_I(inode)->rsrc_inode;
 
-	if (!inode->i_nlink)
+	if (!main_inode->i_nlink)
 		return 0;
 
-	if (hfs_find_init(HFS_SB(inode->i_sb)->cat_tree, &fd))
+	if (hfs_find_init(HFS_SB(main_inode->i_sb)->cat_tree, &fd))
 		/* panic? */
 		return -EIO;
 
-	fd.search_key->cat = HFS_I(inode)->cat_key;
+	fd.search_key->cat = HFS_I(main_inode)->cat_key;
 	if (hfs_brec_find(&fd))
 		/* panic? */
 		goto out;
 
-	if (S_ISDIR(inode->i_mode)) {
+	if (S_ISDIR(main_inode->i_mode)) {
 		if (fd.entrylength < sizeof(struct hfs_cat_dir))
 			/* panic? */;
 		hfs_bnode_read(fd.bnode, &rec, fd.entryoffset,
@@ -439,6 +438,13 @@ int hfs_write_inode(struct inode *inode, int unused)
 
 		hfs_bnode_write(fd.bnode, &rec, fd.entryoffset,
 			    sizeof(struct hfs_cat_dir));
+	} else if (HFS_IS_RSRC(inode)) {
+		hfs_bnode_read(fd.bnode, &rec, fd.entryoffset,
+			       sizeof(struct hfs_cat_file));
+		hfs_inode_write_fork(inode, rec.file.RExtRec,
+				     &rec.file.RLgLen, &rec.file.RPyLen);
+		hfs_bnode_write(fd.bnode, &rec, fd.entryoffset,
+				sizeof(struct hfs_cat_file));
 	} else {
 		if (fd.entrylength < sizeof(struct hfs_cat_file))
 			/* panic? */;
@@ -453,9 +459,6 @@ int hfs_write_inode(struct inode *inode, int unused)
 		else
 			rec.file.Flags |= HFS_FIL_LOCK;
 		hfs_inode_write_fork(inode, rec.file.ExtRec, &rec.file.LgLen, &rec.file.PyLen);
-		if (HFS_I(inode)->rsrc_inode)
-			hfs_inode_write_fork(HFS_I(inode)->rsrc_inode, rec.file.RExtRec,
-					     &rec.file.RLgLen, &rec.file.RPyLen);
 		rec.file.MdDat = hfs_u_to_mtime(inode->i_mtime);
 
 		hfs_bnode_write(fd.bnode, &rec, fd.entryoffset,
