@@ -3439,7 +3439,24 @@ void tw_unmask_command_interrupt(TW_Device_Extension *tw_dev)
 	outl(control_reg_value, control_reg_addr);
 } /* End tw_unmask_command_interrupt() */
 
-/* Now get things going */
-static Scsi_Host_Template driver_template = TWXXXX;
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "3w-xxxx",
+	.proc_info		= tw_scsi_proc_info,
+	.name			= "3ware Storage Controller",
+	.detect			= tw_scsi_detect,
+	.release		= tw_scsi_release,
+	.queuecommand		= tw_scsi_queue,
+	.eh_abort_handler	= tw_scsi_eh_abort,
+	.eh_host_reset_handler	= tw_scsi_eh_reset,
+	.bios_param		= tw_scsi_biosparam,
+	.can_queue		= TW_Q_LENGTH-2,
+	.this_id		= -1,
+	.sg_tablesize		= TW_MAX_SGL_LENGTH,
+	.max_sectors		= TW_MAX_SECTORS,
+	.cmd_per_lun		= TW_MAX_CMDS_PER_LUN,	
+	.use_clustering		= ENABLE_CLUSTERING,
+	.emulated		= 1,
+	.highmem_io		= 1,
+};
 #include "scsi_module.c"
 

@@ -598,9 +598,20 @@ static int aha1740_biosparam(struct scsi_device *sdev, struct block_device *dev,
 
 MODULE_LICENSE("GPL");
 
-/* Eventually this will go into an include file, but this will be later */
-static Scsi_Host_Template driver_template = AHA1740;
-
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "aha1740",
+	.proc_info		= aha1740_proc_info,
+	.name			= "Adaptec 174x (EISA)",
+	.detect			= aha1740_detect,
+	.command		= aha1740_command,
+	.queuecommand		= aha1740_queuecommand,
+	.bios_param		= aha1740_biosparam,
+	.can_queue		= AHA1740_ECBS,
+	.this_id		= 7, 
+	.sg_tablesize		= AHA1740_SCATTER,
+	.cmd_per_lun		= AHA1740_CMDLUN, 
+	.use_clustering		= ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"
 
 /* Okay, you made it all the way through.  As of this writing, 3/31/93, I'm

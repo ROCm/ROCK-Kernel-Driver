@@ -2228,6 +2228,18 @@ void isp2x00_print_scsi_cmd(Scsi_Cmnd * cmd)
 
 MODULE_LICENSE("GPL");
 
-static Scsi_Host_Template driver_template = QLOGICFC;
-
+static Scsi_Host_Template driver_template = {
+        .detect                 = isp2x00_detect,
+        .release                = isp2x00_release,
+        .info                   = isp2x00_info,
+        .queuecommand           = isp2x00_queuecommand,
+        .eh_abort_handler       = isp2x00_abort,
+        .bios_param             = isp2x00_biosparam,
+        .can_queue              = QLOGICFC_REQ_QUEUE_LEN,
+        .this_id                = -1,
+        .sg_tablesize           = QLOGICFC_MAX_SG(QLOGICFC_REQ_QUEUE_LEN),
+	.cmd_per_lun		= QLOGICFC_CMD_PER_LUN,
+        .use_clustering         = ENABLE_CLUSTERING,
+	.highmem_io		= 1,
+};
 #include "scsi_module.c"

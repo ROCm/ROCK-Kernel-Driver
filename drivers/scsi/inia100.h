@@ -76,24 +76,6 @@ static int inia100_bus_reset(Scsi_Cmnd *);
 
 #define inia100_REVID "Initio INI-A100U2W SCSI device driver; Revision: 1.02d"
 
-#define INIA100	{ \
-	.proc_name	= "inia100", \
-	.name		= inia100_REVID, \
-	.detect		= inia100_detect, \
-	.release	= inia100_release, \
-	.queuecommand	= inia100_queue, \
-	.eh_abort_handler = inia100_abort, \
-	.eh_bus_reset_handler	= inia100_bus_reset, \
-	.eh_device_reset_handler = inia100_device_reset, \
-	.can_queue	= 1, \
-	.this_id	= 1, \
-	.sg_tablesize	= SG_ALL, \
-	.cmd_per_lun 	= 1, \
-	.present	= 0, \
-	.unchecked_isa_dma = 0, \
-	.use_clustering	= ENABLE_CLUSTERING, \
-}
-
 #define ULONG   unsigned long
 #define PVOID   void *
 #define USHORT  unsigned short

@@ -386,6 +386,19 @@ simscsi_host_reset (Scsi_Cmnd *sc)
 	return 0;
 }
 
-static Scsi_Host_Template driver_template = SIMSCSI;
-
+static Scsi_Host_Template driver_template = {
+	.name			= "simscsi",
+	.detect			= simscsi_detect,
+	.release		= simscsi_release,
+	.info			= simscsi_info,	
+	.queuecommand		= simscsi_queuecommand,
+	.eh_host_reset_handler	= simscsi_host_reset,
+	.bios_param		= simscsi_biosparam,
+	.can_queue		= SIMSCSI_REQ_QUEUE_LEN,
+	.this_id		= -1,
+	.sg_tablesize		= SG_ALL,
+	.max_sectors		= 1024,
+	.cmd_per_lun		= SIMSCSI_REQ_QUEUE_LEN,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
 #include "../drivers/scsi/scsi_module.c"

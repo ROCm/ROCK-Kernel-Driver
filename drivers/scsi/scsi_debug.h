@@ -24,28 +24,4 @@ static const char * scsi_debug_info(struct Scsi_Host *);
 
 #define SCSI_DEBUG_MAX_CMD_LEN 16
 
-static Scsi_Host_Template sdebug_driver_template = {
-	.proc_info =		scsi_debug_proc_info,
-	.name =			"SCSI DEBUG",
-	.info =			scsi_debug_info,
-	.slave_alloc =		scsi_debug_slave_alloc,
-	.slave_configure =	scsi_debug_slave_configure,
-	.slave_destroy =	scsi_debug_slave_destroy,
-	.ioctl =		scsi_debug_ioctl,
-	.queuecommand =		scsi_debug_queuecommand,
-	.eh_abort_handler =	scsi_debug_abort,
-	.eh_bus_reset_handler = scsi_debug_bus_reset,
-	.eh_device_reset_handler = scsi_debug_device_reset,
-	.eh_host_reset_handler = scsi_debug_host_reset,
-	.bios_param =		scsi_debug_biosparam,
-	.can_queue =		SCSI_DEBUG_CANQUEUE,
-	.this_id =		7,
-	.sg_tablesize =		64,
-	.cmd_per_lun =		3,
-	.max_sectors =		4096,
-	.unchecked_isa_dma = 	0,
-	.use_clustering = 	ENABLE_CLUSTERING,
-	.module =		THIS_MODULE,
-};
-
 #endif

@@ -3059,7 +3059,20 @@ int DC390_release (struct Scsi_Host *host)
 }
 #endif /* def MODULE */
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,99)
 static Scsi_Host_Template driver_template = DC390_T;
+   .proc_name      = "tmscsim", 
+   .proc_info      = DC390_proc_info,
+   .name           = DC390_BANNER " V" DC390_VERSION,
+   .detect         = DC390_detect,
+   .release        = DC390_release,
+   .queuecommand   = DC390_queue_command,
+   .abort          = DC390_abort,
+   .reset          = DC390_reset,
+   .bios_param     = DC390_bios_param,
+   .can_queue      = 42,
+   .this_id        = 7,
+   .sg_tablesize   = SG_ALL,
+   .cmd_per_lun    = 16,
+   .use_clustering = DISABLE_CLUSTERING,
+};
 #include "scsi_module.c"
-#endif

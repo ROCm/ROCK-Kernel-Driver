@@ -3631,8 +3631,30 @@ SCPNT_TO_LOOKUP_IDX(Scsi_Cmnd *sc)
 /* see mptscsih.h */
 
 #ifdef MPT_SCSIHOST_NEED_ENTRY_EXIT_HOOKUPS
-	static Scsi_Host_Template driver_template = MPT_SCSIHOST;
-#	include "../../scsi/scsi_module.c"
+static Scsi_Host_Template driver_template = {
+	.proc_name			= "mptscsih",
+	.proc_info			= x_scsi_proc_info,
+	.name				= "MPT SCSI Host",
+	.detect				= x_scsi_detect,
+	.release			= x_scsi_release,
+	.info				= x_scsi_info,	
+	.queuecommand			= x_scsi_queuecommand,
+	.slave_alloc			= x_scsi_slave_alloc,
+	.slave_configure		= x_scsi_slave_configure,
+	.slave_destroy			= x_scsi_slave_destroy,
+	.eh_abort_handler		= x_scsi_abort,
+	.eh_device_reset_handler	= x_scsi_dev_reset,
+	.eh_bus_reset_handler		= x_scsi_bus_reset,
+	.eh_host_reset_handler		= x_scsi_host_reset,
+	.bios_param			= x_scsi_bios_param,
+	.can_queue			= MPT_SCSI_CAN_QUEUE,
+	.this_id			= -1,
+	.sg_tablesize			= MPT_SCSI_SG_DEPTH,
+	.max_sectors			= MPT_SCSI_MAX_SECTORS,
+	.cmd_per_lun			= MPT_SCSI_CMD_PER_LUN,
+	.use_clustering			= ENABLE_CLUSTERING,
+};
+#include "../../scsi/scsi_module.c"
 #endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

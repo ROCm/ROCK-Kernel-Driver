@@ -14718,10 +14718,21 @@ sym_read_Tekram_nvram (ncr_slot *np, u_short device_id, Tekram_nvram *nvram)
 
 MODULE_LICENSE("GPL");
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-static
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0) || defined(MODULE)
-Scsi_Host_Template driver_template = SYM53C8XX;
+static Scsi_Host_Template driver_template = {
+	.name           = "sym53c8xx",
+	.detect         = sym53c8xx_detect,
+	.release        = sym53c8xx_release,
+	.info           = sym53c8xx_info, 
+	.queuecommand   = sym53c8xx_queue_command,
+	.slave_configure = sym53c8xx_slave_configure,
+	.abort          = sym53c8xx_abort,
+	.reset          = sym53c8xx_reset,
+	.can_queue      = SCSI_NCR_CAN_QUEUE,
+	.this_id        = 7,
+	.sg_tablesize   = SCSI_NCR_SG_TABLESIZE,
+	.cmd_per_lun    = SCSI_NCR_CMD_PER_LUN,
+	.max_sectors	= MAX_HW_SEGMENTS*8,
+	.use_clustering = DISABLE_CLUSTERING,
+	.highmem_io	= 1
+};
 #include "scsi_module.c"
-#endif

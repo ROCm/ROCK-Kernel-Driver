@@ -137,27 +137,6 @@ static int pas16_proc_info (char *buffer ,char **start, off_t offset,
 #define CAN_QUEUE 32 
 #endif
 
-/* 
- * I hadn't thought of this with the earlier drivers - but to prevent
- * macro definition conflicts, we shouldn't define all of the internal
- * macros when this is being used solely for the host stub.
- */
-
-#define MV_PAS16 {					\
-	.name           = "Pro Audio Spectrum-16 SCSI", 	\
-	.detect         = pas16_detect, 			\
-	.queuecommand   = pas16_queue_command,		\
-	.eh_abort_handler = pas16_abort,			\
-	.eh_bus_reset_handler = pas16_bus_reset,		\
-	.eh_device_reset_handler = pas16_device_reset,	\
-	.eh_host_reset_handler = pas16_host_reset,	\
-	.bios_param     = pas16_biosparam, 		\
-	.can_queue      = CAN_QUEUE,			\
-	.this_id        = 7,				\
-	.sg_tablesize   = SG_ALL,				\
-	.cmd_per_lun    = CMD_PER_LUN ,			\
-	.use_clustering = DISABLE_CLUSTERING}
-
 #ifndef HOSTS_C
 
 #define NCR5380_implementation_fields \

@@ -1813,7 +1813,22 @@ static int aha1542_biosparam(struct scsi_device *sdev,
 MODULE_LICENSE("GPL");
 
 
-/* Eventually this will go into an include file, but this will be later */
-static Scsi_Host_Template driver_template = AHA1542;
-
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "aha1542",
+	.name			= "Adaptec 1542",
+	.detect			= aha1542_detect,
+	.command		= aha1542_command,
+	.queuecommand		= aha1542_queuecommand,
+	.eh_abort_handler	= aha1542_abort,
+	.eh_device_reset_handler= aha1542_dev_reset,
+	.eh_bus_reset_handler	= aha1542_bus_reset,
+	.eh_host_reset_handler	= aha1542_host_reset,
+	.bios_param		= aha1542_biosparam,
+	.can_queue		= AHA1542_MAILBOXES, 
+	.this_id		= 7,
+	.sg_tablesize		= AHA1542_SCATTER,
+	.cmd_per_lun		= AHA1542_CMDLUN,
+	.unchecked_isa_dma	= 1, 
+	.use_clustering		= ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"

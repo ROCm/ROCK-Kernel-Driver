@@ -50,45 +50,4 @@ static int DC390_release(struct Scsi_Host *);
 
 extern int DC390_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,30)
-#define DC390_T    {					\
-   .proc_name      = "tmscsim",                           \
-   .proc_info      = DC390_proc_info,			\
-   .name           = DC390_BANNER " V" DC390_VERSION,	\
-   .detect         = DC390_detect,			\
-   .release        = DC390_release,			\
-   .queuecommand   = DC390_queue_command,			\
-   .abort          = DC390_abort,				\
-   .reset          = DC390_reset,				\
-   .bios_param     = DC390_bios_param,			\
-   .can_queue      = 42,					\
-   .this_id        = 7,					\
-   .sg_tablesize   = SG_ALL,				\
-   .cmd_per_lun    = 16,					\
-   .unchecked_isa_dma = 0,				\
-   .use_clustering = DISABLE_CLUSTERING			\
-   }
-#else
-extern struct proc_dir_entry DC390_proc_scsi_tmscsim;
-#define DC390_T    {					\
-   .proc_dir       = &DC390_proc_scsi_tmscsim,		\
-   .proc_info      = DC390_proc_info,			\
-   .name           = DC390_BANNER " V" DC390_VERSION,	\
-   .detect         = DC390_detect,			\
-   .release        = DC390_release,			\
-   .queuecommand   = DC390_queue_command,			\
-   .abort          = DC390_abort,				\
-   .reset          = DC390_reset,				\
-   .bios_param     = DC390_bios_param,			\
-   .can_queue      = 42,					\
-   .this_id        = 7,					\
-   .sg_tablesize   = SG_ALL,				\
-   .cmd_per_lun    = 16,					\
-   NEW_EH						\
-   .unchecked_isa_dma = 0,				\
-   .use_clustering = DISABLE_CLUSTERING			\
-   }
-#endif
-#endif /* defined(HOSTS_C) || defined(MODULE) */
-
 #endif /* DC390_H */

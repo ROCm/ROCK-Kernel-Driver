@@ -66,9 +66,6 @@
     */
    #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20) || defined CONFIG_HIGHIO
       #define IPS_HIGHIO
-      #define IPS_HIGHMEM_IO     .highmem_io = 1,
-   #else
-      #define IPS_HIGHMEM_IO
    #endif
 
    #define IPS_HA(x)                   ((ips_ha_t *) x->hostdata)
@@ -445,47 +442,10 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
    static void ips_select_queue_depth(struct Scsi_Host *, Scsi_Device *);
    static int ips_biosparam(Disk *disk, kdev_t dev, int geom[]);
-#define IPS {	\
-	.detect				= ips_detect,	\
-	.release			= ips_release,	\
-	.info				= ips_info,	\
-	.queuecommand			= ips_queue,	\
-	.eh_abort_handler		= ips_eh_abort,	\
-	.eh_host_reset_handler		= ips_eh_reset,	\
-	.bios_param			= ips_biosparam,\
-	.select_queue_depths		= ips_select_queue_depth, \
-	.can_queue			= 0,		\
-	.this_id			= -1,		\
-	.sg_tablesize			= IPS_MAX_SG,	\
-	.cmd_per_lun			= 16,		\
-	.present			= 0,		\
-	.unchecked_isa_dma		= 0,		\
-	.use_clustering			= ENABLE_CLUSTERING,\
-	.use_new_eh_code		= 1, \
-	IPS_HIGHMEM_IO \
-}
 #else
    static int ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 		sector_t capacity, int geom[]);
    int ips_slave_configure(Scsi_Device *SDptr);
-#define IPS {	\
-	.detect			= ips_detect,		\
-	.release		= ips_release,		\
-	.info			= ips_info,		\
-	.queuecommand		= ips_queue,		\
-	.eh_abort_handler	= ips_eh_abort,		\
-	.eh_host_reset_handler	= ips_eh_reset,		\
-	.slave_configure	= ips_slave_configure,	\
-	.bios_param		= ips_biosparam,	\
-	.can_queue		= 0,			\
-	.this_id		= -1,			\
-	.sg_tablesize		= IPS_MAX_SG,		\
-	.cmd_per_lun		= 3,			\
-	.present		= 0,			\
-	.unchecked_isa_dma	= 0,			\
-	.use_clustering		= ENABLE_CLUSTERING,	\
-	.highmem_io		= 1 \
-}
 #endif
 
 /*

@@ -60,49 +60,6 @@ static int adpt_device_reset(Scsi_Cmnd* cmd);
 
 #define DPT_DRIVER_NAME	"Adaptec I2O RAID"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,00)
-#define DPT_I2O { \
-	.proc_info = adpt_proc_info,					\
-	.detect = adpt_detect,						\
-	.release = adpt_release,						\
-	.info = adpt_info,						\
-	.queuecommand = adpt_queue,					\
-	.eh_abort_handler = adpt_abort,					\
-	.eh_device_reset_handler = adpt_device_reset,			\
-	.eh_bus_reset_handler = adpt_bus_reset,				\
-	.eh_host_reset_handler = adpt_reset,				\
-	.bios_param = adpt_bios_param,					\
-	.can_queue = MAX_TO_IOP_MESSAGES ,/* max simultaneous cmds      */\
-	.this_id = 7,			/* scsi id of host adapter    */\
-	.sg_tablesize = 0,		/* max scatter-gather cmds    */\
-	.cmd_per_lun = 256,		/* cmds per lun (linked cmds) */\
-	.use_clustering = ENABLE_CLUSTERING,				\
-	.use_new_eh_code = 1						\
-}
-
-#else				/* KERNEL_VERSION > 2.2.16 */
-
-#define DPT_I2O { \
-	.proc_info = adpt_proc_info,					\
-	.detect = adpt_detect,						\
-	.release = adpt_release,						\
-	.info = adpt_info,						\
-	.queuecommand = adpt_queue,					\
-	.eh_abort_handler = adpt_abort,					\
-	.eh_device_reset_handler = adpt_device_reset,			\
-	.eh_bus_reset_handler = adpt_bus_reset,				\
-	.eh_host_reset_handler = adpt_reset,				\
-	.bios_param = adpt_bios_param,					\
-	.slave_configure = adpt_slave_configure,				\
-	.can_queue = MAX_TO_IOP_MESSAGES,	/* max simultaneous cmds      */\
-	.this_id = 7,			/* scsi id of host adapter    */\
-	.sg_tablesize = 0,		/* max scatter-gather cmds    */\
-	.cmd_per_lun = 1,			/* cmds per lun (linked cmds) */\
-	.use_clustering = ENABLE_CLUSTERING,				\
-	.proc_name = "dpt_i2o"	/* this is the name of our proc node*/	\
-}
-#endif
-
 #ifndef HOSTS_C
 
 #include "dpt/sys_info.h"

@@ -77,37 +77,6 @@ int sym53c8xx_reset(Scsi_Cmnd *, unsigned int);
 int sym53c8xx_slave_configure(Scsi_Device *);
 int sym53c8xx_release(struct Scsi_Host *);
 
-#if	LINUX_VERSION_CODE >= LinuxVersionCode(2,1,75)
-
-#define SYM53C8XX {     .name           = "sym53c8xx",		\
-			.detect         = sym53c8xx_detect,	\
-			.release        = sym53c8xx_release,	\
-			.info           = sym53c8xx_info, 	\
-			.queuecommand   = sym53c8xx_queue_command,\
-			.slave_configure = sym53c8xx_slave_configure,\
-			.abort          = sym53c8xx_abort,	\
-			.reset          = sym53c8xx_reset,	\
-			.can_queue      = SCSI_NCR_CAN_QUEUE,	\
-			.this_id        = 7,			\
-			.sg_tablesize   = SCSI_NCR_SG_TABLESIZE,	\
-			.cmd_per_lun    = SCSI_NCR_CMD_PER_LUN,	\
-			.max_sectors	= MAX_HW_SEGMENTS*8,	\
-			.use_clustering = DISABLE_CLUSTERING,	\
-			.highmem_io	= 1} 
-
-#else
-
-#define SYM53C8XX {	NULL, NULL, NULL, NULL,				\
-			NULL,			sym53c8xx_detect,	\
-			sym53c8xx_release,	sym53c8xx_info,	NULL,	\
-			sym53c8xx_queue_command,sym53c8xx_abort,	\
-			sym53c8xx_reset, NULL,	scsicam_bios_param,	\
-			SCSI_NCR_CAN_QUEUE,	7,			\
-			SCSI_NCR_SG_TABLESIZE,	SCSI_NCR_CMD_PER_LUN,	\
-			0,	0,	DISABLE_CLUSTERING} 
- 
-#endif /* LINUX_VERSION_CODE */
-
 #endif /* defined(HOSTS_C) || defined(MODULE) */ 
 
 #endif /* SYM53C8XX_H */

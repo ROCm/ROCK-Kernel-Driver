@@ -141,7 +141,23 @@
 unsigned int i91u_debug = DEBUG_DEFAULT;
 #endif
 
-static Scsi_Host_Template driver_template = INI9100U;
+static Scsi_Host_Template driver_template = {
+	.proc_name	= "INI9100U",
+	.proc_info	= "INI9100U",
+	.name		= i91u_REVID,
+	.detect		= i91u_detect,
+	.release	= i91u_release,
+	.command	= i91u_command,
+	.queuecommand	= i91u_queue,
+	.abort		= i91u_abort,
+	.reset		= i91u_reset,
+	.bios_param	= i91u_biosparam,
+	.can_queue	= 1,
+	.this_id	= 1,
+	.sg_tablesize	= SG_ALL,
+	.cmd_per_lun 	= 1,
+	.use_clustering	= ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"
 
 char *i91uCopyright = "Copyright (C) 1996-98";

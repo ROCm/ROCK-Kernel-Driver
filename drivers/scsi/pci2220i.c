@@ -2925,7 +2925,20 @@ int Pci2220i_BiosParam (struct scsi_device *sdev, struct block_device *dev,
 
 MODULE_LICENSE("Dual BSD/GPL");
 
-/* Eventually this will go into an include file, but this will be later */
-static Scsi_Host_Template driver_template = PCI2220I;
-
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "pci2220i",
+	.name			= "PCI-2220I/PCI-2240I",
+	.detect			= Pci2220i_Detect,
+	.release		= Pci2220i_Release,
+	.command		= Pci2220i_Command,
+	.queuecommand		= Pci2220i_QueueCommand,
+	.abort			= Pci2220i_Abort,
+	.reset			= Pci2220i_Reset,
+	.bios_param		= Pci2220i_BiosParam,
+	.can_queue		= 1,
+	.this_id		= -1,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
 #include "scsi_module.c"

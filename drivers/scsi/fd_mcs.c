@@ -1436,7 +1436,23 @@ static int fd_mcs_biosparam(struct scsi_device * disk, struct block_device *bdev
 	return 0;
 }
 
-/* Eventually this will go into an include file, but this will be later */
-	static Scsi_Host_Template driver_template = FD_MCS;
-
+static Scsi_Host_Template driver_template = {
+	.proc_name			= "fd_mcs",
+	.proc_info			= fd_mcs_proc_info,
+	.detect				= fd_mcs_detect,
+	.release			= fd_mcs_release,
+	.info				= fd_mcs_info,
+	.command			= fd_mcs_command,
+	.queuecommand   		= fd_mcs_queue, 
+	.eh_abort_handler		= fd_mcs_abort,
+	.eh_bus_reset_handler		= fd_mcs_bus_reset,
+	.eh_host_reset_handler		= fd_mcs_host_reset,
+	.eh_device_reset_handler	= fd_mcs_device_reset,
+	.bios_param     		= fd_mcs_biosparam,
+	.can_queue      		= 1,
+	.this_id        		= 7,
+	.sg_tablesize   		= 64,
+	.cmd_per_lun    		= 1,
+	.use_clustering 		= DISABLE_CLUSTERING,
+};
 #include "scsi_module.c"

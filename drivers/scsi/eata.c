@@ -2375,8 +2375,19 @@ static int eata2x_release(struct Scsi_Host *shpnt) {
    return FALSE;
 }
 
-static Scsi_Host_Template driver_template = EATA;
-
+static Scsi_Host_Template driver_template = {
+	.name              	= "EATA/DMA 2.0x rev. " EATA_VERSION " ",
+	.detect                  = eata2x_detect,
+	.release                 = eata2x_release,
+	.queuecommand            = eata2x_queuecommand,
+	.eh_abort_handler        = eata2x_eh_abort,
+	.eh_host_reset_handler   = eata2x_eh_host_reset,
+	.bios_param              = eata2x_bios_param,
+	.slave_configure	 = eata2x_slave_configure,
+	.this_id                 = 7,
+	.unchecked_isa_dma       = 1,
+	.use_clustering          = ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"
 
 #ifndef MODULE

@@ -65,24 +65,6 @@ static int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, i
 #define CAN_QUEUE 16
 #endif
 
-#define GENERIC_NCR5380 {						\
-	.proc_info      = generic_NCR5380_proc_info,			\
-	.name           = "Generic NCR5380/NCR53C400 Scsi Driver",	\
-	.detect         = generic_NCR5380_detect,				\
-	.release        = generic_NCR5380_release_resources,		\
-	.info           = (void *)generic_NCR5380_info,			\
-	.queuecommand   = generic_NCR5380_queue_command,			\
-	.eh_abort_handler = generic_NCR5380_abort,				\
-	.eh_bus_reset_handler = generic_NCR5380_bus_reset,			\
-	.eh_device_reset_handler = generic_NCR5380_device_reset,		\
-	.eh_host_reset_handler = generic_NCR5380_host_reset,			\
-	.bios_param     = NCR5380_BIOSPARAM,				\
-	.can_queue      = CAN_QUEUE,					\
-        .this_id        = 7,						\
-        .sg_tablesize   = SG_ALL,						\
-	.cmd_per_lun    = CMD_PER_LUN ,					\
-        .use_clustering = DISABLE_CLUSTERING}
-
 #ifndef HOSTS_C
 
 #define __STRVAL(x) #x

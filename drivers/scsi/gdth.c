@@ -5790,7 +5790,34 @@ GDTH_INITFUNC(void, gdth_setup(char *str,int *ints))
 
 #else
 
-static Scsi_Host_Template driver_template = GDTH;
+static Scsi_Host_Template driver_template = {
+#if LINUX_VERSION_CODE >= 0x02015F
+	.proc_name		= "gdth", 
+#else
+	.proc_dir		= &proc_scsi_gdth,
+#endif
+	.proc_info		= gdth_proc_info,
+	.name			= "GDT SCSI Disk Array Controller",
+	.detect			= gdth_detect, 
+	.release		= gdth_release,
+	.info			= gdth_info, 
+	.queuecommand		= gdth_queuecommand,
+	.eh_abort_handler	= gdth_eh_abort, 
+	.eh_device_reset_handler = gdth_eh_device_reset,
+	.eh_bus_reset_handler	= gdth_eh_bus_reset,
+	.eh_host_reset_handler	= gdth_eh_host_reset,
+	.bios_param		= gdth_bios_param,
+	.can_queue		= GDTH_MAXCMDS,
+	.this_id		= -1,
+	.sg_tablesize		= GDTH_MAXSG,
+	.cmd_per_lun		= GDTH_MAXC_P_L,
+	.unchecked_isa_dma	= 1,
+	.use_clustering		= ENABLE_CLUSTERING,
+#if LINUX_VERSION_CODE < 0x020501
+	.use_new_eh_code	= 1,
+#endif
+};
+
 #include "scsi_module.c"
 #ifndef MODULE
 __setup("gdth=", option_setup);

@@ -2051,7 +2051,21 @@ void* fcMemManager( struct pci_dev *pdev, ALIGNED_MEM *dynamic_mem,
 }
 
 
-static Scsi_Host_Template driver_template = CPQFCTS;
-
+static Scsi_Host_Template driver_template = {
+	.detect                 = cpqfcTS_detect,
+	.release                = cpqfcTS_release,
+	.info                   = cpqfcTS_info,
+	.proc_info              = cpqfcTS_proc_info,
+	.ioctl                  = cpqfcTS_ioctl,
+	.queuecommand           = cpqfcTS_queuecommand,
+	.eh_device_reset_handler   = cpqfcTS_eh_device_reset,
+	.eh_abort_handler       = cpqfcTS_eh_abort, 
+	.bios_param             = cpqfcTS_biosparam, 
+	.can_queue              = CPQFCTS_REQ_QUEUE_LEN,
+	.this_id                = -1, 
+	.sg_tablesize           = SG_ALL, 
+	.cmd_per_lun            = CPQFCTS_CMD_PER_LUN,
+	.use_clustering         = ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"
 

@@ -227,9 +227,7 @@ int __init sgiwd93_detect(Scsi_Host_Template *SGIblows)
 
 	if (request_irq(SGI_WD93_0_IRQ, sgiwd93_intr, 0, "SGI WD93", (void *) sgiwd93_host)) {
 		printk(KERN_WARNING "sgiwd93: Could not register IRQ %d (for host 0).\n", SGI_WD93_0_IRQ);
-#ifdef MODULE
 		wd33c93_release();
-#endif
 		free_page((unsigned long)buf);
 		scsi_unregister(sgiwd93_host);
 		return 0;
@@ -263,9 +261,7 @@ int __init sgiwd93_detect(Scsi_Host_Template *SGIblows)
 	
 			if (request_irq(SGI_WD93_1_IRQ, sgiwd93_intr, 0, "SGI WD93", (void *) sgiwd93_host1)) {
 				printk(KERN_WARNING "sgiwd93: Could not allocate irq %d (for host1).\n", SGI_WD93_1_IRQ);
-#ifdef MODULE
 				wd33c93_release();
-#endif
 				free_page((unsigned long)buf);
 				scsi_unregister(sgiwd93_host1);
 				/* Fall through since host0 registered OK */
@@ -278,17 +274,8 @@ int __init sgiwd93_detect(Scsi_Host_Template *SGIblows)
 	return 1; /* Found one. */
 }
 
-#define HOSTS_C
-
-#include "sgiwd93.h"
-
-static Scsi_Host_Template driver_template = SGIWD93_SCSI;
-
-#include "scsi_module.c"
-
 int sgiwd93_release(struct Scsi_Host *instance)
 {
-#ifdef MODULE
 	free_irq(SGI_WD93_0_IRQ, sgiwd93_intr);
 	free_page(KSEG0ADDR(hdata->dma_bounce_buffer));
 	wd33c93_release();
@@ -297,6 +284,21 @@ int sgiwd93_release(struct Scsi_Host *instance)
 		free_page(KSEG0ADDR(hdata1->dma_bounce_buffer));
 		wd33c93_release();
 	}
-#endif
 	return 1;
 }
+
+static Scsi_Host_Template driver_template = {
+	.proc_name	     = "SGIWD93",
+	.name                = "SGI WD93",
+	.detect              = sgiwd93_detect,
+	.release             = sgiwd93_release,
+	.queuecommand        = wd33c93_queuecommand,
+	.abort               = wd33c93_abort,
+	.reset               = wd33c93_reset,
+	.can_queue           = CAN_QUEUE,
+	.this_id             = 7,
+	.sg_tablesize        = SG_ALL,
+	.cmd_per_lun	     = CMD_PER_LUN,
+	.use_clustering      = DISABLE_CLUSTERING,
+};
+#include "scsi_module.c"

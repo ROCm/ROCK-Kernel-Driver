@@ -5118,6 +5118,18 @@ __setup("BusLogic=", BusLogic_Setup);
 */
 MODULE_LICENSE("GPL");
 
-static SCSI_Host_Template_T driver_template = BUSLOGIC;
-
+static SCSI_Host_Template_T driver_template = {
+	.proc_name		= "BusLogic",
+	.proc_info		= BusLogic_ProcDirectoryInfo,
+	.name			= "BusLogic",
+	.detect			= BusLogic_DetectHostAdapter,
+	.release		= BusLogic_ReleaseHostAdapter,
+	.info			= BusLogic_DriverInfo,
+	.queuecommand		= BusLogic_QueueCommand,
+	.slave_configure	= BusLogic_SlaveConfigure,
+	.bios_param		= BusLogic_BIOSDiskParameters,
+	.unchecked_isa_dma	= 1,
+	.max_sectors		= 128,
+	.use_clustering		= ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"

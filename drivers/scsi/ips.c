@@ -251,7 +251,30 @@ static int          ips_cd_boot = 0;                 /* Booting from Manager CD 
 static char        *ips_FlashData = NULL;            /* CD Boot - Flash Data Buffer      */
 static long         ips_FlashDataInUse = 0;          /* CD Boot - Flash Data In Use Flag */
 static uint32_t     MaxLiteCmds = 32;                /* Max Active Cmds for a Lite Adapter */  
-static Scsi_Host_Template ips_driver_template = IPS;
+static Scsi_Host_Template ips_driver_template = {
+	.detect			= ips_detect,
+	.release		= ips_release,
+	.info			= ips_info,
+	.queuecommand		= ips_queue,
+	.eh_abort_handler	= ips_eh_abort,
+	.eh_host_reset_handler	= ips_eh_reset,
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+	.slave_configure	= ips_slave_configure,
+#else
+	.select_queue_depths	= ips_select_queue_depth,
+#endif
+	.bios_param		= ips_biosparam,
+	.this_id		= -1,
+	.sg_tablesize		= IPS_MAX_SG,
+	.cmd_per_lun		= 3,
+	.use_clustering		= ENABLE_CLUSTERING,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,20) || (defined CONFIG_HIGHIO)
+	.highmem_io		= 1,
+#endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	.use_new_eh_code	= 1,
+#endif
+};
 
 IPS_DEFINE_COMPAT_TABLE( Compatable );               /* Version Compatability Table      */
 

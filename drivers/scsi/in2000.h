@@ -414,22 +414,4 @@ static int in2000_device_reset(Scsi_Cmnd *);
 #define IN2000_CPL      2
 #define IN2000_HOST_ID  7
 
-#define IN2000 {  .proc_name       		= "in2000",	     /* name of /proc/scsi directory entry */ \
-                  .proc_info       		= in2000_proc_info,    /* pointer to proc info function */ \
-                  .name            		= "Always IN2000",     /* device name */ \
-                  .detect          		= in2000_detect,       /* returns number of in2000's found */ \
-                  .release			= in2000_release,	     /* release the in2000 controller */ \
-                  .queuecommand    		= in2000_queuecommand, /* queue scsi command, don't wait */ \
-                  .eh_abort_handler		= in2000_abort,        /* abort current command */ \
-                  .eh_bus_reset_handler		= in2000_bus_reset,    /* reset scsi bus */ \
-                  .eh_device_reset_handler	= in2000_device_reset, /* reset scsi device */ \
-                  .eh_host_reset_handler	= in2000_host_reset,   /* reset scsi hba */ \
-                  .bios_param      		= in2000_biosparam,    /* figures out BIOS parameters for lilo, etc */ \
-                  .can_queue       		= IN2000_CAN_Q,        /* max commands we can queue up */ \
-                  .this_id         		= IN2000_HOST_ID,      /* host-adapter scsi id */ \
-                  .sg_tablesize    		= IN2000_SG,           /* scatter-gather table size */ \
-                  .cmd_per_lun     		= IN2000_CPL,          /* commands per lun */ \
-                  .use_clustering  		= DISABLE_CLUSTERING,  /* ENABLE_CLUSTERING may speed things up */ \
-                }
-
 #endif /* IN2000_H */
