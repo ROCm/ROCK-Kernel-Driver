@@ -172,7 +172,7 @@ int ipxrtr_route_packet(struct sock *sk, struct sockaddr_ipx *usipx,
 			struct iovec *iov, size_t len, int noblock)
 {
 	struct sk_buff *skb;
-	struct ipx_opt *ipxs = ipx_sk(sk);
+	struct ipx_sock *ipxs = ipx_sk(sk);
 	struct ipx_interface *intrfc;
 	struct ipxhdr *ipx;
 	size_t size;

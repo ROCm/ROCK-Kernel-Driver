@@ -58,13 +58,13 @@ static const char *sctp_conntrack_names[] = {
 #define HOURS * 60 MINS
 #define DAYS  * 24 HOURS
 
-unsigned long ip_ct_sctp_timeout_closed            =  10 SECS;
-unsigned long ip_ct_sctp_timeout_cookie_wait       =   3 SECS;
-unsigned long ip_ct_sctp_timeout_cookie_echoed     =   3 SECS;
-unsigned long ip_ct_sctp_timeout_established       =   5 DAYS;
-unsigned long ip_ct_sctp_timeout_shutdown_sent     = 300 SECS / 1000;
-unsigned long ip_ct_sctp_timeout_shutdown_recd     = 300 SECS / 1000;
-unsigned long ip_ct_sctp_timeout_shutdown_ack_sent =   3 SECS;
+static unsigned long ip_ct_sctp_timeout_closed            =  10 SECS;
+static unsigned long ip_ct_sctp_timeout_cookie_wait       =   3 SECS;
+static unsigned long ip_ct_sctp_timeout_cookie_echoed     =   3 SECS;
+static unsigned long ip_ct_sctp_timeout_established       =   5 DAYS;
+static unsigned long ip_ct_sctp_timeout_shutdown_sent     = 300 SECS / 1000;
+static unsigned long ip_ct_sctp_timeout_shutdown_recd     = 300 SECS / 1000;
+static unsigned long ip_ct_sctp_timeout_shutdown_ack_sent =   3 SECS;
 
 static unsigned long * sctp_timeouts[]
 = { NULL,                                  /* SCTP_CONNTRACK_NONE  */
@@ -494,14 +494,7 @@ static int sctp_new(struct ip_conntrack *conntrack,
 	return 1;
 }
 
-static int sctp_exp_matches_pkt(struct ip_conntrack_expect *exp,
-				const struct sk_buff *skb)
-{
-	/* To be implemented */
-	return 0;
-}
-
-struct ip_conntrack_protocol ip_conntrack_protocol_sctp = { 
+static struct ip_conntrack_protocol ip_conntrack_protocol_sctp = { 
 	.proto 		 = IPPROTO_SCTP, 
 	.name 		 = "sctp",
 	.pkt_to_tuple 	 = sctp_pkt_to_tuple, 
@@ -511,7 +504,6 @@ struct ip_conntrack_protocol ip_conntrack_protocol_sctp = {
 	.packet 	 = sctp_packet, 
 	.new 		 = sctp_new, 
 	.destroy 	 = NULL, 
-	.exp_matches_pkt = sctp_exp_matches_pkt, 
 	.me 		 = THIS_MODULE 
 };
 

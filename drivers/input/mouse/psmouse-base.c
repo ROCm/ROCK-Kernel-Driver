@@ -451,14 +451,16 @@ static int psmouse_extensions(struct psmouse *psmouse,
 /*
  * Try ALPS TouchPad
  */
-	if (max_proto > PSMOUSE_IMEX && alps_detect(psmouse, set_properties) == 0) {
-		if (!set_properties || alps_init(psmouse) == 0)
-			return PSMOUSE_ALPS;
-
+	if (max_proto > PSMOUSE_IMEX) {
+		ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_RESET_DIS);
+		if (alps_detect(psmouse, set_properties) == 0) {
+			if (!set_properties || alps_init(psmouse) == 0)
+				return PSMOUSE_ALPS;
 /*
  * Init failed, try basic relative protocols
  */
-		max_proto = PSMOUSE_IMEX;
+			max_proto = PSMOUSE_IMEX;
+		}
 	}
 
 	if (max_proto > PSMOUSE_IMEX && genius_detect(psmouse, set_properties) == 0)

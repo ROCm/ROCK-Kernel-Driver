@@ -73,7 +73,7 @@ static struct sctp_association *sctp_association_init(struct sctp_association *a
 					  sctp_scope_t scope,
 					  int gfp)
 {
-	struct sctp_opt *sp;
+	struct sctp_sock *sp;
 	int i;
 
 	/* Retrieve the SCTP per socket area.  */
@@ -434,7 +434,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 					   int gfp)
 {
 	struct sctp_transport *peer;
-	struct sctp_opt *sp;
+	struct sctp_sock *sp;
 	unsigned short port;
 
 	sp = sctp_sk(asoc->base.sk);
@@ -886,7 +886,7 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 /* This routine moves an association from its old sk to a new sk.  */
 void sctp_assoc_migrate(struct sctp_association *assoc, struct sock *newsk)
 {
-	struct sctp_opt *newsp = sctp_sk(newsk);
+	struct sctp_sock *newsp = sctp_sk(newsk);
 	struct sock *oldsk = assoc->base.sk;
 
 	/* Delete the association from the old endpoint's list of
@@ -1059,7 +1059,7 @@ void sctp_assoc_sync_pmtu(struct sctp_association *asoc)
 	}
 
 	if (pmtu) {
-		struct sctp_opt *sp = sctp_sk(asoc->base.sk);
+		struct sctp_sock *sp = sctp_sk(asoc->base.sk);
 		asoc->pmtu = pmtu;
 		asoc->frag_point = sctp_frag_point(sp, pmtu);
 	}

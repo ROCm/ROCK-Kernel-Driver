@@ -117,8 +117,6 @@ typedef struct {
 
 #define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
-#define rwlock_is_locked(x) ((x)->lock != 0)
-
 #ifndef __s390x__
 #define _raw_read_lock(rw)   \
         asm volatile("   l     2,0(%1)\n"   \

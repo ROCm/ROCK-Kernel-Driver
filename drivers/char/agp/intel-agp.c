@@ -6,7 +6,7 @@
  * Intel(R) 855GM/852GM and 865G support added by David Dawes
  * <dawes@tungstengraphics.com>.
  *
- * Intel(R) 915G support added by Alan Hourihane
+ * Intel(R) 915G/915GM support added by Alan Hourihane
  * <alanh@tungstengraphics.com>.
  */
 
@@ -415,14 +415,16 @@ static void intel_i830_init_gtt_entries(void)
 			break;
 		case I915_GMCH_GMS_STOLEN_48M:
 			/* Check it's really I915G */
-			if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915G_HB)
+			if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915G_HB ||
+			    agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915G_HB)
 				gtt_entries = MB(48) - KB(size);
 			else
 				gtt_entries = 0;
 			break;
 		case I915_GMCH_GMS_STOLEN_64M:
 			/* Check it's really I915G */
-			if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915G_HB)
+			if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915G_HB ||
+			    agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915G_HB)
 				gtt_entries = MB(64) - KB(size);
 			else
 				gtt_entries = 0;
@@ -1648,6 +1650,14 @@ static int __devinit agp_intel_probe(struct pci_dev *pdev,
 		}
 		name = "915G";
 		break;
+	case PCI_DEVICE_ID_INTEL_82915GM_HB:
+		if (find_i830(PCI_DEVICE_ID_INTEL_82915GM_IG)) {
+			bridge->driver = &intel_915_driver;
+		} else {
+			bridge->driver = &intel_845_driver;
+		}
+		name = "915GM";
+		break;
 	case PCI_DEVICE_ID_INTEL_7505_0:
 		bridge->driver = &intel_7505_driver;
 		name = "E7505";
@@ -1720,8 +1730,13 @@ static void __devexit agp_intel_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
-	pci_dev_put(pdev);
 	agp_remove_bridge(bridge);
+
+	if (intel_i810_private.i810_dev)
+		pci_dev_put(intel_i810_private.i810_dev);
+	if (intel_i830_private.i830_dev)
+		pci_dev_put(intel_i830_private.i830_dev);
+
 	agp_put_bridge(bridge);
 }
 
@@ -1775,6 +1790,7 @@ static struct pci_device_id agp_intel_pci_table[] = {
 	ID(PCI_DEVICE_ID_INTEL_7505_0),
 	ID(PCI_DEVICE_ID_INTEL_7205_0),
 	ID(PCI_DEVICE_ID_INTEL_82915G_HB),
+	ID(PCI_DEVICE_ID_INTEL_82915GM_HB),
 	{ }
 };
 

@@ -953,7 +953,6 @@ enum link_state {
 
 struct gem {
 	spinlock_t lock;
-	spinlock_t tx_lock;
 	void __iomem *regs;
 	int rx_new, rx_old;
 	int tx_new, tx_old;

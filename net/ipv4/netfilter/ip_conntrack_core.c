@@ -58,7 +58,6 @@
 #endif
 
 DECLARE_RWLOCK(ip_conntrack_lock);
-DECLARE_RWLOCK(ip_conntrack_expect_tuple_lock);
 
 /* ip_conntrack_standalone needs this */
 atomic_t ip_conntrack_count = ATOMIC_INIT(0);
@@ -79,7 +78,7 @@ static int ip_conntrack_vmalloc;
 
 DEFINE_PER_CPU(struct ip_conntrack_stat, ip_conntrack_stat);
 
-inline void 
+void 
 ip_conntrack_put(struct ip_conntrack *ct)
 {
 	IP_NF_ASSERT(ct);
@@ -118,6 +117,7 @@ ip_ct_get_tuple(const struct iphdr *iph,
 	tuple->src.ip = iph->saddr;
 	tuple->dst.ip = iph->daddr;
 	tuple->dst.protonum = iph->protocol;
+	tuple->dst.dir = IP_CT_DIR_ORIGINAL;
 
 	return protocol->pkt_to_tuple(skb, dataoff, tuple);
 }
@@ -130,135 +130,76 @@ ip_ct_invert_tuple(struct ip_conntrack_tuple *inverse,
 	inverse->src.ip = orig->dst.ip;
 	inverse->dst.ip = orig->src.ip;
 	inverse->dst.protonum = orig->dst.protonum;
+	inverse->dst.dir = !orig->dst.dir;
 
 	return protocol->invert_tuple(inverse, orig);
 }
 
 
 /* ip_conntrack_expect helper functions */
-
-/* Compare tuple parts depending on mask. */
-static inline int expect_cmp(const struct ip_conntrack_expect *i,
-			     const struct ip_conntrack_tuple *tuple)
+static void destroy_expect(struct ip_conntrack_expect *exp)
 {
-	MUST_BE_READ_LOCKED(&ip_conntrack_expect_tuple_lock);
-	return ip_ct_tuple_mask_cmp(tuple, &i->tuple, &i->mask);
-}
-
-static void
-destroy_expect(struct ip_conntrack_expect *exp)
-{
-	DEBUGP("destroy_expect(%p) use=%d\n", exp, atomic_read(&exp->use));
-	IP_NF_ASSERT(atomic_read(&exp->use) == 0);
+	ip_conntrack_put(exp->master);
 	IP_NF_ASSERT(!timer_pending(&exp->timeout));
-
 	kmem_cache_free(ip_conntrack_expect_cachep, exp);
 	CONNTRACK_STAT_INC(expect_delete);
 }
 
-inline void ip_conntrack_expect_put(struct ip_conntrack_expect *exp)
+static void unlink_expect(struct ip_conntrack_expect *exp)
 {
-	IP_NF_ASSERT(exp);
-
-	if (atomic_dec_and_test(&exp->use)) {
-		/* usage count dropped to zero */
-		destroy_expect(exp);
-	}
-}
-
-static inline struct ip_conntrack_expect *
-__ip_ct_expect_find(const struct ip_conntrack_tuple *tuple)
-{
-	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
-	MUST_BE_READ_LOCKED(&ip_conntrack_expect_tuple_lock);
-	return LIST_FIND(&ip_conntrack_expect_list, expect_cmp, 
-			 struct ip_conntrack_expect *, tuple);
-}
-
-/* Find a expectation corresponding to a tuple. */
-struct ip_conntrack_expect *
-ip_conntrack_expect_find_get(const struct ip_conntrack_tuple *tuple)
-{
-	struct ip_conntrack_expect *exp;
-
-	READ_LOCK(&ip_conntrack_lock);
-	READ_LOCK(&ip_conntrack_expect_tuple_lock);
-	exp = __ip_ct_expect_find(tuple);
-	if (exp)
-		atomic_inc(&exp->use);
-	READ_UNLOCK(&ip_conntrack_expect_tuple_lock);
-	READ_UNLOCK(&ip_conntrack_lock);
-
-	return exp;
-}
-
-/* remove one specific expectation from all lists and drop refcount,
- * does _NOT_ delete the timer. */
-static void __unexpect_related(struct ip_conntrack_expect *expect)
-{
-	DEBUGP("unexpect_related(%p)\n", expect);
 	MUST_BE_WRITE_LOCKED(&ip_conntrack_lock);
-
-	/* we're not allowed to unexpect a confirmed expectation! */
-	IP_NF_ASSERT(!expect->sibling);
-
-	/* delete from global and local lists */
-	list_del(&expect->list);
-	list_del(&expect->expected_list);
-
-	/* decrement expect-count of master conntrack */
-	if (expect->expectant)
-		expect->expectant->expecting--;
-
-	ip_conntrack_expect_put(expect);
+	list_del(&exp->list);
+	/* Logically in destroy_expect, but we hold the lock here. */
+	exp->master->expecting--;
 }
 
-/* remove one specific expecatation from all lists, drop refcount
- * and expire timer. 
- * This function can _NOT_ be called for confirmed expects! */
-static void unexpect_related(struct ip_conntrack_expect *expect)
+static void expectation_timed_out(unsigned long ul_expect)
 {
-	IP_NF_ASSERT(expect->expectant);
-	IP_NF_ASSERT(expect->expectant->helper);
-	/* if we are supposed to have a timer, but we can't delete
-	 * it: race condition.  __unexpect_related will
-	 * be calledd by timeout function */
-	if (expect->expectant->helper->timeout
-	    && !del_timer(&expect->timeout))
+	struct ip_conntrack_expect *exp = (void *)ul_expect;
+
+	WRITE_LOCK(&ip_conntrack_lock);
+	unlink_expect(exp);
+	WRITE_UNLOCK(&ip_conntrack_lock);
+	destroy_expect(exp);
+}
+
+/* If an expectation for this connection is found, it gets delete from
+ * global list then returned. */
+static struct ip_conntrack_expect *
+find_expectation(const struct ip_conntrack_tuple *tuple)
+{
+	struct ip_conntrack_expect *i;
+
+	list_for_each_entry(i, &ip_conntrack_expect_list, list) {
+		/* If master is not in hash table yet (ie. packet hasn't left
+		   this machine yet), how can other end know about expected?
+		   Hence these are not the droids you are looking for (if
+		   master ct never got confirmed, we'd hold a reference to it
+		   and weird things would happen to future packets). */
+		if (ip_ct_tuple_mask_cmp(tuple, &i->tuple, &i->mask)
+		    && is_confirmed(i->master)
+		    && del_timer(&i->timeout)) {
+			unlink_expect(i);
+			return i;
+		}
+	}
+	return NULL;
+}
+
+/* delete all expectations for this conntrack */
+static void remove_expectations(struct ip_conntrack *ct)
+{
+	struct ip_conntrack_expect *i, *tmp;
+
+	/* Optimization: most connection never expect any others. */
+	if (ct->expecting == 0)
 		return;
 
-	__unexpect_related(expect);
-}
-
-/* delete all unconfirmed expectations for this conntrack */
-static void remove_expectations(struct ip_conntrack *ct, int drop_refcount)
-{
-	struct list_head *exp_entry, *next;
-	struct ip_conntrack_expect *exp;
-
-	DEBUGP("remove_expectations(%p)\n", ct);
-
-	list_for_each_safe(exp_entry, next, &ct->sibling_list) {
-		exp = list_entry(exp_entry, struct ip_conntrack_expect,
-				 expected_list);
-
-		/* we skip established expectations, as we want to delete
-		 * the un-established ones only */
-		if (exp->sibling) {
-			DEBUGP("remove_expectations: skipping established %p of %p\n", exp->sibling, ct);
-			if (drop_refcount) {
-				/* Indicate that this expectations parent is dead */
-				ip_conntrack_put(exp->expectant);
-				exp->expectant = NULL;
-			}
-			continue;
+	list_for_each_entry_safe(i, tmp, &ip_conntrack_expect_list, list) {
+		if (i->master == ct && del_timer(&i->timeout)) {
+			unlink_expect(i);
+			destroy_expect(i);
 		}
-
-		IP_NF_ASSERT(list_inlist(&ip_conntrack_expect_list, exp));
-		IP_NF_ASSERT(exp->expectant == ct);
-
-		/* delete expectation from global and private lists */
-		unexpect_related(exp);
 	}
 }
 
@@ -275,14 +216,14 @@ clean_from_lists(struct ip_conntrack *ct)
 	LIST_DELETE(&ip_conntrack_hash[ho], &ct->tuplehash[IP_CT_DIR_ORIGINAL]);
 	LIST_DELETE(&ip_conntrack_hash[hr], &ct->tuplehash[IP_CT_DIR_REPLY]);
 
-	/* Destroy all un-established, pending expectations */
-	remove_expectations(ct, 1);
+	/* Destroy all pending expectations */
+	remove_expectations(ct);
 }
 
 static void
 destroy_conntrack(struct nf_conntrack *nfct)
 {
-	struct ip_conntrack *ct = (struct ip_conntrack *)nfct, *master = NULL;
+	struct ip_conntrack *ct = (struct ip_conntrack *)nfct;
 	struct ip_conntrack_protocol *proto;
 
 	DEBUGP("destroy_conntrack(%p)\n", ct);
@@ -304,8 +245,7 @@ destroy_conntrack(struct nf_conntrack *nfct)
 	 * except TFTP can create an expectation on the first packet,
 	 * before connection is in the list, so we need to clean here,
 	 * too. */
-	if (ct->expecting)
-		remove_expectations(ct, 1);
+	remove_expectations(ct);
 
 	/* We overload first tuple to link into unconfirmed list. */
 	if (!is_confirmed(ct)) {
@@ -313,21 +253,11 @@ destroy_conntrack(struct nf_conntrack *nfct)
 		list_del(&ct->tuplehash[IP_CT_DIR_ORIGINAL].list);
 	}
 
-	/* Delete our master expectation */
-	if (ct->master) {
-		if (ct->master->expectant) {
-			/* can't call __unexpect_related here,
-			 * since it would screw up expect_list */
-			list_del(&ct->master->expected_list);
-			master = ct->master->expectant;
-		}
-		kmem_cache_free(ip_conntrack_expect_cachep, ct->master);
-	}
 	CONNTRACK_STAT_INC(delete);
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
-	if (master)
-		ip_conntrack_put(master);
+	if (ct->master)
+		ip_conntrack_put(ct->master);
 
 	DEBUGP("destroy_conntrack: returning ct=%p to slab\n", ct);
 	kmem_cache_free(ip_conntrack_cachep, ct);
@@ -353,7 +283,7 @@ conntrack_tuple_cmp(const struct ip_conntrack_tuple_hash *i,
 		    const struct ip_conntrack *ignored_conntrack)
 {
 	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
-	return i->ctrack != ignored_conntrack
+	return tuplehash_to_ctrack(i) != ignored_conntrack
 		&& ip_ct_tuple_equal(tuple, &i->tuple);
 }
 
@@ -386,7 +316,7 @@ ip_conntrack_find_get(const struct ip_conntrack_tuple *tuple,
 	READ_LOCK(&ip_conntrack_lock);
 	h = __ip_conntrack_find(tuple, ignored_conntrack);
 	if (h)
-		atomic_inc(&h->ctrack->ct_general.use);
+		atomic_inc(&tuplehash_to_ctrack(h)->ct_general.use);
 	READ_UNLOCK(&ip_conntrack_lock);
 
 	return h;
@@ -394,13 +324,13 @@ ip_conntrack_find_get(const struct ip_conntrack_tuple *tuple,
 
 /* Confirm a connection given skb; places it in hash table */
 int
-__ip_conntrack_confirm(struct sk_buff *skb)
+__ip_conntrack_confirm(struct sk_buff **pskb)
 {
 	unsigned int hash, repl_hash;
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
 
-	ct = ip_conntrack_get(skb, &ctinfo);
+	ct = ip_conntrack_get(*pskb, &ctinfo);
 
 	/* ipt_REJECT uses ip_conntrack_attach to attach related
 	   ICMP/TCP RST packets in other direction.  Actual packet
@@ -479,30 +409,33 @@ ip_conntrack_tuple_taken(const struct ip_conntrack_tuple *tuple,
    connection.  Too bad: we're in trouble anyway. */
 static inline int unreplied(const struct ip_conntrack_tuple_hash *i)
 {
-	return !(test_bit(IPS_ASSURED_BIT, &i->ctrack->status));
+	return !(test_bit(IPS_ASSURED_BIT, &tuplehash_to_ctrack(i)->status));
 }
 
 static int early_drop(struct list_head *chain)
 {
 	/* Traverse backwards: gives us oldest, which is roughly LRU */
 	struct ip_conntrack_tuple_hash *h;
+	struct ip_conntrack *ct = NULL;
 	int dropped = 0;
 
 	READ_LOCK(&ip_conntrack_lock);
 	h = LIST_FIND_B(chain, unreplied, struct ip_conntrack_tuple_hash *);
-	if (h)
-		atomic_inc(&h->ctrack->ct_general.use);
+	if (h) {
+		ct = tuplehash_to_ctrack(h);
+		atomic_inc(&ct->ct_general.use);
+	}
 	READ_UNLOCK(&ip_conntrack_lock);
 
-	if (!h)
+	if (!ct)
 		return dropped;
 
-	if (del_timer(&h->ctrack->timeout)) {
-		death_by_timeout((unsigned long)h->ctrack);
+	if (del_timer(&ct->timeout)) {
+		death_by_timeout((unsigned long)ct);
 		dropped = 1;
 		CONNTRACK_STAT_INC(early_drop);
 	}
-	ip_conntrack_put(h->ctrack);
+	ip_conntrack_put(ct);
 	return dropped;
 }
 
@@ -512,7 +445,7 @@ static inline int helper_cmp(const struct ip_conntrack_helper *i,
 	return ip_ct_tuple_mask_cmp(rtuple, &i->tuple, &i->mask);
 }
 
-struct ip_conntrack_helper *ip_ct_find_helper(const struct ip_conntrack_tuple *tuple)
+static struct ip_conntrack_helper *ip_ct_find_helper(const struct ip_conntrack_tuple *tuple)
 {
 	return LIST_FIND(&helpers, helper_cmp,
 			 struct ip_conntrack_helper *,
@@ -529,7 +462,7 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 	struct ip_conntrack *conntrack;
 	struct ip_conntrack_tuple repl_tuple;
 	size_t hash;
-	struct ip_conntrack_expect *expected;
+	struct ip_conntrack_expect *exp;
 
 	if (!ip_conntrack_hash_rnd_initted) {
 		get_random_bytes(&ip_conntrack_hash_rnd, 4);
@@ -565,9 +498,7 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 	atomic_set(&conntrack->ct_general.use, 1);
 	conntrack->ct_general.destroy = destroy_conntrack;
 	conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple = *tuple;
-	conntrack->tuplehash[IP_CT_DIR_ORIGINAL].ctrack = conntrack;
 	conntrack->tuplehash[IP_CT_DIR_REPLY].tuple = repl_tuple;
-	conntrack->tuplehash[IP_CT_DIR_REPLY].ctrack = conntrack;
 	if (!protocol->new(conntrack, skb)) {
 		kmem_cache_free(ip_conntrack_cachep, conntrack);
 		return NULL;
@@ -577,73 +508,39 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 	conntrack->timeout.data = (unsigned long)conntrack;
 	conntrack->timeout.function = death_by_timeout;
 
-	INIT_LIST_HEAD(&conntrack->sibling_list);
-
 	WRITE_LOCK(&ip_conntrack_lock);
-	/* Need finding and deleting of expected ONLY if we win race */
-	READ_LOCK(&ip_conntrack_expect_tuple_lock);
-	expected = LIST_FIND(&ip_conntrack_expect_list, expect_cmp,
-			     struct ip_conntrack_expect *, tuple);
-	READ_UNLOCK(&ip_conntrack_expect_tuple_lock);
+	exp = find_expectation(tuple);
 
-	if (expected) {
-		/* If master is not in hash table yet (ie. packet hasn't left
-		   this machine yet), how can other end know about expected?
-		   Hence these are not the droids you are looking for (if
-		   master ct never got confirmed, we'd hold a reference to it
-		   and weird things would happen to future packets). */
-		if (!is_confirmed(expected->expectant)) {
-			conntrack->helper = ip_ct_find_helper(&repl_tuple);
-			goto end;
-		}
-
-		/* Expectation is dying... */
-		if (expected->expectant->helper->timeout
-		    && !del_timer(&expected->timeout))
-			goto end;	
-
+	if (exp) {
 		DEBUGP("conntrack: expectation arrives ct=%p exp=%p\n",
-			conntrack, expected);
+			conntrack, exp);
 		/* Welcome, Mr. Bond.  We've been expecting you... */
-		IP_NF_ASSERT(expected->expectant);
 		__set_bit(IPS_EXPECTED_BIT, &conntrack->status);
-		conntrack->master = expected;
-		expected->sibling = conntrack;
+		conntrack->master = exp->master;
 #if CONFIG_IP_NF_CONNTRACK_MARK
-		conntrack->mark = expected->expectant->mark;
+		conntrack->mark = exp->master->mark;
 #endif
-		LIST_DELETE(&ip_conntrack_expect_list, expected);
-		expected->expectant->expecting--;
-		nf_conntrack_get(&master_ct(conntrack)->ct_general);
-
-		/* this is a braindead... --pablo */
-		atomic_inc(&ip_conntrack_count);
-
-		/* Overload tuple linked list to put us in unconfirmed list. */
-		list_add(&conntrack->tuplehash[IP_CT_DIR_ORIGINAL].list,
-			 &unconfirmed);
-		WRITE_UNLOCK(&ip_conntrack_lock);
-
-		if (expected->expectfn)
-			expected->expectfn(conntrack);
-	
+		nf_conntrack_get(&conntrack->master->ct_general);
 		CONNTRACK_STAT_INC(expect_new);
-
-		goto ret;
-	} else  {
+	} else {
 		conntrack->helper = ip_ct_find_helper(&repl_tuple);
 
 		CONNTRACK_STAT_INC(new);
 	}
 
-end:
 	/* Overload tuple linked list to put us in unconfirmed list. */
 	list_add(&conntrack->tuplehash[IP_CT_DIR_ORIGINAL].list, &unconfirmed);
 
 	atomic_inc(&ip_conntrack_count);
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
-ret:	return &conntrack->tuplehash[IP_CT_DIR_ORIGINAL];
+	if (exp) {
+		if (exp->expectfn)
+			exp->expectfn(conntrack, exp);
+		destroy_expect(exp);
+	}
+
+	return &conntrack->tuplehash[IP_CT_DIR_ORIGINAL];
 }
 
 /* On success, returns conntrack ptr, sets skb->nfct and ctinfo */
@@ -656,6 +553,7 @@ resolve_normal_ct(struct sk_buff *skb,
 {
 	struct ip_conntrack_tuple tuple;
 	struct ip_conntrack_tuple_hash *h;
+	struct ip_conntrack *ct;
 
 	IP_NF_ASSERT((skb->nh.iph->frag_off & htons(IP_OFFSET)) == 0);
 
@@ -672,6 +570,7 @@ resolve_normal_ct(struct sk_buff *skb,
 		if (IS_ERR(h))
 			return (void *)h;
 	}
+	ct = tuplehash_to_ctrack(h);
 
 	/* It exists; we have (non-exclusive) reference. */
 	if (DIRECTION(h) == IP_CT_DIR_REPLY) {
@@ -680,24 +579,24 @@ resolve_normal_ct(struct sk_buff *skb,
 		*set_reply = 1;
 	} else {
 		/* Once we've had two way comms, always ESTABLISHED. */
-		if (test_bit(IPS_SEEN_REPLY_BIT, &h->ctrack->status)) {
+		if (test_bit(IPS_SEEN_REPLY_BIT, &ct->status)) {
 			DEBUGP("ip_conntrack_in: normal packet for %p\n",
-			       h->ctrack);
+			       ct);
 		        *ctinfo = IP_CT_ESTABLISHED;
-		} else if (test_bit(IPS_EXPECTED_BIT, &h->ctrack->status)) {
+		} else if (test_bit(IPS_EXPECTED_BIT, &ct->status)) {
 			DEBUGP("ip_conntrack_in: related packet for %p\n",
-			       h->ctrack);
+			       ct);
 			*ctinfo = IP_CT_RELATED;
 		} else {
 			DEBUGP("ip_conntrack_in: new packet for %p\n",
-			       h->ctrack);
+			       ct);
 			*ctinfo = IP_CT_NEW;
 		}
 		*set_reply = 0;
 	}
-	skb->nfct = &h->ctrack->ct_general;
+	skb->nfct = &ct->ct_general;
 	skb->nfctinfo = *ctinfo;
-	return h->ctrack;
+	return ct;
 }
 
 /* Netfilter hook itself. */
@@ -782,16 +681,6 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 		return -ret;
 	}
 
-	if (ret != NF_DROP && ct->helper) {
-		ret = ct->helper->help(*pskb, ct, ctinfo);
-		if (ret == -1) {
-			/* Invalid */
-			CONNTRACK_STAT_INC(invalid);
-			nf_conntrack_put((*pskb)->nfct);
-			(*pskb)->nfct = NULL;
-			return NF_ACCEPT;
-		}
-	}
 	if (set_reply)
 		set_bit(IPS_SEEN_REPLY_BIT, &ct->status);
 
@@ -805,55 +694,49 @@ int invert_tuplepr(struct ip_conntrack_tuple *inverse,
 				  ip_ct_find_proto(orig->dst.protonum));
 }
 
-static inline int resent_expect(const struct ip_conntrack_expect *i,
-			        const struct ip_conntrack_tuple *tuple,
-			        const struct ip_conntrack_tuple *mask)
-{
-	DEBUGP("resent_expect\n");
-	DEBUGP("   tuple:   "); DUMP_TUPLE(&i->tuple);
-	DEBUGP("ct_tuple:   "); DUMP_TUPLE(&i->ct_tuple);
-	DEBUGP("test tuple: "); DUMP_TUPLE(tuple);
-	return (((i->ct_tuple.dst.protonum == 0 && ip_ct_tuple_equal(&i->tuple, tuple))
-	         || (i->ct_tuple.dst.protonum && ip_ct_tuple_equal(&i->ct_tuple, tuple)))
-		&& ip_ct_tuple_equal(&i->mask, mask));
-}
-
 /* Would two expected things clash? */
-static inline int expect_clash(const struct ip_conntrack_expect *i,
-			       const struct ip_conntrack_tuple *tuple,
-			       const struct ip_conntrack_tuple *mask)
+static inline int expect_clash(const struct ip_conntrack_expect *a,
+			       const struct ip_conntrack_expect *b)
 {
 	/* Part covered by intersection of masks must be unequal,
            otherwise they clash */
 	struct ip_conntrack_tuple intersect_mask
-		= { { i->mask.src.ip & mask->src.ip,
-		      { i->mask.src.u.all & mask->src.u.all } },
-		    { i->mask.dst.ip & mask->dst.ip,
-		      { i->mask.dst.u.all & mask->dst.u.all },
-		      i->mask.dst.protonum & mask->dst.protonum } };
+		= { { a->mask.src.ip & b->mask.src.ip,
+		      { a->mask.src.u.all & b->mask.src.u.all } },
+		    { a->mask.dst.ip & b->mask.dst.ip,
+		      { a->mask.dst.u.all & b->mask.dst.u.all },
+		      a->mask.dst.protonum & b->mask.dst.protonum } };
 
-	return ip_ct_tuple_mask_cmp(&i->tuple, tuple, &intersect_mask);
+	return ip_ct_tuple_mask_cmp(&a->tuple, &b->tuple, &intersect_mask);
 }
 
-inline void ip_conntrack_unexpect_related(struct ip_conntrack_expect *expect)
+static inline int expect_matches(const struct ip_conntrack_expect *a,
+				 const struct ip_conntrack_expect *b)
 {
+	return a->master == b->master
+		&& ip_ct_tuple_equal(&a->tuple, &b->tuple)
+		&& ip_ct_tuple_equal(&a->mask, &b->mask);
+}
+
+/* Generally a bad idea to call this: could have matched already. */
+void ip_conntrack_unexpect_related(struct ip_conntrack_expect *exp)
+{
+	struct ip_conntrack_expect *i;
+
 	WRITE_LOCK(&ip_conntrack_lock);
-	unexpect_related(expect);
+	/* choose the the oldest expectation to evict */
+	list_for_each_entry_reverse(i, &ip_conntrack_expect_list, list) {
+		if (expect_matches(i, exp) && del_timer(&i->timeout)) {
+			unlink_expect(i);
+			WRITE_UNLOCK(&ip_conntrack_lock);
+			destroy_expect(i);
+			return;
+		}
+	}
 	WRITE_UNLOCK(&ip_conntrack_lock);
 }
-	
-static void expectation_timed_out(unsigned long ul_expect)
-{
-	struct ip_conntrack_expect *expect = (void *) ul_expect;
 
-	DEBUGP("expectation %p timed out\n", expect);	
-	WRITE_LOCK(&ip_conntrack_lock);
-	__unexpect_related(expect);
-	WRITE_UNLOCK(&ip_conntrack_lock);
-}
-
-struct ip_conntrack_expect *
-ip_conntrack_expect_alloc(void)
+struct ip_conntrack_expect *ip_conntrack_expect_alloc(void)
 {
 	struct ip_conntrack_expect *new;
 
@@ -862,178 +745,95 @@ ip_conntrack_expect_alloc(void)
 		DEBUGP("expect_related: OOM allocating expect\n");
 		return NULL;
 	}
-
-	/* tuple_cmp compares whole union, we have to initialized cleanly */
-	memset(new, 0, sizeof(struct ip_conntrack_expect));
-	atomic_set(&new->use, 1);
-
+	new->master = NULL;
 	return new;
 }
 
-static void
-ip_conntrack_expect_insert(struct ip_conntrack_expect *new,
-			   struct ip_conntrack *related_to)
+void ip_conntrack_expect_free(struct ip_conntrack_expect *expect)
 {
-	DEBUGP("new expectation %p of conntrack %p\n", new, related_to);
-	new->expectant = related_to;
-	new->sibling = NULL;
-
-	/* add to expected list for this connection */
-	list_add_tail(&new->expected_list, &related_to->sibling_list);
-	/* add to global list of expectations */
-	list_prepend(&ip_conntrack_expect_list, &new->list);
-	/* add and start timer if required */
-	if (related_to->helper->timeout) {
-		init_timer(&new->timeout);
-		new->timeout.data = (unsigned long)new;
-		new->timeout.function = expectation_timed_out;
-		new->timeout.expires = jiffies +
-					related_to->helper->timeout * HZ;
-		add_timer(&new->timeout);
-	}
-	related_to->expecting++;
+	kmem_cache_free(ip_conntrack_expect_cachep, expect);
 }
 
-/* Add a related connection. */
-int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
-				struct ip_conntrack *related_to)
+static void ip_conntrack_expect_insert(struct ip_conntrack_expect *exp)
 {
-	struct ip_conntrack_expect *old;
-	int ret = 0;
+	atomic_inc(&exp->master->ct_general.use);
+	exp->master->expecting++;
+	list_add(&exp->list, &ip_conntrack_expect_list);
 
-	WRITE_LOCK(&ip_conntrack_lock);
-	/* Because of the write lock, no reader can walk the lists,
-	 * so there is no need to use the tuple lock too */
+	if (exp->master->helper->timeout) {
+		init_timer(&exp->timeout);
+		exp->timeout.data = (unsigned long)exp;
+		exp->timeout.function = expectation_timed_out;
+		exp->timeout.expires
+			= jiffies + exp->master->helper->timeout * HZ;
+		add_timer(&exp->timeout);
+	} else
+		exp->timeout.function = NULL;
+
+	CONNTRACK_STAT_INC(expect_create);
+}
+
+/* Race with expectations being used means we could have none to find; OK. */
+static void evict_oldest_expect(struct ip_conntrack *master)
+{
+	struct ip_conntrack_expect *i;
+
+	list_for_each_entry_reverse(i, &ip_conntrack_expect_list, list) {
+		if (i->master == master) {
+			if (del_timer(&i->timeout)) {
+				unlink_expect(i);
+				destroy_expect(i);
+			}
+			break;
+		}
+	}
+}
+
+static inline int refresh_timer(struct ip_conntrack_expect *i)
+{
+	if (!del_timer(&i->timeout))
+		return 0;
+
+	i->timeout.expires = jiffies + i->master->helper->timeout*HZ;
+	add_timer(&i->timeout);
+	return 1;
+}
+
+int ip_conntrack_expect_related(struct ip_conntrack_expect *expect)
+{
+	struct ip_conntrack_expect *i;
+	int ret;
 
 	DEBUGP("ip_conntrack_expect_related %p\n", related_to);
 	DEBUGP("tuple: "); DUMP_TUPLE(&expect->tuple);
 	DEBUGP("mask:  "); DUMP_TUPLE(&expect->mask);
 
-	old = LIST_FIND(&ip_conntrack_expect_list, resent_expect,
-		        struct ip_conntrack_expect *, &expect->tuple, 
-			&expect->mask);
-	if (old) {
-		/* Helper private data may contain offsets but no pointers
-		   pointing into the payload - otherwise we should have to copy 
-		   the data filled out by the helper over the old one */
-		DEBUGP("expect_related: resent packet\n");
-		if (related_to->helper->timeout) {
-			if (!del_timer(&old->timeout)) {
-				/* expectation is dying. Fall through */
+	WRITE_LOCK(&ip_conntrack_lock);
+	list_for_each_entry(i, &ip_conntrack_expect_list, list) {
+		if (expect_matches(i, expect)) {
+			/* Refresh timer: if it's dying, ignore.. */
+			if (refresh_timer(i)) {
+				ret = 0;
+				/* We don't need the one they've given us. */
+				ip_conntrack_expect_free(expect);
 				goto out;
-			} else {
-				old->timeout.expires = jiffies + 
-					related_to->helper->timeout * HZ;
-				add_timer(&old->timeout);
 			}
+		} else if (expect_clash(i, expect)) {
+			ret = -EBUSY;
+			goto out;
 		}
-
-		WRITE_UNLOCK(&ip_conntrack_lock);
-		/* This expectation is not inserted so no need to lock */
-		kmem_cache_free(ip_conntrack_expect_cachep, expect);
-		return -EEXIST;
-
-	} else if (related_to->helper->max_expected && 
-		   related_to->expecting >= related_to->helper->max_expected) {
-		/* old == NULL */
-		if (!(related_to->helper->flags & 
-		      IP_CT_HELPER_F_REUSE_EXPECT)) {
-			WRITE_UNLOCK(&ip_conntrack_lock);
- 		    	if (net_ratelimit())
- 			    	printk(KERN_WARNING
-				       "ip_conntrack: max number of expected "
-				       "connections %i of %s reached for "
-				       "%u.%u.%u.%u->%u.%u.%u.%u\n",
-				       related_to->helper->max_expected,
-				       related_to->helper->name,
- 		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip),
- 		    	       	       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip));
-			kmem_cache_free(ip_conntrack_expect_cachep, expect);
-			return -EPERM;
-		}
-		DEBUGP("ip_conntrack: max number of expected "
-		       "connections %i of %s reached for "
-		       "%u.%u.%u.%u->%u.%u.%u.%u, reusing\n",
- 		       related_to->helper->max_expected,
-		       related_to->helper->name,
-		       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip),
-		       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip));
- 
-		/* choose the the oldest expectation to evict */
-		list_for_each_entry(old, &related_to->sibling_list, 
-		                                      expected_list)
-			if (old->sibling == NULL)
-				break;
-
-		/* We cannot fail since related_to->expecting is the number
-		 * of unconfirmed expectations */
-		IP_NF_ASSERT(old && old->sibling == NULL);
-
-		/* newnat14 does not reuse the real allocated memory
-		 * structures but rather unexpects the old and
-		 * allocates a new.  unexpect_related will decrement
-		 * related_to->expecting. 
-		 */
-		unexpect_related(old);
-		ret = -EPERM;
-	} else if (LIST_FIND(&ip_conntrack_expect_list, expect_clash,
-			     struct ip_conntrack_expect *, &expect->tuple, 
-			     &expect->mask)) {
-		WRITE_UNLOCK(&ip_conntrack_lock);
-		DEBUGP("expect_related: busy!\n");
-
-		kmem_cache_free(ip_conntrack_expect_cachep, expect);
-		return -EBUSY;
 	}
 
-out:	ip_conntrack_expect_insert(expect, related_to);
+	/* Will be over limit? */
+	if (expect->master->helper->max_expected && 
+	    expect->master->expecting >= expect->master->helper->max_expected)
+		evict_oldest_expect(expect->master);
 
+	ip_conntrack_expect_insert(expect);
+	ret = 0;
+out:
 	WRITE_UNLOCK(&ip_conntrack_lock);
-
-	CONNTRACK_STAT_INC(expect_create);
-
-	return ret;
-}
-
-/* Change tuple in an existing expectation */
-int ip_conntrack_change_expect(struct ip_conntrack_expect *expect,
-			       struct ip_conntrack_tuple *newtuple)
-{
-	int ret;
-
-	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
-	WRITE_LOCK(&ip_conntrack_expect_tuple_lock);
-
-	DEBUGP("change_expect:\n");
-	DEBUGP("exp tuple: "); DUMP_TUPLE(&expect->tuple);
-	DEBUGP("exp mask:  "); DUMP_TUPLE(&expect->mask);
-	DEBUGP("newtuple:  "); DUMP_TUPLE(newtuple);
-	if (expect->ct_tuple.dst.protonum == 0) {
-		/* Never seen before */
-		DEBUGP("change expect: never seen before\n");
-		if (!ip_ct_tuple_equal(&expect->tuple, newtuple) 
-		    && LIST_FIND(&ip_conntrack_expect_list, expect_clash,
-			         struct ip_conntrack_expect *, newtuple, &expect->mask)) {
-			/* Force NAT to find an unused tuple */
-			ret = -1;
-		} else {
-			memcpy(&expect->ct_tuple, &expect->tuple, sizeof(expect->tuple));
-			memcpy(&expect->tuple, newtuple, sizeof(expect->tuple));
-			ret = 0;
-		}
-	} else {
-		/* Resent packet */
-		DEBUGP("change expect: resent packet\n");
-		if (ip_ct_tuple_equal(&expect->tuple, newtuple)) {
-			ret = 0;
-		} else {
-			/* Force NAT to choose again the same port */
-			ret = -1;
-		}
-	}
-	WRITE_UNLOCK(&ip_conntrack_expect_tuple_lock);
-	
-	return ret;
+ 	return ret;
 }
 
 /* Alter reply tuple (maybe alter helper).  This is for NAT, and is
@@ -1049,13 +849,14 @@ void ip_conntrack_alter_reply(struct ip_conntrack *conntrack,
 	DUMP_TUPLE(newreply);
 
 	conntrack->tuplehash[IP_CT_DIR_REPLY].tuple = *newreply;
-	if (!conntrack->master && list_empty(&conntrack->sibling_list))
+	if (!conntrack->master && conntrack->expecting == 0)
 		conntrack->helper = ip_ct_find_helper(newreply);
 	WRITE_UNLOCK(&ip_conntrack_lock);
 }
 
 int ip_conntrack_helper_register(struct ip_conntrack_helper *me)
 {
+	BUG_ON(me->timeout == 0);
 	WRITE_LOCK(&ip_conntrack_lock);
 	list_prepend(&helpers, me);
 	WRITE_UNLOCK(&ip_conntrack_lock);
@@ -1066,23 +867,27 @@ int ip_conntrack_helper_register(struct ip_conntrack_helper *me)
 static inline int unhelp(struct ip_conntrack_tuple_hash *i,
 			 const struct ip_conntrack_helper *me)
 {
-	if (i->ctrack->helper == me) {
-		/* Get rid of any expected. */
-		remove_expectations(i->ctrack, 0);
-		/* And *then* set helper to NULL */
-		i->ctrack->helper = NULL;
-	}
+	if (tuplehash_to_ctrack(i)->helper == me)
+		tuplehash_to_ctrack(i)->helper = NULL;
 	return 0;
 }
 
 void ip_conntrack_helper_unregister(struct ip_conntrack_helper *me)
 {
 	unsigned int i;
+	struct ip_conntrack_expect *exp, *tmp;
 
 	/* Need write lock here, to delete helper. */
 	WRITE_LOCK(&ip_conntrack_lock);
 	LIST_DELETE(&helpers, me);
 
+	/* Get rid of expectations */
+	list_for_each_entry_safe(exp, tmp, &ip_conntrack_expect_list, list) {
+		if (exp->master->helper == me && del_timer(&exp->timeout)) {
+			unlink_expect(exp);
+			destroy_expect(exp);
+		}
+	}
 	/* Get rid of expecteds, set helpers to NULL. */
 	LIST_FIND_W(&unconfirmed, unhelp, struct ip_conntrack_tuple_hash*, me);
 	for (i = 0; i < ip_conntrack_htable_size; i++)
@@ -1201,7 +1006,7 @@ do_iter(const struct ip_conntrack_tuple_hash *i,
 	int (*iter)(struct ip_conntrack *i, void *data),
 	void *data)
 {
-	return iter(i->ctrack, data);
+	return iter(tuplehash_to_ctrack(i), data);
 }
 
 /* Bring out ya dead! */
@@ -1222,7 +1027,7 @@ get_next_corpse(int (*iter)(struct ip_conntrack *i, void *data),
 		h = LIST_FIND_W(&unconfirmed, do_iter,
 				struct ip_conntrack_tuple_hash *, iter, data);
 	if (h)
-		atomic_inc(&h->ctrack->ct_general.use);
+		atomic_inc(&tuplehash_to_ctrack(h)->ct_general.use);
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
 	return h;
@@ -1235,12 +1040,13 @@ ip_ct_iterate_cleanup(int (*iter)(struct ip_conntrack *i, void *), void *data)
 	unsigned int bucket = 0;
 
 	while ((h = get_next_corpse(iter, data, &bucket)) != NULL) {
+		struct ip_conntrack *ct = tuplehash_to_ctrack(h);
 		/* Time to push up daises... */
-		if (del_timer(&h->ctrack->timeout))
-			death_by_timeout((unsigned long)h->ctrack);
+		if (del_timer(&ct->timeout))
+			death_by_timeout((unsigned long)ct);
 		/* ... else the timer will get him soon. */
 
-		ip_conntrack_put(h->ctrack);
+		ip_conntrack_put(ct);
 	}
 }
 
@@ -1277,16 +1083,17 @@ getorigdst(struct sock *sk, int optval, void __user *user, int *len)
 	h = ip_conntrack_find_get(&tuple, NULL);
 	if (h) {
 		struct sockaddr_in sin;
+		struct ip_conntrack *ct = tuplehash_to_ctrack(h);
 
 		sin.sin_family = AF_INET;
-		sin.sin_port = h->ctrack->tuplehash[IP_CT_DIR_ORIGINAL]
+		sin.sin_port = ct->tuplehash[IP_CT_DIR_ORIGINAL]
 			.tuple.dst.u.tcp.port;
-		sin.sin_addr.s_addr = h->ctrack->tuplehash[IP_CT_DIR_ORIGINAL]
+		sin.sin_addr.s_addr = ct->tuplehash[IP_CT_DIR_ORIGINAL]
 			.tuple.dst.ip;
 
 		DEBUGP("SO_ORIGINAL_DST: %u.%u.%u.%u %u\n",
 		       NIPQUAD(sin.sin_addr.s_addr), ntohs(sin.sin_port));
-		ip_conntrack_put(h->ctrack);
+		ip_conntrack_put(ct);
 		if (copy_to_user(user, &sin, sizeof(sin)) != 0)
 			return -EFAULT;
 		else
@@ -1398,7 +1205,7 @@ int __init ip_conntrack_init(void)
 
 	ip_conntrack_cachep = kmem_cache_create("ip_conntrack",
 	                                        sizeof(struct ip_conntrack), 0,
-	                                        SLAB_HWCACHE_ALIGN, NULL,NULL);
+	                                        0, NULL, NULL);
 	if (!ip_conntrack_cachep) {
 		printk(KERN_ERR "Unable to create ip_conntrack slab cache\n");
 		goto err_free_hash;
@@ -1406,7 +1213,7 @@ int __init ip_conntrack_init(void)
 
 	ip_conntrack_expect_cachep = kmem_cache_create("ip_conntrack_expect",
 					sizeof(struct ip_conntrack_expect),
-					0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+					0, 0, NULL, NULL);
 	if (!ip_conntrack_expect_cachep) {
 		printk(KERN_ERR "Unable to create ip_expect slab cache\n");
 		goto err_free_conntrack_slab;

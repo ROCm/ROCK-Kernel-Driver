@@ -44,10 +44,6 @@ struct ip_conntrack_protocol
 	/* Called when a conntrack entry is destroyed */
 	void (*destroy)(struct ip_conntrack *conntrack);
 
-	/* Has to decide if a expectation matches one packet or not */
-	int (*exp_matches_pkt)(struct ip_conntrack_expect *exp,
-			       const struct sk_buff *skb);
-
 	int (*error)(struct sk_buff *skb, enum ip_conntrack_info *ctinfo,
 		     unsigned int hooknum);
 

@@ -71,9 +71,7 @@ static void svc_disconnect(struct atm_vcc *vcc)
 		sigd_enq2(NULL,as_reject,vcc,NULL,NULL,&vcc->qos,0);
 		dev_kfree_skb(skb);
 	}
-	clear_bit(ATM_VF_REGIS,&vcc->flags);
-	clear_bit(ATM_VF_RELEASED,&vcc->flags);
-	clear_bit(ATM_VF_CLOSE,&vcc->flags);
+	clear_bit(ATM_VF_REGIS, &vcc->flags);
 	/* ... may retry later */
 }
 
@@ -90,10 +88,8 @@ static int svc_release(struct socket *sock)
 		/* VCC pointer is used as a reference, so we must not free it
 		   (thereby subjecting it to re-use) before all pending connections
 	           are closed */
-		sock_hold(sk);
-		vcc_release(sock);
 		svc_disconnect(vcc);
-		sock_put(sk);
+		vcc_release(sock);
 	}
 	return 0;
 }
@@ -286,7 +282,8 @@ static int svc_connect(struct socket *sock,struct sockaddr *sockaddr,
  */
 	if (!(error = vcc_connect(sock, vcc->itf, vcc->vpi, vcc->vci)))
 		sock->state = SS_CONNECTED;
-	else (void) svc_disconnect(vcc);
+	else
+		(void) svc_disconnect(vcc);
 out:
 	release_sock(sk);
 	return error;
