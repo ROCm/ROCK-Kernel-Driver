@@ -136,7 +136,7 @@ dma_err_handler(int irq, void *dev_id, struct pt_regs *regs)
 			       i, channel->name);
 			DBOSR |= (1 << i);
 		}
-		DISR |= (1 << i);
+		DISR = (1 << i);
 	}
 	return IRQ_HANDLED;
 }
@@ -158,10 +158,10 @@ dma_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 				 */
 				printk(KERN_WARNING
 				       "spurious IRQ for DMA channel %d\n", i);
-				DISR |= (1 << i);
 			}
 		}
 	}
+	DISR = disr;
 	return IRQ_HANDLED;
 }
 
