@@ -25,7 +25,7 @@
 static unsigned char leds_image[LED_NUM_DIGITS] = { 0 };
 
 /* Spinlock protecting the above leds.  */
-static spinlock_t leds_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(leds_lock);
 
 /* Common body of LED read/write functions, checks POS and LEN for
    correctness, declares a variable using IMG_DECL, initialized pointing at
