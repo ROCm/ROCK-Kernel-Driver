@@ -209,6 +209,9 @@ static int el3_pm_callback(struct pm_dev *pdev, pm_request_t rqst, void *data);
 #if defined(CONFIG_EISA) || defined(CONFIG_MCA)
 static int el3_device_remove (struct device *device);
 #endif
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void el3_poll_controller(struct net_device *dev);
+#endif
 
 #ifdef CONFIG_EISA
 struct eisa_device_id el3_eisa_ids[] = {
@@ -321,6 +324,9 @@ static int __init el3_common_init(struct net_device *dev)
 	dev->set_multicast_list = &set_multicast_list;
 	dev->tx_timeout = el3_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = el3_poll_controller;
+#endif
 	SET_ETHTOOL_OPS(dev, &ethtool_ops);
 
 	err = register_netdev(dev);
@@ -998,6 +1004,19 @@ el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/*
+ * Polling receive - used by netconsole and other diagnostic tools
+ * to allow network i/o with interrupts disabled.
+ */
+static void el3_poll_controller(struct net_device *dev)
+{
+	disable_irq(dev->irq);
+	el3_interrupt(dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
 
 static struct net_device_stats *
 el3_get_stats(struct net_device *dev)
