@@ -23,7 +23,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-
+#include <linux/spinlock.h>
 #include "sound_config.h"
 
 #include "mpu401.h"
@@ -38,6 +38,7 @@ typedef struct uart401_devc
 	volatile unsigned char input_byte;
 	int             my_dev;
 	int             share_irq;
+	spinlock_t	lock;
 }
 uart401_devc;
 
@@ -152,13 +153,11 @@ static int uart401_out(int dev, unsigned char midi_byte)
 	 * Test for input since pending input seems to block the output.
 	 */
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&devc->lock,flags);	
 	if (input_avail(devc))
 		uart401_input_loop(devc);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock,flags);
 
 	/*
 	 * Sometimes it takes about 13000 loops before the output becomes ready
@@ -222,8 +221,7 @@ static void enter_uart_mode(uart401_devc * devc)
 	int ok, timeout;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock,flags);	
 	for (timeout = 30000; timeout > 0 && !output_ready(devc); timeout--);
 
 	devc->input_byte = 0;
@@ -237,7 +235,7 @@ static void enter_uart_mode(uart401_devc * devc)
 			if (uart401_read(devc) == MPU_ACK)
 				ok = 1;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock,flags);
 }
 
 static int reset_uart401(uart401_devc * devc)
@@ -320,11 +318,11 @@ int probe_uart401(struct address_info *hw_config, struct module *owner)
 	devc->input_byte = 0;
 	devc->my_dev = 0;
 	devc->share_irq = 0;
+	spin_lock_init(&devc->lock);
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock,flags);	
 	ok = reset_uart401(devc);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock,flags);
 
 	if (!ok)
 		goto cleanup_devc;

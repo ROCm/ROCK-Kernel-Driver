@@ -15,7 +15,7 @@
  */
 #include <linux/stddef.h>
 #include <linux/kmod.h>
-
+#include <linux/spinlock.h>
 #define MIDIBUF_C
 
 #include "sound_config.h"
@@ -55,6 +55,7 @@ static struct timer_list poll_timer = {
 };
 
 static volatile int open_devs = 0;
+static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 
 #define DATA_AVAIL(q) (q->len)
 #define SPACE_AVAIL(q) (MAX_QUEUE_SIZE - q->len)
@@ -63,20 +64,20 @@ static volatile int open_devs = 0;
 	if (SPACE_AVAIL(q)) \
 	{ \
 	  unsigned long flags; \
-	  save_flags( flags);cli(); \
+	  spin_lock_irqsave(&lock, flags); \
 	  q->queue[q->tail] = (data); \
 	  q->len++; q->tail = (q->tail+1) % MAX_QUEUE_SIZE; \
-	  restore_flags(flags); \
+	  spin_unlock_irqrestore(&lock, flags); \
 	}
 
 #define REMOVE_BYTE(q, data) \
 	if (DATA_AVAIL(q)) \
 	{ \
 	  unsigned long flags; \
-	  save_flags( flags);cli(); \
+	  spin_lock_irqsave(&lock, flags); \
 	  data = q->queue[q->head]; \
 	  q->len--; q->head = (q->head+1) % MAX_QUEUE_SIZE; \
-	  restore_flags(flags); \
+	  spin_unlock_irqrestore(&lock, flags); \
 	}
 
 static void drain_midi_queue(int dev)
@@ -122,8 +123,7 @@ static void midi_poll(unsigned long dummy)
 	unsigned long   flags;
 	int             dev;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 	if (open_devs)
 	{
 		for (dev = 0; dev < num_midis; dev++)
@@ -135,9 +135,9 @@ static void midi_poll(unsigned long dummy)
 				{
 					int c = midi_out_buf[dev]->queue[midi_out_buf[dev]->head];
 
-					restore_flags(flags);	/* Give some time to others */
+					spin_unlock_irqrestore(&lock,flags);/* Give some time to others */
 					ok = midi_devs[dev]->outputc(dev, c);
-					cli();
+					spin_lock_irqsave(&lock, flags);
 					midi_out_buf[dev]->head = (midi_out_buf[dev]->head + 1) % MAX_QUEUE_SIZE;
 					midi_out_buf[dev]->len--;
 				}
@@ -151,7 +151,7 @@ static void midi_poll(unsigned long dummy)
 		 * Come back later
 		 */
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock, flags);
 }
 
 int MIDIbuf_open(int dev, struct file *file)
@@ -217,16 +217,12 @@ int MIDIbuf_open(int dev, struct file *file)
 void MIDIbuf_release(int dev, struct file *file)
 {
 	int mode;
-	unsigned long flags;
 
 	dev = dev >> 4;
 	mode = translate_mode(file);
 
 	if (dev < 0 || dev >= num_midis || midi_devs[dev] == NULL)
 		return;
-
-	save_flags(flags);
-	cli();
 
 	/*
 	 * Wait until the queue is empty
@@ -249,7 +245,6 @@ void MIDIbuf_release(int dev, struct file *file)
 					 * Ensure the output queues are empty
 					 */
 	}
-	restore_flags(flags);
 
 	midi_devs[dev]->close(dev);
 
@@ -267,7 +262,6 @@ void MIDIbuf_release(int dev, struct file *file)
 
 int MIDIbuf_write(int dev, struct file *file, const char *buf, int count)
 {
-	unsigned long flags;
 	int c, n, i;
 	unsigned char tmp_data;
 
@@ -275,9 +269,6 @@ int MIDIbuf_write(int dev, struct file *file, const char *buf, int count)
 
 	if (!count)
 		return 0;
-
-	save_flags(flags);
-	cli();
 
 	c = 0;
 
@@ -308,6 +299,8 @@ int MIDIbuf_write(int dev, struct file *file, const char *buf, int count)
 		for (i = 0; i < n; i++)
 		{
 			/* BROKE BROKE BROKE - CANT DO THIS WITH CLI !! */
+			/* yes, think the same, so I removed the cli() brackets 
+				QUEUE_BYTE is protected against interrupts */
 			if (copy_from_user((char *) &tmp_data, &(buf)[c], 1)) {
 				c = -EFAULT;
 				goto out;
@@ -317,7 +310,6 @@ int MIDIbuf_write(int dev, struct file *file, const char *buf, int count)
 		}
 	}
 out:
-	restore_flags(flags);
 	return c;
 }
 
@@ -325,13 +317,9 @@ out:
 int MIDIbuf_read(int dev, struct file *file, char *buf, int count)
 {
 	int n, c = 0;
-	unsigned long flags;
 	unsigned char tmp_data;
 
 	dev = dev >> 4;
-
-	save_flags(flags);
-	cli();
 
 	if (!DATA_AVAIL(midi_in_buf[dev])) {	/*
 						 * No data yet, wait
@@ -361,6 +349,8 @@ int MIDIbuf_read(int dev, struct file *file, char *buf, int count)
 			REMOVE_BYTE(midi_in_buf[dev], tmp_data);
 			fixit = (char *) &tmp_data;
 			/* BROKE BROKE BROKE */
+			/* yes removed the cli() brackets again
+			 should q->len,tail&head be atomic_t? */
 			if (copy_to_user(&(buf)[c], fixit, 1)) {
 				c = -EFAULT;
 				goto out;
@@ -369,7 +359,6 @@ int MIDIbuf_read(int dev, struct file *file, char *buf, int count)
 		}
 	}
 out:
-	restore_flags(flags);
 	return c;
 }
 
@@ -440,7 +429,7 @@ void MIDIbuf_init(void)
 
 int MIDIbuf_avail(int dev)
 {
-        if (midi_in_buf[dev])
+	if (midi_in_buf[dev])
 		return DATA_AVAIL (midi_in_buf[dev]);
 	return 0;
 }
