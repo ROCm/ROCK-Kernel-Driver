@@ -968,6 +968,7 @@ asmlinkage void smp_error_interrupt(void)
 }
 
 int disable_apic; 
+int enable_local_apic = 1;
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is
@@ -1007,12 +1008,14 @@ int __init APIC_init_uniprocessor (void)
 
 static __init int setup_disableapic(char *str) 
 { 
+	enable_local_apic = -1;
 	disable_apic = 1;
 	return 0;
 } 
 
 static __init int setup_nolapic(char *str) 
 { 
+	enable_local_apic = -1;
 	disable_apic = 1;
 	return 0;
 } 

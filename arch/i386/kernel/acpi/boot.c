@@ -739,6 +739,13 @@ acpi_process_madt(void)
 #ifdef CONFIG_X86_LOCAL_APIC
 	int count, error;
 
+	/* it's still wrong when the apic is disabled later */
+	extern int enable_local_apic;
+	if (enable_local_apic < 0) { 
+		printk(KERN_INFO "ACPI: local apic disabled\n");
+		return;
+	}
+
 	count = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
 	if (count == 1) {
 

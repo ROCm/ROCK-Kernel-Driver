@@ -209,7 +209,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 					struct pt_regs *regs)
 {
 #ifdef CONFIG_X86_IO_APIC
-	if (timer_ack) {
+	if (timer_ack && nr_ioapics) {
 		/*
 		 * Subtle, when I/O APICs are used we have to ack timer IRQ
 		 * manually to reset the IRR bit for do_slow_gettimeoffset().

@@ -204,6 +204,12 @@ running once the system is up.
 			not play well with APC CPU idle - disable it if you have
 			APC and your system crashes randomly.
  
+	apic		[UP,APIC] Tells the kernel to make use of the APIC on
+	                uniprocessor systems. Even when APIC on UP
+			systems is enabled, it needs this parameter
+			to really activate it (needed to avoid problems
+			with certain machines). This enables IO and local APICs.
+ 
 	apm=		[APM] Advanced Power Management
 			See header of arch/i386/kernel/apm.c.
 

@@ -26,6 +26,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
+#include <linux/dmi.h>
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -38,6 +39,8 @@
 #include <mach_apic.h>
 
 #include "io_ports.h"
+
+extern int enable_local_apic;
 
 static void apic_pm_activate(void);
 
@@ -198,6 +201,9 @@ void disconnect_bsp_APIC(void)
 void disable_local_APIC(void)
 {
 	unsigned long value;
+
+	if (enable_local_apic < 0) 
+		return;
 
 	clear_local_APIC();
 
@@ -618,9 +624,14 @@ static void apic_pm_activate(void) { }
 /*
  * Knob to control our willingness to enable the local APIC.
  */
-int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
+/* For SuSE don't enable APIC by default on UP kernels */ 
+#ifndef CONFIG_SMP
+int enable_local_apic = -1; /* -1=force-disable, +1=force-enable */
+#else
+int enable_local_apic = 0;
+#endif
 
-static int __init lapic_disable(char *str)
+int __init lapic_disable(char *str)
 {
 	enable_local_apic = -1;
 	clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
@@ -628,12 +639,25 @@ static int __init lapic_disable(char *str)
 }
 __setup("nolapic", lapic_disable);
 
-static int __init lapic_enable(char *str)
+int __init lapic_enable(char *str)
 {
 	enable_local_apic = 1;
 	return 0;
 }
 __setup("lapic", lapic_enable);
+
+int __init apic_enable(char *str)
+{
+	printk("apic_enable\n");
+	
+#ifdef CONFIG_X86_IO_APIC
+	extern int skip_ioapic_setup;
+	skip_ioapic_setup = 0;
+#endif
+	enable_local_apic = 1;
+	return 0;
+}
+__setup("apic", apic_enable); 
 
 static int __init detect_init_APIC (void)
 {
@@ -1164,12 +1188,31 @@ asmlinkage void smp_error_interrupt(void)
 	irq_exit();
 }
 
+static int __init need_local_apic(struct dmi_system_id *d)
+{ 
+#ifdef CONFIG_X86_LOCAL_APIC
+	extern int enable_local_apic;
+	enable_local_apic = 0;
+	printk(KERN_WARNING "%s machine detected. Enablig LAPIC\n",
+		       d->ident);
+#endif
+	return 0;
+} 
+
+static struct dmi_system_id __initdata apic_dmi_table[] = {
+	{ need_local_apic, "Intel C440GX+", {
+	  DMI_MATCH(DMI_BOARD_VENDOR,"Intel"),
+	  DMI_MATCH(DMI_BOARD_NAME,"C440GX+") } }
+};
+
 /*
  * This initializes the IO-APIC and APIC hardware if this is
  * a UP kernel.
  */
 int __init APIC_init_uniprocessor (void)
 {
+	dmi_check_system(apic_dmi_table);
+
 	if (enable_local_apic < 0)
 		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 
@@ -1180,8 +1223,6 @@ int __init APIC_init_uniprocessor (void)
 	 * Complain if the BIOS pretends there is one.
 	 */
 	if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
-		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
-			boot_cpu_physical_apicid);
 		return -1;
 	}
 
