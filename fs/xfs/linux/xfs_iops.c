@@ -348,6 +348,7 @@ linvfs_readlink(
 	uio.uio_offset = 0;
 	uio.uio_segflg = UIO_USERSPACE;
 	uio.uio_resid = size;
+	uio.uio_iovcnt = 1;
 
 	VOP_READLINK(vp, &uio, NULL, error);
 	if (error)
@@ -395,6 +396,7 @@ linvfs_follow_link(
 	uio->uio_segflg = UIO_SYSSPACE;
 	uio->uio_resid = MAXNAMELEN;
 	uio->uio_fmode = 0;
+	uio->uio_iovcnt = 1;
 
 	VOP_READLINK(vp, uio, NULL, error);
 	if (error) {
