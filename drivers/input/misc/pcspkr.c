@@ -17,6 +17,9 @@
 #include <linux/init.h>
 #include <linux/input.h>
 #include <asm/io.h>
+#ifdef CONFIG_PPC_PMAC
+#include <asm/processor.h>
+#endif
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("PC Speaker beeper driver");
@@ -67,6 +70,12 @@ static int pcspkr_event(struct input_dev *dev, unsigned int type, unsigned int c
 
 static int __init pcspkr_init(void)
 {
+#ifdef CONFIG_PPC_PMAC
+	if(_machine == _MACH_Pmac) {
+		printk("%s: nothing to do on PowerMac\n",__FUNCTION__);
+		return -ENODEV;
+	}
+#endif
 	pcspkr_dev.evbit[0] = BIT(EV_SND);
 	pcspkr_dev.sndbit[0] = BIT(SND_BELL) | BIT(SND_TONE);
 	pcspkr_dev.event = pcspkr_event;
