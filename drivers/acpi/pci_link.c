@@ -820,7 +820,7 @@ void acpi_penalize_isa_irq(int irq)
  */
 static int __init acpi_irq_isa(char *str)
 {
-	return(acpi_irq_penalty_update(str, 1));
+	return acpi_irq_penalty_update(str, 1);
 }
 __setup("acpi_irq_isa=", acpi_irq_isa);
 
@@ -831,7 +831,7 @@ __setup("acpi_irq_isa=", acpi_irq_isa);
  */
 static int __init acpi_irq_pci(char *str)
 {
-	return(acpi_irq_penalty_update(str, 0));
+	return acpi_irq_penalty_update(str, 0);
 }
 __setup("acpi_irq_pci=", acpi_irq_pci);
 
