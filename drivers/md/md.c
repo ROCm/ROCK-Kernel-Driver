@@ -1520,7 +1520,6 @@ static int device_size_calculation(mddev_t * mddev)
 	mdp_super_t *sb = mddev->sb;
 	struct list_head *tmp;
 	mdk_rdev_t *rdev;
-	unsigned long *ra_pages;
 
 	/*
 	 * Do device size calculation. Bail out if too small.
@@ -1578,9 +1577,6 @@ static int device_size_calculation(mddev_t * mddev)
 		md_size[mdidx(mddev)] = sb->size * data_disks;
 
 	readahead = (VM_MAX_READAHEAD * 1024) / PAGE_SIZE;
-	ra_pages = blk_get_ra_pages(rdev->bdev);
-	if (ra_pages)
-		readahead = (*ra_pages * PAGE_CACHE_SIZE) / PAGE_SIZE;
 	if (!sb->level || (sb->level == 4) || (sb->level == 5)) {
 		readahead = (mddev->sb->chunk_size>>PAGE_SHIFT) * 4 * data_disks;
 		if (readahead < data_disks * (MAX_SECTORS>>(PAGE_SHIFT-9))*2)
