@@ -4,7 +4,7 @@
  *  Copyright (c) 1998-2001 Vojtech Pavlik
  *
  *   Based on the work of:
- *	Trystan Larey-Williams 
+ *	Trystan Larey-Williams
  */
 
 /*
@@ -14,18 +14,18 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
@@ -58,7 +58,7 @@ MODULE_LICENSE("GPL");
 #define TMDC_BYTE_REV		11
 #define TMDC_BYTE_DEF		12
 
-#define TMDC_ABS		7	
+#define TMDC_ABS		7
 #define TMDC_ABS_HAT		4
 #define TMDC_BTN		16
 
@@ -104,7 +104,7 @@ struct tmdc {
 	unsigned char btno[2][4];
 	int used;
 	int reads;
-	int bads;	
+	int bads;
 	unsigned char exists;
 };
 
@@ -127,7 +127,7 @@ static int tmdc_read_packet(struct gameport *gameport, unsigned char data[2][TMD
 
 	local_irq_save(flags);
 	gameport_trigger(gameport);
-	
+
 	w = gameport_read(gameport) >> 4;
 
 	do {
@@ -148,7 +148,7 @@ static int tmdc_read_packet(struct gameport *gameport, unsigned char data[2][TMD
 				}
 				data[k][i[k]] |= (~v & 1) << (j[k]++ - 1);	/* Data bit */
 			}
-			t[k]--; 
+			t[k]--;
 		}
 	} while (t[0] > 0 || t[1] > 0);
 
@@ -175,7 +175,7 @@ static void tmdc_timer(unsigned long private)
 		bad = 1;
 	else
 
-	for (j = 0; j < 2; j++) 
+	for (j = 0; j < 2; j++)
 		if (r & (1 << j) & tmdc->exists) {
 
 			if (data[j][TMDC_BYTE_ID] != tmdc->mode[j]) {
@@ -227,7 +227,7 @@ static int tmdc_open(struct input_dev *dev)
 {
 	struct tmdc *tmdc = dev->private;
 	if (!tmdc->used++)
-		mod_timer(&tmdc->timer, jiffies + TMDC_REFRESH_TIME);	
+		mod_timer(&tmdc->timer, jiffies + TMDC_REFRESH_TIME);
 	return 0;
 }
 
@@ -356,7 +356,7 @@ static void tmdc_disconnect(struct gameport *gameport)
 	struct tmdc *tmdc = gameport->private;
 	int i;
 	for (i = 0; i < 2; i++)
-		if (tmdc->exists & (1 << i)) 
+		if (tmdc->exists & (1 << i))
 			input_unregister_device(tmdc->dev + i);
 	gameport_close(gameport);
 	kfree(tmdc);
