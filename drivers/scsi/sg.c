@@ -1797,7 +1797,11 @@ sg_build_direct(Sg_request * srp, Sg_fd * sfp, int dxfer_len)
 	int sg_tablesize = sfp->parentdp->sg_tablesize;
 	struct scatterlist *sgl;
 	int mx_sc_elems, res;
+	struct scsi_device *sdev = sfp->parentdp->device;
 
+	if (((unsigned long)hp->dxferp &
+			queue_dma_alignment(sdev->request_queue)) != 0)
+		return 1;
 	mx_sc_elems = sg_build_sgat(schp, sfp, sg_tablesize);
         if (mx_sc_elems <= 0) {
                 return 1;

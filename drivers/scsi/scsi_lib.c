@@ -1284,6 +1284,15 @@ struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 	blk_queue_max_sectors(q, shost->max_sectors);
 	blk_queue_bounce_limit(q, scsi_calculate_bounce_limit(shost));
 	blk_queue_segment_boundary(q, shost->dma_boundary);
+ 
+	/*
+	 * Set the queue's mask to require a mere 8-byte alignment for
+	 * DMA buffers, rather than the default 512.  This shouldn't
+	 * inconvenience any user programs and should be okay for most
+	 * host adapters.  A host driver can alter this mask in its
+	 * slave_alloc() or slave_configure() callback if necessary.
+	 */
+	blk_queue_dma_alignment(q, (8 - 1));
 
 	if (!shost->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);

@@ -1272,7 +1272,8 @@ static int setup_buffering(Scsi_Tape *STp, const char *buf, size_t count, int is
 		i = STp->try_dio && try_rdio;
 	else
 		i = STp->try_dio && try_wdio;
-	if (i) {
+	if (i && ((unsigned long)buf & queue_dma_alignment(
+					STp->device->request_queue)) == 0) {
 		i = st_map_user_pages(&(STbp->sg[0]), STbp->use_sg,
 				      (unsigned long)buf, count, (is_read ? READ : WRITE),
 				      STp->max_pfn);
