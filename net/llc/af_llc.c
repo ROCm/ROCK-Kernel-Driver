@@ -22,28 +22,12 @@
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/types.h>
-#include <linux/socket.h>
-#include <linux/sockios.h>
-#include <asm/uaccess.h>
-#include <asm/ioctls.h>
-#include <linux/proc_fs.h>
-#include <linux/in.h>
 #include <linux/tcp.h>
-#include <linux/netdevice.h>
-#include <linux/inetdevice.h>
-#include <linux/errno.h>
-#include <net/sock.h>
-#include <net/llc_if.h>
 #include <net/llc_sap.h>
 #include <net/llc_pdu.h>
 #include <net/llc_conn.h>
 #include <net/llc_mac.h>
 #include <net/llc_main.h>
-#include <net/llc_proc.h>
-#include <linux/llc.h>
-#include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
 #include <linux/init.h>
 
@@ -1058,20 +1042,13 @@ static char llc_ui_banner[] __initdata =
 
 int __init llc_ui_init(void)
 {
-	int rc = llc_proc_init();
-
-	if (rc)
-		goto out;
 	llc_ui_sap_last_autoport = LLC_SAP_DYN_START;
 	sock_register(&llc_ui_family_ops);
 	printk(llc_ui_banner);
-	rc = 0;
-out:
-	return rc;
+	return 0;
 }
 
 void __exit llc_ui_exit(void)
 {
 	sock_unregister(PF_LLC);
-	llc_proc_exit();
 }

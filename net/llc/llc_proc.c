@@ -11,32 +11,21 @@
  *
  * See the GNU General Public License for more details.
  */
+
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/types.h>
-#include <linux/socket.h>
-#include <linux/sockios.h>
-#include <asm/uaccess.h>
-#include <asm/ioctls.h>
 #include <linux/proc_fs.h>
-#include <linux/in.h>
-#include <linux/tcp.h>
-#include <linux/netdevice.h>
-#include <linux/inetdevice.h>
 #include <linux/errno.h>
+#include <linux/init.h>
+#include <linux/seq_file.h>
 #include <net/sock.h>
-#include <net/llc_if.h>
-#include <net/llc_sap.h>
-#include <net/llc_pdu.h>
+#include <net/llc_c_ac.h>
+#include <net/llc_c_ev.h>
+#include <net/llc_c_st.h>
 #include <net/llc_conn.h>
 #include <net/llc_mac.h>
 #include <net/llc_main.h>
-#include <linux/llc.h>
-#include <linux/if_arp.h>
-#include <linux/rtnetlink.h>
-#include <linux/init.h>
-#include <linux/seq_file.h>
+#include <net/llc_sap.h>
 
 #ifdef CONFIG_PROC_FS
 static void llc_ui_format_mac(struct seq_file *seq, unsigned char *mac)
@@ -125,7 +114,7 @@ static void llc_seq_stop(struct seq_file *seq, void *v)
 	read_unlock_bh(&llc_main_station.sap_list.lock);
 }
 
-static int llc_seq_show(struct seq_file *seq, void *v)
+static int llc_seq_socket_show(struct seq_file *seq, void *v)
 {
 	struct sock* sk;
 	struct llc_opt *llc;
@@ -157,16 +146,71 @@ out:
 	return 0;
 }
 
-struct seq_operations llc_seq_ops = {
+static char *llc_conn_state_names[] = {
+	[LLC_CONN_STATE_ADM] =        "adm", 
+	[LLC_CONN_STATE_SETUP] =      "setup", 
+	[LLC_CONN_STATE_NORMAL] =     "normal",
+	[LLC_CONN_STATE_BUSY] =       "busy", 
+	[LLC_CONN_STATE_REJ] =        "rej", 
+	[LLC_CONN_STATE_AWAIT] =      "await", 
+	[LLC_CONN_STATE_AWAIT_BUSY] = "await_busy",
+	[LLC_CONN_STATE_AWAIT_REJ] =  "await_rej",
+	[LLC_CONN_STATE_D_CONN]	=     "d_conn",
+	[LLC_CONN_STATE_RESET] =      "reset", 
+	[LLC_CONN_STATE_ERROR] =      "error", 
+	[LLC_CONN_STATE_TEMP] =       "temp", 
+};
+
+static int llc_seq_core_show(struct seq_file *seq, void *v)
+{
+	struct sock* sk;
+	struct llc_opt *llc;
+
+	if (v == (void *)1) {
+		seq_puts(seq, "Connection list:\n"
+			      "dsap state      retr txw rxw pf ff sf df rs cs "
+			      "tack tpfc trs tbs blog busr\n");
+		goto out;
+	}
+	sk = v;
+	llc = llc_sk(sk);
+
+	seq_printf(seq, " %02X  %-10s %3d  %3d %3d %2d %2d %2d %2d %2d %2d "
+			"%4d %4d %3d %3d %4d %4d\n",
+		   llc->daddr.lsap, llc_conn_state_names[llc->state],
+		   llc->retry_count, llc->k, llc->rw, llc->p_flag, llc->f_flag,
+		   llc->s_flag, llc->data_flag, llc->remote_busy_flag,
+		   llc->cause_flag, timer_pending(&llc->ack_timer.timer),
+		   timer_pending(&llc->pf_cycle_timer.timer),
+		   timer_pending(&llc->rej_sent_timer.timer),
+		   timer_pending(&llc->busy_state_timer.timer),
+		   !!sk->backlog.tail, sk->lock.users);
+out:
+	return 0;
+}
+
+struct seq_operations llc_seq_socket_ops = {
 	.start  = llc_seq_start,
 	.next   = llc_seq_next,
 	.stop   = llc_seq_stop,
-	.show   = llc_seq_show,
+	.show   = llc_seq_socket_show,
 };
 
-static int llc_seq_open(struct inode *inode, struct file *file)
+struct seq_operations llc_seq_core_ops = {
+	.start  = llc_seq_start,
+	.next   = llc_seq_next,
+	.stop   = llc_seq_stop,
+	.show   = llc_seq_core_show,
+};
+
+static int llc_seq_socket_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &llc_seq_ops);
+	return seq_open(file, &llc_seq_socket_ops);
+}
+
+static int llc_seq_core_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &llc_seq_core_ops);
 }
 
 static int llc_proc_perms(struct inode* inode, int op)
@@ -174,8 +218,15 @@ static int llc_proc_perms(struct inode* inode, int op)
 	return 0;
 }
 
-static struct file_operations llc_seq_fops = {
-	.open		= llc_seq_open,
+static struct file_operations llc_seq_socket_fops = {
+	.open		= llc_seq_socket_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
+static struct file_operations llc_seq_core_fops = {
+	.open		= llc_seq_core_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= seq_release,
@@ -200,11 +251,21 @@ int __init llc_proc_init(void)
 	if (!p)
 		goto out_socket;
 
-	p->proc_fops = &llc_seq_fops;
+	p->proc_fops = &llc_seq_socket_fops;
 	p->proc_iops = &llc_seq_inode;
+
+	p = create_proc_entry("core", 0, llc_proc_dir);
+	if (!p)
+		goto out_core;
+
+	p->proc_fops = &llc_seq_core_fops;
+	p->proc_iops = &llc_seq_inode;
+
 	rc = 0;
 out:
 	return rc;
+out_core:
+	remove_proc_entry("socket", llc_proc_dir);
 out_socket:
 	remove_proc_entry("llc", proc_net);
 	goto out;
@@ -213,6 +274,7 @@ out_socket:
 void __exit llc_proc_exit(void)
 {
 	remove_proc_entry("socket", llc_proc_dir);
+	remove_proc_entry("core", llc_proc_dir);
 	remove_proc_entry("llc", proc_net);
 }
 #else /* CONFIG_PROC_FS */

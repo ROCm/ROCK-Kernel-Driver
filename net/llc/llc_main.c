@@ -3,7 +3,7 @@
  * 	and connections of the LLC.
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
- * 		 2001 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 		 2001, 2002 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -12,14 +12,9 @@
  *
  * See the GNU General Public License for more details.
  */
-#include <linux/kernel.h>
-#include <linux/netdevice.h>
-#include <net/sock.h>
-#include <linux/sched.h>
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/proc_fs.h>
-#include <net/llc_if.h>
 #include <net/llc_sap.h>
 #include <net/llc_conn.h>
 #include <net/llc_main.h>
@@ -33,7 +28,7 @@
 #include <net/llc_s_ev.h>
 #include <net/llc_s_st.h>
 #include <net/llc_mac.h>
-#include <linux/llc.h>
+#include <net/llc_proc.h>
 
 /* static function prototypes */
 static void llc_station_service_events(struct llc_station *station);
@@ -527,80 +522,6 @@ struct sk_buff *llc_alloc_frame(void)
 	return skb;
 }
 
-static char *llc_conn_state_names[] = {
-	[LLC_CONN_STATE_ADM] =        "adm", 
-	[LLC_CONN_STATE_SETUP] =      "setup", 
-	[LLC_CONN_STATE_NORMAL] =     "normal",
-	[LLC_CONN_STATE_BUSY] =       "busy", 
-	[LLC_CONN_STATE_REJ] =        "rej", 
-	[LLC_CONN_STATE_AWAIT] =      "await", 
-	[LLC_CONN_STATE_AWAIT_BUSY] = "await_busy",
-	[LLC_CONN_STATE_AWAIT_REJ] =  "await_rej",
-	[LLC_CONN_STATE_D_CONN]	=     "d_conn",
-	[LLC_CONN_STATE_RESET] =      "reset", 
-	[LLC_CONN_STATE_ERROR] =      "error", 
-	[LLC_CONN_STATE_TEMP] =       "temp", 
-};
-
-static int llc_proc_get_info(char *bf, char **start, off_t offset, int length)
-{
-	struct list_head *sap_entry;
-	struct sock *sk;
-	off_t begin = 0, pos = 0;
-	int len = 0;
-
-	read_lock_bh(&llc_main_station.sap_list.lock);
-	list_for_each(sap_entry, &llc_main_station.sap_list.list) {
-		struct llc_sap *sap = list_entry(sap_entry, struct llc_sap,
-						 node);
-
-		len += sprintf(bf + len, "lsap=%02X\n", sap->laddr.lsap);
-		read_lock_bh(&sap->sk_list.lock);
-		if (!sap->sk_list.list) {
-			len += sprintf(bf + len, "no connections\n");
-			goto unlock;
-		}
-		len += sprintf(bf + len, "connection list:\n"
-					 "dsap state      retr txw rxw "
-					 "pf ff sf df rs cs "
-					 "tack tpfc trs tbs blog busr\n");
-		for (sk = sap->sk_list.list; sk; sk = sk->next) {
-			struct llc_opt *llc = llc_sk(sk);
-
-			len += sprintf(bf + len, " %02X  %-10s %3d  %3d %3d "
-						 "%2d %2d %2d "
-						 "%2d %2d %2d "
-						 "%4d %4d %3d %3d %4d %4d\n",
-				       llc->daddr.lsap,
-				       llc_conn_state_names[llc->state],
-				       llc->retry_count, llc->k, llc->rw,
-				       llc->p_flag, llc->f_flag, llc->s_flag,
-				       llc->data_flag, llc->remote_busy_flag,
-				       llc->cause_flag,
-				       timer_pending(&llc->ack_timer.timer),
-				       timer_pending(&llc->pf_cycle_timer.timer),
-				       timer_pending(&llc->rej_sent_timer.timer),
-				       timer_pending(&llc->busy_state_timer.timer),
-				       !!sk->backlog.tail, sk->lock.users);
-		}
-unlock:	
-		read_unlock_bh(&sap->sk_list.lock);
-		pos = begin + len;
-		if (pos < offset) {
-			len = 0; /* Keep dumping into the buffer start */
-			begin = pos;
-		}
-		if (pos > offset + length) /* We have dumped enough */
-			break;
-	}
-	read_unlock_bh(&llc_main_station.sap_list.lock);
-
-	/* The data in question runs from begin to begin + len */
-	*start = bf + (offset - begin); /* Start of wanted data */
-	len -= (offset - begin); /* Remove unwanted header data from length */
-	return len;
-}
-
 static struct packet_type llc_packet_type = {
 	.type = __constant_htons(ETH_P_802_2),
 	.func = llc_rcv,
@@ -634,9 +555,11 @@ static int __init llc_init(void)
 	llc_main_station.ack_timer.data     = (unsigned long)&llc_main_station;
 	llc_main_station.ack_timer.function = llc_station_ack_tmr_cb;
 
+	if (llc_proc_init())
+		goto err;
 	skb = alloc_skb(0, GFP_ATOMIC);
 	if (!skb)
-		goto err;
+		goto err_skb;
 	llc_build_offset_table();
 	ev = llc_station_ev(skb);
 	memset(ev, 0, sizeof(*ev));
@@ -651,12 +574,13 @@ static int __init llc_init(void)
 	ev->type	= LLC_STATION_EV_TYPE_SIMPLE;
 	ev->prim_type	= LLC_STATION_EV_ENABLE_WITHOUT_DUP_ADDR_CHECK;
 	rc = llc_station_next_state(&llc_main_station, skb);
-	proc_net_create("802.2", 0, llc_proc_get_info);
 	llc_ui_init();
 	dev_add_pack(&llc_packet_type);
 	dev_add_pack(&llc_tr_packet_type);
 out:
 	return rc;
+err_skb:
+	llc_proc_exit();
 err:
 	printk(llc_error_msg);
 	rc = 1;
@@ -666,9 +590,9 @@ err:
 static void __exit llc_exit(void)
 {
 	llc_ui_exit();
+	llc_proc_exit();
 	dev_remove_pack(&llc_packet_type);
 	dev_remove_pack(&llc_tr_packet_type);
-	proc_net_remove("802.2");
 }
 
 module_init(llc_init);
