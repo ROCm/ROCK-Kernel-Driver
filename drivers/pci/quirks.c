@@ -694,29 +694,38 @@ static int __initdata asus_hides_smbus = 0;
 
 static void __init asus_hides_smbus_hostbridge(struct pci_dev *dev)
 {
-	if (likely(dev->subsystem_vendor != PCI_VENDOR_ID_ASUSTEK))
-		return;
-
-	if (dev->device == PCI_DEVICE_ID_INTEL_82845_HB)
-		switch(dev->subsystem_device) {
-		case 0x8070: /* P4B */
-	    	case 0x8088: /* P4B533 */
-			asus_hides_smbus = 1;
-		}
-	if (dev->device == PCI_DEVICE_ID_INTEL_82845G_HB)
-		switch(dev->subsystem_device) {
- 		case 0x80b1: /* P4GE-V */
-		case 0x80b2: /* P4PE */
- 		case 0x8093: /* P4B533-V */
-			asus_hides_smbus = 1;
-		}
-	if ((dev->device == PCI_DEVICE_ID_INTEL_82850_HB) &&
-	    (dev->subsystem_device == 0x8030)) /* P4T533 */
-		asus_hides_smbus = 1;
-	if ((dev->device == PCI_DEVICE_ID_INTEL_7205_0) &&
-	    (dev->subsystem_device == 0x8070)) /* P4G8X Deluxe */
-		asus_hides_smbus = 1;
-	return;
+	if (unlikely(dev->subsystem_vendor == PCI_VENDOR_ID_ASUSTEK)) {
+		if (dev->device == PCI_DEVICE_ID_INTEL_82845_HB)
+			switch(dev->subsystem_device) {
+			case 0x8070: /* P4B */
+			case 0x8088: /* P4B533 */
+				asus_hides_smbus = 1;
+			}
+		if (dev->device == PCI_DEVICE_ID_INTEL_82845G_HB)
+			switch(dev->subsystem_device) {
+			case 0x80b1: /* P4GE-V */
+			case 0x80b2: /* P4PE */
+			case 0x8093: /* P4B533-V */
+				asus_hides_smbus = 1;
+			}
+		if (dev->device == PCI_DEVICE_ID_INTEL_82850_HB)
+			switch(dev->subsystem_device) {
+			case 0x8030: /* P4T533 */
+				asus_hides_smbus = 1;
+			}
+		if (dev->device == PCI_DEVICE_ID_INTEL_7205_0)
+			switch (dev->subsystem_device) {
+			case 0x8070: /* P4G8X Deluxe */
+				asus_hides_smbus = 1;
+			}
+	} else if (unlikely(dev->subsystem_vendor == PCI_VENDOR_ID_HP)) {
+		if (dev->device ==  PCI_DEVICE_ID_INTEL_82855PM_HB)
+			switch(dev->subsystem_device) {
+			case 0x088C: /* HP Compaq nc8000 */
+			case 0x0890: /* HP Compaq nc6000 */
+				asus_hides_smbus = 1;
+			}
+	}
 }
 
 static void __init asus_hides_smbus_lpc(struct pci_dev *dev)
@@ -1004,13 +1013,16 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 
 	/*
 	 * on Asus P4B boards, the i801SMBus device is disabled at startup.
+	 * this also goes for boards in HP Compaq nc6000 and nc8000 notebooks.
 	 */
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82845_HB,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82845G_HB,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82850_HB,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_7205_0,	asus_hides_smbus_hostbridge },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82855PM_HB,	asus_hides_smbus_hostbridge },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_0,	asus_hides_smbus_lpc },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801BA_0,	asus_hides_smbus_lpc },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_12,	asus_hides_smbus_lpc },
 
 #ifdef CONFIG_SCSI_SATA
 	/* Fixup BIOSes that configure Parallel ATA (PATA / IDE) and

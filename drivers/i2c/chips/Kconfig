@@ -22,6 +22,26 @@ config SENSORS_ADM1021
 	  This driver can also be built as a module.  If so, the module
 	  will be called adm1021.
 
+config SENSORS_ADM1025
+	tristate "Analog Devices ADM1025 and compatibles"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for Analog Devices ADM1025
+	  and Philips NE1619 sensor chips.
+	  This driver can also be built as a module.  If so, the module
+	  will be called adm1025.
+
+config SENSORS_ADM1031
+	tristate "Analog Devices ADM1031 and compatibles"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for Analog Devices ADM1031 
+	  and ADM1030 sensor chips.
+	  This driver can also be built as a module.  If so, the module
+	  will be called adm1031.
+
 config SENSORS_ASB100
 	tristate "Asus ASB100 Bach"
 	depends on I2C && EXPERIMENTAL
@@ -83,11 +103,26 @@ config SENSORS_LM75
 	select I2C_SENSOR
 	help
 	  If you say yes here you get support for National Semiconductor LM75
-	  sensor chips and clones: Dallas Semi DS75 and DS1775, TelCon
-	  TCN75, and National Semiconductor LM77.
+	  sensor chips and clones: Dallas Semiconductor DS75 and DS1775 (in
+	  9-bit precision mode), and TelCom (now Microchip) TCN75.
+
+	  The DS75 and DS1775 in 10- to 12-bit precision modes will require
+	  a force module parameter. The driver will not handle the extra
+	  precision anyhow.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm75.
+
+config SENSORS_LM77
+	tristate "National Semiconductor LM77"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for National Semiconductor LM77
+	  sensor chips.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called lm77.
 
 config SENSORS_LM78
 	tristate "National Semiconductor LM78 and compatibles"
@@ -140,7 +175,8 @@ config SENSORS_LM90
 	select I2C_SENSOR
 	help
 	  If you say yes here you get support for National Semiconductor LM90,
-	  LM89 and LM99, and Analog Devices ADM1032 sensor chips.
+	  LM86, LM89 and LM99, Analog Devices ADM1032 and Maxim MAX6657 and
+	  MAX6658 sensor chips.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm90.
