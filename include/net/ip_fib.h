@@ -277,5 +277,6 @@ static inline void fib_res_put(struct fib_result *res)
 }
 
 extern int fib_proc_init(void);
+extern void fib_proc_exit(void);
 
 #endif  /* _NET_FIB_H */

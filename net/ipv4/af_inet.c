@@ -1155,12 +1155,9 @@ module_init(inet_init);
 
 #ifdef CONFIG_PROC_FS
 
+extern int ip_misc_proc_init(void);
 extern int raw_get_info(char *, char **, off_t, int);
-extern int snmp_get_info(char *, char **, off_t, int);
-extern int netstat_get_info(char *, char **, off_t, int);
-extern int afinet_get_info(char *, char **, off_t, int);
 extern int tcp_get_info(char *, char **, off_t, int);
-extern int udp_get_info(char *, char **, off_t, int);
 
 int __init ipv4_proc_init(void)
 {
@@ -1168,45 +1165,29 @@ int __init ipv4_proc_init(void)
 
 	if (!proc_net_create("raw", 0, raw_get_info))
 		goto out_raw;
-	if (!proc_net_create("netstat", 0, netstat_get_info))
-		goto out_netstat;
-	if (!proc_net_create("snmp", 0, snmp_get_info))
-		goto out_snmp;
-	if (!proc_net_create("sockstat", 0, afinet_get_info))
-		goto out_sockstat;
 	if (!proc_net_create("tcp", 0, tcp_get_info))
 		goto out_tcp;
 	if (udp_proc_init())
 		goto out_udp;
 	if (fib_proc_init())
 		goto out_fib;
+	if (ip_misc_proc_init())
+		goto out_misc;
 out:
 	return rc;
+out_misc:
+	fib_proc_exit();
 out_fib:
 	udp_proc_exit();
 out_udp:
 	proc_net_remove("tcp");
 out_tcp:
-	proc_net_remove("sockstat");
-out_sockstat:
-	proc_net_remove("snmp");
-out_snmp:
-	proc_net_remove("netstat");
-out_netstat:
 	proc_net_remove("raw");
 out_raw:
 	rc = -ENOMEM;
 	goto out;
 }
 
-int ip_seq_release(struct inode *inode, struct file *file)
-{
-	struct seq_file *seq = (struct seq_file *)file->private_data;
-
-	kfree(seq->private);
-	seq->private = NULL;
-	return seq_release(inode, file);
-}
 #else /* CONFIG_PROC_FS */
 int __init ipv4_proc_init(void)
 {
