@@ -372,6 +372,8 @@
  * 0.4.15  2003-09-12
  *    - Use static declarations for usb_scanner_init/usb_scanner_exit 
  *      (Daniele Bellucci).
+ *    - Report back return codes of usb_register and usb_usbmit_urb instead of -1 or
+ *      -ENONMEM (Daniele Bellucci).
  *
  *
  * TODO
@@ -1066,11 +1068,12 @@ probe_scanner(struct usb_interface *intf,
 			     // endpoint[(int)have_intr].bInterval);
 			     250);
 
-	        if (usb_submit_urb(scn->scn_irq, GFP_KERNEL)) {
+		retval = usb_submit_urb(scn->scn_irq, GFP_KERNEL);
+		if (retval) {
 			err("probe_scanner(%d): Unable to allocate INT URB.", intf->minor);
                 	kfree(scn);
 			up(&scn_mutex);
-                	return -ENOMEM;
+                	return retval;
         	}
 	}
 
@@ -1183,13 +1186,16 @@ usb_scanner_exit(void)
 static int __init
 usb_scanner_init (void)
 {
-        if (usb_register(&scanner_driver) < 0)
-                return -1;
+	int retval;
+	retval = usb_register(&scanner_driver);
+	if (retval)
+		goto out;
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	if (vendor != -1 && product != -1)
 		info("probe_scanner: User specified USB scanner -- Vendor:Product - %x:%x", vendor, product);
-	return 0;
+ out:
+	return retval;
 }
 
 module_init(usb_scanner_init);
