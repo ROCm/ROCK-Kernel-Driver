@@ -460,8 +460,13 @@ long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 	if (lpar_rc == H_PTEG_Full)
 		return -1;
 
+	/*
+	 * Since we try and ioremap PHBs we dont own, the pte insert
+	 * will fail. However we must catch the failure in hash_page
+	 * or we will loop forever, so return -2 in this case.
+	 */
 	if (lpar_rc != H_Success)
-		panic("Bad return code from pte enter rc = %lx\n", lpar_rc);
+		return -2;
 
 	return slot;
 }
