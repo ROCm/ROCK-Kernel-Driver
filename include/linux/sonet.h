@@ -56,9 +56,7 @@ struct sonet_stats {
 #define SONET_FRSENSE_SIZE 6		/* C1[3],H1[3] (0xff for unknown) */
 
 
-#ifndef __KERNEL__
-#undef __SONET_ITEMS
-#else
+#ifdef __KERNEL__
 
 #include <asm/atomic.h>
 
