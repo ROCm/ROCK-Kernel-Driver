@@ -282,23 +282,6 @@ config ARIADNE
 	  want). The module is called ariadne. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
-config ARIADNE2
-	tristate "Ariadne II support"
-	depends on NETDEVICES && ZORRO
-	help
-	  This driver is for the Village Tronic Ariadne II and the Individual
-	  Computers X-Surf Ethernet cards. If you have such a card, say Y.
-	  Otherwise, say N.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ariadne2. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
-
-config NE2K_ZORRO
-	tristate "Ariadne II and X-Surf support"
-	depends on NET_ETHERNET && ZORRO
-
 config A2065
 	tristate "A2065 support"
 	depends on NET_ETHERNET && ZORRO
@@ -321,6 +304,20 @@ config HYDRA
 	  inserted in and removed from the running kernel whenever you
 	  want). The module is called hydra. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
+
+config ZORRO8390
+	tristate "Zorro NS8390-based Ethernet support"
+	depends on NET_ETHERNET && ZORRO
+	help
+	  This driver is for Zorro Ethernet cards using an NS8390-compatible
+	  chipset, like the Village Tronic Ariadne II and the Individual
+	  Computers X-Surf Ethernet cards. If you have such a card, say Y.
+	  Otherwise, say N.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module is called zorro8390. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config APNE
 	tristate "PCMCIA NE2000 support"

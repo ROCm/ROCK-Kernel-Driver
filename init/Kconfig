@@ -141,6 +141,8 @@ config EPOLL
 	  Disabling this option will cause the kernel to be built without
 	  support for epoll family of system calls.
 
+source "drivers/block/Kconfig.iosched"
+
 endmenu		# General setup
 
 

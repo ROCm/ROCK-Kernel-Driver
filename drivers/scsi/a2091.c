@@ -43,9 +43,9 @@ static irqreturn_t a2091_intr (int irq, void *dummy, struct pt_regs *fp)
 		continue;
 
 	if (status & ISTR_INTS) {
-		spin_lock_irqsave(&instance->host_lock, flags);
+		spin_lock_irqsave(instance->host_lock, flags);
 		wd33c93_intr (instance);
-		spin_unlock_irqrestore(&instance->host_lock, flags);
+		spin_unlock_irqrestore(instance->host_lock, flags);
 		handled = 1;
 	}
     }

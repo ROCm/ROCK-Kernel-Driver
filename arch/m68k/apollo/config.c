@@ -174,10 +174,6 @@ void config_apollo(void) {
 	mach_hwclk           = dn_dummy_hwclk; /* */
 	mach_set_clock_mmss  = dn_dummy_set_clock_mmss; /* */
 	mach_process_int     = dn_process_int;
-#ifdef CONFIG_BLK_DEV_FD
-	mach_floppy_init     = dn_dummy_floppy_init;
-	mach_floppy_setup    = dn_dummy_floppy_setup;
-#endif
 	mach_reset	     = dn_dummy_reset;  /* */
 #ifdef CONFIG_DUMMY_CONSOLE
         conswitchp           = &dummy_con;

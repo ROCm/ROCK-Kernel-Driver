@@ -138,7 +138,7 @@ static inline void bit_reverse_addr(unsigned char addr[6])
 
 int __init macsonic_init(struct net_device* dev)
 {
-	struct sonic_local* lp;
+	struct sonic_local* lp = NULL;
 	int i;
 
 	/* Allocate the entire chunk of memory for the descriptors.
