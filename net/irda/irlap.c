@@ -60,6 +60,8 @@ int sysctl_warn_noreply_time = 3;
 
 extern void irlap_queue_xmit(struct irlap_cb *self, struct sk_buff *skb);
 static void __irlap_close(struct irlap_cb *self);
+static void irlap_init_qos_capabilities(struct irlap_cb *self,
+					struct qos_info *qos_user);
 
 #ifdef CONFIG_IRDA_DEBUG
 static char *lap_reasons[] = {
@@ -867,7 +869,7 @@ void irlap_flush_all_queues(struct irlap_cb *self)
  *    Change the speed of the IrDA port
  *
  */
-void irlap_change_speed(struct irlap_cb *self, __u32 speed, int now)
+static void irlap_change_speed(struct irlap_cb *self, __u32 speed, int now)
 {
 	struct sk_buff *skb;
 
@@ -894,8 +896,8 @@ void irlap_change_speed(struct irlap_cb *self, __u32 speed, int now)
  *    IrLAP itself. Normally, IrLAP will not specify any values, but it can
  *    be used to restrict certain values.
  */
-void irlap_init_qos_capabilities(struct irlap_cb *self,
-				 struct qos_info *qos_user)
+static void irlap_init_qos_capabilities(struct irlap_cb *self,
+					struct qos_info *qos_user)
 {
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == LAP_MAGIC, return;);

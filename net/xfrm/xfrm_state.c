@@ -51,6 +51,9 @@ static void __xfrm_state_delete(struct xfrm_state *x);
 static struct xfrm_state_afinfo *xfrm_state_get_afinfo(unsigned short family);
 static void xfrm_state_put_afinfo(struct xfrm_state_afinfo *afinfo);
 
+static int km_query(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *pol);
+static void km_state_expired(struct xfrm_state *x, int hard);
+
 static void xfrm_state_gc_destroy(struct xfrm_state *x)
 {
 	if (del_timer(&x->timer))
@@ -746,7 +749,7 @@ void xfrm_replay_advance(struct xfrm_state *x, u32 seq)
 static struct list_head xfrm_km_list = LIST_HEAD_INIT(xfrm_km_list);
 static rwlock_t		xfrm_km_lock = RW_LOCK_UNLOCKED;
 
-void km_state_expired(struct xfrm_state *x, int hard)
+static void km_state_expired(struct xfrm_state *x, int hard)
 {
 	struct xfrm_mgr *km;
 
@@ -764,7 +767,7 @@ void km_state_expired(struct xfrm_state *x, int hard)
 		wake_up(&km_waitq);
 }
 
-int km_query(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *pol)
+static int km_query(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *pol)
 {
 	int err = -EINVAL;
 	struct xfrm_mgr *km;

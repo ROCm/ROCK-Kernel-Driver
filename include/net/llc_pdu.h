@@ -419,7 +419,6 @@ struct llc_frmr_info {
 extern void llc_pdu_set_cmd_rsp(struct sk_buff *skb, u8 type);
 extern void llc_pdu_set_pf_bit(struct sk_buff *skb, u8 bit_value);
 extern void llc_pdu_decode_pf_bit(struct sk_buff *skb, u8 *pf_bit);
-extern void llc_pdu_decode_cr_bit(struct sk_buff *skb, u8 *cr_bit);
 extern void llc_pdu_init_as_disc_cmd(struct sk_buff *skb, u8 p_bit);
 extern void llc_pdu_init_as_i_cmd(struct sk_buff *skb, u8 p_bit, u8 ns, u8 nr);
 extern void llc_pdu_init_as_rej_cmd(struct sk_buff *skb, u8 p_bit, u8 nr);

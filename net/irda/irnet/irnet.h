@@ -363,13 +363,13 @@
 /* Exit a function with debug */
 #define DRETURN(ret, dbg, args...) \
 	{DEXIT(dbg, ": " args);\
-	return(ret); }
+	return ret; }
 
 /* Exit a function on failed condition */
 #define DABORT(cond, ret, dbg, args...) \
 	{if(cond) {\
 		DERROR(dbg, args);\
-		return(ret); }}
+		return ret; }}
 
 /* Invalid assertion, print out an error and exit... */
 #define DASSERT(cond, ret, dbg, args...) \
@@ -520,8 +520,6 @@ extern void
 /* ---------------------------- MODULE ---------------------------- */
 extern int
 	irnet_init(void);		/* Initialise IrNET module */
-extern void
-	irnet_cleanup(void);		/* Teardown IrNET module */
 
 /**************************** VARIABLES ****************************/
 

@@ -233,38 +233,3 @@ g_verify_token_header(struct xdr_netobj *mech, int *body_size,
 
 EXPORT_SYMBOL(g_verify_token_header);
 
-/* Given a buffer containing a token, returns a copy of the mech oid in
- * the parameter mech. */
-u32
-g_get_mech_oid(struct xdr_netobj *mech, struct xdr_netobj * in_buf)
-{
-	unsigned char *buf = in_buf->data;
-	int len = in_buf->len;
-	int ret=0;
-	int seqsize;
-
-	if ((len-=1) < 0)
-		return(G_BAD_TOK_HEADER);
-	if (*buf++ != 0x60)
-		return(G_BAD_TOK_HEADER);
-
-	if ((seqsize = der_read_length(&buf, &len)) < 0)
-		return(G_BAD_TOK_HEADER);
-
-	if ((len-=1) < 0)
-		return(G_BAD_TOK_HEADER);
-	if (*buf++ != 0x06)
-		return(G_BAD_TOK_HEADER);
-
-	if ((len-=1) < 0)
-		return(G_BAD_TOK_HEADER);
-	mech->len = *buf++;
-
-	if ((len-=mech->len) < 0)
-		return(G_BAD_TOK_HEADER);
-	if (!(mech->data = kmalloc(mech->len, GFP_KERNEL))) 
-		return(G_BUFFER_ALLOC);
-	memcpy(mech->data, buf, mech->len);
-
-	return ret;
-}

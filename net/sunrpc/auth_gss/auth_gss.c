@@ -532,7 +532,7 @@ gss_pipe_release(struct inode *inode)
 	spin_unlock(&gss_auth->lock);
 }
 
-void
+static void
 gss_pipe_destroy_msg(struct rpc_pipe_msg *msg)
 {
 	struct gss_upcall_msg *gss_msg = container_of(msg, struct gss_upcall_msg, msg);

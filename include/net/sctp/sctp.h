@@ -584,26 +584,20 @@ static inline int sctp_vtag_hashfn(__u16 lport, __u16 rport, __u32 vtag)
 
 /* WARNING: Do not change the layout of the members in sctp_sock! */
 struct sctp_sock {
-	struct sock	  sk;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-	struct ipv6_pinfo *pinet6;
-#endif /* CONFIG_IPV6 */
-	struct inet_opt	  inet;
+	struct inet_sock  inet;
 	struct sctp_opt	  sctp;
 };
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 struct sctp6_sock {
-	struct sock	  sk;
-	struct ipv6_pinfo *pinet6;
-	struct inet_opt	  inet;
+	struct inet_sock  inet;
 	struct sctp_opt	  sctp;
 	struct ipv6_pinfo inet6;
 };
 #endif /* CONFIG_IPV6 */
 
 #define sctp_sk(__sk) (&((struct sctp_sock *)__sk)->sctp)
-#define sctp_opt2sk(__sp) &container_of(__sp, struct sctp_sock, sctp)->sk
+#define sctp_opt2sk(__sp) &container_of(__sp, struct sctp_sock, sctp)->inet.sk
 
 /* Is a socket of this style? */
 #define sctp_style(sk, style) __sctp_style((sk), (SCTP_SOCKET_##style))

@@ -22,7 +22,7 @@ static int icmp_timeouts[1] =		{ 1*60*HZ };
 
 static char * icmp_state_name_table[1] = { "ICMP" };
 
-struct ip_vs_conn *
+static struct ip_vs_conn *
 icmp_conn_in_get(const struct sk_buff *skb,
 		 struct ip_vs_protocol *pp,
 		 const struct iphdr *iph,
@@ -49,7 +49,7 @@ icmp_conn_in_get(const struct sk_buff *skb,
 #endif
 }
 
-struct ip_vs_conn *
+static struct ip_vs_conn *
 icmp_conn_out_get(const struct sk_buff *skb,
 		  struct ip_vs_protocol *pp,
 		  const struct iphdr *iph,

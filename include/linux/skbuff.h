@@ -1077,9 +1077,9 @@ static inline void kunmap_skb_frag(void *vaddr)
 }
 
 #define skb_queue_walk(queue, skb) \
-		for (skb = (queue)->next, prefetch(skb->next);	\
-		     (skb != (struct sk_buff *)(queue));	\
-		     skb = skb->next, prefetch(skb->next))
+		for (skb = (queue)->next;					\
+		     prefetch(skb->next), (skb != (struct sk_buff *)(queue));	\
+		     skb = skb->next)
 
 
 extern struct sk_buff *skb_recv_datagram(struct sock *sk, unsigned flags,

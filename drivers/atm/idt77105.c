@@ -323,7 +323,7 @@ static int idt77105_start(struct atm_dev *dev)
 }
 
 
-int idt77105_stop(struct atm_dev *dev)
+static int idt77105_stop(struct atm_dev *dev)
 {
 	struct idt77105_priv *walk, *prev;
 

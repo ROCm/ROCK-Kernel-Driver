@@ -25,7 +25,7 @@ static struct rpc_authops *	auth_flavors[RPC_AUTH_MAXFLAVOR] = {
 	NULL,			/* others can be loadable modules */
 };
 
-u32
+static u32
 pseudoflavor_to_flavor(u32 flavor) {
 	if (flavor >= RPC_AUTH_MAXFLAVOR)
 		return RPC_AUTH_GSS;

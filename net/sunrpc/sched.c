@@ -42,6 +42,9 @@ static mempool_t	*rpc_buffer_mempool;
 static void			__rpc_default_timer(struct rpc_task *task);
 static void			rpciod_killall(void);
 
+static void			rpc_free(struct rpc_task *task);
+
+
 /*
  * When an asynchronous RPC task is activated within a bottom half
  * handler, or while executing another RPC task, it is put on
@@ -837,7 +840,7 @@ rpc_malloc(struct rpc_task *task, size_t size)
 	return task->tk_buffer;
 }
 
-void
+static void
 rpc_free(struct rpc_task *task)
 {
 	if (task->tk_buffer) {

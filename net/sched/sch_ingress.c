@@ -274,7 +274,7 @@ static struct nf_hook_ops ing_ops = {
 #endif
 #endif
 
-int ingress_init(struct Qdisc *sch,struct rtattr *opt)
+static int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 {
 	struct ingress_qdisc_data *p = PRIV(sch);
 
