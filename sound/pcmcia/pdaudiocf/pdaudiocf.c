@@ -233,14 +233,14 @@ static int snd_pdacf_assign_resources(pdacf_t *pdacf, int port, int irq)
 	if (err < 0)
 		return err;	
 
-	err = snd_pdacf_pcm_new(pdacf);
-	if (err < 0)
-		return err;
-
 	strcpy(card->driver, "PDAudio-CF");
 	sprintf(card->shortname, "Core Sound %s", card->driver);
 	sprintf(card->longname, "%s at 0x%x, irq %i",
 		card->shortname, port, irq);
+
+	err = snd_pdacf_pcm_new(pdacf);
+	if (err < 0)
+		return err;
 
 #ifdef CONFIG_PM
 	card->power_state_private_data = pdacf;
