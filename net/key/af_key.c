@@ -504,8 +504,8 @@ static uint8_t pfkey_proto_from_xfrm(uint8_t proto)
 	return (proto ? proto : IPSEC_PROTO_ANY);
 }
 
-int pfkey_sadb_addr2xfrm_addr(struct sadb_address *addr,
-			      xfrm_address_t *xaddr)
+static int pfkey_sadb_addr2xfrm_addr(struct sadb_address *addr,
+				     xfrm_address_t *xaddr)
 {
 	switch (((struct sockaddr*)(addr + 1))->sa_family) {
 	case AF_INET:
