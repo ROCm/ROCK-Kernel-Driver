@@ -54,7 +54,7 @@ MODULE_PARM_DESC(dcc_timeout, "timeout on for unestablished DCC channels");
 #endif
 
 static char *dccprotos[] = { "SEND ", "CHAT ", "MOVE ", "TSEND ", "SCHAT " };
-#define MAXMATCHLEN	6
+#define MINMATCHLEN	5
 
 DECLARE_LOCK(ip_irc_lock);
 struct module *ip_conntrack_irc = THIS_MODULE;
@@ -87,9 +87,11 @@ int parse_dcc(char *data, char *data_end, u_int32_t * ip, u_int16_t * port,
 	*ip = simple_strtoul(data, &data, 10);
 
 	/* skip blanks between ip and port */
-	while (*data == ' ')
+	while (*data == ' ') {
+		if (data >= data_end) 
+			return -1;
 		data++;
-
+	}
 
 	*port = simple_strtoul(data, &data, 10);
 	*ad_end_p = data;
@@ -139,13 +141,17 @@ static int help(struct sk_buff *skb,
 
 	data = irc_buffer;
 	data_limit = irc_buffer + skb->len - dataoff;
-	while (data < (data_limit - (22 + MAXMATCHLEN))) {
+
+	/* strlen("\1DCC SENT t AAAAAAAA P\1\n")=24
+	 * 5+MINMATCHLEN+strlen("t AAAAAAAA P\1\n")=14 */
+	while (data < (data_limit - (19 + MINMATCHLEN))) {
 		if (memcmp(data, "\1DCC ", 5)) {
 			data++;
 			continue;
 		}
 
 		data += 5;
+		/* we have at least (19+MINMATCHLEN)-5 bytes valid data left */
 
 		DEBUGP("DCC found in master %u.%u.%u.%u:%u %u.%u.%u.%u:%u...\n",
 			NIPQUAD(iph->saddr), ntohs(tcph.source),
@@ -159,6 +165,9 @@ static int help(struct sk_buff *skb,
 
 			DEBUGP("DCC %s detected\n", dccprotos[i]);
 			data += strlen(dccprotos[i]);
+			/* we have at least 
+			 * (19+MINMATCHLEN)-5-dccprotos[i].matchlen bytes valid
+			 * data left (== 14/13 bytes) */
 			if (parse_dcc((char *)data, data_limit, &dcc_ip,
 				       &dcc_port, &addr_beg_p, &addr_end_p)) {
 				/* unable to parse */
