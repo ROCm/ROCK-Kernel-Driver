@@ -198,7 +198,7 @@ int find_dirent_page(nfs_readdir_descriptor_t *desc)
 
 	dfprintk(VFS, "NFS: find_dirent_page() searching directory page %ld\n", desc->page_index);
 
-	page = read_cache_page(&inode->i_data, desc->page_index,
+	page = read_cache_page(inode->i_mapping, desc->page_index,
 			       (filler_t *)nfs_readdir_filler, desc);
 	if (IS_ERR(page)) {
 		status = PTR_ERR(page);
@@ -713,7 +713,7 @@ int nfs_cached_lookup(struct inode *dir, struct dentry *dentry,
 	desc.page_index = 0;
 	desc.plus = 1;
 
-	for(;(page = find_get_page(&dir->i_data, desc.page_index)); desc.page_index++) {
+	for(;(page = find_get_page(dir->i_mapping, desc.page_index)); desc.page_index++) {
 
 		res = -EIO;
 		if (PageUptodate(page)) {
