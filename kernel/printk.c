@@ -248,6 +248,7 @@ __setup("log_buf_len=", log_buf_len_setup);
  * 	7 -- Enable printk's to console
  *	8 -- Set level of messages printed to console
  *	9 -- Return number of unread characters in the log buffer
+ *     10 -- Return size of the log buffer
  *	20 -- Read from event logging buffer 
  */
 int do_syslog(int type, char __user * buf, int len)
@@ -369,6 +370,9 @@ int do_syslog(int type, char __user * buf, int len)
 		break;
 	case 9:		/* Number of chars in the log buffer */
 		error = log_end - log_start;
+		break;
+	case 10:	/* Size of the log buffer */
+		error = log_buf_len;
 		break;
 	case 20:
 #ifdef CONFIG_EVLOG
