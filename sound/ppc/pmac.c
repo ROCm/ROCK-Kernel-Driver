@@ -231,7 +231,9 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 	st_le16(&chip->extra_dma.cmds->command, DBDMA_STOP);
 	snd_pmac_dma_set_command(rec, &chip->extra_dma);
 	snd_pmac_dma_run(rec, RUN);
+	spin_unlock_irq(&chip->reg_lock);
 	mdelay(5);
+	spin_lock_irq(&chip->reg_lock);
 	/* continuous DMA memory type doesn't provide the physical address,
 	 * so we need to resolve the address here...
 	 */
