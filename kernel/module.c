@@ -1065,6 +1065,7 @@ static struct module *load_module(void *umod,
 			/* MODULE_LICENSE() */
 			DEBUGP("Licence found in section %u\n", i);
 			licenseindex = i;
+			sechdrs[i].sh_flags &= ~(unsigned long)SHF_ALLOC;
 		} else if (strcmp(secstrings+sechdrs[i].sh_name,
 				  "__vermagic") == 0 &&
 			   (sechdrs[i].sh_flags & SHF_ALLOC)) {
