@@ -170,7 +170,6 @@ static void __init geode_configure(void)
 {
 	unsigned long flags;
 	u8 ccr3, ccr4;
-	unsigned long cr0;
 	local_irq_save(flags);
 	
 	ccr3 = getCx86(CX86_CCR3);

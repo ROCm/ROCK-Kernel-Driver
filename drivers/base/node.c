@@ -93,7 +93,7 @@ int __init register_node(struct node *node, int num, struct node *parent)
 
 static int __init register_node_type(void)
 {
-	driver_register(&node_driver);
-	return devclass_register(&node_devclass);
+	devclass_register(&node_devclass);
+	return driver_register(&node_driver);
 }
 postcore_initcall(register_node_type);

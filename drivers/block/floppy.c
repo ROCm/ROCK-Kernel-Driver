@@ -3977,18 +3977,6 @@ static void __init register_devfs_entries (int drive)
     }
 }
 
-static void unregister_devfs_entries (int drive)
-{
-    int i;
-
-    if (UDP->cmos < NUMBER(default_drive_params)) {
-	i = 0;
-	do {
-	    devfs_remove("floppy/%d%s", drive, table[table_sup[UDP->cmos][i]]);
-	} while (table_sup[UDP->cmos][i++]);
-    }
-}
-
 /*
  * Floppy Driver initialization
  * =============================
@@ -4542,6 +4530,18 @@ static void floppy_release_irq_and_dma(void)
 #ifdef MODULE
 
 char *floppy;
+
+static void unregister_devfs_entries (int drive)
+{
+    int i;
+
+    if (UDP->cmos < NUMBER(default_drive_params)) {
+	i = 0;
+	do {
+	    devfs_remove("floppy/%d%s", drive, table[table_sup[UDP->cmos][i]]);
+	} while (table_sup[UDP->cmos][i++]);
+    }
+}
 
 static void __init parse_floppy_cfg_string(char *cfg)
 {
