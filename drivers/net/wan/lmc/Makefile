@@ -4,10 +4,11 @@
 # Specifically the 1000,1200,5200,5245
 #
 
-O_TARGET := lmc.o
+O_TARGET := built-in.o
 
-obj-y := lmc_debug.o lmc_media.o lmc_main.o lmc_proto.o
-obj-m := lmc.o
+obj-$(CONFIG_LANMEDIA) += lmc.o
+
+lmc-objs := lmc_debug.o lmc_media.o lmc_main.o lmc_proto.o
 
 # Like above except every packet gets echoed to KERN_DEBUG
 # in hex

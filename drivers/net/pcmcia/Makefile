@@ -4,7 +4,7 @@
 # Makefile for the Linux PCMCIA network device drivers.
 #
 
-O_TARGET := pcmcia_net.o
+O_TARGET := built-in.o
 
 obj-y		:=
 obj-m		:=

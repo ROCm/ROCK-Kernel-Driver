@@ -5,6 +5,8 @@
 # unless it's something special (ie not a .c file).
 #
 
+O_TARGET := built-in.o
+
 obj-y	:=
 obj-n	:=
 obj-m	:=
@@ -21,7 +23,5 @@ obj-$(CONFIG_ARCNET_RIM_I) += arc-rimi.o
 obj-$(CONFIG_ARCNET_COM20020) += com20020.o
 obj-$(CONFIG_ARCNET_COM20020_ISA) += com20020-isa.o
 obj-$(CONFIG_ARCNET_COM20020_PCI) += com20020-pci.o
-
-O_TARGET := arcnetdrv.o
 
 include $(TOPDIR)/Rules.make
