@@ -168,6 +168,8 @@ int filemap_flush(struct address_space *mapping)
 	return __filemap_fdatawrite(mapping, WB_SYNC_NONE);
 }
 
+EXPORT_SYMBOL(filemap_flush);
+
 /**
  * filemap_fdatawait - walk the list of locked pages of the given address
  *                     space and wait for all of them.
