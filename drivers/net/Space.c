@@ -12,6 +12,8 @@
  *		Donald J. Becker, <becker@scyld.com>
  *
  * Changelog:
+ *		Paul Gortmaker (03/2002)
+		- struct init cleanup, enable multiple ISA autoprobes.
  *		Arnaldo Carvalho de Melo <acme@conectiva.com.br> - 09/1999
  *		- fix sbni: s/device/net_device/
  *		Paul Gortmaker (06/98): 
@@ -410,14 +412,7 @@ static int __init ethif_probe(struct net_device *dev)
 		return 0;
 	if (probe_list(dev, mca_probes) == 0)
 		return 0;
-        /*
-         * Backwards compatibility - an I/O of 0xffe0 was used to indicate
-         * that we shouldn't do a bunch of potentially risky ISA probes
-         * for ethN (N>1).  Since the widespread use of modules, *nobody*
-         * compiles a kernel with all the ISA drivers built in anymore,
-         * and so we should delete this check in linux 2.3 - Paul G.
-         */
-	if (base_addr != 0xffe0 && probe_list(dev, isa_probes) == 0) 
+	if (probe_list(dev, isa_probes) == 0) 
 		return 0;
 	if (probe_list(dev, parport_probes) == 0)
 		return 0;
@@ -466,74 +461,102 @@ static int fcif_probe(struct net_device *dev)
 
 
 #ifdef CONFIG_ETHERTAP
-    static struct net_device tap0_dev = { "tap0", 0, 0, 0, 0, NETLINK_TAPBASE, 0, 0, 0, 0, NEXT_DEV, ethertap_probe, };
-#   undef NEXT_DEV
-#   define NEXT_DEV	(&tap0_dev)
+static struct net_device tap0_dev = {
+	name:		"tap0",
+	base_addr:	NETLINK_TAPBASE,
+	next:		NEXT_DEV,
+	init:		ethertap_probe,
+};
+#undef NEXT_DEV
+#define NEXT_DEV	(&tap0_dev)
 #endif
 
 #ifdef CONFIG_SDLA
-    extern int sdla_init(struct net_device *);
-    static struct net_device sdla0_dev = { "sdla0", 0, 0, 0, 0, 0, 0, 0, 0, 0, NEXT_DEV, sdla_init, };
-
-#   undef NEXT_DEV
-#   define NEXT_DEV	(&sdla0_dev)
+extern int sdla_init(struct net_device *);
+static struct net_device sdla0_dev = {
+	name:		 "sdla0",
+	next:		 NEXT_DEV,
+	init:		 sdla_init,
+};
+#undef NEXT_DEV
+#define NEXT_DEV	(&sdla0_dev)
 #endif
 
 #if defined(CONFIG_LTPC)
-    extern int ltpc_probe(struct net_device *);
-    static struct net_device dev_ltpc = {
-        "lt0",
-                0, 0, 0, 0,
-                0x0, 0,
-                0, 0, 0, NEXT_DEV, ltpc_probe };
-#   undef NEXT_DEV
-#   define NEXT_DEV	(&dev_ltpc)
+extern int ltpc_probe(struct net_device *);
+static struct net_device dev_ltpc = {
+	name:		"lt0",
+	next:		NEXT_DEV,
+	init:		ltpc_probe
+};
+#undef NEXT_DEV
+#define NEXT_DEV	(&dev_ltpc)
 #endif  /* LTPC */
 
 #if defined(CONFIG_COPS)
-    extern int cops_probe(struct net_device *);
-    static struct net_device cops2_dev = { "lt2", 0, 0, 0, 0, 0x0, 0, 0, 0, 0, NEXT_DEV, cops_probe };
-    static struct net_device cops1_dev = { "lt1", 0, 0, 0, 0, 0x0, 0, 0, 0, 0, &cops2_dev, cops_probe };
-    static struct net_device cops0_dev = { "lt0", 0, 0, 0, 0, 0x0, 0, 0, 0, 0, &cops1_dev, cops_probe };
-#   undef NEXT_DEV
-#   define NEXT_DEV     (&cops0_dev)
+extern int cops_probe(struct net_device *);
+static struct net_device cops2_dev = {
+	name:		"lt2",
+	next:		NEXT_DEV,
+	init:		cops_probe,
+};
+static struct net_device cops1_dev = {
+	name:		"lt1",
+	next:		&cops2_dev,
+	init:		cops_probe,
+};
+static struct net_device cops0_dev = {
+	name:		"lt0",
+	next:		&cops1_dev,
+	init:		cops_probe,
+};
+#undef NEXT_DEV
+#define NEXT_DEV     (&cops0_dev)
 #endif  /* COPS */
 
-
-/* The first device defaults to I/O base '0', which means autoprobe. */
-#ifndef ETH0_ADDR
-# define ETH0_ADDR 0
-#endif
-#ifndef ETH0_IRQ
-# define ETH0_IRQ 0
-#endif
-
-/* "eth0" defaults to autoprobe (== 0), other use a base of 0xffe0 (== -0x20),
-   which means "don't do ISA probes".  Distributions don't ship kernels with
-   all ISA drivers compiled in anymore, so its probably no longer an issue. */
-
-#define ETH_NOPROBE_ADDR 0xffe0
-
 static struct net_device eth7_dev = {
-    "eth%d", 0,0,0,0,ETH_NOPROBE_ADDR /* I/O base*/, 0,0,0,0, NEXT_DEV, ethif_probe };
+	name:		"eth%d",
+	next:		NEXT_DEV,
+	init:		ethif_probe,
+};
 static struct net_device eth6_dev = {
-    "eth%d", 0,0,0,0,ETH_NOPROBE_ADDR /* I/O base*/, 0,0,0,0, &eth7_dev, ethif_probe };
+	name:		"eth%d",
+	next:		&eth7_dev,
+	init:		ethif_probe,
+};
 static struct net_device eth5_dev = {
-    "eth%d", 0,0,0,0,ETH_NOPROBE_ADDR /* I/O base*/, 0,0,0,0, &eth6_dev, ethif_probe };
+	name:		"eth%d",
+	next:		&eth6_dev,
+	init:		ethif_probe,
+};
 static struct net_device eth4_dev = {
-    "eth%d", 0,0,0,0,ETH_NOPROBE_ADDR /* I/O base*/, 0,0,0,0, &eth5_dev, ethif_probe };
+	name:		"eth%d",
+	next:		&eth5_dev,
+	init:		ethif_probe,
+};
 static struct net_device eth3_dev = {
-    "eth%d", 0,0,0,0,ETH_NOPROBE_ADDR /* I/O base*/, 0,0,0,0, &eth4_dev, ethif_probe };
+	name:		"eth%d",
+	next:		&eth4_dev,
+	init:		ethif_probe,
+};
 static struct net_device eth2_dev = {
-    "eth%d", 0,0,0,0,ETH_NOPROBE_ADDR /* I/O base*/, 0,0,0,0, &eth3_dev, ethif_probe };
+	name:		"eth%d",
+	next:		&eth3_dev,
+	init:		ethif_probe,
+};
 static struct net_device eth1_dev = {
-    "eth%d", 0,0,0,0,ETH_NOPROBE_ADDR /* I/O base*/, 0,0,0,0, &eth2_dev, ethif_probe };
-
+	name:		"eth%d",
+	next:		&eth2_dev,
+	init:		ethif_probe,
+};
 static struct net_device eth0_dev = {
-    "eth%d", 0, 0, 0, 0, ETH0_ADDR, ETH0_IRQ, 0, 0, 0, &eth1_dev, ethif_probe };
+	name:		"eth%d",
+	next:		&eth1_dev,
+	init:		ethif_probe,
+};
 
-#   undef NEXT_DEV
-#   define NEXT_DEV	(&eth0_dev)
+#undef NEXT_DEV
+#define NEXT_DEV	(&eth0_dev)
 
 
 
@@ -558,75 +581,153 @@ trif_probe(struct net_device *dev)
     return 0;
 }
 static struct net_device tr7_dev = {
-    "tr%d",0,0,0,0,0,0,0,0,0, NEXT_DEV, trif_probe };
+	name:		"tr%d",
+	next:		NEXT_DEV,
+	init:		trif_probe,
+};
 static struct net_device tr6_dev = {
-    "tr%d",0,0,0,0,0,0,0,0,0, &tr7_dev, trif_probe };
+	name:		"tr%d",
+	next:		&tr7_dev,
+	init:		trif_probe,
+};
 static struct net_device tr5_dev = {
-    "tr%d",0,0,0,0,0,0,0,0,0, &tr6_dev, trif_probe };
+	name:		"tr%d",
+	next:		&tr6_dev,
+	init:		trif_probe,
+};
 static struct net_device tr4_dev = {
-    "tr%d",0,0,0,0,0,0,0,0,0, &tr5_dev, trif_probe };
+	name:		"tr%d",
+	next:		&tr5_dev,
+	init:		trif_probe,
+};
 static struct net_device tr3_dev = {
-    "tr%d",0,0,0,0,0,0,0,0,0, &tr4_dev, trif_probe };
+	name:		"tr%d",
+	next:		&tr4_dev,
+	init:		trif_probe,
+};
 static struct net_device tr2_dev = {
-    "tr%d",0,0,0,0,0,0,0,0,0, &tr3_dev, trif_probe };
+	name:		"tr%d",
+	next:		&tr3_dev,
+	init:		trif_probe,
+};
 static struct net_device tr1_dev = {
-    "tr%d",0,0,0,0,0,0,0,0,0, &tr2_dev, trif_probe };
+	name:		"tr%d",
+	next:		&tr2_dev,
+	init:		trif_probe,
+};
 static struct net_device tr0_dev = {
-    "tr%d",0,0,0,0,0,0,0,0,0, &tr1_dev, trif_probe };
-#   undef       NEXT_DEV
-#   define      NEXT_DEV        (&tr0_dev)
+	name:		"tr%d",
+	next:		&tr1_dev,
+	init:		trif_probe,
+};
+#undef       NEXT_DEV
+#define      NEXT_DEV        (&tr0_dev)
 
 #endif 
 
 #ifdef CONFIG_FDDI
-	static struct net_device fddi7_dev =
-		{"fddi7", 0, 0, 0, 0, 0, 0, 0, 0, 0, NEXT_DEV, fddiif_probe};
-	static struct net_device fddi6_dev =
-		{"fddi6", 0, 0, 0, 0, 0, 0, 0, 0, 0, &fddi7_dev, fddiif_probe};
-	static struct net_device fddi5_dev =
-		{"fddi5", 0, 0, 0, 0, 0, 0, 0, 0, 0, &fddi6_dev, fddiif_probe};
-	static struct net_device fddi4_dev =
-		{"fddi4", 0, 0, 0, 0, 0, 0, 0, 0, 0, &fddi5_dev, fddiif_probe};
-	static struct net_device fddi3_dev =
-		{"fddi3", 0, 0, 0, 0, 0, 0, 0, 0, 0, &fddi4_dev, fddiif_probe};
-	static struct net_device fddi2_dev =
-		{"fddi2", 0, 0, 0, 0, 0, 0, 0, 0, 0, &fddi3_dev, fddiif_probe};
-	static struct net_device fddi1_dev =
-		{"fddi1", 0, 0, 0, 0, 0, 0, 0, 0, 0, &fddi2_dev, fddiif_probe};
-	static struct net_device fddi0_dev =
-		{"fddi0", 0, 0, 0, 0, 0, 0, 0, 0, 0, &fddi1_dev, fddiif_probe};
+static struct net_device fddi7_dev = {
+	name:		"fddi7",
+	next:		 NEXT_DEV,
+	init:		fddiif_probe
+};
+static struct net_device fddi6_dev = {
+	name:		"fddi6",
+	next:		&fddi7_dev,
+	init:		fddiif_probe
+};
+static struct net_device fddi5_dev = {
+	name:		"fddi5",
+	next:		&fddi6_dev,
+	init:		fddiif_probe
+};
+static struct net_device fddi4_dev = {
+	name:		"fddi4",
+	next:		&fddi5_dev,
+	init:		fddiif_probe
+};
+static struct net_device fddi3_dev = {
+	name:		"fddi3",
+	next:		&fddi4_dev,
+	init:		fddiif_probe
+};
+static struct net_device fddi2_dev = {
+	name:		"fddi2",
+	next:		&fddi3_dev,
+	init:		fddiif_probe
+};
+static struct net_device fddi1_dev = {
+	name:		"fddi1",
+	next:		&fddi2_dev,
+	init:		fddiif_probe
+};
+static struct net_device fddi0_dev = {
+	name:		"fddi0",
+	next:		&fddi1_dev,
+	init:		fddiif_probe
+};
 #undef	NEXT_DEV
 #define	NEXT_DEV	(&fddi0_dev)
 #endif 
 
 
 #ifdef CONFIG_NET_FC
-    static struct net_device fc1_dev = {
-        "fc1", 0, 0, 0, 0, 0, 0, 0, 0, 0, NEXT_DEV, fcif_probe};
-	static struct net_device fc0_dev = {
-		"fc0", 0, 0, 0, 0, 0, 0, 0, 0, 0, &fc1_dev, fcif_probe};
-#   undef       NEXT_DEV
-#   define      NEXT_DEV        (&fc0_dev)
+static struct net_device fc1_dev = {
+	name:		"fc1",
+	next:		NEXT_DEV,
+	init:		fcif_probe
+};
+static struct net_device fc0_dev = {
+	name:		"fc0",
+	next:		 &fc1_dev,
+	init:		fcif_probe
+};
+#undef       NEXT_DEV
+#define      NEXT_DEV        (&fc0_dev)
 #endif
 
 
 #ifdef CONFIG_SBNI
-	static struct net_device sbni7_dev =
-		{"sbni7", 0, 0, 0, 0, 0, 0, 0, 0, 0, NEXT_DEV, sbni_probe};
-	static struct net_device sbni6_dev =
-		{"sbni6", 0, 0, 0, 0, 0, 0, 0, 0, 0, &sbni7_dev, sbni_probe};
-	static struct net_device sbni5_dev =
-		{"sbni5", 0, 0, 0, 0, 0, 0, 0, 0, 0, &sbni6_dev, sbni_probe};
-	static struct net_device sbni4_dev =
-		{"sbni4", 0, 0, 0, 0, 0, 0, 0, 0, 0, &sbni5_dev, sbni_probe};
-	static struct net_device sbni3_dev =
-		{"sbni3", 0, 0, 0, 0, 0, 0, 0, 0, 0, &sbni4_dev, sbni_probe};
-	static struct net_device sbni2_dev =
-		{"sbni2", 0, 0, 0, 0, 0, 0, 0, 0, 0, &sbni3_dev, sbni_probe};
-	static struct net_device sbni1_dev =
-		{"sbni1", 0, 0, 0, 0, 0, 0, 0, 0, 0, &sbni2_dev, sbni_probe};
-	static struct net_device sbni0_dev =
-		{"sbni0", 0, 0, 0, 0, 0, 0, 0, 0, 0, &sbni1_dev, sbni_probe};
+static struct net_device sbni7_dev = {
+	name:		"sbni7",
+	next:		NEXT_DEV,
+	init:		sbni_probe,
+};
+static struct net_device sbni6_dev =
+	name:		"sbni6",
+	next:		&sbni7_dev,
+	init:		sbni_probe,
+};
+static struct net_device sbni5_dev =
+	name:		"sbni5",
+	next:		&sbni6_dev,
+	init:		sbni_probe,
+};
+static struct net_device sbni4_dev =
+	name:		"sbni4",
+	next:		&sbni5_dev,
+	init:		sbni_probe,
+};
+static struct net_device sbni3_dev =
+	name:		"sbni3",
+	next:		&sbni4_dev,
+	init:		sbni_probe,
+};
+static struct net_device sbni2_dev =
+	name:		"sbni2",
+	next:		&sbni3_dev,
+	init:		sbni_probe,
+};
+static struct net_device sbni1_dev =
+	name:		"sbni1",
+	next:		&sbni2_dev,
+	init:		sbni_probe,
+};
+static struct net_device sbni0_dev =
+	name:		"sbni0",
+	next:		&sbni1_dev,
+	init:		sbni_probe,
+};
 
 #undef	NEXT_DEV
 #define	NEXT_DEV	(&sbni0_dev)
@@ -638,8 +739,11 @@ static struct net_device tr0_dev = {
  */
 
 extern int loopback_init(struct net_device *dev);
-struct net_device loopback_dev = 
-	{"lo", 0, 0, 0, 0, 0, 0, 0, 0, 0, NEXT_DEV, loopback_init};
+struct net_device loopback_dev = {
+	name:		"lo",
+	next:		NEXT_DEV,
+	init:		loopback_init
+};
 
 /*
  * The @dev_base list is protected by @dev_base_lock and the rtln
