@@ -1775,7 +1775,6 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 				       int *optlen)
 {
 	struct sctp_status status;
-	sctp_endpoint_t *ep;
 	sctp_association_t *assoc = NULL;
 	struct sctp_transport *transport;
 	sctp_assoc_t associd;
