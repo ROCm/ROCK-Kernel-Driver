@@ -109,7 +109,7 @@
 #include <asm/byteorder.h>
 
 
-#define DRIVER_VERSION "2004 Feb 02"
+#define DRIVER_VERSION "2004 Nov 08"
 #define DRIVER_AUTHOR "Roman Weissgaerber, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
@@ -657,8 +657,6 @@ retry:
 
 	udev = hcd_to_bus (&ohci->hcd)->root_hub;
 	if (udev) {
-		udev->dev.power.power_state = 0;
-		usb_set_device_state (udev, USB_STATE_CONFIGURED);
 		return 0;
 	}
  
@@ -799,6 +797,7 @@ static int ohci_restart (struct ohci_hcd *ohci)
 	int temp;
 	int i;
 	struct urb_priv *priv;
+	struct usb_device *root = ohci->hcd.self.root_hub;
 
 	/* mark any devices gone, so they do nothing till khubd disconnects.
 	 * recycle any "live" eds/tds (and urbs) right away.
@@ -807,7 +806,11 @@ static int ohci_restart (struct ohci_hcd *ohci)
 	 */ 
 	spin_lock_irq(&ohci->lock);
 	disable (ohci);
-	usb_set_device_state (ohci->hcd.self.root_hub, USB_STATE_NOTATTACHED);
+	for (i = 0; i < root->maxchild; i++) {
+		if (root->children [i])
+			usb_set_device_state (root->children[i],
+				USB_STATE_NOTATTACHED);
+	}
 	if (!list_empty (&ohci->pending))
 		ohci_dbg(ohci, "abort schedule...\n");
 	list_for_each_entry (priv, &ohci->pending, pending) {
@@ -864,7 +867,6 @@ static int ohci_restart (struct ohci_hcd *ohci)
 			ohci_writel (ohci, RH_PS_PSS,
 				&ohci->regs->roothub.portstatus [temp]);
 		ohci_dbg (ohci, "restart complete\n");
-		ohci->hcd.state = USB_STATE_RUNNING;
 	}
 	return 0;
 }

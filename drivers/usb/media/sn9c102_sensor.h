@@ -98,7 +98,7 @@ static const struct usb_device_id sn9c102_id_table[] = {                      \
 	{ USB_DEVICE(0x0c45, 0x6028), }, /* PAS202BCB */                      \
 	{ USB_DEVICE(0x0c45, 0x6029), }, /* PAS106B */                        \
 	{ USB_DEVICE(0x0c45, 0x602a), }, /* HV7131[D|E1] */                   \
-	{ USB_DEVICE(0x0c45, 0x602b), },                                      \
+	{ USB_DEVICE(0x0c45, 0x602b), }, /* MI-0343 */                        \
 	{ USB_DEVICE(0x0c45, 0x602c), }, /* OV7620 */                         \
 	{ USB_DEVICE(0x0c45, 0x6030), }, /* MI03x */                          \
 	{ USB_DEVICE(0x0c45, 0x6080), },                                      \
@@ -292,21 +292,25 @@ struct sn9c102_sensor {
 	   NOTE: in case, you must program the SN9C10X chip to get rid of 
 	         blank pixels or blank lines at the _start_ of each line or
 	         frame after each HSYNC or VSYNC, so that the image starts with
-	         real RGB data (see regs 0x12,0x13) (having set H_SIZE and,
+	         real RGB data (see regs 0x12, 0x13) (having set H_SIZE and,
 	         V_SIZE you don't have to care about blank pixels or blank
 	         lines at the end of each line or frame).
 	*/
 
 	struct v4l2_pix_format pix_format;
 	/*
-	   What you have to define here are: initial 'width' and 'height' of
-	   the target rectangle, the bayer 'pixelformat' and 'priv' which we'll
-	   be used to indicate the number of bits per pixel, 8 or 9. 
-	   Nothing more.
+	   What you have to define here are: 1) initial 'width' and 'height' of
+	   the target rectangle 2) the initial 'pixelformat', which can be
+	   either V4L2_PIX_FMT_SN9C10X (for compressed video) or
+	   V4L2_PIX_FMT_SBGGR8 3) 'priv', which we'll be used to indicate the
+	   number of bits per pixel for uncompressed video, 8 or 9 (despite the
+	   current value of 'pixelformat').
 	   NOTE 1: both 'width' and 'height' _must_ be either 1/1 or 1/2 or 1/4
 	           of cropcap.defrect.width and cropcap.defrect.height. I
 	           suggest 1/1.
-	   NOTE 2: as said above, you have to program the SN9C10X chip to get
+	   NOTE 2: The initial compression quality is defined by the first bit
+	           of reg 0x17 during the initialization of the image sensor.
+	   NOTE 3: as said above, you have to program the SN9C10X chip to get
 	           rid of any blank pixels, so that the output of the sensor
 	           matches the RGB bayer sequence (i.e. BGBGBG...GRGRGR).
 	*/
@@ -332,5 +336,12 @@ struct sn9c102_sensor {
 	struct v4l2_queryctrl _qctrl[V4L2_CID_LASTP1-V4L2_CID_BASE];
 	struct v4l2_rect _rect;
 };
+
+/*****************************************************************************/
+
+/* Private ioctl's for control settings supported by some image sensors */
+#define SN9C102_V4L2_CID_DAC_MAGNITUDE V4L2_CID_PRIVATE_BASE
+#define SN9C102_V4L2_CID_DAC_SIGN V4L2_CID_PRIVATE_BASE + 1
+#define SN9C102_V4L2_CID_GREEN_BALANCE V4L2_CID_PRIVATE_BASE + 2
 
 #endif /* _SN9C102_SENSOR_H_ */

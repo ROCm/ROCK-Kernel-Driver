@@ -28,7 +28,6 @@
 #include <linux/string.h>
 #include <linux/device.h>
 #include <linux/fs.h>
-#include <linux/time.h>
 #include <linux/delay.h>
 #include <linux/stddef.h>
 #include <linux/compiler.h>
@@ -100,6 +99,7 @@ static sn9c102_eof_header_t sn9c102_eof_header[] = {
 };
 
 /*****************************************************************************/
+
 static void* rvmalloc(size_t size)
 {
 	void* mem;
@@ -424,7 +424,8 @@ int sn9c102_i2c_write(struct sn9c102_device* cam, u8 address, u8 value)
 
 /*****************************************************************************/
 
-static void* sn9c102_find_sof_header(void* mem, size_t len)
+static void*
+sn9c102_find_sof_header(struct sn9c102_device* cam, void* mem, size_t len)
 {
 	size_t soflen = sizeof(sn9c102_sof_header_t), i;
 	u8 j, n = sizeof(sn9c102_sof_header) / soflen;
@@ -440,10 +441,14 @@ static void* sn9c102_find_sof_header(void* mem, size_t len)
 }
 
 
-static void* sn9c102_find_eof_header(void* mem, size_t len)
+static void*
+sn9c102_find_eof_header(struct sn9c102_device* cam, void* mem, size_t len)
 {
 	size_t eoflen = sizeof(sn9c102_eof_header_t), i;
 	unsigned j, n = sizeof(sn9c102_eof_header) / eoflen;
+
+	if (cam->sensor->pix_format.pixelformat == V4L2_PIX_FMT_SN9C10X)
+		return NULL; /* EOF header does not exist in compressed data */
 
 	for (i = 0; (len >= eoflen) && (i <= len - eoflen); i++)
 		for (j = 0; j < n; j++)
@@ -509,9 +514,9 @@ static void sn9c102_urb_complete(struct urb *urb, struct pt_regs* regs)
 		*/
 
 redo:
-		sof = sn9c102_find_sof_header(pos, len);
+		sof = sn9c102_find_sof_header(cam, pos, len);
 		if (!sof) {
-			eof = sn9c102_find_eof_header(pos, len);
+			eof = sn9c102_find_eof_header(cam, pos, len);
 			if ((*f)->state == F_GRABBING) {
 end_of_frame:
 				img = len;
@@ -539,7 +544,9 @@ end_of_frame:
 
 				(*f)->buf.bytesused += img;
 
-				if ((*f)->buf.bytesused == (*f)->buf.length) {
+				if ((*f)->buf.bytesused == (*f)->buf.length ||
+				    (cam->sensor->pix_format.pixelformat ==
+				                V4L2_PIX_FMT_SN9C10X && eof)) {
 					u32 b = (*f)->buf.bytesused;
 					(*f)->state = F_DONE;
 					(*f)->buf.sequence= ++cam->frame_count;
@@ -592,14 +599,20 @@ start_of_frame:
 				goto redo;
 
 		} else if ((*f)->state == F_GRABBING) {
-			eof = sn9c102_find_eof_header(pos, len);
+			eof = sn9c102_find_eof_header(cam, pos, len);
 			if (eof && eof < sof)
 				goto end_of_frame; /* (1) */
 			else {
-				DBG(3, "SOF before expected EOF after %lu "
-				       "bytes of image data", 
-				    (unsigned long)((*f)->buf.bytesused))
-				goto start_of_frame;
+				if (cam->sensor->pix_format.pixelformat ==
+				    V4L2_PIX_FMT_SN9C10X) {
+					eof = sof-sizeof(sn9c102_sof_header_t);
+					goto end_of_frame;
+				} else {
+					DBG(3, "SOF before expected EOF after "
+					       "%lu bytes of image data", 
+					  (unsigned long)((*f)->buf.bytesused))
+					goto start_of_frame;
+				}
 			}
 		}
 	}
@@ -721,6 +734,29 @@ static int sn9c102_stop_transfer(struct sn9c102_device* cam)
 		DBG(3, "usb_set_interface() failed")
 
 	return err;
+}
+
+
+int sn9c102_stream_interrupt(struct sn9c102_device* cam)
+{
+	int err = 0;
+
+	cam->stream = STREAM_INTERRUPT;
+	err = wait_event_timeout(cam->wait_stream,
+	                         (cam->stream == STREAM_OFF) ||
+	                         (cam->state & DEV_DISCONNECTED),
+	                         SN9C102_URB_TIMEOUT);
+	if (err) {
+		cam->state |= DEV_MISCONFIGURED;
+		DBG(1, "The camera is misconfigured. To use "
+		       "it, close and open /dev/video%d "
+		       "again.", cam->v4ldev->minor)
+		return err;
+	}
+	if (cam->state & DEV_DISCONNECTED)
+		return -ENODEV;
+
+	return 0;
 }
 
 /*****************************************************************************/
@@ -1127,6 +1163,35 @@ static void sn9c102_create_sysfs(struct sn9c102_device* cam)
 
 /*****************************************************************************/
 
+static int
+sn9c102_set_format(struct sn9c102_device* cam, struct v4l2_pix_format* fmt)
+{
+	int err = 0;
+
+	if (fmt->pixelformat == V4L2_PIX_FMT_SN9C10X)
+		err += sn9c102_write_reg(cam, cam->reg[0x18] | 0x80, 0x18);
+	else
+		err += sn9c102_write_reg(cam, cam->reg[0x18] & 0x7f, 0x18);
+
+	return err ? -EIO : 0;
+}
+
+
+static int
+sn9c102_set_compression(struct sn9c102_device* cam,
+                        struct v4l2_jpegcompression* compression)
+{
+	int err = 0;
+
+	if (compression->quality == 0)
+		err += sn9c102_write_reg(cam, cam->reg[0x17] | 0x01, 0x17);
+	else if (compression->quality == 1)
+		err += sn9c102_write_reg(cam, cam->reg[0x17] & 0xfe, 0x17);
+
+	return err ? -EIO : 0;
+}
+
+
 static int sn9c102_set_scale(struct sn9c102_device* cam, u8 scale)
 {
 	u8 r = 0;
@@ -1204,6 +1269,20 @@ static int sn9c102_init(struct sn9c102_device* cam)
 		}
 	}
 
+	if (!(cam->state & DEV_INITIALIZED))
+		cam->compression.quality =  cam->reg[0x17] & 0x01 ? 0 : 1;
+	else
+		err += sn9c102_set_compression(cam, &cam->compression);
+	err += sn9c102_set_format(cam, &s->pix_format);
+	if (err)
+		return err;
+
+	if (s->pix_format.pixelformat == V4L2_PIX_FMT_SN9C10X)
+		DBG(3, "Compressed video format is active, quality %d", 
+		    cam->compression.quality)
+	else
+		DBG(3, "Uncompressed video format is active")
+
 	if (s->set_crop)
 		if ((err = s->set_crop(cam, rect))) {
 			DBG(3, "set_crop() failed")
@@ -1219,9 +1298,12 @@ static int sn9c102_init(struct sn9c102_device* cam)
 				ctrl.value = qctrl[i].default_value;
 				err = s->set_ctrl(cam, &ctrl);
 				if (err) {
-					DBG(3, "Set control failed")
+					DBG(3, "Set %s control failed",
+					    s->qctrl[i].name)
 					return err;
 				}
+				DBG(3, "Image sensor supports '%s' control",
+				    s->qctrl[i].name)
 			}
 	}
 
@@ -1230,6 +1312,7 @@ static int sn9c102_init(struct sn9c102_device* cam)
 		spin_lock_init(&cam->queue_lock);
 		init_waitqueue_head(&cam->wait_frame);
 		init_waitqueue_head(&cam->wait_stream);
+		cam->nreadbuffers = 2;
 		memcpy(s->_qctrl, s->qctrl, sizeof(s->qctrl));
 		memcpy(&(s->_rect), &(s->cropcap.defrect), 
 		       sizeof(struct v4l2_rect));
@@ -1387,7 +1470,7 @@ sn9c102_read(struct file* filp, char __user * buf, size_t count, loff_t* f_pos)
 	}
 
 	if (cam->io == IO_NONE) {
-		if (!sn9c102_request_buffers(cam, 2)) {
+		if (!sn9c102_request_buffers(cam, cam->nreadbuffers)) {
 			DBG(1, "read() failed, not enough memory")
 			up(&cam->fileop_sem);
 			return -ENOMEM;
@@ -1431,8 +1514,8 @@ sn9c102_read(struct file* filp, char __user * buf, size_t count, loff_t* f_pos)
 
 	sn9c102_queue_unusedframes(cam);
 
-	if (count > f->buf.length)
-		count = f->buf.length;
+	if (count > f->buf.bytesused)
+		count = f->buf.bytesused;
 
 	if (copy_to_user(buf, f->bufmem, count)) {
 		up(&cam->fileop_sem);
@@ -1553,11 +1636,15 @@ static int sn9c102_mmap(struct file* filp, struct vm_area_struct *vma)
 		return -EINVAL;
 	}
 
+	/* VM_IO is eventually going to replace PageReserved altogether */
+	vma->vm_flags |= VM_IO;
+	vma->vm_flags |= VM_RESERVED; /* avoid to swap out this VMA */
+
 	pos = (unsigned long)cam->frame[i].bufmem;
 	while (size > 0) { /* size is page-aligned */
 		page = vmalloc_to_pfn((void *)pos);
 		if (remap_pfn_range(vma, start, page, PAGE_SIZE,
-		                     vma->vm_page_prot)) {
+		                    vma->vm_page_prot)) {
 			up(&cam->fileop_sem);
 			return -EAGAIN;
 		}
@@ -1567,8 +1654,6 @@ static int sn9c102_mmap(struct file* filp, struct vm_area_struct *vma)
 	}
 
 	vma->vm_ops = &sn9c102_vm_ops;
-	vma->vm_flags &= ~VM_IO; /* not I/O memory */
-	vma->vm_flags |= VM_RESERVED; /* avoid to swap out this VMA */
 	vma->vm_private_data = &cam->frame[i];
 
 	sn9c102_vm_open(vma);
@@ -1593,11 +1678,14 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 			.version = SN9C102_MODULE_VERSION_CODE,
 			.capabilities = V4L2_CAP_VIDEO_CAPTURE | 
 			                V4L2_CAP_READWRITE |
-		 	                V4L2_CAP_STREAMING,
+			                V4L2_CAP_STREAMING,
 		};
 
 		strlcpy(cap.card, cam->v4ldev->name, sizeof(cap.card));
-		strlcpy(cap.bus_info, cam->dev.bus_id, sizeof(cap.bus_info));
+		if (usb_make_path(cam->usbdev, cap.bus_info,
+		    sizeof(cap.bus_info)) < 0)
+			strlcpy(cap.bus_info, cam->dev.bus_id,
+			        sizeof(cap.bus_info));
 
 		if (copy_to_user(arg, &cap, sizeof(cap)))
 			return -EFAULT;
@@ -1707,6 +1795,9 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 
 		s->_qctrl[i].default_value = ctrl.value;
 
+		PDBGG("VIDIOC_S_CTRL: id %lu, value %lu",
+		      (unsigned long)ctrl.id, (unsigned long)ctrl.value)
+
 		return 0;
 	}
 
@@ -1803,22 +1894,9 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 		} else
 			scale = 1;
 
-		if (cam->stream == STREAM_ON) {
-			cam->stream = STREAM_INTERRUPT;
-			err = wait_event_interruptible
-			      ( cam->wait_stream, 
-			        (cam->stream == STREAM_OFF) ||
-			        (cam->state & DEV_DISCONNECTED) );
-			if (err) {
-				cam->state |= DEV_MISCONFIGURED;
-				DBG(1, "The camera is misconfigured. To use "
-				       "it, close and open /dev/video%d "
-				       "again.", cam->v4ldev->minor)
+		if (cam->stream == STREAM_ON)
+			if ((err = sn9c102_stream_interrupt(cam)))
 				return err;
-			}
-			if (cam->state & DEV_DISCONNECTED)
-				return -ENODEV;
-		}
 
 		if (copy_to_user(arg, &crop, sizeof(crop))) {
 			cam->stream = stream;
@@ -1859,20 +1937,23 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 
 	case VIDIOC_ENUM_FMT:
 	{
-		struct sn9c102_sensor* s = cam->sensor;
 		struct v4l2_fmtdesc fmtd;
 
 		if (copy_from_user(&fmtd, arg, sizeof(fmtd)))
 			return -EFAULT;
 
-		if (fmtd.index != 0)
+		if (fmtd.index == 0) {
+			strcpy(fmtd.description, "bayer rgb");
+			fmtd.pixelformat = V4L2_PIX_FMT_SBGGR8;
+		} else if (fmtd.index == 1) {
+			strcpy(fmtd.description, "compressed");
+			fmtd.pixelformat = V4L2_PIX_FMT_SN9C10X;
+			fmtd.flags = V4L2_FMT_FLAG_COMPRESSED;
+		} else
 			return -EINVAL;
 
-		memset(&fmtd, 0, sizeof(fmtd));
-
 		fmtd.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-		strcpy(fmtd.description, "bayer rgb");
-		fmtd.pixelformat = s->pix_format.pixelformat;
+		memset(&fmtd.reserved, 0, sizeof(fmtd.reserved));
 
 		if (copy_to_user(arg, &fmtd, sizeof(fmtd)))
 			return -EFAULT;
@@ -1891,8 +1972,9 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 		if (format.type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
 			return -EINVAL;
 
-		pfmt->bytesperline = (pfmt->width * pfmt->priv) / 8;
-		pfmt->sizeimage = pfmt->height * pfmt->bytesperline;
+		pfmt->bytesperline = (pfmt->pixelformat==V4L2_PIX_FMT_SN9C10X)
+		                     ? 0 : (pfmt->width * pfmt->priv) / 8;
+		pfmt->sizeimage = pfmt->height * ((pfmt->width*pfmt->priv)/8);
 		pfmt->field = V4L2_FIELD_NONE;
 		memcpy(&(format.fmt.pix), pfmt, sizeof(*pfmt));
 
@@ -1961,15 +2043,21 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 		pix->width = rect.width / scale;
 		pix->height = rect.height / scale;
 
-		pix->pixelformat = pfmt->pixelformat;
+		if (pix->pixelformat != V4L2_PIX_FMT_SN9C10X &&
+		    pix->pixelformat != V4L2_PIX_FMT_SBGGR8)
+			pix->pixelformat = pfmt->pixelformat;
 		pix->priv = pfmt->priv; /* bpp */
 		pix->colorspace = pfmt->colorspace;
-		pix->bytesperline = (pix->width * pix->priv) / 8;
-		pix->sizeimage = pix->height * pix->bytesperline;
+		pix->bytesperline = (pix->pixelformat == V4L2_PIX_FMT_SN9C10X)
+		                    ? 0 : (pix->width * pix->priv) / 8;
+		pix->sizeimage = pix->height * ((pix->width * pix->priv) / 8);
 		pix->field = V4L2_FIELD_NONE;
 
-		if (cmd == VIDIOC_TRY_FMT)
+		if (cmd == VIDIOC_TRY_FMT) {
+			if (copy_to_user(arg, &format, sizeof(format)))
+				return -EFAULT;
 			return 0;
+		}
 
 		for (i = 0; i < cam->nbuffers; i++)
 			if (cam->frame[i].vma_use_count) {
@@ -1978,22 +2066,9 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 				return -EINVAL;
 			}
 
-		if (cam->stream == STREAM_ON) {
-			cam->stream = STREAM_INTERRUPT;
-			err = wait_event_interruptible
-			      ( cam->wait_stream, 
-			        (cam->stream == STREAM_OFF) ||
-			        (cam->state & DEV_DISCONNECTED) );
-			if (err) {
-				cam->state |= DEV_MISCONFIGURED;
-				DBG(1, "The camera is misconfigured. To use "
-				       "it, close and open /dev/video%d "
-				       "again.", cam->v4ldev->minor)
+		if (cam->stream == STREAM_ON)
+			if ((err = sn9c102_stream_interrupt(cam)))
 				return err;
-			}
-			if (cam->state & DEV_DISCONNECTED)
-				return -ENODEV;
-		}
 
 		if (copy_to_user(arg, &format, sizeof(format))) {
 			cam->stream = stream;
@@ -2002,7 +2077,8 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 
 		sn9c102_release_buffers(cam);
 
-		err = sn9c102_set_crop(cam, &rect);
+		err += sn9c102_set_format(cam, pix);
+		err += sn9c102_set_crop(cam, &rect);
 		if (s->set_crop)
 			err += s->set_crop(cam, &rect);
 		err += sn9c102_set_scale(cam, scale);
@@ -2025,6 +2101,47 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 			       "/dev/video%d again.", cam->v4ldev->minor)
 			return -ENOMEM;
 		}
+
+		cam->stream = stream;
+
+		return 0;
+	}
+
+	case VIDIOC_G_JPEGCOMP:
+	{
+		if (copy_to_user(arg, &cam->compression,
+		                 sizeof(cam->compression)))
+			return -EFAULT;
+
+		return 0;
+	}
+
+	case VIDIOC_S_JPEGCOMP:
+	{
+		struct v4l2_jpegcompression jc;
+		const enum sn9c102_stream_state stream = cam->stream;
+		int err = 0;
+
+		if (copy_from_user(&jc, arg, sizeof(jc)))
+			return -EFAULT;
+
+		if (jc.quality != 0 && jc.quality != 1)
+			return -EINVAL;
+
+		if (cam->stream == STREAM_ON)
+			if ((err = sn9c102_stream_interrupt(cam)))
+				return err;
+
+		err += sn9c102_set_compression(cam, &jc);
+		if (err) { /* atomic, no rollback in ioctl() */
+			cam->state |= DEV_MISCONFIGURED;
+			DBG(1, "VIDIOC_S_JPEGCOMP failed because of hardware "
+			       "problems. To use the camera, close and open "
+			       "/dev/video%d again.", cam->v4ldev->minor)
+			return -EIO;
+		}
+
+		cam->compression.quality = jc.quality;
 
 		cam->stream = stream;
 
@@ -2057,22 +2174,9 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 				return -EINVAL;
 			}
 
-		if (cam->stream == STREAM_ON) {
-			cam->stream = STREAM_INTERRUPT;
-			err = wait_event_interruptible
-			      ( cam->wait_stream, 
-			        (cam->stream == STREAM_OFF) ||
-			        (cam->state & DEV_DISCONNECTED) );
-			if (err) {
-				cam->state |= DEV_MISCONFIGURED;
-				DBG(1, "The camera is misconfigured. To use "
-				       "it, close and open /dev/video%d "
-				       "again.", cam->v4ldev->minor)
+		if (cam->stream == STREAM_ON)
+			if ((err = sn9c102_stream_interrupt(cam)))
 				return err;
-			}
-			if (cam->state & DEV_DISCONNECTED)
-				return -ENODEV;
-		}
 
 		sn9c102_empty_framequeues(cam);
 
@@ -2222,26 +2326,58 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 		if (type != V4L2_BUF_TYPE_VIDEO_CAPTURE || cam->io != IO_MMAP)
 			return -EINVAL;
 
-		if (cam->stream == STREAM_ON) {
-			cam->stream = STREAM_INTERRUPT;
-			err = wait_event_interruptible
-			      ( cam->wait_stream, 
-			        (cam->stream == STREAM_OFF) ||
-			        (cam->state & DEV_DISCONNECTED) );
-			if (err) {
-				cam->state |= DEV_MISCONFIGURED;
-				DBG(1, "The camera is misconfigured. To use "
-				       "it, close and open /dev/video%d "
-				       "again.", cam->v4ldev->minor)
+		if (cam->stream == STREAM_ON)
+			if ((err = sn9c102_stream_interrupt(cam)))
 				return err;
-			}
-			if (cam->state & DEV_DISCONNECTED)
-				return -ENODEV;
-		}
 
 		sn9c102_empty_framequeues(cam);
 
 		DBG(3, "Stream off")
+
+		return 0;
+	}
+
+	case VIDIOC_G_PARM:
+	{
+		struct v4l2_streamparm sp;
+
+		if (copy_from_user(&sp, arg, sizeof(sp)))
+			return -EFAULT;
+
+		if (sp.type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+			return -EINVAL;
+
+		sp.parm.capture.extendedmode = 0;
+		sp.parm.capture.readbuffers = cam->nreadbuffers;
+
+		if (copy_to_user(arg, &sp, sizeof(sp)))
+			return -EFAULT;
+
+		return 0;
+	}
+
+	case VIDIOC_S_PARM:
+	{
+		struct v4l2_streamparm sp;
+
+		if (copy_from_user(&sp, arg, sizeof(sp)))
+			return -EFAULT;
+
+		if (sp.type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+			return -EINVAL;
+
+		sp.parm.capture.extendedmode = 0;
+
+		if (sp.parm.capture.readbuffers == 0)
+			sp.parm.capture.readbuffers = cam->nreadbuffers;
+
+		if (sp.parm.capture.readbuffers > SN9C102_MAX_FRAMES)
+			sp.parm.capture.readbuffers = SN9C102_MAX_FRAMES;
+
+		if (copy_to_user(arg, &sp, sizeof(sp)))
+			return -EFAULT;
+
+		cam->nreadbuffers = sp.parm.capture.readbuffers;
 
 		return 0;
 	}
@@ -2251,8 +2387,6 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 	case VIDIOC_QUERYSTD:
 	case VIDIOC_ENUMSTD:
 	case VIDIOC_QUERYMENU:
-	case VIDIOC_G_PARM:
-	case VIDIOC_S_PARM:
 		return -EINVAL;
 
 	default:
