@@ -53,10 +53,10 @@
  * endian issues in treating two 32 bit numbers as one 64 bit number
  */
 static
-#ifdef __GNUC__
-# if !((__GNUC__ == 2) && (__GNUC_MINOR__ == 95))
+#if defined(__GNUC__) && (__GNUC__ == 2) && (__GNUC_MINOR__ == 95)
+__attribute__((unused))	/* gcc 2.95 miscompiles this when inlined */
+#else
 __inline__
-#endif
 #endif
 xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2, xfs_arch_t arch)
 {
