@@ -1237,14 +1237,14 @@ static int __devinit aureon_init(ice1712_t *ice)
 static unsigned char aureon51_eeprom[] __devinitdata = {
 	0x0a,	/* SYSCONF: clock 512, spdif-in/ADC, 3DACs */
 	0x80,	/* ACLINK: I2S */
-	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
+	0xfc,	/* I2S: vol, 96k, 24bit, 192k */
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
 	0xff,	/* GPIO_DIR */
 	0xff,	/* GPIO_DIR1 */
 	0x5f,	/* GPIO_DIR2 */
-	0xff,	/* GPIO_MASK */
-	0xff,	/* GPIO_MASK1 */
-	0xff,	/* GPIO_MASK2 */
+	0x00,	/* GPIO_MASK */
+	0x00,	/* GPIO_MASK1 */
+	0x00,	/* GPIO_MASK2 */
 	0x00,	/* GPIO_STATE */
 	0x00,	/* GPIO_STATE1 */
 	0x00,	/* GPIO_STATE2 */
@@ -1253,7 +1253,7 @@ static unsigned char aureon51_eeprom[] __devinitdata = {
 static unsigned char aureon71_eeprom[] __devinitdata = {
 	0x0b,	/* SYSCONF: clock 512, spdif-in/ADC, 4DACs */
 	0x80,	/* ACLINK: I2S */
-	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
+	0xfc,	/* I2S: vol, 96k, 24bit, 192k */
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
 	0xff,	/* GPIO_DIR */
 	0xff,	/* GPIO_DIR1 */
@@ -1269,7 +1269,7 @@ static unsigned char aureon71_eeprom[] __devinitdata = {
 static unsigned char prodigy71_eeprom[] __devinitdata = {
 	0x0b,	/* SYSCONF: clock 512, spdif-in/ADC, 4DACs */
 	0x80,	/* ACLINK: I2S */
-	0xf8,	/* I2S: vol, 96k, 24bit, 192k */
+	0xfc,	/* I2S: vol, 96k, 24bit, 192k */
 	0xc3,	/* SPDIF: out-en, out-int, spdif-in */
 	0xff,	/* GPIO_DIR */
 	0xff,	/* GPIO_DIR1 */
