@@ -60,6 +60,7 @@
 #include "xfs_bmap.h"
 #include "xfs_da_btree.h"
 #include "xfs_rw.h"
+#include "xfs_refcache.h"
 #include "xfs_buf_item.h"
 #include "xfs_extfree_item.h"
 #include "xfs_quota.h"
@@ -168,6 +169,7 @@ xfs_cleanup(void)
 
 	xfs_cleanup_procfs();
 	xfs_sysctl_unregister();
+	xfs_refcache_destroy();
 
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
 	kmem_cache_destroy(xfs_btree_cur_zone);
@@ -523,6 +525,12 @@ xfs_unmount(
 					0 : DM_FLAGS_UNWANTED;
 	}
 
+	/*
+	 * First blow any referenced inode from this file system
+	 * out of the reference cache, and delete the timer.
+	 */
+	xfs_refcache_purge_mp(mp);
+
 	XFS_bflush(mp->m_ddev_targp);
 	error = xfs_unmount_flush(mp, 0);
 	if (error)
@@ -593,6 +601,7 @@ xfs_mntupdate(
 	}
 
 	if (*flags & MS_RDONLY) {
+		xfs_refcache_purge_mp(mp);
 		pagebuf_delwri_flush(mp->m_ddev_targp, 0, NULL);
 		xfs_finish_reclaim_all(mp, 0);
 
@@ -1465,8 +1474,18 @@ xfs_syncsub(
 	}
 
 	/*
+	 * If this is the periodic sync, then kick some entries out of
+	 * the reference cache.  This ensures that idle entries are
+	 * eventually kicked out of the cache.
+	 */
+	if (flags & SYNC_REFCACHE) {
+		xfs_refcache_purge_some(mp);
+	}
+
+	/*
 	 * Now check to see if the log needs a "dummy" transaction.
 	 */
+
 	if (!(flags & SYNC_REMOUNT) && xfs_log_need_covered(mp)) {
 		xfs_trans_t *tp;
 		xfs_inode_t *ip;

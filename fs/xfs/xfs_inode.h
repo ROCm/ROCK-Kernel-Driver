@@ -271,7 +271,10 @@ typedef struct xfs_inode {
 	sema_t			i_flock;	/* inode flush lock */
 	atomic_t		i_pincount;	/* inode pin count */
 	wait_queue_head_t	i_ipin_wait;	/* inode pinning wait queue */
-
+#ifdef HAVE_REFCACHE
+	struct xfs_inode	**i_refcache;	/* ptr to entry in ref cache */
+	struct xfs_inode	*i_release;	/* inode to unref */
+#endif
 	/* I/O state */
 	xfs_iocore_t		i_iocore;	/* I/O core */
 

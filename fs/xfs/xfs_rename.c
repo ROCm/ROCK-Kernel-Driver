@@ -51,7 +51,7 @@
 #include "xfs_bmap.h"
 #include "xfs_error.h"
 #include "xfs_quota.h"
-#include "xfs_rw.h"
+#include "xfs_refcache.h"
 #include "xfs_utils.h"
 #include "xfs_trans_space.h"
 #include "xfs_da_btree.h"
@@ -627,6 +627,7 @@ xfs_rename(
 	 */
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (target_ip != NULL) {
+		xfs_refcache_purge_ip(target_ip);
 		IRELE(target_ip);
 	}
 	/*
