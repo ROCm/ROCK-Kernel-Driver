@@ -29,7 +29,7 @@
 #include <linux/list.h>
 #include <asm/byteorder.h>
 
-#include "volume.h"
+#include "types.h"
 
 /*
  * Constant endianness conversion defines.
@@ -679,7 +679,7 @@ typedef ATTR_RECORD ATTR_REC;
  */
 typedef enum {
 	/*
-	 * These flags are only presnt in the STANDARD_INFORMATION attribute
+	 * These flags are only present in the STANDARD_INFORMATION attribute
 	 * (in the field file_attributes).
 	 */
 	FILE_ATTR_READONLY		= const_cpu_to_le32(0x00000001),

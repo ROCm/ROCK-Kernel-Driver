@@ -73,52 +73,27 @@ sloppy=<BOOL>		If sloppy is specified, ignore unknown mount options.
 			Otherwise the default behaviour is to abort mount if
 			any unknown options are found.
 
-posix=<bool>		Deprecated option. Still supported but please use
-			show_inodes=posix in the future. See description for
-			show_inodes=opt.
+show_sys_files=<BOOL>	If show_sys_files is specified, show the system files
+			in directory listings. Otherwise the default behaviour
+			is to hide the system files.
+			Note that even when show_sys_files is specified, "$MFT"
+			will not be visible due to bugs/mis-features in glibc.
+			Further, note that irrespective of show_sys_files, all
+			files are accessible by name, i.e. you can always do
+			"ls -l \$UpCase" for example to specifically show the
+			system file containing the Unicode upcase table.
 
-show_sys_files=<bool>	Deprecated option. Still supported but please use
-			show_inodes=system in the future. See description for
-			show_inodes=opt.
-
-show_inodes=opt		Allows choice of which types of inode names readdir()
-			returns, i.e. this affects what "ls" shows. Following
-			values can be used for "opt":
-			   system: show system files
-			   win32:  long file names (includes POSIX) [DEFAULT]
-			   long:   same as win32
-			   dos:    short file names only (excludes POSIX)
-			   short:  same as dos
-			   posix:  same as both win32 and dos
-			   all:    all file names
-			Note that the options are additive, i.e. specifying:
-			   show_inodes=system,show_inodes=win32,show_inodes=dos
-			is the same as specifying:
-			   show_inodes=all
-			Note that the "posix" and "all" options will show all
-			directory names, BUT the link count on each directory
-			inode entry is set to 1, due to Linux not supporting
-			directory hard links. This may well confuse some
-			user space applications, since the directory names will
-			have the same inode numbers. Thus it is NOT advisable
-			to use the "posix" and "all" options. We provide them
-			only for completeness sake.
-			Further, note that the "system" option will not show
-			"$MFT" due to bugs/mis-features in glibc. Even though
-			it does not show, you can specifically "ls" it:
-				ls -l \$MFT
-			And of course you can stat it, too.
-			Further, note that irrespective of what show_inodes
-			option(s) you use, all files are accessible when you
-			specify the correct name, even though they may not be
-			shown in a normal "ls", i.e. you can always access the
-			system files and both the short and long file names of
-			files and directories.
-			Finally, note that win32 and dos file names are not
-			case sensitive and can be accessed using any
-			combination of lower and upper case, while POSIX file
-			names are case sensitive and they can only be accessed
-			given the correct case.
+case_sensitive=<BOOL>	If case_sensitive is specified, treat all file names as
+			case sensitive and create file names in the POSIX
+			namespace. Otherwise the default behaviour is to treat
+			file names as case insensitive and to create file names
+			in the WIN32/LONG name space. Note, the Linux NTFS
+			driver will never create short file names and will
+			remove them on rename/delete of the corresponding long
+			file name.
+			Note that files remain accessible via their short file
+			name, if it exists. If case_sensitive, you will need to
+			provide the correct case of the short file name.
 
 errors=opt		What to do when critical file system errors are found.
 			Following values can be used for "opt":
@@ -174,12 +149,22 @@ Features
   (from 9:43 minutes on average down to 7:53). The time spent in user space
   was unchanged but the time spent in the kernel was decreased by a factor of
   2.5 (from 85 CPU seconds down to 33).
+- The driver does not support short file names in general. For backwards
+  compatibility, we implement access to files using their short file names if
+  they exist. The driver will not create short file names however, and a rename
+  will discard any existing short file name.
 
 
 Known bugs and (mis-)features
 =============================
 
-- None
+- The link count on each directory inode entry is set to 1, due to Linux not
+  supporting directory hard links. This may well confuse some user space
+  applications, since the directory names will have the same inode numbers.
+  This also speeds up ntfs_read_inode() immensely. And we haven't found any
+  problems with this approach so far. If you find a problem with this, please
+  let us know.
+
 
 Please send bug reports/comments/feedback/abuse to the Linux-NTFS development
 list at sourceforge: linux-ntfs-dev@lists.sourceforge.net
@@ -260,8 +245,20 @@ number of sectors BEFORE attempting to use it. You have been warned!
 ChangeLog
 =========
 
-Note that a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
+Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.8:
+	- Remove now obsolete show_inodes and posix mount option(s).
+	- Restore show_sys_files mount option.
+	- Add new mount option case_sensitive, to determine if the driver
+	  treats file names as case sensitive or not.
+	- Mostly drop support for short file names (for backwards compatibility
+	  we only support accessing files via their short file name if one
+	  exists).
+	- Fix dcache aliasing issues wrt short/long file names.
+	- Cleanups and minor fixes.
+2.0.7:
+	- Just cleanups.
 2.0.6:
 	- Major bugfix to make compatible with other kernel changes. This fixes
 	  the hangs/oopses on umount.
