@@ -62,10 +62,8 @@ static struct pci_dev _vio_dev  = { .sysdata = &vio_dev_node, .dev.bus = &pci_bu
 struct pci_dev *iSeries_veth_dev = &_veth_dev;
 struct device *iSeries_vio_dev = &_vio_dev.dev;
 
-#if 0
 EXPORT_SYMBOL(iSeries_veth_dev);
 EXPORT_SYMBOL(iSeries_vio_dev);
-#endif
 
 extern struct list_head iSeries_Global_Device_List;
 
