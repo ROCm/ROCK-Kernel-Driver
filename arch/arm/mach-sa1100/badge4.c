@@ -143,13 +143,6 @@ void badge4_set_5V(unsigned subsystem, int on)
 EXPORT_SYMBOL(badge4_set_5V);
 
 
-static void __init
-fixup_badge4(struct machine_desc *desc, struct param_struct *params,
-	    char **cmdline, struct meminfo *mi)
-{
-	/* nothing needed here */
-}
-
 static struct map_desc badge4_io_desc[] __initdata = {
   /*  virtual    physical    length      domain     r w c b		   */
   {0xf1000000, 0x08000000, 0x00100000, DOMAIN_IO, 0,1,0,0},/* SRAM  bank 1 */
@@ -170,7 +163,6 @@ static void __init badge4_map_io(void)
 MACHINE_START(BADGE4, "Hewlett-Packard Laboratories BadgePAD 4")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	BOOT_PARAMS(0xc0000100)
-	FIXUP(fixup_badge4)
 	MAPIO(badge4_map_io)
 	INITIRQ(sa1100_init_irq)
 MACHINE_END

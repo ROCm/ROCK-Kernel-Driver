@@ -159,13 +159,11 @@ static void __init get_assabet_scr(void)
 	SCR_value = scr;
 }
 
-extern void convert_to_tag_list(struct param_struct *params, int mem_init);
-
 static void __init
-fixup_assabet(struct machine_desc *desc, struct param_struct *params,
+fixup_assabet(struct machine_desc *desc, struct tag *tags,
 	      char **cmdline, struct meminfo *mi)
 {
-	struct tag *t = (struct tag *)params;
+	struct tag *t = tags;
 
 	/* This must be done before any call to machine_has_neponset() */
 	map_sa1100_gpio_regs();
@@ -173,12 +171,6 @@ fixup_assabet(struct machine_desc *desc, struct param_struct *params,
 
 	if (machine_has_neponset())
 		printk("Neponset expansion board detected\n");
-
-	/*
-	 * Apparantly bootldr uses a param_struct.  Groan.
-	 */
-	if (t->hdr.tag != ATAG_CORE)
-		convert_to_tag_list(params, 1);
 
 	if (t->hdr.tag != ATAG_CORE) {
 		t->hdr.tag = ATAG_CORE;

@@ -36,25 +36,11 @@ static int __init parse_tag_memclk(const struct tag *tag)
 __tagtable(ATAG_MEMCLK, parse_tag_memclk);
 
 #ifdef CONFIG_ARCH_EBSA285
-
-static void __init
-fixup_ebsa285(struct machine_desc *desc, struct param_struct *params,
-	      char **cmdline, struct meminfo *mi)
-{
-#if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
-	ORIG_X		 = params->u1.s.video_x;
-	ORIG_Y		 = params->u1.s.video_y;
-	ORIG_VIDEO_COLS  = params->u1.s.video_num_cols;
-	ORIG_VIDEO_LINES = params->u1.s.video_num_rows;
-#endif
-}
-
 MACHINE_START(EBSA285, "EBSA285")
 	MAINTAINER("Russell King")
 	BOOT_MEM(0x00000000, DC21285_ARMCSR_BASE, 0xfe000000)
 	BOOT_PARAMS(0x00000100)
 	VIDEO(0x000a0000, 0x000bffff)
-	FIXUP(fixup_ebsa285)
 	MAPIO(footbridge_map_io)
 	INITIRQ(footbridge_init_irq)
 MACHINE_END
@@ -67,7 +53,7 @@ MACHINE_END
  * the parameter page.
  */
 static void __init
-fixup_netwinder(struct machine_desc *desc, struct param_struct *params,
+fixup_netwinder(struct machine_desc *desc, struct tag *tags,
 		char **cmdline, struct meminfo *mi)
 {
 #ifdef CONFIG_ISAPNP
@@ -80,21 +66,6 @@ fixup_netwinder(struct machine_desc *desc, struct param_struct *params,
 	 */
 	isapnp_disable = 1;
 #endif
-
-	if (params->u1.s.nr_pages != 0x02000 &&
-	    params->u1.s.nr_pages != 0x04000 &&
-	    params->u1.s.nr_pages != 0x08000 &&
-	    params->u1.s.nr_pages != 0x10000) {
-		printk(KERN_WARNING "Warning: bad NeTTrom parameters "
-		       "detected, using defaults\n");
-
-		params->u1.s.nr_pages = 0x1000;	/* 16MB */
-		params->u1.s.ramdisk_size = 0;
-		params->u1.s.flags = FLAG_READONLY;
-		params->u1.s.initrd_start = 0;
-		params->u1.s.initrd_size = 0;
-		params->u1.s.rd_start = 0;
-	}
 }
 
 MACHINE_START(NETWINDER, "Rebel-NetWinder")
@@ -116,7 +87,7 @@ MACHINE_END
  * hard reboots fail on early boards.
  */
 static void __init
-fixup_cats(struct machine_desc *desc, struct param_struct *unused,
+fixup_cats(struct machine_desc *desc, struct tag *tags,
 	   char **cmdline, struct meminfo *mi)
 {
 	ORIG_VIDEO_LINES  = 25;
@@ -138,7 +109,7 @@ MACHINE_END
 #ifdef CONFIG_ARCH_CO285
 
 static void __init
-fixup_coebsa285(struct machine_desc *desc, struct param_struct *unused,
+fixup_coebsa285(struct machine_desc *desc, struct tag *tags,
 		char **cmdline, struct meminfo *mi)
 {
 	extern unsigned long boot_memory_end;

@@ -27,7 +27,7 @@ extern void clps711x_init_irq(void);
 extern void clps711x_map_io(void); 
 
 static void __init
-fixup_clep7312(struct machine_desc *desc, struct param_struct *params,
+fixup_clep7312(struct machine_desc *desc, struct tag *tags,
 	    char **cmdline, struct meminfo *mi)
 {
 	mi->nr_banks=1;
