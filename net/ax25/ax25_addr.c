@@ -1,24 +1,11 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	Most of this code is based on the SDL diagrams published in the 7th
- *	ARRL Computer Networking Conference papers. The diagrams have mistakes
- *	in them, but are mostly correct. Before you modify the code could you
- *	read the SDL diagrams as the code is not obvious and probably very
- *	easy to break;
- *
- *	History
- *	AX.25 036	Jonathan(G4KLX)	Split from ax25_subr.c.
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -165,14 +152,14 @@ unsigned char *ax25_addr_parse(unsigned char *buf, int len, ax25_address *src, a
 
 	if (flags != NULL) {
 		*flags = 0;
-		
+
 		if (buf[6] & AX25_CBIT)
 			*flags = AX25_COMMAND;
 		if (buf[13] & AX25_CBIT)
 			*flags = AX25_RESPONSE;
 	}
 
-	if (dama != NULL) 
+	if (dama != NULL)
 		*dama = ~buf[13] & AX25_DAMA_FLAG;
 
 	/* Copy to, from */
@@ -243,7 +230,7 @@ int ax25_addr_build(unsigned char *buf, ax25_address *src, ax25_address *dest, a
 	if (d == NULL || d->ndigi == 0) {
 		buf[6] |= AX25_EBIT;
 		return 2 * AX25_ADDR_LEN;
-	}	
+	}
 
 	buf += AX25_ADDR_LEN;
 	len += AX25_ADDR_LEN;
@@ -277,7 +264,7 @@ int ax25_addr_size(ax25_digi *dp)
 	return AX25_ADDR_LEN * (2 + dp->ndigi);
 }
 
-/* 
+/*
  *	Reverse Digipeat List. May not pass both parameters as same struct
  */
 void ax25_digi_invert(ax25_digi *in, ax25_digi *out)
