@@ -526,6 +526,7 @@ extern void move_buf_unaligned(struct fb_info *info, u8 * dst, u8 * src,
 				u32 idx);
 extern void move_buf_aligned(struct fb_info *info, u8 * dst, u8 * src,
 				u32 d_pitch, u32 s_pitch, u32 height);
+extern void fb_set_suspend(struct fb_info *info, int state);
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;
 

@@ -838,7 +838,7 @@ static void radeon_get_pllinfo(struct radeonfb_info *rinfo, char *bios_seg)
 		if (radeon_read_OF(rinfo)) {
 			unsigned int tmp, Nx, M, ref_div, xclk;
 
-			tmp = INPLL(M_SPLL_REF_FB_DIV);
+			tmp = INPLL(X_MPLL_REF_FB_DIV);
 			ref_div = INPLL(PPLL_REF_DIV) & 0x3ff;
 
 			Nx = (tmp & 0xff00) >> 8;
@@ -926,7 +926,7 @@ static void radeon_get_moninfo (struct radeonfb_info *rinfo)
 		return;
 	}
 
-	tmp = INREG(RADEON_BIOS_4_SCRATCH);
+	tmp = INREG(BIOS_4_SCRATCH);
 	printk(KERN_DEBUG "radeon_get_moninfo: bios 4 scratch = %x\n", tmp);
 	
 	if (rinfo->hasCRTC2) {
@@ -2076,7 +2076,7 @@ static int radeonfb_set_par (struct fb_info *info)
 			/* DFP */
 			newmode.fp_gen_cntl |= (FP_FPON | FP_TMDS_EN);
 			newmode.tmds_transmitter_cntl = (TMDS_RAN_PAT_RST |
-							 ICHCSEL | TMDS_PLL_EN) &
+							 TMDS_ICHCSEL | TMDS_PLL_EN) &
 							 ~(TMDS_PLLRST);
 			newmode.crtc_ext_cntl &= ~CRTC_CRT_ON;
 		}

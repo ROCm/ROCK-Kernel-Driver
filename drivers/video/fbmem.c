@@ -1283,6 +1283,9 @@ unregister_framebuffer(struct fb_info *fb_info)
 	return 0;
 }
 
+void fb_set_suspend(struct fb_info *info, int state)
+{
+}
 
 /**
  *	fbmem_init - init frame buffer subsystem
@@ -1399,5 +1402,6 @@ EXPORT_SYMBOL(fb_pan_display);
 EXPORT_SYMBOL(fb_get_buffer_offset);
 EXPORT_SYMBOL(move_buf_unaligned);
 EXPORT_SYMBOL(move_buf_aligned);
+EXPORT_SYMBOL(fb_set_suspend);
 
 MODULE_LICENSE("GPL");
