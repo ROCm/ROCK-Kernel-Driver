@@ -150,6 +150,35 @@ back1:
 	return i;
 }
 
+struct page *
+follow_huge_addr(struct mm_struct *mm,
+	struct vm_area_struct *vma, unsigned long address, int write)
+{
+	unsigned long start = address;
+	int length = 1;
+	int nr;
+	struct page *page;
+
+	nr = follow_hugetlb_page(mm, vma, &page, NULL, &start, &length, 0);
+	if (nr == 1)
+		return page;
+	return NULL;
+}
+
+/*
+ * If virtual address `addr' lies within a huge page, return its controlling
+ * VMA, else NULL.
+ */
+struct vm_area_struct *hugepage_vma(struct mm_struct *mm, unsigned long addr)
+{
+	if (mm->used_hugetlb) {
+		struct vm_area_struct *vma = find_vma(mm, addr);
+		if (vma && is_vm_hugetlb_page(vma))
+			return vma;
+	}
+	return NULL;
+}
+
 void free_huge_page(struct page *page)
 {
 	BUG_ON(page_count(page));
