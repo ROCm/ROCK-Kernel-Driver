@@ -4,10 +4,6 @@
 
 EXTRA_AFLAGS := -ansi
 
-ifeq ($(CONFIG_SOLARIS_EMUL),m)
-  EXTRA_AFLAGS += $(CFLAGS_MODULE) # FIXME
-endif
-
 solaris-objs := entry64.o fs.o misc.o signal.o systbl.o socket.o \
 		ioctl.o ipc.o socksys.o timod.o
 

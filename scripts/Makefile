@@ -5,7 +5,7 @@
 # The following temporary rule will make sure that people's
 # trees get updated to the right permissions, since patch(1)
 # can't do it
-CHMOD_FILES := docgen gen-all-syms kernel-doc mkcompile_h mkversion_h makelst
+CHMOD_FILES := docgen gen-all-syms kernel-doc mkcompile_h makelst
 
 all: fixdep split-include $(CHMOD_FILES)
 

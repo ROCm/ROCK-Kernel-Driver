@@ -121,7 +121,7 @@ $(export-objs:.o=.i)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.s)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.lst): export_flags   := $(EXPORT_FLAGS)
 
-c_flags = $(CFLAGS) $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
+c_flags = $(CFLAGS) $(NOSTDINC_FLAGS) $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags) 
 
 quiet_cmd_cc_s_c = CC     $(RELDIR)/$@
 cmd_cc_s_c       = $(CC) $(c_flags) -S -o $@ $< 
@@ -159,7 +159,7 @@ $(real-objs-y:.o=.s): modkern_aflags := $(AFLAGS_KERNEL)
 $(real-objs-m)      : modkern_aflags := $(AFLAGS_MODULE)
 $(real-objs-m:.o=.s): modkern_aflags := $(AFLAGS_MODULE)
 
-a_flags = $(AFLAGS) $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
+a_flags = $(AFLAGS) $(NOSTDINC_FLAGS) $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
 quiet_cmd_as_s_S = CPP    $(RELDIR)/$@
 cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
