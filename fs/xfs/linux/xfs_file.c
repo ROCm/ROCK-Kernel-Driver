@@ -348,7 +348,7 @@ linvfs_readdir(
 
 	/* Try fairly hard to get memory */
 	do {
-		if ((read_buf = (caddr_t)kmalloc(rlen, GFP_KERNEL)))
+		if ((read_buf = (caddr_t)kmalloc(rlen, GFP_KERNEL | __GFP_NO_COMP)))
 			break;
 		rlen >>= 1;
 	} while (rlen >= 1024);

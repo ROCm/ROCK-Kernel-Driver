@@ -418,11 +418,11 @@ linvfs_follow_link(
 	ASSERT(dentry);
 	ASSERT(nd);
 
-	link = (char *)kmalloc(MAXNAMELEN+1, GFP_KERNEL);
+	link = (char *)kmalloc(MAXNAMELEN+1, GFP_KERNEL | __GFP_NO_COMP);
 	if (!link)
 		return -ENOMEM;
 
-	uio = (uio_t *)kmalloc(sizeof(uio_t), GFP_KERNEL);
+	uio = (uio_t *)kmalloc(sizeof(uio_t), GFP_KERNEL | __GFP_NO_COMP);
 	if (!uio) {
 		kfree(link);
 		return -ENOMEM;
