@@ -90,13 +90,16 @@ extern void copy_page(void *to, void *from);
 extern void clear_user_page(void *page, unsigned long vaddr);
 extern void copy_user_page(void *to, void *from, unsigned long vaddr);
 
-extern unsigned long ppc_memstart;
-extern unsigned long ppc_memoffset;
 #ifndef CONFIG_APUS
 #define PPC_MEMSTART	0
+#define PPC_PGSTART	0
 #define PPC_MEMOFFSET	PAGE_OFFSET
 #else
+extern unsigned long ppc_memstart;
+extern unsigned long ppc_pgstart;
+extern unsigned long ppc_memoffset;
 #define PPC_MEMSTART	ppc_memstart
+#define PPC_PGSTART	ppc_pgstart
 #define PPC_MEMOFFSET	ppc_memoffset
 #endif
 
@@ -136,24 +139,21 @@ static inline void* ___va(unsigned long p)
 #define __pa(x) ___pa((unsigned long)(x))
 #define __va(x) ((void *)(___va((unsigned long)(x))))
 
-#define MAP_PAGE_RESERVED	(1<<15)
-#define virt_to_page(kaddr)	(mem_map + (((unsigned long)kaddr-PAGE_OFFSET) >> PAGE_SHIFT))
-#define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
+#define pfn_to_page(pfn)	(mem_map + ((pfn) - PPC_PGSTART))
+#define page_to_pfn(page)	((unsigned long)((page) - mem_map) + PPC_PGSTART)
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 
-extern unsigned long get_zero_page_fast(void);
+#define pfn_valid(pfn)		(((pfn) - PPC_PGSTART) < max_mapnr)
+#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
 /* Pure 2^n version of get_order */
 extern __inline__ int get_order(unsigned long size)
 {
-	int order;
+	int lz;
 
-	size = (size-1) >> (PAGE_SHIFT-1);
-	order = -1;
-	do {
-		size >>= 1;
-		order++;
-	} while (size);
-	return order;
+	size = (size-1) >> PAGE_SHIFT;
+	asm ("cntlzw %0,%1" : "=r" (lz) : "r" (size));
+	return 32 - lz;
 }
 
 #endif /* __ASSEMBLY__ */

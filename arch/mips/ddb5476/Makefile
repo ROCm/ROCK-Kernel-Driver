@@ -9,10 +9,7 @@
 # Note 2! The CFLAGS definitions are now in the main makefile...
 #
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
+EXTRA_AFLAGS := $(CFLAGS)
 
 O_TARGET = ddb5476.a
 

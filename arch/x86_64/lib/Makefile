@@ -2,9 +2,6 @@
 # Makefile for x86_64-specific library files..
 #
 
-.S.o:
-	$(CC) $(AFLAGS) -c $< -o $*.o
-
 L_TARGET = lib.a
 obj-y  = generic-checksum.o old-checksum.o delay.o \
 	usercopy.o getuser.o putuser.o  \

@@ -28,11 +28,13 @@
  *
  * v3 - 19.12.01 - Jean II
  *	o Make sure we don't go out of standard_ioctl[] in ioctl_standard_call
- *	o Fix /proc/net/wireless to handle __u8 to __s8 change in iwqual
  *	o Add event dispatcher function
  *	o Add event description
  *	o Propagate events as rtnetlink IFLA_WIRELESS option
  *	o Generate event on selected SET requests
+ *
+ * v4 - 18.04.01 - Jean II
+ *	o Fix stupid off by one in iw_ioctl_description : IW_ESSID_MAX_SIZE + 1
  */
 
 /***************************** INCLUDES *****************************/
@@ -122,13 +124,13 @@ static const struct iw_ioctl_description	standard_ioctl[] = {
 	/* SIOCGIWSCAN */
 	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_SCAN_MAX_DATA, 0},
 	/* SIOCSIWESSID */
-	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_ESSID_MAX_SIZE, IW_DESCR_FLAG_EVENT},
+	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_ESSID_MAX_SIZE + 1, IW_DESCR_FLAG_EVENT},
 	/* SIOCGIWESSID */
-	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_ESSID_MAX_SIZE, IW_DESCR_FLAG_DUMP},
+	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_ESSID_MAX_SIZE + 1, IW_DESCR_FLAG_DUMP},
 	/* SIOCSIWNICKN */
-	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_ESSID_MAX_SIZE, 0},
+	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_ESSID_MAX_SIZE + 1, 0},
 	/* SIOCGIWNICKN */
-	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_ESSID_MAX_SIZE, 0},
+	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_ESSID_MAX_SIZE + 1, 0},
 	/* -- hole -- */
 	{ IW_HEADER_TYPE_NULL, 0, 0, 0, 0, 0},
 	/* -- hole -- */

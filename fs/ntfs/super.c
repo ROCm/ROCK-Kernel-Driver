@@ -23,9 +23,9 @@
 #include <linux/stddef.h>
 #include <linux/init.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/spinlock.h>
 #include <linux/blkdev.h>	/* For bdev_hardsect_size(). */
+#include <linux/backing-dev.h>
 
 #include "ntfs.h"
 #include "sysctl.h"
@@ -1424,31 +1424,23 @@ struct super_operations ntfs_sops = {
 						   called from iget(). */
 	dirty_inode:	ntfs_dirty_inode,	/* VFS: Called from
 						   __mark_inode_dirty(). */
-	write_inode:	NULL,		/* VFS: Write dirty inode to disk. */
-	put_inode:	NULL,		/* VFS: Called whenever the reference
-					   count (i_count) of the inode is
-					   going to be decreased but before the
-					   actual decrease. */
-	delete_inode:	NULL,		/* VFS: Delete inode from disk. Called
-					   when i_count becomes 0 and i_nlink is
-					   also 0. */
+	//write_inode:	NULL,		/* VFS: Write dirty inode to disk. */
+	//put_inode:	NULL,		/* VFS: Called whenever the reference
+	//				   count (i_count) of the inode is
+	//				   going to be decreased but before the
+	//				   actual decrease. */
+	//delete_inode:	NULL,		/* VFS: Delete inode from disk. Called
+	//				   when i_count becomes 0 and i_nlink is
+	//				   also 0. */
 	put_super:	ntfs_put_super,	/* Syscall: umount. */
-	write_super:	NULL,		/* Flush dirty super block to disk. */
-	write_super_lockfs:	NULL,	/* ? */
-	unlockfs:	NULL,		/* ? */
+	//write_super:	NULL,		/* Flush dirty super block to disk. */
+	//write_super_lockfs:	NULL,	/* ? */
+	//unlockfs:	NULL,		/* ? */
 	statfs:		ntfs_statfs,	/* Syscall: statfs */
 	remount_fs:	ntfs_remount,	/* Syscall: mount -o remount. */
 	clear_inode:	ntfs_clear_big_inode,	/* VFS: Called when an inode is
 						   removed from memory. */
-	umount_begin:	NULL,		/* Forced umount. */
-	/*
-	 * These are NFSd support functions but NTFS is a standard fs so
-	 * shouldn't need to implement these manually. At least we can try
-	 * without and if it doesn't work in some way we can always implement
-	 * something here.
-	 */
-	fh_to_dentry:	NULL,		/* Get dentry for given file handle. */
-	dentry_to_fh:	NULL,		/* Get file handle for given dentry. */
+	//umount_begin:	NULL,		/* Forced umount. */
 	show_options:	ntfs_show_options, /* Show mount options in proc. */
 };
 
@@ -1518,10 +1510,17 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	INIT_LIST_HEAD(&vol->mftbmp_mapping.i_mmap);
 	INIT_LIST_HEAD(&vol->mftbmp_mapping.i_mmap_shared);
 	spin_lock_init(&vol->mftbmp_mapping.i_shared_lock);
+	/*
+	 * private_lock and private_list are unused by ntfs.  But they
+	 * are available.
+	 */
+	spin_lock_init(&vol->mftbmp_mapping.private_lock);
+	INIT_LIST_HEAD(&vol->mftbmp_mapping.private_list);
+	vol->mftbmp_mapping.assoc_mapping = NULL;
 	vol->mftbmp_mapping.dirtied_when = 0;
 	vol->mftbmp_mapping.gfp_mask = GFP_HIGHUSER;
-	vol->mftbmp_mapping.ra_pages =
-			sb->s_bdev->bd_inode->i_mapping->ra_pages;
+	vol->mftbmp_mapping.backing_dev_info =
+			sb->s_bdev->bd_inode->i_mapping->backing_dev_info;
 
 	/*
 	 * Default is group and other don't have any access to files or

@@ -148,7 +148,7 @@ extern unsigned long ioremap_bot, ioremap_base;
      is cleared in the TLB miss handler before the TLB entry is loaded.
    - All other bits of the PTE are loaded into TLBLO without
      modification, leaving us only the bits 20, 21, 24, 25, 26, 30 for
-     software PTE bits.  We actually use use bits 20, 24, 25, 26, and
+     software PTE bits.  We actually use use bits 21, 24, 25, 26, and
      30 respectively for the software bits: ACCESSED, DIRTY, RW, EXEC,
      PRESENT.
 */
@@ -284,6 +284,16 @@ extern unsigned long ioremap_bot, ioremap_base;
 
 #ifndef __ASSEMBLY__
 /*
+ * Conversions between PTE values and page frame numbers.
+ */
+
+#define pte_pfn(x)		(pte_val(x) >> PAGE_SHIFT)
+#define pte_page(x)		pfn_to_page(pte_pfn(x))
+
+#define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+#define mk_pte(page, prot)	pfn_pte(page_to_pfn(page), prot)
+
+/*
  * ZERO_PAGE is a global shared page that is always zero: used
  * for zero-mapped memory areas etc..
  */
@@ -300,8 +310,6 @@ extern unsigned long empty_zero_page[1024];
 #define	pmd_bad(pmd)		(0)
 #define	pmd_present(pmd)	(pmd_val(pmd) != 0)
 #define	pmd_clear(pmdp)		do { pmd_val(*(pmdp)) = 0; } while (0)
-
-#define pte_page(x)		(mem_map+(unsigned long)((pte_val(x)-PPC_MEMSTART) >> PAGE_SHIFT))
 
 #ifndef __ASSEMBLY__
 /*
@@ -351,25 +359,6 @@ static inline pte_t pte_mkdirty(pte_t pte) {
 	pte_val(pte) |= _PAGE_DIRTY; return pte; }
 static inline pte_t pte_mkyoung(pte_t pte) {
 	pte_val(pte) |= _PAGE_ACCESSED; return pte; }
-
-/*
- * Conversion functions: convert a page and protection to a page entry,
- * and a page entry and page directory to the page they refer to.
- */
-
-static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
-{
-	pte_t pte;
-	pte_val(pte) = physpage | pgprot_val(pgprot);
-	return pte;
-}
-
-#define mk_pte(page,pgprot) \
-({									\
-	pte_t pte;							\
-	pte_val(pte) = (((page - mem_map) << PAGE_SHIFT) + PPC_MEMSTART) | pgprot_val(pgprot); \
-	pte;							\
-})
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {

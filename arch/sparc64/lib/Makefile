@@ -2,13 +2,7 @@
 # Makefile for Sparc64 library files..
 #
 
-.S.s:
-	$(CPP) $(AFLAGS) -ansi $< -o $*.s
-
-.S.o:
-	$(CC) $(AFLAGS) -ansi -c $< -o $*.o
-
-CFLAGS := $(CFLAGS)
+EXTRA_AFLAGS := -ansi
 
 L_TARGET = lib.a
 obj-y := PeeCeeI.o blockops.o debuglocks.o strlen.o strncmp.o \

@@ -10,10 +10,7 @@
 # unless it's something special (ie not a .c file).
 #
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
+EXTRA_AFLAGS := $(CFLAGS)
 
 all: au1000.o
 

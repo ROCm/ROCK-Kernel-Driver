@@ -8,6 +8,25 @@
 # Copyright (C) 1994 by Linus Torvalds
 #
 
+# ROOT_DEV specifies the default root-device when making the image.
+# This can be either FLOPPY, CURRENT, /dev/xxxx or empty, in which case
+# the default of FLOPPY is used by 'build'.
+
+ROOT_DEV := CURRENT
+
+# If you want to preset the SVGA mode, uncomment the next line and
+# set SVGA_MODE to whatever number you want.
+# Set it to -DSVGA_MODE=NORMAL_VGA if you just want the EGA/VGA mode.
+# The number is the same as you would ordinarily press at bootup.
+
+SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
+
+# If you want the RAM disk device, define this to be the size in blocks.
+
+RAMDISK := -DRAMDISK=512
+
+# ---------------------------------------------------------------------------
+
 BOOT_INCL =	$(TOPDIR)/include/linux/config.h \
 		$(TOPDIR)/include/linux/autoconf.h \
 		$(TOPDIR)/include/asm/boot.h

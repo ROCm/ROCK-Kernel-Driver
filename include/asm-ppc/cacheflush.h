@@ -37,5 +37,5 @@ extern void flush_icache_user_range(struct vm_area_struct *vma,
 extern void __flush_dcache_icache(void *page_va);
 extern void __flush_dcache_icache_phys(unsigned long physaddr);
 
-#endif _PPC_CACHEFLUSH_H
-#endif __KERNEL__
+#endif /* _PPC_CACHEFLUSH_H */
+#endif /* __KERNEL__ */

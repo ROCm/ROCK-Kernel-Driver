@@ -34,10 +34,10 @@
  */
 
 #include "udfdecl.h"
-#include <linux/locks.h>
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
 #include <linux/module.h>
+#include <linux/pagemap.h>
 
 #include "udf_i.h"
 #include "udf_sb.h"

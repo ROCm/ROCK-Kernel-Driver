@@ -125,9 +125,6 @@ _static int process_transfer (uhci_t *s, struct urb *urb, int mode);
 _static int process_interrupt (uhci_t *s, struct urb *urb);
 _static int process_iso (uhci_t *s, struct urb *urb, int force);
 
-// How much URBs with ->next are walked
-#define MAX_NEXT_COUNT 2048
-
 static uhci_t *devs = NULL;
 
 /* used by userspace UHCI data structure dumper */
@@ -1217,7 +1214,7 @@ _static int uhci_unlink_urb_sync (uhci_t *s, struct urb *urb)
 			urb->dev = NULL;
 			urb->complete ((struct urb *) urb);
 		}
-		usb_dec_dev_use (usb_dev);
+		usb_put_dev (usb_dev);
 		usb_put_urb (urb);
 	}
 	else
@@ -1301,7 +1298,7 @@ _static void uhci_cleanup_unlink(uhci_t *s, int force)
 	
 			uhci_urb_dma_unmap(s, urb, urb_priv);
 
-			usb_dec_dev_use (dev);
+			usb_put_dev (dev);
 #ifdef DEBUG_SLAB
 			kmem_cache_free (urb_priv_kmem, urb_priv);
 #else
@@ -1655,7 +1652,7 @@ _static int uhci_submit_urb (struct urb *urb, int mem_flags)
 	/* increment the reference count of the urb, as we now also control it */
 	urb = usb_get_urb (urb);
 
-	usb_inc_dev_use (urb->dev);
+	usb_get_dev (urb->dev);
 
 	spin_lock_irqsave (&s->urb_list_lock, flags);
 
@@ -1669,7 +1666,7 @@ _static int uhci_submit_urb (struct urb *urb, int mem_flags)
 		    ((type == PIPE_BULK) &&
 		     (!(urb->transfer_flags & USB_QUEUE_BULK) || !(queued_urb->transfer_flags & USB_QUEUE_BULK)))) {
 			spin_unlock_irqrestore (&s->urb_list_lock, flags);
-			usb_dec_dev_use (urb->dev);
+			usb_put_dev (urb->dev);
 			usb_put_urb (urb);
 			err("ENXIO %08x, flags %x, urb %p, burb %p",urb->pipe,urb->transfer_flags,urb,queued_urb);
 			return -ENXIO;	// urb already queued
@@ -1682,7 +1679,7 @@ _static int uhci_submit_urb (struct urb *urb, int mem_flags)
 	urb_priv = kmalloc (sizeof (urb_priv_t), mem_flags);
 #endif
 	if (!urb_priv) {
-		usb_dec_dev_use (urb->dev);
+		usb_put_dev (urb->dev);
 		spin_unlock_irqrestore (&s->urb_list_lock, flags);
 		usb_put_urb (urb);
 		return -ENOMEM;
@@ -1767,7 +1764,7 @@ _static int uhci_submit_urb (struct urb *urb, int mem_flags)
 	
 	if (ret != 0) {
 		uhci_urb_dma_unmap(s, urb, urb_priv);
-		usb_dec_dev_use (urb->dev);
+		usb_put_dev (urb->dev);
 #ifdef DEBUG_SLAB
 		kmem_cache_free(urb_priv_kmem, urb_priv);
 #else
@@ -2662,82 +2659,16 @@ _static int process_urb (uhci_t *s, struct list_head *p)
 #endif
 
 		if ((usb_pipetype (urb->pipe) != PIPE_INTERRUPT)) {  // process_interrupt does completion on its own		
-			struct urb *next_urb = urb->next;
-			int is_ring = 0;
-			int contains_killed = 0;
-			int loop_count=0;
 			
-			if (next_urb) {
-				// Find out if the URBs are linked to a ring
-				while  (next_urb != NULL && next_urb != urb && loop_count < MAX_NEXT_COUNT) {
-					if (next_urb->status == -ENOENT) {// killed URBs break ring structure & resubmission
-						contains_killed = 1;
-						break;
-					}	
-					next_urb = next_urb->next;
-					loop_count++;
-				}
-				
-				if (loop_count == MAX_NEXT_COUNT)
-					err("process_urb: Too much linked URBs in ring detection!");
-
-				if (next_urb == urb)
-					is_ring=1;
-			}			
-
-			// Submit idle/non-killed URBs linked with urb->next
-			// Stop before the current URB				
-			
-			next_urb = urb->next;	
-			if (next_urb && !contains_killed) {
-				int ret_submit;
-				next_urb = urb->next;	
-				
-				loop_count=0;
-				while (next_urb != NULL && next_urb != urb && loop_count < MAX_NEXT_COUNT) {
-					if (next_urb->status != -EINPROGRESS) {
-					
-						if (next_urb->status == -ENOENT) 
-							break;
-
-						spin_unlock(&s->urb_list_lock);
-
-						// FIXME!!!
-						// We need to know the real state, so 
-						// GFP_ATOMIC is probably not correct
-						ret_submit=uhci_submit_urb(next_urb, GFP_ATOMIC);
-						spin_lock(&s->urb_list_lock);
-						
-						if (ret_submit)
-							break;						
-					}
-					loop_count++;
-					next_urb = next_urb->next;
-				}
-				if (loop_count == MAX_NEXT_COUNT)
-					err("process_urb: Too much linked URBs in resubmission!");
-			}
-
 			// Completion
 			if (urb->complete) {
-				int was_unlinked = (urb->status == -ENOENT);
 				urb->dev = NULL;
 				spin_unlock(&s->urb_list_lock);
-
 				urb->complete ((struct urb *) urb);
-
-				// Re-submit the URB if ring-linked
-				if (is_ring && !was_unlinked && !contains_killed) {
-					urb->dev=usb_dev;
-					// FIXME!!!
-					// We need to know the real state, so 
-					// GFP_ATOMIC is probably not correct
-					uhci_submit_urb (urb, GFP_ATOMIC);
-				}
 				spin_lock(&s->urb_list_lock);
 			}
 			
-			usb_dec_dev_use (usb_dev);
+			usb_put_dev (usb_dev);
 			usb_put_urb (urb);
 		}
 	}

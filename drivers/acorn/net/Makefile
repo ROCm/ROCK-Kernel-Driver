@@ -3,7 +3,7 @@
 # Makefile for the Acorn ethercard network device drivers
 #
 
-O_TARGET := acorn-net.o
+O_TARGET := built-in.o
 
 obj-y	:=
 obj-m	:=

@@ -51,7 +51,7 @@ TABLE OF CONTENTS
     6.2 Information Required Before Contacting Technical Support
     6.3 Obtaining the Latest Driver Version
     6.4 Current maintainer
-
+    6.5 Kernel boot parameters
 
 
 1.0 CIRRUS LOGIC LAN CS8900/CS8920 ETHERNET ADAPTERS
@@ -690,4 +690,14 @@ the latest drivers and technical publications.
 6.4 Current maintainer
 
 In February 2000 the maintenance of this driver was assumed by Andrew
-Morton <andrewm@uow.edu.au>
+Morton <akpm@zip.com.au>
+
+6.5 Kernel module parameters
+
+For use in embedded environments with no cs89x0 EEPROM, the kernel boot
+parameter `cs89x0_media=' has been implemented.  Usage is:
+
+	cs89x0_media=rj45    or
+	cs89x0_media=aui     or
+	cs89x0_media=bnc
+

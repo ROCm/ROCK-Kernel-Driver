@@ -2,7 +2,17 @@
  * BK Id: %F% %I% %G% %U% %#%
  */
 /*
- * Miscellaneous procedures for dealing with the PowerMac hardware.
+ *  arch/ppc/platforms/pmac_nvram.c
+ *
+ *  Copyright (C) 2002 Benjamin Herrenschmidt (benh@kernel.crashing.org)
+ *
+ *  This program is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; either version
+ *  2 of the License, or (at your option) any later version.
+ *  
+ *  Todo: - cleanup some coding horrors in the flash code
+ *        - add support for the OF persistent properties
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -75,7 +85,7 @@ static char nvram_image[NVRAM_SIZE] __pmacdata;
 
 extern int pmac_newworld;
 
-static u8 __openfirmware
+static u8 __pmac
 chrp_checksum(struct chrp_header* hdr)
 {
 	u8 *ptr;
@@ -314,8 +324,8 @@ pmac_nvram_update(void)
 		printk("nvram: Error writing bank %d\n", core99_bank);
 }
 
-unsigned char __openfirmware
-nvram_read_byte(int addr)
+unsigned char __pmac
+pmac_nvram_read_byte(int addr)
 {
 	switch (nvram_naddrs) {
 #ifdef CONFIG_ADB_PMU
@@ -342,8 +352,8 @@ nvram_read_byte(int addr)
 	return 0;
 }
 
-void __openfirmware
-nvram_write_byte(unsigned char val, int addr)
+void __pmac
+pmac_nvram_write_byte(int addr, unsigned char val)
 {
 	switch (nvram_naddrs) {
 #ifdef CONFIG_ADB_PMU
@@ -388,7 +398,7 @@ pmac_xpram_read(int xpaddr)
 	if (offset < 0)
 		return 0;
 		
-	return nvram_read_byte(xpaddr + offset);
+	return pmac_nvram_read_byte(xpaddr + offset);
 }
 
 void __pmac
@@ -399,5 +409,5 @@ pmac_xpram_write(int xpaddr, u8 data)
 	if (offset < 0)
 		return;
 		
-	nvram_write_byte(xpaddr + offset, data);
+	pmac_nvram_write_byte(data, xpaddr + offset);
 }

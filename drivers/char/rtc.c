@@ -815,7 +815,7 @@ found:
 	}
 no_irq:
 #else
-	if (check_region (RTC_PORT (0), RTC_IO_EXTENT))
+	if (!request_region(RTC_PORT(0), RTC_IO_EXTENT, "rtc"))
 	{
 		printk(KERN_ERR "rtc: I/O port %d is not free.\n", RTC_PORT (0));
 		return -EIO;
@@ -826,11 +826,11 @@ no_irq:
 	{
 		/* Yeah right, seeing as irq 8 doesn't even hit the bus. */
 		printk(KERN_ERR "rtc: IRQ %d is not free.\n", RTC_IRQ);
+		release_region(RTC_PORT(0), RTC_IO_EXTENT);
 		return -EIO;
 	}
 #endif
 
-	request_region(RTC_PORT(0), RTC_IO_EXTENT, "rtc");
 #endif /* __sparc__ vs. others */
 
 	misc_register(&rtc_dev);

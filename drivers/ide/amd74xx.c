@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  * $Id: amd74xx.c,v 2.8 2002/03/14 11:52:20 vojtech Exp $
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik
@@ -42,9 +43,11 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ide.h>
+
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #define AMD_IDE_ENABLE		(0x00 + amd_config->base)
 #define AMD_IDE_CONFIG		(0x01 + amd_config->base)
@@ -84,7 +87,6 @@ static struct amd_ide_chip {
 static struct amd_ide_chip *amd_config;
 static unsigned char amd_enabled;
 static unsigned int amd_80w;
-static unsigned int amd_clock;
 
 static unsigned char amd_cyc2udma[] = { 6, 6, 5, 4, 0, 1, 1, 2, 2, 3, 3 };
 static unsigned char amd_udma2cyc[] = { 4, 6, 8, 10, 3, 2, 1, 1 };
@@ -128,7 +130,7 @@ static int amd_get_info(char *buffer, char **addr, off_t offset, int count)
 	amd_print("Highest DMA rate:                   %s", amd_dma[amd_config->flags & AMD_UDMA]);
 
 	amd_print("BM-DMA base:                        %#x", amd_base);
-	amd_print("PCI clock:                          %d.%dMHz", amd_clock / 1000, amd_clock / 100 % 10);
+	amd_print("PCI clock:                          %d.%dMHz", system_bus_speed / 1000, system_bus_speed / 100 % 10);
 	
 	amd_print("-----------------------Primary IDE-------Secondary IDE------");
 
@@ -144,7 +146,7 @@ static int amd_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	amd_print("Cable Type:            %10s%20s", (amd_80w & 1) ? "80w" : "40w", (amd_80w & 2) ? "80w" : "40w");
 
-	if (!amd_clock)
+	if (!system_bus_speed)
                 return p - buffer;
 
 	amd_print("-------------------drive0----drive1----drive2----drive3-----");
@@ -166,22 +168,22 @@ static int amd_get_info(char *buffer, char **addr, off_t offset, int count)
 		den[i]  = (c & ((i & 1) ? 0x40 : 0x20) << ((i & 2) << 2));
 
 		if (den[i] && uen[i] && udma[i] == 1) {
-			speed[i] = amd_clock * 3;
-			cycle[i] = 666666 / amd_clock;
+			speed[i] = system_bus_speed * 3;
+			cycle[i] = 666666 / system_bus_speed;
 			continue;
 		}
 
-		speed[i] = 4 * amd_clock / ((den[i] && uen[i]) ? udma[i] : (active[i] + recover[i]) * 2);
-		cycle[i] = 1000000 * ((den[i] && uen[i]) ? udma[i] : (active[i] + recover[i]) * 2) / amd_clock / 2;
+		speed[i] = 4 * system_bus_speed / ((den[i] && uen[i]) ? udma[i] : (active[i] + recover[i]) * 2);
+		cycle[i] = 1000000 * ((den[i] && uen[i]) ? udma[i] : (active[i] + recover[i]) * 2) / system_bus_speed / 2;
 	}
 
 	amd_print_drive("Transfer Mode: ", "%10s", den[i] ? (uen[i] ? "UDMA" : "DMA") : "PIO");
 
-	amd_print_drive("Address Setup: ", "%8dns", 1000000 * setup[i] / amd_clock);
-	amd_print_drive("Cmd Active:    ", "%8dns", 1000000 * active8b[i] / amd_clock);
-	amd_print_drive("Cmd Recovery:  ", "%8dns", 1000000 * recover8b[i] / amd_clock);
-	amd_print_drive("Data Active:   ", "%8dns", 1000000 * active[i] / amd_clock);
-	amd_print_drive("Data Recovery: ", "%8dns", 1000000 * recover[i] / amd_clock);
+	amd_print_drive("Address Setup: ", "%8dns", 1000000 * setup[i] / system_bus_speed);
+	amd_print_drive("Cmd Active:    ", "%8dns", 1000000 * active8b[i] / system_bus_speed);
+	amd_print_drive("Cmd Recovery:  ", "%8dns", 1000000 * recover8b[i] / system_bus_speed);
+	amd_print_drive("Data Active:   ", "%8dns", 1000000 * active[i] / system_bus_speed);
+	amd_print_drive("Data Recovery: ", "%8dns", 1000000 * recover[i] / system_bus_speed);
 	amd_print_drive("Cycle Time:    ", "%8dns", cycle[i]);
 	amd_print_drive("Transfer Rate: ", "%4d.%dMB/s", speed[i] / 1000, speed[i] / 100 % 10);
 
@@ -235,7 +237,7 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
 			printk(KERN_WARNING "ide%d: Drive %d didn't accept speed setting. Oh, well.\n",
 				drive->dn >> 1, drive->dn & 1);
 
-	T = 1000000000 / amd_clock;
+	T = 1000000000 / system_bus_speed;
 	UT = T / min_t(int, max_t(int, amd_config->flags & AMD_UDMA, 1), 2);
 
 	ata_timing_compute(drive, speed, &t, T, UT);
@@ -245,7 +247,7 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
 		ata_timing_merge(&p, &t, &t, IDE_TIMING_8BIT);
 	}
 
-	if (speed == XFER_UDMA_5 && amd_clock <= 33333) t.udma = 1;
+	if (speed == XFER_UDMA_5 && system_bus_speed <= 33333) t.udma = 1;
 
 	amd_set_speed(drive->channel->pci_dev, drive->dn, &t);
 
@@ -298,7 +300,7 @@ int amd74xx_dmaproc(struct ata_device *drive)
  * and initialize its drive independent registers.
  */
 
-unsigned int __init pci_init_amd74xx(struct pci_dev *dev, const char *name)
+static unsigned int __init amd74xx_init_chipset(struct pci_dev *dev)
 {
 	unsigned char t;
 	unsigned int u;
@@ -355,24 +357,6 @@ unsigned int __init pci_init_amd74xx(struct pci_dev *dev, const char *name)
 		(amd_config->flags & AMD_BAD_FIFO) ? (t & 0x0f) : (t | 0xf0));
 
 /*
- * Determine the system bus clock.
- */
-
-	amd_clock = system_bus_speed * 1000;
-
-	switch (amd_clock) {
-		case 33000: amd_clock = 33333; break;
-		case 37000: amd_clock = 37500; break;
-		case 41000: amd_clock = 41666; break;
-	}
-
-	if (amd_clock < 20000 || amd_clock > 50000) {
-		printk(KERN_WARNING "AMD_IDE: User given PCI clock speed impossible (%d), using 33 MHz instead.\n", amd_clock);
-		printk(KERN_WARNING "AMD_IDE: Use ide0=ata66 if you want to assume 80-wire cable\n");
-		amd_clock = 33333;
-	}
-
-/*
  * Print the boot message.
  */
 
@@ -396,12 +380,12 @@ unsigned int __init pci_init_amd74xx(struct pci_dev *dev, const char *name)
 	return 0;
 }
 
-unsigned int __init ata66_amd74xx(struct ata_channel *hwif)
+static unsigned int __init amd74xx_ata66_check(struct ata_channel *hwif)
 {
 	return ((amd_enabled & amd_80w) >> hwif->unit) & 1;
 }
 
-void __init ide_init_amd74xx(struct ata_channel *hwif)
+static void __init amd74xx_init_channel(struct ata_channel *hwif)
 {
 	int i;
 
@@ -432,9 +416,84 @@ void __init ide_init_amd74xx(struct ata_channel *hwif)
 /*
  * We allow the BM-DMA driver only work on enabled interfaces.
  */
-
-void __init ide_dmacapable_amd74xx(struct ata_channel *hwif, unsigned long dmabase)
+static void __init amd74xx_init_dma(struct ata_channel *ch, unsigned long dmabase)
 {
-	if ((amd_enabled >> hwif->unit) & 1)
-		ide_setup_dma(hwif, dmabase, 8);
+	if ((amd_enabled >> ch->unit) & 1)
+		ata_init_dma(ch, dmabase);
+}
+
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_AMD,
+		device: PCI_DEVICE_ID_AMD_COBRA_7401,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor:	PCI_VENDOR_ID_AMD,
+		device:	PCI_DEVICE_ID_AMD_VIPER_7409,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor:	PCI_VENDOR_ID_AMD,
+		device:	PCI_DEVICE_ID_AMD_VIPER_7411,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor:	PCI_VENDOR_ID_AMD,
+		device:	PCI_DEVICE_ID_AMD_OPUS_7441,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor:	PCI_VENDOR_ID_AMD,
+		device:	PCI_DEVICE_ID_AMD_8111_IDE,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor:	PCI_VENDOR_ID_NVIDIA,
+		device:	PCI_DEVICE_ID_NVIDIA_NFORCE_IDE,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x50,0x01,0x01}, {0x50,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+};
+
+int __init init_amd74xx(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+        return 0;
 }

@@ -6,8 +6,7 @@
 # unless it's something special (ie not a .c file).
 #
 
-.S.o:
-	$(CC) $(CFLAGS) $(CFLAGS_$@) -c $< -o $*.o
+EXTRA_AFLAGS := $(CFLAGS)
 
 all:	kernel.o head.o init_task.o
 
@@ -25,7 +24,7 @@ obj-$(CONFIG_MIPS32_COMPAT)	+= linux32.o scall_o32.o signal32.o ioctl32.o
 obj-$(CONFIG_BINFMT_ELF32)	+= binfmt_elf32.o
 obj-$(CONFIG_SMP)		+= smp.o
 
-CFLAGS_r4k_genex.o := -P
-CFLAGS_r4k_tlb_glue.o := -P
+AFLAGS_r4k_genex.o := -P
+AFLAGS_r4k_tlb_glue.o := -P
 
 include $(TOPDIR)/Rules.make

@@ -2,6 +2,7 @@
 OUTPUT_FORMAT("elf32-hppa")
 OUTPUT_ARCH(hppa)
 ENTRY(_stext)
+jiffies = jiffies_64 + 4;
 SECTIONS
 {
 

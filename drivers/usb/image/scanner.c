@@ -300,6 +300,8 @@
  *      Frank Zago <fzago@greshamstorage.com> and
  *      Oliver Neukum <520047054719-0001@t-online.de> for reviewing/testing.
  *
+ * 05/21/02 Currently maintained by Brian Beattie <beattie@beattie-home.net>
+ *
  * TODO
  *    - Performance
  *    - Select/poll methods

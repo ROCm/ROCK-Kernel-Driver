@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  * linux/drivers/ide/hpt34x.c		Version 0.31	June. 9, 2000
  *
  * Copyright (C) 1998-2000	Andre Hedrick <andre@linux-ide.org>
@@ -40,10 +41,12 @@
 
 #include <asm/io.h>
 #include <asm/irq.h>
+
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #ifndef SPLIT_BYTE
-#define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
+# define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
 #endif
 
 #define HPT343_DEBUG_DRIVE_INFO		0
@@ -108,7 +111,6 @@ static void hpt34x_clear_chipset (ide_drive_t *drive)
 
 static int hpt34x_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	int			err;
 	byte			hi_speed, lo_speed;
 	unsigned int reg1	= 0, tmp1 = 0;
 	unsigned int reg2	= 0, tmp2 = 0;
@@ -126,12 +128,8 @@ static int hpt34x_tune_chipset (ide_drive_t *drive, byte speed)
 	pci_read_config_dword(drive->channel->pci_dev, 0x48, &reg2);
 	tmp1 = ((lo_speed << (3*drive->dn)) | (reg1 & ~(7 << (3*drive->dn))));
 	tmp2 = ((hi_speed << drive->dn) | reg2);
-	err = ide_config_drive_speed(drive, speed);
 	pci_write_config_dword(drive->channel->pci_dev, 0x44, tmp1);
 	pci_write_config_dword(drive->channel->pci_dev, 0x48, tmp2);
-
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 
 #if HPT343_DEBUG_DRIVE_INFO
 	printk("%s: %s drive%d (0x%04x 0x%04x) (0x%04x 0x%04x)" \
@@ -141,8 +139,10 @@ static int hpt34x_tune_chipset (ide_drive_t *drive, byte speed)
 		hi_speed, lo_speed, err);
 #endif /* HPT343_DEBUG_DRIVE_INFO */
 
+	if (!drive->init_speed)
+		drive->init_speed = speed;
 	drive->current_speed = speed;
-	return(err);
+	return ide_config_drive_speed(drive, speed);
 }
 
 static void config_chipset_for_pio(ide_drive_t *drive)
@@ -198,55 +198,25 @@ static void hpt34x_tune_drive (ide_drive_t *drive, byte pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-/*
- * This allows the configuration of ide_pci chipset registers
- * for cards that learn about the drive's UDMA, DMA, PIO capabilities
- * after the drive is reported by the OS.  Initally for designed for
- * HPT343 UDMA chipset by HighPoint|Triones Technologies, Inc.
- */
-static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
+static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 {
-	struct hd_driveid *id	= drive->id;
-	byte speed		= 0x00;
+	int map;
+	u8 mode;
 
 	if (drive->type != ATA_DISK)
 		return 0;
 
-	hpt34x_clear_chipset(drive);
+	if (udma)
+		map = XFER_UDMA;
+	else
+		map = XFER_SWDMA | XFER_MWDMA;
 
-	if ((id->dma_ultra & 0x0010) && ultra) {
-		speed = XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0008) && ultra) {
-		speed = XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0004) && ultra) {
-		speed = XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0002) && ultra) {
-		speed = XFER_UDMA_1;
-	} else if ((id->dma_ultra & 0x0001) && ultra) {
-		speed = XFER_UDMA_0;
-	} else if (id->dma_mword & 0x0004) {
-		speed = XFER_MW_DMA_2;
-	} else if (id->dma_mword & 0x0002) {
-		speed = XFER_MW_DMA_1;
-	} else if (id->dma_mword & 0x0001) {
-		speed = XFER_MW_DMA_0;
-	} else if (id->dma_1word & 0x0004) {
-		speed = XFER_SW_DMA_2;
-	} else if (id->dma_1word & 0x0002) {
-		speed = XFER_SW_DMA_1;
-	} else if (id->dma_1word & 0x0001) {
-		speed = XFER_SW_DMA_0;
-        } else {
+	mode = ata_timing_mode(drive, map);
+	if (mode < XFER_SW_DMA_0)
 		return 0;
-	}
 
-	(void) hpt34x_tune_chipset(drive, speed);
-
-	return ((int)	((id->dma_ultra >> 11) & 3) ? 0 :
-			((id->dma_ultra >> 8) & 7) ? 1 :
-			((id->dma_mword >> 8) & 7) ? 1 :
-			((id->dma_1word >> 8) & 7) ? 1 :
-						     0);
+	hpt34x_clear_chipset(drive);
+	return !hpt34x_tune_chipset(drive, mode);
 }
 
 static int config_drive_xfer_rate(struct ata_device *drive)
@@ -373,7 +343,7 @@ static int hpt34x_dmaproc(struct ata_device *drive)
  */
 #define	HPT34X_PCI_INIT_REG		0x80
 
-unsigned int __init pci_init_hpt34x(struct pci_dev *dev)
+static unsigned int __init pci_init_hpt34x(struct pci_dev *dev)
 {
 	int i = 0;
 	unsigned long hpt34xIoBase = pci_resource_start(dev, 4);
@@ -420,15 +390,15 @@ unsigned int __init pci_init_hpt34x(struct pci_dev *dev)
 		bmide_dev = dev;
 		hpt34x_display_info = &hpt34x_get_info;
 	}
-#endif /* DISPLAY_HPT34X_TIMINGS && CONFIG_PROC_FS */
+#endif
 
 	return dev->irq;
 }
 
-void __init ide_init_hpt34x(struct ata_channel *hwif)
+static void __init ide_init_hpt34x(struct ata_channel *hwif)
 {
-	hwif->tuneproc = &hpt34x_tune_drive;
-	hwif->speedproc = &hpt34x_tune_chipset;
+	hwif->tuneproc = hpt34x_tune_drive;
+	hwif->speedproc = hpt34x_tune_chipset;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
@@ -449,9 +419,28 @@ void __init ide_init_hpt34x(struct ata_channel *hwif)
 		hwif->drives[0].autotune = 1;
 		hwif->drives[1].autotune = 1;
 	}
-#else /* !CONFIG_BLK_DEV_IDEDMA */
+#else
 	hwif->drives[0].autotune = 1;
 	hwif->drives[1].autotune = 1;
 	hwif->autodma = 0;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
+}
+
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+	vendor: PCI_VENDOR_ID_TTI,
+	device: PCI_DEVICE_ID_TTI_HPT343,
+	init_chipset: pci_init_hpt34x,
+	init_channel:	ide_init_hpt34x,
+	bootable: NEVER_BOARD,
+	extra: 16,
+	flags: ATA_F_NOADMA | ATA_F_DMA
+};
+
+int __init init_hpt34x(void)
+{
+	ata_register_chipset(&chipset);
+
+	return 0;
 }

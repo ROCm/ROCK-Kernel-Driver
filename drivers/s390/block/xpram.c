@@ -747,7 +747,10 @@ void xpram_request(request_queue_t * queue)
 #endif /* V24 */
 
 	while(1) {
-		INIT_REQUEST;
+		if (blk_queue_empty(QUEUE)) {
+			CLEAR_INTR;
+			return;
+		}
 
 		fault=0;
 #if ( XPRAM_VERSION == 24 )

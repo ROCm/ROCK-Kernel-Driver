@@ -86,14 +86,6 @@ static spinlock_t list_lock;
 LIST_HEAD(pci_hotplug_slot_list);
 
 
-static int pcihpfs_statfs (struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = PCIHPFS_MAGIC;
-	buf->f_bsize = PAGE_CACHE_SIZE;
-	buf->f_namelen = 255;
-	return 0;
-}
-
 static struct inode *pcihpfs_get_inode (struct super_block *sb, int mode, int dev)
 {
 	struct inode *inode = new_inode(sb);

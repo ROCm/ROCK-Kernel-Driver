@@ -16,7 +16,6 @@
 #include <linux/pagemap.h>
 #include <linux/init.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/blkdev.h>
 #include <linux/cramfs_fs.h>
 #include <linux/smp_lock.h>

@@ -170,7 +170,7 @@ static struct file_operations misc_fops = {
  
 int misc_register(struct miscdevice * misc)
 {
-	static devfs_handle_t devfs_handle;
+	static devfs_handle_t devfs_handle, dir;
 	struct miscdevice *c;
 	
 	if (misc->next || misc->prev)
@@ -201,11 +201,12 @@ int misc_register(struct miscdevice * misc)
 		misc_minors[misc->minor >> 3] |= 1 << (misc->minor & 7);
 	if (!devfs_handle)
 		devfs_handle = devfs_mk_dir (NULL, "misc", NULL);
+	dir = strchr (misc->name, '/') ? NULL : devfs_handle;
 	misc->devfs_handle =
-	    devfs_register (devfs_handle, misc->name, DEVFS_FL_NONE,
-			    MISC_MAJOR, misc->minor,
-			    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
-			    misc->fops, NULL);
+		devfs_register (dir, misc->name, DEVFS_FL_NONE,
+				MISC_MAJOR, misc->minor,
+				S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
+				misc->fops, NULL);
 
 	/*
 	 * Add it to the front, so that later devices can "override"

@@ -24,6 +24,7 @@
 #include <linux/ctype.h>
 #include <linux/file.h>
 #include <linux/pagemap.h>
+#include <linux/namei.h>
 
 #include <asm/uaccess.h>
 

@@ -2,12 +2,9 @@
 # Makefile for MIPS-specific library files..
 #
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
-
 L_TARGET = lib.a
+
+EXTRA_AFLAGS := $(CFLAGS)
 
 obj-y				+= csum_partial.o csum_partial_copy.o \
 				   rtc-std.o rtc-no.o memcpy.o memset.o \

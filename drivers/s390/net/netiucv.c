@@ -75,14 +75,7 @@ MODULE_PARM_DESC (iucv,
 
 static char *iucv = "";
 
-/**
- * compatibility stuff
- */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0))
 typedef struct net_device net_device;
-#else
-typedef struct device net_device;
-#endif
 
 
 /**
@@ -141,9 +134,7 @@ typedef struct iucv_event_t {
  */
 typedef struct netiucv_priv_t {
 	struct net_device_stats stats;
-#if LINUX_VERSION_CODE >= 0x02032D
 	unsigned long           tbusy;
-#endif
 	fsm_instance            *fsm;
         iucv_connection         *conn;
 	struct proc_dir_entry   *proc_dentry;
@@ -172,20 +163,6 @@ typedef struct ll_header_t {
  * Compatibility macros for busy handling
  * of network devices.
  */
-#if LINUX_VERSION_CODE < 0x02032D
-static __inline__ void netiucv_clear_busy(net_device *dev)
-{
-	clear_bit(0 ,(void *)&dev->tbusy);
-	mark_bh(NET_BH);
-}
-
-static __inline__ int netiucv_test_and_set_busy(net_device *dev)
-{
-	return(test_and_set_bit(0, (void *)&dev->tbusy));
-}
-
-#define SET_DEVICE_START(device, value) dev->start = value
-#else
 static __inline__ void netiucv_clear_busy(net_device *dev)
 {
 	clear_bit(0, &(((netiucv_priv *)dev->priv)->tbusy));
@@ -199,11 +176,6 @@ static __inline__ int netiucv_test_and_set_busy(net_device *dev)
 }
 
 #define SET_DEVICE_START(device, value)
-#endif
-
-#if LINUX_VERSION_CODE < 0x020400
-#  define dev_kfree_skb_irq(a) dev_kfree_skb(a)
-#endif
 
 __u8 iucv_host[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 __u8 iucvMagic[16] = {
@@ -1282,7 +1254,7 @@ netiucv_change_mtu (net_device * dev, int new_mtu)
  *****************************************************************************/
 
 static net_device *
-find_netdev_by_ino(unsigned long ino)
+find_netdev_by_ino(struct proc_dir_entry *pde)
 {
 	iucv_connection *conn = connections;
 	net_device *dev = NULL;
@@ -1293,30 +1265,15 @@ find_netdev_by_ino(unsigned long ino)
 			dev = conn->netdev;
 			privptr = (netiucv_priv *)dev->priv;
 
-			if ((privptr->proc_buffer_entry->low_ino == ino) ||
-			    (privptr->proc_user_entry->low_ino == ino)   ||
-			    (privptr->proc_stat_entry->low_ino == ino)     )
+			if ((privptr->proc_buffer_entry == pde) ||
+			    (privptr->proc_user_entry == pde)   ||
+			    (privptr->proc_stat_entry == pde)     )
 				return dev;
 		}
 		conn = conn->next;
 	}
 	return NULL;
 }
-
-#if LINUX_VERSION_CODE < 0x020363
-/**
- * Lock the module, if someone changes into
- * our proc directory.
- */
-static void
-netiucv_fill_inode(struct inode *inode, int fill)
-{
-	if (fill) {
-		MOD_INC_USE_COUNT;
-	} else
-		MOD_DEC_USE_COUNT;
-}
-#endif
 
 #define CTRL_BUFSIZE 40
 
@@ -1342,14 +1299,14 @@ static ssize_t
 netiucv_buffer_write(struct file *file, const char *buf, size_t count,
 			   loff_t *off)
 {
-	unsigned int ino = ((struct inode *)file->f_dentry->d_inode)->i_ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	net_device   *dev;
 	netiucv_priv *privptr;
 	char         *e;
 	int          bs1;
 	char         tmp[CTRL_BUFSIZE];
 
-	if (!(dev = find_netdev_by_ino(ino)))
+	if (!(dev = find_netdev_by_ino(pde)))
 		return -ENODEV;
 	if (off != &file->f_pos)
 		return -ESPIPE;
@@ -1385,7 +1342,7 @@ netiucv_buffer_write(struct file *file, const char *buf, size_t count,
 static ssize_t
 netiucv_buffer_read(struct file *file, char *buf, size_t count, loff_t *off)
 {
-	unsigned int ino = ((struct inode *)file->f_dentry->d_inode)->i_ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	char *sbuf = (char *)file->private_data;
 	net_device *dev;
 	netiucv_priv *privptr;
@@ -1393,7 +1350,7 @@ netiucv_buffer_read(struct file *file, char *buf, size_t count, loff_t *off)
 	char *p = sbuf;
 	int l;
 
-	if (!(dev = find_netdev_by_ino(ino)))
+	if (!(dev = find_netdev_by_ino(pde)))
 		return -ENODEV;
 	if (off != &file->f_pos)
 		return -ESPIPE;
@@ -1438,7 +1395,7 @@ static ssize_t
 netiucv_user_write(struct file *file, const char *buf, size_t count,
 			   loff_t *off)
 {
-	unsigned int ino = ((struct inode *)file->f_dentry->d_inode)->i_ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	net_device   *dev;
 	netiucv_priv *privptr;
 	int          i;
@@ -1446,7 +1403,7 @@ netiucv_user_write(struct file *file, const char *buf, size_t count,
 	char         tmp[CTRL_BUFSIZE];
 	char         user[9];
 
-	if (!(dev = find_netdev_by_ino(ino)))
+	if (!(dev = find_netdev_by_ino(pde)))
 		return -ENODEV;
 	if (off != &file->f_pos)
 		return -ESPIPE;
@@ -1480,7 +1437,7 @@ netiucv_user_write(struct file *file, const char *buf, size_t count,
 static ssize_t
 netiucv_user_read(struct file *file, char *buf, size_t count, loff_t *off)
 {
-	unsigned int ino = ((struct inode *)file->f_dentry->d_inode)->i_ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	char *sbuf = (char *)file->private_data;
 	net_device *dev;
 	netiucv_priv *privptr;
@@ -1488,7 +1445,7 @@ netiucv_user_read(struct file *file, char *buf, size_t count, loff_t *off)
 	char *p = sbuf;
 	int l;
 
-	if (!(dev = find_netdev_by_ino(ino)))
+	if (!(dev = find_netdev_by_ino(pde)))
 		return -ENODEV;
 	if (off != &file->f_pos)
 		return -ESPIPE;
@@ -1536,11 +1493,11 @@ netiucv_stat_close(struct inode *inode, struct file *file)
 static ssize_t
 netiucv_stat_write(struct file *file, const char *buf, size_t count, loff_t *off)
 {
-	unsigned int ino = ((struct inode *)file->f_dentry->d_inode)->i_ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	net_device *dev;
 	netiucv_priv *privptr;
 
-	if (!(dev = find_netdev_by_ino(ino)))
+	if (!(dev = find_netdev_by_ino(pde)))
 		return -ENODEV;
 	privptr = (netiucv_priv *)dev->priv;
 	privptr->conn->prof.maxmulti = 0;
@@ -1555,7 +1512,7 @@ netiucv_stat_write(struct file *file, const char *buf, size_t count, loff_t *off
 static ssize_t
 netiucv_stat_read(struct file *file, char *buf, size_t count, loff_t *off)
 {
-	unsigned int ino = ((struct inode *)file->f_dentry->d_inode)->i_ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	char *sbuf = (char *)file->private_data;
 	net_device *dev;
 	netiucv_priv *privptr;
@@ -1563,7 +1520,7 @@ netiucv_stat_read(struct file *file, char *buf, size_t count, loff_t *off)
 	char *p = sbuf;
 	int l;
 
-	if (!(dev = find_netdev_by_ino(ino)))
+	if (!(dev = find_netdev_by_ino(pde)))
 		return -ENODEV;
 	if (off != &file->f_pos)
 		return -ESPIPE;
@@ -1624,92 +1581,8 @@ static struct file_operations netiucv_user_fops = {
 	release: netiucv_user_close,
 };
 
-static struct inode_operations netiucv_stat_iops = {
-#if LINUX_VERSION_CODE < 0x020363
-	default_file_ops: &netiucv_stat_fops
-#endif
-};
-static struct inode_operations netiucv_buffer_iops = {
-#if LINUX_VERSION_CODE < 0x020363
-	default_file_ops: &netiucv_buffer_fops
-#endif
-};
-
-static struct inode_operations netiucv_user_iops = {
-#if LINUX_VERSION_CODE < 0x020363
-	default_file_ops: &netiucv_user_fops
-#endif
-};
-
-static struct proc_dir_entry stat_entry = {
-	0,                           /* low_ino */
-	10,                          /* namelen */
-	"statistics",                /* name    */
-	S_IFREG | S_IRUGO | S_IWUSR, /* mode    */
-	1,                           /* nlink   */
-	0,                           /* uid     */
-	0,                           /* gid     */
-	0,                           /* size    */
-	&netiucv_stat_iops           /* ops     */
-};
-
-static struct proc_dir_entry buffer_entry = {
-	0,                           /* low_ino */
-	10,                          /* namelen */
-	"buffersize",                /* name    */
-	S_IFREG | S_IRUSR | S_IWUSR, /* mode    */
-	1,                           /* nlink   */
-	0,                           /* uid     */
-	0,                           /* gid     */
-	0,                           /* size    */
-	&netiucv_buffer_iops         /* ops     */
-};
-
-static struct proc_dir_entry user_entry = {
-	0,                           /* low_ino */
-	8,                           /* namelen */
-	"username",                  /* name    */
-	S_IFREG | S_IRUSR | S_IWUSR, /* mode    */
-	1,                           /* nlink   */
-	0,                           /* uid     */
-	0,                           /* gid     */
-	0,                           /* size    */
-	&netiucv_user_iops           /* ops     */
-};
-
-#if LINUX_VERSION_CODE < 0x020363
-static struct proc_dir_entry netiucv_dir = {
-	0,                           /* low_ino  */
-	4,                           /* namelen  */
-	"iucv",                      /* name     */
-	S_IFDIR | S_IRUGO | S_IXUGO, /* mode     */
-	2,                           /* nlink    */
-	0,                           /* uid      */
-	0,                           /* gid      */
-	0,                           /* size     */
-	0,                           /* ops      */
-	0,                           /* get_info */
-	netiucv_fill_inode           /* fill_ino (for locking) */
-};
-
-static struct proc_dir_entry netiucv_template =
-{
-	0,                           /* low_ino  */
-	0,                           /* namelen  */
-	"",                          /* name     */
-	S_IFDIR | S_IRUGO | S_IXUGO, /* mode     */
-	2,                           /* nlink    */
-	0,                           /* uid      */
-	0,                           /* gid      */
-	0,                           /* size     */
-	0,                           /* ops      */
-	0,                           /* get_info */
-	netiucv_fill_inode           /* fill_ino (for locking) */
-};
-#else
 static struct proc_dir_entry *netiucv_dir = NULL;
 static struct proc_dir_entry *netiucv_template = NULL;
-#endif
 
 /**
  * Create the driver's main directory /proc/net/iucv
@@ -1720,13 +1593,8 @@ netiucv_proc_create_main(void)
 	/**
 	 * If not registered, register main proc dir-entry now
 	 */
-#if LINUX_VERSION_CODE > 0x020362
 	if (!netiucv_dir)
 		netiucv_dir = proc_mkdir("iucv", proc_net);
-#else
-	if (netiucv_dir.low_ino == 0)
-		proc_net_register(&netiucv_dir);
-#endif
 }
 
 #ifdef MODULE
@@ -1736,11 +1604,7 @@ netiucv_proc_create_main(void)
 static void
 netiucv_proc_destroy_main(void)
 {
-#if LINUX_VERSION_CODE > 0x020362
 	remove_proc_entry("iucv", proc_net);
-#else
-	proc_net_unregister(netiucv_dir.low_ino);
-#endif
 }
 #endif MODULE
 
@@ -1756,34 +1620,22 @@ static void
 netiucv_proc_create_sub(net_device *dev) {
 	netiucv_priv *privptr = dev->priv;
 
-#if LINUX_VERSION_CODE > 0x020362
 	privptr->proc_dentry = proc_mkdir(dev->name, netiucv_dir);
 	privptr->proc_stat_entry =
 		create_proc_entry("statistics",
 				  S_IFREG | S_IRUSR | S_IWUSR,
 				  privptr->proc_dentry);
 	privptr->proc_stat_entry->proc_fops = &netiucv_stat_fops;
-	privptr->proc_stat_entry->proc_iops = &netiucv_stat_iops;
 	privptr->proc_buffer_entry =
 		create_proc_entry("buffersize",
 				  S_IFREG | S_IRUSR | S_IWUSR,
 				  privptr->proc_dentry);
 	privptr->proc_buffer_entry->proc_fops = &netiucv_buffer_fops;
-	privptr->proc_buffer_entry->proc_iops = &netiucv_buffer_iops;
 	privptr->proc_user_entry =
 		create_proc_entry("username",
 				  S_IFREG | S_IRUSR | S_IWUSR,
 				  privptr->proc_dentry);
 	privptr->proc_user_entry->proc_fops = &netiucv_user_fops;
-	privptr->proc_user_entry->proc_iops = &netiucv_user_iops;
-#else
-	privptr->proc_dentry->name = dev->name;
-	privptr->proc_dentry->namelen = strlen(dev->name);
-	proc_register(&netiucv_dir, privptr->proc_dentry);
-	proc_register(privptr->proc_dentry, privptr->proc_stat_entry);
-	proc_register(privptr->proc_dentry, privptr->proc_buffer_entry);
-	proc_register(privptr->proc_dentry, privptr->proc_user_entry);
-#endif
 	privptr->proc_registered = 1;
 }
 
@@ -1797,21 +1649,10 @@ static void
 netiucv_proc_destroy_sub(netiucv_priv *privptr) {
 	if (!privptr->proc_registered)
 		return;
-#if LINUX_VERSION_CODE > 0x020362
 	remove_proc_entry("statistics", privptr->proc_dentry);
 	remove_proc_entry("buffersize", privptr->proc_dentry);
 	remove_proc_entry("username", privptr->proc_dentry);
 	remove_proc_entry(privptr->proc_dentry->name, netiucv_dir);
-#else
-	proc_unregister(privptr->proc_dentry,
-			privptr->proc_stat_entry->low_ino);
-	proc_unregister(privptr->proc_dentry,
-			privptr->proc_buffer_entry->low_ino);
-	proc_unregister(privptr->proc_dentry,
-			privptr->proc_user_entry->low_ino);
-	proc_unregister(&netiucv_dir,
-			privptr->proc_dentry->low_ino);
-#endif
 	privptr->proc_registered = 0;
 }
 
@@ -1904,21 +1745,13 @@ netiucv_init_netdevice(int ifno, char *username)
 	netiucv_priv *privptr;
 	int          priv_size;
 
-	net_device *dev = kmalloc(sizeof(net_device)
-#if LINUX_VERSION_CODE < 0x020300
-		      + 11 /* name + zero */
-#endif
-		      , GFP_KERNEL);
+	net_device *dev = kmalloc(sizeof(net_device), GFP_KERNEL);
 	if (!dev)
 		return NULL;
 	memset(dev, 0, sizeof(net_device));
-#if LINUX_VERSION_CODE < 0x020300
-	dev->name = (char *)dev + sizeof(net_device);
-#endif
 	sprintf(dev->name, "iucv%d", ifno);
 
-	priv_size = sizeof(netiucv_priv) + sizeof(netiucv_template) +
-		sizeof(stat_entry) + sizeof(buffer_entry) + sizeof(user_entry);
+	priv_size = sizeof(netiucv_priv);
 	dev->priv = kmalloc(priv_size, GFP_KERNEL);
 	if (dev->priv == NULL) {
 		kfree(dev);
@@ -1926,23 +1759,6 @@ netiucv_init_netdevice(int ifno, char *username)
 	}
         memset(dev->priv, 0, priv_size);
         privptr = (netiucv_priv *)dev->priv;
-        privptr->proc_dentry = (struct proc_dir_entry *)
-		(((char *)privptr) + sizeof(netiucv_priv));
-        privptr->proc_stat_entry = (struct proc_dir_entry *)
-		(((char *)privptr) + sizeof(netiucv_priv) +
-		 sizeof(netiucv_template));
-        privptr->proc_buffer_entry = (struct proc_dir_entry *)
-		(((char *)privptr) + sizeof(netiucv_priv) +
-		 sizeof(netiucv_template) + sizeof(stat_entry));
-        privptr->proc_user_entry = (struct proc_dir_entry *)
-		(((char *)privptr) + sizeof(netiucv_priv) +
-		 sizeof(netiucv_template) + sizeof(stat_entry) +
-		 sizeof(buffer_entry));
-	memcpy(privptr->proc_dentry, &netiucv_template,
-	       sizeof(netiucv_template));
-	memcpy(privptr->proc_stat_entry, &stat_entry, sizeof(stat_entry));
-	memcpy(privptr->proc_buffer_entry, &buffer_entry, sizeof(buffer_entry));
-	memcpy(privptr->proc_user_entry, &user_entry, sizeof(user_entry));
 	privptr->fsm = init_fsm("netiucvdev", dev_state_names,
 				dev_event_names, NR_DEV_STATES, NR_DEV_EVENTS,
 				dev_fsm, DEV_FSM_LEN, GFP_KERNEL);
@@ -2015,14 +1831,9 @@ netiucv_banner(void)
 }
 
 #ifndef MODULE
-# if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0))
 #  define init_return(a) return a
 static int __init
 iucv_setup(char *param)
-# else
-#  define init_return(a) return
-__initfunc (void iucv_setup(char *param, int *ints))
-# endif
 {
 	/**
 	* We do not parse parameters here because at the time of
@@ -2034,9 +1845,7 @@ __initfunc (void iucv_setup(char *param, int *ints))
 	init_return(1);
 }
 
-# if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0))
 __setup ("iucv=", iucv_setup);
-# endif
 #else
 static void
 netiucv_exit(void)

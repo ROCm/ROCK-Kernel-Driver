@@ -22,7 +22,7 @@
 #include <asm/page.h>
 #include <asm/cache.h>
 #include <asm/ppc_asm.h>
-#include "ppc_defs.h"
+#include "asm-offsets.h"
 #include "iSeries_asm.h"
 
 	.text

@@ -544,5 +544,5 @@ __arm922_proc_info:
 	.long	cpu_arm922_info
 	.long	arm922_processor_functions
 	.long	v4wbi_tlb_fns
-	.long	v4_user_fns
+	.long	v4wb_user_fns
 	.size	__arm922_proc_info, . - __arm922_proc_info

@@ -55,13 +55,13 @@ int ext3_sync_file(struct file * file, struct dentry *dentry, int datasync)
 	J_ASSERT(ext3_journal_current_handle() == 0);
 
 	/*
-	 * fsync_inode_buffers() just walks i_dirty_buffers and waits
+	 * fsync_inode_buffers() just walks private_list and waits
 	 * on them.  It's a no-op for full data journalling because
-	 * i_dirty_buffers will be ampty.
+	 * private_list will be empty.
 	 * Really, we only need to start I/O on the dirty buffers -
 	 * we'll end up waiting on them in commit.
 	 */
-	ret = fsync_inode_buffers(inode);
+	ret = sync_mapping_buffers(inode->i_mapping);
 	ext3_force_commit(inode->i_sb);
 
 	return ret;

@@ -20,6 +20,7 @@
  * use tagged command queueing.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -52,7 +53,7 @@
 #undef IDE_TCQ_FIDDLE_SI
 
 static ide_startstop_t ide_dmaq_intr(struct ata_device *drive, struct request *rq);
-static ide_startstop_t service(struct ata_device *drive);
+static ide_startstop_t service(struct ata_device *drive, struct request *rq);
 
 static inline void drive_ctl_nien(struct ata_device *drive, int set)
 {
@@ -70,7 +71,7 @@ static ide_startstop_t tcq_nop_handler(struct ata_device *drive, struct request 
 	struct ata_taskfile *args = rq->special;
 
 	ide__sti();
-	ide_end_drive_cmd(drive, GET_STAT(), GET_ERR());
+	ide_end_drive_cmd(drive, rq, GET_STAT(), GET_ERR());
 	kfree(args);
 	return ide_stopped;
 }
@@ -82,7 +83,7 @@ static ide_startstop_t tcq_nop_handler(struct ata_device *drive, struct request 
  */
 static void tcq_invalidate_queue(struct ata_device *drive)
 {
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	struct ata_channel *ch = drive->channel;
 	request_queue_t *q = &drive->queue;
 	struct ata_taskfile *args;
 	struct request *rq;
@@ -90,20 +91,20 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 
 	printk(KERN_INFO "ATA: %s: invalidating pending queue (%d)\n", drive->name, ata_pending_commands(drive));
 
-	spin_lock_irqsave(&ide_lock, flags);
+	spin_lock_irqsave(ch->lock, flags);
 
-	del_timer(&hwgroup->timer);
+	del_timer(&ch->timer);
 
-	if (test_bit(IDE_DMA, &hwgroup->flags))
+	if (test_bit(IDE_DMA, ch->active))
 		udma_stop(drive);
 
 	blk_queue_invalidate_tags(q);
 
 	drive->using_tcq = 0;
 	drive->queue_depth = 1;
-	clear_bit(IDE_BUSY, &hwgroup->flags);
-	clear_bit(IDE_DMA, &hwgroup->flags);
-	hwgroup->handler = NULL;
+	clear_bit(IDE_BUSY, ch->active);
+	clear_bit(IDE_DMA, ch->active);
+	ch->handler = NULL;
 
 	/*
 	 * Do some internal stuff -- we really need this command to be
@@ -144,32 +145,32 @@ out:
 	 * start doing stuff again
 	 */
 	q->request_fn(q);
-	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_unlock_irqrestore(ch->lock, flags);
 	printk(KERN_DEBUG "ATA: tcq_invalidate_queue: done\n");
 }
 
 static void ata_tcq_irq_timeout(unsigned long data)
 {
 	struct ata_device *drive = (struct ata_device *) data;
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	struct ata_channel *ch = drive->channel;
 	unsigned long flags;
 
 	printk(KERN_ERR "ATA: %s: timeout waiting for interrupt...\n", __FUNCTION__);
 
-	spin_lock_irqsave(&ide_lock, flags);
+	spin_lock_irqsave(ch->lock, flags);
 
-	if (test_and_set_bit(IDE_BUSY, &hwgroup->flags))
-		printk(KERN_ERR "ATA: %s: hwgroup not busy\n", __FUNCTION__);
-	if (hwgroup->handler == NULL)
-		printk(KERN_ERR "ATA: %s: missing isr!\n", __FUNCTION__);
+	if (test_and_set_bit(IDE_BUSY, ch->active))
+		printk(KERN_ERR "ATA: %s: IRQ handler not busy\n", __FUNCTION__);
+	if (!ch->handler)
+		printk(KERN_ERR "ATA: %s: missing ISR!\n", __FUNCTION__);
 
-	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	/*
 	 * if pending commands, try service before giving up
 	 */
 	if (ata_pending_commands(drive) && (GET_STAT() & SERVICE_STAT))
-		if (service(drive) == ide_started)
+		if (service(drive, drive->rq) == ide_started)
 			return;
 
 	if (drive)
@@ -178,21 +179,25 @@ static void ata_tcq_irq_timeout(unsigned long data)
 
 static void set_irq(struct ata_device *drive, ata_handler_t *handler)
 {
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	struct ata_channel *ch = drive->channel;
 	unsigned long flags;
 
-	spin_lock_irqsave(&ide_lock, flags);
+	spin_lock_irqsave(ch->lock, flags);
 
 	/*
 	 * always just bump the timer for now, the timeout handling will
 	 * have to be changed to be per-command
+	 *
+	 * FIXME: Jens - this is broken it will interfere with
+	 * the normal timer function on serialized drives!
 	 */
-	hwgroup->timer.function = ata_tcq_irq_timeout;
-	hwgroup->timer.data = (unsigned long) hwgroup->XXX_drive;
-	mod_timer(&hwgroup->timer, jiffies + 5 * HZ);
 
-	hwgroup->handler = handler;
-	spin_unlock_irqrestore(&ide_lock, flags);
+	ch->timer.function = ata_tcq_irq_timeout;
+	ch->timer.data = (unsigned long) ch->drive;
+	mod_timer(&ch->timer, jiffies + 5 * HZ);
+	ch->handler = handler;
+
+	spin_unlock_irqrestore(ch->lock, flags);
 }
 
 /*
@@ -223,9 +228,8 @@ static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *
  *
  * Also, nIEN must be set as not to need protection against ide_dmaq_intr
  */
-static ide_startstop_t service(struct ata_device *drive)
+static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 {
-	struct request *rq;
 	u8 feat;
 	u8 stat;
 	int tag;
@@ -236,13 +240,13 @@ static ide_startstop_t service(struct ata_device *drive)
 	 * Could be called with IDE_DMA in-progress from invalidate
 	 * handler, refuse to do anything.
 	 */
-	if (test_bit(IDE_DMA, &HWGROUP(drive)->flags))
+	if (test_bit(IDE_DMA, drive->channel->active))
 		return ide_stopped;
 
 	/*
 	 * need to select the right drive first...
 	 */
-	if (drive != HWGROUP(drive)->XXX_drive) {
+	if (drive != drive->channel->drive) {
 		SELECT_DRIVE(drive->channel, drive);
 		udelay(10);
 	}
@@ -256,8 +260,9 @@ static ide_startstop_t service(struct ata_device *drive)
 
 	if (wait_altstat(drive, &stat, BUSY_STAT)) {
 		printk(KERN_ERR"%s: BUSY clear took too long\n", __FUNCTION__);
-		ide_dump_status(drive, __FUNCTION__, stat);
+		ide_dump_status(drive, rq, __FUNCTION__, stat);
 		tcq_invalidate_queue(drive);
+
 		return ide_stopped;
 	}
 
@@ -267,8 +272,9 @@ static ide_startstop_t service(struct ata_device *drive)
 	 * FIXME, invalidate queue
 	 */
 	if (stat & ERR_STAT) {
-		ide_dump_status(drive, __FUNCTION__, stat);
+		ide_dump_status(drive, rq, __FUNCTION__, stat);
 		tcq_invalidate_queue(drive);
+
 		return ide_stopped;
 	}
 
@@ -276,7 +282,7 @@ static ide_startstop_t service(struct ata_device *drive)
 	 * should not happen, a buggy device could introduce loop
 	 */
 	if ((feat = GET_FEAT()) & NSEC_REL) {
-		HWGROUP(drive)->rq = NULL;
+		drive->rq = NULL;
 		printk("%s: release in service\n", drive->name);
 		return ide_stopped;
 	}
@@ -291,7 +297,7 @@ static ide_startstop_t service(struct ata_device *drive)
 		return ide_stopped;
 	}
 
-	HWGROUP(drive)->rq = rq;
+	drive->rq = rq;
 
 	/*
 	 * we'll start a dma read or write, device will trigger
@@ -301,7 +307,7 @@ static ide_startstop_t service(struct ata_device *drive)
 	return udma_tcq_start(drive, rq);
 }
 
-static ide_startstop_t check_service(struct ata_device *drive)
+static ide_startstop_t check_service(struct ata_device *drive, struct request *rq)
 {
 	u8 stat;
 
@@ -311,7 +317,7 @@ static ide_startstop_t check_service(struct ata_device *drive)
 		return ide_stopped;
 
 	if ((stat = GET_STAT()) & SERVICE_STAT)
-		return service(drive);
+		return service(drive, rq);
 
 	/*
 	 * we have pending commands, wait for interrupt
@@ -335,8 +341,9 @@ ide_startstop_t ide_dmaq_complete(struct ata_device *drive, struct request *rq, 
 	 */
 	if (unlikely(!OK_STAT(stat, READY_STAT, drive->bad_wstat | DRQ_STAT))) {
 		printk(KERN_ERR "%s: %s: error status %x\n", __FUNCTION__, drive->name,stat);
-		ide_dump_status(drive, __FUNCTION__, stat);
+		ide_dump_status(drive, rq, __FUNCTION__, stat);
 		tcq_invalidate_queue(drive);
+
 		return ide_stopped;
 	}
 
@@ -349,7 +356,7 @@ ide_startstop_t ide_dmaq_complete(struct ata_device *drive, struct request *rq, 
 	/*
 	 * we completed this command, check if we can service a new command
 	 */
-	return check_service(drive);
+	return check_service(drive, rq);
 }
 
 /*
@@ -380,11 +387,11 @@ static ide_startstop_t ide_dmaq_intr(struct ata_device *drive, struct request *r
 	 */
 	if (stat & SERVICE_STAT) {
 		TCQ_PRINTK("%s: SERV (stat=%x)\n", __FUNCTION__, stat);
-		return service(drive);
+		return service(drive, rq);
 	}
 
 	printk("%s: stat=%x, not expected\n", __FUNCTION__, stat);
-	return check_service(drive);
+	return check_service(drive, rq);
 }
 
 /*
@@ -521,7 +528,7 @@ static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *
 	struct ata_channel *ch = drive->channel;
 
 	TCQ_PRINTK("%s: setting up queued %d\n", __FUNCTION__, rq->tag);
-	if (!test_bit(IDE_BUSY, &ch->hwgroup->flags))
+	if (!test_bit(IDE_BUSY, ch->active))
 		printk("queued_rw: IDE_BUSY not set\n");
 
 	if (tcq_wait_dataphase(drive))
@@ -558,7 +565,7 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 	OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
 
 	if (wait_altstat(drive, &stat, BUSY_STAT)) {
-		ide_dump_status(drive, "queued start", stat);
+		ide_dump_status(drive, rq, "queued start", stat);
 		tcq_invalidate_queue(drive);
 		return ide_stopped;
 	}
@@ -566,7 +573,7 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 	drive_ctl_nien(drive, 0);
 
 	if (stat & ERR_STAT) {
-		ide_dump_status(drive, "tcq_start", stat);
+		ide_dump_status(drive, rq, "tcq_start", stat);
 		return ide_stopped;
 	}
 
@@ -576,13 +583,13 @@ ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 	 */
 	if ((feat = GET_FEAT()) & NSEC_REL) {
 		drive->immed_rel++;
-		HWGROUP(drive)->rq = NULL;
+		drive->rq = NULL;
 		set_irq(drive, ide_dmaq_intr);
 
 		TCQ_PRINTK("REL in queued_start\n");
 
 		if ((stat = GET_STAT()) & SERVICE_STAT)
-			return service(drive);
+			return service(drive, rq);
 
 		return ide_released;
 	}
@@ -633,3 +640,6 @@ int udma_tcq_enable(struct ata_device *drive, int on)
 	drive->using_tcq = 1;
 	return 0;
 }
+
+/* FIXME: This should go away! */
+EXPORT_SYMBOL(udma_tcq_enable);

@@ -19,10 +19,12 @@
 #include <linux/hdreg.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
-#include <linux/ide.h>
 #include <linux/init.h>
+#include <linux/ide.h>
 
 #include <asm/io.h>
+
+#include "pcihost.h"
 
 static unsigned int ns87415_count = 0, ns87415_control[MAX_HWIFS] = { 0 };
 
@@ -134,7 +136,7 @@ static int ns87415_dmaproc(struct ata_device *drive)
 }
 #endif
 
-void __init ide_init_ns87415(struct ata_channel *hwif)
+static void __init ide_init_ns87415(struct ata_channel *hwif)
 {
 	struct pci_dev *dev = hwif->pci_dev;
 	unsigned int ctrl, using_inta;
@@ -236,4 +238,19 @@ void __init ide_init_ns87415(struct ata_channel *hwif)
 #endif
 
 	hwif->selectproc = &ns87415_selectproc;
+}
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+	vendor: PCI_VENDOR_ID_NS,
+	device: PCI_DEVICE_ID_NS_87415,
+	init_channel: ide_init_ns87415,
+	bootable: ON_BOARD,
+};
+
+int __init init_ns87415(void)
+{
+	ata_register_chipset(&chipset);
+
+        return 0;
 }

@@ -54,10 +54,10 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/fcntl.h>
-#include <linux/locks.h>
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
+#include <linux/suspend.h> 
 
 /* the number of mounted filesystems.  This is used to decide when to
 ** start and kill the commit thread
@@ -204,7 +204,7 @@ static int set_bit_in_list_bitmap(struct super_block *p_s_sb, int block,
   if (!jb->bitmaps[bmap_nr]) {
     jb->bitmaps[bmap_nr] = get_bitmap_node(p_s_sb) ;
   }
-  set_bit(bit_nr, jb->bitmaps[bmap_nr]->data) ;
+  set_bit(bit_nr, (unsigned long *)jb->bitmaps[bmap_nr]->data) ;
   return 0 ;
 }
 
@@ -550,7 +550,7 @@ int reiserfs_in_journal(struct super_block *p_s_sb,
       PROC_INFO_INC( p_s_sb, journal.in_journal_bitmap );
       jb = SB_JOURNAL(p_s_sb)->j_list_bitmap + i ;
       if (jb->journal_list && jb->bitmaps[bmap_nr] &&
-          test_bit(bit_nr, jb->bitmaps[bmap_nr]->data)) {
+          test_bit(bit_nr, (unsigned long *)jb->bitmaps[bmap_nr]->data)) {
 	tmp_bit = find_next_zero_bit((unsigned long *)
 	                             (jb->bitmaps[bmap_nr]->data),
 	                             p_s_sb->s_blocksize << 3, bit_nr+1) ; 
@@ -1887,6 +1887,7 @@ static int reiserfs_journal_commit_thread(void *nullp) {
   spin_unlock_irq(&current->sigmask_lock);
 
   sprintf(current->comm, "kreiserfsd") ;
+  current->flags |= PF_KERNTHREAD;
   lock_kernel() ;
   while(1) {
 
@@ -1900,7 +1901,12 @@ static int reiserfs_journal_commit_thread(void *nullp) {
       break ;
     }
     wake_up(&reiserfs_commit_thread_done) ;
-    interruptible_sleep_on_timeout(&reiserfs_commit_thread_wait, 5 * HZ) ;
+#ifdef CONFIG_SOFTWARE_SUSPEND
+    if (current->flags & PF_FREEZE) {
+	    refrigerator(PF_IOTHREAD);
+    } else
+#endif
+	    interruptible_sleep_on_timeout(&reiserfs_commit_thread_wait, 5 * HZ) ;
   }
   unlock_kernel() ;
   wake_up(&reiserfs_commit_thread_done) ;

@@ -15,6 +15,7 @@
 #include <asm/prom.h>
 #include <asm/bitops.h>
 #include <asm/bootx.h>
+#include <asm/machdep.h>
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif
@@ -105,6 +106,7 @@ static void cpu_cmd(void);
 #endif /* CONFIG_SMP */
 static int pretty_print_addr(unsigned long addr);
 static void csum(void);
+static void bootcmds(void);
 
 extern int print_insn_big_powerpc(FILE *, unsigned long, unsigned);
 extern void printf(const char *fmt, ...);
@@ -482,8 +484,24 @@ cmds(struct pt_regs *excp)
 			cpu_cmd();
 			break;
 #endif /* CONFIG_SMP */
+		case 'z':
+			bootcmds();
+			break;
 		}
 	}
+}
+
+static void bootcmds(void)
+{
+	int cmd;
+
+	cmd = inchar();
+	if (cmd == 'r')
+		ppc_md.restart(NULL);
+	else if (cmd == 'h')
+		ppc_md.halt();
+	else if (cmd == 'p')
+		ppc_md.power_off();
 }
 
 #ifdef CONFIG_SMP
@@ -670,7 +688,7 @@ bpt_cmds(void)
 					printf("r");
 				if (dabr.address & 2)
 					printf("w");
-				if (dabr.address & 4)
+				if (!(dabr.address & 4))
 					printf("p");
 				printf("]\n");
 			}
@@ -707,8 +725,7 @@ backtrace(struct pt_regs *excp)
 	unsigned sp;
 	unsigned stack[2];
 	struct pt_regs regs;
-	extern char ret_from_intercept, ret_from_syscall_1, ret_from_syscall_2;
-	extern char ret_from_except;
+	extern char ret_from_except, ret_from_except_full, ret_from_syscall;
 
 	printf("backtrace:\n");
 	
@@ -723,10 +740,9 @@ backtrace(struct pt_regs *excp)
 			break;
 		pretty_print_addr(stack[1]);
 		printf(" ");
-		if (stack[1] == (unsigned) &ret_from_intercept
-		    || stack[1] == (unsigned) &ret_from_except
-		    || stack[1] == (unsigned) &ret_from_syscall_1
-		    || stack[1] == (unsigned) &ret_from_syscall_2) {
+		if (stack[1] == (unsigned) &ret_from_except
+		    || stack[1] == (unsigned) &ret_from_except_full
+		    || stack[1] == (unsigned) &ret_from_syscall) {
 			if (mread(sp+16, &regs, sizeof(regs)) != sizeof(regs))
 				break;
 			printf("\nexception:%x [%x] %x ", regs.trap, sp+16,
@@ -751,6 +767,8 @@ getsp()
 void
 excprint(struct pt_regs *fp)
 {
+	int trap;
+
 #ifdef CONFIG_SMP
 	printf("cpu %d: ", smp_processor_id());
 #endif /* CONFIG_SMP */
@@ -759,7 +777,8 @@ excprint(struct pt_regs *fp)
 	printf(", lr = ");
 	pretty_print_addr(fp->link);
 	printf("\nmsr = %x, sp = %x [%x]\n", fp->msr, fp->gpr[1], fp);
-	if (fp->trap == 0x300 || fp->trap == 0x600)
+	trap = TRAP(fp);
+	if (trap == 0x300 || trap == 0x600)
 		printf("dar = %x, dsisr = %x\n", fp->dar, fp->dsisr);
 	if (current)
 		printf("current = %x, pid = %d, comm = %s\n",
@@ -774,9 +793,14 @@ prregs(struct pt_regs *fp)
 
 	if (scanhex(&base))
 		fp = (struct pt_regs *) base;
-	for (n = 0; n < 32; ++n)
+	for (n = 0; n < 32; ++n) {
 		printf("R%.2d = %.8x%s", n, fp->gpr[n],
 		       (n & 3) == 3? "\n": "   ");
+		if (n == 12 && !FULL_REGS(fp)) {
+			printf("\n");
+			break;
+		}
+	}
 	printf("pc  = %.8x   msr = %.8x   lr  = %.8x   cr  = %.8x\n",
 	       fp->nip, fp->msr, fp->link, fp->ccr);
 	printf("ctr = %.8x   xer = %.8x   trap = %4x\n",
@@ -1160,7 +1184,7 @@ static char *fault_chars[] = { "--", "**", "##" };
 static void
 handle_fault(struct pt_regs *regs)
 {
-	fault_type = regs->trap == 0x200? 0: regs->trap == 0x300? 1: 2;
+	fault_type = TRAP(regs) == 0x200? 0: TRAP(regs) == 0x300? 1: 2;
 	longjmp(bus_error_jmp, 1);
 }
 

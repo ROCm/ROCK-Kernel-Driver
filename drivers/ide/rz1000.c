@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  *  Copyright (C) 1995-1998  Linus Torvalds & author (see below)
  *
  *  Principal Author:  mlord@pobox.com (Mark Lord)
@@ -21,14 +22,16 @@
 #include <linux/blkdev.h>
 #include <linux/hdreg.h>
 #include <linux/pci.h>
-#include <linux/ide.h>
 #include <linux/init.h>
+#include <linux/ide.h>
 
 #include <asm/io.h>
 
 #ifdef CONFIG_PCI
 
-void __init ide_init_rz1000(struct ata_channel *hwif)	/* called from ide-pci.c */
+#include "pcihost.h"
+
+static void __init rz1000_init_channel(struct ata_channel *hwif)
 {
 	unsigned short reg;
 	struct pci_dev *dev = hwif->pci_dev;
@@ -43,6 +46,33 @@ void __init ide_init_rz1000(struct ata_channel *hwif)	/* called from ide-pci.c *
 		hwif->no_unmask = 1;
 		printk("%s: serialized, disabled unmasking (buggy RZ1000/RZ1001)\n", hwif->name);
 	}
+}
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_PCTECH,
+		device:	PCI_DEVICE_ID_PCTECH_RZ1000,
+		init_channel: rz1000_init_channel,
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_PCTECH,
+		device: PCI_DEVICE_ID_PCTECH_RZ1001,
+		init_channel: rz1000_init_channel,
+		bootable: ON_BOARD
+	},
+};
+
+int __init init_rz1000(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+        return 0;
 }
 
 #else
@@ -82,9 +112,9 @@ void __init ide_probe_for_rz100x (void)	/* called from ide.c */
 	struct pci_dev *dev = NULL;
 
 	while ((dev = pci_find_device(PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1000, dev))!=NULL)
-		init_rz1000 (dev, "RZ1000");
+		rz1000_init (dev, "RZ1000");
 	while ((dev = pci_find_device(PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1001, dev))!=NULL)
-		init_rz1000 (dev, "RZ1001");
+		rz1000_init (dev, "RZ1001");
 }
 
 #endif

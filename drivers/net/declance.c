@@ -791,6 +791,8 @@ static int lance_open(struct net_device *dev)
 	ib->mode = 0;
 	ib->filter [0] = 0;
 	ib->filter [2] = 0;
+	ib->filter [4] = 0;
+	ib->filter [6] = 0;
 
 	lance_init_ring(dev);
 	load_csrs(lp);
@@ -943,9 +945,9 @@ static void lance_load_multicast(struct net_device *dev)
 		if (!(*addrs & 1))
 			continue;
 
-		crc = ether_crc(6, addrs);
+		crc = ether_crc_le(6, addrs);
 		crc = crc >> 26;
-		mcast_table[crc >> 3] |= 1 << (crc & 0xf);
+		mcast_table[2 * (crc >> 4)] |= 1 << (crc & 0xf);
 	}
 	return;
 }

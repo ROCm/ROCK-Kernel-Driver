@@ -200,6 +200,8 @@ fix_alignment(struct pt_regs *regs)
 		unsigned char v[8];
 	} data;
 
+	CHECK_FULL_REGS(regs);
+
 #if defined(CONFIG_4xx)
 	/* The 4xx-family processors have no DSISR register,
 	 * so we emulate it.

@@ -35,7 +35,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
 #include <linux/slab.h>
@@ -359,20 +359,15 @@ static ssize_t zf_read(struct file *file, char *buf, size_t count,
 static int zf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
-	int ret;
-		
 	switch(cmd){
 		case WDIOC_GETSUPPORT:
-			ret = copy_to_user((struct watchdog_info *)arg, 
-						&zf_info, sizeof(zf_info));
-			if(ret)
+			if (copy_to_user((struct watchdog_info *)arg, 
+					 &zf_info, sizeof(zf_info)))
 				return -EFAULT;
 			break;
 	  
 		case WDIOC_GETSTATUS:
-			ret = copy_to_user((int *)arg, &zf_is_open,
-								sizeof(int));
-			if(ret)
+			if (copy_to_user((int *)arg, &zf_is_open, sizeof(int)))
 				return -EFAULT;
 			break;
 

@@ -6,11 +6,6 @@
 # unless it's something special (ie not a .c file).
 #
 
-.S.s:
-	$(CPP) $(AFLAGS) $< -o $@
-.S.o:
-	$(CC) $(AFLAGS) -c $< -o $@
-
 O_TARGET := nino.o
 
 all: nino.o

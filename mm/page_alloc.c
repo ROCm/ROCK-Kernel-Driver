@@ -22,6 +22,7 @@
 #include <linux/slab.h>
 #include <linux/compiler.h>
 #include <linux/module.h>
+#include <linux/suspend.h>
 
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
@@ -246,6 +247,46 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 
 	return NULL;
 }
+
+#ifdef CONFIG_SOFTWARE_SUSPEND
+int is_head_of_free_region(struct page *p)
+{
+	pg_data_t *pgdat = pgdat_list;
+	unsigned type;
+	unsigned long flags;
+
+	for (type=0;type < MAX_NR_ZONES; type++) {
+		zone_t *zone = pgdat->node_zones + type;
+		int order = MAX_ORDER - 1;
+		free_area_t *area;
+		struct list_head *head, *curr;
+		spin_lock_irqsave(&zone->lock, flags);	/* Should not matter as we need quiescent system for suspend anyway, but... */
+
+		do {
+			area = zone->free_area + order;
+			head = &area->free_list;
+			curr = head;
+
+			for(;;) {
+				if(!curr) {
+//					printk("FIXME: this should not happen but it does!!!");
+					break;
+				}
+				if(p != memlist_entry(curr, struct page, list)) {
+					curr = memlist_next(curr);
+					if (curr == head)
+						break;
+					continue;
+				}
+				return 1 << order;
+			}
+		} while(order--);
+		spin_unlock_irqrestore(&zone->lock, flags);
+
+	}
+	return 0;
+}
+#endif /* CONFIG_SOFTWARE_SUSPEND */
 
 #ifndef CONFIG_DISCONTIGMEM
 struct page *_alloc_pages(unsigned int gfp_mask, unsigned int order)
@@ -569,11 +610,6 @@ unsigned int nr_free_highpages (void)
 }
 #endif
 
-unsigned long nr_buffermem_pages(void)
-{
-	return atomic_read(&buffermem_pages);
-}
-
 /*
  * Accumulate the page_state information across all CPUs.
  * The result is unavoidably approximate - it can change
@@ -613,7 +649,7 @@ void si_meminfo(struct sysinfo *val)
 	val->totalram = totalram_pages;
 	val->sharedram = 0;
 	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
+	val->bufferram = get_page_cache_size();
 #ifdef CONFIG_HIGHMEM
 	val->totalhigh = totalhigh_pages;
 	val->freehigh = nr_free_highpages();

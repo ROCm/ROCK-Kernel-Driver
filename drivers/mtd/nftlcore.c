@@ -837,7 +837,11 @@ void nftl_request(RQFUNC_ARG)
 	int res;
 
 	while (1) {
-		INIT_REQUEST;	/* blk.h */
+		if (blk_queue_empty(QUEUE)) {
+			CLEAR_INTR;
+			return;
+		}
+
 		req = CURRENT;
 		
 		/* We can do this because the generic code knows not to

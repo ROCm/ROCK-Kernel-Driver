@@ -1,4 +1,6 @@
-/* $Id: cmd64x.c,v 1.21 2000/01/30 23:23:16
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
+ * $Id: cmd64x.c,v 1.21 2000/01/30 23:23:16
  *
  * linux/drivers/ide/cmd64x.c		Version 1.22	June 9, 2000
  *
@@ -8,9 +10,9 @@
  *           Due to massive hardware bugs, UltraDMA is only supported
  *           on the 646U2 and not on the 646U.
  *
- * Copyright (C) 1998       Eddie C. Dost  (ecd@skynet.be)
- * Copyright (C) 1998       David S. Miller (davem@redhat.com)
- * Copyright (C) 1999-2000  Andre Hedrick <andre@linux-ide.org>
+ * Copyright (C) 1998		Eddie C. Dost <ecd@skynet.be>
+ * Copyright (C) 1998		David S. Miller <davem@redhat.com>
+ * Copyright (C) 1999-2002	Andre Hedrick <andre@linux-ide.org>
  */
 
 #include <linux/config.h>
@@ -18,12 +20,13 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/hdreg.h>
-#include <linux/ide.h>
 #include <linux/init.h>
+#include <linux/ide.h>
 
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #ifndef SPLIT_BYTE
 #define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
@@ -302,7 +305,7 @@ static void cmd64x_tuneproc(struct ata_device *drive, byte mode_wanted)
 	 */
 
 	recovery_time = t->cycle - (t->setup + t->active);
-	clock_time = 1000 / system_bus_speed;
+	clock_time = 1000000 / system_bus_speed;
 	cycle_count = (t->cycle + clock_time - 1) / clock_time;
 	setup_count = (t->setup + clock_time - 1) / clock_time;
 	active_count = (t->active + clock_time - 1) / clock_time;
@@ -331,6 +334,59 @@ static void cmd64x_tuneproc(struct ata_device *drive, byte mode_wanted)
 	cmdprintk("%s: selected cmd646 PIO mode%d : %d (%dns), clocks=%d/%d/%d\n",
 		drive->name, t.mode - XFER_PIO_0, mode_wanted, cycle_time,
 		setup_count, active_count, recovery_count);
+}
+
+static int cmd64x_ratemask(struct ata_device *drive)
+{
+	struct pci_dev *dev = drive->channel->pci_dev;
+	int map = 0;
+
+	switch(dev->device) {
+		case PCI_DEVICE_ID_CMD_680:
+			map |= XFER_UDMA_133;
+		case PCI_DEVICE_ID_CMD_649:
+			map |= XFER_UDMA_100;
+		case PCI_DEVICE_ID_CMD_648:
+			map |= XFER_UDMA_66;
+		case PCI_DEVICE_ID_CMD_643:
+			map |= XFER_UDMA;
+			break;
+		case PCI_DEVICE_ID_CMD_646:
+		{
+			unsigned int class_rev	= 0;
+			pci_read_config_dword(dev,
+				PCI_CLASS_REVISION, &class_rev);
+			class_rev &= 0xff;
+		/*
+		 * UltraDMA only supported on PCI646U and PCI646U2, which
+		 * correspond to revisions 0x03, 0x05 and 0x07 respectively.
+		 * Actually, although the CMD tech support people won't
+		 * tell me the details, the 0x03 revision cannot support
+		 * UDMA correctly without hardware modifications, and even
+		 * then it only works with Quantum disks due to some
+		 * hold time assumptions in the 646U part which are fixed
+		 * in the 646U2.
+		 *
+		 * So we only do UltraDMA on revision 0x05 and 0x07 chipsets.
+		 */
+			switch(class_rev) {
+				case 0x07:
+				case 0x05:
+					map |= XFER_UDMA;
+				case 0x03:
+				case 0x01:
+				default:
+					break;
+			}
+		}
+	}
+
+	if (!eighty_ninty_three(drive)) {
+		if (map & XFER_UDMA)
+			return XFER_UDMA;
+		return 0;
+	}
+	return map;
 }
 
 static byte cmd680_taskfile_timing(struct ata_channel *hwif)
@@ -432,7 +488,6 @@ static int cmd64x_tune_chipset(struct ata_device *drive, byte speed)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
-	int err			= 0;
 
 	u8 unit			= (drive->select.b.unit & 0x01);
 	u8 pciU			= (hwif->unit) ? UDIDETCR1 : UDIDETCR0;
@@ -466,9 +521,7 @@ static int cmd64x_tune_chipset(struct ata_device *drive, byte speed)
 		case XFER_SW_DMA_1:	regD |= (unit ? 0x80 : 0x20); break;
 		case XFER_SW_DMA_0:	regD |= (unit ? 0xC0 : 0x30); break;
 #else
-	int err			= 0;
-
-		switch(speed) {
+	switch(speed) {
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 		case XFER_PIO_4:	cmd64x_tuneproc(drive, 4); break;
 		case XFER_PIO_3:	cmd64x_tuneproc(drive, 3); break;
@@ -484,8 +537,8 @@ static int cmd64x_tune_chipset(struct ata_device *drive, byte speed)
 	(void) pci_write_config_byte(dev, pciU, regU);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-	err = ide_config_drive_speed(drive, speed);
-
+	if (!drive->init_speed)
+		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -493,7 +546,7 @@ static int cmd64x_tune_chipset(struct ata_device *drive, byte speed)
 	(void) pci_write_config_byte(dev, pciD, regD);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-	return err;
+	return ide_config_drive_speed(drive, speed);
 }
 
 static int cmd680_tune_chipset(struct ata_device *drive, byte speed)
@@ -508,7 +561,6 @@ static int cmd680_tune_chipset(struct ata_device *drive, byte speed)
 	u8 scsc			= 0;
 	u16 ultra		= 0;
 	u16 multi		= 0;
-	int err			= 0;
 
         pci_read_config_byte(dev, addr_mask, &mode_pci);
 	pci_read_config_byte(dev, 0x8A, &scsc);
@@ -591,7 +643,6 @@ speed_break :
 			return 1;
 	}
 
-	
 	if (speed >= XFER_MW_DMA_0) 
 		config_cmd680_chipset_for_pio(drive, 0);
 
@@ -606,182 +657,46 @@ speed_break :
 	pci_write_config_word(dev, dma_pci, multi);
 	pci_write_config_word(dev, udma_pci, ultra);
 
-	err = ide_config_drive_speed(drive, speed);
+	if (!drive->init_speed)
+		drive->init_speed = speed;
 	drive->current_speed = speed;
-	return err;
+
+	return ide_config_drive_speed(drive, speed);
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int config_cmd64x_chipset_for_dma(struct ata_device *drive, unsigned int rev, byte ultra_66)
+static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 {
-	struct hd_driveid *id	= drive->id;
-	struct ata_channel *hwif = drive->channel;
-	struct pci_dev *dev	= hwif->pci_dev;
-
-	byte speed		= 0x00;
-	byte set_pio		= 0x00;
-	byte udma_33		= ((rev >= 0x05) || (ultra_66)) ? 1 : 0;
-	byte udma_66		= eighty_ninty_three(drive);
-	byte udma_100		= 0;
-	int rval;
-
-	switch(dev->device) {
-		case PCI_DEVICE_ID_CMD_649: udma_100 = 1; break;
-		case PCI_DEVICE_ID_CMD_648:
-		case PCI_DEVICE_ID_CMD_646:
-		case PCI_DEVICE_ID_CMD_643:
-		default:
-			break;
-	}
+	int map;
+	u8 mode;
 
 	if (drive->type != ATA_DISK) {
 		cmdprintk("CMD64X: drive is not a disk at double check, inital check failed!!\n");
 		return 0;
 	}
 
-	/* UltraDMA only supported on PCI646U and PCI646U2,
-	 * which correspond to revisions 0x03, 0x05 and 0x07 respectively.
-	 * Actually, although the CMD tech support people won't
-	 * tell me the details, the 0x03 revision cannot support
-	 * UDMA correctly without hardware modifications, and even
-	 * then it only works with Quantum disks due to some
-	 * hold time assumptions in the 646U part which are fixed
-	 * in the 646U2.
-	 * So we only do UltraDMA on revision 0x05 and 0x07 chipsets.
-	 */
-	if ((id->dma_ultra & 0x0020) && (udma_100) && (udma_66) && (udma_33)) {
-		speed = XFER_UDMA_5;
-	} else if ((id->dma_ultra & 0x0010) && (udma_66) && (udma_33)) {
-		speed = XFER_UDMA_4;
-	} else if ((id->dma_ultra & 0x0008) && (udma_66) && (udma_33)) {
-		speed = XFER_UDMA_3;
-	} else if ((id->dma_ultra & 0x0004) && (udma_33)) {
-		speed = XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0002) && (udma_33)) {
-		speed = XFER_UDMA_1;
-	} else if ((id->dma_ultra & 0x0001) && (udma_33)) {
-		speed = XFER_UDMA_0;
-	} else if (id->dma_mword & 0x0004) {
-		speed = XFER_MW_DMA_2;
-	} else if (id->dma_mword & 0x0002) {
-		speed = XFER_MW_DMA_1;
-	} else if (id->dma_mword & 0x0001) {
-		speed = XFER_MW_DMA_0;
-	} else if (id->dma_1word & 0x0004) {
-		speed = XFER_SW_DMA_2;
-	} else if (id->dma_1word & 0x0002) {
-		speed = XFER_SW_DMA_1;
-	} else if (id->dma_1word & 0x0001) {
-		speed = XFER_SW_DMA_0;
-	} else {
-		set_pio = 1;
+	if (udma)
+		map = cmd64x_ratemask(drive);
+	else
+		map = XFER_SWDMA | XFER_MWDMA;
+
+	mode = ata_timing_mode(drive, map);
+
+	if (mode < XFER_SW_DMA_0) {
+		config_chipset_for_pio(drive, 1);
+		return 0;
 	}
 
-	if (!drive->init_speed)
-		drive->init_speed = speed;
-
-	config_chipset_for_pio(drive, set_pio);
-
-	if (set_pio)
-		return 0;
-
-	if (cmd64x_tune_chipset(drive, speed))
-		return 0;
-
-	rval = (int)(	((id->dma_ultra >> 11) & 7) ? 1 :
-			((id->dma_ultra >> 8) & 7) ? 1 :
-			((id->dma_mword >> 8) & 7) ? 1 :
-			((id->dma_1word >> 8) & 7) ? 1 :
-						     0);
-
-	return rval;
-}
-
-static int config_cmd680_chipset_for_dma(struct ata_device *drive)
-{
-	struct hd_driveid *id	= drive->id;
-	byte udma_66		= eighty_ninty_three(drive);
-	byte speed		= 0x00;
-	byte set_pio		= 0x00;
-	int rval;
-
-	if ((id->dma_ultra & 0x0040) && (udma_66))	speed = XFER_UDMA_6;
-	else if ((id->dma_ultra & 0x0020) && (udma_66))	speed = XFER_UDMA_5;
-	else if ((id->dma_ultra & 0x0010) && (udma_66))	speed = XFER_UDMA_4;
-	else if ((id->dma_ultra & 0x0008) && (udma_66))	speed = XFER_UDMA_3;
-	else if (id->dma_ultra & 0x0004)		speed = XFER_UDMA_2;
-	else if (id->dma_ultra & 0x0002)		speed = XFER_UDMA_1;
-	else if (id->dma_ultra & 0x0001)		speed = XFER_UDMA_0;
-	else if (id->dma_mword & 0x0004)		speed = XFER_MW_DMA_2;
-	else if (id->dma_mword & 0x0002)		speed = XFER_MW_DMA_1;
-	else if (id->dma_mword & 0x0001)		speed = XFER_MW_DMA_0;
-	else {
-		set_pio = 1;
-	}
-
-	if (!drive->init_speed)
-		drive->init_speed = speed;
-
-	config_chipset_for_pio(drive, set_pio);
-
-	if (set_pio)
-		return 0;
-
-	if (cmd680_tune_chipset(drive, speed))
-		return 0;
-
-	rval = (int)(	((id->dma_ultra >> 14) & 3) ? 1 :
-			((id->dma_ultra >> 11) & 7) ? 1 :
-			((id->dma_ultra >> 8) & 7) ? 1 :
-			((id->dma_mword >> 8) & 7) ? 1 :
-			((id->dma_1word >> 8) & 7) ? 1 :
-						     0);
-	return rval;
-}
-
-static int config_chipset_for_dma(struct ata_device *drive, unsigned int rev, byte ultra_66)
-{
-	if (drive->channel->pci_dev->device == PCI_DEVICE_ID_CMD_680)
-		return (config_cmd680_chipset_for_dma(drive));
-	return (config_cmd64x_chipset_for_dma(drive, rev, ultra_66));
+	config_chipset_for_pio(drive, 0);
+	return !drive->channel->speedproc(drive, mode);
 }
 
 static int cmd64x_config_drive_for_dma(struct ata_device *drive)
 {
 	struct hd_driveid *id	= drive->id;
 	struct ata_channel *hwif = drive->channel;
-	struct pci_dev *dev	= hwif->pci_dev;
-	unsigned int class_rev	= 0;
-	byte can_ultra_33	= 0;
-	byte can_ultra_66	= 0;
-	byte can_ultra_100	= 0;
-	byte can_ultra_133	= 0;
 	int on = 1;
 	int verbose = 1;
-
-	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
-	class_rev &= 0xff;
-
-	switch(dev->device) {
-		case PCI_DEVICE_ID_CMD_680:
-			can_ultra_133 = 1;
-		case PCI_DEVICE_ID_CMD_649:
-			can_ultra_100 = 1;
-		case PCI_DEVICE_ID_CMD_648:
-			can_ultra_66  = 1;
-		case PCI_DEVICE_ID_CMD_643:
-			can_ultra_33  = 1;
-			break;
-		case PCI_DEVICE_ID_CMD_646:
-			can_ultra_33  = (class_rev >= 0x05) ? 1 : 0;
-			can_ultra_66  = 0;
-			can_ultra_100 = 0;
-			break;
-		default:
-			udma_enable(drive, 0, 1);
-
-			return 0;
-	}
 
 	if ((id != NULL) && ((id->capability & 1) != 0) &&
 	    hwif->autodma && (drive->type == ATA_DISK)) {
@@ -792,10 +707,10 @@ static int cmd64x_config_drive_for_dma(struct ata_device *drive)
 		}
 		on = 0;
 		verbose = 0;
-		if ((id->field_valid & 4) && (can_ultra_33)) {
+		if ((id->field_valid & 4)) {
 			if (id->dma_ultra & 0x007F) {
 				/* Force if Capable UltraDMA */
-				on = config_chipset_for_dma(drive, class_rev, can_ultra_66);
+				on = config_chipset_for_dma(drive, 1);
 				if ((id->field_valid & 2) &&
 				    (!on))
 					goto try_dma_modes;
@@ -805,7 +720,7 @@ try_dma_modes:
 			if ((id->dma_mword & 0x0007) ||
 			    (id->dma_1word & 0x0007)) {
 				/* Force if Capable regular DMA modes */
-				on = config_chipset_for_dma(drive, class_rev, 0);
+				on = config_chipset_for_dma(drive, 0);
 				if (!on)
 					goto no_dma_set;
 			}
@@ -814,7 +729,7 @@ try_dma_modes:
 				goto no_dma_set;
 			}
 			/* Consult the list of known "good" drives */
-			on = config_chipset_for_dma(drive, class_rev, 0);
+			on = config_chipset_for_dma(drive, 0);
 			if (!on)
 				goto no_dma_set;
 		} else {
@@ -1070,19 +985,19 @@ static unsigned int cmd64x_pci_init(struct pci_dev *dev)
 		bmide_dev = dev;
 		cmd64x_display_info = &cmd64x_get_info;
 	}
-#endif /* DISPLAY_CMD64X_TIMINGS && CONFIG_PROC_FS */
+#endif
 
 	return 0;
 }
 
-unsigned int __init pci_init_cmd64x(struct pci_dev *dev)
+static unsigned int __init cmd64x_init_chipset(struct pci_dev *dev)
 {
 	if (dev->device == PCI_DEVICE_ID_CMD_680)
 		return cmd680_pci_init (dev);
 	return cmd64x_pci_init (dev);
 }
 
-unsigned int cmd680_ata66(struct ata_channel *hwif)
+static unsigned int cmd680_ata66(struct ata_channel *hwif)
 {
 	byte ata66	= 0;
 	byte addr_mask	= (hwif->unit) ? 0xB0 : 0xA0;
@@ -1091,7 +1006,7 @@ unsigned int cmd680_ata66(struct ata_channel *hwif)
 	return (ata66 & 0x01) ? 1 : 0;
 }
 
-unsigned int cmd64x_ata66(struct ata_channel *hwif)
+static unsigned int cmd64x_ata66(struct ata_channel *hwif)
 {
 	byte ata66 = 0;
 	byte mask = (hwif->unit) ? 0x02 : 0x01;
@@ -1100,7 +1015,7 @@ unsigned int cmd64x_ata66(struct ata_channel *hwif)
 	return (ata66 & mask) ? 1 : 0;
 }
 
-unsigned int __init ata66_cmd64x(struct ata_channel *hwif)
+static unsigned int __init cmd64x_ata66_check(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	if (dev->device == PCI_DEVICE_ID_CMD_680)
@@ -1108,7 +1023,7 @@ unsigned int __init ata66_cmd64x(struct ata_channel *hwif)
 	return cmd64x_ata66(hwif);
 }
 
-void __init ide_init_cmd64x(struct ata_channel *hwif)
+static void __init cmd64x_init_channel(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned int class_rev;
@@ -1119,14 +1034,13 @@ void __init ide_init_cmd64x(struct ata_channel *hwif)
 	hwif->drives[0].autotune = 1;
 	hwif->drives[1].autotune = 1;
 
-	if (!hwif->dma_base)
-		return;
-
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	switch(dev->device) {
 		case PCI_DEVICE_ID_CMD_680:
 			hwif->busproc	= cmd680_busproc;
-			hwif->XXX_udma	= cmd680_dmaproc;
+#ifdef CONFIG_BLK_DEV_IDEDMA
+			if (hwif->dma_base)
+				hwif->XXX_udma	= cmd680_dmaproc;
+#endif
 			hwif->resetproc = cmd680_reset;
 			hwif->speedproc	= cmd680_tune_chipset;
 			hwif->tuneproc	= cmd680_tuneproc;
@@ -1134,22 +1048,30 @@ void __init ide_init_cmd64x(struct ata_channel *hwif)
 		case PCI_DEVICE_ID_CMD_649:
 		case PCI_DEVICE_ID_CMD_648:
 		case PCI_DEVICE_ID_CMD_643:
-			hwif->udma_stop	= cmd64x_udma_stop;
-			hwif->udma_irq_status = cmd64x_udma_irq_status;
-			hwif->XXX_udma	= cmd64x_dmaproc;
+#ifdef CONFIG_BLK_DEV_IDEDMA
+			if (hwif->dma_base) {
+				hwif->XXX_udma	= cmd64x_dmaproc;
+				hwif->udma_stop	= cmd64x_udma_stop;
+				hwif->udma_irq_status = cmd64x_udma_irq_status;
+			}
+#endif
 			hwif->tuneproc	= cmd64x_tuneproc;
 			hwif->speedproc = cmd64x_tune_chipset;
 			break;
 		case PCI_DEVICE_ID_CMD_646:
 			hwif->chipset = ide_cmd646;
-			if (class_rev == 0x01) {
-				hwif->udma_stop = cmd646_1_udma_stop;
-				hwif->XXX_udma = cmd646_1_dmaproc;
-			} else {
-				hwif->udma_stop = cmd64x_udma_stop;
-				hwif->udma_irq_status = cmd64x_udma_irq_status;
-				hwif->XXX_udma = cmd64x_dmaproc;
+#ifdef CONFIG_BLK_DEV_IDEDMA
+			if (hwif->dma_base) {
+				if (class_rev == 0x01) {
+					hwif->XXX_udma = cmd646_1_dmaproc;
+					hwif->udma_stop = cmd646_1_udma_stop;
+				} else {
+					hwif->XXX_udma = cmd64x_dmaproc;
+					hwif->udma_stop = cmd64x_udma_stop;
+					hwif->udma_irq_status = cmd64x_udma_irq_status;
+				}
 			}
+#endif
 			hwif->tuneproc	= cmd64x_tuneproc;
 			hwif->speedproc	= cmd64x_tune_chipset;
 			break;
@@ -1157,6 +1079,72 @@ void __init ide_init_cmd64x(struct ata_channel *hwif)
 			break;
 	}
 
-	hwif->highmem = 1;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#ifdef CONFIG_BLK_DEV_IDEDMA
+	if (hwif->dma_base) {
+		hwif->highmem = 1;
+# ifdef CONFIG_IDEDMA_AUTO
+		if (!noautodma)
+			hwif->autodma = 1;
+# endif
+	}
+#endif
+}
+
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_CMD,
+		device: PCI_DEVICE_ID_CMD_643,
+		init_chipset: cmd64x_init_chipset,
+		init_channel: cmd64x_init_channel,
+		bootable: ON_BOARD,
+	},
+	{
+		vendor: PCI_VENDOR_ID_CMD,
+		device: PCI_DEVICE_ID_CMD_646,
+		init_chipset: cmd64x_init_chipset,
+		init_channel: cmd64x_init_channel,
+		enablebits: {{0x00,0x00,0x00}, {0x51,0x80,0x80}},
+		bootable: ON_BOARD,
+		flags: ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_CMD,
+		device: PCI_DEVICE_ID_CMD_648,
+		init_chipset: cmd64x_init_chipset,
+		ata66_check: cmd64x_ata66_check,
+		init_channel: cmd64x_init_channel,
+		bootable: ON_BOARD,
+		flags: ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_CMD,
+		device: PCI_DEVICE_ID_CMD_649,
+		init_chipset: cmd64x_init_chipset,
+		ata66_check: cmd64x_ata66_check,
+		init_channel: cmd64x_init_channel,
+		bootable: ON_BOARD,
+		flags: ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_CMD,
+		device: PCI_DEVICE_ID_CMD_680,
+		init_chipset: cmd64x_init_chipset,
+		ata66_check: cmd64x_ata66_check,
+		init_channel: cmd64x_init_channel,
+		bootable: ON_BOARD,
+		flags: ATA_F_DMA
+	},
+};
+
+int __init init_cmd64x(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+        return 0;
 }

@@ -56,7 +56,9 @@ void default_idle(void)
 {
 	int do_power_save = 0;
 
-	if (cur_cpu_spec[smp_processor_id()]->cpu_features & CPU_FTR_CAN_DOZE)
+	/* Check if CPU can powersave */
+	if (cur_cpu_spec[smp_processor_id()]->cpu_features &
+		(CPU_FTR_CAN_DOZE | CPU_FTR_CAN_NAP))
 		do_power_save = 1;
 
 #ifdef CONFIG_PPC_ISERIES
@@ -112,7 +114,7 @@ void power_save(void)
 	/* 7450 has no DOZE mode mode, we return if powersave_nap
 	 * isn't enabled
 	 */
-	if (!nap &&  cur_cpu_spec[smp_processor_id()]->cpu_features & CPU_FTR_SPEC7450)
+	if (!(nap || (cur_cpu_spec[smp_processor_id()]->cpu_features & CPU_FTR_CAN_DOZE)))
 		return;
 	/*
 	 * Disable interrupts to prevent a lost wakeup

@@ -2447,7 +2447,8 @@ static int trident_ioctl(struct inode *inode, struct file *file, unsigned int cm
 		if (dmabuf->mapped)
 			dmabuf->count &= dmabuf->fragsize-1;
 		spin_unlock_irqrestore(&state->card->lock, flags);
-		ret = copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
+		ret = copy_to_user((void *)arg, &cinfo, sizeof(cinfo)) ?
+				-EFAULT : 0;
 		break;
 
 	case SNDCTL_DSP_GETOPTR:

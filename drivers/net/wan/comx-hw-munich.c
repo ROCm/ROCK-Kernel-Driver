@@ -2409,7 +2409,7 @@ static int munich_write_proc(struct file *file, const char *buffer,
 
     /* Paranoia checking: */
 
-    if (file->f_dentry->d_inode->i_ino != entry->low_ino)
+    if (PDE(file->f_dentry->d_inode) != entry)
     {
 	printk(KERN_ERR "munich_write_proc: file <-> data internal error\n");
 	return -EIO;

@@ -4,13 +4,18 @@
 comment 'USB Host Controller Drivers'
 dep_tristate '  EHCI HCD (USB 2.0) support (EXPERIMENTAL)' CONFIG_USB_EHCI_HCD $CONFIG_USB $CONFIG_EXPERIMENTAL
 dep_tristate '  OHCI HCD support (EXPERIMENTAL)' CONFIG_USB_OHCI_HCD $CONFIG_USB $CONFIG_EXPERIMENTAL
-# dep_tristate '  UHCI HCD (most Intel and VIA) support (EXPERIMENTAL)' CONFIG_USB_UHCI_HCD $CONFIG_USB $CONFIG_EXPERIMENTAL
-if [ "$CONFIG_USB_UHCI_ALT" != "y" ]; then
-   dep_tristate '  UHCI (Intel PIIX4, VIA, ...) support' CONFIG_USB_UHCI $CONFIG_USB
+if [ "$CONFIG_USB_UHCI_HCD_ALT" != "y" ]; then
+   dep_tristate '  UHCI HCD (most Intel and VIA) support (EXPERIMENTAL)' CONFIG_USB_UHCI_HCD $CONFIG_USB $CONFIG_EXPERIMENTAL
 fi
-if [ "$CONFIG_USB_UHCI" != "y" ]; then
-   dep_tristate '  UHCI Alternate Driver (JE) support' CONFIG_USB_UHCI_ALT $CONFIG_USB
-else
-   define_bool CONFIG_USB_UHCI_ALT n
+if [ "$CONFIG_USB_UHCI_HCD" != "y" ]; then
+   dep_tristate '  UHCI HCD Alternate (most Intel and VIA) support (EXPERIMENTAL)' CONFIG_USB_UHCI_HCD_ALT $CONFIG_USB $CONFIG_EXPERIMENTAL
 fi
-dep_tristate '  OHCI (Compaq, iMacs, OPTi, SiS, ALi, ...) support' CONFIG_USB_OHCI $CONFIG_USB
+#if [ "$CONFIG_USB_UHCI_ALT" != "y" ]; then
+#   dep_tristate '  UHCI (Intel PIIX4, VIA, ...) support' CONFIG_USB_UHCI $CONFIG_USB
+#fi
+#if [ "$CONFIG_USB_UHCI" != "y" ]; then
+#   dep_tristate '  UHCI Alternate Driver (JE) support' CONFIG_USB_UHCI_ALT $CONFIG_USB
+#else
+#   define_bool CONFIG_USB_UHCI_ALT n
+#fi
+#dep_tristate '  OHCI (Compaq, iMacs, OPTi, SiS, ALi, ...) support' CONFIG_USB_OHCI $CONFIG_USB

@@ -2,10 +2,7 @@
 # Makefile for alpha-specific library files..
 #
 
-.S.s:
-	$(CPP) -D__ASSEMBLY__ $(CFLAGS) -o $*.s $<
-.S.o:
-	$(CC) -D__ASSEMBLY__ $(CFLAGS) -c -o $*.o $<
+EXTRA_AFLAGS := $(CFLAGS)
 
 # Many of these routines have implementations tuned for ev6.
 # Choose them iff we're targeting ev6 specifically.

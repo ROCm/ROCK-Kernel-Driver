@@ -15,6 +15,8 @@
 #include <linux/slab.h>
 #include <linux/tty.h>
 #include <linux/iobuf.h>
+#include <linux/namei.h>
+#include <linux/backing-dev.h>
 
 #include <asm/uaccess.h>
 
@@ -632,7 +634,7 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 			goto cleanup_file;
 	}
 
-	f->f_ra.ra_pages = *inode->i_mapping->ra_pages;
+	f->f_ra.ra_pages = inode->i_mapping->backing_dev_info->ra_pages;
 	f->f_dentry = dentry;
 	f->f_vfsmnt = mnt;
 	f->f_pos = 0;
@@ -835,7 +837,7 @@ int filp_close(struct file *filp, fl_owner_t id)
 		retval = filp->f_op->flush(filp);
 		unlock_kernel();
 	}
-	fcntl_dirnotify(0, filp, 0);
+	dnotify_flush(filp, id);
 	locks_remove_posix(filp, id);
 	fput(filp);
 	return retval;

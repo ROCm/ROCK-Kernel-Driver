@@ -1,0 +1,24 @@
+TARGET=$1
+KERNELRELEASE=$2
+VERSION=$3
+PATCHLEVEL=$4
+SUBLEVEL=$5
+
+# Generate a temporary version.h
+
+( echo \#define UTS_RELEASE \"$KERNELRELEASE\"
+  echo \#define LINUX_VERSION_CODE `expr $VERSION \\* 65536 + $PATCHLEVEL \\* 256 + $SUBLEVEL`
+  echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'
+) > .tmpversion
+
+# Only replace the real version.h if the new one is different
+# in order to preserve the timestamp and avoid unnecessary
+# recompilations.
+
+if [ -r $TARGET ] && \
+      cmp -s $TARGET .tmpversion; then
+   echo $TARGET is unchanged;
+   rm -f .tmpversion
+else
+   mv -f .tmpversion $TARGET
+fi

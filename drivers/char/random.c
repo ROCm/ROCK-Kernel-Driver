@@ -735,18 +735,14 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	__s32		delta, delta2, delta3;
 	int		entropy = 0;
 
-#if defined (__i386__)
-	if ( test_bit(X86_FEATURE_TSC, boot_cpu_data.x86_capability) ) {
+#if defined (__i386__) || defined (__x86_64__)
+	if (cpu_has_tsc) {
 		__u32 high;
 		rdtsc(time, high);
 		num ^= high;
 	} else {
 		time = jiffies;
 	}
-#elif defined (__x86_64__)
-	__u32 high;
-	rdtsc(time, high);
-	num ^= high;
 #else
 	time = jiffies;
 #endif

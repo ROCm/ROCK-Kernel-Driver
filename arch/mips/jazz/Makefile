@@ -6,10 +6,7 @@
 # unless it's something special (ie not a .c file).
 #
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $@
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $@
+EXTRA_AFLAGS := $(CFLAGS)
 
 all: jazz.o
 

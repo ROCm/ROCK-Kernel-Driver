@@ -15,12 +15,14 @@
  * Some code taken from drivers/ide/ide-dma.c:
  *
  *  Copyright (c) 1995-1998  Mark Lord
- *  
+ *
  * TODO:
- * 
+ *
  *  - Find a way to duplicate less code with ide-dma and use the
  *    dma fileds in the hwif structure instead of our own
+ *
  *  - Fix check_disk_change() call
+ *
  *  - Make module-able (includes setting ppc_md. hooks from within
  *    this file and not from arch code, and handling module deps with
  *    mediabay (by having both modules do dynamic lookup of each other
@@ -31,7 +33,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/ide.h>
@@ -52,8 +54,6 @@
 #include <linux/pmu.h>
 #endif
 #include "ata-timing.h"
-
-extern spinlock_t ide_lock;
 
 #undef IDE_PMAC_DEBUG
 
@@ -111,7 +111,7 @@ enum {
 /* 66Mhz cell, found in KeyLargo. Can do ultra mode 0 to 2 on
  * 40 connector cable and to 4 on 80 connector one.
  * Clock unit is 15ns (66Mhz)
- * 
+ *
  * 3 Values can be programmed:
  *  - Write data setup, which appears to match the cycle time. They
  *    also call it DIOW setup.
@@ -146,7 +146,7 @@ enum {
 
 /* 33Mhz cell, found in OHare, Heathrow (& Paddington) and KeyLargo
  * Can do pio & mdma modes, clock unit is 30ns (33Mhz)
- * 
+ *
  * The access time and recovery time can be programmed. Some older
  * Darwin code base limit OHare to 150ns cycle time. I decided to do
  * the same here fore safety against broken old hardware ;)
@@ -180,7 +180,7 @@ enum {
 # define GOOD_DMA_DRIVE		1
 
 /* Rounded Multiword DMA timings
- * 
+ *
  * I gave up finding a generic formula for all controller
  * types and instead, built tables based on timing values
  * used by Apple in Darwin's implementation.
@@ -280,7 +280,7 @@ struct pmu_sleep_notifier idepmac_sleep_notifier = {
 #endif /* CONFIG_PMAC_PBOOK */
 
 static int __pmac
-pmac_ide_find(ide_drive_t *drive)
+pmac_ide_find(struct ata_device *drive)
 {
 	struct ata_channel *hwif = drive->channel;
 	ide_ioreg_t base;
@@ -342,6 +342,7 @@ pmac_ide_init_hwif_ports(hw_regs_t *hw,
 		if (!noautodma)
 			ide_hwifs[ix].autodma = 1;
 #endif
+		ide_hwifs[ix].unmask = 1;
 	}
 }
 
@@ -351,7 +352,7 @@ pmac_ide_init_hwif_ports(hw_regs_t *hw,
  * device for yaboot configuration
  */
 struct device_node*
-pmac_ide_get_devnode(ide_drive_t *drive)
+pmac_ide_get_devnode(struct ata_device *drive)
 {
 	int i = pmac_ide_find(drive);
 	if (i < 0)
@@ -364,7 +365,7 @@ pmac_ide_get_devnode(ide_drive_t *drive)
  * is enough, I beleive selectproc will be called whenever an IDE command is started,
  * but... */
 static void __pmac
-pmac_ide_selectproc(ide_drive_t *drive)
+pmac_ide_selectproc(struct ata_device *drive)
 {
 	int i = pmac_ide_find(drive);
 	if (i < 0)
@@ -386,11 +387,11 @@ pmac_ide_selectproc(ide_drive_t *drive)
  * almost identical to the generic one and works, I've not yet
  * managed to figure out what bit is causing the lockup in the
  * generic code, possibly a timing issue...
- * 
+ *
  * --BenH
  */
 static int __pmac
-wait_for_ready(ide_drive_t *drive)
+wait_for_ready(struct ata_device *drive)
 {
 	/* Timeout bumped for some powerbooks */
 	int timeout = 2000;
@@ -416,12 +417,12 @@ wait_for_ready(ide_drive_t *drive)
 }
 
 static int __pmac
-pmac_ide_do_setfeature(ide_drive_t *drive, byte command)
+pmac_ide_do_setfeature(struct ata_device *drive, byte command)
 {
 	int result = 1;
 	unsigned long flags;
 	struct ata_channel *hwif = drive->channel;
-	
+
 	disable_irq(hwif->irq);	/* disable_irq_nosync ?? */
 	udelay(1);
 	SELECT_DRIVE(drive->channel, drive);
@@ -476,7 +477,7 @@ out:
 
 /* Calculate PIO timings */
 static void __pmac
-pmac_ide_tuneproc(ide_drive_t *drive, byte pio)
+pmac_ide_tuneproc(struct ata_device *drive, byte pio)
 {
 	struct ata_timing *t;
 	int i;
@@ -535,8 +536,8 @@ pmac_ide_tuneproc(ide_drive_t *drive, byte pio)
 #ifdef IDE_PMAC_DEBUG
 	printk(KERN_ERR "ide_pmac: Set PIO timing for mode %d, reg: 0x%08x\n",
 		pio,  *timings);
-#endif	
-		
+#endif
+
 	if (drive->select.all == IN_BYTE(IDE_SELECT_REG))
 		pmac_ide_selectproc(drive);
 }
@@ -552,14 +553,14 @@ set_timings_udma(u32 *timings, byte speed)
 	addrTicks = SYSCLK_TICKS_66(udma_timings[speed & 0xf].addrSetup);
 
 	*timings = ((*timings) & ~(TR_66_UDMA_MASK | TR_66_MDMA_MASK)) |
-			(wrDataSetupTicks << TR_66_UDMA_WRDATASETUP_SHIFT) | 
+			(wrDataSetupTicks << TR_66_UDMA_WRDATASETUP_SHIFT) |
 			(rdyToPauseTicks << TR_66_UDMA_RDY2PAUS_SHIFT) |
 			(addrTicks <<TR_66_UDMA_ADDRSETUP_SHIFT) |
 			TR_66_UDMA_EN;
 #ifdef IDE_PMAC_DEBUG
 	printk(KERN_ERR "ide_pmac: Set UDMA timing for mode %d, reg: 0x%08x\n",
 		speed & 0xf,  *timings);
-#endif	
+#endif
 
 	return 0;
 }
@@ -583,7 +584,7 @@ set_timings_mdma(int intf_type, u32 *timings, byte speed, int drive_cycle_time)
 	/* Adjust for drive */
 	if (drive_cycle_time && drive_cycle_time > cycleTime)
 		cycleTime = drive_cycle_time;
-	/* OHare limits according to some old Apple sources */	
+	/* OHare limits according to some old Apple sources */
 	if ((intf_type == controller_ohare) && (cycleTime < 150))
 		cycleTime = 150;
 	/* Get the proper timing array for this controller */
@@ -615,7 +616,7 @@ set_timings_mdma(int intf_type, u32 *timings, byte speed, int drive_cycle_time)
 #ifdef IDE_PMAC_DEBUG
 	printk(KERN_ERR "ide_pmac: MDMA, cycleTime: %d, accessTime: %d, recTime: %d\n",
 		cycleTime, accessTime, recTime);
-#endif	
+#endif
 	if (intf_type == controller_kl_ata4 || intf_type == controller_kl_ata4_80) {
 		/* 66Mhz cell */
 		accessTicks = SYSCLK_TICKS_66(accessTime);
@@ -645,7 +646,7 @@ set_timings_mdma(int intf_type, u32 *timings, byte speed, int drive_cycle_time)
 		int halfTick = 0;
 		int origAccessTime = accessTime;
 		int origRecTime = recTime;
-		
+
 		accessTicks = SYSCLK_TICKS(accessTime);
 		accessTicks = max(accessTicks, 1U);
 		accessTicks = min(accessTicks, 0x1fU);
@@ -657,7 +658,7 @@ set_timings_mdma(int intf_type, u32 *timings, byte speed, int drive_cycle_time)
 		if ((accessTicks > 1) &&
 		    ((accessTime - IDE_SYSCLK_NS/2) >= origAccessTime) &&
 		    ((recTime - IDE_SYSCLK_NS/2) >= origRecTime)) {
-            		halfTick = 1;
+			halfTick = 1;
 			accessTicks--;
 		}
 		*timings = ((*timings) & ~TR_33_MDMA_MASK) |
@@ -666,19 +667,19 @@ set_timings_mdma(int intf_type, u32 *timings, byte speed, int drive_cycle_time)
 		if (halfTick)
 			*timings |= TR_33_MDMA_HALFTICK;
 	}
-#ifdef IDE_PMAC_DEBUG
+# ifdef IDE_PMAC_DEBUG
 	printk(KERN_ERR "ide_pmac: Set MDMA timing for mode %d, reg: 0x%08x\n",
 		speed & 0xf,  *timings);
-#endif	
+# endif
 	return 0;
 }
-#endif /* #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC */
+#endif
 
 /* You may notice we don't use this function on normal operation,
  * our, normal mdma function is supposed to be more precise
  */
 static int __pmac
-pmac_ide_tune_chipset (ide_drive_t *drive, byte speed)
+pmac_ide_tune_chipset (struct ata_device *drive, byte speed)
 {
 	int intf		= pmac_ide_find(drive);
 	int unit		= (drive->select.b.unit & 0x01);
@@ -687,21 +688,21 @@ pmac_ide_tune_chipset (ide_drive_t *drive, byte speed)
 
 	if (intf < 0)
 		return 1;
-		
+
 	timings = &pmac_ide[intf].timings[unit];
-	
+
 	switch(speed) {
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 		case XFER_UDMA_4:
 		case XFER_UDMA_3:
 			if (pmac_ide[intf].kind != controller_kl_ata4_80)
-				return 1;		
+				return 1;
 		case XFER_UDMA_2:
 		case XFER_UDMA_1:
 		case XFER_UDMA_0:
 			if (pmac_ide[intf].kind != controller_kl_ata4 &&
 				pmac_ide[intf].kind != controller_kl_ata4_80)
-				return 1;		
+				return 1;
 			ret = set_timings_udma(timings, speed);
 			break;
 		case XFER_MW_DMA_2:
@@ -713,7 +714,7 @@ pmac_ide_tune_chipset (ide_drive_t *drive, byte speed)
 		case XFER_SW_DMA_1:
 		case XFER_SW_DMA_0:
 			return 1;
-#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
+#endif
 		case XFER_PIO_4:
 		case XFER_PIO_3:
 		case XFER_PIO_2:
@@ -730,8 +731,8 @@ pmac_ide_tune_chipset (ide_drive_t *drive, byte speed)
 	ret = pmac_ide_do_setfeature(drive, speed);
 	if (ret)
 		return ret;
-		
-	pmac_ide_selectproc(drive);	
+
+	pmac_ide_selectproc(drive);
 	drive->current_speed = speed;
 
 	return 0;
@@ -741,7 +742,7 @@ static void __pmac
 sanitize_timings(int i)
 {
 	unsigned value;
-	
+
 	switch(pmac_ide[i].kind) {
 		case controller_kl_ata4:
 		case controller_kl_ata4_80:
@@ -769,8 +770,8 @@ int __pmac
 pmac_ide_check_base(ide_ioreg_t base)
 {
 	int ix;
-	
- 	for (ix = 0; ix < MAX_HWIFS; ++ix)
+
+	for (ix = 0; ix < MAX_HWIFS; ++ix)
 		if (base == pmac_ide[ix].regbase)
 			return ix;
 	return -1;
@@ -793,7 +794,7 @@ kdev_t __init
 pmac_find_ide_boot(char *bootdevice, int n)
 {
 	int i;
-	
+
 	/*
 	 * Look through the list of IDE interfaces for this one.
 	 */
@@ -856,7 +857,7 @@ pmac_ide_probe(void)
 		int in_bay = 0;
 		u8 pbus, pid;
 		struct pci_dev *pdev = NULL;
-		
+
 		/*
 		 * If this node is not under a mac-io or dbdma node,
 		 * leave it to the generic PCI driver.
@@ -882,7 +883,7 @@ pmac_ide_probe(void)
 		if (pdev == NULL)
 			printk(KERN_WARNING "ide: no PCI host for device %s, DMA disabled\n",
 			       np->full_name);
-		
+
 		/*
 		 * If this slot is taken (e.g. by ide-pci.c) try the next one.
 		 */
@@ -949,7 +950,7 @@ pmac_ide_probe(void)
 		    && strcasecmp(np->parent->name, "media-bay") == 0) {
 #ifdef CONFIG_PMAC_PBOOK
 			media_bay_set_ide_infos(np->parent,base,irq,i);
-#endif /* CONFIG_PMAC_PBOOK */
+#endif
 			in_bay = 1;
 			if (!bidp)
 				pmif->aapl_bus_id = 1;
@@ -960,7 +961,7 @@ pmac_ide_probe(void)
 			 */
 			ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, 0, 1);
 		} else {
- 			/* This is necessary to enable IDE when net-booting */
+			/* This is necessary to enable IDE when net-booting */
 			printk(KERN_INFO "pmac_ide: enabling IDE bus ID %d\n",
 				pmif->aapl_bus_id);
 			ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 1);
@@ -980,14 +981,14 @@ pmac_ide_probe(void)
 #ifdef CONFIG_PMAC_PBOOK
 		if (in_bay && check_media_bay_by_base(base, MB_CD) == 0)
 			hwif->noprobe = 0;
-#endif /* CONFIG_PMAC_PBOOK */
+#endif
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 		if (pdev && np->n_addrs >= 2) {
 			/* has a DBDMA controller channel */
 			pmac_ide_setup_dma(np, i);
 		}
-#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
+#endif
 
 		++i;
 	}
@@ -997,12 +998,12 @@ pmac_ide_probe(void)
 
 #ifdef CONFIG_PMAC_PBOOK
 	pmu_register_sleep_notifier(&idepmac_sleep_notifier);
-#endif /* CONFIG_PMAC_PBOOK */
+#endif
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 
-static void __init 
+static void __init
 pmac_ide_setup_dma(struct device_node *np, int ix)
 {
 	struct pmac_ide_hwif *pmif = &pmac_ide[ix];
@@ -1036,7 +1037,7 @@ pmac_ide_setup_dma(struct device_node *np, int ix)
 	if (pmif->sg_table == NULL) {
 		pci_free_consistent(	ide_hwifs[ix].pci_dev,
 					(MAX_DCMDS + 2) * sizeof(struct dbdma_cmd),
-				    	pmif->dma_table_cpu, pmif->dma_table_dma);
+					pmif->dma_table_cpu, pmif->dma_table_dma);
 		return;
 	}
 	ide_hwifs[ix].udma_enable = pmac_udma_enable;
@@ -1229,7 +1230,7 @@ udma_bits_to_command(unsigned char bits, int high_speed)
 
 /* Calculate MultiWord DMA timings */
 static int __pmac
-pmac_ide_mdma_enable(ide_drive_t *drive, int idx)
+pmac_ide_mdma_enable(struct ata_device *drive, int idx)
 {
 	byte bits = drive->id->dma_mword & 0x07;
 	byte feature = dma_bits_to_command(bits);
@@ -1239,16 +1240,16 @@ pmac_ide_mdma_enable(ide_drive_t *drive, int idx)
 	int ret;
 
 	/* Set feature on drive */
-    	printk(KERN_INFO "%s: Enabling MultiWord DMA %d\n", drive->name, feature & 0xf);
+	printk(KERN_INFO "%s: Enabling MultiWord DMA %d\n", drive->name, feature & 0xf);
 	ret = pmac_ide_do_setfeature(drive, feature);
 	if (ret) {
-	    	printk(KERN_WARNING "%s: Failed !\n", drive->name);
-	    	return 0;
+		printk(KERN_WARNING "%s: Failed !\n", drive->name);
+		return 0;
 	}
 
 	if (!drive->init_speed)
 		drive->init_speed = feature;
-	
+
 	/* which drive is it ? */
 	if (drive->select.b.unit & 0x01)
 		timings = &pmac_ide[idx].timings[1];
@@ -1264,13 +1265,13 @@ pmac_ide_mdma_enable(ide_drive_t *drive, int idx)
 	/* Calculate controller timings */
 	set_timings_mdma(pmac_ide[idx].kind, timings, feature, drive_cycle_time);
 
-	drive->current_speed = feature;	
+	drive->current_speed = feature;
 	return 1;
 }
 
 /* Calculate Ultra DMA timings */
 static int __pmac
-pmac_ide_udma_enable(ide_drive_t *drive, int idx, int high_speed)
+pmac_ide_udma_enable(struct ata_device *drive, int idx, int high_speed)
 {
 	byte bits = drive->id->dma_ultra & 0x1f;
 	byte feature = udma_bits_to_command(bits, high_speed);
@@ -1278,7 +1279,7 @@ pmac_ide_udma_enable(ide_drive_t *drive, int idx, int high_speed)
 	int ret;
 
 	/* Set feature on drive */
-    	printk(KERN_INFO "%s: Enabling Ultra DMA %d\n", drive->name, feature & 0xf);
+	printk(KERN_INFO "%s: Enabling Ultra DMA %d\n", drive->name, feature & 0xf);
 	ret = pmac_ide_do_setfeature(drive, feature);
 	if (ret) {
 		printk(KERN_WARNING "%s: Failed !\n", drive->name);
@@ -1296,12 +1297,12 @@ pmac_ide_udma_enable(ide_drive_t *drive, int idx, int high_speed)
 
 	set_timings_udma(timings, feature);
 
-	drive->current_speed = feature;	
+	drive->current_speed = feature;
 	return 1;
 }
 
 static int __pmac
-pmac_ide_check_dma(ide_drive_t *drive)
+pmac_ide_check_dma(struct ata_device *drive)
 {
 	int ata4, udma, idx;
 	struct hd_driveid *id = drive->id;
@@ -1342,7 +1343,7 @@ pmac_ide_check_dma(ide_drive_t *drive)
 	return 0;
 }
 
-static void ide_toggle_bounce(ide_drive_t *drive, int on)
+static void ide_toggle_bounce(struct ata_device *drive, int on)
 {
 	dma64_addr_t addr = BLK_BOUNCE_HIGH;
 
@@ -1431,7 +1432,7 @@ static int pmac_do_udma(unsigned int reading, struct ata_device *drive, struct r
 	/* Apple adds 60ns to wrDataSetup on reads */
 	if (ata4 && (pmac_ide[ix].timings[unit] & TR_66_UDMA_EN)) {
 		out_le32((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG + _IO_BASE),
-			pmac_ide[ix].timings[unit] + 
+			pmac_ide[ix].timings[unit] +
 			((reading) ? 0x00800000UL : 0));
 		(void)in_le32((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG + _IO_BASE));
 	}
@@ -1529,7 +1530,7 @@ static int pmac_ide_dmaproc(struct ata_device *drive)
 }
 #endif
 
-static void idepmac_sleep_device(ide_drive_t *drive, int i, unsigned base)
+static void idepmac_sleep_device(struct ata_device *drive, int i, unsigned base)
 {
 	int j;
 
@@ -1567,7 +1568,7 @@ static void idepmac_sleep_device(ide_drive_t *drive, int i, unsigned base)
 
 #ifdef CONFIG_PMAC_PBOOK
 static void __pmac
-idepmac_wake_device(ide_drive_t *drive, int used_dma)
+idepmac_wake_device(struct ata_device *drive, int used_dma)
 {
 	/* We force the IDE subdriver to check for a media change
 	 * This must be done first or we may lost the condition
@@ -1580,7 +1581,7 @@ idepmac_wake_device(ide_drive_t *drive, int used_dma)
 
 	/* We kick the VFS too (see fix in ide.c revalidate) */
 	check_disk_change(mk_kdev(drive->channel->major, (drive->select.b.unit) << PARTN_BITS));
-	
+
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	/* We re-enable DMA on the drive if it was active. */
 	/* This doesn't work with the CD-ROM in the media-bay, probably
@@ -1589,12 +1590,12 @@ idepmac_wake_device(ide_drive_t *drive, int used_dma)
 	 */
 	if (used_dma && !ide_spin_wait_hwgroup(drive)) {
 		/* Lock HW group */
-		set_bit(IDE_BUSY, &HWGROUP(drive)->flags);
+		set_bit(IDE_BUSY, &drive->channel->active);
 		pmac_ide_check_dma(drive);
-		clear_bit(IDE_BUSY, &HWGROUP(drive)->flags);
-		spin_unlock_irq(&ide_lock);
+		clear_bit(IDE_BUSY, &drive->channel->active);
+		spin_unlock_irq(drive->channel->lock);
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
+#endif
 }
 
 static void __pmac
@@ -1605,11 +1606,11 @@ idepmac_sleep_interface(int i, unsigned base, int mediabay)
 	/* We clear the timings */
 	pmac_ide[i].timings[0] = 0;
 	pmac_ide[i].timings[1] = 0;
-	
+
 	/* The media bay will handle itself just fine */
 	if (mediabay)
 		return;
-	
+
 	/* Disable the bus */
 	ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, pmac_ide[i].aapl_bus_id, 0);
 }
@@ -1629,7 +1630,7 @@ idepmac_wake_interface(int i, unsigned long base, int mediabay)
 }
 
 static void
-idepmac_sleep_drive(ide_drive_t *drive, int idx, unsigned long base)
+idepmac_sleep_drive(struct ata_device *drive, int idx, unsigned long base)
 {
 	/* Wait for HW group to complete operations */
 	if (ide_spin_wait_hwgroup(drive))
@@ -1638,22 +1639,22 @@ idepmac_sleep_drive(ide_drive_t *drive, int idx, unsigned long base)
 		return;
 	else {
 		/* Lock HW group */
-		set_bit(IDE_BUSY, &HWGROUP(drive)->flags);
+		set_bit(IDE_BUSY, &drive->channel->active);
 		/* Stop the device */
 		idepmac_sleep_device(drive, idx, base);
-		spin_unlock_irq(&ide_lock);
+		spin_unlock_irq(drive->channel->lock);
 	}
 }
 
 static void
-idepmac_wake_drive(ide_drive_t *drive, unsigned long base)
+idepmac_wake_drive(struct ata_device *drive, unsigned long base)
 {
 	int j;
-	
+
 	/* Reset timings */
 	pmac_ide_selectproc(drive);
 	mdelay(10);
-	
+
 	/* Wait up to 20 seconds for the drive to be ready */
 	for (j = 0; j < 200; j++) {
 		int status;
@@ -1666,12 +1667,12 @@ idepmac_wake_drive(ide_drive_t *drive, unsigned long base)
 			break;
 	}
 
-	/* We resume processing on the HW group */
-	spin_lock_irq(&ide_lock);
-	clear_bit(IDE_BUSY, &HWGROUP(drive)->flags);
+	/* We resume processing on the lock group */
+	spin_lock_irq(drive->channel->lock);
+	clear_bit(IDE_BUSY, &drive->channel->active);
 	if (!list_empty(&drive->queue.queue_head))
 		do_ide_request(&drive->queue);
-	spin_unlock_irq(&ide_lock);
+	spin_unlock_irq(drive->channel->lock);
 }
 
 /* Note: We support only master drives for now. This will have to be
@@ -1684,7 +1685,7 @@ idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
 	int i, ret;
 	unsigned long base;
 	int big_delay;
- 
+
 	switch (when) {
 	case PBOOK_SLEEP_REQUEST:
 		break;
@@ -1706,7 +1707,7 @@ idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
 			}
 			/* Disable irq during sleep */
 			disable_irq(pmac_ide[i].irq);
-			
+
 			/* Check if this is a media bay with an IDE device or not
 			 * a media bay.
 			 */
@@ -1721,8 +1722,8 @@ idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
 
 			if ((base = pmac_ide[i].regbase) == 0)
 				continue;
-				
-			/* Make sure we have sane timings */		
+
+			/* Make sure we have sane timings */
 			sanitize_timings(i);
 
 			/* Check if this is a media bay with an IDE device or not
@@ -1730,7 +1731,7 @@ idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
 			 */
 			ret = check_media_bay_by_base(base, MB_CD);
 			if ((ret == 0) || (ret == -ENODEV)) {
-				idepmac_wake_interface(i, base, (ret == 0));				
+				idepmac_wake_interface(i, base, (ret == 0));
 				big_delay = 1;
 			}
 
@@ -1738,18 +1739,18 @@ idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
 		/* Let hardware get up to speed */
 		if (big_delay)
 			mdelay(IDE_WAKEUP_DELAY_MS);
-	
+
 		for (i = 0; i < pmac_ide_count; ++i) {
 			struct ata_channel *hwif;
 			int used_dma, dn;
 			int irq_on = 0;
-			
+
 			if ((base = pmac_ide[i].regbase) == 0)
 				continue;
-				
+
 			hwif = &ide_hwifs[i];
 			for (dn=0; dn<MAX_DRIVES; dn++) {
-				ide_drive_t *drive = &hwif->drives[dn];
+				struct ata_device *drive = &hwif->drives[dn];
 				if (!drive->present)
 					continue;
 				/* We don't have re-configured DMA yet */

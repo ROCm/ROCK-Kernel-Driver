@@ -49,12 +49,12 @@
 #define MSR_LE		(1<<0) 		/* Little Endian */
 
 #ifdef CONFIG_APUS_FAST_EXCEPT
-#define MSR_		MSR_ME|MSR_IP|MSR_RI
+#define MSR_		(MSR_ME|MSR_IP|MSR_RI)
 #else
-#define MSR_		MSR_ME|MSR_RI
+#define MSR_		(MSR_ME|MSR_RI)
 #endif
-#define MSR_KERNEL      MSR_|MSR_IR|MSR_DR
-#define MSR_USER	MSR_KERNEL|MSR_PR|MSR_EE
+#define MSR_KERNEL      (MSR_|MSR_IR|MSR_DR)
+#define MSR_USER	(MSR_KERNEL|MSR_PR|MSR_EE)
 
 /* Floating Point Status and Control Register (FPSCR) Fields */
 
@@ -214,10 +214,11 @@
 #define	  HID0_EBD	(1<<28)		/* Enable Bus Data Parity */
 #define	  HID0_SBCLK	(1<<27)
 #define	  HID0_EICE	(1<<26)
-#define	  HID0_TBEN	(1<<26)		/* Timebase enable - 7450 */
+#define	  HID0_TBEN	(1<<26)		/* Timebase enable - 745x */
 #define	  HID0_ECLK	(1<<25)
 #define	  HID0_PAR	(1<<24)
-#define	  HID0_STEN	(1<<24)		/* S/W Tablewalk enable - 7450 */
+#define	  HID0_STEN	(1<<24)		/* Software table search enable - 745x */
+#define	  HID0_HIGH_BAT	(1<<23)		/* Enable high BATs - 7455 */
 #define	  HID0_DOZE	(1<<23)
 #define	  HID0_NAP	(1<<22)
 #define	  HID0_SLEEP	(1<<21)
@@ -235,10 +236,10 @@
 #define   HID0_SGE	(1<<7)		/* Store Gathering Enable */
 #define	  HID0_SIED	(1<<7)		/* Serial Instr. Execution [Disable] */
 #define	  HID0_DFCA	(1<<6)		/* Data Cache Flush Assist */
+#define   HID0_LRSTK	(1<<4)		/* Link register stack - 745x */
 #define   HID0_BTIC	(1<<5)		/* Branch Target Instr Cache Enable */
-#define   HID0_LRSTK	(1<<4)		/* Link Stack enable - 7450 */
 #define   HID0_ABE	(1<<3)		/* Address Broadcast Enable */
-#define   HID0_FOLD	(1<<3)		/* Branch Folding enable - 7450 */
+#define   HID0_FOLD	(1<<3)		/* Branch Folding enable - 745x */
 #define	  HID0_BHTE	(1<<2)		/* Branch History Table Enable */
 #define	  HID0_BTCD	(1<<1)		/* Branch target cache disable */
 #define	  HID0_NOPDST	(1<<1)		/* No-op dst, dstt, etc. instr. */
@@ -308,6 +309,24 @@
 #define SPRN_L2CR2      0x3f8
 #define	SPRN_L3CR	0x3FA	/* Level 3 Cache Control Regsiter (7450) */
 #define L3CR_L3E		0x80000000	/* L3 enable */
+#define L3CR_L3PE		0x40000000	/* L3 data parity enable */
+#define L3CR_L3APE		0x20000000	/* L3 addr parity enable */
+#define L3CR_L3SIZ		0x10000000	/* L3 size */
+#define L3CR_L3CLKEN		0x08000000	/* L3 clock enable */
+#define L3CR_L3RES		0x04000000	/* L3 special reserved bit */
+#define L3CR_L3CLKDIV		0x03800000	/* L3 clock divisor */
+#define L3CR_L3IO		0x00400000	/* L3 instruction only */
+#define L3CR_L3SPO		0x00040000	/* L3 sample point override */
+#define L3CR_L3CKSP		0x00030000	/* L3 clock sample point */
+#define L3CR_L3PSP		0x0000e000	/* L3 P-clock sample point */
+#define L3CR_L3REP		0x00001000	/* L3 replacement algorithm */
+#define L3CR_L3HWF		0x00000800	/* L3 hardware flush */
+#define L3CR_L3I		0x00000400	/* L3 global invalidate */
+#define L3CR_L3RT		0x00000300	/* L3 SRAM type */
+#define L3CR_L3NIRCA		0x00000080	/* L3 non-integer ratio clock adj. */
+#define L3CR_L3DO		0x00000040	/* L3 data only mode */
+#define L3CR_PMEN		0x00000004	/* L3 private memory enable */
+#define L3CR_PMSIZ		0x00000001	/* L3 private memory size */
 #define SPRN_MSSCR0	0x3f6	/* Memory Subsystem Control Register 0 */
 #define SPRN_MSSSR0	0x3f7	/* Memory Subsystem Status Register 1 */
 #define SPRN_LDSTCR	0x3f8	/* Load/Store control register */
@@ -471,6 +490,8 @@
 #define	SPRG7   SPRN_SPRG7
 #define	SRR0	SPRN_SRR0	/* Save and Restore Register 0 */
 #define	SRR1	SPRN_SRR1	/* Save and Restore Register 1 */
+#define	SRR2	SPRN_SRR2	/* Save and Restore Register 2 */
+#define	SRR3	SPRN_SRR3	/* Save and Restore Register 3 */
 #define	TBRL	SPRN_TBRL	/* Time Base Read Lower Register */
 #define	TBRU	SPRN_TBRU	/* Time Base Read Upper Register */
 #define	TBWL	SPRN_TBWL	/* Time Base Write Lower Register */

@@ -209,7 +209,7 @@ int smp_call_function(void (*func) (void *info), void *info, int nonatomic,
  * remote CPUs are nearly ready to execute <<func>> or are or have executed.
  *
  * You must not call this function with disabled interrupts or from a
- * hardware interrupt handler, you may call it from a bottom half handler.
+ * hardware interrupt handler or from a bottom half handler.
  */
 {
 	if (smp_num_cpus <= 1)
@@ -237,7 +237,7 @@ static int __smp_call_function(void (*func) (void *info), void *info,
 	if (wait)
 		atomic_set(&data.finished, 0);
 
-	spin_lock_bh(&call_lock);
+	spin_lock(&call_lock);
 	call_data = &data;
 	/* Send a message to all other CPUs and wait for them to respond */
 	smp_message_pass(target, PPC_MSG_CALL_FUNCTION, 0, 0);
@@ -269,7 +269,7 @@ static int __smp_call_function(void (*func) (void *info), void *info,
 	ret = 0;
 
  out:
-	spin_unlock_bh(&call_lock);
+	spin_unlock(&call_lock);
 	return ret;
 }
 
@@ -343,11 +343,9 @@ void __init smp_boot_cpus(void)
 		/* create a process for the processor */
 		/* only regs.msr is actually used, and 0 is OK for it */
 		memset(&regs, 0, sizeof(struct pt_regs));
-		if (do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0) < 0)
+		p = do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0);
+		if (IS_ERR(p))
 			panic("failed fork for CPU %d", i);
-		p = prev_task(&init_task);
-		if (!p)
-			panic("No idle task for CPU %d", i);
 		init_idle(p, i);
 		unhash_process(p);
 

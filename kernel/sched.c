@@ -24,22 +24,8 @@
 #include <linux/kernel_stat.h>
 
 /*
- * Priority of a process goes from 0 to 139. The 0-99
- * priority range is allocated to RT tasks, the 100-139
- * range is for SCHED_OTHER tasks. Priority values are
- * inverted: lower p->prio value means higher priority.
- * 
- * MAX_USER_RT_PRIO allows the actual maximum RT priority
- * to be separate from the value exported to user-space.
- * NOTE: MAX_RT_PRIO must not be smaller than MAX_USER_RT_PRIO.
- */
-#define MAX_RT_PRIO		100
-#define MAX_USER_RT_PRIO	100
-#define MAX_PRIO		(MAX_RT_PRIO + 40)
-
-/*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
- * to static priority [ 100 ... 139 (MAX_PRIO-1) ],
+ * to static priority [ MAX_RT_PRIO..MAX_PRIO-1 ],
  * and back.
  */
 #define NICE_TO_PRIO(nice)	(MAX_RT_PRIO + (nice) + 20)
@@ -1138,8 +1124,8 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 	}
 	
 	/*
-	 * Valid priorities for SCHED_FIFO and SCHED_RR are 1..99, valid
-	 * priority for SCHED_OTHER is 0.
+	 * Valid priorities for SCHED_FIFO and SCHED_RR are
+	 * 1..MAX_USER_RT_PRIO, valid priority for SCHED_OTHER is 0.
 	 */
 	retval = -EINVAL;
 	if (lp.sched_priority < 0 || lp.sched_priority > MAX_USER_RT_PRIO-1)

@@ -1,6 +1,6 @@
 O_TARGET        := pci.o
 
-obj-y		:= dma.o i386.o
+obj-y		:= i386.o
 
 ifdef	CONFIG_VISWS
 obj-y		+= visws.o
@@ -23,7 +23,5 @@ obj-y		+= legacy.o
 endif		# CONFIG_MULTIQUAD
 obj-y		+= irq.o common.o
 endif		# CONFIG_VISWS
-
-export-objs     +=      $(obj-y)
 
 include $(TOPDIR)/Rules.make

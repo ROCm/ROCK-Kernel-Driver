@@ -134,6 +134,8 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L2CR)
 	       The bit moved on the 7450.....
 	  ****/
 
+	/* TODO: use HW flush assist when available */
+
 	lis	r4,0x0002
 	mtctr	r4
 	li	r4,0
@@ -154,10 +156,18 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L2CR)
 
 2:
 	/* Set up the L2CR configuration bits (and switch L2 off) */
+	/* CPU errata: Make sure the mtspr below is already in the
+	 * L1 icache
+	 */
+	b	20f
+21:
 	sync
 	mtspr	L2CR,r3
 	sync
-
+	b	22f
+20:
+	b	21b
+22:
 	/* Before we perform the global invalidation, we must disable dynamic
 	 * power management via HID0[DPM] to work around a processor bug where
 	 * DPM can possibly interfere with the state machine in the processor
@@ -221,6 +231,148 @@ _GLOBAL(_get_L2CR)
 BEGIN_FTR_SECTION
 	mfspr	r3,L2CR
 END_FTR_SECTION_IFSET(CPU_FTR_L2CR)
+	blr
+
+
+/*
+ * Here is a similar routine for dealing with the L3 cache
+ * on the 745x family of chips
+ */
+ 
+_GLOBAL(_set_L3CR)
+	/* Make sure this is a 745x chip */
+BEGIN_FTR_SECTION
+	li	r3,-1
+	blr
+END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
+
+	/* Turn off interrupts and data relocation. */
+	mfmsr	r7		/* Save MSR in r7 */
+	rlwinm	r4,r7,0,17,15
+	rlwinm	r4,r4,0,28,26	/* Turn off DR bit */
+	sync
+	mtmsr	r4
+	isync
+
+	/* Stop DST streams */
+	dssall	0
+	
+	/* Get the current enable bit of the L3CR into r4 */
+	mfspr	r4,SPRN_L3CR
+	
+	/* Tweak some bits */
+	rlwinm	r5,r3,0,0,0		/* r5 contains the new enable bit */
+	rlwinm	r3,r3,0,22,20		/* Turn off the invalidate bit */
+	rlwinm	r3,r3,0,1,31		/* Turn off the enable bit */
+	rlwinm	r3,r3,0,5,3		/* Turn off the clken bit */
+	/* Check to see if we need to flush */
+	rlwinm.	r4,r4,0,0,0
+	beq	2f
+
+	/* Flush the cache. First, read the first 4MB of memory (physical) to
+	 * put new data in the cache.  (Actually we only need
+	 * the size of the L3 cache plus the size of the L1+L2 cache, but 4MB will
+	 * cover everything just to be safe).
+	 */
+		
+	/* TODO: use HW flush assist */
+
+	lis	r4,0x0002
+	mtctr	r4
+	li	r4,0
+1:
+	lwzx	r0,r0,r4
+	addi	r4,r4,32		/* Go to start of next cache line */
+	bdnz	1b
+	
+	/* Now, flush the first 4MB of memory */
+	lis	r4,0x0002
+	mtctr	r4
+	li	r4,0
+	sync
+1:
+	dcbf	r0,r4
+	addi	r4,r4,32		/* Go to start of next cache line */
+	bdnz	1b
+
+2:
+	/* Set up the L3CR configuration bits (and switch L3 off) */
+	sync
+	mtspr	SPRN_L3CR,r3
+	sync
+
+	/* Before we perform the global invalidation, we must disable dynamic
+	 * power management via HID0[DPM] to work around a processor bug where
+	 * DPM can possibly interfere with the state machine in the processor
+	 * that invalidates the L3 cache tags. Hrm... This is necessary for L2,
+	 * is it for L3 as well ? --BenH.
+	 */
+	mfspr	r8,HID0			/* Save HID0 in r8 */
+	rlwinm	r4,r8,0,12,10		/* Turn off HID0[DPM] */
+	sync
+	mtspr	HID0,r4			/* Disable DPM */
+	sync
+
+	oris	r3,r3,L3CR_L3RES@h		/* Set reserved bit 5 */
+	mtspr	SPRN_L3CR,r3
+	sync
+	oris	r3,r3,L3CR_L3CLKEN@h		/* Set clken */
+	mtspr	SPRN_L3CR,r3
+	sync
+
+	/* Wait for stabilize */
+	li	r0,128
+	mtctr	r0
+1:	bdnz	1b
+	
+	/* Perform a global invalidation */
+	ori	r3,r3,0x0400
+	sync
+	mtspr	SPRN_L3CR,r3
+	sync
+	isync
+
+	/* We wait for the L3I bit to clear...... */
+10:	mfspr	r3,SPRN_L3CR
+	andi.	r4,r3,0x0400
+	bne	10b
+
+	/* Clear CLKEN */
+	rlwinm	r3,r3,0,5,3		/* Turn off the clken bit */
+	mtspr	SPRN_L3CR,r3
+	sync
+
+	/* Wait for stabilize */
+	li	r0,128
+	mtctr	r0
+1:	bdnz	1b
+	
+	/* Restore HID0[DPM] to whatever it was before */
+	sync
+	mtspr	1008,r8
+	sync
+
+	/* See if we need to enable the cache */
+	cmplwi	r5,0
+	beq	4f
+
+	/* Enable the cache */
+	oris	r3,r3,(L3CR_L3E | L3CR_L3CLKEN)@h
+	mtspr	SPRN_L3CR,r3
+	sync
+
+	/* Restore MSR (restores EE and DR bits to original state) */
+4:	SYNC
+	mtmsr	r7
+	isync
+	blr
+
+_GLOBAL(_get_L3CR)
+	/* Return the L3CR contents */
+	li	r3,0
+BEGIN_FTR_SECTION
+	mfspr	r3,SPRN_L3CR
+END_FTR_SECTION_IFSET(CPU_FTR_L3CR)
 	blr
 
 /* --- End of PowerLogix code ---

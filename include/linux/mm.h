@@ -311,8 +311,6 @@ extern mem_map_t * mem_map;
 extern void show_free_areas(void);
 extern void show_free_areas_node(pg_data_t *pgdat);
 
-extern void clear_page_tables(struct mm_struct *, unsigned long, int);
-
 extern int fail_writepage(struct page *);
 struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int unused);
 struct file *shmem_file_setup(char * name, loff_t size);
@@ -456,7 +454,6 @@ void do_page_cache_readahead(struct file *file,
 void page_cache_readahead(struct file *file, unsigned long offset);
 void page_cache_readaround(struct file *file, unsigned long offset);
 void handle_ra_thrashing(struct file *file);
-extern unsigned long default_ra_pages;
 
 /* vma is the first one with  address < vma->vm_end,
  * and even  address < vma->vm_start. Have to extend vma. */

@@ -582,7 +582,7 @@ err_out_free_netdev:
 #define EE_READ256_CMD	(6 << 8)
 #define EE_ERASE_CMD	(7 << 6)
 
-static int read_eeprom(long ioaddr, int location)
+static int __devinit read_eeprom(long ioaddr, int location)
 {
 	int i;
 	int retval = 0;

@@ -13,7 +13,7 @@
 #include <linux/fs.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
+#include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 
 #include <linux/coda.h>

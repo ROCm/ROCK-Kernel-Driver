@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  * $Id: via82cxxx.c,v 3.34 2002/02/12 11:26:11 vojtech Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
@@ -65,9 +66,11 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ide.h>
+
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #define VIA_IDE_ENABLE		0x40
 #define VIA_IDE_CONFIG		0x41
@@ -102,7 +105,7 @@ static struct via_isa_bridge {
 	unsigned char rev_min;
 	unsigned char rev_max;
 	unsigned short flags;
-} via_isa_bridges[] = {
+} via_isa_bridges [] __initdata = {
 #ifdef FUTURE_BRIDGES
 	{ "vt8237",	PCI_DEVICE_ID_VIA_8237,     0x00, 0x2f, VIA_UDMA_133 },
 	{ "vt8235",	PCI_DEVICE_ID_VIA_8235,     0x00, 0x2f, VIA_UDMA_133 },
@@ -129,7 +132,6 @@ static struct via_isa_bridge {
 static struct via_isa_bridge *via_config;
 static unsigned char via_enabled;
 static unsigned int via_80w;
-static unsigned int via_clock;
 static char *via_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100", "UDMA133" };
 
 /*
@@ -172,7 +174,7 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 	via_print("Highest DMA rate:                   %s", via_dma[via_config->flags & VIA_UDMA]);
 
 	via_print("BM-DMA base:                        %#x", via_base);
-	via_print("PCI clock:                          %d.%dMHz", via_clock / 1000, via_clock / 100 % 10);
+	via_print("PCI clock:                          %d.%dMHz", system_bus_speed / 1000, system_bus_speed / 100 % 10);
 
 	pci_read_config_byte(dev, VIA_MISC_1, &t);
 	via_print("Master Read  Cycle IRDY:            %dws", (t & 64) >> 6);
@@ -220,8 +222,8 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 		uen[i]       = ((u >> ((3 - i) << 3)) & 0x20);
 		den[i]       = (c & ((i & 1) ? 0x40 : 0x20) << ((i & 2) << 2));
 
-		speed[i] = 2 * via_clock / (active[i] + recover[i]);
-		cycle[i] = 1000000 * (active[i] + recover[i]) / via_clock;
+		speed[i] = 2 * system_bus_speed / (active[i] + recover[i]);
+		cycle[i] = 1000000 * (active[i] + recover[i]) / system_bus_speed;
 
 		if (!uen[i] || !den[i])
 			continue;
@@ -229,34 +231,34 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 		switch (via_config->flags & VIA_UDMA) {
 
 			case VIA_UDMA_33:
-				speed[i] = 2 * via_clock / udma[i];
-				cycle[i] = 1000000 * udma[i] / via_clock;
+				speed[i] = 2 * system_bus_speed / udma[i];
+				cycle[i] = 1000000 * udma[i] / system_bus_speed;
 				break;
 
 			case VIA_UDMA_66:
-				speed[i] = 4 * via_clock / (udma[i] * umul[i]);
-				cycle[i] = 500000 * (udma[i] * umul[i]) / via_clock;
+				speed[i] = 4 * system_bus_speed / (udma[i] * umul[i]);
+				cycle[i] = 500000 * (udma[i] * umul[i]) / system_bus_speed;
 				break;
 
 			case VIA_UDMA_100:
-				speed[i] = 6 * via_clock / udma[i];
-				cycle[i] = 333333 * udma[i] / via_clock;
+				speed[i] = 6 * system_bus_speed / udma[i];
+				cycle[i] = 333333 * udma[i] / system_bus_speed;
 				break;
 
 			case VIA_UDMA_133:
-				speed[i] = 8 * via_clock / udma[i];
-				cycle[i] = 250000 * udma[i] / via_clock;
+				speed[i] = 8 * system_bus_speed / udma[i];
+				cycle[i] = 250000 * udma[i] / system_bus_speed;
 				break;
 		}
 	}
 
 	via_print_drive("Transfer Mode: ", "%10s", den[i] ? (uen[i] ? "UDMA" : "DMA") : "PIO");
 
-	via_print_drive("Address Setup: ", "%8dns", 1000000 * setup[i] / via_clock);
-	via_print_drive("Cmd Active:    ", "%8dns", 1000000 * active8b[i] / via_clock);
-	via_print_drive("Cmd Recovery:  ", "%8dns", 1000000 * recover8b[i] / via_clock);
-	via_print_drive("Data Active:   ", "%8dns", 1000000 * active[i] / via_clock);
-	via_print_drive("Data Recovery: ", "%8dns", 1000000 * recover[i] / via_clock);
+	via_print_drive("Address Setup: ", "%8dns", 1000000 * setup[i] / system_bus_speed);
+	via_print_drive("Cmd Active:    ", "%8dns", 1000000 * active8b[i] / system_bus_speed);
+	via_print_drive("Cmd Recovery:  ", "%8dns", 1000000 * recover8b[i] / system_bus_speed);
+	via_print_drive("Data Active:   ", "%8dns", 1000000 * active[i] / system_bus_speed);
+	via_print_drive("Data Recovery: ", "%8dns", 1000000 * recover[i] / system_bus_speed);
 	via_print_drive("Cycle Time:    ", "%8dns", cycle[i]);
 	via_print_drive("Transfer Rate: ", "%4d.%dMB/s", speed[i] / 1000, speed[i] / 100 % 10);
 
@@ -300,9 +302,9 @@ static void via_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_timi
  * by upper layers.
  */
 
-static int via_set_drive(ide_drive_t *drive, unsigned char speed)
+static int via_set_drive(struct ata_device *drive, unsigned char speed)
 {
-	ide_drive_t *peer = drive->channel->drives + (~drive->dn & 1);
+	struct ata_device *peer = drive->channel->drives + (~drive->dn & 1);
 	struct ata_timing t, p;
 	unsigned int T, UT;
 
@@ -311,7 +313,7 @@ static int via_set_drive(ide_drive_t *drive, unsigned char speed)
 			printk(KERN_WARNING "ide%d: Drive %d didn't accept speed setting. Oh, well.\n",
 				drive->dn >> 1, drive->dn & 1);
 
-	T = 1000000000 / via_clock;
+	T = 1000000000 / system_bus_speed;
 
 	switch (via_config->flags & VIA_UDMA) {
 		case VIA_UDMA_33:   UT = T;   break;
@@ -342,7 +344,7 @@ static int via_set_drive(ide_drive_t *drive, unsigned char speed)
  * PIO-only tuning.
  */
 
-static void via82cxxx_tune_drive(ide_drive_t *drive, unsigned char pio)
+static void via82cxxx_tune_drive(struct ata_device *drive, unsigned char pio)
 {
 	if (!((via_enabled >> drive->channel->unit) & 1))
 		return;
@@ -380,7 +382,7 @@ static int via82cxxx_dmaproc(struct ata_device *drive)
  * and initialize its drive independent registers.
  */
 
-unsigned int __init pci_init_via82cxxx(struct pci_dev *dev)
+static unsigned int __init via82cxxx_init_chipset(struct pci_dev *dev)
 {
 	struct pci_dev *isa = NULL;
 	unsigned char t, v;
@@ -468,54 +470,22 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev)
 	pci_write_config_byte(dev, VIA_FIFO_CONFIG, t);
 
 /*
- * Determine system bus clock.
- */
-
-	via_clock = system_bus_speed * 1000;
-
-	switch (via_clock) {
-		case 33000: via_clock = 33333; break;
-		case 37000: via_clock = 37500; break;
-		case 41000: via_clock = 41666; break;
-	}
-
-	if (via_clock < 20000 || via_clock > 50000) {
-		printk(KERN_WARNING "VP_IDE: User given PCI clock speed impossible (%d), using 33 MHz instead.\n", via_clock);
-		printk(KERN_WARNING "VP_IDE: Use ide0=ata66 if you want to assume 80-wire cable.\n");
-		via_clock = 33333;
-	}
-
-/*
  * Print the boot message.
  */
 
 	pci_read_config_byte(isa, PCI_REVISION_ID, &t);
-	printk(KERN_INFO "VP_IDE: VIA %s (rev %02x) IDE %s controller on pci%s\n",
+	printk(KERN_INFO "VP_IDE: VIA %s (rev %02x) ATA %s controller on PCI %s\n",
 		via_config->name, t, via_dma[via_config->flags & VIA_UDMA], dev->slot_name);
-
-/*
- * Setup /proc/ide/via entry.
- */
-
-#if 0 && defined(CONFIG_PROC_FS)
-	if (!via_proc) {
-		via_base = pci_resource_start(dev, 4);
-		bmide_dev = dev;
-		isa_dev = isa;
-		via_display_info = &via_get_info;
-		via_proc = 1;
-	}
-#endif
 
 	return 0;
 }
 
-unsigned int __init ata66_via82cxxx(struct ata_channel *hwif)
+static unsigned int __init via82cxxx_ata66_check(struct ata_channel *hwif)
 {
 	return ((via_enabled & via_80w) >> hwif->unit) & 1;
 }
 
-void __init ide_init_via82cxxx(struct ata_channel *hwif)
+static void __init via82cxxx_init_channel(struct ata_channel *hwif)
 {
 	int i;
 
@@ -546,8 +516,45 @@ void __init ide_init_via82cxxx(struct ata_channel *hwif)
  * We allow the BM-DMA driver to only work on enabled interfaces.
  */
 
-void __init ide_dmacapable_via82cxxx(struct ata_channel *hwif, unsigned long dmabase)
+static void __init via82cxxx_init_dma(struct ata_channel *hwif, unsigned long dmabase)
 {
 	if ((via_enabled >> hwif->unit) & 1)
-		ide_setup_dma(hwif, dmabase, 8);
+		ata_init_dma(hwif, dmabase);
+}
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_VIA,
+		device:	PCI_DEVICE_ID_VIA_82C576_1,
+		init_chipset: via82cxxx_init_chipset,
+		ata66_check: via82cxxx_ata66_check,
+		init_channel: via82cxxx_init_channel,
+		init_dma: via82cxxx_init_dma,
+		enablebits: {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
+		bootable: ON_BOARD,
+		flags: ATA_F_NOADMA
+	},
+	{
+		vendor:	PCI_VENDOR_ID_VIA,
+		device:	PCI_DEVICE_ID_VIA_82C586_1,
+		init_chipset: via82cxxx_init_chipset,
+		ata66_check: via82cxxx_ata66_check,
+		init_channel: via82cxxx_init_channel,
+		init_dma: via82cxxx_init_dma,
+		enablebits: {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
+		bootable: ON_BOARD,
+		flags: ATA_F_NOADMA
+	},
+};
+
+int __init init_via82cxxx(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+	return 0;
 }

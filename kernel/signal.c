@@ -493,7 +493,7 @@ static int send_signal(int sig, struct siginfo *info, struct sigpending *signals
  * No need to set need_resched since signal event passing
  * goes through ->blocked
  */
-static inline void signal_wake_up(struct task_struct *t)
+inline void signal_wake_up(struct task_struct *t)
 {
 	set_tsk_thread_flag(t,TIF_SIGPENDING);
 

@@ -117,7 +117,6 @@ BTFIXUPDEF_CALL(void, free_pgd_fast, pgd_t *)
 
 static __inline__ pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	BUG();
 	return 0;
 }
 

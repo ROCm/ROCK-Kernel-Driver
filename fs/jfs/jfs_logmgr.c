@@ -59,7 +59,6 @@
  */
 
 #include <linux/fs.h>
-#include <linux/locks.h>
 #include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
@@ -169,7 +168,7 @@ static int lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd,
 			 tlock_t * tlck);
 
 static int lmNextPage(log_t * log);
-static int lmLogFileSystem(log_t * log, kdev_t fsdev, int activate);
+static int lmLogFileSystem(log_t * log, char *uuid, int activate);
 static int lmLogInit(log_t * log);
 static int lmLogShutdown(log_t * log);
 
@@ -1099,6 +1098,11 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 * file systems to log may have n-to-1 relationship;
 	 */
       externalLog:
+
+	/*
+	 * TODO: Check for already opened log devices
+	 */
+
 	if (!(bdev = bdget(kdev_t_to_nr(JFS_SBI(sb)->logdev)))) {
 		rc = ENODEV;
 		goto errout10;
@@ -1111,6 +1115,7 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 
 	log->sb = sb;		/* This should be a list */
 	log->bdev = bdev;
+	memcpy(log->uuid, JFS_SBI(sb)->loguuid, sizeof(log->uuid));
 	
 	/*
 	 * initialize log:
@@ -1121,7 +1126,7 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	/*
 	 * add file system to log active file system list
 	 */
-	if ((rc = lmLogFileSystem(log, sb->s_dev, 1)))
+	if ((rc = lmLogFileSystem(log, JFS_SBI(sb)->uuid, 1)))
 		goto errout30;
 
       out:
@@ -1222,6 +1227,10 @@ static int lmLogInit(log_t * log)
 		     ("lmLogInit: inline log:0x%p base:0x%Lx size:0x%x\n",
 		      log, (unsigned long long) log->base, log->size));
 	} else {
+		if (memcmp(logsuper->uuid, log->uuid, 16)) {
+			jERROR(1,("wrong uuid on JFS log device\n"));
+			goto errout20;
+		}
 		log->size = le32_to_cpu(logsuper->size);
 		log->l2bsize = le32_to_cpu(logsuper->l2bsize);
 		jFYI(0,
@@ -1318,7 +1327,6 @@ static int lmLogInit(log_t * log)
 	logsuper->state = cpu_to_le32(LOGMOUNT);
 	log->serial = le32_to_cpu(logsuper->serial) + 1;
 	logsuper->serial = cpu_to_le32(log->serial);
-	logsuper->device = cpu_to_le32(log->bdev->bd_dev);
 	lbmDirectWrite(log, bpsuper, lbmWRITE | lbmRELEASE | lbmSYNC);
 	if ((rc = lbmIOWait(bpsuper, lbmFREE)))
 		goto errout30;
@@ -1375,7 +1383,7 @@ int lmLogClose(struct super_block *sb, log_t * log)
 	 *      external log as separate logical volume
 	 */
       externalLog:
-	lmLogFileSystem(log, sb->s_dev, 0);
+	lmLogFileSystem(log, JFS_SBI(sb)->uuid, 0);
 	rc = lmLogShutdown(log);
 	blkdev_put(log->bdev, BDEV_FS);
 
@@ -1384,6 +1392,35 @@ int lmLogClose(struct super_block *sb, log_t * log)
 	return rc;
 }
 
+
+/*
+ * NAME:	lmLogWait()
+ *
+ * FUNCTION:	wait for all outstanding log records to be written to disk
+ */
+void lmLogWait(log_t *log)
+{
+	int i;
+
+	jFYI(1, ("lmLogWait: log:0x%p\n", log));
+
+	if (log->cqueue.head || !list_empty(&log->synclist)) {
+		/*
+		 * If there was very recent activity, we may need to wait
+		 * for the lazycommit thread to catch up
+		 */
+
+		for (i = 0; i < 800; i++) {	/* Too much? */
+			current->state = TASK_INTERRUPTIBLE;
+			schedule_timeout(HZ / 4);
+			if ((log->cqueue.head == NULL) &&
+			    list_empty(&log->synclist))
+				break;
+		}
+	}
+	assert(log->cqueue.head == NULL);
+	assert(list_empty(&log->synclist));
+}
 
 /*
  * NAME:	lmLogShutdown()
@@ -1411,23 +1448,7 @@ static int lmLogShutdown(log_t * log)
 
 	jFYI(1, ("lmLogShutdown: log:0x%p\n", log));
 
-	if (log->cqueue.head || !list_empty(&log->synclist)) {
-		/*
-		 * If there was very recent activity, we may need to wait
-		 * for the lazycommit thread to catch up
-		 */
-		int i;
-
-		for (i = 0; i < 800; i++) {	/* Too much? */
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(HZ / 4);
-			if ((log->cqueue.head == NULL) &&
-			    list_empty(&log->synclist))
-				break;
-		}
-	}
-	assert(log->cqueue.head == NULL);
-	assert(list_empty(&log->synclist));
+	lmLogWait(log);
 
 	/*
 	 * We need to make sure all of the "written" metapages
@@ -1497,11 +1518,10 @@ static int lmLogShutdown(log_t * log)
  *			
  * serialization: IWRITE_LOCK(log inode) held on entry/exit
  */
-static int lmLogFileSystem(log_t * log, kdev_t fsdev, int activate)
+static int lmLogFileSystem(log_t * log, char *uuid, int activate)
 {
 	int rc = 0;
 	int i;
-	u32 dev_le = cpu_to_le32(kdev_t_to_nr(fsdev));
 	logsuper_t *logsuper;
 	lbuf_t *bpsuper;
 
@@ -1514,8 +1534,8 @@ static int lmLogFileSystem(log_t * log, kdev_t fsdev, int activate)
 	logsuper = (logsuper_t *) bpsuper->l_ldata;
 	if (activate) {
 		for (i = 0; i < MAX_ACTIVE; i++)
-			if (logsuper->active[i] == 0) {
-				logsuper->active[i] = dev_le;
+			if (!memcmp(logsuper->active[i].uuid, NULL_UUID, 16)) {
+				memcpy(logsuper->active[i].uuid, uuid, 16);
 				break;
 			}
 		if (i == MAX_ACTIVE) {
@@ -1525,8 +1545,8 @@ static int lmLogFileSystem(log_t * log, kdev_t fsdev, int activate)
 		}
 	} else {
 		for (i = 0; i < MAX_ACTIVE; i++)
-			if (logsuper->active[i] == dev_le) {
-				logsuper->active[i] = 0;
+			if (!memcmp(logsuper->active[i].uuid, uuid, 16)) {
+				memcpy(logsuper->active[i].uuid, NULL_UUID, 16);
 				break;
 			}
 		assert(i < MAX_ACTIVE);

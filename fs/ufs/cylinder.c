@@ -13,7 +13,6 @@
 #include <linux/time.h>
 #include <linux/stat.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 
 #include <asm/bitops.h>
 #include <asm/byteorder.h>

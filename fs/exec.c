@@ -38,6 +38,7 @@
 #include <linux/binfmts.h>
 #define __NO_VERSION__
 #include <linux/module.h>
+#include <linux/namei.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>

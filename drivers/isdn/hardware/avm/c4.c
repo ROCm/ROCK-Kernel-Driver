@@ -191,15 +191,14 @@ static int c4_load_t4file(avmcard *card, capiloaddatapart * t4file)
 {
 	u32 val;
 	unsigned char *dp;
-	int left, retval;
+	int left;
 	u32 loadoff = 0;
 
 	dp = t4file->data;
 	left = t4file->len;
 	while (left >= sizeof(u32)) {
 	        if (t4file->user) {
-			retval = copy_from_user(&val, dp, sizeof(val));
-			if (retval)
+			if (copy_from_user(&val, dp, sizeof(val)))
 				return -EFAULT;
 		} else {
 			memcpy(&val, dp, sizeof(val));
@@ -216,8 +215,7 @@ static int c4_load_t4file(avmcard *card, capiloaddatapart * t4file)
 	if (left) {
 		val = 0;
 		if (t4file->user) {
-			retval = copy_from_user(&val, dp, left);
-			if (retval)
+			if (copy_from_user(&val, dp, left))
 				return -EFAULT;
 		} else {
 			memcpy(&val, dp, left);
@@ -548,6 +546,7 @@ static void c4_handle_rx(avmcard *card)
 		MsgLen = _get_slice(&p, card->msgbuf);
 		cidx = CAPIMSG_CONTROLLER(card->msgbuf)-card->cardnr;
 		if (cidx >= card->nlogcontr) cidx = 0;
+		cinfo = &card->ctrlinfo[cidx];
 		ctrl = card->ctrlinfo[cidx].capi_ctrl;
 
 		if (!(skb = alloc_skb(MsgLen, GFP_ATOMIC))) {
@@ -555,6 +554,11 @@ static void c4_handle_rx(avmcard *card)
 					card->name);
 		} else {
 			memcpy(skb_put(skb, MsgLen), card->msgbuf, MsgLen);
+			if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_CONF)
+				capilib_data_b3_conf(&cinfo->ncci_head, ApplId,
+						     CAPIMSG_NCCI(skb->data),
+						     CAPIMSG_MSGID(skb->data));
+
 			ctrl->handle_capimsg(ctrl, ApplId, skb);
 		}
 		break;
@@ -566,9 +570,8 @@ static void c4_handle_rx(avmcard *card)
 		WindowSize = _get_word(&p);
 		cidx = (NCCI&0x7f) - card->cardnr;
 		if (cidx >= card->nlogcontr) cidx = 0;
-		ctrl = card->ctrlinfo[cidx].capi_ctrl;
 
-		ctrl->new_ncci(ctrl, ApplId, NCCI, WindowSize);
+		capilib_new_ncci(&card->ctrlinfo[cidx].ncci_head, ApplId, NCCI, WindowSize);
 
 		break;
 
@@ -580,9 +583,7 @@ static void c4_handle_rx(avmcard *card)
 		if (NCCI != 0xffffffff) {
 			cidx = (NCCI&0x7f) - card->cardnr;
 			if (cidx >= card->nlogcontr) cidx = 0;
-			ctrl = card->ctrlinfo[cidx].capi_ctrl;
-			if (ctrl)
-				ctrl->free_ncci(ctrl, ApplId, NCCI);
+			capilib_free_ncci(&card->ctrlinfo[cidx].ncci_head, ApplId, NCCI);
 		}
 		break;
 
@@ -675,6 +676,7 @@ static void c4_handle_interrupt(avmcard *card)
                 for (i=0; i < 4; i++) {
 			avmctrl_info *cinfo = &card->ctrlinfo[i];
 			memset(cinfo->version, 0, sizeof(cinfo->version));
+			capilib_release(&cinfo->ncci_head);
 			if (cinfo->capi_ctrl)
 				cinfo->capi_ctrl->reseted(cinfo->capi_ctrl);
 		}
@@ -804,8 +806,7 @@ static int c4_send_config(avmcard *card, capiloaddatapart * config)
 	left = config->len;
 	while (left >= sizeof(u32)) {
 	        if (config->user) {
-			retval = copy_from_user(val, dp, sizeof(val));
-			if (retval)
+			if (copy_from_user(val, dp, sizeof(val)))
 				return -EFAULT;
 		} else {
 			memcpy(val, dp, sizeof(val));
@@ -818,8 +819,7 @@ static int c4_send_config(avmcard *card, capiloaddatapart * config)
 	if (left) {
 		memset(val, 0, sizeof(val));
 		if (config->user) {
-			retval = copy_from_user(&val, dp, left);
-			if (retval)
+			if (copy_from_user(&val, dp, left))
 				return -EFAULT;
 		} else {
 			memcpy(&val, dp, left);
@@ -897,9 +897,9 @@ void c4_reset_ctr(struct capi_ctr *ctrl)
 	card->nlogcontr = 0;
 }
 
-static void c4_remove_ctr(struct capi_ctr *ctrl)
+static void c4_remove(struct pci_dev *pdev)
 {
-	avmcard *card = ((avmctrl_info *)(ctrl->driverdata))->card;
+	avmcard *card = pci_get_drvdata(pdev);
 	avmctrl_info *cinfo;
 	int i;
 
@@ -916,11 +916,8 @@ static void c4_remove_ctr(struct capi_ctr *ctrl)
 	free_irq(card->irq, card);
 	iounmap(card->mbase);
 	release_region(card->port, AVMB1_PORTLEN);
-	ctrl->driverdata = 0;
         avmcard_dma_free(card->dma);
 	b1_free_card(card);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------------- */
@@ -974,6 +971,8 @@ void c4_release_appl(struct capi_ctr *ctrl, u16 appl)
 	struct sk_buff *skb;
 	void *p;
 
+	capilib_release_appl(&cinfo->ncci_head, appl);
+
 	if (ctrl->cnr == card->cardnr) {
 		skb = alloc_skb(7, GFP_ATOMIC);
 		if (!skb) {
@@ -996,12 +995,25 @@ void c4_release_appl(struct capi_ctr *ctrl, u16 appl)
 /* ------------------------------------------------------------- */
 
 
-static void c4_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
+static u16 c4_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
-	skb_queue_tail(&card->dma->send_queue, skb);
-	c4_dispatch_tx(card);
+	u16 retval = CAPI_NOERROR;
+
+ 	if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_REQ) {
+		retval = capilib_data_b3_req(&cinfo->ncci_head,
+					     CAPIMSG_APPID(skb->data),
+					     CAPIMSG_NCCI(skb->data),
+					     CAPIMSG_MSGID(skb->data));
+	}
+	if (retval == CAPI_NOERROR) {
+		skb_queue_tail(&card->dma->send_queue, skb);
+		c4_dispatch_tx(card);
+	} else {
+		dev_kfree_skb_any(skb);
+	}
+	return retval;
 }
 
 /* ------------------------------------------------------------- */
@@ -1102,8 +1114,6 @@ static int c4_add_card(struct capi_driver *driver,
 	int retval;
 	int i;
 
-	MOD_INC_USE_COUNT;
-
 	card = b1_alloc_card(nr_controllers);
 	if (!card) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
@@ -1189,7 +1199,6 @@ static int c4_add_card(struct capi_driver *driver,
  err_free:
 	b1_free_card(card);
  err:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 
@@ -1201,7 +1210,6 @@ static struct capi_driver c2_driver = {
 	revision: "0.0",
 	load_firmware: c4_load_firmware,
 	reset_ctr: c4_reset_ctr,
-	remove_ctr: c4_remove_ctr,
 	register_appl: c4_register_appl,
 	release_appl: c4_release_appl,
 	send_message: c4_send_message,
@@ -1209,8 +1217,6 @@ static struct capi_driver c2_driver = {
 	procinfo: c4_procinfo,
 	ctr_read_proc: c4_read_proc,
 	driver_read_proc: 0,	/* use standard driver_read_proc */
-	
-	add_card: 0, /* no add_card function */
 };
 
 static struct capi_driver c4_driver = {
@@ -1219,7 +1225,6 @@ static struct capi_driver c4_driver = {
 	revision: "0.0",
 	load_firmware: c4_load_firmware,
 	reset_ctr: c4_reset_ctr,
-	remove_ctr: c4_remove_ctr,
 	register_appl: c4_register_appl,
 	release_appl: c4_release_appl,
 	send_message: c4_send_message,
@@ -1227,25 +1232,7 @@ static struct capi_driver c4_driver = {
 	procinfo: c4_procinfo,
 	ctr_read_proc: c4_read_proc,
 	driver_read_proc: 0,	/* use standard driver_read_proc */
-	
-	add_card: 0, /* no add_card function */
 };
-
-static int c4_attach_driver (struct capi_driver * driver)
-{
-	char *p;
-	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision));
-		driver->revision[sizeof(driver->revision)-1] = 0;
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
-	}
-
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-
-        attach_capi_driver(driver);
-	return 0;
-}
 
 static int __devinit c4_probe(struct pci_dev *dev,
 			      const struct pci_device_id *ent)
@@ -1284,40 +1271,34 @@ static struct pci_driver c4_pci_driver = {
        name:           "c4",
        id_table:       c4_pci_tbl,
        probe:          c4_probe,
+       remove:         c4_remove,
 };
 
 static int __init c4_init(void)
 {
 	int retval;
-	int ncards;
 
-	MOD_INC_USE_COUNT;
+	b1_set_revision(&c2_driver, revision);
+        attach_capi_driver(&c2_driver);
 
-	retval = c4_attach_driver (&c4_driver);
-	if (retval) {
-		MOD_DEC_USE_COUNT;
-		return retval;
-	}
+	b1_set_revision(&c4_driver, revision);
+        attach_capi_driver(&c4_driver);
 
-	retval = c4_attach_driver (&c2_driver);
-	if (retval) {
-		MOD_DEC_USE_COUNT;
-		return retval;
-	}
+	retval = pci_module_init(&c4_pci_driver);
+	if (retval < 0)
+		goto err;
 
-	ncards = pci_register_driver(&c4_pci_driver);
-	if (ncards) {
-		printk(KERN_INFO "%s: %d C4/C2 card(s) detected\n",
-				c4_driver.name, ncards);
-		MOD_DEC_USE_COUNT;
-		return 0;
-	}
-	printk(KERN_ERR "%s: NO C4/C2 card detected\n", c4_driver.name);
-	pci_unregister_driver(&c4_pci_driver);
-	detach_capi_driver(&c4_driver);
+	printk(KERN_INFO "%s: %d C4/C2 card(s) detected\n",
+	       c4_driver.name, retval);
+
+	retval = 0;
+	goto out;
+
+ err:
 	detach_capi_driver(&c2_driver);
-	MOD_DEC_USE_COUNT;
-	return -ENODEV;
+	detach_capi_driver(&c4_driver);
+ out:
+	return retval;
 }
 
 static void __exit c4_exit(void)

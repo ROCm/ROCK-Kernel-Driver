@@ -185,8 +185,8 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 	divert_rule *rulep;
 	char *cp;
 
-	if ((i = copy_from_user(&dioctl, (char *) arg, sizeof(dioctl))))
-		return (i);
+	if (copy_from_user(&dioctl, (char *) arg, sizeof(dioctl)))
+		return -EFAULT;
 
 	switch (cmd) {
 		case IIOCGETVER:
@@ -254,7 +254,7 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 		default:
 			return (-EINVAL);
 	}			/* switch cmd */
-	return (copy_to_user((char *) arg, &dioctl, sizeof(dioctl)));	/* success */
+	return copy_to_user((char *)arg, &dioctl, sizeof(dioctl)) ? -EFAULT : 0;
 }				/* isdn_divert_ioctl */
 
 

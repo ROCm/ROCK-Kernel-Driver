@@ -5,7 +5,6 @@
 #include <linux/config.h>
 #include <linux/time.h>
 #include <linux/reiserfs_fs.h>
-#include <linux/locks.h>
 #include <asm/bitops.h>
 #include <linux/list.h>
 

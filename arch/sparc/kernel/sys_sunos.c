@@ -192,8 +192,7 @@ asmlinkage int sunos_brk(unsigned long brk)
 	 * simple, it hopefully works in most obvious cases.. Easy to
 	 * fool it, but this should catch most mistakes.
 	 */
-	freepages = atomic_read(&buffermem_pages) >> PAGE_SHIFT;
-	freepages += get_page_cache_size();
+	freepages = get_page_cache_size();
 	freepages >>= 1;
 	freepages += nr_free_pages();
 	freepages += nr_swap_pages;
@@ -1049,8 +1048,8 @@ static inline int check_nonblock(int ret, int fd)
 	return ret;
 }
 
-extern asmlinkage int sys_read(unsigned int fd,char *buf,int count);
-extern asmlinkage int sys_write(unsigned int fd,char *buf,int count);
+extern asmlinkage ssize_t sys_read(unsigned int fd,char *buf,int count);
+extern asmlinkage ssize_t sys_write(unsigned int fd,char *buf,int count);
 extern asmlinkage int sys_recv(int fd, void * ubuf, int size, unsigned flags);
 extern asmlinkage int sys_send(int fd, void * buff, int len, unsigned flags);
 extern asmlinkage int sys_accept(int fd, struct sockaddr *sa, int *addrlen);

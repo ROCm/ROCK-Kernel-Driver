@@ -251,16 +251,18 @@ void switch_to(struct task_struct *prev, struct task_struct *new)
 
 void show_regs(struct pt_regs * regs)
 {
-	int i;
+	int i, trap;
 
-	printk("NIP: %08lX XER: %08lX LR: %08lX SP: %08lX REGS: %p TRAP: %04lx    %s\n",
-	       regs->nip, regs->xer, regs->link, regs->gpr[1], regs,regs->trap, print_tainted());
+	printk("NIP: %08lX LR: %08lX SP: %08lX REGS: %p TRAP: %04lx    %s\n",
+	       regs->nip, regs->link, regs->gpr[1], regs, regs->trap,
+	       print_tainted());
 	printk("MSR: %08lx EE: %01x PR: %01x FP: %01x ME: %01x IR/DR: %01x%01x\n",
 	       regs->msr, regs->msr&MSR_EE ? 1 : 0, regs->msr&MSR_PR ? 1 : 0,
 	       regs->msr & MSR_FP ? 1 : 0,regs->msr&MSR_ME ? 1 : 0,
 	       regs->msr&MSR_IR ? 1 : 0,
 	       regs->msr&MSR_DR ? 1 : 0);
-	if (regs->trap == 0x300 || regs->trap == 0x600)
+	trap = TRAP(regs);
+	if (trap == 0x300 || trap == 0x600)
 		printk("DAR: %08lX, DSISR: %08lX\n", regs->dar, regs->dsisr);
 	printk("TASK = %p[%d] '%s' ",
 	       current, current->pid, current->comm);
@@ -280,25 +282,18 @@ void show_regs(struct pt_regs * regs)
 #ifdef CONFIG_SMP
 	printk(" CPU: %d", smp_processor_id());
 #endif /* CONFIG_SMP */
-	
-	printk("\n");
-	for (i = 0;  i < 32;  i++)
-	{
+
+	for (i = 0;  i < 32;  i++) {
 		long r;
 		if ((i % 8) == 0)
-		{
-			printk("GPR%02d: ", i);
-		}
-
-		if ( __get_user(r, &(regs->gpr[i])) )
-		    goto out;
+			printk("\n" KERN_INFO "GPR%02d: ", i);
+		if (__get_user(r, &regs->gpr[i]))
+			break;
 		printk("%08lX ", r);
-		if ((i % 8) == 7)
-		{
-			printk("\n");
-		}
+		if (i == 12 && !FULL_REGS(regs))
+			break;
 	}
-out:
+	printk("\n");
 	print_backtrace((unsigned long *)regs->gpr[1]);
 }
 
@@ -336,6 +331,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 	unsigned long childframe;
 
+	CHECK_FULL_REGS(regs);
 	/* Copy registers */
 	sp -= sizeof(struct pt_regs);
 	childregs = (struct pt_regs *) sp;
@@ -441,19 +437,28 @@ int set_fpexc_mode(struct task_struct *tsk, unsigned int val)
 int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6,
 	      struct pt_regs *regs)
 {
-	return do_fork(p1, regs->gpr[1], regs, 0);
+ 	struct task_struct *p;
+	CHECK_FULL_REGS(regs);
+ 	p = do_fork(p1 & ~CLONE_IDLETASK, regs->gpr[1], regs, 0);
+ 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 int sys_fork(int p1, int p2, int p3, int p4, int p5, int p6,
 	     struct pt_regs *regs)
 {
-	return do_fork(SIGCHLD, regs->gpr[1], regs, 0);
+	struct task_struct *p;
+	CHECK_FULL_REGS(regs);
+	p = do_fork(SIGCHLD, regs->gpr[1], regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 int sys_vfork(int p1, int p2, int p3, int p4, int p5, int p6,
 	      struct pt_regs *regs)
 {
-	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs, 0);
+	struct task_struct *p;
+	CHECK_FULL_REGS(regs);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs, 0);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,

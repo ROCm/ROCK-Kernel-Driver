@@ -62,7 +62,7 @@
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
-static const char driver_name [] = "pegasus";
+static const char driver_name[] = "pegasus";
 
 #define	PEGASUS_USE_INTR
 #define	PEGASUS_WRITE_EEPROM
@@ -981,7 +981,7 @@ static void *pegasus_probe(struct usb_device *dev, unsigned int ifnum,
 		return NULL;
 	}
 
-	usb_inc_dev_use(dev);
+	usb_get_dev(dev);
 	memset(pegasus, 0, sizeof(struct pegasus));
 	pegasus->dev_index = dev_index;
 	init_waitqueue_head(&pegasus->ctrl_wait);
@@ -1086,7 +1086,7 @@ static void pegasus_disconnect(struct usb_device *dev, void *ptr)
 
 	pegasus->flags |= PEGASUS_UNPLUG;
 	unregister_netdev(pegasus->net);
-	usb_dec_dev_use(dev);
+	usb_put_dev(dev);
 	usb_unlink_urb(pegasus->intr_urb);
 	usb_unlink_urb(pegasus->tx_urb);
 	usb_unlink_urb(pegasus->rx_urb);

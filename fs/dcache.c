@@ -32,9 +32,6 @@
 spinlock_t dcache_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 rwlock_t dparent_lock __cacheline_aligned_in_smp = RW_LOCK_UNLOCKED;
 
-/* Right now the dcache depends on the kernel lock */
-#define check_lock()	if (!kernel_locked()) BUG()
-
 static kmem_cache_t *dentry_cache; 
 
 /*
@@ -812,7 +809,6 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
 	struct dentry *new = NULL;
 
 	if (inode && S_ISDIR(inode->i_mode)) {
-		lock_kernel(); /* for d_move */
 		spin_lock(&dcache_lock);
 		if (!list_empty(&inode->i_dentry)) {
 			new = list_entry(inode->i_dentry.next, struct dentry, d_alias);
@@ -828,7 +824,6 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
 			spin_unlock(&dcache_lock);
 			d_rehash(dentry);
 		}
-		unlock_kernel();
 	} else
 		d_add(dentry, inode);
 	return new;
@@ -1012,7 +1007,6 @@ static inline void switch_names(struct dentry * dentry, struct dentry * target)
 {
 	const unsigned char *old_name, *new_name;
 
-	check_lock();
 	memcpy(dentry->d_iname, target->d_iname, DNAME_INLINE_LEN); 
 	old_name = target->d_name.name;
 	new_name = dentry->d_name.name;
@@ -1051,8 +1045,6 @@ static inline void switch_names(struct dentry * dentry, struct dentry * target)
   
 void d_move(struct dentry * dentry, struct dentry * target)
 {
-	check_lock();
-
 	if (!dentry->d_inode)
 		printk(KERN_WARNING "VFS: moving negative dcache entry\n");
 

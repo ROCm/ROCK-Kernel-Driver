@@ -963,21 +963,22 @@ void scsi_request_fn(request_queue_t * q)
 
 			/* 
 			 * This sets up the scatter-gather table (allocating if
-			 * required).  Hosts that need bounce buffers will also
-			 * get those allocated here.  
+			 * required).
 			 */
 			if (!scsi_init_io(SCpnt)) {
-				SCpnt = __scsi_end_request(SCpnt, 0, 
-							   SCpnt->request.nr_sectors, 0, 0);
-				if( SCpnt != NULL )
-				{
-					panic("Should not have leftover blocks\n");
-				}
 				spin_lock_irq(q->queue_lock);
 				SHpnt->host_busy--;
 				SDpnt->device_busy--;
-				continue;
+				if (SDpnt->device_busy == 0) {
+					SDpnt->starved = 1;
+					SHpnt->some_device_starved = 1;
+				}
+				SCpnt->request.special = SCpnt;
+				SCpnt->request.flags |= REQ_SPECIAL;
+				_elv_add_request(q, &SCpnt->request, 0, 0);
+				break;
 			}
+
 			/*
 			 * Initialize the actual SCSI command for this request.
 			 */

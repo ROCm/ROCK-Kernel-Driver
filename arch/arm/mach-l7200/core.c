@@ -83,7 +83,7 @@ static void __init l7200_map_io(void)
 }
 
 static void __init
-fixup_l7200(struct machine_desc *desc, struct param_struct *unused,
+fixup_l7200(struct machine_desc *desc, struct tag *tags,
              char **cmdline, struct meminfo *mi)
 {
         mi->nr_banks      = 1;

@@ -8,10 +8,7 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
+EXTRA_AFLAGS := $(CFLAGS)
 
 OBJS  = init.o memory.o cmdline.o identify.o locore.o
 

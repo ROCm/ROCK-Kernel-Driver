@@ -318,7 +318,8 @@ static ssize_t initrd_read(struct file *file, char *buf,
 	left = initrd_end - initrd_start - *ppos;
 	if (count > left) count = left;
 	if (count == 0) return 0;
-	copy_to_user(buf, (char *)initrd_start + *ppos, count);
+	if (copy_to_user(buf, (char *)initrd_start + *ppos, count))
+		return -EFAULT;
 	*ppos += count;
 	return count;
 }
@@ -375,6 +376,7 @@ static int rd_open(struct inode * inode, struct file * filp)
 	if (rd_bdev[unit] == NULL) {
 		rd_bdev[unit] = bdget(kdev_t_to_nr(inode->i_rdev));
 		rd_bdev[unit]->bd_openers++;
+		rd_bdev[unit]->bd_block_size = rd_blocksize;
 		rd_bdev[unit]->bd_inode->i_mapping->a_ops = &ramdisk_aops;
 	}
 

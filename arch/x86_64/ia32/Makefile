@@ -2,11 +2,6 @@
 # Makefile for the ia32 kernel emulation subsystem.
 #
 
-.S.s:
-	$(CPP) $(AFLAGS) -o $*.s $<
-.S.o:
-	$(CC) $(AFLAGS) -c -o $*.o $<
-
 export-objs := ia32_ioctl.o	
 
 all: ia32.o

@@ -23,7 +23,6 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/unistd.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/stats.h>
@@ -47,7 +46,6 @@ static void nfs_invalidate_inode(struct inode *);
 
 static struct inode *nfs_alloc_inode(struct super_block *sb);
 static void nfs_destroy_inode(struct inode *);
-static void nfs_read_inode(struct inode *);
 static void nfs_write_inode(struct inode *,int);
 static void nfs_delete_inode(struct inode *);
 static void nfs_put_super(struct super_block *);
@@ -59,7 +57,6 @@ static int  nfs_show_options(struct seq_file *, struct vfsmount *);
 static struct super_operations nfs_sops = { 
 	alloc_inode:	nfs_alloc_inode,
 	destroy_inode:	nfs_destroy_inode,
-	read_inode:	nfs_read_inode,
 	write_inode:	nfs_write_inode,
 	delete_inode:	nfs_delete_inode,
 	put_super:	nfs_put_super,
@@ -96,15 +93,6 @@ static inline unsigned long
 nfs_fattr_to_ino_t(struct nfs_fattr *fattr)
 {
 	return nfs_fileid_to_ino_t(fattr->fileid);
-}
-
-/*
- * The "read_inode" function doesn't actually do anything:
- * the real data is filled in later in nfs_fhget.
- */
-static void
-nfs_read_inode(struct inode * inode)
-{
 }
 
 static void
@@ -592,7 +580,7 @@ struct nfs_find_desc {
  * i_ino.
  */
 static int
-nfs_find_actor(struct inode *inode, unsigned long ino, void *opaque)
+nfs_find_actor(struct inode *inode, void *opaque)
 {
 	struct nfs_find_desc	*desc = (struct nfs_find_desc *)opaque;
 	struct nfs_fh		*fh = desc->fh;
@@ -608,6 +596,18 @@ nfs_find_actor(struct inode *inode, unsigned long ino, void *opaque)
 	if (!atomic_read(&inode->i_count))
 		NFS_CACHEINV(inode);
 	return 1;
+}
+
+static int
+nfs_init_locked(struct inode *inode, void *opaque)
+{
+	struct nfs_find_desc	*desc = (struct nfs_find_desc *)opaque;
+	struct nfs_fh		*fh = desc->fh;
+	struct nfs_fattr	*fattr = desc->fattr;
+
+	NFS_FILEID(inode) = fattr->fileid;
+	memcpy(NFS_FH(inode), fh, sizeof(struct nfs_fh));
+	return 0;
 }
 
 /*
@@ -640,7 +640,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		fattr:	fattr
 	};
 	struct inode *inode = NULL;
-	unsigned long ino;
+	unsigned long hash;
 
 	if ((fattr->valid & NFS_ATTR_FATTR) == 0)
 		goto out_no_inode;
@@ -650,20 +650,21 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		goto out_no_inode;
 	}
 
-	ino = nfs_fattr_to_ino_t(fattr);
+	hash = nfs_fattr_to_ino_t(fattr);
 
-	if (!(inode = iget4(sb, ino, nfs_find_actor, &desc)))
+	if (!(inode = iget5_locked(sb, hash, nfs_find_actor, nfs_init_locked, &desc)))
 		goto out_no_inode;
 
-	if (NFS_NEW(inode)) {
+	if (inode->i_state & I_NEW) {
 		__u64		new_size, new_mtime;
 		loff_t		new_isize;
 		time_t		new_atime;
 
+		/* We set i_ino for the few things that still rely on it,
+		 * such as stat(2) */
+		inode->i_ino = hash;
+
 		/* We can't support UPDATE_ATIME(), since the server will reset it */
-		NFS_FLAGS(inode) &= ~NFS_INO_NEW;
-		NFS_FILEID(inode) = fattr->fileid;
-		memcpy(NFS_FH(inode), fh, sizeof(struct nfs_fh));
 		inode->i_flags |= S_NOATIME;
 		inode->i_mode = fattr->mode;
 		/* Why so? Because we want revalidate for devices/FIFOs, and
@@ -711,6 +712,8 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		NFS_ATTRTIMEO(inode) = NFS_MINATTRTIMEO(inode);
 		NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
 		memset(NFS_COOKIEVERF(inode), 0, sizeof(NFS_COOKIEVERF(inode)));
+
+		unlock_new_inode(inode);
 	} else
 		nfs_refresh_inode(inode, fattr);
 	dprintk("NFS: __nfs_fhget(%s/%Ld ct=%d)\n",
@@ -727,7 +730,7 @@ out_no_inode:
 }
 
 int
-nfs_notify_change(struct dentry *dentry, struct iattr *attr)
+nfs_setattr(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
 	struct nfs_fattr fattr;
@@ -741,7 +744,7 @@ nfs_notify_change(struct dentry *dentry, struct iattr *attr)
 	error = nfs_revalidate_inode(NFS_SERVER(inode),inode);
 	if (error) {
 #ifdef NFS_PARANOIA
-printk("nfs_notify_change: revalidate failed, error=%d\n", error);
+printk("nfs_setattr: revalidate failed, error=%d\n", error);
 #endif
 		goto out;
 	}
@@ -765,7 +768,7 @@ printk("nfs_notify_change: revalidate failed, error=%d\n", error);
 	 */
 	if (attr->ia_valid & ATTR_SIZE) {
 		if (attr->ia_size != fattr.size)
-			printk("nfs_notify_change: attr=%Ld, fattr=%Ld??\n",
+			printk("nfs_setattr: attr=%Ld, fattr=%Ld??\n",
 			       (long long) attr->ia_size, (long long)fattr.size);
 		vmtruncate(inode, attr->ia_size);
 	}
@@ -805,14 +808,13 @@ nfs_wait_on_inode(struct inode *inode, int flag)
 	return error;
 }
 
-/*
- * Externally visible revalidation function
- */
-int
-nfs_revalidate(struct dentry *dentry)
+int nfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *inode = dentry->d_inode;
-	return nfs_revalidate_inode(NFS_SERVER(inode), inode);
+	int err = nfs_revalidate_inode(NFS_SERVER(inode), inode);
+	if (!err)
+		generic_fillattr(inode, stat);
+	return err;
 }
 
 /*
@@ -1231,7 +1233,7 @@ static struct inode *nfs_alloc_inode(struct super_block *sb)
 	nfsi = (struct nfs_inode *)kmem_cache_alloc(nfs_inode_cachep, SLAB_KERNEL);
 	if (!nfsi)
 		return NULL;
-	nfsi->flags = NFS_INO_NEW;
+	nfsi->flags = 0;
 	nfsi->mm_cred = NULL;
 	return &nfsi->vfs_inode;
 }

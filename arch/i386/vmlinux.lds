@@ -4,6 +4,7 @@
 OUTPUT_FORMAT("elf32-i386", "elf32-i386", "elf32-i386")
 OUTPUT_ARCH(i386)
 ENTRY(_start)
+jiffies = jiffies_64;
 SECTIONS
 {
   . = 0xC0000000 + 0x100000;
@@ -63,6 +64,12 @@ SECTIONS
   __per_cpu_end = .;
   . = ALIGN(4096);
   __init_end = .;
+
+  . = ALIGN(4096);
+  __nosave_begin = .;
+  .data_nosave : { *(.data.nosave) }
+  . = ALIGN(4096);
+  __nosave_end = .;
 
   . = ALIGN(4096);
   .data.page_aligned : { *(.data.idt) }

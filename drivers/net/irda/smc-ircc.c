@@ -10,6 +10,8 @@
  * Modified by:   Dag Brattli <dag@brattli.net>
  * Modified at:   Tue Jun 26 2001
  * Modified by:   Stefani Seibold <stefani@seibold.net>
+ * Modified at:   Thur Apr 18 2002
+ * Modified by:   Jeff Snyder <je4d@pobox.com>
  * 
  *     Copyright (c) 2001      Stefani Seibold
  *     Copyright (c) 1999-2001 Dag Brattli
@@ -539,7 +541,7 @@ static int __init ircc_open(unsigned int fir_base, unsigned int sir_base)
 	if (ircc_irq < 255) {
 		if (ircc_irq!=irq)
 			MESSAGE("%s, Overriding IRQ - chip says %d, using %d\n",
-				driver_name, self->io->irq, ircc_irq);
+				driver_name, irq, ircc_irq);
 		self->io->irq = ircc_irq;
 	}
 	else
@@ -547,13 +549,13 @@ static int __init ircc_open(unsigned int fir_base, unsigned int sir_base)
 	if (ircc_dma < 255) {
 		if (ircc_dma!=dma)
 			MESSAGE("%s, Overriding DMA - chip says %d, using %d\n",
-				driver_name, self->io->dma, ircc_dma);
+				driver_name, dma, ircc_dma);
 		self->io->dma = ircc_dma;
 	}
 	else
 		self->io->dma = dma;
 
-	request_region(fir_base, CHIP_IO_EXTENT, driver_name);
+	request_region(self->io->fir_base, CHIP_IO_EXTENT, driver_name);
 
 	/* Initialize QoS for this device */
 	irda_init_max_qos_capabilies(&irport->qos);
@@ -1191,10 +1193,9 @@ static int __exit ircc_close(struct ircc_cb *self)
         outb(IRCC_CFGB_IR, iobase+IRCC_SCE_CFGB);
 #endif
 	/* Release the PORT that this driver is using */
-	IRDA_DEBUG(0, __FUNCTION__ "(), releasing 0x%03x\n", 
-		   self->io->fir_base);
+	IRDA_DEBUG(0, __FUNCTION__ "(), releasing 0x%03x\n", iobase);
 
-	release_region(self->io->fir_base, self->io->fir_ext);
+	release_region(iobase, CHIP_IO_EXTENT);
 
 	if (self->tx_buff.head)
 		kfree(self->tx_buff.head);

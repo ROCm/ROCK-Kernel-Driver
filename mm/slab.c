@@ -839,7 +839,10 @@ next:
 	down(&cache_chain_sem);
 	{
 		struct list_head *p;
+		mm_segment_t old_fs;
 
+		old_fs = get_fs();
+		set_fs(KERNEL_DS);
 		list_for_each(p, &cache_chain) {
 			kmem_cache_t *pc = list_entry(p, kmem_cache_t, next);
 			char tmp;
@@ -857,6 +860,7 @@ next:
 				BUG(); 
 			}	
 		}
+		set_fs(old_fs);
 	}
 
 	/* There is no reason to lock our new cache before we
@@ -1965,8 +1969,13 @@ static int s_show(struct seq_file *m, void *p)
 	name = cachep->name; 
 	{
 	char tmp; 
+	mm_segment_t old_fs;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
 	if (__get_user(tmp, name)) 
 		name = "broken"; 
+	set_fs(old_fs);
 	} 	
 
 	seq_printf(m, "%-17s %6lu %6lu %6u %4lu %4lu %4u",

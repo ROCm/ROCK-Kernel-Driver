@@ -49,11 +49,9 @@ static struct map_desc p720t_io_desc[] __initdata = {
 };
 
 static void __init
-fixup_p720t(struct machine_desc *desc, struct param_struct *params,
+fixup_p720t(struct machine_desc *desc, struct tag *tag,
 	    char **cmdline, struct meminfo *mi)
 {
-	struct tag *tag = (struct tag *)params;
-
 	/*
 	 * Our bootloader doesn't setup any tags (yet).
 	 */

@@ -20,13 +20,14 @@
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
-#include <linux/init.h>
 
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #undef DISPLAY_ALI_TIMINGS
 
@@ -239,7 +240,7 @@ static byte chip_is_1543c_e;
 byte ali_proc = 0;
 static struct pci_dev *isa_dev;
 
-static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
+static void ali15x3_tune_drive(struct ata_device *drive, byte pio)
 {
 	struct ata_timing *t;
 	struct ata_channel *hwif = drive->channel;
@@ -260,18 +261,18 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 
 	s_time = t->setup;
 	a_time = t->active;
-	if ((s_clc = (s_time * system_bus_speed + 999) / 1000) >= 8)
+	if ((s_clc = (s_time * system_bus_speed + 999999) / 1000000) >= 8)
 		s_clc = 0;
-	if ((a_clc = (a_time * system_bus_speed + 999) / 1000) >= 8)
+	if ((a_clc = (a_time * system_bus_speed + 999999) / 1000000) >= 8)
 		a_clc = 0;
 	c_time = t->cycle;
 
 #if 0
-	if ((r_clc = ((c_time - s_time - a_time) * system_bus_speed + 999) / 1000) >= 16)
+	if ((r_clc = ((c_time - s_time - a_time) * system_bus_speed + 999999) / 1000000) >= 16)
 		r_clc = 0;
 #endif
 
-	if (!(r_clc = (c_time * system_bus_speed + 999) / 1000 - a_clc - s_clc)) {
+	if (!(r_clc = (c_time * system_bus_speed + 999999) / 1000000 - a_clc - s_clc)) {
 		r_clc = 1;
 	} else {
 		if (r_clc >= 16)
@@ -303,14 +304,49 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 	__restore_flags(flags);
 }
 
-static int ali15x3_tune_chipset (ide_drive_t *drive, byte speed)
+static byte ali15x3_can_ultra(struct ata_device *drive)
 {
-	struct ata_channel *hwif = drive->channel;
-	struct pci_dev *dev	= hwif->pci_dev;
+	if (m5229_revision <= 0x20) {
+		return 0;
+	} else if ((m5229_revision < 0xC2) &&
+#ifndef CONFIG_WDC_ALI15X3
+		((chip_is_1543c_e && strstr(drive->id->model, "WDC ")) ||
+		 (drive->type != ATA_DISK))) {
+#else
+		(drive->type != ATA_DISK)) {
+#endif
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+static int ali15x3_ratemask(struct ata_device *drive)
+{
+	int map = 0;
+
+	if (!ali15x3_can_ultra(drive))
+		return 0;
+
+	map |= XFER_UDMA;
+
+	if (!eighty_ninty_three(drive))
+		return map;
+
+	if (m5229_revision >= 0xC4)
+		map |= XFER_UDMA_100;
+	if (m5229_revision >= 0xC2)
+		map |= XFER_UDMA_66;
+
+	return map;
+}
+
+static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
+{
+	struct pci_dev *dev = drive->channel->pci_dev;
 	byte unit		= (drive->select.b.unit & 0x01);
 	byte tmpbyte		= 0x00;
-	int m5229_udma		= hwif->unit ? 0x57 : 0x56;
-	int err			= 0;
+	int m5229_udma		= drive->channel->unit ? 0x57 : 0x56;
 
 	if (speed < XFER_UDMA_0) {
 		byte ultra_enable	= (unit) ? 0x7f : 0xf7;
@@ -322,16 +358,10 @@ static int ali15x3_tune_chipset (ide_drive_t *drive, byte speed)
 		pci_write_config_byte(dev, m5229_udma, tmpbyte);
 	}
 
-	err = ide_config_drive_speed(drive, speed);
-
+	if (speed < XFER_SW_DMA_0)
+		ali15x3_tune_drive(drive, speed);
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	if (speed >= XFER_SW_DMA_0) {
-		unsigned long dma_base = hwif->dma_base;
-
-		outb(inb(dma_base+2)|(1<<(5+unit)), dma_base+2);
-	}
-
-	if (speed >= XFER_UDMA_0) {
+	else if (speed >= XFER_UDMA_0) {
 		pci_read_config_byte(dev, m5229_udma, &tmpbyte);
 		tmpbyte &= (0x0f << ((1-unit) << 2));
 		/*
@@ -347,89 +377,37 @@ static int ali15x3_tune_chipset (ide_drive_t *drive, byte speed)
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
+	if (!drive->init_speed)
+		drive->init_speed = speed;
 	drive->current_speed = speed;
 
-	return (err);
+	return ide_config_drive_speed(drive, speed);
 }
 
-static void config_chipset_for_pio (ide_drive_t *drive)
+static void config_chipset_for_pio(struct ata_device *drive)
 {
 	ali15x3_tune_drive(drive, 5);
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int config_chipset_for_dma (ide_drive_t *drive, byte ultra33)
+static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 {
-	struct hd_driveid *id	= drive->id;
-	byte speed		= 0x00;
-	byte ultra66		= eighty_ninty_three(drive);
-	byte ultra100		= (m5229_revision>=0xc4) ? 1 : 0;
-	int  rval;
+	int map;
+	u8 mode;
 
-	if ((id->dma_ultra & 0x0020) && (ultra100) && (ultra66) && (ultra33)) {
-		speed = XFER_UDMA_5;
-	} else if ((id->dma_ultra & 0x0010) && (ultra66) && (ultra33)) {
-		speed = XFER_UDMA_4;
-	} else if ((id->dma_ultra & 0x0008) && (ultra66) && (ultra33)) {
-		speed = XFER_UDMA_3;
-	} else if ((id->dma_ultra & 0x0004) && (ultra33)) {
-		speed = XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0002) && (ultra33)) {
-		speed = XFER_UDMA_1;
-	} else if ((id->dma_ultra & 0x0001) && (ultra33)) {
-		speed = XFER_UDMA_0;
-	} else if (id->dma_mword & 0x0004) {
-		speed = XFER_MW_DMA_2;
-	} else if (id->dma_mword & 0x0002) {
-		speed = XFER_MW_DMA_1;
-	} else if (id->dma_mword & 0x0001) {
-		speed = XFER_MW_DMA_0;
-	} else if (id->dma_1word & 0x0004) {
-		speed = XFER_SW_DMA_2;
-	} else if (id->dma_1word & 0x0002) {
-		speed = XFER_SW_DMA_1;
-	} else if (id->dma_1word & 0x0001) {
-		speed = XFER_SW_DMA_0;
-	} else {
+	if (udma)
+		map = ali15x3_ratemask(drive);
+	else
+		map = XFER_SWDMA | XFER_MWDMA;
+
+	mode = ata_timing_mode(drive, map);
+	if (mode < XFER_SW_DMA_0)
 		return 0;
-	}
 
-	(void) ali15x3_tune_chipset(drive, speed);
-
-	if (!drive->init_speed)
-		drive->init_speed = speed;
-
-	rval = (int)(	((id->dma_ultra >> 11) & 3) ? 1:
-			((id->dma_ultra >> 8) & 7) ? 1:
-			((id->dma_mword >> 8) & 7) ? 1:
-			((id->dma_1word >> 8) & 7) ? 1:
-						     0);
-
-	return rval;
+	return !ali15x3_tune_chipset(drive, mode);
 }
 
-static byte ali15x3_can_ultra (ide_drive_t *drive)
-{
-#ifndef CONFIG_WDC_ALI15X3
-	struct hd_driveid *id	= drive->id;
-#endif /* CONFIG_WDC_ALI15X3 */
-
-	if (m5229_revision <= 0x20) {
-		return 0;
-	} else if ((m5229_revision < 0xC2) &&
-#ifndef CONFIG_WDC_ALI15X3
-		   ((chip_is_1543c_e && strstr(id->model, "WDC ")) ||
-		    (drive->type != ATA_DISK))) {
-#else /* CONFIG_WDC_ALI15X3 */
-		   (drive->type != ATA_DISK)) {
-#endif /* CONFIG_WDC_ALI15X3 */
-		return 0;
-	} else {
-		return 1;
-	}
-}
-
-static int ali15x3_config_drive_for_dma(ide_drive_t *drive)
+static int ali15x3_config_drive_for_dma(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 	struct ata_channel *hwif = drive->channel;
@@ -505,7 +483,7 @@ static int ali15x3_dmaproc(struct ata_device *drive)
 }
 #endif
 
-unsigned int __init pci_init_ali15x3(struct pci_dev *dev)
+static unsigned int __init ali15x3_init_chipset(struct pci_dev *dev)
 {
 	unsigned long fixdma_base = pci_resource_start(dev, 4);
 
@@ -543,7 +521,7 @@ unsigned int __init pci_init_ali15x3(struct pci_dev *dev)
  * of UDMA66 transfers. It doesn't check the drives.
  * But see note 2 below!
  */
-unsigned int __init ata66_ali15x3(struct ata_channel *hwif)
+static unsigned int __init ali15x3_ata66_check(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned int ata66	= 0;
@@ -638,7 +616,7 @@ unsigned int __init ata66_ali15x3(struct ata_channel *hwif)
 	return(ata66);
 }
 
-void __init ide_init_ali15x3(struct ata_channel *hwif)
+static void __init ali15x3_init_channel(struct ata_channel *hwif)
 {
 #ifndef CONFIG_SPARC64
 	byte ideic, inmir;
@@ -694,13 +672,33 @@ void __init ide_init_ali15x3(struct ata_channel *hwif)
 		hwif->autodma = 0;
 #else
 	hwif->autodma = 0;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 }
 
-void __init ide_dmacapable_ali15x3(struct ata_channel *hwif, unsigned long dmabase)
+static void __init ali15x3_init_dma(struct ata_channel *ch, unsigned long dmabase)
 {
-	if ((dmabase) && (m5229_revision < 0x20)) {
+	if ((dmabase) && (m5229_revision < 0x20))
 		return;
-	}
-	ide_setup_dma(hwif, dmabase, 8);
+
+	ata_init_dma(ch, dmabase);
+}
+
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+	vendor: PCI_VENDOR_ID_AL,
+        device: PCI_DEVICE_ID_AL_M5229,
+	init_chipset: ali15x3_init_chipset,
+	ata66_check: ali15x3_ata66_check,
+	init_channel: ali15x3_init_channel,
+	init_dma: ali15x3_init_dma,
+	enablebits: { {0x00,0x00,0x00}, {0x00,0x00,0x00} },
+	bootable: ON_BOARD
+};
+
+int __init init_ali15x3(void)
+{
+	ata_register_chipset(&chipset);
+
+        return 0;
 }

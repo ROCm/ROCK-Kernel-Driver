@@ -161,9 +161,14 @@ static void print_bus_info (void)
 		debug ("%s - slot_count = %x\n", __FUNCTION__, ptr->slot_count);
 		debug ("%s - bus# = %x\n", __FUNCTION__, ptr->busno);
 		debug ("%s - current_speed = %x\n", __FUNCTION__, ptr->current_speed);
-		debug ("%s - supported_speed = %x\n", __FUNCTION__, ptr->supported_speed);
 		debug ("%s - controller_id = %x\n", __FUNCTION__, ptr->controller_id);
-		debug ("%s - bus_mode = %x\n", __FUNCTION__, ptr->supported_bus_mode);
+		
+		debug ("%s - slots_at_33_conv = %x\n", __FUNCTION__, ptr->slots_at_33_conv);
+		debug ("%s - slots_at_66_conv = %x\n", __FUNCTION__, ptr->slots_at_66_conv);
+		debug ("%s - slots_at_66_pcix = %x\n", __FUNCTION__, ptr->slots_at_66_pcix);
+		debug ("%s - slots_at_100_pcix = %x\n", __FUNCTION__, ptr->slots_at_100_pcix);
+		debug ("%s - slots_at_133_pcix = %x\n", __FUNCTION__, ptr->slots_at_133_pcix);
+
 	}
 }
 
@@ -455,19 +460,9 @@ static int ebda_rsrc_controller (void)
 				bus_info_ptr1->index = bus_index++;
 				bus_info_ptr1->current_speed = 0xff;
 				bus_info_ptr1->current_bus_mode = 0xff;
-				if ( ((slot_ptr->slot_cap) & EBDA_SLOT_133_MAX) == EBDA_SLOT_133_MAX )
-					bus_info_ptr1->supported_speed =  3;
-				else if ( ((slot_ptr->slot_cap) & EBDA_SLOT_100_MAX) == EBDA_SLOT_100_MAX )
-					bus_info_ptr1->supported_speed =  2;
-				else if ( ((slot_ptr->slot_cap) & EBDA_SLOT_66_MAX) == EBDA_SLOT_66_MAX )
-					bus_info_ptr1->supported_speed =  1;
+				
 				bus_info_ptr1->controller_id = hpc_ptr->ctlr_id;
-				if ( ((slot_ptr->slot_cap) & EBDA_SLOT_PCIX_CAP) == EBDA_SLOT_PCIX_CAP )
-					bus_info_ptr1->supported_bus_mode = 1;
-				else
-					bus_info_ptr1->supported_bus_mode =0;
-
-
+				
 				list_add_tail (&bus_info_ptr1->bus_info_list, &bus_info_head);
 
 			} else {
@@ -486,9 +481,25 @@ static int ebda_rsrc_controller (void)
 		/* init bus structure */
 		bus_ptr = hpc_ptr->buses;
 		for (bus = 0; bus < bus_num; bus++) {
-			bus_ptr->bus_num = readb (io_mem + addr_bus);
+			bus_ptr->bus_num = readb (io_mem + addr_bus + bus);
+			bus_ptr->slots_at_33_conv = readb (io_mem + addr_bus + bus_num + 8 * bus);
+			bus_ptr->slots_at_66_conv = readb (io_mem + addr_bus + bus_num + 8 * bus + 1);
+
+			bus_ptr->slots_at_66_pcix = readb (io_mem + addr_bus + bus_num + 8 * bus + 2);
+
+			bus_ptr->slots_at_100_pcix = readb (io_mem + addr_bus + bus_num + 8 * bus + 3);
+
+			bus_ptr->slots_at_133_pcix = readb (io_mem + addr_bus + bus_num + 8 * bus + 4);
+
+			bus_info_ptr2 = ibmphp_find_same_bus_num (bus_ptr->bus_num);
+			if (bus_info_ptr2) {
+				bus_info_ptr2->slots_at_33_conv = bus_ptr->slots_at_33_conv;
+				bus_info_ptr2->slots_at_66_conv = bus_ptr->slots_at_66_conv;
+				bus_info_ptr2->slots_at_66_pcix = bus_ptr->slots_at_66_pcix;
+				bus_info_ptr2->slots_at_100_pcix = bus_ptr->slots_at_100_pcix;
+				bus_info_ptr2->slots_at_133_pcix = bus_ptr->slots_at_133_pcix; 
+			}
 			bus_ptr++;
-			addr_bus += 1;
 		}
 
 		hpc_ptr->ctlr_type = temp;
@@ -511,10 +522,6 @@ static int ebda_rsrc_controller (void)
 			case 2:
 				hpc_ptr->u.wpeg_ctlr.wpegbbar = readl (io_mem + addr);
 				hpc_ptr->u.wpeg_ctlr.i2c_addr = readb (io_mem + addr + 4);
-				/* following 2 lines for testing purpose */
-				if (hpc_ptr->u.wpeg_ctlr.i2c_addr == 0) 
-					hpc_ptr->ctlr_type = 4;	
-				
 
 				hpc_ptr->irq = readb (io_mem + addr + 5);
 				addr += 6;
@@ -537,6 +544,8 @@ static int ebda_rsrc_controller (void)
 
 		hpc_ptr->revision = 0xff;
 		hpc_ptr->options = 0xff;
+		hpc_ptr->starting_slot_num = hpc_ptr->slots[0].slot_num;
+		hpc_ptr->ending_slot_num = hpc_ptr->slots[slot_num-1].slot_num;
 
 		// register slots with hpc core as well as create linked list of ibm slot
 		for (index = 0; index < hpc_ptr->slot_count; index++) {
@@ -573,10 +582,24 @@ static int ebda_rsrc_controller (void)
 				return -ENOMEM;
 			}
 
+
 			((struct slot *)hp_slot_ptr->private)->flag = TRUE;
 			snprintf (hp_slot_ptr->name, 10, "%d", hpc_ptr->slots[index].slot_num);
 
 			((struct slot *) hp_slot_ptr->private)->capabilities = hpc_ptr->slots[index].slot_cap;
+			if ((hpc_ptr->slots[index].slot_cap & EBDA_SLOT_133_MAX) == EBDA_SLOT_133_MAX)
+				((struct slot *) hp_slot_ptr->private)->supported_speed =  3;
+			else if ((hpc_ptr->slots[index].slot_cap & EBDA_SLOT_100_MAX) == EBDA_SLOT_100_MAX)
+				((struct slot *) hp_slot_ptr->private)->supported_speed =  2;
+			else if ((hpc_ptr->slots[index].slot_cap & EBDA_SLOT_66_MAX) == EBDA_SLOT_66_MAX)
+				((struct slot *) hp_slot_ptr->private)->supported_speed =  1;
+				
+			if ((hpc_ptr->slots[index].slot_cap & EBDA_SLOT_PCIX_CAP) == EBDA_SLOT_PCIX_CAP)
+				((struct slot *) hp_slot_ptr->private)->supported_bus_mode = 1;
+			else
+				((struct slot *) hp_slot_ptr->private)->supported_bus_mode = 0;
+
+
 			((struct slot *) hp_slot_ptr->private)->bus = hpc_ptr->slots[index].slot_bus_num;
 
 			bus_info_ptr1 = ibmphp_find_same_bus_num (hpc_ptr->slots[index].slot_bus_num);
@@ -591,7 +614,7 @@ static int ebda_rsrc_controller (void)
 
 			((struct slot *) hp_slot_ptr->private)->ctlr_index = hpc_ptr->slots[index].ctl_index;
 			((struct slot *) hp_slot_ptr->private)->number = hpc_ptr->slots[index].slot_num;
-
+			
 			((struct slot *) hp_slot_ptr->private)->hotplug_slot = hp_slot_ptr;
 
 			rc = ibmphp_hpc_fillhpslotinfo (hp_slot_ptr);

@@ -32,7 +32,7 @@
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/random.h>
 #include <linux/init.h>
 #include <linux/utsname.h>

@@ -386,7 +386,7 @@ void __init chrp_init_IRQ(void)
 {
 	struct device_node *np;
 	int i;
-	unsigned char* chrp_int_ack_special = 0;
+	unsigned long chrp_int_ack;
 	unsigned char init_senses[NR_IRQS - NUM_8259_INTERRUPTS];
 	int nmi_irq = -1;
 #if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)	
@@ -396,14 +396,14 @@ void __init chrp_init_IRQ(void)
 	for (np = find_devices("pci"); np != NULL; np = np->next) {
 		unsigned int *addrp = (unsigned int *)
 			get_property(np, "8259-interrupt-acknowledge", NULL);
+
 		if (addrp == NULL)
 			continue;
-		chrp_int_ack_special = (unsigned char *)
-			ioremap(addrp[prom_n_addr_cells(np)-1], 1);
+		chrp_int_ack = addrp[prom_n_addr_cells(np)-1];
 		break;
 	}
 	if (np == NULL)
-		printk("Cannot find pci to get ack address\n");
+		printk(KERN_ERR "Cannot find PCI interrupt acknowledge address\n");
 
 	chrp_find_openpic();
 
@@ -411,11 +411,11 @@ void __init chrp_init_IRQ(void)
 	OpenPIC_InitSenses = init_senses;
 	OpenPIC_NumInitSenses = NR_IRQS - NUM_8259_INTERRUPTS;
 
-	openpic_init(1, NUM_8259_INTERRUPTS, chrp_int_ack_special, nmi_irq);
+	openpic_init(1, NUM_8259_INTERRUPTS, nmi_irq);
 
 	for (i = 0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;
-	i8259_init(0);
+	i8259_init(chrp_int_ack);
 
 #if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)
 	/* see if there is a keyboard in the device tree
@@ -433,7 +433,8 @@ void __init
 chrp_init2(void)
 {
 #ifdef CONFIG_NVRAM  
-	pmac_nvram_init();
+// XX replace this in a more saner way
+//	pmac_nvram_init();
 #endif
 
 	request_region(0x20,0x20,"pic1");

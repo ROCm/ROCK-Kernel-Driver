@@ -195,17 +195,20 @@ map_boot_text(void)
 {
 	unsigned long base, offset, size;
 	boot_infos_t *bi = &disp_bi;
+	unsigned char *vbase;
 
+	/* By default, we are no longer mapped */
+	boot_text_mapped = 0;
 	if (bi->dispDeviceBase == 0)
 		return;
 	base = ((unsigned long) bi->dispDeviceBase) & 0xFFFFF000UL;
 	offset = ((unsigned long) bi->dispDeviceBase) - base;
 	size = bi->dispDeviceRowBytes * bi->dispDeviceRect[3] + offset
 		+ bi->dispDeviceRect[0];
-	bi->logicalDisplayBase = ioremap(base, size);
-	if (bi->logicalDisplayBase == 0)
+	vbase = ioremap(base, size);
+	if (vbase == 0)
 		return;
-	bi->logicalDisplayBase += offset;
+	bi->logicalDisplayBase = vbase + offset;
 	boot_text_mapped = 1;
 }
 

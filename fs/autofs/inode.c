@@ -14,7 +14,6 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/file.h>
-#include <linux/locks.h>
 #include <asm/bitops.h>
 #include "autofs_i.h"
 #define __NO_VERSION__

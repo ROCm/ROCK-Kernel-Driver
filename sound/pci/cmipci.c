@@ -846,9 +846,13 @@ static int snd_cmipci_ac3_copy(snd_pcm_substream_t *subs, int channel,
 	snd_pcm_uframes_t offset;
 	snd_pcm_runtime_t *runtime = subs->runtime;
 
-	if (! cm->channel[CM_CH_PLAY].ac3_shift)
-		return copy_from_user(runtime->dma_area + frames_to_bytes(runtime, pos),
-				      src, frames_to_bytes(runtime, count));
+	if (!cm->channel[CM_CH_PLAY].ac3_shift) {
+		if (copy_from_user(runtime->dma_area +
+				   frames_to_bytes(runtime, pos), src,
+				   frames_to_bytes(runtime, count)))
+			return -EFAULT;
+		return 0;
+	}
 
 	if (! access_ok(VERIFY_READ, src, count))
 		return -EFAULT;

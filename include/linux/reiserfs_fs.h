@@ -1342,6 +1342,13 @@ struct virtual_node
   struct virtual_item * vn_vi;	/* array of items (including a new one, excluding item to be deleted) */
 };
 
+/* used by directory items when creating virtual nodes */
+struct direntry_uarea {
+    int flags;
+    __u16 entry_count;
+    __u16 entry_sizes[1];
+} __attribute__ ((__packed__)) ;
+
 
 /***************************************************************************/
 /*                  TREE BALANCE                                           */
@@ -1564,8 +1571,9 @@ extern struct item_operations * item_ops [TYPE_ANY + 1];
 #define B_I_POS_UNFM_POINTER(bh,ih,pos) le32_to_cpu(*(((unp_t *)B_I_PITEM(bh,ih)) + (pos)))
 #define PUT_B_I_POS_UNFM_POINTER(bh,ih,pos, val) do {*(((unp_t *)B_I_PITEM(bh,ih)) + (pos)) = cpu_to_le32(val); } while (0)
 
-struct reiserfs_iget4_args {
+struct reiserfs_iget_args {
     __u32 objectid ;
+    __u32 dirid ;
 } ;
 
 /***************************************************************************/
@@ -1818,8 +1826,9 @@ void padd_item (char * item, int total_length, int length);
 
 /* inode.c */
 
-void reiserfs_read_inode (struct inode * inode) ;
-void reiserfs_read_inode2(struct inode * inode, void *p) ;
+void reiserfs_read_locked_inode(struct inode * inode, struct reiserfs_iget_args *args) ;
+int reiserfs_find_actor(struct inode * inode, void *p) ;
+int reiserfs_init_locked_inode(struct inode * inode, void *p) ;
 void reiserfs_delete_inode (struct inode * inode);
 void reiserfs_write_inode (struct inode * inode, int) ;
 struct dentry *reiserfs_get_dentry(struct super_block *, void *) ;
@@ -1841,10 +1850,10 @@ struct inode * reiserfs_iget (struct super_block * s,
 			      const struct cpu_key * key);
 
 
-struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th, 
+int reiserfs_new_inode (struct reiserfs_transaction_handle *th, 
 				   struct inode * dir, int mode, 
-				   const char * symname, int item_len,
-				   struct dentry *dentry, struct inode *inode, int * err);
+				   const char * symname, loff_t i_size,
+				   struct dentry *dentry, struct inode *inode);
 int reiserfs_sync_inode (struct reiserfs_transaction_handle *th, struct inode * inode);
 void reiserfs_update_sd (struct reiserfs_transaction_handle *th, struct inode * inode);
 

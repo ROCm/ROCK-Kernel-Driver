@@ -4,8 +4,7 @@
 # License.  See the file "README.legal" in the main directory of this archive
 # for more details.
 
-.S.o:
-	$(CC) $(AFLAGS) -traditional -c -o $*.o $<
+EXTRA_AFLAGS := -traditional
 
 OS_TARGET := ifpsp.o
 

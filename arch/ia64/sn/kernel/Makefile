@@ -33,11 +33,6 @@
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 
-.S.s:
-	$(CPP) $(AFLAGS) $(AFLAGS_KERNEL) -o $*.s $<
-.S.o:
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $*.o $<
-
 O_TARGET        = sn.o
 
 ifeq ($(CONFIG_MODULES),y)

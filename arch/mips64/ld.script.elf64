@@ -1,5 +1,6 @@
 OUTPUT_ARCH(mips)
 ENTRY(kernel_entry)
+jiffies = jiffies_64;
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */

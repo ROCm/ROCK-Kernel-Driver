@@ -490,7 +490,7 @@ void allowboot(void)
 			 * The following code is purely to make sure
 			 * Linux can schedule processes on this slave.
 			 */
-			kernel_thread(0, NULL, CLONE_PID);
+			kernel_thread(0, NULL, CLONE_IDLETASK);
 			p = prev_task(&init_task);
 			sprintf(p->comm, "%s%d", "Idle", num_cpus);
 			init_tasks[num_cpus] = p;

@@ -29,13 +29,15 @@
 #include <asm/prom.h>
 #include <asm/uaccess.h>
 #include <asm/mediabay.h>
-#include <asm/feature.h>
+#include <asm/machdep.h>
+#include <asm/pmac_feature.h>
 
 #define MAJOR_NR	FLOPPY_MAJOR
 #include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>
 
-static int floppy_sizes[2] = {2880,2880};
+static int floppy_blocksizes[2] = {512,512};
+static int floppy_sizes[2] = {1440,1440};
 
 #define MAX_FLOPPIES	2
 
@@ -312,10 +314,10 @@ static void start_request(struct floppy_state *fs)
 		return;
 	}
 	while (!QUEUE_EMPTY && fs->state == idle) {
-		if (MAJOR(CURRENT->rq_dev) != MAJOR_NR)
+		if (major(CURRENT->rq_dev) != MAJOR_NR)
 			panic(DEVICE_NAME ": request list destroyed");
-		if (CURRENT->bh && !buffer_locked(CURRENT->bh))
-			panic(DEVICE_NAME ": block not locked");
+//		if (CURRENT->bh && !buffer_locked(CURRENT->bh))
+//			panic(DEVICE_NAME ": block not locked");
 #if 0
 		printk("do_fd_req: dev=%x cmd=%d sec=%ld nr_sec=%ld buf=%p\n",
 		       kdev_t_to_nr(CURRENT->rq_dev), CURRENT->cmd,
@@ -337,7 +339,7 @@ static void start_request(struct floppy_state *fs)
 			continue;
 		}
 
-		if (CURRENT->cmd == WRITE) {
+		if (rq_data_dir(CURRENT) == WRITE) {
 			if (fs->write_prot < 0)
 				fs->write_prot = swim3_readbit(fs, WRITE_PROT);
 			if (fs->write_prot) {
@@ -425,7 +427,7 @@ static inline void setup_transfer(struct floppy_state *fs)
 		printk(KERN_ERR "swim3: transfer 0 sectors?\n");
 		return;
 	}
-	if (CURRENT->cmd == WRITE)
+	if (rq_data_dir(CURRENT) == WRITE)
 		n = 1;
 	else {
 		n = fs->secpertrack - fs->req_sector + 1;
@@ -438,21 +440,21 @@ static inline void setup_transfer(struct floppy_state *fs)
 	out_8(&sw->nsect, n);
 	out_8(&sw->gap3, 0);
 	st_le32(&dr->cmdptr, virt_to_bus(cp));
-	if (CURRENT->cmd == WRITE) {
+	if (rq_data_dir(CURRENT) == WRITE) {
 		/* Set up 3 dma commands: write preamble, data, postamble */
 		init_dma(cp, OUTPUT_MORE, write_preamble, sizeof(write_preamble));
 		++cp;
 		init_dma(cp, OUTPUT_MORE, CURRENT->buffer, 512);
 		++cp;
-		init_dma(cp, OUTPUT_MORE, write_postamble, sizeof(write_postamble));
+		init_dma(cp, OUTPUT_LAST, write_postamble, sizeof(write_postamble));
 	} else {
-		init_dma(cp, INPUT_MORE, CURRENT->buffer, n * 512);
+		init_dma(cp, INPUT_LAST, CURRENT->buffer, n * 512);
 	}
 	++cp;
 	out_le16(&cp->command, DBDMA_STOP);
 	out_le32(&dr->control, (RUN << 16) | RUN);
 	out_8(&sw->control_bis,
-	      (CURRENT->cmd == WRITE? WRITE_SECTORS: 0) | DO_ACTION);
+	      (rq_data_dir(CURRENT) == WRITE? WRITE_SECTORS: 0) | DO_ACTION);
 	/* enable intr when transfer complete */
 	out_8(&sw->intr_enable, ERROR_INTR | TRANSFER_DONE);
 	set_timeout(fs, 2*HZ, xfer_timeout);	/* enable timeout */
@@ -591,7 +593,7 @@ static void xfer_timeout(unsigned long data)
 	out_8(&sw->intr_enable, 0);
 	out_8(&sw->control_bic, WRITE_SECTORS | DO_ACTION);
 	out_8(&sw->select, RELAX);
-	if (CURRENT->cmd == WRITE)
+	if (rq_data_dir(CURRENT) == WRITE)
 		++cp;
 	if (ld_le16(&cp->xfer_status) != 0)
 		s = fs->scount - ((ld_le16(&cp->res_count) + 511) >> 9);
@@ -600,7 +602,7 @@ static void xfer_timeout(unsigned long data)
 	CURRENT->sector += s;
 	CURRENT->current_nr_sectors -= s;
 	printk(KERN_ERR "swim3: timeout %sing sector %ld\n",
-	       (CURRENT->cmd==WRITE? "writ": "read"), CURRENT->sector);
+	       (rq_data_dir(CURRENT)==WRITE? "writ": "read"), CURRENT->sector);
 	end_request(0);
 	fs->state = idle;
 	start_request(fs);
@@ -621,8 +623,8 @@ static void swim3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	printk("swim3 intr state=%d intr=%x err=%x\n", fs->state, intr, err);
 #endif
 	if ((intr & ERROR_INTR) && fs->state != do_transfer)
-		printk(KERN_ERR "swim3_interrupt, state=%d, cmd=%x, intr=%x, err=%x\n",
-		       fs->state, CURRENT->cmd, intr, err);
+		printk(KERN_ERR "swim3_interrupt, state=%d, dir=%lx, intr=%x, err=%x\n",
+		       fs->state, rq_data_dir(CURRENT), intr, err);
 	switch (fs->state) {
 	case locating:
 		if (intr & SEEN_SECTOR) {
@@ -678,13 +680,16 @@ static void swim3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			break;
 		dr = fs->dma;
 		cp = fs->dma_cmd;
-		st_le32(&dr->control, RUN << 16);
+		/* We must wait a bit for dbdma to complete */
+		for (n=0; (in_le32(&dr->status) & ACTIVE) && n < 1000; n++)
+			udelay(10);
+		DBDMA_DO_STOP(dr);
 		out_8(&sw->intr_enable, 0);
 		out_8(&sw->control_bic, WRITE_SECTORS | DO_ACTION);
 		out_8(&sw->select, RELAX);
 		del_timer(&fs->timeout);
 		fs->timeout_pending = 0;
-		if (CURRENT->cmd == WRITE)
+		if (rq_data_dir(CURRENT) == WRITE)
 			++cp;
 		stat = ld_le16(&cp->xfer_status);
 		resid = ld_le16(&cp->res_count);
@@ -701,7 +706,7 @@ static void swim3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				act(fs);
 			} else {
 				printk("swim3: error %sing block %ld (err=%x)\n",
-				       CURRENT->cmd == WRITE? "writ": "read",
+				       rq_data_dir(CURRENT) == WRITE? "writ": "read",
 				       CURRENT->sector, err);
 				end_request(0);
 				fs->state = idle;
@@ -710,8 +715,8 @@ static void swim3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			if ((stat & ACTIVE) == 0 || resid != 0) {
 				/* musta been an error */
 				printk(KERN_ERR "swim3: fd dma: stat=%x resid=%d\n", stat, resid);
-				printk(KERN_ERR "  state=%d, cmd=%x, intr=%x, err=%x\n",
-				       fs->state, CURRENT->cmd, intr, err);
+				printk(KERN_ERR "  state=%d, dir=%lx, intr=%x, err=%x\n",
+				       fs->state, rq_data_dir(CURRENT), intr, err);
 				end_request(0);
 				fs->state = idle;
 				start_request(fs);
@@ -815,7 +820,7 @@ static int floppy_ioctl(struct inode *inode, struct file *filp,
 {
 	struct floppy_state *fs;
 	int err;
-	int devnum = MINOR(inode->i_rdev);
+	int devnum = minor(inode->i_rdev);
 
 	if (devnum >= floppy_count)
 		return -ENODEV;
@@ -835,9 +840,10 @@ static int floppy_ioctl(struct inode *inode, struct file *filp,
 		err = fd_eject(fs);
 		return err;
 	case FDGETPRM:
-	        err = copy_to_user((void *) param, (void *) &floppy_type,
-				   sizeof(struct floppy_struct));
-		return err;
+	        if (copy_to_user((void *) param, (void *)&floppy_type,
+				 sizeof(struct floppy_struct)))
+			return -EFAULT;
+		return 0;
 	}
 	return -ENOTTY;
 }
@@ -847,7 +853,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	struct floppy_state *fs;
 	volatile struct swim3 *sw;
 	int n, err;
-	int devnum = MINOR(inode->i_rdev);
+	int devnum = minor(inode->i_rdev);
 
 	if (devnum >= floppy_count)
 		return -ENODEV;
@@ -921,7 +927,7 @@ static int floppy_release(struct inode *inode, struct file *filp)
 {
 	struct floppy_state *fs;
 	volatile struct swim3 *sw;
-	int devnum = MINOR(inode->i_rdev);
+	int devnum = minor(inode->i_rdev);
 
 	if (devnum >= floppy_count)
 		return -ENODEV;
@@ -938,9 +944,9 @@ static int floppy_release(struct inode *inode, struct file *filp)
 static int floppy_check_change(kdev_t dev)
 {
 	struct floppy_state *fs;
-	int devnum = MINOR(dev);
+	int devnum = minor(dev);
 
-	if (MAJOR(dev) != MAJOR_NR || (devnum >= floppy_count))
+	if (major(dev) != MAJOR_NR || (devnum >= floppy_count))
 		return 0;
 		
 	fs = &floppy_states[devnum];
@@ -952,9 +958,9 @@ static int floppy_revalidate(kdev_t dev)
 	struct floppy_state *fs;
 	volatile struct swim3 *sw;
 	int ret, n;
-	int devnum = MINOR(dev);
+	int devnum = minor(dev);
 
-	if (MAJOR(dev) != MAJOR_NR || (devnum >= floppy_count))
+	if (major(dev) != MAJOR_NR || (devnum >= floppy_count))
 		return 0;
 
 	fs = &floppy_states[devnum];
@@ -1031,8 +1037,8 @@ int swim3_init(void)
 			       MAJOR_NR);
 			return -EBUSY;
 		}
-		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request,
-				&swim3_lock);
+		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,&swim3_lock);
+		blksize_size[MAJOR_NR] = floppy_blocksizes;
 		blk_size[MAJOR_NR] = floppy_sizes;
 	}
 
@@ -1060,9 +1066,14 @@ static int swim3_add_device(struct device_node *swim)
 		return -EINVAL;
 	}
 
+	if (!request_OF_resource(swim, 0, NULL)) {
+		printk(KERN_INFO "swim3: can't request IO resource !\n");
+		return -EINVAL;
+	}
+
 	mediabay = (strcasecmp(swim->parent->type, "media-bay") == 0) ? swim->parent : NULL;
 	if (mediabay == NULL)
-		feature_set(swim, FEATURE_SWIM3_enable);
+		pmac_call_feature(PMAC_FTR_SWIM3_ENABLE, swim, 0, 1);
 	
 	memset(fs, 0, sizeof(*fs));
 	fs->state = idle;
@@ -1084,14 +1095,14 @@ static int swim3_add_device(struct device_node *swim)
 
 	if (request_irq(fs->swim3_intr, swim3_interrupt, 0, "SWIM3", fs)) {
 		printk(KERN_ERR "Couldn't get irq %d for SWIM3\n", fs->swim3_intr);
-		feature_clear(swim, FEATURE_SWIM3_enable);
+		pmac_call_feature(PMAC_FTR_SWIM3_ENABLE, swim, 0, 0);
 		return -EBUSY;
 	}
 /*
 	if (request_irq(fs->dma_intr, fd_dma_interrupt, 0, "SWIM3-dma", fs)) {
 		printk(KERN_ERR "Couldn't get irq %d for SWIM3 DMA",
 		       fs->dma_intr);
-		feature_clear(swim, FEATURE_SWIM3_enable);
+		pmac_call_feature(PMAC_FTR_SWIM3_ENABLE, swim, 0, 0);
 		return -EBUSY;
 	}
 */

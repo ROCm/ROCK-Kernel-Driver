@@ -307,4 +307,5 @@ struct inode_operations minix_dir_inode_operations = {
 	rmdir:		minix_rmdir,
 	mknod:		minix_mknod,
 	rename:		minix_rename,
+	getattr:	minix_getattr,
 };

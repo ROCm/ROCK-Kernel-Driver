@@ -582,17 +582,21 @@ barf:
 	do_exit(SIGILL);
 }
 
+asmlinkage int sparc_do_fork(unsigned long clone_flags,
+			     unsigned long stack_start,
+			     struct pt_regs *regs,
+			     unsigned long stack_size)
+{
+	struct task_struct *p = do_fork(clone_flags, stack_start,
+					regs, stack_size);
+
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+}
+
 /* Copy a Sparc thread.  The fork() return value conventions
  * under SunOS are nothing short of bletcherous:
  * Parent -->  %o0 == childs  pid, %o1 == 0
  * Child  -->  %o0 == parents pid, %o1 == 1
- *
- * NOTE: We have a separate fork kpsr/kwim because
- *       the parent could change these values between
- *       sys_fork invocation and when we reach here
- *       if the parent should sleep while trying to
- *       allocate the task_struct and kernel stack in
- *       do_fork().
  */
 int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		unsigned long unused,

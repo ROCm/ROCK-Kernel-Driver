@@ -9,7 +9,7 @@
  */
 
 #include <linux/config.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/timer.h>
 #include <linux/init.h>
 

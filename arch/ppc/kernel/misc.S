@@ -26,7 +26,7 @@
 #include <asm/mmu.h>
 #include <asm/ppc_asm.h>
 #include <asm/thread_info.h>
-#include "ppc_defs.h"
+#include "asm-offsets.h"
 
 	.text
 
@@ -1017,20 +1017,28 @@ _GLOBAL(cvt_df)
  *   kernel_thread(fn, arg, flags)
  */
 _GLOBAL(kernel_thread)
-	mr	r6,r3		/* function */
+	stwu	r1,-16(r1)
+	stw	r30,8(r1)
+	stw	r31,12(r1)
+	mr	r30,r3		/* function */
+	mr	r31,r4		/* argument */
 	ori	r3,r5,CLONE_VM	/* flags */
 	li	r0,__NR_clone
 	sc
 	cmpi	0,r3,0		/* parent or child? */
-	bnelr			/* return if parent */
+	bne	1f		/* return if parent */
 	li	r0,0		/* make top-level stack frame */
 	stwu	r0,-16(r1)
-	mtlr	r6              /* fn addr in lr */
-	mr	r3,r4	        /* load arg and call fn */
+	mtlr	r30		/* fn addr in lr */
+	mr	r3,r31		/* load arg and call fn */
 	blrl
-	li	r0,__NR_exit	/* exit after child exits */
+	li	r0,__NR_exit	/* exit if function returns */
 	li	r3,0
 	sc
+1:	lwz	r30,8(r1)
+	lwz	r31,12(r1)
+	addi	r1,r1,16
+	blr
 
 /*
  * This routine is just here to keep GCC happy - sigh...
@@ -1050,19 +1058,15 @@ _GLOBAL(name) \
 
 #define __NR__exit __NR_exit
 
-SYSCALL(sync)
 SYSCALL(setsid)
+SYSCALL(open)
+SYSCALL(read)
 SYSCALL(write)
+SYSCALL(lseek)
+SYSCALL(close)
 SYSCALL(dup)
 SYSCALL(execve)
-SYSCALL(open)
-SYSCALL(close)
 SYSCALL(waitpid)
-SYSCALL(fork)
-SYSCALL(delete_module)
-SYSCALL(_exit)
-SYSCALL(lseek)
-SYSCALL(read)
 
 /* Why isn't this a) automatic, b) written in 'C'? */	
 	.data
@@ -1070,7 +1074,7 @@ SYSCALL(read)
 _GLOBAL(sys_call_table)
 	.long sys_ni_syscall	/* 0  -  old "setup()" system call */
 	.long sys_exit
-	.long sys_fork
+	.long ppc_fork
 	.long sys_read
 	.long sys_write
 	.long sys_open		/* 5 */
@@ -1140,7 +1144,7 @@ _GLOBAL(sys_call_table)
 	.long sys_ssetmask
 	.long sys_setreuid	/* 70 */
 	.long sys_setregid
-	.long sys_sigsuspend
+	.long ppc_sigsuspend
 	.long sys_sigpending
 	.long sys_sethostname
 	.long sys_setrlimit	/* 75 */
@@ -1188,7 +1192,7 @@ _GLOBAL(sys_call_table)
 	.long sys_ipc
 	.long sys_fsync
 	.long sys_sigreturn
-	.long sys_clone		/* 120 */
+	.long ppc_clone		/* 120 */
 	.long sys_setdomainname
 	.long sys_newuname
 	.long sys_modify_ldt
@@ -1246,7 +1250,7 @@ _GLOBAL(sys_call_table)
 	.long sys_rt_sigpending	/* 175 */
 	.long sys_rt_sigtimedwait
 	.long sys_rt_sigqueueinfo
-	.long sys_rt_sigsuspend
+	.long ppc_rt_sigsuspend
 	.long sys_pread
 	.long sys_pwrite	/* 180 */
 	.long sys_chown
@@ -1257,7 +1261,7 @@ _GLOBAL(sys_call_table)
 	.long sys_sendfile
 	.long sys_ni_syscall		/* streams1 */
 	.long sys_ni_syscall		/* streams2 */
-	.long sys_vfork
+	.long ppc_vfork
 	.long sys_getrlimit	/* 190 */
 	.long sys_readahead
 	.long sys_mmap2	

@@ -25,7 +25,7 @@
  * Bits in feature control register.
  * Bits postfixed with a _N are in inverse logic
  */
-#define HRW_RESET_SCC		0x00000001	/* actually controls transceiver... */
+#define HRW_SCC_TRANS_EN_N	0x00000001	/* Also controls modem power */
 #define HRW_BAY_POWER_N		0x00000002
 #define HRW_BAY_PCI_ENABLE	0x00000004
 #define HRW_BAY_IDE_ENABLE	0x00000008
@@ -51,7 +51,7 @@
 #define HRW_ARB_BYPASS		0x00400000	/* Disable internal PCI arbitrer */
 #define HRW_IDE1_RESET_N	0x00800000	/* Media bay */
 #define HRW_SLOW_SCC_PCLK	0x01000000	/* ??? (0) */
-#define HRW_MODEM_POWER_N	0x02000000	/* Used by internal modem on wallstreet */
+#define HRW_RESET_SCC		0x02000000
 #define HRW_MFDC_CELL_ENABLE	0x04000000	/* ??? (0) */
 #define HRW_USE_MFDC		0x08000000	/* ??? (0) */
 #define HRW_BMAC_IO_ENABLE	0x60000000	/* two bits, not documented in OF */
@@ -59,10 +59,6 @@
 
 /* We OR those features at boot on desktop G3s */
 #define HRW_DEFAULTS		(HRW_SCCA_IO | HRW_SCCB_IO | HRW_SCC_ENABLE)
-
-/* Those seem to be different on paddington */
-#define PADD_MODEM_POWER_N	0x00000001	/* modem power on paddington */
-#define PADD_RESET_SCC		0x02000000	/* check this please */
 
 /* Looks like Heathrow has some sort of GPIOs as well... */
 #define HRW_GPIO_MODEM_RESET	0x6d

@@ -271,13 +271,10 @@ parse_long:
 				long_slots = 0;
 		}
 
-		for (i = 0; i < 8; i++) {
-			/* see namei.c, msdos_format_name */
-			if (de->name[i] == 0x05)
-				work[i] = 0xE5;
-			else
-				work[i] = de->name[i];
-		}
+		memcpy(work, de->name, sizeof(de->name));
+		/* see namei.c, msdos_format_name */
+		if (work[0] == 0x05)
+			work[0] = 0xE5;
 		for (i = 0, j = 0, last_u = 0; i < 8;) {
 			if (!work[i]) break;
 			chl = fat_shortname2uni(nls_disk, &work[i], 8 - i,
@@ -478,13 +475,10 @@ ParseLong:
 		dotoffset = 1;
 	}
 
-	for (i = 0; i < 8; i++) {
-		/* see namei.c, msdos_format_name */
-		if (de->name[i] == 0x05)
-			work[i] = 0xE5;
-		else
-			work[i] = de->name[i];
-	}
+	memcpy(work, de->name, sizeof(de->name));
+	/* see namei.c, msdos_format_name */
+	if (work[0] == 0x05)
+		work[0] = 0xE5;
 	for (i = 0, j = 0, last = 0, last_u = 0; i < 8;) {
 		if (!(c = work[i])) break;
 		chl = fat_shortname2uni(nls_disk, &work[i], 8 - i,

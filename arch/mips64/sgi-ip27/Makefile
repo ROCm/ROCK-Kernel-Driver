@@ -2,10 +2,7 @@
 # Makefile for the IP27 specific kernel interface routines under Linux.
 #
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
+EXTRA_AFLAGS := $(CFLAGS)
 
 O_TARGET = ip27.o
 

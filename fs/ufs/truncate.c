@@ -35,7 +35,6 @@
 #include <linux/fcntl.h>
 #include <linux/time.h>
 #include <linux/stat.h>
-#include <linux/locks.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
 

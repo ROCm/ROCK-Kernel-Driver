@@ -43,7 +43,6 @@
 
 
 #include <linux/fs.h>
-#include <linux/locks.h>
 #include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
@@ -1155,19 +1154,30 @@ int txCommit(tid_t tid,		/* transaction identifier */
 		jfs_ip = JFS_IP(ip);
 
 		/*
-		 * BUGBUG - Should we call filemap_fdatawrite here instead
-		 * of fsync_inode_data?
-		 * If we do, we have a deadlock condition since we may end
-		 * up recursively calling jfs_get_block with the IWRITELOCK
-		 * held.  We may be able to do away with IWRITELOCK while
-		 * committing transactions and use i_sem instead.
+		 * BUGBUG - This code has temporarily been removed.  The
+		 * intent is to ensure that any file data is written before
+		 * the metadata is committed to the journal.  This prevents
+		 * uninitialized data from appearing in a file after the
+		 * journal has been replayed.  (The uninitialized data
+		 * could be sensitive data removed by another user.)
+		 *
+		 * The problem now is that we are holding the IWRITELOCK
+		 * on the inode, and calling filemap_fdatawrite on an
+		 * unmapped page will cause a deadlock in jfs_get_block.
+		 *
+		 * The long term solution is to pare down the use of
+		 * IWRITELOCK.  We are currently holding it too long.
+		 * We could also be smarter about which data pages need
+		 * to be written before the transaction is committed and
+		 * when we don't need to worry about it at all.
+		 *
+		 * if ((!S_ISDIR(ip->i_mode))
+		 *    && (tblk->flag & COMMIT_DELETE) == 0) {
+		 *	filemap_fdatawait(ip->i_mapping);
+		 *	filemap_fdatawrite(ip->i_mapping);
+		 *	filemap_fdatawait(ip->i_mapping);
+		 * }
 		 */
-		if ((!S_ISDIR(ip->i_mode))
-		    && (tblk->flag & COMMIT_DELETE) == 0) {
-			filemap_fdatawait(ip->i_mapping);
-			filemap_fdatawrite(ip->i_mapping);
-			filemap_fdatawait(ip->i_mapping);
-		}
 
 		/*
 		 * Mark inode as not dirty.  It will still be on the dirty

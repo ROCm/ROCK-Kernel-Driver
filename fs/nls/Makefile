@@ -2,6 +2,9 @@
 # Makefile for native language support
 #
 
+O_TARGET = nls.o
+export-objs := nls_base.o
+
 obj-y	:=	nls_base.o
 obj-m	:=
 obj-n	:=
@@ -52,9 +55,5 @@ obj-$(CONFIG_NLS_KOI8_R)	+= nls_koi8-r.o
 obj-$(CONFIG_NLS_KOI8_U)	+= nls_koi8-u.o nls_koi8-ru.o
 obj-$(CONFIG_NLS_ABC)		+= nls_abc.o
 obj-$(CONFIG_NLS_UTF8)		+= nls_utf8.o
-
-export-objs = $(obj-y)
-
-O_TARGET = nls.o
 
 include $(TOPDIR)/Rules.make

@@ -578,15 +578,19 @@ static int init_irq(struct ata_channel *ch)
 {
 	unsigned long flags;
 	int i;
-	ide_hwgroup_t *hwgroup;
-	ide_hwgroup_t *new_hwgroup;
+	spinlock_t *lock;
+	spinlock_t *new_lock;
+	unsigned long *active;
+	unsigned long *new_active;
 	struct ata_channel *match = NULL;
 
 	/* Spare allocation before sleep. */
-	new_hwgroup = kmalloc(sizeof(*hwgroup), GFP_KERNEL);
+	new_lock = kmalloc(sizeof(*lock), GFP_KERNEL);
+	new_active = kmalloc(sizeof(*active), GFP_KERNEL);
+	*new_active = 0L;
 
 	spin_lock_irqsave(&ide_lock, flags);
-	ch->hwgroup = NULL;
+	ch->lock = NULL;
 
 #if MAX_HWIFS > 1
 	/*
@@ -596,7 +600,7 @@ static int init_irq(struct ata_channel *ch)
 		struct ata_channel *h = &ide_hwifs[i];
 
 		/* scan only initialized channels */
-		if (!h->hwgroup)
+		if (!h->lock)
 			continue;
 
 		if (ch->irq != h->irq)
@@ -606,7 +610,7 @@ static int init_irq(struct ata_channel *ch)
 
 		if (ch->chipset != ide_pci || h->chipset != ide_pci ||
 		     ch->serialized || h->serialized) {
-			if (match && match->hwgroup && match->hwgroup != h->hwgroup)
+			if (match && match->lock && match->lock != h->lock)
 				printk("%s: potential irq problem with %s and %s\n", ch->name, h->name, match->name);
 			/* don't undo a prior perfect match */
 			if (!match || match->irq != ch->irq)
@@ -615,22 +619,22 @@ static int init_irq(struct ata_channel *ch)
 	}
 #endif
 	/*
-	 * If we are still without a hwgroup, then form a new one
+	 * If we are still without a lock group, then form a new one
 	 */
-	if (match) {
-		hwgroup = match->hwgroup;
-		if(new_hwgroup)
-			kfree(new_hwgroup);
-	} else {
-		hwgroup = new_hwgroup;
-		if (!hwgroup) {
+	if (!match) {
+		lock = new_lock;
+		active = new_active;
+		if (!lock) {
 			spin_unlock_irqrestore(&ide_lock, flags);
+
 			return 1;
 		}
-		memset(hwgroup, 0, sizeof(*hwgroup));
-		init_timer(&hwgroup->timer);
-		hwgroup->timer.function = &ide_timer_expiry;
-		hwgroup->timer.data = (unsigned long) hwgroup;
+		spin_lock_init(lock);
+	} else {
+		lock = match->lock;
+		active = match->active;
+		if(new_lock)
+			kfree(new_lock);
 	}
 
 	/*
@@ -647,8 +651,11 @@ static int init_irq(struct ata_channel *ch)
 			OUT_BYTE(0x08, ch->io_ports[IDE_CONTROL_OFFSET]); /* clear nIEN */
 
 		if (request_irq(ch->irq, &ata_irq_request, sa, ch->name, ch)) {
-			if (!match)
-				kfree(hwgroup);
+			if (!match) {
+				kfree(lock);
+				kfree(active);
+			}
+
 			spin_unlock_irqrestore(&ide_lock, flags);
 
 			return 1;
@@ -656,9 +663,15 @@ static int init_irq(struct ata_channel *ch)
 	}
 
 	/*
-	 * Everything is okay. Tag us as member of this hardware group.
+	 * Everything is okay. Tag us as member of this lock group.
 	 */
-	ch->hwgroup = hwgroup;
+	ch->lock = lock;
+	ch->active = active;
+
+	init_timer(&ch->timer);
+	ch->timer.function = &ide_timer_expiry;
+	ch->timer.data = (unsigned long) ch;
+
 	for (i = 0; i < MAX_DRIVES; ++i) {
 		struct ata_device *drive = &ch->drives[i];
 		request_queue_t *q;
@@ -667,8 +680,8 @@ static int init_irq(struct ata_channel *ch)
 		if (!drive->present)
 			continue;
 
-		if (!hwgroup->XXX_drive)
-			hwgroup->XXX_drive = drive;
+		if (!ch->drive)
+			ch->drive = drive;
 
 		/*
 		 * Init the per device request queue
@@ -676,7 +689,7 @@ static int init_irq(struct ata_channel *ch)
 
 		q = &drive->queue;
 		q->queuedata = drive->channel;
-		blk_init_queue(q, do_ide_request, &ide_lock);
+		blk_init_queue(q, do_ide_request, drive->channel->lock);
 		blk_queue_segment_boundary(q, 0xffff);
 
 		/* ATA can do up to 128K per request, pdc4030 needs smaller limit */
@@ -842,7 +855,6 @@ static void channel_init(struct ata_channel *ch)
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		char name[80];
 
-		ide_add_generic_settings(ch->drives + unit);
 		ch->drives[unit].dn = ((ch->unit ? 2 : 0) + unit);
 		sprintf(name, "host%d/bus%d/target%d/lun%d",
 			ch->index, ch->unit, unit, ch->drives[unit].lun);

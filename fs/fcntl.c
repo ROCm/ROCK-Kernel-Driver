@@ -435,7 +435,7 @@ static void send_sigio_to_task(struct task_struct *p,
 			   back to SIGIO in that case. --sct */
 			si.si_signo = fown->signum;
 			si.si_errno = 0;
-		        si.si_code  = reason & ~__SI_MASK;
+		        si.si_code  = reason;
 			/* Make sure we are called with one of the POLL_*
 			   reasons, otherwise we could leak kernel stack into
 			   userspace.  */

@@ -152,13 +152,9 @@ __initcall(flexanet_init);
 
 
 static void __init
-fixup_flexanet(struct machine_desc *desc, struct param_struct *params,
+fixup_flexanet(struct machine_desc *desc, struct tag *tags,
 	      char **cmdline, struct meminfo *mi)
 {
-	int				status;
-	unsigned long	now;
-
-
 	/* fixed RAM size, by now (64MB) */
 	SET_BANK( 0, 0xc0000000, 64*1024*1024 );
 	mi->nr_banks = 1;

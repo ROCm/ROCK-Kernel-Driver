@@ -2,13 +2,9 @@
 # Makefile for Sparc library files..
 #
 
-.S.s:
-	$(CPP) $(AFLAGS) -ansi -DST_DIV0=0x2 $< -o $*.s
-
-.S.o:
-	$(CC) $(AFLAGS) -ansi -DST_DIV0=0x2 -c $< -o $*.o
-
 L_TARGET = lib.a
+
+EXTRA_AFLAGS := -ansi -DST_DIV0=0x02
 
 obj-y := mul.o rem.o sdiv.o udiv.o umul.o urem.o ashrdi3.o memcpy.o memset.o \
          strlen.o checksum.o blockops.o memscan.o memcmp.o strncmp.o \

@@ -10,12 +10,12 @@
 #include <linux/linkage.h>
 #include <linux/time.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/fs.h>
 #include <linux/stat.h>
 #include <linux/fcntl.h>
 #include <linux/net.h>
 #include <linux/in.h>
+#include <linux/namei.h>
 #include <linux/version.h>
 #include <linux/unistd.h>
 #include <linux/slab.h>

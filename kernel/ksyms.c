@@ -21,7 +21,6 @@
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/serial.h>
-#include <linux/locks.h>
 #include <linux/delay.h>
 #include <linux/random.h>
 #include <linux/reboot.h>
@@ -48,6 +47,7 @@
 #include <linux/completion.h>
 #include <linux/seq_file.h>
 #include <linux/binfmts.h>
+#include <linux/namei.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -137,7 +137,6 @@ EXPORT_SYMBOL(fput);
 EXPORT_SYMBOL(fget);
 EXPORT_SYMBOL(igrab);
 EXPORT_SYMBOL(iunique);
-EXPORT_SYMBOL(iget4);
 EXPORT_SYMBOL(iput);
 EXPORT_SYMBOL(inode_init_once);
 EXPORT_SYMBOL(force_delete);
@@ -243,6 +242,8 @@ EXPORT_SYMBOL(shrink_dcache_anon);
 EXPORT_SYMBOL(find_inode_number);
 EXPORT_SYMBOL(is_subdir);
 EXPORT_SYMBOL(get_unused_fd);
+EXPORT_SYMBOL(vfs_read);
+EXPORT_SYMBOL(vfs_write);
 EXPORT_SYMBOL(vfs_create);
 EXPORT_SYMBOL(vfs_mkdir);
 EXPORT_SYMBOL(vfs_mknod);
@@ -258,6 +259,7 @@ EXPORT_SYMBOL(vfs_lstat);
 EXPORT_SYMBOL(lock_rename);
 EXPORT_SYMBOL(unlock_rename);
 EXPORT_SYMBOL(generic_read_dir);
+EXPORT_SYMBOL(generic_fillattr);
 EXPORT_SYMBOL(generic_file_llseek);
 EXPORT_SYMBOL(remote_llseek);
 EXPORT_SYMBOL(no_llseek);
@@ -280,6 +282,9 @@ EXPORT_SYMBOL(__get_lease);
 EXPORT_SYMBOL(lease_get_mtime);
 EXPORT_SYMBOL(lock_may_read);
 EXPORT_SYMBOL(lock_may_write);
+EXPORT_SYMBOL(dcache_dir_open);
+EXPORT_SYMBOL(dcache_dir_close);
+EXPORT_SYMBOL(dcache_dir_lseek);
 EXPORT_SYMBOL(dcache_readdir);
 EXPORT_SYMBOL(simple_statfs);
 EXPORT_SYMBOL(simple_lookup);
@@ -471,6 +476,7 @@ EXPORT_SYMBOL_GPL(idle_cpu);
 EXPORT_SYMBOL_GPL(set_cpus_allowed);
 #endif
 EXPORT_SYMBOL(jiffies);
+EXPORT_SYMBOL(jiffies_64);
 EXPORT_SYMBOL(xtime);
 EXPORT_SYMBOL(do_gettimeofday);
 EXPORT_SYMBOL(do_settimeofday);
@@ -517,6 +523,8 @@ EXPORT_SYMBOL(seq_open);
 EXPORT_SYMBOL(seq_release);
 EXPORT_SYMBOL(seq_read);
 EXPORT_SYMBOL(seq_lseek);
+EXPORT_SYMBOL(single_open);
+EXPORT_SYMBOL(single_release);
 
 /* Program loader interfaces */
 EXPORT_SYMBOL(setup_arg_pages);
@@ -537,7 +545,7 @@ EXPORT_SYMBOL(clear_inode);
 EXPORT_SYMBOL(init_special_inode);
 EXPORT_SYMBOL(__get_hash_table);
 EXPORT_SYMBOL(new_inode);
-EXPORT_SYMBOL(insert_inode_hash);
+EXPORT_SYMBOL(__insert_inode_hash);
 EXPORT_SYMBOL(remove_inode_hash);
 EXPORT_SYMBOL(buffer_insert_list);
 EXPORT_SYMBOL(make_bad_inode);
@@ -567,8 +575,6 @@ EXPORT_SYMBOL(strspn);
 EXPORT_SYMBOL(strsep);
 
 /* software interrupts */
-EXPORT_SYMBOL(tasklet_hi_vec);
-EXPORT_SYMBOL(tasklet_vec);
 EXPORT_SYMBOL(bh_task_vec);
 EXPORT_SYMBOL(init_bh);
 EXPORT_SYMBOL(remove_bh);

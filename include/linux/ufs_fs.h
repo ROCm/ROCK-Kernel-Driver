@@ -31,6 +31,7 @@
 #include <linux/kernel.h>
 #include <linux/time.h>
 #include <linux/stat.h>
+#include <linux/fs.h>
 
 #define UFS_BBLOCK 0
 #define UFS_BBSIZE 8192

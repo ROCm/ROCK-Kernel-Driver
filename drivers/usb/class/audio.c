@@ -1221,6 +1221,7 @@ static int usbout_prepare_desc(struct usbout *u, struct urb *urb)
 		offs += cnt;
 		cp += cnt;
 	}
+	urb->interval = 1;
 	if (err)
 		u->dma.error++;
 	if (u->dma.mapped) {
@@ -1291,6 +1292,7 @@ static int usbout_sync_prepare_desc(struct usbout *u, struct urb *urb)
 		urb->iso_frame_desc[i].length = 3;
 		urb->iso_frame_desc[i].offset = offs;
 	}
+	urb->interval = 1;
 	return 0;
 }
 
@@ -2542,7 +2544,9 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		if (as->usbin.dma.mapped)
 			as->usbin.dma.count &= as->usbin.dma.fragsize-1;
 		spin_unlock_irqrestore(&as->lock, flags);
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
+		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+			return -EFAULT;
+		return 0;
 
 	case SNDCTL_DSP_GETOPTR:
 		if (!(file->f_mode & FMODE_WRITE))
@@ -2554,7 +2558,9 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		if (as->usbout.dma.mapped)
 			as->usbout.dma.count &= as->usbout.dma.fragsize-1;
 		spin_unlock_irqrestore(&as->lock, flags);
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
+		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+			return -EFAULT;
+		return 0;
 
        case SNDCTL_DSP_GETBLKSIZE:
 		if (file->f_mode & FMODE_WRITE) {

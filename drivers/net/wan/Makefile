@@ -5,7 +5,7 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-O_TARGET := wan.o
+O_TARGET := built-in.o
 
 export-objs :=	z85230.o syncppp.o comx.o sdladrv.o cycx_drv.o hdlc_generic.o \
 		dlci.o pc300_drv.o
@@ -51,12 +51,8 @@ obj-$(CONFIG_LANMEDIA)		+=		syncppp.o
 obj-$(CONFIG_SYNCLINK_SYNCPPP)	+=		syncppp.o
 obj-$(CONFIG_X25_ASY)		+= x25_asy.o
 
-subdir-$(CONFIG_LANMEDIA) += lmc
+obj-$(CONFIG_LANMEDIA)		+= lmc/
 
-ifeq ($(CONFIG_LANMEDIA),y)
-  obj-y += lmc/lmc.o
-endif
- 
 obj-$(CONFIG_DLCI)		+= dlci.o 
 obj-$(CONFIG_SDLA)		+= sdla.o
 ifeq ($(CONFIG_WANPIPE_MULTPPP),y)

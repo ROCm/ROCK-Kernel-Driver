@@ -140,7 +140,6 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 /* Free up now-unused memory */
@@ -288,8 +287,6 @@ void __init MMU_init(void)
 		ppc_md.progress("MMU:exit", 0x211);
 
 #ifdef CONFIG_BOOTX_TEXT
-	/* By default, we are no longer mapped */
-	boot_text_mapped = 0;	
 	/* Must be done last, or ppc_md.progress will die. */
 	map_boot_text();
 #endif

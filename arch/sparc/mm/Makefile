@@ -7,8 +7,7 @@
 #
 # Note 2! The CFLAGS definition is now in the main makefile...
 
-.S.o:
-	$(CC) $(AFLAGS) -ansi -c -o $*.o $<
+EXTRA_AFLAGS := -ansi
 
 O_TARGET := mm.o
 obj-y    := fault.o init.o loadmmu.o generic.o extable.o btfixup.o

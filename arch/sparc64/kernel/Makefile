@@ -1,19 +1,10 @@
 # $Id: Makefile,v 1.70 2002/02/09 19:49:30 davem Exp $
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile...
 
 SH = $(CONFIG_SHELL)
 
-.S.s:
-	$(CPP) $(AFLAGS) -ansi $< -o $*.s
-
-.S.o:
-	$(CC) $(AFLAGS) -ansi -c $< -o $*.o
+EXTRA_AFLAGS := -ansi
 
 all: kernel.o head.o init_task.o
 

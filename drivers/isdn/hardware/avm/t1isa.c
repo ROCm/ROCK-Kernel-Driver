@@ -17,8 +17,10 @@
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/capi.h>
+#include <linux/netdevice.h>
 #include <linux/kernelcapi.h>
 #include <linux/init.h>
+#include <linux/pci.h>
 #include <asm/io.h>
 #include <linux/isdn/capicmd.h>
 #include <linux/isdn/capiutil.h>
@@ -34,6 +36,8 @@ MODULE_AUTHOR("Carsten Paeth");
 MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
+
+static struct capi_driver t1isa_driver;
 
 static int hema_irq_table[16] =
 {0,
@@ -174,6 +178,11 @@ static void t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 						card->name);
 			} else {
 				memcpy(skb_put(skb, MsgLen), card->msgbuf, MsgLen);
+				if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3)
+					capilib_data_b3_conf(&cinfo->ncci_head, ApplId,
+							     CAPIMSG_NCCI(skb->data),
+							     CAPIMSG_MSGID(skb->data));
+
 				ctrl->handle_capimsg(ctrl, ApplId, skb);
 			}
 			break;
@@ -184,7 +193,7 @@ static void t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 			NCCI = b1_get_word(card->port);
 			WindowSize = b1_get_word(card->port);
 
-			ctrl->new_ncci(ctrl, ApplId, NCCI, WindowSize);
+			capilib_new_ncci(&cinfo->ncci_head, ApplId, NCCI, WindowSize);
 
 			break;
 
@@ -194,7 +203,7 @@ static void t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 			NCCI = b1_get_word(card->port);
 
 			if (NCCI != 0xffffffff)
-				ctrl->free_ncci(ctrl, ApplId, NCCI);
+				capilib_free_ncci(&cinfo->ncci_head, ApplId, NCCI);
 
 			break;
 
@@ -313,12 +322,13 @@ void t1isa_reset_ctr(struct capi_ctr *ctrl)
 	b1_reset(port);
 
 	memset(cinfo->version, 0, sizeof(cinfo->version));
+	capilib_release(&cinfo->ncci_head);
 	ctrl->reseted(ctrl);
 }
 
-static void t1isa_remove_ctr(struct capi_ctr *ctrl)
+static void t1isa_remove(struct pci_dev *pdev)
 {
-	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
+	avmctrl_info *cinfo = pci_get_drvdata(pdev);
 	avmcard *card = cinfo->card;
 	unsigned int port = card->port;
 
@@ -327,99 +337,81 @@ static void t1isa_remove_ctr(struct capi_ctr *ctrl)
 	b1_reset(port);
 	t1_reset(port);
 
-	detach_capi_ctr(ctrl);
+	detach_capi_ctr(cinfo->capi_ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
 	b1_free_card(card);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------------- */
 
-static int t1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
+static int __init t1isa_probe(struct pci_dev *pdev, int cardnr)
 {
-	struct capi_ctr *ctrl;
-	struct list_head *l;
 	avmctrl_info *cinfo;
 	avmcard *card;
 	int retval;
 
-	MOD_INC_USE_COUNT;
-
 	card = b1_alloc_card(1);
 	if (!card) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
+		printk(KERN_WARNING "%s: no memory.\n", t1isa_driver.name);
 		retval = -ENOMEM;
 		goto err;
 	}
 
 	cinfo = card->ctrlinfo;
-	sprintf(card->name, "t1isa-%x", p->port);
-	card->port = p->port;
-	card->irq = p->irq;
+	card->port = pci_resource_start(pdev, 0);
+	card->irq = pdev->irq;
 	card->cardtype = avm_t1isa;
-	card->cardnr = p->cardnr;
+	card->cardnr = cardnr;
+	sprintf(card->name, "t1isa-%x", card->port);
 
 	if (!(((card->port & 0x7) == 0) && ((card->port & 0x30) != 0x30))) {
 		printk(KERN_WARNING "%s: illegal port 0x%x.\n",
-				driver->name, card->port);
+		       t1isa_driver.name, card->port);
 		retval = -EINVAL;
 		goto err_free;
         }
 	if (hema_irq_table[card->irq & 0xf] == 0) {
 		printk(KERN_WARNING "%s: irq %d not valid.\n",
-		       driver->name, card->irq);
+		       t1isa_driver.name, card->irq);
 		retval = -EINVAL;
 		goto err_free;
 	}
-	list_for_each(l, &driver->contr_head) {
-	        avmcard *cardp;
-
-		ctrl = list_entry(l, struct capi_ctr, driver_list);
-		cardp = ((avmctrl_info *)(ctrl->driverdata))->card;
-		if (cardp->cardnr == card->cardnr) {
-			printk(KERN_WARNING "%s: card with number %d already installed at 0x%x.\n",
-					driver->name, card->cardnr, cardp->port);
-			retval = -EINVAL;
-			goto err_free;
-		}
-	}
 	if (!request_region(card->port, AVMB1_PORTLEN, card->name)) {
-		printk(KERN_WARNING "%s: ports 0x%03x-0x%03x in use.\n",
-		       driver->name, card->port, card->port + AVMB1_PORTLEN);
+		printk(KERN_INFO "%s: ports 0x%03x-0x%03x in use.\n",
+		       t1isa_driver.name, card->port, card->port + AVMB1_PORTLEN);
 		retval = -EBUSY;
 		goto err_free;
 	}
 	retval = request_irq(card->irq, t1isa_interrupt, 0, card->name, card);
 	if (retval) {
-		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
-		       driver->name, card->irq);
+		printk(KERN_INFO "%s: unable to get IRQ %d.\n",
+		       t1isa_driver.name, card->irq);
 		retval = -EBUSY;
 		goto err_release_region;
 	}
 
         if ((retval = t1_detectandinit(card->port, card->irq, card->cardnr)) != 0) {
-		printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
-		       driver->name, card->port, retval);
+		printk(KERN_INFO "%s: NO card at 0x%x (%d)\n",
+		       t1isa_driver.name, card->port, retval);
 		retval = -ENODEV;
 		goto err_free_irq;
 	}
 	t1_disable_irq(card->port);
 	b1_reset(card->port);
 
-	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
+	cinfo->capi_ctrl = attach_capi_ctr(&t1isa_driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
-		printk(KERN_ERR "%s: attach controller failed.\n",
-				driver->name);
+		printk(KERN_INFO "%s: attach controller failed.\n",
+		       t1isa_driver.name);
 		retval = -EBUSY;
 		goto err_free_irq;
 	}
 
-	printk(KERN_INFO
-		"%s: AVM T1 ISA at i/o %#x, irq %d, card %d\n",
-		driver->name, card->port, card->irq, card->cardnr);
+	printk(KERN_INFO "%s: AVM T1 ISA at i/o %#x, irq %d, card %d\n",
+		t1isa_driver.name, card->port, card->irq, card->cardnr);
 
+	pci_set_drvdata(pdev, cinfo);
 	return 0;
 
  err_free_irq:
@@ -429,11 +421,10 @@ static int t1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
  err_free:
 	b1_free_card(card);
  err:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 
-static void t1isa_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
+static u16 t1isa_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
@@ -442,20 +433,36 @@ static void t1isa_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 	u16 len = CAPIMSG_LEN(skb->data);
 	u8 cmd = CAPIMSG_COMMAND(skb->data);
 	u8 subcmd = CAPIMSG_SUBCOMMAND(skb->data);
+	u16 dlen, retval;
 
-	save_flags(flags);
-	cli();
 	if (CAPICMD(cmd, subcmd) == CAPI_DATA_B3_REQ) {
-		u16 dlen = CAPIMSG_DATALEN(skb->data);
+		retval = capilib_data_b3_req(&cinfo->ncci_head,
+					     CAPIMSG_APPID(skb->data),
+					     CAPIMSG_NCCI(skb->data),
+					     CAPIMSG_MSGID(skb->data));
+		if (retval != CAPI_NOERROR) 
+			goto out;
+
+		dlen = CAPIMSG_DATALEN(skb->data);
+
+		save_flags(flags);
+		cli();
 		b1_put_byte(port, SEND_DATA_B3_REQ);
 		t1_put_slice(port, skb->data, len);
 		t1_put_slice(port, skb->data + len, dlen);
+		restore_flags(flags);
 	} else {
+		retval = CAPI_NOERROR;
+
+		save_flags(flags);
+		cli();
 		b1_put_byte(port, SEND_MESSAGE);
 		t1_put_slice(port, skb->data, len);
+		restore_flags(flags);
 	}
-	restore_flags(flags);
-	dev_kfree_skb(skb);
+ out:
+	dev_kfree_skb_any(skb);
+	return retval;
 }
 /* ------------------------------------------------------------- */
 
@@ -484,7 +491,6 @@ static struct capi_driver t1isa_driver = {
 	revision: "0.0",
 	load_firmware: t1isa_load_firmware,
 	reset_ctr: t1isa_reset_ctr,
-	remove_ctr: t1isa_remove_ctr,
 	register_appl: b1_register_appl,
 	release_appl: b1_release_appl,
 	send_message: t1isa_send_message,
@@ -492,36 +498,63 @@ static struct capi_driver t1isa_driver = {
 	procinfo: t1isa_procinfo,
 	ctr_read_proc: b1ctl_read_proc,
 	driver_read_proc: 0,	/* use standard driver_read_proc */
-	
-	add_card: t1isa_add_card,
 };
+
+#define MAX_CARDS 4
+static struct pci_dev isa_dev[MAX_CARDS];
+static int io[MAX_CARDS];
+static int irq[MAX_CARDS];
+static int cardnr[MAX_CARDS];
+
+MODULE_PARM(io, "1-" __MODULE_STRING(MAX_CARDS) "i");
+MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_CARDS) "i");
+MODULE_PARM(cardnr, "1-" __MODULE_STRING(MAX_CARDS) "i");
+MODULE_PARM_DESC(io, "I/O base address(es)");
+MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
+MODULE_PARM_DESC(cardnr, "Card number(s) (as jumpered)");
 
 static int __init t1isa_init(void)
 {
-	struct capi_driver *driver = &t1isa_driver;
-	char *p;
-	int retval = 0;
+	int i, retval;
+	int found = 0;
 
-	MOD_INC_USE_COUNT;
+	b1_set_revision(&t1isa_driver, revision);
+        attach_capi_driver(&t1isa_driver);
 
-	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision));
-		driver->revision[sizeof(driver->revision)-1] = 0;
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
+	for (i = 0; i < MAX_CARDS; i++) {
+		if (!io[i])
+			break;
+
+		isa_dev[i].resource[0].start = io[i];
+		isa_dev[i].irq_resource[0].start = irq[i];
+
+		if (t1isa_probe(&isa_dev[i], cardnr[i]) == 0)
+			found++;
 	}
+	if (found == 0) {
+		retval = -ENODEV;
+		goto err;
+	}
+	retval = 0;
+	goto out;
 
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-
-        attach_capi_driver(driver);
-
-	MOD_DEC_USE_COUNT;
+ err:
+	detach_capi_driver(&t1isa_driver);
+ out:
 	return retval;
 }
 
 static void __exit t1isa_exit(void)
 {
-    detach_capi_driver(&t1isa_driver);
+	int i;
+
+	for (i = 0; i < MAX_CARDS; i++) {
+		if (!io[i])
+			break;
+
+		t1isa_remove(&isa_dev[i]);
+	}
+	detach_capi_driver(&t1isa_driver);
 }
 
 module_init(t1isa_init);

@@ -36,6 +36,16 @@ do { if(CTX_VALID((__vma)->vm_mm->context)) { \
      } \
 } while(0)
 
+#define flush_tlb_vpte_range(__mm, start, end) \
+do { if(CTX_VALID((__mm)->context)) { \
+	unsigned long __start = (start)&PAGE_MASK; \
+	unsigned long __end = PAGE_ALIGN(end); \
+	__flush_tlb_range(CTX_HWBITS((__mm)->context), __start, \
+			  SECONDARY_CONTEXT, __end, PAGE_SIZE, \
+			  (__end - __start)); \
+     } \
+} while(0)
+
 #define flush_tlb_page(vma, page) \
 do { struct mm_struct *__mm = (vma)->vm_mm; \
      if(CTX_VALID(__mm->context)) \
@@ -43,11 +53,18 @@ do { struct mm_struct *__mm = (vma)->vm_mm; \
 			 SECONDARY_CONTEXT); \
 } while(0)
 
+#define flush_tlb_vpte_page(mm, addr) \
+do { struct mm_struct *__mm = (mm); \
+     if(CTX_VALID(__mm->context)) \
+	__flush_tlb_page(CTX_HWBITS(__mm->context), (addr)&PAGE_MASK, \
+			 SECONDARY_CONTEXT); \
+} while(0)
+
 #else /* CONFIG_SMP */
 
 extern void smp_flush_tlb_all(void);
 extern void smp_flush_tlb_mm(struct mm_struct *mm);
-extern void smp_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
+extern void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 				unsigned long end);
 extern void smp_flush_tlb_kernel_range(unsigned long start, unsigned long end);
 extern void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page);
@@ -56,11 +73,15 @@ extern void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page);
 #define flush_tlb_all()		smp_flush_tlb_all()
 #define flush_tlb_mm(mm)	smp_flush_tlb_mm(mm)
 #define flush_tlb_range(vma, start, end) \
-	smp_flush_tlb_range(vma, start, end)
+	smp_flush_tlb_range((vma)->vm_mm, start, end)
+#define flush_tlb_vpte_range(mm, start, end) \
+	smp_flush_tlb_range(mm, start, end)
 #define flush_tlb_kernel_range(start, end) \
 	smp_flush_tlb_kernel_range(start, end)
 #define flush_tlb_page(vma, page) \
 	smp_flush_tlb_page((vma)->vm_mm, page)
+#define flush_tlb_vpte_page(mm, page) \
+	smp_flush_tlb_page((mm), page)
 
 #endif /* ! CONFIG_SMP */
 
@@ -81,13 +102,10 @@ static __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long st
 	vpte_base = (tlb_type == spitfire ?
 		     VPTE_BASE_SPITFIRE :
 		     VPTE_BASE_CHEETAH);
-	{
-		struct vm_area_struct vma;
-		vma.vm_mm = mm;
-		flush_tlb_range(&vma,
-				vpte_base + (s >> (PAGE_SHIFT - 3)),
-				vpte_base + (e >> (PAGE_SHIFT - 3)));
-	}
+
+	flush_tlb_vpte_range(mm,
+			     vpte_base + (s >> (PAGE_SHIFT - 3)),
+			     vpte_base + (e >> (PAGE_SHIFT - 3)));
 }
 
 #endif /* _SPARC64_TLBFLUSH_H */

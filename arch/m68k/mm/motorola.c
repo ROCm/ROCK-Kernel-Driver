@@ -176,7 +176,7 @@ map_chunk (unsigned long addr, long size)
 				pte_dir = kernel_page_table();
 				pmd_set(pmd_dir, pte_dir);
 			}
-			pte_dir = pte_offset(pmd_dir, virtaddr);
+			pte_dir = pte_offset_kernel(pmd_dir, virtaddr);
 
 			if (virtaddr) {
 				if (!pte_present(*pte_dir))
@@ -262,15 +262,13 @@ void __init paging_init(void)
 	 * initialize the bad page table and bad page to point
 	 * to a couple of allocated pages
 	 */
-	empty_bad_page_table = (unsigned long)alloc_bootmem_pages(PAGE_SIZE);
-	empty_bad_page = (unsigned long)alloc_bootmem_pages(PAGE_SIZE);
 	empty_zero_page = (unsigned long)alloc_bootmem_pages(PAGE_SIZE);
 	memset((void *)empty_zero_page, 0, PAGE_SIZE);
 
 	/*
-	 * Set up SFC/DFC registers (user data space)
+	 * Set up SFC/DFC registers
 	 */
-	set_fs (USER_DS);
+	set_fs(KERNEL_DS);
 
 #ifdef DEBUG
 	printk ("before free_area_init\n");

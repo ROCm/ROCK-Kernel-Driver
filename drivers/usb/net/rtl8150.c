@@ -19,6 +19,7 @@
 #include <linux/ethtool.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/usb.h>
+#include <linux/init.h>
 #include <asm/uaccess.h>
 
 /* Version Information */

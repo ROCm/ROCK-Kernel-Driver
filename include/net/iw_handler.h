@@ -245,7 +245,8 @@
 /* Wrapper level flags */
 #define IW_DESCR_FLAG_DUMP	0x0001	/* Not part of the dump command */
 #define IW_DESCR_FLAG_EVENT	0x0002	/* Generate an event on SET */
-#define IW_DESCR_FLAG_RESTRICT	0x0004	/* GET request is ROOT only */
+#define IW_DESCR_FLAG_RESTRICT	0x0004	/* GET : request is ROOT only */
+				/* SET : Omit payload from generated iwevent */
 /* Driver level flags */
 #define IW_DESCR_FLAG_WAIT	0x0100	/* Wait for driver event */
 

@@ -9,8 +9,6 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-USE_STANDARD_AS_RULE	:= true
-
 ifdef CONFIG_PPC64BRIDGE
 EXTRA_AFLAGS		:= -Wa,-mppc64bridge
 endif
@@ -100,25 +98,22 @@ obj-$(CONFIG_PPC_ISERIES)	+= iSeries_misc.o
 
 include $(TOPDIR)/Rules.make
 
-entry.o: entry.S ppc_defs.h
-misc.o: misc.S ppc_defs.h
-l2cr.o: l2cr.S ppc_defs.h
-head.o: head.S ppc_defs.h
-head_4xx.o: head_4xx.S ppc_defs.h
-head_8xx.o: head_8xx.S ppc_defs.h
-iSeries_head.o: iSeries_head.S ppc_defs.h
-iSeries_misc.o: iSeries_misc.S ppc_defs.h
+entry.o: entry.S asm-offsets.h
+misc.o: misc.S asm-offsets.h
+l2cr.o: l2cr.S asm-offsets.h
+head.o: head.S asm-offsets.h
+head_4xx.o: head_4xx.S asm-offsets.h
+head_8xx.o: head_8xx.S asm-offsets.h
+iSeries_head.o: iSeries_head.S asm-offsets.h
+iSeries_misc.o: iSeries_misc.S asm-offsets.h
 
-ppc_defs.h: mk_defs.c ppc_defs.head \
+asm-offsets.h: mk_defs.c asm-offsets.head \
 		$(TOPDIR)/include/asm/mmu.h \
 		$(TOPDIR)/include/asm/processor.h \
 		$(TOPDIR)/include/asm/pgtable.h \
 		$(TOPDIR)/include/asm/ptrace.h
 	$(CC) $(CFLAGS) -S mk_defs.c
-	cp ppc_defs.head ppc_defs.h
-# for bk, this way we can write to the file even if it's not checked out
-	chmod u+w ppc_defs.h
-	grep '^#define' mk_defs.s >> ppc_defs.h
+	(cat asm-offsets.head; grep '^#define' mk_defs.s) >asm-offsets.h
 	rm mk_defs.s
 
 find_name : find_name.c

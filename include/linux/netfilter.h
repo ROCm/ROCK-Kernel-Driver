@@ -158,26 +158,5 @@ extern void nf_invalidate_cache(int pf);
 #define NF_HOOK(pf, hook, skb, indev, outdev, okfn) (okfn)(skb)
 #endif /*CONFIG_NETFILTER*/
 
-/* From arch/i386/kernel/smp.c:
- *
- *	Why isn't this somewhere standard ??
- *
- * Maybe because this procedure is horribly buggy, and does
- * not deserve to live.  Think about signedness issues for five
- * seconds to see why.		- Linus
- */
-
-/* Two signed, return a signed. */
-#define SMAX(a,b) ((ssize_t)(a)>(ssize_t)(b) ? (ssize_t)(a) : (ssize_t)(b))
-#define SMIN(a,b) ((ssize_t)(a)<(ssize_t)(b) ? (ssize_t)(a) : (ssize_t)(b))
-
-/* Two unsigned, return an unsigned. */
-#define UMAX(a,b) ((size_t)(a)>(size_t)(b) ? (size_t)(a) : (size_t)(b))
-#define UMIN(a,b) ((size_t)(a)<(size_t)(b) ? (size_t)(a) : (size_t)(b))
-
-/* Two unsigned, return a signed. */
-#define SUMAX(a,b) ((size_t)(a)>(size_t)(b) ? (ssize_t)(a) : (ssize_t)(b))
-#define SUMIN(a,b) ((size_t)(a)<(size_t)(b) ? (ssize_t)(a) : (ssize_t)(b))
 #endif /*__KERNEL__*/
-
 #endif /*__LINUX_NETFILTER_H*/

@@ -68,10 +68,6 @@ extern char pckbd_unexpected_up(unsigned char keycode);
 extern void pckbd_leds(unsigned char leds);
 extern void pckbd_init_hw(void);
 
-extern int nonpci_ide_default_irq(ide_ioreg_t base);
-extern void nonpci_ide_init_hwif_ports(hw_regs_t * hw, ide_ioreg_t data_port,
-				       ide_ioreg_t ctrl_port, int *irq);
-
 extern void ppc4xx_wdt_heartbeat(void);
 extern int wdt_enable;
 extern unsigned long wdt_period;
@@ -376,11 +372,8 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 **     defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 */
 #ifdef CONFIG_IDE
-# if defined(CONFIG_PCI)
+# ifdef CONFIG_PCI
 	ppc_ide_md.ide_init_hwif = ppc4xx_ide_init_hwif_ports;
-# elif defined (CONFIG_DMA_NONPCI)	/* ON board IDE */
-	ppc_ide_md.default_irq = nonpci_ide_default_irq;
-	ppc_ide_md.ide_init_hwif = nonpci_ide_init_hwif_ports;
 # endif
 #endif
 	board_init();

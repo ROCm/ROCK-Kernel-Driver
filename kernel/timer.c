@@ -67,7 +67,12 @@ unsigned long event;
 
 extern int do_setitimer(int, struct itimerval *, struct itimerval *);
 
-unsigned long volatile jiffies;
+/*
+ * The 64-bit value is not volatile - you MUST NOT read it
+ * without holding read_lock_irq(&xtime_lock).
+ * jiffies is defined in the linker script...
+ */
+u64 jiffies_64;
 
 unsigned int * prof_buffer;
 unsigned long prof_len;
@@ -664,7 +669,7 @@ void timer_bh(void)
 
 void do_timer(struct pt_regs *regs)
 {
-	(*(unsigned long *)&jiffies)++;
+	jiffies_64++;
 #ifndef CONFIG_SMP
 	/* SMP process accounting uses the local APIC timer */
 

@@ -544,13 +544,17 @@ static void hd_request(void)
 {
 	unsigned int dev, block, nsect, sec, track, head, cyl;
 
-	if (!QUEUE_EMPTY && CURRENT->rq_status == RQ_INACTIVE) return;
 	if (DEVICE_INTR)
 		return;
 repeat:
 	del_timer(&device_timer);
 	sti();
-	INIT_REQUEST;
+
+	if (blk_queue_empty(QUEUE)) {
+		CLEAR_INTR;
+		return;
+	}
+
 	if (reset) {
 		cli();
 		reset_hd();

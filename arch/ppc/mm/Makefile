@@ -9,11 +9,11 @@
 #
 # Note 2! The CFLAGS definition is now in the main makefile...
 
-USE_STANDARD_AS_RULE	:= true
-
 ifdef CONFIG_PPC64BRIDGE
 EXTRA_AFLAGS		:= -Wa,-mppc64bridge
 endif
+
+AFLAGS_hashtable.o	+= -I$(TOPDIR)/arch/$(ARCH)/kernel
 
 O_TARGET			:= mm.o
 obj-y				:= fault.o init.o mem_pieces.o extable.o \

@@ -433,13 +433,13 @@ secondary_cpu_start(int cpuid, struct task_struct *idle)
 	return 0;
 }
 
-static int __init
+static struct task_struct * __init
 fork_by_hand(void)
 {
 	/* Don't care about the contents of regs since we'll never
 	   reschedule the forked task. */
 	struct pt_regs regs;
-	return do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0);
+	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0);
 }
 
 /*
@@ -457,12 +457,9 @@ smp_boot_one_cpu(int cpuid, int cpunum)
 	   the other task-y sort of data structures set up like we
 	   wish.  We can't use kernel_thread since we must avoid
 	   rescheduling the child.  */
-	if (fork_by_hand() < 0)
+	idle = fork_by_hand();
+	if (IS_ERR(idle))
 		panic("failed fork for CPU %d", cpuid);
-
-	idle = prev_task(&init_task);
-	if (!idle)
-		panic("No idle process for CPU %d", cpuid);
 
 	init_idle(idle, cpuid);
 	unhash_process(idle);
@@ -871,6 +868,8 @@ smp_send_stop(void)
  *
  * Does not return until remote CPUs are nearly ready to execute <func>
  * or are or have executed.
+ * You must not call this function with disabled interrupts or from a
+ * hardware interrupt handler or from a bottom half handler.
  */
 
 int

@@ -15,7 +15,6 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/file.h>
@@ -610,6 +609,14 @@ smb_statfs(struct super_block *sb, struct statfs *buf)
 	buf->f_type = SMB_SUPER_MAGIC;
 	buf->f_namelen = SMB_MAXPATHLEN;
 	return result;
+}
+
+int smb_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+{
+	int err = smb_revalidate_inode(dentry);
+	if (!err)
+		generic_fillattr(dentry->d_inode, stat);
+	return err;
 }
 
 int

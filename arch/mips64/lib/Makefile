@@ -2,10 +2,7 @@
 # Makefile for MIPS-specific library files..
 #
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
+EXTRA_AFLAGS := $(CFLAGS)
 
 L_TARGET = lib.a
 

@@ -2,11 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-.S.s:
-	$(CPP) $(AFLAGS) $(AFLAGS_KERNEL) -o $*.s $<
-.S.o:
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $*.o $<
-
 all: kernel.o head.o init_task.o
 
 O_TARGET := kernel.o

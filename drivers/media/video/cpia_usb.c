@@ -163,6 +163,11 @@ static void cpia_usb_complete(struct urb *urb)
 			}
 		}
 	}
+
+	/* resubmit */
+	urb->dev = ucpia->dev;
+	if ((i = usb_submit_urb(urb, GFP_ATOMIC)) != 0)
+		printk(KERN_ERR __FUNCTION__ ": usb_submit_urb ret %d\n", i);
 }
 
 static int cpia_usb_open(void *privdata)
@@ -200,7 +205,9 @@ static int cpia_usb_open(void *privdata)
 	ucpia->curbuff = ucpia->buffers[0];
 	ucpia->workbuff = ucpia->buffers[1];
 
-	/* We double buffer the Iso lists */
+	/* We double buffer the Iso lists, and also know the polling
+	 * interval is every frame (1 == (1 << (bInterval -1))).
+	 */
 	urb = usb_alloc_urb(FRAMES_PER_DESC, GFP_KERNEL);
 	if (!urb) {
 		printk(KERN_ERR "cpia_init_isoc: usb_alloc_urb 0\n");
@@ -216,6 +223,7 @@ static int cpia_usb_open(void *privdata)
 	urb->transfer_buffer = ucpia->sbuf[0].data;
 	urb->complete = cpia_usb_complete;
 	urb->number_of_packets = FRAMES_PER_DESC;
+	urb->interval = 1;
 	urb->transfer_buffer_length = FRAME_SIZE_PER_DESC * FRAMES_PER_DESC;
 	for (fx = 0; fx < FRAMES_PER_DESC; fx++) {
 		urb->iso_frame_desc[fx].offset = FRAME_SIZE_PER_DESC * fx;
@@ -237,15 +245,14 @@ static int cpia_usb_open(void *privdata)
 	urb->transfer_buffer = ucpia->sbuf[1].data;
 	urb->complete = cpia_usb_complete;
 	urb->number_of_packets = FRAMES_PER_DESC;
+	urb->interval = 1;
 	urb->transfer_buffer_length = FRAME_SIZE_PER_DESC * FRAMES_PER_DESC;
 	for (fx = 0; fx < FRAMES_PER_DESC; fx++) {
 		urb->iso_frame_desc[fx].offset = FRAME_SIZE_PER_DESC * fx;
 		urb->iso_frame_desc[fx].length = FRAME_SIZE_PER_DESC;
 	}
 
-	ucpia->sbuf[1].urb->next = ucpia->sbuf[0].urb;
-	ucpia->sbuf[0].urb->next = ucpia->sbuf[1].urb;
-	
+	/* queue the ISO urbs, and resubmit in the completion handler */
 	err = usb_submit_urb(ucpia->sbuf[0].urb, GFP_KERNEL);
 	if (err) {
 		printk(KERN_ERR "cpia_init_isoc: usb_submit_urb 0 ret %d\n",

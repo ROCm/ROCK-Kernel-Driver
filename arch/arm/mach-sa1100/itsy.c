@@ -17,7 +17,7 @@
 
 
 static void __init
-fixup_itsy(struct machine_desc *desc, struct param_struct *params,
+fixup_itsy(struct machine_desc *desc, struct tag *tags,
 	   char **cmdline, struct meminfo *mi)
 {
 	SET_BANK( 0, 0xc0000000, 16*1024*1024 );

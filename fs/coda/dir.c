@@ -15,7 +15,6 @@
 #include <linux/file.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
 
@@ -73,8 +72,8 @@ struct inode_operations coda_dir_inode_operations =
 	mknod:		coda_mknod,
 	rename:		coda_rename,
 	permission:	coda_permission,
-        revalidate:	coda_revalidate_inode,
-	setattr:	coda_notify_change,
+        getattr:	coda_getattr,
+	setattr:	coda_setattr,
 };
 
 struct file_operations coda_dir_operations = {
@@ -148,7 +147,6 @@ exit:
 
 int coda_permission(struct inode *inode, int mask)
 {
-	umode_t mode = inode->i_mode;
         int error;
  
 	if (!mask)

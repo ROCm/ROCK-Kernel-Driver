@@ -18,7 +18,6 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/config.h>
-#include <linux/locks.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/init.h>
@@ -27,6 +26,7 @@
 #include <linux/completion.h>
 #include <linux/compiler.h>
 #include <scsi/scsi.h>
+#include <linux/backing-dev.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -100,21 +100,21 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
 }
 
 /**
- * blk_get_ra_pages - get the address of a queue's readahead tunable
+ * blk_get_backing_dev_info - get the address of a queue's backing_dev_info
  * @dev:	device
  *
  * Locates the passed device's request queue and returns the address of its
- * readahead setting.
+ * backing_dev_info
  *
  * Will return NULL if the request queue cannot be located.
  */
-unsigned long *blk_get_ra_pages(struct block_device *bdev)
+struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 {
-	unsigned long *ret = NULL;
+	struct backing_dev_info *ret = NULL;
 	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
 
 	if (q)
-		ret = &q->ra_pages;
+		ret = &q->backing_dev_info;
 	return ret;
 }
 
@@ -153,7 +153,8 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->max_phys_segments = MAX_PHYS_SEGMENTS;
 	q->max_hw_segments = MAX_HW_SEGMENTS;
 	q->make_request_fn = mfn;
-	q->ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
+	q->backing_dev_info.ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
+	q->backing_dev_info.state = 0;
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
 
@@ -520,42 +521,6 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
 						       rq->current_nr_sectors);
 
 	printk("\n");
-}
-
-/*
- * standard prep_rq_fn that builds 10 byte cmds
- */
-int ll_10byte_cmd_build(request_queue_t *q, struct request *rq)
-{
-	int hard_sect = queue_hardsect_size(q);
-	sector_t block = rq->hard_sector / (hard_sect >> 9);
-	unsigned long blocks = rq->hard_nr_sectors / (hard_sect >> 9);
-
-	if (!(rq->flags & REQ_CMD))
-		return 0;
-
-	memset(rq->cmd, 0, sizeof(rq->cmd));
-
-	if (rq_data_dir(rq) == READ)
-		rq->cmd[0] = READ_10;
-	else 
-		rq->cmd[0] = WRITE_10;
-
-	/*
-	 * fill in lba
-	 */
-	rq->cmd[2] = (block >> 24) & 0xff;
-	rq->cmd[3] = (block >> 16) & 0xff;
-	rq->cmd[4] = (block >>  8) & 0xff;
-	rq->cmd[5] = block & 0xff;
-
-	/*
-	 * and transfer length
-	 */
-	rq->cmd[7] = (blocks >> 8) & 0xff;
-	rq->cmd[8] = blocks & 0xff;
-
-	return 0;
 }
 
 void blk_recount_segments(request_queue_t *q, struct bio *bio)
@@ -1417,7 +1382,9 @@ get_rq:
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
 	req->bio = req->biotail = bio;
-	req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
+	if (bio->bi_bdev)
+		req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
+	else	req->rq_dev = NODEV;
 	add_request(q, req, insert_here);
 out:
 	if (freereq)
@@ -1762,9 +1729,8 @@ inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
 {
 	if (rq->flags & REQ_CMD) {
 		rq->hard_sector += nsect;
-		rq->hard_nr_sectors -= nsect;
+		rq->nr_sectors = rq->hard_nr_sectors -= nsect;
 		rq->sector = rq->hard_sector;
-		rq->nr_sectors = rq->hard_nr_sectors;
 
 		rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
 		rq->hard_cur_sectors = rq->current_nr_sectors;
@@ -1941,7 +1907,6 @@ EXPORT_SYMBOL(blk_queue_assign_lock);
 EXPORT_SYMBOL(blk_phys_contig_segment);
 EXPORT_SYMBOL(blk_hw_contig_segment);
 
-EXPORT_SYMBOL(ll_10byte_cmd_build);
 EXPORT_SYMBOL(blk_queue_prep_rq);
 
 EXPORT_SYMBOL(blk_queue_init_tags);

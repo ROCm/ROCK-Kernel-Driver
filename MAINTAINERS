@@ -389,8 +389,14 @@ L:	cycsyn-devel@bazar.conectiva.com.br
 S:	Maintained
 
 CYCLADES ASYNC MUX DRIVER
-P:	Ivan Passos
-M:	ivan@cyclades.com
+P:	Henrique Gobbi
+M:	henrique@cyclades.com
+W:	http://www.cyclades.com/
+S:	Supported
+
+CYCLADES PC300 DRIVER
+P:	Henrique Gobbi
+M:	henrique@cyclades.com
 W:	http://www.cyclades.com/
 S:	Supported
 
@@ -703,7 +709,8 @@ W:	http://www.uni-mainz.de/~langm000/linux.html
 S:	Maintained
 
 IBM ServeRAID RAID DRIVER
-P:	Keith Mitchell
+P: 	Jack Hammer
+P:	Dave Jeffrey	
 M:	ipslinux@us.ibm.com
 W:	http://www.developer.ibm.com/welcome/netfinity/serveraid.html
 S:	Supported 
@@ -1439,6 +1446,14 @@ M:	neilb@cse.unsw.edu.au
 L:	linux-raid@vger.kernel.org
 S:	Maintained
 
+SOFTWARE SUSPEND:
+P:	Gabor Kuti
+M:	seasons@falcon.sch.bme.hu
+M:	seasons@makosteszta.sote.hu
+L:	http://lister.fornax.hu/mailman/listinfo/swsusp
+W:	http://falcon.sch.bme.hu/~seasons/linux
+S:	Maintained
+
 SONIC NETWORK DRIVER
 P:	Thomas Bogendoerfer
 M:	tsbogend@alpha.franken.de
@@ -1717,6 +1732,14 @@ M:	petkan@users.sourceforge.net
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 W:	http://pegasus2.sourceforge.net/
+S:	Maintained
+
+USB SCANNER DRIVER
+P:	Brian Beattie
+M:	beattie@beattie-home.net
+L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+W:	http://www.beattie-home.net/linux
 S:	Maintained
 
 USB SE401 DRIVER

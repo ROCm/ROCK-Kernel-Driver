@@ -2,7 +2,6 @@
 #define AMIGAFFS_H
 
 #include <linux/types.h>
-#include <linux/locks.h>
 
 #include <asm/byteorder.h>
 

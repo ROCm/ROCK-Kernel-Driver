@@ -2,8 +2,6 @@
 # Makefile for i386-specific library files..
 #
 
-USE_STANDARD_AS_RULE	:= true
-
 L_TARGET = lib.a
 
 obj-y = checksum.o old-checksum.o delay.o \

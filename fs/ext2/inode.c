@@ -23,10 +23,10 @@
  */
 
 #include "ext2.h"
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/time.h>
 #include <linux/highuid.h>
+#include <linux/pagemap.h>
 #include <linux/quotaops.h>
 #include <linux/module.h>
 
@@ -41,7 +41,8 @@ static int ext2_update_inode(struct inode * inode, int do_sync);
  */
 void ext2_put_inode (struct inode * inode)
 {
-	ext2_discard_prealloc (inode);
+	if (atomic_read(&inode->i_count) < 2)	/* final iput? */
+		ext2_discard_prealloc (inode);
 }
 
 /*
@@ -583,6 +584,20 @@ static int ext2_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, u
 {
 	return generic_direct_IO(rw, inode, iobuf, blocknr, blocksize, ext2_get_block);
 }
+
+static int
+ext2_writeback_mapping(struct address_space *mapping, int *nr_to_write)
+{
+	int ret;
+	int err;
+
+	ret = write_mapping_buffers(mapping);
+	err = generic_writeback_mapping(mapping, nr_to_write);
+	if (!ret)
+		ret = err;
+	return ret;
+}
+
 struct address_space_operations ext2_aops = {
 	readpage: ext2_readpage,
 	writepage: ext2_writepage,
@@ -591,7 +606,7 @@ struct address_space_operations ext2_aops = {
 	commit_write: generic_commit_write,
 	bmap: ext2_bmap,
 	direct_IO: ext2_direct_IO,
-	writeback_mapping: generic_writeback_mapping,
+	writeback_mapping: ext2_writeback_mapping,
 	vm_writeback: generic_vm_writeback,
 };
 
@@ -860,7 +875,7 @@ do_indirects:
 	}
 	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 	if (IS_SYNC(inode)) {
-		fsync_inode_buffers(inode);
+		sync_mapping_buffers(inode->i_mapping);
 		ext2_sync_inode (inode);
 	} else {
 		mark_inode_dirty(inode);

@@ -132,19 +132,6 @@ static int pdcraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
 			return 0;
 		}
 
-		case HDIO_GETGEO_BIG:
-		{
-			struct hd_big_geometry *loc = (struct hd_big_geometry *) arg;
-			if (!loc) return -EINVAL;
-			if (put_user(raid[minor].geom.heads, (byte *) &loc->heads)) return -EFAULT;
-			if (put_user(raid[minor].geom.sectors, (byte *) &loc->sectors)) return -EFAULT;
-			if (put_user(raid[minor].geom.cylinders, (unsigned int *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)ataraid_gendisk.part[minor(inode->i_rdev)].start_sect,
-				(unsigned long *) &loc->start)) return -EFAULT;
-			return 0;
-		}
-
-			
 		case BLKROSET:
 		case BLKROGET:
 		case BLKSSZGET:

@@ -1,4 +1,4 @@
-/***** vi:set ts=8 sts=8 sw=8:************************************************
+/**** vi:set ts=8 sts=8 sw=8:************************************************
  *
  *  Copyright (C) 1994-1998,2002  Linus Torvalds and authors:
  *
@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/ide.h>
+#include <linux/suspend.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -316,7 +317,7 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 		unsigned long flags;
 		int ret;
 
-		spin_lock_irqsave(&ide_lock, flags);
+		spin_lock_irqsave(drive->channel->lock, flags);
 
 		ret = blk_queue_start_tag(&drive->queue, rq);
 
@@ -325,7 +326,7 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 		if (ata_pending_commands(drive) > drive->max_last_depth)
 			drive->max_last_depth = ata_pending_commands(drive);
 
-		spin_unlock_irqrestore(&ide_lock, flags);
+		spin_unlock_irqrestore(drive->channel->lock, flags);
 
 		if (ret) {
 			BUG_ON(!ata_pending_commands(drive));
@@ -438,13 +439,6 @@ static int set_multcount(struct ata_device *drive, int arg)
 	if (!drive->id)
 		return -EIO;
 
-	/* FIXME: Hmm... just bailing out my be problematic, since there *is*
-	 * activity during boot. For now the same problem persists in
-	 * set_pio_mode() we will have to do something about it soon.
-	 */
-	if (HWGROUP(drive)->handler)
-		return -EBUSY;
-
 	if (arg > drive->id->max_multsect)
 		arg = drive->id->max_multsect;
 
@@ -466,17 +460,8 @@ static int set_multcount(struct ata_device *drive, int arg)
 
 static int set_nowerr(struct ata_device *drive, int arg)
 {
-	if (HWGROUP(drive)->handler)
-		return -EBUSY;
-
 	drive->nowerr = arg;
 	drive->bad_wstat = arg ? BAD_R_STAT : BAD_W_STAT;
-
-	/* FIXME: I'm less then sure that we are under the global request lock here!
-	 */
-#if 0
-	spin_unlock_irq(&ide_lock);
-#endif
 
 	return 0;
 }
@@ -531,8 +516,10 @@ static int set_using_tcq(struct ata_device *drive, int arg)
 {
 	if (!drive->driver)
 		return -EPERM;
+
 	if (!drive->channel->XXX_udma)
 		return -EPERM;
+
 	if (arg == drive->queue_depth && drive->using_tcq)
 		return 0;
 
@@ -568,20 +555,6 @@ static int set_lba_addressing(struct ata_device *drive, int arg)
 	return (probe_lba_addressing(drive, arg));
 }
 
-static void idedisk_add_settings(struct ata_device *drive)
-{
-	struct hd_driveid *id = drive->id;
-
-	ide_add_setting(drive,	"address",		SETTING_RW,					HDIO_GET_ADDRESS,	HDIO_SET_ADDRESS,	TYPE_INTA,	0,	2,				1,	1,	&drive->addressing,	set_lba_addressing);
-	ide_add_setting(drive,	"multcount",		id ? SETTING_RW : SETTING_READ,			HDIO_GET_MULTCOUNT,	HDIO_SET_MULTCOUNT,	TYPE_BYTE,	0,	id ? id->max_multsect : 0,	1,	1,	&drive->mult_count,		set_multcount);
-	ide_add_setting(drive,	"nowerr",		SETTING_RW,					HDIO_GET_NOWERR,	HDIO_SET_NOWERR,	TYPE_BYTE,	0,	1,				1,	1,	&drive->nowerr,			set_nowerr);
-	ide_add_setting(drive,	"wcache",		SETTING_RW,					HDIO_GET_WCACHE,	HDIO_SET_WCACHE,	TYPE_BYTE,	0,	1,				1,	1,	&drive->wcache,			write_cache);
-	ide_add_setting(drive,	"acoustic",		SETTING_RW,					HDIO_GET_ACOUSTIC,	HDIO_SET_ACOUSTIC,	TYPE_BYTE,	0,	254,				1,	1,	&drive->acoustic,		set_acoustic);
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-	ide_add_setting(drive,	"using_tcq",		SETTING_RW,					HDIO_GET_QDMA,		HDIO_SET_QDMA,		TYPE_BYTE,	0,	IDE_MAX_TAG,			1,		1,		&drive->using_tcq,		set_using_tcq);
-#endif
-}
-
 static int idedisk_suspend(struct device *dev, u32 state, u32 level)
 {
 	struct ata_device *drive = dev->driver_data;
@@ -590,12 +563,14 @@ static int idedisk_suspend(struct device *dev, u32 state, u32 level)
 	 * already been done...
 	 */
 
+	BUG_ON(in_interrupt());
+
 	if (level != SUSPEND_SAVE_STATE)
 		return 0;
 
 	/* wait until all commands are finished */
-	printk("ide_disk_suspend()\n");
-	while (HWGROUP(drive)->handler)
+	/* FIXME: waiting for spinlocks should be done instead. */
+	while (drive->channel->handler)
 		yield();
 
 	/* set the drive to standby */
@@ -624,9 +599,6 @@ static int idedisk_resume(struct device *dev, u32 level)
 
 
 /* This is just a hook for the overall driver tree.
- *
- * FIXME: This is soon goig to replace the custom linked list games played up
- * to great extend between the different components of the IDE drivers.
  */
 
 static struct device_driver idedisk_devdrv = {
@@ -782,8 +754,6 @@ static void idedisk_setup(struct ata_device *drive)
 	sector_t capacity;
 	sector_t set_max;
 	int drvid = -1;
-
-	idedisk_add_settings(drive);
 
 	if (id == NULL)
 		return;
@@ -1022,8 +992,164 @@ static int idedisk_cleanup(struct ata_device *drive)
 	return ide_unregister_subdriver(drive);
 }
 
+static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct hd_driveid *id = drive->id;
+
+	switch (cmd) {
+		case HDIO_GET_ADDRESS: {
+			unsigned long val = drive->addressing;
+
+			if (put_user(val, (unsigned long *) arg))
+				return -EFAULT;
+			return 0;
+		}
+
+		case HDIO_SET_ADDRESS: {
+			int val;
+
+			if (arg < 0 || arg > 2)
+				return -EINVAL;
+
+			if (ide_spin_wait_hwgroup(drive))
+				return -EBUSY;
+
+			val = set_lba_addressing(drive, arg);
+			spin_unlock_irq(drive->channel->lock);
+
+			return val;
+		}
+
+		case HDIO_GET_MULTCOUNT: {
+			unsigned long val = drive->mult_count & 0xFF;
+
+			if (put_user(val, (unsigned long *) arg))
+				return -EFAULT;
+			return 0;
+		}
+
+		case HDIO_SET_MULTCOUNT: {
+			int val;
+
+			if (!id)
+				return -EBUSY;
+
+			if (arg < 0 || arg > (id ? id->max_multsect : 0))
+				return -EINVAL;
+
+			if (ide_spin_wait_hwgroup(drive))
+				return -EBUSY;
+
+			val = set_multcount(drive, arg);
+			spin_unlock_irq(drive->channel->lock);
+
+			return val;
+		}
+
+		case HDIO_GET_NOWERR: {
+			unsigned long val = drive->nowerr;
+
+			if (put_user(val, (unsigned long *) arg))
+				return -EFAULT;
+
+			return 0;
+		}
+
+		case HDIO_SET_NOWERR: {
+			int val;
+
+			if (arg < 0 || arg > 1)
+				return -EINVAL;
+
+			if (ide_spin_wait_hwgroup(drive))
+				return -EBUSY;
+
+			val = set_nowerr(drive, arg);
+			spin_unlock_irq(drive->channel->lock);
+
+			return val;
+		}
+
+		case HDIO_GET_WCACHE: {
+			unsigned long val = drive->wcache;
+
+			if (put_user(val, (unsigned long *) arg))
+				return -EFAULT;
+
+			return 0;
+		}
+
+		case HDIO_SET_WCACHE: {
+			int val;
+
+			if (arg < 0 || arg > 1)
+				return -EINVAL;
+
+			if (ide_spin_wait_hwgroup(drive))
+				return -EBUSY;
+
+			val = write_cache(drive, arg);
+			spin_unlock_irq(drive->channel->lock);
+
+			return val;
+		}
+
+		case HDIO_GET_ACOUSTIC: {
+			unsigned long val = drive->acoustic;
+
+			if (put_user(val, (u8 *) arg))
+				return -EFAULT;
+			return 0;
+		}
+
+		case HDIO_SET_ACOUSTIC: {
+			int val;
+
+			if (arg < 0 || arg > 254)
+				return -EINVAL;
+
+			if (ide_spin_wait_hwgroup(drive))
+				return -EBUSY;
+
+			val = set_acoustic(drive, arg);
+			spin_unlock_irq(drive->channel->lock);
+
+			return val;
+		}
+
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+		case HDIO_GET_QDMA: {
+			u8 val = drive->using_tcq;
+
+			if (put_user(val, (u8 *) arg))
+				return -EFAULT;
+
+			return 0;
+		}
+
+		case HDIO_SET_QDMA: {
+			int val;
+
+			if (arg < 0 || arg > IDE_MAX_TAG)
+				return -EINVAL;
+
+			if (ide_spin_wait_hwgroup(drive))
+				return -EBUSY;
+
+			val = set_using_tcq(drive, arg);
+			spin_unlock_irq(drive->channel->lock);
+
+			return val;
+		}
+#endif
+		default:
+			return -EINVAL;
+	}
+}
+
+
 /*
- *      IDE subdriver functions, registered with ide.c
+ * Subdriver functions.
  */
 static struct ata_operations idedisk_driver = {
 	owner:			THIS_MODULE,
@@ -1031,7 +1157,7 @@ static struct ata_operations idedisk_driver = {
 	standby:		idedisk_standby,
 	do_request:		idedisk_do_request,
 	end_request:		NULL,
-	ioctl:			NULL,
+	ioctl:			idedisk_ioctl,
 	open:			idedisk_open,
 	release:		idedisk_release,
 	check_media_change:	idedisk_check_media_change,
@@ -1048,11 +1174,9 @@ static void __exit idedisk_exit (void)
 
 	while ((drive = ide_scan_devices(ATA_DISK, "ide-disk", &idedisk_driver, failed)) != NULL) {
 		if (idedisk_cleanup (drive)) {
-			printk (KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
+			printk(KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
+			++failed;
 		}
-		/* We must remove proc entries defined in this module.
-		   Otherwise we oops while accessing these entries */
 	}
 }
 
@@ -1073,10 +1197,11 @@ int idedisk_init(void)
 			idedisk_cleanup(drive);
 			continue;
 		}
-		failed--;
+		--failed;
 	}
 	revalidate_drives();
 	MOD_DEC_USE_COUNT;
+
 	return 0;
 }
 

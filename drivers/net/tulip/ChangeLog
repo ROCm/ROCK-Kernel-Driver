@@ -1,3 +1,13 @@
+2002-05-11  Juan Quintela  <quintela@mandrakesoft.com>
+
+	* 21142.c (t21142_lnk_change): Revert earlier patch
+	to always reset phy; only conditionally do so now.
+
+2002-05-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core (tulip_pci_tbl): Add new "comet"
+	pci id.  Contributed by Ohta Kyuma.
+
 2002-03-07  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
 	* tulip_core (tulip_mwi_config): Use new PCI API functions

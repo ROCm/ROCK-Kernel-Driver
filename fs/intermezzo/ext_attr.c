@@ -14,7 +14,6 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/unistd.h>
 
 #include <asm/system.h>
@@ -105,9 +104,8 @@ int presto_set_ext_attr(struct inode *inode,
                         printk("InterMezzo: out of memory!!!\n");
                         return -ENOMEM;
                 }
-                error = copy_from_user(buf, buffer, buffer_len);
-                if (error) 
-                        return error;
+                if (copy_from_user(buf, buffer, buffer_len))
+                        return -EFAULT;
             } else 
                 buf = buffer;
         } else

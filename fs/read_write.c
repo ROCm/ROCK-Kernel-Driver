@@ -162,57 +162,107 @@ bad:
 }
 #endif
 
-asmlinkage ssize_t sys_read(unsigned int fd, char * buf, size_t count)
+ssize_t vfs_read(struct file *file, char *buf, size_t count, loff_t *pos)
 {
+	struct inode *inode = file->f_dentry->d_inode;
 	ssize_t ret;
-	struct file * file;
 
-	ret = -EBADF;
-	file = fget(fd);
-	if (file) {
-		if (file->f_mode & FMODE_READ) {
-			ret = locks_verify_area(FLOCK_VERIFY_READ, file->f_dentry->d_inode,
-						file, file->f_pos, count);
-			if (!ret) {
-				ssize_t (*read)(struct file *, char *, size_t, loff_t *);
-				ret = -EINVAL;
-				if (file->f_op && (read = file->f_op->read) != NULL)
-					ret = read(file, buf, count, &file->f_pos);
-			}
-		}
+	if (!(file->f_mode & FMODE_READ))
+		return -EBADF;
+	if (!file->f_op || !file->f_op->read)
+		return -EINVAL;
+	if (pos < 0)
+		return -EINVAL;
+
+	ret = locks_verify_area(FLOCK_VERIFY_READ, inode, file, *pos, count);
+	if (!ret) {
+		ret = file->f_op->read(file, buf, count, pos);
 		if (ret > 0)
 			dnotify_parent(file->f_dentry, DN_ACCESS);
+	}
+
+	return ret;
+}
+
+ssize_t vfs_write(struct file *file, const char *buf, size_t count, loff_t *pos)
+{
+	struct inode *inode = file->f_dentry->d_inode;
+	ssize_t ret;
+
+	if (!(file->f_mode & FMODE_WRITE))
+		return -EBADF;
+	if (!file->f_op || !file->f_op->write)
+		return -EINVAL;
+	if (pos < 0)
+		return -EINVAL;
+
+	ret = locks_verify_area(FLOCK_VERIFY_WRITE, inode, file, *pos, count);
+	if (!ret) {
+		ret = file->f_op->write(file, buf, count, pos);
+		if (ret > 0)
+			dnotify_parent(file->f_dentry, DN_MODIFY);
+	}
+
+	return ret;
+}
+
+asmlinkage ssize_t sys_read(unsigned int fd, char * buf, size_t count)
+{
+	struct file *file;
+	ssize_t ret = -EBADF;
+
+	file = fget(fd);
+	if (file) {
+		ret = vfs_read(file, buf, count, &file->f_pos);
 		fput(file);
 	}
+
 	return ret;
 }
 
 asmlinkage ssize_t sys_write(unsigned int fd, const char * buf, size_t count)
 {
-	ssize_t ret;
-	struct file * file;
+	struct file *file;
+	ssize_t ret = -EBADF;
 
-	ret = -EBADF;
 	file = fget(fd);
 	if (file) {
-		if (file->f_mode & FMODE_WRITE) {
-			struct inode *inode = file->f_dentry->d_inode;
-			ret = locks_verify_area(FLOCK_VERIFY_WRITE, inode, file,
-				file->f_pos, count);
-			if (!ret) {
-				ssize_t (*write)(struct file *, const char *, size_t, loff_t *);
-				ret = -EINVAL;
-				if (file->f_op && (write = file->f_op->write) != NULL)
-					ret = write(file, buf, count, &file->f_pos);
-			}
-		}
-		if (ret > 0)
-			dnotify_parent(file->f_dentry, DN_MODIFY);
+		ret = vfs_write(file, buf, count, &file->f_pos);
 		fput(file);
 	}
+
 	return ret;
 }
 
+asmlinkage ssize_t sys_pread(unsigned int fd, char *buf,
+			     size_t count, loff_t pos)
+{
+	struct file *file;
+	ssize_t ret = -EBADF;
+
+	file = fget(fd);
+	if (file) {
+		ret = vfs_read(file, buf, count, &pos);
+		fput(file);
+	}
+
+	return ret;
+}
+
+asmlinkage ssize_t sys_pwrite(unsigned int fd, const char *buf,
+			      size_t count, loff_t pos)
+{
+	struct file *file;
+	ssize_t ret = -EBADF;
+
+	file = fget(fd);
+	if (file) {
+		ret = vfs_write(file, buf, count, &pos);
+		fput(file);
+	}
+
+	return ret;
+}
 
 static ssize_t do_readv_writev(int type, struct file *file,
 			       const struct iovec * vector,
@@ -352,73 +402,6 @@ asmlinkage ssize_t sys_writev(unsigned long fd, const struct iovec * vector,
 		ret = do_readv_writev(VERIFY_READ, file, vector, count);
 	fput(file);
 
-bad_file:
-	return ret;
-}
-
-/* From the Single Unix Spec: pread & pwrite act like lseek to pos + op +
-   lseek back to original location.  They fail just like lseek does on
-   non-seekable files.  */
-
-asmlinkage ssize_t sys_pread(unsigned int fd, char * buf,
-			     size_t count, loff_t pos)
-{
-	ssize_t ret;
-	struct file * file;
-	ssize_t (*read)(struct file *, char *, size_t, loff_t *);
-
-	ret = -EBADF;
-	file = fget(fd);
-	if (!file)
-		goto bad_file;
-	if (!(file->f_mode & FMODE_READ))
-		goto out;
-	ret = locks_verify_area(FLOCK_VERIFY_READ, file->f_dentry->d_inode,
-				file, pos, count);
-	if (ret)
-		goto out;
-	ret = -EINVAL;
-	if (!file->f_op || !(read = file->f_op->read))
-		goto out;
-	if (pos < 0)
-		goto out;
-	ret = read(file, buf, count, &pos);
-	if (ret > 0)
-		dnotify_parent(file->f_dentry, DN_ACCESS);
-out:
-	fput(file);
-bad_file:
-	return ret;
-}
-
-asmlinkage ssize_t sys_pwrite(unsigned int fd, const char * buf,
-			      size_t count, loff_t pos)
-{
-	ssize_t ret;
-	struct file * file;
-	ssize_t (*write)(struct file *, const char *, size_t, loff_t *);
-
-	ret = -EBADF;
-	file = fget(fd);
-	if (!file)
-		goto bad_file;
-	if (!(file->f_mode & FMODE_WRITE))
-		goto out;
-	ret = locks_verify_area(FLOCK_VERIFY_WRITE, file->f_dentry->d_inode,
-				file, pos, count);
-	if (ret)
-		goto out;
-	ret = -EINVAL;
-	if (!file->f_op || !(write = file->f_op->write))
-		goto out;
-	if (pos < 0)
-		goto out;
-
-	ret = write(file, buf, count, &pos);
-	if (ret > 0)
-		dnotify_parent(file->f_dentry, DN_MODIFY);
-out:
-	fput(file);
 bad_file:
 	return ret;
 }

@@ -168,6 +168,8 @@ void __init visws_get_board_type_and_rev(void);
 static int disable_x86_serial_nr __initdata = 1;
 static int disable_x86_fxsr __initdata = 0;
 
+extern unsigned long saved_videomode;
+
 /*
  * This is set up by the setup-routine at boot-time
  */
@@ -182,6 +184,7 @@ static int disable_x86_fxsr __initdata = 0;
 #define SYS_DESC_TABLE (*(struct sys_desc_table_struct*)(PARAM+0xa0))
 #define MOUNT_ROOT_RDONLY (*(unsigned short *) (PARAM+0x1F2))
 #define RAMDISK_FLAGS (*(unsigned short *) (PARAM+0x1F8))
+#define VIDEO_MODE (*(unsigned short *) (PARAM+0x1FA))
 #define ORIG_ROOT_DEV (*(unsigned short *) (PARAM+0x1FC))
 #define AUX_DEVICE_INFO (*(unsigned char *) (PARAM+0x1FF))
 #define LOADER_TYPE (*(unsigned char *) (PARAM+0x210))
@@ -681,6 +684,10 @@ void __init setup_arch(char **cmdline_p)
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
 	apm_info.bios = APM_BIOS_INFO;
+#ifdef CONFIG_ACPI_SLEEP
+	saved_videomode = VIDEO_MODE;
+	printk("Video mode to be used for restore is %lx\n", saved_videomode);
+#endif
 	if( SYS_DESC_TABLE.length != 0 ) {
 		MCA_bus = SYS_DESC_TABLE.table[3] &0x2;
 		machine_id = SYS_DESC_TABLE.table[0];
@@ -1226,7 +1233,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 			 * here.
 			 */
 			if (c->x86_model == 6 || c->x86_model == 7) {
-				if (!test_bit(X86_FEATURE_XMM, c->x86_capability)) {
+				if (!cpu_has(c, X86_FEATURE_XMM)) {
 					printk(KERN_INFO "Enabling disabled K7/SSE Support.\n");
 					rdmsr(MSR_K7_HWCR, l, h);
 					l &= ~0x00008000;
@@ -2153,12 +2160,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		strcpy(c->x86_model_id, p);
 	
 #ifdef CONFIG_SMP
-	/* PGE CPUID bug: Pentium4 supports PGE, but seems to have SMP bugs.. */
-	if ( c->x86 == 15 )
-		clear_bit(X86_FEATURE_PGE, c->x86_capability);
-
-
-	if (test_bit(X86_FEATURE_HT, c->x86_capability)) {
+	if (cpu_has(c, X86_FEATURE_HT)) {
 		extern	int phys_proc_id[NR_CPUS];
 		
 		u32 	eax, ebx, ecx, edx;
@@ -2327,8 +2329,7 @@ static int __init deep_magic_nexgen_probe(void)
 
 static void __init squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 {
-	if( test_bit(X86_FEATURE_PN, c->x86_capability) &&
-	    disable_x86_serial_nr ) {
+	if (cpu_has(c, X86_FEATURE_PN) && disable_x86_serial_nr ) {
 		/* Disable processor serial number */
 		unsigned long lo,hi;
 		rdmsr(MSR_IA32_BBL_CR_CTL,lo,hi);
@@ -2765,7 +2766,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	else
 		seq_printf(m, "stepping\t: unknown\n");
 
-	if ( test_bit(X86_FEATURE_TSC, c->x86_capability) ) {
+	if ( cpu_has(c, X86_FEATURE_TSC) ) {
 		seq_printf(m, "cpu MHz\t\t: %lu.%03lu\n",
 			cpu_khz / 1000, (cpu_khz % 1000));
 	}

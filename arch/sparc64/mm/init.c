@@ -341,7 +341,6 @@ void show_mem(void)
 #ifndef CONFIG_SMP
 	printk("%d entries in page dir cache\n",pgd_cache_size);
 #endif	
-	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 void mmu_info(struct seq_file *m)
@@ -1704,7 +1703,7 @@ void __init mem_init(void)
 	max_mapnr = last_valid_pfn - pfn_base;
 	high_memory = __va(last_valid_pfn << PAGE_SHIFT);
 
-	num_physpages = free_all_bootmem() - 1;
+	totalram_pages = num_physpages = free_all_bootmem() - 1;
 
 	/*
 	 * Set up the zero page, mark it reserved, so that page count
@@ -1737,6 +1736,7 @@ void __init mem_init(void)
 		addr += alias_base;
 		free_pgd_fast((pgd_t *)addr);
 		num_physpages++;
+		totalram_pages++;
 	}
 #endif
 
@@ -1773,6 +1773,7 @@ void free_initmem (void)
 		set_page_count(p, 1);
 		__free_page(p);
 		num_physpages++;
+		totalram_pages++;
 	}
 }
 
@@ -1788,6 +1789,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 		set_page_count(p, 1);
 		__free_page(p);
 		num_physpages++;
+		totalram_pages++;
 	}
 }
 #endif

@@ -41,7 +41,7 @@ ENTRY(ia32_clone)
 	mov out3=16				// stacksize (compensates for 16-byte scratch area)
 	adds out2=IA64_SWITCH_STACK_SIZE+16,sp	// out2 = &regs
 	zxt4 out0=in0				// out0 = clone_flags
-	br.call.sptk.many rp=do_fork
+	br.call.sptk.many rp=do_fork_WITHOUT_CLONE_IDLETASK		// FIXME: mask out CLONE_IDLETASK from flags, and return value now task_struct *.
 .ret0:	.restore sp
 	adds sp=IA64_SWITCH_STACK_SIZE,sp	// pop the switch stack
 	mov ar.pfs=loc1
@@ -167,7 +167,7 @@ GLOBAL_ENTRY(sys32_fork)
 	mov out1=0
 	mov out3=0
 	adds out2=IA64_SWITCH_STACK_SIZE+16,sp	// out2 = &regs
-	br.call.sptk.few rp=do_fork
+	br.call.sptk.few rp=do_fork_FIXME_RETURNS_TASK_STRUCT
 .ret5:	mov ar.pfs=loc1
 	.restore sp
 	adds sp=IA64_SWITCH_STACK_SIZE,sp	// pop the switch stack

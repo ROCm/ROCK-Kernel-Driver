@@ -1553,7 +1553,7 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
 		if (u > devinfo.bsize) {
 			u = devinfo.bsize;
 		}
-		ret = copy_to_user(devinfo.buf, cp->dev_desc, u);
+		ret = copy_to_user(devinfo.buf, cp->dev_desc, u) ? -EFAULT : 0;
 		break;
 
 	/* get the max. string descriptor length */
@@ -1803,7 +1803,7 @@ write_again:
 		wake_up (&cp->bufferwait);
 		up (&cp->mutex);
 		up (&ccp->mutex);
-		return -EIO;
+		return -EFAULT;
 	}
 
 	/* set the header byte */

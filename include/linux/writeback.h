@@ -13,20 +13,27 @@ extern struct list_head inode_in_use;
 extern struct list_head inode_unused;
 
 /*
+ * Yes, writeback.h requires sched.h
+ * No, sched.h is not included from here.
+ */
+static inline int current_is_pdflush(void)
+{
+	return current->flags & PF_FLUSHER;
+}
+
+/*
  * fs/fs-writeback.c
  */
 #define WB_SYNC_NONE	0	/* Don't wait on anything */
 #define WB_SYNC_LAST	1	/* Wait on the last-written mapping */
 #define WB_SYNC_ALL	2	/* Wait on every mapping */
+#define WB_SYNC_HOLD	3	/* Hold the inode on sb_dirty for sys_sync() */
 
-void try_to_writeback_unused_inodes(unsigned long pexclusive);
-void writeback_single_inode(struct inode *inode,
-				int sync, int *nr_to_write);
 void writeback_unlocked_inodes(int *nr_to_write, int sync_mode,
 				unsigned long *older_than_this);
-void writeback_inodes_sb(struct super_block *);
 void __wait_on_inode(struct inode * inode);
-void sync_inodes(void);
+void sync_inodes_sb(struct super_block *, int wait);
+void sync_inodes(int wait);
 
 static inline void wait_on_inode(struct inode *inode)
 {
@@ -37,17 +44,9 @@ static inline void wait_on_inode(struct inode *inode)
 /*
  * mm/page-writeback.c
  */
-/*
- * How much data to write out at a time in various places.  This isn't
- * really very important - it's just here to prevent any thread from
- * locking an inode for too long and blocking other threads which wish
- * to write the same file for allocation throttling purposes.
- */
-#define WRITEOUT_PAGES	((4096 * 1024) / PAGE_CACHE_SIZE)
-
 void balance_dirty_pages(struct address_space *mapping);
 void balance_dirty_pages_ratelimited(struct address_space *mapping);
-int pdflush_flush(unsigned long nr_pages);
 int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);
+int writeback_mapping(struct address_space *mapping, int *nr_to_write);
 
 #endif		/* WRITEBACK_H */

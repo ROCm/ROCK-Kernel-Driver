@@ -4,6 +4,7 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/utsname.h>
@@ -347,6 +348,16 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void * arg)
 		machine_restart(buffer);
 		break;
 
+#ifdef CONFIG_SOFTWARE_SUSPEND
+	case LINUX_REBOOT_CMD_SW_SUSPEND:
+		if(!software_suspend_enabled)
+			return -EAGAIN;
+		
+		software_suspend();
+		do_exit(0);
+		break;
+#endif
+
 	default:
 		unlock_kernel();
 		return -EINVAL;
@@ -679,8 +690,8 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 			wmb();
 		}
 		current->euid = euid;
-		current->fsuid = euid;
 	}
+	current->fsuid = current->euid;
 	if (suid != (uid_t) -1)
 		current->suid = suid;
 
@@ -725,8 +736,8 @@ asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 			wmb();
 		}
 		current->egid = egid;
-		current->fsgid = egid;
 	}
+	current->fsgid = current->egid;
 	if (rgid != (gid_t) -1)
 		current->gid = rgid;
 	if (sgid != (gid_t) -1)

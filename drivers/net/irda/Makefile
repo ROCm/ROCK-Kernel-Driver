@@ -6,7 +6,7 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-O_TARGET := irda.o
+O_TARGET := built-in.o
 
 export-objs	= irport.o
 

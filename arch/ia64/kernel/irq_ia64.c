@@ -14,7 +14,7 @@
 
 #include <linux/config.h>
 
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>

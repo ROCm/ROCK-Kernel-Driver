@@ -118,7 +118,6 @@ if [ "$CONFIG_ETRAX_IDE" = "y" ]; then
 	define_bool CONFIG_BLK_DEV_IDECD y
 
 	define_bool CONFIG_BLK_DEV_IDEDMA y
-	define_bool CONFIG_DMA_NONPCI y
 	
 	int 'Delay for drives to regain consciousness' CONFIG_ETRAX_IDE_DELAY 15
 	

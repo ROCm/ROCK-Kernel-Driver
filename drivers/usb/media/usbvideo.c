@@ -970,7 +970,7 @@ static void usbvideo_Disconnect(struct usb_device *dev, void *ptr)
 	for (i=0; i < USBVIDEO_NUMSBUF; i++)
 		usb_free_urb(uvd->sbuf[i].urb);
 
-	usb_dec_dev_use(uvd->dev);
+	usb_put_dev(uvd->dev);
 	uvd->dev = NULL;    	    /* USB device is no more */
 
 	video_unregister_device(&uvd->vdev);
@@ -1176,7 +1176,7 @@ int usbvideo_RegisterVideoDevice(uvd_t *uvd)
 	}
 #endif
 
-	usb_inc_dev_use(uvd->dev);
+	usb_get_dev(uvd->dev);
 	return 0;
 }
 

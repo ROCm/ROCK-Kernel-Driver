@@ -47,8 +47,6 @@ static void b1pcmcia_remove_ctr(struct capi_ctr *ctrl)
 	detach_capi_ctr(ctrl);
 	free_irq(card->irq, card);
 	b1_free_card(card);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------------- */
@@ -62,8 +60,6 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 	avmcard *card;
 	char *cardname;
 	int retval;
-
-	MOD_INC_USE_COUNT;
 
 	card = b1_alloc_card(1);
 	if (!card) {
@@ -123,7 +119,6 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
  err_free:
 	b1_free_card(card);
  err:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 
@@ -153,7 +148,6 @@ static struct capi_driver b1pcmcia_driver = {
 	revision: "0.0",
 	load_firmware: b1_load_firmware,
 	reset_ctr: b1_reset_ctr,
-	remove_ctr: b1pcmcia_remove_ctr,
 	register_appl: b1_register_appl,
 	release_appl: b1_release_appl,
 	send_message: b1_send_message,
@@ -161,8 +155,6 @@ static struct capi_driver b1pcmcia_driver = {
 	procinfo: b1pcmcia_procinfo,
 	ctr_read_proc: b1ctl_read_proc,
 	driver_read_proc: 0,	/* use standard driver_read_proc */
-
-	add_card: 0,
 };
 
 /* ------------------------------------------------------------- */
@@ -208,30 +200,15 @@ EXPORT_SYMBOL(b1pcmcia_delcard);
 
 static int __init b1pcmcia_init(void)
 {
-	struct capi_driver *driver = &b1pcmcia_driver;
-	char *p;
-	int retval = 0;
+	b1_set_revision(&b1pcmcia_driver, revision);
+        attach_capi_driver(&b1pcmcia_driver);
 
-	MOD_INC_USE_COUNT;
-
-	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision));
-		driver->revision[sizeof(driver->revision)-1] = 0;
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
-	}
-
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-
-        attach_capi_driver(driver);
-
-	MOD_DEC_USE_COUNT;
-	return retval;
+	return 0;
 }
 
 static void __exit b1pcmcia_exit(void)
 {
-    detach_capi_driver(&b1pcmcia_driver);
+	detach_capi_driver(&b1pcmcia_driver);
 }
 
 module_init(b1pcmcia_init);

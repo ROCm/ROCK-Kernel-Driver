@@ -33,7 +33,6 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/quotaops.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 
 static inline int udf_match(int len, const char * const name, struct qstr *qs)

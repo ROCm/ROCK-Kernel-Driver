@@ -160,6 +160,7 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 		put_page(page);
 		len -= bytes;
 		buf += bytes;
+		addr += bytes;
 	}
 	up_read(&mm->mmap_sem);
 	mmput(mm);

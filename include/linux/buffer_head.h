@@ -29,6 +29,7 @@ enum bh_state_bits {
 struct page;
 struct kiobuf;
 struct buffer_head;
+struct address_space;
 typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
 
 /*
@@ -44,13 +45,13 @@ struct buffer_head {
 	struct page *b_page;		/* the page this bh is mapped to */
 
 	sector_t b_blocknr;		/* block number */
-	unsigned short b_size;		/* block size */
+	u32 b_size;			/* block size */
 	char *b_data;			/* pointer to data block */
 
 	struct block_device *b_bdev;
 	bh_end_io_t *b_end_io;		/* I/O completion */
  	void *b_private;		/* reserved for b_end_io */
-	struct list_head     b_inode_buffers; /* list of inode dirty buffers */
+	struct list_head b_assoc_buffers; /* associated with another mapping */
 };
 
 
@@ -145,12 +146,19 @@ int try_to_free_buffers(struct page *);
 void create_empty_buffers(struct page *, unsigned long,
 			unsigned long b_state);
 void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
+
+/* Things to do with buffers at mapping->private_list */
 void buffer_insert_list(spinlock_t *lock,
 			struct buffer_head *, struct list_head *);
+void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode);
+int write_mapping_buffers(struct address_space *mapping);
+int inode_has_buffers(struct inode *);
+void invalidate_inode_buffers(struct inode *);
+int fsync_buffers_list(spinlock_t *lock, struct list_head *);
+int sync_mapping_buffers(struct address_space *mapping);
 
 void mark_buffer_async_read(struct buffer_head *bh);
 void mark_buffer_async_write(struct buffer_head *bh);
-void invalidate_inode_buffers(struct inode *);
 void invalidate_bdev(struct block_device *, int);
 void __invalidate_buffers(kdev_t dev, int);
 int sync_blockdev(struct block_device *bdev);
@@ -161,8 +169,6 @@ int fsync_dev(kdev_t);
 int fsync_bdev(struct block_device *);
 int fsync_super(struct super_block *);
 int fsync_no_super(struct block_device *);
-int fsync_buffers_list(spinlock_t *lock, struct list_head *);
-int inode_has_buffers(struct inode *);
 struct buffer_head *__get_hash_table(struct block_device *, sector_t, int);
 struct buffer_head * __getblk(struct block_device *, sector_t, int);
 void __brelse(struct buffer_head *);
@@ -217,14 +223,6 @@ static inline void put_bh(struct buffer_head *bh)
         atomic_dec(&bh->b_count);
 }
 
-static inline void
-mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
-{
-	mark_buffer_dirty(bh);
-	buffer_insert_list(&inode->i_bufferlist_lock,
-			bh, &inode->i_dirty_buffers);
-}
-
 /*
  * If an error happens during the make_request, this function
  * has to be recalled. It marks the buffer as clean and not
@@ -243,11 +241,6 @@ static inline void buffer_IO_error(struct buffer_head * bh)
 	bh->b_end_io(bh, buffer_uptodate(bh));
 }
 
-static inline int fsync_inode_buffers(struct inode *inode)
-{
-	return fsync_buffers_list(&inode->i_bufferlist_lock,
-				&inode->i_dirty_buffers);
-}
 
 static inline void brelse(struct buffer_head *buf)
 {

@@ -436,25 +436,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
                         return  -EFAULT;
                 return(0);
 	}
-	case HDIO_GETGEO_BIG:
-        {
-		struct hd_big_geometry driver_geo;
-                if (hba[ctlr]->drv[dsk].cylinders) {
-                        driver_geo.heads = hba[ctlr]->drv[dsk].heads;
-                        driver_geo.sectors = hba[ctlr]->drv[dsk].sectors;
-                        driver_geo.cylinders = hba[ctlr]->drv[dsk].cylinders;
-                } else {
-                        driver_geo.heads = 0xff;
-                        driver_geo.sectors = 0x3f;
-                        driver_geo.cylinders = hba[ctlr]->drv[dsk].nr_blocks / (0xff*0x3f);
-              	}
-	      	driver_geo.start= 
-			hba[ctlr]->hd[minor(inode->i_rdev)].start_sect;
-		if (copy_to_user((void *) arg, &driver_geo,  
-				sizeof( struct hd_big_geometry)))
-                        return  -EFAULT;
-                return(0);
-        }
+
 	case BLKRRPART:
 		return revalidate_logvol(inode->i_rdev, 1);
 	case BLKGETSIZE:

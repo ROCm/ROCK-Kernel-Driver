@@ -860,7 +860,7 @@ ppp_irnet_send(struct ppp_channel *	chan,
       irda_irnet_connect(self);
 #endif /* CONNECT_IN_SEND */
 
-      DEBUG(PPP_INFO, "IrTTP not ready ! (%d-%d)\n",
+      DEBUG(PPP_INFO, "IrTTP not ready ! (%ld-%ld)\n",
 	    self->ttp_open, self->ttp_connect);
 
       /* Note : we can either drop the packet or block the packet.

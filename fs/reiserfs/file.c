@@ -72,6 +72,12 @@ static void reiserfs_vfs_truncate_file(struct inode *inode) {
 }
 
 /* Sync a reiserfs file. */
+
+/*
+ * FIXME: sync_mapping_buffers() never has anything to sync.  Can
+ * be removed...
+ */
+
 static int reiserfs_sync_file(
 			      struct file   * p_s_filp,
 			      struct dentry * p_s_dentry,
@@ -85,7 +91,7 @@ static int reiserfs_sync_file(
   if (!S_ISREG(p_s_inode->i_mode))
       BUG ();
 
-  n_err = fsync_inode_buffers(p_s_inode) ;
+  n_err = sync_mapping_buffers(p_s_inode->i_mapping) ;
   reiserfs_commit_for_inode(p_s_inode) ;
   unlock_kernel() ;
   return ( n_err < 0 ) ? -EIO : 0;

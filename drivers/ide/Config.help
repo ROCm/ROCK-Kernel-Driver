@@ -294,9 +294,6 @@ CONFIG_IDEDMA_IVB
 
   It is normally safe to answer Y; however, the default is N.
 
-CONFIG_BLK_DEV_PDC_ADMA
-  Please read the comments at the top of <file:drivers/ide/ide-pci.c>.
-
 CONFIG_BLK_DEV_AEC62XX
   This driver adds up to 4 more EIDE devices sharing a single
   interrupt. This add-on card is a bootable PCI UDMA controller. In
@@ -307,6 +304,7 @@ CONFIG_BLK_DEV_AEC62XX
   The ATP850U/UF is an UltraDMA 33 chipset base.
   The ATP860 is an UltraDMA 66 chipset base.
   The ATP860M(acintosh) version is an UltraDMA 66 chipset base.
+  The ATP865 is an ATA100/133 chipset.
 
   Please read the comments at the top of <file:drivers/ide/aec62xx.c>.
   If you say Y here, then say Y to "Use DMA by default when available"
@@ -314,6 +312,12 @@ CONFIG_BLK_DEV_AEC62XX
 
 CONFIG_AEC62XX_TUNING
   Please read the comments at the top of <file:drivers/ide/aec62xx.c>.
+  If unsure, say N.
+
+CONFIG_AEC6280_BURST
+  Use burst mode for DMA transfers. Higher speed, but causes more load
+  on the bus.
+
   If unsure, say N.
 
 CONFIG_BLK_DEV_ALI15X3
@@ -699,35 +703,6 @@ CONFIG_IDE_8xx_PCCARD
   EXT_DIRECT is used for IDE devices directly connected to the 8xx
              bus using some glue logic, but _not_ the 8xx internal
              PCMCIA interface (example: IDIF860 systems)
-
-CONFIG_BLK_DEV_IDEDISK_FUJITSU
-  Enable vendor-specific code for Fujitsu IDE disks.  Unless you are
-  the IDE maintainer, you probably do not want to mess with this.
-
-CONFIG_BLK_DEV_IDEDISK_IBM
-  Enable vendor-specific code for IBM IDE disks.  Unless you are the
-  IDE maintainer, you probably do not want to mess with this.
-
-CONFIG_BLK_DEV_IDEDISK_MAXTOR
-  Enable vendor-specific code for Maxtor IDE disks.  Unless you are
-  the IDE maintainer, you probably do not want to mess with this.
-
-CONFIG_BLK_DEV_IDEDISK_QUANTUM
-  Enable vendor-specific code for Quantum IDE disks.  Unless you are
-  the IDE maintainer, you probably do not want to mess with this.
-
-CONFIG_BLK_DEV_IDEDISK_SEAGATE
-  Enable vendor-specific code for Seagate IDE disks.  Unless you are
-  the IDE maintainer, you probably do not want to mess with this.
-
-CONFIG_BLK_DEV_IDEDISK_WD
-  Enable vendor-specific code for Western Digital IDE disks.  Unless
-  you are the IDE maintainer, you probably do not want to mess with
-  this.
-
-CONFIG_BLK_DEV_TIVO
-  Enable vendor-specific code for TiVo IDE disks.  Unless you are the
-  IDE maintainer, you probably do not want to mess with this.
 
 CONFIG_IDEDISK_STROKE
   Should you have a system w/ an AWARD Bios and your drives are larger

@@ -34,6 +34,7 @@
 #include <linux/wait.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/completion.h>
 #include <asm/uaccess.h>
 #ifdef CONFIG_PPC
 #include <asm/prom.h>
@@ -77,8 +78,8 @@ struct notifier_block *adb_client_list = NULL;
 static int adb_got_sleep = 0;
 static int adb_inited = 0;
 static pid_t adb_probe_task_pid;
-static unsigned long adb_probe_task_flag;
-static wait_queue_head_t adb_probe_task_wq;
+static DECLARE_MUTEX(adb_probe_mutex);
+static struct completion adb_probe_task_comp;
 static int sleepy_trackpad;
 int __adb_probe_sync;
 
@@ -241,7 +242,8 @@ adb_probe_task(void *x)
 	printk(KERN_INFO "adb: finished probe task...\n");
 	
 	adb_probe_task_pid = 0;
-	clear_bit(0, &adb_probe_task_flag);
+	up(&adb_probe_mutex);
+	
 	return 0;
 }
 
@@ -263,14 +265,8 @@ adb_reset_bus(void)
 		do_adb_reset_bus();
 		return 0;
 	}
-		
-	/* We need to get a lock on the probe thread */
-	while (test_and_set_bit(0, &adb_probe_task_flag))
-		schedule();
 
-	/* Just wait for PID to be 0 just in case (possible race) */
-	while (adb_probe_task_pid != 0)
-		schedule();
+	down(&adb_probe_mutex);
 
 	/* Create probe thread as a child of keventd */
 	if (current_is_keventd())
@@ -318,7 +314,7 @@ int __init adb_init(void)
 		if (machine_is_compatible("AAPL,PowerBook1998") ||
 			machine_is_compatible("PowerBook1,1"))
 			sleepy_trackpad = 1;
-		init_waitqueue_head(&adb_probe_task_wq);
+		init_completion(&adb_probe_task_comp);
 		adbdev_init();
 		adb_reset_bus();
 	}
@@ -340,21 +336,20 @@ adb_notify_sleep(struct pmu_sleep_notifier *self, int when)
 	case PBOOK_SLEEP_REQUEST:
 		adb_got_sleep = 1;
 		/* We need to get a lock on the probe thread */
-		while (test_and_set_bit(0, &adb_probe_task_flag))
-			schedule();
-		/* Just wait for PID to be 0 just in case (possible race) */
-		while (adb_probe_task_pid != 0)
-			schedule();
+		down(&adb_probe_mutex);
+		/* Stop autopoll */
 		if (adb_controller->autopoll)
 			adb_controller->autopoll(0);
 		ret = notifier_call_chain(&adb_client_list, ADB_MSG_POWERDOWN, NULL);
-		if (ret & NOTIFY_STOP_MASK)
+		if (ret & NOTIFY_STOP_MASK) {
+			up(&adb_probe_mutex);
 			return PBOOK_SLEEP_REFUSE;
+		}
 		break;
 	case PBOOK_SLEEP_REJECT:
 		if (adb_got_sleep) {
 			adb_got_sleep = 0;
-			clear_bit(0, &adb_probe_task_flag);
+			up(&adb_probe_mutex);
 			adb_reset_bus();
 		}
 		break;
@@ -363,7 +358,7 @@ adb_notify_sleep(struct pmu_sleep_notifier *self, int when)
 		break;
 	case PBOOK_WAKE:
 		adb_got_sleep = 0;
-		clear_bit(0, &adb_probe_task_flag);
+		up(&adb_probe_mutex);
 		adb_reset_bus();
 		break;
 	}
@@ -435,9 +430,10 @@ adb_poll(void)
 static void
 adb_probe_wakeup(struct adb_request *req)
 {
-	wake_up(&adb_probe_task_wq);
+	complete(&adb_probe_task_comp);
 }
 
+/* Static request used during probe */
 static struct adb_request adb_sreq;
 static unsigned long adb_sreq_lock; // Use semaphore ! */ 
 
@@ -484,20 +480,11 @@ adb_request(struct adb_request *req, void (*done)(struct adb_request *),
 	if ((flags & ADBREQ_SYNC) &&
 	    (current->pid && adb_probe_task_pid &&
 	    adb_probe_task_pid == current->pid)) {
-		DECLARE_WAITQUEUE(wait, current);
 		req->done = adb_probe_wakeup;
-		add_wait_queue(&adb_probe_task_wq, &wait);
 		rc = adb_controller->send_request(req, 0);
 		if (rc || req->complete)
 			goto bail;
-		for (;;) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			if (req->complete)
-				break;
-			schedule();
-		}
-		current->state = TASK_RUNNING;
-		remove_wait_queue(&adb_probe_task_wq, &wait);
+		wait_for_completion(&adb_probe_task_comp);
 		rc = 0;
 		goto bail;
 	}
@@ -652,7 +639,7 @@ static int adb_open(struct inode *inode, struct file *file)
 {
 	struct adbdev_state *state;
 
-	if (MINOR(inode->i_rdev) > 0 || adb_controller == NULL)
+	if (minor(inode->i_rdev) > 0 || adb_controller == NULL)
 		return -ENXIO;
 	state = kmalloc(sizeof(struct adbdev_state), GFP_KERNEL);
 	if (state == 0)
@@ -672,6 +659,7 @@ static int adb_release(struct inode *inode, struct file *file)
 	struct adbdev_state *state = file->private_data;
 	unsigned long flags;
 
+	lock_kernel();
 	if (state) {
 		file->private_data = NULL;
 		spin_lock_irqsave(&state->lock, flags);
@@ -684,6 +672,7 @@ static int adb_release(struct inode *inode, struct file *file)
 			spin_unlock_irqrestore(&state->lock, flags);
 		}
 	}
+	unlock_kernel();
 	return 0;
 }
 
@@ -705,17 +694,16 @@ static ssize_t adb_read(struct file *file, char *buf,
 		return ret;
 
 	req = NULL;
+	spin_lock_irqsave(&state->lock, flags);
 	add_wait_queue(&state->wait_queue, &wait);
 	current->state = TASK_INTERRUPTIBLE;
 
 	for (;;) {
-		spin_lock_irqsave(&state->lock, flags);
 		req = state->completed;
 		if (req != NULL)
 			state->completed = req->next;
 		else if (atomic_read(&state->n_pending) == 0)
 			ret = -EIO;
-		spin_unlock_irqrestore(&state->lock, flags);
 		if (req != NULL || ret != 0)
 			break;
 		
@@ -727,12 +715,15 @@ static ssize_t adb_read(struct file *file, char *buf,
 			ret = -ERESTARTSYS;
 			break;
 		}
+		spin_unlock_irqrestore(&state->lock, flags);
 		schedule();
+		spin_lock_irqsave(&state->lock, flags);
 	}
 
 	current->state = TASK_RUNNING;
 	remove_wait_queue(&state->wait_queue, &wait);
-
+	spin_unlock_irqrestore(&state->lock, flags);
+	
 	if (ret)
 		return ret;
 
@@ -755,6 +746,8 @@ static ssize_t adb_write(struct file *file, const char *buf,
 
 	if (count < 2 || count > sizeof(req->data))
 		return -EINVAL;
+	if (adb_controller == NULL)
+		return -ENXIO;
 	ret = verify_area(VERIFY_READ, buf, count);
 	if (ret)
 		return ret;
@@ -774,7 +767,10 @@ static ssize_t adb_write(struct file *file, const char *buf,
 		goto out;
 
 	atomic_inc(&state->n_pending);
-	if (adb_controller == NULL) return -ENXIO;
+
+	/* If a probe is in progress or we are sleeping, wait for it to complete */
+	down(&adb_probe_mutex);
+	up(&adb_probe_mutex);
 
 	/* Special case for ADB_BUSRESET request, all others are sent to
 	   the controller */
@@ -782,6 +778,8 @@ static ssize_t adb_write(struct file *file, const char *buf,
 		&&(req->data[1] == ADB_BUSRESET)) {
 		ret = do_adb_reset_bus();
 		atomic_dec(&state->n_pending);
+		if (ret == 0)
+			ret = count;
 		goto out;
 	} else {	
 		req->reply_expected = ((req->data[1] & 0xc) == 0xc);

@@ -217,7 +217,7 @@ isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
 	}
 	if ((ret = copy_from_user(&size, p, sizeof(int)))) {
 		printk(KERN_ERR"isar_load_firmware copy_from_user ret %d\n", ret);
-		return ret;
+		return -EFAULT;
 	}
 	p += sizeof(int);
 	printk(KERN_DEBUG"isar_load_firmware size: %d\n", size);
@@ -240,6 +240,7 @@ isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
 	while (cnt < size) {
 		if ((ret = copy_from_user(&blk_head, p, BLK_HEAD_SIZE))) {
 			printk(KERN_ERR"isar_load_firmware copy_from_user ret %d\n", ret);
+			ret = -EFAULT;
 			goto reterror;
 		}
 #ifdef __BIG_ENDIAN
@@ -282,6 +283,7 @@ isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
 			*mp++ = noc;
 			if ((ret = copy_from_user(tmpmsg, p, nom))) {
 				printk(KERN_ERR"isar_load_firmware copy_from_user ret %d\n", ret);
+				ret = -EFAULT;
 				goto reterror;
 			}
 			p += nom;

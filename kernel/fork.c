@@ -136,8 +136,8 @@ static int get_pid(unsigned long flags)
 	struct task_struct *p;
 	int pid;
 
-	if (flags & CLONE_PID)
-		return current->pid;
+	if (flags & CLONE_IDLETASK)
+		return 0;
 
 	spin_lock(&lastpid_lock);
 	if((++last_pid) & 0xffff8000) {
@@ -387,14 +387,14 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 	if (!mm_init(mm))
 		goto fail_nomem;
 
+	if (init_new_context(tsk,mm))
+		goto free_pt;
+
 	down_write(&oldmm->mmap_sem);
 	retval = dup_mmap(mm);
 	up_write(&oldmm->mmap_sem);
 
 	if (retval)
-		goto free_pt;
-
-	if (init_new_context(tsk,mm))
 		goto free_pt;
 
 good_mm:
@@ -608,27 +608,18 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
  * For an example that's using stack_top, see
  * arch/ia64/kernel/process.c.
  */
-int do_fork(unsigned long clone_flags, unsigned long stack_start,
-	    struct pt_regs *regs, unsigned long stack_size)
+struct task_struct *do_fork(unsigned long clone_flags,
+			    unsigned long stack_start,
+			    struct pt_regs *regs,
+			    unsigned long stack_size)
 {
 	int retval;
 	unsigned long flags;
-	struct task_struct *p;
+	struct task_struct *p = NULL;
 	struct completion vfork;
 
 	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
-		return -EINVAL;
-
-	retval = -EPERM;
-
-	/* 
-	 * CLONE_PID is only allowed for the initial SMP swapper
-	 * calls
-	 */
-	if (clone_flags & CLONE_PID) {
-		if (current->pid)
-			goto fork_out;
-	}
+		return ERR_PTR(-EINVAL);
 
 	retval = -ENOMEM;
 	p = dup_task_struct(current);
@@ -768,8 +759,7 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	 *
 	 * Let it rip!
 	 */
-	retval = p->pid;
-	p->tgid = retval;
+	p->tgid = p->pid;
 	INIT_LIST_HEAD(&p->thread_group);
 
 	/* Need tasklist lock for parent etc handling! */
@@ -807,9 +797,12 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 		 * COW overhead when the child exec()s afterwards.
 		 */
 		set_need_resched();
+	retval = 0;
 
 fork_out:
-	return retval;
+	if (retval)
+		return ERR_PTR(retval);
+	return p;
 
 bad_fork_cleanup_namespace:
 	exit_namespace(p);

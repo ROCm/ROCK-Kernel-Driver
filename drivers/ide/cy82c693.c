@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  * linux/drivers/ide/cy82c693.c		Version 0.34	Dec. 13, 1999
  *
  *  Copyright (C) 1998-2000 Andreas S. Krebs (akrebs@altavista.net), Maintainer
@@ -48,12 +49,13 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
-#include <linux/ide.h>
 #include <linux/init.h>
+#include <linux/ide.h>
 
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 /* the current version */
 #define CY82_VERSION	"CY82C693U driver v0.34 99-13-12 Andreas S. Krebs (akrebs@altavista.net)"
@@ -119,7 +121,7 @@ static int calc_clk (int time, int bus_speed)
 {
 	int clocks;
 
-	clocks = (time*bus_speed+999)/1000 -1;
+	clocks = (time*bus_speed+999999)/1000000 -1;
 
 	if (clocks < 0)
 		clocks = 0;
@@ -383,7 +385,7 @@ static void cy82c693_tune_drive (ide_drive_t *drive, byte pio)
  * the device prior to INIT.
  */
 
-unsigned int __init pci_init_cy82c693(struct pci_dev *dev)
+static unsigned int __init pci_init_cy82c693(struct pci_dev *dev)
 {
 #ifdef CY82C693_SETDMA_CLOCK
         byte data;
@@ -419,18 +421,18 @@ unsigned int __init pci_init_cy82c693(struct pci_dev *dev)
         OUT_BYTE(CY82_INDEX_CTRLREG1, CY82_INDEX_PORT);
         OUT_BYTE(data, CY82_DATA_PORT);
 
-#if CY82C693_DEBUG_INFO
+# if CY82C693_DEBUG_INFO
 	printk (KERN_INFO "%s: New Peripheral Configuration Register: 0x%X\n", dev->name, data);
-#endif /* CY82C693_DEBUG_INFO */
+# endif
 
-#endif /* CY82C693_SETDMA_CLOCK */
+#endif
 	return 0;
 }
 
 /*
  * the init function - called for each ide channel once
  */
-void __init ide_init_cy82c693(struct ata_channel *hwif)
+static void __init ide_init_cy82c693(struct ata_channel *hwif)
 {
 	hwif->chipset = ide_cy82c693;
 	hwif->tuneproc = cy82c693_tune_drive;
@@ -445,5 +447,23 @@ void __init ide_init_cy82c693(struct ata_channel *hwif)
 		if (!noautodma)
 			hwif->autodma = 1;
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
+}
+
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+	vendor: PCI_VENDOR_ID_CONTAQ,
+	device: PCI_DEVICE_ID_CONTAQ_82C693,
+	init_chipset: pci_init_cy82c693,
+	init_channel: ide_init_cy82c693,
+	bootable: ON_BOARD,
+	flags: ATA_F_DMA
+};
+
+int __init init_cy82c693(void)
+{
+	ata_register_chipset(&chipset);
+
+	return 0;
 }

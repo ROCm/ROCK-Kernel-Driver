@@ -191,7 +191,7 @@ do_sigbus:
 	 * or user mode.
 	 */
 	tsk->thread.cp0_badvaddr = address;
-	info.si_code = SIGBUS;
+	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRERR;
 	info.si_addr = (void *) address;

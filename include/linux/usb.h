@@ -363,22 +363,6 @@ struct usb_bus {
 extern int usb_root_hub_string(int id, int serial,
 		char *type, __u8 *data, int len);
 
-/*
- * As of USB 2.0, full/low speed devices are segregated into trees.
- * One type grows from USB 1.1 host controllers (OHCI, UHCI etc).
- * The other type grows from high speed hubs when they connect to
- * full/low speed devices using "Transaction Translators" (TTs).
- *
- * TTs should only be known to the hub driver, and high speed bus
- * drivers (only EHCI for now).  They affect periodic scheduling and
- * sometimes control/bulk error recovery.
- */
-struct usb_tt {
-	struct usb_device	*hub;	/* upstream highspeed hub */
-	int			multi;	/* true means one TT per port */
-};
-
-
 /* -------------------------------------------------------------------------- */
 
 /* This is arbitrary.
@@ -386,6 +370,8 @@ struct usb_tt {
  * have up to 255 ports. The most yet reported is 10.
  */
 #define USB_MAXCHILDREN		(16)
+
+struct usb_tt;
 
 struct usb_device {
 	int		devnum;		/* Address on USB bus */
@@ -440,6 +426,11 @@ struct usb_device {
 	struct usb_device *children[USB_MAXCHILDREN];
 };
 
+extern struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *);
+extern struct usb_device *usb_get_dev(struct usb_device *dev);
+extern void usb_free_dev(struct usb_device *);
+#define usb_put_dev usb_free_dev
+
 /* for when layers above USB add new non-USB drivers */
 extern void usb_scan_devices(void);
 
@@ -448,50 +439,6 @@ extern int usb_reset_device(struct usb_device *dev);
 
 /* for drivers using iso endpoints */
 extern int usb_get_current_frame_number (struct usb_device *usb_dev);
-
-/**
- * usb_inc_dev_use - record another reference to a device
- * @dev: the device being referenced
- *
- * Each live reference to a device should be refcounted.
- *
- * Drivers for USB interfaces should normally record such references in
- * their probe() methods, when they bind to an interface, and release
- * them usb_dec_dev_use(), in their disconnect() methods.
- */
-static inline void usb_inc_dev_use (struct usb_device *dev)
-{
-	atomic_inc (&dev->refcnt);
-}
-
-/**
- * usb_dec_dev_use - drop a reference to a device
- * @dev: the device no longer being referenced
- *
- * Each live reference to a device should be refcounted.
- *
- * Drivers for USB interfaces should normally release such references in
- * their disconnect() methods, and record them in probe().
- *
- * Note that driver disconnect() methods must guarantee that when they
- * return, all of their outstanding references to the device (and its
- * interfaces) are cleaned up.  That means that all pending URBs from
- * this driver must have completed, and that no more copies of the device
- * handle are saved in driver records (including other kernel threads).
- */
-static inline void usb_dec_dev_use (struct usb_device *dev)
-{
-	if (atomic_dec_and_test (&dev->refcnt)) {
-		/* May only go to zero when usbcore finishes
-		 * usb_disconnect() processing:  khubd or HCDs.
-		 *
-		 * If you hit this BUG() it's likely a problem
-		 * with some driver's disconnect() routine.
-		 */
-		BUG ();
-	}
-}
-
 
 /* used these for multi-interface device registration */
 extern int usb_find_interface_driver_for_ifnum(struct usb_device *dev, unsigned int ifnum);
@@ -820,7 +767,6 @@ typedef void (*usb_complete_t)(struct urb *);
 /**
  * struct urb - USB Request Block
  * @urb_list: For use by current owner of the URB.
- * @next: Used to link ISO requests into rings.
  * @pipe: Holds endpoint number, direction, type, and max packet size.
  *	Create these values with the eight macros available;
  *	usb_{snd,rcv}TYPEpipe(dev,endpoint), where the type is "ctrl"
@@ -880,7 +826,7 @@ typedef void (*usb_complete_t)(struct urb *);
  *
  * Initialization:
  *
- * All URBs submitted must initialize dev, pipe, next (may be null),
+ * All URBs submitted must initialize dev, pipe,
  * transfer_flags (may be zero), complete, timeout (may be zero).
  * The USB_ASYNC_UNLINK transfer flag affects later invocations of
  * the usb_unlink_urb() routine.
@@ -926,7 +872,9 @@ typedef void (*usb_complete_t)(struct urb *);
  * the quality of service is only "best effort".  Callers provide specially
  * allocated URBs, with number_of_packets worth of iso_frame_desc structures
  * at the end.  Each such packet is an individual ISO transfer.  Isochronous
- * URBs are normally submitted with urb->next fields set up as a ring, so
+ * URBs are normally queued (no flag like USB_BULK_QUEUE is needed) so that
+ * transfers are at least double buffered, and then explicitly resubmitted
+ * in completion handlers, so
  * that data (such as audio or video) streams at as constant a rate as the
  * host controller scheduler can support.
  *
@@ -944,14 +892,15 @@ typedef void (*usb_complete_t)(struct urb *);
  * When completion callback is invoked for non-isochronous URBs, the
  * actual_length field tells how many bytes were transferred.
  *
- * For interrupt and isochronous URBs, the URB provided to the callback
+ * For interrupt URBs, the URB provided to the callback
  * function is still "owned" by the USB core subsystem unless the status
  * indicates that the URB has been unlinked.  Completion handlers should
  * not modify such URBs until they have been unlinked.
  *
  * ISO transfer status is reported in the status and actual_length fields
  * of the iso_frame_desc array, and the number of errors is reported in
- * error_count.
+ * error_count.  Completion callbacks for ISO transfers will normally
+ * (re)submit URBs to ensure a constant transfer rate.
  */
 struct urb
 {
@@ -959,7 +908,6 @@ struct urb
 	atomic_t count;			/* reference count of the URB */
 	void *hcpriv;			/* private data for host controller */
 	struct list_head urb_list;	/* list pointer to all active urbs */
-	struct urb *next; 		/* (in) pointer to next URB */
 	struct usb_device *dev; 	/* (in) pointer to associated device */
 	unsigned int pipe;		/* (in) pipe information */
 	int status;			/* (return) non-ISO status */
@@ -1176,6 +1124,7 @@ extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
  * appropriately.
  */
 
+/* NOTE:  these are not the standard USB_ENDPOINT_XFER_* values!! */
 #define PIPE_ISOCHRONOUS		0
 #define PIPE_INTERRUPT			1
 #define PIPE_CONTROL			2

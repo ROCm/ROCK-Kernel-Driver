@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  * $Id: piix.c,v 1.3 2002/03/29 16:06:06 vojtech Exp $
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik
@@ -45,9 +46,11 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ide.h>
+
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #define PIIX_IDETIM0		0x40
 #define PIIX_IDETIM1		0x42
@@ -102,7 +105,6 @@ static struct piix_ide_chip {
 static struct piix_ide_chip *piix_config;
 static unsigned char piix_enabled;
 static unsigned int piix_80w;
-static unsigned int piix_clock;
 
 static char *piix_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100", "UDMA133" };
 
@@ -144,7 +146,7 @@ static int piix_get_info(char *buffer, char **addr, off_t offset, int count)
 								: piix_dma[piix_config->flags & PIIX_UDMA]);
 
 	piix_print("BM-DMA base:                        %#x", piix_base);
-	piix_print("PCI clock:                          %d.%dMHz", piix_clock / 1000, piix_clock / 100 % 10);
+	piix_print("PCI clock:                          %d.%dMHz", system_bus_speed / 1000, system_bus_speed / 100 % 10);
 
 	piix_print("-----------------------Primary IDE-------Secondary IDE------");
 
@@ -157,7 +159,7 @@ static int piix_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	piix_print("Cable Type:            %10s%20s", (piix_80w & 1) ? "80w" : "40w", (piix_80w & 2) ? "80w" : "40w");
 
-	if (!piix_clock)
+	if (!system_bus_speed)
                 return p - buffer;
 
 	piix_print("-------------------drive0----drive1----drive2----drive3-----");
@@ -189,8 +191,8 @@ static int piix_get_info(char *buffer, char **addr, off_t offset, int count)
 		}
 
 		dmaen[i] = (c & ((i & 1) ? 0x40 : 0x20) << ((i & 2) << 2));
-		cycle[i] = 1000000 / piix_clock * (active[i] + recover[i]);
-		speed[i] = 2 * piix_clock / (active[i] + recover[i]);
+		cycle[i] = 1000000 / system_bus_speed * (active[i] + recover[i]);
+		speed[i] = 2 * system_bus_speed / (active[i] + recover[i]);
 
 		if (!(piix_config->flags & PIIX_UDMA))
 			continue;
@@ -210,17 +212,17 @@ static int piix_get_info(char *buffer, char **addr, off_t offset, int count)
 			udma[i] = (4 - ((e >> (i << 2)) & 3)) * umul;
 		} else  udma[i] = (8 - ((e >> (i << 2)) & 7)) * 2;
 
-		speed[i] = 8 * piix_clock / udma[i];
-		cycle[i] = 250000 * udma[i] / piix_clock;
+		speed[i] = 8 * system_bus_speed / udma[i];
+		cycle[i] = 250000 * udma[i] / system_bus_speed;
 	}
 
 	piix_print_drive("Transfer Mode: ", "%10s", dmaen[i] ? (uen[i] ? "UDMA" : "DMA") : "PIO");
 
-	piix_print_drive("Address Setup: ", "%8dns", (1000000 / piix_clock) * 3);
-	piix_print_drive("Cmd Active:    ", "%8dns", (1000000 / piix_clock) * 12);
-	piix_print_drive("Cmd Recovery:  ", "%8dns", (1000000 / piix_clock) * 18);
-	piix_print_drive("Data Active:   ", "%8dns", (1000000 / piix_clock) * active[i]);
-	piix_print_drive("Data Recovery: ", "%8dns", (1000000 / piix_clock) * recover[i]);
+	piix_print_drive("Address Setup: ", "%8dns", (1000000 / system_bus_speed) * 3);
+	piix_print_drive("Cmd Active:    ", "%8dns", (1000000 / system_bus_speed) * 12);
+	piix_print_drive("Cmd Recovery:  ", "%8dns", (1000000 / system_bus_speed) * 18);
+	piix_print_drive("Data Active:   ", "%8dns", (1000000 / system_bus_speed) * active[i]);
+	piix_print_drive("Data Recovery: ", "%8dns", (1000000 / system_bus_speed) * recover[i]);
 	piix_print_drive("Cycle Time:    ", "%8dns", cycle[i]);
 	piix_print_drive("Transfer Rate: ", "%4d.%dMB/s", speed[i] / 1000, speed[i] / 100 % 10);
 
@@ -321,9 +323,9 @@ static void piix_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_tim
  * by upper layers.
  */
 
-static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
+static int piix_set_drive(struct ata_device *drive, unsigned char speed)
 {
-	ide_drive_t *peer = drive->channel->drives + (~drive->dn & 1);
+	struct ata_device *peer = drive->channel->drives + (~drive->dn & 1);
 	struct ata_timing t, p;
 	int err, T, UT, umul = 1;
 
@@ -336,7 +338,7 @@ static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
 	if (speed > XFER_UDMA_4 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_100)
 		umul = 4;
 	
-	T = 1000000000 / piix_clock;
+	T = 1000000000 / system_bus_speed;
 	UT = T / umul;
 
 	ata_timing_compute(drive, speed, &t, T, UT);
@@ -361,7 +363,7 @@ static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
  * PIO-only tuning.
  */
 
-static void piix_tune_drive(ide_drive_t *drive, unsigned char pio)
+static void piix_tune_drive(struct ata_device *drive, unsigned char pio)
 {
 	if (!((piix_enabled >> drive->channel->unit) & 1))
 		return;
@@ -401,8 +403,7 @@ int piix_dmaproc(struct ata_device *drive)
  * The initialization callback. Here we determine the IDE chip type
  * and initialize its drive independent registers.
  */
-
-unsigned int __init pci_init_piix(struct pci_dev *dev, const char *name)
+static unsigned int __init piix_init_chipset(struct pci_dev *dev)
 {
 	unsigned int u;
 	unsigned short w;
@@ -492,24 +493,6 @@ unsigned int __init pci_init_piix(struct pci_dev *dev, const char *name)
 	}
 
 /*
- * Determine the system bus clock.
- */
-
-	piix_clock = system_bus_speed * 1000;
-
-	switch (piix_clock) {
-		case 33000: piix_clock = 33333; break;
-		case 37000: piix_clock = 37500; break;
-		case 41000: piix_clock = 41666; break;
-	}
-
-	if (piix_clock < 20000 || piix_clock > 50000) {
-		printk(KERN_WARNING "PIIX: User given PCI clock speed impossible (%d), using 33 MHz instead.\n", piix_clock);
-		printk(KERN_WARNING "PIIX: Use ide0=ata66 if you want to assume 80-wire cable\n");
-		piix_clock = 33333;
-	}
-
-/*
  * Print the boot message.
  */
 
@@ -532,12 +515,12 @@ unsigned int __init pci_init_piix(struct pci_dev *dev, const char *name)
 	return 0;
 }
 
-unsigned int __init ata66_piix(struct ata_channel *hwif)
+static unsigned int __init piix_ata66_check(struct ata_channel *hwif)
 {
 	return ((piix_enabled & piix_80w) >> hwif->unit) & 1;
 }
 
-void __init ide_init_piix(struct ata_channel *hwif)
+static void __init piix_init_channel(struct ata_channel *hwif)
 {
 	int i;
 
@@ -567,10 +550,166 @@ void __init ide_init_piix(struct ata_channel *hwif)
  * We allow the BM-DMA driver only work on enabled interfaces,
  * and only if DMA is safe with the chip and bridge.
  */
-
-void __init ide_dmacapable_piix(struct ata_channel *hwif, unsigned long dmabase)
+static void __init piix_init_dma(struct ata_channel *hwif, unsigned long dmabase)
 {
 	if (((piix_enabled >> hwif->unit) & 1)
 		&& !(piix_config->flags & PIIX_NODMA))
-			ide_setup_dma(hwif, dmabase, 8);
+			ata_init_dma(hwif, dmabase);
+}
+
+
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82371FB_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82371SB_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82371AB,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82443MX_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82372FB_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801AA_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801AB_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801BA_9,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801BA_8,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801E_9,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801CA_10,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801CA_11,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801DB_9,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_EFAR,
+		device: PCI_DEVICE_ID_EFAR_SLC90E66_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+};
+
+int __init init_piix(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+	return 0;
 }

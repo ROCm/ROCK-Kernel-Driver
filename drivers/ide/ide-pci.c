@@ -25,293 +25,45 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
+#include "pcihost.h"
+
 /* Missing PCI device IDs: */
 #define PCI_VENDOR_ID_HINT 0x3388
 #define PCI_DEVICE_ID_HINT 0x8013
 
 /*
- * Some combi chips, which can be used on the PCI bus or the VL bus can be in
- * some systems acessed either through the PCI config space or through the
- * hosts IO bus.  If the corresponding initialization driver is using the host
- * IO space to deal with them please define the following.
+ * This is the list of registered PCI chipset driver data structures.
  */
+static struct ata_pci_device *ata_pci_device_list = NULL;
 
-#define	ATA_PCI_IGNORE	((void *)-1)
-#define IDE_NO_DRIVER	((void *)-2)
-
-#ifdef CONFIG_BLK_DEV_AEC62XX
-extern unsigned int pci_init_aec62xx(struct pci_dev *);
-extern unsigned int ata66_aec62xx(struct ata_channel *);
-extern void ide_init_aec62xx(struct ata_channel *);
-extern void ide_dmacapable_aec62xx(struct ata_channel *, unsigned long);
-#endif
-
-#ifdef CONFIG_BLK_DEV_ALI15X3
-extern unsigned int pci_init_ali15x3(struct pci_dev *);
-extern unsigned int ata66_ali15x3(struct ata_channel *);
-extern void ide_init_ali15x3(struct ata_channel *);
-extern void ide_dmacapable_ali15x3(struct ata_channel *, unsigned long);
-#endif
-
-#ifdef CONFIG_BLK_DEV_AMD74XX
-extern unsigned int pci_init_amd74xx(struct pci_dev *);
-extern unsigned int ata66_amd74xx(struct ata_channel *);
-extern void ide_init_amd74xx(struct ata_channel *);
-extern void ide_dmacapable_amd74xx(struct ata_channel *, unsigned long);
-#endif
-
-#ifdef CONFIG_BLK_DEV_CMD64X
-extern unsigned int pci_init_cmd64x(struct pci_dev *);
-extern unsigned int ata66_cmd64x(struct ata_channel *);
-extern void ide_init_cmd64x(struct ata_channel *);
-extern void ide_dmacapable_cmd64x(struct ata_channel *, unsigned long);
-#endif
-
-#ifdef CONFIG_BLK_DEV_CY82C693
-extern unsigned int pci_init_cy82c693(struct pci_dev *);
-extern void ide_init_cy82c693(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_CS5530
-extern unsigned int pci_init_cs5530(struct pci_dev *);
-extern void ide_init_cs5530(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_HPT34X
-extern unsigned int pci_init_hpt34x(struct pci_dev *);
-extern void ide_init_hpt34x(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_HPT366
-extern unsigned int pci_init_hpt366(struct pci_dev *);
-extern unsigned int ata66_hpt366(struct ata_channel *);
-extern void ide_init_hpt366(struct ata_channel *);
-extern void ide_dmacapable_hpt366(struct ata_channel *, unsigned long);
-#endif
-
-#ifdef CONFIG_BLK_DEV_NS87415
-extern void ide_init_ns87415(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_OPTI621
-extern void ide_init_opti621(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_PDC_ADMA
-extern unsigned int pci_init_pdcadma(struct pci_dev *);
-extern unsigned int ata66_pdcadma(struct ata_channel *);
-extern void ide_init_pdcadma(struct ata_channel *);
-extern void ide_dmacapable_pdcadma(struct ata_channel *, unsigned long);
-#endif
-
-#ifdef CONFIG_BLK_DEV_PDC202XX
-extern unsigned int pci_init_pdc202xx(struct pci_dev *);
-extern unsigned int ata66_pdc202xx(struct ata_channel *);
-extern void ide_init_pdc202xx(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_PIIX
-extern unsigned int pci_init_piix(struct pci_dev *);
-extern unsigned int ata66_piix(struct ata_channel *);
-extern void ide_init_piix(struct ata_channel *);
-extern void ide_dmacapable_piix(struct ata_channel *, unsigned long);
-#endif
-
-#ifdef CONFIG_BLK_DEV_IT8172
-extern unsigned int pci_init_it8172(struct pci_dev *);
-extern void ide_init_it8172(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_RZ1000
-extern void ide_init_rz1000(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_SVWKS
-extern unsigned int pci_init_svwks(struct pci_dev *);
-extern unsigned int ata66_svwks(struct ata_channel *);
-extern void ide_init_svwks(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_SIS5513
-extern unsigned int pci_init_sis5513(struct pci_dev *);
-extern unsigned int ata66_sis5513(struct ata_channel *);
-extern void ide_init_sis5513(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_SL82C105
-extern unsigned int pci_init_sl82c105(struct pci_dev *);
-extern void dma_init_sl82c105(struct ata_channel *, unsigned long);
-extern void ide_init_sl82c105(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_TRM290
-extern void ide_init_trm290(struct ata_channel *);
-#endif
-
-#ifdef CONFIG_BLK_DEV_VIA82CXXX
-extern unsigned int pci_init_via82cxxx(struct pci_dev *);
-extern unsigned int ata66_via82cxxx(struct ata_channel *);
-extern void ide_init_via82cxxx(struct ata_channel *);
-extern void ide_dmacapable_via82cxxx(struct ata_channel *, unsigned long);
-#endif
-
-typedef struct ide_pci_enablebit_s {
-	u8	reg;	/* pci configuration register holding the enable-bit */
-	u8	mask;	/* mask used to isolate the enable-bit */
-	u8	val;	/* expected value of masked register when "enabled" */
-} ide_pci_enablebit_t;
-
-/* Flags used to untangle quirk handling.
+/*
+ * This function supplies the data necessary to detect the particular chipset.
+ *
+ * Please note that we don't copy data over. We are just linking it in to the
+ * list.
  */
-#define ATA_F_DMA	0x01
-#define ATA_F_NODMA	0x02	/* no DMA mode supported at all */
-#define ATA_F_NOADMA	0x04	/* DMA has to be enabled explicitely */
-#define ATA_F_FIXIRQ	0x08	/* fixed irq wiring */
-#define ATA_F_SER	0x10	/* serialize on first and second channel interrupts */
-#define ATA_F_IRQ	0x20	/* trust IRQ information from config */
-#define ATA_F_PHACK	0x40	/* apply PROMISE hacks */
-#define ATA_F_HPTHACK	0x80	/* apply HPT366 hacks */
+void ata_register_chipset(struct ata_pci_device *d)
+{
+	struct ata_pci_device *tmp;
 
-struct ata_pci_device {
-	unsigned short		vendor;
-	unsigned short		device;
-	unsigned int		(*init_chipset)(struct pci_dev *dev);
-	unsigned int		(*ata66_check)(struct ata_channel *hwif);
-	void			(*init_channel)(struct ata_channel *hwif);
-	void			(*dma_init)(struct ata_channel *hwif, unsigned long dmabase);
-	ide_pci_enablebit_t	enablebits[2];
-	unsigned int		bootable;
-	unsigned int		extra;
-	unsigned int		flags;
-};
+	if (!d)
+		return;
 
-static struct ata_pci_device pci_chipsets[] __initdata = {
-#ifdef CONFIG_BLK_DEV_PIIX
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371FB_1, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371SB_1, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82443MX_1, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82372FB_1, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AA_1, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AB_1, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_9, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_8, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801E_9, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_10, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_11, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801DB_9, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_EFAR, PCI_DEVICE_ID_EFAR_SLC90E66_1, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
-#endif
-#ifdef CONFIG_BLK_DEV_VIA82CXXX
-	{PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C576_1,	pci_init_via82cxxx, ata66_via82cxxx, ide_init_via82cxxx, ide_dmacapable_via82cxxx, {{0x40,0x02,0x02}, {0x40,0x01,0x01}}, ON_BOARD, 0, ATA_F_NOADMA },
-	{PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C586_1,	pci_init_via82cxxx, ata66_via82cxxx, ide_init_via82cxxx, ide_dmacapable_via82cxxx, {{0x40,0x02,0x02}, {0x40,0x01,0x01}}, ON_BOARD, 0, ATA_F_NOADMA },
-#endif
-#ifdef CONFIG_BLK_DEV_PDC202XX
-# ifdef CONFIG_PDC202XX_FORCE
-        {PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20246, pci_init_pdc202xx, NULL, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD,	16, ATA_F_IRQ | ATA_F_DMA },
-        {PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20262, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 48, ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA},
-        {PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20265, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 48, ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA},
-        {PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20267, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 48, ATA_F_IRQ | ATA_F_DMA },
-# else
-	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20246, pci_init_pdc202xx, NULL, ide_init_pdc202xx, NULL, {{0x50,0x02,0x02}, {0x50,0x04,0x04}}, OFF_BOARD, 16, ATA_F_IRQ | ATA_F_DMA },
-	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20262, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x50,0x02,0x02}, {0x50,0x04,0x04}}, OFF_BOARD, 48, ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA },
-	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20265, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x50,0x02,0x02}, {0x50,0x04,0x04}}, OFF_BOARD, 48, ATA_F_IRQ | ATA_F_PHACK  | ATA_F_DMA },
-	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20267, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x50,0x02,0x02}, {0x50,0x04,0x04}}, OFF_BOARD, 48, ATA_F_IRQ  | ATA_F_DMA },
-# endif
-	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20268, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
-	/* Promise used a different PCI identification for the raid card
-	 * apparently to try and prevent Linux detecting it and using our own
-	 * raid code. We want to detect it for the ataraid drivers, so we have
-	 * to list both here.. */
-	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20268R, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ  | ATA_F_DMA },
-	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20269, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
-	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20275, pci_init_pdc202xx, ata66_pdc202xx,	ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
-	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20276, pci_init_pdc202xx, ata66_pdc202xx,	ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
-#endif
-#ifdef CONFIG_BLK_DEV_RZ1000
-	{PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1000, NULL, NULL,	ide_init_rz1000, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1001, NULL, NULL,	ide_init_rz1000, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-#endif
-#ifdef CONFIG_BLK_DEV_SIS5513
-	{PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_5513, pci_init_sis5513, ata66_sis5513, ide_init_sis5513, NULL, {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}}, ON_BOARD, 0, ATA_F_NOADMA },
-#endif
-#ifdef CONFIG_BLK_DEV_CMD64X
-	{PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_643, pci_init_cmd64x, NULL, ide_init_cmd64x, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_646, pci_init_cmd64x, NULL, ide_init_cmd64x, NULL, {{0x00,0x00,0x00}, {0x51,0x80,0x80}}, ON_BOARD, 0, ATA_F_DMA },
-	{PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_648, pci_init_cmd64x, ata66_cmd64x, ide_init_cmd64x, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_DMA },
-	{PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_649, pci_init_cmd64x, ata66_cmd64x, ide_init_cmd64x, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_DMA },
-	{PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_680, pci_init_cmd64x, ata66_cmd64x, ide_init_cmd64x, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_DMA },
-#endif
-#ifdef CONFIG_BLK_DEV_OPTI621
-	{PCI_VENDOR_ID_OPTI, PCI_DEVICE_ID_OPTI_82C621, NULL, NULL, ide_init_opti621, NULL, {{0x45,0x80,0x00}, {0x40,0x08,0x00}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_OPTI, PCI_DEVICE_ID_OPTI_82C825, NULL, NULL, ide_init_opti621, NULL, {{0x45,0x80,0x00}, {0x40,0x08,0x00}}, ON_BOARD, 0, 0 },
-#endif
-#ifdef CONFIG_BLK_DEV_TRM290
-	{PCI_VENDOR_ID_TEKRAM, PCI_DEVICE_ID_TEKRAM_DC290, NULL, NULL, ide_init_trm290,	NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-#endif
-#ifdef CONFIG_BLK_DEV_NS87415
-	{PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_87415, NULL, NULL, ide_init_ns87415, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-#endif
-#ifdef CONFIG_BLK_DEV_AEC62XX
-	{PCI_VENDOR_ID_ARTOP, PCI_DEVICE_ID_ARTOP_ATP850UF, pci_init_aec62xx, NULL, ide_init_aec62xx, ide_dmacapable_aec62xx, {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}}, OFF_BOARD, 0, ATA_F_SER | ATA_F_IRQ | ATA_F_DMA },
-	{PCI_VENDOR_ID_ARTOP, PCI_DEVICE_ID_ARTOP_ATP860, pci_init_aec62xx, ata66_aec62xx, ide_init_aec62xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, NEVER_BOARD, 0, ATA_F_IRQ | ATA_F_NOADMA | ATA_F_DMA },
-	{PCI_VENDOR_ID_ARTOP, PCI_DEVICE_ID_ARTOP_ATP860R, pci_init_aec62xx, ata66_aec62xx, ide_init_aec62xx, NULL, {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
-#endif
-#ifdef CONFIG_BLK_DEV_SL82C105
-	{PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_82C105, pci_init_sl82c105, NULL, ide_init_sl82c105, dma_init_sl82c105, {{0x40,0x01,0x01}, {0x40,0x10,0x10}}, ON_BOARD, 0, 0 },
-#endif
-#ifdef CONFIG_BLK_DEV_HPT34X
-	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT343, pci_init_hpt34x, NULL, ide_init_hpt34x, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, NEVER_BOARD, 16, ATA_F_NOADMA | ATA_F_DMA },
-#endif
-#ifdef CONFIG_BLK_DEV_HPT366
-	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT366, pci_init_hpt366, ata66_hpt366, ide_init_hpt366, ide_dmacapable_hpt366, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 240, ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA },
-	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT372, pci_init_hpt366, ata66_hpt366, ide_init_hpt366, ide_dmacapable_hpt366, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA },
-	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT374, pci_init_hpt366, ata66_hpt366, ide_init_hpt366, ide_dmacapable_hpt366, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA },
-#endif
-#ifdef CONFIG_BLK_DEV_ALI15X3
-	{PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M5229, pci_init_ali15x3, ata66_ali15x3, ide_init_ali15x3, ide_dmacapable_ali15x3, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-#endif
-#ifdef CONFIG_BLK_DEV_CY82C693
-	{PCI_VENDOR_ID_CONTAQ, PCI_DEVICE_ID_CONTAQ_82C693, pci_init_cy82c693, NULL, ide_init_cy82c693,	NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_DMA },
-#endif
-#ifdef CONFIG_BLK_DEV_CS5530
-	{PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5530_IDE, pci_init_cs5530, NULL, ide_init_cs5530, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_DMA },
-#endif
-#ifdef CONFIG_BLK_DEV_AMD74XX
-	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_COBRA_7401, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7409, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7411, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_OPUS_7441, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8111_IDE, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE_IDE, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x50,0x01,0x01}, {0x50,0x02,0x02}}, ON_BOARD, 0, 0 },
-#endif
-#ifdef CONFIG_BLK_DEV_PDC_ADMA
-	{PCI_VENDOR_ID_PDC, PCI_DEVICE_ID_PDC_1841, pci_init_pdcadma, ata66_pdcadma, ide_init_pdcadma, ide_dmacapable_pdcadma, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_NODMA },
-#endif
-#ifdef CONFIG_BLK_DEV_SVWKS
-        {PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_OSB4IDE, pci_init_svwks, ata66_svwks, ide_init_svwks, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_DMA },
-	{PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB5IDE, pci_init_svwks, ata66_svwks, ide_init_svwks, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-#endif
-#ifdef CONFIG_BLK_DEV_IT8172
-	{PCI_VENDOR_ID_ITE, PCI_DEVICE_ID_ITE_IT8172G, pci_init_it8172,	NULL, ide_init_it8172, NULL, {{0x00,0x00,0x00}, {0x40,0x00,0x01}}, ON_BOARD, 0, 0 },
-#endif
-	/* Those are id's of chips we don't deal currently with,
-	 * but which still need some generic quirk handling.
-	 */
-	{PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_SAMURAI_IDE, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_640, NULL, NULL, ATA_PCI_IGNORE, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_87410, NULL, NULL, NULL, NULL, {{0x43,0x08,0x08}, {0x47,0x08,0x08}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_HINT, PCI_DEVICE_ID_HINT, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_HOLTEK, PCI_DEVICE_ID_HOLTEK_6565, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371MX, NULL, NULL, NULL, NULL, {{0x6D,0x80,0x80}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_NODMA },
-	{PCI_VENDOR_ID_UMC, PCI_DEVICE_ID_UMC_UM8673F, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_FIXIRQ },
-	{PCI_VENDOR_ID_UMC, PCI_DEVICE_ID_UMC_UM8886A, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_FIXIRQ },
-	{PCI_VENDOR_ID_UMC, PCI_DEVICE_ID_UMC_UM8886BF, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_FIXIRQ },
-	{PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C561, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_NOADMA },
-	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT366, NULL, NULL, IDE_NO_DRIVER, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 240, ATA_F_IRQ | ATA_F_HPTHACK },
-	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT372, NULL, NULL, IDE_NO_DRIVER, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_HPTHACK },
-	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT374, NULL, NULL, IDE_NO_DRIVER, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_HPTHACK },
-	{0, 0, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0 }};
+	d->next = NULL;
+
+	if (!ata_pci_device_list) {
+		ata_pci_device_list = d;
+
+		return;
+	}
+
+	tmp = ata_pci_device_list;
+	while (tmp->next) {
+		tmp = tmp->next;
+	}
+
+	tmp->next = d;
+}
 
 /*
  * This allows off board ide-pci cards the enable a BIOS, verify interrupt
@@ -330,7 +82,7 @@ static unsigned int __init trust_pci_irq(struct ata_pci_device *d, struct pci_de
  * Match a PCI IDE port against an entry in ide_hwifs[],
  * based on io_base port if possible.
  */
-static struct ata_channel __init *lookup_hwif (unsigned long io_base, int bootable, const char *name)
+static struct ata_channel __init *lookup_channel(unsigned long io_base, int bootable, const char *name)
 {
 	int h;
 	struct ata_channel *hwif;
@@ -370,7 +122,7 @@ static struct ata_channel __init *lookup_hwif (unsigned long io_base, int bootab
 	 * Unless there is a bootable card that does not use the standard
 	 * ports 1f0/170 (the ide0/ide1 defaults). The (bootable) flag.
 	 */
-	if (bootable) {
+	if (bootable == ON_BOARD) {
 		for (h = 0; h < MAX_HWIFS; ++h) {
 			hwif = &ide_hwifs[h];
 			if (hwif->chipset == ide_unknown)
@@ -482,7 +234,8 @@ static unsigned long __init get_dma_base(struct ata_channel *hwif, int extra, co
 /*
  * Setup DMA transfers on a channel.
  */
-static void __init setup_channel_dma(struct ata_channel *hwif, struct pci_dev *dev,
+static void __init setup_channel_dma(struct ata_channel *ch,
+		struct pci_dev *dev,
 		struct ata_pci_device *d,
 		int port,
 		u8 class_rev,
@@ -496,14 +249,15 @@ static void __init setup_channel_dma(struct ata_channel *hwif, struct pci_dev *d
 		autodma = 0;
 
 	if (autodma)
-		hwif->autodma = 1;
+		ch->autodma = 1;
 
 	if (!((d->flags & ATA_F_DMA) || ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE && (dev->class & 0x80))))
 		return;
 
-	dma_base = get_dma_base(hwif, ((port == ATA_PRIMARY) && d->extra) ? d->extra : 0, dev->name);
+	dma_base = get_dma_base(ch, ((port == ATA_PRIMARY) && d->extra) ? d->extra : 0, dev->name);
 	if (!dma_base) {
-		printk("%s: %s Bus-Master DMA was disabled by BIOS\n", hwif->name, dev->name);
+		printk("%s: %s Bus-Master DMA was disabled by BIOS\n",
+				ch->name, dev->name);
 
 		return;
 	}
@@ -513,17 +267,18 @@ static void __init setup_channel_dma(struct ata_channel *hwif, struct pci_dev *d
 		 * Set up BM-DMA capability (PnP BIOS should have done this already)
 		 */
 		if (!(d->vendor == PCI_VENDOR_ID_CYRIX && d->device == PCI_DEVICE_ID_CYRIX_5530_IDE))
-			hwif->autodma = 0;	/* default DMA off if we had to configure it here */
+			ch->autodma = 0;	/* default DMA off if we had to configure it here */
 		pci_write_config_word(dev, PCI_COMMAND, *pcicmd | PCI_COMMAND_MASTER);
 		if (pci_read_config_word(dev, PCI_COMMAND, pcicmd) || !(*pcicmd & PCI_COMMAND_MASTER)) {
-			printk("%s: %s error updating PCICMD\n", hwif->name, dev->name);
+			printk("%s: %s error updating PCICMD\n",
+					ch->name, dev->name);
 			dma_base = 0;
 		}
 	}
-	if (d->dma_init)
-		d->dma_init(hwif, dma_base);
+	if (d->init_dma)
+		d->init_dma(ch, dma_base);
 	else
-		ide_setup_dma(hwif, dma_base, 8);
+		ata_init_dma(ch, dma_base);
 }
 #endif
 
@@ -598,7 +353,7 @@ controller_ok:
 	if (!base)
 		base = port ? 0x170 : 0x1f0;
 
-	if ((ch = lookup_hwif(base, d->bootable, dev->name)) == NULL)
+	if ((ch = lookup_channel(base, d->bootable, dev->name)) == NULL)
 		return -ENOMEM;	/* no room in ide_hwifs[] */
 
 	if (ch->io_ports[IDE_DATA_OFFSET] != base) {
@@ -668,11 +423,6 @@ static void __init setup_pci_device(struct pci_dev *dev, struct ata_pci_device *
 	if (!noautodma)
 		autodma = 1;
 #endif
-
-	if (d->init_channel == IDE_NO_DRIVER) {
-		printk(KERN_WARNING "%s: detected chipset, but driver not compiled in!\n", dev->name);
-		d->init_channel = NULL;
-	}
 
 	if (pci_enable_device(dev)) {
 		printk(KERN_WARNING "%s: Could not enable PCI device.\n", dev->name);
@@ -803,13 +553,14 @@ static void __init pdc20270_device_order_fixup (struct pci_dev *dev, struct ata_
 			}
 		}
 	}
-
-	printk("%s: IDE controller on PCI bus %02x dev %02x\n", dev->name, dev->bus->number, dev->devfn);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
+			dev->name, dev->slot_name, dev->devfn);
 	setup_pci_device(dev, d);
 	if (!dev2)
 		return;
 	d2 = d;
-	printk("%s: IDE controller on PCI bus %02x dev %02x\n", dev2->name, dev2->bus->number, dev2->devfn);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
+			dev2->name, dev2->slot_name, dev2->devfn);
 	setup_pci_device(dev2, d2);
 }
 
@@ -832,8 +583,8 @@ static void __init hpt374_device_order_fixup (struct pci_dev *dev, struct ata_pc
 		}
 	}
 
-	printk("%s: IDE controller on PCI bus %02x dev %02x\n",
-		dev->name, dev->bus->number, dev->devfn);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
+		dev->name, dev->slot_name, dev->devfn);
 	setup_pci_device(dev, d);
 	if (!dev2) {
 		return;
@@ -849,8 +600,8 @@ static void __init hpt374_device_order_fixup (struct pci_dev *dev, struct ata_pc
 		}
 	}
 	d2 = d;
-	printk("%s: IDE controller on PCI bus %02x dev %02x\n",
-		dev2->name, dev2->bus->number, dev2->devfn);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
+		dev2->name, dev2->slot_name, dev2->devfn);
 	setup_pci_device(dev2, d2);
 
 }
@@ -871,7 +622,7 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pc
 	switch(class_rev) {
 		case 5:
 		case 4:
-		case 3:	printk("%s: IDE controller on PCI slot %s\n", dev->name, dev->slot_name);
+		case 3:	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev->name, dev->slot_name);
 			setup_pci_device(dev, d);
 			return;
 		default:	break;
@@ -887,17 +638,17 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pc
 			pci_read_config_byte(dev2, PCI_INTERRUPT_PIN, &pin2);
 			if ((pin1 != pin2) && (dev->irq == dev2->irq)) {
 				d->bootable = ON_BOARD;
-				printk("%s: onboard version of chipset, pin1=%d pin2=%d\n", dev->name, pin1, pin2);
+				printk(KERN_INFO "ATAL: %s: onboard version of chipset, pin1=%d pin2=%d\n", dev->name, pin1, pin2);
 			}
 			break;
 		}
 	}
-	printk("%s: IDE controller on PCI slot %s\n", dev->name, dev->slot_name);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev->name, dev->slot_name);
 	setup_pci_device(dev, d);
 	if (!dev2)
 		return;
 	d2 = d;
-	printk("%s: IDE controller on PCI slot %s\n", dev2->name, dev2->slot_name);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev2->name, dev2->slot_name);
 	setup_pci_device(dev2, d2);
 }
 
@@ -916,11 +667,27 @@ static void __init scan_pcidev(struct pci_dev *dev)
 	vendor = dev->vendor;
 	device = dev->device;
 
+
+
 	/* Look up the chipset information.
+	 * We expect only one match.
 	 */
-	d = pci_chipsets;
-	while (d->vendor && !(d->vendor == vendor && d->device == device))
-		++d;
+	for (d = ata_pci_device_list; d; d = d->next) {
+		if (d->vendor == vendor && d->device == device)
+			break;
+	}
+
+	if (!d) {
+		/* Only check the device calls, if it wasn't listed, since
+		 * there are in esp. some pdc202xx chips which "work around"
+		 * beeing grabbed by generic drivers.
+		 */
+		if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
+			printk(KERN_INFO "ATA: unknown interface: %s, on PCI slot %s\n",
+					dev->name, dev->slot_name);
+		}
+		return;
+	}
 
 	if (d->init_channel == ATA_PCI_IGNORE)
 		printk(KERN_INFO "ATA: %s: ignored by PCI bus scan\n", dev->name);
@@ -937,15 +704,11 @@ static void __init scan_pcidev(struct pci_dev *dev)
 			hpt366_device_order_fixup(dev, d);
 		if (d->device == PCI_DEVICE_ID_TTI_HPT374)
 			hpt374_device_order_fixup(dev, d);
-	}
-	else if (d->vendor == PCI_VENDOR_ID_PROMISE && d->device == PCI_DEVICE_ID_PROMISE_20268R)
+	} else if (d->vendor == PCI_VENDOR_ID_PROMISE && d->device == PCI_DEVICE_ID_PROMISE_20268R)
 		pdc20270_device_order_fixup(dev, d);
-	else if (!(d->vendor == 0 && d->device == 0) || (dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
-		if (d->vendor == 0 && d->device == 0)
-			printk(KERN_INFO "ATA: unknown interface: %s (%04x:%04x) on PCI slot %s\n",
-			       dev->name, vendor, device, dev->slot_name);
-		else
-			printk(KERN_INFO "ATA: interface: %s, on PCI slot %s\n", dev->name, dev->slot_name);
+	else {
+		printk(KERN_INFO "ATA: %s (%04x:%04x) on PCI slot %s\n",
+				dev->name, vendor, device, dev->slot_name);
 		setup_pci_device(dev, d);
 	}
 }
@@ -963,4 +726,93 @@ void __init ide_scan_pcibus(int scan_direction)
 			scan_pcidev(dev);
 		}
 	}
+}
+
+/* known chips without particular chipset driver module data table */
+/* Those are id's of chips we don't deal currently with, but which still need
+ * some generic quirk handling.
+ */
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_PCTECH,
+		device: PCI_DEVICE_ID_PCTECH_SAMURAI_IDE,
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_CMD,
+		device: PCI_DEVICE_ID_CMD_640,
+		init_channel: ATA_PCI_IGNORE,
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_NS,
+		device: PCI_DEVICE_ID_NS_87410,
+		enablebits: {{0x43,0x08,0x08}, {0x47,0x08,0x08}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_HINT,
+		device: PCI_DEVICE_ID_HINT,
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_HOLTEK,
+		device: PCI_DEVICE_ID_HOLTEK_6565,
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82371MX,
+		enablebits: {{0x6D,0x80,0x80}, {0x00,0x00,0x00}},
+		bootable: ON_BOARD,
+		flags: ATA_F_NODMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_UMC,
+		device: PCI_DEVICE_ID_UMC_UM8673F,
+		bootable: ON_BOARD,
+		flags: ATA_F_FIXIRQ
+	},
+	{
+		vendor: PCI_VENDOR_ID_UMC,
+		device: PCI_DEVICE_ID_UMC_UM8886A,
+		bootable: ON_BOARD,
+		flags: ATA_F_FIXIRQ
+	},
+	{
+		vendor: PCI_VENDOR_ID_UMC,
+		device: PCI_DEVICE_ID_UMC_UM8886BF,
+		bootable: ON_BOARD,
+		flags: ATA_F_FIXIRQ
+	},
+	{
+		vendor: PCI_VENDOR_ID_VIA,
+		device: PCI_DEVICE_ID_VIA_82C561,
+		bootable: ON_BOARD,
+		flags: ATA_F_NOADMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_VIA,
+		device: PCI_DEVICE_ID_VIA_82C586_1,
+		bootable: ON_BOARD,
+		flags: ATA_F_NOADMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_TTI,
+		device: PCI_DEVICE_ID_TTI_HPT366,
+		bootable: OFF_BOARD,
+		extra: 240,
+		flags: ATA_F_IRQ | ATA_F_HPTHACK
+	}
+};
+
+int __init init_ata_pci_misc(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+	return 0;
 }

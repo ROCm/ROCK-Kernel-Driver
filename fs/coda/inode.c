@@ -15,7 +15,6 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/unistd.h>
 #include <linux/smp_lock.h>
 #include <linux/file.h>
@@ -33,7 +32,6 @@
 #include <linux/coda_cache.h>
 
 /* VFS super_block ops */
-static void coda_read_inode(struct inode *);
 static void coda_clear_inode(struct inode *);
 static void coda_put_super(struct super_block *);
 static int coda_statfs(struct super_block *sb, struct statfs *buf);
@@ -92,7 +90,6 @@ struct super_operations coda_super_operations =
 {
 	alloc_inode:	coda_alloc_inode,
 	destroy_inode:	coda_destroy_inode,
-	read_inode:	coda_read_inode,
 	clear_inode:	coda_clear_inode,
 	put_super:	coda_put_super,
 	statfs:		coda_statfs,
@@ -229,18 +226,6 @@ static void coda_put_super(struct super_block *sb)
 	kfree(sbi);
 }
 
-/* all filling in of inodes postponed until lookup */
-static void coda_read_inode(struct inode *inode)
-{
-	struct coda_sb_info *sbi = coda_sbp(inode->i_sb);
-	struct coda_inode_info *cii;
-
-        if (!sbi) BUG();
-
-	cii = ITOC(inode);
-	list_add(&cii->c_cilist, &sbi->sbi_cihead);
-}
-
 static void coda_clear_inode(struct inode *inode)
 {
 	struct coda_inode_info *cii = ITOC(inode);
@@ -252,7 +237,15 @@ static void coda_clear_inode(struct inode *inode)
 	coda_cache_clear_inode(inode);
 }
 
-int coda_notify_change(struct dentry *de, struct iattr *iattr)
+int coda_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+{
+	int err = coda_revalidate_inode(dentry);
+	if (!err)
+		generic_fillattr(dentry->d_inode, stat);
+	return err;
+}
+
+int coda_setattr(struct dentry *de, struct iattr *iattr)
 {
 	struct inode *inode = de->d_inode;
         struct coda_vattr vattr;
@@ -281,8 +274,8 @@ int coda_notify_change(struct dentry *de, struct iattr *iattr)
 
 struct inode_operations coda_file_inode_operations = {
 	permission:	coda_permission,
-	revalidate:	coda_revalidate_inode,
-	setattr:	coda_notify_change,
+	getattr:	coda_getattr,
+	setattr:	coda_setattr,
 };
 
 static int coda_statfs(struct super_block *sb, struct statfs *buf)

@@ -1,10 +1,13 @@
 /* Driver for USB Mass Storage compliant devices
  * Debugging Functions Source Code File
  *
- * $Id: debug.c,v 1.5 2001/06/27 23:20:45 mdharm Exp $
+ * $Id: debug.c,v 1.9 2002/04/22 03:39:43 mdharm Exp $
  *
  * Current development and maintenance by:
- *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
+ *   (c) 1999-2002 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
+ *
+ * Developed with the assistance of:
+ *   (c) 2002 Alan Stern <stern@rowland.org>
  *
  * Initial work by:
  *   (c) 1999 Michael Gee (michael@linuxspecific.com)
@@ -302,9 +305,11 @@ void usb_stor_show_sense(
 	case 0x1902: what="defect list error in primary list"; break;
 	case 0x1903: what="defect list error in grown list"; break;
 	case 0x1C00: what="defect list not found"; break;
+	case 0x2000: what="invalid command operation code"; break;
 	case 0x2400: what="invalid field in CDB"; break;
 	case 0x2703: what="associated write protect"; break;
 	case 0x2800: what="not ready to ready transition"; break;
+	case 0x2900: what="device reset occurred"; break;
 	case 0x2903: what="bus device reset function occurred"; break;
 	case 0x2904: what="device internal reset"; break;
 	case 0x2B00: what="copy can't execute / host can't disconnect"; break;
@@ -327,7 +332,7 @@ void usb_stor_show_sense(
 	case 0x3502: what="enclosure services unavailable"; break;
 	case 0x3503: what="enclosure services transfer failure"; break;
 	case 0x3504: what="enclosure services transfer refused"; break;
-	case 0x3A00: what="medium not present"; break;
+	case 0x3A00: what="media not present"; break;
 	case 0x3B0F: what="end of medium reached"; break;
 	case 0x3F02: what="changed operating definition"; break;
 	case 0x4100: what="data path failure (should use 40 NN)"; break;

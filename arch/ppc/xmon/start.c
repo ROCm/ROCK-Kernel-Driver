@@ -32,6 +32,7 @@ unsigned int TXRDY, RXRDY, DLAB;
 extern void xmon_printf(const char *fmt, ...);
 static int xmon_expect(const char *str, unsigned int timeout);
 
+static int use_serial;
 static int use_screen;
 static int via_modem;
 static int xmon_use_sccb;
@@ -95,6 +96,7 @@ static unsigned long chrp_find_phys_io_base(void)
 }
 #endif /* CONFIG_ALL_PPC */
 
+#ifdef CONFIG_MAGIC_SYSRQ
 static void sysrq_handle_xmon(int key, struct pt_regs *regs,
 			      struct kbd_struct *kbd, struct tty_struct *tty)
 {
@@ -107,20 +109,20 @@ static struct sysrq_key_op sysrq_xmon_op =
 	help_msg:	"Xmon",
 	action_msg:	"Entering xmon\n",
 };
+#endif
 
 void
 xmon_map_scc(void)
 {
 #ifdef CONFIG_ALL_PPC
 	volatile unsigned char *base;
-
-	use_screen = 0;
 	
 	if (_machine == _MACH_Pmac) {
 		struct device_node *np;
 		unsigned long addr;
 #ifdef CONFIG_BOOTX_TEXT
-		if (!machine_is_compatible("iMac")) {
+		if (!use_screen && !use_serial
+		    && !machine_is_compatible("iMac")) {
 			/* see if there is a keyboard in the device tree
 			   with a parent of type "adb" */
 			for (np = find_devices("keyboard"); np; np = np->next)
@@ -218,7 +220,9 @@ xmon_map_scc(void)
 	DLAB = 0x80;
 #endif /* platform */
 
+#ifdef CONFIG_MAGIC_SYSRQ
 	__sysrq_put_key_op('x', &sysrq_xmon_op);
+#endif
 }
 
 static int scc_initialized = 0;

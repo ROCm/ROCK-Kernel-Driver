@@ -78,31 +78,6 @@ char *ide_xfer_verbose (byte xfer_rate)
 	return "XFER ERROR";
 }
 
-byte ide_auto_reduce_xfer (ide_drive_t *drive)
-{
-	if (!drive->crc_count)
-		return drive->current_speed;
-	drive->crc_count = 0;
-
-	switch(drive->current_speed) {
-		case XFER_UDMA_7:	return XFER_UDMA_6;
-		case XFER_UDMA_6:	return XFER_UDMA_5;
-		case XFER_UDMA_5:	return XFER_UDMA_4;
-		case XFER_UDMA_4:	return XFER_UDMA_3;
-		case XFER_UDMA_3:	return XFER_UDMA_2;
-		case XFER_UDMA_2:	return XFER_UDMA_1;
-		case XFER_UDMA_1:	return XFER_UDMA_0;
-			/*
-			 * OOPS we do not goto non Ultra DMA modes
-			 * without iCRC's available we force
-			 * the system to PIO and make the user
-			 * invoke the ATA-1 ATA-2 DMA modes.
-			 */
-		case XFER_UDMA_0:
-		default:		return XFER_PIO_4;
-	}
-}
-
 /*
  * hd_driveid data come as little endian,
  * they need to be converted on big endian machines
@@ -110,7 +85,7 @@ byte ide_auto_reduce_xfer (ide_drive_t *drive)
 void ide_fix_driveid(struct hd_driveid *id)
 {
 #ifndef __LITTLE_ENDIAN
-#ifdef __BIG_ENDIAN
+# ifdef __BIG_ENDIAN
 	int i;
 	unsigned short *stringcast;
 
@@ -196,13 +171,13 @@ void ide_fix_driveid(struct hd_driveid *id)
 	for (i = 0; i < 48; i++)
 		id->words206_254[i] = __le16_to_cpu(id->words206_254[i]);
 	id->integrity_word  = __le16_to_cpu(id->integrity_word);
-#else
-#error "Please fix <asm/byteorder.h>"
-#endif /* __BIG_ENDIAN */
-#endif /* __LITTLE_ENDIAN */
+# else
+#  error "Please fix <asm/byteorder.h>"
+# endif
+#endif
 }
 
-int ide_driveid_update (ide_drive_t *drive)
+int ide_driveid_update(struct ata_device *drive)
 {
 	/*
 	 * Re-read drive->id for possible DMA mode
@@ -255,56 +230,9 @@ int ide_driveid_update (ide_drive_t *drive)
 }
 
 /*
- * Verify that we are doing an approved SETFEATURES_XFER with respect
- * to the hardware being able to support request.  Since some hardware
- * can improperly report capabilties, we check to see if the host adapter
- * in combination with the device (usually a disk) properly detect
- * and acknowledge each end of the ribbon.
+ *  All hosts that use the 80c ribbon must use this!
  */
-int ide_ata66_check (ide_drive_t *drive, struct ata_taskfile *args)
-{
-	if ((args->taskfile.command == WIN_SETFEATURES) &&
-	    (args->taskfile.sector_number > XFER_UDMA_2) &&
-	    (args->taskfile.feature == SETFEATURES_XFER)) {
-		if (!drive->channel->udma_four) {
-			printk("%s: Speed warnings UDMA 3/4/5 is not functional.\n", drive->channel->name);
-			return 1;
-		}
-#ifndef CONFIG_IDEDMA_IVB
-		if ((drive->id->hw_config & 0x6000) == 0) {
-#else
-		if (((drive->id->hw_config & 0x2000) == 0) ||
-		    ((drive->id->hw_config & 0x4000) == 0)) {
-#endif
-			printk("%s: Speed warnings UDMA 3/4/5 is not functional.\n", drive->name);
-			return 1;
-		}
-	}
-	return 0;
-}
-
-/*
- * Backside of HDIO_DRIVE_CMD call of SETFEATURES_XFER.
- * 1 : Safe to update drive->id DMA registers.
- * 0 : OOPs not allowed.
- */
-int set_transfer (ide_drive_t *drive, struct ata_taskfile *args)
-{
-	if ((args->taskfile.command == WIN_SETFEATURES) &&
-	    (args->taskfile.sector_number >= XFER_SW_DMA_0) &&
-	    (args->taskfile.feature == SETFEATURES_XFER) &&
-	    (drive->id->dma_ultra ||
-	     drive->id->dma_mword ||
-	     drive->id->dma_1word))
-		return 1;
-
-	return 0;
-}
-
-/*
- *  All hosts that use the 80c ribbon mus use!
- */
-byte eighty_ninty_three (ide_drive_t *drive)
+byte eighty_ninty_three(struct ata_device *drive)
 {
 	return ((byte) ((drive->channel->udma_four) &&
 #ifndef CONFIG_IDEDMA_IVB
@@ -324,17 +252,17 @@ byte eighty_ninty_three (ide_drive_t *drive)
  *
  * const char *msg == consider adding for verbose errors.
  */
-int ide_config_drive_speed (ide_drive_t *drive, byte speed)
+int ide_config_drive_speed(struct ata_device *drive, byte speed)
 {
 	struct ata_channel *hwif = drive->channel;
 	int i;
 	int error = 1;
-	byte stat;
+	u8 stat;
 
-#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
-	byte unit = (drive->select.b.unit & 0x01);
+#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(__CRIS__)
+	u8 unit = (drive->select.b.unit & 0x01);
 	outb(inb(hwif->dma_base+2) & ~(1<<(5+unit)), hwif->dma_base+2);
-#endif /* (CONFIG_BLK_DEV_IDEDMA) && !(CONFIG_DMA_NONPCI) */
+#endif
 
 	/*
 	 * Don't use ide_wait_cmd here - it will
@@ -393,7 +321,7 @@ int ide_config_drive_speed (ide_drive_t *drive, byte speed)
 	enable_irq(hwif->irq);
 
 	if (error) {
-		ide_dump_status(drive, "set_drive_speed_status", stat);
+		ide_dump_status(drive, NULL, "set_drive_speed_status", stat);
 		return error;
 	}
 
@@ -401,13 +329,13 @@ int ide_config_drive_speed (ide_drive_t *drive, byte speed)
 	drive->id->dma_mword &= ~0x0F00;
 	drive->id->dma_1word &= ~0x0F00;
 
-#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
+#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(__CRIS__)
 	if (speed > XFER_PIO_4) {
 		outb(inb(hwif->dma_base+2)|(1<<(5+unit)), hwif->dma_base+2);
 	} else {
 		outb(inb(hwif->dma_base+2) & ~(1<<(5+unit)), hwif->dma_base+2);
 	}
-#endif /* (CONFIG_BLK_DEV_IDEDMA) && !(CONFIG_DMA_NONPCI) */
+#endif
 
 	switch(speed) {
 		case XFER_UDMA_7:   drive->id->dma_ultra |= 0x8080; break;
@@ -429,11 +357,7 @@ int ide_config_drive_speed (ide_drive_t *drive, byte speed)
 	return error;
 }
 
-EXPORT_SYMBOL(ide_auto_reduce_xfer);
 EXPORT_SYMBOL(ide_fix_driveid);
 EXPORT_SYMBOL(ide_driveid_update);
-EXPORT_SYMBOL(ide_ata66_check);
-EXPORT_SYMBOL(set_transfer);
 EXPORT_SYMBOL(eighty_ninty_three);
 EXPORT_SYMBOL(ide_config_drive_speed);
-

@@ -170,7 +170,6 @@ struct nfs_inode {
 #define NFS_INO_REVALIDATING	0x0004		/* revalidating attrs */
 #define NFS_IS_SNAPSHOT		0x0010		/* a snapshot file */
 #define NFS_INO_FLUSH		0x0020		/* inode is due for flushing */
-#define NFS_INO_NEW		0x0040		/* hadn't been filled yet */
 
 static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
@@ -208,7 +207,6 @@ do { \
 #define NFS_FLAGS(inode)		(NFS_I(inode)->flags)
 #define NFS_REVALIDATING(inode)		(NFS_FLAGS(inode) & NFS_INO_REVALIDATING)
 #define NFS_STALE(inode)		(NFS_FLAGS(inode) & NFS_INO_STALE)
-#define NFS_NEW(inode)			(NFS_FLAGS(inode) & NFS_INO_NEW)
 
 #define NFS_FILEID(inode)		(NFS_I(inode)->fileid)
 
@@ -236,12 +234,12 @@ extern int nfs_inode_is_stale(struct inode *, struct nfs_fh *,
 extern struct inode *nfs_fhget(struct dentry *, struct nfs_fh *,
 				struct nfs_fattr *);
 extern int __nfs_refresh_inode(struct inode *, struct nfs_fattr *);
-extern int nfs_revalidate(struct dentry *);
+extern int nfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 extern int nfs_permission(struct inode *, int);
 extern int nfs_open(struct inode *, struct file *);
 extern int nfs_release(struct inode *, struct file *);
 extern int __nfs_revalidate_inode(struct nfs_server *, struct inode *);
-extern int nfs_notify_change(struct dentry *, struct iattr *);
+extern int nfs_setattr(struct dentry *, struct iattr *);
 
 /*
  * linux/fs/nfs/file.c

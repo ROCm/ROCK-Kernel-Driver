@@ -50,21 +50,13 @@
  * 40000000 - 4FFFFFFF      PCI memory.  256M non-prefetchable
  * 50000000 - 5FFFFFFF      PCI memory.  256M prefetchable
  * 60000000 - 60FFFFFF      PCI IO.  16M
- * 68000000 - 68FFFFFF      PCI Configuration. 16M
+ * 61000000 - 61FFFFFF      PCI Configuration. 16M
  * 
  * There are three V3 windows, each described by a pair of V3 registers.
  * These are LB_BASE0/LB_MAP0, LB_BASE1/LB_MAP1 and LB_BASE2/LB_MAP2.
  * Base0 and Base1 can be used for any type of PCI memory access.   Base2
  * can be used either for PCI I/O or for I20 accesses.  By default, uHAL
  * uses this only for PCI IO space.
- * 
- * PCI Memory is mapped so that assigned addresses in PCI Memory match
- * local bus memory addresses.  In other words, if a PCI device is assigned
- * address 80200000 then that address is a valid local bus address as well
- * as a valid PCI Memory address.  PCI IO addresses are mapped to start
- * at zero.  This means that local bus address 60000000 maps to PCI IO address
- * 00000000 and so on.   Device driver writers need to be aware of this 
- * distinction.
  * 
  * Normally these spaces are mapped using the following base registers:
  * 
@@ -73,7 +65,7 @@
  * Mem   40000000 - 4FFFFFFF      LB_BASE0/LB_MAP0
  * Mem   50000000 - 5FFFFFFF      LB_BASE1/LB_MAP1
  * IO    60000000 - 60FFFFFF      LB_BASE2/LB_MAP2
- * Cfg   68000000 - 68FFFFFF      
+ * Cfg   61000000 - 61FFFFFF
  * 
  * This means that I20 and PCI configuration space accesses will fail.
  * When PCI configuration accesses are needed (via the uHAL PCI 
@@ -84,7 +76,7 @@
  * Mem   40000000 - 4FFFFFFF      LB_BASE0/LB_MAP0
  * Mem   50000000 - 5FFFFFFF      LB_BASE0/LB_MAP0
  * IO    60000000 - 60FFFFFF      LB_BASE2/LB_MAP2
- * Cfg   68000000 - 68FFFFFF      LB_BASE1/LB_MAP1
+ * Cfg   61000000 - 61FFFFFF      LB_BASE1/LB_MAP1
  * 
  * To make this work, the code depends on overlapping windows working.
  * The V3 chip translates an address by checking its range within 
@@ -174,10 +166,10 @@
 static spinlock_t v3_lock = SPIN_LOCK_UNLOCKED;
 
 #define PCI_BUS_NONMEM_START	0x00000000
-#define PCI_BUS_NONMEM_SIZE	0x10000000
+#define PCI_BUS_NONMEM_SIZE	SZ_256M
 
-#define PCI_BUS_PREMEM_START	0x10000000
-#define PCI_BUS_PREMEM_SIZE	0x10000000
+#define PCI_BUS_PREMEM_START	PCI_BUS_NONMEM_START + PCI_BUS_NONMEM_SIZE
+#define PCI_BUS_PREMEM_SIZE	SZ_256M
 
 #if PCI_BUS_NONMEM_START & 0x000fffff
 #error PCI_BUS_NONMEM_START must be megabyte aligned
@@ -400,15 +392,15 @@ static struct pci_ops pci_v3_ops = {
 
 static struct resource non_mem = {
 	name:	"PCI non-prefetchable",
-	start:	0x40000000 + PCI_BUS_NONMEM_START,
-	end:	0x40000000 + PCI_BUS_NONMEM_START + PCI_BUS_NONMEM_SIZE - 1,
+	start:	PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START,
+	end:	PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START + PCI_BUS_NONMEM_SIZE - 1,
 	flags:	IORESOURCE_MEM,
 };
 
 static struct resource pre_mem = {
 	name:	"PCI prefetchable",
-	start:	0x40000000 + PCI_BUS_PREMEM_START,
-	end:	0x40000000 + PCI_BUS_PREMEM_START + PCI_BUS_PREMEM_SIZE - 1,
+	start:	PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START,
+	end:	PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START + PCI_BUS_PREMEM_SIZE - 1,
 	flags:	IORESOURCE_MEM | IORESOURCE_PREFETCH,
 };
 
@@ -433,7 +425,7 @@ static int __init pci_v3_setup_resources(struct resource **resource)
 	 */
 	resource[0] = &ioport_resource;
 	resource[1] = &non_mem;
-	resource[2] = &pre_mem;
+//	resource[2] = &pre_mem;
 
 	return 1;
 }
@@ -530,7 +522,7 @@ int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
 	int ret = 0;
 
 	if (nr == 0) {
-		sys->mem_offset = 0x40000000;
+		sys->mem_offset = PHYS_PCI_MEM_BASE;
 		ret = pci_v3_setup_resources(sys->resource);
 	}
 

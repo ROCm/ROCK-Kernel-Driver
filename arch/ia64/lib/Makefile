@@ -2,9 +2,6 @@
 # Makefile for ia64-specific library routines..
 #
 
-.S.o:
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c $< -o $@
-
 L_TARGET = lib.a
 
 export-objs := io.o swiotlb.o
@@ -25,27 +22,27 @@ IGNORE_FLAGS_OBJS =	__divsi3.o __udivsi3.o __modsi3.o __umodsi3.o \
 $(L_TARGET): $(obj-y) $(export-objs)
 
 __divdi3.o: idiv64.S
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $@ $<
+	$(CC) $(AFLAGS) -c -o $@ $<
 
 __udivdi3.o: idiv64.S
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DUNSIGNED -c -o $@ $<
+	$(CC) $(AFLAGS) -c -DUNSIGNED -c -o $@ $<
 
 __moddi3.o: idiv64.S
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DMODULO -c -o $@ $<
+	$(CC) $(AFLAGS) -c -DMODULO -c -o $@ $<
 
 __umoddi3.o: idiv64.S
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DMODULO -DUNSIGNED -c -o $@ $<
+	$(CC) $(AFLAGS) -c -DMODULO -DUNSIGNED -c -o $@ $<
 
 __divsi3.o: idiv32.S
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $@ $<
+	$(CC) $(AFLAGS) -c -o $@ $<
 
 __udivsi3.o: idiv32.S
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DUNSIGNED -c -o $@ $<
+	$(CC) $(AFLAGS) -c -DUNSIGNED -c -o $@ $<
 
 __modsi3.o: idiv32.S
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DMODULO -c -o $@ $<
+	$(CC) $(AFLAGS) -c -DMODULO -c -o $@ $<
 
 __umodsi3.o: idiv32.S
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DMODULO -DUNSIGNED -c -o $@ $<
+	$(CC) $(AFLAGS) -c -DMODULO -DUNSIGNED -c -o $@ $<
 
 include $(TOPDIR)/Rules.make

@@ -35,6 +35,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/pmac_feature.h>
+#include <asm/sections.h>
 
 #if defined CONFIG_KGDB
 #include <asm/kgdb.h>
@@ -230,7 +231,6 @@ int show_cpuinfo(struct seq_file *m, void *v)
 	return 0;
 }
 
-
 static void *c_start(struct seq_file *m, loff_t *pos)
 {
 	int i = *pos;
@@ -309,6 +309,27 @@ early_init(int r3, int r4, int r5)
 }
 
 #ifdef CONFIG_ALL_PPC
+/*
+ * Assume here that all clock rates are the same in a
+ * smp system.  -- Cort
+ */
+int __openfirmware
+of_show_percpuinfo(struct seq_file *m, int i)
+{
+	struct device_node *cpu_node;
+	int *fp, s;
+			
+	cpu_node = find_type_devices("cpu");
+	if (!cpu_node)
+		return 0;
+	for (s = 0; s < i && cpu_node->next; s++)
+		cpu_node = cpu_node->next;
+	fp = (int *) get_property(cpu_node, "clock-frequency", NULL);
+	if (fp)
+		seq_printf(m, "clock\t\t: %dMHz\n", *fp / 1000000);
+	return 0;
+}
+
 void __init
 intuit_machine_type(void)
 {
@@ -521,12 +542,33 @@ int __init ppc_setup_l2cr(char *str)
 	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR) {
 		unsigned long val = simple_strtoul(str, NULL, 0);
 		printk(KERN_INFO "l2cr set to %lx\n", val);
-                _set_L2CR(0);           /* force invalidate by disable cache */
-                _set_L2CR(val);         /* and enable it */
+		_set_L2CR(0);		/* force invalidate by disable cache */
+		_set_L2CR(val);		/* and enable it */
 	}
 	return 1;
 }
 __setup("l2cr=", ppc_setup_l2cr);
+
+#ifdef CONFIG_NVRAM
+/* Generic nvram hooks we now look into ppc_md.nvram_read_val
+ * on pmac too ;)
+ * //XX Those 2 could be moved to headers
+ */
+unsigned char
+nvram_read_byte(int addr)
+{
+	if (ppc_md.nvram_read_val)
+		return ppc_md.nvram_read_val(addr);
+	return 0xff;
+}
+
+void
+nvram_write_byte(unsigned char val, int addr)
+{
+	if (ppc_md.nvram_write_val)
+		ppc_md.nvram_write_val(val, addr);
+}
+#endif /* CONFIG_NVRAM */
 
 int __init ppc_init(void)
 {

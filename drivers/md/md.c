@@ -436,14 +436,15 @@ static int alloc_array_sb(mddev_t * mddev)
 
 static int alloc_disk_sb(mdk_rdev_t * rdev)
 {
-	if (rdev->sb)
+	if (rdev->sb_page)
 		MD_BUG();
 
-	rdev->sb = (mdp_super_t *) __get_free_page(GFP_KERNEL);
-	if (!rdev->sb) {
+	rdev->sb_page = alloc_page(GFP_KERNEL);
+	if (!rdev->sb_page) {
 		printk(OUT_OF_MEM);
 		return -EINVAL;
 	}
+	rdev->sb = (mdp_super_t *) page_address(rdev->sb_page);
 	clear_page(rdev->sb);
 
 	return 0;
@@ -451,9 +452,10 @@ static int alloc_disk_sb(mdk_rdev_t * rdev)
 
 static void free_disk_sb(mdk_rdev_t * rdev)
 {
-	if (rdev->sb) {
-		free_page((unsigned long) rdev->sb);
+	if (rdev->sb_page) {
+		page_cache_release(rdev->sb_page);
 		rdev->sb = NULL;
+		rdev->sb_page = NULL;
 		rdev->sb_offset = 0;
 		rdev->size = 0;
 	} else {
@@ -462,13 +464,42 @@ static void free_disk_sb(mdk_rdev_t * rdev)
 	}
 }
 
+
+static void bi_complete(struct bio *bio)
+{
+	complete((struct completion*)bio->bi_private);
+}
+
+static int sync_page_io(struct block_device *bdev, sector_t sector, int size,
+		   struct page *page, int rw)
+{
+	struct bio bio;
+	struct bio_vec vec;
+	struct completion event;
+
+	bio_init(&bio);
+	bio.bi_io_vec = &vec;
+	vec.bv_page = page;
+	vec.bv_len = size;
+	vec.bv_offset = 0;
+	bio.bi_vcnt = 1;
+	bio.bi_idx = 0;
+	bio.bi_size = size;
+	bio.bi_bdev = bdev;
+	bio.bi_sector = sector;
+	init_completion(&event);
+	bio.bi_private = &event;
+	bio.bi_end_io = bi_complete;
+	submit_bio(rw, &bio);
+	run_task_queue(&tq_disk);
+	wait_for_completion(&event);
+
+	return test_bit(BIO_UPTODATE, &bio.bi_flags);
+}
+
 static int read_disk_sb(mdk_rdev_t * rdev)
 {
-	struct address_space *mapping = rdev->bdev->bd_inode->i_mapping;
-	struct page *page;
-	char *p;
 	unsigned long sb_offset;
-	int n = PAGE_CACHE_SIZE / BLOCK_SIZE;
 
 	if (!rdev->sb) {
 		MD_BUG();
@@ -483,24 +514,14 @@ static int read_disk_sb(mdk_rdev_t * rdev)
 	 */
 	sb_offset = calc_dev_sboffset(rdev->dev, rdev->mddev, 1);
 	rdev->sb_offset = sb_offset;
-	page = read_cache_page(mapping, sb_offset/n,
-			(filler_t *)mapping->a_ops->readpage, NULL);
-	if (IS_ERR(page))
-		goto out;
-	wait_on_page_locked(page);
-	if (!PageUptodate(page))
+
+	if (!sync_page_io(rdev->bdev, sb_offset<<1, MD_SB_BYTES, rdev->sb_page, READ))
 		goto fail;
-	if (PageError(page))
-		goto fail;
-	p = (char *)page_address(page) + BLOCK_SIZE * (sb_offset % n);
-	memcpy((char*)rdev->sb, p, MD_SB_BYTES);
-	page_cache_release(page);
+
 	printk(KERN_INFO " [events: %08lx]\n", (unsigned long)rdev->sb->events_lo);
 	return 0;
 
 fail:
-	page_cache_release(page);
-out:
 	printk(NO_SB,partition_name(rdev->dev));
 	return -EINVAL;
 }
@@ -550,25 +571,13 @@ abort:
 	return ret;
 }
 
-static kdev_t dev_unit(kdev_t dev)
-{
-	unsigned int mask;
-	struct gendisk *hd = get_gendisk(dev);
-
-	if (!hd)
-		return NODEV;
-	mask = ~((1 << hd->minor_shift) - 1);
-
-	return mk_kdev(major(dev), minor(dev) & mask);
-}
-
-static mdk_rdev_t * match_dev_unit(mddev_t *mddev, kdev_t dev)
+static mdk_rdev_t * match_dev_unit(mddev_t *mddev, mdk_rdev_t *dev)
 {
 	struct list_head *tmp;
 	mdk_rdev_t *rdev;
 
 	ITERATE_RDEV(mddev,rdev,tmp)
-		if (kdev_same(dev_unit(rdev->dev), dev_unit(dev)))
+		if (rdev->bdev->bd_contains == dev->bdev->bd_contains)
 			return rdev;
 
 	return NULL;
@@ -580,7 +589,7 @@ static int match_mddev_units(mddev_t *mddev1, mddev_t *mddev2)
 	mdk_rdev_t *rdev;
 
 	ITERATE_RDEV(mddev1,rdev,tmp)
-		if (match_dev_unit(mddev2, rdev->dev))
+		if (match_dev_unit(mddev2, rdev))
 			return 1;
 
 	return 0;
@@ -597,7 +606,7 @@ static void bind_rdev_to_array(mdk_rdev_t * rdev, mddev_t * mddev)
 		MD_BUG();
 		return;
 	}
-	same_pdev = match_dev_unit(mddev, rdev->dev);
+	same_pdev = match_dev_unit(mddev, rdev);
 	if (same_pdev)
 		printk( KERN_WARNING
 "md%d: WARNING: %s appears to be on the same physical disk as %s. True\n"
@@ -893,11 +902,6 @@ static mdk_rdev_t * find_rdev_all(kdev_t dev)
 
 static int write_disk_sb(mdk_rdev_t * rdev)
 {
-	struct block_device *bdev = rdev->bdev;
-	struct address_space *mapping = bdev->bd_inode->i_mapping;
-	struct page *page;
-	unsigned offs;
-	int error;
 	kdev_t dev = rdev->dev;
 	unsigned long sb_offset, size;
 
@@ -933,29 +937,11 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 	}
 
 	printk(KERN_INFO "(write) %s's sb offset: %ld\n", partition_name(dev), sb_offset);
-	fsync_bdev(bdev);
-	page = grab_cache_page(mapping, sb_offset/(PAGE_CACHE_SIZE/BLOCK_SIZE));
-	offs = sb_offset % (PAGE_CACHE_SIZE/BLOCK_SIZE);
-	if (!page)
+
+	if (!sync_page_io(rdev->bdev, sb_offset<<1, MD_SB_BYTES, rdev->sb_page, WRITE))
 		goto fail;
-	error = mapping->a_ops->prepare_write(NULL, page, offs,
-						offs + MD_SB_BYTES);
-	if (error)
-		goto unlock;
-	memcpy((char *)page_address(page) + offs, rdev->sb, MD_SB_BYTES);
-	error = mapping->a_ops->commit_write(NULL, page, offs,
-						offs + MD_SB_BYTES);
-	if (error)
-		goto unlock;
-	unlock_page(page);
-	wait_on_page_locked(page);
-	page_cache_release(page);
-	fsync_bdev(bdev);
 skip:
 	return 0;
-unlock:
-	unlock_page(page);
-	page_cache_release(page);
 fail:
 	printk("md: write_disk_sb failed for device %s\n", partition_name(dev));
 	return 1;

@@ -168,13 +168,11 @@ struct ebda_hpc_slot {
 
 struct ebda_hpc_bus {
 	u32 bus_num;
-/*
 	u8 slots_at_33_conv;
 	u8 slots_at_66_conv;
 	u8 slots_at_66_pcix;
 	u8 slots_at_100_pcix;
 	u8 slots_at_133_pcix;
-*/
 };
 
 
@@ -232,12 +230,15 @@ struct bus_info {
 	u8 slot_max;
 	u8 slot_count;
 	u8 busno;
-	u8 current_speed;
-	u8 supported_speed;
 	u8 controller_id;
-	u8 supported_bus_mode;
+	u8 current_speed;
 	u8 current_bus_mode;
 	u8 index;
+	u8 slots_at_33_conv;
+	u8 slots_at_66_conv;
+	u8 slots_at_66_pcix;
+	u8 slots_at_100_pcix;
+	u8 slots_at_133_pcix;
 	struct list_head bus_info_list;
 };
 
@@ -690,8 +691,11 @@ struct slot {
 	u8 bus;
 	u8 device;
 	u8 number;
+	u8 real_physical_slot_num;
 	char name[100];
 	u32 capabilities;
+	u8 supported_speed;
+	u8 supported_bus_mode;
 	struct hotplug_slot *hotplug_slot;
 	struct controller *ctrl;
 	struct pci_func *func;
@@ -709,10 +713,12 @@ struct slot {
 struct controller {
 	struct ebda_hpc_slot *slots;
 	struct ebda_hpc_bus *buses;
+	u8 starting_slot_num;	/* starting and ending slot #'s this ctrl controls*/
+	u8 ending_slot_num;
 	u8 revision;
 	u8 options;		/* which options HPC supports */
 	u8 status;
-	u8 ctlr_id;		/* TONI */
+	u8 ctlr_id;
 	u8 slot_count;
 	u8 bus_count;
 	u8 ctlr_relative_id;

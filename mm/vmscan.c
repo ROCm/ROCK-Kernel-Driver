@@ -23,6 +23,7 @@
 #include <linux/file.h>
 #include <linux/writeback.h>
 #include <linux/compiler.h>
+#include <linux/suspend.h>
 
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
@@ -424,11 +425,10 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			goto page_mapped;
 
 		/*
-		 * The page is locked. IO in progress?
-		 * Move it to the back of the list.
+		 * IO in progress? Leave it at the back of the list.
 		 */
 		if (unlikely(PageWriteback(page))) {
-			if (PageLaunder(page) && (gfp_mask & __GFP_FS)) {
+			if (gfp_mask & __GFP_FS) {
 				page_cache_get(page);
 				spin_unlock(&pagemap_lru_lock);
 				wait_on_page_writeback(page);
@@ -458,35 +458,20 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			 * pinned it and after the I/O to the page is finished,
 			 * so the direct writes to the page cannot get lost.
 			 */
-			struct address_space_operations *a_ops;
 			int (*writeback)(struct page *, int *);
-			int (*writepage)(struct page *);
+			const int nr_pages = SWAP_CLUSTER_MAX;
+			int nr_to_write = nr_pages;
 
-			/*
-			 * There's no guarantee that writeback() will actually
-			 * start I/O against *this* page.  Which is broken if we're
-			 * trying to free memory in a particular zone.  FIXME.
-			 */
-			a_ops = mapping->a_ops;
-			writeback = a_ops->vm_writeback;
-			writepage = a_ops->writepage;
-			if (writeback || writepage) {
-				SetPageLaunder(page);
-				page_cache_get(page);
-				spin_unlock(&pagemap_lru_lock);
-				ClearPageDirty(page);
-
-				if (writeback) {
-					int nr_to_write = WRITEOUT_PAGES;
-					writeback(page, &nr_to_write);
-				} else {
-					writepage(page);
-				}
-				page_cache_release(page);
-
-				spin_lock(&pagemap_lru_lock);
-				continue;
-			}
+			writeback = mapping->a_ops->vm_writeback;
+			if (writeback == NULL)
+				writeback = generic_vm_writeback;
+			page_cache_get(page);
+			spin_unlock(&pagemap_lru_lock);
+			(*writeback)(page, &nr_to_write);
+			max_scan -= (nr_pages - nr_to_write);
+			page_cache_release(page);
+			spin_lock(&pagemap_lru_lock);
+			continue;
 		}
 
 		/*
@@ -648,6 +633,8 @@ static int shrink_caches(zone_t * classzone, int priority, unsigned int gfp_mask
 	if (nr_pages <= 0)
 		return 0;
 
+	wakeup_bdflush();
+
 	shrink_dcache_memory(priority, gfp_mask);
 
 	/* After shrinking the dcache, get rid of unused inodes too .. */
@@ -795,18 +782,22 @@ int kswapd(void *unused)
 	 * us from recursively trying to free more memory as we're
 	 * trying to free the first piece of memory in the first place).
 	 */
-	tsk->flags |= PF_MEMALLOC;
+	tsk->flags |= PF_MEMALLOC | PF_KERNTHREAD;
 
 	/*
 	 * Kswapd main loop.
 	 */
 	for (;;) {
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
 		__set_current_state(TASK_INTERRUPTIBLE);
 		add_wait_queue(&kswapd_wait, &wait);
 
 		mb();
-		if (kswapd_can_sleep())
+		if (kswapd_can_sleep()) {
 			schedule();
+		}
+		
 
 		__set_current_state(TASK_RUNNING);
 		remove_wait_queue(&kswapd_wait, &wait);

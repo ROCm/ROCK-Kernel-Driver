@@ -13,6 +13,7 @@
 #include <linux/swapctl.h>
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
+#include <linux/namei.h>
 #include <linux/shm.h>
 #include <linux/blkdev.h>
 #include <linux/compiler.h>
@@ -311,6 +312,11 @@ int remove_exclusive_swap_page(struct page *page)
 		write_lock(&swapper_space.page_lock);
 		if (page_count(page) - !!PagePrivate(page) == 2) {
 			__delete_from_swap_cache(page);
+			/*
+			 * NOTE: if/when swap gets buffer/page coherency
+			 * like other mappings, we'll need to mark the buffers
+			 * dirty here too.  set_page_dirty().
+			 */
 			SetPageDirty(page);
 			retval = 1;
 		}
@@ -1088,7 +1094,7 @@ bad_swap_2:
 	swap_list_unlock();
 	if (swap_map)
 		vfree(swap_map);
-	if (swap_file)
+	if (swap_file && !IS_ERR(swap_file))
 		filp_close(swap_file, NULL);
 out:
 	if (swap_header)

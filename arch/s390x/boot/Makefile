@@ -13,8 +13,7 @@ O_TARGET :=
 
 include $(TOPDIR)/Rules.make
 
-.S.o:
-	$(CC) -D__ASSEMBLY__ $(AFLAGS) -traditional -c $< -o $*.o
+EXTRA_AFLAGS := -traditional
 
 %.lnk: %.o
 	$(LD) -Ttext 0x0 -o $@ $<

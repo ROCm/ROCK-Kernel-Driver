@@ -35,6 +35,7 @@
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/usb.h>
+#include <linux/namei.h>
 #include <linux/usbdevice_fs.h>
 #include <linux/smp_lock.h>
 #include <asm/byteorder.h>

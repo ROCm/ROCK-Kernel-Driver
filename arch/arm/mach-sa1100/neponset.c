@@ -84,7 +84,7 @@ neponset_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *reg
 	}
 }
 
-static void __init neponset_init_irq(void)
+static inline void __init neponset_init_irq(void)
 {
 	/*
 	 * Install handler for GPIO25.
@@ -101,66 +101,6 @@ static void __init neponset_init_irq(void)
 	set_irq_handler(IRQ_NEPONSET_USAR, do_simple_IRQ);
 	set_irq_flags(IRQ_NEPONSET_USAR, IRQF_VALID | IRQF_PROBE);
 }
-
-static int __init neponset_init(void)
-{
-	int ret;
-
-	/*
-	 * The Neponset is only present on the Assabet machine type.
-	 */
-	if (!machine_is_assabet())
-		return -ENODEV;
-
-	/*
-	 * Ensure that the memory bus request/grant signals are setup,
-	 * and the grant is held in its inactive state, whether or not
-	 * we actually have a Neponset attached.
-	 */
-	sa1110_mb_disable();
-
-	if (!machine_has_neponset()) {
-		printk(KERN_DEBUG "Neponset expansion board not present\n");
-		return -ENODEV;
-	}
-
-	if (WHOAMI != 0x11) {
-		printk(KERN_WARNING "Neponset board detected, but "
-			"wrong ID: %02x\n", WHOAMI);
-		return -ENODEV;
-	}
-
-	ret = device_register(&neponset_device);
-	if (ret)
-		return ret;
-
-	neponset_init_irq();
-
-	/*
-	 * Disable GPIO 0/1 drivers so the buttons work on the module.
-	 */
-	NCR_0 |= NCR_GP01_OFF;
-
-	/*
-	 * Neponset has SA1111 connected to CS4.  We know that after
-	 * reset the chip will be configured for variable latency IO.
-	 */
-	/* FIXME: setup MSC2 */
-
-	/*
-	 * Probe and initialise the SA1111.
-	 */
-	return sa1111_init(&neponset_device, 0x40000000, IRQ_NEPONSET_SA1111);
-}
-
-__initcall(neponset_init);
-
-static struct map_desc neponset_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf3000000, 0x10000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* System Registers */
-  { 0xf4000000, 0x40000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA-1111 */
-  LAST_DESC
-};
 
 static void neponset_set_mctrl(struct uart_port *port, u_int mctrl)
 {
@@ -220,9 +160,69 @@ static struct sa1100_port_fns neponset_port_fns __initdata = {
 	get_mctrl:	neponset_get_mctrl,
 };
 
+static int __init neponset_init(void)
+{
+	int ret;
+
+	/*
+	 * The Neponset is only present on the Assabet machine type.
+	 */
+	if (!machine_is_assabet())
+		return -ENODEV;
+
+	/*
+	 * Ensure that the memory bus request/grant signals are setup,
+	 * and the grant is held in its inactive state, whether or not
+	 * we actually have a Neponset attached.
+	 */
+	sa1110_mb_disable();
+
+	if (!machine_has_neponset()) {
+		printk(KERN_DEBUG "Neponset expansion board not present\n");
+		return -ENODEV;
+	}
+
+	if (WHOAMI != 0x11) {
+		printk(KERN_WARNING "Neponset board detected, but "
+			"wrong ID: %02x\n", WHOAMI);
+		return -ENODEV;
+	}
+
+	ret = device_register(&neponset_device);
+	if (ret)
+		return ret;
+
+	sa1100_register_uart_fns(&neponset_port_fns);
+
+	neponset_init_irq();
+
+	/*
+	 * Disable GPIO 0/1 drivers so the buttons work on the module.
+	 */
+	NCR_0 = NCR_GP01_OFF;
+
+	/*
+	 * Neponset has SA1111 connected to CS4.  We know that after
+	 * reset the chip will be configured for variable latency IO.
+	 */
+	/* FIXME: setup MSC2 */
+
+	/*
+	 * Probe and initialise the SA1111.
+	 */
+	return sa1111_init(&neponset_device, 0x40000000, IRQ_NEPONSET_SA1111);
+}
+
+__initcall(neponset_init);
+
+static struct map_desc neponset_io_desc[] __initdata = {
+ /* virtual     physical    length      domain     r  w  c  b */
+  { 0xf3000000, 0x10000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* System Registers */
+  { 0xf4000000, 0x40000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA-1111 */
+  LAST_DESC
+};
+
 void __init neponset_map_io(void)
 {
 	iotable_init(neponset_io_desc);
-	if (machine_has_neponset())
-		sa1100_register_uart_fns(&neponset_port_fns);
 }

@@ -907,7 +907,9 @@ static int pc_write(struct tty_struct * tty, int from_user,
 				
 				----------------------------------------------------------------- */
 
-				copy_from_user(ch->tmp_buf, buf, bytesAvailable);
+				if (copy_from_user(ch->tmp_buf, buf,
+						   bytesAvailable))
+					return -EFAULT;
 
 			} /* End if area verified */
 
@@ -2999,7 +3001,8 @@ static int pc_ioctl(struct tty_struct *tty, struct file * file,
 				di.port = boards[brd].port ;
 				di.membase = boards[brd].membase ;
 
-				copy_to_user((char *)arg, &di, sizeof (di));
+				if (copy_to_user((char *)arg, &di, sizeof (di)))
+					return -EFAULT;
 				break;
 
 			} /* End case DIGI_GETINFO */
@@ -3068,14 +3071,9 @@ static int pc_ioctl(struct tty_struct *tty, struct file * file,
 	{ /* Begin switch cmd */
 
 		case TCGETS:
-			retval = verify_area(VERIFY_WRITE, (void *)arg,
-                              sizeof(struct termios));
-			
-			if (retval)
-				return(retval);
-
-			copy_to_user((struct termios *)arg, 
-			             tty->termios, sizeof(struct termios));
+			if (copy_to_user((struct termios *)arg, 
+					 tty->termios, sizeof(struct termios)))
+				return -EFAULT;
 			return(0);
 
 		case TCGETA:
@@ -3235,14 +3233,9 @@ static int pc_ioctl(struct tty_struct *tty, struct file * file,
 			break;
 
 		case DIGI_GETA:
-			if ((error=
-				verify_area(VERIFY_WRITE, (char*)arg, sizeof(digi_t))))
-			{
-				printk(KERN_ERR "<Error> - Digi GETA failed\n");
-				return(error);
-			}
-
-			copy_to_user((char*)arg, &ch->digiext, sizeof(digi_t));
+			if (copy_to_user((char*)arg, &ch->digiext,
+					 sizeof(digi_t)))
+				return -EFAULT;
 			break;
 
 		case DIGI_SETAW:
@@ -3263,11 +3256,9 @@ static int pc_ioctl(struct tty_struct *tty, struct file * file,
 			/* Fall Thru */
 
 		case DIGI_SETA:
-			if ((error =
-				verify_area(VERIFY_READ, (char*)arg,sizeof(digi_t))))
-				return(error);
-
-			copy_from_user(&ch->digiext, (char*)arg, sizeof(digi_t));
+			if (copy_from_user(&ch->digiext, (char*)arg,
+					   sizeof(digi_t)))
+				return -EFAULT;
 			
 			if (ch->digiext.digi_flags & DIGI_ALTPIN) 
 			{
@@ -3310,10 +3301,8 @@ static int pc_ioctl(struct tty_struct *tty, struct file * file,
 			memoff(ch);
 			restore_flags(flags);
 
-			if ((error = verify_area(VERIFY_WRITE, (char*)arg,sizeof(dflow))))
-				return(error);
-
-			copy_to_user((char*)arg, &dflow, sizeof(dflow));
+			if (copy_to_user((char*)arg, &dflow, sizeof(dflow)))
+				return -EFAULT;
 			break;
 
 		case DIGI_SETAFLOW:
@@ -3329,10 +3318,8 @@ static int pc_ioctl(struct tty_struct *tty, struct file * file,
 				stopc = ch->stopca;
 			}
 
-			if ((error = verify_area(VERIFY_READ, (char*)arg,sizeof(dflow))))
-				return(error);
-
-			copy_from_user(&dflow, (char*)arg, sizeof(dflow));
+			if (copy_from_user(&dflow, (char*)arg, sizeof(dflow)))
+				return -EFAULT;
 
 			if (dflow.startc != startc || dflow.stopc != stopc) 
 			{ /* Begin  if setflow toggled */

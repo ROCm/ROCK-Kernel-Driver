@@ -846,7 +846,7 @@ static struct xor_block_template xor_block_pIII_sse = {
 		xor_speed(&xor_block_32regs);		\
 	        if (cpu_has_xmm)			\
 			xor_speed(&xor_block_pIII_sse);	\
-	        if (md_cpu_has_mmx()) {			\
+	        if (cpu_has_mmx) {			\
 	                xor_speed(&xor_block_pII_mmx);	\
 	                xor_speed(&xor_block_p5_mmx);	\
 	        }					\

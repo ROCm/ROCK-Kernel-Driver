@@ -42,7 +42,7 @@ __initcall(victor_init);
 
 
 static void __init
-fixup_victor(struct machine_desc *desc, struct param_struct *params,
+fixup_victor(struct machine_desc *desc, struct tag *tags,
 	     char **cmdline, struct meminfo *mi)
 {
 	SET_BANK( 0, 0xc0000000, 4*1024*1024 );

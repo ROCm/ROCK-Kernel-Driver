@@ -61,7 +61,7 @@
 
 #include <linux/genhd.h>
 
-static char sd_version_str[] = "Version: 2.0.3 (20020417)";
+/* static char sd_version_str[] = "Version: 2.0.3 (20020417)"; */
 
 #define SD_MAJOR(i) (!(i) ? SCSI_DISK0_MAJOR : SCSI_DISK1_MAJOR-1+(i))
 
@@ -129,7 +129,7 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt);
 static Scsi_Disk * sd_get_sdisk(int index);
 
 
-#if defined(CONFIG_PPC)
+#if defined(CONFIG_PPC32)
 /**
  *	sd_find_target - find kdev_t of first scsi disk that matches
  *	given host and scsi_id. 
@@ -149,7 +149,7 @@ sd_find_target(void *hp, int scsi_id)
 {
 	Scsi_Disk *sdkp;
 	Scsi_Device *sdp;
-	Scsi_Host *shp = hp;
+	struct Scsi_Host *shp = hp;
 	int dsk_nr;
 	unsigned long iflags;
 
@@ -162,7 +162,7 @@ sd_find_target(void *hp, int scsi_id)
 		sdp = sdkp->device;
 		if (sdp && (sdp->host == shp) && (sdp->id == scsi_id)) {
 			read_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
-			return MKDEV_SD(k);
+			return MKDEV_SD(dsk_nr);
 		}
 	}
 	read_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
@@ -242,38 +242,7 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 				return -EFAULT;
 			return 0;
 		}
-		case HDIO_GETGEO_BIG:
-		{
-			struct hd_big_geometry *loc = 
-					(struct hd_big_geometry *) arg;
 
-			if(!loc)
-				return -EINVAL;
-			host = sdp->host;
-
-			/* default to most commonly used values */
-			diskinfo[0] = 0x40;
-			diskinfo[1] = 0x20;
-			diskinfo[2] = sdkp->capacity >> 11;
-
-			/* override with calculated, extended default, 
-			   or driver values */
-			if(host->hostt->bios_param != NULL) 
-				host->hostt->bios_param(sdkp, dev,
-							&diskinfo[0]);
-			else
-				scsicam_bios_param(sdkp, dev, &diskinfo[0]);
-
-			if (put_user(diskinfo[0], &loc->heads) ||
-				put_user(diskinfo[1], &loc->sectors) ||
-				put_user(diskinfo[2], 
-					 (unsigned int *) &loc->cylinders) ||
-				put_user((unsigned)
-					   get_start_sect(inode->i_rdev),
-					 (unsigned long *)&loc->start))
-				return -EFAULT;
-			return 0;
-		}
 		case BLKGETSIZE:
 		case BLKGETSIZE64:
 		case BLKROSET:

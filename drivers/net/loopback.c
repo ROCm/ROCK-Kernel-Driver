@@ -29,7 +29,7 @@
  *		2 of the License, or (at your option) any later version.
  */
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/interrupt.h>
 #include <linux/fs.h>
 #include <linux/types.h>

@@ -78,8 +78,12 @@ int scsi_init_io(Scsi_Cmnd *SCpnt)
 	if (in_interrupt())
 		gfp_mask &= ~__GFP_WAIT;
 
+	/*
+	 * if sg table allocation fails, requeue request later.
+	 */
 	sgpnt = scsi_alloc_sgtable(SCpnt, gfp_mask);
-	BUG_ON(!sgpnt);
+	if (!sgpnt)
+		return 0;
 
 	SCpnt->request_buffer = (char *) sgpnt;
 	SCpnt->request_bufflen = req->nr_sectors << 9;
@@ -102,8 +106,13 @@ int scsi_init_io(Scsi_Cmnd *SCpnt)
 	printk("Incorrect number of segments after building list\n");
 	printk("counted %d, received %d\n", count, SCpnt->use_sg);
 	printk("req nr_sec %lu, cur_nr_sec %u\n", req->nr_sectors, req->current_nr_sectors);
-	BUG();
-	return 0; /* ahem */
+
+	/*
+	 * kill it. there should be no leftover blocks in this request
+	 */
+	SCpnt = scsi_end_request(SCpnt, 0, req->nr_sectors);
+	BUG_ON(SCpnt);
+	return 0;
 }
 
 /*

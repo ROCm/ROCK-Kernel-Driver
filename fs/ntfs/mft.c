@@ -20,12 +20,9 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <linux/locks.h>
 #include <linux/swap.h>
 
 #include "ntfs.h"
-
-#define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
 
 /**
  * __format_mft_record - initialize an empty mft record
@@ -114,13 +111,6 @@ struct address_space_operations ntfs_mft_aops = {
 						   disk request queue. */
 	prepare_write:	NULL,			/* . */
 	commit_write:	NULL,			/* . */
-	bmap:		NULL,			/* Needed for FIBMAP.
-						   Don't use it. */
-	flushpage:	NULL,			/* . */
-	releasepage:	NULL,			/* . */
-#ifdef KERNEL_HAS_O_DIRECT
-	direct_IO:	NULL,			/* . */
-#endif
 };
 
 /**

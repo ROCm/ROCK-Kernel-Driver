@@ -210,12 +210,6 @@ static struct file_operations tape_devices_file_ops =
 	release:tape_devices_release,	/* close */
 };
 
-static struct inode_operations tape_devices_inode_ops =
-{
-#if !(LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
-	default_file_ops:&tape_devices_file_ops		/* file ops */
-#endif				/* LINUX_IS_24 */
-};
 #endif /* CONFIG_PROC_FS */
 
 /* SECTION: Parameters for tape */
@@ -271,9 +265,7 @@ tape_parm_call_setup (char *str)
 	return 1;
 }
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,2,16))
 __setup("tape=", tape_parm_call_setup);
-#endif   /* kernel <2.2.19 */
 #endif   /* not defined MODULE */
 
 static inline int
@@ -909,30 +901,10 @@ tape_init (void)
 	/* Allocate local buffer for the ccwcache       */
 	tape_init_emergency_req ();
 #ifdef CONFIG_PROC_FS
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
 	tape_devices_entry = create_proc_entry ("tapedevices",
 						S_IFREG | S_IRUGO | S_IWUSR,
 						&proc_root);
 	tape_devices_entry->proc_fops = &tape_devices_file_ops;
-	tape_devices_entry->proc_iops = &tape_devices_inode_ops;
-#else
-	tape_devices_entry = (struct proc_dir_entry *) kmalloc 
-            (sizeof (struct proc_dir_entry), GFP_ATOMIC);
-        if (tape_devices_entry) {
-            memset (tape_devices_entry, 0, sizeof (struct proc_dir_entry));
-            tape_devices_entry->name = "tapedevices";
-            tape_devices_entry->namelen = strlen ("tapedevices");
-            tape_devices_entry->low_ino = 0;
-            tape_devices_entry->mode = (S_IFREG | S_IRUGO | S_IWUSR);
-            tape_devices_entry->nlink = 1;
-            tape_devices_entry->uid = 0;
-            tape_devices_entry->gid = 0;
-            tape_devices_entry->size = 0;
-            tape_devices_entry->get_info = NULL;
-            tape_devices_entry->ops = &tape_devices_inode_ops;
-            proc_register (&proc_root, tape_devices_entry);
-	}
-#endif
 #endif /* CONFIG_PROC_FS */
 
 	return 0;
@@ -996,12 +968,7 @@ cleanup_module (void)
         devfs_unregister (tape_devfs_root_entry);
 #endif CONFIG_DEVFS_FS
 #ifdef CONFIG_PROC_FS
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
 	remove_proc_entry ("tapedevices", &proc_root);
-#else
-	proc_unregister (&proc_root, tape_devices_entry->low_ino);
-	kfree (tape_devices_entry);
-#endif				/* LINUX_IS_24 */
 #endif 
 #ifdef CONFIG_S390_TAPE_CHAR
 	tapechar_uninit();

@@ -38,60 +38,74 @@ static void redo_inode_mask(struct inode *inode)
 	inode->i_dnotify_mask = new_mask;
 }
 
+void dnotify_flush(struct file *filp, fl_owner_t id)
+{
+	struct dnotify_struct *dn;
+	struct dnotify_struct **prev;
+	struct inode *inode;
+
+	inode = filp->f_dentry->d_inode;
+	if (!S_ISDIR(inode->i_mode))
+		return;
+	write_lock(&dn_lock);
+	prev = &inode->i_dnotify;
+	while ((dn = *prev) != NULL) {
+		if ((dn->dn_owner == id) && (dn->dn_filp == filp)) {
+			*prev = dn->dn_next;
+			redo_inode_mask(inode);
+			kmem_cache_free(dn_cache, dn);
+			break;
+		}
+		prev = &dn->dn_next;
+	}
+	write_unlock(&dn_lock);
+}
+
 int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
 {
-	struct dnotify_struct *dn = NULL;
+	struct dnotify_struct *dn;
 	struct dnotify_struct *odn;
 	struct dnotify_struct **prev;
 	struct inode *inode;
-	int turning_off = (arg & ~DN_MULTISHOT) == 0;
+	fl_owner_t id = current->files;
 
-	if (!turning_off && !dir_notify_enable)
+	if ((arg & ~DN_MULTISHOT) == 0) {
+		dnotify_flush(filp, id);
+		return 0;
+	}
+	if (!dir_notify_enable)
 		return -EINVAL;
 	inode = filp->f_dentry->d_inode;
 	if (!S_ISDIR(inode->i_mode))
 		return -ENOTDIR;
-	if (!turning_off) {
-		dn = kmem_cache_alloc(dn_cache, SLAB_KERNEL);
-		if (dn == NULL)
-			return -ENOMEM;
-	}
+	dn = kmem_cache_alloc(dn_cache, SLAB_KERNEL);
+	if (dn == NULL)
+		return -ENOMEM;
 	write_lock(&dn_lock);
 	prev = &inode->i_dnotify;
-	for (odn = *prev; odn != NULL; prev = &odn->dn_next, odn = *prev)
-		if ((odn->dn_owner == current->files) && (odn->dn_filp == filp))
-			break;
-	if (odn != NULL) {
-		if (turning_off) {
-			*prev = odn->dn_next;
-			redo_inode_mask(inode);
-			dn = odn;
-			goto out_free;
+	while ((odn = *prev) != NULL) {
+		if ((odn->dn_owner == id) && (odn->dn_filp == filp)) {
+			odn->dn_fd = fd;
+			odn->dn_mask |= arg;
+			inode->i_dnotify_mask |= arg & ~DN_MULTISHOT;
+			kmem_cache_free(dn_cache, dn);
+			goto out;
 		}
-		odn->dn_fd = fd;
-		odn->dn_mask |= arg;
-		inode->i_dnotify_mask |= arg & ~DN_MULTISHOT;
-		goto out_free;
+		prev = &odn->dn_next;
 	}
-	if (turning_off)
-		goto out;
 	filp->f_owner.pid = current->pid;
 	filp->f_owner.uid = current->uid;
 	filp->f_owner.euid = current->euid;
-	dn->dn_magic = DNOTIFY_MAGIC;
 	dn->dn_mask = arg;
 	dn->dn_fd = fd;
 	dn->dn_filp = filp;
-	dn->dn_owner = current->files;
+	dn->dn_owner = id;
 	inode->i_dnotify_mask |= arg & ~DN_MULTISHOT;
 	dn->dn_next = inode->i_dnotify;
 	inode->i_dnotify = dn;
 out:
 	write_unlock(&dn_lock);
 	return 0;
-out_free:
-	kmem_cache_free(dn_cache, dn);
-	goto out;
 }
 
 void __inode_dir_notify(struct inode *inode, unsigned long event)
@@ -104,11 +118,6 @@ void __inode_dir_notify(struct inode *inode, unsigned long event)
 	write_lock(&dn_lock);
 	prev = &inode->i_dnotify;
 	while ((dn = *prev) != NULL) {
-		if (dn->dn_magic != DNOTIFY_MAGIC) {
-		        printk(KERN_ERR "__inode_dir_notify: bad magic "
-				"number in dnotify_struct!\n");
-		        goto out;
-		}
 		if ((dn->dn_mask & event) == 0) {
 			prev = &dn->dn_next;
 			continue;
@@ -126,7 +135,6 @@ void __inode_dir_notify(struct inode *inode, unsigned long event)
 	}
 	if (changed)
 		redo_inode_mask(inode);
-out:
 	write_unlock(&dn_lock);
 }
 

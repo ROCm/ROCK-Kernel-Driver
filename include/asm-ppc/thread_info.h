@@ -23,6 +23,8 @@ struct thread_info {
 	unsigned long		flags;		/* low level flags */
 	int			cpu;		/* cpu we're on */
 	int			preempt_count;	/* not used at present */
+	int			softirq_count;
+	int			hardirq_count;
 };
 
 /*
@@ -67,6 +69,9 @@ static inline struct thread_info *current_thread_info(void)
 #define TI_EXECDOMAIN	4
 #define TI_FLAGS	8
 #define TI_CPU		12
+#define TI_PREEMPT	16
+#define TI_SOFTIRQ	20
+#define TI_HARDIRQ	24
 
 #define PREEMPT_ACTIVE		0x4000000
 

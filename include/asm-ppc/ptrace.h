@@ -33,14 +33,16 @@ struct pt_regs {
 	unsigned long mq;		/* 601 only (not used at present) */
 					/* Used on APUS to hold IPL value. */
 	unsigned long trap;		/* Reason for being here */
+	/* N.B. for critical exceptions on 4xx, the dar and dsisr
+	   fields are overloaded to hold srr0 and srr1. */
 	unsigned long dar;		/* Fault registers */
 	unsigned long dsisr;
 	unsigned long result; 		/* Result of a system call */
 };
-#endif
 
 /* iSeries uses mq field for soft enable flag */
 #define softEnable mq
+#endif /* __ASSEMBLY__ */
 
 #ifdef __KERNEL__
 #define STACK_FRAME_OVERHEAD	16	/* size of minimum stack frame */
@@ -48,8 +50,27 @@ struct pt_regs {
 /* Size of stack frame allocated when calling signal handler. */
 #define __SIGNAL_FRAMESIZE	64
 
+#ifndef __ASSEMBLY__
 #define instruction_pointer(regs) ((regs)->nip)
 #define user_mode(regs) (((regs)->msr & MSR_PR) != 0)
+
+/*
+ * We use the least-significant bit of the trap field to indicate
+ * whether we have saved the full set of registers, or only a
+ * partial set.  A 1 there means the partial set.
+ * On 4xx we use the next bit to indicate whether the exception
+ * is a critical exception (1 means it is).
+ */
+#define FULL_REGS(regs)		(((regs)->trap & 1) == 0)
+#define IS_CRITICAL_EXC(regs)	(((regs)->trap & 2) == 0)
+#define TRAP(regs)		((regs)->trap & ~0xF)
+
+#define CHECK_FULL_REGS(regs)						      \
+do {									      \
+	if ((regs)->trap & 1)						      \
+		printk(KERN_CRIT "%s: partial register set\n", __FUNCTION__); \
+} while (0)
+#endif /* __ASSEMBLY__ */
 
 #endif /* __KERNEL__ */
 

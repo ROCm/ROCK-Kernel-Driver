@@ -7,8 +7,7 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-.S.o:
-	$(CC) $(AFLAGS) -traditional -c -o $*.o $<
+EXTRA_AFLAGS := -traditional
 
 OS_TARGET := fpsp.o
 

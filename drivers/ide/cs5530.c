@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  * linux/drivers/ide/cs5530.c		Version 0.6	Mar. 18, 2000
  *
  * Copyright (C) 2000			Andre Hedrick <andre@linux-ide.org>
@@ -24,10 +25,12 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ide.h>
+
 #include <asm/io.h>
 #include <asm/irq.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #undef DISPLAY_CS5530_TIMINGS
 
@@ -243,7 +246,7 @@ int cs5530_dmaproc(struct ata_device *drive)
 /*
  * Initialize the cs5530 bridge for reliable IDE DMA operation.
  */
-unsigned int __init pci_init_cs5530(struct pci_dev *dev)
+static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 {
 	struct pci_dev *master_0 = NULL, *cs5530_0 = NULL;
 	unsigned short pcicmd = 0;
@@ -334,7 +337,7 @@ unsigned int __init pci_init_cs5530(struct pci_dev *dev)
  * This gets invoked by the IDE driver once for each channel,
  * and performs channel-specific pre-initialization before drive probing.
  */
-void __init ide_init_cs5530(struct ata_channel *hwif)
+static void __init ide_init_cs5530(struct ata_channel *hwif)
 {
 	hwif->serialized = 1;
 	if (!hwif->dma_base) {
@@ -363,4 +366,22 @@ void __init ide_init_cs5530(struct ata_channel *hwif)
 				hwif->drives[1].autotune = 1;	/* needs autotuning later */
 		}
 	}
+}
+
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+	vendor: PCI_VENDOR_ID_CYRIX,
+	device: PCI_DEVICE_ID_CYRIX_5530_IDE,
+	init_chipset: pci_init_cs5530,
+	init_channel: ide_init_cs5530,
+	bootable: ON_BOARD,
+	flags: ATA_F_DMA
+};
+
+int __init init_cs5530(void)
+{
+	ata_register_chipset(&chipset);
+
+        return 0;
 }

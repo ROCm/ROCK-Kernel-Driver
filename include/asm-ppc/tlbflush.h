@@ -30,7 +30,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
 static inline void flush_tlb_page(struct vm_area_struct *vma,
 				unsigned long vmaddr)
 	{ _tlbie(vmaddr); }
-static inline void flush_tlb_range(struct mm_struct *mm,
+static inline void flush_tlb_range(struct vm_area_struct *vma,
 				unsigned long start, unsigned long end)
 	{ __tlbia(); }
 static inline void flush_tlb_kernel_range(unsigned long start,
@@ -86,5 +86,5 @@ static inline void flush_tlb_pgtables(struct mm_struct *mm,
 {
 }
 
-#endif _PPC_TLBFLUSH_H
-#endif __KERNEL__
+#endif /* _PPC_TLBFLUSH_H */
+#endif /*__KERNEL__ */

@@ -2692,7 +2692,7 @@ ace_load_tx_bd(struct ace_private *ap, struct tx_desc *desc, u64 addr,
 	flagsize &= ~BD_FLG_COAL_NOW;
 #endif
 
-	if (!ACE_IS_TIGON_I(ap)) {
+	if (ACE_IS_TIGON_I(ap)) {
 		writel(addr >> 32, &desc->addr.addrhi);
 		writel(addr & 0xffffffff, &desc->addr.addrlo);
 		writel(flagsize, &desc->flagsize);

@@ -10,8 +10,6 @@
 #include <asm/pstate.h>
 #include <asm/ptrace.h>
 
-#define AOFF_task_fpregs	(((ASIZ_task) + (64 - 1)) & ~(64 - 1))
- 
 /* Clobbers %o5, %g1, %g2, %g3, %g7, %icc, %xcc */
 
 #define VISEntry					\

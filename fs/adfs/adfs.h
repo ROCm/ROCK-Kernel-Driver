@@ -77,7 +77,7 @@ void adfs_write_inode(struct inode *inode,int unused);
 int adfs_notify_change(struct dentry *dentry, struct iattr *attr);
 
 /* map.c */
-extern int adfs_map_lookup(struct super_block *sb, int frag_id, int offset);
+extern int adfs_map_lookup(struct super_block *sb, unsigned int frag_id, unsigned int offset);
 extern unsigned int adfs_map_free(struct super_block *sb);
 
 /* Misc */

@@ -398,6 +398,6 @@ struct file_operations smb_file_operations =
 struct inode_operations smb_file_inode_operations =
 {
 	permission:	smb_file_permission,
-	revalidate:	smb_revalidate_inode,
+	getattr:	smb_getattr,
 	setattr:	smb_notify_change,
 };

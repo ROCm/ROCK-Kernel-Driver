@@ -345,3 +345,18 @@ do_indirects:
 	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
 }
+
+static inline unsigned nblocks(loff_t size)
+{
+	unsigned blocks, res, direct = DIRECT, i = DEPTH;
+	blocks = (size + BLOCK_SIZE - 1) >> BLOCK_SIZE_BITS;
+	res = blocks;
+	while (--i && blocks > direct) {
+		blocks -= direct;
+		blocks += BLOCK_SIZE/sizeof(block_t) - 1;
+		blocks /= BLOCK_SIZE/sizeof(block_t);
+		res += blocks;
+		direct = 1;
+	}
+	return blocks;
+}

@@ -6,10 +6,10 @@
  *  May be freely distributed as part of Linux.
  */
 
+#include <linux/compile.h>
 #include <linux/uts.h>
 #include <linux/utsname.h>
 #include <linux/version.h>
-#include <linux/compile.h>
 
 #define version(a) Version_ ## a
 #define version_string(a) version(a)

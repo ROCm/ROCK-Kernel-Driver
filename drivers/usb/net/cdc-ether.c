@@ -19,7 +19,7 @@
  */
 
 
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/delay.h>
@@ -1256,7 +1256,7 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 	                            ether_dev );
 
 	// Does this REALLY do anything???
-	usb_inc_dev_use( usb );
+	usb_get_dev( usb );
 
 	// TODO - last minute HACK
 	ether_dev->comm_ep_in = 5;
@@ -1298,7 +1298,7 @@ static void CDCEther_disconnect( struct usb_device *usb, void *ptr )
 	ether_dev->net = NULL;
 
 	// I ask again, does this do anything???
-	usb_dec_dev_use( usb );
+	usb_put_dev( usb );
 
 	// We are done with this interface
 	usb_driver_release_interface( &CDCEther_driver, 

@@ -31,7 +31,7 @@ static const char *version=
 #endif
 
 #include <linux/module.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/delay.h>
 #include <asm/bitops.h>
 #include <asm/io.h>

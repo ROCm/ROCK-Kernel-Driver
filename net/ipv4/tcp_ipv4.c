@@ -1518,7 +1518,6 @@ int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 			NETDEBUG(if (net_ratelimit()) \
 				printk(KERN_DEBUG "TCP: drop open request from %u.%u.%u.%u/%u\n", \
 					NIPQUAD(saddr), ntohs(skb->h.th->source)));
-			TCP_INC_STATS_BH(TcpAttemptFails);
 			dst_release(dst);
 			goto drop_and_free;
 		}

@@ -1912,3 +1912,22 @@ Changes for patch v210
   Thanks to Anton Blanchard <anton@samba.org>
 
 - Updated README from master HTML file
+===============================================================================
+Changes for patch v211
+
+- Do not put miscellaneous character devices in /dev/misc if they
+  specify their own directory (i.e. contain a '/' character)
+
+- Copied macro for error messages from fs/devfs/base.c to
+  fs/devfs/util.c and made use of this macro
+
+- Removed 2.4.x compatibility code from fs/devfs/base.c
+===============================================================================
+Changes for patch v212
+
+- Added BKL to <devfs_open> because drivers still need it
+===============================================================================
+Changes for patch v213
+
+- Protected <scan_dir_for_removable> and <get_removable_partition>
+  from changing directory contents

@@ -14,8 +14,8 @@
 
 #include <linux/config.h>
 #include "ext2.h"
-#include <linux/locks.h>
 #include <linux/quotaops.h>
+#include <linux/sched.h>
 
 
 /*
@@ -218,6 +218,44 @@ error_return:
 }
 
 /*
+ * We perform asynchronous prereading of the new inode's inode block when
+ * we create the inode, in the expectation that the inode will be written
+ * back soon.  There are two reasons:
+ *
+ * - When creating a large number of files, the async prereads will be
+ *   nicely merged into large reads
+ * - When writing out a large number of inodes, we don't need to keep on
+ *   stalling the writes while we read the inode block.
+ *
+ * FIXME: ext2_get_group_desc() needs to be simplified.
+ */
+static void ext2_preread_inode(struct inode *inode)
+{
+	unsigned long block_group;
+	unsigned long offset;
+	unsigned long block;
+	struct buffer_head *bh;
+	struct ext2_group_desc * gdp;
+
+	block_group = (inode->i_ino - 1) / EXT2_INODES_PER_GROUP(inode->i_sb);
+	gdp = ext2_get_group_desc(inode->i_sb, block_group, &bh);
+	if (gdp == NULL)
+		return;
+
+	/*
+	 * Figure out the offset within the block group inode table
+	 */
+	offset = ((inode->i_ino - 1) % EXT2_INODES_PER_GROUP(inode->i_sb)) *
+				EXT2_INODE_SIZE(inode->i_sb);
+	block = le32_to_cpu(gdp->bg_inode_table) +
+				(offset >> EXT2_BLOCK_SIZE_BITS(inode->i_sb));
+	bh = sb_getblk(inode->i_sb, block);
+	if (!buffer_uptodate(bh) && !buffer_locked(bh))
+		ll_rw_block(READA, 1, &bh);
+	__brelse(bh);
+}
+
+/*
  * There are two policies for allocating an inode.  If the new inode is
  * a directory, then a forward search is made for a block group with both
  * free space and a low directory-to-inode ratio; if that fails, then of
@@ -417,6 +455,7 @@ repeat:
 		return ERR_PTR(-EDQUOT);
 	}
 	ext2_debug ("allocating inode %lu\n", inode->i_ino);
+	ext2_preread_inode(inode);
 	return inode;
 
 fail2:

@@ -2,11 +2,6 @@
 # Makefile for the ia32 kernel emulation subsystem.
 #
 
-.S.s:
-	$(CPP) $(AFLAGS) $(AFLAGS_KERNEL) -o $*.s $<
-.S.o:
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $*.o $<
-
 all: ia32.o
 
 O_TARGET := ia32.o

@@ -25,15 +25,8 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/swap.h>
-#include <linux/locks.h>
 
 #include "ntfs.h"
-
-#define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,8)
-#define page_buffers(page)	(page)->buffers
-#endif
 
 /**
  * end_buffer_read_file_async -

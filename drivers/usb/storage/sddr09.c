@@ -1,7 +1,10 @@
 /* Driver for SanDisk SDDR-09 SmartMedia reader
  *
+ * $Id: sddr09.c,v 1.24 2002/04/22 03:39:43 mdharm Exp $
  *   (c) 2000, 2001 Robert Baruch (autophile@starband.net)
  *   (c) 2002 Andries Brouwer (aeb@cwi.nl)
+ * Developed with the assistance of:
+ *   (c) 2002 Alan Stern <stern@rowland.org>
  *
  * The SanDisk SDDR-09 SmartMedia reader uses the Shuttle EUSB-01 chip.
  * This chip is a programmable USB controller. In the SDDR-09, it has
@@ -25,6 +28,7 @@
  */
 
 #include "transport.h"
+#include "raw_bulk.h"
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
@@ -212,67 +216,6 @@ static void nand_store_ecc(unsigned char *data, unsigned char *ecc) {
 
 static int erase_bad_lba_entries = 0;
 
-/*
- * Send a control message and wait for the response.
- *
- * us - the pointer to the us_data structure for the device to use
- *
- * request - the URB Setup Packet's first 6 bytes. The first byte always
- *  corresponds to the request type, and the second byte always corresponds
- *  to the request.  The other 4 bytes do not correspond to value and index,
- *  since they are used in a custom way by the SCM protocol.
- *
- * xfer_data - a buffer from which to get, or to which to store, any data
- *  that gets send or received, respectively, with the URB. Even though
- *  it looks like we allocate a buffer in this code for the data, xfer_data
- *  must contain enough allocated space.
- *
- * xfer_len - the number of bytes to send or receive with the URB.
- *
- */
-
-static int
-sddr09_send_control(struct us_data *us,
-		    int pipe,
-		    unsigned char request,
-		    unsigned char requesttype,
-		    unsigned int value,
-		    unsigned int index,
-		    unsigned char *xfer_data,
-		    unsigned int xfer_len) {
-
-	int result;
-
-	// Send the URB to the device and wait for a response.
-
-	/* Why are request and request type reversed in this call? */
-
-	result = usb_stor_control_msg(us, pipe,
-			request, requesttype, value, index,
-			xfer_data, xfer_len);
-
-
-	// Check the return code for the command.
-
-	if (result < 0) {
-		/* if the command was aborted, indicate that */
-		if (result == -ENOENT)
-			return USB_STOR_TRANSPORT_ABORTED;
-
-		/* a stall is a fatal condition from the device */
-		if (result == -EPIPE) {
-			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_clear_halt(us->pusb_dev, pipe);
-			US_DEBUGP("-- usb_clear_halt() returns %d\n", result);
-			return USB_STOR_TRANSPORT_FAILED;
-		}
-
-		return USB_STOR_TRANSPORT_ERROR;
-	}
-
-	return USB_STOR_TRANSPORT_GOOD;
-}
-
 /* send vendor interface command (0x41) */
 /* called for requests 0, 1, 8 */
 static int
@@ -291,7 +234,7 @@ sddr09_send_command(struct us_data *us,
 	else
 		pipe = usb_sndctrlpipe(us->pusb_dev,0);
 
-	return sddr09_send_control(us, pipe, request, requesttype,
+	return usb_storage_send_control(us, pipe, request, requesttype,
 				   0, 0, xfer_data, xfer_len);
 }
 
@@ -300,135 +243,6 @@ sddr09_send_scsi_command(struct us_data *us,
 			 unsigned char *command,
 			 unsigned int command_len) {
 	return sddr09_send_command(us, 0, USB_DIR_OUT, command, command_len);
-}
-
-static int
-sddr09_raw_bulk(struct us_data *us, int direction,
-		unsigned char *data, unsigned int len) {
-
-	int result;
-	int act_len;
-	int pipe;
-
-	if (direction == SCSI_DATA_READ)
-		pipe = usb_rcvbulkpipe(us->pusb_dev, us->ep_in);
-	else
-		pipe = usb_sndbulkpipe(us->pusb_dev, us->ep_out);
-
-	result = usb_stor_bulk_msg(us, data, pipe, len, &act_len);
-
-	/* if we stall, we need to clear it before we go on */
-	if (result == -EPIPE) {
-		US_DEBUGP("EPIPE: clearing endpoint halt for"
-			  " pipe 0x%x, stalled at %d bytes\n",
-			  pipe, act_len);
-		usb_clear_halt(us->pusb_dev, pipe);
-	}
-
-	if (result) {
-		/* -ENOENT -- we canceled this transfer */
-		if (result == -ENOENT) {
-			US_DEBUGP("usbat_raw_bulk(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
-		}
-
-		/* NAK - that means we've retried a few times already */
-       		if (result == -ETIMEDOUT)
-			US_DEBUGP("usbat_raw_bulk(): device NAKed\n");
-		else if (result == -EOVERFLOW)
-			US_DEBUGP("us_transfer_partial(): babble/overflow\n");
-		else if (result != -EPIPE)
-			US_DEBUGP("us_transfer_partial(): unknown error %d\n",
-				  result);
-
-		return US_BULK_TRANSFER_FAILED;
-	}
-
-	if (act_len != len) {
-		US_DEBUGP("Warning: Transferred only %d of %d bytes\n",
-			  act_len, len);
-		return US_BULK_TRANSFER_SHORT;
-	}
-
-	return US_BULK_TRANSFER_GOOD;
-}
-
-static int
-sddr09_bulk_transport(struct us_data *us, int direction,
-		      unsigned char *data, unsigned int len,
-		      int use_sg) {
-
-	int result = USB_STOR_TRANSPORT_GOOD;
-	int transferred = 0;
-	int i;
-	struct scatterlist *sg;
-	char string[64];
-
-#define DEBUG_PRCT 12
-
-	if (len == 0)
-		return USB_STOR_TRANSPORT_GOOD;
-
-	if (direction == SCSI_DATA_WRITE && !use_sg) {
-
-		/* Debug-print the first N bytes of the write transfer */
-
-		strcpy(string, "wr: ");
-		for (i=0; i<len && i<DEBUG_PRCT; i++) {
-			sprintf(string+strlen(string), "%02X ",
-				data[i]);
-			if ((i%16) == 15) {
-				US_DEBUGP("%s\n", string);
-				strcpy(string, "wr: ");
-			}
-		}
-		if ((i%16)!=0)
-			US_DEBUGP("%s\n", string);
-	}
-
-	US_DEBUGP("SCM data %s transfer %d sg buffers %d\n",
-		  (direction == SCSI_DATA_READ) ? "in" : "out",
-		  len, use_sg);
-
-	if (!use_sg)
-		result = sddr09_raw_bulk(us, direction, data, len);
-	else {
-		sg = (struct scatterlist *)data;
-
-		for (i=0; i<use_sg && transferred<len; i++) {
-			unsigned char *buf;
-			unsigned int length;
-
-			buf = page_address(sg[i].page) + sg[i].offset;
-			length = len-transferred;
-			if (length > sg[i].length)
-				length = sg[i].length;
-
-			result = sddr09_raw_bulk(us, direction, buf, length);
-			if (result != US_BULK_TRANSFER_GOOD)
-				break;
-			transferred += sg[i].length;
-		}
-	}
-
-	if (direction == SCSI_DATA_READ && !use_sg) {
-
-		/* Debug-print the first N bytes of the read transfer */
-
-		strcpy(string, "rd: ");
-		for (i=0; i<len && i<DEBUG_PRCT; i++) {
-			sprintf(string+strlen(string), "%02X ",
-				data[i]);
-			if ((i%16) == 15) {
-				US_DEBUGP("%s\n", string);
-				strcpy(string, "rd: ");
-			}
-		}
-		if ((i%16)!=0)
-			US_DEBUGP("%s\n", string);
-	}
-
-	return result;
 }
 
 #if 0
@@ -462,6 +276,7 @@ sddr09_request_sense(struct us_data *us, unsigned char *sensebuf, int buflen) {
 		0x03, LUNBITS, 0, 0, buflen, 0, 0, 0, 0, 0, 0, 0
 	};
 	int result;
+	unsigned int act_len;
 
 	result = sddr09_send_scsi_command(us, command, sizeof(command));
 	if (result != USB_STOR_TRANSPORT_GOOD) {
@@ -469,7 +284,7 @@ sddr09_request_sense(struct us_data *us, unsigned char *sensebuf, int buflen) {
 		return result;
 	}
 
-	result = sddr09_raw_bulk(us, SCSI_DATA_READ, sensebuf, buflen);
+	result = usb_storage_raw_bulk(us, SCSI_DATA_READ, sensebuf, buflen, &act_len);
 	if (result != USB_STOR_TRANSPORT_GOOD)
 		US_DEBUGP("request sense bulk in failed\n");
 	else
@@ -526,7 +341,7 @@ sddr09_readX(struct us_data *us, int x, unsigned long fromaddress,
 		return result;
 	}
 
-	result = sddr09_bulk_transport(us, SCSI_DATA_READ,
+	result = usb_storage_bulk_transport(us, SCSI_DATA_READ,
 				       buf, bulklen, use_sg);
 
 	if (result != USB_STOR_TRANSPORT_GOOD)
@@ -692,7 +507,7 @@ sddr09_writeX(struct us_data *us,
 		return result;
 	}
 
-	result = sddr09_bulk_transport(us, SCSI_DATA_WRITE,
+	result = usb_storage_bulk_transport(us, SCSI_DATA_WRITE,
 				       buf, bulklen, use_sg);
 
 	if (result != USB_STOR_TRANSPORT_GOOD)
@@ -773,7 +588,7 @@ sddr09_read_sg_test_only(struct us_data *us) {
 	if (!buf)
 		return USB_STOR_TRANSPORT_ERROR;
 
-	result = sddr09_bulk_transport(us, SCSI_DATA_READ,
+	result = usb_storage_bulk_transport(us, SCSI_DATA_READ,
 				       buf, bulklen, 0);
 	if (result != USB_STOR_TRANSPORT_GOOD)
 		US_DEBUGP("Result for bulk_transport in sddr09_read_sg %d\n",
@@ -811,7 +626,7 @@ sddr09_read_status(struct us_data *us, unsigned char *status) {
 	if (result != USB_STOR_TRANSPORT_GOOD)
 		return result;
 
-	result = sddr09_bulk_transport(us, SCSI_DATA_READ,
+	result = usb_storage_bulk_transport(us, SCSI_DATA_READ,
 				       data, sizeof(data), 0);
 	*status = data[0];
 	return result;
@@ -829,8 +644,7 @@ sddr09_read_data(struct us_data *us,
 	unsigned int page, pages;
 	unsigned char *buffer = NULL;
 	unsigned char *ptr;
-	struct scatterlist *sg = NULL;
-	int result, i, len;
+	int result, len;
 
 	// If we're using scatter-gather, we have to create a new
 	// buffer to read all of the data in first, since a
@@ -841,14 +655,11 @@ sddr09_read_data(struct us_data *us,
 
 	len = sectors*info->pagesize;
 
-	if (use_sg) {
-		sg = (struct scatterlist *)content;
-		buffer = kmalloc(len, GFP_NOIO);
-		if (buffer == NULL)
-			return USB_STOR_TRANSPORT_ERROR;
-		ptr = buffer;
-	} else
-		ptr = content;
+	buffer = (use_sg ? kmalloc(len, GFP_NOIO) : content);
+	if (buffer == NULL)
+		return USB_STOR_TRANSPORT_ERROR;
+
+	ptr = buffer;
 
 	// Figure out the initial LBA and page
 	lba = address >> info->blockshift;
@@ -910,23 +721,8 @@ sddr09_read_data(struct us_data *us,
 		ptr += (pages << info->pageshift);
 	}
 
-	if (use_sg && result == USB_STOR_TRANSPORT_GOOD) {
-		int transferred = 0;
-
-		for (i=0; i<use_sg && transferred<len; i++) {
-			unsigned char *buf;
-			unsigned int length;
-
-			buf = page_address(sg[i].page) + sg[i].offset;
-
-			length = len-transferred;
-			if (length > sg[i].length)
-				length = sg[i].length;
-
-			memcpy(buf, buffer+transferred, length);
-			transferred += sg[i].length;
-		}
-	}
+	if (use_sg && result == USB_STOR_TRANSPORT_GOOD)
+		us_copy_to_sgbuf_all(buffer, len, content, use_sg);
 
 	if (use_sg)
 		kfree(buffer);
@@ -1077,49 +873,19 @@ sddr09_write_data(struct us_data *us,
 	unsigned int lba, page, pages;
 	unsigned char *buffer = NULL;
 	unsigned char *ptr;
-	struct scatterlist *sg = NULL;
-	int result, i, len;
-
-	// If we're using scatter-gather, we have to create a new
-	// buffer to write all of the data in first, since a
-	// scatter-gather buffer could in theory start in the middle
-	// of a page, which would be bad. A developer who wants a
-	// challenge might want to write a limited-buffer
-	// version of this code.
+	int result, len;
 
 	len = sectors*info->pagesize;
 
-	if (use_sg) {
-		int transferred = 0;
+	buffer = us_copy_from_sgbuf_all(content, len, use_sg);
+	if (buffer == NULL)
+		return USB_STOR_TRANSPORT_ERROR;
 
-		sg = (struct scatterlist *)content;
-		buffer = kmalloc(len, GFP_NOIO);
-		if (buffer == NULL)
-			return USB_STOR_TRANSPORT_ERROR;
-
-		for (i=0; i<use_sg && transferred<len; i++) {
-			unsigned char *buf;
-			unsigned int length;
-
-			buf = page_address(sg[i].page) + sg[i].offset;
-
-			length = len-transferred;
-			if (length > sg[i].length)
-				length = sg[i].length;
-
-			memcpy(buffer+transferred, buf, length);
-			transferred += sg[i].length;
-		}
-		ptr = buffer;
-	} else
-		ptr = content;
+	ptr = buffer;
 
 	// Figure out the initial LBA and page
 	lba = address >> info->blockshift;
 	page = (address & info->blockmask);
-
-	// This could be made much more efficient by checking for
-	// contiguous LBA's. Another exercise left to the student.
 
 	result = USB_STOR_TRANSPORT_GOOD;
 
@@ -1182,7 +948,7 @@ sddr09_read_deviceID(struct us_data *us, unsigned char *deviceID) {
 	if (result != USB_STOR_TRANSPORT_GOOD)
 		return result;
 
-	result = sddr09_bulk_transport(us, SCSI_DATA_READ, content, 64, 0);
+	result = usb_storage_bulk_transport(us, SCSI_DATA_READ, content, 64, 0);
 
 	for (i = 0; i < 4; i++)
 		deviceID[i] = content[i];
@@ -1386,15 +1152,6 @@ sddr09_read_map(struct us_data *us) {
 	// Each block is 64 bytes of control data, so block i is located in
 	// scatterlist block i*64/128k = i*(2^6)*(2^-17) = i*(2^-11)
 
-#if 0
-	/* No translation */
-	for (i=0; i<numblocks; i++) {
-		lba = i;
-		info->pba_to_lba[i] = lba;
-		info->lba_to_pba[lba] = i;
-	}
-	printk("sddr09: no translation today\n");
-#else
 	for (i=0; i<numblocks; i++) {
 		ptr = page_address(sg[i>>11].page) +
 			sg[i>>11].offset + ((i&0x7ff)<<6);
@@ -1482,7 +1239,6 @@ sddr09_read_map(struct us_data *us) {
 		info->pba_to_lba[i] = lba;
 		info->lba_to_pba[lba] = i;
 	}
-#endif
 
 	/*
 	 * Approximate capacity. This is not entirely correct yet,
@@ -1508,7 +1264,7 @@ sddr09_read_map(struct us_data *us) {
 	US_DEBUGP("Found %d LBA's\n", lbact);
 
 	for (i=0; i<alloc_blocks; i++)
-		kfree(page_address(sg[i].page)+sg[i].offset);
+		kfree(page_address(sg[i].page) + sg[i].offset);
 	kfree(sg);
 	return 0;
 }
@@ -1799,7 +1555,7 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 			  "sending" : "receiving",
 			  srb->request_bufflen);
 
-		result = sddr09_bulk_transport(us,
+		result = usb_storage_bulk_transport(us,
 					       srb->sc_data_direction,
 					       srb->request_buffer, 
 					       srb->request_bufflen,

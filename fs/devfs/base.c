@@ -620,6 +620,19 @@
 	       unlock_kernel() due to recent VFS locking changes. BKL isn't
 	       required in devfs.
   v1.13
+    20020428   Richard Gooch <rgooch@atnf.csiro.au>
+	       Removed 2.4.x compatibility code.
+  v1.14
+    20020510   Richard Gooch <rgooch@atnf.csiro.au>
+	       Added BKL to <devfs_open> because drivers still need it.
+  v1.15
+    20020512   Richard Gooch <rgooch@atnf.csiro.au>
+	       Protected <scan_dir_for_removable> and <get_removable_partition>
+	       from changing directory contents.
+  v1.16
+    20020514   Richard Gooch <rgooch@atnf.csiro.au>
+	       Minor cleanup of <scan_dir_for_removable>.
+  v1.17
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -652,7 +665,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "1.13 (20020406)"
+#define DEVFS_VERSION            "1.17 (20020514)"
 
 #define DEVFS_NAME "devfs"
 
@@ -1400,16 +1413,8 @@ static void free_dentry (struct devfs_entry *de)
 
 static int is_devfsd_or_child (struct fs_info *fs_info)
 {
-    struct task_struct *p;
-
     if (current == fs_info->devfsd_task) return (TRUE);
     if (current->pgrp == fs_info->devfsd_pgrp) return (TRUE);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,1)
-    for (p = current->p_opptr; p != &init_task; p = p->p_opptr)
-    {
-	if (p == fs_info->devfsd_task) return (TRUE);
-    }
-#endif
     return (FALSE);
 }   /*  End Function is_devfsd_or_child  */
 
@@ -1829,16 +1834,6 @@ devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name, void *info)
     de->info = info;
     if ( ( err = _devfs_append_entry (dir, de, FALSE, &old) ) != 0 )
     {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,1)
-	if ( old && S_ISDIR (old->mode) )
-	{
-	    PRINTK ("(%s): using old entry in dir: %p \"%s\"\n",
-		    name, dir, dir->name);
-	    old->vfs_deletable = FALSE;
-	    devfs_put (dir);
-	    return old;
-	}
-#endif
 	PRINTK ("(%s): could not append to dir: %p \"%s\", err: %d\n",
 		name, dir, dir->name, err);
 	devfs_put (old);
@@ -2427,6 +2422,9 @@ static int try_modload (struct devfs_entry *parent, struct fs_info *fs_info,
  *	@de: The device.
  *
  *	Returns 1 if the media was changed, else 0.
+ *
+ *	This function may block, and may indirectly cause the parent directory
+ *	contents to be changed due to partition re-reading.
  */
 
 static int check_disc_changed (struct devfs_entry *de)
@@ -2461,19 +2459,29 @@ out:
 /**
  *	scan_dir_for_removable - Scan a directory for removable media devices and check media.
  *	@dir: The directory.
+ *
+ *	This function may block, and may indirectly cause the directory
+ *	contents to be changed due to partition re-reading. The directory will
+ *	be locked for reading.
  */
 
 static void scan_dir_for_removable (struct devfs_entry *dir)
 {
     struct devfs_entry *de;
 
-    if (dir->u.dir.num_removable < 1) return;
-    for (de = dir->u.dir.first; de != NULL; de = de->next)
+    read_lock (&dir->u.dir.lock);
+    if (dir->u.dir.num_removable < 1) de = NULL;
+    else
     {
-	if ( !S_ISBLK (de->mode) ) continue;
-	if (!de->u.fcb.removable) continue;
-	check_disc_changed (de);
+	for (de = dir->u.dir.first; de != NULL; de = de->next)
+	{
+	    if (S_ISBLK (de->mode) && de->u.fcb.removable) break;
+	}
+	devfs_get (de);
     }
+    read_unlock (&dir->u.dir.lock);
+    if (de) check_disc_changed (de);
+    devfs_put (de);
 }   /*  End Function scan_dir_for_removable  */
 
 /**
@@ -2483,25 +2491,37 @@ static void scan_dir_for_removable (struct devfs_entry *dir)
  *	@namelen: The number of characters in <<name>>.
  *
  *	Returns 1 if the media was changed, else 0.
+ *
+ *	This function may block, and may indirectly cause the directory
+ *	contents to be changed due to partition re-reading. The directory must
+ *	be locked for reading upon entry, and will be unlocked upon exit.
  */
 
 static int get_removable_partition (struct devfs_entry *dir, const char *name,
 				    unsigned int namelen)
 {
+    int retval;
     struct devfs_entry *de;
 
+    if (dir->u.dir.num_removable < 1)
+    {
+	read_unlock (&dir->u.dir.lock);
+	return 0;
+    }
     for (de = dir->u.dir.first; de != NULL; de = de->next)
     {
-	if ( !S_ISBLK (de->mode) ) continue;
-	if (!de->u.fcb.removable) continue;
-	if (strcmp (de->name, "disc") == 0) return check_disc_changed (de);
+	if (!S_ISBLK (de->mode) || !de->u.fcb.removable) continue;
+	if (strcmp (de->name, "disc") == 0) break;
 	/*  Support for names where the partition is appended to the disc name
 	 */
 	if (de->namelen >= namelen) continue;
-	if (strncmp (de->name, name, de->namelen) != 0) continue;
-	return check_disc_changed (de);
+	if (strncmp (de->name, name, de->namelen) == 0) break;
     }
-    return 0;
+    devfs_get (de);
+    read_unlock (&dir->u.dir.lock);
+    retval = de ? check_disc_changed (de) : 0;
+    devfs_put (de);
+    return retval;
 }   /*  End Function get_removable_partition  */
 
 
@@ -2739,15 +2759,22 @@ static int devfs_open (struct inode *inode, struct file *file)
     {
 	file->f_op = &def_blk_fops;
 	if (df->ops) inode->i_bdev->bd_op = df->ops;
+	err = def_blk_fops.open (inode, file);
     }
-    else file->f_op = fops_get ( (struct file_operations *) df->ops );
-    if (file->f_op)
-	err = file->f_op->open ? (*file->f_op->open) (inode, file) : 0;
     else
     {
-	/*  Fallback to legacy scheme  */
-	if ( S_ISCHR (inode->i_mode) ) err = chrdev_open (inode, file);
-	else err = -ENODEV;
+	file->f_op = fops_get ( (struct file_operations *) df->ops );
+	if (file->f_op)
+	{
+	    lock_kernel ();
+	    err = file->f_op->open ? (*file->f_op->open) (inode, file) : 0;
+	    unlock_kernel ();
+	}
+	else
+	{   /*  Fallback to legacy scheme  */
+	    if ( S_ISCHR (inode->i_mode) ) err = chrdev_open (inode, file);
+	    else err = -ENODEV;
+	}
     }
     if (err < 0) return err;
     /*  Open was successful  */
@@ -2947,15 +2974,17 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry)
     if (parent == NULL) return ERR_PTR (-ENOENT);
     read_lock (&parent->u.dir.lock);
     de = _devfs_search_dir (parent, dentry->d_name.name, dentry->d_name.len);
-    read_unlock (&parent->u.dir.lock);
-    if ( (de == NULL) && (parent->u.dir.num_removable > 0) &&
-	 get_removable_partition (parent, dentry->d_name.name,
-				  dentry->d_name.len) )
-    {
-	read_lock (&parent->u.dir.lock);
-	de = _devfs_search_dir (parent, dentry->d_name.name,
-				dentry->d_name.len);
-	read_unlock (&parent->u.dir.lock);
+    if (de) read_unlock (&parent->u.dir.lock);
+    else
+    {   /*  Try re-reading the partition (media may have changed)  */
+	if ( get_removable_partition (parent, dentry->d_name.name,
+				      dentry->d_name.len) )  /*  Unlocks  */
+	{   /*  Media did change  */
+	    read_lock (&parent->u.dir.lock);
+	    de = _devfs_search_dir (parent, dentry->d_name.name,
+				    dentry->d_name.len);
+	    read_unlock (&parent->u.dir.lock);
+	}
     }
     lookup_info.de = de;
     init_waitqueue_head (&lookup_info.wait_queue);

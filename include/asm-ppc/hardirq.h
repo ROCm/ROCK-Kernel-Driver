@@ -8,7 +8,6 @@
 #include <linux/config.h>
 #include <asm/smp.h>
 
-/* entry.S is sensitive to the offsets of these fields */
 /* The __last_jiffy_stamp field is needed to ensure that no decrementer 
  * interrupt is lost on SMP machines. Since on most CPUs it is in the same 
  * cache line as local_irq_count, it is cheap to access and is also used on UP 
@@ -40,8 +39,8 @@ typedef struct {
 #define hardirq_trylock(cpu)	(local_irq_count(cpu) == 0)
 #define hardirq_endlock(cpu)	do { } while (0)
 
-#define hardirq_enter(cpu)	(local_irq_count(cpu)++)
-#define hardirq_exit(cpu)	(local_irq_count(cpu)--)
+#define hardirq_enter(cpu)	do { preempt_disable(); local_irq_count(cpu)++; } while (0)
+#define hardirq_exit(cpu)	do { local_irq_count(cpu)--; preempt_enable(); } while (0)
 
 #define synchronize_irq()	do { } while (0)
 #define release_irqlock(cpu)    do { } while (0)
@@ -75,7 +74,8 @@ static inline void release_irqlock(int cpu)
 static inline void hardirq_enter(int cpu)
 {
 	unsigned int loops = 10000000;
-	
+
+	preempt_disable();
 	++local_irq_count(cpu);
 	while (test_bit(0,&global_irq_lock)) {
 		if (cpu == global_irq_holder) {
@@ -97,6 +97,7 @@ static inline void hardirq_enter(int cpu)
 static inline void hardirq_exit(int cpu)
 {
 	--local_irq_count(cpu);
+	preempt_enable();
 }
 
 static inline int hardirq_trylock(int cpu)

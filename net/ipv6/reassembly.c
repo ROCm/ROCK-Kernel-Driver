@@ -29,7 +29,7 @@
 #include <linux/string.h>
 #include <linux/socket.h>
 #include <linux/sockios.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/net.h>
 #include <linux/netdevice.h>
 #include <linux/in6.h>

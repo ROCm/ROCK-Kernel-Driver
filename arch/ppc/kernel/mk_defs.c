@@ -107,10 +107,13 @@ main(void)
 	DEFINE(_DSISR, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dsisr));
 	/* The PowerPC 400-class processors have neither the DAR nor the DSISR
 	 * SPRs. Hence, we overload them to hold the similar DEAR and ESR SPRs
-	 * for such processors.
+	 * for such processors.  For critical interrupts we use them to
+	 * hold SRR0 and SRR1.
 	 */
 	DEFINE(_DEAR, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dar));
 	DEFINE(_ESR, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dsisr));
+	DEFINE(_SRR0, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dar));
+	DEFINE(_SRR1, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dsisr));
 	DEFINE(ORIG_GPR3, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, orig_gpr3));
 	DEFINE(RESULT, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, result));
 	DEFINE(TRAP, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, trap));

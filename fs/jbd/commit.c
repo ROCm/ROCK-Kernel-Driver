@@ -18,7 +18,6 @@
 #include <linux/jbd.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 
 extern spinlock_t journal_datalist_lock;

@@ -13,7 +13,6 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/bitops.h>
 #include <linux/amigaffs.h>
 

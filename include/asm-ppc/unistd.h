@@ -234,7 +234,6 @@
 
 #define __NR(n)	#n
 
-
 #define __syscall_return(type) \
 	return (__sc_err & 0x10000000 ? errno = __sc_ret, __sc_ret = -1 : 0), \
 	       (type) __sc_ret
@@ -403,8 +402,9 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5)	\
 	__syscall_return (type);					\
 }
 
+#ifdef __KERNEL__
 
-#ifdef __KERNEL_SYSCALLS__
+#define __NR__exit __NR_exit
 
 /*
  * Forking from kernel space will result in the child getting a new,
@@ -414,29 +414,24 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5)	\
  * the child.
  */
 
+#ifdef __KERNEL_SYSCALLS__
 /*
  * System call prototypes.
  */
-#define __NR__exit __NR_exit
-static inline _syscall0(int,pause)
-static inline _syscall0(int,sync)
-static inline _syscall0(pid_t,setsid)
-static inline _syscall3(int,write,int,fd,const char *,buf,off_t,count)
-static inline _syscall3(int,read,int,fd,char *,buf,off_t,count)
-static inline _syscall3(off_t,lseek,int,fd,off_t,offset,int,count)
-static inline _syscall1(int,dup,int,fd)
-static inline _syscall3(int,execve,const char *,file,char **,argv,char **,envp)
-static inline _syscall3(int,open,const char *,file,int,flag,int,mode)
-static inline _syscall1(int,close,int,fd)
-static inline _syscall1(int,_exit,int,exitcode)
-static inline _syscall3(pid_t,waitpid,pid_t,pid,int *,wait_stat,int,options)
-static inline _syscall1(int,delete_module,const char *,name)
+extern pid_t setsid(void);
+extern int write(int fd, const char *buf, off_t count);
+extern int read(int fd, char *buf, off_t count);
+extern off_t lseek(int fd, off_t offset, int count);
+extern int dup(int fd);
+extern int execve(const char *file, char **argv, char **envp);
+extern int open(const char *file, int flag, int mode);
+extern int close(int fd);
+extern pid_t waitpid(pid_t pid, int *wait_stat, int options);
 
 static inline pid_t wait(int * wait_stat) 
 {
 	return waitpid(-1, wait_stat, 0);
 }
-
 #endif /* __KERNEL_SYSCALLS__ */
 
 /*
@@ -446,5 +441,7 @@ static inline pid_t wait(int * wait_stat)
  * but it doesn't work on all toolchains, so we just do it by hand
  */
 #define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall");
+
+#endif /* __KERNEL__ */
 
 #endif /* _ASM_PPC_UNISTD_H_ */

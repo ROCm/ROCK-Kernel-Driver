@@ -146,7 +146,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
  * remote CPUs are nearly ready to execute <<func>> or are or have executed.
  *
  * You must not call this function with disabled interrupts or from a
- * hardware interrupt handler, you may call it from a bottom half handler.
+ * hardware interrupt handler or from a bottom half handler.
  */
 {
 	struct call_data_struct data;
@@ -162,7 +162,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	if (wait)
 		atomic_set(&data.finished, 0);
 
-	spin_lock_bh(&call_lock);
+	spin_lock(&call_lock);
 	call_data = &data;
 	/* Send a message to all other CPUs and wait for them to respond */
         smp_ext_bitcall_others(ec_call_function);
@@ -174,7 +174,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
 			barrier();
-	spin_unlock_bh(&call_lock);
+	spin_unlock(&call_lock);
 
 	return 0;
 }
@@ -484,13 +484,13 @@ void __init initialize_secondary(void)
 {
 }
 
-static int __init fork_by_hand(void)
+static struct task_struct * __init fork_by_hand(void)
 {
        struct pt_regs regs;
        /* don't care about the psw and regs settings since we'll never
           reschedule the forked task. */
        memset(&regs,0,sizeof(struct pt_regs));
-       return do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0);
+       return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0);
 }
 
 static void __init do_boot_cpu(int cpu)
@@ -500,16 +500,14 @@ static void __init do_boot_cpu(int cpu)
 
         /* We can't use kernel_thread since we must _avoid_ to reschedule
            the child. */
-        if (fork_by_hand() < 0)
+        idle = fork_by_hand();
+	if (IS_ERR(idle))
                 panic("failed fork for CPU %d", cpu);
 
         /*
          * We remove it from the pidhash and the runqueue
          * once we got the process:
          */
-        idle = prev_task(&init_task);
-        if (!idle)
-                panic("No idle process for CPU %d",cpu);
         idle->processor = cpu;
 	idle->cpus_runnable = 1 << cpu; /* we schedule the first task manually */
 

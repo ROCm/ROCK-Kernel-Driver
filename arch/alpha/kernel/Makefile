@@ -7,12 +7,9 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-.S.s:
-	$(CPP) $(CFLAGS) $(AFLAGS) -o $*.s $<
-.S.o:
-	$(CC) $(CFLAGS) $(AFLAGS) -c -o $*.o $<
-
 O_TARGET := kernel.o
+
+EXTRA_AFLAGS := $(CFLAGS)
 
 export-objs := alpha_ksyms.o
 

@@ -8,11 +8,6 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-# These assembly files can't be assembld with -traditional, so we
-# need another build rule than the one in the toplevel Makefile.
-.S.o:
-	$(CC) $(AFLAGS) -c $< -o $*.o
-
 all: kernel.o head.o
 
 O_TARGET := kernel.o

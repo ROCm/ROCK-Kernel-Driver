@@ -90,6 +90,24 @@ CONFIG_BLK_DEV_LOOP
 
   Most users will answer N here.
 
+Micro Memory MM5415 Battery Backed RAM support (EXPERIMENTAL)
+CONFIG_BLK_DEV_UMEM
+  Saying Y here will include support for the MM5415 family of
+  battery backed (Non-volatile) RAM cards.
+  http://www.umem.com/
+
+  The cards appear as block devices that can be partitioned into
+  as many as 15 partitions.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read Documentation/modules.txt. The module will be
+  called umem.o.
+
+  The umem driver has not yet been allocated a MAJOR number, so
+  one is chosen dynamically.  Use "devfs" or look in /proc/devices
+  for the device number
+
 CONFIG_BLK_DEV_NBD
   Saying Y here will allow your computer to be a client for network
   block devices, i.e. it will be able to use block devices exported by

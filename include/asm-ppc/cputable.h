@@ -67,6 +67,8 @@ extern struct cpu_spec		*cur_cpu_spec[];
 #define CPU_FTR_604_PERF_MON		0x00000080
 #define CPU_FTR_601			0x00000100
 #define CPU_FTR_HPTE_TABLE		0x00000200
+#define CPU_FTR_CAN_NAP			0x00000400
+#define CPU_FTR_L3CR			0x00000800
 
 #ifdef __ASSEMBLY__
 

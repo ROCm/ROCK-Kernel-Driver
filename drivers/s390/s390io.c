@@ -6981,8 +6981,7 @@ static int cio_sensedata_entry_open( struct inode *inode, struct file *file)
 	int len = 0;
 	tempinfo_t *info;
 	int irq;
-	int devno;
-	char * devno_str;
+	int devno = PDE(inode)->data;
 
 	info = (tempinfo_t *) vmalloc(sizeof(tempinfo_t));
 	if (info == NULL) {
@@ -6997,10 +6996,6 @@ static int cio_sensedata_entry_open( struct inode *inode, struct file *file)
 			vfree(info);
 			rc = -ENOMEM;
 		} else {
-			devno_str = kmalloc(6*sizeof(char), GFP_KERNEL);
-			memset(devno_str, 0, 6*sizeof(char));
-			memcpy(devno_str,file->f_dentry->d_parent->d_name.name, strlen(file->f_dentry->d_parent->d_name.name)+1);
-			devno = simple_strtoul(devno_str, &devno_str, 16);
 			irq = get_irq_by_devno(devno);
 			if (irq != -1) {
 				len += sprintf(info->data+len, "Dev Type/Mod: ");
@@ -7031,8 +7026,7 @@ static int cio_in_use_entry_open( struct inode *inode, struct file *file)
 	int len = 0;
 	tempinfo_t *info;
 	int irq;
-	int devno;
-	char * devno_str;
+	int devno = PDE(inode)->data;
 
 	info = (tempinfo_t *) vmalloc(sizeof(tempinfo_t));
 	if (info == NULL) {
@@ -7047,10 +7041,6 @@ static int cio_in_use_entry_open( struct inode *inode, struct file *file)
 			vfree(info);
 			rc = -ENOMEM;
 		} else {
-			devno_str = kmalloc(6*sizeof(char), GFP_KERNEL);
-			memset(devno_str, 0, 6*sizeof(char));
-			memcpy(devno_str,file->f_dentry->d_parent->d_name.name, strlen(file->f_dentry->d_parent->d_name.name)+1);
-			devno = simple_strtoul(devno_str, &devno_str, 16);
 			irq = get_irq_by_devno(devno);
 			if (irq != -1) {
 				len += sprintf(info->data+len, "%s\n", ioinfo[irq]->ui.flags.ready?"yes":"no");
@@ -7069,9 +7059,8 @@ static int cio_chpid_entry_open( struct inode *inode, struct file *file)
 	int len = 0;
 	tempinfo_t *info;
 	int irq;
-	int devno;
+	int devno = PDE(inode)->data;
 	int i;
-	char * devno_str;
 
 	info = (tempinfo_t *) vmalloc(sizeof(tempinfo_t));
 	if (info == NULL) {
@@ -7086,10 +7075,6 @@ static int cio_chpid_entry_open( struct inode *inode, struct file *file)
 			vfree(info);
 			rc = -ENOMEM;
 		} else {
-			devno_str = kmalloc(6*sizeof(char), GFP_KERNEL);
-			memset(devno_str, 0, 6*sizeof(char));
-			memcpy(devno_str,file->f_dentry->d_parent->d_name.name, strlen(file->f_dentry->d_parent->d_name.name)+1);
-			devno = simple_strtoul(devno_str, &devno_str, 16);
 			irq = get_irq_by_devno(devno);
 			if (irq != -1) {
 				for (i=0; i<8; i++) {
@@ -7172,10 +7157,13 @@ int cio_procfs_device_create(int devno)
 				}
 				/* create the different entries */
 				entry->cio_sensedata_entry = create_proc_entry( "sensedata", S_IFREG|S_IRUGO, entry->cio_device_entry);
+				entry->cio_sensedata_entry->data = devno;
 				entry->cio_sensedata_entry->proc_fops = &cio_sensedata_entry_file_ops;
 				entry->cio_in_use_entry = create_proc_entry( "in_use", S_IFREG|S_IRUGO, entry->cio_device_entry);
+				entry->cio_in_use_entry->data = devno;
 				entry->cio_in_use_entry->proc_fops = &cio_in_use_entry_file_ops;
 				entry->cio_chpid_entry = create_proc_entry( "chpids", S_IFREG|S_IRUGO, entry->cio_device_entry);
+				entry->cio_chpid_entry->data = devno;
 				entry->cio_chpid_entry->proc_fops = &cio_chpid_entry_file_ops;
 			} else {
 				printk( KERN_WARNING "Error, could not allocate procfs structure!\n");

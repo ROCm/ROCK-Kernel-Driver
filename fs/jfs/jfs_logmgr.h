@@ -58,7 +58,7 @@
 #define	LOGMAGIC	0x87654321
 #define	LOGVERSION	1
 
-#define MAX_ACTIVE	512	/* Max active file systems sharing log */
+#define MAX_ACTIVE	128	/* Max active file systems sharing log */
 
 typedef struct {
 	u32 magic;		/* 4: log lv identifier */
@@ -72,9 +72,14 @@ typedef struct {
 	u32 state;		/* 4: state - see below */
 
 	s32 end;		/* 4: addr of last log record set by logredo */
-	u32 device;		/* 4: save device in case location changes */
-	u32 active[MAX_ACTIVE];	/* 2048: active file systems list */
+	char uuid[16];		/* 16: 128-bit journal uuid */
+	char label[16];		/* 16: journal label */
+	struct {
+		char uuid[16];
+	} active[MAX_ACTIVE];	/* 2048: active file systems list */
 } logsuper_t;
+
+#define NULL_UUID "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 
 /* log flag: commit option (see jfs_filsys.h) */
 
@@ -411,6 +416,7 @@ typedef struct jfs_log {
 	spinlock_t synclock;	/* 4: synclist lock */
 	struct lbuf *wqueue;	/* 4: log pageout queue */
 	int count;		/* 4: count */
+	char uuid[16];		/* 16: 128-bit uuid of log device */
 } log_t;
 
 /*
@@ -489,6 +495,7 @@ typedef struct logsyncblk {
 }
 
 extern int lmLogOpen(struct super_block *sb, log_t ** log);
+extern void lmLogWait(log_t * log);
 extern int lmLogClose(struct super_block *sb, log_t * log);
 extern int lmLogSync(log_t * log, int nosyncwait);
 extern int lmLogQuiesce(log_t * log);

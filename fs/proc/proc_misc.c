@@ -130,7 +130,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 {
 	struct sysinfo i;
 	int len;
-	int pg_size ;
 	struct page_state ps;
 
 	get_page_state(&ps);
@@ -140,7 +139,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 #define K(x) ((x) << (PAGE_SHIFT - 10))
 	si_meminfo(&i);
 	si_swapinfo(&i);
-	pg_size = get_page_cache_size() - i.bufferram ;
 
 	/*
 	 * Tagged format, for easy grepping and expansion.
@@ -149,7 +147,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"MemTotal:     %8lu kB\n"
 		"MemFree:      %8lu kB\n"
 		"MemShared:    %8lu kB\n"
-		"Buffers:      %8lu kB\n"
 		"Cached:       %8lu kB\n"
 		"SwapCached:   %8lu kB\n"
 		"Active:       %8u kB\n"
@@ -165,8 +162,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.totalram),
 		K(i.freeram),
 		K(i.sharedram),
-		K(i.bufferram),
-		K(pg_size - swapper_space.nrpages),
+		K(ps.nr_pagecache-swapper_space.nrpages),
 		K(swapper_space.nrpages),
 		K(nr_active_pages),
 		K(nr_inactive_pages),
@@ -361,25 +357,7 @@ static int devices_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
-static void *single_start(struct seq_file *p, loff_t *pos)
-{
-	return NULL + (*pos == 0);
-}
-static void *single_next(struct seq_file *p, void *v, loff_t *pos)
-{
-	++*pos;
-	return NULL;
-}
-static void single_stop(struct seq_file *p, void *v)
-{
-}
 extern int show_interrupts(struct seq_file *p, void *v);
-static struct seq_operations proc_interrupts_op = {
-	start:	single_start,
-	next:	single_next,
-	stop:	single_stop,
-	show:	show_interrupts,
-};
 static int interrupts_open(struct inode *inode, struct file *file)
 {
 	unsigned size = PAGE_SIZE;
@@ -393,7 +371,7 @@ static int interrupts_open(struct inode *inode, struct file *file)
 
 	if (!buf)
 		return -ENOMEM;
-	res = seq_open(file, &proc_interrupts_op);
+	res = single_open(file, show_interrupts, NULL);
 	if (!res) {
 		m = file->private_data;
 		m->buf = buf;
@@ -406,7 +384,7 @@ static struct file_operations proc_interrupts_operations = {
 	open:		interrupts_open,
 	read:		seq_read,
 	llseek:		seq_lseek,
-	release:	seq_release,
+	release:	single_release,
 };
 
 static int filesystems_read_proc(char *page, char **start, off_t off,

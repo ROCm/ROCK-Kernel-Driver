@@ -83,10 +83,6 @@ static int to_debug = FALSE;
 //
 //----------------------------------------------------------------------------
 #define WPG_I2C_IOREMAP_SIZE	0x2044	// size of linear address interval
-#define WPG_CTLR_MAX		0x01	// max controllers
-#define WPG_SLOT_MAX		0x06	// max slots
-#define WPG_CTLR_SLOT_MAX	0x06	// max slots per controller
-#define WPG_FIRST_CTLR		0x00	// index of the controller
 
 //----------------------------------------------------------------------------
 // command index
@@ -127,7 +123,7 @@ static void free_hpc_access (void);
 static void poll_hpc (void);
 static int update_slot (struct slot *, u8);
 static int process_changeinstatus (struct slot *, struct slot *);
-static int process_changeinlatch (u8, u8);
+static int process_changeinlatch (u8, u8, struct controller *);
 static int hpc_poll_thread (void *);
 static int hpc_wait_ctlr_notworking (int, struct controller *, void *, u8 *);
 //----------------------------------------------------------------------------
@@ -277,8 +273,7 @@ static u8 ctrl_write (struct controller *ctlr_ptr, void *WPGBbar, u8 index, u8 c
 	int i;
 
 
-	debug_polling ("%s - Entry WPGBbar[%lx] index[%x] cmd[%x]\n",
-		       __FUNCTION__, (ulong) WPGBbar, index, cmd);
+	debug_polling ("%s - Entry WPGBbar[%lx] index[%x] cmd[%x]\n", __FUNCTION__, (ulong) WPGBbar, index, cmd);
 
 	rc = 0;
 	//--------------------------------------------------------------------
@@ -470,8 +465,7 @@ int ibmphp_hpc_readslot (struct slot * pslot, u8 cmd, u8 * pstatus)
 	int rc = 0;
 	int busindex;
 
-	debug_polling ("%s - Entry pslot[%lx] cmd[%x] pstatus[%lx]\n",
-		       __FUNCTION__, (ulong) pslot, cmd, (ulong) pstatus);
+	debug_polling ("%s - Entry pslot[%lx] cmd[%x] pstatus[%lx]\n", __FUNCTION__, (ulong) pslot, cmd, (ulong) pstatus);
 
 	if ((pslot == NULL)
 	    || ((pstatus == NULL) && (cmd != READ_ALLSTAT) && (cmd != READ_BUSSTATUS))) {
@@ -779,7 +773,7 @@ static void poll_hpc (void)
 										  &curlatchlow);
 							if (oldlatchlow != curlatchlow)
 								process_changeinlatch (oldlatchlow,
-											curlatchlow);
+											curlatchlow, pslot->ctrl);
 						}
 					}
 				}
@@ -917,7 +911,6 @@ static int process_changeinstatus (struct slot *pslot, struct slot *poldslot)
 
 	// bit 0 - HPC_SLOT_POWER
 	if ((pslot->status & 0x01) != (poldslot->status & 0x01))
-		/* ????????? DO WE NEED TO UPDATE BUS SPEED INFO HERE ??? */
 		update = TRUE;
 
 	// bit 1 - HPC_SLOT_CONNECT
@@ -936,7 +929,7 @@ static int process_changeinstatus (struct slot *pslot, struct slot *poldslot)
 	// bit 5 - HPC_SLOT_PWRGD
 	if ((pslot->status & 0x20) != (poldslot->status & 0x20))
 		// OFF -> ON: ignore, ON -> OFF: disable slot
-		if (poldslot->status & 0x20)
+		if ((poldslot->status & 0x20) && (SLOT_CONNECT (poldslot->status) == HPC_SLOT_CONNECTED) && (SLOT_PRESENT (poldslot->status))) 
 			disable = TRUE;
 
 	// bit 6 - HPC_SLOT_BUS_SPEED
@@ -947,20 +940,20 @@ static int process_changeinstatus (struct slot *pslot, struct slot *poldslot)
 		update = TRUE;
 		// OPEN -> CLOSE
 		if (pslot->status & 0x80) {
-			if (SLOT_POWER (pslot->status)) {
+			if (SLOT_PWRGD (pslot->status)) {
 				// power goes on and off after closing latch
 				// check again to make sure power is still ON
 				long_delay (1 * HZ);
 				rc = ibmphp_hpc_readslot (pslot, READ_SLOTSTATUS, &status);
-				if (SLOT_POWER (status))
+				if (SLOT_PWRGD (status))
 					update = TRUE;
 				else	// overwrite power in pslot to OFF
 					pslot->status &= ~HPC_SLOT_POWER;
 			}
 		}
 		// CLOSE -> OPEN 
-		else if ((SLOT_POWER (poldslot->status) == HPC_SLOT_POWER_ON)
-			|| (SLOT_CONNECT (poldslot->status) == HPC_SLOT_CONNECTED)) {
+		else if ((SLOT_PWRGD (poldslot->status) == HPC_SLOT_PWRGD_GOOD)
+			&& (SLOT_CONNECT (poldslot->status) == HPC_SLOT_CONNECTED) && (SLOT_PRESENT (poldslot->status))) {
 			disable = TRUE;
 		}
 		// else - ignore
@@ -994,7 +987,7 @@ static int process_changeinstatus (struct slot *pslot, struct slot *poldslot)
 * Return   0 or error codes
 * Value:
 *---------------------------------------------------------------------*/
-static int process_changeinlatch (u8 old, u8 new)
+static int process_changeinlatch (u8 old, u8 new, struct controller *ctrl)
 {
 	struct slot myslot, *pslot;
 	u8 i;
@@ -1004,7 +997,7 @@ static int process_changeinlatch (u8 old, u8 new)
 	debug ("%s - Entry old[%x], new[%x]\n", __FUNCTION__, old, new);
 	// bit 0 reserved, 0 is LSB, check bit 1-6 for 6 slots
 
-	for (i = 1; i <= 6; i++) {
+	for (i = ctrl->starting_slot_num; i <= ctrl->ending_slot_num; i++) {
 		mask = 0x01 << i;
 		if ((mask & old) != (mask & new)) {
 			pslot = ibmphp_get_slot_from_physical_num (i);

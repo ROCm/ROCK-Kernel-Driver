@@ -10,7 +10,6 @@
 #include <linux/string.h>
 #include <linux/fs.h>
 #include <linux/openprom_fs.h>
-#include <linux/locks.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>

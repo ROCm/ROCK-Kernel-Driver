@@ -1,8 +1,6 @@
 /*
- * linux/drivers/ide/ide-geometry.c
- *
  * Sun Feb 24 23:13:03 CET 2002: Patch by Andries Brouwer to remove the
- * confused CMOS probe applied. This is solving more problems then it my
+ * confused CMOS probe applied. This is solving more problems than it may
  * (unexpectedly) introduce.
  */
 
@@ -14,17 +12,17 @@
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 
-extern ide_drive_t * get_info_ptr(kdev_t);
+extern struct ata_device * get_info_ptr(kdev_t);
 
 /*
  * If heads is nonzero: find a translation with this many heads and S=63.
  * Otherwise: find out how OnTrack Disk Manager would translate the disk.
  */
 static void
-ontrack(ide_drive_t *drive, int heads, unsigned int *c, int *h, int *s)
+ontrack(struct ata_device *drive, int heads, unsigned int *c, int *h, int *s)
 {
-	static const byte dm_head_vals[] = {4, 8, 16, 32, 64, 128, 255, 0};
-	const byte *headp = dm_head_vals;
+	static const u8 dm_head_vals[] = {4, 8, 16, 32, 64, 128, 255, 0};
+	const u8 *headp = dm_head_vals;
 	unsigned long total;
 
 	/*
@@ -72,13 +70,13 @@ ontrack(ide_drive_t *drive, int heads, unsigned int *c, int *h, int *s)
  *	-1 = similar to "0", plus redirect sector 0 to sector 1.
  *	 2 = convert to a CHS geometry with "ptheads" heads.
  *
- * Returns 0 if the translation was not possible, if the device was not 
+ * Returns 0 if the translation was not possible, if the device was not
  * an IDE disk drive, or if a geometry was "forced" on the commandline.
  * Returns 1 if the geometry translation was successful.
  */
-int ide_xlate_1024 (kdev_t i_rdev, int xparm, int ptheads, const char *msg)
+int ide_xlate_1024(kdev_t i_rdev, int xparm, int ptheads, const char *msg)
 {
-	ide_drive_t *drive;
+	struct ata_device *drive;
 	const char *msg1 = "";
 	int heads = 0;
 	int c, h, s;
@@ -144,4 +142,4 @@ int ide_xlate_1024 (kdev_t i_rdev, int xparm, int ptheads, const char *msg)
 		       drive->bios_cyl, drive->bios_head, drive->bios_sect);
 	return ret;
 }
-#endif /* defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE) */
+#endif

@@ -231,7 +231,7 @@ void daemonize(void)
 
 /*
  * When we die, we re-parent all our children.
- * Try to give them to another thread in our process
+ * Try to give them to another thread in our thread
  * group, and if no such member exists, give it to
  * the global child reaper process (ie "init")
  */
@@ -241,8 +241,14 @@ static inline void forget_original_parent(struct task_struct * father)
 
 	read_lock(&tasklist_lock);
 
-	/* Next in our thread group */
-	reaper = next_thread(father);
+	/* Next in our thread group, if they're not already exiting */
+	reaper = father;
+	do {
+		reaper = next_thread(reaper);
+		if (!(reaper->flags & PF_EXITING))
+			break;
+	} while (reaper != father);
+
 	if (reaper == father)
 		reaper = child_reaper;
 

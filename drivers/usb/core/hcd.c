@@ -1320,7 +1320,7 @@ static void urb_unlink (struct urb *urb)
 	list_del_init (&urb->urb_list);
 	dev = urb->dev;
 	urb->dev = NULL;
-	usb_dec_dev_use (dev);
+	usb_put_dev (dev);
 	spin_unlock_irqrestore (&hcd_data_lock, flags);
 }
 
@@ -1406,11 +1406,6 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	/* the I/O buffer must usually be mapped/unmapped */
 	if (urb->transfer_buffer_length < 0)
 		return -EINVAL;
-
-	if (urb->next) {
-		warn ("use explicit queuing not urb->next");
-		return -EINVAL;
-	}
 
 #ifdef DEBUG
 	/* stuff that drivers shouldn't do, but which shouldn't
@@ -1516,7 +1511,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 
 	spin_lock_irqsave (&hcd_data_lock, flags);
 	if (HCD_IS_RUNNING (hcd->state) && hcd->state != USB_STATE_QUIESCING) {
-		usb_inc_dev_use (urb->dev);
+		usb_get_dev (urb->dev);
 		list_add (&urb->urb_list, &dev->urb_list);
 		status = 0;
 	} else {
@@ -1732,7 +1727,8 @@ static int hcd_free_dev (struct usb_device *udev)
 		return -EINVAL;
 	}
 
-	hcd->driver->free_config (hcd, udev);
+	if (hcd->driver->free_config)
+		hcd->driver->free_config (hcd, udev);
 
 	spin_lock_irqsave (&hcd_data_lock, flags);
 	list_del (&dev->dev_list);
@@ -1784,10 +1780,6 @@ static void hcd_irq (int irq, void *__hcd, struct pt_regs * r)
  * HCDs must not use this for periodic URBs that are still scheduled
  * and will be reissued.  They should just call their completion handlers
  * until the urb is returned to the device driver by unlinking.
- *
- * NOTE that no urb->next processing is done, even for isochronous URBs.
- * ISO streaming functionality can be achieved by having completion handlers
- * re-queue URBs.  Such explicit queuing doesn't discard error reports.
  */
 void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
 {

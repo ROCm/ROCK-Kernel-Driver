@@ -962,15 +962,40 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 
 	init_MUTEX(&dev->serialize);
 
-	dev->bus->op->allocate(dev);
+	if (dev->bus->op->allocate)
+		dev->bus->op->allocate(dev);
 
 	return dev;
 }
 
 /**
- * usb_free_dev - free a usb device structure (usbcore-internal)
+ * usb_get_dev - increments the reference count of the device
+ * @dev: the device being referenced
+ *
+ * Each live reference to a device should be refcounted.
+ *
+ * Drivers for USB interfaces should normally record such references in
+ * their probe() methods, when they bind to an interface, and release
+ * them by calling usb_put_dev(), in their disconnect() methods.
+ *
+ * A pointer to the device with the incremented reference counter is returned.
+ */
+struct usb_device *usb_get_dev (struct usb_device *dev)
+{
+	if (dev) {
+		atomic_inc (&dev->refcnt);
+		return dev;
+	}
+	return NULL;
+}
+
+/**
+ * usb_free_dev - free a usb device structure when all users of it are finished.
  * @dev: device that's been disconnected
  * Context: !in_interrupt ()
+ *
+ * Must be called when a user of a device is finished with it.  When the last
+ * user of the device calls this function, the memory of the device is freed.
  *
  * Used by hub and virtual root hub drivers.  The device is completely
  * gone, everything is cleaned up, so it's time to get rid of these last
@@ -978,19 +1003,13 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
  */
 void usb_free_dev(struct usb_device *dev)
 {
-	if (in_interrupt ())
-		BUG ();
-	if (!atomic_dec_and_test (&dev->refcnt)) {
-		/* MUST go to zero here, else someone's hanging on to
-		 * a device that's supposed to have been cleaned up!!
-		 */
-		BUG ();
+	if (atomic_dec_and_test(&dev->refcnt)) {
+		if (dev->bus->op->deallocate)
+			dev->bus->op->deallocate(dev);
+		usb_destroy_configuration (dev);
+		usb_bus_put (dev->bus);
+		kfree (dev);
 	}
-
-	dev->bus->op->deallocate (dev);
-	usb_destroy_configuration (dev);
-	usb_bus_put (dev->bus);
-	kfree (dev);
 }
 
 /**
@@ -1046,7 +1065,7 @@ void usb_free_urb(struct urb *urb)
 }
 
 /**
- * usb_get_urb - incrementes the reference count of the urb
+ * usb_get_urb - increments the reference count of the urb
  * @urb: pointer to the urb to modify
  *
  * This must be  called whenever a urb is transfered from a device driver to a
@@ -1162,10 +1181,15 @@ struct urb * usb_get_urb(struct urb *urb)
  */
 int usb_submit_urb(struct urb *urb, int mem_flags)
 {
-	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op)
+
+	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op) {
+		if (usb_maxpacket(urb->dev, urb->pipe, usb_pipeout(urb->pipe)) <= 0) {
+			err("%s: pipe %x has invalid size (<= 0)", __FUNCTION__, urb->pipe);
+			return -EMSGSIZE;
+		}
 		return urb->dev->bus->op->submit_urb(urb, mem_flags);
-	else
-		return -ENODEV;
+	}
+	return -ENODEV;
 }
 
 /*-------------------------------------------------------------------*/
@@ -1928,8 +1952,9 @@ void usb_disconnect(struct usb_device **pdev)
 		put_device(&dev->dev);
 	}
 
-	/* Free up the device itself */
-	usb_free_dev(dev);
+	/* Decrement the reference count, it'll auto free everything when */
+	/* it hits 0 which could very well be now */
+	usb_put_dev(dev);
 }
 
 /**
@@ -2558,9 +2583,13 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
  * Only hub drivers (including virtual root hub drivers for host
  * controllers) should ever call this.
  */
+#define NEW_DEVICE_RETRYS	2
+#define SET_ADDRESS_RETRYS	2
 int usb_new_device(struct usb_device *dev)
 {
-	int err;
+	int err = 0;
+	int i;
+	int j;
 
 	/* USB v1.1 5.5.3 */
 	/* We read the first 8 bytes from the device descriptor to get to */
@@ -2569,18 +2598,30 @@ int usb_new_device(struct usb_device *dev)
 	dev->epmaxpacketin [0] = 8;
 	dev->epmaxpacketout[0] = 8;
 
-	err = usb_set_address(dev);
-	if (err < 0) {
-		err("USB device not accepting new address=%d (error=%d)",
-			dev->devnum, err);
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		dev->devnum = -1;
-		return 1;
+	for (i = 0; i < NEW_DEVICE_RETRYS; ++i) {
+
+		for (j = 0; j < SET_ADDRESS_RETRYS; ++j) {
+			err = usb_set_address(dev);
+			if (err >= 0)
+				break;
+			wait_ms(200);
+		}
+		if (err < 0) {
+			err("USB device not accepting new address=%d (error=%d)",
+				dev->devnum, err);
+			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
+			dev->devnum = -1;
+			return 1;
+		}
+
+		wait_ms(10);	/* Let the SET_ADDRESS settle */
+
+		err = usb_get_descriptor(dev, USB_DT_DEVICE, 0, &dev->descriptor, 8);
+		if (err >= 8)
+			break;
+		wait_ms(100);
 	}
 
-	wait_ms(10);	/* Let the SET_ADDRESS settle */
-
-	err = usb_get_descriptor(dev, USB_DT_DEVICE, 0, &dev->descriptor, 8);
 	if (err < 8) {
 		if (err < 0)
 			err("USB device not responding, giving up (error=%d)", err);
@@ -2743,9 +2784,8 @@ module_exit(usb_exit);
 
 /*
  * USB may be built into the kernel or be built as modules.
- * If the USB core [and maybe a host controller driver] is built
- * into the kernel, and other device drivers are built as modules,
- * then these symbols need to be exported for the modules to use.
+ * These symbols are exported for device (or host controller)
+ * driver modules to use.
  */
 EXPORT_SYMBOL(usb_ifnum_to_ifpos);
 EXPORT_SYMBOL(usb_ifnum_to_if);
@@ -2762,6 +2802,8 @@ EXPORT_SYMBOL(usb_deregister_dev);
 
 EXPORT_SYMBOL(usb_alloc_dev);
 EXPORT_SYMBOL(usb_free_dev);
+EXPORT_SYMBOL(usb_get_dev);
+EXPORT_SYMBOL(usb_hub_tt_clear_buffer);
 
 EXPORT_SYMBOL(usb_find_interface_driver_for_ifnum);
 EXPORT_SYMBOL(usb_driver_claim_interface);
@@ -2799,6 +2841,5 @@ EXPORT_SYMBOL(usb_clear_halt);
 EXPORT_SYMBOL(usb_set_configuration);
 EXPORT_SYMBOL(usb_set_interface);
 
-EXPORT_SYMBOL(usb_make_path);
 EXPORT_SYMBOL(usb_devfs_handle);
 MODULE_LICENSE("GPL");

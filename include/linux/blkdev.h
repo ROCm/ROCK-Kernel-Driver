@@ -7,6 +7,7 @@
 #include <linux/tqueue.h>
 #include <linux/list.h>
 #include <linux/pagemap.h>
+#include <linux/backing-dev.h>
 
 #include <asm/scatterlist.h>
 
@@ -162,11 +163,7 @@ struct request_queue
 	make_request_fn		*make_request_fn;
 	prep_rq_fn		*prep_rq_fn;
 
-	/*
-	 * The VM-level readahead tunable for this device.  In
-	 * units of PAGE_CACHE_SIZE pages.
-	 */
-	unsigned long ra_pages;
+	struct backing_dev_info	backing_dev_info;
 
 	/*
 	 * The queue owner gets to use this for whatever they like.
@@ -306,7 +303,6 @@ extern void blk_recount_segments(request_queue_t *, struct bio *);
 extern inline int blk_phys_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern inline int blk_hw_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern int block_ioctl(struct block_device *, unsigned int, unsigned long);
-extern int ll_10byte_cmd_build(request_queue_t *, struct request *);
 
 /*
  * get ready for proper ref counting
@@ -328,7 +324,7 @@ extern void blk_queue_hardsect_size(request_queue_t *q, unsigned short);
 extern void blk_queue_segment_boundary(request_queue_t *q, unsigned long);
 extern void blk_queue_assign_lock(request_queue_t *q, spinlock_t *);
 extern void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn);
-extern unsigned long *blk_get_ra_pages(struct block_device *bdev);
+extern struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev);
 
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);
