@@ -1250,7 +1250,7 @@ int usb_serial_probe(struct usb_interface *interface,
 			interface = &dev->actconfig->interface[0];
 			iface_desc = &interface->altsetting[0];
 			for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {
-				endpoint = &iface_desc->endpoint[i];
+				endpoint = &iface_desc->endpoint[i].desc;
 				if ((endpoint->bEndpointAddress & 0x80) &&
 				    ((endpoint->bmAttributes & 3) == 0x03)) {
 					/* we found a interrupt in endpoint */
