@@ -2046,10 +2046,8 @@ dasd_setup_blkdev(dasd_device_t * device)
 			    &device->request_queue_lock);
 	if (rc)
 		return rc;
-	elevator_exit(device->request_queue, &device->request_queue->elevator);
-	rc = elevator_init(device->request_queue,
-			   &device->request_queue->elevator,
-			   elevator_noop);
+	elevator_exit(device->request_queue);
+	rc = elevator_init(device->request_queue, &elevator_noop);
 	if (rc) {
 		blk_cleanup_queue(device->request_queue);
 		return rc;
