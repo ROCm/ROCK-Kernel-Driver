@@ -552,7 +552,7 @@ config X86_MCE
 	  the 386 and 486, so nearly everyone can say Y here.
 
 config X86_MCE_NONFATAL
-	bool "Check for non-fatal errors on AMD Athlon/Duron / Intel Pentium 4"
+	tristate "Check for non-fatal errors on AMD Athlon/Duron / Intel Pentium 4"
 	depends on X86_MCE
 	help
 	  Enabling this feature starts a timer that triggers every 5 seconds which
