@@ -233,7 +233,7 @@ qla2x00_mbx_completion(scsi_qla_host_t *ha, uint16_t mb0)
 	device_reg_t	*reg = ha->iobase;
 
 	/* Load return mailbox registers. */
-	ha->flags.mbox_int = TRUE;
+	ha->flags.mbox_int = 1;
 	ha->mailbox_out[0] = mb0;
 	wptr = (uint16_t *)MAILBOX_REG(ha, reg, 1);
 

@@ -971,7 +971,7 @@ qla2x00_wait_for_hba_online(scsi_qla_host_t *ha)
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(HZ);
 	}
-	if (ha->flags.online == TRUE) 
+	if (ha->flags.online) 
 		return_status = QLA_SUCCESS; 
 	else
 		return_status = QLA_FUNCTION_FAILED;
@@ -2216,7 +2216,7 @@ qla2x00_free_device(scsi_qla_host_t *ha)
 	qla2x00_mem_free(ha);
 
 
-	ha->flags.online = FALSE;
+	ha->flags.online = 0;
 
 	/* Detach interrupts */
 	if (ha->pdev->irq)
@@ -2287,12 +2287,12 @@ copy_info(struct info_str *info, char *fmt, ...)
 *
 * inout : decides the direction of the dataflow and the meaning of the
 *         variables
-* buffer: If inout==FALSE data is being written to it else read from it
+* buffer: If inout==0 data is being written to it else read from it
 *         (ptr to a page buffer)
-* *start: If inout==FALSE start of the valid data in the buffer
-* offset: If inout==FALSE starting offset from the beginning of all
+* *start: If inout==0 start of the valid data in the buffer
+* offset: If inout==0 starting offset from the beginning of all
 *         possible data to return.
-* length: If inout==FALSE max number of bytes to be written into the buffer
+* length: If inout==0 max number of bytes to be written into the buffer
 *         else number of bytes in "buffer"
 * Returns:
 *         < 0:  error. errno value.
@@ -2319,7 +2319,7 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 
 	ha = (scsi_qla_host_t *) shost->hostdata;
 
-	if (inout == TRUE) {
+	if (inout) {
 		/* Has data been written to the file? */
 		DEBUG3(printk(
 		    "%s: has data been written to the file. \n",
@@ -2483,6 +2483,7 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 		    tq->port_name[4], tq->port_name[5],
 		    tq->port_name[6], tq->port_name[7]);
 	}
+
 	copy_info(&info, "\nSCSI LUN Information:\n");
 	copy_info(&info,
 	    "(Id:Lun)  * - indicates lun is not registered with the OS.\n");
@@ -3460,7 +3461,7 @@ qla2x00_do_dpc(void *data)
 			DEBUG(printk("scsi(%ld): qla2x00_restart_queues()\n",
 			    ha->host_no));
 
-			qla2x00_restart_queues(ha,FALSE);
+			qla2x00_restart_queues(ha, 0);
 
 			DEBUG(printk("scsi(%ld): qla2x00_restart_queues - end\n",
 			    ha->host_no));
@@ -3471,7 +3472,7 @@ qla2x00_do_dpc(void *data)
 			DEBUG(printk("scsi(%ld): qla2x00_abort_queues()\n",
 			    ha->host_no));
 				
-			qla2x00_abort_queues(ha, FALSE);
+			qla2x00_abort_queues(ha, 0);
 
 			DEBUG(printk("scsi(%ld): qla2x00_abort_queues - end\n",
 			    ha->host_no));
@@ -3562,8 +3563,6 @@ qla2x00_rst_aen(scsi_qla_host_t *ha)
 	if (ha->flags.online && !ha->flags.reset_active &&
 	    !atomic_read(&ha->loop_down_timer) &&
 	    !(test_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags))) {
-
-		/* 10/15 ha->flags.reset_active = TRUE; */
 		do {
 			clear_bit(RESET_MARKER_NEEDED, &ha->dpc_flags);
 
@@ -3574,8 +3573,6 @@ qla2x00_rst_aen(scsi_qla_host_t *ha)
 			ha->marker_needed = 1;
 		} while (!atomic_read(&ha->loop_down_timer) &&
 		    (test_bit(RESET_MARKER_NEEDED, &ha->dpc_flags)));
-
-		/* 10/15 ha->flags.reset_active = FALSE; */
 	}
 }
 

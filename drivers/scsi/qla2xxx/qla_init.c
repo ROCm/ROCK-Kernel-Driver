@@ -107,8 +107,8 @@ qla2x00_initialize_adapter(scsi_qla_host_t *ha)
 	uint32_t wait_time;
 
 	/* Clear adapter flags. */
-	ha->flags.online = FALSE;
-	ha->flags.reset_active = FALSE;
+	ha->flags.online = 0;
+	ha->flags.reset_active = 0;
 	atomic_set(&ha->loop_down_timer, LOOP_DOWN_TIME);
 	atomic_set(&ha->loop_state, LOOP_DOWN);
 	ha->device_flags = 0;
@@ -225,7 +225,7 @@ check_fw_ready_again:
 		qla2x00_marker(ha, 0, 0, MK_SYNC_ALL);
 		ha->marker_needed = 0;
 
-		ha->flags.online = TRUE;
+		ha->flags.online = 1;
 	} else {
 		DEBUG2_3(printk("%s(): **** FAILED ****\n", __func__));
 	}
@@ -1552,20 +1552,20 @@ qla2x00_configure_loop(scsi_qla_host_t *ha)
 	if (ha->current_topology == ISP_CFG_FL &&
 	    (test_bit(LOCAL_LOOP_UPDATE, &flags))) {
 
-		ha->flags.rscn_queue_overflow = TRUE;
+		ha->flags.rscn_queue_overflow = 1;
 		set_bit(RSCN_UPDATE, &flags);
 
 	} else if (ha->current_topology == ISP_CFG_F &&
 	    (test_bit(LOCAL_LOOP_UPDATE, &flags))) {
 
-		ha->flags.rscn_queue_overflow = TRUE;
+		ha->flags.rscn_queue_overflow = 1;
 		set_bit(RSCN_UPDATE, &flags);
 		clear_bit(LOCAL_LOOP_UPDATE, &flags);
 
 	} else if (!ha->flags.online ||
 	    (test_bit(ABORT_ISP_ACTIVE, &flags))) {
 
-		ha->flags.rscn_queue_overflow = TRUE;
+		ha->flags.rscn_queue_overflow = 1;
 		set_bit(RSCN_UPDATE, &flags);
 		set_bit(LOCAL_LOOP_UPDATE, &flags);
 	}
@@ -3103,7 +3103,7 @@ qla2x00_loop_resync(scsi_qla_host_t *ha)
 				wait_time &&
 				(test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags)));
 		}
-		qla2x00_restart_queues(ha, TRUE);
+		qla2x00_restart_queues(ha, 1);
 	}
 
 	if (test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags)) {
@@ -4106,7 +4106,7 @@ qla2x00_abort_isp(scsi_qla_host_t *ha)
 	uint8_t        status = 0;
 
 	if (ha->flags.online) {
-		ha->flags.online = FALSE;
+		ha->flags.online = 0;
 		clear_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
 		qla2x00_stats.ispAbort++;
 		ha->total_isp_aborts++;  /* used by ioctl */
@@ -4171,20 +4171,20 @@ qla2x00_abort_isp(scsi_qla_host_t *ha)
 				ha->marker_needed = 1;
 			}
 
-			ha->flags.online = TRUE;
+			ha->flags.online = 1;
 
 			/* Enable ISP interrupts. */
 			qla2x00_enable_intrs(ha);
 
 			/* v2.19.5b6 Return all commands */
-			qla2x00_abort_queues(ha, TRUE);
+			qla2x00_abort_queues(ha, 1);
 
 			/* Restart queues that may have been stopped. */
-			qla2x00_restart_queues(ha,TRUE);
+			qla2x00_restart_queues(ha, 1);
 			ha->isp_abort_cnt = 0; 
 			clear_bit(ISP_ABORT_RETRY, &ha->dpc_flags);
 		} else {	/* failed the ISP abort */
-			ha->flags.online = TRUE;
+			ha->flags.online = 1;
 			if (test_bit(ISP_ABORT_RETRY, &ha->dpc_flags)) {
 				if (ha->isp_abort_cnt == 0) {
  					qla_printk(KERN_WARNING, ha,
@@ -4195,8 +4195,8 @@ qla2x00_abort_isp(scsi_qla_host_t *ha)
 					 * completely.
 					 */
 					qla2x00_reset_adapter(ha);
-					qla2x00_abort_queues(ha, FALSE);
-					ha->flags.online = FALSE;
+					qla2x00_abort_queues(ha, 0);
+					ha->flags.online = 0;
 					clear_bit(ISP_ABORT_RETRY,
 					    &ha->dpc_flags);
 					status = 0;
@@ -4251,7 +4251,7 @@ qla2x00_restart_isp(scsi_qla_host_t *ha)
 
 	/* If firmware needs to be loaded */
 	if (qla2x00_isp_firmware(ha)) {
-		ha->flags.online = FALSE;
+		ha->flags.online = 0;
 		if (!(status = qla2x00_chip_diag(ha))) {
 			if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 				status = qla2x00_setup_chip(ha);
@@ -4290,7 +4290,7 @@ qla2x00_restart_isp(scsi_qla_host_t *ha)
 					"status = %d\n",
 					__func__,
 					status);)
-			ha->flags.online = TRUE;
+			ha->flags.online = 1;
 			/* Wait at most MAX_TARGET RSCNs for a stable link. */
 			wait_time = 256;
 			do {
@@ -4327,7 +4327,7 @@ qla2x00_reset_adapter(scsi_qla_host_t *ha)
 	unsigned long flags = 0;
 	device_reg_t *reg = ha->iobase;
 
-	ha->flags.online = FALSE;
+	ha->flags.online = 0;
 	qla2x00_disable_intrs(ha);
 	/* Reset RISC processor. */
 	spin_lock_irqsave(&ha->hardware_lock, flags);

@@ -89,7 +89,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 		}
 	}
 
-	ha->flags.mbox_busy = TRUE;
+	ha->flags.mbox_busy = 1;
 	/* Save mailbox command for debug */
 	ha->mcp = mcp;
 
@@ -135,7 +135,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 #endif
 
 	/* Issue set host interrupt command to send cmd out. */
-	ha->flags.mbox_int = FALSE;
+	ha->flags.mbox_int = 0;
 	clear_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
 
 	/* Unlock mbx registers and wait for interrupt */
@@ -216,7 +216,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 		    command);)
 
 		/* Got interrupt. Clear the flag. */
-		ha->flags.mbox_int = FALSE;
+		ha->flags.mbox_int = 0;
 		clear_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
 
 		if (ha->mailbox_out[0] != MBS_COMMAND_COMPLETE) {
@@ -257,7 +257,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 	if (!abort_active)
 		spin_unlock_irqrestore(&ha->mbx_reg_lock, mbx_flags);
 
-	ha->flags.mbox_busy = FALSE;
+	ha->flags.mbox_busy = 0;
 
 	/* Clean up */
 	ha->mcp = NULL;
