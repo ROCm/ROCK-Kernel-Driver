@@ -204,7 +204,7 @@ config SA1100_OMNIMETER
 	depends on ARCH_SA1100
 	help
 	  Say Y here if you are using the inhand electronics OmniMeter.  See
-	  <http://www.inhandelectronics.com/html/omni1.html> for details.
+	  <http://www.inhandelectronics.com/omnimeter.asp> for details.
 
 config SA1100_PANGOLIN
 	bool "Pangolin"
@@ -232,7 +232,7 @@ config SA1100_PT_SYSTEM3
 	help
 	  Say Y here if you intend to build a kernel suitable to run on
 	  a Pruftechnik Digital Board. For more information see
-	  <http://www.pruftechnik.com>
+	  <http://www.pruftechnik.com/>
 
 config SA1100_SHANNON
 	bool "Shannon"
@@ -250,8 +250,8 @@ config SA1100_SHERMAN
 	  Say Y here to support the Blazie Engineering `Sherman' StrongARM
 	  1110-based SBC, used primarily in assistance products for the
 	  visually impaired.  The company is now Freedom Scientific, with
-	  a website at <http://www.freedomscientific.com/index.html>. The
-	  Sherman product, however, appears to have been discontinued.
+	  a website at <http://www.freedomscientific.com/>. The Sherman
+	  product, however, appears to have been discontinued.
 
 config SA1100_SIMPAD
 	bool "Simpad"
@@ -262,7 +262,7 @@ config SA1100_SIMPAD
 	  FLASH. The SL4 version got 64 MB RAM and 32 MB FLASH and a
 	  PCMCIA-Slot. The version for the Germany Telecom (DTAG) is the same
 	  like CL4 in additional it has a PCMCIA-Slot. For more information
-	  visit <http://www.my-siemens.com or www.siemens.ch>.
+	  visit <http://www.my-siemens.com/> or <http://www.siemens.ch/>.
 
 config SA1100_PFS168
 	bool "Tulsa"
@@ -280,7 +280,7 @@ config SA1100_VICTOR
 	help
 	  Say Y here if you are using a Visu Aide Intel(R) StrongARM(R)
 	  SA-1100 based Victor Digital Talking Book Reader.  See
-	  <http://www.visuaide.com/pagevictor.en.html> for information on
+	  <http://www.visuaide.com/products.html> for information on
 	  this system.
 
 config SA1100_XP860
