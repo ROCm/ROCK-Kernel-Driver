@@ -1532,7 +1532,7 @@ static int snd_ensoniq_free(ensoniq_t *ensoniq)
 	outl(0, ES_REG(ensoniq, CONTROL));	/* switch everything off */
 	outl(0, ES_REG(ensoniq, SERIAL));	/* clear serial interface */
 #endif
-	synchronize_irq();
+	synchronize_irq(ensoniq->irq);
 	pci_set_power_state(ensoniq->pci, 3);
       __hw_end:
 #ifdef CHIP1370
@@ -1720,7 +1720,7 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 #ifdef CHIP1371
 	snd_ctl_add(card, snd_ctl_new1(&snd_es1371_joystick_addr, ensoniq));
 #endif
-	synchronize_irq();
+	synchronize_irq(ensoniq->irq);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, ensoniq, &ops)) < 0) {
 		snd_ensoniq_free(ensoniq);
