@@ -225,43 +225,6 @@ static const lookup_t service_table[] = {
 };
 #define SERVICE_COUNT (sizeof(service_table)/sizeof(lookup_t))
 
-/*======================================================================
-
- These functions are just shorthand for the actual low-level drivers
-
-======================================================================*/
-
-static int get_socket_status(struct pcmcia_socket *s, int *val)
-{
-	return s->ss_entry->get_status(s, val);
-}
-
-static int set_socket(struct pcmcia_socket *s, socket_state_t *state)
-{
-	return s->ss_entry->set_socket(s, state);
-}
-
-static int set_io_map(struct pcmcia_socket *s, struct pccard_io_map *io)
-{
-	return s->ss_entry->set_io_map(s, io);
-}
-
-static int set_mem_map(struct pcmcia_socket *s, struct pccard_mem_map *mem)
-{
-	return s->ss_entry->set_mem_map(s, mem);
-}
-
-static int suspend_socket(struct pcmcia_socket *s)
-{
-	s->socket = dead_socket;
-	return s->ss_entry->suspend(s);
-}
-
-static int init_socket(struct pcmcia_socket *s)
-{
-	s->socket = dead_socket;
-	return s->ss_entry->init(s);
-}
 
 /*====================================================================
 
@@ -339,7 +302,8 @@ static int pcmcia_add_socket(struct class_device *class_dev)
 	INIT_LIST_HEAD(&socket->cis_cache);
 	spin_lock_init(&socket->lock);
 
-	init_socket(socket);
+	socket->socket = dead_socket;
+	socket->ss_entry->init(socket);
 
 	init_completion(&socket->thread_done);
 	init_waitqueue_head(&socket->thread_wait);
@@ -510,7 +474,8 @@ static void shutdown_socket(struct pcmcia_socket *s)
 
     /* Blank out the socket state */
     s->state &= SOCKET_PRESENT|SOCKET_SETUP_PENDING;
-    init_socket(s);
+    s->socket = dead_socket;
+    s->ss_entry->init(s);
     s->irq.AssignedIRQ = s->irq.Config = 0;
     s->lock_count = 0;
     destroy_cis_cache(s);
@@ -525,7 +490,7 @@ static void shutdown_socket(struct pcmcia_socket *s)
     s->socket.Vpp = 0;
     s->socket.Vcc = 0;
     s->socket.io_irq = 0;
-    set_socket(s, &s->socket);
+    s->ss_entry->set_socket(s, &s->socket);
     /* */
 #ifdef CONFIG_CARDBUS
     cb_free(s);
@@ -619,16 +584,16 @@ static int socket_reset(struct pcmcia_socket *skt)
 	int status, i;
 
 	skt->socket.flags |= SS_OUTPUT_ENA | SS_RESET;
-	set_socket(skt, &skt->socket);
+	skt->ss_entry->set_socket(skt, &skt->socket);
 	udelay((long)reset_time);
 
 	skt->socket.flags &= ~SS_RESET;
-	set_socket(skt, &skt->socket);
+	skt->ss_entry->set_socket(skt, &skt->socket);
 
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(cs_to_timeout(unreset_delay));
 	for (i = 0; i < unreset_limit; i++) {
-		get_socket_status(skt, &status);
+		skt->ss_entry->get_status(skt, &status);
 
 		if (!(status & SS_DETECT))
 			return CS_NO_CARD;
@@ -648,7 +613,7 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 {
 	int status, i;
 
-	get_socket_status(skt, &status);
+	skt->ss_entry->get_status(skt, &status);
 	if (!(status & SS_DETECT))
 		return CS_NO_CARD;
 
@@ -656,7 +621,7 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 	schedule_timeout(cs_to_timeout(initial_delay));
 
 	for (i = 0; i < 100; i++) {
-		get_socket_status(skt, &status);
+		skt->ss_entry->get_status(skt, &status);
 		if (!(status & SS_DETECT))
 			return CS_NO_CARD;
 
@@ -693,7 +658,7 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 	}
 	skt->state |= SOCKET_PRESENT;
 	skt->socket.flags = SS_DEBOUNCED;
-	set_socket(skt, &skt->socket);
+	skt->ss_entry->set_socket(skt, &skt->socket);
 
 	/*
 	 * Wait "vcc_settle" for the supply to stabilise.
@@ -739,7 +704,8 @@ static int socket_suspend(struct pcmcia_socket *skt)
 		return CS_IN_USE;
 
 	send_event(skt, CS_EVENT_PM_SUSPEND, CS_EVENT_PRI_LOW);
-	suspend_socket(skt);
+	skt->socket = dead_socket;
+	skt->ss_entry->suspend(skt);
 	skt->state |= SOCKET_SUSPEND;
 
 	return CS_SUCCESS;
@@ -757,7 +723,8 @@ static int socket_resume(struct pcmcia_socket *skt)
 	if (!(skt->state & SOCKET_SUSPEND))
 		return CS_IN_USE;
 
-	init_socket(skt);
+	skt->socket = dead_socket;
+	skt->ss_entry->init(skt);
 
 	ret = socket_setup(skt, resume_delay);
 	if (ret == CS_SUCCESS) {
@@ -811,7 +778,7 @@ static void socket_detect_change(struct pcmcia_socket *skt)
 			schedule_timeout(cs_to_timeout(2));
 		}
 
-		get_socket_status(skt, &status);
+		skt->ss_entry->get_status(skt, &status);
 		if ((skt->state & SOCKET_PRESENT) &&
 		     !(status & SS_DETECT))
 			socket_remove(skt);
@@ -1364,7 +1331,7 @@ int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
     s = SOCKET(handle);
-    get_socket_status(s, &val);
+    s->ss_entry->get_status(s, &val);
     status->CardState = status->SocketState = 0;
     status->CardState |= (val & SS_DETECT) ? CS_EVENT_CARD_DETECT : 0;
     status->CardState |= (val & SS_CARDBUS) ? CS_EVENT_CB_DETECT : 0;
@@ -1443,7 +1410,7 @@ int pcmcia_map_mem_page(window_handle_t win, memreq_t *req)
 	return CS_BAD_PAGE;
     s = win->sock;
     win->ctl.card_start = req->CardOffset;
-    if (set_mem_map(s, &win->ctl) != 0)
+    if (s->ss_entry->set_mem_map(s, &win->ctl) != 0)
 	return CS_BAD_OFFSET;
     return CS_SUCCESS;
 } /* map_mem_page */
@@ -1476,7 +1443,7 @@ int pcmcia_modify_configuration(client_handle_t handle,
 	    c->Attributes &= ~CONF_ENABLE_IRQ;
 	    s->socket.io_irq = 0;
 	}
-	set_socket(s, &s->socket);
+	s->ss_entry->set_socket(s, &s->socket);
     }
 
     if (mod->Attributes & CONF_VCC_CHANGE_VALID)
@@ -1488,7 +1455,7 @@ int pcmcia_modify_configuration(client_handle_t handle,
 	if (mod->Vpp1 != mod->Vpp2)
 	    return CS_BAD_VPP;
 	c->Vpp1 = c->Vpp2 = s->socket.Vpp = mod->Vpp1;
-	if (set_socket(s, &s->socket))
+	if (s->ss_entry->set_socket(s, &s->socket))
 	    return CS_BAD_VPP;
     } else if ((mod->Attributes & CONF_VPP1_CHANGE_VALID) ||
 	       (mod->Attributes & CONF_VPP2_CHANGE_VALID))
@@ -1518,7 +1485,7 @@ int pcmcia_modify_window(window_handle_t win, modwin_t *req)
     if (req->Attributes & WIN_USE_WAIT)
 	win->ctl.flags |= MAP_USE_WAIT;
     win->ctl.speed = req->AccessSpeed;
-    set_mem_map(win->sock, &win->ctl);
+    win->sock->ss_entry->set_mem_map(win->sock, &win->ctl);
     
     return CS_SUCCESS;
 } /* modify_window */
@@ -1618,7 +1585,7 @@ int pcmcia_release_configuration(client_handle_t handle)
 	    s->socket.flags = SS_OUTPUT_ENA;   /* Is this correct? */
 	    s->socket.Vpp = 0;
 	    s->socket.io_irq = 0;
-	    set_socket(s, &s->socket);
+	    s->ss_entry->set_socket(s, &s->socket);
 	}
 	if (c->state & CONFIG_IO_REQ)
 	    for (i = 0; i < MAX_IO_WIN; i++) {
@@ -1628,7 +1595,7 @@ int pcmcia_release_configuration(client_handle_t handle)
 		if (s->io[i].Config != 0)
 		    continue;
 		io.map = i;
-		set_io_map(s, &io);
+		s->ss_entry->set_io_map(s, &io);
 	    }
 	c->state &= ~CONFIG_LOCKED;
     }
@@ -1729,7 +1696,7 @@ int pcmcia_release_window(window_handle_t win)
 
     /* Shut down memory window */
     win->ctl.flags &= ~MAP_ACTIVE;
-    set_mem_map(s, &win->ctl);
+    s->ss_entry->set_mem_map(s, &win->ctl);
     s->state &= ~SOCKET_WIN_REQ(win->index);
 
     /* Release system memory */
@@ -1776,7 +1743,7 @@ int pcmcia_request_configuration(client_handle_t handle,
     if (req->Vpp1 != req->Vpp2)
 	return CS_BAD_VPP;
     s->socket.Vpp = req->Vpp1;
-    if (set_socket(s, &s->socket))
+    if (s->ss_entry->set_socket(s, &s->socket))
 	return CS_BAD_VPP;
     
     c->Vcc = req->Vcc; c->Vpp1 = c->Vpp2 = req->Vpp1;
@@ -1794,7 +1761,7 @@ int pcmcia_request_configuration(client_handle_t handle,
 	s->socket.io_irq = s->irq.AssignedIRQ;
     else
 	s->socket.io_irq = 0;
-    set_socket(s, &s->socket);
+    s->ss_entry->set_socket(s, &s->socket);
     s->lock_count++;
     
     /* Set up CIS configuration registers */
@@ -1859,7 +1826,7 @@ int pcmcia_request_configuration(client_handle_t handle,
 		}
 		iomap.start = s->io[i].BasePort;
 		iomap.stop = iomap.start + s->io[i].NumPorts - 1;
-		set_io_map(s, &iomap);
+		s->ss_entry->set_io_map(s, &iomap);
 		s->io[i].Config++;
 	    }
     }
@@ -2080,7 +2047,7 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
     win->ctl.sys_start = win->base;
     win->ctl.sys_stop = win->base + win->size-1;
     win->ctl.card_start = 0;
-    if (set_mem_map(s, &win->ctl) != 0)
+    if (s->ss_entry->set_mem_map(s, &win->ctl) != 0)
 	return CS_BAD_ARGS;
     s->state |= SOCKET_WIN_REQ(w);
 
