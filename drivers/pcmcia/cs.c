@@ -474,7 +474,7 @@ static void shutdown_socket(struct pcmcia_socket *s)
     DEBUG(1, "cs: shutdown_socket(%p)\n", s);
 
     /* Blank out the socket state */
-    s->state &= SOCKET_PRESENT|SOCKET_SETUP_PENDING;
+    s->state &= SOCKET_PRESENT|SOCKET_INUSE;
     s->socket = dead_socket;
     s->ops->init(s);
     s->irq.AssignedIRQ = s->irq.Config = 0;
@@ -657,7 +657,6 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 		pcmcia_error(skt, "unsupported voltage key.\n");
 		return CS_BAD_TYPE;
 	}
-	skt->state |= SOCKET_PRESENT;
 	skt->socket.flags = SS_DEBOUNCED;
 	skt->ops->set_socket(skt, &skt->socket);
 
@@ -678,11 +677,12 @@ static int socket_insert(struct pcmcia_socket *skt)
 {
 	int ret;
 
-	if (!try_module_get(skt->owner))
+	if (!cs_socket_get(skt))
 		return CS_NO_CARD;
 
 	ret = socket_setup(skt, setup_delay);
 	if (ret == CS_SUCCESS) {
+		skt->state |= SOCKET_PRESENT;
 #ifdef CONFIG_CARDBUS
 		if (skt->state & SOCKET_CARDBUS) {
 			cb_alloc(skt);
@@ -693,7 +693,7 @@ static int socket_insert(struct pcmcia_socket *skt)
 		skt->socket.flags &= ~SS_DEBOUNCED;
 	} else {
 		socket_shutdown(skt);
-		module_put(skt->owner);
+		cs_socket_put(skt);
 	}
 
 	return ret;
@@ -741,10 +741,8 @@ static int socket_resume(struct pcmcia_socket *skt)
 		}
 		skt->socket.flags &= ~SS_DEBOUNCED;
 	} else {
-		unsigned int old_state = skt->state;
 		socket_shutdown(skt);
-		if (old_state & SOCKET_PRESENT)
-			module_put(skt->owner);
+		cs_socket_put(skt);
 	}
 
 	skt->state &= ~SOCKET_SUSPEND;
@@ -755,7 +753,7 @@ static int socket_resume(struct pcmcia_socket *skt)
 static void socket_remove(struct pcmcia_socket *skt)
 {
 	socket_shutdown(skt);
-	module_put(skt->owner);
+	cs_socket_put(skt);
 }
 
 /*
@@ -1020,7 +1018,7 @@ int pcmcia_bind_device(bind_req_t *req)
     init_waitqueue_head(&client->mtd_req);
     client->next = s->clients;
     s->clients = client;
-    DEBUG(1, "cs: bind_device(): client 0x%p, sock %d, dev %s\n",
+    DEBUG(1, "cs: bind_device(): client 0x%p, sock %p, dev %s\n",
 	  client, client->Socket, client->dev_info);
     return CS_SUCCESS;
 } /* bind_device */
@@ -1063,7 +1061,7 @@ int pcmcia_bind_mtd(mtd_bind_t *req)
 
 /*====================================================================*/
 
-int pcmcia_deregister_client(client_handle_t handle)
+int pcmcia_deregister_clientR(client_handle_t handle)
 {
     client_t **client;
     struct pcmcia_socket *s;
@@ -1346,8 +1344,6 @@ int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
 	status->CardState |= CS_EVENT_PM_SUSPEND;
     if (!(s->state & SOCKET_PRESENT))
 	return CS_NO_CARD;
-    if (s->state & SOCKET_SETUP_PENDING)
-	status->CardState |= CS_EVENT_CARD_INSERTION;
     
     /* Get info from the PRR, if necessary */
     if (handle->Function == BIND_FN_ALL) {
@@ -1524,6 +1520,10 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
     if (client == NULL)
 	return CS_OUT_OF_RESOURCE;
 
+    /*
+     * Prevent this racing with a card insertion.
+     */
+    down(&s->skt_sem);
     *handle = client;
     client->state &= ~CLIENT_UNBOUND;
     client->Socket = s;
@@ -1547,22 +1547,28 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 	s->config = kmalloc(sizeof(config_t) * s->functions,
 			    GFP_KERNEL);
 	if (!s->config)
-		return CS_OUT_OF_RESOURCE;
+		goto out_no_resource;
 	memset(s->config, 0, sizeof(config_t) * s->functions);
     }
     
-    DEBUG(1, "cs: register_client(): client 0x%p, sock %d, dev %s\n",
+    DEBUG(1, "cs: register_client(): client 0x%p, sock %p, dev %s\n",
 	  client, client->Socket, client->dev_info);
     if (client->EventMask & CS_EVENT_REGISTRATION_COMPLETE)
 	EVENT(client, CS_EVENT_REGISTRATION_COMPLETE, CS_EVENT_PRI_LOW);
-    if ((s->state & SOCKET_PRESENT) &&
-	!(s->state & SOCKET_SETUP_PENDING)) {
+
+    if ((s->state & (SOCKET_PRESENT|SOCKET_CARDBUS)) == SOCKET_PRESENT) {
 	if (client->EventMask & CS_EVENT_CARD_INSERTION)
 	    EVENT(client, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
 	else
 	    client->PendingEvents |= CS_EVENT_CARD_INSERTION;
     }
+
+    up(&s->skt_sem);
     return CS_SUCCESS;
+
+ out_no_resource:
+    up(&s->skt_sem);
+    return CS_OUT_OF_RESOURCE;
 } /* register_client */
 
 /*====================================================================*/
@@ -2081,7 +2087,7 @@ int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: resetting socket %d\n", handle->Socket);
+	DEBUG(1, "cs: resetting socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
 
 	down(&skt->skt_sem);
@@ -2130,7 +2136,7 @@ int pcmcia_suspend_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: suspending socket %d\n", handle->Socket);
+	DEBUG(1, "cs: suspending socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
 
 	down(&skt->skt_sem);
@@ -2157,7 +2163,7 @@ int pcmcia_resume_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: waking up socket %d\n", handle->Socket);
+	DEBUG(1, "cs: waking up socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
 
 	down(&skt->skt_sem);
@@ -2190,7 +2196,7 @@ int pcmcia_eject_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: user eject request on socket %d\n", handle->Socket);
+	DEBUG(1, "cs: user eject request on socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
 
 	down(&skt->skt_sem);
@@ -2219,7 +2225,7 @@ int pcmcia_insert_card(client_handle_t handle, client_req_t *req)
 
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: user insert request on socket %d\n", handle->Socket);
+	DEBUG(1, "cs: user insert request on socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
 
 	down(&skt->skt_sem);

@@ -850,29 +850,6 @@ static inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned l
 	if (rq->bio)
 		bio_kunmap_irq(buffer, flags);
 }
-
-#else /* !CONFIG_IDE_TASKFILE_IO */
-
-static inline void *task_map_rq(struct request *rq, unsigned long *flags)
-{
-	/*
-	 * fs request
-	 */
-	if (rq->cbio)
-		return rq_map_buffer(rq, flags);
-
-	/*
-	 * task request
-	 */
-	return rq->buffer + blk_rq_offset(rq);
-}
-
-static inline void task_unmap_rq(struct request *rq, char *buffer, unsigned long *flags)
-{
-	if (rq->cbio)
-		rq_unmap_buffer(buffer, flags);
-}
-
 #endif /* !CONFIG_IDE_TASKFILE_IO */
 
 #define IDE_CHIPSET_PCI_MASK	\
@@ -1472,9 +1449,19 @@ static inline void task_sectors(ide_drive_t *drive, struct request *rq,
 				unsigned nsect, int rw)
 {
 	unsigned long flags;
+	unsigned int bio_rq;
 	char *buf;
 
-	buf = task_map_rq(rq, &flags);
+	/*
+	 * bio_rq flag is needed because we can call
+	 * rq_unmap_buffer() with rq->cbio == NULL
+	 */
+	bio_rq = rq->cbio ? 1 : 0;
+
+	if (bio_rq)
+		buf = rq_map_buffer(rq, &flags);	/* fs request */
+	else
+		buf = rq->buffer + blk_rq_offset(rq);	/* task request */
 
 	/*
 	 * IRQ can happen instantly after reading/writing
@@ -1487,9 +1474,9 @@ static inline void task_sectors(ide_drive_t *drive, struct request *rq,
 	else
 		taskfile_input_data(drive, buf, nsect * SECTOR_WORDS);
 
-	task_unmap_rq(rq, buf, &flags);
+	if (bio_rq)
+		rq_unmap_buffer(buf, &flags);
 }
-
 #endif /* CONFIG_IDE_TASKFILE_IO */
 
 extern int drive_is_ready(ide_drive_t *);

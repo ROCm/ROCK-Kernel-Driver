@@ -217,33 +217,35 @@ struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
 
 /**
  * usb_epnum_to_ep_desc - get the endpoint object with a given endpoint number
- * @dev: the device whose current configuration is considered
- * @epnum: the desired endpoint
+ * @dev: the device whose current configuration+altsettings is considered
+ * @epnum: the desired endpoint, masked with USB_DIR_IN as appropriate.
  *
  * This walks the device descriptor for the currently active configuration,
  * and returns a pointer to the endpoint with that particular endpoint
  * number, or null.
  *
- * Note that interface descriptors are not required to assign endpont
- * numbers sequentially, so that it would be incorrect to assume that
- * the first endpoint in that descriptor corresponds to interface zero.
+ * Note that interface descriptors are not required to list endpoint
+ * numbers in any standardized order, so that it would be wrong to
+ * assume that ep2in precedes either ep5in, ep2out, or even ep1out.
  * This routine helps device drivers avoid such mistakes.
  */
 struct usb_endpoint_descriptor *
 usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
 {
-	int i, j, k;
+	int i, k;
 
-	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++)
-		for (j = 0; j < dev->actconfig->interface[i]->num_altsetting; j++)
-			for (k = 0; k < dev->actconfig->interface[i]->
-				altsetting[j].desc.bNumEndpoints; k++)
-				if (epnum == dev->actconfig->interface[i]->
-						altsetting[j].endpoint[k]
-						.desc.bEndpointAddress)
-					return &dev->actconfig->interface[i]->
-						altsetting[j].endpoint[k]
-						.desc;
+	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
+		struct usb_interface		*intf;
+		struct usb_host_interface	*alt;
+
+		/* only endpoints in current altseting are active */
+		intf = dev->actconfig->interface[i];
+		alt = intf->altsetting + intf->act_altsetting;
+
+		for (k = 0; k < alt->desc.bNumEndpoints; k++)
+			if (epnum == alt->endpoint[k].desc.bEndpointAddress)
+				return &alt->endpoint[k].desc;
+	}
 
 	return NULL;
 }
