@@ -52,6 +52,7 @@
 #include "dvb_net.h"
 #include "stv0299.h"
 #include "mt352.h"
+#include "mt312.h"
 
 
 static int debug;
@@ -315,10 +316,10 @@ static int master_xfer(struct i2c_adapter* adapter, struct i2c_msg msgs[], int n
 		up(&tmp->i2c_sem);
 
 		if (ret != msgs[1].len) {
-			printk("%s: read error !\n", __FUNCTION__);
+			dprintk("%s: read error !\n", __FUNCTION__);
 
 			for (i = 0; i < 2; i++) {
-				printk("message %d: flags=0x%x, addr=0x%x, buf=0x%x, len=%d \n", i,
+				dprintk("message %d: flags=0x%x, addr=0x%x, buf=0x%x, len=%d \n", i,
 				       msgs[i].flags, msgs[i].addr, msgs[i].buf[0], msgs[i].len);
 		}
 
@@ -338,9 +339,9 @@ static int master_xfer(struct i2c_adapter* adapter, struct i2c_msg msgs[], int n
 		up(&tmp->i2c_sem);
 
 		if (ret != msgs[0].len - 1) {
-			printk("%s: write error %i !\n", __FUNCTION__, ret);
+			dprintk("%s: write error %i !\n", __FUNCTION__, ret);
 
-			printk("message %d: flags=0x%x, addr=0x%x, buf[0]=0x%x, len=%d \n", i,
+			dprintk("message %d: flags=0x%x, addr=0x%x, buf[0]=0x%x, len=%d \n", i,
 			       msgs[i].flags, msgs[i].addr, msgs[i].buf[0], msgs[i].len);
 
 			return -EREMOTEIO;
@@ -2026,7 +2027,6 @@ static int dvb_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 	return 0;
 }
 
-#if 0
 /* lnb control */
 static void set_tuner_tone(struct adapter *adapter, u8 tone)
 {
@@ -2061,7 +2061,6 @@ static void set_tuner_tone(struct adapter *adapter, u8 tone)
 		write_reg_dw(adapter, 0x200, 0x40ff8000);
 	}
 }
-#endif
 
 static void set_tuner_polarity(struct adapter *adapter, u8 polarity)
 {
@@ -2089,7 +2088,6 @@ static void set_tuner_polarity(struct adapter *adapter, u8 polarity)
 	write_reg_dw(adapter, 0x204, var);
 }
 
-#if 0
 static void diseqc_send_bit(struct adapter *adapter, int data)
 {
 	set_tuner_tone(adapter, 1);
@@ -2139,12 +2137,11 @@ static int send_diseqc_msg(struct adapter *adapter, int len, u8 *msg, unsigned l
 	return 0;
 }
 
-
-static int soft_diseqc(struct adapter *adapter, unsigned int cmd, void *arg)
+static int flexcop_set_tone(struct dvb_frontend* fe, fe_sec_tone_mode_t tone)
 {
-	switch (cmd) {
-	case FE_SET_TONE:
-		switch ((fe_sec_tone_mode_t) arg) {
+	struct adapter* adapter = (struct adapter*) fe->dvb->priv;
+
+	switch(tone) {
 		case SEC_TONE_ON:
 			set_tuner_tone(adapter, 1);
 			break;
@@ -2154,27 +2151,27 @@ static int soft_diseqc(struct adapter *adapter, unsigned int cmd, void *arg)
 			default:
 				return -EINVAL;
 			};
-		break;
-
-	case FE_DISEQC_SEND_MASTER_CMD:
-		{
-			struct dvb_diseqc_master_cmd *cmd = arg;
-
-			send_diseqc_msg(adapter, cmd->msg_len, cmd->msg, 0);
-			break;
-		}
-
-	case FE_DISEQC_SEND_BURST:
-		send_diseqc_msg(adapter, 0, NULL, (unsigned long) arg);
-		break;
-
-	default:
-		return -EOPNOTSUPP;
-	};
 
 	return 0;
 }
-#endif
+
+static int flexcop_diseqc_send_master_cmd(struct dvb_frontend* fe, struct dvb_diseqc_master_cmd* cmd)
+		{
+	struct adapter* adapter = (struct adapter*) fe->dvb->priv;
+
+			send_diseqc_msg(adapter, cmd->msg_len, cmd->msg, 0);
+
+	return 0;
+		}
+
+static int flexcop_diseqc_send_burst(struct dvb_frontend* fe, fe_sec_mini_cmd_t minicmd)
+{
+	struct adapter* adapter = (struct adapter*) fe->dvb->priv;
+
+	send_diseqc_msg(adapter, 0, NULL, minicmd);
+
+	return 0;
+}
 
 static int flexcop_set_voltage(struct dvb_frontend* fe, fe_sec_voltage_t voltage)
 		{
@@ -2377,6 +2374,32 @@ static struct mt352_config samsung_tdtc9251dh0_config = {
    	.pll_set = samsung_tdtc9251dh0_pll_set,
 };
 
+static int skystar23_samsung_tbdu18132_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params)
+{
+	u8 buf[4];
+	u32 div;
+	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = buf, .len = sizeof(buf) };
+	struct adapter* adapter = (struct adapter*) fe->dvb->priv;
+
+	div = (params->frequency + (125/2)) / 125;
+
+	buf[0] = (div >> 8) & 0x7f;
+	buf[1] = (div >> 0) & 0xff;
+	buf[2] = 0x84 | ((div >> 10) & 0x60);
+	buf[3] = 0x80;
+
+	if (params->frequency < 1550000)
+		buf[3] |= 0x02;
+
+	if (i2c_transfer (&adapter->i2c_adap, &msg, 1) != 1) return -EIO;
+	return 0;
+}
+
+static struct mt312_config skystar23_samsung_tbdu18132_config = {
+
+	.demod_address = 0x0e,
+   	.pll_set = skystar23_samsung_tbdu18132_pll_set,
+};
 
 
 
@@ -2386,7 +2409,7 @@ static void frontend_init(struct adapter *skystar2)
 	switch(skystar2->pdev->device) {
 	case 0x2103: // Technisat Skystar2 OR Technisat Airstar2
 
-		// try the skystar2 first (stv0299/Samsung tbmu24112(sl1935))
+		// try the skystar2 v2.6 first (stv0299/Samsung tbmu24112(sl1935))
 		skystar2->fe = stv0299_attach(&samsung_tbmu24112_config, &skystar2->i2c_adap);
 		if (skystar2->fe != NULL) {
 			skystar2->fe->ops->set_voltage = flexcop_set_voltage;
@@ -2400,6 +2423,18 @@ static void frontend_init(struct adapter *skystar2)
 		if (skystar2->fe != NULL) {
 			skystar2->fe->ops->info.frequency_min = 474000000;
 			skystar2->fe->ops->info.frequency_max = 858000000;
+			break;
+		}
+
+		// try the skystar2 v2.3 (vp310/Samsung tbdu18132(tsa5059))
+		skystar2->fe = vp310_attach(&skystar23_samsung_tbdu18132_config, &skystar2->i2c_adap);
+		if (skystar2->fe != NULL) {
+			skystar2->fe->ops->diseqc_send_master_cmd = flexcop_diseqc_send_master_cmd;
+			skystar2->fe->ops->diseqc_send_burst = flexcop_diseqc_send_burst;
+			skystar2->fe->ops->set_tone = flexcop_set_tone;
+			skystar2->fe->ops->set_voltage = flexcop_set_voltage;
+			skystar2->fe_sleep = skystar2->fe->ops->sleep;
+			skystar2->fe->ops->sleep = flexcop_sleep;
 			break;
 		}
 		break;
