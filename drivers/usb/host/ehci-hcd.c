@@ -330,6 +330,7 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 	u32			temp;
+	unsigned		count = 256/4;
 
 	spin_lock_init (&ehci->lock);
 
@@ -345,15 +346,20 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 		temp = HCC_EXT_CAPS (readl (&ehci->caps->hcc_params));
 	else
 		temp = 0;
-	while (temp) {
+	while (temp && count--) {
 		u32		cap;
 
-		pci_read_config_dword (to_pci_dev(ehci->hcd.self.controller), temp, &cap);
+		pci_read_config_dword (to_pci_dev(ehci->hcd.self.controller),
+				temp, &cap);
 		ehci_dbg (ehci, "capability %04x at %02x\n", cap, temp);
 		switch (cap & 0xff) {
 		case 1:			/* BIOS/SMM/... handoff */
 			if (bios_handoff (ehci, temp, cap) != 0)
 				return -EOPNOTSUPP;
+			break;
+		case 0x0a:		/* appendix C */
+			ehci_dbg (ehci, "debug registers, BAR %d offset %d\n",
+				(cap >> 29) & 0x07, (cap >> 16) & 0x0fff);
 			break;
 		case 0:			/* illegal reserved capability */
 			ehci_warn (ehci, "illegal capability!\n");
@@ -363,6 +369,10 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 			break;
 		}
 		temp = (cap >> 8) & 0xff;
+	}
+	if (!count) {
+		ehci_err (ehci, "bogus capabilities ... PCI problems!\n");
+		return -EIO;
 	}
 #endif
 
@@ -577,7 +587,8 @@ static void ehci_stop (struct usb_hcd *hcd)
 
 	/* root hub is shut down separately (first, when possible) */
 	spin_lock_irq (&ehci->lock);
-	ehci_work (ehci, NULL);
+	if (ehci->async)
+		ehci_work (ehci, NULL);
 	spin_unlock_irq (&ehci->lock);
 	ehci_mem_cleanup (ehci);
 
