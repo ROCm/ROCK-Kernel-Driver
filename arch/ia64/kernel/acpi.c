@@ -58,8 +58,6 @@
 
 #define PREFIX			"ACPI: "
 
-int acpi_noirq __initdata = 0;
-
 void (*pm_idle) (void);
 EXPORT_SYMBOL(pm_idle);
 void (*pm_power_off) (void);
