@@ -92,7 +92,7 @@ static int get_msg(mixart_mgr_t *mgr, mixart_msg_t *resp, u32 msg_frame_address 
 	}
 	size -= MSG_DESCRIPTOR_SIZE;
 
-	memcpy_fromio(resp->data, MIXART_MEM(mgr, msg_frame_address + MSG_HEADER_SIZE ), size);
+	memcpy_fromio(resp->data, (void *)MIXART_MEM(mgr, msg_frame_address + MSG_HEADER_SIZE ), size);
 	resp->size = size;
 
 	/* swap if necessary */
