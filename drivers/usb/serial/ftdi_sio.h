@@ -50,7 +50,6 @@
  * The following are the values for the Matrix Orbital LCD displays,
  * which are the FT232BM ( similar to the 8U232AM )
  */
-#define FTDI_MTXORB_VID                FTDI_VID        /* Matrix Orbital Product Id */
 #define FTDI_MTXORB_0_PID      0xFA00  /* Matrix Orbital Product Id */
 #define FTDI_MTXORB_1_PID      0xFA01  /* Matrix Orbital Product Id */
 #define FTDI_MTXORB_2_PID      0xFA02  /* Matrix Orbital Product Id */
@@ -63,9 +62,7 @@
  * The following are the values for the Perle Systems
  * UltraPort USB serial converters
  */
-#define FTDI_PERLE_VID		FTDI_VID	/* Perle Systems Vendor Id */
-#define FTDI_PERLE_PID		0xF0C0	/* Perle UltraPort Product Id
-*/
+#define FTDI_PERLE_ULTRAPORT_PID 0xF0C0	/* Perle UltraPort Product Id */
 
 /*
  * The following are the values for the Sealevel SeaLINK+ adapters.
