@@ -399,7 +399,7 @@ int cleanup_journal_tail(journal_t *journal)
 	 * next transaction ID we will write, and where it will
 	 * start. */
 
-	/* j_checkpoint_transactions needs locking */
+	spin_lock(&journal->j_state_lock);
 	spin_lock(&journal->j_list_lock);
 	transaction = journal->j_checkpoint_transactions;
 	if (transaction) {
@@ -416,6 +416,7 @@ int cleanup_journal_tail(journal_t *journal)
 		blocknr = journal->j_head;
 	}
 	spin_unlock(&journal->j_list_lock);
+	spin_unlock(&journal->j_state_lock);
 	J_ASSERT (blocknr != 0);
 
 	/* If the oldest pinned transaction is at the tail of the log

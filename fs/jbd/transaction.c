@@ -39,6 +39,8 @@
  *	The journal MUST be locked.  We don't perform atomic mallocs on the
  *	new transaction	and we can't block without protecting against other
  *	processes trying to touch the journal while it is in transition.
+ *
+ * Called under j_state_lock
  */
 
 static transaction_t *
@@ -443,13 +445,14 @@ void journal_lock_updates(journal_t *journal)
 
 	spin_lock(&journal->j_state_lock);
 	++journal->j_barrier_count;
-	spin_unlock(&journal->j_state_lock);
 
 	/* Wait until there are no running updates */
 	while (1) {
 		transaction_t *transaction = journal->j_running_transaction;
+
 		if (!transaction)
 			break;
+
 		spin_lock(&transaction->t_handle_lock);
 		if (!transaction->t_updates) {
 			spin_unlock(&transaction->t_handle_lock);
@@ -458,12 +461,14 @@ void journal_lock_updates(journal_t *journal)
 		prepare_to_wait(&journal->j_wait_updates, &wait,
 				TASK_UNINTERRUPTIBLE);
 		spin_unlock(&transaction->t_handle_lock);
+		spin_unlock(&journal->j_state_lock);
 		unlock_journal(journal);
 		schedule();
 		finish_wait(&journal->j_wait_updates, &wait);
 		lock_journal(journal);
+		spin_lock(&journal->j_state_lock);
 	}
-
+	spin_unlock(&journal->j_state_lock);
 	unlock_journal(journal);
 
 	/*
@@ -1781,6 +1786,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 	if (!buffer_jbd(bh))
 		goto zap_buffer_unlocked;
 
+	spin_lock(&journal->j_state_lock);
 	jbd_lock_bh_state(bh);
 	spin_lock(&journal->j_list_lock);
 	jh = bh2jh(bh);
@@ -1813,6 +1819,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 					journal->j_running_transaction);
 			spin_unlock(&journal->j_list_lock);
 			jbd_unlock_bh_state(bh);
+			spin_unlock(&journal->j_state_lock);
 			return ret;
 		} else {
 			/* There is no currently-running transaction. So the
@@ -1825,6 +1832,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 					journal->j_committing_transaction);
 				spin_unlock(&journal->j_list_lock);
 				jbd_unlock_bh_state(bh);
+				spin_unlock(&journal->j_state_lock);
 				return ret;
 			} else {
 				/* The orphan record's transaction has
@@ -1847,6 +1855,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 		}
 		spin_unlock(&journal->j_list_lock);
 		jbd_unlock_bh_state(bh);
+		spin_unlock(&journal->j_state_lock);
 		return 0;
 	} else {
 		/* Good, the buffer belongs to the running transaction.
@@ -1862,6 +1871,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 zap_buffer:
 	spin_unlock(&journal->j_list_lock);
 	jbd_unlock_bh_state(bh);
+	spin_unlock(&journal->j_state_lock);
 zap_buffer_unlocked:
 	clear_buffer_dirty(bh);
 	J_ASSERT_BH(bh, !buffer_jbddirty(bh));

@@ -417,14 +417,10 @@ int log_space_left (journal_t *journal)
 /*
  * This function must be non-allocating for PF_MEMALLOC tasks
  */
-tid_t log_start_commit (journal_t *journal, transaction_t *transaction)
+static tid_t __log_start_commit(journal_t *journal, transaction_t *transaction)
 {
-	tid_t target;
+	tid_t target = journal->j_commit_request;
 
-	lock_kernel(); /* Protect journal->j_running_transaction */
-
-	target = journal->j_commit_request;
-	
 	/*
 	 * A NULL transaction asks us to commit the currently running
 	 * transaction, if there is one.  
@@ -456,8 +452,17 @@ tid_t log_start_commit (journal_t *journal, transaction_t *transaction)
 	wake_up(&journal->j_wait_commit);
 
 out:
-	unlock_kernel();
 	return target;
+}
+
+tid_t log_start_commit(journal_t *journal, transaction_t *transaction)
+{
+	tid_t ret;
+
+	spin_lock(&journal->j_state_lock);
+	ret = __log_start_commit(journal, transaction);
+	spin_unlock(&journal->j_state_lock);
+	return ret;
 }
 
 /*
@@ -1205,24 +1210,30 @@ static int journal_convert_superblock_v1(journal_t *journal,
  * recovery does not need to happen on remount.
  */
 
-int journal_flush (journal_t *journal)
+int journal_flush(journal_t *journal)
 {
 	int err = 0;
 	transaction_t *transaction = NULL;
 	unsigned long old_tail;
 
-	lock_kernel();
+	spin_lock(&journal->j_state_lock);
 	
 	/* Force everything buffered to the log... */
 	if (journal->j_running_transaction) {
 		transaction = journal->j_running_transaction;
-		log_start_commit(journal, transaction);
+		__log_start_commit(journal, transaction);
 	} else if (journal->j_committing_transaction)
 		transaction = journal->j_committing_transaction;
 
 	/* Wait for the log commit to complete... */
-	if (transaction)
-		log_wait_commit(journal, transaction->t_tid);
+	if (transaction) {
+		tid_t tid = transaction->t_tid;
+
+		spin_unlock(&journal->j_state_lock);
+		log_wait_commit(journal, tid);
+	} else {
+		spin_unlock(&journal->j_state_lock);
+	}
 
 	/* ...and flush everything in the log out to disk. */
 	lock_journal(journal);
@@ -1247,8 +1258,6 @@ int journal_flush (journal_t *journal)
 	J_ASSERT(!journal->j_checkpoint_transactions);
 	J_ASSERT(journal->j_head == journal->j_tail);
 	J_ASSERT(journal->j_tail_sequence == journal->j_transaction_sequence);
-
-	unlock_kernel();
 	
 	return err;
 }
@@ -1318,10 +1327,12 @@ const char *journal_dev_name(journal_t *journal, char *buffer)
  * itself are here.
  */
 
-/* Quick version for internal journal use (doesn't lock the journal).
+/*
+ * Quick version for internal journal use (doesn't lock the journal).
  * Aborts hard --- we mark the abort as occurred, but do _nothing_ else,
- * and don't attempt to make any other journal updates. */
-void __journal_abort_hard (journal_t *journal)
+ * and don't attempt to make any other journal updates.
+ */
+void __journal_abort_hard(journal_t *journal)
 {
 	transaction_t *transaction;
 	char b[BDEVNAME_SIZE];
@@ -1329,15 +1340,15 @@ void __journal_abort_hard (journal_t *journal)
 	if (journal->j_flags & JFS_ABORT)
 		return;
 
-	printk (KERN_ERR "Aborting journal on device %s.\n",
+	printk(KERN_ERR "Aborting journal on device %s.\n",
 		journal_dev_name(journal, b));
 
-	lock_kernel();
+	spin_lock(&journal->j_state_lock);
 	journal->j_flags |= JFS_ABORT;
 	transaction = journal->j_running_transaction;
 	if (transaction)
-		log_start_commit(journal, transaction);
-	unlock_kernel();
+		__log_start_commit(journal, transaction);
+	spin_unlock(&journal->j_state_lock);
 }
 
 /* Soft abort: record the abort error status in the journal superblock,

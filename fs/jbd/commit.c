@@ -62,7 +62,7 @@ void journal_commit_transaction(journal_t *journal)
 	 * all outstanding updates to complete.
 	 */
 
-	lock_journal(journal); /* Protect journal->j_running_transaction */
+	lock_journal(journal);
 
 #ifdef COMMIT_STATS
 	spin_lock(&journal->j_list_lock);
@@ -72,14 +72,14 @@ void journal_commit_transaction(journal_t *journal)
 
 	lock_kernel();
 
-	J_ASSERT (journal->j_running_transaction != NULL);
-	J_ASSERT (journal->j_committing_transaction == NULL);
+	J_ASSERT(journal->j_running_transaction != NULL);
+	J_ASSERT(journal->j_committing_transaction == NULL);
 
 	commit_transaction = journal->j_running_transaction;
-	J_ASSERT (commit_transaction->t_state == T_RUNNING);
+	J_ASSERT(commit_transaction->t_state == T_RUNNING);
 
-	jbd_debug (1, "JBD: starting commit of transaction %d\n",
-		   commit_transaction->t_tid);
+	jbd_debug(1, "JBD: starting commit of transaction %d\n",
+			commit_transaction->t_tid);
 
 	commit_transaction->t_state = T_LOCKED;
 
@@ -158,14 +158,13 @@ void journal_commit_transaction(journal_t *journal)
 	 * get a new running transaction for incoming filesystem updates
 	 */
 
+	spin_lock(&journal->j_state_lock);
 	commit_transaction->t_state = T_FLUSH;
-
-	wake_up(&journal->j_wait_transaction_locked);
-
 	journal->j_committing_transaction = commit_transaction;
 	journal->j_running_transaction = NULL;
-
 	commit_transaction->t_log_start = journal->j_head;
+	wake_up(&journal->j_wait_transaction_locked);
+	spin_unlock(&journal->j_state_lock);
 
 	unlock_kernel();
 	
