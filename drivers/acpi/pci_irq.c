@@ -273,11 +273,6 @@ acpi_pci_irq_lookup (struct pci_bus *bus, int device, int pin)
 	return_VALUE(entry->irq);
 }
 
-/*
- * current thinking is that acpi_pci_irq_derive() adds no value
- * and should be deleted, so warn if it actually does something.
- */
-
 static int
 acpi_pci_irq_derive (
 	struct pci_dev		*dev,
@@ -285,6 +280,7 @@ acpi_pci_irq_derive (
 {
 	struct pci_dev		*bridge = dev;
 	int			irq = 0;
+	u8			bridge_pin = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_irq_derive");
 
@@ -293,11 +289,25 @@ acpi_pci_irq_derive (
 
 	/* 
 	 * Attempt to derive an IRQ for this device from a parent bridge's
-	 * PCI interrupt routing entry (a.k.a. the "bridge swizzle").
+	 * PCI interrupt routing entry (eg. yenta bridge and add-in card bridge).
 	 */
 	while (!irq && bridge->bus->self) {
 		pin = (pin + PCI_SLOT(bridge->devfn)) % 4;
 		bridge = bridge->bus->self;
+
+		if ((bridge->class >> 8) == PCI_CLASS_BRIDGE_CARDBUS) {
+			/* PC card has the same IRQ as its cardbridge */
+			pci_read_config_byte(bridge, PCI_INTERRUPT_PIN, &bridge_pin);
+			if (!bridge_pin) {
+				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+					"No interrupt pin configured for device %s\n", pci_name(bridge)));
+				return_VALUE(0);
+			}
+			/* Pin is from 0 to 3 */
+			bridge_pin --;
+			pin = bridge_pin;
+		}
+
 		irq = acpi_pci_irq_lookup(bridge->bus,
 				PCI_SLOT(bridge->devfn), pin);
 	}
@@ -307,7 +317,7 @@ acpi_pci_irq_derive (
 		return_VALUE(0);
 	}
 
-	ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Derive IRQ %d for device %s from %s\n",
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Derive IRQ %d for device %s from %s\n",
 		irq, pci_name(dev), pci_name(bridge)));
 
 	return_VALUE(irq);
@@ -344,13 +354,6 @@ acpi_pci_irq_enable (
 	 */
  	irq = acpi_pci_irq_lookup(dev->bus, PCI_SLOT(dev->devfn), pin);
 
-	/*
-	 * Check if the device has an IRQ,
-	 * Hotplug devices may get IRQs by scanning
-	 */
-	if (!irq && dev->irq)
-		irq = dev->irq;
- 
 	/*
 	 * If no PRT entry was found, we'll try to derive an IRQ from the
 	 * device's parent bridge.
