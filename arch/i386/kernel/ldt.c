@@ -54,7 +54,7 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 	pc->size = mincount;
 	wmb();
 
-	if (reload) {
+	if (reload && (&current->active_mm->context == pc)) {
 #ifdef CONFIG_SMP
 		cpumask_t mask;
 		preempt_disable();
@@ -209,7 +209,7 @@ static int write_ldt(struct task_struct *task, void __user * ptr, unsigned long 
 
 	down(&mm->context.sem);
 	if (ldt_info.entry_number >= mm->context.size) {
-		error = alloc_ldt(&current->mm->context, ldt_info.entry_number+1, 1);
+		error = alloc_ldt(&mm->context, ldt_info.entry_number+1, 1);
 		if (error < 0)
 			goto out_unlock;
 	}
