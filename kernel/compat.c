@@ -430,3 +430,130 @@ asmlinkage int compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 	return ret;
 }
 
+static int get_compat_itimerspec(struct itimerspec *dst, 
+				 struct compat_itimerspec *src)
+{ 
+	if (get_compat_timespec(&dst->it_interval, &src->it_interval) ||
+	    get_compat_timespec(&dst->it_value, &src->it_value))
+		return -EFAULT;
+	return 0;
+} 
+
+static int put_compat_itimerspec(struct compat_itimerspec *dst, 
+				 struct itimerspec *src)
+{ 
+	if (put_compat_timespec(&src->it_interval, &dst->it_interval) ||
+	    put_compat_timespec(&src->it_value, &dst->it_value))
+		return -EFAULT;
+	return 0;
+} 
+
+extern asmlinkage long sys_timer_settime(timer_t timer_id, int flags,
+				  struct itimerspec __user *new_setting,
+				 struct itimerspec __user *old_setting);
+extern asmlinkage long sys_timer_gettime(timer_t timer_id, 
+					 struct itimerspec __user *setting);
+
+long compat_timer_settime(timer_t timer_id, int flags, 
+			  struct compat_itimerspec *new, 
+			  struct compat_itimerspec *old)
+{ 
+	long err;
+	mm_segment_t oldfs;
+	struct itimerspec newts, oldts;
+	if (get_compat_itimerspec(&newts, new))
+		return -EFAULT;	
+	oldfs = get_fs();
+	err = sys_timer_settime(timer_id, flags, &newts, &oldts);
+	set_fs(oldfs); 
+	if (!err && old && put_compat_itimerspec(old, &oldts))
+		return -EFAULT;
+	return err;
+} 
+
+long compat_timer_gettime(timer_t timer_id, struct compat_itimerspec *setting)
+{ 
+	long err;
+	mm_segment_t oldfs;
+	struct itimerspec ts; 
+	oldfs = get_fs();
+	err = sys_timer_gettime(timer_id, &ts); 
+	set_fs(oldfs); 
+	if (!err && put_compat_itimerspec(setting, &ts))
+		return -EFAULT;
+	return err;
+} 
+
+extern asmlinkage long
+sys_clock_settime(clockid_t which_clock, struct timespec __user *tp);
+
+long compat_clock_settime(clockid_t which_clock,  struct compat_timespec *tp)
+{
+	long err;
+	mm_segment_t oldfs;
+	struct timespec ts; 
+	if (get_compat_timespec(&ts, tp))
+		return -EFAULT; 
+	oldfs = get_fs(); 
+	err = sys_clock_settime(which_clock, &ts); 
+	set_fs(oldfs);
+	return err;
+} 
+
+extern asmlinkage long
+sys_clock_gettime(clockid_t which_clock, struct timespec __user *tp);
+
+long compat_clock_gettime(clockid_t which_clock,  struct compat_timespec *tp)
+{
+	long err;
+	mm_segment_t oldfs;
+	struct timespec ts; 
+	oldfs = get_fs(); 
+	err = sys_clock_gettime(which_clock, &ts); 
+	set_fs(oldfs);
+	if (!err && put_compat_timespec(&ts, tp))
+		return -EFAULT; 
+	return err;
+} 
+
+extern asmlinkage long
+sys_clock_getres(clockid_t which_clock, struct timespec __user *tp);
+
+long compat_clock_getres(clockid_t which_clock,  struct compat_timespec *tp)
+{
+	long err;
+	mm_segment_t oldfs;
+	struct timespec ts; 
+	oldfs = get_fs(); 
+	err = sys_clock_getres(which_clock, &ts); 
+	set_fs(oldfs);
+	if (!err && put_compat_timespec(&ts, tp))
+		return -EFAULT; 
+	return err;
+} 
+
+extern asmlinkage long
+sys_clock_nanosleep(clockid_t which_clock, int flags,
+		     struct timespec __user *rqtp,
+		    struct timespec __user *rmtp);
+
+long compat_clock_nanosleep(clockid_t which_clock, int flags,
+			    struct compat_timespec __user *rqtp,
+			    struct compat_timespec __user *rmtp)
+{
+	long err;
+	mm_segment_t oldfs;
+	struct timespec in, out; 
+	if (get_compat_timespec(&in, rqtp)) 
+		return -EFAULT;
+	oldfs = get_fs(); 
+	err = sys_clock_nanosleep(which_clock, flags, &in, &out);  
+	set_fs(oldfs);
+	if ((err == -ERESTART_RESTARTBLOCK) && rmtp &&
+	    put_compat_timespec(&out, rmtp))
+		return -EFAULT;
+	return err;	
+} 
+
+/* timer_create is architecture specific because it needs sigevent conversion */
+

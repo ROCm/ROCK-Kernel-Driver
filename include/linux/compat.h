@@ -15,6 +15,11 @@
 #define compat_jiffies_to_clock_t(x)	\
 		(((unsigned long)(x) * COMPAT_USER_HZ) / HZ)
 
+struct compat_itimerspec { 
+	struct compat_timespec it_interval;
+	struct compat_timespec it_value;
+};
+
 struct compat_utimbuf {
 	compat_time_t		actime;
 	compat_time_t		modtime;
