@@ -1,12 +1,6 @@
 #
 # Makefile for the memory technology device drivers.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now inherited from the
-# parent makes..
 #
 # $Id: Makefile,v 1.63 2001/06/13 09:43:07 dwmw2 Exp $
 
@@ -20,7 +14,6 @@ obj-            :=
 O_TARGET	:= mtdlink.o
 
 export-objs	:= mtdcore.o mtdpart.o redboot.o bootldr.o afs.o
-list-multi	:= nftl.o
 
 mod-subdirs	:= 
 subdir-y	:= chips maps devices nand
@@ -59,7 +52,3 @@ obj-$(CONFIG_NFTL)		+= nftl.o
 nftl-objs	:= nftlcore.o nftlmount.o
 
 include $(TOPDIR)/Rules.make
-
-nftl.o: $(nftl-objs)
-	$(LD) -r -o $@ $(nftl-objs)
-
