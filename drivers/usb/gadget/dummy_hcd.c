@@ -70,6 +70,8 @@
 static const char	driver_name [] = "dummy_hcd";
 static const char	driver_desc [] = "USB Host+Gadget Emulator";
 
+static const char	gadget_name [] = "dummy_udc";
+
 MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_AUTHOR ("David Brownell");
 MODULE_LICENSE ("GPL");
@@ -647,7 +649,7 @@ usb_gadget_register_driver (struct usb_gadget_driver *driver)
 	 * SLAVE side init ... the layer above hardware, which
 	 * can't enumerate without help from the driver we're binding.
 	 */
-	dum->gadget.name = driver_name;
+	dum->gadget.name = gadget_name;
 	dum->gadget.ops = &dummy_ops;
 	dum->gadget.is_dualspeed = 1;
 
