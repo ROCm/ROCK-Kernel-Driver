@@ -657,7 +657,7 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 		pcmcia_error(skt, "unsupported voltage key.\n");
 		return CS_BAD_TYPE;
 	}
-	skt->socket.flags = SS_DEBOUNCED;
+	skt->socket.flags = 0;
 	skt->ops->set_socket(skt, &skt->socket);
 
 	/*
@@ -690,7 +690,6 @@ static int socket_insert(struct pcmcia_socket *skt)
 		}
 #endif
 		send_event(skt, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
-		skt->socket.flags &= ~SS_DEBOUNCED;
 	} else {
 		socket_shutdown(skt);
 		cs_socket_put(skt);
@@ -739,7 +738,6 @@ static int socket_resume(struct pcmcia_socket *skt)
 		} else {
 			send_event(skt, CS_EVENT_PM_RESUME, CS_EVENT_PRI_LOW);
 		}
-		skt->socket.flags &= ~SS_DEBOUNCED;
 	} else {
 		socket_shutdown(skt);
 		cs_socket_put(skt);

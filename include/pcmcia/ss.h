@@ -78,7 +78,6 @@ extern socket_state_t dead_socket;
 #define SS_DMA_MODE	0x0080
 #define SS_SPKR_ENA	0x0100
 #define SS_OUTPUT_ENA	0x0200
-#define SS_DEBOUNCED	0x0400	/* Tell driver that the debounce delay has ended */
 
 /* Flags for I/O port and memory windows */
 #define MAP_ACTIVE	0x01
