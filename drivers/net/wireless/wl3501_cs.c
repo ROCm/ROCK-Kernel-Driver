@@ -719,7 +719,7 @@ static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 	signal.timeout = 10;
 	memcpy((char *)&(signal.beacon_period),
 	       (char *)&(this->bss_set[stas].beacon_period), 72);
-	signal.phy_pset[2] = this->chan;
+	signal.phy_pset[2] = this->def_chan;
 
 	if (wl3501_esbq_req_test(this)) {
 		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
@@ -1877,7 +1877,7 @@ static int wl3501_set_freq(struct net_device *dev, struct iw_request_info *info,
 	else {
 		struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 
-		this->chan = channel;
+		this->def_chan = channel;
 		rc = wl3501_reset(dev);
 	}
 
