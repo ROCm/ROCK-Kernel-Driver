@@ -144,7 +144,7 @@ static void iommu_table_getparms(struct iSeries_Device_Node* dn,
 }
 
 
-void iommu_devnode_init(struct iSeries_Device_Node *dn)
+void iommu_devnode_init_iSeries(struct iSeries_Device_Node *dn)
 {
 	struct iommu_table *tbl;
 
