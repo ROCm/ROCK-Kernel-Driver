@@ -665,6 +665,15 @@ Module parameters
 
     The power-management is supported.
     
+  Module snd-intel8x0m
+  --------------------
+
+    Module for Intel ICH (i8x0) chipset MC97 modems.
+
+    ac97_clock	  - AC'97 codec clock base (0 = auto-detect)
+
+    This module supports up to 8 cards and autoprobe.
+
   Module snd-interwave
   --------------------
 
