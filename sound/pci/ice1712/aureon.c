@@ -496,6 +496,7 @@ struct snd_ice1712_card_info snd_vt1724_aureon_cards[] __devinitdata = {
 	{
 		.subvendor = VT1724_SUBDEVICE_AUREON51_SKY,
 		.name = "Terratec Aureon 5.1-Sky",
+		.model = "aureon51",
 		.chip_init = aureon_init,
 		.build_controls = aureon_add_controls,
 		.eeprom_size = sizeof(aureon51_eeprom),
@@ -504,6 +505,7 @@ struct snd_ice1712_card_info snd_vt1724_aureon_cards[] __devinitdata = {
 	{
 		.subvendor = VT1724_SUBDEVICE_AUREON71_SPACE,
 		.name = "Terratec Aureon 7.1-Space",
+		.model = "aureon71",
 		.chip_init = aureon_init,
 		.build_controls = aureon_add_controls,
 		.eeprom_size = sizeof(aureon71_eeprom),

@@ -171,10 +171,11 @@ static int __devinit revo_add_controls(ice1712_t *ice)
 /* entry point */
 struct snd_ice1712_card_info snd_vt1724_revo_cards[] __devinitdata = {
 	{
-		VT1724_SUBDEVICE_REVOLUTION71,
-		"M Audio Revolution-7.1",
-		revo_init,
-		revo_add_controls,
+		.subvendor = VT1724_SUBDEVICE_REVOLUTION71,
+		.name = "M Audio Revolution-7.1",
+		.model = "revo71",
+		.chip_init = revo_init,
+		.build_controls = revo_add_controls,
 	},
 	{ } /* terminator */
 };

@@ -84,9 +84,9 @@ MODULE_DEVICES("{"
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;		/* Enable this card */
+static char *model[SNDRV_CARDS];
 static int omni[SNDRV_CARDS];	/* Delta44 & 66 Omni I/O support */
 static int cs8427_timeout[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 500}; /* CS8427 S/PDIF transciever reset timeout value in msec */
-static int ez8[SNDRV_CARDS];	/* EZ8 card */
 static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
@@ -104,9 +104,8 @@ MODULE_PARM_SYNTAX(omni, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 module_param_array(cs8427_timeout, int, boot_devs, 0444);
 MODULE_PARM_DESC(cs8427_timeout, "Define reset timeout for cs8427 chip in msec resolution.");
 MODULE_PARM_SYNTAX(cs8427_timeout, SNDRV_ENABLED ", allows:{{1,1000}},default=500,skill:advanced");
-module_param_array(ez8, bool, boot_devs, 0444);
-MODULE_PARM_DESC(ez8, "Enable Event Electronics EZ8 support.");
-MODULE_PARM_SYNTAX(ez8, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
+module_param_array(model, charp, boot_devs, 0444);
+MODULE_PARM_DESC(model, "Use the given board model.");
 
 #ifndef PCI_VENDOR_ID_ICE
 #define PCI_VENDOR_ID_ICE		0x1412
@@ -2289,6 +2288,16 @@ static snd_kcontrol_new_t snd_ice1712_mixer_pro_peak __devinitdata = {
  *
  */
 
+/*
+ * list of available boards
+ */
+static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
+	snd_ice1712_hoontech_cards,
+	snd_ice1712_delta_cards,
+	snd_ice1712_ews_cards,
+	0,
+};
+
 static unsigned char __devinit snd_ice1712_read_i2c(ice1712_t *ice,
 						 unsigned char dev,
 						 unsigned char addr)
@@ -2301,7 +2310,7 @@ static unsigned char __devinit snd_ice1712_read_i2c(ice1712_t *ice,
 	return inb(ICEREG(ice, I2C_DATA));
 }
 
-static int __devinit snd_ice1712_read_eeprom(ice1712_t *ice)
+static int __devinit snd_ice1712_read_eeprom(ice1712_t *ice, const char *modelname)
 {
 	int dev = 0xa0;		/* EEPROM device address */
 	unsigned int i, size;
@@ -2310,10 +2319,23 @@ static int __devinit snd_ice1712_read_eeprom(ice1712_t *ice)
 		snd_printk("ICE1712 has not detected EEPROM\n");
 		return -EIO;
 	}
-	ice->eeprom.subvendor = (snd_ice1712_read_i2c(ice, dev, 0x00) << 0) |
-				(snd_ice1712_read_i2c(ice, dev, 0x01) << 8) | 
-				(snd_ice1712_read_i2c(ice, dev, 0x02) << 16) | 
-				(snd_ice1712_read_i2c(ice, dev, 0x03) << 24);
+	if (modelname && *modelname) {
+		struct snd_ice1712_card_info **tbl, *c;
+		for (tbl = card_tables; *tbl; tbl++) {
+			for (c = *tbl; c->subvendor; c++) {
+				if (c->model && !strcmp(modelname, c->model)) {
+					/* use the given subvendor */
+					printk(KERN_INFO "ice1712: Using board model %s\n", c->name);
+					ice->eeprom.subvendor = c->subvendor;
+					break;
+				}
+			}
+		}
+	} else
+		ice->eeprom.subvendor = (snd_ice1712_read_i2c(ice, dev, 0x00) << 0) |
+			(snd_ice1712_read_i2c(ice, dev, 0x01) << 8) | 
+			(snd_ice1712_read_i2c(ice, dev, 0x02) << 16) | 
+			(snd_ice1712_read_i2c(ice, dev, 0x03) << 24);
 	ice->eeprom.size = snd_ice1712_read_i2c(ice, dev, 0x04);
 	if (ice->eeprom.size < 6)
 		ice->eeprom.size = 32; /* FIXME: any cards without the correct size? */
@@ -2486,9 +2508,9 @@ static int snd_ice1712_dev_free(snd_device_t *device)
 
 static int __devinit snd_ice1712_create(snd_card_t * card,
 					struct pci_dev *pci,
+					const char *modelname,
 					int omni,
 					int cs8427_timeout,
-					int ez8,
 					ice1712_t ** r_ice1712)
 {
 	ice1712_t *ice;
@@ -2517,7 +2539,6 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 		cs8427_timeout = 1;
 	else if (cs8427_timeout > 1000)
 		cs8427_timeout = 1000;
-	ice->ez8 = ez8 ? 1 : 0;
 	ice->cs8427_timeout = cs8427_timeout;
 	spin_lock_init(&ice->reg_lock);
 	init_MUTEX(&ice->gpio_mutex);
@@ -2572,7 +2593,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 	
 	ice->irq = pci->irq;
 
-	if (snd_ice1712_read_eeprom(ice) < 0) {
+	if (snd_ice1712_read_eeprom(ice, modelname) < 0) {
 		snd_ice1712_free(ice);
 		return -EIO;
 	}
@@ -2607,14 +2628,6 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 
 static struct snd_ice1712_card_info no_matched __devinitdata;
 
-static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
-	snd_ice1712_hoontech_cards,
-	snd_ice1712_delta_cards,
-	snd_ice1712_ews_cards,
-	0,
-};
-
-
 static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 				       const struct pci_device_id *pci_id)
 {
@@ -2638,7 +2651,7 @@ static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 	strcpy(card->driver, "ICE1712");
 	strcpy(card->shortname, "ICEnsemble ICE1712");
 	
-	if ((err = snd_ice1712_create(card, pci, omni[dev], cs8427_timeout[dev], ez8[dev], &ice)) < 0) {
+	if ((err = snd_ice1712_create(card, pci, model[dev], omni[dev], cs8427_timeout[dev], &ice)) < 0) {
 		snd_card_free(card);
 		return err;
 	}

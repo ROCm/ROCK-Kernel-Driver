@@ -156,20 +156,6 @@ static int __devinit snd_ice1712_hoontech_init(ice1712_t *ice)
 {
 	int box, chn;
 
-	/* EZ8 Hack: Change shortname and subvendor id, Recall functions called in
-	 * snd_ice1712_chip_init when it still thinks it is a Hoontech DSP24 card.
-	 */
-	if (ice->ez8) {
-		strcpy(ice->card->shortname, "Event Electronics EZ8");
-		ice->eeprom.subvendor = 0;
-		ice->gpio.write_mask = ice->eeprom.gpiomask;
-		ice->gpio.direction = ice->eeprom.gpiodir;
-		snd_ice1712_write(ice, ICE1712_IREG_GPIO_WRITE_MASK, ice->eeprom.gpiomask);
-		snd_ice1712_write(ice, ICE1712_IREG_GPIO_DIRECTION, ice->eeprom.gpiodir);
-		snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, ice->eeprom.gpiostate);
-		return 0;
-	}
-
 	ice->num_total_dacs = 8;
 	ice->num_total_adcs = 8;
 
@@ -231,17 +217,36 @@ static int __devinit snd_ice1712_hoontech_init(ice1712_t *ice)
 }
 
 
+static int __devinit snd_ice1712_ez8_init(ice1712_t *ice)
+{
+	ice->gpio.write_mask = ice->eeprom.gpiomask;
+	ice->gpio.direction = ice->eeprom.gpiodir;
+	snd_ice1712_write(ice, ICE1712_IREG_GPIO_WRITE_MASK, ice->eeprom.gpiomask);
+	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DIRECTION, ice->eeprom.gpiodir);
+	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, ice->eeprom.gpiostate);
+	return 0;
+}
+
+
 /* entry point */
 struct snd_ice1712_card_info snd_ice1712_hoontech_cards[] __devinitdata = {
 	{
-		ICE1712_SUBDEVICE_STDSP24,
-		"Hoontech SoundTrack Audio DSP24",
-		snd_ice1712_hoontech_init,
+		.subvendor = ICE1712_SUBDEVICE_STDSP24,
+		.name = "Hoontech SoundTrack Audio DSP24",
+		.model = "dsp24",
+		.chip_init = snd_ice1712_hoontech_init,
 	},
 	{
-		ICE1712_SUBDEVICE_STDSP24_MEDIA7_1,
-		"Hoontech STA DSP24 Media 7.1",
-		snd_ice1712_hoontech_init,
+		.subvendor = ICE1712_SUBDEVICE_STDSP24_MEDIA7_1,
+		.name = "Hoontech STA DSP24 Media 7.1",
+		.model = "dsp24_71",
+		.chip_init = snd_ice1712_hoontech_init,
+	},
+	{
+		.subvendor = ICE1712_SUBDEVICE_EVENT_EZ8,	/* a dummy id */
+		.name = "Event Electronics EZ8",
+		.model = "ez8",
+		.chip_init = snd_ice1712_ez8_init,
 	},
 	{ } /* terminator */
 };

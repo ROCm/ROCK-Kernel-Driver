@@ -62,6 +62,7 @@ MODULE_DEVICES("{"
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;		/* Enable this card */
+static char *model[SNDRV_CARDS];
 static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
@@ -73,6 +74,8 @@ MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ICE1724 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+module_param_array(model, charp, boot_devs, 0444);
+MODULE_PARM_DESC(model, "Use the given board model.");
 
 #ifndef PCI_VENDOR_ID_ICE
 #define PCI_VENDOR_ID_ICE		0x1412
@@ -1732,9 +1735,7 @@ static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
 /*
  */
 
-static unsigned char __devinit snd_vt1724_read_i2c(ice1712_t *ice,
-						 unsigned char dev,
-						 unsigned char addr)
+unsigned char snd_vt1724_read_i2c(ice1712_t *ice, unsigned char dev, unsigned char addr)
 {
 	long t = 0x10000;
 
@@ -1744,37 +1745,49 @@ static unsigned char __devinit snd_vt1724_read_i2c(ice1712_t *ice,
 	return inb(ICEREG1724(ice, I2C_DATA));
 }
 
-static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice)
+void snd_vt1724_write_i2c(ice1712_t *ice, unsigned char dev, unsigned char addr, unsigned char data)
+{
+	long t = 0x10000;
+
+	outb(addr, ICEREG1724(ice, I2C_BYTE_ADDR));
+	outb(data, ICEREG1724(ice, I2C_DATA));
+	outb(dev | VT1724_I2C_WRITE, ICEREG1724(ice, I2C_DEV_ADDR));
+	while (t-- > 0 && (inb(ICEREG1724(ice, I2C_CTRL)) & VT1724_I2C_BUSY)) ;
+}
+
+static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice, const char *modelname)
 {
 	int dev = 0xa0;		/* EEPROM device address */
 	unsigned int i, size;
 	struct snd_ice1712_card_info **tbl, *c;
 
-	if ((inb(ICEREG1724(ice, I2C_CTRL)) & VT1724_I2C_EEPROM) == 0) {
-		snd_printk(KERN_WARNING "ICE1724 has not detected EEPROM\n");
-		// return -EIO;
-	}
-	ice->eeprom.subvendor = (snd_vt1724_read_i2c(ice, dev, 0x00) << 0) |
+	if (! modelname || ! *modelname) {
+		if ((inb(ICEREG1724(ice, I2C_CTRL)) & VT1724_I2C_EEPROM) == 0) {
+			snd_printk(KERN_WARNING "ICE1724 has not detected EEPROM\n");
+			// return -EIO;
+		}
+		ice->eeprom.subvendor = (snd_vt1724_read_i2c(ice, dev, 0x00) << 0) |
 				(snd_vt1724_read_i2c(ice, dev, 0x01) << 8) | 
 				(snd_vt1724_read_i2c(ice, dev, 0x02) << 16) | 
 				(snd_vt1724_read_i2c(ice, dev, 0x03) << 24);
-
-	/* if the EEPROM is given by the driver, use it */
+	}
 	for (tbl = card_tables; *tbl; tbl++) {
 		for (c = *tbl; c->subvendor; c++) {
-			if (c->subvendor == ice->eeprom.subvendor) {
-				if (! c->eeprom_size || ! c->eeprom_data)
-					goto found;
-				snd_printdd("using the defined eeprom..\n");
-				ice->eeprom.version = 2;
-				ice->eeprom.size = c->eeprom_size + 6;
-				memcpy(ice->eeprom.data, c->eeprom_data, c->eeprom_size);
-				goto read_skipped;
-			}
+			if (modelname && c->model && ! strcmp(modelname, c->model)) {
+				printk(KERN_INFO "ice1724: Using board model %s\n", c->name);
+				ice->eeprom.subvendor = c->subvendor;
+			} else if (c->subvendor != ice->eeprom.subvendor)
+				continue;
+			if (! c->eeprom_size || ! c->eeprom_data)
+				break;
+			/* if the EEPROM is given by the driver, use it */
+			snd_printdd("using the defined eeprom..\n");
+			ice->eeprom.version = 2;
+			ice->eeprom.size = c->eeprom_size + 6;
+			memcpy(ice->eeprom.data, c->eeprom_data, c->eeprom_size);
+			goto read_skipped;
 		}
 	}
-
- found:
 	ice->eeprom.size = snd_vt1724_read_i2c(ice, dev, 0x04);
 	if (ice->eeprom.size < 6)
 		ice->eeprom.size = 32;
@@ -1928,6 +1941,7 @@ static int snd_vt1724_dev_free(snd_device_t *device)
 
 static int __devinit snd_vt1724_create(snd_card_t * card,
 				       struct pci_dev *pci,
+				       const char *modelname,
 				       ice1712_t ** r_ice1712)
 {
 	ice1712_t *ice;
@@ -1983,7 +1997,7 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
 
 	ice->irq = pci->irq;
 
-	if (snd_vt1724_read_eeprom(ice) < 0) {
+	if (snd_vt1724_read_eeprom(ice, modelname) < 0) {
 		snd_vt1724_free(ice);
 		return -EIO;
 	}
@@ -2042,7 +2056,7 @@ static int __devinit snd_vt1724_probe(struct pci_dev *pci,
 	strcpy(card->driver, "ICE1724");
 	strcpy(card->shortname, "ICEnsemble ICE1724");
 	
-	if ((err = snd_vt1724_create(card, pci, &ice)) < 0) {
+	if ((err = snd_vt1724_create(card, pci, model[dev], &ice)) < 0) {
 		snd_card_free(card);
 		return err;
 	}

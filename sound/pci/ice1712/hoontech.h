@@ -25,12 +25,14 @@
  */      
 
 #define  HOONTECH_DEVICE_DESC \
-	"{Hoontech SoundTrack DSP 24}," \
-	"{Hoontech SoundTrack DSP 24 Value}," \
-	"{Hoontech SoundTrack DSP 24 Media 7.1}," \
+	"{Hoontech,SoundTrack DSP 24}," \
+	"{Hoontech,SoundTrack DSP 24 Value}," \
+	"{Hoontech,SoundTrack DSP 24 Media 7.1}," \
+	"{Event Electronics,EZ8},"
 
 #define ICE1712_SUBDEVICE_STDSP24		0x12141217	/* Hoontech SoundTrack Audio DSP 24 */
 #define ICE1712_SUBDEVICE_STDSP24_MEDIA7_1	0x16141217	/* Hoontech ST Audio DSP24 Media 7.1 */
+#define ICE1712_SUBDEVICE_EVENT_EZ8		0x00010001	/* A dummy id for EZ8 */
 
 extern struct snd_ice1712_card_info snd_ice1712_hoontech_cards[];
 
