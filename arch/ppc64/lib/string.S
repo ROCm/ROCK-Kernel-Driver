@@ -66,13 +66,12 @@ _GLOBAL(strlen)
 	blr
 
 _GLOBAL(memset)
-	neg	r0,r5
+	neg	r0,r3
 	rlwimi	r4,r4,8,16,23
 	andi.	r0,r0,7			/* # bytes to be 8-byte aligned */
 	rlwimi	r4,r4,16,0,15
 	cmplw	cr1,r5,r0		/* do we get that far? */
 	rldimi	r4,r4,32,0
-	mr	r6,r3
 	mtcrf	1,r0
 	mr	r6,r3
 	blt	cr1,8f
