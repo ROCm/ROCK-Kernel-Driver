@@ -16,7 +16,7 @@
 
 extern void restore_current(void);
 
-spinlock_t prom_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(prom_lock);
 
 /* Reset and reboot the machine with the command 'bcommand'. */
 void
