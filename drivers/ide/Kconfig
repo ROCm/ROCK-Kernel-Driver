@@ -830,6 +830,13 @@ config BLK_DEV_IDE_RAPIDE
 	  Say Y here if you want to support the Yellowstone RapIDE controller
 	  manufactured for use with Acorn computers.
 
+config BLK_DEV_IDE_BAST
+	tristate "Simtec BAST / Thorcom VR1000 IDE support"
+	depends on ARM && (ARCH_BAST || MACH_VR100)
+	help
+	  Say Y here if you want to support the onboard IDE channels on the
+	  Simtec BAST or the Thorcom VR1000
+
 config BLK_DEV_GAYLE
 	bool "Amiga Gayle IDE interface support"
 	depends on AMIGA
