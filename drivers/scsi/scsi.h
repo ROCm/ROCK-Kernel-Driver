@@ -421,12 +421,6 @@ extern int  scsi_partsize(unsigned char *buf, unsigned long capacity,
                     unsigned int *secs);
 
 /*
- * sg list allocations
- */
-struct scatterlist *scsi_alloc_sgtable(Scsi_Cmnd *SCpnt, int gfp_mask);
-void scsi_free_sgtable(struct scatterlist *sgl, int index);
-
-/*
  * Prototypes for functions in scsi_lib.c
  */
 extern int scsi_maybe_unblock_host(Scsi_Device * SDpnt);
@@ -437,13 +431,13 @@ extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 extern void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt);
 extern int scsi_prep_fn(struct request_queue *q, struct request *req);
 extern void scsi_request_fn(request_queue_t * q);
-extern int scsi_starvation_completion(Scsi_Device * SDpnt);
+extern int scsi_init_queue(void);
+extern void scsi_exit_queue(void);
 
 /*
  * Prototypes for functions in scsi.c
  */
 extern int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt);
-extern void scsi_bottom_half_handler(void);
 extern void scsi_release_commandblocks(Scsi_Device * SDpnt);
 extern void scsi_build_commandblocks(Scsi_Device * SDpnt);
 extern void scsi_adjust_queue_depth(Scsi_Device *, int, int);
@@ -462,7 +456,6 @@ extern void scsi_do_cmd(Scsi_Cmnd *, const void *cmnd,
 			void *buffer, unsigned bufflen,
 			void (*done) (struct scsi_cmnd *),
 			int timeout, int retries);
-extern int scsi_dev_init(void);
 extern int scsi_mlqueue_insert(struct scsi_cmnd *, int);
 extern int scsi_attach_device(struct scsi_device *);
 extern void scsi_detach_device(struct scsi_device *);

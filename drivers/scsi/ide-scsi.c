@@ -764,7 +764,7 @@ static inline int should_transform(ide_drive_t *drive, Scsi_Cmnd *cmd)
 
 	if (disk) {
 		struct Scsi_Device_Template **p = disk->private_data;
-		if (strcmp((*p)->tag, "sg") == 0)
+		if (strcmp((*p)->scsi_driverfs_driver.name, "sg") == 0)
 			return test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
 	}
 	return test_bit(IDESCSI_TRANSFORM, &scsi->transform);

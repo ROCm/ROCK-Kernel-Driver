@@ -142,14 +142,13 @@ static void __init network_ldisc_init(void)
 static void __init special_device_init(void)
 {
 #ifdef CONFIG_NET_SB1000
-	{
-		extern int sb1000_probe(struct net_device *dev);
-		static struct net_device sb1000_dev = 
-		{
-			"cm0" __PAD3, 0x0, 0x0, 0x0, 0x0, 0, 0, 0, 0, 0, NULL, sb1000_probe 
-		};
-		register_netdev(&sb1000_dev);
-	}
+	extern int sb1000_probe(struct net_device *dev);
+
+	static struct net_device sb1000_dev = {
+		.name = "cm0" __PAD3,
+		.init = sb1000_probe,
+	};
+	register_netdev(&sb1000_dev);
 #endif
 }
 

@@ -48,7 +48,6 @@ extern int ne2_probe(struct net_device *dev);
 extern int hp100_probe(struct net_device *dev);
 extern int ultra_probe(struct net_device *dev);
 extern int ultra32_probe(struct net_device *dev);
-extern int ultramca_probe(struct net_device *dev);
 extern int wd_probe(struct net_device *dev);
 extern int el2_probe(struct net_device *dev);
 extern int ne_probe(struct net_device *dev);
@@ -191,9 +190,6 @@ static struct devprobe eisa_probes[] __initdata = {
 
 
 static struct devprobe mca_probes[] __initdata = {
-#ifdef CONFIG_ULTRAMCA 
-	{ultramca_probe, 0},
-#endif
 #ifdef CONFIG_NE2_MCA
 	{ne2_probe, 0},
 #endif

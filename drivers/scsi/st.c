@@ -33,7 +33,7 @@ static char *verstr = "20021015";
 #include <linux/ioctl.h>
 #include <linux/fcntl.h>
 #include <linux/spinlock.h>
-#include <linux/smp_lock.h>
+#include <linux/blk.h>
 #include <asm/uaccess.h>
 #include <asm/dma.h>
 #include <asm/system.h>
@@ -54,9 +54,6 @@ static char *verstr = "20021015";
 #define DEBC(a)
 #endif
 
-#define MAJOR_NR SCSI_TAPE_MAJOR
-#define DEVICE_NR(device) (minor(device) & 0x7f)
-#include <linux/blk.h>
 
 #include "scsi.h"
 #include "hosts.h"
@@ -3768,13 +3765,14 @@ static int st_attach(Scsi_Device * SDp)
 	tpnt->try_dio = try_direct_io && !SDp->host->unchecked_isa_dma;
 	bounce_limit = BLK_BOUNCE_HIGH; /* Borrowed from scsi_merge.c */
 	if (SDp->host->highmem_io) {
+		struct device *dev = scsi_get_device(SDp->host);
 		if (!PCI_DMA_BUS_IS_PHYS)
 			/* Platforms with virtual-DMA translation
 			 * hardware have no practical limit.
 			 */
 			bounce_limit = BLK_BOUNCE_ANY;
-		else if (SDp->host->pci_dev)
-			bounce_limit = SDp->host->pci_dev->dma_mask;
+		else if (dev && dev->dma_mask)
+			bounce_limit = *dev->dma_mask;
 	} else if (SDp->host->unchecked_isa_dma)
 		bounce_limit = BLK_BOUNCE_ISA;
 	bounce_limit >>= PAGE_SHIFT;
