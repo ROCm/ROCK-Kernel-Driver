@@ -23,6 +23,7 @@
 #include <linux/pagevec.h>
 #include <linux/quotaops.h>
 #include <linux/dnotify.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 
