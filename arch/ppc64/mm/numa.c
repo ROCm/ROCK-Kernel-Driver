@@ -210,6 +210,8 @@ static void __init setup_nonnuma(void)
 	for (i = 0; i < NR_CPUS; i++)
 		map_cpu_to_node(i, 0);
 
+	node_set_online(0);
+
 	node_data[0].node_start_pfn = 0;
 	node_data[0].node_spanned_pages = lmb_end_of_DRAM() / PAGE_SIZE;
 
