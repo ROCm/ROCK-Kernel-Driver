@@ -375,7 +375,7 @@ static int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 #endif
 
 	/* locate an available ecb */
-	spin_lock_irqsave(&SCpnt->device->host->host_lock, flags);
+	spin_lock_irqsave(SCpnt->device->host->host_lock, flags);
 	ecbno = host->last_ecb_used + 1; /* An optimization */
 	if (ecbno >= AHA1740_ECBS)
 		ecbno = 0;
@@ -394,7 +394,7 @@ static int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 						    doubles as reserved flag */
 
 	host->last_ecb_used = ecbno;    
-	spin_unlock_irqrestore(&SCpnt->device->host->host_lock, flags);
+	spin_unlock_irqrestore(SCpnt->device->host->host_lock, flags);
 
 #ifdef DEBUG
 	printk("Sending command (%d %x)...", ecbno, done);
@@ -491,7 +491,7 @@ static int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 		unsigned int base = SCpnt->device->host->io_port;
 		DEB(printk("aha1740[%d] critical section\n",ecbno));
 
-		spin_lock_irqsave(&SCpnt->device->host->host_lock, flags);
+		spin_lock_irqsave(SCpnt->device->host->host_lock, flags);
 		for (loopcnt = 0; ; loopcnt++) {
 			if (inb(G2STAT(base)) & G2STAT_MBXOUT) break;
 			if (loopcnt == LOOPCNT_WARN) {
@@ -511,7 +511,7 @@ static int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 				panic("aha1740.c: attn wait failed!\n");
 		}
 		outb(ATTN_START | (target & 7), ATTN(base)); /* Start it up */
-		spin_unlock_irqrestore(&SCpnt->device->host->host_lock, flags);
+		spin_unlock_irqrestore(SCpnt->device->host->host_lock, flags);
 		DEB(printk("aha1740[%d] request queued.\n",ecbno));
 	} else
 		printk(KERN_ALERT "aha1740_queuecommand: done can't be NULL\n");
@@ -594,7 +594,7 @@ static int aha1740_probe (struct device *dev)
 	if (!request_region(slotbase, SLOTSIZE, "aha1740")) /* See if in use */
 		return -EBUSY;
 	if (!aha1740_test_port(slotbase))
-		goto err_release;
+		goto err_release_region;
 	aha1740_getconfig(slotbase,&irq_level,&translation);
 	if ((inb(G2STAT(slotbase)) &
 	     (G2STAT_MBXOUT|G2STAT_BUSY)) != G2STAT_MBXOUT) {
@@ -609,7 +609,7 @@ static int aha1740_probe (struct device *dev)
 	shpnt = scsi_host_alloc(&aha1740_template,
 			      sizeof(struct aha1740_hostdata));
 	if(shpnt == NULL)
-		goto err_release;
+		goto err_release_region;
 
 	shpnt->base = 0;
 	shpnt->io_port = slotbase;
@@ -625,21 +625,26 @@ static int aha1740_probe (struct device *dev)
 	if (!host->ecb_dma_addr) {
 		printk (KERN_ERR "aha1740_probe: Couldn't map ECB, giving up\n");
 		scsi_unregister (shpnt);
-		goto err_release;
+		goto err_host_put;
 	}
 	
 	DEB(printk("aha1740_probe: enable interrupt channel %d\n",irq_level));
 	if (request_irq(irq_level,aha1740_intr_handle,0,"aha1740",shpnt)) {
 		printk(KERN_ERR "aha1740_probe: Unable to allocate IRQ %d.\n",
 		       irq_level);
-		goto err_release;
+		goto err_unmap;
 	}
 
 	eisa_set_drvdata (edev, shpnt);
 	scsi_add_host (shpnt, dev);
 	return 0;
 
- err_release:
+ err_unmap:
+	dma_unmap_single (&edev->dev, host->ecb_dma_addr,
+			  sizeof (host->ecb), DMA_BIDIRECTIONAL);
+ err_host_put:
+	scsi_host_put (shpnt);
+ err_release_region:
 	release_region(slotbase, SLOTSIZE);
 
 	return -ENODEV;
