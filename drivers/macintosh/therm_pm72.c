@@ -317,6 +317,20 @@ static int fan_write_reg(int reg, const unsigned char *ptr, int nb)
 	return nw;
 }
 
+static int start_fcu(void)
+{
+	unsigned char buf = 0xff;
+	int rc;
+
+	rc = fan_write_reg(0xe, &buf, 1);
+	if (rc < 0)
+		return -EIO;
+	rc = fan_write_reg(0x2e, &buf, 1);
+	if (rc < 0)
+		return -EIO;
+	return 0;
+}
+
 static int set_rpm_fan(int fan, int rpm)
 {
 	unsigned char buf[2];
@@ -1011,6 +1025,12 @@ static int main_control_loop(void *x)
 
 	down(&driver_lock);
 
+	if (start_fcu() < 0) {
+		printk(KERN_ERR "kfand: failed to start FCU\n");
+		up(&driver_lock);
+		goto out;
+	}
+
 	/* Set the PCI fan once for now */
 	set_pwm_fan(SLOTS_FAN_PWM_ID, SLOTS_FAN_DEFAULT_PWM);
 
@@ -1057,6 +1077,7 @@ static int main_control_loop(void *x)
 			schedule_timeout(HZ - elapsed);
 	}
 
+ out:
 	DBG("main_control_loop ended\n");
 
 	ctrl_task = 0;
