@@ -985,8 +985,8 @@ void accel_cursor(struct vc_data *vc, struct fb_info *info, struct fb_cursor *cu
 
 	size = ((width + 7) >> 3) * height;
 
-	data = kmalloc(size, GFP_KERNEL);
-	mask = kmalloc(size, GFP_KERNEL);
+	data = kmalloc(size, GFP_ATOMIC);
+	mask = kmalloc(size, GFP_ATOMIC);
 	
 	if (cursor->set & FB_CUR_SETSIZE) {
 		memset(data, 0xff, size);

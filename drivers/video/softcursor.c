@@ -43,7 +43,7 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	if (cursor->set & FB_CUR_SETSHAPE) {
 		if (info->cursor.mask)
 			kfree(info->cursor.mask);
-		info->cursor.mask = kmalloc(dsize, GFP_KERNEL);
+		info->cursor.mask = kmalloc(dsize, GFP_ATOMIC);
 		if (cursor->mask)
 			memcpy(info->cursor.mask, cursor->mask, dsize);
 		else
