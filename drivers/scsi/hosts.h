@@ -168,40 +168,6 @@ typedef struct	SHT
      int (*eh_host_reset_handler)(Scsi_Cmnd *);
 
     /*
-     * Since the mid level driver handles time outs, etc, we want to
-     * be able to abort the current command.  Abort returns 0 if the
-     * abortion was successful.	 The field SCpnt->abort reason
-     * can be filled in with the appropriate reason why we wanted
-     * the abort in the first place, and this will be used
-     * in the mid-level code instead of the host_byte().
-     * If non-zero, the code passed to it
-     * will be used as the return code, otherwise
-     * DID_ABORT  should be returned.
-     *
-     * Note that the scsi driver should "clean up" after itself,
-     * resetting the bus, etc.	if necessary.
-     *
-     * NOTE - this interface is depreciated, and will go away.  Use
-     * the eh_ routines instead.
-     */
-    int (* abort)(Scsi_Cmnd *);
-
-    /*
-     * The reset function will reset the SCSI bus.  Any executing
-     * commands should fail with a DID_RESET in the host byte.
-     * The Scsi_Cmnd  is passed so that the reset routine can figure
-     * out which host adapter should be reset, and also which command
-     * within the command block was responsible for the reset in
-     * the first place.	 Some hosts do not implement a reset function,
-     * and these hosts must call scsi_request_sense(SCpnt) to keep
-     * the command alive.
-     *
-     * NOTE - this interface is depreciated, and will go away.  Use
-     * the eh_ routines instead.
-     */
-    int (* reset)(Scsi_Cmnd *, unsigned int);
-
-    /*
      * Once the device has responded to an INQUIRY and we know the device
      * is online, call into the low level driver with the Scsi_Device *
      * (so that the low level driver may save it off in a safe location
