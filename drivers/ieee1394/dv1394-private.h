@@ -412,6 +412,10 @@ static inline dma_addr_t dma_offset_to_bus(struct dma_region *dma, unsigned long
 /* struct video_card contains all data associated with one instance
    of the dv1394 driver 
 */
+enum modes {
+	MODE_RECEIVE,
+	MODE_TRANSMIT
+};
 
 struct video_card {
 
@@ -574,6 +578,7 @@ struct video_card {
 	
 	unsigned int current_packet;
 	int first_frame; 	/* received first start frame marker? */
+	enum modes mode;
 };
 
 /* 

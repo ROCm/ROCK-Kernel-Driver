@@ -73,6 +73,7 @@ out:
 
 int do_truncate(struct dentry *dentry, loff_t length)
 {
+	int err;
 	struct iattr newattrs;
 
 	/* Not pretty: "inode->i_size" shouldn't really be signed. But it is. */
@@ -81,7 +82,10 @@ int do_truncate(struct dentry *dentry, loff_t length)
 
 	newattrs.ia_size = length;
 	newattrs.ia_valid = ATTR_SIZE | ATTR_CTIME;
-	return notify_change(dentry, &newattrs);
+	down(&dentry->d_inode->i_sem);
+	err = notify_change(dentry, &newattrs);
+	up(&dentry->d_inode->i_sem);
+	return err;
 }
 
 static inline long do_sys_truncate(const char * path, loff_t length)
@@ -255,7 +259,9 @@ asmlinkage long sys_utime(char * filename, struct utimbuf * times)
 		    (error = permission(inode,MAY_WRITE)) != 0)
 			goto dput_and_out;
 	}
+	down(&inode->i_sem);
 	error = notify_change(nd.dentry, &newattrs);
+	up(&inode->i_sem);
 dput_and_out:
 	path_release(&nd);
 out:
@@ -299,7 +305,9 @@ asmlinkage long sys_utimes(char * filename, struct timeval * utimes)
 		if ((error = permission(inode,MAY_WRITE)) != 0)
 			goto dput_and_out;
 	}
+	down(&inode->i_sem);
 	error = notify_change(nd.dentry, &newattrs);
+	up(&inode->i_sem);
 dput_and_out:
 	path_release(&nd);
 out:
@@ -449,11 +457,13 @@ asmlinkage long sys_fchmod(unsigned int fd, mode_t mode)
 	err = -EPERM;
 	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
 		goto out_putf;
+	down(&inode->i_sem);
 	if (mode == (mode_t) -1)
 		mode = inode->i_mode;
 	newattrs.ia_mode = (mode & S_IALLUGO) | (inode->i_mode & ~S_IALLUGO);
 	newattrs.ia_valid = ATTR_MODE | ATTR_CTIME;
 	err = notify_change(dentry, &newattrs);
+	up(&inode->i_sem);
 
 out_putf:
 	fput(file);
@@ -481,11 +491,13 @@ asmlinkage long sys_chmod(const char * filename, mode_t mode)
 	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
 		goto dput_and_out;
 
+	down(&inode->i_sem);
 	if (mode == (mode_t) -1)
 		mode = inode->i_mode;
 	newattrs.ia_mode = (mode & S_IALLUGO) | (inode->i_mode & ~S_IALLUGO);
 	newattrs.ia_valid = ATTR_MODE | ATTR_CTIME;
 	error = notify_change(nd.dentry, &newattrs);
+	up(&inode->i_sem);
 
 dput_and_out:
 	path_release(&nd);
@@ -510,45 +522,20 @@ static int chown_common(struct dentry * dentry, uid_t user, gid_t group)
 	error = -EPERM;
 	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
 		goto out;
-	if (user == (uid_t) -1)
-		user = inode->i_uid;
-	if (group == (gid_t) -1)
-		group = inode->i_gid;
-	newattrs.ia_mode = inode->i_mode;
-	newattrs.ia_uid = user;
-	newattrs.ia_gid = group;
-	newattrs.ia_valid =  ATTR_UID | ATTR_GID | ATTR_CTIME;
-	/*
-	 * If the user or group of a non-directory has been changed by a
-	 * non-root user, remove the setuid bit.
-	 * 19981026	David C Niemi <niemi@tux.org>
-	 *
-	 * Changed this to apply to all users, including root, to avoid
-	 * some races. This is the behavior we had in 2.0. The check for
-	 * non-root was definitely wrong for 2.2 anyway, as it should
-	 * have been using CAP_FSETID rather than fsuid -- 19990830 SD.
-	 */
-	if ((inode->i_mode & S_ISUID) == S_ISUID &&
-		!S_ISDIR(inode->i_mode))
-	{
-		newattrs.ia_mode &= ~S_ISUID;
-		newattrs.ia_valid |= ATTR_MODE;
+	newattrs.ia_valid =  ATTR_CTIME;
+	if (user != (uid_t) -1) {
+		newattrs.ia_valid =  ATTR_UID;
+		newattrs.ia_uid = user;
 	}
-	/*
-	 * Likewise, if the user or group of a non-directory has been changed
-	 * by a non-root user, remove the setgid bit UNLESS there is no group
-	 * execute bit (this would be a file marked for mandatory locking).
-	 * 19981026	David C Niemi <niemi@tux.org>
-	 *
-	 * Removed the fsuid check (see the comment above) -- 19990830 SD.
-	 */
-	if (((inode->i_mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) 
-		&& !S_ISDIR(inode->i_mode))
-	{
-		newattrs.ia_mode &= ~S_ISGID;
-		newattrs.ia_valid |= ATTR_MODE;
+	if (group != (gid_t) -1) {
+		newattrs.ia_valid =  ATTR_GID;
+		newattrs.ia_gid = group;
 	}
+	if (!S_ISDIR(inode->i_mode))
+		newattrs.ia_valid |= ATTR_KILL_SUID|ATTR_KILL_SGID;
+	down(&inode->i_sem);
 	error = notify_change(dentry, &newattrs);
+	up(&inode->i_sem);
 out:
 	return error;
 }

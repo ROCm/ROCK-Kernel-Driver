@@ -63,14 +63,16 @@ int hpsb_packet_success(struct hpsb_packet *packet);
  * The generic read, write and lock functions.  All recognize the local node ID
  * and act accordingly.  Read and write automatically use quadlet commands if
  * length == 4 and and block commands otherwise (however, they do not yet
- * support lengths that are not a multiple of 4).
+ * support lengths that are not a multiple of 4).  You must explicitly specifiy
+ * the generation for which the node ID is valid, to avoid sending packets to
+ * the wrong nodes when we race with a bus reset.
  */
-int hpsb_read(struct hpsb_host *host, nodeid_t node, u64 addr,
-              quadlet_t *buffer, size_t length);
-int hpsb_write(struct hpsb_host *host, nodeid_t node, u64 addr,
-               quadlet_t *buffer, size_t length);
-int hpsb_lock(struct hpsb_host *host, nodeid_t node, u64 addr, int extcode,
-              quadlet_t *data, quadlet_t arg);
+int hpsb_read(struct hpsb_host *host, nodeid_t node, unsigned int generation,
+	      u64 addr, quadlet_t *buffer, size_t length);
+int hpsb_write(struct hpsb_host *host, nodeid_t node, unsigned int generation,
+	       u64 addr, quadlet_t *buffer, size_t length);
+int hpsb_lock(struct hpsb_host *host, nodeid_t node, unsigned int generation,
+	      u64 addr, int extcode, quadlet_t *data, quadlet_t arg);
 
 /* Generic packet creation. Used by hpsb_write. Also useful for protocol
  * drivers that want to implement their own hpsb_write replacement.  */

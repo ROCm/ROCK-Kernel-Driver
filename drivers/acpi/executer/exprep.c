@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exprep - ACPI AML (p-code) execution - field prep utilities
- *              $Revision: 114 $
+ *              $Revision: 115 $
  *
  *****************************************************************************/
 
@@ -204,61 +204,77 @@ acpi_ex_prep_common_field_object (
 	 * two pieces of information - the width of each field access and the
 	 * necessary Byte_alignment (address granularity) of the access.
 	 *
-	 * For Any_acc, the Access_bit_width is the largest width that is both necessary
-	 * and possible in an attempt to access the whole field in one
-	 * I/O operation.  However, for Any_acc, the Byte_alignment is always one byte.
+	 * For Any_acc, the Access_bit_width is the largest width that is both
+	 * necessary and possible in an attempt to access the whole field in one
+	 * I/O operation.  However, for Any_acc, the Byte_alignment is always one
+	 * byte.
 	 *
 	 * For all Buffer Fields, the Byte_alignment is always one byte.
 	 *
-	 * For all other access types (Byte, Word, Dword, Qword), the Bitwidth is the
-	 * same (equivalent) as the Byte_alignment.
+	 * For all other access types (Byte, Word, Dword, Qword), the Bitwidth is
+	 * the same (equivalent) as the Byte_alignment.
 	 */
-	access_bit_width = acpi_ex_decode_field_access (obj_desc, field_flags, &byte_alignment);
+	access_bit_width = acpi_ex_decode_field_access (obj_desc, field_flags,
+			  &byte_alignment);
 	if (!access_bit_width) {
 		return_ACPI_STATUS (AE_AML_OPERAND_VALUE);
 	}
 
 	/* Setup width (access granularity) fields */
 
-	obj_desc->common_field.access_byte_width = (u8) ACPI_DIV_8 (access_bit_width); /* 1, 2, 4,  8 */
+	obj_desc->common_field.access_byte_width = (u8)
+			ACPI_DIV_8 (access_bit_width); /* 1, 2, 4,  8 */
 
 	/*
-	 * Base_byte_offset is the address of the start of the field within the region. It is
-	 * the byte address of the first *datum* (field-width data unit) of the field.
-	 * (i.e., the first datum that contains at least the first *bit* of the field.)
-	 * Note: Byte_alignment is always either equal to the Access_bit_width or 8 (Byte access),
-	 * and it defines the addressing granularity of the parent region or buffer.
+	 * Base_byte_offset is the address of the start of the field within the
+	 * region.  It is the byte address of the first *datum* (field-width data
+	 * unit) of the field. (i.e., the first datum that contains at least the
+	 * first *bit* of the field.)
+	 *
+	 * Note: Byte_alignment is always either equal to the Access_bit_width or 8
+	 * (Byte access), and it defines the addressing granularity of the parent
+	 * region or buffer.
 	 */
-	nearest_byte_address                     = ACPI_ROUND_BITS_DOWN_TO_BYTES (field_bit_position);
-	obj_desc->common_field.base_byte_offset  = ACPI_ROUND_DOWN (nearest_byte_address, byte_alignment);
+	nearest_byte_address =
+			ACPI_ROUND_BITS_DOWN_TO_BYTES (field_bit_position);
+	obj_desc->common_field.base_byte_offset =
+			ACPI_ROUND_DOWN (nearest_byte_address, byte_alignment);
 
 	/*
-	 * Start_field_bit_offset is the offset of the first bit of the field within a field datum.
+	 * Start_field_bit_offset is the offset of the first bit of the field within
+	 * a field datum.
 	 */
-	obj_desc->common_field.start_field_bit_offset = (u8) (field_bit_position -
-			  ACPI_MUL_8 (obj_desc->common_field.base_byte_offset));
+	obj_desc->common_field.start_field_bit_offset = (u8)
+		(field_bit_position - ACPI_MUL_8 (obj_desc->common_field.base_byte_offset));
 
 	/*
 	 * Valid bits -- the number of bits that compose a partial datum,
-	 * 1) At the end of the field within the region (arbitrary starting bit offset)
-	 * 2) At the end of a buffer used to contain the field (starting offset always zero)
+	 * 1) At the end of the field within the region (arbitrary starting bit
+	 *    offset)
+	 * 2) At the end of a buffer used to contain the field (starting offset
+	 *    always zero)
 	 */
-	obj_desc->common_field.end_field_valid_bits = (u8) ((obj_desc->common_field.start_field_bit_offset + field_bit_length) %
-			   access_bit_width);
-	obj_desc->common_field.end_buffer_valid_bits = (u8) (field_bit_length % access_bit_width); /* Start_buffer_bit_offset always = 0 */
+	obj_desc->common_field.end_field_valid_bits = (u8)
+		((obj_desc->common_field.start_field_bit_offset + field_bit_length) %
+				  access_bit_width);
+	/* Start_buffer_bit_offset always = 0 */
+
+	obj_desc->common_field.end_buffer_valid_bits = (u8)
+		(field_bit_length % access_bit_width);
 
 	/*
-	 * Datum_valid_bits is the number of valid field bits in the first field datum.
+	 * Datum_valid_bits is the number of valid field bits in the first
+	 * field datum.
 	 */
-	obj_desc->common_field.datum_valid_bits  = (u8) (access_bit_width -
-			  obj_desc->common_field.start_field_bit_offset);
+	obj_desc->common_field.datum_valid_bits  = (u8)
+		(access_bit_width - obj_desc->common_field.start_field_bit_offset);
 
 	/*
 	 * Does the entire field fit within a single field access element? (datum)
 	 * (i.e., without crossing a datum boundary)
 	 */
 	if ((obj_desc->common_field.start_field_bit_offset + field_bit_length) <=
-		(u16) access_bit_width) {
+			(u16) access_bit_width) {
 		obj_desc->common.flags |= AOPOBJ_SINGLE_DATUM;
 	}
 
@@ -341,7 +357,7 @@ acpi_ex_prep_field_value (
 
 		acpi_ut_add_reference (obj_desc->field.region_obj);
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 			"Region_field: Bitoff=%X Off=%X Gran=%X Region %p\n",
 			obj_desc->field.start_field_bit_offset, obj_desc->field.base_byte_offset,
 			obj_desc->field.access_byte_width, obj_desc->field.region_obj));
@@ -359,9 +375,12 @@ acpi_ex_prep_field_value (
 		acpi_ut_add_reference (obj_desc->bank_field.region_obj);
 		acpi_ut_add_reference (obj_desc->bank_field.bank_obj);
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Bank Field: Bit_off=%X Off=%X Gran=%X Region %p Bank_reg %p\n",
-			obj_desc->bank_field.start_field_bit_offset, obj_desc->bank_field.base_byte_offset,
-			obj_desc->field.access_byte_width, obj_desc->bank_field.region_obj,
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
+			"Bank Field: Bit_off=%X Off=%X Gran=%X Region %p Bank_reg %p\n",
+			obj_desc->bank_field.start_field_bit_offset,
+			obj_desc->bank_field.base_byte_offset,
+			obj_desc->field.access_byte_width,
+			obj_desc->bank_field.region_obj,
 			obj_desc->bank_field.bank_obj));
 		break;
 
@@ -370,8 +389,8 @@ acpi_ex_prep_field_value (
 
 		obj_desc->index_field.index_obj = acpi_ns_get_attached_object (info->register_node);
 		obj_desc->index_field.data_obj = acpi_ns_get_attached_object (info->data_register_node);
-		obj_desc->index_field.value  = (u32) (info->field_bit_position /
-				  ACPI_MUL_8 (obj_desc->field.access_byte_width));
+		obj_desc->index_field.value  = (u32)
+			(info->field_bit_position / ACPI_MUL_8 (obj_desc->field.access_byte_width));
 
 		if (!obj_desc->index_field.data_obj || !obj_desc->index_field.index_obj) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Index Object\n"));
@@ -383,9 +402,12 @@ acpi_ex_prep_field_value (
 		acpi_ut_add_reference (obj_desc->index_field.data_obj);
 		acpi_ut_add_reference (obj_desc->index_field.index_obj);
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Index_field: bitoff=%X off=%X gran=%X Index %p Data %p\n",
-			obj_desc->index_field.start_field_bit_offset, obj_desc->index_field.base_byte_offset,
-			obj_desc->field.access_byte_width, obj_desc->index_field.index_obj,
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
+			"Index_field: bitoff=%X off=%X gran=%X Index %p Data %p\n",
+			obj_desc->index_field.start_field_bit_offset,
+			obj_desc->index_field.base_byte_offset,
+			obj_desc->field.access_byte_width,
+			obj_desc->index_field.index_obj,
 			obj_desc->index_field.data_obj));
 		break;
 	}
@@ -397,7 +419,7 @@ acpi_ex_prep_field_value (
 	status = acpi_ns_attach_object (info->field_node, obj_desc,
 			  acpi_ns_get_type (info->field_node));
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "set Named_obj %p (%4.4s) val = %p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "set Named_obj %p (%4.4s) val = %p\n",
 			info->field_node, (char *) &(info->field_node->name), obj_desc));
 
 	/* Remove local reference to the object */

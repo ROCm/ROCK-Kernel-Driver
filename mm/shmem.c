@@ -802,7 +802,7 @@ shmem_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 
 	status	= 0;
 	if (count) {
-		remove_suid(inode);
+		remove_suid(file->f_dentry);
 		inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 	}
 

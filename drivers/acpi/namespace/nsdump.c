@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 127 $
+ *              $Revision: 129 $
  *
  *****************************************************************************/
 
@@ -53,7 +53,7 @@ acpi_ns_print_pathname (
 	u32                     num_segments,
 	char                    *pathname)
 {
-	ACPI_FUNCTION_NAME ("Acpi_ns_print_pathname");
+	ACPI_FUNCTION_NAME ("Ns_print_pathname");
 
 
 	if (!(acpi_dbg_level & ACPI_LV_NAMES) || !(acpi_dbg_layer & ACPI_NAMESPACE)) {
@@ -228,7 +228,7 @@ acpi_ns_dump_one_object (
 		type = INTERNAL_TYPE_DEF_ANY;  /* prints as *ERROR* */
 	}
 
-	if (!acpi_ut_valid_acpi_name (this_node->name)) {
+	if (!acpi_ut_valid_acpi_name (this_node->name.integer)) {
 		ACPI_REPORT_WARNING (("Invalid ACPI Name %08X\n", this_node->name));
 	}
 
@@ -255,59 +255,87 @@ acpi_ns_dump_one_object (
 
 		switch (type) {
 		case ACPI_TYPE_PROCESSOR:
+
 			acpi_os_printf (" ID %d Addr %.4X Len %.4X\n",
 					 obj_desc->processor.proc_id,
 					 obj_desc->processor.address,
 					 obj_desc->processor.length);
 			break;
 
+
 		case ACPI_TYPE_DEVICE:
+
 			acpi_os_printf (" Notification object: %p", obj_desc);
 			break;
 
+
 		case ACPI_TYPE_METHOD:
+
 			acpi_os_printf (" Args %d Len %.4X Aml %p \n",
 					 obj_desc->method.param_count,
 					 obj_desc->method.aml_length,
 					 obj_desc->method.aml_start);
 			break;
 
+
 		case ACPI_TYPE_INTEGER:
+
 			acpi_os_printf (" = %8.8X%8.8X\n",
 					 ACPI_HIDWORD (obj_desc->integer.value),
 					 ACPI_LODWORD (obj_desc->integer.value));
 			break;
 
+
 		case ACPI_TYPE_PACKAGE:
-			acpi_os_printf (" Elements %.2X\n",
-					 obj_desc->package.count);
+
+			if (obj_desc->common.flags & AOPOBJ_DATA_VALID) {
+				acpi_os_printf (" Elements %.2X\n",
+						 obj_desc->package.count);
+			}
+			else {
+				acpi_os_printf (" [Length not yet evaluated]\n");
+			}
 			break;
 
+
 		case ACPI_TYPE_BUFFER:
-			acpi_os_printf (" Len %.2X",
-					 obj_desc->buffer.length);
 
-			/* Dump some of the buffer */
+			if (obj_desc->common.flags & AOPOBJ_DATA_VALID) {
+				acpi_os_printf (" Len %.2X",
+						 obj_desc->buffer.length);
 
-			if (obj_desc->buffer.length > 0) {
-				acpi_os_printf (" =");
-				for (i = 0; (i < obj_desc->buffer.length && i < 12); i++) {
-					acpi_os_printf (" %.2X", obj_desc->buffer.pointer[i]);
+				/* Dump some of the buffer */
+
+				if (obj_desc->buffer.length > 0) {
+					acpi_os_printf (" =");
+					for (i = 0; (i < obj_desc->buffer.length && i < 12); i++) {
+						acpi_os_printf (" %.2X", obj_desc->buffer.pointer[i]);
+					}
+				}
+				acpi_os_printf ("\n");
+			}
+			else {
+				acpi_os_printf (" [Length not yet evaluated]\n");
+			}
+			break;
+
+
+		case ACPI_TYPE_STRING:
+
+			acpi_os_printf (" Len %.2X", obj_desc->string.length);
+
+			if (obj_desc->string.length > 0) {
+				acpi_os_printf (" = \"%.32s\"", obj_desc->string.pointer);
+				if (obj_desc->string.length > 32) {
+					acpi_os_printf ("...");
 				}
 			}
 			acpi_os_printf ("\n");
 			break;
 
-		case ACPI_TYPE_STRING:
-			acpi_os_printf (" Len %.2X", obj_desc->string.length);
-
-			if (obj_desc->string.length > 0) {
-				 acpi_os_printf (" = \"%.32s\"...", obj_desc->string.pointer);
-			}
-			acpi_os_printf ("\n");
-			break;
 
 		case ACPI_TYPE_REGION:
+
 			acpi_os_printf (" [%s]", acpi_ut_get_region_name (obj_desc->region.space_id));
 			if (obj_desc->region.flags & AOPOBJ_DATA_VALID) {
 				acpi_os_printf (" Addr %8.8X%8.8X Len %.4X\n",
@@ -316,16 +344,20 @@ acpi_ns_dump_one_object (
 						 obj_desc->region.length);
 			}
 			else {
-				acpi_os_printf (" [Address/Length not evaluated]\n");
+				acpi_os_printf (" [Address/Length not yet evaluated]\n");
 			}
 			break;
 
+
 		case INTERNAL_TYPE_REFERENCE:
+
 			acpi_os_printf (" [%s]\n",
 					acpi_ps_get_opcode_name (obj_desc->reference.opcode));
 			break;
 
+
 		case ACPI_TYPE_BUFFER_FIELD:
+
 			if (obj_desc->buffer_field.buffer_obj &&
 				obj_desc->buffer_field.buffer_obj->buffer.node) {
 				acpi_os_printf (" Buf [%4.4s]",
@@ -333,24 +365,32 @@ acpi_ns_dump_one_object (
 			}
 			break;
 
+
 		case INTERNAL_TYPE_REGION_FIELD:
+
 			acpi_os_printf (" Rgn [%4.4s]",
 					(char *) &obj_desc->common_field.region_obj->region.node->name);
 			break;
 
+
 		case INTERNAL_TYPE_BANK_FIELD:
+
 			acpi_os_printf (" Rgn [%4.4s] Bnk [%4.4s]",
 					(char *) &obj_desc->common_field.region_obj->region.node->name,
 					(char *) &obj_desc->bank_field.bank_obj->common_field.node->name);
 			break;
 
+
 		case INTERNAL_TYPE_INDEX_FIELD:
+
 			acpi_os_printf (" Idx [%4.4s] Dat [%4.4s]",
 					(char *) &obj_desc->index_field.index_obj->common_field.node->name,
 					(char *) &obj_desc->index_field.data_obj->common_field.node->name);
 			break;
 
+
 		default:
+
 			acpi_os_printf (" Object %p\n", obj_desc);
 			break;
 		}

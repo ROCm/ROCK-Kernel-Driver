@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbxfroot - Find the root ACPI table (RSDT)
- *              $Revision: 58 $
+ *              $Revision: 61 $
  *
  *****************************************************************************/
 
@@ -118,7 +118,8 @@ acpi_get_firmware_table (
 	u32                     flags,
 	acpi_table_header       **table_pointer)
 {
-	ACPI_PHYSICAL_ADDRESS   physical_address;
+	ACPI_POINTER            rsdp_address;
+	ACPI_POINTER            address;
 	acpi_table_header       *rsdt_ptr = NULL;
 	acpi_table_header       *table_ptr;
 	acpi_status             status;
@@ -149,7 +150,7 @@ acpi_get_firmware_table (
 	if (!acpi_gbl_RSDP) {
 		/* Get the RSDP */
 
-		status = acpi_os_get_root_pointer (flags, &physical_address);
+		status = acpi_os_get_root_pointer (flags, &rsdp_address);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "RSDP  not found\n"));
 			return_ACPI_STATUS (AE_NO_ACPI_TABLES);
@@ -158,14 +159,14 @@ acpi_get_firmware_table (
 		/* Map and validate the RSDP */
 
 		if ((flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING) {
-			status = acpi_os_map_memory (physical_address, sizeof (RSDP_DESCRIPTOR),
+			status = acpi_os_map_memory (rsdp_address.pointer.physical, sizeof (RSDP_DESCRIPTOR),
 					  (void **) &acpi_gbl_RSDP);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
 			}
 		}
 		else {
-			acpi_gbl_RSDP = ACPI_PHYSADDR_TO_PTR (physical_address);
+			acpi_gbl_RSDP = rsdp_address.pointer.logical;
 		}
 
 		/*
@@ -194,8 +195,9 @@ acpi_get_firmware_table (
 
 	/* Get the RSDT and validate it */
 
-	physical_address = acpi_tb_get_rsdt_address ();
-	status = acpi_tb_get_table_pointer (physical_address, flags, &rsdt_size, &rsdt_ptr);
+	acpi_tb_get_rsdt_address (&address);
+
+	status = acpi_tb_get_table_pointer (&address, flags, &rsdt_size, &rsdt_ptr);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -217,18 +219,18 @@ acpi_get_firmware_table (
 	for (i = 0, j = 0; i < table_count; i++) {
 		/* Get the next table pointer */
 
+		address.pointer_type = acpi_gbl_table_flags;
 		if (acpi_gbl_RSDP->revision < 2) {
-			physical_address = (ACPI_PHYSICAL_ADDRESS)
-				((RSDT_DESCRIPTOR *) rsdt_ptr)->table_offset_entry[i];
+			address.pointer.value = ((RSDT_DESCRIPTOR *) rsdt_ptr)->table_offset_entry[i];
 		}
 		else {
-			physical_address = (ACPI_PHYSICAL_ADDRESS)
-				ACPI_GET_ADDRESS (((xsdt_descriptor *) rsdt_ptr)->table_offset_entry[i]);
+			address.pointer.value = ACPI_GET_ADDRESS (
+				((xsdt_descriptor *) rsdt_ptr)->table_offset_entry[i]);
 		}
 
 		/* Get addressibility if necessary */
 
-		status = acpi_tb_get_table_pointer (physical_address, flags, &table_size, &table_ptr);
+		status = acpi_tb_get_table_pointer (&address, flags, &table_size, &table_ptr);
 		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}
@@ -276,8 +278,8 @@ cleanup:
  *
  * FUNCTION:    Acpi_find_root_pointer
  *
- * PARAMETERS:  **Rsdp_physical_address     - Where to place the RSDP address
- *              Flags                       - Logical/Physical addressing
+ * PARAMETERS:  **Rsdp_address          - Where to place the RSDP address
+ *              Flags                   - Logical/Physical addressing
  *
  * RETURN:      Status, Physical address of the RSDP
  *
@@ -288,7 +290,7 @@ cleanup:
 acpi_status
 acpi_find_root_pointer (
 	u32                     flags,
-	ACPI_PHYSICAL_ADDRESS   *rsdp_physical_address)
+	ACPI_POINTER            *rsdp_address)
 {
 	acpi_table_desc         table_info;
 	acpi_status             status;
@@ -305,7 +307,8 @@ acpi_find_root_pointer (
 		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
-	*rsdp_physical_address = table_info.physical_address;
+	rsdp_address->pointer_type = ACPI_PHYSICAL_POINTER;
+	rsdp_address->pointer.physical = table_info.physical_address;
 	return_ACPI_STATUS (AE_OK);
 }
 

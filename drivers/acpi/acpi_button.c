@@ -1,5 +1,5 @@
 /*
- *  acpi_button.c - ACPI Button Driver ($Revision: 22 $)
+ *  acpi_button.c - ACPI Button Driver ($Revision: 24 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -69,7 +69,7 @@ struct acpi_button {
 #include <linux/compatmac.h>
 #include <linux/proc_fs.h>
 
-struct proc_dir_entry		*acpi_button_dir = NULL;
+static struct proc_dir_entry	*acpi_button_dir = NULL;
 
 
 static int
@@ -81,7 +81,6 @@ acpi_button_read_info (
 	int 			*eof,
 	void			*data)
 {
-	int			result = 0;
 	struct acpi_button	*button = (struct acpi_button *) data;
 	char			*p = page;
 	int			len = 0;
@@ -111,8 +110,14 @@ acpi_button_add_fs (
 	struct acpi_device	*device)
 {
 	struct proc_dir_entry	*entry = NULL;
+	struct acpi_button	*button = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_button_add_fs");
+
+	if (!device || !acpi_driver_data(device))
+		return_VALUE(-EINVAL);
+
+	button = acpi_driver_data(device);
 
 	if (!acpi_button_dir) {
 		acpi_button_dir = proc_mkdir(ACPI_BUTTON_CLASS, acpi_root_dir);
@@ -120,12 +125,26 @@ acpi_button_add_fs (
 			return_VALUE(-ENODEV);
 	}
 
-	if (!acpi_device_dir(device)) {
-		acpi_device_dir(device) = proc_mkdir(acpi_device_bid(device),
+	switch (button->type) {
+	case ACPI_BUTTON_TYPE_POWER:
+	case ACPI_BUTTON_TYPE_POWERF:
+		entry = proc_mkdir(ACPI_BUTTON_SUBCLASS_POWER, 
 			acpi_button_dir);
-		if (!acpi_device_dir(device))
-			return_VALUE(-ENODEV);
+		break;
+	case ACPI_BUTTON_TYPE_SLEEP:
+	case ACPI_BUTTON_TYPE_SLEEPF:
+		entry = proc_mkdir(ACPI_BUTTON_SUBCLASS_SLEEP, 
+			acpi_button_dir);
+		break;
+	case ACPI_BUTTON_TYPE_LID:
+		entry = proc_mkdir(ACPI_BUTTON_SUBCLASS_LID, 
+			acpi_button_dir);
+		break;
 	}
+
+	acpi_device_dir(device) = proc_mkdir(acpi_device_bid(device), entry);
+	if (!acpi_device_dir(device))
+		return_VALUE(-ENODEV);
 
 	/* 'info' [R] */
 	entry = create_proc_entry(ACPI_BUTTON_FILE_INFO,
@@ -227,37 +246,46 @@ acpi_button_add (
 
 	button->device = device;
 	button->handle = device->handle;
-	sprintf(acpi_device_class(device), "%s", ACPI_BUTTON_CLASS);
 	acpi_driver_data(device) = button;
 
 	/*
 	 * Determine the button type (via hid), as fixed-feature buttons
 	 * need to be handled a bit differently than generic-space.
 	 */
-	if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_POWERF)) {
-		button->type = ACPI_BUTTON_TYPE_POWERF;
-		sprintf(acpi_device_name(device), "%s",
-			ACPI_BUTTON_DEVICE_NAME_POWERF);
-	}
-	else if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_SLEEPF)) {
-		button->type = ACPI_BUTTON_TYPE_SLEEPF;
-		sprintf(acpi_device_name(device), "%s",
-			ACPI_BUTTON_DEVICE_NAME_SLEEPF);
-	}
-	else if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_POWER)) {
+	if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_POWER)) {
 		button->type = ACPI_BUTTON_TYPE_POWER;
 		sprintf(acpi_device_name(device), "%s",
 			ACPI_BUTTON_DEVICE_NAME_POWER);
+		sprintf(acpi_device_class(device), "%s/%s", 
+			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_POWER);
+	}
+	else if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_POWERF)) {
+		button->type = ACPI_BUTTON_TYPE_POWERF;
+		sprintf(acpi_device_name(device), "%s",
+			ACPI_BUTTON_DEVICE_NAME_POWERF);
+		sprintf(acpi_device_class(device), "%s/%s", 
+			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_POWER);
 	}
 	else if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_SLEEP)) {
 		button->type = ACPI_BUTTON_TYPE_SLEEP;
 		sprintf(acpi_device_name(device), "%s",
 			ACPI_BUTTON_DEVICE_NAME_SLEEP);
+		sprintf(acpi_device_class(device), "%s/%s", 
+			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_SLEEP);
+	}
+	else if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_SLEEPF)) {
+		button->type = ACPI_BUTTON_TYPE_SLEEPF;
+		sprintf(acpi_device_name(device), "%s",
+			ACPI_BUTTON_DEVICE_NAME_SLEEPF);
+		sprintf(acpi_device_class(device), "%s/%s", 
+			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_SLEEP);
 	}
 	else if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_LID)) {
 		button->type = ACPI_BUTTON_TYPE_LID;
 		sprintf(acpi_device_name(device), "%s",
 			ACPI_BUTTON_DEVICE_NAME_LID);
+		sprintf(acpi_device_class(device), "%s/%s", 
+			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_LID);
 	}
 	else {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unsupported hid [%s]\n",

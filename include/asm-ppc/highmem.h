@@ -28,7 +28,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <asm/kmap_types.h>
-#include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 
 /* undef for production */
 #define HIGHMEM_DEBUG 1

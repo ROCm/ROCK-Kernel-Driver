@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evevent - Fixed and General Purpose Even handling and dispatch
- *              $Revision: 71 $
+ *              $Revision: 78 $
  *
  *****************************************************************************/
 
@@ -326,11 +326,14 @@ acpi_ev_gpe_initialize (void)
 	 *  FADT table contain zeros. The GPE0_LEN and GPE1_LEN do not need
 	 *  to be the same size."
 	 */
-	acpi_gbl_gpe_block_info[0].register_count = (u16) ACPI_DIV_2 (acpi_gbl_FADT->gpe0_blk_len);
-	acpi_gbl_gpe_block_info[1].register_count = (u16) ACPI_DIV_2 (acpi_gbl_FADT->gpe1_blk_len);
+	acpi_gbl_gpe_block_info[0].address_space_id = acpi_gbl_FADT->Xgpe0_blk.address_space_id;
+	acpi_gbl_gpe_block_info[1].address_space_id = acpi_gbl_FADT->Xgpe1_blk.address_space_id;
 
-	acpi_gbl_gpe_block_info[0].block_address = (u16) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe0_blk.address);
-	acpi_gbl_gpe_block_info[1].block_address = (u16) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe1_blk.address);
+	acpi_gbl_gpe_block_info[0].register_count = (u16) ACPI_DIV_16 (acpi_gbl_FADT->Xgpe0_blk.register_bit_width);
+	acpi_gbl_gpe_block_info[1].register_count = (u16) ACPI_DIV_16 (acpi_gbl_FADT->Xgpe1_blk.register_bit_width);
+
+	acpi_gbl_gpe_block_info[0].block_address = &acpi_gbl_FADT->Xgpe0_blk;
+	acpi_gbl_gpe_block_info[1].block_address = &acpi_gbl_FADT->Xgpe1_blk;
 
 	acpi_gbl_gpe_block_info[0].block_base_number = 0;
 	acpi_gbl_gpe_block_info[1].block_base_number = acpi_gbl_FADT->gpe1_base;
@@ -421,9 +424,20 @@ acpi_ev_gpe_initialize (void)
 			/* Init the Register info for this entire GPE register (8 GPEs) */
 
 			gpe_register_info->base_gpe_number = (u8) (acpi_gbl_gpe_block_info[gpe_block].block_base_number + (ACPI_MUL_8 (i)));
-			gpe_register_info->status_addr = (u16) (acpi_gbl_gpe_block_info[gpe_block].block_address + i);
-			gpe_register_info->enable_addr = (u16) (acpi_gbl_gpe_block_info[gpe_block].block_address + i +
-					  acpi_gbl_gpe_block_info[gpe_block].register_count);
+
+			ACPI_STORE_ADDRESS (gpe_register_info->status_address.address,
+					   (ACPI_GET_ADDRESS (acpi_gbl_gpe_block_info[gpe_block].block_address->address) + i));
+
+			ACPI_STORE_ADDRESS (gpe_register_info->enable_address.address,
+					   (ACPI_GET_ADDRESS (acpi_gbl_gpe_block_info[gpe_block].block_address->address) + i +
+							  acpi_gbl_gpe_block_info[gpe_block].register_count));
+
+			gpe_register_info->status_address.address_space_id = acpi_gbl_gpe_block_info[gpe_block].address_space_id;
+			gpe_register_info->enable_address.address_space_id = acpi_gbl_gpe_block_info[gpe_block].address_space_id;
+			gpe_register_info->status_address.register_bit_width = 8;
+			gpe_register_info->enable_address.register_bit_width = 8;
+			gpe_register_info->status_address.register_bit_offset = 8;
+			gpe_register_info->enable_address.register_bit_offset = 8;
 
 			/* Init the Index mapping info for each GPE number within this register */
 
@@ -440,18 +454,24 @@ acpi_ev_gpe_initialize (void)
 			 * are cleared by writing a '1', while enable registers are cleared
 			 * by writing a '0'.
 			 */
-			acpi_os_write_port (gpe_register_info->enable_addr, 0x00, 8);
-			acpi_os_write_port (gpe_register_info->status_addr, 0xFF, 8);
+
+			acpi_hw_low_level_write (8, 0x00, &gpe_register_info->enable_address, 0);
+			acpi_hw_low_level_write (8, 0xFF, &gpe_register_info->status_address, 0);
 
 			gpe_register++;
 		}
-	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "GPE registers: %X@%8.8X%8.8X (Blk0) %X@%8.8X%8.8X (Blk1)\n",
-		acpi_gbl_gpe_block_info[0].register_count,
-		ACPI_HIDWORD (acpi_gbl_FADT->Xgpe0_blk.address), ACPI_LODWORD (acpi_gbl_FADT->Xgpe0_blk.address),
-		acpi_gbl_gpe_block_info[1].register_count,
-		ACPI_HIDWORD (acpi_gbl_FADT->Xgpe1_blk.address), ACPI_LODWORD (acpi_gbl_FADT->Xgpe1_blk.address)));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "GPE Block%d: %X registers at %8.8X%8.8X\n",
+			gpe_block, acpi_gbl_gpe_block_info[0].register_count,
+			ACPI_HIDWORD (acpi_gbl_gpe_block_info[gpe_block].block_address->address),
+			ACPI_LODWORD (acpi_gbl_gpe_block_info[gpe_block].block_address->address)));
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "GPE Block%d Range GPE #%2.2X to GPE #%2.2X\n",
+			gpe_block,
+			acpi_gbl_gpe_block_info[gpe_block].block_base_number,
+			acpi_gbl_gpe_block_info[gpe_block].block_base_number +
+				((acpi_gbl_gpe_block_info[gpe_block].register_count * 8) -1)));
+	}
 
 	return_ACPI_STATUS (AE_OK);
 
@@ -645,17 +665,18 @@ acpi_ev_gpe_detect (void)
 	for (i = 0; i < acpi_gbl_gpe_register_count; i++) {
 		gpe_register_info = &acpi_gbl_gpe_register_info[i];
 
-		acpi_os_read_port (gpe_register_info->status_addr,
-				  &gpe_register_info->status, 8);
+		gpe_register_info->status = (u8) acpi_hw_low_level_read (8,
+				   &gpe_register_info->status_address, 0);
 
-		acpi_os_read_port (gpe_register_info->enable_addr,
-				  &gpe_register_info->enable, 8);
+		gpe_register_info->enable = (u8) acpi_hw_low_level_read (8,
+				   &gpe_register_info->enable_address, 0);
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INTERRUPTS,
-			"GPE block at %X - Enable %08X Status %08X\n",
-			gpe_register_info->enable_addr,
-			gpe_register_info->status,
-			gpe_register_info->enable));
+			"GPE block at %8.8X%8.8X - Enable %08X Status %08X\n",
+			ACPI_HIDWORD (gpe_register_info->enable_address.address),
+			ACPI_LODWORD (gpe_register_info->enable_address.address),
+			gpe_register_info->enable,
+			gpe_register_info->status));
 
 		/* First check if there is anything active at all in this register */
 
@@ -816,18 +837,18 @@ acpi_ev_gpe_dispatch (
 	}
 	else if (gpe_info->method_handle) {
 		/*
+		 * Disable GPE, so it doesn't keep firing before the method has a
+		 * chance to run.
+		 */
+		acpi_hw_disable_gpe (gpe_number);
+
+		/*
 		 * Execute the method associated with the GPE.
 		 */
 		if (ACPI_FAILURE (acpi_os_queue_for_execution (OSD_PRIORITY_GPE,
 				 acpi_ev_asynch_execute_gpe_method,
 				 ACPI_TO_POINTER (gpe_number)))) {
-			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to queue handler for GPE[%X], disabling event\n", gpe_number));
-
-			/*
-			 * Disable the GPE on error.  The GPE will remain disabled until the ACPI
-			 * Core Subsystem is restarted, or the handler is reinstalled.
-			 */
-			acpi_hw_disable_gpe (gpe_number);
+			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to queue handler for GPE[%X], event is disabled\n", gpe_number));
 		}
 	}
 	else {

@@ -195,9 +195,27 @@ struct sbp2_status_block {
  * Miscellaneous SBP2 related config rom defines
  */
 
-#define SBP2_STATUS_FIFO_ADDRESS				0xfffe00000000ULL     /* for write posting! */
+/* 
+ * The status fifo address definition below is used as a status base, with a chunk
+ * separately assigned for each sbp2 device detected. For example, 0xfffe00000000ULL 
+ * is used for the first sbp2 device detected, 0xfffe00000020ULL for the next sbp2 
+ * device, and so on.
+ *
+ * Note: We could use a single status fifo address for all sbp2 devices, and figure 
+ * out which sbp2 device the status belongs to by looking at the source node id of
+ * the status write... but, using separate addresses for each sbp2 device allows for
+ * better code and the ability to support multiple luns within a single 1394 node.
+ *
+ * Also note that we choose the address range below as it is a region specified for
+ * write posting, where the ohci controller will automatically send an ack_complete
+ * when the status is written by the sbp2 device... saving a split transaction.   =)
+ */ 
+#define SBP2_STATUS_FIFO_ADDRESS				0xfffe00000000ULL
 #define SBP2_STATUS_FIFO_ADDRESS_HI                             0xfffe
 #define SBP2_STATUS_FIFO_ADDRESS_LO                             0x0
+
+#define SBP2_STATUS_FIFO_ENTRY_TO_OFFSET(entry)			((entry) << 5)
+#define SBP2_STATUS_FIFO_OFFSET_TO_ENTRY(offset)		((offset) >> 5)
 
 #define SBP2_UNIT_DIRECTORY_OFFSET_KEY				0xd1
 #define SBP2_CSR_OFFSET_KEY					0x54
@@ -209,8 +227,8 @@ struct sbp2_status_block {
 #define SBP2_DEVICE_TYPE_AND_LUN_KEY				0x14
 #define SBP2_FIRMWARE_REVISION_KEY				0x3c
 
-#define SBP2_DEVICE_TYPE(q)			(((q) >> 16) & 0x1f)
-#define SBP2_DEVICE_LUN(q)			((q) & 0xffff)
+#define SBP2_DEVICE_TYPE(q)					(((q) >> 16) & 0x1f)
+#define SBP2_DEVICE_LUN(q)					((q) & 0xffff)
 
 #define SBP2_AGENT_STATE_OFFSET					0x00ULL
 #define SBP2_AGENT_RESET_OFFSET					0x04ULL
@@ -231,9 +249,13 @@ struct sbp2_status_block {
 #define SBP2_UNIT_SPEC_ID_ENTRY					0x0000609e
 #define SBP2_SW_VERSION_ENTRY					0x00010483
 
-
+/*
+ * Other misc defines
+ */
 #define SBP2_128KB_BROKEN_FIRMWARE				0xa0b800
 #define SBP2_BROKEN_FIRMWARE_MAX_TRANSFER			0x20000
+
+#define SBP2_DEVICE_TYPE_LUN_UNINITIALIZED			0xffffffff
 
 /*
  * Flags for SBP-2 functions
@@ -247,9 +269,10 @@ struct sbp2_status_block {
 #define SBP2_MAX_SG_ELEMENTS		SG_ALL
 #define SBP2_CLUSTERING			ENABLE_CLUSTERING
 #define SBP2_MAX_SG_ELEMENT_LENGTH	0xf000
-#define SBP2SCSI_MAX_SCSI_IDS		8
+#define SBP2SCSI_MAX_SCSI_IDS		16	/* Max sbp2 device instances supported */
 #define SBP2SCSI_MAX_OUTSTANDING_CMDS	8	/* Max total outstanding sbp2 commands allowed at a time! */
-#define SBP2SCSI_MAX_CMDS_PER_LUN	4 	/* Max outstanding sbp2 commands per device - tune as needed */
+#define SBP2SCSI_MAX_CMDS_PER_LUN	1 	/* Max outstanding sbp2 commands per device - tune as needed */
+#define SBP2_MAX_SECTORS		255	/* Max sectors supported */
 
 #ifndef TYPE_SDAD
 #define TYPE_SDAD			0x0e	/* simplified direct access device */
@@ -291,13 +314,8 @@ static unchar sbp2scsi_direction_table[0x100] = {
 	DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN
 };
 
-
-/*
- * Number of request packets available for actual sbp2 I/O requests (these are used
- * for sending command and agent reset packets).
- */
-#define SBP2_MAX_REQUEST_PACKETS	SBP2SCSI_MAX_OUTSTANDING_CMDS	/* Per host adapter instance */
-#define SBP2_MAX_COMMAND_ORBS		SBP2SCSI_MAX_CMDS_PER_LUN * 2	/* Per sbp2 device instance */
+#define SBP2_MAX_REQUEST_PACKETS	(sbp2_max_outstanding_cmds * 2)
+#define SBP2_MAX_COMMAND_ORBS		(sbp2_max_cmds_per_lun * 2)
 
 /*
  * Request packets structure (used for sending command and agent reset packets)
@@ -327,7 +345,6 @@ struct sbp2_command_info {
 	dma_addr_t command_orb_dma ____cacheline_aligned;
 	Scsi_Cmnd *Current_SCpnt;
 	void (*Current_done)(Scsi_Cmnd *);
-	unsigned int linked;
 
 	/* Also need s/g structure for each sbp2 command */
 	struct sbp2_unrestricted_page_table scatter_gather_element[SBP2_MAX_SG_ELEMENTS] ____cacheline_aligned;
@@ -434,7 +451,7 @@ struct sbp2scsi_host_info {
 	 * Here is the pool of request packets. All the hpsb packets (for 1394 bus transactions)
 	 * are allocated at init and simply re-initialized when needed.
 	 */
-	struct sbp2_request_packet request_packet[SBP2_MAX_REQUEST_PACKETS];
+	struct sbp2_request_packet *request_packet;
 
 	/*
 	 * SCSI ID instance data (one for each sbp2 device instance possible)
@@ -453,7 +470,7 @@ struct sbp2scsi_host_info {
 static int sbp2util_create_request_packet_pool(struct sbp2scsi_host_info *hi);
 static void sbp2util_remove_request_packet_pool(struct sbp2scsi_host_info *hi);
 static struct sbp2_request_packet *sbp2util_allocate_write_request_packet(struct sbp2scsi_host_info *hi,
-									  nodeid_t node, u64 addr,
+									  struct node_entry *ne, u64 addr,
 									  size_t data_size,
 									  quadlet_t data);
 static void sbp2util_free_request_packet(struct sbp2_request_packet *request_packet);
@@ -505,8 +522,6 @@ static int sbp2_link_orb_command(struct sbp2scsi_host_info *hi, struct scsi_id_i
 				 struct sbp2_command_info *command);
 static int sbp2_send_command(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id,
 			     Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *));
-static int sbp2_send_split_command(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id,
-				   Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *));
 static unsigned int sbp2_status_to_sense_data(unchar *sbp2_status, unchar *sense_data);
 static void sbp2_check_sbp2_command(unchar *cmd);
 static void sbp2_check_sbp2_response(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id, 

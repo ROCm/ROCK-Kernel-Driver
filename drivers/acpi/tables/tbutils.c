@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbutils - Table manipulation utilities
- *              $Revision: 49 $
+ *              $Revision: 51 $
  *
  *****************************************************************************/
 
@@ -71,7 +71,6 @@ acpi_tb_handle_to_object (
 		} while (list_head != &acpi_gbl_acpi_tables[i]);
 	}
 
-
 	ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Table_id=%X does not exist\n", table_id));
 	return (AE_BAD_PARAMETER);
 }
@@ -115,7 +114,6 @@ acpi_tb_validate_table_header (
 		return (AE_BAD_ADDRESS);
 	}
 
-
 	/* Ensure that the signature is 4 ASCII characters */
 
 	ACPI_MOVE_UNALIGNED32_TO_32 (&signature, &table_header->signature);
@@ -124,11 +122,10 @@ acpi_tb_validate_table_header (
 			"Table signature at %p [%p] has invalid characters\n",
 			table_header, &signature));
 
-		ACPI_REPORT_WARNING (("Invalid table signature %4.4s found\n", (char *) &signature));
+		ACPI_REPORT_WARNING (("Invalid table signature found: [%4.4s]\n", (char *) &signature));
 		ACPI_DUMP_BUFFER (table_header, sizeof (acpi_table_header));
 		return (AE_BAD_SIGNATURE);
 	}
-
 
 	/* Validate the table length */
 
@@ -208,10 +205,10 @@ acpi_tb_map_acpi_table (
 		}
 	}
 
-
 	/* Map the physical memory for the correct length */
 
-	status = acpi_os_map_memory (physical_address, table_size, (void **) &table);
+	status = acpi_os_map_memory (physical_address, table_size,
+			  (void **) &table);
 	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
@@ -222,7 +219,6 @@ acpi_tb_map_acpi_table (
 
 	*size = table_size;
 	*logical_address = table;
-
 	return (status);
 }
 
@@ -263,8 +259,6 @@ acpi_tb_verify_table_checksum (
 
 		status = AE_BAD_CHECKSUM;
 	}
-
-
 	return_ACPI_STATUS (status);
 }
 
@@ -301,7 +295,6 @@ acpi_tb_checksum (
 			sum = (u8) (sum + *rover);
 		}
 	}
-
 	return (sum);
 }
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsmethod - Parser/Interpreter interface - control method parsing
- *              $Revision: 79 $
+ *              $Revision: 81 $
  *
  *****************************************************************************/
 
@@ -77,7 +77,7 @@ acpi_ds_parse_method (
 		return_ACPI_STATUS (AE_NULL_ENTRY);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** Parsing [%4.4s] **** Named_obj=%p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** Parsing [%4.4s] **** Named_obj=%p\n",
 		(char *) &((acpi_namespace_node *) obj_handle)->name, obj_handle));
 
 	/* Extract the method object from the method Node */
@@ -111,7 +111,7 @@ acpi_ds_parse_method (
 
 	/* Init new op with the method name and pointer back to the Node */
 
-	acpi_ps_set_name (op, node->name);
+	acpi_ps_set_name (op, node->name.integer);
 	op->node = node;
 
 	/*
@@ -152,7 +152,7 @@ acpi_ds_parse_method (
 		return_ACPI_STATUS (status);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** [%4.4s] Parsed **** Named_obj=%p Op=%p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** [%4.4s] Parsed **** Named_obj=%p Op=%p\n",
 		(char *) &((acpi_namespace_node *) obj_handle)->name, obj_handle, op));
 
 	acpi_ps_delete_parse_tree (op);
@@ -413,7 +413,6 @@ acpi_ds_restart_control_method (
 		"Method=%p Return=%p Return_used?=%X Res_stack=%p State=%p\n",
 		walk_state->method_call_op, return_desc, walk_state->return_used,
 		walk_state->results, walk_state));
-
 
 	return_ACPI_STATUS (AE_OK);
 }

@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfname - Public interfaces to the ACPI subsystem
  *                         ACPI Namespace oriented interfaces
- *              $Revision: 89 $
+ *              $Revision: 90 $
  *
  *****************************************************************************/
 
@@ -243,8 +243,8 @@ acpi_get_object_info (
 		return (AE_BAD_PARAMETER);
 	}
 
-	info->type      = node->type;
-	info->name      = node->name;
+	info->type = node->type;
+	info->name = node->name.integer;
 
 	status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {

@@ -43,6 +43,16 @@ static struct hpsb_host_operations dummy_ops = {
         devctl:           dummy_devctl
 };
 
+/**
+ * hpsb_ref_host - increase reference count for host controller.
+ * @host: the host controller
+ *
+ * Increase the reference count for the specified host controller.
+ * When holding a reference to a host, the memory allocated for the
+ * host struct will not be freed and the host is guaranteed to be in a
+ * consistent state.  The driver may be unloaded or the controller may
+ * be removed (PCMCIA), but the host struct will remain valid.
+ */
 
 int hpsb_ref_host(struct hpsb_host *host)
 {
@@ -53,17 +63,25 @@ int hpsb_ref_host(struct hpsb_host *host)
         spin_lock_irqsave(&hosts_lock, flags);
         list_for_each(lh, &hosts) {
                 if (host == list_entry(lh, struct hpsb_host, host_list)) {
-                        if (host->ops->devctl(host, MODIFY_USAGE, 1)) {
-				host->refcount++;
-                                retval = 1;
-                }
+                        host->ops->devctl(host, MODIFY_USAGE, 1);
+			host->refcount++;
+                        retval = 1;
 			break;
-        }
+        	}
         }
         spin_unlock_irqrestore(&hosts_lock, flags);
 
         return retval;
 }
+
+/**
+ * hpsb_unref_host - decrease reference count for host controller.
+ * @host: the host controller
+ *
+ * Decrease the reference count for the specified host controller.
+ * When the reference count reaches zero, the memory allocated for the
+ * &hpsb_host will be freed.
+ */
 
 void hpsb_unref_host(struct hpsb_host *host)
 {
@@ -74,10 +92,31 @@ void hpsb_unref_host(struct hpsb_host *host)
         spin_lock_irqsave(&hosts_lock, flags);
         host->refcount--;
 
-        if (!host->refcount && !host->is_shutdown)
+        if (!host->refcount && host->is_shutdown)
                 kfree(host);
         spin_unlock_irqrestore(&hosts_lock, flags);
 }
+
+/**
+ * hpsb_alloc_host - allocate a new host controller.
+ * @drv: the driver that will manage the host controller
+ * @extra: number of extra bytes to allocate for the driver
+ *
+ * Allocate a &hpsb_host and initialize the general subsystem specific
+ * fields.  If the driver needs to store per host data, as drivers
+ * usually do, the amount of memory required can be specified by the
+ * @extra parameter.  Once allocated, the driver should initialize the
+ * driver specific parts, enable the controller and make it available
+ * to the general subsystem using hpsb_add_host().
+ *
+ * The &hpsb_host is allocated with an single initial reference
+ * belonging to the driver.  Once the driver is done with the struct,
+ * for example, when the driver is unloaded, it should release this
+ * reference using hpsb_unref_host().
+ *
+ * Return Value: a pointer to the &hpsb_host if succesful, %NULL if
+ * no memory was available.
+ */
 
 struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra)
 {
@@ -85,12 +124,12 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra)
 
         h = kmalloc(sizeof(struct hpsb_host) + extra, SLAB_KERNEL);
         if (!h) return NULL;
+        memset(h, 0, sizeof(struct hpsb_host));
 
-        memset(h, 0, sizeof(struct hpsb_host) + extra);
-
+	h->hostdata = h + 1;
         h->driver = drv;
         h->ops = drv->ops;
-	h->hostdata = h + 1;
+	h->refcount = 1;
 
         INIT_LIST_HEAD(&h->pending_packets);
         spin_lock_init(&h->pending_pkt_lock);
@@ -134,9 +173,7 @@ void hpsb_remove_host(struct hpsb_host *host)
         spin_lock_irqsave(&hosts_lock, flags);
         list_del(&host->driver_list);
         list_del(&host->host_list);
-
         drv->number_of_hosts--;
-        if (!host->refcount) kfree(host);
         spin_unlock_irqrestore(&hosts_lock, flags);
 }
 

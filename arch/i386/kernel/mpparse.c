@@ -14,7 +14,6 @@
 
 #include <linux/mm.h>
 #include <linux/irq.h>
-#include <linux/acpi.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/config.h>
@@ -24,15 +23,13 @@
 #include <linux/mc146818rtc.h>
 
 #include <asm/smp.h>
+#include <asm/acpi.h>
 #include <asm/mtrr.h>
 #include <asm/mpspec.h>
 #include <asm/pgalloc.h>
 
 /* Have we found an MP table */
 int smp_found_config;
-
-/* Have we found an ACPI MADT table */
-int acpi_found_madt = 0;
 
 /*
  * Various Linux-internal data structures created from the
@@ -41,8 +38,6 @@ int acpi_found_madt = 0;
 int apic_version [MAX_APICS];
 int mp_bus_id_to_type [MAX_MP_BUSSES];
 int mp_bus_id_to_node [MAX_MP_BUSSES];
-int mp_bus_id_to_local [MAX_MP_BUSSES];
-int quad_local_to_mp_bus_id [NR_CPUS/4][4];
 int mp_bus_id_to_pci_bus [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = -1 };
 int mp_current_pci_id;
 
@@ -68,19 +63,6 @@ static unsigned int num_processors;
 
 /* Bitmask of physically existing CPUs */
 unsigned long phys_cpu_present_map;
-
-/* ACPI MADT entry parsing functions */
-#ifdef CONFIG_ACPI_BOOT
-extern struct acpi_boot_flags acpi_boot;
-#ifdef CONFIG_X86_LOCAL_APIC
-extern int acpi_parse_lapic (acpi_table_entry_header *header);
-extern int acpi_parse_lapic_addr_ovr (acpi_table_entry_header *header);
-extern int acpi_parse_lapic_nmi (acpi_table_entry_header *header);
-#endif /*CONFIG_X86_LOCAL_APIC*/
-#ifdef CONFIG_X86_IO_APIC
-extern int acpi_parse_ioapic (acpi_table_entry_header *header);
-#endif /*CONFIG_X86_IO_APIC*/
-#endif /*CONFIG_ACPI_BOOT*/
 
 /*
  * Intel MP BIOS table parsing routines:
@@ -139,7 +121,7 @@ static char __init *mpc_family(int family,int model)
 	return n;
 }
 
-/*
+/* 
  * Have to match translation table entries to main table entries by counter
  * hence the mpc_record variable .... can't see a less disgusting way of
  * doing this ....
@@ -255,17 +237,13 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 static void __init MP_bus_info (struct mpc_config_bus *m)
 {
 	char str[7];
-	int quad;
 
 	memcpy(str, m->mpc_bustype, 6);
 	str[6] = 0;
 	
 	if (clustered_apic_mode) {
-		quad = translation_table[mpc_record]->trans_quad;
-		mp_bus_id_to_node[m->mpc_busid] = quad;
-		mp_bus_id_to_local[m->mpc_busid] = translation_table[mpc_record]->trans_local;
-		quad_local_to_mp_bus_id[quad][translation_table[mpc_record]->trans_local] = m->mpc_busid;
-		printk("Bus #%d is %s (node %d)\n", m->mpc_busid, str, quad);
+		mp_bus_id_to_node[m->mpc_busid] = translation_table[mpc_record]->trans_quad;
+		printk("Bus #%d is %s (node %d)\n", m->mpc_busid, str, mp_bus_id_to_node[m->mpc_busid]);
 	} else {
 		Dprintk("Bus #%d is %s\n", m->mpc_busid, str);
 	}
@@ -342,14 +320,13 @@ static void __init MP_lintsrc_info (struct mpc_config_lintsrc *m)
 
 static void __init MP_translation_info (struct mpc_config_translation *m)
 {
-	printk("Translation: record %d, type %d, quad %d, global %d, local %d\n", mpc_record, m->trans_type, m->trans_quad, m->trans_global, m->trans_local);
+	printk("Translation: record %d, type %d, quad %d, global %d, local %d\n", mpc_record, m->trans_type, 
+		m->trans_quad, m->trans_global, m->trans_local);
 
 	if (mpc_record >= MAX_MPC_ENTRY) 
 		printk("MAX_MPC_ENTRY exceeded!\n");
 	else
 		translation_table[mpc_record] = m; /* stash this for later */
-	if (m->trans_quad+1 > numnodes)
-		numnodes = m->trans_quad+1;
 }
 
 /*
@@ -439,11 +416,11 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 
 	printk("APIC at: 0x%lX\n",mpc->mpc_lapic);
 
-	/*
-	 * Save the local APIC address, it might be non-default,
-	 * but only if we're not using the ACPI tables
+	/* 
+	 * Save the local APIC address (it might be non-default), but only 
+	 * if we're not using the ACPI tables.
 	 */
-	if (!acpi_found_madt)
+	if (!acpi_mp_config)
 		mp_lapic_addr = mpc->mpc_lapic;
 
 	if (clustered_apic_mode && mpc->mpc_oemptr) {
@@ -464,7 +441,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 					(struct mpc_config_processor *)mpt;
 
 				/* ACPI may already have provided this one for us */
-				if (!acpi_found_madt)
+				if (!acpi_mp_config)
 					MP_processor_info(m);
 				mpt += sizeof(*m);
 				count += sizeof(*m);
@@ -514,6 +491,10 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 			}
 		}
 		++mpc_record;
+	}
+	if (clustered_apic_mode && nr_ioapics > 2) {
+		/* don't initialise IO apics on secondary quads */
+		nr_ioapics = 2;
 	}
 	if (!num_processors)
 		printk(KERN_ERR "SMP mptable: no processors registered!\n");
@@ -686,20 +667,6 @@ void __init get_smp_config (void)
 {
 	struct intel_mp_floating *mpf = mpf_found;
 
-#ifdef CONFIG_ACPI_BOOT
-	/*
-	 * Check if the MADT exists, and if so, use it to get processor
-	 * information (ACPI_MADT_LAPIC).  The MADT supports the concept
-	 * of both logical (e.g. HT) and physical processor(s); where the
-	 * MPS only supports physical.
-	 */
-	if (acpi_boot.madt) {
-		acpi_found_madt = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
-		if (acpi_found_madt > 0)
-			acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic);
-	}
-#endif /*CONFIG_ACPI_BOOT*/
-	
 	printk("Intel MultiProcessor Specification v1.%d\n", mpf->mpf_specification);
 	if (mpf->mpf_feature2 & (1<<7)) {
 		printk("    IMCR and PIC compatibility mode.\n");

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstore - AML Interpreter object store support
- *              $Revision: 162 $
+ *              $Revision: 163 $
  *
  *****************************************************************************/
 
@@ -150,7 +150,7 @@ acpi_ex_store (
 		 * Storing to the Debug object causes the value stored to be
 		 * displayed and otherwise has no effect -- see ACPI Specification
 		 */
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** Write to Debug Object: ****:\n\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "**** Write to Debug Object: ****:\n\n"));
 
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "[ACPI Debug] %s: ",
 				  acpi_ut_get_type_name (source_desc->common.type)));
@@ -191,7 +191,7 @@ acpi_ex_store (
 			break;
 		}
 
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "\n"));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC, "\n"));
 		break;
 
 
@@ -404,7 +404,7 @@ acpi_ex_store_object_to_node (
 	target_type = acpi_ns_get_type (node);
 	target_desc = acpi_ns_get_attached_object (node);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Storing %p(%s) into node %p(%s)\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Storing %p(%s) into node %p(%s)\n",
 		source_desc, acpi_ut_get_type_name (source_desc->common.type),
 			  node, acpi_ut_get_type_name (target_type)));
 
@@ -456,7 +456,7 @@ acpi_ex_store_object_to_node (
 			 */
 			status = acpi_ns_attach_object (node, new_desc, target_type);
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 				"Store %s into %s via Convert/Attach\n",
 				acpi_ut_get_type_name (source_desc->common.type),
 				acpi_ut_get_type_name (new_desc->common.type)));
@@ -466,7 +466,7 @@ acpi_ex_store_object_to_node (
 
 	default:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 			"Storing %s (%p) directly into node (%p), no implicit conversion\n",
 			acpi_ut_get_type_name (source_desc->common.type), source_desc, node));
 

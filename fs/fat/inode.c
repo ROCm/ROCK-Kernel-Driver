@@ -1086,7 +1086,8 @@ int fat_notify_change(struct dentry * dentry, struct iattr * attr)
 			error = 0;
 		goto out;
 	}
-	if( error = inode_setattr(inode, attr) )
+	error = inode_setattr(inode, attr);
+	if (error)
 		goto out;
 
 	if (S_ISDIR(inode->i_mode))

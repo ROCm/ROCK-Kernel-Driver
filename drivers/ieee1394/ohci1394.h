@@ -22,6 +22,7 @@
 #define _OHCI1394_H
 
 #include "ieee1394_types.h"
+#include <asm/io.h>
 
 #define OHCI1394_DRIVER_NAME      "ohci1394"
 
@@ -192,7 +193,7 @@ struct ti_ohci {
 
 	/* IRQ hooks, for video1394 and dv1394 */
 	
-#define OHCI1394_MAX_IRQ_HOOKS 4
+#define OHCI1394_MAX_IRQ_HOOKS 16
 	
 	struct ohci1394_irq_hook {
 		void (*irq_handler) (int card, quadlet_t isoRecvEvent, 
@@ -314,7 +315,7 @@ static inline u32 reg_read(const struct ti_ohci *ohci, int offset)
 #define OHCI1394_AsRspRcvCommandPtr           0x1EC
 
 /* Isochronous transmit registers */
-/* Add (32 * n) for context n */
+/* Add (16 * n) for context n */
 #define OHCI1394_IsoXmitContextBase           0x200
 #define OHCI1394_IsoXmitContextControlSet     0x200
 #define OHCI1394_IsoXmitContextControlClear   0x204
@@ -362,6 +363,28 @@ static inline u32 reg_read(const struct ti_ohci *ohci, int offset)
 #define DMA_CTL_IRQ                      0x00300000
 #define DMA_CTL_BRANCH                   0x000c0000
 #define DMA_CTL_WAIT                     0x00030000
+
+/* OHCI evt_* error types, table 3-2 of the OHCI 1.1 spec. */
+#define EVT_NO_STATUS		0x0	/* No event status */
+#define EVT_RESERVED		0x1	/* Reserved, not used !!! */
+#define EVT_LONG_PACKET		0x2	/* The revc data was longer than the buf */
+#define EVT_MISSING_ACK		0x3	/* A subaction gap was detected before an ack
+					   arrived, or recv'd ack had a parity error */
+#define EVT_UNDERRUN		0x4	/* Underrun on corresponding FIFO, packet
+					   truncated */
+#define EVT_OVERRUN		0x5	/* A recv FIFO overflowed on reception of ISO
+					   packet */
+#define EVT_DESCRIPTOR_READ	0x6	/* An unrecoverable error occured while host was
+					   reading a descriptor block */
+#define EVT_DATA_READ		0x7	/* An error occured while host controller was
+					   attempting to read from host memory in the data
+					   stage of descriptor processing */
+#define EVT_DATA_WRITE		0x8	/* An error occured while host controller was
+					   attempting to write either during the data stage
+					   of descriptor processing, or when processing a single
+					   16-bit host memory write */
+#define EVT_BUS_RESET		0x9	/* Identifies a PHY packet in the recv buffer as
+					   being a synthesized bus reset packet */
 
 #define OHCI1394_TCODE_PHY               0xE
 

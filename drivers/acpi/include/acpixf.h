@@ -96,7 +96,7 @@ acpi_free (
 acpi_status
 acpi_find_root_pointer (
 	u32                     flags,
-	ACPI_PHYSICAL_ADDRESS   *rsdp_physical_address);
+	ACPI_POINTER            *rsdp_address);
 
 acpi_status
 acpi_load_tables (

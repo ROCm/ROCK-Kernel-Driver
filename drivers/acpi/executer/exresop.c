@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresop - AML Interpreter operand/object resolution
- *              $Revision: 47 $
+ *              $Revision: 48 $
  *
  *****************************************************************************/
 
@@ -69,7 +69,7 @@ acpi_ex_check_object_type (
 	}
 
 	if (type_needed != this_type) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Needed [%s], found [%s] %p\n",
 			acpi_ut_get_type_name (type_needed),
 			acpi_ut_get_type_name (this_type), object));
@@ -135,8 +135,8 @@ acpi_ex_resolve_operands (
 		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Opcode %X Operand_types=%X \n",
-		opcode, arg_types));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Opcode %X [%s] Operand_types=%X \n",
+		opcode, op_info->name, arg_types));
 
 	/*
 	 * Normal exit is with (Arg_types == 0) at end of argument list.
@@ -203,7 +203,7 @@ acpi_ex_resolve_operands (
 				case AML_LOCAL_OP:
 				case AML_REVISION_OP:
 
-					ACPI_DEBUG_ONLY_MEMBERS (ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+					ACPI_DEBUG_ONLY_MEMBERS (ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 						"Reference Opcode: %s\n", op_info->name)));
 					break;
 

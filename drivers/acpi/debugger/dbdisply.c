@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisply - debug display commands
- *              $Revision: 66 $
+ *              $Revision: 67 $
  *
  ******************************************************************************/
 
@@ -298,6 +298,7 @@ acpi_db_decode_internal_object (
 
 
 	if (!obj_desc) {
+		acpi_os_printf (" Uninitialized\n");
 		return;
 	}
 
@@ -420,10 +421,10 @@ acpi_db_display_internal_object (
 				break;
 
 			case AML_LOCAL_OP:
-				acpi_os_printf ("[Local%d]", obj_desc->reference.offset);
+				acpi_os_printf ("[Local%d] ", obj_desc->reference.offset);
 				if (walk_state) {
 					obj_desc = walk_state->local_variables[obj_desc->reference.offset].object;
-					acpi_os_printf (" %p", obj_desc);
+					acpi_os_printf ("%p", obj_desc);
 					acpi_db_decode_internal_object (obj_desc);
 				}
 				break;
@@ -432,7 +433,7 @@ acpi_db_display_internal_object (
 				acpi_os_printf ("[Arg%d] ", obj_desc->reference.offset);
 				if (walk_state) {
 					obj_desc = walk_state->arguments[obj_desc->reference.offset].object;
-					acpi_os_printf (" %p", obj_desc);
+					acpi_os_printf ("%p", obj_desc);
 					acpi_db_decode_internal_object (obj_desc);
 				}
 				break;
@@ -466,7 +467,6 @@ acpi_db_display_internal_object (
 		acpi_os_printf ("<Not a valid ACPI Object Descriptor> ");
 		break;
 	}
-
 
 	acpi_os_printf ("\n");
 }

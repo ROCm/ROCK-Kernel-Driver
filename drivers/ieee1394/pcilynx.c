@@ -29,7 +29,6 @@
 #include <linux/pci.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
-#include <linux/smp_lock.h>
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/io.h>
@@ -55,6 +54,7 @@
 #define PRINT_GD(level, fmt, args...) do {} while (0)
 #define PRINTD(level, card, fmt, args...) do {} while (0)
 #endif
+
 
 static struct hpsb_host_driver *lynx_driver;
 static unsigned int card_id;
@@ -614,7 +614,7 @@ static ssize_t mem_write(struct file*, const char*, size_t, loff_t*);
 
 
 static struct file_operations aux_ops = {
-        OWNER_THIS_MODULE
+	owner:		THIS_MODULE,
         read:           mem_read,
         write:          mem_write,
         poll:           aux_poll,
@@ -639,42 +639,31 @@ static int mem_open(struct inode *inode, struct file *file)
         enum { t_rom, t_aux, t_ram } type;
         struct memdata *md;
         
-        V22_COMPAT_MOD_INC_USE_COUNT;
-
         if (cid < PCILYNX_MINOR_AUX_START) {
                 /* just for completeness */
-                V22_COMPAT_MOD_DEC_USE_COUNT;
                 return -ENXIO;
         } else if (cid < PCILYNX_MINOR_ROM_START) {
                 cid -= PCILYNX_MINOR_AUX_START;
-                if (cid >= num_of_cards || !cards[cid].aux_port) {
-                        V22_COMPAT_MOD_DEC_USE_COUNT;
+                if (cid >= num_of_cards || !cards[cid].aux_port)
                         return -ENXIO;
-                }
                 type = t_aux;
         } else if (cid < PCILYNX_MINOR_RAM_START) {
                 cid -= PCILYNX_MINOR_ROM_START;
-                if (cid >= num_of_cards || !cards[cid].local_rom) {
-                        V22_COMPAT_MOD_DEC_USE_COUNT;
+                if (cid >= num_of_cards || !cards[cid].local_rom)
                         return -ENXIO;
-                }
                 type = t_rom;
         } else {
                 /* WARNING: Know what you are doing when opening RAM.
                  * It is currently used inside the driver! */
                 cid -= PCILYNX_MINOR_RAM_START;
-                if (cid >= num_of_cards || !cards[cid].local_ram) {
-                        V22_COMPAT_MOD_DEC_USE_COUNT;
+                if (cid >= num_of_cards || !cards[cid].local_ram)
                         return -ENXIO;
-                }
                 type = t_ram;
         }
 
         md = (struct memdata *)kmalloc(sizeof(struct memdata), SLAB_KERNEL);
-        if (md == NULL) {
-                V22_COMPAT_MOD_DEC_USE_COUNT;
+        if (md == NULL)
                 return -ENOMEM;
-        }
 
         md->lynx = &cards[cid];
         md->cid = cid;
@@ -700,11 +689,7 @@ static int mem_open(struct inode *inode, struct file *file)
 
 static int mem_release(struct inode *inode, struct file *file)
 {
-        struct memdata *md = (struct memdata *)file->private_data;
-
-        kfree(md);
-
-        V22_COMPAT_MOD_DEC_USE_COUNT;
+        kfree(file->private_data);
         return 0;
 }
 
@@ -732,9 +717,8 @@ static unsigned int aux_poll(struct file *file, poll_table *pt)
 
 loff_t mem_llseek(struct file *file, loff_t offs, int orig)
 {
-        loff_t newoffs = -1;
+        loff_t newoffs;
 
-        lock_kernel();
         switch (orig) {
         case 0:
                 newoffs = offs;
@@ -744,14 +728,13 @@ loff_t mem_llseek(struct file *file, loff_t offs, int orig)
                 break;
         case 2:
                 newoffs = PCILYNX_MAX_MEMORY + 1 + offs;
-        }
-
-        if (newoffs < 0 || newoffs > PCILYNX_MAX_MEMORY + 1) {
-                unlock_kernel();
+                break;
+        default:
                 return -EINVAL;
         }
 
-        unlock_kernel();
+        if (newoffs < 0 || newoffs > PCILYNX_MAX_MEMORY + 1) return -EINVAL;
+
         file->f_pos = newoffs;
         return newoffs;
 }
@@ -1229,7 +1212,7 @@ static void remove_card(struct pci_dev *dev)
         }
 
 	tasklet_kill(&lynx->iso_rcv.tq);
-        kfree(lynx);
+	hpsb_unref_host(lynx->host);
 }
 
 
