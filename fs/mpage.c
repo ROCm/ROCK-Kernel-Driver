@@ -519,6 +519,17 @@ alloc_new:
 	}
 
 	/*
+	 * Must try to add the page before marking the buffer clean or
+	 * the confused fail path above (OOM) will be very confused when
+	 * it finds all bh marked clean (i.e. it will not write anything)
+	 */
+	length = first_unmapped << blkbits;
+	if (bio_add_page(bio, page, length, 0) < length) {
+		bio = mpage_bio_submit(WRITE, bio);
+		goto alloc_new;
+	}
+
+	/*
 	 * OK, we have our BIO, so we can now mark the buffers clean.  Make
 	 * sure to only clean buffers which we know we'll be writing.
 	 */
@@ -536,12 +547,6 @@ alloc_new:
 
 		if (buffer_heads_over_limit)
 			try_to_free_buffers(page);
-	}
-
-	length = first_unmapped << blkbits;
-	if (bio_add_page(bio, page, length, 0) < length) {
-		bio = mpage_bio_submit(WRITE, bio);
-		goto alloc_new;
 	}
 
 	BUG_ON(PageWriteback(page));
