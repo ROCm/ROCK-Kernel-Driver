@@ -372,11 +372,25 @@ static inline int is_ctx_switch(unsigned long val)
 }
  
 
-/* compute number of filled slots in cpu_buffer queue */
-static unsigned long nr_filled_slots(struct oprofile_cpu_buffer * b)
+/* "acquire" as many cpu buffer slots as we can */
+static unsigned long get_slots(struct oprofile_cpu_buffer * b)
 {
 	unsigned long head = b->head_pos;
 	unsigned long tail = b->tail_pos;
+
+	/*
+	 * Subtle. This resets the persistent last_task
+	 * and in_kernel values used for switching notes.
+	 * BUT, there is a small window between reading
+	 * head_pos, and this call, that means samples
+	 * can appear at the new head position, but not
+	 * be prefixed with the notes for switching
+	 * kernel mode or a task switch. This small hole
+	 * can lead to mis-attribution or samples where
+	 * we don't know if it's in the kernel or not,
+	 * at the start of an event buffer.
+	 */
+	cpu_buffer_reset(b);
 
 	if (head >= tail)
 		return head - tail;
@@ -414,9 +428,9 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
  
 	/* Remember, only we can modify tail_pos */
 
-	unsigned long const available_elements = nr_filled_slots(cpu_buf);
+	unsigned long const available = get_slots(cpu_buf);
   
-	for (i=0; i < available_elements; ++i) {
+	for (i=0; i < available; ++i) {
 		struct op_sample * s = &cpu_buf->buffer[cpu_buf->tail_pos];
  
 		if (is_ctx_switch(s->eip)) {
@@ -441,8 +455,6 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
 		increment_tail(cpu_buf);
 	}
 	release_mm(mm);
-
-	cpu_buffer_reset(cpu_buf);
 }
  
  
