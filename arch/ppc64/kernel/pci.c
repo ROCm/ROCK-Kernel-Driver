@@ -490,7 +490,8 @@ pcibios_init(void)
 #endif
 
 	/* Cache the location of the ISA bridge (if we have one) */
-	if (ppc64_isabridge_dev = pci_find_class(PCI_CLASS_BRIDGE_ISA << 8, NULL))
+	ppc64_isabridge_dev = pci_find_class(PCI_CLASS_BRIDGE_ISA << 8, NULL);
+	if (ppc64_isabridge_dev != NULL)
 		printk("ISA bridge at %s\n", ppc64_isabridge_dev->slot_name);
 
 	printk("PCI: Probing PCI hardware done\n");
@@ -514,11 +515,11 @@ unsigned long resource_fixup(struct pci_dev * dev, struct resource * res,
 
 void __init pcibios_fixup_bus(struct pci_bus *bus)
 {
+#ifndef CONFIG_PPC_ISERIES
 	struct pci_controller *phb = PCI_GET_PHB_PTR(bus);
 	struct resource *res;
 	int i;
 
-#ifndef CONFIG_PPC_ISERIES
 	if (bus->parent == NULL) {
 		/* This is a host bridge - fill in its resources */
 		phb->bus = bus;
