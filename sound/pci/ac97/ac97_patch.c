@@ -1903,6 +1903,15 @@ int patch_cm9739(ac97_t * ac97)
 	/* FIXME: set up GPIO */
 	snd_ac97_write_cache(ac97, 0x70, 0x0100);
 	snd_ac97_write_cache(ac97, 0x72, 0x0020);
+	/* Special exception for ASUS W1000/CMI9739. It does not have an SPDIF in. */
+	if (ac97->pci &&
+	     ac97->subsystem_vendor == 0x1043 &&
+	     ac97->subsystem_device == 0x1843) {
+		snd_ac97_write_cache(ac97, AC97_CM9739_SPDIF_CTRL,
+			snd_ac97_read(ac97, AC97_CM9739_SPDIF_CTRL) & ~0x01);
+		snd_ac97_write_cache(ac97, AC97_CM9739_MULTI_CHAN,
+			snd_ac97_read(ac97, AC97_CM9739_MULTI_CHAN) | (1 << 14));
+	}
 
 	return 0;
 }
