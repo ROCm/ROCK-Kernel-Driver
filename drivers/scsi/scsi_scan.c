@@ -80,7 +80,6 @@ module_param_named(max_luns, max_scsi_luns, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(max_luns,
 		 "last scsi LUN (should be between 1 and 2^32-1)");
 
-#ifdef CONFIG_SCSI_REPORT_LUNS
 /*
  * max_scsi_report_luns: the maximum number of LUNS that will be
  * returned from the REPORT LUNS command. 8 times this value must
@@ -88,13 +87,12 @@ MODULE_PARM_DESC(max_luns,
  * in practice, the maximum number of LUNs suppored by any device
  * is about 16k.
  */
-static unsigned int max_scsi_report_luns = 128;
+static unsigned int max_scsi_report_luns = 511;
 
 module_param_named(max_report_luns, max_scsi_report_luns, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(max_report_luns,
 		 "REPORT LUNS maximum number of LUNS received (should be"
 		 " between 1 and 16384)");
-#endif
 
 /**
  * scsi_unlock_floptical - unlock device via a special MODE SENSE command
@@ -864,7 +862,6 @@ static void scsi_sequential_lun_scan(struct Scsi_Host *shost, uint channel,
 			return;
 }
 
-#ifdef CONFIG_SCSI_REPORT_LUNS
 /**
  * scsilun_to_int: convert a scsi_lun to an int
  * @scsilun:	struct scsi_lun to be converted.
@@ -925,9 +922,14 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
 	u8 *data;
 
 	/*
-	 * Only support SCSI-3 and up devices.
+	 * Only support SCSI-3 and up devices if BLIST_NOREPORTLUN is not set.
+	 * Also allow SCSI-2 if BLIST_REPORTLUN2 is set and host adapter does
+	 * support more than 8 LUNs.
 	 */
-	if (sdev->scsi_level < SCSI_3)
+	if ((bflags & BLIST_NOREPORTLUN) || 
+	     sdev->scsi_level < SCSI_2 ||
+	    (sdev->scsi_level < SCSI_3 && 
+	     (!(bflags & BLIST_REPORTLUN2) || sdev->host->max_lun <= 8)) )
 		return 1;
 	if (bflags & BLIST_NOLUN)
 		return 0;
@@ -1091,9 +1093,6 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
 	printk(ALLOC_FAILURE_MSG, __FUNCTION__);
 	return 0;
 }
-#else
-# define scsi_report_lun_scan(sdev, blags, rescan)	(1)
-#endif	/* CONFIG_SCSI_REPORT_LUNS */
 
 struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
 				    uint channel, uint id, uint lun)
