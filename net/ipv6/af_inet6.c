@@ -799,6 +799,13 @@ static int __init inet6_init(void)
 	addrconf_init();
 	sit_init();
 
+	/* Init v6 extention headers. */
+	ipv6_hopopts_init();
+	ipv6_rthdr_init();
+	ipv6_frag_init();
+	ipv6_nodata_init();
+	ipv6_destopt_init();
+
 	/* Init v6 transport protocols. */
 	udpv6_init();
 	tcpv6_init();
