@@ -235,7 +235,7 @@ void __init set_highmem_pages_init(int bad_ppro)
 {
 	int pfn;
 	for (pfn = highstart_pfn; pfn < highend_pfn; pfn++)
-		one_highpage_init((struct page *)(mem_map + pfn), pfn, bad_ppro);
+		one_highpage_init(pfn_to_page(pfn), pfn, bad_ppro);
 	totalram_pages += totalhigh_pages;
 }
 #else
@@ -419,7 +419,7 @@ void __init test_wp_bit(void)
 static void __init set_max_mapnr_init(void)
 {
 #ifdef CONFIG_HIGHMEM
-	highmem_start_page = mem_map + highstart_pfn;
+	highmem_start_page = pfn_to_page(highstart_pfn);
 	max_mapnr = num_physpages = highend_pfn;
 #else
 	max_mapnr = num_physpages = max_low_pfn;
@@ -458,7 +458,7 @@ void __init mem_init(void)
 		/*
 		 * Only count reserved RAM pages
 		 */
-		if (page_is_ram(tmp) && PageReserved(mem_map+tmp))
+		if (page_is_ram(tmp) && PageReserved(pfn_to_page(tmp)))
 			reservedpages++;
 
 	set_highmem_pages_init(bad_ppro);

@@ -46,9 +46,9 @@ static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
  */
 static inline int bad_range(struct zone *zone, struct page *page)
 {
-	if (page - mem_map >= zone->zone_start_mapnr + zone->size)
+	if (page_to_pfn(page) >= zone->zone_start_pfn + zone->size)
 		return 1;
-	if (page - mem_map < zone->zone_start_mapnr)
+	if (page_to_pfn(page) < zone->zone_start_pfn)
 		return 1;
 	if (zone != page_zone(page))
 		return 1;

@@ -235,8 +235,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
 
 #ifndef CONFIG_DISCONTIGMEM
-#define pmd_page(pmd) \
-	(mem_map + (pmd_val(pmd) >> PAGE_SHIFT))
+#define pmd_page(pmd) (pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
 #endif /* !CONFIG_DISCONTIGMEM */
 
 #define pmd_large(pmd) \

@@ -96,23 +96,7 @@ static inline void * phys_to_virt(unsigned long address)
 /*
  * Change "struct page" to physical address.
  */
-#ifdef CONFIG_HIGHMEM64G
-
-#ifndef CONFIG_DISCONTIGMEM
-#define page_to_phys(page)	((u64)(page - mem_map) << PAGE_SHIFT)
-#else
-#define page_to_phys(page)	((u64)(page - page_zone(page)->zone_mem_map + page_zone(page)->zone_start_pfn) << PAGE_SHIFT)
-#endif /* !CONFIG_DISCONTIGMEM */
-
-#else
-
-#ifndef CONFIG_DISCONTIGMEM
-#define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
-#else
-#define page_to_phys(page)	((page - page_zone(page)->zone_mem_map + page_zone(page)->zone_start_pfn) << PAGE_SHIFT)
-#endif /* !CONFIG_DISCONTIGMEM */
-
-#endif /* CONFIG_HIGHMEM64G */
+#define page_to_phys(page)    ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
 
 extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 
