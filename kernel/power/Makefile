@@ -1,4 +1,8 @@
 
+ifeq ($(CONFIG_PM_DEBUG),y)
+EXTRA_CFLAGS	+=	-DDEBUG
+endif
+
 swsusp-smp-$(CONFIG_SMP)	+= smp.o
 
 obj-y				:= main.o process.o console.o pm.o

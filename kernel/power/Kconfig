@@ -18,6 +18,13 @@ config PM
 	  will issue the hlt instruction if nothing is to be done, thereby
 	  sending the processor to sleep and saving power.
 
+config PM_DEBUG
+	bool "Power Management Debug Support"
+	---help---
+	This option enables verbose debugging support in the Power Management
+	code. This is helpful when debugging and reporting various PM bugs, 
+	like suspend support.
+
 config SOFTWARE_SUSPEND
 	bool "Software Suspend (EXPERIMENTAL)"
 	depends on EXPERIMENTAL && PM && SWAP

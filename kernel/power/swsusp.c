@@ -123,26 +123,6 @@ static const char name_suspend[] = "Suspend Machine: ";
 static const char name_resume[] = "Resume Machine: ";
 
 /*
- * Debug
- */
-#define	DEBUG_DEFAULT
-#undef	DEBUG_PROCESS
-#undef	DEBUG_SLOW
-#define TEST_SWSUSP 0		/* Set to 1 to reboot instead of halt machine after suspension */
-
-#ifdef DEBUG_DEFAULT
-# define PRINTK(f, a...)	printk(f, ## a)
-#else
-# define PRINTK(f, a...)       	do { } while(0)
-#endif
-
-#ifdef DEBUG_SLOW
-#define MDELAY(a) mdelay(a)
-#else
-#define MDELAY(a) do { } while(0)
-#endif
-
-/*
  * Saving part...
  */
 
@@ -328,27 +308,20 @@ static int data_write(void)
 	return error;
 }
 
-#ifdef DEBUG
 static void dump_info(void)
 {
-	printk(" swsusp: Version: %u\n",swsusp_info.version_code);
-	printk(" swsusp: Num Pages: %ld\n",swsusp_info.num_physpages);
-	printk(" swsusp: UTS Sys: %s\n",swsusp_info.uts.sysname);
-	printk(" swsusp: UTS Node: %s\n",swsusp_info.uts.nodename);
-	printk(" swsusp: UTS Release: %s\n",swsusp_info.uts.release);
-	printk(" swsusp: UTS Version: %s\n",swsusp_info.uts.version);
-	printk(" swsusp: UTS Machine: %s\n",swsusp_info.uts.machine);
-	printk(" swsusp: UTS Domain: %s\n",swsusp_info.uts.domainname);
-	printk(" swsusp: CPUs: %d\n",swsusp_info.cpus);
-	printk(" swsusp: Image: %ld Pages\n",swsusp_info.image_pages);
-	printk(" swsusp: Pagedir: %ld Pages\n",swsusp_info.pagedir_pages);
+	pr_debug(" swsusp: Version: %u\n",swsusp_info.version_code);
+	pr_debug(" swsusp: Num Pages: %ld\n",swsusp_info.num_physpages);
+	pr_debug(" swsusp: UTS Sys: %s\n",swsusp_info.uts.sysname);
+	pr_debug(" swsusp: UTS Node: %s\n",swsusp_info.uts.nodename);
+	pr_debug(" swsusp: UTS Release: %s\n",swsusp_info.uts.release);
+	pr_debug(" swsusp: UTS Version: %s\n",swsusp_info.uts.version);
+	pr_debug(" swsusp: UTS Machine: %s\n",swsusp_info.uts.machine);
+	pr_debug(" swsusp: UTS Domain: %s\n",swsusp_info.uts.domainname);
+	pr_debug(" swsusp: CPUs: %d\n",swsusp_info.cpus);
+	pr_debug(" swsusp: Image: %ld Pages\n",swsusp_info.image_pages);
+	pr_debug(" swsusp: Pagedir: %ld Pages\n",swsusp_info.pagedir_pages);
 }
-#else
-static void dump_info(void)
-{
-
-}
-#endif
 
 static void init_header(void)
 {
@@ -574,7 +547,7 @@ static int saveable(struct zone * zone, unsigned long * zone_pfn)
 	if (PageNosave(page))
 		return 0;
 	if (PageReserved(page) && pfn_is_nosave(pfn)) {
-		PRINTK("[nosave pfn 0x%lx]", pfn);
+		pr_debug("[nosave pfn 0x%lx]", pfn);
 		return 0;
 	}
 	if ((chunk_size = is_head_of_free_region(page))) {
