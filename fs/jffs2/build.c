@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.32 2002/03/08 15:11:24 dwmw2 Exp $
+ * $Id: build.c,v 1.35 2002/05/20 14:56:37 dwmw2 Exp $
  *
  */
 
@@ -99,6 +99,9 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 		kfree(scan);
 	}
 	D1(printk(KERN_DEBUG "Pass 3 complete\n"));
+
+	/* Rotate the lists by some number to ensure wear levelling */
+	jffs2_rotate_lists(c);
 
 	return ret;
 }
@@ -280,6 +283,7 @@ int jffs2_do_mount_fs(struct jffs2_sb_info *c)
 	spin_lock_init(&c->inocache_lock);
 
 	INIT_LIST_HEAD(&c->clean_list);
+	INIT_LIST_HEAD(&c->very_dirty_list);
 	INIT_LIST_HEAD(&c->dirty_list);
 	INIT_LIST_HEAD(&c->erasable_list);
 	INIT_LIST_HEAD(&c->erasing_list);

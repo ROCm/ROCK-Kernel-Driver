@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: dir.c,v 1.68 2002/03/11 12:36:59 dwmw2 Exp $
+ * $Id: dir.c,v 1.70 2002/06/20 23:33:12 dwmw2 Exp $
  *
  */
 
@@ -716,7 +716,29 @@ static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
 {
 	int ret;
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(old_dir_i->i_sb);
+	struct jffs2_inode_info *victim_f = NULL;
 	uint8_t type;
+
+	/* The VFS will check for us and prevent trying to rename a 
+	 * file over a directory and vice versa, but if it's a directory,
+	 * the VFS can't check whether the victim is empty. The filesystem
+	 * needs to do that for itself.
+	 */
+	if (new_dentry->d_inode) {
+		victim_f = JFFS2_INODE_INFO(new_dentry->d_inode);
+		if (S_ISDIR(new_dentry->d_inode->i_mode)) {
+			struct jffs2_full_dirent *fd;
+
+			down(&victim_f->sem);
+			for (fd = victim_f->dents; fd; fd = fd->next) {
+				if (fd->ino) {
+					up(&victim_f->sem);
+					return -ENOTEMPTY;
+				}
+			}
+			up(&victim_f->sem);
+		}
+	}
 
 	/* XXX: We probably ought to alloc enough space for
 	   both nodes at the same time. Writing the new link, 
@@ -736,7 +758,21 @@ static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
 	if (ret)
 		return ret;
 
-	if (S_ISDIR(old_dentry->d_inode->i_mode))
+	if (victim_f) {
+		/* There was a victim. Kill it off nicely */
+		new_dentry->d_inode->i_nlink--;
+		/* Don't oops if the victim was a dirent pointing to an
+		   inode which didn't exist. */
+		if (victim_f->inocache) {
+			down(&victim_f->sem);
+			victim_f->inocache->nlink--;
+			up(&victim_f->sem);
+		}
+	}
+
+	/* If it was a directory we moved, and there was no victim, 
+	   increase i_nlink on its new parent */
+	if (S_ISDIR(old_dentry->d_inode->i_mode) && !victim_f)
 		new_dir_i->i_nlink++;
 
 	/* Unlink the original */

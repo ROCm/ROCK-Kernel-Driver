@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: super.c,v 1.64 2002/03/17 10:18:42 dwmw2 Exp $
+ * $Id: super.c,v 1.71 2002/07/23 12:57:38 dwmw2 Exp $
  *
  */
 
@@ -19,12 +19,12 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/fs.h>
-#include <linux/namei.h>
 #include <linux/jffs2.h>
 #include <linux/pagemap.h>
 #include <linux/mtd/mtd.h>
 #include <linux/interrupt.h>
 #include <linux/ctype.h>
+#include <linux/namei.h>
 #include "nodelist.h"
 
 void jffs2_put_super (struct super_block *);
@@ -258,10 +258,15 @@ void jffs2_put_super (struct super_block *sb)
 
 	if (!(sb->s_flags & MS_RDONLY))
 		jffs2_stop_garbage_collect_thread(c);
+	down(&c->alloc_sem);
 	jffs2_flush_wbuf(c, 1);
+	up(&c->alloc_sem);
 	jffs2_free_ino_caches(c);
 	jffs2_free_raw_node_refs(c);
 	kfree(c->blocks);
+	if (c->wbuf)
+		kfree(c->wbuf);
+	kfree(c->inocache_list);
 	if (c->mtd->sync)
 		c->mtd->sync(c->mtd);
 
@@ -302,18 +307,25 @@ static int __init init_jffs2_fs(void)
 	ret = jffs2_zlib_init();
 	if (ret) {
 		printk(KERN_ERR "JFFS2 error: Failed to initialise zlib workspaces\n");
-		return ret;
+		goto out;
 	}
 	ret = jffs2_create_slab_caches();
 	if (ret) {
 		printk(KERN_ERR "JFFS2 error: Failed to initialise slab caches\n");
-		return ret;
+		goto out_zlib;
 	}
 	ret = register_filesystem(&jffs2_fs_type);
 	if (ret) {
 		printk(KERN_ERR "JFFS2 error: Failed to register filesystem\n");
-		jffs2_destroy_slab_caches();
+		goto out_slab;
 	}
+	return 0;
+
+ out_slab:
+	jffs2_destroy_slab_caches();
+ out_zlib:
+	jffs2_zlib_exit();
+ out:
 	return ret;
 }
 

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: file.c,v 1.70 2002/03/05 09:55:07 dwmw2 Exp $
+ * $Id: file.c,v 1.74 2002/07/23 12:58:53 dwmw2 Exp $
  *
  */
 
@@ -41,9 +41,11 @@ int jffs2_fsync(struct file *filp, struct dentry *dentry, int datasync)
 	 * maybe we have to think about it to find a smarter
 	 * solution.
 	 */
+	down(&c->alloc_sem);
 	down(&f->sem);
 	jffs2_flush_wbuf(c,2);
 	up(&f->sem);
+	up(&c->alloc_sem);
 			
 	return 0;	
 }
@@ -256,18 +258,18 @@ int jffs2_do_readpage_unlock(struct inode *inode, struct page *pg)
 
 int jffs2_readpage (struct file *filp, struct page *pg)
 {
-	struct jffs2_inode_info *f = JFFS2_INODE_INFO(filp->f_dentry->d_inode);
+	struct jffs2_inode_info *f = JFFS2_INODE_INFO(pg->mapping->host);
 	int ret;
 	
 	down(&f->sem);
-	ret = jffs2_do_readpage_unlock(filp->f_dentry->d_inode, pg);
+	ret = jffs2_do_readpage_unlock(pg->mapping->host, pg);
 	up(&f->sem);
 	return ret;
 }
 
 int jffs2_prepare_write (struct file *filp, struct page *pg, unsigned start, unsigned end)
 {
-	struct inode *inode = filp->f_dentry->d_inode;
+	struct inode *inode = pg->mapping->host;
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	uint32_t pageofs = pg->index << PAGE_CACHE_SHIFT;
 	int ret = 0;
@@ -351,7 +353,7 @@ int jffs2_commit_write (struct file *filp, struct page *pg, unsigned start, unsi
 	/* Actually commit the write from the page cache page we're looking at.
 	 * For now, we write the full page out each time. It sucks, but it's simple
 	 */
-	struct inode *inode = filp->f_dentry->d_inode;
+	struct inode *inode = pg->mapping->host;
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(inode->i_sb);
 	struct jffs2_raw_inode *ri;

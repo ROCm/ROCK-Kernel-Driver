@@ -7,8 +7,8 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: wbuf.c,v 1.7 2002/03/08 11:27:59 dwmw2 Exp $
- *
+ * $Id: wbuf.c,v 1.12 2002/05/20 14:56:39 dwmw2 Exp $
+ * -- with the NAND definitions added back pending MTD update for 2.5.
  */
 
 #include <linux/kernel.h>
@@ -27,25 +27,100 @@
 #define NAND_JFFS2_OOB8_FSDALEN		2
 #define NAND_JFFS2_OOB16_FSDALEN	8
 
+
+/* max. erase failures before we mark a block bad */
 #define MAX_ERASE_FAILURES 	5
+
+/* two seconds timeout for timed wbuf-flushing */
+#define WBUF_FLUSH_TIMEOUT	2 * HZ
 
 static inline void jffs2_refile_wbuf_blocks(struct jffs2_sb_info *c)
 {
 	struct list_head *this, *next;
+	static int n;
 
 	if (list_empty(&c->erasable_pending_wbuf_list))
 		return;
 
 	list_for_each_safe(this, next, &c->erasable_pending_wbuf_list) {
+		struct jffs2_eraseblock *jeb = list_entry(this, struct jffs2_eraseblock, list);
+
+		D1(printk(KERN_DEBUG "Removing eraseblock at 0x%08x from erasable_pending_wbuf_list...\n", jeb->offset));
 		list_del(this);
-		list_add_tail(this, &c->erasable_list);
+		if ((jiffies + (n++)) & 127) {
+			/* Most of the time, we just erase it immediately. Otherwise we
+			   spend ages scanning it on mount, etc. */
+			D1(printk(KERN_DEBUG "...and adding to erase_pending_list\n"));
+			list_add_tail(&jeb->list, &c->erase_pending_list);
+			c->nr_erasing_blocks++;
+			jffs2_erase_pending_trigger(c);
+		} else {
+			/* Sometimes, however, we leave it elsewhere so it doesn't get
+			   immediately reused, and we spread the load a bit. */
+			D1(printk(KERN_DEBUG "...and adding to erasable_list\n"));
+			list_add_tail(&jeb->list, &c->erasable_list);
+		}
 	}
 }
 
+/* 
+*	Timed flushing of wbuf. If we have no consecutive write to wbuf, within	
+*	the specified time, we flush the contents with padding !
+*/
+void jffs2_wbuf_timeout (unsigned long data)
+{
+	struct jffs2_sb_info *c = (struct jffs2_sb_info *) data;
+	/* 
+	* Wake up the flush process, we need process context to have the right 
+	* to sleep on flash write
+	*/
+	D1(printk(KERN_DEBUG "jffs2_wbuf_timeout(): timer expired\n"));
+	schedule_task(&c->wbuf_task);
+}
+
+/*
+*	Process for timed wbuf flush
+*
+*	FIXME What happens, if we have a write failure there ????
+*/
+void jffs2_wbuf_process (void *data)
+{
+	struct jffs2_sb_info *c = (struct jffs2_sb_info *) data;	
+	
+	D1(printk(KERN_DEBUG "jffs2_wbuf_process() entered\n"));
+
+	if (!down_trylock(&c->alloc_sem)) {
+		D1(printk (KERN_DEBUG "jffs2_wbuf_process() alloc_sem got\n"));
+	
+		if(!c->nextblock || (c->nextblock->free_size < (c->wbuf_pagesize - c->wbuf_len)))
+			jffs2_flush_wbuf(c, 1); /* pad only */
+		else			
+			jffs2_flush_wbuf(c, 2); /* pad and adjust nextblock */
+		up(&c->alloc_sem);
+	} else {
+		D1(printk (KERN_DEBUG "jffs2_wbuf_process() alloc_sem already occupied\n"));
+	}	
+}
+
+
+/* Meaning of pad argument:
+   0: Do not pad. Probably pointless - we only ever use this when we can't pad anyway.
+   1: Pad, do not adjust nextblock free_size
+   2: Pad, adjust nextblock free_size
+*/
 int jffs2_flush_wbuf(struct jffs2_sb_info *c, int pad)
 {
 	int ret;
 	size_t retlen;
+	
+	if (!down_trylock(&c->alloc_sem)) {
+		up(&c->alloc_sem);
+		printk(KERN_CRIT "jffs2_flush_wbuf() called with alloc_sem not locked!\n");
+		BUG();
+	}
+
+	/* delete a eventually started timed wbuf flush */
+	del_timer_sync(&c->wbuf_timer);
 
 	if(!c->wbuf || !c->wbuf_len)
 		return 0;
@@ -315,6 +390,11 @@ int jffs2_flash_writev(struct jffs2_sb_info *c, const struct iovec *invecs, unsi
 
 alldone:	
 	*retlen = donelen;
+	/* Setup timed wbuf flush, if buffer len != 0 */
+	if (c->wbuf_len) {
+		D1(printk (KERN_DEBUG "jffs2_flash_writev: mod wbuf_timer\n"));	
+		mod_timer(&c->wbuf_timer, jiffies + WBUF_FLUSH_TIMEOUT);
+	}
 	return 0;
 }
 

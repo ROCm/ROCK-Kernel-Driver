@@ -7,19 +7,19 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: background.c,v 1.23 2002/03/06 12:37:08 dwmw2 Exp $
+ * $Id: background.c,v 1.29 2002/06/07 10:04:28 dwmw2 Exp $
  *
  */
 
 #define __KERNEL_SYSCALLS__
 
 #include <linux/kernel.h>
-#include <linux/unistd.h>
 #include <linux/jffs2.h>
 #include <linux/mtd/mtd.h>
 #include <linux/interrupt.h>
 #include <linux/completion.h>
 #include <linux/mtd/compatmac.h> /* recalc_sigpending() */
+#include <linux/unistd.h>
 #include "nodelist.h"
 
 
@@ -62,6 +62,13 @@ int jffs2_start_garbage_collect_thread(struct jffs2_sb_info *c)
 
 void jffs2_stop_garbage_collect_thread(struct jffs2_sb_info *c)
 {
+	if (c->mtd->type == MTD_NANDFLASH) {
+		/* stop a eventually scheduled wbuf flush timer */
+		del_timer_sync(&c->wbuf_timer);
+		/* make sure, that a scheduled wbuf flush task is completed */
+		flush_scheduled_tasks();
+	}
+
 	spin_lock_bh(&c->erase_completion_lock);
 	if (c->gc_task) {
 		D1(printk(KERN_DEBUG "jffs2: Killing GC task %d\n", c->gc_task->pid));
@@ -147,11 +154,23 @@ static int jffs2_garbage_collect_thread(void *_c)
 
 static int thread_should_wake(struct jffs2_sb_info *c)
 {
-	D1(printk(KERN_DEBUG "thread_should_wake(): nr_free_blocks %d, nr_erasing_blocks %d, dirty_size 0x%x\n", 
-		  c->nr_free_blocks, c->nr_erasing_blocks, c->dirty_size));
+	uint32_t gcnodeofs = 0;
+	int ret;
+
+	/* Don't count any progress we've already made through the gcblock
+	   as dirty space, for the purposes of this calculation */
+	if (c->gcblock && c->gcblock->gc_node)
+		gcnodeofs = c->gcblock->gc_node->flash_offset & ~3 & (c->sector_size-1);
+
 	if (c->nr_free_blocks + c->nr_erasing_blocks < JFFS2_RESERVED_BLOCKS_GCTRIGGER &&
-	    c->dirty_size > c->sector_size)
-		return 1;
+	    (c->dirty_size - gcnodeofs) > c->sector_size)
+		ret = 1;
 	else 
-		return 0;
+		ret = 0;
+
+	D1(printk(KERN_DEBUG "thread_should_wake(): nr_free_blocks %d, nr_erasing_blocks %d, dirty_size 0x%x (mod 0x%x): %s\n", 
+		  c->nr_free_blocks, c->nr_erasing_blocks, c->dirty_size,
+		  c->dirty_size - gcnodeofs, ret?"yes":"no"));
+
+	return ret;
 }

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodelist.c,v 1.42 2002/03/11 11:17:29 dwmw2 Exp $
+ * $Id: nodelist.c,v 1.47 2002/06/26 01:25:30 dwmw2 Exp $
  *
  */
 
@@ -45,7 +45,7 @@ void jffs2_add_fd_to_list(struct jffs2_sb_info *c, struct jffs2_full_dirent *new
 	*prev = new;
 
  out:
-	D1(while(*list) {
+	D2(while(*list) {
 		printk(KERN_DEBUG "Dirent \"%s\" (hash 0x%08x, ino #%u\n", (*list)->name, (*list)->nhash, (*list)->ino);
 		list = &(*list)->next;
 	});
@@ -287,17 +287,14 @@ struct jffs2_inode_cache *jffs2_get_ino_cache(struct jffs2_sb_info *c, int ino)
 	D2(printk(KERN_DEBUG "jffs2_get_ino_cache(): ino %u\n", ino));
 	spin_lock (&c->inocache_lock);
 
-	if (c->inocache_last && c->inocache_last->ino == ino) {
-		ret = c->inocache_last;
-	} else {
-		ret = c->inocache_list[ino % INOCACHE_HASHSIZE];
-		while (ret && ret->ino < ino) {
-			ret = ret->next;
-		}
-
-		if (ret && ret->ino != ino)
-			ret = NULL;
+	ret = c->inocache_list[ino % INOCACHE_HASHSIZE];
+	while (ret && ret->ino < ino) {
+		ret = ret->next;
 	}
+	
+	if (ret && ret->ino != ino)
+		ret = NULL;
+
 	spin_unlock(&c->inocache_lock);
 
 	D2(printk(KERN_DEBUG "jffs2_get_ino_cache found %p for ino %u\n", ret, ino));
@@ -318,8 +315,6 @@ void jffs2_add_ino_cache (struct jffs2_sb_info *c, struct jffs2_inode_cache *new
 	new->next = *prev;
 	*prev = new;
 
-	c->inocache_last = new;
-
 	spin_unlock(&c->inocache_lock);
 }
 
@@ -337,8 +332,6 @@ void jffs2_del_ino_cache(struct jffs2_sb_info *c, struct jffs2_inode_cache *old)
 	if ((*prev) == old) {
 		*prev = old->next;
 	}
-	if (c->inocache_last == old)
-		c->inocache_last = NULL;
 
 	spin_unlock(&c->inocache_lock);
 }
@@ -358,7 +351,6 @@ void jffs2_free_ino_caches(struct jffs2_sb_info *c)
 		}
 		c->inocache_list[i] = NULL;
 	}
-	c->inocache_last = NULL;
 }
 
 void jffs2_free_raw_node_refs(struct jffs2_sb_info *c)

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: readinode.c,v 1.71 2002/03/06 12:25:59 dwmw2 Exp $
+ * $Id: readinode.c,v 1.73 2002/05/20 14:56:38 dwmw2 Exp $
  *
  */
 
@@ -313,6 +313,7 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		printk(KERN_NOTICE "MTD read in jffs2_do_read_inode() failed: Returned %d, %ld of %d bytes read\n",
 		       ret, (long)retlen, sizeof(*latest_node));
 		/* FIXME: If this fails, there seems to be a memory leak. Find it. */
+		up(&f->sem);
 		jffs2_do_clear_inode(c, f);
 		return ret?ret:-EIO;
 	}
@@ -320,6 +321,7 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 	crc = crc32(0, latest_node, sizeof(*latest_node)-8);
 	if (crc != latest_node->node_crc) {
 		printk(KERN_NOTICE "CRC failed for read_inode of inode %u at physical location 0x%x\n", ino, fn->raw->flash_offset & ~3);
+		up(&f->sem);
 		jffs2_do_clear_inode(c, f);
 		return -EIO;
 	}
@@ -354,11 +356,13 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		   kept as the metadata node */
 		if (f->metadata) {
 			printk(KERN_WARNING "Argh. Special inode #%u with mode 0%o had metadata node\n", ino, latest_node->mode);
+			up(&f->sem);
 			jffs2_do_clear_inode(c, f);
 			return -EIO;
 		}
 		if (!f->fraglist) {
 			printk(KERN_WARNING "Argh. Special inode #%u with mode 0%o has no fragments\n", ino, latest_node->mode);
+			up(&f->sem);
 			jffs2_do_clear_inode(c, f);
 			return -EIO;
 		}
@@ -366,6 +370,7 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		if (f->fraglist->next) {
 			printk(KERN_WARNING "Argh. Special inode #%u with mode 0%o had more than one node\n", ino, latest_node->mode);
 			/* FIXME: Deal with it - check crc32, check for duplicate node, check times and discard the older one */
+			up(&f->sem);
 			jffs2_do_clear_inode(c, f);
 			return -EIO;
 		}

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: scan.c,v 1.69 2002/03/08 11:03:23 dwmw2 Exp $
+ * $Id: scan.c,v 1.78 2002/07/02 22:48:24 dwmw2 Exp $
  *
  */
 #include <linux/kernel.h>
@@ -38,7 +38,6 @@
 } while(0)
 
 static uint32_t pseudo_random;
-static void jffs2_rotate_lists(struct jffs2_sb_info *c);
 
 static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 
@@ -117,13 +116,23 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
                            not the one with most free space.
                         */
                         if (jeb->free_size > 2*sizeof(struct jffs2_raw_inode) && 
-                                (!c->nextblock || c->nextblock->free_size < jeb->free_size)) {
+			    (jffs2_can_mark_obsolete(c) || jeb->free_size > c->wbuf_pagesize) &&
+			    (!c->nextblock || c->nextblock->free_size < jeb->free_size)) {
                                 /* Better candidate for the next writes to go to */
-                                if (c->nextblock) 
-					list_add(&c->nextblock->list, &c->dirty_list);
+                                if (c->nextblock) {
+					if (VERYDIRTY(c, c->nextblock->dirty_size)) {
+						list_add(&c->nextblock->list, &c->very_dirty_list);
+					} else {
+						list_add(&c->nextblock->list, &c->dirty_list);
+					}
+				}
                                 c->nextblock = jeb;
                         } else {
-                                list_add(&jeb->list, &c->dirty_list);
+				if (VERYDIRTY(c, jeb->dirty_size)) {
+					list_add(&jeb->list, &c->very_dirty_list);
+				} else {
+					list_add(&jeb->list, &c->dirty_list);
+				}
                         }
 			break;
 
@@ -143,14 +152,26 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 			bad_blocks++;
 			break;
 		default:
-			printk("jffs2_scan_medium(): unknown block state\n");
+			printk(KERN_WARNING "jffs2_scan_medium(): unknown block state\n");
 			BUG();	
 		}
 	}
 
-	/* Rotate the lists by some number to ensure wear levelling */
-	jffs2_rotate_lists(c);
+	if (!jffs2_can_mark_obsolete(c) && c->nextblock && (c->nextblock->free_size & (c->wbuf_pagesize-1))) {
+		/* If we're going to start writing into a block which already 
+		   contains data, and the end of the data isn't page-aligned,
+		   skip a little and align it. */
 
+		uint32_t skip = c->nextblock->free_size & (c->wbuf_pagesize-1);
+
+		D1(printk(KERN_DEBUG "jffs2_scan_medium(): Skipping %d bytes in nextblock to ensure page alignment\n",
+			  skip));
+		c->nextblock->dirty_size += skip;
+		c->dirty_size += skip;
+
+		c->nextblock->free_size -= skip;
+		c->free_size -= skip;
+	}
 	if (c->nr_erasing_blocks) {
 		if ( !c->used_size && ((empty_blocks+bad_blocks)!= c->nr_blocks || bad_blocks == c->nr_blocks) ) {
 			printk(KERN_NOTICE "Cowardly refusing to erase blocks on filesystem with no valid JFFS2 nodes\n");
@@ -221,7 +242,9 @@ static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblo
 	while(ofs < jeb->offset + c->sector_size) {
 		size_t retlen;
 		ACCT_PARANOIA_CHECK(jeb);
-		
+
+		cond_resched();
+
 		if (ofs & 3) {
 			printk(KERN_WARNING "Eep. ofs 0x%08x not word-aligned!\n", ofs);
 			ofs = (ofs+3)&~3;
@@ -319,9 +342,9 @@ static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblo
 			break;
 
 		case JFFS2_NODETYPE_CLEANMARKER:
-			if (node.totlen != sizeof(struct jffs2_unknown_node)) {
+			if (node.totlen != c->cleanmarker_size) {
 				printk(KERN_NOTICE "CLEANMARKER node found at 0x%08x has totlen 0x%x != normal 0x%x\n", 
-				       ofs, node.totlen, sizeof(struct jffs2_unknown_node));
+				       ofs, node.totlen, c->cleanmarker_size);
 				DIRTY_SPACE(PAD(sizeof(struct jffs2_unknown_node)));
 			} else if (jeb->first_node) {
 				printk(KERN_NOTICE "CLEANMARKER node found at 0x%08x, not first node in block (0x%08x)\n", ofs, jeb->offset);
@@ -345,6 +368,11 @@ static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblo
 			ofs += PAD(sizeof(struct jffs2_unknown_node));
 			break;
 
+		case JFFS2_NODETYPE_PADDING:
+			DIRTY_SPACE(PAD(node.totlen));
+			ofs += PAD(node.totlen);
+			break;
+
 		default:
 			switch (node.nodetype & JFFS2_COMPAT_MASK) {
 			case JFFS2_FEATURE_ROCOMPAT:
@@ -354,7 +382,7 @@ static int jffs2_scan_eraseblock (struct jffs2_sb_info *c, struct jffs2_eraseblo
 					return -EROFS;
 				DIRTY_SPACE(PAD(node.totlen));
 				ofs += PAD(node.totlen);
-				continue;
+				break;
 
 			case JFFS2_FEATURE_INCOMPAT:
 				printk(KERN_NOTICE "Incompatible feature node (0x%04x) found at offset 0x%08x\n", node.nodetype, ofs);
@@ -600,7 +628,7 @@ static int jffs2_scan_inode_node(struct jffs2_sb_info *c, struct jffs2_erasebloc
 		if (!jeb->used_size) {
 			D1(printk(KERN_DEBUG "No valid nodes yet found in this eraseblock 0x%08x, so obsoleting the new instance at 0x%08x\n", 
 				  jeb->offset, raw->flash_offset & ~3));
-			ri.nodetype &= ~JFFS2_NODE_ACCURATE;
+ 			ri.nodetype &= ~JFFS2_NODE_ACCURATE;
 			/* Perhaps we could also mark it as such on the medium. Maybe later */
 		}
 		break;
@@ -626,7 +654,11 @@ static int jffs2_scan_inode_node(struct jffs2_sb_info *c, struct jffs2_erasebloc
 		tn->version = ri.version;
 
 		USED_SPACE(PAD(ri.totlen));
-		jffs2_add_tn_to_list(tn, &ic->scan->tmpnodes);
+
+		/* No need to scan from the beginning of the list again. 
+		   We can start from tn_list instead (Thanks Jocke) */
+		jffs2_add_tn_to_list(tn, tn_list);
+
 		/* Make sure the one we just added is the _last_ in the list
 		   with this version number, so the older ones get obsoleted */
 		while (tn->next && tn->next->version == tn->version) {
@@ -789,22 +821,84 @@ static void rotate_list(struct list_head *head, uint32_t count)
 	list_add(head, n);
 }
 
-static void jffs2_rotate_lists(struct jffs2_sb_info *c)
+void jffs2_rotate_lists(struct jffs2_sb_info *c)
 {
 	uint32_t x;
+	uint32_t rotateby;
 
 	x = count_list(&c->clean_list);
-	if (x)
-		rotate_list((&c->clean_list), pseudo_random % x);
+	if (x) {
+		rotateby = pseudo_random % x;
+		D1(printk(KERN_DEBUG "Rotating clean_list by %d\n", rotateby));
+
+		rotate_list((&c->clean_list), rotateby);
+
+		D1(printk(KERN_DEBUG "Erase block at front of clean_list is at %08x\n",
+			  list_entry(c->clean_list.next, struct jffs2_eraseblock, list)->offset));
+	} else {
+		D1(printk(KERN_DEBUG "Not rotating empty clean_list\n"));
+	}
+
+	x = count_list(&c->very_dirty_list);
+	if (x) {
+		rotateby = pseudo_random % x;
+		D1(printk(KERN_DEBUG "Rotating very_dirty_list by %d\n", rotateby));
+
+		rotate_list((&c->very_dirty_list), rotateby);
+
+		D1(printk(KERN_DEBUG "Erase block at front of very_dirty_list is at %08x\n",
+			  list_entry(c->very_dirty_list.next, struct jffs2_eraseblock, list)->offset));
+	} else {
+		D1(printk(KERN_DEBUG "Not rotating empty very_dirty_list\n"));
+	}
 
 	x = count_list(&c->dirty_list);
-	if (x)
-		rotate_list((&c->dirty_list), pseudo_random % x);
+	if (x) {
+		rotateby = pseudo_random % x;
+		D1(printk(KERN_DEBUG "Rotating dirty_list by %d\n", rotateby));
 
-	if (c->nr_erasing_blocks)
-		rotate_list((&c->erase_pending_list), pseudo_random % c->nr_erasing_blocks);
+		rotate_list((&c->dirty_list), rotateby);
 
-	if (c->nr_free_blocks) /* Not that it should ever be zero */
-		rotate_list((&c->free_list), pseudo_random % c->nr_free_blocks);
+		D1(printk(KERN_DEBUG "Erase block at front of dirty_list is at %08x\n",
+			  list_entry(c->dirty_list.next, struct jffs2_eraseblock, list)->offset));
+	} else {
+		D1(printk(KERN_DEBUG "Not rotating empty dirty_list\n"));
+	}
 
+	x = count_list(&c->erasable_list);
+	if (x) {
+		rotateby = pseudo_random % x;
+		D1(printk(KERN_DEBUG "Rotating erasable_list by %d\n", rotateby));
+
+		rotate_list((&c->erasable_list), rotateby);
+
+		D1(printk(KERN_DEBUG "Erase block at front of erasable_list is at %08x\n",
+			  list_entry(c->erasable_list.next, struct jffs2_eraseblock, list)->offset));
+	} else {
+		D1(printk(KERN_DEBUG "Not rotating empty erasable_list\n"));
+	}
+
+	if (c->nr_erasing_blocks) {
+		rotateby = pseudo_random % c->nr_erasing_blocks;
+		D1(printk(KERN_DEBUG "Rotating erase_pending_list by %d\n", rotateby));
+
+		rotate_list((&c->erase_pending_list), rotateby);
+
+		D1(printk(KERN_DEBUG "Erase block at front of erase_pending_list is at %08x\n",
+			  list_entry(c->erase_pending_list.next, struct jffs2_eraseblock, list)->offset));
+	} else {
+		D1(printk(KERN_DEBUG "Not rotating empty erase_pending_list\n"));
+	}
+
+	if (c->nr_free_blocks) {
+		rotateby = pseudo_random % c->nr_free_blocks;
+		D1(printk(KERN_DEBUG "Rotating free_list by %d\n", rotateby));
+
+		rotate_list((&c->free_list), rotateby);
+
+		D1(printk(KERN_DEBUG "Erase block at front of free_list is at %08x\n",
+			  list_entry(c->free_list.next, struct jffs2_eraseblock, list)->offset));
+	} else {
+		D1(printk(KERN_DEBUG "Not rotating empty free_list\n"));
+	}
 }

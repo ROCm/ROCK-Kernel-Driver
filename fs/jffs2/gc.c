@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: gc.c,v 1.68 2002/03/08 15:11:24 dwmw2 Exp $
+ * $Id: gc.c,v 1.74 2002/05/20 14:56:38 dwmw2 Exp $
  *
  */
 
@@ -41,14 +41,21 @@ static struct jffs2_eraseblock *jffs2_find_gc_block(struct jffs2_sb_info *c)
 
 	/* Pick an eraseblock to garbage collect next. This is where we'll
 	   put the clever wear-levelling algorithms. Eventually.  */
+	/* We possibly want to favour the dirtier blocks more when the
+	   number of free blocks is low. */
 	if (!list_empty(&c->bad_used_list) && c->nr_free_blocks > JFFS2_RESERVED_BLOCKS_GCBAD) {
 		D1(printk(KERN_DEBUG "Picking block from bad_used_list to GC next\n"));
 		nextlist = &c->bad_used_list;
-	} else if (n < 100 && !list_empty(&c->erasable_list)) {
+	} else if (n < 50 && !list_empty(&c->erasable_list)) {
+		/* Note that most of them will have gone directly to be erased. 
+		   So don't favour the erasable_list _too_ much. */
 		D1(printk(KERN_DEBUG "Picking block from erasable_list to GC next\n"));
 		nextlist = &c->erasable_list;
+	} else if (n < 110 && !list_empty(&c->very_dirty_list)) {
+		/* Most of the time, pick one off the very_dirty list */
+		D1(printk(KERN_DEBUG "Picking block from very_dirty_list to GC next\n"));
+		nextlist = &c->very_dirty_list;
 	} else if (n < 126 && !list_empty(&c->dirty_list)) {
-		/* Most of the time, pick one off the dirty list */
 		D1(printk(KERN_DEBUG "Picking block from dirty_list to GC next\n"));
 		nextlist = &c->dirty_list;
 	} else if (!list_empty(&c->clean_list)) {
@@ -58,12 +65,15 @@ static struct jffs2_eraseblock *jffs2_find_gc_block(struct jffs2_sb_info *c)
 		D1(printk(KERN_DEBUG "Picking block from dirty_list to GC next (clean_list was empty)\n"));
 
 		nextlist = &c->dirty_list;
+	} else if (!list_empty(&c->very_dirty_list)) {
+		D1(printk(KERN_DEBUG "Picking block from very_dirty_list to GC next (clean_list and dirty_list were empty)\n"));
+		nextlist = &c->very_dirty_list;
 	} else if (!list_empty(&c->erasable_list)) {
-		D1(printk(KERN_DEBUG "Picking block from erasable_list to GC next (clean_list and dirty_list were empty)\n"));
+		D1(printk(KERN_DEBUG "Picking block from erasable_list to GC next (clean_list and {very_,}dirty_list were empty)\n"));
 
 		nextlist = &c->erasable_list;
 	} else {
-		/* Eep. Both were empty */
+		/* Eep. All were empty */
 		printk(KERN_NOTICE "jffs2: No clean, dirty _or_ erasable blocks to GC from! Where are they all?\n");
 		return NULL;
 	}
@@ -76,6 +86,8 @@ static struct jffs2_eraseblock *jffs2_find_gc_block(struct jffs2_sb_info *c)
 		printk(KERN_WARNING "Eep. ret->gc_node for block at 0x%08x is NULL\n", ret->offset);
 		BUG();
 	}
+
+	D1(jffs2_dump_block_lists(c));
 	return ret;
 }
 
@@ -114,7 +126,9 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 		return -EIO;
 	}
 
-	D1(printk(KERN_DEBUG "garbage collect from block at phys 0x%08x\n", jeb->offset));
+	D1(printk(KERN_DEBUG "GC from block %08x, used_size %08x, dirty_size %08x, free_size %08x\n", jeb->offset, jeb->used_size, jeb->dirty_size, jeb->free_size));
+	D1(if (c->nextblock)
+	   printk(KERN_DEBUG "Nextblock at  %08x, used_size %08x, dirty_size %08x, free_size %08x\n", c->nextblock->offset, c->nextblock->used_size, c->nextblock->dirty_size, c->nextblock->free_size));
 
 	if (!jeb->used_size)
 		goto eraseit;
@@ -582,9 +596,21 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 			jffs2_mark_node_obsolete(c, f->metadata->raw);
 			jffs2_free_full_dnode(f->metadata);
 			f->metadata = NULL;
-			return 0;
 		}
+		return 0;
 	}
+
+	/* 
+	 * We should only get here in the case where the node we are
+	 * replacing had more than one frag, so we kept the same version
+	 * number as before. (Except in case of error -- see 'goto fill;' 
+	 * above.)
+	 */
+	D1(if(unlikely(fn->frags <= 1)) {
+		printk(KERN_WARNING "jffs2_garbage_collect_hole: Replacing fn with %d frag(s) but new ver %d != highest_version %d of ino #%d\n",
+		       fn->frags, ri.version, f->highest_version, ri.ino);
+	});
+
 	for (frag = f->fraglist; frag; frag = frag->next) {
 		if (frag->ofs > fn->size + fn->ofs)
 			break;

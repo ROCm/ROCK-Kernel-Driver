@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: compr_zlib.c,v 1.15 2002/03/04 09:35:48 dwmw2 Exp $
+ * $Id: compr_zlib.c,v 1.18 2002/05/20 14:56:37 dwmw2 Exp $
  *
  */
 
@@ -41,21 +41,21 @@ int __init jffs2_zlib_init(void)
 {
 	deflate_workspace = vmalloc(zlib_deflate_workspacesize());
 	if (!deflate_workspace) {
-		printk("Failed to allocate %d bytes for deflate workspace\n", zlib_deflate_workspacesize());
+		printk(KERN_WARNING "Failed to allocate %d bytes for deflate workspace\n", zlib_deflate_workspacesize());
 		return -ENOMEM;
 	}
-	D1(printk("Allocated %d bytes for deflate workspace\n", zlib_deflate_workspacesize()));
+	D1(printk(KERN_DEBUG "Allocated %d bytes for deflate workspace\n", zlib_deflate_workspacesize()));
 	inflate_workspace = vmalloc(zlib_inflate_workspacesize());
 	if (!inflate_workspace) {
-		printk("Failed to allocate %d bytes for inflate workspace\n", zlib_inflate_workspacesize());
+		printk(KERN_WARNING "Failed to allocate %d bytes for inflate workspace\n", zlib_inflate_workspacesize());
 		vfree(deflate_workspace);
 		return -ENOMEM;
 	}
-	D1(printk("Allocated %d bytes for inflate workspace\n", zlib_inflate_workspacesize()));
+	D1(printk(KERN_DEBUG "Allocated %d bytes for inflate workspace\n", zlib_inflate_workspacesize()));
 	return 0;
 }
 
-void __exit jffs2_zlib_exit(void)
+void jffs2_zlib_exit(void)
 {
 	vfree(deflate_workspace);
 	vfree(inflate_workspace);

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: fs.c,v 1.4 2002/03/11 12:36:59 dwmw2 Exp $
+ * $Id: fs.c,v 1.13 2002/07/02 22:48:24 dwmw2 Exp $
  *
  */
 
@@ -44,121 +44,9 @@ int jffs2_statfs(struct super_block *sb, struct statfs *buf)
 
 	buf->f_bavail = buf->f_bfree = avail >> PAGE_SHIFT;
 
-#if CONFIG_JFFS2_FS_DEBUG > 0
-	printk(KERN_DEBUG "STATFS:\n");
-	printk(KERN_DEBUG "flash_size: %08x\n", c->flash_size);
-	printk(KERN_DEBUG "used_size: %08x\n", c->used_size);
-	printk(KERN_DEBUG "dirty_size: %08x\n", c->dirty_size);
-	printk(KERN_DEBUG "free_size: %08x\n", c->free_size);
-	printk(KERN_DEBUG "erasing_size: %08x\n", c->erasing_size);
-	printk(KERN_DEBUG "bad_size: %08x\n", c->bad_size);
-	printk(KERN_DEBUG "sector_size: %08x\n", c->sector_size);
-	printk(KERN_DEBUG "jffs2_reserved_blocks size: %08x\n",c->sector_size * JFFS2_RESERVED_BLOCKS_WRITE);
-
-	if (c->nextblock) {
-		printk(KERN_DEBUG "nextblock: 0x%08x\n", c->nextblock->offset);
-	} else {
-		printk(KERN_DEBUG "nextblock: NULL\n");
-	}
-	if (c->gcblock) {
-		printk(KERN_DEBUG "gcblock: 0x%08x\n", c->gcblock->offset);
-	} else {
-		printk(KERN_DEBUG "gcblock: NULL\n");
-	}
-	if (list_empty(&c->clean_list)) {
-		printk(KERN_DEBUG "clean_list: empty\n");
-	} else {
-		struct list_head *this;
-
-		list_for_each(this, &c->clean_list) {
-			struct jffs2_eraseblock *jeb = list_entry(this, struct jffs2_eraseblock, list);
-			printk(KERN_DEBUG "clean_list: %08x\n", jeb->offset);
-		}
-	}
-	if (list_empty(&c->dirty_list)) {
-		printk(KERN_DEBUG "dirty_list: empty\n");
-	} else {
-		struct list_head *this;
-
-		list_for_each(this, &c->dirty_list) {
-			struct jffs2_eraseblock *jeb = list_entry(this, struct jffs2_eraseblock, list);
-			printk(KERN_DEBUG "dirty_list: %08x\n", jeb->offset);
-		}
-	}
-	if (list_empty(&c->erasable_list)) {
-		printk(KERN_DEBUG "erasable_list: empty\n");
-	} else {
-		struct list_head *this;
-
-		list_for_each(this, &c->erasable_list) {
-			struct jffs2_eraseblock *jeb = list_entry(this, struct jffs2_eraseblock, list);
-			printk(KERN_DEBUG "erasable_list: %08x\n", jeb->offset);
-		}
-	}
-	if (list_empty(&c->erasing_list)) {
-		printk(KERN_DEBUG "erasing_list: empty\n");
-	} else {
-		struct list_head *this;
-
-		list_for_each(this, &c->erasing_list) {
-			struct jffs2_eraseblock *jeb = list_entry(this, struct jffs2_eraseblock, list);
-			printk(KERN_DEBUG "erasing_list: %08x\n", jeb->offset);
-		}
-	}
-	if (list_empty(&c->erase_pending_list)) {
-		printk(KERN_DEBUG "erase_pending_list: empty\n");
-	} else {
-		struct list_head *this;
-
-		list_for_each(this, &c->erase_pending_list) {
-			struct jffs2_eraseblock *jeb = list_entry(this, struct jffs2_eraseblock, list);
-			printk(KERN_DEBUG "erase_pending_list: %08x\n", jeb->offset);
-		}
-	}
-	if (list_empty(&c->erasable_pending_wbuf_list)) {
-		printk(KERN_DEBUG "erasable_pending_wbuf_list: empty\n");
-	} else {
-		struct list_head *this;
-
-		list_for_each(this, &c->erasable_pending_wbuf_list) {
-			struct jffs2_eraseblock *jeb = list_entry(this, struct jffs2_eraseblock, list);
-			printk(KERN_DEBUG "erase_pending_wbuf_list: %08x\n", jeb->offset);
-		}
-	}
-	if (list_empty(&c->free_list)) {
-		printk(KERN_DEBUG "free_list: empty\n");
-	} else {
-		struct list_head *this;
-
-		list_for_each(this, &c->free_list) {
-			struct jffs2_eraseblock *jeb = list_entry(this, struct jffs2_eraseblock, list);
-			printk(KERN_DEBUG "free_list: %08x\n", jeb->offset);
-		}
-	}
-	if (list_empty(&c->bad_list)) {
-		printk(KERN_DEBUG "bad_list: empty\n");
-	} else {
-		struct list_head *this;
-
-		list_for_each(this, &c->bad_list) {
-			struct jffs2_eraseblock *jeb = list_entry(this, struct jffs2_eraseblock, list);
-			printk(KERN_DEBUG "bad_list: %08x\n", jeb->offset);
-		}
-	}
-	if (list_empty(&c->bad_used_list)) {
-		printk(KERN_DEBUG "bad_used_list: empty\n");
-	} else {
-		struct list_head *this;
-
-		list_for_each(this, &c->bad_used_list) {
-			struct jffs2_eraseblock *jeb = list_entry(this, struct jffs2_eraseblock, list);
-			printk(KERN_DEBUG "bad_used_list: %08x\n", jeb->offset);
-		}
-	}
-#endif /* CONFIG_JFFS2_FS_DEBUG */
+	D1(jffs2_dump_block_lists(c));
 
 	spin_unlock_bh(&c->erase_completion_lock);
-
 
 	return 0;
 }
@@ -250,9 +138,9 @@ void jffs2_read_inode (struct inode *inode)
 		if (jffs2_read_dnode(c, f->metadata, (char *)&rdev, 0, sizeof(rdev)) < 0) {
 			/* Eep */
 			printk(KERN_NOTICE "Read device numbers for inode %lu failed\n", (unsigned long)inode->i_ino);
+			up(&f->sem);
 			jffs2_do_clear_inode(c, f);
 			make_bad_inode(inode);
-			up(&f->sem);
 			return;
 		}			
 
@@ -301,11 +189,19 @@ void jffs2_write_super (struct super_block *sb)
 	if (sb->s_flags & MS_RDONLY)
 		return;
 
-	D1(printk("jffs2_write_super(): flush_wbuf before gc-trigger\n"));
-	jffs2_flush_wbuf(c, 2);
+	D1(printk(KERN_DEBUG "jffs2_write_super(): flush_wbuf before gc-trigger\n"));
 	jffs2_garbage_collect_trigger(c);
 	jffs2_erase_pending_blocks(c);
 	jffs2_mark_erased_blocks(c);
+	/* Eep. If we lock this here, we deadlock with jffs2_reserve_space() when
+	 * it locks the alloc_sem and jffs2_do_reserve_space() waits for erases
+	 * to happen. I think the erases and/or the flush_wbuf want doing from
+	 *
+	 */
+	if (!down_trylock(&c->alloc_sem)) {
+		jffs2_flush_wbuf(c, 2);
+		up(&c->alloc_sem);
+	} // else it stays dirty. FIXME.
 }
 
 
@@ -370,33 +266,61 @@ int jffs2_do_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct jffs2_sb_info *c;
 	struct inode *root_i;
+	int ret;
 
 	c = JFFS2_SB_INFO(sb);
 
 	c->sector_size = c->mtd->erasesize;
 	c->flash_size = c->mtd->size;
 
+#if 0
 	if (c->sector_size < 0x10000) {
 		printk(KERN_INFO "jffs2: Erase block size too small (%dKiB). Using 64KiB instead\n",
 		       c->sector_size / 1024);
 		c->sector_size = 0x10000;
 	}
+#endif
 	if (c->flash_size < 5*c->sector_size) {
 		printk(KERN_ERR "jffs2: Too few erase blocks (%d)\n",
 		       c->flash_size / c->sector_size);
 		return -EINVAL;
 	}
+
+	c->cleanmarker_size = sizeof(struct jffs2_unknown_node);
+	/* Jörn -- stick alignment for weird 8-byte-page flash here */
+
+	if (jffs2_cleanmarker_oob(c)) {
+		/* Cleanmarker is out-of-band, so inline size zero */
+		c->cleanmarker_size = 0;
+	}
+
 	if (c->mtd->type == MTD_NANDFLASH) {
 		/* Initialise write buffer */
 		c->wbuf_pagesize = c->mtd->oobblock;
 		c->wbuf_ofs = 0xFFFFFFFF;
 		c->wbuf = kmalloc(c->wbuf_pagesize, GFP_KERNEL);
 		if (!c->wbuf)
-			goto out_mtd;
+			return -ENOMEM;
+
+		/* Initialize process for timed wbuf flush */
+		INIT_TQUEUE(&c->wbuf_task,(void*) jffs2_wbuf_process, (void *)c);
+		/* Initialize timer for timed wbuf flush */
+		init_timer(&c->wbuf_timer);
+		c->wbuf_timer.function = jffs2_wbuf_timeout;
+		c->wbuf_timer.data = (unsigned long) c;
 	}
 
-	if (jffs2_do_mount_fs(c))
-		goto out_mtd;
+	c->inocache_list = kmalloc(INOCACHE_HASHSIZE * sizeof(struct jffs2_inode_cache *), GFP_KERNEL);
+	if (!c->inocache_list) {
+		ret = -ENOMEM;
+		goto out_wbuf;
+	}
+	memset(c->inocache_list, 0, INOCACHE_HASHSIZE * sizeof(struct jffs2_inode_cache *));
+
+	if ((ret = jffs2_do_mount_fs(c)))
+		goto out_inohash;
+
+	ret = -EINVAL;
 
 	D1(printk(KERN_DEBUG "jffs2_do_fill_super(): Getting root inode\n"));
 	root_i = iget(sb, 1);
@@ -426,6 +350,10 @@ int jffs2_do_fill_super(struct super_block *sb, void *data, int silent)
 	jffs2_free_ino_caches(c);
 	jffs2_free_raw_node_refs(c);
 	kfree(c->blocks);
- out_mtd:
-	return -EINVAL;
+ out_inohash:
+	kfree(c->inocache_list);
+ out_wbuf:
+	if (c->wbuf)
+		kfree(c->wbuf);
+	return ret;
 }

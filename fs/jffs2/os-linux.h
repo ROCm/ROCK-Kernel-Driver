@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: os-linux.h,v 1.16 2002/03/17 10:18:42 dwmw2 Exp $
+ * $Id: os-linux.h,v 1.19 2002/05/20 14:56:38 dwmw2 Exp $
  *
  */
 
@@ -77,6 +77,8 @@ static inline void jffs2_init_inode_info(struct jffs2_inode_info *f)
 #define jffs2_nand_read_failcnt(c,jeb) do { ; } while(0)
 #define jffs2_write_nand_badblock(c,jeb) do { ; } while(0)
 #define jffs2_flash_writev jffs2_flash_direct_writev
+#define jffs2_wbuf_timeout NULL
+#define jffs2_wbuf_process NULL
 
 #else /* NAND support present */
 
@@ -95,6 +97,8 @@ int jffs2_check_oob_empty(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb,
 int jffs2_check_nand_cleanmarker(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 int jffs2_write_nand_cleanmarker(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 int jffs2_write_nand_badblock(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
+void jffs2_wbuf_timeout(unsigned long data);
+void jffs2_wbuf_process(void *data);
 #endif /* NAND */
 
 /* background.c */
