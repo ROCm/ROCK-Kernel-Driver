@@ -913,7 +913,7 @@ struct sk_buff *sock_alloc_send_skb(struct sock *sk, unsigned long size,
 	return sock_alloc_send_pskb(sk, size, 0, noblock, errcode);
 }
 
-void __lock_sock(struct sock *sk)
+static void __lock_sock(struct sock *sk)
 {
 	DEFINE_WAIT(wait);
 
@@ -929,7 +929,7 @@ void __lock_sock(struct sock *sk)
 	finish_wait(&sk->sk_lock.wq, &wait);
 }
 
-void __release_sock(struct sock *sk)
+static void __release_sock(struct sock *sk)
 {
 	struct sk_buff *skb = sk->sk_backlog.head;
 
@@ -1359,8 +1359,6 @@ void sk_free_slab(struct proto *prot)
 
 EXPORT_SYMBOL(sk_free_slab);
 
-EXPORT_SYMBOL(__lock_sock);
-EXPORT_SYMBOL(__release_sock);
 EXPORT_SYMBOL(sk_alloc);
 EXPORT_SYMBOL(sk_free);
 EXPORT_SYMBOL(sk_send_sigurg);
