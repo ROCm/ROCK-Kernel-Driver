@@ -11,6 +11,7 @@
 #include <linux/errno.h>
 #include <linux/mm.h>
 #include <linux/highmem.h>
+#include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 
 #include <asm/pgtable.h>

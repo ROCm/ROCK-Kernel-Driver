@@ -105,9 +105,9 @@ smb_readpage(struct file *file, struct page *page)
 	int		error;
 	struct dentry  *dentry = file->f_dentry;
 
-	get_page(page);
+	page_cache_get(page);
 	error = smb_readpage_sync(dentry, page);
-	put_page(page);
+	page_cache_release(page);
 	return error;
 }
 
@@ -194,11 +194,11 @@ smb_writepage(struct page *page)
 	if (page->index >= end_index+1 || !offset)
 		return -EIO;
 do_it:
-	get_page(page);
+	page_cache_get(page);
 	err = smb_writepage_sync(inode, page, 0, offset);
 	SetPageUptodate(page);
 	unlock_page(page);
-	put_page(page);
+	page_cache_release(page);
 	return err;
 }
 

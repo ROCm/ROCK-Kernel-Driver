@@ -33,6 +33,7 @@
 #include <linux/smp_lock.h>
 #include <linux/compiler.h>
 #include <linux/highmem.h>
+#include <linux/pagemap.h>
 
 #include <asm/uaccess.h>
 #include <asm/param.h>
@@ -1249,7 +1250,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 					flush_page_to_ram(page);
 					kunmap(page);
 				}
-				put_page(page);
+				page_cache_release(page);
 			}
 		}
 	}
