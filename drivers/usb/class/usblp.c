@@ -851,7 +851,7 @@ static int usblp_probe(struct usb_interface *intf,
 		       const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev (intf);
-	struct usblp *usblp = 0;
+	struct usblp *usblp = NULL;
 	int protocol;
 	int retval;
 
@@ -1019,7 +1019,7 @@ static int usblp_select_alts(struct usblp *usblp)
 			continue;
 
 		/* Look for bulk OUT and IN endpoints. */
-		epwrite = epread = 0;
+		epwrite = epread = NULL;
 		for (e = 0; e < ifd->desc.bNumEndpoints; e++) {
 			epd = &ifd->endpoint[e].desc;
 

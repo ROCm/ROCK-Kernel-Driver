@@ -1090,10 +1090,10 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 {
 	struct usbdevfs_ioctl	ctrl;
 	int			size;
-	void			*buf = 0;
+	void			*buf = NULL;
 	int			retval = 0;
-	struct usb_interface    *intf = 0;
-	struct usb_driver       *driver = 0;
+	struct usb_interface    *intf = NULL;
+	struct usb_driver       *driver = NULL;
 
 	/* get input parameters and alloc buffer */
 	if (copy_from_user(&ctrl, arg, sizeof (ctrl)))
