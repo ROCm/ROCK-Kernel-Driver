@@ -702,7 +702,7 @@ config PC_KEYBOARD
 
 config SERIAL_CONSOLE
 	bool
-	depends on 8xx || CPM2
+	depends on 8xx
 	default y
 
 config SERIAL_CONSOLE_BAUD

@@ -5,9 +5,6 @@
 menu "CPM2 Options"
 	depends on CPM2
 
-config SCC_CONSOLE
-	bool "Enable SCC Console"
-
 config SCC_ENET
 	bool "CPM SCC Ethernet"
 	depends on NET_ETHERNET
