@@ -648,7 +648,6 @@ static void hwif_register (ide_hwif_t *hwif)
 {
 	/* register with global device tree */
 	strlcpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
-	snprintf(hwif->gendev.name,DEVICE_NAME_SIZE,"IDE Controller");
 	hwif->gendev.driver_data = hwif;
 	if (hwif->pci_dev)
 		hwif->gendev.parent = &hwif->pci_dev->dev;
@@ -1217,8 +1216,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 		ide_add_generic_settings(drive);
 		snprintf(drive->gendev.bus_id,BUS_ID_SIZE,"%u.%u",
 			 hwif->index,unit);
-		snprintf(drive->gendev.name,DEVICE_NAME_SIZE,
-			 "%s","IDE Drive");
 		drive->gendev.parent = &hwif->gendev;
 		drive->gendev.bus = &ide_bus_type;
 		drive->gendev.driver_data = drive;

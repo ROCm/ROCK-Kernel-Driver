@@ -372,9 +372,6 @@ static struct device_driver tcic_driver = {
 static struct platform_device tcic_device = {
 	.name = "tcic-pcmcia",
 	.id = 0,
-	.dev = {
-		.name = "tcic-pcmcia",
-	},
 };
 
 

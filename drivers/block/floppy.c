@@ -4232,9 +4232,6 @@ static int have_no_fdc= -ENODEV;
 static struct platform_device floppy_device = {
 	.name		= "floppy",
 	.id		= 0,
-	.dev		= {
-		.name	= "Floppy Drive",
-	},
 };
 
 static struct kobject *floppy_find(dev_t dev, int *part, void *data)
