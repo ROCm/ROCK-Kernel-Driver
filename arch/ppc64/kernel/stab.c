@@ -474,14 +474,14 @@ static void preload_slb(struct task_struct *tsk, struct mm_struct *mm)
 void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 {
 	unsigned long offset = __get_cpu_var(stab_cache_ptr);
+	union {
+		unsigned long word0;
+		slb_dword0 data;
+	} esid_data;
+
 
 	if (offset <= NR_STAB_CACHE_ENTRIES) {
 		int i;
-		union {
-			unsigned long word0;
-			slb_dword0 data;
-		} esid_data;
-
 		asm volatile("isync" : : : "memory");
 		for (i = 0; i < offset; i++) {
 			esid_data.word0 = 0;
@@ -491,6 +491,17 @@ void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 		asm volatile("isync" : : : "memory");
 	} else {
 		asm volatile("isync; slbia; isync" : : : "memory");
+	}
+
+	/* Workaround POWER5 < DD2.1 issue */
+	if (offset == 1 || offset > NR_STAB_CACHE_ENTRIES) {
+		/* 
+		 * flush segment in EEH region, we dont normally access
+		 * addresses in this region.
+		 */
+		esid_data.word0 = 0;
+		esid_data.data.esid = EEH_REGION_ID;
+		asm volatile("slbie %0" : : "r" (esid_data));
 	}
 
 	__get_cpu_var(stab_cache_ptr) = 0;
