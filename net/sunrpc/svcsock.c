@@ -1255,6 +1255,7 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 
 	/* No data, incomplete (TCP) read, or accept() */
 	if (len == 0 || len == -EAGAIN) {
+		rqstp->rq_res.len = 0;
 		svc_sock_release(rqstp);
 		return -EAGAIN;
 	}
