@@ -58,49 +58,6 @@ void cpu_idle (void)
 	(*idle) ();
 }
 
-struct spec_reg_name {
-	const char *name;
-	int gpr;
-};
-
-struct spec_reg_name spec_reg_names[] = {
-	{ "sp", GPR_SP },
-	{ "gp", GPR_GP },
-	{ "tp", GPR_TP },
-	{ "ep", GPR_EP },
-	{ "lp", GPR_LP },
-	{ 0, 0 }
-};
-
-void show_regs (struct pt_regs *regs)
-{
-	int gpr_base, gpr_offs;
-
-	printk ("     pc 0x%08lx    psw 0x%08lx                       kernel_mode %d\n",
-		regs->pc, regs->psw, regs->kernel_mode);
-	printk ("   ctpc 0x%08lx  ctpsw 0x%08lx   ctbp 0x%08lx\n",
-		regs->ctpc, regs->ctpsw, regs->ctbp);
-
-	for (gpr_base = 0; gpr_base < NUM_GPRS; gpr_base += 4) {
-		for (gpr_offs = 0; gpr_offs < 4; gpr_offs++) {
-			int gpr = gpr_base + gpr_offs;
-			long val = regs->gpr[gpr];
-			struct spec_reg_name *srn;
-
-			for (srn = spec_reg_names; srn->name; srn++)
-				if (srn->gpr == gpr)
-					break;
-
-			if (srn->name)
-				printk ("%7s 0x%08lx", srn->name, val);
-			else
-				printk ("    r%02d 0x%08lx", gpr, val);
-		}
-
-		printk ("\n");
-	}
-}
-
 /*
  * This is the mechanism for creating a new kernel thread.
  *

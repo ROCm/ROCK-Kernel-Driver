@@ -60,3 +60,76 @@ void unexpected_reset (unsigned long ret_addr, unsigned long kmode,
 	machine_halt ();
 }
 #endif /* CONFIG_RESET_GUARD */
+
+
+
+struct spec_reg_name {
+	const char *name;
+	int gpr;
+};
+
+struct spec_reg_name spec_reg_names[] = {
+	{ "sp", GPR_SP },
+	{ "gp", GPR_GP },
+	{ "tp", GPR_TP },
+	{ "ep", GPR_EP },
+	{ "lp", GPR_LP },
+	{ 0, 0 }
+};
+
+void show_regs (struct pt_regs *regs)
+{
+	int gpr_base, gpr_offs;
+
+	printk ("     pc 0x%08lx    psw 0x%08lx                       kernel_mode %d\n",
+		regs->pc, regs->psw, regs->kernel_mode);
+	printk ("   ctpc 0x%08lx  ctpsw 0x%08lx   ctbp 0x%08lx\n",
+		regs->ctpc, regs->ctpsw, regs->ctbp);
+
+	for (gpr_base = 0; gpr_base < NUM_GPRS; gpr_base += 4) {
+		for (gpr_offs = 0; gpr_offs < 4; gpr_offs++) {
+			int gpr = gpr_base + gpr_offs;
+			long val = regs->gpr[gpr];
+			struct spec_reg_name *srn;
+
+			for (srn = spec_reg_names; srn->name; srn++)
+				if (srn->gpr == gpr)
+					break;
+
+			if (srn->name)
+				printk ("%7s 0x%08lx", srn->name, val);
+			else
+				printk ("    r%02d 0x%08lx", gpr, val);
+		}
+
+		printk ("\n");
+	}
+}
+
+void show_stack (unsigned long *sp)
+{
+	unsigned long end;
+	unsigned long addr = (unsigned long)sp;
+
+	if (! addr)
+		addr = stack_addr ();
+
+	addr = addr & ~3;
+	end = (addr + THREAD_SIZE - 1) & THREAD_MASK;
+
+	while (addr < end) {
+		printk ("%8lX: ", addr);
+		while (addr < end) {
+			printk (" %8lX", *(unsigned long *)addr);
+			addr += sizeof (unsigned long);
+			if (! (addr & 0xF))
+				break;
+		}
+		printk ("\n");
+	}
+}
+
+void dump_stack ()
+{
+	show_stack (0);
+}
