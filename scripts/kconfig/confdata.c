@@ -408,6 +408,7 @@ int conf_write(const char *name)
 	if (out_h) {
 		fclose(out_h);
 		rename(".tmpconfig.h", "include/linux/autoconf.h");
+		file_write_dep(NULL);
 	}
 	if (!name || basename != conf_def_filename) {
 		if (!name)
