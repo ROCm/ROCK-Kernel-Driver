@@ -106,7 +106,7 @@ cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 
 quiet_cmd_cc_lst_c = MKLST   $@
       cmd_cc_lst_c = $(CC) $(c_flags) -g -c -o $*.o $< && \
-		     $(CONFIG_SHELL) $(src)/scripts/makelst $*.o \
+		     $(CONFIG_SHELL) $(srctree)/scripts/makelst $*.o \
 				     System.map $(OBJDUMP) > $@
 
 %.lst: %.c FORCE
