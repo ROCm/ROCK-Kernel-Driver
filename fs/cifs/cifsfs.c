@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/cifsfs.c
  *
- *   Copyright (C) International Business Machines  Corp., 2002,2003
+ *   Copyright (C) International Business Machines  Corp., 2002,2004
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   Common Internet FileSystem (CIFS) client
@@ -537,12 +537,18 @@ struct file_operations cifs_file_ops = {
 	.flush = cifs_flush,
 	.mmap  = cifs_file_mmap,
 	.sendfile = generic_file_sendfile,
+#ifdef CIFS_FCNTL
+	.fcntl = cifs_fcntl,
+#endif
 };
 
 struct file_operations cifs_dir_ops = {
 	.readdir = cifs_readdir,
 	.release = cifs_closedir,
 	.read    = generic_read_dir,
+#ifdef CIFS_FCNTL
+	.fcntl   = cifs_fcntl,
+#endif
 };
 
 static void

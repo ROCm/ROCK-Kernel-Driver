@@ -1,3 +1,8 @@
+Version 1.09
+------------
+Fix /proc/fs module unload warning message (that could be logged
+to the kernel log)
+
 Version 1.08
 ------------
 Allow file_mode and dir_mode (specified at mount time) to be enforced
