@@ -30,14 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <linux/types.h>
-#include <linux/slab.h>
-
-#include <xfs_types.h>
-#include "kmem.h"
-#include "spin.h"
-#include "debug.h"
-#include "ktrace.h"
+#include <xfs.h>
 
 static kmem_zone_t *ktrace_hdr_zone;
 static kmem_zone_t *ktrace_ent_zone;
