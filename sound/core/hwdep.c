@@ -292,9 +292,7 @@ static int snd_hwdep_control_ioctl(snd_card_t * card, snd_ctl_file_t * control,
 
 static struct file_operations snd_hwdep_f_ops =
 {
-#ifndef LINUX_2_2
 	.owner = 	THIS_MODULE,
-#endif
 	.llseek =	snd_hwdep_llseek,
 	.read = 	snd_hwdep_read,
 	.write =	snd_hwdep_write,

@@ -43,10 +43,8 @@
 #endif	/* CS4231 */
 #include <sound/mpu401.h>
 #include <sound/opl3.h>
-#ifdef USE_OPL4
 #ifndef OPTi93X
-#include "opl4.h" /* <sound/opl4.h> */
-#endif
+#include <sound/opl4.h>
 #endif
 #define SNDRV_LEGACY_FIND_FREE_IRQ
 #define SNDRV_LEGACY_FIND_FREE_DMA
@@ -2105,7 +2103,6 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 
 	if (chip->fm_port > 0) {
 		opl3_t *opl3 = NULL;
-#ifdef USE_OPL4
 #ifndef OPTi93X
 		if (chip->hardware == OPTi9XX_HW_82C928 ||
 		    chip->hardware == OPTi9XX_HW_82C929 ||
@@ -2124,7 +2121,6 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 			}
 		}
 #endif	/* !OPTi93X */
-#endif
 		if (!opl3 && snd_opl3_create(card,
 					     chip->fm_port,
 					     chip->fm_port + 2,

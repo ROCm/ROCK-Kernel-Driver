@@ -154,9 +154,7 @@ static int snd_open(struct inode *inode, struct file *file)
 
 struct file_operations snd_fops =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.open =		snd_open
 };
 
@@ -366,9 +364,6 @@ static int __init alsa_sound_init(void)
 #ifndef MODULE
 	printk(KERN_INFO "Advanced Linux Sound Architecture Driver Version " CONFIG_SND_VERSION CONFIG_SND_DATE ".\n");
 #endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) && defined(CONFIG_APM)
-	pm_init();
-#endif
 	return 0;
 }
 
@@ -383,9 +378,6 @@ static void __exit alsa_sound_exit(void)
 	snd_info_minor_unregister();
 #endif
 	snd_info_done();
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) && defined(CONFIG_APM)
-	pm_done();
-#endif
 #ifdef CONFIG_SND_DEBUG_MEMORY
 	snd_memory_done();
 #endif

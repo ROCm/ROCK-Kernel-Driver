@@ -2602,9 +2602,6 @@ static ssize_t snd_pcm_write(struct file *file, const char *buf, size_t count, l
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t result;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
-	up(&file->f_dentry->d_inode->i_sem);
-#endif
 	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, result = -ENXIO; goto end);
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, result = -ENXIO; goto end);
@@ -2622,13 +2619,9 @@ static ssize_t snd_pcm_write(struct file *file, const char *buf, size_t count, l
 	if (result > 0)
 		result = frames_to_bytes(runtime, result);
  end:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
-	down(&file->f_dentry->d_inode->i_sem);
-#endif
 	return result;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 44)
 static ssize_t snd_pcm_readv(struct file *file, const struct iovec *_vector,
 			     unsigned long count, loff_t * offset)
 
@@ -2675,9 +2668,6 @@ static ssize_t snd_pcm_writev(struct file *file, const struct iovec *_vector,
 	void **bufs;
 	snd_pcm_uframes_t frames;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
-	up(&file->f_dentry->d_inode->i_sem);
-#endif
 	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, result = -ENXIO; goto end);
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, result = -ENXIO; goto end);
@@ -2702,12 +2692,8 @@ static ssize_t snd_pcm_writev(struct file *file, const struct iovec *_vector,
 		result = frames_to_bytes(runtime, result);
 	kfree(bufs);
  end:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
-	down(&file->f_dentry->d_inode->i_sem);
-#endif
 	return result;
 }
-#endif
 
 unsigned int snd_pcm_playback_poll(struct file *file, poll_table * wait)
 {
@@ -2789,22 +2775,7 @@ unsigned int snd_pcm_capture_poll(struct file *file, poll_table * wait)
 	return mask;
 }
 
-#ifndef VM_RESERVED
-#ifndef LINUX_2_2
-static int snd_pcm_mmap_swapout(struct page * page, struct file * file)
-#else
-static int snd_pcm_mmap_swapout(struct vm_area_struct * area, struct page * page)
-#endif
-{
-	return 0;
-}
-#endif
-
-#ifndef LINUX_2_2
 static struct page * snd_pcm_mmap_status_nopage(struct vm_area_struct *area, unsigned long address, int no_share)
-#else
-static unsigned long snd_pcm_mmap_status_nopage(struct vm_area_struct *area, unsigned long address, int no_share)
-#endif
 {
 	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)area->vm_private_data;
 	snd_pcm_runtime_t *runtime;
@@ -2815,19 +2786,12 @@ static unsigned long snd_pcm_mmap_status_nopage(struct vm_area_struct *area, uns
 	runtime = substream->runtime;
 	page = virt_to_page(runtime->status);
 	get_page(page);
-#ifndef LINUX_2_2
 	return page;
-#else
-	return page_address(page);
-#endif
 }
 
 static struct vm_operations_struct snd_pcm_vm_ops_status =
 {
 	.nopage =	snd_pcm_mmap_status_nopage,
-#ifndef VM_RESERVED
-	.swapout =	snd_pcm_mmap_swapout,
-#endif
 };
 
 int snd_pcm_mmap_status(snd_pcm_substream_t *substream, struct file *file,
@@ -2843,22 +2807,12 @@ int snd_pcm_mmap_status(snd_pcm_substream_t *substream, struct file *file,
 	if (size != PAGE_ALIGN(sizeof(snd_pcm_mmap_status_t)))
 		return -EINVAL;
 	area->vm_ops = &snd_pcm_vm_ops_status;
-#ifndef LINUX_2_2
 	area->vm_private_data = substream;
-#else
-	area->vm_private_data = (long)substream;	
-#endif
-#ifdef VM_RESERVED
 	area->vm_flags |= VM_RESERVED;
-#endif
 	return 0;
 }
 
-#ifndef LINUX_2_2
 static struct page * snd_pcm_mmap_control_nopage(struct vm_area_struct *area, unsigned long address, int no_share)
-#else
-static unsigned long snd_pcm_mmap_control_nopage(struct vm_area_struct *area, unsigned long address, int no_share)
-#endif
 {
 	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)area->vm_private_data;
 	snd_pcm_runtime_t *runtime;
@@ -2869,19 +2823,12 @@ static unsigned long snd_pcm_mmap_control_nopage(struct vm_area_struct *area, un
 	runtime = substream->runtime;
 	page = virt_to_page(runtime->control);
 	get_page(page);
-#ifndef LINUX_2_2
 	return page;
-#else
-	return page_address(page);
-#endif
 }
 
 static struct vm_operations_struct snd_pcm_vm_ops_control =
 {
 	.nopage =	snd_pcm_mmap_control_nopage,
-#ifndef VM_RESERVED
-	.swapout =	snd_pcm_mmap_swapout,
-#endif
 };
 
 static int snd_pcm_mmap_control(snd_pcm_substream_t *substream, struct file *file,
@@ -2897,14 +2844,8 @@ static int snd_pcm_mmap_control(snd_pcm_substream_t *substream, struct file *fil
 	if (size != PAGE_ALIGN(sizeof(snd_pcm_mmap_control_t)))
 		return -EINVAL;
 	area->vm_ops = &snd_pcm_vm_ops_control;
-#ifndef LINUX_2_2
 	area->vm_private_data = substream;
-#else
-	area->vm_private_data = (long)substream;	
-#endif
-#ifdef VM_RESERVED
 	area->vm_flags |= VM_RESERVED;
-#endif
 	return 0;
 }
 
@@ -2920,11 +2861,7 @@ static void snd_pcm_mmap_data_close(struct vm_area_struct *area)
 	atomic_dec(&substream->runtime->mmap_count);
 }
 
-#ifndef LINUX_2_2
 static struct page * snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsigned long address, int no_share)
-#else
-static unsigned long snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsigned long address, int no_share)
-#endif
 {
 	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)area->vm_private_data;
 	snd_pcm_runtime_t *runtime;
@@ -2936,11 +2873,7 @@ static unsigned long snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsig
 	if (substream == NULL)
 		return NOPAGE_OOM;
 	runtime = substream->runtime;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 25)
 	offset = area->vm_pgoff << PAGE_SHIFT;
-#else
-	offset = area->vm_offset;
-#endif
 	offset += address - area->vm_start;
 	snd_assert((offset % PAGE_SIZE) == 0, return NOPAGE_OOM);
 	dma_bytes = PAGE_ALIGN(runtime->dma_bytes);
@@ -2955,11 +2888,7 @@ static unsigned long snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsig
 		page = virt_to_page(vaddr);
 	}
 	get_page(page);
-#ifndef LINUX_2_2
 	return page;
-#else
-	return page_address(page);
-#endif
 }
 
 static struct vm_operations_struct snd_pcm_vm_ops_data =
@@ -2967,9 +2896,6 @@ static struct vm_operations_struct snd_pcm_vm_ops_data =
 	.open =		snd_pcm_mmap_data_open,
 	.close =	snd_pcm_mmap_data_close,
 	.nopage =	snd_pcm_mmap_data_nopage,
-#ifndef VM_RESERVED
-	.swapout =	snd_pcm_mmap_swapout,
-#endif
 };
 
 int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
@@ -2997,11 +2923,7 @@ int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
 	    runtime->access == SNDRV_PCM_ACCESS_RW_NONINTERLEAVED)
 		return -EINVAL;
 	size = area->vm_end - area->vm_start;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 25)
 	offset = area->vm_pgoff << PAGE_SHIFT;
-#else
-	offset = area->vm_offset;
-#endif
 	dma_bytes = PAGE_ALIGN(runtime->dma_bytes);
 	if ((size_t)size > dma_bytes)
 		return -EINVAL;
@@ -3009,14 +2931,8 @@ int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
 		return -EINVAL;
 
 	area->vm_ops = &snd_pcm_vm_ops_data;
-#ifndef LINUX_2_2
 	area->vm_private_data = substream;
-#else
-	area->vm_private_data = (long)substream;
-#endif
-#ifdef VM_RESERVED
 	area->vm_flags |= VM_RESERVED;
-#endif
 	atomic_inc(&runtime->mmap_count);
 	return 0;
 }
@@ -3031,11 +2947,7 @@ static int snd_pcm_mmap(struct file *file, struct vm_area_struct *area)
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 25)
 	offset = area->vm_pgoff << PAGE_SHIFT;
-#else
-	offset = area->vm_offset;
-#endif
 	switch (offset) {
 	case SNDRV_PCM_MMAP_OFFSET_STATUS:
 		return snd_pcm_mmap_status(substream, file, area);
@@ -3143,13 +3055,9 @@ static int snd_pcm_hw_params_old_user(snd_pcm_substream_t * substream, struct sn
  */
 
 static struct file_operations snd_pcm_f_ops_playback = {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.write =	snd_pcm_write,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 44)
 	.writev =	snd_pcm_writev,
-#endif
 	.open =		snd_pcm_open,
 	.release =	snd_pcm_release,
 	.poll =		snd_pcm_playback_poll,
@@ -3159,13 +3067,9 @@ static struct file_operations snd_pcm_f_ops_playback = {
 };
 
 static struct file_operations snd_pcm_f_ops_capture = {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.read =		snd_pcm_read,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 44)
 	.readv =	snd_pcm_readv,
-#endif
 	.open =		snd_pcm_open,
 	.release =	snd_pcm_release,
 	.poll =		snd_pcm_capture_poll,

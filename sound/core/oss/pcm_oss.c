@@ -1981,11 +1981,7 @@ static int snd_pcm_oss_mmap(struct file *file, struct vm_area_struct *area)
 	if (runtime->oss.plugin_first != NULL)
 		return -EIO;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 3, 25)
 	if (area->vm_pgoff != 0)
-#else
-	if (area->vm_offset != 0)
-#endif
 		return -EINVAL;
 
 	err = snd_pcm_mmap_data(substream, file, area);
@@ -2148,9 +2144,7 @@ static void snd_pcm_oss_proc_done(snd_pcm_t *pcm)
 
 static struct file_operations snd_pcm_oss_f_reg =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.read =		snd_pcm_oss_read,
 	.write =	snd_pcm_oss_write,
 	.open =		snd_pcm_oss_open,

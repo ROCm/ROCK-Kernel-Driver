@@ -1222,7 +1222,7 @@ static int build_audio_procunit(mixer_build_t *state, int unitid, unsigned char 
 			if (! len)
 				strlcpy(kctl->id.name, name, sizeof(kctl->id.name));
 		}
-		strlcat(kctl->id.name, ' ', sizeof(kctl->id.name));
+		strlcat(kctl->id.name, " ", sizeof(kctl->id.name));
 		strlcat(kctl->id.name, valinfo->suffix, sizeof(kctl->id.name));
 
 		snd_printdd(KERN_INFO "[%d] PU [%s] ch = %d, val = %d/%d\n",

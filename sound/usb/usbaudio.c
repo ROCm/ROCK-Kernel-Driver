@@ -2566,7 +2566,7 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 		}
 	}
 	if (len > 0)
-		strlcat(card->longname, ' ', sizeof(card->longname));
+		strlcat(card->longname, " ", sizeof(card->longname));
 
 	len = strlen(card->longname);
 

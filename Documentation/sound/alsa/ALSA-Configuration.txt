@@ -994,6 +994,53 @@ Module parameters
     
     Module supports up to 8 cards.
 
+  Module snd-vx222
+  ----------------
+
+    Module for Digigram VX-Pocket VX222, V222 v2 and Mic cards.
+
+    mic		- Enable Microphone on V222 Mic (NYI)
+
+    Module supports up to 8 cards.
+
+    For loading the firmware, use vxloader utility in alsa-tools
+    package.  You can load the firmware automatically by adding
+    the following to /etc/modules.conf
+
+	post-install snd-vx222 "/usr/bin/vxload"
+
+  Module snd-vxpocket
+  -------------------
+
+    Module for Digigram VX-Pocket VX2 PCMCIA card.
+
+    irq_mask - IRQ bitmask, specifies the available IRQs as bits
+
+    Module supports up to 8 cards.  The module is compiled only when
+    PCMCIA is supported on kernel.
+
+    To activate the driver via the card manager, you'll need to set
+    up /etc/pcmcia/vxpocket.conf.  See the sound/pcmcia/vx/vxpocket.c.
+
+    For loading the firmware, use vxloader utility in alsa-tools
+    package.
+
+  Module snd-vxp440
+  -----------------
+
+    Module for Digigram VX-Pocket 440 PCMCIA card.
+
+    irq_mask - IRQ bitmask, specifies the available IRQs as bits
+
+    Module supports up to 8 cards.  The module is compiled only when
+    PCMCIA is supported on kernel.
+
+    To activate the driver via the card manager, you'll need to set
+    up /etc/pcmcia/vxp440.conf.  See the sound/pcmcia/vx/vxp440.c.
+
+    For loading the firmware, use vxloader utility in alsa-tools
+    package.
+
   Module snd-ymfpci
   -----------------
 

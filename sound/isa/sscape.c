@@ -1221,7 +1221,7 @@ static int __devinit create_sscape(const struct params *params, snd_card_t **rca
 		printk(KERN_ERR "sscape: Failed to create firmware device\n");
 		goto _release_card;
 	}
-	strncpy(sscape->hw->name, "SoundScape M68K", sizeof(sscape->hw->name) - 1);
+	strlcpy(sscape->hw->name, "SoundScape M68K", sizeof(sscape->hw->name));
 	sscape->hw->name[sizeof(sscape->hw->name) - 1] = '\0';
 	sscape->hw->iface = SNDRV_HWDEP_IFACE_SSCAPE;
 	sscape->hw->ops.open = sscape_hw_open;

@@ -121,7 +121,6 @@ snd_info_entry_t *snd_seq_root = NULL;
 snd_info_entry_t *snd_oss_root = NULL;
 #endif
 
-#ifndef LINUX_2_2
 static inline void snd_info_entry_prepare(struct proc_dir_entry *de)
 {
 	de->owner = THIS_MODULE;
@@ -133,7 +132,6 @@ void snd_remove_proc_entry(struct proc_dir_entry *parent,
 	if (de)
 		remove_proc_entry(de->name, parent);
 }
-#endif
 
 static loff_t snd_info_entry_llseek(struct file *file, loff_t offset, int orig)
 {
@@ -143,9 +141,7 @@ static loff_t snd_info_entry_llseek(struct file *file, loff_t offset, int orig)
 
 	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
 	entry = data->entry;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 3)
 	lock_kernel();
-#endif
 	switch (entry->content) {
 	case SNDRV_INFO_CONTENT_TEXT:
 		switch (orig) {
@@ -174,9 +170,7 @@ static loff_t snd_info_entry_llseek(struct file *file, loff_t offset, int orig)
 	}
 	ret = -ENXIO;
 out:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 3)
 	unlock_kernel();
-#endif
 	return ret;
 }
 
@@ -495,9 +489,7 @@ static int snd_info_entry_mmap(struct file *file, struct vm_area_struct *vma)
 
 static struct file_operations snd_info_entry_operations =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.llseek =	snd_info_entry_llseek,
 	.read =		snd_info_entry_read,
 	.write =	snd_info_entry_write,
@@ -507,13 +499,6 @@ static struct file_operations snd_info_entry_operations =
 	.open =		snd_info_entry_open,
 	.release =	snd_info_entry_release,
 };
-
-#ifdef LINUX_2_2
-static struct inode_operations snd_info_entry_inode_operations =
-{
-	&snd_info_entry_operations,	/* default sound info directory file-ops */
-};
-#endif	/* LINUX_2_2 */
 
 /**
  * snd_create_proc_entry - create a procfs entry
@@ -923,16 +908,9 @@ int snd_info_register(snd_info_entry_t * entry)
 		up(&info_mutex);
 		return -ENOMEM;
 	}
-#ifndef LINUX_2_2
 	p->owner = entry->module;
-#endif
-	if (!S_ISDIR(entry->mode)) {
-#ifndef LINUX_2_2
+	if (!S_ISDIR(entry->mode))
 		p->proc_fops = &snd_info_entry_operations;
-#else
-		p->ops = &snd_info_entry_inode_operations;
-#endif
-	}
 	p->size = entry->size;
 	p->data = entry;
 	entry->p = p;

@@ -927,9 +927,7 @@ static int snd_ctl_fasync(int fd, struct file * file, int on)
 
 static struct file_operations snd_ctl_f_ops =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.read =		snd_ctl_read,
 	.open =		snd_ctl_open,
 	.release =	snd_ctl_release,

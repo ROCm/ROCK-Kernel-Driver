@@ -32,7 +32,7 @@
 #define chip_t pmac_t
 
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) || defined(CONFIG_ADB_CUDA)
+#ifdef CONFIG_ADB_CUDA
 #define PMAC_AMP_AVAIL
 #endif
 
@@ -43,11 +43,7 @@ typedef struct awacs_amp {
 	unsigned char amp_tone[2];
 } awacs_amp_t;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-#define CHECK_CUDA_AMP() (adb_hardware == ADB_VIACUDA)
-#else
 #define CHECK_CUDA_AMP() (sys_ctrler == SYS_CTRLER_CUDA)
-#endif
 
 #endif /* PMAC_AMP_AVAIL */
 
