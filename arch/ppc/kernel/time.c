@@ -244,7 +244,7 @@ int do_settimeofday(struct timespec *tv)
 	time_t wtm_sec, new_sec = tv->tv_sec;
 	long wtm_nsec, new_nsec = tv->tv_nsec;
 	unsigned long flags;
-	int tb_delta, new_nsec, new_sec;
+	int tb_delta;
 
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
