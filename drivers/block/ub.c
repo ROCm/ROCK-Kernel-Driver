@@ -36,7 +36,7 @@
 #define DRV_NAME "ub"
 #define DEVFS_NAME DRV_NAME
 
-#define UB_MAJOR 125	/* Stolen from Experimental range for a week - XXX */
+#define UB_MAJOR 180
 
 /*
  * Definitions which have to be scattered once we understand the layout better.
