@@ -43,24 +43,19 @@ typedef struct {
 	unsigned rd:1;		/* Read data in data phase      */
 	unsigned wanted:1;	/* Parport sharing busy flag    */
 	wait_queue_head_t *waiting;
+	struct Scsi_Host *host;
 } imm_struct;
 
 static void imm_reset_pulse(unsigned int base);
 static int device_check(imm_struct *dev);
 
-#define IMM_EMPTY \
-{	.base		= -1,		\
-	.mode		= IMM_AUTODETECT,	\
-}
-
 #include "imm.h"
 #define NO_HOSTS 4
-static imm_struct imm_hosts[NO_HOSTS] =
-    { IMM_EMPTY, IMM_EMPTY, IMM_EMPTY, IMM_EMPTY };
+static imm_struct imm_hosts[NO_HOSTS];
 
 static inline imm_struct *imm_dev(struct Scsi_Host *host)
 {
-	return &imm_hosts[host->unique_id];
+	return *(imm_struct **)&host->hostdata;
 }
 
 static spinlock_t arbitration_lock = SPIN_LOCK_UNLOCKED;
@@ -135,6 +130,12 @@ static int imm_probe(imm_struct *dev, struct parport *pb)
 	int err;
 
 	init_waitqueue_head(&waiting);
+
+	memset(dev, 0, sizeof(dev));
+
+	dev->base = -1;
+	dev->mode = IMM_AUTODETECT;
+
 	dev->dev = parport_register_device(pb, "imm", NULL, imm_wakeup,
 						NULL, 0, dev);
 
@@ -200,7 +201,7 @@ static int imm_probe(imm_struct *dev, struct parport *pb)
 	INIT_WORK(&dev->imm_tq, imm_interrupt, dev);
 
 	err = -ENOMEM;
-	host = scsi_host_alloc(&imm_template, 0);
+	host = scsi_host_alloc(&imm_template, sizeof(imm_struct *));
 	if (!host)
 		goto out;
 	list_add_tail(&host->sht_legacy_list, &imm_template.legacy_hosts);
@@ -208,6 +209,8 @@ static int imm_probe(imm_struct *dev, struct parport *pb)
 	host->n_io_port = ports;
 	host->dma_channel = -1;
 	host->unique_id = dev - imm_hosts;
+	*(imm_struct **)&host->hostdata = dev;
+	dev->host = host;
 	err = scsi_add_host(host, NULL);
 	if (err)
 		goto out1;
