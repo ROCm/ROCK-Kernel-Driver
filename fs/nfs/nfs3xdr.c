@@ -504,7 +504,7 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
 	struct iovec *iov = rcvbuf->head;
 	struct page **page;
-	int hdrlen;
+	int hdrlen, recvd;
 	int status, nr;
 	unsigned int len, pglen;
 	u32 *entry, *end;
@@ -523,17 +523,24 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 	}
 
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
-	if (iov->iov_len > hdrlen) {
+	if (iov->iov_len < hdrlen) {
+		printk(KERN_WARNING "NFS: READDIR reply header overflowed:"
+				"length %d > %d\n", hdrlen, iov->iov_len);
+		return -errno_NFSERR_IO;
+	} else if (iov->iov_len != hdrlen) {
 		dprintk("NFS: READDIR header is short. iovec will be shifted.\n");
 		xdr_shift_buf(rcvbuf, iov->iov_len - hdrlen);
 	}
 
 	pglen = rcvbuf->page_len;
+	recvd = req->rq_received - hdrlen;
+	if (pglen > recvd)
+		pglen = recvd;
 	page = rcvbuf->pages;
 	p = kmap(*page);
 	end = (u32 *)((char *)p + pglen);
+	entry = p;
 	for (nr = 0; *p++; nr++) {
-		entry = p - 1;
 		if (p + 3 > end)
 			goto short_pkt;
 		p += 2;				/* inode # */
@@ -570,15 +577,21 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 
 		if (p + 2 > end)
 			goto short_pkt;
+		entry = p;
 	}
+	if (!nr)
+		goto short_pkt;
+ out:
 	kunmap(*page);
 	return nr;
  short_pkt:
-	printk(KERN_NOTICE "NFS: short packet in readdir reply!\n");
-	/* truncate listing */
 	entry[0] = entry[1] = 0;
-	kunmap(*page);
-	return nr;
+	/* truncate listing ? */
+	if (!nr) {
+		printk(KERN_NOTICE "NFS: readdir reply truncated!\n");
+		entry[1] = 1;
+	}
+	goto out;
 err_unmap:
 	kunmap(*page);
 	return -errno_NFSERR_IO;
