@@ -2625,7 +2625,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 		case BLKFLSBUF:
 		case BLKBSZGET:
 		case BLKBSZSET:
-			err = blk_ioctl(dev, cmd, arg);
+			err = blk_ioctl(inode->i_bdev, cmd, arg);
 			goto abort;
 
 		default:;

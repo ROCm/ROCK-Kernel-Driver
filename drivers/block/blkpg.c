@@ -200,16 +200,14 @@ int blkpg_ioctl(kdev_t dev, struct blkpg_ioctl_arg *arg)
  * Common ioctl's for block devices
  */
 extern int block_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg);
-int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
+int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 {
 	request_queue_t *q;
 	struct gendisk *g;
 	u64 ullval = 0;
 	int intval;
 	unsigned short usval;
-
-	if (kdev_none(dev))
-		return -EINVAL;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	intval = block_ioctl(dev, cmd, arg);
 	if (intval != -ENOTTY)

@@ -57,7 +57,7 @@ struct blkpg_partition {
 #ifdef __KERNEL__
 
 extern char * partition_name(kdev_t dev);
-extern int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg);
+extern int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg);
 
 #endif /* __KERNEL__ */
 

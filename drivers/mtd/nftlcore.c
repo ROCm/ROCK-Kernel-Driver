@@ -823,7 +823,7 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 	case BLKROSET:
 	case BLKROGET:
 	case BLKSSZGET:
-		return blk_ioctl(inode->i_rdev, cmd, arg);
+		return blk_ioctl(inode->i_bdev, cmd, arg);
 #endif
 
 	default:

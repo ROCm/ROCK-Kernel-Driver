@@ -1729,7 +1729,7 @@ int cdrom_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 	case BLKROGET:
 	case BLKFLSBUF:
 	case BLKSSZGET:
-		return blk_ioctl(ip->i_rdev, cmd, arg);
+		return blk_ioctl(ip->i_bdev, cmd, arg);
 	case CDROMSUBCHNL: {
 		struct cdrom_subchnl q;
 		u_char requested, back;
