@@ -1560,21 +1560,22 @@ static int serial8250_request_port(struct uart_port *port)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
 	struct resource *res = NULL, *res_rsa = NULL;
-	int ret = -EBUSY;
+	int ret = 0;
 
-	if (up->port.type == PORT_RSA) {
-		ret = serial8250_request_rsa_resource(up, &res_rsa);
-		if (ret)
-			return ret;
+	if (up->port.flags & UPF_RESOURCES) {
+		if (up->port.type == PORT_RSA) {
+			ret = serial8250_request_rsa_resource(up, &res_rsa);
+			if (ret)
+				return ret;
+		}
+
+		ret = serial8250_request_std_resource(up, &res);
 	}
-
-	ret = serial8250_request_std_resource(up, &res);
 
 	/*
 	 * If we have a mapbase, then request that as well.
 	 */
-	if (res != NULL && up->port.iotype == SERIAL_IO_MEM &&
-	    up->port.mapbase) {
+	if (ret == 0 && up->port.flags & UPF_IOREMAP) {
 		int size = res->end - res->start + 1;
 
 		up->port.membase = ioremap(up->port.mapbase, size);
@@ -1610,13 +1611,17 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 	 * Find the region that we can probe for.  This in turn
 	 * tells us whether we can probe for the type of port.
 	 */
-	ret = serial8250_request_std_resource(up, &res_std);
-	if (ret)
-		return;
+	if (up->port.flags & UPF_RESOURCES) {
+		ret = serial8250_request_std_resource(up, &res_std);
+		if (ret)
+			return;
 
-	ret = serial8250_request_rsa_resource(up, &res_rsa);
-	if (ret)
+		ret = serial8250_request_rsa_resource(up, &res_rsa);
+		if (ret)
+			probeflags &= ~PROBE_RSA;
+	} else {
 		probeflags &= ~PROBE_RSA;
+	}
 
 	if (flags & UART_CONFIG_TYPE)
 		autoconfig(up, probeflags);
@@ -1678,6 +1683,7 @@ static struct uart_8250_port serial8250_ports[UART_NR];
 
 static void __init serial8250_isa_init_ports(void)
 {
+	struct uart_8250_port *up;
 	static int first = 1;
 	int i;
 
@@ -1685,13 +1691,18 @@ static void __init serial8250_isa_init_ports(void)
 		return;
 	first = 0;
 
-	for (i = 0; i < ARRAY_SIZE(old_serial_port); i++) {
-		serial8250_ports[i].port.iobase  = old_serial_port[i].port;
-		serial8250_ports[i].port.irq     = irq_cannonicalize(old_serial_port[i].irq);
-		serial8250_ports[i].port.uartclk = old_serial_port[i].base_baud * 16;
-		serial8250_ports[i].port.flags   = old_serial_port[i].flags;
-		serial8250_ports[i].port.hub6    = old_serial_port[i].hub6;
-		serial8250_ports[i].port.ops     = &serial8250_pops;
+	for (i = 0, up = serial8250_ports; i < ARRAY_SIZE(old_serial_port);
+	     i++, up++) {
+		up->port.iobase   = old_serial_port[i].port;
+		up->port.irq      = irq_cannonicalize(old_serial_port[i].irq);
+		up->port.uartclk  = old_serial_port[i].baud_base * 16;
+		up->port.flags    = old_serial_port[i].flags |
+				    UPF_RESOURCES;
+		up->port.hub6     = old_serial_port[i].hub6;
+		up->port.membase  = old_serial_port[i].iomem_base;
+		up->port.iotype   = old_serial_port[i].io_type;
+		up->port.regshift = old_serial_port[i].iomem_reg_shift;
+		up->port.ops      = &serial8250_pops;
 	}
 }
 
