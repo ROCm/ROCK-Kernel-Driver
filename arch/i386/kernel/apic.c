@@ -491,12 +491,25 @@ void __init setup_local_APIC (void)
 	apic_pm_activate();
 }
 
+/*
+ * If Linux enabled the LAPIC against the BIOS default
+ * disable it down before re-entering the BIOS on shutdown.
+ * Otherwise the BIOS may get confused and not power-off.
+ */
+void
+lapic_shutdown()
+{
+	if (!cpu_has_apic || !enabled_via_apicbase)
+		return;
+
+	local_irq_disable();
+	disable_local_APIC();
+	local_irq_enable();
+}
+
 #ifdef CONFIG_PM
 
 static struct {
-	/* 'active' is true if the local APIC was enabled by us and
-	   not the BIOS; this signifies that we are also responsible
-	   for disabling it before entering apm/acpi suspend */
 	int active;
 	/* r/w apic fields */
 	unsigned int apic_id;
@@ -584,6 +597,10 @@ static int lapic_resume(struct sys_device *dev)
 	return 0;
 }
 
+/*
+ * This device has no shutdown method - fully functioning local APICs
+ * are needed on every CPU up until machine_halt/restart/poweroff.
+ */
 
 static struct sysdev_class lapic_sysclass = {
 	set_kset_name("lapic"),
