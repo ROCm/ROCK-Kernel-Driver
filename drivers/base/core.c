@@ -9,10 +9,6 @@
  */
 
 #include <linux/config.h>
-#ifdef CONFIG_DEBUG_DRIVER
-#define DEBUG	1
-#endif
-
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/init.h>

@@ -43,6 +43,8 @@ struct machdep_calls {
 	long		(*time_init)(void); /* Optional, may be NULL */
 	int		(*set_rtc_time)(unsigned long nowtime);
 	unsigned long	(*get_rtc_time)(void);
+	unsigned char 	(*rtc_read_val)(int addr);
+	void		(*rtc_write_val)(int addr, unsigned char val);
 	void		(*calibrate_decr)(void);
 
 	void		(*heartbeat)(void);

@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
-SUBLEVEL = 4
-EXTRAVERSION =
+SUBLEVEL = 5
+EXTRAVERSION =-rc1
 NAME=Feisty Dunnart
 
 # *DOCUMENTATION*
@@ -304,17 +304,10 @@ RCS_TAR_IGNORE := --exclude SCCS --exclude BitKeeper --exclude .svn --exclude CV
 # ===========================================================================
 # Rules shared between *config targets and build targets
 
-# Helpers built in scripts/
-
-scripts/docproc scripts/split-include : scripts ;
-
-.PHONY: scripts scripts/fixdep
-scripts:
-	$(Q)$(MAKE) $(build)=scripts
-
-scripts/fixdep:
-	$(Q)$(MAKE) $(build)=scripts $@
-
+# Basic helpers built in scripts/
+.PHONY: scripts_basic
+scripts_basic:
+	$(Q)$(MAKE) $(build)=scripts/basic
 
 # To make sure we do not include .config for any of the *config targets
 # catch them early, and hand them over to scripts/kconfig/Makefile
@@ -358,15 +351,25 @@ ifeq ($(config-targets),1)
 # *config targets only - make sure prerequisites are updated, and descend
 # in scripts/kconfig to make the *config target
 
-%config: scripts/fixdep FORCE
+config: scripts_basic FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
-config : scripts/fixdep FORCE
+%config: scripts_basic FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
 
 else
 # ===========================================================================
 # Build targets only - this includes vmlinux, arch specific targets, clean
 # targets and others. In general all targets except *config targets.
+
+# Additional helpers built in scripts/
+# Carefully list dependencies so we do not try to build scripts twice
+# in parrallel
+.PHONY: scripts
+scripts: scripts_basic include/config/MARKER
+	$(Q)$(MAKE) $(build)=$(@)
+
+scripts_basic: include/linux/autoconf.h
+
 
 # That's our default target when none is given on the command line
 # Note that 'modules' will be added as a prerequisite as well, 
@@ -400,7 +403,9 @@ include .config
 # with it and forgot to run make oldconfig
 include/linux/autoconf.h: .config
 	$(Q)$(MAKE) -f $(srctree)/Makefile silentoldconfig
-
+else
+# Dummy target needed, because used as prerequisite
+include/linux/autoconf.h: ;
 endif
 
 include $(srctree)/arch/$(ARCH)/Makefile
@@ -633,9 +638,9 @@ include/asm:
 
 # 	Split autoconf.h into include/linux/config/*
 
-include/config/MARKER: scripts/split-include include/linux/autoconf.h
+include/config/MARKER: include/linux/autoconf.h
 	@echo '  SPLIT   include/linux/autoconf.h -> include/config/*'
-	@scripts/split-include include/linux/autoconf.h include/config
+	@scripts/basic/split-include include/linux/autoconf.h include/config
 	@touch $@
 
 # Generate some files
@@ -929,7 +934,7 @@ help:
 
 # Documentation targets
 # ---------------------------------------------------------------------------
-%docs: scripts/docproc FORCE
+%docs: scripts FORCE
 	$(Q)$(MAKE) $(build)=Documentation/DocBook $@
 
 # Scripts to check various things for consistency
@@ -982,7 +987,7 @@ if_changed_dep = $(if $(strip $? $(filter-out FORCE $(wildcard $^),$^)\
 	@set -e; \
 	$(if $($(quiet)cmd_$(1)),echo '  $(subst ','\'',$($(quiet)cmd_$(1)))';) \
 	$(cmd_$(1)); \
-	scripts/fixdep $(depfile) $@ '$(subst $$,$$$$,$(subst ','\'',$(cmd_$(1))))' > $(@D)/.$(@F).tmp; \
+	scripts/basic/fixdep $(depfile) $@ '$(subst $$,$$$$,$(subst ','\'',$(cmd_$(1))))' > $(@D)/.$(@F).tmp; \
 	rm -f $(depfile); \
 	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
 

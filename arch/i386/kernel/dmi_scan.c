@@ -525,7 +525,7 @@ static __init int print_if_true(struct dmi_blacklist *d)
 #ifdef	CONFIG_ACPI_BOOT
 extern int acpi_disabled, acpi_force;
 
-static __init __attribute__((unused)) int acpi_disable(struct dmi_blacklist *d) 
+static __init __attribute__((unused)) int disable_acpi(struct dmi_blacklist *d)
 { 
 	if (!acpi_force) { 
 		printk(KERN_NOTICE "%s detected: acpi off\n",d->ident); 
@@ -933,7 +933,7 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	 *	Boxes that need ACPI disabled
 	 */
 
-	{ acpi_disable, "IBM Thinkpad", {
+	{ disable_acpi, "IBM Thinkpad", {
 			MATCH(DMI_BOARD_VENDOR, "IBM"),
 			MATCH(DMI_BOARD_NAME, "2629H1G"),
 			NO_MATCH, NO_MATCH }},

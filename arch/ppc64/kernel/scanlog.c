@@ -28,7 +28,6 @@
 #include <asm/uaccess.h>
 #include <asm/rtas.h>
 #include <asm/prom.h>
-#include <asm/proc_fs.h>
 
 #define MODULE_VERS "1.0"
 #define MODULE_NAME "scanlog"
@@ -212,16 +211,7 @@ int __init scanlog_init(void)
 		return -EIO;
 	}
 
-	if (proc_ppc64.rtas == NULL) {
-		proc_ppc64_init();
-	}
-
-	if (proc_ppc64.rtas == NULL) {
-		printk(KERN_ERR "Failed to create /proc/rtas in scanlog_init\n");
-		return -EIO;
-	}
-
-        ent = create_proc_entry("scan-log-dump",  S_IRUSR, proc_ppc64.rtas);
+        ent = create_proc_entry("ppc64/rtas/scan-log-dump",  S_IRUSR, NULL);
 	if (ent) {
 		ent->proc_fops = &scanlog_fops;
 		/* Ideally we could allocate a buffer < 4G */

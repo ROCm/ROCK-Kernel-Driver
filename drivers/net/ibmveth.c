@@ -527,7 +527,10 @@ static int ibmveth_open(struct net_device *netdev)
 	ibmveth_debug_printk("registering irq 0x%x\n", netdev->irq);
 	if((rc = request_irq(netdev->irq, &ibmveth_interrupt, 0, netdev->name, netdev)) != 0) {
 		ibmveth_error_printk("unable to request irq 0x%x, rc %d\n", netdev->irq, rc);
-		h_free_logical_lan(adapter->vdev->unit_address);
+		do {
+			rc = h_free_logical_lan(adapter->vdev->unit_address);
+		} while H_isLongBusy(rc);
+
 		ibmveth_cleanup(adapter);
 		return rc;
 	}
@@ -556,7 +559,9 @@ static int ibmveth_close(struct net_device *netdev)
 	cancel_delayed_work(&adapter->replenish_task);
 	flush_scheduled_work();
 
-	lpar_rc = h_free_logical_lan(adapter->vdev->unit_address);
+	do {
+		lpar_rc = h_free_logical_lan(adapter->vdev->unit_address);
+	} while H_isLongBusy(lpar_rc);
 
 	if(lpar_rc != H_Success)
 	{
@@ -617,6 +622,8 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	union ibmveth_buf_desc desc[IbmVethMaxSendFrags];
 	unsigned long lpar_rc;
 	int nfrags = 0, curfrag;
+	unsigned long correlator;
+	unsigned int retry_count;
 
 	if ((skb_shinfo(skb)->nr_frags + 1) > IbmVethMaxSendFrags) {
 		adapter->stats.tx_dropped++;
@@ -674,8 +681,8 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	}
 
 	/* send the frame. Arbitrarily set retrycount to 1024 */
-	unsigned long correlator = 0;
-	unsigned int retry_count = 1024;
+	correlator = 0;
+	retry_count = 1024;
 	do {
 		lpar_rc = h_send_logical_lan(adapter->vdev->unit_address,
 					     desc[0].desc,

@@ -36,7 +36,6 @@
 #include <linux/delay.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
-#include <linux/proc_fs.h>
 
 #include <asm/pgalloc.h>
 #include <asm/page.h>
@@ -76,8 +75,6 @@ pgd_t * ioremap_pgd = (pgd_t *)&ioremap_dir;
 
 unsigned long klimit = (unsigned long)_end;
 
-HPTE *Hash=0;
-unsigned long Hash_size=0;
 unsigned long _SDR1=0;
 unsigned long _ASR=0;
 

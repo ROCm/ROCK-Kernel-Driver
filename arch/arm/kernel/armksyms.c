@@ -88,10 +88,6 @@ EXPORT_SYMBOL_ALIAS(kern_fp_enter,fp_enter);
 EXPORT_SYMBOL_ALIAS(fp_printk,printk);
 EXPORT_SYMBOL_ALIAS(fp_send_sig,send_sig);
 
-#ifdef CONFIG_VT
-EXPORT_SYMBOL(kd_mksound);
-#endif
-
 EXPORT_SYMBOL_NOVERS(__do_softirq);
 EXPORT_SYMBOL_NOVERS(__backtrace);
 
@@ -188,11 +184,6 @@ EXPORT_SYMBOL(__arch_copy_to_user);
 EXPORT_SYMBOL(__arch_clear_user);
 EXPORT_SYMBOL(__arch_strnlen_user);
 EXPORT_SYMBOL(__arch_strncpy_from_user);
-
-	/* consistent area handling */
-EXPORT_SYMBOL(consistent_alloc);
-EXPORT_SYMBOL(consistent_free);
-EXPORT_SYMBOL(consistent_sync);
 
 EXPORT_SYMBOL_NOVERS(__get_user_1);
 EXPORT_SYMBOL_NOVERS(__get_user_2);

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/blacklist.c
  *   S/390 common I/O routines -- blacklisting of specific devices
- *   $Revision: 1.29 $
+ *   $Revision: 1.31 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -72,7 +72,10 @@ static inline int
 blacklist_busid(char **str, int *id0, int *id1, int *devno)
 {
 	int val, old_style;
- 
+	char *sav;
+
+	sav = *str;
+
 	/* check for leading '0x' */
 	old_style = 0;
 	if ((*str)[0] == '0' && (*str)[1] == 'x') {
@@ -80,44 +83,54 @@ blacklist_busid(char **str, int *id0, int *id1, int *devno)
 		old_style = 1;
 	}
 	if (!isxdigit((*str)[0]))	/* We require at least one hex digit */
-		return -EINVAL;
+		goto confused;
 	val = simple_strtoul(*str, str, 16);
 	if (old_style || (*str)[0] != '.') {
 		*id0 = *id1 = 0;
 		if (val < 0 || val > 0xffff)
-			return -EINVAL;
+			goto confused;
 		*devno = val;
+		if ((*str)[0] != ',' && (*str)[0] != '-' &&
+		    (*str)[0] != '\n' && (*str)[0] != '\0')
+			goto confused;
 		return 0;
 	}
 	/* New style x.y.z busid */
 	if (val < 0 || val > 0xff)
-		return -EINVAL;
+		goto confused;
 	*id0 = val;
 	(*str)++;
 	if (!isxdigit((*str)[0]))	/* We require at least one hex digit */
-		return -EINVAL;
+		goto confused;
 	val = simple_strtoul(*str, str, 16);
 	if (val < 0 || val > 0xff || (*str)++[0] != '.')
-		return -EINVAL;
+		goto confused;
 	*id1 = val;
 	if (!isxdigit((*str)[0]))	/* We require at least one hex digit */
-		return -EINVAL;
+		goto confused;
 	val = simple_strtoul(*str, str, 16);
 	if (val < 0 || val > 0xffff)
-		return -EINVAL;
+		goto confused;
 	*devno = val;
+	if ((*str)[0] != ',' && (*str)[0] != '-' &&
+	    (*str)[0] != '\n' && (*str)[0] != '\0')
+		goto confused;
 	return 0;
+confused:
+	strsep(str, ",\n");
+	printk(KERN_WARNING "Invalid cio_ignore parameter '%s'\n", sav);
+	return 1;
 }
 
 static inline int
 blacklist_parse_parameters (char *str, range_action action)
 {
 	unsigned int from, to, from_id0, to_id0, from_id1, to_id1;
-	char *sav;
 
-	sav = str;
 	while (*str != 0 && *str != '\n') {
 		range_action ra = action;
+		while(*str == ',')
+			str++;
 		if (*str == '!') {
 			ra = !action;
 			++str;
@@ -138,32 +151,37 @@ blacklist_parse_parameters (char *str, range_action action)
 			rc = blacklist_busid(&str, &from_id0,
 					     &from_id1, &from);
 			if (rc)
-				goto out_err;
+				continue;
 			to = from;
 			to_id0 = from_id0;
 			to_id1 = from_id1;
 			if (*str == '-') {
 				str++;
-				rc = blacklist_busid(&str, &to_id0, &to_id1,
-						     &to);
+				rc = blacklist_busid(&str, &to_id0,
+						     &to_id1, &to);
 				if (rc)
-					goto out_err;
+					continue;
 			}
-			if ((from_id0 != to_id0) || (from_id1 != to_id1))
-				goto out_err;
+			if (*str == '-') {
+				printk(KERN_WARNING "invalid cio_ignore "
+					"parameter '%s'\n",
+					strsep(&str, ",\n"));
+				continue;
+			}
+			if ((from_id0 != to_id0) || (from_id1 != to_id1)) {
+				printk(KERN_WARNING "invalid cio_ignore range "
+					"%x.%x.%04x-%x.%x.%04x\n",
+					from_id0, from_id1, from,
+					to_id0, to_id1, to);
+				continue;
+			}
 		}
 		/* FIXME: ignoring id0 and id1 here. */
 		pr_debug("blacklist_setup: adding range "
 			 "from 0.0.%04x to 0.0.%04x\n", from, to);
 		blacklist_range (ra, from, to);
-
-		if (*str == ',')
-			str++;
 	}
 	return 1;
-out_err:
-	printk(KERN_WARNING "blacklist_setup: error parsing \"%s\"\n", sav);
-	return 0;
 }
 
 /* Parsing the commandline for blacklist parameters, e.g. to blacklist

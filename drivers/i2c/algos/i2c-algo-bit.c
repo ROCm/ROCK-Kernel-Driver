@@ -21,8 +21,6 @@
 /* With some changes from Frodo Looijaard <frodol@dds.nl>, Kyösti Mälkki
    <kmalkki@cc.hut.fi> and Jean Delvare <khali@linux-fr.org> */
 
-/* #define DEBUG 1 */
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>

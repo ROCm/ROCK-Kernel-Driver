@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Tue Feb 24 17:17:50 2004
+# Last update: Sat Mar 13 14:36:30 2004
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -474,3 +474,14 @@ edb9315			MACH_EDB9315		EDB9315			463
 reciva_tt		MACH_RECIVA_TT		RECIVA_TT		464
 cstcb01			MACH_CSTCB01		CSTCB01			465
 cstcb1			MACH_CSTCB1		CSTCB1			466
+shadwell		MACH_SHADWELL		SHADWELL		467
+goepel263		MACH_GOEPEL263		GOEPEL263		468
+acq100			MACH_ACQ100		ACQ100			469
+mx1fs2			MACH_MX1FS2		MX1FS2			470
+hiptop_g1		MACH_HIPTOP_G1		HIPTOP_G1		471
+sparky			MACH_SPARKY		SPARKY			472
+ns9750			MACH_NS9750		NS9750			473
+phoenix			MACH_PHOENIX		PHOENIX			474
+vr1000			MACH_VR1000		VR1000			475
+deisterpxa		MACH_DEISTERPXA		DEISTERPXA		476
+bcm1160			MACH_BCM1160		BCM1160			477

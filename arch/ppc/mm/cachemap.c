@@ -35,7 +35,7 @@
 #include <linux/delay.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
-#include <linux/pci.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/pgalloc.h>
 #include <asm/prom.h>
@@ -143,15 +143,15 @@ void consistent_sync(void *vaddr, size_t size, int direction)
 	unsigned long end   = start + size;
 
 	switch (direction) {
-	case PCI_DMA_NONE:
+	case DMA_NONE:
 		BUG();
-	case PCI_DMA_FROMDEVICE:	/* invalidate only */
+	case DMA_FROM_DEVICE:	/* invalidate only */
 		invalidate_dcache_range(start, end);
 		break;
-	case PCI_DMA_TODEVICE:		/* writeback only */
+	case DMA_TODEVICE:		/* writeback only */
 		clean_dcache_range(start, end);
 		break;
-	case PCI_DMA_BIDIRECTIONAL:	/* writeback and invalidate */
+	case DMA_BIDIRECTIONAL:	/* writeback and invalidate */
 		flush_dcache_range(start, end);
 		break;
 	}

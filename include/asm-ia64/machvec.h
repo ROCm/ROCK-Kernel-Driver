@@ -154,10 +154,10 @@ struct ia64_machine_vector {
 	ia64_mv_dma_unmap_single *dma_unmap_single;
 	ia64_mv_dma_map_sg *dma_map_sg;
 	ia64_mv_dma_unmap_sg *dma_unmap_sg;
-	ia64_mv_dma_sync_single *dma_sync_single_for_cpu;
-	ia64_mv_dma_sync_sg *dma_sync_sg_for_cpu;
-	ia64_mv_dma_sync_single *dma_sync_single_for_device;
-	ia64_mv_dma_sync_sg *dma_sync_sg_for_device;
+	ia64_mv_dma_sync_single_for_cpu *dma_sync_single_for_cpu;
+	ia64_mv_dma_sync_sg_for_cpu *dma_sync_sg_for_cpu;
+	ia64_mv_dma_sync_single_for_device *dma_sync_single_for_device;
+	ia64_mv_dma_sync_sg_for_device *dma_sync_sg_for_device;
 	ia64_mv_dma_supported *dma_supported;
 	ia64_mv_irq_desc *irq_desc;
 	ia64_mv_irq_to_vector *irq_to_vector;

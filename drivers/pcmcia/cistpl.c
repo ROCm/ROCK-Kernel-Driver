@@ -143,7 +143,7 @@ int read_cis_mem(struct pcmcia_socket *s, int attr, u_int addr,
 {
     u_char *sys, *end, *buf = ptr;
     
-    DEBUG(3, "cs: read_cis_mem(%d, %#x, %u)\n", attr, addr, len);
+    cs_dbg(s, 3, "read_cis_mem(%d, %#x, %u)\n", attr, addr, len);
 
     if (attr & IS_INDIRECT) {
 	/* Indirect accesses use a bunch of special registers at fixed
@@ -195,7 +195,7 @@ int read_cis_mem(struct pcmcia_socket *s, int attr, u_int addr,
 	    addr = 0;
 	}
     }
-    DEBUG(3, "cs:  %#2.2x %#2.2x %#2.2x %#2.2x ...\n",
+    cs_dbg(s, 3, "  %#2.2x %#2.2x %#2.2x %#2.2x ...\n",
 	  *(u_char *)(ptr+0), *(u_char *)(ptr+1),
 	  *(u_char *)(ptr+2), *(u_char *)(ptr+3));
     return 0;
@@ -206,7 +206,7 @@ void write_cis_mem(struct pcmcia_socket *s, int attr, u_int addr,
 {
     u_char *sys, *end, *buf = ptr;
     
-    DEBUG(3, "cs: write_cis_mem(%d, %#x, %u)\n", attr, addr, len);
+    cs_dbg(s, 3, "write_cis_mem(%d, %#x, %u)\n", attr, addr, len);
 
     if (attr & IS_INDIRECT) {
 	/* Indirect accesses use a bunch of special registers at fixed
@@ -578,8 +578,7 @@ int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple)
 	ofs += link[1] + 2;
     }
     if (i == MAX_TUPLES) {
-	DEBUG(1, "cs: overrun in pcmcia_get_next_tuple for socket %d\n",
-	      handle->Socket);
+	cs_dbg(s, 1, "cs: overrun in pcmcia_get_next_tuple\n");
 	return CS_NO_MORE_ITEMS;
     }
     

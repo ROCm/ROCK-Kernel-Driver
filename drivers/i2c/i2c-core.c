@@ -22,10 +22,6 @@
    SMBus 2.0 support by Mark Studebaker <mdsxyz123@yahoo.com>                */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_CORE
-#define DEBUG	1
-#endif
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -175,7 +171,7 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 		driver = list_entry(item, struct i2c_driver, list);
 		if (driver->detach_adapter)
 			if ((res = driver->detach_adapter(adap))) {
-				dev_warn(&adap->dev, "can't detach adapter"
+				dev_warn(&adap->dev, "can't detach adapter "
 					 "while detaching driver %s: driver not "
 					 "detached!", driver->name);
 				goto out_unlock;
@@ -437,8 +433,11 @@ static void i2c_dec_use_client(struct i2c_client *client)
 
 int i2c_use_client(struct i2c_client *client)
 {
-	if (!i2c_inc_use_client(client))
-		return -ENODEV;
+	int ret;
+
+	ret = i2c_inc_use_client(client);
+	if (ret)
+		return ret;
 
 	if (client->flags & I2C_CLIENT_ALLOW_USE) {
 		if (client->flags & I2C_CLIENT_ALLOW_MULTIPLE_USE)
@@ -618,7 +617,7 @@ int i2c_control(struct i2c_client *client,
 	int ret = 0;
 	struct i2c_adapter *adap = client->adapter;
 
-	dev_dbg(&client->dev, "i2c ioctl, cmd: 0x%x, arg: %#lx\n", cmd, arg);
+	dev_dbg(&client->adapter->dev, "i2c ioctl, cmd: 0x%x, arg: %#lx\n", cmd, arg);
 	switch (cmd) {
 		case I2C_RETRIES:
 			adap->retries = arg;

@@ -607,8 +607,6 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 static void __init detect_ht(void)
 {
 #ifdef CONFIG_SMP
-	extern	int phys_proc_id[NR_CPUS];
-	
 	u32 	eax, ebx, ecx, edx;
 	int 	index_lsb, index_msb, tmp;
 	int	initial_apic_id;
@@ -1022,7 +1020,6 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	
 #ifdef CONFIG_X86_HT
 	if (cpu_has_ht) {
-		extern int phys_proc_id[NR_CPUS];
 		seq_printf(m, "physical id\t: %d\n", phys_proc_id[c - cpu_data]);
 		seq_printf(m, "siblings\t: %d\n", smp_num_siblings);
 	}

@@ -96,23 +96,10 @@ config SMP
 	  Even if you don't know what to do here, say Y.
 
 config NR_CPUS
-	int "Maximum number of CPUs (2-32)"
-	range 2 32
-	depends on SMP && ARCH_S390X = 'n'
-	default "32"
-	help
-	  This allows you to specify the maximum number of CPUs which this
-	  kernel will support.  The maximum supported value is 32 and the
-	  minimum value which makes sense is 2.
-
-	  This is purely to save memory - each supported CPU adds
-	  approximately eight kilobytes to the kernel image.
-	
-config NR_CPUS
 	int "Maximum number of CPUs (2-64)"
 	range 2 64
-	depends on SMP && ARCH_S390X
-	default "64"
+	depends on SMP
+	default "32"
 	help
 	  This allows you to specify the maximum number of CPUs which this
 	  kernel will support.  The maximum supported value is 64 and the
@@ -141,6 +128,11 @@ config S390_SUPPORT
 config COMPAT
 	bool
 	depends on S390_SUPPORT
+	default y
+
+config SYSVIPC_COMPAT
+	bool
+	depends on COMPAT && SYSVIPC
 	default y
 
 config BINFMT_ELF32

@@ -37,11 +37,14 @@ typedef void *(*traverse_func)(struct device_node *me, void *data);
 void *traverse_pci_devices(struct device_node *start, traverse_func pre, traverse_func post, void *data);
 void *traverse_all_pci_devices(traverse_func pre);
 
-struct pci_dev *pci_find_dev_by_addr(unsigned long addr);
 void pci_devs_phb_init(void);
 void pci_fix_bus_sysdata(void);
 struct device_node *fetch_dev_dn(struct pci_dev *dev);
 
 #define PCI_GET_PHB_PTR(dev)    (((struct device_node *)(dev)->sysdata)->phb)
+
+/* PCI address cache management routines */
+void pci_addr_cache_insert_device(struct pci_dev *dev);
+void pci_addr_cache_remove_device(struct pci_dev *dev);
 
 #endif /* __PPC_KERNEL_PCI_H__ */

@@ -7,7 +7,7 @@
  *	   trini@mvista.com
  * Derived from arch/ppc/boot/prep/head.S (Cort Dougan, many others).
  *
- * 2001-2003 (c) MontaVista, Software, Inc.  This file is licensed under
+ * 2001-2004 (c) MontaVista, Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
@@ -57,10 +57,11 @@ start_:
 	isync
 #endif
 
-#if defined(CONFIG_MBX) || defined(CONFIG_RPX6)
+#if defined(CONFIG_MBX) || defined(CONFIG_RPX6) || defined(CONFIG_PPC_PREP)
 	mr	r29,r3	/* On the MBX860, r3 is the board info pointer.
-			 * On the RPXSUPER, r3 points to the
-			 * NVRAM configuration keys.
+			 * On the RPXSUPER, r3 points to the NVRAM
+			 * configuration keys.
+			 * On PReP, r3 is the pointer to the residual data.
 			 */
 #endif
 
@@ -69,7 +70,36 @@ start_:
 	/* The following functions we call must not modify r3 or r4.....
 	*/
 #ifdef CONFIG_6xx
+	/* On PReP we must look at the OpenFirmware pointer and sanity
+	 * test it.  On other platforms, we disable the MMU right now
+	 * and other bits.
+	 */
+#ifdef CONFIG_PPC_PREP
+/*
+ * Save the OF pointer to r25, but only if the entry point is in a sane
+ * location; if not we store 0.  If there is no entry point, or it is
+ * invalid, we establish the default MSR value immediately.  Otherwise,
+ * we defer doing that, to allow OF functions to be called, until we
+ * begin uncompressing the kernel.
+ */
+	lis	r8,0x0fff		/* r8 = 0x0fffffff */
+	ori	r8,r8,0xffff
+
+	subc	r8,r8,r5		/* r8 = (r5 <= r8) ? ~0 : 0 */
+	subfe	r8,r8,r8
+	nand	r8,r8,r8
+
+	and.	r5,r5,r8		/* r5 will be cleared if (r5 > r8) */
+	bne+	haveOF
+
+	li	r8,MSR_IP|MSR_FP	/* Not OF: set MSR immediately */
+  	mtmsr	r8
+	isync
+haveOF:
+	mr	r25,r5
+#else
 	bl	disable_6xx_mmu
+#endif
 	bl	disable_6xx_l1cache
 
 	CLEAR_CACHES
@@ -99,7 +129,7 @@ start_:
 	mr	r3, r29
 #endif
 
-#if defined(CONFIG_MBX) || defined(CONFIG_RPX6)
+#if defined(CONFIG_MBX) || defined(CONFIG_RPX6) || defined(CONFIG_PPC_PREP)
 	mr	r4,r29	/* put the board info pointer where the relocate
 			 * routine will find it
 			 */

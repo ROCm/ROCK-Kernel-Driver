@@ -1587,7 +1587,7 @@ config CODA_FS_OLD_API
 #
 config INTERMEZZO_FS
 	tristate "InterMezzo file system support (replicating fs) (EXPERIMENTAL)"
-	depends on INET && EXPERIMENTAL && BROKEN
+	depends on INET && EXPERIMENTAL 
 	help
 	  InterMezzo is a networked file system with disconnected operation
 	  and kernel level write back caching.  It is most often used for

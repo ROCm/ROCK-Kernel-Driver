@@ -1811,7 +1811,7 @@ static int lbmLogInit(struct jfs_log * log)
 		lbuf = kmalloc(sizeof(struct lbuf), GFP_KERNEL);
 		if (lbuf == 0)
 			goto error;
-		lbuf->l_ldata = (char *) __get_free_page(GFP_KERNEL);
+		lbuf->l_ldata = (char *) get_zeroed_page(GFP_KERNEL);
 		if (lbuf->l_ldata == 0) {
 			kfree(lbuf);
 			goto error;

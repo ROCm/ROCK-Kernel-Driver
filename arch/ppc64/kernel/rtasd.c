@@ -26,7 +26,6 @@
 #include <asm/prom.h>
 #include <asm/nvram.h>
 #include <asm/atomic.h>
-#include <asm/proc_fs.h>
 
 #if 0
 #define DEBUG(A...)	printk(KERN_ERR A)
@@ -47,7 +46,6 @@ static unsigned int rtas_event_scan_rate;
 static unsigned int rtas_error_log_max;
 static unsigned int rtas_error_log_buffer_max;
 
-extern spinlock_t proc_ppc64_lock;
 extern volatile int no_more_logging;
 
 volatile int error_log_cnt = 0;
@@ -445,20 +443,18 @@ static int __init rtas_init(void)
 {
 	struct proc_dir_entry *entry;
 
-	if (proc_ppc64.rtas == NULL) {
-		proc_ppc64_init();
+	/* No RTAS, only warn if we are on a pSeries box  */
+	if (rtas_token("event-scan") == RTAS_UNKNOWN_SERVICE) {
+		if (systemcfg->platform & PLATFORM_PSERIES);
+			printk(KERN_ERR "rtasd: no RTAS on system\n");
+		return 1;
 	}
 
-	if (proc_ppc64.rtas == NULL) {
-		printk(KERN_ERR "rtas_init: /proc/ppc64/rtas does not exist.");
-		return -EIO;
-	}
-
-	entry = create_proc_entry("error_log", S_IRUSR, proc_ppc64.rtas);
+	entry = create_proc_entry("ppc64/error_log", S_IRUSR, NULL);
 	if (entry)
 		entry->proc_fops = &proc_rtas_log_operations;
 	else
-		printk(KERN_ERR "Failed to create rtas/error_log proc entry\n");
+		printk(KERN_ERR "Failed to create error_log proc entry\n");
 
 	if (kernel_thread(rtasd, 0, CLONE_FS) < 0)
 		printk(KERN_ERR "Failed to start RTAS daemon\n");

@@ -231,6 +231,7 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle,
  no_page:
 	return ret;
 }
+EXPORT_SYMBOL(consistent_alloc);
 
 /*
  * Since we have the DMA mask available to us here, we could try to do
@@ -245,7 +246,6 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, int gfp)
 
 	return consistent_alloc(gfp, size, handle, 0);
 }
-
 EXPORT_SYMBOL(dma_alloc_coherent);
 
 /*
@@ -312,6 +312,7 @@ void consistent_free(void *vaddr, size_t size, dma_addr_t handle)
 	       "invalid area: %p\n", vaddr);
 	dump_stack();
 }
+EXPORT_SYMBOL(consistent_free);
 
 /*
  * Initialise the consistent memory allocation.
@@ -374,3 +375,4 @@ void consistent_sync(void *vaddr, size_t size, int direction)
 		BUG();
 	}
 }
+EXPORT_SYMBOL(consistent_sync);

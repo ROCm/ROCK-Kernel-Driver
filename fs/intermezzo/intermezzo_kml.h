@@ -41,7 +41,7 @@ struct big_journal_prefix {
         u32 fsgid;
         u32 opcode;
         u32 ngroups;
-        u32 groups[NGROUPS_MAX];
+        u32 groups[NGROUPS_SMALL];
 };
 
 enum kml_opcode {

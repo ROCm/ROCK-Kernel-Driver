@@ -30,13 +30,13 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <asm/iSeries/HvLpConfig.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <asm/nvram.h>
 #include <asm/time.h>
 #include <asm/iSeries/ItSpCommArea.h>
-#include <asm/iSeries/iSeries_proc.h>
 #include <asm/uaccess.h>
 #include <linux/dma-mapping.h>
 #include <linux/bcd.h>
@@ -560,6 +560,7 @@ void mf_allocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
 	if ((rc != 0) && (hdlr != NULL))
 		(*hdlr)(userToken, rc);
 }
+EXPORT_SYMBOL(mf_allocateLpEvents);
 
 /*
  * Global kernel interface to unseed and deallocate events already in
@@ -590,6 +591,7 @@ void mf_deallocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
 	if ((rc != 0) && (hdlr != NULL))
 		(*hdlr)(userToken, rc);
 }
+EXPORT_SYMBOL(mf_deallocateLpEvents);
 
 /*
  * Global kernel interface to tell the VSP object in the primary
@@ -680,8 +682,6 @@ void mf_init(void)
 
 	/* initialization complete */
 	printk(KERN_NOTICE "mf.c: iSeries Linux LPAR Machine Facilities initialized\n");
-
-	iSeries_proc_callback(&mf_proc_init);
 }
 
 void mf_setSide(char side)

@@ -2195,8 +2195,6 @@ void tty_unregister_device(struct tty_driver *driver, unsigned index)
 EXPORT_SYMBOL(tty_register_device);
 EXPORT_SYMBOL(tty_unregister_device);
 
-static struct kobject tty_kobj = {.name = "tty"};
-
 struct tty_driver *alloc_tty_driver(int lines)
 {
 	struct tty_driver *driver;
@@ -2256,7 +2254,6 @@ int tty_register_driver(struct tty_driver *driver)
 	int error;
         int i;
 	dev_t dev;
-	char *s;
 	void **p = NULL;
 
 	if (driver->flags & TTY_DRIVER_INSTALLED)
@@ -2296,15 +2293,11 @@ int tty_register_driver(struct tty_driver *driver)
 		driver->termios_locked = NULL;
 	}
 
-	driver->cdev.kobj.parent = &tty_kobj;
-	strcpy(driver->cdev.kobj.name, driver->name);
-	for (s = strchr(driver->cdev.kobj.name, '/'); s; s = strchr(s, '/'))
-		*s = '!';
 	cdev_init(&driver->cdev, &tty_fops);
 	driver->cdev.owner = driver->owner;
 	error = cdev_add(&driver->cdev, dev, driver->num);
 	if (error) {
-		kobject_del(&driver->cdev.kobj);
+		cdev_del(&driver->cdev);
 		unregister_chrdev_region(dev, driver->num);
 		driver->ttys = NULL;
 		driver->termios = driver->termios_locked = NULL;
@@ -2420,7 +2413,9 @@ static int __init tty_class_init(void)
 }
 
 postcore_initcall(tty_class_init);
- 
+
+/* 3/2004 jmc: why do these devices exist? */
+
 static struct cdev tty_cdev, console_cdev;
 #ifdef CONFIG_UNIX98_PTYS
 static struct cdev ptmx_cdev;
@@ -2435,7 +2430,6 @@ static struct cdev vc0_cdev;
  */
 static int __init tty_init(void)
 {
-	strcpy(tty_cdev.kobj.name, "dev.tty");
 	cdev_init(&tty_cdev, &tty_fops);
 	if (cdev_add(&tty_cdev, MKDEV(TTYAUX_MAJOR, 0), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 0), 1, "/dev/tty") < 0)
@@ -2443,7 +2437,6 @@ static int __init tty_init(void)
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 0), S_IFCHR|S_IRUGO|S_IWUGO, "tty");
 	class_simple_device_add(tty_class, MKDEV(TTYAUX_MAJOR, 0), NULL, "tty");
 
-	strcpy(console_cdev.kobj.name, "dev.console");
 	cdev_init(&console_cdev, &console_fops);
 	if (cdev_add(&console_cdev, MKDEV(TTYAUX_MAJOR, 1), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 1), 1, "/dev/console") < 0)
@@ -2451,11 +2444,7 @@ static int __init tty_init(void)
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 1), S_IFCHR|S_IRUSR|S_IWUSR, "console");
 	class_simple_device_add(tty_class, MKDEV(TTYAUX_MAJOR, 1), NULL, "console");
 
-	tty_kobj.kset = tty_cdev.kobj.kset;
-	kobject_register(&tty_kobj);
-
 #ifdef CONFIG_UNIX98_PTYS
-	strcpy(ptmx_cdev.kobj.name, "dev.ptmx");
 	cdev_init(&ptmx_cdev, &tty_fops);
 	if (cdev_add(&ptmx_cdev, MKDEV(TTYAUX_MAJOR, 2), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 2), 1, "/dev/ptmx") < 0)
@@ -2465,7 +2454,6 @@ static int __init tty_init(void)
 #endif
 
 #ifdef CONFIG_VT
-	strcpy(vc0_cdev.kobj.name, "dev.vc0");
 	cdev_init(&vc0_cdev, &console_fops);
 	if (cdev_add(&vc0_cdev, MKDEV(TTY_MAJOR, 0), 1) ||
 	    register_chrdev_region(MKDEV(TTY_MAJOR, 0), 1, "/dev/vc/0") < 0)

@@ -50,6 +50,17 @@ const char *processor_modes[]=
 
 static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
 
+#ifdef CONFIG_DEBUG_USER
+unsigned int user_debug;
+
+static int __init user_debug_setup(char *str)
+{
+	get_option(&str, &user_debug);
+	return 1;
+}
+__setup("user_debug=", user_debug_setup);
+#endif
+
 void dump_backtrace_entry(unsigned long where, unsigned long from)
 {
 #ifdef CONFIG_KALLSYMS
@@ -287,9 +298,11 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
 	spin_unlock_irq(&undef_lock);
 
 #ifdef CONFIG_DEBUG_USER
-	printk(KERN_INFO "%s (%d): undefined instruction: pc=%p\n",
-		current->comm, current->pid, pc);
-	dump_instr(regs);
+	if (user_debug & UDBG_UNDEFINED) {
+		printk(KERN_INFO "%s (%d): undefined instruction: pc=%p\n",
+			current->comm, current->pid, pc);
+		dump_instr(regs);
+	}
 #endif
 
 	current->thread.error_code = 0;
@@ -351,9 +364,11 @@ static int bad_syscall(int n, struct pt_regs *regs)
 	}
 
 #ifdef CONFIG_DEBUG_USER
-	printk(KERN_ERR "[%d] %s: obsolete system call %08x.\n",
-		current->pid, current->comm, n);
-	dump_instr(regs);
+	if (user_debug & UDBG_SYSCALL) {
+		printk(KERN_ERR "[%d] %s: obsolete system call %08x.\n",
+			current->pid, current->comm, n);
+		dump_instr(regs);
+	}
 #endif
 
 	info.si_signo = SIGILL;
@@ -459,11 +474,14 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 	 * experience shows that these seem to indicate that
 	 * something catastrophic has happened
 	 */
-	printk("[%d] %s: arm syscall %d\n", current->pid, current->comm, no);
-	dump_instr(regs);
-	if (user_mode(regs)) {
-		show_regs(regs);
-		c_backtrace(regs->ARM_fp, processor_mode(regs));
+	if (user_debug & UDBG_SYSCALL) {
+		printk("[%d] %s: arm syscall %d\n",
+		       current->pid, current->comm, no);
+		dump_instr(regs);
+		if (user_mode(regs)) {
+			show_regs(regs);
+			c_backtrace(regs->ARM_fp, processor_mode(regs));
+		}
 	}
 #endif
 	info.si_signo = SIGILL;
@@ -495,10 +513,12 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
 	siginfo_t info;
 
 #ifdef CONFIG_DEBUG_USER
-	printk(KERN_ERR "[%d] %s: bad data abort: code %d instr 0x%08lx\n",
-		current->pid, current->comm, code, instr);
-	dump_instr(regs);
-	show_pte(current->mm, addr);
+	if (user_debug & UDBG_BADABORT) {
+		printk(KERN_ERR "[%d] %s: bad data abort: code %d instr 0x%08lx\n",
+			current->pid, current->comm, code, instr);
+		dump_instr(regs);
+		show_pte(current->mm, addr);
+	}
 #endif
 
 	info.si_signo = SIGILL;

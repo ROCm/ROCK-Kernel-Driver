@@ -418,7 +418,7 @@ static void izo_setup_ctxt(struct dentry *root, struct vfsmount *mnt,
         new.fsgid = 0;
         new.fs = get_fs(); 
         /* XXX where can we get the groups from? */
-        new.ngroups = 0;
+        new.group_info = groups_alloc(0);
 
         push_ctxt(save, &new); 
 }

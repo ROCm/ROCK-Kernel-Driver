@@ -11,6 +11,7 @@
  * Usage: modpost vmlinux module1.o module2.o ...
  */
 
+#include <ctype.h>
 #include "modpost.h"
 
 /* Are we using CONFIG_MODVERSIONS? */
@@ -44,8 +45,6 @@ warn(const char *fmt, ...)
 	va_end(arglist);
 }
 
-#define NOFAIL(ptr)	do_nofail((ptr), __FILE__, __LINE__, #ptr)
-
 void *do_nofail(void *ptr, const char *file, int line, const char *expr)
 {
 	if (!ptr) {
@@ -63,21 +62,19 @@ struct module *
 new_module(char *modname)
 {
 	struct module *mod;
-	char *p;
-	size_t len;
+	char *p, *s;
 	
 	mod = NOFAIL(malloc(sizeof(*mod)));
 	memset(mod, 0, sizeof(*mod));
 	p = NOFAIL(strdup(modname));
 
-	len = strlen(p);
-
 	/* strip trailing .o */
-	if (len > 2 && p[len-2] == '.' && p[len-1] == 'o')
-		p[len -2] = '\0';
+	if ((s = strrchr(p, '.')) != NULL)
+		if (strcmp(s, ".o") == 0)
+			*s = '\0';
 
 	/* add to list */
-	mod->name = NOFAIL(strdup(p));
+	mod->name = p;
 	mod->next = modules;
 	modules = mod;
 
@@ -207,6 +204,42 @@ grab_file(const char *filename, unsigned long *size)
 	if (map == MAP_FAILED)
 		return NULL;
 	return map;
+}
+
+/*
+   Return a copy of the next line in a mmap'ed file.
+   spaces in the beginning of the line is trimmed away.
+   Return a pointer to a static buffer.
+*/
+char*
+get_next_line(unsigned long *pos, void *file, unsigned long size)
+{
+	static char line[4096];
+	int skip = 1;
+	size_t len = 0;
+	char *p = (char *)file + *pos;
+	char *s = line;
+
+	for (; *pos < size ; (*pos)++)
+	{
+		if (skip && isspace(*p)) {
+			p++;
+			continue;
+		}
+		skip = 0;
+		if (*p != '\n' && (*pos < size)) {
+			len++;
+			*s++ = *p++;
+			if (len > 4095)
+				break; /* Too long, stop */
+		} else {
+			/* End of string */
+			*s = '\0';
+			return line;
+		}
+	}
+	/* End of buffer */
+	return NULL;
 }
 
 void

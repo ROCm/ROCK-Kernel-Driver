@@ -61,6 +61,14 @@ extern const struct linux_logo logo_linux_clut224;
 #endif
 
 /*
+ * Properties whose value is longer than this get excluded from our
+ * copy of the device tree. This value does need to be big enough to
+ * ensure that we don't lose things like the interrupt-map property
+ * on a PCI-PCI bridge.
+ */
+#define MAX_PROPERTY_LENGTH	(1UL * 1024 * 1024)
+
+/*
  * prom_init() is called very early on, before the kernel text
  * and data have been mapped to KERNELBASE.  At this point the code
  * is running at whatever address it has been loaded at, so
@@ -908,9 +916,11 @@ prom_initialize_tce_table(void)
 			*tce_entryp = tce_entry;
 		}
 
+		/* It seems OF doesn't null-terminate the path :-( */
+		memset(path, 0, sizeof(path));
 		/* Call OF to setup the TCE hardware */
 		if (call_prom(RELOC("package-to-path"), 3, 1, node,
-                             path, 255) <= 0) {
+                             path, sizeof(path)-1) <= 0) {
                         prom_print(RELOC("package-to-path failed\n"));
                 } else {
                         prom_print(RELOC("opened "));
@@ -1687,6 +1697,11 @@ check_display(unsigned long mem)
 		/* It seems OF doesn't null-terminate the path :-( */
 		path = (char *) mem;
 		memset(path, 0, 256);
+
+		/*
+		 * leave some room at the end of the path for appending extra
+		 * arguments
+		 */
 		if ((long) call_prom(RELOC("package-to-path"), 3, 1,
 				    node, path, 250) < 0)
 			continue;
@@ -1794,8 +1809,7 @@ copy_device_tree(unsigned long mem_start)
 	return new_start;
 }
 
-__init
-static unsigned long
+static unsigned long __init
 inspect_node(phandle node, struct device_node *dad,
 	     unsigned long mem_start, unsigned long mem_end,
 	     struct device_node ***allnextpp)
@@ -1843,6 +1857,22 @@ inspect_node(phandle node, struct device_node *dad,
 				  valp, mem_end - mem_start);
 		if (pp->length < 0)
 			continue;
+		if (pp->length > MAX_PROPERTY_LENGTH) {
+			char path[128];
+
+			prom_print(RELOC("WARNING: ignoring large property "));
+			/* It seems OF doesn't null-terminate the path :-( */
+			memset(path, 0, sizeof(path));
+			if (call_prom(RELOC("package-to-path"), 3, 1, node,
+                            path, sizeof(path)-1) > 0)
+				prom_print(path);
+			prom_print(namep);
+			prom_print(RELOC(" length 0x"));
+			prom_print_hex(pp->length);
+			prom_print_nl();
+
+			continue;
+		}
 		mem_start = DOUBLEWORD_ALIGN(mem_start + pp->length);
 		*prev_propp = PTRUNRELOC(pp);
 		prev_propp = &pp->next;
@@ -2853,40 +2883,12 @@ int of_remove_node(struct device_node *np)
 	struct device_node *parent, *child;
 
 	parent = of_get_parent(np);
-
 	if (!parent)
 		return -EINVAL;
 
-	/* Make sure we are not recursively removing
-	 * more than one level of nodes.  We need to
-	 * allow this so we can remove a slot containing
-	 * an IOA.
-	 */
-	for (child = of_get_next_child(np, NULL);
-	     child != NULL;
-	     child = of_get_next_child(np, child)) {
-		struct device_node *grandchild;
-
-		if ((grandchild = of_get_next_child(child, NULL))) {
-			/* Too deep */
-			of_node_put(grandchild);
-			of_node_put(child);
-			return -EBUSY;
-		}
-	}
-
-	/* Now that we're reasonably sure that we won't
-	 * overflow our stack, remove any children of np.
-	 */
-	for (child = of_get_next_child(np, NULL);
-	     child != NULL;
-	     child = of_get_next_child(np, child)) {
-		int rc;
-
-		if ((rc = of_remove_node(child))) {
-			of_node_put(child);
-			return rc;
-		}
+	if ((child = of_get_next_child(np, NULL))) {
+		of_node_put(child);
+		return -EBUSY;
 	}
 
 	write_lock(&devtree_lock);
@@ -2964,6 +2966,53 @@ static void remove_node_proc_entries(struct device_node *np)
 #endif /* CONFIG_PROC_DEVICETREE */
 
 /*
+ * Fix up n_intrs and intrs fields in a new device node
+ *
+ */
+static int of_finish_dynamic_node_interrupts(struct device_node *node)
+{
+	int intrcells, intlen, i;
+	unsigned *irq, *ints, virq;
+	struct device_node *ic;
+
+	ints = (unsigned int *)get_property(node, "interrupts", &intlen);
+	intrcells = prom_n_intr_cells(node);
+	intlen /= intrcells * sizeof(unsigned int);
+	node->n_intrs = intlen;
+	node->intrs = kmalloc(sizeof(struct interrupt_info) * intlen,
+			      GFP_KERNEL);
+	if (!node->intrs)
+		return -ENOMEM;
+
+	for (i = 0; i < intlen; ++i) {
+		int n, j;
+		node->intrs[i].line = 0;
+		node->intrs[i].sense = 1;
+		n = map_interrupt(&irq, &ic, node, ints, intrcells);
+		if (n <= 0)
+			continue;
+		virq = virt_irq_create_mapping(irq[0]);
+		if (virq == NO_IRQ) {
+			printk(KERN_CRIT "Could not allocate interrupt "
+			       "number for %s\n", node->full_name);
+			return -ENOMEM;
+		}
+		node->intrs[i].line = openpic_to_irq(virq);
+		if (n > 1)
+			node->intrs[i].sense = irq[1];
+		if (n > 2) {
+			printk(KERN_DEBUG "hmmm, got %d intr cells for %s:", n,
+			       node->full_name);
+			for (j = 0; j < n; ++j)
+				printk(" %d", irq[j]);
+			printk("\n");
+		}
+		ints += intrcells;
+	}
+	return 0;
+}
+
+/*
  * Fix up the uninitialized fields in a new device node:
  * name, type, n_addrs, addrs, n_intrs, intrs, and pci-specific fields
  *
@@ -2978,11 +3027,8 @@ static int of_finish_dynamic_node(struct device_node *node)
 {
 	struct device_node *parent = of_get_parent(node);
 	u32 *regs;
-	unsigned int *ints;
-	int intlen, intrcells;
-	int i, j, n, err = 0;
-	unsigned int *irq, virq;
-	struct device_node *ic;
+	int err = 0;
+	phandle *ibm_phandle;
  
 	node->name = get_property(node, "name", 0);
 	node->type = get_property(node, "device_type", 0);
@@ -2997,6 +3043,10 @@ static int of_finish_dynamic_node(struct device_node *node)
 	 */
 	if (systemcfg->platform == PLATFORM_POWERMAC)
 		return -ENODEV;
+
+	/* fix up new node's linux_phandle field */
+	if ((ibm_phandle = (unsigned int *)get_property(node, "ibm,phandle", NULL)))
+		node->linux_phandle = *ibm_phandle;
 
 	/* do the work of interpret_pci_props */
 	if (parent->type && !strcmp(parent->type, "pci")) {
@@ -3027,45 +3077,9 @@ static int of_finish_dynamic_node(struct device_node *node)
 	}
 
 	/* now do the work of finish_node_interrupts */
-
-	ints = (unsigned int *) get_property(node, "interrupts", &intlen);
-	if (!ints) {
-		err = -ENODEV;
-		goto out;
-	}
-
-	intrcells = prom_n_intr_cells(node);
-	intlen /= intrcells * sizeof(unsigned int);
-	node->n_intrs = intlen;
-	node->intrs = kmalloc(sizeof(struct interrupt_info) * intlen,
-			      GFP_KERNEL);
-	if (!node->intrs) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-	for (i = 0; i < intlen; ++i) {
-		node->intrs[i].line = 0;
-		node->intrs[i].sense = 1;
-		n = map_interrupt(&irq, &ic, node, ints, intrcells);
-		if (n <= 0)
-			continue;
-		virq = virt_irq_create_mapping(irq[0]);
-		if (virq == NO_IRQ) {
-			printk(KERN_CRIT "Could not allocate interrupt "
-			       "number for %s\n", node->full_name);
-		} else
-			node->intrs[i].line = openpic_to_irq(virq);
-		if (n > 1)
-			node->intrs[i].sense = irq[1];
-		if (n > 2) {
-			printk(KERN_DEBUG "hmmm, got %d intr cells for %s:", n,
-			       node->full_name);
-			for (j = 0; j < n; ++j)
-				printk(" %d", irq[j]);
-			printk("\n");
-		}
-		ints += intrcells;
+	if (get_property(node, "interrupts", 0)) {
+		err = of_finish_dynamic_node_interrupts(node);
+		if (err) goto out;
 	}
 
        /* now do the rough equivalent of update_dn_pci_info, this

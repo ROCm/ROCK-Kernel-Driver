@@ -683,11 +683,24 @@ static struct file_system_type hugetlbfs_fs_type = {
 
 static struct vfsmount *hugetlbfs_vfsmount;
 
-static atomic_t hugetlbfs_counter = ATOMIC_INIT(0);
+/*
+ * Return the next identifier for a shm file
+ */
+static unsigned long hugetlbfs_counter(void)
+{
+	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+	static unsigned long counter;
+	unsigned long ret;
+
+	spin_lock(&lock);
+	ret = ++counter;
+	spin_unlock(&lock);
+	return ret;
+}
 
 struct file *hugetlb_zero_setup(size_t size)
 {
-	int error, n;
+	int error;
 	struct file *file;
 	struct inode *inode;
 	struct dentry *dentry, *root;
@@ -699,11 +712,9 @@ struct file *hugetlb_zero_setup(size_t size)
 
 	if (!is_hugepage_mem_enough(size))
 		return ERR_PTR(-ENOMEM);
-	n = atomic_read(&hugetlbfs_counter);
-	atomic_inc(&hugetlbfs_counter);
 
 	root = hugetlbfs_vfsmount->mnt_root;
-	snprintf(buf, 16, "%d", n);
+	snprintf(buf, 16, "%lu", hugetlbfs_counter());
 	quick_string.name = buf;
 	quick_string.len = strlen(quick_string.name);
 	quick_string.hash = 0;

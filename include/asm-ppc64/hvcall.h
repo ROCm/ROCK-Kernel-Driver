@@ -4,6 +4,14 @@
 #define H_Success	0
 #define H_Busy		1	/* Hardware busy -- retry later */
 #define H_Constrained	4	/* Resource request constrained to max allowed */
+#define H_LongBusyStartRange   9900  /* Start of long busy range */
+#define H_LongBusyOrder1msec   9900  /* Long busy, hint that 1msec is a good time to retry */
+#define H_LongBusyOrder10msec  9901  /* Long busy, hint that 10msec is a good time to retry */
+#define H_LongBusyOrder100msec 9902  /* Long busy, hint that 100msec is a good time to retry */
+#define H_LongBusyOrder1sec    9903  /* Long busy, hint that 1sec is a good time to retry */
+#define H_LongBusyOrder10sec   9904  /* Long busy, hint that 10sec is a good time to retry */
+#define H_LongBusyOrder100sec  9905  /* Long busy, hint that 100sec is a good time to retry */
+#define H_LongBusyEndRange     9905  /* End of long busy range */
 #define H_Hardware	-1	/* Hardware error */
 #define H_Function	-2	/* Function not supported */
 #define H_Privilege	-3	/* Caller not privileged */
@@ -20,6 +28,16 @@
 #define H_DestParm             -14
 #define H_RemoteParm           -15
 #define H_Resource             -16
+
+/* Long Busy is a condition that can be returned by the firmware
+ * when a call cannot be completed now, but the identical call
+ * should be retried later.  This prevents calls blocking in the
+ * firmware for long periods of time. Annoyingly the firmware can return
+ * a range of return codes, hinting at how long we should wait before
+ * retrying.  If you don't care for the hint, the macro below is a good
+ * way to check for the long_busy return codes
+ */
+#define H_isLongBusy(x)  ((x >= H_LongBusyStartRange) && (x <= H_LongBusyEndRange))
 
 /* Flags */
 #define H_LARGE_PAGE		(1UL<<(63-16))
@@ -76,7 +94,7 @@
 #define H_PROD		        0xE8
 #define H_GET_PPP		0xEC
 #define H_SET_PPP		0xF0
-#define H_SET_PURR		0xF4
+#define H_PURR			0xF4
 #define H_PIC		        0xF8
 #define H_REG_CRQ		0xFC
 #define H_FREE_CRQ		0x100
@@ -84,6 +102,9 @@
 #define H_SEND_CRQ		0x108
 #define H_COPY_RDMA             0x110
 #define H_POLL_PENDING	        0x1D8
+#define H_VTERM_PARTNER_INFO	0x150
+#define H_REGISTER_VTERM		0x154
+#define H_FREE_VTERM			0x158
 
 /* plpar_hcall() -- Generic call interface using above opcodes
  *

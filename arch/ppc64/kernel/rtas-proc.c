@@ -28,7 +28,6 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
-#include <asm/proc_fs.h>
 #include <asm/machdep.h> /* for ppc_md */
 #include <asm/time.h>
 
@@ -117,8 +116,6 @@
 
 
 /* Globals */
-extern struct proc_dir_entry *proc_rtas;
-
 static struct rtas_sensors sensors;
 static struct device_node *rtas_node = NULL;
 static unsigned long power_on_time = 0; /* Save the time the user set */
@@ -201,50 +198,49 @@ int get_location_code(struct individual_sensor s, char * buf);
 int check_location_string (char *c, char * buf);
 int check_location (char *c, int idx, char * buf);
 
-/* ****************************************************************** */
-/* MAIN                                                               */
-/* ****************************************************************** */
-void proc_rtas_init(void)
+static int __init proc_rtas_init(void)
 {
 	struct proc_dir_entry *entry;
 
+	if (!(systemcfg->platform & PLATFORM_PSERIES))
+		return 1;
+
 	rtas_node = of_find_node_by_name(NULL, "rtas");
-	if ((rtas_node == NULL) || (systemcfg->platform == PLATFORM_ISERIES_LPAR)) {
-		return;
-	}
-	
-	if (proc_ppc64.rtas == NULL) {
-		proc_ppc64_init();
-	}
+	if (rtas_node == NULL)
+		return 1;
 
-	if (proc_ppc64.rtas == NULL) {
-		printk(KERN_ERR "Failed to create /proc/rtas in proc_rtas_init\n");
-		return;
-	}
+	entry = create_proc_entry("ppc64/rtas/progress", S_IRUGO|S_IWUSR, NULL);
+	if (entry)
+		entry->proc_fops = &ppc_rtas_progress_operations;
 
-	/* /proc/rtas entries */
+	entry = create_proc_entry("ppc64/rtas/clock", S_IRUGO|S_IWUSR, NULL);
+	if (entry)
+		entry->proc_fops = &ppc_rtas_clock_operations;
 
-	entry = create_proc_entry("progress", S_IRUGO|S_IWUSR, proc_ppc64.rtas);
-	if (entry) entry->proc_fops = &ppc_rtas_progress_operations;
+	entry = create_proc_entry("ppc64/rtas/poweron", S_IWUSR|S_IRUGO, NULL);
+	if (entry)
+		entry->proc_fops = &ppc_rtas_poweron_operations;
 
-	entry = create_proc_entry("clock", S_IRUGO|S_IWUSR, proc_ppc64.rtas); 
-	if (entry) entry->proc_fops = &ppc_rtas_clock_operations;
+	create_proc_read_entry("ppc64/rtas/sensors", S_IRUGO, NULL,
+			       ppc_rtas_sensor_read, NULL);
 
-	entry = create_proc_entry("poweron", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
-	if (entry) entry->proc_fops = &ppc_rtas_poweron_operations;
+	entry = create_proc_entry("ppc64/rtas/frequency", S_IWUSR|S_IRUGO,
+				  NULL);
+	if (entry)
+		entry->proc_fops = &ppc_rtas_tone_freq_operations;
 
-	create_proc_read_entry("sensors", S_IRUGO, proc_ppc64.rtas, 
-			ppc_rtas_sensor_read, NULL);
-	
-	entry = create_proc_entry("frequency", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
-	if (entry) entry->proc_fops = &ppc_rtas_tone_freq_operations;
+	entry = create_proc_entry("ppc64/rtas/volume", S_IWUSR|S_IRUGO, NULL);
+	if (entry)
+		entry->proc_fops = &ppc_rtas_tone_volume_operations;
 
-	entry = create_proc_entry("volume", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
-	if (entry) entry->proc_fops = &ppc_rtas_tone_volume_operations;
+	entry = create_proc_entry("ppc64/rtas/rmo_buffer", S_IRUSR, NULL);
+	if (entry)
+		entry->proc_fops = &ppc_rtas_rmo_buf_ops;
 
-	entry = create_proc_entry("rmo_buffer", S_IRUSR, proc_ppc64.rtas);
-	if (entry) entry->proc_fops = &ppc_rtas_rmo_buf_ops;
+	return 0;
 }
+
+__initcall(proc_rtas_init);
 
 /* ****************************************************************** */
 /* POWER-ON-TIME                                                      */

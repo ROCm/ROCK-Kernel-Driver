@@ -217,9 +217,9 @@ static int presto_file_open(struct inode *inode, struct file *file)
                 fdata->fd_mode = file->f_dentry->d_inode->i_mode;
                 fdata->fd_uid = file->f_dentry->d_inode->i_uid;
                 fdata->fd_gid = file->f_dentry->d_inode->i_gid;
-                fdata->fd_ngroups = current->ngroups;
-                for (i=0 ; i < current->ngroups ; i++)
-                        fdata->fd_groups[i] = current->groups[i];
+                fdata->fd_ngroups = current->group_info->ngroups;
+                for (i=0 ; i < current->group_info->ngroups ; i++)
+                        fdata->fd_groups[i] = GROUP_AT(current->group_info,i);
                 if (!ISLENTO(minor)) 
                         fdata->fd_info.flags = LENTO_FL_KML; 
                 else { 

@@ -47,6 +47,7 @@ struct cpu_workqueue_struct {
 	struct workqueue_struct *wq;
 	task_t *thread;
 
+	int run_depth;		/* Detect run_workqueue() recursion depth */
 } ____cacheline_aligned;
 
 /*
@@ -129,6 +130,13 @@ static inline void run_workqueue(struct cpu_workqueue_struct *cwq)
 	 * done.
 	 */
 	spin_lock_irqsave(&cwq->lock, flags);
+	cwq->run_depth++;
+	if (cwq->run_depth > 3) {
+		/* morton gets to eat his hat */
+		printk("%s: recursion depth exceeded: %d\n",
+			__FUNCTION__, cwq->run_depth);
+		dump_stack();
+	}
 	while (!list_empty(&cwq->worklist)) {
 		struct work_struct *work = list_entry(cwq->worklist.next,
 						struct work_struct, entry);
@@ -146,6 +154,7 @@ static inline void run_workqueue(struct cpu_workqueue_struct *cwq)
 		cwq->remove_sequence++;
 		wake_up(&cwq->work_done);
 	}
+	cwq->run_depth--;
 	spin_unlock_irqrestore(&cwq->lock, flags);
 }
 
@@ -218,6 +227,14 @@ void fastcall flush_workqueue(struct workqueue_struct *wq)
 			continue;
 		cwq = wq->cpu_wq + cpu;
 
+		if (cwq->thread == current) {
+			/*
+			 * Probably keventd trying to flush its own queue.
+			 * So simply run it by hand rather than deadlocking.
+			 */
+			run_workqueue(cwq);
+			continue;
+		}
 		spin_lock_irq(&cwq->lock);
 		sequence_needed = cwq->insert_sequence;
 
@@ -267,6 +284,7 @@ struct workqueue_struct *create_workqueue(const char *name)
 	wq = kmalloc(sizeof(*wq), GFP_KERNEL);
 	if (!wq)
 		return NULL;
+	memset(wq, 0, sizeof(*wq));
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		if (!cpu_online(cpu))

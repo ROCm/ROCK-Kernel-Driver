@@ -250,7 +250,7 @@ xpram shows up under sys/ as 'xpram'.
 -----------
 
 The netiucv driver creates an attribute 'connection' under
-bus/iucv/drivers/NETIUCV. Piping to this attibute creates a new netiucv
+bus/iucv/drivers/netiucv. Piping to this attibute creates a new netiucv
 connection to the specified host.
 
 Netiucv connections show up under devices/iucv/ as "netiucv<ifnum>". The interface

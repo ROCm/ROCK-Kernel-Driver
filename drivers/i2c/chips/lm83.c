@@ -28,10 +28,6 @@
  */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_CHIP
-#define DEBUG	1
-#endif
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -118,7 +114,7 @@ static const u8 LM83_REG_W_HIGH[] = {
 static int lm83_attach_adapter(struct i2c_adapter *adapter);
 static int lm83_detect(struct i2c_adapter *adapter, int address, int kind);
 static int lm83_detach_client(struct i2c_client *client);
-static void lm83_update_client(struct i2c_client *client);
+static struct lm83_data *lm83_update_device(struct device *dev);
 
 /*
  * Driver data (common to all clients)
@@ -162,9 +158,7 @@ static int lm83_id = 0;
 #define show_temp(suffix, value) \
 static ssize_t show_temp_##suffix(struct device *dev, char *buf) \
 { \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct lm83_data *data = i2c_get_clientdata(client); \
-	lm83_update_client(client); \
+	struct lm83_data *data = lm83_update_device(dev); \
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->value)); \
 }
 show_temp(input1, temp_input[0]);
@@ -195,23 +189,21 @@ set_temp(crit, temp_crit, LM83_REG_W_TCRIT);
 
 static ssize_t show_alarms(struct device *dev, char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct lm83_data *data = i2c_get_clientdata(client);
-	lm83_update_client(client);
+	struct lm83_data *data = lm83_update_device(dev);
 	return sprintf(buf, "%d\n", data->alarms);
 }
 
-static DEVICE_ATTR(temp_input1, S_IRUGO, show_temp_input1, NULL);
-static DEVICE_ATTR(temp_input2, S_IRUGO, show_temp_input2, NULL);
-static DEVICE_ATTR(temp_input3, S_IRUGO, show_temp_input3, NULL);
-static DEVICE_ATTR(temp_input4, S_IRUGO, show_temp_input4, NULL);
-static DEVICE_ATTR(temp_max1, S_IWUSR | S_IRUGO, show_temp_high1,
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp_input1, NULL);
+static DEVICE_ATTR(temp2_input, S_IRUGO, show_temp_input2, NULL);
+static DEVICE_ATTR(temp3_input, S_IRUGO, show_temp_input3, NULL);
+static DEVICE_ATTR(temp4_input, S_IRUGO, show_temp_input4, NULL);
+static DEVICE_ATTR(temp1_max, S_IWUSR | S_IRUGO, show_temp_high1,
     set_temp_high1);
-static DEVICE_ATTR(temp_max2, S_IWUSR | S_IRUGO, show_temp_high2,
+static DEVICE_ATTR(temp2_max, S_IWUSR | S_IRUGO, show_temp_high2,
     set_temp_high2);
-static DEVICE_ATTR(temp_max3, S_IWUSR | S_IRUGO, show_temp_high3,
+static DEVICE_ATTR(temp3_max, S_IWUSR | S_IRUGO, show_temp_high3,
     set_temp_high3);
-static DEVICE_ATTR(temp_max4, S_IWUSR | S_IRUGO, show_temp_high4,
+static DEVICE_ATTR(temp4_max, S_IWUSR | S_IRUGO, show_temp_high4,
     set_temp_high4);
 static DEVICE_ATTR(temp_crit, S_IWUSR | S_IRUGO, show_temp_crit,
     set_temp_crit);
@@ -292,7 +284,6 @@ static int lm83_detect(struct i2c_adapter *adapter, int address, int kind)
 		if (man_id == 0x01) { /* National Semiconductor */
 			if (chip_id == 0x03) {
 				kind = lm83;
-				name = "lm83";
 			}
 		}
 
@@ -302,6 +293,10 @@ static int lm83_detect(struct i2c_adapter *adapter, int address, int kind)
 			    "chip_id=0x%02X).\n", man_id, chip_id);
 			goto exit_free;
 		}
+	}
+
+	if (kind == lm83) {
+		name = "lm83";
 	}
 
 	/* We can fill in the remaining client fields */
@@ -320,14 +315,14 @@ static int lm83_detect(struct i2c_adapter *adapter, int address, int kind)
 	 */
 
 	/* Register sysfs hooks */
-	device_create_file(&new_client->dev, &dev_attr_temp_input1);
-	device_create_file(&new_client->dev, &dev_attr_temp_input2);
-	device_create_file(&new_client->dev, &dev_attr_temp_input3);
-	device_create_file(&new_client->dev, &dev_attr_temp_input4);
-	device_create_file(&new_client->dev, &dev_attr_temp_max1);
-	device_create_file(&new_client->dev, &dev_attr_temp_max2);
-	device_create_file(&new_client->dev, &dev_attr_temp_max3);
-	device_create_file(&new_client->dev, &dev_attr_temp_max4);
+	device_create_file(&new_client->dev, &dev_attr_temp1_input);
+	device_create_file(&new_client->dev, &dev_attr_temp2_input);
+	device_create_file(&new_client->dev, &dev_attr_temp3_input);
+	device_create_file(&new_client->dev, &dev_attr_temp4_input);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max);
+	device_create_file(&new_client->dev, &dev_attr_temp2_max);
+	device_create_file(&new_client->dev, &dev_attr_temp3_max);
+	device_create_file(&new_client->dev, &dev_attr_temp4_max);
 	device_create_file(&new_client->dev, &dev_attr_temp_crit);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 
@@ -353,8 +348,9 @@ static int lm83_detach_client(struct i2c_client *client)
 	return 0;
 }
 
-static void lm83_update_client(struct i2c_client *client)
+static struct lm83_data *lm83_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct lm83_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
@@ -385,6 +381,8 @@ static void lm83_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_lm83_init(void)

@@ -423,7 +423,7 @@ static int associate_dev(struct us_data *us, struct usb_interface *intf)
 	/* Fill in the device-related fields */
 	us->pusb_dev = interface_to_usbdev(intf);
 	us->pusb_intf = intf;
-	us->ifnum = intf->altsetting->desc.bInterfaceNumber;
+	us->ifnum = intf->cur_altsetting->desc.bInterfaceNumber;
 
 	/* Store our private data in the interface and increment the
 	 * device's reference count */
@@ -452,7 +452,7 @@ static void get_device_info(struct us_data *us, int id_index)
 {
 	struct usb_device *dev = us->pusb_dev;
 	struct usb_interface_descriptor *idesc =
-		&us->pusb_intf->altsetting[us->pusb_intf->act_altsetting].desc;
+		&us->pusb_intf->cur_altsetting->desc;
 	struct us_unusual_dev *unusual_dev = &us_unusual_dev_list[id_index];
 	struct usb_device_id *id = &storage_usb_ids[id_index];
 
@@ -686,7 +686,7 @@ static int get_protocol(struct us_data *us)
 static int get_pipes(struct us_data *us)
 {
 	struct usb_host_interface *altsetting =
-		&us->pusb_intf->altsetting[us->pusb_intf->act_altsetting];
+		us->pusb_intf->cur_altsetting;
 	int i;
 	struct usb_endpoint_descriptor *ep;
 	struct usb_endpoint_descriptor *ep_in = NULL;
@@ -877,8 +877,9 @@ static int storage_probe(struct usb_interface *intf,
 	int result;
 
 	US_DEBUGP("USB Mass Storage device detected\n");
-	US_DEBUGP("act_altsetting is %d, id_index is %d\n",
-			intf->act_altsetting, id_index);
+	US_DEBUGP("altsetting is %d, id_index is %d\n",
+			intf->cur_altsetting->desc.bAlternateSetting,
+			id_index);
 
 	/* Allocate the us_data structure and initialize the mutexes */
 	us = (struct us_data *) kmalloc(sizeof(*us), GFP_KERNEL);
@@ -953,8 +954,6 @@ static int storage_probe(struct usb_interface *intf,
 
 	scsi_scan_host(us->host);
 
-	printk(KERN_DEBUG 
-	       "WARNING: USB Mass Storage data integrity not assured\n");
 	printk(KERN_DEBUG 
 	       "USB Mass Storage device found at %d\n", us->pusb_dev->devnum);
 	return 0;

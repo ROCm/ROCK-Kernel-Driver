@@ -15,6 +15,7 @@
 #include <linux/console.h>
 #include <linux/serial_core.h>
 #include <linux/serial.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -510,6 +511,7 @@ static struct uart_driver serial21285_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "ttyFB",
 	.dev_name		= "ttyFB",
+	.devfs_name             = "ttyFB",
 	.major			= SERIAL_21285_MAJOR,
 	.minor			= SERIAL_21285_MINOR,
 	.nr			= 1,
@@ -542,3 +544,4 @@ module_exit(serial21285_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Intel Footbridge (21285) serial driver $Revision: 1.37 $");
+MODULE_ALIAS_CHARDEV(SERIAL_21285_MAJOR, SERIAL_21285_MINOR);

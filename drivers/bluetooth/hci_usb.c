@@ -55,7 +55,7 @@
 
 #include "hci_usb.h"
 
-#ifndef HCI_USB_DEBUG
+#ifndef CONFIG_BT_HCIUSB_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #undef  BT_DMP
@@ -795,7 +795,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	struct hci_dev *hdev;
 	int i, a, e, size, ifn, isoc_ifnum, isoc_alts;
 
-	BT_DBG("udev %p ifnum %d", udev, ifnum);
+	BT_DBG("udev %p intf %p", udev, intf);
 
 	if (!id->driver_info) {
 		const struct usb_device_id *match;
@@ -991,7 +991,7 @@ static struct usb_driver hci_usb_driver = {
 	.id_table   =  bluetooth_ids,
 };
 
-int hci_usb_init(void)
+static int __init hci_usb_init(void)
 {
 	int err;
 
@@ -1003,14 +1003,15 @@ int hci_usb_init(void)
 	return err;
 }
 
-void hci_usb_cleanup(void)
+static void __exit hci_usb_exit(void)
 {
 	usb_deregister(&hci_usb_driver);
 }
 
 module_init(hci_usb_init);
-module_exit(hci_usb_cleanup);
+module_exit(hci_usb_exit);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth HCI USB driver ver " VERSION);
+MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");

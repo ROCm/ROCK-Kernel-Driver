@@ -30,6 +30,7 @@
 #include <linux/serial.h>
 #include <linux/console.h>
 #include <linux/sysrq.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -541,3 +542,4 @@ MODULE_DESCRIPTION("Anakin serial driver");
 MODULE_AUTHOR("Tak-Shing Chan <chan@aleph1.co.uk>");
 MODULE_SUPPORTED_DEVICE("ttyAN");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_CHARDEV(SERIAL_ANAKIN_MAJOR, SERIAL_ANAKIN_MINOR);

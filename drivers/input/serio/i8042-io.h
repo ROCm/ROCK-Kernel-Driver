@@ -25,6 +25,9 @@
 #elif defined(__ia64__)
 # define I8042_KBD_IRQ isa_irq_to_vector(1)
 # define I8042_AUX_IRQ isa_irq_to_vector(12)
+#elif defined(__arm__)
+/* defined in include/asm-arm/arch-xxx/irqs.h */
+#include <asm/irq.h>
 #else
 # define I8042_KBD_IRQ	1
 # define I8042_AUX_IRQ	12

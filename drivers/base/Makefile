@@ -6,3 +6,8 @@ obj-y			:= core.o sys.o interface.o bus.o \
 obj-y			+= power/
 obj-$(CONFIG_FW_LOADER)	+= firmware_class.o
 obj-$(CONFIG_NUMA)	+= node.o
+
+ifeq ($(CONFIG_DEBUG_DRIVER),y)
+EXTRA_CFLAGS += -DDEBUG
+endif
+

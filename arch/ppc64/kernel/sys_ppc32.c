@@ -2577,17 +2577,6 @@ asmlinkage long sys32_umask(u32 mask)
 	return sys_umask((int)mask);
 }
 
-
-/* Note: it is necessary to treat flags as an unsigned int,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_umount(char * name, u32 flags)
-{
-	return sys_umount(name, (int)flags);
-}
-
 struct __sysctl_args32 {
 	u32 name;
 	int nlen;

@@ -74,6 +74,8 @@ static int pc98bm_irq = PC98BM_IRQ;
 module_param_named(irq, pc98bm_irq, uint, 0);
 MODULE_PARM_DESC(irq, "IRQ number (13=default)");
 
+__obsolete_setup("pc98bm_irq=");
+
 static int pc98bm_used = 0;
 
 static irqreturn_t pc98bm_interrupt(int irq, void *dev_id, struct pt_regs *regs);

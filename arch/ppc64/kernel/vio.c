@@ -580,5 +580,4 @@ struct bus_type vio_bus_type = {
 	.match = vio_bus_match,
 };
 
-EXPORT_SYMBOL(plpar_hcall_norets);
-EXPORT_SYMBOL(plpar_hcall_8arg_2ret);
+EXPORT_SYMBOL(vio_bus_type);

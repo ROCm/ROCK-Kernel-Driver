@@ -51,8 +51,8 @@ static const size_t	pool_max [HCD_BUFFER_POOLS] = {
  * @hcd: the bus whose buffer pools are to be initialized
  * Context: !in_interrupt()
  *
- * Call this as part of initializing a host controller that uses the pci dma
- * memory allocators.  It initializes some pools of dma-consistent memory that
+ * Call this as part of initializing a host controller that uses the dma
+ * memory allocators.  It initializes some pools of dma-coherent memory that
  * will be shared by all drivers using that controller, or returns a negative
  * errno value on error.
  *
@@ -115,6 +115,12 @@ void *hcd_buffer_alloc (
 	struct usb_hcd		*hcd = bus->hcpriv;
 	int 			i;
 
+	/* some USB hosts just use PIO */
+	if (!bus->controller->dma_mask) {
+		*dma = ~(dma_addr_t) 0;
+		return kmalloc (size, mem_flags);
+	}
+
 	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
 		if (size <= pool_max [i])
 			return dma_pool_alloc (hcd->pool [i], mem_flags, dma);
@@ -134,6 +140,12 @@ void hcd_buffer_free (
 
 	if (!addr)
 		return;
+
+	if (!bus->controller->dma_mask) {
+		kfree (addr);
+		return;
+	}
+
 	for (i = 0; i < HCD_BUFFER_POOLS; i++) {
 		if (size <= pool_max [i]) {
 			dma_pool_free (hcd->pool [i], addr, dma);

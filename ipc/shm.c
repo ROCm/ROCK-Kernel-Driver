@@ -656,7 +656,10 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 			if (shmflg & SHM_RND)
 				addr &= ~(SHMLBA-1);	   /* round down */
 			else
-				return -EINVAL;
+#ifndef __ARCH_FORCE_SHMLBA
+				if (addr & ~PAGE_MASK)
+#endif
+					return -EINVAL;
 		}
 		flags = MAP_SHARED | MAP_FIXED;
 	} else {
@@ -759,6 +762,21 @@ asmlinkage long sys_shmdt(char __user *shmaddr)
 
 	down_write(&mm->mmap_sem);
 
+	/*
+	 * This function tries to be smart and unmap shm segments that
+	 * were modified by partial mlock or munmap calls:
+	 * - It first determines the size of the shm segment that should be
+	 *   unmapped: It searches for a vma that is backed by shm and that
+	 *   started at address shmaddr. It records it's size and then unmaps
+	 *   it.
+	 * - Then it unmaps all shm vmas that started at shmaddr and that
+	 *   are within the initially determined size.
+	 * Errors from do_munmap are ignored: the function only fails if
+	 * it's called with invalid parameters or if it's called to unmap
+	 * a part of a vma. Both calls in this function are for full vmas,
+	 * the parameters are directly copied from the vma itself and always
+	 * valid - therefore do_munmap cannot fail. (famous last words?)
+	 */
 	/*
 	 * If it had been mremap()'d, the starting address would not
 	 * match the usual checks anyway. So assume all vma's are

@@ -341,6 +341,10 @@ struct metapage *__get_metapage(struct inode *inode, unsigned long lblock,
 		}
 		mp->data = kmap(mp->page) + page_offset;
 	}
+
+	if (new)
+		memset(mp->data, 0, PSIZE);
+
 	jfs_info("__get_metapage: returning = 0x%p", mp);
 	return mp;
 

@@ -15,7 +15,7 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
-#include <asm/proc_fs.h>
+#include <linux/proc_fs.h>
 #include <asm/delay.h>
 #include <asm/uaccess.h>
 #include <asm/rtas.h>
@@ -106,10 +106,10 @@ struct rtas_validate_flash_t
 };
 
 static spinlock_t flash_file_open_lock = SPIN_LOCK_UNLOCKED;
-static struct proc_dir_entry *firmware_flash_pde = NULL;
-static struct proc_dir_entry *firmware_update_pde = NULL;
-static struct proc_dir_entry *validate_pde = NULL;
-static struct proc_dir_entry *manage_pde = NULL;
+static struct proc_dir_entry *firmware_flash_pde;
+static struct proc_dir_entry *firmware_update_pde;
+static struct proc_dir_entry *validate_pde;
+static struct proc_dir_entry *manage_pde;
 
 /* Do simple sanity checks on the flash image. */
 static int flash_list_valid(struct flash_block_list *flist)
@@ -501,7 +501,7 @@ static ssize_t validate_flash_read(struct file *file, char *buf,
 }
 
 static ssize_t validate_flash_write(struct file *file, const char *buf,
-				size_t count, loff_t *off)
+				    size_t count, loff_t *off)
 {
 	struct proc_dir_entry *dp = PDE(file->f_dentry->d_inode);
 	struct rtas_validate_flash_t *args_buf;
@@ -567,18 +567,18 @@ static int validate_flash_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static inline void remove_flash_pde(struct proc_dir_entry *dp)
+static void remove_flash_pde(struct proc_dir_entry *dp)
 {
 	if (dp) {
 		if (dp->data != NULL)
 			kfree(dp->data);
-		remove_proc_entry(dp->name, proc_ppc64.rtas);
+		remove_proc_entry(dp->name, NULL);
 	}
 }
 
-static inline int initialize_flash_pde_data(const char *rtas_call_name, 
-		                            size_t buf_size,
-					    struct proc_dir_entry *dp)
+static int initialize_flash_pde_data(const char *rtas_call_name,
+				     size_t buf_size,
+				     struct proc_dir_entry *dp)
 {
 	int *status;
 	int token;
@@ -591,7 +591,8 @@ static inline int initialize_flash_pde_data(const char *rtas_call_name,
 
 	memset(dp->data, 0, buf_size);
 
-	/* This code assumes that the status int is the first member of the
+	/*
+	 * This code assumes that the status int is the first member of the
 	 * struct 
 	 */
 	status = (int *) dp->data;
@@ -604,12 +605,12 @@ static inline int initialize_flash_pde_data(const char *rtas_call_name,
 	return 0;
 }
 
-static inline struct proc_dir_entry * create_flash_pde(const char *filename, 
-					struct file_operations *fops)
+static struct proc_dir_entry *create_flash_pde(const char *filename,
+					       struct file_operations *fops)
 {
 	struct proc_dir_entry *ent = NULL;
 
-	ent = create_proc_entry(filename, S_IRUSR | S_IWUSR, proc_ppc64.rtas);
+	ent = create_proc_entry(filename, S_IRUSR | S_IWUSR, NULL);
 	if (ent != NULL) {
 		ent->nlink = 1;
 		ent->proc_fops = fops;
@@ -644,50 +645,79 @@ int __init rtas_flash_init(void)
 {
 	int rc;
 
-	if (!proc_ppc64.rtas) {
-		printk(KERN_WARNING "rtas proc dir does not already exist");
-		return -ENOENT;
+	if (rtas_token("ibm,update-flash-64-and-reboot") ==
+		       RTAS_UNKNOWN_SERVICE) {
+		printk(KERN_ERR "rtas_flash: no firmware flash support\n");
+		return 1;
 	}
 
-	firmware_flash_pde = create_flash_pde(FIRMWARE_FLASH_NAME, 
+	firmware_flash_pde = create_flash_pde("ppc64/rtas/"
+					      FIRMWARE_FLASH_NAME,
 					      &rtas_flash_operations);
+	if (firmware_flash_pde == NULL) {
+		rc = -ENOMEM;
+		goto cleanup;
+	}
+
 	rc = initialize_flash_pde_data("ibm,update-flash-64-and-reboot",
 			 	       sizeof(struct rtas_update_flash_t), 
 				       firmware_flash_pde);
 	if (rc != 0)
-		return rc;
-	
-	firmware_update_pde = create_flash_pde(FIRMWARE_UPDATE_NAME, 
+		goto cleanup;
+
+	firmware_update_pde = create_flash_pde("ppc64/rtas/"
+					       FIRMWARE_UPDATE_NAME,
 					       &rtas_flash_operations);
+	if (firmware_update_pde == NULL) {
+		rc = -ENOMEM;
+		goto cleanup;
+	}
+
 	rc = initialize_flash_pde_data("ibm,update-flash-64-and-reboot",
 			 	       sizeof(struct rtas_update_flash_t), 
 				       firmware_update_pde);
 	if (rc != 0)
-		return rc;
-	
-	validate_pde = create_flash_pde(VALIDATE_FLASH_NAME, 
+		goto cleanup;
+
+	validate_pde = create_flash_pde("ppc64/rtas/" VALIDATE_FLASH_NAME,
 			      		&validate_flash_operations);
+	if (validate_pde == NULL) {
+		rc = -ENOMEM;
+		goto cleanup;
+	}
+
 	rc = initialize_flash_pde_data("ibm,validate-flash-image",
 		                       sizeof(struct rtas_validate_flash_t), 
 				       validate_pde);
 	if (rc != 0)
-		return rc;
-	
-	manage_pde = create_flash_pde(MANAGE_FLASH_NAME, 
+		goto cleanup;
+
+	manage_pde = create_flash_pde("ppc64/rtas" MANAGE_FLASH_NAME,
 				      &manage_flash_operations);
+	if (manage_pde == NULL) {
+		rc = -ENOMEM;
+		goto cleanup;
+	}
+
 	rc = initialize_flash_pde_data("ibm,manage-flash-image",
 			               sizeof(struct rtas_manage_flash_t),
 				       manage_pde);
 	if (rc != 0)
-		return rc;
-	
+		goto cleanup;
+
 	return 0;
+
+cleanup:
+	remove_flash_pde(firmware_flash_pde);
+	remove_flash_pde(firmware_update_pde);
+	remove_flash_pde(validate_pde);
+	remove_flash_pde(manage_pde);
+
+	return rc;
 }
 
 void __exit rtas_flash_cleanup(void)
 {
-	if (!proc_ppc64.rtas)
-		return;
 	remove_flash_pde(firmware_flash_pde);
 	remove_flash_pde(firmware_update_pde);
 	remove_flash_pde(validate_pde);

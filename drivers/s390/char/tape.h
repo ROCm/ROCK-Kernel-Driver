@@ -199,8 +199,8 @@ struct tape_device {
 	struct list_head		node;
 
 	struct ccw_device *		cdev;
-	struct cdev *			nt;
-	struct cdev *			rt;
+	struct tape_class_device *	nt;
+	struct tape_class_device *	rt;
 
 	/* Device discipline information. */
 	struct tape_discipline *	discipline;

@@ -39,7 +39,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/naca.h>
-#include <asm/pmc.h>
 #include <asm/machdep.h>
 #include <asm/lmb.h>
 #include <asm/abs_addr.h>

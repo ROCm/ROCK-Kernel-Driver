@@ -99,7 +99,7 @@ ccw_device_accumulate_ecw(struct ccw_device *cdev, struct irb *irb)
 static inline int
 ccw_device_accumulate_esw_valid(struct irb *irb)
 {
-	if (irb->scsw.eswf && irb->scsw.stctl == SCSW_STCTL_STATUS_PEND)
+	if (!irb->scsw.eswf && irb->scsw.stctl == SCSW_STCTL_STATUS_PEND)
 		return 0;
 	if (irb->scsw.stctl == 
 	    		(SCSW_STCTL_INTER_STATUS|SCSW_STCTL_STATUS_PEND) &&

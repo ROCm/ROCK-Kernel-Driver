@@ -193,9 +193,9 @@ poke_user(struct task_struct *child, addr_t addr, addr_t data)
 		 */
 		if (addr == (addr_t) &dummy->regs.psw.mask &&
 #ifdef CONFIG_S390_SUPPORT
-		    (data & ~PSW_MASK_CC) != PSW_USER32_BITS &&
+		    data != PSW_MASK_MERGE(PSW_USER32_BITS, data) &&
 #endif
-		    (data & ~PSW_MASK_CC) != PSW_USER_BITS)
+		    data != PSW_MASK_MERGE(PSW_USER_BITS, data))
 			/* Invalid psw mask. */
 			return -EINVAL;
 #ifndef CONFIG_ARCH_S390X
@@ -331,7 +331,7 @@ peek_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 		if (addr == (addr_t) &dummy32->regs.psw.mask) {
 			/* Fake a 31 bit psw mask. */
 			tmp = (__u32)(__KSTK_PTREGS(child)->psw.mask >> 32);
-			tmp = (tmp & PSW32_MASK_CC) | PSW32_USER_BITS;
+			tmp = PSW32_MASK_MERGE(PSW32_USER_BITS, tmp);
 		} else if (addr == (addr_t) &dummy32->regs.psw.addr) {
 			/* Fake a 31 bit psw address. */
 			tmp = (__u32) __KSTK_PTREGS(child)->psw.addr |
@@ -402,11 +402,11 @@ poke_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 		 */
 		if (addr == (addr_t) &dummy32->regs.psw.mask) {
 			/* Build a 64 bit psw mask from 31 bit mask. */
-			if ((tmp & ~PSW32_MASK_CC) != PSW32_USER_BITS)
+			if (tmp != PSW32_MASK_MERGE(PSW32_USER_BITS, tmp))
 				/* Invalid psw mask. */
 				return -EINVAL;
-			__KSTK_PTREGS(child)->psw.mask = PSW_USER32_BITS |
-				((tmp & PSW32_MASK_CC) << 32);
+			__KSTK_PTREGS(child)->psw.mask =
+				PSW_MASK_MERGE(PSW_USER32_BITS, (__u64) tmp << 32);
 		} else if (addr == (addr_t) &dummy32->regs.psw.addr) {
 			/* Build a 64 bit psw address from 31 bit address. */
 			__KSTK_PTREGS(child)->psw.addr = 

@@ -914,7 +914,7 @@ static void print_objinfo(kmem_cache_t *cachep, void *objp, int lines)
 		printk("\n");
 	}
 	realobj = (char*)objp+obj_dbghead(cachep);
-	size = cachep->objsize;
+	size = obj_reallen(cachep);
 	for (i=0; i<size && lines;i+=16, lines--) {
 		int limit;
 		limit = 16;
@@ -2885,7 +2885,8 @@ void ptrinfo(unsigned long addr)
 #endif
 
 	page = virt_to_page((void*)addr);
-	printk("struct page at %p, flags %lxh.\n", page, page->flags);
+	printk("struct page at %p, flags %08lx\n",
+			page, (unsigned long)page->flags);
 	if (PageSlab(page)) {
 		kmem_cache_t *c;
 		struct slab *s;

@@ -118,7 +118,7 @@ int fastcall page_referenced(struct page * page)
 	int referenced = 0;
 
 	if (page_test_and_clear_young(page))
-		mark_page_accessed(page);
+		referenced++;
 
 	if (TestClearPageReferenced(page))
 		referenced++;

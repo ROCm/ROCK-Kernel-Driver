@@ -579,7 +579,11 @@ show_periodic (struct class_device *class_dev, char *buf)
 				break;
 			case Q_TYPE_SITD:
 				temp = scnprintf (next, size,
-					" sitd/%p", p.sitd);
+					" sitd%d-%04x/%p",
+					p.sitd->stream->interval,
+					le32_to_cpup (&p.sitd->hw_uframe)
+						& 0x0000ffff,
+					p.sitd);
 				tag = Q_NEXT_TYPE (p.sitd->hw_next);
 				p = p.sitd->sitd_next;
 				break;

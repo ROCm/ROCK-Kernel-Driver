@@ -17,12 +17,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
-#ifndef _HVLPCONFIG_H
+#include <linux/module.h>
 #include <asm/iSeries/HvLpConfig.h>
-#endif
 
 HvLpIndex HvLpConfig_getLpIndex_outline(void)
 {
 	return HvLpConfig_getLpIndex();
 }
-
+EXPORT_SYMBOL(HvLpConfig_getLpIndex_outline);

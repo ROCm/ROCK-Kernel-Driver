@@ -148,9 +148,14 @@ sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regs)
 /* Returns non-zero on fault. */
 static int save_sigregs(struct pt_regs *regs, _sigregs *sregs)
 {
+	unsigned long old_mask = regs->psw.mask;
 	int err;
   
+	/* Copy a 'clean' PSW mask to the user to avoid leaking
+	   information about whether PER is currently on.  */
+	regs->psw.mask = PSW_MASK_MERGE(PSW_USER_BITS, regs->psw.mask);
 	err = __copy_to_user(&sregs->regs, regs, sizeof(_s390_regs_common));
+	regs->psw.mask = old_mask;
 	if (err != 0)
 		return err;
 	/* 
@@ -165,13 +170,14 @@ static int save_sigregs(struct pt_regs *regs, _sigregs *sregs)
 /* Returns positive number on error */
 static int restore_sigregs(struct pt_regs *regs, _sigregs *sregs)
 {
+	unsigned long old_mask = regs->psw.mask;
 	int err;
 
 	/* Alwys make any pending restarted system call return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 	err = __copy_from_user(regs, &sregs->regs, sizeof(_s390_regs_common));
-	regs->psw.mask = PSW_USER_BITS | (regs->psw.mask & PSW_MASK_CC);
+	regs->psw.mask = PSW_MASK_MERGE(old_mask, regs->psw.mask);
 	regs->psw.addr |= PSW_ADDR_AMODE;
 	if (err)
 		return err;
@@ -319,7 +325,6 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	/* Set up registers for signal handler */
 	regs->gprs[15] = (unsigned long) frame;
 	regs->psw.addr = (unsigned long) ka->sa.sa_handler | PSW_ADDR_AMODE;
-	regs->psw.mask = PSW_USER_BITS;
 
 	regs->gprs[2] = map_signal(sig);
 	regs->gprs[3] = (unsigned long) &frame->sc;
@@ -378,7 +383,6 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Set up registers for signal handler */
 	regs->gprs[15] = (unsigned long) frame;
 	regs->psw.addr = (unsigned long) ka->sa.sa_handler | PSW_ADDR_AMODE;
-	regs->psw.mask = PSW_USER_BITS;
 
 	regs->gprs[2] = map_signal(sig);
 	regs->gprs[3] = (unsigned long) &frame->info;
@@ -400,30 +404,6 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	struct pt_regs * regs)
 {
 	struct k_sigaction *ka = &current->sighand->action[sig-1];
-
-	/* Are we from a system call? */
-	if (regs->trap == __LC_SVC_OLD_PSW) {
-		/* If so, check system call restarting.. */
-		switch (regs->gprs[2]) {
-			case -ERESTART_RESTARTBLOCK:
-				current_thread_info()->restart_block.fn =
-					do_no_restart_syscall;
-				clear_thread_flag(TIF_RESTART_SVC);
-			case -ERESTARTNOHAND:
-				regs->gprs[2] = -EINTR;
-				break;
-
-			case -ERESTARTSYS:
-				if (!(ka->sa.sa_flags & SA_RESTART)) {
-					regs->gprs[2] = -EINTR;
-					break;
-				}
-			/* fallthrough */
-			case -ERESTARTNOINTR:
-				regs->gprs[2] = regs->orig_gpr2;
-				regs->psw.addr -= regs->ilc;
-		}
-	}
 
 	/* Set up the stack frame */
 	if (ka->sa.sa_flags & SA_SIGINFO)
@@ -454,6 +434,7 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
  */
 int do_signal(struct pt_regs *regs, sigset_t *oldset)
 {
+	unsigned long retval = 0, continue_addr = 0, restart_addr = 0;
 	siginfo_t info;
 	int signr;
 
@@ -468,35 +449,62 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 
 	if (!oldset)
 		oldset = &current->blocked;
-#ifdef CONFIG_S390_SUPPORT 
-	if (test_thread_flag(TIF_31BIT)) {
-		extern asmlinkage int do_signal32(struct pt_regs *regs,
-						  sigset_t *oldset); 
-		return do_signal32(regs, oldset);
-        }
-#endif 
 
+	/* Are we from a system call? */
+	if (regs->trap == __LC_SVC_OLD_PSW) {
+		continue_addr = regs->psw.addr;
+		restart_addr = continue_addr - regs->ilc;
+		retval = regs->gprs[2];
+
+		/* Prepare for system call restart.  We do this here so that a
+		   debugger will see the already changed PSW. */
+		if (retval == -ERESTARTNOHAND ||
+		    retval == -ERESTARTSYS ||
+		    retval == -ERESTARTNOINTR) {
+			regs->gprs[2] = regs->orig_gpr2;
+			regs->psw.addr = restart_addr;
+		} else if (retval == -ERESTART_RESTARTBLOCK) {
+			regs->gprs[2] = -EINTR;
+		}
+	}
+
+	/* Get signal to deliver.  When running under ptrace, at this point
+	   the debugger may change all our registers ... */
 	signr = get_signal_to_deliver(&info, regs, NULL);
+
+	/* Depending on the signal settings we may need to revert the
+	   decision to restart the system call. */
+	if (signr > 0 && regs->psw.addr == restart_addr) {
+		if (retval == -ERESTARTNOHAND
+		    || (retval == -ERESTARTSYS
+			 && !(current->sighand->action[signr-1].sa.sa_flags
+			      & SA_RESTART))) {
+			regs->gprs[2] = -EINTR;
+			regs->psw.addr = continue_addr;
+		}
+	}
+
 	if (signr > 0) {
 		/* Whee!  Actually deliver the signal.  */
+#ifdef CONFIG_S390_SUPPORT
+		if (test_thread_flag(TIF_31BIT)) {
+			extern void handle_signal32(unsigned long sig,
+						    siginfo_t *info,
+						    sigset_t *oldset,
+						    struct pt_regs *regs);
+			handle_signal32(signr, &info, oldset, regs);
+			return 1;
+	        }
+#endif
 		handle_signal(signr, &info, oldset, regs);
 		return 1;
 	}
 
-	/* Did we come from a system call? */
-	if ( regs->trap == __LC_SVC_OLD_PSW /* System Call! */ ) {
-		/* Restart the system call - no handlers present */
-		if (regs->gprs[2] == -ERESTARTNOHAND ||
-		    regs->gprs[2] == -ERESTARTSYS ||
-		    regs->gprs[2] == -ERESTARTNOINTR) {
-			regs->gprs[2] = regs->orig_gpr2;
-			regs->psw.addr -= regs->ilc;
-		}
-		/* Restart the system call with a new system call number */
-		if (regs->gprs[2] == -ERESTART_RESTARTBLOCK) {
-			regs->gprs[2] = __NR_restart_syscall;
-			set_thread_flag(TIF_RESTART_SVC);
-		}
+	/* Restart a different system call. */
+	if (retval == -ERESTART_RESTARTBLOCK
+	    && regs->psw.addr == continue_addr) {
+		regs->gprs[2] = __NR_restart_syscall;
+		set_thread_flag(TIF_RESTART_SVC);
 	}
 	return 0;
 }

@@ -131,31 +131,65 @@ static int hvc_write(struct tty_struct *tty, int from_user,
 		     const unsigned char *buf, int count)
 {
 	struct hvc_struct *hp = tty->driver_data;
-	char *p;
-	int todo, written = 0;
+	char *tbuf, *p;
+	int tbsize, rsize, written = 0;
 	unsigned long flags;
 
-	spin_lock_irqsave(&hp->lock, flags);
-	while (count > 0 && (todo = N_OUTBUF - hp->n_outbuf) > 0) {
-		if (todo > count)
-			todo = count;
-		p = hp->outbuf + hp->n_outbuf;
-		if (from_user) {
-			todo -= copy_from_user(p, buf, todo);
-			if (todo == 0) {
+	if (from_user) {
+		tbsize = min(count, (int)PAGE_SIZE);
+		if (!(tbuf = kmalloc(tbsize, GFP_KERNEL)))
+			return -ENOMEM;
+
+		while ((rsize = count - written) > 0) {
+			int wsize;
+			if (rsize > tbsize)
+				rsize = tbsize;
+
+			p = tbuf;
+			rsize -= copy_from_user(p, buf, rsize);
+			if (!rsize) {
 				if (written == 0)
 					written = -EFAULT;
 				break;
 			}
-		} else
-			memcpy(p, buf, todo);
-		count -= todo;
-		buf += todo;
-		hp->n_outbuf += todo;
-		written += todo;
-		hvc_push(hp);
+			buf += rsize;
+			written += rsize;
+
+			spin_lock_irqsave(&hp->lock, flags);
+			for (wsize = N_OUTBUF - hp->n_outbuf; rsize && wsize;
+					wsize = N_OUTBUF - hp->n_outbuf) {
+				if (wsize > rsize)
+					wsize = rsize;
+				memcpy(hp->outbuf + hp->n_outbuf, p, wsize);
+				hp->n_outbuf += wsize;
+				hvc_push(hp);
+				rsize -= wsize;
+				p += wsize;
+			}
+			spin_unlock_irqrestore(&hp->lock, flags);
+
+			if (rsize)
+				break;
+
+			if (count < tbsize)
+				tbsize = count;
+		}
+
+		kfree(tbuf);
+	} else {
+		spin_lock_irqsave(&hp->lock, flags);
+		while (count > 0 && (rsize = N_OUTBUF - hp->n_outbuf) > 0) {
+			if (rsize > count)
+				rsize = count;
+			memcpy(hp->outbuf + hp->n_outbuf, buf, rsize);
+			count -= rsize;
+			buf += rsize;
+			hp->n_outbuf += rsize;
+			written += rsize;
+			hvc_push(hp);
+		}
+		spin_unlock_irqrestore(&hp->lock, flags);
 	}
-	spin_unlock_irqrestore(&hp->lock, flags);
 
 	return written;
 }

@@ -26,6 +26,25 @@ config PCMCIA
 	  To compile this driver as modules, choose M here: the
 	  modules will be called pcmcia_core and ds.
 
+config PCMCIA_DEBUG
+	bool "Enable PCMCIA debugging"
+	depends on PCMCIA != n
+	help
+	  Say Y here to enable PCMCIA subsystem debugging.  You
+	  will need to choose the debugging level either via the
+	  kernel command line, or module options depending whether
+	  you build the PCMCIA as modules.
+
+	  The kernel command line options are:
+	    pcmcia_core.pc_debug=N
+	    ds.pc_debug=N
+	    sa11xx_core.pc_debug=N
+
+	  The module option is called pc_debug=N
+
+	  In all the above examples, N is the debugging verbosity
+	  level.
+
 config YENTA
 	tristate "CardBus yenta-compatible bridge support"
 	depends on PCMCIA && PCI

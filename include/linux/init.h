@@ -110,12 +110,21 @@ struct obs_kernel_param {
 };
 
 /* OBSOLETE: see moduleparam.h for the right way. */
-#define __setup(str, fn)					\
-	static char __setup_str_##fn[] __initdata = str;	\
-	static struct obs_kernel_param __setup_##fn		\
+#define __setup_param(str, unique_id, fn)			\
+	static char __setup_str_##unique_id[] __initdata = str;	\
+	static struct obs_kernel_param __setup_##unique_id	\
 		 __attribute_used__				\
 		 __attribute__((__section__(".init.setup")))	\
-		= { __setup_str_##fn, fn }
+		= { __setup_str_##unique_id, fn }
+
+#define __setup_null_param(str, unique_id)			\
+	__setup_param(str, unique_id, NULL)
+
+#define __setup(str, fn)					\
+	__setup_param(str, fn, fn)
+
+#define __obsolete_setup(str)					\
+	__setup_null_param(str, __LINE__)
 
 #endif /* __ASSEMBLY__ */
 
@@ -172,7 +181,10 @@ struct obs_kernel_param {
 	{ return exitfn; }					\
 	void cleanup_module(void) __attribute__((alias(#exitfn)));
 
-#define __setup(str,func) /* nothing */
+#define __setup_param(str, unique_id, fn)	/* nothing */
+#define __setup_null_param(str, unique_id) 	/* nothing */
+#define __setup(str, func) 			/* nothing */
+#define __obsolete_setup(str) 			/* nothing */
 #endif
 
 /* Data marked not to be saved by software_suspend() */

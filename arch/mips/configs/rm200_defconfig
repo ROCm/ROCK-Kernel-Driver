@@ -323,7 +323,6 @@ CONFIG_MD_RAID5=m
 # CONFIG_MD_RAID6 is not set
 CONFIG_MD_MULTIPATH=m
 CONFIG_BLK_DEV_DM=m
-CONFIG_DM_IOCTL_V4=y
 
 #
 # Fusion MPT device support

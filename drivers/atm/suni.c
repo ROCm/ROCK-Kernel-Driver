@@ -230,7 +230,7 @@ static int suni_start(struct atm_dev *dev)
 	unsigned long flags;
 	int first;
 
-	if (!(dev->dev_data = kmalloc(sizeof(struct suni_priv),GFP_KERNEL)))
+	if (!(dev->phy_data = kmalloc(sizeof(struct suni_priv),GFP_KERNEL)))
 		return -ENOMEM;
 
 	PRIV(dev)->dev = dev;

@@ -82,13 +82,13 @@ S: Howell, NJ 07731
 S: USA
 
 N: Erik Andersen
-E: andersee@debian.org
-W: http://www.xmission.com/~andersen
-P: 1024/FC4CFFED 78 3C 6A 19 FA 5D 92 5A  FB AC 7B A5 A5 E1 FF 8E
+E: andersen@codepoet.org
+W: http://www.codepoet.org/
+P: 1024D/30D39057 1BC4 2742 E885 E4DE 9301  0C82 5F9B 643E 30D3 9057
 D: Maintainer of ide-cd and Uniform CD-ROM driver, 
 D: ATAPI CD-Changer support, Major 2.1.x CD-ROM update.
-S: 4538 South Carnegie Tech Street
-S: Salt Lake City, Utah 84120
+S: 352 North 525 East
+S: Springville, Utah 84663
 S: USA
 
 N: Michael Ang
@@ -673,11 +673,6 @@ S: Northampton
 S: NN1 3QT
 S: United Kingdom
 
-N: Stephane Dalton
-E: sdalton@videotron.ca
-D: Tieman Voyager USB Braille display driver.
-S: Québec, Canada
-
 N: Uwe Dannowski
 E: Uwe.Dannowski@ira.uka.de
 W: http://i30www.ira.uka.de/~dannowsk/
@@ -796,11 +791,6 @@ N: Cort Dougan
 E: cort@fsmlabs.com
 W: http://www.fsmlabs.com/linuxppcbk.html
 D: PowerPC
-
-N: Stéphane Doyon
-E: s.doyon@videotron.ca
-D: Tieman Voyager USB Braille display driver.
-S: Québec, Canada
 
 N: Oleg Drokin
 E: green@ccssu.crimea.ua
