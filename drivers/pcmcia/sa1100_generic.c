@@ -334,6 +334,7 @@ static DECLARE_WORK(sa1100_pcmcia_task, sa1100_pcmcia_task_handler, NULL);
 static void sa1100_pcmcia_poll_event(unsigned long dummy)
 {
   DEBUG(4, "%s(): polling for events\n", __FUNCTION__);
+  init_timer(&poll_timer);
   poll_timer.function = sa1100_pcmcia_poll_event;
   poll_timer.expires = jiffies + SA1100_PCMCIA_POLL_PERIOD;
   add_timer(&poll_timer);

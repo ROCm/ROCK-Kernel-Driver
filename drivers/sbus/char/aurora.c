@@ -883,8 +883,8 @@ static void aurora_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 #ifdef AURORA_INT_DEBUG
 static void aurora_timer (unsigned long ignored);
 
-static struct timer_list
-aurora_poll_timer = { NULL, NULL, 0, 0, aurora_timer };
+static struct timer_list aurora_poll_timer =
+			TIMER_INITIALIZER(aurora_timer, 0, 0);
 
 static void
 aurora_timer (unsigned long ignored)

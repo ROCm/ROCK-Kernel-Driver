@@ -553,6 +553,7 @@ int fcp_initialize(fc_channel *fcchain, int count)
 	l->count = count;
 	FCND(("FCP Init for %d channels\n", count))
 	init_MUTEX_LOCKED(&l->sem);
+	init_timer(&l->timer);
 	l->timer.function = fcp_login_timeout;
 	l->timer.data = (unsigned long)l;
 	atomic_set (&l->todo, count);

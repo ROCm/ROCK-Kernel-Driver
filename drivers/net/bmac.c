@@ -1403,7 +1403,7 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 
 	memset((char *) bp->tx_cmds, 0,
 	       (N_TX_RING + N_RX_RING + 2) * sizeof(struct dbdma_cmd));
-	/*     init_timer(&bp->tx_timeout); */
+	init_timer(&bp->tx_timeout);
 	/*     bp->timeout_active = 0; */
 
 	ret = request_irq(dev->irq, bmac_misc_intr, 0, "BMAC-misc", dev);
