@@ -44,10 +44,16 @@ struct tcf_##name *next; \
 	u32 capab; \
 	int action; \
 	struct tcf_t tm; \
-	struct tc_stats stats; \
+	struct gnet_stats_basic bstats; \
+	struct gnet_stats_queue qstats; \
+	struct gnet_stats_rate_est rate_est; \
 	spinlock_t *stats_lock; \
 	spinlock_t lock
 
+struct tcf_act_hdr
+{
+	tca_gen(act_hdr);
+};
 
 struct tc_action
 {
