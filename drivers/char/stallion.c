@@ -2402,18 +2402,25 @@ static inline int stl_initeio(stlbrd_t *brdp)
 			brdp->ioctrl);
 	}
 
-	if (check_region(brdp->ioaddr1, brdp->iosize1)) {
-		printk("STALLION: Warning, board %d I/O address %x conflicts "
-			"with another device\n", brdp->brdnr, brdp->ioaddr1);
+	if (!request_region(brdp->ioaddr1, brdp->iosize1, name)) {
+		printk(KERN_WARNING "STALLION: Warning, board %d I/O address "
+			"%x conflicts with another device\n", brdp->brdnr, 
+			brdp->ioaddr1);
+		return(-EBUSY);
 	}
-	if (brdp->iosize2 > 0) {
-		if (check_region(brdp->ioaddr2, brdp->iosize2)) {
-			printk("STALLION: Warning, board %d I/O address %x "
-				"conflicts with another device\n",
+	
+	if (brdp->iosize2 > 0)
+		if (!request_region(brdp->ioaddr2, brdp->iosize2, name)) {
+			printk(KERN_WARNING "STALLION: Warning, board %d I/O "
+				"address %x conflicts with another device\n",
 				brdp->brdnr, brdp->ioaddr2);
+			printk(KERN_WARNING "STALLION: Warning, also "
+				"releasing board %d I/O address %x \n", 
+				brdp->brdnr, brdp->ioaddr1);
+			release_region(brdp->ioaddr1, brdp->iosize1);
+        		return(-EBUSY);
 		}
-	}
- 
+
 /*
  *	Everything looks OK, so let's go ahead and probe for the hardware.
  */
@@ -2454,14 +2461,11 @@ static inline int stl_initeio(stlbrd_t *brdp)
  *	We have verfied that the board is actually present, so now we
  *	can complete the setup.
  */
-	request_region(brdp->ioaddr1, brdp->iosize1, name);
-	if (brdp->iosize2 > 0)
-		request_region(brdp->ioaddr2, brdp->iosize2, name);
 
 	panelp = (stlpanel_t *) stl_memalloc(sizeof(stlpanel_t));
 	if (panelp == (stlpanel_t *) NULL) {
-		printk("STALLION: failed to allocate memory (size=%d)\n",
-			sizeof(stlpanel_t));
+		printk(KERN_WARNING "STALLION: failed to allocate memory "
+			"(size=%d)\n", sizeof(stlpanel_t));
 		return(-ENOMEM);
 	}
 	memset(panelp, 0, sizeof(stlpanel_t));
@@ -2585,22 +2589,27 @@ static int inline stl_initech(stlbrd_t *brdp)
 	}
 
 /*
- *	Check boards for possible IO address conflicts. We won't actually
- *	do anything about it here, just issue a warning...
+ *	Check boards for possible IO address conflicts and return fail status 
+ * 	if an IO conflict found.
  */
-	conflict = check_region(brdp->ioaddr1, brdp->iosize1) ?
-		brdp->ioaddr1 : 0;
-	if ((conflict == 0) && (brdp->iosize2 > 0))
-		conflict = check_region(brdp->ioaddr2, brdp->iosize2) ?
-			brdp->ioaddr2 : 0;
-	if (conflict) {
-		printk("STALLION: Warning, board %d I/O address %x conflicts "
-			"with another device\n", brdp->brdnr, conflict);
+	if (!request_region(brdp->ioaddr1, brdp->iosize1, name)) {
+		printk(KERN_WARNING "STALLION: Warning, board %d I/O address "
+			"%x conflicts with another device\n", brdp->brdnr, 
+			brdp->ioaddr1);
+		return(-EBUSY);
 	}
-
-	request_region(brdp->ioaddr1, brdp->iosize1, name);
+	
 	if (brdp->iosize2 > 0)
-		request_region(brdp->ioaddr2, brdp->iosize2, name);
+		if (!request_region(brdp->ioaddr2, brdp->iosize2, name)) {
+			printk(KERN_WARNING "STALLION: Warning, board %d I/O "
+				"address %x conflicts with another device\n",
+				brdp->brdnr, brdp->ioaddr2);
+			printk(KERN_WARNING "STALLION: Warning, also "
+				"releasing board %d I/O address %x \n", 
+				brdp->brdnr, brdp->ioaddr1);
+			release_region(brdp->ioaddr1, brdp->iosize1);
+			return(-EBUSY);
+		}
 
 /*
  *	Scan through the secondary io address space looking for panels.
