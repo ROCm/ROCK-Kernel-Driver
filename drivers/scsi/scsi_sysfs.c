@@ -321,6 +321,22 @@ static void scsi_host_release(struct device *dev)
 	scsi_free_shost(shost);
 }
 
+void scsi_sysfs_init_host(struct Scsi_Host *shost)
+{
+	device_initialize(&shost->host_gendev);
+	snprintf(shost->host_gendev.bus_id, BUS_ID_SIZE, "host%d",
+		shost->host_no);
+	snprintf(shost->host_gendev.name, DEVICE_NAME_SIZE, "%s",
+		shost->hostt->proc_name);
+	shost->host_gendev.release = scsi_host_release;
+
+	class_device_initialize(&shost->class_dev);
+	shost->class_dev.dev = &shost->host_gendev;
+	shost->class_dev.class = &shost_class;
+	snprintf(shost->class_dev.class_id, BUS_ID_SIZE, "host%d",
+		  shost->host_no);
+}
+
 /**
  * scsi_sysfs_add_host - add scsi host to subsystem
  * @shost:     scsi host struct to add to subsystem
@@ -330,22 +346,13 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost, struct device *dev)
 {
 	int i, error;
 
-	snprintf(shost->host_gendev.bus_id, BUS_ID_SIZE, "host%d",
-		shost->host_no);
-	snprintf(shost->host_gendev.name, DEVICE_NAME_SIZE, "%s",
-		shost->hostt->proc_name);
 	if (!shost->host_gendev.parent)
 		shost->host_gendev.parent = (dev) ? dev : &legacy_bus;
-	shost->host_gendev.release = scsi_host_release;
 
 	error = device_add(&shost->host_gendev);
 	if (error)
 		return error;
 
-	shost->class_dev.dev = &shost->host_gendev;
-	shost->class_dev.class = &shost_class;
-	snprintf(shost->class_dev.class_id, BUS_ID_SIZE, "host%d",
-		  shost->host_no);
 	error = class_device_add(&shost->class_dev);
 	if (error)
 		goto clean_device;

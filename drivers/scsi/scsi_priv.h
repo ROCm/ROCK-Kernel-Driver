@@ -123,6 +123,7 @@ extern int scsi_device_register(struct scsi_device *);
 extern void scsi_device_unregister(struct scsi_device *);
 extern int scsi_upper_driver_register(struct Scsi_Device_Template *);
 extern void scsi_upper_driver_unregister(struct Scsi_Device_Template *);
+extern void scsi_sysfs_init_host(struct Scsi_Host *);
 extern int scsi_sysfs_add_host(struct Scsi_Host *, struct device *);
 extern void scsi_sysfs_remove_host(struct Scsi_Host *);
 extern int scsi_sysfs_register(void);

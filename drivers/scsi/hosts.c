@@ -405,8 +405,8 @@ found:
 	rval = scsi_setup_command_freelist(shost);
 	if (rval)
 		goto fail;
-	device_initialize(&shost->host_gendev);
-	class_device_initialize(&shost->class_dev);
+
+	scsi_sysfs_init_host(shost);
 
 	shost->eh_notify = &sem;
 	kernel_thread((int (*)(void *)) scsi_error_handler, (void *) shost, 0);
