@@ -118,8 +118,14 @@ config I2C_I810
 	  will be called i2c-i810.
 
 config I2C_IBM_IIC
-	tristate "IBM IIC I2C"
+	tristate "IBM PPC 4xx on-chip I2C interface"
 	depends on IBM_OCP && I2C
+	help
+	  Say Y here if you want to use IIC peripheral found on 
+	  embedded IBM PPC 4xx based systems. 
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-ibm_iic.
 
 config I2C_IOP3XX
 	tristate "Intel XScale IOP3xx on-chip I2C interface"
