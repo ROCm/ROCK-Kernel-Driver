@@ -65,7 +65,7 @@ extern void add_timer_on(struct timer_list *timer, int cpu);
 extern int del_timer(struct timer_list * timer);
 extern int mod_timer(struct timer_list *timer, unsigned long expires);
   
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
   extern int del_timer_sync(struct timer_list * timer);
 #else
 # define del_timer_sync(t) del_timer(t)

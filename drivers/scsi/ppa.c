@@ -219,15 +219,12 @@ int ppa_detect(Scsi_Host_Template * host)
 	    printk("  supported by the imm (ZIP Plus) driver. If the\n");
 	    printk("  cable is marked with \"AutoDetect\", this is what has\n");
 	    printk("  happened.\n");
-	    spin_lock_irq(hreg->host_lock);
 	    return 0;
 	}
 	try_again = 1;
 	goto retry_entry;
-    } else {
-	spin_lock_irq(hreg->host_lock);
+    } else
 	return 1;		/* return number of hosts detected */
-    }
 }
 
 /* This is to give the ppa driver a way to modify the timings (and other

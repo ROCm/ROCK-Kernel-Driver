@@ -154,8 +154,8 @@ static int set_scc_power(struct mac_serial * info, int state);
 static int setup_scc(struct mac_serial * info);
 static void dbdma_reset(volatile struct dbdma_regs *dma);
 static void dbdma_flush(volatile struct dbdma_regs *dma);
-static void rs_txdma_irq(int irq, void *dev_id, struct pt_regs *regs);
-static void rs_rxdma_irq(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t rs_txdma_irq(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t rs_rxdma_irq(int irq, void *dev_id, struct pt_regs *regs);
 static void dma_init(struct mac_serial * info);
 static void rxdma_start(struct mac_serial * info, int current);
 static void rxdma_to_tty(struct mac_serial * info);
@@ -558,18 +558,19 @@ static _INLINE_ void receive_special_dma(struct mac_serial *info)
 /*
  * This is the serial driver's generic interrupt routine
  */
-static void rs_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t rs_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct mac_serial *info = (struct mac_serial *) dev_id;
 	unsigned char zs_intreg;
 	int shift;
 	unsigned long flags;
+	int handled = 0;
 
 	if (!(info->flags & ZILOG_INITIALIZED)) {
 		printk(KERN_WARNING "rs_interrupt: irq %d, port not "
 				    "initialized\n", irq);
 		disable_irq(irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	/* NOTE: The read register 3, which holds the irq status,
@@ -595,6 +596,7 @@ static void rs_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 		if ((zs_intreg & CHAN_IRQMASK) == 0)
 			break;
+		handled = 1;
 
 		if (zs_intreg & CHBRxIP) {
 			/* If we are doing DMA, we only ask for interrupts
@@ -610,30 +612,32 @@ static void rs_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			status_handle(info);
 	}
 	spin_unlock_irqrestore(&info->lock, flags);
+	return IRQ_RETVAL(handled);
 }
 
 /* Transmit DMA interrupt - not used at present */
-static void rs_txdma_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t rs_txdma_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
+	return IRQ_HANDLED;
 }
 
 /*
  * Receive DMA interrupt.
  */
-static void rs_rxdma_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t rs_rxdma_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct mac_serial *info = (struct mac_serial *) dev_id;
 	volatile struct dbdma_cmd *cd;
 
 	if (!info->dma_initted)
-		return;
+		return IRQ_NONE;
 	spin_lock(&info->rx_dma_lock);
 	/* First, confirm that this interrupt is, indeed, coming */
 	/* from Rx DMA */
 	cd = info->rx_cmds[info->rx_cbuf] + 2;
 	if ((in_le16(&cd->xfer_status) & (RUN | ACTIVE)) != (RUN | ACTIVE)) {
 		spin_unlock(&info->rx_dma_lock);
-		return;
+		return IRQ_NONE;
 	}
 	if (info->rx_fbuf != RX_NO_FBUF) {
 		info->rx_cbuf = info->rx_fbuf;
@@ -643,6 +647,7 @@ static void rs_rxdma_irq(int irq, void *dev_id, struct pt_regs *regs)
 			info->rx_fbuf = RX_NO_FBUF;
 	}
 	spin_unlock(&info->rx_dma_lock);
+	return IRQ_HANDLED;
 }
 
 /*
@@ -2660,9 +2665,9 @@ no_dma:
 	callout_driver.proc_entry = 0;
 
 	if (tty_register_driver(&serial_driver))
-		panic("Couldn't register serial driver\n");
+		printk(KERN_ERR "Error: couldn't register serial driver\n");
 	if (tty_register_driver(&callout_driver))
-		panic("Couldn't register callout driver\n");
+		printk(KERN_ERR "Error: couldn't register callout driver\n");
 
 	for (channel = 0; channel < zs_channels_found; ++channel) {
 #ifdef CONFIG_KGDB

@@ -55,7 +55,7 @@ static inline void i810_print_status_page(drm_device_t *dev)
 {
    	drm_device_dma_t *dma = dev->dma;
       	drm_i810_private_t *dev_priv = dev->dev_private;
-	u32 *temp = (u32 *)dev_priv->hw_status_page;
+	u32 *temp = dev_priv->hw_status_page;
    	int i;
 
    	DRM_DEBUG(  "hw_status: Interrupt Status : %x\n", temp[0]);
@@ -115,9 +115,7 @@ static struct file_operations i810_buffer_fops = {
 	.release = DRM(release),
 	.ioctl	 = DRM(ioctl),
 	.mmap	 = i810_mmap_buffers,
-	.read	 = DRM(read),
 	.fasync  = DRM(fasync),
-      	.poll	 = DRM(poll),
 };
 
 int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma)
@@ -242,9 +240,9 @@ static int i810_dma_cleanup(drm_device_t *dev)
 		   	DRM(ioremapfree)((void *) dev_priv->ring.virtual_start,
 					 dev_priv->ring.Size);
 		}
-	   	if(dev_priv->hw_status_page != 0UL) {
+	   	if (dev_priv->hw_status_page) {
 		   	pci_free_consistent(dev->pdev, PAGE_SIZE,
-					    (void *)dev_priv->hw_status_page,
+					    dev_priv->hw_status_page,
 					    dev_priv->dma_status_page);
 		   	/* Need to rewrite hardware status page */
 		   	I810_WRITE(0x02080, 0x1ffff000);
@@ -256,7 +254,8 @@ static int i810_dma_cleanup(drm_device_t *dev)
 		for (i = 0; i < dma->buf_count; i++) {
 			drm_buf_t *buf = dma->buflist[ i ];
 			drm_i810_buf_priv_t *buf_priv = buf->dev_private;
-			DRM(ioremapfree)(buf_priv->kernel_virtual, buf->total);
+			if ( buf_priv->kernel_virtual && buf->total )
+				DRM(ioremapfree)(buf_priv->kernel_virtual, buf->total);
 		}
 	}
    	return 0;
@@ -406,16 +405,16 @@ static int i810_dma_initialize(drm_device_t *dev,
 
    	/* Program Hardware Status Page */
    	dev_priv->hw_status_page =
-		(unsigned long) pci_alloc_consistent(dev->pdev, PAGE_SIZE,
+		pci_alloc_consistent(dev->pdev, PAGE_SIZE,
 						&dev_priv->dma_status_page);
-   	if(dev_priv->hw_status_page == 0UL) {
+   	if (!dev_priv->hw_status_page) {
 		dev->dev_private = (void *)dev_priv;
 		i810_dma_cleanup(dev);
 		DRM_ERROR("Can not allocate hardware status page\n");
 		return -ENOMEM;
 	}
-   	memset((void *) dev_priv->hw_status_page, 0, PAGE_SIZE);
-   	DRM_DEBUG("hw status page @ %lx\n", dev_priv->hw_status_page);
+   	memset(dev_priv->hw_status_page, 0, PAGE_SIZE);
+   	DRM_DEBUG("hw status page @ %p\n", dev_priv->hw_status_page);
 
 	I810_WRITE(0x02080, dev_priv->dma_status_page);
    	DRM_DEBUG("Enabled hardware status page\n");
@@ -900,7 +899,7 @@ int i810_dma_vertex(struct inode *inode, struct file *filp,
 	drm_device_t *dev = priv->dev;
 	drm_device_dma_t *dma = dev->dma;
    	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
-      	u32 *hw_status = (u32 *)dev_priv->hw_status_page;
+      	u32 *hw_status = dev_priv->hw_status_page;
    	drm_i810_sarea_t *sarea_priv = (drm_i810_sarea_t *)
      					dev_priv->sarea_priv;
 	drm_i810_vertex_t vertex;
@@ -976,7 +975,7 @@ int i810_getage(struct inode *inode, struct file *filp, unsigned int cmd,
    	drm_file_t	  *priv	    = filp->private_data;
 	drm_device_t	  *dev	    = priv->dev;
    	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
-      	u32 *hw_status = (u32 *)dev_priv->hw_status_page;
+      	u32 *hw_status = dev_priv->hw_status_page;
    	drm_i810_sarea_t *sarea_priv = (drm_i810_sarea_t *)
      					dev_priv->sarea_priv;
 
@@ -992,7 +991,7 @@ int i810_getbuf(struct inode *inode, struct file *filp, unsigned int cmd,
 	int		  retcode   = 0;
 	drm_i810_dma_t	  d;
    	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
-   	u32 *hw_status = (u32 *)dev_priv->hw_status_page;
+   	u32 *hw_status = dev_priv->hw_status_page;
    	drm_i810_sarea_t *sarea_priv = (drm_i810_sarea_t *)
      					dev_priv->sarea_priv;
 
@@ -1101,7 +1100,7 @@ int i810_dma_mc(struct inode *inode, struct file *filp,
 	drm_device_t *dev = priv->dev;
 	drm_device_dma_t *dma = dev->dma;
 	drm_i810_private_t *dev_priv = (drm_i810_private_t *)dev->dev_private;
-	u32 *hw_status = (u32 *)dev_priv->hw_status_page;
+	u32 *hw_status = dev_priv->hw_status_page;
 	drm_i810_sarea_t *sarea_priv = (drm_i810_sarea_t *)
 		dev_priv->sarea_priv;
 	drm_i810_mc_t mc;

@@ -180,8 +180,8 @@ static int pmu_adb_reset_bus(void);
 static int init_pmu(void);
 static int pmu_queue_request(struct adb_request *req);
 static void pmu_start(void);
-static void via_pmu_interrupt(int irq, void *arg, struct pt_regs *regs);
-static void gpio1_interrupt(int irq, void *arg, struct pt_regs *regs);
+static irqreturn_t via_pmu_interrupt(int irq, void *arg, struct pt_regs *regs);
+static irqreturn_t gpio1_interrupt(int irq, void *arg, struct pt_regs *regs);
 static int proc_get_info(char *page, char **start, off_t off,
 			  int count, int *eof, void *data);
 #ifdef CONFIG_PMAC_BACKLIGHT
@@ -1393,7 +1393,7 @@ pmu_sr_intr(struct pt_regs *regs)
 	return NULL;
 }
 
-static void __pmac
+static irqreturn_t __pmac
 via_pmu_interrupt(int irq, void *arg, struct pt_regs *regs)
 {
 	unsigned long flags;
@@ -1401,7 +1401,8 @@ via_pmu_interrupt(int irq, void *arg, struct pt_regs *regs)
 	int nloop = 0;
 	int int_data = -1;
 	struct adb_request *req = NULL;
-	
+	int handled = 0;
+
 	/* This is a bit brutal, we can probably do better */
 	spin_lock_irqsave(&pmu_lock, flags);
 	++disable_poll;
@@ -1410,6 +1411,7 @@ via_pmu_interrupt(int irq, void *arg, struct pt_regs *regs)
 		intr = in_8(&via[IFR]) & (SR_INT | CB1_INT);
 		if (intr == 0)
 			break;
+		handled = 1;
 		if (++nloop > 1000) {
 			printk(KERN_DEBUG "PMU: stuck in intr loop, "
 			       "intr=%x, ier=%x pmu_state=%d\n",
@@ -1473,15 +1475,19 @@ no_free_slot:
 		int_data = -1;
 		goto recheck;
 	}
+
+	return IRQ_RETVAL(handled);
 }
 
-static void __pmac
+static irqreturn_t __pmac
 gpio1_interrupt(int irq, void *arg, struct pt_regs *regs)
 {
 	if ((in_8(gpio_reg + 0x9) & 0x02) == 0) {
 		adb_int_pending = 1;
 		via_pmu_interrupt(0, 0, 0);
+		return IRQ_HANDLED;
 	}
+	return IRQ_NONE;
 }
 
 #ifdef CONFIG_PMAC_BACKLIGHT

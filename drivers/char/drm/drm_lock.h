@@ -31,19 +31,13 @@
 
 #include "drmP.h"
 
-int DRM(block)(struct inode *inode, struct file *filp, unsigned int cmd,
+int DRM(noop)(struct inode *inode, struct file *filp, unsigned int cmd,
 	       unsigned long arg)
 {
 	DRM_DEBUG("\n");
 	return 0;
 }
 
-int DRM(unblock)(struct inode *inode, struct file *filp, unsigned int cmd,
-		 unsigned long arg)
-{
-	DRM_DEBUG("\n");
-	return 0;
-}
 
 int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
 {
@@ -106,113 +100,6 @@ int DRM(lock_free)(drm_device_t *dev,
 	}
 	wake_up_interruptible(&dev->lock.lock_queue);
 	return 0;
-}
-
-static int DRM(flush_queue)(drm_device_t *dev, int context)
-{
-	DECLARE_WAITQUEUE(entry, current);
-	int		  ret	= 0;
-	drm_queue_t	  *q	= dev->queuelist[context];
-
-	DRM_DEBUG("\n");
-
-	atomic_inc(&q->use_count);
-	if (atomic_read(&q->use_count) > 1) {
-		atomic_inc(&q->block_write);
-		add_wait_queue(&q->flush_queue, &entry);
-		atomic_inc(&q->block_count);
-		for (;;) {
-			current->state = TASK_INTERRUPTIBLE;
-			if (!DRM_BUFCOUNT(&q->waitlist)) break;
-			schedule();
-			if (signal_pending(current)) {
-				ret = -EINTR; /* Can't restart */
-				break;
-			}
-		}
-		atomic_dec(&q->block_count);
-		current->state = TASK_RUNNING;
-		remove_wait_queue(&q->flush_queue, &entry);
-	}
-	atomic_dec(&q->use_count);
-
-				/* NOTE: block_write is still incremented!
-				   Use drm_flush_unlock_queue to decrement. */
-	return ret;
-}
-
-static int DRM(flush_unblock_queue)(drm_device_t *dev, int context)
-{
-	drm_queue_t	  *q	= dev->queuelist[context];
-
-	DRM_DEBUG("\n");
-
-	atomic_inc(&q->use_count);
-	if (atomic_read(&q->use_count) > 1) {
-		if (atomic_read(&q->block_write)) {
-			atomic_dec(&q->block_write);
-			wake_up_interruptible(&q->write_queue);
-		}
-	}
-	atomic_dec(&q->use_count);
-	return 0;
-}
-
-int DRM(flush_block_and_flush)(drm_device_t *dev, int context,
-			       drm_lock_flags_t flags)
-{
-	int ret = 0;
-	int i;
-
-	DRM_DEBUG("\n");
-
-	if (flags & _DRM_LOCK_FLUSH) {
-		ret = DRM(flush_queue)(dev, DRM_KERNEL_CONTEXT);
-		if (!ret) ret = DRM(flush_queue)(dev, context);
-	}
-	if (flags & _DRM_LOCK_FLUSH_ALL) {
-		for (i = 0; !ret && i < dev->queue_count; i++) {
-			ret = DRM(flush_queue)(dev, i);
-		}
-	}
-	return ret;
-}
-
-int DRM(flush_unblock)(drm_device_t *dev, int context, drm_lock_flags_t flags)
-{
-	int ret = 0;
-	int i;
-
-	DRM_DEBUG("\n");
-
-	if (flags & _DRM_LOCK_FLUSH) {
-		ret = DRM(flush_unblock_queue)(dev, DRM_KERNEL_CONTEXT);
-		if (!ret) ret = DRM(flush_unblock_queue)(dev, context);
-	}
-	if (flags & _DRM_LOCK_FLUSH_ALL) {
-		for (i = 0; !ret && i < dev->queue_count; i++) {
-			ret = DRM(flush_unblock_queue)(dev, i);
-		}
-	}
-
-	return ret;
-}
-
-int DRM(finish)(struct inode *inode, struct file *filp, unsigned int cmd,
-		unsigned long arg)
-{
-	drm_file_t	  *priv	  = filp->private_data;
-	drm_device_t	  *dev	  = priv->dev;
-	int		  ret	  = 0;
-	drm_lock_t	  lock;
-
-	DRM_DEBUG("\n");
-
-	if (copy_from_user(&lock, (drm_lock_t *)arg, sizeof(lock)))
-		return -EFAULT;
-	ret = DRM(flush_block_and_flush)(dev, lock.context, lock.flags);
-	DRM(flush_unblock)(dev, lock.context, lock.flags);
-	return ret;
 }
 
 /* If we get here, it means that the process has called DRM_IOCTL_LOCK

@@ -63,34 +63,18 @@ int ncr53c8xx_slave_configure(Scsi_Device *);
 int ncr53c8xx_release(struct Scsi_Host *);
 
 
-#if	LINUX_VERSION_CODE >= LinuxVersionCode(2,1,75)
-
 #define NCR53C8XX {     .name           = "ncr53c8xx",		\
 			.detect         = ncr53c8xx_detect,	\
 			.release        = ncr53c8xx_release,	\
 			.info           = ncr53c8xx_info, 	\
 			.queuecommand   = ncr53c8xx_queue_command,\
 			.slave_configure = ncr53c8xx_slave_configure,\
-			.abort          = ncr53c8xx_abort,	\
-			.reset          = ncr53c8xx_reset,	\
+			.eh_bus_reset_handler = ncr53c8xx_bus_reset,	\
 			.can_queue      = SCSI_NCR_CAN_QUEUE,	\
 			.this_id        = 7,			\
 			.sg_tablesize   = SCSI_NCR_SG_TABLESIZE,	\
 			.cmd_per_lun    = SCSI_NCR_CMD_PER_LUN,	\
 			.use_clustering = DISABLE_CLUSTERING} 
-
-#else
-
-#define NCR53C8XX {	NULL, NULL, NULL, NULL,				\
-			NULL,			ncr53c8xx_detect,	\
-			ncr53c8xx_release,	ncr53c8xx_info,	NULL,	\
-			ncr53c8xx_queue_command,ncr53c8xx_abort,	\
-			ncr53c8xx_reset, NULL,	scsicam_bios_param,	\
-			SCSI_NCR_CAN_QUEUE,	7,			\
-			SCSI_NCR_SG_TABLESIZE,	SCSI_NCR_CMD_PER_LUN,	\
-			0,	0,	DISABLE_CLUSTERING} 
- 
-#endif /* LINUX_VERSION_CODE */
 
 #endif /* defined(HOSTS_C) || defined(MODULE) */ 
 

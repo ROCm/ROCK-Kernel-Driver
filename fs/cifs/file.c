@@ -152,28 +152,31 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 {
 	int rc = 0;
 	struct cifsFileInfo *open_file = NULL;
+    struct file * file = NULL;
 	struct list_head *tmp;
 
 /* list all files open on tree connection */
 	list_for_each(tmp, &pTcon->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, flist);
-		if(open_file)
-			if(open_file->pfile) {
-				if(open_file->pfile->private_data) {
-					kfree(open_file->pfile->private_data);
-				}
-				rc = cifs_open(open_file->pfile->f_dentry->d_inode,
-						  open_file->pfile);
+		if(open_file) {
+			if(open_file->search_resume_name) {
+				kfree(open_file->search_resume_name);
+			}
+			file = open_file->pfile;
+			kfree(open_file);
+			if(file) {                
+				file->private_data = NULL;
+				rc = cifs_open(file->f_dentry->d_inode,file);
 				if(rc) {
 					cFYI(1,("reconnecting file %s failed with %d",
-							open_file->pfile->f_dentry->d_name.name,rc));
+						file->f_dentry->d_name.name,rc));
 				} else {
 					cFYI(1,("reconnection of %s succeeded",
-							open_file->pfile->f_dentry->d_name.name));
+						file->f_dentry->d_name.name));
 				}
-			}
+			} 
+		}
 	}
-
 	return rc;
 }
 
@@ -196,6 +199,8 @@ cifs_close(struct inode *inode, struct file *file)
 			list_del(&pSMBFile->flist);
 		list_del(&pSMBFile->tlist);
 		rc = CIFSSMBClose(xid, pTcon, pSMBFile->netfid);
+		if(pSMBFile->search_resume_name)
+			kfree(pSMBFile->search_resume_name);
 		kfree(file->private_data);
 		file->private_data = NULL;
 	} else
@@ -874,6 +879,9 @@ fill_in_inode(struct inode *tmp_inode,
 	} else {
 		*pobject_type = DT_REG;
 		tmp_inode->i_mode |= S_IFREG;
+		if(pfindData->ExtFileAttributes & ATTR_READONLY)
+			tmp_inode->i_mode &= ~(S_IWUGO);
+
 	}/* could add code here - to validate if device or weird share type? */
 
 	/* can not fill in nlink here as in qpathinfo version and Unx search */
@@ -1055,6 +1063,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	int xid, i;
 	int Unicode = FALSE;
 	int UnixSearch = FALSE;
+	unsigned int bufsize;
 	__u16 searchHandle;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
@@ -1065,14 +1074,19 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	T2_FFIRST_RSP_PARMS findParms;
 	T2_FNEXT_RSP_PARMS findNextParms;
 	FILE_DIRECTORY_INFO *pfindData;
+	FILE_DIRECTORY_INFO *lastFindData;
 	FILE_UNIX_INFO *pfindDataUnix;
 
 	xid = GetXid();
 
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
 	pTcon = cifs_sb->tcon;
-	data = kmalloc(pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE,
-			GFP_KERNEL);
+	bufsize = pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE;
+	if(bufsize > CIFS_MAX_MSGSIZE) {
+		FreeXid(xid);
+		return -EIO;
+	}
+	data = kmalloc(bufsize, GFP_KERNEL);
 	pfindData = (FILE_DIRECTORY_INFO *) data;
 
 	full_path = build_wildcard_path_from_dentry(file->f_dentry);
@@ -1081,8 +1095,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 
 	switch ((int) file->f_pos) {
 	case 0:
-		if (filldir
-		    (direntry, ".", 1, file->f_pos,
+		if (filldir(direntry, ".", 1, file->f_pos,
 		     file->f_dentry->d_inode->i_ino, DT_DIR) < 0) {
 			cERROR(1, ("Filldir for current dir failed "));
 			break;
@@ -1090,8 +1103,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 		file->f_pos++;
 		/* fallthrough */
 	case 1:
-		if (filldir
-		    (direntry, "..", 2, file->f_pos,
+		if (filldir(direntry, "..", 2, file->f_pos,
 		     file->f_dentry->d_parent->d_inode->i_ino, DT_DIR) < 0) {
 			cERROR(1, ("Filldir for parent dir failed "));
 			break;
@@ -1099,44 +1111,107 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 		file->f_pos++;
 		/* fallthrough */
 	case 2:
-		/* do not reallocate search handle if rewind */
-		if(file->private_data == NULL) {
-			rc = CIFSFindFirst(xid, pTcon, full_path, pfindData,
-				   &findParms, cifs_sb->local_nls,
-				   &Unicode, &UnixSearch);
-			cFYI(1,
-			     ("Count: %d  End: %d ", findParms.SearchCount,
-			      findParms.EndofSearch));
-		} else {
-			cFYI(1,("Search rewinding on %s",full_path));
-			goto readdir_rewind;
+		if (file->private_data != NULL) {
+			cifsFile =
+				(struct cifsFileInfo *) file->private_data;
+			if (cifsFile->endOfSearch) {
+				if(cifsFile->emptyDir) {
+					cFYI(1, ("End of search, empty dir"));
+					rc = 0;
+					break;
+				}
+			} else
+				CIFSFindClose(xid, pTcon, cifsFile->netfid);
+			if(cifsFile->search_resume_name) {
+				kfree(cifsFile->search_resume_name);
+				cifsFile->search_resume_name = NULL;
+			}
 		}
-
+		rc = CIFSFindFirst(xid, pTcon, full_path, pfindData,
+				&findParms, cifs_sb->local_nls,
+				&Unicode, &UnixSearch);
+		cFYI(1, ("Count: %d  End: %d ", findParms.SearchCount,
+			findParms.EndofSearch));
+ 
 		if (rc == 0) {
 			searchHandle = findParms.SearchHandle;
 			if(file->private_data == NULL)
 				file->private_data =
 				    kmalloc(sizeof(struct cifsFileInfo),
-					 GFP_KERNEL);
-			else {
-				/* BB close search handle */
-				cFYI(1,("Search rewinding on %s",full_path));
-			}
+					  GFP_KERNEL);
 			if (file->private_data) {
 				memset(file->private_data, 0,
 				       sizeof (struct cifsFileInfo));
 				cifsFile =
 				    (struct cifsFileInfo *) file->private_data;
 				cifsFile->netfid = searchHandle;
+			} else {
+				rc = -ENOMEM;
+				break;
 			}
 
 			renew_parental_timestamps(file->f_dentry);
-
+			lastFindData = 
+				(FILE_DIRECTORY_INFO *) ((char *) pfindData + 
+					le32_to_cpu(findParms.LastNameOffset));
+			if((char *)lastFindData > (char *)pfindData + bufsize) {
+				cFYI(1,("last search entry past end of packet"));
+				rc = -EIO;
+				break;
+			}
+			/* Offset of resume key same for levels 257 and 514 */
+			cifsFile->resume_key = lastFindData->FileIndex;
+			if(UnixSearch == FALSE) {
+				cifsFile->resume_name_length = 
+					le32_to_cpu(lastFindData->FileNameLength);
+				if(cifsFile->resume_name_length > bufsize - 64) {
+					cFYI(1,("Illegal resume file name length %d",
+						cifsFile->resume_name_length));
+					rc = -ENOMEM;
+					break;
+				}
+				cifsFile->search_resume_name = 
+					kmalloc(cifsFile->resume_name_length, GFP_KERNEL);
+				cFYI(1,("Last file: %s with name %d bytes long",
+					lastFindData->FileName,
+					cifsFile->resume_name_length));
+				memcpy(cifsFile->search_resume_name,
+					lastFindData->FileName, 
+					cifsFile->resume_name_length);
+			} else {
+				pfindDataUnix = (FILE_UNIX_INFO *)lastFindData;
+				if (Unicode == TRUE) {
+					for(i=0;(pfindDataUnix->FileName[i] 
+						    | pfindDataUnix->FileName[i+1]);
+						i+=2) {
+						if(i > bufsize-64)
+							break;
+					}
+					cifsFile->resume_name_length = i + 2;
+				} else {
+					cifsFile->resume_name_length = 
+						strnlen(pfindDataUnix->FileName,
+							bufsize-63);
+				}
+				if(cifsFile->resume_name_length > bufsize - 64) {
+					cFYI(1,("Illegal resume file name length %d",
+						cifsFile->resume_name_length));
+					rc = -ENOMEM;
+					break;
+				}
+				cifsFile->search_resume_name = 
+					kmalloc(cifsFile->resume_name_length, GFP_KERNEL);
+				cFYI(1,("Last file: %s with name %d bytes long",
+					pfindDataUnix->FileName,
+					cifsFile->resume_name_length));
+				memcpy(cifsFile->search_resume_name,
+					pfindDataUnix->FileName, 
+					cifsFile->resume_name_length);
+			}
 			for (i = 2; i < findParms.SearchCount + 2; i++) {
 				if (UnixSearch == FALSE) {
 					pfindData->FileNameLength =
-					    le32_to_cpu(pfindData->
-							FileNameLength);
+					  le32_to_cpu(pfindData->FileNameLength);
 					if (Unicode == TRUE)
 						pfindData->FileNameLength =
 						    cifs_strfromUCS_le
@@ -1165,18 +1240,17 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					    (FILE_UNIX_INFO *) pfindData;
 					if (Unicode == TRUE)
 						qstring.len =
-						    cifs_strfromUCS_le
-						    (pfindDataUnix->
-						     FileName, (wchar_t *)
-						     pfindDataUnix->
-						     FileName,
-						     MAX_PATHCONF,
-						     cifs_sb->local_nls);
+							cifs_strfromUCS_le
+							(pfindDataUnix->FileName,
+							(wchar_t *)
+							pfindDataUnix->FileName,
+							MAX_PATHCONF,
+							cifs_sb->local_nls);
 					else
 						qstring.len =
-						    strnlen(pfindDataUnix->
-							    FileName,
-							    MAX_PATHCONF);
+							strnlen(pfindDataUnix->
+							  FileName,
+							  MAX_PATHCONF);
 					if (((qstring.len != 1)
 					     || (pfindDataUnix->
 						 FileName[0] != '.'))
@@ -1193,21 +1267,26 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 						file->f_pos++;
 					}
 				}
-				pfindData = (FILE_DIRECTORY_INFO *) ((char *) pfindData + le32_to_cpu(pfindData->NextEntryOffset));	/* works also for Unix find struct since this is the first field of both */
+				/* works also for Unix ff struct since first field of both */
+				pfindData = 
+					(FILE_DIRECTORY_INFO *) ((char *) pfindData
+						 + le32_to_cpu(pfindData->NextEntryOffset));
 				/* BB also should check to make sure that pointer is not beyond the end of the SMB */
+				/* if(pfindData > lastFindData) rc = -EIO; break; */
 			}	/* end for loop */
 			if ((findParms.EndofSearch != 0) && cifsFile) {
 				cifsFile->endOfSearch = TRUE;
+				if(findParms.SearchCount == 2)
+					cifsFile->emptyDir = TRUE;
 			}
 		} else {
 			if (cifsFile)
 				cifsFile->endOfSearch = TRUE;
-			rc = 0;	/* unless parent directory disappeared - do not return error here (eg Access Denied or no more files) */
+			/* unless parent directory gone do not return error */
+			rc = 0;
 		}
 		break;
-readdir_rewind:
 	default:
-		/* BB rewrite eventually to better handle rewind */
 		if (file->private_data == NULL) {
 			rc = -EBADF;
 			cFYI(1,
@@ -1222,43 +1301,96 @@ readdir_rewind:
 			}
 			searchHandle = cifsFile->netfid;
 			rc = CIFSFindNext(xid, pTcon, pfindData,
-					  &findNextParms, searchHandle, 0,
-					  &Unicode, &UnixSearch);
-			cFYI(1,
-			     ("Count: %d  End: %d ",
+				&findNextParms, searchHandle, 
+				cifsFile->search_resume_name,
+				cifsFile->resume_name_length,
+				cifsFile->resume_key,
+				&Unicode, &UnixSearch);
+			cFYI(1,("Count: %d  End: %d ",
 			      findNextParms.SearchCount,
 			      findNextParms.EndofSearch));
 			if ((rc == 0) && (findNextParms.SearchCount != 0)) {
+			/* BB save off resume key, key name and name length  */
+				lastFindData = 
+					(FILE_DIRECTORY_INFO *) ((char *) pfindData 
+						+ le32_to_cpu(findNextParms.LastNameOffset));
+				if((char *)lastFindData > (char *)pfindData + bufsize) {
+					cFYI(1,("last search entry past end of packet"));
+					rc = -EIO;
+					break;
+				}
+				/* Offset of resume key same for levels 257 and 514 */
+				cifsFile->resume_key = lastFindData->FileIndex;
+
+				if(UnixSearch == FALSE) {
+					cifsFile->resume_name_length = 
+						le32_to_cpu(lastFindData->FileNameLength);
+					if(cifsFile->resume_name_length > bufsize - 64) {
+						cFYI(1,("Illegal resume file name length %d",
+							cifsFile->resume_name_length));
+						rc = -ENOMEM;
+						break;
+					}
+					cifsFile->search_resume_name = 
+						kmalloc(cifsFile->resume_name_length, GFP_KERNEL);
+					cFYI(1,("Last file: %s with name %d bytes long",
+						lastFindData->FileName,
+						cifsFile->resume_name_length));
+					memcpy(cifsFile->search_resume_name,
+						lastFindData->FileName, 
+						cifsFile->resume_name_length);
+				} else {
+					pfindDataUnix = (FILE_UNIX_INFO *)lastFindData;
+					if (Unicode == TRUE) {
+						for(i=0;(pfindDataUnix->FileName[i] 
+								| pfindDataUnix->FileName[i+1]);
+							i+=2) {
+							if(i > bufsize-64)
+								break;
+						}
+						cifsFile->resume_name_length = i + 2;
+					} else {
+						cifsFile->resume_name_length = 
+							strnlen(pfindDataUnix->
+							 FileName,
+							 MAX_PATHCONF);
+					}
+					if(cifsFile->resume_name_length > bufsize - 64) {
+						cFYI(1,("Illegal resume file name length %d",
+								cifsFile->resume_name_length));
+						rc = -ENOMEM;
+						break;
+					}
+					cifsFile->search_resume_name = 
+						kmalloc(cifsFile->resume_name_length, GFP_KERNEL);
+					cFYI(1,("fnext last file: %s with name %d bytes long",
+						lastFindData->FileName,
+						cifsFile->resume_name_length));
+					memcpy(cifsFile->search_resume_name,
+						lastFindData->FileName, 
+						cifsFile->resume_name_length);
+				}
+
 				for (i = 0; i < findNextParms.SearchCount; i++) {
 					pfindData->FileNameLength =
 					    le32_to_cpu(pfindData->
 							FileNameLength);
 					if (UnixSearch == FALSE) {
 						if (Unicode == TRUE)
-							pfindData->
-							    FileNameLength
-							    =
-							    cifs_strfromUCS_le
-							    (pfindData->
-							     FileName,
-							     (wchar_t *)
-							     pfindData->
-							     FileName,
-							     (pfindData->
-							      FileNameLength)
-							     / 2,
-							     cifs_sb->
-							     local_nls);
-						qstring.len =
-						    pfindData->FileNameLength;
+							pfindData->FileNameLength =
+							  cifs_strfromUCS_le
+							  (pfindData->FileName,
+							  (wchar_t *)
+							  pfindData->FileName,
+							  (pfindData->FileNameLength)/ 2,
+							  cifs_sb->local_nls);
+						qstring.len = 
+							pfindData->FileNameLength;
 						if (((qstring.len != 1)
-						     || (pfindData->
-							 FileName[0] != '.'))
+						    || (pfindData->FileName[0] != '.'))
 						    && ((qstring.len != 2)
-							|| (pfindData->
-							    FileName[0] != '.')
-							|| (pfindData->
-							    FileName[1] !=
+							|| (pfindData->FileName[0] != '.')
+							|| (pfindData->FileName[1] !=
 							    '.'))) {
 							cifs_filldir
 							    (&qstring,
@@ -1273,22 +1405,18 @@ readdir_rewind:
 						    pfindData;
 						if (Unicode == TRUE)
 							qstring.len =
-							    cifs_strfromUCS_le
-							    (pfindDataUnix->
-							     FileName,
-							     (wchar_t *)
-							     pfindDataUnix->
-							     FileName,
-							     MAX_PATHCONF,
-							     cifs_sb->
-							     local_nls);
+							  cifs_strfromUCS_le
+							  (pfindDataUnix->FileName,
+							  (wchar_t *)
+							  pfindDataUnix->FileName,
+							  MAX_PATHCONF,
+							  cifs_sb->local_nls);
 						else
 							qstring.len =
-							    strnlen
-							    (pfindDataUnix->
-							     FileName,
-							     MAX_PATHCONF);
-
+							  strnlen
+							  (pfindDataUnix->
+							  FileName,
+							  MAX_PATHCONF);
 						if (((qstring.len != 1)
 						     || (pfindDataUnix->
 							 FileName[0] != '.'))
@@ -1308,8 +1436,7 @@ readdir_rewind:
 					}
 					pfindData = (FILE_DIRECTORY_INFO *) ((char *) pfindData + le32_to_cpu(pfindData->NextEntryOffset));	/* works also for Unix find struct since this is the first field of both */
 					/* BB also should check to make sure that pointer is not beyond the end of the SMB */
-
-				}	/* end for loop */
+				} /* end for loop */
 				if (findNextParms.EndofSearch != 0) {
 					cifsFile->endOfSearch = TRUE;
 				}
@@ -1318,8 +1445,7 @@ readdir_rewind:
 				rc = 0;	/* unless parent directory disappeared - do not return error here (eg Access Denied or no more files) */
 			}
 		}
-	}			/* end switch */
-
+	} /* end switch */
 	if (data)
 		kfree(data);
 	if (full_path)
@@ -1335,7 +1461,8 @@ struct address_space_operations cifs_addr_ops = {
 	.writepage = cifs_writepage,
 	.prepare_write = simple_prepare_write,
 	.commit_write = cifs_commit_write,
-	.sync_page = cifs_sync_page, 
+	.sync_page = cifs_sync_page,
+	/*.direct_IO = */
 };
 
 struct address_space_operations cifs_addr_ops_writethrough = {
@@ -1345,6 +1472,7 @@ struct address_space_operations cifs_addr_ops_writethrough = {
 	.prepare_write = simple_prepare_write,
 	.commit_write = cifs_commit_write,
 	.sync_page = cifs_sync_page,
+	/*.direct_IO = 	 */
 };
 
 struct address_space_operations cifs_addr_ops_nocache = {
@@ -1354,5 +1482,6 @@ struct address_space_operations cifs_addr_ops_nocache = {
 	.prepare_write = simple_prepare_write,
 	.commit_write = cifs_commit_write,
 	.sync_page = cifs_sync_page,
+	/*.direct_IO = */
 };
 

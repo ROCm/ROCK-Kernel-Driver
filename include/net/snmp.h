@@ -304,6 +304,8 @@ struct linux_mib
 
 #define SNMP_INC_STATS_BH(mib, field) 	\
 	(per_cpu_ptr(mib[0], smp_processor_id())->field++)
+#define SNMP_INC_STATS_OFFSET_BH(mib, field, offset)	\
+	((*((&per_cpu_ptr(mib[0], smp_processor_id())->field) + (offset)))++)
 #define SNMP_INC_STATS_USER(mib, field) \
 	(per_cpu_ptr(mib[1], smp_processor_id())->field++)
 #define SNMP_INC_STATS(mib, field) 	\

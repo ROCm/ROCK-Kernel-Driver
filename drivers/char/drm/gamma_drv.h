@@ -40,6 +40,7 @@ typedef struct drm_gamma_private {
 	drm_map_t *mmio1;
 	drm_map_t *mmio2;
 	drm_map_t *mmio3;
+	int num_rast;
 } drm_gamma_private_t;
 
 				/* gamma_dma.c */
@@ -58,6 +59,29 @@ extern int  gamma_dma(struct inode *inode, struct file *filp,
 		      unsigned int cmd, unsigned long arg);
 extern int  gamma_find_devices(void);
 extern int  gamma_found(void);
+
+/* Gamma-specific code pulled from drm_dma.h:
+ */
+extern void	     DRM(clear_next_buffer)(drm_device_t *dev);
+extern int	     DRM(select_queue)(drm_device_t *dev,
+				       void (*wrapper)(unsigned long));
+extern int	     DRM(dma_enqueue)(struct file *filp, drm_dma_t *dma);
+extern int	     DRM(dma_get_buffers)(struct file *filp, drm_dma_t *dma);
+
+
+/* Gamma-specific code pulled from drm_lists.h (now renamed gamma_lists.h):
+ */
+extern int	     DRM(waitlist_create)(drm_waitlist_t *bl, int count);
+extern int	     DRM(waitlist_destroy)(drm_waitlist_t *bl);
+extern int	     DRM(waitlist_put)(drm_waitlist_t *bl, drm_buf_t *buf);
+extern drm_buf_t     *DRM(waitlist_get)(drm_waitlist_t *bl);
+extern int	     DRM(freelist_create)(drm_freelist_t *bl, int count);
+extern int	     DRM(freelist_destroy)(drm_freelist_t *bl);
+extern int	     DRM(freelist_put)(drm_device_t *dev, drm_freelist_t *bl,
+				       drm_buf_t *buf);
+extern drm_buf_t     *DRM(freelist_get)(drm_freelist_t *bl, int block);
+
+
 
 #define GLINT_DRI_BUF_COUNT 256
 

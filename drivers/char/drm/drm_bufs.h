@@ -128,7 +128,7 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 
 	case _DRM_SHM:
 		map->handle = vmalloc_32(map->size);
-		DRM_DEBUG( "%ld %d %p\n",
+		DRM_DEBUG( "%lu %d %p\n",
 			   map->size, DRM(order)( map->size ), map->handle );
 		if ( !map->handle ) {
 			DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
@@ -269,9 +269,11 @@ static void DRM(cleanup_buf_error)(drm_buf_entry_t *entry)
 
 	if (entry->seg_count) {
 		for (i = 0; i < entry->seg_count; i++) {
-			DRM(free_pages)(entry->seglist[i],
-					entry->page_order,
-					DRM_MEM_DMA);
+			if (entry->seglist[i]) {
+				DRM(free_pages)(entry->seglist[i],
+					        entry->page_order,
+					        DRM_MEM_DMA);
+			}
 		}
 		DRM(free)(entry->seglist,
 			  entry->seg_count *
@@ -281,9 +283,9 @@ static void DRM(cleanup_buf_error)(drm_buf_entry_t *entry)
 		entry->seg_count = 0;
 	}
 
-   	if(entry->buf_count) {
-	   	for(i = 0; i < entry->buf_count; i++) {
-			if(entry->buflist[i].dev_private) {
+   	if (entry->buf_count) {
+	   	for (i = 0; i < entry->buf_count; i++) {
+			if (entry->buflist[i].dev_private) {
 				DRM(free)(entry->buflist[i].dev_private,
 					  entry->buflist[i].dev_priv_size,
 					  DRM_MEM_BUFS);
@@ -345,7 +347,7 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 	DRM_DEBUG( "count:      %d\n",  count );
 	DRM_DEBUG( "order:      %d\n",  order );
 	DRM_DEBUG( "size:       %d\n",  size );
-	DRM_DEBUG( "agp_offset: %ld\n", agp_offset );
+	DRM_DEBUG( "agp_offset: %lu\n", agp_offset );
 	DRM_DEBUG( "alignment:  %d\n",  alignment );
 	DRM_DEBUG( "page_order: %d\n",  page_order );
 	DRM_DEBUG( "total:      %d\n",  total );
@@ -412,15 +414,12 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 			/* Set count correctly so we free the proper amount. */
 			entry->buf_count = count;
 			DRM(cleanup_buf_error)(entry);
+			up( &dev->struct_sem );
+			atomic_dec( &dev->buf_alloc );
+			return -ENOMEM;
 		}
 		memset( buf->dev_private, 0, buf->dev_priv_size );
 
-#if __HAVE_DMA_HISTOGRAM
-		buf->time_queued = 0;
-		buf->time_dispatched = 0;
-		buf->time_completed = 0;
-		buf->time_freed = 0;
-#endif
 		DRM_DEBUG( "buffer %d @ %p\n",
 			   entry->buf_count, buf->address );
 
@@ -565,12 +564,13 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 	}
 	memset( entry->seglist, 0, count * sizeof(*entry->seglist) );
 
-	temp_pagelist = DRM(realloc)( dma->pagelist,
-				      dma->page_count * sizeof(*dma->pagelist),
-				      (dma->page_count + (count << page_order))
-				      * sizeof(*dma->pagelist),
-				      DRM_MEM_PAGES );
-	if(!temp_pagelist) {
+	/* Keep the original pagelist until we know all the allocations
+	 * have succeeded
+	 */
+	temp_pagelist = DRM(alloc)( (dma->page_count + (count << page_order))
+				    * sizeof(*dma->pagelist),
+				    DRM_MEM_PAGES );
+	if (!temp_pagelist) {
 		DRM(free)( entry->buflist,
 			   count * sizeof(*entry->buflist),
 			   DRM_MEM_BUFS );
@@ -581,8 +581,9 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 		atomic_dec( &dev->buf_alloc );
 		return -ENOMEM;
 	}
-
-	dma->pagelist = temp_pagelist;
+	memcpy(temp_pagelist,
+	       dma->pagelist,
+	       dma->page_count * sizeof(*dma->pagelist));
 	DRM_DEBUG( "pagelist: %d entries\n",
 		   dma->page_count + (count << page_order) );
 
@@ -593,13 +594,25 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 
 	while ( entry->buf_count < count ) {
 		page = DRM(alloc_pages)( page_order, DRM_MEM_DMA );
-		if ( !page ) break;
+		if ( !page ) {
+			/* Set count correctly so we free the proper amount. */
+			entry->buf_count = count;
+			entry->seg_count = count;
+			DRM(cleanup_buf_error)(entry);
+			DRM(free)( temp_pagelist,
+				   (dma->page_count + (count << page_order))
+				   * sizeof(*dma->pagelist),
+				   DRM_MEM_PAGES );
+			up( &dev->struct_sem );
+			atomic_dec( &dev->buf_alloc );
+			return -ENOMEM;
+		}
 		entry->seglist[entry->seg_count++] = page;
 		for ( i = 0 ; i < (1 << page_order) ; i++ ) {
 			DRM_DEBUG( "page %d @ 0x%08lx\n",
 				   dma->page_count + page_count,
 				   page + PAGE_SIZE * i );
-			dma->pagelist[dma->page_count + page_count++]
+			temp_pagelist[dma->page_count + page_count++]
 				= page + PAGE_SIZE * i;
 		}
 		for ( offset = 0 ;
@@ -617,12 +630,25 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 			buf->pending = 0;
 			init_waitqueue_head( &buf->dma_wait );
 			buf->filp    = 0;
-#if __HAVE_DMA_HISTOGRAM
-			buf->time_queued     = 0;
-			buf->time_dispatched = 0;
-			buf->time_completed  = 0;
-			buf->time_freed      = 0;
-#endif
+
+			buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
+			buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
+						       DRM_MEM_BUFS );
+			if(!buf->dev_private) {
+				/* Set count correctly so we free the proper amount. */
+				entry->buf_count = count;
+				entry->seg_count = count;
+				DRM(cleanup_buf_error)(entry);
+				DRM(free)( temp_pagelist,
+					   (dma->page_count + (count << page_order))
+					   * sizeof(*dma->pagelist),
+					   DRM_MEM_PAGES );
+				up( &dev->struct_sem );
+				atomic_dec( &dev->buf_alloc );
+				return -ENOMEM;
+			}
+			memset( buf->dev_private, 0, buf->dev_priv_size );
+
 			DRM_DEBUG( "buffer %d @ %p\n",
 				   entry->buf_count, buf->address );
 		}
@@ -634,9 +660,13 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 				     (dma->buf_count + entry->buf_count)
 				     * sizeof(*dma->buflist),
 				     DRM_MEM_BUFS );
-	if(!temp_buflist) {
+	if (!temp_buflist) {
 		/* Free the entry because it isn't valid */
 		DRM(cleanup_buf_error)(entry);
+		DRM(free)( temp_pagelist,
+			   (dma->page_count + (count << page_order))
+			   * sizeof(*dma->pagelist),
+			   DRM_MEM_PAGES );
 		up( &dev->struct_sem );
 		atomic_dec( &dev->buf_alloc );
 		return -ENOMEM;
@@ -646,6 +676,14 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 	for ( i = 0 ; i < entry->buf_count ; i++ ) {
 		dma->buflist[i + dma->buf_count] = &entry->buflist[i];
 	}
+
+	/* No allocations failed, so now we can replace the orginal pagelist
+	 * with the new one.
+	 */
+	DRM(free)(dma->pagelist,
+		  dma->page_count * sizeof(*dma->pagelist),
+		  DRM_MEM_PAGES);
+	dma->pagelist = temp_pagelist;
 
 	dma->buf_count += entry->buf_count;
 	dma->seg_count += entry->seg_count;
@@ -715,7 +753,7 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 	DRM_DEBUG( "count:      %d\n",  count );
 	DRM_DEBUG( "order:      %d\n",  order );
 	DRM_DEBUG( "size:       %d\n",  size );
-	DRM_DEBUG( "agp_offset: %ld\n", agp_offset );
+	DRM_DEBUG( "agp_offset: %lu\n", agp_offset );
 	DRM_DEBUG( "alignment:  %d\n",  alignment );
 	DRM_DEBUG( "page_order: %d\n",  page_order );
 	DRM_DEBUG( "total:      %d\n",  total );
@@ -789,12 +827,6 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 
 		memset( buf->dev_private, 0, buf->dev_priv_size );
 
-# if __HAVE_DMA_HISTOGRAM
-		buf->time_queued = 0;
-		buf->time_dispatched = 0;
-		buf->time_completed = 0;
-		buf->time_freed = 0;
-# endif
 		DRM_DEBUG( "buffer %d @ %p\n",
 			   entry->buf_count, buf->address );
 

@@ -40,6 +40,7 @@
 #include <linux/string.h>
 #include <linux/miscdevice.h>
 #include <linux/init.h>
+#include <linux/fs.h>
 #include <asm/oplib.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>

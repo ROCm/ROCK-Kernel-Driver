@@ -32,6 +32,7 @@
 #include "cifs_debug.h"
 
 extern kmem_cache_t *cifs_mid_cachep;
+extern kmem_cache_t *cifs_oplock_cachep;
 
 struct mid_q_entry *
 AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
@@ -93,6 +94,39 @@ DeleteMidQEntry(struct mid_q_entry *midEntry)
 	write_unlock(&GlobalMid_Lock);
 	buf_release(midEntry->resp_buf);
 	kmem_cache_free(cifs_mid_cachep, midEntry);
+}
+
+struct oplock_q_entry *
+AllocOplockQEntry(struct file * file, struct cifsTconInfo * tcon)
+{
+	struct oplock_q_entry *temp;
+	if ((file == NULL) || (tcon == NULL)) {
+		cERROR(1, ("Null parms passed to AllocOplockQEntry"));
+		return NULL;
+	}
+	temp = (struct oplock_q_entry *) kmem_cache_alloc(cifs_oplock_cachep,
+						       SLAB_KERNEL);
+	if (temp == NULL)
+		return temp;
+	else {
+		temp->file_to_flush = file;
+		temp->tcon = tcon;
+		write_lock(&GlobalMid_Lock);
+		list_add_tail(&temp->qhead, &GlobalOplock_Q);
+		write_unlock(&GlobalMid_Lock);
+	}
+    return temp;
+
+}
+
+void DeleteOplockQEntry(struct oplock_q_entry * oplockEntry)
+{
+	/* BB add spinlock to protect midq for each session BB */
+	write_lock(&GlobalMid_Lock); 
+    /* should we check if list empty first? */
+	list_del(&oplockEntry->qhead);
+	write_unlock(&GlobalMid_Lock);
+	kmem_cache_free(cifs_oplock_cachep, oplockEntry);
 }
 
 int

@@ -4395,32 +4395,6 @@ advansys_proc_info(char *buffer, char **start, off_t offset, int length,
     curbuf += cnt;
 
     /*
-     * Display target driver information for each device attached
-     * to the board.
-     */
-    list_for_each_entry (scd, &shp->my_devices, siblings)
-    {
-        if (scd->host == shp) {
-            cp = boardp->prtbuf;
-            /*
-             * Note: If proc_print_scsidevice() writes more than
-             * ASC_PRTBUF_SIZE bytes, it will overrun 'prtbuf'.
-             */
-            proc_print_scsidevice(scd, cp, &cplen, 0);
-            ASC_ASSERT(cplen < ASC_PRTBUF_SIZE);
-            cnt = asc_proc_copy(advoffset, offset, curbuf, leftlen, cp, cplen);
-            totcnt += cnt;
-            leftlen -= cnt;
-            if (leftlen == 0) {
-                ASC_DBG1(1, "advansys_proc_info: totcnt %d\n", totcnt);
-                return totcnt;
-            }
-            advoffset += cplen;
-            curbuf += cnt;
-        }
-    }
-
-    /*
      * Display EEPROM configuration for the board.
      */
     cp = boardp->prtbuf;

@@ -195,11 +195,6 @@ static void __init setup_bootmem(void)
 
 #endif /* __LP64__ */
 
-#if 1
-	/* KLUGE! this really belongs in kernel/resource.c! */
-	iomem_resource.end = ~0UL;
-#endif
-
 	sysram_resource_count = npmem_ranges;
 	for (i = 0; i < sysram_resource_count; i++) {
 		struct resource *res = &sysram_resources[i];
