@@ -179,7 +179,7 @@ struct uart_port {
 #define UPF_RESOURCES		(1 << 30)
 #define UPF_IOREMAP		(1 << 31)
 
-#define UPF_FLAGS		(0x7fff)
+#define UPF_CHANGE_MASK		(0x7fff)
 #define UPF_USR_MASK		(UPF_SPD_MASK|UPF_LOW_LATENCY)
 
 	unsigned int		mctrl;			/* current modem ctrl settings */
@@ -275,12 +275,30 @@ struct uart_driver {
 };
 
 void uart_write_wakeup(struct uart_port *port);
+
+/*
+ * Baud rate helpers.
+ */
+void uart_update_timeout(struct uart_port *port, unsigned int cflag,
+			 unsigned int quot);
+unsigned int uart_get_baud_rate(struct uart_port *port,
+				struct termios *termios);
+unsigned int uart_get_divisor(struct uart_port *port, struct termios *termios,
+			      struct termios *old_termios);
+
+/*
+ * Console helpers.
+ */
 struct uart_port *uart_get_console(struct uart_port *ports, int nr,
 				   struct console *c);
 void uart_parse_options(char *options, int *baud, int *parity, int *bits,
 			int *flow);
 int uart_set_options(struct uart_port *port, struct console *co, int baud,
 		     int parity, int bits, int flow);
+
+/*
+ * Port/driver registration/removal
+ */
 int uart_register_driver(struct uart_driver *uart);
 void uart_unregister_driver(struct uart_driver *uart);
 void uart_unregister_port(struct uart_driver *reg, int line);

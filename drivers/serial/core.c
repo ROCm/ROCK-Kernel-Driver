@@ -827,7 +827,7 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 
 	port->irq              = new_serial.irq;
 	port->uartclk          = new_serial.baud_base * 16;
-	port->flags            = new_serial.flags & UPF_FLAGS;
+	port->flags            = new_serial.flags & UPF_CHANGE_MASK;
 	port->custom_divisor   = new_serial.custom_divisor;
 	state->close_delay     = new_serial.close_delay * HZ / 100;
 	state->closing_wait    = new_serial.closing_wait * HZ / 100;
