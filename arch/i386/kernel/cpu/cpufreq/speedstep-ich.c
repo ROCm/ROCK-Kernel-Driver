@@ -247,13 +247,13 @@ static int speedstep_target (struct cpufreq_policy *policy,
 	if (cpufreq_frequency_table_target(policy, &speedstep_freqs[0], target_freq, relation, &newstate))
 		return -EINVAL;
 
+	freqs.old = speedstep_get(policy->cpu);
+	freqs.new = speedstep_freqs[newstate].frequency;
+	freqs.cpu = policy->cpu;
+
 	/* no transition necessary */
 	if (freqs.old == freqs.new)
 		return 0;
-
-	freqs.old = speedstep_get_processor_frequency(speedstep_processor);
-	freqs.new = speedstep_freqs[newstate].frequency;
-	freqs.cpu = policy->cpu;
 
 	cpus_allowed = current->cpus_allowed;
 
@@ -324,14 +324,13 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 				     &speedstep_freqs[SPEEDSTEP_LOW].frequency,
 				     &speedstep_freqs[SPEEDSTEP_HIGH].frequency,
 				     &speedstep_set_state);
+	set_cpus_allowed(current, cpus_allowed);
 	if (result) {
-		set_cpus_allowed(current, cpus_allowed);
 		return result;
 	}
 
 	/* get current speed setting */
-	speed = speedstep_get_processor_frequency(speedstep_processor);
-	set_cpus_allowed(current, cpus_allowed);
+	speed = speedstep_get(policy->cpu);
 	if (!speed)
 		return -EIO;
 
@@ -362,7 +361,20 @@ static int speedstep_cpu_exit(struct cpufreq_policy *policy)
 
 static unsigned int speedstep_get(unsigned int cpu)
 {
-	return speedstep_get_processor_frequency(speedstep_processor);
+ 	unsigned int	speed;
+	cpumask_t       cpus_allowed,affected_cpu_map;
+ 
+	/* only run on CPU to be set, or on its sibling */
+	cpus_allowed = current->cpus_allowed;
+#ifdef CONFIG_SMP
+	affected_cpu_map = cpu_sibling_map[cpu];
+#else
+	affected_cpu_map = cpumask_of_cpu(cpu);
+#endif
+	set_cpus_allowed(current, affected_cpu_map);
+	speed=speedstep_get_processor_frequency(speedstep_processor);
+	set_cpus_allowed(current, cpus_allowed);
+	return speed;
 }
 
 static struct freq_attr* speedstep_attr[] = {

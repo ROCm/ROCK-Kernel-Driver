@@ -88,6 +88,11 @@ config X86_POWERNOW_K7
 
 	  If in doubt, say N.
 
+config X86_POWERNOW_K7_ACPI
+	bool
+	depends on ((X86_POWERNOW_K7 = "m" && ACPI_PROCESSOR) || (X86_POWERNOW_K7 = "y" && ACPI_PROCESSOR = "y"))
+	default y
+
 config X86_POWERNOW_K8
 	tristate "AMD Opteron/Athlon64 PowerNow!"
 	depends on CPU_FREQ && EXPERIMENTAL
@@ -97,6 +102,11 @@ config X86_POWERNOW_K8
 	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
+
+config X86_POWERNOW_K8_ACPI
+	bool
+	depends on ((X86_POWERNOW_K8 = "m" && ACPI_PROCESSOR) || (X86_POWERNOW_K8 = "y" && ACPI_PROCESSOR = "y"))
+	default y
 
 config X86_GX_SUSPMOD
 	tristate "Cyrix MediaGX/NatSemi Geode Suspend Modulation"
