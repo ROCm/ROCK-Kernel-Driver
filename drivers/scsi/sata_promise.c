@@ -37,7 +37,7 @@
 #undef DIRECT_HDMA
 
 #define DRV_NAME	"sata_promise"
-#define DRV_VERSION	"0.84"
+#define DRV_VERSION	"0.85"
 
 
 enum {
@@ -839,7 +839,7 @@ static irqreturn_t pdc20621_interrupt (int irq, void *dev_instance, struct pt_re
 		VPRINTK("QUICK EXIT 2\n");
 		return IRQ_NONE;
 	}
-	mask &= 0xf;		/* only 16 tags possible */
+	mask &= 0xffff;		/* only 16 tags possible */
 	if (!mask) {
 		VPRINTK("QUICK EXIT 3\n");
 		return IRQ_NONE;
@@ -1001,7 +1001,7 @@ static irqreturn_t pdc_interrupt (int irq, void *dev_instance, struct pt_regs *r
 		VPRINTK("QUICK EXIT 2\n");
 		return IRQ_NONE;
 	}
-	mask &= 0xf;		/* only 16 tags possible */
+	mask &= 0xffff;		/* only 16 tags possible */
 	if (!mask) {
 		VPRINTK("QUICK EXIT 3\n");
 		return IRQ_NONE;
