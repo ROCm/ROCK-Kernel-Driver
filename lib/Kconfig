@@ -26,5 +26,7 @@ config ZLIB_DEFLATE
 		(PPP_DEFLATE=m || JFFS2_FS=m || CRYPTO_DEFLATE=m)
 	default y if PPP_DEFLATE=y || JFFS2_FS=y || CRYPTO_DEFLATE=y
 
+source "drivers/base/Kconfig.lib"
+
 endmenu
 
