@@ -418,13 +418,6 @@ snd_wavefront_probe (int dev, struct pnp_card_link *pcard,
 	snd_hwdep_t *fx_processor;
 	int hw_dev = 0, midi_dev = 0, err;
 
-	if (cs4232_mpu_port[dev] < 0)
-		cs4232_mpu_port[dev] = SNDRV_AUTO_PORT;
-	if (fm_port[dev] < 0)
-		fm_port[dev] = SNDRV_AUTO_PORT;
-	if (ics2115_port[dev] < 0)
-		ics2115_port[dev] = SNDRV_AUTO_PORT;
-
 #ifdef CONFIG_PNP
 	if (!isapnp[dev]) {
 #endif
@@ -490,7 +483,7 @@ snd_wavefront_probe (int dev, struct pnp_card_link *pcard,
 
 	/* ---------- OPL3 synth --------- */
 
-	if (fm_port[dev] != SNDRV_AUTO_PORT) {
+	if (fm_port[dev] > 0 && fm_port[dev] != SNDRV_AUTO_PORT) {
 		opl3_t *opl3;
 
 	        if ((err = snd_opl3_create(card,
@@ -561,7 +554,7 @@ snd_wavefront_probe (int dev, struct pnp_card_link *pcard,
 
 	/* ------ ICS2115 internal MIDI ------------ */
 
-	if (ics2115_port[dev] >= 0 && ics2115_port[dev] != SNDRV_AUTO_PORT) {
+	if (ics2115_port[dev] > 0 && ics2115_port[dev] != SNDRV_AUTO_PORT) {
 		ics2115_internal_rmidi = 
 			snd_wavefront_new_midi (card, 
 						midi_dev,
@@ -578,7 +571,7 @@ snd_wavefront_probe (int dev, struct pnp_card_link *pcard,
 
 	/* ------ ICS2115 external MIDI ------------ */
 
-	if (ics2115_port[dev] >= 0 && ics2115_port[dev] != SNDRV_AUTO_PORT) {
+	if (ics2115_port[dev] > 0 && ics2115_port[dev] != SNDRV_AUTO_PORT) {
 		ics2115_external_rmidi = 
 			snd_wavefront_new_midi (card, 
 						midi_dev,
@@ -631,7 +624,7 @@ snd_wavefront_probe (int dev, struct pnp_card_link *pcard,
 	if (dma2[dev] >= 0 && dma2[dev] < 8)
 		sprintf(card->longname + strlen(card->longname), "&%d", dma2[dev]);
 
-	if (cs4232_mpu_port[dev] != SNDRV_AUTO_PORT) {
+	if (cs4232_mpu_port[dev] > 0 && cs4232_mpu_port[dev] != SNDRV_AUTO_PORT) {
 		sprintf (card->longname + strlen (card->longname), 
 			 " MPU-401 0x%lx irq %d",
 			 cs4232_mpu_port[dev],
@@ -756,13 +749,13 @@ static int __init alsa_card_wavefront_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&isapnp[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&cs4232_pcm_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&cs4232_pcm_port[nr_dev]) == 2 &&
 	       get_option(&str,&cs4232_pcm_irq[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&cs4232_mpu_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&cs4232_mpu_port[nr_dev]) == 2 &&
 	       get_option(&str,&cs4232_mpu_irq[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&ics2115_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&ics2115_port[nr_dev]) == 2 &&
 	       get_option(&str,&ics2115_irq[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&fm_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
 	       get_option(&str,&dma1[nr_dev]) == 2 &&
 	       get_option(&str,&dma2[nr_dev]) == 2 &&
 	       get_option(&str,&use_cs4232_midi[nr_dev]) == 2);

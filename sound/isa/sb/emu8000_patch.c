@@ -82,7 +82,7 @@ snd_emu8000_close_dma(emu8000_t *emu)
  * 8bit samples etc.
  */
 static unsigned short
-read_word(const void *buf, int offset, int mode)
+read_word(const void __user *buf, int offset, int mode)
 {
 	unsigned short c;
 	if (mode & SNDRV_SFNT_SAMPLE_8BITS) {
@@ -146,7 +146,7 @@ write_word(emu8000_t *emu, int *offset, unsigned short data)
  */
 int
 snd_emu8000_sample_new(snd_emux_t *rec, snd_sf_sample_t *sp,
-		       snd_util_memhdr_t *hdr, const void *data, long count)
+		       snd_util_memhdr_t *hdr, const void __user *data, long count)
 {
 	int  i;
 	int  rc;

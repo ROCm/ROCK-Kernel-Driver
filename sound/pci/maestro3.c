@@ -1981,14 +1981,19 @@ static void snd_m3_ac97_reset(m3_t *chip)
 
 static int __devinit snd_m3_mixer(m3_t *chip)
 {
+	ac97_bus_t bus, *pbus;
 	ac97_t ac97;
 	int err;
 
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_m3_ac97_write;
+	bus.read = snd_m3_ac97_read;
+	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+		return err;
+	
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_m3_ac97_write;
-	ac97.read = snd_m3_ac97_read;
 	ac97.private_data = chip;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97)) < 0)
+	if ((err = snd_ac97_mixer(pbus, &ac97, &chip->ac97)) < 0)
 		return err;
 
 	/* seems ac97 PCM needs initialization.. hack hack.. */
@@ -2349,7 +2354,8 @@ snd_m3_enable_ints(m3_t *chip)
 {
 	unsigned long io = chip->iobase;
 
-	outw(ASSP_INT_ENABLE | MPU401_INT_ENABLE, io + HOST_INT_CTRL);
+	/* TODO: MPU401 not supported yet */
+	outw(ASSP_INT_ENABLE /*| MPU401_INT_ENABLE*/, io + HOST_INT_CTRL);
 	outb(inb(io + ASSP_CONTROL_C) | ASSP_HOST_INT_ENABLE,
 	     io + ASSP_CONTROL_C);
 }
@@ -2541,11 +2547,11 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 		return -EIO;
 
 	/* check, if we can restrict PCI DMA transfers to 28 bits */
-	if (!pci_dma_supported(pci, 0x0fffffff)) {
+	if (pci_set_dma_mask(pci, 0x0fffffff) < 0 ||
+	    pci_set_consistent_dma_mask(pci, 0x0fffffff) < 0) {
 		snd_printk("architecture does not support 28bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x0fffffff);
 
 	chip = snd_magic_kcalloc(m3_t, 0, GFP_KERNEL);
 	if (chip == NULL)

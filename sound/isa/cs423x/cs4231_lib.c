@@ -1531,26 +1531,31 @@ int snd_cs4231_create(snd_card_t * card,
 	chip->dma2 = -1;
 
 	if ((chip->res_port = request_region(port, 4, "CS4231")) == NULL) {
+		snd_printk(KERN_ERR "cs4231: can't grab port 0x%lx\n", port);
 		snd_cs4231_free(chip);
 		return -EBUSY;
 	}
 	chip->port = port;
 	if ((long)cport >= 0 && (chip->res_cport = request_region(cport, 8, "CS4232 Control")) == NULL) {
+		snd_printk(KERN_ERR "cs4231: can't grab control port 0x%lx\n", cport);
 		snd_cs4231_free(chip);
 		return -ENODEV;
 	}
 	chip->cport = cport;
 	if (!(hwshare & CS4231_HWSHARE_IRQ) && request_irq(irq, snd_cs4231_interrupt, SA_INTERRUPT, "CS4231", (void *) chip)) {
+		snd_printk(KERN_ERR "cs4231: can't grab IRQ %d\n", irq);
 		snd_cs4231_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = irq;
 	if (!(hwshare & CS4231_HWSHARE_DMA1) && request_dma(dma1, "CS4231 - 1")) {
+		snd_printk(KERN_ERR "cs4231: can't grab DMA1 %d\n", dma1);
 		snd_cs4231_free(chip);
 		return -EBUSY;
 	}
 	chip->dma1 = dma1;
 	if (!(hwshare & CS4231_HWSHARE_DMA2) && dma1 != dma2 && dma2 >= 0 && request_dma(dma2, "CS4231 - 2")) {
+		snd_printk(KERN_ERR "cs4231: can't grab DMA2 %d\n", dma2);
 		snd_cs4231_free(chip);
 		return -EBUSY;
 	}

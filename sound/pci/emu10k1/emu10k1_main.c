@@ -239,14 +239,9 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
  		}
 	}
 	
-	if (!emu->APS) {	/* enable analog output */
-		if (!emu->audigy) {
-			unsigned int reg = inl(emu->port + HCFG);
-			outl(reg | HCFG_GPOUT0, emu->port + HCFG);
-		} else {
-			unsigned int reg = inl(emu->port + A_IOCFG);
-			outl(reg | A_IOCFG_GPOUT0, emu->port + A_IOCFG);
-		}
+	if (emu->audigy) {	/* enable analog output */
+		unsigned int reg = inl(emu->port + A_IOCFG);
+		outl(reg | A_IOCFG_GPOUT0, emu->port + A_IOCFG);
 	}
 
 	/*
@@ -269,6 +264,9 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 			 * This has to be done after init ALice3 I2SOut beyond 48KHz.
 			 * So, sequence is important. */
 			outl(inl(emu->port + A_IOCFG) | 0x0040, emu->port + A_IOCFG);
+		} else {
+			/* Disable routing from AC97 line out to Front speakers */
+			outl(inl(emu->port + A_IOCFG) | 0x0080, emu->port + A_IOCFG);
 		}
 	}
 	
@@ -601,7 +599,8 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 		return -ENOMEM;
 	/* set the DMA transfer mask */
 	emu->dma_mask = is_audigy ? AUDIGY_DMA_MASK : EMU10K1_DMA_MASK;
-	if (pci_set_dma_mask(pci, emu->dma_mask) < 0) {
+	if (pci_set_dma_mask(pci, emu->dma_mask) < 0 ||
+	    pci_set_consistent_dma_mask(pci, emu->dma_mask) < 0) {
 		snd_printk(KERN_ERR "architecture does not support PCI busmaster DMA with mask 0x%lx\n", emu->dma_mask);
 		snd_magic_kfree(emu);
 		return -ENXIO;

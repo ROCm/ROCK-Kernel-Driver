@@ -37,7 +37,7 @@
 
 static int major = CONFIG_SND_MAJOR;
 int snd_major;
-static int cards_limit = SNDRV_CARDS;
+static int cards_limit = 1;
 static int device_mode = S_IFCHR | S_IRUGO | S_IWUGO;
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
@@ -49,7 +49,7 @@ MODULE_PARM(major, "i");
 MODULE_PARM_DESC(major, "Major # for sound driver.");
 MODULE_PARM_SYNTAX(major, "default:116,skill:devel");
 MODULE_PARM(cards_limit, "i");
-MODULE_PARM_DESC(cards_limit, "Count of soundcards installed in the system.");
+MODULE_PARM_DESC(cards_limit, "Count of auto-loadable soundcards.");
 MODULE_PARM_SYNTAX(cards_limit, "default:8,skill:advanced");
 MODULE_ALIAS_CHARDEV_MAJOR(CONFIG_SND_MAJOR);
 #ifdef CONFIG_DEVFS_FS
@@ -57,7 +57,12 @@ MODULE_PARM(device_mode, "i");
 MODULE_PARM_DESC(device_mode, "Device file permission mask for devfs.");
 MODULE_PARM_SYNTAX(device_mode, "default:0666,base:8");
 #endif
+MODULE_ALIAS_CHARDEV_MAJOR(CONFIG_SND_MAJOR);
 
+/* this one holds the actual max. card number currently available.
+ * as default, it's identical with cards_limit option.  when more
+ * modules are loaded manually, this limit number increases, too.
+ */
 int snd_ecards_limit;
 
 static struct list_head snd_minors_hash[SNDRV_CARDS];
@@ -78,6 +83,8 @@ void snd_request_card(int card)
 {
 	int locked;
 
+	if (! current->fs->root)
+		return;
 	read_lock(&snd_card_rwlock);
 	locked = snd_cards_lock & (1 << card);
 	read_unlock(&snd_card_rwlock);
@@ -92,6 +99,8 @@ static void snd_request_other(int minor)
 {
 	char *str;
 
+	if (! current->fs->root)
+		return;
 	switch (minor) {
 	case SNDRV_MINOR_SEQUENCER:	str = "snd-seq";	break;
 	case SNDRV_MINOR_TIMER:		str = "snd-timer";	break;
@@ -221,8 +230,7 @@ int snd_register_device(int type, snd_card_t * card, int dev, snd_minor_t * reg,
 		return -EBUSY;
 	}
 	list_add_tail(&preg->list, &snd_minors_hash[SNDRV_MINOR_CARD(minor)]);
-
-	if (strncmp(name, "controlC", 8)) {	/* created in sound.c */
+	if (strncmp(name, "controlC", 8) || card->number >= cards_limit) {
 		devfs_mk_cdev(MKDEV(major, minor), S_IFCHR | device_mode, "snd/%s", name);
 		if (card)
 			device = card->dev;
@@ -257,7 +265,7 @@ int snd_unregister_device(int type, snd_card_t * card, int dev)
 		return -EINVAL;
 	}
 
-	if (strncmp(mptr->name, "controlC", 8)) {	/* created in sound.c */
+	if (strncmp(mptr->name, "controlC", 8) || card->number >= cards_limit) { /* created in sound.c */
 		devfs_remove("snd/%s", mptr->name);
 		class_simple_device_remove(MKDEV(major, minor));
 	}
@@ -303,7 +311,6 @@ int __init snd_minor_info_init(void)
 
 	entry = snd_info_create_module_entry(THIS_MODULE, "devices", NULL);
 	if (entry) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->c.text.read_size = PAGE_SIZE;
 		entry->c.text.read = snd_minor_info_read;
 		if (snd_info_register(entry) < 0) {

@@ -125,15 +125,11 @@ void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t 
 	}
 }
 
-static inline int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
+static inline snd_pcm_uframes_t snd_pcm_update_hw_ptr_pos(snd_pcm_substream_t *substream,
+							  snd_pcm_runtime_t *runtime)
 {
-	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_uframes_t pos;
-	snd_pcm_uframes_t old_hw_ptr, new_hw_ptr, hw_ptr_interrupt;
-	snd_pcm_uframes_t avail;
-	snd_pcm_sframes_t delta;
 
-	old_hw_ptr = runtime->status->hw_ptr;
 	pos = substream->ops->pointer(substream);
 	if (runtime->tstamp_mode & SNDRV_PCM_TSTAMP_MMAP)
 		snd_timestamp_now((snd_timestamp_t*)&runtime->status->tstamp, runtime->tstamp_timespec);
@@ -143,30 +139,14 @@ static inline int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream
 	} else
 #endif
 	snd_runtime_check(pos < runtime->buffer_size, return 0);
-
 	pos -= pos % runtime->min_align;
-	new_hw_ptr = runtime->hw_ptr_base + pos;
+	return pos;
+}
 
-	hw_ptr_interrupt = runtime->hw_ptr_interrupt + runtime->period_size;
-
-	delta = hw_ptr_interrupt - new_hw_ptr;
-	if (delta > 0) {
-		if ((snd_pcm_uframes_t)delta < runtime->buffer_size / 2) {
-			snd_printd("Unexpected hw_pointer value (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
-			return 0;
-		}
-		runtime->hw_ptr_base += runtime->buffer_size;
-		if (runtime->hw_ptr_base == runtime->boundary)
-			runtime->hw_ptr_base = 0;
-		new_hw_ptr = runtime->hw_ptr_base + pos;
-	}
-
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
-	    runtime->silence_size > 0)
-		snd_pcm_playback_silence(substream, new_hw_ptr);
-
-	runtime->status->hw_ptr = new_hw_ptr;
-	runtime->hw_ptr_interrupt = new_hw_ptr - new_hw_ptr % runtime->period_size;
+static inline int snd_pcm_update_hw_ptr_post(snd_pcm_substream_t *substream,
+					     snd_pcm_runtime_t *runtime)
+{
+	snd_pcm_uframes_t avail;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		avail = snd_pcm_playback_avail(runtime);
@@ -185,33 +165,64 @@ static inline int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream
 	return 0;
 }
 
+static inline int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_uframes_t pos;
+	snd_pcm_uframes_t new_hw_ptr, hw_ptr_interrupt;
+	snd_pcm_sframes_t delta;
+
+	pos = snd_pcm_update_hw_ptr_pos(substream, runtime);
+	if (runtime->period_size == runtime->buffer_size)
+		goto __next_buf;
+	new_hw_ptr = runtime->hw_ptr_base + pos;
+	hw_ptr_interrupt = runtime->hw_ptr_interrupt + runtime->period_size;
+
+	delta = hw_ptr_interrupt - new_hw_ptr;
+	if (delta > 0) {
+		if ((snd_pcm_uframes_t)delta < runtime->buffer_size / 2) {
+#ifdef CONFIG_SND_DEBUG
+			if (runtime->periods > 1)
+				snd_printd(KERN_ERR "Unexpected hw_pointer value [1] (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
+#endif
+			return 0;
+		}
+	      __next_buf:
+		runtime->hw_ptr_base += runtime->buffer_size;
+		if (runtime->hw_ptr_base == runtime->boundary)
+			runtime->hw_ptr_base = 0;
+		new_hw_ptr = runtime->hw_ptr_base + pos;
+	}
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
+	    runtime->silence_size > 0)
+		snd_pcm_playback_silence(substream, new_hw_ptr);
+
+	runtime->status->hw_ptr = new_hw_ptr;
+	runtime->hw_ptr_interrupt = new_hw_ptr - new_hw_ptr % runtime->period_size;
+
+	return snd_pcm_update_hw_ptr_post(substream, runtime);
+}
+
 /* CAUTION: call it with irq disabled */
 int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_uframes_t pos;
 	snd_pcm_uframes_t old_hw_ptr, new_hw_ptr;
-	snd_pcm_uframes_t avail;
 	snd_pcm_sframes_t delta;
 
 	old_hw_ptr = runtime->status->hw_ptr;
-	pos = substream->ops->pointer(substream);
-	if (runtime->tstamp_mode & SNDRV_PCM_TSTAMP_MMAP)
-		snd_timestamp_now((snd_timestamp_t*)&runtime->status->tstamp, runtime->tstamp_timespec);
-#ifdef CONFIG_SND_DEBUG
-	if (pos >= runtime->buffer_size) {
-		snd_printk(KERN_ERR "BUG: stream = %i, pos = 0x%lx, buffer size = 0x%lx, period size = 0x%lx\n", substream->stream, pos, runtime->buffer_size, runtime->period_size);
-	} else
-#endif
-	snd_runtime_check(pos < runtime->buffer_size, return 0);
-
-	pos -= pos % runtime->min_align;
+	pos = snd_pcm_update_hw_ptr_pos(substream, runtime);
 	new_hw_ptr = runtime->hw_ptr_base + pos;
 
 	delta = old_hw_ptr - new_hw_ptr;
 	if (delta > 0) {
 		if ((snd_pcm_uframes_t)delta < runtime->buffer_size / 2) {
-			snd_printd("Unexpected hw_pointer value (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
+#ifdef CONFIG_SND_DEBUG
+			if (runtime->periods > 2)
+				snd_printd(KERN_ERR "Unexpected hw_pointer value [2] (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
+#endif
 			return 0;
 		}
 		runtime->hw_ptr_base += runtime->buffer_size;
@@ -222,23 +233,10 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
 	    runtime->silence_size > 0)
 		snd_pcm_playback_silence(substream, new_hw_ptr);
+
 	runtime->status->hw_ptr = new_hw_ptr;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		avail = snd_pcm_playback_avail(runtime);
-	else
-		avail = snd_pcm_capture_avail(runtime);
-	if (avail > runtime->avail_max)
-		runtime->avail_max = avail;
-	if (avail >= runtime->stop_threshold) {
-		snd_pcm_stop(substream,
-			     runtime->status->state == SNDRV_PCM_STATE_DRAINING ?
-			     SNDRV_PCM_STATE_SETUP : SNDRV_PCM_STATE_XRUN);
-		return -EPIPE;
-	}
-	if (avail >= runtime->control->avail_min)
-		wake_up(&runtime->sleep);
-	return 0;
+	return snd_pcm_update_hw_ptr_post(substream, runtime);
 }
 
 /**

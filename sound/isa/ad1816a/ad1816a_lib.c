@@ -593,20 +593,24 @@ int snd_ad1816a_create(snd_card_t *card,
 	chip->dma2 = -1;
 
 	if ((chip->res_port = request_region(port, 16, "AD1816A")) == NULL) {
+		snd_printk(KERN_ERR "ad1816a: can't grab port 0x%lx\n", port);
 		snd_ad1816a_free(chip);
 		return -EBUSY;
 	}
 	if (request_irq(irq, snd_ad1816a_interrupt, SA_INTERRUPT, "AD1816A", (void *) chip)) {
+		snd_printk(KERN_ERR "ad1816a: can't grab IRQ %d\n", irq);
 		snd_ad1816a_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = irq;
 	if (request_dma(dma1, "AD1816A - 1")) {
+		snd_printk(KERN_ERR "ad1816a: can't grab DMA1 %d\n", dma1);
 		snd_ad1816a_free(chip);
 		return -EBUSY;
 	}
 	chip->dma1 = dma1;
 	if (request_dma(dma2, "AD1816A - 2")) {
+		snd_printk(KERN_ERR "ad1816a: can't grab DMA2 %d\n", dma2);
 		snd_ad1816a_free(chip);
 		return -EBUSY;
 	}

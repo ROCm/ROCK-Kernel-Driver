@@ -1,6 +1,6 @@
 /*
  *   ALSA sequencer Ports 
- *   Copyright (c) 1998 by Frank van de Pol <fvdpol@home.nl>
+ *   Copyright (c) 1998 by Frank van de Pol <fvdpol@coil.demon.nl>
  *
  *
  *   This program is free software; you can redistribute it and/or modify

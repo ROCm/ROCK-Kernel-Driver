@@ -43,6 +43,8 @@
 #include "amp.h"
 #include "revo.h"
 #include "aureon.h"
+#include "prodigy.h"
+
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("ICEnsemble ICE1724 (Envy24HT)");
@@ -52,6 +54,7 @@ MODULE_DEVICES("{"
 	       REVO_DEVICE_DESC
 	       AMP_AUDIO2000_DEVICE_DESC
 	       AUREON_DEVICE_DESC
+	       PRODIGY_DEVICE_DESC
 		"{VIA,VT1724},"
 		"{ICEnsemble,Generic ICE1724},"
 		"{ICEnsemble,Generic Envy24HT}}");
@@ -908,17 +911,21 @@ static int __devinit snd_vt1724_ac97_mixer(ice1712_t * ice)
 	int err;
 
 	if (! (ice->eeprom.data[ICE_EEP2_ACLINK] & VT1724_CFG_PRO_I2S)) {
+		ac97_bus_t bus, *pbus;
 		ac97_t ac97;
 		/* cold reset */
 		outb(inb(ICEMT1724(ice, AC97_CMD)) | 0x80, ICEMT1724(ice, AC97_CMD));
 		mdelay(5); /* FIXME */
 		outb(inb(ICEMT1724(ice, AC97_CMD)) & ~0x80, ICEMT1724(ice, AC97_CMD));
 
+		memset(&bus, 0, sizeof(bus));
+		bus.write = snd_vt1724_ac97_write;
+		bus.read = snd_vt1724_ac97_read;
+		if ((err = snd_ac97_bus(ice->card, &bus, &pbus)) < 0)
+			return err;
 		memset(&ac97, 0, sizeof(ac97));
-		ac97.write = snd_vt1724_ac97_write;
-		ac97.read = snd_vt1724_ac97_read;
 		ac97.private_data = ice;
-		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0)
+		if ((err = snd_ac97_mixer(pbus, &ac97, &ice->ac97)) < 0)
 			printk(KERN_WARNING "ice1712: cannot initialize pro ac97, skipped\n");
 		else
 			return 0;
@@ -975,7 +982,7 @@ static void __devinit snd_vt1724_proc_init(ice1712_t * ice)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(ice->card, "ice1724", &entry))
-		snd_info_set_text_ops(entry, ice, snd_vt1724_proc_read);
+		snd_info_set_text_ops(entry, ice, 1024, snd_vt1724_proc_read);
 }
 
 /*
@@ -1576,6 +1583,7 @@ static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
 	snd_vt1724_revo_cards,
 	snd_vt1724_amp_cards, 
 	snd_vt1724_aureon_cards,
+	snd_vt1724_prodigy_cards,
 	0,
 };
 
@@ -1793,7 +1801,6 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
         /* enable PCI device */
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
-	pci_set_dma_mask(pci, 0xffffffff); 
 
 	ice = snd_magic_kcalloc(ice1712_t, 0, GFP_KERNEL);
 	if (ice == NULL)

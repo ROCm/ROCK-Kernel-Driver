@@ -31,6 +31,7 @@
 #include <sound/hwdep.h>
 #include <sound/cs4231.h>
 #include <sound/mpu401.h>
+#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #include <sound/sscape_ioctl.h>
@@ -616,10 +617,10 @@ static int sscape_upload_microcode(struct soundscape *sscape,
 	 */
 	if (get_user(code, &mc->code))
 		return -EFAULT;
-	if ((err = verify_area(VERIFY_READ, code, 65536)) != 0)
+	if ((err = verify_area(VERIFY_READ, code, SSCAPE_MICROCODE_SIZE)) != 0)
 		return err;
 
-	if ((ret = upload_dma_data(sscape, code, 65536)) == 0) {
+	if ((ret = upload_dma_data(sscape, code, SSCAPE_MICROCODE_SIZE)) == 0) {
 		snd_printk(KERN_INFO "sscape: MIDI firmware loaded\n");
 	}
 
@@ -1173,6 +1174,7 @@ static int __devinit create_sscape(const struct params *params, snd_card_t **rca
 	 * can detect and control this hardware ...
 	 */
 	if ((io_res = request_region(params->port, 8, "SoundScape")) == NULL) {
+		snd_printk(KERN_ERR "sscape: can't grab port 0x%x\n", params->port);
 		return -EBUSY;
 	}
 
@@ -1180,6 +1182,7 @@ static int __devinit create_sscape(const struct params *params, snd_card_t **rca
 	 * Grab both DMA channels (OK, only one for now) ...
 	 */
 	if ((err = request_dma(params->dma1, "SoundScape")) < 0) {
+		snd_printk(KERN_ERR "sscape: can't grab DMA %d\n", params->dma1);
 		goto _release_region;
 	}
 
@@ -1538,8 +1541,8 @@ static int __init builtin_sscape_setup(char *str)
 		return 0;
 
 	(void)((get_option(&str, &index[nr_dev]) == 2) &&
-	       (get_option(&str, (int*)&id[nr_dev]) == 2) &&
-	       (get_option(&str, (int*)&port[nr_dev]) == 2) &&
+	       (get_id(&str, &id[nr_dev]) == 2) &&
+	       (get_option_long(&str, &port[nr_dev]) == 2) &&
 	       (get_option(&str, &irq[nr_dev]) == 2) &&
 	       (get_option(&str, &mpu_irq[nr_dev]) == 2) &&
 	       (get_option(&str, &dma[nr_dev]) == 2)); 

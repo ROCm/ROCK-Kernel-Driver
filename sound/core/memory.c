@@ -231,7 +231,6 @@ int __init snd_memory_info_init(void)
 
 	entry = snd_info_create_module_entry(THIS_MODULE, "meminfo", NULL);
 	if (entry) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->c.text.read_size = 256;
 		entry->c.text.read = snd_memory_info_read;
 		if (snd_info_register(entry) < 0) {

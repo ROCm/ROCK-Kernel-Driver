@@ -1398,11 +1398,11 @@ static int __devinit snd_es1938_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
         /* check, if we can restrict PCI DMA transfers to 24 bits */
-        if (!pci_dma_supported(pci, 0x00ffffff)) {
+	if (pci_set_dma_mask(pci, 0x00ffffff) < 0 ||
+	    pci_set_consistent_dma_mask(pci, 0x00ffffff) < 0) {
                 snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
                 return -ENXIO;
         }
-	pci_set_dma_mask(pci, 0x00ffffff);
 
 	chip = snd_magic_kcalloc(es1938_t, 0, GFP_KERNEL);
 	if (chip == NULL)

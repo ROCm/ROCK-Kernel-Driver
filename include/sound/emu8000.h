@@ -114,7 +114,7 @@ void snd_emu8000_init_fm(emu8000_t *emu);
 void snd_emu8000_update_chorus_mode(emu8000_t *emu);
 void snd_emu8000_update_reverb_mode(emu8000_t *emu);
 void snd_emu8000_update_equalizer(emu8000_t *emu);
-int snd_emu8000_load_chorus_fx(emu8000_t *emu, int mode, const void *buf, long len);
-int snd_emu8000_load_reverb_fx(emu8000_t *emu, int mode, const void *buf, long len);
+int snd_emu8000_load_chorus_fx(emu8000_t *emu, int mode, const void __user *buf, long len);
+int snd_emu8000_load_reverb_fx(emu8000_t *emu, int mode, const void __user *buf, long len);
 
 #endif /* __SOUND_EMU8000_H */

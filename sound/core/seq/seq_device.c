@@ -132,6 +132,9 @@ void snd_seq_device_load_drivers(void)
 #ifdef CONFIG_KMOD
 	struct list_head *head;
 
+	if (! current->fs->root)
+		return;
+
 	down(&ops_mutex);
 	list_for_each(head, &opslist) {
 		ops_list_t *ops = list_entry(head, ops_list_t, list);

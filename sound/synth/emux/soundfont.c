@@ -43,14 +43,14 @@ static snd_sf_zone_t *sf_zone_new(snd_sf_list_t *sflist, snd_soundfont_t *sf);
 static void set_sample_counter(snd_sf_list_t *sflist, snd_soundfont_t *sf, snd_sf_sample_t *sp);
 static snd_sf_sample_t *sf_sample_new(snd_sf_list_t *sflist, snd_soundfont_t *sf);
 static void sf_sample_delete(snd_sf_list_t *sflist, snd_soundfont_t *sf, snd_sf_sample_t *sp);
-static int load_map(snd_sf_list_t *sflist, const void *data, int count);
-static int load_info(snd_sf_list_t *sflist, const void *data, long count);
+static int load_map(snd_sf_list_t *sflist, const void __user *data, int count);
+static int load_info(snd_sf_list_t *sflist, const void __user *data, long count);
 static int remove_info(snd_sf_list_t *sflist, snd_soundfont_t *sf, int bank, int instr);
 static void init_voice_info(soundfont_voice_info_t *avp);
 static void init_voice_parm(soundfont_voice_parm_t *pp);
 static snd_sf_sample_t *set_sample(snd_soundfont_t *sf, soundfont_voice_info_t *avp);
 static snd_sf_sample_t *find_sample(snd_soundfont_t *sf, int sample_id);
-static int load_data(snd_sf_list_t *sflist, const void *data, long count);
+static int load_data(snd_sf_list_t *sflist, const void __user *data, long count);
 static void rebuild_presets(snd_sf_list_t *sflist);
 static void add_preset(snd_sf_list_t *sflist, snd_sf_zone_t *cur);
 static void delete_preset(snd_sf_list_t *sflist, snd_sf_zone_t *zp);
@@ -111,7 +111,7 @@ snd_soundfont_close_check(snd_sf_list_t *sflist, int client)
  * it wants to do with it.
  */
 int
-snd_soundfont_load(snd_sf_list_t *sflist, const void *data, long count, int client)
+snd_soundfont_load(snd_sf_list_t *sflist, const void __user *data, long count, int client)
 {
 	soundfont_patch_info_t patch;
 	unsigned long flags;
@@ -211,7 +211,7 @@ is_special_type(int type)
 
 /* open patch; create sf list */
 static int
-open_patch(snd_sf_list_t *sflist, const char *data, int count, int client)
+open_patch(snd_sf_list_t *sflist, const char __user *data, int count, int client)
 {
 	soundfont_open_parm_t parm;
 	snd_soundfont_t *sf;
@@ -394,7 +394,7 @@ sf_sample_delete(snd_sf_list_t *sflist, snd_soundfont_t *sf, snd_sf_sample_t *sp
 
 /* load voice map */
 static int
-load_map(snd_sf_list_t *sflist, const void *data, int count)
+load_map(snd_sf_list_t *sflist, const void __user *data, int count)
 {
 	snd_sf_zone_t *zp, *prevp;
 	snd_soundfont_t *sf;
@@ -490,7 +490,7 @@ remove_info(snd_sf_list_t *sflist, snd_soundfont_t *sf, int bank, int instr)
  * open soundfont.
  */
 static int
-load_info(snd_sf_list_t *sflist, const void *data, long count)
+load_info(snd_sf_list_t *sflist, const void __user *data, long count)
 {
 	snd_soundfont_t *sf;
 	snd_sf_zone_t *zone;
@@ -674,7 +674,7 @@ find_sample(snd_soundfont_t *sf, int sample_id)
  * routine.
  */
 static int
-load_data(snd_sf_list_t *sflist, const void *data, long count)
+load_data(snd_sf_list_t *sflist, const void __user *data, long count)
 {
 	snd_soundfont_t *sf;
 	soundfont_sample_info_t sample_info;
@@ -912,7 +912,7 @@ int snd_sf_vol_table[128] = {
 
 /* load GUS patch */
 static int
-load_guspatch(snd_sf_list_t *sflist, const char *data, long count, int client)
+load_guspatch(snd_sf_list_t *sflist, const char __user *data, long count, int client)
 {
 	struct patch_info patch;
 	snd_soundfont_t *sf;
@@ -1085,7 +1085,7 @@ load_guspatch(snd_sf_list_t *sflist, const char *data, long count, int client)
 
 /* load GUS patch */
 int
-snd_soundfont_load_guspatch(snd_sf_list_t *sflist, const char *data,
+snd_soundfont_load_guspatch(snd_sf_list_t *sflist, const char __user *data,
 			    long count, int client)
 {
 	int rc;

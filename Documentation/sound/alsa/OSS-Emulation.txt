@@ -152,8 +152,7 @@ available:
 	direct		don't use plugins
 	block		force block open mode
 	non-block	force non-block open mode
-	whole-frag	write only whole fragments (optimization affecting
-			playback only)
+	partial-frag	write also partial fragments (affects playback only)
 	no-silence	do not fill silence ahead to avoid clicks
 
 The disable option is useful when one stream direction (playback or

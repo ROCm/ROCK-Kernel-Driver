@@ -36,7 +36,7 @@ static void sysex(snd_emux_t *emu, char *buf, int len, int parsed, snd_midi_chan
 #ifdef CONFIG_SND_SEQUENCER_OSS
 static int oss_ioctl(snd_emux_t *emu, int cmd, int p1, int p2);
 #endif
-static int load_fx(snd_emux_t *emu, int type, int mode, const void *buf, long len);
+static int load_fx(snd_emux_t *emu, int type, int mode, const void __user *buf, long len);
 
 static void set_pitch(emu8000_t *hw, snd_emux_voice_t *vp);
 static void set_volume(emu8000_t *hw, snd_emux_voice_t *vp);
@@ -523,7 +523,7 @@ oss_ioctl(snd_emux_t *emu, int cmd, int p1, int p2)
  */
 
 static int
-load_fx(snd_emux_t *emu, int type, int mode, const void *buf, long len)
+load_fx(snd_emux_t *emu, int type, int mode, const void __user *buf, long len)
 {
 	emu8000_t *hw;
 	hw = snd_magic_cast(emu8000_t, emu->hw, return -EINVAL);

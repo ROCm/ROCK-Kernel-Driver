@@ -659,15 +659,18 @@ int snd_es1688_create(snd_card_t * card,
 	chip->dma8 = -1;
 	
 	if ((chip->res_port = request_region(port + 4, 12, "ES1688")) == NULL) {
+		snd_printk(KERN_ERR "es1688: can't grab port 0x%lx\n", port + 4);
 		snd_es1688_free(chip);
 		return -EBUSY;
 	}
 	if (request_irq(irq, snd_es1688_interrupt, SA_INTERRUPT, "ES1688", (void *) chip)) {
+		snd_printk(KERN_ERR "es1688: can't grab IRQ %d\n", irq);
 		snd_es1688_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = irq;
 	if (request_dma(dma8, "ES1688")) {
+		snd_printk(KERN_ERR "es1688: can't grab DMA8 %d\n", dma8);
 		snd_es1688_free(chip);
 		return -EBUSY;
 	}
