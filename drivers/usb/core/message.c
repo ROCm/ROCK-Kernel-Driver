@@ -17,6 +17,8 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/timer.h>
+#include <linux/ctype.h>
+#include <linux/device.h>
 #include <asm/byteorder.h>
 
 #include "hcd.h"	/* for usbcore internals */
@@ -623,6 +625,20 @@ int usb_get_string(struct usb_device *dev, unsigned short langid,
 	return result;
 }
 
+static void usb_try_string_workarounds(unsigned char *buf, int *length)
+{
+	int newlength, oldlength = *length;
+
+	for (newlength = 2; newlength + 1 < oldlength; newlength += 2)
+		if (!isprint(buf[newlength]) || buf[newlength + 1])
+			break;
+
+	if (newlength > 2) {
+		buf[0] = newlength;
+		*length = newlength;
+	}
+}
+
 static int usb_string_sub(struct usb_device *dev, unsigned int langid,
 		unsigned int index, unsigned char *buf)
 {
@@ -634,19 +650,26 @@ static int usb_string_sub(struct usb_device *dev, unsigned int langid,
 
 	/* If that failed try to read the descriptor length, then
 	 * ask for just that many bytes */
-	if (rc < 0) {
+	if (rc < 2) {
 		rc = usb_get_string(dev, langid, index, buf, 2);
 		if (rc == 2)
 			rc = usb_get_string(dev, langid, index, buf, buf[0]);
 	}
 
-	if (rc >= 0) {
+	if (rc >= 2) {
+		if (!buf[0] && !buf[1])
+			usb_try_string_workarounds(buf, &rc);
+
 		/* There might be extra junk at the end of the descriptor */
 		if (buf[0] < rc)
 			rc = buf[0];
-		if (rc < 2)
-			rc = -EINVAL;
+
+		rc = rc - (rc & 1); /* force a multiple of two */
 	}
+
+	if (rc < 2)
+		rc = (rc < 0 ? rc : -EINVAL);
+
 	return rc;
 }
 
@@ -723,6 +746,9 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	}
 	buf[idx] = 0;
 	err = idx;
+
+	if (tbuf[1] != USB_DT_STRING)
+		dev_dbg(&dev->dev, "wrong descriptor type %02x for string %d (\"%s\")\n", tbuf[1], index, buf);
 
  errout:
 	kfree(tbuf);
