@@ -484,8 +484,7 @@ static void send_next(struct ti_lynx *lynx, int what)
         }
 
         packet = driver_packet(d->queue.next);
-        list_del(&packet->driver_list);
-        list_add_tail(&packet->driver_list, &d->pcl_queue);
+	list_move_tail(&packet->driver_list, &d->pcl_queue);
 
         d->header_dma = pci_map_single(lynx->dev, packet->header,
                                        packet->header_size, PCI_DMA_TODEVICE);
@@ -500,11 +499,9 @@ static void send_next(struct ti_lynx *lynx, int what)
         pcl.next = PCL_NEXT_INVALID;
         pcl.async_error_next = PCL_NEXT_INVALID;
         pcl.pcl_status = 0;
-#ifdef __BIG_ENDIAN
         pcl.buffer[0].control = packet->speed_code << 14 | packet->header_size;
-#else
-        pcl.buffer[0].control = packet->speed_code << 14 | packet->header_size 
-                | PCL_BIGENDIAN;
+#ifdef __BIG_ENDIAN
+        pcl.buffer[0].control |= PCL_BIGENDIAN;
 #endif
         pcl.buffer[0].pointer = d->header_dma;
         pcl.buffer[1].control = PCL_LAST_BUFF | packet->data_size;
@@ -1698,13 +1695,13 @@ static int __devinit add_card(struct pci_dev *dev,
 
         pcl.next = PCL_NEXT_INVALID;
         pcl.async_error_next = PCL_NEXT_INVALID;
-#ifdef __BIG_ENDIAN
+
         pcl.buffer[0].control = PCL_CMD_RCV | 16;
-        pcl.buffer[1].control = PCL_LAST_BUFF | 4080;
-#else
-        pcl.buffer[0].control = PCL_CMD_RCV | PCL_BIGENDIAN | 16;
-        pcl.buffer[1].control = PCL_LAST_BUFF | 4080;
+#ifdef __BIG_ENDIAN
+	pcl.buffer[0].control |= PCL_BIGENDIAN;
 #endif
+	pcl.buffer[1].control = PCL_LAST_BUFF | 4080;
+
         pcl.buffer[0].pointer = lynx->rcv_page_dma;
         pcl.buffer[1].pointer = lynx->rcv_page_dma + 16;
         put_pcl(lynx, lynx->rcv_pcl, &pcl);

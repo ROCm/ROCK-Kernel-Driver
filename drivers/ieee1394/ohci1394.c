@@ -162,7 +162,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s: fw-host%d: " fmt "\n" , OHCI1394_DRIVER_NAME, ohci->host->id , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 1191 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1193 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -367,32 +367,6 @@ static void ohci_soft_reset(struct ti_ohci *ohci) {
 	DBGMSG ("Soft reset finished");
 }
 
-static int run_context(struct ti_ohci *ohci, int reg, char *msg)
-{
-	u32 nodeId;
-
-	/* check that the node id is valid */
-	nodeId = reg_read(ohci, OHCI1394_NodeID);
-	if (!(nodeId&0x80000000)) {
-		PRINT(KERN_ERR,
-		      "Running dma failed because Node ID is not valid");
-		return -1;
-	}
-
-	/* check that the node number != 63 */
-	if ((nodeId&0x3f)==63) {
-		PRINT(KERN_ERR,
-		      "Running dma failed because Node ID == 63");
-		return -1;
-	}
-
-	/* Run the dma context */
-	reg_write(ohci, reg, 0x8000);
-
-	if (msg) PRINT(KERN_DEBUG, "%s", msg);
-
-	return 0;
-}
 
 /* Generate the dma receive prgs and start the context */
 static void initialize_dma_rcv_ctx(struct dma_rcv_ctx *d, int generate_irq)
@@ -831,7 +805,7 @@ static void insert_packet(struct ti_ohci *ohci,
 
 	/* queue the packet in the appropriate context queue */
 	list_add_tail(&packet->driver_list, &d->fifo_list);
-	d->prg_ind = (d->prg_ind+1)%d->num_desc;
+	d->prg_ind = (d->prg_ind + 1) % d->num_desc;
 }
 
 /*
@@ -840,45 +814,53 @@ static void insert_packet(struct ti_ohci *ohci,
  *
  * The function MUST be called with the d->lock held.
  */ 
-static int dma_trm_flush(struct ti_ohci *ohci, struct dma_trm_ctx *d)
+static void dma_trm_flush(struct ti_ohci *ohci, struct dma_trm_ctx *d)
 {
-	struct hpsb_packet *p;
-	int idx,z;
-
-	if (list_empty(&d->pending_list) || d->free_prgs == 0)
-		return 0;
-
-	p = driver_packet(d->pending_list.next);
-	idx = d->prg_ind;
-	z = (p->data_size) ? 3 : 2;
+	struct hpsb_packet *packet, *ptmp;
+	int idx = d->prg_ind;
+	int z = 0;
 
 	/* insert the packets into the dma fifo */
-	while (d->free_prgs > 0 && !list_empty(&d->pending_list)) {
-		struct hpsb_packet *p = driver_packet(d->pending_list.next);
-		list_del_init(&p->driver_list);
-		insert_packet(ohci, d, p);
+	list_for_each_entry_safe(packet, ptmp, &d->pending_list, driver_list) {
+		if (!d->free_prgs)
+			break;
+
+		/* For the first packet only */
+		if (!z)
+			z = (packet->data_size) ? 3 : 2;
+
+		/* Insert the packet */
+		list_del_init(&packet->driver_list);
+		insert_packet(ohci, d, packet);
 	}
 
-	if (d->free_prgs == 0)
-		DBGMSG("Transmit DMA FIFO ctx=%d is full... waiting", d->ctx);
+	/* Nothing must have been done, either no free_prgs or no packets */
+	if (z == 0)
+		return;
 
 	/* Is the context running ? (should be unless it is 
 	   the first packet to be sent in this context) */
 	if (!(reg_read(ohci, d->ctrlSet) & 0x8000)) {
+		u32 nodeId = reg_read(ohci, OHCI1394_NodeID);
+
 		DBGMSG("Starting transmit DMA ctx=%d",d->ctx);
-		reg_write(ohci, d->cmdPtr, d->prg_bus[idx]|z);
-		run_context(ohci, d->ctrlSet, NULL);
-	}
-	else {
+		reg_write(ohci, d->cmdPtr, d->prg_bus[idx] | z);
+
+		/* Check that the node id is valid, and not 63 */
+		if (!(nodeId & 0x80000000) || (nodeId & 0x3f) == 63)
+			PRINT(KERN_ERR, "Running dma failed because Node ID is not valid");
+		else
+			reg_write(ohci, d->ctrlSet, 0x8000);
+	} else {
 		/* Wake up the dma context if necessary */
-		if (!(reg_read(ohci, d->ctrlSet) & 0x400)) {
+		if (!(reg_read(ohci, d->ctrlSet) & 0x400))
 			DBGMSG("Waking transmit DMA ctx=%d",d->ctx);
-		}
 
 		/* do this always, to avoid race condition */
 		reg_write(ohci, d->ctrlSet, 0x1000);
 	}
-	return 1;
+
+	return;
 }
 
 /* Transmission of an async or iso packet */
@@ -2234,6 +2216,7 @@ static void dma_trm_reset(struct dma_trm_ctx *d)
 	unsigned long flags;
 	LIST_HEAD(packet_list);
 	struct ti_ohci *ohci = d->ohci;
+	struct hpsb_packet *packet, *ptmp;
 
 	ohci1394_stop_context(ohci, d->ctrlClear, NULL);
 
@@ -2254,15 +2237,16 @@ static void dma_trm_reset(struct dma_trm_ctx *d)
 
 	spin_unlock_irqrestore(&d->lock, flags);
 
-	/* Now process subsystem callbacks for the packets from the
-	 * context. */
+	if (list_empty(&packet_list))
+		return;
 
-	while (!list_empty(&packet_list)) {
-		struct hpsb_packet *p = driver_packet(packet_list.next);
-		PRINT(KERN_INFO,
-		      "AT dma reset ctx=%d, aborting transmission", d->ctx);
-		list_del_init(&p->driver_list);
-		hpsb_packet_sent(ohci->host, p, ACKX_ABORTED);
+	PRINT(KERN_INFO, "AT dma reset ctx=%d, aborting transmission", d->ctx);
+
+	/* Now process subsystem callbacks for the packets from this
+	 * context. */
+	list_for_each_entry_safe(packet, ptmp, &packet_list, driver_list) {
+		list_del_init(&packet->driver_list);
+		hpsb_packet_sent(ohci->host, packet, ACKX_ABORTED);
 	}
 }
 
@@ -2746,15 +2730,14 @@ static void dma_trm_tasklet (unsigned long data)
 {
 	struct dma_trm_ctx *d = (struct dma_trm_ctx*)data;
 	struct ti_ohci *ohci = (struct ti_ohci*)(d->ohci);
-	struct hpsb_packet *packet;
+	struct hpsb_packet *packet, *ptmp;
 	unsigned long flags;
 	u32 status, ack;
         size_t datasize;
 
 	spin_lock_irqsave(&d->lock, flags);
 
-	while (!list_empty(&d->fifo_list)) {
-		packet = driver_packet(d->fifo_list.next);
+	list_for_each_entry_safe(packet, ptmp, &d->fifo_list, driver_list) {
                 datasize = packet->data_size;
 		if (datasize && packet->type != hpsb_raw)
 			status = le32_to_cpu(
