@@ -501,7 +501,7 @@ repeat_lock_task:
 			}
 			success = 1;
 		}
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	       	else
 			if (unlikely(kick) && task_running(rq, p) && (p->thread_info->cpu != smp_processor_id()))
 				smp_send_reschedule(p->thread_info->cpu);

@@ -89,6 +89,8 @@ __register_chrdev_region(unsigned int major, unsigned int baseminor,
 	if (cd == NULL)
 		return ERR_PTR(-ENOMEM);
 
+	memset(cd, 0, sizeof(struct char_device_struct));
+
 	write_lock_irq(&chrdevs_lock);
 
 	/* temporary */
