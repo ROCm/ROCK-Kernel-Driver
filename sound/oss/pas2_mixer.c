@@ -31,7 +31,7 @@ extern int     *pas_osp;
 extern int      pas_audiodev;
 
 static int      rec_devices = (SOUND_MASK_MIC);		/* Default recording source */
-static int      mode_control = 0;
+static int      mode_control;
 
 #define POSSIBLE_RECORDING_DEVICES	(SOUND_MASK_SYNTH | SOUND_MASK_SPEAKER | SOUND_MASK_LINE | SOUND_MASK_MIC | \
 					 SOUND_MASK_CD | SOUND_MASK_ALTPCM)

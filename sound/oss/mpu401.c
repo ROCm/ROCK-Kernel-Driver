@@ -109,12 +109,9 @@ static inline void write_data(struct mpu_config *devc, unsigned char byte)
 #define	MPU_RESET	0xFF
 #define	UART_MODE_ON	0x3F
 
-static struct mpu_config dev_conf[MAX_MIDI_DEV] =
-{
-	{0}
-};
+static struct mpu_config dev_conf[MAX_MIDI_DEV];
 
-static int n_mpu_devs = 0;
+static int n_mpu_devs;
 
 static int reset_mpu401(struct mpu_config *devc);
 static void set_uart_mode(int dev, struct mpu_config *devc, int arg);

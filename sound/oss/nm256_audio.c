@@ -533,7 +533,7 @@ nm256_interrupt (int irq, void *dev_id, struct pt_regs *dummy)
 {
     struct nm256_info *card = (struct nm256_info *)dev_id;
     u16 status;
-    static int badintrcount = 0;
+    static int badintrcount;
     int handled = 0;
 
     if ((card == NULL) || (card->magsig != NM_MAGIC_SIG)) {
@@ -636,7 +636,7 @@ nm256_interrupt_zx (int irq, void *dev_id, struct pt_regs *dummy)
 {
     struct nm256_info *card = (struct nm256_info *)dev_id;
     u32 status;
-    static int badintrcount = 0;
+    static int badintrcount;
     int handled = 0;
 
     if ((card == NULL) || (card->magsig != NM_MAGIC_SIG)) {

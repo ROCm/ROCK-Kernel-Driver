@@ -2522,10 +2522,10 @@ static /*const*/ struct file_operations es1370_midi_fops = {
 /* maximum number of devices; only used for command line params */
 #define NR_DEVICE 5
 
-static int lineout[NR_DEVICE] = { 0, };
-static int micbias[NR_DEVICE] = { 0, };
+static int lineout[NR_DEVICE];
+static int micbias[NR_DEVICE];
 
-static unsigned int devindex = 0;
+static unsigned int devindex;
 
 MODULE_PARM(lineout, "1-" __MODULE_STRING(NR_DEVICE) "i");
 MODULE_PARM_DESC(lineout, "if 1 the LINE input is converted to LINE out");

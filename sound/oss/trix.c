@@ -29,15 +29,15 @@
 
 #include "trix_boot.h"
 
-static int kilroy_was_here = 0;	/* Don't detect twice */
-static int sb_initialized = 0;
-static int mpu_initialized = 0;
+static int kilroy_was_here;	/* Don't detect twice */
+static int sb_initialized;
+static int mpu_initialized;
 
-static int *trix_osp = NULL;
+static int *trix_osp;
 
-static int mpu = 0;
+static int mpu;
 
-static int joystick=0;
+static int joystick;
 
 static unsigned char trix_read(int addr)
 {
@@ -426,7 +426,7 @@ static struct address_info cfg;
 static struct address_info cfg2;
 static struct address_info cfg_mpu;
 
-static int sb = 0;
+static int sb;
 static int fw_load;
 
 static int __initdata io	= -1;

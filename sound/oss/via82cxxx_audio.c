@@ -335,7 +335,7 @@ struct via_info {
 
 
 /* number of cards, used for assigning unique numbers to cards */
-static unsigned via_num_cards = 0;
+static unsigned via_num_cards;
 
 
 
@@ -3400,7 +3400,7 @@ static int __init via_init_one (struct pci_dev *pdev, const struct pci_device_id
 #endif
 	int rc;
 	struct via_info *card;
-	static int printed_version = 0;
+	static int printed_version;
 
 	DPRINTK ("ENTER\n");
 

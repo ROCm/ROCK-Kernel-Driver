@@ -34,16 +34,16 @@
 #define PCM_DAC	1
 #define PCM_ADC	2
 
-static unsigned long pcm_speed = 0;	/* sampling rate */
+static unsigned long pcm_speed; 	/* sampling rate */
 static unsigned char pcm_channels = 1;	/* channels (1 or 2) */
 static unsigned char pcm_bits = 8;	/* bits/sample (8 or 16) */
-static unsigned char pcm_filter = 0;	/* filter FLAG */
+static unsigned char pcm_filter;	/* filter FLAG */
 static unsigned char pcm_mode = PCM_NON;
-static unsigned long pcm_count = 0;
+static unsigned long pcm_count;
 static unsigned short pcm_bitsok = 8;	/* mask of OK bits */
-static int      pcm_busy = 0;
+static int      pcm_busy;
 int             pas_audiodev = -1;
-static int      open_mode = 0;
+static int      open_mode;
 
 extern spinlock_t pas_lock;
 

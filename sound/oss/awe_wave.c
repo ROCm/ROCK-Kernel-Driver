@@ -99,9 +99,9 @@ struct _awe_sample_list {
 };
 
 /* sample and information table */
-static int current_sf_id = 0;	/* current number of fonts */
-static int locked_sf_id = 0;	/* locked position */
-static sf_list *sfhead = NULL, *sftail = NULL;	/* linked-lists */
+static int current_sf_id;	/* current number of fonts */
+static int locked_sf_id;	/* locked position */
+static sf_list *sfhead, *sftail;	/* linked-lists */
 
 #define awe_free_mem_ptr() (sftail ? sftail->mem_ptr : 0)
 #define awe_free_info() (sftail ? sftail->num_info : 0)
@@ -206,7 +206,7 @@ int memsize = AWE_DEFAULT_MEM_SIZE; /* memory size in Kbytes */
 #ifdef __ISAPNP__
 static int isapnp = -1;
 #else
-static int isapnp = 0;
+static int isapnp;
 #endif
 
 MODULE_AUTHOR("Takashi Iwai <iwai@ww.uni-erlangen.de>");
@@ -226,10 +226,10 @@ static int awe_mem_start = AWE_DRAM_OFFSET;
 /* maximum channels for playing */
 static int awe_max_voices = AWE_MAX_VOICES;
 
-static int patch_opened = 0;		/* sample already loaded? */
+static int patch_opened;		/* sample already loaded? */
 
 static char atten_relative = FALSE;
-static short atten_offset = 0;
+static short atten_offset;
 
 static int awe_present = FALSE;		/* awe device present? */
 static int awe_busy = FALSE;		/* awe device opened? */
@@ -246,7 +246,7 @@ static int playing_mode = AWE_PLAY_INDIRECT;
 #define SINGLE_LAYER_MODE()	(playing_mode == AWE_PLAY_INDIRECT || playing_mode == AWE_PLAY_DIRECT)
 #define MULTI_LAYER_MODE()	(playing_mode == AWE_PLAY_MULTI || playing_mode == AWE_PLAY_MULTI2)
 
-static int current_alloc_time = 0;	/* voice allocation index for channel mode */
+static int current_alloc_time;  	/* voice allocation index for channel mode */
 
 static struct synth_info awe_info = {
 	"AWE32 Synth",		/* name */
@@ -5271,10 +5271,10 @@ static void __exit unload_midiemu(void)
 static int midi_opened = FALSE;
 
 static int midi_mode;
-static int coarsetune = 0, finetune = 0;
+static int coarsetune, finetune;
 
 static int xg_mapping = TRUE;
-static int xg_bankmode = 0;
+static int xg_bankmode;
 
 /* effect sensitivity */
 

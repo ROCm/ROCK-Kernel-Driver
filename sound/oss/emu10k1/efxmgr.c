@@ -123,7 +123,7 @@ void emu10k1_mute_irqhandler(struct emu10k1_card *card)
 {
 	int oss_channel = VOLCTRL_CHANNEL;
 	int left, right;
-	static int val = 0;
+	static int val;
 
 	if (val) {
 		left = val & 0xff;

@@ -37,7 +37,7 @@ static int local_start_dma(struct audio_operations *adev, unsigned long physaddr
 
 
 
-static int debugmem = 0;	/* switched off by default */
+static int debugmem;    	/* switched off by default */
 static int dma_buffsize = DSP_BUFFSIZE;
 
 static long dmabuf_timeout(struct dma_buffparms *dmap)

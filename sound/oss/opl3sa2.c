@@ -125,7 +125,7 @@ static const char *CHIPSET_TABLE[] = {"OPL3-SA2", "OPL3-SA3"};
 #endif
 
 /* This should be pretty obvious */
-static int opl3sa2_cards_num; /* = 0 */
+static int opl3sa2_cards_num;
 
 typedef struct {
 	/* device resources */

@@ -407,8 +407,8 @@ static void Q40Silence(void)
 	*DAC_LEFT=*DAC_RIGHT=127;
 }
 
-static char *q40_pp=NULL;
-static unsigned int q40_sc=0;
+static char *q40_pp;
+static unsigned int q40_sc;
 
 static void Q40PlayNextFrame(int index)
 {

@@ -65,7 +65,7 @@ int             sound_dmap_flag = 1;
 int             sound_dmap_flag = 0;
 #endif
 
-static char     dma_alloc_map[MAX_DMA_CHANNELS] = {0};
+static char     dma_alloc_map[MAX_DMA_CHANNELS];
 
 #define DMA_MAP_UNAVAIL		0
 #define DMA_MAP_FREE		1
@@ -78,7 +78,7 @@ unsigned long seq_time = 0;	/* Time for /dev/sequencer */
  * Table for configurable mixer volume handling
  */
 static mixer_vol_table mixer_vols[MAX_MIXER_DEV];
-static int num_mixer_volumes = 0;
+static int num_mixer_volumes;
 
 int *load_mixer_volumes(char *name, int *levels, int present)
 {
@@ -534,8 +534,8 @@ static const struct {
 	 &num_audiodevs},
 };
 
-static int dmabuf = 0;
-static int dmabug = 0;
+static int dmabuf;
+static int dmabug;
 
 MODULE_PARM(dmabuf, "i");
 MODULE_PARM(dmabug, "i");
