@@ -29,6 +29,7 @@
 #include <linux/types.h>
 #include <linux/serial.h>
 #include <linux/errno.h>
+#include <linux/ioport.h>
 #include <linux/init.h>
 
 #include <asm/ecard.h>
@@ -38,95 +39,84 @@
 #define NUM_SERIALS	MY_NUMPORTS * MAX_ECARDS
 #endif
 
-#ifdef MODULE
-static int __serial_ports[NUM_SERIALS];
-static int __serial_pcount;
-static int __serial_addr[NUM_SERIALS];
+static int serial_ports[NUM_SERIALS];
+static int serial_pcount;
+static int serial_addr[NUM_SERIALS];
 static struct expansion_card *expcard[MAX_ECARDS];
-#define ADD_ECARD(ec,card) expcard[(card)] = (ec)
-#define ADD_PORT(port,addr)					\
-	do {							\
-		__serial_ports[__serial_pcount] = (port);	\
-		__serial_addr[__serial_pcount] = (addr);	\
-		__serial_pcount += 1;				\
-	} while (0)
-#else
-#define ADD_ECARD(ec,card)
-#define ADD_PORT(port,addr)
-#endif
 
 static const card_ids serial_cids[] = { MY_CARD_LIST, { 0xffff, 0xffff } };
 
 static inline int serial_register_onedev (unsigned long port, int irq)
 {
-    struct serial_struct req;
+	struct serial_struct req;
 
-    memset(&req, 0, sizeof(req));
-    req.baud_base = MY_BAUD_BASE;
-    req.irq = irq;
-    req.port = port;
-    req.flags = 0;
+	memset(&req, 0, sizeof(req));
+	req.baud_base = MY_BAUD_BASE;
+	req.irq = irq;
+	req.port = port;
+	req.flags = 0;
 
-    return register_serial(&req);
+	return register_serial(&req);
 }
 
-static int __init INIT (void)
+static int __init serial_card_init(void)
 {
-    int card = 0;
+	int card = 0;
 
-    ecard_startfind ();
+	ecard_startfind ();
 
-    do {
-	struct expansion_card *ec;
-	unsigned long cardaddr;
-	int port;
+	do {
+		struct expansion_card *ec;
+		unsigned long cardaddr;
+		int port;
 
-	ec = ecard_find (0, serial_cids);
-	if (!ec)
-	    break;
+		ec = ecard_find (0, serial_cids);
+		if (!ec)
+			break;
 
-	cardaddr = MY_BASE_ADDRESS(ec);
+		cardaddr = MY_BASE_ADDRESS(ec);
 
-	for (port = 0; port < MY_NUMPORTS; port ++) {
-	    unsigned long address;
-	    int line;
+		for (port = 0; port < MY_NUMPORTS; port ++) {
+			unsigned long address;
+			int line;
 
-	    address = MY_PORT_ADDRESS(port, cardaddr);
+			address = MY_PORT_ADDRESS(port, cardaddr);
 
-	    line = serial_register_onedev (address, ec->irq);
-	    if (line < 0)
-		break;
-	    ADD_PORT(line, address);
+			line = serial_register_onedev (address, ec->irq);
+			if (line < 0)
+				break;
+			serial_ports[serial_pcount] = line;
+			serial_addr[serial_pcount] = address;
+			serial_pcount += 1;
+		}
+
+		if (port) {
+			ecard_claim (ec);
+			expcard[card] = ec;
+		} else
+			break;
+	} while (++card < MAX_ECARDS);
+	return card ? 0 : -ENODEV;
+}
+
+static void __exit serial_card_exit(void)
+{
+	int i;
+
+	for (i = 0; i < serial_pcount; i++) {
+		unregister_serial(serial_ports[i]);
+		release_region(serial_addr[i], 8);
 	}
 
-	if (port) {
-	    ecard_claim (ec);
-	    ADD_ECARD(ec, card);
-	} else
-	    break;
-    } while (++card < MAX_ECARDS);
-    return card ? 0 : -ENODEV;
-}
-
-static void __exit EXIT (void)
-{
-#ifdef MODULE
-    int i;
-
-    for (i = 0; i < __serial_pcount; i++) {
-	unregister_serial(__serial_ports[i]);
-	release_region(__serial_addr[i], 8);
-    }
-
-    for (i = 0; i < MAX_ECARDS; i++)
-	if (expcard[i])
-	    ecard_release (expcard[i]);
-#endif
+	for (i = 0; i < MAX_ECARDS; i++)
+		if (expcard[i])
+			ecard_release (expcard[i]);
 }
 
 EXPORT_NO_SYMBOLS;
 
+MODULE_AUTHOR("Russell King");
 MODULE_LICENSE("GPL");
 
-module_init(INIT);
-module_exit(EXIT);
+module_init(serial_card_init);
+module_exit(serial_card_exit);
