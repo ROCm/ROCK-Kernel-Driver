@@ -2142,6 +2142,23 @@ out:
 	return rc;
 }
 
+static int wl3501_get_power(struct net_device *dev,
+			    struct iw_request_info *info,
+			    union iwreq_data *wrqu, char *extra)
+{
+	u8 pwr_state;
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	int rc = wl3501_get_mib_value(this,
+				      WL3501_MIB_ATTR_CURRENT_PWR_STATE,
+				      &pwr_state, sizeof(pwr_state));
+	if (rc)
+		goto out;
+	wrqu->power.disabled = !pwr_state;
+	wrqu->power.flags = IW_POWER_ON;
+out:
+	return rc;
+}
+
 static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWNAME	- SIOCIWFIRST] = wl3501_get_name,
 	[SIOCSIWFREQ	- SIOCIWFIRST] = wl3501_set_freq,
@@ -2164,6 +2181,7 @@ static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWRTS	- SIOCIWFIRST] = wl3501_get_rts_threshold,
 	[SIOCGIWFRAG	- SIOCIWFIRST] = wl3501_get_frag_threshold,
 	[SIOCGIWENCODE	- SIOCIWFIRST] = wl3501_get_encode,
+	[SIOCGIWPOWER	- SIOCIWFIRST] = wl3501_get_power,
 };
 
 static const struct iw_handler_def wl3501_handler_def = {
