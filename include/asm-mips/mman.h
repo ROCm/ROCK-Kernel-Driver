@@ -20,6 +20,8 @@
 #define PROT_EXEC	0x04		/* page can be executed */
 /*			0x08		   reserved for PROT_EXEC_NOFLUSH */
 #define PROT_SEM	0x10		/* page may be used for atomic ops */
+#define PROT_GROWSDOWN	0x01000000	/* mprotect flag: extend change to start of growsdown vma */
+#define PROT_GROWSUP	0x02000000	/* mprotect flag: extend change to end of growsup vma */
 
 /*
  * Flags for mmap
