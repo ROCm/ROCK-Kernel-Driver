@@ -25,7 +25,7 @@ static int smb_readdir(struct file *, void *, filldir_t);
 static int smb_dir_open(struct inode *, struct file *);
 
 static struct dentry *smb_lookup(struct inode *, struct dentry *, struct nameidata *);
-static int smb_create(struct inode *, struct dentry *, int);
+static int smb_create(struct inode *, struct dentry *, int, struct nameidata *);
 static int smb_mkdir(struct inode *, struct dentry *, int);
 static int smb_rmdir(struct inode *, struct dentry *);
 static int smb_unlink(struct inode *, struct dentry *);
@@ -510,7 +510,8 @@ out_close:
 
 /* N.B. How should the mode argument be used? */
 static int
-smb_create(struct inode *dir, struct dentry *dentry, int mode)
+smb_create(struct inode *dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	struct smb_sb_info *server = server_from_dentry(dentry);
 	__u16 fileid;

@@ -412,7 +412,8 @@ int presto_prep(struct dentry *dentry, struct presto_cache **cache,
         return 0;
 }
 
-static int presto_create(struct inode * dir, struct dentry * dentry, int mode)
+static int presto_create(struct inode * dir, struct dentry * dentry, int mode,
+                struct nameidata *nd)
 {
         int error;
         struct presto_cache *cache;

@@ -78,7 +78,8 @@ struct file_operations bfs_dir_operations = {
 
 extern void dump_imap(const char *, struct super_block *);
 
-static int bfs_create(struct inode * dir, struct dentry * dentry, int mode)
+static int bfs_create(struct inode * dir, struct dentry * dentry, int mode,
+		struct nameidata *nd)
 {
 	int err;
 	struct inode * inode;

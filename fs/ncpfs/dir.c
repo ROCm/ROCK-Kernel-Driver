@@ -34,7 +34,7 @@ static void ncp_do_readdir(struct file *, void *, filldir_t,
 
 static int ncp_readdir(struct file *, void *, filldir_t);
 
-static int ncp_create(struct inode *, struct dentry *, int);
+static int ncp_create(struct inode *, struct dentry *, int, struct nameidata *);
 static struct dentry *ncp_lookup(struct inode *, struct dentry *, struct nameidata *);
 static int ncp_unlink(struct inode *, struct dentry *);
 static int ncp_mkdir(struct inode *, struct dentry *, int);
@@ -942,7 +942,8 @@ out:
 	return error;
 }
 
-static int ncp_create(struct inode *dir, struct dentry *dentry, int mode)
+static int ncp_create(struct inode *dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	return ncp_create_new(dir, dentry, mode, 0, 0);
 }

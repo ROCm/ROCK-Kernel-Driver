@@ -274,7 +274,7 @@ static int umsdos_create_any (struct inode *dir, struct dentry *dentry,
 	if (fake->d_inode)
 		goto out_remove_dput;
 
-	ret = msdos_create (dir, fake, S_IFREG | 0777);
+	ret = msdos_create (dir, fake, S_IFREG | 0777, NULL);
 	if (ret)
 		goto out_remove_dput;
 
@@ -311,7 +311,7 @@ out_remove:
  * 
  * Return the status of the operation. 0 mean success.
  */
-int UMSDOS_create (struct inode *dir, struct dentry *dentry, int mode)
+int UMSDOS_create (struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	return umsdos_create_any (dir, dentry, mode, 0, 0);
 }

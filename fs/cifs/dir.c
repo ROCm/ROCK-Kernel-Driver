@@ -119,7 +119,8 @@ build_wildcard_path_from_dentry(struct dentry *direntry)
 /* Inode operations in similar order to how they appear in the Linux file fs.h */
 
 int
-cifs_create(struct inode *inode, struct dentry *direntry, int mode)
+cifs_create(struct inode *inode, struct dentry *direntry, int mode,
+		struct nameidata *nd)
 {
 	int rc = -ENOENT;
 	int xid;

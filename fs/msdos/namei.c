@@ -261,7 +261,8 @@ static int msdos_add_entry(struct inode *dir, const char *name,
  */
 
 /***** Create a file */
-int msdos_create(struct inode *dir,struct dentry *dentry,int mode)
+int msdos_create(struct inode *dir,struct dentry *dentry,int mode,
+		struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
 	struct buffer_head *bh;

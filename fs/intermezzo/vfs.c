@@ -598,7 +598,7 @@ int presto_do_create(struct presto_file_set *fset, struct dentry *dir,
         }
         DQUOT_INIT(dir->d_inode);
         lock_kernel();
-        error = iops->create(dir->d_inode, dentry, mode);
+        error = iops->create(dir->d_inode, dentry, mode, NULL);
         if (error) {
                 EXIT;
                 goto exit_lock;

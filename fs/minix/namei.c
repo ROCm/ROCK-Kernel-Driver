@@ -89,7 +89,8 @@ static int minix_mknod(struct inode * dir, struct dentry *dentry, int mode, dev_
 	return error;
 }
 
-static int minix_create(struct inode * dir, struct dentry *dentry, int mode)
+static int minix_create(struct inode * dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	return minix_mknod(dir, dentry, mode, 0);
 }

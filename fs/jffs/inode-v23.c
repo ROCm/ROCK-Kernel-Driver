@@ -1273,7 +1273,8 @@ jffs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
  * with d_instantiate().
  */
 static int
-jffs_create(struct inode *dir, struct dentry *dentry, int mode)
+jffs_create(struct inode *dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	struct jffs_raw_inode raw_inode;
 	struct jffs_control *c;

@@ -621,7 +621,7 @@ static int udf_delete_entry(struct inode *inode, struct fileIdentDesc *fi,
 	return udf_write_fi(inode, cfi, fi, fibh, NULL, NULL);
 }
 
-static int udf_create(struct inode *dir, struct dentry *dentry, int mode)
+static int udf_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	struct udf_fileident_bh fibh;
 	struct inode *inode;

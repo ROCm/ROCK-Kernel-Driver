@@ -163,7 +163,7 @@ static inline void mark_inodes_deleted(struct hfs_cat_entry *entry,
  * a directory and return a corresponding inode, given the inode for
  * the directory and the name (and its length) of the new file.
  */
-int hfs_create(struct inode * dir, struct dentry *dentry, int mode)
+int hfs_create(struct inode * dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	struct hfs_cat_entry *entry = HFS_I(dir)->entry;
 	struct hfs_cat_entry *new;

@@ -175,7 +175,8 @@ STATIC int
 linvfs_create(
 	struct inode	*dir,
 	struct dentry	*dentry,
-	int		mode)
+	int		mode,
+	struct nameidata *nd)
 {
 	return linvfs_mknod(dir, dentry, mode, 0);
 }

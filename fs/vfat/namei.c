@@ -912,7 +912,8 @@ error:
 	return dentry;
 }
 
-int vfat_create(struct inode *dir,struct dentry* dentry,int mode)
+int vfat_create(struct inode *dir,struct dentry* dentry,int mode,
+		struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
 	struct inode *inode = NULL;

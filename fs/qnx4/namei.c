@@ -142,7 +142,8 @@ out:
 }
 
 #ifdef CONFIG_QNX4FS_RW
-int qnx4_create(struct inode *dir, struct dentry *dentry, int mode)
+int qnx4_create(struct inode *dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	QNX4DEBUG(("qnx4: qnx4_create\n"));
 	if (dir == NULL) {

@@ -106,7 +106,7 @@ bail:
 	return -ENOSPC;
 }
 
-int hpfs_create(struct inode *dir, struct dentry *dentry, int mode)
+int hpfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	const char *name = dentry->d_name.name;
 	unsigned len = dentry->d_name.len;

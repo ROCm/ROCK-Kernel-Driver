@@ -256,7 +256,7 @@ affs_unlink(struct inode *dir, struct dentry *dentry)
 }
 
 int
-affs_create(struct inode *dir, struct dentry *dentry, int mode)
+affs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
 	struct inode	*inode;
