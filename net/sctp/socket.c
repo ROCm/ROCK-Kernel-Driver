@@ -1342,8 +1342,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
 
 		/* When only partial message is copied to the user, increase
 		 * rwnd by that amount. If all the data in the skb is read,
-		 * rwnd is updated when the skb's destructor is called via
-		 * sctp_ulpevent_free().
+		 * rwnd is updated when the event is freed.
 		 */
 		sctp_assoc_rwnd_increase(event->asoc, copied);
 		goto out;
@@ -1354,7 +1353,18 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
 		msg->msg_flags &= ~MSG_EOR;
 
 out_free:
-	sctp_ulpevent_kfree_skb(skb); /* Free the skb. */
+	if (flags & MSG_PEEK) {
+		/* Release the skb reference acquired after peeking the skb in
+		 * sctp_skb_recv_datagram().
+		 */
+		kfree_skb(skb);
+	} else {
+		/* Free the event which includes releasing the reference to
+		 * the owner of the skb, freeing the skb and updating the
+		 * rwnd.
+		 */ 
+		sctp_ulpevent_free(event);
+	}
 out:
 	sctp_release_sock(sk);
 	return err;

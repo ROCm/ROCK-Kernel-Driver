@@ -99,12 +99,12 @@ void sctp_ulpq_flush(struct sctp_ulpq *ulpq)
 
 	while ((skb = __skb_dequeue(&ulpq->lobby))) {
 		event = sctp_skb2event(skb);
-		sctp_ulpevent_kfree_skb(skb);
+		sctp_ulpevent_free(event);
 	}
 
 	while ((skb = __skb_dequeue(&ulpq->reasm))) {
 		event = sctp_skb2event(skb);
-		sctp_ulpevent_kfree_skb(skb);
+		sctp_ulpevent_free(event);
 	}
 
 }
@@ -237,7 +237,7 @@ out_free:
 	if (sctp_event2skb(event)->list)
 		sctp_queue_purge_ulpevents(sctp_event2skb(event)->list);
 	else
-		sctp_ulpevent_kfree_skb(sctp_event2skb(event));
+		sctp_ulpevent_free(event);
 	return 0;
 }
 
@@ -696,7 +696,7 @@ static __u16 sctp_ulpq_renege_order(struct sctp_ulpq *ulpq, __u16 needed)
 		event = sctp_skb2event(skb);
 		tsn = event->sndrcvinfo.sinfo_tsn;
 
-		sctp_ulpevent_kfree_skb(skb);
+		sctp_ulpevent_free(event);
 		sctp_tsnmap_renege(tsnmap, tsn);
 		if (freed >= needed)
 			return freed;
@@ -722,7 +722,7 @@ static __u16 sctp_ulpq_renege_frags(struct sctp_ulpq *ulpq, __u16 needed)
 		event = sctp_skb2event(skb);
 		tsn = event->sndrcvinfo.sinfo_tsn;
 
-		sctp_ulpevent_kfree_skb(skb);
+		sctp_ulpevent_free(event);
 		sctp_tsnmap_renege(tsnmap, tsn);
 		if (freed >= needed)
 			return freed;
