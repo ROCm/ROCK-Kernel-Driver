@@ -304,42 +304,42 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 int
 is_valid_oplock_break(struct smb_hdr *buf)
 {    
-	struct smb_com_lock_req * pSMB = (struct smb_com_lock_req *)buf;
-	struct list_head *tmp;
-	struct cifsTconInfo *tcon;
+       struct smb_com_lock_req * pSMB = (struct smb_com_lock_req *)buf;
+       struct list_head *tmp;
+       struct cifsTconInfo *tcon;
 
-	/* could add check for smb response flag 0x80 */
-	cFYI(1,("\nChecking for oplock break"));    
-	if(pSMB->hdr.Command != SMB_COM_LOCKING_ANDX)
-		return FALSE;
-	if(pSMB->hdr.Flags & SMBFLG_RESPONSE)
-		return FALSE; /* server sends us "request" here */
-	if(pSMB->hdr.WordCount != 8)
-		return FALSE;
+       /* could add check for smb response flag 0x80 */
+       cFYI(1,("\nChecking for oplock break"));    
+       if(pSMB->hdr.Command != SMB_COM_LOCKING_ANDX)
+               return FALSE;
+       if(pSMB->hdr.Flags & SMBFLG_RESPONSE)
+               return FALSE; /* server sends us "request" here */
+       if(pSMB->hdr.WordCount != 8)
+               return FALSE;
 
-	cFYI(1,(" oplock type 0x%d level 0x%d",pSMB->LockType,pSMB->OplockLevel));
-	if(!(pSMB->LockType & LOCKING_ANDX_OPLOCK_RELEASE))
-		return FALSE;    
+       cFYI(1,(" oplock type 0x%d level 0x%d",pSMB->LockType,pSMB->OplockLevel));
+       if(!(pSMB->LockType & LOCKING_ANDX_OPLOCK_RELEASE))
+               return FALSE;    
 
-	/* look up tcon based on tid & uid */
-	read_lock(&GlobalSMBSeslock);
-	list_for_each(tmp, &GlobalTreeConnectionList) {
-		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
-		if (tcon->tid == buf->Tid)
-			if(tcon->ses->Suid == buf->Uid) {
-			/* BB Add following logic: 
-			  2) look up inode from tcon->openFileList->file->f_dentry->d_inode
-			  3) flush dirty pages and cached byte range locks and mark inode
-			  4) depending on break type change to r/o caching or no caching
-			  5) send oplock break response to server */
-				read_unlock(&GlobalSMBSeslock);
-				cFYI(1,("\nFound matching connection, process oplock break"));
-				return TRUE;
-			}
-	}
-	read_unlock(&GlobalSMBSeslock);
-	cFYI(1,("\nProcessing oplock break for non-existent connection"));
-	return TRUE;
+       /* look up tcon based on tid & uid */
+       read_lock(&GlobalSMBSeslock);
+       list_for_each(tmp, &GlobalTreeConnectionList) {
+               tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
+               if (tcon->tid == buf->Tid)
+                       if(tcon->ses->Suid == buf->Uid) {
+                       /* BB Add following logic: 
+                         2) look up inode from tcon->openFileList->file->f_dentry->d_inode
+                         3) flush dirty pages and cached byte range locks and mark inode
+                         4) depending on break type change to r/o caching or no caching
+                         5) send oplock break response to server */
+                               read_unlock(&GlobalSMBSeslock);
+                               cFYI(1,("\nFound matching connection, process oplock break"));
+                               return TRUE;
+                       }
+       }
+       read_unlock(&GlobalSMBSeslock);
+       cFYI(1,("\nProcessing oplock break for non-existent connection"));
+       return TRUE;
 }
 
 void

@@ -14,3 +14,9 @@ and others for their work on the Linux smbfs module over the years. Thanks to
 the other members of the Storage Network Industry Association CIFS Technical
 Workgroup for their work specifying this highly complex protocol and finally
 thanks to the Samba team for their technical advice and encouragement.
+
+Patch Contributors
+------------------
+Zwane Mwaikambo
+Andi Kleen
+

@@ -736,18 +736,18 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 				   && (pSesInfo->secType == RawNTLMSSP)) {
 				cFYI(1, ("\nNTLMSSP sesssetup "));
 				rc = CIFSNTLMSSPNegotiateSessSetup(xid,
-								   pSesInfo,
-								   cryptKey,
-								   volume_info.domainname,
-                                   &ntlmv2_flag,
-								   cifs_sb->local_nls);
+								pSesInfo,
+								cryptKey,
+								volume_info.domainname,
+								&ntlmv2_flag,
+								cifs_sb->local_nls);
 				if (!rc) {
-                    if(ntlmv2_flag) {
-                        cFYI(1,("\nAble to use the more secure NTLM version 2 password hash"));
-                        /* SMBNTv2encrypt( ...);  */ /* BB fix this up - 
-                        and note that Samba client equivalent looks wrong */
-                    } else
-					    SMBNTencrypt(password_with_pad,cryptKey,ntlm_session_key);
+					if(ntlmv2_flag) {
+						cFYI(1,("\nAble to use the more secure NTLM version 2 password hash"));
+				/* SMBNTv2encrypt( ...);  */ /* BB fix this up - 
+				   and note that Samba client equivalent looks wrong */
+					} else
+						SMBNTencrypt(password_with_pad,cryptKey,ntlm_session_key);
 
 					/* for better security the weaker lanman hash not sent 
                        in AuthSessSetup so why bother calculating it */
@@ -758,13 +758,13 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 						   cryptKey, session_key); */
 
 					rc = CIFSNTLMSSPAuthSessSetup(xid,
-								      pSesInfo,
-								      volume_info.
-								      username,
-								      volume_info.domainname,
-								      ntlm_session_key,
-								      session_key,
-                                      ntlmv2_flag,
+								pSesInfo,
+								volume_info.
+								username,
+								volume_info.domainname,
+								ntlm_session_key,
+								session_key,
+								ntlmv2_flag,
 								      cifs_sb->local_nls);
 				}
 			} else {	/* old style NTLM 0.12 session setup */
@@ -821,6 +821,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 								 "",
 								 cifs_sb->
 								 local_nls);
+					FreeXid(xid);
 					return -ENODEV;
 				} else {
 					rc = CIFSTCon(xid, pSesInfo,
@@ -909,8 +910,8 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 	pSMB->req_no_secext.MaxBufferSize = cpu_to_le16(ses->maxBuf);
 	pSMB->req_no_secext.MaxMpxCount = cpu_to_le16(ses->maxReq);
 
-    if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-        smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	pSMB->req_no_secext.Capabilities =
 	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS;
@@ -944,8 +945,8 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 			*bcc_ptr = 0;
 			bcc_ptr++;
 		}
-        if(user == NULL)
-            bytes_returned = 0; /* skill null user */
+		if(user == NULL)
+			bytes_returned = 0; /* skill null user */
         else
 		    bytes_returned =
 		        cifs_strtoUCS((wchar_t *) bcc_ptr, user, 100, nls_codepage);
@@ -976,10 +977,10 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 		bcc_ptr += 2 * bytes_returned;
 		bcc_ptr += 2;
 	} else {
-        if(user != NULL) {                
+		if(user != NULL) {                
 		    strncpy(bcc_ptr, user, 200);
 		    bcc_ptr += strnlen(user, 200);
-        }
+		}
 		*bcc_ptr = 0;
 		bcc_ptr++;
 		if (domain == NULL) {
@@ -1081,7 +1082,6 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 						    kcalloc(2, GFP_KERNEL);
 					}
 				} else {	/* ASCII */
-
 					len = strnlen(bcc_ptr, 1024);
 					if (((long) bcc_ptr + len) - (long)
 					    pByteArea(smb_buffer_response)
@@ -1164,8 +1164,8 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	pSMB->req.MaxBufferSize = cpu_to_le16(ses->maxBuf);
 	pSMB->req.MaxMpxCount = cpu_to_le16(ses->maxReq);
 
-    if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-        smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	pSMB->req.Capabilities =
 	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
@@ -1410,7 +1410,7 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	PCHALLENGE_MESSAGE SecurityBlob2;
 
 	cFYI(1, ("\nIn NTLMSSP sesssetup (negotiate) "));
-    *pNTLMv2_flag = FALSE;
+	*pNTLMv2_flag = FALSE;
 	smb_buffer = buf_get();
 	if (smb_buffer == 0) {
 		return -ENOMEM;
@@ -1429,8 +1429,8 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	pSMB->req.MaxBufferSize = cpu_to_le16(ses->maxBuf);
 	pSMB->req.MaxMpxCount = cpu_to_le16(ses->maxReq);
 
-    if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-        smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	pSMB->req.Capabilities =
 	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
@@ -1457,8 +1457,8 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	    NTLMSSP_NEGOTIATE_UNICODE | NTLMSSP_NEGOTIATE_OEM |
 	    NTLMSSP_REQUEST_TARGET | NTLMSSP_NEGOTIATE_NTLM | 0x80000000 |
 	    NTLMSSP_NEGOTIATE_ALWAYS_SIGN | NTLMSSP_NEGOTIATE_128;
-    if(ntlmv2_support)
-        SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
+	if(ntlmv2_support)
+		SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
 	/* setup pointers to domain name and workstation name */
 	bcc_ptr += SecurityBlobLength;
 
@@ -1574,8 +1574,8 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 				memcpy(challenge_from_server,
 				       SecurityBlob2->Challenge,
 				       CIFS_CRYPTO_KEY_SIZE);
-                if(SecurityBlob2->NegotiateFlags & NTLMSSP_NEGOTIATE_NTLMV2)
-                    *pNTLMv2_flag = TRUE;
+				if(SecurityBlob2->NegotiateFlags & NTLMSSP_NEGOTIATE_NTLMV2)
+					*pNTLMv2_flag = TRUE;
 				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
@@ -1661,7 +1661,6 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 						    kcalloc(2, GFP_KERNEL);
 					}
 				} else {	/* ASCII */
-
 					len = strnlen(bcc_ptr, 1024);
 					if (((long) bcc_ptr + len) - (long)
 					    pByteArea(smb_buffer_response)
@@ -1758,8 +1757,8 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 
 	pSMB->req.hdr.Uid = ses->Suid;
 
-    if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-        smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	pSMB->req.Capabilities =
 	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
@@ -1787,8 +1786,8 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	    NTLMSSP_NEGOTIATE_UNICODE | NTLMSSP_REQUEST_TARGET |
 	    NTLMSSP_NEGOTIATE_NTLM | NTLMSSP_NEGOTIATE_TARGET_INFO |
 	    0x80000000 | NTLMSSP_NEGOTIATE_ALWAYS_SIGN | NTLMSSP_NEGOTIATE_128;
-    if(ntlmv2_flag)
-        SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
+	if(ntlmv2_flag)
+		SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
 
 /* setup pointers to domain name and workstation name */
 
@@ -2048,7 +2047,6 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 						ses->serverNOS = kcalloc(2, GFP_KERNEL);
 					}
 				} else {	/* ASCII */
-
 					len = strnlen(bcc_ptr, 1024);
 					if (((long) bcc_ptr + len) - 
                         (long) pByteArea(smb_buffer_response) 
@@ -2132,8 +2130,8 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 	bcc_ptr = &(pSMB->Password[0]);
 	bcc_ptr++;		/* skip password */
 
-    if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-        smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	if (ses->capabilities & CAP_STATUS32) {
 		smb_buffer->Flags2 |= SMBFLG2_ERR_STATUS;

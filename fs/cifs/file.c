@@ -35,6 +35,8 @@
 #include "cifs_debug.h"
 #include "cifs_fs_sb.h"
 
+
+
 int
 cifs_open(struct inode *inode, struct file *file)
 {
@@ -42,8 +44,8 @@ cifs_open(struct inode *inode, struct file *file)
 	int xid, oplock;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
-    struct cifsFileInfo *pCifsFile;
-    struct cifsInodeInfo *pCifsInode;
+	struct cifsFileInfo *pCifsFile;
+	struct cifsInodeInfo *pCifsInode;
 	char *full_path = NULL;
 	int desiredAccess = 0x20197;
 	int disposition = FILE_OPEN;
@@ -104,28 +106,27 @@ cifs_open(struct inode *inode, struct file *file)
 		if (file->private_data) {
 			memset(file->private_data, 0,
 			       sizeof (struct cifsFileInfo));
-            pCifsFile = (struct cifsFileInfo *) file->private_data;
+			pCifsFile = (struct cifsFileInfo *) file->private_data;
 			pCifsFile->netfid = netfid;
 			pCifsFile->pid = current->pid;
-            list_add(&pCifsFile->tlist,&pTcon->openFileList);
-            pCifsInode = CIFS_I(file->f_dentry->d_inode);
-            list_add(&pCifsFile->flist,&pCifsInode->openFileList);
-            if(file->f_flags & O_CREAT) {           
-                 /* time to set mode which we can not
-                 set earlier due to problems creating new read-only files */
-                if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
-                    CIFSSMBUnixSetPerms(xid, pTcon, full_path, inode->i_mode,
-                                        0xFFFFFFFFFFFFFFFF,  
-                                        0xFFFFFFFFFFFFFFFF,
-                                        cifs_sb->local_nls);
-                else {/* BB to be implemented via Windows secrty descriptors*/
-         /* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
-                    /* in the meantime we could set the r/o dos attribute 
-                       when perms are e.g.:   
-                            mode & 0222 == 0 */
-                }
-            }
-
+			pCifsFile->pfile = file; /* needed for writepage */
+			list_add(&pCifsFile->tlist,&pTcon->openFileList);
+			pCifsInode = CIFS_I(file->f_dentry->d_inode);
+			list_add(&pCifsFile->flist,&pCifsInode->openFileList);
+			if(file->f_flags & O_CREAT) {           
+				/* time to set mode which we can not set earlier due
+				 to problems creating new read-only files */
+				if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
+					CIFSSMBUnixSetPerms(xid, pTcon, full_path, inode->i_mode,
+						0xFFFFFFFFFFFFFFFF,  
+						0xFFFFFFFFFFFFFFFF,
+						cifs_sb->local_nls);
+				else {/* BB implement via Windows security descriptors */
+			/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
+			/* in the meantime could set r/o dos attribute when perms are eg:
+					mode & 0222 == 0 */
+				}
+			}
 		}
 	}
 
@@ -151,10 +152,10 @@ cifs_close(struct inode *inode, struct file *file)
 
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
- 	if (pSMBFile) {
-        list_del(&pSMBFile->flist);
-        list_del(&pSMBFile->tlist);
-        rc = CIFSSMBClose(xid, pTcon, pSMBFile->netfid);
+	if (pSMBFile) {
+		list_del(&pSMBFile->flist);
+		list_del(&pSMBFile->tlist);
+		rc = CIFSSMBClose(xid, pTcon, pSMBFile->netfid);
 		kfree(file->private_data);
 		file->private_data = NULL;
 	} else
@@ -162,7 +163,6 @@ cifs_close(struct inode *inode, struct file *file)
 
 	FreeXid(xid);
 	return rc;
-
 }
 
 int
@@ -344,20 +344,24 @@ cifs_write(struct file * file, const char *write_data,
 			file->f_dentry->d_inode->i_size = *poffset;
 	}
 	mark_inode_dirty_sync(file->f_dentry->d_inode);
+	FreeXid(xid);
 	return total_written;
 }
 
 static int
-cifs_writepage(struct page *page)
+cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 {
 	struct address_space *mapping = page->mapping;
+	loff_t offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
+	char * write_data = kmap(page);
 	int rc = -EFAULT;
 	int bytes_written = 0;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
-	int xid;
 	struct inode *inode = page->mapping->host;
-	loff_t *poffset = NULL;
+	struct cifsInodeInfo *cifsInode;
+	struct cifsFileInfo *open_file = NULL;
+	int xid;
 
 	xid = GetXid();
 
@@ -365,24 +369,78 @@ cifs_writepage(struct page *page)
 	pTcon = cifs_sb->tcon;
 
 	/* figure out which file struct to use 
-	   if (file->private_data == NULL) {
+	if (file->private_data == NULL) {
 	   FreeXid(xid);
 	   return -EBADF;
-	   }     
+	}     
 	 */
 	if (!mapping) {
 		FreeXid(xid);
 		return -EFAULT;
+	} else if(!mapping->host) {
+		FreeXid(xid);
+		return -EFAULT;
 	}
 
-	/* BB fix and add missing call to cifs_writepage_sync here */
+	if((to > PAGE_CACHE_SIZE) || (from > to))
+		return -EIO;
 
-	inode->i_ctime = inode->i_mtime = CURRENT_TIME;	/* BB is this right? */
-	if ((bytes_written > 0) && (poffset)) {
-		if (*poffset > inode->i_size)
-			inode->i_size = *poffset;
+        offset += (loff_t)from;
+	write_data += from;
+
+	cifsInode = CIFS_I(mapping->host);
+	if(!list_empty(&(cifsInode->openFileList))) {            
+		open_file = list_entry(cifsInode->openFileList.next,
+					   struct cifsFileInfo, flist);           
+	/* We could check if file is open for writing first */
+		if(open_file->pfile)
+			bytes_written = cifs_write(open_file->pfile, write_data,
+					   to-from, &offset);
+		/* Does mm or vfs already set times? */
+		inode->i_atime = inode->i_mtime = CURRENT_TIME;	
+		if ((bytes_written > 0) && (offset)) {
+			rc = 0;
+			if (offset > inode->i_size)
+				inode->i_size = offset;
+		} else if(bytes_written < 0) {
+			rc = bytes_written;
+		}
+		mark_inode_dirty_sync(inode);
+	} else {
+		cFYI(1,("\nNo open files to get file handle from"));
+		rc = -EIO;
 	}
-	mark_inode_dirty_sync(inode);
+
+	FreeXid(xid);
+	return rc;
+}
+
+static int
+cifs_writepage(struct page* page)
+{
+	int rc = -EFAULT;
+	int xid;
+
+	xid = GetXid();
+	page_cache_get(page);
+	rc = cifs_partialpagewrite(page,0,PAGE_CACHE_SIZE);
+	/* insert call to SetPageToUpdate like function here? */
+	unlock_page(page);
+	page_cache_release(page);	
+	FreeXid(xid);
+	return rc;
+}
+
+static int
+cifs_commit_write(struct file *file, struct page *page, unsigned offset,
+		  unsigned to)
+{
+	int xid,rc;
+	xid = GetXid();
+
+	if(offset > to)
+		return -EIO;
+	rc = cifs_partialpagewrite(page,offset,to);
 
 	FreeXid(xid);
 	return rc;
@@ -393,21 +451,6 @@ cifs_prepare_write(struct file *file, struct page *page, unsigned offset,
 		   unsigned to)
 {
 	return 0;	/* eventually add code to flush any incompatible requests */
-}
-
-static int
-cifs_commit_write(struct file *file, struct page *page, unsigned offset,
-		  unsigned to)
-{
-	long rc = -EFAULT;
-
-	lock_kernel();
-/*	status = cifs_updatepage(file, page, offset, to-offset); */
-
-/* BB add - do we really need to lock the kernel here for so long ? */
-
-	unlock_kernel();
-	return rc;
 }
 
 int
@@ -489,13 +532,30 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 	return total_read;
 }
 
-static int
-cifs_readpage_sync(struct file *file, struct page *page)
+int
+cifs_file_mmap(struct file * file, struct vm_area_struct * vma)
 {
-	unsigned int count = PAGE_CACHE_SIZE;
+	struct dentry * dentry = file->f_dentry;
+	int	rc, xid;
+
+	xid = GetXid();
+	rc = cifs_revalidate(dentry);
+	if (rc) {
+		cFYI(1,("Validation prior to mmap failed, error=%d\n", rc));
+		FreeXid(xid);
+		return rc;
+	}
+	rc = generic_file_mmap(file, vma);
+	FreeXid(xid);
+	return rc;
+}
+
+static int
+cifs_readpage(struct file *file, struct page *page)
+{
+	loff_t offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
+	char * read_data;
 	int rc = -EACCES;
-	int bytes_read = 0;
-	int total_read = 0;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	int xid;
@@ -508,26 +568,33 @@ cifs_readpage_sync(struct file *file, struct page *page)
 		FreeXid(xid);
 		return -EBADF;
 	}
-
-	/* BB finish adding missing here */
-
-	cFYI(1,
-	     ("\nCount is %d total read %d bytes read %d ", count, total_read,
-	      bytes_read));
-
-	FreeXid(xid);
-	return rc;
-}
-
-static int
-cifs_readpage(struct file *file, struct page *page)
-{
-	int rc;
-
 	page_cache_get(page);
-	rc = cifs_readpage_sync(file, page);
+	read_data = kmap(page);
 	/* for reads over a certain size we could initiate async read ahead */
+
+	rc = cifs_read(file, read_data, PAGE_CACHE_SIZE, &offset);
+
+	if (rc < 0)
+		goto io_error;
+	else {
+		cFYI(1,("\nBytes read %d ",rc));
+	}
+
+	file->f_dentry->d_inode->i_atime = CURRENT_TIME;
+
+	if(PAGE_CACHE_SIZE > rc) {
+		memset(read_data+rc, 0, PAGE_CACHE_SIZE - rc);
+	}
+	flush_dcache_page(page);
+	SetPageUptodate(page);
+	rc = 0;
+
+io_error:
+	kunmap(page);
+	unlock_page(page);
+
 	page_cache_release(page);
+	FreeXid(xid);
 	return rc;
 }
 
@@ -546,11 +613,11 @@ fill_in_inode(struct inode *tmp_inode,
 
 	/* Linux can not store file creation time unfortunately so we ignore it */
 	tmp_inode->i_atime =
-	    le64_to_cpu(cifs_NTtimeToUnix(pfindData->LastAccessTime));
+	    cifs_NTtimeToUnix(le64_to_cpu(pfindData->LastAccessTime));
 	tmp_inode->i_mtime =
-	    le64_to_cpu(cifs_NTtimeToUnix(pfindData->LastWriteTime));
+	    cifs_NTtimeToUnix(le64_to_cpu(pfindData->LastWriteTime));
 	tmp_inode->i_ctime =
-	    le64_to_cpu(cifs_NTtimeToUnix(pfindData->ChangeTime));
+	    cifs_NTtimeToUnix(le64_to_cpu(pfindData->ChangeTime));
 	/* should we treat the dos attribute of read-only as read-only mode bit e.g. 555 */
 	tmp_inode->i_mode = S_IALLUGO & ~(S_ISUID | S_IXGRP);	/* 2767 perms - indicate mandatory locking */
 	cFYI(0,
@@ -605,16 +672,12 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	atomic_inc(&cifsInfo->inUse);
 
 	tmp_inode->i_atime =
-	    le64_to_cpu(cifs_NTtimeToUnix(pfindData->LastAccessTime));
+	    cifs_NTtimeToUnix(le64_to_cpu(pfindData->LastAccessTime));
 	tmp_inode->i_mtime =
-	    le64_to_cpu(cifs_NTtimeToUnix(pfindData->LastModificationTime));
+	    cifs_NTtimeToUnix(le64_to_cpu(pfindData->LastModificationTime));
 	tmp_inode->i_ctime =
-	    le64_to_cpu(cifs_NTtimeToUnix(pfindData->LastStatusChange));
+	    cifs_NTtimeToUnix(le64_to_cpu(pfindData->LastStatusChange));
 
-	/* tmp_inode->i_mtime =
-	   cifs_NTtimeToUnix(pfindData->LastModificationTime);
-	   tmp_inode->i_ctime =
-	   cifs_NTtimeToUnix(pfindData->LastStatusChange); */
 	tmp_inode->i_mode = le64_to_cpu(pfindData->Permissions);
 	pfindData->Type = le32_to_cpu(pfindData->Type);
 	if (pfindData->Type == UNIX_FILE) {
@@ -1013,8 +1076,17 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 
 struct address_space_operations cifs_addr_ops = {
 	.readpage = cifs_readpage,
-	.sync_page = cifs_sync_page,
 	.writepage = cifs_writepage,
 	.prepare_write = cifs_prepare_write,
-	.commit_write = cifs_commit_write
+	.commit_write = cifs_commit_write,
+/*	.sync_page = cifs_sync_page, */
+};
+
+/* change over to struct below when sync page tested and complete */
+struct address_space_operations cifs_addr_ops2 = {
+	.readpage = cifs_readpage,
+	.writepage = cifs_writepage,
+	.prepare_write = cifs_prepare_write,
+	.commit_write = cifs_commit_write,
+	.sync_page = cifs_sync_page,
 };
