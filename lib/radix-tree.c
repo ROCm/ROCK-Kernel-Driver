@@ -154,8 +154,7 @@ static int radix_tree_extend(struct radix_tree_root *root, unsigned long index)
 
 			/* Increase the height.  */
 			node->slots[0] = root->rnode;
-			if (root->rnode)
-				node->count = 1;
+			node->count = 1;
 			root->rnode = node;
 			root->height++;
 		} while (height > root->height);
