@@ -57,7 +57,7 @@
 #define BT_DBG(D...)
 #endif
 
-#define VERSION "2.1"
+#define VERSION "2.2"
 
 static struct proto_ops l2cap_sock_ops;
 
@@ -404,6 +404,7 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_
 	}
 
 	write_lock_bh(&l2cap_sk_list.lock);
+
 	if (la->l2_psm && __l2cap_get_sock_by_addr(la->l2_psm, &la->l2_bdaddr)) {
 		err = -EADDRINUSE;
 	} else {
@@ -413,6 +414,7 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_
 		l2cap_pi(sk)->sport = la->l2_psm;
 		sk->sk_state = BT_BOUND;
 	}
+
 	write_unlock_bh(&l2cap_sk_list.lock);
 
 done:
@@ -547,8 +549,25 @@ static int l2cap_sock_listen(struct socket *sock, int backlog)
 	}
 
 	if (!l2cap_pi(sk)->psm) {
+		bdaddr_t *src = &bt_sk(sk)->src;
+		u16 psm;
+
 		err = -EINVAL;
-		goto done;
+
+		write_lock_bh(&l2cap_sk_list.lock);
+
+		for (psm = 0x1001; psm < 0x1100; psm += 2)
+			if (!__l2cap_get_sock_by_addr(psm, src)) {
+				l2cap_pi(sk)->psm   = htobs(psm);
+				l2cap_pi(sk)->sport = htobs(psm);
+				err = 0;
+				break;
+			}
+
+		write_unlock_bh(&l2cap_sk_list.lock);
+
+		if (err < 0)
+			goto done;
 	}
 
 	sk->sk_max_ack_backlog = backlog;
