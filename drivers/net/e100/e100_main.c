@@ -804,8 +804,6 @@ static struct pci_driver e100_driver = {
 #ifdef CONFIG_PM
 	.suspend      = e100_suspend,
 	.resume       = e100_resume,
-	.save_state   = e100_save_state,
-	.enable_wake  = e100_enable_wake,
 #endif
 };
 
