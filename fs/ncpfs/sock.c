@@ -205,6 +205,7 @@ static void __ncptcp_try_send(struct ncp_server *server) {
 	struct ncp_request_reply *rq;
 	struct msghdr msg;
 	struct iovec* iov;
+	struct iovec iovc[3];
 	int result;
 
 	rq = server->tx.creq;
@@ -212,10 +213,12 @@ static void __ncptcp_try_send(struct ncp_server *server) {
 		return;
 	}
 
+	/* sock_sendmsg updates iov pointers for us :-( */
+	memcpy(iovc, rq->tx_ciov, rq->tx_iovlen * sizeof(iov[0]));
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
 	msg.msg_control = NULL;
-	msg.msg_iov = rq->tx_ciov;
+	msg.msg_iov = iovc;
 	msg.msg_iovlen = rq->tx_iovlen;
 	msg.msg_flags = MSG_NOSIGNAL | MSG_DONTWAIT;
 	result = sock_sendmsg(server->ncp_sock, &msg, rq->tx_totallen);
@@ -239,6 +242,7 @@ static void __ncptcp_try_send(struct ncp_server *server) {
 		iov++;
 		rq->tx_iovlen--;
 	}
+	iov->iov_base += result;
 	iov->iov_len -= result;
 	rq->tx_ciov = iov;
 }
