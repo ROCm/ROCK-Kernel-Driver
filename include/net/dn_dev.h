@@ -45,7 +45,7 @@ struct dn_ifaddr {
  * device will come up. In the dn_dev structure, it is the actual
  * state.
  *
- * Things have changed here. I've killed timer1 since its a user space
+ * Things have changed here. I've killed timer1 since it's a user space
  * issue for a user space routing deamon to sort out. The kernel does
  * not need to be bothered with it.
  *

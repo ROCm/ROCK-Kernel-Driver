@@ -451,7 +451,7 @@ static void mfm_rw_intr(void)
 		return;
 	};
 
-	/* OK so what ever happend its not an error, now I reckon we are left between
+	/* OK so what ever happened it's not an error, now I reckon we are left between
 	   a choice of command end or some data which is ready to be collected */
 	/* I think we have to transfer data while the interrupt line is on and its
 	   not any other type of interrupt */

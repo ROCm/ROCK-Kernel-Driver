@@ -434,7 +434,7 @@ static int setup (wan_device_t* wandev, wandev_conf_t* conf)
 	}
 
 	/* If the current card has already been configured
-         * or its a piggyback card, do not try to allocate
+         * or it's a piggyback card, do not try to allocate
          * resources.
 	 */
 	if (!card->wandev.piggyback && !card->configured){

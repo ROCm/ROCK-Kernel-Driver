@@ -798,7 +798,7 @@ static void i2ob_request(request_queue_t *q)
 
 		/* 
 		 *	Queue depths probably belong with some kind of 
-		 *	generic IOP commit control. Certainly its not right 
+		 *	generic IOP commit control. Certainly it's not right 
 		 *	its global!  
 		 */
 		if(atomic_read(&i2ob_queues[dev->unit]->queue_depth) >= dev->depth)

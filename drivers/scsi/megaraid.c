@@ -309,7 +309,7 @@
  *	Thu Mar 15 18:38:11 EST 2001 - AM
  *
  *	Firmware version check removed if subsysid==0x1111 and
- *	subsysvid==0x1111, since its not yet initialized.
+ *	subsysvid==0x1111, since it's not yet initialized.
  *
  *	changes made to correctly calculate the base in mega_findCard.
  *

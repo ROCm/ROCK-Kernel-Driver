@@ -169,7 +169,7 @@ void pr_out(ADAPTER * a)
     a->ram_outw(a, &ReqOut->XBuffer.length, length);
     a->ram_out(a, &ReqOut->ReqId, this->Id);
     a->ram_out(a, &ReqOut->ReqCh, this->ReqCh);
-        /* if its a specific request (no ASSIGN) ...                */
+        /* if it's a specific request (no ASSIGN) ...                */
     if(this->Id &0x1f) {
         /* if buffers are left in the list of data buffers do       */
         /* do chaining (LL_MDATA, N_MDATA)                          */
@@ -405,7 +405,7 @@ void scom_out(ADAPTER * a)
   a->ram_outw(a, &RAM->XBuffer.length, length);
   a->ram_out(a, &RAM->ReqId, this->Id);
   a->ram_out(a, &RAM->ReqCh, this->ReqCh);
-        /* if its a specific request (no ASSIGN) ...                */
+        /* if it's a specific request (no ASSIGN) ...                */
   if(this->Id &0x1f) {
         /* if buffers are left in the list of data buffers do       */
         /* chaining (LL_MDATA, N_MDATA)                             */

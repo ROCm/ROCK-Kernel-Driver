@@ -147,7 +147,7 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 }
 
 /* Special close routine which deletes map information if we are the last
- * person to close a mapping and its not in the global maplist.
+ * person to close a mapping and it's not in the global maplist.
  */
 
 void DRM(vm_shm_close)(struct vm_area_struct *vma)

@@ -1486,7 +1486,7 @@ kgdb_handle_serial:
   move.d   $r0,[reg+0x62]   ; Save the return address in BRP
   move     $usp,[reg+0x66]  ; USP
 
-;; get the serial character (from debugport.c) and check if its a ctrl-c
+;; get the serial character (from debugport.c) and check if it is a ctrl-c
 
   jsr getDebugChar
   cmp.b 3, $r10

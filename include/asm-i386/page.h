@@ -24,7 +24,7 @@
 #else
 
 /*
- *	On older X86 processors its not a win to use MMX here it seems.
+ *	On older X86 processors it's not a win to use MMX here it seems.
  *	Maybe the K6-III ?
  */
  

@@ -56,7 +56,7 @@ struct slvl_board
  
 static void sealevel_input(struct z8530_channel *c, struct sk_buff *skb)
 {
-	/* Drop the CRC - its not a good idea to try and negotiate it ;) */
+	/* Drop the CRC - it's not a good idea to try and negotiate it ;) */
 	skb_trim(skb, skb->len-2);
 	skb->protocol=htons(ETH_P_WAN_PPP);
 	skb->mac.raw=skb->data;

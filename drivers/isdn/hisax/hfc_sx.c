@@ -97,7 +97,7 @@ fifo_select(struct IsdnCardState *cs, u8 fifo)
 
 /******************************************/
 /* reset the specified fifo to defaults.  */
-/* If its a send fifo init needed markers */
+/* If it's a send fifo init needed markers */
 /******************************************/
 static void
 reset_fifo(struct IsdnCardState *cs, u8 fifo)

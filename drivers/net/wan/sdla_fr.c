@@ -2747,7 +2747,7 @@ static int handle_IPXWAN(unsigned char *sendpacket,
 		return 1;
 	}
 
-	/* If we get here, its an IPX-data packet so it'll get passed up the 
+	/* If we get here, it's an IPX-data packet so it'll get passed up the 
 	 * stack.
 	 * switch the network numbers 
 	 */

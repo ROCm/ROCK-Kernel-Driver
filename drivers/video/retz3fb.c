@@ -1379,7 +1379,7 @@ int __init retz3fb_init(void)
 		zinfo->base = ioremap(board_addr, board_size);
 		zinfo->regs = zinfo->base;
 		zinfo->fbmem = zinfo->base + VIDEO_MEM_OFFSET;
-		/* Get memory size - for now we asume its a 4MB board */
+		/* Get memory size - for now we asume it's a 4MB board */
 		zinfo->fbsize = 0x00400000; /* 4 MB */
 		zinfo->physregs = board_addr;
 		zinfo->physfbmem = board_addr + VIDEO_MEM_OFFSET;

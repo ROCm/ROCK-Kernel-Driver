@@ -292,7 +292,7 @@ MODULE_PARM(clocking, "i");
 
 
 /* changed so that I could actually find all the
-	references and fix them up.  its a little more readable now. */
+	references and fix them up.  it's a little more readable now. */
 #define ESS_FMT_STEREO	0x01
 #define ESS_FMT_16BIT	0x02
 #define ESS_FMT_MASK	0x03
