@@ -507,8 +507,15 @@ xfs_relse_buftarg(
 	truncate_inode_pages(btp->pbr_mapping, 0LL);
 }
 
+unsigned int
+xfs_getsize_buftarg(
+	xfs_buftarg_t		*btp)
+{
+	return block_size(btp->pbr_bdev);
+}
+
 void
-xfs_size_buftarg(
+xfs_setsize_buftarg(
 	xfs_buftarg_t		*btp,
 	unsigned int		blocksize,
 	unsigned int		sectorsize)
@@ -535,7 +542,7 @@ xfs_alloc_buftarg(
 	btp->pbr_dev =  bdev->bd_dev;
 	btp->pbr_bdev = bdev;
 	btp->pbr_mapping = bdev->bd_inode->i_mapping;
-	xfs_size_buftarg(btp, PAGE_CACHE_SIZE, bdev_hardsect_size(bdev));
+	xfs_setsize_buftarg(btp, PAGE_CACHE_SIZE, bdev_hardsect_size(bdev));
 
 	return btp;
 }
