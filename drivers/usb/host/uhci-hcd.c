@@ -2074,7 +2074,7 @@ static int __devinit uhci_start(struct usb_hcd *hcd)
 	struct proc_dir_entry *ent;
 #endif
 
-	uhci->io_addr = (unsigned) hcd->regs;
+	uhci->io_addr = (unsigned long) hcd->regs;
 	io_size = pci_resource_len(hcd->pdev, hcd->region);
 
 #ifdef CONFIG_PROC_FS
