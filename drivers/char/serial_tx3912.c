@@ -1054,9 +1054,10 @@ static struct console sercons = {
 	.index    = -1
 };
 
-void __init tx3912_console_init(void)
+static void __init tx3912_console_init(void)
 {
 	register_console(&sercons);
 }
+console_initcall(tx3912_console_init);
 
 #endif

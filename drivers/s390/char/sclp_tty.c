@@ -797,3 +797,6 @@ sclp_tty_init(void)
 	if (tty_register_driver(&sclp_tty_driver))
 		panic("Couldn't register sclp_tty driver\n");
 }
+
+console_initcall(sclp_tty_init);
+

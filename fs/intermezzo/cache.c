@@ -22,7 +22,6 @@
 
 #define __NO_VERSION__
 #include <linux/module.h>
-#include <stdarg.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>

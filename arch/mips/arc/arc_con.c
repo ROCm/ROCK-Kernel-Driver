@@ -63,7 +63,8 @@ static struct console arc_cons = {
  *    Register console.
  */
 
-void __init arc_console_init(void)
+static void __init arc_console_init(void)
 {
 	register_console(&arc_cons);
 }
+console_initcall(arc_console_init);

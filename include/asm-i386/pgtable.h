@@ -49,8 +49,6 @@ void pgtable_cache_init(void);
 
 #endif
 
-#define __beep() asm("movb $0x3,%al; outb %al,$0x61")
-
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
 #define PGDIR_SIZE	(1UL << PGDIR_SHIFT)

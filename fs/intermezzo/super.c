@@ -26,8 +26,6 @@
 static char rcsid[] __attribute ((unused)) = "$Id: super.c,v 1.4 2002/10/12 02:16:19 rread Exp $";
 #define INTERMEZZO_VERSION "$Revision: 1.4 $"
 
-#include <stdarg.h>
-
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>

@@ -237,3 +237,5 @@ sclp_console_init(void)
 	/* enable printk-access to this driver */
 	register_console(&sclp_console);
 }
+
+console_initcall(sclp_console_init);

@@ -98,8 +98,6 @@ extern unsigned long empty_zero_page[1024];
 
 #endif /* !__ASSEMBLY__ */
 
-#define __beep() asm("")
-
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
 #define PGDIR_SIZE	(1UL << PGDIR_SHIFT)

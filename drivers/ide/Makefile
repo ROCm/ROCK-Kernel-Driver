@@ -28,3 +28,4 @@ obj-$(CONFIG_PROC_FS)			+= ide-proc.o
 endif
 
 obj-$(CONFIG_BLK_DEV_IDE)		+= legacy/ ppc/ arm/
+obj-$(CONFIG_BLK_DEV_HD)		+= legacy/
