@@ -1234,7 +1234,7 @@ void swapin_readahead(swp_entry_t entry, unsigned long addr,struct vm_area_struc
 				vma = next_vma;
 				next_vma = vma ? vma->vm_next : NULL;
 			}
-			if (addr < vma->vm_start) 
+			if (vma && addr < vma->vm_start) 
 				vma = NULL; 
 		} else { 
 			if (next_vma && addr >= next_vma->vm_start) { 

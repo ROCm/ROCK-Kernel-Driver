@@ -29,7 +29,7 @@
 #include <net/ipv6.h>
 #include <linux/ipv6.h>
 #include <linux/icmpv6.h>
-
+#define Iprintk(x...)  
 #define XFRM6_TUNNEL_HSIZE 1024
 /* note: we assume index of xfrm_tunnel_table[] == spi */
 static xfrm_address_t *xfrm6_tunnel_table[XFRM6_TUNNEL_HSIZE];
@@ -39,17 +39,17 @@ static spinlock_t xfrm6_tunnel_lock = SPIN_LOCK_UNLOCKED;
 static unsigned xfrm6_addr_hash(xfrm_address_t *addr)
 {
 	unsigned h;
-	printk(KERN_DEBUG "%s:called\n", __FUNCTION__);
+	Iprintk(KERN_DEBUG "%s:called\n", __FUNCTION__);
 	h = ntohl(addr->a6[0]^addr->a6[1]^addr->a6[2]^addr->a6[3]);
 	h = (h ^ (h>>16)) % XFRM6_TUNNEL_HSIZE;
-	printk(KERN_DEBUG "%s:hash:%u\n", __FUNCTION__, h);
+	Iprintk(KERN_DEBUG "%s:hash:%u\n", __FUNCTION__, h);
 	return h;
 }
 
 static void xfrm6_tunnel_htable_init(void)
 {
 	int i;
-	printk(KERN_DEBUG "%s:called\n", __FUNCTION__);
+	Iprintk(KERN_DEBUG "%s:called\n", __FUNCTION__);
 	for (i=0; i<XFRM6_TUNNEL_HSIZE; i++)
 		xfrm6_tunnel_table[i] = NULL;
 }
@@ -61,21 +61,21 @@ u32 xfrm6_tunnel_spi_lookup(xfrm_address_t *saddr)
 	xfrm_address_t *index_addr;
 	int i;
 
-	printk(KERN_DEBUG "%s:called\n", __FUNCTION__);
+	Iprintk(KERN_DEBUG "%s:called\n", __FUNCTION__);
 	spin_lock(&xfrm6_tunnel_lock);
 	for (i = index; i < XFRM6_TUNNEL_HSIZE; i++) {
 		index_addr = xfrm6_tunnel_table[i];
 		if (index_addr == NULL)
 			continue;
 		if (!memcmp(index_addr, saddr, sizeof(xfrm_address_t))) {
-			printk(KERN_DEBUG "%s:match\n", __FUNCTION__);
+			Iprintk(KERN_DEBUG "%s:match\n", __FUNCTION__);
 			spi = htonl(i);
 			goto out;
 		}
 	}
 out:
 	spin_unlock(&xfrm6_tunnel_lock);
-	printk(KERN_DEBUG "%s:spi:%u\n", __FUNCTION__,ntohl(spi));
+	Iprintk(KERN_DEBUG "%s:spi:%u\n", __FUNCTION__,ntohl(spi));
 	return spi;
 }
 
@@ -102,20 +102,20 @@ u32 xfrm6_tunnel_alloc_spi(xfrm_address_t *saddr)
 
 out:
 	spin_unlock(&xfrm6_tunnel_lock);
-	printk(KERN_DEBUG "%s:spi:%u\n", __FUNCTION__,ntohl(spi));
+	Iprintk(KERN_DEBUG "%s:spi:%u\n", __FUNCTION__,ntohl(spi));
 	return spi;
 }
 
 static void xfrm6_tunnel_free_spi(xfrm_address_t *saddr){
 	u32 index = ntohl(xfrm6_tunnel_spi_lookup(saddr));
 
-	printk(KERN_DEBUG "%s:spi:%u\n", __FUNCTION__,index);
+	Iprintk(KERN_DEBUG "%s:spi:%u\n", __FUNCTION__,index);
 	if (index) {
 		spin_lock(&xfrm6_tunnel_lock);
 		kfree(xfrm6_tunnel_table[index]);
 		xfrm6_tunnel_table[index] = NULL;
 		spin_unlock(&xfrm6_tunnel_lock);
-		printk(KERN_DEBUG "%s:spi freed\n", __FUNCTION__);
+		Iprintk(KERN_DEBUG "%s:spi freed\n", __FUNCTION__);
 	}
 }
 
@@ -249,7 +249,7 @@ static int ip6ip6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	}
 
 	spi = xfrm6_tunnel_spi_lookup((xfrm_address_t *)&iph->saddr);
-	printk(KERN_DEBUG "%s:spi:%u\n", __FUNCTION__,spi);
+	Iprintk(KERN_DEBUG "%s:spi:%u\n", __FUNCTION__,spi);
 	x = xfrm_state_lookup((xfrm_address_t *)&iph->daddr, 
 			spi,
 			IPPROTO_IPV6, AF_INET6);
@@ -305,17 +305,17 @@ static void ip6ip6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		case ICMPV6_ADDR_UNREACH:
 		case ICMPV6_PORT_UNREACH:
 		default:
-			printk(KERN_ERR "xfrm ip6ip6: Destination Unreach.\n");
+			Iprintk(KERN_ERR "xfrm ip6ip6: Destination Unreach.\n");
 			break;
 		}
 		break;
 	case ICMPV6_PKT_TOOBIG:
-			printk(KERN_ERR "xfrm ip6ip6: Packet Too Big.\n");
+			Iprintk(KERN_ERR "xfrm ip6ip6: Packet Too Big.\n");
 		break;
 	case ICMPV6_TIME_EXCEED:
 		switch (code) {
 		case ICMPV6_EXC_HOPLIMIT:
-			printk(KERN_ERR "xfrm ip6ip6: Too small Hoplimit.\n");
+			Iprintk(KERN_ERR "xfrm ip6ip6: Too small Hoplimit.\n");
 			break;
 		case ICMPV6_EXC_FRAGTIME:
 		default: 
@@ -372,7 +372,7 @@ static int __init ip6ip6_init(void)
 int __init ip6ip6_init(void)
 #endif
 {
-	printk(KERN_DEBUG "ip6ip6 init\n");
+	Iprintk(KERN_DEBUG "ip6ip6 init\n");
 	if (xfrm_register_type(&ip6ip6_type, AF_INET6) < 0) {
 		printk(KERN_INFO "ip6ip6 init: can't add xfrm type\n");
 		return -EAGAIN;
@@ -392,7 +392,7 @@ static void __exit ip6ip6_fini(void)
 void __exit ip6ip6_fini(void)
 #endif
 {
-	printk(KERN_DEBUG "ip6ip6 fini\n");
+	Iprintk(KERN_DEBUG "ip6ip6 fini\n");
 	if (inet6_del_protocol(&ip6ip6_protocol, IPPROTO_IPV6) < 0)
 		printk(KERN_INFO "ip6ip6 close: can't remove protocol\n");
 	if (xfrm_unregister_type(&ip6ip6_type, AF_INET6) < 0)
