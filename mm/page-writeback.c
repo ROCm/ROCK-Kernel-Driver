@@ -95,31 +95,33 @@ void balance_dirty_pages(struct address_space *mapping)
 	struct page_state ps;
 	long background_thresh;
 	long async_thresh;
-	unsigned long dirty_and_writeback;
-	struct backing_dev_info *bdi;
-
-	get_page_state(&ps);
-	dirty_and_writeback = ps.nr_dirty + ps.nr_writeback;
+	struct backing_dev_info *bdi = mapping->backing_dev_info;
 
 	background_thresh = (dirty_background_ratio * total_pages) / 100;
 	async_thresh = (dirty_async_ratio * total_pages) / 100;
-	bdi = mapping->backing_dev_info;
 
-	if (dirty_and_writeback > async_thresh) {
+	get_page_state(&ps);
+
+	while (ps.nr_dirty + ps.nr_writeback > async_thresh) {
 		struct writeback_control wbc = {
 			.bdi		= bdi,
 			.sync_mode	= WB_SYNC_NONE,
 			.older_than_this = NULL,
 			.nr_to_write	= sync_writeback_pages(),
 		};
-		if (!dirty_exceeded)
-			dirty_exceeded = 1;
-		writeback_inodes(&wbc);
+
+		dirty_exceeded = 1;
+
+		if (ps.nr_dirty)
+			writeback_inodes(&wbc);
+
 		get_page_state(&ps);
-	} else {
-		if (dirty_exceeded)
-			dirty_exceeded = 0;
+		if (ps.nr_dirty + ps.nr_writeback <= async_thresh)
+			break;
+		blk_congestion_wait(WRITE, HZ/10);
 	}
+
+	dirty_exceeded = 0;
 
 	if (!writeback_in_progress(bdi) && ps.nr_dirty > background_thresh)
 		pdflush_operation(background_writeout, 0);
