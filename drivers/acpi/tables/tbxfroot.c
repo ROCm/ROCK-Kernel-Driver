@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbxfroot - Find the root ACPI table (RSDT)
- *              $Revision: 65 $
+ *              $Revision: 66 $
  *
  *****************************************************************************/
 
@@ -342,7 +342,7 @@ acpi_tb_scan_memory_for_rsdp (
 
 	for (offset = 0, mem_rover = start_address;
 		 offset < length;
-		 offset += RSDP_SCAN_STEP, mem_rover += RSDP_SCAN_STEP) {
+		 offset += ACPI_RSDP_SCAN_STEP, mem_rover += ACPI_RSDP_SCAN_STEP) {
 
 		/* The signature and checksum must both be correct */
 
@@ -404,21 +404,21 @@ acpi_tb_find_rsdp (
 		/*
 		 * 1) Search EBDA (low memory) paragraphs
 		 */
-		status = acpi_os_map_memory ((u64) LO_RSDP_WINDOW_BASE, LO_RSDP_WINDOW_SIZE,
+		status = acpi_os_map_memory ((u64) ACPI_LO_RSDP_WINDOW_BASE, ACPI_LO_RSDP_WINDOW_SIZE,
 				  (void **) &table_ptr);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %X for length %X\n",
-				LO_RSDP_WINDOW_BASE, LO_RSDP_WINDOW_SIZE));
+				ACPI_LO_RSDP_WINDOW_BASE, ACPI_LO_RSDP_WINDOW_SIZE));
 			return_ACPI_STATUS (status);
 		}
 
-		mem_rover = acpi_tb_scan_memory_for_rsdp (table_ptr, LO_RSDP_WINDOW_SIZE);
-		acpi_os_unmap_memory (table_ptr, LO_RSDP_WINDOW_SIZE);
+		mem_rover = acpi_tb_scan_memory_for_rsdp (table_ptr, ACPI_LO_RSDP_WINDOW_SIZE);
+		acpi_os_unmap_memory (table_ptr, ACPI_LO_RSDP_WINDOW_SIZE);
 
 		if (mem_rover) {
 			/* Found it, return the physical address */
 
-			phys_addr = LO_RSDP_WINDOW_BASE;
+			phys_addr = ACPI_LO_RSDP_WINDOW_BASE;
 			phys_addr += ACPI_PTR_DIFF (mem_rover,table_ptr);
 
 			table_info->physical_address = phys_addr;
@@ -428,21 +428,21 @@ acpi_tb_find_rsdp (
 		/*
 		 * 2) Search upper memory: 16-byte boundaries in E0000h-F0000h
 		 */
-		status = acpi_os_map_memory ((u64) HI_RSDP_WINDOW_BASE, HI_RSDP_WINDOW_SIZE,
+		status = acpi_os_map_memory ((u64) ACPI_HI_RSDP_WINDOW_BASE, ACPI_HI_RSDP_WINDOW_SIZE,
 				  (void **) &table_ptr);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %X for length %X\n",
-				HI_RSDP_WINDOW_BASE, HI_RSDP_WINDOW_SIZE));
+				ACPI_HI_RSDP_WINDOW_BASE, ACPI_HI_RSDP_WINDOW_SIZE));
 			return_ACPI_STATUS (status);
 		}
 
-		mem_rover = acpi_tb_scan_memory_for_rsdp (table_ptr, HI_RSDP_WINDOW_SIZE);
-		acpi_os_unmap_memory (table_ptr, HI_RSDP_WINDOW_SIZE);
+		mem_rover = acpi_tb_scan_memory_for_rsdp (table_ptr, ACPI_HI_RSDP_WINDOW_SIZE);
+		acpi_os_unmap_memory (table_ptr, ACPI_HI_RSDP_WINDOW_SIZE);
 
 		if (mem_rover) {
 			/* Found it, return the physical address */
 
-			phys_addr = HI_RSDP_WINDOW_BASE;
+			phys_addr = ACPI_HI_RSDP_WINDOW_BASE;
 			phys_addr += ACPI_PTR_DIFF (mem_rover, table_ptr);
 
 			table_info->physical_address = phys_addr;
@@ -457,8 +457,8 @@ acpi_tb_find_rsdp (
 		/*
 		 * 1) Search EBDA (low memory) paragraphs
 		 */
-		mem_rover = acpi_tb_scan_memory_for_rsdp (ACPI_PHYSADDR_TO_PTR (LO_RSDP_WINDOW_BASE),
-				  LO_RSDP_WINDOW_SIZE);
+		mem_rover = acpi_tb_scan_memory_for_rsdp (ACPI_PHYSADDR_TO_PTR (ACPI_LO_RSDP_WINDOW_BASE),
+				  ACPI_LO_RSDP_WINDOW_SIZE);
 		if (mem_rover) {
 			/* Found it, return the physical address */
 
@@ -469,8 +469,8 @@ acpi_tb_find_rsdp (
 		/*
 		 * 2) Search upper memory: 16-byte boundaries in E0000h-F0000h
 		 */
-		mem_rover = acpi_tb_scan_memory_for_rsdp (ACPI_PHYSADDR_TO_PTR (HI_RSDP_WINDOW_BASE),
-				  HI_RSDP_WINDOW_SIZE);
+		mem_rover = acpi_tb_scan_memory_for_rsdp (ACPI_PHYSADDR_TO_PTR (ACPI_HI_RSDP_WINDOW_BASE),
+				  ACPI_HI_RSDP_WINDOW_SIZE);
 		if (mem_rover) {
 			/* Found it, return the physical address */
 

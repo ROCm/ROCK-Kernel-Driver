@@ -158,7 +158,7 @@ acpi_pci_irq_add_prt (
 	int			bus)
 {
 	acpi_status		status = AE_OK;
-	char			pathname[PATHNAME_MAX] = {0};
+	char			pathname[ACPI_PATHNAME_MAX] = {0};
 	acpi_buffer		buffer = {0, NULL};
 	acpi_pci_routing_table	*prt = NULL;
 	acpi_pci_routing_table	*entry = NULL;
@@ -346,9 +346,13 @@ acpi_pci_irq_enable (
 	 */
 	if (!irq) {
 		printk(KERN_WARNING PREFIX "No IRQ known for interrupt pin %c of device %s", ('A' + pin), dev->slot_name);
-		if (dev->irq) 
+		/* Interrupt Line values above 0xF are forbidden */
+		if (dev->irq && dev->irq >= 0xF) {
 			printk(" - using IRQ %d\n", dev->irq);
-		return_VALUE(dev->irq);
+			return_VALUE(dev->irq);
+		}
+		else
+			return_VALUE(0);
  	}
 
 	dev->irq = irq;

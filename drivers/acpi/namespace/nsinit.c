@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsinit - namespace initialization
- *              $Revision: 50 $
+ *              $Revision: 52 $
  *
  *****************************************************************************/
 
@@ -59,7 +59,7 @@ acpi_ns_initialize_objects (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 		"**** Starting initialization of namespace objects ****\n"));
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "Completing Region/Field/Buffer/Package initialization:"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "Completing Region/Field/Buffer/Package initialization:"));
 
 	/* Set all init info to zero */
 
@@ -75,12 +75,13 @@ acpi_ns_initialize_objects (
 			acpi_format_exception (status)));
 	}
 
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT,
 		"\nInitialized %hd/%hd Regions %hd/%hd Fields %hd/%hd Buffers %hd/%hd Packages (%hd nodes)\n",
 		info.op_region_init, info.op_region_count,
 		info.field_init,    info.field_count,
 		info.buffer_init,   info.buffer_count,
 		info.package_init,  info.package_count, info.object_count));
+
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 		"%hd Control Methods found\n", info.method_count));
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
@@ -123,7 +124,7 @@ acpi_ns_initialize_devices (
 	info.num_STA = 0;
 	info.num_INI = 0;
 
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "Executing all Device _STA and_INI methods:"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "Executing all Device _STA and_INI methods:"));
 
 	/* Walk namespace for all objects of type Device */
 
@@ -135,7 +136,7 @@ acpi_ns_initialize_devices (
 			acpi_format_exception (status)));
 	}
 
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT,
 		"\n%hd Devices found containing: %hd _STA, %hd _INI methods\n",
 		info.device_count, info.num_STA, info.num_INI));
 
@@ -274,8 +275,10 @@ acpi_ns_init_one_object (
 				node->name.ascii, acpi_ut_get_type_name (type), acpi_format_exception (status)));
 	}
 
-	if (!(acpi_dbg_level & ACPI_LV_INIT)) {
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "."));
+	/* Print a dot for each object unless we are going to print the entire pathname */
+
+	if (!(acpi_dbg_level & ACPI_LV_INIT_NAMES)) {
+		acpi_os_printf (".");
 	}
 
 	/*
@@ -318,7 +321,7 @@ acpi_ns_init_one_device (
 
 
 	if ((acpi_dbg_level <= ACPI_LV_ALL_EXCEPTIONS) && (!(acpi_dbg_level & ACPI_LV_INFO))) {
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "."));
+		acpi_os_printf (".");
 	}
 
 	info->device_count++;
@@ -342,7 +345,7 @@ acpi_ns_init_one_device (
 	/*
 	 * Run _STA to determine if we can run _INI on the device.
 	 */
-	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (node, "_STA [Method]"));
+	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (ACPI_TYPE_METHOD, node, "_STA"));
 	status = acpi_ut_execute_STA (node, &flags);
 	if (ACPI_FAILURE (status)) {
 		/* Ignore error and move on to next device */
@@ -361,7 +364,7 @@ acpi_ns_init_one_device (
 	/*
 	 * The device is present. Run _INI.
 	 */
-	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (obj_handle, "_INI [Method]"));
+	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (ACPI_TYPE_METHOD, obj_handle, "_INI"));
 	status = acpi_ns_evaluate_relative (obj_handle, "_INI", NULL, NULL);
 	if (ACPI_FAILURE (status)) {
 		/* No _INI (AE_NOT_FOUND) means device requires no initialization */

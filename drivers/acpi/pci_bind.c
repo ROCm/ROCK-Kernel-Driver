@@ -124,8 +124,8 @@ acpi_pci_bind (
 	acpi_status		status = AE_OK;
 	struct acpi_pci_data	*data = NULL;
 	struct acpi_pci_data	*pdata = NULL;
-	char			pathname[PATHNAME_MAX] = {0};
-	acpi_buffer		buffer = {PATHNAME_MAX, pathname};
+	char			pathname[ACPI_PATHNAME_MAX] = {0};
+	acpi_buffer		buffer = {ACPI_PATHNAME_MAX, pathname};
 	acpi_handle		handle = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_bind");
@@ -267,8 +267,8 @@ acpi_pci_bind_root (
 	int			result = 0;
 	acpi_status		status = AE_OK;
 	struct acpi_pci_data	*data = NULL;
-	char			pathname[PATHNAME_MAX] = {0};
-	acpi_buffer		buffer = {PATHNAME_MAX, pathname};
+	char			pathname[ACPI_PATHNAME_MAX] = {0};
+	acpi_buffer		buffer = {ACPI_PATHNAME_MAX, pathname};
 
 	ACPI_FUNCTION_TRACE("acpi_pci_bind_root");
 

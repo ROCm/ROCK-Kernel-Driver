@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 146 $
+ *              $Revision: 149 $
  *
  *****************************************************************************/
 
@@ -90,16 +90,13 @@ acpi_ns_print_pathname (
  *
  ******************************************************************************/
 
-acpi_status
+void
 acpi_ns_dump_pathname (
 	acpi_handle             handle,
 	NATIVE_CHAR             *msg,
 	u32                     level,
 	u32                     component)
 {
-	acpi_buffer             buffer;
-	acpi_status             status;
-
 
 	ACPI_FUNCTION_TRACE ("Ns_dump_pathname");
 
@@ -107,20 +104,14 @@ acpi_ns_dump_pathname (
 	/* Do this only if the requested debug level and component are enabled */
 
 	if (!(acpi_dbg_level & level) || !(acpi_dbg_layer & component)) {
-		return_ACPI_STATUS (AE_OK);
+		return_VOID;
 	}
 
 	/* Convert handle to a full pathname and print it (with supplied message) */
 
-	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
-
-	status = acpi_ns_handle_to_pathname (handle, &buffer);
-	if (ACPI_SUCCESS (status)) {
-		acpi_os_printf ("%s %s (Node %p)\n", msg, (char *) buffer.pointer, handle);
-		ACPI_MEM_FREE (buffer.pointer);
-	}
-
-	return_ACPI_STATUS (status);
+	acpi_ns_print_node_pathname (handle, msg);
+	acpi_os_printf ("\n");
+	return_VOID;
 }
 
 
