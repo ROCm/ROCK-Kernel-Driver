@@ -31,7 +31,10 @@
 
 #include <linux/ncp_fs.h>
 
+#include <net/sock.h>
+
 #include "ncplib_kernel.h"
+#include "getopt.h"
 
 static void ncp_delete_inode(struct inode *);
 static void ncp_put_super(struct super_block *);
@@ -283,6 +286,103 @@ ncp_delete_inode(struct inode *inode)
 	clear_inode(inode);
 }
 
+static void ncp_stop_tasks(struct ncp_server *server) {
+	struct sock* sk = server->ncp_sock->sk;
+		
+	sk->error_report = server->error_report;
+	sk->data_ready = server->data_ready;
+	sk->write_space = server->write_space;
+	del_timer_sync(&server->timeout_tm);
+	flush_scheduled_tasks();
+}
+
+static const struct ncp_option ncp_opts[] = {
+	{ "uid",	OPT_INT,	'u' },
+	{ "gid",	OPT_INT,	'g' },
+	{ "owner",	OPT_INT,	'o' },
+	{ "mode",	OPT_INT,	'm' },
+	{ "dirmode",	OPT_INT,	'd' },
+	{ "timeout",	OPT_INT,	't' },
+	{ "retry",	OPT_INT,	'r' },
+	{ "flags",	OPT_INT,	'f' },
+	{ "wdogpid",	OPT_INT,	'w' },
+	{ "ncpfd",	OPT_INT,	'n' },
+	{ "infofd",	OPT_INT,	'i' },	/* v5 */
+	{ "version",	OPT_INT,	'v' },
+	{ NULL,		0,		0 } };
+
+static int ncp_parse_options(struct ncp_mount_data_kernel *data, char *options) {
+	int optval;
+	char *optarg;
+	unsigned long optint;
+	int version = 0;
+
+	data->flags = 0;
+	data->int_flags = 0;
+	data->mounted_uid = 0;
+	data->wdog_pid = -1;
+	data->ncp_fd = ~0;
+	data->time_out = 10;
+	data->retry_count = 20;
+	data->uid = 0;
+	data->gid = 0;
+	data->file_mode = 0600;
+	data->dir_mode = 0700;
+	data->info_fd = -1;
+	data->mounted_vol[0] = 0;
+	
+	while ((optval = ncp_getopt("ncpfs", &options, ncp_opts, NULL, &optarg, &optint)) != 0) {
+		if (optval < 0)
+			return optval;
+		switch (optval) {
+			case 'u':
+				data->uid = optint;
+				break;
+			case 'g':
+				data->gid = optint;
+				break;
+			case 'o':
+				data->mounted_uid = optint;
+				break;
+			case 'm':
+				data->file_mode = optint;
+				break;
+			case 'd':
+				data->dir_mode = optint;
+				break;
+			case 't':
+				data->time_out = optint;
+				break;
+			case 'r':
+				data->retry_count = optint;
+				break;
+			case 'f':
+				data->flags = optint;
+				break;
+			case 'w':
+				data->wdog_pid = optint;
+				break;
+			case 'n':
+				data->ncp_fd = optint;
+				break;
+			case 'i':
+				data->info_fd = optint;
+				break;
+			case 'v':
+				if (optint < NCP_MOUNT_VERSION_V4) {
+					return -ECHRNG;
+				}
+				if (optint > NCP_MOUNT_VERSION_V5) {
+					return -ECHRNG;
+				}
+				version = optint;
+				break;
+			
+		}
+	}
+	return 0;
+}
+
 static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 {
 	struct ncp_mount_data_kernel data;
@@ -323,6 +423,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 				data.gid = md->gid;
 				data.file_mode = md->file_mode;
 				data.dir_mode = md->dir_mode;
+				data.info_fd = -1;
 				memcpy(data.mounted_vol, md->mounted_vol,
 					NCP_VOLNAME_LEN+1);
 			}
@@ -342,12 +443,18 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 				data.gid = md->gid;
 				data.file_mode = md->file_mode;
 				data.dir_mode = md->dir_mode;
+				data.info_fd = -1;
 				data.mounted_vol[0] = 0;
 			}
 			break;
 		default:
 			error = -ECHRNG;
-			goto out;
+			if (*(__u32*)raw_data == cpu_to_be32(0x76657273)) {
+				error = ncp_parse_options(&data, raw_data);
+			}
+			if (error)
+				goto out;
+			break;
 	}
 	error = -EBADF;
 	ncp_filp = fget(data.ncp_fd);
@@ -376,6 +483,28 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	memset(server, 0, sizeof(*server));
 
 	server->ncp_filp = ncp_filp;
+	server->ncp_sock = sock;
+	
+	if (data.info_fd != -1) {
+		struct socket *info_sock;
+
+		error = -EBADF;
+		server->info_filp = fget(data.info_fd);
+		if (!server->info_filp)
+			goto out_fput;
+		error = -ENOTSOCK;
+		sock_inode = server->info_filp->f_dentry->d_inode;
+		if (!S_ISSOCK(sock_inode->i_mode))
+			goto out_fput2;
+		info_sock = SOCKET_I(sock_inode);
+		if (!info_sock)
+			goto out_fput2;
+		error = -EBADFD;
+		if (info_sock->type != SOCK_STREAM)
+			goto out_fput2;
+		server->info_sock = info_sock;
+	}
+
 /*	server->lock = 0;	*/
 	init_MUTEX(&server->sem);
 	server->packet = NULL;
@@ -413,6 +542,16 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 
 	server->dentry_ttl = 0;	/* no caching */
 
+	INIT_LIST_HEAD(&server->tx.requests);
+	init_MUTEX(&server->rcv.creq_sem);
+	server->tx.creq = NULL;
+	server->rcv.creq = NULL;
+	server->data_ready = sock->sk->data_ready;
+	server->write_space = sock->sk->write_space;
+	server->error_report = sock->sk->error_report;
+	sock->sk->user_data = server;
+
+	init_timer(&server->timeout_tm);
 #undef NCP_PACKET_SIZE
 #define NCP_PACKET_SIZE 131072
 	error = -ENOMEM;
@@ -420,6 +559,22 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	server->packet = vmalloc(NCP_PACKET_SIZE);
 	if (server->packet == NULL)
 		goto out_nls;
+
+	sock->sk->data_ready = ncp_tcp_data_ready;
+	sock->sk->error_report = ncp_tcp_error_report;
+	if (sock->type == SOCK_STREAM) {
+		server->rcv.ptr = (unsigned char*)&server->rcv.buf;
+		server->rcv.len = 10;
+		server->rcv.state = 0;
+		INIT_TQUEUE(&server->rcv.tq, ncp_tcp_rcv_proc, server);
+		INIT_TQUEUE(&server->tx.tq, ncp_tcp_tx_proc, server);
+		sock->sk->write_space = ncp_tcp_write_space;
+	} else {
+		INIT_TQUEUE(&server->rcv.tq, ncpdgram_rcv_proc, server);
+		INIT_TQUEUE(&server->timeout_tq, ncpdgram_timeout_proc, server);
+		server->timeout_tm.data = (unsigned long)server;
+		server->timeout_tm.function = ncpdgram_timeout_call;
+	}
 
 	ncp_lock_server(server);
 	error = ncp_connect(server);
@@ -495,12 +650,16 @@ out_disconnect:
 	ncp_disconnect(server);
 	ncp_unlock_server(server);
 out_packet:
+	ncp_stop_tasks(server);
 	vfree(server->packet);
 out_nls:
 #ifdef CONFIG_NCPFS_NLS
 	unload_nls(server->nls_io);
 	unload_nls(server->nls_vol);
 #endif
+out_fput2:
+	if (server->info_filp)
+		fput(server->info_filp);
 out_fput:
 	/* 23/12/1998 Marcin Dalecki <dalecki@cs.net.pl>:
 	 * 
@@ -522,6 +681,8 @@ static void ncp_put_super(struct super_block *sb)
 	ncp_disconnect(server);
 	ncp_unlock_server(server);
 
+	ncp_stop_tasks(server);
+
 #ifdef CONFIG_NCPFS_NLS
 	/* unload the NLS charsets */
 	if (server->nls_vol)
@@ -536,6 +697,8 @@ static void ncp_put_super(struct super_block *sb)
 	}
 #endif /* CONFIG_NCPFS_NLS */
 
+	if (server->info_filp)
+		fput(server->info_filp);
 	fput(server->ncp_filp);
 	kill_proc(server->m.wdog_pid, SIGTERM, 1);
 
