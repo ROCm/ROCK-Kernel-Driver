@@ -717,6 +717,12 @@ static unsigned int __devinit init_chipset_pdc202xx(struct pci_dev *dev, const c
 
 static void __devinit init_hwif_pdc202xx(ide_hwif_t *hwif)
 {
+	struct pci_dev *dev = hwif->pci_dev;
+
+	/* PDC20265 has problems with large LBA48 requests */
+	if (dev->device == PCI_DEVICE_ID_PROMISE_20265)
+		hwif->rqsize = 256;
+
 	hwif->autodma = 0;
 	hwif->tuneproc  = &config_chipset_for_pio;
 	hwif->quirkproc = &pdc202xx_quirkproc;
