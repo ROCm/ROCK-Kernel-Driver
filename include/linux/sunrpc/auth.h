@@ -19,6 +19,14 @@
 /* size of the nodename buffer */
 #define UNX_MAXNODENAME	32
 
+/* Work around the lack of a VFS credential */
+struct auth_cred {
+	uid_t	uid;
+	gid_t	gid;
+	int	ngroups;
+	gid_t	*groups;
+};
+
 /*
  * Client user credentials
  */
@@ -74,13 +82,13 @@ struct rpc_authops {
 	struct rpc_auth *	(*create)(struct rpc_clnt *);
 	void			(*destroy)(struct rpc_auth *);
 
-	struct rpc_cred *	(*crcreate)(int);
+	struct rpc_cred *	(*crcreate)(struct auth_cred *, int);
 };
 
 struct rpc_credops {
 	void			(*crdestroy)(struct rpc_cred *);
 
-	int			(*crmatch)(struct rpc_cred *, int);
+	int			(*crmatch)(struct auth_cred *, struct rpc_cred *, int);
 	u32 *			(*crmarshal)(struct rpc_task *, u32 *, int);
 	int			(*crrefresh)(struct rpc_task *);
 	u32 *			(*crvalidate)(struct rpc_task *, u32 *);
