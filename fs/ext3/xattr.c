@@ -272,8 +272,7 @@ ext3_xattr_ibody_get(struct inode *inode, int name_index, const char *name,
 	void *end;
 	int error;
 
-	if (EXT3_SB(inode->i_sb)->s_inode_size <= EXT3_GOOD_OLD_INODE_SIZE ||
-	    !(EXT3_I(inode)->i_state & EXT3_STATE_XATTR))
+	if (!(EXT3_I(inode)->i_state & EXT3_STATE_XATTR))
 		return -ENODATA;
 	error = ext3_get_inode_loc(inode, &iloc);
 	if (error)
@@ -399,8 +398,7 @@ ext3_xattr_ibody_list(struct inode *inode, char *buffer, size_t buffer_size)
 	void *end;
 	int error;
 
-	if (EXT3_SB(inode->i_sb)->s_inode_size <= EXT3_GOOD_OLD_INODE_SIZE ||
-	    !(EXT3_I(inode)->i_state & EXT3_STATE_XATTR))
+	if (!(EXT3_I(inode)->i_state & EXT3_STATE_XATTR))
 		return 0;
 	error = ext3_get_inode_loc(inode, &iloc);
 	if (error)
@@ -865,7 +863,7 @@ ext3_xattr_ibody_find(struct inode *inode, struct ext3_xattr_info *i,
 	struct ext3_inode *raw_inode;
 	int error;
 
-	if (EXT3_SB(inode->i_sb)->s_inode_size <= EXT3_GOOD_OLD_INODE_SIZE)
+	if (EXT3_I(inode)->i_extra_isize == 0)
 		return 0;
 	raw_inode = ext3_raw_inode(&is->iloc);
 	header = IHDR(inode, raw_inode);
@@ -896,7 +894,7 @@ ext3_xattr_ibody_set(handle_t *handle, struct inode *inode,
 	struct ext3_xattr_search *s = &is->s;
 	int error;
 
-	if (EXT3_SB(inode->i_sb)->s_inode_size <= EXT3_GOOD_OLD_INODE_SIZE)
+	if (EXT3_I(inode)->i_extra_isize == 0)
 		return -ENOSPC;
 	error = ext3_xattr_set_entry(i, s);
 	if (error)
