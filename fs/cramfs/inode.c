@@ -293,6 +293,8 @@ static int cramfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	if (offset & 3)
 		return -EINVAL;
 
+	lock_kernel();
+
 	copied = 0;
 	while (offset < inode->i_size) {
 		struct cramfs_inode *de;
@@ -313,8 +315,10 @@ static int cramfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		namelen = de->namelen << 2;
 		nextoffset = offset + sizeof(*de) + namelen;
 		for (;;) {
-			if (!namelen)
+			if (!namelen) {
+				unlock_kernel();
 				return -EIO;
+			}
 			if (name[namelen-1])
 				break;
 			namelen--;
@@ -327,6 +331,7 @@ static int cramfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		filp->f_pos = offset;
 		copied++;
 	}
+	unlock_kernel();
 	return 0;
 }
 

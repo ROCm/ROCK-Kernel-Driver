@@ -14,6 +14,7 @@
 #include <linux/nfs.h>
 #include <linux/nfs3.h>
 #include <linux/nfs_fs.h>
+#include <linux/smp_lock.h>
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
@@ -560,6 +561,8 @@ nfs3_proc_readdir(struct inode *dir, struct rpc_cred *cred,
 	u32			*verf = NFS_COOKIEVERF(dir);
 	int			status;
 
+	lock_kernel();
+
 	arg.buffer  = entry;
 	arg.bufsiz  = size;
 	arg.verf[0] = verf[0];
@@ -580,6 +583,7 @@ nfs3_proc_readdir(struct inode *dir, struct rpc_cred *cred,
 	status = rpc_call_sync(NFS_CLIENT(dir), &msg, 0);
 	nfs_refresh_inode(dir, &dir_attr);
 	dprintk("NFS reply readdir: %d\n", status);
+	unlock_kernel();
 	return status;
 }
 

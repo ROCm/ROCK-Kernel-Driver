@@ -400,6 +400,8 @@ static int ncp_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	int result, mtime_valid = 0;
 	time_t mtime = 0;
 
+	lock_kernel();
+
 	ctl.page  = NULL;
 	ctl.cache = NULL;
 
@@ -533,6 +535,7 @@ finished:
 		page_cache_release(ctl.page);
 	}
 out:
+	unlock_kernel();
 	return result;
 }
 

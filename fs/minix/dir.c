@@ -7,6 +7,7 @@
  */
 
 #include "minix.h"
+#include <linux/smp_lock.h>
 
 typedef struct minix_dir_entry minix_dirent;
 
@@ -89,6 +90,8 @@ static int minix_readdir(struct file * filp, void * dirent, filldir_t filldir)
 	struct minix_sb_info *sbi = minix_sb(sb);
 	unsigned chunk_size = sbi->s_dirsize;
 
+	lock_kernel();
+
 	pos = (pos + chunk_size-1) & ~(chunk_size-1);
 	if (pos >= inode->i_size)
 		goto done;
@@ -124,6 +127,7 @@ static int minix_readdir(struct file * filp, void * dirent, filldir_t filldir)
 done:
 	filp->f_pos = (n << PAGE_CACHE_SHIFT) | offset;
 	UPDATE_ATIME(inode);
+	unlock_kernel();
 	return 0;
 }
 

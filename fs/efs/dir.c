@@ -5,6 +5,7 @@
  */
 
 #include <linux/efs_fs.h>
+#include <linux/smp_lock.h>
 
 static int efs_readdir(struct file *, void *, filldir_t);
 
@@ -30,6 +31,8 @@ static int efs_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 
 	if (inode->i_size & (EFS_DIRBSIZE-1))
 		printk(KERN_WARNING "EFS: WARNING: readdir(): directory size not a multiple of EFS_DIRBSIZE\n");
+
+	lock_kernel();
 
 	/* work out where this entry can be found */
 	block = filp->f_pos >> EFS_DIRBSIZE_BITS;
@@ -91,7 +94,7 @@ static int efs_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 				}
 				brelse(bh);
 				filp->f_pos = (block << EFS_DIRBSIZE_BITS) | slot;
-				return 0;
+				goto out;
 			}
 			slot++;
 		}
@@ -102,6 +105,8 @@ static int efs_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 	}
 
 	filp->f_pos = (block << EFS_DIRBSIZE_BITS) | slot;
+out:
+	unlock_kernel();
 	return 0;
 }
 

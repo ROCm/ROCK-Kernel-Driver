@@ -102,6 +102,7 @@
 
 #include <linux/fs.h>
 #include <linux/locks.h>
+#include <linux/smp_lock.h>
 #include "jfs_incore.h"
 #include "jfs_superblock.h"
 #include "jfs_filsys.h"
@@ -2868,6 +2869,8 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	if (filp->f_pos == DIREND)
 		return 0;
 
+	lock_kernel();
+
 	if (DO_INDEX(ip)) {
 		/*
 		 * persistent index is stored in directory entries.
@@ -2885,12 +2888,14 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 			if (dtEmpty(ip)) {
 				filp->f_pos = DIREND;
+				unlock_kernel();
 				return 0;
 			}
 		      repeat:
 			rc = get_index(ip, dir_index, &dirtab_slot);
 			if (rc) {
 				filp->f_pos = DIREND;
+				unlock_kernel();
 				return rc;
 			}
 			if (dirtab_slot.flag == DIR_INDEX_FREE) {
@@ -2898,11 +2903,13 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 					jERROR(1, ("jfs_readdir detected "
 						   "infinite loop!\n"));
 					filp->f_pos = DIREND;
+					unlock_kernel();
 					return 0;
 				}
 				dir_index = le32_to_cpu(dirtab_slot.addr2);
 				if (dir_index == -1) {
 					filp->f_pos = DIREND;
+					unlock_kernel();
 					return 0;
 				}
 				goto repeat;
@@ -2912,12 +2919,14 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			DT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
 			if (rc) {
 				filp->f_pos = DIREND;
+				unlock_kernel();
 				return 0;
 			}
 			if (p->header.flag & BT_INTERNAL) {
 				jERROR(1,("jfs_readdir: bad index table\n"));
 				DT_PUTPAGE(mp);
 				filp->f_pos = -1;
+				unlock_kernel();
 				return 0;
 			}
 		} else {
@@ -2927,27 +2936,34 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				 */
 				filp->f_pos = 0;
 				if (filldir(dirent, ".", 1, 0, ip->i_ino,
-					    DT_DIR))
+					    DT_DIR)) {
+					unlock_kernel();	
 					return 0;
+				}
 			}
 			/*
 			 * parent ".."
 			 */
 			filp->f_pos = 1;
 			if (filldir
-			    (dirent, "..", 2, 1, PARENT(ip), DT_DIR))
+			    (dirent, "..", 2, 1, PARENT(ip), DT_DIR)) {
+				unlock_kernel();
 				return 0;
+			}
 
 			/*
 			 * Find first entry of left-most leaf
 			 */
 			if (dtEmpty(ip)) {
 				filp->f_pos = DIREND;
+				unlock_kernel();
 				return 0;
 			}
 
-			if ((rc = dtReadFirst(ip, &btstack)))
+			if ((rc = dtReadFirst(ip, &btstack))) {
+				unlock_kernel();
 				return -rc;
+			}
 
 			DT_GETSEARCH(ip, btstack.top, bn, mp, p, index);
 		}
@@ -2966,8 +2982,10 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			/* build "." entry */
 
 			if (filldir(dirent, ".", 1, filp->f_pos, ip->i_ino,
-				    DT_DIR))
+				    DT_DIR)) {
+				unlock_kernel();
 				return 0;
+			}
 			dtoffset->index = 1;
 		}
 
@@ -2976,8 +2994,10 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				/* build ".." entry */
 
 				if (filldir(dirent, "..", 2, filp->f_pos,
-					    PARENT(ip), DT_DIR))
+					    PARENT(ip), DT_DIR)) {
+					unlock_kernel();
 					return 0;
+				}
 			} else {
 				jERROR(1,
 				       ("jfs_readdir called with invalid offset!\n"));
@@ -2988,6 +3008,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 		if (dtEmpty(ip)) {
 			filp->f_pos = DIREND;
+			unlock_kernel();
 			return 0;
 		}
 
@@ -2996,6 +3017,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			       ("jfs_readdir: unexpected rc = %d from dtReadNext\n",
 				rc));
 			filp->f_pos = DIREND;
+			unlock_kernel();
 			return 0;
 		}
 		/* get start leaf page and index */
@@ -3004,6 +3026,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		/* offset beyond directory eof ? */
 		if (bn < 0) {
 			filp->f_pos = DIREND;
+			unlock_kernel();
 			return 0;
 		}
 	}
@@ -3013,6 +3036,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		DT_PUTPAGE(mp);
 		jERROR(1, ("jfs_readdir: kmalloc failed!\n"));
 		filp->f_pos = DIREND;
+		unlock_kernel();
 		return 0;
 	}
 	while (1) {
@@ -3087,6 +3111,7 @@ skip_one:
 		DT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
 		if (rc) {
 			kfree(d_name);
+			unlock_kernel();
 			return -rc;
 		}
 
@@ -3102,7 +3127,7 @@ skip_one:
       out:
 	kfree(d_name);
 	DT_PUTPAGE(mp);
-
+	unlock_kernel();
 	return rc;
 }
 

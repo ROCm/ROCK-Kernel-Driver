@@ -75,6 +75,9 @@ smb_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		DENTRY_PATH(dentry),  (int) filp->f_pos);
 
 	result = 0;
+
+	lock_kernel();
+
 	switch ((unsigned int) filp->f_pos) {
 	case 0:
 		if (filldir(dirent, ".", 1, 0, dir->i_ino, DT_DIR) < 0)
@@ -207,6 +210,7 @@ finished:
 		page_cache_release(ctl.page);
 	}
 out:
+	unlock_kernel();
 	return result;
 }
 

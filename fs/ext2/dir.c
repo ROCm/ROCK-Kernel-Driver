@@ -23,6 +23,7 @@
 
 #include "ext2.h"
 #include <linux/pagemap.h>
+#include <linux/smp_lock.h>
 
 typedef struct ext2_dir_entry_2 ext2_dirent;
 
@@ -258,6 +259,8 @@ ext2_readdir (struct file * filp, void * dirent, filldir_t filldir)
 	int need_revalidate = (filp->f_version != inode->i_version);
 	int ret = 0;
 
+	lock_kernel();
+
 	if (pos > inode->i_size - EXT2_DIR_REC_LEN(1))
 		goto done;
 
@@ -310,6 +313,7 @@ done:
 	filp->f_pos = (n << PAGE_CACHE_SHIFT) | offset;
 	filp->f_version = inode->i_version;
 	UPDATE_ATIME(inode);
+	unlock_kernel();
 	return 0;
 }
 

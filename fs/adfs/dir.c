@@ -36,6 +36,8 @@ adfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	struct adfs_dir dir;
 	int ret = 0;
 
+	lock_kernel();	
+
 	if (filp->f_pos >> 32)
 		goto out;
 
@@ -77,6 +79,7 @@ free_out:
 	ops->free(&dir);
 
 out:
+	unlock_kernel();
 	return ret;
 }
 

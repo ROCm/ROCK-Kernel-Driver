@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/sysv_fs.h>
 #include <linux/pagemap.h>
+#include <linux/smp_lock.h>
 
 static int sysv_readdir(struct file *, void *, filldir_t);
 
@@ -76,6 +77,8 @@ static int sysv_readdir(struct file * filp, void * dirent, filldir_t filldir)
 	unsigned long n = pos >> PAGE_CACHE_SHIFT;
 	unsigned long npages = dir_pages(inode);
 
+	lock_kernel();
+
 	pos = (pos + SYSV_DIRSIZE-1) & ~(SYSV_DIRSIZE-1);
 	if (pos >= inode->i_size)
 		goto done;
@@ -113,6 +116,7 @@ static int sysv_readdir(struct file * filp, void * dirent, filldir_t filldir)
 done:
 	filp->f_pos = (n << PAGE_CACHE_SHIFT) | offset;
 	UPDATE_ATIME(inode);
+	unlock_kernel();
 	return 0;
 }
 

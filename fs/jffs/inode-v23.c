@@ -48,6 +48,7 @@
 #include <linux/stat.h>
 #include <linux/blkdev.h>
 #include <linux/quotaops.h>
+#include <linux/smp_lock.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
@@ -568,6 +569,7 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	struct jffs_control *c = (struct jffs_control *)inode->i_sb->u.generic_sbp;
 	int j;
 	int ddino;
+	lock_kernel();
 	D3(printk (KERN_NOTICE "readdir(): down biglock\n"));
 	down(&c->fmc->biglock);
 
@@ -577,6 +579,7 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		if (filldir(dirent, ".", 1, filp->f_pos, inode->i_ino, DT_DIR) < 0) {
 			D3(printk (KERN_NOTICE "readdir(): up biglock\n"));
 			up(&c->fmc->biglock);
+			unlock_kernel();
 			return 0;
 		}
 		filp->f_pos = 1;
@@ -593,6 +596,7 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		if (filldir(dirent, "..", 2, filp->f_pos, ddino, DT_DIR) < 0) {
 			D3(printk (KERN_NOTICE "readdir(): up biglock\n"));
 			up(&c->fmc->biglock);
+			unlock_kernel();
 			return 0;
 		}
 		filp->f_pos++;
@@ -611,6 +615,7 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			    filp->f_pos , f->ino, DT_UNKNOWN) < 0) {
 		        D3(printk (KERN_NOTICE "readdir(): up biglock\n"));
 			up(&c->fmc->biglock);
+			unlock_kernel();
 			return 0;
 		}
 		filp->f_pos++;
@@ -620,6 +625,7 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	}
 	D3(printk (KERN_NOTICE "readdir(): up biglock\n"));
 	up(&c->fmc->biglock);
+	unlock_kernel();
 	return filp->f_pos;
 } /* jffs_readdir()  */
 

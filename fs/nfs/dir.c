@@ -355,9 +355,13 @@ static int nfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	struct nfs_entry my_entry;
 	long		res;
 
+	lock_kernel();
+
 	res = nfs_revalidate(dentry);
-	if (res < 0)
+	if (res < 0) {
+		unlock_kernel();
 		return res;
+	}
 
 	/*
 	 * filp->f_pos points to the file offset in the page cache.
@@ -394,6 +398,7 @@ static int nfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			break;
 		}
 	}
+	unlock_kernel();
 	if (desc->error < 0)
 		return desc->error;
 	if (res < 0)
