@@ -40,7 +40,7 @@
 #define MAY_OWNER_OVERRIDE	64
 #define	MAY_LOCAL_ACCESS	128 /* IRIX doing local access check on device special file*/
 #if (MAY_SATTR | MAY_TRUNC | MAY_LOCK | MAY_OWNER_OVERRIDE | MAY_LOCAL_ACCESS) & (MAY_READ | MAY_WRITE | MAY_EXEC)
-# error "please use a different value for MAY_SATTR or MAY_TRUNC or MAY_LOCK or MAY_OWNER_OVERRIDE."
+# error "please use a different value for MAY_SATTR or MAY_TRUNC or MAY_LOCK or MAY_LOCAL_ACCESS or MAY_OWNER_OVERRIDE."
 #endif
 #define MAY_CREATE		(MAY_EXEC|MAY_WRITE)
 #define MAY_REMOVE		(MAY_EXEC|MAY_WRITE|MAY_TRUNC)
