@@ -991,6 +991,11 @@ speedo_open(struct net_device *dev)
 	if ((sp->phy[0] & 0x8000) == 0)
 		sp->advertising = mdio_read(ioaddr, sp->phy[0] & 0x1f, 4);
 
+	if (mdio_read(ioaddr, sp->phy[0] & 0x1f, MII_BMSR) & BMSR_LSTATUS)
+		netif_carrier_on(dev);
+	else
+		netif_carrier_off(dev);
+
 	if (speedo_debug > 2) {
 		printk(KERN_DEBUG "%s: Done speedo_open(), status %8.8x.\n",
 			   dev->name, inw(ioaddr + SCBStatus));
@@ -1102,7 +1107,7 @@ static void speedo_timer(unsigned long data)
 			/* Clear sticky bit. */
 			mdio_read(ioaddr, phy_num, 1);
 			/* If link beat has returned... */
-			if (mdio_read(ioaddr, phy_num, 1) & 0x0004)
+			if (mdio_read(ioaddr, phy_num, MII_BMSR) & BMSR_LSTATUS)
 				netif_carrier_on(dev);
 			else
 				netif_carrier_off(dev);
