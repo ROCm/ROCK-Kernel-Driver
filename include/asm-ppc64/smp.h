@@ -52,8 +52,6 @@ extern cpumask_t cpu_sibling_map[NR_CPUS];
 #endif
 #define PPC_MSG_DEBUGGER_BREAK  3
 
-extern cpumask_t irq_affinity[];
-
 void smp_init_iSeries(void);
 void smp_init_pSeries(void);
 
