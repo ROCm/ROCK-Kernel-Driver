@@ -1196,8 +1196,10 @@ static struct file_operations proc_pid_attr_operations = {
 	.write		= proc_pid_attr_write,
 };
 
-static struct file_operations proc_attr_operations;
-static struct inode_operations proc_attr_inode_operations;
+static struct file_operations proc_tid_attr_operations;
+static struct inode_operations proc_tid_attr_inode_operations;
+static struct file_operations proc_tgid_attr_operations;
+static struct inode_operations proc_tgid_attr_inode_operations;
 #endif
 
 /* SMP-safe */
@@ -1304,10 +1306,14 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 			break;
 #ifdef CONFIG_SECURITY
 		case PROC_TID_ATTR:
+			inode->i_nlink = 2;
+			inode->i_op = &proc_tid_attr_inode_operations;
+			inode->i_fop = &proc_tid_attr_operations;
+			break;
 		case PROC_TGID_ATTR:
 			inode->i_nlink = 2;
-			inode->i_op = &proc_attr_inode_operations;
-			inode->i_fop = &proc_attr_operations;
+			inode->i_op = &proc_tgid_attr_inode_operations;
+			inode->i_fop = &proc_tgid_attr_operations;
 			break;
 		case PROC_TID_ATTR_CURRENT:
 		case PROC_TGID_ATTR_CURRENT:
@@ -1713,11 +1719,14 @@ static int proc_task_readdir(struct file * filp, void * dirent, filldir_t filldi
 	nr_tids = get_tid_list(pos, tid_array, inode);
 
 	for (i = 0; i < nr_tids; i++) {
-		int tid = tid_array[i];
-		ino = fake_ino(tid,PROC_TID_INO);
 		unsigned long j = PROC_NUMBUF;
+		int tid = tid_array[i];
 
-		do buf[--j] = '0' + (tid % 10); while (tid/=10);
+		ino = fake_ino(tid,PROC_TID_INO);
+
+		do
+			buf[--j] = '0' + (tid % 10);
+		while (tid /= 10);
 
 		if (filldir(dirent, buf+j, PROC_NUMBUF-j, pos, ino, DT_DIR) < 0)
 			break;

@@ -36,8 +36,6 @@
 
 #define TUN_MINOR	     200
 
-extern int misc_init(void);
-
 struct miscdevice 
 {
 	int minor;

@@ -370,6 +370,19 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
+/* RED-PEN: calculation is done in 32bits with multiply for performance
+   and could overflow, it may be better (but slower)to use an 64bit division. */
+unsigned long long sched_clock(void)
+{
+	unsigned long a;
+
+	if (__vxtime.mode == VXTIME_HPET)
+		return (hpet_readl(HPET_COUNTER) * vxtime.quot) >> 32;
+
+	rdtscll(a);
+	return (a * vxtime.tsc_quot) >> 32;
+}
+
 unsigned long get_cmos_time(void)
 {
 	unsigned int timeout, year, mon, day, hour, min, sec;

@@ -42,7 +42,6 @@ struct rand_pool_info {
 
 #ifdef __KERNEL__
 
-extern void rand_initialize(void);
 extern void rand_initialize_irq(int irq);
 
 extern void batch_entropy_store(u32 a, u32 b, int num);

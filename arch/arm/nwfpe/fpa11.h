@@ -33,6 +33,7 @@ register unsigned int *user_registers asm("sl");
 
 #define GET_USERREG() (user_registers)
 
+#include <linux/config.h>
 #include <linux/thread_info.h>
 
 /* includes */

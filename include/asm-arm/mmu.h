@@ -1,8 +1,6 @@
 #ifndef __ARM_MMU_H
 #define __ARM_MMU_H
 
-#include <linux/config.h>
-
 typedef struct {
 #if __LINUX_ARM_ARCH__ >= 6
 	unsigned int id;

@@ -27,7 +27,12 @@
 #define cpus_shift_right(dst, src, n)	do { dst = (src) >> (n); } while (0)
 #define cpus_shift_left(dst, src, n)	do { dst = (src) << (n); } while (0)
 
-#define any_online_cpu(map)		({ (map) ? first_cpu(map) : NR_CPUS; })
+#define any_online_cpu(map)			\
+({						\
+	cpumask_t __tmp__;			\
+	cpus_and(__tmp__, map, cpu_online_map);	\
+	__tmp__ ? first_cpu(__tmp__) : NR_CPUS;	\
+})
 
 #define CPU_MASK_ALL	(~((cpumask_t)0) >> (8*sizeof(cpumask_t) - NR_CPUS))
 #define CPU_MASK_NONE	((cpumask_t)0)

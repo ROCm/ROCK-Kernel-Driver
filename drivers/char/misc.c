@@ -277,7 +277,7 @@ int misc_deregister(struct miscdevice * misc)
 EXPORT_SYMBOL(misc_register);
 EXPORT_SYMBOL(misc_deregister);
 
-int __init misc_init(void)
+static int __init misc_init(void)
 {
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *ent;
@@ -320,3 +320,4 @@ int __init misc_init(void)
 	}
 	return 0;
 }
+module_init(misc_init);

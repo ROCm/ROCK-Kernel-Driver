@@ -89,7 +89,7 @@
 #define _NSIG_WORDS	(__NEW_NSIG / _NSIG_BPW)
 
 #define SIGRTMIN	32
-#define SIGRTMAX	(__NEW_NSIG - 1)
+#define SIGRTMAX	__NEW_NSIG
 
 #if defined(__KERNEL__) || defined(__WANT_POSIX1B_SIGNALS__)
 #define	_NSIG		__NEW_NSIG

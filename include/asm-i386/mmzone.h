@@ -122,11 +122,29 @@ static inline struct pglist_data *pfn_to_pgdat(unsigned long pfn)
 #elif CONFIG_ACPI_SRAT
 #include <asm/srat.h>
 #elif CONFIG_X86_PC
-#define get_memcfg_numa get_memcfg_numa_flat
 #define get_zholes_size(n) (0)
 #else
 #define pfn_to_nid(pfn)		(0)
 #endif /* CONFIG_X86_NUMAQ */
+
+extern int get_memcfg_numa_flat(void );
+/*
+ * This allows any one NUMA architecture to be compiled
+ * for, and still fall back to the flat function if it
+ * fails.
+ */
+static inline void get_memcfg_numa(void)
+{
+#ifdef CONFIG_X86_NUMAQ
+	if (get_memcfg_numaq())
+		return;
+#elif CONFIG_ACPI_SRAT
+	if (get_memcfg_from_srat())
+		return;
+#endif
+
+	get_memcfg_numa_flat();
+}
 
 #endif /* CONFIG_DISCONTIGMEM */
 #endif /* _ASM_MMZONE_H_ */

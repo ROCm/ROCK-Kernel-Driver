@@ -66,3 +66,25 @@ ifeq ($(CONFIG_HDLC_PPP),y)
 endif
 obj-$(CONFIG_N2)		+= n2.o
 obj-$(CONFIG_C101)		+= c101.o
+obj-$(CONFIG_WANXL)		+= wanxl.o
+
+ifeq ($(CONFIG_WANXL_BUILD_FIRMWARE),y)
+ifeq ($(ARCH),m68k)
+  AS68K = $(AS)
+  LD68K = $(LD)
+else
+  AS68K = as68k
+  LD68K = ld68k
+endif
+
+quiet_cmd_build_wanxlfw = BLD FW  $@
+      cmd_build_wanxlfw = \
+	$(CPP) -Wp,-MD,$(depfile) -Iinclude $(obj)/wanxlfw.S | $(AS68K) -m68360 -o $(obj)/wanxlfw.o; \
+	$(LD68K) --oformat binary -Ttext 0x1000 $(obj)/wanxlfw.o -o $(obj)/wanxlfw.bin; \
+	hexdump -ve '"\n" 16/1 "0x%02X,"' $(obj)/wanxlfw.bin | sed 's/0x  ,//g;1s/^/static u8 firmware[]={/;$$s/,$$/\n};\n/' >$(obj)/wanxlfw.inc; \
+	rm -f $(obj)/wanxlfw.bin $(obj)/wanxlfw.o
+
+$(obj)/wanxlfw.inc:	$(obj)/wanxlfw.S
+	$(call if_changed_dep,build_wanxlfw)
+targets += wanxlfw.inc
+endif

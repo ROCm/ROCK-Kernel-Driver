@@ -1334,7 +1334,7 @@ static int is_devfsd_or_child (struct fs_info *fs_info)
     struct task_struct *p = current;
 
     if (p == fs_info->devfsd_task) return (TRUE);
-    if (p->pgrp == fs_info->devfsd_pgrp) return (TRUE);
+    if (process_group(p) == fs_info->devfsd_pgrp) return (TRUE);
     read_lock(&tasklist_lock);
     for ( ; p != &init_task; p = p->real_parent)
     {
@@ -2744,8 +2744,8 @@ static int devfsd_ioctl (struct inode *inode, struct file *file,
 	    }
 	    fs_info->devfsd_task = current;
 	    spin_unlock (&lock);
-	    fs_info->devfsd_pgrp = (current->pgrp == current->pid) ?
-		current->pgrp : 0;
+	    fs_info->devfsd_pgrp = (process_group(current) == current->pid) ?
+		process_group(current) : 0;
 	    fs_info->devfsd_file = file;
 	    fs_info->devfsd_info = kmalloc (sizeof *fs_info->devfsd_info,
 					    GFP_KERNEL);
