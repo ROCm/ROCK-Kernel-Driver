@@ -1531,7 +1531,7 @@ xlog_recover_reorder_trans(
 	xlog_recover_item_t	*first_item, *itemq, *itemq_next;
 	xfs_buf_log_format_t	*buf_f;
 	xfs_buf_log_format_v1_t	*obuf_f;
-	ushort			flags;
+	ushort			flags = 0;
 
 	first_item = itemq = trans->r_itemq;
 	trans->r_itemq = NULL;

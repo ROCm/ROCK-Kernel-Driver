@@ -32,6 +32,44 @@
 #ifndef __XFS_LINUX__
 #define __XFS_LINUX__
 
+#include <linux/types.h>
+#include <linux/config.h>
+
+/*
+ * Some types are conditional depending on the target system.
+ * XFS_BIG_BLKNOS needs block layer disk addresses to be 64 bits.
+ * XFS_BIG_INUMS needs the VFS inode number to be 64 bits, as well
+ * as requiring XFS_BIG_BLKNOS to be set.
+ */
+#if defined(CONFIG_LBD) || (BITS_PER_LONG == 64)
+# define XFS_BIG_BLKNOS	1
+# if BITS_PER_LONG == 64
+#  define XFS_BIG_INUMS	1
+# else
+#  define XFS_BIG_INUMS	0
+# endif
+#else
+# define XFS_BIG_BLKNOS	0
+# define XFS_BIG_INUMS	0
+#endif
+
+#include <xfs_types.h>
+#include <xfs_arch.h>
+
+#include <kmem.h>
+#include <mrlock.h>
+#include <spin.h>
+#include <sv.h>
+#include <mutex.h>
+#include <sema.h>
+#include <time.h>
+
+#include <support/qsort.h>
+#include <support/ktrace.h>
+#include <support/debug.h>
+#include <support/move.h>
+#include <support/uuid.h>
+
 #include <linux/mm.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -55,19 +93,18 @@
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
 
-#include <linux/xfs_behavior.h>
-#include <linux/xfs_vfs.h>
-#include <linux/xfs_cred.h>
-#include <linux/xfs_vnode.h>
-#include <linux/xfs_stats.h>
-#include <linux/xfs_sysctl.h>
-#include <linux/xfs_iops.h>
-#include <linux/xfs_super.h>
-#include <linux/xfs_globals.h>
-#include <linux/xfs_fs_subr.h>
-#include <linux/xfs_lrw.h>
-
-#include <pagebuf/page_buf.h>
+#include <xfs_behavior.h>
+#include <xfs_vfs.h>
+#include <xfs_cred.h>
+#include <xfs_vnode.h>
+#include <xfs_stats.h>
+#include <xfs_sysctl.h>
+#include <xfs_iops.h>
+#include <xfs_super.h>
+#include <xfs_globals.h>
+#include <xfs_fs_subr.h>
+#include <xfs_lrw.h>
+#include <xfs_buf.h>
 
 /*
  * Feature macros (disable/enable)

@@ -106,10 +106,9 @@ STATIC int xfs_attr_rmtval_remove(xfs_da_args_t *args);
 #define ATTR_RMTVALUE_MAPSIZE	1	/* # of map entries at once */
 #define ATTR_RMTVALUE_TRANSBLKS	8	/* max # of blks in a transaction */
 
-#if defined(DEBUG)
+#if defined(XFS_ATTR_TRACE)
 ktrace_t *xfs_attr_trace_buf;
 #endif
-
 
 
 /*========================================================================
@@ -2589,6 +2588,14 @@ attr_trusted_capable(
 }
 
 STATIC int
+attr_secure_capable(
+	struct vnode	*vp,
+	cred_t		*cred)
+{
+	return -ENOSECURITY;
+}
+
+STATIC int
 attr_system_set(
 	struct vnode *vp, char *name, void *data, size_t size, int xflags)
 {
@@ -2651,6 +2658,16 @@ struct attrnames attr_trusted = {
 	.attr_capable	= attr_trusted_capable,
 };
 
+struct attrnames attr_secure = {
+	.attr_name	= "security.",
+	.attr_namelen	= sizeof("security.") - 1,
+	.attr_flag	= ATTR_SECURE,
+	.attr_get	= attr_generic_get,
+	.attr_set	= attr_generic_set,
+	.attr_remove	= attr_generic_remove,
+	.attr_capable	= attr_secure_capable,
+};
+
 struct attrnames attr_user = {
 	.attr_name	= "user.",
 	.attr_namelen	= sizeof("user.") - 1,
@@ -2661,4 +2678,4 @@ struct attrnames attr_user = {
 };
 
 struct attrnames *attr_namespaces[] =
-	{ &attr_system, &attr_trusted, &attr_user };
+	{ &attr_system, &attr_trusted, &attr_secure, &attr_user };

@@ -69,8 +69,9 @@ typedef struct attrnames {
 	attrcapable_t	attr_capable;
 } attrnames_t;
 
-#define ATTR_NAMECOUNT	3
+#define ATTR_NAMECOUNT	4
 extern struct attrnames attr_user;
+extern struct attrnames attr_secure;
 extern struct attrnames attr_system;
 extern struct attrnames attr_trusted;
 extern struct attrnames *attr_namespaces[ATTR_NAMECOUNT];
@@ -86,6 +87,7 @@ extern int attr_generic_list(struct vnode *, void *, size_t, int, ssize_t *);
 #define ATTR_DONTFOLLOW	0x0001	/* -- unused, from IRIX -- */
 #define ATTR_ROOT	0x0002	/* use attrs in root (trusted) namespace */
 #define ATTR_TRUST	0x0004	/* -- unused, from IRIX -- */
+#define ATTR_SECURE	0x0008	/* use attrs in security namespace */
 #define ATTR_CREATE	0x0010	/* pure create: fail if attr already exists */
 #define ATTR_REPLACE	0x0020	/* pure set: fail if attr does not exist */
 #define ATTR_SYSTEM	0x0100	/* use attrs in system (pseudo) namespace */
