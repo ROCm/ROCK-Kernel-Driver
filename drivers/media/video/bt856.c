@@ -98,6 +98,7 @@ bt856_write (struct i2c_client *client,
 	     u8                 value)
 {
 	struct bt856 *encoder = i2c_get_clientdata(client);
+
 	encoder->reg[reg - REG_OFFSET] = value;
 	return i2c_smbus_write_byte_data(client, reg, value);
 }
@@ -109,6 +110,7 @@ bt856_setbit (struct i2c_client *client,
 	      u8                 value)
 {
 	struct bt856 *encoder = i2c_get_clientdata(client);
+
 	return bt856_write(client, reg,
 			   (encoder->
 			    reg[reg - REG_OFFSET] & ~(1 << bit)) |
@@ -120,6 +122,7 @@ bt856_dump (struct i2c_client *client)
 {
 	int i;
 	struct bt856 *encoder = i2c_get_clientdata(client);
+
 	printk(KERN_INFO "%s: register dump:", I2C_NAME(client));
 	for (i = 0xd6; i <= 0xde; i += 2)
 		printk(" %02x", encoder->reg[i - REG_OFFSET]);

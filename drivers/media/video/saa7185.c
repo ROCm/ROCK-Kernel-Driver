@@ -98,6 +98,7 @@ saa7185_write (struct i2c_client *client,
 	       u8                 value)
 {
 	struct saa7185 *encoder = i2c_get_clientdata(client);
+
 	dprintk(1, KERN_DEBUG "SAA7185: %02x set to %02x\n", reg, value);
 	encoder->reg[reg] = value;
 	return i2c_smbus_write_byte_data(client, reg, value);
@@ -118,6 +119,7 @@ saa7185_write_block (struct i2c_client *client,
 		struct saa7185 *encoder = i2c_get_clientdata(client);
 		struct i2c_msg msg;
 		u8 block_data[32];
+
 		msg.addr = client->addr;
 		msg.flags = client->flags;
 		while (len >= 2) {
@@ -131,16 +133,16 @@ saa7185_write_block (struct i2c_client *client,
 				data += 2;
 			} while (len >= 2 && data[0] == reg &&
 				 msg.len < 32);
-			if ((ret =
-			     i2c_transfer(client->adapter, &msg, 1)) < 0)
+			if ((ret = i2c_transfer(client->adapter,
+						&msg, 1)) < 0)
 				break;
 		}
 	} else {
 		/* do some slow I2C emulation kind of thing */
 		while (len >= 2) {
 			reg = *data++;
-			if ((ret =
-			     saa7185_write(client, reg, *data++)) < 0)
+			if ((ret = saa7185_write(client, reg,
+						 *data++)) < 0)
 				break;
 			len -= 2;
 		}

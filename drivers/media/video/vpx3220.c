@@ -76,6 +76,7 @@ vpx3220_write (struct i2c_client *client,
 	       u8                 value)
 {
 	struct vpx3220 *decoder = i2c_get_clientdata(client);
+
 	decoder->reg[reg] = value;
 	return i2c_smbus_write_byte_data(client, reg, value);
 }
@@ -294,6 +295,7 @@ vpx3220_dump_i2c (struct i2c_client *client)
 {
 	int len = sizeof(init_common);
 	const unsigned char *data = init_common;
+
 	while (len > 1) {
 		dprintk(1,
 			KERN_DEBUG "vpx3216b i2c reg 0x%02x data 0x%02x\n",

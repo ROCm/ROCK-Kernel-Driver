@@ -190,6 +190,7 @@ static inline unsigned long
 get_time (void)
 {
 	struct timeval tv;
+
 	do_gettimeofday(&tv);
 	return (1000000 * tv.tv_sec + tv.tv_usec);
 }
@@ -868,8 +869,8 @@ zr36057_set_jpg (struct zoran          *zr,
 void
 print_interrupts (struct zoran *zr)
 {
-	int res, noerr;
-	noerr = 0;
+	int res, noerr = 0;
+
 	printk(KERN_INFO "%s: interrupts received:", ZR_DEVNAME(zr));
 	if ((res = zr->field_counter) < -1 || res > 1) {
 		printk(" FD:%d", res);
@@ -931,6 +932,7 @@ static u32
 count_reset_interrupt (struct zoran *zr)
 {
 	u32 isr;
+
 	if ((isr = btread(ZR36057_ISR) & 0x78000000)) {
 		if (isr & ZR36057_ISR_GIRQ1) {
 			btwrite(ZR36057_ISR_GIRQ1, ZR36057_ISR);
@@ -961,6 +963,7 @@ void
 jpeg_start (struct zoran *zr)
 {
 	int reg;
+
 	zr->frame_num = 0;
 
 	/* deassert P_reset, disable code transfer, deassert Active */
@@ -1625,10 +1628,11 @@ void
 zoran_set_pci_master (struct zoran *zr,
 		      int           set_master)
 {
-	u16 command;
 	if (set_master) {
 		pci_set_master(zr->pci_dev);
 	} else {
+		u16 command;
+
 		pci_read_config_word(zr->pci_dev, PCI_COMMAND, &command);
 		command &= ~PCI_COMMAND_MASTER;
 		pci_write_config_word(zr->pci_dev, PCI_COMMAND, command);
@@ -1639,6 +1643,7 @@ void
 zoran_init_hardware (struct zoran *zr)
 {
 	int j, zero = 0;
+
 	/* Enable bus-mastering */
 	zoran_set_pci_master(zr, 1);
 
@@ -1700,6 +1705,7 @@ void
 zr36057_init_vfe (struct zoran *zr)
 {
 	u32 reg;
+
 	reg = btread(ZR36057_VFESPFR);
 	reg |= ZR36057_VFESPFR_LittleEndian;
 	reg &= ~ZR36057_VFESPFR_VCLKPol;
@@ -1730,6 +1736,7 @@ decoder_command (struct zoran *zr,
 	if (zr->card.type == LML33 &&
 	    (cmd == DECODER_SET_NORM || DECODER_SET_INPUT)) {
 		int res;
+
 		// Bt819 needs to reset its FIFO buffer using #FRST pin and
 		// LML33 card uses GPIO(7) for that.
 		GPIO(zr, 7, 0);
