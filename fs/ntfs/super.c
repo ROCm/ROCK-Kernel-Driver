@@ -1,8 +1,8 @@
 /*
  * super.c - NTFS kernel super block handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (c) 2001,2002 Richard Russon.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001,2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1761,7 +1761,7 @@ static void __exit exit_ntfs_fs(void)
 }
 
 MODULE_AUTHOR("Anton Altaparmakov <aia21@cantab.net>");
-MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2002 Anton Altaparmakov");
+MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2003 Anton Altaparmakov");
 MODULE_LICENSE("GPL");
 #ifdef DEBUG
 MODULE_PARM(debug_msgs, "i");
