@@ -24,6 +24,23 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid);
 static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 		      int kernel_segment);
 
+static inline void slb_add_bolted(void)
+{
+#ifndef CONFIG_PPC_ISERIES
+	unsigned long esid = GET_ESID(VMALLOCBASE);
+	unsigned long vsid = get_kernel_vsid(VMALLOCBASE);
+
+	WARN_ON(!irqs_disabled());
+
+	/*
+	 * Bolt in the first vmalloc segment. Since modules end
+	 * up there it gets hit very heavily.
+	 */
+	get_paca()->xStab_data.next_round_robin = 1;
+	make_slbe(esid, vsid, 0, 1);
+#endif
+}
+
 /*
  * Build an entry for the base kernel segment and put it into
  * the segment table or SLB.  All other segment table or SLB
@@ -44,26 +61,16 @@ void stab_initialize(unsigned long stab)
 		/* Invalidate the entire SLB & all the ERATS */
 #ifdef CONFIG_PPC_ISERIES
 		asm volatile("isync; slbia; isync":::"memory");
-		/*
-		 * The hypervisor loads SLB entry 0, but we need to increment
-		 * next_round_robin to avoid overwriting it
-		 */
-		get_paca()->xStab_data.next_round_robin = 1;
 #else
 		asm volatile("isync":::"memory");
 		asm volatile("slbmte  %0,%0"::"r" (0) : "memory");
 		asm volatile("isync; slbia; isync":::"memory");
+		get_paca()->xStab_data.next_round_robin = 0;
 		make_slbe(esid, vsid, seg0_largepages, 1);
 		asm volatile("isync":::"memory");
 #endif
 
-		/*
-		 * Bolt in the first vmalloc segment. Since modules end
-		 * up there it gets hit very heavily.
-		 */
-		esid = GET_ESID(VMALLOCBASE);
-		vsid = get_kernel_vsid(VMALLOCBASE);
-		make_slbe(esid, vsid, 0, 1);
+		slb_add_bolted();
 	} else {
 		asm volatile("isync; slbia; isync":::"memory");
 		make_ste(stab, esid, vsid);
@@ -443,8 +450,9 @@ int slb_allocate(unsigned long ea)
 	}
 
 	esid = GET_ESID(ea);
-
+#ifndef CONFIG_PPC_ISERIES
 	BUG_ON((esid << SID_SHIFT) == VMALLOCBASE);
+#endif
 	__slb_allocate(esid, vsid, context);
 
 	return 0;
@@ -501,9 +509,6 @@ void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 		unsigned long word0;
 		slb_dword0 data;
 	} esid_data;
-	unsigned long esid, vsid;
-
-	WARN_ON(!irqs_disabled());
 
 	if (offset <= NR_STAB_CACHE_ENTRIES) {
 		int i;
@@ -517,17 +522,7 @@ void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 		asm volatile("isync" : : : "memory");
 	} else {
 		asm volatile("isync; slbia; isync" : : : "memory");
-
-		/*
-		 * Bolt in the first vmalloc segment. Since modules end
-		 * up there it gets hit very heavily. We must not touch
-		 * the vmalloc region between the slbia and here, thats
-		 * why we require interrupts off.
-		 */
-		esid = GET_ESID(VMALLOCBASE);
-		vsid = get_kernel_vsid(VMALLOCBASE);
-		get_paca()->xStab_data.next_round_robin = 1;
-		make_slbe(esid, vsid, 0, 1);
+		slb_add_bolted();
 	}
 
 	/* Workaround POWER5 < DD2.1 issue */
