@@ -11,7 +11,7 @@
 #include <linux/notifier.h>
 #include <linux/smp.h>
 #include <linux/oprofile.h>
-#include <linux/device.h>
+#include <linux/sysdev.h>
 #include <asm/nmi.h>
 #include <asm/msr.h>
 #include <asm/apic.h>
