@@ -363,16 +363,33 @@ pcibios_assign_resources(void)
  * Allocate pci_controller(phb) initialized common variables. 
  */
 struct pci_controller * __init
-pci_alloc_pci_controller(char *model, enum phb_types controller_type)
+pci_alloc_pci_controller(enum phb_types controller_type)
 {
         struct pci_controller *hose;
-        PPCDBG(PPCDBG_PHBINIT, "PCI: Allocate pci_controller for %s\n",model);
+	char *model;
+
         hose = (struct pci_controller *)alloc_bootmem(sizeof(struct pci_controller));
         if(hose == NULL) {
                 printk(KERN_ERR "PCI: Allocate pci_controller failed.\n");
                 return NULL;
         }
         memset(hose, 0, sizeof(struct pci_controller));
+
+	switch(controller_type) {
+	case phb_type_python:
+		model = "PHB PY";
+		break;
+	case phb_type_speedwagon:
+		model = "PHB SW";
+		break;
+	case phb_type_winnipeg:
+		model = "PHB WP";
+		break;
+	default:
+		model = "PHB UK";
+		break;
+	}
+
         if(strlen(model) < 8)
 		strcpy(hose->what,model);
         else
