@@ -139,7 +139,15 @@ struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
 	skb_queue_head_init(&self->wx_list);
 
 	/* My unique IrLAP device address! */
-	get_random_bytes(&self->saddr, sizeof(self->saddr));
+	/* We don't want the broadcast address, neither the NULL address
+	 * (most often used to signify "invalid"), and we don't want an
+	 * address already in use (otherwise connect won't be able
+	 * to select the proper link). - Jean II */
+	do {
+		get_random_bytes(&self->saddr, sizeof(self->saddr));
+	} while ((self->saddr == 0x0) || (self->saddr == BROADCAST) ||
+		 (hashbin_find(irlap, self->saddr, NULL)) );
+	/* Copy to the driver */
 	memcpy(dev->dev_addr, &self->saddr, 4);
 
 	init_timer(&self->slot_timer);
