@@ -345,6 +345,7 @@ struct urb_priv {
 	int status;			/* Final status */
 
 	unsigned long inserttime;	/* In jiffies */
+	unsigned long fsbrtime;	/* In jiffies */
 
 	struct list_head queue_list;
 	struct list_head complete_list;

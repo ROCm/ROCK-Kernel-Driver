@@ -346,11 +346,7 @@ static int shrink_cache(int nr_pages, int max_scan, unsigned int gfp_mask)
 
 		page = list_entry(entry, struct page, lru);
 
-		if (unlikely(!PageInactive(page) && !PageActive(page)))
-			BUG();
-
-		/* Mapping-less page on LRU-list? */
-		if (unlikely(!page->mapping))
+		if (unlikely(!PageInactive(page)))
 			BUG();
 
 		list_del(entry);
@@ -363,31 +359,17 @@ static int shrink_cache(int nr_pages, int max_scan, unsigned int gfp_mask)
 			continue;
 
 		/* Racy check to avoid trylocking when not worthwhile */
-		if (!is_page_cache_freeable(page))
+		if (!page->buffers && page_count(page) != 1)
 			continue;
-
-		if (unlikely(TryLockPage(page))) {
-			if (gfp_mask & __GFP_FS) {
-				page_cache_get(page);
-				spin_unlock(&pagemap_lru_lock);
-				wait_on_page(page);
-				page_cache_release(page);
-				spin_lock(&pagemap_lru_lock);
-			}
-			continue;
-		}
 
 		/*
-		 * Still strictly racy - we don't own the pagecache lock,
-		 * so somebody might look up the page while we do this.
-		 * It's just a heuristic, though.
+		 * The page is locked. IO in progress?
+		 * Move it to the back of the list.
 		 */
-		if (!is_page_cache_freeable(page)) {
-			UnlockPage(page);
+		if (unlikely(TryLockPage(page)))
 			continue;
-		}
 
-		if (PageDirty(page)) {
+		if (PageDirty(page) && is_page_cache_freeable(page) && page->mapping) {
 			/*
 			 * It is not critical here to write it only if
 			 * the page is unmapped beause any direct writer
@@ -460,6 +442,9 @@ static int shrink_cache(int nr_pages, int max_scan, unsigned int gfp_mask)
 				continue;
 			}
 		}
+
+		if (unlikely(!page->mapping))
+			BUG();
 
 		if (unlikely(!spin_trylock(&pagecache_lock))) {
 			/* we hold the page lock so the page cannot go away from under us */

@@ -15,7 +15,7 @@
  * support as appropriate.  Devices currently supported include:
  *
  *	- AnchorChip 2720
- *	- Belkin F5U104 (custom)
+ *	- Belkin, eTEK (interops with Win32 drivers)
  *	- "Linux Devices" (like iPaq and similar SA-1100 based PDAs)
  *	- NetChip 1080 (interoperates with NetChip Win32 drivers)
  *	- Prolific PL-2301/2302 (replaces "plusb" driver)
@@ -73,6 +73,9 @@
  *		Win32 Belkin driver; other cleanups (db).
  * 16-jul-2001	Bugfixes for uhci oops-on-unplug, Belkin support, various
  *		cleanups for problems not yet seen in the field. (db)
+ * 17-oct-2001	Handle "Advance USBNET" product, like Belkin/eTEK devices,
+ *		from Ioannis Mavroukakis <i.mavroukakis@btinternet.com>;
+ *		rx unlinks somehow weren't async; minor cleanup.
  *
  *-------------------------------------------------------------------------*/
 
@@ -97,7 +100,7 @@
 
 
 #define	CONFIG_USB_AN2720
-#define	CONFIG_USB_BELKIN_F5U104
+#define	CONFIG_USB_BELKIN
 #define	CONFIG_USB_LINUXDEV
 #define	CONFIG_USB_NET1080
 #define	CONFIG_USB_PL2301
@@ -119,7 +122,7 @@
 #endif
 
 // packets are always ethernet inside
-// ... except they can be bigger (up to 64K with this framing)
+// ... except they can be bigger (limit of 64K with NetChip framing)
 #define MIN_PACKET	sizeof(struct ethhdr)
 #define MAX_PACKET	32768
 
@@ -161,7 +164,7 @@ struct usbnet {
 	struct sk_buff_head	txq;
 	struct sk_buff_head	done;
 	struct tasklet_struct	bh;
-	struct tq_struct ctrl_task;
+	struct tq_struct	ctrl_task;
 };
 
 // device-specific info used by the driver
@@ -169,7 +172,8 @@ struct driver_info {
 	char		*description;
 
 	int		flags;
-#define FLAG_FRAMING	0x0001		/* guard against device dropouts */ 
+#define FLAG_FRAMING_NC	0x0001		/* guard against device dropouts */ 
+#define FLAG_NO_SETINT	0x0010		/* device can't set_interface() */
 
 	/* reset device ... can sleep */
 	int	(*reset)(struct usbnet *);
@@ -251,7 +255,7 @@ struct nc_trailer {
 	u16	packet_id;
 } __attribute__((__packed__));
 
-// packets may use FLAG_FRAMING and optional pad
+// packets may use FLAG_FRAMING_NC and optional pad
 #define FRAMED_SIZE(mtu) (sizeof (struct nc_header) \
 				+ sizeof (struct ethhdr) \
 				+ (mtu) \
@@ -288,22 +292,24 @@ static const struct driver_info	an2720_info = {
 
 
 
-#ifdef	CONFIG_USB_BELKIN_F5U104
+#ifdef	CONFIG_USB_BELKIN
 
 /*-------------------------------------------------------------------------
  *
  * Belkin F5U104 ... two NetChip 2280 devices + Atmel microcontroller
  *
+ * ... also two eTEK designs, including one sold as "Advance USBNET"
+ *
  *-------------------------------------------------------------------------*/
 
 static const struct driver_info	belkin_info = {
-	description:	"Belkin USB Direct Connect (F5U104)",
+	description:	"Belkin, eTEK, or compatible",
 
 	in: 1, out: 1,		// direction distinguishes these
 	epsize:	64,
 };
 
-#endif	/* CONFIG_USB_BELKIN_F5U104 */
+#endif	/* CONFIG_USB_BELKIN */
 
 
 
@@ -632,7 +638,7 @@ static int net1080_check_connect (struct usbnet *dev)
 
 static const struct driver_info	net1080_info = {
 	description:	"NetChip TurboCONNECT",
-	flags:		FLAG_FRAMING,
+	flags:		FLAG_FRAMING_NC,
 	reset:		net1080_reset,
 	check_connect:	net1080_check_connect,
 
@@ -729,9 +735,9 @@ static int usbnet_change_mtu (struct net_device *net, int new_mtu)
 {
 	struct usbnet	*dev = (struct usbnet *) net->priv;
 
-	if (new_mtu <= sizeof (struct ethhdr) || new_mtu > MAX_PACKET)
+	if (new_mtu <= MIN_PACKET || new_mtu > MAX_PACKET)
 		return -EINVAL;
-	if (((dev->driver_info->flags) & FLAG_FRAMING)) {
+	if (((dev->driver_info->flags) & FLAG_FRAMING_NC)) {
 		if (FRAMED_SIZE (new_mtu) > MAX_PACKET)
 			return -EINVAL;
 	// no second zero-length packet read wanted after mtu-sized packets
@@ -779,9 +785,11 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 	unsigned long		lockflags;
 	size_t			size;
 
-	size = (dev->driver_info->flags & FLAG_FRAMING)
-			? FRAMED_SIZE (dev->net.mtu)
-			: (sizeof (struct ethhdr) + dev->net.mtu);
+	if (dev->driver_info->flags & FLAG_FRAMING_NC)
+		size = FRAMED_SIZE (dev->net.mtu);
+	else
+		size = (sizeof (struct ethhdr) + dev->net.mtu);
+
 	if ((skb = alloc_skb (size, flags)) == 0) {
 		dbg ("no rx skb");
 		tasklet_schedule (&dev->bh);
@@ -798,8 +806,14 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 	FILL_BULK_URB (urb, dev->udev,
 		usb_rcvbulkpipe (dev->udev, dev->driver_info->in),
 		skb->data, size, rx_complete, skb);
+	urb->transfer_flags |= USB_ASYNC_UNLINK;
 #ifdef	REALLY_QUEUE
 	urb->transfer_flags |= USB_QUEUE_BULK;
+#endif
+#if 0
+	// Idle-but-posted reads with UHCI really chew up
+	// PCI bandwidth unless FSBR is disabled
+	urb->transfer_flags |= USB_NO_FSBR;
 #endif
 
 	spin_lock_irqsave (&dev->rxq.lock, lockflags);
@@ -827,7 +841,7 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 
 static inline void rx_process (struct usbnet *dev, struct sk_buff *skb)
 {
-	if (dev->driver_info->flags & FLAG_FRAMING) {
+	if (dev->driver_info->flags & FLAG_FRAMING_NC) {
 		struct nc_header	*header;
 		struct nc_trailer	*trailer;
 
@@ -1083,9 +1097,11 @@ static int usbnet_open (struct net_device *net)
 	}
 
 	netif_start_queue (net);
-	devdbg (dev, "open: enable queueing (rx %d, tx %d) mtu %d %sframed",
+	devdbg (dev, "open: enable queueing (rx %d, tx %d) mtu %d %s framing",
 		RX_QLEN, TX_QLEN, dev->net.mtu,
-		(info->flags & FLAG_FRAMING) ? "" : "un"
+		(info->flags & FLAG_FRAMING_NC)
+		    ? "NetChip"
+		    : "raw"
 		);
 
 	// delay posting reads until we're fully open
@@ -1194,7 +1210,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 
 	flags = in_interrupt () ? GFP_ATOMIC : GFP_KERNEL;
 
-	if (info->flags & FLAG_FRAMING) {
+	if (info->flags & FLAG_FRAMING_NC) {
 		struct sk_buff	*skb2;
 		skb2 = fixup_skb (skb, flags);
 		if (!skb2) {
@@ -1215,7 +1231,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	entry->state = tx_start;
 	entry->length = length;
 
-	if (info->flags & FLAG_FRAMING) {
+	if (info->flags & FLAG_FRAMING_NC) {
 		header = (struct nc_header *) skb_push (skb, sizeof *header);
 		header->hdr_len = cpu_to_le16 (sizeof (*header));
 		header->packet_len = cpu_to_le16 (length);
@@ -1223,31 +1239,31 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 			*skb_put (skb, 1) = PAD_BYTE;
 		trailer = (struct nc_trailer *) skb_put (skb, sizeof *trailer);
 	} else if ((length % EP_SIZE (dev)) == 0) {
-			if (skb_shared (skb)) {
-				struct sk_buff *skb2;
-				skb2 = skb_unshare (skb, flags);
-				if (!skb2) {
-					dbg ("can't unshare skb");
-					goto drop;
-				}
-				skb = skb2;
+		// not all hardware behaves with USB_ZERO_PACKET,
+		// so we add an extra one-byte packet
+		if (skb_shared (skb)) {
+			struct sk_buff *skb2;
+			skb2 = skb_unshare (skb, flags);
+			if (!skb2) {
+				dbg ("can't unshare skb");
+				goto drop;
 			}
-			skb->len++;
+			skb = skb2;
 		}
+		skb->len++;
+	}
 
 	FILL_BULK_URB (urb, dev->udev,
 			usb_sndbulkpipe (dev->udev, info->out),
 			skb->data, skb->len, tx_complete, skb);
-	// Idle-but-posted reads with UHCI really chew up
-	// PCI bandwidth unless FSBR is disabled
-	urb->transfer_flags |= USB_ASYNC_UNLINK | USB_NO_FSBR;
+	urb->transfer_flags |= USB_ASYNC_UNLINK;
 #ifdef	REALLY_QUEUE
 	urb->transfer_flags |= USB_QUEUE_BULK;
 #endif
 	// FIXME urb->timeout = ... jiffies ... ;
 
 	spin_lock_irqsave (&dev->txq.lock, flags);
-	if (info->flags & FLAG_FRAMING) {
+	if (info->flags & FLAG_FRAMING_NC) {
 		header->packet_id = cpu_to_le16 (dev->packet_id++);
 		put_unaligned (header->packet_id, &trailer->packet_id);
 #if 0
@@ -1408,9 +1424,12 @@ usbnet_probe (struct usb_device *udev, unsigned ifnum,
 		return 0;
 	}
 
-	if (usb_set_interface (udev, ifnum, altnum) < 0) {
-		err ("set_interface failed");
-		return 0;
+	// more sanity (unless the device is broken)
+	if (!(info->flags & FLAG_NO_SETINT)) {
+		if (usb_set_interface (udev, ifnum, altnum) < 0) {
+			err ("set_interface failed");
+			return 0;
+		}
 	}
 
 	// set up our own records
@@ -1484,6 +1503,18 @@ static const struct usb_device_id	products [] = {
 },
 #endif
 
+#ifdef	CONFIG_USB_BELKIN
+{
+	USB_DEVICE (0x050d, 0x0004),	// Belkin
+	driver_info:	(unsigned long) &belkin_info,
+}, {
+	USB_DEVICE (0x056c, 0x8100),	// eTEK
+	driver_info:	(unsigned long) &belkin_info,
+}, {
+	USB_DEVICE (0x0525, 0x9901),	// Advance USBNET (eTEK)
+	driver_info:	(unsigned long) &belkin_info,
+},
+#endif
 
 // GeneSys GL620USB (www.genesyslogic.com.tw)
 // (patch exists against an older driver version)
@@ -1505,16 +1536,6 @@ static const struct usb_device_id	products [] = {
 {
 	USB_DEVICE (0x0525, 0x1080),	// NetChip ref design
 	driver_info:	(unsigned long) &net1080_info,
-},
-#endif
-
-#ifdef	CONFIG_USB_BELKIN_F5U104
-{
-	USB_DEVICE (0x050d, 0x0004),	// Belkin
-	driver_info:	(unsigned long) &belkin_info,
-}, {
-	USB_DEVICE (0x056c, 0x8100),	// eTEK
-	driver_info:	(unsigned long) &belkin_info,
 },
 #endif
 
@@ -1563,6 +1584,7 @@ static void __exit usbnet_exit (void)
 }
 module_exit (usbnet_exit);
 
+EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR ("David Brownell <dbrownell@users.sourceforge.net>");
-MODULE_DESCRIPTION ("USB Host-to-Host Link Drivers (Belkin, Linux, NetChip, Prolific, ...)");
-MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION ("USB Host-to-Host Link Drivers (numerous vendors)");
+MODULE_LICENSE ("GPL");

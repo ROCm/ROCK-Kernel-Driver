@@ -394,7 +394,7 @@ rebalance:
 	}
 
 	/* Don't let big-order allocations loop */
-	if (order)
+	if (order > 1)
 		return NULL;
 
 	/* Yield for kswapd, and try again */

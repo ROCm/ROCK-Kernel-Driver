@@ -138,7 +138,7 @@ struct analog_port {
 
 #ifdef __i386__
 #define TSC_PRESENT	(test_bit(X86_FEATURE_TSC, &boot_cpu_data.x86_capability))
-#define GET_TIME(x)	do { if (TSC_PRESENT) rdtscl(x); else outb(0, 0x43); x = inb(0x40); x |= inb(0x40) << 8; } while (0)
+#define GET_TIME(x)	do { if (TSC_PRESENT) rdtscl(x); else { outb(0, 0x43); x = inb(0x40); x |= inb(0x40) << 8; } } while (0)
 #define DELTA(x,y)	(TSC_PRESENT?((y)-(x)):((x)-(y)+((x)<(y)?1193180L/HZ:0)))
 #define TIME_NAME	(TSC_PRESENT?"TSC":"PIT")
 #elif __x86_64__
@@ -499,7 +499,9 @@ static void analog_init_device(struct analog_port *port, struct analog *analog, 
 	else
 		printk(" [%s timer, %d %sHz clock, %d ns res]\n", TIME_NAME,
 		port->speed > 10000 ? (port->speed + 800) / 1000 : port->speed,
-		port->speed > 10000 ? "M" : "k", (port->loop * 1000000) / port->speed);
+		port->speed > 10000 ? "M" : "k",
+		port->speed > 10000 ? (port->loop * 1000) / (port->speed / 1000)
+				    : (port->loop * 1000000) / port->speed);
 }
 
 /*

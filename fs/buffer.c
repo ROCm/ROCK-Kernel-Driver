@@ -1131,31 +1131,13 @@ void __brelse(struct buffer_head * buf)
 }
 
 /*
- * bforget() is like brelse(), except it might discard any
+ * bforget() is like brelse(), except it discards any
  * potentially dirty data.
  */
 void __bforget(struct buffer_head * buf)
 {
-	/* grab the lru lock here so that "b_count" is stable */
-	spin_lock(&lru_list_lock);
-	write_lock(&hash_table_lock);
-	if (!atomic_dec_and_test(&buf->b_count) || buffer_locked(buf))
-		goto in_use;
-
-	/* Mark it clean */
-	clear_bit(BH_Dirty, &buf->b_state);
-	write_unlock(&hash_table_lock);
-
-	/* After which we can remove it from all queues */
-	remove_inode_queue(buf);
-	__remove_from_lru_list(buf);
-	buf->b_list = BUF_CLEAN;
-	spin_unlock(&lru_list_lock);
-	return;
-
-in_use:
-	write_unlock(&hash_table_lock);
-	spin_unlock(&lru_list_lock);
+	mark_buffer_clean(buf);
+	__brelse(buf);
 }
 
 /**

@@ -113,44 +113,6 @@ static int uhci_alloc_dev(struct usb_device *dev)
 
 static int uhci_free_dev(struct usb_device *dev)
 {
-	struct uhci *uhci = (struct uhci *)dev->bus->hcpriv;
-	struct list_head list, *tmp, *head;
-	unsigned long flags;
-
-	/* Walk through the entire URB list and forcefully remove any */
-	/*  URBs that are still active for that device */
-
-	/* Two stage unlink so we don't deadlock on urb_list_lock */
-	INIT_LIST_HEAD(&list);
-
-	spin_lock_irqsave(&uhci->urb_list_lock, flags);
-	head = &uhci->urb_list;
-	tmp = head->next;
-	while (tmp != head) {
-		struct urb *urb = list_entry(tmp, struct urb, urb_list);
-
-		tmp = tmp->next;
-
-		if (urb->dev == dev) {
-			list_del(&urb->urb_list);
-			list_add(&urb->urb_list, &list);
-		}
-	}
-	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
-
-	head = &list;
-	tmp = head->next;
-	while (tmp != head) {
-		struct urb *urb = list_entry(tmp, struct urb, urb_list);
-		tmp = tmp->next;
-
-		/* Make sure we block waiting on these to die */
-		urb->transfer_flags &= ~USB_ASYNC_UNLINK;
-
-		/* uhci_unlink_urb will unlink from the temp list */
-		uhci_unlink_urb(urb);
-	}
-
 	return 0;
 }
 
@@ -396,50 +358,96 @@ static void uhci_free_qh(struct uhci *uhci, struct uhci_qh *qh)
 	pci_pool_free(uhci->qh_pool, qh, qh->dma_handle);
 }
 
-static void uhci_insert_qh(struct uhci *uhci, struct uhci_qh *skelqh, struct uhci_qh *qh)
+static void _uhci_insert_qh(struct uhci *uhci, struct uhci_qh *skelqh, struct urb *urb)
 {
+	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
+	struct list_head *head, *tmp;
 	struct uhci_qh *lqh;
-	unsigned long flags;
-
-	spin_lock_irqsave(&uhci->frame_list_lock, flags);
 
 	/* Grab the last QH */
 	lqh = list_entry(skelqh->list.prev, struct uhci_qh, list);
 
-	qh->link = lqh->link;
+	if (lqh->urbp) {
+		head = &lqh->urbp->queue_list;
+		tmp = head->next;
+		while (head != tmp) {
+			struct urb_priv *turbp =
+				list_entry(tmp, struct urb_priv, queue_list);
+
+			tmp = tmp->next;
+
+			turbp->qh->link = urbp->qh->dma_handle | UHCI_PTR_QH;
+		}
+	}
+
+	head = &urbp->queue_list;
+	tmp = head->next;
+	while (head != tmp) {
+		struct urb_priv *turbp =
+			list_entry(tmp, struct urb_priv, queue_list);
+
+		tmp = tmp->next;
+
+		turbp->qh->link = lqh->link;
+	}
+
+	urbp->qh->link = lqh->link;
 	mb();				/* Ordering is important */
-	lqh->link = qh->dma_handle | UHCI_PTR_QH;
+	lqh->link = urbp->qh->dma_handle | UHCI_PTR_QH;
 
-	list_add_tail(&qh->list, &skelqh->list);
+	list_add_tail(&urbp->qh->list, &skelqh->list);
+}
 
+static void uhci_insert_qh(struct uhci *uhci, struct uhci_qh *skelqh, struct urb *urb)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&uhci->frame_list_lock, flags);
+	_uhci_insert_qh(uhci, skelqh, urb);
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
 }
 
-static void uhci_remove_qh(struct uhci *uhci, struct uhci_qh *qh)
+static void uhci_remove_qh(struct uhci *uhci, struct urb *urb)
 {
+	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
 	unsigned long flags;
-	struct uhci_qh *prevqh;
+	struct uhci_qh *qh = urbp->qh, *pqh;
+
+	if (!qh)
+		return;
 
 	/* Only go through the hoops if it's actually linked in */
-	if (list_empty(&qh->list)) {
-		goto list;
+	if (!list_empty(&qh->list)) {
+		qh->urbp = NULL;
+
+		spin_lock_irqsave(&uhci->frame_list_lock, flags);
+
+		pqh = list_entry(qh->list.prev, struct uhci_qh, list);
+
+		if (pqh->urbp) {
+			struct list_head *head, *tmp;
+
+			head = &pqh->urbp->queue_list;
+			tmp = head->next;
+			while (head != tmp) {
+				struct urb_priv *turbp =
+					list_entry(tmp, struct urb_priv, queue_list);
+
+				tmp = tmp->next;
+
+				turbp->qh->link = qh->link;
+			}
+		}
+
+		pqh->link = qh->link;
+		mb();
+		qh->element = qh->link = UHCI_PTR_TERM;
+
+		list_del_init(&qh->list);
+
+		spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
 	}
 
-	qh->urbp = NULL;
-
-	spin_lock_irqsave(&uhci->frame_list_lock, flags);
-
-	prevqh = list_entry(qh->list.prev, struct uhci_qh, list);
-
-	prevqh->link = qh->link;
-	mb();
-	qh->element = qh->link = UHCI_PTR_TERM;
-
-	list_del_init(&qh->list);
-
-	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
-
-list:
 	spin_lock_irqsave(&uhci->qh_remove_list_lock, flags);
 
 	/* Check to see if the remove list is empty. Set the IOC bit */
@@ -464,9 +472,10 @@ static int uhci_fixup_toggle(struct urb *urb, unsigned int toggle)
 
 		tmp = tmp->next;
 
-		td->info &= ~(1 << TD_TOKEN_TOGGLE);
 		if (toggle)
-			td->info |= (1 << TD_TOKEN_TOGGLE);
+			set_bit(TD_TOKEN_TOGGLE, &td->info);
+		else
+			clear_bit(TD_TOKEN_TOGGLE, &td->info);
 
 		toggle ^= 1;
 	}
@@ -481,7 +490,7 @@ static void uhci_append_queued_urb(struct uhci *uhci, struct urb *eurb, struct u
 {
 	struct urb_priv *eurbp, *urbp, *furbp, *lurbp;
 	struct list_head *tmp;
-	struct uhci_td *ftd, *lltd;
+	struct uhci_td *lltd;
 	unsigned long flags;
 
 	eurbp = eurb->hcpriv;
@@ -510,13 +519,15 @@ static void uhci_append_queued_urb(struct uhci *uhci, struct urb *eurb, struct u
 	lurbp = list_entry(furbp->queue_list.prev, struct urb_priv, queue_list);
 
 	lltd = list_entry(lurbp->td_list.prev, struct uhci_td, list);
-	ftd = list_entry(urbp->td_list.next, struct uhci_td, list);
 
 	uhci_fixup_toggle(urb, uhci_toggle(lltd->info) ^ 1);
 
+	/* All qh's in the queue need to link to the next queue */
+	urbp->qh->link = eurbp->qh->link;
+
 	mb();			/* Make sure we flush everything */
 	/* Only support bulk right now, so no depth */
-	lltd->link = ftd->dma_handle;
+	lltd->link = urbp->qh->dma_handle | UHCI_PTR_QH;
 
 	list_add_tail(&urbp->queue_list, &furbp->queue_list);
 
@@ -576,30 +587,9 @@ static void uhci_delete_queued_urb(struct uhci *uhci, struct urb *urb)
 		usb_pipeout(urb->pipe), toggle);
 
 	if (!urbp->queued) {
-		int status;
-
-		/*  The HC may continue using the current QH if it finished */
-		/* all of the TD's in this URB and may have started on the */
-		/* next URB's TD's already, so we'll take over ownership */
-		/* of this QH and use it instead. Don't forget to delete */
-		/* the old QH first */
-		uhci_free_qh(uhci, nurbp->qh);
-
-		nurbp->qh = urbp->qh;
-		nurbp->qh->urbp = nurbp;
-		urbp->qh = NULL;
-
-		/* If the last TD from the first (this) urb didn't */
-		/*  complete, reset qh->element to the first TD in the */
-		/*  next urb */
-		pltd = list_entry(urbp->td_list.prev, struct uhci_td, list);
-		status = uhci_status_bits(pltd->status);
-		if ((status & TD_CTRL_ACTIVE) || uhci_actual_length(pltd->status) < uhci_expected_length(pltd->info)) {
-			struct uhci_td *ftd = list_entry(nurbp->td_list.next, struct uhci_td, list);
-			nurbp->qh->element = ftd->dma_handle;
-		}
-
 		nurbp->queued = 0;
+
+		_uhci_insert_qh(uhci, uhci->skel_bulk_qh, nurbp->urb);
 	} else {
 		/* We're somewhere in the middle (or end). A bit trickier */
 		/*  than the head scenario */
@@ -607,15 +597,10 @@ static void uhci_delete_queued_urb(struct uhci *uhci, struct urb *urb)
 				queue_list);
 
 		pltd = list_entry(purbp->td_list.prev, struct uhci_td, list);
-		if (nurbp->queued) {
-			struct uhci_td *nftd;
-
-			/* Close the gap between the two */
-			nftd = list_entry(nurbp->td_list.next, struct uhci_td,
-					list);
-			pltd->link = nftd->dma_handle;
-		} else
-			/* The next URB happens to be the beggining, so */
+		if (nurbp->queued)
+			pltd->link = nurbp->qh->dma_handle | UHCI_PTR_QH;
+		else
+			/* The next URB happens to be the beginning, so */
 			/*  we're the last, end the chain */
 			pltd->link = UHCI_PTR_TERM;
 	}
@@ -639,6 +624,7 @@ static struct urb_priv *uhci_alloc_urb_priv(struct uhci *uhci, struct urb *urb)
 	memset((void *)urbp, 0, sizeof(*urbp));
 
 	urbp->inserttime = jiffies;
+	urbp->fsbrtime = jiffies;
 	urbp->urb = urb;
 	urbp->dev = urb->dev;
 	
@@ -900,18 +886,18 @@ static int uhci_submit_control(struct urb *urb)
 	if (!qh)
 		return -ENOMEM;
 
+	urbp->qh = qh;
+	qh->urbp = urbp;
+
 	/* Low speed or small transfers gets a different queue and treatment */
 	if (urb->pipe & TD_CTRL_LS) {
 		uhci_insert_tds_in_qh(qh, urb, 0);
-		uhci_insert_qh(uhci, uhci->skel_ls_control_qh, qh);
+		uhci_insert_qh(uhci, uhci->skel_ls_control_qh, urb);
 	} else {
 		uhci_insert_tds_in_qh(qh, urb, 1);
-		uhci_insert_qh(uhci, uhci->skel_hs_control_qh, qh);
+		uhci_insert_qh(uhci, uhci->skel_hs_control_qh, urb);
 		uhci_inc_fsbr(uhci, urb);
 	}
-
-	urbp->qh = qh;
-	qh->urbp = urbp;
 
 	return -EINPROGRESS;
 }
@@ -961,6 +947,7 @@ static int uhci_result_control(struct urb *urb)
 		    !(td->status & TD_CTRL_ACTIVE)) {
 			uhci_inc_fsbr(urb->dev->bus->hcpriv, urb);
 			urbp->fsbr_timeout = 0;
+			urbp->fsbrtime = jiffies;
 			clear_bit(TD_CTRL_IOC_BIT, &td->status);
 		}
 
@@ -1043,7 +1030,7 @@ static int usb_control_retrigger_status(struct urb *urb)
 	urbp->short_control_packet = 1;
 
 	/* Create a new QH to avoid pointer overwriting problems */
-	uhci_remove_qh(uhci, urbp->qh);
+	uhci_remove_qh(uhci, urb);
 
 	/* Delete all of the TD's except for the status TD at the end */
 	head = &urbp->td_list;
@@ -1071,9 +1058,9 @@ static int usb_control_retrigger_status(struct urb *urb)
 
 	/* Low speed or small transfers gets a different queue and treatment */
 	if (urb->pipe & TD_CTRL_LS)
-		uhci_insert_qh(uhci, uhci->skel_ls_control_qh, urbp->qh);
+		uhci_insert_qh(uhci, uhci->skel_ls_control_qh, urb);
 	else
-		uhci_insert_qh(uhci, uhci->skel_hs_control_qh, urbp->qh);
+		uhci_insert_qh(uhci, uhci->skel_hs_control_qh, urb);
 
 	return -EINPROGRESS;
 }
@@ -1134,6 +1121,7 @@ static int uhci_result_interrupt(struct urb *urb)
 		    !(td->status & TD_CTRL_ACTIVE)) {
 			uhci_inc_fsbr(urb->dev->bus->hcpriv, urb);
 			urbp->fsbr_timeout = 0;
+			urbp->fsbrtime = jiffies;
 			clear_bit(TD_CTRL_IOC_BIT, &td->status);
 		}
 
@@ -1147,10 +1135,6 @@ static int uhci_result_interrupt(struct urb *urb)
 			goto td_error;
 
 		if (uhci_actual_length(td->status) < uhci_expected_length(td->info)) {
-			usb_settoggle(urb->dev, uhci_endpoint(td->info),
-				uhci_packetout(td->info),
-				uhci_toggle(td->info) ^ 1);
-
 			if (urb->transfer_flags & USB_DISABLE_SPD) {
 				ret = -EREMOTEIO;
 				goto err;
@@ -1303,7 +1287,7 @@ static int uhci_submit_bulk(struct urb *urb, struct urb *eurb)
 	if (urb->transfer_flags & USB_QUEUE_BULK && eurb)
 		uhci_append_queued_urb(uhci, eurb, urb);
 	else
-		uhci_insert_qh(uhci, uhci->skel_bulk_qh, qh);
+		uhci_insert_qh(uhci, uhci->skel_bulk_qh, urb);
 
 	uhci_inc_fsbr(uhci, urb);
 
@@ -1681,6 +1665,7 @@ static void uhci_transfer_result(struct uhci *uhci, struct urb *urb)
 
 static void uhci_unlink_generic(struct uhci *uhci, struct urb *urb)
 {
+	struct list_head *head, *tmp;
 	struct urb_priv *urbp = urb->hcpriv;
 
 	/* We can get called when urbp allocation fails, so check */
@@ -1689,15 +1674,30 @@ static void uhci_unlink_generic(struct uhci *uhci, struct urb *urb)
 
 	uhci_dec_fsbr(uhci, urb);	/* Safe since it checks */
 
+	head = &urbp->td_list;
+	tmp = head->next;
+	while (tmp != head) {
+		struct uhci_td *td = list_entry(tmp, struct uhci_td, list);
+
+		tmp = tmp->next;
+
+		/* Control and Isochronous ignore the toggle, so this */
+		/* is safe for all types */
+		if (!(td->status & TD_CTRL_ACTIVE) &&
+		    uhci_actual_length(td->status) < uhci_expected_length(td->info) ||
+		    tmp == head) {
+			usb_settoggle(urb->dev, uhci_endpoint(td->info),
+				uhci_packetout(td->info),
+				uhci_toggle(td->info) ^ 1);
+		}
+	}
+
 	uhci_delete_queued_urb(uhci, urb);
 
-	if (urbp->qh)
-		/* The interrupt loop will reclaim the QH's */
-		uhci_remove_qh(uhci, urbp->qh);
+	/* The interrupt loop will reclaim the QH's */
+	uhci_remove_qh(uhci, urb);
 }
 
-/* FIXME: If we forcefully unlink an urb, we should reset the toggle for */
-/*  that pipe to match what actually completed */
 static int uhci_unlink_urb(struct urb *urb)
 {
 	struct uhci *uhci;
@@ -1951,11 +1951,11 @@ static void rh_int_timer_do(unsigned long ptr)
 		tmp = tmp->next;
 
 		/* Check if the FSBR timed out */
-		if (urbp->fsbr && time_after_eq(jiffies, urbp->inserttime + IDLE_TIMEOUT))
+		if (urbp->fsbr && !urbp->fsbr_timeout && time_after_eq(jiffies, urbp->fsbrtime + IDLE_TIMEOUT))
 			uhci_fsbr_timeout(uhci, u);
 
 		/* Check if the URB timed out */
-		if (u->timeout && time_after_eq(jiffies, u->timeout)) {
+		if (u->timeout && time_after_eq(jiffies, urbp->inserttime + u->timeout)) {
 			list_del(&u->urb_list);
 			list_add_tail(&u->urb_list, &list);
 		}
