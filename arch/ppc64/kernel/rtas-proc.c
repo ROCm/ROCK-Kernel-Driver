@@ -580,7 +580,7 @@ static void ppc_rtas_process_sensor(struct seq_file *m,
 			}
 			break;
 		case THERMAL_SENSOR:
-			seq_printf(m, "Temp. (°C/°F):\t");
+			seq_printf(m, "Temp. (C/F):\t");
 			temperature = 1;
 			break;
 		case LID_STATUS:
