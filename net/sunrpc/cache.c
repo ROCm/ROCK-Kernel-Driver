@@ -400,9 +400,10 @@ void cache_flush(void)
 
 void cache_purge(struct cache_detail *detail)
 {
-	detail->flush_time = get_seconds()+1;
+	detail->flush_time = LONG_MAX;
 	detail->nextcheck = get_seconds();
 	cache_flush();
+	detail->flush_time = 1;
 }
 
 
