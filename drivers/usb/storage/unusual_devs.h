@@ -299,6 +299,15 @@ UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
                 US_SC_8070, US_PR_CBI, NULL,
                 US_FL_FIX_INQUIRY ),
 
+/* Enable USB storage access to the MMC/SD and CompactFlash cards inside the
+ * Pontis SP600 MP3 player (entry found on http://www.pontis.de/).
+ */
+UNUSUAL_DEV(  0x09bc, 0x0003, 0x0000, 0x9999,
+		"PONTIS",
+		"SP600",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_START_STOP ),
+
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x05ab, 0x0031, 0x0100, 0x0110,
 		"In-System",
