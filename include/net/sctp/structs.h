@@ -1393,6 +1393,10 @@ struct sctp_association {
 		__u8	ipv4_address;	 /* Peer understands IPv4 addresses? */
 		__u8	ipv6_address;	 /* Peer understands IPv6 addresses? */
 		__u8	hostname_address;/* Peer understands DNS addresses? */
+
+		/* Does peer support ADDIP? */
+		__u8    asconf_capable;
+
 		struct sctp_inithdr i;
 		int cookie_len;
 		void *cookie;

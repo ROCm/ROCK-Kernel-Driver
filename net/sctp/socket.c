@@ -97,6 +97,8 @@ static void sctp_wait_for_close(struct sock *sk, long timeo);
 static inline int sctp_verify_addr(struct sock *, union sctp_addr *, int);
 static int sctp_bindx_add(struct sock *, struct sockaddr *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr *, int);
+static int sctp_send_asconf_add_ip(struct sock *, struct sockaddr *, int);
+static int sctp_send_asconf_del_ip(struct sock *, struct sockaddr *, int);
 static int sctp_do_bind(struct sock *, union sctp_addr *, int);
 static int sctp_autobind(struct sock *sk);
 static void sctp_sock_migrate(struct sock *, struct sock *,
@@ -349,6 +351,106 @@ err_bindx_add:
 	return retval;
 }
 
+/* Send an ASCONF chunk with Add IP address parameters to all the peers of the
+ * associations that are part of the endpoint indicating that a list of local
+ * addresses are added to the endpoint.
+ *
+ * If any of the addresses is already in the bind address list of the 
+ * association, we do not send the chunk for that association.  But it will not
+ * affect other associations.
+ *
+ * Only sctp_setsockopt_bindx() is supposed to call this function.
+ */
+static int sctp_send_asconf_add_ip(struct sock		*sk, 
+				   struct sockaddr	*addrs,
+				   int 			addrcnt)
+{
+	struct sctp_opt			*sp;
+	struct sctp_endpoint		*ep;
+	struct sctp_association		*asoc;
+	struct sctp_bind_addr		*bp;
+	struct sctp_chunk		*chunk;
+	struct sctp_sockaddr_entry	*laddr;
+	union sctp_addr			*addr;
+	void				*addr_buf;
+	struct sctp_af			*af;
+	struct list_head		*pos;
+	struct list_head		*p;
+	int 				i;
+	int 				retval = 0;
+
+	sp = sctp_sk(sk);
+	ep = sp->ep;
+
+	SCTP_DEBUG_PRINTK("%s: (sk: %p, addrs: %p, addrcnt: %d)\n",
+			  __FUNCTION__, sk, addrs, addrcnt);
+
+	list_for_each(pos, &ep->asocs) {
+		asoc = list_entry(pos, struct sctp_association, asocs);
+
+		if (!sctp_state(asoc, ESTABLISHED))
+			continue;
+
+		if (!asoc->peer.asconf_capable)
+			continue;
+		
+		/* Check if any address in the packed array of addresses is
+	         * in the bind address list of the association. If so, 
+		 * do not send the asconf chunk to its peer, but continue with 
+		 * other associations.
+		 */
+		addr_buf = addrs;
+		for (i = 0; i < addrcnt; i++) {
+			addr = (union sctp_addr *)addr_buf;
+			af = sctp_get_af_specific(addr->v4.sin_family);
+			if (!af) {
+				retval = -EINVAL;
+				goto out;
+			}
+
+			if (sctp_assoc_lookup_laddr(asoc, addr))		
+				break;
+			
+			addr_buf += af->sockaddr_len;
+		}
+		if (i < addrcnt)
+			continue;
+
+		/* Use the first address in bind addr list of association as
+		 * Address Parameter of ASCONF CHUNK.
+		 */
+		sctp_read_lock(&asoc->base.addr_lock);
+		bp = &asoc->base.bind_addr;
+		p = bp->address_list.next;
+		laddr = list_entry(p, struct sctp_sockaddr_entry, list);
+		sctp_read_unlock(&asoc->base.addr_lock);
+
+		chunk = sctp_make_asconf_update_ip(asoc, &laddr->a, addrs,
+						   addrcnt, SCTP_PARAM_ADD_IP);
+		if (!chunk) {
+			retval = -ENOMEM;
+			goto out;
+		}
+
+		retval = sctp_primitive_ASCONF(asoc, chunk);
+		if (retval) {
+			sctp_chunk_free(chunk);
+			goto out;
+		}
+
+		/* FIXME: After sending the add address ASCONF chunk, we 
+		 * cannot append the address to the association's binding 
+		 * address list, because the new address may be used as the
+		 * source of a message sent to the peer before the ASCONF
+		 * chunk is received by the peer.  So we should wait until
+		 * ASCONF_ACK is received.
+		 */
+	}
+
+out:
+	return retval;
+}
+
 /* Remove a list of addresses from bind addresses list.  Do not remove the
  * last address.
  *
@@ -433,6 +535,106 @@ err_bindx_rem:
 		}
 	}
 
+	return retval;
+}
+
+/* Send an ASCONF chunk with Delete IP address parameters to all the peers of
+ * the associations that are part of the endpoint indicating that a list of
+ * local addresses are removed from the endpoint.
+ *
+ * If any of the addresses is already in the bind address list of the 
+ * association, we do not send the chunk for that association.  But it will not
+ * affect other associations.
+ *
+ * Only sctp_setsockopt_bindx() is supposed to call this function.
+ */
+static int sctp_send_asconf_del_ip(struct sock		*sk,
+				   struct sockaddr	*addrs,
+				   int			addrcnt)
+{
+	struct sctp_opt		*sp;
+	struct sctp_endpoint	*ep;
+	struct sctp_association	*asoc;
+	struct sctp_bind_addr	*bp;
+	struct sctp_chunk	*chunk;
+	union sctp_addr		*laddr;
+	void			*addr_buf;
+	struct sctp_af		*af;
+	struct list_head	*pos;
+	int 			i;
+	int 			retval = 0;
+
+	sp = sctp_sk(sk);
+	ep = sp->ep;
+
+	SCTP_DEBUG_PRINTK("%s: (sk: %p, addrs: %p, addrcnt: %d)\n",
+			  __FUNCTION__, sk, addrs, addrcnt);
+
+	list_for_each(pos, &ep->asocs) {
+		asoc = list_entry(pos, struct sctp_association, asocs);
+
+		if (!sctp_state(asoc, ESTABLISHED))
+			continue;
+
+		if (!asoc->peer.asconf_capable)
+			continue;
+
+		/* Check if any address in the packed array of addresses is
+	         * not present in the bind address list of the association.
+		 * If so, do not send the asconf chunk to its peer, but
+		 * continue with other associations.
+		 */
+		addr_buf = addrs;
+		for (i = 0; i < addrcnt; i++) {
+			laddr = (union sctp_addr *)addr_buf;
+			af = sctp_get_af_specific(laddr->v4.sin_family);
+			if (!af) {
+				retval = -EINVAL;
+				goto out;
+			}
+
+			if (!sctp_assoc_lookup_laddr(asoc, laddr))		
+				break;
+			
+			addr_buf += af->sockaddr_len;
+		}
+		if (i < addrcnt)
+			continue;
+
+		/* Find one address in the association's bind address list
+		 * that is not in the packed array of addresses. This is to
+		 * make sure that we do not delete all the addresses in the
+		 * association.
+		 */
+		sctp_read_lock(&asoc->base.addr_lock);
+		bp = &asoc->base.bind_addr;
+		laddr = sctp_find_unmatch_addr(bp, (union sctp_addr *)addrs,
+					       addrcnt, sp);
+		sctp_read_unlock(&asoc->base.addr_lock);		
+		if (!laddr)
+			continue;
+
+		chunk = sctp_make_asconf_update_ip(asoc, laddr, addrs, addrcnt, 
+						   SCTP_PARAM_DEL_IP);
+		if (!chunk) {
+			retval = -ENOMEM;
+			goto out;
+		}
+
+		retval = sctp_primitive_ASCONF(asoc, chunk);
+		if (retval) {
+			sctp_chunk_free(chunk);
+			goto out;
+		}
+
+		/* FIXME: After sending the delete address ASCONF chunk, we
+		 * cannot remove the addresses from the association's bind
+		 * address list, because there maybe some packet send to
+		 * the delete addresses, so we should wait until ASCONF_ACK 
+		 * packet is received.
+		 */
+	}
+out:
 	return retval;
 }
 
@@ -564,10 +766,16 @@ SCTP_STATIC int sctp_setsockopt_bindx(struct sock* sk, struct sockaddr *addrs,
 	switch (op) {
 	case SCTP_BINDX_ADD_ADDR:
 		err = sctp_bindx_add(sk, kaddrs, addrcnt);
+		if (err)
+			goto out;
+		err = sctp_send_asconf_add_ip(sk, kaddrs, addrcnt);
 		break;
 
 	case SCTP_BINDX_REM_ADDR:
 		err = sctp_bindx_rem(sk, kaddrs, addrcnt);
+		if (err)
+			goto out;
+		err = sctp_send_asconf_del_ip(sk, kaddrs, addrcnt);
 		break;
 
 	default:
@@ -575,6 +783,7 @@ SCTP_STATIC int sctp_setsockopt_bindx(struct sock* sk, struct sockaddr *addrs,
 		break;
         };
 
+out:
 	kfree(kaddrs);
 
 	return err;
