@@ -569,28 +569,27 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 }
 EXPORT_SYMBOL_GPL(__ide_do_rw_disk);
 
-static task_ioreg_t get_command (ide_drive_t *drive, int cmd)
+static u8 get_command(ide_drive_t *drive, int cmd)
 {
-	int lba48bit = (drive->addressing == 1) ? 1 : 0;
+	unsigned int lba48 = (drive->addressing == 1) ? 1 : 0;
 
-	if ((cmd == READ) && drive->using_tcq)
-		return lba48bit ? WIN_READDMA_QUEUED_EXT : WIN_READDMA_QUEUED;
-	if ((cmd == READ) && (drive->using_dma))
-		return (lba48bit) ? WIN_READDMA_EXT : WIN_READDMA;
-	else if ((cmd == READ) && (drive->mult_count))
-		return (lba48bit) ? WIN_MULTREAD_EXT : WIN_MULTREAD;
-	else if (cmd == READ)
-		return (lba48bit) ? WIN_READ_EXT : WIN_READ;
-	else if ((cmd == WRITE) && drive->using_tcq)
-		return lba48bit ? WIN_WRITEDMA_QUEUED_EXT : WIN_WRITEDMA_QUEUED;
-	else if ((cmd == WRITE) && (drive->using_dma))
-		return (lba48bit) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
-	else if ((cmd == WRITE) && (drive->mult_count))
-		return (lba48bit) ? WIN_MULTWRITE_EXT : WIN_MULTWRITE;
-	else if (cmd == WRITE)
-		return (lba48bit) ? WIN_WRITE_EXT : WIN_WRITE;
-	else
-		return WIN_NOP;
+	if (cmd == READ) {
+		if (drive->using_tcq)
+			return lba48 ? WIN_READDMA_QUEUED_EXT : WIN_READDMA_QUEUED;
+		if (drive->using_dma)
+			return lba48 ? WIN_READDMA_EXT : WIN_READDMA;
+		if (drive->mult_count)
+			return lba48 ? WIN_MULTREAD_EXT : WIN_MULTREAD;
+		return lba48 ? WIN_READ_EXT : WIN_READ;
+	} else {
+		if (drive->using_tcq)
+			return lba48 ? WIN_WRITEDMA_QUEUED_EXT : WIN_WRITEDMA_QUEUED;
+		if (drive->using_dma)
+			return lba48 ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
+		if (drive->mult_count)
+			return lba48 ? WIN_MULTWRITE_EXT : WIN_MULTWRITE;
+		return lba48 ? WIN_WRITE_EXT : WIN_WRITE;
+	}
 }
 
 static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
