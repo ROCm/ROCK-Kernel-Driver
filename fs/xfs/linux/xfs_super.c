@@ -241,6 +241,19 @@ xfs_initialize_vnode(
 	}
 }
 
+struct inode *
+xfs_get_inode(
+	bhv_desc_t	*bdp,
+	xfs_ino_t	ino,
+	int		flags)
+{
+	struct vfs	*vfsp = bhvtovfs(bdp);
+
+	if (flags & IGET_NOALLOC)
+		return ilookup(vfsp->vfs_super, ino);
+	return iget_locked(vfsp->vfs_super, ino);
+}
+
 void
 xfs_flush_inode(
 	xfs_inode_t	*ip)
@@ -898,7 +911,6 @@ init_xfs_fs( void )
 	vn_init();
 	xfs_init();
 	uuid_init();
-	vfs_initdmapi();
 	vfs_initquota();
 
 	error = register_filesystem(&xfs_fs_type);
@@ -920,9 +932,8 @@ STATIC void __exit
 exit_xfs_fs( void )
 {
 	unregister_filesystem(&xfs_fs_type);
-	xfs_cleanup();
 	vfs_exitquota();
-	vfs_exitdmapi();
+	xfs_cleanup();
 	pagebuf_terminate();
 	destroy_inodecache();
 	ktrace_uninit();

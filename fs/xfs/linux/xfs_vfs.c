@@ -201,6 +201,19 @@ vfs_quotactl(
 	return ((*bhvtovfsops(next)->vfs_quotactl)(next, cmd, id, addr));
 }
 
+struct inode *
+vfs_get_inode(
+	struct bhv_desc		*bdp,
+	xfs_ino_t		ino,
+	int			fl)
+{
+	struct bhv_desc		*next = bdp;
+
+	while (! (bhvtovfsops(next))->vfs_get_inode)
+		next = BHV_NEXTNULL(next);
+	return ((*bhvtovfsops(next)->vfs_get_inode)(next, ino, fl));
+}
+
 void
 vfs_init_vnode(
 	struct bhv_desc		*bdp,

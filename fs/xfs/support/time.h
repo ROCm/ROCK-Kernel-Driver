@@ -29,36 +29,27 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_H__
-#define __XFS_H__
+#ifndef __XFS_SUPPORT_TIME_H__
+#define __XFS_SUPPORT_TIME_H__
 
-#include <linux/types.h>
-#include <linux/config.h>
-#include <linux/version.h>
-#include <xfs_types.h>
+#include <linux/sched.h>
+#include <linux/time.h>
 
-#include <xfs_arch.h>
+typedef struct timespec timespec_t;
 
-#include <support/mrlock.h>
-#include <support/qsort.h>
-#include <support/spin.h>
-#include <support/sv.h>
-#include <support/ktrace.h>
-#include <support/mutex.h>
-#include <support/sema.h>
-#include <support/debug.h>
-#include <support/move.h>
-#include <support/uuid.h>
-#include <support/time.h>
+static inline void delay(long ticks)
+{
+	current->state = TASK_UNINTERRUPTIBLE;
+	schedule_timeout(ticks);
+}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#include <linux/kmem.h>
-#include <linux/xfs_linux.h>
-#else
-#include <linux-2.4/kmem.h>
-#include <linux-2.4/xfs_linux.h>
-#endif
+static inline void nanotime(struct timespec *tvp)
+{
+	struct timeval tv;
 
-#include <xfs_fs.h> 
+	do_gettimeofday(&tv);
+	tvp->tv_sec = tv.tv_sec;
+	tvp->tv_nsec = tv.tv_usec * 1000;
+}
 
-#endif	/* __XFS_H__ */
+#endif /* __XFS_SUPPORT_TIME_H__ */

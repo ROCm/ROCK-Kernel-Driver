@@ -451,9 +451,9 @@ xfs_mount(
 	 * Setup xfs_mount function vectors from available behaviors
 	 */
 	p = vfs_bhv_lookup(vfsp, VFS_POSITION_DM);
-	mp->m_dm_ops = p ? *(xfs_dmops_t *) vfs_bhv_custom(p) : xfs_dmcore_xfs;
+	mp->m_dm_ops = p ? *(xfs_dmops_t *) vfs_bhv_custom(p) : xfs_dmcore_stub;
 	p = vfs_bhv_lookup(vfsp, VFS_POSITION_QM);
-	mp->m_qm_ops = p ? *(xfs_qmops_t *) vfs_bhv_custom(p) : xfs_qmcore_xfs;
+	mp->m_qm_ops = p ? *(xfs_qmops_t *) vfs_bhv_custom(p) : xfs_qmcore_stub;
 	p = vfs_bhv_lookup(vfsp, VFS_POSITION_IO);
 	mp->m_io_ops = p ? *(xfs_ioops_t *) vfs_bhv_custom(p) : xfs_iocore_xfs;
 
@@ -770,7 +770,6 @@ xfs_statvfs(
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
 	unsigned long	s;
-	u64 id;
 
 	mp = XFS_BHVTOM(bdp);
 	sbp = &(mp->m_sb);
@@ -797,9 +796,8 @@ xfs_statvfs(
 	statp->f_ffree = statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	XFS_SB_UNLOCK(mp, s);
 
-	id = huge_encode_dev(mp->m_dev);
-	statp->f_fsid.val[0] = (u32)id;
-	statp->f_fsid.val[1] = (u32)(id >> 32);
+	statp->f_fsid.val[0] = mp->m_dev;
+	statp->f_fsid.val[1] = 0;
 	statp->f_namelen = MAXNAMELEN - 1;
 
 	return 0;
@@ -1866,6 +1864,7 @@ vfsops_t xfs_vfsops = {
 	.vfs_vget		= xfs_vget,
 	.vfs_dmapiops		= (vfs_dmapiops_t)fs_nosys,
 	.vfs_quotactl		= (vfs_quotactl_t)fs_nosys,
+	.vfs_get_inode		= xfs_get_inode,
 	.vfs_init_vnode		= xfs_initialize_vnode,
 	.vfs_force_shutdown	= xfs_do_force_shutdown,
 };

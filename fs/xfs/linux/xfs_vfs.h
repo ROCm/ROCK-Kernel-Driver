@@ -95,6 +95,8 @@ typedef enum {
 #define SYNC_REFCACHE		0x0040  /* prune some of the nfs ref cache */
 #define SYNC_REMOUNT		0x0080  /* remount readonly, no dummy LRs */
 
+#define IGET_NOALLOC		0x0001	/* vfs_get_inode may return NULL */
+
 typedef int	(*vfs_mount_t)(bhv_desc_t *,
 				struct xfs_mount_args *, struct cred *);
 typedef int	(*vfs_parseargs_t)(bhv_desc_t *, char *,
@@ -112,6 +114,7 @@ typedef int	(*vfs_quotactl_t)(bhv_desc_t *, int, int, caddr_t);
 typedef void	(*vfs_init_vnode_t)(bhv_desc_t *,
 				struct vnode *, bhv_desc_t *, int);
 typedef void	(*vfs_force_shutdown_t)(bhv_desc_t *, int, char *, int);
+typedef	struct inode * (*vfs_get_inode_t)(bhv_desc_t *, xfs_ino_t, int);
 
 typedef struct vfsops {
 	bhv_position_t		vf_position;	/* behavior chain position */
@@ -126,6 +129,7 @@ typedef struct vfsops {
 	vfs_vget_t		vfs_vget;	/* get vnode from fid */
 	vfs_dmapiops_t		vfs_dmapiops;	/* data migration */
 	vfs_quotactl_t		vfs_quotactl;	/* disk quota */
+	vfs_get_inode_t		vfs_get_inode;	/* bhv specific iget */
 	vfs_init_vnode_t	vfs_init_vnode;	/* initialize a new vnode */
 	vfs_force_shutdown_t	vfs_force_shutdown;	/* crash and burn */
 } vfsops_t;
@@ -145,6 +149,7 @@ typedef struct vfsops {
 #define VFS_VGET(v, vpp,fidp, rv)	((rv) = vfs_vget(VHEAD(v), vpp,fidp))
 #define VFS_DMAPIOPS(v, p, rv)		((rv) = vfs_dmapiops(VHEAD(v), p))
 #define VFS_QUOTACTL(v, c,id,p, rv)	((rv) = vfs_quotactl(VHEAD(v), c,id,p))
+#define VFS_GET_INODE(v, ino, fl)	( vfs_get_inode(VHEAD(v), ino,fl) )
 #define VFS_INIT_VNODE(v, vp,b,ul)	( vfs_init_vnode(VHEAD(v), vp,b,ul) )
 #define VFS_FORCE_SHUTDOWN(v, fl,f,l)	( vfs_force_shutdown(VHEAD(v), fl,f,l) )
 
@@ -162,6 +167,7 @@ typedef struct vfsops {
 #define PVFS_VGET(b, vpp,fidp, rv)	((rv) = vfs_vget(b, vpp,fidp))
 #define PVFS_DMAPIOPS(b, p, rv)		((rv) = vfs_dmapiops(b, p))
 #define PVFS_QUOTACTL(b, c,id,p, rv)	((rv) = vfs_quotactl(b, c,id,p))
+#define PVFS_GET_INODE(b, ino,fl)	( vfs_get_inode(b, ino,fl) )
 #define PVFS_INIT_VNODE(b, vp,b2,ul)	( vfs_init_vnode(b, vp,b2,ul) )
 #define PVFS_FORCE_SHUTDOWN(b, fl,f,l)	( vfs_force_shutdown(b, fl,f,l) )
 
@@ -176,13 +182,27 @@ extern int vfs_sync(bhv_desc_t *, int, struct cred *);
 extern int vfs_vget(bhv_desc_t *, struct vnode **, struct fid *);
 extern int vfs_dmapiops(bhv_desc_t *, caddr_t);
 extern int vfs_quotactl(bhv_desc_t *, int, int, caddr_t);
+extern struct inode *vfs_get_inode(bhv_desc_t *, xfs_ino_t, int);
 extern void vfs_init_vnode(bhv_desc_t *, struct vnode *, bhv_desc_t *, int);
 extern void vfs_force_shutdown(bhv_desc_t *, int, char *, int);
+
+#define XFS_DMOPS		"xfs_dm_operations"	/* Data Migration */
+#define XFS_QMOPS		"xfs_qm_operations"	/* Quota Manager  */
+#define XFS_IOOPS		"xfs_io_operations"	/* I/O subsystem  */
+#define XFS_DM_MODULE		"xfs_dmapi"
+#define XFS_QM_MODULE		"xfs_quota"
+#define XFS_IO_MODULE		"xfs_ioops"
 
 typedef struct bhv_vfsops {
 	struct vfsops		bhv_common;
 	void *			bhv_custom;
 } bhv_vfsops_t;
+
+typedef struct bhv_module {
+	bhv_desc_t		bm_desc;
+	const char *		bm_name;
+	bhv_vfsops_t *		bm_ops;
+} bhv_module_t;
 
 #define vfs_bhv_lookup(v, id)	( bhv_lookup_range(&(v)->vfs_bh, (id), (id)) )
 #define vfs_bhv_custom(b)	( ((bhv_vfsops_t *)BHV_OPS(b))->bhv_custom )
@@ -193,6 +213,13 @@ extern vfs_t *vfs_allocate(void);
 extern void vfs_deallocate(vfs_t *);
 extern void vfs_insertops(vfs_t *, bhv_vfsops_t *);
 extern void vfs_insertbhv(vfs_t *, bhv_desc_t *, vfsops_t *, void *);
+
+#define bhv_lookup_module(n,m)	( (m) ? \
+				inter_module_get_request(n, m) : \
+				inter_module_get(n) )
+#define bhv_remove_module(n)	inter_module_put(n)
+#define bhv_module_init(n,m,op)	inter_module_register(n,m,op)
+#define bhv_module_exit(n)	inter_module_unregister(n)
 
 extern void bhv_insert_all_vfsops(struct vfs *);
 extern void bhv_remove_all_vfsops(struct vfs *, int);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -30,42 +30,63 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #include "xfs.h"
-
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_dmapi.h"
-#include "xfs_mount.h"
+#include "dmapi.h"
+#include "dmapi_kern.h"
+#include "dmapi_private.h"
 
 
-STATIC struct xfs_dquot *
-xfs_dqvopchown_default(
-	struct xfs_trans	*tp,
-	struct xfs_inode	*ip,
-	struct xfs_dquot	**dqp,
-	struct xfs_dquot	*dq)
+int
+dm_get_region(
+	dm_sessid_t	sid,
+	void		*hanp,
+	size_t		hlen,
+	dm_token_t	token,
+	u_int		nelem,
+	dm_region_t	*regbufp,
+	u_int		*nelemp)
 {
-	return NULL;
+	dm_fsys_vector_t *fsys_vector;
+	dm_tokdata_t	*tdp;
+	int		error;
+
+	error = dm_app_get_tdp(sid, hanp, hlen, token, DM_TDT_REG,
+		DM_RIGHT_SHARED, &tdp);
+	if (error != 0)
+		return(error);
+
+	fsys_vector = dm_fsys_vector(tdp->td_vp);
+	error = fsys_vector->get_region(tdp->td_vp, tdp->td_right,
+		nelem, regbufp, nelemp);
+
+	dm_app_put_tdp(tdp);
+	return(error);
 }
 
-xfs_qmops_t	xfs_qmcore_stub = {
-	.xfs_qminit		= (xfs_qminit_t) fs_noerr,
-	.xfs_qmdone		= (xfs_qmdone_t) fs_noerr,
-	.xfs_qmmount		= (xfs_qmmount_t) fs_noerr,
-	.xfs_qmunmount		= (xfs_qmunmount_t) fs_noerr,
-	.xfs_dqrele		= (xfs_dqrele_t) fs_noerr,
-	.xfs_dqattach		= (xfs_dqattach_t) fs_noerr,
-	.xfs_dqdetach		= (xfs_dqdetach_t) fs_noerr,
-	.xfs_dqpurgeall		= (xfs_dqpurgeall_t) fs_noerr,
-	.xfs_dqvopalloc		= (xfs_dqvopalloc_t) fs_noerr,
-	.xfs_dqvopcreate	= (xfs_dqvopcreate_t) fs_noerr,
-	.xfs_dqvoprename	= (xfs_dqvoprename_t) fs_noerr,
-	.xfs_dqvopchown		= xfs_dqvopchown_default,
-	.xfs_dqvopchownresv	= (xfs_dqvopchownresv_t) fs_noerr,
-};
+
+
+int
+dm_set_region(
+	dm_sessid_t	sid,
+	void		*hanp,
+	size_t		hlen,
+	dm_token_t	token,
+	u_int		nelem,
+	dm_region_t	*regbufp,
+	dm_boolean_t	*exactflagp)
+{
+	dm_fsys_vector_t *fsys_vector;
+	dm_tokdata_t	*tdp;
+	int		error;
+
+	error = dm_app_get_tdp(sid, hanp, hlen, token, DM_TDT_REG,
+		DM_RIGHT_EXCL, &tdp);
+	if (error != 0)
+		return(error);
+
+	fsys_vector = dm_fsys_vector(tdp->td_vp);
+	error = fsys_vector->set_region(tdp->td_vp, tdp->td_right,
+		nelem, regbufp, exactflagp);
+
+	dm_app_put_tdp(tdp);
+	return(error);
+}
