@@ -1390,8 +1390,6 @@ S:	Maintained
 NCP FILESYSTEM
 P:	Petr Vandrovec
 M:	vandrove@vc.cvut.cz
-P:	Volker Lendecke
-M:	vl@kki.org
 L:	linware@sh.cvut.cz
 S:	Maintained
 
