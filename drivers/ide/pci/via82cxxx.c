@@ -667,5 +667,3 @@ module_exit(via_ide_exit);
 MODULE_AUTHOR("Vojtech Pavlik, Michel Aubry, Jeff Garzik, Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for VIA IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

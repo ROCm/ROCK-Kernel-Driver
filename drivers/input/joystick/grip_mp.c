@@ -22,10 +22,7 @@
 
 MODULE_AUTHOR("Brian Bonnlander");
 MODULE_DESCRIPTION("Gravis Grip Multiport driver");
-#ifdef MODULE_LICENSE
 MODULE_LICENSE("GPL");
-#endif
-EXPORT_NO_SYMBOLS;
 
 #ifdef GRIP_DEBUG
 #define dbg(format, arg...) printk(KERN_ERR __FILE__ ": " format "\n" , ## arg)

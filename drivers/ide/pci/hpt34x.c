@@ -362,5 +362,3 @@ module_exit(hpt34x_ide_exit);
 MODULE_AUTHOR("Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for Highpoint 34x IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

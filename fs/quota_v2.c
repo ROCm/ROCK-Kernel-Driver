@@ -688,7 +688,5 @@ static void __exit exit_v2_quota_format(void)
 	unregister_quota_format(&v2_quota_format);
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_v2_quota_format);
 module_exit(exit_v2_quota_format);

@@ -320,6 +320,3 @@ module_exit(cs5520_ide_exit);
 MODULE_AUTHOR("Alan Cox");
 MODULE_DESCRIPTION("PCI driver module for Cyrix 5510/5520 IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;
-

@@ -430,7 +430,6 @@ static void __exit rtc_generic_exit(void)
 
 module_init(rtc_generic_init);
 module_exit(rtc_generic_exit);
-EXPORT_NO_SYMBOLS;
 
 
 /*

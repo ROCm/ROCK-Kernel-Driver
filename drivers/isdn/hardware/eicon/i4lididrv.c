@@ -27,8 +27,6 @@
 
 #include "../avmb1/capicmd.h"  /* this should be moved in a common place */
 
-EXPORT_NO_SYMBOLS;
-
 #define INCLUDE_INLINE_FUNCS
 
 static eicon_card *cards = (eicon_card *) NULL;   /* glob. var , contains

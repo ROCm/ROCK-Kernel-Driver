@@ -277,7 +277,3 @@ module_exit(power_exit);
 MODULE_AUTHOR("Helge Deller");
 MODULE_DESCRIPTION("Soft power switch driver");
 MODULE_LICENSE("Dual BSD/GPL");
-
-
-EXPORT_NO_SYMBOLS;
-

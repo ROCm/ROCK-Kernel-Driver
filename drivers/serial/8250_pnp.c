@@ -437,7 +437,5 @@ static void __exit serial8250_pnp_exit(void)
 module_init(serial8250_pnp_init);
 module_exit(serial8250_pnp_exit);
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Generic 8250/16x50 PnP serial driver");

@@ -1722,8 +1722,6 @@ static void __exit sunzilog_exit(void)
 module_init(sunzilog_init);
 module_exit(sunzilog_exit);
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("David S. Miller");
 MODULE_DESCRIPTION("Sun Zilog serial port driver");
 MODULE_LICENSE("GPL");

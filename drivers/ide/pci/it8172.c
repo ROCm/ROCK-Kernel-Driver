@@ -330,5 +330,3 @@ module_exit(it8172_ide_exit);
 MODULE_AUTHOR("SteveL@mvista.com");
 MODULE_DESCRIPTION("PCI driver module for ITE 8172 IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

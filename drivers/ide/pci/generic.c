@@ -165,5 +165,3 @@ module_exit(generic_ide_exit);
 MODULE_AUTHOR("Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for generic PCI IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

@@ -28,8 +28,6 @@
 #include "di_defs.h"
 #include "debug_if.h"
 
-EXPORT_NO_SYMBOLS;
-
 static char *main_revision = "$Revision: 1.1.2.4 $";
 
 static int major = 241;

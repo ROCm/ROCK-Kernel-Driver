@@ -403,5 +403,3 @@ module_exit(slc90e66_ide_exit);
 MODULE_AUTHOR("Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for SLC90E66 IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;
