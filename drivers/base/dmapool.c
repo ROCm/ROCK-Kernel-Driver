@@ -43,9 +43,11 @@ static DECLARE_MUTEX (pools_lock);
 static ssize_t
 show_pools (struct device *dev, char *buf)
 {
-	unsigned		temp, size;
-	char			*next;
-	struct list_head	*i, *j;
+	unsigned temp;
+	unsigned size;
+	char *next;
+	struct dma_page *page;
+	struct dma_pool *pool;
 
 	next = buf;
 	size = PAGE_SIZE;
@@ -55,16 +57,11 @@ show_pools (struct device *dev, char *buf)
 	next += temp;
 
 	down (&pools_lock);
-	list_for_each (i, &dev->dma_pools) {
-		struct dma_pool	*pool;
-		unsigned	pages = 0, blocks = 0;
+	list_for_each_entry(pool, &dev->dma_pools, pools) {
+		unsigned pages = 0;
+		unsigned blocks = 0;
 
-		pool = list_entry (i, struct dma_pool, pools);
-
-		list_for_each (j, &pool->page_list) {
-			struct dma_page	*page;
-
-			page = list_entry (j, struct dma_page, page_list);
+		list_for_each_entry(page, &pool->page_list, page_list) {
 			pages++;
 			blocks += page->in_use;
 		}
@@ -268,7 +265,6 @@ void *
 dma_pool_alloc (struct dma_pool *pool, int mem_flags, dma_addr_t *handle)
 {
 	unsigned long		flags;
-	struct list_head	*entry;
 	struct dma_page		*page;
 	int			map, block;
 	size_t			offset;
@@ -276,9 +272,8 @@ dma_pool_alloc (struct dma_pool *pool, int mem_flags, dma_addr_t *handle)
 
 restart:
 	spin_lock_irqsave (&pool->lock, flags);
-	list_for_each (entry, &pool->page_list) {
+	list_for_each_entry(page, &pool->page_list, page_list) {
 		int		i;
-		page = list_entry (entry, struct dma_page, page_list);
 		/* only cachable accesses here ... */
 		for (map = 0, i = 0;
 				i < pool->blocks_per_page;
@@ -330,12 +325,10 @@ static struct dma_page *
 pool_find_page (struct dma_pool *pool, dma_addr_t dma)
 {
 	unsigned long		flags;
-	struct list_head	*entry;
 	struct dma_page		*page;
 
 	spin_lock_irqsave (&pool->lock, flags);
-	list_for_each (entry, &pool->page_list) {
-		page = list_entry (entry, struct dma_page, page_list);
+	list_for_each_entry(page, &pool->page_list, page_list) {
 		if (dma < page->dma)
 			continue;
 		if (dma < (page->dma + pool->allocation))
