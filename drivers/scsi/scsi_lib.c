@@ -1313,39 +1313,6 @@ void scsi_unblock_requests(struct Scsi_Host *shost)
 	scsi_run_host_queues(shost);
 }
 
-/*
- * Function:    scsi_report_bus_reset()
- *
- * Purpose:     Utility function used by low-level drivers to report that
- *		they have observed a bus reset on the bus being handled.
- *
- * Arguments:   shost       - Host in question
- *		channel     - channel on which reset was observed.
- *
- * Returns:     Nothing
- *
- * Lock status: No locks are assumed held.
- *
- * Notes:       This only needs to be called if the reset is one which
- *		originates from an unknown location.  Resets originated
- *		by the mid-level itself don't need to call this, but there
- *		should be no harm.
- *
- *		The main purpose of this is to make sure that a CHECK_CONDITION
- *		is properly treated.
- */
-void scsi_report_bus_reset(struct Scsi_Host *shost, int channel)
-{
-	struct scsi_device *sdev;
-
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
-		if (channel == sdev->channel) {
-			sdev->was_reset = 1;
-			sdev->expecting_cc_ua = 1;
-		}
-	}
-}
-
 int __init scsi_init_queue(void)
 {
 	int i;

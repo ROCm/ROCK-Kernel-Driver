@@ -4086,22 +4086,19 @@ ahc_send_async(struct ahc_softc *ahc, char channel,
 	}
         case AC_SENT_BDR:
 	{
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+		WARN_ON(lun != CAM_LUN_WILDCARD);
+		scsi_report_device_reset(ahc->platform_data->host,
+					 channel - 'A', target);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
 		Scsi_Device *scsi_dev;
 
 		/*
 		 * Find the SCSI device associated with this
 		 * request and indicate that a UA is expected.
-		 * XXX This should really be handled by the mid-layer.
 		 */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-		list_for_each_entry(scsi_dev,
-				    &ahc->platform_data->host->my_devices,
-				    siblings) {
-#else
 		for (scsi_dev = ahc->platform_data->host->host_queue;
 		     scsi_dev != NULL; scsi_dev = scsi_dev->next) {
-#endif
 			if (channel - 'A' == scsi_dev->channel
 			 && target == scsi_dev->id
 			 && (lun == CAM_LUN_WILDCARD

@@ -65,6 +65,7 @@ EXPORT_SYMBOL(scsi_get_command);
 EXPORT_SYMBOL(scsi_put_command);
 
 EXPORT_SYMBOL(scsi_report_bus_reset);
+EXPORT_SYMBOL(scsi_report_device_reset);
 EXPORT_SYMBOL(scsi_block_requests);
 EXPORT_SYMBOL(scsi_unblock_requests);
 EXPORT_SYMBOL(scsi_adjust_queue_depth);
