@@ -6736,12 +6736,12 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
  *   prepare for this device to go away
  *-F*************************************************************************/
 static void
-aic7xxx_slave_destroy(Scsi_Device *sdpnt)
+aic7xxx_slave_destroy(Scsi_Device *SDptr)
 {
-  struct aic_dev_data *aic_dev = sdpnt->hostdata;
+  struct aic_dev_data *aic_dev = SDptr->hostdata;
 
   list_del(&aic_dev->list);
-  sdpnt->hostdata = NULL;
+  SDptr->hostdata = NULL;
   kfree(aic_dev);
   return;
 }
@@ -6756,16 +6756,16 @@ aic7xxx_slave_destroy(Scsi_Device *sdpnt)
  *   depths, allocate command structs, etc.
  *-F*************************************************************************/
 static int
-aic7xxx_slave_configure(Scsi_Device *sdpnt)
+aic7xxx_slave_configure(Scsi_Device *SDptr)
 {
-  struct aic7xxx_host *p = (struct aic7xxx_host *) sdpnt->host->hostdata;
+  struct aic7xxx_host *p = (struct aic7xxx_host *) SDptr->host->hostdata;
   struct aic_dev_data *aic_dev;
   int scbnum;
 
-  aic_dev = (struct aic_dev_data *)sdpnt->hostdata;
+  aic_dev = (struct aic_dev_data *)SDptr->hostdata;
 
   aic7xxx_init_transinfo(p, aic_dev);
-  aic7xxx_device_queue_depth(p, sdpnt);
+  aic7xxx_device_queue_depth(p, SDptr);
   if(list_empty(&aic_dev->list))
     list_add_tail(&aic_dev->list, &p->aic_devs);
 
@@ -9024,7 +9024,6 @@ aic7xxx_detect(Scsi_Host_Template *template)
 
   template->proc_name = "aic7xxx";
   template->sg_tablesize = AIC7XXX_MAX_SG;
-  template->max_sectors = 2048;
 
 
 #ifdef CONFIG_PCI
@@ -9246,12 +9245,22 @@ aic7xxx_detect(Scsi_Host_Template *template)
 	    {
               /* duplicate PCI entry, skip it */
 	      kfree(temp_p);
-	      temp_p = NULL;
+              continue;
 	    }
 	    current_p = current_p->next;
 	  }
-	  if ( temp_p == NULL )
+          if(pci_request_regions(temp_p->pdev, "aic7xxx"))
+          {
+            printk("aic7xxx: <%s> at PCI %d/%d/%d\n", 
+              board_names[aic_pdevs[i].board_name_index],
+              temp_p->pci_bus,
+              PCI_SLOT(temp_p->pci_device_fn),
+              PCI_FUNC(temp_p->pci_device_fn));
+            printk("aic7xxx: I/O ports already in use, ignoring.\n");
+            kfree(temp_p);
             continue;
+          }
+
           if (aic7xxx_verbose & VERBOSE_PROBE2)
             printk("aic7xxx: <%s> at PCI %d/%d\n", 
               board_names[aic_pdevs[i].board_name_index],
@@ -9283,20 +9292,6 @@ aic7xxx_detect(Scsi_Host_Template *template)
           pci_write_config_dword(pdev, DEVCONFIG, devconfig);
 #endif /* AIC7XXX_STRICT_PCI_SETUP */
 
-          if(temp_p->base && !request_region(temp_p->base, MAXREG - MINREG,
-				  "aic7xxx"))
-          {
-            printk("aic7xxx: <%s> at PCI %d/%d/%d\n", 
-              board_names[aic_pdevs[i].board_name_index],
-              temp_p->pci_bus,
-              PCI_SLOT(temp_p->pci_device_fn),
-              PCI_FUNC(temp_p->pci_device_fn));
-            printk("aic7xxx: I/O ports already in use, ignoring.\n");
-            kfree(temp_p);
-            temp_p = NULL;
-            continue;
-          }
-
           temp_p->unpause = INTEN;
           temp_p->pause = temp_p->unpause | PAUSE;
           if ( ((temp_p->base == 0) &&
@@ -9309,9 +9304,7 @@ aic7xxx_detect(Scsi_Host_Template *template)
               PCI_SLOT(temp_p->pci_device_fn),
               PCI_FUNC(temp_p->pci_device_fn));
             printk("aic7xxx: Controller disabled by BIOS, ignoring.\n");
-            kfree(temp_p);
-            temp_p = NULL;
-            continue;
+            goto skip_pci_controller;
           }
 
 #ifdef MMAPIO
@@ -9353,9 +9346,7 @@ aic7xxx_detect(Scsi_Host_Template *template)
                     PCI_SLOT(temp_p->pci_device_fn),
                     PCI_FUNC(temp_p->pci_device_fn));
                   printk("aic7xxx: Controller disabled by BIOS, ignoring.\n");
-                  kfree(temp_p);
-                  temp_p = NULL;
-                  continue;
+                  goto skip_pci_controller;
                 }
               }
             }
@@ -9398,10 +9389,7 @@ aic7xxx_detect(Scsi_Host_Template *template)
 
           if (aic7xxx_chip_reset(temp_p) == -1)
           {
-            release_region(temp_p->base, MAXREG - MINREG);
-            kfree(temp_p);
-            temp_p = NULL;
-            continue;
+            goto skip_pci_controller;
           }
           /*
            * Very quickly put the term setting back into the register since
@@ -9687,6 +9675,10 @@ aic7xxx_detect(Scsi_Host_Template *template)
           }
           temp_p->next = NULL;
           found++;
+	  continue;
+skip_pci_controller:
+	  pci_release_regions(temp_p->pdev);
+	  kfree(temp_p);
         }  /* Found an Adaptec PCI device. */
         else /* Well, we found one, but we couldn't get any memory */
         {
@@ -10969,14 +10961,16 @@ aic7xxx_release(struct Scsi_Host *host)
 
   if(p->irq)
     free_irq(p->irq, p);
-  if(p->base)
-    release_region(p->base, MAXREG - MINREG);
 #ifdef MMAPIO
   if(p->maddr)
   {
     iounmap((void *) (((unsigned long) p->maddr) & PAGE_MASK));
   }
 #endif /* MMAPIO */
+  if(!p->pdev)
+    release_region(p->base, MAXREG - MINREG);
+  else
+    pci_release_regions(p->pdev);
   prev = NULL;
   next = first_aic7xxx;
   while(next != NULL)
