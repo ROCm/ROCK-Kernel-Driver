@@ -199,14 +199,7 @@ typedef enum {
 
 extern struct bhv_vfsops xfs_dmops;
 
-#if defined(CONFIG_XFS_DMAPI) || defined(CONFIG_XFS_DMAPI_MODULE)
-void xfs_dm_init(void);
-void xfs_dm_exit(void);
-#define XFS_DM_INIT()	xfs_dm_init()
-#define XFS_DM_EXIT()	xfs_dm_exit()
-#else
-#define XFS_DM_INIT()
-#define XFS_DM_EXIT()
-#endif
+extern int dmapi_init(void);
+extern void dmapi_uninit(void);
 
 #endif  /* __XFS_DMAPI_H__ */

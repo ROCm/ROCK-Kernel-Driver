@@ -137,6 +137,10 @@ enum
 	KERN_MAXTIMESLICE=67,	/* int: nice -20 max timeslice */
 	KERN_MINTIMESLICE=68,	/* int: nice +19 min timeslice */
 	KERN_HZ=69,		/* unsigned long: interal kernel HZ */
+	KERN_SHMUSEHUGEPAGES=70,/* int: back shm with huge pages */
+	KERN_MMAPUSEHUGEPAGES=71,       /* int: back anon mmap with hpages */
+	KERN_HPAGES_MAP_SZ=72,  /* int: min size (MB) of mapping */
+
 };
 
 

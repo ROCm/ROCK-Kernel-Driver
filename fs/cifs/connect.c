@@ -256,7 +256,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		pdu_length = 4 + ntohl(smb_buffer->smb_buf_length);
 		/* Ony read pdu_length after below checks for too short (due
 		   to e.g. int overflow) and too long ie beyond end of buf */
-		cFYI(1, ("Peek length rcvd: %d with smb length: %d", length, pdu_length));
+		cFYI(1, ("Peek length rcvd: 0x%x beginning 0x%x)", length, pdu_length));
 
 		temp = (char *) smb_buffer;
 		if (length > 3) {
@@ -974,6 +974,8 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 			rfc1002mangle(ses_init_buf->trailer.session_req.called_name,
 				DEFAULT_CIFS_CALLED_NAME,16);
 			ses_init_buf->trailer.session_req.calling_len = 32;
+			/* calling name ends in null (byte 16) from old smb
+			convention. */
 			if(netbios_name && (netbios_name[0] !=0)) {
 				rfc1002mangle(ses_init_buf->trailer.session_req.calling_name,
 					netbios_name,16);
@@ -983,7 +985,6 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 			}
 			ses_init_buf->trailer.session_req.scope1 = 0;
 			ses_init_buf->trailer.session_req.scope2 = 0;
-		/* BB fixme ensure calling space padded w/null terminate*/
 			smb_buf = (struct smb_hdr *)ses_init_buf;
 			/* sizeof RFC1002_SESSION_REQUEST with no scope */
 			smb_buf->smb_buf_length = 0x81000044;

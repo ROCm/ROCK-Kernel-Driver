@@ -446,8 +446,8 @@ RmDirRetry:
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len = cifs_strtoUCS((wchar_t *) pSMB->DirName, dirName, 530
-					 /* find define for this maxpathcomponent */
-					 , nls_codepage);
+				/* find define for this maxpathcomponent */
+				, nls_codepage);
 		name_len++;	/* trailing null */
 		name_len *= 2;
 	} else {		/* BB improve the check for buffer overruns BB */
@@ -594,7 +594,10 @@ openRetry:
 	} else {
 		*pOplock = pSMBr->OplockLevel;	/* one byte no need to le_to_cpu */
 		*netfid = pSMBr->Fid;	/* cifs fid stays in le */
-		/* Do we care about the CreateAction in any cases? */
+		/* Let caller know file was created so we can set the mode. */
+		/* Do we care about the CreateAction in any other cases? */
+		if(cpu_to_le32(FILE_CREATE) == pSMBr->CreateAction)
+			*pOplock |= CIFS_CREATE_ACTION; 
 		if(pfile_info) {
 		    memcpy((char *)pfile_info,(char *)&pSMBr->CreationTime,
 			36 /* CreationTime to Attributes */);
@@ -2467,7 +2470,8 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	int bytes_returned = 0;
 	__u32 tmp;
 
-	cFYI(1, ("SetFileSize (via SetFileInfo) %lld",size));
+	cFYI(1, ("SetFileSize (via SetFileInfo) %lld",
+			(long long)size));
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)

@@ -3125,14 +3125,14 @@ struct bhv_vfsops xfs_dmops = { {
 	.vfs_dmapiops		= xfs_dm_get_fsys_vector, },
 };
 
-void
+void __init
 xfs_dm_init(void)
 {
 	vfs_bhv_set_custom(&xfs_dmops, &xfs_dmcore_xfs);
 	bhv_module_init(XFS_DMOPS, THIS_MODULE, &xfs_dmops);
 }
 
-void
+void __exit
 xfs_dm_exit(void)
 {
 	bhv_module_exit(XFS_DMOPS);

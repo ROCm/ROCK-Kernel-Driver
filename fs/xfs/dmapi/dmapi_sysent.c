@@ -55,6 +55,9 @@ kmem_cache_t	*dm_fsreg_cachep = NULL;
 kmem_cache_t	*dm_tokdata_cachep = NULL;
 kmem_cache_t	*dm_session_cachep = NULL;
 
+extern void __init xfs_dm_init(void);
+extern void __exit xfs_dm_exit(void);
+
 static int
 dmapi_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	    unsigned long arg)
@@ -752,11 +755,13 @@ int __init dmapi_init(void)
 	if( ret != 0 )
 		printk(KERN_ERR "dmapi_init: misc_register returned %d\n", ret);
 	dmapi_init_procfs(dmapi_dev.minor);
+	xfs_dm_init();
 	return(0);
 }
 
 void __exit dmapi_uninit(void)
 {
+	xfs_dm_exit();
 	misc_deregister(&dmapi_dev);
 	dmapi_cleanup_procfs();
 	kmem_cache_destroy(dm_tokdata_cachep);

@@ -774,6 +774,7 @@ exit_cifs(void)
 MODULE_AUTHOR("Steve French <sfrench@us.ibm.com>");
 MODULE_LICENSE("GPL");		/* combination of LGPL + GPL source behaves as GPL */
 MODULE_DESCRIPTION
-    ("VFS to access servers complying with the SNIA CIFS Specification e.g. Samba and Windows Revision: 1.11");
+    ("VFS to access servers complying with the SNIA CIFS Specification e.g. Samba and Windows");
+MODULE_VERSION(CIFS_VERSION);
 module_init(init_cifs)
 module_exit(exit_cifs)

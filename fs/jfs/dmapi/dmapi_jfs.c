@@ -311,13 +311,10 @@ prohibited_mr_events(
 {
 	struct address_space *mapping;
 	struct vm_area_struct *vma;
-	prio_tree_iter iter;
-	struct list_head *l;
+	struct prio_tree_iter iter;
 	int		prohibited = 0;
 	dm_off_t	rgnbeg = rgn->rg_offset;
 	dm_off_t	rgnend = rgnbeg + rgn->rg_size;
-	dm_off_t	mmbeg;
-	dm_off_t	mmend;
 
 	if (prio_tree_empty(&ip->i_mapping->i_mmap))
 		return 0;
