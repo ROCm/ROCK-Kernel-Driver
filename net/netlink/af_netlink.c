@@ -386,7 +386,7 @@ static int netlink_connect(struct socket *sock, struct sockaddr *addr,
 		nlk->dst_groups = nladdr->nl_groups;
 	}
 
-	return 0;
+	return err;
 }
 
 static int netlink_getname(struct socket *sock, struct sockaddr *addr, int *addr_len, int peer)
