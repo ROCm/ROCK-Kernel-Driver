@@ -66,6 +66,7 @@
 #define S3C2410_LCON_PMASK	  (0x7 << 3)
 
 #define S3C2410_LCON_STOPB	  (1<<2)
+#define S3C2410_LCON_IRM          (1<<6)
 
 #define S3C2410_UCON_UCLK	  (1<<10)
 #define S3C2410_UCON_SBREAK	  (1<<4)
@@ -97,6 +98,14 @@
 #define S3C2410_UFSTAT_RXMASK	  (15<<0)
 #define S3C2410_UFSTAT_RXSHIFT	  (0)
 
+#define S3C2440_UFSTAT_TXFULL	  (1<<14)
+#define S3C2440_UFSTAT_RXFULL	  (1<<6)
+#define S3C2440_UFSTAT_TXSHIFT	  (8)
+#define S3C2440_UFSTAT_RXSHIFT	  (0)
+#define S3C2440_UFSTAT_TXMASK	  (63<<8)
+#define S3C2440_UFSTAT_RXMASK	  (63)
+
+#define S3C2410_UTRSTAT_TXE	  (1<<2)
 #define S3C2410_UTRSTAT_TXFE	  (1<<1)
 #define S3C2410_UTRSTAT_RXDR	  (1<<0)
 
