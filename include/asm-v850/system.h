@@ -76,10 +76,12 @@ static inline int irqs_disabled (void)
 #define smp_mb()	mb ()
 #define smp_rmb()	rmb ()
 #define smp_wmb()	wmb ()
+#define smp_read_barrier_depends()	read_barrier_depends()
 #else
 #define smp_mb()	barrier ()
 #define smp_rmb()	barrier ()
 #define smp_wmb()	barrier ()
+#define smp_read_barrier_depends()	((void)0)
 #endif
 
 #define xchg(ptr, with) \
