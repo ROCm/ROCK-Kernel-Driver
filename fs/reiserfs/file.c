@@ -215,7 +215,13 @@ int reiserfs_allocate_blocks_for_region(
     hint.key = key.on_disk_key; // on disk key of file.
     hint.block = inode->i_blocks>>(inode->i_sb->s_blocksize_bits-9); // Number of disk blocks this file occupies already.
     hint.formatted_node = 0; // We are allocating blocks for unformatted node.
-    hint.preallocate = 0; // We do not do any preallocation for now.
+
+    /* only preallocate if this is a small write */
+    if (blocks_to_allocate <
+        REISERFS_SB(inode->i_sb)->s_alloc_options.preallocsize)
+        hint.preallocate = 1;
+    else
+        hint.preallocate = 0;
 
     /* Call block allocator to allocate blocks */
     res = reiserfs_allocate_blocknrs(&hint, allocated_blocks, blocks_to_allocate, blocks_to_allocate);
