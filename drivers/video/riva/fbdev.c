@@ -310,9 +310,9 @@ static struct fb_var_screeninfo rivafb_default_var = {
 	xres_virtual:	640,
 	yres_virtual:	480,
 	bits_per_pixel:	8,
-	red:		{0, 6, 0},
-	green:		{0, 6, 0},
-	blue:		{0, 6, 0},
+	red:		{0, 8, 0},
+	green:		{0, 8, 0},
+	blue:		{0, 8, 0},
 	transp:		{0, 0, 0},
 	activate:	FB_ACTIVATE_NOW,
 	height:		-1,
@@ -512,6 +512,31 @@ static void riva_wclut(RIVA_HW_INST *chip,
 	VGA_WR08(chip->PDIO, 0x3c9, red);
 	VGA_WR08(chip->PDIO, 0x3c9, green);
 	VGA_WR08(chip->PDIO, 0x3c9, blue);
+}
+
+/**
+ * riva_rclut - read fromCLUT register
+ * @chip: pointer to RIVA_HW_INST object
+ * @regnum: register number
+ * @red: red component
+ * @green: green component
+ * @blue: blue component
+ *
+ * DESCRIPTION:
+ * Reads red, green, and blue from color register @regnum.
+ *
+ * CALLED FROM:
+ * rivafb_setcolreg()
+ */
+static void riva_rclut(RIVA_HW_INST *chip,
+		       unsigned char regnum, unsigned char *red,
+		       unsigned char *green, unsigned char *blue)
+{
+	
+	VGA_WR08(chip->PDIO, 0x3c8, regnum);
+	*red = VGA_RD08(chip->PDIO, 0x3c9);
+	*green = VGA_RD08(chip->PDIO, 0x3c9);
+	*blue = VGA_RD08(chip->PDIO, 0x3c9);
 }
 
 /**
@@ -887,21 +912,18 @@ void riva_setup_accel(struct riva_par *par)
  */
 static int riva_get_cmap_len(const struct fb_var_screeninfo *var)
 {
-	int rc = 16;		/* reasonable default */
+	int rc = 256;		/* reasonable default */
 
-	switch (var->bits_per_pixel) {
+	switch (var->green.length) {
 	case 8:
-		rc = 256;	/* pseudocolor... 256 entries HW palette */
+		rc = 256;	/* 256 entries (2^8), 8 bpp and RGB8888 */
 		break;
-	case 15:
-		rc = 15;	/* fix for 15 bpp depths on Riva 128 based cards */
+	case 5:
+		rc = 32;	/* 32 entries (2^5), 16 bpp, RGB555 */
 		break;
-	case 16:
-		rc = 16;	/* directcolor... 16 entries SW palette */
-		break;		/* Mystique: truecolor, 16 entries SW palette, HW palette hardwired into 1:1 mapping */
-	case 32:
-		rc = 16;	/* directcolor... 16 entries SW palette */
-		break;		/* Mystique: truecolor, 16 entries SW palette, HW palette hardwired into 1:1 mapping */
+	case 6:
+		rc = 64;	/* 64 entries (2^6), 16 bpp, RGB565 */
+		break;		
 	default:
 		/* should not occur */
 		break;
@@ -1041,7 +1063,7 @@ static int rivafb_set_par(struct fb_info *info)
 	
 	info->fix.line_length = (info->var.xres_virtual * (info->var.bits_per_pixel >> 3));
 	info->fix.visual = (info->var.bits_per_pixel == 8) ?
-				FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_TRUECOLOR;
+				FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
 	return 0;
 }
 
@@ -1155,6 +1177,7 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 {
 	struct riva_par *par = (struct riva_par *)info->par;
 	RIVA_HW_INST *chip = &par->riva;
+	int i;
 
 	if (regno >= riva_get_cmap_len(&info->var))
 		return -EINVAL;
@@ -1172,23 +1195,46 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		break;
 	case 16:
 		if (info->var.green.length == 5) {
-			/* 0rrrrrgg gggbbbbb */
-			((u32 *)(info->pseudo_palette))[regno] =
+			if (regno < 16) {
+				/* 0rrrrrgg gggbbbbb */
+				((u32 *)info->pseudo_palette)[regno] =
 					((red & 0xf800) >> 1) |
 					((green & 0xf800) >> 6) |
 					((blue & 0xf800) >> 11);
+			}
+			for (i = 0; i < 8; i++) 
+				riva_wclut(chip, regno*8+i, red >> 8,
+					   green >> 8, blue >> 8);
 		} else {
-			/* rrrrrggg gggbbbbb */
-			((u32 *)(info->pseudo_palette))[regno] =
+			u8 r, g, b;
+
+			if (regno < 16) {
+				/* rrrrrggg gggbbbbb */
+				((u32 *)info->pseudo_palette)[regno] =
 					((red & 0xf800) >> 0) |
 					((green & 0xf800) >> 5) |
 					((blue & 0xf800) >> 11);
+			}
+			if (regno < 32) {
+				for (i = 0; i < 8; i++) {
+					riva_wclut(chip, regno*8+i, red >> 8, 
+						   green >> 8, blue >> 8);
+				}
+			}
+			for (i = 0; i < 4; i++) {
+				riva_rclut(chip, regno*2+i, &r, &g, &b);
+				riva_wclut(chip, regno*4+i, r, green >> 8, b);
+			}
 		}
 		break;
 	case 32:
-		((u32 *) (info->pseudo_palette))[regno] =
-		    		((red & 0xff00) << 8) |
-		    		((green & 0xff00)) | ((blue & 0xff00) >> 8);
+		if (regno < 16) {
+			((u32 *)info->pseudo_palette)[regno] =
+				((red & 0xff00) << 8) |
+				((green & 0xff00)) | ((blue & 0xff00) >> 8);
+			
+		}
+		riva_wclut(chip, regno, red >> 8, green >> 8, blue >> 8);
 		break;
 	default:
 		/* do nothing */
@@ -1217,7 +1263,7 @@ static void rivafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect
 	if (info->var.bits_per_pixel == 8)
 		color = rect->color;
 	else
-		color = ((u32 *)(info->pseudo_palette))[rect->color];
+		color = ((u32 *)info->pseudo_palette)[rect->color];
 
 	switch (rect->rop) {
 	case ROP_XOR:
@@ -1355,14 +1401,14 @@ static void rivafb_imageblit(struct fb_info *info, const struct fb_image *image)
 		bgx = image->bg_color;
 		break;
 	case 16:
-		fgx = ((u32 *) (info->pseudo_palette))[image->fg_color];
-		bgx = ((u32 *) (info->pseudo_palette))[image->bg_color];
+		fgx = ((u32 *)info->pseudo_palette)[image->fg_color];
+		bgx = ((u32 *)info->pseudo_palette)[image->bg_color];
 		if (info->var.green.length == 6)
 			convert_bgcolor_16(&bgx);	
 		break;
 	case 32:
-		fgx = ((u32 *) (info->pseudo_palette))[image->fg_color];
-		bgx = ((u32 *) (info->pseudo_palette))[image->bg_color];
+		fgx = ((u32 *)info->pseudo_palette)[image->fg_color];
+		bgx = ((u32 *)info->pseudo_palette)[image->bg_color];
 		break;
 	}
 
@@ -1574,7 +1620,7 @@ static int __init riva_set_fbinfo(struct fb_info *info)
 	info->fix = rivafb_fix;
 	info->fbops = &riva_fb_ops;
 	info->pseudo_palette = pseudo_palette;
-	
+
 #ifndef MODULE
 	if (mode_option)
 		fb_find_mode(&info->var, info, mode_option,
