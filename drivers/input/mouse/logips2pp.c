@@ -150,7 +150,7 @@ static int ps2pp_detect_model(struct psmouse *psmouse, unsigned char *param)
 	static int logitech_wheel[] = { 52, 53, 75, 76, 80, 81, 83, 88, 112, -1 };
 	static int logitech_ps2pp[] = { 12, 13, 40, 41, 42, 43, 50, 51, 52, 53, 73, 75,
 						76, 80, 81, 83, 88, 96, 97, 112, -1 };
-	static int logitech_mx[] = { 112, -1 };
+	static int logitech_mx[] = { 61, 112, -1 };
 
 	psmouse->vendor = "Logitech";
 	psmouse->model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);

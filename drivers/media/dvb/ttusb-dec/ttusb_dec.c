@@ -30,6 +30,7 @@
 #include <linux/version.h>
 #include <linux/interrupt.h>
 #include <linux/firmware.h>
+#include <linux/init.h>
 
 #include "dmxdev.h"
 #include "dvb_demux.h"
