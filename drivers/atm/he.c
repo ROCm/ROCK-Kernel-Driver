@@ -2710,12 +2710,13 @@ he_close(struct atm_vcc *vcc)
 		remove_wait_queue(&he_vcc->tx_waitq, &wait);
 		set_current_state(TASK_RUNNING);
 
+		spin_lock_irqsave(&he_dev->global_lock, flags);
+
 		if (timeout == 0) {
 			hprintk("close tx timeout cid 0x%x\n", cid);
 			goto close_tx_incomplete;
 		}
 
-		spin_lock_irqsave(&he_dev->global_lock, flags);
 		while (!((tsr4 = he_readl_tsr4(he_dev, cid)) & TSR4_SESSION_ENDED)) {
 			HPRINTK("close tx cid 0x%x !TSR4_SESSION_ENDED (tsr4 = 0x%x)\n", cid, tsr4);
 			udelay(250);
