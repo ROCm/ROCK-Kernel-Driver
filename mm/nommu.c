@@ -250,23 +250,16 @@ static inline unsigned long calc_vm_flags(unsigned long prot, unsigned long flag
 #ifdef DEBUG
 static void show_process_blocks(void)
 {
-	struct mm_tblock_struct * tblock, *tmp;
-	
+	struct mm_tblock_struct *tblock;
+
 	printk("Process blocks %d:", current->pid);
-	
-	tmp = current->mm->context.tblock;
-	while (tmp) {
-		printk(" %p: %p", tmp, tmp->rblock);
-		if (tmp->rblock)
-			printk(" (%d @%p #%d)", kobjsize(tmp->rblock->kblock),
-				tmp->rblock->kblock, tmp->rblock->refcount);
-		if (tmp->next)
-			printk(" ->");
-		else
-			printk(".");
-		tmp = tmp->next;
+
+	for (tblock = &current->mm->context.tblock; tblock; tblock = tblock->next) {
+		printk(" %p: %p", tblock, tblock->rblock);
+		if (tblock->rblock)
+			printk(" (%d @%p #%d)", kobjsize(tblock->rblock->kblock), tblock->rblock->kblock, tblock->rblock->refcount);
+		printk(tblock->next ? " ->" : ".\n");
 	}
-	printk("\n");
 }
 #endif /* DEBUG */
 
@@ -355,7 +348,7 @@ unsigned long do_mmap_pgoff(
 			error = file->f_op->mmap(file, &vma);
 				   
 #ifdef DEBUG
-			printk("mmap mmap returned %d /%x\n", error, vma.vm_start);
+			printk("f_op->mmap() returned %d/%lx\n", error, vma.vm_start);
 #endif
 			if (!error)
 				return vma.vm_start;
