@@ -1393,7 +1393,7 @@ static int ext3_ordered_writepage(struct page *page,
 	return ret;
 
 out_fail:
-	__set_page_dirty_nobuffers(page);
+	redirty_page_for_writepage(wbc, page);
 	unlock_page(page);
 	return ret;
 }
@@ -1422,7 +1422,7 @@ static int ext3_writeback_writepage(struct page *page,
 	return ret;
 
 out_fail:
-	__set_page_dirty_nobuffers(page);
+	redirty_page_for_writepage(wbc, page);
 	unlock_page(page);
 	return ret;
 }
@@ -1478,7 +1478,7 @@ out:
 	return ret;
 
 no_write:
-	__set_page_dirty_nobuffers(page);
+	redirty_page_for_writepage(wbc, page);
 out_unlock:
 	unlock_page(page);
 	goto out;

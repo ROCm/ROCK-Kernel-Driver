@@ -486,6 +486,8 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long 
 
 int __set_page_dirty_buffers(struct page *page);
 int __set_page_dirty_nobuffers(struct page *page);
+int redirty_page_for_writepage(struct writeback_control *wbc,
+				struct page *page);
 int FASTCALL(set_page_dirty(struct page *page));
 int set_page_dirty_lock(struct page *page);
 int clear_page_dirty_for_io(struct page *page);

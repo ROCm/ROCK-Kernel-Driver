@@ -2112,7 +2112,7 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
 	    lock_buffer(bh);
 	} else {
 	    if (test_set_buffer_locked(bh)) {
-		__set_page_dirty_nobuffers(page);
+		redirty_page_for_writepage(wbc, page);
 		continue;
 	    }
 	}
