@@ -21,6 +21,7 @@
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
 #include <linux/stat.h>
+#include <linux/pagemap.h>
 #include <asm/div64.h>
 #include "cifsfs.h"
 #include "cifspdu.h"
@@ -587,6 +588,29 @@ cifs_truncate_file(struct inode *inode)
 	return;
 }
 
+static int cifs_trunc_page(struct address_space *mapping, loff_t from)
+{
+        pgoff_t index = from >> PAGE_CACHE_SHIFT;
+        unsigned offset = from & (PAGE_CACHE_SIZE-1);
+        struct page *page;
+        char *kaddr;
+        int rc = 0;
+
+        page = grab_cache_page(mapping, index);
+        if (!page)
+                return -ENOMEM;
+
+
+        kaddr = kmap_atomic(page, KM_USER0);
+        memset(kaddr + offset, 0, PAGE_CACHE_SIZE - offset);
+        flush_dcache_page(page);
+        kunmap_atomic(kaddr, KM_USER0);
+        set_page_dirty(page);
+        unlock_page(page);
+        page_cache_release(page);
+        return rc;
+}
+
 int
 cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 {
@@ -639,7 +663,8 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	/*	CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size, TRUE, cifs_sb->local_nls);*/
 		if (rc == 0) {
 			rc = vmtruncate(direntry->d_inode, attrs->ia_size);
-			nobh_truncate_page(direntry->d_inode->i_mapping, direntry->d_inode->i_size);
+			cifs_trunc_page(direntry->d_inode->i_mapping, direntry->d_inode->i_size); 
+
 /*          cFYI(1,("truncate_page to 0x%lx \n",direntry->d_inode->i_size)); */
 		}
 	}

@@ -2020,21 +2020,21 @@ CIFSSMBSetEOF(int xid, struct cifsTconInfo *tcon, char *fileName,
 	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
                                      InformationLevel) - 4;
 	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
-    if(SetAllocation) {
-        if (tcon->ses->capabilities & CAP_INFOLEVEL_PASSTHRU)
-            pSMB->InformationLevel =
-                cpu_to_le16(SMB_SET_FILE_ALLOCATION_INFO2);
-        else
-            pSMB->InformationLevel =
-                cpu_to_le16(SMB_SET_FILE_ALLOCATION_INFO);
-    } else /* Set File Size */  {    
+	if(SetAllocation) {
+        	if (tcon->ses->capabilities & CAP_INFOLEVEL_PASSTHRU)
+	            pSMB->InformationLevel =
+                	cpu_to_le16(SMB_SET_FILE_ALLOCATION_INFO2);
+        	else
+	            pSMB->InformationLevel =
+        	        cpu_to_le16(SMB_SET_FILE_ALLOCATION_INFO);
+	} else /* Set File Size */  {    
 	    if (tcon->ses->capabilities & CAP_INFOLEVEL_PASSTHRU)
 		    pSMB->InformationLevel =
 		        cpu_to_le16(SMB_SET_FILE_END_OF_FILE_INFO2);
 	    else
 		    pSMB->InformationLevel =
 		        cpu_to_le16(SMB_SET_FILE_END_OF_FILE_INFO);
-    }
+	}
 
 	parm_data =
 	    (struct file_end_of_file_info *) (((char *) &pSMB->hdr.Protocol) +
@@ -2071,10 +2071,10 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	struct smb_com_transaction2_sfi_req *pSMB  = NULL;
 	struct smb_com_transaction2_sfi_rsp *pSMBr = NULL;
 	char *data_offset;
-    struct file_end_of_file_info *parm_data;
+	struct file_end_of_file_info *parm_data;
 	int rc = 0;
 	int bytes_returned = 0;
-    __u32 tmp;
+	__u32 tmp;
 
 	cFYI(1, ("SetFileSize (via SetFileInfo)"));
 

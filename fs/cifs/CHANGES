@@ -1,3 +1,7 @@
+Version 0.74
+------------
+Fix truncate bug (set file size) that could cause hangs e.g. running fsx
+
 Version 0.73
 ------------
 unload nls if mount fails.
