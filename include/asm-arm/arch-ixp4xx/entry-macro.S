@@ -21,6 +21,19 @@
 		subs    \irqnr, \base, \irqnr
 
 1001:
+		/*
+		 * IXP465 has an upper IRQ status register
+		 */
+#if defined(CONFIG_CPU_IXP46X)
+		bne 	1002f
+		ldr	\irqstat, =(IXP4XX_INTC_BASE_VIRT+IXP4XX_ICIP2_OFFSET)
+		ldr	\irqstat, [\irqstat]		@ get upper interrupts
+		mov	\irqnr, #63
+		clz	\irqstat, \irqstat
+ 		cmp	\irqstat, #32
+		subne	\irqnr, \irqnr, \irqstat
+1002:
+#endif
 		.endm
 
 
