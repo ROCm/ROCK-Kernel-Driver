@@ -92,7 +92,7 @@ _exception(int signr, siginfo_t *info, struct pt_regs *regs)
 		if (debugger)
 			debugger(regs);
 #endif
-		die("Exception in kernel mode\n", regs, signr);
+		die("Exception in kernel mode", regs, signr);
 	}
 
 	force_sig_info(signr, info, current);
