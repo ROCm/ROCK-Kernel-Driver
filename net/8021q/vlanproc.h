@@ -3,12 +3,9 @@
 
 #ifdef CONFIG_PROC_FS
 int vlan_proc_init(void);
-
 int vlan_proc_rem_dev(struct net_device *vlandev);
 int vlan_proc_add_dev (struct net_device *vlandev);
 void vlan_proc_cleanup (void);
-
-#define	VLAN_PROC_BUFSZ	(4096)	/* buffer size for printing proc info */
 
 #else /* No CONFIG_PROC_FS */
 
