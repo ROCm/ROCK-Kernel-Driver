@@ -2588,7 +2588,7 @@ static int inet6_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 		/* temp addr */
 #ifdef CONFIG_IPV6_PRIVACY
 		for (ifa = idev->tempaddr_list; ifa; 
-		     ifa = ifua->tmp_next, ip_idx++) {
+		     ifa = ifa->tmp_next, ip_idx++) {
 			if (ip_idx < s_ip_idx)
 				continue;
 			if ((err = inet6_fill_ifaddr(skb, ifa, 
