@@ -63,10 +63,6 @@ struct crw {
 #define CRW_ERC_PERRI    0x07 /* perm. error, facility init */
 #define CRW_ERC_PMOD     0x08 /* installed parameters modified */
 
-#define MCHCHK_STATUS_TO_PROCESS    0x00000001
-#define MCHCHK_STATUS_IN_PROGRESS   0x00000002
-#define MCHCHK_STATUS_WAITING       0x00000004
-
 extern __inline__ int stcrw(struct crw *pcrw )
 {
         int ccode;

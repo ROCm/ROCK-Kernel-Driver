@@ -528,8 +528,15 @@ asmlinkage long compat_sys_fcntl64(unsigned int fd, unsigned int cmd,
 		ret = sys_fcntl(fd, cmd, (unsigned long)&f);
 		set_fs(old_fs);
 		if ((cmd == F_GETLK) && (ret == 0)) {
+			/* POSIX-2001 now defines negative l_len */
+			if (f.l_len < 0) {
+				f.l_start += f.l_len;
+				f.l_len = -f.l_len;
+			}
+			if (f.l_start < 0)
+				return -EINVAL;
 			if ((f.l_start >= COMPAT_OFF_T_MAX) ||
-			    ((f.l_start + f.l_len) >= COMPAT_OFF_T_MAX))
+			    ((f.l_start + f.l_len) > COMPAT_OFF_T_MAX))
 				ret = -EOVERFLOW;
 			if (ret == 0)
 				ret = put_compat_flock(&f, compat_ptr(arg));
@@ -549,8 +556,15 @@ asmlinkage long compat_sys_fcntl64(unsigned int fd, unsigned int cmd,
 				(unsigned long)&f);
 		set_fs(old_fs);
 		if ((cmd == F_GETLK64) && (ret == 0)) {
+			/* POSIX-2001 now defines negative l_len */
+			if (f.l_len < 0) {
+				f.l_start += f.l_len;
+				f.l_len = -f.l_len;
+			}
+			if (f.l_start < 0)
+				return -EINVAL;
 			if ((f.l_start >= COMPAT_LOFF_T_MAX) ||
-			    ((f.l_start + f.l_len) >= COMPAT_LOFF_T_MAX))
+			    ((f.l_start + f.l_len) > COMPAT_LOFF_T_MAX))
 				ret = -EOVERFLOW;
 			if (ret == 0)
 				ret = put_compat_flock64(&f, compat_ptr(arg));

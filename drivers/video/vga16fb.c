@@ -1342,9 +1342,13 @@ int __init vga16fb_init(void)
 {
 	int i;
 	int ret;
-
 #ifndef MODULE
-	vga16fb_setup(fb_get_options("vga16fb"));
+	char *option = NULL;
+
+	if (fb_get_options("vga16fb", &option))
+		return -ENODEV;
+
+	vga16fb_setup(option);
 #endif
 	printk(KERN_DEBUG "vga16fb: initializing\n");
 

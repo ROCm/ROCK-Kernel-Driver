@@ -1179,13 +1179,13 @@ bad_fork_free:
 	goto fork_out;
 }
 
-struct pt_regs * __init __attribute__((weak)) idle_regs(struct pt_regs *regs)
+struct pt_regs * __devinit __attribute__((weak)) idle_regs(struct pt_regs *regs)
 {
 	memset(regs, 0, sizeof(struct pt_regs));
 	return regs;
 }
 
-task_t * __init fork_idle(int cpu)
+task_t * __devinit fork_idle(int cpu)
 {
 	task_t *task;
 	struct pt_regs regs;

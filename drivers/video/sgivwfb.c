@@ -870,7 +870,11 @@ int __init sgivwfb_init(void)
 	int ret;
 
 #ifndef MODULE
-	sgivwfb_setup(fb_get_options("sgivwfb"));
+	char *option = NULL;
+
+	if (fb_get_options("sgivwfb", &option))
+		return -ENODEV;
+	sgivwfb_setup(option);
 #endif
 	ret = driver_register(&sgivwfb_driver);
 	if (!ret) {

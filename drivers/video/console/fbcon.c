@@ -689,7 +689,7 @@ static int var_to_display(struct display *disp,
 	disp->green = var->green;
 	disp->blue = var->blue;
 	disp->transp = var->transp;
-	disp->mode = fb_match_mode(var, &info->monspecs.modelist);
+	disp->mode = fb_match_mode(var, &info->modelist);
 	if (disp->mode == NULL)
 		/* This should not happen */
 		return -EINVAL;
@@ -1973,7 +1973,7 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 		struct fb_videomode *mode;
 
 		DPRINTK("attempting resize %ix%i\n", var.xres, var.yres);
-		mode = fb_find_best_mode(&var, &info->monspecs.modelist);
+		mode = fb_find_best_mode(&var, &info->modelist);
 		if (mode == NULL)
 			return -EINVAL;
 		fb_videomode_to_var(&var, mode);

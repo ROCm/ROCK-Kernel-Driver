@@ -121,7 +121,8 @@ module_exit(exit_efs_fs)
 
 static efs_block_t efs_validate_vh(struct volume_header *vh) {
 	int		i;
-	unsigned int	cs, csum, *ui;
+	__be32		cs, *ui;
+	int		csum;
 	efs_block_t	sblock = 0; /* shuts up gcc */
 	struct pt_types	*pt_entry;
 	int		pt_type, slice = -1;
@@ -135,8 +136,8 @@ static efs_block_t efs_validate_vh(struct volume_header *vh) {
 		return 0;
 	}
 
-	ui = ((unsigned int *) (vh + 1)) - 1;
-	for(csum = 0; ui >= ((unsigned int *) vh);) {
+	ui = ((__be32 *) (vh + 1)) - 1;
+	for(csum = 0; ui >= ((__be32 *) vh);) {
 		cs = *ui--;
 		csum += be32_to_cpu(cs);
 	}

@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.132 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.138 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.132 $	 $Date: 2004/08/19 12:39:43 $
+ *    $Revision: 1.138 $	 $Date: 2004/09/17 10:40:53 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -79,7 +79,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.132 $"
+#define VERSION_QETH_C "$Revision: 1.138 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -4373,12 +4373,13 @@ qeth_snmp_command(struct qeth_card *card, char *udata)
 	/* skip 4 bytes (data_len struct member) to get req_len */
 	if (copy_from_user(&req_len, udata + sizeof(int), sizeof(int)))
 		return -EFAULT;
-	ureq = kmalloc(req_len, GFP_KERNEL);
+	ureq = kmalloc(req_len+sizeof(struct qeth_snmp_ureq_hdr), GFP_KERNEL);
 	if (!ureq) {
 		QETH_DBF_TEXT(trace, 2, "snmpnome");
 		return -ENOMEM;
 	}
-	if (copy_from_user(ureq, udata, req_len)){
+	if (copy_from_user(ureq, udata,
+			req_len+sizeof(struct qeth_snmp_ureq_hdr))){
 		kfree(ureq);
 		return -EFAULT;
 	}
@@ -5743,7 +5744,7 @@ qeth_start_ipa_ip_fragmentation(struct qeth_card *card)
 	QETH_DBF_TEXT(trace,3,"ipaipfrg");
 
 	if (!qeth_is_supported(card, IPA_IP_FRAGMENTATION)) {
-		PRINT_INFO("IP fragmentation not supported on %s\n",
+		PRINT_INFO("Hardware IP fragmentation not supported on %s\n",
 			   card->info.if_name);
 		return  -EOPNOTSUPP;
 	}
@@ -5751,11 +5752,11 @@ qeth_start_ipa_ip_fragmentation(struct qeth_card *card)
 	rc = qeth_send_simple_setassparms(card, IPA_IP_FRAGMENTATION,
 					  IPA_CMD_ASS_START, 0);
 	if (rc) {
-		PRINT_WARN("Could not start IP fragmentation "
+		PRINT_WARN("Could not start Hardware IP fragmentation "
 			   "assist on %s: 0x%x\n",
 			   card->info.if_name, rc);
 	} else
-		PRINT_INFO("IP fragmentation enabled \n");
+		PRINT_INFO("Hardware IP fragmentation enabled \n");
 	return rc;
 }
 

@@ -609,6 +609,9 @@ static struct pci_driver asiliantfb_driver = {
 
 int __init asiliantfb_init(void)
 {
+	if (fb_get_options("asiliantfb", NULL))
+		return -ENODEV;
+
 	return pci_module_init(&asiliantfb_driver);
 }
 

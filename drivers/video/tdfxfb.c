@@ -1363,7 +1363,12 @@ static void __devexit tdfxfb_remove(struct pci_dev *pdev)
 int __init tdfxfb_init(void)
 {
 #ifndef MODULE
-	tdfxfb_setup(fb_get_options("tdfxfb"));
+	char *option = NULL;
+
+	if (fb_get_options("tdfxfb", &option))
+		return -ENODEV;
+
+	tdfxfb_setup(option);
 #endif
         return pci_module_init(&tdfxfb_driver);
 }

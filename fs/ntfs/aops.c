@@ -348,7 +348,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 	s64 attr_pos;
 	ntfs_inode *ni, *base_ni;
 	u8 *kaddr;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *mrec;
 	u32 attr_len;
 	int err = 0;
@@ -397,16 +397,15 @@ int ntfs_readpage(struct file *file, struct page *page)
 		err = PTR_ERR(mrec);
 		goto err_out;
 	}
-	ctx = get_attr_search_ctx(base_ni, mrec);
+	ctx = ntfs_attr_get_search_ctx(base_ni, mrec);
 	if (unlikely(!ctx)) {
 		err = -ENOMEM;
 		goto unm_err_out;
 	}
-	if (unlikely(!lookup_attr(ni->type, ni->name, ni->name_len,
-			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
-		err = -ENOENT;
+	err = ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err))
 		goto put_unm_err_out;
-	}
 
 	/* Starting position of the page within the attribute value. */
 	attr_pos = page->index << PAGE_CACHE_SHIFT;
@@ -433,7 +432,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 
 	SetPageUptodate(page);
 put_unm_err_out:
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 unm_err_out:
 	unmap_mft_record(base_ni);
 err_out:
@@ -1030,7 +1029,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	struct inode *vi;
 	ntfs_inode *ni, *base_ni;
 	char *kaddr;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *m;
 	u32 attr_len, bytes;
 	int err;
@@ -1117,16 +1116,15 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 		ctx = NULL;
 		goto err_out;
 	}
-	ctx = get_attr_search_ctx(base_ni, m);
+	ctx = ntfs_attr_get_search_ctx(base_ni, m);
 	if (unlikely(!ctx)) {
 		err = -ENOMEM;
 		goto err_out;
 	}
-	if (unlikely(!lookup_attr(ni->type, ni->name, ni->name_len,
-			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
-		err = -ENOENT;
+	err = ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err))
 		goto err_out;
-	}
 
 	/* Starting position of the page within the attribute value. */
 	attr_pos = page->index << PAGE_CACHE_SHIFT;
@@ -1201,7 +1199,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	/* Mark the mft record dirty, so it gets written back. */
 	mark_mft_record_dirty(ctx->ntfs_ino);
 
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(base_ni);
 	return 0;
 err_out:
@@ -1221,7 +1219,7 @@ err_out:
 	}
 	unlock_page(page);
 	if (ctx)
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (m)
 		unmap_mft_record(base_ni);
 	return err;
@@ -1683,9 +1681,9 @@ static int ntfs_prepare_write(struct file *file, struct page *page,
 	 * We thus defer the uptodate bringing of the page region outside the
 	 * region written to to ntfs_commit_write(). The reason for doing this
 	 * is that we save one round of:
-	 *	map_mft_record(), get_attr_search_ctx(), lookup_attr(),
-	 *	kmap_atomic(), kunmap_atomic(), put_attr_search_ctx(),
-	 *	unmap_mft_record().
+	 *	map_mft_record(), ntfs_attr_get_search_ctx(),
+	 *	ntfs_attr_lookup(), kmap_atomic(), kunmap_atomic(),
+	 *	ntfs_attr_put_search_ctx(), unmap_mft_record().
 	 * Which is obviously a very worthwhile save.
 	 *
 	 * Thus we just return success now...
@@ -1804,7 +1802,7 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 	struct inode *vi;
 	ntfs_inode *ni, *base_ni;
 	char *kaddr, *kattr;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *m;
 	u32 attr_len, bytes;
 	int err;
@@ -1891,16 +1889,15 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 		ctx = NULL;
 		goto err_out;
 	}
-	ctx = get_attr_search_ctx(base_ni, m);
+	ctx = ntfs_attr_get_search_ctx(base_ni, m);
 	if (unlikely(!ctx)) {
 		err = -ENOMEM;
 		goto err_out;
 	}
-	if (unlikely(!lookup_attr(ni->type, ni->name, ni->name_len,
-			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
-		err = -ENOENT;
+	err = ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err))
 		goto err_out;
-	}
 
 	/* Starting position of the page within the attribute value. */
 	attr_pos = page->index << PAGE_CACHE_SHIFT;
@@ -1966,7 +1963,7 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 	/* Mark the mft record dirty, so it gets written back. */
 	mark_mft_record_dirty(ctx->ntfs_ino);
 
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(base_ni);
 	ntfs_debug("Done.");
 	return 0;
@@ -1993,7 +1990,7 @@ err_out:
 		SetPageError(page);
 	}
 	if (ctx)
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (m)
 		unmap_mft_record(base_ni);
 	return err;

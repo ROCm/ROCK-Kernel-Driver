@@ -225,6 +225,10 @@ static void probe_bus_iseries(void)
 	struct vio_dev *viodev;
 	int i;
 
+	/* there is only one of each of these */
+	vio_register_device_iseries("viocons", 0);
+	vio_register_device_iseries("vscsi", 0);
+
 	vlan_map = HvLpConfig_getVirtualLanIndexMap();
 	for (i = 0; i < HVMAXARCHITECTEDVIRTUALLANS; i++) {
 		if ((vlan_map & (0x8000 >> i)) == 0)

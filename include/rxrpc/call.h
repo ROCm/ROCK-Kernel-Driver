@@ -67,8 +67,8 @@ struct rxrpc_call
 	wait_queue_head_t	waitq;		/* wait queue for events to happen */
 	struct list_head	link;		/* general internal list link */
 	struct list_head	call_link;	/* master call list link */
-	uint32_t		chan_ix;	/* connection channel index (net order) */
-	uint32_t		call_id;	/* call ID on connection (net order) */
+	__be32			chan_ix;	/* connection channel index  */
+	__be32			call_id;	/* call ID on connection  */
 	unsigned long		cjif;		/* jiffies at call creation */
 	unsigned long		flags;		/* control flags */
 #define RXRPC_CALL_ACKS_TIMO	0x00000001	/* ACKS timeout reached */
@@ -97,7 +97,7 @@ struct rxrpc_call
 	rxrpc_seq_t		ackr_win_bot;	/* bottom of ACK window */
 	rxrpc_seq_t		ackr_win_top;	/* top of ACK window */
 	rxrpc_seq_t		ackr_high_seq;	/* highest seqno yet received */
-	rxrpc_seq_t		ackr_prev_seq;	/* previous seqno received */
+	rxrpc_seq_net_t		ackr_prev_seq;	/* previous seqno received */
 	unsigned		ackr_pend_cnt;	/* number of pending ACKs */
 	struct timer_list	ackr_dfr_timo;	/* timeout on deferred ACK */
 	char			ackr_dfr_perm;	/* request for deferred ACKs permitted */

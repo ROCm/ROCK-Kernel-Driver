@@ -284,6 +284,9 @@ int __init dnfb_init(void)
 {
 	int ret;
 
+	if (fb_get_options("dnfb", NULL))
+		return -ENODEV;
+
 	ret = driver_register(&dnfb_driver);
 
 	if (!ret) {

@@ -1683,11 +1683,16 @@ Your cooperation is appreciated.
 		  1 = /dev/dcxx1	Second capture card
 		    ...
 
- 94 block	Inverse NAND Flash Translation Layer
-		  0 = /dev/inftla	First INFTL layer
-		 16 = /dev/inftlb	Second INFTL layer
+ 94 block IBM S/390 DASD block storage
+    		  0 = /dev/dasda First DASD device, major
+    		  1 = /dev/dasda1 First DASD device, block 1
+	    	  2 = /dev/dasda2 First DASD device, block 2
+    		  3 = /dev/dasda3 First DASD device, block 3
+    		  4 = /dev/dasdb Second DASD device, major
+    		  5 = /dev/dasdb1 Second DASD device, block 1
+    		  6 = /dev/dasdb2 Second DASD device, block 2
+    		  7 = /dev/dasdb3 Second DASD device, block 3
 		    ...
-		240 = /dev/inftlp	16th INTFL layer
 
  95 char	IP filter
 		  0 = /dev/ipl		Filter control device/log file
@@ -1696,15 +1701,9 @@ Your cooperation is appreciated.
 		  3 = /dev/ipauth	Authentication control device/log file
 		    ...		
 
- 95 block	IBM S/390 DASD block storage
-		  0 = /dev/dasd0	First DASD device, major
-		  1 = /dev/dasd0a	First DASD device, block 1
-		  2 = /dev/dasd0b	First DASD device, block 2
-		  3 = /dev/dasd0c	First DASD device, block 3
-		  4 = /dev/dasd1	Second DASD device, major
-		  5 = /dev/dasd1a	Second DASD device, block 1
-		  6 = /dev/dasd1b	Second DASD device, block 2
-		  7 = /dev/dasd1c	Second DASD device, block 3
+ 95 block	IBM S/390 VM/ESA minidisk
+		  0 = /dev/msd0		First VM/ESA minidisk
+		  1 = /dev/msd1		Second VM/ESA minidisk
 		    ...
 
  96 char	Parallel port ATAPI tape devices
@@ -1715,10 +1714,11 @@ Your cooperation is appreciated.
 		129 = /dev/npt1		Second p.p. ATAPI tape, no rewind
 		    ...
 
- 96 block	IBM S/390 VM/ESA minidisk
-		  0 = /dev/msd0		First VM/ESA minidisk
-		  1 = /dev/msd1		Second VM/ESA minidisk
+ 96 block Inverse NAND Flash Translation Layer
+		  0 = /dev/inftla First INFTL layer
+		 16 = /dev/inftlb Second INFTL layer
 		    ...
+		240 = /dev/inftlp	16th INTFL layer
 
  97 char	Parallel port generic ATAPI interface
 		  0 = /dev/pg0		First parallel port ATAPI device
@@ -2745,6 +2745,8 @@ Your cooperation is appreciated.
 		 41 = /dev/ttySMX0		Motorola i.MX - port 0
 		 42 = /dev/ttySMX1		Motorola i.MX - port 1
 		 43 = /dev/ttySMX2		Motorola i.MX - port 2
+		 44 = /dev/ttyMM0		Marvell MPSC - port 0
+		 45 = /dev/ttyMM1		Marvell MPSC - port 1
 
 205 char	Low-density serial ports (alternate device)
 		  0 = /dev/culu0		Callout device for ttyLU0

@@ -67,7 +67,7 @@ struct rxrpc_peer
 
 
 extern int rxrpc_peer_lookup(struct rxrpc_transport *trans,
-			     u32 addr,
+			     __be32 addr,
 			     struct rxrpc_peer **_peer);
 
 static inline void rxrpc_get_peer(struct rxrpc_peer *peer)

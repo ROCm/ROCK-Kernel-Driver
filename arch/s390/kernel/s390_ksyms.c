@@ -61,6 +61,5 @@ EXPORT_SYMBOL(csum_fold);
 EXPORT_SYMBOL(console_mode);
 EXPORT_SYMBOL(console_devno);
 EXPORT_SYMBOL(console_irq);
-EXPORT_SYMBOL(do_call_softirq);
 EXPORT_SYMBOL(sys_wait4);
 EXPORT_SYMBOL(cpcmd);

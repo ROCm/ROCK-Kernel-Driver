@@ -3137,7 +3137,11 @@ int __init radeonfb_old_setup (char *options);
 int __init radeonfb_old_init (void)
 {
 #ifndef MODULE
-	radeonfb_old_setup(fb_get_options("radeonfb_old"));
+	char *option = NULL;
+
+	if (fb_get_options("radeonfb_old", &option))
+		return -ENODEV;
+	radeonfb_old_setup(option);
 #endif
 	return pci_module_init (&radeonfb_driver);
 }

@@ -468,6 +468,9 @@ int __init tcx_init(void)
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev;
 
+	if (fb_get_options("tcxfb", NULL))
+		return -ENODEV;
+
 	for_all_sbusdev(sdev, sbus) {
 		if (!strcmp(sdev->prom_name, "tcx"))
 			tcx_init_one(sdev);

@@ -2258,7 +2258,11 @@ int __init amifb_init(void)
 	u_int defmode;
 
 #ifndef MODULE
-	amifb_setup(fb_get_options("amifb"));
+	char *option = NULL;
+
+	if (fb_get_options("amifb", &option))
+		return -ENODEV;
+	amifb_setup(option);
 #endif
 	if (!MACH_IS_AMIGA || !AMIGAHW_PRESENT(AMI_VIDEO))
 		return -ENXIO;

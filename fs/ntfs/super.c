@@ -29,6 +29,7 @@
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
 #include <linux/moduleparam.h>
+#include <linux/smp_lock.h>
 
 #include "ntfs.h"
 #include "sysctl.h"
@@ -317,7 +318,7 @@ static int ntfs_write_volume_flags(ntfs_volume *vol, const VOLUME_FLAGS flags)
 	ntfs_inode *ni = NTFS_I(vol->vol_ino);
 	MFT_RECORD *m;
 	VOLUME_INFORMATION *vi;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	int err;
 
 	ntfs_debug("Entering, old flags = 0x%x, new flags = 0x%x.",
@@ -330,28 +331,28 @@ static int ntfs_write_volume_flags(ntfs_volume *vol, const VOLUME_FLAGS flags)
 		err = PTR_ERR(m);
 		goto err_out;
 	}
-	ctx = get_attr_search_ctx(ni, m);
+	ctx = ntfs_attr_get_search_ctx(ni, m);
 	if (!ctx) {
 		err = -ENOMEM;
 		goto put_unm_err_out;
 	}
-	if (!lookup_attr(AT_VOLUME_INFORMATION, NULL, 0, 0, 0, NULL, 0, ctx)) {
-		err = -EIO;
+	err = ntfs_attr_lookup(AT_VOLUME_INFORMATION, NULL, 0, 0, 0, NULL, 0,
+			ctx);
+	if (err)
 		goto put_unm_err_out;
-	}
 	vi = (VOLUME_INFORMATION*)((u8*)ctx->attr +
 			le16_to_cpu(ctx->attr->data.resident.value_offset));
 	vol->vol_flags = vi->flags = flags;
 	flush_dcache_mft_record_page(ctx->ntfs_ino);
 	mark_mft_record_dirty(ctx->ntfs_ino);
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(ni);
 done:
 	ntfs_debug("Done.");
 	return 0;
 put_unm_err_out:
 	if (ctx)
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(ni);
 err_out:
 	ntfs_error(vol->sb, "Failed with error code %i.", -err);
@@ -1343,7 +1344,7 @@ static BOOL load_system_files(ntfs_volume *vol)
 	struct super_block *sb = vol->sb;
 	MFT_RECORD *m;
 	VOLUME_INFORMATION *vi;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 
 	ntfs_debug("Entering.");
 #ifdef NTFS_RW
@@ -1427,14 +1428,14 @@ iput_volume_failed:
 		iput(vol->vol_ino);
 		goto volume_failed;
 	}
-	if (!(ctx = get_attr_search_ctx(NTFS_I(vol->vol_ino), m))) {
+	if (!(ctx = ntfs_attr_get_search_ctx(NTFS_I(vol->vol_ino), m))) {
 		ntfs_error(sb, "Failed to get attribute search context.");
 		goto get_ctx_vol_failed;
 	}
-	if (!lookup_attr(AT_VOLUME_INFORMATION, NULL, 0, 0, 0, NULL, 0, ctx) ||
-			ctx->attr->non_resident || ctx->attr->flags) {
+	if (ntfs_attr_lookup(AT_VOLUME_INFORMATION, NULL, 0, 0, 0, NULL, 0,
+			ctx) || ctx->attr->non_resident || ctx->attr->flags) {
 err_put_vol:
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 get_ctx_vol_failed:
 		unmap_mft_record(NTFS_I(vol->vol_ino));
 		goto iput_volume_failed;
@@ -1450,7 +1451,7 @@ get_ctx_vol_failed:
 	vol->vol_flags = vi->flags;
 	vol->major_ver = vi->major_ver;
 	vol->minor_ver = vi->minor_ver;
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(NTFS_I(vol->vol_ino));
 	printk(KERN_INFO "NTFS volume version %i.%i.\n", vol->major_ver,
 			vol->minor_ver);
@@ -2013,7 +2014,7 @@ static s64 get_nr_free_clusters(ntfs_volume *vol)
  */
 static unsigned long __get_nr_free_mft_records(ntfs_volume *vol)
 {
-	s64 nr_free = vol->nr_mft_records;
+	s64 nr_free;
 	u32 *kaddr;
 	struct address_space *mapping = vol->mftbmp_ino->i_mapping;
 	filler_t *readpage = (filler_t*)mapping->a_ops->readpage;
@@ -2022,13 +2023,16 @@ static unsigned long __get_nr_free_mft_records(ntfs_volume *vol)
 	unsigned int max_size;
 
 	ntfs_debug("Entering.");
+	/* Number of mft records in file system (at this point in time). */
+	nr_free = vol->mft_ino->i_size >> vol->mft_record_size_bits;
 	/*
-	 * Convert the number of bits into bytes rounded up, then convert into
-	 * multiples of PAGE_CACHE_SIZE, rounding up so that if we have one
-	 * full and one partial page max_index = 2.
+	 * Convert the maximum number of set bits into bytes rounded up, then
+	 * convert into multiples of PAGE_CACHE_SIZE, rounding up so that if we
+	 * have one full and one partial page max_index = 2.
 	 */
-	max_index = (((vol->nr_mft_records + 7) >> 3) + PAGE_CACHE_SIZE - 1) >>
-			PAGE_CACHE_SHIFT;
+	max_index = ((((NTFS_I(vol->mft_ino)->initialized_size >>
+			vol->mft_record_size_bits) + 7) >> 3) +
+			PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	/* Use multiples of 4 bytes. */
 	max_size = PAGE_CACHE_SIZE >> 2;
 	ntfs_debug("Reading $MFT/$BITMAP, max_index = 0x%lx, max_size = "
@@ -2123,9 +2127,9 @@ static int ntfs_statfs(struct super_block *sb, struct kstatfs *sfs)
 	sfs->f_bavail = sfs->f_bfree = size;
 	/* Serialize accesses to the inode bitmap. */
 	down_read(&vol->mftbmp_lock);
-	/* Total file nodes in file system (at this moment in time). */
-	sfs->f_files  = vol->mft_ino->i_size >> vol->mft_record_size_bits;
-	/* Free file nodes in fs (based on current total count). */
+	/* Number of inodes in file system (at this point in time). */
+	sfs->f_files = vol->mft_ino->i_size >> vol->mft_record_size_bits;
+	/* Free inodes in fs (based on current total count). */
 	sfs->f_ffree = __get_nr_free_mft_records(vol);
 	up_read(&vol->mftbmp_lock);
 	/*
@@ -2288,6 +2292,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->fmask = 0177;
 	vol->dmask = 0077;
 
+	unlock_kernel();
+
 	/* Important to get the mount options dealt with now. */
 	if (!parse_options(vol, (char*)opt))
 		goto err_out_now;
@@ -2424,6 +2430,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 		}
 		up(&ntfs_lock);
 		sb->s_export_op = &ntfs_export_ops;
+		lock_kernel();
 		return 0;
 	}
 	ntfs_error(sb, "Failed to allocate root directory.");
@@ -2527,6 +2534,7 @@ iput_tmp_ino_err_out_now:
 	}
 	/* Errors at this stage are irrelevant. */
 err_out_now:
+	lock_kernel();
 	sb->s_fs_info = NULL;
 	kfree(vol);
 	ntfs_debug("Failed, returning -EINVAL.");
@@ -2620,7 +2628,7 @@ static int __init init_ntfs_fs(void)
 		goto ictx_err_out;
 	}
 	ntfs_attr_ctx_cache = kmem_cache_create(ntfs_attr_ctx_cache_name,
-			sizeof(attr_search_context), 0 /* offset */,
+			sizeof(ntfs_attr_search_ctx), 0 /* offset */,
 			SLAB_HWCACHE_ALIGN, NULL /* ctor */, NULL /* dtor */);
 	if (!ntfs_attr_ctx_cache) {
 		printk(KERN_CRIT "NTFS: Failed to create %s!\n",

@@ -1572,7 +1572,11 @@ static struct pci_driver sstfb_driver = {
 int __devinit sstfb_init(void)
 {
 #ifndef MODULE
-	sstfb_setup(fb_get_options("sstfb"));
+	char *option = NULL;
+
+	if (fb_get_options("sstfb", &option))
+		return -ENODEV;
+	sstfb_setup(option);
 #endif
 	return pci_module_init(&sstfb_driver);
 }

@@ -16,6 +16,10 @@ obj-$(CONFIG_PNP)		+= pnp/
 # char/ comes before serial/ etc so that the VT console is the boot-time
 # default.
 obj-y				+= char/
+
+# i810fb depends on char/agp/
+obj-$(CONFIG_FB_I810)           += video/i810/
+
 # we also need input/serio early so serio bus is initialized by the time
 # serial drivers start registering their serio ports
 obj-$(CONFIG_SERIO)		+= input/serio/

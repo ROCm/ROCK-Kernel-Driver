@@ -65,7 +65,7 @@ void ntfs_index_ctx_put(ntfs_index_context *ictx)
 	if (ictx->entry) {
 		if (ictx->is_in_root) {
 			if (ictx->actx)
-				put_attr_search_ctx(ictx->actx);
+				ntfs_attr_put_search_ctx(ictx->actx);
 			if (ictx->base_ni)
 				unmap_mft_record(ictx->base_ni);
 		} else {
@@ -125,6 +125,7 @@ void ntfs_index_ctx_put(ntfs_index_context *ictx)
 int ntfs_index_lookup(const void *key, const int key_len,
 		ntfs_index_context *ictx)
 {
+	VCN vcn, old_vcn;
 	ntfs_inode *idx_ni = ictx->idx_ni;
 	ntfs_volume *vol = idx_ni->vol;
 	struct super_block *sb = vol->sb;
@@ -133,13 +134,11 @@ int ntfs_index_lookup(const void *key, const int key_len,
 	INDEX_ROOT *ir;
 	INDEX_ENTRY *ie;
 	INDEX_ALLOCATION *ia;
-	u8 *index_end;
-	attr_search_context *actx;
-	int rc, err = 0;
-	VCN vcn, old_vcn;
+	u8 *index_end, *kaddr;
+	ntfs_attr_search_ctx *actx;
 	struct address_space *ia_mapping;
 	struct page *page;
-	u8 *kaddr;
+	int rc, err = 0;
 
 	ntfs_debug("Entering.");
 	BUG_ON(!NInoAttr(idx_ni));
@@ -162,17 +161,20 @@ int ntfs_index_lookup(const void *key, const int key_len,
 				-PTR_ERR(m));
 		return PTR_ERR(m);
 	}
-	actx = get_attr_search_ctx(base_ni, m);
+	actx = ntfs_attr_get_search_ctx(base_ni, m);
 	if (unlikely(!actx)) {
 		err = -ENOMEM;
 		goto err_out;
 	}
 	/* Find the index root attribute in the mft record. */
-	if (!lookup_attr(AT_INDEX_ROOT, idx_ni->name, idx_ni->name_len,
-			CASE_SENSITIVE, 0, NULL, 0, actx)) {
-		ntfs_error(sb, "Index root attribute missing in inode 0x%lx.",
-				idx_ni->mft_no);
-		err = -EIO;
+	err = ntfs_attr_lookup(AT_INDEX_ROOT, idx_ni->name, idx_ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, actx);
+	if (unlikely(err)) {
+		if (err == -ENOENT) {
+			ntfs_error(sb, "Index root attribute missing in inode "
+					"0x%lx.", idx_ni->mft_no);
+			err = -EIO;
+		}
 		goto err_out;
 	}
 	/* Get to the index root value (it has been verified in read_inode). */
@@ -269,7 +271,7 @@ done:
 	 * We are done with the index root and the mft record.  Release them,
 	 * otherwise we deadlock with ntfs_map_page().
 	 */
-	put_attr_search_ctx(actx);
+	ntfs_attr_put_search_ctx(actx);
 	unmap_mft_record(base_ni);
 	m = NULL;
 	actx = NULL;
@@ -448,7 +450,7 @@ unm_err_out:
 	ntfs_unmap_page(page);
 err_out:
 	if (actx)
-		put_attr_search_ctx(actx);
+		ntfs_attr_put_search_ctx(actx);
 	if (m)
 		unmap_mft_record(base_ni);
 	return err;

@@ -83,7 +83,7 @@ MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 	INDEX_ALLOCATION *ia;
 	u8 *index_end;
 	u64 mref;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	int err, rc;
 	VCN vcn, old_vcn;
 	struct address_space *ia_mapping;
@@ -100,17 +100,21 @@ MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 				-PTR_ERR(m));
 		return ERR_MREF(PTR_ERR(m));
 	}
-	ctx = get_attr_search_ctx(dir_ni, m);
+	ctx = ntfs_attr_get_search_ctx(dir_ni, m);
 	if (unlikely(!ctx)) {
 		err = -ENOMEM;
 		goto err_out;
 	}
 	/* Find the index root attribute in the mft record. */
-	if (!lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL, 0,
-			ctx)) {
-		ntfs_error(sb, "Index root attribute missing in directory "
-				"inode 0x%lx.", dir_ni->mft_no);
-		err = -EIO;
+	err = ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+			0, ctx);
+	if (unlikely(err)) {
+		if (err == -ENOENT) {
+			ntfs_error(sb, "Index root attribute missing in "
+					"directory inode 0x%lx.",
+					dir_ni->mft_no);
+			err = -EIO;
+		}
 		goto err_out;
 	}
 	/* Get to the index root value (it's been verified in read_inode). */
@@ -179,7 +183,7 @@ found_it:
 				*res = NULL;
 			}
 			mref = le64_to_cpu(ie->data.dir.indexed_file);
-			put_attr_search_ctx(ctx);
+			ntfs_attr_put_search_ctx(ctx);
 			unmap_mft_record(dir_ni);
 			return mref;
 		}
@@ -278,7 +282,7 @@ found_it:
 	 */
 	if (!(ie->flags & INDEX_ENTRY_NODE)) {
 		if (name) {
-			put_attr_search_ctx(ctx);
+			ntfs_attr_put_search_ctx(ctx);
 			unmap_mft_record(dir_ni);
 			return name->mref;
 		}
@@ -301,7 +305,7 @@ found_it:
 	 * We are done with the index root and the mft record. Release them,
 	 * otherwise we deadlock with ntfs_map_page().
 	 */
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(dir_ni);
 	m = NULL;
 	ctx = NULL;
@@ -582,7 +586,7 @@ unm_err_out:
 	ntfs_unmap_page(page);
 err_out:
 	if (ctx)
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (m)
 		unmap_mft_record(dir_ni);
 	if (name) {
@@ -634,7 +638,7 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 	INDEX_ALLOCATION *ia;
 	u8 *index_end;
 	u64 mref;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	int err, rc;
 	IGNORE_CASE_BOOL ic;
 	VCN vcn, old_vcn;
@@ -649,17 +653,21 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 				-PTR_ERR(m));
 		return ERR_MREF(PTR_ERR(m));
 	}
-	ctx = get_attr_search_ctx(dir_ni, m);
+	ctx = ntfs_attr_get_search_ctx(dir_ni, m);
 	if (!ctx) {
 		err = -ENOMEM;
 		goto err_out;
 	}
 	/* Find the index root attribute in the mft record. */
-	if (!lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL, 0,
-			ctx)) {
-		ntfs_error(sb, "Index root attribute missing in directory "
-				"inode 0x%lx.", dir_ni->mft_no);
-		err = -EIO;
+	err = ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+			0, ctx);
+	if (unlikely(err)) {
+		if (err == -ENOENT) {
+			ntfs_error(sb, "Index root attribute missing in "
+					"directory inode 0x%lx.",
+					dir_ni->mft_no);
+			err = -EIO;
+		}
 		goto err_out;
 	}
 	/* Get to the index root value (it's been verified in read_inode). */
@@ -710,7 +718,7 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 				vol->upcase, vol->upcase_len)) {
 found_it:
 			mref = le64_to_cpu(ie->data.dir.indexed_file);
-			put_attr_search_ctx(ctx);
+			ntfs_attr_put_search_ctx(ctx);
 			unmap_mft_record(dir_ni);
 			return mref;
 		}
@@ -776,7 +784,7 @@ found_it:
 	 * We are done with the index root and the mft record. Release them,
 	 * otherwise we deadlock with ntfs_map_page().
 	 */
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(dir_ni);
 	m = NULL;
 	ctx = NULL;
@@ -979,7 +987,7 @@ unm_err_out:
 	ntfs_unmap_page(page);
 err_out:
 	if (ctx)
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (m)
 		unmap_mft_record(dir_ni);
 	return ERR_MREF(err);
@@ -1125,7 +1133,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	struct address_space *ia_mapping, *bmp_mapping;
 	struct page *bmp_page = NULL, *ia_page = NULL;
 	u8 *kaddr, *bmp, *index_end;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 
 	fpos = filp->f_pos;
 	ntfs_debug("Entering for inode 0x%lx, fpos 0x%llx.",
@@ -1175,7 +1183,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		m = NULL;
 		goto err_out;
 	}
-	ctx = get_attr_search_ctx(ndir, m);
+	ctx = ntfs_attr_get_search_ctx(ndir, m);
 	if (unlikely(!ctx)) {
 		err = -ENOMEM;
 		goto err_out;
@@ -1183,8 +1191,9 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	/* Get the offset into the index root attribute. */
 	ir_pos = (s64)fpos;
 	/* Find the index root attribute in the mft record. */
-	if (unlikely(!lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0,
-			NULL, 0, ctx))) {
+	err = ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL,
+			0, ctx);
+	if (unlikely(err)) {
 		ntfs_error(sb, "Index root attribute missing in directory "
 				"inode 0x%lx.", vdir->i_ino);
 		goto err_out;
@@ -1208,7 +1217,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	/* Copy the index root value (it has been verified in read_inode). */
 	memcpy(ir, (u8*)ctx->attr +
 			le16_to_cpu(ctx->attr->data.resident.value_offset), rc);
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(ndir);
 	ctx = NULL;
 	m = NULL;
@@ -1460,7 +1469,7 @@ err_out:
 	if (name)
 		kfree(name);
 	if (ctx)
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (m)
 		unmap_mft_record(ndir);
 	if (!err)

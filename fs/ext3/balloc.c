@@ -91,8 +91,8 @@ read_block_bitmap(struct super_block *sb, unsigned int block_group)
 	if (!bh)
 		ext3_error (sb, "read_block_bitmap",
 			    "Cannot read block bitmap - "
-			    "block_group = %d, block_bitmap = %lu",
-			    block_group, (unsigned long) desc->bg_block_bitmap);
+			    "block_group = %d, block_bitmap = %u",
+			    block_group, le32_to_cpu(desc->bg_block_bitmap));
 error_out:
 	return bh;
 }

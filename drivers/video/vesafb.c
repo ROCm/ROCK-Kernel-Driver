@@ -410,8 +410,11 @@ static struct platform_device vesafb_device = {
 int __init vesafb_init(void)
 {
 	int ret;
+	char *option = NULL;
 
-	vesafb_setup(fb_get_options("vesafb"));
+	/* ignore error return of fb_get_options */
+	fb_get_options("vesafb", &option);
+	vesafb_setup(option);
 	ret = driver_register(&vesafb_driver);
 
 	if (!ret) {

@@ -634,7 +634,7 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 
-	policy->cpuinfo.transition_latency = 20 * latency / fsb;
+	policy->cpuinfo.transition_latency = cpufreq_scale(2000000UL, fsb, latency);
 
 	policy->cur = powernow_get(0);
 

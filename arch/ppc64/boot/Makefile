@@ -29,7 +29,7 @@ BOOTCFLAGS	:= $(HOSTCFLAGS) $(LINUXINCLUDE) -fno-builtin
 BOOTAS		:= $(CROSS32_COMPILE)as
 BOOTAFLAGS	:= -D__ASSEMBLY__ $(BOOTCFLAGS) -traditional
 BOOTLD		:= $(CROSS32_COMPILE)ld
-BOOTLFLAGS	:= -Ttext 0x00400000 -e _start -T $(obj)/zImage.lds
+BOOTLFLAGS	:= -Ttext 0x00400000 -e _start -T $(srctree)/$(src)/zImage.lds
 BOOTOBJCOPY	:= $(CROSS32_COMPILE)objcopy
 OBJCOPYFLAGS    := contents,alloc,load,readonly,data
 

@@ -195,6 +195,21 @@ static inline void list_del_rcu(struct list_head *entry)
 	entry->prev = LIST_POISON2;
 }
 
+/*
+ * list_replace_rcu - replace old entry by new one
+ * @old : the element to be replaced
+ * @new : the new element to insert
+ *
+ * The old entry will be replaced with the new entry atomically.
+ */
+static inline void list_replace_rcu(struct list_head *old, struct list_head *new){
+	new->next = old->next;
+	new->prev = old->prev;
+	smp_wmb();
+	new->next->prev = new;
+	new->prev->next = new;
+}
+
 /**
  * list_del_init - deletes entry from list and reinitialize it.
  * @entry: the element to delete from the list.

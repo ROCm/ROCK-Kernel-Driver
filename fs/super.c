@@ -116,6 +116,27 @@ int __put_super(struct super_block *sb)
 	return ret;
 }
 
+/*
+ * Drop a superblock's refcount.
+ * Returns non-zero if the superblock is about to be destroyed and
+ * at least is already removed from super_blocks list, so if we are
+ * making a loop through super blocks then we need to restart.
+ * The caller must hold sb_lock.
+ */
+int __put_super_and_need_restart(struct super_block *sb)
+{
+	/* check for race with generic_shutdown_super() */
+	if (list_empty(&sb->s_list)) {
+		/* super block is removed, need to restart... */
+		__put_super(sb);
+		return 1;
+	}
+	/* can't be the last, since s_list is still in use */
+	sb->s_count--;
+	BUG_ON(sb->s_count == 0);
+	return 0;
+}
+
 /**
  *	put_super	-	drop a temporary reference to superblock
  *	@s: superblock in question
@@ -229,7 +250,8 @@ void generic_shutdown_super(struct super_block *sb)
 		unlock_super(sb);
 	}
 	spin_lock(&sb_lock);
-	list_del(&sb->s_list);
+	/* should be initialized for __put_super_and_need_restart() */
+	list_del_init(&sb->s_list);
 	list_del(&sb->s_instances);
 	spin_unlock(&sb_lock);
 	up_write(&sb->s_umount);
@@ -282,7 +304,7 @@ retry:
 	}
 	s->s_type = type;
 	strlcpy(s->s_id, type->name, sizeof(s->s_id));
-	list_add(&s->s_list, super_blocks.prev);
+	list_add_tail(&s->s_list, &super_blocks);
 	list_add(&s->s_instances, &type->fs_supers);
 	spin_unlock(&sb_lock);
 	get_filesystem(type);

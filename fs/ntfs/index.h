@@ -78,7 +78,7 @@ typedef struct {
 	u16 data_len;
 	BOOL is_in_root;
 	INDEX_ROOT *ir;
-	attr_search_context *actx;
+	ntfs_attr_search_ctx *actx;
 	ntfs_inode *base_ni;
 	INDEX_ALLOCATION *ia;
 	struct page *page;

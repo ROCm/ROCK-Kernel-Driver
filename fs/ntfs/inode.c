@@ -105,8 +105,11 @@ static int ntfs_init_locked_inode(struct inode *vi, ntfs_attr *na)
 	ni->name_len = na->name_len;
 
 	/* If initializing a normal inode, we are done. */
-	if (likely(na->type == AT_UNUSED))
+	if (likely(na->type == AT_UNUSED)) {
+		BUG_ON(na->name);
+		BUG_ON(na->name_len);
 		return 0;
+	}
 
 	/* It is a fake inode. */
 	NInoSetAttr(ni);
@@ -118,15 +121,16 @@ static int ntfs_init_locked_inode(struct inode *vi, ntfs_attr *na)
 	 * thus the fraction of named attributes with name != I30 is actually
 	 * absolutely tiny.
 	 */
-	if (na->name && na->name_len && na->name != I30) {
+	if (na->name_len && na->name != I30) {
 		unsigned int i;
 
+		BUG_ON(!na->name);
 		i = na->name_len * sizeof(ntfschar);
 		ni->name = (ntfschar*)kmalloc(i + sizeof(ntfschar), GFP_ATOMIC);
 		if (!ni->name)
 			return -ENOMEM;
 		memcpy(ni->name, na->name, i);
-		ni->name[i] = cpu_to_le16('\0');
+		ni->name[i] = cpu_to_le16(L'\0');
 	}
 	return 0;
 }
@@ -428,20 +432,21 @@ inline ntfs_inode *ntfs_new_extent_inode(struct super_block *sb,
  * Return values:
  *	   1: file is in $Extend directory
  *	   0: file is not in $Extend directory
- *	-EIO: file is corrupt
+ *    -errno: failed to determine if the file is in the $Extend directory
  */
-static int ntfs_is_extended_system_file(attr_search_context *ctx)
+static int ntfs_is_extended_system_file(ntfs_attr_search_ctx *ctx)
 {
-	int nr_links;
+	int nr_links, err;
 
 	/* Restart search. */
-	reinit_attr_search_ctx(ctx);
+	ntfs_attr_reinit_search_ctx(ctx);
 
 	/* Get number of hard links. */
 	nr_links = le16_to_cpu(ctx->mrec->link_count);
 
 	/* Loop through all hard links. */
-	while (lookup_attr(AT_FILE_NAME, NULL, 0, 0, 0, NULL, 0, ctx)) {
+	while (!(err = ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, 0, 0, NULL, 0,
+			ctx))) {
 		FILE_NAME_ATTR *file_name_attr;
 		ATTR_RECORD *attr = ctx->attr;
 		u8 *p, *p2;
@@ -484,7 +489,9 @@ err_corrupt_attr:
 		if (MREF_LE(file_name_attr->parent_directory) == FILE_Extend)
 			return 1;	/* YES, it's an extended system file. */
 	}
-	if (nr_links) {
+	if (unlikely(err != -ENOENT))
+		return err;
+	if (unlikely(nr_links)) {
 		ntfs_error(ctx->ntfs_ino->vol->sb, "Inode hard link count "
 				"doesn't match number of name attributes. You "
 				"should run chkdsk.");
@@ -525,7 +532,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	ntfs_inode *ni;
 	MFT_RECORD *m;
 	STANDARD_INFORMATION *si;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	int err = 0;
 
 	ntfs_debug("Entering for i_ino 0x%lx.", vi->i_ino);
@@ -557,7 +564,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 		err = PTR_ERR(m);
 		goto err_out;
 	}
-	ctx = get_attr_search_ctx(ni, m);
+	ctx = ntfs_attr_get_search_ctx(ni, m);
 	if (!ctx) {
 		err = -ENOMEM;
 		goto unm_err_out;
@@ -608,14 +615,18 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	 * in fact fail if the standard information is in an extent record, but
 	 * I don't think this actually ever happens.
 	 */
-	if (!lookup_attr(AT_STANDARD_INFORMATION, NULL, 0, 0, 0, NULL, 0,
-			ctx)) {
-		/*
-		 * TODO: We should be performing a hot fix here (if the recover
-		 * mount option is set) by creating a new attribute.
-		 */
-		ntfs_error(vi->i_sb, "$STANDARD_INFORMATION attribute is "
-				"missing.");
+	err = ntfs_attr_lookup(AT_STANDARD_INFORMATION, NULL, 0, 0, 0, NULL, 0,
+			ctx);
+	if (unlikely(err)) {
+		if (err == -ENOENT) {
+			/*
+			 * TODO: We should be performing a hot fix here (if the
+			 * recover mount option is set) by creating a new
+			 * attribute.
+			 */
+			ntfs_error(vi->i_sb, "$STANDARD_INFORMATION attribute "
+					"is missing.");
+		}
 		goto unm_err_out;
 	}
 	/* Get the standard information attribute value. */
@@ -646,8 +657,15 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	vi->i_atime = ntfs2utc(si->last_access_time);
 
 	/* Find the attribute list attribute if present. */
-	reinit_attr_search_ctx(ctx);
-	if (lookup_attr(AT_ATTRIBUTE_LIST, NULL, 0, 0, 0, NULL, 0, ctx)) {
+	ntfs_attr_reinit_search_ctx(ctx);
+	err = ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0, 0, 0, NULL, 0, ctx);
+	if (err) {
+		if (unlikely(err != -ENOENT)) {
+			ntfs_error(vi->i_sb, "Failed to lookup attribute list "
+					"attribute. You should run chkdsk.");
+			goto unm_err_out;
+		}
+	} else /* if (!err) */ {
 		if (vi->i_ino == FILE_MFT)
 			goto skip_attr_list_load;
 		ntfs_debug("Attribute list found in inode 0x%lx.", vi->i_ino);
@@ -733,13 +751,17 @@ skip_attr_list_load:
 		char *ir_end, *index_end;
 
 		/* It is a directory, find index root attribute. */
-		reinit_attr_search_ctx(ctx);
-		if (!lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0,
-				NULL, 0, ctx)) {
-			// FIXME: File is corrupt! Hot-fix with empty index
-			// root attribute if recovery option is set.
-			ntfs_error(vi->i_sb, "$INDEX_ROOT attribute is "
-					"missing.");
+		ntfs_attr_reinit_search_ctx(ctx);
+		err = ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE,
+				0, NULL, 0, ctx);
+		if (unlikely(err)) {
+			if (err == -ENOENT) {
+				// FIXME: File is corrupt! Hot-fix with empty
+				// index root attribute if recovery option is
+				// set.
+				ntfs_error(vi->i_sb, "$INDEX_ROOT attribute "
+						"is missing.");
+			}
 			goto unm_err_out;
 		}
 		/* Set up the state. */
@@ -841,7 +863,7 @@ skip_attr_list_load:
 			vi->i_size = ni->initialized_size =
 					ni->allocated_size = 0;
 			/* We are done with the mft record, so we release it. */
-			put_attr_search_ctx(ctx);
+			ntfs_attr_put_search_ctx(ctx);
 			unmap_mft_record(ni);
 			m = NULL;
 			ctx = NULL;
@@ -849,12 +871,19 @@ skip_attr_list_load:
 		} /* LARGE_INDEX: Index allocation present. Setup state. */
 		NInoSetIndexAllocPresent(ni);
 		/* Find index allocation attribute. */
-		reinit_attr_search_ctx(ctx);
-		if (!lookup_attr(AT_INDEX_ALLOCATION, I30, 4, CASE_SENSITIVE,
-				0, NULL, 0, ctx)) {
-			ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute "
-					"is not present but $INDEX_ROOT "
-					"indicated it is.");
+		ntfs_attr_reinit_search_ctx(ctx);
+		err = ntfs_attr_lookup(AT_INDEX_ALLOCATION, I30, 4,
+				CASE_SENSITIVE, 0, NULL, 0, ctx);
+		if (unlikely(err)) {
+			if (err == -ENOENT)
+				ntfs_error(vi->i_sb, "$INDEX_ALLOCATION "
+						"attribute is not present but "
+						"$INDEX_ROOT indicated it "
+						"is.");
+			else
+				ntfs_error(vi->i_sb, "Failed to lookup "
+						"$INDEX_ALLOCATION "
+						"attribute.");
 			goto unm_err_out;
 		}
 		if (!ctx->attr->non_resident) {
@@ -894,7 +923,7 @@ skip_attr_list_load:
 		 * We are done with the mft record, so we release it. Otherwise
 		 * we would deadlock in ntfs_attr_iget().
 		 */
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		unmap_mft_record(ni);
 		m = NULL;
 		ctx = NULL;
@@ -938,7 +967,7 @@ skip_large_dir_stuff:
 		vi->i_mapping->a_ops = &ntfs_mst_aops;
 	} else {
 		/* It is a file. */
-		reinit_attr_search_ctx(ctx);
+		ntfs_attr_reinit_search_ctx(ctx);
 
 		/* Setup the data attribute, even if not present. */
 		ni->type = AT_DATA;
@@ -946,9 +975,15 @@ skip_large_dir_stuff:
 		ni->name_len = 0;
 
 		/* Find first extent of the unnamed data attribute. */
-		if (!lookup_attr(AT_DATA, NULL, 0, 0, 0, NULL, 0, ctx)) {
+		err = ntfs_attr_lookup(AT_DATA, NULL, 0, 0, 0, NULL, 0, ctx);
+		if (unlikely(err)) {
 			vi->i_size = ni->initialized_size =
-					ni->allocated_size = 0LL;
+					ni->allocated_size = 0;
+			if (err != -ENOENT) {
+				ntfs_error(vi->i_sb, "Failed to lookup $DATA "
+						"attribute.");
+				goto unm_err_out;
+			}
 			/*
 			 * FILE_Secure does not have an unnamed $DATA
 			 * attribute, so we special case it here.
@@ -1059,7 +1094,7 @@ skip_large_dir_stuff:
 		}
 no_data_attr_special_case:
 		/* We are done with the mft record, so we release it. */
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		unmap_mft_record(ni);
 		m = NULL;
 		ctx = NULL;
@@ -1098,7 +1133,7 @@ unm_err_out:
 	if (!err)
 		err = -EIO;
 	if (ctx)
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (m)
 		unmap_mft_record(ni);
 err_out:
@@ -1133,7 +1168,7 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 	ntfs_volume *vol = NTFS_SB(vi->i_sb);
 	ntfs_inode *ni, *base_ni;
 	MFT_RECORD *m;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	int err = 0;
 
 	ntfs_debug("Entering for i_ino 0x%lx.", vi->i_ino);
@@ -1162,15 +1197,16 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 		err = PTR_ERR(m);
 		goto err_out;
 	}
-	ctx = get_attr_search_ctx(base_ni, m);
+	ctx = ntfs_attr_get_search_ctx(base_ni, m);
 	if (!ctx) {
 		err = -ENOMEM;
 		goto unm_err_out;
 	}
 
 	/* Find the attribute. */
-	if (!lookup_attr(ni->type, ni->name, ni->name_len, CASE_SENSITIVE, 0,
-			NULL, 0, ctx))
+	err = ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err))
 		goto unm_err_out;
 
 	if (!ctx->attr->non_resident) {
@@ -1333,7 +1369,7 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 	ni->ext.base_ntfs_ino = base_ni;
 	ni->nr_extents = -1;
 
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(base_ni);
 
 	ntfs_debug("Done.");
@@ -1343,7 +1379,7 @@ unm_err_out:
 	if (!err)
 		err = -EIO;
 	if (ctx)
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(base_ni);
 err_out:
 	ntfs_error(vi->i_sb, "Failed with error code %i while reading "
@@ -1392,7 +1428,7 @@ static int ntfs_read_locked_index_inode(struct inode *base_vi, struct inode *vi)
 	ntfs_inode *ni, *base_ni, *bni;
 	struct inode *bvi;
 	MFT_RECORD *m;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	INDEX_ROOT *ir;
 	u8 *ir_end, *index_end;
 	int err = 0;
@@ -1419,15 +1455,18 @@ static int ntfs_read_locked_index_inode(struct inode *base_vi, struct inode *vi)
 		err = PTR_ERR(m);
 		goto err_out;
 	}
-	ctx = get_attr_search_ctx(base_ni, m);
+	ctx = ntfs_attr_get_search_ctx(base_ni, m);
 	if (!ctx) {
 		err = -ENOMEM;
 		goto unm_err_out;
 	}
 	/* Find the index root attribute. */
-	if (!lookup_attr(AT_INDEX_ROOT, ni->name, ni->name_len, CASE_SENSITIVE,
-			0, NULL, 0, ctx)) {
-		ntfs_error(vi->i_sb, "$INDEX_ROOT attribute is missing.");
+	err = ntfs_attr_lookup(AT_INDEX_ROOT, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err)) {
+		if (err == -ENOENT)
+			ntfs_error(vi->i_sb, "$INDEX_ROOT attribute is "
+					"missing.");
 		goto unm_err_out;
 	}
 	/* Set up the state. */
@@ -1497,7 +1536,7 @@ static int ntfs_read_locked_index_inode(struct inode *base_vi, struct inode *vi)
 		/* No index allocation. */
 		vi->i_size = ni->initialized_size = ni->allocated_size = 0;
 		/* We are done with the mft record, so we release it. */
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 		unmap_mft_record(base_ni);
 		m = NULL;
 		ctx = NULL;
@@ -1505,11 +1544,17 @@ static int ntfs_read_locked_index_inode(struct inode *base_vi, struct inode *vi)
 	} /* LARGE_INDEX:  Index allocation present.  Setup state. */
 	NInoSetIndexAllocPresent(ni);
 	/* Find index allocation attribute. */
-	reinit_attr_search_ctx(ctx);
-	if (!lookup_attr(AT_INDEX_ALLOCATION, ni->name, ni->name_len,
-			CASE_SENSITIVE, 0, NULL, 0, ctx)) {
-		ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute is not "
-				"present but $INDEX_ROOT indicated it is.");
+	ntfs_attr_reinit_search_ctx(ctx);
+	err = ntfs_attr_lookup(AT_INDEX_ALLOCATION, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err)) {
+		if (err == -ENOENT)
+			ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute is "
+					"not present but $INDEX_ROOT "
+					"indicated it is.");
+		else
+			ntfs_error(vi->i_sb, "Failed to lookup "
+					"$INDEX_ALLOCATION attribute.");
 		goto unm_err_out;
 	}
 	if (!ctx->attr->non_resident) {
@@ -1546,7 +1591,7 @@ static int ntfs_read_locked_index_inode(struct inode *base_vi, struct inode *vi)
 	 * We are done with the mft record, so we release it.  Otherwise
 	 * we would deadlock in ntfs_attr_iget().
 	 */
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(base_ni);
 	m = NULL;
 	ctx = NULL;
@@ -1597,7 +1642,7 @@ unm_err_out:
 	if (!err)
 		err = -EIO;
 	if (ctx)
-		put_attr_search_ctx(ctx);
+		ntfs_attr_put_search_ctx(ctx);
 	if (m)
 		unmap_mft_record(base_ni);
 err_out:
@@ -1619,16 +1664,16 @@ err_out:
  * is not initialized and hence we cannot get at the contents of mft records
  * by calling map_mft_record*().
  *
- * Further it needs to cope with the circular references problem, i.e. can't
+ * Further it needs to cope with the circular references problem, i.e. cannot
  * load any attributes other than $ATTRIBUTE_LIST until $DATA is loaded, because
- * we don't know where the other extent mft records are yet and again, because
- * we cannot call map_mft_record*() yet. Obviously this applies only when an
+ * we do not know where the other extent mft records are yet and again, because
+ * we cannot call map_mft_record*() yet.  Obviously this applies only when an
  * attribute list is actually present in $MFT inode.
  *
  * We solve these problems by starting with the $DATA attribute before anything
- * else and iterating using lookup_attr($DATA) over all extents. As each extent
- * is found, we decompress_mapping_pairs() including the implied
- * merge_runlists(). Each step of the iteration necessarily provides
+ * else and iterating using ntfs_attr_lookup($DATA) over all extents.  As each
+ * extent is found, we decompress_mapping_pairs() including the implied
+ * ntfs_merge_runlists().  Each step of the iteration necessarily provides
  * sufficient information for the next step to complete.
  *
  * This should work but there are two possible pit falls (see inline comments
@@ -1644,7 +1689,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 	ntfs_inode *ni;
 	MFT_RECORD *m = NULL;
 	ATTR_RECORD *attr;
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	unsigned int i, nr_blocks;
 	int err;
 
@@ -1719,14 +1764,21 @@ int ntfs_read_inode_mount(struct inode *vi)
 	/* Provides readpage() and sync_page() for map_mft_record(). */
 	vi->i_mapping->a_ops = &ntfs_mft_aops;
 
-	ctx = get_attr_search_ctx(ni, m);
+	ctx = ntfs_attr_get_search_ctx(ni, m);
 	if (!ctx) {
 		err = -ENOMEM;
 		goto err_out;
 	}
 
 	/* Find the attribute list attribute if present. */
-	if (lookup_attr(AT_ATTRIBUTE_LIST, NULL, 0, 0, 0, NULL, 0, ctx)) {
+	err = ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0, 0, 0, NULL, 0, ctx);
+	if (err) {
+		if (unlikely(err != -ENOENT)) {
+			ntfs_error(sb, "Failed to lookup attribute list "
+					"attribute. You should run chkdsk.");
+			goto put_err_out;
+		}
+	} else /* if (!err) */ {
 		ATTR_LIST_ENTRY *al_entry, *next_al_entry;
 		u8 *al_end;
 
@@ -1855,12 +1907,13 @@ int ntfs_read_inode_mount(struct inode *vi)
 		}
 	}
 
-	reinit_attr_search_ctx(ctx);
+	ntfs_attr_reinit_search_ctx(ctx);
 
 	/* Now load all attribute extents. */
 	attr = NULL;
 	next_vcn = last_vcn = highest_vcn = 0;
-	while (lookup_attr(AT_DATA, NULL, 0, 0, next_vcn, NULL, 0, ctx)) {
+	while (!(err = ntfs_attr_lookup(AT_DATA, NULL, 0, 0, next_vcn, NULL, 0,
+			ctx))) {
 		runlist_element *nrl;
 
 		/* Cache the current attribute. */
@@ -1900,8 +1953,6 @@ int ntfs_read_inode_mount(struct inode *vi)
 
 		/* Are we in the first extent? */
 		if (!next_vcn) {
-			u64 ll;
-
 			if (attr->data.non_resident.lowest_vcn) {
 				ntfs_error(sb, "First extent of $DATA "
 						"attribute has non zero "
@@ -1920,17 +1971,15 @@ int ntfs_read_inode_mount(struct inode *vi)
 					non_resident.initialized_size);
 			ni->allocated_size = sle64_to_cpu(
 					attr->data.non_resident.allocated_size);
-			/* Set the number of mft records. */
-			ll = vi->i_size >> vol->mft_record_size_bits;
 			/*
 			 * Verify the number of mft records does not exceed
 			 * 2^32 - 1.
 			 */
-			if (ll >= (1ULL << 32)) {
+			if ((vi->i_size >> vol->mft_record_size_bits) >=
+					(1ULL << 32)) {
 				ntfs_error(sb, "$MFT is too big! Aborting.");
 				goto put_err_out;
 			}
-			vol->nr_mft_records = ll;
 			/*
 			 * We have got the first extent of the runlist for
 			 * $MFT which means it is now relatively safe to call
@@ -1959,7 +2008,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 						"saw this message to "
 						"linux-ntfs-dev@lists."
 						"sourceforge.net");
-				put_attr_search_ctx(ctx);
+				ntfs_attr_put_search_ctx(ctx);
 				/* Revert to the safe super operations. */
 				ntfs_free(m);
 				return -1;
@@ -1995,21 +2044,26 @@ int ntfs_read_inode_mount(struct inode *vi)
 			goto put_err_out;
 		}
 	}
+	if (err != -ENOENT) {
+		ntfs_error(sb, "Failed to lookup $MFT/$DATA attribute extent. "
+				"$MFT is corrupt. Run chkdsk.");
+		goto put_err_out;
+	}
 	if (!attr) {
 		ntfs_error(sb, "$MFT/$DATA attribute not found. $MFT is "
 				"corrupt. Run chkdsk.");
 		goto put_err_out;
 	}
 	if (highest_vcn && highest_vcn != last_vcn - 1) {
-		ntfs_error(sb, "Failed to load the complete runlist "
-				"for $MFT/$DATA. Driver bug or "
-				"corrupt $MFT. Run chkdsk.");
+		ntfs_error(sb, "Failed to load the complete runlist for "
+				"$MFT/$DATA. Driver bug or corrupt $MFT. "
+				"Run chkdsk.");
 		ntfs_debug("highest_vcn = 0x%llx, last_vcn - 1 = 0x%llx",
 				(unsigned long long)highest_vcn,
 				(unsigned long long)last_vcn - 1);
 		goto put_err_out;
 	}
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	ntfs_debug("Done.");
 	ntfs_free(m);
 	return 0;
@@ -2018,7 +2072,7 @@ em_put_err_out:
 	ntfs_error(sb, "Couldn't find first extent of $DATA attribute in "
 			"attribute list. $MFT is corrupt. Run chkdsk.");
 put_err_out:
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 err_out:
 	ntfs_error(sb, "Failed. Marking inode as bad.");
 	make_bad_inode(vi);
@@ -2321,7 +2375,7 @@ int ntfs_write_inode(struct inode *vi, int sync)
 {
 	s64 nt;
 	ntfs_inode *ni = NTFS_I(vi);
-	attr_search_context *ctx;
+	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *m;
 	STANDARD_INFORMATION *si;
 	int err = 0;
@@ -2346,15 +2400,15 @@ int ntfs_write_inode(struct inode *vi, int sync)
 		goto err_out;
 	}
 	/* Update the access times in the standard information attribute. */
-	ctx = get_attr_search_ctx(ni, m);
+	ctx = ntfs_attr_get_search_ctx(ni, m);
 	if (unlikely(!ctx)) {
 		err = -ENOMEM;
 		goto unm_err_out;
 	}
-	if (unlikely(!lookup_attr(AT_STANDARD_INFORMATION, NULL, 0,
-			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
-		put_attr_search_ctx(ctx);
-		err = -ENOENT;
+	err = ntfs_attr_lookup(AT_STANDARD_INFORMATION, NULL, 0,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err)) {
+		ntfs_attr_put_search_ctx(ctx);
 		goto unm_err_out;
 	}
 	si = (STANDARD_INFORMATION*)((u8*)ctx->attr +
@@ -2399,7 +2453,7 @@ int ntfs_write_inode(struct inode *vi, int sync)
 	 */
 	if (modified && !NInoTestSetDirty(ctx->ntfs_ino))
 		__set_page_dirty_nobuffers(ctx->ntfs_ino->page);
-	put_attr_search_ctx(ctx);
+	ntfs_attr_put_search_ctx(ctx);
 	/* Now the access times are updated, write the base mft record. */
 	if (NInoDirty(ni))
 		err = write_mft_record(ni, m, sync);

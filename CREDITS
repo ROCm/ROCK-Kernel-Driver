@@ -2618,6 +2618,7 @@ N: Nicolas Pitre
 E: nico@cam.org
 D: StrongARM SA1100 support integrator & hacker
 D: Xscale PXA architecture
+D: unified SMC 91C9x/91C11x ethernet driver (smc91x)
 S: Montreal, Quebec, Canada
 
 N: Ken Pizzini

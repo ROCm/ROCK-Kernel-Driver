@@ -444,6 +444,9 @@ int __init cg3_init(void)
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev;
 
+	if (fb_get_options("cg3fb", NULL))
+		return -ENODEV;
+
 	for_all_sbusdev(sdev, sbus) {
 		if (!strcmp(sdev->prom_name, "cgthree") ||
 		    !strcmp(sdev->prom_name, "cgRDI"))

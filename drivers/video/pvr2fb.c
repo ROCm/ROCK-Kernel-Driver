@@ -1058,7 +1058,11 @@ int __init pvr2fb_init(void)
 	int size;
 
 #ifndef MODULE
-	pvr2fb_setup(fb_get_options("pvr2fb"));
+	char *option = NULL;
+
+	if (fb_get_options("pvr2fb", &option))
+		return -ENODEV;
+	pvr2fb_setup(option);
 #endif
 	size = sizeof(struct fb_info) + sizeof(struct pvr2fb_par) + 16 * sizeof(u32);
 

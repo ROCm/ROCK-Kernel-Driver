@@ -1527,7 +1527,11 @@ int __init
 tgafb_init(void)
 {
 #ifndef MODULE
-	tgafb_setup(fb_get_options("tgafb"));
+	char *option = NULL;
+
+	if (fb_get_options("tgafb", &option))
+		return -ENODEV;
+	tgafb_setup(option);
 #endif
 	return pci_module_init(&tgafb_driver);
 }
