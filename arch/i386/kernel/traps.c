@@ -374,6 +374,9 @@ DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, get_cr
 
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
+	if (regs->eflags & X86_EFLAGS_IF)
+		local_irq_enable();
+ 
 	if (regs->eflags & VM_MASK)
 		goto gp_in_vm86;
 
@@ -386,6 +389,7 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 	return;
 
 gp_in_vm86:
+	local_irq_enable();
 	handle_vm86_fault((struct kernel_vm86_regs *) regs, error_code);
 	return;
 
