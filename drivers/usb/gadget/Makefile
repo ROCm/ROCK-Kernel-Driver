@@ -14,6 +14,10 @@ g_ether-objs			:= ether.o usbstring.o config.o epautoconf.o
 g_serial-objs			:= serial.o usbstring.o
 gadgetfs-objs			:= inode.o
 g_file_storage-objs		:= file_storage.o usbstring.o
+
+ifeq ($(CONFIG_USB_ETH_RNDIS),y)
+	g_ether-objs		+= rndis.o
+endif
  
 obj-$(CONFIG_USB_ZERO)		+= g_zero.o
 obj-$(CONFIG_USB_ETH)		+= g_ether.o
