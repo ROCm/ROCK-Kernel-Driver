@@ -1,3 +1,4 @@
+if ARCH_PXA
 
 menu "Intel PXA2xx Implementations"
 
@@ -32,3 +33,4 @@ config PXA27x
 	help
 	  Select code specific to PXA27x variants
 
+endif

@@ -1,3 +1,4 @@
+if ARCH_SA1100
 
 menu "SA11x0 Implementations"
 
@@ -349,3 +350,4 @@ config H3600_SLEEVE
 
 endmenu
 
+endif

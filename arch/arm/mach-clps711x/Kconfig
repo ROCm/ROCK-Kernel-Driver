@@ -1,3 +1,4 @@
+if ARCH_CLPS711X
 
 menu "CLPS711X/EP721X Implementations"
 
@@ -74,3 +75,4 @@ config EP72XX_ROM_BOOT
 
 endmenu
 
+endif

@@ -1,3 +1,4 @@
+if ARCH_IOP3XX
 
 menu "IOP3xx Implementation Options"
 
@@ -52,3 +53,4 @@ config IOP3XX_PMON
 
 endmenu
 
+endif

@@ -1,3 +1,4 @@
+if ARCH_LH7A40X
 
 menu "LH7A40X Implementations"
 
@@ -14,7 +15,7 @@ config MACH_LPD7A400
 	bool "LPD7A400 Card Engine"
 	depends on ARCH_LH7A40X
 	select ARCH_LH7A400
-	select IDE_POLL
+#	select IDE_POLL
 	help
 	  Say Y here if you are using Logic Product Development's
 	  LPD7A400 CardEngine.  For the time being, the LPD7A400 and
@@ -24,7 +25,7 @@ config MACH_LPD7A404
 	bool "LPD7A404 Card Engine"
 	depends on ARCH_LH7A40X
 	select ARCH_LH7A404
-	select IDE_POLL
+#	select IDE_POLL
 	help
 	  Say Y here if you are using Logic Product Development's
 	  LPD7A404 CardEngine. For the time being, the LPD7A400 and
@@ -37,3 +38,5 @@ config ARCH_LH7A404
 	bool
 
 endmenu
+
+endif

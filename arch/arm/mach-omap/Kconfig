@@ -1,3 +1,4 @@
+if ARCH_OMAP
 
 menu "TI OMAP Implementations"
 
@@ -171,3 +172,5 @@ config OMAP_ARM_30MHZ
           Enable 30MHz clock for OMAP CPU. If unsure, say N.
 
 endmenu
+
+endif

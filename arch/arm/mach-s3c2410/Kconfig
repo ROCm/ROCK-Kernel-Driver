@@ -1,3 +1,5 @@
+if ARCH_S3C2410
+
 menu "S3C2410 Implementations"
 
 config ARCH_BAST
@@ -30,3 +32,5 @@ config MACH_VR1000
 	  Say Y here if you are using the Simtec VR1000 board.
 
 endmenu
+
+endif
