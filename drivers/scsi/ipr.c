@@ -497,13 +497,18 @@ static void ipr_unmap_sglist(struct ipr_ioa_cfg *ioa_cfg,
 }
 
 /**
- * ipr_mask_and_clear_all_interrupts - Mask and clears all interrupts on the adapter
+ * ipr_mask_and_clear_interrupts - Mask all and clear specified interrupts
  * @ioa_cfg:	ioa config struct
+ * @clr_ints:     interrupts to clear
+ *
+ * This function masks all interrupts on the adapter, then clears the
+ * interrupts specified in the mask
  *
  * Return value:
  * 	none
  **/
-static void ipr_mask_and_clear_all_interrupts(struct ipr_ioa_cfg *ioa_cfg)
+static void ipr_mask_and_clear_interrupts(struct ipr_ioa_cfg *ioa_cfg,
+					  u32 clr_ints)
 {
 	volatile u32 int_reg;
 
@@ -514,7 +519,7 @@ static void ipr_mask_and_clear_all_interrupts(struct ipr_ioa_cfg *ioa_cfg)
 	writel(~0, ioa_cfg->regs.set_interrupt_mask_reg);
 
 	/* Clear any pending interrupts */
-	writel(~0, ioa_cfg->regs.clr_interrupt_reg);
+	writel(clr_ints, ioa_cfg->regs.clr_interrupt_reg);
 	int_reg = readl(ioa_cfg->regs.sense_interrupt_reg);
 }
 
@@ -2840,7 +2845,7 @@ static int ipr_slave_configure(struct scsi_device *sdev)
 		if (ipr_is_af_dasd_device(res) || ipr_is_ioa_resource(res))
 			sdev->scsi_level = 4;
 		if (ipr_is_vset_device(res))
-			sdev->rw_timeout = IPR_VSET_RW_TIMEOUT;
+			sdev->timeout = IPR_VSET_RW_TIMEOUT;
 
 		sdev->allow_restart = 1;
 		scsi_adjust_queue_depth(sdev, 0, res->qdepth);
@@ -3182,7 +3187,7 @@ static irqreturn_t ipr_handle_other_interrupt(struct ipr_ioa_cfg *ioa_cfg,
 		if (WAIT_FOR_DUMP == ioa_cfg->sdt_state)
 			ioa_cfg->sdt_state = GET_DUMP;
 
-		ipr_mask_and_clear_all_interrupts(ioa_cfg);
+		ipr_mask_and_clear_interrupts(ioa_cfg, ~0);
 		ipr_initiate_ioa_reset(ioa_cfg, IPR_SHUTDOWN_NONE);
 	}
 
@@ -4769,18 +4774,27 @@ static void ipr_init_ioa_mem(struct ipr_ioa_cfg *ioa_cfg)
 static int ipr_reset_enable_ioa(struct ipr_cmnd *ipr_cmd)
 {
 	struct ipr_ioa_cfg *ioa_cfg = ipr_cmd->ioa_cfg;
-	volatile u32 temp_reg;
+	volatile u32 int_reg;
 
 	ENTER;
+	ipr_cmd->job_step = ipr_ioafp_indentify_hrrq;
 	ipr_init_ioa_mem(ioa_cfg);
 
-	/* Enable interrupts */
 	ioa_cfg->allow_interrupts = 1;
-	writel(IPR_PCII_OPER_INTERRUPTS, ioa_cfg->regs.clr_interrupt_mask_reg);
-	temp_reg = readl(ioa_cfg->regs.sense_interrupt_mask_reg);
+	int_reg = readl(ioa_cfg->regs.sense_interrupt_reg);
+
+	if (int_reg & IPR_PCII_IOA_TRANS_TO_OPER) {
+		writel((IPR_PCII_ERROR_INTERRUPTS | IPR_PCII_HRRQ_UPDATED),
+		       ioa_cfg->regs.clr_interrupt_mask_reg);
+		int_reg = readl(ioa_cfg->regs.sense_interrupt_mask_reg);
+		return IPR_RC_JOB_CONTINUE;
+	}
 
 	/* Enable destructive diagnostics on IOA */
 	writel(IPR_DOORBELL, ioa_cfg->regs.set_uproc_interrupt_reg);
+
+	writel(IPR_PCII_OPER_INTERRUPTS, ioa_cfg->regs.clr_interrupt_mask_reg);
+	int_reg = readl(ioa_cfg->regs.sense_interrupt_mask_reg);
 
 	dev_info(&ioa_cfg->pdev->dev, "Initializing IOA.\n");
 
@@ -4788,7 +4802,6 @@ static int ipr_reset_enable_ioa(struct ipr_cmnd *ipr_cmd)
 	ipr_cmd->timer.expires = jiffies + IPR_OPERATIONAL_TIMEOUT;
 	ipr_cmd->timer.function = (void (*)(unsigned long))ipr_timeout;
 	add_timer(&ipr_cmd->timer);
-	ipr_cmd->job_step = ipr_ioafp_indentify_hrrq;
 
 	LEAVE;
 	return IPR_RC_JOB_RETURN;
@@ -5042,7 +5055,7 @@ static int ipr_reset_alert(struct ipr_cmnd *ipr_cmd)
 	rc = pci_read_config_word(ioa_cfg->pdev, PCI_COMMAND, &cmd_reg);
 
 	if ((rc == PCIBIOS_SUCCESSFUL) && (cmd_reg & PCI_COMMAND_MEMORY)) {
-		ipr_mask_and_clear_all_interrupts(ioa_cfg);
+		ipr_mask_and_clear_interrupts(ioa_cfg, ~0);
 		writel(IPR_UPROCI_RESET_ALERT, ioa_cfg->regs.set_uproc_interrupt_reg);
 		ipr_cmd->job_step = ipr_reset_wait_to_start_bist;
 	} else {
@@ -5208,6 +5221,38 @@ static void ipr_reset_ioa_job(struct ipr_cmnd *ipr_cmd)
 }
 
 /**
+ * _ipr_initiate_ioa_reset - Initiate an adapter reset
+ * @ioa_cfg:		ioa config struct
+ * @job_step:		first job step of reset job
+ * @shutdown_type:	shutdown type
+ *
+ * Description: This function will initiate the reset of the given adapter
+ * starting at the selected job step.
+ * If the caller needs to wait on the completion of the reset,
+ * the caller must sleep on the reset_wait_q.
+ *
+ * Return value:
+ * 	none
+ **/
+static void _ipr_initiate_ioa_reset(struct ipr_ioa_cfg *ioa_cfg,
+				    int (*job_step) (struct ipr_cmnd *),
+				    enum ipr_shutdown_type shutdown_type)
+{
+	struct ipr_cmnd *ipr_cmd;
+
+	ioa_cfg->in_reset_reload = 1;
+	ioa_cfg->allow_cmds = 0;
+	scsi_block_requests(ioa_cfg->host);
+
+	ipr_cmd = ipr_get_free_ipr_cmnd(ioa_cfg);
+	ioa_cfg->reset_cmd = ipr_cmd;
+	ipr_cmd->job_step = job_step;
+	ipr_cmd->shutdown_type = shutdown_type;
+
+	ipr_reset_ioa_job(ipr_cmd);
+}
+
+/**
  * ipr_initiate_ioa_reset - Initiate an adapter reset
  * @ioa_cfg:		ioa config struct
  * @shutdown_type:	shutdown type
@@ -5222,8 +5267,6 @@ static void ipr_reset_ioa_job(struct ipr_cmnd *ipr_cmd)
 static void ipr_initiate_ioa_reset(struct ipr_ioa_cfg *ioa_cfg,
 				   enum ipr_shutdown_type shutdown_type)
 {
-	struct ipr_cmnd *ipr_cmd;
-
 	if (ioa_cfg->ioa_is_dead)
 		return;
 
@@ -5253,16 +5296,8 @@ static void ipr_initiate_ioa_reset(struct ipr_ioa_cfg *ioa_cfg,
 		}
 	}
 
-	ioa_cfg->in_reset_reload = 1;
-	ioa_cfg->allow_cmds = 0;
-	scsi_block_requests(ioa_cfg->host);
-
-	ipr_cmd = ipr_get_free_ipr_cmnd(ioa_cfg);
-	ioa_cfg->reset_cmd = ipr_cmd;
-	ipr_cmd->job_step = ipr_reset_shutdown_ioa;
-	ipr_cmd->shutdown_type = shutdown_type;
-
-	ipr_reset_ioa_job(ipr_cmd);
+	_ipr_initiate_ioa_reset(ioa_cfg, ipr_reset_shutdown_ioa,
+				shutdown_type);
 }
 
 /**
@@ -5283,10 +5318,8 @@ static int __devinit ipr_probe_ioa_part2(struct ipr_ioa_cfg *ioa_cfg)
 
 	ENTER;
 	spin_lock_irqsave(ioa_cfg->host->host_lock, host_lock_flags);
-
 	dev_dbg(&ioa_cfg->pdev->dev, "ioa_cfg adx: 0x%p\n", ioa_cfg);
-
-	ipr_initiate_ioa_reset(ioa_cfg, IPR_SHUTDOWN_NONE);
+	_ipr_initiate_ioa_reset(ioa_cfg, ipr_reset_enable_ioa, IPR_SHUTDOWN_NONE);
 
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, host_lock_flags);
 	wait_event(ioa_cfg->reset_wait_q, !ioa_cfg->in_reset_reload);
@@ -5693,11 +5726,13 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 	if ((rc = ipr_save_pcix_cmd_reg(ioa_cfg)))
 		goto cleanup_nomem;
 
+	if ((rc = ipr_set_pcix_cmd_reg(ioa_cfg)))
+		goto cleanup_nomem;
+
 	if ((rc = ipr_alloc_mem(ioa_cfg)))
 		goto cleanup;
 
-	ipr_mask_and_clear_all_interrupts(ioa_cfg);
-
+	ipr_mask_and_clear_interrupts(ioa_cfg, ~IPR_PCII_IOA_TRANS_TO_OPER);
 	rc = request_irq(pdev->irq, ipr_isr, SA_SHIRQ, IPR_NAME, ioa_cfg);
 
 	if (rc) {

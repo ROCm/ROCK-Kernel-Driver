@@ -104,7 +104,7 @@ struct scsi_device {
 	unsigned int max_device_blocked; /* what device_blocked counts down from  */
 #define SCSI_DEFAULT_DEVICE_BLOCKED	3
 
-	int rw_timeout;
+	int timeout;
 
 	struct device		sdev_gendev;
 	struct class_device	sdev_classdev;
