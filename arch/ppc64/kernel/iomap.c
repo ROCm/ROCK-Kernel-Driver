@@ -113,7 +113,7 @@ void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long max)
 	if (flags & IORESOURCE_IO)
 		return ioport_map(start, len);
 	if (flags & IORESOURCE_MEM)
-		return (void __iomem *) start;
+		return ioremap(start, len);
 	/* What? */
 	return NULL;
 }
