@@ -23,7 +23,76 @@ DECLARE_MUTEX(device_sem);
 
 spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
 
-#define to_dev(node) container_of(node,struct device,driver_list)
+struct subsystem device_subsys;
+
+#define to_dev(obj) container_of(obj,struct device,kobj)
+
+
+/*
+ * sysfs bindings for devices.
+ */
+
+#define to_dev_attr(_attr) container_of(_attr,struct device_attribute,attr)
+
+extern struct attribute * dev_default_attrs[];
+
+static ssize_t
+dev_attr_show(struct kobject * kobj, struct attribute * attr,
+	      char * buf, size_t count, loff_t off)
+{
+	struct device_attribute * dev_attr = to_dev_attr(attr);
+	struct device * dev = to_dev(kobj);
+	ssize_t ret = 0;
+
+	if (dev_attr->show)
+		ret = dev_attr->show(dev,buf,count,off);
+	return ret;
+}
+
+static ssize_t
+dev_attr_store(struct kobject * kobj, struct attribute * attr,
+	       const char * buf, size_t count, loff_t off)
+{
+	struct device_attribute * dev_attr = to_dev_attr(attr);
+	struct device * dev = to_dev(kobj);
+	ssize_t ret = 0;
+
+	if (dev_attr->store)
+		ret = dev_attr->store(dev,buf,count,off);
+	return ret;
+}
+
+static struct sysfs_ops dev_sysfs_ops = {
+	.show	= dev_attr_show,
+	.store	= dev_attr_store,
+};
+
+struct subsystem device_subsys = {
+	.kobj		= {
+		.name	= "devices",
+	},
+	.sysfs_ops	= &dev_sysfs_ops,
+	.default_attrs	= dev_default_attrs,
+};
+
+
+int device_create_file(struct device * dev, struct device_attribute * attr)
+{
+	int error = 0;
+	if (get_device(dev)) {
+		error = sysfs_create_file(&dev->kobj,&attr->attr);
+		put_device(dev);
+	}
+	return error;
+}
+
+void device_remove_file(struct device * dev, struct device_attribute * attr)
+{
+	if (get_device(dev)) {
+		sysfs_remove_file(&dev->kobj,&attr->attr);
+		put_device(dev);
+	}
+}
 
 int device_add(struct device *dev)
 {
@@ -43,6 +112,12 @@ int device_add(struct device *dev)
 
 	pr_debug("DEV: registering device: ID = '%s', name = %s\n",
 		 dev->bus_id, dev->name);
+
+	strncpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
+	if (dev->parent)
+		dev->kobj.parent = &dev->parent->kobj;
+	dev->kobj.subsys = &device_subsys;
+	kobject_register(&dev->kobj);
 
 	if ((error = device_make_dir(dev)))
 		goto register_done;
@@ -69,6 +144,7 @@ int device_add(struct device *dev)
 
 void device_initialize(struct device *dev)
 {
+	kobject_init(&dev->kobj);
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->children);
 	INIT_LIST_HEAD(&dev->g_list);
@@ -184,8 +260,16 @@ void device_unregister(struct device * dev)
 
 	pr_debug("DEV: Unregistering device. ID = '%s', name = '%s'\n",
 		 dev->bus_id,dev->name);
+	kobject_unregister(&dev->kobj);
 	put_device(dev);
 }
+
+static int __init device_subsys_init(void)
+{
+	return subsystem_register(&device_subsys);
+}
+
+core_initcall(device_subsys_init);
 
 EXPORT_SYMBOL(device_register);
 EXPORT_SYMBOL(device_unregister);

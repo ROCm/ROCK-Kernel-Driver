@@ -29,6 +29,7 @@
 #include <linux/list.h>
 #include <linux/sched.h>
 #include <linux/driverfs_fs.h>
+#include <linux/kobject.h>
 
 #define DEVICE_NAME_SIZE	80
 #define DEVICE_ID_SIZE		32
@@ -275,6 +276,7 @@ struct device {
 	struct list_head intf_list;
 	struct device 	* parent;
 
+	struct kobject kobj;
 	char	name[DEVICE_NAME_SIZE];	/* descriptive ascii string */
 	char	bus_id[BUS_ID_SIZE];	/* position on parent bus */
 
