@@ -1271,7 +1271,7 @@ int isd200_get_inquiry_data( struct us_data *us )
 				/* ATA Command Identify successful */
 				int i;
 				__u16 *src, *dest;
-				ata_fix_driveid(&info->drive);
+				ide_fix_driveid(&info->drive);
 
 				US_DEBUGP("   Identify Data Structure:\n");
 				US_DEBUGP("      config = 0x%x\n", info->drive.config);

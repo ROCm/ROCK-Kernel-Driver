@@ -349,8 +349,8 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
 	 * all the complex logic above, let's find them and eliminate them.
 	 */
 	if (len != srb->request_bufflen) {
-		printk("USB len=%d, request_bufflen=%d\n", len, srb->request_bufflen);
-		show_trace(NULL);
+		printk(KERN_ERR "USB len=%d, request_bufflen=%d\n", len, srb->request_bufflen);
+		printk(KERN_ERR "Fix this -- future 2.5 kernels will not work if this is not fixed!\n");
 	}
 
 	return len;
