@@ -74,7 +74,7 @@ void usr2_handler(int sig, struct uml_pt_regs *regs)
 {
 	CHOOSE_MODE(syscall_handler_tt(sig, regs), (void) 0);
 }
- 
+
 struct signal_info sig_info[] = {
 	[ SIGTRAP ] { handler :		relay_signal,
 		      is_irq :		0 },
@@ -119,11 +119,11 @@ void alarm_handler(int sig, struct sigcontext sc)
 		switch_timers(1);
 }
 
-void do_longjmp(void *p, int val)
+void do_longjmp(void *b, int val)
 {
-    jmp_buf *jbuf = (jmp_buf *) p;
+	jmp_buf *buf = b;
 
-    longjmp(*jbuf, val);
+	longjmp(*buf, val);
 }
 
 /*

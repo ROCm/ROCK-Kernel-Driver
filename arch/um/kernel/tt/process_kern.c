@@ -24,30 +24,11 @@
 #include "init.h"
 #include "tt.h"
 
-extern void start_kernel(void);
-
-static int start_kernel_proc(void *unused)
-{
-	int pid;
-
-	block_signals();
-	pid = os_getpid();
-
-	cpu_tasks[0].pid = pid;
-	cpu_tasks[0].task = current;
-#ifdef CONFIG_SMP
- 	cpu_online_map = 1;
-#endif
-	if(debug) os_stop_process(pid);
-	start_kernel();
-	return(0);
-}
-
 void *switch_to_tt(void *prev, void *next, void *last)
 {
 	struct task_struct *from, *to;
 	unsigned long flags;
-	int vtalrm, alrm, prof, err, cpu;
+	int err, vtalrm, alrm, prof, cpu;
 	char c;
 	/* jailing and SMP are incompatible, so this doesn't need to be 
 	 * made per-cpu 
@@ -60,7 +41,7 @@ void *switch_to_tt(void *prev, void *next, void *last)
 	to->thread.prev_sched = from;
 
 	cpu = from->thread_info->cpu;
-	if(cpu == 0) 
+	if(cpu == 0)
 		forward_interrupts(to->thread.mode.tt.extern_pid);
 #ifdef CONFIG_SMP
 	forward_ipi(cpu_data[cpu].ipi_pipe[0], to->thread.mode.tt.extern_pid);
@@ -128,18 +109,6 @@ void exit_thread_tt(void)
 {
 	close(current->thread.mode.tt.switch_pipe[0]);
 	close(current->thread.mode.tt.switch_pipe[1]);
-}
-
-void reboot_tt(void)
-{
-	current->thread.request.op = OP_REBOOT;
-	os_usr1_process(os_getpid());
-}
-
-void halt_tt(void)
-{
-	current->thread.request.op = OP_HALT;
-	os_usr1_process(os_getpid());
 }
 
 extern void schedule_tail(struct task_struct *prev);
@@ -276,6 +245,32 @@ int copy_thread_tt(int nr, unsigned long clone_flags, unsigned long sp,
 	return(0);
 }
 
+void reboot_tt(void)
+{
+	current->thread.request.op = OP_REBOOT;
+	os_usr1_process(os_getpid());
+}
+
+void halt_tt(void)
+{
+	current->thread.request.op = OP_HALT;
+	os_usr1_process(os_getpid());
+}
+
+void kill_off_processes_tt(void)
+{
+	struct task_struct *p;
+	int me;
+
+	me = os_getpid();
+        for_each_process(p){
+		if(p->thread.mode.tt.extern_pid != me) 
+			os_kill_process(p->thread.mode.tt.extern_pid, 0);
+	}
+	if(init_task.thread.mode.tt.extern_pid != me) 
+		os_kill_process(init_task.thread.mode.tt.extern_pid, 0);
+}
+
 void initial_thread_cb_tt(void (*proc)(void *), void *arg)
 {
 	if(os_getpid() == tracing_pid){
@@ -395,7 +390,6 @@ static void mprotect_kernel_mem(int w)
 	mprotect_kernel_vm(w);
 }
 
-/* No SMP problems since jailing and SMP are incompatible */
 void unprotect_kernel_mem(void)
 {
 	mprotect_kernel_mem(1);
@@ -406,18 +400,23 @@ void protect_kernel_mem(void)
 	mprotect_kernel_mem(0);
 }
 
-void kill_off_processes_tt(void)
-{
-	struct task_struct *p;
-	int me;
+extern void start_kernel(void);
 
-	me = os_getpid();
-        for_each_process(p){
-		if(p->thread.mode.tt.extern_pid != me) 
-			os_kill_process(p->thread.mode.tt.extern_pid, 0);
-	}
-	if(init_task.thread.mode.tt.extern_pid != me) 
-		os_kill_process(init_task.thread.mode.tt.extern_pid, 0);
+static int start_kernel_proc(void *unused)
+{
+	int pid;
+
+	block_signals();
+	pid = os_getpid();
+
+	cpu_tasks[0].pid = pid;
+	cpu_tasks[0].task = current;
+#ifdef CONFIG_SMP
+ 	cpu_online_map = 1;
+#endif
+	if(debug) os_stop_process(pid);
+	start_kernel();
+	return(0);
 }
 
 void set_tracing(void *task, int tracing)
@@ -435,7 +434,8 @@ int set_user_mode(void *t)
 	struct task_struct *task;
 
 	task = t ? t : current;
-	if(task->thread.mode.tt.tracing) return(1);
+	if(task->thread.mode.tt.tracing) 
+		return(1);
 	task->thread.request.op = OP_TRACE_ON;
 	os_usr1_process(os_getpid());
 	return(0);
@@ -451,20 +451,20 @@ void set_init_pid(int pid)
 		      err);
 }
 
-void clear_singlestep(void *t)
-{
-	struct task_struct *task = (struct task_struct *) t;
-
-	task->ptrace &= ~PT_DTRACE;
-}
-
 int singlestepping(void *t)
 {
-	struct task_struct *task = (struct task_struct *) t;
+	struct task_struct *task = t;
 
 	if(task->thread.mode.tt.singlestep_syscall)
 		return(0);
 	return(task->ptrace & PT_DTRACE);
+}
+
+void clear_singlestep(void *t)
+{
+	struct task_struct *task = t;
+
+	task->ptrace &= ~PT_DTRACE;
 }
 
 int start_uml_tt(void)

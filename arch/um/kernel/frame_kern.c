@@ -29,11 +29,11 @@ static int copy_restorer(void (*restorer)(void), unsigned long start,
 
 static int copy_sc_to_user(void *to, struct pt_regs *from)
 {
- 	return(CHOOSE_MODE(copy_sc_to_user_tt(to, from->regs.mode.tt, 
- 					      &signal_frame_sc_sr.arch),
- 			   copy_sc_to_user_skas(to, &from->regs,
- 						current->thread.cr2,
- 						current->thread.err)));
+	return(CHOOSE_MODE(copy_sc_to_user_tt(to, from->regs.mode.tt, 
+					      &signal_frame_sc_sr.arch),
+			   copy_sc_to_user_skas(to, &from->regs,
+						current->thread.cr2,
+						current->thread.err)));
 }
 
 int setup_signal_stack_si(unsigned long stack_top, int sig, 

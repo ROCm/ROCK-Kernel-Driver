@@ -13,4 +13,3 @@ $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f *.o core child ptproxy

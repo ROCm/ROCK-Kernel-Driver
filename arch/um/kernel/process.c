@@ -39,6 +39,7 @@
 #include "mode.h"
 #ifdef CONFIG_MODE_SKAS
 #include "skas_ptrace.h"
+#include "skas.h"
 #endif
 
 void init_new_thread_stack(void *sig_stack, void (*usr1_handler)(int))
@@ -128,12 +129,6 @@ int start_fork_tramp(void *thread_arg, unsigned long temp_stack,
 		panic("outer trampoline didn't exit with SIGKILL");
 
 	return(arg.pid);
-}
-
-void trace_myself(void)
-{
-	if(ptrace(PTRACE_TRACEME, 0, 0, 0) < 0)
-		panic("ptrace failed in trace_myself");
 }
 
 void suspend_new_thread(int fd)
@@ -227,19 +222,19 @@ void __init check_ptrace(void)
 			break;
 		}
 	}
- 	stop_ptraced_child(pid, stack, 0);
+	stop_ptraced_child(pid, stack, 0);
 	printk("OK\n");
 }
 
 int run_kernel_thread(int (*fn)(void *), void *arg, void **jmp_ptr)
 {
 	jmp_buf buf;
- 	int n;
+	int n;
 
 	*jmp_ptr = &buf;
- 	n = setjmp(buf);
- 	if(n != 0)
- 		return(n);
+	n = setjmp(buf);
+	if(n != 0)
+		return(n);
 	(*fn)(arg);
 	return(0);
 }
@@ -253,31 +248,6 @@ void forward_pending_sigio(int target)
 	if(sigismember(&sigs, SIGIO))
 		kill(target, SIGIO);
 }
-
-#ifdef CONFIG_MODE_SKAS
-static void init_registers(int pid)
-{
-	int err;
-
-	if(ptrace(PTRACE_GETREGS, pid, 0, exec_regs) < 0)
-		panic("check_ptrace : PTRACE_GETREGS failed, errno = %d", 
-		      errno);
-
-	err = ptrace(PTRACE_GETFPXREGS, pid, 0, exec_fpx_regs);
-	if(!err)
-		return;
-
-	have_fpx_regs = 0;
-	if(errno != EIO)
-		panic("check_ptrace : PTRACE_GETFPXREGS failed, errno = %d", 
-		      errno);
-
-	err = ptrace(PTRACE_GETFPREGS, pid, 0, exec_fp_regs);
-	if(err)
-		panic("check_ptrace : PTRACE_GETFPREGS failed, errno = %d", 
-		      errno);
-}
-#endif	
 
 int can_do_skas(void)
 {
@@ -311,7 +281,7 @@ int can_do_skas(void)
 	return(ret);
 #else
 	return(0);
-#endif	
+#endif
 }
 
 /*

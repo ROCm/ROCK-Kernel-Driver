@@ -3,6 +3,7 @@
  * Lars Brinkhoff.
  * Licensed under the GPL
  */
+
 #ifndef __DEBUG_H
 #define __DEBUG_H
 
@@ -11,6 +12,8 @@ extern void child_proxy(pid_t pid, int status);
 extern void init_proxy (pid_t pid, int waiting, int status);
 extern int start_debugger(char *prog, int startup, int stop, int *debugger_fd);
 extern void fake_child_exit(void);
+extern int gdb_config(char *str);
+extern int gdb_remove(char *unused);
 
 #endif
 

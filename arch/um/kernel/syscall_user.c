@@ -18,8 +18,8 @@ struct {
 
 int record_syscall_start(int syscall)
 {
- 	int max, index;
- 	
+	int max, index;
+
 	max = sizeof(syscall_record)/sizeof(syscall_record[0]);
 	index = next_syscall_index(max);
 
@@ -32,8 +32,8 @@ int record_syscall_start(int syscall)
 
 void record_syscall_end(int index, int result)
 {
- 	syscall_record[index].result = result;
- 	gettimeofday(&syscall_record[index].end, NULL);
+	syscall_record[index].result = result;
+	gettimeofday(&syscall_record[index].end, NULL);
 }
 
 /*

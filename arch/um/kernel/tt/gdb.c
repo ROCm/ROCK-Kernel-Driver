@@ -117,7 +117,7 @@ struct gdb_data {
 static void config_gdb_cb(void *arg)
 {
 	struct gdb_data *data = arg;
-	struct task_struct *task;
+	void *task;
 	int pid;
 
 	data->err = -1;
@@ -228,19 +228,19 @@ int debugger_signal(int status, pid_t pid){ return(0); }
 void child_signal(pid_t pid, int status){ }
 int init_ptrace_proxy(int idle_pid, int startup, int stop)
 {
-	printk(KERN_ERR "debug requested when CONFIG_PT_PROXY is off\n");
+	printk(UM_KERN_ERR "debug requested when CONFIG_PT_PROXY is off\n");
 	kill_child_dead(idle_pid);
 	exit(1);
 }
 
 void signal_usr1(int sig)
 {
-	printk(KERN_ERR "debug requested when CONFIG_PT_PROXY is off\n");
+	printk(UM_KERN_ERR "debug requested when CONFIG_PT_PROXY is off\n");
 }
 
 int attach_debugger(int idle_pid, int pid, int stop)
 {
-	printk(KERN_ERR "attach_debugger called when CONFIG_PT_PROXY "
+	printk(UM_KERN_ERR "attach_debugger called when CONFIG_PT_PROXY "
 	       "is off\n");
 	return(-1);
 }
@@ -265,3 +265,14 @@ void debugger_parent_signal(int status, int pid)
 }
 
 #endif
+
+/*
+ * Overrides for Emacs so that we follow Linus's tabbing style.
+ * Emacs will notice this stuff at the end of the file and automatically
+ * adjust the settings for this buffer only.  This must remain at the end
+ * of the file.
+ * ---------------------------------------------------------------------------
+ * Local variables:
+ * c-file-style: "linux"
+ * End:
+ */

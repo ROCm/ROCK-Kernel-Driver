@@ -33,6 +33,7 @@ extern int new_mm(int from);
 extern void save_registers(struct uml_pt_regs *regs);
 extern void restore_registers(struct uml_pt_regs *regs);
 extern void start_userspace(void);
+extern void init_registers(int pid);
 
 #endif
 

@@ -187,7 +187,7 @@ void register_winch(int fd, void *device_data)
 
 	if(!isatty(fd)) return;
 
- 	pid = tcgetpgrp(fd);
+	pid = tcgetpgrp(fd);
 	if(!CHOOSE_MODE(is_tracer_winch(pid, fd, device_data), 0) && 
 	   (pid == -1)){
 		thread = winch_tramp(fd, device_data, &thread_fd);

@@ -84,7 +84,8 @@ static void fix_range(struct mm_struct *mm, unsigned long start_addr,
 
 atomic_t vmchange_seq = ATOMIC_INIT(1);
 
-void flush_kernel_range(unsigned long start, unsigned long end, int update_seq)
+static void flush_kernel_vm_range(unsigned long start, unsigned long end, 
+				  int update_seq)
 {
 	struct mm_struct *mm;
 	pgd_t *pgd;
@@ -133,7 +134,7 @@ void flush_kernel_range(unsigned long start, unsigned long end, int update_seq)
 
 void flush_tlb_kernel_range(unsigned long start, unsigned long end)
 {
-        flush_kernel_range(start, end, 1);
+        flush_kernel_vm_range(start, end, 1);
 }
 
 static void protect_vm_page(unsigned long addr, int w, int must_succeed)
@@ -189,7 +190,7 @@ void flush_tlb_range_tt(struct vm_area_struct *vma, unsigned long start,
 	 * either process memory or kernel vm
 	 */
 	if((start >= start_vm) && (start < end_vm)) 
-		flush_kernel_range(start, end, 1);
+		flush_kernel_vm_range(start, end, 1);
 	else fix_range(vma->vm_mm, start, end, 0);
 }
 
@@ -204,13 +205,13 @@ void flush_tlb_mm_tt(struct mm_struct *mm)
 	seq = atomic_read(&vmchange_seq);
 	if(current->thread.mode.tt.vm_seq == seq) return;
 	current->thread.mode.tt.vm_seq = seq;
-	flush_kernel_range(start_vm, end_vm, 0);
+	flush_kernel_vm_range(start_vm, end_vm, 0);
 }
 
 void force_flush_all_tt(void)
 {
 	fix_range(current->mm, 0, STACK_TOP, 1);
-	flush_kernel_range(start_vm, end_vm, 0);
+	flush_kernel_vm_range(start_vm, end_vm, 0);
 }
 
 /*

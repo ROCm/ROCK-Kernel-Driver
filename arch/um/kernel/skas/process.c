@@ -351,6 +351,29 @@ void kill_off_processes_skas(void)
 	os_kill_process(userspace_pid, 1);
 }
 
+void init_registers(int pid)
+{
+	int err;
+
+	if(ptrace(PTRACE_GETREGS, pid, 0, exec_regs) < 0)
+		panic("check_ptrace : PTRACE_GETREGS failed, errno = %d", 
+		      errno);
+
+	err = ptrace(PTRACE_GETFPXREGS, pid, 0, exec_fpx_regs);
+	if(!err)
+		return;
+
+	have_fpx_regs = 0;
+	if(errno != EIO)
+		panic("check_ptrace : PTRACE_GETFPXREGS failed, errno = %d", 
+		      errno);
+
+	err = ptrace(PTRACE_GETFPREGS, pid, 0, exec_fp_regs);
+	if(err)
+		panic("check_ptrace : PTRACE_GETFPREGS failed, errno = %d", 
+		      errno);
+}
+
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

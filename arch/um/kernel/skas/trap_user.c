@@ -50,6 +50,8 @@ void user_signal(int sig, struct uml_pt_regs *regs)
 	regs->mode.skas.trap_type = 0;
 	info = &sig_info[sig];
 	(*info->handler)(sig, regs);
+
+	unblock_signals();
 }
 
 /*

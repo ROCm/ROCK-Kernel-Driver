@@ -24,8 +24,8 @@ struct mm_struct;
 
 #ifdef CONFIG_MODE_TT
 struct proc_tt_mode {
- 	int extern_pid;
- 	int tracing;
+	int extern_pid;
+	int tracing;
 	int switch_pipe[2];
 	int singlestep_syscall;
 	int vm_seq;
@@ -40,7 +40,6 @@ struct proc_skas_mode {
 #endif
 
 struct thread_struct {
-	int tracing;
 	int forking;
 	unsigned long kernel_stack;
 	int nsyscalls;

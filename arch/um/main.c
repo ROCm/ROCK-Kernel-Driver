@@ -135,13 +135,13 @@ int main(int argc, char **argv, char **envp)
 }
 
 #define CAN_KMALLOC() \
- 	(kmalloc_ok && CHOOSE_MODE((getpid() != tracing_pid), 1))
+	(kmalloc_ok && CHOOSE_MODE((getpid() != tracing_pid), 1))
 
 extern void *__real_malloc(int);
 
 void *__wrap_malloc(int size)
 {
- 	if(CAN_KMALLOC()) return(um_kmalloc(size));
+	if(CAN_KMALLOC()) return(um_kmalloc(size));
 	else return(__real_malloc(size));
 }
 
@@ -158,7 +158,7 @@ extern void __real_free(void *);
 
 void __wrap_free(void *ptr)
 {
- 	if(CAN_KMALLOC()) kfree(ptr);
+	if(CAN_KMALLOC()) kfree(ptr);
 	else __real_free(ptr);
 }
 

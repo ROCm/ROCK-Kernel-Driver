@@ -73,7 +73,6 @@ extern void setup_hostinfo(void);
 extern void add_arg(char *cmd_line, char *arg);
 extern void init_new_thread_stack(void *sig_stack, void (*usr1_handler)(int));
 extern void init_new_thread_signals(int altstack);
-extern void attach_process(int pid);
 extern void do_exec(int old_pid, int new_pid);
 extern void tracer_panic(char *msg, ...);
 extern char *get_umid(int only_if_set);

@@ -372,13 +372,14 @@ int tracer(int (*init_proc)(void *), void *sp)
 			if(!tracing && (debugger_pid != -1) && (sig != 0) &&
 				(sig != SIGALRM) && (sig != SIGVTALRM) &&
 				(sig != SIGSEGV) && (sig != SIGTRAP) &&
-				(sig != SIGUSR2) && (sig != SIGIO)){
+				(sig != SIGUSR2) && (sig != SIGIO) &&
+				(sig != SIGFPE)){
 				child_signal(pid, status);
 				continue;
 			}
 
 			if(tracing){
-				if(singlestepping(task))
+				if(singlestepping_tt(task))
 					cont_type = PTRACE_SINGLESTEP;
 				else cont_type = PTRACE_SYSCALL;
 			}
