@@ -34,6 +34,7 @@
 #include <asm/ppc_asm.h>
 #include <asm/offsets.h>
 #include <asm/bug.h>
+#include <asm/cputable.h>
 
 #ifdef CONFIG_PPC_ISERIES
 #define DO_SOFT_DISABLE
@@ -1267,6 +1268,11 @@ _GLOBAL(__start_initialization_iSeries)
 	li	r0,0
 	stdu	r0,-STACK_FRAME_OVERHEAD(r1)
 
+	LOADADDR(r3,cpu_specs)
+	LOADADDR(r4,cur_cpu_spec)
+	li	r5,0
+	bl	.identify_cpu
+
 	LOADADDR(r2,__toc_start)
 	addi	r2,r2,0x4000
 	addi	r2,r2,0x4000
@@ -1730,6 +1736,13 @@ _STATIC(start_here_pSeries)
 	li	r0,0
 	stdu	r0,-STACK_FRAME_OVERHEAD(r1)
 
+	LOADADDR(r3,cpu_specs)
+	sub	r3,r3,r26
+	LOADADDR(r4,cur_cpu_spec)
+	sub	r4,r4,r26
+	mr	r5,r26
+	bl	.identify_cpu
+
 	/* set up the TOC (physical address) */
 	LOADADDR(r2,__toc_start)
 	addi    r2,r2,0x4000
@@ -1887,6 +1900,11 @@ _STATIC(start_here_common)
 #endif
 
 	bl .start_kernel
+
+_GLOBAL(__setup_cpu_power3)
+	blr
+_GLOBAL(__setup_cpu_power4)
+	blr
 
 _GLOBAL(hmt_init)
 #ifdef CONFIG_HMT

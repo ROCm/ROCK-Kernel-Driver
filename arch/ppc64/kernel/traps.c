@@ -28,6 +28,7 @@
 #include <linux/interrupt.h>
 #include <linux/config.h>
 #include <linux/init.h>
+#include <linux/module.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -306,6 +307,56 @@ static void parse_fpe(struct pt_regs *regs)
 	_exception(SIGFPE, &info, regs);
 }
 
+/*
+ * Look through the list of trap instructions that are used for BUG(),
+ * BUG_ON() and WARN_ON() and see if we hit one.  At this point we know
+ * that the exception was caused by a trap instruction of some kind.
+ * Returns 1 if we should continue (i.e. it was a WARN_ON) or 0
+ * otherwise.
+ */
+extern struct bug_entry __start___bug_table[], __stop___bug_table[];
+
+#ifndef CONFIG_MODULES
+#define module_find_bug(x)	NULL
+#endif
+
+static struct bug_entry *find_bug(unsigned long bugaddr)
+{
+	struct bug_entry *bug;
+
+	for (bug = __start___bug_table; bug < __stop___bug_table; ++bug)
+		if (bugaddr == bug->bug_addr)
+			return bug;
+	return module_find_bug(bugaddr);
+}
+
+int
+check_bug_trap(struct pt_regs *regs)
+{
+	struct bug_entry *bug;
+	unsigned long addr;
+
+	if (regs->msr & MSR_PR)
+		return 0;	/* not in kernel */
+	addr = regs->nip;	/* address of trap instruction */
+	if (addr < PAGE_OFFSET)
+		return 0;
+	bug = find_bug(regs->nip);
+	if (bug == NULL)
+		return 0;
+	if (bug->line & BUG_WARNING_TRAP) {
+		/* this is a WARN_ON rather than BUG/BUG_ON */
+		printk(KERN_ERR "Badness in %s at %s:%d\n",
+		       bug->function, bug->file,
+		       bug->line & ~BUG_WARNING_TRAP);
+		dump_stack();
+		return 1;
+	}
+	printk(KERN_CRIT "kernel BUG in %s at %s:%d!\n",
+	       bug->function, bug->file, bug->line);
+	return 0;
+}
+
 void
 ProgramCheckException(struct pt_regs *regs)
 {
@@ -330,6 +381,10 @@ ProgramCheckException(struct pt_regs *regs)
 		if (debugger_bpt && debugger_bpt(regs))
 			return;
 #endif
+		if (check_bug_trap(regs)) {
+			regs->nip += 4;
+			return;
+		}
 		info.si_signo = SIGTRAP;
 		info.si_errno = 0;
 		info.si_code = TRAP_BRKPT;
