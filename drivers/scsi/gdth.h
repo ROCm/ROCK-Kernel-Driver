@@ -10,7 +10,7 @@
  *
  * <achim.leubner@intel.com>
  *
- * $Id: gdth.h,v 1.46 2002/02/05 09:39:53 achim Exp $
+ * $Id: gdth.h,v 1.48 2003/02/27 14:58:22 achim Exp $
  */
 
 #include <linux/version.h>
@@ -29,16 +29,16 @@
 /* defines, macros */
 
 /* driver version */
-#define GDTH_VERSION_STR        "2.05"
+#define GDTH_VERSION_STR        "2.07"
 #define GDTH_VERSION            2
-#define GDTH_SUBVERSION         5
+#define GDTH_SUBVERSION         7
 
 /* protocol version */
 #define PROTOCOL_VERSION        1
 
 /* OEM IDs */
-#define OEM_ID_ICP	0x941c
-#define OEM_ID_INTEL	0x8000
+#define OEM_ID_ICP      0x941c
+#define OEM_ID_INTEL    0x8000
 
 /* controller classes */
 #define GDT_ISA         0x01                    /* ISA controller */
@@ -134,12 +134,17 @@
 
 #ifndef PCI_DEVICE_ID_VORTEX_GDTNEWRX
 /* new GDT Rx Controller */
-#define PCI_DEVICE_ID_VORTEX_GDTNEWRX	0x300
+#define PCI_DEVICE_ID_VORTEX_GDTNEWRX   0x300
 #endif
-	
+        
 #ifndef PCI_DEVICE_ID_INTEL_SRC
 /* Intel Storage RAID Controller */
-#define PCI_DEVICE_ID_INTEL_SRC		0x600
+#define PCI_DEVICE_ID_INTEL_SRC         0x600
+#endif
+
+#ifndef PCI_DEVICE_ID_INTEL_SRC_XSCALE
+/* Intel Storage RAID Controller */
+#define PCI_DEVICE_ID_INTEL_SRC_XSCALE  0x601
 #endif
 
 /* limits */
@@ -153,8 +158,6 @@
 #define MAXID           127
 #define MAXLUN          8
 #define MAXBUS          6
-#define MAX_HDRIVES     100                     /* max. host drive count */
-#define MAX_LDRIVES     255                     /* max. log. drive count */
 #define MAX_EVENTS      100                     /* event buffer count */
 #define MAX_RES_ARGS    40                      /* device reservation, 
                                                    must be a multiple of 4 */
@@ -254,6 +257,7 @@
 #define CACHE_DRV_INFO  0x07                    /* cache drive info */
 #define BOARD_FEATURES  0x15                    /* controller features */
 #define BOARD_INFO      0x28                    /* controller info */
+#define CACHE_READ_OEM_STRING_RECORD 0x84       /* read OEM string record */ 
 #define HOST_GET        0x10001L                /* get host drive list */
 #define IO_CHANNEL      0x00020000L             /* default IO channel */
 #define INVALID_CHANNEL 0x0000ffffL             /* invalid channel */
@@ -265,7 +269,7 @@
 #define S_CACHE_UNKNOWN 12                      /* cache serv.: drive unknown */
 #define S_RAW_SCSI      12                      /* raw serv.: target error */
 #define S_RAW_ILL       0xff                    /* raw serv.: illegal */
-#define S_CACHE_RESERV	-24			/* cache: reserv. conflict */	
+#define S_CACHE_RESERV  -24                     /* cache: reserv. conflict */   
 
 /* timeout values */
 #define INIT_RETRIES    100000                  /* 100000 * 1ms = 100s */
@@ -292,10 +296,15 @@
 #define MAILBOXREG      0x0c90                  /* mailbox reg. (16 bytes) */
 #define EISAREG         0x0cc0                  /* EISA configuration */
 
+/* DMA memory mappings */
+#define GDTH_MAP_NONE   0
+#define GDTH_MAP_SINGLE 1
+#define GDTH_MAP_SG     2
+#define GDTH_MAP_IOCTL  3 
+
 /* other defines */
 #define LINUX_OS        8                       /* used for cache optim. */
 #define SCATTER_GATHER  1                       /* s/g feature */
-#define GDTH_MAXSG      32                      /* max. s/g elements */
 #define SECS32          0x1f                    /* round capacity */
 #define BIOS_ID_OFFS    0x10                    /* offset contr-ID in ISABIOS */
 #define LOCALBOARD      0                       /* board node always 0 */
@@ -303,10 +312,7 @@
 #define SPEZINDEX       1                       /* cmd index unknown service */
 #define GDT_WR_THROUGH  0x100                   /* WRITE_THROUGH supported */
 
-
-/* typedefs */
-typedef u32     ulong32;
-#define PACKED  __attribute__((packed))
+#include "gdth_ioctl.h"
 
 /* screenservice message */
 typedef struct {                               
@@ -535,6 +541,50 @@ typedef struct {
     unchar      ld_error;                       /* error */
 } PACKED gdth_cdrinfo_str;
 
+/* OEM string */
+typedef struct {
+    ulong32     ctl_version;
+    ulong32     file_major_version;
+    ulong32     file_minor_version;
+    ulong32     buffer_size;
+    ulong32     cpy_count;
+    ulong32     ext_error;
+    ulong32     oem_id;
+    ulong32     board_id;
+} PACKED gdth_oem_str_params;
+
+typedef struct {
+    unchar      product_0_1_name[16];
+    unchar      product_4_5_name[16];
+    unchar      product_cluster_name[16];
+    unchar      product_reserved[16];
+    unchar      scsi_cluster_target_vendor_id[16];
+    unchar      cluster_raid_fw_name[16];
+    unchar      oem_brand_name[16];
+    unchar      oem_raid_type[16];
+    unchar      bios_type[13];
+    unchar      bios_title[50];
+    unchar      oem_company_name[37];
+    ulong32     pci_id_1;
+    ulong32     pci_id_2;
+    unchar      validation_status[80];
+    unchar      reserved_1[4];
+    unchar      scsi_host_drive_inquiry_vendor_id[16];
+    unchar      library_file_template[16];
+    unchar      reserved_2[16];
+    unchar      tool_name_1[32];
+    unchar      tool_name_2[32];
+    unchar      tool_name_3[32];
+    unchar      oem_contact_1[84];
+    unchar      oem_contact_2[84];
+    unchar      oem_contact_3[84];
+} PACKED gdth_oem_str;
+
+typedef struct {
+    gdth_oem_str_params params;
+    gdth_oem_str        text;
+} PACKED gdth_oem_str_ioctl;
+
 /* board features */
 typedef struct {
     unchar      chaining;                       /* Chaining supported */
@@ -593,118 +643,6 @@ typedef struct {
     ulong32     location;                       /* controller number */
     gdth_hentry_str entry[MAX_HDRIVES];         /* entries */
 } PACKED gdth_hget_str;    
-
-/* scatter/gather element */
-typedef struct {
-    ulong32     sg_ptr;                         /* address */
-    ulong32     sg_len;                         /* length */
-} PACKED gdth_sg_str;
-
-/* command structure */
-typedef struct {
-    ulong32     BoardNode;                      /* board node (always 0) */
-    ulong32     CommandIndex;                   /* command number */
-    ushort      OpCode;                         /* the command (READ,..) */
-    union {
-        struct {
-            ushort      DeviceNo;               /* number of cache drive */
-            ulong32     BlockNo;                /* block number */
-            ulong32     BlockCnt;               /* block count */
-            ulong32     DestAddr;               /* dest. addr. (if s/g: -1) */
-            ulong32     sg_canz;                /* s/g element count */
-            gdth_sg_str sg_lst[GDTH_MAXSG];     /* s/g list */
-        } PACKED cache;                         /* cache service cmd. str. */
-        struct {
-            ushort      param_size;             /* size of p_param buffer */
-            ulong32     subfunc;                /* IOCTL function */
-            ulong32     channel;                /* device */
-            ulong32     p_param;                /* buffer */
-        } PACKED ioctl;                         /* IOCTL command structure */
-        struct {
-            ushort      reserved;
-            union {
-                struct {
-                    ulong32  msg_handle;        /* message handle */
-                    ulong32  msg_addr;          /* message buffer address */
-                } PACKED msg;
-                unchar       data[12];          /* buffer for rtc data, ... */
-            } su;
-        } PACKED screen;                        /* screen service cmd. str. */
-        struct {
-            ushort      reserved;
-            ulong32     direction;              /* data direction */
-            ulong32     mdisc_time;             /* disc. time (0: no timeout)*/
-            ulong32     mcon_time;              /* connect time(0: no to.) */
-            ulong32     sdata;                  /* dest. addr. (if s/g: -1) */
-            ulong32     sdlen;                  /* data length (bytes) */
-            ulong32     clen;                   /* SCSI cmd. length(6,10,12) */
-            unchar      cmd[12];                /* SCSI command */
-            unchar      target;                 /* target ID */
-            unchar      lun;                    /* LUN */
-            unchar      bus;                    /* SCSI bus number */
-            unchar      priority;               /* only 0 used */
-            ulong32     sense_len;              /* sense data length */
-            ulong32     sense_data;             /* sense data addr. */
-            ulong32     link_p;                 /* linked cmds (not supp.) */
-            ulong32     sg_ranz;                /* s/g element count */
-            gdth_sg_str sg_lst[GDTH_MAXSG];     /* s/g list */
-        } PACKED raw;                           /* raw service cmd. struct. */
-    } u;
-    /* additional variables */
-    unchar      Service;                        /* controller service */
-    ushort      Status;                         /* command result */
-    ulong32     Info;                           /* additional information */
-    Scsi_Cmnd   *RequestBuffer;                 /* request buffer */
-} PACKED gdth_cmd_str;
-
-/* controller event structure */
-#define ES_ASYNC    1
-#define ES_DRIVER   2
-#define ES_TEST     3
-#define ES_SYNC     4
-typedef struct {
-    ushort                  size;               /* size of structure */
-    union {
-        char                stream[16];
-        struct {
-            ushort          ionode;
-            ushort          service;
-            ulong32         index;
-        } PACKED driver;
-        struct {
-            ushort          ionode;
-            ushort          service;
-            ushort          status;
-            ulong32         info;
-            unchar          scsi_coord[3];
-        } PACKED async;
-        struct {
-            ushort          ionode;
-            ushort          service;
-            ushort          status;
-            ulong32         info;
-            ushort          hostdrive;
-            unchar          scsi_coord[3];
-            unchar          sense_key;
-        } PACKED sync;
-        struct {
-            ulong32         l1, l2, l3, l4;
-        } PACKED test;
-    } eu;
-    ulong32                 severity;
-    unchar                  event_string[256];          
-} PACKED gdth_evt_data;
-
-typedef struct {
-    ulong32         first_stamp;
-    ulong32         last_stamp;
-    ushort          same_count;
-    ushort          event_source;
-    ushort          event_idx;
-    unchar          application;
-    unchar          reserved;
-    gdth_evt_data   event_data;
-} PACKED gdth_evt_str;
 
 
 /* DPRAM structures */
@@ -889,7 +827,9 @@ typedef struct {
     ulong32             brd_phys;               /* slot number/BIOS address */
     gdt6c_plx_regs      *plx;                   /* PLX regs (new PCI contr.) */
     gdth_cmd_str        *pccb;                  /* address command structure */
+    ulong32             ccb_phys;               /* phys. address */
     char                *pscratch;              /* scratch (DMA) buffer */
+    ulong32             scratch_phys;           /* phys. address */
     unchar              scratch_busy;           /* in use? */
     unchar              scan_mode;              /* current scan mode */
     unchar              irq;                    /* IRQ */
@@ -946,6 +886,10 @@ typedef struct {
 #if LINUX_VERSION_CODE >= 0x02015F
     spinlock_t          smp_lock;
 #endif
+#if LINUX_VERSION_CODE >= 0x020400
+    struct pci_dev      *pdev;
+#endif
+    char                oem_name[8];
 } gdth_ha_str;
 
 /* structure for scsi_register(), SCSI bus != 0 */
@@ -1032,34 +976,145 @@ int gdth_reset(Scsi_Cmnd *);
 #endif
 const char *gdth_info(struct Scsi_Host *);
 
+#if LINUX_VERSION_CODE >= 0x020501
 int gdth_bios_param(struct scsi_device *,struct block_device *,sector_t,int *);
 int gdth_proc_info(char *,char **,off_t,int,int,int);
 int gdth_eh_abort(Scsi_Cmnd *scp);
 int gdth_eh_device_reset(Scsi_Cmnd *scp);
 int gdth_eh_bus_reset(Scsi_Cmnd *scp);
 int gdth_eh_host_reset(Scsi_Cmnd *scp);
-#define GDTH { .proc_name       = "gdth",                          \
-               .proc_info       = gdth_proc_info,                  \
-               .name            = "GDT SCSI Disk Array Controller",\
-               .detect          = gdth_detect,                     \
-               .release         = gdth_release,                    \
-               .info            = gdth_info,                       \
-               .command         = NULL,                            \
-               .queuecommand    = gdth_queuecommand,               \
-               .eh_abort_handler = gdth_eh_abort,                  \
-               .eh_device_reset_handler = gdth_eh_device_reset,    \
-               .eh_bus_reset_handler = gdth_eh_bus_reset,          \
-               .eh_host_reset_handler = gdth_eh_host_reset,        \
-               .abort           = gdth_abort,                      \
-               .reset           = gdth_reset,                      \
-               .bios_param      = gdth_bios_param,                 \
-               .can_queue       = GDTH_MAXCMDS,                    \
-               .this_id         = -1,                              \
-               .sg_tablesize    = GDTH_MAXSG,                      \
-               .cmd_per_lun     = GDTH_MAXC_P_L,                   \
-               .present         = 0,                               \
-               .unchecked_isa_dma = 1,                             \
-               .use_clustering  = ENABLE_CLUSTERING }
+#define GDTH { .proc_name =      "gdth",                          \
+               .proc_info =      gdth_proc_info,                  \
+               .name =           "GDT SCSI Disk Array Controller",\
+               .detect =         gdth_detect,                     \
+               .release =        gdth_release,                    \
+               .info =           gdth_info,                       \
+               .command =        NULL,                            \
+               .queuecommand =   gdth_queuecommand,               \
+               .eh_abort_handler = gdth_eh_abort,                 \
+               .eh_device_reset_handler = gdth_eh_device_reset,   \
+               .eh_bus_reset_handler = gdth_eh_bus_reset,         \
+               .eh_host_reset_handler = gdth_eh_host_reset,       \
+               .abort =          NULL,                            \
+               .reset =          NULL,                            \
+               .bios_param =     gdth_bios_param,                 \
+               .can_queue =      GDTH_MAXCMDS,                    \
+               .this_id =        -1,                              \
+               .sg_tablesize =   GDTH_MAXSG,                      \
+               .cmd_per_lun =    GDTH_MAXC_P_L,                   \
+               .present =        0,                               \
+               .unchecked_isa_dma = 1,                            \
+               .use_clustering = ENABLE_CLUSTERING}
+
+#elif LINUX_VERSION_CODE >= 0x020322
+int gdth_bios_param(Disk *,kdev_t,int *);
+int gdth_proc_info(char *,char **,off_t,int,int,int);
+int gdth_eh_abort(Scsi_Cmnd *scp);
+int gdth_eh_device_reset(Scsi_Cmnd *scp);
+int gdth_eh_bus_reset(Scsi_Cmnd *scp);
+int gdth_eh_host_reset(Scsi_Cmnd *scp);
+#define GDTH { proc_name:       "gdth",                          \
+               proc_info:       gdth_proc_info,                  \
+               name:            "GDT SCSI Disk Array Controller",\
+               detect:          gdth_detect,                     \
+               release:         gdth_release,                    \
+               info:            gdth_info,                       \
+               command:         NULL,                            \
+               queuecommand:    gdth_queuecommand,               \
+               eh_abort_handler: gdth_eh_abort,                  \
+               eh_device_reset_handler: gdth_eh_device_reset,    \
+               eh_bus_reset_handler: gdth_eh_bus_reset,          \
+               eh_host_reset_handler: gdth_eh_host_reset,        \
+               abort:           gdth_abort,                      \
+               reset:           gdth_reset,                      \
+               bios_param:      gdth_bios_param,                 \
+               can_queue:       GDTH_MAXCMDS,                    \
+               this_id:         -1,                              \
+               sg_tablesize:    GDTH_MAXSG,                      \
+               cmd_per_lun:     GDTH_MAXC_P_L,                   \
+               present:         0,                               \
+               unchecked_isa_dma: 1,                             \
+               use_clustering:  ENABLE_CLUSTERING,               \
+               use_new_eh_code: 1       /* use new error code */ }    
+
+#elif LINUX_VERSION_CODE >= 0x02015F
+int gdth_bios_param(Disk *,kdev_t,int *);
+extern struct proc_dir_entry proc_scsi_gdth;
+int gdth_proc_info(char *,char **,off_t,int,int,int);
+int gdth_eh_abort(Scsi_Cmnd *scp);
+int gdth_eh_device_reset(Scsi_Cmnd *scp);
+int gdth_eh_bus_reset(Scsi_Cmnd *scp);
+int gdth_eh_host_reset(Scsi_Cmnd *scp);
+#define GDTH { proc_dir:        &proc_scsi_gdth,                 \
+               proc_info:       gdth_proc_info,                  \
+               name:            "GDT SCSI Disk Array Controller",\
+               detect:          gdth_detect,                     \
+               release:         gdth_release,                    \
+               info:            gdth_info,                       \
+               command:         NULL,                            \
+               queuecommand:    gdth_queuecommand,               \
+               eh_abort_handler: gdth_eh_abort,                  \
+               eh_device_reset_handler: gdth_eh_device_reset,    \
+               eh_bus_reset_handler: gdth_eh_bus_reset,          \
+               eh_host_reset_handler: gdth_eh_host_reset,        \
+               abort:           gdth_abort,                      \
+               reset:           gdth_reset,                      \
+               bios_param:      gdth_bios_param,                 \
+               can_queue:       GDTH_MAXCMDS,                    \
+               this_id:         -1,                              \
+               sg_tablesize:    GDTH_MAXSG,                      \
+               cmd_per_lun:     GDTH_MAXC_P_L,                   \
+               present:         0,                               \
+               unchecked_isa_dma: 1,                             \
+               use_clustering:  ENABLE_CLUSTERING,               \
+               use_new_eh_code: 1       /* use new error code */ }    
+
+#elif LINUX_VERSION_CODE >= 0x010300
+int gdth_bios_param(Disk *,kdev_t,int *);
+extern struct proc_dir_entry proc_scsi_gdth;
+int gdth_proc_info(char *,char **,off_t,int,int,int);
+#define GDTH { NULL, NULL,                              \
+                   &proc_scsi_gdth,                     \
+                   gdth_proc_info,                      \
+                   "GDT SCSI Disk Array Controller",    \
+                   gdth_detect,                         \
+                   gdth_release,                        \
+                   gdth_info,                           \
+                   NULL,                                \
+                   gdth_queuecommand,                   \
+                   gdth_abort,                          \
+                   gdth_reset,                          \
+                   NULL,                                \
+                   gdth_bios_param,                     \
+                   GDTH_MAXCMDS,                        \
+                   -1,                                  \
+                   GDTH_MAXSG,                          \
+                   GDTH_MAXC_P_L,                       \
+                   0,                                   \
+                   1,                                   \
+                   ENABLE_CLUSTERING}
+
+#else
+int gdth_bios_param(Disk *,int,int *);
+#define GDTH { NULL, NULL,                              \
+                   "GDT SCSI Disk Array Controller",    \
+                   gdth_detect,                         \
+                   gdth_release,                        \
+                   gdth_info,                           \
+                   NULL,                                \
+                   gdth_queuecommand,                   \
+                   gdth_abort,                          \
+                   gdth_reset,                          \
+                   NULL,                                \
+                   gdth_bios_param,                     \
+                   GDTH_MAXCMDS,                        \
+                   -1,                                  \
+                   GDTH_MAXSG,                          \
+                   GDTH_MAXC_P_L,                       \
+                   0,                                   \
+                   1,                                   \
+                   ENABLE_CLUSTERING}
+#endif
 
 #endif
 

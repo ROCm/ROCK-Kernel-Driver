@@ -447,7 +447,7 @@ static struct dentry *get_object(struct super_block *sb, void *vobjp)
  * @dentry:  the dentry to encode
  * @fh:      where to store the file handle fragment
  * @max_len: maximum length to store there
- * @connectable: whether to store parent infomation
+ * @connectable: whether to store parent information
  *
  * This default encode_fh function assumes that the 32 inode number
  * is suitable for locating an inode, and that the generation number

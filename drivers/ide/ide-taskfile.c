@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/ide-taskfile.c	Version 0.33	April 11, 2002
+ * linux/drivers/ide/ide-taskfile.c	Version 0.38	March 05, 2003
  *
  *  Copyright (C) 2000-2002	Michael Cornwell <cornwell@acm.org>
  *  Copyright (C) 2000-2002	Andre Hedrick <andre@linux-ide.org>
@@ -27,7 +27,6 @@
  */
 
 #include <linux/config.h>
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/string.h>
@@ -642,7 +641,7 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 				 * NOTE: could rewind beyond beginning :-/
 				 */
 			} else {
-				printk("%s: MULTI-READ assume all data " \
+				printk(KERN_ERR "%s: MULTI-READ assume all data " \
 					"transfered is bad status=0x%02x\n",
 					drive->name, stat);
 			}
@@ -810,11 +809,6 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 	rq->errors = 0;
 	return ide_started;
 #else /* ! ALTERNATE_STATE_DIAGRAM_MULTI_OUT */
-
-#if 0
-	if (wait_for_ready(drive, 100))
-		IDE_DEBUG(__LINE__);		//BUG();
-#else
 	if (!(drive_is_ready(drive))) {
 		int i;
 		for (i=0; i<100; i++) {
@@ -822,7 +816,7 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 				break;
 		}
 	}
-#endif
+
 	/*
 	 * WARNING :: if the drive as not acked good status we may not
 	 * move the DATA-TRANSFER T-Bar as BSY != 0. <andre@linux-ide.org>
@@ -864,7 +858,7 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 				 * NOTE: could rewind beyond beginning :-/
 				 */
 			} else {
-				printk("%s: MULTI-WRITE assume all data " \
+				printk(KERN_ERR "%s: MULTI-WRITE assume all data " \
 					"transfered is bad status=0x%02x\n",
 					drive->name, stat);
 			}
@@ -1497,7 +1491,7 @@ int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 		case TASKFILE_MULTI_OUT:
 			if (!drive->mult_count) {
 				/* (hs): give up if multcount is not set */
-				printk("%s: %s Multimode Write " \
+				printk(KERN_ERR "%s: %s Multimode Write " \
 					"multcount is not set\n",
 					drive->name, __FUNCTION__);
 				err = -EPERM;
@@ -1525,7 +1519,7 @@ int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 		case TASKFILE_MULTI_IN:
 			if (!drive->mult_count) {
 				/* (hs): give up if multcount is not set */
-				printk("%s: %s Multimode Read failure " \
+				printk(KERN_ERR "%s: %s Multimode Read failure " \
 					"multcount is not set\n",
 					drive->name, __FUNCTION__);
 				err = -EPERM;

@@ -30,7 +30,6 @@
  **********************************************************************
  */
 
-#define __NO_VERSION__		/* Kernel version only defined once */
 #include <linux/module.h>
 #include <linux/version.h>
 #include <asm/uaccess.h>
@@ -251,7 +250,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 		case CMD_SETRECSRC:
 			switch (ctl->val[0]) {
 			case WAVERECORD_AC97:
-				if (card->isaps) {
+				if (card->is_aps) {
 					ret = -EINVAL;
 					break;
 				}
@@ -444,6 +443,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 
 		case CMD_SETGPR2OSS:
 			id = ctl->val[0];
+			/* 0 == left, 1 == right */
 			ch = ctl->val[1];
 			addr = ctl->val[2];
 
@@ -454,18 +454,18 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 
 			card->mgr.ctrl_gpr[id][ch] = addr;
 
-			if (card->isaps)
+			if (card->is_aps)
 				break;
 
 			if (addr >= 0) {
 				unsigned int state = card->ac97.mixer_state[id];
 
-				if (ch) {
+				if (ch == 1) {
 					state >>= 8;
 					card->ac97.stereo_mixers |= (1 << id);
-				} else {
-					card->ac97.supported_mixers |= (1 << id);
 				}
+
+				card->ac97.supported_mixers |= (1 << id);
 
 				if (id == SOUND_MIXER_TREBLE) {
 					set_treble(card, card->ac97.mixer_state[id] & 0xff, (card->ac97.mixer_state[id] >> 8) & 0xff);
@@ -475,10 +475,10 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 					emu10k1_set_volume_gpr(card, addr, state & 0xff,
 							       volume_params[id]);
 			} else {
-				if (ch) {
-					card->ac97.stereo_mixers &= ~(1 << id);
-					card->ac97.stereo_mixers |= card->ac97_stereo_mixers;
-				} else {
+				card->ac97.stereo_mixers &= ~(1 << id);
+				card->ac97.stereo_mixers |= card->ac97_stereo_mixers;
+
+				if (ch == 0) {
 					card->ac97.supported_mixers &= ~(1 << id);
 					card->ac97.supported_mixers |= card->ac97_supported_mixers;
 				}
@@ -499,6 +499,12 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 				ret = -EFAULT;
 			break;
 
+		case CMD_AC97_BOOST:
+			if(ctl->val[0])
+				emu10k1_ac97_write(&card->ac97, 0x18, 0x0);	
+			else
+				emu10k1_ac97_write(&card->ac97, 0x18, 0x0808);
+			break;
 		default:
 			ret = -EINVAL;
 			break;
@@ -551,7 +557,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 
 				card->tankmem.size = size;
 
-				sblive_writeptr_tag(card, 0, TCB, card->tankmem.dma_handle, TCBS, size_reg, TAGLIST_END);
+				sblive_writeptr_tag(card, 0, TCB, (u32) card->tankmem.dma_handle, TCBS, size_reg, TAGLIST_END);
 
 				emu10k1_writefn0(card, HCFG_LOCKTANKCACHE, 0);
 			}
@@ -571,6 +577,8 @@ static int emu10k1_dsp_mixer(struct emu10k1_card *card, unsigned int oss_mixer, 
 	unsigned int left, right;
 	int val;
 	int scale;
+
+	card->ac97.modcnt++;
 
 	if (get_user(val, (int *)arg))
 		return -EFAULT;
@@ -612,7 +620,7 @@ static int emu10k1_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 	unsigned int oss_mixer = _IOC_NR(cmd);
 	
 	ret = -EINVAL;
-	if (!card->isaps) {
+	if (!card->is_aps) {
 		if (cmd == SOUND_MIXER_INFO) {
 			mixer_info info;
 
@@ -626,7 +634,7 @@ static int emu10k1_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 			return 0;
 		}
 
-		if ((_IOC_DIR(cmd) == (_IOC_WRITE|_IOC_READ)) && oss_mixer <= SOUND_MIXER_NRDEVICES)
+		if ((_SIOC_DIR(cmd) == (_SIOC_WRITE|_SIOC_READ)) && oss_mixer <= SOUND_MIXER_NRDEVICES)
 			ret = emu10k1_dsp_mixer(card, oss_mixer, arg);
 		else
 			ret = card->ac97.mixer_ioctl(&card->ac97, cmd, arg);

@@ -1020,7 +1020,7 @@ void __init aha1542_setup(char *str, int *ints)
 
 static int __init do_setup(char *str)
 {
-	int ints[4];
+	int ints[5];
 
 	int count=setup_idx;
 

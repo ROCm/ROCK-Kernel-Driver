@@ -312,42 +312,7 @@ static void tune_ht6560b (ide_drive_t *drive, u8 pio)
 #endif
 }
 
-void __init probe_ht6560b (void)
-{
-	int t;
-	
-	request_region(HT_CONFIG_PORT, 1, ide_hwifs[0].name);
-	ide_hwifs[0].chipset = ide_ht6560b;
-	ide_hwifs[1].chipset = ide_ht6560b;
-	ide_hwifs[0].selectproc = &ht6560b_selectproc;
-	ide_hwifs[1].selectproc = &ht6560b_selectproc;
-	ide_hwifs[0].tuneproc = &tune_ht6560b;
-	ide_hwifs[1].tuneproc = &tune_ht6560b;
-	ide_hwifs[0].serialized = 1;  /* is this needed? */
-	ide_hwifs[1].serialized = 1;  /* is this needed? */
-	ide_hwifs[0].mate = &ide_hwifs[1];
-	ide_hwifs[1].mate = &ide_hwifs[0];
-	ide_hwifs[1].channel = 1;
-			
-	/*
-	 * Setting default configurations for drives
-	 */
-	t = (HT_CONFIG_DEFAULT << 8);
-	t |= HT_TIMING_DEFAULT;
-	ide_hwifs[0].drives[0].drive_data = t;
-	ide_hwifs[0].drives[1].drive_data = t;
-	t |= (HT_SECONDARY_IF << 8);
-	ide_hwifs[1].drives[0].drive_data = t;
-	ide_hwifs[1].drives[1].drive_data = t;
-
-#ifndef HWIF_PROBE_CLASSIC_METHOD
-	probe_hwif_init(&ide_hwifs[0]);
-	probe_hwif_init(&ide_hwifs[1]);
-#endif /* HWIF_PROBE_CLASSIC_METHOD */
-
-}
-
-void __init ht6560b_release (void)
+void ht6560b_release (void)
 {
 	if (ide_hwifs[0].chipset != ide_ht6560b &&
 	    ide_hwifs[1].chipset != ide_ht6560b)
@@ -371,36 +336,11 @@ void __init ht6560b_release (void)
 	release_region(HT_CONFIG_PORT, 1);
 }
 
-#ifndef MODULE
-/*
- * init_ht6560b:
- *
- * called by ide.c when parsing command line
- */
-
-void __init init_ht6560b (void)
-{
-	if (check_region(HT_CONFIG_PORT,1)) {
-		printk(KERN_NOTICE "%s: HT_CONFIG_PORT not found\n",
-			__FUNCTION__);
-		return;
-	}
-	if (!try_to_init_ht6560b()) {
-                printk(KERN_NOTICE "%s: HBA not found\n", __FUNCTION__);
-		return;
-	}
-	probe_ht6560b();
-}
-
-#else
-
-MODULE_AUTHOR("See Local File");
-MODULE_DESCRIPTION("HT-6560B EIDE-controller support");
-MODULE_LICENSE("GPL");
-
 int __init ht6560b_mod_init(void)
 {
-	if (check_region(HT_CONFIG_PORT,1)) {
+	int t;
+
+	if (!request_region(HT_CONFIG_PORT, 1, ide_hwifs[0].name)) {
 		printk(KERN_NOTICE "%s: HT_CONFIG_PORT not found\n",
 			__FUNCTION__);
 		return -ENODEV;
@@ -408,23 +348,68 @@ int __init ht6560b_mod_init(void)
 
 	if (!try_to_init_ht6560b()) {
 		printk(KERN_NOTICE "%s: HBA not found\n", __FUNCTION__);
-		return -ENODEV;
+		goto release_region;
 	}
 
-	probe_ht6560b();
-        if (ide_hwifs[0].chipset != ide_ht6560b &&
-            ide_hwifs[1].chipset != ide_ht6560b) {
-                ht6560b_release();
-                return -ENODEV;
-        }
-        return 0;
-}
-module_init(ht6560b_mod_init);
+	ide_hwifs[0].chipset = ide_ht6560b;
+	ide_hwifs[1].chipset = ide_ht6560b;
+	ide_hwifs[0].selectproc = &ht6560b_selectproc;
+	ide_hwifs[1].selectproc = &ht6560b_selectproc;
+	ide_hwifs[0].tuneproc = &tune_ht6560b;
+	ide_hwifs[1].tuneproc = &tune_ht6560b;
+	ide_hwifs[0].serialized = 1;  /* is this needed? */
+	ide_hwifs[1].serialized = 1;  /* is this needed? */
+	ide_hwifs[0].mate = &ide_hwifs[1];
+	ide_hwifs[1].mate = &ide_hwifs[0];
+	ide_hwifs[1].channel = 1;
 
+	/*
+	 * Setting default configurations for drives
+	 */
+	t = (HT_CONFIG_DEFAULT << 8);
+	t |= HT_TIMING_DEFAULT;
+	ide_hwifs[0].drives[0].drive_data = t;
+	ide_hwifs[0].drives[1].drive_data = t;
+	t |= (HT_SECONDARY_IF << 8);
+	ide_hwifs[1].drives[0].drive_data = t;
+	ide_hwifs[1].drives[1].drive_data = t;
+
+	probe_hwif_init(&ide_hwifs[0]);
+	probe_hwif_init(&ide_hwifs[1]);
+
+#ifdef MODULE
+	if (ide_hwifs[0].chipset != ide_ht6560b &&
+	    ide_hwifs[1].chipset != ide_ht6560b) {
+		ht6560b_release();
+		return -ENODEV;
+	}
+#endif
+
+	return 0;
+
+release_region:
+	release_region(HT_CONFIG_PORT, 1);
+	return -ENODEV;
+}
+
+MODULE_AUTHOR("See Local File");
+MODULE_DESCRIPTION("HT-6560B EIDE-controller support");
+MODULE_LICENSE("GPL");
+
+#ifdef MODULE
 void __init ht6560b_mod_exit(void)
 {
         ht6560b_release();
 }
-module_exit(ht6560b_mod_exit);
-#endif
 
+module_init(ht6560b_mod_init);
+module_exit(ht6560b_mod_exit);
+#else
+/*
+ * called by ide.c when parsing command line
+ */
+void __init init_ht6560b (void)
+{
+	ht6560b_mod_init();	/* ignore return value */
+}
+#endif

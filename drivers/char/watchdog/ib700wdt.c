@@ -228,6 +228,8 @@ ibwdt_open(struct inode *inode, struct file *file)
 			spin_unlock(&ibwdt_lock);
 			return -EBUSY;
 		}
+		if (nowayout)
+			MOD_INC_USE_COUNT;
 
 		/* Activate */
 		ibwdt_is_open = 1;

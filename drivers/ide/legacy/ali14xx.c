@@ -229,10 +229,8 @@ int __init probe_ali14xx (void)
 		return 1;
 	}
 
-#ifndef HWIF_PROBE_CLASSIC_METHOD
 	probe_hwif_init(&ide_hwifs[0]);
 	probe_hwif_init(&ide_hwifs[1]);
-#endif /* HWIF_PROBE_CLASSIC_METHOD */
 
 	return 0;
 }

@@ -32,6 +32,84 @@
 #include "voicemgr.h"
 #include "8010.h"
 
+/**
+ * emu10k1_voice_alloc_buffer -
+ *
+ * allocates the memory buffer for a voice. Two page tables are kept for each buffer.
+ * One (dma_handle) keeps track of the host memory pages used and the other (virtualpagetable)
+ * is passed to the device so that it can do DMA to host memory.
+ *
+ */
+int emu10k1_voice_alloc_buffer(struct emu10k1_card *card, struct voice_mem *mem, u32 pages)
+{
+	u32 pageindex, pagecount;
+	u32 busaddx;
+	int i;
+
+	DPD(2, "requested pages is: %d\n", pages);
+
+	if ((mem->emupageindex = emu10k1_addxmgr_alloc(pages * PAGE_SIZE, card)) < 0)
+	{
+		DPF(1, "couldn't allocate emu10k1 address space\n");
+		return -1;
+	}
+
+	/* Fill in virtual memory table */
+	for (pagecount = 0; pagecount < pages; pagecount++) {
+		if ((mem->addr[pagecount] = pci_alloc_consistent(card->pci_dev, PAGE_SIZE, &mem->dma_handle[pagecount]))
+			== NULL) {
+			mem->pages = pagecount;
+			DPF(1, "couldn't allocate dma memory\n");
+			return -1;
+		}
+
+		DPD(2, "Virtual Addx: %p\n", mem->addr[pagecount]);
+
+		for (i = 0; i < PAGE_SIZE / EMUPAGESIZE; i++) {
+			busaddx = (u32) mem->dma_handle[pagecount] + i * EMUPAGESIZE;
+
+			DPD(3, "Bus Addx: %#x\n", busaddx);
+
+			pageindex = mem->emupageindex + pagecount * PAGE_SIZE / EMUPAGESIZE + i;
+
+			((u32 *) card->virtualpagetable.addr)[pageindex] = cpu_to_le32((busaddx * 2) | pageindex);
+		}
+	}
+
+	mem->pages = pagecount;
+
+	return 0;
+}
+
+/**
+ * emu10k1_voice_free_buffer -
+ *
+ * frees the memory buffer for a voice.
+ */
+void emu10k1_voice_free_buffer(struct emu10k1_card *card, struct voice_mem *mem)
+{
+	u32 pagecount, pageindex;
+	int i;
+
+	if (mem->emupageindex < 0)
+		return;
+
+	for (pagecount = 0; pagecount < mem->pages; pagecount++) {
+		pci_free_consistent(card->pci_dev, PAGE_SIZE,
+					mem->addr[pagecount],
+					mem->dma_handle[pagecount]);
+
+		for (i = 0; i < PAGE_SIZE / EMUPAGESIZE; i++) {
+			pageindex = mem->emupageindex + pagecount * PAGE_SIZE / EMUPAGESIZE + i;
+			((u32 *) card->virtualpagetable.addr)[pageindex] =
+				cpu_to_le32(((u32) card->silentpage.dma_handle * 2) | pageindex);
+		}
+	}
+
+	emu10k1_addxmgr_free(card, mem->emupageindex);
+	mem->emupageindex = -1;
+}
+
 int emu10k1_voice_alloc(struct emu10k1_card *card, struct emu_voice *voice)
 {
 	u8 *voicetable = card->voicetable;
@@ -96,8 +174,10 @@ void emu10k1_voice_free(struct emu_voice *voice)
 							VTFT, 0x0000ffff,
 							PTRX_PITCHTARGET, 0,
 							CVCF, 0x0000ffff,
-							CPF, 0,
+							//CPF, 0,
 							TAGLIST_END);
+		
+		sblive_writeptr(card, CPF, voice->num + i, 0);
 	}
 
 	voice->usage = VOICE_USAGE_FREE;
@@ -151,8 +231,8 @@ void emu10k1_voice_playback_setup(struct emu_voice *voice)
 				    Z1, 0,
 				    Z2, 0,
 				    /* Invalidate maps */
-				    MAPA, MAP_PTI_MASK | (card->silentpage.dma_handle * 2),
-				    MAPB, MAP_PTI_MASK | (card->silentpage.dma_handle * 2),
+				    MAPA, MAP_PTI_MASK | ((u32) card->silentpage.dma_handle * 2),
+				    MAPB, MAP_PTI_MASK | ((u32) card->silentpage.dma_handle * 2),
 				/* modulation envelope */
 				    CVCF, 0x0000ffff,
 				    VTFT, 0x0000ffff,

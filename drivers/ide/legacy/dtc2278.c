@@ -138,11 +138,8 @@ void __init probe_dtc2278 (void)
 	ide_hwifs[1].mate = &ide_hwifs[0];
 	ide_hwifs[1].channel = 1;
 
-#ifndef HWIF_PROBE_CLASSIC_METHOD
 	probe_hwif_init(&ide_hwifs[0]);
 	probe_hwif_init(&ide_hwifs[1]);
-#endif /* HWIF_PROBE_CLASSIC_METHOD */
-
 }
 
 void __init dtc2278_release (void)

@@ -1,9 +1,7 @@
 /*
  * Exported symbols for midi driver.
- * __NO_VERSION__ because this is still part of sound.o.
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 
 char midi_syms_symbol;

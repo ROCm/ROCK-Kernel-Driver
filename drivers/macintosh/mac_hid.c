@@ -25,38 +25,56 @@ static int mouse_last_keycode = 0;
 
 #if defined(CONFIG_SYSCTL)
 /* file(s) in /proc/sys/dev/mac_hid */
-ctl_table mac_hid_files[] =
-{
-  {
-    DEV_MAC_HID_MOUSE_BUTTON_EMULATION,
-    "mouse_button_emulation", &mouse_emulate_buttons, sizeof(int),
-    0644, NULL, &proc_dointvec
-  },
-  {
-    DEV_MAC_HID_MOUSE_BUTTON2_KEYCODE,
-    "mouse_button2_keycode", &mouse_button2_keycode, sizeof(int),
-    0644, NULL, &proc_dointvec
-  },
-  {
-    DEV_MAC_HID_MOUSE_BUTTON3_KEYCODE,
-    "mouse_button3_keycode", &mouse_button3_keycode, sizeof(int),
-    0644, NULL, &proc_dointvec
-  },
-  { 0 }
+ctl_table mac_hid_files[] = {
+	{
+		.ctl_name	= DEV_MAC_HID_MOUSE_BUTTON_EMULATION,
+		.procname	= "mouse_button_emulation",
+		.data		= &mouse_emulate_buttons,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= DEV_MAC_HID_MOUSE_BUTTON2_KEYCODE,
+		.procname	= "mouse_button2_keycode",
+		.data		= &mouse_button2_keycode,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= DEV_MAC_HID_MOUSE_BUTTON3_KEYCODE,
+		.procname	= "mouse_button3_keycode",
+		.data		= &mouse_button3_keycode,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{ .ctl_name = 0 }
 };
 
 /* dir in /proc/sys/dev */
-ctl_table mac_hid_dir[] =
-{
-  { DEV_MAC_HID, "mac_hid", NULL, 0, 0555, mac_hid_files },
-  { 0 }
+ctl_table mac_hid_dir[] = {
+	{
+		.ctl_name	= DEV_MAC_HID,
+		.procname	= "mac_hid",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= mac_hid_files,
+	},
+	{ .ctl_name = 0 }
 };
 
 /* /proc/sys/dev itself, in case that is not there yet */
-ctl_table mac_hid_root_dir[] =
-{
-  { CTL_DEV, "dev", NULL, 0, 0555, mac_hid_dir },
-  { 0 }
+ctl_table mac_hid_root_dir[] = {
+	{
+		.ctl_name	= CTL_DEV,
+		.procname	= "dev",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= mac_hid_dir,
+	},
+	{ .ctl_name = 0 }
 };
 
 static struct ctl_table_header *mac_hid_sysctl_header;

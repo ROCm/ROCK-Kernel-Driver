@@ -16,7 +16,6 @@
 #include <linux/pagemap.h>
 #include <asm/bitops.h>
 #include "autofs_i.h"
-#define __NO_VERSION__
 #include <linux/module.h>
 
 static void ino_lnkfree(struct autofs_info *ino)

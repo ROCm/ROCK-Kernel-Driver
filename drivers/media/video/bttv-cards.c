@@ -24,8 +24,6 @@
     
 */
 
-#define __NO_VERSION__ 1
-
 #include <linux/version.h>
 #include <linux/delay.h>
 #include <linux/module.h>

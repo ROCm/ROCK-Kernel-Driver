@@ -29,8 +29,8 @@
  **********************************************************************
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
+#include <linux/poll.h>
 #include <linux/slab.h>
 #include <linux/version.h>
 #include <linux/sched.h>
@@ -371,8 +371,32 @@ static ssize_t emu10k1_midi_write(struct file *file, const char *buffer, size_t 
 
 static unsigned int emu10k1_midi_poll(struct file *file, struct poll_table_struct *wait)
 {
+	struct emu10k1_mididevice *midi_dev = (struct emu10k1_mididevice *) file->private_data;
+	unsigned long flags;
+	unsigned int mask = 0;
+
 	DPF(4, "emu10k1_midi_poll() called\n");
-	return 0;
+
+	if (file->f_mode & FMODE_WRITE)
+		poll_wait(file, &midi_dev->oWait, wait);
+
+	if (file->f_mode & FMODE_READ)
+		poll_wait(file, &midi_dev->iWait, wait);
+
+	spin_lock_irqsave(&midi_spinlock, flags);
+
+	if (file->f_mode & FMODE_WRITE)
+		mask |= POLLOUT | POLLWRNORM;
+
+	if (file->f_mode & FMODE_READ) {
+		if (midi_dev->mistate == MIDIIN_STATE_STARTED)
+			if (midi_dev->icnt > 0)
+				mask |= POLLIN | POLLRDNORM;
+	}
+
+	spin_unlock_irqrestore(&midi_spinlock, flags);
+
+	return mask;
 }
 
 int emu10k1_midi_callback(unsigned long msg, unsigned long refdata, unsigned long *pmsg)

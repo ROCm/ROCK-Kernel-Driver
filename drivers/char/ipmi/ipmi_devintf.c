@@ -105,7 +105,7 @@ static int ipmi_fasync(int fd, struct file *file, int on)
 
 static struct ipmi_user_hndl ipmi_hndlrs =
 {
-	ipmi_recv_hndl : file_receive_handler
+	.ipmi_recv_hndl	= file_receive_handler,
 };
 
 static int ipmi_open(struct inode *inode, struct file *file)
@@ -424,12 +424,12 @@ static int ipmi_ioctl(struct inode  *inode,
 
 
 static struct file_operations ipmi_fops = {
-	owner:   THIS_MODULE,
-	ioctl:   ipmi_ioctl,
-	open:    ipmi_open,
-	release: ipmi_release,
-	fasync:  ipmi_fasync,
-	poll:    ipmi_poll
+	.owner		= THIS_MODULE,
+	.ioctl		= ipmi_ioctl,
+	.open		= ipmi_open,
+	.release	= ipmi_release,
+	.fasync		= ipmi_fasync,
+	.poll		= ipmi_poll,
 };
 
 #define DEVICE_NAME     "ipmidev"
@@ -468,8 +468,8 @@ static void ipmi_smi_gone(int if_num)
 
 static struct ipmi_smi_watcher smi_watcher =
 {
-	new_smi  : ipmi_new_smi,
-	smi_gone : ipmi_smi_gone
+	.new_smi	= ipmi_new_smi,
+	.smi_gone	= ipmi_smi_gone,
 };
 
 static __init int init_ipmi_devintf(void)

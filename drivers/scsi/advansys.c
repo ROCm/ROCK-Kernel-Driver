@@ -7099,7 +7099,7 @@ asc_isr_callback(ASC_DVC_VAR *asc_dvc_varp, ASC_QDONE_INFO *qdonep)
          * then return the number of underrun bytes.
          */
         if (scp->request_bufflen != 0 && qdonep->remain_bytes != 0 &&
-            qdonep->remain_bytes <= scp->request_bufflen != 0) {
+            qdonep->remain_bytes <= scp->request_bufflen) {
             ASC_DBG1(1, "asc_isr_callback: underrun condition %u bytes\n",
             (unsigned) qdonep->remain_bytes);
             scp->resid = qdonep->remain_bytes;

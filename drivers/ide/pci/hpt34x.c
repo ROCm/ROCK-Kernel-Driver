@@ -58,7 +58,7 @@ static int n_hpt34x_devs;
 static int hpt34x_get_info (char *buffer, char **addr, off_t offset, int count)
 {
 	char *p = buffer;
-	int i;
+	int i, len;
 
 	p += sprintf(p, "\n                             "
 			"HPT34X Chipset.\n");
@@ -96,7 +96,11 @@ static int hpt34x_get_info (char *buffer, char **addr, off_t offset, int count)
 	}
 	p += sprintf(p, "\n");
 
-	return p-buffer;	/* => must be less than 4k! */
+	/* p - buffer must be less than 4k! */
+	len = (p - buffer) - offset;
+	*addr = buffer + offset;
+	
+	return len > count ? count : len;
 }
 #endif  /* defined(DISPLAY_HPT34X_TIMINGS) && defined(CONFIG_PROC_FS) */
 

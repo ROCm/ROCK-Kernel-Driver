@@ -939,7 +939,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		error = first;
 		goto out_fail;
 	}
-	if (FAT_FIRST_ENT(sb, media) != first) {
+	if (FAT_FIRST_ENT(sb, media) != first
+	    && (media != 0xf8 || FAT_FIRST_ENT(sb, 0xfe) != first)) {
 		if (!silent) {
 			printk(KERN_ERR "FAT: invalid first entry of FAT "
 			       "(0x%x != 0x%x)\n",

@@ -31,7 +31,6 @@
  * with heavy changes by Linus Torvalds
  */
 
-#define __NO_VERSION__
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>

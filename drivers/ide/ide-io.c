@@ -330,10 +330,7 @@ media_out:
 		hwif->OUTB(WIN_IDLEIMMEDIATE,IDE_COMMAND_REG);
 	}
 	if (rq->errors >= ERROR_MAX) {
-		if (drive->driver != NULL)
-			DRIVER(drive)->end_request(drive, 0, 0);
-		else
-	 		ide_end_request(drive, 0, 0);
+		DRIVER(drive)->end_request(drive, 0, 0);
 	} else {
 		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
 			++rq->errors;
@@ -347,6 +344,49 @@ media_out:
 }
 
 EXPORT_SYMBOL(ide_error);
+
+/**
+ *	ide_abort	-	abort pending IDE operatins
+ *	@drive: drive the error occurred on
+ *	@msg: message to report
+ *
+ *	ide_abort kills and cleans up when we are about to do a 
+ *	host initiated reset on active commands. Longer term we
+ *	want handlers to have sensible abort handling themselves
+ *
+ *	This differs fundamentally from ide_error because in 
+ *	this case the command is doing just fine when we
+ *	blow it away.
+ */
+ 
+ide_startstop_t ide_abort(ide_drive_t *drive, const char *msg)
+{
+	ide_hwif_t *hwif;
+	struct request *rq;
+
+	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
+		return ide_stopped;
+
+	hwif = HWIF(drive);
+	/* retry only "normal" I/O: */
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
+		rq->errors = 1;
+		ide_end_drive_cmd(drive, BUSY_STAT, 0);
+		return ide_stopped;
+	}
+	if (rq->flags & REQ_DRIVE_TASKFILE) {
+		rq->errors = 1;
+		ide_end_drive_cmd(drive, BUSY_STAT, 0);
+//		ide_end_taskfile(drive, BUSY_STAT, 0);
+		return ide_stopped;
+	}
+
+	rq->errors |= ERROR_RESET;
+	DRIVER(drive)->end_request(drive, 0, 0);
+	return ide_stopped;
+}
+
+EXPORT_SYMBOL(ide_abort);
 
 /**
  *	ide_cmd		-	issue a simple drive command
@@ -399,7 +439,7 @@ ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 			udelay(100);
 	}
 
-	if (!OK_STAT(stat, READY_STAT, BAD_STAT))
+	if (!OK_STAT(stat, READY_STAT, BAD_STAT) && DRIVER(drive) != NULL)
 		return DRIVER(drive)->error(drive, "drive_cmd", stat);
 		/* calls ide_end_drive_cmd */
 	ide_end_drive_cmd(drive, stat, hwif->INB(IDE_ERROR_REG));
@@ -428,13 +468,10 @@ ide_startstop_t do_special (ide_drive_t *drive)
 		s->b.set_tune = 0;
 		if (HWIF(drive)->tuneproc != NULL)
 			HWIF(drive)->tuneproc(drive, drive->tune_req);
-	} else if (drive->driver != NULL) {
-		return DRIVER(drive)->special(drive);
-	} else if (s->all) {
-		printk(KERN_ERR "%s: bad special flag: 0x%02x\n", drive->name, s->all);
-		s->all = 0;
+		return ide_stopped;
 	}
-	return ide_stopped;
+	else
+		return DRIVER(drive)->special(drive);
 }
 
 EXPORT_SYMBOL(do_special);
@@ -589,40 +626,15 @@ ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 			return execute_drive_cmd(drive, rq);
 		else if (rq->flags & REQ_DRIVE_TASKFILE)
 			return execute_drive_cmd(drive, rq);
-
-		if (drive->driver != NULL) {
-			return (DRIVER(drive)->do_request(drive, rq, block));
-		}
-		printk(KERN_ERR "%s: media type %d not supported\n", drive->name, drive->media);
-		goto kill_rq;
+		return (DRIVER(drive)->do_request(drive, rq, block));
 	}
 	return do_special(drive);
 kill_rq:
-	if (drive->driver != NULL)
-		DRIVER(drive)->end_request(drive, 0, 0);
-	else
-		ide_end_request(drive, 0, 0);
+	DRIVER(drive)->end_request(drive, 0, 0);
 	return ide_stopped;
 }
 
 EXPORT_SYMBOL(start_request);
-
-/**
- *	restart_request		-	reissue an IDE request
- *	@drive: drive for request
- *	@rq: request to reissue
- *
- *	Reissue a request. See start_request for details and for
- *	FIXME
- */
- 
-int restart_request (ide_drive_t *drive, struct request *rq)
-{
-	(void) start_request(drive, rq);
-	return 0;
-}
-
-EXPORT_SYMBOL(restart_request);
 
 /**
  *	ide_stall_queue		-	pause an IDE device
@@ -742,8 +754,8 @@ void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
 	/* for atari only: POSSIBLY BROKEN HERE(?) */
 	ide_get_lock(ide_intr, hwgroup);
 
-	/* necessary paranoia: ensure IRQs are masked on local CPU */
-	local_irq_disable();
+	/* caller must own ide_lock */
+	BUG_ON(!irqs_disabled());
 
 	while (!hwgroup->busy) {
 		hwgroup->busy = 1;

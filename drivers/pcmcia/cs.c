@@ -895,6 +895,10 @@ int pcmcia_access_configuration_register(client_handle_t handle,
 	c = &s->config[reg->Function];
     } else
 	c = CONFIG(handle);
+
+    if (c == NULL)
+	return CS_NO_CARD;
+
     if (!(c->state & CONFIG_LOCKED))
 	return CS_CONFIGURATION_LOCKED;
 
