@@ -176,11 +176,34 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 }
 static int validate_t2(struct smb_t2_rsp * pSMB) 
 {
-	int rc = 0;
+	int rc = -EINVAL;
+	int total_size;
+	char * pBCC;
 
-	/* check for plausible wct, bcc and possible t2 data and parm sizes */
+	/* check for plausible wct, bcc and t2 data and parm sizes */
 	/* check for parm and data offset going beyond end of smb */
-
+	if(pSMB->hdr.WordCount >= 10) {
+		if((le16_to_cpu(pSMB->t2_rsp.ParameterOffset) <= 1024) &&
+		   (le16_to_cpu(pSMB->t2_rsp.DataOffset) <= 1024)) {
+			/* check that bcc is at least as big as parms + data */
+			/* check that bcc is less than negotiated smb buffer */
+			total_size = le16_to_cpu(pSMB->t2_rsp.ParameterCount);
+			if(total_size < 512) {
+				total_size+=le16_to_cpu(pSMB->t2_rsp.DataCount);
+				/* BCC le converted in SendReceive */
+				pBCC = (pSMB->hdr.WordCount * 2) + sizeof(struct smb_hdr) + 
+					(char *)pSMB;
+				if((total_size <= (*(u16 *)pBCC)) && 
+				   (total_size < 
+					CIFS_MAX_MSGSIZE+MAX_CIFS_HDR_SIZE)) {
+					return 0;
+				}
+				
+			}
+		}
+	}
+	cifs_dump_mem("Invalid transact2 SMB: ",(char *)pSMB,
+		sizeof(struct smb_t2_rsp) + 16);
 	return rc;
 }
 int
@@ -2132,12 +2155,12 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 			*pUnicodeFlag = FALSE;
 		memcpy(findParms,
 		       (char *) &pSMBr->hdr.Protocol +
-		       le16_to_cpu(pSMBr->ParameterOffset),
+		       le16_to_cpu(pSMBr->t2.ParameterOffset),
 		       sizeof (T2_FNEXT_RSP_PARMS));
 		response_data =
 		    (char *) &pSMBr->hdr.Protocol +
-		    le16_to_cpu(pSMBr->DataOffset);
-		memcpy(findData, response_data, le16_to_cpu(pSMBr->DataCount));
+		    le16_to_cpu(pSMBr->t2.DataOffset);
+		memcpy(findData,response_data,le16_to_cpu(pSMBr->t2.DataCount));
 	}
 	if (pSMB)
 		cifs_buf_release(pSMB);
@@ -2431,7 +2454,7 @@ QFSInfoRetry:
 	if (rc) {
 		cERROR(1, ("Send error in QFSInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		cFYI(1,
 		     ("Decoding qfsinfo response.  BCC: %d  Offset %d",
 		      pSMBr->ByteCount, data_offset));
@@ -2513,7 +2536,7 @@ QFSAttributeRetry:
 	if (rc) {
 		cERROR(1, ("Send error in QFSAttributeInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		if ((pSMBr->ByteCount < 13) || (data_offset > 512)) {	/* BB also check enough bytes returned */
 			rc = -EIO;	/* bad smb */
 		} else {
@@ -2582,7 +2605,7 @@ QFSDeviceRetry:
 	if (rc) {
 		cFYI(1, ("Send error in QFSDeviceInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		if ((pSMBr->ByteCount < sizeof (FILE_SYSTEM_DEVICE_INFO))
                  || (data_offset > 512))
 			rc = -EIO;	/* bad smb */
@@ -2651,7 +2674,7 @@ QFSUnixRetry:
 	if (rc) {
 		cERROR(1, ("Send error in QFSUnixInfo = %d", rc));
 	} else {		/* decode response */
-		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 		if ((pSMBr->ByteCount < 13) || (data_offset > 512)) {
 			rc = -EIO;	/* bad smb */
 		} else {

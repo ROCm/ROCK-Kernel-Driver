@@ -336,7 +336,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				    (checkSMBhdr
 				     (smb_buffer, smb_buffer->Mid))) {
 					cERROR(1,
-					    ("Invalid size or format for SMB found with length %d and pdu_lenght %d",
+					    ("Invalid size or format for SMB found with length %d and pdu_length %d",
 						length, pdu_length));
 					cifs_dump_mem("Received Data is: ",temp,sizeof(struct smb_hdr));
 					/* could we fix this network corruption by finding next 
