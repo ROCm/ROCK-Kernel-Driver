@@ -916,7 +916,7 @@ sd_read_cache_type(Scsi_Disk *sdkp, char *diskname,
 
 		SRpnt->sr_data_direction = SCSI_DATA_READ;
 		scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
-			    24, SD_TIMEOUT, MAX_RETRIES);
+			    128, SD_TIMEOUT, MAX_RETRIES);
 
 		the_result = SRpnt->sr_result;
 		retries--;
