@@ -567,17 +567,17 @@ static struct net_device_stats *sppp_cb_net_stats(struct net_device *dev);
 
 /* ioctl handlers */
 
-static int  get_stats(SLMP_INFO *info, struct mgsl_icount *user_icount);
-static int  get_params(SLMP_INFO *info, MGSL_PARAMS *params);
-static int  set_params(SLMP_INFO *info, MGSL_PARAMS *params);
-static int  get_txidle(SLMP_INFO *info, int*idle_mode);
+static int  get_stats(SLMP_INFO *info, struct mgsl_icount __user *user_icount);
+static int  get_params(SLMP_INFO *info, MGSL_PARAMS __user *params);
+static int  set_params(SLMP_INFO *info, MGSL_PARAMS __user *params);
+static int  get_txidle(SLMP_INFO *info, int __user *idle_mode);
 static int  set_txidle(SLMP_INFO *info, int idle_mode);
 static int  tx_enable(SLMP_INFO *info, int enable);
 static int  tx_abort(SLMP_INFO *info);
 static int  rx_enable(SLMP_INFO *info, int enable);
 static int  map_status(int signals);
 static int  modem_input_wait(SLMP_INFO *info,int arg);
-static int  wait_mgsl_event(SLMP_INFO *info, int *mask_ptr);
+static int  wait_mgsl_event(SLMP_INFO *info, int __user *mask_ptr);
 static int  tiocmget(struct tty_struct *tty, struct file *file);
 static int  tiocmset(struct tty_struct *tty, struct file *file,
 		     unsigned int set, unsigned int clear);
@@ -692,7 +692,7 @@ static u32 sca_pci_load_interval = 64;
  * This allows remote debugging of dynamically loadable modules.
  */
 static void* synclinkmp_get_text_ptr(void);
-static void* synclinkmp_get_text_ptr() {return synclinkmp_get_text_ptr;}
+static void* synclinkmp_get_text_ptr(void) {return synclinkmp_get_text_ptr;}
 
 static inline int sanity_check(SLMP_INFO *info,
 			       char *name, const char *routine)
@@ -1333,8 +1333,9 @@ static int ioctl(struct tty_struct *tty, struct file *file,
 	SLMP_INFO *info = (SLMP_INFO *)tty->driver_data;
 	int error;
 	struct mgsl_icount cnow;	/* kernel counter temps */
-	struct serial_icounter_struct *p_cuser;	/* user space */
+	struct serial_icounter_struct __user *p_cuser;	/* user space */
 	unsigned long flags;
+	void __user *argp = (void __user *)arg;
 
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):%s ioctl() cmd=%08X\n", __FILE__,__LINE__,
@@ -1351,23 +1352,23 @@ static int ioctl(struct tty_struct *tty, struct file *file,
 
 	switch (cmd) {
 	case MGSL_IOCGPARAMS:
-		return get_params(info,(MGSL_PARAMS *)arg);
+		return get_params(info, argp);
 	case MGSL_IOCSPARAMS:
-		return set_params(info,(MGSL_PARAMS *)arg);
+		return set_params(info, argp);
 	case MGSL_IOCGTXIDLE:
-		return get_txidle(info,(int*)arg);
+		return get_txidle(info, argp);
 	case MGSL_IOCSTXIDLE:
-		return set_txidle(info,(int)arg);
+		return set_txidle(info, (int)arg);
 	case MGSL_IOCTXENABLE:
-		return tx_enable(info,(int)arg);
+		return tx_enable(info, (int)arg);
 	case MGSL_IOCRXENABLE:
-		return rx_enable(info,(int)arg);
+		return rx_enable(info, (int)arg);
 	case MGSL_IOCTXABORT:
 		return tx_abort(info);
 	case MGSL_IOCGSTATS:
-		return get_stats(info,(struct mgsl_icount*)arg);
+		return get_stats(info, argp);
 	case MGSL_IOCWAITEVENT:
-		return wait_mgsl_event(info,(int*)arg);
+		return wait_mgsl_event(info, argp);
 	case MGSL_IOCLOOPTXDONE:
 		return 0; // TODO: Not supported, need to document
 		/* Wait for modem input (DCD,RI,DSR,CTS) change
@@ -1386,7 +1387,7 @@ static int ioctl(struct tty_struct *tty, struct file *file,
 		spin_lock_irqsave(&info->lock,flags);
 		cnow = info->icount;
 		spin_unlock_irqrestore(&info->lock,flags);
-		p_cuser = (struct serial_icounter_struct *) arg;
+		p_cuser = argp;
 		PUT_USER(error,cnow.cts, &p_cuser->cts);
 		if (error) return error;
 		PUT_USER(error,cnow.dsr, &p_cuser->dsr);
@@ -2762,7 +2763,7 @@ static void change_params(SLMP_INFO *info)
 	program_hw(info);
 }
 
-static int get_stats(SLMP_INFO * info, struct mgsl_icount *user_icount)
+static int get_stats(SLMP_INFO * info, struct mgsl_icount __user *user_icount)
 {
 	int err;
 
@@ -2781,7 +2782,7 @@ static int get_stats(SLMP_INFO * info, struct mgsl_icount *user_icount)
 	return 0;
 }
 
-static int get_params(SLMP_INFO * info, MGSL_PARAMS *user_params)
+static int get_params(SLMP_INFO * info, MGSL_PARAMS __user *user_params)
 {
 	int err;
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -2799,7 +2800,7 @@ static int get_params(SLMP_INFO * info, MGSL_PARAMS *user_params)
 	return 0;
 }
 
-static int set_params(SLMP_INFO * info, MGSL_PARAMS *new_params)
+static int set_params(SLMP_INFO * info, MGSL_PARAMS __user *new_params)
 {
  	unsigned long flags;
 	MGSL_PARAMS tmp_params;
@@ -2825,7 +2826,7 @@ static int set_params(SLMP_INFO * info, MGSL_PARAMS *new_params)
 	return 0;
 }
 
-static int get_txidle(SLMP_INFO * info, int*idle_mode)
+static int get_txidle(SLMP_INFO * info, int __user *idle_mode)
 {
 	int err;
 
@@ -2938,7 +2939,7 @@ static int map_status(int signals)
 
 /* wait for specified event to occur
  */
-static int wait_mgsl_event(SLMP_INFO * info, int * mask_ptr)
+static int wait_mgsl_event(SLMP_INFO * info, int __user *mask_ptr)
 {
  	unsigned long flags;
 	int s;
