@@ -42,10 +42,8 @@ static void handle_signal(struct pt_regs *regs, unsigned long signr,
 			  struct k_sigaction *ka, siginfo_t *info,
 			  sigset_t *oldset)
 {
-        __sighandler_t handler;
 	void (*restorer)(void);
 	unsigned long sp;
-	sigset_t save;
 	int err, error, ret;
 
 	error = PT_REGS_SYSCALL_RET(&current->thread.regs);
@@ -79,11 +77,24 @@ static void handle_signal(struct pt_regs *regs, unsigned long signr,
 		break;
 	}
 
-	handler = ka->sa.sa_handler;
-	save = *oldset;
+	sp = PT_REGS_SP(regs);
+	if((ka->sa.sa_flags & SA_ONSTACK) && (sas_ss_flags(sp) == 0))
+		sp = current->sas_ss_sp + current->sas_ss_size;
 
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
+	if(error != 0) PT_REGS_SET_SYSCALL_RETURN(regs, ret);
+
+	if (ka->sa.sa_flags & SA_RESTORER)
+		restorer = ka->sa.sa_restorer;
+	else restorer = NULL;
+
+	if(ka->sa.sa_flags & SA_SIGINFO)
+		err = setup_signal_stack_si(sp, signr,
+					    (unsigned long) ka->sa.sa_handler,
+					    restorer, regs, info, oldset);
+	else
+		err = setup_signal_stack_sc(sp, signr,
+					    (unsigned long) ka->sa.sa_handler,
+					    restorer, regs, oldset);
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
 		spin_lock_irq(&current->sighand->siglock);
@@ -94,23 +105,6 @@ static void handle_signal(struct pt_regs *regs, unsigned long signr,
 		spin_unlock_irq(&current->sighand->siglock);
 	}
 
-	sp = PT_REGS_SP(regs);
-
-	if((ka->sa.sa_flags & SA_ONSTACK) && (sas_ss_flags(sp) == 0))
-		sp = current->sas_ss_sp + current->sas_ss_size;
-	
-	if(error != 0)
-		PT_REGS_SET_SYSCALL_RETURN(regs, ret);
-
-	if (ka->sa.sa_flags & SA_RESTORER) restorer = ka->sa.sa_restorer;
-	else restorer = NULL;
-
-	if(ka->sa.sa_flags & SA_SIGINFO)
-		err = setup_signal_stack_si(sp, signr, (unsigned long) handler,
-					    restorer, regs, info, &save);
-	else
-		err = setup_signal_stack_sc(sp, signr, (unsigned long) handler,
-					    restorer, regs, &save);
 	if(err)
 		force_sigsegv(signr, current);
 }
