@@ -207,7 +207,7 @@ static int __init rtc_init(void)
 		return retval;
 
 #ifdef CONFIG_PROC_FS
-	if(create_proc_read_entry ("driver/rtc", 0, 0, rtc_read_proc, NULL) == NULL)
+	if (create_proc_read_entry ("driver/rtc", 0, NULL, rtc_read_proc, NULL) == NULL)
 		misc_deregister(&rtc_dev);
 		return -ENOMEM;
 #endif

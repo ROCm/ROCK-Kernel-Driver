@@ -201,7 +201,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	NEW_AUX_ENT(AT_EGID, (elf_addr_t) tsk->egid);
  	NEW_AUX_ENT(AT_SECURE, (elf_addr_t) security_bprm_secureexec(bprm));
 	if (k_platform) {
-		NEW_AUX_ENT(AT_PLATFORM, (elf_addr_t)(long)u_platform);
+		NEW_AUX_ENT(AT_PLATFORM, (elf_addr_t)(unsigned long)u_platform);
 	}
 	if (bprm->interp_flags & BINPRM_FLAGS_EXECFD) {
 		NEW_AUX_ENT(AT_EXECFD, (elf_addr_t) bprm->interp_data);
@@ -492,7 +492,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
   	struct exec interp_ex;
 	char passed_fileno[6];
 	struct files_struct *files;
-	int executable_stack = EXSTACK_DEFAULT;
+	int have_pt_gnu_stack, executable_stack = EXSTACK_DEFAULT;
 	unsigned long def_flags = 0;
 	
 	/* Get the exec-header */
@@ -627,8 +627,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 				executable_stack = EXSTACK_DISABLE_X;
 			break;
 		}
-	if (i == elf_ex.e_phnum)
-		def_flags |= VM_EXEC | VM_MAYEXEC;
+	have_pt_gnu_stack = (i < elf_ex.e_phnum);
 
 	/* Some simple consistency checks for the interpreter */
 	if (elf_interpreter) {
@@ -701,6 +700,8 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	/* Do this immediately, since STACK_TOP as used in setup_arg_pages
 	   may depend on the personality.  */
 	SET_PERSONALITY(elf_ex, ibcs2_interpreter);
+	if (elf_read_implies_exec(elf_ex, have_pt_gnu_stack))
+		current->personality |= READ_IMPLIES_EXEC;
 
 	/* Do this so that we can load the interpreter, if need be.  We will
 	   change some of these later */

@@ -213,8 +213,8 @@ int sysctl_icmp_ratemask = 0x1818;
  */
 
 struct icmp_control {
-	int output_off;		/* Field offset for increment on output */
-	int input_off;		/* Field offset for increment on input */
+	int output_entry;	/* Field for increment on output */
+	int input_entry;	/* Field for increment on input */
 	void (*handler)(struct sk_buff *skb);
 	short   error;		/* This ICMP is classed as an error message */
 };
@@ -318,8 +318,8 @@ out:
 static void icmp_out_count(int type)
 {
 	if (type <= NR_ICMP_TYPES) {
-		ICMP_INC_STATS_FIELD(icmp_pointers[type].output_off);
-		ICMP_INC_STATS(IcmpOutMsgs);
+		ICMP_INC_STATS(icmp_pointers[type].output_entry);
+		ICMP_INC_STATS(ICMP_MIB_OUTMSGS);
 	}
 }
 
@@ -714,7 +714,7 @@ static void icmp_unreach(struct sk_buff *skb)
 out:
 	return;
 out_err:
-	ICMP_INC_STATS_BH(IcmpInErrors);
+	ICMP_INC_STATS_BH(ICMP_MIB_INERRORS);
 	goto out;
 }
 
@@ -755,7 +755,7 @@ static void icmp_redirect(struct sk_buff *skb)
 out:
 	return;
 out_err:
-	ICMP_INC_STATS_BH(IcmpInErrors);
+	ICMP_INC_STATS_BH(ICMP_MIB_INERRORS);
 	goto out;
 }
 
@@ -823,7 +823,7 @@ static void icmp_timestamp(struct sk_buff *skb)
 out:
 	return;
 out_err:
-	ICMP_INC_STATS_BH(IcmpInErrors);
+	ICMP_INC_STATS_BH(ICMP_MIB_INERRORS);
 	goto out;
 }
 
@@ -922,7 +922,7 @@ int icmp_rcv(struct sk_buff *skb)
 	struct icmphdr *icmph;
 	struct rtable *rt = (struct rtable *)skb->dst;
 
-	ICMP_INC_STATS_BH(IcmpInMsgs);
+	ICMP_INC_STATS_BH(ICMP_MIB_INMSGS);
 
 	switch (skb->ip_summed) {
 	case CHECKSUM_HW:
@@ -974,14 +974,14 @@ int icmp_rcv(struct sk_buff *skb)
   		}
 	}
 
-	ICMP_INC_STATS_BH_FIELD(icmp_pointers[icmph->type].input_off);
+	ICMP_INC_STATS_BH(icmp_pointers[icmph->type].input_entry);
 	icmp_pointers[icmph->type].handler(skb);
 
 drop:
 	kfree_skb(skb);
 	return 0;
 error:
-	ICMP_INC_STATS_BH(IcmpInErrors);
+	ICMP_INC_STATS_BH(ICMP_MIB_INERRORS);
 	goto drop;
 }
 
@@ -990,109 +990,109 @@ error:
  */
 static struct icmp_control icmp_pointers[NR_ICMP_TYPES + 1] = {
 	[ICMP_ECHOREPLY] = {
-		.output_off = offsetof(struct icmp_mib, IcmpOutEchoReps),
-		.input_off = offsetof(struct icmp_mib, IcmpInEchoReps),
+		.output_entry = ICMP_MIB_OUTECHOREPS,
+		.input_entry = ICMP_MIB_INECHOREPS,
 		.handler = icmp_discard,
 	},
 	[1] = {
-		.output_off = offsetof(struct icmp_mib, dummy),
-		.input_off = offsetof(struct icmp_mib,IcmpInErrors),
+		.output_entry = ICMP_MIB_DUMMY,
+		.input_entry = ICMP_MIB_INERRORS,
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	[2] = {
-		.output_off = offsetof(struct icmp_mib, dummy),
-		.input_off = offsetof(struct icmp_mib,IcmpInErrors),
+		.output_entry = ICMP_MIB_DUMMY,
+		.input_entry = ICMP_MIB_INERRORS,
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	[ICMP_DEST_UNREACH] = {
-		.output_off = offsetof(struct icmp_mib, IcmpOutDestUnreachs),
-		.input_off = offsetof(struct icmp_mib, IcmpInDestUnreachs),
+		.output_entry = ICMP_MIB_OUTDESTUNREACHS,
+		.input_entry = ICMP_MIB_INDESTUNREACHS,
 		.handler = icmp_unreach,
 		.error = 1,
 	},
 	[ICMP_SOURCE_QUENCH] = {
-		.output_off = offsetof(struct icmp_mib, IcmpOutSrcQuenchs),
-		.input_off = offsetof(struct icmp_mib, IcmpInSrcQuenchs),
+		.output_entry = ICMP_MIB_OUTSRCQUENCHS,
+		.input_entry = ICMP_MIB_INSRCQUENCHS,
 		.handler = icmp_unreach,
 		.error = 1,
 	},
 	[ICMP_REDIRECT] = {
-		.output_off = offsetof(struct icmp_mib, IcmpOutRedirects),
-		.input_off = offsetof(struct icmp_mib, IcmpInRedirects),
+		.output_entry = ICMP_MIB_OUTREDIRECTS,
+		.input_entry = ICMP_MIB_INREDIRECTS,
 		.handler = icmp_redirect,
 		.error = 1,
 	},
 	[6] = {
-		.output_off = offsetof(struct icmp_mib, dummy),
-		.input_off = offsetof(struct icmp_mib, IcmpInErrors),
+		.output_entry = ICMP_MIB_DUMMY,
+		.input_entry = ICMP_MIB_INERRORS,
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	[7] = {
-		.output_off = offsetof(struct icmp_mib, dummy),
-		.input_off = offsetof(struct icmp_mib, IcmpInErrors),
+		.output_entry = ICMP_MIB_DUMMY,
+		.input_entry = ICMP_MIB_INERRORS,
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	[ICMP_ECHO] = {
-		.output_off = offsetof(struct icmp_mib, IcmpOutEchos),
-		.input_off = offsetof(struct icmp_mib, IcmpInEchos),
+		.output_entry = ICMP_MIB_OUTECHOS,
+		.input_entry = ICMP_MIB_INECHOS,
 		.handler = icmp_echo,
 	},
 	[9] = {
-		.output_off = offsetof(struct icmp_mib, dummy),
-		.input_off = offsetof(struct icmp_mib, IcmpInErrors),
+		.output_entry = ICMP_MIB_DUMMY,
+		.input_entry = ICMP_MIB_INERRORS,
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	[10] = {
-		.output_off = offsetof(struct icmp_mib, dummy),
-		.input_off = offsetof(struct icmp_mib, IcmpInErrors),
+		.output_entry = ICMP_MIB_DUMMY,
+		.input_entry = ICMP_MIB_INERRORS,
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	[ICMP_TIME_EXCEEDED] = {
-		.output_off = offsetof(struct icmp_mib, IcmpOutTimeExcds),
-		.input_off = offsetof(struct icmp_mib,IcmpInTimeExcds),
+		.output_entry = ICMP_MIB_OUTTIMEEXCDS,
+		.input_entry = ICMP_MIB_INTIMEEXCDS,
 		.handler = icmp_unreach,
 		.error = 1,
 	},
 	[ICMP_PARAMETERPROB] = {
-		.output_off = offsetof(struct icmp_mib, IcmpOutParmProbs),
-		.input_off = offsetof(struct icmp_mib, IcmpInParmProbs),
+		.output_entry = ICMP_MIB_OUTPARMPROBS,
+		.input_entry = ICMP_MIB_INPARMPROBS,
 		.handler = icmp_unreach,
 		.error = 1,
 	},
 	[ICMP_TIMESTAMP] = {
-		.output_off = offsetof(struct icmp_mib, IcmpOutTimestamps),
-		.input_off = offsetof(struct icmp_mib, IcmpInTimestamps),
+		.output_entry = ICMP_MIB_OUTTIMESTAMPS,
+		.input_entry = ICMP_MIB_INTIMESTAMPS,
 		.handler = icmp_timestamp,
 	},
 	[ICMP_TIMESTAMPREPLY] = {
-		.output_off = offsetof(struct icmp_mib, IcmpOutTimestampReps),
-		.input_off = offsetof(struct icmp_mib, IcmpInTimestampReps),
+		.output_entry = ICMP_MIB_OUTTIMESTAMPREPS,
+		.input_entry = ICMP_MIB_INTIMESTAMPREPS,
 		.handler = icmp_discard,
 	},
 	[ICMP_INFO_REQUEST] = {
-		.output_off = offsetof(struct icmp_mib, dummy),
-		.input_off = offsetof(struct icmp_mib, dummy),
+		.output_entry = ICMP_MIB_DUMMY,
+		.input_entry = ICMP_MIB_DUMMY,
 		.handler = icmp_discard,
 	},
  	[ICMP_INFO_REPLY] = {
-		.output_off = offsetof(struct icmp_mib, dummy),
-		.input_off = offsetof(struct icmp_mib, dummy),
+		.output_entry = ICMP_MIB_DUMMY,
+		.input_entry = ICMP_MIB_DUMMY,
 		.handler = icmp_discard,
 	},
 	[ICMP_ADDRESS] = {
-		.output_off = offsetof(struct icmp_mib, IcmpOutAddrMasks),
-		.input_off = offsetof(struct icmp_mib, IcmpInAddrMasks),
+		.output_entry = ICMP_MIB_OUTADDRMASKS,
+		.input_entry = ICMP_MIB_INADDRMASKS,
 		.handler = icmp_address,
 	},
 	[ICMP_ADDRESSREPLY] = {
-		.output_off = offsetof(struct icmp_mib, IcmpOutAddrMaskReps),
-		.input_off = offsetof(struct icmp_mib, IcmpInAddrMaskReps),
+		.output_entry = ICMP_MIB_OUTADDRMASKREPS,
+		.input_entry = ICMP_MIB_INADDRMASKREPS,
 		.handler = icmp_address_reply,
 	},
 };

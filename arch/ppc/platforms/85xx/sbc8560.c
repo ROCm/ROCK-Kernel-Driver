@@ -92,6 +92,7 @@ sbc8560_early_serial_map(void)
         uart_req.iotype = SERIAL_IO_MEM;
         uart_req.mapbase = UARTA_ADDR;
         uart_req.membase = ioremap(uart_req.mapbase, MPC85xx_UART0_SIZE);
+	uart_req.type = PORT_16650;
 
 #if defined(CONFIG_SERIAL_TEXT_DEBUG) || defined(CONFIG_KGDB)
         gen550_init(0, &uart_req);

@@ -563,7 +563,7 @@ Note: we do not have explicit unassign, but look at _push()
 		BRPRIV(skb->dev)->stats.rx_packets--;
 		br2684_push(atmvcc, skb);
 	}
-	(void) try_module_get(THIS_MODULE);
+	__module_get(THIS_MODULE);
 	return 0;
     error:
 	write_unlock_irq(&devs_lock);

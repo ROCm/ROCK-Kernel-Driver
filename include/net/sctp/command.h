@@ -94,6 +94,9 @@ typedef enum {
 	SCTP_CMD_REPORT_FWDTSN,	 /* Report new cumulative TSN Ack. */
 	SCTP_CMD_PROCESS_FWDTSN, /* Skips were reported, so process further. */
 	SCTP_CMD_CLEAR_INIT_TAG, /* Clears association peer's inittag. */
+	SCTP_CMD_DEL_NON_PRIMARY, /* Removes non-primary peer transports. */
+	SCTP_CMD_T3_RTX_TIMERS_STOP, /* Stops T3-rtx pending timers */
+	SCTP_CMD_FORCE_PRIM_RETRAN,  /* Forces retrans. over primary path. */
 	SCTP_CMD_LAST
 } sctp_verb_t;
 

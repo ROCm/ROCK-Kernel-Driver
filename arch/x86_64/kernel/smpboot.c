@@ -660,7 +660,7 @@ static void __init do_boot_cpu (int apicid)
 			Dprintk("CPU has booted.\n");
 		} else {
 			boot_error = 1;
-			if (*((volatile unsigned char *)phys_to_virt(8192))
+			if (*((volatile unsigned char *)phys_to_virt(SMP_TRAMPOLINE_BASE))
 					== 0xA5)
 				/* trampoline started but...? */
 				printk("Stuck ??\n");
@@ -677,9 +677,6 @@ static void __init do_boot_cpu (int apicid)
 		clear_bit(cpu, &cpu_initialized); /* was set by cpu_init() */
 		cpucount--;
 	}
-
-	/* mark "stuck" area as not stuck */
-	*((volatile unsigned *)phys_to_virt(8192)) = 0;
 }
 
 cycles_t cacheflush_time;

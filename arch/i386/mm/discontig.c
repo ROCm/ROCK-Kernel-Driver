@@ -463,7 +463,11 @@ void __init set_highmem_pages_init(int bad_ppro)
 void __init set_max_mapnr_init(void)
 {
 #ifdef CONFIG_HIGHMEM
-	highmem_start_page = NODE_DATA(0)->node_zones[ZONE_HIGHMEM].zone_mem_map;
+	struct zone *high0 = &NODE_DATA(0)->node_zones[ZONE_HIGHMEM];
+	if (high0->spanned_pages > 0)
+	      	highmem_start_page = high0->zone_mem_map;
+	else
+		highmem_start_page = pfn_to_page(max_low_pfn+1); 
 	num_physpages = highend_pfn;
 #else
 	num_physpages = max_low_pfn;

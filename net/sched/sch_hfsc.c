@@ -193,7 +193,7 @@ struct hfsc_sched
 /*
  * macros
  */
-#if PSCHED_CLOCK_SOURCE == PSCHED_GETTIMEOFDAY
+#ifdef CONFIG_NET_SCH_CLK_GETTIMEOFDAY
 #include <linux/time.h>
 #undef PSCHED_GET_TIME
 #define PSCHED_GET_TIME(stamp)						\
@@ -429,10 +429,10 @@ actlist_get_minvt(struct hfsc_class *cl, u64 cur_time)
  *	ism: (psched_us/byte) << ISM_SHIFT
  *	dx: psched_us
  *
- * Time source resolution
- *  PSCHED_JIFFIES: for 48<=HZ<=1534 resolution is between 0.63us and 1.27us.
- *  PSCHED_CPU: resolution is between 0.5us and 1us.
- *  PSCHED_GETTIMEOFDAY: resolution is exactly 1us.
+ * Clock source resolution (CONFIG_NET_SCH_CLK_*)
+ *  JIFFIES: for 48<=HZ<=1534 resolution is between 0.63us and 1.27us.
+ *  CPU: resolution is between 0.5us and 1us.
+ *  GETTIMEOFDAY: resolution is exactly 1us.
  *
  * sm and ism are scaled in order to keep effective digits.
  * SM_SHIFT and ISM_SHIFT are selected to keep at least 4 effective

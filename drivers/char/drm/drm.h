@@ -153,11 +153,11 @@ typedef struct drm_version {
 	int    version_minor;	  /**< Minor version */
 	int    version_patchlevel;/**< Patch level */
 	size_t name_len;	  /**< Length of name buffer */
-	char   *name;		  /**< Name of driver */
+	char   __user *name;	  /**< Name of driver */
 	size_t date_len;	  /**< Length of date buffer */
-	char   *date;		  /**< User-space buffer to hold date */
+	char   __user *date;	  /**< User-space buffer to hold date */
 	size_t desc_len;	  /**< Length of desc buffer */
-	char   *desc;		  /**< User-space buffer to hold desc */
+	char   __user *desc;	  /**< User-space buffer to hold desc */
 } drm_version_t;
 
 
@@ -168,13 +168,13 @@ typedef struct drm_version {
  */
 typedef struct drm_unique {
 	size_t unique_len;	  /**< Length of unique */
-	char   *unique;		  /**< Unique name for driver instantiation */
+	char   __user *unique;	  /**< Unique name for driver instantiation */
 } drm_unique_t;
 
 
 typedef struct drm_list {
 	int		 count;	  /**< Length of user-space structures */
-	drm_version_t	 *version;
+	drm_version_t	 __user *version;
 } drm_list_t;
 
 
@@ -380,7 +380,7 @@ typedef struct drm_buf_desc {
  */
 typedef struct drm_buf_info {
 	int	       count;	/**< Entries in list */
-	drm_buf_desc_t *list;
+	drm_buf_desc_t __user *list;
 } drm_buf_info_t;
 
 
@@ -389,7 +389,7 @@ typedef struct drm_buf_info {
  */
 typedef struct drm_buf_free {
 	int	       count;
-	int	       *list;
+	int	       __user *list;
 } drm_buf_free_t;
 
 
@@ -402,7 +402,7 @@ typedef struct drm_buf_pub {
 	int		  idx;	       /**< Index into the master buffer list */
 	int		  total;       /**< Buffer size */
 	int		  used;	       /**< Amount of buffer in use (for DMA) */
-	void		  *address;    /**< Address of buffer */
+	void	  __user *address;     /**< Address of buffer */
 } drm_buf_pub_t;
 
 
@@ -411,8 +411,8 @@ typedef struct drm_buf_pub {
  */
 typedef struct drm_buf_map {
 	int	      count;	/**< Length of the buffer list */
-	void	      *virtual;	/**< Mmap'd area in user-virtual */
-	drm_buf_pub_t *list;	/**< Buffer information */
+	void	      __user *virtual;	/**< Mmap'd area in user-virtual */
+	drm_buf_pub_t __user *list;	/**< Buffer information */
 } drm_buf_map_t;
 
 
@@ -426,13 +426,13 @@ typedef struct drm_buf_map {
 typedef struct drm_dma {
 	int		context;	  /**< Context handle */
 	int		send_count;	  /**< Number of buffers to send */
-	int		*send_indices;	  /**< List of handles to buffers */
-	int		*send_sizes;	  /**< Lengths of data to send */
+	int	__user *send_indices;	  /**< List of handles to buffers */
+	int	__user *send_sizes;	  /**< Lengths of data to send */
 	drm_dma_flags_t flags;		  /**< Flags */
 	int		request_count;	  /**< Number of buffers requested */
 	int		request_size;	  /**< Desired size for buffers */
-	int		*request_indices; /**< Buffer information */
-	int		*request_sizes;
+	int	__user *request_indices;  /**< Buffer information */
+	int	__user *request_sizes;
 	int		granted_count;	  /**< Number of buffers granted */
 } drm_dma_t;
 
@@ -459,7 +459,7 @@ typedef struct drm_ctx {
  */
 typedef struct drm_ctx_res {
 	int		count;
-	drm_ctx_t	*contexts;
+	drm_ctx_t	__user *contexts;
 } drm_ctx_res_t;
 
 

@@ -668,7 +668,7 @@ int mga_dma_init( DRM_IOCTL_ARGS )
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
 
-	DRM_COPY_FROM_USER_IOCTL( init, (drm_mga_init_t *)data, sizeof(init) );
+	DRM_COPY_FROM_USER_IOCTL( init, (drm_mga_init_t __user *)data, sizeof(init) );
 
 	switch ( init.func ) {
 	case MGA_INIT_DMA:
@@ -693,7 +693,7 @@ int mga_dma_flush( DRM_IOCTL_ARGS )
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
 
-	DRM_COPY_FROM_USER_IOCTL( lock, (drm_lock_t *)data, sizeof(lock) );
+	DRM_COPY_FROM_USER_IOCTL( lock, (drm_lock_t __user *)data, sizeof(lock) );
 
 	DRM_DEBUG( "%s%s%s\n",
 		   (lock.flags & _DRM_LOCK_FLUSH) ?	"flush, " : "",
@@ -764,12 +764,13 @@ int mga_dma_buffers( DRM_IOCTL_ARGS )
 	DRM_DEVICE;
 	drm_device_dma_t *dma = dev->dma;
 	drm_mga_private_t *dev_priv = (drm_mga_private_t *)dev->dev_private;
+	drm_dma_t __user *argp = (void __user *)data;
 	drm_dma_t d;
 	int ret = 0;
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
 
-	DRM_COPY_FROM_USER_IOCTL( d, (drm_dma_t *)data, sizeof(d) );
+	DRM_COPY_FROM_USER_IOCTL( d, argp, sizeof(d) );
 
 	/* Please don't send us buffers.
 	 */
@@ -795,7 +796,7 @@ int mga_dma_buffers( DRM_IOCTL_ARGS )
 		ret = mga_dma_get_buffers( filp, dev, &d );
 	}
 
-	DRM_COPY_TO_USER_IOCTL( (drm_dma_t *)data, d, sizeof(d) );
+	DRM_COPY_TO_USER_IOCTL( argp, d, sizeof(d) );
 
 	return ret;
 }

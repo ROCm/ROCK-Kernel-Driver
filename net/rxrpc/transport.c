@@ -612,7 +612,6 @@ int rxrpc_trans_immediate_abort(struct rxrpc_transport *trans,
 	struct sockaddr_in sin;
 	struct msghdr msghdr;
 	struct kvec iov[2];
-	mm_segment_t oldfs;
 	uint32_t _error;
 	int len, ret;
 
@@ -649,12 +648,6 @@ int rxrpc_trans_immediate_abort(struct rxrpc_transport *trans,
 
 	msghdr.msg_name		= &sin;
 	msghdr.msg_namelen	= sizeof(sin);
-	/*
-	 * the following is safe, since for compiler definitions of kvec and
-	 * iovec are identical, yielding the same in-core layout and alignment
-	 */
-	msghdr.msg_iov		= (struct iovec *)iov;
-	msghdr.msg_iovlen	= 2;
 	msghdr.msg_control	= NULL;
 	msghdr.msg_controllen	= 0;
 	msghdr.msg_flags	= MSG_DONTWAIT;
@@ -666,10 +659,7 @@ int rxrpc_trans_immediate_abort(struct rxrpc_transport *trans,
 	     htons(sin.sin_port));
 
 	/* send the message */
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sock_sendmsg(trans->socket, &msghdr, len);
-	set_fs(oldfs);
+	ret = kernel_sendmsg(trans->socket, &msghdr, iov, 2, len);
 
 	_leave(" = %d", ret);
 	return ret;
@@ -688,7 +678,6 @@ static void rxrpc_trans_receive_error_report(struct rxrpc_transport *trans)
 	struct list_head connq, *_p;
 	struct errormsg emsg;
 	struct msghdr msg;
-	mm_segment_t oldfs;
 	uint16_t port;
 	int local, err;
 
@@ -700,17 +689,12 @@ static void rxrpc_trans_receive_error_report(struct rxrpc_transport *trans)
 		/* try and receive an error message */
 		msg.msg_name	= &sin;
 		msg.msg_namelen	= sizeof(sin);
-		msg.msg_iov	= NULL;
-		msg.msg_iovlen	= 0;
 		msg.msg_control	= &emsg;
 		msg.msg_controllen = sizeof(emsg);
 		msg.msg_flags	= 0;
 
-		oldfs = get_fs();
-		set_fs(KERNEL_DS);
-		err = sock_recvmsg(trans->socket, &msg, 0,
+		err = kernel_recvmsg(trans->socket, &msg, NULL, 0, 0,
 				   MSG_ERRQUEUE | MSG_DONTWAIT | MSG_TRUNC);
-		set_fs(oldfs);
 
 		if (err == -EAGAIN) {
 			_leave("");
