@@ -318,6 +318,7 @@ void __exit agp_exit(void)
 {
 }
 
+#ifdef MODULE
 static __init int agp_setup(char *s)
 {
 	if (!strcmp(s,"off"))
@@ -327,6 +328,7 @@ static __init int agp_setup(char *s)
 	return 1;	
 }
 __setup("agp=", agp_setup);
+#endif
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION("AGP GART driver");
