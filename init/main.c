@@ -335,7 +335,6 @@ asmlinkage void __init start_kernel(void)
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
  */
-	lock_kernel();
 	printk(linux_banner);
 	setup_arch(&command_line);
 	setup_per_cpu_areas();
@@ -402,6 +401,9 @@ asmlinkage void __init start_kernel(void)
 	printk("POSIX conformance testing by UNIFIX\n");
 
 	init_idle(current, smp_processor_id());
+
+	lock_kernel();
+
 	/* 
 	 *	We count on the initial thread going ok 
 	 *	Like idlers init is an unlocked kernel thread, which will
