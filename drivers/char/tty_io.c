@@ -150,8 +150,7 @@ extern void con3215_init(void);
 extern void tty3215_init(void);
 extern void tub3270_con_init(void);
 extern void tub3270_init(void);
-extern void rs285_console_init(void);
-extern void sa1100_rs_console_init(void);
+extern void uart_console_init(void);
 extern void sgi_serial_console_init(void);
 extern void sci_console_init(void);
 extern void tx3912_console_init(void);
@@ -2221,17 +2220,11 @@ void __init console_init(void)
 #ifdef CONFIG_STDIO_CONSOLE
 	stdio_console_init();
 #endif
-#ifdef CONFIG_SERIAL_21285_CONSOLE
-	rs285_console_init();
-#endif
-#ifdef CONFIG_SERIAL_SA1100_CONSOLE
-	sa1100_rs_console_init();
+#ifdef CONFIG_SERIAL_CORE_CONSOLE
+	uart_console_init();
 #endif
 #ifdef CONFIG_ARC_CONSOLE
 	arc_console_init();
-#endif
-#ifdef CONFIG_SERIAL_AMBA_CONSOLE
-	ambauart_console_init();
 #endif
 #ifdef CONFIG_SERIAL_TX3912_CONSOLE
 	tx3912_console_init();
