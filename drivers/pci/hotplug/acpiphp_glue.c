@@ -66,7 +66,7 @@ static void handle_hotplug_event_func (acpi_handle, u32, void *);
  *  4. ..
  *
  */
-static int is_ejectable (acpi_handle handle)
+static int is_ejectable(acpi_handle handle)
 {
 	acpi_status status;
 	acpi_handle tmp;
@@ -326,10 +326,10 @@ static void decode_hpp(struct acpiphp_bridge *bridge)
 	bridge->hpp.enable_PERR = package->package.elements[3].integer.value;
 
 	dbg("_HPP parameter = (%02x, %02x, %02x, %02x)\n",
-	    bridge->hpp.cache_line_size,
-	    bridge->hpp.latency_timer,
-	    bridge->hpp.enable_SERR,
-	    bridge->hpp.enable_PERR);
+		bridge->hpp.cache_line_size,
+		bridge->hpp.latency_timer,
+		bridge->hpp.enable_SERR,
+		bridge->hpp.enable_PERR);
 
 	bridge->flags |= BRIDGE_HAS_HPP;
 
