@@ -535,7 +535,7 @@ int ubd_init(void)
 	INIT_ELV(ubd_queue, &ubd_queue->elevator);
 	INIT_HARDSECT(hardsect_size, MAJOR_NR, hardsect_sizes);
 	for(i = 0; i < MAX_DEV; i++)
-		add_gendisk(&ubd_gendisk[i]);
+		add_disk(&ubd_gendisk[i]);
 	if(fake_major != 0){
 		char name[sizeof("ubd_nnn\0")];
 
@@ -549,7 +549,7 @@ int ubd_init(void)
 		blk_dev[fake_major].queue = ubd_get_queue;
 		INIT_HARDSECT(hardsect_size, fake_major, hardsect_sizes);
 		for(i = 0; i < MAX_DEV; i++)
-			add_gendisk(&fake_gendisk[i]);
+			add_disk(&fake_gendisk[i]);
 	}
 	for(i = 0; i < MAX_DEV; i++) 
 		ubd_add(i);
