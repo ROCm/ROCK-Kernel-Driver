@@ -239,8 +239,8 @@ static int ohci_urb_enqueue (
 		goto fail;
 	}
 
-	/* schedule the ed if needed */
-	if (ed->state == ED_IDLE) {
+	if (ed->state == ED_IDLE || ed->state == ED_DESCHEDULED) {
+		/* schedule the ed if needed */
 		retval = ed_schedule (ohci, ed);
 		if (retval < 0)
 			goto fail0;
@@ -347,6 +347,10 @@ rescan:
 	if (!HCD_IS_RUNNING (ohci->hcd.state))
 		ed->state = ED_IDLE;
 	switch (ed->state) {
+	case ED_DESCHEDULED:
+		start_ed_unlink (ohci, ed);
+		BUG_ON (ed->state != ED_UNLINK);
+		/* fall through */
 	case ED_UNLINK:		/* wait for hw to finish? */
 		/* major IRQ delivery trouble loses INTR_SF too... */
 		WARN_ON (limit-- == 0);

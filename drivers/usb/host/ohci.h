@@ -48,6 +48,7 @@ struct ed {
 #define ED_IDLE 	0x00		/* NOT linked to HC */
 #define ED_UNLINK 	0x01		/* being unlinked from hc */
 #define ED_OPER		0x02		/* IS linked to hc */
+#define ED_DESCHEDULED	0x03		/* idle for HCD, but HC may still hold reference to it */
 
 	u8			type; 		/* PIPE_{BULK,...} */
 
