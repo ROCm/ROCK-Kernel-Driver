@@ -635,7 +635,7 @@ unsigned char * pnp_write_resources(unsigned char * p, unsigned char * end, stru
 		{
 			if (len != 2)
 				goto sm_err;
-			write_dma(p, &res->dma_resource[irq]);
+			write_dma(p, &res->dma_resource[dma]);
 			dma++;
 			break;
 		}
