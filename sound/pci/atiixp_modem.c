@@ -571,6 +571,8 @@ static int snd_atiixp_chip_start(atiixp_t *chip)
 	/* set up spdif, enable burst mode */
 	reg = atiixp_read(chip, CMD);
 	reg |= ATI_REG_CMD_BURST_EN;
+	if(!(reg & ATI_REG_CMD_MODEM_PRESENT))
+		reg |= ATI_REG_CMD_MODEM_PRESENT;
 	atiixp_write(chip, CMD, reg);
 
 	/* clear all interrupt source */
