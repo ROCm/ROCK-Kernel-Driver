@@ -2083,6 +2083,8 @@ nfsd4_encode_readlink(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_r
 	 * assume that truncation occurred, and return NFS4ERR_RESOURCE.
 	 */
 	nfserr = nfsd_readlink(readlink->rl_rqstp, readlink->rl_fhp, page, &maxcount);
+	if (nfserr == nfserr_isdir)
+		return nfserr_inval;
 	if (nfserr)
 		return nfserr;
 
