@@ -481,6 +481,8 @@ static inline void  smc_rcv(struct net_device *dev)
 		packet_len, packet_len);
 
 	if (unlikely(status & RS_ERRORS)) {
+		SMC_WAIT_MMU_BUSY();
+		SMC_SET_MMU_CMD(MC_RELEASE);
 		lp->stats.rx_errors++;
 		if (status & RS_ALGNERR)
 			lp->stats.rx_frame_errors++;
@@ -509,8 +511,10 @@ static inline void  smc_rcv(struct net_device *dev)
 		if (unlikely(skb == NULL)) {
 			printk(KERN_NOTICE "%s: Low memory, packet dropped.\n",
 				dev->name);
+			SMC_WAIT_MMU_BUSY();
+			SMC_SET_MMU_CMD(MC_RELEASE);
 			lp->stats.rx_dropped++;
-			goto done;
+			return;
 		}
 
 		/* Align IP header to 32 bits */
@@ -529,6 +533,9 @@ static inline void  smc_rcv(struct net_device *dev)
 		data = skb_put(skb, data_len);
 		SMC_PULL_DATA(data, packet_len - 4);
 
+		SMC_WAIT_MMU_BUSY();
+		SMC_SET_MMU_CMD(MC_RELEASE);
+
 		PRINT_PKT(data, packet_len - 4);
 
 		dev->last_rx = jiffies;
@@ -538,10 +545,6 @@ static inline void  smc_rcv(struct net_device *dev)
 		lp->stats.rx_packets++;
 		lp->stats.rx_bytes += data_len;
 	}
-
-done:
-	SMC_WAIT_MMU_BUSY();
-	SMC_SET_MMU_CMD(MC_RELEASE);
 }
 
 #ifdef CONFIG_SMP
