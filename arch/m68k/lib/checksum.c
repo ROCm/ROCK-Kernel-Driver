@@ -243,7 +243,7 @@ csum_partial_copy_from_user(const char *src, char *dst, int len,
 	     "8:\n"
 		".section .fixup,\"ax\"\n"
 		".even\n"
-		/* If any execption occurs zero out the rest.
+		/* If any exception occurs zero out the rest.
 		   Similarities with the code above are intentional :-) */
 	     "90:\t"
 		"clrw %3@+\n\t"
