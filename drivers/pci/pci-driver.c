@@ -18,7 +18,7 @@ static int pci_device_probe(struct device * dev)
 	struct pci_dev * pci_dev = list_entry(dev,struct pci_dev,dev);
 
 	if (drv->probe)
-		error = drv->probe(pci_dev,NULL);
+		error = drv->probe(pci_dev,drv->id_table);
 	return error > 0 ? 0 : -ENODEV;
 }
 
