@@ -325,13 +325,13 @@ int tty_check_change(struct tty_struct * tty)
 		printk(KERN_WARNING "tty_check_change: tty->pgrp <= 0!\n");
 		return 0;
 	}
-	if (current->pgrp == tty->pgrp)
+	if (process_group(current) == tty->pgrp)
 		return 0;
 	if (is_ignored(SIGTTOU))
 		return 0;
-	if (is_orphaned_pgrp(current->pgrp))
+	if (is_orphaned_pgrp(process_group(current)))
 		return -EIO;
-	(void) kill_pg(current->pgrp,SIGTTOU,1);
+	(void) kill_pg(process_group(current), SIGTTOU, 1);
 	return -ERESTARTSYS;
 }
 
@@ -1406,7 +1406,7 @@ got_driver:
 		task_unlock(current);
 		current->tty_old_pgrp = 0;
 		tty->session = current->session;
-		tty->pgrp = current->pgrp;
+		tty->pgrp = process_group(current);
 	}
 	return 0;
 }
@@ -1580,7 +1580,7 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 	task_unlock(current);
 	current->tty_old_pgrp = 0;
 	tty->session = current->session;
-	tty->pgrp = current->pgrp;
+	tty->pgrp = process_group(current);
 	return 0;
 }
 

@@ -362,7 +362,7 @@ struct task_struct {
 	unsigned long personality;
 	int did_exec:1;
 	pid_t pid;
-	pid_t pgrp;
+	pid_t __pgrp;		/* Accessed via process_group() */
 	pid_t tty_old_pgrp;
 	pid_t session;
 	pid_t tgid;
@@ -377,7 +377,7 @@ struct task_struct {
 	struct task_struct *parent;	/* parent process */
 	struct list_head children;	/* list of my children */
 	struct list_head sibling;	/* linkage in my parent's children list */
-	struct task_struct *group_leader;
+	struct task_struct *group_leader;	/* threadgroup leader */
 
 	/* PID/PID hash table linkage. */
 	struct pid_link pids[PIDTYPE_MAX];
@@ -462,6 +462,11 @@ struct task_struct {
 	unsigned long ptrace_message;
 	siginfo_t *last_siginfo; /* For ptrace use.  */
 };
+
+static inline pid_t process_group(struct task_struct *tsk)
+{
+	return tsk->group_leader->__pgrp;
+}
 
 extern void __put_task_struct(struct task_struct *tsk);
 #define get_task_struct(tsk) do { atomic_inc(&(tsk)->usage); } while(0)

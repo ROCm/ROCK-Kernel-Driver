@@ -1004,7 +1004,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	attach_pid(p, PIDTYPE_PID, p->pid);
 	if (thread_group_leader(p)) {
 		attach_pid(p, PIDTYPE_TGID, p->tgid);
-		attach_pid(p, PIDTYPE_PGID, p->pgrp);
+		attach_pid(p, PIDTYPE_PGID, process_group(p));
 		attach_pid(p, PIDTYPE_SID, p->session);
 		if (p->pid)
 			__get_cpu_var(process_counts)++;

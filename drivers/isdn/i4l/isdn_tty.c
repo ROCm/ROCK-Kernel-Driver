@@ -1989,7 +1989,8 @@ modem_write_profile(atemu * m)
 	memcpy(m->pmsn, m->msn, ISDN_MSNLEN);
 	memcpy(m->plmsn, m->lmsn, ISDN_LMSNLEN);
 	if ((get_isdn_dev())->profd)
-		kill_pg_info(SIGIO, SEND_SIG_PRIV, (get_isdn_dev())->profd->pgrp);
+		kill_pg_info(SIGIO, SEND_SIG_PRIV,
+			process_group((get_isdn_dev())->profd));
 }
 
 static struct tty_operations modem_ops = {
