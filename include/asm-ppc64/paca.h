@@ -60,8 +60,11 @@ struct paca_struct {
 	struct ItLpPaca *xLpPacaPtr;	/* Pointer to LpPaca for PLIC		0x00 */
 	struct ItLpRegSave *xLpRegSavePtr; /* Pointer to LpRegSave for PLIC	0x08 */
 	u64 xCurrent;  		        /* Pointer to current			0x10 */
-	u16 xPacaIndex;			/* Logical processor number		0x18 */
-        u16 xHwProcNum;                 /* Physical processor number            0x1A */
+	/* Note: the spinlock functions in arch/ppc64/lib/locks.c load lock_token and
+	   xPacaIndex with a single lwz instruction, using the constant offset 24.
+	   If you move either field, fix the spinlocks and rwlocks. */
+	u16 lock_token;			/* Constant 0x8000, used in spinlocks	0x18 */
+	u16 xPacaIndex;			/* Logical processor number		0x1A */
 	u32 default_decr;		/* Default decrementer value		0x1c */	
 	u64 xKsave;			/* Saved Kernel stack addr or zero	0x20 */
 	struct ItLpQueue *lpQueuePtr;	/* LpQueue handled by this processor    0x28 */
@@ -70,7 +73,8 @@ struct paca_struct {
 	u8 *exception_sp;		/*                                      0x50 */
 	u8 xProcEnabled;		/*                                      0x58 */
 	u8 prof_enabled;		/* 1=iSeries profiling enabled          0x59 */
-	u8 resv1[38];			/*					0x5a-0x7f*/
+	u16 xHwProcNum;			/* Physical processor number		0x5a */
+	u8 resv1[36];			/*					0x5c */
 
 /*=====================================================================================
  * CACHE_LINE_2 0x0080 - 0x00FF
