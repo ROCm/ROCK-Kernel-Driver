@@ -505,6 +505,7 @@ EXPORT_SYMBOL(vsscanf);
 EXPORT_SYMBOL(kdevname);
 EXPORT_SYMBOL(__bdevname);
 EXPORT_SYMBOL(cdevname);
+EXPORT_SYMBOL(simple_strtoull);
 EXPORT_SYMBOL(simple_strtoul);
 EXPORT_SYMBOL(simple_strtol);
 EXPORT_SYMBOL(system_utsname);	/* UTS data */
