@@ -426,8 +426,7 @@ static void dev_forward_change(struct inet6_dev *idev)
 	}
 	for (ifa=idev->addr_list; ifa; ifa=ifa->if_next) {
 		ipv6_addr_prefix(&addr, &ifa->addr, ifa->prefix_len);
-		if (addr.s6_addr32[0] == 0 && addr.s6_addr32[1] == 0 &&
-		    addr.s6_addr32[2] == 0 && addr.s6_addr32[3] == 0)
+		if (ipv6_addr_any(&addr))
 			continue;
 		if (idev->cnf.forwarding)
 			ipv6_dev_ac_inc(idev->dev, &addr);
@@ -2030,8 +2029,7 @@ static void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 		struct in6_addr addr;
 
 		ipv6_addr_prefix(&addr, &ifp->addr, ifp->prefix_len);
-		if (addr.s6_addr32[0] || addr.s6_addr32[1] ||
-		    addr.s6_addr32[2] || addr.s6_addr32[3])
+		if (!ipv6_addr_any(&addr))
 			ipv6_dev_ac_inc(ifp->idev->dev, &addr);
 	}
 }
@@ -2368,8 +2366,7 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 			struct in6_addr addr;
 
 			ipv6_addr_prefix(&addr, &ifp->addr, ifp->prefix_len);
-			if (addr.s6_addr32[0] || addr.s6_addr32[1] ||
-			    addr.s6_addr32[2] || addr.s6_addr32[3])
+			if (!ipv6_addr_any(&addr))
 				ipv6_dev_ac_dec(ifp->idev->dev, &addr);
 		}
 		if (!ipv6_chk_addr(&ifp->addr, NULL))
