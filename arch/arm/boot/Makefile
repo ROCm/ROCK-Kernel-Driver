@@ -64,25 +64,12 @@ params_phys-$(CONFIG_ARCH_VERSATILE_PB)	:= 0x00000100
 initrd_phys-$(CONFIG_ARCH_VERSATILE_PB)	:= 0x00800000
 
 ZRELADDR    := $(zreladdr-y)
-ZTEXTADDR   := $(ztextaddr-y)
 PARAMS_PHYS := $(params_phys-y)
 INITRD_PHYS := $(initrd_phys-y)
-#
-# We now have a PIC decompressor implementation.  Decompressors running
-# from RAM should not define ZTEXTADDR.  Decompressors running directly
-# from ROM or Flash must define ZTEXTADDR (preferably via the config)
-# FIXME: Previous assignment to ztextaddr-y is lost here. See SHARK
-ifeq ($(CONFIG_ZBOOT_ROM),y)
-ZTEXTADDR	:= $(CONFIG_ZBOOT_ROM_TEXT)
-ZBSSADDR	:= $(CONFIG_ZBOOT_ROM_BSS)
-else
-ZTEXTADDR	:= 0
-ZBSSADDR	:= ALIGN(4)
-endif
 
-export	ZTEXTADDR ZBSSADDR ZRELADDR INITRD_PHYS PARAMS_PHYS
+export ZRELADDR INITRD_PHYS PARAMS_PHYS
 
-targets := Image zImage bootpImage
+targets := Image zImage bootpImage uImage
 
 $(obj)/Image: vmlinux FORCE
 	$(call if_changed,objcopy)
@@ -97,8 +84,7 @@ quiet_cmd_uimage = UIMAGE  $@
 		   -C none -a $(ZRELADDR) -e $(ZRELADDR) \
 		   -n 'Linux-$(KERNELRELEASE)' -d $< $@
 
-targets += uImage
-$(obj)/uImage:	$(obj)/zImage
+$(obj)/uImage:	$(obj)/zImage FORCE
 	$(call if_changed,uimage)
 	@echo '  Image $@ is ready'
 
