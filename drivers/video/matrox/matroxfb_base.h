@@ -99,20 +99,15 @@
 #endif
 #endif
 
-#if defined(__alpha__) || defined(__mc68000__)
+#if defined(__alpha__) || defined(__mc68000__) || defined(__i386__) || defined(__x86_64__)
 #define READx_WORKS
 #define MEMCPYTOIO_WORKS
 #else
+/* ppc/ppc64 must use __raw_{read,write}[bwl] as we drive adapter 
+   in big-endian mode for compatibility with XFree mga driver, and
+   so we do not want little-endian {read,write}[bwl] */
 #define READx_FAILS
-/* recheck __ppc__, maybe that __ppc__ needs MEMCPYTOIO_WRITEL */
-/* I benchmarked PII/350MHz with G200... MEMCPY, MEMCPYTOIO and WRITEL are on same speed ( <2% diff) */
-/* so that means that G200 speed (or AGP speed?) is our limit... I do not have benchmark to test, how */
-/* much of PCI bandwidth is used during transfers... */
-#if defined(__i386__) || defined(__x86_64__)
-#define MEMCPYTOIO_MEMCPY
-#else
 #define MEMCPYTOIO_WRITEL
-#endif
 #endif
 
 #if defined(__mc68000__)
@@ -160,7 +155,7 @@
 #endif
 
 typedef struct {
-	u_int8_t*	vaddr;
+	u_int8_t __iomem*	vaddr;
 } vaddr_t;
 
 #ifdef READx_WORKS
@@ -189,27 +184,27 @@ static inline void mga_writel(vaddr_t va, unsigned int offs, u_int32_t value) {
 }
 #else
 static inline unsigned int mga_readb(vaddr_t va, unsigned int offs) {
-	return *(volatile u_int8_t*)(va.vaddr + offs);
+	return __raw_readb(va.vaddr + offs);
 }
 
 static inline unsigned int mga_readw(vaddr_t va, unsigned int offs) {
-	return *(volatile u_int16_t*)(va.vaddr + offs);
+	return __raw_readw(va.vaddr + offs);
 }
 
 static inline u_int32_t mga_readl(vaddr_t va, unsigned int offs) {
-	return *(volatile u_int32_t*)(va.vaddr + offs);
+	return __raw_readl(va.vaddr + offs);
 }
 
 static inline void mga_writeb(vaddr_t va, unsigned int offs, u_int8_t value) {
-	*(volatile u_int8_t*)(va.vaddr + offs) = value;
+	__raw_writeb(value, va.vaddr + offs);
 }
 
 static inline void mga_writew(vaddr_t va, unsigned int offs, u_int16_t value) {
-	*(volatile u_int16_t*)(va.vaddr + offs) = value;
+	__raw_writew(value, va.vaddr + offs);
 }
 
 static inline void mga_writel(vaddr_t va, unsigned int offs, u_int32_t value) {
-	*(volatile u_int32_t*)(va.vaddr + offs) = value;
+	__raw_writel(value, va.vaddr + offs);
 }
 #endif
 
@@ -238,8 +233,6 @@ static inline void mga_memcpy_toio(vaddr_t va, unsigned int offs, const void* sr
 		memcpy(&tmp, src, len);
 		mga_writel(va, offs, tmp);
 	}
-#elif defined(MEMCPYTOIO_MEMCPY)
-	memcpy(va.vaddr + offs, src, len);
 #else
 #error "Sorry, do not know how to write block of data to device"
 #endif
@@ -249,7 +242,7 @@ static inline void vaddr_add(vaddr_t* va, unsigned long offs) {
 	va->vaddr += offs;
 }
 
-static inline void* vaddr_va(vaddr_t va) {
+static inline void __iomem* vaddr_va(vaddr_t va) {
 	return va.vaddr;
 }
 
