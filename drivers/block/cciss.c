@@ -2617,7 +2617,7 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 static struct pci_driver cciss_pci_driver = {
 	name:		"cciss",
 	probe:		cciss_init_one,
-	remove:		cciss_remove_one,
+	remove:		__devexit_p(cciss_remove_one),
 	id_table:	cciss_pci_device_id, /* id_table */
 };
 

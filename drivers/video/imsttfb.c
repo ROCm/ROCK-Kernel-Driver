@@ -1643,7 +1643,7 @@ static struct pci_driver imsttfb_pci_driver = {
 	name:		"imsttfb",
 	id_table:	imsttfb_pci_tbl,
 	probe:		imsttfb_probe,
-	remove:		imsttfb_remove,
+	remove:		__devexit_p(imsttfb_remove),
 };
 
 static struct fb_ops imsttfb_ops = {

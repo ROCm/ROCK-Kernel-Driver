@@ -84,8 +84,8 @@ titan_update_irq_hw(unsigned long mask)
 	*dim3;
 #else
 	volatile unsigned long *dimB;
-	if (bcpu == 0) dimB = &cchip->dim0.csr;
-	else if (bcpu == 1) dimB = &cchip->dim1.csr;
+	dimB = &cchip->dim0.csr;
+	if (bcpu == 1) dimB = &cchip->dim1.csr;
 	else if (bcpu == 2) dimB = &cchip->dim2.csr;
 	else if (bcpu == 3) dimB = &cchip->dim3.csr;
 
@@ -190,9 +190,6 @@ init_titan_irqs(struct hw_interrupt_type * ops, int imin, int imax)
 static void __init
 privateer_init_irq(void)
 {
-	extern asmlinkage void entInt(void);
-	int cpu;
-
 	outb(0, DMA1_RESET_REG);
 	outb(0, DMA2_RESET_REG);
 	outb(DMA_MODE_CASCADE, DMA2_MODE_REG);

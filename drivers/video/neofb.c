@@ -2332,7 +2332,7 @@ static struct pci_driver neofb_driver = {
   name:      "neofb",
   id_table:  neofb_devices,
   probe:     neofb_probe,
-  remove:    neofb_remove
+  remove:    __devexit_p(neofb_remove)
 };
 
 /* **************************** init-time only **************************** */
