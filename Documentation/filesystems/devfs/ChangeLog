@@ -1965,3 +1965,13 @@ Changes for patch v217
 - Updated README from master HTML file
 
 - Fixed module unload race in <devfs_open>
+===============================================================================
+Changes for patch v218
+
+- Removed DEVFS_FL_AUTO_OWNER flag
+
+- Switched lingering structure field initialiser to ISO C
+
+- Added locking when setting/clearing flags
+
+- Documentation fix in fs/devfs/util.c
