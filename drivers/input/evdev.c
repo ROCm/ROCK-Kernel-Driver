@@ -218,7 +218,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			return put_user(EV_VERSION, (int *) arg);
 
 		case EVIOCGID:
-			return copy_to_user((void *) arg, &dev->id, sizeof(struct input_id));
+			return copy_to_user((void *) arg, &dev->id, sizeof(struct input_id)) ? -EFAULT : 0;
 		
 		case EVIOCGREP:
 			if (put_user(dev->rep[0], ((int *) arg) + 0)) return -EFAULT;
