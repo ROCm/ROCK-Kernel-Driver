@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.3 2003/05/28 10:54:23 dwmw2 Exp $
+# $Id: Kconfig,v 1.4 2003/05/28 15:18:54 dwmw2 Exp $
 
 menu "Self-contained MTD device drivers"
 	depends on MTD!=n
@@ -148,20 +148,16 @@ config MTD_DOC2001
 	  chips.
 
 config MTD_DOC2001PLUS
-	tristate "M-Systems Disk-On-Chip Millennium-only alternative driver (see help)"
+	tristate "M-Systems Disk-On-Chip Millennium Plus"
 	depends on MTD
 	---help---
-	  This provides an alternative MTD device driver for the M-Systems 
-	  DiskOnChip Millennium devices.  Use this if you have problems with
-	  the combined DiskOnChip 2000 and Millennium driver above.  To get
-	  the DiskOnChip probe code to load and use this driver instead of
-	  the other one, you will need to undefine DOC_SINGLE_DRIVER near
-	  the beginning of <file:drivers/mtd/devices/docprobe.c>.
+	  This provides an MTD device driver for the M-Systems DiskOnChip
+	  Millennium Plus devices.
 
-	  If you use this device, you probably also want to enable the NFTL
-	  'NAND Flash Translation Layer' option below, which is used to
-	  emulate a block device by using a kind of file system on the flash
-	  chips.
+	  If you use this device, you probably also want to enable the INFTL
+	  'Inverse NAND Flash Translation Layer' option below, which is used
+	  to emulate a block device by using a kind of file system on the 
+	  flash chips.
 
 config MTD_DOCPROBE
 	tristate

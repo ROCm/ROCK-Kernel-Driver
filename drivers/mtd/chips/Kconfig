@@ -1,5 +1,5 @@
 # drivers/mtd/chips/Kconfig
-# $Id: Kconfig,v 1.2 2003/05/28 10:59:06 dwmw2 Exp $
+# $Id: Kconfig,v 1.3 2003/05/28 15:13:24 dwmw2 Exp $
 
 menu "RAM/ROM/Flash chip drivers"
 	depends on MTD!=n
@@ -106,6 +106,13 @@ config MTD_CFI_B4
 	  If you wish to support CFI devices on a physical bus which is
 	  32 bits wide, say 'Y'.
 
+config MTD_CFI_B8
+	bool "Support 64-bit buswidth"
+	depends on MTD_CFI_GEOMETRY
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  64 bits wide, say 'Y'.
+
 config MTD_CFI_I1
 	bool "Support 1-chip flash interleave" if !MTD_CFI_B1
 	depends on MTD_CFI_GEOMETRY
@@ -126,6 +133,13 @@ config MTD_CFI_I4
 	depends on MTD_CFI_GEOMETRY
 	help
 	  If your flash chips are interleaved in fours - i.e. you have four
+	  flash chips addressed by each bus cycle, then say 'Y'.
+
+config MTD_CFI_I8
+	bool "Support 8-chip flash interleave"
+	depends on MTD_CFI_GEOMETRY
+	help
+	  If your flash chips are interleaved in eights - i.e. you have eight
 	  flash chips addressed by each bus cycle, then say 'Y'.
 
 config MTD_CFI_INTELEXT

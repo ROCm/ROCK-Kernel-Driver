@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.10 2003/05/28 11:34:44 dwmw2 Exp $
+# $Id: Kconfig,v 1.11 2003/05/28 15:16:56 dwmw2 Exp $
 
 menu "Mapping drivers for chip access"
 	depends on MTD!=n
@@ -458,7 +458,7 @@ config MTD_H720X
 # This needs CFI or JEDEC, depending on the cards found.
 config MTD_PCI
 	tristate "PCI MTD driver"
-	depends on MTD && PCI
+	depends on MTD && PCI && MTD_COMPLEX_MAPPINGS
 	help
 	  Mapping for accessing flash devices on add-in cards like the Intel XScale
 	  IQ80310 card, and the Intel EBSA285 card in blank ROM programming mode
@@ -468,7 +468,7 @@ config MTD_PCI
 
 config MTD_PCMCIA
 	tristate "PCMCIA MTD driver"
-	depends on MTD && PCMCIA
+	depends on MTD && PCMCIA && MTD_COMPLEX_MAPPINGS
 	help
 	  Map driver for accessing PCMCIA linear flash memory cards. These
 	  cards are usually around 4-16MiB in size. This does not include

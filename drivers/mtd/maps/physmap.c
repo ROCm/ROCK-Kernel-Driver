@@ -59,6 +59,7 @@ static struct mtd_partition physmap_partitions[] = {
 };
 
 #define NUM_PARTITIONS	(sizeof(physmap_partitions)/sizeof(struct mtd_partition))
+const char *part_probes = {"cmdlinepart", "RedBoot", NULL};
 
 #endif /* CONFIG_MTD_PARTITIONS */
 
@@ -86,7 +87,7 @@ int __init init_physmap(void)
 		mymtd->owner = THIS_MODULE;
 
 #ifdef CONFIG_MTD_PARTITIONS
-		mtd_parts_nb = parse_mtd_partitions(mymtd, probes, 
+		mtd_parts_nb = parse_mtd_partitions(mymtd, part_probes, 
 						    &mtd_parts, 0);
 
 		if (mtd_parts_nb > 0)
@@ -120,7 +121,7 @@ static void __exit cleanup_physmap(void)
 		del_mtd_partitions(mymtd);
 		kfree(mtd_parts);
 	} else if (NUM_PARTITIONS) {
-		del_mtd_partions(mymtd);
+		del_mtd_partitions(mymtd);
 	} else {
 		del_mtd_device(mymtd);
 	}

@@ -2,7 +2,7 @@
  * amd76xrom.c
  *
  * Normal mappings of chips in physical memory
- * $Id: amd76xrom.c,v 1.7 2003/05/21 12:45:17 dwmw2 Exp $
+ * $Id: amd76xrom.c,v 1.8 2003/05/28 15:44:28 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -102,7 +102,7 @@ static int __devinit amd76xrom_init_one (struct pci_dev *pdev,
 		if (rom_size > window->size) {
 			continue;
 		}
-		info->map.phys = window->start + window->size - rom_size
+		info->map.phys = window->start + window->size - rom_size;
 		info->map.virt = 
 			info->window_addr + window->size - rom_size;
 		info->map.size = rom_size;
