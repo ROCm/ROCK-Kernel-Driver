@@ -2310,7 +2310,7 @@ int radeon_cp_cmdbuf( DRM_IOCTL_ARGS )
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	drm_file_t *filp_priv;
 	drm_device_dma_t *dma = dev->dma;
-	drm_buf_t *buf = 0;
+	drm_buf_t *buf = NULL;
 	int idx;
 	drm_radeon_cmd_buffer_t cmdbuf;
 	drm_radeon_cmd_header_t header;

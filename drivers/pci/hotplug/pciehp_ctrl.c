@@ -1454,7 +1454,7 @@ int pciehp_event_start_thread(void)
 	event_finished=0;
 
 	init_MUTEX_LOCKED(&event_semaphore);
-	pid = kernel_thread(event_thread, 0, 0);
+	pid = kernel_thread(event_thread, NULL, 0);
 
 	if (pid < 0) {
 		err ("Can't start up our event thread\n");

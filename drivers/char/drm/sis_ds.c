@@ -165,7 +165,7 @@ memHeap_t *mmInit(int ofs,
 	PMemBlock blocks;
 
 	if (size <= 0)
-		return 0;
+		return NULL;
 
 	blocks = (TMemBlock *)DRM(calloc)(1, sizeof(TMemBlock), DRM_MEM_DRIVER);
 	if (blocks != NULL) {
@@ -174,7 +174,7 @@ memHeap_t *mmInit(int ofs,
 		blocks->free = 1;
 		return (memHeap_t *)blocks;
 	} else
-		return 0;
+		return NULL;
 }
 
 /* Checks if a pointer 'b' is part of the heap 'heap' */

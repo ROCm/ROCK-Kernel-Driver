@@ -614,9 +614,9 @@ cpci_start_thread(void)
 	thread_finished = 0;
 
 	if(controller->irq) {
-		pid = kernel_thread(event_thread, 0, 0);
+		pid = kernel_thread(event_thread, NULL, 0);
 	} else {
-		pid = kernel_thread(poll_thread, 0, 0);
+		pid = kernel_thread(poll_thread, NULL, 0);
 	}
 	if(pid < 0) {
 		err("Can't start up our thread");

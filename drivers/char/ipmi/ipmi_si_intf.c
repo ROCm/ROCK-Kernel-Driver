@@ -1781,7 +1781,7 @@ static int init_one_smi(int intf_num, struct smi_info **smi)
 	/* So we know not to free it unless we have allocated one. */
 	new_smi->intf = NULL;
 	new_smi->si_sm = NULL;
-	new_smi->handlers = 0;
+	new_smi->handlers = NULL;
 
 	if (!new_smi->irq_setup) {
 		new_smi->irq = irqs[intf_num];

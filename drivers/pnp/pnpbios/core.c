@@ -130,7 +130,7 @@ static int pnp_dock_event(int dock, struct pnp_docking_station_info *info)
 	/* only one standardized param to hotplug command: type */
 	argv [0] = hotplug_path;
 	argv [1] = "dock";
-	argv [2] = 0;
+	argv [2] = NULL;
 
 	/* minimal command environment */
 	envp [i++] = "HOME=/";
@@ -153,7 +153,7 @@ static int pnp_dock_event(int dock, struct pnp_docking_station_info *info)
 	envp [i++] = scratch;
 	scratch += sprintf (scratch, "DOCK=%x/%x/%x",
 		info->location_id, info->serial, info->capabilities);
-	envp[i] = 0;
+	envp[i] = NULL;
 	
 	value = call_usermodehelper (argv [0], argv, envp, 0);
 	kfree (buf);

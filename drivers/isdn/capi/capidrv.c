@@ -1636,7 +1636,7 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 					      NULL,	/* LLC */
 					      NULL,	/* HLC */
 					      /* BChannelinformation */
-					      isleasedline ? AdditionalInfo : 0,
+					      isleasedline ? AdditionalInfo : NULL,
 					      NULL,	/* Keypadfacility */
 					      NULL,	/* Useruserdata */
 					      NULL	/* Facilitydataarray */
