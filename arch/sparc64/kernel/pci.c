@@ -205,6 +205,7 @@ void pci_config_write32(u32 *addr, u32 val)
 extern void sabre_init(int, char *);
 extern void psycho_init(int, char *);
 extern void schizo_init(int, char *);
+extern void tomatillo_init(int, char *);
 
 static struct {
 	char *model_name;
@@ -216,7 +217,9 @@ static struct {
 	{ "SUNW,psycho", psycho_init },
 	{ "pci108e,8000", psycho_init },
 	{ "SUNW,schizo", schizo_init },
-	{ "pci108e,8001", schizo_init }
+	{ "pci108e,8001", schizo_init },
+	{ "SUNW,tomatillo", tomatillo_init },
+	{ "pci108e,a801", tomatillo_init },
 };
 #define PCI_NUM_CONTROLLER_TYPES (sizeof(pci_controller_table) / \
 				  sizeof(pci_controller_table[0]))
