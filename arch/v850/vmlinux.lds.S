@@ -95,7 +95,10 @@
 			*(.initcall6.init)				      \
 			*(.initcall7.init)				      \
 		. = ALIGN (4) ;						      \
-		___initcall_end = . ;
+		___initcall_end = . ;					      \
+		___con_initcall_start = .;				      \
+			*(.con_initcall.init)				      \
+		___con_initcall_end = .;
 
 /* Contents of `init' section for a kernel that's loaded into RAM.  */
 #define RAMK_INIT_CONTENTS						      \
