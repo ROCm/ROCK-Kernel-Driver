@@ -6,7 +6,7 @@
 /* 0x54 is just a magic number to make these relatively unique ('T') */
 
 #define TCGETS		0x5401
-#define TCSETS		0x5402
+#define TCSETS		0x5402 /* Clashes with SNDCTL_TMR_START sound ioctl */
 #define TCSETSW		0x5403
 #define TCSETSF		0x5404
 #define TCGETA		0x5405
