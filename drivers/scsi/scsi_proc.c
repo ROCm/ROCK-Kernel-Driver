@@ -37,9 +37,7 @@
 /* 4K page size, but our output routines, use some slack for overruns */
 #define PROC_BLOCK_SIZE (3*1024)
 
-/* XXX: this shouldn't really be exposed to drivers. */
-struct proc_dir_entry *proc_scsi;
-EXPORT_SYMBOL(proc_scsi);
+static struct proc_dir_entry *proc_scsi;
 
 /* Protect sht->present and sht->proc_dir */
 static DECLARE_MUTEX(global_host_template_sem);

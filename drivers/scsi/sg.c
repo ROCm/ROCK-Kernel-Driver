@@ -2583,7 +2583,7 @@ sg_get_dev(int dev)
 
 static struct proc_dir_entry *sg_proc_sgp = NULL;
 
-static char sg_proc_sg_dirname[] = "sg";
+static char sg_proc_sg_dirname[] = "scsi/sg";
 
 static int sg_proc_adio_read(char *buffer, char **start, off_t offset,
 			     int size, int *eof, void *data);
@@ -2657,10 +2657,6 @@ static struct sg_proc_leaf sg_proc_leaf_arr[] = {
 				size : begin + len - offset;    \
     } while(0)
 
-/* this should _really_ be private to the scsi midlayer.  But
-   /proc/scsi/sg is an established name, so.. */
-extern struct proc_dir_entry *proc_scsi;
-
 static int
 sg_proc_init(void)
 {
@@ -2670,10 +2666,8 @@ sg_proc_init(void)
 	struct proc_dir_entry *pdep;
 	struct sg_proc_leaf * leaf;
 
-	if (!proc_scsi)
-		return 1;
 	sg_proc_sgp = create_proc_entry(sg_proc_sg_dirname,
-					S_IFDIR | S_IRUGO | S_IXUGO, proc_scsi);
+					S_IFDIR | S_IRUGO | S_IXUGO, NULL);
 	if (!sg_proc_sgp)
 		return 1;
 	for (k = 0; k < num_leaves; ++k) {
@@ -2696,11 +2690,11 @@ sg_proc_cleanup(void)
 	int num_leaves =
 	    sizeof (sg_proc_leaf_arr) / sizeof (sg_proc_leaf_arr[0]);
 
-	if ((!proc_scsi) || (!sg_proc_sgp))
+	if (!sg_proc_sgp)
 		return;
 	for (k = 0; k < num_leaves; ++k)
 		remove_proc_entry(sg_proc_leaf_arr[k].name, sg_proc_sgp);
-	remove_proc_entry(sg_proc_sg_dirname, proc_scsi);
+	remove_proc_entry(sg_proc_sg_dirname, NULL);
 }
 
 static int
