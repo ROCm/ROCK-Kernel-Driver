@@ -16,13 +16,10 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/compatmac.h>
 
+#define LOCAL_END_REQUEST
 #define MAJOR_NR MTD_BLOCK_MAJOR
 #define DEVICE_NAME "mtdblock"
-#define DEVICE_REQUEST mtdblock_request
 #define DEVICE_NR(device) (device)
-#define DEVICE_ON(device)
-#define DEVICE_OFF(device)
-#define DEVICE_NO_RANDOM
 #include <linux/blk.h>
 
 #if LINUX_VERSION_CODE < 0x20300
@@ -52,7 +49,7 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	if (inode == 0)
 		return -EINVAL;
 	
-	dev = MINOR(inode->i_rdev);
+	dev = minor(inode->i_rdev);
 	
 	mtd = get_mtd_device(NULL, dev);
 	if (!mtd)
@@ -81,7 +78,7 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
    
 	invalidate_device(inode->i_rdev, 1);
 
-	dev = MINOR(inode->i_rdev);
+	dev = minor(inode->i_rdev);
 	mtd = __get_mtd_device(NULL, dev);
 
 	if (!mtd) {
@@ -97,8 +94,15 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 	DEBUG(1, "ok\n");
 
 	release_return(0);
-}  
+}
 
+static inline void mtdblock_end_request(struct request *req, int uptodate)
+{
+	if (end_that_request_first(req, uptodate, req->hard_cur_sectors))
+		return;
+	blkdev_dequeue_request(req);
+	end_that_request_last(req);
+}
 
 static void mtdblock_request(RQFUNC_ARG)
 {
@@ -113,19 +117,19 @@ static void mtdblock_request(RQFUNC_ARG)
       INIT_REQUEST;
       current_request = CURRENT;
    
-      if (MINOR(current_request->rq_dev) >= MAX_MTD_DEVICES)
+      if (minor(current_request->rq_dev) >= MAX_MTD_DEVICES)
       {
 	 printk("mtd: Unsupported device!\n");
-	 end_request(0);
+	 mtdblock_end_request(current_request, 0);
 	 continue;
       }
       
       // Grab our MTD structure
 
-      mtd = __get_mtd_device(NULL, MINOR(current_request->rq_dev));
+      mtd = __get_mtd_device(NULL, minor(current_request->rq_dev));
       if (!mtd) {
 	      printk("MTD device %d doesn't appear to exist any more\n", CURRENT_DEV);
-	      end_request(0);
+	      mtdblock_end_request(current_request, 0);
       }
 
       if (current_request->sector << 9 > mtd->size ||
@@ -133,7 +137,7 @@ static void mtdblock_request(RQFUNC_ARG)
       {
 	 printk("mtd: Attempt to read past end of device!\n");
 	 printk("size: %x, sector: %lx, nr_sectors %lx\n", mtd->size, current_request->sector, current_request->nr_sectors);
-	 end_request(0);
+	 mtdblock_end_request(current_request, 0);
 	 continue;
       }
       
@@ -192,7 +196,7 @@ static void mtdblock_request(RQFUNC_ARG)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
 	spin_lock_irq(&io_request_lock);
 #endif
-	end_request(res);
+	mtdblock_end_request(current_request, res);
    }
 }
 
@@ -203,7 +207,7 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 {
 	struct mtd_info *mtd;
 
-	mtd = __get_mtd_device(NULL, MINOR(inode->i_rdev));
+	mtd = __get_mtd_device(NULL, minor(inode->i_rdev));
 
 	if (!mtd) return -EINVAL;
 

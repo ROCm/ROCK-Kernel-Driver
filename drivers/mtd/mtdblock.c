@@ -16,11 +16,8 @@
 
 #define MAJOR_NR MTD_BLOCK_MAJOR
 #define DEVICE_NAME "mtdblock"
-#define DEVICE_REQUEST mtdblock_request
 #define DEVICE_NR(device) (device)
-#define DEVICE_ON(device)
-#define DEVICE_OFF(device)
-#define DEVICE_NO_RANDOM
+#define LOCAL_END_REQUEST
 #include <linux/blk.h>
 /* for old kernels... */
 #ifndef QUEUE_EMPTY
@@ -283,7 +280,7 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	if (!inode)
 		return -EINVAL;
 	
-	dev = MINOR(inode->i_rdev);
+	dev = minor(inode->i_rdev);
 	if (dev >= MAX_MTD_DEVICES)
 		return -EINVAL;
 
@@ -373,7 +370,7 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 
 	invalidate_device(inode->i_rdev, 1);
 
-	dev = MINOR(inode->i_rdev);
+	dev = minor(inode->i_rdev);
 	mtdblk = mtdblks[dev];
 
 	down(&mtdblk->cache_sem);
@@ -417,18 +414,20 @@ static void handle_mtdblock_request(void)
 		INIT_REQUEST;
 		req = CURRENT;
 		spin_unlock_irq(&QUEUE->queue_lock);
-		mtdblk = mtdblks[MINOR(req->rq_dev)];
+		mtdblk = mtdblks[minor(req->rq_dev)];
 		res = 0;
 
-		if (MINOR(req->rq_dev) >= MAX_MTD_DEVICES)
+		if (minor(req->rq_dev) >= MAX_MTD_DEVICES)
 			panic(__FUNCTION__": minor out of bound");
+
+		if (req->flags & REQ_CMD)
+			goto end_req;
 
 		if ((req->sector + req->current_nr_sectors) > (mtdblk->mtd->size >> 9))
 			goto end_req;
 
 		// Handle the request
-		switch (req->cmd)
-		{
+		switch (rq_data_dir(CURRENT)) {
 			int err;
 
 			case READ:
@@ -459,7 +458,11 @@ static void handle_mtdblock_request(void)
 
 end_req:
 		spin_lock_irq(&QUEUE->queue_lock);
-		end_request(res);
+		if (!end_that_request_first(req, res, req->hard_cur_sectors)) {
+			blkdev_dequeue_request(req);
+			end_that_request_last(req);
+		}
+
 	}
 }
 
@@ -519,7 +522,7 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 {
 	struct mtdblk_dev *mtdblk;
 
-	mtdblk = mtdblks[MINOR(inode->i_rdev)];
+	mtdblk = mtdblks[minor(inode->i_rdev)];
 
 #ifdef PARANOIA
 	if (!mtdblk)
@@ -597,6 +600,8 @@ static void mtd_notify_remove(struct mtd_info* mtd)
 }
 #endif
 
+static spinlock_t mtddev_lock = SPIN_LOCK_UNLOCKED;
+
 int __init init_mtdblock(void)
 {
 	int i;
@@ -630,7 +635,7 @@ int __init init_mtdblock(void)
 	blksize_size[MAJOR_NR] = mtd_blksizes;
 	blk_size[MAJOR_NR] = mtd_sizes;
 	
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &mtdblock_request);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &mtdblock_request, &mtddev_lock);
 	kernel_thread (mtdblock_thread, NULL, CLONE_FS|CLONE_FILES|CLONE_SIGHAND);
 	return 0;
 }
