@@ -38,7 +38,6 @@
 #include <linux/binfmts.h>
 #include <linux/swap.h>
 #include <linux/utsname.h>
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/namei.h>
 #include <linux/proc_fs.h>

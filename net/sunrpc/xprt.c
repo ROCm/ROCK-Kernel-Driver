@@ -175,10 +175,10 @@ __xprt_lock_write_next(struct rpc_xprt *xprt)
 
 	if (xprt->snd_task)
 		return;
-	if (!xprt->nocong && RPCXPRT_CONGESTED(xprt))
-		return;
 	task = rpc_wake_up_next(&xprt->resend);
 	if (!task) {
+		if (!xprt->nocong && RPCXPRT_CONGESTED(xprt))
+			return;
 		task = rpc_wake_up_next(&xprt->sending);
 		if (!task)
 			return;
@@ -1071,7 +1071,6 @@ xprt_timer(struct rpc_task *task)
 		}
 		rpc_inc_timeo(&task->tk_client->cl_rtt);
 		xprt_adjust_cwnd(req->rq_xprt, -ETIMEDOUT);
-		__xprt_put_cong(xprt, req);
 	}
 	req->rq_nresend++;
 
@@ -1211,10 +1210,7 @@ xprt_transmit(struct rpc_task *task)
 		req->rq_bytes_sent = 0;
 	}
  out_release:
-	spin_lock_bh(&xprt->sock_lock);
-	__xprt_release_write(xprt, task);
-	__xprt_put_cong(xprt, req);
-	spin_unlock_bh(&xprt->sock_lock);
+	xprt_release_write(xprt, task);
 	return;
  out_receive:
 	dprintk("RPC: %4d xmit complete\n", task->tk_pid);

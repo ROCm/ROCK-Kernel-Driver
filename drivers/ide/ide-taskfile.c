@@ -1670,7 +1670,7 @@ abort:
 
 #else
 
-	int err = 0;
+	int err = -EIO;
 	u8 args[4], *argbuf = args;
 	u8 xfer_rate = 0;
 	int argsize = 0;
