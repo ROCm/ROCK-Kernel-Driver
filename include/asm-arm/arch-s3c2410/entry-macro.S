@@ -8,11 +8,12 @@
  * warranty of any kind, whether express or implied.
  */
 
-		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
 
-30000:
+	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+
 		mov	\tmp, #S3C2410_VA_IRQ
 		ldr	\irqnr, [ \tmp, #0x14 ]		@ get irq no
+30000:
 		teq	\irqnr, #4
 		teqne	\irqnr, #5
 		beq	1002f				@ external irq reg
@@ -29,15 +30,17 @@
 		tst	\irqstat, #1
 		bne	20002f
 
+		/* debug/warning if we get an invalud response from the
+		 * INTOFFSET register */
 #if 1
-		stmfd	r13!, { r0 - r4 , r14 }
-		ldr	r1,	[ \tmp, #0x14 ]		@ intoffset
+		stmfd	r13!, { r0 - r4 , r8-r12, r14 }
+		ldr	r1,	[ \tmp, #0x14 ]		@ INTOFFSET
 		ldr	r2,	[ \tmp, #0x10 ]		@ INTPND
 		ldr	r3,	[ \tmp, #0x00 ]		@ SRCPND
 		adr	r0, 20003f
 		bl	printk
 		b	20004f
-#endif
+
 20003:
 		.ascii	"<7>irq: err - bad offset %d, intpnd=%08x, srcpnd=%08x\n"
 		.byte	0
@@ -45,7 +48,8 @@
 20004:
 		mov	r1, #1
 		mov	\tmp, #S3C2410_VA_IRQ
-		ldmfd	r13!, { r0 - r4 , r14 }
+		ldmfd	r13!, { r0 - r4 , r8-r12, r14 }
+#endif
 
 		@ try working out interript number for ourselves
 		mov	\irqnr, #0
