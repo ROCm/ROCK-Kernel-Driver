@@ -709,6 +709,7 @@ acpi_hw_low_level_read (
 	u32                             *value,
 	struct acpi_generic_address     *reg)
 {
+	u64                             address;
 	acpi_status                     status;
 
 
@@ -720,8 +721,14 @@ acpi_hw_low_level_read (
 	 * a non-zero address within. However, don't return an error
 	 * because the PM1A/B code must not fail if B isn't present.
 	 */
-	if ((!reg) ||
-		(!reg->address)) {
+	if (!reg) {
+		return (AE_OK);
+	}
+
+	/* Get a local copy of the address.  Handles possible alignment issues */
+
+	ACPI_MOVE_64_TO_64 (&address, &reg->address);
+	if (!address) {
 		return (AE_OK);
 	}
 	*value = 0;
@@ -734,14 +741,14 @@ acpi_hw_low_level_read (
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 
 		status = acpi_os_read_memory (
-				 (acpi_physical_address) reg->address,
+				 (acpi_physical_address) address,
 				 value, width);
 		break;
 
 
 	case ACPI_ADR_SPACE_SYSTEM_IO:
 
-		status = acpi_os_read_port ((acpi_io_address) reg->address,
+		status = acpi_os_read_port ((acpi_io_address) address,
 				 value, width);
 		break;
 
@@ -754,7 +761,7 @@ acpi_hw_low_level_read (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Read:  %8.8X width %2d from %8.8X%8.8X (%s)\n",
 			*value, width,
-			ACPI_FORMAT_UINT64 (reg->address),
+			ACPI_FORMAT_UINT64 (address),
 			acpi_ut_get_region_name (reg->address_space_id)));
 
 	return (status);
@@ -781,6 +788,7 @@ acpi_hw_low_level_write (
 	u32                             value,
 	struct acpi_generic_address     *reg)
 {
+	u64                             address;
 	acpi_status                     status;
 
 
@@ -792,8 +800,14 @@ acpi_hw_low_level_write (
 	 * a non-zero address within. However, don't return an error
 	 * because the PM1A/B code must not fail if B isn't present.
 	 */
-	if ((!reg) ||
-		(!reg->address)) {
+	if (!reg) {
+		return (AE_OK);
+	}
+
+	/* Get a local copy of the address.  Handles possible alignment issues */
+
+	ACPI_MOVE_64_TO_64 (&address, &reg->address);
+	if (!address) {
 		return (AE_OK);
 	}
 
@@ -805,14 +819,14 @@ acpi_hw_low_level_write (
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 
 		status = acpi_os_write_memory (
-				 (acpi_physical_address) reg->address,
+				 (acpi_physical_address) address,
 				 value, width);
 		break;
 
 
 	case ACPI_ADR_SPACE_SYSTEM_IO:
 
-		status = acpi_os_write_port ((acpi_io_address) reg->address,
+		status = acpi_os_write_port ((acpi_io_address) address,
 				 value, width);
 		break;
 
@@ -825,7 +839,7 @@ acpi_hw_low_level_write (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Wrote: %8.8X width %2d   to %8.8X%8.8X (%s)\n",
 			value, width,
-			ACPI_FORMAT_UINT64 (reg->address),
+			ACPI_FORMAT_UINT64 (address),
 			acpi_ut_get_region_name (reg->address_space_id)));
 
 	return (status);

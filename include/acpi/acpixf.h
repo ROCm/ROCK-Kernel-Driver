@@ -300,6 +300,15 @@ acpi_install_gpe_handler (
 	void                            *context);
 
 acpi_status
+acpi_install_exception_handler (
+	acpi_exception_handler          handler);
+
+
+/*
+ * Event interfaces
+ */
+
+acpi_status
 acpi_acquire_global_lock (
 	u16                             timeout,
 	u32                             *handle);

@@ -60,17 +60,18 @@
  * Dispatch table for opcode classes
  */
 static ACPI_EXECUTE_OP      acpi_gbl_op_type_dispatch [] = {
-			 acpi_ex_opcode_1A_0T_0R,
-			 acpi_ex_opcode_1A_0T_1R,
-			 acpi_ex_opcode_1A_1T_0R,
-			 acpi_ex_opcode_1A_1T_1R,
-			 acpi_ex_opcode_2A_0T_0R,
-			 acpi_ex_opcode_2A_0T_1R,
-			 acpi_ex_opcode_2A_1T_1R,
-			 acpi_ex_opcode_2A_2T_1R,
-			 acpi_ex_opcode_3A_0T_0R,
-			 acpi_ex_opcode_3A_1T_1R,
-			 acpi_ex_opcode_6A_0T_1R};
+			  acpi_ex_opcode_0A_0T_1R,
+			  acpi_ex_opcode_1A_0T_0R,
+			  acpi_ex_opcode_1A_0T_1R,
+			  acpi_ex_opcode_1A_1T_0R,
+			  acpi_ex_opcode_1A_1T_1R,
+			  acpi_ex_opcode_2A_0T_0R,
+			  acpi_ex_opcode_2A_0T_1R,
+			  acpi_ex_opcode_2A_1T_1R,
+			  acpi_ex_opcode_2A_2T_1R,
+			  acpi_ex_opcode_3A_0T_0R,
+			  acpi_ex_opcode_3A_1T_1R,
+			  acpi_ex_opcode_6A_0T_1R};
 
 /*****************************************************************************
  *
@@ -413,7 +414,7 @@ acpi_ds_exec_end_op (
 			 * routine.  There is one routine per opcode "type" based upon the
 			 * number of opcode arguments and return type.
 			 */
-			status = acpi_gbl_op_type_dispatch [op_type] (walk_state);
+			status = acpi_gbl_op_type_dispatch[op_type] (walk_state);
 		}
 		else {
 			/*
@@ -639,7 +640,8 @@ acpi_ds_exec_end_op (
 	 * conditional predicate
 	 */
 
-	if ((walk_state->control_state) &&
+	if ((ACPI_SUCCESS (status)) &&
+		(walk_state->control_state) &&
 		(walk_state->control_state->common.state ==
 			ACPI_CONTROL_PREDICATE_EXECUTING) &&
 		(walk_state->control_state->control.predicate_op == op)) {
@@ -649,6 +651,19 @@ acpi_ds_exec_end_op (
 
 
 cleanup:
+
+	/* Invoke exception handler on error */
+
+	if (ACPI_FAILURE (status) &&
+		acpi_gbl_exception_handler &&
+		!(status & AE_CODE_CONTROL)) {
+		acpi_ex_exit_interpreter ();
+		status = acpi_gbl_exception_handler (status,
+				 walk_state->method_node->name.integer, walk_state->opcode,
+				 walk_state->aml_offset, NULL);
+		acpi_ex_enter_interpreter ();
+	}
+
 	if (walk_state->result_obj) {
 		/* Break to debugger to display result */
 

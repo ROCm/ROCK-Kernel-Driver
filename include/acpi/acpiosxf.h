@@ -217,9 +217,12 @@ acpi_os_wait_events_complete(
 	void * context);
 
 void
+acpi_os_wait_events_complete (
+	void                            *context);
+
+void
 acpi_os_sleep (
-	u32                             seconds,
-	u32                             milliseconds);
+	acpi_integer                    milliseconds);
 
 void
 acpi_os_stall (
@@ -304,7 +307,7 @@ acpi_os_writable (
 	void                            *pointer,
 	acpi_size                       length);
 
-u32
+u64
 acpi_os_get_timer (
 	void);
 

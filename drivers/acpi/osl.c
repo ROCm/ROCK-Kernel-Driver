@@ -306,10 +306,10 @@ acpi_os_remove_interrupt_handler(u32 irq, acpi_osd_handler handler)
  */
 
 void
-acpi_os_sleep(u32 sec, u32 ms)
+acpi_os_sleep(acpi_integer ms)
 {
 	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(HZ * sec + (ms * HZ) / 1000);
+	schedule_timeout(((signed long) ms * HZ) / 1000);
 }
 
 void
@@ -324,6 +324,29 @@ acpi_os_stall(u32 us)
 		touch_nmi_watchdog();
 		us -= delay;
 	}
+}
+
+/*
+ * Support ACPI 3.0 AML Timer operand
+ * Returns 64-bit free-running, monotonically increasing timer
+ * with 100ns granularity
+ */
+u64
+acpi_os_get_timer (void)
+{
+	static u64 t;
+
+#ifdef	CONFIG_HPET
+	/* TBD: use HPET if available */
+#endif
+
+#ifdef	CONFIG_X86_PM_TIMER
+	/* TBD: default to PM timer if HPET was not available */
+#endif
+	if (!t)
+		printk(KERN_ERR PREFIX "acpi_os_get_timer() TBD\n");
+
+	return(++t);
 }
 
 acpi_status
