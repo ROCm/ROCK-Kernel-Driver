@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -57,6 +57,8 @@
 #include <linux/if.h>
 #include <asm/uaccess.h>
 #include <linux/ip.h>
+#include <linux/if_vlan.h>
+#include <linux/mii.h>
 
 #define E100_REGS_LEN 1
 /*
@@ -301,6 +303,9 @@ struct driver_stats {
 
 /* EEPROM bit definitions */
 /*- EEPROM control register bits */
+#define EEPROM_FLAG_ASF  0x8000
+#define EEPROM_FLAG_GCL  0x4000
+
 #define EN_TRNF          0x10	/* Enable turnoff */
 #define EEDO             0x08	/* EEPROM data out */
 #define EEDI             0x04	/* EEPROM data in (set for writing data) */
@@ -319,6 +324,8 @@ struct driver_stats {
 #define EEPROM_COMPATIBILITY_WORD       3
 #define EEPROM_PWA_NO                   8
 #define EEPROM_ID_WORD			0x0A
+#define EEPROM_CONFIG_ASF		0x0D
+#define EEPROM_SMBUS_ADDR		0x90
 
 #define EEPROM_SUM                      0xbaba
 
@@ -358,7 +365,7 @@ struct driver_stats {
 #define CB_STATUS_MASK          BIT_12_15	/* CB Status Mask (4-bits) */
 #define CB_STATUS_COMPLETE      BIT_15	/* CB Complete Bit */
 #define CB_STATUS_OK            BIT_13	/* CB OK Bit */
-#define CB_STATUS_UNDERRUN      BIT_12	/* CB A Bit */
+#define CB_STATUS_VLAN          BIT_12 /* CB Valn detected Bit */
 #define CB_STATUS_FAIL          BIT_11	/* CB Fail (F) Bit */
 
 /*misc command bits */
@@ -851,6 +858,7 @@ struct ethtool_lpbk_data{
 };
 
 struct e100_private {
+	struct vlan_group *vlgrp;
 	u32 flags;		/* board management flags */
 	u32 tx_per_underrun;	/* number of good tx frames per underrun */
 	unsigned int tx_count;	/* count of tx frames, so we can request an interrupt */
@@ -886,7 +894,6 @@ struct e100_private {
 	struct driver_stats drv_stats;
 
 	u8 rev_id;		/* adapter PCI revision ID */
-	unsigned long device_type;	/* device type from e100_vendor.h */
 
 	unsigned int phy_addr;	/* address of PHY component */
 	unsigned int PhyId;	/* ID of PHY component */
@@ -922,8 +929,6 @@ struct e100_private {
 	u8 ifs_value;
 
 	struct cfg_params params;	/* adapter's command line parameters */
-
-	char *id_string;
 
 	u32 speed_duplex_caps;	/* adapter's speed/duplex capabilities */
 
