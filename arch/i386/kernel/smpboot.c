@@ -1011,7 +1011,7 @@ extern int prof_counter[NR_CPUS];
 
 static int boot_cpu_logical_apicid;
 /* Where the IO area was mapped on multiquad, always 0 otherwise */
-void *xquad_portio = NULL;
+void *xquad_portio;
 
 int cpu_sibling_map[NR_CPUS] __cacheline_aligned;
 
