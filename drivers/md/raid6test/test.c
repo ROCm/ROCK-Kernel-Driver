@@ -73,14 +73,19 @@ int main(int argc, char *argv[])
 					erra = memcmp(data[i], recovi, PAGE_SIZE);
 					errb = memcmp(data[j], recovj, PAGE_SIZE);
 
-					printf("algo=%-8s  faila=%3d(%c)  failb=%3d(%c)  %s\n",
-					       raid6_call.name,
-					       i, (i==NDISKS-2)?'P':'D',
-					       j, (j==NDISKS-1)?'Q':(j==NDISKS-2)?'P':'D',
-					       (!erra && !errb) ? "OK" :
-					       !erra ? "ERRB" :
-					       !errb ? "ERRA" :
-					       "ERRAB");
+					if ( i < NDISKS-2 && j == NDISKS-1 ) {
+						/* We don't implement the DQ failure scenario, since it's
+						   equivalent to a RAID-5 failure (XOR, then recompute Q) */
+					} else {
+						printf("algo=%-8s  faila=%3d(%c)  failb=%3d(%c)  %s\n",
+						       raid6_call.name,
+						       i, (i==NDISKS-2)?'P':'D',
+						       j, (j==NDISKS-1)?'Q':(j==NDISKS-2)?'P':'D',
+						       (!erra && !errb) ? "OK" :
+						       !erra ? "ERRB" :
+						       !errb ? "ERRA" :
+						       "ERRAB");
+					}
 
 					dataptrs[i] = data[i];
 					dataptrs[j] = data[j];
