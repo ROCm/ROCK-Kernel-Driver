@@ -826,7 +826,6 @@ static int init_dev(struct tty_driver *driver, int idx,
 	if(!tty)
 		goto fail_no_mem;
 	initialize_tty_struct(tty);
-	tty->device = MKDEV(driver->major, driver->minor_start) + idx;
 	tty->driver = driver;
 	tty->index = idx;
 	tty_line_name(driver, idx, tty->name);
@@ -854,8 +853,6 @@ static int init_dev(struct tty_driver *driver, int idx,
 		if (!o_tty)
 			goto free_mem_out;
 		initialize_tty_struct(o_tty);
-		o_tty->device = MKDEV(driver->other->major,
-					driver->other->minor_start) + idx;
 		o_tty->driver = driver->other;
 		o_tty->index = idx;
 		tty_line_name(driver->other, idx, o_tty->name);

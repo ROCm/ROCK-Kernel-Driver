@@ -184,7 +184,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	struct inode	*inode;
 	struct dentry	*dchild;
 	int		nfserr, type, mode;
-	dev_t		rdev = 0;
+	dev_t		rdev = 0, wanted = new_decode_dev(attr->ia_size);
 
 	dprintk("nfsd: CREATE   %s %.*s\n",
 		SVCFH_fmt(dirfhp), argp->len, argp->name);
@@ -230,7 +230,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	inode = newfhp->fh_dentry->d_inode;
 
 	/* Unfudge the mode bits */
-	if (attr->ia_valid & ATTR_MODE) { 
+	if (attr->ia_valid & ATTR_MODE) {
 		type = attr->ia_mode & S_IFMT;
 		mode = attr->ia_mode & ~S_IFMT;
 		if (!type) {
@@ -242,7 +242,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 				case S_IFCHR:
 				case S_IFBLK:
 					/* reserve rdev for later checking */
-					attr->ia_size = inode->i_rdev;
+					rdev = inode->i_rdev;
 					attr->ia_valid |= ATTR_SIZE;
 
 					/* FALLTHROUGH */
@@ -277,22 +277,16 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	 */
 	if (type != S_IFREG) {
 		int	is_borc = 0;
-		u32	size = attr->ia_size;
-
-		/* may need to change when we widen dev_t */
-		rdev = old_decode_dev(size);
 		if (type != S_IFBLK && type != S_IFCHR) {
 			rdev = 0;
 		} else if (type == S_IFCHR && !(attr->ia_valid & ATTR_SIZE)) {
 			/* If you think you've seen the worst, grok this. */
 			type = S_IFIFO;
-		} else if (size != rdev) {
-			/* dev got truncated because of 16bit Linux dev_t */
-			nfserr = nfserr_inval;
-			goto out_unlock;
 		} else {
 			/* Okay, char or block special */
 			is_borc = 1;
+			if (!rdev)
+				rdev = wanted;
 		}
 
 		/* we've used the SIZE information, so discard it */
@@ -300,11 +294,10 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 
 		/* Make sure the type and device matches */
 		nfserr = nfserr_exist;
-		if (inode && (type != (inode->i_mode & S_IFMT) || 
-		    (is_borc && inode->i_rdev != rdev)))
+		if (inode && type != (inode->i_mode & S_IFMT))
 			goto out_unlock;
 	}
-	
+
 	nfserr = 0;
 	if (!inode) {
 		/* File doesn't exist. Create it and set attrs */

@@ -71,14 +71,17 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 {
 	struct compat_stat tmp;
 
+	if (!new_valid_dev(stat->dev) || !new_valid_dev(stat->rdev))
+		return -EOVERFLOW;
+
 	memset(&tmp, 0, sizeof(tmp));
-	tmp.st_dev = stat->dev;
+	tmp.st_dev = new_encode_dev(stat->dev);
 	tmp.st_ino = stat->ino;
 	tmp.st_mode = stat->mode;
 	tmp.st_nlink = stat->nlink;
 	SET_STAT_UID(tmp, stat->uid);
 	SET_STAT_GID(tmp, stat->gid);
-	tmp.st_rdev = stat->rdev;
+	tmp.st_rdev = new_encode_dev(stat->rdev);
 	tmp.st_size = stat->size;
 	tmp.st_atime = stat->atime.tv_sec;
 	tmp.st_mtime = stat->mtime.tv_sec;

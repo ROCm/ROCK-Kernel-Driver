@@ -459,7 +459,7 @@ static int __info(struct mapped_device *md, struct dm_ioctl *param)
 	if (!bdev)
 		return -ENXIO;
 
-	param->dev = bdev->bd_dev;
+	param->dev = old_encode_dev(bdev->bd_dev);
 	param->open_count = bdev->bd_openers;
 	bdput(bdev);
 
@@ -577,7 +577,7 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
 	}
 
 	if (param->flags & DM_PERSISTENT_DEV_FLAG)
-		r = dm_create_with_minor(MINOR(param->dev), &md);
+		r = dm_create_with_minor(MINOR(old_decode_dev(param->dev)), &md);
 	else
 		r = dm_create(&md);
 
@@ -816,7 +816,7 @@ static int dep(struct dm_ioctl *param, struct dm_ioctl *user)
 	count = 0;
 	list_for_each(tmp, dm_table_get_devices(table)) {
 		struct dm_dev *dd = list_entry(tmp, struct dm_dev, list);
-		deps->dev[count++] = dd->bdev->bd_dev;
+		deps->dev[count++] = old_encode_dev(dd->bdev->bd_dev);
 	}
 	dm_table_put(table);
 	dm_put(md);

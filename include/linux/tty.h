@@ -264,7 +264,6 @@ struct tty_struct {
 	char name[64];
 	int pgrp;
 	int session;
-	dev_t	device;
 	unsigned long flags;
 	int count;
 	struct winsize winsize;
@@ -418,6 +417,11 @@ extern void console_print(const char *);
 
 extern int vt_ioctl(struct tty_struct *tty, struct file * file,
 		    unsigned int cmd, unsigned long arg);
+
+static inline dev_t tty_devnum(struct tty_struct *tty)
+{
+	return MKDEV(tty->driver->major, tty->driver->minor_start) + tty->index;
+}
 
 #endif /* __KERNEL__ */
 #endif

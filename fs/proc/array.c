@@ -306,7 +306,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		mm = mmgrab(mm);
 	if (task->tty) {
 		tty_pgrp = task->tty->pgrp;
-		tty_nr = task->tty->device;
+		tty_nr = tty_devnum(task->tty);
 	}
 	task_unlock(task);
 	if (mm) {

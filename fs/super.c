@@ -405,14 +405,14 @@ rescan:
 	return NULL;
 }
 
-asmlinkage long sys_ustat(dev_t dev, struct ustat __user * ubuf)
+asmlinkage long sys_ustat(unsigned dev, struct ustat __user * ubuf)
 {
         struct super_block *s;
         struct ustat tmp;
         struct kstatfs sbuf;
 	int err = -EINVAL;
 
-        s = user_get_super(dev);
+        s = user_get_super(new_decode_dev(dev));
         if (s == NULL)
                 goto out;
 	err = vfs_statfs(s, &sbuf);

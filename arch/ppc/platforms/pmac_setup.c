@@ -107,7 +107,7 @@ extern char saved_command_line[];
 
 extern int pmac_newworld;
 
-#define DEFAULT_ROOT_DEVICE 0x0801	/* sda1 - slightly silly choice */
+#define DEFAULT_ROOT_DEVICE Root_SDA1	/* sda1 - slightly silly choice */
 
 extern void zs_kgdb_hook(int tty_num);
 static void ohare_init(void);

@@ -197,20 +197,4 @@ typedef enum {
 	XFS_BTNUM_MAX
 } xfs_btnum_t;
 
-
-/*
- * Juggle IRIX device numbers - still used in ondisk structures
- */
-#define XFS_DEV_BITSMAJOR	14
-#define XFS_DEV_BITSMINOR	18
-#define XFS_DEV_MAXMAJ		0x1ff
-#define XFS_DEV_MAXMIN		0x3ffff
-#define XFS_DEV_MAJOR(dev)	((int)(((unsigned)(dev)>>XFS_DEV_BITSMINOR) \
-				    & XFS_DEV_MAXMAJ))
-#define XFS_DEV_MINOR(dev)	((int)((dev)&XFS_DEV_MAXMIN))
-#define XFS_MKDEV(major,minor) ((xfs_dev_t)(((major)<<XFS_DEV_BITSMINOR) \
-				    | (minor&XFS_DEV_MAXMIN)))
-
-#define XFS_DEV_TO_KDEVT(dev)	MKDEV(XFS_DEV_MAJOR(dev),XFS_DEV_MINOR(dev))
-
 #endif	/* !__XFS_TYPES_H */

@@ -2179,8 +2179,8 @@ xlog_recover_do_buffer_trans(
 		break;
 	default:
 		xfs_fs_cmn_err(CE_ALERT, log->l_mp,
-			"xfs_log_recover: unknown buffer type 0x%x, dev 0x%x",
-			buf_f->blf_type, log->l_dev);
+			"xfs_log_recover: unknown buffer type 0x%x, dev %u:%u",
+			buf_f->blf_type, MAJOR(log->l_dev), MINOR(log->l_dev));
 		XFS_ERROR_REPORT("xlog_recover_do_buffer_trans",
 				 XFS_ERRLEVEL_LOW, log->l_mp);
 		return XFS_ERROR(EFSCORRUPTED);
