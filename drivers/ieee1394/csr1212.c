@@ -1061,6 +1061,10 @@ void csr1212_fill_cache(struct csr1212_csr_rom_cache *cache)
 		}
 
 		nkv = kv->next;
+		if (kv->prev)
+			kv->prev->next = NULL;
+		if (kv->next)
+			kv->next->prev = NULL;
 		kv->prev = NULL;
 		kv->next = NULL;
 	}
@@ -1134,7 +1138,7 @@ int csr1212_generate_csr_image(struct csr1212_csr *csr)
 			/* Make sure the Extended ROM leaf is a multiple of
 			 * max_rom in size. */
 			leaf_size = (cache->len + (csr->max_rom - 1)) &
-				(csr->max_rom - 1);
+				~(csr->max_rom - 1);
 
 			/* Zero out the unused ROM region */
 			memset(cache->data + bytes_to_quads(cache->len), 0x00,
