@@ -1771,8 +1771,6 @@ pagebuf_delwri_flush(
 		}
 	}
 
-	spin_unlock(&pbd_delwrite_lock);
-
 	blk_run_queues();
 
 	if (pinptr)
