@@ -1812,7 +1812,7 @@ extern void init_umc8672(void);
 #endif
 #ifdef CONFIG_BLK_DEV_DTC2278
 static int __initdata probe_dtc2278;
-extern void init_dtc2278(void);
+extern int dtc2278_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_HT6560B
 static int __initdata probe_ht6560b;
@@ -2609,7 +2609,7 @@ int __init ide_init (void)
 #endif
 #ifdef CONFIG_BLK_DEV_DTC2278
 	if (probe_dtc2278)
-		init_dtc2278();
+		(void)dtc2278_init();
 #endif
 #ifdef CONFIG_BLK_DEV_HT6560B
 	if (probe_ht6560b)
