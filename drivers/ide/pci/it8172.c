@@ -56,7 +56,7 @@ static void it8172_tune_drive (ide_drive_t *drive, u8 pio)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct pci_dev *dev	= hwif->pci_dev;
-	int is_slave		= (hwif->drives[1] == drive);
+	int is_slave		= (&hwif->drives[1] == drive);
 	unsigned long flags;
 	u16 drive_enables;
 	u32 drive_timing;
@@ -94,7 +94,7 @@ static void it8172_tune_drive (ide_drive_t *drive, u8 pio)
 	}
 
 	pci_write_config_word(dev, 0x40, drive_enables);
-	spin_unlock_irqrestore(&ide_lock, flags)
+	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
 static u8 it8172_dma_2_pio (u8 xfer_rate)

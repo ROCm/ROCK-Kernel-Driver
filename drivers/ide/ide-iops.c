@@ -184,16 +184,6 @@ void default_hwif_mmiops (ide_hwif_t *hwif)
 
 EXPORT_SYMBOL(default_hwif_mmiops);
 
-void default_hwif_transport (ide_hwif_t *hwif)
-{
-	hwif->ata_input_data		= ata_input_data;
-	hwif->ata_output_data		= ata_output_data;
-	hwif->atapi_input_bytes		= atapi_input_bytes;
-	hwif->atapi_output_bytes	= atapi_output_bytes;
-}
-
-EXPORT_SYMBOL(default_hwif_transport);
-
 u32 ide_read_24 (ide_drive_t *drive)
 {
 	u8 hcyl = HWIF(drive)->INB(IDE_HCYL_REG);
@@ -201,8 +191,6 @@ u32 ide_read_24 (ide_drive_t *drive)
 	u8 sect = HWIF(drive)->INB(IDE_SECTOR_REG);
 	return (hcyl<<16)|(lcyl<<8)|sect;
 }
-
-EXPORT_SYMBOL(ide_read_24);
 
 void SELECT_DRIVE (ide_drive_t *drive)
 {
@@ -240,7 +228,7 @@ void QUIRK_LIST (ide_drive_t *drive)
  * of the sector count register location, with interrupts disabled
  * to ensure that the reads all happen together.
  */
-void ata_vlb_sync (ide_drive_t *drive, unsigned long port)
+static void ata_vlb_sync(ide_drive_t *drive, unsigned long port)
 {
 	(void) HWIF(drive)->INB(port);
 	(void) HWIF(drive)->INB(port);
@@ -250,7 +238,7 @@ void ata_vlb_sync (ide_drive_t *drive, unsigned long port)
 /*
  * This is used for most PIO data transfers *from* the IDE interface
  */
-void ata_input_data (ide_drive_t *drive, void *buffer, u32 wcount)
+static void ata_input_data(ide_drive_t *drive, void *buffer, u32 wcount)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 io_32bit		= drive->io_32bit;
@@ -272,7 +260,7 @@ void ata_input_data (ide_drive_t *drive, void *buffer, u32 wcount)
 /*
  * This is used for most PIO data transfers *to* the IDE interface
  */
-void ata_output_data (ide_drive_t *drive, void *buffer, u32 wcount)
+static void ata_output_data(ide_drive_t *drive, void *buffer, u32 wcount)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 io_32bit		= drive->io_32bit;
@@ -299,7 +287,7 @@ void ata_output_data (ide_drive_t *drive, void *buffer, u32 wcount)
  * extra byte allocated for the buffer.
  */
 
-void atapi_input_bytes (ide_drive_t *drive, void *buffer, u32 bytecount)
+static void atapi_input_bytes(ide_drive_t *drive, void *buffer, u32 bytecount)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 
@@ -316,9 +304,7 @@ void atapi_input_bytes (ide_drive_t *drive, void *buffer, u32 bytecount)
 		hwif->INSW(IDE_DATA_REG, ((u8 *)buffer)+(bytecount & ~0x03), 1);
 }
 
-EXPORT_SYMBOL(atapi_input_bytes);
-
-void atapi_output_bytes (ide_drive_t *drive, void *buffer, u32 bytecount)
+static void atapi_output_bytes(ide_drive_t *drive, void *buffer, u32 bytecount)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 
@@ -335,7 +321,15 @@ void atapi_output_bytes (ide_drive_t *drive, void *buffer, u32 bytecount)
 		hwif->OUTSW(IDE_DATA_REG, ((u8*)buffer)+(bytecount & ~0x03), 1);
 }
 
-EXPORT_SYMBOL(atapi_output_bytes);
+void default_hwif_transport(ide_hwif_t *hwif)
+{
+	hwif->ata_input_data		= ata_input_data;
+	hwif->ata_output_data		= ata_output_data;
+	hwif->atapi_input_bytes		= atapi_input_bytes;
+	hwif->atapi_output_bytes	= atapi_output_bytes;
+}
+
+EXPORT_SYMBOL(default_hwif_transport);
 
 /*
  * Beginning of Taskfile OPCODE Library and feature sets.
@@ -437,6 +431,7 @@ void ide_fix_driveid (struct hd_driveid *id)
 #endif
 }
 
+/* FIXME: exported for use by the USB storage (isd200.c) code only */
 EXPORT_SYMBOL(ide_fix_driveid);
 
 void ide_fixstring (u8 *s, const int bytecount, const int byteswap)
@@ -1028,14 +1023,14 @@ static ide_startstop_t atapi_reset_pollfunc (ide_drive_t *drive)
 			return ide_started;
 		}
 		/* end of polling */
-		hwgroup->poll_timeout = 0;
+		hwgroup->polling = 0;
 		printk("%s: ATAPI reset timed-out, status=0x%02x\n",
 				drive->name, stat);
 		/* do it the old fashioned way */
 		return do_reset1(drive, 1);
 	}
 	/* done polling */
-	hwgroup->poll_timeout = 0;
+	hwgroup->polling = 0;
 	return ide_stopped;
 }
 
@@ -1095,7 +1090,7 @@ static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 			printk("\n");
 		}
 	}
-	hwgroup->poll_timeout = 0;	/* done polling */
+	hwgroup->polling = 0;	/* done polling */
 	return ide_stopped;
 }
 
@@ -1112,7 +1107,7 @@ static void check_dma_crc(ide_drive_t *drive)
 #endif
 }
 
-void pre_reset (ide_drive_t *drive)
+static void pre_reset(ide_drive_t *drive)
 {
 	DRIVER(drive)->pre_reset(drive);
 
@@ -1170,6 +1165,7 @@ static ide_startstop_t do_reset1 (ide_drive_t *drive, int do_not_try_atapi)
 		udelay (20);
 		hwif->OUTB(WIN_SRST, IDE_COMMAND_REG);
 		hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+		hwgroup->polling = 1;
 		__ide_set_handler(drive, &atapi_reset_pollfunc, HZ/20, NULL);
 		spin_unlock_irqrestore(&ide_lock, flags);
 		return ide_started;
@@ -1210,6 +1206,7 @@ static ide_startstop_t do_reset1 (ide_drive_t *drive, int do_not_try_atapi)
 	/* more than enough time */
 	udelay(10);
 	hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+	hwgroup->polling = 1;
 	__ide_set_handler(drive, &reset_pollfunc, HZ/20, NULL);
 
 	/*
