@@ -87,14 +87,14 @@ static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p,
 				int msg_len);
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
 static inline void sctp_sk_addr_set(struct sock *,
-				    const sockaddr_storage_t *newaddr,
-				    sockaddr_storage_t *saveaddr);
+				    const union sctp_addr *newaddr,
+				    union sctp_addr *saveaddr);
 static inline void sctp_sk_addr_restore(struct sock *,
-					const sockaddr_storage_t *);
+					const union sctp_addr *);
 static inline int sctp_sendmsg_verify_name(struct sock *, struct msghdr *);
 static int sctp_bindx_add(struct sock *, struct sockaddr_storage *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr_storage *, int);
-static int sctp_do_bind(struct sock *, sockaddr_storage_t *, int);
+static int sctp_do_bind(struct sock *, union sctp_addr *, int);
 static int sctp_autobind(struct sock *sk);
 
 
@@ -122,7 +122,7 @@ int sctp_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 
 	/* Disallow binding twice. */
 	if (!sctp_sk(sk)->ep->base.bind_addr.port)
-		retval = sctp_do_bind(sk, (sockaddr_storage_t *)uaddr,
+		retval = sctp_do_bind(sk, (union sctp_addr *)uaddr,
 				      addr_len);
 	else
 		retval = -EINVAL;
@@ -135,14 +135,14 @@ int sctp_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 static long sctp_get_port_local(struct sock *, unsigned short);
 
 /* Bind a local address either to an endpoint or to an association.  */
-SCTP_STATIC int sctp_do_bind(struct sock *sk, sockaddr_storage_t *newaddr,
+SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *newaddr,
 			     int addr_len)
 {
 	sctp_opt_t *sp = sctp_sk(sk);
 	sctp_endpoint_t *ep = sp->ep;
 	sctp_bind_addr_t *bp = &ep->base.bind_addr;
 	unsigned short sa_family = newaddr->sa.sa_family;
-	sockaddr_storage_t tmpaddr, saveaddr;
+	union sctp_addr tmpaddr, saveaddr;
 	unsigned short *snum;
 	int ret = 0;
 
@@ -403,7 +403,7 @@ int sctp_bindx_add(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 			goto err_bindx_add;
 		};
 
-		retval = sctp_do_bind(sk, (sockaddr_storage_t *)&addrs[cnt],
+		retval = sctp_do_bind(sk, (union sctp_addr *)&addrs[cnt],
 				      addr_len);
 
 err_bindx_add:
@@ -481,7 +481,7 @@ int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 	int cnt;
 	sctp_bind_addr_t *bp = &ep->base.bind_addr;
 	int retval = 0;
-	sockaddr_storage_t saveaddr;
+	union sctp_addr saveaddr;
 
 	SCTP_DEBUG_PRINTK("sctp_bindx_rem (sk: %p, addrs: %p, addrcnt: %d)\n",
 			  sk, addrs, addrcnt);
@@ -500,7 +500,7 @@ int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 		 */
 		switch (((struct sockaddr *)&addrs[cnt])->sa_family) {
 		case AF_INET:
-			saveaddr = *((sockaddr_storage_t *)
+			saveaddr = *((union sctp_addr *)
 				     &addrs[cnt]);
 			saveaddr.v4.sin_port = ntohs(saveaddr.v4.sin_port);
 			/* Verify the port.  */
@@ -511,7 +511,7 @@ int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 			break;
 
 		case AF_INET6:
-			saveaddr = *((sockaddr_storage_t *)
+			saveaddr = *((union sctp_addr *)
 				     &addrs[cnt]);
 			saveaddr.v6.sin6_port =
 				ntohs(saveaddr.v6.sin6_port);
@@ -741,7 +741,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	sctp_association_t *new_asoc=NULL, *asoc=NULL;
 	sctp_transport_t *transport;
 	sctp_chunk_t *chunk = NULL;
-	sockaddr_storage_t to;
+	union sctp_addr to;
 	struct sockaddr *msg_name = NULL;
 	struct sctp_sndrcvinfo default_sinfo = { 0 };
 	struct sctp_sndrcvinfo *sinfo;
@@ -1258,7 +1258,7 @@ static inline int sctp_setsockopt_set_peer_addr_params(struct sock *sk,
 {
 	struct sctp_paddrparams params;
 	sctp_association_t *asoc;
-	sockaddr_storage_t *addr;
+	union sctp_addr *addr;
 	sctp_transport_t *trans;
 	int error;
 
@@ -1271,7 +1271,7 @@ static inline int sctp_setsockopt_set_peer_addr_params(struct sock *sk,
 	if (!asoc)
 		return -EINVAL;
 
-	addr = (sockaddr_storage_t *) &(params.spp_address);
+	addr = (union sctp_addr *) &(params.spp_address);
 
 	trans = sctp_assoc_lookup_paddr(asoc, addr);
 	if (!trans)
@@ -1606,7 +1606,7 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 	status.sstat_fragmentation_point = assoc->frag_point;
 	status.sstat_primary.spinfo_assoc_id = sctp_assoc2id(transport->asoc);
 	memcpy(&status.sstat_primary.spinfo_address,
-	       &(transport->ipaddr), sizeof(sockaddr_storage_t));
+	       &(transport->ipaddr), sizeof(union sctp_addr));
 	status.sstat_primary.spinfo_state = transport->active;
 	status.sstat_primary.spinfo_cwnd = transport->cwnd;
 	status.sstat_primary.spinfo_srtt = transport->srtt;
@@ -1781,7 +1781,7 @@ static inline int sctp_getsockopt_get_peer_addr_params(struct sock *sk,
 {
 	struct sctp_paddrparams params;
 	sctp_association_t *asoc;
-	sockaddr_storage_t *addr;
+	union sctp_addr *addr;
 	sctp_transport_t *trans;
 
 	if (len != sizeof(struct sctp_paddrparams))
@@ -1793,7 +1793,7 @@ static inline int sctp_getsockopt_get_peer_addr_params(struct sock *sk,
 	if (!asoc)
 		return -EINVAL;
 
-	addr = (sockaddr_storage_t *) &(params.spp_address);
+	addr = (union sctp_addr *) &(params.spp_address);
 
 	trans = sctp_assoc_lookup_paddr(asoc, addr);
 	if (!trans)
@@ -1990,7 +1990,7 @@ static long sctp_get_port_local(struct sock *sk, unsigned short snum)
 		 * socket is going to be sk2.
 		 */
 		int sk_reuse = sk->reuse;
-		sockaddr_storage_t tmpaddr;
+		union sctp_addr tmpaddr;
 		struct sock *sk2 = pp->sk;
 
 		SCTP_DEBUG_PRINTK("sctp_get_port() found a "
@@ -2293,10 +2293,10 @@ void sctp_put_port(struct sock *sk)
  */
 static int sctp_autobind(struct sock *sk)
 {
-	sockaddr_storage_t autoaddr;
+	union sctp_addr autoaddr;
 	int addr_len = 0;
 
-	memset(&autoaddr, 0, sizeof(sockaddr_storage_t));
+	memset(&autoaddr, 0, sizeof(union sctp_addr));
 
 	switch (sk->family) {
 	case PF_INET:
@@ -2437,8 +2437,8 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *msg,
 
 /* Setup sk->rcv_saddr before calling get_port().  */
 static inline void sctp_sk_addr_set(struct sock *sk,
-				    const sockaddr_storage_t *newaddr,
-				    sockaddr_storage_t *saveaddr)
+				    const union sctp_addr *newaddr,
+				    union sctp_addr *saveaddr)
 {
 	struct inet_opt *inet = inet_sk(sk);
 
@@ -2465,7 +2465,7 @@ static inline void sctp_sk_addr_set(struct sock *sk,
 }
 
 /* Restore sk->rcv_saddr after failing get_port().  */
-static inline void sctp_sk_addr_restore(struct sock *sk, const sockaddr_storage_t *addr)
+static inline void sctp_sk_addr_restore(struct sock *sk, const union sctp_addr *addr)
 {
 	struct inet_opt *inet = inet_sk(sk);
 
@@ -2610,12 +2610,12 @@ no_packet:
 
 static inline int sctp_sendmsg_verify_name(struct sock *sk, struct msghdr *msg)
 {
-	sockaddr_storage_t *sa;
+	union sctp_addr *sa;
 
 	if (msg->msg_namelen < sizeof (struct sockaddr))
 		return -EINVAL;
 
-	sa = (sockaddr_storage_t *) msg->msg_name;
+	sa = (union sctp_addr *) msg->msg_name;
 	switch (sa->sa.sa_family) {
 	case AF_INET:
 		if (msg->msg_namelen < sizeof(struct sockaddr_in))

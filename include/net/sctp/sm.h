@@ -332,10 +332,10 @@ __u32 sctp_generate_tag(const sctp_endpoint_t *);
 __u32 sctp_generate_tsn(const sctp_endpoint_t *);
 
 /* 4th level prototypes */
-void sctp_param2sockaddr(sockaddr_storage_t *addr, sctp_addr_param_t *,
+void sctp_param2sockaddr(union sctp_addr *addr, sctp_addr_param_t *,
 			 __u16 port);
-int sctp_addr2sockaddr(const union sctp_params, sockaddr_storage_t *);
-int sockaddr2sctp_addr(const sockaddr_storage_t *, sctp_addr_param_t *);
+int sctp_addr2sockaddr(const union sctp_params, union sctp_addr *);
+int sockaddr2sctp_addr(const union sctp_addr *, sctp_addr_param_t *);
 
 /* Extern declarations for major data structures.  */
 sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t, sctp_state_t);

@@ -237,7 +237,7 @@ void sctp_endpoint_put(sctp_endpoint_t *ep)
 
 /* Is this the endpoint we are looking for?  */
 sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *ep,
-					const sockaddr_storage_t *laddr)
+					const union sctp_addr *laddr)
 {
 	sctp_endpoint_t *retval;
 
@@ -262,7 +262,7 @@ out:
  */
 sctp_association_t *__sctp_endpoint_lookup_assoc(
 	const sctp_endpoint_t *endpoint,
-	const sockaddr_storage_t *paddr,
+	const union sctp_addr *paddr,
 	sctp_transport_t **transport)
 {
 	int rport;
@@ -289,7 +289,7 @@ sctp_association_t *__sctp_endpoint_lookup_assoc(
 
 /* Lookup association on an endpoint based on a peer address.  BH-safe.  */
 sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
-					       const sockaddr_storage_t *paddr,
+					       const union sctp_addr *paddr,
 					       sctp_transport_t **transport)
 {
 	sctp_association_t *asoc;

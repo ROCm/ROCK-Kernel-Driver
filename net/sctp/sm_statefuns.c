@@ -832,7 +832,7 @@ sctp_disposition_t sctp_sf_backbeat_8_3(const sctp_endpoint_t *ep,
 					sctp_cmd_seq_t *commands)
 {
 	sctp_chunk_t *chunk = arg;
-	sockaddr_storage_t from_addr;
+	union sctp_addr from_addr;
 	sctp_transport_t *link;
 	sctp_sender_hb_info_t *hbinfo;
 	unsigned long max_interval;
@@ -881,7 +881,7 @@ sctp_disposition_t sctp_sf_backbeat_8_3(const sctp_endpoint_t *ep,
 /* Helper function to send out an abort for the restart
  * condition.
  */
-static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa,
+static int sctp_sf_send_restart_abort(union sctp_addr *ssa,
 				      sctp_chunk_t *init,
 				      sctp_cmd_seq_t *commands)
 {
@@ -4313,7 +4313,7 @@ sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
 	/* Cache a route for the transport with the chunk's destination as
 	 * the source address.
 	 */
-	sctp_transport_route(transport, (sockaddr_storage_t *)&chunk->dest);
+	sctp_transport_route(transport, (union sctp_addr *)&chunk->dest);
 
 	packet = sctp_packet_init(packet, transport, sport, dport);
 	packet = sctp_packet_config(packet, vtag, 0, NULL);

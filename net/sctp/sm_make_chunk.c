@@ -1033,7 +1033,7 @@ nodata:
 /* Set chunk->source and dest based on the IP header in chunk->skb.  */
 void sctp_init_addrs(sctp_chunk_t *chunk)
 {
-	sockaddr_storage_t *source, *dest;
+	union sctp_addr *source, *dest;
 	struct sk_buff *skb;
 	struct sctphdr *sh;
 	struct iphdr *ih4;
@@ -1075,7 +1075,7 @@ void sctp_init_addrs(sctp_chunk_t *chunk)
 }
 
 /* Extract the source address from a chunk.  */
-const sockaddr_storage_t *sctp_source(const sctp_chunk_t *chunk)
+const union sctp_addr *sctp_source(const sctp_chunk_t *chunk)
 {
 	/* If we have a known transport, use that.  */
 	if (chunk->transport) {
@@ -1661,7 +1661,7 @@ int sctp_verify_init(const sctp_association_t *asoc,
  * Returns 0 on failure, else success.
  */
 int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
-		      const sockaddr_storage_t *peer_addr,
+		      const union sctp_addr *peer_addr,
 		      sctp_init_chunk_t *peer_init,
 		      int priority)
 {
@@ -1780,9 +1780,9 @@ nomem:
  * structures for the addresses.
  */
 int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
-		       const sockaddr_storage_t *peer_addr, int priority)
+		       const union sctp_addr *peer_addr, int priority)
 {
-	sockaddr_storage_t addr;
+	union sctp_addr addr;
 	int i;
 	__u16 sat;
 	int retval = 1;
@@ -1906,8 +1906,8 @@ __u32 sctp_generate_tsn(const sctp_endpoint_t *ep)
  * 4th Level Abstractions
  ********************************************************************/
 
-/* Convert from an SCTP IP parameter to a sockaddr_storage_t.  */
-void sctp_param2sockaddr(sockaddr_storage_t *addr, sctp_addr_param_t *param,
+/* Convert from an SCTP IP parameter to a union sctp_addr.  */
+void sctp_param2sockaddr(union sctp_addr *addr, sctp_addr_param_t *param,
 			 __u16 port)
 {
 	switch(param->v4.param_hdr.type) {
@@ -1934,7 +1934,7 @@ void sctp_param2sockaddr(sockaddr_storage_t *addr, sctp_addr_param_t *param,
 
 /* Convert an IP address in an SCTP param into a sockaddr_in.  */
 /* Returns true if a valid conversion was possible.  */
-int sctp_addr2sockaddr(union sctp_params p, sockaddr_storage_t *sa)
+int sctp_addr2sockaddr(union sctp_params p, union sctp_addr *sa)
 {
 	switch (p.p->type) {
 	case SCTP_PARAM_IPV4_ADDRESS:
@@ -1955,30 +1955,10 @@ int sctp_addr2sockaddr(union sctp_params p, sockaddr_storage_t *sa)
 	return 1;
 }
 
-/* Convert from an IP version number to an Address Family symbol.  */
-int ipver2af(__u8 ipver)
-{
-	int family;
-
-	switch (ipver) {
-	case 4:
-		family = AF_INET;
-		break;
-	case 6:
-		family = AF_INET6;
-		break;
-	default:
-		family = 0;
-		break;
-	};
-
-	return family;
-}
-
 /* Convert a sockaddr_in to an IP address in an SCTP param.
  * Returns len if a valid conversion was possible.
  */
-int sockaddr2sctp_addr(const sockaddr_storage_t *sa, sctp_addr_param_t *p)
+int sockaddr2sctp_addr(const union sctp_addr *sa, sctp_addr_param_t *p)
 {
 	int len = 0;
 

@@ -52,7 +52,7 @@
 #include <net/sctp/sm.h>
 
 /* Forward declarations for internal helpers. */
-static int sctp_copy_one_addr(sctp_bind_addr_t *, sockaddr_storage_t *,
+static int sctp_copy_one_addr(sctp_bind_addr_t *, union sctp_addr *,
 			      sctp_scope_t scope, int priority, int flags);
 static void sctp_bind_addr_clean(sctp_bind_addr_t *);
 
@@ -143,7 +143,7 @@ void sctp_bind_addr_free(sctp_bind_addr_t *bp)
 }
 
 /* Add an address to the bind address list in the SCTP_bind_addr structure. */
-int sctp_add_bind_addr(sctp_bind_addr_t *bp, sockaddr_storage_t *new,
+int sctp_add_bind_addr(sctp_bind_addr_t *bp, union sctp_addr *new,
 		       int priority)
 {
 	struct sockaddr_storage_list *addr;
@@ -171,7 +171,7 @@ int sctp_add_bind_addr(sctp_bind_addr_t *bp, sockaddr_storage_t *new,
 /* Delete an address from the bind address list in the SCTP_bind_addr
  * structure.
  */
-int sctp_del_bind_addr(sctp_bind_addr_t *bp, sockaddr_storage_t *del_addr)
+int sctp_del_bind_addr(sctp_bind_addr_t *bp, union sctp_addr *del_addr)
 {
 	struct list_head *pos, *temp;
 	struct sockaddr_storage_list *addr;
@@ -242,7 +242,7 @@ int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
 {
 	sctp_addr_param_t *rawaddr;
 	sctp_paramhdr_t *param;
-	sockaddr_storage_t addr;
+	union sctp_addr addr;
 	int retval = 0;
 	int len;
 
@@ -283,7 +283,7 @@ int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
  ********************************************************************/
 
 /* Does this contain a specified address? */
-int sctp_bind_addr_has_addr(sctp_bind_addr_t *bp, const sockaddr_storage_t *addr)
+int sctp_bind_addr_has_addr(sctp_bind_addr_t *bp, const union sctp_addr *addr)
 {
 	struct sockaddr_storage_list *laddr;
 	struct list_head *pos;
@@ -298,7 +298,7 @@ int sctp_bind_addr_has_addr(sctp_bind_addr_t *bp, const sockaddr_storage_t *addr
 }
 
 /* Copy out addresses from the global local address list. */
-static int sctp_copy_one_addr(sctp_bind_addr_t *dest, sockaddr_storage_t *addr,
+static int sctp_copy_one_addr(sctp_bind_addr_t *dest, union sctp_addr *addr,
 			      sctp_scope_t scope, int priority, int flags)
 {
 	sctp_protocol_t *proto = sctp_get_protocol();
@@ -324,7 +324,7 @@ static int sctp_copy_one_addr(sctp_bind_addr_t *dest, sockaddr_storage_t *addr,
 }
 
 /* Is addr one of the wildcards?  */
-int sctp_is_any(const sockaddr_storage_t *addr)
+int sctp_is_any(const union sctp_addr *addr)
 {
 	int retval = 0;
 
@@ -350,7 +350,7 @@ int sctp_is_any(const sockaddr_storage_t *addr)
 }
 
 /* Is 'addr' valid for 'scope'?  */
-int sctp_in_scope(const sockaddr_storage_t *addr, sctp_scope_t scope)
+int sctp_in_scope(const union sctp_addr *addr, sctp_scope_t scope)
 {
 	sctp_scope_t addr_scope = sctp_scope(addr);
 
@@ -420,7 +420,7 @@ int sctp_in_scope(const sockaddr_storage_t *addr, sctp_scope_t scope)
  ********************************************************************/
 
 /* What is the scope of 'addr'?  */
-sctp_scope_t sctp_scope(const sockaddr_storage_t *addr)
+sctp_scope_t sctp_scope(const union sctp_addr *addr)
 {
 	sctp_scope_t retval = SCTP_SCOPE_GLOBAL;
 
@@ -501,7 +501,7 @@ sctp_scope_t sctp_scope(const sockaddr_storage_t *addr)
  * Return 0 - If the address is a non-unicast or an illegal address.
  * Return 1 - If the address is a unicast.
  */
-int sctp_addr_is_valid(const sockaddr_storage_t *addr)
+int sctp_addr_is_valid(const union sctp_addr *addr)
 {
 	unsigned short sa_family = addr->sa.sa_family;
 
