@@ -645,7 +645,7 @@ static void __init prep_init_sound(void)
 static void __init
 prep_init_vesa(void)
 {
-#if     (defined(CONFIG_FB_VGA16) || defined(CONFIG_FB_VGA_16_MODULE) || \
+#if     (defined(CONFIG_FB_VGA16) || defined(CONFIG_FB_VGA16_MODULE) || \
 	 defined(CONFIG_FB_VESA))
 	PPC_DEVICE *vgadev = NULL;
 
