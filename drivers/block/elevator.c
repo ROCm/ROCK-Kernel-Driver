@@ -320,7 +320,21 @@ void elv_add_request(request_queue_t *q, struct request *rq, int where,
 
 static inline struct request *__elv_next_request(request_queue_t *q)
 {
-	return q->elevator->ops->elevator_next_req_fn(q);
+	struct request *rq = q->elevator->ops->elevator_next_req_fn(q);
+
+	/*
+	 * if this is a barrier write and the device has to issue a
+	 * flush sequence to support it, check how far we are
+	 */
+	if (rq && blk_fs_request(rq) && blk_barrier_rq(rq)) {
+		BUG_ON(q->ordered == QUEUE_ORDERED_NONE);
+
+		if (q->ordered == QUEUE_ORDERED_FLUSH &&
+		    !blk_barrier_preflush(rq))
+			rq = blk_start_pre_flush(q, rq);
+	}
+
+	return rq;
 }
 
 struct request *elv_next_request(request_queue_t *q)

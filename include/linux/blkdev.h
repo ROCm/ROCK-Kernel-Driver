@@ -284,6 +284,8 @@ struct bio_vec;
 typedef int (merge_bvec_fn) (request_queue_t *, struct bio *, struct bio_vec *);
 typedef void (activity_fn) (void *data, int rw);
 typedef int (issue_flush_fn) (request_queue_t *, struct gendisk *, sector_t *);
+typedef int (prepare_flush_fn) (request_queue_t *, struct request *);
+typedef void (end_flush_fn) (request_queue_t *, struct request *);
 
 enum blk_queue_state {
 	Queue_down,
@@ -327,6 +329,8 @@ struct request_queue
 	merge_bvec_fn		*merge_bvec_fn;
 	activity_fn		*activity_fn;
 	issue_flush_fn		*issue_flush_fn;
+	prepare_flush_fn	*prepare_flush_fn;
+	end_flush_fn		*end_flush_fn;
 
 	/*
 	 * Auto-unplugging state
@@ -398,6 +402,18 @@ struct request_queue
 	unsigned int		sg_reserved_size;
 
 	struct list_head	drain_list;
+
+	/*
+	 * reserved for flush operations
+	 */
+	struct request		*flush_rq;
+	unsigned char		ordered;
+};
+
+enum {
+	QUEUE_ORDERED_NONE,
+	QUEUE_ORDERED_TAG,
+	QUEUE_ORDERED_FLUSH,
 };
 
 #define RQ_INACTIVE		(-1)
@@ -414,12 +430,13 @@ struct request_queue
 #define QUEUE_FLAG_DEAD		5	/* queue being torn down */
 #define QUEUE_FLAG_REENTER	6	/* Re-entrancy avoidance */
 #define QUEUE_FLAG_PLUGGED	7	/* queue is plugged */
-#define QUEUE_FLAG_ORDERED	8	/* supports ordered writes */
-#define QUEUE_FLAG_DRAIN	9	/* draining queue for sched switch */
+#define QUEUE_FLAG_DRAIN	8	/* draining queue for sched switch */
+#define QUEUE_FLAG_FLUSH	9	/* doing barrier flush sequence */
 
 #define blk_queue_plugged(q)	test_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
 #define blk_queue_stopped(q)	test_bit(QUEUE_FLAG_STOPPED, &(q)->queue_flags)
+#define blk_queue_flushing(q)	test_bit(QUEUE_FLAG_FLUSH, &(q)->queue_flags)
 
 #define blk_fs_request(rq)	((rq)->flags & REQ_CMD)
 #define blk_pc_request(rq)	((rq)->flags & REQ_BLOCK_PC)
@@ -620,6 +637,9 @@ extern struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bd
 extern void blk_queue_ordered(request_queue_t *, int);
 extern void blk_queue_issue_flush_fn(request_queue_t *, issue_flush_fn *);
 extern int blkdev_scsi_issue_flush_fn(request_queue_t *, struct gendisk *, sector_t *);
+extern struct request *blk_start_pre_flush(request_queue_t *,struct request *);
+extern int blk_complete_barrier_rq(request_queue_t *, struct request *, int);
+extern int blk_complete_barrier_rq_locked(request_queue_t *, struct request *, int);
 
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);

@@ -363,6 +363,12 @@ struct scsi_host_template {
 	unsigned skip_settle_delay:1;
 
 	/*
+	 * ordered write support
+	 */
+	unsigned ordered_flush:1;
+	unsigned ordered_tag:1;
+
+	/*
 	 * Countdown for host blocking with no commands outstanding
 	 */
 	unsigned int max_host_blocked;
@@ -500,6 +506,12 @@ struct Scsi_Host {
 	 * the spec ;)
 	 */
 	unsigned reverse_ordering:1;
+
+	/*
+	 * ordered write support
+	 */
+	unsigned ordered_flush:1;
+	unsigned ordered_tag:1;
 
 	/*
 	 * Host has rejected a command because it was busy.

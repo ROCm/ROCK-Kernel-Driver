@@ -122,6 +122,8 @@ static void sd_shutdown(struct device *dev);
 static void sd_rescan(struct device *);
 static int sd_init_command(struct scsi_cmnd *);
 static int sd_issue_flush(struct device *, sector_t *);
+static void sd_end_flush(request_queue_t *, struct request *);
+static int sd_prepare_flush(request_queue_t *, struct request *);
 static void sd_read_capacity(struct scsi_disk *sdkp, char *diskname,
 		 struct scsi_request *SRpnt, unsigned char *buffer);
 
@@ -136,6 +138,8 @@ static struct scsi_driver sd_template = {
 	.rescan			= sd_rescan,
 	.init_command		= sd_init_command,
 	.issue_flush		= sd_issue_flush,
+	.prepare_flush		= sd_prepare_flush,
+	.end_flush		= sd_end_flush,
 };
 
 /*
@@ -733,6 +737,33 @@ static int sd_issue_flush(struct device *dev, sector_t *error_sector)
 		return 0;
 
 	return sd_sync_cache(sdp);
+}
+
+static void sd_end_flush(request_queue_t *q, struct request *flush_rq)
+{
+	struct request *rq = flush_rq->end_io_data;
+	struct scsi_cmnd *cmd = rq->special;
+	unsigned int bytes = rq->hard_nr_sectors << 9;
+
+	if (!flush_rq->errors)
+		scsi_io_completion(cmd, bytes, 0);
+	else
+		scsi_io_completion(cmd, 0, bytes);
+}
+
+static int sd_prepare_flush(request_queue_t *q, struct request *rq)
+{
+	struct scsi_device *sdev = q->queuedata;
+	struct scsi_disk *sdkp = dev_get_drvdata(&sdev->sdev_gendev);
+
+	if (sdkp->WCE) {
+		memset(rq->cmd, 0, sizeof(rq->cmd));
+		rq->flags = REQ_BLOCK_PC | REQ_SOFTBARRIER;
+		rq->cmd[0] = SYNCHRONIZE_CACHE;
+		return 1;
+	}
+
+	return 0;
 }
 
 static void sd_rescan(struct device *dev)

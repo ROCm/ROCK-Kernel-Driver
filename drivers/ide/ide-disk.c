@@ -701,17 +701,53 @@ static ide_proc_entry_t idedisk_proc[] = {
 
 #endif	/* CONFIG_PROC_FS */
 
-static int idedisk_issue_flush(request_queue_t *q, struct gendisk *disk,
-			       sector_t *error_sector)
+static void idedisk_end_flush(request_queue_t *q, struct request *flush_rq)
 {
 	ide_drive_t *drive = q->queuedata;
-	struct request *rq;
-	int ret;
+	struct request *rq = flush_rq->end_io_data;
+	int good_sectors = rq->hard_nr_sectors;
+	int bad_sectors;
+	sector_t sector;
+
+	if (flush_rq->errors & ABRT_ERR) {
+		printk(KERN_ERR "%s: barrier support doesn't work\n", drive->name);
+		blk_queue_ordered(drive->queue, QUEUE_ORDERED_NONE);
+		blk_queue_issue_flush_fn(drive->queue, NULL);
+		good_sectors = 0;
+	} else if (flush_rq->errors) {
+		sector = ide_get_error_location(drive, flush_rq->buffer);
+		if ((sector >= rq->hard_sector) &&
+		    (sector < rq->hard_sector + rq->hard_nr_sectors))
+			good_sectors = sector - rq->hard_sector;
+		else
+			good_sectors = 0;
+	}
+
+	if (flush_rq->errors)
+		printk(KERN_ERR "%s: failed barrier write: "
+				"sector=%Lx(good=%d/bad=%d)\n",
+				drive->name, (unsigned long long)rq->sector,
+				good_sectors,
+				(int) (rq->hard_nr_sectors-good_sectors));
+
+	bad_sectors = rq->hard_nr_sectors - good_sectors;
+
+	spin_lock(&ide_lock);
+
+	if (good_sectors)
+		__ide_end_request(drive, rq, 1, good_sectors);
+	if (bad_sectors)
+		__ide_end_request(drive, rq, 0, bad_sectors);
+
+	spin_unlock(&ide_lock);
+}
+
+static int idedisk_prepare_flush(request_queue_t *q, struct request *rq)
+{
+	ide_drive_t *drive = q->queuedata;
 
 	if (!drive->wcache)
 		return 0;
-
-	rq = blk_get_request(q, WRITE, __GFP_WAIT);
 
 	memset(rq->cmd, 0, sizeof(rq->cmd));
 
@@ -724,6 +760,22 @@ static int idedisk_issue_flush(request_queue_t *q, struct gendisk *disk,
 
 	rq->flags |= REQ_DRIVE_TASK | REQ_SOFTBARRIER;
 	rq->buffer = rq->cmd;
+	return 1;
+}
+
+static int idedisk_issue_flush(request_queue_t *q, struct gendisk *disk,
+			       sector_t *error_sector)
+{
+	ide_drive_t *drive = q->queuedata;
+	struct request *rq;
+	int ret;
+
+	if (!drive->wcache)
+		return 0;
+
+	rq = blk_get_request(q, WRITE, __GFP_WAIT);
+
+	idedisk_prepare_flush(q, rq);
 
 	ret = blk_execute_rq(q, disk, rq);
 
@@ -1101,10 +1153,15 @@ static void idedisk_setup (ide_drive_t *drive)
 			barrier = 0;
 	}
 
-	printk(KERN_DEBUG "%s: cache flushes %ssupported\n",
+	if (!strncmp(drive->name, "hdc", 3))
+		barrier = 1;
+
+	printk(KERN_INFO "%s: cache flushes %ssupported\n",
 		drive->name, barrier ? "" : "not ");
 	if (barrier) {
-		blk_queue_ordered(drive->queue, 1);
+		blk_queue_ordered(drive->queue, QUEUE_ORDERED_FLUSH);
+		drive->queue->prepare_flush_fn = idedisk_prepare_flush;
+		drive->queue->end_flush_fn = idedisk_end_flush;
 		blk_queue_issue_flush_fn(drive->queue, idedisk_issue_flush);
 	}
 }

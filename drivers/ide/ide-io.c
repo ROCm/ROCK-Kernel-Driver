@@ -55,62 +55,8 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-static void ide_fill_flush_cmd(ide_drive_t *drive, struct request *rq)
-{
-	char *buf = rq->cmd;
-
-	/*
-	 * reuse cdb space for ata command
-	 */
-	memset(buf, 0, sizeof(rq->cmd));
-
-	rq->flags |= REQ_DRIVE_TASK | REQ_STARTED;
-	rq->buffer = buf;
-	rq->buffer[0] = WIN_FLUSH_CACHE;
-
-	if (ide_id_has_flush_cache_ext(drive->id) &&
-	    (drive->capacity64 >= (1UL << 28)))
-		rq->buffer[0] = WIN_FLUSH_CACHE_EXT;
-}
-
-/*
- * preempt pending requests, and store this cache flush for immediate
- * execution
- */
-static struct request *ide_queue_flush_cmd(ide_drive_t *drive,
-					   struct request *rq, int post)
-{
-	struct request *flush_rq = &HWGROUP(drive)->wrq;
-
-	/*
-	 * write cache disabled, clear the barrier bit and treat it like
-	 * an ordinary write
-	 */
-	if (!drive->wcache) {
-		rq->flags |= REQ_BAR_PREFLUSH;
-		return rq;
-	}
-
-	ide_init_drive_cmd(flush_rq);
-	ide_fill_flush_cmd(drive, flush_rq);
-
-	flush_rq->special = rq;
-	flush_rq->nr_sectors = rq->nr_sectors;
-
-	if (!post) {
-		drive->doing_barrier = 1;
-		flush_rq->flags |= REQ_BAR_PREFLUSH;
-		blkdev_dequeue_request(rq);
-	} else
-		flush_rq->flags |= REQ_BAR_POSTFLUSH;
-
-	__elv_add_request(drive->queue, flush_rq, ELEVATOR_INSERT_FRONT, 0);
-	HWGROUP(drive)->rq = NULL;
-	return flush_rq;
-}
-
-static int __ide_end_request(ide_drive_t *drive, struct request *rq,
-			     int uptodate, int nr_sectors)
+int __ide_end_request(ide_drive_t *drive, struct request *rq, int uptodate,
+		      int nr_sectors)
 {
 	int ret = 1;
 
@@ -148,6 +94,7 @@ static int __ide_end_request(ide_drive_t *drive, struct request *rq,
 	}
 	return ret;
 }
+EXPORT_SYMBOL(__ide_end_request);
 
 /**
  *	ide_end_request		-	complete an IDE I/O
@@ -172,17 +119,10 @@ int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 	if (!nr_sectors)
 		nr_sectors = rq->hard_cur_sectors;
 
-	if (!blk_barrier_rq(rq) || !drive->wcache)
+	if (blk_complete_barrier_rq_locked(drive->queue, rq, nr_sectors))
+		ret = rq->nr_sectors != 0;
+	else
 		ret = __ide_end_request(drive, rq, uptodate, nr_sectors);
-	else {
-		struct request *flush_rq = &HWGROUP(drive)->wrq;
-
-		flush_rq->nr_sectors -= nr_sectors;
-		if (!flush_rq->nr_sectors) {
-			ide_queue_flush_cmd(drive, rq, 1);
-			ret = 0;
-		}
-	}
 
 	spin_unlock_irqrestore(&ide_lock, flags);
 	return ret;
@@ -251,79 +191,6 @@ u64 ide_get_error_location(ide_drive_t *drive, char *args)
 	return sector;
 }
 EXPORT_SYMBOL(ide_get_error_location);
-
-static void ide_complete_barrier(ide_drive_t *drive, struct request *rq,
-				 int error)
-{
-	struct request *real_rq = rq->special;
-	int good_sectors, bad_sectors;
-	sector_t sector;
-
-	if (!error) {
-		if (blk_barrier_postflush(rq)) {
-			/*
-			 * this completes the barrier write
-			 */
-			__ide_end_request(drive, real_rq, 1, real_rq->hard_nr_sectors);
-			drive->doing_barrier = 0;
-		} else {
-			/*
-			 * just indicate that we did the pre flush
-			 */
-			real_rq->flags |= REQ_BAR_PREFLUSH;
-			elv_requeue_request(drive->queue, real_rq);
-		}
-		/*
-		 * all is fine, return
-		 */
-		return;
-	}
-
-	/*
-	 * we need to end real_rq, but it's not on the queue currently.
-	 * put it back on the queue, so we don't have to special case
-	 * anything else for completing it
-	 */
-	if (!blk_barrier_postflush(rq))
-		elv_requeue_request(drive->queue, real_rq);
-
-	/*
-	 * drive aborted flush command, assume FLUSH_CACHE_* doesn't
-	 * work and disable barrier support
-	 */
-	if (error & ABRT_ERR) {
-		printk(KERN_ERR "%s: barrier support doesn't work\n", drive->name);
-		__ide_end_request(drive, real_rq, -EOPNOTSUPP, real_rq->hard_nr_sectors);
-		blk_queue_ordered(drive->queue, 0);
-		blk_queue_issue_flush_fn(drive->queue, NULL);
-	} else {
-		/*
-		 * find out what part of the request failed
-		 */
-		good_sectors = 0;
-		if (blk_barrier_postflush(rq)) {
-			sector = ide_get_error_location(drive, rq->buffer);
-
-			if ((sector >= real_rq->hard_sector) &&
-			    (sector < real_rq->hard_sector + real_rq->hard_nr_sectors))
-				good_sectors = sector - real_rq->hard_sector;
-		} else
-			sector = real_rq->hard_sector;
-
-		bad_sectors = real_rq->hard_nr_sectors - good_sectors;
-		if (good_sectors)
-			__ide_end_request(drive, real_rq, 1, good_sectors);
-		if (bad_sectors)
-			__ide_end_request(drive, real_rq, 0, bad_sectors);
-
-		printk(KERN_ERR "%s: failed barrier write: "
-				"sector=%Lx(good=%d/bad=%d)\n",
-				drive->name, (unsigned long long)sector,
-				good_sectors, bad_sectors);
-	}
-
-	drive->doing_barrier = 0;
-}
 
 /**
  *	ide_end_drive_cmd	-	end an explicit drive command
@@ -416,11 +283,8 @@ void ide_end_drive_cmd (ide_drive_t *drive, u8 stat, u8 err)
 
 	spin_lock_irqsave(&ide_lock, flags);
 	blkdev_dequeue_request(rq);
-
-	if (blk_barrier_preflush(rq) || blk_barrier_postflush(rq))
-		ide_complete_barrier(drive, rq, err);
-
 	HWGROUP(drive)->rq = NULL;
+	rq->errors = err;
 	end_that_request_last(rq);
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
@@ -960,12 +824,13 @@ void ide_pin_hwgroup(ide_drive_t *drive)
 
 	spin_lock_irq(&ide_lock);
 	do {
-		if (!hwgroup->busy && !drive->blocked && !drive->doing_barrier)
+		if (!hwgroup->busy && !drive->blocked &&
+		    !blk_queue_flushing(drive->queue))
 			break;
 		spin_unlock_irq(&ide_lock);
 		schedule_timeout(HZ/100);
 		spin_lock_irq(&ide_lock);
-	} while (hwgroup->busy || drive->blocked || drive->doing_barrier);
+	} while (hwgroup->busy || drive->blocked || blk_queue_flushing(drive->queue));
 
 	/*
 	 * we've now secured exclusive access to this hwgroup
@@ -1001,7 +866,7 @@ repeat:
 	 * though that is 3 requests, it must be seen as a single transaction.
 	 * we must not preempt this drive until that is complete
 	 */
-	if (drive->doing_barrier) {
+	if (blk_queue_flushing(drive->queue)) {
 		/*
 		 * small race where queue could get replugged during
 		 * the 3-request flush cycle, just yank the plug since
@@ -1162,13 +1027,6 @@ static void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
 			hwgroup->busy = 0;
 			break;
 		}
-
-		/*
-		 * if rq is a barrier write, issue pre cache flush if not
-		 * already done
-		 */
-		if (blk_barrier_rq(rq) && !blk_barrier_preflush(rq))
-			rq = ide_queue_flush_cmd(drive, rq, 0);
 
 		/*
 		 * Sanity: don't accept a request that isn't a PM request
