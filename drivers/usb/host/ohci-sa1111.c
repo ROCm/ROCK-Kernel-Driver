@@ -352,9 +352,8 @@ static const struct hc_driver ohci_sa1111_hc_driver = {
 
 /*-------------------------------------------------------------------------*/
 
-static int ohci_hcd_sa1111_drv_probe(struct device *_dev)
+static int ohci_hcd_sa1111_drv_probe(struct sa1111_dev *dev)
 {
-	struct sa1111_dev *dev = SA1111_DEV(_dev);
 	struct usb_hcd *hcd = NULL;
 	int ret;
 
@@ -364,43 +363,29 @@ static int ohci_hcd_sa1111_drv_probe(struct device *_dev)
 	ret = usb_hcd_sa1111_probe(&ohci_sa1111_hc_driver, &hcd, dev);
 
 	if (ret == 0)
-		dev->dev.driver_data = hcd;
+		sa1111_set_drvdata(dev, hcd);
 
 	return ret;
 }
 
-static int ohci_hcd_sa1111_drv_remove(struct device *_dev)
+static int ohci_hcd_sa1111_drv_remove(struct sa1111_dev *dev)
 {
-	struct sa1111_dev *dev = SA1111_DEV(_dev);
-	struct usb_hcd *hcd = dev->dev.driver_data;
+	struct usb_hcd *hcd = sa1111_get_drvdata(dev);
 
 	usb_hcd_sa1111_remove(hcd, dev);
 
-	dev->dev.driver_data = NULL;
+	sa1111_set_drvdata(dev, NULL);
 
-	return 0;
-}
-
-static int ohci_hcd_sa1111_drv_suspend(struct device *dev, u32 state, u32 level)
-{
-	return 0;
-}
-
-static int ohci_hcd_sa1111_drv_resume(struct device *dev, u32 level)
-{
 	return 0;
 }
 
 static struct sa1111_driver ohci_hcd_sa1111_driver = {
 	.drv = {
-		.name		= "sa1111-ohci",
-		.bus		= &sa1111_bus_type,
-		.probe		= ohci_hcd_sa1111_drv_probe,
-		.remove		= ohci_hcd_sa1111_drv_remove,
-		.suspend	= ohci_hcd_sa1111_drv_suspend,
-		.resume		= ohci_hcd_sa1111_drv_resume,
+		.name	= "sa1111-ohci",
 	},
-	.devid			= SA1111_DEVID_USB,
+	.devid		= SA1111_DEVID_USB,
+	.probe		= ohci_hcd_sa1111_drv_probe,
+	.remove		= ohci_hcd_sa1111_drv_remove,
 };
 
 static int __init ohci_hcd_sa1111_init (void)
@@ -409,12 +394,12 @@ static int __init ohci_hcd_sa1111_init (void)
 	dbg ("block sizes: ed %d td %d",
 		sizeof (struct ed), sizeof (struct td));
 
-	return driver_register(&ohci_hcd_sa1111_driver.drv);
+	return sa1111_driver_register(&ohci_hcd_sa1111_driver);
 }
 
 static void __exit ohci_hcd_sa1111_cleanup (void)
 {
-	driver_unregister(&ohci_hcd_sa1111_driver.drv);
+	sa1111_driver_unregister(&ohci_hcd_sa1111_driver);
 }
 
 module_init (ohci_hcd_sa1111_init);

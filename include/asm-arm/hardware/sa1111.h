@@ -542,9 +542,16 @@ struct sa1111_dev {
 
 #define SA1111_DEV(_d)	container_of((_d), struct sa1111_dev, dev)
 
+#define sa1111_get_drvdata(d)	dev_get_drvdata(&(d)->dev)
+#define sa1111_set_drvdata(d,p)	dev_get_drvdata(&(d)->dev, p)
+
 struct sa1111_driver {
 	struct device_driver	drv;
 	unsigned int		devid;
+	int (*probe)(struct sa1111_dev *);
+	int (*remove)(struct sa1111_dev *);
+	int (*suspend)(struct sa1111_dev *, u32);
+	int (*resume)(struct sa1111_dev *);
 };
 
 #define SA1111_DRV(_d)	container_of((_d), struct sa1111_driver, drv)
@@ -572,5 +579,8 @@ int sa1111_set_audio_rate(struct sa1111_dev *sadev, int rate);
 int sa1111_get_audio_rate(struct sa1111_dev *sadev);
 
 int sa1111_check_dma_bug(dma_addr_t addr);
+
+int sa1111_driver_register(struct sa1111_driver *);
+void sa1111_driver_unregister(struct sa1111_driver *);
 
 #endif  /* _ASM_ARCH_SA1111 */
