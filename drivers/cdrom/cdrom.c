@@ -2626,7 +2626,8 @@ static void cdrom_sysctl_register(void)
 
 static void cdrom_sysctl_unregister(void)
 {
-	unregister_sysctl_table(cdrom_sysctl_header);
+	if (cdrom_sysctl_header)
+		unregister_sysctl_table(cdrom_sysctl_header);
 }
 
 #endif /* CONFIG_SYSCTL */

@@ -869,7 +869,6 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 
 DECLARE_WAIT_QUEUE_HEAD(kswapd_wait);
 DECLARE_WAIT_QUEUE_HEAD(kswapd_done);
-struct task_struct *kswapd_task;
 
 /*
  * The background pageout daemon, started as a kernel thread
@@ -892,7 +891,6 @@ int kswapd(void *unused)
 	tsk->pgrp = 1;
 	strcpy(tsk->comm, "kswapd");
 	sigfillset(&tsk->blocked);
-	kswapd_task = tsk;
 	
 	/*
 	 * Tell the memory management that we're a "memory allocator",
@@ -964,8 +962,8 @@ int kswapd(void *unused)
 
 void wakeup_kswapd(void)
 {
-	if (current != kswapd_task)
-		wake_up_process(kswapd_task);
+	if (waitqueue_active(&kswapd_wait))
+		wake_up_interruptible(&kswapd_wait);
 }
 
 /*

@@ -5,7 +5,7 @@
  *
  *		PF_INET protocol family socket handler.
  *
- * Version:	$Id: af_inet.c,v 1.129 2001/03/02 03:13:05 davem Exp $
+ * Version:	$Id: af_inet.c,v 1.130 2001/04/29 08:21:32 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -135,11 +135,11 @@ extern int dlci_ioctl(unsigned int, void*);
 #endif
 
 #ifdef CONFIG_DLCI_MODULE
-int (*dlci_ioctl_hook)(unsigned int, void *) = NULL;
+int (*dlci_ioctl_hook)(unsigned int, void *);
 #endif
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-int (*br_ioctl_hook)(unsigned long) = NULL;
+int (*br_ioctl_hook)(unsigned long);
 #endif
 
 /* New destruction routine */
@@ -361,19 +361,19 @@ static int inet_create(struct socket *sock, int protocol)
 
 	sk->destruct = inet_sock_destruct;
 
-	sk->zapped = 0;
-	sk->family = PF_INET;
-	sk->protocol = protocol;
+	sk->zapped	= 0;
+	sk->family	= PF_INET;
+	sk->protocol	= protocol;
 
-	sk->prot = prot;
+	sk->prot	= prot;
 	sk->backlog_rcv = prot->backlog_rcv;
 
-	sk->protinfo.af_inet.ttl=sysctl_ip_default_ttl;
+	sk->protinfo.af_inet.ttl	= sysctl_ip_default_ttl;
 
-	sk->protinfo.af_inet.mc_loop=1;
-	sk->protinfo.af_inet.mc_ttl=1;
-	sk->protinfo.af_inet.mc_index=0;
-	sk->protinfo.af_inet.mc_list=NULL;
+	sk->protinfo.af_inet.mc_loop	= 1;
+	sk->protinfo.af_inet.mc_ttl	= 1;
+	sk->protinfo.af_inet.mc_index	= 0;
+	sk->protinfo.af_inet.mc_list	= NULL;
 
 #ifdef INET_REFCNT_DEBUG
 	atomic_inc(&inet_sock_nr);
@@ -815,8 +815,7 @@ static int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	int err;
 	int pid;
 
-	switch(cmd) 
-	{
+	switch(cmd) {
 		case FIOSETOWN:
 		case SIOCSPGRP:
 			err = get_user(pid, (int *) arg);
@@ -962,8 +961,8 @@ struct proto_ops inet_dgram_ops = {
 };
 
 struct net_proto_family inet_family_ops = {
-	PF_INET,
-	inet_create
+	family:	PF_INET,
+	create:	inet_create
 };
 
 
@@ -982,8 +981,7 @@ static int __init inet_init(void)
 
 	printk(KERN_INFO "NET4: Linux TCP/IP 1.0 for NET4.0\n");
 
-	if (sizeof(struct inet_skb_parm) > sizeof(dummy_skb->cb))
-	{
+	if (sizeof(struct inet_skb_parm) > sizeof(dummy_skb->cb)) {
 		printk(KERN_CRIT "inet_proto_init: panic\n");
 		return -EINVAL;
 	}
@@ -999,8 +997,7 @@ static int __init inet_init(void)
 	 */
 
 	printk(KERN_INFO "IP Protocols: ");
-	for(p = inet_protocol_base; p != NULL;) 
-	{
+	for (p = inet_protocol_base; p != NULL;) {
 		struct inet_protocol *tmp = (struct inet_protocol *) p->next;
 		inet_add_protocol(p);
 		printk("%s%s",p->name,tmp?", ":"\n");

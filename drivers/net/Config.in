@@ -261,6 +261,9 @@ if [ "$CONFIG_NET_RADIO" = "y" ]; then
       dep_bool '     Aironet 4500/4800 I365 broken support (EXPERIMENTAL)' CONFIG_AIRONET4500_I365 $CONFIG_EXPERIMENTAL
    fi
    dep_tristate '   Aironet 4500/4800 PROC interface ' CONFIG_AIRONET4500_PROC $CONFIG_AIRONET4500 m
+
+# New directory for Wireless LAN devices - cards above will move there
+   source drivers/net/wireless/Config.in
 fi
 
 endmenu

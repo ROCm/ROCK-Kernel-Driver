@@ -1306,7 +1306,7 @@ static void allocated_rx_buffer(struct dmfe_board_info *db)
 	rxptr = db->rx_insert_ptr;
 
 	while (db->rx_avail_cnt < RX_DESC_CNT) {
-		if ((skb = alloc_skb(RX_ALLOC_SIZE, GFP_ATOMIC)) == NULL)
+		if ((skb = dev_alloc_skb(RX_ALLOC_SIZE)) == NULL)
 			break;
 		rxptr->rx_skb_ptr = (u32) skb;
 		rxptr->rdes2 = virt_to_bus(skb->tail);

@@ -989,11 +989,6 @@ void ymf_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	status = ymfpci_readl(codec, YDSXGR_STATUS);
 	if (status & 0x80000000) {
-		spin_lock(&codec->reg_lock);
-		ymfpci_writel(codec, YDSXGR_STATUS, 0x80000000);
-		mode = ymfpci_readl(codec, YDSXGR_MODE) | 2;
-		ymfpci_writel(codec, YDSXGR_MODE, mode);
-		spin_unlock(&codec->reg_lock);
 		codec->active_bank = ymfpci_readl(codec, YDSXGR_CTRLSELECT) & 1;
 		spin_lock(&codec->voice_lock);
 		for (nvoice = 0; nvoice < 64; nvoice++) {
@@ -1007,6 +1002,11 @@ void ymf_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				ymf_cap_interrupt(codec, cap);
 		}
 		spin_unlock(&codec->voice_lock);
+		spin_lock(&codec->reg_lock);
+		ymfpci_writel(codec, YDSXGR_STATUS, 0x80000000);
+		mode = ymfpci_readl(codec, YDSXGR_MODE) | 2;
+		ymfpci_writel(codec, YDSXGR_MODE, mode);
+		spin_unlock(&codec->reg_lock);
 	}
 
 	status = ymfpci_readl(codec, YDSXGR_INTFLAG);
@@ -2106,6 +2106,8 @@ static void ymfpci_aclink_reset(struct pci_dev * pci)
 		pci_write_config_byte(pci, PCIR_DSXGCTRL, cmd | 0x03);
 		pci_write_config_byte(pci, PCIR_DSXGCTRL, cmd & 0xfc);
 	}
+	pci_write_config_word(pci, PCIR_DSXPWRCTRL1, 0);
+	pci_write_config_word(pci, PCIR_DSXPWRCTRL2, 0);
 }
 
 static void ymfpci_enable_dsp(ymfpci_t *codec)

@@ -1,0 +1,22 @@
+#
+# Wireless LAN device configuration
+#
+
+###tristate '  Hermes chipset support' CONFIG_NET_ORINOCO
+###dep_tristate '    PCMCIA Hermes support (Orinoco/WavelanIEEE/PrismII/Symbol 802.11b cards)' CONFIG_PCMCIA_HERMES $CONFIG_NET_ORINOCO $CONFIG_PCMCIA
+
+if [ "$CONFIG_ALL_PPC" = "y" ]; then
+   tristate '  Apple Airport support (built-in)' CONFIG_APPLE_AIRPORT
+fi
+
+# If Pcmcia is compiled in, offer Pcmcia cards...
+if [ "$CONFIG_HOTPLUG" = "y" -a "$CONFIG_PCMCIA" != "n" ]; then
+   comment 'Wireless Pcmcia cards support' 
+
+   dep_tristate '  Hermes support (Orinoco/WavelanIEEE/PrismII/Symbol 802.11b cards)' CONFIG_PCMCIA_HERMES $CONFIG_PCMCIA
+
+# If one of the Pcmcia cards above is enabled, activate Pcmcia network support
+   if [ "$CONFIG_PCMCIA_HERMES" = "y" ]; then
+      define_bool CONFIG_PCMCIA_NETCARD y
+   fi
+fi

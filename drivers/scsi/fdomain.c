@@ -587,9 +587,7 @@ __setup("fdomain=", fdomain_setup);
 
 static void do_pause( unsigned amount )	/* Pause for amount*10 milliseconds */
 {
-   do {
-	udelay(10*1000);
-   } while (--amount);
+   mdelay(10*amount);
 }
 
 inline static void fdomain_make_bus_idle( void )
@@ -971,7 +969,7 @@ int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
    	return 0;
    shpnt->irq = interrupt_level;
    shpnt->io_port = port_base;
-   scsi_set_pci_device(shpnt->pci_dev, pdev);
+   scsi_set_pci_device(shpnt, pdev);
    shpnt->n_io_port = 0x10;
    print_banner( shpnt );
 

@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/aic7xxx/aic7xxx_inline.h#15 $
+ * $Id: //depot/src/aic7xxx/aic7xxx_inline.h#21 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_inline.h,v 1.8 2000/11/12 05:19:46 gibbs Exp $
  */
@@ -37,10 +37,10 @@
 #define _AIC7XXX_INLINE_H_
 
 /************************* Sequencer Execution Control ************************/
-static __inline int  sequencer_paused(struct ahc_softc *ahc);
+static __inline int  ahc_is_paused(struct ahc_softc *ahc);
 static __inline void ahc_pause_bug_fix(struct ahc_softc *ahc);
-static __inline void pause_sequencer(struct ahc_softc *ahc);
-static __inline void unpause_sequencer(struct ahc_softc *ahc);
+static __inline void ahc_pause(struct ahc_softc *ahc);
+static __inline void ahc_unpause(struct ahc_softc *ahc);
 
 /*
  * Work around any chip bugs related to halting sequencer execution.
@@ -62,7 +62,7 @@ ahc_pause_bug_fix(struct ahc_softc *ahc)
  * Returns non-zero status if the sequencer is stopped.
  */
 static __inline int
-sequencer_paused(struct ahc_softc *ahc)
+ahc_is_paused(struct ahc_softc *ahc)
 {
 	return ((ahc_inb(ahc, HCNTRL) & PAUSE) != 0);
 }
@@ -75,7 +75,7 @@ sequencer_paused(struct ahc_softc *ahc)
  * for critical sections.
  */
 static __inline void
-pause_sequencer(struct ahc_softc *ahc)
+ahc_pause(struct ahc_softc *ahc)
 {
 	ahc_outb(ahc, HCNTRL, ahc->pause);
 
@@ -83,7 +83,7 @@ pause_sequencer(struct ahc_softc *ahc)
 	 * Since the sequencer can disable pausing in a critical section, we
 	 * must loop until it actually stops.
 	 */
-	while (sequencer_paused(ahc) == 0)
+	while (ahc_is_paused(ahc) == 0)
 		;
 
 	ahc_pause_bug_fix(ahc);
@@ -100,7 +100,7 @@ pause_sequencer(struct ahc_softc *ahc)
  * condition.
  */
 static __inline void
-unpause_sequencer(struct ahc_softc *ahc)
+ahc_unpause(struct ahc_softc *ahc)
 {
 	if ((ahc_inb(ahc, INTSTAT) & (SCSIINT | SEQINT | BRKADRINT)) == 0)
 		ahc_outb(ahc, HCNTRL, ahc->unpause);
@@ -188,12 +188,12 @@ ahc_name(struct ahc_softc *ahc)
 
 /*********************** Miscelaneous Support Functions ***********************/
 
-static __inline int	ahc_check_residual(struct scb *scb);
+static __inline void	ahc_update_residual(struct scb *scb);
 static __inline struct ahc_initiator_tinfo *
 			ahc_fetch_transinfo(struct ahc_softc *ahc,
 					    char channel, u_int our_id,
 					    u_int remote_id,
-					    struct tmode_tstate **tstate);
+					    struct ahc_tmode_tstate **tstate);
 static __inline struct scb*
 			ahc_get_scb(struct ahc_softc *ahc);
 static __inline void	ahc_free_scb(struct ahc_softc *ahc, struct scb *scb);
@@ -211,15 +211,16 @@ static __inline uint32_t
  * Determine whether the sequencer reported a residual
  * for this SCB/transaction.
  */
-static __inline int
-ahc_check_residual(struct scb *scb)
+static __inline void
+ahc_update_residual(struct scb *scb)
 {
-	struct status_pkt *sp;
+	uint32_t sgptr;
 
-	sp = &scb->hscb->shared_data.status;
-	if ((scb->hscb->sgptr & SG_RESID_VALID) != 0)
-		return (1);
-	return (0);
+	sgptr = ahc_le32toh(scb->hscb->sgptr);
+	if ((sgptr & SG_RESID_VALID) != 0)
+		ahc_calc_residual(scb);
+	else
+		ahc_set_residual(scb, 0);
 }
 
 /*
@@ -228,7 +229,7 @@ ahc_check_residual(struct scb *scb)
  */
 static __inline struct ahc_initiator_tinfo *
 ahc_fetch_transinfo(struct ahc_softc *ahc, char channel, u_int our_id,
-		    u_int remote_id, struct tmode_tstate **tstate)
+		    u_int remote_id, struct ahc_tmode_tstate **tstate)
 {
 	/*
 	 * Transfer data structures are stored from the perspective
@@ -345,10 +346,10 @@ ahc_queue_scb(struct ahc_softc *ahc, struct scb *scb)
 		ahc_outb(ahc, HNSCB_QOFF, ahc->qinfifonext);
 	} else {
 		if ((ahc->features & AHC_AUTOPAUSE) == 0)
-			pause_sequencer(ahc);
+			ahc_pause(ahc);
 		ahc_outb(ahc, KERNEL_QINPOS, ahc->qinfifonext);
 		if ((ahc->features & AHC_AUTOPAUSE) == 0)
-			unpause_sequencer(ahc);
+			ahc_unpause(ahc);
 	}
 }
 
@@ -412,19 +413,28 @@ ahc_intr(struct ahc_softc *ahc)
 	 * completion queues.  This avoids a costly PCI bus read in
 	 * most cases.
 	 */
-	intstat = 0;
-	if ((queuestat = ahc_check_cmdcmpltqueues(ahc)) != 0)
+	if ((ahc->flags & (AHC_ALL_INTERRUPTS|AHC_EDGE_INTERRUPT)) == 0
+	 && (queuestat = ahc_check_cmdcmpltqueues(ahc)) != 0)
 		intstat = CMDCMPLT;
-
-	if ((intstat & INT_PEND) == 0
-	 || (ahc->flags & AHC_ALL_INTERRUPTS) != 0) {
-
+	else {
 		intstat = ahc_inb(ahc, INTSTAT);
+		/*
+		 * We can't generate queuestat once above
+		 * or we are exposed to a race when our
+		 * interrupt is shared with another device.
+		 * if instat showed a command complete interrupt,
+		 * but our first generation of queue stat
+		 * "just missed" the delivery of this transaction,
+		 * we would clear the command complete interrupt
+		 * below without ever servicing the completed
+		 * command.
+		 */
+		queuestat = ahc_check_cmdcmpltqueues(ahc);
 #if AHC_PCI_CONFIG > 0
 		if (ahc->unsolicited_ints > 500
 		 && (ahc->chip & AHC_PCI) != 0
 		 && (ahc_inb(ahc, ERROR) & PCIERRSTAT) != 0)
-			ahc_pci_intr(ahc);
+			ahc->bus_intr(ahc);
 #endif
 	}
 

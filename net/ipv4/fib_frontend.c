@@ -5,7 +5,7 @@
  *
  *		IPv4 Forwarding Information Base: FIB frontend.
  *
- * Version:	$Id: fib_frontend.c,v 1.21 1999/12/15 22:39:07 davem Exp $
+ * Version:	$Id: fib_frontend.c,v 1.23 2001/05/01 23:21:37 davem Exp $
  *
  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
  *
@@ -569,9 +569,9 @@ static void fib_del_ifaddr(struct in_ifaddr *ifa)
 #undef BRD1_OK
 }
 
-static void fib_disable_ip(struct net_device *dev, int force)
+static void fib_disable_ip(struct net_device *dev, u32 addr, int force)
 {
-	if (fib_sync_down(0, dev, force))
+	if (fib_sync_down(addr, dev, force))
 		fib_flush();
 	rt_cache_flush(0);
 	arp_ifdown(dev);
@@ -591,7 +591,7 @@ static int fib_inetaddr_event(struct notifier_block *this, unsigned long event, 
 			/* Last address was deleted from this interface.
 			   Disable IP.
 			 */
-			fib_disable_ip(ifa->ifa_dev->dev, 1);
+			fib_disable_ip(ifa->ifa_dev->dev, ifa->ifa_local, 1);
 		} else {
 			fib_del_ifaddr(ifa);
 			rt_cache_flush(-1);
@@ -620,10 +620,10 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 		rt_cache_flush(-1);
 		break;
 	case NETDEV_DOWN:
-		fib_disable_ip(dev, 0);
+		fib_disable_ip(dev, 0, 0);
 		break;
 	case NETDEV_UNREGISTER:
-		fib_disable_ip(dev, 1);
+		fib_disable_ip(dev, 0, 1);
 		break;
 	case NETDEV_CHANGEMTU:
 	case NETDEV_CHANGE:
@@ -634,15 +634,11 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 }
 
 struct notifier_block fib_inetaddr_notifier = {
-	fib_inetaddr_event,
-	NULL,
-	0
+	notifier_call:	fib_inetaddr_event,
 };
 
 struct notifier_block fib_netdev_notifier = {
-	fib_netdev_event,
-	NULL,
-	0
+	notifier_call:	fib_netdev_event,
 };
 
 void __init ip_fib_init(void)

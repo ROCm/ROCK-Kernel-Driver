@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux_pci.c#15 $
+ * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux_pci.c#17 $
  */
 
 #include "aic7xxx_osm.h"
@@ -57,7 +57,7 @@ static struct pci_device_id ahc_linux_pci_id_table[] = {
 	{ 0 }
 };
 
-static struct pci_driver aic7xxx_pci_driver = {
+struct pci_driver aic7xxx_pci_driver = {
 	name:		"aic7xxx",
 	probe:		ahc_linux_pci_dev_probe,
 	remove:		ahc_linux_pci_dev_remove,
@@ -133,7 +133,7 @@ ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	pdev->driver_data = ahc;
 	if (aic7xxx_detect_complete)
-		aic7xxx_register_host(ahc, aic7xxx_driver_template);
+		ahc_linux_register_host(ahc, aic7xxx_driver_template);
 #endif
 	return (0);
 }
@@ -191,11 +191,9 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 {
 	uint32_t command;
 	u_long	 base;
-#ifdef MMAPIO
 	u_long	 start;
 	u_long	 base_page;
 	u_long	 base_offset;
-#endif
 	uint8_t *maddr;
 
 	command = ahc_pci_read_config(ahc->dev_softc, PCIR_COMMAND, 4);
@@ -306,11 +304,47 @@ ahc_pci_map_int(struct ahc_softc *ahc)
 	int error;
 
 	ahc->platform_data->irq = ahc->dev_softc->irq;
-	error = request_irq(ahc->platform_data->irq, aic7xxx_isr,
-			    SA_INTERRUPT|SA_SHIRQ, "aic7xxx", ahc);
-	if (error < 0)
-		error = request_irq(ahc->platform_data->irq, aic7xxx_isr,
-				    SA_SHIRQ, "aic7xxx", ahc);
+	error = request_irq(ahc->platform_data->irq, ahc_linux_isr,
+			    SA_SHIRQ, "aic7xxx", ahc);
 	
 	return (-error);
+}
+
+void
+ahc_power_state_change(struct ahc_softc *ahc, ahc_power_state new_state)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+	pci_set_power_state(ahc->dev_softc, new_state);
+#else
+	uint32_t cap;
+	u_int cap_offset;
+
+	/*
+	 * Traverse the capability list looking for
+	 * the power management capability.
+	 */
+	cap = 0;
+	cap_offset = ahc_pci_read_config(ahc->dev_softc,
+					 PCIR_CAP_PTR, /*bytes*/1);
+	while (cap_offset != 0) {
+
+		cap = ahc_pci_read_config(ahc->dev_softc,
+					  cap_offset, /*bytes*/4);
+		if ((cap & 0xFF) == 1
+		 && ((cap >> 16) & 0x3) > 0) {
+			uint32_t pm_control;
+
+			pm_control = ahc_pci_read_config(ahc->dev_softc,
+							 cap_offset + 4,
+							 /*bytes*/4);
+			pm_control &= ~0x3;
+			pm_control |= new_state;
+			ahc_pci_write_config(ahc->dev_softc,
+					     cap_offset + 4,
+					     pm_control, /*bytes*/2);
+			break;
+		}
+		cap_offset = (cap >> 8) & 0xFF;
+	}
+#endif 
 }

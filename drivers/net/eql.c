@@ -422,6 +422,8 @@ static int eql_enslave(struct net_device *dev, slaving_request_t *srqp)
 				slave_t *s = eql_new_slave ();
 				equalizer_t *eql = 
 					(equalizer_t *) master_dev->priv;
+				if (!s)
+					return -ENOMEM;
 				s->dev = slave_dev;
 				s->priority = srq.priority;
 				s->priority_bps = srq.priority;

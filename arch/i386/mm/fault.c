@@ -117,6 +117,10 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	/* get the address */
 	__asm__("movl %%cr2,%0":"=r" (address));
 
+	/* It's safe to allow irq's after cr2 has been saved */
+	if (regs->eflags & X86_EFLAGS_IF)
+		local_irq_enable();
+
 	tsk = current;
 
 	/*
@@ -127,8 +131,12 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	 * be in an interrupt or a critical region, and should
 	 * only copy the information from the master page table,
 	 * nothing more.
+	 *
+	 * This verifies that the fault happens in kernel space
+	 * (error_code & 4) == 0, and that the fault was not a
+	 * protection error (error_code & 1) == 0.
 	 */
-	if (address >= TASK_SIZE)
+	if (address >= TASK_SIZE && !(error_code & 5))
 		goto vmalloc_fault;
 
 	mm = tsk->mm;
@@ -224,7 +232,6 @@ good_area:
 bad_area:
 	up_read(&mm->mmap_sem);
 
-bad_area_nosemaphore:
 	/* User mode accesses just cause a SIGSEGV */
 	if (error_code & 4) {
 		tsk->thread.cr2 = address;
@@ -329,24 +336,25 @@ vmalloc_fault:
 		int offset = __pgd_offset(address);
 		pgd_t *pgd, *pgd_k;
 		pmd_t *pmd, *pmd_k;
+		pte_t *pte_k;
 
 		asm("movl %%cr3,%0":"=r" (pgd));
 		pgd = offset + (pgd_t *)__va(pgd);
 		pgd_k = init_mm.pgd + offset;
 
-		if (!pgd_present(*pgd)) {
-			if (!pgd_present(*pgd_k))
-				goto bad_area_nosemaphore;
-			set_pgd(pgd, *pgd_k);
-			return;
-		}
-
+		if (!pgd_present(*pgd_k))
+			goto no_context;
+		set_pgd(pgd, *pgd_k);
+		
 		pmd = pmd_offset(pgd, address);
 		pmd_k = pmd_offset(pgd_k, address);
-
-		if (pmd_present(*pmd) || !pmd_present(*pmd_k))
-			goto bad_area_nosemaphore;
+		if (!pmd_present(*pmd_k))
+			goto no_context;
 		set_pmd(pmd, *pmd_k);
+
+		pte_k = pte_offset(pmd_k, address);
+		if (!pte_present(*pte_k))
+			goto no_context;
 		return;
 	}
 }

@@ -1108,9 +1108,13 @@ void scsi_block_requests(struct Scsi_Host * SHpnt)
  */
 void scsi_unblock_requests(struct Scsi_Host * SHpnt)
 {
-	SHpnt->host_self_blocked = FALSE;
-}
+	Scsi_Device *SDloop;
 
+	SHpnt->host_self_blocked = FALSE;
+	/* Now that we are unblocked, try to start the queues. */
+	for (SDloop = SHpnt->host_queue; SDloop; SDloop = SDloop->next)
+		scsi_queue_next_request(&SDloop->request_queue, NULL);
+}
 
 /*
  * Function:    scsi_report_bus_reset()

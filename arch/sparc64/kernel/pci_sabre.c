@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.27 2001/04/24 05:14:12 davem Exp $
+/* $Id: pci_sabre.c,v 1.29 2001/05/02 00:32:56 davem Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -215,7 +215,7 @@
 	 ((unsigned long)(DEVFN) << 8)  |	\
 	 ((unsigned long)(REG)))
 
-static int apb_present;
+static int hummingbird_p;
 
 static void *sabre_pci_config_mkaddr(struct pci_pbm_info *pbm,
 				     unsigned char bus,
@@ -231,7 +231,7 @@ static void *sabre_pci_config_mkaddr(struct pci_pbm_info *pbm,
 
 static int sabre_out_of_range(unsigned char devfn)
 {
-	if (!apb_present)
+	if (hummingbird_p)
 		return 0;
 
 	return (((PCI_SLOT(devfn) == 0) && (PCI_FUNC(devfn) > 0)) ||
@@ -243,7 +243,7 @@ static int __sabre_out_of_range(struct pci_pbm_info *pbm,
 				unsigned char bus,
 				unsigned char devfn)
 {
-	if (!apb_present)
+	if (hummingbird_p)
 		return 0;
 
 	return ((pbm->parent == 0) ||
@@ -1461,12 +1461,10 @@ static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node,
 			prom_printf("Cannot register Hummingbird's MEM space.\n");
 			prom_halt();
 		}
-	} else {
-		apb_present = 1;
 	}
 }
 
-void __init sabre_init(int pnode)
+void __init sabre_init(int pnode, char *model_name)
 {
 	struct linux_prom64_registers pr_regs[2];
 	struct pci_controller_info *p;
@@ -1477,6 +1475,18 @@ void __init sabre_init(int pnode)
 	u32 vdma[2];
 	u32 upa_portid, dma_mask;
 	int bus;
+
+	hummingbird_p = 0;
+	if (!strcmp(model_name, "pci108e,a001"))
+		hummingbird_p = 1;
+	else if (!strcmp(model_name, "SUNW,sabre")) {
+		char compat[64];
+
+		if (prom_getproperty(pnode, "compatible",
+				     compat, sizeof(compat)) > 0 &&
+		    !strcmp(compat, "pci108e,a001"))
+			hummingbird_p = 1;
+	}
 
 	p = kmalloc(sizeof(*p), GFP_ATOMIC);
 	if (!p) {

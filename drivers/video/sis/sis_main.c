@@ -1029,6 +1029,8 @@ static struct OH *poh_new_node(void)
 
 	if (heap.pohFreeList == NULL) {
 		poha = kmalloc(OH_ALLOC_SIZE, GFP_KERNEL);
+		if (!poha)
+			return NULL;
 
 		poha->pohaNext = heap.pohaChain;
 		heap.pohaChain = poha;

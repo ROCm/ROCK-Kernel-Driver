@@ -29,7 +29,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_proc.c#7 $
+ * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_proc.c#11 $
  */
 #include "aic7xxx_osm.h"
 #include "aic7xxx_inline.h"
@@ -174,7 +174,7 @@ ahc_dump_target_state(struct ahc_softc *ahc, struct info_str *info,
 {
 	struct	ahc_linux_target *targ;
 	struct	ahc_initiator_tinfo *tinfo;
-	struct	tmode_tstate *tstate;
+	struct	ahc_tmode_tstate *tstate;
 	int	lun;
 
 	tinfo = ahc_fetch_transinfo(ahc, channel, our_id,
@@ -190,7 +190,7 @@ ahc_dump_target_state(struct ahc_softc *ahc, struct info_str *info,
 	copy_info(info, "\tGoal: ");
 	ahc_format_transinfo(info, &tinfo->goal);
 	copy_info(info, "\tCurr: ");
-	ahc_format_transinfo(info, &tinfo->current);
+	ahc_format_transinfo(info, &tinfo->curr);
 
 	for (lun = 0; lun < AHC_NUM_LUNS; lun++) {
 		struct ahc_linux_device *dev;
@@ -210,7 +210,7 @@ ahc_dump_device_state(struct info_str *info, struct ahc_linux_device *dev)
 	copy_info(info, "\tChannel %c Target %d Lun %d Settings\n",
 		  dev->target->channel + 'A', dev->target->target, dev->lun);
 
-	copy_info(info, "\t\tCommands Queued %d\n", dev->num_commands);
+	copy_info(info, "\t\tCommands Queued %ld\n", dev->commands_issued);
 	copy_info(info, "\t\tCommands Active %d\n", dev->active);
 	copy_info(info, "\t\tCommand Openings %d\n", dev->openings);
 	copy_info(info, "\t\tMax Tagged Openings %d\n", dev->maxtags);
@@ -221,7 +221,7 @@ ahc_dump_device_state(struct info_str *info, struct ahc_linux_device *dev)
  * Return information to handle /proc support for the driver.
  */
 int
-aic7xxx_proc_info(char *buffer, char **start, off_t offset,
+ahc_linux_proc_info(char *buffer, char **start, off_t offset,
 		  int length, int hostno, int inout)
 {
 	struct	ahc_softc *ahc;

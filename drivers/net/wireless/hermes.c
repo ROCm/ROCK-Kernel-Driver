@@ -106,7 +106,7 @@ static int hermes_issue_cmd(hermes_t *hw, uint16_t cmd, uint16_t param0)
  * Function definitions
  */
 
-void hermes_struct_init(hermes_t *hw, ushort io)
+void hermes_struct_init(hermes_t *hw, uint io)
 {
 	hw->iobase = io;
 	hw->inten = 0x0;

@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/aic7xxx/aicasm/aicasm_symbol.c#4 $
+ * $Id: //depot/src/aic7xxx/aicasm/aicasm_symbol.c#5 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aicasm/aicasm_symbol.c,v 1.11 2000/09/22 22:19:54 gibbs Exp $
  */
@@ -36,7 +36,7 @@
 #include <sys/types.h>
 
 #ifdef __linux__
-#include <db1/db.h>
+#include "aicdb.h"
 #else
 #include <db.h>
 #endif

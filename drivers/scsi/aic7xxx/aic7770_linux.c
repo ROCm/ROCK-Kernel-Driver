@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7770_linux.c#5 $
+ * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7770_linux.c#7 $
  */
 
 #include "aic7xxx_osm.h"
@@ -128,19 +128,18 @@ aic7770_map_registers(struct ahc_softc *ahc)
 }
 
 int
-aic7770_map_int(struct ahc_softc *ahc, u_int irq, int shared)
+aic7770_map_int(struct ahc_softc *ahc, u_int irq)
 {
 	int error;
+	int shared;
 
-	if (shared)
+	shared = 0;
+	if ((ahc->flags & AHC_EDGE_INTERRUPT) == 0)
 		shared = SA_SHIRQ;
 
 	ahc->platform_data->irq = irq;
-	error = request_irq(ahc->platform_data->irq, aic7xxx_isr,
-			    SA_INTERRUPT|shared, "aic7xxx", ahc);
-	if (error < 0)
-		error = request_irq(ahc->platform_data->irq, aic7xxx_isr,
-				    shared, "aic7xxx", ahc);
+	error = request_irq(ahc->platform_data->irq, ahc_linux_isr,
+			    shared, "aic7xxx", ahc);
 	
 	return (-error);
 }

@@ -18,7 +18,7 @@
  * along with this program; see the file COPYING.  If not, write to
  * the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  * 
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#45 $
+ * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#59 $
  *
  * Copyright (c) 2000, 2001 Adaptec Inc.
  * All rights reserved.
@@ -47,7 +47,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#45 $
+ * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#59 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -61,6 +61,10 @@
 #include <linux/malloc.h>
 #include <linux/pci.h>
 #include <linux/version.h>
+
+#ifndef KERNEL_VERSION
+#define KERNEL_VERSION(x,y,z) (((x)<<16)+((y)<<8)+(z))
+#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 #include <linux/config.h>
@@ -78,14 +82,6 @@
 #include "cam.h"
 #include "queue.h"
 #include "scsi_message.h"
-
-/*
- * We never have to reference the current task, and the driver core
- * makes ample use of this "name".
- */
-#ifdef current
-#undef current
-#endif
 
 /************************* Forward Declarations *******************************/
 struct ahc_softc;
@@ -114,7 +110,7 @@ extern Scsi_Host_Template* aic7xxx_driver_template;
 
 /***************************** Bus Space/DMA **********************************/
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,2,16)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,2,17)
 typedef dma_addr_t bus_addr_t;
 #else
 typedef uint32_t bus_addr_t;
@@ -353,11 +349,7 @@ struct scsi_inquiry_data
 #include <linux/smp.h>
 #endif
 
-#define AIC7XXX_DRIVER_VERSION  "6.1.5"
-
-#ifndef KERNEL_VERSION
-#define KERNEL_VERSION(x,y,z) (((x)<<16)+((y)<<8)+(z))
-#endif
+#define AIC7XXX_DRIVER_VERSION  "6.1.13"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -401,7 +393,9 @@ typedef enum {
 	AHC_DEV_UNCONFIGURED	 = 0x01,
 	AHC_DEV_FREEZE_TIL_EMPTY = 0x02, /* Freeze queue until active == 0 */
 	AHC_DEV_TIMER_ACTIVE	 = 0x04, /* Our timer is active */
-	AHC_DEV_ON_RUN_LIST	 = 0x08	 /* Queued to be run later */
+	AHC_DEV_ON_RUN_LIST	 = 0x08, /* Queued to be run later */
+	AHC_DEV_Q_BASIC		 = 0x10, /* Allow basic device queuing */
+	AHC_DEV_Q_TAGGED	 = 0x20  /* Allow full SCSI2 command queueing */
 } ahc_dev_flags;
 
 struct ahc_linux_target;
@@ -434,7 +428,7 @@ struct ahc_linux_device {
 	/*
 	 * Cumulative command counter.
 	 */
-	u_int		num_commands;
+	u_long		commands_issued;
 
 	/*
 	 * The number of tagged transactions when
@@ -465,8 +459,16 @@ struct ahc_linux_device {
 	 * on devices with a fixed number of tags.
 	 */
 	u_int		last_queuefull_same_count;
-
 #define AHC_LOCK_TAGS_COUNT 50
+
+	/*
+	 * How many transactions have been queued
+	 * without the device going idle.  We use
+	 * this statistic to 
+	 */
+	u_int		commands_since_idle_or_otag;
+#define AHC_OTAG_THRESH	250
+
 	int		lun;
 	struct		ahc_linux_target *target;
 };
@@ -570,9 +572,6 @@ ahc_delay(long usec)
 #endif
 #define mb() \
 	__asm__ __volatile__("mb": : :"memory")
-#elif defined(__sparc__)
-#define MMAPIO
-/* The default mb() define does what this driver wants. -DaveM */
 #endif
 
 static __inline uint8_t ahc_inb(struct ahc_softc * ahc, long port);
@@ -644,8 +643,8 @@ ahc_insb(struct ahc_softc * ahc, long port, uint8_t *array, int count)
 }
 
 /**************************** Initialization **********************************/
-int	aic7xxx_register_host(struct ahc_softc *ahc,
-			      Scsi_Host_Template *template);
+int	ahc_linux_register_host(struct ahc_softc *,
+				Scsi_Host_Template *);
 
 /*************************** Pretty Printing **********************************/
 struct info_str {
@@ -784,11 +783,24 @@ ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
 #define PCIR_SUBVEND_0	0x2c
 #define PCIR_SUBDEV_0	0x2e
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+extern struct pci_driver aic7xxx_pci_driver;
+#endif
+
+typedef enum
+{
+	AHC_POWER_STATE_D0,
+	AHC_POWER_STATE_D1,
+	AHC_POWER_STATE_D2,
+	AHC_POWER_STATE_D3
+} ahc_power_state;
+
+void ahc_power_state_change(struct ahc_softc *ahc,
+			    ahc_power_state new_state);
 /**************************** VL/EISA Routines ********************************/
 int			 aic7770_linux_probe(Scsi_Host_Template *);
 int			 aic7770_map_registers(struct ahc_softc *ahc);
-int			 aic7770_map_int(struct ahc_softc *ahc,
-					 u_int irq, int shared);
+int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
 
 /******************************* PCI Routines *********************************/
 /*
@@ -1047,16 +1059,16 @@ ahc_freeze_scb(struct scb *scb)
 }
 
 void	ahc_platform_set_tags(struct ahc_softc *ahc,
-			      struct ahc_devinfo *devinfo, int enable);
+			      struct ahc_devinfo *devinfo, ahc_queue_alg);
 int	ahc_platform_abort_scbs(struct ahc_softc *ahc, int target,
 				char channel, int lun, u_int tag,
 				role_t role, uint32_t status);
-void	aic7xxx_isr(int irq, void *dev_id, struct pt_regs * regs);
+void	ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
 void	ahc_platform_flushwork(struct ahc_softc *ahc);
 int	ahc_softc_comp(struct ahc_softc *, struct ahc_softc *);
 void	ahc_done(struct ahc_softc*, struct scb*);
 void	ahc_send_async(struct ahc_softc *, char channel,
-		       u_int target, u_int lun, ac_code);
+		       u_int target, u_int lun, ac_code, void *);
 void	ahc_print_path(struct ahc_softc *, struct scb *);
 void	ahc_platform_dump_card_state(struct ahc_softc *ahc);
 

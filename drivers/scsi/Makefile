@@ -6,6 +6,12 @@
 #
 # 20 Sep 2000, Torben Mathiasen <tmm@image.dk>
 # Changed link order to reflect new scsi initialization.
+#
+# *!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!
+# The link order must be, SCSI Core, SCSI HBA drivers, and
+# lastly SCSI peripheral drivers (disk/tape/cdrom/etc.) to
+# satisfy certain initialization assumptions in the SCSI layer.
+# *!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!
 
 O_TARGET := scsidrv.o
 
@@ -64,6 +70,9 @@ obj-$(CONFIG_SCSI_ULTRASTOR)	+= ultrastor.o
 obj-$(CONFIG_SCSI_AHA152X)	+= aha152x.o
 obj-$(CONFIG_SCSI_AHA1542)	+= aha1542.o
 obj-$(CONFIG_SCSI_AHA1740)	+= aha1740.o
+ifeq ($(CONFIG_SCSI_AIC7XXX),y)
+obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx/aic7xxx_drv.o
+endif
 obj-$(CONFIG_SCSI_AIC7XXX_OLD)	+= aic7xxx_old.o
 obj-$(CONFIG_SCSI_IPS)		+= ips.o
 obj-$(CONFIG_SCSI_FD_MCS)	+= fd_mcs.o

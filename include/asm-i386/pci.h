@@ -9,8 +9,9 @@
 
 #define pcibios_assign_all_busses()	0
 
+extern unsigned long pci_mem_start;
 #define PCIBIOS_MIN_IO		0x1000
-#define PCIBIOS_MIN_MEM		0x10000000
+#define PCIBIOS_MIN_MEM		(pci_mem_start)
 
 void pcibios_set_master(struct pci_dev *dev);
 void pcibios_penalize_isa_irq(int irq);

@@ -95,6 +95,7 @@ APISOURCES :=	$(TOPDIR)/drivers/media/video/videodev.c \
 		$(TOPDIR)/kernel/pm.c \
 		$(TOPDIR)/kernel/ksyms.c \
 		$(TOPDIR)/kernel/kmod.c \
+		$(TOPDIR)/kernel/module.c \
 		$(TOPDIR)/kernel/printk.c \
 		$(TOPDIR)/kernel/sched.c \
 		$(TOPDIR)/kernel/sysctl.c \

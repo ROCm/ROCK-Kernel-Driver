@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp.c,v 1.202 2001/04/20 20:46:19 davem Exp $
+ * Version:	$Id: tcp.c,v 1.204 2001/05/01 23:07:49 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -1122,8 +1122,16 @@ new_segment:
 
 				/* Time to copy data. We are close to the end! */
 				err = tcp_copy_to_page(sk, from, skb, page, off, copy);
-				if (err)
+				if (err) {
+					/* If this page was new, give it to the
+					 * socket so it does not get leaked.
+					 */
+					if (TCP_PAGE(sk) == NULL) {
+						TCP_PAGE(sk) = page;
+						TCP_OFF(sk) = 0;
+					}
 					goto do_error;
+				}
 
 				/* Update the skb. */
 				if (merge) {
@@ -1182,12 +1190,9 @@ out:
 	return copied;
 
 do_fault:
-	if (skb->len==0) {
-		if (tp->send_head == skb) {
-			tp->send_head = skb->prev;
-			if (TCP_SKB_CB(skb)->seq == tp->snd_nxt)
-				tp->send_head = NULL;
-		}
+	if (skb->len == 0) {
+		if (tp->send_head == skb)
+			tp->send_head = NULL;
 		__skb_unlink(skb, skb->list);
 		tcp_free_skb(sk, skb);
 	}

@@ -191,8 +191,6 @@ void oom_kill(void)
  */
 int out_of_memory(void)
 {
-	struct sysinfo swp_info;
-
 	/* Enough free memory?  Not OOM. */
 	if (nr_free_pages() > freepages.min)
 		return 0;
@@ -201,8 +199,7 @@ int out_of_memory(void)
 		return 0;
 
 	/* Enough swap space left?  Not OOM. */
-	si_swapinfo(&swp_info);
-	if (swp_info.freeswap > 0)
+	if (nr_swap_pages > 0)
 		return 0;
 
 	/* Else... */

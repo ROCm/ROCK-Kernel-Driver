@@ -1034,7 +1034,6 @@ repeat:
 int balance_dirty_state(kdev_t dev)
 {
 	unsigned long dirty, tot, hard_dirty_limit, soft_dirty_limit;
-	int shortage;
 
 	dirty = size_buffers_type[BUF_DIRTY] >> PAGE_SHIFT;
 	tot = nr_free_buffer_pages();
@@ -1049,16 +1048,6 @@ int balance_dirty_state(kdev_t dev)
 			return 1;
 		return 0;
 	}
-
-	/*
-	 * If we are about to get low on free pages and
-	 * cleaning the inactive_dirty pages would help
-	 * fix this, wake up bdflush.
-	 */
-	shortage = free_shortage();
-	if (shortage && nr_inactive_dirty_pages > shortage &&
-			nr_inactive_dirty_pages > freepages.high)
-		return 0;
 
 	return -1;
 }
@@ -2578,16 +2567,15 @@ static int flush_dirty_buffers(int check_flushtime)
 	return flushed;
 }
 
-struct task_struct *bdflush_tsk = 0;
+DECLARE_WAIT_QUEUE_HEAD(bdflush_wait);
 
 void wakeup_bdflush(int block)
 {
-	if (current != bdflush_tsk) {
-		wake_up_process(bdflush_tsk);
+	if (waitqueue_active(&bdflush_wait))
+		wake_up_interruptible(&bdflush_wait);
 
-		if (block)
-			flush_dirty_buffers(0);
-	}
+	if (block)
+		flush_dirty_buffers(0);
 }
 
 /* 
@@ -2688,7 +2676,6 @@ int bdflush(void *sem)
 	tsk->session = 1;
 	tsk->pgrp = 1;
 	strcpy(tsk->comm, "bdflush");
-	bdflush_tsk = tsk;
 
 	/* avoid getting signals */
 	spin_lock_irq(&tsk->sigmask_lock);
@@ -2703,22 +2690,16 @@ int bdflush(void *sem)
 		CHECK_EMERGENCY_SYNC
 
 		flushed = flush_dirty_buffers(0);
-		if (free_shortage())
-			flushed += page_launder(GFP_KERNEL, 0);
 
 		/*
 		 * If there are still a lot of dirty buffers around,
 		 * skip the sleep and flush some more. Otherwise, we
 		 * go to sleep waiting a wakeup.
 		 */
-		set_current_state(TASK_INTERRUPTIBLE);
 		if (!flushed || balance_dirty_state(NODEV) < 0) {
 			run_task_queue(&tq_disk);
-			schedule();
+			interruptible_sleep_on(&bdflush_wait);
 		}
-		/* Remember to mark us as running otherwise
-		   the next schedule will block. */
-		__set_current_state(TASK_RUNNING);
 	}
 }
 

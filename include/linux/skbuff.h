@@ -1069,7 +1069,7 @@ static inline struct sk_buff *dev_alloc_skb(unsigned int length)
 static inline int
 skb_cow(struct sk_buff *skb, unsigned int headroom)
 {
-	int delta = headroom - skb_headroom(skb);
+	int delta = (headroom > 16 ? headroom : 16) - skb_headroom(skb);
 
 	if (delta < 0)
 		delta = 0;

@@ -586,7 +586,7 @@ static int proc_base_readdir(struct file * filp,
 	struct pid_entry *p;
 
 	pid = inode->u.proc_i.task->pid;
-	if (!inode->u.proc_i.task->p_pptr)
+	if (!pid)
 		return -ENOENT;
 	i = filp->f_pos;
 	switch (i) {
@@ -641,7 +641,7 @@ static struct inode *proc_pid_make_inode(struct super_block * sb, struct task_st
 	 */
 	inode->u.proc_i.task = task;
 	get_task_struct(task);
-	if (!task->p_pptr)
+	if (!task->pid)
 		goto out_unlock;
 
 	inode->i_uid = 0;
@@ -673,7 +673,7 @@ static int pid_fd_revalidate(struct dentry * dentry, int flags)
  */
 static int pid_base_revalidate(struct dentry * dentry, int flags)
 {
-	if (dentry->d_inode->u.proc_i.task->p_pptr)
+	if (dentry->d_inode->u.proc_i.task->pid)
 		return 1;
 	d_drop(dentry);
 	return 0;

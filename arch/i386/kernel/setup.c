@@ -127,6 +127,9 @@ unsigned int machine_submodel_id;
 unsigned int BIOS_revision;
 unsigned int mca_pentium_flag;
 
+/* For PCI or other memory-mapped resources */
+unsigned long pci_mem_start = 0x10000000;
+
 /*
  * Setup options
  */
@@ -1008,6 +1011,9 @@ void __init setup_arch(char **cmdline_p)
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
 		request_resource(&ioport_resource, standard_io_resources+i);
+
+	/* Tell the PCI layer not to allocate too close to the RAM area.. */
+	pci_mem_start = ((max_low_pfn << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)

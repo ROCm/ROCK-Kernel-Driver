@@ -1,6 +1,6 @@
 /* linux/net/inet/arp.c
  *
- * Version:	$Id: arp.c,v 1.96 2001/02/02 08:42:59 davem Exp $
+ * Version:	$Id: arp.c,v 1.97 2001/04/30 04:36:12 davem Exp $
  *
  * Copyright (C) 1994 by Florian  La Roche
  *
@@ -123,69 +123,71 @@ static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb);
 static void arp_error_report(struct neighbour *neigh, struct sk_buff *skb);
 static void parp_redo(struct sk_buff *skb);
 
-static struct neigh_ops arp_generic_ops =
-{
-	AF_INET,
-	NULL,
-	arp_solicit,
-	arp_error_report,
-	neigh_resolve_output,
-	neigh_connected_output,
-	dev_queue_xmit,
-	dev_queue_xmit
+static struct neigh_ops arp_generic_ops = {
+	family:			AF_INET,
+	solicit:		arp_solicit,
+	error_report:		arp_error_report,
+	output:			neigh_resolve_output,
+	connected_output:	neigh_connected_output,
+	hh_output:		dev_queue_xmit,
+	queue_xmit:		dev_queue_xmit,
 };
 
-static struct neigh_ops arp_hh_ops =
-{
-	AF_INET,
-	NULL,
-	arp_solicit,
-	arp_error_report,
-	neigh_resolve_output,
-	neigh_resolve_output,
-	dev_queue_xmit,
-	dev_queue_xmit
+static struct neigh_ops arp_hh_ops = {
+	family:			AF_INET,
+	solicit:		arp_solicit,
+	error_report:		arp_error_report,
+	output:			neigh_resolve_output,
+	connected_output:	neigh_resolve_output,
+	hh_output:		dev_queue_xmit,
+	queue_xmit:		dev_queue_xmit,
 };
 
-static struct neigh_ops arp_direct_ops =
-{
-	AF_INET,
-	NULL,
-	NULL,
-	NULL,
-	dev_queue_xmit,
-	dev_queue_xmit,
-	dev_queue_xmit,
-	dev_queue_xmit
+static struct neigh_ops arp_direct_ops = {
+	family:			AF_INET,
+	output:			dev_queue_xmit,
+	connected_output:	dev_queue_xmit,
+	hh_output:		dev_queue_xmit,
+	queue_xmit:		dev_queue_xmit,
 };
 
-struct neigh_ops arp_broken_ops =
-{
-	AF_INET,
-	NULL,
-	arp_solicit,
-	arp_error_report,
-	neigh_compat_output,
-	neigh_compat_output,
-	dev_queue_xmit,
-	dev_queue_xmit,
+struct neigh_ops arp_broken_ops = {
+	family:			AF_INET,
+	solicit:		arp_solicit,
+	error_report:		arp_error_report,
+	output:			neigh_compat_output,
+	connected_output:	neigh_compat_output,
+	hh_output:		dev_queue_xmit,
+	queue_xmit:		dev_queue_xmit,
 };
 
-struct neigh_table arp_tbl =
-{
-	NULL,
-	AF_INET,
-	sizeof(struct neighbour) + 4,
-	4,
-	arp_hash,
-	arp_constructor,
-	NULL,
-	NULL,
-	parp_redo,
-	"arp_cache",
-        { NULL, NULL, &arp_tbl, 0, NULL, NULL,
-		  30*HZ, 1*HZ, 60*HZ, 30*HZ, 5*HZ, 3, 3, 0, 3, 1*HZ, (8*HZ)/10, 64, 1*HZ },
-	30*HZ, 128, 512, 1024,
+struct neigh_table arp_tbl = {
+	family:		AF_INET,
+	entry_size:	sizeof(struct neighbour) + 4,
+	key_len:	4,
+	hash:		arp_hash,
+	constructor:	arp_constructor,
+	proxy_redo:	parp_redo,
+	id:		"arp_cache",
+	parms: {
+		tbl:			&arp_tbl,
+		base_reachable_time:	30 * HZ,
+		retrans_time:		1 * HZ,
+		gc_staletime:		60 * HZ,
+		reachable_time:		30 * HZ,
+		delay_probe_time:	5 * HZ,
+		queue_len:		3,
+		ucast_probes:		3,
+		mcast_probes:		3,
+		anycast_delay:		1 * HZ,
+		proxy_delay:		(8 * HZ) / 10,
+		proxy_qlen:		64,
+		locktime:		1 * HZ,
+	},
+	gc_interval:	30 * HZ,
+	gc_thresh1:	128,
+	gc_thresh2:	512,
+	gc_thresh3:	1024,
 };
 
 int arp_mc_map(u32 addr, u8 *haddr, struct net_device *dev, int dir)
@@ -194,10 +196,10 @@ int arp_mc_map(u32 addr, u8 *haddr, struct net_device *dev, int dir)
 	case ARPHRD_ETHER:
 	case ARPHRD_FDDI:
 	case ARPHRD_IEEE802:
-		ip_eth_mc_map(addr, haddr) ; 
-		return 0 ; 
+		ip_eth_mc_map(addr, haddr);
+		return 0; 
 	case ARPHRD_IEEE802_TR:
-		ip_tr_mc_map(addr, haddr) ; 
+		ip_tr_mc_map(addr, haddr);
 		return 0;
 	default:
 		if (dir) {
@@ -1162,13 +1164,10 @@ void arp_ifdown(struct net_device *dev)
  *	Called once on startup.
  */
 
-static struct packet_type arp_packet_type =
-{
-	__constant_htons(ETH_P_ARP),
-	NULL,		/* All devices */
-	arp_rcv,
-	(void*)1,
-	NULL
+static struct packet_type arp_packet_type = {
+	type:	__constant_htons(ETH_P_ARP),
+	func:	arp_rcv,
+	data:	(void*) 1, /* understand shared skbs */
 };
 
 void __init arp_init (void)

@@ -27,10 +27,11 @@
  *
  *      Copyright (C) 1999,2000  Moxa Technologies Co., LTD.
  *
- *      for             : LINUX 2.0.X, 2.2.X
- *      date            : 1999/07/22
- *      version         : 1.1 
+ *      for             : LINUX 2.0.X, 2.2.X, 2.4.X
+ *      date            : 2001/05/01
+ *      version         : 1.2 
  *      
+ *    Fixes for C104H/PCI by Tim Hockin <thockin@sun.com>
  */
 
 #include <linux/config.h>
@@ -61,7 +62,7 @@
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 
-#define		MXSER_VERSION			"1.1kern"
+#define		MXSER_VERSION			"1.2"
 
 #define		MXSERMAJOR	 	174
 #define		MXSERCUMAJOR		175
@@ -120,7 +121,7 @@
 #define CI104J_ASIC_ID  5
 
 enum {
-	MXSER_BOARD_C168_ISA = 1,
+	MXSER_BOARD_C168_ISA = 0,
 	MXSER_BOARD_C104_ISA,
 	MXSER_BOARD_CI104J,
 	MXSER_BOARD_C168_PCI,
@@ -434,7 +435,7 @@ int mxser_initbrd(int board, struct mxser_hwconf *hwconf)
 			     "mxser", info);
 	if (retval) {
 		restore_flags(flags);
-		printk("Board %d: %s", board, mxser_brdname[hwconf->board_type - 1]);
+		printk("Board %d: %s", board, mxser_brdname[hwconf->board_type]);
 		printk("  Request irq fail,IRQ (%d) may be conflit with another device.\n", info->irq);
 		return (retval);
 	}
@@ -455,7 +456,7 @@ static int mxser_get_PCI_conf(struct pci_dev *pdev, int board_type, struct mxser
 	unsigned int ioaddress;
 
 	hwconf->board_type = board_type;
-	hwconf->ports = mxser_numports[board_type - 1];
+	hwconf->ports = mxser_numports[board_type];
 	ioaddress = pci_resource_start (pdev, 2);
 	for (i = 0; i < hwconf->ports; i++)
 		hwconf->ioaddr[i] = ioaddress + 8 * i;
@@ -544,7 +545,7 @@ int mxser_init(void)
 
 		if (retval != 0)
 			printk("Found MOXA %s board (CAP=0x%x)\n",
-			       mxser_brdname[hwconf.board_type - 1],
+			       mxser_brdname[hwconf.board_type],
 			       ioaddr[b]);
 
 		if (retval <= 0) {
@@ -579,7 +580,7 @@ int mxser_init(void)
 
 		if (retval != 0)
 			printk("Found MOXA %s board (CAP=0x%x)\n",
-			       mxser_brdname[hwconf.board_type - 1],
+			       mxser_brdname[hwconf.board_type],
 			       ioaddr[b]);
 
 		if (retval <= 0) {
@@ -612,21 +613,15 @@ int mxser_init(void)
 
 		n = sizeof(mxser_pcibrds) / sizeof(mxser_pciinfo);
 		index = 0;
-		b = 0;
-		while (b < n) {
+		for (b = 0; b < n; b++) {
 			pdev = pci_find_device(mxser_pcibrds[b].vendor_id,
 					       mxser_pcibrds[b].device_id, pdev);
-			if (!pdev)
-			{
-				b++;
-				continue;
-			}
-			if (pci_enable_device(pdev))
+			if (!pdev || pci_enable_device(pdev))
 				continue;
 			hwconf.pdev = pdev;
 			printk("Found MOXA %s board(BusNo=%d,DevNo=%d)\n",
-				mxser_brdname[mxser_pcibrds[b].board_type - 1],
-				pdev->bus->number, PCI_SLOT(pdev->devfn >> 3));
+				mxser_brdname[mxser_pcibrds[b].board_type],
+				pdev->bus->number, PCI_SLOT(pdev->devfn));
 			if (m >= MXSER_BOARDS) {
 				printk("Too many Smartio family boards found (maximum %d),board not configured\n", MXSER_BOARDS);
 			} else {
@@ -1352,7 +1347,7 @@ static void mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		return;
 	if (port == 0)
 		return;
-	max = mxser_numports[mxsercfg[i].board_type - 1];
+	max = mxser_numports[mxsercfg[i].board_type];
 
 	while (1) {
 		irqbits = inb(port->vector) & port->vectormask;

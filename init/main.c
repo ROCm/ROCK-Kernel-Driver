@@ -561,9 +561,6 @@ asmlinkage void __init start_kernel(void)
 #endif
 	mem_init();
 	kmem_cache_sizes_init();
-#ifdef CONFIG_PROC_FS
-	proc_root_init();
-#endif
 	mempages = num_physpages;
 
 	fork_init(mempages);
@@ -577,6 +574,9 @@ asmlinkage void __init start_kernel(void)
 	signals_init();
 	bdev_init();
 	inode_init(mempages);
+#ifdef CONFIG_PROC_FS
+	proc_root_init();
+#endif
 #if defined(CONFIG_SYSVIPC)
 	ipc_init();
 #endif

@@ -1,4 +1,4 @@
-/* $Id: pci_psycho.c,v 1.22 2001/04/17 01:19:23 davem Exp $
+/* $Id: pci_psycho.c,v 1.23 2001/05/02 00:27:27 davem Exp $
  * pci_psycho.c: PSYCHO/U2P specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -1521,7 +1521,7 @@ static void psycho_pbm_init(struct pci_controller_info *p,
 
 #define PSYCHO_CONFIGSPACE	0x001000000UL
 
-void __init psycho_init(int node)
+void __init psycho_init(int node, char *model_name)
 {
 	struct linux_prom64_registers pr_regs[3];
 	struct pci_controller_info *p;

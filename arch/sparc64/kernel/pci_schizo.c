@@ -1,4 +1,4 @@
-/* $Id: pci_schizo.c,v 1.14 2001/04/17 01:19:23 davem Exp $
+/* $Id: pci_schizo.c,v 1.15 2001/05/02 00:27:27 davem Exp $
  * pci_schizo.c: SCHIZO specific PCI controller support.
  *
  * Copyright (C) 2001 David S. Miller (davem@redhat.com)
@@ -1709,7 +1709,7 @@ static void schizo_controller_hwinit(struct pci_controller_info *p)
 	schizo_write(pbm_b_base + 0x2000UL, tmp);
 }
 
-void __init schizo_init(int node)
+void __init schizo_init(int node, char *model_name)
 {
 	struct linux_prom64_registers pr_regs[3];
 	struct pci_controller_info *p;

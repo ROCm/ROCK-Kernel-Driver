@@ -17,7 +17,7 @@
 #define tigonFwSbssLen 0x38
 #define tigonFwBssAddr 0x00015dd0
 #define tigonFwBssLen 0x2080
-#ifndef CONFIG_ACENIC_OMIT_TIGON_I
+#ifdef CONFIG_ACENIC_OMIT_TIGON_I
 #define tigonFwText 0
 #define tigonFwData 0
 #define tigonFwRodata 0

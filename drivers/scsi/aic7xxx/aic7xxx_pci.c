@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/aic7xxx/aic7xxx_pci.c#17 $
+ * $Id: //depot/src/aic7xxx/aic7xxx_pci.c#24 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_pci.c,v 1.6 2000/11/10 20:13:41 gibbs Exp $
  */
@@ -263,7 +263,7 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 	{
 		ID_AHA_2930C_VAR & ID_DEV_VENDOR_MASK,
 		ID_DEV_VENDOR_MASK,
-		"Adaptec 2930C SCSI adapter (VAR)",
+		"Adaptec 2930C Ultra SCSI adapter (VAR)",
 		ahc_aic7860_setup
 	},
 	/* aic7870 based controllers */
@@ -452,7 +452,7 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 	{
 		ID_AIC7892_ARO,
 		ID_ALL_MASK,
-		"Adaptec aic7892 Ultra2 SCSI adapter (ARO)",
+		"Adaptec aic7892 Ultra160 SCSI adapter (ARO)",
 		ahc_aic7892_setup
 	},
 	/* aic7895 based controllers */	
@@ -546,13 +546,13 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 	{
 		ID_AIC7859 & ID_DEV_VENDOR_MASK,
 		ID_DEV_VENDOR_MASK,
-		"Adaptec aic7859 Ultra SCSI adapter",
+		"Adaptec aic7859 SCSI adapter",
 		ahc_aic7860_setup
 	},
 	{
 		ID_AIC7860 & ID_DEV_VENDOR_MASK,
 		ID_DEV_VENDOR_MASK,
-		"Adaptec aic7860 SCSI adapter",
+		"Adaptec aic7860 Ultra SCSI adapter",
 		ahc_aic7860_setup
 	},
 	{
@@ -644,16 +644,6 @@ const u_int ahc_num_pci_devs = NUM_ELEMENTS(ahc_pci_ident_table);
 #define		CACHESIZE	0x0000003ful	/* only 5 bits */
 #define		LATTIME		0x0000ff00ul
 
-typedef enum
-{
-	AHC_POWER_STATE_D0,
-	AHC_POWER_STATE_D1,
-	AHC_POWER_STATE_D2,
-	AHC_POWER_STATE_D3
-} ahc_power_state;
-
-static void ahc_power_state_change(struct ahc_softc *ahc,
-				   ahc_power_state new_state);
 static int ahc_ext_scbram_present(struct ahc_softc *ahc);
 static void ahc_scbram_config(struct ahc_softc *ahc, int enable,
 				  int pcheck, int fast, int large);
@@ -761,9 +751,11 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	if (error != 0)
 		return (error);
 
+	ahc->bus_intr = ahc_pci_intr;
+
 	/* Remeber how the card was setup in case there is no SEEPROM */
 	if ((ahc_inb(ahc, HCNTRL) & POWRDN) == 0) {
-		pause_sequencer(ahc);
+		ahc_pause(ahc);
 		if ((ahc->features & AHC_ULTRA2) != 0)
 			our_id = ahc_inb(ahc, SCSIID_ULTRA2) & OID;
 		else
@@ -786,7 +778,8 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 		/* Perform ALT-Mode Setup */
 		sfunct = ahc_inb(ahc, SFUNCT) & ~ALT_MODE;
 		ahc_outb(ahc, SFUNCT, sfunct | ALT_MODE);
-		ahc_outb(ahc, OPTIONMODE, OPTIONMODE_DEFAULTS);
+		ahc_outb(ahc, OPTIONMODE,
+			 OPTIONMODE_DEFAULTS|AUTOACKEN|BUSFREEREV|EXPPHASEDIS);
 		ahc_outb(ahc, SFUNCT, sfunct);
 
 		/* Normal mode setup */
@@ -794,9 +787,6 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 					  |TARGCRCENDEN);
 	}
 
-	error = ahc_pci_map_int(ahc);
-	if (error != 0)
-		return (error);
 	dscommand0 = ahc_inb(ahc, DSCOMMAND0);
 	dscommand0 |= MPARCKEN|CACHETHEN;
 	if ((ahc->features & AHC_ULTRA2) != 0) {
@@ -824,6 +814,19 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	    ahc_pci_read_config(ahc->dev_softc, CSIZE_LATTIME,
 				/*bytes*/1) & CACHESIZE;
 	ahc->pci_cachesize *= 4;
+
+	/*
+	 * We cannot perform ULTRA speeds without the presense
+	 * of the external precision resistor.
+	 */
+	if ((ahc->features & AHC_ULTRA) != 0) {
+		uint32_t devconfig;
+
+		devconfig = ahc_pci_read_config(ahc->dev_softc,
+						DEVCONFIG, /*bytes*/4);
+		if ((devconfig & REXTVALID) == 0)
+			ahc->features &= ~AHC_ULTRA;
+	}
 
 	/* See if we have a SEEPROM and perform auto-term */
 	check_extport(ahc, &sxfrctl1);
@@ -879,20 +882,6 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	if ((sxfrctl1 & STPWEN) != 0)
 		ahc->flags |= AHC_TERM_ENB_A;
 
-	/*
-	 * We cannot perform ULTRA speeds without
-	 * the presense of the external precision
-	 * resistor.
-	 */
-	if ((ahc->features & AHC_ULTRA) != 0) {
-		uint32_t devconfig;
-
-		devconfig = ahc_pci_read_config(ahc->dev_softc,
-						DEVCONFIG, /*bytes*/4);
-		if ((devconfig & REXTVALID) == 0)
-			ahc->flags |= AHC_ULTRA_DISABLED;
-	}
-
 	/* Core initialization */
 	error = ahc_init(ahc);
 	if (error != 0)
@@ -903,42 +892,16 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	 */
 	ahc_softc_insert(ahc);
 
-	return (0);
-}
-
-static void
-ahc_power_state_change(struct ahc_softc *ahc, ahc_power_state new_state)
-{
-	uint32_t cap;
-	u_int cap_offset;
-
 	/*
-	 * Traverse the capability list looking for
-	 * the power management capability.
+	 * Allow interrupts now that we are completely setup.
 	 */
-	cap = 0;
-	cap_offset = ahc_pci_read_config(ahc->dev_softc,
-					 PCIR_CAP_PTR, /*bytes*/1);
-	while (cap_offset != 0) {
+	error = ahc_pci_map_int(ahc);
+	if (error != 0)
+		return (error);
 
-		cap = ahc_pci_read_config(ahc->dev_softc,
-					  cap_offset, /*bytes*/4);
-		if ((cap & 0xFF) == 1
-		 && ((cap >> 16) & 0x3) > 0) {
-			uint32_t pm_control;
+	ahc_intr_enable(ahc, TRUE);
 
-			pm_control = ahc_pci_read_config(ahc->dev_softc,
-							 cap_offset + 4,
-							 /*bytes*/4);
-			pm_control &= ~0x3;
-			pm_control |= new_state;
-			ahc_pci_write_config(ahc->dev_softc,
-					     cap_offset + 4,
-					     pm_control, /*bytes*/2);
-			break;
-		}
-		cap_offset = (cap >> 8) & 0xFF;
-	}
+	return (0);
 }
 
 /*
@@ -1190,32 +1153,37 @@ check_extport(struct ahc_softc *ahc, u_int *sxfrctl1)
 			}
 			sd.sd_chip = C56_66;
 		}
+		release_seeprom(&sd);
 	}
 
-#if 0
 	if (!have_seeprom) {
 		/*
 		 * Pull scratch ram settings and treat them as
 		 * if they are the contents of an seeprom if
 		 * the 'ADPT' signature is found in SCB2.
+		 * We manually compose the data as 16bit values
+		 * to avoid endian issues.
 		 */
 		ahc_outb(ahc, SCBPTR, 2);
 		if (ahc_inb(ahc, SCB_BASE) == 'A'
 		 && ahc_inb(ahc, SCB_BASE + 1) == 'D'
 		 && ahc_inb(ahc, SCB_BASE + 2) == 'P'
 		 && ahc_inb(ahc, SCB_BASE + 3) == 'T') {
-			uint8_t *sc_bytes;
+			uint16_t *sc_data;
 			int	  i;
 
-			sc_bytes = (uint8_t *)&sc;
-			for (i = 0; i < 64; i++)
-				sc_bytes[i] = ahc_inb(ahc, TARG_SCSIRATE + i);
-			/* Byte 0x1c is stored in byte 4 of SCB2 */
-			sc_bytes[0x1c] = ahc_inb(ahc, SCB_BASE + 4);
+			sc_data = (uint16_t *)&sc;
+			for (i = 0; i < 32; i++) {
+				uint16_t val;
+				int	 j;
+
+				j = i * 2;
+				val = ahc_inb(ahc, SRAM_BASE + j)
+				    | ahc_inb(ahc, SRAM_BASE + j + 1) << 8;
+			}
 			have_seeprom = verify_cksum(&sc);
 		}
 	}
-#endif
 
 	if (!have_seeprom) {
 		if (bootverbose)
@@ -1301,9 +1269,8 @@ check_extport(struct ahc_softc *ahc, u_int *sxfrctl1)
 		if (sc.adapter_control & CFRESETB)
 			scsi_conf |= RESET_SCSI;
 
-		if ((sc.adapter_control & CFCHNLBPRIMARY) != 0
-		 && (ahc->features & AHC_MULTI_FUNC) != 0)
-			ahc->flags |= AHC_CHANNEL_B_PRIMARY;
+		ahc->flags |=
+		    (sc.adapter_control & CFBOOTCHAN) >> CFBOOTCHANSHIFT;
 
 		if (sc.bios_control & CFEXTEND)
 			ahc->flags |= AHC_EXTENDED_TRANS_A;
@@ -1318,7 +1285,8 @@ check_extport(struct ahc_softc *ahc, u_int *sxfrctl1)
 				ultraenb = 0;
 		}
 
-		if (sc.signature == CFSIGNATURE) {
+		if (sc.signature == CFSIGNATURE
+		 || sc.signature == CFSIGNATURE2) {
 			uint32_t devconfig;
 
 			/* Honor the STPWLEVEL settings */
@@ -1362,10 +1330,11 @@ check_extport(struct ahc_softc *ahc, u_int *sxfrctl1)
 			have_autoterm = FALSE;
 	}
 
-	if (have_autoterm)
+	if (have_autoterm) {
+		acquire_seeprom(ahc, &sd);
 		configure_termination(ahc, &sd, adapter_control, sxfrctl1);
-
-	release_seeprom(&sd);
+		release_seeprom(&sd);
+	}
 }
 
 static void
@@ -1806,7 +1775,7 @@ ahc_pci_intr(struct ahc_softc *ahc)
 		ahc_outb(ahc, CLRINT, CLRPARERR);
 	}
 
-	unpause_sequencer(ahc);
+	ahc_unpause(ahc);
 }
 
 static int

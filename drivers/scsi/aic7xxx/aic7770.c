@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/aic7xxx/aic7770.c#6 $
+ * $Id: //depot/src/aic7xxx/aic7770.c#11 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7770.c,v 1.1 2000/09/16 20:02:27 gibbs Exp $
  */
@@ -95,8 +95,6 @@ aic7770_config(struct ahc_softc *ahc, struct aic7770_identity *entry)
 	u_int	hostconf;
 	u_int   irq;
 	u_int	intdef;
-	u_int	hcntrl;
-	int	shared;
 
 	ahc_init_probe_config(&probe_config);
 	error = entry->setup(ahc->dev_softc, &probe_config);
@@ -107,15 +105,15 @@ aic7770_config(struct ahc_softc *ahc, struct aic7770_identity *entry)
 	if (error != 0)
 		return (error);
 
-	/* Pause the card preseving the IRQ type */
-	hcntrl = ahc_inb(ahc, HCNTRL) & IRQMS;
-	ahc_outb(ahc, HCNTRL, hcntrl | PAUSE);
-	while ((ahc_inb(ahc, HCNTRL) & PAUSE) == 0)
-		;
+	probe_config.description = entry->name;
+	error = ahc_softc_init(ahc, &probe_config);
+
+	error = ahc_reset(ahc);
+	if (error != 0)
+		return (error);
 
 	/* Make sure we have a valid interrupt vector */
 	intdef = ahc_inb(ahc, INTDEF);
-	shared = (intdef & EDGE_TRIG) ? 0 : 1;
 	irq = intdef & VECTOR;
 	switch (irq) {
 	case 9:
@@ -130,16 +128,8 @@ aic7770_config(struct ahc_softc *ahc, struct aic7770_identity *entry)
 		return (ENXIO);
 	}
 
-	probe_config.description = entry->name;
-	error = ahc_softc_init(ahc, &probe_config);
-
-	error = aic7770_map_int(ahc, irq, shared);
-	if (error != 0)
-		return (error);
-
-	error = ahc_reset(ahc);
-	if (error != 0)
-		return (error);
+	if ((intdef & EDGE_TRIG) != 0)
+		ahc->flags |= AHC_EDGE_INTERRUPT;
 
 	switch (probe_config.chip & (AHC_EISA|AHC_VL)) {
 	case AHC_EISA:
@@ -154,7 +144,7 @@ aic7770_config(struct ahc_softc *ahc, struct aic7770_identity *entry)
 
 		/* Get the primary channel information */
 		if ((biosctrl & CHANNEL_B_PRIMARY) != 0)
-			ahc->flags |= AHC_CHANNEL_B_PRIMARY;
+			ahc->flags |= 1;
 
 		if ((biosctrl & BIOSMODE) == BIOSDISABLED) {
 			ahc->flags |= AHC_USEDEFAULTS;
@@ -210,10 +200,19 @@ aic7770_config(struct ahc_softc *ahc, struct aic7770_identity *entry)
 	 */
 	ahc_softc_insert(ahc);
 
+	error = aic7770_map_int(ahc, irq);
+	if (error != 0)
+		return (error);
+
 	/*
 	 * Enable the board's BUS drivers
 	 */
 	ahc_outb(ahc, BCTL, ENABLE);
+
+	/*
+	 * Allow interrupts.
+	 */
+	ahc_intr_enable(ahc, TRUE);
 
 	return (0);
 }

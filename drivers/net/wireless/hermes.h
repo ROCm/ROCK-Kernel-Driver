@@ -277,7 +277,7 @@ typedef struct hermes_multicast {
 #define hermes_write_data(hw, off, buf, count) (outsw((hw)->iobase + (off), (buf), (count)))
 
 /* Function prototypes */
-void hermes_struct_init(hermes_t *hw, ushort io);
+void hermes_struct_init(hermes_t *hw, uint io);
 int hermes_reset(hermes_t *hw);
 int hermes_docmd_wait(hermes_t *hw, uint16_t cmd, uint16_t parm0, hermes_response_t *resp);
 int hermes_allocate(hermes_t *hw, uint16_t size, uint16_t *fid);

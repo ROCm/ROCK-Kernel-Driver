@@ -149,7 +149,7 @@ an MMIO register read.
 #include <asm/io.h>
 
 
-#define RTL8139_VERSION "0.9.16"
+#define RTL8139_VERSION "0.9.17"
 #define MODNAME "8139too"
 #define RTL8139_DRIVER_NAME   MODNAME " Fast Ethernet driver " RTL8139_VERSION
 #define PFX MODNAME ": "
@@ -728,7 +728,7 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	struct rtl8139_private *tp;
 	u8 tmp8;
 	int rc;
-	unsigned int i, have_pci_pm = 1;
+	unsigned int i;
 	u32 pio_start, pio_end, pio_flags, pio_len;
 	unsigned long mmio_start, mmio_end, mmio_flags, mmio_len;
 	u32 tmp;
@@ -770,10 +770,6 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 	DPRINTK("PIO region size == 0x%02X\n", pio_len);
 	DPRINTK("MMIO region size == 0x%02lX\n", mmio_len);
 
-	/* ugly hueristic, but it's a chicken-and-egg problem */
-	if (pio_len < RTL8139B_IO_SIZE)
-		have_pci_pm = 0;
-	
 #ifdef USE_IO_OPS
 	/* make sure PCI base addr 0 is PIO */
 	if (!(pio_flags & IORESOURCE_IO)) {
@@ -824,30 +820,7 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 #endif /* USE_IO_OPS */
 
 	/* Bring old chips out of low-power mode. */
-	if (have_pci_pm) {
-		u8 new_tmp8 = tmp8 = RTL_R8 (Config1);
-		if ((rtl_chip_info[tp->chipset].flags & HasLWake) &&
-		    (tmp8 & LWAKE))
-			new_tmp8 &= ~LWAKE;
-		new_tmp8 |= Cfg1_PM_Enable;
-		if (new_tmp8 != tmp8) {
-			RTL_W8 (Cfg9346, Cfg9346_Unlock);
-			RTL_W8 (Config1, tmp8);
-			RTL_W8 (Cfg9346, Cfg9346_Lock);
-		}
-		if (rtl_chip_info[tp->chipset].flags & HasLWake) {
-			tmp8 = RTL_R8 (Config4);
-			if (tmp8 & LWPTN)
-				RTL_W8 (Config4, tmp8 & ~LWPTN);
-		}
-	} else {
-		RTL_W8 (HltClk, 'R');
-		tmp8 = RTL_R8 (Config1);
-		tmp8 &= ~(SLEEP | PWRDN);
-		RTL_W8 (Config1, tmp8);
-	}
-
-	rtl8139_chip_reset (ioaddr);
+	RTL_W8 (HltClk, 'R');
 
 	/* check for missing/broken hardware */
 	if (RTL_R32 (TxConfig) == 0xFFFFFFFF) {
@@ -876,6 +849,32 @@ match:
 		tmp,
 		tp->chipset,
 		rtl_chip_info[tp->chipset].name);
+
+	if (tp->chipset >= CH_8139B) {
+		u8 new_tmp8 = tmp8 = RTL_R8 (Config1);
+		DPRINTK("PCI PM wakeup\n");
+		if ((rtl_chip_info[tp->chipset].flags & HasLWake) &&
+		    (tmp8 & LWAKE))
+			new_tmp8 &= ~LWAKE;
+		new_tmp8 |= Cfg1_PM_Enable;
+		if (new_tmp8 != tmp8) {
+			RTL_W8 (Cfg9346, Cfg9346_Unlock);
+			RTL_W8 (Config1, tmp8);
+			RTL_W8 (Cfg9346, Cfg9346_Lock);
+		}
+		if (rtl_chip_info[tp->chipset].flags & HasLWake) {
+			tmp8 = RTL_R8 (Config4);
+			if (tmp8 & LWPTN)
+				RTL_W8 (Config4, tmp8 & ~LWPTN);
+		}
+	} else {
+		DPRINTK("Old chip wakeup\n");
+		tmp8 = RTL_R8 (Config1);
+		tmp8 &= ~(SLEEP | PWRDN);
+		RTL_W8 (Config1, tmp8);
+	}
+
+	rtl8139_chip_reset (ioaddr);
 
 	DPRINTK ("EXIT, returning 0\n");
 	*dev_out = dev;
@@ -1358,11 +1357,16 @@ static void rtl8139_hw_start (struct net_device *dev)
 		else if ((mii_reg5 & 0x0100) == 0x0100
 				 || (mii_reg5 & 0x00C0) == 0x0040)
 			tp->full_duplex = 1;
-		printk(KERN_INFO"%s: Setting %s%s-duplex based on"
+		if (mii_reg5) {
+			printk(KERN_INFO"%s: Setting %s%s-duplex based on"
 			   " auto-negotiated partner ability %4.4x.\n", dev->name,
 			   mii_reg5 == 0 ? "" :
 			   (mii_reg5 & 0x0180) ? "100mbps " : "10mbps ",
 			   tp->full_duplex ? "full" : "half", mii_reg5);
+		} else {
+			printk(KERN_INFO"%s: media is unconnected, link down, or incompatible connection\n",
+			       dev->name);
+		}
 	}
 
 	if (tp->chipset >= CH_8139B) {
@@ -1542,11 +1546,18 @@ static inline void rtl8139_thread_iter (struct net_device *dev,
 		    || (mii_reg5 & 0x01C0) == 0x0040;
 		if (tp->full_duplex != duplex) {
 			tp->full_duplex = duplex;
-			printk (KERN_INFO
-				"%s: Setting %s-duplex based on MII #%d link"
-				" partner ability of %4.4x.\n", dev->name,
-				tp->full_duplex ? "full" : "half",
-				tp->phys[0], mii_reg5);
+
+			if (mii_reg5) {
+				printk (KERN_INFO
+					"%s: Setting %s-duplex based on MII #%d link"
+					" partner ability of %4.4x.\n",
+					dev->name,
+					tp->full_duplex ? "full" : "half",
+					tp->phys[0], mii_reg5);
+			} else {
+				printk(KERN_INFO"%s: media is unconnected, link down, or incompatible connection\n",
+				       dev->name);
+			}
 #if 0
 			RTL_W8 (Cfg9346, Cfg9346_Unlock);
 			RTL_W8 (Config1, tp->full_duplex ? 0x60 : 0x20);

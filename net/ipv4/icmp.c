@@ -3,7 +3,7 @@
  *	
  *		Alan Cox, <alan@redhat.com>
  *
- *	Version: $Id: icmp.c,v 1.74 2001/04/16 23:58:51 davem Exp $
+ *	Version: $Id: icmp.c,v 1.75 2001/04/30 04:40:40 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -139,11 +139,11 @@ struct icmp_err icmp_err_convert[] = {
 };
 
 /* Control parameters for ECHO relies. */
-int sysctl_icmp_echo_ignore_all = 0;
-int sysctl_icmp_echo_ignore_broadcasts = 0;
+int sysctl_icmp_echo_ignore_all;
+int sysctl_icmp_echo_ignore_broadcasts;
 
 /* Control parameter - ignore bogus broadcast responses? */
-int sysctl_icmp_ignore_bogus_error_responses =0;
+int sysctl_icmp_ignore_bogus_error_responses;
 
 /*
  *	ICMP control array. This specifies what to do with each ICMP.
@@ -167,7 +167,7 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1];
  */
 	
 struct inode icmp_inode;
-struct socket *icmp_socket=&icmp_inode.u.socket_i;
+struct socket *icmp_socket = &icmp_inode.u.socket_i;
 
 /* ICMPv4 socket is only a bit non-reenterable (unlike ICMPv6,
    which is strongly non-reenterable). A bit later it will be made
@@ -651,7 +651,7 @@ static void icmp_unreach(struct sk_buff *skb)
 	 */
 
 	ipprot = (struct inet_protocol *) inet_protos[hash];
-	while(ipprot != NULL) {
+	while (ipprot) {
 		struct inet_protocol *nextip;
 
 		nextip = (struct inet_protocol *) ipprot->next;
@@ -695,7 +695,7 @@ static void icmp_redirect(struct sk_buff *skb)
 	iph = (struct iphdr *) skb->data;
 	ip = iph->daddr;
 
-	switch(skb->h.icmph->code & 7) {
+	switch (skb->h.icmph->code & 7) {
 		case ICMP_REDIR_NET:
 		case ICMP_REDIR_NETTOS:
 			/*
@@ -753,7 +753,7 @@ static void icmp_timestamp(struct sk_buff *skb)
 	 *	Too short.
 	 */
 	 
-	if(skb->len<4) {
+	if (skb->len < 4) {
 		ICMP_INC_STATS_BH(IcmpInErrors);
 		return;
 	}
@@ -945,7 +945,7 @@ static unsigned long dummy;
 int sysctl_icmp_destunreach_time = 1*HZ;
 int sysctl_icmp_timeexceed_time = 1*HZ;
 int sysctl_icmp_paramprob_time = 1*HZ;
-int sysctl_icmp_echoreply_time = 0; /* don't limit it per default. */
+int sysctl_icmp_echoreply_time; /* don't limit it per default. */
 
 /*
  *	This table is the definition of how we handle ICMP.

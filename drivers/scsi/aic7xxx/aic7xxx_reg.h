@@ -86,8 +86,8 @@
 #define		SELDO           	0x40
 #define		SELDI           	0x20
 #define		SELINGO         	0x10
-#define		IOERR           	0x08
 #define		SWRAP           	0x08
+#define		IOERR           	0x08
 #define		SDONE           	0x04
 #define		SPIORDY         	0x02
 #define		DMADONE         	0x01
@@ -191,8 +191,8 @@
 #define		BRDDAT5         	0x20
 #define		BRDDAT4         	0x10
 #define		BRDSTB          	0x10
-#define		BRDCS           	0x08
 #define		BRDDAT3         	0x08
+#define		BRDCS           	0x08
 #define		BRDDAT2         	0x04
 #define		BRDRW           	0x04
 #define		BRDRW_ULTRA2    	0x02
@@ -242,8 +242,8 @@
 #define		PRELOADEN       	0x80
 #define		WIDEODD         	0x40
 #define		SCSIEN          	0x20
-#define		SDMAENACK       	0x10
 #define		SDMAEN          	0x10
+#define		SDMAENACK       	0x10
 #define		HDMAEN          	0x08
 #define		HDMAENACK       	0x08
 #define		DIRECTION       	0x04
@@ -271,8 +271,8 @@
 #define		P_MESGOUT       	0xa0
 #define		P_COMMAND       	0x80
 #define		CDI             	0x80
-#define		IOI             	0x40
 #define		P_DATAIN        	0x40
+#define		IOI             	0x40
 #define		MSGI            	0x20
 #define		P_BUSFREE       	0x01
 #define		P_DATAOUT       	0x00
@@ -314,9 +314,7 @@
 
 #define	LAST_MSG        		0x53
 
-#define	TARGET_MSG_REQUEST		0x54
-
-#define	SCSISEQ_TEMPLATE		0x56
+#define	SCSISEQ_TEMPLATE		0x54
 #define		ENSELO          	0x40
 #define		ENSELI          	0x20
 #define		ENRSELI         	0x10
@@ -324,11 +322,11 @@
 #define		ENAUTOATNI      	0x04
 #define		ENAUTOATNP      	0x02
 
-#define	DATA_COUNT_ODD  		0x57
+#define	DATA_COUNT_ODD  		0x55
 
-#define	INITIATOR_TAG   		0x58
+#define	INITIATOR_TAG   		0x56
 
-#define	SEQ_FLAGS2      		0x59
+#define	SEQ_FLAGS2      		0x57
 #define		SCB_DMA         	0x01
 
 #define	SCSICONF        		0x5a
@@ -345,8 +343,8 @@
 #define	HOSTCONF        		0x5d
 
 #define	HA_274_BIOSCTRL 		0x5f
-#define		BIOSMODE        	0x30
 #define		BIOSDISABLED    	0x30
+#define		BIOSMODE        	0x30
 #define		CHANNEL_B_PRIMARY	0x08
 
 #define	SEQCTL          		0x60
@@ -483,7 +481,8 @@
 
 #define	DFSTATUS        		0x94
 #define		PRELOAD_AVAIL   	0x80
-#define		DWORDEMP        	0x20
+#define		DFCACHETH       	0x40
+#define		FIFOQWDEMP      	0x20
 #define		MREQPEND        	0x10
 #define		HDONE           	0x08
 #define		DFTHRESH        	0x04
@@ -521,18 +520,19 @@
 #define		COMMAND_PHASE   	0x10
 #define		MSG_IN_PHASE    	0x08
 #define		MSG_OUT_PHASE   	0x04
+#define		DATA_PHASE_MASK 	0x03
 #define		DATA_IN_PHASE   	0x02
 #define		DATA_OUT_PHASE  	0x01
 
 #define	SFUNCT          		0x9f
 #define		ALT_MODE        	0x80
 
+#define	SCB_BASE        		0xa0
+
 #define	SCB_CDB_PTR     		0xa0
+#define	SCB_RESIDUAL_DATACNT		0xa0
 #define	SCB_CDB_STORE   		0xa0
 #define	SCB_TARGET_INFO 		0xa0
-#define	SCB_RESIDUAL_DATACNT		0xa0
-
-#define	SCB_BASE        		0xa0
 
 #define	SCB_RESIDUAL_SGPTR		0xa4
 
@@ -579,12 +579,12 @@
 
 #define	SCB_NEXT        		0xbf
 
+#define	SCB_64_SPARE    		0xc0
+
 #define	SEECTL_2840     		0xc0
 #define		CS_2840         	0x04
 #define		CK_2840         	0x02
 #define		DO_2840         	0x01
-
-#define	SCB_64_SPARE    		0xc0
 
 #define	STATUS_2840     		0xc1
 #define		EEPROM_TF       	0x80
@@ -648,8 +648,8 @@
 #define		WR_DFTHRSH_63   	0x30
 #define		WR_DFTHRSH_50   	0x20
 #define		WR_DFTHRSH_25   	0x10
-#define		RD_DFTHRSH_MAX  	0x07
 #define		RD_DFTHRSH      	0x07
+#define		RD_DFTHRSH_MAX  	0x07
 #define		RD_DFTHRSH_90   	0x06
 #define		RD_DFTHRSH_85   	0x05
 #define		RD_DFTHRSH_75   	0x04
@@ -668,39 +668,39 @@
 #define	SG_CACHE_PRE    		0xfc
 
 
-#define	CMD_GROUP_CODE_SHIFT	0x05
-#define	BUS_8_BIT	0x00
-#define	CCSGRAM_MAXSEGS	0x10
-#define	TARGET_DATA_IN	0x01
-#define	STATUS_QUEUE_FULL	0x28
-#define	STATUS_BUSY	0x08
-#define	MAX_OFFSET_8BIT	0x0f
-#define	BUS_16_BIT	0x01
-#define	TID_SHIFT	0x04
-#define	SCB_DOWNLOAD_SIZE_64	0x30
-#define	SCB_UPLOAD_SIZE	0x20
-#define	HOST_MAILBOX_SHIFT	0x04
 #define	SCB_INITIATOR_TAG	0x03
-#define	SCB_TARGET_STATUS	0x02
 #define	SCB_TARGET_DATA_DIR	0x01
 #define	SCB_TARGET_PHASES	0x00
 #define	MAX_OFFSET_ULTRA2	0x7f
 #define	MAX_OFFSET_16BIT	0x08
+#define	BUS_8_BIT	0x00
 #define	TARGET_CMD_CMPLT	0xfe
+#define	STATUS_QUEUE_FULL	0x28
+#define	STATUS_BUSY	0x08
+#define	MAX_OFFSET_8BIT	0x0f
+#define	BUS_32_BIT	0x02
+#define	CCSGADDR_MAX	0x80
+#define	TID_SHIFT	0x04
+#define	SCB_DOWNLOAD_SIZE_64	0x30
+#define	HOST_MAILBOX_SHIFT	0x04
+#define	SCB_TARGET_STATUS	0x02
+#define	CMD_GROUP_CODE_SHIFT	0x05
+#define	CCSGRAM_MAXSEGS	0x10
 #define	SCB_LIST_NULL	0xff
 #define	SG_SIZEOF	0x08
 #define	SCB_DOWNLOAD_SIZE	0x20
 #define	SEQ_MAILBOX_SHIFT	0x00
+#define	TARGET_DATA_IN	0x01
 #define	HOST_MSG	0xff
-#define	BUS_32_BIT	0x02
-#define	CCSGADDR_MAX	0x80
+#define	BUS_16_BIT	0x01
+#define	SCB_UPLOAD_SIZE	0x20
 
 
 /* Downloaded Constant Definitions */
+#define	INVERTED_CACHESIZE_MASK	0x03
 #define	SG_PREFETCH_ADDR_MASK	0x06
 #define	SG_PREFETCH_ALIGN_MASK	0x05
 #define	QOUTFIFO_OFFSET	0x00
 #define	SG_PREFETCH_CNT	0x04
-#define	INVERTED_CACHESIZE_MASK	0x03
 #define	CACHESIZE_MASK	0x02
 #define	QINFIFO_OFFSET	0x01

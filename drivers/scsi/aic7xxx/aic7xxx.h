@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/aic7xxx/aic7xxx.h#19 $
+ * $Id: //depot/src/aic7xxx/aic7xxx.h#27 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.h,v 1.30 2000/11/10 20:13:40 gibbs Exp $
  */
@@ -209,9 +209,15 @@ typedef enum {
 	AHC_MULTIROLE	= 0x40000,	/* Space for two roles at a time */
 	AHC_REMOVABLE	= 0x80000,	/* Hot-Swap supported */
 	AHC_AIC7770_FE	= AHC_FENONE,
-	AHC_AIC7850_FE	= AHC_SPIOCAP|AHC_AUTOPAUSE|AHC_TARGETMODE,
-	AHC_AIC7855_FE	= AHC_AIC7850_FE,
-	AHC_AIC7860_FE	= AHC_AIC7850_FE|AHC_ULTRA,
+	/*
+	 * The real 7850 does not support Ultra modes, but there are
+	 * several cards that use the generic 7850 PCI ID even though
+	 * they are using an Ultra capable chip (7859/7860).  We start
+	 * out with the AHC_ULTRA feature set and then check the DEVSTATUS
+	 * register to determine if the capability is really present.
+	 */
+	AHC_AIC7850_FE	= AHC_SPIOCAP|AHC_AUTOPAUSE|AHC_TARGETMODE|AHC_ULTRA,
+	AHC_AIC7860_FE	= AHC_AIC7850_FE,
 	AHC_AIC7870_FE	= AHC_TARGETMODE,
 	AHC_AIC7880_FE	= AHC_AIC7870_FE|AHC_ULTRA,
 	/*
@@ -286,56 +292,56 @@ typedef enum {
  * chip/controller's configuration.
  */
 typedef enum {
-	AHC_FNONE		= 0x000,
-	AHC_PAGESCBS		= 0x001,/* Enable SCB paging */
-	AHC_CHANNEL_B_PRIMARY	= 0x002,/*
-					 * On twin channel adapters, probe
-					 * channel B first since it is the
-					 * primary bus.
+	AHC_FNONE	      = 0x000,
+	AHC_PRIMARY_CHANNEL   = 0x003,/*
+					 * The channel that should
+					 * be probed first.
 					 */
-	AHC_USEDEFAULTS		= 0x004,/*
+	AHC_USEDEFAULTS	      = 0x004,/*
 					 * For cards without an seeprom
 					 * or a BIOS to initialize the chip's
 					 * SRAM, we use the default target
 					 * settings.
 					 */
-	AHC_SEQUENCER_DEBUG	= 0x008,
-	AHC_SHARED_SRAM		= 0x010,
-	AHC_LARGE_SEEPROM	= 0x020,/* Uses C56_66 not C46 */
-	AHC_RESET_BUS_A		= 0x040,
-	AHC_RESET_BUS_B		= 0x080,
-	AHC_EXTENDED_TRANS_A	= 0x100,
-	AHC_EXTENDED_TRANS_B	= 0x200,
-	AHC_TERM_ENB_A		= 0x400,
-	AHC_TERM_ENB_B		= 0x800,
-	AHC_INITIATORROLE	= 0x1000,/*
+	AHC_SEQUENCER_DEBUG   = 0x008,
+	AHC_SHARED_SRAM	      = 0x010,
+	AHC_LARGE_SEEPROM     = 0x020,/* Uses C56_66 not C46 */
+	AHC_RESET_BUS_A	      = 0x040,
+	AHC_RESET_BUS_B	      = 0x080,
+	AHC_EXTENDED_TRANS_A  = 0x100,
+	AHC_EXTENDED_TRANS_B  = 0x200,
+	AHC_TERM_ENB_A	      = 0x400,
+	AHC_TERM_ENB_B	      = 0x800,
+	AHC_INITIATORROLE     = 0x1000,/*
 					  * Allow initiator operations on
 					  * this controller.
 					  */
-	AHC_TARGETROLE		= 0x2000,/*
+	AHC_TARGETROLE	      = 0x2000,/*
 					  * Allow target operations on this
 					  * controller.
 					  */
-	AHC_NEWEEPROM_FMT	= 0x4000,
-	AHC_RESOURCE_SHORTAGE	= 0x8000,
-	AHC_TQINFIFO_BLOCKED	= 0x10000,/* Blocked waiting for ATIOs */
-	AHC_INT50_SPEEDFLEX	= 0x20000,/*
+	AHC_NEWEEPROM_FMT     = 0x4000,
+	AHC_RESOURCE_SHORTAGE = 0x8000,
+	AHC_TQINFIFO_BLOCKED  = 0x10000,/* Blocked waiting for ATIOs */
+	AHC_INT50_SPEEDFLEX   = 0x20000,/*
 					   * Internal 50pin connector
 					   * sits behind an aic3860
 					   */
-	AHC_SCB_BTT		= 0x40000,/*
+	AHC_SCB_BTT	      = 0x40000,/*
 					   * The busy targets table is
 					   * stored in SCB space rather
 					   * than SRAM.
 					   */
-	AHC_BIOS_ENABLED	= 0x80000,
-	AHC_ALL_INTERRUPTS	= 0x100000,
-	AHC_ULTRA_DISABLED	= 0x200000/*
+	AHC_BIOS_ENABLED      = 0x80000,
+	AHC_ALL_INTERRUPTS    = 0x100000,
+	AHC_ULTRA_DISABLED    = 0x200000, /*
 					   * The precision resistor for
 					   * ultra transmission speeds is
 					   * missing, so we must limit
 					   * ourselves to fast SCSI.
 					   */
+	AHC_PAGESCBS	      = 0x400000, /* Enable SCB paging */
+	AHC_EDGE_INTERRUPT    = 0x800000  /* Device uses edge triggered ints */
 } ahc_flag;
 
 /*
@@ -515,8 +521,9 @@ typedef enum {
 	SCB_DEVICE_RESET	= 0x0004,
 	SCB_SENSE		= 0x0008,
 	SCB_CDB32_PTR		= 0x0010,
-	SCB_RECOVERY_SCB	= 0x0040,
-	SCB_NEGOTIATE		= 0x0080,
+	SCB_RECOVERY_SCB	= 0x0020,
+	SCB_AUTO_NEGOTIATE	= 0x0040,/* Negotiate to achieve goal. */
+	SCB_NEGOTIATE		= 0x0080,/* Negotiation forced for command. */
 	SCB_ABORT		= 0x1000,
 	SCB_UNTAGGEDQ		= 0x2000,
 	SCB_ACTIVE		= 0x4000,
@@ -625,7 +632,7 @@ struct ahc_tmode_event {
  * data structures.
  */
 #ifdef AHC_TARGET_MODE 
-struct tmode_lstate {
+struct ahc_tmode_lstate {
 	struct cam_path *path;
 	struct ccb_hdr_slist accept_tios;
 	struct ccb_hdr_slist immed_notifies;
@@ -634,7 +641,7 @@ struct tmode_lstate {
 	uint8_t event_w_idx;
 };
 #else
-struct tmode_lstate;
+struct ahc_tmode_lstate;
 #endif
 
 /******************** Transfer Negotiation Datastructures *********************/
@@ -659,7 +666,7 @@ struct ahc_transinfo {
  * Per-initiator current, goal and user transfer negotiation information. */
 struct ahc_initiator_tinfo {
 	uint8_t scsirate;		/* Computed value for SCSIRATE reg */
-	struct ahc_transinfo current;
+	struct ahc_transinfo curr;
 	struct ahc_transinfo goal;
 	struct ahc_transinfo user;
 };
@@ -671,16 +678,17 @@ struct ahc_initiator_tinfo {
  * that we are the target and the targets are the initiators since the
  * negotiation is the same regardless of role.
  */
-struct tmode_tstate {
-	struct tmode_lstate*		enabled_luns[AHC_NUM_LUNS];
+struct ahc_tmode_tstate {
+	struct ahc_tmode_lstate*	enabled_luns[AHC_NUM_LUNS];
 	struct ahc_initiator_tinfo	transinfo[AHC_NUM_TARGETS];
 
 	/*
 	 * Per initiator state bitmasks.
 	 */
-	uint16_t		 ultraenb;	/* Using ultra sync rate  */
-	uint16_t	 	 discenable;	/* Disconnection allowed  */
-	uint16_t		 tagenable;	/* Tagged Queuing allowed */
+	uint16_t	 auto_negotiate;/* Auto Negotiation Required */
+	uint16_t	 ultraenb;	/* Using ultra sync rate  */
+	uint16_t	 discenable;	/* Disconnection allowed  */
+	uint16_t	 tagenable;	/* Tagged Queuing allowed */
 };
 
 /*
@@ -711,32 +719,14 @@ extern struct ahc_syncrate ahc_syncrates[];
 
 /***************************** Lookup Tables **********************************/
 /*
- * Textual descriptions of the different chips indexed by chip type.
- */
-extern char *ahc_chip_names[];
-extern const u_int num_chip_names;
-
-/*
- * Hardware error codes.
- */
-struct hard_error_entry {
-        uint8_t errno;
-	char *errmesg;
-};
-extern struct hard_error_entry hard_error[];
-extern const u_int num_errors;
-
-/*
  * Phase -> name and message out response
  * to parity errors in each phase table. 
  */
-struct phase_table_entry {
+struct ahc_phase_table_entry {
         uint8_t phase;
         uint8_t mesg_out; /* Message response to parity errors */
 	char *phasemsg;
 };
-extern struct phase_table_entry phase_table[];
-extern const u_int num_phases;
 
 /************************** Serial EEPROM Format ******************************/
 
@@ -765,12 +755,19 @@ struct seeprom_config {
 #define		CFSUPREM	0x0001	/* support all removeable drives */
 #define		CFSUPREMB	0x0002	/* support removeable boot drives */
 #define		CFBIOSEN	0x0004	/* BIOS enabled */
-/*		UNUSED		0x0008	*/
+#define		CFBIOS_BUSSCAN	0x0008	/* Have the BIOS Scan the Bus */
 #define		CFSM2DRV	0x0010	/* support more than two drives */
-#define		CF284XEXTEND	0x0020	/* extended translation (284x cards) */	
 #define		CFSTPWLEVEL	0x0010	/* Termination level control */
+#define		CF284XEXTEND	0x0020	/* extended translation (284x cards) */	
+#define		CFCTRL_A	0x0020	/* BIOS displays Ctrl-A message */	
+#define		CFTERM_MENU	0x0040	/* BIOS displays termination menu */	
 #define		CFEXTEND	0x0080	/* extended translation enabled */
 #define		CFSCAMEN	0x0100	/* SCAM enable */
+#define		CFMSG_LEVEL	0x0600	/* BIOS Message Level */
+#define			CFMSG_VERBOSE	0x0000
+#define			CFMSG_SILENT	0x0200
+#define			CFMSG_DIAG	0x0400
+#define		CFBOOTCD	0x0800  /* Support Bootable CD-ROM */
 /*		UNUSED		0xff00	*/
 
 /*
@@ -785,10 +782,11 @@ struct seeprom_config {
 #define		CFWSTERM	0x0008	/* SCSI high byte termination */
 #define		CFSPARITY	0x0010	/* SCSI parity */
 #define		CF284XSTERM     0x0020	/* SCSI low byte term (284x cards) */	
-#define		CFMULTILUN	0x0020	/* SCSI low byte term (284x cards) */	
+#define		CFMULTILUN	0x0020
 #define		CFRESETB	0x0040	/* reset SCSI bus at boot */
 #define		CFCLUSTERENB	0x0080	/* Cluster Enable */
-#define		CFCHNLBPRIMARY	0x0100	/* aic7895 probe B channel first */
+#define		CFBOOTCHAN	0x0300	/* probe this channel first */
+#define		CFBOOTCHANSHIFT 8
 #define		CFSEAUTOTERM	0x0400	/* Ultra2 Perform secondary Auto Term*/
 #define		CFSELOWTERM	0x0800	/* Ultra2 secondary low term */
 #define		CFSEHIGHTERM	0x1000	/* Ultra2 secondary high term */
@@ -812,6 +810,7 @@ struct seeprom_config {
 	uint16_t res_1[10];		/* words 20-29 */
 	uint16_t signature;		/* Signature == 0x250 */
 #define		CFSIGNATURE	0x250
+#define		CFSIGNATURE2	0x300
 	uint16_t checksum;		/* word 31 */
 };
 
@@ -857,6 +856,8 @@ struct ahc_suspend_state {
 	uint8_t	*btt;
 };
 
+typedef void (*ahc_bus_intr_t)(struct ahc_softc *);
+
 struct ahc_softc {
 	bus_space_tag_t           tag;
 	bus_space_handle_t        bsh;
@@ -900,24 +901,29 @@ struct ahc_softc {
 	ahc_dev_softc_t		  dev_softc;
 
 	/*
+	 * Bus specific device information.
+	 */
+	ahc_bus_intr_t		  bus_intr;
+
+	/*
 	 * Target mode related state kept on a per enabled lun basis.
 	 * Targets that are not enabled will have null entries.
 	 * As an initiator, we keep one target entry for our initiator
 	 * ID to store our sync/wide transfer settings.
 	 */
-	struct tmode_tstate*	  enabled_targets[AHC_NUM_TARGETS];
+	struct ahc_tmode_tstate  *enabled_targets[AHC_NUM_TARGETS];
 
 	/*
 	 * The black hole device responsible for handling requests for
 	 * disabled luns on enabled targets.
 	 */
-	struct tmode_lstate*	  black_hole;
+	struct ahc_tmode_lstate  *black_hole;
 
 	/*
 	 * Device instance currently on the bus awaiting a continue TIO
 	 * for a command that was not given the disconnect priveledge.
 	 */
-	struct tmode_lstate*	  pending_device;
+	struct ahc_tmode_lstate  *pending_device;
 
 	/*
 	 * Card characteristics
@@ -951,9 +957,6 @@ struct ahc_softc {
 	/* Initiator Bus ID */
 	uint8_t			  our_id;
 	uint8_t			  our_id_b;
-
-	/* Targets that need negotiation messages */
-	uint16_t		  targ_msg_req;
 
 	/*
 	 * PCI error detection.
@@ -1102,6 +1105,7 @@ int			 ahc_softc_init(struct ahc_softc *,
 					struct ahc_probe_config*);
 void			 ahc_controller_info(struct ahc_softc *ahc, char *buf);
 int			 ahc_init(struct ahc_softc *ahc);
+void			 ahc_intr_enable(struct ahc_softc *ahc, int enable);
 void			 ahc_pause_and_flushwork(struct ahc_softc *ahc);
 int			 ahc_suspend(struct ahc_softc *ahc); 
 int			 ahc_resume(struct ahc_softc *ahc);
@@ -1143,8 +1147,11 @@ int			ahc_search_disc_list(struct ahc_softc *ahc, int target,
 void			ahc_freeze_devq(struct ahc_softc *ahc, struct scb *scb);
 int			ahc_reset_channel(struct ahc_softc *ahc, char channel,
 					  int initiate_reset);
-void			restart_sequencer(struct ahc_softc *ahc);
+void			ahc_restart(struct ahc_softc *ahc);
+void			ahc_calc_residual(struct scb *scb);
 /*************************** Utility Functions ********************************/
+struct ahc_phase_table_entry*
+			ahc_lookup_phase_entry(int phase);
 void			ahc_compile_devinfo(struct ahc_devinfo *devinfo,
 					    u_int our_id, u_int target,
 					    u_int lun, char channel,
@@ -1163,10 +1170,11 @@ void			ahc_validate_width(struct ahc_softc *ahc,
 					   struct ahc_initiator_tinfo *tinfo,
 					   u_int *bus_width,
 					   role_t role);
-void			ahc_update_target_msg_request(struct ahc_softc *ahc,
-					struct ahc_devinfo *dinfo,
-					struct ahc_initiator_tinfo *tinfo,
-					int force, int paused);
+int			ahc_update_neg_request(struct ahc_softc*,
+					       struct ahc_devinfo*,
+					       struct ahc_tmode_tstate*,
+					       struct ahc_initiator_tinfo*,
+					       int /*force*/);
 void			ahc_set_width(struct ahc_softc *ahc,
 				      struct ahc_devinfo *devinfo,
 				      u_int width, u_int type, int paused);
@@ -1176,22 +1184,27 @@ void			ahc_set_syncrate(struct ahc_softc *ahc,
 					 u_int period, u_int offset,
 					 u_int ppr_options,
 					 u_int type, int paused);
+typedef enum {
+	AHC_QUEUE_NONE,
+	AHC_QUEUE_BASIC,
+	AHC_QUEUE_TAGGED
+} ahc_queue_alg;
+
 void			ahc_set_tags(struct ahc_softc *ahc,
-				     struct ahc_devinfo *devinfo, int enable);
+				     struct ahc_devinfo *devinfo,
+				     ahc_queue_alg alg);
 
 /**************************** Target Mode *************************************/
 #ifdef AHC_TARGET_MODE
 void		ahc_send_lstate_events(struct ahc_softc *,
-				       struct tmode_lstate *);
+				       struct ahc_tmode_lstate *);
 void		ahc_handle_en_lun(struct ahc_softc *ahc,
 				  struct cam_sim *sim, union ccb *ccb);
 cam_status	ahc_find_tmode_devs(struct ahc_softc *ahc,
 				    struct cam_sim *sim, union ccb *ccb,
-				    struct tmode_tstate **tstate,
-				    struct tmode_lstate **lstate,
+				    struct ahc_tmode_tstate **tstate,
+				    struct ahc_tmode_lstate **lstate,
 				    int notfound_failure);
-void		ahc_setup_target_msgin(struct ahc_softc *ahc,
-				       struct ahc_devinfo *devinfo);
 #ifndef AHC_TMODE_ENABLE
 #define AHC_TMODE_ENABLE 0
 #endif

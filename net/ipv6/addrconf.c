@@ -6,7 +6,7 @@
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *	Alexey Kuznetsov	<kuznet@ms2.inr.ac.ru>
  *
- *	$Id: addrconf.c,v 1.62 2001/04/26 19:11:59 davem Exp $
+ *	$Id: addrconf.c,v 1.64 2001/05/01 23:05:47 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -22,6 +22,10 @@
  *	Andi Kleen			:	kill doube kfree on module
  *						unload.
  *	Maciej W. Rozycki		:	FDDI support
+ *	sekiya@USAGI			:	Don't send too many RS
+ *						packets.
+ *	yoshfuji@USAGI			:       Fixed interval between DAD
+ *						packets.
  */
 
 #include <linux/config.h>
@@ -1509,7 +1513,7 @@ static void addrconf_dad_timer(unsigned long data)
 	}
 
 	ifp->probes--;
-	addrconf_mod_timer(ifp, AC_DAD, ifp->idev->cnf.rtr_solicit_interval);
+	addrconf_mod_timer(ifp, AC_DAD, ifp->idev->nd_parms->retrans_time);
 	spin_unlock_bh(&ifp->lock);
 
 	/* send a neighbour solicitation for our addr */

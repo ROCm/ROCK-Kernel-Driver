@@ -5635,7 +5635,7 @@ CONFIG_AIC7XXX_CMDS_PER_DEVICE
   Default: 253
 
 Initial Bus Reset Settle Delay
-CONFIG_AIC7XXX_RESET_DELAY
+CONFIG_AIC7XXX_RESET_DELAY_MS
   The number of milliseconds to delay after an initial bus reset.
   The bus settle delay following all error recovery actions is
   dictated by the SCSI layer and is not affected by this value.

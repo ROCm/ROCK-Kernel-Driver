@@ -62,6 +62,7 @@ static void release_task(struct task_struct * p)
 		current->counter += p->counter;
 		if (current->counter >= MAX_COUNTER)
 			current->counter = MAX_COUNTER;
+		p->pid = 0;
 		free_task_struct(p);
 	} else {
 		printk("task releasing itself\n");

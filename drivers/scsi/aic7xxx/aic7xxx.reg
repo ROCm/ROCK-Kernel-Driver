@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/aic7xxx/aic7xxx.reg#13 $
+ * $Id: //depot/src/aic7xxx/aic7xxx.reg#17 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.reg,v 1.31 2000/11/10 20:13:40 gibbs Exp $
  */
@@ -877,7 +877,8 @@ register DFSTATUS {
 	address			0x094
 	access_mode RO
 	bit	PRELOAD_AVAIL	0x80
-	bit	DWORDEMP	0x20
+	bit	DFCACHETH	0x40
+	bit	FIFOQWDEMP	0x20
 	bit	MREQPEND	0x10
 	bit	HDONE		0x08
 	bit	DFTHRESH	0x04
@@ -969,6 +970,7 @@ register SCSIPHASE {
 	bit	MSG_OUT_PHASE	0x04
 	bit	DATA_IN_PHASE	0x02
 	bit	DATA_OUT_PHASE	0x01
+	mask	DATA_PHASE_MASK	0x03
 }
 
 /*
@@ -1415,15 +1417,6 @@ scratch_ram {
 	 */
 	LAST_MSG {
 		size		1
-	}
-
-	/*
-	 * Interrupt kernel for a message to this target on
-	 * the next transaction.  This is usually used for
-	 * negotiation requests.
-	 */
-	TARGET_MSG_REQUEST {
-		size		2
 	}
 
 	/*
