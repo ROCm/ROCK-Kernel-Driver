@@ -157,33 +157,6 @@ static inline void fix_tail_page_for_writing(struct page *page) {
     }
 }
 
-
-
-
-/* we need to allocate a block for new unformatted node.  Try to figure out
-   what point in bitmap reiserfs_new_blocknrs should start from. */
-static b_blocknr_t find_tag (struct buffer_head * bh, struct item_head * ih,
-			     __u32 * item, int pos_in_item)
-{
-  __u32 block ;
-  if (!is_indirect_le_ih (ih))
-	 /* something more complicated could be here */
-	 return bh->b_blocknr;
-
-  /* for indirect item: go to left and look for the first non-hole entry in
-	  the indirect item */
-  if (pos_in_item == I_UNFM_NUM (ih))
-	 pos_in_item --;
-  while (pos_in_item >= 0) {
-	 block = get_block_num(item, pos_in_item) ;
-	 if (block)
-		return block ;
-	 pos_in_item --;
-  }
-  return bh->b_blocknr;
-}
-
-
 /* reiserfs_get_block does not need to allocate a block only if it has been
    done already or non-hole position has been found in the indirect item */
 static inline int allocation_needed (int retval, b_blocknr_t allocated, 
@@ -342,10 +315,10 @@ research:
     ** kmap schedules
     */
     if (!p) {
-    p = (char *)kmap(bh_result->b_page) ;
-    if (fs_changed (fs_gen, inode->i_sb) && item_moved (&tmp_ih, &path)) {
-        goto research;
-    }
+	p = (char *)kmap(bh_result->b_page) ;
+	if (fs_changed (fs_gen, inode->i_sb) && item_moved (&tmp_ih, &path)) {
+	    goto research;
+	}
     }
     p += offset ;
     memset (p, 0, inode->i_sb->s_blocksize);
@@ -506,24 +479,24 @@ out:
 }
 
 static inline int _allocate_block(struct reiserfs_transaction_handle *th,
+			   long block,
                            struct inode *inode, 
 			   b_blocknr_t *allocated_block_nr, 
-			   unsigned long tag,
+			   struct path * path,
 			   int flags) {
   
 #ifdef REISERFS_PREALLOCATE
     if (!(flags & GET_BLOCK_NO_ISEM)) {
-        return reiserfs_new_unf_blocknrs2(th, inode, allocated_block_nr, tag);
+	return reiserfs_new_unf_blocknrs2(th, inode, allocated_block_nr, path, block);
     }
 #endif
-    return reiserfs_new_unf_blocknrs (th, allocated_block_nr, tag);
+    return reiserfs_new_unf_blocknrs (th, allocated_block_nr, path, block);
 }
 
 int reiserfs_get_block (struct inode * inode, sector_t block,
 			struct buffer_head * bh_result, int create)
 {
     int repeat, retval;
-    unsigned long tag;
     b_blocknr_t allocated_block_nr = 0;// b_blocknr_t is unsigned long
     INITIALIZE_PATH(path);
     int pos_in_item;
@@ -602,7 +575,6 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 
     if (allocation_needed (retval, allocated_block_nr, ih, item, pos_in_item)) {
 	/* we have to allocate block for the unformatted node */
-	tag = find_tag (bh, ih, item, pos_in_item);
 	if (!transaction_started) {
 	    pathrelse(&path) ;
 	    journal_begin(&th, inode->i_sb, jbegin_count) ;
@@ -611,7 +583,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	    goto research ;
 	}
 
-	repeat = _allocate_block(&th, inode, &allocated_block_nr, tag, create);
+	repeat = _allocate_block(&th, block, inode, &allocated_block_nr, &path, create);
 
 	if (repeat == NO_DISK_SPACE) {
 	    /* restart the transaction to give the journal a chance to free
@@ -619,7 +591,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	    ** research if we succeed on the second try
 	    */
 	    restart_transaction(&th, inode, &path) ; 
-	    repeat = _allocate_block(&th, inode,&allocated_block_nr,tag,create);
+	    repeat = _allocate_block(&th, block, inode, &allocated_block_nr, NULL, create);
 
 	    if (repeat != NO_DISK_SPACE) {
 		goto research ;
@@ -770,8 +742,8 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	    add_to_flushlist(inode, unbh) ;
 
 	    /* mark it dirty now to prevent commit_write from adding
-	    ** this buffer to the inode's dirty buffer list
-	    */
+	     ** this buffer to the inode's dirty buffer list
+	     */
 		/*
 		 * AKPM: changed __mark_buffer_dirty to mark_buffer_dirty().
 		 * It's still atomic, but it sets the page dirty too,
@@ -779,7 +751,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 		 * VM (which was also the case with __mark_buffer_dirty())
 		 */
 	    mark_buffer_dirty(unbh) ;
-		  
+
 	    //inode->i_blocks += inode->i_sb->s_blocksize / 512;
 	    //mark_tail_converted (inode);
 	} else {
@@ -920,7 +892,7 @@ static void init_inode (struct inode * inode, struct path * path)
 	inode->i_blocks = sd_v1_blocks(sd);
 	inode->i_generation = le32_to_cpu (INODE_PKEY (inode)->k_dir_id);
 	blocks = (inode->i_size + 511) >> 9;
-	blocks = _ROUND_UP (blocks, inode->i_blksize >> 9);
+	blocks = _ROUND_UP (blocks, inode->i_sb->s_blocksize >> 9);
 	if (inode->i_blocks > blocks) {
 	    // there was a bug in <=3.5.23 when i_blocks could take negative
 	    // values. Starting from 3.5.17 this value could even be stored in
@@ -1592,6 +1564,10 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
 	set_inode_sd_version (inode, STAT_DATA_V2);
     
     /* insert the stat data into the tree */
+#ifdef DISPLACE_NEW_PACKING_LOCALITIES
+    if (REISERFS_I(dir)->new_packing_locality)
+	th->displace_new_blocks = 1;
+#endif
     retval = reiserfs_insert_item (th, &path_to_key, &key, &ih, (char *)(&sd));
     if (retval) {
 	err = retval;
@@ -1599,6 +1575,10 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
 	goto out_bad_inode;
     }
 
+#ifdef DISPLACE_NEW_PACKING_LOCALITIES
+    if (!th->displace_new_blocks)
+	REISERFS_I(dir)->new_packing_locality = 0;
+#endif
     if (S_ISDIR(mode)) {
 	/* insert item with "." and ".." */
 	retval = reiserfs_new_directory (th, &ih, &path_to_key, dir);
@@ -1772,16 +1752,16 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     reiserfs_update_inode_transaction(p_s_inode) ;
     windex = push_journal_writer("reiserfs_vfs_truncate_file") ;
     if (update_timestamps)
-           /* we are doing real truncate: if the system crashes before the last
-              transaction of truncating gets committed - on reboot the file
-              either appears truncated properly or not truncated at all */
-           add_save_link (&th, p_s_inode, 1);
+	    /* we are doing real truncate: if the system crashes before the last
+	       transaction of truncating gets committed - on reboot the file
+	       either appears truncated properly or not truncated at all */
+	add_save_link (&th, p_s_inode, 1);
     reiserfs_do_truncate (&th, p_s_inode, page, update_timestamps) ;
     pop_journal_writer(windex) ;
     journal_end(&th, p_s_inode->i_sb,  JOURNAL_PER_BALANCE_CNT * 2 + 1 ) ;
 
     if (update_timestamps)
-       remove_save_link (p_s_inode, 1/* truncate */);
+	remove_save_link (p_s_inode, 1/* truncate */);
 
     if (page) {
         length = offset & (blocksize - 1) ;
