@@ -10,6 +10,7 @@
 
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/smp_lock.h>
 #include <linux/fs.h>
 #include <linux/unistd.h>
 #include <linux/string.h>
@@ -273,7 +274,9 @@ struct dentry *nfsd_findparent(struct dentry *child)
 	/* I'm going to assume that if the returned dentry is different, then
 	 * it is well connected.  But nobody returns different dentrys do they?
 	 */
+	down(&child->d_inode->i_sem);
 	pdentry = child->d_inode->i_op->lookup(child->d_inode, tdentry);
+	up(&child->d_inode->i_sem);
 	d_drop(tdentry); /* we never want ".." hashed */
 	if (!pdentry && tdentry->d_inode == NULL) {
 		/* File system cannot find ".." ... sad but possible */
@@ -426,6 +429,7 @@ find_fh_dentry(struct super_block *sb, __u32 *datap, int len, int fhtype, int ne
 	 */
 	dprintk("nfs_fh: need to look harder for %s/%d\n", sb->s_id, datap[0]);
 
+	lock_kernel();
 	if (!S_ISDIR(result->d_inode->i_mode)) {
 		nfsdstats.fh_nocache_nondir++;
 			/* need to iget dirino and make sure this inode is in that directory */
@@ -499,6 +503,7 @@ find_fh_dentry(struct super_block *sb, __u32 *datap, int len, int fhtype, int ne
 			dput(dentry);
 			dput(result);	/* this will discard the whole free path, so we can up the semaphore */
 			up(&sb->s_nfsd_free_path_sem);
+			unlock_kernel();
 			goto retry;
 		}
 		dput(dentry);
@@ -506,6 +511,7 @@ find_fh_dentry(struct super_block *sb, __u32 *datap, int len, int fhtype, int ne
 	}
 	dput(dentry);
 	up(&sb->s_nfsd_free_path_sem);
+	unlock_kernel();
 	return result;
 
 err_dentry:
@@ -513,6 +519,7 @@ err_dentry:
 err_result:
 	dput(result);
 	up(&sb->s_nfsd_free_path_sem);
+	unlock_kernel();
 err_out:
 	if (err == -ESTALE)
 		nfsdstats.fh_stale++;
