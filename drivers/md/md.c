@@ -132,13 +132,6 @@ static LIST_HEAD(all_mddevs);
 
 static mddev_t *mddev_map[MAX_MD_DEVS];
 
-static inline mddev_t * kdev_to_mddev (kdev_t dev)
-{
-	if (major(dev) != MD_MAJOR)
-		BUG();
-        return mddev_map[minor(dev)];
-}
-
 static int md_fail_request (request_queue_t *q, struct bio *bio)
 {
 	bio_io_error(bio);
@@ -2703,15 +2696,17 @@ static int md_open(struct inode *inode, struct file *file)
 	 */
 	mddev_t *mddev = mddev_find(minor(inode->i_rdev));
 
-	if (mddev) 
+	if (mddev) {
+		inode->i_bdev->bd_inode->u.generic_ip = mddev;
 		return 0; /* and we "own" a reference */
-	else
+	} else
 		return -ENOMEM;
 }
 
 static int md_release(struct inode *inode, struct file * file)
 {
-	mddev_t *mddev = kdev_to_mddev(inode->i_rdev);
+ 	mddev_t *mddev = inode->i_bdev->bd_inode->u.generic_ip;
+
 	if (!mddev)
 		BUG();
 	mddev_put(mddev);
@@ -3439,11 +3434,14 @@ static void md_geninit(void)
 
 request_queue_t * md_queue_proc(kdev_t dev)
 {
-	mddev_t *mddev = kdev_to_mddev(dev);
-	if (mddev == NULL)
-		return BLK_DEFAULT_QUEUE(MAJOR_NR);
-	else
-		return &mddev->queue;
+	mddev_t *mddev = mddev_find(minor(dev));
+	request_queue_t *q = BLK_DEFAULT_QUEUE(MAJOR_NR);
+	if (!mddev || atomic_read(&mddev->active)<2)
+		BUG();
+	if (mddev->pers)
+		q = &mddev->queue;
+	mddev_put(mddev); /* the caller must hold a reference... */
+	return q;
 }
 
 int __init md_init(void)
