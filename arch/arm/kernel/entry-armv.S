@@ -1219,7 +1219,7 @@ ENTRY(ret_from_exception)
 
 /*
  * Register switch for ARMv3 and ARMv4 processors
- * r0 = previous thread_info, r1 = next thread_info
+ * r0 = previous task_struct, r1 = previous thread_info, r2 = next thread_info
  * previous and next are guaranteed not to be the same.
  */
 ENTRY(__switch_to)
