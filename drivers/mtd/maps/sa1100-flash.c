@@ -1089,8 +1089,10 @@ static void __exit sa1100_destroy_mtd(struct sa_info *sa, struct mtd_info *mtd)
 
 	del_mtd_partitions(mtd);
 
+#ifdef CONFIG_MTD_CONCAT
 	if (mtd != sa[0].mtd)
 		mtd_concat_destroy(mtd);
+#endif
 
 	for (i = NR_SUBMTD; i >= 0; i--) {
 		if (sa[i].mtd)
