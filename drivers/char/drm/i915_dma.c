@@ -296,7 +296,14 @@ static int do_validate_cmd(int cmd)
 		case 0x1c:
 			return 1;
 		case 0x1d:
-			return (cmd & 0xffff) + 2;
+			switch ((cmd>>16)&0xff) {
+			case 0x3:
+				return (cmd & 0x1f) + 2;
+			case 0x4:
+				return (cmd & 0xf) + 2;
+			default:
+				return (cmd & 0xffff) + 2;
+			}
 		case 0x1e:
 			if (cmd & (1 << 23))
 				return (cmd & 0xffff) + 1;
