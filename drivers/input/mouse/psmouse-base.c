@@ -121,6 +121,19 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 	if (psmouse->state == PSMOUSE_IGNORE)
 		goto out;
 
+	if (flags & (SERIO_PARITY|SERIO_TIMEOUT)) {
+		if (psmouse->state == PSMOUSE_ACTIVATED)
+			printk(KERN_WARNING "psmouse.c: bad data from KBC -%s%s\n",
+				flags & SERIO_TIMEOUT ? " timeout" : "",
+				flags & SERIO_PARITY ? " bad parity" : "");
+		if (psmouse->acking) {
+			psmouse->ack = -1;
+			psmouse->acking = 0;
+		}
+		psmouse->pktcnt = 0;
+		goto out;
+	}
+
 	if (psmouse->acking) {
 		switch (data) {
 			case PSMOUSE_RET_ACK:
