@@ -146,8 +146,8 @@ static int ingress_enqueue(struct sk_buff *skb,struct Qdisc *sch)
 	 * Unlike normal "enqueue" functions, ingress_enqueue returns a
 	 * firewall FW_* code.
 	 */
-	switch (result) {
 #ifdef CONFIG_NET_CLS_POLICE
+	switch (result) {
 		case TC_POLICE_SHOT:
 			result = NF_DROP;
 			sch->stats.drops++;
@@ -160,7 +160,7 @@ static int ingress_enqueue(struct sk_buff *skb,struct Qdisc *sch)
 			sch->stats.bytes += skb->len;
 			result = NF_ACCEPT;
 			break;
-	}
+	};
 #else
 	sch->stats.packets++;
 	sch->stats.bytes += skb->len;
