@@ -32,7 +32,7 @@ ENTRY(ia32_execve)
 END(ia32_execve)
 
 ENTRY(ia32_clone)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(2)
+	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(5)
 	alloc r16=ar.pfs,5,2,6,0
 	DO_SAVE_SWITCH_STACK
 	mov loc0=rp
