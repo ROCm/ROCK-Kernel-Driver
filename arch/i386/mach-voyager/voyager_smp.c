@@ -623,7 +623,9 @@ do_boot_cpu(__u8 cpu)
 		((virt_to_phys(page_table_copies)) & PAGE_MASK)
 		| _PAGE_RW | _PAGE_USER | _PAGE_PRESENT;
 #else
-	((unsigned long *)swapper_pg_dir)[0] = 0x102007;
+	((unsigned long *)swapper_pg_dir)[0] = 
+		(virt_to_phys(pg0) & PAGE_MASK)
+		| _PAGE_RW | _PAGE_USER | _PAGE_PRESENT;
 #endif
 
 	if(quad_boot) {

@@ -1332,6 +1332,11 @@ config X86_BIOS_REBOOT
 	depends on !(X86_VISWS || X86_VOYAGER)
 	default y
 
+config X86_TRAMPOLINE
+	bool
+	depends on X86_SMP || (X86_VOYAGER && SMP)
+	default y
+
 config PC
 	bool
 	depends on X86 && !EMBEDDED
