@@ -750,6 +750,8 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		if (is_vm_hugetlb_page(vma)) {
 			i = follow_hugetlb_page(mm, vma, pages, vmas,
 						&start, &len, i);
+			if (i < 0) 
+				return i;
 			continue;
 		}
 		spin_lock(&mm->page_table_lock);

@@ -177,8 +177,8 @@ follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 			pte = huge_pte_offset(mm, vaddr);
 
-			/* hugetlb should be locked, and hence, prefaulted */
-			WARN_ON(!pte || pte_none(*pte));
+			if(!pte || pte_none(*pte))
+				return -EFAULT;
 
 			page = &pte_page(*pte)[vpfn % (HPAGE_SIZE/PAGE_SIZE)];
 
@@ -342,52 +342,57 @@ hugetlb_alloc_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct address_space *mapping = vma->vm_file->f_mapping;
 
 	pte = huge_pte_alloc(mm, addr); 
-		if (!pte) {
+	if (!pte) {
 		ret = VM_FAULT_OOM;
-			goto out;
-		}
+		goto out;
+	}
 
 	/* Handle race */
 	if (!pte_none(*pte)) { 
 		ret = VM_FAULT_MINOR;
 		goto flush; 
 	}
-
-		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
-			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
-		page = find_get_page(mapping, idx);
-		if (!page) {
+	
+	idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
+		+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
+	page = find_get_page(mapping, idx);
+	if (!page) {
 		/* Should do this at prefault time, but that gets us into
-		   trouble with freeing right now. */
+		   trouble with freeing right now. We do a quick overcommit 
+		   check instead. */
 		ret = hugetlb_get_quota(mapping);
 		if (ret) {
 			ret = VM_FAULT_OOM;
-				goto out;
-			}
+			goto out;
+		}
 		
 		page = alloc_hugetlb_page(vma, addr);
-			if (!page) {
-				hugetlb_put_quota(mapping);
+		if (!page) {
+			hugetlb_put_quota(mapping);
 			
 			/* Instead of OOMing here could just transparently use
 			   small pages. */
+
+			printk(KERN_INFO "%s[%d] ran out of huge pages. Killed.\n",
+			       current->comm, current->pid);
 			
 			ret = VM_FAULT_OOM;
-				goto out;
-			}
-			ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
+			goto out;
+		}
+		ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
+		if (!ret)
 			unlock_page(page);
-			if (ret) {
-				hugetlb_put_quota(mapping);
-				free_huge_page(page);
+		if (ret) {
+			hugetlb_put_quota(mapping);
+			free_huge_page(page);
 			ret = VM_FAULT_SIGBUS;
-				goto out;
-			}
+			goto out;
+		}
 		ret = VM_FAULT_MAJOR; 
 	} else
 		ret = VM_FAULT_MINOR;
 		
-		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
+	set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
 
  flush:
 	/* Don't need to flush other CPUs. They will just do a page
@@ -607,14 +612,49 @@ int hugetlb_report_node_meminfo(int node, char *buf)
 			HPAGE_SIZE/1024);
 }
 
-/* Not accurate with policy */
+int __is_hugepage_mem_enough(struct mempolicy *pol, size_t size)
+{
+	struct vm_area_struct vma = { 
+#ifdef CONFIG_NUMA	
+		.vm_policy = pol 
+#endif	
+	}; 
+	long pm = 0; 
+	int i;
+	for (i = 0; i < numnodes; i++) { 
+		/* Dumb algorithm, but hopefully does not matter here */
+		if (!mpol_node_valid(i, &vma, 0))		
+			continue;
+		pm += htlbpagemem[i];
+	}
+	return (size + ~HPAGE_MASK)/HPAGE_SIZE <= pm;
+}
+
+/* Check process policy here. VMA policy is checked in mbind. 
+   We do not catch changing of process policy later, but before
+   the actual fault. */
 int is_hugepage_mem_enough(size_t size)
 {
-	long pm = 0;
-	int i;
-	for (i = 0; i < numnodes; i++)
-		pm += htlbpagemem[i];
-	return (size + ~HPAGE_MASK)/HPAGE_SIZE <= pm;
+	return __is_hugepage_mem_enough(NULL, size);
+}
+
+/* Count allocated huge pages in a range */
+unsigned long huge_count_pages(unsigned long addr, unsigned long end)
+{
+	unsigned long pages = 0;
+	while (addr < end) {
+		pmd_t *pmd;
+		pgd_t *pgd = pgd_offset_k(addr);
+		if (pgd_none(*pgd)) {
+			addr = (addr + PGDIR_SIZE) & PGDIR_MASK;
+			continue;
+		}
+		pmd = pmd_offset(pgd, addr);
+		if (!pmd_none(*pmd))
+			pages++;
+		addr = (addr + PMD_SIZE) & PMD_MASK;
+	}
+	return pages;
 }
 
 /* Return the number pages of memory we physically have, in PAGE_SIZE units. */

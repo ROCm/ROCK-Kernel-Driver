@@ -21,6 +21,7 @@ int hugetlb_prefault(struct address_space *, struct vm_area_struct *);
 void huge_page_release(struct page *);
 int hugetlb_report_meminfo(char *);
 int is_hugepage_mem_enough(size_t);
+int __is_hugepage_mem_enough(struct mempolicy *pol, size_t);
 unsigned long hugetlb_total_pages(void);
 struct page *follow_huge_addr(struct mm_struct *mm, struct vm_area_struct *vma,
 			unsigned long address, int write);
@@ -30,9 +31,10 @@ struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 				pmd_t *pmd, int write);
 int is_aligned_hugepage_range(unsigned long addr, unsigned long len);
 int pmd_huge(pmd_t pmd);
+unsigned long huge_count_pages(unsigned long addr, unsigned long end);
 
 extern int htlbpage_max;
-extern int sysctl_hugetlb_shm_group;
+extern int sysctl_overcommit_hugepages;
 
 static inline void
 mark_mm_hugetlb(struct mm_struct *mm, struct vm_area_struct *vma)

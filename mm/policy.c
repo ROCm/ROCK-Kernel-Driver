@@ -258,7 +258,7 @@ verify_pages(unsigned long addr, unsigned long end, unsigned long *nodes)
 /* Step 1: check the range */
 static struct vm_area_struct *
 check_range(struct mm_struct *mm, unsigned long start, unsigned long end,
-	    unsigned long *nodes, unsigned long flags)
+	    unsigned long *nodes, unsigned long flags, struct mempolicy *pol)
 {
 	int err;
 	struct vm_area_struct *first, *vma, *prev;
@@ -267,7 +267,7 @@ check_range(struct mm_struct *mm, unsigned long start, unsigned long end,
 	if (!first)
 		return ERR_PTR(-EFAULT);
 	prev = NULL;
-	for (vma = first; vma->vm_start < end; vma = vma->vm_next) {
+	for (vma = first; vma && vma->vm_start < end; vma = vma->vm_next) {
 		if (!vma->vm_next && vma->vm_end < end)
 			return ERR_PTR(-EFAULT);
 		if (prev && prev->vm_end < vma->vm_start)
@@ -279,6 +279,23 @@ check_range(struct mm_struct *mm, unsigned long start, unsigned long end,
 				break;
 			}
 		}
+		if (is_vm_hugetlb_page(vma) && 
+		    !sysctl_overcommit_hugepages &&
+		    pol && pol->policy == MPOL_BIND) { 
+			unsigned long len; 
+			len = min_t(unsigned long, end, vma->vm_end) -
+				max_t(unsigned long, start, vma->vm_start);
+			len -= huge_count_pages(start, end) * HPAGE_SIZE; 
+			if (len == 0) 
+				;
+			else if (!__is_hugepage_mem_enough(pol, len)) { 
+				PDprintk("not enough huge pages (%d) (%d,%lx)\n",
+					 len/HPAGE_SIZE, 
+					 pol ? pol->policy : 0, 
+					 pol ? pol->v.nodes : 0); 
+				return ERR_PTR(-ENOMEM);
+			}
+		} 
 		prev = vma;
 	}
 	return first;
@@ -317,7 +334,7 @@ static int mbind_range(struct vm_area_struct *vma, unsigned long start,
 	int err;
 
 	err = 0;
-	for (; vma->vm_start < end; vma = next) {
+	for (; vma && vma->vm_start < end; vma = next) {
 		next = vma->vm_next;
 		if (vma->vm_start < start)
 			err = split_vma(vma->vm_mm, vma, start, 1);
@@ -368,7 +385,7 @@ asmlinkage long sys_mbind(unsigned long start, unsigned long len,
 			mode,nodes[0]);
 
 	down_write(&mm->mmap_sem);
-	vma = check_range(mm, start, end, nodes, flags);
+	vma = check_range(mm, start, end, nodes, flags, new);
 	err = PTR_ERR(vma);
 	if (!IS_ERR(vma))
 		err = mbind_range(vma, start, end, new);

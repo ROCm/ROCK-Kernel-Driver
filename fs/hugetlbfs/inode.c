@@ -32,6 +32,8 @@
 /* some random number */
 #define HUGETLBFS_MAGIC	0x958458f6
 
+int sysctl_overcommit_hugepages;  /* no overcommit by default */
+
 static struct super_operations hugetlbfs_ops;
 static struct address_space_operations hugetlbfs_aops;
 struct file_operations hugetlbfs_file_operations;
@@ -43,7 +45,12 @@ static struct backing_dev_info hugetlbfs_backing_dev_info = {
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
 
-int sysctl_hugetlb_shm_group;
+/* Can be overwritten by architecture */
+__attribute__((weak)) unsigned long 
+huge_count_pages(unsigned long addr, unsigned long end)
+{
+	return 0;
+}
 
 static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
@@ -61,6 +68,10 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	if (vma->vm_end - vma->vm_start < HPAGE_SIZE)
 		return -EINVAL;
 
+	if (!sysctl_overcommit_hugepages && 
+	    !is_hugepage_mem_enough(vma->vm_end - vma->vm_start))
+		return -ENOMEM;
+	    
 	vma_len = (loff_t)(vma->vm_end - vma->vm_start);
 
 	down(&inode->i_sem);
@@ -738,12 +749,6 @@ static unsigned long hugetlbfs_counter(void)
 	return ret;
 }
 
-static int can_do_hugetlb_shm(void)
-{
-	return likely(capable(CAP_IPC_LOCK) ||
-			in_group_p(sysctl_hugetlb_shm_group));
-}
-
 struct file *hugetlb_zero_setup(size_t size)
 {
 	int error;
@@ -753,7 +758,7 @@ struct file *hugetlb_zero_setup(size_t size)
 	struct qstr quick_string;
 	char buf[16];
 
-	if (!can_do_hugetlb_shm())
+	if (!can_do_mlock())
 		return ERR_PTR(-EPERM);
 
 	if (!is_hugepage_mem_enough(size))
