@@ -251,7 +251,7 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 			new_vma->vm_policy =mpol_copy(new_vma->vm_policy);
 			if (IS_ERR(new_vma->vm_policy))
 				goto out_vma;
-			INIT_LIST_HEAD(&new_vma->shared);
+			INIT_VMA_SHARED(new_vma);
 			new_vma->vm_start = new_addr;
 			new_vma->vm_end = new_addr+new_len;
 			new_vma->vm_pgoff += (addr-vma->vm_start) >> PAGE_SHIFT;
@@ -310,6 +310,8 @@ unsigned long do_mremap(unsigned long addr,
 	unsigned long flags, unsigned long new_addr)
 {
 	struct vm_area_struct *vma;
+	struct address_space *mapping = NULL;
+	struct prio_tree_root *root = NULL;
 	unsigned long ret = -EINVAL;
 	unsigned long charged = 0;
 
@@ -417,9 +419,26 @@ unsigned long do_mremap(unsigned long addr,
 		/* can we just expand the current mapping? */
 		if (max_addr - addr >= new_len) {
 			int pages = (new_len - old_len) >> PAGE_SHIFT;
+
+			if (vma->vm_file) {
+				mapping = vma->vm_file->f_mapping;
+				if (vma->vm_flags & VM_SHARED) {
+					if (likely(!(vma->vm_flags & VM_NONLINEAR)))
+						root = &mapping->i_mmap_shared;
+				}
+				else
+					root = &mapping->i_mmap;
+				down(&mapping->i_shared_sem);
+			}
+
 			spin_lock(&vma->vm_mm->page_table_lock);
-			vma->vm_end = addr + new_len;
+			__vma_modify(root, vma, vma->vm_start,
+					addr + new_len, vma->vm_pgoff);
 			spin_unlock(&vma->vm_mm->page_table_lock);
+
+			if(mapping)
+				up(&mapping->i_shared_sem);
+
 			current->mm->total_vm += pages;
 			if (vma->vm_flags & VM_LOCKED) {
 				current->mm->locked_vm += pages;

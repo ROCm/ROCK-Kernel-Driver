@@ -1081,11 +1081,11 @@ no_new_page:
  * An hlen of zero blows away the entire portion file after hba.
  */
 static void
-invalidate_mmap_range_list(struct list_head *head,
+invalidate_mmap_range_list(struct prio_tree_root *root,
 			   unsigned long const hba,
 			   unsigned long const hlen)
 {
-	struct list_head *curr;
+	struct prio_tree_iter iter;
 	unsigned long hea;	/* last page of hole. */
 	unsigned long vba;
 	unsigned long vea;	/* last page of corresponding uva hole. */
@@ -1096,17 +1096,16 @@ invalidate_mmap_range_list(struct list_head *head,
 	hea = hba + hlen - 1;	/* avoid overflow. */
 	if (hea < hba)
 		hea = ULONG_MAX;
-	list_for_each(curr, head) {
-		vp = list_entry(curr, struct vm_area_struct, shared);
+	vp = __vma_prio_tree_first(root, &iter, hba, hea);
+	while(vp) {
 		vba = vp->vm_pgoff;
 		vea = vba + ((vp->vm_end - vp->vm_start) >> PAGE_SHIFT) - 1;
-		if (hea < vba || vea < hba)
-		    	continue;	/* Mapping disjoint from hole. */
 		zba = (hba <= vba) ? vba : hba;
 		zea = (vea <= hea) ? vea : hea;
 		zap_page_range(vp,
 			       ((zba - vba) << PAGE_SHIFT) + vp->vm_start,
 			       (zea - zba + 1) << PAGE_SHIFT);
+		vp = __vma_prio_tree_next(vp, root, &iter, hba, hea);
 	}
 }
 
@@ -1141,9 +1140,9 @@ void invalidate_mmap_range(struct address_space *mapping,
 	down(&mapping->i_shared_sem);
 	/* Protect against page fault */
 	atomic_inc(&mapping->truncate_count);
-	if (unlikely(!list_empty(&mapping->i_mmap)))
+	if (unlikely(!prio_tree_empty(&mapping->i_mmap)))
 		invalidate_mmap_range_list(&mapping->i_mmap, hba, hlen);
-	if (unlikely(!list_empty(&mapping->i_mmap_shared)))
+	if (unlikely(!prio_tree_empty(&mapping->i_mmap_shared)))
 		invalidate_mmap_range_list(&mapping->i_mmap_shared, hba, hlen);
 	up(&mapping->i_shared_sem);
 }
