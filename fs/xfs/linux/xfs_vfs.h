@@ -112,6 +112,7 @@ typedef int	(*vfs_quotactl_t)(bhv_desc_t *, int, int, caddr_t);
 typedef void	(*vfs_init_vnode_t)(bhv_desc_t *,
 				struct vnode *, bhv_desc_t *, int);
 typedef void	(*vfs_force_shutdown_t)(bhv_desc_t *, int, char *, int);
+typedef void	(*vfs_freeze_t)(bhv_desc_t *);
 
 typedef struct vfsops {
 	bhv_position_t		vf_position;	/* behavior chain position */
@@ -128,6 +129,7 @@ typedef struct vfsops {
 	vfs_quotactl_t		vfs_quotactl;	/* disk quota */
 	vfs_init_vnode_t	vfs_init_vnode;	/* initialize a new vnode */
 	vfs_force_shutdown_t	vfs_force_shutdown;	/* crash and burn */
+	vfs_freeze_t		vfs_freeze;	/* freeze fs for snapshot */
 } vfsops_t;
 
 /*
@@ -147,6 +149,7 @@ typedef struct vfsops {
 #define VFS_QUOTACTL(v, c,id,p, rv)	((rv) = vfs_quotactl(VHEAD(v), c,id,p))
 #define VFS_INIT_VNODE(v, vp,b,ul)	( vfs_init_vnode(VHEAD(v), vp,b,ul) )
 #define VFS_FORCE_SHUTDOWN(v, fl,f,l)	( vfs_force_shutdown(VHEAD(v), fl,f,l) )
+#define VFS_FREEZE(v)			( vfs_freeze(VHEAD(v)) )
 
 /*
  * PVFS's.  Operates on behavior descriptor pointers.
@@ -164,6 +167,7 @@ typedef struct vfsops {
 #define PVFS_QUOTACTL(b, c,id,p, rv)	((rv) = vfs_quotactl(b, c,id,p))
 #define PVFS_INIT_VNODE(b, vp,b2,ul)	( vfs_init_vnode(b, vp,b2,ul) )
 #define PVFS_FORCE_SHUTDOWN(b, fl,f,l)	( vfs_force_shutdown(b, fl,f,l) )
+#define PVFS_FREEZE(b)			( vfs_freeze(b) )
 
 extern int vfs_mount(bhv_desc_t *, struct xfs_mount_args *, struct cred *);
 extern int vfs_parseargs(bhv_desc_t *, char *, struct xfs_mount_args *, int);
@@ -178,6 +182,7 @@ extern int vfs_dmapiops(bhv_desc_t *, caddr_t);
 extern int vfs_quotactl(bhv_desc_t *, int, int, caddr_t);
 extern void vfs_init_vnode(bhv_desc_t *, struct vnode *, bhv_desc_t *, int);
 extern void vfs_force_shutdown(bhv_desc_t *, int, char *, int);
+extern void vfs_freeze(bhv_desc_t *);
 
 typedef struct bhv_vfsops {
 	struct vfsops		bhv_common;

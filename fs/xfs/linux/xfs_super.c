@@ -589,28 +589,7 @@ STATIC void
 linvfs_freeze_fs(
 	struct super_block	*sb)
 {
-	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
-	vnode_t			*vp;
-	int			error;
-
-	if (sb->s_flags & MS_RDONLY)
-		return;
-	VFS_ROOT(vfsp, &vp, error);
-	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, 0, XFS_IOC_FREEZE, 0, error);
-	VN_RELE(vp);
-}
-
-STATIC void
-linvfs_unfreeze_fs(
-	struct super_block	*sb)
-{
-	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
-	vnode_t			*vp;
-	int			error;
-
-	VFS_ROOT(vfsp, &vp, error);
-	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, 0, XFS_IOC_THAW, 0, error);
-	VN_RELE(vp);
+	VFS_FREEZE(LINVFS_GET_VFS(sb));
 }
 
 STATIC struct dentry *
@@ -850,7 +829,6 @@ STATIC struct super_operations linvfs_sops = {
 	.write_super		= linvfs_write_super,
 	.sync_fs		= linvfs_sync_super,
 	.write_super_lockfs	= linvfs_freeze_fs,
-	.unlockfs		= linvfs_unfreeze_fs,
 	.statfs			= linvfs_statfs,
 	.remount_fs		= linvfs_remount,
 	.show_options		= linvfs_show_options,
