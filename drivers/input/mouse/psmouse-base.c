@@ -180,7 +180,7 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		if (psmouse->pktcnt == 2) {
 			if (psmouse->packet[1] == PSMOUSE_RET_ID) {
 				psmouse->state = PSMOUSE_IGNORE;
-				serio_rescan(serio);
+				serio_reconnect(serio);
 				goto out;
 			}
 			if (psmouse->type == PSMOUSE_SYNAPTICS) {
