@@ -1828,10 +1828,8 @@ static int wl3501_get_freq(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
-	int f = this->chan;
-	wrqu->freq.m = f;
-	printk(KERN_INFO "%s: bss_basic_rate_set=%-10.10s\n", __FUNCTION__,
-		this->bss_set[f].bss_basic_rate_set);
+
+	wrqu->freq.m = this->chan;
 	wrqu->freq.e = 0;
 	return 0;
 }
