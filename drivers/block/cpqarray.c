@@ -1193,7 +1193,7 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 		if (error)
 			goto out_passthru;
 		error = -EFAULT;
-		if (copy_to_user(io, &my_io, sizeof(*my_io)))
+		if (copy_to_user(io, my_io, sizeof(*my_io)))
 			goto out_passthru;
 		error = 0;
 out_passthru:

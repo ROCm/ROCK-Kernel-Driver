@@ -67,7 +67,7 @@ typedef struct {
 	__u8	reserved;
 } rhdr_t;
 
-#define SG_MAX			31
+#define SG_MAX			32
 typedef struct {
 	rhdr_t	hdr;
 	sg_t	sg[SG_MAX];
