@@ -21,6 +21,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <asm/io.h>
+#include <asm/irq.h>
 
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG
