@@ -2405,7 +2405,7 @@ config PPP_FILTER
 config PPP_ASYNC
 	tristate "PPP support for async serial ports"
 	depends on PPP
-	select CRC16
+	select CRC_CCITT
 	---help---
 	  Say Y (or M) here if you want to be able to use PPP over standard
 	  asynchronous serial ports, such as COM1 or COM2 on a PC.  If you use
