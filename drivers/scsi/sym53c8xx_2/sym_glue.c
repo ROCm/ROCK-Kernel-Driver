@@ -223,7 +223,7 @@ typedef dma_addr_t	bus_addr_t;
 struct sym_eh_wait {
 	struct semaphore sem;
 	struct timer_list timer;
-	void (*old_done)(Scsi_Cmnd *);
+	void (*old_done)(struct scsi_cmnd *);
 	int to_do;
 	int timed_out;
 };
@@ -243,7 +243,7 @@ struct sym_ucmd {		/* Override the SCSI pointer structure */
 typedef struct sym_ucmd *ucmd_p;
 
 #define SYM_UCMD_PTR(cmd)  ((ucmd_p)(&(cmd)->SCp))
-#define SYM_SCMD_PTR(ucmd) sym_que_entry(ucmd, Scsi_Cmnd, SCp)
+#define SYM_SCMD_PTR(ucmd) sym_que_entry(ucmd, struct scsi_cmnd, SCp)
 #define SYM_SOFTC_PTR(cmd) (((struct host_data *)cmd->device->host->hostdata)->ncb)
 
 /*
@@ -285,7 +285,7 @@ typedef struct sym_ucmd *ucmd_p;
 #define bus_sg_dma_address(sc)	sg_dma_address(sc)
 #define bus_sg_dma_len(sc)	sg_dma_len(sc)
 
-static void __unmap_scsi_data(struct pci_dev *pdev, Scsi_Cmnd *cmd)
+static void __unmap_scsi_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 {
 	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
@@ -301,7 +301,7 @@ static void __unmap_scsi_data(struct pci_dev *pdev, Scsi_Cmnd *cmd)
 	SYM_UCMD_PTR(cmd)->data_mapped = 0;
 }
 
-static bus_addr_t __map_scsi_single_data(struct pci_dev *pdev, Scsi_Cmnd *cmd)
+static bus_addr_t __map_scsi_single_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 {
 	bus_addr_t mapping;
 	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
@@ -316,7 +316,7 @@ static bus_addr_t __map_scsi_single_data(struct pci_dev *pdev, Scsi_Cmnd *cmd)
 	return mapping;
 }
 
-static int __map_scsi_sg_data(struct pci_dev *pdev, Scsi_Cmnd *cmd)
+static int __map_scsi_sg_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 {
 	int use_sg;
 	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
@@ -330,7 +330,7 @@ static int __map_scsi_sg_data(struct pci_dev *pdev, Scsi_Cmnd *cmd)
 	return use_sg;
 }
 
-static void __sync_scsi_data(struct pci_dev *pdev, Scsi_Cmnd *cmd)
+static void __sync_scsi_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 {
 	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
@@ -359,14 +359,14 @@ static void __sync_scsi_data(struct pci_dev *pdev, Scsi_Cmnd *cmd)
 /*
  *  Complete a pending CAM CCB.
  */
-void sym_xpt_done(hcb_p np, Scsi_Cmnd *ccb)
+void sym_xpt_done(hcb_p np, struct scsi_cmnd *ccb)
 {
 	sym_remque(&SYM_UCMD_PTR(ccb)->link_cmdq);
 	unmap_scsi_data(np, ccb);
 	ccb->scsi_done(ccb);
 }
 
-void sym_xpt_done2(hcb_p np, Scsi_Cmnd *ccb, int cam_status)
+void sym_xpt_done2(hcb_p np, struct scsi_cmnd *ccb, int cam_status)
 {
 	sym_set_cam_status(ccb, cam_status);
 	sym_xpt_done(np, ccb);
@@ -378,7 +378,7 @@ void sym_xpt_done2(hcb_p np, Scsi_Cmnd *ccb, int cam_status)
  */
 void sym_print_addr (ccb_p cp)
 {
-	Scsi_Cmnd *cmd = cp->cam_ccb;
+	struct scsi_cmnd *cmd = cp->cam_ccb;
 	if (cmd)
 		printf("%s:%d:%d:", sym_name(SYM_SOFTC_PTR(cmd)),
 		       cmd->device->id,cmd->device->lun);
@@ -439,7 +439,7 @@ static int sym_xerr_cam_status(int cam_status, int x_status)
  */
 void sym_set_cam_result_error(hcb_p np, ccb_p cp, int resid)
 {
-	Scsi_Cmnd *csio = cp->cam_ccb;
+	struct scsi_cmnd *csio = cp->cam_ccb;
 	u_int cam_status, scsi_status, drv_status;
 
 	drv_status  = 0;
@@ -507,7 +507,7 @@ void sym_set_cam_result_error(hcb_p np, ccb_p cp, int resid)
 /*
  *  Called on successfull INQUIRY response.
  */
-void sym_sniff_inquiry(hcb_p np, Scsi_Cmnd *cmd, int resid)
+void sym_sniff_inquiry(hcb_p np, struct scsi_cmnd *cmd, int resid)
 {
 	int retv;
 
@@ -528,7 +528,7 @@ void sym_sniff_inquiry(hcb_p np, Scsi_Cmnd *cmd, int resid)
  *  Build the scatter/gather array for an I/O.
  */
 
-static int sym_scatter_no_sglist(hcb_p np, ccb_p cp, Scsi_Cmnd *cmd)
+static int sym_scatter_no_sglist(hcb_p np, ccb_p cp, struct scsi_cmnd *cmd)
 {
 	struct sym_tblmove *data = &cp->phys.data[SYM_CONF_MAX_SG-1];
 	int segment;
@@ -550,7 +550,7 @@ static int sym_scatter_no_sglist(hcb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 	return segment;
 }
 
-static int sym_scatter(hcb_p np, ccb_p cp, Scsi_Cmnd *cmd)
+static int sym_scatter(hcb_p np, ccb_p cp, struct scsi_cmnd *cmd)
 {
 	int segment;
 	int use_sg = (int) cmd->use_sg;
@@ -587,9 +587,9 @@ static int sym_scatter(hcb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 /*
  *  Queue a SCSI command.
  */
-static int sym_queue_command(hcb_p np, Scsi_Cmnd *ccb)
+static int sym_queue_command(hcb_p np, struct scsi_cmnd *ccb)
 {
-/*	Scsi_Device        *device    = ccb->device; */
+/*	struct scsi_device        *device    = ccb->device; */
 	tcb_p	tp;
 	lcb_p	lp;
 	ccb_p	cp;
@@ -652,7 +652,7 @@ static int sym_queue_command(hcb_p np, Scsi_Cmnd *ccb)
 /*
  *  Setup buffers and pointers that address the CDB.
  */
-static int __inline sym_setup_cdb(hcb_p np, Scsi_Cmnd *ccb, ccb_p cp)
+static int __inline sym_setup_cdb(hcb_p np, struct scsi_cmnd *ccb, ccb_p cp)
 {
 	u32	cmd_ba;
 	int	cmd_len;
@@ -678,7 +678,7 @@ static int __inline sym_setup_cdb(hcb_p np, Scsi_Cmnd *ccb, ccb_p cp)
 /*
  *  Setup pointers that address the data and start the I/O.
  */
-int sym_setup_data_and_start(hcb_p np, Scsi_Cmnd *csio, ccb_p cp)
+int sym_setup_data_and_start(hcb_p np, struct scsi_cmnd *csio, ccb_p cp)
 {
 	int dir;
 	tcb_p tp = &np->target[cp->target];
@@ -835,7 +835,7 @@ void sym_log_bus_error(hcb_p np)
  */
 static void sym_requeue_awaiting_cmds(hcb_p np)
 {
-	Scsi_Cmnd *cmd;
+	struct scsi_cmnd *cmd;
 	ucmd_p ucp = SYM_UCMD_PTR(cmd);
 	SYM_QUEHEAD tmp_cmdq;
 	int sts;
@@ -856,7 +856,7 @@ static void sym_requeue_awaiting_cmds(hcb_p np)
 /*
  *  Linux entry point of the queuecommand() function
  */
-int sym53c8xx_queue_command (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+int sym53c8xx_queue_command (struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
 	hcb_p  np  = SYM_SOFTC_PTR(cmd);
 	ucmd_p ucp = SYM_UCMD_PTR(cmd);
@@ -968,7 +968,7 @@ static void sym53c8xx_timer(unsigned long npref)
 /*
  *  Our general completion handler.
  */
-static void __sym_eh_done(Scsi_Cmnd *cmd, int timed_out)
+static void __sym_eh_done(struct scsi_cmnd *cmd, int timed_out)
 {
 	struct sym_eh_wait *ep = SYM_UCMD_PTR(cmd)->eh_wait;
 	if (!ep)
@@ -993,18 +993,18 @@ static void __sym_eh_done(Scsi_Cmnd *cmd, int timed_out)
 /*
  *  scsi_done() alias when error recovery is in progress. 
  */
-static void sym_eh_done(Scsi_Cmnd *cmd) { __sym_eh_done(cmd, 0); }
+static void sym_eh_done(struct scsi_cmnd *cmd) { __sym_eh_done(cmd, 0); }
 
 /*
  *  Some timeout handler to avoid waiting too long.
  */
-static void sym_eh_timeout(u_long p) { __sym_eh_done((Scsi_Cmnd *)p, 1); }
+static void sym_eh_timeout(u_long p) { __sym_eh_done((struct scsi_cmnd *)p, 1); }
 
 /*
  *  Generic method for our eh processing.
  *  The 'op' argument tells what we have to do.
  */
-static int sym_eh_handler(int op, char *opname, Scsi_Cmnd *cmd)
+static int sym_eh_handler(int op, char *opname, struct scsi_cmnd *cmd)
 {
 	hcb_p np = SYM_SOFTC_PTR(cmd);
 	SYM_QUEHEAD *qp;
@@ -1117,22 +1117,22 @@ finish:
 /*
  * Error handlers called from the eh thread (one thread per HBA).
  */
-int sym53c8xx_eh_abort_handler(Scsi_Cmnd *cmd)
+int sym53c8xx_eh_abort_handler(struct scsi_cmnd *cmd)
 {
 	return sym_eh_handler(SYM_EH_ABORT, "ABORT", cmd);
 }
 
-int sym53c8xx_eh_device_reset_handler(Scsi_Cmnd *cmd)
+int sym53c8xx_eh_device_reset_handler(struct scsi_cmnd *cmd)
 {
 	return sym_eh_handler(SYM_EH_DEVICE_RESET, "DEVICE RESET", cmd);
 }
 
-int sym53c8xx_eh_bus_reset_handler(Scsi_Cmnd *cmd)
+int sym53c8xx_eh_bus_reset_handler(struct scsi_cmnd *cmd)
 {
 	return sym_eh_handler(SYM_EH_BUS_RESET, "BUS RESET", cmd);
 }
 
-int sym53c8xx_eh_host_reset_handler(Scsi_Cmnd *cmd)
+int sym53c8xx_eh_host_reset_handler(struct scsi_cmnd *cmd)
 {
 	return sym_eh_handler(SYM_EH_HOST_RESET, "HOST RESET", cmd);
 }
@@ -1229,7 +1229,7 @@ static int device_queue_depth(hcb_p np, int target, int lun)
  * Linux entry point for device queue sizing.
  */
 int
-sym53c8xx_slave_configure(Scsi_Device *device)
+sym53c8xx_slave_configure(struct scsi_device *device)
 {
 	struct Scsi_Host *host = device->host;
 	hcb_p np;
@@ -1792,7 +1792,7 @@ out_err32:
  *  start the timer daemon.
  */
 static int __init 
-sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
+sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 {
         struct host_data *host_data;
 	hcb_p np = 0;
@@ -1827,7 +1827,7 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 	/*
 	 *	Allocate host_data structure
 	 */
-        if (!(instance = scsi_register(tpnt, sizeof(*host_data))))
+        if (!(instance = scsi_host_alloc(tpnt, sizeof(*host_data))))
 	        goto attach_failed;
 	host_data = (struct host_data *) instance->hostdata;
 
@@ -1852,6 +1852,8 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 #endif
 	host_data->ncb = np;
 	np->s.host = instance;
+
+	pci_set_drvdata(dev->pdev, np);
 
 	SYM_INIT_LOCK_HCB(np);
 
@@ -2020,6 +2022,7 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 	 *  Now let the generic SCSI driver
 	 *  look for the SCSI devices on the bus ..
 	 */
+	scsi_add_host(instance, &dev->pdev->dev);
 	return 0;
 
 attach_failed:
@@ -2262,62 +2265,13 @@ int __init sym53c8xx_setup(char *str)
 __setup("sym53c8xx=", sym53c8xx_setup);
 #endif
 
-#ifdef	SYM_CONF_PQS_PDS_SUPPORT
-/*
- *  Detect all NCR PQS/PDS boards and keep track of their bus nr.
- *
- *  The NCR PQS or PDS card is constructed as a DEC bridge
- *  behind which sit a proprietary NCR memory controller and
- *  four or two 53c875s as separate devices.  In its usual mode
- *  of operation, the 875s are slaved to the memory controller
- *  for all transfers.  We can tell if an 875 is part of a
- *  PQS/PDS or not since if it is, it will be on the same bus
- *  as the memory controller.  To operate with the Linux
- *  driver, the memory controller is disabled and the 875s
- *  freed to function independently.  The only wrinkle is that
- *  the preset SCSI ID (which may be zero) must be read in from
- *  a special configuration space register of the 875
- */
-#ifndef SYM_CONF_MAX_PQS_BUS
-#define SYM_CONF_MAX_PQS_BUS 16
-#endif
-static int pqs_bus[SYM_CONF_MAX_PQS_BUS] __initdata = { 0 };
-
-static void __init sym_detect_pqs_pds(void)
-{
-	short index;
-	struct pci_dev *dev = NULL;
-
-	for(index=0; index < SYM_CONF_MAX_PQS_BUS; index++) {
-		u_char tmp;
-
-		dev = pci_find_device(0x101a, 0x0009, dev);
-		if (dev == NULL) {
-			pqs_bus[index] = -1;
-			break;
-		}
-		printf_info(NAME53C8XX ": NCR PQS/PDS memory controller detected on bus %d\n", dev->bus->number);
-		pci_read_config_byte(dev, 0x44, &tmp);
-		/* bit 1: allow individual 875 configuration */
-		tmp |= 0x2;
-		pci_write_config_byte(dev, 0x44, tmp);
-		pci_read_config_byte(dev, 0x45, &tmp);
-		/* bit 2: drive individual 875 interrupts to the bus */
-		tmp |= 0x4;
-		pci_write_config_byte(dev, 0x45, tmp);
-
-		pqs_bus[index] = dev->bus->number;
-	}
-}
-#endif /* SYM_CONF_PQS_PDS_SUPPORT */
-
 /*
  *  Read and check the PCI configuration for any detected NCR 
  *  boards and save data for attaching after all boards have 
  *  been detected.
  */
 static int __init
-sym53c8xx_pci_init(Scsi_Host_Template *tpnt, struct pci_dev *pdev, sym_device *device)
+sym53c8xx_pci_init(struct pci_dev *pdev, sym_device *device)
 {
 	u_short vendor_id, device_id, command, status_reg;
 	u_char cache_line_size;
@@ -2534,26 +2488,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, struct pci_dev *pdev, sym_device *d
 	return 0;
 }
 
-/*
- *  List of supported NCR chip ids
- */
-static u_short sym_chip_ids[] __initdata	= {
-	PCI_ID_SYM53C810,
-	PCI_ID_SYM53C815,
-	PCI_ID_SYM53C825,
-	PCI_ID_SYM53C860,
-	PCI_ID_SYM53C875,
-	PCI_ID_SYM53C875_2,
-	PCI_ID_SYM53C885,
-	PCI_ID_SYM53C875A,
-	PCI_ID_SYM53C895,
-	PCI_ID_SYM53C896,
-	PCI_ID_SYM53C895A,
-	PCI_ID_LSI53C1510D,
- 	PCI_ID_LSI53C1010,
- 	PCI_ID_LSI53C1010_2
-};
-
+#if 0
 /*
  *  Detect all 53c8xx hosts and then attach them.
  *
@@ -2564,7 +2499,7 @@ static u_short sym_chip_ids[] __initdata	= {
  *  If no NVRAM is found or data appears invalid attach boards in 
  *  the order they are detected.
  */
-int __init sym53c8xx_detect(Scsi_Host_Template *tpnt)
+int __init sym53c8xx_detect(struct scsi_host_template *tpnt)
 {
 	struct pci_dev *pcidev;
 	int i, j, chips, hosts, count;
@@ -2637,8 +2572,7 @@ if (sym53c8xx)
 			continue;
 		devp = &devtbl[count];
 		devp->host_id = SYM_SETUP_HOST_ID;
-		devp->attach_done = 0;
-		if (sym53c8xx_pci_init(tpnt, pcidev, devp)) {
+		if (sym53c8xx_pci_init(pcidev, devp)) {
 			continue;
 		}
 		++count;
@@ -2749,7 +2683,7 @@ next:
 
 	return attach_count;
 }
-
+#endif
 
 
 /*
@@ -2784,27 +2718,26 @@ static int sym_detach(hcb_p np)
 	return 1;
 }
 
+#if 0
 int sym53c8xx_release(struct Scsi_Host *host)
 {
      sym_detach(((struct host_data *) host->hostdata)->ncb);
 
      return 0;
 }
-
-/*
- * For bigots to keep silent. :)
- */
-#ifdef MODULE_LICENSE
-MODULE_LICENSE("Dual BSD/GPL");
 #endif
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Driver host template.
  */
-static Scsi_Host_Template driver_template = {
+static struct scsi_host_template sym2_template = {
 	.name			= "sym53c8xx",
+#if 0
 	.detect			= sym53c8xx_detect,
 	.release		= sym53c8xx_release,
+#endif
 	.info			= sym53c8xx_info, 
 	.queuecommand		= sym53c8xx_queue_command,
 	.slave_configure	= sym53c8xx_slave_configure,
@@ -2820,4 +2753,173 @@ static Scsi_Host_Template driver_template = {
 	.proc_name		= NAME53C8XX,
 #endif
 };
-#include "../scsi_module.c"
+
+#ifdef _SYM_CONF_PQS_PDS_SUPPORT
+#if 0
+/*
+ *  Detect all NCR PQS/PDS boards and keep track of their bus nr.
+ *
+ *  The NCR PQS or PDS card is constructed as a DEC bridge
+ *  behind which sit a proprietary NCR memory controller and
+ *  four or two 53c875s as separate devices.  In its usual mode
+ *  of operation, the 875s are slaved to the memory controller
+ *  for all transfers.  We can tell if an 875 is part of a
+ *  PQS/PDS or not since if it is, it will be on the same bus
+ *  as the memory controller.  To operate with the Linux
+ *  driver, the memory controller is disabled and the 875s
+ *  freed to function independently.  The only wrinkle is that
+ *  the preset SCSI ID (which may be zero) must be read in from
+ *  a special configuration space register of the 875
+ */
+#ifndef SYM_CONF_MAX_PQS_BUS
+#define SYM_CONF_MAX_PQS_BUS 16
+#endif
+static int pqs_bus[SYM_CONF_MAX_PQS_BUS] __initdata = { 0 };
+
+static void __init sym_detect_pqs_pds(void)
+{
+	short index;
+	struct pci_dev *dev = NULL;
+
+	for(index=0; index < SYM_CONF_MAX_PQS_BUS; index++) {
+		u_char tmp;
+
+		dev = pci_find_device(0x101a, 0x0009, dev);
+		if (dev == NULL) {
+			pqs_bus[index] = -1;
+			break;
+		}
+		printf_info(NAME53C8XX ": NCR PQS/PDS memory controller detected on bus %d\n", dev->bus->number);
+		pci_read_config_byte(dev, 0x44, &tmp);
+		/* bit 1: allow individual 875 configuration */
+		tmp |= 0x2;
+		pci_write_config_byte(dev, 0x44, tmp);
+		pci_read_config_byte(dev, 0x45, &tmp);
+		/* bit 2: drive individual 875 interrupts to the bus */
+		tmp |= 0x4;
+		pci_write_config_byte(dev, 0x45, tmp);
+
+		pqs_bus[index] = dev->bus->number;
+	}
+}
+#endif
+
+static int pqs_probe()
+{
+}
+
+static void pqs_remove()
+{
+}
+
+static struct pci_device_id pqs_id_table[] __devinitdata = {
+	{ 0x101a, 0x0009, },
+};
+
+MODULE_DEVICE_TABLE(pci, pqs_id_table);
+
+static struct pci_driver pqs_driver = {
+	.name		= NAME53C8XX " (PQS)",
+	.id_table	= pqs_id_table,
+	.probe		= pqs_probe,
+	.remove		= __devexit_p(pqs_remove),
+};
+#endif /* PQS */
+
+static int attach_count;
+
+static int __devinit sym2_probe(struct pci_dev *pdev,
+				const struct pci_device_id *ent)
+{
+	sym_device sym_dev;
+	sym_nvram nvram;
+
+	sym_dev.host_id = SYM_SETUP_HOST_ID;
+	if (sym53c8xx_pci_init(pdev, &sym_dev))
+		return -ENODEV;
+	printk(KERN_INFO "%s: 53c%s detected\n", sym_name(&sym_dev), sym_dev.chip.name);
+
+	sym_dev.nvram = &nvram;
+	nvram.type = 0;
+#if SYM_CONF_NVRAM_SUPPORT
+	sym_get_nvram(&sym_dev, &nvram);
+#endif
+
+	if (sym_attach(&sym2_template, attach_count, &sym_dev))
+		return -ENODEV;
+
+	attach_count++;
+	return 0;
+}
+
+static void __devexit sym2_remove(struct pci_dev *pdev)
+{
+	sym_detach(pci_get_drvdata(pdev));
+	attach_count--;
+}
+
+static struct pci_device_id sym2_id_table[] __devinitdata = {
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C810,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C820,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL }, /* new */
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C825,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C815,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_53C810AP,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL }, /* new */
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C860,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_53C1510,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C896,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C895,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C885,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C875,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C1510,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL }, /* new */
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_53C895A,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_53C875A,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_53C1010_33,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_53C1010_66,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_NCR_53C875J,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+};
+
+MODULE_DEVICE_TABLE(pci, sym2_id_table);
+
+static struct pci_driver sym2_driver = {
+	.name		= NAME53C8XX,
+	.id_table	= sym2_id_table,
+	.probe		= sym2_probe,
+	.remove		= __devexit_p(sym2_remove),
+};
+
+static int __init sym2_init(void)
+{
+#ifdef _SYM_CONF_PQS_PDS_SUPPORT
+	pci_register_driver(&pqs_driver);
+#endif
+	pci_register_driver(&sym2_driver);
+	return 0;
+}
+
+static void __exit sym2_exit(void)
+{
+	pci_unregister_driver(&sym2_driver);
+#ifdef _SYM_CONF_PQS_PDS_SUPPORT
+	pci_unregister_driver(&pqs_driver);
+#endif
+}
+
+module_init(sym2_init);
+module_exit(sym2_exit);
