@@ -42,9 +42,14 @@
    discard it in modules) */
 #define __init		__attribute__ ((__section__ (".init.text")))
 #define __initdata	__attribute__ ((__section__ (".init.data")))
-#define __exit		__attribute__ ((__section__(".exit.text")))
 #define __exitdata	__attribute__ ((__section__(".exit.data")))
 #define __exit_call	__attribute__ ((unused,__section__ (".exitcall.exit")))
+
+#ifdef MODULE
+#define __exit		__attribute__ ((__section__(".exit.text")))
+#else
+#define __exit		__attribute__ ((unused,__section__(".exit.text")))
+#endif
 
 /* For assembly routines */
 #define __INIT		.section	".init.text","ax"
@@ -183,6 +188,12 @@ extern struct kernel_param __setup_start, __setup_end;
 #define __devexit_p(x) x
 #else
 #define __devexit_p(x) NULL
+#endif
+
+#ifdef MODULE
+#define __exit_p(x) x
+#else
+#define __exit_p(x) NULL
 #endif
 
 #endif /* _LINUX_INIT_H */
