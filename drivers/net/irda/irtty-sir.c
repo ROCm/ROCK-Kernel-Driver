@@ -504,10 +504,7 @@ static int irtty_open(struct tty_struct *tty)
 	struct sirtty_cb *priv;
 	int ret = 0;
 
-	/* unfortunately, there's no tty_ldisc->owner field
-	 * so there is some window for SMP race with rmmod
-	 */
-	MOD_INC_USE_COUNT;
+	/* Module stuff handled via irda_ldisc.owner - Jean II */
 
 	/* First make sure we're not already connected. */
 	if (tty->disc_data != NULL) {
@@ -569,7 +566,6 @@ static int irtty_open(struct tty_struct *tty)
 out_put:
 	sirdev_put_instance(dev);
 out:
-	MOD_DEC_USE_COUNT;
 	return ret;
 }
 
@@ -614,8 +610,6 @@ static void irtty_close(struct tty_struct *tty)
 		tty->driver->stop(tty);
 
 	kfree(priv);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------- */
@@ -633,6 +627,7 @@ static struct tty_ldisc irda_ldisc = {
 	.receive_buf	= irtty_receive_buf,
 	.receive_room	= irtty_receive_room,
 	.write_wakeup	= irtty_write_wakeup,
+	.owner		= THIS_MODULE,
 };
 
 /* ------------------------------------------------------- */
