@@ -1,5 +1,5 @@
-#ifndef _ARCH_SPARC64_LOCAL_H
-#define _ARCH_SPARC64_LOCAL_H
+#ifndef _ALPHA_LOCAL_H
+#define _ALPHA_LOCAL_H
 
 #include <linux/percpu.h>
 #include <asm/atomic.h>
@@ -37,4 +37,4 @@ typedef atomic64_t local_t;
 #define __cpu_local_add(i, v)	__local_add((i), &__get_cpu_var(v))
 #define __cpu_local_sub(i, v)	__local_sub((i), &__get_cpu_var(v))
 
-#endif /* _ARCH_SPARC64_LOCAL_H */
+#endif /* _ALPHA_LOCAL_H */
