@@ -4,13 +4,9 @@
 #include <linux/compiler-gcc.h>
 
 #if __GNUC_MINOR__ >= 1
-# define inline		__inline__ __attribute__((always_inline))
-# define __inline__	__inline__ __attribute__((always_inline))
-# define __inline	__inline__ __attribute__((always_inline))
-#endif
-
-#if __GNUC_MINOR__ >= 1
-# define __always_inline inline __attribute__((always_inline))
+# define inline		inline		__attribute__((always_inline))
+# define __inline__	__inline__	__attribute__((always_inline))
+# define __inline	__inline	__attribute__((always_inline))
 #endif
 
 #if __GNUC_MINOR__ > 0
