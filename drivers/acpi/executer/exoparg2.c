@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg2 - AML execution - opcodes with 2 arguments
- *              $Revision: 113 $
+ *              $Revision: 114 $
  *
  *****************************************************************************/
 
@@ -490,7 +490,9 @@ store_result_to_target:
 			goto cleanup;
 		}
 
-		walk_state->result_obj = return_desc;
+		if (!walk_state->result_obj) {
+			walk_state->result_obj = return_desc;
+		}
 	}
 
 

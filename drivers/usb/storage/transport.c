@@ -562,12 +562,6 @@ int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
 			value, index, data, size);
 	US_DEBUGP("usb_stor_control_msg returned %d\n", result);
 
-	/* did we abort this command? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		US_DEBUGP("-- transfer aborted\n");
-		return USB_STOR_XFER_ABORTED;
-	}
-
 	/* a stall indicates a protocol error */
 	if (result == -EPIPE) {
 		US_DEBUGP("-- stall on control pipe\n");
@@ -624,12 +618,6 @@ int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
 		return USB_STOR_XFER_STALLED;
 	}
 
-	/* did we abort this command? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		US_DEBUGP("-- transfer aborted\n");
-		return USB_STOR_XFER_ABORTED;
-	}
-
 	/* NAK - that means we've retried a few times already */
 	if (result == -ETIMEDOUT) {
 		US_DEBUGP("-- device NAKed\n");
@@ -669,7 +657,7 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 
 	/* initialize the scatter-gather request block */
 	US_DEBUGP("usb_stor_bulk_transfer_sglist(): xfer %d bytes, "
-			"%d entires\n", length, num_sg);
+			"%d entries\n", length, num_sg);
 	result = usb_sg_init(us->current_sg, us->pusb_dev, pipe, 0,
 			sg, num_sg, length, SLAB_NOIO);
 	if (result) {
@@ -691,26 +679,27 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 		}
 	}
 
+	/* wait for the completion of the transfer */
 	usb_sg_wait(us->current_sg);
 	clear_bit(US_FLIDX_CANCEL_SG, &us->flags);
 
 	result = us->current_sg->status;
 	partial = us->current_sg->bytes;
-	US_DEBUGP("usb_sg_wait() returned %d xferrerd %d/%d\n",
+	US_DEBUGP("usb_sg_wait() returned %d xferred %d/%d\n",
 			result, partial, length);
 	if (act_len)
 		*act_len = partial;
 
 	/* if we stall, we need to clear it before we go on */
 	if (result == -EPIPE) {
-		US_DEBUGP("clearing endpoint halt for pipe 0x%x,"
+		US_DEBUGP("clearing endpoint halt for pipe 0x%x, "
 				"stalled at %d bytes\n", pipe, partial);
 		if (usb_stor_clear_halt(us, pipe) < 0)
 			return USB_STOR_XFER_ERROR;
 		return USB_STOR_XFER_STALLED;
 	}
 
-	/* NAK - that means we've tried this a few times already */
+	/* NAK - that means we've retried this a few times already */
 	if (result == -ETIMEDOUT) {
 		US_DEBUGP("-- device NAKed\n");
 		return USB_STOR_XFER_ERROR;
@@ -738,10 +727,10 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
  * Transfer an entire SCSI command's worth of data payload over the bulk
  * pipe.
  *
- * Nore that this uses the usb_stor_bulk_transfer_buf() and
+ * Nore that this uses usb_stor_bulk_transfer_buf() and
  * usb_stor_bulk_transfer_sglist() to achieve its goals --
  * this function simply determines whether we're going to use
- * scatter-gather or not, and acts apropriately.
+ * scatter-gather or not, and acts appropriately.
  */
 int usb_stor_bulk_transfer_sg(struct us_data* us, unsigned int pipe,
 		char *buf, unsigned int length_left, int use_sg, int *residual)
@@ -1116,15 +1105,6 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	if (result != USB_STOR_XFER_GOOD) {
 		/* Reset flag for status notification */
 		clear_bit(US_FLIDX_IP_WANTED, &us->flags);
-	}
-
-	/* did we abort this command? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		US_DEBUGP("usb_stor_control_msg(): transfer aborted\n");
-		return USB_STOR_TRANSPORT_ABORTED;
-	}
-
-	if (result != USB_STOR_XFER_GOOD) {
 		/* Uh oh... serious problem here */
 		return USB_STOR_TRANSPORT_ERROR;
 	}
@@ -1137,12 +1117,6 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
 					transfer_length);
 		US_DEBUGP("CBI data stage result is 0x%x\n", result);
-
-		/* report any errors */
-		if (result == USB_STOR_XFER_ABORTED) {
-			clear_bit(US_FLIDX_IP_WANTED, &us->flags);
-			return USB_STOR_TRANSPORT_ABORTED;
-		}
 		if (result == USB_STOR_XFER_ERROR) {
 			clear_bit(US_FLIDX_IP_WANTED, &us->flags);
 			return USB_STOR_TRANSPORT_ERROR;
@@ -1157,7 +1131,7 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* has the current command been aborted? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		US_DEBUGP("CBI interrupt aborted\n");
-		return USB_STOR_TRANSPORT_ABORTED;
+		return USB_STOR_TRANSPORT_ERROR;
 	}
 
 	US_DEBUGP("Got interrupt data (0x%x, 0x%x)\n", 
@@ -1222,13 +1196,6 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* check the return code for the command */
 	US_DEBUGP("Call to usb_stor_ctrl_transfer() returned %d\n", result);
-
-	/* did we abort this command? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		US_DEBUGP("usb_stor_CB_transport(): transfer aborted\n");
-		return USB_STOR_TRANSPORT_ABORTED;
-	}
-
 	if (result != USB_STOR_XFER_GOOD) {
 		/* Uh oh... serious problem here */
 		return USB_STOR_TRANSPORT_ERROR;
@@ -1242,14 +1209,8 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
 					transfer_length);
 		US_DEBUGP("CB data stage result is 0x%x\n", result);
-
-		/* report any errors */
-		if (result == USB_STOR_XFER_ABORTED) {
-			return USB_STOR_TRANSPORT_ABORTED;
-		}
-		if (result == USB_STOR_XFER_ERROR) {
+		if (result == USB_STOR_XFER_ERROR)
 			return USB_STOR_TRANSPORT_ERROR;
-		}
 	}
 
 	/* STATUS STAGE */
@@ -1319,12 +1280,6 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
 				(char *) &bcb, US_BULK_CB_WRAP_LEN, NULL);
 	US_DEBUGP("Bulk command transfer result=%d\n", result);
-
-	/* did we abort this command? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-		return USB_STOR_TRANSPORT_ABORTED;
-	}
 	if (result != USB_STOR_XFER_GOOD)
 		return USB_STOR_TRANSPORT_ERROR;
 
@@ -1336,10 +1291,6 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
 					transfer_length);
 		US_DEBUGP("Bulk data transfer result 0x%x\n", result);
-
-		/* if it was aborted, we need to indicate that */
-		if (result == USB_STOR_XFER_ABORTED)
-			return USB_STOR_TRANSPORT_ABORTED;
 		if (result == USB_STOR_XFER_ERROR)
 			return USB_STOR_TRANSPORT_ERROR;
 	}
@@ -1353,12 +1304,6 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
 				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
 
-	/* did we abort this command? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-		return USB_STOR_TRANSPORT_ABORTED;
-	}
-
 	/* did the attempt to read the CSW fail? */
 	if (result == USB_STOR_XFER_STALLED) {
 
@@ -1366,12 +1311,6 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("Attempting to get CSW (2nd try)...\n");
 		result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
 				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
-
-		/* did we abort this command? */
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-			US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-			return USB_STOR_TRANSPORT_ABORTED;
-		}
 	}
 
 	/* if we still have a failure at this point, we're in trouble */

@@ -424,6 +424,7 @@ static void snd_mtpav_output_timer(unsigned long data)
 /* spinlock held! */
 static void snd_mtpav_add_output_timer(mtpav_t *chip)
 {
+	init_timer(&chip->timer);
 	chip->timer.function = snd_mtpav_output_timer;
 	chip->timer.data = (unsigned long) mtp_card;
 	chip->timer.expires = 1 + jiffies;

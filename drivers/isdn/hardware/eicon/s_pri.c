@@ -228,7 +228,7 @@ dsp_check_presence (volatile byte* addr, volatile byte* data, int dsp)
 static dword
 diva_pri_detect_dsps (PISDN_ADAPTER IoAdapter)
 {
-//  byte* base = a->resources.pci.addr[2];
+  /* byte* base = a->resources.pci.addr[2]; */
   byte* base = IoAdapter->reset - MP_RESET ;
   dword ret = 0, DspCount = 0 ;
   dword row_offset[] = {
@@ -242,12 +242,12 @@ diva_pri_detect_dsps (PISDN_ADAPTER IoAdapter)
   byte *dsp_addr_port, *dsp_data_port, row_state;
   int dsp_row = 0, dsp_index, dsp_num;
  IoAdapter->InitialDspInfo &= 0xffff ;
-//  if (!base || !a->xdi_adapter.reset)
+ /* if (!base || !a->xdi_adapter.reset) */
   if (!base || !IoAdapter->reset)
   {
     return (0);
   }
-//  *(volatile byte*)(a->xdi_adapter.reset) = _MP_RISC_RESET | _MP_DSP_RESET;
+  /* *(volatile byte*)(a->xdi_adapter.reset) = _MP_RISC_RESET | _MP_DSP_RESET; */
   *(volatile byte*)(IoAdapter->reset) = _MP_RISC_RESET | _MP_DSP_RESET;
   diva_os_wait (5) ;
   for (dsp_num = 0; dsp_num < 30; dsp_num++) {
@@ -264,7 +264,7 @@ diva_pri_detect_dsps (PISDN_ADAPTER IoAdapter)
    DspCount++ ;
     }
   }
-//  *(volatile byte*)(a->xdi_adapter.reset) = _MP_RISC_RESET | _MP_LED1 | _MP_LED2;
+  /* *(volatile byte*)(a->xdi_adapter.reset) = _MP_RISC_RESET | _MP_LED1 | _MP_LED2; */
   *(volatile byte*)(IoAdapter->reset) = _MP_RISC_RESET | _MP_LED1 | _MP_LED2;
   diva_os_wait (50) ;
   /*

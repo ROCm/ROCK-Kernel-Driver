@@ -361,8 +361,6 @@ helper_cmp(const struct ip_nat_helper *helper,
 	return ip_ct_tuple_mask_cmp(tuple, &helper->tuple, &helper->mask);
 }
 
-#define MODULE_MAX_NAMELEN		32
-
 int ip_nat_helper_register(struct ip_nat_helper *me)
 {
 	int ret = 0;
@@ -374,14 +372,13 @@ int ip_nat_helper_register(struct ip_nat_helper *me)
 		    && ct_helper->me) {
 			__MOD_INC_USE_COUNT(ct_helper->me);
 		} else {
-
 			/* We are a NAT helper for protocol X.  If we need
 			 * respective conntrack helper for protoccol X, compute
 			 * conntrack helper name and try to load module */
-			char name[MODULE_MAX_NAMELEN];
-			const char *tmp = me->me->name;
+			char name[MODULE_NAME_LEN];
+			const char *tmp = module_name(me->me);
 			
-			if (strlen(tmp) + 6 > MODULE_MAX_NAMELEN) {
+			if (strlen(tmp) + 6 > MODULE_NAME_LEN) {
 				printk("%s: unable to "
 				       "compute conntrack helper name "
 				       "from %s\n", __FUNCTION__, tmp);
@@ -466,9 +463,12 @@ void ip_nat_helper_unregister(struct ip_nat_helper *me)
 		if ((ct_helper = ip_ct_find_helper(&me->tuple))
 		    && ct_helper->me) {
 			__MOD_DEC_USE_COUNT(ct_helper->me);
-		} else 
+		}
+#ifdef CONFIG_MODULES
+		else 
 			printk("%s: unable to decrement usage count"
 			       " of conntrack helper %s\n",
 			       __FUNCTION__, me->me->name);
+#endif
 	}
 }

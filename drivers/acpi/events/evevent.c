@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evevent - Fixed and General Purpose Even handling and dispatch
- *              $Revision: 95 $
+ *              $Revision: 96 $
  *
  *****************************************************************************/
 
@@ -503,9 +503,9 @@ acpi_ev_gpe_initialize (void)
 
 			ACPI_REPORT_INFO (("GPE Block%d defined as GPE%d to GPE%d\n",
 				(s32) gpe_block,
-				acpi_gbl_gpe_block_info[gpe_block].block_base_number,
-				acpi_gbl_gpe_block_info[gpe_block].block_base_number +
-					((acpi_gbl_gpe_block_info[gpe_block].register_count * 8) -1)));
+				(u32) acpi_gbl_gpe_block_info[gpe_block].block_base_number,
+				(u32) (acpi_gbl_gpe_block_info[gpe_block].block_base_number +
+					((acpi_gbl_gpe_block_info[gpe_block].register_count * 8) -1))));
 		}
 	}
 

@@ -1199,23 +1199,22 @@ vicam_video_init(struct video_device *vdev)
 }
 
 static struct file_operations vicam_fops = {
-	.owner =  THIS_MODULE,
-	.open =   vicam_open,
-	.release =vicam_close,
-	.read =   vicam_read,
-	.mmap =   vicam_mmap,
-	.ioctl =  vicam_ioctl,
-	.llseek = no_llseek,
+	.owner		= THIS_MODULE,
+	.open		= vicam_open,
+	.release	= vicam_close,
+	.read		= vicam_read,
+	.mmap		= vicam_mmap,
+	.ioctl		= vicam_ioctl,
+	.llseek		= no_llseek,
 };
 
 static struct video_device vicam_template = {
-	.owner = THIS_MODULE,
-	.name = "ViCam-based USB Camera",
-	.type = VID_TYPE_CAPTURE,
-	.hardware = VID_HARDWARE_VICAM,
-	.fops = &vicam_fops,
-//	.initialize = vicam_video_init,
-	.minor = -1,
+	.owner 		= THIS_MODULE,
+	.name 		= "ViCam-based USB Camera",
+	.type 		= VID_TYPE_CAPTURE,
+	.hardware 	= VID_HARDWARE_VICAM,
+	.fops 		= &vicam_fops,
+	.minor 		= -1,
 };
 
 /* table of devices that work with this driver */
@@ -1227,10 +1226,10 @@ static struct usb_device_id vicam_table[] = {
 MODULE_DEVICE_TABLE(usb, vicam_table);
 
 static struct usb_driver vicam_driver = {
-	name:"vicam",
-	probe:vicam_probe,
-	disconnect:vicam_disconnect,
-	id_table:vicam_table
+	.name		= "vicam",
+	.probe		= vicam_probe,
+	.disconnect	= vicam_disconnect,
+	.id_table	= vicam_table
 };
 
 /**

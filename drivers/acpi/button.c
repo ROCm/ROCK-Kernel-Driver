@@ -141,12 +141,6 @@ acpi_button_add_fs (
 
 	button = acpi_driver_data(device);
 
-	if (!acpi_button_dir) {
-		acpi_button_dir = proc_mkdir(ACPI_BUTTON_CLASS, acpi_root_dir);
-		if (!acpi_button_dir)
-			return_VALUE(-ENODEV);
-	}
-
 	switch (button->type) {
 	case ACPI_BUTTON_TYPE_POWER:
 	case ACPI_BUTTON_TYPE_POWERF:
@@ -189,9 +183,6 @@ acpi_button_remove_fs (
 	struct acpi_device	*device)
 {
 	ACPI_FUNCTION_TRACE("acpi_button_remove_fs");
-
-	if (!acpi_button_dir)
-		return_VALUE(-ENODEV);
 
 	if (acpi_device_dir(device))
 		remove_proc_entry(acpi_device_bid(device), acpi_button_dir);
@@ -446,9 +437,15 @@ acpi_button_init (void)
 
 	ACPI_FUNCTION_TRACE("acpi_button_init");
 
-	result = acpi_bus_register_driver(&acpi_button_driver);
-	if (result < 0)
+	acpi_button_dir = proc_mkdir(ACPI_BUTTON_CLASS, acpi_root_dir);
+	if (!acpi_button_dir)
 		return_VALUE(-ENODEV);
+
+	result = acpi_bus_register_driver(&acpi_button_driver);
+	if (result < 0) {
+		remove_proc_entry(ACPI_BUTTON_CLASS, acpi_root_dir);
+		return_VALUE(-ENODEV);
+	}
 
 	return_VALUE(0);
 }
@@ -460,6 +457,8 @@ acpi_button_exit (void)
 	ACPI_FUNCTION_TRACE("acpi_button_exit");
 
 	acpi_bus_unregister_driver(&acpi_button_driver);
+
+	remove_proc_entry(ACPI_BUTTON_CLASS, acpi_root_dir);
 
 	return_VOID;
 }

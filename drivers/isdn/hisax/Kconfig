@@ -1,10 +1,9 @@
 
 menu "Passive cards"
-	depends on NET && ISDN_BOOL && ISDN!=n
+	depends on ISDN
 
 config ISDN_DRV_HISAX
 	tristate "HiSax SiemensChipSet driver support"
-	depends on ISDN
 	---help---
 	  This is a driver supporting the Siemens chipset on various
 	  ISDN-cards (like AVM A1, Elsa ISDN cards, Teles S0-16.0, Teles
@@ -17,12 +16,12 @@ config ISDN_DRV_HISAX
 	  also to the configuration option of the driver for your particular
 	  card, below.
 
+if ISDN_DRV_HISAX!=n
+
 comment "D-channel protocol features"
-	depends on ISDN_DRV_HISAX
 
 config HISAX_EURO
 	bool "HiSax Support for EURO/DSS1"
-	depends on ISDN_DRV_HISAX
 	help
 	  Say Y or N according to the D-channel protocol which your local
 	  telephone service company provides.
@@ -64,7 +63,6 @@ config HISAX_NO_KEYPAD
 
 config HISAX_1TR6
 	bool "HiSax Support for german 1TR6"
-	depends on ISDN_DRV_HISAX
 	help
 	  Say Y or N according to the D-channel protocol which your local
 	  telephone service company provides.
@@ -75,25 +73,22 @@ config HISAX_1TR6
 
 config HISAX_NI1
 	bool "HiSax Support for US NI1"
-	depends on ISDN_DRV_HISAX
 	help
 	  Enable this if you like to use ISDN in US on a NI1 basic rate
 	  interface.
 
 config HISAX_MAX_CARDS
 	int "Maximum number of cards supported by HiSax"
-	depends on ISDN_DRV_HISAX
 	default "8"
 	help
 	  This option allows you to specify the maximum number of cards which
 	  the HiSax driver will be able to handle.  
 
 comment "HiSax supported cards"
-	depends on ISDN_DRV_HISAX
 
 config HISAX_16_0
 	bool "Teles 16.0/8.0"
-	depends on ISDN_DRV_HISAX && ISA
+	depends on ISA
 	help
 	  This enables HiSax support for the Teles ISDN-cards S0-16.0, S0-8
 	  and many compatibles.
@@ -104,7 +99,6 @@ config HISAX_16_0
 
 config HISAX_16_3
 	bool "Teles 16.3 or PNP or PCMCIA"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the Teles ISDN-cards S0-16.3 the
 	  Teles/Creatix PnP and the Teles PCMCIA.
@@ -115,14 +109,12 @@ config HISAX_16_3
 
 config HISAX_TELESPCI
 	bool "Teles PCI"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the Teles PCI.
 	  See <file:Documentation/isdn/README.HiSax> on how to configure it.
 
 config HISAX_S0BOX
 	bool "Teles S0Box"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the Teles/Creatix parallel port
 	  S0BOX.  See <file:Documentation/isdn/README.HiSax> on how to
@@ -130,7 +122,7 @@ config HISAX_S0BOX
 
 config HISAX_AVM_A1
 	bool "AVM A1 (Fritz)"
-	depends on ISDN_DRV_HISAX && ISA
+	depends on ISA
 	help
 	  This enables HiSax support for the AVM A1 (aka "Fritz").
 
@@ -140,21 +132,18 @@ config HISAX_AVM_A1
 
 config HISAX_FRITZPCI
 	bool "AVM PnP/PCI (Fritz!PnP/PCI)"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the AVM "Fritz!PnP" and "Fritz!PCI".
 	  See <file:Documentation/isdn/README.HiSax> on how to configure it.
 
 config HISAX_AVM_A1_PCMCIA
 	bool "AVM A1 PCMCIA (Fritz)"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the AVM A1 "Fritz!PCMCIA").
 	  See <file:Documentation/isdn/README.HiSax> on how to configure it.
 
 config HISAX_ELSA
 	bool "Elsa cards"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the Elsa Mircolink ISA cards, for the
 	  Elsa Quickstep series cards and Elsa PCMCIA.
@@ -165,7 +154,7 @@ config HISAX_ELSA
 
 config HISAX_IX1MICROR2
 	bool "ITK ix1-micro Revision 2"
-	depends on ISDN_DRV_HISAX && ISA
+	depends on ISA
 	help
 	  This enables HiSax support for the ITK ix1-micro Revision 2 card.
 
@@ -175,7 +164,6 @@ config HISAX_IX1MICROR2
 
 config HISAX_DIEHLDIVA
 	bool "Eicon.Diehl Diva cards"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the Eicon.Diehl Diva none PRO
 	  versions passive ISDN cards.
@@ -186,7 +174,7 @@ config HISAX_DIEHLDIVA
 
 config HISAX_ASUSCOM
 	bool "ASUSCOM ISA cards"
-	depends on ISDN_DRV_HISAX && ISA
+	depends on ISA
 	help
 	  This enables HiSax support for the AsusCom and their OEM versions
 	  passive ISDN ISA cards.
@@ -197,7 +185,7 @@ config HISAX_ASUSCOM
 
 config HISAX_TELEINT
 	bool "TELEINT cards"
-	depends on ISDN_DRV_HISAX && ISA
+	depends on ISA
 	help
 	  This enables HiSax support for the TELEINT SA1 semiactiv ISDN card.
 
@@ -207,7 +195,7 @@ config HISAX_TELEINT
 
 config HISAX_HFCS
 	bool "HFC-S based cards"
-	depends on ISDN_DRV_HISAX && ISA
+	depends on ISA
 	help
 	  This enables HiSax support for the HFC-S 2BDS0 based cards, like
 	  teles 16.3c.
@@ -218,7 +206,6 @@ config HISAX_HFCS
 
 config HISAX_SEDLBAUER
 	bool "Sedlbauer cards"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the Sedlbauer passive ISDN cards.
 
@@ -228,7 +215,7 @@ config HISAX_SEDLBAUER
 
 config HISAX_SPORTSTER
 	bool "USR Sportster internal TA"
-	depends on ISDN_DRV_HISAX && ISA
+	depends on ISA
 	help
 	  This enables HiSax support for the USR Sportster internal TA card.
 
@@ -238,7 +225,7 @@ config HISAX_SPORTSTER
 
 config HISAX_MIC
 	bool "MIC card"
-	depends on ISDN_DRV_HISAX && ISA
+	depends on ISA
 	help
 	  This enables HiSax support for the ITH MIC card.
 
@@ -248,7 +235,6 @@ config HISAX_MIC
 
 config HISAX_NETJET
 	bool "NETjet card"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the NetJet from Traverse
 	  Technologies.
@@ -259,7 +245,6 @@ config HISAX_NETJET
 
 config HISAX_NETJET_U
 	bool "NETspider U card"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the Netspider U interface ISDN card
 	  from Traverse Technologies.
@@ -269,7 +254,6 @@ config HISAX_NETJET_U
 
 config HISAX_NICCY
 	bool "Niccy PnP/PCI card"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the Dr. Neuhaus Niccy PnP or PCI.
 
@@ -279,7 +263,7 @@ config HISAX_NICCY
 
 config HISAX_ISURF
 	bool "Siemens I-Surf card"
-	depends on ISDN_DRV_HISAX && ISA
+	depends on ISA
 	help
 	  This enables HiSax support for the Siemens I-Talk/I-Surf card with
 	  ISAR chip.
@@ -289,7 +273,7 @@ config HISAX_ISURF
 
 config HISAX_HSTSAPHIR
 	bool "HST Saphir card"
-	depends on ISDN_DRV_HISAX && ISA
+	depends on ISA
 	help
 	  This enables HiSax support for the HST Saphir card.
 
@@ -299,7 +283,6 @@ config HISAX_HSTSAPHIR
 
 config HISAX_BKM_A4T
 	bool "Telekom A4T card"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the Telekom A4T card.
 
@@ -309,7 +292,6 @@ config HISAX_BKM_A4T
 
 config HISAX_SCT_QUADRO
 	bool "Scitel Quadro card"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the Scitel Quadro card.
 
@@ -319,7 +301,6 @@ config HISAX_SCT_QUADRO
 
 config HISAX_GAZEL
 	bool "Gazel cards"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the Gazel cards.
 
@@ -329,7 +310,6 @@ config HISAX_GAZEL
 
 config HISAX_HFC_PCI
 	bool "HFC PCI-Bus cards"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the HFC-S PCI 2BDS0 based cards.
 
@@ -338,7 +318,6 @@ config HISAX_HFC_PCI
 
 config HISAX_W6692
 	bool "Winbond W6692 based cards"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for Winbond W6692 based PCI ISDN cards.
 
@@ -348,26 +327,32 @@ config HISAX_W6692
 
 config HISAX_HFC_SX
 	bool "HFC-S+, HFC-SP, HFC-PCMCIA cards"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables HiSax support for the HFC-S+, HFC-SP and HFC-PCMCIA
 	  cards. This code is not finished yet.
 
 #      bool '  TESTEMULATOR (EXPERIMENTAL)' CONFIG_HISAX_TESTEMU
+
 config HISAX_ENTERNOW_PCI
 	bool "Formula-n enter:now PCI card (EXPERIMENTAL)"
-	depends on ISDN_DRV_HISAX && EXPERIMENTAL
+	depends on EXPERIMENTAL
+	help
+	  This enables HiSax support for the Formula-n enter:now PCI
+	  ISDN card.
 
 config HISAX_AMD7930
 	bool "Am7930 (EXPERIMENTAL)"
-	depends on ISDN_DRV_HISAX && EXPERIMENTAL && (SPARC32 || SPARC64)
+	depends on EXPERIMENTAL && (SPARC32 || SPARC64)
 	help
 	  This enables HiSax support for the AMD7930 chips on some SPARCs.
 	  This code is not finished yet.
 
+endif
+
+if ISDN_DRV_HISAX
+
 config HISAX_DEBUG
 	bool "HiSax debugging"
-	depends on ISDN_DRV_HISAX
 	help
 	  This enables debugging code in the new-style HiSax drivers, i.e.
 	  the ST5481 USB driver currently. 
@@ -375,51 +360,55 @@ config HISAX_DEBUG
 
 config HISAX_SEDLBAUER_CS
 	tristate "Sedlbauer PCMCIA cards"
-	depends on ISDN_DRV_HISAX && PCMCIA
+	depends on PCMCIA
 	help
 	  This enables the PCMCIA client driver for the Sedlbauer Speed Star
 	  and Speed Star II cards.
 
 config HISAX_ELSA_CS
 	tristate "ELSA PCMCIA MicroLink cards"
-	depends on ISDN_DRV_HISAX && PCMCIA
+	depends on PCMCIA
 	help
 	  This enables the PCMCIA client driver for the Elsa PCMCIA MicroLink
 	  card.
 
 config HISAX_AVM_A1_CS
 	tristate "AVM A1 PCMCIA cards"
-	depends on ISDN_DRV_HISAX && PCMCIA
+	depends on PCMCIA
 	help
 	  This enables the PCMCIA client driver for the AVM A1 / Fritz!Card
 	  PCMCIA cards.
 
 config HISAX_ST5481
 	tristate "ST5481 USB ISDN modem (EXPERIMENTAL)"
-	depends on ISDN_DRV_HISAX && USB && EXPERIMENTAL
+	depends on USB && EXPERIMENTAL
 	help
 	  This enables the driver for ST5481 based USB ISDN adapters,
 	  e.g. the BeWan Gazel 128 USB
 
 config HISAX_FRITZ_PCIPNP
 	tristate "AVM Fritz!Card PCI/PCIv2/PnP support (EXPERIMENTAL)"
-	depends on ISDN_DRV_HISAX && EXPERIMENTAL
+	depends on EXPERIMENTAL
 	help
-	  This enables the driver for the AVM Fritz!Card PCI, Fritz!Card PCI v2 
-	  and Fritz!Card PnP.
+	  This enables the driver for the AVM Fritz!Card PCI,
+	  Fritz!Card PCI v2 and Fritz!Card PnP.
 	  (the latter also needs you to select "ISA Plug and Play support"
 	  from the menu "Plug and Play configuration")
 
 config HISAX_FRITZ_CLASSIC
 	tristate "AVM Fritz!Card classic support (EXPERIMENTAL)"
-	depends on ISDN_DRV_HISAX && EXPERIMENTAL
+	depends on EXPERIMENTAL
 	help
 	  This enables the driver for the AVM Fritz!Card classic, formerly
 	  known as AVM A1.
 
 config HISAX_HFCPCI
 	tristate "HFC PCI support (EXPERIMENTAL)"
-	depends on ISDN_DRV_HISAX && EXPERIMENTAL
+	depends on EXPERIMENTAL
+	help
+	  This enables the driver for CCD HFC PCI based cards.
+
+endif
 
 endmenu
 

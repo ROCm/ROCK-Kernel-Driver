@@ -44,15 +44,17 @@ search_exception_table(unsigned long addr)
 	return ret;
 #else
 	unsigned long flags;
-	/* The kernel is the last "module" -- no need to treat it special.  */
-	struct module *mp;
+	struct list_head *i;
 
+	/* The kernel is the last "module" -- no need to treat it special.  */
 	spin_lock_irqsave(&modlist_lock, flags);
-	for (mp = module_list; mp != NULL; mp = mp->next) {
-		if (mp->ex_table_start == NULL || !(mp->flags&(MOD_RUNNING|MOD_INITIALIZING)))
+	list_for_each(i, &extables) {
+		struct exception_table *ex
+			= list_entry(i, struct exception_table, list);
+		if (ex->num_entries == 0)
 			continue;
-		ret = search_one_table(mp->ex_table_start,
-				       mp->ex_table_end - 1, addr);
+		ret = search_one_table(ex->entry,
+				       ex->entry + ex->num_entries - 1, addr);
 		if (ret)
 			break;
 	}

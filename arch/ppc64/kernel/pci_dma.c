@@ -60,11 +60,11 @@ extern struct list_head iSeries_Global_Device_List;
 struct TceTable   virtBusVethTceTable;	/* Tce table for virtual ethernet */
 struct TceTable   virtBusVioTceTable;	/* Tce table for virtual I/O */
 
-struct iSeries_Device_Node iSeries_veth_dev_node = { LogicalSlot: 0xFF, DevTceTable: &virtBusVethTceTable };
-struct iSeries_Device_Node iSeries_vio_dev_node  = { LogicalSlot: 0xFF, DevTceTable: &virtBusVioTceTable };
+struct iSeries_Device_Node iSeries_veth_dev_node = { .LogicalSlot = 0xFF, .DevTceTable = &virtBusVethTceTable };
+struct iSeries_Device_Node iSeries_vio_dev_node  = { .LogicalSlot = 0xFF, .DevTceTable = &virtBusVioTceTable };
 
-struct pci_dev    iSeries_veth_dev_st = { sysdata: &iSeries_veth_dev_node };
-struct pci_dev    iSeries_vio_dev_st  = { sysdata: &iSeries_vio_dev_node  };
+struct pci_dev    iSeries_veth_dev_st = { .sysdata = &iSeries_veth_dev_node };
+struct pci_dev    iSeries_vio_dev_st  = { .sysdata = &iSeries_vio_dev_node  };
 
 struct pci_dev  * iSeries_veth_dev = &iSeries_veth_dev_st;
 struct pci_dev  * iSeries_vio_dev  = &iSeries_vio_dev_st;

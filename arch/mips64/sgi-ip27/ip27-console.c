@@ -45,11 +45,11 @@ ip27prom_console_dev(struct console *c)
 }
 
 static struct console ip27_prom_console = {
-    name:	"prom",
-    write:	ip27prom_console_write,
-    device:	ip27prom_console_dev,
-    flags:	CON_PRINTBUFFER,
-    index:	-1,
+    .name	= "prom",
+    .write	= ip27prom_console_write,
+    .device	= ip27prom_console_dev,
+    .flags	= CON_PRINTBUFFER,
+    .index	= -1,
 };
 
 __init void ip27_setup_console(void)

@@ -1060,13 +1060,6 @@ acpi_thermal_add_fs (
 
 	ACPI_FUNCTION_TRACE("acpi_thermal_add_fs");
 
-	if (!acpi_thermal_dir) {
-		acpi_thermal_dir = proc_mkdir(ACPI_THERMAL_CLASS, 
-			acpi_root_dir);
-		if (!acpi_thermal_dir)
-			return_VALUE(-ENODEV);
-	}
-
 	if (!acpi_device_dir(device)) {
 		acpi_device_dir(device) = proc_mkdir(acpi_device_bid(device),
 			acpi_thermal_dir);
@@ -1146,9 +1139,6 @@ acpi_thermal_remove_fs (
 	struct acpi_device	*device)
 {
 	ACPI_FUNCTION_TRACE("acpi_thermal_remove_fs");
-
-	if (!acpi_thermal_dir)
-		return_VALUE(-ENODEV);
 
 	if (acpi_device_dir(device))
 		remove_proc_entry(acpi_device_bid(device), acpi_thermal_dir);
@@ -1351,9 +1341,15 @@ acpi_thermal_init (void)
 
 	ACPI_FUNCTION_TRACE("acpi_thermal_init");
 
-	result = acpi_bus_register_driver(&acpi_thermal_driver);
-	if (result < 0)
+	acpi_thermal_dir = proc_mkdir(ACPI_THERMAL_CLASS, acpi_root_dir);
+	if (!acpi_thermal_dir)
 		return_VALUE(-ENODEV);
+
+	result = acpi_bus_register_driver(&acpi_thermal_driver);
+	if (result < 0) {
+		remove_proc_entry(ACPI_THERMAL_CLASS, acpi_root_dir);
+		return_VALUE(-ENODEV);
+	}
 
 	return_VALUE(0);
 }
@@ -1362,13 +1358,11 @@ acpi_thermal_init (void)
 static void __exit
 acpi_thermal_exit (void)
 {
-	int			result = 0;
-
 	ACPI_FUNCTION_TRACE("acpi_thermal_exit");
 
-	result = acpi_bus_unregister_driver(&acpi_thermal_driver);
-	if (!result)
-		remove_proc_entry(ACPI_THERMAL_CLASS, acpi_root_dir);
+	acpi_bus_unregister_driver(&acpi_thermal_driver);
+
+	remove_proc_entry(ACPI_THERMAL_CLASS, acpi_root_dir);
 
 	return_VOID;
 }

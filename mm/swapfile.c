@@ -959,24 +959,26 @@ asmlinkage long sys_swapoff(const char * specialfile)
 {
 	struct swap_info_struct * p = NULL;
 	unsigned short *swap_map;
-	struct file *swap_file;
-	struct nameidata nd;
+	struct file *swap_file, *victim;
+	struct address_space *mapping;
 	int i, type, prev;
 	int err;
 	
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
-	err = user_path_walk(specialfile, &nd);
-	if (err)
+	victim = filp_open(specialfile, O_RDWR, 0);
+	err = PTR_ERR(victim);
+	if (IS_ERR(victim))
 		goto out;
 
+	mapping = victim->f_dentry->d_inode->i_mapping;
 	prev = -1;
 	swap_list_lock();
 	for (type = swap_list.head; type >= 0; type = swap_info[type].next) {
 		p = swap_info + type;
 		if ((p->flags & SWP_ACTIVE) == SWP_ACTIVE) {
-			if (p->swap_file->f_dentry == nd.dentry)
+			if (p->swap_file->f_dentry->d_inode->i_mapping==mapping)
 				break;
 		}
 		prev = type;
@@ -1040,7 +1042,7 @@ asmlinkage long sys_swapoff(const char * specialfile)
 	err = 0;
 
 out_dput:
-	path_release(&nd);
+	filp_close(victim, NULL);
 out:
 	return err;
 }

@@ -199,10 +199,10 @@ static ssize_t rtas_flash_write(struct file *file, const char *buffer,
 }
 
 static struct file_operations rtas_flash_operations = {
-	read:		rtas_flash_read,
-	write:		rtas_flash_write,
-	open:		rtas_flash_open,
-	release:	rtas_flash_release,
+	.read		= rtas_flash_read,
+	.write		= rtas_flash_write,
+	.open		= rtas_flash_open,
+	.release	= rtas_flash_release,
 };
 
 

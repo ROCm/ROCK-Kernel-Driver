@@ -2148,9 +2148,9 @@ idt77252_init_est(struct vc_map *vc, int pcr)
 
 	est->interval = 2;		/* XXX: make this configurable */
 	est->ewma_log = 2;		/* XXX: make this configurable */
+	init_timer(&est->timer);
 	est->timer.data = (unsigned long)vc;
 	est->timer.function = idt77252_est_timer;
-	init_timer(&est->timer);
 
 	est->timer.expires = jiffies + ((HZ / 4) << est->interval);
 	add_timer(&est->timer);
@@ -3745,9 +3745,9 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	spin_lock_init(&card->cmd_lock);
 	spin_lock_init(&card->tst_lock);
 
+	init_timer(&card->tst_timer);
 	card->tst_timer.data = (unsigned long)card;
 	card->tst_timer.function = tst_timer;
-	init_timer(&card->tst_timer);
 
 	/* Do the I/O remapping... */
 	card->membase = (unsigned long) ioremap(membase, 1024);

@@ -103,7 +103,7 @@ static int detect(struct SHT *sht)
  *
  * NOTE: There is no contention here, because we're already deregistered
  * the driver and we're doing each virtual host in turn, not in parallel
- * Synchronization: BLK, no spinlock.
+ * Synchronization: BKL, no spinlock.
  */
 static int release(struct Scsi_Host *psh)
 {

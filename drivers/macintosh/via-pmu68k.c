@@ -1040,10 +1040,10 @@ static int /*__openfirmware*/ pmu_ioctl(struct inode * inode, struct file *filp,
 }
 
 static struct file_operations pmu_device_fops = {
-	read:		pmu_read,
-	write:		pmu_write,
-	ioctl:		pmu_ioctl,
-	open:		pmu_open,
+	.read		= pmu_read,
+	.write		= pmu_write,
+	.ioctl		= pmu_ioctl,
+	.open		= pmu_open,
 };
 
 static struct miscdevice pmu_device = {

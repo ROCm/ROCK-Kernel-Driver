@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exsystem - Interface to OS services
- *              $Revision: 73 $
+ *              $Revision: 74 $
  *
  *****************************************************************************/
 
@@ -51,7 +51,7 @@
 acpi_status
 acpi_ex_system_wait_semaphore (
 	acpi_handle             semaphore,
-	u32                     timeout)
+	u16                     timeout)
 {
 	acpi_status             status;
 	acpi_status             status2;
@@ -201,12 +201,12 @@ acpi_ex_system_acquire_mutex (
 	 * Support for the _GL_ Mutex object -- go get the global lock
 	 */
 	if (obj_desc->mutex.semaphore == acpi_gbl_global_lock_semaphore) {
-		status = acpi_ev_acquire_global_lock ((u32) time_desc->integer.value);
+		status = acpi_ev_acquire_global_lock ((u16) time_desc->integer.value);
 		return_ACPI_STATUS (status);
 	}
 
 	status = acpi_ex_system_wait_semaphore (obj_desc->mutex.semaphore,
-			  (u32) time_desc->integer.value);
+			  (u16) time_desc->integer.value);
 	return_ACPI_STATUS (status);
 }
 
@@ -312,7 +312,7 @@ acpi_ex_system_wait_event (
 
 	if (obj_desc) {
 		status = acpi_ex_system_wait_semaphore (obj_desc->event.semaphore,
-				  (u32) time_desc->integer.value);
+				  (u16) time_desc->integer.value);
 	}
 
 	return_ACPI_STATUS (status);

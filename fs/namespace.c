@@ -110,7 +110,7 @@ static void attach_mnt(struct vfsmount *mnt, struct nameidata *nd)
 	mnt->mnt_parent = mntget(nd->mnt);
 	mnt->mnt_mountpoint = dget(nd->dentry);
 	list_add(&mnt->mnt_hash, mount_hashtable+hash(nd->mnt, nd->dentry));
-	list_add(&mnt->mnt_child, &nd->mnt->mnt_mounts);
+	list_add_tail(&mnt->mnt_child, &nd->mnt->mnt_mounts);
 	nd->dentry->d_mounted++;
 }
 

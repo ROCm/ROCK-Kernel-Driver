@@ -53,7 +53,7 @@ static struct aper_size_info_fixed hp_zx1_sizes[] =
 
 static struct gatt_mask hp_zx1_masks[] =
 {
-	{mask: HP_ZX1_PDIR_VALID_BIT, type: 0}
+	{.mask = HP_ZX1_PDIR_VALID_BIT, .type = 0}
 };
 
 static struct _hp_private {

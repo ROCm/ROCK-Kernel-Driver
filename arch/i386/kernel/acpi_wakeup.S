@@ -262,6 +262,48 @@ ENTRY(saved_esp)	.long	0
 
 ENTRY(saved_magic)	.long	0
 
+ENTRY(do_suspend_lowlevel)
+	cmpl $0,4(%esp)
+	jne .L1432
+	call save_processor_state
+
+	movl %esp, saved_context_esp
+	movl %eax, saved_context_eax
+	movl %ebx, saved_context_ebx
+	movl %ecx, saved_context_ecx
+	movl %edx, saved_context_edx
+	movl %ebp, saved_context_ebp
+	movl %esi, saved_context_esi
+	movl %edi, saved_context_edi
+	pushfl ; popl saved_context_eflags
+
+	movl $.L1432,saved_eip
+	movl %esp,saved_esp
+	movl %ebp,saved_ebp
+	movl %ebx,saved_ebx
+	movl %edi,saved_edi
+	movl %esi,saved_esi
+
+	pushl $3
+	call acpi_enter_sleep_state
+	addl $4,%esp
+	ret
+	.p2align 4,,7
+.L1432:
+	movl $104,%eax
+	movw %eax, %ds
+	movl saved_context_esp, %esp
+	movl saved_context_ebp, %ebp
+	movl saved_context_eax, %eax
+	movl saved_context_ebx, %ebx
+	movl saved_context_ecx, %ecx
+	movl saved_context_edx, %edx
+	movl saved_context_esi, %esi
+	movl saved_context_edi, %edi
+	call restore_processor_state
+	pushl saved_context_eflags ; popfl
+	ret
+
 ALIGN
 # saved registers
 saved_gdt:	.long	0,0

@@ -77,7 +77,7 @@ struct dm_table *dm_get_table(struct mapped_device *md);
 /*
  * Info functions.
  */
-kdev_t dm_kdev(struct mapped_device *md);
+struct gendisk *dm_disk(struct mapped_device *md);
 int dm_suspended(struct mapped_device *md);
 
 /*-----------------------------------------------------------------

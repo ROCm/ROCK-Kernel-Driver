@@ -1514,6 +1514,7 @@ int __init cm206_init(void)
 	memset(cd, 0, sizeof(*cd));	/* give'm some reasonable value */
 	cd->sector_last = -1;	/* flag no data buffered */
 	cd->adapter_last = -1;
+	init_timer(&cd->timer);
 	cd->timer.function = cm206_timeout;
 	cd->max_sectors = (inw(r_data_status) & ds_ram_size) ? 24 : 97;
 	printk(KERN_INFO "%d kB adapter memory available, "

@@ -31,20 +31,20 @@
 
 EXPORT_NO_SYMBOLS;
 
-static char *main_revision = "$Revision: 1.1.2.2 $";
-static char *DRIVERNAME = "Eicon DIVA - CAPI Interface driver (http://www.melware.net)";
+static char *main_revision = "$Revision: 1.1.2.11 $";
+static char *DRIVERNAME =
+    "Eicon DIVA - CAPI Interface driver (http://www.melware.net)";
 static char *DRIVERLNAME = "divacapi";
 
-MODULE_DESCRIPTION(             "CAPI driver for Eicon DIVA cards");
-MODULE_AUTHOR(                  "Cytronics & Melware, Eicon Networks");
-MODULE_SUPPORTED_DEVICE(        "CAPI and DIVA card drivers");
+MODULE_DESCRIPTION("CAPI driver for Eicon DIVA cards");
+MODULE_AUTHOR("Cytronics & Melware, Eicon Networks");
+MODULE_SUPPORTED_DEVICE("CAPI and DIVA card drivers");
 MODULE_LICENSE("GPL");
 
 /*
  * get revision number from revision string
  */
-static char *
-getrev(const char *revision)
+static char *getrev(const char *revision)
 {
 	char *rev;
 	char *p;
@@ -52,7 +52,8 @@ getrev(const char *revision)
 		rev = p + 2;
 		p = strchr(rev, '$');
 		*--p = 0;
-	} else rev = "1.0";
+	} else
+		rev = "1.0";
 	return rev;
 
 }
@@ -60,86 +61,85 @@ getrev(const char *revision)
 /*
  * sleep for some milliseconds
  */
-void
-diva_os_sleep (dword mSec)
+void diva_os_sleep(dword mSec)
 {
 	unsigned long timeout = HZ * mSec / 1000 + 1;
-			 
+
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(timeout);
 }
 
 /*
  * wait for some milliseconds
- */ 
-void
-diva_os_wait (dword mSec)
+ */
+void diva_os_wait(dword mSec)
 {
-	mdelay (mSec);
-} 
+	mdelay(mSec);
+}
 
 /*
  * alloc memory
  */
-void* diva_os_malloc (unsigned long flags, unsigned long size)
+void *diva_os_malloc(unsigned long flags, unsigned long size)
 {
-		void* ret = NULL;
-		if (size) {
-				ret = (void *)vmalloc((unsigned int)size);
-		}
-		return(ret);
+	void *ret = NULL;
+	if (size) {
+		ret = (void *) vmalloc((unsigned int) size);
+	}
+	return (ret);
 }
 
 /*
  * free memory
  */
-void diva_os_free(unsigned long unused, void* ptr)
+void diva_os_free(unsigned long unused, void *ptr)
 {
-		if (ptr) {
-				vfree(ptr);
-		}
+	if (ptr) {
+		vfree(ptr);
+	}
 }
 
 /*
  * alloc a message buffer
  */
-diva_os_message_buffer_s *
-diva_os_alloc_message_buffer(unsigned long size, void **data_buf)
+diva_os_message_buffer_s *diva_os_alloc_message_buffer(unsigned long size,
+						       void **data_buf)
 {
-		diva_os_message_buffer_s *dmb = alloc_skb(size, GFP_ATOMIC);
-		if (dmb) {
-				*data_buf = skb_put(dmb, size);
-		}
-		return(dmb);
+	diva_os_message_buffer_s *dmb = alloc_skb(size, GFP_ATOMIC);
+	if (dmb) {
+		*data_buf = skb_put(dmb, size);
+	}
+	return (dmb);
 }
 
 /*
  * free a message buffer
  */
-void diva_os_free_message_buffer(diva_os_message_buffer_s *dmb)
+void diva_os_free_message_buffer(diva_os_message_buffer_s * dmb)
 {
-		kfree_skb(dmb);
-} 
+	kfree_skb(dmb);
+}
 
 /*
  * proc function for controller info
  */
-static int diva_ctl_read_proc(char *page, char **start, off_t off,int count, int *eof, struct capi_ctr *ctrl)
+static int diva_ctl_read_proc(char *page, char **start, off_t off,
+			      int count, int *eof, struct capi_ctr *ctrl)
 {
-  diva_card *card = (diva_card *)ctrl->driverdata;
-  int len = 0;
+	diva_card *card = (diva_card *) ctrl->driverdata;
+	int len = 0;
 
-  len += sprintf(page+len, "%s\n", ctrl->name);
-  len += sprintf(page+len, "Serial No. : %s\n", ctrl->serial);
-  len += sprintf(page+len, "Id         : %d\n", card->Id);
-  len += sprintf(page+len, "Channels   : %d\n", card->d.channels);
+	len += sprintf(page + len, "%s\n", ctrl->name);
+	len += sprintf(page + len, "Serial No. : %s\n", ctrl->serial);
+	len += sprintf(page + len, "Id         : %d\n", card->Id);
+	len += sprintf(page + len, "Channels   : %d\n", card->d.channels);
 
-  if (off + count >= len)
-    *eof = 1;
-  if (len < off)
-    return 0;
-  *start = page + off;
-  return((count < len-off) ? count : len-off);
+	if (off + count >= len)
+		*eof = 1;
+	if (len < off)
+		return 0;
+	*start = page + off;
+	return ((count < len - off) ? count : len - off);
 }
 
 /*
@@ -147,52 +147,50 @@ static int diva_ctl_read_proc(char *page, char **start, off_t off,int count, int
  */
 void diva_os_set_controller_struct(struct capi_ctr *ctrl)
 {
-		ctrl->driver_name    = DRIVERLNAME;
-		ctrl->load_firmware  = 0;
-		ctrl->reset_ctr      = 0;
-		ctrl->ctr_read_proc  = diva_ctl_read_proc;
-		SET_MODULE_OWNER(ctrl);
+	ctrl->driver_name = DRIVERLNAME;
+	ctrl->load_firmware = 0;
+	ctrl->reset_ctr = 0;
+	ctrl->ctr_read_proc = diva_ctl_read_proc;
+	SET_MODULE_OWNER(ctrl);
 }
 
 /*
  * module init
  */
-static int DIVA_INIT_FUNCTION
-divacapi_init(void)
+static int DIVA_INIT_FUNCTION divacapi_init(void)
 {
-  char tmprev[32];
-  int ret = 0;      
+	char tmprev[32];
+	int ret = 0;
 
-  MOD_INC_USE_COUNT;
+	MOD_INC_USE_COUNT;
 
-  sprintf(DRIVERRELEASE, "%d.%d%s", DRRELMAJOR, DRRELMINOR, DRRELEXTRA);
+	sprintf(DRIVERRELEASE, "%d.%d%s", DRRELMAJOR, DRRELMINOR,
+		DRRELEXTRA);
 
-  printk(KERN_INFO "%s\n", DRIVERNAME);
-  printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE);
-  strcpy(tmprev, main_revision);
-  printk("%s  Build: %s(%s)\n", getrev(tmprev),
-        diva_capi_common_code_build, DIVA_BUILD);
+	printk(KERN_INFO "%s\n", DRIVERNAME);
+	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE);
+	strcpy(tmprev, main_revision);
+	printk("%s  Build: %s(%s)\n", getrev(tmprev),
+	       diva_capi_common_code_build, DIVA_BUILD);
 
-	if (!(init_capifunc()))
-	{
-    printk(KERN_ERR "%s: failed init capi_driver.\n", DRIVERLNAME);
-    ret = -EIO;
+	if (!(init_capifunc())) {
+		printk(KERN_ERR "%s: failed init capi_driver.\n",
+		       DRIVERLNAME);
+		ret = -EIO;
 	}
 
-  MOD_DEC_USE_COUNT;
-  return ret;
+	MOD_DEC_USE_COUNT;
+	return ret;
 }
 
 /*
  * module exit
  */
-static void DIVA_EXIT_FUNCTION
-divacapi_exit(void)
+static void DIVA_EXIT_FUNCTION divacapi_exit(void)
 {
-  finit_capifunc();
-  printk(KERN_INFO "%s: module unloaded.\n", DRIVERLNAME);
+	finit_capifunc();
+	printk(KERN_INFO "%s: module unloaded.\n", DRIVERLNAME);
 }
 
 module_init(divacapi_init);
 module_exit(divacapi_exit);
-

@@ -151,12 +151,6 @@ acpi_fan_add_fs (
 	if (!device)
 		return_VALUE(-EINVAL);
 
-	if (!acpi_fan_dir) {
-		acpi_fan_dir = proc_mkdir(ACPI_FAN_CLASS, acpi_root_dir);
-		if (!acpi_fan_dir)
-			return_VALUE(-ENODEV);
-	}
-
 	if (!acpi_device_dir(device)) {
 		acpi_device_dir(device) = proc_mkdir(acpi_device_bid(device),
 			acpi_fan_dir);
@@ -186,9 +180,6 @@ acpi_fan_remove_fs (
 	struct acpi_device	*device)
 {
 	ACPI_FUNCTION_TRACE("acpi_fan_remove_fs");
-
-	if (!acpi_fan_dir)
-		return_VALUE(-ENODEV);
 
 	if (acpi_device_dir(device))
 		remove_proc_entry(acpi_device_bid(device), acpi_fan_dir);
@@ -276,9 +267,15 @@ acpi_fan_init (void)
 
 	ACPI_FUNCTION_TRACE("acpi_fan_init");
 
-	result = acpi_bus_register_driver(&acpi_fan_driver);
-	if (result < 0)
+	acpi_fan_dir = proc_mkdir(ACPI_FAN_CLASS, acpi_root_dir);
+	if (!acpi_fan_dir)
 		return_VALUE(-ENODEV);
+
+	result = acpi_bus_register_driver(&acpi_fan_driver);
+	if (result < 0) {
+		remove_proc_entry(ACPI_FAN_CLASS, acpi_root_dir);
+		return_VALUE(-ENODEV);
+	}
 
 	return_VALUE(0);
 }
@@ -287,13 +284,11 @@ acpi_fan_init (void)
 void __exit
 acpi_fan_exit (void)
 {
-	int			result = 0;
-
 	ACPI_FUNCTION_TRACE("acpi_fan_exit");
 
-	result = acpi_bus_unregister_driver(&acpi_fan_driver);
-	if (!result)
-		remove_proc_entry(ACPI_FAN_CLASS, acpi_root_dir);
+	acpi_bus_unregister_driver(&acpi_fan_driver);
+
+	remove_proc_entry(ACPI_FAN_CLASS, acpi_root_dir);
 
 	return_VOID;
 }

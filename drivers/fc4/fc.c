@@ -676,6 +676,7 @@ int fcp_forceoffline(fc_channel *fcchain, int count)
 	l.magic = LSOMAGIC;
 	FCND(("FCP Force Offline for %d channels\n", count))
 	init_MUTEX_LOCKED(&l.sem);
+	init_timer(&l.timer);
 	l.timer.function = fcp_login_timeout;
 	l.timer.data = (unsigned long)&l;
 	atomic_set (&l.todo, count);
@@ -977,7 +978,7 @@ int fcp_scsi_dev_reset(Scsi_Cmnd *SCpnt)
 
 
         fc->rst_pkt->eh_state = SCSI_STATE_QUEUED;
-
+	init_timer(&fc->rst_pkt->eh_timeout);
 	fc->rst_pkt->eh_timeout.data = (unsigned long) fc->rst_pkt;
 	fc->rst_pkt->eh_timeout.expires = jiffies + FCP_RESET_TIMEOUT;
 	fc->rst_pkt->eh_timeout.function = (void (*)(unsigned long))fcp_scsi_reset_done;

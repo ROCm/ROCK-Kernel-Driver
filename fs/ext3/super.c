@@ -308,12 +308,12 @@ void ext3_update_dynamic_rev(struct super_block *sb)
 /*
  * Open the external journal device
  */
-static struct block_device *ext3_blkdev_get(kdev_t dev)
+static struct block_device *ext3_blkdev_get(dev_t dev)
 {
 	struct block_device *bdev;
 	int err = -ENODEV;
 
-	bdev = bdget(kdev_t_to_nr(dev));
+	bdev = bdget(dev);
 	if (bdev == NULL)
 		goto fail;
 	err = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
@@ -1422,7 +1422,7 @@ static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
 }
 
 static journal_t *ext3_get_dev_journal(struct super_block *sb,
-				       kdev_t j_dev)
+				       dev_t j_dev)
 {
 	struct buffer_head * bh;
 	journal_t *journal;
@@ -1508,7 +1508,7 @@ static int ext3_load_journal(struct super_block * sb,
 {
 	journal_t *journal;
 	int journal_inum = le32_to_cpu(es->s_journal_inum);
-	kdev_t journal_dev = to_kdev_t(le32_to_cpu(es->s_journal_dev));
+	dev_t journal_dev = le32_to_cpu(es->s_journal_dev);
 	int err = 0;
 	int really_read_only;
 
@@ -1534,7 +1534,7 @@ static int ext3_load_journal(struct super_block * sb,
 		}
 	}
 
-	if (journal_inum && !kdev_none(journal_dev)) {
+	if (journal_inum && journal_dev) {
 		printk(KERN_ERR "EXT3-fs: filesystem has both journal "
 		       "and inode journals!\n");
 		return -EINVAL;

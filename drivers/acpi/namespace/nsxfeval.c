@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfeval - Public interfaces to the ACPI subsystem
  *                         ACPI Object evaluation interfaces
- *              $Revision: 3 $
+ *              $Revision: 4 $
  *
  ******************************************************************************/
 
@@ -570,11 +570,13 @@ acpi_get_devices (
  *
  * FUNCTION:    Acpi_attach_data
  *
- * PARAMETERS:
+ * PARAMETERS:  Obj_handle          - Namespace node
+ *              Handler             - Handler for this attachment
+ *              Data                - Pointer to data to be attached
  *
  * RETURN:      Status
  *
- * DESCRIPTION:
+ * DESCRIPTION: Attach arbitrary data and handler to a namespace node.
  *
  ******************************************************************************/
 
@@ -621,11 +623,12 @@ unlock_and_exit:
  *
  * FUNCTION:    Acpi_detach_data
  *
- * PARAMETERS:
+ * PARAMETERS:  Obj_handle          - Namespace node handle
+ *              Handler             - Handler used in call to Acpi_attach_data
  *
  * RETURN:      Status
  *
- * DESCRIPTION:
+ * DESCRIPTION: Remove data that was previously attached to a node.
  *
  ******************************************************************************/
 
@@ -670,11 +673,13 @@ unlock_and_exit:
  *
  * FUNCTION:    Acpi_get_data
  *
- * PARAMETERS:
+ * PARAMETERS:  Obj_handle          - Namespace node
+ *              Handler             - Handler used in call to Attach_data
+ *              Data                - Where the data is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION:
+ * DESCRIPTION: Retrieve data that was previously attached to a namespace node.
  *
  ******************************************************************************/
 

@@ -178,14 +178,12 @@ raw_ctl_ioctl(struct inode *inode, struct file *filp,
 			up(&raw_mutex);
 		} else {
 			struct block_device *bdev;
-			kdev_t dev;
 
 			down(&raw_mutex);
 			bdev = rawdev->binding;
 			if (bdev) {
-				dev = to_kdev_t(bdev->bd_dev);
-				rq.block_major = major(dev);
-				rq.block_minor = minor(dev);
+				rq.block_major = MAJOR(bdev->bd_dev);
+				rq.block_minor = MINOR(bdev->bd_dev);
 			} else {
 				rq.block_major = rq.block_minor = 0;
 			}

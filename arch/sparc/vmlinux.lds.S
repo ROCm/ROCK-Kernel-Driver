@@ -29,9 +29,12 @@ SECTIONS
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
+
+  . = ALIGN(64);
   __start___ksymtab = .;
   __ksymtab  : { *(__ksymtab) }
   __stop___ksymtab = .;
+
   __start___kallsyms = .;	/* All kernel symbols */
   __kallsyms : { *(__kallsyms) }
   __stop___kallsyms = .;

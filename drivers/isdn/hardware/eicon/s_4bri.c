@@ -249,12 +249,12 @@ static byte * qBri_check_FPGAsrc (PISDN_ADAPTER IoAdapter, char *FileName,
 
 /******************************************************************************/
 
-#define FPGA_PROG   0x0001		// PROG enable low
-#define FPGA_BUSY   0x0002		// BUSY high, DONE low
-#define	FPGA_CS     0x000C		// Enable I/O pins
+#define FPGA_PROG   0x0001		/* PROG enable low */
+#define FPGA_BUSY   0x0002		/* BUSY high, DONE low */
+#define	FPGA_CS     0x000C		/* Enable I/O pins */
 #define FPGA_CCLK   0x0100
 #define FPGA_DOUT   0x0400
-#define FPGA_DIN    FPGA_DOUT   // bidirectional I/O
+#define FPGA_DIN    FPGA_DOUT   /* bidirectional I/O */
 
 int qBri_FPGA_download (PISDN_ADAPTER IoAdapter) {
 	int            bit ;
@@ -296,9 +296,9 @@ int qBri_FPGA_download (PISDN_ADAPTER IoAdapter) {
 /*
  *	prepare download, pulse PROGRAM pin down.
  */
-	WRITE_WORD(addr, baseval & ~FPGA_PROG) ; // PROGRAM low pulse
-	WRITE_WORD(addr, baseval) ;              // release
-	diva_os_wait (50) ;  // wait until FPGA finished internal memory clear
+	WRITE_WORD(addr, baseval & ~FPGA_PROG) ; /* PROGRAM low pulse */
+	WRITE_WORD(addr, baseval) ;              /* release */
+	diva_os_wait (50) ;  /* wait until FPGA finished internal memory clear */
 /*
  *	check done pin, must be low
  */
@@ -315,14 +315,14 @@ int qBri_FPGA_download (PISDN_ADAPTER IoAdapter) {
 	{
 		val = ((word)File[code++]) << 3 ;
 
-		for ( bit = 8 ; bit-- > 0 ; val <<= 1 ) // put byte onto FPGA
+		for ( bit = 8 ; bit-- > 0 ; val <<= 1 ) /* put byte onto FPGA */
 		{
-			baseval &= ~FPGA_DOUT ;             // clr  data bit
-			baseval |= (val & FPGA_DOUT) ;      // copy data bit
+			baseval &= ~FPGA_DOUT ;             /* clr  data bit */
+			baseval |= (val & FPGA_DOUT) ;      /* copy data bit */
 			WRITE_WORD(addr, baseval) ;
-			WRITE_WORD(addr, baseval | FPGA_CCLK) ;     // set CCLK hi
-			WRITE_WORD(addr, baseval | FPGA_CCLK) ;     // set CCLK hi
-			WRITE_WORD(addr, baseval) ;                 // set CCLK lo
+			WRITE_WORD(addr, baseval | FPGA_CCLK) ;     /* set CCLK hi */
+			WRITE_WORD(addr, baseval | FPGA_CCLK) ;     /* set CCLK hi */
+			WRITE_WORD(addr, baseval) ;                 /* set CCLK lo */
 		}
 	}
 	xdiFreeFile (File) ;
@@ -868,7 +868,7 @@ static void disable_qBri_interrupt (PISDN_ADAPTER IoAdapter) {
 /*
  *	clear interrupt line (reset Local Interrupt Test Register)
  */
-	IoAdapter->reset[PLX9054_INTCSR] = 0x00 ;	// disable PCI interrupts
+	IoAdapter->reset[PLX9054_INTCSR] = 0x00 ;	/* disable PCI interrupts */
 	WRITE_DWORD(qBriIrq, MQ_IRQ_REQ_OFF) ;
 }
 

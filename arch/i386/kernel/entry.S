@@ -66,7 +66,9 @@ OLDESP		= 0x34
 OLDSS		= 0x38
 
 CF_MASK		= 0x00000001
+TF_MASK		= 0x00000100
 IF_MASK		= 0x00000200
+DF_MASK		= 0x00000400 
 NT_MASK		= 0x00004000
 VM_MASK		= 0x00020000
 
@@ -134,6 +136,17 @@ ENTRY(lcall7)
 	movl %eax,EFLAGS(%esp)	#
 	movl %edx,EIP(%esp)	# Now we move them to their "normal" places
 	movl %ecx,CS(%esp)	#
+
+	#
+	# Call gates don't clear TF and NT in eflags like
+	# traps do, so we need to do it ourselves.
+	# %eax already contains eflags (but it may have
+	# DF set, clear that also)
+	#
+	andl $~(DF_MASK | TF_MASK | NT_MASK),%eax
+	pushl %eax
+	popfl
+
 	movl %esp, %ebx
 	pushl %ebx
 	andl $-8192, %ebx	# GET_THREAD_INFO
@@ -156,6 +169,17 @@ ENTRY(lcall27)
 	movl %eax,EFLAGS(%esp)	#
 	movl %edx,EIP(%esp)	# Now we move them to their "normal" places
 	movl %ecx,CS(%esp)	#
+
+	#
+	# Call gates don't clear TF and NT in eflags like
+	# traps do, so we need to do it ourselves.
+	# %eax already contains eflags (but it may have
+	# DF set, clear that also)
+	#
+	andl $~(DF_MASK | TF_MASK | NT_MASK),%eax
+	pushl %eax
+	popfl
+
 	movl %esp, %ebx
 	pushl %ebx
 	andl $-8192, %ebx	# GET_THREAD_INFO
@@ -612,10 +636,10 @@ ENTRY(sys_call_table)
 	.long sys_adjtimex
 	.long sys_mprotect	/* 125 */
 	.long sys_sigprocmask
-	.long sys_create_module
+	.long sys_ni_syscall	/* old "create_module" */ 
 	.long sys_init_module
 	.long sys_delete_module
-	.long sys_get_kernel_syms	/* 130 */
+	.long sys_ni_syscall	/* 130:	old "get_kernel_syms" */
 	.long sys_quotactl
 	.long sys_getpgid
 	.long sys_fchdir
@@ -652,7 +676,7 @@ ENTRY(sys_call_table)
 	.long sys_setresuid16
 	.long sys_getresuid16	/* 165 */
 	.long sys_vm86
-	.long sys_query_module
+	.long sys_ni_syscall	/* Old sys_query_module */
 	.long sys_poll
 	.long sys_nfsservctl
 	.long sys_setresgid16	/* 170 */

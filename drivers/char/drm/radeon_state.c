@@ -30,6 +30,7 @@
 #include "radeon.h"
 #include "drmP.h"
 #include "drm.h"
+#include "drm_sarea.h"
 #include "radeon_drm.h"
 #include "radeon_drv.h"
 
@@ -279,6 +280,18 @@ static struct {
 	{ R200_SE_VTX_STATE_CNTL, 1, "R200_SE_VTX_STATE_CNTL" }, 
 	{ R200_RE_POINTSIZE, 1, "R200_RE_POINTSIZE" }, 
 	{ R200_SE_TCL_INPUT_VTX_VECTOR_ADDR_0, 4, "R200_SE_TCL_INPUT_VTX_VECTOR_ADDR_0" },
+	{ R200_PP_CUBIC_FACES_0, 1, "R200_PP_CUBIC_FACES_0" }, /* 61 */
+	{ R200_PP_CUBIC_OFFSET_F1_0, 5, "R200_PP_CUBIC_OFFSET_F1_0" }, /* 62 */
+	{ R200_PP_CUBIC_FACES_1, 1, "R200_PP_CUBIC_FACES_1" },
+	{ R200_PP_CUBIC_OFFSET_F1_1, 5, "R200_PP_CUBIC_OFFSET_F1_1" },
+	{ R200_PP_CUBIC_FACES_2, 1, "R200_PP_CUBIC_FACES_2" },
+	{ R200_PP_CUBIC_OFFSET_F1_2, 5, "R200_PP_CUBIC_OFFSET_F1_2" },
+	{ R200_PP_CUBIC_FACES_3, 1, "R200_PP_CUBIC_FACES_3" },
+	{ R200_PP_CUBIC_OFFSET_F1_3, 5, "R200_PP_CUBIC_OFFSET_F1_3" },
+	{ R200_PP_CUBIC_FACES_4, 1, "R200_PP_CUBIC_FACES_4" },
+	{ R200_PP_CUBIC_OFFSET_F1_4, 5, "R200_PP_CUBIC_OFFSET_F1_4" },
+	{ R200_PP_CUBIC_FACES_5, 1, "R200_PP_CUBIC_FACES_5" },
+	{ R200_PP_CUBIC_OFFSET_F1_5, 5, "R200_PP_CUBIC_OFFSET_F1_5" },
 };
 
 
@@ -791,6 +804,9 @@ static void radeon_cp_dispatch_swap( drm_device_t *dev )
 static void radeon_cp_dispatch_flip( drm_device_t *dev )
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
+	drm_sarea_t *sarea = (drm_sarea_t *)dev_priv->sarea->handle;
+	int offset = (dev_priv->current_page == 1)
+		   ? dev_priv->front_offset : dev_priv->back_offset;
 	RING_LOCALS;
 	DRM_DEBUG( "%s: page=%d pfCurrentPage=%d\n", 
 		__FUNCTION__, 
@@ -804,18 +820,17 @@ static void radeon_cp_dispatch_flip( drm_device_t *dev )
 		radeon_cp_performance_boxes( dev_priv );
 	}
 
-	BEGIN_RING( 4 );
+	/* Update the frame offsets for both CRTCs
+	 */
+	BEGIN_RING( 6 );
 
 	RADEON_WAIT_UNTIL_3D_IDLE();
-	OUT_RING( CP_PACKET0( RADEON_CRTC_OFFSET, 0 ) );
-
-	if ( dev_priv->current_page == 0 ) {
-		OUT_RING( dev_priv->back_offset );
-		dev_priv->current_page = 1;
-	} else {
-		OUT_RING( dev_priv->front_offset );
-		dev_priv->current_page = 0;
-	}
+	OUT_RING_REG( RADEON_CRTC_OFFSET, ( ( sarea->frame.y * dev_priv->front_pitch
+					      + sarea->frame.x 
+					      * ( dev_priv->color_fmt - 2 ) ) & ~7 )
+					  + offset );
+	OUT_RING_REG( RADEON_CRTC2_OFFSET, dev_priv->sarea_priv->crtc2_base
+					   + offset );
 
 	ADVANCE_RING();
 
@@ -824,7 +839,8 @@ static void radeon_cp_dispatch_flip( drm_device_t *dev )
 	 * performing the swapbuffer ioctl.
 	 */
 	dev_priv->sarea_priv->last_frame++;
-	dev_priv->sarea_priv->pfCurrentPage = dev_priv->current_page;
+	dev_priv->sarea_priv->pfCurrentPage = dev_priv->current_page =
+					      1 - dev_priv->current_page;
 
 	BEGIN_RING( 2 );
 
@@ -1292,12 +1308,12 @@ static int radeon_do_init_pageflip( drm_device_t *dev )
 
 	DRM_DEBUG( "\n" );
 
-	dev_priv->crtc_offset_cntl = RADEON_READ( RADEON_CRTC_OFFSET_CNTL );
-
-	BEGIN_RING( 4 );
+	BEGIN_RING( 6 );
 	RADEON_WAIT_UNTIL_3D_IDLE();
 	OUT_RING( CP_PACKET0( RADEON_CRTC_OFFSET_CNTL, 0 ) );
-	OUT_RING( dev_priv->crtc_offset_cntl | RADEON_CRTC_OFFSET_FLIP_CNTL );
+	OUT_RING( RADEON_READ( RADEON_CRTC_OFFSET_CNTL ) | RADEON_CRTC_OFFSET_FLIP_CNTL );
+	OUT_RING( CP_PACKET0( RADEON_CRTC2_OFFSET_CNTL, 0 ) );
+	OUT_RING( RADEON_READ( RADEON_CRTC2_OFFSET_CNTL ) | RADEON_CRTC_OFFSET_FLIP_CNTL );
 	ADVANCE_RING();
 
 	dev_priv->page_flipping = 1;
@@ -1318,10 +1334,6 @@ int radeon_do_cleanup_pageflip( drm_device_t *dev )
 	if (dev_priv->current_page != 0)
 		radeon_cp_dispatch_flip( dev );
 
-	/* FIXME: If the X server changes screen resolution, it
-	 * clobbers the value of RADEON_CRTC_OFFSET_CNTL, above,
-	 * leading to a flashing efect.
-	 */
 	dev_priv->page_flipping = 0;
 	return 0;
 }
@@ -1792,11 +1804,16 @@ static int radeon_emit_packets(
 	drm_radeon_cmd_buffer_t *cmdbuf )
 {
 	int id = (int)header.packet.packet_id;
-	int sz = packet[id].len;
-	int reg = packet[id].start;
+	int sz, reg;
 	int *data = (int *)cmdbuf->buf;
 	RING_LOCALS;
    
+	if (id >= RADEON_MAX_STATE_PACKETS)
+		return DRM_ERR(EINVAL);
+
+	sz = packet[id].len;
+	reg = packet[id].start;
+
 	if (sz * sizeof(int) > cmdbuf->bufsz) 
 		return DRM_ERR(EINVAL);
 

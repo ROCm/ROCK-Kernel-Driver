@@ -92,7 +92,7 @@ ipt_tcpmss_target(struct sk_buff **pskb,
 			return NF_DROP; /* or IPT_CONTINUE ?? */
 		}
 
-		newmss = dst_pmtu((*pskb)->dst->pmtu) - sizeof(struct iphdr) - sizeof(struct tcphdr);
+		newmss = dst_pmtu((*pskb)->dst) - sizeof(struct iphdr) - sizeof(struct tcphdr);
 	} else
 		newmss = tcpmssinfo->mss;
 

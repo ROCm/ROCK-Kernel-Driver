@@ -64,6 +64,8 @@ typedef struct drm_i810_private {
       	unsigned long hw_status_page;
    	unsigned long counter;
 
+	dma_addr_t dma_status_page;
+
 	drm_buf_t *mmap_buffer;
 
 

@@ -40,31 +40,42 @@
  */
  
 #include <linux/config.h> 
-#include <asm/system.h>
+#include <asm/atomic.h>
+#include <asm/byteorder.h>
+#include <asm/current.h>
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
 #include <linux/types.h>
-#include <linux/sched.h>
+#include <linux/stddef.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
-#include <linux/timer.h>
-#include <linux/mm.h>
+#include <linux/aio.h>
 #include <linux/kernel.h>
-#include <linux/fcntl.h>
+#include <linux/spinlock.h>
+#include <linux/sockios.h>
 #include <linux/socket.h>
 #include <linux/in.h>
-#include <linux/inet.h>
 #include <linux/netdevice.h>
-#include <linux/mroute.h>
-#include <net/tcp.h>
-#include <net/protocol.h>
+#include <linux/in_route.h>
+#include <linux/route.h>
+#include <linux/tcp.h>
 #include <linux/skbuff.h>
+#include <net/dst.h>
 #include <net/sock.h>
+#include <linux/gfp.h>
+#include <linux/ip.h>
+#include <net/ip.h>
 #include <net/icmp.h>
 #include <net/udp.h>
 #include <net/raw.h>
+#include <net/snmp.h>
 #include <net/inet_common.h>
 #include <net/checksum.h>
 #include <net/xfrm.h>
+#include <linux/rtnetlink.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 
 struct sock *raw_v4_htable[RAWV4_HTABLE_SIZE];
@@ -431,7 +442,7 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 						.saddr = saddr,
 						.tos = tos } },
 				    .proto = inet->hdrincl ? IPPROTO_RAW : sk->protocol };
-		err = ip_route_output_flow(&rt, &fl, sk, msg->msg_flags&MSG_DONTWAIT);
+		err = ip_route_output_flow(&rt, &fl, sk, !(msg->msg_flags&MSG_DONTWAIT));
 	}
 	if (err)
 		goto done;
@@ -656,64 +667,6 @@ static int raw_ioctl(struct sock *sk, int cmd, unsigned long arg)
 	}
 }
 
-static void get_raw_sock(struct sock *sp, char *tmpbuf, int i)
-{
-	struct inet_opt *inet = inet_sk(sp);
-	unsigned int dest = inet->daddr,
-		     src = inet->rcv_saddr;
-	__u16 destp = 0,
-	      srcp  = inet->num;
-
-	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
-		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
-		i, src, srcp, dest, destp, sp->state, 
-		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
-		0, 0L, 0,
-		sock_i_uid(sp), 0,
-		sock_i_ino(sp),
-		atomic_read(&sp->refcnt), sp);
-}
-
-int raw_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	int len = 0, num = 0, i;
-	off_t pos = 128;
-	off_t begin;
-	char tmpbuf[129];
-
-	if (offset < 128) 
-		len += sprintf(buffer, "%-127s\n",
-			       "  sl  local_address rem_address   st tx_queue "
-			       "rx_queue tr tm->when retrnsmt   uid  timeout "
-			       "inode");
-	read_lock(&raw_v4_lock);
-	for (i = 0; i < RAWV4_HTABLE_SIZE; i++) {
-		struct sock *sk;
-
-		for (sk = raw_v4_htable[i]; sk; sk = sk->next, num++) {
-			if (sk->family != PF_INET)
-				continue;
-			pos += 128;
-			if (pos <= offset)
-				continue;
-			get_raw_sock(sk, tmpbuf, i);
-			len += sprintf(buffer + len, "%-127s\n", tmpbuf);
-			if (len >= length)
-				goto out;
-		}
-	}
-out:
-	read_unlock(&raw_v4_lock);
-	begin = len - (pos - offset);
-	*start = buffer + begin;
-	len -= begin;
-	if (len > length)
-		len = length;
-	if (len < 0)
-		len = 0; 
-	return len;
-}
-
 struct proto raw_prot = {
 	.name =		"RAW",
 	.close =	raw_close,
@@ -730,3 +683,147 @@ struct proto raw_prot = {
 	.hash =		raw_v4_hash,
 	.unhash =	raw_v4_unhash,
 };
+
+#ifdef CONFIG_PROC_FS
+struct raw_iter_state {
+	int bucket;
+};
+
+#define raw_seq_private(seq) ((struct raw_iter_state *)&seq->private)
+
+static struct sock *raw_get_first(struct seq_file *seq)
+{
+	struct sock *sk = NULL;
+	struct raw_iter_state* state = raw_seq_private(seq);
+
+	for (state->bucket = 0; state->bucket < RAWV4_HTABLE_SIZE; ++state->bucket) {
+		sk = raw_v4_htable[state->bucket];
+		while (sk && sk->family != PF_INET)
+			sk = sk->next;
+		if (sk)
+			break;
+	}
+	return sk;
+}
+
+static struct sock *raw_get_next(struct seq_file *seq, struct sock *sk)
+{
+	struct raw_iter_state* state = raw_seq_private(seq);
+
+	do {
+		sk = sk->next;
+try_again:
+	} while (sk && sk->family != PF_INET);
+
+	if (!sk && ++state->bucket < RAWV4_HTABLE_SIZE) {
+		sk = raw_v4_htable[state->bucket];
+		goto try_again;
+	}
+	return sk;
+}
+
+static struct sock *raw_get_idx(struct seq_file *seq, loff_t pos)
+{
+	struct sock *sk = raw_get_first(seq);
+
+	if (sk)
+		while (pos && (sk = raw_get_next(seq, sk)) != NULL)
+			--pos;
+	return pos ? NULL : sk;
+}
+
+static void *raw_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	read_lock(&raw_v4_lock);
+	return *pos ? raw_get_idx(seq, *pos) : (void *)1;
+}
+
+static void *raw_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct sock *sk;
+
+	if (v == (void *)1)
+		sk = raw_get_first(seq);
+	else
+		sk = raw_get_next(seq, v);
+	++*pos;
+	return sk;
+}
+
+static void raw_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock(&raw_v4_lock);
+}
+
+static __inline__ char *get_raw_sock(struct sock *sp, char *tmpbuf, int i)
+{
+	struct inet_opt *inet = inet_sk(sp);
+	unsigned int dest = inet->daddr,
+		     src = inet->rcv_saddr;
+	__u16 destp = 0,
+	      srcp  = inet->num;
+
+	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
+		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
+		i, src, srcp, dest, destp, sp->state, 
+		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
+		0, 0L, 0, sock_i_uid(sp), 0, sock_i_ino(sp),
+		atomic_read(&sp->refcnt), sp);
+	return tmpbuf;
+}
+
+static int raw_seq_show(struct seq_file *seq, void *v)
+{
+	char tmpbuf[129];
+
+	if (v == (void *)1)
+		seq_printf(seq, "%-127s\n",
+			       "  sl  local_address rem_address   st tx_queue "
+			       "rx_queue tr tm->when retrnsmt   uid  timeout "
+			       "inode");
+	else {
+		struct raw_iter_state *state = raw_seq_private(seq);
+
+		seq_printf(seq, "%-127s\n",
+			   get_raw_sock(v, tmpbuf, state->bucket));
+	}
+	return 0;
+}
+
+static struct seq_operations raw_seq_ops = {
+	.start = raw_seq_start,
+	.next  = raw_seq_next,
+	.stop  = raw_seq_stop,
+	.show  = raw_seq_show,
+};
+
+static int raw_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &raw_seq_ops);
+}
+
+static struct file_operations raw_seq_fops = {
+	.open	 = raw_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = seq_release,
+};
+
+int __init raw_proc_init(void)
+{
+	struct proc_dir_entry *p;
+	int rc = 0;
+
+	p = create_proc_entry("raw", S_IRUGO, proc_net);
+	if (p)
+		p->proc_fops = &raw_seq_fops;
+	else
+		rc = -ENOMEM;
+	return rc;
+}
+
+void __init raw_proc_exit(void)
+{
+	remove_proc_entry("raw", proc_net);
+}
+#endif /* CONFIG_PROC_FS */

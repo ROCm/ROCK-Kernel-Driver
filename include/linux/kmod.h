@@ -28,6 +28,7 @@ extern int request_module(const char * name);
 static inline int request_module(const char * name) { return -ENOSYS; }
 #endif
 
+#define try_then_request_module(x, mod) ((x) ?: request_module(mod), (x))
 extern int exec_usermodehelper(char *program_path, char *argv[], char *envp[]);
 extern int call_usermodehelper(char *path, char *argv[], char *envp[]);
 

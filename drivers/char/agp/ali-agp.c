@@ -216,7 +216,7 @@ static void ali_destroy_page(void * addr)
 /* Setup function */
 static struct gatt_mask ali_generic_masks[] =
 {
-	{mask: 0x00000000, type: 0}
+	{.mask = 0x00000000, .type = 0}
 };
 
 static struct aper_size_info_32 ali_generic_sizes[7] =

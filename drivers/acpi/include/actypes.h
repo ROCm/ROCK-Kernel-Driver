@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actypes.h - Common data types for the entire ACPI subsystem
- *       $Revision: 240 $
+ *       $Revision: 241 $
  *
  *****************************************************************************/
 
@@ -499,6 +499,7 @@ typedef u32                             acpi_object_type;
  */
 #define ACPI_READ                       0
 #define ACPI_WRITE                      1
+#define ACPI_IO_MASK                    1
 
 
 /*

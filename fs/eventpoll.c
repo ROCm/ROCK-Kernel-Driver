@@ -107,6 +107,8 @@
 /* Get the "struct epitem" from a wait queue pointer */
 #define EP_ITEM_FROM_WAIT(p) ((struct epitem *) container_of(p, struct eppoll_entry, wait)->base)
 
+/* Get the "struct epitem" from an epoll queue wrapper */
+#define EP_ITEM_FROM_EPQUEUE(p) (container_of(p, struct ep_pqueue, pt)->dpi)
 
 
 
@@ -187,6 +189,12 @@ struct epitem {
 	atomic_t usecnt;
 };
 
+/* Wrapper struct used by poll queueing */
+struct ep_pqueue {
+	poll_table pt;
+	struct epitem *dpi;
+};
+
 
 
 static unsigned int ep_get_hash_bits(unsigned int hintsize);
@@ -201,7 +209,7 @@ static void ep_free(struct eventpoll *ep);
 static struct epitem *ep_find(struct eventpoll *ep, struct file *file);
 static void ep_use_epitem(struct epitem *dpi);
 static void ep_release_epitem(struct epitem *dpi);
-static void ep_ptable_queue_proc(void *priv, wait_queue_head_t *whead);
+static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead, poll_table *pt);
 static int ep_insert(struct eventpoll *ep, struct pollfd *pfd, struct file *tfile);
 static int ep_modify(struct eventpoll *ep, struct epitem *dpi, unsigned int events);
 static int ep_unlink(struct eventpoll *ep, struct epitem *dpi);
@@ -791,9 +799,9 @@ static void ep_release_epitem(struct epitem *dpi)
  * This is the callback that is used to add our wait queue to the
  * target file wakeup lists.
  */
-static void ep_ptable_queue_proc(void *priv, wait_queue_head_t *whead)
+static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead, poll_table *pt)
 {
-	struct epitem *dpi = priv;
+	struct epitem *dpi = EP_ITEM_FROM_EPQUEUE(pt);
 
 	/* No more than EP_MAX_POLL_QUEUE wait queue are supported */
 	if (dpi->nwait < EP_MAX_POLL_QUEUE) {
@@ -809,7 +817,7 @@ static int ep_insert(struct eventpoll *ep, struct pollfd *pfd, struct file *tfil
 	int error, i, revents;
 	unsigned long flags;
 	struct epitem *dpi;
-	poll_table pt;
+	struct ep_pqueue epq;
 
 	error = -ENOMEM;
 	if (!(dpi = DPI_MEM_ALLOC()))
@@ -830,7 +838,8 @@ static int ep_insert(struct eventpoll *ep, struct pollfd *pfd, struct file *tfil
 	}
 
 	/* Initialize the poll table using the queue callback */
-	poll_initwait_ex(&pt, 1, ep_ptable_queue_proc, dpi);
+	epq.dpi = dpi;
+	poll_initwait_ex(&epq.pt, ep_ptable_queue_proc);
 
 	/* We have to drop the new item inside our item list to keep track of it */
 	write_lock_irqsave(&ep->lock, flags);
@@ -839,7 +848,7 @@ static int ep_insert(struct eventpoll *ep, struct pollfd *pfd, struct file *tfil
 	list_add(&dpi->llink, ep_hash_entry(ep, ep_hash_index(ep, tfile)));
 
 	/* Attach the item to the poll hooks and get current event bits */
-	revents = tfile->f_op->poll(tfile, &pt);
+	revents = tfile->f_op->poll(tfile, &epq.pt);
 
 	/* If the file is already "ready" we drop it inside the ready list */
 	if ((revents & pfd->events) && !EP_IS_LINKED(&dpi->rdllink)) {
@@ -854,7 +863,7 @@ static int ep_insert(struct eventpoll *ep, struct pollfd *pfd, struct file *tfil
 
 	write_unlock_irqrestore(&ep->lock, flags);
 
-	poll_freewait(&pt);
+	poll_freewait(&epq.pt);
 
 	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: ep_insert(%p, %d)\n",
 		     current, ep, pfd->fd));
@@ -874,20 +883,11 @@ static int ep_modify(struct eventpoll *ep, struct epitem *dpi, unsigned int even
 {
 	unsigned int revents;
 	unsigned long flags;
-	poll_table pt;
-
-	/*
-	 * This is a special poll table initialization that will
-	 * make poll_wait() to not perform any wait queue insertion when
-	 * called by file->f_op->poll(). This is a fast way to retrieve
-	 * file events with perform any queue insertion, hence saving CPU cycles.
-	 */
-	poll_initwait_ex(&pt, 0, NULL, NULL);
 
 	write_lock_irqsave(&ep->lock, flags);
 
 	/* Get current event bits */
-	revents = dpi->file->f_op->poll(dpi->file, &pt);
+	revents = dpi->file->f_op->poll(dpi->file, NULL);
 
 	/* Set the new event interest mask */
 	dpi->pfd.events = events;
@@ -905,8 +905,6 @@ static int ep_modify(struct eventpoll *ep, struct epitem *dpi, unsigned int even
 	}
 
 	write_unlock_irqrestore(&ep->lock, flags);
-
-	poll_freewait(&pt);
 
 	return 0;
 }
@@ -1066,15 +1064,6 @@ static int ep_events_transfer(struct eventpoll *ep, struct pollfd *events, int m
 	unsigned long flags;
 	struct list_head *lsthead = &ep->rdllist;
 	struct pollfd eventbuf[EP_EVENT_BUFF_SIZE];
-	poll_table pt;
-
-	/*
-	 * This is a special poll table initialization that will
-	 * make poll_wait() to not perform any wait queue insertion when
-	 * called by file->f_op->poll(). This is a fast way to retrieve
-	 * file events with perform any queue insertion, hence saving CPU cycles.
-	 */
-	poll_initwait_ex(&pt, 0, NULL, NULL);
 
 	write_lock_irqsave(&ep->lock, flags);
 
@@ -1093,7 +1082,7 @@ static int ep_events_transfer(struct eventpoll *ep, struct pollfd *events, int m
 			continue;
 
 		/* Fetch event bits from the signaled file */
-		revents = dpi->file->f_op->poll(dpi->file, &pt);
+		revents = dpi->file->f_op->poll(dpi->file, NULL);
 
 		if (revents & dpi->pfd.events) {
 			eventbuf[ebufcnt] = dpi->pfd;
@@ -1108,10 +1097,8 @@ static int ep_events_transfer(struct eventpoll *ep, struct pollfd *events, int m
 				 */
 				write_unlock_irqrestore(&ep->lock, flags);
 				if (__copy_to_user(&events[eventcnt], eventbuf,
-						   ebufcnt * sizeof(struct pollfd))) {
-					poll_freewait(&pt);
+						   ebufcnt * sizeof(struct pollfd)))
 					return -EFAULT;
-				}
 				eventcnt += ebufcnt;
 				ebufcnt = 0;
 				write_lock_irqsave(&ep->lock, flags);
@@ -1128,8 +1115,6 @@ static int ep_events_transfer(struct eventpoll *ep, struct pollfd *events, int m
 		else
 			eventcnt += ebufcnt;
 	}
-
-	poll_freewait(&pt);
 
 	return eventcnt;
 }

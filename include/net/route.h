@@ -140,7 +140,9 @@ static inline char rt_tos2priority(u8 tos)
 	return ip_tos2prio[IPTOS_TOS(tos)>>1];
 }
 
-static inline int ip_route_connect(struct rtable **rp, u32 dst, u32 src, u32 tos, int oif, u8 protocol, u16 sport, u16 dport)
+static inline int ip_route_connect(struct rtable **rp, u32 dst,
+				   u32 src, u32 tos, int oif, u8 protocol,
+				   u16 sport, u16 dport, struct sock *sk)
 {
 	struct flowi fl = { .oif = oif,
 			    .nl_u = { .ip4_u = { .daddr = dst,
@@ -161,10 +163,11 @@ static inline int ip_route_connect(struct rtable **rp, u32 dst, u32 src, u32 tos
 		ip_rt_put(*rp);
 		*rp = NULL;
 	}
-	return ip_route_output_key(rp, &fl);
+	return ip_route_output_flow(rp, &fl, sk, 0);
 }
 
-static inline int ip_route_newports(struct rtable **rp, u16 sport, u16 dport)
+static inline int ip_route_newports(struct rtable **rp, u16 sport, u16 dport,
+				    struct sock *sk)
 {
 	if (sport != (*rp)->fl.uli_u.ports.sport ||
 	    dport != (*rp)->fl.uli_u.ports.dport) {
@@ -175,7 +178,7 @@ static inline int ip_route_newports(struct rtable **rp, u16 sport, u16 dport)
 		fl.uli_u.ports.dport = dport;
 		ip_rt_put(*rp);
 		*rp = NULL;
-		return ip_route_output_key(rp, &fl);
+		return ip_route_output_flow(rp, &fl, sk, 0);
 	}
 	return 0;
 }

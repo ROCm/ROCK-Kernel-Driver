@@ -24,7 +24,7 @@ static unsigned int shouldnt_happen(void)
 }
 
 struct rtc_ops no_rtc_ops = {
-    rtc_read_data:  (void *) &shouldnt_happen,
-    rtc_write_data: (void *) &shouldnt_happen,
-    rtc_bcd_mode:   (void *) &shouldnt_happen
+    .rtc_read_data  = (void *) &shouldnt_happen,
+    .rtc_write_data = (void *) &shouldnt_happen,
+    .rtc_bcd_mode   = (void *) &shouldnt_happen
 };

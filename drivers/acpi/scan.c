@@ -258,6 +258,8 @@ acpi_bus_driver_init (
 		return_VALUE(result);
 	}
 
+	device->driver = driver;
+
 	/*
 	 * TBD - Configuration Management: Assign resources to device based
 	 * upon possible configuration and currently allocated resources.

@@ -22,7 +22,7 @@ static spinlock_t xfrm_state_lock = SPIN_LOCK_UNLOCKED;
 static struct list_head xfrm_state_bydst[XFRM_DST_HSIZE];
 static struct list_head xfrm_state_byspi[XFRM_DST_HSIZE];
 
-wait_queue_head_t *km_waitq;
+DECLARE_WAIT_QUEUE_HEAD(km_waitq);
 
 #define ACQ_EXPIRES 30
 
@@ -163,7 +163,7 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 
 	if (kill && x->type)
 		x->type->destructor(x);
-	wake_up(km_waitq);
+	wake_up(&km_waitq);
 }
 
 void xfrm_state_delete(struct xfrm_state *x)
@@ -195,7 +195,7 @@ restart:
 		}
 	}
 	spin_unlock_bh(&xfrm_state_lock);
-	wake_up(km_waitq);
+	wake_up(&km_waitq);
 }
 
 struct xfrm_state *
@@ -213,6 +213,7 @@ xfrm_state_find(u32 daddr, u32 saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
 	spin_lock_bh(&xfrm_state_lock);
 	list_for_each_entry(x, xfrm_state_bydst+h, bydst) {
 		if (daddr == x->id.daddr.xfrm4_addr &&
+		    x->props.reqid == tmpl->reqid &&
 		    (saddr == x->props.saddr.xfrm4_addr || !saddr || !x->props.saddr.xfrm4_addr) &&
 		    tmpl->mode == x->props.mode &&
 		    tmpl->id.proto == x->id.proto) {
@@ -278,6 +279,7 @@ xfrm_state_find(u32 daddr, u32 saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
 		if (x->props.saddr.xfrm4_addr == 0)
 			x->props.saddr.xfrm4_addr = saddr;
 		x->props.mode = tmpl->mode;
+		x->props.reqid = tmpl->reqid;
 
 		if (km_query(x, tmpl, pol) == 0) {
 			x->km.state = XFRM_STATE_ACQ;
@@ -323,7 +325,7 @@ void xfrm_state_insert(struct xfrm_state *x)
 		atomic_inc(&x->refcnt);
 
 	spin_unlock_bh(&xfrm_state_lock);
-	wake_up(km_waitq);
+	wake_up(&km_waitq);
 }
 
 int xfrm_state_check_expire(struct xfrm_state *x)
@@ -384,7 +386,7 @@ xfrm_state_lookup(u32 daddr, u32 spi, u8 proto)
 }
 
 struct xfrm_state *
-xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr)
+xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr, int create)
 {
 	struct xfrm_state *x, *x0;
 	unsigned h = ntohl(daddr);
@@ -398,10 +400,11 @@ xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr)
 		    mode == x->props.mode &&
 		    proto == x->id.proto &&
 		    saddr == x->props.saddr.xfrm4_addr &&
-		    (!reqid || reqid == x->props.reqid)) {
+		    reqid == x->props.reqid &&
+		    x->km.state == XFRM_STATE_ACQ) {
 			    if (!x0)
 				    x0 = x;
-			    if (x->km.state != XFRM_STATE_ACQ)
+			    if (x->id.spi)
 				    continue;
 			    x0 = x;
 			    break;
@@ -409,7 +412,7 @@ xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr)
 	}
 	if (x0) {
 		atomic_inc(&x0->refcnt);
-	} else if ((x0 = xfrm_state_alloc()) != NULL) {
+	} else if (create && (x0 = xfrm_state_alloc()) != NULL) {
 		x0->sel.daddr.xfrm4_addr = daddr;
 		x0->sel.daddr.xfrm4_mask = ~0;
 		x0->sel.saddr.xfrm4_addr = saddr;
@@ -427,7 +430,7 @@ xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr)
 		mod_timer(&x0->timer, jiffies + ACQ_EXPIRES*HZ);
 		atomic_inc(&x0->refcnt);
 		list_add_tail(&x0->bydst, xfrm_state_bydst+h);
-		wake_up(km_waitq);
+		wake_up(&km_waitq);
 	}
 	spin_unlock_bh(&xfrm_state_lock);
 	return x0;
@@ -491,7 +494,7 @@ xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi)
 		list_add(&x->byspi, xfrm_state_byspi+h);
 		atomic_inc(&x->refcnt);
 		spin_unlock_bh(&xfrm_state_lock);
-		wake_up(km_waitq);
+		wake_up(&km_waitq);
 	}
 }
 

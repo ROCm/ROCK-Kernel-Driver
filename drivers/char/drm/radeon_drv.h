@@ -109,8 +109,6 @@ typedef struct drm_radeon_private {
 	int do_boxes;
 	int page_flipping;
 	int current_page;
-	u32 crtc_offset;
-	u32 crtc_offset_cntl;
 
 	u32 color_fmt;
 	unsigned int front_offset;
@@ -230,6 +228,8 @@ extern int radeon_emit_irq(drm_device_t *dev);
 #define RADEON_CRTC_OFFSET_CNTL		0x0228
 #	define RADEON_CRTC_TILE_EN		(1 << 15)
 #	define RADEON_CRTC_OFFSET_FLIP_CNTL	(1 << 16)
+#define RADEON_CRTC2_OFFSET		0x0324
+#define RADEON_CRTC2_OFFSET_CNTL	0x0328
 
 #define RADEON_RB3D_COLORPITCH		0x1c48
 
@@ -574,6 +574,9 @@ extern int radeon_emit_irq(drm_device_t *dev);
 #define RADEON_TXFORMAT_RGBA8888	7
 #define RADEON_TXFORMAT_VYUY422         10
 #define RADEON_TXFORMAT_YVYU422         11
+#define RADEON_TXFORMAT_DXT1            12
+#define RADEON_TXFORMAT_DXT23           14
+#define RADEON_TXFORMAT_DXT45           15
 
 #define R200_PP_TXCBLEND_0                0x2f00
 #define R200_PP_TXCBLEND_1                0x2f10
@@ -602,6 +605,44 @@ extern int radeon_emit_irq(drm_device_t *dev);
 #define R200_PP_TXOFFSET_2                0x2d30
 #define R200_PP_TXOFFSET_1                0x2d18
 #define R200_PP_TXOFFSET_0                0x2d00
+
+#define R200_PP_CUBIC_FACES_0             0x2c18
+#define R200_PP_CUBIC_FACES_1             0x2c38
+#define R200_PP_CUBIC_FACES_2             0x2c58
+#define R200_PP_CUBIC_FACES_3             0x2c78
+#define R200_PP_CUBIC_FACES_4             0x2c98
+#define R200_PP_CUBIC_FACES_5             0x2cb8
+#define R200_PP_CUBIC_OFFSET_F1_0         0x2d04
+#define R200_PP_CUBIC_OFFSET_F2_0         0x2d08
+#define R200_PP_CUBIC_OFFSET_F3_0         0x2d0c
+#define R200_PP_CUBIC_OFFSET_F4_0         0x2d10
+#define R200_PP_CUBIC_OFFSET_F5_0         0x2d14
+#define R200_PP_CUBIC_OFFSET_F1_1         0x2d1c
+#define R200_PP_CUBIC_OFFSET_F2_1         0x2d20
+#define R200_PP_CUBIC_OFFSET_F3_1         0x2d24
+#define R200_PP_CUBIC_OFFSET_F4_1         0x2d28
+#define R200_PP_CUBIC_OFFSET_F5_1         0x2d2c
+#define R200_PP_CUBIC_OFFSET_F1_2         0x2d34
+#define R200_PP_CUBIC_OFFSET_F2_2         0x2d38
+#define R200_PP_CUBIC_OFFSET_F3_2         0x2d3c
+#define R200_PP_CUBIC_OFFSET_F4_2         0x2d40
+#define R200_PP_CUBIC_OFFSET_F5_2         0x2d44
+#define R200_PP_CUBIC_OFFSET_F1_3         0x2d4c
+#define R200_PP_CUBIC_OFFSET_F2_3         0x2d50
+#define R200_PP_CUBIC_OFFSET_F3_3         0x2d54
+#define R200_PP_CUBIC_OFFSET_F4_3         0x2d58
+#define R200_PP_CUBIC_OFFSET_F5_3         0x2d5c
+#define R200_PP_CUBIC_OFFSET_F1_4         0x2d64
+#define R200_PP_CUBIC_OFFSET_F2_4         0x2d68
+#define R200_PP_CUBIC_OFFSET_F3_4         0x2d6c
+#define R200_PP_CUBIC_OFFSET_F4_4         0x2d70
+#define R200_PP_CUBIC_OFFSET_F5_4         0x2d74
+#define R200_PP_CUBIC_OFFSET_F1_5         0x2d7c
+#define R200_PP_CUBIC_OFFSET_F2_5         0x2d80
+#define R200_PP_CUBIC_OFFSET_F3_5         0x2d84
+#define R200_PP_CUBIC_OFFSET_F4_5         0x2d88
+#define R200_PP_CUBIC_OFFSET_F5_5         0x2d8c
+
 #define R200_RE_AUX_SCISSOR_CNTL          0x26f0
 #define R200_SE_VTE_CNTL                  0x20b0
 #define R200_SE_TCL_OUTPUT_VTX_COMP_SEL   0x2250

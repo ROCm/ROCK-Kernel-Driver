@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclocal.h - Internal data types used across the ACPI subsystem
- *       $Revision: 178 $
+ *       $Revision: 179 $
  *
  *****************************************************************************/
 
@@ -27,7 +27,7 @@
 #define __ACLOCAL_H__
 
 
-#define WAIT_FOREVER                    ((u32) -1)
+#define ACPI_WAIT_FOREVER               0xFFFF  /* u16, as per ACPI spec */
 
 typedef void*                           acpi_mutex;
 typedef u32                             ACPI_MUTEX_HANDLE;

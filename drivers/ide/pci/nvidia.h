@@ -17,10 +17,10 @@ static int nforce_get_info(char *, char **, off_t, int);
 
 static ide_pci_host_proc_t nforce_procs[] __initdata = {
 	{
-		name:		"nforce",
-		set:		1,
-		get_info:	nforce_get_info,
-		parent:		NULL,
+		.name		= "nforce",
+		.set		= 1,
+		.get_info	= nforce_get_info,
+		.parent		= NULL,
 	},
 };
 #endif  /* defined(DISPLAY_NFORCE_TIMINGS) && defined(CONFIG_PROC_FS) */
@@ -31,18 +31,18 @@ static void init_dma_nforce(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t nvidia_chipsets[] __devinitdata = {
 	{
-		vendor:		PCI_VENDOR_ID_NVIDIA,
-		device:		PCI_DEVICE_ID_NVIDIA_NFORCE_IDE,
-		name:		"NFORCE",
-		init_chipset:	init_chipset_nforce,
-		init_iops:	NULL,
-		init_hwif:	init_hwif_nforce,
-		init_dma:	init_dma_nforce,
-		channels:	2,
-		autodma:	AUTODMA,
-		enablebits:	{{0x50,0x01,0x01}, {0x50,0x02,0x02}},
-		bootable:	ON_BOARD,
-		extra:		0,
+		.vendor		= PCI_VENDOR_ID_NVIDIA,
+		.device		= PCI_DEVICE_ID_NVIDIA_NFORCE_IDE,
+		.name		= "NFORCE",
+		.init_chipset	= init_chipset_nforce,
+		.init_iops	= NULL,
+		.init_hwif	= init_hwif_nforce,
+		.init_dma	= init_dma_nforce,
+		.channels	= 2,
+		.autodma	= AUTODMA,
+		.enablebits	= {{0x50,0x01,0x01}, {0x50,0x02,0x02}},
+		.bootable	= ON_BOARD,
+		.extra		= 0,
 	}
 };
 

@@ -7,6 +7,7 @@
 #define NETLINK_FIREWALL	3	/* Firewalling hook				*/
 #define NETLINK_TCPDIAG		4	/* TCP socket monitoring			*/
 #define NETLINK_NFLOG		5	/* netfilter/iptables ULOG */
+#define NETLINK_XFRM		6	/* ipsec */
 #define NETLINK_ARPD		8
 #define NETLINK_ROUTE6		11	/* af_inet6 route comm channel */
 #define NETLINK_IP6_FW		13
@@ -85,6 +86,8 @@ struct nlmsgerr
 #define NET_MAJOR 36		/* Major 36 is reserved for networking 						*/
 
 #ifdef __KERNEL__
+
+#include <linux/capability.h>
 
 struct netlink_skb_parms
 {

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 44 $
+ *              $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -36,11 +36,13 @@
  *
  * FUNCTION:    Acpi_tb_get_table_count
  *
- * PARAMETERS:
+ * PARAMETERS:  RSDP            - Pointer to the RSDP
+ *              RSDT            - Pointer to the RSDT/XSDT
  *
- * RETURN:
+ * RETURN:      The number of tables pointed to by the RSDT or XSDT.
  *
- * DESCRIPTION: Calculate the number of tables
+ * DESCRIPTION: Calculate the number of tables.  Automatically handles either
+ *              an RSDT or XSDT.
  *
  ******************************************************************************/
 
@@ -80,9 +82,9 @@ acpi_tb_get_table_count (
  *
  * FUNCTION:    Acpi_tb_convert_to_xsdt
  *
- * PARAMETERS:
+ * PARAMETERS:  Table_info      - Info about the RSDT
  *
- * RETURN:
+ * RETURN:      Status
  *
  * DESCRIPTION: Convert an RSDT to an XSDT (internal common format)
  *
@@ -311,13 +313,11 @@ acpi_tb_convert_fadt2 (
  *
  * RETURN:      Status
  *
- * DESCRIPTION:
- *    Converts a BIOS supplied ACPI 1.0 FADT to an intermediate
- *    ACPI 2.0 FADT. If the BIOS supplied a 2.0 FADT then it is simply
- *    copied to the intermediate FADT.  The ACPI CA software uses this
- *    intermediate FADT. Thus a significant amount of special #ifdef
- *    type codeing is saved. This intermediate FADT will need to be
- *    freed at some point.
+ * DESCRIPTION: Converts a BIOS supplied ACPI 1.0 FADT to a local
+ *              ACPI 2.0 FADT. If the BIOS supplied a 2.0 FADT then it is simply
+ *              copied to the local FADT.  The ACPI CA software uses this
+ *              local FADT. Thus a significant amount of special #ifdef
+ *              type codeing is saved.
  *
  ******************************************************************************/
 

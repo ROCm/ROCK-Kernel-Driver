@@ -837,11 +837,11 @@ out:
 }
 
 static struct file_operations adb_fops = {
-	llseek:		no_llseek,
-	read:		adb_read,
-	write:		adb_write,
-	open:		adb_open,
-	release:	adb_release,
+	.llseek		= no_llseek,
+	.read		= adb_read,
+	.write		= adb_write,
+	.open		= adb_open,
+	.release	= adb_release,
 };
 
 static void

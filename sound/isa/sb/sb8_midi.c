@@ -205,6 +205,7 @@ static void snd_sb8dsp_midi_output_trigger(snd_rawmidi_substream_t * substream, 
 	spin_lock_irqsave(&chip->open_lock, flags);
 	if (up) {
 		if (!(chip->open & SB_OPEN_MIDI_TRIGGER)) {
+			init_timer(&chip->midi_timer);
 			chip->midi_timer.function = snd_sb8dsp_midi_output_timer;
 			chip->midi_timer.data = (unsigned long) substream;
 			chip->midi_timer.expires = 1 + jiffies;
