@@ -58,7 +58,6 @@ volatile int smp_commenced = 0;
 int smp_num_cpus = 1;
 int smp_tb_synchronized = 0;
 spinlock_t kernel_flag __cacheline_aligned = SPIN_LOCK_UNLOCKED;
-cycles_t cacheflush_time;
 unsigned long cache_decay_ticks;
 static int max_cpus __initdata = NR_CPUS;
 
@@ -595,12 +594,13 @@ void __init smp_boot_cpus(void)
 	}
 
 	/*
-	 * XXX very rough, assumes 20 bus cycles to read a cache line,
-	 * timebase increments every 4 bus cycles, 32kB L1 data cache.
+	 * XXX very rough. On POWER4 we optimise tlb flushes for
+	 * tasks that only run on one cpu so we increase decay ticks.
 	 */
-	cacheflush_time = 5 * 1024;
-	/* XXX - Fix - Anton */
-	cache_decay_ticks = 0;
+	if (__is_processor(PV_POWER4))
+		cache_decay_ticks = HZ/50;
+	else
+		cache_decay_ticks = HZ/100;
 
 	/* Probe arch for CPUs */
 	cpu_nr = ppc_md.smp_probe();
