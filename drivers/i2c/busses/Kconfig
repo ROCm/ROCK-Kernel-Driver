@@ -291,6 +291,13 @@ config I2C_RPXLITE
 	depends on (RPXLITE || RPXCLASSIC) && I2C
 	select I2C_ALGO8XX
 
+config I2C_S3C2410
+	tristate "S3C2410 I2C Driver"
+	depends on I2C && ARCH_S3C2410
+	help
+	  Say Y here to include support for I2C controller in the
+	  Samsung S3C2410 based System-on-Chip devices.
+
 config I2C_SAVAGE4
 	tristate "S3 Savage 4"
 	depends on I2C && PCI && EXPERIMENTAL
