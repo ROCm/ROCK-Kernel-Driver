@@ -507,45 +507,6 @@ long sys32_rt_sigtimedwait(compat_sigset_t *uthese, compat_siginfo_t *uinfo,
 	return ret;
 }
 
-
-
-static siginfo_t * siginfo32to64(siginfo_t *d, compat_siginfo_t *s)
-{
-	d->si_signo = s->si_signo;
-	d->si_errno = s->si_errno;
-	d->si_code = s->si_code;
-	if (s->si_signo >= SIGRTMIN) {
-		d->si_pid = s->si_pid;
-		d->si_uid = s->si_uid;
-		d->si_int = s->si_int;
-	} else {
-		switch (s->si_signo) {
-		/* XXX: What about POSIX1.b timers */
-		case SIGCHLD:
-			d->si_pid = s->si_pid;
-			d->si_status = s->si_status;
-			d->si_utime = s->si_utime;
-			d->si_stime = s->si_stime;
-			break;
-		case SIGSEGV:
-		case SIGBUS:
-		case SIGFPE:
-		case SIGILL:
-			d->si_addr = (void *)A(s->si_addr);
-	  		break;
-		case SIGPOLL:
-			d->si_band = s->si_band;
-			d->si_fd = s->si_fd;
-			break;
-		default:
-			d->si_pid = s->si_pid;
-			d->si_uid = s->si_uid;
-			break;
-		}
-	}
-	return d;
-}
-
 /*
  * Note: it is necessary to treat pid and sig as unsigned ints, with the
  * corresponding cast to a signed int to insure that the proper conversion
@@ -556,15 +517,12 @@ static siginfo_t * siginfo32to64(siginfo_t *d, compat_siginfo_t *s)
 long sys32_rt_sigqueueinfo(u32 pid, u32 sig, compat_siginfo_t *uinfo)
 {
 	siginfo_t info;
-	compat_siginfo_t info32;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	
-	if (copy_from_user (&info32, uinfo, sizeof(compat_siginfo_t)))
+	if (copy_from_user (&info, uinfo, 3*sizeof(int)) ||
+	    copy_from_user (info._sifields._pad, uinfo->_sifields._pad, SI_PAD_SIZE32))
 		return -EFAULT;
-    	/* XXX: Is this correct? */
-	siginfo32to64(&info, &info32);
-
 	set_fs (KERNEL_DS);
 	ret = sys_rt_sigqueueinfo((int)pid, (int)sig, &info);
 	set_fs (old_fs);
