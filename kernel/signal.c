@@ -1001,6 +1001,12 @@ void zap_other_threads(struct task_struct *p)
 
 	for (t = next_thread(p); t != p; t = next_thread(t)) {
 		/*
+		 * Don't bother with already dead threads
+		 */
+		if (t->state == TASK_ZOMBIE)
+			continue;
+
+		/*
 		 * We don't want to notify the parent, since we are
 		 * killed as part of a thread group due to another
 		 * thread doing an execve() or similar. So set the
