@@ -137,7 +137,7 @@
 
 
 static unsigned short ali1535_smba;
-DECLARE_MUTEX(i2c_ali1535_sem);
+static DECLARE_MUTEX(i2c_ali1535_sem);
 
 /* Detect whether a ALI1535 can be found, and initialize it, where necessary.
    Note the differences between kernels with the old PCI BIOS interface and
@@ -465,7 +465,7 @@ EXIT:
 }
 
 
-u32 ali1535_func(struct i2c_adapter *adapter)
+static u32 ali1535_func(struct i2c_adapter *adapter)
 {
 	return I2C_FUNC_SMBUS_QUICK | I2C_FUNC_SMBUS_BYTE |
 	    I2C_FUNC_SMBUS_BYTE_DATA | I2C_FUNC_SMBUS_WORD_DATA |

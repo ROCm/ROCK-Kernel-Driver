@@ -733,10 +733,8 @@ void ds_disconnect(struct usb_interface *intf)
 	while (atomic_read(&dev->refcnt)) {
 		printk(KERN_INFO "Waiting for DS to become free: refcnt=%d.\n",
 				atomic_read(&dev->refcnt));
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ);
 
-		if (signal_pending(current))
+		if (msleep_interruptible(1000))
 			flush_signals(current);
 	}
 
