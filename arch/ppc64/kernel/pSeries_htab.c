@@ -357,7 +357,7 @@ static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
 	hptep->dw0.dword0 = 0;
 
 	/* Invalidate the tlb */
-	if (!large && local && __is_processor(PV_POWER4)) {
+	if (cpu_has_tlbiel() && !large && local) {
 		_tlbiel(va);
 	} else {
 		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
@@ -417,7 +417,7 @@ static void pSeries_flush_hash_range(unsigned long context,
 		hptep->dw0.dword0 = 0;
 	}
 
-	if (!large && local && __is_processor(PV_POWER4)) {
+	if (cpu_has_tlbiel() && !large && local) {
 		asm volatile("ptesync":::"memory");
 
 		for (i = 0; i < j; i++) {

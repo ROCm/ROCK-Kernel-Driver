@@ -542,7 +542,7 @@ insert_bpts()
 		}
 	}
 
-	if (!__is_processor(PV_POWER4)) {
+	if (!__is_processor(PV_POWER4) && !__is_processor(PV_POWER4p)) {
 		if (dabr.enabled)
 			set_dabr(dabr.address);
 		if (iabr.enabled)
@@ -559,7 +559,7 @@ remove_bpts()
 
 	if (naca->platform != PLATFORM_PSERIES)
 		return;
-	if (!__is_processor(PV_POWER4)) {
+	if (!__is_processor(PV_POWER4) && !__is_processor(PV_POWER4p)) {
 		set_dabr(0);
 		set_iabr(0);
 	}
@@ -844,7 +844,7 @@ bpt_cmds(void)
 	cmd = inchar();
 	switch (cmd) {
 	case 'd':	/* bd - hardware data breakpoint */
-		if (__is_processor(PV_POWER4)) {
+		if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p)) {
 			printf("Not implemented on POWER4\n");
 			break;
 		}
@@ -864,7 +864,7 @@ bpt_cmds(void)
 			dabr.address = (dabr.address & ~7) | mode;
 		break;
 	case 'i':	/* bi - hardware instr breakpoint */
-		if (__is_processor(PV_POWER4)) {
+		if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p)) {
 			printf("Not implemented on POWER4\n");
 			break;
 		}

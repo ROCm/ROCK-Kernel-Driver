@@ -324,7 +324,7 @@ void initialize_paca_hardware_interrupt_stack(void)
 	 * __get_free_pages() might give us a page > KERNBASE+256M which
 	 * is mapped with large ptes so we can't set up the guard page.
 	 */
-	if (__is_processor(PV_POWER4))
+	if (cpu_has_largepage())
 		return;
 
 	for (i=0; i < NR_CPUS; i++) {

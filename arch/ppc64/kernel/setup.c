@@ -300,6 +300,9 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	case PV_SSTAR:
 		seq_printf(m, "RS64-IV (sstar)\n");
 		break;
+	case PV_POWER4p:
+		seq_printf(m, "POWER4+ (gq)\n");
+		break;
 	case PV_630:
 		seq_printf(m, "POWER3 (630)\n");
 		break;

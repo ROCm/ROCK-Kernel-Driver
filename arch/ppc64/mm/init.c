@@ -57,6 +57,7 @@
 #include <asm/tlb.h>
 #include <asm/naca.h>
 #include <asm/eeh.h>
+#include <asm/processor.h>
 
 #include <asm/ppcdebug.h>
 
@@ -570,7 +571,7 @@ void flush_dcache_page(struct page *page)
 
 void flush_icache_page(struct vm_area_struct *vma, struct page *page)
 {
-	if (__is_processor(PV_POWER4))
+	if (cpu_has_noexecute())
 		return;
 
 	if ((vma->vm_flags & VM_EXEC) == 0)
@@ -588,7 +589,7 @@ void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 	clear_page(page);
 
 	/* XXX we shouldnt have to do this, but glibc requires it */
-	if (__is_processor(PV_POWER4))
+	if (cpu_has_noexecute())
 		clear_bit(PG_arch_1, &pg->flags);
 	else
 		__flush_dcache_icache(page);
@@ -608,7 +609,7 @@ void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
 		return;
 #endif
 
-	if (__is_processor(PV_POWER4))
+	if (cpu_has_noexecute())
 		clear_bit(PG_arch_1, &pg->flags);
 	else
 		__flush_dcache_icache(vto);

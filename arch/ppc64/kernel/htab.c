@@ -139,7 +139,7 @@ htab_initialize(void)
 	mask = pteg_count-1;
 
 	/* XXX we currently map kernel text rw, should fix this */
-	if (__is_processor(PV_POWER4) && _naca->physicalMemorySize > 256*MB) {
+	if (cpu_has_largepage() && _naca->physicalMemorySize > 256*MB) {
 		create_pte_mapping((unsigned long)KERNELBASE, 
 				   KERNELBASE + 256*MB, mode_rw, mask, 0);
 		create_pte_mapping((unsigned long)KERNELBASE + 256*MB, 
@@ -245,9 +245,8 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 
 #define PPC64_HWNOEXEC (1 << 2)
 
-	/* We do lazy icache flushing on POWER4 */
-	if (unlikely(__is_processor(PV_POWER4) &&
-	    pfn_valid(pte_pfn(new_pte)))) {
+	/* We do lazy icache flushing on cpus that support it */
+	if (unlikely(cpu_has_noexecute() && pfn_valid(pte_pfn(new_pte)))) {
 		struct page *page = pte_page(new_pte);
 
 		/* page is dirty */

@@ -25,8 +25,6 @@
 int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid);
 void make_slbe(unsigned long esid, unsigned long vsid, int large);
 
-#define cpu_has_slb()	(__is_processor(PV_POWER4))
-
 /*
  * Build an entry for the base kernel segment and put it into
  * the segment table or SLB.  All other segment table or SLB
