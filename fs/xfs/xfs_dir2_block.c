@@ -437,7 +437,6 @@ xfs_dir2_block_getdents(
 	xfs_mount_t		*mp;		/* filesystem mount point */
 	xfs_dir2_put_args_t	p;		/* arg package for put rtn */
 	char			*ptr;		/* current data entry */
-	char			*savptr;	/* saved data entry */
 	int			wantoff;	/* starting block offset */
 
 	mp = dp->i_mount;
