@@ -27,7 +27,6 @@
 #include "user_util.h"
 #include "kern_util.h"
 #include "kern.h"
-#include "mprot.h"
 #include "mem_user.h"
 #include "mem.h"
 #include "umid.h"

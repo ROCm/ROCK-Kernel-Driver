@@ -74,7 +74,6 @@ extern void do_exec(int old_pid, int new_pid);
 extern void tracer_panic(char *msg, ...);
 extern char *get_umid(int only_if_set);
 extern void do_longjmp(void *p, int val);
-extern void suspend_new_thread(int fd);
 extern int detach(int pid, int sig);
 extern int attach(int pid);
 extern void kill_child_dead(int pid);
