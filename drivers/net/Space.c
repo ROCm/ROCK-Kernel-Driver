@@ -103,6 +103,9 @@ extern struct net_device *sdla_init(void);
 #ifdef CONFIG_COPS
 extern struct net_device *cops_probe(int unit);
 #endif
+#ifdef CONFIG_LTPC
+extern struct net_device *ltpc_probe(void);
+#endif
   
 /* Detachable devices ("pocket adaptors") */
 extern int de620_probe(struct net_device *);
@@ -470,22 +473,14 @@ void __init probe_old_netdevs(void)
 	cops_probe(1);
 	cops_probe(2);
 #endif
+#ifdef CONFIG_LTPC
+	ltpc_probe();
+#endif
 #ifdef CONFIG_SDLA
 	sdla_init();
 #endif
 
 }
-
-#if defined(CONFIG_LTPC)
-extern int ltpc_probe(struct net_device *);
-static struct net_device dev_ltpc = {
-	.name		= "lt0",
-	.next		= NEXT_DEV,
-	.init		= ltpc_probe
-};
-#undef NEXT_DEV
-#define NEXT_DEV	(&dev_ltpc)
-#endif  /* LTPC */
 
 /*
  * The @dev_base list is protected by @dev_base_lock and the rtln
