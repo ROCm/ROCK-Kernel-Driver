@@ -189,7 +189,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 	int i,datasize,res;
 	unsigned long funcs;
 
-	dev_dbg(&client->dev, "i2c-%d ioctl, cmd: 0x%x, arg: %lx.\n",
+	dev_dbg(&client->adapter->dev, "i2c-%d ioctl, cmd: 0x%x, arg: %lx.\n",
 		iminor(inode),cmd, arg);
 
 	switch ( cmd ) {
@@ -310,7 +310,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		    (data_arg.size != I2C_SMBUS_BLOCK_DATA) &&
 		    (data_arg.size != I2C_SMBUS_I2C_BLOCK_DATA) &&
 		    (data_arg.size != I2C_SMBUS_BLOCK_PROC_CALL)) {
-			dev_dbg(&client->dev,
+			dev_dbg(&client->adapter->dev,
 				"size out of range (%x) in ioctl I2C_SMBUS.\n",
 				data_arg.size);
 			return -EINVAL;
@@ -319,7 +319,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		   so the check is valid if size==I2C_SMBUS_QUICK too. */
 		if ((data_arg.read_write != I2C_SMBUS_READ) && 
 		    (data_arg.read_write != I2C_SMBUS_WRITE)) {
-			dev_dbg(&client->dev, 
+			dev_dbg(&client->adapter->dev, 
 				"read_write out of range (%x) in ioctl I2C_SMBUS.\n",
 				data_arg.read_write);
 			return -EINVAL;
@@ -338,7 +338,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 					      data_arg.size, NULL);
 
 		if (data_arg.data == NULL) {
-			dev_dbg(&client->dev,
+			dev_dbg(&client->adapter->dev,
 				"data is NULL pointer in ioctl I2C_SMBUS.\n");
 			return -EINVAL;
 		}
