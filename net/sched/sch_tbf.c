@@ -455,6 +455,8 @@ static int tbf_graft(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
 	sch_tree_lock(sch);	
 	*old = xchg(&q->qdisc, new);
 	qdisc_reset(*old);
+	sch->q.qlen = 0;
+	sch->stats.backlog = 0;
 	sch_tree_unlock(sch);
 	
 	return 0;
