@@ -1105,7 +1105,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	struct cifsTconInfo *pTcon;
 	int bytes_read = 0;
 	unsigned int read_size,i;
-	char * smb_read_data = 0;
+	char * smb_read_data = NULL;
 	struct smb_com_read_rsp * pSMBr;
 	struct pagevec lru_pvec;
 	struct cifsFileInfo * open_file;
@@ -1170,7 +1170,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			if(rc== -EAGAIN) {
 				if(smb_read_data) {
 					cifs_buf_release(smb_read_data);
-					smb_read_data = 0;
+					smb_read_data = NULL;
 				}
 			}
 		}
@@ -1224,7 +1224,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		}
 		if(smb_read_data) {
 			cifs_buf_release(smb_read_data);
-			smb_read_data = 0;
+			smb_read_data = NULL;
 		}
 		bytes_read = 0;
 	}
@@ -1234,7 +1234,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 /* need to free smb_read_data buf before exit */
 	if(smb_read_data) {
 		cifs_buf_release(smb_read_data);
-		smb_read_data = 0;
+		smb_read_data = NULL;
 	} 
 
 	FreeXid(xid);
@@ -1463,9 +1463,13 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	} else if (pfindData->Type == UNIX_CHARDEV) {
 		*pobject_type = DT_CHR;
 		tmp_inode->i_mode |= S_IFCHR;
+		tmp_inode->i_rdev = MKDEV(le64_to_cpu(pfindData->DevMajor),
+				le64_to_cpu(pfindData->DevMinor) & MINORMASK);
 	} else if (pfindData->Type == UNIX_BLOCKDEV) {
 		*pobject_type = DT_BLK;
 		tmp_inode->i_mode |= S_IFBLK;
+		tmp_inode->i_rdev = MKDEV(le64_to_cpu(pfindData->DevMajor),
+				le64_to_cpu(pfindData->DevMinor) & MINORMASK);
 	} else if (pfindData->Type == UNIX_FIFO) {
 		*pobject_type = DT_FIFO;
 		tmp_inode->i_mode |= S_IFIFO;
@@ -1682,7 +1686,14 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	data = kmalloc(bufsize, GFP_KERNEL);
 	pfindData = (FILE_DIRECTORY_INFO *) data;
 
+	if(file->f_dentry == NULL) {
+		FreeXid(xid);
+		return -EIO;
+	}
+	down(&file->f_dentry->d_sb->s_vfs_rename_sem);
 	full_path = build_wildcard_path_from_dentry(file->f_dentry);
+	up(&file->f_dentry->d_sb->s_vfs_rename_sem);
+
 
 	cFYI(1, ("Full path: %s start at: %lld ", full_path, file->f_pos));
 

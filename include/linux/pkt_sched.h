@@ -37,17 +37,7 @@ struct tc_stats
 	__u32	bps;			/* Current flow byte rate */
 	__u32	pps;			/* Current flow packet rate */
 	__u32	qlen;
-#ifdef CONFIG_NET_CLS_ACT
-/* eventually remove the define here; adding this(useful) 
-field at least fixes the 8 byte layout problems we 
-have with MIPS and PPC because we have a u64
-*/
-	__u32	reqs;			/* number of requeues happened */
-#endif
 	__u32	backlog;
-#ifdef __KERNEL__
-	spinlock_t *lock;
-#endif
 };
 
 struct tc_estimator
@@ -108,34 +98,6 @@ struct tc_prio_qopt
 {
 	int	bands;			/* Number of bands */
 	__u8	priomap[TC_PRIO_MAX+1];	/* Map: logical priority -> PRIO band */
-};
-
-/* CSZ section */
-
-struct tc_csz_qopt
-{
-	int		flows;		/* Maximal number of guaranteed flows */
-	unsigned char	R_log;		/* Fixed point position for round number */
-	unsigned char	delta_log;	/* Log of maximal managed time interval */
-	__u8		priomap[TC_PRIO_MAX+1];	/* Map: logical priority -> CSZ band */
-};
-
-struct tc_csz_copt
-{
-	struct tc_ratespec slice;
-	struct tc_ratespec rate;
-	struct tc_ratespec peakrate;
-	__u32		limit;
-	__u32		buffer;
-	__u32		mtu;
-};
-
-enum
-{
-	TCA_CSZ_UNSPEC,
-	TCA_CSZ_PARMS,
-	TCA_CSZ_RTAB,
-	TCA_CSZ_PTAB,
 };
 
 /* TBF section */
@@ -439,11 +401,14 @@ enum {
 
 #define TCA_ATM_MAX	TCA_ATM_STATE
 
-/* Delay section */
-struct tc_dly_qopt
+/* Network emulator */
+struct tc_netem_qopt
 {
-	__u32	latency;
-	__u32   limit;
-	__u32	loss;
+	__u32	latency;	/* added delay (us) */
+	__u32   limit;		/* fifo limit (packets) */
+	__u32	loss;		/* random packet loss (0=none ~0=100%) */
+	__u32	gap;		/* re-ordering gap (0 for delay all) */
+	__u32   duplicate;	/* random packet dup  (0=none ~0=100%) */
+	__u32	jitter;		/* random jitter in latency (us) */
 };
 #endif

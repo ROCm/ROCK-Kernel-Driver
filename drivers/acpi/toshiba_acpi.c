@@ -115,7 +115,7 @@ is_valid_acpi_path(const char* methodName)
 	acpi_handle handle;
 	acpi_status status;
 
-	status = acpi_get_handle(0, (char*)methodName, &handle);
+	status = acpi_get_handle(NULL, (char*)methodName, &handle);
 	return !ACPI_FAILURE(status);
 }
 
@@ -131,7 +131,7 @@ write_acpi_int(const char* methodName, int val)
 	in_objs[0].type = ACPI_TYPE_INTEGER;
 	in_objs[0].integer.value = val;
 
-	status = acpi_evaluate_object(0, (char*)methodName, &params, 0);
+	status = acpi_evaluate_object(NULL, (char*)methodName, &params, NULL);
 	return (status == AE_OK);
 }
 
@@ -178,7 +178,7 @@ hci_raw(const u32 in[HCI_WORDS], u32 out[HCI_WORDS])
 	results.length = sizeof(out_objs);
 	results.pointer = out_objs;
 
-	status = acpi_evaluate_object(0, (char*)method_hci, &params,
+	status = acpi_evaluate_object(NULL, (char*)method_hci, &params,
 		&results);
 	if ((status == AE_OK) && (out_objs->package.count <= HCI_WORDS)) {
 		for (i = 0; i < out_objs->package.count; ++i) {
@@ -487,8 +487,8 @@ ProcItem proc_items[] =
 	{ "video"	, read_video	, write_video	},
 	{ "fan"		, read_fan	, write_fan	},
 	{ "keys"	, read_keys	, write_keys	},
-	{ "version"	, read_version	, 0		},
-	{ 0		, 0		, 0		},
+	{ "version"	, read_version	, NULL		},
+	{ NULL }
 };
 
 static acpi_status __init

@@ -1839,7 +1839,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		    pci_unmap_single(lp->pci_dev, lp->tx_dma_addr[entry],
 			lp->tx_skbuff[entry]->len, PCI_DMA_TODEVICE);
 		    dev_kfree_skb_irq(lp->tx_skbuff[entry]);
-		    lp->tx_skbuff[entry] = 0;
+		    lp->tx_skbuff[entry] = NULL;
 		    lp->tx_dma_addr[entry] = 0;
 		}
 		dirty_tx++;

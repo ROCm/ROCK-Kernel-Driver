@@ -97,7 +97,7 @@ asmlinkage unsigned long sunos_mmap(unsigned long addr, unsigned long len,
 		    iminor(file->f_dentry->d_inode) == 5) {
 			flags |= MAP_ANONYMOUS;
 			fput(file);
-			file = 0;
+			file = NULL;
 		}
 	}
 	ret_type = flags & _MAP_NEW;
@@ -505,7 +505,7 @@ asmlinkage int sunos_nosys(void)
 	info.si_signo = SIGSYS;
 	info.si_errno = 0;
 	info.si_code = __SI_FAULT|0x100;
-	info.si_addr = (void *)regs->pc;
+	info.si_addr = (void __user *)regs->pc;
 	info.si_trapno = regs->u_regs[UREG_G1];
 	send_sig_info(SIGSYS, &info, current);
 	if (cnt++ < 4) {
@@ -755,7 +755,7 @@ sunos_mount(char __user *type, char __user *dir, int flags, void __user *data)
 {
 	int linux_flags = 0;
 	int ret = -EINVAL;
-	char *dev_fname = 0;
+	char *dev_fname = NULL;
 	char *dir_page, *type_page;
 
 	if (!capable (CAP_SYS_ADMIN))

@@ -279,6 +279,16 @@ void path_release(struct nameidata *nd)
 }
 
 /*
+ * umount() mustn't call path_release()/mntput() as that would clear
+ * mnt_expiry_mark
+ */
+void path_release_on_umount(struct nameidata *nd)
+{
+	dput(nd->dentry);
+	_mntput(nd->mnt);
+}
+
+/*
  * Internal lookup() using the new generic dcache.
  * SMP-safe
  */
@@ -398,7 +408,61 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, s
 	return result;
 }
 
-static int __vfs_follow_link(struct nameidata *, const char *);
+static int __emul_lookup_dentry(const char *, struct nameidata *);
+
+/* SMP-safe */
+static inline int
+walk_init_root(const char *name, struct nameidata *nd)
+{
+	read_lock(&current->fs->lock);
+	if (current->fs->altroot && !(nd->flags & LOOKUP_NOALT)) {
+		nd->mnt = mntget(current->fs->altrootmnt);
+		nd->dentry = dget(current->fs->altroot);
+		read_unlock(&current->fs->lock);
+		if (__emul_lookup_dentry(name,nd))
+			return 0;
+		read_lock(&current->fs->lock);
+	}
+	nd->mnt = mntget(current->fs->rootmnt);
+	nd->dentry = dget(current->fs->root);
+	read_unlock(&current->fs->lock);
+	return 1;
+}
+
+static inline int __vfs_follow_link(struct nameidata *nd, const char *link)
+{
+	int res = 0;
+	char *name;
+	if (IS_ERR(link))
+		goto fail;
+
+	if (*link == '/') {
+		path_release(nd);
+		if (!walk_init_root(link, nd))
+			/* weird __emul_prefix() stuff did it */
+			goto out;
+	}
+	res = link_path_walk(link, nd);
+out:
+	if (nd->depth || res || nd->last_type!=LAST_NORM)
+		return res;
+	/*
+	 * If it is an iterative symlinks resolution in open_namei() we
+	 * have to copy the last component. And all that crap because of
+	 * bloody create() on broken symlinks. Furrfu...
+	 */
+	name = __getname();
+	if (unlikely(!name)) {
+		path_release(nd);
+		return -ENOMEM;
+	}
+	strcpy(name, nd->last.name);
+	nd->last.name = name;
+	return 0;
+fail:
+	path_release(nd);
+	return PTR_ERR(link);
+}
 
 /*
  * This limits recursive symlink follows to 8, while
@@ -857,25 +921,6 @@ set_it:
 		dput(olddentry);
 		mntput(oldmnt);
 	}
-}
-
-/* SMP-safe */
-static inline int
-walk_init_root(const char *name, struct nameidata *nd)
-{
-	read_lock(&current->fs->lock);
-	if (current->fs->altroot && !(nd->flags & LOOKUP_NOALT)) {
-		nd->mnt = mntget(current->fs->altrootmnt);
-		nd->dentry = dget(current->fs->altroot);
-		read_unlock(&current->fs->lock);
-		if (__emul_lookup_dentry(name,nd))
-			return 0;
-		read_lock(&current->fs->lock);
-	}
-	nd->mnt = mntget(current->fs->rootmnt);
-	nd->dentry = dget(current->fs->root);
-	read_unlock(&current->fs->lock);
-	return 1;
 }
 
 int fastcall path_lookup(const char *name, unsigned int flags, struct nameidata *nd)
@@ -2209,41 +2254,6 @@ int generic_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 			dentry->d_inode->i_op->put_link(dentry, &nd);
 	}
 	return res;
-}
-
-static int __vfs_follow_link(struct nameidata *nd, const char *link)
-{
-	int res = 0;
-	char *name;
-	if (IS_ERR(link))
-		goto fail;
-
-	if (*link == '/') {
-		path_release(nd);
-		if (!walk_init_root(link, nd))
-			/* weird __emul_prefix() stuff did it */
-			goto out;
-	}
-	res = link_path_walk(link, nd);
-out:
-	if (nd->depth || res || nd->last_type!=LAST_NORM)
-		return res;
-	/*
-	 * If it is an iterative symlinks resolution in open_namei() we
-	 * have to copy the last component. And all that crap because of
-	 * bloody create() on broken symlinks. Furrfu...
-	 */
-	name = __getname();
-	if (unlikely(!name)) {
-		path_release(nd);
-		return -ENOMEM;
-	}
-	strcpy(name, nd->last.name);
-	nd->last.name = name;
-	return 0;
-fail:
-	path_release(nd);
-	return PTR_ERR(link);
 }
 
 int vfs_follow_link(struct nameidata *nd, const char *link)

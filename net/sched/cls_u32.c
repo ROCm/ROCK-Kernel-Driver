@@ -72,6 +72,7 @@ struct tc_u_knode
 	struct tcf_police	*police;
 #endif
 #endif
+	u8			fshift;
 	struct tcf_result	res;
 	struct tc_u_hnode	*ht_down;
 	struct tc_u32_sel	sel;
@@ -99,16 +100,10 @@ struct tc_u_common
 
 static struct tc_u_common *u32_list;
 
-static __inline__ unsigned u32_hash_fold(u32 key, struct tc_u32_sel *sel)
+static __inline__ unsigned u32_hash_fold(u32 key, struct tc_u32_sel *sel, u8 fshift)
 {
-#ifdef fix_u32_bug
-	unsigned h = (key & sel->hmask)>>sel->fshift;
-#else
-	unsigned h = (key & sel->hmask);
+	unsigned h = (key & sel->hmask)>>fshift;
 
-	h ^= h>>16;
-	h ^= h>>8;
-#endif
 	return h;
 }
 
@@ -206,7 +201,7 @@ check_terminal:
 		ht = n->ht_down;
 		sel = 0;
 		if (ht->divisor)
-			sel = ht->divisor&u32_hash_fold(*(u32*)(ptr+n->sel.hoff), &n->sel);
+			sel = ht->divisor&u32_hash_fold(*(u32*)(ptr+n->sel.hoff), &n->sel,n->fshift);
 
 		if (!(n->sel.flags&(TC_U32_VAROFFSET|TC_U32_OFFSET|TC_U32_EAT)))
 			goto next_ht;
@@ -701,6 +696,17 @@ static int u32_change(struct tcf_proto *tp, unsigned long base, u32 handle,
 	memcpy(&n->sel, s, sizeof(*s) + s->nkeys*sizeof(struct tc_u32_key));
 	n->ht_up = ht;
 	n->handle = handle;
+{
+	u8 i = 0;
+	u32 mask = s->hmask;
+	if (mask) {
+		while (!(mask & 1)) {
+			i++;
+			mask>>=1;
+		}
+	}
+	n->fshift = i;
+}
 	err = u32_set_parms(tp->q, base, ht, n, tb, tca[TCA_RATE-1]);
 	if (err == 0) {
 		struct tc_u_knode **ins;
@@ -784,9 +790,6 @@ static int u32_dump(struct tcf_proto *tp, unsigned long fh,
 			RTA_PUT(skb, TCA_U32_CLASSID, 4, &n->res.classid);
 		if (n->ht_down)
 			RTA_PUT(skb, TCA_U32_LINK, 4, &n->ht_down->handle);
-#ifdef CONFIG_CLS_U32_PERF2
-		n->sel.rcnt = n->sel.rhit = 0;
-#endif
 #ifdef CONFIG_NET_CLS_ACT
 		/* again for backward compatible mode - we want
 		*  to work with both old and new modes of entering
@@ -842,7 +845,8 @@ static int u32_dump(struct tcf_proto *tp, unsigned long fh,
 #else
 #ifdef CONFIG_NET_CLS_POLICE
 	if (TC_U32_KEY(n->handle) && n->police) {
-		if (qdisc_copy_stats(skb,&n->police->stats))
+		if (qdisc_copy_stats(skb, &n->police->stats,
+				     n->police->stats_lock))
 			goto rtattr_failure;
 	}
 #endif

@@ -235,24 +235,13 @@ static inline int put_compat_semid_ds(struct semid64_ds *s,
 	return err;
 }
 
-static inline int do_semctl(int semid, int semnum, int cmd, union semun arg)
-{
-	mm_segment_t old_fs;
-	int err;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	err = sys_semctl(semid, semnum, cmd, arg);
-	set_fs(old_fs);
-
-	return err;
-}
 long compat_sys_semctl(int first, int second, int third, void __user *uptr)
 {
 	union semun fourth;
 	u32 pad;
 	int err, err2;
 	struct semid64_ds s64;
+	struct semid64_ds __user *up64;
 	int version = compat_ipc_parse_version(&third);
 
 	if (!uptr)
@@ -279,16 +268,17 @@ long compat_sys_semctl(int first, int second, int third, void __user *uptr)
 
 	case IPC_STAT:
 	case SEM_STAT:
-		fourth.__pad = &s64;
-		err = do_semctl(first, second, third, fourth);
+		up64 = compat_alloc_user_space(sizeof(s64));
+		fourth.__pad = up64;
+		err = sys_semctl(first, second, third, fourth);
 		if (err < 0)
 			break;
-
-		if (version == IPC_64) {
+		if (copy_from_user(&s64, up64, sizeof(s64)))
+			err2 = -EFAULT;
+		else if (version == IPC_64)
 			err2 = put_compat_semid64_ds(&s64, compat_ptr(pad));
-		} else {
+		else
 			err2 = put_compat_semid_ds(&s64, compat_ptr(pad));
-		}
 		if (err2)
 			err = -EFAULT;
 		break;
@@ -299,11 +289,14 @@ long compat_sys_semctl(int first, int second, int third, void __user *uptr)
 		} else {
 			err = get_compat_semid_ds(&s64, compat_ptr(pad));
 		}
+		up64 = compat_alloc_user_space(sizeof(s64));
+		if (copy_to_user(up64, &s64, sizeof(s64)))
+			err = -EFAULT;
 		if (err)
 			break;
 
-		fourth.__pad = &s64;
-		err = do_semctl(first, second, third, fourth);
+		fourth.__pad = up64;
+		err = sys_semctl(first, second, third, fourth);
 		break;
 
 	default:
@@ -315,39 +308,30 @@ long compat_sys_semctl(int first, int second, int third, void __user *uptr)
 
 long compat_sys_msgsnd(int first, int second, int third, void __user *uptr)
 {
-	struct msgbuf *p;
-	struct compat_msgbuf __user *up;
-	mm_segment_t old_fs;
-	int err;
+	struct msgbuf __user *p;
+	struct compat_msgbuf __user *up = uptr;
+	long type;
 
 	if (first < 0)
 		return -EINVAL;
 	if (second < 0 || (second >= MAXBUF - sizeof(struct msgbuf)))
 		return -EINVAL;
 
-	p = kmalloc(second + sizeof(struct msgbuf), GFP_USER);
-	if (!p)
-		return -ENOMEM;
-	err = -EFAULT;
-	up = uptr;
-	if (get_user(p->mtype, &up->mtype) ||
-	    copy_from_user(p->mtext, &up->mtext, second))
-		goto out;
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	err = sys_msgsnd(first, p, second, third);
-	set_fs(old_fs);
-out:
-	kfree(p);
-	return err;
+	p = compat_alloc_user_space(second + sizeof(struct msgbuf));
+	if (get_user(type, &up->mtype) ||
+	    put_user(type, &p->mtype) ||
+	    copy_in_user(p->mtext, up->mtext, second))
+		return -EFAULT;
+
+	return sys_msgsnd(first, p, second, third);
 }
 
 long compat_sys_msgrcv(int first, int second, int msgtyp, int third,
 			   int version, void __user *uptr)
 {
-	struct msgbuf *p;
+	struct msgbuf __user *p;
 	struct compat_msgbuf __user *up;
-	mm_segment_t old_fs;
+	long type;
 	int err;
 
 	if (first < 0)
@@ -356,34 +340,25 @@ long compat_sys_msgrcv(int first, int second, int msgtyp, int third,
 		return -EINVAL;
 
 	if (!version) {
-		struct compat_ipc_kludge __user *uipck = uptr;
 		struct compat_ipc_kludge ipck;
-
 		err = -EINVAL;
 		if (!uptr)
 			goto out;
 		err = -EFAULT;
-		if (copy_from_user (&ipck, uipck, sizeof(ipck)))
+		if (copy_from_user (&ipck, uptr, sizeof(ipck)))
 			goto out;
 		uptr = compat_ptr(ipck.msgp);
 		msgtyp = ipck.msgtyp;
 	}
-	err = -ENOMEM;
-	p = kmalloc(second + sizeof(struct msgbuf), GFP_USER);
-	if (!p)
-		goto out;
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
+	p = compat_alloc_user_space(second + sizeof(struct msgbuf));
 	err = sys_msgrcv(first, p, second, msgtyp, third);
-	set_fs(old_fs);
 	if (err < 0)
-		goto free_then_out;
+		goto out;
 	up = uptr;
-	if (put_user(p->mtype, &up->mtype) ||
-	    __copy_to_user(&up->mtext, p->mtext, err))
+	if (get_user(type, &p->mtype) ||
+	    put_user(type, &up->mtype) ||
+	    copy_in_user(up->mtext, p->mtext, err))
 		err = -EFAULT;
-free_then_out:
-	kfree(p);
 out:
 	return err;
 }
@@ -450,24 +425,12 @@ static inline int put_compat_msqid_ds(struct msqid64_ds *m,
 	return err;
 }
 
-static inline int do_msgctl(int first, int second, void *buf)
-{
-	mm_segment_t old_fs;
-	int err;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	err = sys_msgctl(first, second, buf);
-	set_fs(old_fs);
-
-	return err;
-}
-
 long compat_sys_msgctl(int first, int second, void __user *uptr)
 {
 	int err, err2;
 	struct msqid64_ds m64;
 	int version = compat_ipc_parse_version(&second);
+	void __user *p;
 
 	switch (second & (~IPC_64)) {
 	case IPC_INFO:
@@ -484,21 +447,25 @@ long compat_sys_msgctl(int first, int second, void __user *uptr)
 		}
 		if (err)
 			break;
-
-		err = do_msgctl(first, second, &m64);
+		p = compat_alloc_user_space(sizeof(m64));
+		if (copy_to_user(p, &m64, sizeof(m64)))
+			err = -EFAULT;
+		else
+			err = sys_msgctl(first, second, p);
 		break;
 
 	case IPC_STAT:
 	case MSG_STAT:
-		err = do_msgctl(first, second, &m64);
+		p = compat_alloc_user_space(sizeof(m64));
+		err = sys_msgctl(first, second, p);
 		if (err < 0)
 			break;
-
-		if (version == IPC_64) {
+		if (copy_from_user(&m64, p, sizeof(m64)))
+			err2 = -EFAULT;
+		else if (version == IPC_64)
 			err2 = put_compat_msqid64_ds(&m64, uptr);
-		} else {
+		else
 			err2 = put_compat_msqid_ds(&m64, uptr);
-		}
 		if (err2)
 			err = -EFAULT;
 		break;
@@ -607,40 +574,29 @@ static inline int put_compat_shminfo(struct shminfo64 *smi,
 	err |= __put_user(smi->shmall, &up->shmall);
 }
 
-static inline int put_compat_shm_info(struct shm_info *si,
+static inline int put_compat_shm_info(struct shm_info __user *ip,
 				      struct compat_shm_info __user *uip)
 {
 	int err;
+	struct shm_info si;
 
-	if (!access_ok(VERIFY_WRITE, uip, sizeof(*uip)))
+	if (!access_ok(VERIFY_WRITE, uip, sizeof(*uip)) ||
+	    copy_from_user(&si, ip, sizeof(si)))
 		return -EFAULT;
-	err  = __put_user(si->used_ids, &uip->used_ids);
-	err |= __put_user(si->shm_tot, &uip->shm_tot);
-	err |= __put_user(si->shm_rss, &uip->shm_rss);
-	err |= __put_user(si->shm_swp, &uip->shm_swp);
-	err |= __put_user(si->swap_attempts, &uip->swap_attempts);
-	err |= __put_user(si->swap_successes, &uip->swap_successes);
-	return err;
-}
-
-static inline int do_shmctl(int shmid, int cmd, void *buf)
-{
-	mm_segment_t old_fs;
-	int err;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	err = sys_shmctl(shmid, cmd, buf);
-	set_fs(old_fs);
-
+	err  = __put_user(si.used_ids, &uip->used_ids);
+	err |= __put_user(si.shm_tot, &uip->shm_tot);
+	err |= __put_user(si.shm_rss, &uip->shm_rss);
+	err |= __put_user(si.shm_swp, &uip->shm_swp);
+	err |= __put_user(si.swap_attempts, &uip->swap_attempts);
+	err |= __put_user(si.swap_successes, &uip->swap_successes);
 	return err;
 }
 
 long compat_sys_shmctl(int first, int second, void __user *uptr)
 {
+	void __user *p;
 	struct shmid64_ds s64;
 	struct shminfo64 smi;
-	struct shm_info si;
 	int err, err2;
 	int version = compat_ipc_parse_version(&second);
 
@@ -652,15 +608,16 @@ long compat_sys_shmctl(int first, int second, void __user *uptr)
 		break;
 
 	case IPC_INFO:
-		err = do_shmctl(first, second, &smi);
+		p = compat_alloc_user_space(sizeof(smi));
+		err = sys_shmctl(first, second, p);
 		if (err < 0)
 			break;
-
-		if (version == IPC_64) {
+		if (copy_from_user(&smi, p, sizeof(smi)))
+			err2 = -EFAULT;
+		else if (version == IPC_64)
 			err2 = put_compat_shminfo64(&smi, uptr);
-		} else {
+		else
 			err2 = put_compat_shminfo(&smi, uptr);
-		}
 		if (err2)
 			err = -EFAULT;
 		break;
@@ -674,30 +631,35 @@ long compat_sys_shmctl(int first, int second, void __user *uptr)
 		}
 		if (err)
 			break;
-
-		err = do_shmctl(first, second, &s64);
+		p = compat_alloc_user_space(sizeof(s64));
+		if (copy_to_user(p, &s64, sizeof(s64)))
+			err = -EFAULT;
+		else
+			err = sys_shmctl(first, second, p);
 		break;
 
 	case IPC_STAT:
 	case SHM_STAT:
-		err = do_shmctl(first, second, &s64);
+		p = compat_alloc_user_space(sizeof(s64));
+		err = sys_shmctl(first, second, p);
 		if (err < 0)
 			break;
-
-		if (version == IPC_64) {
+		if (copy_from_user(&s64, p, sizeof(s64)))
+			err2 = -EFAULT;
+		else if (version == IPC_64)
 			err2 = put_compat_shmid64_ds(&s64, uptr);
-		} else {
+		else
 			err2 = put_compat_shmid_ds(&s64, uptr);
-		}
 		if (err2)
 			err = -EFAULT;
 		break;
 
 	case SHM_INFO:
-		err = do_shmctl(first, second, &si);
+		p = compat_alloc_user_space(sizeof(struct shm_info));
+		err = sys_shmctl(first, second, p);
 		if (err < 0)
 			break;
-		err2 = put_compat_shm_info(&si, uptr);
+		err2 = put_compat_shm_info(p, uptr);
 		if (err2)
 			err = -EFAULT;
 		break;
@@ -712,24 +674,14 @@ long compat_sys_shmctl(int first, int second, void __user *uptr)
 long compat_sys_semtimedop(int semid, struct sembuf __user *tsems,
 		unsigned nsops, const struct compat_timespec __user *timeout)
 {
-	struct timespec ts;
-	struct timespec __user *ts64;
-
-	/* parameter checking precedence should mirror sys_semtimedop() */
-	if (nsops < 1 || semid < 0)
-		return -EINVAL;
-	if (nsops > sc_semopm)
-		return -E2BIG;
-	if (!access_ok(VERIFY_READ, tsems, nsops * sizeof(struct sembuf)))
-		return -EFAULT;
-	if (!timeout)
-		return sys_semtimedop(semid, tsems, nsops, 0);
-
-	ts64 = compat_alloc_user_space(sizeof(*ts64));
-	if (get_compat_timespec(&ts, timeout))
-		return -EFAULT;
-	if (copy_to_user(ts64, &ts, sizeof(ts)))
-		return -EFAULT;
-
+	struct timespec __user *ts64 = NULL;
+	if (timeout) {
+		struct timespec ts;
+		ts64 = compat_alloc_user_space(sizeof(*ts64));
+		if (get_compat_timespec(&ts, timeout))
+			return -EFAULT;
+		if (copy_to_user(ts64, &ts, sizeof(ts)))
+			return -EFAULT;
+	}
 	return sys_semtimedop(semid, tsems, nsops, ts64);
 }

@@ -241,7 +241,7 @@ static int ts_release(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-ts_read(struct file *file, char *data, size_t count, loff_t *ppos)
+ts_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
 {
 	struct saa7134_dev *dev = file->private_data;
 

@@ -84,7 +84,7 @@ static int kcopyd_get_pages(struct kcopyd_client *kc,
 		;
 
 	kc->pages = pl->next;
-	pl->next = 0;
+	pl->next = NULL;
 
 	spin_unlock(&kc->lock);
 

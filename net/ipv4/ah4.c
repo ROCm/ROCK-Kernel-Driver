@@ -67,56 +67,31 @@ static int ah_output(struct sk_buff **pskb)
 		char 		buf[60];
 	} tmp_iph;
 
-	if ((*pskb)->ip_summed == CHECKSUM_HW) {
-		err = skb_checksum_help(pskb, 0);
-		if (err)
-			goto error_nolock;
-	}
+	top_iph = (*pskb)->nh.iph;
+	iph = &tmp_iph.iph;
 
-	spin_lock_bh(&x->lock);
-	err = xfrm_state_check(x, *pskb);
-	if (err)
-		goto error;
+	iph->tos = top_iph->tos;
+	iph->ttl = top_iph->ttl;
+	iph->frag_off = top_iph->frag_off;
+	iph->daddr = top_iph->daddr;
 
-	iph = (*pskb)->nh.iph;
-	if (x->props.mode) {
-		err = xfrm4_tunnel_check_size(*pskb);
+	if (top_iph->ihl != 5) {
+		memcpy(iph+1, top_iph+1, top_iph->ihl*4 - sizeof(struct iphdr));
+		err = ip_clear_mutable_options(top_iph, &top_iph->daddr);
 		if (err)
 			goto error;
-		top_iph = (struct iphdr*)skb_push(*pskb, x->props.header_len);
-		top_iph->ihl = 5;
-		top_iph->version = 4;
-		top_iph->tos = 0;
-		top_iph->tot_len = htons((*pskb)->len);
-		top_iph->frag_off = 0;
-		if (!(iph->frag_off&htons(IP_DF)))
-			__ip_select_ident(top_iph, dst, 0);
-		top_iph->ttl = 0;
-		top_iph->protocol = IPPROTO_AH;
-		top_iph->check = 0;
-		top_iph->saddr = x->props.saddr.a4;
-		top_iph->daddr = x->id.daddr.a4;
-		ah = (struct ip_auth_hdr*)(top_iph+1);
-		ah->nexthdr = IPPROTO_IPIP;
-	} else {
-		memcpy(&tmp_iph, (*pskb)->data, iph->ihl*4);
-		top_iph = (struct iphdr*)skb_push(*pskb, x->props.header_len);
-		memcpy(top_iph, &tmp_iph, iph->ihl*4);
-		iph = &tmp_iph.iph;
-		top_iph->tos = 0;
-		top_iph->tot_len = htons((*pskb)->len);
-		top_iph->frag_off = 0;
-		top_iph->ttl = 0;
-		top_iph->protocol = IPPROTO_AH;
-		top_iph->check = 0;
-		if (top_iph->ihl != 5) {
-			err = ip_clear_mutable_options(top_iph, &top_iph->daddr);
-			if (err)
-				goto error;
-		}
-		ah = (struct ip_auth_hdr*)((char*)top_iph+iph->ihl*4);
-		ah->nexthdr = iph->protocol;
 	}
+
+	ah = (struct ip_auth_hdr *)((char *)top_iph+top_iph->ihl*4);
+	ah->nexthdr = top_iph->protocol;
+
+	top_iph->tos = 0;
+	top_iph->tot_len = htons((*pskb)->len);
+	top_iph->frag_off = 0;
+	top_iph->ttl = 0;
+	top_iph->protocol = IPPROTO_AH;
+	top_iph->check = 0;
+
 	ahp = x->data;
 	ah->hdrlen  = (XFRM_ALIGN8(sizeof(struct ip_auth_hdr) + 
 				   ahp->icv_trunc_len) >> 2) - 2;
@@ -125,36 +100,19 @@ static int ah_output(struct sk_buff **pskb)
 	ah->spi = x->id.spi;
 	ah->seq_no = htonl(++x->replay.oseq);
 	ahp->icv(ahp, *pskb, ah->auth_data);
+
 	top_iph->tos = iph->tos;
 	top_iph->ttl = iph->ttl;
-	if (x->props.mode) {
-		if (x->props.flags & XFRM_STATE_NOECN)
-			IP_ECN_clear(top_iph);
-		top_iph->frag_off = iph->frag_off&~htons(IP_MF|IP_OFFSET);
-		memset(&(IPCB(*pskb)->opt), 0, sizeof(struct ip_options));
-	} else {
-		top_iph->frag_off = iph->frag_off;
-		top_iph->daddr = iph->daddr;
-		if (iph->ihl != 5)
-			memcpy(top_iph+1, iph+1, iph->ihl*4 - sizeof(struct iphdr));
-	}
+	top_iph->frag_off = iph->frag_off;
+	top_iph->daddr = iph->daddr;
+	if (top_iph->ihl != 5)
+		memcpy(top_iph+1, iph+1, top_iph->ihl*4 - sizeof(struct iphdr));
+
 	ip_send_check(top_iph);
 
-	(*pskb)->nh.raw = (*pskb)->data;
-
-	x->curlft.bytes += (*pskb)->len;
-	x->curlft.packets++;
-	spin_unlock_bh(&x->lock);
-	if (((*pskb)->dst = dst_pop(dst)) == NULL) {
-		err = -EHOSTUNREACH;
-		goto error_nolock;
-	}
-	return NET_XMIT_BYPASS;
+	err = 0;
 
 error:
-	spin_unlock_bh(&x->lock);
-error_nolock:
-	kfree_skb(*pskb);
 	return err;
 }
 

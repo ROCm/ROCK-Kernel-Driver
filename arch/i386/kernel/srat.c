@@ -181,23 +181,6 @@ static __init void chunk_to_zones(unsigned long cstart, unsigned long cend,
 	}
 }
 
-static void __init initialize_physnode_map(void)
-{
-	int i;
-	unsigned long pfn;
-	struct node_memory_chunk_s *nmcp;
-
-	/* Run the list of memory chunks and fill in the phymap. */
-	nmcp = node_memory_chunk;
-	for (i = num_memory_chunks; --i >= 0; nmcp++) {
-		for (pfn = nmcp->start_pfn; pfn <= nmcp->end_pfn;
-						pfn += PAGES_PER_ELEMENT)
-		{
-			physnode_map[pfn / PAGES_PER_ELEMENT] = (int)nmcp->nid;
-		}
-	}
-}
-
 /* Parse the ACPI Static Resource Affinity Table */
 static int __init acpi20_parse_srat(struct acpi_table_srat *sratp)
 {
@@ -265,8 +248,6 @@ static int __init acpi20_parse_srat(struct acpi_table_srat *sratp)
 	for (i = 0; i < num_memory_chunks; i++)
 		node_memory_chunk[i].nid = pxm_to_nid_map[node_memory_chunk[i].pxm];
 
-	initialize_physnode_map();
-	
 	printk("pxm bitmap: ");
 	for (i = 0; i < sizeof(pxm_bitmap); i++) {
 		printk("%02X ", pxm_bitmap[i]);

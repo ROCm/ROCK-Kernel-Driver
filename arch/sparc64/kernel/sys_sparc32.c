@@ -1293,9 +1293,9 @@ asmlinkage long compat_sys_sigaction(int sig, struct old_sigaction32 __user *act
 		u32 u_handler, u_restorer;
 		
 		ret = get_user(u_handler, &act->sa_handler);
-		new_ka.sa.sa_handler = (void *) (long) u_handler;
+		new_ka.sa.sa_handler =  compat_ptr(u_handler);
 		ret |= __get_user(u_restorer, &act->sa_restorer);
-		new_ka.sa.sa_restorer = (void *) (long) u_restorer;
+		new_ka.sa.sa_restorer = compat_ptr(u_restorer);
 		ret |= __get_user(new_ka.sa.sa_flags, &act->sa_flags);
 		ret |= __get_user(mask, &act->sa_mask);
 		if (ret)
@@ -1340,7 +1340,7 @@ asmlinkage long compat_sys_rt_sigaction(int sig,
 
 		new_ka.ka_restorer = restorer;
 		ret = get_user(u_handler, &act->sa_handler);
-		new_ka.sa.sa_handler = (void *) (long) u_handler;
+		new_ka.sa.sa_handler =  compat_ptr(u_handler);
 		ret |= __copy_from_user(&set32, &act->sa_mask, sizeof(compat_sigset_t));
 		switch (_NSIG_WORDS) {
 		case 4: new_ka.sa.sa_mask.sig[3] = set32.sig[6] | (((long)set32.sig[7]) << 32);
@@ -1350,7 +1350,7 @@ asmlinkage long compat_sys_rt_sigaction(int sig,
 		}
 		ret |= __get_user(new_ka.sa.sa_flags, &act->sa_flags);
 		ret |= __get_user(u_restorer, &act->sa_restorer);
-		new_ka.sa.sa_restorer = (void *) (long) u_restorer;
+		new_ka.sa.sa_restorer = compat_ptr(u_restorer);
                 if (ret)
                 	return -EFAULT;
 	}

@@ -82,7 +82,7 @@ but recognizes them
 succeed but still return access denied (appears to be Windows 
 server not cifs client problem) and has not been reproduced recently.
 NTFS partitions do not have this problem.
-4) debug connectation lock test case 10 which fails against
+4) debug connectathon lock test case 10 which fails against
 Samba (may be unmappable due to POSIX to Windows lock model
 differences but worth investigating).  Also debug Samba to 
 see why lock test case 7 takes longer to complete to Samba
@@ -91,7 +91,7 @@ than to Windows.
 Misc testing to do
 ==================
 1) check out max path names and max path name components against various server
-types. Return max path name in stat -f information
+types. Try nested symlinks. Return max path name in stat -f information
 
 2) Modify file portion of ltp so it can run against a mounted network
 share and run it against cifs vfs.

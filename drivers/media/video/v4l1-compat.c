@@ -490,7 +490,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 		fmt2->fmt.win.w.width   = win->width;
 		fmt2->fmt.win.w.height  = win->height;
 		fmt2->fmt.win.chromakey = win->chromakey;
-		fmt2->fmt.win.clips     = (void *)win->clips;
+		fmt2->fmt.win.clips     = (void __user *)win->clips;
 		fmt2->fmt.win.clipcount = win->clipcount;
 		err2 = drv(inode, file, VIDIOC_S_FMT, fmt2);
 		if (err2 < 0)

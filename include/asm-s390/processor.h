@@ -319,6 +319,16 @@ static inline void disabled_wait(unsigned long code)
 #endif /* __s390x__ */
 }
 
+/*
+ * CPU idle notifier chain.
+ */
+#define CPU_IDLE	0
+#define CPU_NOT_IDLE	1
+
+struct notifier_block;
+int register_idle_notifier(struct notifier_block *nb);
+int unregister_idle_notifier(struct notifier_block *nb);
+
 #endif
 
 #endif                                 /* __ASM_S390_PROCESSOR_H           */

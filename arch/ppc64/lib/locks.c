@@ -38,6 +38,10 @@
 
 /* waiting for a spinlock... */
 #if defined(CONFIG_PPC_SPLPAR) || defined(CONFIG_PPC_ISERIES)
+
+/* We only yield to the hypervisor if we are in shared processor mode */
+#define SHARED_PROCESSOR (get_paca()->lppaca.xSharedProc)
+
 void __spin_yield(spinlock_t *lock)
 {
 	unsigned int lock_value, holder_cpu, yield_count;
@@ -65,6 +69,7 @@ void __spin_yield(spinlock_t *lock)
 
 #else /* SPLPAR || ISERIES */
 #define __spin_yield(x)	barrier()
+#define SHARED_PROCESSOR	0
 #endif
 
 /*
@@ -104,7 +109,8 @@ void _raw_spin_lock(spinlock_t *lock)
 			break;
 		do {
 			HMT_low();
-			__spin_yield(lock);
+			if (SHARED_PROCESSOR)
+				__spin_yield(lock);
 		} while (likely(lock->lock != 0));
 		HMT_medium();
 	}
@@ -123,7 +129,8 @@ void _raw_spin_lock_flags(spinlock_t *lock, unsigned long flags)
 		local_irq_restore(flags);
 		do {
 			HMT_low();
-			__spin_yield(lock);
+			if (SHARED_PROCESSOR)
+				__spin_yield(lock);
 		} while (likely(lock->lock != 0));
 		HMT_medium();
 		local_irq_restore(flags_dis);
@@ -134,8 +141,12 @@ EXPORT_SYMBOL(_raw_spin_lock_flags);
 
 void spin_unlock_wait(spinlock_t *lock)
 {
-	while (lock->lock)
-		__spin_yield(lock);
+	while (lock->lock) {
+		HMT_low();
+		if (SHARED_PROCESSOR)
+			__spin_yield(lock);
+	}
+	HMT_medium();
 }
 
 EXPORT_SYMBOL(spin_unlock_wait);
@@ -213,7 +224,8 @@ void _raw_read_lock(rwlock_t *rw)
 			break;
 		do {
 			HMT_low();
-			__rw_yield(rw);
+			if (SHARED_PROCESSOR)
+				__rw_yield(rw);
 		} while (likely(rw->lock < 0));
 		HMT_medium();
 	}
@@ -275,7 +287,8 @@ void _raw_write_lock(rwlock_t *rw)
 			break;
 		do {
 			HMT_low();
-			__rw_yield(rw);
+			if (SHARED_PROCESSOR)
+				__rw_yield(rw);
 		} while (likely(rw->lock != 0));
 		HMT_medium();
 	}

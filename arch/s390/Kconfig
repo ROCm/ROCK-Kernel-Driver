@@ -107,6 +107,15 @@ config NR_CPUS
 	  This is purely to save memory - each supported CPU adds
 	  approximately sixteen kilobytes to the kernel image.
 
+config HOTPLUG_CPU
+	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
+	depends on SMP && HOTPLUG && EXPERIMENTAL
+	default n
+	help
+	  Say Y here to experiment with turning CPUs off and on.  CPUs
+	  can be controlled through /sys/devices/system/cpu/cpu#.
+	  Say N if you want to disable CPU hotplug.
+
 config MATHEMU
 	bool "IEEE FPU emulation"
 	depends on MARCH_G5

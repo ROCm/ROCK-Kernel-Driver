@@ -446,7 +446,7 @@ static int streamer_reset(struct net_device *dev)
 	__u8 *streamer_mmio;
 	unsigned long t;
 	unsigned int uaa_addr;
-	struct sk_buff *skb = 0;
+	struct sk_buff *skb = NULL;
 	__u16 misr;
 
 	streamer_priv = (struct streamer_private *) dev->priv;

@@ -223,11 +223,11 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/dmi.h>
+#include <linux/suspend.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/desc.h>
-#include <asm/suspend.h>
 
 #include "io_ports.h"
 

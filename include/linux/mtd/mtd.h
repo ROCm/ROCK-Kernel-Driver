@@ -200,16 +200,16 @@ struct mtd_info {
 	/* This function is not yet implemented */
 	int (*write_user_prot_reg) (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf);
 
-	/* iovec-based read/write methods. We need these especially for NAND flash,
+	/* kvec-based read/write methods. We need these especially for NAND flash,
 	   with its limited number of write cycles per erase.
 	   NB: The 'count' parameter is the number of _vectors_, each of 
 	   which contains an (ofs, len) tuple.
 	*/
-	int (*readv) (struct mtd_info *mtd, struct iovec *vecs, unsigned long count, loff_t from, size_t *retlen);
-	int (*readv_ecc) (struct mtd_info *mtd, struct iovec *vecs, unsigned long count, loff_t from, 
+	int (*readv) (struct mtd_info *mtd, struct kvec *vecs, unsigned long count, loff_t from, size_t *retlen);
+	int (*readv_ecc) (struct mtd_info *mtd, struct kvec *vecs, unsigned long count, loff_t from, 
 		size_t *retlen, u_char *eccbuf, struct nand_oobinfo *oobsel);
-	int (*writev) (struct mtd_info *mtd, const struct iovec *vecs, unsigned long count, loff_t to, size_t *retlen);
-	int (*writev_ecc) (struct mtd_info *mtd, const struct iovec *vecs, unsigned long count, loff_t to, 
+	int (*writev) (struct mtd_info *mtd, const struct kvec *vecs, unsigned long count, loff_t to, size_t *retlen);
+	int (*writev_ecc) (struct mtd_info *mtd, const struct kvec *vecs, unsigned long count, loff_t to, 
 		size_t *retlen, u_char *eccbuf, struct nand_oobinfo *oobsel);
 
 	/* Sync */
@@ -250,10 +250,10 @@ struct mtd_notifier {
 extern void register_mtd_user (struct mtd_notifier *new);
 extern int unregister_mtd_user (struct mtd_notifier *old);
 
-int default_mtd_writev(struct mtd_info *mtd, const struct iovec *vecs,
+int default_mtd_writev(struct mtd_info *mtd, const struct kvec *vecs,
 		       unsigned long count, loff_t to, size_t *retlen);
 
-int default_mtd_readv(struct mtd_info *mtd, struct iovec *vecs,
+int default_mtd_readv(struct mtd_info *mtd, struct kvec *vecs,
 		      unsigned long count, loff_t from, size_t *retlen);
 
 #define MTD_ERASE(mtd, args...) (*(mtd->erase))(mtd, args)

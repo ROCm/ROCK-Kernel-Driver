@@ -137,25 +137,14 @@ const char *bdevname(struct block_device *bdev, char *buf)
 EXPORT_SYMBOL(bdevname);
 
 /*
- * NOTE: this cannot be called from interrupt context.
- *
- * But in interrupt context you should really have a struct
- * block_device anyway and use bdevname() above.
+ * There's very little reason to use this, you should really
+ * have a struct block_device just about everywhere and use
+ * bdevname() instead.
  */
 const char *__bdevname(dev_t dev, char *buffer)
 {
-	struct gendisk *disk;
-	int part;
-
-	disk = get_gendisk(dev, &part);
-	if (disk) {
-		buffer = disk_name(disk, part, buffer);
-		put_disk(disk);
-	} else {
-		snprintf(buffer, BDEVNAME_SIZE, "unknown-block(%u,%u)",
+	scnprintf(buffer, BDEVNAME_SIZE, "unknown-block(%u,%u)",
 				MAJOR(dev), MINOR(dev));
-	}
-
 	return buffer;
 }
 

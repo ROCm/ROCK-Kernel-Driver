@@ -66,7 +66,7 @@
 #include <linux/ip.h>
 #include <linux/udp.h>
 #include <linux/tcp.h>
-#include <linux/crc16.h>
+#include <linux/crc-ccitt.h>
 
 /* --------------------------------------------------------------------- */
 
@@ -105,7 +105,7 @@ static char ax25_nocall[AX25_ADDR_LEN] =
 
 static inline void append_crc_ccitt(unsigned char *buffer, int len)
 {
- 	unsigned int crc = crc16(0xffff, buffer, len) ^ 0xffff;
+ 	unsigned int crc = crc_ccitt(0xffff, buffer, len) ^ 0xffff;
 	*buffer++ = crc;
 	*buffer++ = crc >> 8;
 }
@@ -114,7 +114,7 @@ static inline void append_crc_ccitt(unsigned char *buffer, int len)
 
 static inline int check_crc_ccitt(const unsigned char *buf, int cnt)
 {
-	return (crc16(0xffff, buf, cnt) & 0xffff) == 0xf0b8;
+	return (crc_ccitt(0xffff, buf, cnt) & 0xffff) == 0xf0b8;
 }
 
 /*---------------------------------------------------------------------------*/

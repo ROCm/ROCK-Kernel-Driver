@@ -212,7 +212,7 @@ static struct saa7146_standard hexium_standards[] = {
    without eeprom */
 static int hexium_probe(struct saa7146_dev *dev)
 {
-	struct hexium *hexium = 0;
+	struct hexium *hexium = NULL;
 	union i2c_smbus_data data;
 	int err = 0;
 

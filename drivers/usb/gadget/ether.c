@@ -685,7 +685,7 @@ static const struct usb_descriptor_header *fs_eth_function [10] = {
 	(struct usb_descriptor_header *) &data_intf,
 	(struct usb_descriptor_header *) &fs_source_desc,
 	(struct usb_descriptor_header *) &fs_sink_desc,
-	0,
+	NULL,
 #endif /* DEV_CONFIG_CDC */
 };
 
@@ -695,9 +695,9 @@ static inline void __init fs_subset_descriptors(void)
 	fs_eth_function[0] = (struct usb_descriptor_header *) &subset_data_intf;
 	fs_eth_function[1] = (struct usb_descriptor_header *) &fs_source_desc;
 	fs_eth_function[2] = (struct usb_descriptor_header *) &fs_sink_desc;
-	fs_eth_function[3] = 0;
+	fs_eth_function[3] = NULL;
 #else
-	fs_eth_function[0] = 0;
+	fs_eth_function[0] = NULL;
 #endif
 }
 
@@ -714,7 +714,7 @@ static const struct usb_descriptor_header *fs_rndis_function [] = {
 	(struct usb_descriptor_header *) &rndis_data_intf,
 	(struct usb_descriptor_header *) &fs_source_desc,
 	(struct usb_descriptor_header *) &fs_sink_desc,
-	0,
+	NULL,
 };
 #endif
 
@@ -780,7 +780,7 @@ static const struct usb_descriptor_header *hs_eth_function [10] = {
 	(struct usb_descriptor_header *) &data_intf,
 	(struct usb_descriptor_header *) &hs_source_desc,
 	(struct usb_descriptor_header *) &hs_sink_desc,
-	0,
+	NULL,
 #endif /* DEV_CONFIG_CDC */
 };
 
@@ -790,9 +790,9 @@ static inline void __init hs_subset_descriptors(void)
 	hs_eth_function[0] = (struct usb_descriptor_header *) &subset_data_intf;
 	hs_eth_function[1] = (struct usb_descriptor_header *) &fs_source_desc;
 	hs_eth_function[2] = (struct usb_descriptor_header *) &fs_sink_desc;
-	hs_eth_function[3] = 0;
+	hs_eth_function[3] = NULL;
 #else
-	hs_eth_function[0] = 0;
+	hs_eth_function[0] = NULL;
 #endif
 }
 
@@ -809,7 +809,7 @@ static const struct usb_descriptor_header *hs_rndis_function [] = {
 	(struct usb_descriptor_header *) &rndis_data_intf,
 	(struct usb_descriptor_header *) &hs_source_desc,
 	(struct usb_descriptor_header *) &hs_sink_desc,
-	0,
+	NULL,
 };
 #endif
 
@@ -1051,8 +1051,8 @@ set_ether_config (struct eth_dev *dev, int gfp_flags)
 		if (dev->status_ep)
 			(void) usb_ep_disable (dev->status_ep);
 #endif
-		dev->status_ep = 0;
-		dev->status = 0;
+		dev->status_ep = NULL;
+		dev->status = NULL;
 #if defined(DEV_CONFIG_SUBSET) || defined(CONFIG_USB_ETH_RNDIS)
 		if (dev->rndis || !dev->cdc) {
 			if (dev->in_ep)
@@ -1061,10 +1061,10 @@ set_ether_config (struct eth_dev *dev, int gfp_flags)
 				(void) usb_ep_disable (dev->out_ep);
 		}
 #endif
-		dev->in_ep = 0;
-		dev->in = 0;
-		dev->out_ep = 0;
-		dev->out = 0;
+		dev->in_ep = NULL;
+		dev->in = NULL;
+		dev->out_ep = NULL;
+		dev->out = NULL;
 	} else
 
 	/* activate non-CDC configs right away
@@ -1111,7 +1111,7 @@ static void eth_reset_config (struct eth_dev *dev)
 			list_del (&req->list);
 			usb_ep_free_request (dev->in_ep, req);
 		}
-		dev->in_ep = 0;
+		dev->in_ep = NULL;
 	}
 	if (dev->out_ep) {
 		usb_ep_disable (dev->out_ep);
@@ -1121,12 +1121,12 @@ static void eth_reset_config (struct eth_dev *dev)
 			list_del (&req->list);
 			usb_ep_free_request (dev->out_ep, req);
 		}
-		dev->out_ep = 0;
+		dev->out_ep = NULL;
 	}
 
 	if (dev->status_ep) {
 		usb_ep_disable (dev->status_ep);
-		dev->status_ep = 0;
+		dev->status_ep = NULL;
 	}
 	dev->config = 0;
 }
@@ -1800,7 +1800,7 @@ static void rx_complete (struct usb_ep *ep, struct usb_request *req)
 		 * use skb buffers.
 		 */
 		status = netif_rx (skb);
-		skb = 0;
+		skb = NULL;
 		break;
 
 	/* software-driven interface shutdown */
@@ -1834,7 +1834,7 @@ quiesce:
 clean:
 		/* nobody reading rx_reqs, so no dev->lock */
 		list_add (&req->list, &dev->rx_reqs);
-		req = 0;
+		req = NULL;
 	}
 	if (req)
 		rx_submit (dev, req, GFP_ATOMIC);
@@ -1969,7 +1969,7 @@ static int eth_start_xmit (struct sk_buff *skb, struct net_device *net)
 	struct eth_dev		*dev = (struct eth_dev *) net->priv;
 	int			length = skb->len;
 	int			retval;
-	struct usb_request	*req = 0;
+	struct usb_request	*req = NULL;
 	unsigned long		flags;
 
 	/* FIXME check dev->cdc_filter to decide whether to send this,
@@ -2212,7 +2212,7 @@ eth_unbind (struct usb_gadget *gadget)
 				dev->req->buf, dev->req->dma,
 				USB_BUFSIZ);
 		usb_ep_free_request (gadget->ep0, dev->req);
-		dev->req = 0;
+		dev->req = NULL;
 	}
 
 	unregister_netdev (dev->net);
@@ -2220,7 +2220,7 @@ eth_unbind (struct usb_gadget *gadget)
 
 	/* assuming we used keventd, it must quiesce too */
 	flush_scheduled_work ();
-	set_gadget_data (gadget, 0);
+	set_gadget_data (gadget, NULL);
 }
 
 static u8 __init nibble (unsigned char c)

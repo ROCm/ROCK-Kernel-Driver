@@ -1227,7 +1227,7 @@ struct acpiphp_slot *get_slot_from_id(int id)
 	/* should never happen! */
 	err("%s: no object for id %d\n", __FUNCTION__, id);
 	WARN_ON(1);
-	return 0;
+	return NULL;
 }
 
 

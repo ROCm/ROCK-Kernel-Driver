@@ -556,7 +556,7 @@ static unsigned char envctrl_i2c_voltage_status(struct i2c_child_t *pchild,
  * Return: Number of read bytes. 0 for error.
  */
 static ssize_t
-envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+envctrl_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct i2c_child_t *pchild;
 	unsigned char data[10];
@@ -574,7 +574,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 
 		data[0] = (unsigned char)(warning_temperature);
 		ret = 1;
-		if (copy_to_user((unsigned char *)buf, data, ret))
+		if (copy_to_user(buf, data, ret))
 			ret = -EFAULT;
 		break;
 
@@ -584,7 +584,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 
 		data[0] = (unsigned char)(shutdown_temperature);
 		ret = 1;
-		if (copy_to_user((unsigned char *)buf, data, ret))
+		if (copy_to_user(buf, data, ret))
 			ret = -EFAULT;
 		break;
 
@@ -592,7 +592,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 		if (!(pchild = envctrl_get_i2c_child(ENVCTRL_MTHRBDTEMP_MON)))
 			return 0;
 		ret = envctrl_read_noncpu_info(pchild, ENVCTRL_MTHRBDTEMP_MON, data);
-		if (copy_to_user((unsigned char *)buf, data, ret))
+		if (copy_to_user(buf, data, ret))
 			ret = -EFAULT;
 		break;
 
@@ -602,7 +602,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 		ret = envctrl_read_cpu_info(read_cpu, pchild, ENVCTRL_CPUTEMP_MON, data);
 
 		/* Reset cpu to the default cpu0. */
-		if (copy_to_user((unsigned char *)buf, data, ret))
+		if (copy_to_user(buf, data, ret))
 			ret = -EFAULT;
 		break;
 
@@ -612,7 +612,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 		ret = envctrl_read_cpu_info(read_cpu, pchild, ENVCTRL_CPUVOLTAGE_MON, data);
 
 		/* Reset cpu to the default cpu0. */
-		if (copy_to_user((unsigned char *)buf, data, ret))
+		if (copy_to_user(buf, data, ret))
 			ret = -EFAULT;
 		break;
 
@@ -620,7 +620,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 		if (!(pchild = envctrl_get_i2c_child(ENVCTRL_SCSITEMP_MON)))
 			return 0;
 		ret = envctrl_read_noncpu_info(pchild, ENVCTRL_SCSITEMP_MON, data);
-		if (copy_to_user((unsigned char *)buf, data, ret))
+		if (copy_to_user(buf, data, ret))
 			ret = -EFAULT;
 		break;
 
@@ -628,7 +628,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 		if (!(pchild = envctrl_get_i2c_child(ENVCTRL_ETHERTEMP_MON)))
 			return 0;
 		ret = envctrl_read_noncpu_info(pchild, ENVCTRL_ETHERTEMP_MON, data);
-		if (copy_to_user((unsigned char *)buf, data, ret))
+		if (copy_to_user(buf, data, ret))
 			ret = -EFAULT;
 		break;
 
@@ -637,7 +637,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 			return 0;
 		data[0] = envctrl_i2c_read_8574(pchild->addr);
 		ret = envctrl_i2c_fan_status(pchild,data[0], data);
-		if (copy_to_user((unsigned char *)buf, data, ret))
+		if (copy_to_user(buf, data, ret))
 			ret = -EFAULT;
 		break;
 	
@@ -646,7 +646,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 			return 0;
 		data[0] = envctrl_i2c_read_8574(pchild->addr);
 		ret = envctrl_i2c_globaladdr(pchild, data[0], data);
-		if (copy_to_user((unsigned char *)buf, data, ret))
+		if (copy_to_user(buf, data, ret))
 			ret = -EFAULT;
 		break;
 
@@ -657,7 +657,7 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 				return 0;
 		data[0] = envctrl_i2c_read_8574(pchild->addr);
 		ret = envctrl_i2c_voltage_status(pchild, data[0], data);
-		if (copy_to_user((unsigned char *)buf, data, ret))
+		if (copy_to_user(buf, data, ret))
 			ret = -EFAULT;
 		break;
 
@@ -676,7 +676,7 @@ static int
 envctrl_ioctl(struct inode *inode, struct file *file,
 	      unsigned int cmd, unsigned long arg)
 {
-	char *infobuf;
+	char __user *infobuf;
 
 	switch (cmd) {
 	case ENVCTRL_RD_WARNING_TEMPERATURE:
@@ -695,7 +695,7 @@ envctrl_ioctl(struct inode *inode, struct file *file,
 		/* Check to see if application passes in any cpu number,
 		 * the default is cpu0.
 		 */
-		infobuf = (char *) arg;
+		infobuf = (char __user *) arg;
 		if (infobuf == NULL) {
 			read_cpu = 0;
 		}else {
@@ -719,7 +719,7 @@ envctrl_ioctl(struct inode *inode, struct file *file,
 static int
 envctrl_open(struct inode *inode, struct file *file)
 {
-	file->private_data = 0;
+	file->private_data = NULL;
 	return 0;
 }
 

@@ -76,8 +76,8 @@ static int grip_abs_dc[] = { ABS_X, ABS_Y, ABS_RX, ABS_RY, ABS_THROTTLE, ABS_HAT
 
 static char *grip_name[] = { NULL, "Gravis GamePad Pro", "Gravis Blackhawk Digital",
 				"Gravis Xterminator Digital", "Gravis Xterminator DualControl" };
-static int *grip_abs[] = { 0, grip_abs_gpp, grip_abs_bd, grip_abs_xt, grip_abs_dc };
-static int *grip_btn[] = { 0, grip_btn_gpp, grip_btn_bd, grip_btn_xt, grip_btn_dc };
+static int *grip_abs[] = { NULL, grip_abs_gpp, grip_abs_bd, grip_abs_xt, grip_abs_dc };
+static int *grip_btn[] = { NULL, grip_btn_gpp, grip_btn_bd, grip_btn_xt, grip_btn_dc };
 static char grip_anx[] = { 0, 0, 3, 5, 5 };
 static char grip_cen[] = { 0, 0, 2, 2, 4 };
 

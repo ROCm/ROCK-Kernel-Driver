@@ -533,6 +533,7 @@ struct fb_ops {
 #define FBINFO_MISC_MODECHANGEUSER     0x10000 /* mode change request
 						  from userspace */
 #define FBINFO_MISC_MODESWITCH         0x20000 /* mode switch */
+#define FBINFO_MISC_MODESWITCHLATE     0x40000 /* init hardware later */
 
 struct fb_info {
 	int node;
@@ -638,10 +639,16 @@ extern int unregister_framebuffer(struct fb_info *fb_info);
 extern int fb_prepare_logo(struct fb_info *fb_info);
 extern int fb_show_logo(struct fb_info *fb_info);
 extern char* fb_get_buffer_offset(struct fb_info *info, struct fb_pixmap *buf, u32 size);
-extern void fb_move_buf_unaligned(struct fb_info *info, struct fb_pixmap *buf,
+extern void fb_iomove_buf_unaligned(struct fb_info *info, struct fb_pixmap *buf,
 				u8 *dst, u32 d_pitch, u8 *src, u32 idx,
 				u32 height, u32 shift_high, u32 shift_low, u32 mod);
-extern void fb_move_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
+extern void fb_iomove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
+				u8 *dst, u32 d_pitch, u8 *src, u32 s_pitch,
+				u32 height);
+extern void fb_sysmove_buf_unaligned(struct fb_info *info, struct fb_pixmap *buf,
+				u8 *dst, u32 d_pitch, u8 *src, u32 idx,
+				u32 height, u32 shift_high, u32 shift_low, u32 mod);
+extern void fb_sysmove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
 				u8 *dst, u32 d_pitch, u8 *src, u32 s_pitch,
 				u32 height);
 extern void fb_load_cursor_image(struct fb_info *);

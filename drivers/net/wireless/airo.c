@@ -101,7 +101,7 @@ static struct pci_driver airo_driver = {
    infront of the label, that statistic will not be included in the list
    of statistics in the /proc filesystem */
 
-#define IGNLABEL(comment) 0
+#define IGNLABEL(comment) NULL
 static char *statsLabels[] = {
 	"RxOverrun",
 	IGNLABEL("RxPlcpCrcErr"),
@@ -2346,7 +2346,7 @@ void stop_airo_card( struct net_device *dev, int freeres )
 		if (ai->wifidev) {
 			unregister_netdev(ai->wifidev);
 			free_netdev(ai->wifidev);
-			ai->wifidev = 0;
+			ai->wifidev = NULL;
 		}
 		clear_bit(FLAG_REGISTERED, &ai->flags);
 	}
@@ -2358,7 +2358,7 @@ void stop_airo_card( struct net_device *dev, int freeres )
 	 * Clean out tx queue
 	 */
 	if (test_bit(FLAG_MPI, &ai->flags) && skb_queue_len (&ai->txq) > 0) {
-		struct sk_buff *skb = 0;
+		struct sk_buff *skb = NULL;
 		for (;(skb = skb_dequeue(&ai->txq));)
 			dev_kfree_skb(skb);
 	}

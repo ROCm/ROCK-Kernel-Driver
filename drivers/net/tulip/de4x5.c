@@ -4721,8 +4721,8 @@ type1_infoblock(struct net_device *dev, u_char count, u_char *p)
     if (lp->state == INITIALISED) {
         lp->ibn = 1;
 	lp->active = *p++;
-	lp->phy[lp->active].gep = (*p ? p : 0); p += (*p + 1);
-	lp->phy[lp->active].rst = (*p ? p : 0); p += (*p + 1);
+	lp->phy[lp->active].gep = (*p ? p : NULL); p += (*p + 1);
+	lp->phy[lp->active].rst = (*p ? p : NULL); p += (*p + 1);
 	lp->phy[lp->active].mc  = TWIDDLE(p); p += 2;
 	lp->phy[lp->active].ana = TWIDDLE(p); p += 2;
 	lp->phy[lp->active].fdx = TWIDDLE(p); p += 2;
@@ -4802,8 +4802,8 @@ type3_infoblock(struct net_device *dev, u_char count, u_char *p)
         lp->ibn = 3;
         lp->active = *p++;
 	if (MOTO_SROM_BUG) lp->active = 0;
-	lp->phy[lp->active].gep = (*p ? p : 0); p += (2 * (*p) + 1);
-	lp->phy[lp->active].rst = (*p ? p : 0); p += (2 * (*p) + 1);
+	lp->phy[lp->active].gep = (*p ? p : NULL); p += (2 * (*p) + 1);
+	lp->phy[lp->active].rst = (*p ? p : NULL); p += (2 * (*p) + 1);
 	lp->phy[lp->active].mc  = TWIDDLE(p); p += 2;
 	lp->phy[lp->active].ana = TWIDDLE(p); p += 2;
 	lp->phy[lp->active].fdx = TWIDDLE(p); p += 2;

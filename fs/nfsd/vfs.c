@@ -1477,10 +1477,12 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t *offsetp,
 	err = nfsd_open(rqstp, fhp, S_IFDIR, MAY_READ, &file);
 	if (err)
 		goto out;
-	if (offset > ~(u32) 0)
-		goto out_close;
 
-	file.f_pos = offset;
+	offset = vfs_llseek(&file, offset, 0);
+	if (offset < 0) {
+		err = nfserrno((int)offset);
+		goto out_close;
+	}
 
 	/*
 	 * Read the directory entries. This silly loop is necessary because
@@ -1496,7 +1498,7 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t *offsetp,
 		err = nfserrno(err);
 	else
 		err = cdp->err;
-	*offsetp = file.f_pos;
+	*offsetp = vfs_llseek(&file, 0, 1);
 
 	if (err == nfserr_eof || err == nfserr_toosmall)
 		err = nfs_ok; /* can still be found in ->err */

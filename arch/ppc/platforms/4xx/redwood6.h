@@ -33,6 +33,7 @@ typedef struct board_info {
 #endif				/* !__ASSEMBLY__ */
 
 #define SMC91111_BASE_ADDR	0xf2030300
+#define SMC91111_REG_SIZE	16
 #define SMC91111_IRQ		27
 #define IDE_XLINUX_MUX_BASE        0xf2040000
 #define IDE_DMA_ADDR	0xfce00000

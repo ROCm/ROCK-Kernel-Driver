@@ -171,7 +171,7 @@ static struct dev_data *dev_new (void)
 
 	dev = kmalloc (sizeof *dev, GFP_KERNEL);
 	if (!dev)
-		return 0;
+		return NULL;
 	memset (dev, 0, sizeof *dev);
 	dev->state = STATE_DEV_DISABLED;
 	atomic_set (&dev->count, 1);
@@ -597,8 +597,8 @@ static void ep_aio_complete(struct usb_ep *ep, struct usb_request *req)
 
 	/* lock against disconnect (and ideally, cancel) */
 	spin_lock(&epdata->dev->lock);
-	priv->req = 0;
-	priv->epdata = 0;
+	priv->req = NULL;
+	priv->epdata = NULL;
 	if (NULL == iocb->ki_retry
 			|| unlikely(0 == req->actual)
 			|| unlikely(kiocbIsCancelled(iocb))) {
@@ -1204,7 +1204,7 @@ dev_release (struct inode *inode, struct file *fd)
 
 	fasync_helper (-1, fd, 0, &dev->fasync);
 	kfree (dev->buf);
-	dev->buf = 0;
+	dev->buf = NULL;
 	put_dev (dev);
 
 	/* other endpoints were all decoupled from this device */
@@ -1356,7 +1356,7 @@ gadgetfs_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 
 	req->buf = dev->rbuf;
 	req->dma = DMA_ADDR_INVALID;
-	req->context = 0;
+	req->context = NULL;
 	value = -EOPNOTSUPP;
 	switch (ctrl->bRequest) {
 
@@ -1524,7 +1524,7 @@ restart:
 		ep = list_entry (entry, struct ep_data, epfiles);
 		list_del_init (&ep->epfiles);
 		dentry = ep->dentry;
-		ep->dentry = 0;
+		ep->dentry = NULL;
 		parent = dentry->d_parent->d_inode;
 
 		/* break link to controller */
@@ -1532,7 +1532,7 @@ restart:
 			(void) usb_ep_disable (ep->ep);
 		ep->state = STATE_EP_UNBOUND;
 		usb_ep_free_request (ep->ep, ep->req);
-		ep->ep = 0;
+		ep->ep = NULL;
 		wake_up (&ep->wait);
 		put_ep (ep);
 
@@ -1612,8 +1612,8 @@ gadgetfs_unbind (struct usb_gadget *gadget)
 	spin_unlock_irq (&dev->lock);
 
 	destroy_ep_files (dev);
-	gadget->ep0->driver_data = 0;
-	set_gadget_data (gadget, 0);
+	gadget->ep0->driver_data = NULL;
+	set_gadget_data (gadget, NULL);
 
 	/* we've already been disconnected ... no i/o is active */
 	if (dev->req)
@@ -1646,7 +1646,7 @@ gadgetfs_bind (struct usb_gadget *gadget)
 	dev->req = usb_ep_alloc_request (gadget->ep0, GFP_KERNEL);
 	if (!dev->req)
 		goto enomem;
-	dev->req->context = 0;
+	dev->req->context = NULL;
 	dev->req->complete = epio_complete;
 
 	if (activate_ep_files (dev) < 0)
@@ -1835,7 +1835,7 @@ dev_config (struct file *fd, const char *buf, size_t len, loff_t *ptr)
 	value = usb_gadget_register_driver (&gadgetfs_driver);
 	if (value != 0) {
 		kfree (dev->buf);
-		dev->buf = 0;
+		dev->buf = NULL;
 	} else {
 		/* at this point "good" hardware has for the first time
 		 * let the USB the host see us.  alternatively, if users
@@ -1855,7 +1855,7 @@ fail:
 	spin_unlock_irq (&dev->lock);
 	pr_debug ("%s: %s fail %Zd, %p\n", shortname, __FUNCTION__, value, dev);
 	kfree (dev->buf);
-	dev->buf = 0;
+	dev->buf = NULL;
 	return value;
 }
 
@@ -1944,13 +1944,13 @@ gadgetfs_create_file (struct super_block *sb, char const *name,
 	qname.hash = full_name_hash (qname.name, qname.len);
 	dentry = d_alloc (sb->s_root, &qname);
 	if (!dentry)
-		return 0;
+		return NULL;
 
 	inode = gadgetfs_make_inode (sb, data, fops,
 			S_IFREG | (default_perm & S_IRWXUGO));
 	if (!inode) {
 		dput(dentry);
-		return 0;
+		return NULL;
 	}
 	d_add (dentry, inode);
 	*dentry_p = dentry;
@@ -1980,7 +1980,7 @@ gadgetfs_fill_super (struct super_block *sb, void *opts, int silent)
 
 	/* root inode */
 	inode = gadgetfs_make_inode (sb,
-			0, &simple_dir_operations,
+			NULL, &simple_dir_operations,
 			S_IFDIR | S_IRUGO | S_IXUGO);
 	if (!inode)
 		return -ENOMEM;
@@ -2027,7 +2027,7 @@ gadgetfs_kill_sb (struct super_block *sb)
 	kill_litter_super (sb);
 	if (the_device) {
 		put_dev (the_device);
-		the_device = 0;
+		the_device = NULL;
 	}
 }
 

@@ -1829,7 +1829,7 @@ int cpqhp_event_start_thread(void)
 	init_MUTEX_LOCKED(&event_exit);
 	event_finished=0;
 
-	pid = kernel_thread(event_thread, 0, 0);
+	pid = kernel_thread(event_thread, NULL, 0);
 	if (pid < 0) {
 		err ("Can't start up our event thread\n");
 		return -1;

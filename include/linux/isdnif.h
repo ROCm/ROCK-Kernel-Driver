@@ -502,26 +502,18 @@ typedef struct {
    * Parameters:
    *             u_char pointer data
    *             int    length of data
-   *             int    Flag: 0 = Call form Kernel-Space (use memcpy,
-   *                              no schedule allowed) 
-   *                          1 = Data is in User-Space (use memcpy_fromfs,
-   *                              may schedule)
    *             int    driverId
    *             int    local channel-number (0 ...)
    */
-  int (*writecmd)(const u_char*, int, int, int, int);
+  int (*writecmd)(const u_char __user *, int, int, int);
 
   /* Read raw Status replies
    *             u_char pointer data (volatile)
    *             int    length of buffer
-   *             int    Flag: 0 = Call form Kernel-Space (use memcpy,
-   *                              no schedule allowed) 
-   *                          1 = Data is in User-Space (use memcpy_fromfs,
-   *                              may schedule)
    *             int    driverId
    *             int    local channel-number (0 ...)
    */
-  int (*readstat)(u_char*, int, int, int, int);
+  int (*readstat)(u_char __user *, int, int, int);
 
   char id[20];
 } isdn_if;

@@ -62,7 +62,7 @@ static struct eeprom_fixup eeprom_fixups[] __devinitdata = {
 	 */
 	{ 0x1e00, 0x0000, 0x000b, 0x8f01, 0x0103, 0x0300, 0x0821, 0x000, 0x0001, 0x0000, 0x01e1 }
   },
-  {0, 0, 0, 0, {}}};
+  {NULL}};
 
 
 static const char *block_name[] __devinitdata = {
@@ -136,7 +136,7 @@ void __devinit tulip_parse_eeprom(struct net_device *dev)
 	unsigned char *ee_data = tp->eeprom;
 	int i;
 
-	tp->mtable = 0;
+	tp->mtable = NULL;
 	/* Detect an old-style (SA only) EEPROM layout:
 	   memcmp(eedata, eedata+16, 8). */
 	for (i = 0; i < 8; i ++)

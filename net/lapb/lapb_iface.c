@@ -176,7 +176,7 @@ int lapb_unregister(struct net_device *dev)
 	struct lapb_cb *lapb;
 	int rc = LAPB_BADTOKEN;
 
-	write_unlock_bh(&lapb_list_lock);
+	write_lock_bh(&lapb_list_lock);
 	lapb = __lapb_devtostruct(dev);
 	if (!lapb)
 		goto out;

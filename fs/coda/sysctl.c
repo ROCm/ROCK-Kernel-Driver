@@ -240,7 +240,7 @@ void coda_sysctl_clean(void)
 #ifdef CONFIG_SYSCTL
 	if ( fs_table_header ) {
 		unregister_sysctl_table(fs_table_header);
-		fs_table_header = 0;
+		fs_table_header = NULL;
 	}
 #endif
 

@@ -561,7 +561,7 @@ static int ip6_fragment(struct sk_buff **pskb, int (*output)(struct sk_buff**))
 		err = 0;
 		offset = 0;
 		frag = skb_shinfo(skb)->frag_list;
-		skb_shinfo(skb)->frag_list = 0;
+		skb_shinfo(skb)->frag_list = NULL;
 		/* BUILD HEADER */
 
 		tmp_hdr = kmalloc(hlen, GFP_ATOMIC);

@@ -29,6 +29,8 @@ led-$(CONFIG_SA1100_BRUTUS)		+= leds-brutus.o
 obj-$(CONFIG_SA1100_CERF)		+= cerf.o
 led-$(CONFIG_SA1100_CERF)		+= leds-cerf.o
 
+obj-$(CONFIG_SA1100_COLLIE)		+= collie.o
+
 obj-$(CONFIG_SA1100_EMPEG)		+= empeg.o
 
 obj-$(CONFIG_SA1100_FLEXANET)		+= flexanet.o

@@ -433,7 +433,7 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 	sch->dequeue = ops->dequeue;
 	sch->dev = dev;
 	atomic_set(&sch->refcnt, 1);
-	sch->stats.lock = &dev->queue_lock;
+	sch->stats_lock = &dev->queue_lock;
 	if (handle == 0) {
 		handle = qdisc_alloc_handle(dev);
 		err = -ENOMEM;
@@ -460,7 +460,8 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 		write_unlock(&qdisc_tree_lock);
 #ifdef CONFIG_NET_ESTIMATOR
 		if (tca[TCA_RATE-1])
-			qdisc_new_estimator(&sch->stats, tca[TCA_RATE-1]);
+			qdisc_new_estimator(&sch->stats, sch->stats_lock,
+					    tca[TCA_RATE-1]);
 #endif
 		return sch;
 	}
@@ -487,7 +488,8 @@ static int qdisc_change(struct Qdisc *sch, struct rtattr **tca)
 #ifdef CONFIG_NET_ESTIMATOR
 	if (tca[TCA_RATE-1]) {
 		qdisc_kill_estimator(&sch->stats);
-		qdisc_new_estimator(&sch->stats, tca[TCA_RATE-1]);
+		qdisc_new_estimator(&sch->stats, sch->stats_lock,
+				    tca[TCA_RATE-1]);
 	}
 #endif
 	return 0;
@@ -726,15 +728,15 @@ graft:
 	return 0;
 }
 
-int qdisc_copy_stats(struct sk_buff *skb, struct tc_stats *st)
+int qdisc_copy_stats(struct sk_buff *skb, struct tc_stats *st, spinlock_t *lock)
 {
-	spin_lock_bh(st->lock);
-	RTA_PUT(skb, TCA_STATS, (char*)&st->lock - (char*)st, st);
-	spin_unlock_bh(st->lock);
+	spin_lock_bh(lock);
+	RTA_PUT(skb, TCA_STATS, sizeof(struct tc_stats), st);
+	spin_unlock_bh(lock);
 	return 0;
 
 rtattr_failure:
-	spin_unlock_bh(st->lock);
+	spin_unlock_bh(lock);
 	return -1;
 }
 
@@ -758,7 +760,7 @@ static int tc_fill_qdisc(struct sk_buff *skb, struct Qdisc *q, u32 clid,
 	if (q->ops->dump && q->ops->dump(q, skb) < 0)
 		goto rtattr_failure;
 	q->stats.qlen = q->q.qlen;
-	if (qdisc_copy_stats(skb, &q->stats))
+	if (qdisc_copy_stats(skb, &q->stats, q->stats_lock))
 		goto rtattr_failure;
 	nlh->nlmsg_len = skb->tail - b;
 	return skb->len;

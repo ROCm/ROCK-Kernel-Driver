@@ -752,7 +752,7 @@ static void do_pcd_request(request_queue_t * q)
 			pcd_count = pcd_req->current_nr_sectors;
 			pcd_buf = pcd_req->buffer;
 			pcd_busy = 1;
-			ps_set_intr(do_pcd_read, 0, 0, nice);
+			ps_set_intr(do_pcd_read, NULL, 0, nice);
 			return;
 		} else
 			end_request(pcd_req, 0);

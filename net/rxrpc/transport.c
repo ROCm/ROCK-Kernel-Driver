@@ -611,7 +611,7 @@ int rxrpc_trans_immediate_abort(struct rxrpc_transport *trans,
 	struct rxrpc_header ahdr;
 	struct sockaddr_in sin;
 	struct msghdr msghdr;
-	struct iovec iov[2];
+	struct kvec iov[2];
 	mm_segment_t oldfs;
 	uint32_t _error;
 	int len, ret;
@@ -649,7 +649,11 @@ int rxrpc_trans_immediate_abort(struct rxrpc_transport *trans,
 
 	msghdr.msg_name		= &sin;
 	msghdr.msg_namelen	= sizeof(sin);
-	msghdr.msg_iov		= iov;
+	/*
+	 * the following is safe, since for compiler definitions of kvec and
+	 * iovec are identical, yielding the same in-core layout and alignment
+	 */
+	msghdr.msg_iov		= (struct iovec *)iov;
 	msghdr.msg_iovlen	= 2;
 	msghdr.msg_control	= NULL;
 	msghdr.msg_controllen	= 0;

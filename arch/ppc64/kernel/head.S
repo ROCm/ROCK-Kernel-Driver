@@ -407,7 +407,6 @@ __start_interrupts:
 	STD_EXCEPTION_PSERIES(0x100, SystemReset)
 
 	. = 0x200
-	.globl MachineCheck_Pseries
 _MachineCheckPseries:
 	mtspr	SPRG1,r13		/* save r13 */
 	EXCEPTION_PROLOG_PSERIES(PACA_EXMC, MachineCheck_common)

@@ -85,7 +85,7 @@ void ci_get_data(struct dvb_ringbuffer *cibuf, u8 *data, int len)
 
 	DVB_RINGBUFFER_WRITE_BYTE(cibuf, len >> 8);
 	DVB_RINGBUFFER_WRITE_BYTE(cibuf, len & 0xff);
-	dvb_ringbuffer_write(cibuf, data, len, 0);
+	dvb_ringbuffer_write(cibuf, data, len);
 	wake_up_interruptible(&cibuf->queue);
 }
 
@@ -110,9 +110,9 @@ void ci_ll_flush(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf)
 void ci_ll_release(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf)
 {
 	vfree(cirbuf->data);
-	cirbuf->data = 0;
+	cirbuf->data = NULL;
 	vfree(ciwbuf->data);
-	ciwbuf->data = 0;
+	ciwbuf->data = NULL;
 }
 
 int ci_ll_reset(struct dvb_ringbuffer *cibuf, struct file *file,
@@ -133,7 +133,7 @@ int ci_ll_reset(struct dvb_ringbuffer *cibuf, struct file *file,
 	for (i = 0; i < 2; i++) {
 		if (slots & (1 << i)) {
 			msg[2] = i;
-			dvb_ringbuffer_write(cibuf, msg, 8, 0);
+			dvb_ringbuffer_write(cibuf, msg, 8);
 			slot[i].flags = 0;
 		}
 	}
@@ -142,30 +142,46 @@ int ci_ll_reset(struct dvb_ringbuffer *cibuf, struct file *file,
 }
 
 static ssize_t ci_ll_write(struct dvb_ringbuffer *cibuf, struct file *file,
-			   const char *buf, size_t count, loff_t *ppos)
+			   const char __user *buf, size_t count, loff_t *ppos)
 {
 	int free;
 	int non_blocking = file->f_flags & O_NONBLOCK;
+	char *page = (char *)__get_free_page(GFP_USER);
+	int res;
 
+	if (!page)
+		return -ENOMEM;
+
+	res = -EINVAL;
 	if (count > 2048)
-		return -EINVAL;
+		goto out;
+
+	res = -EFAULT;
+	if (copy_from_user(page, buf, count))
+		goto out;
+
 	free = dvb_ringbuffer_free(cibuf);
 	if (count + 2 > free) {
+		res = -EWOULDBLOCK;
 		if (non_blocking)
-			return -EWOULDBLOCK;
+			goto out;
+		res = -ERESTARTSYS;
 		if (wait_event_interruptible(cibuf->queue,
 					     (dvb_ringbuffer_free(cibuf) >= count + 2)))
-			return -ERESTARTSYS;
+			goto out;
 	}
 
 	DVB_RINGBUFFER_WRITE_BYTE(cibuf, count >> 8);
 	DVB_RINGBUFFER_WRITE_BYTE(cibuf, count & 0xff);
 
-	return dvb_ringbuffer_write(cibuf, buf, count, 1);
+	res = dvb_ringbuffer_write(cibuf, page, count);
+out:
+	free_page((unsigned long)page);
+	return res;
 }
 
 static ssize_t ci_ll_read(struct dvb_ringbuffer *cibuf, struct file *file,
-			  char *buf, size_t count, loff_t *ppos)
+			  char __user *buf, size_t count, loff_t *ppos)
 {
 	int avail;
 	int non_blocking = file->f_flags & O_NONBLOCK;
@@ -301,7 +317,7 @@ static int dvb_ca_ioctl(struct inode *inode, struct file *file,
 	return 0;
 }
 
-static ssize_t dvb_ca_write(struct file *file, const char *buf,
+static ssize_t dvb_ca_write(struct file *file, const char __user *buf,
 			    size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev = (struct dvb_device *) file->private_data;
@@ -311,7 +327,7 @@ static ssize_t dvb_ca_write(struct file *file, const char *buf,
 	return ci_ll_write(&av7110->ci_wbuffer, file, buf, count, ppos);
 }
 
-static ssize_t dvb_ca_read(struct file *file, char *buf,
+static ssize_t dvb_ca_read(struct file *file, char __user *buf,
 			   size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev = (struct dvb_device *) file->private_data;
@@ -334,7 +350,7 @@ static struct file_operations dvb_ca_fops = {
 };
 
 static struct dvb_device dvbdev_ca = {
-	.priv		= 0,
+	.priv		= NULL,
 	.users		= 1,
 	.writers	= 1,
 	.fops		= &dvb_ca_fops,

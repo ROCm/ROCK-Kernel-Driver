@@ -192,6 +192,10 @@ void undo_irq(u_int Attributes, int irq);
 int adjust_resource_info(client_handle_t handle, adjust_t *adj);
 void release_resource_db(void);
 
+/* In socket_sysfs.c */
+extern struct class_interface pccard_sysfs_interface;
+
+/* In cs.c */
 extern struct rw_semaphore pcmcia_socket_list_rwsem;
 extern struct list_head pcmcia_socket_list;
 

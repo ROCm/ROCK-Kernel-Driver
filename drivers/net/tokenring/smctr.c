@@ -69,7 +69,7 @@ static const char cardname[] = "smctr";
 
 #define SMCTR_IO_EXTENT   20
 
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 static unsigned int smctr_posid = 0x6ec6;
 #endif
 
@@ -479,7 +479,7 @@ static int smctr_checksum_firmware(struct net_device *dev)
 
 static int __init smctr_chk_mca(struct net_device *dev)
 {
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 	struct net_local *tp = netdev_priv(dev);
 	int current_slot;
 	__u8 r1, r2, r3, r4, r5;
@@ -626,7 +626,7 @@ static int __init smctr_chk_mca(struct net_device *dev)
 	return (0);
 #else
 	return (-1);
-#endif /* CONFIG_MCA */
+#endif /* CONFIG_MCA_LEGACY */
 }
 
 static int smctr_chg_rx_mask(struct net_device *dev)
@@ -3617,7 +3617,7 @@ struct net_device __init *smctr_probe(int unit)
 		goto out1;
 	return dev;
 out1:
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 	{ struct net_local *tp = netdev_priv(dev);
 	  if (tp->slot_num)
 		mca_mark_as_unused(tp->slot_num);
@@ -4939,7 +4939,7 @@ static int smctr_send_rq_init(struct net_device *dev)
                 tmf->dc_sc = DC_RPS | SC_RS;
                 tmf->vl    = 4;
 
-                smctr_make_8025_hdr(dev, 0L, tmf, AC_FC_RQ_INIT);
+                smctr_make_8025_hdr(dev, NULL, tmf, AC_FC_RQ_INIT);
 
                 tsv = (MAC_SUB_VECTOR *)((__u32)tmf + sizeof(MAC_HEADER));
                 smctr_make_product_id(dev, tsv);
@@ -5685,7 +5685,7 @@ static struct net_device *setup_card(int n)
 		goto out1;
 	return dev;
  out1:
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 	{ struct net_local *tp = netdev_priv(dev);
 	  if (tp->slot_num)
 		mca_mark_as_unused(tp->slot_num);
@@ -5725,7 +5725,7 @@ void cleanup_module(void)
 		if (dev) {
 
 			unregister_netdev(dev);
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 			{ struct net_local *tp = netdev_priv(dev);
 			if (tp->slot_num)
 				mca_mark_as_unused(tp->slot_num);

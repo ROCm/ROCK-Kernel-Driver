@@ -4,7 +4,7 @@ menu "Passive cards"
 
 config ISDN_DRV_HISAX
 	tristate "HiSax SiemensChipSet driver support"
-	select CRC16
+	select CRC_CCITT
 	---help---
 	  This is a driver supporting the Siemens chipset on various
 	  ISDN-cards (like AVM A1, Elsa ISDN cards, Teles S0-16.0, Teles
@@ -400,7 +400,7 @@ comment "HiSax sub driver modules"
 config HISAX_ST5481
 	tristate "ST5481 USB ISDN modem (EXPERIMENTAL)"
 	depends on USB && EXPERIMENTAL
-	select CRC16
+	select CRC_CCITT
 	help
 	  This enables the driver for ST5481 based USB ISDN adapters,
 	  e.g. the BeWan Gazel 128 USB

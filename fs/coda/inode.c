@@ -142,7 +142,7 @@ static int get_device_index(struct coda_mount_data *data)
 
 static int coda_fill_super(struct super_block *sb, void *data, int silent)
 {
-        struct inode *root = 0; 
+        struct inode *root = NULL; 
 	struct coda_sb_info *sbi = NULL;
 	struct venus_comm *vc = NULL;
 	struct CodaFid fid;

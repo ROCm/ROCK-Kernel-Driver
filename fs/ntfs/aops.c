@@ -800,7 +800,7 @@ static const char *ntfs_please_email = "Please email "
 static int ntfs_write_mst_block(struct writeback_control *wbc,
 		struct page *page)
 {
-	sector_t block, dblock, rec_block;;
+	sector_t block, dblock, rec_block;
 	struct inode *vi = page->mapping->host;
 	ntfs_inode *ni = NTFS_I(vi);
 	ntfs_volume *vol = ni->vol;

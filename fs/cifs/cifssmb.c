@@ -190,7 +190,7 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 		rc = -EIO;
 		return rc;
 	}
-	rc = smb_init(SMB_COM_NEGOTIATE, 0, 0 /* no tcon yet */ ,
+	rc = smb_init(SMB_COM_NEGOTIATE, 0, NULL /* no tcon yet */ ,
 		      (void **) &pSMB, (void **) &pSMBr);
 	if (rc)
 		return rc;
@@ -363,7 +363,7 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 		return -EBUSY;
 	}
 
-	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, 0 /* no tcon anymore */,
+	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, NULL /* no tcon anymore */,
 		 (void **) &pSMB, (void **) &smb_buffer_response);
 
 	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
@@ -2067,7 +2067,7 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 	if (ses == NULL)
 		return -ENODEV;
 getDFSRetry:
-	rc = smb_init(SMB_COM_TRANSACTION2, 15, 0, (void **) &pSMB,
+	rc = smb_init(SMB_COM_TRANSACTION2, 15, NULL, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
 		return rc;
@@ -2836,6 +2836,23 @@ setPermsRetry:
 	data_offset->DevMajor = cpu_to_le64(MAJOR(device));
 	data_offset->DevMinor = cpu_to_le64(MINOR(device));
 	data_offset->Permissions = cpu_to_le64(mode);
+    
+	if(S_ISREG(mode))
+		data_offset->Type = cpu_to_le32(UNIX_FILE);
+	else if(S_ISDIR(mode))
+		data_offset->Type = cpu_to_le32(UNIX_DIR);
+	else if(S_ISLNK(mode))
+		data_offset->Type = cpu_to_le32(UNIX_SYMLINK);
+	else if(S_ISCHR(mode))
+		data_offset->Type = cpu_to_le32(UNIX_CHARDEV);
+	else if(S_ISBLK(mode))
+		data_offset->Type = cpu_to_le32(UNIX_BLOCKDEV);
+	else if(S_ISFIFO(mode))
+		data_offset->Type = cpu_to_le32(UNIX_FIFO);
+	else if(S_ISSOCK(mode))
+		data_offset->Type = cpu_to_le32(UNIX_SOCKET);
+
+
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);

@@ -269,7 +269,7 @@ static void async_completed(struct urb *urb, struct pt_regs *regs)
 		sinfo.si_signo = as->signr;
 		sinfo.si_errno = as->urb->status;
 		sinfo.si_code = SI_ASYNCIO;
-		sinfo.si_addr = (void *)as->userurb;
+		sinfo.si_addr = as->userurb;
 		send_sig_info(as->signr, &sinfo, as->task);
 	}
         wake_up(&ps->wait);

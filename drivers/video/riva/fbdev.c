@@ -1619,8 +1619,8 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 			break;
 		}
 		
-		fb_move_buf_aligned(info, &info->sprite, data, d_pitch, src,
-				    s_pitch, info->cursor.image.height);
+		fb_sysmove_buf_aligned(info, &info->sprite, data, d_pitch, src,
+				       s_pitch, info->cursor.image.height);
 
 		bg = ((info->cmap.red[bg_idx] & 0xf8) << 7) |
 		     ((info->cmap.green[bg_idx] & 0xf8) << 2) |
@@ -1681,7 +1681,8 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 		    | FBINFO_HWACCEL_YPAN
 		    | FBINFO_HWACCEL_COPYAREA
 		    | FBINFO_HWACCEL_FILLRECT
-		    | FBINFO_HWACCEL_IMAGEBLIT;
+		    | FBINFO_HWACCEL_IMAGEBLIT
+	            | FBINFO_MISC_MODESWITCHLATE;
 	info->var = rivafb_default_var;
 	info->fix.visual = (info->var.bits_per_pixel == 8) ?
 				FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;

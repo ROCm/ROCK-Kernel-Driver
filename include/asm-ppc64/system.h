@@ -128,6 +128,9 @@ static inline void flush_altivec_to_thread(struct task_struct *t)
 }
 #endif
 
+/* EBCDIC -> ASCII conversion for [0-9A-Z] on iSeries */
+extern unsigned char e2a(unsigned char);
+
 extern struct task_struct *__switch_to(struct task_struct *,
 				       struct task_struct *);
 #define switch_to(prev, next, last)	((last) = __switch_to((prev), (next)))

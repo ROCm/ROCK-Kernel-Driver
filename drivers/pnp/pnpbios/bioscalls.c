@@ -260,7 +260,7 @@ static int __pnp_bios_dev_node_info(struct pnp_dev_node_info *data)
 	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_GET_NUM_SYS_DEV_NODES, 0, PNP_TS1, 2, PNP_TS1, PNP_DS, 0, 0,
-			       data, sizeof(struct pnp_dev_node_info), 0, 0);
+			       data, sizeof(struct pnp_dev_node_info), NULL, 0);
 	data->no_nodes &= 0xff;
 	return status;
 }
@@ -323,7 +323,7 @@ static int __pnp_bios_set_dev_node(u8 nodenum, char boot, struct pnp_bios_node *
 	if ( !boot && pnpbios_dont_use_current_config )
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_SET_SYS_DEV_NODE, nodenum, 0, PNP_TS1, boot ? 2 : 1, PNP_DS, 0, 0,
-			       data, 65536, 0, 0);
+			       data, 65536, NULL, 0);
 	return status;
 }
 
@@ -381,7 +381,7 @@ int pnp_bios_dock_station_info(struct pnp_docking_station_info *data)
 	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_GET_DOCKING_STATION_INFORMATION, 0, PNP_TS1, PNP_DS, 0, 0, 0, 0,
-			       data, sizeof(struct pnp_docking_station_info), 0, 0);
+			       data, sizeof(struct pnp_docking_station_info), NULL, 0);
 	return status;
 }
 

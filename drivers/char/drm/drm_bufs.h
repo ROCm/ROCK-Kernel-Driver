@@ -125,7 +125,7 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 		return -EINVAL;
 	}
 	map->mtrr   = -1;
-	map->handle = 0;
+	map->handle = NULL;
 
 	switch ( map->type ) {
 	case _DRM_REGISTERS:
@@ -468,7 +468,7 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 		buf->waiting = 0;
 		buf->pending = 0;
 		init_waitqueue_head( &buf->dma_wait );
-		buf->filp    = 0;
+		buf->filp    = NULL;
 
 		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
 		buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
@@ -692,7 +692,7 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 			buf->waiting = 0;
 			buf->pending = 0;
 			init_waitqueue_head( &buf->dma_wait );
-			buf->filp    = 0;
+			buf->filp    = NULL;
 
 			buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
 			buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),

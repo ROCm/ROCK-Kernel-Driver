@@ -1237,7 +1237,7 @@ struct fib_ioctl
 {
 	u32	fibctx;
 	s32	wait;
-	char	*fib;
+	char	__user *fib;
 };
 
 struct revision
@@ -1448,8 +1448,8 @@ int fib_complete(struct fib * context);
 struct aac_dev *aac_init_adapter(struct aac_dev *dev);
 int aac_get_containers(struct aac_dev *dev);
 int aac_scsi_cmd(struct scsi_cmnd *cmd);
-int aac_dev_ioctl(struct aac_dev *dev, int cmd, void *arg);
-int aac_do_ioctl(struct aac_dev * dev, int cmd, void *arg);
+int aac_dev_ioctl(struct aac_dev *dev, int cmd, void __user *arg);
+int aac_do_ioctl(struct aac_dev * dev, int cmd, void __user *arg);
 int aac_rx_init(struct aac_dev *dev);
 int aac_rkt_init(struct aac_dev *dev);
 int aac_sa_init(struct aac_dev *dev);

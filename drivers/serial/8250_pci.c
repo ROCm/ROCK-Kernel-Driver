@@ -1665,7 +1665,7 @@ pciserial_init_one(struct pci_dev *dev, const struct pci_device_id *ent)
 	for (i = 0; i < nr_ports; i++) {
 		memset(&serial_req, 0, sizeof(serial_req));
 		serial_req.flags = UPF_SKIP_TEST | UPF_AUTOPROBE |
-				   UPF_RESOURCES | UPF_SHARE_IRQ;
+				   UPF_SHARE_IRQ;
 		serial_req.baud_base = board->base_baud;
 		serial_req.irq = get_pci_irq(dev, board, i);
 		if (quirk->setup(dev, board, &serial_req, i))

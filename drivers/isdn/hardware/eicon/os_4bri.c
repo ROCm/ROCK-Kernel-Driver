@@ -17,7 +17,7 @@
 #include "mi_pc.h"
 #include "dsrv4bri.h"
 
-void *diva_xdiLoadFileFile = 0;
+void *diva_xdiLoadFileFile = NULL;
 dword diva_xdiLoadFileLength = 0;
 
 /*
@@ -268,7 +268,7 @@ int diva_4bri_init_card(diva_os_xdi_adapter_t * a)
 		     (diva_os_xdi_adapter_t *) diva_os_malloc(0, sizeof(*a))))
 		{
 			diva_os_free(0, a->slave_adapters[0]);
-			a->slave_adapters[0] = 0;
+			a->slave_adapters[0] = NULL;
 			diva_4bri_cleanup_adapter(a);
 			return (-1);
 		}
@@ -277,8 +277,8 @@ int diva_4bri_init_card(diva_os_xdi_adapter_t * a)
 		{
 			diva_os_free(0, a->slave_adapters[0]);
 			diva_os_free(0, a->slave_adapters[1]);
-			a->slave_adapters[0] = 0;
-			a->slave_adapters[1] = 0;
+			a->slave_adapters[0] = NULL;
+			a->slave_adapters[1] = NULL;
 			diva_4bri_cleanup_adapter(a);
 			return (-1);
 		}
@@ -300,7 +300,7 @@ int diva_4bri_init_card(diva_os_xdi_adapter_t * a)
 	if (!(a->slave_list = quadro_list)) {
 		for (i = 0; i < (tasks - 1); i++) {
 			diva_os_free(0, a->slave_adapters[i]);
-			a->slave_adapters[i] = 0;
+			a->slave_adapters[i] = NULL;
 		}
 		diva_4bri_cleanup_adapter(a);
 		return (-1);
@@ -499,7 +499,7 @@ static int diva_4bri_cleanup_adapter(diva_os_xdi_adapter_t * a)
 			    && a->resources.pci.addr[bar]) {
 				divasa_unmap_pci_bar(a->resources.pci.addr[bar]);
 				a->resources.pci.bar[bar] = 0;
-				a->resources.pci.addr[bar] = 0;
+				a->resources.pci.addr[bar] = NULL;
 			}
 		}
 	}
@@ -515,12 +515,12 @@ static int diva_4bri_cleanup_adapter(diva_os_xdi_adapter_t * a)
 					 _4bri_bar_length[1],
 					 &a->port_name[0], 1);
 		a->resources.pci.bar[1] = 0;
-		a->resources.pci.addr[1] = 0;
+		a->resources.pci.addr[1] = NULL;
 	}
 
 	if (a->slave_list) {
 		diva_os_free(0, a->slave_list);
-		a->slave_list = 0;
+		a->slave_list = NULL;
 	}
 
 	return (0);
@@ -607,14 +607,14 @@ static int diva_4bri_cleanup_slave_adapters(diva_os_xdi_adapter_t * a)
 
 			diva_os_remove_soft_isr(&diva_current->xdi_adapter.
 						req_soft_isr);
-			diva_current->xdi_adapter.isr_soft_isr.object = 0;
+			diva_current->xdi_adapter.isr_soft_isr.object = NULL;
 
 			if (diva_current->xdi_adapter.e_tbl) {
 				diva_os_free(0,
 					     diva_current->xdi_adapter.
 					     e_tbl);
 			}
-			diva_current->xdi_adapter.e_tbl = 0;
+			diva_current->xdi_adapter.e_tbl = NULL;
 			diva_current->xdi_adapter.e_max = 0;
 			diva_current->xdi_adapter.e_count = 0;
 		}
@@ -823,7 +823,7 @@ void *xdiLoadFile(char *FileName, unsigned long *FileLength,
 	if (FileLength) {
 		*FileLength = diva_xdiLoadFileLength;
 	}
-	diva_xdiLoadFileFile = 0;
+	diva_xdiLoadFileFile = NULL;
 	diva_xdiLoadFileLength = 0;
 
 	return (ret);
@@ -848,7 +848,7 @@ diva_4bri_write_fpga_image(diva_os_xdi_adapter_t * a, byte * data,
 
 	ret = qBri_FPGA_download(&a->xdi_adapter);
 
-	diva_xdiLoadFileFile = 0;
+	diva_xdiLoadFileFile = NULL;
 	diva_xdiLoadFileLength = 0;
 
 	return (ret ? 0 : -1);
@@ -1116,7 +1116,7 @@ static int diva_4bri_stop_adapter(diva_os_xdi_adapter_t * a)
 
 	if (a->clear_interrupts_proc) {
 		diva_4bri_clear_interrupts(a);
-		a->clear_interrupts_proc = 0;
+		a->clear_interrupts_proc = NULL;
 		DBG_ERR(("A: A(%d) no final interrupt from 4BRI adapter",
 			 IoAdapter->ANum))
 	}

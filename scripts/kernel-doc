@@ -652,7 +652,7 @@ sub output_struct_sgml(%) {
 	$type = $args{'parametertypes'}{$parameter};
 	if ($type =~ m/([^\(]*\(\*)\s*\)\s*\(([^\)]*)\)/) {
 	    # pointer-to-function
-	    print "  $1 $parameter ($2);\n";
+	    print "  $1 $parameter) ($2);\n";
 	} elsif ($type =~ m/^(.*?)\s*(:.*)/) {
 	    print "  $1 $parameter$2;\n";
 	} else {
@@ -1206,7 +1206,7 @@ sub dump_struct($$) {
         my $members = $3;
 
 	# ignore embedded structs or unions
-	$members =~ s/{.*}//g;
+	$members =~ s/{.*?}//g;
 
 	create_parameterlist($members, ';', $file);
 

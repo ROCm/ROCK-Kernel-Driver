@@ -205,7 +205,6 @@ struct uart_port {
 #define UPF_CONS_FLOW		(1 << 23)
 #define UPF_SHARE_IRQ		(1 << 24)
 #define UPF_BOOT_AUTOCONF	(1 << 28)
-#define UPF_RESOURCES		(1 << 30)
 #define UPF_IOREMAP		(1 << 31)
 
 #define UPF_CHANGE_MASK		(0x17fff)

@@ -61,7 +61,7 @@ static int pcm20_setfreq(struct pcm20_device *dev, unsigned long freq)
 	freql = freq & 0xff;
 	freqh = freq >> 8;
 
-	aci_rds_cmd(RDS_RESET, 0, 0);
+	aci_rds_cmd(RDS_RESET, NULL, 0);
 	pcm20_stereo(dev, 1);
 
 	return aci_rw_cmd(ACI_WRITE_TUNE, freql, freqh);

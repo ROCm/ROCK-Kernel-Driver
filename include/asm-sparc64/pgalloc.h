@@ -196,7 +196,7 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
 	pte_t *pte = pte_alloc_one_kernel(mm, addr);
 	if (pte)
 		return virt_to_page(pte);
-	return 0;
+	return NULL;
 }
 
 static __inline__ pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)

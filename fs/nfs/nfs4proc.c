@@ -387,7 +387,7 @@ retry:
         fattr->valid = 0;
 
 	if (sattr->ia_valid & ATTR_SIZE)
-		nfs4_copy_stateid(&arg.stateid, state, 0);
+		nfs4_copy_stateid(&arg.stateid, state, NULL);
 	else
 		memcpy(&arg.stateid, &zero_stateid, sizeof(arg.stateid));
 

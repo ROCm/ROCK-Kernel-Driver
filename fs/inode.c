@@ -90,7 +90,7 @@ spinlock_t inode_lock = SPIN_LOCK_UNLOCKED;
  * from its final dispose_list, the struct super_block they refer to
  * (for inode->i_sb->s_op) may already have been freed and reused.
  */
-static DECLARE_MUTEX(iprune_sem);
+DECLARE_MUTEX(iprune_sem);
 
 /*
  * Statistics gathering..
@@ -1235,26 +1235,26 @@ void remove_dquot_ref(struct super_block *sb, int type, struct list_head *tofree
 	if (!sb->dq_op)
 		return;	/* nothing to do */
 	spin_lock(&inode_lock);	/* This lock is for inodes code */
-	/* We don't have to lock against quota code - test IS_QUOTAINIT is just for speedup... */
- 
+
+	/* We hold dqptr_sem so we are safe against the quota code */
 	list_for_each(act_head, &inode_in_use) {
 		inode = list_entry(act_head, struct inode, i_list);
-		if (inode->i_sb == sb && IS_QUOTAINIT(inode))
+		if (inode->i_sb == sb && !IS_NOQUOTA(inode))
 			remove_inode_dquot_ref(inode, type, tofree_head);
 	}
 	list_for_each(act_head, &inode_unused) {
 		inode = list_entry(act_head, struct inode, i_list);
-		if (inode->i_sb == sb && IS_QUOTAINIT(inode))
+		if (inode->i_sb == sb && !IS_NOQUOTA(inode))
 			remove_inode_dquot_ref(inode, type, tofree_head);
 	}
 	list_for_each(act_head, &sb->s_dirty) {
 		inode = list_entry(act_head, struct inode, i_list);
-		if (IS_QUOTAINIT(inode))
+		if (!IS_NOQUOTA(inode))
 			remove_inode_dquot_ref(inode, type, tofree_head);
 	}
 	list_for_each(act_head, &sb->s_io) {
 		inode = list_entry(act_head, struct inode, i_list);
-		if (IS_QUOTAINIT(inode))
+		if (!IS_NOQUOTA(inode))
 			remove_inode_dquot_ref(inode, type, tofree_head);
 	}
 	spin_unlock(&inode_lock);

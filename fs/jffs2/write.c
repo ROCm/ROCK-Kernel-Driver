@@ -92,7 +92,7 @@ struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2
 	struct jffs2_raw_node_ref *raw;
 	struct jffs2_full_dnode *fn;
 	size_t retlen;
-	struct iovec vecs[2];
+	struct kvec vecs[2];
 	int ret;
 	int retried = 0;
 	unsigned long cnt = 2;
@@ -233,7 +233,7 @@ struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jff
 	struct jffs2_raw_node_ref *raw;
 	struct jffs2_full_dirent *fd;
 	size_t retlen;
-	struct iovec vecs[2];
+	struct kvec vecs[2];
 	int retried = 0;
 	int ret;
 

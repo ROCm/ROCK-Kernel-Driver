@@ -5,6 +5,7 @@
  *    Copyright (C) 1999,2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *    Author(s): Denis Joseph Barrow (djbarrow@de.ibm.com,barrow_dj@yahoo.com),
  *               Martin Schwidefsky (schwidefsky@de.ibm.com)
+ *               Heiko Carstens (heiko.carstens@de.ibm.com)
  *
  *  based on other smp stuff by 
  *    (c) 1995 Alan Cox, CymruNET Ltd  <alan@cymru.net>
@@ -56,6 +57,8 @@ int              smp_threads_ready=0;      /* Set when the idlers are all forked
 cpumask_t cpu_online_map;
 cpumask_t cpu_possible_map;
 unsigned long    cache_decay_ticks = 0;
+
+static struct task_struct *current_set[NR_CPUS];
 
 EXPORT_SYMBOL(cpu_online_map);
 
@@ -124,7 +127,6 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	struct call_data_struct data;
 	int cpus = num_online_cpus()-1;
 
-	/* FIXME: get cpu lock -hc */
 	if (cpus <= 0)
 		return 0;
 
@@ -211,7 +213,6 @@ EXPORT_SYMBOL(smp_call_function_on);
 
 static inline void do_send_stop(void)
 {
-        unsigned long dummy;
         int i, rc;
 
         /* stop all processors */
@@ -219,25 +220,23 @@ static inline void do_send_stop(void)
                 if (!cpu_online(i) || smp_processor_id() == i)
 			continue;
 		do {
-			rc = signal_processor_ps(&dummy, 0, i, sigp_stop);
+			rc = signal_processor(i, sigp_stop);
 		} while (rc == sigp_busy);
 	}
 }
 
 static inline void do_store_status(void)
 {
-        unsigned long low_core_addr;
-        unsigned long dummy;
         int i, rc;
 
         /* store status of all processors in their lowcores (real 0) */
         for (i =  0; i < NR_CPUS; i++) {
                 if (!cpu_online(i) || smp_processor_id() == i) 
 			continue;
-		low_core_addr = (unsigned long) lowcore_ptr[i];
 		do {
-			rc = signal_processor_ps(&dummy, low_core_addr, i,
-						 sigp_store_status_at_address);
+			rc = signal_processor_p(
+				(__u32)(unsigned long) lowcore_ptr[i], i,
+				sigp_store_status_at_address);
 		} while(rc == sigp_busy);
         }
 }
@@ -265,8 +264,10 @@ static cpumask_t cpu_restart_map;
 
 static void do_machine_restart(void * __unused)
 {
+	static atomic_t cpuid = ATOMIC_INIT(-1);
+
 	cpu_clear(smp_processor_id(), cpu_restart_map);
-	if (smp_processor_id() == 0) {
+	if (atomic_compare_and_swap(-1, smp_processor_id(), &cpuid) == 0) {
 		/* Wait for all other cpus to enter do_machine_restart. */
 		while (!cpus_empty(cpu_restart_map))
 			cpu_relax();
@@ -307,7 +308,9 @@ static void do_wait_for_stop(void)
 
 static void do_machine_halt(void * __unused)
 {
-	if (smp_processor_id() == 0) {
+	static atomic_t cpuid = ATOMIC_INIT(-1);
+
+	if (atomic_compare_and_swap(-1, smp_processor_id(), &cpuid) == 0) {
 		smp_send_stop();
 		if (MACHINE_IS_VM && strlen(vmhalt_cmd) > 0)
 			cpcmd(vmhalt_cmd, NULL, 0);
@@ -324,7 +327,9 @@ void machine_halt_smp(void)
 
 static void do_machine_power_off(void * __unused)
 {
-	if (smp_processor_id() == 0) {
+	static atomic_t cpuid = ATOMIC_INIT(-1);
+
+	if (atomic_compare_and_swap(-1, smp_processor_id(), &cpuid) == 0) {
 		smp_send_stop();
 		if (MACHINE_IS_VM && strlen(vmpoff_cmd) > 0)
 			cpcmd(vmpoff_cmd, NULL, 0);
@@ -482,7 +487,24 @@ void smp_ctl_clear_bit(int cr, int bit) {
  * Lets check how many CPUs we have.
  */
 
-void __init smp_check_cpus(unsigned int max_cpus)
+#ifdef CONFIG_HOTPLUG_CPU
+
+void
+__init smp_check_cpus(unsigned int max_cpus)
+{
+	int cpu;
+
+	/*
+	 * cpu 0 is the boot cpu. See smp_prepare_boot_cpu.
+	 */
+	for (cpu = 1; cpu < max_cpus; cpu++)
+		cpu_set(cpu, cpu_possible_map);
+}
+
+#else /* CONFIG_HOTPLUG_CPU */
+
+void
+__init smp_check_cpus(unsigned int max_cpus)
 {
         int curr_cpu, num_cpus;
 	__u16 boot_cpu_addr;
@@ -505,10 +527,13 @@ void __init smp_check_cpus(unsigned int max_cpus)
         printk("Boot cpu address %2X\n", boot_cpu_addr);
 }
 
+#endif /* CONFIG_HOTPLUG_CPU */
+
 /*
  *      Activate a secondary processor.
  */
 extern void init_cpu_timer(void);
+extern void init_cpu_vtimer(void);
 extern int pfault_init(void);
 extern int pfault_token(void);
 
@@ -518,6 +543,9 @@ int __devinit start_secondary(void *cpuvoid)
         cpu_init();
         /* init per CPU timer */
         init_cpu_timer();
+#ifdef CONFIG_VIRT_TIMER
+        init_cpu_vtimer();
+#endif
 #ifdef CONFIG_PFAULT
 	/* Enable pfault pseudo page faults on this cpu. */
 	pfault_init();
@@ -532,26 +560,102 @@ int __devinit start_secondary(void *cpuvoid)
         return cpu_idle(NULL);
 }
 
-static struct task_struct *__devinit fork_by_hand(void)
+static void __init smp_create_idle(unsigned int cpu)
 {
-       struct pt_regs regs;
-       /* don't care about the psw and regs settings since we'll never
-          reschedule the forked task. */
-       memset(&regs,0,sizeof(struct pt_regs));
-       return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
-}
-
-int __cpu_up(unsigned int cpu)
-{
-        struct task_struct *idle;
-        struct _lowcore    *cpu_lowcore;
-        sigp_ccode          ccode;
+	struct pt_regs regs;
+	struct task_struct *p;
 
 	/*
-	 *  Set prefix page for new cpu
+	 *  don't care about the psw and regs settings since we'll never
+	 *  reschedule the forked task.
 	 */
+	memset(&regs, 0, sizeof(struct pt_regs));
+	p = copy_process(CLONE_VM | CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+	if (IS_ERR(p))
+		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
 
-	ccode = signal_processor_p((unsigned long)(lowcore_ptr[cpu]),
+	wake_up_forked_process(p);
+	init_idle(p, cpu);
+	unhash_process(p);
+	current_set[cpu] = p;
+}
+
+/* Reserving and releasing of CPUs */
+
+static spinlock_t smp_reserve_lock = SPIN_LOCK_UNLOCKED;
+static int smp_cpu_reserved[NR_CPUS];
+
+int
+smp_get_cpu(cpumask_t cpu_mask)
+{
+	unsigned long flags;
+	int cpu;
+
+	spin_lock_irqsave(&smp_reserve_lock, flags);
+	/* Try to find an already reserved cpu. */
+	for_each_cpu_mask(cpu, cpu_mask) {
+		if (smp_cpu_reserved[cpu] != 0) {
+			smp_cpu_reserved[cpu]++;
+			/* Found one. */
+			goto out;
+		}
+	}
+	/* Reserve a new cpu from cpu_mask. */
+	for_each_cpu_mask(cpu, cpu_mask) {
+		if (cpu_online(cpu)) {
+			smp_cpu_reserved[cpu]++;
+			goto out;
+		}
+	}
+	cpu = -ENODEV;
+out:
+	spin_unlock_irqrestore(&smp_reserve_lock, flags);
+	return cpu;
+}
+
+void
+smp_put_cpu(int cpu)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&smp_reserve_lock, flags);
+	smp_cpu_reserved[cpu]--;
+	spin_unlock_irqrestore(&smp_reserve_lock, flags);
+}
+
+static inline int
+cpu_stopped(int cpu)
+{
+	__u32 status;
+
+	/* Check for stopped state */
+	if (signal_processor_ps(&status, 0, cpu, sigp_sense) == sigp_status_stored) {
+		if (status & 0x40)
+			return 1;
+	}
+	return 0;
+}
+
+/* Upping and downing of CPUs */
+
+int
+__cpu_up(unsigned int cpu)
+{
+	struct task_struct *idle;
+        struct _lowcore    *cpu_lowcore;
+        sigp_ccode          ccode;
+	int                 curr_cpu;
+
+	for (curr_cpu = 0; curr_cpu <= 65535; curr_cpu++) {
+		__cpu_logical_map[cpu] = (__u16) curr_cpu;
+		if (cpu_stopped(cpu))
+			break;
+	}
+
+	if (!cpu_stopped(cpu))
+		return -ENODEV;
+
+	ccode = signal_processor_p((__u32)(unsigned long)(lowcore_ptr[cpu]),
 				   cpu, sigp_set_prefix);
 	if (ccode){
 		printk("sigp_set_prefix failed for cpu %d "
@@ -560,23 +664,7 @@ int __cpu_up(unsigned int cpu)
 		return -EIO;
 	}
 
-        /* We can't use kernel_thread since we must _avoid_ to reschedule
-           the child. */
-        idle = fork_by_hand();
-	if (IS_ERR(idle)){
-                printk("failed fork for CPU %d", cpu);
-		return -EIO;
-	}
-	wake_up_forked_process(idle);
-
-        /*
-         * We remove it from the pidhash and the runqueue
-         * once we got the process:
-         */
-	init_idle(idle, cpu);
-
-        unhash_process(idle);
-
+	idle = current_set[cpu];
         cpu_lowcore = lowcore_ptr[cpu];
 	cpu_lowcore->save_area[15] = idle->thread.ksp;
 	cpu_lowcore->kernel_stack = (unsigned long)
@@ -595,6 +683,64 @@ int __cpu_up(unsigned int cpu)
 	return 0;
 }
 
+int
+__cpu_disable(void)
+{
+	unsigned long flags;
+	ec_creg_mask_parms cr_parms;
+
+	spin_lock_irqsave(&smp_reserve_lock, flags);
+	if (smp_cpu_reserved[smp_processor_id()] != 0) {
+		spin_unlock_irqrestore(&smp_reserve_lock, flags);
+		return -EBUSY;
+	}
+
+	/* disable all external interrupts */
+
+	cr_parms.start_ctl = 0;
+	cr_parms.end_ctl = 0;
+	cr_parms.orvals[0] = 0;
+	cr_parms.andvals[0] = ~(1<<15 | 1<<14 | 1<<13 | 1<<12 |
+				1<<11 | 1<<10 | 1<< 6 | 1<< 4);
+	smp_ctl_bit_callback(&cr_parms);
+
+	/* disable all I/O interrupts */
+
+	cr_parms.start_ctl = 6;
+	cr_parms.end_ctl = 6;
+	cr_parms.orvals[6] = 0;
+	cr_parms.andvals[6] = ~(1<<31 | 1<<30 | 1<<29 | 1<<28 |
+				1<<27 | 1<<26 | 1<<25 | 1<<24);
+	smp_ctl_bit_callback(&cr_parms);
+
+	/* disable most machine checks */
+
+	cr_parms.start_ctl = 14;
+	cr_parms.end_ctl = 14;
+	cr_parms.orvals[14] = 0;
+	cr_parms.andvals[14] = ~(1<<28 | 1<<27 | 1<<26 | 1<<25 | 1<<24);
+	smp_ctl_bit_callback(&cr_parms);
+
+	spin_unlock_irqrestore(&smp_reserve_lock, flags);
+	return 0;
+}
+
+void
+__cpu_die(unsigned int cpu)
+{
+	/* Wait until target cpu is down */
+	while (!cpu_stopped(cpu));
+	printk("Processor %d spun down\n", cpu);
+}
+
+void
+cpu_die(void)
+{
+	signal_processor(smp_processor_id(), sigp_stop);
+	BUG();
+	for(;;);
+}
+
 /*
  *	Cycle through the processors and setup structures.
  */
@@ -602,6 +748,7 @@ int __cpu_up(unsigned int cpu)
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
 	unsigned long async_stack;
+	unsigned int cpu;
         int i;
 
         /* request the 0x1202 external interrupt */
@@ -628,13 +775,20 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		lowcore_ptr[i]->async_stack = async_stack + (ASYNC_SIZE);
 	}
 	set_prefix((u32)(unsigned long) lowcore_ptr[smp_processor_id()]);
+
+	for_each_cpu(cpu)
+		if (cpu != smp_processor_id())
+			smp_create_idle(cpu);
 }
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	cpu_set(smp_processor_id(), cpu_online_map);
-	cpu_set(smp_processor_id(), cpu_possible_map);
-	S390_lowcore.percpu_offset = __per_cpu_offset[smp_processor_id()];
+	BUG_ON(smp_processor_id() != 0);
+
+	cpu_set(0, cpu_online_map);
+	cpu_set(0, cpu_possible_map);
+	S390_lowcore.percpu_offset = __per_cpu_offset[0];
+	current_set[0] = current;
 }
 
 void smp_cpus_done(unsigned int max_cpus)
@@ -675,3 +829,6 @@ EXPORT_SYMBOL(lowcore_ptr);
 EXPORT_SYMBOL(smp_ctl_set_bit);
 EXPORT_SYMBOL(smp_ctl_clear_bit);
 EXPORT_SYMBOL(smp_call_function);
+EXPORT_SYMBOL(smp_get_cpu);
+EXPORT_SYMBOL(smp_put_cpu);
+

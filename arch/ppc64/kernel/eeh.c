@@ -45,11 +45,17 @@
 static int ibm_set_eeh_option;
 static int ibm_set_slot_reset;
 static int ibm_read_slot_reset_state;
+static int ibm_slot_error_detail;
 
 static int eeh_subsystem_enabled;
 #define EEH_MAX_OPTS 4096
 static char *eeh_opts;
 static int eeh_opts_last;
+
+/* Buffer for reporting slot-error-detail rtas calls */
+static unsigned char slot_errbuf[RTAS_ERROR_LOG_MAX];
+static spinlock_t slot_errbuf_lock = SPIN_LOCK_UNLOCKED;
+static int eeh_error_buf_size;
 
 /* System monitoring statistics */
 static DEFINE_PER_CPU(unsigned long, total_mmio_ffs);
@@ -208,7 +214,6 @@ static void __pci_addr_cache_insert_device(struct pci_dev *dev)
 	if (!dn) {
 		printk(KERN_WARNING "PCI: no pci dn found for dev=%s %s\n",
 			pci_name(dev), pci_pretty_name(dev));
-		pci_dev_put(dev);
 		return;
 	}
 
@@ -219,9 +224,11 @@ static void __pci_addr_cache_insert_device(struct pci_dev *dev)
 		printk(KERN_INFO "PCI: skip building address cache for=%s %s\n",
 		       pci_name(dev), pci_pretty_name(dev));
 #endif
-		pci_dev_put(dev);
 		return;
 	}
+
+	/* The cache holds a reference to the device... */
+	pci_dev_get(dev);
 
 	/* Walk resources on this device, poke them into the tree */
 	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
@@ -272,6 +279,8 @@ restart:
 		}
 		n = rb_next(n);
 	}
+
+	/* The cache no longer holds its reference to this device... */
 	pci_dev_put(dev);
 }
 
@@ -311,7 +320,6 @@ void __init pci_addr_cache_build(void)
 	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		/* Ignore PCI bridges ( XXX why ??) */
 		if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE) {
-			pci_dev_put(dev);
 			continue;
 		}
 		pci_addr_cache_insert_device(dev);
@@ -368,9 +376,6 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 	struct device_node *dn;
 	int ret;
 	int rets[2];
-	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
-	/* dont want this on the stack */
-	static unsigned char slot_err_buf[RTAS_ERROR_LOG_MAX];
 	unsigned long flags;
 
 	__get_cpu_var(total_mmio_ffs)++;
@@ -397,12 +402,6 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		return val;
 	}
 
-        /* Make sure we aren't ISA */
-        if (!strcmp(dn->type, "isa")) {
-                pci_dev_put(dev);
-                return val;
-        }
-
 	if (!dn->eeh_config_addr) {
 		pci_dev_put(dev);
 		return val;
@@ -420,23 +419,24 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 			BUID_LO(dn->phb->buid));
 
 	if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
-		int slot_err_ret;
+		int log_event;
 
-		spin_lock_irqsave(&lock, flags);
-		memset(slot_err_buf, 0, RTAS_ERROR_LOG_MAX);
-		slot_err_ret = rtas_call(rtas_token("ibm,slot-error-detail"),
-					 8, 1, NULL, dn->eeh_config_addr,
-					 BUID_HI(dn->phb->buid),
-					 BUID_LO(dn->phb->buid), NULL, 0,
-					 __pa(slot_err_buf),
-					 RTAS_ERROR_LOG_MAX,
-					 2 /* Permanent Error */);
+		spin_lock_irqsave(&slot_errbuf_lock, flags);
+		memset(slot_errbuf, 0, eeh_error_buf_size);
 
-		if (slot_err_ret == 0)
-			log_error(slot_err_buf, ERR_TYPE_RTAS_LOG,
+		log_event = rtas_call(ibm_slot_error_detail,
+		                      8, 1, NULL, dn->eeh_config_addr,
+		                      BUID_HI(dn->phb->buid),
+		                      BUID_LO(dn->phb->buid), NULL, 0,
+		                      virt_to_phys(slot_errbuf),
+		                      eeh_error_buf_size,
+		                      2 /* Permanent Error */);
+
+		if (log_event == 0)
+			log_error(slot_errbuf, ERR_TYPE_RTAS_LOG,
 				  1 /* Fatal */);
 
-		spin_unlock_irqrestore(&lock, flags);
+		spin_unlock_irqrestore(&slot_errbuf_lock, flags);
 
 		/*
 		 * XXX We should create a separate sysctl for this.
@@ -465,6 +465,7 @@ EXPORT_SYMBOL(eeh_check_failure);
 struct eeh_early_enable_info {
 	unsigned int buid_hi;
 	unsigned int buid_lo;
+	int force_off;
 };
 
 /* Enable eeh for the given device node. */
@@ -479,18 +480,20 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 	u32 *regs;
 	int enable;
 
+	dn->eeh_mode = 0;
+
 	if (status && strcmp(status, "ok") != 0)
 		return NULL;	/* ignore devices with bad status */
 
-	/* Weed out PHBs or other bad nodes. */
+	/* Ignore bad nodes. */
 	if (!class_code || !vendor_id || !device_id)
 		return NULL;
 
-	/* Ignore known PHBs and EADs bridges */
-	if (*vendor_id == PCI_VENDOR_ID_IBM &&
-	    (*device_id == 0x0102 || *device_id == 0x008b ||
-	     *device_id == 0x0188 || *device_id == 0x0302))
+	/* There is nothing to check on PCI to ISA bridges */
+	if (dn->type && !strcmp(dn->type, "isa")) {
+		dn->eeh_mode |= EEH_MODE_NOCHECK;
 		return NULL;
+	}
 
 	/*
 	 * Now decide if we are going to "Disable" EEH checking
@@ -508,25 +511,17 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 				   enable)) {
 		if (enable) {
 			printk(KERN_WARNING "EEH: %s user requested to run "
-			       "without EEH.\n", dn->full_name);
+			       "without EEH checking.\n", dn->full_name);
 			enable = 0;
 		}
 	}
 
-	if (!enable) {
-		dn->eeh_mode = EEH_MODE_NOCHECK;
-		return NULL;
+	if (!enable || info->force_off) {
+		dn->eeh_mode |= EEH_MODE_NOCHECK;
 	}
 
-	/* This device may already have an EEH parent. */
-	if (dn->parent && (dn->parent->eeh_mode & EEH_MODE_SUPPORTED)) {
-		/* Parent supports EEH. */
-		dn->eeh_mode |= EEH_MODE_SUPPORTED;
-		dn->eeh_config_addr = dn->parent->eeh_config_addr;
-		return NULL;
-	}
-
-	/* Ok... see if this device supports EEH. */
+	/* Ok... see if this device supports EEH.  Some do, some don't,
+	 * and the only way to find out is to check each and every one. */
 	regs = (u32 *)get_property(dn, "reg", 0);
 	if (regs) {
 		/* First register entry is addr (00BBSS00)  */
@@ -539,12 +534,18 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 			dn->eeh_mode |= EEH_MODE_SUPPORTED;
 			dn->eeh_config_addr = regs[0];
 #ifdef DEBUG
-			printk(KERN_DEBUG "EEH: %s: eeh enabled\n",
-			       dn->full_name);
+			printk(KERN_DEBUG "EEH: %s: eeh enabled\n", dn->full_name);
 #endif
 		} else {
-			printk(KERN_WARNING "EEH: %s: rtas_call failed.\n",
-			       dn->full_name);
+
+			/* This device doesn't support EEH, but it may have an
+			 * EEH parent, in which case we mark it as supported. */
+			if (dn->parent && (dn->parent->eeh_mode & EEH_MODE_SUPPORTED)) {
+				/* Parent supports EEH. */
+				dn->eeh_mode |= EEH_MODE_SUPPORTED;
+				dn->eeh_config_addr = dn->parent->eeh_config_addr;
+				return NULL;
+			}
 		}
 	} else {
 		printk(KERN_WARNING "EEH: %s: unable to get reg property.\n",
@@ -559,58 +560,72 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
  * As a side effect we can determine here if eeh is supported at all.
  * Note that we leave EEH on so failed config cycles won't cause a machine
  * check.  If a user turns off EEH for a particular adapter they are really
- * telling Linux to ignore errors.
+ * telling Linux to ignore errors.  Some hardware (e.g. POWER5) won't
+ * grant access to a slot if EEH isn't enabled, and so we always enable
+ * EEH for all slots/all devices.
  *
- * We should probably distinguish between "ignore errors" and "turn EEH off"
- * but for now disabling EEH for adapters is mostly to work around drivers that
- * directly access mmio space (without using the macros).
- *
- * The eeh-force-off option does literally what it says, so if Linux must
- * avoid enabling EEH this must be done.
+ * The eeh-force-off option disables EEH checking globally, for all slots.
+ * Even if force-off is set, the EEH hardware is still enabled, so that
+ * newer systems can boot.
  */
 void __init eeh_init(void)
 {
-	struct device_node *phb;
+	struct device_node *phb, *np;
 	struct eeh_early_enable_info info;
 	char *eeh_force_off = strstr(saved_command_line, "eeh-force-off");
+
+	init_pci_config_tokens();
+
+	np = of_find_node_by_path("/rtas");
+	if (np == NULL) {
+		printk(KERN_WARNING "EEH: RTAS not found !\n");
+		return;
+	}
 
 	ibm_set_eeh_option = rtas_token("ibm,set-eeh-option");
 	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");
 	ibm_read_slot_reset_state = rtas_token("ibm,read-slot-reset-state");
+	ibm_slot_error_detail = rtas_token("ibm,slot-error-detail");
 
 	if (ibm_set_eeh_option == RTAS_UNKNOWN_SERVICE)
 		return;
 
+	eeh_error_buf_size = rtas_token("rtas-error-log-max");
+	if (eeh_error_buf_size == RTAS_UNKNOWN_SERVICE) {
+		eeh_error_buf_size = 1024;
+	}
+	if (eeh_error_buf_size > RTAS_ERROR_LOG_MAX) {
+		printk(KERN_WARNING "EEH: rtas-error-log-max is bigger than allocated "
+		      "buffer ! (%d vs %d)", eeh_error_buf_size, RTAS_ERROR_LOG_MAX);
+		eeh_error_buf_size = RTAS_ERROR_LOG_MAX;
+	}
+
+	info.force_off = 0;
 	if (eeh_force_off) {
 		printk(KERN_WARNING "EEH: WARNING: PCI Enhanced I/O Error "
 		       "Handling is user disabled\n");
-		return;
+		info.force_off = 1;
 	}
 
 	/* Enable EEH for all adapters.  Note that eeh requires buid's */
 	for (phb = of_find_node_by_name(NULL, "pci"); phb;
 	     phb = of_find_node_by_name(phb, "pci")) {
-		int len;
-		int *buid_vals;
+		unsigned long buid;
 
-		buid_vals = (int *)get_property(phb, "ibm,fw-phb-id", &len);
-		if (!buid_vals)
+		buid = get_phb_buid(phb);
+		if (buid == 0)
 			continue;
-		if (len == sizeof(int)) {
-			info.buid_lo = buid_vals[0];
-			info.buid_hi = 0;
-		} else if (len == sizeof(int)*2) {
-			info.buid_hi = buid_vals[0];
-			info.buid_lo = buid_vals[1];
-		} else {
-			printk(KERN_INFO "EEH: odd ibm,fw-phb-id len returned: %d\n", len);
-			continue;
-		}
+
+		info.buid_lo = BUID_LO(buid);
+		info.buid_hi = BUID_HI(buid);
 		traverse_pci_devices(phb, early_enable_eeh, NULL, &info);
 	}
 
-	if (eeh_subsystem_enabled)
+	if (eeh_subsystem_enabled) {
 		printk(KERN_INFO "EEH: PCI Enhanced I/O Error Handling Enabled\n");
+	} else {
+		printk(KERN_WARNING "EEH: disabled PCI Enhanced I/O Error Handling\n");
+	}
 }
 
 /**
@@ -750,10 +765,10 @@ static int proc_eeh_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations proc_eeh_operations = {
-	.open		= proc_eeh_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
+	.open      = proc_eeh_open,
+	.read      = seq_read,
+	.llseek    = seq_lseek,
+	.release   = single_release,
 };
 
 static int __init eeh_init_proc(void)
@@ -766,7 +781,7 @@ static int __init eeh_init_proc(void)
 			e->proc_fops = &proc_eeh_operations;
 	}
 
-        return 0;
+	return 0;
 }
 __initcall(eeh_init_proc);
 

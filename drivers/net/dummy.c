@@ -78,6 +78,7 @@ static void __init dummy_setup(struct net_device *dev)
 	/* Fill in device structure with ethernet-generic values. */
 	ether_setup(dev);
 	dev->tx_queue_len = 0;
+	dev->change_mtu = NULL;
 	dev->flags |= IFF_NOARP;
 	dev->flags &= ~IFF_MULTICAST;
 	SET_MODULE_OWNER(dev);

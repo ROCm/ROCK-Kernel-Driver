@@ -56,7 +56,7 @@ bootmem_data_t node0_bdata;
  *     physnode_map[4-7] = 1;
  *     physnode_map[8- ] = -1;
  */
-u8 physnode_map[MAX_ELEMENTS] = { [0 ... (MAX_ELEMENTS - 1)] = -1};
+s8 physnode_map[MAX_ELEMENTS] = { [0 ... (MAX_ELEMENTS - 1)] = -1};
 
 unsigned long node_start_pfn[MAX_NUMNODES];
 unsigned long node_end_pfn[MAX_NUMNODES];
@@ -87,8 +87,6 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags);
  */
 int __init get_memcfg_numa_flat(void)
 {
-	int pfn;
-
 	printk("NUMA - single node, flat memory mode\n");
 
 	/* Run the memory configuration and find the top of memory. */
@@ -96,16 +94,7 @@ int __init get_memcfg_numa_flat(void)
 	node_start_pfn[0]  = 0;
 	node_end_pfn[0]	  = max_pfn;
 
-	/* Fill in the physnode_map with our simplistic memory model,
-	* all memory is in node 0.
-	*/
-	for (pfn = node_start_pfn[0]; pfn <= node_end_pfn[0];
-	       pfn += PAGES_PER_ELEMENT)
-	{
-		physnode_map[pfn / PAGES_PER_ELEMENT] = 0;
-	}
-
-         /* Indicate there is one node available. */
+        /* Indicate there is one node available. */
 	node_set_online(0);
 	numnodes = 1;
 	return 1;
@@ -234,7 +223,7 @@ unsigned long __init setup_memory(void)
 {
 	int nid;
 	unsigned long bootmap_size, system_start_pfn, system_max_low_pfn;
-	unsigned long reserve_pages;
+	unsigned long reserve_pages, pfn;
 
 	/*
 	 * When mapping a NUMA machine we allocate the node_mem_map arrays
@@ -244,6 +233,21 @@ unsigned long __init setup_memory(void)
 	 * and ZONE_HIGHMEM.
 	 */
 	get_memcfg_numa();
+
+	/* Fill in the physnode_map */
+	for (nid = 0; nid < numnodes; nid++) {
+		printk("Node: %d, start_pfn: %ld, end_pfn: %ld\n",
+				nid, node_start_pfn[nid], node_end_pfn[nid]);
+		printk("  Setting physnode_map array to node %d for pfns:\n  ",
+				nid);
+		for (pfn = node_start_pfn[nid]; pfn < node_end_pfn[nid];
+	       				pfn += PAGES_PER_ELEMENT) {
+			physnode_map[pfn / PAGES_PER_ELEMENT] = nid;
+			printk("%ld ", pfn);
+		}
+		printk("\n");
+	}
+
 	reserve_pages = calculate_numa_remap_pages();
 
 	/* partially used pages are not usable - thus round upwards */
@@ -416,17 +420,22 @@ void __init zone_sizes_init(void)
 void __init set_highmem_pages_init(int bad_ppro) 
 {
 #ifdef CONFIG_HIGHMEM
-	int nid;
+	struct zone *zone;
 
-	for (nid = 0; nid < numnodes; nid++) {
+	for_each_zone(zone) {
 		unsigned long node_pfn, node_high_size, zone_start_pfn;
 		struct page * zone_mem_map;
 		
-		node_high_size = NODE_DATA(nid)->node_zones[ZONE_HIGHMEM].spanned_pages;
-		zone_mem_map = NODE_DATA(nid)->node_zones[ZONE_HIGHMEM].zone_mem_map;
-		zone_start_pfn = NODE_DATA(nid)->node_zones[ZONE_HIGHMEM].zone_start_pfn;
+		if (!is_highmem(zone))
+			continue;
 
-		printk("Initializing highpages for node %d\n", nid);
+		printk("Initializing %s for node %d\n", zone->name,
+			zone->zone_pgdat->node_id);
+
+		node_high_size = zone->spanned_pages;
+		zone_mem_map = zone->zone_mem_map;
+		zone_start_pfn = zone->zone_start_pfn;
+
 		for (node_pfn = 0; node_pfn < node_high_size; node_pfn++) {
 			one_highpage_init((struct page *)(zone_mem_map + node_pfn),
 					  zone_start_pfn + node_pfn, bad_ppro);

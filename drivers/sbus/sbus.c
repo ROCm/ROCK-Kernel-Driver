@@ -192,7 +192,7 @@ static void __init sbus_do_child_siblings(int start_node,
 	while((this_node = prom_getsibling(this_node)) != 0) {
 		this_dev->next = kmalloc(sizeof(struct sbus_dev), GFP_ATOMIC);
 		this_dev = this_dev->next;
-		this_dev->next = 0;
+		this_dev->next = NULL;
 		this_dev->parent = parent;
 
 		this_dev->bus = sbus;
@@ -202,7 +202,7 @@ static void __init sbus_do_child_siblings(int start_node,
 			this_dev->child = kmalloc(sizeof(struct sbus_dev),
 						  GFP_ATOMIC);
 			this_dev->child->bus = sbus;
-			this_dev->child->next = 0;
+			this_dev->child->next = NULL;
 			fill_sbus_device(prom_getchild(this_node), this_dev->child);
 			sbus_do_child_siblings(prom_getchild(this_node),
 					       this_dev->child, this_dev, sbus);
@@ -308,6 +308,10 @@ static void __init sbus_fixup_all_regs(struct sbus_dev *first_sdev)
 
 extern void register_proc_sparc_ioport(void);
 extern void firetruck_init(void);
+
+#ifdef CONFIG_SUN4
+extern void sun4_dvma_init(void);
+#endif
 
 static int __init sbus_init(void)
 {
@@ -439,7 +443,7 @@ static int __init sbus_init(void)
 						  GFP_ATOMIC);
 			/* Fill it */
 			this_dev->child->bus = sbus;
-			this_dev->child->next = 0;
+			this_dev->child->next = NULL;
 			fill_sbus_device(prom_getchild(sbus_devs),
 					 this_dev->child);
 			sbus_do_child_siblings(prom_getchild(sbus_devs),
@@ -469,7 +473,7 @@ static int __init sbus_init(void)
 							  GFP_ATOMIC);
 				/* Fill it */
 				this_dev->child->bus = sbus;
-				this_dev->child->next = 0;
+				this_dev->child->next = NULL;
 				fill_sbus_device(prom_getchild(sbus_devs),
 						 this_dev->child);
 				sbus_do_child_siblings(prom_getchild(sbus_devs),

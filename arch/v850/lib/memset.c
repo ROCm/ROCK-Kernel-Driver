@@ -1,8 +1,8 @@
 /*
  * arch/v850/lib/memset.c -- Memory initialization
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,04  NEC Corporation
+ *  Copyright (C) 2001,02,04  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -26,11 +26,13 @@ void *memset (void *dst, int val, __kernel_size_t count)
 
 		/* copy initial unaligned bytes.  */
 		if ((long)ptr & 1) {
-			*((char *)ptr)++ = val;
+			*(char *)ptr = val;
+			ptr = (void *)((char *)ptr + 1);
 			count--;
 		}
 		if (count > 2 && ((long)ptr & 2)) {
-			*((short *)ptr)++ = val;
+			*(short *)ptr = val;
+			ptr = (void *)((short *)ptr + 1);
 			count -= 2;
 		}
 
@@ -46,15 +48,20 @@ void *memset (void *dst, int val, __kernel_size_t count)
 		count %= 32;
 
 		/* long copying loop.  */
-		for (loop = count / 4; loop; loop--)
-			*((long *)ptr)++ = val;
+		for (loop = count / 4; loop; loop--) {
+			*(long *)ptr = val;
+			ptr = (void *)((long *)ptr + 1);
+		}
 		count %= 4;
 
 		/* finish up with any trailing bytes.  */
-		if (count & 2)
-			*((short *)ptr)++ = val;
-		if (count & 1)
+		if (count & 2) {
+			*(short *)ptr = val;
+			ptr = (void *)((short *)ptr + 1);
+		}
+		if (count & 1) {
 			*(char *)ptr = val;
+		}
 	}
 
 	return dst;

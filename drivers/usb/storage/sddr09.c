@@ -1089,7 +1089,7 @@ sddr09_get_cardinfo(struct us_data *us, unsigned char flags) {
 	if (result != USB_STOR_TRANSPORT_GOOD) {
 		US_DEBUGP("Result of read_deviceID is %d\n", result);
 		printk("sddr09: could not read card info\n");
-		return 0;
+		return NULL;
 	}
 
 	sprintf(blurbtxt, "sddr09: Found Flash card, ID = %02X %02X %02X %02X",

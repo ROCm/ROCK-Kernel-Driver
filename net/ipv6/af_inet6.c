@@ -719,13 +719,13 @@ static int __init inet6_init(void)
 	/* allocate our sock slab caches */
         tcp6_sk_cachep = kmem_cache_create("tcp6_sock",
 					   sizeof(struct tcp6_sock), 0,
-                                           SLAB_HWCACHE_ALIGN, 0, 0);
+                                           SLAB_HWCACHE_ALIGN, NULL, NULL);
         udp6_sk_cachep = kmem_cache_create("udp6_sock",
 					   sizeof(struct udp6_sock), 0,
-                                           SLAB_HWCACHE_ALIGN, 0, 0);
+                                           SLAB_HWCACHE_ALIGN, NULL, NULL);
         raw6_sk_cachep = kmem_cache_create("raw6_sock",
 					   sizeof(struct raw6_sock), 0,
-                                           SLAB_HWCACHE_ALIGN, 0, 0);
+                                           SLAB_HWCACHE_ALIGN, NULL, NULL);
         if (!tcp6_sk_cachep || !udp6_sk_cachep || !raw6_sk_cachep)
                 printk(KERN_CRIT "%s: Can't create protocol sock SLAB "
 		       "caches!\n", __FUNCTION__);

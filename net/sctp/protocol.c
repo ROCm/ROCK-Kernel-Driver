@@ -101,7 +101,7 @@ __init int sctp_proc_init(void)
 {
 	if (!proc_net_sctp) {
 		struct proc_dir_entry *ent;
-		ent = proc_mkdir("net/sctp", 0);
+		ent = proc_mkdir("net/sctp", NULL);
 		if (ent) {
 			ent->owner = THIS_MODULE;
 			proc_net_sctp = ent;
@@ -134,7 +134,7 @@ void sctp_proc_exit(void)
 
 	if (proc_net_sctp) {
 		proc_net_sctp = NULL;
-		remove_proc_entry("net/sctp", 0);
+		remove_proc_entry("net/sctp", NULL);
 	}
 }
 

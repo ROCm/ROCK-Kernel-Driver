@@ -296,7 +296,7 @@ int allow_signal(int sig)
 		   Let the signal code know it'll be handled, so
 		   that they don't get converted to SIGKILL or
 		   just silently dropped */
-		current->sighand->action[(sig)-1].sa.sa_handler = (void *)2;
+		current->sighand->action[(sig)-1].sa.sa_handler = (void __user *)2;
 	}
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
@@ -828,9 +828,6 @@ asmlinkage NORET_TYPE void do_exit(long code)
 	__exit_fs(tsk);
 	exit_namespace(tsk);
 	exit_thread();
-#ifdef CONFIG_NUMA
-	mpol_free(tsk->mempolicy);
-#endif
 
 	if (tsk->signal->leader)
 		disassociate_ctty(1);
@@ -841,6 +838,10 @@ asmlinkage NORET_TYPE void do_exit(long code)
 
 	tsk->exit_code = code;
 	exit_notify(tsk);
+#ifdef CONFIG_NUMA
+	mpol_free(tsk->mempolicy);
+	tsk->mempolicy = NULL;
+#endif
 	schedule();
 	BUG();
 	/* Avoid "noreturn function does return".  */

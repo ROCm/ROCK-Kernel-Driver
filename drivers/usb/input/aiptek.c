@@ -1324,7 +1324,7 @@ store_tabletXtilt(struct device *dev, const char *buf, size_t count)
 	if (strcmp(buf, "disable") == 0) {
 		aiptek->newSetting.xTilt = AIPTEK_TILT_DISABLE;
 	} else {
-		x = (int)simple_strtol(buf, 0, 10);
+		x = (int)simple_strtol(buf, NULL, 10);
 		if (x >= AIPTEK_TILT_MIN && x <= AIPTEK_TILT_MAX) {
 			aiptek->newSetting.xTilt = x;
 		}
@@ -1366,7 +1366,7 @@ store_tabletYtilt(struct device *dev, const char *buf, size_t count)
 	if (strcmp(buf, "disable") == 0) {
 		aiptek->newSetting.yTilt = AIPTEK_TILT_DISABLE;
 	} else {
-		y = (int)simple_strtol(buf, 0, 10);
+		y = (int)simple_strtol(buf, NULL, 10);
 		if (y >= AIPTEK_TILT_MIN && y <= AIPTEK_TILT_MAX) {
 			aiptek->newSetting.yTilt = y;
 		}
@@ -1399,7 +1399,7 @@ store_tabletJitterDelay(struct device *dev, const char *buf, size_t count)
 	if (aiptek == NULL)
 		return 0;
 
-	aiptek->newSetting.jitterDelay = (int)simple_strtol(buf, 0, 10);
+	aiptek->newSetting.jitterDelay = (int)simple_strtol(buf, NULL, 10);
 	return count;
 }
 
@@ -1430,7 +1430,7 @@ store_tabletProgrammableDelay(struct device *dev, const char *buf, size_t count)
 	if (aiptek == NULL)
 		return 0;
 
-	aiptek->newSetting.programmableDelay = (int)simple_strtol(buf, 0, 10);
+	aiptek->newSetting.programmableDelay = (int)simple_strtol(buf, NULL, 10);
 	return count;
 }
 
@@ -1805,7 +1805,7 @@ store_tabletWheel(struct device *dev, const char *buf, size_t count)
 	if (aiptek == NULL)
 		return 0;
 
-	aiptek->newSetting.wheel = (int)simple_strtol(buf, 0, 10);
+	aiptek->newSetting.wheel = (int)simple_strtol(buf, NULL, 10);
 	return count;
 }
 

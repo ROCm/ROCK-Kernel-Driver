@@ -173,8 +173,8 @@ extern void copy_to_pam_dword(tpam_card *, const void *, u32);
 extern void copy_to_pam(tpam_card *, void *, const void *, u32);
 extern u32 copy_from_pam_dword(tpam_card *, const void *);
 extern void copy_from_pam(tpam_card *, void *, const void *, u32);
-extern int copy_from_pam_to_user(tpam_card *, void *, const void *, u32);
-extern int copy_from_user_to_pam(tpam_card *, void *, const void *, u32);
+extern int copy_from_pam_to_user(tpam_card *, void __user *, const void *, u32);
+extern int copy_from_user_to_pam(tpam_card *, void *, const void __user *, u32);
 extern int tpam_verify_area(u32, u32);
 
 /* Function prototypes from tpam_nco.c */

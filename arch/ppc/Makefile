@@ -13,6 +13,13 @@
 # This must match PAGE_OFFSET in include/asm-ppc/page.h.
 KERNELLOAD	:= $(CONFIG_KERNEL_START)
 
+HAS_BIARCH	:= $(shell if $(CC) -m32 -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi;)
+ifeq ($(HAS_BIARCH),y)
+AS		:= $(AS) -a32
+LD		:= $(LD) -m elf32ppc
+CC		:= $(CC) -m32
+endif
+
 LDFLAGS_vmlinux	:= -Ttext $(KERNELLOAD) -Bstatic
 CPPFLAGS	+= -Iarch/$(ARCH)
 AFLAGS		+= -Iarch/$(ARCH)

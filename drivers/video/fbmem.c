@@ -430,20 +430,9 @@ static int ofonly __initdata = 0;
 /*
  * Drawing helpers.
  */
-static u8 fb_sys_inbuf(struct fb_info *info, u8 *src)
-{
-	return *src;
-}
-
-static void fb_sys_outbuf(struct fb_info *info, u8 *dst,
-				u8 *src, unsigned int size)
-{
-	memcpy(dst, src, size);
-}	
-
-void fb_move_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
-			u8 *dst, u32 d_pitch, u8 *src, u32 s_pitch,
-			u32 height)
+void fb_iomove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
+			   u8 *dst, u32 d_pitch, u8 *src, u32 s_pitch,
+			   u32 height)
 {
 	int i;
 
@@ -454,10 +443,24 @@ void fb_move_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
 	}
 }
 
-void fb_move_buf_unaligned(struct fb_info *info, struct fb_pixmap *buf,
-			u8 *dst, u32 d_pitch, u8 *src, u32 idx,
-			u32 height, u32 shift_high, u32 shift_low,
-			u32 mod)
+void fb_sysmove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
+			    u8 *dst, u32 d_pitch, u8 *src, u32 s_pitch,
+			    u32 height)
+{
+	int i, j;
+
+	for (i = height; i--; ) {
+		for (j = 0; j < s_pitch; j++)
+			dst[j] = src[j];
+		src += s_pitch;
+		dst += d_pitch;
+	}
+}
+
+void fb_iomove_buf_unaligned(struct fb_info *info, struct fb_pixmap *buf,
+			     u8 *dst, u32 d_pitch, u8 *src, u32 idx,
+			     u32 height, u32 shift_high, u32 shift_low,
+			     u32 mod)
 {
 	u8 mask = (u8) (0xfff << shift_high), tmp;
 	int i, j;
@@ -480,6 +483,37 @@ void fb_move_buf_unaligned(struct fb_info *info, struct fb_pixmap *buf,
 			tmp = *src << shift_high;
 			buf->outbuf(info, dst+idx+1, &tmp, 1);
 		}	
+		src++;
+		dst += d_pitch;
+	}
+}
+
+void fb_sysmove_buf_unaligned(struct fb_info *info, struct fb_pixmap *buf,
+			      u8 *dst, u32 d_pitch, u8 *src, u32 idx,
+			      u32 height, u32 shift_high, u32 shift_low,
+			      u32 mod)
+{
+	u8 mask = (u8) (0xfff << shift_high), tmp;
+	int i, j;
+
+	for (i = height; i--; ) {
+		for (j = 0; j < idx; j++) {
+			tmp = dst[j];
+			tmp &= mask;
+			tmp |= *src >> shift_low;
+			dst[j] = tmp;
+			tmp = *src << shift_high;
+			dst[j+1] = tmp;
+			src++;
+		}
+		tmp = dst[idx];
+		tmp &= mask;
+		tmp |= *src >> shift_low;
+		dst[idx] = tmp;
+		if (shift_high < mod) {
+			tmp = *src << shift_high;
+			dst[idx+1] = tmp;
+		}
 		src++;
 		dst += d_pitch;
 	}
@@ -897,7 +931,10 @@ fb_load_cursor_image(struct fb_info *info)
 	unsigned int width = (info->cursor.image.width + 7) >> 3;
 	u8 *data = (u8 *) info->cursor.image.data;
 
-	info->sprite.outbuf(info, info->sprite.addr, data, width);
+	if (info->sprite.outbuf)
+	    info->sprite.outbuf(info, info->sprite.addr, data, width);
+	else
+	    memcpy(info->sprite.addr, data, width);
 }
 
 int
@@ -1319,10 +1356,6 @@ register_framebuffer(struct fb_info *fb_info)
 		}
 	}	
 	fb_info->pixmap.offset = 0;
-	if (fb_info->pixmap.outbuf == NULL)
-		fb_info->pixmap.outbuf = fb_sys_outbuf;
-	if (fb_info->pixmap.inbuf == NULL)
-		fb_info->pixmap.inbuf = fb_sys_inbuf;
 
 	if (fb_info->sprite.addr == NULL) {
 		fb_info->sprite.addr = kmalloc(FBPIXMAPSIZE, GFP_KERNEL);
@@ -1335,10 +1368,6 @@ register_framebuffer(struct fb_info *fb_info)
 		}
 	}
 	fb_info->sprite.offset = 0;
-	if (fb_info->sprite.outbuf == NULL)
-		fb_info->sprite.outbuf = fb_sys_outbuf;
-	if (fb_info->sprite.inbuf == NULL)
-		fb_info->sprite.inbuf = fb_sys_inbuf;
 
 	registered_fb[i] = fb_info;
 
@@ -1430,7 +1459,7 @@ fbmem_init(void)
 {
 	int i;
 
-	create_proc_read_entry("fb", 0, 0, fbmem_read_proc, NULL);
+	create_proc_read_entry("fb", 0, NULL, fbmem_read_proc, NULL);
 
 	devfs_mk_dir("fb");
 	if (register_chrdev(FB_MAJOR,"fb",&fb_fops))
@@ -1533,8 +1562,10 @@ EXPORT_SYMBOL(fb_set_var);
 EXPORT_SYMBOL(fb_blank);
 EXPORT_SYMBOL(fb_pan_display);
 EXPORT_SYMBOL(fb_get_buffer_offset);
-EXPORT_SYMBOL(fb_move_buf_unaligned);
-EXPORT_SYMBOL(fb_move_buf_aligned);
+EXPORT_SYMBOL(fb_iomove_buf_unaligned);
+EXPORT_SYMBOL(fb_iomove_buf_aligned);
+EXPORT_SYMBOL(fb_sysmove_buf_unaligned);
+EXPORT_SYMBOL(fb_sysmove_buf_aligned);
 EXPORT_SYMBOL(fb_load_cursor_image);
 EXPORT_SYMBOL(fb_set_suspend);
 EXPORT_SYMBOL(fb_register_client);

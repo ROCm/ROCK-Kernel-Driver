@@ -109,7 +109,7 @@ int av7110_record_cb(struct dvb_filter_pes2ts *p2t, u8 *buf, size_t len)
 	if (buf[3] == 0xe0)	 // video PES do not have a length in TS
 		buf[4] = buf[5] = 0;
 	if (dvbdmxfeed->ts_type & TS_PAYLOAD_ONLY)
-		return dvbdmxfeed->cb.ts(buf, len, 0, 0,
+		return dvbdmxfeed->cb.ts(buf, len, NULL, 0,
 					 &dvbdmxfeed->feed.ts, DMX_OK);
 	else
 		return dvb_filter_pes2ts(p2t, buf, len, 1);
@@ -121,7 +121,7 @@ static int dvb_filter_pes2ts_cb(void *priv, unsigned char *data)
 
 //	DEB_EE(("dvb_demux_feed:%p\n", dvbdmxfeed));
 
-	dvbdmxfeed->cb.ts(data, 188, 0, 0,
+	dvbdmxfeed->cb.ts(data, 188, NULL, 0,
 			  &dvbdmxfeed->feed.ts, DMX_OK);
 	return 0;
 }
@@ -393,7 +393,7 @@ static inline long aux_ring_buffer_write(struct dvb_ringbuffer *rbuf,
 		free = dvb_ringbuffer_free(rbuf);
 		if (free > todo)
 			free = todo;
-		dvb_ringbuffer_write(rbuf, buf, free, 0);
+		dvb_ringbuffer_write(rbuf, buf, free);
 		todo -= free;
 		buf += free;
 	}
@@ -424,8 +424,8 @@ static void play_audio_cb(u8 *buf, int count, void *priv)
 #define FREE_COND (dvb_ringbuffer_free(&av7110->avout) >= 20 * 1024 && \
 		   dvb_ringbuffer_free(&av7110->aout) >= 20 * 1024)
 
-static ssize_t dvb_play(struct av7110 *av7110, const u8 *buf,
-			unsigned long count, int nonblock, int type, int umem)
+static ssize_t dvb_play(struct av7110 *av7110, const u8 __user *buf,
+			unsigned long count, int nonblock, int type)
 {
 	unsigned long todo = count, n;
 	DEB_EE(("av7110: %p\n", av7110));
@@ -447,22 +447,47 @@ static ssize_t dvb_play(struct av7110 *av7110, const u8 *buf,
 		n = todo;
 		if (n > IPACKS * 2)
 			n = IPACKS * 2;
-		if (umem) {
-			if (copy_from_user(av7110->kbuf[type], buf, n))
-				return -EFAULT;
-			av7110_ipack_instant_repack(av7110->kbuf[type], n,
-						    &av7110->ipack[type]);
-		} else {
-			av7110_ipack_instant_repack(buf, n,
-						    &av7110->ipack[type]);
-		}
+		if (copy_from_user(av7110->kbuf[type], buf, n))
+			return -EFAULT;
+		av7110_ipack_instant_repack(av7110->kbuf[type], n,
+					    &av7110->ipack[type]);
 		todo -= n;
 		buf += n;
 	}
 	return count - todo;
 }
 
-static ssize_t dvb_aplay(struct av7110 *av7110, const u8 *buf,
+static ssize_t dvb_play_kernel(struct av7110 *av7110, const u8 *buf,
+			unsigned long count, int nonblock, int type)
+{
+	unsigned long todo = count, n;
+	DEB_EE(("av7110: %p\n", av7110));
+
+	if (!av7110->kbuf[type])
+		return -ENOBUFS;
+
+	if (nonblock && !FREE_COND)
+		return -EWOULDBLOCK;
+
+	while (todo > 0) {
+		if (!FREE_COND) {
+			if (nonblock)
+				return count - todo;
+			if (wait_event_interruptible(av7110->avout.queue,
+						     FREE_COND))
+				return count - todo;
+		}
+		n = todo;
+		if (n > IPACKS * 2)
+			n = IPACKS * 2;
+		av7110_ipack_instant_repack(buf, n, &av7110->ipack[type]);
+		todo -= n;
+		buf += n;
+	}
+	return count - todo;
+}
+
+static ssize_t dvb_aplay(struct av7110 *av7110, const u8 __user *buf,
 			 unsigned long count, int nonblock, int type)
 {
 	unsigned long todo = count, n;
@@ -733,7 +758,7 @@ static void p_to_t(u8 const *buf, long int length, u16 pid, u8 *counter,
 			memcpy(obuf + l, buf + c, TS_SIZE - l);
 			c = length;
 		}
-		feed->cb.ts(obuf, 188, 0, 0, &feed->feed.ts, DMX_OK);
+		feed->cb.ts(obuf, 188, NULL, 0, &feed->feed.ts, DMX_OK);
 		pes_start = 0;
 	}
 }
@@ -871,7 +896,7 @@ static unsigned int dvb_video_poll(struct file *file, poll_table *wait)
 	return mask;
 }
 
-static ssize_t dvb_video_write(struct file *file, const char *buf,
+static ssize_t dvb_video_write(struct file *file, const char __user *buf,
 			       size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev = (struct dvb_device *) file->private_data;
@@ -885,7 +910,7 @@ static ssize_t dvb_video_write(struct file *file, const char *buf,
 	if (av7110->videostate.stream_source != VIDEO_SOURCE_MEMORY)
 		return -EPERM;
 
-	return dvb_play(av7110, buf, count, file->f_flags & O_NONBLOCK, 1, 1);
+	return dvb_play(av7110, buf, count, file->f_flags & O_NONBLOCK, 1);
 }
 
 static unsigned int dvb_audio_poll(struct file *file, poll_table *wait)
@@ -907,7 +932,7 @@ static unsigned int dvb_audio_poll(struct file *file, poll_table *wait)
 	return mask;
 }
 
-static ssize_t dvb_audio_write(struct file *file, const char *buf,
+static ssize_t dvb_audio_write(struct file *file, const char __user *buf,
 			       size_t count, loff_t *ppos)
 {
 	struct dvb_device *dvbdev = (struct dvb_device *) file->private_data;
@@ -926,7 +951,7 @@ u8 iframe_header[] = { 0x00, 0x00, 0x01, 0xe0, 0x00, 0x00, 0x80, 0x00, 0x00 };
 
 #define MIN_IFRAME 400000
 
-static int play_iframe(struct av7110 *av7110, u8 *buf, unsigned int len, int nonblock)
+static int play_iframe(struct av7110 *av7110, u8 __user *buf, unsigned int len, int nonblock)
 {
 	int i, n;
 
@@ -942,10 +967,10 @@ static int play_iframe(struct av7110 *av7110, u8 *buf, unsigned int len, int non
 	n = MIN_IFRAME / len + 1;
 
 	/* FIXME: nonblock? */
-	dvb_play(av7110, iframe_header, sizeof(iframe_header), 0, 1, 0);
+	dvb_play_kernel(av7110, iframe_header, sizeof(iframe_header), 0, 1);
 
 	for (i = 0; i < n; i++)
-		dvb_play(av7110, buf, len, 0, 1, 1);
+		dvb_play(av7110, buf, len, 0, 1);
 
 	av7110_ipack_flush(&av7110->ipack[1]);
 	return 0;
@@ -1347,7 +1372,7 @@ static struct file_operations dvb_video_fops = {
 };
 
 static struct dvb_device dvbdev_video = {
-	.priv		= 0,
+	.priv		= NULL,
 	.users		= 6,
 	.readers	= 5,	/* arbitrary */
 	.writers	= 1,
@@ -1365,7 +1390,7 @@ static struct file_operations dvb_audio_fops = {
 };
 
 static struct dvb_device dvbdev_audio = {
-	.priv		= 0,
+	.priv		= NULL,
 	.users		= 1,
 	.writers	= 1,
 	.fops		= &dvb_audio_fops,

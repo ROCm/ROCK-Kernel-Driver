@@ -54,9 +54,7 @@ int sysctl_userprocess_debug = 0;
 #endif
 
 extern pgm_check_handler_t do_protection_exception;
-extern pgm_check_handler_t do_segment_exception;
-extern pgm_check_handler_t do_region_exception;
-extern pgm_check_handler_t do_page_exception;
+extern pgm_check_handler_t do_dat_exception;
 extern pgm_check_handler_t do_pseudo_page_fault;
 #ifdef CONFIG_PFAULT
 extern int pfault_init(void);
@@ -64,9 +62,7 @@ extern void pfault_fini(void);
 extern void pfault_interrupt(struct pt_regs *regs, __u16 error_code);
 static ext_int_info_t ext_int_pfault;
 #endif
-#if defined(CONFIG_NO_IDLE_HZ) || defined(CONFIG_VIRT_TIMER)
 extern pgm_check_handler_t do_monitor_call;
-#endif
 
 #define stack_pointer ({ void **sp; asm("la %0,0(15)" : "=&d" (sp)); sp; })
 
@@ -302,14 +298,10 @@ static inline void *get_check_address(struct pt_regs *regs)
 	return (void *)((regs->psw.addr-S390_lowcore.pgm_ilc) & PSW_ADDR_INSN);
 }
 
-int do_debugger_trap(struct pt_regs *regs)
+void do_single_step(struct pt_regs *regs)
 {
-	if ((regs->psw.mask & PSW_MASK_PSTATE) &&
-	    (current->ptrace & PT_PTRACED)) {
-		force_sig(SIGTRAP,current);
-		return 0;
-	}
-	return 1;
+	if ((current->ptrace & PT_PTRACED) != 0)
+		force_sig(SIGTRAP, current);
 }
 
 #define DO_ERROR(signr, str, name) \
@@ -331,12 +323,24 @@ asmlinkage void name(struct pt_regs * regs, long interruption_code) \
 
 DO_ERROR(SIGSEGV, "Unknown program exception", default_trap_handler)
 
-DO_ERROR_INFO(SIGBUS, "addressing exception", addressing_exception,
-	      BUS_ADRERR, get_check_address(regs))
+DO_ERROR_INFO(SIGILL, "addressing exception", addressing_exception,
+	      ILL_ILLADR, get_check_address(regs))
 DO_ERROR_INFO(SIGILL,  "execute exception", execute_exception,
 	      ILL_ILLOPN, get_check_address(regs))
 DO_ERROR_INFO(SIGFPE,  "fixpoint divide exception", divide_exception,
 	      FPE_INTDIV, get_check_address(regs))
+DO_ERROR_INFO(SIGFPE,  "fixpoint overflow exception", overflow_exception,
+	      FPE_INTOVF, get_check_address(regs))
+DO_ERROR_INFO(SIGFPE,  "HFP overflow exception", hfp_overflow_exception,
+	      FPE_FLTOVF, get_check_address(regs))
+DO_ERROR_INFO(SIGFPE,  "HFP underflow exception", hfp_underflow_exception,
+	      FPE_FLTUND, get_check_address(regs))
+DO_ERROR_INFO(SIGFPE,  "HFP significance exception", hfp_significance_exception,
+	      FPE_FLTRES, get_check_address(regs))
+DO_ERROR_INFO(SIGFPE,  "HFP divide exception", hfp_divide_exception,
+	      FPE_FLTDIV, get_check_address(regs))
+DO_ERROR_INFO(SIGFPE,  "HFP square root exception", hfp_sqrt_exception,
+	      FPE_FLTINV, get_check_address(regs))
 DO_ERROR_INFO(SIGILL,  "operand exception", operand_exception,
 	      ILL_ILLOPN, get_check_address(regs))
 DO_ERROR_INFO(SIGILL,  "privileged operation", privileged_op,
@@ -390,19 +394,15 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 	if (regs->psw.mask & PSW_MASK_PSTATE)
 		local_irq_enable();
 
-	if (regs->psw.mask & PSW_MASK_PSTATE)
-		get_user(*((__u16 *) opcode), (__u16 __user *)location);
-	else
-		*((__u16 *)opcode)=*((__u16 *)location);
-	if (*((__u16 *)opcode)==S390_BREAKPOINT_U16)
-        {
-		if(do_debugger_trap(regs))
-			signal = SIGILL;
-	}
+	if (regs->psw.mask & PSW_MASK_PSTATE) {
+		get_user(*((__u16 *) opcode), (__u16 __user *) location);
+		if (*((__u16 *) opcode) == S390_BREAKPOINT_U16) {
+			if (current->ptrace & PT_PTRACED)
+				force_sig(SIGTRAP, current);
+			else
+				signal = SIGILL;
 #ifdef CONFIG_MATHEMU
-        else if (regs->psw.mask & PSW_MASK_PSTATE)
-	{
-		if (opcode[0] == 0xb3) {
+		} else if (opcode[0] == 0xb3) {
 			get_user(*((__u16 *) (opcode+2)), location+1);
 			signal = math_emu_b3(opcode, regs);
                 } else if (opcode[0] == 0xed) {
@@ -418,12 +418,12 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 		} else if (*((__u16 *) opcode) == 0xb29d) {
 			get_user(*((__u16 *) (opcode+2)), location+1);
 			signal = math_emu_lfpc(opcode, regs);
+#endif
 		} else
 			signal = SIGILL;
-        }
-#endif 
-	else
+	} else
 		signal = SIGILL;
+
         if (signal == SIGFPE)
 		do_fp_trap(regs, location,
                            current->thread.fp_regs.fpc, interruption_code);
@@ -447,9 +447,9 @@ specification_exception(struct pt_regs * regs, long interruption_code)
 	 * We got all needed information from the lowcore and can
 	 * now safely switch on interrupts.
 	 */
-	if (regs->psw.mask & PSW_MASK_PSTATE)
+        if (regs->psw.mask & PSW_MASK_PSTATE)
 		local_irq_enable();
-		
+
         if (regs->psw.mask & PSW_MASK_PSTATE) {
 		get_user(*((__u16 *) opcode), location);
 		switch (opcode[0]) {
@@ -481,6 +481,7 @@ specification_exception(struct pt_regs * regs, long interruption_code)
                 }
         } else
 		signal = SIGILL;
+
         if (signal == SIGFPE)
 		do_fp_trap(regs, location,
                            current->thread.fp_regs.fpc, interruption_code);
@@ -607,22 +608,31 @@ void __init trap_init(void)
         pgm_check_table[5] = &addressing_exception;
         pgm_check_table[6] = &specification_exception;
         pgm_check_table[7] = &data_exception;
+        pgm_check_table[8] = &overflow_exception;
         pgm_check_table[9] = &divide_exception;
-        pgm_check_table[0x10] = &do_segment_exception;
-        pgm_check_table[0x11] = &do_page_exception;
+        pgm_check_table[0x0A] = &overflow_exception;
+        pgm_check_table[0x0B] = &divide_exception;
+        pgm_check_table[0x0C] = &hfp_overflow_exception;
+        pgm_check_table[0x0D] = &hfp_underflow_exception;
+        pgm_check_table[0x0E] = &hfp_significance_exception;
+        pgm_check_table[0x0F] = &hfp_divide_exception;
+        pgm_check_table[0x10] = &do_dat_exception;
+        pgm_check_table[0x11] = &do_dat_exception;
         pgm_check_table[0x12] = &translation_exception;
         pgm_check_table[0x13] = &special_op_exception;
 #ifndef CONFIG_ARCH_S390X
  	pgm_check_table[0x14] = &do_pseudo_page_fault;
 #else /* CONFIG_ARCH_S390X */
-        pgm_check_table[0x38] = &addressing_exception;
-        pgm_check_table[0x3B] = &do_region_exception;
+        pgm_check_table[0x38] = &do_dat_exception;
+	pgm_check_table[0x39] = &do_dat_exception;
+	pgm_check_table[0x3A] = &do_dat_exception;
+        pgm_check_table[0x3B] = &do_dat_exception;
 #endif /* CONFIG_ARCH_S390X */
         pgm_check_table[0x15] = &operand_exception;
         pgm_check_table[0x1C] = &privileged_op;
-#if defined(CONFIG_VIRT_TIMER) || defined(CONFIG_NO_IDLE_HZ)
+        pgm_check_table[0x1D] = &hfp_sqrt_exception;
 	pgm_check_table[0x40] = &do_monitor_call;
-#endif
+
 	if (MACHINE_IS_VM) {
 		/*
 		 * First try to get pfault pseudo page faults going.

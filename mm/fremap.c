@@ -194,7 +194,8 @@ asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 	 * or VM_LOCKED, but VM_LOCKED could be revoked later on).
 	 */
 	if (vma && (vma->vm_flags & VM_SHARED) &&
-		(!vma->vm_private_data || (vma->vm_flags & VM_RESERVED)) &&
+		(!vma->vm_private_data ||
+			(vma->vm_flags & (VM_NONLINEAR|VM_RESERVED))) &&
 		vma->vm_ops && vma->vm_ops->populate &&
 			end > start && start >= vma->vm_start &&
 				end <= vma->vm_end) {

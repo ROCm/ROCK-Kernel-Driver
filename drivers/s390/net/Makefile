@@ -2,7 +2,7 @@
 # S/390 network devices
 #
 
-ctc-objs := ctcmain.o ctctty.o
+ctc-objs := ctcmain.o ctctty.o ctcdbug.o
 
 obj-$(CONFIG_IUCV) += iucv.o
 obj-$(CONFIG_NETIUCV) += netiucv.o fsm.o

@@ -85,7 +85,7 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_NEED_RESCHED	3	/* rescheduling necessary */
 #define TIF_RESTART_SVC		4	/* restart svc with new svc number */
 #define TIF_SYSCALL_AUDIT	5	/* syscall auditing active */
-#define TIF_SINGLE_STEP		6	/* single stepped svc */
+#define TIF_SINGLE_STEP		6	/* deliver sigtrap on return to user */
 #define TIF_USEDFPU		16	/* FPU was used by this task this quantum (SMP) */
 #define TIF_POLLING_NRFLAG	17	/* true if poll_idle() is polling 
 					   TIF_NEED_RESCHED */

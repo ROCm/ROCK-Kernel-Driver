@@ -371,6 +371,7 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 			else
 			{
 				printk(KERN_ERR "ufs_new_fragments: bread fail\n");
+				unlock_super(sb);
 				return 0;
 			}
 		}

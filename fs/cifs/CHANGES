@@ -1,7 +1,11 @@
 Version 1.20
 ------------
 Make transaction counts more consistent. Merge /proc/fs/cifs/SimultaneousOps
-info into /proc/fs/cifs/DebugData
+info into /proc/fs/cifs/DebugData.  Fix oops in rare oops in readdir 
+(in build_wildcard_path_from_dentry).  Fix mknod to pass type field
+(block/char/fifo) properly.  Remove spurious mount warning log entry when
+credentials passed as mount argument. Set major/minor device number in
+inode for block and char devices when unix extensions enabled.
 
 Version 1.19
 ------------

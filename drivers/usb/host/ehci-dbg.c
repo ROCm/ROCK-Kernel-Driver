@@ -536,7 +536,7 @@ show_periodic (struct class_device *class_dev, char *buf)
 					if (p.qh->qh_next.ptr)
 						temp = scnprintf (next, size,
 							" ...");
-					p.ptr = 0;
+					p.ptr = NULL;
 					break;
 				}
 				/* show more info the first time around */

@@ -563,7 +563,7 @@ static struct {
 	{ R200_PP_CUBIC_OFFSET_F1_5, 5, "R200_PP_CUBIC_OFFSET_F1_5" },
 	{ RADEON_PP_TEX_SIZE_0, 2, "RADEON_PP_TEX_SIZE_0" },
 	{ RADEON_PP_TEX_SIZE_1, 2, "RADEON_PP_TEX_SIZE_1" },
-	{ RADEON_PP_TEX_SIZE_2, 2, "RADEON_PP_TEX_SIZE_1" },
+	{ RADEON_PP_TEX_SIZE_2, 2, "RADEON_PP_TEX_SIZE_2" },
 	{ R200_RB3D_BLENDCOLOR, 3, "R200_RB3D_BLENDCOLOR" },
 };
 
@@ -2310,7 +2310,7 @@ int radeon_cp_cmdbuf( DRM_IOCTL_ARGS )
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	drm_file_t *filp_priv;
 	drm_device_dma_t *dma = dev->dma;
-	drm_buf_t *buf = 0;
+	drm_buf_t *buf = NULL;
 	int idx;
 	drm_radeon_cmd_buffer_t cmdbuf;
 	drm_radeon_cmd_header_t header;

@@ -202,7 +202,7 @@ int ipv6_sock_ac_drop(struct sock *sk, int ifindex, struct in6_addr *addr)
 	struct ipv6_ac_socklist *pac, *prev_pac;
 
 	write_lock_bh(&ipv6_sk_ac_lock);
-	prev_pac = 0;
+	prev_pac = NULL;
 	for (pac = np->ipv6_ac_list; pac; pac = pac->acl_next) {
 		if ((ifindex == 0 || pac->acl_ifindex == ifindex) &&
 		     ipv6_addr_cmp(&pac->acl_addr, addr) == 0)
@@ -232,13 +232,13 @@ int ipv6_sock_ac_drop(struct sock *sk, int ifindex, struct in6_addr *addr)
 void ipv6_sock_ac_close(struct sock *sk)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
-	struct net_device *dev = 0;
+	struct net_device *dev = NULL;
 	struct ipv6_ac_socklist *pac;
 	int	prev_index;
 
 	write_lock_bh(&ipv6_sk_ac_lock);
 	pac = np->ipv6_ac_list;
-	np->ipv6_ac_list = 0;
+	np->ipv6_ac_list = NULL;
 	write_unlock_bh(&ipv6_sk_ac_lock);
 
 	prev_index = 0;
@@ -373,7 +373,7 @@ int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr)
 		return -ENODEV;
 
 	write_lock_bh(&idev->lock);
-	prev_aca = 0;
+	prev_aca = NULL;
 	for (aca = idev->ac_list; aca; aca = aca->aca_next) {
 		if (ipv6_addr_cmp(&aca->aca_addr, addr) == 0)
 			break;

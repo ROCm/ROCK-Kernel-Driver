@@ -136,7 +136,7 @@
 #define LCA_PMR_DMAO    0x80                    /* DMA override */
 #define LCA_PMR_OCCEB   0xffff0000L             /* Override cycle counter - even bits */
 #define LCA_PMR_OCCOB   0xffff000000000000L     /* Override cycle counter - even bits */
-#define LCA_PMR_PRIMARY_MASK    0xfffffffffffffff8
+#define LCA_PMR_PRIMARY_MASK    0xfffffffffffffff8L
 
 /* LCA PMR Macros */
 

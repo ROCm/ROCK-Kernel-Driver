@@ -627,7 +627,7 @@ static void x25_asy_close_tty(struct tty_struct *tty)
 		(void) dev_close(sl->dev);
 	}
 
-	tty->disc_data = 0;
+	tty->disc_data = NULL;
 	sl->tty = NULL;
 	x25_asy_free(sl);
 }

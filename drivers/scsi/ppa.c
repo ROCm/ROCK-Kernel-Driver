@@ -682,7 +682,7 @@ static void ppa_interrupt(void *data)
 
 	ppa_pb_dismiss(dev);
 
-	dev->cur_cmd = 0;
+	dev->cur_cmd = NULL;
 
 	cmd->scsi_done(cmd);
 }

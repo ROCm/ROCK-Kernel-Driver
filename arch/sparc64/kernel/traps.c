@@ -93,7 +93,7 @@ void bad_trap (struct pt_regs *regs, long lvl)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLTRP;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = lvl;
 	force_sig_info(SIGILL, &info, current);
 }
@@ -133,7 +133,7 @@ void instruction_access_exception(struct pt_regs *regs,
 	info.si_signo = SIGSEGV;
 	info.si_errno = 0;
 	info.si_code = SEGV_MAPERR;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = 0;
 	force_sig_info(SIGSEGV, &info, current);
 }
@@ -176,7 +176,7 @@ void data_access_exception (struct pt_regs *regs,
 	info.si_signo = SIGSEGV;
 	info.si_errno = 0;
 	info.si_code = SEGV_MAPERR;
-	info.si_addr = (void *)sfar;
+	info.si_addr = (void __user *)sfar;
 	info.si_trapno = 0;
 	force_sig_info(SIGSEGV, &info, current);
 }
@@ -1617,7 +1617,7 @@ void do_fpe_common(struct pt_regs *regs)
 		}
 		info.si_signo = SIGFPE;
 		info.si_errno = 0;
-		info.si_addr = (void *)regs->tpc;
+		info.si_addr = (void __user *)regs->tpc;
 		info.si_trapno = 0;
 		info.si_code = __SI_FAULT;
 		if ((fsr & 0x1c000) == (1 << 14)) {
@@ -1672,7 +1672,7 @@ void do_tof(struct pt_regs *regs)
 	info.si_signo = SIGEMT;
 	info.si_errno = 0;
 	info.si_code = EMT_TAGOVF;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = 0;
 	force_sig_info(SIGEMT, &info, current);
 }
@@ -1690,7 +1690,7 @@ void do_div0(struct pt_regs *regs)
 	info.si_signo = SIGFPE;
 	info.si_errno = 0;
 	info.si_code = FPE_INTDIV;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = 0;
 	force_sig_info(SIGFPE, &info, current);
 }
@@ -1850,7 +1850,7 @@ void do_illegal_instruction(struct pt_regs *regs)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLOPC;
-	info.si_addr = (void *)pc;
+	info.si_addr = (void __user *)pc;
 	info.si_trapno = 0;
 	force_sig_info(SIGILL, &info, current);
 }
@@ -1872,7 +1872,7 @@ void mem_address_unaligned(struct pt_regs *regs, unsigned long sfar, unsigned lo
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRALN;
-	info.si_addr = (void *)sfar;
+	info.si_addr = (void __user *)sfar;
 	info.si_trapno = 0;
 	force_sig_info(SIGBUS, &info, current);
 }
@@ -1888,7 +1888,7 @@ void do_privop(struct pt_regs *regs)
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_PRVOPC;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = 0;
 	force_sig_info(SIGILL, &info, current);
 }

@@ -150,7 +150,7 @@ static struct saa7146_extension extension;
 
 static int mxb_probe(struct saa7146_dev* dev)
 {
-	struct mxb* mxb = 0;
+	struct mxb* mxb = NULL;
 	struct i2c_client *client;
 	struct list_head *item;
 	int result;

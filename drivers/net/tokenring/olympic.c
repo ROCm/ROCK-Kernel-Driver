@@ -268,7 +268,7 @@ static int __devinit olympic_probe(struct pci_dev *pdev, const struct pci_device
 		char proc_name[20] ; 
 		strcpy(proc_name,"net/olympic_") ; 
 		strcat(proc_name,dev->name) ; 
-		create_proc_read_entry(proc_name,0,0,olympic_proc_info,(void *)dev) ; 
+		create_proc_read_entry(proc_name,0,NULL,olympic_proc_info,(void *)dev) ; 
 		printk("Olympic: Network Monitor information: /proc/%s\n",proc_name); 
 	}
 	return  0 ;

@@ -257,66 +257,6 @@ struct video_window32 {
 	compat_int_t clipcount;
 };
 
-static void free_kvideo_clips(struct video_window *kp)
-{
-	struct video_clip *cp;
-
-	cp = kp->clips;
-	if(cp != NULL)
-		kfree(cp);
-}
-
-static int get_video_window32(struct video_window *kp, struct video_window32 __user *up)
-{
-	struct video_clip32 __user *ucp;
-	struct video_clip *kcp;
-	int nclips, err, i;
-	u32 tmp;
-
-	if(get_user(kp->x, &up->x))
-		return -EFAULT;
-	__get_user(kp->y, &up->y);
-	__get_user(kp->width, &up->width);
-	__get_user(kp->height, &up->height);
-	__get_user(kp->chromakey, &up->chromakey);
-	__get_user(kp->flags, &up->flags);
-	__get_user(kp->clipcount, &up->clipcount);
-	__get_user(tmp, &up->clips);
-	ucp = compat_ptr(tmp);
-	kp->clips = NULL;
-
-	nclips = kp->clipcount;
-	if(nclips == 0)
-		return 0;
-
-	if(ucp == 0)
-		return -EINVAL;
-
-	/* Peculiar interface... */
-	if(nclips < 0)
-		nclips = VIDEO_CLIPMAP_SIZE;
-
-	kcp = kmalloc(nclips * sizeof(struct video_clip), GFP_KERNEL);
-	err = -ENOMEM;
-	if(kcp == NULL)
-		goto cleanup_and_err;
-
-	kp->clips = kcp;
-	for(i = 0; i < nclips; i++) {
-		__get_user(kcp[i].x, &ucp[i].x);
-		__get_user(kcp[i].y, &ucp[i].y);
-		__get_user(kcp[i].width, &ucp[i].width);
-		__get_user(kcp[i].height, &ucp[i].height);
-		kcp[nclips].next = NULL;
-	}
-
-	return 0;
-
-cleanup_and_err:
-	free_kvideo_clips(kp);
-	return err;
-}
-
 /* You get back everything except the clips... */
 static int put_video_window32(struct video_window *kp, struct video_window32 __user *up)
 {
@@ -340,6 +280,66 @@ static int put_video_window32(struct video_window *kp, struct video_window32 __u
 #define VIDIOCGFREQ32		_IOR('v',14, u32)
 #define VIDIOCSFREQ32		_IOW('v',15, u32)
 
+enum {
+	MaxClips = (~0U-sizeof(struct video_window))/sizeof(struct video_clip)
+};
+
+static int do_set_window(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct video_window32 __user *up = compat_ptr(arg);
+	struct video_window __user *vw;
+	struct video_clip __user *p;
+	int nclips;
+	u32 n;
+
+	if (get_user(nclips, &up->clipcount))
+		return -EFAULT;
+
+	/* Peculiar interface... */
+	if (nclips < 0)
+		nclips = VIDEO_CLIPMAP_SIZE;
+
+	if (nclips > MaxClips)
+		return -ENOMEM;
+
+	vw = compat_alloc_user_space(sizeof(struct video_window) +
+				    nclips * sizeof(struct video_clip));
+
+	p = nclips ? (struct video_clip __user *)(vw + 1) : NULL;
+
+	if (get_user(n, &up->x) || put_user(n, &vw->x) ||
+	    get_user(n, &up->y) || put_user(n, &vw->y) ||
+	    get_user(n, &up->width) || put_user(n, &vw->width) ||
+	    get_user(n, &up->height) || put_user(n, &vw->height) ||
+	    get_user(n, &up->chromakey) || put_user(n, &vw->chromakey) ||
+	    get_user(n, &up->flags) || put_user(n, &vw->flags) ||
+	    get_user(n, &up->clipcount) || put_user(n, &vw->clipcount) ||
+	    get_user(n, &up->clips) || put_user(p, &vw->clips))
+		return -EFAULT;
+
+	if (nclips) {
+		struct video_clip32 __user *u = compat_ptr(n);
+		int i;
+		if (!u)
+			return -EINVAL;
+		for (i = 0; i < nclips; i++, u++, p++) {
+			s32 v;
+			if (get_user(v, &u->x) ||
+			    put_user(v, &p->x) ||
+			    get_user(v, &u->y) ||
+			    put_user(v, &p->y) ||
+			    get_user(v, &u->width) ||
+			    put_user(v, &p->width) ||
+			    get_user(v, &u->height) ||
+			    put_user(v, &p->height) ||
+			    put_user(NULL, &p->next))
+				return -EFAULT;
+		}
+	}
+
+	return sys_ioctl(fd, VIDIOCSWIN, (unsigned long)p);
+}
+
 static int do_video_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	union {
@@ -357,7 +357,6 @@ static int do_video_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	case VIDIOCGTUNER32: cmd = VIDIOCGTUNER; break;
 	case VIDIOCSTUNER32: cmd = VIDIOCSTUNER; break;
 	case VIDIOCGWIN32: cmd = VIDIOCGWIN; break;
-	case VIDIOCSWIN32: cmd = VIDIOCSWIN; break;
 	case VIDIOCGFBUF32: cmd = VIDIOCGFBUF; break;
 	case VIDIOCSFBUF32: cmd = VIDIOCSFBUF; break;
 	case VIDIOCGFREQ32: cmd = VIDIOCGFREQ; break;
@@ -368,10 +367,6 @@ static int do_video_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	case VIDIOCSTUNER:
 	case VIDIOCGTUNER:
 		err = get_video_tuner32(&karg.vt, up);
-		break;
-
-	case VIDIOCSWIN:
-		err = get_video_window32(&karg.vw, up);
 		break;
 
 	case VIDIOCSFBUF:
@@ -388,9 +383,6 @@ static int do_video_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	set_fs(KERNEL_DS);
 	err = sys_ioctl(fd, cmd, (unsigned long)&karg);
 	set_fs(old_fs);
-
-	if(cmd == VIDIOCSWIN)
-		free_kvideo_clips(&karg.vw);
 
 	if(err == 0) {
 		switch(cmd) {
@@ -1960,6 +1952,11 @@ static int do_blkgetsize64(unsigned int fd, unsigned int cmd,
 #define CMTPGETCONNLIST	_IOR('C', 210, int)
 #define CMTPGETCONNINFO	_IOR('C', 211, int)
 
+#define HIDPCONNADD	_IOW('H', 200, int)
+#define HIDPCONNDEL	_IOW('H', 201, int)
+#define HIDPGETCONNLIST	_IOR('H', 210, int)
+#define HIDPGETCONNINFO	_IOR('H', 211, int)
+
 struct floppy_struct32 {
 	compat_uint_t	size;
 	compat_uint_t	sect;
@@ -2520,54 +2517,15 @@ struct usbdevfs_ctrltransfer32 {
 
 static int do_usbdevfs_control(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-        struct usbdevfs_ctrltransfer kctrl;
-        struct usbdevfs_ctrltransfer32 __user *uctrl;
-        mm_segment_t old_fs;
+        struct usbdevfs_ctrltransfer32 __user *p32 = compat_ptr(arg);
+        struct usbdevfs_ctrltransfer __user *p;
         __u32 udata;
-        void __user *uptr;
-        void *kptr;
-        int err;
-
-        uctrl = compat_ptr(arg);
-
-        if (copy_from_user(&kctrl, uctrl,
-                           (sizeof(struct usbdevfs_ctrltransfer32) -
-                            sizeof(compat_caddr_t))))
-                return -EFAULT;
-
-        if (get_user(udata, &uctrl->data))
-                return -EFAULT;
-        uptr = compat_ptr(udata);
-        /* In usbdevice_fs, it limits the control buffer to a page,
-         * for simplicity so do we.
-         */
-        if (!uptr || kctrl.wLength > PAGE_SIZE)
-                return -EINVAL;
-
-        kptr = (void *)__get_free_page(GFP_KERNEL);
-
-        if ((kctrl.bRequestType & USB_DIR_IN) == 0) {
-                err = -EFAULT;
-                if (copy_from_user(kptr, uptr, kctrl.wLength))
-                        goto out;
-        }
-
-        kctrl.data = kptr;
-
-        old_fs = get_fs();
-        set_fs(KERNEL_DS);
-        err = sys_ioctl(fd, USBDEVFS_CONTROL, (unsigned long)&kctrl);
-        set_fs(old_fs);
-
-        if (err >= 0 &&
-            ((kctrl.bRequestType & USB_DIR_IN) != 0)) {
-                if (copy_to_user(uptr, kptr, kctrl.wLength))
-                        err = -EFAULT;
-        }
-
-out:
-        free_page((unsigned long) kptr);
-        return err;
+        p = compat_alloc_user_space(sizeof(*p));
+        if (copy_in_user(p, p32, (sizeof(*p32) - sizeof(compat_caddr_t))) ||
+            get_user(udata, &p32->data) ||
+	    put_user(compat_ptr(udata), &p->data))
+		return -EFAULT;
+        return sys_ioctl(fd, USBDEVFS_CONTROL, (unsigned long)p);
 }
 
 
@@ -2582,54 +2540,20 @@ struct usbdevfs_bulktransfer32 {
 
 static int do_usbdevfs_bulk(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-        struct usbdevfs_bulktransfer kbulk;
-        struct usbdevfs_bulktransfer32 __user *ubulk;
-        mm_segment_t old_fs;
-        __u32 udata;
-        void __user *uptr;
-        void *kptr;
-        int err;
+        struct usbdevfs_bulktransfer32 __user *p32 = compat_ptr(arg);
+        struct usbdevfs_bulktransfer __user *p;
+        compat_uint_t n;
+        compat_caddr_t addr;
 
-	ubulk = compat_ptr(arg);
+        p = compat_alloc_user_space(sizeof(*p));
 
-        if (get_user(kbulk.ep, &ubulk->ep) ||
-            get_user(kbulk.len, &ubulk->len) ||
-            get_user(kbulk.timeout, &ubulk->timeout) ||
-            get_user(udata, &ubulk->data))
+        if (get_user(n, &p32->ep) || put_user(n, &p->ep) ||
+            get_user(n, &p32->len) || put_user(n, &p->len) ||
+            get_user(n, &p32->timeout) || put_user(n, &p->timeout) ||
+            get_user(addr, &p32->data) || put_user(compat_ptr(addr), &p->data))
                 return -EFAULT;
 
-        uptr = compat_ptr(udata);
-
-        /* In usbdevice_fs, it limits the control buffer to a page,
-         * for simplicity so do we.
-         */
-        if (!uptr || kbulk.len > PAGE_SIZE)
-                return -EINVAL;
-
-        kptr = (void *) __get_free_page(GFP_KERNEL);
-
-        if ((kbulk.ep & 0x80) == 0) {
-                err = -EFAULT;
-	        if (copy_from_user(kptr, uptr, kbulk.len))
-                        goto out;
-        }
-
-        kbulk.data = kptr;
-
-	old_fs = get_fs();
-        set_fs(KERNEL_DS);
-        err = sys_ioctl(fd, USBDEVFS_BULK, (unsigned long) &kbulk);
-        set_fs(old_fs);
-
-        if (err >= 0 &&
-            ((kbulk.ep & 0x80) != 0)) {
-                if (copy_to_user(uptr, kptr, kbulk.len))
-                        err = -EFAULT;
-        }
-
-out:
-        free_page((unsigned long) kptr);
-        return err;
+        return sys_ioctl(fd, USBDEVFS_BULK, (unsigned long)p);
 }
 
 /* This needs more work before we can enable it.  Unfortunately
@@ -3337,7 +3261,7 @@ HANDLE_IOCTL(EXT2_IOC32_SETVERSION, do_ext2_ioctl)
 HANDLE_IOCTL(VIDIOCGTUNER32, do_video_ioctl)
 HANDLE_IOCTL(VIDIOCSTUNER32, do_video_ioctl)
 HANDLE_IOCTL(VIDIOCGWIN32, do_video_ioctl)
-HANDLE_IOCTL(VIDIOCSWIN32, do_video_ioctl)
+HANDLE_IOCTL(VIDIOCSWIN32, do_set_window)
 HANDLE_IOCTL(VIDIOCGFBUF32, do_video_ioctl)
 HANDLE_IOCTL(VIDIOCSFBUF32, do_video_ioctl)
 HANDLE_IOCTL(VIDIOCGFREQ32, do_video_ioctl)

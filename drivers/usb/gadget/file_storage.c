@@ -3673,7 +3673,7 @@ static void fsg_unbind(struct usb_gadget *gadget)
 		usb_ep_free_request(fsg->ep0, req);
 	}
 
-	set_gadget_data(gadget, 0);
+	set_gadget_data(gadget, NULL);
 }
 
 

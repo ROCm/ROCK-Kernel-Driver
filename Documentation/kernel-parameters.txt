@@ -170,8 +170,6 @@ running once the system is up.
 	aic79xx=	[HW,SCSI]
 			See Documentation/scsi/aic79xx.txt.
 
-	allowdma0	[ISAPNP]
-
 	AM53C974=	[HW,SCSI]
 			Format: <host-scsi-id>,<target-scsi-id>,<max-rate>,<max-offset>
 			See also header of drivers/scsi/AM53C974.c.
@@ -714,6 +712,10 @@ running once the system is up.
 	nodisconnect	[HW,SCSI,M68K] Disables SCSI disconnects.
 
 	noexec		[IA-64]
+
+	noexec		[i386]
+			noexec=on: enable non-executable mappings (default)
+			noexec=off: disable nn-executable mappings
 
 	nofxsr		[BUGS=IA-32]
 

@@ -86,6 +86,7 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb);
 static struct proto_ops pppoe_ops;
 static rwlock_t pppoe_hash_lock = RW_LOCK_UNLOCKED;
 
+static struct ppp_channel_ops pppoe_chan_ops;
 
 static inline int cmp_2_addr(struct pppoe_addr *a, struct pppoe_addr *b)
 {

@@ -628,7 +628,7 @@ int dump_fpu (struct pt_regs * regs, elf_fpregset_t * fpregs)
 		       &current->thread.fpqueue[0], &current->thread.fpqdepth);
 		if (regs != NULL) {
 			regs->psr &= ~(PSR_EF);
-			last_task_used_math = 0;
+			last_task_used_math = NULL;
 		}
 	}
 #endif

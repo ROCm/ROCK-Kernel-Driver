@@ -91,7 +91,7 @@ struct dpc
 /* fixme: add vbi stuff here */
 static int dpc_probe(struct saa7146_dev* dev)
 {
-	struct dpc* dpc = 0;	
+	struct dpc* dpc = NULL;	
 	struct i2c_client *client;
 	struct list_head *item;
 

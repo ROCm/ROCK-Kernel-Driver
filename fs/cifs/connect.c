@@ -715,6 +715,8 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 				if((i==15) && (value[i] != 0))
 					printk(KERN_WARNING "CIFS: netbiosname longer than 15 and was truncated.\n");
 			}
+		} else if (strnicmp(data, "credentials", 4) == 0) {
+			/* ignore */
 		} else if (strnicmp(data, "version", 3) == 0) {
 			/* ignore */
 		} else if (strnicmp(data, "rw", 2) == 0) {
@@ -1443,7 +1445,7 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 
 	/* send SMBsessionSetup here */
 	header_assemble(smb_buffer, SMB_COM_SESSION_SETUP_ANDX,
-			0 /* no tCon exists yet */ , 13 /* wct */ );
+			NULL /* no tCon exists yet */ , 13 /* wct */ );
 
 	pSMB->req_no_secext.AndXCommand = 0xFF;
 	pSMB->req_no_secext.MaxBufferSize = cpu_to_le16(ses->server->maxBuf);
@@ -1699,7 +1701,7 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 
 	/* send SMBsessionSetup here */
 	header_assemble(smb_buffer, SMB_COM_SESSION_SETUP_ANDX,
-			0 /* no tCon exists yet */ , 12 /* wct */ );
+			NULL /* no tCon exists yet */ , 12 /* wct */ );
 	pSMB->req.hdr.Flags2 |= SMBFLG2_EXT_SEC;
 	pSMB->req.AndXCommand = 0xFF;
 	pSMB->req.MaxBufferSize = cpu_to_le16(ses->server->maxBuf);
@@ -1961,7 +1963,7 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 
 	/* send SMBsessionSetup here */
 	header_assemble(smb_buffer, SMB_COM_SESSION_SETUP_ANDX,
-			0 /* no tCon exists yet */ , 12 /* wct */ );
+			NULL /* no tCon exists yet */ , 12 /* wct */ );
 	pSMB->req.hdr.Flags2 |= SMBFLG2_EXT_SEC;
 	pSMB->req.hdr.Flags |= (SMBFLG_CASELESS | SMBFLG_CANONICAL_PATH_FORMAT);
 
@@ -2301,7 +2303,7 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 
 	/* send SMBsessionSetup here */
 	header_assemble(smb_buffer, SMB_COM_SESSION_SETUP_ANDX,
-			0 /* no tCon exists yet */ , 12 /* wct */ );
+			NULL /* no tCon exists yet */ , 12 /* wct */ );
 	pSMB->req.hdr.Flags |= (SMBFLG_CASELESS | SMBFLG_CANONICAL_PATH_FORMAT);
 	pSMB->req.hdr.Flags2 |= SMBFLG2_EXT_SEC;
 	pSMB->req.AndXCommand = 0xFF;
@@ -2674,7 +2676,7 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 	smb_buffer_response = smb_buffer;
 
 	header_assemble(smb_buffer, SMB_COM_TREE_CONNECT_ANDX,
-			0 /*no tid */ , 4 /*wct */ );
+			NULL /*no tid */ , 4 /*wct */ );
 	smb_buffer->Uid = ses->Suid;
 	pSMB = (TCONX_REQ *) smb_buffer;
 	pSMBr = (TCONX_RSP *) smb_buffer_response;

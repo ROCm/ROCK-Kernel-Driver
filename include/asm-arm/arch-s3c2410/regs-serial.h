@@ -106,8 +106,23 @@
 
 /* fifo size information */
 
-#define S3C2410_UFCON_RXC(fcon)	  (((fcon) & S3C2410_UFSTAT_RXMASK) >> S3C2410_UFSTAT_RXSHIFT)
-#define S3C2410_UFCON_TXC(fcon)	  (((fcon) & S3C2410_UFSTAT_TXMASK) >> S3C2410_UFSTAT_TXSHIFT)
+#ifndef __ASSEMBLY__
+static inline int S3C2410_UFCON_RXC(int fcon)
+{
+	if (fcon & S3C2410_UFSTAT_RXFULL)
+		return 16;
+
+	return ((fcon) & S3C2410_UFSTAT_RXMASK) >> S3C2410_UFSTAT_RXSHIFT;
+}
+
+static inline int S3C2410_UFCON_TXC(int fcon)
+{
+	if (fcon & S3C2410_UFSTAT_TXFULL)
+		return 16;
+
+	return ((fcon) & S3C2410_UFSTAT_TXMASK) >> S3C2410_UFSTAT_TXSHIFT;
+}
+#endif /* __ASSEMBLY__ */
 
 #define S3C2410_UMSTAT_CTS	  (1<<0)
 #define S3C2410_UMSTAT_DeltaCTS	  (1<<2)

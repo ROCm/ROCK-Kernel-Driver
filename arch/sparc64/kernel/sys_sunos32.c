@@ -465,7 +465,7 @@ asmlinkage int sunos_nosys(void)
 	info.si_signo = SIGSYS;
 	info.si_errno = 0;
 	info.si_code = __SI_FAULT|0x100;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = regs->u_regs[UREG_G1];
 	send_sig_info(SIGSYS, &info, current);
 	if (cnt++ < 4) {
@@ -1280,7 +1280,7 @@ asmlinkage int sunos_sigaction (int sig,
 		if (get_user(u_handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_flags, &act->sa_flags))
 			return -EFAULT;
-		new_ka.sa.sa_handler = (void *) (long) u_handler;
+		new_ka.sa.sa_handler = compat_ptr(u_handler);
 		__get_user(mask, &act->sa_mask);
 		new_ka.sa.sa_restorer = NULL;
 		new_ka.ka_restorer = NULL;

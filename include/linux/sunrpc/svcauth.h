@@ -93,7 +93,6 @@ struct auth_ops {
 	int	(*release)(struct svc_rqst *rq);
 	void	(*domain_release)(struct auth_domain *);
 };
-extern struct auth_ops	*authtab[RPC_AUTH_MAXFLAVOR];
 
 #define	SVC_GARBAGE	1
 #define	SVC_SYSERR	2

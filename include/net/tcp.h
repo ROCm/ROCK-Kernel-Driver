@@ -272,20 +272,20 @@ static __inline__ int tw_del_dead_node(struct tcp_tw_bucket *tw)
 
 #define tcptw_sk(__sk)	((struct tcp_tw_bucket *)(__sk))
 
-static inline const u32 tcp_v4_rcv_saddr(const struct sock *sk)
+static inline u32 tcp_v4_rcv_saddr(const struct sock *sk)
 {
 	return likely(sk->sk_state != TCP_TIME_WAIT) ?
 		inet_sk(sk)->rcv_saddr : tcptw_sk(sk)->tw_rcv_saddr;
 }
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-static inline const struct in6_addr *__tcp_v6_rcv_saddr(const struct sock *sk)
+static inline struct in6_addr *__tcp_v6_rcv_saddr(const struct sock *sk)
 {
 	return likely(sk->sk_state != TCP_TIME_WAIT) ?
 		&inet6_sk(sk)->rcv_saddr : &tcptw_sk(sk)->tw_v6_rcv_saddr;
 }
 
-static inline const struct in6_addr *tcp_v6_rcv_saddr(const struct sock *sk)
+static inline struct in6_addr *tcp_v6_rcv_saddr(const struct sock *sk)
 {
 	return sk->sk_family == AF_INET6 ? __tcp_v6_rcv_saddr(sk) : NULL;
 }
@@ -1036,7 +1036,7 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
 		break;
 
 	default:
-		printk(KERN_DEBUG "bug: unknown timer value\n");
+		printk(timer_bug_msg);
 	};
 }
 

@@ -358,7 +358,7 @@ static inline void hci_cs_create_conn(struct hci_dev *hdev, __u8 status)
 			status, batostr(&cp->bdaddr), conn);
 
 	if (status) {
-		if (conn) {
+		if (conn && conn->state == BT_CONNECT) {
 			conn->state = BT_CLOSED;
 			hci_proto_connect_cfm(conn, status);
 			hci_conn_del(conn);
@@ -486,7 +486,7 @@ static inline void hci_inquiry_result_evt(struct hci_dev *hdev, struct sk_buff *
 
 	hci_dev_lock(hdev);
 	for (; num_rsp; num_rsp--)
-		inquiry_cache_update(hdev, info++);
+		hci_inquiry_cache_update(hdev, info++);
 	hci_dev_unlock(hdev);
 }
 
@@ -508,7 +508,7 @@ static inline void hci_inquiry_result_with_rssi_evt(struct hci_dev *hdev, struct
 		memcpy(tmp.dev_class, &info->dev_class, 3);
 		tmp.clock_offset      = info->clock_offset;
 		info++;
-		inquiry_cache_update(hdev, &tmp);
+		hci_inquiry_cache_update(hdev, &tmp);
 	}
 	hci_dev_unlock(hdev);
 }

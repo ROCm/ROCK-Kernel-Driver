@@ -205,7 +205,7 @@ static struct dvb_bt8xx_card *dvb_bt8xx_find_by_pci(struct i2c_adapter *adap)
 	if (NULL == dev) {
 		/* shoudn't happen with 2.6.0-test7 + newer */
 		printk("attach: Huh? i2c adapter not in sysfs tree?\n");
-		return 0;
+		return NULL;
 	}
 	pci = to_pci_dev(dev);
 	list_for_each(item, &card_list) {

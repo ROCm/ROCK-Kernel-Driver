@@ -67,7 +67,7 @@ static int options_node = 0;
  * structure will be placed in "*opp_p". Return value is the length
  * of the user supplied buffer.
  */
-static int copyin(struct openpromio *info, struct openpromio **opp_p)
+static int copyin(struct openpromio __user *info, struct openpromio **opp_p)
 {
 	unsigned int bufsize;
 
@@ -98,7 +98,7 @@ static int copyin(struct openpromio *info, struct openpromio **opp_p)
 	return bufsize;
 }
 
-static int getstrings(struct openpromio *info, struct openpromio **opp_p)
+static int getstrings(struct openpromio __user *info, struct openpromio **opp_p)
 {
 	int n, bufsize;
 	char c;
@@ -132,7 +132,7 @@ static int getstrings(struct openpromio *info, struct openpromio **opp_p)
 /*
  * Copy an openpromio structure in kernel space back to user space.
  */
-static int copyout(void *info, struct openpromio *opp, int len)
+static int copyout(void __user *info, struct openpromio *opp, int len)
 {
 	if (copy_to_user(info, opp, len))
 		return -EFAULT;
@@ -150,11 +150,12 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 	struct openpromio *opp;
 	int bufsize, len, error = 0;
 	static int cnt;
+	void __user *argp = (void __user *)arg;
 
 	if (cmd == OPROMSETOPT)
-		bufsize = getstrings((void *)arg, &opp);
+		bufsize = getstrings(argp, &opp);
 	else
-		bufsize = copyin((void *)arg, &opp);
+		bufsize = copyin(argp, &opp);
 
 	if (bufsize < 0)
 		return bufsize;
@@ -165,7 +166,7 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 		len = prom_getproplen(node, opp->oprom_array);
 
 		if (len <= 0 || len > bufsize) {
-			error = copyout((void *)arg, opp, sizeof(int));
+			error = copyout(argp, opp, sizeof(int));
 			break;
 		}
 
@@ -175,7 +176,7 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 		opp->oprom_array[len] = '\0';
 		opp->oprom_size = len;
 
-		error = copyout((void *)arg, opp, sizeof(int) + bufsize);
+		error = copyout(argp, opp, sizeof(int) + bufsize);
 		break;
 
 	case OPROMNXTOPT:
@@ -184,7 +185,7 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 
 		len = strlen(buf);
 		if (len == 0 || len + 1 > bufsize) {
-			error = copyout((void *)arg, opp, sizeof(int));
+			error = copyout(argp, opp, sizeof(int));
 			break;
 		}
 
@@ -192,7 +193,7 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 		opp->oprom_array[len] = '\0';
 		opp->oprom_size = ++len;
 
-		error = copyout((void *)arg, opp, sizeof(int) + bufsize);
+		error = copyout(argp, opp, sizeof(int) + bufsize);
 		break;
 
 	case OPROMSETOPT:
@@ -227,7 +228,7 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 		*((int *)opp->oprom_array) = node;
 		opp->oprom_size = sizeof(int);
 
-		error = copyout((void *)arg, opp, bufsize + sizeof(int));
+		error = copyout(argp, opp, bufsize + sizeof(int));
 		break;
 
 	case OPROMPCI2NODE:
@@ -246,7 +247,7 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 				data->current_node = node;
 				*((int *)opp->oprom_array) = node;
 				opp->oprom_size = sizeof(int);
-				error = copyout((void *)arg, opp, bufsize + sizeof(int));
+				error = copyout(argp, opp, bufsize + sizeof(int));
 			}
 #endif
 		}
@@ -258,7 +259,7 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 		*((int *)opp->oprom_array) = node;
 		opp->oprom_size = sizeof(int);
 
-		error = copyout((void *)arg, opp, bufsize + sizeof(int));
+		error = copyout(argp, opp, bufsize + sizeof(int));
 		break;
 
 	case OPROMGETBOOTARGS:
@@ -274,7 +275,7 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 		strcpy(opp->oprom_array, buf);
 		opp->oprom_size = len;
 
-		error = copyout((void *)arg, opp, bufsize + sizeof(int));
+		error = copyout(argp, opp, bufsize + sizeof(int));
 		break;
 
 	case OPROMU2P:
@@ -317,7 +318,7 @@ static int goodnode(int n, DATA *data)
 }
 
 /* Copy in a whole string from userspace into kernelspace. */
-static int copyin_string(char *user, size_t len, char **ptr)
+static int copyin_string(char __user *user, size_t len, char **ptr)
 {
 	char *tmp;
 
@@ -347,6 +348,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 			      unsigned int cmd, unsigned long arg)
 {
 	DATA *data = (DATA *) file->private_data;
+	void __user *argp = (void __user *)arg;
 	struct opiocdesc op;
 	int error, node, len;
 	char *str, *tmp;
@@ -355,7 +357,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 
 	switch (cmd) {
 	case OPIOCGET:
-		if (copy_from_user(&op, (void *)arg, sizeof(op)))
+		if (copy_from_user(&op, argp, sizeof(op)))
 			return -EFAULT;
 
 		if (!goodnode(op.op_nodeid,data))
@@ -377,7 +379,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 		if (len <= 0) {
 			kfree(str);
 			/* Verified by the above copy_from_user */
-			if (__copy_to_user((void *)arg, &op,
+			if (__copy_to_user(argp, &op,
 				       sizeof(op)))
 				return -EFAULT;
 			return 0;
@@ -393,7 +395,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 
 		tmp[len] = '\0';
 
-		if (__copy_to_user((void *)arg, &op, sizeof(op)) != 0
+		if (__copy_to_user(argp, &op, sizeof(op)) != 0
 		    || copy_to_user(op.op_buf, tmp, len) != 0)
 			error = -EFAULT;
 
@@ -403,7 +405,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 		return error;
 
 	case OPIOCNEXTPROP:
-		if (copy_from_user(&op, (void *)arg, sizeof(op)))
+		if (copy_from_user(&op, argp, sizeof(op)))
 			return -EFAULT;
 
 		if (!goodnode(op.op_nodeid,data))
@@ -425,7 +427,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 			len = op.op_buflen = 0;
 		}
 
-		error = verify_area(VERIFY_WRITE, (void *)arg, sizeof(op));
+		error = verify_area(VERIFY_WRITE, argp, sizeof(op));
 		if (error) {
 			kfree(str);
 			return error;
@@ -437,7 +439,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 			return error;
 		}
 
-		error = __copy_to_user((void *)arg, &op, sizeof(op));
+		error = __copy_to_user(argp, &op, sizeof(op));
 		if (!error) error = __copy_to_user(op.op_buf, tmp, len);
 
 		kfree(str);
@@ -445,7 +447,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 		return error;
 
 	case OPIOCSET:
-		if (copy_from_user(&op, (void *)arg, sizeof(op)))
+		if (copy_from_user(&op, argp, sizeof(op)))
 			return -EFAULT;
 
 		if (!goodnode(op.op_nodeid,data))
@@ -472,13 +474,13 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 		return 0;
 
 	case OPIOCGETOPTNODE:
-		if (copy_to_user((void *)arg, &options_node, sizeof(int)))
+		if (copy_to_user(argp, &options_node, sizeof(int)))
 			return -EFAULT;
 		return 0;
 
 	case OPIOCGETNEXT:
 	case OPIOCGETCHILD:
-		if (copy_from_user(&node, (void *)arg, sizeof(int)))
+		if (copy_from_user(&node, argp, sizeof(int)))
 			return -EFAULT;
 
 		if (cmd == OPIOCGETNEXT)
@@ -486,7 +488,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 		else
 			node = __prom_getchild(node);
 
-		if (__copy_to_user((void *)arg, &node, sizeof(int)))
+		if (__copy_to_user(argp, &node, sizeof(int)))
 			return -EFAULT;
 
 		return 0;

@@ -3112,7 +3112,7 @@ static __init int ipmi_init_msghandler(void)
 		ipmi_interfaces[i] = NULL;
 	}
 
-	proc_ipmi_root = proc_mkdir("ipmi", 0);
+	proc_ipmi_root = proc_mkdir("ipmi", NULL);
 	if (!proc_ipmi_root) {
 	    printk("Unable to create IPMI proc dir");
 	    return -ENOMEM;
