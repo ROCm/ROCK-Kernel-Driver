@@ -775,7 +775,10 @@ usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
 	init_MUTEX(&dev->serialize);
 
 	if (dev->bus->op->allocate)
-		dev->bus->op->allocate(dev);
+		if (dev->bus->op->allocate(dev)) {
+			kfree(dev);
+			return NULL;
+		}
 
 	return dev;
 }
