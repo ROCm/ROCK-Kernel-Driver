@@ -452,7 +452,7 @@ static void fans_full_blast(void)
 	}
 }
 
-#define POLL_INTERVAL	(5 * HZ)
+#define POLL_INTERVAL	(5 * 1000)
 static unsigned long last_warning_jiffies;
 static struct task_struct *kenvctrld_task;
 
@@ -468,8 +468,7 @@ static int kenvctrld(void *__unused)
 		struct bbc_cpu_temperature *tp;
 		struct bbc_fan_control *fp;
 
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(POLL_INTERVAL);
+		msleep_interruptible(POLL_INTERVAL);
 		if (signal_pending(current))
 			break;
 
