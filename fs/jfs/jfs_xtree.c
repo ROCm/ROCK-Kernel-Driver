@@ -1622,7 +1622,6 @@ int xtExtend(tid_t tid,		/* transaction id */
 	s64 xaddr;
 	struct tlock *tlck;
 	struct xtlock *xtlck = NULL;
-	int rootsplit = 0;
 
 	jfs_info("xtExtend: nxoff:0x%lx nxlen:0x%x", (ulong) xoff, xlen);
 
@@ -1678,8 +1677,6 @@ int xtExtend(tid_t tid,		/* transaction id */
 	 * The xtSplitUp() will insert the entry and unpin the leaf page.
 	 */
 	if (nextindex == le16_to_cpu(p->header.maxentry)) {
-		rootsplit = p->header.flag & BT_ROOT;
-
 		/* xtSpliUp() unpins leaf pages */
 		split.mp = mp;
 		split.index = index + 1;
@@ -1691,16 +1688,21 @@ int xtExtend(tid_t tid,		/* transaction id */
 		if ((rc = xtSplitUp(tid, ip, &split, &btstack)))
 			return rc;
 
+		/* get back old page */
+		XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
+		if (rc)
+			return rc;
 		/*
 		 * if leaf root has been split, original root has been
 		 * copied to new child page, i.e., original entry now
 		 * resides on the new child page;
 		 */
-		if (rootsplit) {
+		if (p->header.flag & BT_INTERNAL) {
 			ASSERT(p->header.nextindex ==
 			       cpu_to_le16(XTENTRYSTART + 1));
 			xad = &p->xad[XTENTRYSTART];
 			bn = addressXAD(xad);
+			XT_PUTPAGE(mp);
 
 			/* get new child page */
 			XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
@@ -1712,11 +1714,6 @@ int xtExtend(tid_t tid,		/* transaction id */
 				tlck = txLock(tid, ip, mp, tlckXTREE|tlckGROW);
 				xtlck = (struct xtlock *) & tlck->lock;
 			}
-		} else {
-			/* get back old page */
-			XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
-			if (rc)
-				return rc;
 		}
 	}
 	/*
@@ -1790,7 +1787,6 @@ int xtTailgate(tid_t tid,		/* transaction id */
 	struct xtlock *xtlck = 0;
 	struct tlock *mtlck;
 	struct maplock *pxdlock;
-	int rootsplit = 0;
 
 /*
 printf("xtTailgate: nxoff:0x%lx nxlen:0x%x nxaddr:0x%lx\n",
@@ -1848,8 +1844,6 @@ printf("xtTailgate: xoff:0x%lx xlen:0x%x xaddr:0x%lx\n",
 	 * The xtSplitUp() will insert the entry and unpin the leaf page.
 	 */
 	if (nextindex == le16_to_cpu(p->header.maxentry)) {
-		rootsplit = p->header.flag & BT_ROOT;
-
 		/* xtSpliUp() unpins leaf pages */
 		split.mp = mp;
 		split.index = index + 1;
@@ -1861,16 +1855,21 @@ printf("xtTailgate: xoff:0x%lx xlen:0x%x xaddr:0x%lx\n",
 		if ((rc = xtSplitUp(tid, ip, &split, &btstack)))
 			return rc;
 
+		/* get back old page */
+		XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
+		if (rc)
+			return rc;
 		/*
 		 * if leaf root has been split, original root has been
 		 * copied to new child page, i.e., original entry now
 		 * resides on the new child page;
 		 */
-		if (rootsplit) {
+		if (p->header.flag & BT_INTERNAL) {
 			ASSERT(p->header.nextindex ==
 			       cpu_to_le16(XTENTRYSTART + 1));
 			xad = &p->xad[XTENTRYSTART];
 			bn = addressXAD(xad);
+			XT_PUTPAGE(mp);
 
 			/* get new child page */
 			XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
@@ -1882,11 +1881,6 @@ printf("xtTailgate: xoff:0x%lx xlen:0x%x xaddr:0x%lx\n",
 				tlck = txLock(tid, ip, mp, tlckXTREE|tlckGROW);
 				xtlck = (struct xtlock *) & tlck->lock;
 			}
-		} else {
-			/* get back old page */
-			XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
-			if (rc)
-				return rc;
 		}
 	}
 	/*
@@ -1976,7 +1970,7 @@ int xtUpdate(tid_t tid, struct inode *ip, xad_t * nxad)
 	s64 nxaddr, xaddr;
 	struct tlock *tlck;
 	struct xtlock *xtlck = NULL;
-	int rootsplit = 0, newpage = 0;
+	int newpage = 0;
 
 	/* there must exist extent to be tailgated */
 	nxoff = offsetXAD(nxad);
@@ -2183,7 +2177,6 @@ int xtUpdate(tid_t tid, struct inode *ip, xad_t * nxad)
 
 	/* insert nXAD:recorded */
 	if (nextindex == le16_to_cpu(p->header.maxentry)) {
-		rootsplit = p->header.flag & BT_ROOT;
 
 		/* xtSpliUp() unpins leaf pages */
 		split.mp = mp;
@@ -2196,16 +2189,21 @@ int xtUpdate(tid_t tid, struct inode *ip, xad_t * nxad)
 		if ((rc = xtSplitUp(tid, ip, &split, &btstack)))
 			return rc;
 
+		/* get back old page */
+		XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
+		if (rc)
+			return rc;
 		/*
 		 * if leaf root has been split, original root has been
 		 * copied to new child page, i.e., original entry now
 		 * resides on the new child page;
 		 */
-		if (rootsplit) {
+		if (p->header.flag & BT_INTERNAL) {
 			ASSERT(p->header.nextindex ==
 			       cpu_to_le16(XTENTRYSTART + 1));
 			xad = &p->xad[XTENTRYSTART];
 			bn = addressXAD(xad);
+			XT_PUTPAGE(mp);
 
 			/* get new child page */
 			XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
@@ -2218,11 +2216,6 @@ int xtUpdate(tid_t tid, struct inode *ip, xad_t * nxad)
 				xtlck = (struct xtlock *) & tlck->lock;
 			}
 		} else {
-			/* get back old page */
-			XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
-			if (rc)
-				return rc;
-
 			/* is nXAD on new page ? */
 			if (newindex >
 			    (le16_to_cpu(p->header.maxentry) >> 1)) {
@@ -2336,8 +2329,6 @@ int xtUpdate(tid_t tid, struct inode *ip, xad_t * nxad)
 	xlen = xlen - nxlen;
 	xaddr = xaddr + nxlen;
 	if (nextindex == le16_to_cpu(p->header.maxentry)) {
-		rootsplit = p->header.flag & BT_ROOT;
-
 /*
 printf("xtUpdate.updateLeft.split p:0x%p\n", p);
 */
@@ -2352,16 +2343,22 @@ printf("xtUpdate.updateLeft.split p:0x%p\n", p);
 		if ((rc = xtSplitUp(tid, ip, &split, &btstack)))
 			return rc;
 
+		/* get back old page */
+		XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
+		if (rc)
+			return rc;
+
 		/*
 		 * if leaf root has been split, original root has been
 		 * copied to new child page, i.e., original entry now
 		 * resides on the new child page;
 		 */
-		if (rootsplit) {
+		if (p->header.flag & BT_INTERNAL) {
 			ASSERT(p->header.nextindex ==
 			       cpu_to_le16(XTENTRYSTART + 1));
 			xad = &p->xad[XTENTRYSTART];
 			bn = addressXAD(xad);
+			XT_PUTPAGE(mp);
 
 			/* get new child page */
 			XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
@@ -2373,11 +2370,6 @@ printf("xtUpdate.updateLeft.split p:0x%p\n", p);
 				tlck = txLock(tid, ip, mp, tlckXTREE|tlckGROW);
 				xtlck = (struct xtlock *) & tlck->lock;
 			}
-		} else {
-			/* get back old page */
-			XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
-			if (rc)
-				return rc;
 		}
 	} else {
 		/* if insert into middle, shift right remaining entries */
