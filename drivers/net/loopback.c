@@ -128,17 +128,13 @@ static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 	 *	instead are lobbed from tx queue to rx queue 
 	 */
 
-	if(atomic_read(&skb->users) != 1)
-	{
+	if (skb_shared(skb)) {
 	  	struct sk_buff *skb2=skb;
 	  	skb=skb_clone(skb, GFP_ATOMIC);		/* Clone the buffer */
-	  	if(skb==NULL) {
-			kfree_skb(skb2);
+		kfree_skb(skb2);
+	  	if (unlikely(skb==NULL))
 			return 0;
-		}
-	  	kfree_skb(skb2);
-	}
-	else
+	} else
 		skb_orphan(skb);
 
 	skb->protocol=eth_type_trans(skb,dev);
@@ -148,12 +144,8 @@ static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 #endif
 
 	if (skb_shinfo(skb)->tso_size) {
-		struct iphdr *iph = skb->nh.iph;
-
-		if (skb->protocol != htons(ETH_P_IP))
-			BUG();
-		if (iph->protocol != IPPROTO_TCP)
-			BUG();
+		BUG_ON(skb->protocol != htons(ETH_P_IP));
+		BUG_ON(skb->nh.iph->protocol != IPPROTO_TCP);
 
 		emulate_large_send_offload(skb);
 		return 0;
