@@ -1419,12 +1419,15 @@ construct_dentry(struct qstr *qstring, struct file *file,
 		/* BB overwrite the old name? i.e. tmp_dentry->d_name and tmp_dentry->d_name.len ?? */
 		if(*ptmp_inode == NULL) {
 	                *ptmp_inode = new_inode(file->f_dentry->d_sb);
+			if(*ptmp_inode == NULL)
+				return;
 			d_instantiate(tmp_dentry, *ptmp_inode);
 		}
 	} else {
 		tmp_dentry = d_alloc(file->f_dentry, qstring);
 		if(tmp_dentry == NULL) {
 			cERROR(1,("Failed allocating dentry"));
+			*ptmp_inode = NULL;
 			return;
 		}
 			
@@ -1432,6 +1435,8 @@ construct_dentry(struct qstr *qstring, struct file *file,
 		tmp_dentry->d_op = &cifs_dentry_ops;
 		cFYI(0, (" instantiate dentry 0x%p with inode 0x%p ",
 			 tmp_dentry, *ptmp_inode));
+		if(*ptmp_inode == NULL)
+			return;
 		d_instantiate(tmp_dentry, *ptmp_inode);
 		d_rehash(tmp_dentry);
 	}
@@ -1488,7 +1493,9 @@ cifs_filldir(struct qstr *pqstring, FILE_DIRECTORY_INFO * pfindData,
 	pqstring->len = pfindData->FileNameLength;
 
 	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
-
+	if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
+		return -ENOMEM;
+	}
 	fill_in_inode(tmp_inode, pfindData, &object_type);
 	rc = filldir(direntry, pfindData->FileName, pqstring->len, file->f_pos,
 		tmp_inode->i_ino, object_type);
@@ -1514,6 +1521,9 @@ cifs_filldir_unix(struct qstr *pqstring,
 	pqstring->len = strnlen(pUnixFindData->FileName, MAX_PATHCONF);
 
 	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
+        if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
+                return -ENOMEM;
+        }
 
 	unix_fill_in_inode(tmp_inode, pUnixFindData, &object_type);
 	rc = filldir(direntry, pUnixFindData->FileName, pqstring->len,
