@@ -283,20 +283,20 @@ static void path_rec_completion(int status,
 	skb_queue_head_init(&skqueue);
 
 	if (!status) {
-		/*
-		 * For now we set static_rate to 0.  This is not
-		 * really correct: we should look at the rate
-		 * component of the path member record, compare it
-		 * with the rate of our local port (calculated from
-		 * the active link speed and link width) and set an
-		 * inter-packet delay appropriately.
-		 */
 		struct ib_ah_attr av = {
 			.dlid 	       = be16_to_cpu(pathrec->dlid),
 			.sl 	       = pathrec->sl,
-			.static_rate   = 0,
 			.port_num      = priv->port
 		};
+
+		if (ib_sa_rate_enum_to_int(pathrec->rate) > 0)
+			av.static_rate = (2 * priv->local_rate -
+					  ib_sa_rate_enum_to_int(pathrec->rate) - 1) /
+				(priv->local_rate ? priv->local_rate : 1);
+
+		ipoib_dbg(priv, "static_rate %d for local port %dX, path %dX\n",
+			  av.static_rate, priv->local_rate,
+			  ib_sa_rate_enum_to_int(pathrec->rate));
 
 		ah = ipoib_create_ah(dev, priv->pd, &av);
 	}
