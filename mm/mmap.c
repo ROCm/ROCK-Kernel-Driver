@@ -620,7 +620,7 @@ unsigned long get_unmapped_area(struct file *file, unsigned long addr, unsigned 
 {
 	if (flags & MAP_FIXED) {
 		if (addr > TASK_SIZE - len)
-			return -EINVAL;
+			return -ENOMEM;
 		if (addr & ~PAGE_MASK)
 			return -EINVAL;
 		return addr;
