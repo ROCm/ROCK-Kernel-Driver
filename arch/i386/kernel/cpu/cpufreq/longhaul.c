@@ -445,12 +445,8 @@ static int __init longhaul_init (void)
 		return -ENODEV;
 
 	switch (c->x86_model) {
-	case 6 ... 7:
+	case 6 ... 8:
 		return cpufreq_register_driver(&longhaul_driver);
-	case 8:
-		printk (KERN_INFO PFX "Ezra-T unsupported: Waiting on updated docs "
-						"from VIA before this is usable.\n");
-		break;
 	case 9:
 		printk (KERN_INFO PFX "Nehemiah unsupported: Waiting on working silicon "
 						"from VIA before this is usable.\n");
