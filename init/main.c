@@ -542,12 +542,16 @@ static void do_pre_smp_initcalls(void)
 	spawn_ksoftirqd();
 }
 
+static void run_init_process(char *init_filename)
+{
+	argv_init[0] = init_filename;
+	execve(init_filename, argv_init, envp_init);
+}
+
 extern void prepare_namespace(void);
 
 static int init(void * unused)
 {
-	static char * argv_sh[] = { "sh", NULL, };
-
 	lock_kernel();
 	/*
 	 * Tell the world that we're going to be the grim
@@ -592,10 +596,12 @@ static int init(void * unused)
 	 */
 
 	if (execute_command)
-		execve(execute_command,argv_init,envp_init);
-	execve("/sbin/init",argv_init,envp_init);
-	execve("/etc/init",argv_init,envp_init);
-	execve("/bin/init",argv_init,envp_init);
-	execve("/bin/sh",argv_sh,envp_init);
+		run_init_process(execute_command);
+
+	run_init_process("/sbin/init");
+	run_init_process("/etc/init");
+	run_init_process("/bin/init");
+	run_init_process("/bin/sh");
+
 	panic("No init found.  Try passing init= option to kernel.");
 }
