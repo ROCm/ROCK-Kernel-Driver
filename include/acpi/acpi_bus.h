@@ -157,7 +157,8 @@ struct acpi_device_flags {
 	u32			suprise_removal_ok:1;
 	u32			power_manageable:1;
 	u32			performance_manageable:1;
-	u32			reserved:21;
+	u32			wake_capable:1; /* Wakeup(_PRW) supported? */
+	u32			reserved:20;
 };
 
 
@@ -203,10 +204,8 @@ struct acpi_device_power_flags {
 	u32			explicit_get:1;		     /* _PSC present? */
 	u32			power_resources:1;	   /* Power resources */
 	u32			inrush_current:1;	  /* Serialize Dx->D0 */
-	u32			wake_capable:1;		 /* Wakeup supported? */
-	u32			wake_enabled:1;		/* Enabled for wakeup */
 	u32			power_removed:1;	   /* Optimize Dx->D0 */
-	u32			reserved:26;
+	u32			reserved:28;
 };
 
 struct acpi_device_power_state {
@@ -250,6 +249,25 @@ struct acpi_device_perf {
 	struct acpi_device_perf_state *states;
 };
 
+/* Wakeup Management */
+struct acpi_device_wakeup_flags {
+	u8	valid:1; /* Can successfully enable wakeup? */
+	u8	run_wake:1; /* Run-Wake GPE devices */
+};
+
+struct acpi_device_wakeup_state {
+	u8	enabled:1;
+	u8	active:1;
+};
+
+struct acpi_device_wakeup {
+	acpi_handle		gpe_device;
+	acpi_integer		gpe_number;;
+	acpi_integer		sleep_state;
+	struct acpi_handle_list	resources;
+	struct acpi_device_wakeup_state	state;
+	struct acpi_device_wakeup_flags	flags;
+};
 
 /* Device */
 
@@ -258,11 +276,13 @@ struct acpi_device {
 	struct acpi_device	*parent;
 	struct list_head	children;
 	struct list_head	node;
+	struct list_head	wakeup_list;
 	struct list_head	g_list;
 	struct acpi_device_status status;
 	struct acpi_device_flags flags;
 	struct acpi_device_pnp	pnp;
 	struct acpi_device_power power;
+	struct acpi_device_wakeup wakeup;
 	struct acpi_device_perf	performance;
 	struct acpi_device_dir	dir;
 	struct acpi_device_ops	ops;

@@ -81,7 +81,8 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_device *device, int domain, int b
    -------------------------------------------------------------------------- */
 
 #ifdef CONFIG_ACPI_POWER
-
+int acpi_enable_wakeup_device_power (struct acpi_device *dev);
+int acpi_disable_wakeup_device_power (struct acpi_device *dev);
 int acpi_power_get_inferred_state (struct acpi_device *device);
 int acpi_power_transition (struct acpi_device *device, int state);
 #endif
