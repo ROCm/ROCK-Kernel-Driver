@@ -1356,55 +1356,51 @@ static int __init  dgrs_scan(void)
 	uint	irq;
 	uint	plxreg;
 	uint	plxdma;
+	struct pci_dev *pdev = NULL;
 
 	/*
 	 *	First, check for PCI boards
 	 */
-	if (pci_present())
+	while ((pdev = pci_find_device(SE6_PCI_VENDOR_ID, SE6_PCI_DEVICE_ID, pdev)) != NULL)
 	{
-		struct pci_dev *pdev = NULL;
+		/*
+		 * Get and check the bus-master and latency values.
+		 * Some PCI BIOSes fail to set the master-enable bit,
+		 * and the latency timer must be set to the maximum
+		 * value to avoid data corruption that occurs when the
+		 * timer expires during a transfer.  Yes, it's a bug.
+		 */
+		if (pci_enable_device(pdev))
+			continue;
+		pci_set_master(pdev);
 
-		while ((pdev = pci_find_device(SE6_PCI_VENDOR_ID, SE6_PCI_DEVICE_ID, pdev)) != NULL)
-		{
-			/*
-			 * Get and check the bus-master and latency values.
-			 * Some PCI BIOSes fail to set the master-enable bit,
-			 * and the latency timer must be set to the maximum
-			 * value to avoid data corruption that occurs when the
-			 * timer expires during a transfer.  Yes, it's a bug.
-			 */
-			if (pci_enable_device(pdev))
-				continue;
-			pci_set_master(pdev);
+		plxreg = pci_resource_start (pdev, 0);
+		io = pci_resource_start (pdev, 1);
+		mem = pci_resource_start (pdev, 2);
+		pci_read_config_dword(pdev, 0x30, &plxdma);
+		irq = pdev->irq;
+		plxdma &= ~15;
 
-			plxreg = pci_resource_start (pdev, 0);
-			io = pci_resource_start (pdev, 1);
-			mem = pci_resource_start (pdev, 2);
-			pci_read_config_dword(pdev, 0x30, &plxdma);
-			irq = pdev->irq;
-			plxdma &= ~15;
+		/*
+		 * On some BIOSES, the PLX "expansion rom" (used for DMA)
+		 * address comes up as "0".  This is probably because
+		 * the BIOS doesn't see a valid 55 AA ROM signature at
+		 * the "ROM" start and zeroes the address.  To get
+		 * around this problem the SE-6 is configured to ask
+		 * for 4 MB of space for the dual port memory.  We then
+		 * must set its range back to 2 MB, and use the upper
+		 * half for DMA register access
+		 */
+		OUTL(io + PLX_SPACE0_RANGE, 0xFFE00000L);
+		if (plxdma == 0)
+			plxdma = mem + (2048L * 1024L);
+		pci_write_config_dword(pdev, 0x30, plxdma + 1);
+		pci_read_config_dword(pdev, 0x30, &plxdma);
+		plxdma &= ~15;
 
-			/*
-			 * On some BIOSES, the PLX "expansion rom" (used for DMA)
-			 * address comes up as "0".  This is probably because
-			 * the BIOS doesn't see a valid 55 AA ROM signature at
-			 * the "ROM" start and zeroes the address.  To get
-			 * around this problem the SE-6 is configured to ask
-			 * for 4 MB of space for the dual port memory.  We then
-			 * must set its range back to 2 MB, and use the upper
-			 * half for DMA register access
-			 */
-			OUTL(io + PLX_SPACE0_RANGE, 0xFFE00000L);
-			if (plxdma == 0)
-				plxdma = mem + (2048L * 1024L);
-			pci_write_config_dword(pdev, 0x30, plxdma + 1);
-			pci_read_config_dword(pdev, 0x30, &plxdma);
-			plxdma &= ~15;
+		dgrs_found_device(io, mem, irq, plxreg, plxdma);
 
-			dgrs_found_device(io, mem, irq, plxreg, plxdma);
-
-			cards_found++;
-		}
+		cards_found++;
 	}
 
 	/*
