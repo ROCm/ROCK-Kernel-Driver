@@ -121,7 +121,7 @@ static int match(const struct sk_buff *skb,
                  const void *matchinfo,
 		 int offset,
 		 const void *hdr,
-		 u_int16_t datalen,
+		 int datalen,
 		 int *hotdrop)
 {
 	const struct ip6t_policy_info *info = matchinfo;
