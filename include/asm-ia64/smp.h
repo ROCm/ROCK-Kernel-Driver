@@ -128,6 +128,7 @@ hard_smp_processor_id (void)
 extern int __cpu_disable (void);
 extern void __cpu_die (unsigned int cpu);
 extern int __cpu_up (unsigned int cpu);
+extern void __init smp_build_cpu_map(void);
 
 extern void __init init_smp_config (void);
 extern void smp_do_timer (struct pt_regs *regs);

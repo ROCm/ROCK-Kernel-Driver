@@ -350,11 +350,7 @@ start_secondary (void *unused)
 	efi_map_pal_code();
 	cpu_init();
 	smp_callin();
-	Dprintk("CPU %d is set to go.\n", smp_processor_id());
-	while (!atomic_read(&smp_commenced))
-		cpu_relax();
 
-	Dprintk("CPU %d is starting idle.\n", smp_processor_id());
 	return cpu_idle();
 }
 
@@ -368,15 +364,11 @@ fork_by_hand (void)
 	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, 0, 0);
 }
 
-static void __init
-do_boot_cpu (int sapicid)
+static int __init
+do_boot_cpu (int sapicid, int cpu)
 {
 	struct task_struct *idle;
-	int timeout, cpu;
-
-	cpu = ++cpucount;
-
-	set_bit(cpu, &phys_cpu_present_map);
+	int timeout;
 
 	/*
 	 * We can't use kernel_thread since we must avoid to
@@ -391,8 +383,6 @@ do_boot_cpu (int sapicid)
 	 * once we got the process:
 	 */
 	init_idle(idle, cpu);
-
-	ia64_cpu_to_sapicid[cpu] = sapicid;
 
 	unhash_process(idle);
 
@@ -421,8 +411,10 @@ do_boot_cpu (int sapicid)
 	} else {
 		printk(KERN_ERR "Processor 0x%x/0x%x is stuck.\n", cpu, sapicid);
 		ia64_cpu_to_sapicid[cpu] = -1;
-		cpucount--;
+		clear_bit(cpu, &cpu_online_map);  /* was set in smp_callin() */
+		return -EINVAL;
 	}
+	return 0;
 }
 
 unsigned long cache_decay_ticks;	/* # of ticks an idle task is considered cache-hot */
@@ -437,21 +429,42 @@ smp_tune_scheduling (void)
 }
 
 /*
- * Cycle through the APs sending Wakeup IPIs to boot each.
+ * Initialize the logical CPU number to SAPICID mapping
  */
-static void __init
-smp_boot_cpus (unsigned int max_cpus)
+void __init
+smp_build_cpu_map(void)
 {
-	int sapicid, cpu;
+	int sapicid, cpu, i;
 	int boot_cpu_id = hard_smp_processor_id();
-
-	/*
-	 * Initialize the logical to physical CPU number mapping
-	 * and the per-CPU profiling counter/multiplier
-	 */
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++)
 		ia64_cpu_to_sapicid[cpu] = -1;
+
+	ia64_cpu_to_sapicid[0] = boot_cpu_id;
+	phys_cpu_present_map = 1;
+
+	for (cpu = 1, i = 0; i < smp_boot_data.cpu_count; i++) {
+		sapicid = smp_boot_data.cpu_phys_id[i];
+		if (sapicid == -1 || sapicid == boot_cpu_id)
+			continue;
+		phys_cpu_present_map |= (1 << cpu);
+		ia64_cpu_to_sapicid[cpu] = sapicid;
+		cpu++;
+	}
+}
+
+/*
+ * Cycle through the APs sending Wakeup IPIs to boot each.
+ */
+void __init
+smp_prepare_cpus (unsigned int max_cpus)
+{
+	int boot_cpu_id = hard_smp_processor_id();
+
+	/*
+	 * Initialize the per-CPU profiling counter/multiplier
+	 */
+
 	smp_setup_percpu_timer();
 
 	/*
@@ -459,7 +472,6 @@ smp_boot_cpus (unsigned int max_cpus)
 	 */
 	set_bit(0, &cpu_online_map);
 	set_bit(0, &cpu_callin_map);
-	set_bit(0, &phys_cpu_present_map);
 
 	local_cpu_data->loops_per_jiffy = loops_per_jiffy;
 	ia64_cpu_to_sapicid[0] = boot_cpu_id;
@@ -474,78 +486,48 @@ smp_boot_cpus (unsigned int max_cpus)
 	 */
 	if (!max_cpus || (max_cpus < -1)) {
 		printk(KERN_INFO "SMP mode deactivated.\n");
-		cpu_online_map =  1;
-		goto smp_done;
+		cpu_online_map = phys_cpu_present_map = 1;
+		return;
 	}
-	if (max_cpus != -1)
-		printk (KERN_INFO "Limiting CPUs to %d\n", max_cpus);
-
-	if (smp_boot_data.cpu_count > 1) {
-
-		printk(KERN_INFO "SMP: starting up secondaries.\n");
-
-		for (cpu = 0; cpu < smp_boot_data.cpu_count; cpu++) {
-			/*
-			 * Don't even attempt to start the boot CPU!
-			 */
-			sapicid = smp_boot_data.cpu_phys_id[cpu];
-			if ((sapicid == -1) || (sapicid == hard_smp_processor_id()))
-				continue;
-
-			if ((max_cpus > 0) && (cpucount + 1 >= max_cpus))
-				break;
-
-			do_boot_cpu(sapicid);
-
-			/*
-			 * Make sure we unmap all failed CPUs
-			 */
-			if (ia64_cpu_to_sapicid[cpu] == -1)
-				printk("phys CPU#%d not responding - cannot use it.\n", cpu);
-		}
-
-		/*
-		 * Allow the user to impress friends.
-		 */
-
-		printk("Before bogomips.\n");
-		if (!cpucount) {
-			printk(KERN_WARNING "Warning: only one processor found.\n");
-		} else {
-			unsigned long bogosum = 0;
-  			for (cpu = 0; cpu < NR_CPUS; cpu++)
-				if (cpu_online_map & (1UL << cpu))
-					bogosum += cpu_data(cpu)->loops_per_jiffy;
-
-			printk(KERN_INFO"Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
-			       cpucount + 1, bogosum/(500000/HZ), (bogosum/(5000/HZ))%100);
-		}
-	}
-  smp_done:
-	;
 }
 
-void __init
-smp_prepare_cpus (unsigned int max_cpus)
+void
+smp_cpus_done(unsigned int dummy)
 {
- 	smp_boot_cpus(max_cpus);
+	int cpu;
+	unsigned long bogosum = 0;
+
+	/*
+	 * Allow the user to impress friends.
+	 */
+
+	for (cpu = 0; cpu < NR_CPUS; cpu++)
+		if (cpu_online(cpu))
+			bogosum += cpu_data(cpu)->loops_per_jiffy;
+
+	printk(KERN_INFO"Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
+	       num_online_cpus(), bogosum/(500000/HZ), (bogosum/(5000/HZ))%100);
 }
 
 int __devinit
 __cpu_up (unsigned int cpu)
 {
-	/*
-	 * Yeah, that's cheesy, but it will do until there is real hotplug support and in
-	 * the meantime, this gives time for the interface changes to settle down...
-	 */
-	smp_commence();
-	return 0;
-}
+	int ret;
+	int sapicid;
 
-void __init
-smp_cpus_done (unsigned int max_cpus)
-{
-	/* nuthing... */
+	sapicid = ia64_cpu_to_sapicid[cpu];
+	if (sapicid == -1)
+		return -EINVAL;
+
+	printk(KERN_INFO "Processor %d/%d is spinning up...\n", sapicid, cpu);
+
+	/* Processor goes to start_secondary(), sets online flag */
+	ret = do_boot_cpu(sapicid, cpu);
+	if (ret < 0)
+		return ret;
+
+	printk(KERN_INFO "Processor %d has spun up...\n", cpu);
+	return 0;
 }
 
 /*

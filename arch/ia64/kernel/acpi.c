@@ -603,6 +603,8 @@ acpi_boot_init (char *cmdline)
 		available_cpus = 1; /* We've got at least one of these, no? */
 	}
 	smp_boot_data.cpu_count = total_cpus;
+
+	smp_build_cpu_map();
 #endif
 	/* Make boot-up look pretty */
 	printk("%d CPUs available, %d CPUs total\n", available_cpus, total_cpus);
