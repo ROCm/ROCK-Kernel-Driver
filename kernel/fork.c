@@ -24,6 +24,7 @@
 #include <linux/mempolicy.h>
 #include <linux/sem.h>
 #include <linux/file.h>
+#include <linux/key.h>
 #include <linux/binfmts.h>
 #include <linux/mman.h>
 #include <linux/fs.h>
@@ -1019,6 +1020,10 @@ static task_t *copy_process(unsigned long clone_flags,
  	}
 #endif
 
+	p->tgid = p->pid;
+	if (clone_flags & CLONE_THREAD)
+		p->tgid = current->tgid;
+
 	if ((retval = security_task_alloc(p)))
 		goto bad_fork_cleanup_policy;
 	if ((retval = audit_alloc(p)))
@@ -1036,8 +1041,10 @@ static task_t *copy_process(unsigned long clone_flags,
 		goto bad_fork_cleanup_sighand;
 	if ((retval = copy_mm(clone_flags, p)))
 		goto bad_fork_cleanup_signal;
-	if ((retval = copy_namespace(clone_flags, p)))
+	if ((retval = copy_keys(clone_flags, p)))
 		goto bad_fork_cleanup_mm;
+	if ((retval = copy_namespace(clone_flags, p)))
+		goto bad_fork_cleanup_keys;
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
 		goto bad_fork_cleanup_namespace;
@@ -1071,7 +1078,6 @@ static task_t *copy_process(unsigned long clone_flags,
 	 * Ok, make it visible to the rest of the system.
 	 * We dont wake it up yet.
 	 */
-	p->tgid = p->pid;
 	p->group_leader = p;
 	INIT_LIST_HEAD(&p->ptrace_children);
 	INIT_LIST_HEAD(&p->ptrace_list);
@@ -1119,7 +1125,6 @@ static task_t *copy_process(unsigned long clone_flags,
 			retval = -EAGAIN;
 			goto bad_fork_cleanup_namespace;
 		}
-		p->tgid = current->tgid;
 		p->group_leader = current->group_leader;
 
 		if (current->signal->group_stop_count > 0) {
@@ -1159,6 +1164,8 @@ fork_out:
 
 bad_fork_cleanup_namespace:
 	exit_namespace(p);
+bad_fork_cleanup_keys:
+	exit_keys(p);
 bad_fork_cleanup_mm:
 	if (p->mm)
 		mmput(p->mm);

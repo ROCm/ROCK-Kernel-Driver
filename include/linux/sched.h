@@ -358,6 +358,11 @@ struct user_struct {
 	unsigned long mq_bytes;	/* How many bytes can be allocated to mqueue? */
 	unsigned long locked_shm; /* How many pages of mlocked shm ? */
 
+#ifdef CONFIG_KEYS
+	struct key *uid_keyring;	/* UID specific keyring */
+	struct key *session_keyring;	/* UID's default session keyring */
+#endif
+
 	/* Hash table maintenance information */
 	struct list_head uidhash_list;
 	uid_t uid;
@@ -611,6 +616,11 @@ struct task_struct {
 	kernel_cap_t   cap_effective, cap_inheritable, cap_permitted;
 	unsigned keep_capabilities:1;
 	struct user_struct *user;
+#ifdef CONFIG_KEYS
+	struct key *session_keyring;	/* keyring inherited over fork */
+	struct key *process_keyring;	/* keyring private to this process (CLONE_THREAD) */
+	struct key *thread_keyring;	/* keyring private to this thread */
+#endif
 	unsigned short used_math;
 	char comm[16];
 /* file system info */
@@ -644,7 +654,7 @@ struct task_struct {
 /* Thread group tracking */
    	u32 parent_exec_id;
    	u32 self_exec_id;
-/* Protection of (de-)allocation: mm, files, fs, tty */
+/* Protection of (de-)allocation: mm, files, fs, tty, keyrings */
 	spinlock_t alloc_lock;
 /* Protection of proc_dentry: nesting proc_lock, dcache_lock, write_lock_irq(&tasklist_lock); */
 	spinlock_t proc_lock;
@@ -977,8 +987,8 @@ static inline int thread_group_empty(task_t *p)
 extern void unhash_process(struct task_struct *p);
 
 /*
- * Protects ->fs, ->files, ->mm, ->ptrace, ->group_info, ->comm and
- * synchronises with wait4().
+ * Protects ->fs, ->files, ->mm, ->ptrace, ->group_info, ->comm, keyring
+ * subscriptions and synchronises with wait4().  Also used in procfs.
  *
  * Nests both inside and outside of read_lock(&tasklist_lock).
  * It must not be nested with write_lock_irq(&tasklist_lock),
