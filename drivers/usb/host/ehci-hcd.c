@@ -41,6 +41,7 @@
 #include <linux/reboot.h>
 #include <linux/usb.h>
 #include <linux/moduleparam.h>
+#include <linux/dma-mapping.h>
 
 #include "../core/hcd.h"
 
