@@ -227,6 +227,8 @@ static void hvc_poll(int index)
 	spin_unlock_irqrestore(&hp->lock, flags);
 }
 
+extern unsigned long cpus_in_xmon;
+
 int khvcd(void *unused)
 {
 	int i;
@@ -237,8 +239,10 @@ int khvcd(void *unused)
 	sigfillset(&current->blocked);
 
 	for (;;) {
-		for (i = 0; i < MAX_NR_HVC_CONSOLES; ++i)
-			hvc_poll(i);
+		if (!cpus_in_xmon) {
+			for (i = 0; i < MAX_NR_HVC_CONSOLES; ++i)
+				hvc_poll(i);
+		}
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(TIMEOUT);
 	}

@@ -33,7 +33,7 @@
 #define skipbl	xmon_skipbl
 
 #ifdef CONFIG_SMP
-static unsigned long cpus_in_xmon = 0;
+unsigned long cpus_in_xmon = 0;
 static unsigned long got_xmon = 0;
 static volatile int take_xmon = -1;
 #endif /* CONFIG_SMP */
