@@ -509,7 +509,7 @@ static int do_write_oneword(struct map_info *map, struct flchip *chip, unsigned 
 	chip->state = FL_WRITING;
 
 	adr += chip->start;
-	DEBUG( MTD_DEBUG_LEVEL3, "MTD %s(): WRITE 0x%.8lx(0x%.8x)\n",
+	DEBUG( MTD_DEBUG_LEVEL3, "MTD %s(): WRITE 0x%.8lx(0x%.8llx)\n",
 	       __func__, adr, datum );
 
 	ENABLE_VPP(map);
@@ -645,7 +645,7 @@ static int do_write_oneword(struct map_info *map, struct flchip *chip, unsigned 
 	       __func__ );
 
 	printk(KERN_WARNING
-	       "MTD %s(): 0x%.8lx(0x%.8x): 0x%.8x 0x%.8x 0x%.8x 0x%.8x\n",
+	       "MTD %s(): 0x%.8lx(0x%.8llx): 0x%.8x 0x%.8x 0x%.8x 0x%.8x\n",
 	       __func__, adr, datum,
 	       prev_oldstatus, prev_status,
 	       oldstatus, status);
@@ -971,7 +971,7 @@ static inline int do_erase_chip(struct map_info *map, struct flchip *chip)
 	       __func__ );
 
 	printk(KERN_WARNING
-	       "MTD %s(): 0x%.8lx(0x%.8x): 0x%.8x 0x%.8x 0x%.8x 0x%.8x\n",
+	       "MTD %s(): 0x%.8lx(0x%.8llx): 0x%.8x 0x%.8x 0x%.8x 0x%.8x\n",
 	       __func__, adr, ones,
 	       prev_oldstatus, prev_status,
 	       oldstatus, status);
@@ -1151,7 +1151,7 @@ static inline int do_erase_oneblock(struct map_info *map, struct flchip *chip, u
 	       __func__ );
 
 	printk(KERN_WARNING
-	       "MTD %s(): 0x%.8lx(0x%.8x): 0x%.8x 0x%.8x 0x%.8x 0x%.8x\n",
+	       "MTD %s(): 0x%.8lx(0x%.8llx): 0x%.8x 0x%.8x 0x%.8x 0x%.8x\n",
 	       __func__, adr, ones,
 	       prev_oldstatus, prev_status,
 	       oldstatus, status);

@@ -116,7 +116,7 @@ static int mtd_close(struct inode *inode, struct file *file)
 */
 #define MAX_KMALLOC_SIZE 0x20000
 
-static ssize_t mtd_read(struct file *file, char *buf, size_t count,loff_t *ppos)
+static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t *ppos)
 {
 	struct mtd_info *mtd = (struct mtd_info *)file->private_data;
 	size_t retlen=0;
@@ -169,7 +169,7 @@ static ssize_t mtd_read(struct file *file, char *buf, size_t count,loff_t *ppos)
 	return total_retlen;
 } /* mtd_read */
 
-static ssize_t mtd_write(struct file *file, const char *buf, size_t count,loff_t *ppos)
+static ssize_t mtd_write(struct file *file, const char __user *buf, size_t count,loff_t *ppos)
 {
 	struct mtd_info *mtd = (struct mtd_info *)file->private_data;
 	char *kbuf;
@@ -238,6 +238,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		     u_int cmd, u_long arg)
 {
 	struct mtd_info *mtd = (struct mtd_info *)file->private_data;
+	void __user *argp = (void __user *)arg;
 	int ret = 0;
 	u_long size;
 	
@@ -245,17 +246,17 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 
 	size = (cmd & IOCSIZE_MASK) >> IOCSIZE_SHIFT;
 	if (cmd & IOC_IN) {
-		ret = verify_area(VERIFY_READ, (char *)arg, size);
+		ret = verify_area(VERIFY_READ, argp, size);
 		if (ret) return ret;
 	}
 	if (cmd & IOC_OUT) {
-		ret = verify_area(VERIFY_WRITE, (char *)arg, size);
+		ret = verify_area(VERIFY_WRITE, argp, size);
 		if (ret) return ret;
 	}
 	
 	switch (cmd) {
 	case MEMGETREGIONCOUNT:
-		if (copy_to_user((int *) arg, &(mtd->numeraseregions), sizeof(int)))
+		if (copy_to_user(argp, &(mtd->numeraseregions), sizeof(int)))
 			return -EFAULT;
 		break;
 
@@ -263,24 +264,19 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 	{
 		struct region_info_user ur;
 
-		if (copy_from_user(	&ur, 
-					(struct region_info_user *)arg, 
-					sizeof(struct region_info_user))) {
+		if (copy_from_user(&ur, argp, sizeof(struct region_info_user)))
 			return -EFAULT;
-		}
 
 		if (ur.regionindex >= mtd->numeraseregions)
 			return -EINVAL;
-		if (copy_to_user((struct mtd_erase_region_info *) arg, 
-				&(mtd->eraseregions[ur.regionindex]),
+		if (copy_to_user(argp, &(mtd->eraseregions[ur.regionindex]),
 				sizeof(struct mtd_erase_region_info)))
 			return -EFAULT;
 		break;
 	}
 
 	case MEMGETINFO:
-		if (copy_to_user((struct mtd_info *)arg, mtd,
-				 sizeof(struct mtd_info_user)))
+		if (copy_to_user(argp, mtd, sizeof(struct mtd_info_user)))
 			return -EFAULT;
 		break;
 
@@ -301,7 +297,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 			init_waitqueue_head(&waitq);
 
 			memset (erase,0,sizeof(struct erase_info));
-			if (copy_from_user(&erase->addr, (u_long *)arg,
+			if (copy_from_user(&erase->addr, argp,
 					   2 * sizeof(u_long))) {
 				kfree(erase);
 				return -EFAULT;
@@ -345,7 +341,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		if(!(file->f_mode & 2))
 			return -EPERM;
 
-		if (copy_from_user(&buf, (struct mtd_oob_buf *)arg, sizeof(struct mtd_oob_buf)))
+		if (copy_from_user(&buf, argp, sizeof(struct mtd_oob_buf)))
 			return -EFAULT;
 		
 		if (buf.length > 0x4096)
@@ -354,7 +350,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		if (!mtd->write_oob)
 			ret = -EOPNOTSUPP;
 		else
-			ret = verify_area(VERIFY_READ, (char *)buf.ptr, buf.length);
+			ret = verify_area(VERIFY_READ, buf.ptr, buf.length);
 
 		if (ret)
 			return ret;
@@ -370,7 +366,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 
 		ret = (mtd->write_oob)(mtd, buf.start, buf.length, &retlen, databuf);
 
-		if (copy_to_user((void *)arg + sizeof(u_int32_t), &retlen, sizeof(u_int32_t)))
+		if (copy_to_user(argp + sizeof(u_int32_t), &retlen, sizeof(u_int32_t)))
 			ret = -EFAULT;
 
 		kfree(databuf);
@@ -384,7 +380,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		void *databuf;
 		ssize_t retlen;
 
-		if (copy_from_user(&buf, (struct mtd_oob_buf *)arg, sizeof(struct mtd_oob_buf)))
+		if (copy_from_user(&buf, argp, sizeof(struct mtd_oob_buf)))
 			return -EFAULT;
 		
 		if (buf.length > 0x4096)
@@ -393,7 +389,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		if (!mtd->read_oob)
 			ret = -EOPNOTSUPP;
 		else
-			ret = verify_area(VERIFY_WRITE, (char *)buf.ptr, buf.length);
+			ret = verify_area(VERIFY_WRITE, buf.ptr, buf.length);
 
 		if (ret)
 			return ret;
@@ -404,7 +400,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		
 		ret = (mtd->read_oob)(mtd, buf.start, buf.length, &retlen, databuf);
 
-		if (copy_to_user((void *)arg + sizeof(u_int32_t), &retlen, sizeof(u_int32_t)))
+		if (copy_to_user(argp + sizeof(u_int32_t), &retlen, sizeof(u_int32_t)))
 			ret = -EFAULT;
 		else if (retlen && copy_to_user(buf.ptr, databuf, retlen))
 			ret = -EFAULT;
@@ -417,7 +413,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 	{
 		unsigned long adrs[2];
 
-		if (copy_from_user(adrs ,(void *)arg, 2* sizeof(unsigned long)))
+		if (copy_from_user(adrs, argp, 2* sizeof(unsigned long)))
 			return -EFAULT;
 
 		if (!mtd->lock)
@@ -431,7 +427,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 	{
 		unsigned long adrs[2];
 
-		if (copy_from_user(adrs, (void *)arg, 2* sizeof(unsigned long)))
+		if (copy_from_user(adrs, argp, 2* sizeof(unsigned long)))
 			return -EFAULT;
 
 		if (!mtd->unlock)
@@ -443,7 +439,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 
 	case MEMSETOOBSEL:
 	{
-		if (copy_from_user(&mtd->oobinfo ,(void *)arg, sizeof(struct nand_oobinfo)))
+		if (copy_from_user(&mtd->oobinfo, argp, sizeof(struct nand_oobinfo)))
 			return -EFAULT;
 		break;
 	}

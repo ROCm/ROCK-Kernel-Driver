@@ -22,7 +22,7 @@ struct erase_info_user {
 struct mtd_oob_buf {
 	u_int32_t start;
 	u_int32_t length;
-	unsigned char *ptr;
+	unsigned char __user *ptr;
 };
 
 #define MTD_CHAR_MAJOR 90
