@@ -1131,7 +1131,7 @@ static void set_license(struct module *mod, const char *license)
 		license = "unspecified";
 
 	mod->license_gplok = license_is_gpl_compatible(license);
-	if (!mod->license_gplok) {
+	if (!mod->license_gplok && !(tainted & TAINT_PROPRIETARY_MODULE)) {
 		printk(KERN_WARNING "%s: module license '%s' taints kernel.\n",
 		       mod->name, license);
 		tainted |= TAINT_PROPRIETARY_MODULE;
