@@ -1,24 +1,11 @@
-comment "Supported Frontend Modules"
-	depends on DVB
-
-config DVB_TWINHAN_DST
-	tristate "TWINHAN DST based DVB-S frontend (QPSK)"
-	depends on DVB_CORE && DVB_BT8XX
-	help
-	  Used in such cards as the VP-1020/1030, Twinhan DST,
-	  VVmer TV@SAT. Say Y when you want to support frontends 
-	  using this asic.
-
-	  This module requires the dvb-bt8xx driver and dvb bt878
-	  module.
+comment "DVB-S (satellite) frontends"
+	depends on DVB_CORE
 
 config DVB_STV0299
-	tristate "STV0299 based DVB-S frontend (QPSK)"
+	tristate "ST STV0299 based"
 	depends on DVB_CORE
 	help
-	  The stv0299 by ST is used in many DVB-S tuner modules, 
-	  say Y when you want to support frontends based on this 
-	  DVB-S demodulator.
+	  A DVB-S tuner module. Say Y when you want to support this frontend.
 
 	  Some examples are the Alps BSRU6, the Philips SU1278 and
 	  the LG TDQB-S00x.
@@ -27,157 +14,123 @@ config DVB_STV0299
 	  DVB adapter simply enable all supported frontends, the 
 	  right one will get autodetected.
 
-config DVB_SP887X
- 	tristate "Frontends with sp887x demodulators, e.g. Microtune DTF7072"
+config DVB_CX24110
+	tristate "Connexant CX24110 based"
  	depends on DVB_CORE
  	help
- 	  A DVB-T demodulator driver. Say Y when you want to support the sp887x.
+	  A DVB-S tuner module. Say Y when you want to support this frontend.
  
  	  If you don't know what tuner module is soldered on your
  	  DVB adapter simply enable all supported frontends, the
  	  right one will get autodetected.
 
-
-config DVB_SP887X_FIRMWARE_FILE
-        string "Full pathname of sp887x firmware file"
-        depends on DVB_SP887X
-        default "/usr/lib/hotplug/firmware/sc_main.mc"
-        help
-          This driver needs a copy of the Avermedia firmware. The version tested
-	  is part of the Avermedia DVB-T 1.3.26.3 Application. This can be downloaded
-	  from the Avermedia web site.
-	  If the software is installed in Windows the file will be in the
-	  /Program Files/AVerTV DVB-T/ directory and is called sc_main.mc.
-	  Alternatively it can "extracted" from the install cab files but this will have
-	  to be done in windows as I don't know of a linux version of extract.exe.
-	  Copy this file to /usr/lib/hotplug/firmware/sc_main.mc.
-	  With this version of the file the first 10 bytes are discarded and the next
-	  0x4000 loaded. This may change in future versions.
-
-config DVB_ALPS_TDLB7
-	tristate "Alps TDLB7 (OFDM)"
+config DVB_GRUNDIG_29504_491
+	tristate "Grundig 29504-491 based"
 	depends on DVB_CORE
 	help
-	  A DVB-T tuner module. Say Y when you want to support this frontend.
-
-	  This tuner module needs some microcode located in a file called
-	  "Sc_main.mc" in the windows driver. Please pass the module parameter
-	  mcfile="/PATH/FILENAME" when loading alps_tdlb7.o.
+	  A DVB-S tuner module. Say Y when you want to support this frontend.
 
 	  If you don't know what tuner module is soldered on your
 	  DVB adapter simply enable all supported frontends, the
 	  right one will get autodetected.
 
-
-config DVB_ALPS_TDMB7
-	tristate "Alps TDMB7 (OFDM)"
+config DVB_MT312
+	tristate "Zarlink MT312 based"
 	depends on DVB_CORE
 	help
-	  A DVB-T tuner module. Say Y when you want to support this frontend.
+	  A DVB-S tuner module. Say Y when you want to support this frontend.
 
 	  If you don't know what tuner module is soldered on your
 	  DVB adapter simply enable all supported frontends, the
 	  right one will get autodetected.
 
-config DVB_ATMEL_AT76C651
-	tristate "Atmel AT76C651 (QAM)"
+config DVB_VES1X93
+	tristate "VLSI VES1893 or VES1993 based"
 	depends on DVB_CORE
 	help
-	  The AT76C651 Demodulator is used in some DVB-C SetTopBoxes. Say Y
-	  when you see this demodulator chip near your tuner module.
+	  A DVB-S tuner module. Say Y when you want to support this frontend.
 
 	  If you don't know what tuner module is soldered on your
 	  DVB adapter simply enable all supported frontends, the
 	  right one will get autodetected.
 
-config DVB_CX24110
-	tristate "Frontends with Connexant CX24110 demodulator (QPSK)"
+comment "DVB-T (terrestrial) frontends"
+	depends on DVB_CORE
+
+config DVB_SP887X
+ 	tristate "Microtune sp887x based (i.e. Microtune DTF7072)"
 	depends on DVB_CORE
 	help
-	  The CX24110 Demodulator is used in some DVB-S frontends. 
-	  Say Y if you want support for this chip in your kernel.
+ 	  A DVB-T tuner module. Say Y when you want to support this frontend.
+
+	  This driver needs a copy of the Avermedia firmware. The version tested
+	  is part of the Avermedia DVB-T 1.3.26.3 Application. If the software is
+	  installed in Windoze the file will be in the /Program Files/AVerTV DVB-T/
+	  directory and is called sc_main.mc. Alternatively it can "extracted" from
+	  the install cab files.
+
+   	  Copy this file to '/usr/lib/hotplug/firmware/dvb-fe-sp887x.fw'.
 
 	  If you don't know what tuner module is soldered on your 
 	  DVB adapter simply enable all supported frontends, the 
 	  right one will get autodetected.
 
-config DVB_GRUNDIG_29504_491
-	tristate "Grundig 29504-491 (QPSK)"
+config DVB_ALPS_TDLB7
+	tristate "Alps TDLB7 based"
 	depends on DVB_CORE
 	help
-	  A DVB-S tuner module. Say Y when you want to support this frontend.
+	  A DVB-T tuner module. Say Y when you want to support this frontend.
+
+	  This driver needs a copy of the firmware file from the Haupauge
+	  Windoze driver. Copy 'Sc_main.mc' to
+	  '/usr/lib/hotplug/firmware/dvb-fe-tdlb7.fw'.
+
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
+	  right one will get autodetected.
+
+config DVB_ALPS_TDMB7
+	tristate "Alps TDMB7 based"
+	depends on DVB_CORE
+	help
+	  A DVB-T tuner module. Say Y when you want to support this frontend.
 
 	  If you don't know what tuner module is soldered on your 
 	  DVB adapter simply enable all supported frontends, the 
 	  right one will get autodetected.
 
 config DVB_GRUNDIG_29504_401
-	tristate "Grundig 29504-401 (OFDM)"
+	tristate "Grundig 29504-401 based"
 	depends on DVB_CORE
 	help
 	  A DVB-T tuner module. Say Y when you want to support this frontend.
-
-	  If you don't know what tuner module is soldered on your 
-	  DVB adapter simply enable all supported frontends, the 
-	  right one will get autodetected.
-
-config DVB_MT312
-	tristate "Zarlink MT312 Satellite Channel Decoder (QPSK)"
-	depends on DVB_CORE
-	help
-	  A DVB-S tuner module. Say Y when you want to support this frontend.
-
-	  If you don't know what tuner module is soldered on your 
-	  DVB adapter simply enable all supported frontends, the 
-	  right one will get autodetected.
-
-config DVB_VES1820
-	tristate "Frontends with external VES1820 demodulator (QAM)"
-	depends on DVB_CORE
-	help
-	  The VES1820 Demodulator is used on many DVB-C PCI cards and in some
-	  DVB-C SetTopBoxes. Say Y when you see this demodulator chip near your
-	  tuner module.
-
-	  If you don't know what tuner module is soldered on your 
-	  DVB adapter simply enable all supported frontends, the 
-	  right one will get autodetected.
-
-config DVB_VES1X93
-	tristate "Frontends with VES1893 or VES1993 demodulator (QPSK)"
-	depends on DVB_CORE
-	help
-	  A DVB-S tuner module. Say Y when you want to support this frontend.
 
 	  If you don't know what tuner module is soldered on your 
 	  DVB adapter simply enable all supported frontends, the 
 	  right one will get autodetected.
 
 config DVB_TDA1004X
-	tristate "Frontends with external TDA10045H or TDA10046H demodulators (OFDM)"
+	tristate "Philips TDA10045H/TDA10046H based"
 	depends on DVB_CORE
 	help
 	  A DVB-T tuner module. Say Y when you want to support this frontend.
 
-	  If you don't know what tuner module is soldered on your
-	  DVB adapter simply enable all supported frontends, the
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
 	  right one will get autodetected.
-
-config DVB_TDA1004X_FIRMWARE_FILE
-        string "Full pathname of tda1004x.bin firmware file"
-        depends on DVB_TDA1004X
-        default "/usr/lib/hotplug/firmware/tda1004x.bin"
-        help
-          The TDA1004X requires additional firmware in order to function.
-          The firmware file can obtained as follows:
-            wget http://www.technotrend.de/new/215/TTweb_215a_budget_20_05_2003.zip
-            unzip -j TTweb_215a_budget_20_05_2003.zip Software/Oem/PCI/App/ttlcdacc.dll
-            mv ttlcdacc.dll /usr/lib/hotplug/firmware/tda1004x.bin
-	  Note: even if you're using a USB device, you MUST get the file from the
-	  TechnoTrend PCI drivers.
 
 config DVB_NXT6000
-	tristate "Frontends with NxtWave Communications NXT6000 demodulator (OFDM)"
+	tristate "NxtWave Communications NXT6000 based"
+	depends on DVB_CORE
+	help
+	  A DVB-T tuner module. Say Y when you want to support this frontend.
+
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
+	  right one will get autodetected.
+
+config DVB_MT352
+	tristate "Zarlink MT352 based"
 	depends on DVB_CORE
 	help
 	  A DVB-T tuner module. Say Y when you want to support this frontend.
@@ -185,3 +138,37 @@ config DVB_NXT6000
 	  If you don't know what tuner module is soldered on your
 	  DVB adapter simply enable all supported frontends, the
 	  right one will get autodetected.
+
+comment "DVB-C (cable) frontends"
+	depends on DVB_CORE
+
+config DVB_ATMEL_AT76C651
+	tristate "Atmel AT76C651 based"
+	depends on DVB_CORE
+        help
+ 	  A DVB-C tuner module. Say Y when you want to support this frontend.
+
+	  If you don't know what tuner module is soldered on your
+	  DVB adapter simply enable all supported frontends, the
+	  right one will get autodetected.
+
+config DVB_VES1820
+	tristate "VLSI VES1820 based"
+	depends on DVB_CORE
+	help
+ 	  A DVB-C tuner module. Say Y when you want to support this frontend.
+
+	  If you don't know what tuner module is soldered on your
+	  DVB adapter simply enable all supported frontends, the
+	  right one will get autodetected.
+
+comment "Misc. Frontend Modules"
+	depends on DVB_CORE
+
+config DVB_TWINHAN_DST
+	tristate "Twinhan DST based DVB-S/-T frontend"
+	depends on DVB_CORE && DVB_BT8XX
+	help
+	  Used in such cards as the VP-1020/1030, Twinhan DST,
+	  VVmer TV@SAT. Say Y when you want to support frontends
+	  using this asic.
