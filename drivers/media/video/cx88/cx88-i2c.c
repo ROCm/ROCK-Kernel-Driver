@@ -134,7 +134,7 @@ static struct i2c_algo_bit_data cx8800_i2c_algo_template = {
 static struct i2c_adapter cx8800_i2c_adap_template = {
 	I2C_DEVNAME("cx2388x"),
 	.owner             = THIS_MODULE,
-	.id                = I2C_HW_B_BT848,
+	.id                = I2C_HW_B_CX2388x,
 	.client_register   = attach_inform,
 	.client_unregister = detach_inform,
 };
