@@ -633,7 +633,7 @@ static int hci_sock_dev_event(struct notifier_block *this, unsigned long event, 
 
 struct net_proto_family hci_sock_family_ops = {
 	.family = PF_BLUETOOTH,
-	.create = hci_sock_create
+	.create = hci_sock_create,
 };
 
 struct notifier_block hci_sock_nblock = {

@@ -535,8 +535,8 @@ struct proto_ops inet6_dgram_ops = {
 };
 
 struct net_proto_family inet6_family_ops = {
-	.family =PF_INET6,
-	.create =inet6_create,
+	.family = PF_INET6,
+	.create = inet6_create,
 };
 
 #ifdef MODULE
@@ -556,13 +556,13 @@ extern void ipv6_sysctl_unregister(void);
 #endif
 
 static struct inet_protosw rawv6_protosw = {
-	.type =      SOCK_RAW,
-	.protocol =  IPPROTO_IP,	/* wild card */
-	.prot =      &rawv6_prot,
-	.ops =       &inet6_dgram_ops,
-	.capability =CAP_NET_RAW,
-	.no_check =  UDP_CSUM_DEFAULT,
-	.flags =     INET_PROTOSW_REUSE,
+	.type		= SOCK_RAW,
+	.protocol	= IPPROTO_IP,	/* wild card */
+	.prot		= &rawv6_prot,
+	.ops		= &inet6_dgram_ops,
+	.capability	= CAP_NET_RAW,
+	.no_check	= UDP_CSUM_DEFAULT,
+	.flags		= INET_PROTOSW_REUSE,
 };
 
 #define INETSW6_ARRAY_LEN (sizeof(inetsw6_array) / sizeof(struct inet_protosw))
