@@ -746,10 +746,6 @@ extern void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change);
 
 extern struct semaphore rtnl_sem;
 
-#define rtnl_exlock()		do { } while(0)
-#define rtnl_exunlock()		do { } while(0)
-#define rtnl_exlock_nowait()	(0)
-
 #define rtnl_shlock()		down(&rtnl_sem)
 #define rtnl_shlock_nowait()	down_trylock(&rtnl_sem)
 

@@ -3041,7 +3041,6 @@ static void netdev_wait_allrefs(struct net_device *dev)
 	while (atomic_read(&dev->refcnt) != 0) {
 		if (time_after(jiffies, rebroadcast_time + 1 * HZ)) {
 			rtnl_shlock();
-			rtnl_exlock();
 
 			/* Rebroadcast unregister notification */
 			notifier_call_chain(&netdev_chain,
@@ -3058,7 +3057,6 @@ static void netdev_wait_allrefs(struct net_device *dev)
 				linkwatch_run_queue();
 			}
 
-			rtnl_exunlock();
 			rtnl_shunlock();
 
 			rebroadcast_time = jiffies;

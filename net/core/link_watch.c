@@ -93,9 +93,7 @@ static void linkwatch_event(void *dummy)
 	clear_bit(LW_RUNNING, &linkwatch_flags);
 
 	rtnl_shlock();
-	rtnl_exlock();
 	linkwatch_run_queue();
-	rtnl_exunlock();
 	rtnl_shunlock();
 }
 
