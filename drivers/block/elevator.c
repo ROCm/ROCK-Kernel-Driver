@@ -303,8 +303,14 @@ static inline struct request *__elv_next_request(request_queue_t *q)
 struct request *elv_next_request(request_queue_t *q)
 {
 	struct request *rq;
+	int ret;
 
 	while ((rq = __elv_next_request(q))) {
+		/*
+		 * just mark as started even if we don't start it, a request
+		 * that has been delayed should not be passed by new incoming
+		 * requests
+		 */
 		rq->flags |= REQ_STARTED;
 
 		if (&rq->queuelist == q->last_merge)
@@ -313,20 +319,22 @@ struct request *elv_next_request(request_queue_t *q)
 		if ((rq->flags & REQ_DONTPREP) || !q->prep_rq_fn)
 			break;
 
-		/*
-		 * all ok, break and return it
-		 */
-		if (!q->prep_rq_fn(q, rq))
+		ret = q->prep_rq_fn(q, rq);
+		if (ret == BLKPREP_OK) {
 			break;
-
-		/*
-		 * prep said no-go, kill it
-		 */
-		blkdev_dequeue_request(rq);
-		if (end_that_request_first(rq, 0, rq->nr_sectors))
-			BUG();
-
-		end_that_request_last(rq);
+		} else if (ret == BLKPREP_DEFER) {
+			rq = NULL;
+			break;
+		} else if (ret == BLKPREP_KILL) {
+			blkdev_dequeue_request(rq);
+			rq->flags |= REQ_QUIET;
+			while (end_that_request_first(rq, 0, rq->nr_sectors))
+				;
+			end_that_request_last(rq);
+		} else {
+			printk("%s: bad return=%d\n", __FUNCTION__, ret);
+			break;
+		}
 	}
 
 	return rq;

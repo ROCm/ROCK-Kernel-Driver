@@ -254,6 +254,13 @@ struct request_queue
  */
 #define blk_queue_headactive(q, head_active)
 
+/*
+ * q->prep_rq_fn return values
+ */
+#define BLKPREP_OK		0	/* serve it */
+#define BLKPREP_KILL		1	/* fatal error, kill */
+#define BLKPREP_DEFER		2	/* leave on queue */
+
 extern unsigned long blk_max_low_pfn, blk_max_pfn;
 
 /*
