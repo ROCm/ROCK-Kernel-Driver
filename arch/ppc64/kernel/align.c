@@ -1,12 +1,12 @@
-/*
- * align.c - handle alignment exceptions for the Power PC.
+/* align.c - handle alignment exceptions for the Power PC.
  *
  * Copyright (c) 1996 Paul Mackerras <paulus@cs.anu.edu.au>
  * Copyright (c) 1998-1999 TiVo, Inc.
  *   PowerPC 403GCX modifications.
  * Copyright (c) 1999 Grant Erickson <grant@lcse.umn.edu>
  *   PowerPC 403GCX/405GP modifications.
- * Copyright (c) 2001 PPC64 team, IBM Corp
+ * Copyright (c) 2001-2002 PPC64 team, IBM Corp
+ *   64-bit and Power4 support
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -27,10 +27,8 @@ struct aligninfo {
 	unsigned char flags;
 };
 
-#define	OPCD(inst)	(((inst) & 0xFC000000) >> 26)
-#define	RS(inst)	(((inst) & 0x03E00000) >> 21)
-#define	RA(inst)	(((inst) & 0x001F0000) >> 16)
-#define	IS_DFORM(code)	((code) >= 32 && (code) <= 47)
+#define IS_XFORM(inst)	(((inst) >> 26) == 31)
+#define IS_DSFORM(inst)	(((inst) >> 26) >= 56)
 
 #define INVALID	{ 0, 0 }
 
@@ -40,9 +38,7 @@ struct aligninfo {
 #define F	8	/* to/from fp regs */
 #define U	0x10	/* update index register */
 #define M	0x20	/* multiple load/store */
-#define S	0x40	/* single-precision fp, or byte-swap value */
-#define HARD	0x80	/* string, stwcx. */
-#define D	0x100	/* double-word load/store */
+#define SW	0x40	/* byte swap */
 
 #define DCBZ	0x5f	/* 8xx/82xx dcbz faults when cache not enabled */
 
@@ -61,9 +57,9 @@ static struct aligninfo aligninfo[128] = {
 	{ 2, LD+SE },		/* 00 0 0101: lha */
 	{ 2, ST },		/* 00 0 0110: sth */
 	{ 4, LD+M },		/* 00 0 0111: lmw */
-	{ 4, LD+F+S },		/* 00 0 1000: lfs */
+	{ 4, LD+F },		/* 00 0 1000: lfs */
 	{ 8, LD+F },		/* 00 0 1001: lfd */
-	{ 4, ST+F+S },		/* 00 0 1010: stfs */
+	{ 4, ST+F },		/* 00 0 1010: stfs */
 	{ 8, ST+F },		/* 00 0 1011: stfd */
 	INVALID,		/* 00 0 1100 */
 	{ 8, LD },		/* 00 0 1101: ld */
@@ -77,12 +73,12 @@ static struct aligninfo aligninfo[128] = {
 	{ 2, LD+SE+U },		/* 00 1 0101: lhau */
 	{ 2, ST+U },		/* 00 1 0110: sthu */
 	{ 4, ST+M },		/* 00 1 0111: stmw */
-	{ 4, LD+F+S+U },	/* 00 1 1000: lfsu */
+	{ 4, LD+F+U },		/* 00 1 1000: lfsu */
 	{ 8, LD+F+U },		/* 00 1 1001: lfdu */
-	{ 4, ST+F+S+U },	/* 00 1 1010: stfsu */
+	{ 4, ST+F+U },		/* 00 1 1010: stfsu */
 	{ 8, ST+F+U },		/* 00 1 1011: stfdu */
 	INVALID,		/* 00 1 1100 */
-	{ 8, ST },		/* 00 1 1101: std */
+	INVALID,		/* 00 1 1101 */
 	INVALID,		/* 00 1 1110 */
 	INVALID,		/* 00 1 1111 */
 	{ 8, LD },		/* 01 0 0000: ldx */
@@ -90,13 +86,13 @@ static struct aligninfo aligninfo[128] = {
 	{ 8, ST },		/* 01 0 0010: stdx */
 	INVALID,		/* 01 0 0011 */
 	INVALID,		/* 01 0 0100 */
-	INVALID,		/* 01 0 0101: lwax?? */
+	{ 4, LD+SE },		/* 01 0 0101: lwax */
 	INVALID,		/* 01 0 0110 */
 	INVALID,		/* 01 0 0111 */
-	{ 0, LD+HARD },		/* 01 0 1000: lswx */
-	{ 0, LD+HARD },		/* 01 0 1001: lswi */
-	{ 0, ST+HARD },		/* 01 0 1010: stswx */
-	{ 0, ST+HARD },		/* 01 0 1011: stswi */
+	{ 0, LD },		/* 01 0 1000: lswx */
+	{ 0, LD },		/* 01 0 1001: lswi */
+	{ 0, ST },		/* 01 0 1010: stswx */
+	{ 0, ST },		/* 01 0 1011: stswi */
 	INVALID,		/* 01 0 1100 */
 	{ 8, LD+U },		/* 01 0 1101: ldu */
 	INVALID,		/* 01 0 1110 */
@@ -106,7 +102,7 @@ static struct aligninfo aligninfo[128] = {
 	{ 8, ST+U },		/* 01 1 0010: stdux */
 	INVALID,		/* 01 1 0011 */
 	INVALID,		/* 01 1 0100 */
-	INVALID,		/* 01 1 0101: lwaux?? */
+	{ 4, LD+SE+U },		/* 01 1 0101: lwaux */
 	INVALID,		/* 01 1 0110 */
 	INVALID,		/* 01 1 0111 */
 	INVALID,		/* 01 1 1000 */
@@ -119,19 +115,19 @@ static struct aligninfo aligninfo[128] = {
 	INVALID,		/* 01 1 1111 */
 	INVALID,		/* 10 0 0000 */
 	INVALID,		/* 10 0 0001 */
-	{ 0, ST+HARD },		/* 10 0 0010: stwcx. */
+	{ 0, ST },		/* 10 0 0010: stwcx. */
 	INVALID,		/* 10 0 0011 */
 	INVALID,		/* 10 0 0100 */
 	INVALID,		/* 10 0 0101 */
 	INVALID,		/* 10 0 0110 */
 	INVALID,		/* 10 0 0111 */
-	{ 4, LD+S },		/* 10 0 1000: lwbrx */
+	{ 4, LD+SW },		/* 10 0 1000: lwbrx */
 	INVALID,		/* 10 0 1001 */
-	{ 4, ST+S },		/* 10 0 1010: stwbrx */
+	{ 4, ST+SW },		/* 10 0 1010: stwbrx */
 	INVALID,		/* 10 0 1011 */
-	{ 2, LD+S },		/* 10 0 1100: lhbrx */
-	INVALID,		/* 10 0 1101 */
-	{ 2, ST+S },		/* 10 0 1110: sthbrx */
+	{ 2, LD+SW },		/* 10 0 1100: lhbrx */
+	{ 4, LD+SE },		/* 10 0 1101  lwa */
+	{ 2, ST+SW },		/* 10 0 1110: sthbrx */
 	INVALID,		/* 10 0 1111 */
 	INVALID,		/* 10 1 0000 */
 	INVALID,		/* 10 1 0001 */
@@ -148,7 +144,7 @@ static struct aligninfo aligninfo[128] = {
 	INVALID,		/* 10 1 1100 */
 	INVALID,		/* 10 1 1101 */
 	INVALID,		/* 10 1 1110 */
-	{ 0, ST+HARD },		/* 10 1 1111: dcbz */
+	{ L1_CACHE_BYTES, ST },	/* 10 1 1111: dcbz */
 	{ 4, LD },		/* 11 0 0000: lwzx */
 	INVALID,		/* 11 0 0001 */
 	{ 4, ST },		/* 11 0 0010: stwx */
@@ -157,14 +153,14 @@ static struct aligninfo aligninfo[128] = {
 	{ 2, LD+SE },		/* 11 0 0101: lhax */
 	{ 2, ST },		/* 11 0 0110: sthx */
 	INVALID,		/* 11 0 0111 */
-	{ 4, LD+F+S },		/* 11 0 1000: lfsx */
+	{ 4, LD+F },		/* 11 0 1000: lfsx */
 	{ 8, LD+F },		/* 11 0 1001: lfdx */
-	{ 4, ST+F+S },		/* 11 0 1010: stfsx */
+	{ 4, ST+F },		/* 11 0 1010: stfsx */
 	{ 8, ST+F },		/* 11 0 1011: stfdx */
 	INVALID,		/* 11 0 1100 */
-	INVALID,		/* 11 0 1101 */
+	{ 8, LD+M },		/* 11 0 1101: lmd */
 	INVALID,		/* 11 0 1110 */
-	INVALID,		/* 11 0 1111 */
+	{ 8, ST+M },		/* 11 0 1111: stmd */
 	{ 4, LD+U },		/* 11 1 0000: lwzux */
 	INVALID,		/* 11 1 0001 */
 	{ 4, ST+U },		/* 11 1 0010: stwux */
@@ -173,9 +169,9 @@ static struct aligninfo aligninfo[128] = {
 	{ 2, LD+SE+U },		/* 11 1 0101: lhaux */
 	{ 2, ST+U },		/* 11 1 0110: sthux */
 	INVALID,		/* 11 1 0111 */
-	{ 4, LD+F+S+U },	/* 11 1 1000: lfsux */
+	{ 4, LD+F+U },		/* 11 1 1000: lfsux */
 	{ 8, LD+F+U },		/* 11 1 1001: lfdux */
-	{ 4, ST+F+S+U },	/* 11 1 1010: stfsux */
+	{ 4, ST+F+U },		/* 11 1 1010: stfsux */
 	{ 8, ST+F+U },		/* 11 1 1011: stfdux */
 	INVALID,		/* 11 1 1100 */
 	INVALID,		/* 11 1 1101 */
@@ -185,73 +181,91 @@ static struct aligninfo aligninfo[128] = {
 
 #define SWAP(a, b)	(t = (a), (a) = (b), (b) = t)
 
+unsigned static inline make_dsisr( unsigned instr )
+{
+	unsigned dsisr;
+	
+	/* create a DSISR value from the instruction */
+	dsisr = (instr & 0x03ff0000) >> 16;			/* bits  6:15 --> 22:31 */
+	
+	if ( IS_XFORM(instr) ) {
+		dsisr |= (instr & 0x00000006) << 14;		/* bits 29:30 --> 15:16 */
+		dsisr |= (instr & 0x00000040) << 8;		/* bit     25 -->    17 */
+		dsisr |= (instr & 0x00000780) << 3;		/* bits 21:24 --> 18:21 */
+	}
+	else {
+		dsisr |= (instr & 0x04000000) >> 12;		/* bit      5 -->    17 */
+		dsisr |= (instr & 0x78000000) >> 17;		/* bits  1: 4 --> 18:21 */
+		if ( IS_DSFORM(instr) ) {
+			dsisr |= (instr & 0x00000003) << 18;	/* bits 30:31 --> 12:13 */
+		}
+	}
+	
+	return dsisr;
+}
+
 int
 fix_alignment(struct pt_regs *regs)
 {
-	int instr, nb, flags;
-	int opcode, f1, f2, f3;
-	int i, t;
-	int reg, areg;
-	unsigned char *addr;
+	unsigned int instr, nb, flags;
+	int t;
+	unsigned long reg, areg;
+	unsigned long i;
+	int ret;
+	unsigned dsisr;
+	unsigned char *addr, *p;
+	unsigned long *lp;
 	union {
-		int l;
 		long ll;
-		float f;
-		double d;
+		double dd;
 		unsigned char v[8];
+		struct {
+			unsigned hi32;
+			int	 low32;
+		} x32;
+		struct {
+			unsigned char hi48[6];
+			short	      low16;
+		} x16;
 	} data;
 
-	if (__is_processor(PV_POWER4)) {
-		/* 
-		 * The POWER4 has a DSISR register but doesn't set it on
-		 * an alignment fault.  -- paulus
-		 */
+	/*
+	 * Return 1 on success
+	 * Return 0 if unable to handle the interrupt
+	 * Return -EFAULT if data address is bad
+	 */
 
-		instr = *((unsigned int *)regs->nip);
-		opcode = OPCD(instr);
-		reg = RS(instr);
-		areg = RA(instr);
+	dsisr = regs->dsisr;
 
-		if (IS_DFORM(opcode)) {
-			f1 = 0;
-			f2 = (instr & 0x04000000) >> 26;
-			f3 = (instr & 0x78000000) >> 27;
-		} else {
-			f1 = (instr & 0x00000006) >> 1;
-			f2 = (instr & 0x00000040) >> 6;
-			f3 = (instr & 0x00000780) >> 7;
-		}
+	/* Power4 doesn't set DSISR for an alignment interrupt */
+	if (__is_processor(PV_POWER4))
+		dsisr = make_dsisr( *((unsigned *)regs->nip) );
 
-		instr = ((f1 << 5) | (f2 << 4) | f3);
-	} else {
-		reg = (regs->dsisr >> 5) & 0x1f;	/* source/dest register */
-		areg = regs->dsisr & 0x1f;		/* register to update */
-		instr = (regs->dsisr >> 10) & 0x7f;
-		instr |= (regs->dsisr >> 13) & 0x60;
-	}
+	/* extract the operation and registers from the dsisr */
+	reg = (dsisr >> 5) & 0x1f;	/* source/dest register */
+	areg = dsisr & 0x1f;		/* register to update */
+	instr = (dsisr >> 10) & 0x7f;
+	instr |= (dsisr >> 13) & 0x60;
 
+	/* Lookup the operation in our table */
 	nb = aligninfo[instr].len;
-	if (nb == 0) {
-		long *p;
-		int i;
-
-		if (instr != DCBZ)
-			return 0;	/* too hard or invalid instruction */
-		/*
-		 * The dcbz (data cache block zero) instruction
-		 * gives an alignment fault if used on non-cacheable
-		 * memory.  We handle the fault mainly for the
-		 * case when we are running with the cache disabled
-		 * for debugging.
-		 */
-		p = (long *) (regs->dar & -L1_CACHE_BYTES);
-		for (i = 0; i < L1_CACHE_BYTES / sizeof(long); ++i)
-			p[i] = 0;
-		return 1;
-	}
-
 	flags = aligninfo[instr].flags;
+
+	/* DAR has the operand effective address */
 	addr = (unsigned char *)regs->dar;
+
+	/* A size of 0 indicates an instruction we don't support */
+	/* we also don't support the multiples (lmw, stmw, lmd, stmd) */
+	if ((nb == 0) || (flags & M))
+		return 0;		/* too hard or invalid instruction */
+
+	/*
+	 * Special handling for dcbz
+	 * dcbz may give an alignment exception for accesses to caching inhibited
+	 * storage
+	 */
+	if (instr == DCBZ)
+		addr = (unsigned char *) ((unsigned long)addr & -L1_CACHE_BYTES);
 
 	/* Verify the address of the operand */
 	if (user_mode(regs)) {
@@ -259,104 +273,111 @@ fix_alignment(struct pt_regs *regs)
 			return -EFAULT;	/* bad address */
 	}
 
+	/* Force the fprs into the save area so we can reference them */
 	if ((flags & F) && (regs->msr & MSR_FP))
 		giveup_fpu(current);
-	if (flags & M)
-		return 0;		/* too hard for now */
-
-	/* If we read the operand, copy it in */
+	
+	/* If we are loading, get the data from user space */
 	if (flags & LD) {
-		if (nb == 2) {
-			data.v[0] = data.v[1] = 0;
-			if (__get_user(data.v[2], addr)
-			    || __get_user(data.v[3], addr+1))
+		data.ll = 0;
+		ret = 0;
+		p = addr;
+		switch (nb) {
+		case 8:
+			ret |= __get_user(data.v[0], p++);
+			ret |= __get_user(data.v[1], p++);
+			ret |= __get_user(data.v[2], p++);
+			ret |= __get_user(data.v[3], p++);
+		case 4:
+			ret |= __get_user(data.v[4], p++);
+			ret |= __get_user(data.v[5], p++);
+		case 2:
+			ret |= __get_user(data.v[6], p++);
+			ret |= __get_user(data.v[7], p++);
+			if (ret)
 				return -EFAULT;
-		} else {
-			for (i = 0; i < nb; ++i)
-				if (__get_user(data.v[i], addr+i))
-					return -EFAULT;
 		}
 	}
-	/* Unfortunately D (== 0x100) doesn't fit in the aligninfo[n].flags
-	   field.  So synthesize it here. */
-	if ((flags & F) == 0 && nb == 8)
-		flags |= D;
-
-	switch (flags & ~U) {
-	case LD+SE:
-		if (data.v[2] >= 0x80)
-			data.v[0] = data.v[1] = -1;
-		/* fall through */
-	case LD:
-		regs->gpr[reg] = data.l;
-		break;
-	case LD+D:
-		regs->gpr[reg] = data.ll;
-		break;
-	case LD+S:
-		if (nb == 2) {
-			SWAP(data.v[2], data.v[3]);
-		} else {
-			SWAP(data.v[0], data.v[3]);
-			SWAP(data.v[1], data.v[2]);
-		}
-		regs->gpr[reg] = data.l;
-		break;
-	case ST:
-		data.l = regs->gpr[reg];
-		break;
-	case ST+D:
-		data.ll = regs->gpr[reg];
-		break;
-	case ST+S:
-		data.l = regs->gpr[reg];
-		if (nb == 2) {
-			SWAP(data.v[2], data.v[3]);
-		} else {
-			SWAP(data.v[0], data.v[3]);
-			SWAP(data.v[1], data.v[2]);
-		}
-		break;
-	case LD+F:
-		current->thread.fpr[reg] = data.d;
-		break;
-	case ST+F:
-		data.d = current->thread.fpr[reg];
-		break;
-	/* these require some floating point conversions... */
-	/* we'd like to use the assignment, but we have to compile
-	 * the kernel with -msoft-float so it doesn't use the
-	 * fp regs for copying 8-byte objects. */
-	case LD+F+S:
-		enable_kernel_fp();
-		cvt_fd(&data.f, &current->thread.fpr[reg], &current->thread.fpscr);
-		/* current->thread.fpr[reg] = data.f; */
-		break;
-	case ST+F+S:
-		enable_kernel_fp();
-		cvt_df(&current->thread.fpr[reg], &data.f, &current->thread.fpscr);
-		/* data.f = current->thread.fpr[reg]; */
-		break;
-	default:
-		printk("align: can't handle flags=%x\n", flags);
-		return 0;
-	}
-
+	
+	/* If we are storing, get the data from the saved gpr or fpr */
 	if (flags & ST) {
-		if (nb == 2) {
-			if (__put_user(data.v[2], addr)
-			    || __put_user(data.v[3], addr+1))
-				return -EFAULT;
-		} else {
-			for (i = 0; i < nb; ++i)
-				if (__put_user(data.v[i], addr+i))
-					return -EFAULT;
+		if (flags & F) {
+			if (nb == 4) {
+				/* Doing stfs, have to convert to single */
+				enable_kernel_fp();
+				cvt_df(&current->thread.fpr[reg], (float *)&data.v[4], &current->thread.fpscr);
+			}
+			else
+				data.dd = current->thread.fpr[reg];
+		}
+		else 
+			data.ll = regs->gpr[reg];
+	}
+	
+	/* Swap bytes as needed */
+	if (flags & SW) {
+		if (nb == 2)
+			SWAP(data.v[6], data.v[7]);
+		else {	/* nb must be 4 */
+			SWAP(data.v[4], data.v[7]);
+			SWAP(data.v[5], data.v[6]);
 		}
 	}
-
+	
+	/* Sign extend as needed */
+	if (flags & SE) {
+		if ( nb == 2 )
+			data.ll = data.x16.low16;
+		else	/* nb must be 4 */
+			data.ll = data.x32.low32;
+	}
+	
+	/* If we are loading, move the data to the gpr or fpr */
+	if (flags & LD) {
+		if (flags & F) {
+			if (nb == 4) {
+				/* Doing lfs, have to convert to double */
+				enable_kernel_fp();
+				cvt_fd((float *)&data.v[4], &current->thread.fpr[reg], &current->thread.fpscr);
+			}
+			else
+				current->thread.fpr[reg] = data.dd;
+		}
+		else
+			regs->gpr[reg] = data.ll;
+	}
+	
+	/* If we are storing, copy the data to the user */
+	if (flags & ST) {
+		ret = 0;
+		p = addr;
+		switch (nb) {
+		case 128:	/* Special case - must be dcbz */
+			lp = (unsigned long *)p;
+			for (i = 0; i < L1_CACHE_BYTES / sizeof(long); ++i)
+				ret |= __put_user(0, lp++);
+			break;
+		case 8:
+			ret |= __put_user(data.v[0], p++);
+			ret |= __put_user(data.v[1], p++);
+			ret |= __put_user(data.v[2], p++);
+			ret |= __put_user(data.v[3], p++);
+		case 4:
+			ret |= __put_user(data.v[4], p++);
+			ret |= __put_user(data.v[5], p++);
+		case 2:
+			ret |= __put_user(data.v[6], p++);
+			ret |= __put_user(data.v[7], p++);
+		}
+		if (ret)
+			return -EFAULT;
+	}
+	
+	/* Update RA as needed */
 	if (flags & U) {
 		regs->gpr[areg] = regs->dar;
 	}
 
 	return 1;
 }
+
