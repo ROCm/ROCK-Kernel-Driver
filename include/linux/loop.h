@@ -56,6 +56,8 @@ struct loop_device {
 	struct semaphore	lo_ctl_mutex;
 	struct semaphore	lo_bh_mutex;
 	atomic_t		lo_pending;
+
+	request_queue_t		lo_queue;
 };
 
 typedef	int (* transfer_proc_t)(struct loop_device *, int cmd,
