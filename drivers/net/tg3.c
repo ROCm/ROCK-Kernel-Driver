@@ -5775,7 +5775,8 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x2aaa);
 	}
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) &&
+	    (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0)) {
 		tg3_writephy(tp, 0x1c, 0x8d68);
 		tg3_writephy(tp, 0x1c, 0x8d68);
 	}
@@ -6104,6 +6105,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703 &&
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703S &&
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5704 &&
+	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5704_A2 &&
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_AC91002A1)
 		return -ENODEV;
 
