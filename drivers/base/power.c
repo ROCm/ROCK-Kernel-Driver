@@ -59,7 +59,7 @@ int device_suspend(u32 state, u32 level)
 			error = dev->driver->suspend(dev,state,level);
 			if (error)
 				printk(KERN_ERR "%s: suspend returned %d\n",
-				       dev->name,error);
+				       dev->bus_id, error);
 		}
 	}
 	up_write(&devices_subsys.rwsem);

@@ -210,8 +210,7 @@ int device_add(struct device *dev)
 
 	parent = get_device(dev->parent);
 
-	pr_debug("DEV: registering device: ID = '%s', name = %s\n",
-		 dev->bus_id, dev->name);
+	pr_debug("DEV: registering device: ID = '%s'\n", dev->bus_id);
 
 	/* first, register with generic layer. */
 	strlcpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
@@ -337,8 +336,7 @@ void device_del(struct device * dev)
  */
 void device_unregister(struct device * dev)
 {
-	pr_debug("DEV: Unregistering device. ID = '%s', name = '%s'\n",
-		 dev->bus_id,dev->name);
+	pr_debug("DEV: Unregistering device. ID = '%s'\n", dev->bus_id);
 	device_del(dev);
 	put_device(dev);
 }

@@ -14,13 +14,6 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 
-static ssize_t device_read_name(struct device * dev, char * buf)
-{
-	return sprintf(buf,"%s\n",dev->name);
-}
-
-static DEVICE_ATTR(name,S_IRUGO,device_read_name,NULL);
-
 static ssize_t
 device_read_power(struct device * dev, char * page)
 {
@@ -91,7 +84,6 @@ static DEVICE_ATTR(power,S_IWUSR | S_IRUGO,
 		   device_read_power,device_write_power);
 
 struct attribute * dev_default_attrs[] = {
-	&dev_attr_name.attr,
 	&dev_attr_power.attr,
 	NULL,
 };

@@ -15,7 +15,6 @@
 #include <linux/init.h>
 
 struct device legacy_bus = {
-	.name		= "legacy bus",
 	.bus_id		= "legacy",
 };
 
