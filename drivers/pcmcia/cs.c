@@ -984,41 +984,6 @@ int pcmcia_access_configuration_register(client_handle_t handle,
     return CS_SUCCESS;
 } /* access_configuration_register */
 
-/*======================================================================
-
-    Bind_device() associates a device driver with a particular socket.
-    It is normally called by Driver Services after it has identified
-    a newly inserted card.  An instance of that driver will then be
-    eligible to register as a client of this socket.
-    
-======================================================================*/
-
-int pcmcia_bind_device(bind_req_t *req)
-{
-    client_t *client;
-    struct pcmcia_socket *s;
-
-    s = req->Socket;
-    if (!s)
-	    return CS_BAD_SOCKET;
-
-    client = (client_t *)kmalloc(sizeof(client_t), GFP_KERNEL);
-    if (!client) return CS_OUT_OF_RESOURCE;
-    memset(client, '\0', sizeof(client_t));
-    client->client_magic = CLIENT_MAGIC;
-    strlcpy(client->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
-    client->Socket = s;
-    client->Function = req->Function;
-    client->state = CLIENT_UNBOUND;
-    client->erase_busy.next = &client->erase_busy;
-    client->erase_busy.prev = &client->erase_busy;
-    init_waitqueue_head(&client->mtd_req);
-    client->next = s->clients;
-    s->clients = client;
-    cs_dbg(s, 1, "bind_device(): client 0x%p, dev %s\n",
-	   client, client->dev_info);
-    return CS_SUCCESS;
-} /* bind_device */
 
 /*======================================================================
 
@@ -2304,7 +2269,6 @@ int pcmcia_report_error(client_handle_t handle, error_info_t *err)
 /* in alpha order */
 EXPORT_SYMBOL(pcmcia_access_configuration_register);
 EXPORT_SYMBOL(pcmcia_adjust_resource_info);
-EXPORT_SYMBOL(pcmcia_bind_device);
 EXPORT_SYMBOL(pcmcia_bind_mtd);
 EXPORT_SYMBOL(pcmcia_check_erase_queue);
 EXPORT_SYMBOL(pcmcia_close_memory);

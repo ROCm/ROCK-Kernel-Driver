@@ -62,6 +62,8 @@
 #include <pcmcia/ds.h>
 #include <pcmcia/ss.h>
 
+#include "cs_internal.h"
+
 /*====================================================================*/
 
 /* Module parameters */
@@ -133,6 +135,50 @@ static int major_dev = -1;
 extern struct proc_dir_entry *proc_pccard;
 
 /*====================================================================*/
+
+/* code which was in cs.c before */
+
+/*======================================================================
+
+    Bind_device() associates a device driver with a particular socket.
+    It is normally called by Driver Services after it has identified
+    a newly inserted card.  An instance of that driver will then be
+    eligible to register as a client of this socket.
+    
+======================================================================*/
+
+static int pcmcia_bind_device(bind_req_t *req)
+{
+	client_t *client;
+	struct pcmcia_socket *s;
+
+	s = req->Socket;
+	if (!s)
+		return CS_BAD_SOCKET;
+
+	client = (client_t *) kmalloc(sizeof(client_t), GFP_KERNEL);
+	if (!client) 
+		return CS_OUT_OF_RESOURCE;
+	memset(client, '\0', sizeof(client_t));
+	client->client_magic = CLIENT_MAGIC;
+	strlcpy(client->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
+	client->Socket = s;
+	client->Function = req->Function;
+	client->state = CLIENT_UNBOUND;
+	client->erase_busy.next = &client->erase_busy;
+	client->erase_busy.prev = &client->erase_busy;
+	init_waitqueue_head(&client->mtd_req);
+	client->next = s->clients;
+	s->clients = client;
+	ds_dbg(1, "%s: bind_device(): client 0x%p, dev %s\n",
+		cs_socket_name(client->Socket), client, client->dev_info);
+	return CS_SUCCESS;
+} /* bind_device */
+
+
+/* end of code which was in cs.c before */
+
+/*======================================================================*/
 
 void cs_error(client_handle_t handle, int func, int ret)
 {
