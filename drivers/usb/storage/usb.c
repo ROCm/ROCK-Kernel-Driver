@@ -430,39 +430,39 @@ static int usb_stor_control_thread(void * __us)
 }	
 
 /* Set up the URB and the usb_ctrlrequest.
- * ss->dev_semaphore must already be locked.
+ * us->dev_semaphore must already be locked.
  * Note that this function assumes that all the data in the us_data
  * structure is current.
  * Returns non-zero on failure, zero on success
  */ 
-static int usb_stor_allocate_urbs(struct us_data *ss)
+static int usb_stor_allocate_urbs(struct us_data *us)
 {
 	/* calculate and store the pipe values */
-	ss->send_ctrl_pipe = usb_sndctrlpipe(ss->pusb_dev, 0);
-	ss->recv_ctrl_pipe = usb_rcvctrlpipe(ss->pusb_dev, 0);
-	ss->send_bulk_pipe = usb_sndbulkpipe(ss->pusb_dev, ss->ep_out);
-	ss->recv_bulk_pipe = usb_rcvbulkpipe(ss->pusb_dev, ss->ep_in);
-	ss->recv_intr_pipe = usb_rcvintpipe(ss->pusb_dev, ss->ep_int);
+	us->send_ctrl_pipe = usb_sndctrlpipe(us->pusb_dev, 0);
+	us->recv_ctrl_pipe = usb_rcvctrlpipe(us->pusb_dev, 0);
+	us->send_bulk_pipe = usb_sndbulkpipe(us->pusb_dev, us->ep_out);
+	us->recv_bulk_pipe = usb_rcvbulkpipe(us->pusb_dev, us->ep_in);
+	us->recv_intr_pipe = usb_rcvintpipe(us->pusb_dev, us->ep_int);
 
 	/* allocate the usb_ctrlrequest for control packets */
 	US_DEBUGP("Allocating usb_ctrlrequest\n");
-	ss->dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_NOIO);
-	if (!ss->dr) {
+	us->dr = kmalloc(sizeof(struct usb_ctrlrequest), GFP_NOIO);
+	if (!us->dr) {
 		US_DEBUGP("allocation failed\n");
 		return 1;
 	}
 
 	/* allocate the URB we're going to use */
 	US_DEBUGP("Allocating URB\n");
-	ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!ss->current_urb) {
+	us->current_urb = usb_alloc_urb(0, GFP_KERNEL);
+	if (!us->current_urb) {
 		US_DEBUGP("allocation failed\n");
 		return 2;
 	}
 
 	US_DEBUGP("Allocating scatter-gather request block\n");
-	ss->current_sg = kmalloc(sizeof(*ss->current_sg), GFP_KERNEL);
-	if (!ss->current_sg) {
+	us->current_sg = kmalloc(sizeof(*us->current_sg), GFP_KERNEL);
+	if (!us->current_sg) {
 		US_DEBUGP("allocation failed\n");
 		return 5;
 	}
@@ -471,32 +471,32 @@ static int usb_stor_allocate_urbs(struct us_data *ss)
 }
 
 /* Deallocate the URB, the usb_ctrlrequest, and the IRQ pipe.
- * ss->dev_semaphore must already be locked.
+ * us->dev_semaphore must already be locked.
  */
-static void usb_stor_deallocate_urbs(struct us_data *ss)
+static void usb_stor_deallocate_urbs(struct us_data *us)
 {
 	/* free the scatter-gather request block */
-	if (ss->current_sg) {
-		kfree(ss->current_sg);
-		ss->current_sg = NULL;
+	if (us->current_sg) {
+		kfree(us->current_sg);
+		us->current_sg = NULL;
 	}
 
 	/* free up the main URB for this device */
-	if (ss->current_urb) {
+	if (us->current_urb) {
 		US_DEBUGP("-- releasing main URB\n");
-		usb_free_urb(ss->current_urb);
-		ss->current_urb = NULL;
+		usb_free_urb(us->current_urb);
+		us->current_urb = NULL;
 	}
 
 	/* free the usb_ctrlrequest buffer */
-	if (ss->dr) {
-		kfree(ss->dr);
-		ss->dr = NULL;
+	if (us->dr) {
+		kfree(us->dr);
+		us->dr = NULL;
 	}
 
 	/* mark the device as gone */
-	usb_put_dev(ss->pusb_dev);
-	ss->pusb_dev = NULL;
+	usb_put_dev(us->pusb_dev);
+	us->pusb_dev = NULL;
 }
 
 /* Probe to see if a new device is actually a SCSI device */
@@ -512,7 +512,7 @@ static int storage_probe(struct usb_interface *intf,
 	char serial[USB_STOR_STRING_LEN];	     /* serial number */
 	unsigned int flags;
 	struct us_unusual_dev *unusual_dev;
-	struct us_data *ss = NULL;
+	struct us_data *us = NULL;
 	int result;
 
 	/* these are temporary copies -- we test on these, then put them
@@ -633,212 +633,212 @@ static int storage_probe(struct usb_interface *intf,
 			   serial, sizeof(serial));
 
 	/* New device -- allocate memory and initialize */
-	if ((ss = (struct us_data *)kmalloc(sizeof(struct us_data), 
+	if ((us = (struct us_data *)kmalloc(sizeof(struct us_data), 
 					    GFP_KERNEL)) == NULL) {
 		printk(KERN_WARNING USB_STORAGE "Out of memory\n");
 		usb_put_dev(dev);
 		return -ENOMEM;
 	}
-	memset(ss, 0, sizeof(struct us_data));
+	memset(us, 0, sizeof(struct us_data));
 
 	/* Initialize the mutexes only when the struct is new */
-	init_completion(&(ss->notify));
-	init_MUTEX_LOCKED(&(ss->dev_semaphore));
+	init_completion(&(us->notify));
+	init_MUTEX_LOCKED(&(us->dev_semaphore));
 
 	/* copy over the subclass and protocol data */
-	ss->subclass = subclass;
-	ss->protocol = protocol;
-	ss->flags = flags;
-	ss->unusual_dev = unusual_dev;
+	us->subclass = subclass;
+	us->protocol = protocol;
+	us->flags = flags;
+	us->unusual_dev = unusual_dev;
 
 	/* copy over the endpoint data */
-	ss->ep_in = ep_in->bEndpointAddress & 
+	us->ep_in = ep_in->bEndpointAddress & 
 		USB_ENDPOINT_NUMBER_MASK;
-	ss->ep_out = ep_out->bEndpointAddress & 
+	us->ep_out = ep_out->bEndpointAddress & 
 		USB_ENDPOINT_NUMBER_MASK;
 	if (ep_int) {
-		ss->ep_int = ep_int->bEndpointAddress & 
+		us->ep_int = ep_int->bEndpointAddress & 
 			USB_ENDPOINT_NUMBER_MASK;
-		ss->ep_bInterval = ep_int->bInterval;
+		us->ep_bInterval = ep_int->bInterval;
 	}
 	else
-		ss->ep_int = ss->ep_bInterval = 0;
+		us->ep_int = us->ep_bInterval = 0;
 
 	/* establish the connection to the new device */
-	ss->ifnum = ifnum;
-	ss->pusb_dev = dev;
+	us->ifnum = ifnum;
+	us->pusb_dev = dev;
 
 	/* copy over the identifiying strings */
-	strncpy(ss->vendor, mf, USB_STOR_STRING_LEN);
-	strncpy(ss->product, prod, USB_STOR_STRING_LEN);
-	strncpy(ss->serial, serial, USB_STOR_STRING_LEN);
-	if (strlen(ss->vendor) == 0) {
+	strncpy(us->vendor, mf, USB_STOR_STRING_LEN);
+	strncpy(us->product, prod, USB_STOR_STRING_LEN);
+	strncpy(us->serial, serial, USB_STOR_STRING_LEN);
+	if (strlen(us->vendor) == 0) {
 		if (unusual_dev->vendorName)
-			strncpy(ss->vendor, unusual_dev->vendorName,
+			strncpy(us->vendor, unusual_dev->vendorName,
 				USB_STOR_STRING_LEN);
 		else
-			strncpy(ss->vendor, "Unknown",
+			strncpy(us->vendor, "Unknown",
 				USB_STOR_STRING_LEN);
 	}
-	if (strlen(ss->product) == 0) {
+	if (strlen(us->product) == 0) {
 		if (unusual_dev->productName)
-			strncpy(ss->product, unusual_dev->productName,
+			strncpy(us->product, unusual_dev->productName,
 				USB_STOR_STRING_LEN);
 		else
-			strncpy(ss->product, "Unknown",
+			strncpy(us->product, "Unknown",
 				USB_STOR_STRING_LEN);
 	}
-	if (strlen(ss->serial) == 0)
-		strncpy(ss->serial, "None", USB_STOR_STRING_LEN);
+	if (strlen(us->serial) == 0)
+		strncpy(us->serial, "None", USB_STOR_STRING_LEN);
 
 	/* 
 	 * Set the handler pointers based on the protocol
 	 * Again, this data is persistent across reattachments
 	 */
-	switch (ss->protocol) {
+	switch (us->protocol) {
 	case US_PR_CB:
-		ss->transport_name = "Control/Bulk";
-		ss->transport = usb_stor_CB_transport;
-		ss->transport_reset = usb_stor_CB_reset;
-		ss->max_lun = 7;
+		us->transport_name = "Control/Bulk";
+		us->transport = usb_stor_CB_transport;
+		us->transport_reset = usb_stor_CB_reset;
+		us->max_lun = 7;
 		break;
 
 	case US_PR_CBI:
-		ss->transport_name = "Control/Bulk/Interrupt";
-		ss->transport = usb_stor_CBI_transport;
-		ss->transport_reset = usb_stor_CB_reset;
-		ss->max_lun = 7;
+		us->transport_name = "Control/Bulk/Interrupt";
+		us->transport = usb_stor_CBI_transport;
+		us->transport_reset = usb_stor_CB_reset;
+		us->max_lun = 7;
 		break;
 
 	case US_PR_BULK:
-		ss->transport_name = "Bulk";
-		ss->transport = usb_stor_Bulk_transport;
-		ss->transport_reset = usb_stor_Bulk_reset;
-		ss->max_lun = usb_stor_Bulk_max_lun(ss);
+		us->transport_name = "Bulk";
+		us->transport = usb_stor_Bulk_transport;
+		us->transport_reset = usb_stor_Bulk_reset;
+		us->max_lun = usb_stor_Bulk_max_lun(us);
 		break;
 
 #ifdef CONFIG_USB_STORAGE_HP8200e
 	case US_PR_SCM_ATAPI:
-		ss->transport_name = "SCM/ATAPI";
-		ss->transport = hp8200e_transport;
-		ss->transport_reset = usb_stor_CB_reset;
-		ss->max_lun = 1;
+		us->transport_name = "SCM/ATAPI";
+		us->transport = hp8200e_transport;
+		us->transport_reset = usb_stor_CB_reset;
+		us->max_lun = 1;
 		break;
 #endif
 
 #ifdef CONFIG_USB_STORAGE_SDDR09
 	case US_PR_EUSB_SDDR09:
-		ss->transport_name = "EUSB/SDDR09";
-		ss->transport = sddr09_transport;
-		ss->transport_reset = usb_stor_CB_reset;
-		ss->max_lun = 0;
+		us->transport_name = "EUSB/SDDR09";
+		us->transport = sddr09_transport;
+		us->transport_reset = usb_stor_CB_reset;
+		us->max_lun = 0;
 		break;
 #endif
 
 #ifdef CONFIG_USB_STORAGE_SDDR55
 	case US_PR_SDDR55:
-		ss->transport_name = "SDDR55";
-		ss->transport = sddr55_transport;
-		ss->transport_reset = sddr55_reset;
-		ss->max_lun = 0;
+		us->transport_name = "SDDR55";
+		us->transport = sddr55_transport;
+		us->transport_reset = sddr55_reset;
+		us->max_lun = 0;
 		break;
 #endif
 
 #ifdef CONFIG_USB_STORAGE_DPCM
 	case US_PR_DPCM_USB:
-		ss->transport_name = "Control/Bulk-EUSB/SDDR09";
-		ss->transport = dpcm_transport;
-		ss->transport_reset = usb_stor_CB_reset;
-		ss->max_lun = 1;
+		us->transport_name = "Control/Bulk-EUSB/SDDR09";
+		us->transport = dpcm_transport;
+		us->transport_reset = usb_stor_CB_reset;
+		us->max_lun = 1;
 		break;
 #endif
 
 #ifdef CONFIG_USB_STORAGE_FREECOM
 	case US_PR_FREECOM:
-		ss->transport_name = "Freecom";
-		ss->transport = freecom_transport;
-		ss->transport_reset = usb_stor_freecom_reset;
-		ss->max_lun = 0;
+		us->transport_name = "Freecom";
+		us->transport = freecom_transport;
+		us->transport_reset = usb_stor_freecom_reset;
+		us->max_lun = 0;
 		break;
 #endif
 
 #ifdef CONFIG_USB_STORAGE_DATAFAB
 	case US_PR_DATAFAB:
-		ss->transport_name  = "Datafab Bulk-Only";
-		ss->transport = datafab_transport;
-		ss->transport_reset = usb_stor_Bulk_reset;
-		ss->max_lun = 1;
+		us->transport_name  = "Datafab Bulk-Only";
+		us->transport = datafab_transport;
+		us->transport_reset = usb_stor_Bulk_reset;
+		us->max_lun = 1;
 		break;
 #endif
 
 #ifdef CONFIG_USB_STORAGE_JUMPSHOT
 	case US_PR_JUMPSHOT:
-		ss->transport_name  = "Lexar Jumpshot Control/Bulk";
-		ss->transport = jumpshot_transport;
-		ss->transport_reset = usb_stor_Bulk_reset;
-		ss->max_lun = 1;
+		us->transport_name  = "Lexar Jumpshot Control/Bulk";
+		us->transport = jumpshot_transport;
+		us->transport_reset = usb_stor_Bulk_reset;
+		us->max_lun = 1;
 		break;
 #endif
 
 	default:
-		/* ss->transport_name = "Unknown"; */
+		/* us->transport_name = "Unknown"; */
 		goto BadDevice;
 	}
-	US_DEBUGP("Transport: %s\n", ss->transport_name);
+	US_DEBUGP("Transport: %s\n", us->transport_name);
 
 	/* fix for single-lun devices */
-	if (ss->flags & US_FL_SINGLE_LUN)
-		ss->max_lun = 0;
+	if (us->flags & US_FL_SINGLE_LUN)
+		us->max_lun = 0;
 
-	switch (ss->subclass) {
+	switch (us->subclass) {
 	case US_SC_RBC:
-		ss->protocol_name = "Reduced Block Commands (RBC)";
-		ss->proto_handler = usb_stor_transparent_scsi_command;
+		us->protocol_name = "Reduced Block Commands (RBC)";
+		us->proto_handler = usb_stor_transparent_scsi_command;
 		break;
 
 	case US_SC_8020:
-		ss->protocol_name = "8020i";
-		ss->proto_handler = usb_stor_ATAPI_command;
-		ss->max_lun = 0;
+		us->protocol_name = "8020i";
+		us->proto_handler = usb_stor_ATAPI_command;
+		us->max_lun = 0;
 		break;
 
 	case US_SC_QIC:
-		ss->protocol_name = "QIC-157";
-		ss->proto_handler = usb_stor_qic157_command;
-		ss->max_lun = 0;
+		us->protocol_name = "QIC-157";
+		us->proto_handler = usb_stor_qic157_command;
+		us->max_lun = 0;
 		break;
 
 	case US_SC_8070:
-		ss->protocol_name = "8070i";
-		ss->proto_handler = usb_stor_ATAPI_command;
-		ss->max_lun = 0;
+		us->protocol_name = "8070i";
+		us->proto_handler = usb_stor_ATAPI_command;
+		us->max_lun = 0;
 		break;
 
 	case US_SC_SCSI:
-		ss->protocol_name = "Transparent SCSI";
-		ss->proto_handler = usb_stor_transparent_scsi_command;
+		us->protocol_name = "Transparent SCSI";
+		us->proto_handler = usb_stor_transparent_scsi_command;
 		break;
 
 	case US_SC_UFI:
-		ss->protocol_name = "Uniform Floppy Interface (UFI)";
-		ss->proto_handler = usb_stor_ufi_command;
+		us->protocol_name = "Uniform Floppy Interface (UFI)";
+		us->proto_handler = usb_stor_ufi_command;
 		break;
 
 #ifdef CONFIG_USB_STORAGE_ISD200
 	case US_SC_ISD200:
-		ss->protocol_name = "ISD200 ATA/ATAPI";
-		ss->proto_handler = isd200_ata_command;
+		us->protocol_name = "ISD200 ATA/ATAPI";
+		us->proto_handler = isd200_ata_command;
 		break;
 #endif
 
 	default:
-		/* ss->protocol_name = "Unknown"; */
+		/* us->protocol_name = "Unknown"; */
 		goto BadDevice;
 	}
-	US_DEBUGP("Protocol: %s\n", ss->protocol_name);
+	US_DEBUGP("Protocol: %s\n", us->protocol_name);
 
 	/* allocate the URB, the usb_ctrlrequest, and the IRQ URB */
-	if (usb_stor_allocate_urbs(ss))
+	if (usb_stor_allocate_urbs(us))
 		goto BadDevice;
 
 	/*
@@ -849,59 +849,59 @@ static int storage_probe(struct usb_interface *intf,
 	/* Just before we start our control thread, initialize
 	 * the device if it needs initialization */
 	if (unusual_dev && unusual_dev->initFunction)
-		unusual_dev->initFunction(ss);
+		unusual_dev->initFunction(us);
 
 	/* start up our control thread */
-	atomic_set(&ss->sm_state, US_STATE_IDLE);
-	ss->pid = kernel_thread(usb_stor_control_thread, ss,
+	atomic_set(&us->sm_state, US_STATE_IDLE);
+	us->pid = kernel_thread(usb_stor_control_thread, us,
 				CLONE_VM);
-	if (ss->pid < 0) {
+	if (us->pid < 0) {
 		printk(KERN_WARNING USB_STORAGE 
 		       "Unable to start control thread\n");
 		goto BadDevice;
 	}
 
 	/* wait for the thread to start */
-	wait_for_completion(&(ss->notify));
+	wait_for_completion(&(us->notify));
 
 	/* unlock the device pointers */
-	up(&(ss->dev_semaphore));
+	up(&(us->dev_semaphore));
 
 	/* now register	*/
-	ss->host = scsi_register(&usb_stor_host_template, sizeof(ss));
-	if (!ss->host) {
+	us->host = scsi_register(&usb_stor_host_template, sizeof(us));
+	if (!us->host) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to register the scsi host\n");
 
 		/* tell the control thread to exit */
-		ss->srb = NULL;
-		up(&ss->sema);
-		wait_for_completion(&ss->notify);
+		us->srb = NULL;
+		up(&us->sema);
+		wait_for_completion(&us->notify);
 
 		/* re-lock the device pointers */
-		down(&ss->dev_semaphore);
+		down(&us->dev_semaphore);
 		goto BadDevice;
 	}
 
 	/* set the hostdata to prepare for scanning */
-	ss->host->hostdata[0] = (unsigned long)ss;
+	us->host->hostdata[0] = (unsigned long)us;
 
 	/* associate this host with our interface */
-	scsi_set_device(ss->host, &intf->dev);
+	scsi_set_device(us->host, &intf->dev);
 
 	/* now add the host */
-	result = scsi_add_host(ss->host, NULL);
+	result = scsi_add_host(us->host, NULL);
 	if (result) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to add the scsi host\n");
 
 		/* tell the control thread to exit */
-		ss->srb = NULL;
-		up(&ss->sema);
-		wait_for_completion(&ss->notify);
+		us->srb = NULL;
+		up(&us->sema);
+		wait_for_completion(&us->notify);
 
 		/* re-lock the device pointers */
-		down(&ss->dev_semaphore);
+		down(&us->dev_semaphore);
 		goto BadDevice;
 	}
 
@@ -911,66 +911,66 @@ static int storage_probe(struct usb_interface *intf,
 	       "USB Mass Storage device found at %d\n", dev->devnum);
 
 	/* save a pointer to our structure */
-	usb_set_intfdata(intf, ss);
+	usb_set_intfdata(intf, us);
 	return 0;
 
 	/* we come here if there are any problems */
-	/* ss->dev_semaphore must be locked */
+	/* us->dev_semaphore must be locked */
 BadDevice:
 	US_DEBUGP("storage_probe() failed\n");
-	usb_stor_deallocate_urbs(ss);
-	up(&ss->dev_semaphore);
-	kfree(ss);
+	usb_stor_deallocate_urbs(us);
+	up(&us->dev_semaphore);
+	kfree(us);
 	return -EIO;
 }
 
 /* Handle a disconnect event from the USB core */
 static void storage_disconnect(struct usb_interface *intf)
 {
-	struct us_data *ss;
+	struct us_data *us;
 	struct scsi_device *sdev;
 
 	US_DEBUGP("storage_disconnect() called\n");
 
-	ss = usb_get_intfdata(intf);
+	us = usb_get_intfdata(intf);
 	usb_set_intfdata(intf, NULL);
 
 	/* serious error -- we're attempting to disconnect an interface but
 	 * cannot locate the local data structure
 	 */
-	BUG_ON(ss == NULL);
+	BUG_ON(us == NULL);
 
 	/* set devices offline -- need host lock for this */
-	scsi_lock(ss->host);
-	list_for_each_entry(sdev, &ss->host->my_devices, siblings)
+	scsi_lock(us->host);
+	list_for_each_entry(sdev, &us->host->my_devices, siblings)
 		sdev->online = 0;
-	scsi_unlock(ss->host);
+	scsi_unlock(us->host);
 
 	/* lock device access -- no need to unlock, as we're going away */
-	down(&(ss->dev_semaphore));
+	down(&(us->dev_semaphore));
 
 	/* Complete all pending commands with * cmd->result = DID_ERROR << 16.
 	 * Since we only queue one command at a time, this is pretty easy. */
-	if (ss->srb) {
-		ss->srb->result = DID_ERROR << 16;
-		ss->srb->scsi_done(ss->srb);
+	if (us->srb) {
+		us->srb->result = DID_ERROR << 16;
+		us->srb->scsi_done(us->srb);
 	}
 
 	/* TODO: somehow, wait for the device to
 	 * be 'idle' (tasklet completion) */
 
 	/* remove the pointer to the data structure we were using */
-	(struct us_data*)ss->host->hostdata[0] = NULL;
+	(struct us_data*)us->host->hostdata[0] = NULL;
 
 	/* begin SCSI host removal sequence */
-	if(scsi_remove_host(ss->host)) {
+	if(scsi_remove_host(us->host)) {
 		US_DEBUGP("-- SCSI refused to unregister\n");
 		BUG();
 		return;
 	};
 
 	/* finish SCSI host removal sequence */
-	scsi_unregister(ss->host);
+	scsi_unregister(us->host);
 
 	/* Kill the control threads
 	 *
@@ -978,34 +978,34 @@ static void storage_disconnect(struct usb_interface *intf)
 	 * notification that it has exited.
 	 */
 	US_DEBUGP("-- sending exit command to thread\n");
-	BUG_ON(atomic_read(&ss->sm_state) != US_STATE_IDLE);
-	ss->srb = NULL;
-	up(&(ss->sema));
-	wait_for_completion(&(ss->notify));
+	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
+	us->srb = NULL;
+	up(&(us->sema));
+	wait_for_completion(&(us->notify));
 
 	/* free allocated urbs */
-	usb_stor_deallocate_urbs(ss);
+	usb_stor_deallocate_urbs(us);
 
 	/* If there's extra data in the us_data structure then
 	 * free that first */
-	if (ss->extra) {
+	if (us->extra) {
 		/* call the destructor routine, if it exists */
-		if (ss->extra_destructor) {
+		if (us->extra_destructor) {
 			US_DEBUGP("-- calling extra_destructor()\n");
-			ss->extra_destructor(ss->extra);
+			us->extra_destructor(us->extra);
 		}
 
 		/* destroy the extra data */
 		US_DEBUGP("-- freeing the data structure\n");
-		kfree(ss->extra);
+		kfree(us->extra);
 	}
 
 	/* up the semaphore so auto-code-checkers won't complain about
 	 * the down/up imbalance */
-	up(&(ss->dev_semaphore));
+	up(&(us->dev_semaphore));
 
 	/* free the structure itself */
-	kfree (ss);
+	kfree (us);
 }
 
 /***********************************************************************
