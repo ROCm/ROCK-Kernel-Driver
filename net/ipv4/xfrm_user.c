@@ -1086,10 +1086,26 @@ struct xfrm_policy *xfrm_compile_policy(u16 family, int opt,
 	struct xfrm_policy *xp;
 	int nr;
 
-	if (opt != IP_XFRM_POLICY) {
-		*dir = -EOPNOTSUPP;
+	switch (family) {
+	case AF_INET:
+		if (opt != IP_XFRM_POLICY) {
+			*dir = -EOPNOTSUPP;
+			return NULL;
+		}
+		break;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	case AF_INET6:
+		if (opt != IPV6_XFRM_POLICY) {
+			*dir = -EOPNOTSUPP;
+			return NULL;
+		}
+		break;
+#endif
+	default:
+		*dir = -EINVAL;
 		return NULL;
 	}
+
 	*dir = -EINVAL;
 
 	if (len < sizeof(*p) ||

@@ -10,6 +10,7 @@
 #include <linux/pfkeyv2.h>
 #include <linux/in6.h>
 
+#include <net/sock.h>
 #include <net/dst.h>
 #include <net/route.h>
 #include <net/ip6_fib.h>
