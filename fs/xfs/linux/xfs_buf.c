@@ -1535,7 +1535,7 @@ pagebuf_delwri_queue(
 	}
 
 	list_add_tail(&pb->pb_list, &pbd_delwrite_queue);
-	pb->pb_flushtime = jiffies + xfs_age_buffer;
+	pb->pb_queuetime = jiffies;
 	spin_unlock(&pbd_delwrite_lock);
 
 	if (unlock)
@@ -1605,7 +1605,9 @@ pagebuf_daemon(
 
 			if (!pagebuf_ispin(pb) && !pagebuf_cond_lock(pb)) {
 				if (!force_flush &&
-				    time_before(jiffies, pb->pb_flushtime)) {
+				    time_before(jiffies,
+						pb->pb_queuetime +
+						xfs_age_buffer)) {
 					pagebuf_unlock(pb);
 					break;
 				}
