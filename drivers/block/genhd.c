@@ -721,6 +721,17 @@ int bdev_read_only(struct block_device *bdev)
 		return disk->policy;
 }
 
+int invalidate_partition(struct gendisk *disk, int index)
+{
+	int res = 0;
+	struct block_device *bdev = bdget_disk(disk, index);
+	if (bdev)
+		res = __invalidate_device(bdev, 1);
+	bdput(bdev);
+	return res;
+}
+
 EXPORT_SYMBOL(bdev_read_only);
 EXPORT_SYMBOL(set_device_ro);
 EXPORT_SYMBOL(set_disk_ro);
+EXPORT_SYMBOL(invalidate_partition);

@@ -1684,7 +1684,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 
 		del_timer_sync(&mddev->safemode_timer);
 
-		invalidate_device(mk_kdev(disk->major, disk->first_minor), 1);
+		invalidate_partition(disk, 0);
 
 		if (ro) {
 			err  = -ENXIO;

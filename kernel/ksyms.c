@@ -188,7 +188,6 @@ EXPORT_SYMBOL(files_lock);
 EXPORT_SYMBOL(check_disk_change);
 EXPORT_SYMBOL(invalidate_bdev);
 EXPORT_SYMBOL(invalidate_inodes);
-EXPORT_SYMBOL(invalidate_device);
 EXPORT_SYMBOL(__invalidate_device);
 EXPORT_SYMBOL(invalidate_inode_pages);
 EXPORT_SYMBOL_GPL(invalidate_inode_pages2);

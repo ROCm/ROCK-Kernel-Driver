@@ -535,7 +535,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		} else {
 			struct hd_struct *p;
 			struct block_device *whole;
-			whole = bdget(MKDEV(disk->major, disk->first_minor));
+			whole = bdget_disk(disk, 0);
 			ret = -ENOMEM;
 			if (!whole)
 				goto out_first;
