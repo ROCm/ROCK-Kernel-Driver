@@ -1047,7 +1047,7 @@ static void ultrastor_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	printk("Ux4F interrupt: bad MSCP address %x\n", (unsigned int) mscp);
 	/* A command has been lost.  Reset and report an error
 	   for all commands.  */
-	ultrastor_reset(NULL, 0);
+	ultrastor_host_reset(dev_id);
 	return;
     }
 #endif
