@@ -14,7 +14,7 @@
 #define _S2IO_H
 
 #define TBD 0
-#define BIT(loc)		(1ULL << (loc))
+#define BIT(loc)		(0x8000000000000000ULL >> (loc))
 #define vBIT(val, loc, sz)	(((u64)val) << (64-loc-sz))
 
 #ifndef BOOL
