@@ -245,9 +245,13 @@ extern void ntfs_put_inode(struct inode *vi);
 
 extern int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt);
 
+#ifdef NTFS_RW
+
 extern void ntfs_truncate(struct inode *vi);
 
 extern int ntfs_setattr(struct dentry *dentry, struct iattr *attr);
+
+#endif
 
 #endif /* _LINUX_NTFS_FS_INODE_H */
 

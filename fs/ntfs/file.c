@@ -64,8 +64,10 @@ struct file_operations ntfs_file_ops = {
 };
 
 struct inode_operations ntfs_file_inode_ops = {
+#ifdef NTFS_RW
 	.truncate	= ntfs_truncate,
 	.setattr	= ntfs_setattr,
+#endif
 };
 
 struct file_operations ntfs_empty_file_ops = {};

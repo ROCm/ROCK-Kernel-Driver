@@ -1928,6 +1928,8 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
 	return 0;
 }
 
+#ifdef NTFS_RW
+
 /**
  * ntfs_truncate - called when the i_size of an ntfs inode is changed
  * @vi:		inode for which the i_size was changed
@@ -2016,4 +2018,6 @@ trunc_err:
 
 	return err;
 }
+
+#endif
 
