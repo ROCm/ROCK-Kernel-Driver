@@ -47,23 +47,3 @@ __XScale_start:
 #ifdef CONFIG_ARCH_COTULLA_IDP
 		mov	r7, #MACH_TYPE_COTULLA_IDP
 #endif
-
-#ifdef CONFIG_ARCH_IQ80310
-		/*
-		 * Crank the CPU up to 733MHz
-		 */
-		mov	r1, #9
-		mcr	p14, 0, r1, c6, c0, 0
-
-		/*
-		 * Disable ECC error notification
-		 * At some point, we should add an ECC handler to Linux
-		 */
-		mov	r1, #0x1500
-		mov	r0, #0x4
-		str	r0, [r1, #0x34]
-
-		mov	r7, #MACH_TYPE_IQ80310
-#endif
-
-

@@ -411,9 +411,7 @@
 
 		.macro	addruart,rx
 		mov	\rx, #0xfe000000	@ physical
-#ifdef CONFIG_ARCH_IQ80310
-		orr	\rx, \rx, #0x00810000	@ location of the UART
-#elif defined(CONFIG_ARCH_IQ80321)
+#if defined(CONFIG_ARCH_IQ80321)
 		orr	\rx, \rx, #0x00800000	@ location of the UART
 #else
 #error Unknown IOP3XX implementation
