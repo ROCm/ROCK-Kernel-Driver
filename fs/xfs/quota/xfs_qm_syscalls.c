@@ -1114,7 +1114,7 @@ mutex_t	      qcheck_lock;
 	  cmn_err(CE_DEBUG, "%s (#%d)", title, (int) (l)->qh_nelems); \
 	  for (dqp = (xfs_dqtest_t *)(l)->qh_next; dqp != NULL; \
 	       dqp = (xfs_dqtest_t *)dqp->NXT) { \
-		cmn_err(CE_DEBUG, "  %d\. \"%d (%s)\"  bcnt = %d, icnt = %d", \
+		cmn_err(CE_DEBUG, "  %d. \"%d (%s)\"  bcnt = %d, icnt = %d", \
 			 ++i, dqp->d_id, DQFLAGTO_TYPESTR(dqp),	     \
 			 dqp->d_bcount, dqp->d_icount); } \
 }
