@@ -54,8 +54,6 @@ static int i2c_sysctl_chips(ctl_table * table, int *name, int nlen,
 				void *newval, size_t newlen,
 				void **context);
 
-int __init sensors_init(void);
-
 #define SENSORS_ENTRY_MAX 20
 static struct ctl_table_header *i2c_entries[SENSORS_ENTRY_MAX];
 
@@ -815,35 +813,23 @@ int __init sensors_init(void)
 	return 0;
 }
 
+static void __exit i2c_cleanup(void)
+{
+	if (i2c_initialized >= 1) {
+		unregister_sysctl_table(i2c_proc_header);
+		i2c_initialized--;
+	}
+}
+
 EXPORT_SYMBOL(i2c_deregister_entry);
 EXPORT_SYMBOL(i2c_detect);
 EXPORT_SYMBOL(i2c_proc_real);
 EXPORT_SYMBOL(i2c_register_entry);
 EXPORT_SYMBOL(i2c_sysctl_real);
 
-#ifdef MODULE
-
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>");
 MODULE_DESCRIPTION("i2c-proc driver");
 MODULE_LICENSE("GPL");
 
-int i2c_cleanup(void)
-{
-	if (i2c_initialized >= 1) {
-		unregister_sysctl_table(i2c_proc_header);
-		i2c_initialized--;
-	}
-	return 0;
-}
-
-int init_module(void)
-{
-	return sensors_init();
-}
-
-int cleanup_module(void)
-{
-	return i2c_cleanup();
-}
-
-#endif				/* MODULE */
+module_init(sensors_init);
+module_exit(i2c_cleanup);

@@ -21,7 +21,7 @@
    All SMBus-related things are written by Frodo Looijaard <frodol@dds.nl>
    SMBus 2.0 support by Mark Studebaker <mdsxyz123@yahoo.com>                */
 
-/* $Id: i2c-core.c,v 1.83 2002/07/08 01:37:15 mds Exp $ */
+/* $Id: i2c-core.c,v 1.86 2002/09/12 06:47:26 ac9410 Exp $ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -35,10 +35,6 @@
 
 #include <linux/version.h>
 #include <linux/init.h>
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-#define init_MUTEX(s) do { *(s) = MUTEX; } while(0)
-#endif
 
 #include <asm/uaccess.h>
 
@@ -72,7 +68,7 @@ static struct i2c_driver *drivers[I2C_DRIVER_MAX];
 static int driver_count;
 
 /**** debug level */
-static int i2c_debug=1;
+static int i2c_debug;
 
 /* ---------------------------------------------------
  * /proc entry declarations
@@ -84,10 +80,6 @@ static int i2c_debug=1;
 static int i2cproc_init(void);
 static int i2cproc_cleanup(void);
 
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,3,27))
-static void monitor_bus_i2c(struct inode *inode, int fill);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,58)) */
-
 static ssize_t i2cproc_bus_read(struct file * file, char * buf,size_t count, 
                                 loff_t *ppos);
 static int read_bus_i2c(char *buf, char **start, off_t offset, int len,
@@ -98,12 +90,6 @@ static int read_bus_i2c(char *buf, char **start, off_t offset, int len,
 static struct file_operations i2cproc_operations = {
 	read:		i2cproc_bus_read,
 };
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,48))
-static struct inode_operations i2cproc_inode_operations = {
-	&i2cproc_operations
-};
-#endif
 
 static int i2cproc_initialized = 0;
 
@@ -164,16 +150,8 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 			goto ERROR1;
 		}
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,48))
 		proc_entry->proc_fops = &i2cproc_operations;
-#else
-		proc_entry->ops = &i2cproc_inode_operations;
-#endif
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,27))
 		proc_entry->owner = THIS_MODULE;
-#else
-		proc_entry->fill_inode = &monitor_bus_i2c;
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,58)) */
 		adap->inode = proc_entry->low_ino;
 	}
 
@@ -611,18 +589,6 @@ int i2c_release_client(struct i2c_client *client)
 
 #ifdef CONFIG_PROC_FS
 
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,3,27))
-/* Monitor access to /proc/bus/i2c*; make unloading i2c-proc impossible
-   if some process still uses it or some file in it */
-void monitor_bus_i2c(struct inode *inode, int fill)
-{
-	if (fill)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
-}
-#endif /* (LINUX_VERSION_CODE <= KERNEL_VERSION(2,3,37)) */
-
 /* This function generates the output for /proc/bus/i2c */
 int read_bus_i2c(char *buf, char **start, off_t offset, int len, int *eof, 
                  void *private)
@@ -658,18 +624,19 @@ ssize_t i2cproc_bus_read(struct file * file, char * buf,size_t count,
 	struct i2c_client *client;
 	int i,j,k,order_nr,len=0,len_total;
 	int order[I2C_CLIENT_MAX];
+#define OUTPUT_LENGTH_PER_LINE 70
 
-	if (count > 4096)
-		return -EINVAL; 
 	len_total = file->f_pos + count;
-	/* Too bad if this gets longer (unlikely) */
-	if (len_total > 4096)
-		len_total = 4096;
+	if (len_total > (I2C_CLIENT_MAX * OUTPUT_LENGTH_PER_LINE) )
+		/* adjust to maximum file size */
+		len_total = (I2C_CLIENT_MAX * OUTPUT_LENGTH_PER_LINE);
 	for (i = 0; i < I2C_ADAP_MAX; i++)
 		if (adapters[i]->inode == inode->i_ino) {
 		/* We need a bit of slack in the kernel buffer; this makes the
 		   sprintf safe. */
-			if (! (kbuf = kmalloc(count + 80,GFP_KERNEL)))
+			if (! (kbuf = kmalloc(len_total +
+			                      OUTPUT_LENGTH_PER_LINE,
+			                      GFP_KERNEL)))
 				return -ENOMEM;
 			/* Order will hold the indexes of the clients
 			   sorted by address */
@@ -731,11 +698,7 @@ int i2cproc_init(void)
 		return -ENOENT;
  	}
 	proc_bus_i2c->read_proc = &read_bus_i2c;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,27))
 	proc_bus_i2c->owner = THIS_MODULE;
-#else
-	proc_bus_i2c->fill_inode = &monitor_bus_i2c;
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,27)) */
 	i2cproc_initialized += 2;
 	return 0;
 }
@@ -1492,6 +1455,11 @@ static int __init i2c_init(void)
 	return 0;
 }
 
+static void __exit i2c_exit(void)
+{
+	i2cproc_cleanup();
+}
+
 #ifndef MODULE
 #ifdef CONFIG_I2C_CHARDEV
 	extern int i2c_dev_init(void);
@@ -1622,20 +1590,11 @@ EXPORT_SYMBOL(i2c_smbus_write_i2c_block_data);
 EXPORT_SYMBOL(i2c_get_functionality);
 EXPORT_SYMBOL(i2c_check_functionality);
 
-#ifdef MODULE
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus main module");
 MODULE_PARM(i2c_debug, "i");
 MODULE_PARM_DESC(i2c_debug,"debug level");
 MODULE_LICENSE("GPL");
 
-int init_module(void) 
-{
-	return i2c_init();
-}
-
-void cleanup_module(void) 
-{
-	i2cproc_cleanup();
-}
-#endif
+module_init(i2c_init);
+module_exit(i2c_exit);
