@@ -1417,6 +1417,7 @@ void __init setup_arch(char **cmdline_p)
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
+	acpi_boot_table_init();
 	acpi_boot_init();
 
 #ifdef CONFIG_X86_LOCAL_APIC
