@@ -11,22 +11,18 @@
  * Code common to all CIA core logic chips.
  */
 
-#include <linux/kernel.h>
-#include <linux/types.h>
-#include <linux/pci.h>
-#include <linux/sched.h>
-#include <linux/init.h>
-
-#include <asm/system.h>
-#include <asm/ptrace.h>
-#include <asm/hwrpb.h>
-
 #define __EXTERN_INLINE inline
 #include <asm/io.h>
 #include <asm/core_cia.h>
 #undef __EXTERN_INLINE
 
+#include <linux/types.h>
+#include <linux/pci.h>
+#include <linux/sched.h>
+#include <linux/init.h>
 #include <linux/bootmem.h>
+
+#include <asm/ptrace.h>
 
 #include "proto.h"
 #include "pci_impl.h"

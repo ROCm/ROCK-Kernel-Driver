@@ -4,28 +4,23 @@
  * Code common to all TITAN core logic chips.
  */
 
-#include <linux/config.h>
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/types.h>
-#include <linux/pci.h>
-#include <linux/sched.h>
-#include <linux/init.h>
-#include <linux/vmalloc.h>
-
-#include <asm/hwrpb.h>
-#include <asm/ptrace.h>
-#include <asm/system.h>
-#include <asm/smp.h>
-#include <asm/pgalloc.h>
-#include <asm/tlbflush.h>
-
 #define __EXTERN_INLINE inline
 #include <asm/io.h>
 #include <asm/core_titan.h>
 #undef __EXTERN_INLINE
 
+#include <linux/module.h>
+#include <linux/types.h>
+#include <linux/pci.h>
+#include <linux/sched.h>
+#include <linux/init.h>
+#include <linux/vmalloc.h>
 #include <linux/bootmem.h>
+
+#include <asm/ptrace.h>
+#include <asm/smp.h>
+#include <asm/pgalloc.h>
+#include <asm/tlbflush.h>
 
 #include "proto.h"
 #include "pci_impl.h"

@@ -9,20 +9,18 @@
  * Code common to all T2 core logic chips.
  */
 
-#include <linux/kernel.h>
+#define __EXTERN_INLINE
+#include <asm/io.h>
+#include <asm/core_t2.h>
+#undef __EXTERN_INLINE
+
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/sched.h>
 #include <linux/init.h>
 
 #include <asm/ptrace.h>
-#include <asm/system.h>
 #include <asm/delay.h>
-
-#define __EXTERN_INLINE
-#include <asm/io.h>
-#include <asm/core_t2.h>
-#undef __EXTERN_INLINE
 
 #include "proto.h"
 #include "pci_impl.h"
