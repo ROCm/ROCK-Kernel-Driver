@@ -427,11 +427,11 @@ void wake_up_forked_process(task_t * p)
  */
 void sched_exit(task_t * p)
 {
-	__cli();
+	local_irq_disable();
 	current->time_slice += p->time_slice;
 	if (unlikely(current->time_slice > MAX_TIMESLICE))
 		current->time_slice = MAX_TIMESLICE;
-	__sti();
+	local_irq_enable();
 	/*
 	 * If the child was a (relative-) CPU hog then decrease
 	 * the sleep_avg of the parent as well.
@@ -727,7 +727,8 @@ void scheduler_tick(int user_tick, int system)
 	task_t *p = current;
 
 	if (p == rq->idle) {
-		if (local_bh_count(cpu) || local_irq_count(cpu) > 1)
+		/* note: this timer irq context must be accounted for as well */
+		if (preempt_count() >= 2*IRQ_OFFSET)
 			kstat.per_cpu_system[cpu] += system;
 #if CONFIG_SMP
 		idle_tick();
@@ -816,7 +817,7 @@ need_resched:
 	prev = current;
 	rq = this_rq();
 
-	release_kernel_lock(prev, smp_processor_id());
+	release_kernel_lock(prev);
 	prepare_arch_schedule(prev);
 	prev->sleep_timestamp = jiffies;
 	spin_lock_irq(&rq->lock);
@@ -825,7 +826,7 @@ need_resched:
 	 * if entering off of a kernel preemption go straight
 	 * to picking the next task.
 	 */
-	if (unlikely(preempt_get_count() & PREEMPT_ACTIVE))
+	if (unlikely(preempt_count() & PREEMPT_ACTIVE))
 		goto pick_next_task;
 
 	switch (prev->state) {
@@ -1679,8 +1680,8 @@ void __init init_idle(task_t *idle, int cpu)
 	runqueue_t *idle_rq = cpu_rq(cpu), *rq = cpu_rq(task_cpu(idle));
 	unsigned long flags;
 
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	double_rq_lock(idle_rq, rq);
 
 	idle_rq->curr = idle_rq->idle = idle;
@@ -1691,10 +1692,12 @@ void __init init_idle(task_t *idle, int cpu)
 	set_task_cpu(idle, cpu);
 	double_rq_unlock(idle_rq, rq);
 	set_tsk_need_resched(idle);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	/* Set the preempt count _outside_ the spinlocks! */
+#if CONFIG_PREEMPT
 	idle->thread_info->preempt_count = (idle->lock_depth >= 0);
+#endif
 }
 
 extern void init_timervecs(void);

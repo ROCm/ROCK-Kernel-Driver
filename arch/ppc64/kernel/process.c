@@ -99,9 +99,9 @@ _switch_to(struct task_struct *prev, struct task_struct *new)
 	new_thread = &new->thread;
 	old_thread = &current->thread;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	_switch(old_thread, new_thread);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 void show_regs(struct pt_regs * regs)

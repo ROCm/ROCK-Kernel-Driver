@@ -21,10 +21,10 @@ extern void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq);
 			asm volatile("mfmsr %0" : "=r" (rval)); rval;})
 #define mtmsr(v)	asm volatile("mtmsr %0" : : "r" (v))
 
-#define __save_flags(flags)	((flags) = mfmsr())
-#define __restore_flags(flags)	mtmsr(flags)
+#define local_save_flags(flags)	((flags) = mfmsr())
+#define local_irq_restore(flags)	mtmsr(flags)
 
-static inline void __cli(void)
+static inline void local_irq_disable(void)
 {
 	unsigned long msr;
 	msr = mfmsr();
@@ -32,7 +32,7 @@ static inline void __cli(void)
 	__asm__ __volatile__("": : :"memory");
 }
 
-static inline void __sti(void)
+static inline void local_irq_enable(void)
 {
 	unsigned long msr;
 	__asm__ __volatile__("": : :"memory");
@@ -49,18 +49,18 @@ static inline void __do_save_and_cli(unsigned long *flags)
 	__asm__ __volatile__("": : :"memory");
 }
 
-#define __save_and_cli(flags)          __do_save_and_cli(&flags)
+#define local_irq_save(flags)          __do_save_and_cli(&flags)
 
 #else
 
-extern void __sti(void);
-extern void __cli(void);
-extern void __restore_flags(unsigned long);
-extern void __save_flags_ptr(unsigned long *);
-extern unsigned long __sti_end, __cli_end, __restore_flags_end, __save_flags_ptr_end;
+extern void local_irq_enable(void);
+extern void local_irq_disable(void);
+extern void local_irq_restore(unsigned long);
+extern void local_save_flags_ptr(unsigned long *);
+extern unsigned long local_irq_enable_end, local_irq_disable_end, local_irq_restore_end, local_save_flags_ptr_end;
 
-#define __save_flags(flags) __save_flags_ptr((unsigned long *)&flags)
-#define __save_and_cli(flags) ({__save_flags(flags);__cli();})
+#define local_save_flags(flags) local_save_flags_ptr((unsigned long *)&flags)
+#define local_irq_save(flags) ({local_save_flags(flags);local_irq_disable();})
 
 #endif
 

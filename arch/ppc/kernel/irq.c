@@ -422,7 +422,7 @@ handle_irq_event(int irq, struct pt_regs *regs, struct irqaction *action)
 	int status = 0;
 
 	if (!(action->flags & SA_INTERRUPT))
-		__sti();
+		local_irq_enable();
 
 	do {
 		status |= action->flags;
@@ -431,7 +431,7 @@ handle_irq_event(int irq, struct pt_regs *regs, struct irqaction *action)
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
-	__cli();
+	local_irq_disable();
 }
 
 /*
@@ -637,15 +637,15 @@ static inline void wait_on_irq(int cpu)
 				show("wait_on_irq");
 				count = ~0;
 			}
-			__sti();
+			local_irq_enable();
 			/* 
-			 * We have to allow irqs to arrive between __sti and __cli
+			 * We have to allow irqs to arrive between local_irq_enable and local_irq_disable
 			 * Some cpus apparently won't cause the interrupt
 			 * for several instructions. We hope that isync will
 			 * catch this --Troy
 			 */
 			__asm__ __volatile__ ("isync");
-			__cli();
+			local_irq_disable();
 			if (irqs_running())
 				continue;
 			if (global_irq_lock)
@@ -736,10 +736,10 @@ void __global_cli(void)
 {
 	unsigned long flags;
 	
-	__save_flags(flags);
+	local_save_flags(flags);
 	if (flags & (1 << 15)) {
 		int cpu = smp_processor_id();
-		__cli();
+		local_irq_disable();
 		if (!local_irq_count(cpu))
 			get_irqlock(cpu);
 	}
@@ -751,7 +751,7 @@ void __global_sti(void)
 
 	if (!local_irq_count(cpu))
 		release_irqlock(cpu);
-	__sti();
+	local_irq_enable();
 }
 
 /*
@@ -767,7 +767,7 @@ unsigned long __global_save_flags(void)
 	int local_enabled;
 	unsigned long flags;
 
-	__save_flags(flags);
+	local_save_flags(flags);
 	local_enabled = (flags >> 15) & 1;
 	/* default to local */
 	retval = 2 + local_enabled;
@@ -817,10 +817,10 @@ void __global_restore_flags(unsigned long flags)
 		__global_sti();
 		break;
 	case 2:
-		__cli();
+		local_irq_disable();
 		break;
 	case 3:
-		__sti();
+		local_irq_enable();
 		break;
 	default:
 	{

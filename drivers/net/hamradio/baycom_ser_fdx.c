@@ -350,7 +350,7 @@ static void ser12_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		bc->modem.ser12.txshreg >>= 1;
 	}
  end_transmit:
-	__sti();
+	local_irq_enable();
 	if (!bc->modem.ptt && txcount) {
 		hdlcdrv_arbitrate(dev, &bc->hdrv);
 		if (hdlcdrv_ptt(&bc->hdrv)) {
@@ -361,7 +361,7 @@ static void ser12_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	hdlcdrv_transmitter(dev, &bc->hdrv);
 	hdlcdrv_receiver(dev, &bc->hdrv);
-	__cli();
+	local_irq_disable();
 }
 
 /* --------------------------------------------------------------------- */

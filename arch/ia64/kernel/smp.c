@@ -91,7 +91,7 @@ stop_this_cpu (void)
 	 */
 	clear_bit(smp_processor_id(), &cpu_online_map);
 	max_xtp();
-	__cli();
+	local_irq_disable();
 	cpu_halt();
 }
 

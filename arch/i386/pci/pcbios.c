@@ -82,7 +82,7 @@ static unsigned long bios32_service(unsigned long service)
 	unsigned long entry;		/* %edx */
 	unsigned long flags;
 
-	__save_flags(flags); __cli();
+	local_save_flags(flags); local_irq_disable();
 	__asm__("lcall *(%%edi); cld"
 		: "=a" (return_code),
 		  "=b" (address),
@@ -91,7 +91,7 @@ static unsigned long bios32_service(unsigned long service)
 		: "0" (service),
 		  "1" (0),
 		  "D" (&bios32_indirect));
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	switch (return_code) {
 		case 0:
@@ -122,7 +122,7 @@ static int __devinit check_pcibios(void)
 	if ((pcibios_entry = bios32_service(PCI_SERVICE))) {
 		pci_indirect.address = pcibios_entry + PAGE_OFFSET;
 
-		__save_flags(flags); __cli();
+		local_save_flags(flags); local_irq_disable();
 		__asm__(
 			"lcall *(%%edi); cld\n\t"
 			"jc 1f\n\t"
@@ -135,7 +135,7 @@ static int __devinit check_pcibios(void)
 			: "1" (PCIBIOS_PCI_BIOS_PRESENT),
 			  "D" (&pci_indirect)
 			: "memory");
-		__restore_flags(flags);
+		local_irq_restore(flags);
 
 		status = (eax >> 8) & 0xff;
 		hw_mech = eax & 0xff;

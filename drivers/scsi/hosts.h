@@ -210,9 +210,9 @@ typedef struct	SHT
      * This function determines the bios parameters for a given
      * harddisk.  These tend to be numbers that are made up by
      * the host adapter.  Parameters:
-     * size, device number, list (heads, sectors, cylinders)
+     * size, device, list (heads, sectors, cylinders)
      */
-    int (* bios_param)(Disk *, kdev_t, int []);
+    int (* bios_param)(Disk *, struct block_device *, int []);
 
 
     /*

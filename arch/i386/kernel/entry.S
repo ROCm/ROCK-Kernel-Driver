@@ -72,12 +72,8 @@ VM_MASK		= 0x00020000
 
 #ifdef CONFIG_PREEMPT
 #define preempt_stop		cli
-#define INC_PRE_COUNT(reg)	incl TI_PRE_COUNT(reg);
-#define DEC_PRE_COUNT(reg)	decl TI_PRE_COUNT(reg);
 #else
 #define preempt_stop
-#define INC_PRE_COUNT(reg)
-#define DEC_PRE_COUNT(reg)
 #define resume_kernel		restore_all
 #endif
 
@@ -190,8 +186,6 @@ ENTRY(ret_from_fork)
 	# userspace resumption stub bypassing syscall exit tracing
 	ALIGN
 ret_from_intr:
-	preempt_stop
-	DEC_PRE_COUNT(%ebx)
 ret_from_exception:
 	movl EFLAGS(%esp), %eax		# mix EFLAGS and CS
 	movb CS(%esp), %al
@@ -338,9 +332,8 @@ vector=vector+1
 	ALIGN
 common_interrupt:
 	SAVE_ALL
-	GET_THREAD_INFO(%ebx)
-	INC_PRE_COUNT(%ebx)
 	call do_IRQ
+	GET_THREAD_INFO(%ebx)
 	jmp ret_from_intr
 
 #define BUILD_INTERRUPT(name, nr)	\
@@ -348,7 +341,6 @@ ENTRY(name)				\
 	pushl $nr-256;			\
 	SAVE_ALL			\
 	GET_THREAD_INFO(%ebx);		\
-	INC_PRE_COUNT(%ebx)		\
 	call smp_/**/name;	\
 	jmp ret_from_intr;
 

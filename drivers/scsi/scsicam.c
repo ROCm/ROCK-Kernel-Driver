@@ -26,39 +26,25 @@
 static int setsize(unsigned long capacity, unsigned int *cyls, unsigned int *hds,
 		   unsigned int *secs);
 
-unsigned char *scsi_bios_ptable(kdev_t dev)
+unsigned char *scsi_bios_ptable(struct block_device *dev)
 {
-	struct block_device *bdev;
 	unsigned char *res = kmalloc(66, GFP_KERNEL);
-	kdev_t rdev = mk_kdev(major(dev), minor(dev) & ~0x0f);
-
 	if (res) {
-		struct buffer_head *bh;
-		int err;
-
-		bdev = bdget(kdev_t_to_nr(rdev));
-		if (!bdev)
-			goto fail;
-		err = blkdev_get(bdev, FMODE_READ, 0, BDEV_FILE);
-		if (err)
-			goto fail;
-		bh = __bread(bdev, 0, block_size(bdev));
-		if (!bh)
-			goto fail2;
-		memcpy(res, bh->b_data + 0x1be, 66);
-		brelse(bh);
-		blkdev_put(bdev, BDEV_FILE);
+		struct block_device *bdev = dev->bd_contains;
+		struct buffer_head *bh = __bread(bdev, 0, block_size(bdev));
+		if (bh) {
+			memcpy(res, bh->b_data + 0x1be, 66);
+			brelse(bh);
+		} else {
+			kfree(res);
+			res = NULL;
+		}
 	}
 	return res;
-fail2:
-	blkdev_put(bdev, BDEV_FILE);
-fail:
-	kfree(res);
-	return NULL;
 }
 
 /*
- * Function : int scsicam_bios_param (Disk *disk, int dev, int *ip)
+ * Function : int scsicam_bios_param (Disk *disk, struct block_device *bdev, int *ip)
  *
  * Purpose : to determine the BIOS mapping used for a drive in a 
  *      SCSI-CAM system, storing the results in ip as required
@@ -69,13 +55,13 @@ fail:
  */
 
 int scsicam_bios_param(Disk * disk,	/* SCSI disk */
-		       kdev_t dev,	/* Device major, minor */
+		       struct block_device *bdev,
 		  int *ip /* Heads, sectors, cylinders in that order */ )
 {
 	int ret_code;
 	int size = disk->capacity;
 	unsigned long temp_cyl;
-	unsigned char *p = scsi_bios_ptable(dev);
+	unsigned char *p = scsi_bios_ptable(bdev);
 
 	if (!p)
 		return -1;

@@ -64,7 +64,7 @@ const char * isp1020_info(struct Scsi_Host *);
 int isp1020_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
 int isp1020_abort(Scsi_Cmnd *);
 int isp1020_reset(Scsi_Cmnd *, unsigned int);
-int isp1020_biosparam(Disk *, kdev_t, int[]);
+int isp1020_biosparam(Disk *, struct block_device *, int[]);
 
 #ifndef NULL
 #define NULL (0)

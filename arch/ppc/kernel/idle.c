@@ -120,7 +120,7 @@ void power_save(void)
 	 * Disable interrupts to prevent a lost wakeup
 	 * when going to sleep.  This is necessary even with
 	 * RTLinux since we are not guaranteed an interrupt
-	 * didn't come in and is waiting for a __sti() before
+	 * didn't come in and is waiting for a local_irq_enable() before
 	 * emulating one.  This way, we really do hard disable.
 	 * 
 	 * We assume that we're sti-ed when we come in here.  We
@@ -163,8 +163,8 @@ void yield_shared_processor(void)
 	u64 tb;
 
 	/* Poll for I/O events */
-	__cli();
-	__sti();
+	local_irq_disable();
+	local_irq_enable();
 	
 	paca = (struct Paca *)mfspr(SPRG1);
 	if ( paca->xLpPaca.xSharedProc ) {
@@ -181,8 +181,8 @@ void yield_shared_processor(void)
 		 * Disabling/enabling will check for LpEvents, IPIs
 		 * and decrementers
 		 */
-		__cli();
-		__sti();
+		local_irq_disable();
+		local_irq_enable();
 
 		++yield_count;
 
@@ -193,14 +193,14 @@ void yield_shared_processor(void)
 		HvCall_yieldProcessor( HvCall_YieldTimed, tb );
 
 		/* Check here for any of the above pending or timeout expired*/
-		__cli();
+		local_irq_disable();
 		/*
 		 * The decrementer stops during the yield.  Just force
 		 * a fake decrementer now and the timer_interrupt
 		 * code will straighten it all out
 		 */
 		paca->xLpPaca.xDecrInt = 1;
-		__sti();
+		local_irq_enable();
 	}
 }
 #endif /* CONFIG_PPC_ISERIES */

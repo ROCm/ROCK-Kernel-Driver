@@ -70,7 +70,8 @@ duration of the critical region.
 preempt_enable()		decrement the preempt counter
 preempt_disable()		increment the preempt counter
 preempt_enable_no_resched()	decrement, but do not immediately preempt
-preempt_get_count()		return the preempt counter
+preempt_check_resched()		if needed, reschedule
+preempt_count()			return the preempt counter
 
 The functions are nestable.  In other words, you can call preempt_disable
 n-times in a code path, and preemption will not be reenabled until the n-th
@@ -80,6 +81,13 @@ preemption is not enabled.
 Note that you do not need to explicitly prevent preemption if you are holding
 any locks or interrupts are disabled, since preemption is implicitly disabled
 in those cases.
+
+But keep in mind that 'irqs disabled' is a fundamentally unsafe way of
+disabling preemption - any spin_unlock() decreasing the preemption count
+to 0 might trigger a reschedule. A simple printk() might trigger a reschedule.
+So use this implicit preemption-disabling property only if you know that the
+affected codepath does not do any of this. Best policy is to use this only for
+small, atomic code that you wrote and which calls no complex functions.
 
 Example:
 

@@ -10,12 +10,14 @@
 #include <linux/config.h>
 #include <linux/irq.h>
 #include <linux/tqueue.h>
+
 #include <asm/processor.h> 
 #include <asm/system.h>
 #include <asm/msr.h>
 #include <asm/apic.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
+#include <asm/hardirq.h>
 
 #ifdef CONFIG_X86_MCE
 
@@ -74,7 +76,9 @@ static void (*vendor_thermal_interrupt)(struct pt_regs *regs) = unexpected_therm
 
 asmlinkage void smp_thermal_interrupt(struct pt_regs regs)
 {
+	irq_enter();
 	vendor_thermal_interrupt(&regs);
+	irq_exit();
 }
 
 /* P4/Xeon Thermal regulation detect and init */

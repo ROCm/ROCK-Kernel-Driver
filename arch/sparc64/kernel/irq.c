@@ -634,9 +634,9 @@ again:
 				show("get_irqlock");
 				count = (~0 >> 1);
 			}
-			__sti();
+			local_irq_enable();
 			SYNC_OTHER_ULTRAS(cpu);
-			__cli();
+			local_irq_disable();
 		}
 		goto again;
 	}
@@ -648,10 +648,10 @@ void __global_cli(void)
 {
 	unsigned long flags;
 
-	__save_flags(flags);
+	local_save_flags(flags);
 	if(flags == 0) {
 		int cpu;
-		__cli();
+		local_irq_disable();
 		cpu = smp_processor_id();
 		if (! local_irq_count(cpu))
 			get_irqlock(cpu);
@@ -666,7 +666,7 @@ void __global_sti(void)
 	cpu = smp_processor_id();
 	if (! local_irq_count(cpu))
 		release_irqlock(cpu);
-	__sti();
+	local_irq_enable();
 	preempt_enable();
 }
 
@@ -674,7 +674,7 @@ unsigned long __global_save_flags(void)
 {
 	unsigned long flags, local_enabled, retval;
 
-	__save_flags(flags);
+	local_save_flags(flags);
 	local_enabled = ((flags == 0) ? 1 : 0);
 	retval = 2 + local_enabled;
 	if (! local_irq_count(smp_processor_id())) {
@@ -696,10 +696,10 @@ void __global_restore_flags(unsigned long flags)
 		__global_sti();
 		break;
 	case 2:
-		__cli();
+		local_irq_disable();
 		break;
 	case 3:
-		__sti();
+		local_irq_enable();
 		break;
 	default:
 	{

@@ -52,7 +52,7 @@ prom_cmdline(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 #ifdef CONFIG_SUN_CONSOLE
 	if(!serial_console && prom_palette)
@@ -75,7 +75,7 @@ prom_cmdline(void)
 		prom_palette (0);
 #endif
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 #ifdef CONFIG_SMP

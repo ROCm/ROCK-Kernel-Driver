@@ -61,16 +61,16 @@ _GLOBAL(get_tb64)
 	mtmsr	r5		/* restore MSR_EE */
 	blr
 
-/* void __save_flags(unsigned long *flags) */
-_GLOBAL(__save_flags_ptr)
+/* void local_save_flags(unsigned long *flags) */
+_GLOBAL(local_save_flags_ptr)
 	mfspr	r4,SPRG1	/* Get Paca pointer */
 	lbz	r4,PACAPROCENABLED(r4)
 	stw	r4,0(r3)
 	blr
-_GLOBAL(__save_flags_ptr_end)
+_GLOBAL(local_save_flags_ptr_end)
 
-/* void __restore_flags(unsigned long flags) */	
-_GLOBAL(__restore_flags)
+/* void local_irq_restore(unsigned long flags) */	
+_GLOBAL(local_irq_restore)
 	cmpi	0,r3,0		/* Are we enabling? */
 	beq	0f		/* No - then skip interrupt checks */
 
@@ -104,19 +104,19 @@ _GLOBAL(__restore_flags)
 	mfspr	r4,SPRG1
 	stb	r3,PACAPROCENABLED(r4)
 	blr
-_GLOBAL(__restore_flags_end)
+_GLOBAL(local_irq_restore_end)
 	
-_GLOBAL(__cli)
+_GLOBAL(local_irq_disable)
 	mfspr	r4,SPRG1
 	li	r3,0
 	stb	r3,PACAPROCENABLED(r4)
 	blr			/* Done */
-_GLOBAL(__cli_end)
+_GLOBAL(local_irq_disable_end)
 
-_GLOBAL(__sti)
+_GLOBAL(local_irq_enable)
 	li	r3,1
-	b	__restore_flags
-_GLOBAL(__sti_end)
+	b	local_irq_restore
+_GLOBAL(local_irq_enable_end)
 
 /*
  * We were about to enable interrupts but we have to simulate

@@ -49,7 +49,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 /*
  * Save the current interrupt enable state & disable IRQs
  */
-#define __save_flags_cli(x)					\
+#define local_save_flags_cli(x)					\
 	({							\
 		unsigned long temp;				\
 	__asm__ __volatile__(					\
@@ -64,7 +64,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 /*
  * Enable IRQs
  */
-#define __sti()							\
+#define local_irq_enable()							\
 	({							\
 		unsigned long temp;				\
 	__asm__ __volatile__(					\
@@ -79,7 +79,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 /*
  * Disable IRQs
  */
-#define __cli()							\
+#define local_irq_disable()							\
 	({							\
 		unsigned long temp;				\
 	__asm__ __volatile__(					\
@@ -124,7 +124,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 /*
  * save current IRQ & FIQ state
  */
-#define __save_flags(x)						\
+#define local_save_flags(x)						\
 	__asm__ __volatile__(					\
 	"mrs	%0, cpsr		@ save_flags\n"		\
 	  : "=r" (x)						\
@@ -134,7 +134,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 /*
  * restore saved IRQ & FIQ state
  */
-#define __restore_flags(x)					\
+#define local_irq_restore(x)					\
 	__asm__ __volatile__(					\
 	"msr	cpsr_c, %0		@ restore_flags\n"	\
 	:							\
@@ -168,17 +168,17 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
 	switch (size) {
 #ifdef swp_is_buggy
 		case 1:
-			__save_flags_cli(flags);
+			local_save_flags_cli(flags);
 			ret = *(volatile unsigned char *)ptr;
 			*(volatile unsigned char *)ptr = x;
-			__restore_flags(flags);
+			local_irq_restore(flags);
 			break;
 
 		case 4:
-			__save_flags_cli(flags);
+			local_save_flags_cli(flags);
 			ret = *(volatile unsigned long *)ptr;
 			*(volatile unsigned long *)ptr = x;
-			__restore_flags(flags);
+			local_irq_restore(flags);
 			break;
 #else
 		case 1:	__asm__ __volatile__ ("swpb %0, %1, [%2]"

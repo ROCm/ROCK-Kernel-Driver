@@ -464,14 +464,6 @@ static int jsfd_ioctl(struct inode *inode, struct file *file,
 	case BLKGETSIZE64:
 		return put_user(jsfd_bytesizes[dev], (u64 *) arg);
 
-#if 0
-	case BLKROSET:
-	case BLKROGET:
-	case BLKSSZGET:
-		return blk_ioctl(inode->i_bdev, cmd, arg);
-#endif
-
-	/* case BLKFLSBUF: */	/* Program, then read, what happens? Stale? */
 	default: ;
 	}
 	return -ENOTTY;

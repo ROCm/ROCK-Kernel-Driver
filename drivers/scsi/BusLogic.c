@@ -4110,7 +4110,7 @@ int BusLogic_ResetCommand(SCSI_Command_T *Command, unsigned int ResetFlags)
   the BIOS, and a warning may be displayed.
 */
 
-int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, KernelDevice_T Device,
+int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, struct block_device *bdev,
 				int *Parameters)
 {
   BusLogic_HostAdapter_T *HostAdapter =
@@ -4138,7 +4138,7 @@ int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, KernelDevice_T Device,
     }
   DiskParameters->Cylinders =
     Disk->capacity / (DiskParameters->Heads * DiskParameters->Sectors);
-  buf = scsi_bios_ptable(Device);
+  buf = scsi_bios_ptable(bdev);
   if (buf == NULL) return 0;
   /*
     If the boot sector partition table flag is valid, search for a partition

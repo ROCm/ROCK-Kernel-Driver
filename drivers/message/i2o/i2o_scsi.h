@@ -20,7 +20,7 @@ extern int i2o_scsi_command(Scsi_Cmnd *);
 extern int i2o_scsi_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 extern int i2o_scsi_abort(Scsi_Cmnd *);
 extern int i2o_scsi_reset(Scsi_Cmnd *, unsigned int);
-extern int i2o_scsi_bios_param(Disk *, kdev_t, int *);
+extern int i2o_scsi_bios_param(Disk *, struct block_device *, int *);
 extern void i2o_scsi_setup(char *str, int *ints);
 extern int i2o_scsi_release(struct Scsi_Host *host);
 

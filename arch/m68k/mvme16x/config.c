@@ -52,7 +52,6 @@ extern int  mvme16x_kbdrate (struct kbd_repeat *);
 extern unsigned long mvme16x_gettimeoffset (void);
 extern int mvme16x_hwclk (int, struct rtc_time *);
 extern int mvme16x_set_clock_mmss (unsigned long);
-extern void mvme16x_check_partition (struct gendisk *hd, unsigned int dev);
 extern void mvme16x_mksound( unsigned int count, unsigned int ticks );
 extern void mvme16x_reset (void);
 extern void mvme16x_waitbut(void);

@@ -22,7 +22,7 @@
 #include <linux/kernel.h>
 
 extern __inline__ void
-__sti(void)
+local_irq_enable(void)
 {
 	__asm__ __volatile__(
 		".set\tpush\n\t"
@@ -46,7 +46,7 @@ __sti(void)
  * no nops at all.
  */
 extern __inline__ void
-__cli(void)
+local_irq_disable(void)
 {
 	__asm__ __volatile__(
 		".set\tpush\n\t"
@@ -66,7 +66,7 @@ __cli(void)
 		: "$1", "memory");
 }
 
-#define __save_flags(x)							\
+#define local_save_flags(x)							\
 __asm__ __volatile__(							\
 	".set\tpush\n\t"						\
 	".set\treorder\n\t"						\
@@ -74,7 +74,7 @@ __asm__ __volatile__(							\
 	".set\tpop\n\t"							\
 	: "=r" (x))
 
-#define __save_and_cli(x)						\
+#define local_irq_save(x)						\
 __asm__ __volatile__(							\
 	".set\tpush\n\t"						\
 	".set\treorder\n\t"						\
@@ -92,12 +92,12 @@ __asm__ __volatile__(							\
 	: /* no inputs */						\
 	: "$1", "memory")
 
-#define __restore_flags(flags)						\
+#define local_irq_restore(flags)						\
 do {									\
 	unsigned long __tmp1;						\
 									\
 	__asm__ __volatile__(						\
-		".set\tnoreorder\t\t\t# __restore_flags\n\t"		\
+		".set\tnoreorder\t\t\t# local_irq_restore\n\t"		\
 		".set\tnoat\n\t"					\
 		"mfc0\t$1, $12\n\t"					\
 		"andi\t%0, 1\n\t"					\
@@ -129,19 +129,13 @@ extern void __global_restore_flags(unsigned long);
 
 #else /* Single processor */
 
-#  define sti() __sti()
-#  define cli() __cli()
-#  define save_flags(x) __save_flags(x)
-#  define save_and_cli(x) __save_and_cli(x)
-#  define restore_flags(x) __restore_flags(x)
+#  define sti() local_irq_enable()
+#  define cli() local_irq_disable()
+#  define save_flags(x) local_save_flags(x)
+#  define save_and_cli(x) local_irq_save(x)
+#  define restore_flags(x) local_irq_restore(x)
 
 #endif /* SMP */
-
-/* For spinlocks etc */
-#define local_irq_save(x)	__save_and_cli(x);
-#define local_irq_restore(x)	__restore_flags(x);
-#define local_irq_disable()	__cli();
-#define local_irq_enable()	__sti();
 
 /*
  * These are probably defined overly paranoid ...

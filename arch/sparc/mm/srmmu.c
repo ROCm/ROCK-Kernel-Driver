@@ -694,7 +694,7 @@ static void cypress_flush_cache_mm(struct mm_struct *mm)
 
 	FLUSH_BEGIN(mm)
 	flush_user_windows();
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	octx = srmmu_get_context();
 	srmmu_set_context(mm->context);
 	a = 0x20; b = 0x40; c = 0x60;
@@ -718,7 +718,7 @@ static void cypress_flush_cache_mm(struct mm_struct *mm)
 				     "r" (e), "r" (f), "r" (g));
 	} while(faddr);
 	srmmu_set_context(octx);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	FLUSH_END
 }
 
@@ -731,7 +731,7 @@ static void cypress_flush_cache_range(struct vm_area_struct *vma, unsigned long 
 
 	FLUSH_BEGIN(mm)
 	flush_user_windows();
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	octx = srmmu_get_context();
 	srmmu_set_context(mm->context);
 	a = 0x20; b = 0x40; c = 0x60;
@@ -760,7 +760,7 @@ static void cypress_flush_cache_range(struct vm_area_struct *vma, unsigned long 
 		start += SRMMU_PMD_SIZE;
 	}
 	srmmu_set_context(octx);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	FLUSH_END
 }
 
@@ -773,7 +773,7 @@ static void cypress_flush_cache_page(struct vm_area_struct *vma, unsigned long p
 
 	FLUSH_BEGIN(mm)
 	flush_user_windows();
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	octx = srmmu_get_context();
 	srmmu_set_context(mm->context);
 	a = 0x20; b = 0x40; c = 0x60;
@@ -799,7 +799,7 @@ static void cypress_flush_cache_page(struct vm_area_struct *vma, unsigned long p
 					     "r" (e), "r" (f), "r" (g));
 	} while(line != page);
 	srmmu_set_context(octx);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	FLUSH_END
 }
 

@@ -132,23 +132,23 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 #define set_wmb(var, value)     do { var = value; wmb(); } while (0)
 
 /* interrupt control.. */
-#define __sti() ({ \
+#define local_irq_enable() ({ \
         __u8 __dummy; \
         __asm__ __volatile__ ( \
                 "stosm 0(%0),0x03" : : "a" (&__dummy) : "memory"); \
         })
 
-#define __cli() ({ \
+#define local_irq_disable() ({ \
         __u32 __flags; \
         __asm__ __volatile__ ( \
                 "stnsm 0(%0),0xFC" : : "a" (&__flags) : "memory"); \
         __flags; \
         })
 
-#define __save_flags(x) \
+#define local_save_flags(x) \
         __asm__ __volatile__("stosm 0(%0),0" : : "a" (&x) : "memory")
 
-#define __restore_flags(x) \
+#define local_irq_restore(x) \
         __asm__ __volatile__("ssm   0(%0)" : : "a" (&x) : "memory")
 
 #define __load_psw(psw) \
@@ -211,10 +211,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
         })
 
 /* For spinlocks etc */
-#define local_irq_save(x)	((x) = __cli())
-#define local_irq_restore(x)	__restore_flags(x)
-#define local_irq_disable()	__cli()
-#define local_irq_enable()	__sti()
+#define local_irq_save(x)	((x) = local_irq_disable())
 
 #ifdef CONFIG_SMP
 
@@ -235,10 +232,10 @@ extern void smp_ctl_clear_bit(int cr, int bit);
 
 #else
 
-#define cli() __cli()
-#define sti() __sti()
-#define save_flags(x) __save_flags(x)
-#define restore_flags(x) __restore_flags(x)
+#define cli() local_irq_disable()
+#define sti() local_irq_enable()
+#define save_flags(x) local_save_flags(x)
+#define restore_flags(x) local_irq_restore(x)
 
 #define ctl_set_bit(cr, bit) __ctl_set_bit(cr, bit)
 #define ctl_clear_bit(cr, bit) __ctl_clear_bit(cr, bit)

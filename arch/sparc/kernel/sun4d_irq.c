@@ -490,14 +490,14 @@ static void __init sun4d_init_timers(void (*counter_fn)(int, void *, struct pt_r
 		 * has copied the firmwares level 14 vector into boot cpu's
 		 * trap table, we must fix this now or we get squashed.
 		 */
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		patchme_maybe_smp_msg[0] = 0x01000000; /* NOP out the branch */
 		trap_table->inst_one = lvl14_save[0];
 		trap_table->inst_two = lvl14_save[1];
 		trap_table->inst_three = lvl14_save[2];
 		trap_table->inst_four = lvl14_save[3];
 		local_flush_cache_all();
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 #endif
 }
@@ -541,7 +541,7 @@ static char *sun4d_irq_itoa(unsigned int irq)
 
 void __init sun4d_init_IRQ(void)
 {
-	__cli();
+	local_irq_disable();
 
 	BTFIXUPSET_CALL(enable_irq, sun4d_enable_irq, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(disable_irq, sun4d_disable_irq, BTFIXUPCALL_NORM);

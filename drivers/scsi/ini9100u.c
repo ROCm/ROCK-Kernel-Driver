@@ -583,7 +583,7 @@ int i91u_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 /*
  * Return the "logical geometry"
  */
-int i91u_biosparam(Scsi_Disk * disk, kdev_t dev, int *info_array)
+int i91u_biosparam(Scsi_Disk * disk, struct block_device *dev, int *info_array)
 {
 	HCS *pHcb;		/* Point to Host adapter control block */
 	TCS *pTcb;

@@ -143,7 +143,7 @@ void __init smp4d_callin(void)
 	local_flush_cache_all();
 	local_flush_tlb_all();
 	
-	__sti();	/* We don't allow PIL 14 yet */
+	local_irq_enable();	/* We don't allow PIL 14 yet */
 	
 	while(!smp_commenced)
 		barrier();
@@ -181,7 +181,7 @@ void __init smp4d_boot_cpus(void)
 	if (boot_cpu_id)
 		current_set[0] = NULL;
 
-	__sti();
+	local_irq_enable();
 	cpu_present_map = 0;
 	for(i=0; i < linux_num_cpus; i++)
 		cpu_present_map |= (1<<linux_cpus[i].mid);

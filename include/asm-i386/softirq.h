@@ -1,50 +1,27 @@
 #ifndef __ASM_SOFTIRQ_H
 #define __ASM_SOFTIRQ_H
 
-#include <asm/atomic.h>
+#include <linux/preempt.h>
 #include <asm/hardirq.h>
 
-#define __cpu_bh_enable(cpu) \
-		do { barrier(); local_bh_count(cpu)--; preempt_enable(); } while (0)
-#define cpu_bh_disable(cpu) \
-		do { preempt_disable(); local_bh_count(cpu)++; barrier(); } while (0)
+#define local_bh_disable() \
+		do { preempt_count() += IRQ_OFFSET; barrier(); } while (0)
+#define __local_bh_enable() \
+		do { barrier(); preempt_count() -= IRQ_OFFSET; } while (0)
 
-#define local_bh_disable()	cpu_bh_disable(smp_processor_id())
-#define __local_bh_enable()	__cpu_bh_enable(smp_processor_id())
-
-#define in_softirq() (local_bh_count(smp_processor_id()) != 0)
-
-/*
- * NOTE: this assembly code assumes:
- *
- *    (char *)&local_bh_count - 8 == (char *)&softirq_pending
- *
- * If you change the offsets in irq_stat then you have to
- * update this code as well.
- */
-#define _local_bh_enable()						\
+#define local_bh_enable()						\
 do {									\
-	unsigned int *ptr = &local_bh_count(smp_processor_id());	\
-									\
-	barrier();							\
-	if (!--*ptr)							\
-		__asm__ __volatile__ (					\
-			"cmpl $0, -8(%0);"				\
-			"jnz 2f;"					\
-			"1:;"						\
-									\
-			LOCK_SECTION_START("")				\
-			"2: pushl %%eax; pushl %%ecx; pushl %%edx;"	\
-			"call %c1;"					\
-			"popl %%edx; popl %%ecx; popl %%eax;"		\
-			"jmp 1b;"					\
-			LOCK_SECTION_END				\
-									\
-		: /* no output */					\
-		: "r" (ptr), "i" (do_softirq)				\
-		/* no registers clobbered */ );				\
+	if (unlikely((preempt_count() == IRQ_OFFSET) &&			\
+				softirq_pending(smp_processor_id()))) { \
+		__local_bh_enable();					\
+		do_softirq();						\
+		preempt_check_resched();				\
+	} else {							\
+		__local_bh_enable();					\
+		preempt_check_resched();				\
+	}								\
 } while (0)
 
-#define local_bh_enable() do { _local_bh_enable(); preempt_enable(); } while (0)
+#define in_softirq() in_interrupt()
 
 #endif	/* __ASM_SOFTIRQ_H */

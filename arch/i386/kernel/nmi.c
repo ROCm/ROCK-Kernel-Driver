@@ -78,7 +78,7 @@ int __init check_nmi_watchdog (void)
 	printk(KERN_INFO "testing NMI watchdog ... ");
 
 	memcpy(tmp, irq_stat, sizeof(tmp));
-	sti();
+	local_irq_enable();
 	mdelay((10*1000)/nmi_hz); // wait 10 ticks
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {

@@ -651,7 +651,7 @@ host->proc_name =  "qlogicfas";
 
 /*----------------------------------------------------------------*/
 /* return bios parameters */
-int	qlogicfas_biosparam(Disk * disk, kdev_t dev, int ip[])
+int	qlogicfas_biosparam(Disk * disk, struct block_device *dev, int ip[])
 {
 /* This should mimic the DOS Qlogic driver's behavior exactly */
 	ip[0] = 0x40;

@@ -158,10 +158,10 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 			break;
 		case FPC_EIR: { /* implementation / version register */
 			unsigned int flags;
-			__save_flags(flags);
+			local_save_flags(flags);
 			set_cp0_status(ST0_CU1, ST0_CU1);
 			__asm__ __volatile__("cfc1\t%0,$0": "=r" (tmp));
-			__restore_flags(flags);
+			local_irq_restore(flags);
 			break;
 		}
 		default:
@@ -418,10 +418,10 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			break;
 		case FPC_EIR: { /* implementation / version register */
 			unsigned int flags;
-			__save_flags(flags);
+			local_save_flags(flags);
 			set_cp0_status(ST0_CU1, ST0_CU1);
 			__asm__ __volatile__("cfc1\t%0,$0": "=r" (tmp));
-			__restore_flags(flags);
+			local_irq_restore(flags);
 			break;
 		}
 		default:

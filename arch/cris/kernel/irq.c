@@ -266,7 +266,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
 	action = irq_action[irq];
         if (action) {
                 if (!(action->flags & SA_INTERRUPT))
-                        __sti();
+                        local_irq_enable();
                 action = irq_action[irq];
                 do_random = 0;
                 do {
@@ -276,7 +276,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
                 } while (action);
                 if (do_random & SA_SAMPLE_RANDOM)
                         add_interrupt_randomness(irq);
-                __cli();
+                local_irq_disable();
         }
         irq_exit(cpu);
 

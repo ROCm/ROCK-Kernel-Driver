@@ -122,11 +122,6 @@ static int hptraid_ioctl(struct inode *inode, struct file *file,
 			return 0;
 		}
 
-	case BLKROSET:
-	case BLKROGET:
-	case BLKSSZGET:
-		return blk_ioctl(inode->i_bdev, cmd, arg);
-
 	default:
 		return -EINVAL;
 	};

@@ -126,7 +126,7 @@ void __init smp4m_callin(void)
 	local_flush_cache_all();
 	local_flush_tlb_all();
 
-	__sti();
+	local_irq_enable();
 }
 
 extern int cpu_idle(void *unused);
@@ -152,7 +152,7 @@ void __init smp4m_boot_cpus(void)
 
 	printk("Entering SMP Mode...\n");
 
-	__sti();
+	local_irq_enable();
 	cpu_present_map = 0;
 
 	for(i=0; i < linux_num_cpus; i++)

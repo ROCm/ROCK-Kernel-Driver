@@ -450,7 +450,7 @@ static int sgiseeq_open(struct net_device *dev)
 	unsigned long flags;
 	int err;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 	err = -EAGAIN;
 	if (request_irq(dev->irq, sgiseeq_interrupt, 0, sgiseeqstr, dev)) {
@@ -464,7 +464,7 @@ static int sgiseeq_open(struct net_device *dev)
 	netif_start_queue(dev);
 
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	return err;
 }
 

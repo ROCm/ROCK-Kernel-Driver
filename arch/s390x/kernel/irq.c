@@ -162,9 +162,9 @@ static inline void wait_on_irq(int cpu)
 				show("wait_on_irq");
 				count = ~0;
 			}
-			__sti();
+			local_irq_enable();
 			SYNC_OTHER_CORES(cpu);
-			__cli();
+			local_irq_disable();
 			check_smp_invalidate(cpu);
 			if (atomic_read(&global_irq_count))
 				continue;
@@ -250,10 +250,10 @@ void __global_cli(void)
 {
 	unsigned long flags;
 
-	__save_flags(flags);
+	local_save_flags(flags);
 	if (flags & (1UL << EFLAGS_I_SHIFT)) {
 		int cpu = smp_processor_id();
-		__cli();
+		local_irq_disable();
 		if (!in_irq())
 			get_irqlock(cpu);
 	}
@@ -264,7 +264,7 @@ void __global_sti(void)
 
 	if (!in_irq())
 		release_irqlock(smp_processor_id());
-	__sti();
+	local_irq_enable();
 }
 
 /*
@@ -280,7 +280,7 @@ unsigned long __global_save_flags(void)
 	int local_enabled;
 	unsigned long flags;
 
-	__save_flags(flags);
+	local_save_flags(flags);
 	local_enabled = (flags >> EFLAGS_I_SHIFT) & 1;
 	/* default to local */
 	retval = 2 + local_enabled;
@@ -306,10 +306,10 @@ void __global_restore_flags(unsigned long flags)
 		__global_sti();
 		break;
 	case 2:
-		__cli();
+		local_irq_disable();
 		break;
 	case 3:
-		__sti();
+		local_irq_enable();
 		break;
 	default:
 		printk("global_restore_flags: %08lx (%08lx)\n",

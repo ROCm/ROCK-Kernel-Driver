@@ -138,7 +138,7 @@ pcore_setup_arch(void)
 static void
 pcore_restart(char *cmd)
 {
-	__cli();
+	local_irq_disable();
 	/* Hard reset */
 	writeb(0x11, 0xfe000332);
 	while(1);
@@ -147,7 +147,7 @@ pcore_restart(char *cmd)
 static void
 pcore_halt(void)
 {
-	__cli();
+	local_irq_disable();
 	/* Turn off user LEDs */
 	writeb(0x00, 0xfe000300);
 	while (1);

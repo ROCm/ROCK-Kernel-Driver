@@ -711,7 +711,7 @@ static int idescsi_device_reset(Scsi_Cmnd *cmd)
 	return SUCCESS;
 }
 
-static int idescsi_bios(Disk *disk, kdev_t dev, int *parm)
+static int idescsi_bios(Disk *disk, struct block_device *dev, int *parm)
 {
 	idescsi_scsi_t *scsi = idescsi_private(disk->device->host);
 	struct ata_device *drive = scsi->drive;

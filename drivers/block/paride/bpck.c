@@ -17,6 +17,7 @@
 #define	BPCK_VERSION	"1.02" 
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -452,34 +453,36 @@ static void bpck_release_proto( PIA *pi)
 {       MOD_DEC_USE_COUNT;
 }
 
-struct pi_protocol bpck = { "bpck",0,5,2,4,256,
-			  bpck_write_regr,
-			  bpck_read_regr,
-			  bpck_write_block,
-			  bpck_read_block,
-			  bpck_connect,
-			  bpck_disconnect,
-			  bpck_test_port,
-			  bpck_probe_unit,
-		          bpck_test_proto,
-			  bpck_log_adapter,
-			  bpck_init_proto,
-			  bpck_release_proto
-			};
+static struct pi_protocol bpck = {
+	.name		= "bpck",
+	.max_mode	= 5,
+	.epp_first	= 2,
+	.default_delay	= 4,
+	.max_units	= 255,
+	.write_regr	= bpck_write_regr,
+	.read_regr	= bpck_read_regr,
+	.write_block	= bpck_write_block,
+	.read_block	= bpck_read_block,
+	.connect	= bpck_connect,
+	.disconnect	= bpck_disconnect,
+	.test_port	= bpck_test_port,
+	.probe_unit	= bpck_probe_unit,
+	.test_proto	= bpck_test_proto,
+	.log_adapter	= bpck_log_adapter,
+	.init_proto	= bpck_init_proto,
+	.release_proto	= bpck_release_proto,
+};
 
-#ifdef MODULE
-
-int	init_module(void)
-
-{	return pi_register(&bpck) - 1;
+static int __init bpck_init(void)
+{
+	return pi_register(&bpck)-1;
 }
 
-void	cleanup_module(void)
-
-{	pi_unregister(&bpck);
+static void __exit bpck_exit(void)
+{
+	pi_unregister(&bpck);
 }
 
-#endif
-
-/* end of bpck.c */
 MODULE_LICENSE("GPL");
+module_init(bpck_init)
+module_exit(bpck_exit)

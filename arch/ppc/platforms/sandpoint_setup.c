@@ -390,7 +390,7 @@ sandpoint_map_io(void)
 static void
 sandpoint_restart(char *cmd)
 {
-	__cli();
+	local_irq_disable();
 
 	/* Set exception prefix high - to the firmware */
 	_nmask_and_or_msr(0, MSR_IP);
@@ -404,7 +404,7 @@ sandpoint_restart(char *cmd)
 static void
 sandpoint_power_off(void)
 {
-	__cli();
+	local_irq_disable();
 	for(;;);  /* No way to shut power off with software */
 	/* NOTREACHED */
 }
