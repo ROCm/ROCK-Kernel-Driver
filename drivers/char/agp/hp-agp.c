@@ -31,7 +31,7 @@
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
-
+#include "hp.h"
 
 #ifndef log2
 #define log2(x)		ffz(~(x))

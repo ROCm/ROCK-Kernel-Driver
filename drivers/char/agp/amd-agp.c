@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
+#include "amd.h"
 
 struct amd_page_map {
 	unsigned long *real;

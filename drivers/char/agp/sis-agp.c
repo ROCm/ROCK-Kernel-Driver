@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
+#include "sis.h"
 
 static int sis_fetch_size(void)
 {
