@@ -227,9 +227,12 @@ struct dst_entry *sctp_v4_get_dst(union sctp_addr *daddr,
 				  union sctp_addr *saddr)
 {
 	struct rtable *rt;
-	struct flowi fl = { .nl_u = { .ip4_u = { .daddr =
-						    daddr->v4.sin_addr.s_addr,
-					       } } };
+	struct flowi fl = { 
+		.nl_u = { 
+			.ip4_u = { .daddr =
+				   daddr->v4.sin_addr.s_addr, }}, 
+		.proto = IPPROTO_SCTP,
+	};
 
 	if (saddr)
 		fl.fl4_src = saddr->v4.sin_addr.s_addr;

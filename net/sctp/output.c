@@ -429,6 +429,8 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	}
 
 	nskb->dst = dst_clone(transport->dst);
+	if (!nskb->dst)
+		goto no_route;
 
 	SCTP_DEBUG_PRINTK("***sctp_transmit_packet*** skb length %d\n",
 			  nskb->len);
@@ -436,6 +438,11 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 out:
 	packet->size = SCTP_IP_OVERHEAD;
 	return err;
+no_route:
+	kfree_skb(nskb);
+	IP_INC_STATS_BH(IpOutNoRoutes);
+	err = -EHOSTUNREACH;
+	goto out;
 }
 
 /********************************************************************
