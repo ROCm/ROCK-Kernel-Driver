@@ -1849,9 +1849,6 @@ static int tcp_v6_init_sock(struct sock *sk)
 	 */
 	tp->snd_cwnd = 2;
 
-	tp->frto_counter = 0;
-	tp->frto_highmark = 0;
-
 	/* See draft-stevens-tcpca-spec-01 for discussion of the
 	 * initialization of these values.
 	 */
