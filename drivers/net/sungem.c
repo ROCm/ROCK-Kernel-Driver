@@ -37,9 +37,9 @@
 #include <linux/random.h>
 #include <linux/workqueue.h>
 #include <linux/if_vlan.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>

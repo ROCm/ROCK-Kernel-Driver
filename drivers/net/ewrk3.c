@@ -161,8 +161,8 @@
 #include <linux/types.h>
 #include <linux/unistd.h>
 #include <linux/ctype.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>

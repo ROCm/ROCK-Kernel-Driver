@@ -18,9 +18,9 @@
 #include <linux/bootmem.h>
 #include <linux/swap.h>
 #include <linux/highmem.h>
+#include <linux/bitops.h>
 #include <asm/types.h>
 #include <asm/processor.h>
-#include <asm/bitops.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>

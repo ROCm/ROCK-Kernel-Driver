@@ -25,8 +25,8 @@
 #include <linux/serial.h>
 #include <linux/serialP.h>
 #include <linux/serial_core.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/serial.h>
 

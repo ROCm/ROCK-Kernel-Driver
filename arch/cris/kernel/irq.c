@@ -36,9 +36,9 @@
 #include <linux/init.h>
 #include <linux/seq_file.h>
 #include <linux/errno.h>
+#include <linux/bitops.h>
 
 #include <asm/io.h>
-#include <asm/bitops.h>
 
 /* Defined in arch specific irq.c */
 extern void arch_setup_irq(int irq);

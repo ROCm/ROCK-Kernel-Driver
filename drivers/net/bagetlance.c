@@ -25,9 +25,9 @@ static char *version = "bagetlance.c: v1.1 11/10/98\n";
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/baget/baget.h>
 

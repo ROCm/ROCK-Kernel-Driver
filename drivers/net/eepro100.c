@@ -102,8 +102,8 @@ static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <linux/init.h>
 #include <linux/mii.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/irq.h>

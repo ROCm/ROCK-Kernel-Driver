@@ -227,9 +227,9 @@ static int dma;
 #include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/atalk.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/dma.h>
 #include <asm/io.h>
 

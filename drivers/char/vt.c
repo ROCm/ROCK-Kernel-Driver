@@ -101,11 +101,11 @@
 #include <linux/bootmem.h>
 #include <linux/pm.h>
 #include <linux/font.h>
+#include <linux/bitops.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #include "console_macros.h"
 

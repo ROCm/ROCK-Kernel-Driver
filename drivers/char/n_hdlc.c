@@ -103,9 +103,9 @@
 #include <linux/string.h>	/* used in new tty drivers */
 #include <linux/signal.h>	/* used in new tty drivers */
 #include <linux/if.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/termios.h>
 #include <asm/uaccess.h>
 

@@ -50,7 +50,7 @@
 #include <linux/string.h>
 #include <linux/pagemap.h>
 #include <linux/dma-mapping.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <linux/capability.h>

@@ -193,8 +193,8 @@ static const int multicast_filter_limit = 32;
 #include <linux/mii.h>
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
+#include <linux/bitops.h>
 #include <asm/processor.h>	/* Processor type for cache alignment. */
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>

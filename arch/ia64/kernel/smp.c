@@ -29,9 +29,9 @@
 #include <linux/cache.h>
 #include <linux/delay.h>
 #include <linux/efi.h>
+#include <linux/bitops.h>
 
 #include <asm/atomic.h>
-#include <asm/bitops.h>
 #include <asm/current.h>
 #include <asm/delay.h>
 #include <asm/machvec.h>

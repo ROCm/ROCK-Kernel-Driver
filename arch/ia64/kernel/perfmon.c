@@ -38,8 +38,8 @@
 #include <linux/pagemap.h>
 #include <linux/mount.h>
 #include <linux/version.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/errno.h>
 #include <asm/intrinsics.h>
 #include <asm/page.h>

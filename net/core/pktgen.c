@@ -74,8 +74,8 @@
 #include <linux/init.h>
 #include <linux/inet.h>
 #include <linux/rcupdate.h>
+#include <linux/bitops.h>
 #include <asm/byteorder.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>

@@ -85,13 +85,13 @@ static char *serial_version = "4.30";
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
 #include <asm/setup.h>
 
 #include <asm/system.h>
 
 #include <asm/irq.h>
-#include <asm/bitops.h>
 
 #include <asm/amigahw.h>
 #include <asm/amigaints.h>

@@ -35,10 +35,7 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/slab.h>
-
-#if defined(__powerpc__)
-#include <asm/bitops.h>
-#endif
+#include <linux/bitops.h>
 
 #include "dvb_frontend.h"
 

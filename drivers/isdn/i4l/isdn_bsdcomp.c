@@ -68,9 +68,9 @@
 #include <linux/errno.h>
 #include <linux/string.h>	/* used in new tty drivers */
 #include <linux/signal.h>	/* used in new tty drivers */
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/types.h>
 

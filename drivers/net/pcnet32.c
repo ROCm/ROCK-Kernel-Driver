@@ -47,8 +47,8 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " tsbogend@alpha.franken.de\n";
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
 #include <linux/moduleparam.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>

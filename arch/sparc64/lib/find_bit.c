@@ -1,4 +1,4 @@
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 
 /**
  * find_next_bit - find the next set bit in a memory region

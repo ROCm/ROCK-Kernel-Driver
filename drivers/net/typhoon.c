@@ -115,8 +115,8 @@ static const int multicast_filter_limit = 32;
 #include <linux/ethtool.h>
 #include <linux/if_vlan.h>
 #include <linux/crc32.h>
+#include <linux/bitops.h>
 #include <asm/processor.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <linux/in6.h>

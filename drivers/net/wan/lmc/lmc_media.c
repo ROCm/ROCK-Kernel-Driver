@@ -16,11 +16,11 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/inet.h>
+#include <linux/bitops.h>
 
 #include <net/syncppp.h>
 
 #include <asm/processor.h>             /* Processor type for cache alignment. */
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 

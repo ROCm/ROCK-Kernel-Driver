@@ -8,10 +8,10 @@
 #include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/interrupt.h>
+#include <linux/bitops.h>
 #include <asm/ptrace.h>
 #include <asm/string.h>
 #include <asm/prom.h>
-#include <asm/bitops.h>
 #include <asm/bootx.h>
 #include <asm/machdep.h>
 #include <asm/xmon.h>

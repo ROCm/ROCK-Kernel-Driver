@@ -72,10 +72,10 @@ static const char rcsid[] = "$Id: sk_g16.c,v 1.1 1994/06/30 16:25:15 root Exp $"
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/bitops.h> 
 
 #include "sk_g16.h"
 

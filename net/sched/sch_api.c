@@ -35,6 +35,7 @@
 #include <linux/seq_file.h>
 #include <linux/kmod.h>
 #include <linux/list.h>
+#include <linux/bitops.h>
 
 #include <net/sock.h>
 #include <net/pkt_sched.h>
@@ -42,7 +43,6 @@
 #include <asm/processor.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 
 static int qdisc_notify(struct sk_buff *oskb, struct nlmsghdr *n, u32 clid,
 			struct Qdisc *old, struct Qdisc *new);

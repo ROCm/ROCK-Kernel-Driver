@@ -33,9 +33,9 @@
 #include <linux/etherdevice.h>
 #include <linux/init.h>
 #include <linux/random.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/byteorder.h>
 
 #include <net/irda/irda.h>

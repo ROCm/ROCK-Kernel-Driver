@@ -33,7 +33,7 @@
 #include <linux/wait.h>
 #include <linux/eventpoll.h>
 #include <linux/mount.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/io.h>

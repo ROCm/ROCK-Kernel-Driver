@@ -51,8 +51,8 @@
 #include <linux/dmapool.h>
 #include <linux/dma-mapping.h>
 #include <linux/usb.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/irq.h>

@@ -33,12 +33,12 @@
 #include <linux/string.h>
 #include <linux/dma-mapping.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/iommu.h>
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
-#include <asm/bitops.h>
 
 #define DBG(...)
 

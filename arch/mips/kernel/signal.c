@@ -20,9 +20,9 @@
 #include <linux/ptrace.h>
 #include <linux/suspend.h>
 #include <linux/unistd.h>
+#include <linux/bitops.h>
 
 #include <asm/asm.h>
-#include <asm/bitops.h>
 #include <asm/cacheflush.h>
 #include <asm/fpu.h>
 #include <asm/sim.h>

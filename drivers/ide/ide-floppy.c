@@ -97,13 +97,13 @@
 #include <linux/slab.h>
 #include <linux/cdrom.h>
 #include <linux/ide.h>
+#include <linux/bitops.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/unaligned.h>
-#include <asm/bitops.h>
 
 /*
  *	The following are used to debug the driver.

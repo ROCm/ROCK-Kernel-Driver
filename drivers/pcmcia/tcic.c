@@ -45,9 +45,9 @@
 #include <linux/delay.h>
 #include <linux/workqueue.h>
 #include <linux/device.h>
+#include <linux/bitops.h>
 
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <asm/system.h>
 
 #include <pcmcia/version.h>

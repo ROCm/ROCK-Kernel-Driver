@@ -34,12 +34,12 @@
 #include <linux/keyboard.h>
 #include <linux/init.h>
 #include <linux/pm.h>
+#include <linux/bitops.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/segment.h>
-#include <asm/bitops.h>
 #include <asm/delay.h>
 #include <asm/uaccess.h>
 

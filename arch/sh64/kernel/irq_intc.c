@@ -20,12 +20,12 @@
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/stddef.h>
+#include <linux/bitops.h>       /* this includes also <asm/registers.h */
+                                /* which is required to remap register */
+                                /* names used into __asm__ blocks...   */
 
 #include <asm/hardware.h>
 #include <asm/platform.h>
-#include <asm/bitops.h>		/* this includes also <asm/registers.h */
-				/* which is required to remap register */
-				/* names used into __asm__ blocks...   */
 #include <asm/page.h>
 #include <asm/io.h>
 #include <asm/irq.h>

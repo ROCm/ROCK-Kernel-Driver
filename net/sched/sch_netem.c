@@ -15,7 +15,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>

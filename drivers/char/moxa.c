@@ -50,10 +50,10 @@
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 
 #define		MOXA_VERSION		"5.1k"

@@ -25,7 +25,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/highmem.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/atomic.h>
 #include "raid6.h"
 

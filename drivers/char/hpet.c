@@ -28,13 +28,13 @@
 #include <linux/wait.h>
 #include <linux/bcd.h>
 #include <linux/seq_file.h>
+#include <linux/bitops.h>
 
 #include <asm/current.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/div64.h>
 
 #include <linux/acpi.h>

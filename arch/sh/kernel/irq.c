@@ -31,10 +31,10 @@
 #include <linux/init.h>
 #include <linux/seq_file.h>
 #include <linux/kallsyms.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <asm/pgalloc.h>
 #include <asm/delay.h>
 #include <asm/irq.h>

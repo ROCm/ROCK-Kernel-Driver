@@ -257,8 +257,8 @@ static int vortex_debug = 1;
 #include <linux/ethtool.h>
 #include <linux/highmem.h>
 #include <linux/eisa.h>
+#include <linux/bitops.h>
 #include <asm/irq.h>			/* For NR_IRQS only. */
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 

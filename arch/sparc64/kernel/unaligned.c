@@ -19,8 +19,8 @@
 #include <asm/uaccess.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/bitops.h>
 #include <asm/fpumacro.h>
-#include <asm/bitops.h>
 
 /* #define DEBUG_MNA */
 

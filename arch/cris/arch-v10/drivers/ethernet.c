@@ -222,13 +222,13 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
+#include <linux/bitops.h>
 
 #include <asm/arch/svinto.h>/* DMA and register descriptions */
 #include <asm/io.h>         /* LED_* I/O functions */
 #include <asm/irq.h>
 #include <asm/dma.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/ethernet.h>
 #include <asm/cache.h>
 
