@@ -861,7 +861,7 @@ static int resp_report_luns(unsigned char * cmd, unsigned char * buff,
 	unsigned int alloc_len; 
 	int lun_cnt, i, upper;
 	int select_report = (int)cmd[2];
-	ScsiLun *one_lun;
+	struct scsi_lun *one_lun;
 
 	alloc_len = cmd[9] + (cmd[8] << 8) + (cmd[7] << 16) + (cmd[6] << 24);
 	if ((alloc_len < 16) || (select_report > 2)) {
@@ -873,11 +873,11 @@ static int resp_report_luns(unsigned char * cmd, unsigned char * buff,
 			      (lun 0 to lun 16383) */
 		memset(buff, 0, bufflen);
 		lun_cnt = scsi_debug_max_luns;
-		buff[2] = ((sizeof(ScsiLun) * lun_cnt) >> 8) & 0xff;
-		buff[3] = (sizeof(ScsiLun) * lun_cnt) & 0xff;
-		lun_cnt = min((int)((bufflen - 8) / sizeof(ScsiLun)), 
+		buff[2] = ((sizeof(struct scsi_lun) * lun_cnt) >> 8) & 0xff;
+		buff[3] = (sizeof(struct scsi_lun) * lun_cnt) & 0xff;
+		lun_cnt = min((int)((bufflen - 8) / sizeof(struct scsi_lun)), 
 			      lun_cnt);
-		one_lun = (ScsiLun*) &buff[8];
+		one_lun = (struct scsi_lun *) &buff[8];
 		for (i = 0; i < lun_cnt; i++) {
 			upper = (i >> 8) & 0x3f;
 			if (upper)
