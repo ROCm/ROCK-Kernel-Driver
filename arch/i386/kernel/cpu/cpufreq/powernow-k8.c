@@ -516,6 +516,77 @@ static int check_pst_table(struct powernow_k8_data *data, struct pst_s *pst, u8 
 	return 0;
 }
 
+static void print_basics(struct powernow_k8_data *data)
+{
+	int j;
+	for (j = 0; j < data->numps; j++) {
+		printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x (%d mV)\n", j,
+			data->powernow_table[j].index & 0xff,
+			data->powernow_table[j].frequency/1000,
+			data->powernow_table[j].index >> 8,
+			find_millivolts_from_vid(data, data->powernow_table[j].index >> 8));
+	}
+	if (data->batps)
+		printk(KERN_INFO PFX "Only %d pstates on battery\n", data->batps);
+}
+
+static int fill_powernow_table(struct powernow_k8_data *data, struct pst_s *pst, u8 maxvid)
+{
+	struct cpufreq_frequency_table *powernow_table;
+	unsigned int j;
+
+	if (data->batps) {    /* use ACPI support to get full speed on mains power */
+		printk(KERN_WARNING PFX "Only %d pstates usable (use ACPI driver for full range\n", data->batps);
+		data->numps = data->batps;
+	}
+
+	for ( j=1; j<data->numps; j++ ) {
+		if (pst[j-1].fid >= pst[j].fid) {
+			printk(KERN_ERR PFX "PST out of sequence\n");
+			return -EINVAL;
+		}
+	}
+
+	if (data->numps < 2) {
+		printk(KERN_ERR PFX "no p states to transition\n");
+		return -ENODEV;
+	}
+                                                                                                    
+	if (check_pst_table(data, pst, maxvid))
+		return -EINVAL;
+
+	powernow_table = kmalloc((sizeof(struct cpufreq_frequency_table)
+		* (data->numps + 1)), GFP_KERNEL);
+	if (!powernow_table) {
+		printk(KERN_ERR PFX "powernow_table memory alloc failure\n");
+		return -ENOMEM;
+	}
+
+	for (j = 0; j < data->numps; j++) {
+		powernow_table[j].index = pst[j].fid; /* lower 8 bits */
+		powernow_table[j].index |= (pst[j].vid << 8); /* upper 8 bits */
+		powernow_table[j].frequency = find_khz_freq_from_fid(pst[j].fid);
+	}
+	powernow_table[data->numps].frequency = CPUFREQ_TABLE_END;
+	powernow_table[data->numps].index = 0;
+
+	if (query_current_values_with_pending_wait(data)) {
+		kfree(powernow_table);
+		return -EIO;
+	}
+
+	dprintk(KERN_INFO PFX "cfid %x, cvid %x\n", data->currfid, data->currvid);
+	data->powernow_table = powernow_table;
+	print_basics(data);
+
+	for (j = 0; j < data->numps; j++)
+		if ((pst[j].fid==data->currfid) && (pst[j].vid==data->currvid))
+			return 0;
+
+	dprintk(KERN_ERR PFX "currfid/vid do not match PST, ignoring\n");
+	return 0;
+}
+
 /* Find and validate the PSB/PST table in BIOS. */
 static int find_psb_table(struct powernow_k8_data *data)
 {
