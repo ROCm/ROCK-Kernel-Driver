@@ -236,6 +236,7 @@ static unsigned int real_irq_to_virt(unsigned int real_irq)
 	return ptr - virt_irq_to_real_map;
 }
 
+#ifdef CONFIG_SMP
 static int get_irq_server(unsigned int irq)
 {
 	cpumask_t cpumask = irq_affinity[irq];
@@ -265,6 +266,12 @@ static int get_irq_server(unsigned int irq)
 	return server;
 
 }
+#else
+static int get_irq_server(unsigned int irq)
+{
+	return default_server;
+}
+#endif
 
 static void xics_enable_irq(unsigned int virq)
 {
