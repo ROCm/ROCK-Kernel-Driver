@@ -167,6 +167,8 @@ void wakeup_bdflush(void);
 struct buffer_head *alloc_buffer_head(void);
 void free_buffer_head(struct buffer_head * bh);
 void FASTCALL(unlock_buffer(struct buffer_head *bh));
+void ll_rw_block(int, int, struct buffer_head * bh[]);
+int submit_bh(int, struct buffer_head *);
 extern int buffer_heads_over_limit;
 
 /*
