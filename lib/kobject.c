@@ -317,7 +317,7 @@ int subsystem_register(struct subsystem * s)
 	int error;
 
 	subsystem_init(s);
-	pr_debug("subsystem %s: registering\n",s->kobj.name);
+	pr_debug("subsystem %s: registering\n",s->kset.kobj.name);
 
 	if (!(error = kset_add(&s->kset))) {
 		if (!s->kset.subsys)
@@ -328,7 +328,7 @@ int subsystem_register(struct subsystem * s)
 
 void subsystem_unregister(struct subsystem * s)
 {
-	pr_debug("subsystem %s: unregistering\n",s->kobj.name);
+	pr_debug("subsystem %s: unregistering\n",s->kset.kobj.name);
 	kset_unregister(&s->kset);
 }
 
