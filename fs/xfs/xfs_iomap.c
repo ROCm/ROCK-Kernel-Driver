@@ -585,8 +585,10 @@ retry:
 	 * out to the file system's write iosize.  We clean up any extra
 	 * space left over when the file is closed in xfs_inactive().
 	 *
-	 * We don't bother with this for sync writes, because we need
-	 * to minimize the amount we write for good performance.
+	 * For sync writes, we are flushing delayed allocate space to
+	 * try to make additional space available for allocation near
+	 * the filesystem full boundary - preallocation hurts in that
+	 * situation, of course.
 	 */
 	if (!(ioflag & BMAPI_SYNC) && ((offset + count) > ip->i_d.di_size)) {
 		xfs_off_t	aligned_offset;

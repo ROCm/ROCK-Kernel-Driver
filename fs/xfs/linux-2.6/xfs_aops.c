@@ -994,17 +994,6 @@ linvfs_get_block(
 }
 
 STATIC int
-linvfs_get_block_sync(
-	struct inode		*inode,
-	sector_t		iblock,
-	struct buffer_head	*bh_result,
-	int			create)
-{
-	return linvfs_get_block_core(inode, iblock, 0, bh_result,
-					create, 0, BMAPI_SYNC|BMAPI_WRITE);
-}
-
-STATIC int
 linvfs_get_blocks_direct(
 	struct inode		*inode,
 	sector_t		iblock,
@@ -1258,13 +1247,7 @@ linvfs_prepare_write(
 	unsigned int		from,
 	unsigned int		to)
 {
-	if (file && (file->f_flags & O_SYNC)) {
-		return block_prepare_write(page, from, to,
-						linvfs_get_block_sync);
-	} else {
-		return block_prepare_write(page, from, to,
-						linvfs_get_block);
-	}
+	return block_prepare_write(page, from, to, linvfs_get_block);
 }
 
 struct address_space_operations linvfs_aops = {
