@@ -93,7 +93,7 @@ void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb,
 			if (skb->sk->state == TCP_LISTEN)
 				goto drop;
 
-			llc_save_primitive(skb, ev->primitive);
+			llc_save_primitive(skb, ev->prim);
 
 			/* queue skb to the user. */
 			if (sock_queue_rcv_skb(skb->sk, skb))
@@ -118,14 +118,13 @@ void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb)
 	pdu = llc_pdu_un_hdr(skb);
 	switch (LLC_U_PDU_RSP(pdu)) {
 	case LLC_1_PDU_CMD_TEST:
-		ev->primitive = LLC_TEST_PRIM;	   break;
+		ev->prim = LLC_TEST_PRIM;	break;
 	case LLC_1_PDU_CMD_XID:
-		ev->primitive = LLC_XID_PRIM;	   break;
+		ev->prim = LLC_XID_PRIM;	break;
 	case LLC_1_PDU_CMD_UI:
-		ev->primitive = LLC_DATAUNIT_PRIM; break;
+		ev->prim = LLC_DATAUNIT_PRIM;	break;
 	}
 	ev->ind_cfm_flag = LLC_IND;
-	ev->prim	 = NULL;
 }
 
 /**

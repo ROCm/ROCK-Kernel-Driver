@@ -66,12 +66,6 @@ struct llc_opt {
 	u32		    rx_pdu_hdr;	   /* used for saving header of last pdu
 					      received and caused sending FRMR.
 					      Used for resending FRMR */
-#ifdef DEBUG_LLC_CONN_ALLOC
-	char *f_alloc,	/* function that allocated this connection */
-	     *f_free;	/* function that freed this connection */
-	int l_alloc,	/* line that allocated this connection */
-	    l_free;	/* line that freed this connection */
-#endif
 };
 
 #define llc_sk(__sk) ((struct llc_opt *)(__sk)->protinfo)

@@ -110,37 +110,14 @@
 #define LLC_CONN_EV_QFY_S_FLAG_EQ_0		11
 #define LLC_CONN_EV_QFY_INIT_P_F_CYCLE		12
 
-/* Event data interface; what is sent in an event package */
-/* Event LLC_CONN_EV_TYPE_SIMPLE interface */
-struct llc_conn_ev_simple_if {
-	u8 ev;
-};
-
-/* Event LLC_CONN_EV_TYPE_PRIM interface */
-struct llc_conn_ev_prim_if {
-	u8			  prim;  /* connect, disconnect, reset, ... */
-	u8			  type;  /* request, indicate, response, conf */
-	struct llc_prim_if_block *data;
-};
-
-/* Event LLC_CONN_EV_TYPE_PDU interface */
-struct llc_conn_ev_pdu_if {
-	u8 ev;
-};
-
-union llc_conn_ev_if {
-	struct llc_conn_ev_simple_if  a;	/* 'a' for simple, easy ... */
-	struct llc_conn_ev_prim_if    prim;
-	struct llc_conn_ev_pdu_if     pdu;
-};
-
 struct llc_conn_state_ev {
-	u8			  type;
-	u8			  reason;
-	u8			  status;
-	u8			  ind_prim;
-	u8			  cfm_prim;
-	union llc_conn_ev_if	  data;
+	u8 type;
+	u8 prim;
+	u8 prim_type;
+	u8 reason;
+	u8 status;
+	u8 ind_prim;
+	u8 cfm_prim;
 };
 
 static __inline__ struct llc_conn_state_ev *llc_conn_ev(struct sk_buff *skb)

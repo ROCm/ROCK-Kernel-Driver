@@ -67,49 +67,7 @@ struct llc_addr {
 	u8 mac[IFHWADDRLEN];
 };
 
-struct llc_prim_reset {
-	struct sock *sk;
-	u16	     link;
-};
-
- /* Sending data in conection-less mode */
-struct llc_prim_unit_data {
-	struct llc_addr	saddr;
-	struct llc_addr	daddr;
-	u8		pri;
-	struct sk_buff *skb;		/* pointer to frame */
-	u8		lfb;		/* largest frame bit (TR) */
-};
-
-struct llc_prim_xid {
-	struct llc_addr saddr;
-	struct llc_addr daddr;
-	u8		pri;
-	struct sk_buff *skb;
-};
-
-struct llc_prim_test {
-	struct llc_addr	saddr;
-	struct llc_addr	daddr;
-	u8		pri;
-	struct sk_buff *skb;		/* pointer to frame */
-};
-
-union llc_u_prim_data {
-	struct llc_prim_reset	  res;
-	struct llc_prim_unit_data udata;	/* unit data */
-	struct llc_prim_xid	  xid;
-	struct llc_prim_test	  test;
-};
-
 struct llc_sap;
-
-/* Information block passed with all called primitives */
-struct llc_prim_if_block {
-	struct llc_sap	      *sap;
-	u8		       prim;
-	union llc_u_prim_data *data;
-};
 
 extern struct llc_sap *llc_sap_open(u8 lsap,
 				    int (*func)(struct sk_buff *skb,

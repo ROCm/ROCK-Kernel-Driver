@@ -34,38 +34,14 @@
 #define LLC_SAP_EV_RX_TEST_R		 9
 #define LLC_SAP_EV_DEACTIVATION_REQ	10
 
-/* Interfaces for various types of supported events */
-struct llc_sap_ev_simple_if {
-	u8 ev;
-};
-
-struct llc_prim_if_block;
-
-struct llc_sap_ev_prim_if {
-	u8			  prim; /* connect, disconnect, reset, ... */
-	u8			  type; /* request, indicate, response, conf */
-	struct llc_prim_if_block *data;
-};
-
-struct llc_sap_ev_pdu_if {
-	u8 ev;
-};
-
-union llc_sap_ev_if {
-	struct llc_sap_ev_simple_if	a;	/* 'a' for simple, easy ... */
-	struct llc_sap_ev_prim_if	prim;
-	struct llc_sap_ev_pdu_if	pdu;
-};
-
-struct llc_prim_if_block;
-
 struct llc_sap_state_ev {
-	u8			  primitive;
-	u8			  type;
-	u8			  reason;
-	u8			  ind_cfm_flag;
-	struct llc_prim_if_block *prim;
-	union llc_sap_ev_if	  data;
+	u8		prim;
+	u8		prim_type;
+	u8		type;
+	u8		reason;
+	u8		ind_cfm_flag;
+	struct llc_addr saddr;
+	struct llc_addr daddr;
 };
 
 static __inline__ struct llc_sap_state_ev *llc_sap_ev(struct sk_buff *skb)

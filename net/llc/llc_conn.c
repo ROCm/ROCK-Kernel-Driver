@@ -366,7 +366,7 @@ void llc_conn_free_ev(struct sk_buff *skb)
 		if (LLC_PDU_TYPE_IS_I(pdu) || !ev->ind_prim)
 			kfree_skb(skb);
 	} else if (ev->type == LLC_CONN_EV_TYPE_PRIM &&
-		   ev->data.prim.prim != LLC_DATA_PRIM)
+		   ev->prim != LLC_DATA_PRIM)
 		kfree_skb(skb);
 	else if (ev->type == LLC_CONN_EV_TYPE_P_TMR ||
 		 ev->type == LLC_CONN_EV_TYPE_BUSY_TMR ||

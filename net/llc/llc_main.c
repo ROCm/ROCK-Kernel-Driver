@@ -667,7 +667,7 @@ static int __init llc_init(void)
 	llc_main_station.maximum_retry	= 1;
 	llc_main_station.state		= LLC_STATION_STATE_DOWN;
 	ev->type	= LLC_STATION_EV_TYPE_SIMPLE;
-	ev->data.a.ev	= LLC_STATION_EV_ENABLE_WITHOUT_DUP_ADDR_CHECK;
+	ev->prim_type	= LLC_STATION_EV_ENABLE_WITHOUT_DUP_ADDR_CHECK;
 	rc = llc_station_next_state(&llc_main_station, skb);
 	proc_net_create("802.2", 0, llc_proc_get_info);
 	llc_ui_init();
