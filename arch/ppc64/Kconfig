@@ -354,6 +354,11 @@ source "arch/ppc64/oprofile/Kconfig"
 
 menu "Kernel hacking"
 
+config KERNTYPES
+	bool
+	depends on CRASH_DUMP
+	default y
+
 config CRASH_DUMP
 	tristate "Crash dump support"
 	default n
