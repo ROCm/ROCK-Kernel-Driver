@@ -1,13 +1,13 @@
 /*
  * I2O user space accessible structures/APIs
- * 
+ *
  * (c) Copyright 1999, 2000 Red Hat Software
  *
- * This program is free software; you can redistribute it and/or 
- * modify it under the terms of the GNU General Public License 
- * as published by the Free Software Foundation; either version 
- * 2 of the License, or (at your option) any later version.  
- * 
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License, or (at your option) any later version.
+ *
  *************************************************************************
  *
  * This header file defines the I2O APIs that are available to both
@@ -23,7 +23,7 @@
 /* How many controllers are we allowing */
 #define MAX_I2O_CONTROLLERS	32
 
-#include <linux/ioctl.h>
+//#include <linux/ioctl.h>
 
 /*
  * I2O Control IOCTLs and structures
@@ -42,17 +42,24 @@
 #define I2OEVTREG		_IOW(I2O_MAGIC_NUMBER,10,struct i2o_evt_id)
 #define I2OEVTGET		_IOR(I2O_MAGIC_NUMBER,11,struct i2o_evt_info)
 #define I2OPASSTHRU		_IOR(I2O_MAGIC_NUMBER,12,struct i2o_cmd_passthru)
+#define I2OPASSTHRU32		_IOR(I2O_MAGIC_NUMBER,12,struct i2o_cmd_passthru32)
+
+struct i2o_cmd_passthru32
+{
+	unsigned int iop;	/* IOP unit number */
+	u32 msg;		/* message */
+};
 
 struct i2o_cmd_passthru
 {
 	unsigned int iop;	/* IOP unit number */
-	void __user *msg;	/* message */
+	void __user *msg;		/* message */
 };
 
 struct i2o_cmd_hrtlct
 {
-	unsigned int iop;	/* IOP unit number */
-	void __user *resbuf;	/* Buffer for result */
+	unsigned int iop;		/* IOP unit number */
+	void __user *resbuf;		/* Buffer for result */
 	unsigned int __user *reslen;	/* Buffer length in bytes */
 };
 
@@ -351,14 +358,15 @@ typedef struct _i2o_status_block
 #define I2O_CLASS_BUS_ADAPTER_PORT		0x080
 #define I2O_CLASS_PEER_TRANSPORT_AGENT		0x090
 #define I2O_CLASS_PEER_TRANSPORT		0x091
+#define	I2O_CLASS_END				0xfff
 
-/* 
+/*
  *  Rest of 0x092 - 0x09f reserved for peer-to-peer classes
  */
 
 #define I2O_CLASS_MATCH_ANYCLASS		0xffffffff
 
-/* 
+/*
  *  Subclasses
  */
 
@@ -380,7 +388,7 @@ typedef struct _i2o_status_block
 #define I2O_PARAMS_TABLE_CLEAR			0x000A
 
 /*
- * I2O serial number conventions / formats 
+ * I2O serial number conventions / formats
  * (circa v1.5)
  */
 
@@ -391,7 +399,7 @@ typedef struct _i2o_status_block
 #define I2O_SNFORMAT_LAN48_MAC			4
 #define I2O_SNFORMAT_WAN			5
 
-/* 
+/*
  * Plus new in v2.0 (Yellowstone pdf doc)
  */
 
@@ -402,7 +410,7 @@ typedef struct _i2o_status_block
 #define I2O_SNFORMAT_UNKNOWN2			0xff
 
 /*
- *	I2O Get Status State values 
+ *	I2O Get Status State values
  */
 
 #define ADAPTER_STATE_INITIALIZING		0x01
