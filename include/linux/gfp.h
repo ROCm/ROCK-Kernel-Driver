@@ -4,6 +4,10 @@
 #include <linux/mmzone.h>
 #include <linux/stddef.h>
 #include <linux/linkage.h>
+#include <linux/config.h>
+
+struct vm_area_struct;
+
 /*
  * GFP bitmasks..
  */
@@ -69,19 +73,38 @@
  * For the normal case of non-DISCONTIGMEM systems the NODE_DATA() gets
  * optimized to &contig_page_data at compile-time.
  */
-extern struct page * FASTCALL(__alloc_pages(unsigned int, unsigned int, struct zonelist *));
-static inline struct page * alloc_pages_node(int nid, unsigned int gfp_mask, unsigned int order)
+extern struct page *
+FASTCALL(__alloc_pages(unsigned int, unsigned int, struct zonelist *));
+
+static inline struct page *alloc_pages_node(int nid, unsigned int gfp_mask,
+						unsigned int order)
 {
 	if (unlikely(order >= MAX_ORDER))
 		return NULL;
 
-	return __alloc_pages(gfp_mask, order, NODE_DATA(nid)->node_zonelists + (gfp_mask & GFP_ZONEMASK));
+	return __alloc_pages(gfp_mask, order,
+		NODE_DATA(nid)->node_zonelists + (gfp_mask & GFP_ZONEMASK));
 }
 
+#ifdef CONFIG_NUMA
+extern struct page *alloc_pages_current(unsigned gfp_mask, unsigned order);
+
+static inline struct page *
+alloc_pages(unsigned int gfp_mask, unsigned int order)
+{
+	if (unlikely(order >= MAX_ORDER))
+		return NULL;
+
+	return alloc_pages_current(gfp_mask, order);
+}
+extern struct page *alloc_page_vma(unsigned gfp_mask,
+			struct vm_area_struct *vma, unsigned long addr);
+#else
 #define alloc_pages(gfp_mask, order) \
 		alloc_pages_node(numa_node_id(), gfp_mask, order)
-#define alloc_page(gfp_mask) \
-		alloc_pages_node(numa_node_id(), gfp_mask, 0)
+#define alloc_page_vma(gfp_mask, vma, addr) alloc_pages(gfp_mask, 0)
+#endif
+#define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)
 
 extern unsigned long FASTCALL(__get_free_pages(unsigned int gfp_mask, unsigned int order));
 extern unsigned long FASTCALL(get_zeroed_page(unsigned int gfp_mask));
