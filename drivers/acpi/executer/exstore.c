@@ -192,7 +192,7 @@ acpi_ex_store (
 
 		if (!acpi_ut_valid_internal_object (source_desc)) {
 		   ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT,
-			   "%X, Invalid Internal Object!\n", source_desc));
+			   "%p, Invalid Internal Object!\n", source_desc));
 		   break;
 		}
 
