@@ -303,7 +303,7 @@ static int __init pcibios_init(void)
 		ppc_md.pcibios_fixup();
 
 	/* Cache the location of the ISA bridge (if we have one) */
-	ppc64_isabridge_dev = pci_find_class(PCI_CLASS_BRIDGE_ISA << 8, NULL);
+	ppc64_isabridge_dev = pci_get_class(PCI_CLASS_BRIDGE_ISA << 8, NULL);
 	if (ppc64_isabridge_dev != NULL)
 		printk("ISA bridge at %s\n", pci_name(ppc64_isabridge_dev));
 
