@@ -1036,6 +1036,9 @@ static inline void arch_pick_mmap_layout(struct mm_struct *mm)
 }
 #endif
 
+extern long sched_setaffinity(pid_t pid, cpumask_t new_mask);
+extern long sched_getaffinity(pid_t pid, cpumask_t *mask);
+
 #endif /* __KERNEL__ */
 
 #endif

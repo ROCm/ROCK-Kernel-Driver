@@ -249,7 +249,7 @@ struct solaris_x86_vtoc {
 /* check against BSD src/sys/sys/disklabel.h for consistency */
 
 #define BSD_DISKMAGIC	(0x82564557UL)	/* The disk magic number */
-#define BSD_MAXPARTITIONS	8
+#define BSD_MAXPARTITIONS	16
 #define OPENBSD_MAXPARTITIONS	16
 #define BSD_FS_UNUSED		0	/* disklabel unused partition entry ID */
 struct bsd_disklabel {

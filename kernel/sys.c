@@ -1735,6 +1735,17 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 			}
 			current->keep_capabilities = arg2;
 			break;
+		case PR_SET_NAME: {
+			struct task_struct *me = current;
+			unsigned char ncomm[sizeof(me->comm)];
+
+			ncomm[sizeof(me->comm)-1] = 0;
+			if (strncpy_from_user(ncomm, (char *)arg2,
+						sizeof(me->comm)-1) < 0)
+				return -EFAULT;
+			set_task_comm(me, ncomm);
+			return 0;
+		}
 		default:
 			error = -EINVAL;
 			break;

@@ -741,8 +741,10 @@ no_thread_group:
 	spin_unlock(&oldsighand->siglock);
 	write_unlock_irq(&tasklist_lock);
 
-	if (newsig && atomic_dec_and_test(&oldsig->count))
+	if (newsig && atomic_dec_and_test(&oldsig->count)) {
+		exit_itimers(oldsig);
 		kmem_cache_free(signal_cachep, oldsig);
+	}
 
 	if (atomic_dec_and_test(&oldsighand->count))
 		kmem_cache_free(sighand_cachep, oldsighand);

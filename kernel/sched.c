@@ -3383,33 +3383,10 @@ out_unlock:
 	return retval;
 }
 
-static int get_user_cpu_mask(unsigned long __user *user_mask_ptr, unsigned len,
-			     cpumask_t *new_mask)
+long sched_setaffinity(pid_t pid, cpumask_t new_mask)
 {
-	if (len < sizeof(cpumask_t)) {
-		memset(new_mask, 0, sizeof(cpumask_t));
-	} else if (len > sizeof(cpumask_t)) {
-		len = sizeof(cpumask_t);
-	}
-	return copy_from_user(new_mask, user_mask_ptr, len) ? -EFAULT : 0;
-}
-
-/**
- * sys_sched_setaffinity - set the cpu affinity of a process
- * @pid: pid of the process
- * @len: length in bytes of the bitmask pointed to by user_mask_ptr
- * @user_mask_ptr: user-space pointer to the new cpu mask
- */
-asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
-				      unsigned long __user *user_mask_ptr)
-{
-	cpumask_t new_mask;
-	int retval;
 	task_t *p;
-
-	retval = get_user_cpu_mask(user_mask_ptr, len, &new_mask);
-	if (retval)
-		return retval;
+	int retval;
 
 	lock_cpu_hotplug();
 	read_lock(&tasklist_lock);
@@ -3442,6 +3419,36 @@ out_unlock:
 	return retval;
 }
 
+static int get_user_cpu_mask(unsigned long __user *user_mask_ptr, unsigned len,
+			     cpumask_t *new_mask)
+{
+	if (len < sizeof(cpumask_t)) {
+		memset(new_mask, 0, sizeof(cpumask_t));
+	} else if (len > sizeof(cpumask_t)) {
+		len = sizeof(cpumask_t);
+	}
+	return copy_from_user(new_mask, user_mask_ptr, len) ? -EFAULT : 0;
+}
+
+/**
+ * sys_sched_setaffinity - set the cpu affinity of a process
+ * @pid: pid of the process
+ * @len: length in bytes of the bitmask pointed to by user_mask_ptr
+ * @user_mask_ptr: user-space pointer to the new cpu mask
+ */
+asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
+				      unsigned long __user *user_mask_ptr)
+{
+	cpumask_t new_mask;
+	int retval;
+
+	retval = get_user_cpu_mask(user_mask_ptr, len, &new_mask);
+	if (retval)
+		return retval;
+
+	return sched_setaffinity(pid, new_mask);
+}
+
 /*
  * Represents all cpu's present in the system
  * In systems capable of hotplug, this map could dynamically grow
@@ -3457,23 +3464,10 @@ cpumask_t cpu_online_map = CPU_MASK_ALL;
 cpumask_t cpu_possible_map = CPU_MASK_ALL;
 #endif
 
-/**
- * sys_sched_getaffinity - get the cpu affinity of a process
- * @pid: pid of the process
- * @len: length in bytes of the bitmask pointed to by user_mask_ptr
- * @user_mask_ptr: user-space pointer to hold the current cpu mask
- */
-asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
-				      unsigned long __user *user_mask_ptr)
+long sched_getaffinity(pid_t pid, cpumask_t *mask)
 {
-	unsigned int real_len;
-	cpumask_t mask;
 	int retval;
 	task_t *p;
-
-	real_len = sizeof(mask);
-	if (len < real_len)
-		return -EINVAL;
 
 	lock_cpu_hotplug();
 	read_lock(&tasklist_lock);
@@ -3484,16 +3478,40 @@ asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
 		goto out_unlock;
 
 	retval = 0;
-	cpus_and(mask, p->cpus_allowed, cpu_possible_map);
+	cpus_and(*mask, p->cpus_allowed, cpu_possible_map);
 
 out_unlock:
 	read_unlock(&tasklist_lock);
 	unlock_cpu_hotplug();
 	if (retval)
 		return retval;
-	if (copy_to_user(user_mask_ptr, &mask, real_len))
+
+	return 0;
+}
+
+/**
+ * sys_sched_getaffinity - get the cpu affinity of a process
+ * @pid: pid of the process
+ * @len: length in bytes of the bitmask pointed to by user_mask_ptr
+ * @user_mask_ptr: user-space pointer to hold the current cpu mask
+ */
+asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
+				      unsigned long __user *user_mask_ptr)
+{
+	int ret;
+	cpumask_t mask;
+
+	if (len < sizeof(cpumask_t))
+		return -EINVAL;
+
+	ret = sched_getaffinity(pid, &mask);
+	if (ret < 0)
+		return ret;
+
+	if (copy_to_user(user_mask_ptr, &mask, sizeof(cpumask_t)))
 		return -EFAULT;
-	return real_len;
+
+	return sizeof(cpumask_t);
 }
 
 /**

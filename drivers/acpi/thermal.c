@@ -659,7 +659,7 @@ acpi_thermal_check (
 	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
 	unsigned long		sleep_time = 0;
 	int			i = 0;
-	struct acpi_thermal_state state = tz->state;
+	struct acpi_thermal_state state;
 
 	ACPI_FUNCTION_TRACE("acpi_thermal_check");
 
@@ -667,6 +667,8 @@ acpi_thermal_check (
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid (NULL) context.\n"));
 		return_VOID;
 	}
+
+	state = tz->state;
 
 	result = acpi_thermal_get_temperature(tz);
 	if (result)

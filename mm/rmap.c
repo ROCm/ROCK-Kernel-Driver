@@ -408,8 +408,9 @@ int page_referenced(struct page *page, int is_locked)
 			referenced += page_referenced_file(page);
 		else if (TestSetPageLocked(page))
 			referenced++;
-		else if (page->mapping) {
-			referenced += page_referenced_file(page);
+		else {
+			if (page->mapping)
+				referenced += page_referenced_file(page);
 			unlock_page(page);
 		}
 	}

@@ -487,6 +487,7 @@ void mmput(struct mm_struct *mm)
 		mmdrop(mm);
 	}
 }
+EXPORT_SYMBOL_GPL(mmput);
 
 /**
  * get_task_mm - acquire a reference to the task's mm
@@ -518,6 +519,7 @@ struct mm_struct *get_task_mm(struct task_struct *task)
 	task_unlock(task);
 	return mm;
 }
+EXPORT_SYMBOL_GPL(get_task_mm);
 
 /* Please note the differences between mmput and mm_release.
  * mmput is called whenever we stop holding onto a mm_struct,

@@ -246,6 +246,9 @@ parse_bsd(struct parsed_partitions *state, struct block_device *bdev,
 		put_partition(state, state->next++, bsd_start, bsd_size);
 	}
 	put_dev_sector(sect);
+	if (le16_to_cpu(l->d_npartitions) > max_partitions)
+		printk(" (ignored %d more)",
+		       le16_to_cpu(l->d_npartitions) - max_partitions);
 	printk(" >\n");
 }
 #endif

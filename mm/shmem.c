@@ -1567,6 +1567,20 @@ static int shmem_create(struct inode *dir, struct dentry *dentry, int mode,
 static int shmem_link(struct dentry *old_dentry, struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = old_dentry->d_inode;
+	struct shmem_sb_info *sbinfo = SHMEM_SB(inode->i_sb);
+
+	/*
+	 * No ordinary (disk based) filesystem counts links as inodes;
+	 * but each new link needs a new dentry, pinning lowmem, and
+	 * tmpfs dentries cannot be pruned until they are unlinked.
+	 */
+	spin_lock(&sbinfo->stat_lock);
+	if (!sbinfo->free_inodes) {
+		spin_unlock(&sbinfo->stat_lock);
+		return -ENOSPC;
+	}
+	sbinfo->free_inodes--;
+	spin_unlock(&sbinfo->stat_lock);
 
 	dir->i_size += BOGO_DIRENT_SIZE;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
@@ -1580,6 +1594,13 @@ static int shmem_link(struct dentry *old_dentry, struct inode *dir, struct dentr
 static int shmem_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
+
+	if (inode->i_nlink > 1 && !S_ISDIR(inode->i_mode)) {
+		struct shmem_sb_info *sbinfo = SHMEM_SB(inode->i_sb);
+		spin_lock(&sbinfo->stat_lock);
+		sbinfo->free_inodes++;
+		spin_unlock(&sbinfo->stat_lock);
+	}
 
 	dir->i_size -= BOGO_DIRENT_SIZE;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
@@ -1818,9 +1839,12 @@ static int shmem_fill_super(struct super_block *sb,
 
 	/*
 	 * Per default we only allow half of the physical ram per
-	 * tmpfs instance
+	 * tmpfs instance, limiting inodes to one per page of lowmem.
 	 */
-	blocks = inodes = totalram_pages / 2;
+	blocks = totalram_pages / 2;
+	inodes = totalram_pages - totalhigh_pages;
+	if (inodes > blocks)
+		inodes = blocks;
 
 #ifdef CONFIG_TMPFS
 	if (shmem_parse_options(data, &mode, &uid, &gid, &blocks, &inodes)) {
@@ -1897,8 +1921,7 @@ static int init_inodecache(void)
 {
 	shmem_inode_cachep = kmem_cache_create("shmem_inode_cache",
 				sizeof(struct shmem_inode_info),
-				0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
-				init_once, NULL);
+				0, 0, init_once, NULL);
 	if (shmem_inode_cachep == NULL)
 		return -ENOMEM;
 	return 0;

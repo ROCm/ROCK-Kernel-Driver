@@ -122,7 +122,6 @@ struct siginfo32 {
 			int _status;			/* exit code */
 			compat_clock_t _utime;
 			compat_clock_t _stime;
-			struct compat_rusage _rusage;
 		} _sigchld;
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS, SIGEMT */
@@ -188,8 +187,6 @@ int copy_siginfo_to_user32(struct siginfo32 __user *to, siginfo_t *from)
 			err |= __put_user(from->si_utime, &to->si_utime);
 			err |= __put_user(from->si_stime, &to->si_stime);
 			err |= __put_user(from->si_status, &to->si_status);
-			err |= put_compat_rusage(&from->si_rusage,
-						 &to->si_rusage);
 		default:
 			err |= __put_user(from->si_pid, &to->si_pid);
 			err |= __put_user(from->si_uid, &to->si_uid);

@@ -133,7 +133,7 @@ static struct notifier_block module_load_nb = {
  
 static void end_sync(void)
 {
-	end_cpu_timers();
+	end_cpu_work();
 	/* make sure we don't leak task structs */
 	process_task_mortuary();
 	process_task_mortuary();
@@ -144,7 +144,7 @@ int sync_start(void)
 {
 	int err;
 
-	start_cpu_timers();
+	start_cpu_work();
 
 	err = task_handoff_register(&task_free_nb);
 	if (err)
@@ -339,40 +339,25 @@ static void add_sample(struct mm_struct * mm, struct op_sample * s, int in_kerne
 	}
 }
  
- 
+
 static void release_mm(struct mm_struct * mm)
 {
-	if (mm)
-		up_read(&mm->mmap_sem);
+	if (!mm)
+		return;
+	up_read(&mm->mmap_sem);
+	mmput(mm);
 }
 
 
-/* Take the task's mmap_sem to protect ourselves from
- * races when we do lookup_dcookie().
- */
 static struct mm_struct * take_tasks_mm(struct task_struct * task)
 {
-	struct mm_struct * mm;
-       
-	/* Subtle. We don't need to keep a reference to this task's mm,
-	 * because, for the mm to be freed on another CPU, that would have
-	 * to go through the task exit notifier, which ends up sleeping
-	 * on the buffer_sem we hold, so we end up with mutual exclusion
-	 * anyway.
-	 */
-	task_lock(task);
-	mm = task->mm;
-	task_unlock(task);
- 
-	if (mm) {
-		/* needed to walk the task's VMAs */
+	struct mm_struct * mm = get_task_mm(task);
+	if (mm)
 		down_read(&mm->mmap_sem);
-	}
- 
 	return mm;
 }
- 
- 
+
+
 static inline int is_ctx_switch(unsigned long val)
 {
 	return val == ~0UL;
