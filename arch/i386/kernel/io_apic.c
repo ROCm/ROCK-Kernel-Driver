@@ -1073,6 +1073,8 @@ static int pin_2_irq(int idx, int apic, int pin)
 			while (i < apic)
 				irq += nr_ioapic_registers[i++];
 			irq += pin;
+			if ((!apic) && (irq < 16)) 
+				irq += 16;
 			break;
 		}
 		default:
@@ -1301,7 +1303,9 @@ void __init print_IO_APIC(void)
 	printk(KERN_DEBUG ".......    : physical APIC id: %02X\n", reg_00.ID);
 	printk(KERN_DEBUG ".......    : Delivery Type: %X\n", reg_00.delivery_type);
 	printk(KERN_DEBUG ".......    : LTS          : %X\n", reg_00.LTS);
-	if (reg_00.__reserved_0 || reg_00.__reserved_1 || reg_00.__reserved_2)
+	if (reg_00.ID >= APIC_BROADCAST_ID)
+		UNEXPECTED_IO_APIC();
+	if (reg_00.__reserved_1 || reg_00.__reserved_2)
 		UNEXPECTED_IO_APIC();
 
 	printk(KERN_DEBUG ".... register #01: %08X\n", *(int *)&reg_01);
@@ -1625,7 +1629,7 @@ static void __init setup_ioapic_ids_from_mpc(void)
 			mp_ioapics[apic].mpc_apicid = i;
 		} else {
 			printk("Setting %d in the phys_id_present_map\n", mp_ioapics[apic].mpc_apicid);
-			phys_id_present_map |= 1 << mp_ioapics[apic].mpc_apicid;
+			phys_id_present_map |= apicid_to_cpu_present(mp_ioapics[apic].mpc_apicid);
 		}
 
 
@@ -2226,10 +2230,10 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 	 * Every APIC in a system must have a unique ID or we get lots of nice 
 	 * 'stuck on smp_invalidate_needed IPI wait' messages.
 	 */
-	if (apic_id_map & (1 << apic_id)) {
+	if (check_apicid_used(apic_id_map, apic_id)) {
 
 		for (i = 0; i < IO_APIC_MAX_ID; i++) {
-			if (!(apic_id_map & (1 << i)))
+			if (!check_apicid_used(apic_id_map, i))
 				break;
 		}
 
@@ -2242,7 +2246,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 		apic_id = i;
 	} 
 
-	apic_id_map |= (1 << apic_id);
+	apic_id_map |= apicid_to_cpu_present(apic_id);
 
 	if (reg_00.ID != apic_id) {
 		reg_00.ID = apic_id;
