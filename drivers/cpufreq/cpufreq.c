@@ -504,9 +504,9 @@ static int cpufreq_resume(struct sys_device * sysdev)
 	if (cpufreq_driver->setpolicy)
 		ret = cpufreq_driver->setpolicy(cpu_policy);
 	else
-	/* CPUFREQ_RELATION_H or CPUFREQ_RELATION_L have the same effect here, as cpu_policy->cur is known
-	 * to be a valid and exact target frequency
-	 */
+		/* CPUFREQ_RELATION_H or CPUFREQ_RELATION_L have the same effect here, as cpu_policy->cur is known
+		 * to be a valid and exact target frequency
+		 */
 		ret = cpufreq_driver->target(cpu_policy, cpu_policy->cur, CPUFREQ_RELATION_H);
 
 	if (ret)
