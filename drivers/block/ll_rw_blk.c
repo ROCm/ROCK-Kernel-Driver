@@ -1350,12 +1350,12 @@ static int blk_init_free_list(request_queue_t *q)
 static int __make_request(request_queue_t *, struct bio *);
 
 static elevator_t *chosen_elevator =
-#if defined(CONFIG_IOSCHED_AS)
+#if defined(CONFIG_IOSCHED_CFQ)
+	&iosched_cfq;
+#elif defined(CONFIG_IOSCHED_AS)
 	&iosched_as;
 #elif defined(CONFIG_IOSCHED_DEADLINE)
 	&iosched_deadline;
-#elif defined(CONFIG_IOSCHED_CFQ)
-	&iosched_cfq;
 #elif defined(CONFIG_IOSCHED_NOOP)
 	&elevator_noop;
 #else
