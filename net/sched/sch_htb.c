@@ -437,13 +437,13 @@ static void htb_add_to_wait_tree (struct htb_sched *q,
 		cl->pq_key++;
 
 	/* update the nearest event cache */
-	if (q->near_ev_cache[cl->level] - cl->pq_key < 0x80000000)
+	if (time_after(q->near_ev_cache[cl->level], cl->pq_key))
 		q->near_ev_cache[cl->level] = cl->pq_key;
 	
 	while (*p) {
 		struct htb_class *c; parent = *p;
 		c = rb_entry(parent, struct htb_class, pq_node);
-		if (cl->pq_key - c->pq_key < 0x80000000)
+		if (time_after_eq(cl->pq_key, c->pq_key))
 			p = &parent->rb_right;
 		else 
 			p = &parent->rb_left;
@@ -869,7 +869,7 @@ static long htb_do_events(struct htb_sched *q,int level)
 		while (p->rb_left) p = p->rb_left;
 
 		cl = rb_entry(p, struct htb_class, pq_node);
-		if (cl->pq_key - (q->jiffies+1) < 0x80000000) {
+		if (time_after(cl->pq_key, q->jiffies)) {
 			HTB_DBG(8,3,"htb_do_ev_ret delay=%ld\n",cl->pq_key - q->jiffies);
 			return cl->pq_key - q->jiffies;
 		}
@@ -1048,7 +1048,7 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 		/* common case optimization - skip event handler quickly */
 		int m;
 		long delay;
-		if (q->jiffies - q->near_ev_cache[level] < 0x80000000 || 0) {
+		if (time_after_eq(q->jiffies, q->near_ev_cache[level])) {
 			delay = htb_do_events(q,level);
 			q->near_ev_cache[level] = q->jiffies + (delay ? delay : HZ);
 #ifdef HTB_DEBUG
