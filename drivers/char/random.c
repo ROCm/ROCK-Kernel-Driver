@@ -1742,10 +1742,9 @@ static int
 random_ioctl(struct inode * inode, struct file * file,
 	     unsigned int cmd, unsigned long arg)
 {
-	int *tmp, size, ent_count;
+	int size, ent_count;
 	int __user *p = (int __user *)arg;
 	int retval;
-	unsigned long flags;
 	
 	switch (cmd) {
 	case RNDGETENTCNT:
@@ -1765,40 +1764,6 @@ random_ioctl(struct inode * inode, struct file * file,
 		 */
 		if (random_state->entropy_count >= random_read_wakeup_thresh)
 			wake_up_interruptible(&random_read_wait);
-		return 0;
-	case RNDGETPOOL:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EPERM;
-		if (get_user(size, p) ||
-		    put_user(random_state->poolinfo.poolwords, p++))
-			return -EFAULT;
-		if (size < 0)
-			return -EFAULT;
-		if (size > random_state->poolinfo.poolwords)
-			size = random_state->poolinfo.poolwords;
-
-		/* prepare to atomically snapshot pool */
-
-		tmp = kmalloc(size * sizeof(__u32), GFP_KERNEL);
-
-		if (!tmp)
-			return -ENOMEM;
-
-		spin_lock_irqsave(&random_state->lock, flags);
-		ent_count = random_state->entropy_count;
-		memcpy(tmp, random_state->pool, size * sizeof(__u32));
-		spin_unlock_irqrestore(&random_state->lock, flags);
-
-		if (!copy_to_user(p, tmp, size * sizeof(__u32))) {
-			kfree(tmp);
-			return -EFAULT;
-		}
-
-		kfree(tmp);
-
-		if(put_user(ent_count, p++))
-			return -EFAULT;
-
 		return 0;
 	case RNDADDENTROPY:
 		if (!capable(CAP_SYS_ADMIN))
