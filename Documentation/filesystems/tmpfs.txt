@@ -62,7 +62,9 @@ size:      The limit of allocated bytes for this tmpfs instance. The
            since the OOM handler will not be able to free that memory.
 nr_blocks: The same as size, but in blocks of PAGE_CACHE_SIZE.
 nr_inodes: The maximum number of inodes for this instance. The default
-           is half of the number of your physical RAM pages.
+           is half of the number of your physical RAM pages, or (on a
+           a machine with highmem) the number of lowmem RAM pages,
+           whichever is the lower.
 
 These parameters accept a suffix k, m or g for kilo, mega and giga and
 can be changed on remount.  The size parameter also accepts a suffix %
@@ -89,4 +91,4 @@ RAM/SWAP in 10240 inodes and it is only accessible by root.
 Author:
    Christoph Rohland <cr@sap.com>, 1.12.01
 Updated:
-   Hugh Dickins <hugh@veritas.com>, 01 April 2003
+   Hugh Dickins <hugh@veritas.com>, 01 September 2004
