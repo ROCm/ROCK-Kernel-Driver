@@ -36,11 +36,8 @@ static void __free_cpu_buffers(int num)
 {
 	int i;
  
-	for (i = 0; i < NR_CPUS; ++i) {
-		if (!cpu_online(i))
-			continue;
+	for_each_online_cpu(i)
 		vfree(cpu_buffer[i].buffer);
-	}
 }
  
  
@@ -50,12 +47,9 @@ int alloc_cpu_buffers(void)
  
 	unsigned long buffer_size = fs_cpu_buffer_size;
  
-	for (i = 0; i < NR_CPUS; ++i) {
+	for_each_online_cpu(i) {
 		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
  
-		if (!cpu_online(i))
-			continue;
-
 		b->buffer = vmalloc(sizeof(struct op_sample) * buffer_size);
 		if (!b->buffer)
 			goto fail;
@@ -94,11 +88,8 @@ void start_cpu_timers(void)
 
 	timers_enabled = 1;
 
-	for (i = 0; i < NR_CPUS; ++i) {
+	for_each_online_cpu(i) {
 		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
-
-		if (!cpu_online(i))
-			continue;
 
 		add_timer_on(&b->timer, i);
 	}
@@ -111,11 +102,8 @@ void end_cpu_timers(void)
 
 	timers_enabled = 0;
 
-	for (i = 0; i < NR_CPUS; ++i) {
+	for_each_online_cpu(i) {
 		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
-
-		if (!cpu_online(i))
-			continue;
 
 		del_timer_sync(&b->timer);
 	}
