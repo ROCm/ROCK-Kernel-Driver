@@ -553,6 +553,23 @@ void pcibios_resource_to_bus(struct pci_dev *pdev, struct pci_bus_region *region
 	region->end = res->end - zero_res.start;
 }
 
+void pcibios_bus_to_resource(struct pci_dev *pdev, struct resource *res,
+			     struct pci_bus_region *region)
+{
+	struct pci_pbm_info *pbm = pci_bus2pbm[pdev->bus->number];
+	struct resource *root;
+
+	res->start = region->start;
+	res->end = region->end;
+
+	if (res->flags & IORESOURCE_IO)
+		root = &pbm->io_space;
+	else
+		root = &pbm->mem_space;
+
+	pbm->parent->resource_adjust(pdev, res, root);
+}
+
 char * __init pcibios_setup(char *str)
 {
 	if (!strcmp(str, "onboardfirst")) {
