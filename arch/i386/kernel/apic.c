@@ -26,8 +26,6 @@
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
-#include <linux/module.h>
-
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
