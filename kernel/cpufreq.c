@@ -352,13 +352,12 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	if (ret)
 		goto out;
 
+	/* set up files for this cpu device */
 	drv_attr = cpufreq_driver->attr;
 	while ((drv_attr) && (*drv_attr)) {
 		sysfs_create_file(&policy->kobj, &((*drv_attr)->attr));
 		drv_attr++;
 	}
-	/* set up files for this cpu device */
-
 	
 	/* set default policy */
 	ret = cpufreq_set_policy(&new_policy);
