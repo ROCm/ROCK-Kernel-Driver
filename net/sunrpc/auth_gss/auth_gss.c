@@ -235,7 +235,7 @@ gss_parse_init_downcall(struct gss_api_mech *gm, struct xdr_netobj *buf,
 		goto err;
 	}
 	ctx->gc_proc = RPC_GSS_PROC_DATA;
-	ctx->gc_seq = 0;
+	ctx->gc_seq = 1;	/* NetApp 6.4R1 doesn't accept seq. no. 0 */
 	spin_lock_init(&ctx->gc_seq_lock);
 	atomic_set(&ctx->count,1);
 
