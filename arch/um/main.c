@@ -15,10 +15,12 @@
 #include "user_util.h"
 #include "kern_util.h"
 #include "mem_user.h"
+#include "signal_user.h"
 #include "user.h"
 #include "init.h"
 #include "mode.h"
 #include "choose-mode.h"
+#include "uml-config.h"
 
 /* Set in set_stklim, which is called from main and __wrap_malloc.  
  * __wrap_malloc only calls it if main hasn't started.
@@ -31,11 +33,6 @@ char *linux_prog;
 #define PGD_BOUND (4 * 1024 * 1024)
 #define STACKSIZE (8 * 1024 * 1024)
 #define THREAD_NAME_LEN (256)
-
-/* Never changed */
-static char padding[THREAD_NAME_LEN] = { 
-	[ 0 ...  THREAD_NAME_LEN - 2] = ' ', '\0' 
-};
 
 static void set_stklim(void)
 {
@@ -66,26 +63,43 @@ static __init void do_uml_initcalls(void)
 	}
 }
 
+static void last_ditch_exit(int sig)
+{
+	CHOOSE_MODE(kmalloc_ok = 0, (void) 0);
+	signal(SIGINT, SIG_DFL);
+	signal(SIGTERM, SIG_DFL);
+	signal(SIGHUP, SIG_DFL);
+	uml_cleanup();
+	exit(1);
+}
+
 extern int uml_exitcode;
 
 int main(int argc, char **argv, char **envp)
 {
+	char **new_argv;
 	sigset_t mask;
 	int ret, i;
-	char **new_argv;
 
-	/* Enable all signals - in some environments, we can enter with
-	 * some signals blocked
+	/* Enable all signals except SIGIO - in some environments, we can 
+	 * enter with some signals blocked
 	 */
 
 	sigemptyset(&mask);
+	sigaddset(&mask, SIGIO);
 	if(sigprocmask(SIG_SETMASK, &mask, NULL) < 0){
 		perror("sigprocmask");
 		exit(1);
 	}
 
+#ifdef UML_CONFIG_MODE_TT
 	/* Allocate memory for thread command lines */
 	if(argc < 2 || strlen(argv[1]) < THREAD_NAME_LEN - 1){
+
+		char padding[THREAD_NAME_LEN] = { 
+			[ 0 ...  THREAD_NAME_LEN - 2] = ' ', '\0' 
+		};
+
 		new_argv = malloc((argc + 2) * sizeof(char*));
 		if(!new_argv) {
 			perror("Allocating extended argv");
@@ -103,6 +117,7 @@ int main(int argc, char **argv, char **envp)
 		perror("execing with extended args");
 		exit(1);
 	}	
+#endif
 
 	linux_prog = argv[0];
 
@@ -119,6 +134,10 @@ int main(int argc, char **argv, char **envp)
 		}
 	}
 	new_argv[argc] = NULL;
+
+	set_handler(SIGINT, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
+	set_handler(SIGTERM, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
+	set_handler(SIGHUP, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
 
 	do_uml_initcalls();
 	ret = linux_main(argc, argv);
@@ -141,8 +160,10 @@ extern void *__real_malloc(int);
 
 void *__wrap_malloc(int size)
 {
-	if(CAN_KMALLOC()) return(um_kmalloc(size));
-	else return(__real_malloc(size));
+	if(CAN_KMALLOC())
+		return(um_kmalloc(size));
+	else
+		return(__real_malloc(size));
 }
 
 void *__wrap_calloc(int n, int size)
