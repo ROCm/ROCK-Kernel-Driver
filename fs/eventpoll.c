@@ -853,7 +853,7 @@ static int ep_insert(struct eventpoll *ep, struct pollfd *pfd, struct file *tfil
 
 	/* Initialize the poll table using the queue callback */
 	epq.dpi = dpi;
-	poll_initwait_ex(&epq.pt, ep_ptable_queue_proc, NULL);
+	init_poll_funcptr(&epq.pt, ep_ptable_queue_proc);
 
 	/*
 	 * Attach the item to the poll hooks and get current event bits.
@@ -861,8 +861,6 @@ static int ep_insert(struct eventpoll *ep, struct pollfd *pfd, struct file *tfil
 	 * been increased by the caller of this function.
 	 */
 	revents = tfile->f_op->poll(tfile, &epq.pt);
-
-	poll_freewait(&epq.pt);
 
 	/* We have to drop the new item inside our item list to keep track of it */
 	write_lock_irqsave(&ep->lock, flags);
