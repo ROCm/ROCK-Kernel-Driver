@@ -710,37 +710,15 @@ static int kaweth_close(struct net_device *net)
 	return 0;
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void kaweth_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
 
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strlcpy(info.driver, driver_name, sizeof(info.driver));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-	}
-
-	return -EOPNOTSUPP;
+	strlcpy(info->driver, driver_name, sizeof(info->driver));
 }
 
-/****************************************************************
- *     kaweth_ioctl
- ****************************************************************/
-static int kaweth_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
-{
-	switch (cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(net, rq->ifr_data);
-	}
-	return -EOPNOTSUPP;
-}
+static struct ethtool_ops ops = {
+	.get_drvinfo = kaweth_get_drvinfo
+};
 
 /****************************************************************
  *     kaweth_usb_transmit_complete
@@ -1107,11 +1085,11 @@ static int kaweth_probe(
 	kaweth->net->watchdog_timeo = KAWETH_TX_TIMEOUT;
 	kaweth->net->tx_timeout = kaweth_tx_timeout;
 
-	kaweth->net->do_ioctl = kaweth_ioctl;
 	kaweth->net->hard_start_xmit = kaweth_start_xmit;
 	kaweth->net->set_multicast_list = kaweth_set_rx_mode;
 	kaweth->net->get_stats = kaweth_netdev_stats;
 	kaweth->net->mtu = le16_to_cpu(kaweth->configuration.segment_size);
+	SET_ETHTOOL_OPS(kaweth->net, &ops);
 
 	memset(&kaweth->stats, 0, sizeof(kaweth->stats));
 
