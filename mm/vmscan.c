@@ -870,7 +870,8 @@ int try_to_free_pages(struct zone **zones,
 		wakeup_bdflush(total_scanned);
 
 		/* Take a nap, wait for some writeback to complete */
-		blk_congestion_wait(WRITE, HZ/10);
+		if (total_scanned)
+			blk_congestion_wait(WRITE, HZ/10);
 	}
 	if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY))
 		out_of_memory();
@@ -915,6 +916,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 
 	for (priority = DEF_PRIORITY; priority; priority--) {
 		int all_zones_ok = 1;
+		int pages_scanned = 0;
 
 		for (i = 0; i < pgdat->nr_zones; i++) {
 			struct zone *zone = pgdat->node_zones + i;
@@ -933,6 +935,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 			max_scan = zone->nr_inactive >> priority;
 			reclaimed = shrink_zone(zone, max_scan, GFP_KERNEL,
 					&total_scanned, ps);
+			total_scanned += pages_scanned;
 			reclaim_state->reclaimed_slab = 0;
 			shrink_slab(total_scanned, GFP_KERNEL);
 			reclaimed += reclaim_state->reclaimed_slab;
@@ -950,7 +953,8 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 		 * OK, kswapd is getting into trouble.  Take a nap, then take
 		 * another pass across the zones.
 		 */
-		blk_congestion_wait(WRITE, HZ/10);
+		if (pages_scanned)
+			blk_congestion_wait(WRITE, HZ/10);
 	}
 
 	for (i = 0; i < pgdat->nr_zones; i++) {
