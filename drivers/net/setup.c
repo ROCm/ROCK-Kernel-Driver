@@ -9,9 +9,6 @@
 #include <linux/init.h>
 #include <linux/netlink.h>
 
-extern int scc_enet_init(void); 
-extern int fec_enet_init(void); 
-
 /*
  *	Devices in this list must do new style probing. That is they must
  *	allocate their own device objects and do their own bus scans.
@@ -27,12 +24,6 @@ static struct net_probe pci_probes[] __initdata = {
 	/*
 	 *	Early setup devices
 	 */
-#if defined(CONFIG_SCC_ENET)
-        {scc_enet_init, 0},
-#endif
-#if defined(CONFIG_FEC_ENET)
-        {fec_enet_init, 0},
-#endif
 	{NULL, 0},
 };
 
