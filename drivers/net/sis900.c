@@ -18,7 +18,8 @@
    preliminary Rev. 1.0 Jan. 18, 1998
    http://www.sis.com.tw/support/databook.htm
 
-   Rev 1.08.02 Jan. 4 2002 Matt Domsch <Matt_Domsch@dell.com> update to use library crc32 function
+   Rev 1.08.02 Nov. 30 2001 Hui-Fen Hsu workaround for EDB & bug fix for dhcp problem
+               Jan.  4 2002 Matt Domsch <Matt_Domsch@dell.com> update to use library crc32 function
    Rev 1.08.01 Aug. 25 2001 Hui-Fen Hsu update for 630ET & workaround for ICS1893 PHY
    Rev 1.08.00 Jun. 11 2001 Hui-Fen Hsu workaround for RTL8201 PHY and some bug fix
    Rev 1.07.11 Apr.  2 2001 Hui-Fen Hsu updates PCI drivers to use the new pci_set_dma_mask for kernel 2.4.3
@@ -56,19 +57,24 @@
 #include <linux/netdevice.h>
 #include <linux/init.h>
 #include <linux/mii.h>
-
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/delay.h>
+#include <linux/crc32.h>
+#include <linux/ethtool.h>
+
 #include <asm/processor.h>      /* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
-#include <linux/delay.h>
-#include <linux/crc32.h>
+#include <asm/uaccess.h>	/* User space memory access functions */
 
 #include "sis900.h"
 
+#define SIS900_MODULE_NAME "sis900"
+#define SIS900_DRV_VERSION "v1.08.02 1/4/2002"
+
 static char version[] __devinitdata =
-KERN_INFO "sis900.c: v1.08.02  1/4/2002\n";
+KERN_INFO "sis900.c: " SIS900_DRV_VERSION "\n";
 
 static int max_interrupt_work = 40;
 static int multicast_filter_limit = 128;
@@ -872,6 +878,9 @@ sis900_open(struct net_device *net_dev)
 
 	netif_start_queue(net_dev);
 
+	/* Workaround for EDB */
+	sis900_set_mode(ioaddr, HW_SPEED_10_MBPS, FDX_CAPABLE_HALF_SELECTED);
+
 	/* Enable all known interrupts by setting the interrupt mask. */
 	outl((RxSOVR|RxORN|RxERR|RxOK|TxURN|TxERR|TxIDLE), ioaddr + imr);
 	outl(RxENA | inl(ioaddr + cr), ioaddr + cr);
@@ -1128,6 +1137,7 @@ static void sis900_timer(unsigned long data)
 			sis900_set_mode(net_dev->base_addr, speed, duplex);
 			pci_read_config_byte(sis_priv->pci_dev, PCI_CLASS_REVISION, &revision);
 			sis630_set_eq(net_dev, revision);
+			netif_start_queue(net_dev);
 		}
 
 		sis_priv->timer.expires = jiffies + HZ;
@@ -1410,6 +1420,12 @@ sis900_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
 	long ioaddr = net_dev->base_addr;
 	unsigned int  entry;
 	unsigned long flags;
+
+	/* Don't transmit data before the complete of auto-negotiation */
+	if(!sis_priv->autong_complete){
+		netif_stop_queue(net_dev);
+		return 1;
+	}
 
 	spin_lock_irqsave(&sis_priv->lock, flags);
 
@@ -1769,6 +1785,40 @@ sis900_close(struct net_device *net_dev)
 }
 
 /**
+ *	netdev_ethtool_ioctl: - For the basic support of ethtool
+ *	@net_dev: the net device to command for
+ *	@useraddr: start address of interface request
+ *
+ *	Process ethtool command such as "ehtool -i" to show information
+ */
+
+static int netdev_ethtool_ioctl (struct net_device *net_dev, void *useraddr)
+{
+ 	struct sis900_private *sis_priv = net_dev->priv;
+ 	u32 ethcmd;
+
+	if (copy_from_user (&ethcmd, useraddr, sizeof (ethcmd)))
+		return -EFAULT;
+	
+	switch (ethcmd) {
+	case ETHTOOL_GDRVINFO:
+		{
+			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
+			strcpy (info.driver, SIS900_MODULE_NAME);
+			strcpy (info.version, SIS900_DRV_VERSION);
+			strcpy (info.bus_info, sis_priv->pci_dev->slot_name);
+			if (copy_to_user (useraddr, &info, sizeof (info)))
+				return -EFAULT;
+			return 0;
+		}
+	default:
+		break;
+	}
+
+	return -EOPNOTSUPP;
+}
+
+/**
  *	mii_ioctl: - process MII i/o control command 
  *	@net_dev: the net device to command for
  *	@rq: parameter for command
@@ -1783,6 +1833,9 @@ static int mii_ioctl(struct net_device *net_dev, struct ifreq *rq, int cmd)
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
 
 	switch(cmd) {
+	case SIOCETHTOOL:
+		return netdev_ethtool_ioctl(net_dev, (void *) rq->ifr_data);
+
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		data->phy_id = sis_priv->mii->phy_addr;
 		/* Fall Through */
@@ -2071,8 +2124,6 @@ static void __devexit sis900_remove(struct pci_dev *pci_dev)
 	pci_release_regions(pci_dev);
 	pci_set_drvdata(pci_dev, NULL);
 }
-
-#define SIS900_MODULE_NAME "sis900"
 
 static struct pci_driver sis900_pci_driver = {
 	name:		SIS900_MODULE_NAME,

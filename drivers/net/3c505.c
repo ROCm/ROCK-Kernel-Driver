@@ -1160,6 +1160,87 @@ static struct net_device_stats *elp_get_stats(struct net_device *dev)
 	return &adapter->stats;
 }
 
+/**
+ * netdev_ethtool_ioctl: Handle network interface SIOCETHTOOL ioctls
+ * @dev: network interface on which out-of-band action is to be performed
+ * @useraddr: userspace address to which data is to be read and returned
+ *
+ * Process the various commands of the SIOCETHTOOL interface.
+ */
+
+static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
+{
+	u32 ethcmd;
+
+	/* dev_ioctl() in ../../net/core/dev.c has already checked
+	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
+
+	if (get_user(ethcmd, (u32 *)useraddr))
+		return -EFAULT;
+
+	switch (ethcmd) {
+
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
+		strcpy (info.driver, DRV_NAME);
+		strcpy (info.version, DRV_VERSION);
+		sprintf(info.bus_info, "ISA 0x%lx", dev->base_addr);
+		if (copy_to_user (useraddr, &info, sizeof (info)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get message-level */
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
+		edata.data = debug;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set message-level */
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+		debug = edata.data;
+		return 0;
+	}
+
+	default:
+		break;
+	}
+
+	return -EOPNOTSUPP;
+}
+
+/**
+ * netdev_ioctl: Handle network interface ioctls
+ * @dev: network interface on which out-of-band action is to be performed
+ * @rq: user request data
+ * @cmd: command issued by user
+ *
+ * Process the various out-of-band ioctls passed to this driver.
+ */
+
+static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
+{
+	int rc = 0;
+
+	switch (cmd) {
+	case SIOCETHTOOL:
+		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		break;
+
+	default:
+		rc = -EOPNOTSUPP;
+		break;
+	}
+
+	return rc;
+}
+ 
+
 /******************************************************
  *
  * close the board
