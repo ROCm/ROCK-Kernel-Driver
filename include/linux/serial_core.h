@@ -67,6 +67,12 @@
 #define PORT_PC9861	45
 #define PORT_PC9801_101	46
 
+/* DZ */
+#define PORT_DZ		47
+
+/* Parisc type numbers. */
+#define PORT_MUX	48
+
 /* Macintosh Zilog type numbers */
 #define PORT_MAC_ZILOG	50	/* m68k : not yet implemented */
 #define PORT_PMAC_ZILOG	51
