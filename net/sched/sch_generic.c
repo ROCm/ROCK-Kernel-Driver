@@ -285,10 +285,9 @@ static const u8 prio2band[TC_PRIO_MAX+1] =
 static int
 pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc* qdisc)
 {
-	struct sk_buff_head *list;
+	struct sk_buff_head *list = qdisc_priv(qdisc);
 
-	list = ((struct sk_buff_head*)qdisc->data) +
-		prio2band[skb->priority&TC_PRIO_MAX];
+	list += prio2band[skb->priority&TC_PRIO_MAX];
 
 	if (list->qlen < qdisc->dev->tx_queue_len) {
 		__skb_queue_tail(list, skb);
@@ -306,7 +305,7 @@ static struct sk_buff *
 pfifo_fast_dequeue(struct Qdisc* qdisc)
 {
 	int prio;
-	struct sk_buff_head *list = ((struct sk_buff_head*)qdisc->data);
+	struct sk_buff_head *list = qdisc_priv(qdisc);
 	struct sk_buff *skb;
 
 	for (prio = 0; prio < 3; prio++, list++) {
@@ -322,10 +321,9 @@ pfifo_fast_dequeue(struct Qdisc* qdisc)
 static int
 pfifo_fast_requeue(struct sk_buff *skb, struct Qdisc* qdisc)
 {
-	struct sk_buff_head *list;
+	struct sk_buff_head *list = qdisc_priv(qdisc);
 
-	list = ((struct sk_buff_head*)qdisc->data) +
-		prio2band[skb->priority&TC_PRIO_MAX];
+	list += prio2band[skb->priority&TC_PRIO_MAX];
 
 	__skb_queue_head(list, skb);
 	qdisc->q.qlen++;
@@ -336,7 +334,7 @@ static void
 pfifo_fast_reset(struct Qdisc* qdisc)
 {
 	int prio;
-	struct sk_buff_head *list = ((struct sk_buff_head*)qdisc->data);
+	struct sk_buff_head *list = qdisc_priv(qdisc);
 
 	for (prio=0; prio < 3; prio++)
 		skb_queue_purge(list+prio);
@@ -361,9 +359,7 @@ rtattr_failure:
 static int pfifo_fast_init(struct Qdisc *qdisc, struct rtattr *opt)
 {
 	int i;
-	struct sk_buff_head *list;
-
-	list = ((struct sk_buff_head*)qdisc->data);
+	struct sk_buff_head *list = qdisc_priv(qdisc);
 
 	for (i=0; i<3; i++)
 		skb_queue_head_init(list+i);
@@ -387,13 +383,22 @@ static struct Qdisc_ops pfifo_fast_ops = {
 
 struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)
 {
+	void *p;
 	struct Qdisc *sch;
-	int size = sizeof(*sch) + ops->priv_size;
+	int size;
 
-	sch = kmalloc(size, GFP_KERNEL);
-	if (!sch)
+	/* ensure that the Qdisc and the private data are 32-byte aligned */
+	size = ((sizeof(*sch) + QDISC_ALIGN_CONST) & ~QDISC_ALIGN_CONST);
+	size += ops->priv_size + QDISC_ALIGN_CONST;
+
+	p = kmalloc(size, GFP_KERNEL);
+	if (!p)
 		return NULL;
-	memset(sch, 0, size);
+	memset(p, 0, size);
+
+	sch = (struct Qdisc *)(((unsigned long)p + QDISC_ALIGN_CONST) 
+			       & ~QDISC_ALIGN_CONST);
+	sch->padded = (char *)sch - (char *)p;
 
 	INIT_LIST_HEAD(&sch->list);
 	skb_queue_head_init(&sch->q);
@@ -410,7 +415,7 @@ struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)
 	if (!ops->init || ops->init(sch, NULL) == 0)
 		return sch;
 
-	kfree(sch);
+	kfree(p);
 	return NULL;
 }
 
@@ -445,7 +450,7 @@ static void __qdisc_destroy(struct rcu_head *head)
 
 	dev_put(qdisc->dev);
 	if (!(qdisc->flags&TCQ_F_BUILTIN))
-		kfree(qdisc);
+		kfree((char *) qdisc - qdisc->padded);
 }
 
 /* Under dev->queue_lock and BH! */

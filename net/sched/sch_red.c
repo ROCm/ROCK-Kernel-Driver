@@ -180,7 +180,7 @@ static int red_ecn_mark(struct sk_buff *skb)
 static int
 red_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 {
-	struct red_sched_data *q = (struct red_sched_data *)sch->data;
+	struct red_sched_data *q = qdisc_priv(sch);
 
 	psched_time_t now;
 
@@ -303,7 +303,7 @@ drop:
 static int
 red_requeue(struct sk_buff *skb, struct Qdisc* sch)
 {
-	struct red_sched_data *q = (struct red_sched_data *)sch->data;
+	struct red_sched_data *q = qdisc_priv(sch);
 
 	PSCHED_SET_PASTPERFECT(q->qidlestart);
 
@@ -316,7 +316,7 @@ static struct sk_buff *
 red_dequeue(struct Qdisc* sch)
 {
 	struct sk_buff *skb;
-	struct red_sched_data *q = (struct red_sched_data *)sch->data;
+	struct red_sched_data *q = qdisc_priv(sch);
 
 	skb = __skb_dequeue(&sch->q);
 	if (skb) {
@@ -330,7 +330,7 @@ red_dequeue(struct Qdisc* sch)
 static unsigned int red_drop(struct Qdisc* sch)
 {
 	struct sk_buff *skb;
-	struct red_sched_data *q = (struct red_sched_data *)sch->data;
+	struct red_sched_data *q = qdisc_priv(sch);
 
 	skb = __skb_dequeue_tail(&sch->q);
 	if (skb) {
@@ -347,7 +347,7 @@ static unsigned int red_drop(struct Qdisc* sch)
 
 static void red_reset(struct Qdisc* sch)
 {
-	struct red_sched_data *q = (struct red_sched_data *)sch->data;
+	struct red_sched_data *q = qdisc_priv(sch);
 
 	__skb_queue_purge(&sch->q);
 	sch->stats.backlog = 0;
@@ -358,7 +358,7 @@ static void red_reset(struct Qdisc* sch)
 
 static int red_change(struct Qdisc *sch, struct rtattr *opt)
 {
-	struct red_sched_data *q = (struct red_sched_data *)sch->data;
+	struct red_sched_data *q = qdisc_priv(sch);
 	struct rtattr *tb[TCA_RED_STAB];
 	struct tc_red_qopt *ctl;
 
@@ -407,7 +407,7 @@ rtattr_failure:
 
 static int red_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
-	struct red_sched_data *q = (struct red_sched_data *)sch->data;
+	struct red_sched_data *q = qdisc_priv(sch);
 	unsigned char	 *b = skb->tail;
 	struct rtattr *rta;
 	struct tc_red_qopt opt;

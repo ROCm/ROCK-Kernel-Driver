@@ -30,7 +30,7 @@
 #endif
 
 
-#define PRIV(sch) ((struct dsmark_qdisc_data *) (sch)->data)
+#define PRIV(sch) qdisc_priv(sch)
 
 
 /*
