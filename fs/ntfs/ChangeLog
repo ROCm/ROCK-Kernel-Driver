@@ -24,6 +24,8 @@ ToDo:
 
 	- super.c::parse_ntfs_boot_sector(): Correct the check for 64-bit
 	  clusters. (Philipp Thomas)
+	- attrib.c::load_attribute_list(): Fix bug when initialized_size is a
+	  multiple of the block_size but not the cluster size. (Szaka)
 
 2.1.2 - Important bug fixes aleviating the hangs in statfs.
 

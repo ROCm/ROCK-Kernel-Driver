@@ -1238,11 +1238,9 @@ int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al,
 	unsigned char block_size_bits = sb->s_blocksize_bits;
 
 	ntfs_debug("Entering.");
-#ifdef DEBUG
 	if (!vol || !run_list || !al || size <= 0 || initialized_size < 0 ||
 			initialized_size > size)
 		return -EINVAL;
-#endif
 	if (!initialized_size) {
 		memset(al, 0, size);
 		return 0;
@@ -1273,8 +1271,8 @@ int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al,
 						"read attribute list.");
 				goto err_out;
 			}
-			if (al + block_size > al_end)
-				goto do_partial;
+			if (al + block_size >= al_end)
+				goto do_final;
 			memcpy(al, bh->b_data, block_size);
 			brelse(bh);
 			al += block_size;
@@ -1288,7 +1286,7 @@ initialize:
 done:
 	up_read(&run_list->lock);
 	return err;
-do_partial:
+do_final:
 	if (al < al_end) {
 		/* Partial block. */
 		memcpy(al, bh->b_data, al_end - al);
