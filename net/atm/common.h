@@ -18,7 +18,7 @@ int atm_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 int atm_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 		int total_len);
 unsigned int atm_poll(struct file *file,struct socket *sock,poll_table *wait);
-int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg);
+int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg);
 int atm_setsockopt(struct socket *sock,int level,int optname,char *optval,
     int optlen);
 int atm_getsockopt(struct socket *sock,int level,int optname,char *optval,
