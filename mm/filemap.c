@@ -201,18 +201,18 @@ static int truncate_list_pages(struct address_space *mapping,
 			int failed;
 
 			page_cache_get(page);
-			if (PageWriteback(page)) {
-				/*
-				 * urgggh. This function is utterly foul,
-				 * and this addition doesn't help.  Kill.
-				 */
+			failed = TestSetPageLocked(page);
+			if (!failed && PageWriteback(page)) {
+				unlock_page(page);
+				list_del(head);
+				list_add_tail(head, curr);
 				write_unlock(&mapping->page_lock);
 				wait_on_page_writeback(page);
+				page_cache_release(page);
 				unlocked = 1;
 				write_lock(&mapping->page_lock);
 				goto restart;
 			}
-			failed = TestSetPageLocked(page);
 
 			list_del(head);
 			if (!failed)
