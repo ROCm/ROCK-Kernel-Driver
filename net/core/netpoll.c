@@ -38,7 +38,11 @@ static struct sk_buff *skbs;
 static spinlock_t rx_list_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(rx_list);
 
-static int trapped;
+static atomic_t trapped;
+spinlock_t netpoll_poll_lock = SPIN_LOCK_UNLOCKED;
+
+#define NETPOLL_RX_ENABLED  1
+#define NETPOLL_RX_DROP     2
 
 #define MAX_SKB_SIZE \
 		(MAX_UDP_CHUNK + sizeof(struct udphdr) + \
@@ -70,6 +74,7 @@ void netpoll_poll(struct netpoll *np)
 	 * timeouts.  Thus, we set our budget to a more reasonable value.
 	 */
 	int budget = 16;
+	unsigned long flags;
 
 	if(!np->dev || !netif_running(np->dev) || !np->dev->poll_controller)
 		return;
@@ -78,9 +83,19 @@ void netpoll_poll(struct netpoll *np)
 	np->dev->poll_controller(np->dev);
 
 	/* If scheduling is stopped, tickle NAPI bits */
-	if(trapped && np->dev->poll &&
-	   test_bit(__LINK_STATE_RX_SCHED, &np->dev->state))
+	spin_lock_irqsave(&netpoll_poll_lock, flags);
+	if (np->dev->poll &&
+	    test_bit(__LINK_STATE_RX_SCHED, &np->dev->state)) {
+		np->dev->netpoll_rx |= NETPOLL_RX_DROP;
+		atomic_inc(&trapped);
+
 		np->dev->poll(np->dev, &budget);
+
+		atomic_dec(&trapped);
+		np->dev->netpoll_rx &= ~NETPOLL_RX_DROP;
+	}
+	spin_unlock_irqrestore(&netpoll_poll_lock, flags);
+
 	zap_completion_queue();
 }
 
@@ -357,7 +372,8 @@ int netpoll_rx(struct sk_buff *skb)
 		goto out;
 
 	/* check if netpoll clients need ARP */
-	if (skb->protocol == __constant_htons(ETH_P_ARP) && trapped) {
+	if (skb->protocol == __constant_htons(ETH_P_ARP) &&
+	    atomic_read(&trapped)) {
 		arp_reply(skb);
 		return 1;
 	}
@@ -420,7 +436,7 @@ int netpoll_rx(struct sk_buff *skb)
 	spin_unlock_irqrestore(&rx_list_lock, flags);
 
 out:
-	return trapped;
+	return atomic_read(&trapped);
 }
 
 int netpoll_parse_options(struct netpoll *np, char *opt)
@@ -613,7 +629,7 @@ int netpoll_setup(struct netpoll *np)
 	if(np->rx_hook) {
 		unsigned long flags;
 
-		np->dev->netpoll_rx = 1;
+		np->dev->netpoll_rx = NETPOLL_RX_ENABLED;
 
 		spin_lock_irqsave(&rx_list_lock, flags);
 		list_add(&np->rx_list, &rx_list);
@@ -644,12 +660,15 @@ void netpoll_cleanup(struct netpoll *np)
 
 int netpoll_trap(void)
 {
-	return trapped;
+	return atomic_read(&trapped);
 }
 
 void netpoll_set_trap(int trap)
 {
-	trapped = trap;
+	if (trap)
+		atomic_inc(&trapped);
+	else
+		atomic_dec(&trapped);
 }
 
 EXPORT_SYMBOL(netpoll_set_trap);
