@@ -68,6 +68,7 @@ obj-$(CONFIG_SCSI_GENERIC_NCR5380) += g_NCR5380.o
 obj-$(CONFIG_SCSI_GENERIC_NCR5380_MMIO) += g_NCR5380_mmio.o
 obj-$(CONFIG_SCSI_NCR53C406A)	+= NCR53c406a.o
 obj-$(CONFIG_SCSI_NCR_D700)	+= NCR_D700.o 53c700.o
+obj-$(CONFIG_SCSI_NCR_Q720)	+= NCR_Q720_mod.o
 obj-$(CONFIG_SCSI_SYM53C416)	+= sym53c416.o
 obj-$(CONFIG_SCSI_QLOGIC_FAS)	+= qlogicfas.o
 obj-$(CONFIG_SCSI_QLOGIC_ISP)	+= qlogicisp.o 
@@ -137,8 +138,12 @@ ncr53c8xx-flags-$(CONFIG_SCSI_ZALON) \
 			-DCONFIG_SCSI_NCR53C8XX_NO_WORD_TRANSFERS \
 			-DCONFIG_SCSI_NCR53C8XX_NO_NVRAM \
 			-DSCSI_NCR_BIG_ENDIAN -DSIMULATED_INTFLY
+ncr53c8xx-flags-$(CONFIG_SCSI_NCR_Q720) \
+		:= -DCONFIG_SCSI_NCR53C8XX_NO_NVRAM \
+			-DSIMULATED_INTFLY
 CFLAGS_ncr53c8xx.o	:= $(ncr53c8xx-flags-y) $(ncr53c8xx-flags-m)
 zalon7xx-objs	:= zalon.o ncr53c8xx.o
+NCR_Q720_mod-objs	:= NCR_Q720.o ncr53c8xx.o
 cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o \
 		   cpqfcTSworker.o cpqfcTStrigger.o
 
