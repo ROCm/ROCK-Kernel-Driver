@@ -155,11 +155,17 @@ depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 #   targets (That happens when someone does make some/dir/foo.[ois])
 
 ifeq ($(MAKECMDGOALS),subdirclean)
+
+__clean-files := $(wildcard $(EXTRA_TARGETS) $(host-progs) $(clean-files))
+
 subdirclean: $(subdir-ymn)
+ifneq ($(strip $(__clean-files) $(clean-rule)),)
+	rm -f $(__clean-files)
+	$(clean-rule)
+else
 	@/bin/true
-	@rm -f $(EXTRA_TARGETS) $(host-progs) $(clean-files) \
-        $(addprefix $(obj)/,*.[oas] .*.cmd .*.tmp .*.d)
-	@$(clean-rule)
+endif
+
 else
 ifeq ($(MAKECMDGOALS),fastdep)
 
@@ -180,7 +186,7 @@ else
 # This sets version suffixes on exported symbols
 # ---------------------------------------------------------------------------
 
-MODVERDIR := include/linux/modules/
+MODVERDIR := include/linux/modules
 
 #
 # Added the SMP separator to stop module accidents between uniprocessor

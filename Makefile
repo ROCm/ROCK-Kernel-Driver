@@ -239,7 +239,7 @@ ifdef include-config
 
 #	If .config doesn't exist - tough luck
 
-.config: arch/$(ARCH)/config.in $(shell find . -name Config.in)
+.config: arch/$(ARCH)/config.in # FIXME $(shell find . -name Config.in)
 	@echo '***'
 	@if [ -f $@ ]; then \
 	  echo '*** The tree was updated, so your .config may be'; \
@@ -456,18 +456,23 @@ include/linux/version.h: Makefile
 
 depend dep: .hdepend
 
-#	.hdepend is our (misnomed) marker for whether we've run
+#	.hdepend is our (misnomed) marker for whether we've
 #	generated module versions
 
-.hdepend: $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
+make-versions := $(strip $(if $(filter dep depend,$(MAKECMDGOALS)),1) \
+			 $(if $(wildcard .hdepend),,1))
+
+.hdepend: prepare FORCE
+ifneq ($(make-versions),)
 	@$(MAKE) include/linux/modversions.h
 	@touch $@
+endif
 
 ifdef CONFIG_MODVERSIONS
 
 # 	Update modversions.h, but only if it would change.
 
-include/linux/modversions.h: scripts/fixdep prepare FORCE
+include/linux/modversions.h: FORCE
 	@rm -rf .tmp_export-objs
 	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
 	@echo -n '  Generating $@'
@@ -688,42 +693,34 @@ MRPROPER_DIRS += \
 	include/config \
 	include/linux/modules
 
-# clean - Delete all intermidiate files
+# clean - Delete all intermediate files
 #
-clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook
-cleanprint:
-	@echo '  Cleaning the srctree'
+clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook scripts
 
-$(addprefix _clean_,$(clean-dirs)): cleanprint
+$(addprefix _clean_,$(clean-dirs)):
 	+@$(call descend,$(patsubst _clean_%,%,$@), subdirclean)
 
 quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
 cmd_rmclean	  = rm -f $(CLEAN_FILES)
 clean: archclean $(addprefix _clean_,$(clean-dirs))
 	$(call cmd,rmclean)
+	@find . $(RCS_FIND_IGNORE) \
+	 	\( -name '*.[oas]' -o -name '.*.cmd' -o -name '.*.d' \
+		-o -name '.*.tmp' \) -type f -print | xargs rm -f
 
 # mrproper - delete configuration + modules + core files
 #
 quiet_cmd_mrproper = RM  $$(MRPROPER_DIRS) + $$(MRPROPER_FILES)
 cmd_mrproper = rm -rf $(MRPROPER_DIRS) && rm -f $(MRPROPER_FILES)
-mrproper: clean archmrproper
-	@echo '  Making mrproper in the srctree'
+mrproper distclean: clean archmrproper
+	@echo '  Making $@ in the srctree'
 	@find . $(RCS_FIND_IGNORE) \
-		\( -name .depend -o -name .\*.cmd -o -name core \) \
-		-type f -print | xargs rm -f
-	$(call cmd,mrproper)
-	+@$(call descend,scripts,mrproper)
-
-# distclean - remove all temporaries left behind by patch, vi, emacs etc.
-#
-distclean: mrproper
-	@echo '  Making distclean in the srctree'
-	@find . $(RCS_FIND_IGNORE) \
-		\( -not -type d \) -and \
 	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
-	 	-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f \
-		-print | xargs rm -f
+	 	-o -name '.*.rej' -o -size 0 \
+		-o -name '*%' -o -name '.*.cmd' -o -name 'core' \) \
+		-type f -print | xargs rm -f
+	$(call cmd,mrproper)
 
 # Generate tags for editors
 # ---------------------------------------------------------------------------
