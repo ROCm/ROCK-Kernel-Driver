@@ -1987,6 +1987,11 @@ config R8169
 	  To compile this driver as a module, choose M here: the module
 	  will be called r8169.  This is recommended.
 
+config R8169_NAPI
+	bool "Use Rx and Tx Polling (NAPI) (EXPERIMENTAL)"
+	depends on R8169 && EXPERIMENTAL 
+
+
 config SK98LIN
 	tristate "Marvell Yukon Chipset / SysKonnect SK-98xx Support"
 	depends on PCI
