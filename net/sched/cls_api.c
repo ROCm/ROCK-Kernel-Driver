@@ -231,8 +231,12 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 		tp->classify = tp_ops->classify;
 		tp->classid = parent;
 		err = -EBUSY;
-		if (!try_module_get(tp_ops->owner) ||
-		    (err = tp_ops->init(tp)) != 0) {
+		if (!try_module_get(tp_ops->owner)) {
+			kfree(tp);
+			goto errout;
+		}
+		if ((err = tp_ops->init(tp)) != 0) {
+			module_put(tp_ops->owner);
 			kfree(tp);
 			goto errout;
 		}
