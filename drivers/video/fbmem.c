@@ -61,6 +61,8 @@ extern int cyberfb_init(void);
 extern int cyberfb_setup(char*);
 extern int pm2fb_init(void);
 extern int pm2fb_setup(char*);
+extern int pm3fb_init(void);
+extern int pm3fb_setup(char*);
 extern int clps711xfb_init(void);
 extern int cyber2000fb_init(void);
 extern int cyber2000fb_setup(char*);
@@ -120,10 +122,16 @@ extern int rivafb_init(void);
 extern int rivafb_setup(char*);
 extern int tdfxfb_init(void);
 extern int tdfxfb_setup(char*);
+extern int tridentfb_init(void);
+extern int tridentfb_setup(char*);
 extern int sisfb_init(void);
 extern int sisfb_setup(char*);
 extern int stifb_init(void);
 extern int stifb_setup(char*);
+extern int pmagbafb_init(void);
+extern int pmagbbfb_init(void);
+extern void maxinefb_init(void);
+extern int tx3912fb_init(void);
 extern int radeonfb_init(void);
 extern int radeonfb_setup(char*);
 extern int e1355fb_init(void);
@@ -172,6 +180,9 @@ static struct {
 #ifdef CONFIG_FB_PM2
 	{ "pm2fb", pm2fb_init, pm2fb_setup },
 #endif
+#ifdef CONFIG_FB_PM3
+	{ "pm3fb", pm3fb_init, pm3fb_setup },
+#endif           
 #ifdef CONFIG_FB_CLGEN
 	{ "clgen", clgenfb_init, clgenfb_setup },
 #endif
@@ -219,6 +230,9 @@ static struct {
 #endif 
 #ifdef CONFIG_FB_SIS
 	{ "sisfb", sisfb_init, sisfb_setup },
+#endif
+#ifdef CONFIG_FB_TRIDENT
+	{ "trident", tridentfb_init, tridentfb_setup },
 #endif
 
 	/*
@@ -285,12 +299,24 @@ static struct {
 #ifdef CONFIG_FB_HIT
 	{ "hitfb", hitfb_init, NULL },
 #endif
+#ifdef CONFIG_FB_TX3912
+	{ "tx3912", tx3912fb_init, NULL },
+#endif
 #ifdef CONFIG_FB_E1355
 	{ "e1355fb", e1355fb_init, e1355fb_setup },
 #endif
 #ifdef CONFIG_FB_PVR2
 	{ "pvr2", pvr2fb_init, pvr2fb_setup },
 #endif
+#ifdef CONFIG_FB_PMAG_BA
+	{ "pmagbafb", pmagbafb_init, NULL },
+#endif          
+#ifdef CONFIG_FB_PMAGB_B
+	{ "pmagbbfb", pmagbbfb_init, NULL },
+#endif
+#ifdef CONFIG_FB_MAXINE
+	{ "maxinefb", maxinefb_init, NULL },
+#endif            
 #ifdef CONFIG_FB_VOODOO1
 	{ "sst", sstfb_init, sstfb_setup },
 #endif
