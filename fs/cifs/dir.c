@@ -125,7 +125,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	int rc = -ENOENT;
 	int xid;
 	int oplock = 0;
-	int desiredAccess = GENERIC_ALL;
+	int desiredAccess = GENERIC_READ | GENERIC_WRITE;
 	__u16 fileHandle;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
@@ -150,8 +150,12 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 			desiredAccess = GENERIC_READ;
 		else if ((nd->intent.open.flags & O_ACCMODE) == O_WRONLY)
 			desiredAccess = GENERIC_WRITE;
-		else if ((nd->intent.open.flags & O_ACCMODE) == O_RDWR)
-			desiredAccess = GENERIC_ALL;
+		else if ((nd->intent.open.flags & O_ACCMODE) == O_RDWR) {
+			/* GENERIC_ALL is too much permission to request */
+			/* can cause unnecessary access denied on create */
+			/* desiredAccess = GENERIC_ALL; */
+			desiredAccess = GENERIC_READ | GENERIC_WRITE;
+		}
 
 		if((nd->intent.open.flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL))
 			disposition = FILE_CREATE;

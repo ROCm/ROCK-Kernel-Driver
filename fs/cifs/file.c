@@ -87,8 +87,12 @@ cifs_open(struct inode *inode, struct file *file)
 		desiredAccess = GENERIC_READ;
 	else if ((file->f_flags & O_ACCMODE) == O_WRONLY)
 		desiredAccess = GENERIC_WRITE;
-	else if ((file->f_flags & O_ACCMODE) == O_RDWR)
-		desiredAccess = GENERIC_ALL;
+	else if ((file->f_flags & O_ACCMODE) == O_RDWR) {
+		/* GENERIC_ALL is too much permission to request */
+		/* can cause unnecessary access denied on create */
+		/* desiredAccess = GENERIC_ALL; */
+		desiredAccess = GENERIC_READ | GENERIC_WRITE;
+	}
 
 /*********************************************************************
  *  open flag mapping table:
@@ -262,8 +266,12 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 		desiredAccess = GENERIC_READ;
 	else if ((file->f_flags & O_ACCMODE) == O_WRONLY)
 		desiredAccess = GENERIC_WRITE;
-	else if ((file->f_flags & O_ACCMODE) == O_RDWR)
-		desiredAccess = GENERIC_ALL;
+	else if ((file->f_flags & O_ACCMODE) == O_RDWR) {
+		/* GENERIC_ALL is too much permission to request */
+		/* can cause unnecessary access denied on create */
+		/* desiredAccess = GENERIC_ALL; */
+		desiredAccess = GENERIC_READ | GENERIC_WRITE;
+	}
 
 	if (oplockEnabled)
 		oplock = REQ_OPLOCK;
