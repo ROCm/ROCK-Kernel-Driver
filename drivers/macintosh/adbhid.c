@@ -611,8 +611,8 @@ adbhid_input_register(int id, int default_id, int original_handler_id,
 		/* HACK WARNING!! This should go away as soon there is an utility
 		 * to control that for event devices.
 		 */
-		adbhid[id]->input.rep[REP_DELAY] = HZ/2;   /* input layer default: HZ/4 */
-		adbhid[id]->input.rep[REP_PERIOD] = HZ/15; /* input layer default: HZ/33 */
+		adbhid[id]->input.rep[REP_DELAY] = 500;   /* input layer default: 250 */
+		adbhid[id]->input.rep[REP_PERIOD] = 66; /* input layer default: 33 */
 	}
 }
 

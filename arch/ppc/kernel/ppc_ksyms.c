@@ -367,11 +367,17 @@ EXPORT_SYMBOL(next_mmu_context);
 EXPORT_SYMBOL(set_context);
 EXPORT_SYMBOL(handle_mm_fault); /* For MOL */
 EXPORT_SYMBOL_NOVERS(disarm_decr);
+extern long mol_trampoline;
+EXPORT_SYMBOL(mol_trampoline); /* For MOL */
 #ifdef CONFIG_PPC_STD_MMU
 EXPORT_SYMBOL(flush_hash_pages); /* For MOL */
+#ifdef CONFIG_SMP
+extern int mmu_hash_lock;
+EXPORT_SYMBOL(mmu_hash_lock); /* For MOL */
+#endif /* CONFIG_SMP */
 extern long *intercept_table;
 EXPORT_SYMBOL(intercept_table);
-#endif
+#endif /* CONFIG_PPC_STD_MMU */
 EXPORT_SYMBOL(cur_cpu_spec);
 #ifdef CONFIG_PPC_PMAC
 extern unsigned long agp_special_page;

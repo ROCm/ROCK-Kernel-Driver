@@ -87,6 +87,10 @@
 #define SPRN_CTR	0x009	/* Count Register */
 #define SPRN_DABR	0x3F5	/* Data Address Breakpoint Register */
 #define SPRN_DAR	0x013	/* Data Address Register */
+#define SPRN_TBRL	0x10C	/* Time Base Read Lower Register (user, R/O) */
+#define SPRN_TBRU	0x10D	/* Time Base Read Upper Register (user, R/O) */
+#define SPRN_TBWL	0x11C	/* Time Base Lower Register (super, R/W) */
+#define SPRN_TBWU	0x11D	/* Time Base Upper Register (super, R/W) */
 #define SPRN_DBAT0L	0x219	/* Data BAT 0 Lower Register */
 #define SPRN_DBAT0U	0x218	/* Data BAT 0 Upper Register */
 #define SPRN_DBAT1L	0x21B	/* Data BAT 1 Lower Register */
@@ -397,6 +401,10 @@
 #define THRM2	SPRN_THRM2	/* Thermal Management Register 2 */
 #define THRM3	SPRN_THRM3	/* Thermal Management Register 3 */
 #define XER	SPRN_XER
+#define TBRL	SPRN_TBRL	/* Time Base Read Lower Register */
+#define TBRU	SPRN_TBRU	/* Time Base Read Upper Register */
+#define TBWL	SPRN_TBWL	/* Time Base Write Lower Register */
+#define TBWU	SPRN_TBWU	/* Time Base Write Upper Register */
 
 /* Processor Version Register */
 
