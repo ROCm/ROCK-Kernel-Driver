@@ -58,7 +58,7 @@
 #include <net/inet_common.h>
 
 /* Global data structures. */
-sctp_protocol_t sctp_proto;
+struct sctp_protocol sctp_proto;
 struct proc_dir_entry	*proc_net_sctp;
 DEFINE_SNMP_STAT(struct sctp_mib, sctp_statistics);
 
@@ -152,7 +152,7 @@ static void sctp_v4_copy_addrlist(struct list_head *addrlist,
 /* Extract our IP addresses from the system and stash them in the
  * protocol structure.
  */
-static void __sctp_get_local_addr_list(sctp_protocol_t *proto)
+static void __sctp_get_local_addr_list(struct sctp_protocol *proto)
 {
 	struct net_device *dev;
 	struct list_head *pos;
@@ -168,7 +168,7 @@ static void __sctp_get_local_addr_list(sctp_protocol_t *proto)
 	read_unlock(&dev_base_lock);
 }
 
-static void sctp_get_local_addr_list(sctp_protocol_t *proto)
+static void sctp_get_local_addr_list(struct sctp_protocol *proto)
 {
 	long flags __attribute__ ((unused));
 
@@ -178,7 +178,7 @@ static void sctp_get_local_addr_list(sctp_protocol_t *proto)
 }
 
 /* Free the existing local addresses.  */
-static void __sctp_free_local_addr_list(sctp_protocol_t *proto)
+static void __sctp_free_local_addr_list(struct sctp_protocol *proto)
 {
 	struct sockaddr_storage_list *addr;
 	struct list_head *pos, *temp;
@@ -191,7 +191,7 @@ static void __sctp_free_local_addr_list(sctp_protocol_t *proto)
 }
 
 /* Free the existing local addresses.  */
-static void sctp_free_local_addr_list(sctp_protocol_t *proto)
+static void sctp_free_local_addr_list(struct sctp_protocol *proto)
 {
 	long flags __attribute__ ((unused));
 
@@ -201,8 +201,9 @@ static void sctp_free_local_addr_list(sctp_protocol_t *proto)
 }
 
 /* Copy the local addresses which are valid for 'scope' into 'bp'.  */
-int sctp_copy_local_addr_list(sctp_protocol_t *proto, sctp_bind_addr_t *bp,
-			      sctp_scope_t scope, int priority, int copy_flags)
+int sctp_copy_local_addr_list(struct sctp_protocol *proto,
+			      struct sctp_bind_addr *bp, sctp_scope_t scope,
+			      int priority, int copy_flags)
 {
 	struct sockaddr_storage_list *addr;
 	int error = 0;
@@ -331,7 +332,7 @@ static int sctp_v4_addr_valid(union sctp_addr *addr)
 static int sctp_v4_available(const union sctp_addr *addr)
 {
 	int ret = inet_addr_type(addr->v4.sin_addr.s_addr);
-	
+
 	/* FIXME: ip_nonlocal_bind sysctl support. */
 
 	if (addr->v4.sin_addr.s_addr != INADDR_ANY && ret != RTN_LOCAL)
@@ -380,7 +381,7 @@ static sctp_scope_t sctp_v4_scope(union sctp_addr *addr)
 
 /* Returns a valid dst cache entry for the given source and destination ip
  * addresses. If an association is passed, trys to get a dst entry with a
- * source adddress that matches an address in the bind address list. 
+ * source adddress that matches an address in the bind address list.
  */
 struct dst_entry *sctp_v4_get_dst(sctp_association_t *asoc,
 				  union sctp_addr *daddr,
@@ -756,7 +757,7 @@ int sctp_register_pf(struct sctp_pf *pf, sa_family_t family)
 static int __init init_sctp_mibs(void)
 {
 	int i;
-	
+
 	sctp_statistics[0] = kmalloc_percpu(sizeof (struct sctp_mib),
 					    GFP_KERNEL);
 	if (!sctp_statistics[0])
@@ -778,7 +779,7 @@ static int __init init_sctp_mibs(void)
 		}
 	}
 	return 0;
-	
+
 }
 
 static void cleanup_sctp_mibs(void)
@@ -802,9 +803,9 @@ __init int sctp_init(void)
 
 	/* Allocate and initialise sctp mibs.  */
 	status = init_sctp_mibs();
-	if (status) 
+	if (status)
 		goto err_init_mibs;
-		
+
 	/* Initialize proc fs directory.  */
 	sctp_proc_init();
 
@@ -831,7 +832,7 @@ __init int sctp_init(void)
 	/* Valid.Cookie.Life        - 60  seconds */
 	sctp_proto.valid_cookie_life	= 60 * HZ;
 
-	/* Whether Cookie Preservative is enabled(1) or not(0) */ 
+	/* Whether Cookie Preservative is enabled(1) or not(0) */
 	sctp_proto.cookie_preserve_enable = 1;
 
 	/* Max.Burst		    - 4 */
@@ -920,7 +921,7 @@ __init int sctp_init(void)
 	INIT_LIST_HEAD(&sctp_proto.local_addr_list);
 	sctp_proto.local_addr_lock = SPIN_LOCK_UNLOCKED;
 
-	/* Register notifier for inet address additions/deletions. */ 
+	/* Register notifier for inet address additions/deletions. */
 	register_inetaddr_notifier(&sctp_inetaddr_notifier);
 
 	sctp_get_local_addr_list(&sctp_proto);
@@ -942,7 +943,7 @@ err_ahash_alloc:
 	sctp_dbg_objcnt_exit();
 	sctp_proc_exit();
 	cleanup_sctp_mibs();
-err_init_mibs:	
+err_init_mibs:
 	inet_del_protocol(&sctp_protocol, IPPROTO_SCTP);
 	inet_unregister_protosw(&sctp_protosw);
 	return status;

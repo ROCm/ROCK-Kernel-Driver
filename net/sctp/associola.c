@@ -360,9 +360,25 @@ static void sctp_association_destroy(sctp_association_t *asoc)
 	}
 }
 
+/* Change the primary destination address for the peer. */
+void sctp_assoc_set_primary(struct sctp_association *asoc,
+			    struct sctp_transport *transport)
+{
+	asoc->peer.primary_path = transport;
+
+	/* Set a default msg_name for events. */
+	memcpy(&asoc->peer.primary_addr, &transport->ipaddr,
+	       sizeof(union sctp_addr));
+
+	/* If the primary path is changing, assume that the
+	 * user wants to use this new path.
+	 */
+	if (transport->active)
+		asoc->peer.active_path = transport;
+}
 
 /* Add a transport address to an association.  */
-struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *asoc,
+struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 					   const union sctp_addr *addr,
 					   int priority)
 {
@@ -460,11 +476,7 @@ struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *asoc,
 
 	/* If we do not yet have a primary path, set one.  */
 	if (NULL == asoc->peer.primary_path) {
-		asoc->peer.primary_path = peer;
-		/* Set a default msg_name for events. */
-		memcpy(&asoc->peer.primary_addr, &peer->ipaddr,
-		       sizeof(union sctp_addr));
-		asoc->peer.active_path = peer;
+		sctp_assoc_set_primary(asoc, peer);
 		asoc->peer.retran_path = peer;
 	}
 
@@ -603,7 +615,7 @@ void sctp_association_put(sctp_association_t *asoc)
 /* Allocate the next TSN, Transmission Sequence Number, for the given
  * association.
  */
-__u32 __sctp_association_get_next_tsn(sctp_association_t *asoc)
+__u32 sctp_association_get_next_tsn(sctp_association_t *asoc)
 {
 	/* From Section 1.6 Serial Number Arithmetic:
 	 * Transmission Sequence Numbers wrap around when they reach
@@ -618,7 +630,7 @@ __u32 __sctp_association_get_next_tsn(sctp_association_t *asoc)
 }
 
 /* Allocate 'num' TSNs by incrementing the association's TSN by num. */
-__u32 __sctp_association_get_tsn_block(sctp_association_t *asoc, int num)
+__u32 sctp_association_get_tsn_block(sctp_association_t *asoc, int num)
 {
 	__u32 retval = asoc->next_tsn;
 
@@ -942,7 +954,7 @@ struct sctp_transport *sctp_assoc_choose_shutdown_transport(sctp_association_t *
 {
 	/* If this is the first time SHUTDOWN is sent, use the active path,
 	 * else use the retran path. If the last SHUTDOWN was sent over the
-	 * retran path, update the retran path and use it. 
+	 * retran path, update the retran path and use it.
 	 */
 	if (!asoc->shutdown_last_sent_to)
 		return asoc->peer.active_path;

@@ -125,7 +125,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		sctp_free_chunk(chunk);
 	}
 
-	/* Throw away any chunks in the retransmit queue. */ 
+	/* Throw away any chunks in the retransmit queue. */
 	list_for_each_safe(lchunk, temp, &q->retransmit) {
 		list_del(lchunk);
 		chunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
@@ -241,7 +241,7 @@ void sctp_retransmit_insert(struct list_head *tlchunk, struct sctp_outq *q)
 }
 
 /* Mark all the eligible packets on a transport for retransmission.  */
-void sctp_retransmit_mark(struct sctp_outq *q, 
+void sctp_retransmit_mark(struct sctp_outq *q,
 			  struct sctp_transport *transport,
 			  __u8 fast_retransmit)
 {
@@ -553,7 +553,7 @@ void sctp_xmit_fragmented_chunks(struct sctp_outq *q, sctp_packet_t *packet,
 	}
 
 	/* Get a TSN block of nfrags TSNs. */
-	tsn = __sctp_association_get_tsn_block(asoc, nfrags);
+	tsn = sctp_association_get_tsn_block(asoc, nfrags);
 
 	pos = skb_peek(&q->out);
 	/* Transmit the first fragment. */
@@ -595,7 +595,7 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
  	old_flags = chunk->chunk_hdr->flags;
 	if (old_flags & SCTP_DATA_FIRST_FRAG)
 		flags = SCTP_DATA_FIRST_FRAG;
-	else 
+	else
 		flags = SCTP_DATA_MIDDLE_FRAG;
 
 	/* Make the first fragment. */
@@ -1003,7 +1003,7 @@ sctp_flush_out:
 	 */
 	while ((ltransport = sctp_list_dequeue(&transport_list)) != NULL ) {
 		struct sctp_transport *t = list_entry(ltransport,
-						      struct sctp_transport, 
+						      struct sctp_transport,
 						      send_ready);
 		if (t != transport)
 			transport = t;
@@ -1125,7 +1125,7 @@ int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 	 * This is a MASSIVE candidate for optimization.
 	 */
 	list_for_each(pos, transport_list) {
-		transport  = list_entry(pos, struct sctp_transport, 
+		transport  = list_entry(pos, struct sctp_transport,
 					transports);
 		sctp_check_transmitted(q, &transport->transmitted,
 				       transport, sack, highest_new_tsn);
@@ -1179,7 +1179,7 @@ int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 		goto finish;
 
 	list_for_each(pos, transport_list) {
-		transport  = list_entry(pos, struct sctp_transport, 
+		transport  = list_entry(pos, struct sctp_transport,
 					transports);
 		q->empty = q->empty && list_empty(&transport->transmitted);
 		if (!q->empty)

@@ -118,7 +118,6 @@ struct sctp_opt;
 struct sctp_endpoint_common;
 struct sctp_ssnmap;
 
-typedef struct sctp_protocol sctp_protocol_t;
 typedef struct sctp_endpoint sctp_endpoint_t;
 typedef struct sctp_association sctp_association_t;
 typedef struct sctp_packet sctp_packet_t;
@@ -254,7 +253,7 @@ struct sctp_af {
 	void 		(*get_saddr)	(struct sctp_association *asoc,
 					 struct dst_entry *dst,
 					 union sctp_addr *daddr,
-				 	 union sctp_addr *saddr);	 
+				 	 union sctp_addr *saddr);
 	void            (*copy_addrlist) (struct list_head *,
 					  struct net_device *);
 	void            (*dst_saddr)    (union sctp_addr *saddr,
@@ -1130,8 +1129,9 @@ static inline sctp_endpoint_t *sctp_ep(sctp_endpoint_common_t *base)
 }
 
 /* These are function signatures for manipulating endpoints.  */
-sctp_endpoint_t *sctp_endpoint_new(sctp_protocol_t *, struct sock *, int);
-sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *, sctp_protocol_t *,
+sctp_endpoint_t *sctp_endpoint_new(struct sctp_protocol *, struct sock *, int);
+sctp_endpoint_t *sctp_endpoint_init(struct sctp_endpoint *,
+				    struct sctp_protocol *,
 				    struct sock *, int priority);
 void sctp_endpoint_free(sctp_endpoint_t *);
 void sctp_endpoint_put(sctp_endpoint_t *);
@@ -1143,7 +1143,6 @@ sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
 int sctp_endpoint_is_peeled_off(sctp_endpoint_t *, const union sctp_addr *);
 sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *,
 					const union sctp_addr *);
-
 int sctp_has_association(const union sctp_addr *laddr,
 			 const union sctp_addr *paddr);
 
@@ -1619,7 +1618,7 @@ struct sctp_transport *sctp_assoc_lookup_paddr(const sctp_association_t *,
 struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *,
 				     const union sctp_addr *address,
 				     const int priority);
-void sctp_assoc_control_transport(sctp_association_t *,
+void sctp_assoc_control_transport(struct sctp_association *,
 				  struct sctp_transport *,
 				  sctp_transport_cmd_t, sctp_sn_error_t);
 struct sctp_transport *sctp_assoc_lookup_tsn(sctp_association_t *, __u32);
@@ -1629,14 +1628,14 @@ struct sctp_transport *sctp_assoc_is_match(sctp_association_t *,
 void sctp_assoc_migrate(sctp_association_t *, struct sock *);
 void sctp_assoc_update(sctp_association_t *dst, sctp_association_t *src);
 
-__u32 __sctp_association_get_next_tsn(sctp_association_t *);
-__u32 __sctp_association_get_tsn_block(sctp_association_t *, int);
-__u16 __sctp_association_get_next_ssn(sctp_association_t *, __u16 sid);
+__u32 sctp_association_get_next_tsn(struct sctp_association *);
+__u32 sctp_association_get_tsn_block(struct sctp_association *, int);
 
-void sctp_assoc_sync_pmtu(sctp_association_t *);
-void sctp_assoc_rwnd_increase(sctp_association_t *, int);
-void sctp_assoc_rwnd_decrease(sctp_association_t *, int);
-
+void sctp_assoc_sync_pmtu(struct sctp_association *);
+void sctp_assoc_rwnd_increase(struct sctp_association *, int);
+void sctp_assoc_rwnd_decrease(struct sctp_association *, int);
+void sctp_assoc_set_primary(struct sctp_association *,
+			    struct sctp_transport *);
 int sctp_assoc_set_bind_addr_from_ep(sctp_association_t *, int);
 int sctp_assoc_set_bind_addr_from_cookie(sctp_association_t *,
 					 sctp_cookie_t *, int);

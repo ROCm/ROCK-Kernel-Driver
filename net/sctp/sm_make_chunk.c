@@ -1282,7 +1282,7 @@ void sctp_chunk_assign_tsn(sctp_chunk_t *chunk)
 		 * assign a TSN.
 		 */
 		chunk->subh.data_hdr->tsn =
-			htonl(__sctp_association_get_next_tsn(chunk->asoc));
+			htonl(sctp_association_get_next_tsn(chunk->asoc));
 		chunk->has_tsn = 1;
 	}
 }
