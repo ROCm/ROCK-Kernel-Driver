@@ -50,7 +50,7 @@ extern unsigned long (*vidc_filler) (unsigned long ibuf, unsigned long iend,
  * Virtual DMA buffer exhausted
  */
 
-extern void     (*dma_interrupt) (void);
+extern irqreturn_t (*dma_interrupt) (void);
 
 /*
  * Virtual DMA buffer addresses
