@@ -40,7 +40,7 @@ static void enum_device(struct device_class * cls, struct device * dev)
 	u32 val;
 	spin_lock(&device_lock);
 	val = cls->devnum++;
-	write_unlock(&device_lock);
+	spin_unlock(&device_lock);
 	dev->class_num = val;
 	devclass_dev_link(cls,dev);
 }
