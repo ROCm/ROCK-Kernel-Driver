@@ -156,7 +156,7 @@ ENTRY(cpu_xscale_reset)
 	msr	cpsr_c, r1			@ reset CPSR
 	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
 	bic	r1, r1, #0x0086			@ ........B....CA.
-	bic	r1, r1, #0x1900			@ ...IZ..S........
+	bic	r1, r1, #0x3900			@ ..VIZ..S........
 	mcr	p15, 0, r1, c1, c0, 0		@ ctrl register
 	mcr	p15, 0, ip, c7, c7, 0		@ invalidate I,D caches & BTB
 	bic	r1, r1, #0x0001			@ ...............M
