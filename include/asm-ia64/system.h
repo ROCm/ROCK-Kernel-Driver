@@ -148,7 +148,7 @@ do {										\
 			      "cmp.ne p6,p7=%1,r0;;"				\
 			      "(p6) ssm psr.i;"					\
 			      "(p7) rsm psr.i;;"				\
-			      "srlz.d"						\
+			      "(p6) srlz.d"					\
 			      : "=&r" (old_psr) : "r"((psr) & IA64_PSR_I)	\
 			      : "p6", "p7", "memory");				\
 	if ((old_psr & IA64_PSR_I) && !(psr & IA64_PSR_I)) {			\

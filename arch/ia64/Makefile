@@ -96,6 +96,8 @@ MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
 vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
+CPPFLAGS_arch/$(ARCH)/vmlinux.lds.s
+
 compressed: vmlinux
 	$(OBJCOPY) $(OBJCOPYFLAGS) vmlinux vmlinux-tmp
 	gzip vmlinux-tmp
@@ -104,27 +106,11 @@ compressed: vmlinux
 rawboot:
 	@$(MAKEBOOT) rawboot
 
-#
-# My boot writes directly to a specific disk partition, I doubt most
-# people will want to do that without changes..
-#
-msb my-special-boot:
-	@$(MAKEBOOT) msb
-
-bootimage:
-	@$(MAKEBOOT) bootimage
-
-srmboot:
-	@$(MAKEBOOT) srmboot
-
 archclean:
 	@$(MAKEBOOT) clean
 
 archmrproper:
 	@$(MAKE) -C arch/$(ARCH)/tools mrproper
-
-bootpfile:
-	@$(MAKEBOOT) bootpfile
 
 prepare: $(TOPDIR)/include/asm-ia64/offsets.h
 

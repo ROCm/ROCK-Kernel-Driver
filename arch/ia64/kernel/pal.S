@@ -245,3 +245,48 @@ GLOBAL_ENTRY(ia64_pal_call_phys_stacked)
 	br.ret.sptk.many b0
 END(ia64_pal_call_phys_stacked)
 
+/*
+ * Save scratch fp scratch regs which aren't saved in pt_regs already (fp10-fp15).
+ *
+ * NOTE: We need to do this since firmware (SAL and PAL) may use any of the scratch
+ * regs fp-low partition.
+ *
+ * Inputs:
+ *      in0	Address of stack storage for fp regs
+ */
+GLOBAL_ENTRY(ia64_save_scratch_fpregs)
+	alloc r3=ar.pfs,1,0,0,0
+	add r2=16,in0
+	;;
+	stf.spill [in0] = f10,32
+	stf.spill [r2]  = f11,32
+	;;
+	stf.spill [in0] = f12,32
+	stf.spill [r2]  = f13,32
+	;;
+	stf.spill [in0] = f14,32
+	stf.spill [r2]  = f15,32
+	br.ret.sptk.many rp
+END(ia64_save_scratch_fpregs)
+
+/*
+ * Load scratch fp scratch regs (fp10-fp15)
+ *
+ * Inputs:
+ *      in0	Address of stack storage for fp regs
+ */
+
+GLOBAL_ENTRY(ia64_load_scratch_fpregs)
+	alloc r3=ar.pfs,1,0,0,0
+	add r2=16,in0
+	;;
+	ldf.fill  f10 = [in0],32
+	ldf.fill  f11 = [r2],32
+	;;
+	ldf.fill  f12 = [in0],32
+	ldf.fill  f13 = [r2],32
+	;;
+	ldf.fill  f14 = [in0],32
+	ldf.fill  f15 = [r2],32
+	br.ret.sptk.many rp
+END(ia64_load_scratch_fpregs)

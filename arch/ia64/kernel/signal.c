@@ -354,6 +354,15 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 	return err;
 }
 
+/*
+ * Check whether the register-backing store is already on the signal stack.
+ */
+static inline int
+rbs_on_sig_stack (unsigned long bsp)
+{
+	return (bsp - current->sas_ss_sp < current->sas_ss_size);
+}
+
 static long
 setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	     struct sigscratch *scr)
@@ -366,10 +375,17 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 
 	frame = (void *) scr->pt.r12;
 	tramp_addr = GATE_ADDR + (ia64_sigtramp - __start_gate_section);
-	if ((ka->sa.sa_flags & SA_ONSTACK) != 0 && !on_sig_stack((unsigned long) frame)) {
-		new_rbs  = (current->sas_ss_sp + sizeof(long) - 1) & ~(sizeof(long) - 1);
-		frame = (void *) ((current->sas_ss_sp + current->sas_ss_size)
-				  & ~(STACK_ALIGN - 1));
+	if (ka->sa.sa_flags & SA_ONSTACK) {
+		/*
+		 * We need to check the memory and register stacks separately, because
+		 * they're switched separately (memory stack is switched in the kernel,
+		 * register stack is switched in the signal trampoline).
+		 */
+		if (!on_sig_stack((unsigned long) frame))
+			frame = (void *) ((current->sas_ss_sp + current->sas_ss_size)
+					  & ~(STACK_ALIGN - 1));
+		if (!rbs_on_sig_stack(scr->pt.ar_bspstore))
+			new_rbs  = (current->sas_ss_sp + sizeof(long) - 1) & ~(sizeof(long) - 1);
 	}
 	frame = (void *) frame - ((sizeof(*frame) + STACK_ALIGN - 1) & ~(STACK_ALIGN - 1));
 
