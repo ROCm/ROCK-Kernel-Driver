@@ -16,6 +16,10 @@ extern ia64_mv_readb_t __ia64_readb;
 extern ia64_mv_readw_t __ia64_readw;
 extern ia64_mv_readl_t __ia64_readl;
 extern ia64_mv_readq_t __ia64_readq;
+extern ia64_mv_readb_t __ia64_readb_relaxed;
+extern ia64_mv_readw_t __ia64_readw_relaxed;
+extern ia64_mv_readl_t __ia64_readl_relaxed;
+extern ia64_mv_readq_t __ia64_readq_relaxed;
 
 #define MACHVEC_HELPER(name)									\
  struct ia64_machine_vector machvec_##name __attribute__ ((unused, __section__ (".machvec")))	\

@@ -65,6 +65,10 @@ EXPORT_SYMBOL(__ia64_memset_c_io);
 #undef __ia64_readw
 #undef __ia64_readl
 #undef __ia64_readq
+#undef __ia64_readb_relaxed
+#undef __ia64_readw_relaxed
+#undef __ia64_readl_relaxed
+#undef __ia64_readq_relaxed
 #undef __ia64_writeb
 #undef __ia64_writew
 #undef __ia64_writel
@@ -126,6 +130,30 @@ __ia64_readl (void *addr)
 
 unsigned long
 __ia64_readq (void *addr)
+{
+	return ___ia64_readq (addr);
+}
+
+unsigned char
+__ia64_readb_relaxed (void *addr)
+{
+	return ___ia64_readb (addr);
+}
+
+unsigned short
+__ia64_readw_relaxed (void *addr)
+{
+	return ___ia64_readw (addr);
+}
+
+unsigned int
+__ia64_readl_relaxed (void *addr)
+{
+	return ___ia64_readl (addr);
+}
+
+unsigned long
+__ia64_readq_relaxed (void *addr)
 {
 	return ___ia64_readq (addr);
 }
