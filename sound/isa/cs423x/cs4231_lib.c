@@ -1896,8 +1896,6 @@ int snd_cs4231_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucon
 	return change;
 }
 
-#define CS4231_CONTROLS (sizeof(snd_cs4231_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_cs4231_controls[] = {
 CS4231_DOUBLE("PCM Playback Switch", 0, CS4231_LEFT_OUTPUT, CS4231_RIGHT_OUTPUT, 7, 7, 1, 1),
 CS4231_DOUBLE("PCM Playback Volume", 0, CS4231_LEFT_OUTPUT, CS4231_RIGHT_OUTPUT, 0, 0, 63, 1),
@@ -1936,7 +1934,7 @@ int snd_cs4231_mixer(cs4231_t *chip)
 
 	strcpy(card->mixername, chip->pcm->name);
 
-	for (idx = 0; idx < CS4231_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_cs4231_controls); idx++) {
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_cs4231_controls[idx], chip))) < 0)
 			return err;
 	}

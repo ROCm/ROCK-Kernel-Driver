@@ -460,8 +460,6 @@ static int mixart_sync_nonblock_events(mixart_mgr_t *mgr)
 
 /*
  *  prepare callback for all pcms
- *
- *  NOTE: this callback is non-atomic (pcm->info_flags |= SNDRV_PCM_INFO_NONATOMIC_OPS)
  */
 static int snd_mixart_prepare(snd_pcm_substream_t *subs)
 {
@@ -939,7 +937,7 @@ static int snd_mixart_pcm_analog(mixart_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_mixart_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_mixart_capture_ops);
 
-	pcm->info_flags = SNDRV_PCM_INFO_NONATOMIC_OPS;
+	pcm->info_flags = 0;
 	strcpy(pcm->name, name);
 
 	preallocate_buffers(chip, pcm);
@@ -970,7 +968,7 @@ static int snd_mixart_pcm_digital(mixart_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_mixart_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_mixart_capture_ops);
 
-	pcm->info_flags = SNDRV_PCM_INFO_NONATOMIC_OPS;
+	pcm->info_flags = 0;
 	strcpy(pcm->name, name);
 
 	preallocate_buffers(chip, pcm);
@@ -1076,11 +1074,8 @@ static int snd_mixart_free(mixart_mgr_t *mgr)
 	for (i = 0; i < 2; i++) {
 		if (mgr->mem[i].virt)
 			iounmap((void *)mgr->mem[i].virt);
-		if (mgr->mem[i].res) {
-			release_resource(mgr->mem[i].res);
-			kfree_nocheck(mgr->mem[i].res);
-		}
 	}
+	pci_release_regions(mgr->pci);
 
 	/* free flowarray */
 	if(mgr->flowinfo.area) {
@@ -1307,19 +1302,14 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	mgr->irq = -1;
 
 	/* resource assignment */
+	if ((err = pci_request_regions(pci, CARD_NAME)) < 0) {
+		kfree(mgr);
+		return err;
+	}
 	for (i = 0; i < 2; i++) {
-		static int memory_sizes[2] = {
-			MIXART_BA0_SIZE, /* 16M */	  
-			MIXART_BA1_SIZE  /* 4 k */
-		};
 		mgr->mem[i].phys = pci_resource_start(pci, i);
-		mgr->mem[i].res = request_mem_region(mgr->mem[i].phys, memory_sizes[i], CARD_NAME);
-		if (! mgr->mem[i].res) {
-			snd_printk(KERN_ERR "unable to grab memory 0x%lx\n", mgr->mem[i].phys);
-			snd_mixart_free(mgr);
-			return -EBUSY;
-		}
-		mgr->mem[i].virt = (unsigned long)ioremap_nocache(mgr->mem[i].phys, memory_sizes[i]);
+		mgr->mem[i].virt = (unsigned long)ioremap_nocache(mgr->mem[i].phys,
+								  pci_resource_len(pci, i));
 	}
 
 	if (request_irq(pci->irq, snd_mixart_interrupt, SA_INTERRUPT|SA_SHIRQ, CARD_NAME, (void *)mgr)) {
@@ -1333,13 +1323,13 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	sprintf(mgr->longname, "%s at 0x%lx & 0x%lx, irq %i", mgr->shortname, mgr->mem[0].phys, mgr->mem[1].phys, mgr->irq);
 
 	/* ISR spinlock  */
-	mgr->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&mgr->lock);
 
 	/* init mailbox  */
 	mgr->msg_fifo_readptr = 0;
 	mgr->msg_fifo_writeptr = 0;
 
-	mgr->msg_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&mgr->msg_lock);
 	init_MUTEX(&mgr->msg_mutex);
 	init_waitqueue_head(&mgr->msg_sleep);
 	atomic_set(&mgr->msg_processed, 0);

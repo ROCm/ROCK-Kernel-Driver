@@ -184,15 +184,10 @@ struct _snd_azf3328 {
 	int irq;
 
 	unsigned long codec_port;
-	struct resource *res_codec_port;
 	unsigned long io2_port;
-	struct resource *res_io2_port;
 	unsigned long mpu_port;
-	struct resource *res_mpu_port;
 	unsigned long synth_port;
-	struct resource *res_synth_port;
 	unsigned long mixer_port;
-	struct resource *res_mixer_port;
 
 #ifdef SUPPORT_JOYSTICK
 	struct gameport gameport;
@@ -547,8 +542,6 @@ static int snd_azf3328_put_mixer_enum(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 	return (nreg != oreg);
 }
 
-#define NUM_CONTROLS(ary) (sizeof(ary) / sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_azf3328_mixer_controls[] __devinitdata = {
 	AZF3328_MIXER_SWITCH("Master Playback Switch", IDX_MIXER_PLAY_MASTER, 15, 1),
 	AZF3328_MIXER_VOL_STEREO("Master Playback Volume", IDX_MIXER_PLAY_MASTER, 0x1f, 1),
@@ -644,7 +637,7 @@ static int __devinit snd_azf3328_mixer_new(azf3328_t *chip)
 	
 	/* add mixer controls */
 	sw = snd_azf3328_mixer_controls;
-	for (idx = 0; idx < NUM_CONTROLS(snd_azf3328_mixer_controls); idx++, sw++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_azf3328_mixer_controls); idx++, sw++) {
 		if ((err = snd_ctl_add(chip->card, snd_ctl_new1(sw, chip))) < 0)
 			return err;
 	}
@@ -807,7 +800,6 @@ static int snd_azf3328_capture_prepare(snd_pcm_substream_t * substream)
 
 static int snd_azf3328_playback_trigger(snd_pcm_substream_t * substream, int cmd)
 {
-	unsigned long flags;
 	azf3328_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int result = 0;
@@ -824,7 +816,7 @@ static int snd_azf3328_playback_trigger(snd_pcm_substream_t * substream, int cmd
 
 		snd_azf3328_setfmt(chip, IDX_IO_PLAY_SOUNDFORMAT, runtime->rate, snd_pcm_format_width(runtime->format), runtime->channels);
 
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock(&chip->reg_lock);
 		/* stop playback */
 		status1 = inw(chip->codec_port+IDX_IO_PLAY_FLAGS);
 		status1 &= ~DMA_RESUME;
@@ -832,11 +824,11 @@ static int snd_azf3328_playback_trigger(snd_pcm_substream_t * substream, int cmd
 	    
 		/* FIXME: clear interrupts or what??? */
 		outw(0xffff, chip->codec_port+IDX_IO_PLAY_IRQMASK);
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock(&chip->reg_lock);
 
 		snd_azf3328_setdmaa(chip, runtime->dma_addr, snd_pcm_lib_period_bytes(substream), snd_pcm_lib_buffer_bytes(substream), 0);
 
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock(&chip->reg_lock);
 #if WIN9X
 		/* FIXME: enable playback/recording??? */
 		status1 |= DMA_PLAY_SOMETHING1 | DMA_PLAY_SOMETHING2;
@@ -852,7 +844,7 @@ static int snd_azf3328_playback_trigger(snd_pcm_substream_t * substream, int cmd
 		outw(DMA_PLAY_SOMETHING1|DMA_PLAY_SOMETHING2, chip->codec_port+IDX_IO_PLAY_FLAGS);
 		outw(DMA_RESUME|SOMETHING_ALMOST_ALWAYS_SET|DMA_EPILOGUE_SOMETHING|DMA_SOMETHING_ELSE, chip->codec_port+IDX_IO_PLAY_FLAGS);
 #endif
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock(&chip->reg_lock);
 
 		/* now unmute WaveOut */
 		snd_azf3328_mixer_set_mute(chip, IDX_MIXER_WAVEOUT, 0);
@@ -864,7 +856,7 @@ static int snd_azf3328_playback_trigger(snd_pcm_substream_t * substream, int cmd
 		/* mute WaveOut */
 		snd_azf3328_mixer_set_mute(chip, IDX_MIXER_WAVEOUT, 1);
 
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock(&chip->reg_lock);
 		/* stop playback */
 		status1 = inw(chip->codec_port+IDX_IO_PLAY_FLAGS);
 
@@ -876,7 +868,7 @@ static int snd_azf3328_playback_trigger(snd_pcm_substream_t * substream, int cmd
 
 		status1 &= ~DMA_PLAY_SOMETHING1;
 		outw(status1, chip->codec_port+IDX_IO_PLAY_FLAGS);
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock(&chip->reg_lock);
 	    
 		/* now unmute WaveOut */
 		snd_azf3328_mixer_set_mute(chip, IDX_MIXER_WAVEOUT, 0);
@@ -900,7 +892,6 @@ static int snd_azf3328_playback_trigger(snd_pcm_substream_t * substream, int cmd
  * should actually be triggered like that */
 static int snd_azf3328_capture_trigger(snd_pcm_substream_t * substream, int cmd)
 {
-	unsigned long flags;
 	azf3328_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int result = 0;
@@ -914,7 +905,7 @@ static int snd_azf3328_capture_trigger(snd_pcm_substream_t * substream, int cmd)
 
 		snd_azf3328_setfmt(chip, IDX_IO_REC_SOUNDFORMAT, runtime->rate, snd_pcm_format_width(runtime->format), runtime->channels);
 
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock(&chip->reg_lock);
 		/* stop recording */
 		status1 = inw(chip->codec_port+IDX_IO_REC_FLAGS);
 		status1 &= ~DMA_RESUME;
@@ -922,11 +913,11 @@ static int snd_azf3328_capture_trigger(snd_pcm_substream_t * substream, int cmd)
 	    
 		/* FIXME: clear interrupts or what??? */
 		outw(0xffff, chip->codec_port+IDX_IO_REC_IRQMASK);
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock(&chip->reg_lock);
 
 		snd_azf3328_setdmaa(chip, runtime->dma_addr, snd_pcm_lib_period_bytes(substream), snd_pcm_lib_buffer_bytes(substream), 1);
 
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock(&chip->reg_lock);
 #if WIN9X
 		/* FIXME: enable playback/recording??? */
 		status1 |= DMA_PLAY_SOMETHING1 | DMA_PLAY_SOMETHING2;
@@ -942,13 +933,13 @@ static int snd_azf3328_capture_trigger(snd_pcm_substream_t * substream, int cmd)
 		outw(DMA_PLAY_SOMETHING1|DMA_PLAY_SOMETHING2, chip->codec_port+IDX_IO_REC_FLAGS);
 		outw(DMA_RESUME|SOMETHING_ALMOST_ALWAYS_SET|DMA_EPILOGUE_SOMETHING|DMA_SOMETHING_ELSE, chip->codec_port+IDX_IO_REC_FLAGS);
 #endif
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock(&chip->reg_lock);
 
 		snd_azf3328_dbgio(chip, "trigger2");
 		chip->is_playing = 1;
 		break;
         case SNDRV_PCM_TRIGGER_STOP:
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock(&chip->reg_lock);
 		/* stop recording */
 		status1 = inw(chip->codec_port+IDX_IO_REC_FLAGS);
 
@@ -960,7 +951,7 @@ static int snd_azf3328_capture_trigger(snd_pcm_substream_t * substream, int cmd)
 
 		status1 &= ~DMA_PLAY_SOMETHING1;
 		outw(status1, chip->codec_port+IDX_IO_REC_FLAGS);
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock(&chip->reg_lock);
 	    
 		chip->is_playing = 0;
 		break;
@@ -984,16 +975,13 @@ static snd_pcm_uframes_t snd_azf3328_playback_pointer(snd_pcm_substream_t * subs
 	unsigned long bufptr, playptr;
 	unsigned long result;
 	snd_pcm_uframes_t frmres;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
 #if QUERY_HARDWARE
 	bufptr = inl(chip->codec_port+IDX_IO_PLAY_DMA_START_1);
 #else
 	bufptr = substream->runtime->dma_addr;
 #endif
 	playptr = inl(chip->codec_port+IDX_IO_PLAY_DMA_CURRPOS);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
 	result = playptr - bufptr;
 	frmres = bytes_to_frames( substream->runtime, result );
@@ -1007,16 +995,13 @@ static snd_pcm_uframes_t snd_azf3328_capture_pointer(snd_pcm_substream_t * subst
 	unsigned long bufptr, recptr;
 	unsigned long result;
 	snd_pcm_uframes_t frmres;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
 #if QUERY_HARDWARE
 	bufptr = inl(chip->codec_port+IDX_IO_REC_DMA_START_1);
 #else
 	bufptr = substream->runtime->dma_addr;
 #endif
 	recptr = inl(chip->codec_port+IDX_IO_REC_DMA_CURRPOS);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
 	result = recptr - bufptr;
 	frmres = bytes_to_frames( substream->runtime, result );
@@ -1281,28 +1266,9 @@ static int snd_azf3328_free(azf3328_t *chip)
 		kfree_nocheck(chip->res_joystick);
 	}
 #endif
-        if (chip->res_codec_port) {
-		release_resource(chip->res_codec_port);
-		kfree_nocheck(chip->res_codec_port);
-	}
-        if (chip->res_io2_port) {
-		release_resource(chip->res_io2_port);
-		kfree_nocheck(chip->res_io2_port);
-	}
-        if (chip->res_mpu_port) {
-		release_resource(chip->res_mpu_port);
-		kfree_nocheck(chip->res_mpu_port);
-	}
-        if (chip->res_synth_port) {
-		release_resource(chip->res_synth_port);
-		kfree_nocheck(chip->res_synth_port);
-	}
-        if (chip->res_mixer_port) {
-		release_resource(chip->res_mixer_port);
-		kfree_nocheck(chip->res_mixer_port);
-	}
         if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
+	pci_release_regions(chip->pci);
 
         kfree(chip);
         return 0;
@@ -1339,7 +1305,6 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
                                          unsigned long device_type,
                                          azf3328_t ** rchip)
 {
-	unsigned long flags;
 	azf3328_t *chip;
 	int err;
 	static snd_device_ops_t ops = {
@@ -1367,36 +1332,16 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 		return -ENXIO;
 	}
 
+	if ((err = pci_request_regions(pci, "Aztech AZF3328")) < 0) {
+		kfree(chip);
+		return err;
+	}
+
 	chip->codec_port = pci_resource_start(pci, 0);
-	if ((chip->res_codec_port = request_region(chip->codec_port, 0x80, "Aztech AZF3328 I/O")) == NULL) {
-		snd_printk("unable to grab I/O port at 0x%lx-0x%lx\n", chip->codec_port, chip->codec_port + 0x80 - 1);
-		snd_azf3328_free(chip);
-		return -EBUSY;
-	}
 	chip->io2_port = pci_resource_start(pci, 1);
-	if ((chip->res_io2_port = request_region(chip->io2_port, 0x08, "Aztech AZF3328 I/O 2")) == NULL) {
-		snd_printk("unable to grab I/O 2 port at 0x%lx-0x%lx\n", chip->io2_port, chip->io2_port + 0x08 - 1);
-		snd_azf3328_free(chip);
-		return -EBUSY;
-	}
 	chip->mpu_port = pci_resource_start(pci, 2);
-	if ((chip->res_mpu_port = request_region(chip->mpu_port, 0x04, "Aztech AZF3328 MPU401")) == NULL) {
-		snd_printk("unable to grab MPU401 port at 0x%lx-0x%lx\n", chip->mpu_port, chip->mpu_port + 0x04 - 1);
-		snd_azf3328_free(chip);
-		return -EBUSY;
-	}
 	chip->synth_port = pci_resource_start(pci, 3);
-	if ((chip->res_synth_port = request_region(chip->synth_port, 0x08, "Aztech AZF3328 OPL3")) == NULL) {
-		snd_printk("unable to grab OPL3 port at 0x%lx-0x%lx\n", chip->synth_port, chip->synth_port + 0x08 - 1);
-		snd_azf3328_free(chip);
-		return -EBUSY;
-	}
 	chip->mixer_port = pci_resource_start(pci, 4);
-	if ((chip->res_mixer_port = request_region(chip->mixer_port, 0x40, "Aztech AZF3328 Mixer")) == NULL) {
-                snd_printk("unable to grab mixer port at 0x%lx-0x%lx\n", chip->mixer_port, chip->mixer_port + 0x40 - 1);
-		snd_azf3328_free(chip);
-		return -EBUSY;
-	}
 
 	if (request_irq(pci->irq, snd_azf3328_interrupt, SA_INTERRUPT|SA_SHIRQ, card->shortname, (void *)chip)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
@@ -1429,13 +1374,13 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 #endif
 
 	/* standard chip init stuff */
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	outb(DMA_PLAY_SOMETHING2|DMA_EPILOGUE_SOMETHING|DMA_SOMETHING_ELSE, chip->codec_port + IDX_IO_PLAY_FLAGS);
 	outb(DMA_PLAY_SOMETHING2|DMA_EPILOGUE_SOMETHING|DMA_SOMETHING_ELSE, chip->codec_port + IDX_IO_SOMETHING_FLAGS);
 	outb(DMA_PLAY_SOMETHING2|DMA_EPILOGUE_SOMETHING|DMA_SOMETHING_ELSE, chip->codec_port + IDX_IO_REC_FLAGS);
 	outb(0x0, chip->codec_port + IDX_IO_IRQ63H);
 
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	snd_card_set_dev(card, &pci->dev);
 

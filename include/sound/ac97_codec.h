@@ -369,6 +369,8 @@
  */
 
 typedef struct _snd_ac97_bus ac97_bus_t;
+typedef struct _snd_ac97_bus_ops ac97_bus_ops_t;
+typedef struct _snd_ac97_template ac97_template_t;
 typedef struct _snd_ac97 ac97_t;
 
 enum ac97_pcm_cfg {
@@ -405,19 +407,23 @@ struct snd_ac97_build_ops {
 	int (*build_post_spdif) (ac97_t *ac97);
 };
 
-struct _snd_ac97_bus {
-	/* -- lowlevel (hardware) driver specific -- */
+struct _snd_ac97_bus_ops {
 	void (*reset) (ac97_t *ac97);
 	void (*write) (ac97_t *ac97, unsigned short reg, unsigned short val);
 	unsigned short (*read) (ac97_t *ac97, unsigned short reg);
 	void (*wait) (ac97_t *ac97);
 	void (*init) (ac97_t *ac97);
+};
+
+struct _snd_ac97_bus {
+	/* -- lowlevel (hardware) driver specific -- */
+	ac97_bus_ops_t *ops;
 	void *private_data;
 	void (*private_free) (ac97_bus_t *bus);
 	/* --- */
 	snd_card_t *card;
 	unsigned short num;	/* bus number */
-	unsigned short vra: 1,	/* bridge supports VRA */
+	unsigned short no_vra: 1, /* bridge doesn't support VRA */
 		       isdin: 1;/* independent SDIN */
 	unsigned int clock;	/* AC'97 base clock (usually 48000Hz) */
 	spinlock_t bus_lock;	/* used mainly for slot allocation */
@@ -426,6 +432,17 @@ struct _snd_ac97_bus {
 	struct ac97_pcm *pcms;
 	ac97_t *codec[4];
 	snd_info_entry_t *proc;
+};
+
+struct _snd_ac97_template {
+	void *private_data;
+	void (*private_free) (ac97_t *ac97);
+	struct pci_dev *pci;	/* assigned PCI device - used for quirks */
+	unsigned short num;	/* number of codec: 0 = primary, 1 = secondary */
+	unsigned short addr;	/* physical address of codec [0-3] */
+	unsigned int scaps;	/* driver capabilities */
+	unsigned int limited_regs; /* allow limited registers only */
+	DECLARE_BITMAP(reg_accessed, 0x80); /* bit flags */
 };
 
 struct _snd_ac97 {
@@ -490,8 +507,8 @@ static inline int ac97_can_spdif(ac97_t * ac97)
 }
 
 /* functions */
-int snd_ac97_bus(snd_card_t * card, ac97_bus_t * _bus, ac97_bus_t ** rbus); /* create new AC97 bus */
-int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97);	/* create mixer controls */
+int snd_ac97_bus(snd_card_t *card, int num, ac97_bus_ops_t *ops, void *private_data, ac97_bus_t **rbus); /* create new AC97 bus */
+int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97);	/* create mixer controls */
 
 void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value);
 unsigned short snd_ac97_read(ac97_t *ac97, unsigned short reg);

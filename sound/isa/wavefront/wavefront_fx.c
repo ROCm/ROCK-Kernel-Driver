@@ -167,8 +167,9 @@ snd_wavefront_fx_ioctl (snd_hwdep_t *sdev, struct file *file,
 	snd_wavefront_card_t *acard;
 	snd_wavefront_t *dev;
 	wavefront_fx_info r;
-	unsigned short page_data[256];
+	unsigned short *page_data = NULL;
 	unsigned short *pd;
+	int err = 0;
 
 	snd_assert(sdev->card != NULL, return -ENODEV);
 	
@@ -195,23 +196,30 @@ snd_wavefront_fx_ioctl (snd_hwdep_t *sdev, struct file *file,
 		} else if (r.data[2] == 1) {
 			pd = (unsigned short *) &r.data[3];
 		} else {
-			if (r.data[2] > (long)sizeof (page_data)) {
+			if (r.data[2] > 256) {
 				snd_printk ("cannot write "
-					    "> 255 bytes to FX\n");
+					    "> 512 bytes to FX\n");
 				return -EIO;
 			}
+			page_data = kmalloc(r.data[2] * sizeof(short), GFP_KERNEL);
+			if (!page_data)
+				return -ENOMEM;
 			if (copy_from_user (page_data,
 					    (unsigned char __user *) r.data[3],
-					    r.data[2]))
+					    r.data[2] * sizeof(short))) {
+				kfree(page_data);
 				return -EFAULT;
+			}
 			pd = page_data;
 		}
 
-		wavefront_fx_memset (dev,
+		err = wavefront_fx_memset (dev,
 			     r.data[0], /* page */
 			     r.data[1], /* addr */
 			     r.data[2], /* cnt */
 			     pd);
+		if (page_data)
+			kfree(page_data);
 		break;
 
 	default:
@@ -219,7 +227,7 @@ snd_wavefront_fx_ioctl (snd_hwdep_t *sdev, struct file *file,
 			    r.request);
 		return -ENOTTY;
 	}
-	return 0;
+	return err;
 }
 
 /* YSS225 initialization.

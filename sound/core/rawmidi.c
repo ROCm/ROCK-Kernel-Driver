@@ -23,6 +23,7 @@
 #include <sound/core.h>
 #include <linux/major.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/time.h>
@@ -673,8 +674,8 @@ static int snd_rawmidi_input_status(snd_rawmidi_substream_t * substream,
 	return 0;
 }
 
-static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
-			     unsigned int cmd, unsigned long arg)
+static inline int _snd_rawmidi_ioctl(struct inode *inode, struct file *file,
+				     unsigned int cmd, unsigned long arg)
 {
 	snd_rawmidi_file_t *rfile;
 	void __user *argp = (void __user *)arg;
@@ -782,6 +783,17 @@ static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 #endif
 	}
 	return -ENOTTY;
+}
+
+/* FIXME: need to unlock BKL to allow preemption */
+static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
+			     unsigned int cmd, unsigned long arg)
+{
+	int err;
+	unlock_kernel();
+	err = _snd_rawmidi_ioctl(inode, file, cmd, arg);
+	lock_kernel();
+	return err;
 }
 
 int snd_rawmidi_control_ioctl(snd_card_t * card, snd_ctl_file_t * control,

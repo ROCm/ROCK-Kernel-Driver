@@ -906,7 +906,7 @@ static int snd_trident_playback_prepare(snd_pcm_substream_t * substream)
 	snd_trident_voice_t *evoice = voice->extra;
 	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[substream->number];
 
-	spin_lock(&trident->reg_lock);	
+	spin_lock_irq(&trident->reg_lock);	
 
 	/* set delta (rate) value */
 	voice->Delta = snd_trident_convert_rate(runtime->rate);
@@ -967,7 +967,7 @@ static int snd_trident_playback_prepare(snd_pcm_substream_t * substream)
 		evoice->ESO = (runtime->period_size * 2) - 1;
 	}
 
-	spin_unlock(&trident->reg_lock);
+	spin_unlock_irq(&trident->reg_lock);
 
 	return 0;
 }
@@ -1008,7 +1008,7 @@ static int snd_trident_capture_prepare(snd_pcm_substream_t * substream)
 	snd_trident_voice_t *voice = (snd_trident_voice_t *) runtime->private_data;
 	unsigned int val, ESO_bytes;
 
-	spin_lock(&trident->reg_lock);
+	spin_lock_irq(&trident->reg_lock);
 
 	// Initilize the channel and set channel Mode
 	outb(0, TRID_REG(trident, LEGACY_DMAR15));
@@ -1077,7 +1077,7 @@ static int snd_trident_capture_prepare(snd_pcm_substream_t * substream)
 
 	snd_trident_write_voice_regs(trident, voice);
 
-	spin_unlock(&trident->reg_lock);
+	spin_unlock_irq(&trident->reg_lock);
 	return 0;
 }
 
@@ -1148,7 +1148,7 @@ static int snd_trident_si7018_capture_prepare(snd_pcm_substream_t * substream)
 	snd_trident_voice_t *voice = (snd_trident_voice_t *) runtime->private_data;
 	snd_trident_voice_t *evoice = voice->extra;
 
-	spin_lock(&trident->reg_lock);
+	spin_lock_irq(&trident->reg_lock);
 
 	voice->LBA = runtime->dma_addr;
 	voice->Delta = snd_trident_convert_adc_rate(runtime->rate);
@@ -1197,7 +1197,7 @@ static int snd_trident_si7018_capture_prepare(snd_pcm_substream_t * substream)
 		evoice->ESO = (runtime->period_size * 2) - 1;
 	}
 	
-	spin_unlock(&trident->reg_lock);
+	spin_unlock_irq(&trident->reg_lock);
 	return 0;
 }
 
@@ -1219,7 +1219,7 @@ static int snd_trident_foldback_prepare(snd_pcm_substream_t * substream)
 	snd_trident_voice_t *voice = (snd_trident_voice_t *) runtime->private_data;
 	snd_trident_voice_t *evoice = voice->extra;
 
-	spin_lock(&trident->reg_lock);
+	spin_lock_irq(&trident->reg_lock);
 
 	/* Set channel buffer Address */
 	if (voice->memblk)
@@ -1274,7 +1274,7 @@ static int snd_trident_foldback_prepare(snd_pcm_substream_t * substream)
 		evoice->ESO = (runtime->period_size * 2) - 1;
 	}
 
-	spin_unlock(&trident->reg_lock);
+	spin_unlock_irq(&trident->reg_lock);
 	return 0;
 }
 
@@ -1365,7 +1365,7 @@ static int snd_trident_spdif_prepare(snd_pcm_substream_t * substream)
 	unsigned int RESO, LBAO;
 	unsigned int temp;
 
-	spin_lock(&trident->reg_lock);
+	spin_lock_irq(&trident->reg_lock);
 
 	if (trident->device != TRIDENT_DEVICE_ID_SI7018) {
 
@@ -1477,7 +1477,7 @@ static int snd_trident_spdif_prepare(snd_pcm_substream_t * substream)
 		outl(temp, TRID_REG(trident, SI_SERIAL_INTF_CTRL));
 	}
 
-	spin_unlock(&trident->reg_lock);
+	spin_unlock_irq(&trident->reg_lock);
 
 	return 0;
 }
@@ -2322,13 +2322,12 @@ static int snd_trident_spdif_control_get(snd_kcontrol_t * kcontrol,
 					 snd_ctl_elem_value_t * ucontrol)
 {
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned char val;
 
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	val = trident->spdif_ctrl;
 	ucontrol->value.integer.value[0] = val == kcontrol->private_value;
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return 0;
 }
 
@@ -2336,12 +2335,11 @@ static int snd_trident_spdif_control_put(snd_kcontrol_t * kcontrol,
 					 snd_ctl_elem_value_t * ucontrol)
 {
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned char val;
 	int change;
 
 	val = ucontrol->value.integer.value[0] ? (unsigned char) kcontrol->private_value : 0x00;
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	/* S/PDIF C Channel bits 0-31 : 48khz, SCMS disabled */
 	change = trident->spdif_ctrl != val;
 	trident->spdif_ctrl = val;
@@ -2360,7 +2358,7 @@ static int snd_trident_spdif_control_put(snd_kcontrol_t * kcontrol,
 			outl(temp, TRID_REG(trident, SI_SERIAL_INTF_CTRL));
 		}
 	}
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return change;
 }
 
@@ -2391,14 +2389,13 @@ static int snd_trident_spdif_default_get(snd_kcontrol_t * kcontrol,
 					 snd_ctl_elem_value_t * ucontrol)
 {
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	ucontrol->value.iec958.status[0] = (trident->spdif_bits >> 0) & 0xff;
 	ucontrol->value.iec958.status[1] = (trident->spdif_bits >> 8) & 0xff;
 	ucontrol->value.iec958.status[2] = (trident->spdif_bits >> 16) & 0xff;
 	ucontrol->value.iec958.status[3] = (trident->spdif_bits >> 24) & 0xff;
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return 0;
 }
 
@@ -2406,7 +2403,6 @@ static int snd_trident_spdif_default_put(snd_kcontrol_t * kcontrol,
 					 snd_ctl_elem_value_t * ucontrol)
 {
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned int val;
 	int change;
 
@@ -2414,7 +2410,7 @@ static int snd_trident_spdif_default_put(snd_kcontrol_t * kcontrol,
 	      (ucontrol->value.iec958.status[1] << 8) |
 	      (ucontrol->value.iec958.status[2] << 16) |
 	      (ucontrol->value.iec958.status[3] << 24);
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	change = trident->spdif_bits != val;
 	trident->spdif_bits = val;
 	if (trident->device != TRIDENT_DEVICE_ID_SI7018) {
@@ -2424,7 +2420,7 @@ static int snd_trident_spdif_default_put(snd_kcontrol_t * kcontrol,
 		if (trident->spdif == NULL)
 			outl(trident->spdif_bits, TRID_REG(trident, SI_SPDIF_CS));
 	}
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return change;
 }
 
@@ -2486,14 +2482,13 @@ static int snd_trident_spdif_stream_get(snd_kcontrol_t * kcontrol,
 					snd_ctl_elem_value_t * ucontrol)
 {
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	ucontrol->value.iec958.status[0] = (trident->spdif_pcm_bits >> 0) & 0xff;
 	ucontrol->value.iec958.status[1] = (trident->spdif_pcm_bits >> 8) & 0xff;
 	ucontrol->value.iec958.status[2] = (trident->spdif_pcm_bits >> 16) & 0xff;
 	ucontrol->value.iec958.status[3] = (trident->spdif_pcm_bits >> 24) & 0xff;
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return 0;
 }
 
@@ -2501,7 +2496,6 @@ static int snd_trident_spdif_stream_put(snd_kcontrol_t * kcontrol,
 					snd_ctl_elem_value_t * ucontrol)
 {
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned int val;
 	int change;
 
@@ -2509,7 +2503,7 @@ static int snd_trident_spdif_stream_put(snd_kcontrol_t * kcontrol,
 	      (ucontrol->value.iec958.status[1] << 8) |
 	      (ucontrol->value.iec958.status[2] << 16) |
 	      (ucontrol->value.iec958.status[3] << 24);
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	change = trident->spdif_pcm_bits != val;
 	trident->spdif_pcm_bits = val;
 	if (trident->spdif != NULL) {
@@ -2519,7 +2513,7 @@ static int snd_trident_spdif_stream_put(snd_kcontrol_t * kcontrol,
 			outl(trident->spdif_bits, TRID_REG(trident, SI_SPDIF_CS));
 		}
 	}
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return change;
 }
 
@@ -2552,13 +2546,12 @@ static int snd_trident_ac97_control_get(snd_kcontrol_t * kcontrol,
 					snd_ctl_elem_value_t * ucontrol)
 {
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned char val;
 
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	val = trident->ac97_ctrl = inl(TRID_REG(trident, NX_ACR0_AC97_COM_STAT));
 	ucontrol->value.integer.value[0] = (val & (1 << kcontrol->private_value)) ? 1 : 0;
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return 0;
 }
 
@@ -2566,11 +2559,10 @@ static int snd_trident_ac97_control_put(snd_kcontrol_t * kcontrol,
 					snd_ctl_elem_value_t * ucontrol)
 {
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned char val;
 	int change = 0;
 
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	val = trident->ac97_ctrl = inl(TRID_REG(trident, NX_ACR0_AC97_COM_STAT));
 	val &= ~(1 << kcontrol->private_value);
 	if (ucontrol->value.integer.value[0])
@@ -2578,7 +2570,7 @@ static int snd_trident_ac97_control_put(snd_kcontrol_t * kcontrol,
 	change = val != trident->ac97_ctrl;
 	trident->ac97_ctrl = val;
 	outl(trident->ac97_ctrl = val, TRID_REG(trident, NX_ACR0_AC97_COM_STAT));
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return change;
 }
 
@@ -2622,19 +2614,18 @@ static int snd_trident_vol_control_get(snd_kcontrol_t * kcontrol,
 static int snd_trident_vol_control_put(snd_kcontrol_t * kcontrol,
 				       snd_ctl_elem_value_t * ucontrol)
 {
-	unsigned long flags;
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
 	unsigned int val;
 	int change = 0;
 
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	val = trident->musicvol_wavevol;
 	val &= ~(0xffff << kcontrol->private_value);
 	val |= ((255 - (ucontrol->value.integer.value[0] & 0xff)) |
 	        ((255 - (ucontrol->value.integer.value[1] & 0xff)) << 8)) << kcontrol->private_value;
 	change = val != trident->musicvol_wavevol;
 	outl(trident->musicvol_wavevol = val, TRID_REG(trident, T4D_MUSICVOL_WAVEVOL));
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return change;
 }
 
@@ -2694,7 +2685,6 @@ static int snd_trident_pcm_vol_control_get(snd_kcontrol_t * kcontrol,
 static int snd_trident_pcm_vol_control_put(snd_kcontrol_t * kcontrol,
 					   snd_ctl_elem_value_t * ucontrol)
 {
-	unsigned long flags;
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
 	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 	unsigned int val;
@@ -2705,12 +2695,12 @@ static int snd_trident_pcm_vol_control_put(snd_kcontrol_t * kcontrol,
 	} else {
 		val = (255 - (ucontrol->value.integer.value[0] & 255)) << 2;
 	}
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	change = val != mix->vol;
 	mix->vol = val;
 	if (mix->voice != NULL)
 		snd_trident_write_vol_reg(trident, mix->voice, val);
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return change;
 }
 
@@ -2758,7 +2748,6 @@ static int snd_trident_pcm_pan_control_get(snd_kcontrol_t * kcontrol,
 static int snd_trident_pcm_pan_control_put(snd_kcontrol_t * kcontrol,
 					   snd_ctl_elem_value_t * ucontrol)
 {
-	unsigned long flags;
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
 	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 	unsigned char val;
@@ -2768,12 +2757,12 @@ static int snd_trident_pcm_pan_control_put(snd_kcontrol_t * kcontrol,
 		val = ucontrol->value.integer.value[0] & 0x3f;
 	else
 		val = (0x3f - (ucontrol->value.integer.value[0] & 0x3f)) | 0x40;
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	change = val != mix->pan;
 	mix->pan = val;
 	if (mix->voice != NULL)
 		snd_trident_write_pan_reg(trident, mix->voice, val);
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return change;
 }
 
@@ -2816,19 +2805,18 @@ static int snd_trident_pcm_rvol_control_get(snd_kcontrol_t * kcontrol,
 static int snd_trident_pcm_rvol_control_put(snd_kcontrol_t * kcontrol,
 					    snd_ctl_elem_value_t * ucontrol)
 {
-	unsigned long flags;
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
 	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 	unsigned short val;
 	int change = 0;
 
 	val = 0x7f - (ucontrol->value.integer.value[0] & 0x7f);
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	change = val != mix->rvol;
 	mix->rvol = val;
 	if (mix->voice != NULL)
 		snd_trident_write_rvol_reg(trident, mix->voice, val);
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return change;
 }
 
@@ -2871,19 +2859,18 @@ static int snd_trident_pcm_cvol_control_get(snd_kcontrol_t * kcontrol,
 static int snd_trident_pcm_cvol_control_put(snd_kcontrol_t * kcontrol,
 					    snd_ctl_elem_value_t * ucontrol)
 {
-	unsigned long flags;
 	trident_t *trident = snd_kcontrol_chip(kcontrol);
 	snd_trident_pcm_mixer_t *mix = &trident->pcm_mixer[snd_ctl_get_ioffnum(kcontrol, &ucontrol->id)];
 	unsigned short val;
 	int change = 0;
 
 	val = 0x7f - (ucontrol->value.integer.value[0] & 0x7f);
-	spin_lock_irqsave(&trident->reg_lock, flags);
+	spin_lock_irq(&trident->reg_lock);
 	change = val != mix->cvol;
 	mix->cvol = val;
 	if (mix->voice != NULL)
 		snd_trident_write_cvol_reg(trident, mix->voice, val);
-	spin_unlock_irqrestore(&trident->reg_lock, flags);
+	spin_unlock_irq(&trident->reg_lock);
 	return change;
 }
 
@@ -2959,21 +2946,21 @@ static int snd_trident_pcm_mixer_free(trident_t *trident, snd_trident_voice_t *v
 
 static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device)
 {
-	ac97_bus_t _bus;
-	ac97_t _ac97;
+	ac97_template_t _ac97;
 	snd_card_t * card = trident->card;
 	snd_kcontrol_t *kctl;
 	snd_ctl_elem_value_t *uctl;
 	int idx, err, retries = 2;
+	static ac97_bus_ops_t ops = {
+		.write = snd_trident_codec_write,
+		.read = snd_trident_codec_read,
+	};
 
 	uctl = kcalloc(1, sizeof(*uctl), GFP_KERNEL);
 	if (!uctl)
 		return -ENOMEM;
 
-	memset(&_bus, 0, sizeof(_bus));
-	_bus.write = snd_trident_codec_write;
-	_bus.read = snd_trident_codec_read;
-	if ((err = snd_ac97_bus(trident->card, &_bus, &trident->ac97_bus)) < 0)
+	if ((err = snd_ac97_bus(trident->card, 0, &ops, NULL, &trident->ac97_bus)) < 0)
 		goto __out;
 
 	memset(&_ac97, 0, sizeof(_ac97));
@@ -3568,18 +3555,17 @@ int __devinit snd_trident_create(snd_card_t * card,
 	if (max_wavetable_size < 0 )
 		max_wavetable_size = 0;
 	trident->synth.max_size = max_wavetable_size * 1024;
-	trident->port = pci_resource_start(pci, 0);
 	trident->irq = -1;
 
 	trident->midi_port = TRID_REG(trident, T4D_MPU401_BASE);
 	pci_set_master(pci);
+
+	if ((err = pci_request_regions(pci, "Trident Audio")) < 0) {
+		kfree(trident);
+		return err;
+	}
 	trident->port = pci_resource_start(pci, 0);
 
-	if ((trident->res_port = request_region(trident->port, 0x100, "Trident Audio")) == NULL) {
-		snd_printk("unable to grab I/O region 0x%lx-0x%lx\n", trident->port, trident->port + 0x100 - 1);
-		snd_trident_free(trident);
-		return -EBUSY;
-	}
 	if (request_irq(pci->irq, snd_trident_interrupt, SA_INTERRUPT|SA_SHIRQ, "Trident Audio", (void *) trident)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		snd_trident_free(trident);
@@ -3697,10 +3683,7 @@ int snd_trident_free(trident_t *trident)
 	}
 	if (trident->irq >= 0)
 		free_irq(trident->irq, (void *)trident);
-	if (trident->res_port) {
-		release_resource(trident->res_port);
-		kfree_nocheck(trident->res_port);
-	}
+	pci_release_regions(trident->pci);
 	kfree(trident);
 	return 0;
 }

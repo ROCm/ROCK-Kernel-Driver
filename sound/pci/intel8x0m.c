@@ -226,19 +226,15 @@ typedef struct _snd_intel8x0m intel8x0_t;
 
 struct _snd_intel8x0m {
 	unsigned int device_type;
-	char ac97_name[64];
-	char ctrl_name[64];
 
 	int irq;
 
 	unsigned int mmio;
 	unsigned long addr;
 	unsigned long remap_addr;
-	struct resource *res;
 	unsigned int bm_mmio;
 	unsigned long bmaddr;
 	unsigned long remap_bmaddr;
-	struct resource *res_bm;
 
 	struct pci_dev *pci;
 	snd_card_t *card;
@@ -879,19 +875,17 @@ static void snd_intel8x0_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 {
-	ac97_bus_t bus, *pbus;
-	ac97_t ac97, *x97;
+	ac97_bus_t *pbus;
+	ac97_template_t ac97;
+	ac97_t *x97;
 	int err;
 	unsigned int glob_sta = 0;
+	static ac97_bus_ops_t ops = {
+		.write = snd_intel8x0_codec_write,
+		.read = snd_intel8x0_codec_read,
+	};
 
 	chip->in_ac97_init = 1;
-	memset(&bus, 0, sizeof(bus));
-	bus.private_data = chip;
-	bus.private_free = snd_intel8x0_mixer_free_ac97_bus;
-	if (ac97_clock >= 8000 && ac97_clock <= 48000)
-		bus.clock = ac97_clock;
-	else
-		bus.clock = 48000;
 	
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
@@ -899,13 +893,14 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 	ac97.scaps = AC97_SCAP_SKIP_AUDIO;
 
 	glob_sta = igetdword(chip, ICHREG(GLOB_STA));
-	bus.write = snd_intel8x0_codec_write;
-	bus.read = snd_intel8x0_codec_read;
-	bus.vra = 1;
 
-	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+	if ((err = snd_ac97_bus(chip->card, 0, &ops, chip, &pbus)) < 0)
 		goto __err;
+	pbus->private_free = snd_intel8x0_mixer_free_ac97_bus;
+	if (ac97_clock >= 8000 && ac97_clock <= 48000)
+		pbus->clock = ac97_clock;
 	chip->ac97_bus = pbus;
+
 	ac97.pci = chip->pci;
 	ac97.num = glob_sta & ICH_SCR ? 1 : 0;
 	if ((err = snd_ac97_mixer(pbus, &ac97, &x97)) < 0) {
@@ -1055,16 +1050,9 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 		iounmap((void *) chip->remap_addr);
 	if (chip->remap_bmaddr)
 		iounmap((void *) chip->remap_bmaddr);
-	if (chip->res) {
-		release_resource(chip->res);
-		kfree_nocheck(chip->res);
-	}
-	if (chip->res_bm) {
-		release_resource(chip->res_bm);
-		kfree_nocheck(chip->res_bm);
-	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
+	pci_release_regions(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -1171,29 +1159,23 @@ static int __devinit snd_intel8x0m_create(snd_card_t * card,
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
-	snd_intel8x0m_proc_init(chip);
-	sprintf(chip->ac97_name, "%s - AC'97", card->shortname);
-	sprintf(chip->ctrl_name, "%s - Controller", card->shortname);
+
+	if ((err = pci_request_regions(pci, card->shortname)) < 0) {
+		kfree(chip);
+		return err;
+	}
+
 	if (device_type == DEVICE_ALI) {
 		/* ALI5455 has no ac97 region */
 		chip->bmaddr = pci_resource_start(pci, 0);
-		if ((chip->res_bm = request_region(chip->bmaddr, 256, chip->ctrl_name)) == NULL) {
-			snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->bmaddr, chip->bmaddr + 256 - 1);
-			snd_intel8x0_free(chip);
-			return -EBUSY;
-		}
 		goto port_inited;
 	}
 
 	if (pci_resource_flags(pci, 2) & IORESOURCE_MEM) {	/* ICH4 and Nforce */
 		chip->mmio = 1;
 		chip->addr = pci_resource_start(pci, 2);
-		if ((chip->res = request_mem_region(chip->addr, 512, chip->ac97_name)) == NULL) {
-			snd_printk("unable to grab I/O memory 0x%lx-0x%lx\n", chip->addr, chip->addr + 512 - 1);
-			snd_intel8x0_free(chip);
-			return -EBUSY;
-		}
-		chip->remap_addr = (unsigned long) ioremap_nocache(chip->addr, 512);
+		chip->remap_addr = (unsigned long) ioremap_nocache(chip->addr,
+								   pci_resource_len(pci, 2));
 		if (chip->remap_addr == 0) {
 			snd_printk("AC'97 space ioremap problem\n");
 			snd_intel8x0_free(chip);
@@ -1201,21 +1183,12 @@ static int __devinit snd_intel8x0m_create(snd_card_t * card,
 		}
 	} else {
 		chip->addr = pci_resource_start(pci, 0);
-		if ((chip->res = request_region(chip->addr, 256, chip->ac97_name)) == NULL) {
-			snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->addr, chip->addr + 256 - 1);
-			snd_intel8x0_free(chip);
-			return -EBUSY;
-		}
 	}
 	if (pci_resource_flags(pci, 3) & IORESOURCE_MEM) {	/* ICH4 */
 		chip->bm_mmio = 1;
 		chip->bmaddr = pci_resource_start(pci, 3);
-		if ((chip->res_bm = request_mem_region(chip->bmaddr, 256, chip->ctrl_name)) == NULL) {
-			snd_printk("unable to grab I/O memory 0x%lx-0x%lx\n", chip->bmaddr, chip->bmaddr + 512 - 1);
-			snd_intel8x0_free(chip);
-			return -EBUSY;
-		}
-		chip->remap_bmaddr = (unsigned long) ioremap_nocache(chip->bmaddr, 256);
+		chip->remap_bmaddr = (unsigned long) ioremap_nocache(chip->bmaddr,
+								     pci_resource_len(pci, 3));
 		if (chip->remap_bmaddr == 0) {
 			snd_printk("Controller space ioremap problem\n");
 			snd_intel8x0_free(chip);
@@ -1223,11 +1196,6 @@ static int __devinit snd_intel8x0m_create(snd_card_t * card,
 		}
 	} else {
 		chip->bmaddr = pci_resource_start(pci, 1);
-		if ((chip->res_bm = request_region(chip->bmaddr, 128, chip->ctrl_name)) == NULL) {
-			snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->bmaddr, chip->bmaddr + 128 - 1);
-			snd_intel8x0_free(chip);
-			return -EBUSY;
-		}
 	}
 
  port_inited:
@@ -1347,10 +1315,10 @@ static int __devinit snd_intel8x0m_probe(struct pci_dev *pci,
 
 	switch (pci_id->driver_data) {
 	case DEVICE_NFORCE:
-		strcpy(card->driver, "NFORCE");
+		strcpy(card->driver, "NFORCE-MODEM");
 		break;
 	default:
-		strcpy(card->driver, "ICH");
+		strcpy(card->driver, "ICH-MODEM");
 		break;
 	}
 
@@ -1377,6 +1345,8 @@ static int __devinit snd_intel8x0m_probe(struct pci_dev *pci,
 		return err;
 	}
 	
+	snd_intel8x0m_proc_init(chip);
+
 	sprintf(card->longname, "%s at 0x%lx, irq %i",
 		card->shortname, chip->addr, chip->irq);
 

@@ -121,6 +121,8 @@ typedef struct _snd_pcm_ops {
 #define SNDRV_PCM_TRIGGER_SUSPEND	5
 #define SNDRV_PCM_TRIGGER_RESUME	6
 
+#define SNDRV_PCM_POS_XRUN		((snd_pcm_uframes_t)-1)
+
 /* If you change this don't forget to change rates[] table in pcm_native.c */
 #define SNDRV_PCM_RATE_5512		(1<<0)		/* 5512Hz */
 #define SNDRV_PCM_RATE_8000		(1<<1)		/* 8000Hz */

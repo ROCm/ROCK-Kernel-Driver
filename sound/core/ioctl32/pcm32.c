@@ -69,7 +69,7 @@ struct sndrv_pcm_hw_params32 {
 	unsigned char reserved[64];
 } __attribute__((packed));
 
-#define numberof(array)  (sizeof(array)/sizeof(array[0]))
+#define numberof(array) ARRAY_SIZE(array)
 
 #define CVT_sndrv_pcm_hw_params()\
 {\
@@ -312,7 +312,7 @@ static void snd_pcm_hw_convert_from_old_params(snd_pcm_hw_params_t *params, stru
 
 	memset(params, 0, sizeof(*params));
 	params->flags = oparams->flags;
-	for (i = 0; i < sizeof(oparams->masks) / sizeof(unsigned int); i++)
+	for (i = 0; i < ARRAY_SIZE(oparams->masks); i++)
 		params->masks[i].bits[0] = oparams->masks[i];
 	memcpy(params->intervals, oparams->intervals, sizeof(oparams->intervals));
 	params->rmask = __OLD_TO_NEW_MASK(oparams->rmask);
@@ -330,7 +330,7 @@ static void snd_pcm_hw_convert_to_old_params(struct sndrv_pcm_hw_params_old32 *o
 
 	memset(oparams, 0, sizeof(*oparams));
 	oparams->flags = params->flags;
-	for (i = 0; i < sizeof(oparams->masks) / sizeof(unsigned int); i++)
+	for (i = 0; i < ARRAY_SIZE(oparams->masks); i++)
 		oparams->masks[i] = params->masks[i].bits[0];
 	memcpy(oparams->intervals, params->intervals, sizeof(oparams->intervals));
 	oparams->rmask = __NEW_TO_OLD_MASK(params->rmask);

@@ -238,10 +238,8 @@ static unsigned int snd_card_harmony_rates[] = {
 	44100, 48000
 };
 
-#define RATES sizeof(snd_card_harmony_rates) / sizeof(snd_card_harmony_rates[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraint_rates = {
-	.count = RATES,
+	.count = ARRAY_SIZE(snd_card_harmony_rates),
 	.list = snd_card_harmony_rates,
 	.mask = 0,
 };
@@ -278,7 +276,7 @@ static unsigned int snd_card_harmony_rate_bits(int rate)
 {
 	unsigned int idx;
 	
-	for (idx = 0; idx <= RATES; idx++)
+	for (idx = 0; idx <= ARRAY_SIZE(snd_card_harmony_rates); idx++)
 		if (snd_card_harmony_rates[idx] == rate)
 			return rate_bits[idx];
 	return HARMONY_SR_44KHZ; /* fallback */

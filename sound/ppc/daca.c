@@ -215,8 +215,6 @@ static snd_kcontrol_new_t daca_mixers[] = {
 	},
 };
 
-#define num_controls(ary) (sizeof(ary) / sizeof(snd_kcontrol_new_t))
-
 
 #ifdef CONFIG_PMAC_PBOOK
 static void daca_resume(pmac_t *chip)
@@ -270,7 +268,7 @@ int __init snd_pmac_daca_init(pmac_t *chip)
 	 */
 	strcpy(chip->card->mixername, "PowerMac DACA");
 
-	for (i = 0; i < num_controls(daca_mixers); i++) {
+	for (i = 0; i < ARRAY_SIZE(daca_mixers); i++) {
 		if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&daca_mixers[i], chip))) < 0)
 			return err;
 	}

@@ -395,8 +395,8 @@ static void __devinit snd_interwave_detect_memory(snd_gus_card_t * gus)
 	int bank_pos, pages;
 	unsigned int i, lmct;
 	int psizes[4];
+	unsigned char iwave[8];
 	unsigned char csum;
-	struct rom_hdr romh;
 
 	snd_interwave_reset(gus);
 	snd_gf1_write8(gus, SNDRV_GF1_GB_GLOBAL_MODE, snd_gf1_read8(gus, SNDRV_GF1_GB_GLOBAL_MODE) | 0x01);		/* enhanced mode */
@@ -418,7 +418,7 @@ static void __devinit snd_interwave_detect_memory(snd_gus_card_t * gus)
 #if 0
 		printk("lmct = 0x%08x\n", lmct);
 #endif
-		for (i = 0; i < sizeof(lmc) / sizeof(unsigned int); i++)
+		for (i = 0; i < ARRAY_SIZE(lmc); i++)
 			if (lmct == lmc[i]) {
 #if 0
 				printk("found !!! %i\n", i);
@@ -427,7 +427,7 @@ static void __devinit snd_interwave_detect_memory(snd_gus_card_t * gus)
 				snd_interwave_bank_sizes(gus, psizes);
 				break;
 			}
-		if (i >= sizeof(lmc) / sizeof(unsigned int) && !gus->gf1.enh_mode)
+		if (i >= ARRAY_SIZE(lmc) && !gus->gf1.enh_mode)
 			 snd_gf1_write16(gus, SNDRV_GF1_GW_MEMORY_CONFIG, (snd_gf1_look16(gus, SNDRV_GF1_GW_MEMORY_CONFIG) & 0xfff0) | 2);
 		for (i = 0; i < 4; i++) {
 			gus->gf1.mem_alloc.banks_8[i].address =
@@ -445,33 +445,29 @@ static void __devinit snd_interwave_detect_memory(snd_gus_card_t * gus)
 	gus->gf1.rom_banks = 0;
 	gus->gf1.rom_memory = 0;
 	for (bank_pos = 0; bank_pos < 16L * 1024L * 1024L; bank_pos += 4L * 1024L * 1024L) {
-		for (i = 0; i < sizeof(struct rom_hdr); i++)
-			*(((unsigned char *) &romh) + i) = snd_gf1_peek(gus, i + bank_pos);
+		for (i = 0; i < 8; ++i)
+			iwave[i] = snd_gf1_peek(gus, bank_pos + i);
 #ifdef CONFIG_SND_DEBUG_ROM
 		printk("ROM at 0x%06x = %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n", bank_pos,
-		       romh.iwave[0], romh.iwave[1], romh.iwave[2], romh.iwave[3],
-		       romh.iwave[4], romh.iwave[5], romh.iwave[6], romh.iwave[7]);
+		       iwave[0], iwave[1], iwave[2], iwave[3],
+		       iwave[4], iwave[5], iwave[6], iwave[7]);
 #endif
-		if (strncmp(romh.iwave, "INTRWAVE", 8))
+		if (strncmp(iwave, "INTRWAVE", 8))
 			continue;	/* first check */
 		csum = 0;
-		for (i = 0; i < sizeof(struct rom_hdr) - 1; i++)
-			csum += *(((unsigned char *) &romh) + i);
+		for (i = 0; i < sizeof(struct rom_hdr); i++)
+			csum += snd_gf1_peek(gus, bank_pos + i);
 #ifdef CONFIG_SND_DEBUG_ROM
-		printk("ROM checksum = 0x%x == 0x%x (computed)\n", romh.csum, (unsigned char) (256 - csum));
+		printk("ROM checksum = 0x%x (computed)\n", csum);
 #endif
-		if (256 - csum != romh.csum)
+		if (csum != 0)
 			continue;	/* not valid rom */
 		gus->gf1.rom_banks++;
 		gus->gf1.rom_present |= 1 << (bank_pos >> 22);
-#ifdef SNDRV_LITTLE_ENDIAN
-		gus->gf1.rom_memory = romh.rom_size;
-#else
-		gus->gf1.rom_memory = ((romh.rom_size >> 24) & 0x000000ff) |
-				      ((romh.rom_size >>  8) & 0x0000ff00) |
-				      ((romh.rom_size <<  8) & 0x00ff0000) |
-				      ((romh.rom_size << 24) & 0xff000000);
-#endif
+		gus->gf1.rom_memory = snd_gf1_peek(gus, bank_pos + 40) |
+				     (snd_gf1_peek(gus, bank_pos + 41) << 8) |
+				     (snd_gf1_peek(gus, bank_pos + 42) << 16) |
+				     (snd_gf1_peek(gus, bank_pos + 43) << 24);
 	}
 #if 0
 	if (gus->gf1.rom_memory > 0) {
@@ -507,8 +503,6 @@ static void __devinit snd_interwave_init(int dev, snd_gus_card_t * gus)
 
 }
 
-#define INTERWAVE_CONTROLS (sizeof(snd_interwave_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_interwave_controls[] = {
 CS4231_DOUBLE("Master Playback Switch", 0, CS4231_LINE_LEFT_OUTPUT, CS4231_LINE_RIGHT_OUTPUT, 7, 7, 1, 1),
 CS4231_DOUBLE("Master Playback Volume", 0, CS4231_LINE_LEFT_OUTPUT, CS4231_LINE_RIGHT_OUTPUT, 0, 0, 31, 1),
@@ -536,7 +530,7 @@ static int __devinit snd_interwave_mixer(cs4231_t *chip)
 		return err;
 #endif
 	/* add new master and mic controls */
-	for (idx = 0; idx < INTERWAVE_CONTROLS; idx++)
+	for (idx = 0; idx < ARRAY_SIZE(snd_interwave_controls); idx++)
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_interwave_controls[idx], chip))) < 0)
 			return err;
 	snd_cs4231_out(chip, CS4231_LINE_LEFT_OUTPUT, 0x9f);

@@ -899,8 +899,6 @@ static int snd_ad1816a_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 	return change;
 }
 
-#define AD1816A_CONTROLS (sizeof(snd_ad1816a_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_ad1816a_controls[] = {
 AD1816A_DOUBLE("Master Playback Switch", AD1816A_MASTER_ATT, 15, 7, 1, 1),
 AD1816A_DOUBLE("Master Playback Volume", AD1816A_MASTER_ATT, 8, 0, 31, 1),
@@ -948,7 +946,7 @@ int snd_ad1816a_mixer(ad1816a_t *chip)
 
 	strcpy(card->mixername, snd_ad1816a_chip_id(chip));
 
-	for (idx = 0; idx < AD1816A_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_ad1816a_controls); idx++) {
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_ad1816a_controls[idx], chip))) < 0)
 			return err;
 	}

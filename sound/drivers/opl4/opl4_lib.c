@@ -36,62 +36,68 @@ static void inline snd_opl4_wait(opl4_t *opl4)
 
 void snd_opl4_write(opl4_t *opl4, u8 reg, u8 value)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&opl4->reg_lock, flags);
-
 	snd_opl4_wait(opl4);
 	outb(reg, opl4->pcm_port);
 
 	snd_opl4_wait(opl4);
 	outb(value, opl4->pcm_port + 1);
-
-	spin_unlock_irqrestore(&opl4->reg_lock, flags);
 }
 
 u8 snd_opl4_read(opl4_t *opl4, u8 reg)
 {
-	unsigned long flags;
-	u8 value;
-
-	spin_lock_irqsave(&opl4->reg_lock, flags);
-
 	snd_opl4_wait(opl4);
 	outb(reg, opl4->pcm_port);
 
 	snd_opl4_wait(opl4);
-	value = inb(opl4->pcm_port + 1);
-
-	spin_unlock_irqrestore(&opl4->reg_lock, flags);
-	return value;
+	return inb(opl4->pcm_port + 1);
 }
 
 void snd_opl4_read_memory(opl4_t *opl4, char *buf, int offset, int size)
 {
-	u8 memcfg = snd_opl4_read(opl4, OPL4_REG_MEMORY_CONFIGURATION);
+	unsigned long flags;
+	u8 memcfg;
+
+	spin_lock_irqsave(&opl4->reg_lock, flags);
+
+	memcfg = snd_opl4_read(opl4, OPL4_REG_MEMORY_CONFIGURATION);
 	snd_opl4_write(opl4, OPL4_REG_MEMORY_CONFIGURATION, memcfg | OPL4_MODE_BIT);
 
 	snd_opl4_write(opl4, OPL4_REG_MEMORY_ADDRESS_HIGH, offset >> 16);
 	snd_opl4_write(opl4, OPL4_REG_MEMORY_ADDRESS_MID, offset >> 8);
 	snd_opl4_write(opl4, OPL4_REG_MEMORY_ADDRESS_LOW, offset);
-	for (; size > 0; size--)
-		*buf++ = snd_opl4_read(opl4, OPL4_REG_MEMORY_DATA);
+
+	snd_opl4_wait(opl4);
+	outb(OPL4_REG_MEMORY_DATA, opl4->pcm_port);
+	snd_opl4_wait(opl4);
+	insb(opl4->pcm_port + 1, buf, size);
 
 	snd_opl4_write(opl4, OPL4_REG_MEMORY_CONFIGURATION, memcfg);
+
+	spin_unlock_irqrestore(&opl4->reg_lock, flags);
 }
 
 void snd_opl4_write_memory(opl4_t *opl4, const char *buf, int offset, int size)
 {
-	u8 memcfg = snd_opl4_read(opl4, OPL4_REG_MEMORY_CONFIGURATION);
+	unsigned long flags;
+	u8 memcfg;
+
+	spin_lock_irqsave(&opl4->reg_lock, flags);
+
+	memcfg = snd_opl4_read(opl4, OPL4_REG_MEMORY_CONFIGURATION);
 	snd_opl4_write(opl4, OPL4_REG_MEMORY_CONFIGURATION, memcfg | OPL4_MODE_BIT);
 
 	snd_opl4_write(opl4, OPL4_REG_MEMORY_ADDRESS_HIGH, offset >> 16);
 	snd_opl4_write(opl4, OPL4_REG_MEMORY_ADDRESS_MID, offset >> 8);
 	snd_opl4_write(opl4, OPL4_REG_MEMORY_ADDRESS_LOW, offset);
-	for (; size > 0; size--)
-		snd_opl4_write(opl4, OPL4_REG_MEMORY_DATA, *buf++);
+
+	snd_opl4_wait(opl4);
+	outb(OPL4_REG_MEMORY_DATA, opl4->pcm_port);
+	snd_opl4_wait(opl4);
+	outsb(opl4->pcm_port + 1, buf, size);
 
 	snd_opl4_write(opl4, OPL4_REG_MEMORY_CONFIGURATION, memcfg);
+
+	spin_unlock_irqrestore(&opl4->reg_lock, flags);
 }
 
 static void snd_opl4_enable_opl4(opl4_t *opl4)
@@ -230,7 +236,7 @@ int snd_opl4_create(snd_card_t *card,
 	}
 
 	/* opl3 initialization disabled opl4, so reenable */
-	snd_opl4_enable_opl4(opl4); 
+	snd_opl4_enable_opl4(opl4);
 
 	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, opl4, &ops);
 	if (err < 0) {

@@ -5,7 +5,7 @@
  *
  *   Copyright (c) 2002 by Takashi Iwai <tiwai@suse.de>
  *
- *   Many codes borrowed from audio.c by 
+ *   Many codes borrowed from audio.c by
  *	    Alan Cox (alan@lxorguk.ukuu.org.uk)
  *	    Thomas Sailer (sailer@ife.ee.ethz.ch)
  *
@@ -77,7 +77,7 @@ struct usb_mixer_elem_info {
 	unsigned int ctrlif;
 	unsigned int id;
 	unsigned int control;	/* CS or ICN (high byte) */
-	unsigned int cmask; /* channel mask bitmap: 0 = master */ 
+	unsigned int cmask; /* channel mask bitmap: 0 = master */
 	int channels;
 	int val_type;
 	int min, max, res;
@@ -299,7 +299,7 @@ static int get_ctl_value(usb_mixer_elem_info_t *cval, int request, int validx, i
 	unsigned char buf[2];
 	int val_len = cval->val_type >= USB_MIXER_S16 ? 2 : 1;
 	int timeout = 10;
- 
+
 	while (timeout-- > 0) {
 		if (snd_usb_ctl_msg(cval->chip->dev, usb_rcvctrlpipe(cval->chip->dev, 0),
 				    request,
@@ -334,7 +334,7 @@ static int set_ctl_value(usb_mixer_elem_info_t *cval, int request, int validx, i
 	unsigned char buf[2];
 	int val_len = cval->val_type >= USB_MIXER_S16 ? 2 : 1;
 	int timeout = 10;
- 
+
 	value_set = convert_bytes_value(cval, value_set);
 	buf[0] = value_set & 0xff;
 	buf[1] = (value_set >> 8) & 0xff;
@@ -361,7 +361,7 @@ inline static int set_cur_mix_value(usb_mixer_elem_info_t *cval, int channel, in
 
 
 /*
- * parser routines begin here... 
+ * parser routines begin here...
  */
 
 static int parse_audio_unit(mixer_build_t *state, int unitid);
@@ -443,7 +443,7 @@ static struct iterm_name_combo {
 	{ 0x0712, "Multi-Track Recorder" },
 	{ 0x0713, "Synthesizer" },
 	{ 0 },
-};	
+};
 
 static int get_term_name(mixer_build_t *state, usb_audio_term_t *iterm,
 			 unsigned char *name, int maxlen, int term_only)
@@ -615,7 +615,7 @@ static int get_min_max(usb_mixer_elem_info_t *cval, int default_min)
 			cval->res = 1;
 		} else {
 			int last_valid_res = cval->res;
-		
+
 			while (cval->res > 1) {
 				if (set_ctl_value(cval, SET_RES, (cval->control << 8) | minchn, cval->res / 2) < 0)
 					break;
@@ -634,7 +634,7 @@ static int get_min_max(usb_mixer_elem_info_t *cval, int default_min)
 
 /* get a feature/mixer unit info */
 static int mixer_ctl_feature_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
-{	
+{
 	usb_mixer_elem_info_t *cval = kcontrol->private_data;
 
 	if (cval->val_type == USB_MIXER_BOOLEAN ||
@@ -914,7 +914,7 @@ static int parse_audio_feature_unit(mixer_build_t *state, int unitid, unsigned c
 		if (master_bits & (1 << i))
 			build_feature_ctl(state, ftr, 0, i, &iterm, unitid);
 	}
-	
+
 	return 0;
 }
 
@@ -1243,7 +1243,7 @@ static int parse_audio_extension_unit(mixer_build_t *state, int unitid, unsigned
  * use an enumerator type for routing
  */
 static int mixer_ctl_selector_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
-{	
+{
 	usb_mixer_elem_info_t *cval = kcontrol->private_data;
 	char **itemlist = (char **)kcontrol->private_value;
 

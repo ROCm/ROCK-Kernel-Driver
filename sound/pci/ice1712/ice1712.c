@@ -584,7 +584,7 @@ static int snd_ice1712_playback_prepare(snd_pcm_substream_t * substream)
 	rate = (runtime->rate * 8192) / 375;
 	if (rate > 0x000fffff)
 		rate = 0x000fffff;
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	outb(0, ice->ddma_port + 15);
 	outb(ICE1712_DMA_MODE_WRITE | ICE1712_DMA_AUTOINIT, ice->ddma_port + 0x0b);
 	outl(runtime->dma_addr, ice->ddma_port + 0);
@@ -597,7 +597,7 @@ static int snd_ice1712_playback_prepare(snd_pcm_substream_t * substream)
 	snd_ice1712_write(ice, ICE1712_IREG_PBK_COUNT_HI, period_size >> 8);
 	snd_ice1712_write(ice, ICE1712_IREG_PBK_LEFT, 0);
 	snd_ice1712_write(ice, ICE1712_IREG_PBK_RIGHT, 0);
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 	return 0;
 }
 
@@ -620,7 +620,7 @@ static int snd_ice1712_playback_ds_prepare(snd_pcm_substream_t * substream)
 	ice->playback_con_active_buf[substream->number] = 0;
 	ice->playback_con_virt_addr[substream->number] = runtime->dma_addr;
 	chn = substream->number * 2;
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	snd_ice1712_ds_write(ice, chn, ICE1712_DSC_ADDR0, runtime->dma_addr);
 	snd_ice1712_ds_write(ice, chn, ICE1712_DSC_COUNT0, period_size);
 	snd_ice1712_ds_write(ice, chn, ICE1712_DSC_ADDR1, runtime->dma_addr + (runtime->periods > 1 ? period_size + 1 : 0));
@@ -632,7 +632,7 @@ static int snd_ice1712_playback_ds_prepare(snd_pcm_substream_t * substream)
 		snd_ice1712_ds_write(ice, chn + 1, ICE1712_DSC_RATE, rate);
 		snd_ice1712_ds_write(ice, chn + 1, ICE1712_DSC_VOLUME, 0);
 	}
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 	return 0;
 }
 
@@ -650,13 +650,13 @@ static int snd_ice1712_capture_prepare(snd_pcm_substream_t * substream)
 		tmp &= ~0x04;
 	if (runtime->channels == 2)
 		tmp &= ~0x02;
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	outl(ice->capture_con_virt_addr = runtime->dma_addr, ICEREG(ice, CONCAP_ADDR));
 	outw(buf_size, ICEREG(ice, CONCAP_COUNT));
 	snd_ice1712_write(ice, ICE1712_IREG_CAP_COUNT_HI, period_size >> 8);
 	snd_ice1712_write(ice, ICE1712_IREG_CAP_COUNT_LO, period_size & 0xff);
 	snd_ice1712_write(ice, ICE1712_IREG_CAP_CTRL, tmp);
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 	snd_ac97_set_rate(ice->ac97, AC97_PCM_LR_ADC_RATE, runtime->rate);
 	return 0;
 }
@@ -946,10 +946,8 @@ static int __devinit snd_ice1712_pcm_ds(ice1712_t * ice, int device, snd_pcm_t *
 static unsigned int rates[] = { 8000, 9600, 11025, 12000, 16000, 22050, 24000,
 				32000, 44100, 48000, 64000, 88200, 96000 };
 
-#define RATES sizeof(rates) / sizeof(rates[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	.count = RATES,
+	.count = ARRAY_SIZE(rates),
 	.list = rates,
 	.mask = 0,
 };
@@ -1071,11 +1069,11 @@ static int snd_ice1712_playback_pro_prepare(snd_pcm_substream_t * substream)
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 
 	ice->playback_pro_size = snd_pcm_lib_buffer_bytes(substream);
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	outl(substream->runtime->dma_addr, ICEMT(ice, PLAYBACK_ADDR));
 	outw((ice->playback_pro_size >> 2) - 1, ICEMT(ice, PLAYBACK_SIZE));
 	outw((snd_pcm_lib_period_bytes(substream) >> 2) - 1, ICEMT(ice, PLAYBACK_COUNT));
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 
 	return 0;
 }
@@ -1094,11 +1092,11 @@ static int snd_ice1712_capture_pro_prepare(snd_pcm_substream_t * substream)
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 
 	ice->capture_pro_size = snd_pcm_lib_buffer_bytes(substream);
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	outl(substream->runtime->dma_addr, ICEMT(ice, CAPTURE_ADDR));
 	outw((ice->capture_pro_size >> 2) - 1, ICEMT(ice, CAPTURE_SIZE));
 	outw((snd_pcm_lib_period_bytes(substream) >> 2) - 1, ICEMT(ice, CAPTURE_COUNT));
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 	return 0;
 }
 
@@ -1511,15 +1509,20 @@ static void snd_ice1712_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 {
-	int err;
-	ac97_t ac97;
-	ac97_bus_t bus, *pbus;
+	int err, bus_num = 0;
+	ac97_template_t ac97;
+	ac97_bus_t *pbus;
+	static ac97_bus_ops_t con_ops = {
+		.write = snd_ice1712_ac97_write,
+		.read = snd_ice1712_ac97_read,
+	};
+	static ac97_bus_ops_t pro_ops = {
+		.write = snd_ice1712_pro_ac97_write,
+		.read = snd_ice1712_pro_ac97_read,
+	};
 
 	if (ice_has_con_ac97(ice)) {
-		memset(&bus, 0, sizeof(bus));
-		bus.write = snd_ice1712_ac97_write;
-		bus.read = snd_ice1712_ac97_read;
-		if ((err = snd_ac97_bus(ice->card, &bus, &pbus)) < 0)
+		if ((err = snd_ac97_bus(ice->card, bus_num++, &con_ops, NULL, &pbus)) < 0)
 			return err;
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.private_data = ice;
@@ -1534,10 +1537,7 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 	}
 
 	if (! (ice->eeprom.data[ICE_EEP1_ACLINK] & ICE1712_CFG_PRO_I2S)) {
-		memset(&bus, 0, sizeof(bus));
-		bus.write = snd_ice1712_pro_ac97_write;
-		bus.read = snd_ice1712_pro_ac97_read;
-		if ((err = snd_ac97_bus(ice->card, &bus, &pbus)) < 0)
+		if ((err = snd_ac97_bus(ice->card, bus_num, &pro_ops, NULL, &pbus)) < 0)
 			return err;
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.private_data = ice;
@@ -2462,7 +2462,7 @@ static int __devinit snd_ice1712_build_controls(ice1712_t *ice)
 
 static int snd_ice1712_free(ice1712_t *ice)
 {
-	if (ice->res_port == NULL)
+	if (! ice->port)
 		goto __hw_end;
 	/* mask all interrupts */
 	outb(0xc0, ICEMT(ice, IRQ));
@@ -2473,22 +2473,8 @@ static int snd_ice1712_free(ice1712_t *ice)
 		synchronize_irq(ice->irq);
 		free_irq(ice->irq, (void *) ice);
 	}
-	if (ice->res_port) {
-		release_resource(ice->res_port);
-		kfree_nocheck(ice->res_port);
-	}
-	if (ice->res_ddma_port) {
-		release_resource(ice->res_ddma_port);
-		kfree_nocheck(ice->res_ddma_port);
-	}
-	if (ice->res_dmapath_port) {
-		release_resource(ice->res_dmapath_port);
-		kfree_nocheck(ice->res_dmapath_port);
-	}
-	if (ice->res_profi_port) {
-		release_resource(ice->res_profi_port);
-		kfree_nocheck(ice->res_profi_port);
-	}
+	if (ice->port)
+		pci_release_regions(ice->pci);
 	snd_ice1712_akm4xxx_free(ice);
 	kfree(ice);
 	return 0;
@@ -2549,36 +2535,21 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 	ice->card = card;
 	ice->pci = pci;
 	ice->irq = -1;
-	ice->port = pci_resource_start(pci, 0);
-	ice->ddma_port = pci_resource_start(pci, 1);
-	ice->dmapath_port = pci_resource_start(pci, 2);
-	ice->profi_port = pci_resource_start(pci, 3);
 	pci_set_master(pci);
 	pci_write_config_word(ice->pci, 0x40, 0x807f);
 	pci_write_config_word(ice->pci, 0x42, 0x0006);
 	snd_ice1712_proc_init(ice);
 	synchronize_irq(pci->irq);
 
-	if ((ice->res_port = request_region(ice->port, 32, "ICE1712 - Controller")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->port, ice->port + 32 - 1);
-		snd_ice1712_free(ice);
-		return -EIO;
+	if ((err = pci_request_regions(pci, "ICE1712")) < 0) {
+		kfree(ice);
+		return err;
 	}
-	if ((ice->res_ddma_port = request_region(ice->ddma_port, 16, "ICE1712 - DDMA")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->ddma_port, ice->ddma_port + 16 - 1);
-		snd_ice1712_free(ice);
-		return -EIO;
-	}
-	if ((ice->res_dmapath_port = request_region(ice->dmapath_port, 16, "ICE1712 - DMA path")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->dmapath_port, ice->dmapath_port + 16 - 1);
-		snd_ice1712_free(ice);
-		return -EIO;
-	}
-	if ((ice->res_profi_port = request_region(ice->profi_port, 64, "ICE1712 - Professional")) == NULL) {
-		snd_printk("unable to grab ports 0x%lx-0x%lx\n", ice->profi_port, ice->profi_port + 16 - 1);
-		snd_ice1712_free(ice);
-		return -EIO;
-	}
+	ice->port = pci_resource_start(pci, 0);
+	ice->ddma_port = pci_resource_start(pci, 1);
+	ice->dmapath_port = pci_resource_start(pci, 2);
+	ice->profi_port = pci_resource_start(pci, 3);
+
 	if (request_irq(pci->irq, snd_ice1712_interrupt, SA_INTERRUPT|SA_SHIRQ, "ICE1712", (void *) ice)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		snd_ice1712_free(ice);

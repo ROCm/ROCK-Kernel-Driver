@@ -212,7 +212,6 @@ typedef struct snd_rme9652 {
 	spinlock_t lock;
 	int irq;
 	unsigned long port;
-	struct resource *res_port;
 	unsigned long iobase;
 	
 	int precise_ptr;
@@ -862,15 +861,14 @@ static int snd_rme9652_control_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem
 static int snd_rme9652_control_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	u32 val;
 	
 	val = snd_rme9652_convert_from_aes(&ucontrol->value.iec958);
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	change = val != rme9652->creg_spdif;
 	rme9652->creg_spdif = val;
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return change;
 }
 
@@ -892,17 +890,16 @@ static int snd_rme9652_control_spdif_stream_get(snd_kcontrol_t * kcontrol, snd_c
 static int snd_rme9652_control_spdif_stream_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	u32 val;
 	
 	val = snd_rme9652_convert_from_aes(&ucontrol->value.iec958);
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	change = val != rme9652->creg_spdif_stream;
 	rme9652->creg_spdif_stream = val;
 	rme9652->control_register &= ~(RME9652_PRO | RME9652_Dolby | RME9652_EMP);
 	rme9652_write(rme9652, RME9652_control_register, rme9652->control_register |= val);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return change;
 }
 
@@ -973,29 +970,27 @@ static int snd_rme9652_info_adat1_in(snd_kcontrol_t *kcontrol, snd_ctl_elem_info
 static int snd_rme9652_get_adat1_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	ucontrol->value.enumerated.item[0] = rme9652_adat1_in(rme9652);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return 0;
 }
 
 static int snd_rme9652_put_adat1_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_rme9652_use_is_exclusive(rme9652))
 		return -EBUSY;
 	val = ucontrol->value.enumerated.item[0] % 2;
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	change = val != rme9652_adat1_in(rme9652);
 	if (change)
 		rme9652_set_adat1_input(rme9652, val);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return change;
 }
 
@@ -1046,29 +1041,27 @@ static int snd_rme9652_info_spdif_in(snd_kcontrol_t *kcontrol, snd_ctl_elem_info
 static int snd_rme9652_get_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	ucontrol->value.enumerated.item[0] = rme9652_spdif_in(rme9652);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return 0;
 }
 
 static int snd_rme9652_put_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_rme9652_use_is_exclusive(rme9652))
 		return -EBUSY;
 	val = ucontrol->value.enumerated.item[0] % 3;
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	change = val != rme9652_spdif_in(rme9652);
 	if (change)
 		rme9652_set_spdif_input(rme9652, val);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return change;
 }
 
@@ -1117,28 +1110,26 @@ static int snd_rme9652_info_spdif_out(snd_kcontrol_t *kcontrol, snd_ctl_elem_inf
 static int snd_rme9652_get_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	ucontrol->value.integer.value[0] = rme9652_spdif_out(rme9652);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return 0;
 }
 
 static int snd_rme9652_put_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_rme9652_use_is_exclusive(rme9652))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	change = (int)val != rme9652_spdif_out(rme9652);
 	rme9652_set_spdif_output(rme9652, val);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return change;
 }
 
@@ -1206,26 +1197,24 @@ static int snd_rme9652_info_sync_mode(snd_kcontrol_t *kcontrol, snd_ctl_elem_inf
 static int snd_rme9652_get_sync_mode(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	ucontrol->value.enumerated.item[0] = rme9652_sync_mode(rme9652);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return 0;
 }
 
 static int snd_rme9652_put_sync_mode(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	val = ucontrol->value.enumerated.item[0] % 3;
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	change = (int)val != rme9652_sync_mode(rme9652);
 	rme9652_set_sync_mode(rme9652, val);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return change;
 }
 
@@ -1300,18 +1289,16 @@ static int snd_rme9652_info_sync_pref(snd_kcontrol_t *kcontrol, snd_ctl_elem_inf
 static int snd_rme9652_get_sync_pref(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	ucontrol->value.enumerated.item[0] = rme9652_sync_pref(rme9652);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return 0;
 }
 
 static int snd_rme9652_put_sync_pref(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change, max;
 	unsigned int val;
 	
@@ -1319,10 +1306,10 @@ static int snd_rme9652_put_sync_pref(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 		return -EBUSY;
 	max = rme9652->ss_channels == RME9652_NCHANNELS ? 4 : 3;
 	val = ucontrol->value.enumerated.item[0] % max;
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	change = (int)val != rme9652_sync_pref(rme9652);
 	rme9652_set_sync_pref(rme9652, val);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return change;
 }
 
@@ -1351,7 +1338,6 @@ static int snd_rme9652_get_thru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 static int snd_rme9652_put_thru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int chn;
 	u32 thru_bits = 0;
@@ -1364,7 +1350,7 @@ static int snd_rme9652_put_thru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 			thru_bits |= 1 << chn;
 	}
 	
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	change = thru_bits ^ rme9652->thru_bits;
 	if (change) {
 		for (chn = 0; chn < rme9652->ss_channels; ++chn) {
@@ -1373,7 +1359,7 @@ static int snd_rme9652_put_thru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 			rme9652_set_thru(rme9652,chn,thru_bits&(1<<chn));
 		}
 	}
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return !!change;
 }
 
@@ -1395,18 +1381,16 @@ static int snd_rme9652_info_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_inf
 static int snd_rme9652_get_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	ucontrol->value.integer.value[0] = rme9652->passthru;
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return 0;
 }
 
 static int snd_rme9652_put_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	int err = 0;
@@ -1415,11 +1399,11 @@ static int snd_rme9652_put_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 		return -EBUSY;
 
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	change = (ucontrol->value.integer.value[0] != rme9652->passthru);
 	if (change)
 		err = rme9652_set_passthru(rme9652, val);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return err ? err : change;
 }
 
@@ -1443,11 +1427,10 @@ static int snd_rme9652_info_spdif_rate(snd_kcontrol_t *kcontrol, snd_ctl_elem_in
 static int snd_rme9652_get_spdif_rate(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 	ucontrol->value.integer.value[0] = rme9652_spdif_sample_rate(rme9652);
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return 0;
 }
 
@@ -1568,8 +1551,6 @@ static int snd_rme9652_get_tc_value(void *private_data,
 
 #endif				/* ALSA_HAS_STANDARD_WAY_OF_RETURNING_TIMECODE */
 
-#define RME9652_CONTROLS (sizeof(snd_rme9652_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_rme9652_controls[] = {
 {
 	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
@@ -1637,7 +1618,7 @@ int snd_rme9652_create_controls(snd_card_t *card, rme9652_t *rme9652)
 	int err;
 	snd_kcontrol_t *kctl;
 
-	for (idx = 0; idx < RME9652_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_rme9652_controls); idx++) {
 		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_rme9652_controls[idx], rme9652))) < 0)
 			return err;
 		if (idx == 1)	/* IEC958 (S/PDIF) Stream */
@@ -1861,14 +1842,13 @@ static int snd_rme9652_free(rme9652_t *rme9652)
 		rme9652_stop(rme9652);
 	snd_rme9652_free_buffers(rme9652);
 
-	if (rme9652->iobase)
-		iounmap((void *) rme9652->iobase);
-	if (rme9652->res_port) {
-		release_resource(rme9652->res_port);
-		kfree_nocheck(rme9652->res_port);
-	}
 	if (rme9652->irq >= 0)
 		free_irq(rme9652->irq, (void *)rme9652);
+	if (rme9652->iobase)
+		iounmap((void *) rme9652->iobase);
+	if (rme9652->port)
+		pci_release_regions(rme9652->pci);
+
 	return 0;
 }
 
@@ -2256,12 +2236,13 @@ static int snd_rme9652_trigger(snd_pcm_substream_t *substream,
 static int snd_rme9652_prepare(snd_pcm_substream_t *substream)
 {
 	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
+	unsigned long flags;
 	int result = 0;
 
-	spin_lock(&rme9652->lock);
+	spin_lock_irqsave(&rme9652->lock, flags);
 	if (!rme9652->running)
 		rme9652_reset_hw_pointer(rme9652);
-	spin_unlock(&rme9652->lock);
+	spin_unlock_irqrestore(&rme9652->lock, flags);
 	return result;
 }
 
@@ -2314,10 +2295,8 @@ static snd_pcm_hardware_t snd_rme9652_capture_subinfo =
 
 static unsigned int period_sizes[] = { 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
 
-#define PERIOD_SIZES sizeof(period_sizes) / sizeof(period_sizes[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraints_period_sizes = {
-	.count = PERIOD_SIZES,
+	.count = ARRAY_SIZE(period_sizes),
 	.list = period_sizes,
 	.mask = 0
 };
@@ -2382,10 +2361,9 @@ static int snd_rme9652_hw_rule_rate_channels(snd_pcm_hw_params_t *params,
 static int snd_rme9652_playback_open(snd_pcm_substream_t *substream)
 {
 	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 
 	snd_pcm_set_sync(substream);
 
@@ -2401,7 +2379,7 @@ static int snd_rme9652_playback_open(snd_pcm_substream_t *substream)
 	rme9652->playback_pid = current->pid;
 	rme9652->playback_substream = substream;
 
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, &hw_constraints_period_sizes);
@@ -2425,14 +2403,13 @@ static int snd_rme9652_playback_open(snd_pcm_substream_t *substream)
 static int snd_rme9652_playback_release(snd_pcm_substream_t *substream)
 {
 	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 
 	rme9652->playback_pid = -1;
 	rme9652->playback_substream = NULL;
 
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 
 	rme9652->spdif_ctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(rme9652->card, SNDRV_CTL_EVENT_MASK_VALUE |
@@ -2444,10 +2421,9 @@ static int snd_rme9652_playback_release(snd_pcm_substream_t *substream)
 static int snd_rme9652_capture_open(snd_pcm_substream_t *substream)
 {
 	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 
 	snd_pcm_set_sync(substream);
 
@@ -2463,7 +2439,7 @@ static int snd_rme9652_capture_open(snd_pcm_substream_t *substream)
 	rme9652->capture_pid = current->pid;
 	rme9652->capture_substream = substream;
 
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, &hw_constraints_period_sizes);
@@ -2482,14 +2458,13 @@ static int snd_rme9652_capture_open(snd_pcm_substream_t *substream)
 static int snd_rme9652_capture_release(snd_pcm_substream_t *substream)
 {
 	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 
-	spin_lock_irqsave(&rme9652->lock, flags);
+	spin_lock_irq(&rme9652->lock);
 
 	rme9652->capture_pid = -1;
 	rme9652->capture_substream = NULL;
 
-	spin_unlock_irqrestore(&rme9652->lock, flags);
+	spin_unlock_irq(&rme9652->lock);
 	return 0;
 }
 
@@ -2571,12 +2546,9 @@ static int __devinit snd_rme9652_create(snd_card_t *card,
 
 	spin_lock_init(&rme9652->lock);
 
+	if ((err = pci_request_regions(pci, "rme9652")) < 0)
+		return err;
 	rme9652->port = pci_resource_start(pci, 0);
-	if ((rme9652->res_port = request_mem_region(rme9652->port, RME9652_IO_EXTENT, "rme9652")) == NULL) {
-		snd_printk("unable to grab memory region 0x%lx-0x%lx\n", rme9652->port, rme9652->port + RME9652_IO_EXTENT - 1);
-		return -EBUSY;
-	}
-
 	rme9652->iobase = (unsigned long) ioremap_nocache(rme9652->port, RME9652_IO_EXTENT);
 	if (rme9652->iobase == 0) {
 		snd_printk("unable to remap region 0x%lx-0x%lx\n", rme9652->port, rme9652->port + RME9652_IO_EXTENT - 1);

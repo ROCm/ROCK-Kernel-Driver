@@ -188,6 +188,13 @@ Module parameters
 
     This module supports up to 8 cards and autoprobe.
 
+  Module snd-atiixp-modem
+  -----------------------
+
+    Module for ATI IXP 150/200/250 AC97 modem controllers.
+
+    Module supports up to 8 cards.
+
   Module snd-au8810, snd-au8820, snd-au8830
   -----------------------------------------
 

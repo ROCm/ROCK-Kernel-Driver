@@ -152,6 +152,10 @@ static void *snd_dma_hack_alloc_coherent(struct device *dev, size_t size,
 
 #endif /* arch */
 
+#if ! defined(__arm__)
+#define NEED_RESERVE_PAGES
+#endif
+
 /*
  *
  *  Generic memory allocators
@@ -160,22 +164,28 @@ static void *snd_dma_hack_alloc_coherent(struct device *dev, size_t size,
 
 static long snd_allocated_pages; /* holding the number of allocated pages */
 
-static void mark_pages(void *res, int order)
+static inline void inc_snd_pages(int order)
 {
-	struct page *page = virt_to_page(res);
-	struct page *last_page = page + (1 << order);
-	while (page < last_page)
-		SetPageReserved(page++);
 	snd_allocated_pages += 1 << order;
 }
 
-static void unmark_pages(void *res, int order)
+static inline void dec_snd_pages(int order)
 {
-	struct page *page = virt_to_page(res);
+	snd_allocated_pages -= 1 << order;
+}
+
+static void mark_pages(struct page *page, int order)
+{
+	struct page *last_page = page + (1 << order);
+	while (page < last_page)
+		SetPageReserved(page++);
+}
+
+static void unmark_pages(struct page *page, int order)
+{
 	struct page *last_page = page + (1 << order);
 	while (page < last_page)
 		ClearPageReserved(page++);
-	snd_allocated_pages -= 1 << order;
 }
 
 /**
@@ -194,9 +204,10 @@ void *snd_malloc_pages(size_t size, unsigned int gfp_flags)
 
 	snd_assert(size > 0, return NULL);
 	snd_assert(gfp_flags != 0, return NULL);
-	for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
+	pg = get_order(size);
 	if ((res = (void *) __get_free_pages(gfp_flags, pg)) != NULL) {
-		mark_pages(res, pg);
+		mark_pages(virt_to_page(res), pg);
+		inc_snd_pages(pg);
 	}
 	return res;
 }
@@ -243,8 +254,9 @@ void snd_free_pages(void *ptr, size_t size)
 
 	if (ptr == NULL)
 		return;
-	for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
-	unmark_pages(ptr, pg);
+	pg = get_order(size);
+	dec_snd_pages(pg);
+	unmark_pages(virt_to_page(ptr), pg);
 	free_pages((unsigned long) ptr, pg);
 }
 
@@ -254,6 +266,7 @@ void snd_free_pages(void *ptr, size_t size)
  *
  */
 
+/* allocate the coherent DMA pages */
 static void *snd_malloc_dev_pages(struct device *dev, size_t size, dma_addr_t *dma)
 {
 	int pg;
@@ -267,8 +280,12 @@ static void *snd_malloc_dev_pages(struct device *dev, size_t size, dma_addr_t *d
 	if (pg > 0)
 		gfp_flags |= __GFP_NOWARN;
 	res = dma_alloc_coherent(dev, PAGE_SIZE << pg, dma, gfp_flags);
-	if (res != NULL)
-		mark_pages(res, pg);
+	if (res != NULL) {
+#ifdef NEED_RESERVE_PAGES
+		mark_pages(virt_to_page(res), pg); /* should be dma_to_page() */
+#endif
+		inc_snd_pages(pg);
+	}
 
 	return res;
 }
@@ -289,6 +306,7 @@ static void *snd_malloc_dev_pages_fallback(struct device *dev, size_t size,
 	return NULL;
 }
 
+/* free the coherent DMA pages */
 static void snd_free_dev_pages(struct device *dev, size_t size, void *ptr,
 			       dma_addr_t dma)
 {
@@ -297,7 +315,10 @@ static void snd_free_dev_pages(struct device *dev, size_t size, void *ptr,
 	if (ptr == NULL)
 		return;
 	pg = get_order(size);
-	unmark_pages(ptr, pg);
+	dec_snd_pages(pg);
+#ifdef NEED_RESERVE_PAGES
+	unmark_pages(virt_to_page(ptr), pg); /* should be dma_to_page() */
+#endif
 	dma_free_coherent(dev, PAGE_SIZE << pg, ptr, dma);
 }
 
@@ -312,11 +333,10 @@ static void *snd_malloc_sbus_pages(struct device *dev, size_t size,
 
 	snd_assert(size > 0, return NULL);
 	snd_assert(dma_addr != NULL, return NULL);
-	for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
+	pg = get_order(size);
 	res = sbus_alloc_consistent(sdev, PAGE_SIZE * (1 << pg), dma_addr);
-	if (res != NULL) {
-		mark_pages(res, pg);
-	}
+	if (res != NULL)
+		inc_snd_pages(pg);
 	return res;
 }
 
@@ -344,8 +364,8 @@ static void snd_free_sbus_pages(struct device *dev, size_t size,
 
 	if (ptr == NULL)
 		return;
-	for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
-	unmark_pages(ptr, pg);
+	pg = get_order(size);
+	dec_snd_pages(pg);
 	sbus_free_consistent(sdev, PAGE_SIZE * (1 << pg), ptr, dma_addr);
 }
 
@@ -474,7 +494,7 @@ int snd_dma_alloc_pages_fallback(const struct snd_dma_device *dev, size_t size,
 /**
  * snd_dma_free_pages - release the allocated buffer
  * @dev: the buffer device info
- * @dmbab: the buffer allocation record to release
+ * @dmab: the buffer allocation record to release
  *
  * Releases the allocated buffer via snd_dma_alloc_pages().
  */
@@ -658,7 +678,7 @@ struct prealloc_dev {
 	unsigned int buffers;
 };
 
-#define HAMMERFALL_BUFFER_SIZE    (16*1024*4*(26+1))
+#define HAMMERFALL_BUFFER_SIZE    (16*1024*4*(26+1)+0x10000)
 
 static struct prealloc_dev prealloc_devices[] __initdata = {
 	{

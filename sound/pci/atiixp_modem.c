@@ -1,5 +1,5 @@
 /*
- *   ALSA driver for ATI IXP 150/200/250/300 AC97 controllers
+ *   ALSA driver for ATI IXP 150/200/250 AC97 modem controllers
  *
  *	Copyright (c) 2004 Takashi Iwai <tiwai@suse.de>
  *
@@ -35,15 +35,14 @@
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
-MODULE_DESCRIPTION("ATI IXP AC97 controller");
+MODULE_DESCRIPTION("ATI IXP MC97 controller");
 MODULE_LICENSE("GPL");
-MODULE_SUPPORTED_DEVICE("{{ATI,IXP150/200/250/300}}");
+MODULE_SUPPORTED_DEVICE("{{ATI,IXP150/200/250}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
-static int spdif_aclink[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
@@ -54,64 +53,56 @@ module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable audio part of ATI IXP controller.");
 module_param_array(ac97_clock, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
-module_param_array(spdif_aclink, bool, boot_devs, 0444);
-MODULE_PARM_DESC(spdif_aclink, "S/PDIF over AC-link.");
 
 
 /*
  */
 
 #define ATI_REG_ISR			0x00	/* interrupt source */
-#define  ATI_REG_ISR_IN_XRUN		(1U<<0)
-#define  ATI_REG_ISR_IN_STATUS		(1U<<1)
-#define  ATI_REG_ISR_OUT_XRUN		(1U<<2)
-#define  ATI_REG_ISR_OUT_STATUS		(1U<<3)
-#define  ATI_REG_ISR_SPDF_XRUN		(1U<<4)
-#define  ATI_REG_ISR_SPDF_STATUS	(1U<<5)
+#define  ATI_REG_ISR_MODEM_IN_XRUN	(1U<<0)
+#define  ATI_REG_ISR_MODEM_IN_STATUS	(1U<<1)
+#define  ATI_REG_ISR_MODEM_OUT1_XRUN	(1U<<2)
+#define  ATI_REG_ISR_MODEM_OUT1_STATUS	(1U<<3)
+#define  ATI_REG_ISR_MODEM_OUT2_XRUN	(1U<<4)
+#define  ATI_REG_ISR_MODEM_OUT2_STATUS	(1U<<5)
+#define  ATI_REG_ISR_MODEM_OUT3_XRUN	(1U<<6)
+#define  ATI_REG_ISR_MODEM_OUT3_STATUS	(1U<<7)
 #define  ATI_REG_ISR_PHYS_INTR		(1U<<8)
 #define  ATI_REG_ISR_PHYS_MISMATCH	(1U<<9)
 #define  ATI_REG_ISR_CODEC0_NOT_READY	(1U<<10)
 #define  ATI_REG_ISR_CODEC1_NOT_READY	(1U<<11)
 #define  ATI_REG_ISR_CODEC2_NOT_READY	(1U<<12)
 #define  ATI_REG_ISR_NEW_FRAME		(1U<<13)
+#define  ATI_REG_ISR_MODEM_GPIO_DATA	(1U<<14)
 
 #define ATI_REG_IER			0x04	/* interrupt enable */
-#define  ATI_REG_IER_IN_XRUN_EN		(1U<<0)
-#define  ATI_REG_IER_IO_STATUS_EN	(1U<<1)
-#define  ATI_REG_IER_OUT_XRUN_EN	(1U<<2)
-#define  ATI_REG_IER_OUT_XRUN_COND	(1U<<3)
-#define  ATI_REG_IER_SPDF_XRUN_EN	(1U<<4)
-#define  ATI_REG_IER_SPDF_STATUS_EN	(1U<<5)
+#define  ATI_REG_IER_MODEM_IN_XRUN_EN	(1U<<0)
+#define  ATI_REG_IER_MODEM_STATUS_EN	(1U<<1)
+#define  ATI_REG_IER_MODEM_OUT1_XRUN_EN	(1U<<2)
+#define  ATI_REG_IER_MODEM_OUT2_XRUN_EN	(1U<<4)
+#define  ATI_REG_IER_MODEM_OUT3_XRUN_EN	(1U<<6)
 #define  ATI_REG_IER_PHYS_INTR_EN	(1U<<8)
 #define  ATI_REG_IER_PHYS_MISMATCH_EN	(1U<<9)
 #define  ATI_REG_IER_CODEC0_INTR_EN	(1U<<10)
 #define  ATI_REG_IER_CODEC1_INTR_EN	(1U<<11)
 #define  ATI_REG_IER_CODEC2_INTR_EN	(1U<<12)
 #define  ATI_REG_IER_NEW_FRAME_EN	(1U<<13)	/* (RO */
-#define  ATI_REG_IER_SET_BUS_BUSY	(1U<<14)	/* (WO) audio is running */
+#define  ATI_REG_IER_MODEM_GPIO_DATA_EN	(1U<<14)	/* (WO) modem is running */
+#define  ATI_REG_IER_MODEM_SET_BUS_BUSY	(1U<<15)
 
 #define ATI_REG_CMD			0x08	/* command */
-#define  ATI_REG_CMD_POWERDOWN		(1U<<0)
-#define  ATI_REG_CMD_RECEIVE_EN		(1U<<1)
-#define  ATI_REG_CMD_SEND_EN		(1U<<2)
-#define  ATI_REG_CMD_STATUS_MEM		(1U<<3)
-#define  ATI_REG_CMD_SPDF_OUT_EN	(1U<<4)
-#define  ATI_REG_CMD_SPDF_STATUS_MEM	(1U<<5)
-#define  ATI_REG_CMD_SPDF_THRESHOLD	(3U<<6)
-#define  ATI_REG_CMD_SPDF_THRESHOLD_SHIFT	6
-#define  ATI_REG_CMD_IN_DMA_EN		(1U<<8)
-#define  ATI_REG_CMD_OUT_DMA_EN		(1U<<9)
-#define  ATI_REG_CMD_SPDF_DMA_EN	(1U<<10)
-#define  ATI_REG_CMD_SPDF_OUT_STOPPED	(1U<<11)
-#define  ATI_REG_CMD_SPDF_CONFIG_MASK	(7U<<12)
-#define   ATI_REG_CMD_SPDF_CONFIG_34	(1U<<12)
-#define   ATI_REG_CMD_SPDF_CONFIG_78	(2U<<12)
-#define   ATI_REG_CMD_SPDF_CONFIG_69	(3U<<12)
-#define   ATI_REG_CMD_SPDF_CONFIG_01	(4U<<12)
-#define  ATI_REG_CMD_INTERLEAVE_SPDF	(1U<<16)
+#define  ATI_REG_CMD_POWERDOWN	(1U<<0)
+#define  ATI_REG_CMD_MODEM_RECEIVE_EN	(1U<<1)	/* modem only */
+#define  ATI_REG_CMD_MODEM_SEND1_EN	(1U<<2)	/* modem only */
+#define  ATI_REG_CMD_MODEM_SEND2_EN	(1U<<3)	/* modem only */
+#define  ATI_REG_CMD_MODEM_SEND3_EN	(1U<<4)	/* modem only */
+#define  ATI_REG_CMD_MODEM_STATUS_MEM	(1U<<5)	/* modem only */
+#define  ATI_REG_CMD_MODEM_IN_DMA_EN	(1U<<8)	/* modem only */
+#define  ATI_REG_CMD_MODEM_OUT_DMA1_EN	(1U<<9)	/* modem only */
+#define  ATI_REG_CMD_MODEM_OUT_DMA2_EN	(1U<<10)	/* modem only */
+#define  ATI_REG_CMD_MODEM_OUT_DMA3_EN	(1U<<11)	/* modem only */
 #define  ATI_REG_CMD_AUDIO_PRESENT	(1U<<20)
-#define  ATI_REG_CMD_INTERLEAVE_IN	(1U<<21)
-#define  ATI_REG_CMD_INTERLEAVE_OUT	(1U<<22)
+#define  ATI_REG_CMD_MODEM_GPIO_THRU_DMA	(1U<<22)	/* modem only */
 #define  ATI_REG_CMD_LOOPBACK_EN	(1U<<23)
 #define  ATI_REG_CMD_PACKED_DIS		(1U<<24)
 #define  ATI_REG_CMD_BURST_EN		(1U<<25)
@@ -142,54 +133,45 @@ MODULE_PARM_DESC(spdif_aclink, "S/PDIF over AC-link.");
 
 #define ATI_REG_IN_FIFO_THRESHOLD	0x1c
 
-#define ATI_REG_IN_DMA_LINKPTR		0x20
-#define ATI_REG_IN_DMA_DT_START		0x24	/* RO */
-#define ATI_REG_IN_DMA_DT_NEXT		0x28	/* RO */
-#define ATI_REG_IN_DMA_DT_CUR		0x2c	/* RO */
-#define ATI_REG_IN_DMA_DT_SIZE		0x30
-
-#define ATI_REG_OUT_DMA_SLOT		0x34
-#define  ATI_REG_OUT_DMA_SLOT_BIT(x)	(1U << ((x) - 3))
-#define  ATI_REG_OUT_DMA_SLOT_MASK	0x1ff
-#define  ATI_REG_OUT_DMA_THRESHOLD_MASK	0xf800
-#define  ATI_REG_OUT_DMA_THRESHOLD_SHIFT	11
-
-#define ATI_REG_OUT_DMA_LINKPTR		0x38
-#define ATI_REG_OUT_DMA_DT_START	0x3c	/* RO */
-#define ATI_REG_OUT_DMA_DT_NEXT		0x40	/* RO */
-#define ATI_REG_OUT_DMA_DT_CUR		0x44	/* RO */
-#define ATI_REG_OUT_DMA_DT_SIZE		0x48
-
-#define ATI_REG_SPDF_CMD		0x4c
-#define  ATI_REG_SPDF_CMD_LFSR		(1U<<4)
-#define  ATI_REG_SPDF_CMD_SINGLE_CH	(1U<<5)
-#define  ATI_REG_SPDF_CMD_LFSR_ACC	(0xff<<8)	/* RO */
-
-#define ATI_REG_SPDF_DMA_LINKPTR	0x50
-#define ATI_REG_SPDF_DMA_DT_START	0x54	/* RO */
-#define ATI_REG_SPDF_DMA_DT_NEXT	0x58	/* RO */
-#define ATI_REG_SPDF_DMA_DT_CUR		0x5c	/* RO */
-#define ATI_REG_SPDF_DMA_DT_SIZE	0x60
+#define ATI_REG_MODEM_IN_DMA_LINKPTR	0x20
+#define ATI_REG_MODEM_IN_DMA_DT_START	0x24	/* RO */
+#define ATI_REG_MODEM_IN_DMA_DT_NEXT	0x28	/* RO */
+#define ATI_REG_MODEM_IN_DMA_DT_CUR	0x2c	/* RO */
+#define ATI_REG_MODEM_IN_DMA_DT_SIZE	0x30
+#define ATI_REG_MODEM_OUT_FIFO		0x34	/* output threshold */
+#define  ATI_REG_MODEM_OUT1_DMA_THRESHOLD_MASK	(0xf<<16)
+#define  ATI_REG_MODEM_OUT1_DMA_THRESHOLD_SHIFT	16
+#define ATI_REG_MODEM_OUT_DMA1_LINKPTR	0x38
+#define ATI_REG_MODEM_OUT_DMA2_LINKPTR	0x3c
+#define ATI_REG_MODEM_OUT_DMA3_LINKPTR	0x40
+#define ATI_REG_MODEM_OUT_DMA1_DT_START	0x44
+#define ATI_REG_MODEM_OUT_DMA1_DT_NEXT	0x48
+#define ATI_REG_MODEM_OUT_DMA1_DT_CUR	0x4c
+#define ATI_REG_MODEM_OUT_DMA2_DT_START	0x50
+#define ATI_REG_MODEM_OUT_DMA2_DT_NEXT	0x54
+#define ATI_REG_MODEM_OUT_DMA2_DT_CUR	0x58
+#define ATI_REG_MODEM_OUT_DMA3_DT_START	0x5c
+#define ATI_REG_MODEM_OUT_DMA3_DT_NEXT	0x60
+#define ATI_REG_MODEM_OUT_DMA3_DT_CUR	0x64
+#define ATI_REG_MODEM_OUT_DMA12_DT_SIZE	0x68
+#define ATI_REG_MODEM_OUT_DMA3_DT_SIZE	0x6c
+#define ATI_REG_MODEM_OUT_FIFO_USED     0x70
+#define ATI_REG_MODEM_OUT_GPIO		0x74
+#define  ATI_REG_MODEM_OUT_GPIO_EN	   1
+#define  ATI_REG_MODEM_OUT_GPIO_DATA_SHIFT 5
+#define ATI_REG_MODEM_IN_GPIO		0x78
 
 #define ATI_REG_MODEM_MIRROR		0x7c
 #define ATI_REG_AUDIO_MIRROR		0x80
 
-#define ATI_REG_6CH_REORDER		0x84	/* reorder slots for 6ch */
-#define  ATI_REG_6CH_REORDER_EN		(1U<<0)	/* 3,4,7,8,6,9 -> 3,4,6,9,7,8 */
-
-#define ATI_REG_FIFO_FLUSH		0x88
-#define  ATI_REG_FIFO_OUT_FLUSH		(1U<<0)
-#define  ATI_REG_FIFO_IN_FLUSH		(1U<<1)
+#define ATI_REG_MODEM_FIFO_FLUSH	0x88
+#define  ATI_REG_MODEM_FIFO_OUT1_FLUSH	(1U<<0)
+#define  ATI_REG_MODEM_FIFO_OUT2_FLUSH	(1U<<1)
+#define  ATI_REG_MODEM_FIFO_OUT3_FLUSH	(1U<<2)
+#define  ATI_REG_MODEM_FIFO_IN_FLUSH	(1U<<3)
 
 /* LINKPTR */
 #define  ATI_REG_LINKPTR_EN		(1U<<0)
-
-/* [INT|OUT|SPDIF]_DMA_DT_SIZE */
-#define  ATI_REG_DMA_DT_SIZE		(0xffffU<<0)
-#define  ATI_REG_DMA_FIFO_USED		(0x1fU<<16)
-#define  ATI_REG_DMA_FIFO_FREE		(0x1fU<<21)
-#define  ATI_REG_DMA_STATE		(7U<<26)
-
 
 #define ATI_MAX_DESCRIPTORS	256	/* max number of descriptor packets */
 
@@ -216,9 +198,9 @@ typedef struct atiixp_dma_desc {
 /*
  * stream enum
  */
-enum { ATI_DMA_PLAYBACK, ATI_DMA_CAPTURE, ATI_DMA_SPDIF, NUM_ATI_DMAS }; /* DMAs */
-enum { ATI_PCM_OUT, ATI_PCM_IN, ATI_PCM_SPDIF, NUM_ATI_PCMS }; /* AC97 pcm slots */
-enum { ATI_PCMDEV_ANALOG, ATI_PCMDEV_DIGITAL, NUM_ATI_PCMDEVS }; /* pcm devices */
+enum { ATI_DMA_PLAYBACK, ATI_DMA_CAPTURE, NUM_ATI_DMAS }; /* DMAs */
+enum { ATI_PCM_OUT, ATI_PCM_IN, NUM_ATI_PCMS }; /* AC97 pcm slots */
+enum { ATI_PCMDEV_ANALOG, NUM_ATI_PCMDEVS }; /* pcm devices */
 
 #define NUM_ATI_CODECS	3
 
@@ -258,6 +240,7 @@ struct snd_atiixp {
 	snd_card_t *card;
 	struct pci_dev *pci;
 
+	struct resource *res;		/* memory i/o */
 	unsigned long addr;
 	unsigned long remap_addr;
 	int irq;
@@ -284,8 +267,7 @@ struct snd_atiixp {
 /*
  */
 static struct pci_device_id snd_atiixp_ids[] = {
-	{ 0x1002, 0x4341, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* SB200 */
-	{ 0x1002, 0x4361, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* SB300 */
+	{ 0x1002, 0x434d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* SB200 */
 	{ 0, }
 };
 
@@ -591,23 +573,16 @@ static int snd_atiixp_chip_start(atiixp_t *chip)
 
 	/* set up spdif, enable burst mode */
 	reg = atiixp_read(chip, CMD);
-	reg |= 0x02 << ATI_REG_CMD_SPDF_THRESHOLD_SHIFT;
 	reg |= ATI_REG_CMD_BURST_EN;
 	atiixp_write(chip, CMD, reg);
-
-	reg = atiixp_read(chip, SPDF_CMD);
-	reg &= ~(ATI_REG_SPDF_CMD_LFSR|ATI_REG_SPDF_CMD_SINGLE_CH);
-	atiixp_write(chip, SPDF_CMD, reg);
 
 	/* clear all interrupt source */
 	atiixp_write(chip, ISR, 0xffffffff);
 	/* enable irqs */
 	atiixp_write(chip, IER,
-		     ATI_REG_IER_IO_STATUS_EN |
-		     ATI_REG_IER_IN_XRUN_EN |
-		     ATI_REG_IER_OUT_XRUN_EN |
-		     ATI_REG_IER_SPDF_XRUN_EN |
-		     ATI_REG_IER_SPDF_STATUS_EN);
+		     ATI_REG_IER_MODEM_STATUS_EN |
+		     ATI_REG_IER_MODEM_IN_XRUN_EN |
+		     ATI_REG_IER_MODEM_OUT1_XRUN_EN);
 	return 0;
 }
 
@@ -683,13 +658,12 @@ static void snd_atiixp_update_dma(atiixp_t *chip, atiixp_dma_t *dma)
 static void snd_atiixp_check_bus_busy(atiixp_t *chip)
 {
 	unsigned int bus_busy;
-	if (atiixp_read(chip, CMD) & (ATI_REG_CMD_SEND_EN |
-				      ATI_REG_CMD_RECEIVE_EN |
-				      ATI_REG_CMD_SPDF_OUT_EN))
-		bus_busy = ATI_REG_IER_SET_BUS_BUSY;
+	if (atiixp_read(chip, CMD) & (ATI_REG_CMD_MODEM_SEND1_EN |
+				      ATI_REG_CMD_MODEM_RECEIVE_EN))
+		bus_busy = ATI_REG_IER_MODEM_SET_BUS_BUSY;
 	else
 		bus_busy = 0;
-	atiixp_update(chip, IER, ATI_REG_IER_SET_BUS_BUSY, bus_busy);
+	atiixp_update(chip, IER, ATI_REG_IER_MODEM_SET_BUS_BUSY, bus_busy);
 }
 
 /* common trigger callback
@@ -699,33 +673,44 @@ static int snd_atiixp_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 {
 	atiixp_t *chip = snd_pcm_substream_chip(substream);
 	atiixp_dma_t *dma = (atiixp_dma_t *)substream->runtime->private_data;
-	int err = 0;
+	unsigned int reg = 0;
+	int i;
 
 	snd_assert(dma->ops->enable_transfer && dma->ops->flush_dma, return -EINVAL);
 
+	if (cmd != SNDRV_PCM_TRIGGER_START && cmd != SNDRV_PCM_TRIGGER_STOP)
+		return -EINVAL;
+
 	spin_lock(&chip->reg_lock);
-	switch (cmd) {
-	case SNDRV_PCM_TRIGGER_START:
+
+	/* hook off/on: via GPIO_OUT */
+	for (i = 0; i < NUM_ATI_CODECS; i++) {
+		if (chip->ac97[i]) {
+			reg = snd_ac97_read(chip->ac97[i], AC97_GPIO_STATUS);
+			break;
+	}
+	}
+	if(cmd == SNDRV_PCM_TRIGGER_START)
+		reg |= AC97_GPIO_LINE1_OH;
+	else
+		reg &= ~AC97_GPIO_LINE1_OH;
+	reg = (reg << ATI_REG_MODEM_OUT_GPIO_DATA_SHIFT) | ATI_REG_MODEM_OUT_GPIO_EN ;
+	atiixp_write(chip, MODEM_OUT_GPIO, reg);
+
+	if (cmd == SNDRV_PCM_TRIGGER_START) {
 		dma->ops->enable_transfer(chip, 1);
 		dma->running = 1;
-		break;
-	case SNDRV_PCM_TRIGGER_STOP:
+	} else {
 		dma->ops->enable_transfer(chip, 0);
 		dma->running = 0;
-		break;
-	default:
-		err = -EINVAL;
-		break;
 	}
-	if (! err) {
+	snd_atiixp_check_bus_busy(chip);
+	if (cmd == SNDRV_PCM_TRIGGER_STOP) {
+		dma->ops->flush_dma(chip);
 		snd_atiixp_check_bus_busy(chip);
-		if (cmd == SNDRV_PCM_TRIGGER_STOP) {
-			dma->ops->flush_dma(chip);
-			snd_atiixp_check_bus_busy(chip);
-		}
 	}
 	spin_unlock(&chip->reg_lock);
-	return err;
+	return 0;
 }
 
 
@@ -738,7 +723,7 @@ static int snd_atiixp_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 /* flush FIFO of analog OUT DMA */
 static void atiixp_out_flush_dma(atiixp_t *chip)
 {
-	atiixp_write(chip, FIFO_FLUSH, ATI_REG_FIFO_OUT_FLUSH);
+	atiixp_write(chip, MODEM_FIFO_FLUSH, ATI_REG_MODEM_FIFO_OUT1_FLUSH);
 }
 
 /* enable/disable analog OUT DMA */
@@ -747,27 +732,27 @@ static void atiixp_out_enable_dma(atiixp_t *chip, int on)
 	unsigned int data;
 	data = atiixp_read(chip, CMD);
 	if (on) {
-		if (data & ATI_REG_CMD_OUT_DMA_EN)
+		if (data & ATI_REG_CMD_MODEM_OUT_DMA1_EN)
 			return;
 		atiixp_out_flush_dma(chip);
-		data |= ATI_REG_CMD_OUT_DMA_EN;
+		data |= ATI_REG_CMD_MODEM_OUT_DMA1_EN;
 	} else
-		data &= ~ATI_REG_CMD_OUT_DMA_EN;
+		data &= ~ATI_REG_CMD_MODEM_OUT_DMA1_EN;
 	atiixp_write(chip, CMD, data);
 }
 
 /* start/stop transfer over OUT DMA */
 static void atiixp_out_enable_transfer(atiixp_t *chip, int on)
 {
-	atiixp_update(chip, CMD, ATI_REG_CMD_SEND_EN,
-		      on ? ATI_REG_CMD_SEND_EN : 0);
+	atiixp_update(chip, CMD, ATI_REG_CMD_MODEM_SEND1_EN,
+		      on ? ATI_REG_CMD_MODEM_SEND1_EN : 0);
 }
 
 /* enable/disable analog IN DMA */
 static void atiixp_in_enable_dma(atiixp_t *chip, int on)
 {
-	atiixp_update(chip, CMD, ATI_REG_CMD_IN_DMA_EN,
-		      on ? ATI_REG_CMD_IN_DMA_EN : 0);
+	atiixp_update(chip, CMD, ATI_REG_CMD_MODEM_IN_DMA_EN,
+		      on ? ATI_REG_CMD_MODEM_IN_DMA_EN : 0);
 }
 
 /* start/stop analog IN DMA */
@@ -775,89 +760,18 @@ static void atiixp_in_enable_transfer(atiixp_t *chip, int on)
 {
 	if (on) {
 		unsigned int data = atiixp_read(chip, CMD);
-		if (! (data & ATI_REG_CMD_RECEIVE_EN)) {
-			data |= ATI_REG_CMD_RECEIVE_EN;
-#if 0 /* FIXME: this causes the endless loop */
-			/* wait until slot 3/4 are finished */
-			while ((atiixp_read(chip, COUNTER) &
-				ATI_REG_COUNTER_SLOT) != 5)
-				;
-#endif
+		if (! (data & ATI_REG_CMD_MODEM_RECEIVE_EN)) {
+			data |= ATI_REG_CMD_MODEM_RECEIVE_EN;
 			atiixp_write(chip, CMD, data);
 		}
 	} else
-		atiixp_update(chip, CMD, ATI_REG_CMD_RECEIVE_EN, 0);
+		atiixp_update(chip, CMD, ATI_REG_CMD_MODEM_RECEIVE_EN, 0);
 }
 
 /* flush FIFO of analog IN DMA */
 static void atiixp_in_flush_dma(atiixp_t *chip)
 {
-	atiixp_write(chip, FIFO_FLUSH, ATI_REG_FIFO_IN_FLUSH);
-}
-
-/* enable/disable SPDIF OUT DMA */
-static void atiixp_spdif_enable_dma(atiixp_t *chip, int on)
-{
-	atiixp_update(chip, CMD, ATI_REG_CMD_SPDF_DMA_EN,
-		      on ? ATI_REG_CMD_SPDF_DMA_EN : 0);
-}
-
-/* start/stop SPDIF OUT DMA */
-static void atiixp_spdif_enable_transfer(atiixp_t *chip, int on)
-{
-	unsigned int data;
-	data = atiixp_read(chip, CMD);
-	if (on)
-		data |= ATI_REG_CMD_SPDF_OUT_EN;
-	else
-		data &= ~ATI_REG_CMD_SPDF_OUT_EN;
-	atiixp_write(chip, CMD, data);
-}
-
-/* flush FIFO of SPDIF OUT DMA */
-static void atiixp_spdif_flush_dma(atiixp_t *chip)
-{
-	int timeout;
-
-	/* DMA off, transfer on */
-	atiixp_spdif_enable_dma(chip, 0);
-	atiixp_spdif_enable_transfer(chip, 1);
-	
-	timeout = 100;
-	do {
-		if (! (atiixp_read(chip, SPDF_DMA_DT_SIZE) & ATI_REG_DMA_FIFO_USED))
-			break;
-		udelay(1);
-	} while (timeout-- > 0);
-
-	atiixp_spdif_enable_transfer(chip, 0);
-}
-
-/* set up slots and formats for SPDIF OUT */
-static int snd_atiixp_spdif_prepare(snd_pcm_substream_t *substream)
-{
-	atiixp_t *chip = snd_pcm_substream_chip(substream);
-
-	spin_lock_irq(&chip->reg_lock);
-	if (chip->spdif_over_aclink) {
-		unsigned int data;
-		/* enable slots 10/11 */
-		atiixp_update(chip, CMD, ATI_REG_CMD_SPDF_CONFIG_MASK,
-			      ATI_REG_CMD_SPDF_CONFIG_01);
-		data = atiixp_read(chip, OUT_DMA_SLOT) & ~ATI_REG_OUT_DMA_SLOT_MASK;
-		data |= ATI_REG_OUT_DMA_SLOT_BIT(10) |
-			ATI_REG_OUT_DMA_SLOT_BIT(11);
-		data |= 0x04 << ATI_REG_OUT_DMA_THRESHOLD_SHIFT;
-		atiixp_write(chip, OUT_DMA_SLOT, data);
-		atiixp_update(chip, CMD, ATI_REG_CMD_INTERLEAVE_OUT,
-			      substream->runtime->format == SNDRV_PCM_FORMAT_S16_LE ?
-			      ATI_REG_CMD_INTERLEAVE_OUT : 0);
-	} else {
-		atiixp_update(chip, CMD, ATI_REG_CMD_SPDF_CONFIG_MASK, 0);
-		atiixp_update(chip, CMD, ATI_REG_CMD_INTERLEAVE_SPDF, 0);
-	}
-	spin_unlock_irq(&chip->reg_lock);
-	return 0;
+	atiixp_write(chip, MODEM_FIFO_FLUSH, ATI_REG_MODEM_FIFO_IN_FLUSH);
 }
 
 /* set up slots and formats for analog OUT */
@@ -867,40 +781,11 @@ static int snd_atiixp_playback_prepare(snd_pcm_substream_t *substream)
 	unsigned int data;
 
 	spin_lock_irq(&chip->reg_lock);
-	data = atiixp_read(chip, OUT_DMA_SLOT) & ~ATI_REG_OUT_DMA_SLOT_MASK;
-	switch (substream->runtime->channels) {
-	case 8:
-		data |= ATI_REG_OUT_DMA_SLOT_BIT(10) |
-			ATI_REG_OUT_DMA_SLOT_BIT(11);
-		/* fallthru */
-	case 6:
-		data |= ATI_REG_OUT_DMA_SLOT_BIT(7) |
-			ATI_REG_OUT_DMA_SLOT_BIT(8);
-		/* fallthru */
-	case 4:
-		data |= ATI_REG_OUT_DMA_SLOT_BIT(6) |
-			ATI_REG_OUT_DMA_SLOT_BIT(9);
-		/* fallthru */
-	default:
-		data |= ATI_REG_OUT_DMA_SLOT_BIT(3) |
-			ATI_REG_OUT_DMA_SLOT_BIT(4);
-		break;
-	}
-
 	/* set output threshold */
-	data |= 0x04 << ATI_REG_OUT_DMA_THRESHOLD_SHIFT;
-	atiixp_write(chip, OUT_DMA_SLOT, data);
-
-	atiixp_update(chip, CMD, ATI_REG_CMD_INTERLEAVE_OUT,
-		      substream->runtime->format == SNDRV_PCM_FORMAT_S16_LE ?
-		      ATI_REG_CMD_INTERLEAVE_OUT : 0);
-
-	/*
-	 * enable 6 channel re-ordering bit if needed
-	 */
-	atiixp_update(chip, 6CH_REORDER, ATI_REG_6CH_REORDER_EN,
-		      substream->runtime->channels >= 6 ? ATI_REG_6CH_REORDER_EN: 0);
-    
+	data = atiixp_read(chip, MODEM_OUT_FIFO);
+	data &= ~ATI_REG_MODEM_OUT1_DMA_THRESHOLD_MASK;
+	data |= 0x04 << ATI_REG_MODEM_OUT1_DMA_THRESHOLD_SHIFT;
+	atiixp_write(chip, MODEM_OUT_FIFO, data);
 	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
@@ -908,13 +793,6 @@ static int snd_atiixp_playback_prepare(snd_pcm_substream_t *substream)
 /* set up slots and formats for analog IN */
 static int snd_atiixp_capture_prepare(snd_pcm_substream_t *substream)
 {
-	atiixp_t *chip = snd_pcm_substream_chip(substream);
-
-	spin_lock_irq(&chip->reg_lock);
-	atiixp_update(chip, CMD, ATI_REG_CMD_INTERLEAVE_IN,
-		      substream->runtime->format == SNDRV_PCM_FORMAT_S16_LE ?
-		      ATI_REG_CMD_INTERLEAVE_IN : 0);
-	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 
@@ -927,6 +805,7 @@ static int snd_atiixp_pcm_hw_params(snd_pcm_substream_t *substream,
 	atiixp_t *chip = snd_pcm_substream_chip(substream);
 	atiixp_dma_t *dma = (atiixp_dma_t *)substream->runtime->private_data;
 	int err;
+	int i;
 
 	err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 	if (err < 0)
@@ -940,20 +819,12 @@ static int snd_atiixp_pcm_hw_params(snd_pcm_substream_t *substream,
 	if (err < 0)
 		return err;
 
-	if (dma->ac97_pcm_type >= 0) {
-		struct ac97_pcm *pcm = chip->pcms[dma->ac97_pcm_type];
-		/* PCM is bound to AC97 codec(s)
-		 * set up the AC97 codecs
-		 */
-		if (dma->pcm_open_flag) {
-			snd_ac97_pcm_close(pcm);
-			dma->pcm_open_flag = 0;
-		}
-		err = snd_ac97_pcm_open(pcm, params_rate(hw_params),
-					params_channels(hw_params),
-					pcm->r[0].slots);
-		if (err >= 0)
-			dma->pcm_open_flag = 1;
+	/* set up modem rate */
+	for (i = 0; i < NUM_ATI_CODECS; i++) {
+		if (! chip->ac97[i])
+			continue;
+		snd_ac97_write(chip->ac97[i], AC97_LINE1_RATE, params_rate(hw_params));
+		snd_ac97_write(chip->ac97[i], AC97_LINE1_LEVEL, 0);
 	}
 
 	return err;
@@ -964,11 +835,6 @@ static int snd_atiixp_pcm_hw_free(snd_pcm_substream_t * substream)
 	atiixp_t *chip = snd_pcm_substream_chip(substream);
 	atiixp_dma_t *dma = (atiixp_dma_t *)substream->runtime->private_data;
 
-	if (dma->pcm_open_flag) {
-		struct ac97_pcm *pcm = chip->pcms[dma->ac97_pcm_type];
-		snd_ac97_pcm_close(pcm);
-		dma->pcm_open_flag = 0;
-	}
 	atiixp_clear_dma_packets(chip, dma, substream);
 	snd_pcm_lib_free_pages(substream);
 	return 0;
@@ -982,12 +848,11 @@ static snd_pcm_hardware_t snd_atiixp_pcm_hw =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
-				 SNDRV_PCM_INFO_RESUME |
 				 SNDRV_PCM_INFO_MMAP_VALID),
-	.formats =		SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE,
-	.rates =		SNDRV_PCM_RATE_48000,
-	.rate_min =		48000,
-	.rate_max =		48000,
+	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =		SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_KNOT,
+	.rate_min =		8000,
+	.rate_max =		16000,
 	.channels_min =		2,
 	.channels_max =		2,
 	.buffer_bytes_max =	256 * 1024,
@@ -1002,6 +867,12 @@ static int snd_atiixp_pcm_open(snd_pcm_substream_t *substream, atiixp_dma_t *dma
 	atiixp_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int err;
+	static unsigned int rates[] = { 8000,  9600, 12000, 16000 };
+	static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
+		.count = ARRAY_SIZE(rates),
+		.list = rates,
+		.mask = 0,
+	};
 
 	snd_assert(dma->ops && dma->ops->enable_dma, return -EINVAL);
 
@@ -1010,13 +881,8 @@ static int snd_atiixp_pcm_open(snd_pcm_substream_t *substream, atiixp_dma_t *dma
 	dma->substream = substream;
 	runtime->hw = snd_atiixp_pcm_hw;
 	dma->ac97_pcm_type = pcm_type;
-	if (pcm_type >= 0) {
-		runtime->hw.rates = chip->pcms[pcm_type]->rates;
-		snd_pcm_limit_hw_rates(runtime);
-	} else {
-		/* direct SPDIF */
-		runtime->hw.formats = SNDRV_PCM_FMTBIT_IEC958_SUBFRAME_LE;
-	}
+	if ((err = snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates)) < 0)
+		return err;
 	if ((err = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS)) < 0)
 		return err;
 	runtime->private_data = dma;
@@ -1055,11 +921,6 @@ static int snd_atiixp_playback_open(snd_pcm_substream_t *substream)
 	up(&chip->open_mutex);
 	if (err < 0)
 		return err;
-	substream->runtime->hw.channels_max = chip->max_channels;
-	if (chip->max_channels > 2)
-		/* channels must be even */
-		snd_pcm_hw_constraint_step(substream->runtime, 0,
-					   SNDRV_PCM_HW_PARAM_CHANNELS, 2);
 	return 0;
 }
 
@@ -1085,31 +946,6 @@ static int snd_atiixp_capture_close(snd_pcm_substream_t *substream)
 	return snd_atiixp_pcm_close(substream, &chip->dmas[ATI_DMA_CAPTURE]);
 }
 
-static int snd_atiixp_spdif_open(snd_pcm_substream_t *substream)
-{
-	atiixp_t *chip = snd_pcm_substream_chip(substream);
-	int err;
-	down(&chip->open_mutex);
-	if (chip->spdif_over_aclink) /* share DMA_PLAYBACK */
-		err = snd_atiixp_pcm_open(substream, &chip->dmas[ATI_DMA_PLAYBACK], 2);
-	else
-		err = snd_atiixp_pcm_open(substream, &chip->dmas[ATI_DMA_SPDIF], -1);
-	up(&chip->open_mutex);
-	return err;
-}
-
-static int snd_atiixp_spdif_close(snd_pcm_substream_t *substream)
-{
-	atiixp_t *chip = snd_pcm_substream_chip(substream);
-	int err;
-	down(&chip->open_mutex);
-	if (chip->spdif_over_aclink)
-		err = snd_atiixp_pcm_close(substream, &chip->dmas[ATI_DMA_PLAYBACK]);
-	else
-		err = snd_atiixp_pcm_close(substream, &chip->dmas[ATI_DMA_SPDIF]);
-	up(&chip->open_mutex);
-	return err;
-}
 
 /* AC97 playback */
 static snd_pcm_ops_t snd_atiixp_playback_ops = {
@@ -1135,58 +971,10 @@ static snd_pcm_ops_t snd_atiixp_capture_ops = {
 	.pointer =	snd_atiixp_pcm_pointer,
 };
 
-/* SPDIF playback */
-static snd_pcm_ops_t snd_atiixp_spdif_ops = {
-	.open =		snd_atiixp_spdif_open,
-	.close =	snd_atiixp_spdif_close,
-	.ioctl =	snd_pcm_lib_ioctl,
-	.hw_params =	snd_atiixp_pcm_hw_params,
-	.hw_free =	snd_atiixp_pcm_hw_free,
-	.prepare =	snd_atiixp_spdif_prepare,
-	.trigger =	snd_atiixp_pcm_trigger,
-	.pointer =	snd_atiixp_pcm_pointer,
-};
-
-static struct ac97_pcm atiixp_pcm_defs[] __devinitdata = {
-	/* front PCM */
-	{
-		.exclusive = 1,
-		.r = {	{
-				.slots = (1 << AC97_SLOT_PCM_LEFT) |
-					 (1 << AC97_SLOT_PCM_RIGHT) |
-					 (1 << AC97_SLOT_PCM_CENTER) |
-					 (1 << AC97_SLOT_PCM_SLEFT) |
-					 (1 << AC97_SLOT_PCM_SRIGHT) |
-					 (1 << AC97_SLOT_LFE)
-			}
-		}
-	},
-	/* PCM IN #1 */
-	{
-		.stream = 1,
-		.exclusive = 1,
-		.r = {	{
-				.slots = (1 << AC97_SLOT_PCM_LEFT) |
-					 (1 << AC97_SLOT_PCM_RIGHT)
-			}
-		}
-	},
-	/* S/PDIF OUT (optional) */
-	{
-		.exclusive = 1,
-		.spdif = 1,
-		.r = {	{
-				.slots = (1 << AC97_SLOT_SPDIF_LEFT2) |
-					 (1 << AC97_SLOT_SPDIF_RIGHT2)
-			}
-		}
-	},
-};
-
 static atiixp_dma_ops_t snd_atiixp_playback_dma_ops = {
 	.type = ATI_DMA_PLAYBACK,
-	.llp_offset = ATI_REG_OUT_DMA_LINKPTR,
-	.dt_cur = ATI_REG_OUT_DMA_DT_CUR,
+	.llp_offset = ATI_REG_MODEM_OUT_DMA1_LINKPTR,
+	.dt_cur = ATI_REG_MODEM_OUT_DMA1_DT_CUR,
 	.enable_dma = atiixp_out_enable_dma,
 	.enable_transfer = atiixp_out_enable_transfer,
 	.flush_dma = atiixp_out_flush_dma,
@@ -1194,95 +982,34 @@ static atiixp_dma_ops_t snd_atiixp_playback_dma_ops = {
 	
 static atiixp_dma_ops_t snd_atiixp_capture_dma_ops = {
 	.type = ATI_DMA_CAPTURE,
-	.llp_offset = ATI_REG_IN_DMA_LINKPTR,
-	.dt_cur = ATI_REG_IN_DMA_DT_CUR,
+	.llp_offset = ATI_REG_MODEM_IN_DMA_LINKPTR,
+	.dt_cur = ATI_REG_MODEM_IN_DMA_DT_CUR,
 	.enable_dma = atiixp_in_enable_dma,
 	.enable_transfer = atiixp_in_enable_transfer,
 	.flush_dma = atiixp_in_flush_dma,
 };
-	
-static atiixp_dma_ops_t snd_atiixp_spdif_dma_ops = {
-	.type = ATI_DMA_SPDIF,
-	.llp_offset = ATI_REG_SPDF_DMA_LINKPTR,
-	.dt_cur = ATI_REG_SPDF_DMA_DT_CUR,
-	.enable_dma = atiixp_spdif_enable_dma,
-	.enable_transfer = atiixp_spdif_enable_transfer,
-	.flush_dma = atiixp_spdif_flush_dma,
-};
-	
 
 static int __devinit snd_atiixp_pcm_new(atiixp_t *chip)
 {
 	snd_pcm_t *pcm;
-	ac97_bus_t *pbus = chip->ac97_bus;
-	int err, i, num_pcms;
+	int err;
 
 	/* initialize constants */
 	chip->dmas[ATI_DMA_PLAYBACK].ops = &snd_atiixp_playback_dma_ops;
 	chip->dmas[ATI_DMA_CAPTURE].ops = &snd_atiixp_capture_dma_ops;
-	if (! chip->spdif_over_aclink)
-		chip->dmas[ATI_DMA_SPDIF].ops = &snd_atiixp_spdif_dma_ops;
-
-	/* assign AC97 pcm */
-	if (chip->spdif_over_aclink)
-		num_pcms = 3;
-	else
-		num_pcms = 2;
-	err = snd_ac97_pcm_assign(pbus, num_pcms, atiixp_pcm_defs);
-	if (err < 0)
-		return err;
-	for (i = 0; i < num_pcms; i++)
-		chip->pcms[i] = &pbus->pcms[i];
-
-	chip->max_channels = 2;
-	if (pbus->pcms[ATI_PCM_OUT].r[0].slots & (1 << AC97_SLOT_PCM_SLEFT)) {
-		if (pbus->pcms[ATI_PCM_OUT].r[0].slots & (1 << AC97_SLOT_LFE))
-			chip->max_channels = 6;
-		else
-			chip->max_channels = 4;
-	}
 
 	/* PCM #0: analog I/O */
-	err = snd_pcm_new(chip->card, "ATI IXP AC97", ATI_PCMDEV_ANALOG, 1, 1, &pcm);
+	err = snd_pcm_new(chip->card, "ATI IXP MC97", ATI_PCMDEV_ANALOG, 1, 1, &pcm);
 	if (err < 0)
 		return err;
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_atiixp_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_atiixp_capture_ops);
 	pcm->private_data = chip;
-	strcpy(pcm->name, "ATI IXP AC97");
+	strcpy(pcm->name, "ATI IXP MC97");
 	chip->pcmdevs[ATI_PCMDEV_ANALOG] = pcm;
 
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
 					      snd_dma_pci_data(chip->pci), 64*1024, 128*1024);
-
-	/* no SPDIF support on codec? */
-	if (chip->pcms[ATI_PCM_SPDIF] && ! chip->pcms[ATI_PCM_SPDIF]->rates)
-		return 0;
-		
-	/* FIXME: non-48k sample rate doesn't work on my test machine with AD1888 */
-	if (chip->pcms[ATI_PCM_SPDIF])
-		chip->pcms[ATI_PCM_SPDIF]->rates = SNDRV_PCM_RATE_48000;
-
-	/* PCM #1: spdif playback */
-	err = snd_pcm_new(chip->card, "ATI IXP IEC958", ATI_PCMDEV_DIGITAL, 1, 0, &pcm);
-	if (err < 0)
-		return err;
-	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_atiixp_spdif_ops);
-	pcm->private_data = chip;
-	if (chip->spdif_over_aclink)
-		strcpy(pcm->name, "ATI IXP IEC958 (AC97)");
-	else
-		strcpy(pcm->name, "ATI IXP IEC958 (Direct)");
-	chip->pcmdevs[ATI_PCMDEV_DIGITAL] = pcm;
-
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
-					      snd_dma_pci_data(chip->pci), 64*1024, 128*1024);
-
-	/* pre-select AC97 SPDIF slots 10/11 */
-	for (i = 0; i < NUM_ATI_CODECS; i++) {
-		if (chip->ac97[i])
-			snd_ac97_update_bits(chip->ac97[i], AC97_EXTENDED_STATUS, 0x03 << 4, 0x03 << 4);
-	}
 
 	return 0;
 }
@@ -1303,20 +1030,14 @@ static irqreturn_t snd_atiixp_interrupt(int irq, void *dev_id, struct pt_regs *r
 		return IRQ_NONE;
 
 	/* process audio DMA */
-	if (status & ATI_REG_ISR_OUT_XRUN)
+	if (status & ATI_REG_ISR_MODEM_OUT1_XRUN)
 		snd_atiixp_xrun_dma(chip,  &chip->dmas[ATI_DMA_PLAYBACK]);
-	else if (status & ATI_REG_ISR_OUT_STATUS)
+	else if (status & ATI_REG_ISR_MODEM_OUT1_STATUS)
 		snd_atiixp_update_dma(chip, &chip->dmas[ATI_DMA_PLAYBACK]);
-	if (status & ATI_REG_ISR_IN_XRUN)
+	if (status & ATI_REG_ISR_MODEM_IN_XRUN)
 		snd_atiixp_xrun_dma(chip,  &chip->dmas[ATI_DMA_CAPTURE]);
-	else if (status & ATI_REG_ISR_IN_STATUS)
+	else if (status & ATI_REG_ISR_MODEM_IN_STATUS)
 		snd_atiixp_update_dma(chip, &chip->dmas[ATI_DMA_CAPTURE]);
-	if (! chip->spdif_over_aclink) {
-		if (status & ATI_REG_ISR_SPDF_XRUN)
-			snd_atiixp_xrun_dma(chip,  &chip->dmas[ATI_DMA_SPDIF]);
-		else if (status & ATI_REG_ISR_SPDF_STATUS)
-			snd_atiixp_update_dma(chip, &chip->dmas[ATI_DMA_SPDIF]);
-	}
 
 	/* for codec detection */
 	if (status & CODEC_CHECK_BITS) {
@@ -1371,10 +1092,10 @@ static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock)
 		ac97.private_data = chip;
 		ac97.pci = chip->pci;
 		ac97.num = i;
-		ac97.scaps = AC97_SCAP_SKIP_MODEM;
+		ac97.scaps = AC97_SCAP_SKIP_AUDIO;
 		if ((err = snd_ac97_mixer(pbus, &ac97, &chip->ac97[i])) < 0) {
 			chip->ac97[i] = NULL; /* to be sure */
-			snd_printdd("atiixp: codec %d not available for audio\n", i);
+			snd_printdd("atiixp: codec %d not available for modem\n", i);
 			continue;
 		}
 		codec_count++;
@@ -1511,7 +1232,7 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
-	if ((err = pci_request_regions(pci, "ATI IXP AC97")) < 0) {
+	if ((err = pci_request_regions(pci, "ATI IXP MC97")) < 0) {
 		kfree(chip);
 		return err;
 	}
@@ -1545,7 +1266,7 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 
 
 static int __devinit snd_atiixp_probe(struct pci_dev *pci,
-				     const struct pci_device_id *pci_id)
+				      const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -1566,15 +1287,13 @@ static int __devinit snd_atiixp_probe(struct pci_dev *pci,
 
 	pci_read_config_byte(pci, PCI_REVISION_ID, &revision);
 
-	strcpy(card->driver, spdif_aclink[dev] ? "ATIIXP" : "ATIIXP-SPDMA");
-	strcpy(card->shortname, "ATI IXP");
+	strcpy(card->driver, "ATIIXP-MODEM");
+	strcpy(card->shortname, "ATI IXP Modem");
 	if ((err = snd_atiixp_create(card, pci, &chip)) < 0)
 		goto __error;
 
 	if ((err = snd_atiixp_aclink_reset(chip)) < 0)
 		goto __error;
-
-	chip->spdif_over_aclink = spdif_aclink[dev];
 
 	if ((err = snd_atiixp_mixer_new(chip, ac97_clock[dev])) < 0)
 		goto __error;
@@ -1610,7 +1329,7 @@ static void __devexit snd_atiixp_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	.name = "ATI IXP AC97 controller",
+	.name = "ATI IXP MC97 controller",
 	.id_table = snd_atiixp_ids,
 	.probe = snd_atiixp_probe,
 	.remove = __devexit_p(snd_atiixp_remove),

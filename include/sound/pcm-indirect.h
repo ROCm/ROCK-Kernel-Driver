@@ -157,11 +157,15 @@ static inline snd_pcm_uframes_t
 snd_pcm_indirect_capture_pointer(snd_pcm_substream_t *substream,
 				 snd_pcm_indirect_t *rec, unsigned int ptr)
 {
+	int qsize;
 	int bytes = ptr - rec->hw_io;
 	if (bytes < 0)
 		bytes += rec->hw_buffer_size;
 	rec->hw_io = ptr;
 	rec->hw_ready += bytes;
+	qsize = rec->hw_queue_size ? rec->hw_queue_size : rec->hw_buffer_size;
+	if (rec->hw_ready > qsize)
+		return SNDRV_PCM_POS_XRUN;
 	rec->sw_io += bytes;
 	if (rec->sw_io >= rec->sw_buffer_size)
 		rec->sw_io -= rec->sw_buffer_size;

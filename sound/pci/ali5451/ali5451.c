@@ -240,7 +240,6 @@ struct snd_stru_ali {
 
 	unsigned int hw_initialized: 1;
 	unsigned int spdif_support: 1;
-	struct resource *res_port;
 
 	struct pci_dev	*pci;
 	struct pci_dev	*pci_m1533;
@@ -1521,16 +1520,15 @@ static snd_pcm_uframes_t snd_ali_playback_pointer(snd_pcm_substream_t *substream
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_ali_voice_t *pvoice = (snd_ali_voice_t *) runtime->private_data;
 	unsigned int cso;
-	unsigned long flags;
 
-	spin_lock_irqsave(&codec->reg_lock, flags);
+	spin_lock(&codec->reg_lock);
 	if (!pvoice->running) {
-		spin_unlock_irqrestore(&codec->reg_lock, flags);
+		spin_unlock(&codec->reg_lock);
 		return 0;
 	}
 	outb(pvoice->number, ALI_REG(codec, ALI_GC_CIR));
 	cso = inw(ALI_REG(codec, ALI_CSO_ALPHA_FMS + 2));
-	spin_unlock_irqrestore(&codec->reg_lock, flags);
+	spin_unlock(&codec->reg_lock);
 	snd_ali_printk("playback pointer returned cso=%xh.\n", cso);
 
 	return cso;
@@ -1868,18 +1866,17 @@ static void snd_ali_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_ali_mixer(ali_t * codec)
 {
-	ac97_bus_t bus;
-	ac97_t ac97;
+	ac97_template_t ac97;
 	unsigned int idx;
 	int err;
+	static ac97_bus_ops_t ops = {
+		.write = snd_ali_codec_write,
+		.read = snd_ali_codec_read,
+	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_ali_codec_write;
-	bus.read = snd_ali_codec_read;
-	bus.private_data = codec;
-	bus.private_free = snd_ali_mixer_free_ac97_bus;
-	if ((err = snd_ac97_bus(codec->card, &bus, &codec->ac97_bus)) < 0)
+	if ((err = snd_ac97_bus(codec->card, 0, &ops, codec, &codec->ac97_bus)) < 0)
 		return err;
+	codec->ac97_bus->private_free = snd_ali_mixer_free_ac97_bus;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = codec;
@@ -1936,6 +1933,7 @@ static int ali_suspend(snd_card_t *card, unsigned int state)
 	outl(0xffffffff, ALI_REG(chip, ALI_STOP));
 
 	spin_unlock_irq(&chip->reg_lock);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1973,6 +1971,7 @@ static int ali_resume(snd_card_t *card, unsigned int state)
 	spin_unlock_irq(&chip->reg_lock);
 
 	snd_ac97_resume(chip->ac97);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	
 	return 0;
 }
@@ -1986,10 +1985,8 @@ static int snd_ali_free(ali_t * codec)
 		synchronize_irq(codec->irq);
 		free_irq(codec->irq, (void *)codec);
 	}
-	if (codec->res_port) {
-		release_resource(codec->res_port);
-		kfree_nocheck(codec->res_port);
-	}
+	if (codec->port)
+		pci_release_regions(codec->pci);
 #ifdef CONFIG_PM
 	if (codec->image)
 		kfree(codec->image);
@@ -2048,11 +2045,12 @@ static int snd_ali_chip_init(ali_t *codec)
 
 static int __devinit snd_ali_resources(ali_t *codec)
 {
+	int err;
+
 	snd_ali_printk("resouces allocation ...\n");
-	if ((codec->res_port = request_region(codec->port, 0x100, "ALI 5451")) == NULL) {
-		snd_printk("Unalbe to request io ports.\n");
-		return -EBUSY;
-	}
+	if ((err = pci_request_regions(codec->pci, "ALI 5451")) < 0)
+		return err;
+	codec->port = pci_resource_start(codec->pci, 0);
 
 	if (request_irq(codec->pci->irq, snd_ali_card_interrupt, SA_INTERRUPT|SA_SHIRQ, "ALI 5451", (void *)codec)) {
 		snd_printk("Unable to request irq.\n");
@@ -2108,7 +2106,6 @@ static int __devinit snd_ali_create(snd_card_t * card,
 	codec->card = card;
 	codec->pci = pci;
 	codec->irq = -1;
-	codec->port = pci_resource_start(pci, 0);
 	pci_read_config_byte(pci, PCI_REVISION_ID, &codec->revision);
 	codec->spdif_support = spdif_support;
 

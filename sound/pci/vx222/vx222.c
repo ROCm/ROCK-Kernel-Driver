@@ -111,17 +111,12 @@ static struct snd_vx_hardware vx222_mic_hw = {
  */
 static int snd_vx222_free(vx_core_t *chip)
 {
-	int i;
 	struct snd_vx222 *vx = (struct snd_vx222 *)chip;
 
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void*)chip);
-	for (i = 0; i < 2; i++) {
-		if (vx->port_res[i]) {
-			release_resource(vx->port_res[i]);
-			kfree_nocheck(vx->port_res[i]);
-		}
-	}
+	if (vx->port[0])
+		pci_release_regions(vx->pci);
 	kfree(chip);
 	return 0;
 }
@@ -156,21 +151,14 @@ static int __devinit snd_vx222_create(snd_card_t *card, struct pci_dev *pci,
 	if (! chip)
 		return -ENOMEM;
 	vx = (struct snd_vx222 *)chip;
+	vx->pci = pci;
 
-	for (i = 0; i < 2; i++) {
-		if (!(pci_resource_flags(pci, i + 1) & IORESOURCE_IO)) {
-			snd_printk(KERN_ERR "invalid i/o resource %d\n", i + 1);
-			snd_vx222_free(chip);
-			return -ENOMEM;
-		}
-		vx->port[i] = pci_resource_start(pci, i + 1);
-		if ((vx->port_res[i] = request_region(vx->port[i], 0x60,
-						      CARD_NAME)) == NULL) {
-			snd_printk(KERN_ERR "unable to grab port 0x%lx\n", vx->port[i]);
-			snd_vx222_free(chip);
-			return -EBUSY;
-		}
+	if ((err = pci_request_regions(pci, CARD_NAME)) < 0) {
+		snd_vx222_free(chip);
+		return err;
 	}
+	for (i = 0; i < 2; i++)
+		vx->port[i] = pci_resource_start(pci, i + 1);
 
 	if (request_irq(pci->irq, snd_vx_irq_handler, SA_INTERRUPT|SA_SHIRQ,
 			CARD_NAME, (void *) chip)) {

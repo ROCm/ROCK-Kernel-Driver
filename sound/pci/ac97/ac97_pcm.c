@@ -487,7 +487,10 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 				rpcm->r[0].rslots[j] = tmp;
 				rpcm->r[0].codec[j] = bus->codec[j];
 				rpcm->r[0].rate_table[j] = rate_table[pcm->stream][j];
-				rates = get_rates(rpcm, j, tmp, 0);
+				if (bus->no_vra)
+					rates = SNDRV_PCM_RATE_48000;
+				else
+					rates = get_rates(rpcm, j, tmp, 0);
 				if (pcm->exclusive)
 					avail_slots[pcm->stream][j] &= ~tmp;
 			}
