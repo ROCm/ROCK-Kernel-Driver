@@ -13,6 +13,7 @@
 #include <stdarg.h>
 
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -157,6 +158,8 @@ void machine_halt(void)
 	panic("Halt failed!");
 }
 
+EXPORT_SYMBOL(machine_halt);
+
 void machine_restart(char * cmd)
 {
 	char *p;
@@ -177,6 +180,8 @@ void machine_restart(char * cmd)
 	panic("Reboot failed!");
 }
 
+EXPORT_SYMBOL(machine_restart);
+
 void machine_power_off(void)
 {
 #ifdef CONFIG_SUN_AUXIO
@@ -185,6 +190,8 @@ void machine_power_off(void)
 #endif
 	machine_halt();
 }
+
+EXPORT_SYMBOL(machine_power_off);
 
 static spinlock_t sparc_backtrace_lock = SPIN_LOCK_UNLOCKED;
 

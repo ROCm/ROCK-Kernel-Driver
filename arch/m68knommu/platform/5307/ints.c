@@ -15,6 +15,7 @@
  * for more details.
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/sched.h>
@@ -136,6 +137,8 @@ int request_irq(
 	return 0;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 void free_irq(unsigned int irq, void *dev_id)
 {
 	if (irq >= NR_IRQS) {
@@ -161,6 +164,8 @@ void free_irq(unsigned int irq, void *dev_id)
 	irq_list[irq].dev_id  = NULL;
 	irq_list[irq].devname = NULL;
 }
+
+EXPORT_SYMBOL(free_irq);
 
 
 int sys_request_irq(unsigned int irq, 
@@ -222,10 +227,14 @@ unsigned long probe_irq_on (void)
 	return 0;
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 int probe_irq_off (unsigned long irqs)
 {
 	return 0;
 }
+
+EXPORT_SYMBOL(probe_irq_off);
 
 asmlinkage void process_int(unsigned long vec, struct pt_regs *fp)
 {

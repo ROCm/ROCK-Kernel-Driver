@@ -10,6 +10,7 @@
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/blkdev.h>
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
@@ -18,6 +19,8 @@ struct backing_dev_info default_backing_dev_info = {
 	.ra_pages	= (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE,
 	.state		= 0,
 };
+
+EXPORT_SYMBOL_GPL(default_backing_dev_info);
 
 /*
  * Initialise a struct file's readahead state
@@ -28,6 +31,8 @@ file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping)
 	memset(ra, 0, sizeof(*ra));
 	ra->ra_pages = mapping->backing_dev_info->ra_pages;
 }
+
+EXPORT_SYMBOL(file_ra_state_init);
 
 /*
  * Return max readahead size for this inode in number-of-pages.
@@ -88,6 +93,8 @@ int read_cache_pages(struct address_space *mapping, struct list_head *pages,
 	pagevec_lru_add(&lru_pvec);
 	return ret;
 }
+
+EXPORT_SYMBOL(read_cache_pages);
 
 static int read_pages(struct address_space *mapping, struct file *filp,
 		struct list_head *pages, unsigned nr_pages)

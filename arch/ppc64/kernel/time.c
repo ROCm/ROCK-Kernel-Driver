@@ -35,6 +35,7 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/param.h>
@@ -66,6 +67,8 @@
 void smp_local_timer_interrupt(struct pt_regs *);
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+EXPORT_SYMBOL(jiffies_64);
 
 /* keep track of when we need to update the rtc */
 time_t last_rtc_update;
@@ -345,6 +348,8 @@ void do_gettimeofday(struct timeval *tv)
         tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int do_settimeofday(struct timespec *tv)
 {
 	time_t wtm_sec, new_sec = tv->tv_sec;
@@ -410,6 +415,8 @@ int do_settimeofday(struct timespec *tv)
 	write_sequnlock_irqrestore(&xtime_lock, flags);
 	return 0;
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 /*
  * This function is a copy of the architecture independent function

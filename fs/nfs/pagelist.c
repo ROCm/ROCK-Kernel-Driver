@@ -49,7 +49,7 @@ nfs_page_free(struct nfs_page *p)
 
 /**
  * nfs_create_request - Create an NFS read/write request.
- * @cred: RPC credential to use
+ * @file: file descriptor to use
  * @inode: inode to which the request is attached
  * @page: page to write
  * @offset: starting offset within the page for the write
@@ -62,7 +62,7 @@ nfs_page_free(struct nfs_page *p)
  * User should ensure it is safe to sleep in this function.
  */
 struct nfs_page *
-nfs_create_request(struct rpc_cred *cred, struct inode *inode,
+nfs_create_request(struct file *file, struct inode *inode,
 		   struct page *page,
 		   unsigned int offset, unsigned int count)
 {
@@ -93,11 +93,9 @@ nfs_create_request(struct rpc_cred *cred, struct inode *inode,
 	req->wb_offset  = offset;
 	req->wb_pgbase	= offset;
 	req->wb_bytes   = count;
-
-	if (cred)
-		req->wb_cred = get_rpccred(cred);
 	req->wb_inode   = inode;
 	req->wb_count   = 1;
+	server->rpc_ops->request_init(req, file);
 
 	return req;
 }
@@ -111,6 +109,8 @@ nfs_create_request(struct rpc_cred *cred, struct inode *inode,
  */
 void nfs_clear_request(struct nfs_page *req)
 {
+	if (req->wb_state)
+		req->wb_state = NULL;
 	/* Release struct file or cached credential */
 	if (req->wb_file) {
 		fput(req->wb_file);

@@ -13,6 +13,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/ptrace.h>
@@ -279,6 +280,8 @@ machine_restart(char *cmd)
 	}
 }
 
+EXPORT_SYMBOL(machine_restart);
+
 void
 mca_nmi_hook(void)
 {
@@ -314,8 +317,12 @@ machine_halt(void)
 	machine_power_off();
 }
 
+EXPORT_SYMBOL(machine_halt);
+
 void machine_power_off(void)
 {
 	if (pm_power_off)
 		pm_power_off();
 }
+
+EXPORT_SYMBOL(machine_power_off);

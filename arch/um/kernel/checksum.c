@@ -1,5 +1,6 @@
 #include "asm/uaccess.h"
 #include "linux/errno.h"
+#include "linux/module.h"
 
 extern unsigned int arch_csum_partial(const char *buff, int len, int sum);
 
@@ -7,6 +8,8 @@ extern unsigned int csum_partial(char *buff, int len, int sum)
 {
 	return(arch_csum_partial(buff, len, sum));
 }
+
+EXPORT_SYMBOL(csum_partial);
 
 unsigned int csum_partial_copy_to(const char *src, char *dst, int len, 
 				  int sum, int *err_ptr)

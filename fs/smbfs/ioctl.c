@@ -31,8 +31,8 @@ smb_ioctl(struct inode *inode, struct file *filp,
 	int result = -EINVAL;
 
 	switch (cmd) {
-		uid16_t uid16 = 0;
-		uid_t uid32 = 0;
+		uid16_t uid16;
+		uid_t uid32;
 	case SMB_IOC_GETMOUNTUID:
 		SET_UID(uid16, server->mnt->mounted_uid);
 		result = put_user(uid16, (uid16_t *) arg);

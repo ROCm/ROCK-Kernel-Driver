@@ -23,6 +23,8 @@ struct file_operations generic_ro_fops = {
 	.sendfile	= generic_file_sendfile,
 };
 
+EXPORT_SYMBOL(generic_ro_fops);
+
 loff_t generic_file_llseek(struct file *file, loff_t offset, int origin)
 {
 	long long retval;
@@ -48,6 +50,8 @@ loff_t generic_file_llseek(struct file *file, loff_t offset, int origin)
 	return retval;
 }
 
+EXPORT_SYMBOL(generic_file_llseek);
+
 loff_t remote_llseek(struct file *file, loff_t offset, int origin)
 {
 	long long retval;
@@ -72,10 +76,14 @@ loff_t remote_llseek(struct file *file, loff_t offset, int origin)
 	return retval;
 }
 
+EXPORT_SYMBOL(remote_llseek);
+
 loff_t no_llseek(struct file *file, loff_t offset, int origin)
 {
 	return -ESPIPE;
 }
+
+EXPORT_SYMBOL(no_llseek);
 
 loff_t default_llseek(struct file *file, loff_t offset, int origin)
 {
@@ -100,6 +108,8 @@ loff_t default_llseek(struct file *file, loff_t offset, int origin)
 	unlock_kernel();
 	return retval;
 }
+
+EXPORT_SYMBOL(default_llseek);
 
 static inline loff_t llseek(struct file *file, loff_t offset, int origin)
 {
@@ -183,6 +193,8 @@ ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *pp
 	return ret;
 }
 
+EXPORT_SYMBOL(do_sync_read);
+
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
@@ -209,6 +221,8 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 	return ret;
 }
 
+EXPORT_SYMBOL(vfs_read);
+
 ssize_t do_sync_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos)
 {
 	struct kiocb kiocb;
@@ -222,6 +236,8 @@ ssize_t do_sync_write(struct file *filp, const char __user *buf, size_t len, lof
 	*ppos = kiocb.ki_pos;
 	return ret;
 }
+
+EXPORT_SYMBOL(do_sync_write);
 
 ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_t *pos)
 {
@@ -248,6 +264,8 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 
 	return ret;
 }
+
+EXPORT_SYMBOL(vfs_write);
 
 asmlinkage ssize_t sys_read(unsigned int fd, char __user * buf, size_t count)
 {
@@ -336,6 +354,8 @@ unsigned long iov_shorten(struct iovec *iov, unsigned long nr_segs, size_t to)
 	}
 	return seg;
 }
+
+EXPORT_SYMBOL(iov_shorten);
 
 static ssize_t do_readv_writev(int type, struct file *file,
 			       const struct iovec __user * uvector,
@@ -468,6 +488,8 @@ ssize_t vfs_readv(struct file *file, const struct iovec __user *vec,
 	return do_readv_writev(READ, file, vec, vlen, pos);
 }
 
+EXPORT_SYMBOL(vfs_readv);
+
 ssize_t vfs_writev(struct file *file, const struct iovec __user *vec,
 		   unsigned long vlen, loff_t *pos)
 {
@@ -479,6 +501,7 @@ ssize_t vfs_writev(struct file *file, const struct iovec __user *vec,
 	return do_readv_writev(WRITE, file, vec, vlen, pos);
 }
 
+EXPORT_SYMBOL(vfs_writev);
 
 asmlinkage ssize_t
 sys_readv(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
@@ -630,6 +653,3 @@ asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t __user *offset, 
 
 	return do_sendfile(out_fd, in_fd, NULL, count, 0);
 }
-
-EXPORT_SYMBOL(do_sync_read);
-EXPORT_SYMBOL(do_sync_write);

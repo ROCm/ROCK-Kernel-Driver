@@ -189,6 +189,7 @@ int noautodma = 1;
 #endif
 
 EXPORT_SYMBOL(noautodma);
+EXPORT_SYMBOL(ide_bus_type);
 
 int (*ide_probe)(void);
 

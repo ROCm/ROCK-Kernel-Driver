@@ -12,6 +12,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <linux/errno.h>
@@ -202,6 +203,8 @@ void free_irq(unsigned int irq, void *dev_id)
 
         restore_flags(flags);
 }
+
+EXPORT_SYMBOL(free_irq);
 
 #ifdef CONFIG_SMP
 
@@ -621,6 +624,8 @@ int request_irq(unsigned int irq,
 	return 0;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 /* We really don't need these at all on the Sparc.  We only have
  * stubs here because they are exported to modules.
  */
@@ -629,10 +634,14 @@ unsigned long probe_irq_on(void)
 	return 0;
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 int probe_irq_off(unsigned long mask)
 {
 	return 0;
 }
+
+EXPORT_SYMBOL(probe_irq_off);
 
 /* djhr
  * This could probably be made indirect too and assigned in the CPU

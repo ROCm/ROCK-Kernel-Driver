@@ -14,6 +14,7 @@
  * General Public License for more details.
  */
 #include <linux/fs.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/dnotify.h>
 #include <linux/init.h>
@@ -139,6 +140,8 @@ void __inode_dir_notify(struct inode *inode, unsigned long event)
 		redo_inode_mask(inode);
 	write_unlock(&dn_lock);
 }
+
+EXPORT_SYMBOL(__inode_dir_notify);
 
 /*
  * This is hopelessly wrong, but unfixable without API changes.  At

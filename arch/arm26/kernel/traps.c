@@ -134,6 +134,8 @@ static void dump_instr(struct pt_regs *regs)
 	dump_mem("Stack: ", sp, 8192+(unsigned long)tsk->thread_info);
 }
 
+EXPORT_SYMBOL(dump_stack);
+
 void dump_stack(void)
 {
 #ifdef CONFIG_DEBUG_ERRORS

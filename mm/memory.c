@@ -59,11 +59,18 @@
 /* use the per-pgdat data instead for discontigmem - mbligh */
 unsigned long max_mapnr;
 struct page *mem_map;
+
+EXPORT_SYMBOL(max_mapnr);
+EXPORT_SYMBOL(mem_map);
 #endif
 
 unsigned long num_physpages;
 void * high_memory;
 struct page *highmem_start_page;
+
+EXPORT_SYMBOL(num_physpages);
+EXPORT_SYMBOL(highmem_start_page);
+EXPORT_SYMBOL(high_memory);
 
 /*
  * We special-case the C-O-W ZERO_PAGE, because it's such
@@ -789,6 +796,8 @@ out:
 	return i;
 }
 
+EXPORT_SYMBOL(get_user_pages);
+
 static void zeromap_pte_range(pte_t * pte, unsigned long address,
                                      unsigned long size, pgprot_t prot)
 {
@@ -939,6 +948,8 @@ int remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned lo
 	spin_unlock(&mm->page_table_lock);
 	return error;
 }
+
+EXPORT_SYMBOL(remap_page_range);
 
 /*
  * Establish a new mapping:
@@ -1177,6 +1188,8 @@ out_sig:
 out:
 	return -EFBIG;
 }
+
+EXPORT_SYMBOL(vmtruncate);
 
 /* 
  * Primitive swap readahead code. We simply read an aligned block of
@@ -1686,3 +1699,5 @@ struct page * vmalloc_to_page(void * vmalloc_addr)
 	}
 	return page;
 }
+
+EXPORT_SYMBOL(vmalloc_to_page);

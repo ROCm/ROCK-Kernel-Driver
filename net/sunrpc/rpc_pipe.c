@@ -59,43 +59,6 @@ rpc_purge_upcall(struct inode *inode, int err)
 	up(&inode->i_sem);
 }
 
-/*
- * XXX should only be called in ->downcall
- */
-void
-__rpc_purge_current_upcall(struct file *filp)
-{
-	struct rpc_pipe_msg *msg;
-
-	msg = filp->private_data;
-	filp->private_data = NULL;
-
-	if (msg != NULL)
-		msg->errno = 0;
-}
-
-void
-__rpc_purge_one_upcall(struct file *filp, struct rpc_pipe_msg *target)
-{
-	struct rpc_inode *rpci = RPC_I(filp->f_dentry->d_inode);
-	struct rpc_pipe_msg *msg;
-
-	msg = filp->private_data;
-	if (msg == target) {
-		filp->private_data = NULL;
-		goto found;
-	}
-	list_for_each_entry(msg, &rpci->pipe, list) {
-		if (msg == target) {
-			list_del(&msg->list);
-			goto found;
-		}
-	}
-	BUG();
-found:
-	return;
-}
-
 int
 rpc_queue_upcall(struct inode *inode, struct rpc_pipe_msg *msg)
 {
@@ -198,14 +161,15 @@ rpc_pipe_read(struct file *filp, char __user *buf, size_t len, loff_t *offset)
 			list_del_init(&msg->list);
 			rpci->pipelen -= msg->len;
 			filp->private_data = msg;
+			msg->copied = 0;
 		}
 		if (msg == NULL)
 			goto out_unlock;
 	}
+	/* NOTE: it is up to the callback to update msg->copied */
 	res = rpci->ops->upcall(filp, msg, buf, len);
 	if (res < 0 || msg->len == msg->copied) {
 		filp->private_data = NULL;
-		msg->errno = 0;
 		rpci->ops->destroy_msg(msg);
 	}
 out_unlock:
@@ -685,7 +649,7 @@ rpc_mkpipe(char *path, void *private, struct rpc_pipe_ops *ops, int flags)
 	if (IS_ERR(dentry))
 		return dentry;
 	dir = nd.dentry->d_inode;
-	inode = rpc_get_inode(dir->i_sb, S_IFSOCK | S_IRUSR | S_IXUSR);
+	inode = rpc_get_inode(dir->i_sb, S_IFSOCK | S_IRUSR | S_IWUSR);
 	if (!inode)
 		goto err_dput;
 	inode->i_ino = iunique(dir->i_sb, 100);

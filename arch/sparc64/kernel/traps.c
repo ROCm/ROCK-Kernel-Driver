@@ -10,6 +10,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/sched.h>  /* for jiffies */
 #include <linux/kernel.h>
 #include <linux/kallsyms.h>
@@ -1766,6 +1767,8 @@ void dump_stack(void)
 			     : "=r" (ksp));
 	show_stack(current, ksp);
 }
+
+EXPORT_SYMBOL(dump_stack);
 
 void die_if_kernel(char *str, struct pt_regs *regs)
 {
