@@ -2209,9 +2209,21 @@ void txForce(struct tblock * tblk)
 				tlck->flag &= ~tlckWRITEPAGE;
 
 				/* do not release page to freelist */
+
+				/*
+				 * The "right" thing to do here is to
+				 * synchronously write the metadata.
+				 * With the current implementation this
+				 * is hard since write_metapage requires
+				 * us to kunmap & remap the page.  If we
+				 * have tlocks pointing into the metadata
+				 * pages, we don't want to do this.  I think
+				 * we can get by with synchronously writing
+				 * the pages when they are released.
+				 */
 				assert(atomic_read(&mp->nohomeok));
-				hold_metapage(mp, 0);
-				write_metapage(mp);
+				set_bit(META_dirty, &mp->flag);
+				set_bit(META_sync, &mp->flag);
 			}
 		}
 	}
