@@ -156,12 +156,6 @@ struct pcmcia_driver {
 int pcmcia_register_driver(struct pcmcia_driver *driver);
 void pcmcia_unregister_driver(struct pcmcia_driver *driver);
 
-/* legacy driver registration interface.  don't use in new code */
-int register_pccard_driver(dev_info_t *dev_info,
-			   dev_link_t *(*attach)(void),
-			   void (*detach)(dev_link_t *));
-int unregister_pccard_driver(dev_info_t *dev_info);
-
 /* error reporting */
 void cs_error(client_handle_t handle, int func, int ret);
 

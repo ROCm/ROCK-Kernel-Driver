@@ -470,28 +470,25 @@ int ide_event(event_t event, int priority,
     return 0;
 } /* ide_event */
 
-/*====================================================================*/
+static struct pcmcia_driver ide_cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "ide_cs",
+	},
+	.attach		= ide_attach,
+	.detach		= ide_detach,
+};
 
 static int __init init_ide_cs(void)
 {
-    servinfo_t serv;
-    DEBUG(0, "%s\n", version);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "ide-cs: Card Services release "
-	       "does not match!\n");
-	return -EINVAL;
-    }
-    register_pccard_driver(&dev_info, &ide_attach, &ide_detach);
-    return 0;
+	return pcmcia_register_driver(&ide_cs_driver);
 }
 
 static void __exit exit_ide_cs(void)
 {
-    DEBUG(0, "ide-cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL)
-	ide_detach(dev_list);
+	pcmcia_unregister_driver(&ide_cs_driver);
+	while (dev_list != NULL)
+		ide_detach(dev_list);
 }
 
 module_init(init_ide_cs);

@@ -836,17 +836,18 @@ static dev_link_t *pcmciamtd_attach(void)
 	return link;
 }
 
+static struct pcmcia_driver pcmciamtd_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "pcmciamtd",
+	},
+	.attach		= pcmciamtd_attach,
+	.detach		= pcmciamtd_detach,
+};
 
 static int __init init_pcmciamtd(void)
 {
-	servinfo_t serv;
-
 	info(DRIVER_DESC " " DRIVER_VERSION);
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		err("Card Services release does not match!");
-		return -1;
-	}
 
 	if(buswidth && buswidth != 1 && buswidth != 2) {
 		info("bad buswidth (%d), using default", buswidth);
@@ -860,8 +861,8 @@ static int __init init_pcmciamtd(void)
 		info("bad mem_type (%d), using default", mem_type);
 		mem_type = 0;
 	}
-	register_pccard_driver(&dev_info, &pcmciamtd_attach, &pcmciamtd_detach);
-	return 0;
+
+	return pcmcia_register_driver(&pcmciamtd_driver);
 }
 
 
@@ -870,7 +871,10 @@ static void __exit exit_pcmciamtd(void)
 	struct list_head *temp1, *temp2;
 
 	DEBUG(1, DRIVER_DESC " unloading");
-	unregister_pccard_driver(&dev_info);
+
+	pcmcia_unregister_driver(&pcmciamtd_driver);
+
+	/* XXX: this really needs to move into generic code.. */
 	list_for_each_safe(temp1, temp2, &dev_list) {
 		dev_link_t *link = &list_entry(temp1, struct pcmciamtd_dev, list)->link;
 		if (link && (link->state & DEV_CONFIG)) {
