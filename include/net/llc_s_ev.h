@@ -49,7 +49,6 @@ struct llc_sap_ev_prim_if {
 
 struct llc_sap_ev_pdu_if {
 	u8 ev;
-	u8 reason;
 };
 
 union llc_sap_ev_if {
@@ -62,6 +61,7 @@ struct llc_prim_if_block;
 
 struct llc_sap_state_ev {
 	u8			  type;
+	u8			  reason;
 	u8			  ind_cfm_flag;
 	struct llc_prim_if_block *prim;
 	union llc_sap_ev_if	  data;
