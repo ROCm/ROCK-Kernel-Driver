@@ -2999,7 +2999,7 @@ int block_sync_page(struct page *page)
 {
 	struct address_space *mapping;
 	smp_mb();
-	mapping = page->mapping;
+	mapping = page_mapping(page);
 	blk_run_address_space(mapping);
 	return 0;
 }
