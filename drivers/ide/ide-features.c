@@ -257,12 +257,12 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	struct ata_channel *hwif = drive->channel;
 	int i;
 	int error = 1;
-	byte stat;
+	u8 stat;
 
-#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
-	byte unit = (drive->select.b.unit & 0x01);
+#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(__CRIS__)
+	u8 unit = (drive->select.b.unit & 0x01);
 	outb(inb(hwif->dma_base+2) & ~(1<<(5+unit)), hwif->dma_base+2);
-#endif /* (CONFIG_BLK_DEV_IDEDMA) && !(CONFIG_DMA_NONPCI) */
+#endif
 
 	/*
 	 * Don't use ide_wait_cmd here - it will
@@ -329,7 +329,7 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	drive->id->dma_mword &= ~0x0F00;
 	drive->id->dma_1word &= ~0x0F00;
 
-#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
+#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(__CRIS__)
 	if (speed > XFER_PIO_4) {
 		outb(inb(hwif->dma_base+2)|(1<<(5+unit)), hwif->dma_base+2);
 	} else {

@@ -704,35 +704,6 @@ CONFIG_IDE_8xx_PCCARD
              bus using some glue logic, but _not_ the 8xx internal
              PCMCIA interface (example: IDIF860 systems)
 
-CONFIG_BLK_DEV_IDEDISK_FUJITSU
-  Enable vendor-specific code for Fujitsu IDE disks.  Unless you are
-  the IDE maintainer, you probably do not want to mess with this.
-
-CONFIG_BLK_DEV_IDEDISK_IBM
-  Enable vendor-specific code for IBM IDE disks.  Unless you are the
-  IDE maintainer, you probably do not want to mess with this.
-
-CONFIG_BLK_DEV_IDEDISK_MAXTOR
-  Enable vendor-specific code for Maxtor IDE disks.  Unless you are
-  the IDE maintainer, you probably do not want to mess with this.
-
-CONFIG_BLK_DEV_IDEDISK_QUANTUM
-  Enable vendor-specific code for Quantum IDE disks.  Unless you are
-  the IDE maintainer, you probably do not want to mess with this.
-
-CONFIG_BLK_DEV_IDEDISK_SEAGATE
-  Enable vendor-specific code for Seagate IDE disks.  Unless you are
-  the IDE maintainer, you probably do not want to mess with this.
-
-CONFIG_BLK_DEV_IDEDISK_WD
-  Enable vendor-specific code for Western Digital IDE disks.  Unless
-  you are the IDE maintainer, you probably do not want to mess with
-  this.
-
-CONFIG_BLK_DEV_TIVO
-  Enable vendor-specific code for TiVo IDE disks.  Unless you are the
-  IDE maintainer, you probably do not want to mess with this.
-
 CONFIG_IDEDISK_STROKE
   Should you have a system w/ an AWARD Bios and your drives are larger
   than 32GB and it will not boot, one is required to perform a few OEM

@@ -1956,7 +1956,7 @@ void ide_unregister(struct ata_channel *ch)
 		ch->active = NULL;
 	}
 
-#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
+#ifdef CONFIG_BLK_DEV_IDEDMA
 	ide_release_dma(ch);
 #endif
 
