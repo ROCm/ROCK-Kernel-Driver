@@ -147,7 +147,6 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 	DATA *data = (DATA *) file->private_data;
 	char buffer[OPROMMAXPARAM+1], *buf;
 	struct openpromio *opp;
-	unsigned long flags;
 	int bufsize, len, error = 0;
 	extern char saved_command_line[];
 	static int cnt;
@@ -163,18 +162,14 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 	switch (cmd) {
 	case OPROMGETOPT:
 	case OPROMGETPROP:
-		save_and_cli(flags);
 		len = prom_getproplen(node, opp->oprom_array);
-		restore_flags(flags);
 
 		if (len <= 0 || len > bufsize) {
 			error = copyout((void *)arg, opp, sizeof(int));
 			break;
 		}
 
-		save_and_cli(flags);
 		len = prom_getproperty(node, opp->oprom_array, buffer, bufsize);
-		restore_flags(flags);
 
 		memcpy(opp->oprom_array, buffer, len);
 		opp->oprom_array[len] = '\0';
@@ -185,9 +180,7 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 
 	case OPROMNXTOPT:
 	case OPROMNXTPROP:
-		save_and_cli(flags);
 		buf = prom_nextprop(node, opp->oprom_array, buffer);
-		restore_flags(flags);
 
 		len = strlen(buf);
 		if (len == 0 || len + 1 > bufsize) {
@@ -207,10 +200,8 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 		buf = opp->oprom_array + strlen(opp->oprom_array) + 1;
 		len = opp->oprom_array + bufsize - buf;
 
-		save_and_cli(flags);
 		error = prom_setprop(options_node, opp->oprom_array,
 				     buf, len);
-		restore_flags(flags);
 
 		if (error < 0)
 			error = -EINVAL;
@@ -226,13 +217,11 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 
 		node = *((int *) opp->oprom_array);
 
-		save_and_cli(flags);
 		switch (cmd) {
 		case OPROMNEXT: node = __prom_getsibling(node); break;
 		case OPROMCHILD: node = __prom_getchild(node); break;
 		case OPROMSETCUR: break;
 		}
-		restore_flags(flags);
 
 		data->current_node = node;
 		*((int *)opp->oprom_array) = node;
@@ -264,9 +253,7 @@ static int openprom_sunos_ioctl(struct inode * inode, struct file * file,
 		break;
 
 	case OPROMPATH2NODE:
-		save_and_cli(flags);
 		node = prom_finddevice(opp->oprom_array);
-		restore_flags(flags);
 		data->current_node = node;
 		*((int *)opp->oprom_array) = node;
 		opp->oprom_size = sizeof(int);
@@ -361,7 +348,6 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 {
 	DATA *data = (DATA *) file->private_data;
 	struct opiocdesc op;
-	unsigned long flags;
 	int error, node, len;
 	char *str, *tmp;
 	char buffer[64];
@@ -379,9 +365,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 		if (error)
 			return error;
 
-		save_and_cli(flags);
 		len = prom_getproplen(op.op_nodeid,str);
-		restore_flags(flags);
 
 		if (len > op.op_buflen) {
 			kfree(str);
@@ -405,9 +389,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 			return -ENOMEM;
 		}
 
-		save_and_cli(flags);
 		prom_getproperty(op.op_nodeid, str, tmp, len);
-		restore_flags(flags);
 
 		tmp[len] = '\0';
 
@@ -431,9 +413,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 		if (error)
 			return error;
 
-		save_and_cli(flags);
 		tmp = prom_nextprop(op.op_nodeid,str,buffer);
-		restore_flags(flags);
 
 		if (tmp) {
 			len = strlen(tmp);
@@ -481,9 +461,7 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 			return error;
 		}
 
-		save_and_cli(flags);
 		len = prom_setprop(op.op_nodeid,str,tmp,op.op_buflen+1);
-		restore_flags(flags);
 
 		if (len != op.op_buflen)
 			return -EINVAL;
@@ -503,12 +481,10 @@ static int openprom_bsd_ioctl(struct inode * inode, struct file * file,
 		if (copy_from_user(&node, (void *)arg, sizeof(int)))
 			return -EFAULT;
 
-		save_and_cli(flags);
 		if (cmd == OPIOCGETNEXT)
 			node = __prom_getsibling(node);
 		else
 			node = __prom_getchild(node);
-		restore_flags(flags);
 
 		if (__copy_to_user((void *)arg, &node, sizeof(int)))
 			return -EFAULT;
@@ -624,7 +600,6 @@ static struct miscdevice openprom_dev = {
 
 static int __init openprom_init(void)
 {
-	unsigned long flags;
 	int error;
 
 	error = misc_register(&openprom_dev);
@@ -633,10 +608,8 @@ static int __init openprom_init(void)
 		return error;
 	}
 
-	save_and_cli(flags);
 	options_node = prom_getchild(prom_root_node);
 	options_node = prom_searchsiblings(options_node,"options");
-	restore_flags(flags);
 
 	if (options_node == 0 || options_node == -1) {
 		printk(KERN_ERR "openprom: unable to find options node\n");
