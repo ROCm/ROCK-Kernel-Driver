@@ -388,23 +388,21 @@ void
 pagebuf_free(
 	page_buf_t		*pb)
 {
+	pb_hash_t		*hash = pb_hash(pb);
+
 	PB_TRACE(pb, "free", 0);
 
-	if (pb->pb_flags & _PBF_LOCKABLE) {
-		 pb_hash_t	*hash = pb_hash(pb);
-
-		spin_lock(&hash->pb_hash_lock);
-		/*
-		 * Someone grabbed a reference while we weren't looking,
-		 * try again later.
-		 */
-		if (unlikely(atomic_read(&pb->pb_hold))) {
-			spin_unlock(&hash->pb_hash_lock);
-			return;
-		} else if (!list_empty(&pb->pb_hash_list))
-			list_del_init(&pb->pb_hash_list);
+	spin_lock(&hash->pb_hash_lock);
+	/*
+	 * Someone grabbed a reference while we weren't looking,
+	 * try again later.
+	 */
+	if (unlikely(atomic_read(&pb->pb_hold))) {
 		spin_unlock(&hash->pb_hash_lock);
-	}
+		return;
+	} else if (!list_empty(&pb->pb_hash_list))
+		list_del_init(&pb->pb_hash_list);
+	spin_unlock(&hash->pb_hash_lock);
 
 	/* release any virtual mapping */ ;
 	if (pb->pb_flags & _PBF_ADDR_ALLOCATED) {
@@ -668,7 +666,7 @@ _pagebuf_find(				/* find buffer for block	*/
 	/* No match found */
 	if (new_pb) {
 		_pagebuf_initialize(new_pb, target, range_base,
-				range_length, flags | _PBF_LOCKABLE);
+				range_length, flags);
 		new_pb->pb_hash_index = hval;
 		list_add(&new_pb->pb_hash_list, &h->pb_hash);
 	} else {
@@ -712,7 +710,6 @@ found:
 	if (pb->pb_flags & PBF_STALE)
 		pb->pb_flags &= PBF_MAPPABLE | \
 				PBF_MAPPED | \
-				_PBF_LOCKABLE | \
 				_PBF_ALL_PAGES_MAPPED | \
 				_PBF_ADDR_ALLOCATED | \
 				_PBF_MEM_ALLOCATED | \
@@ -870,9 +867,9 @@ pagebuf_get_empty(
 {
 	page_buf_t		*pb;
 
-	pb = pagebuf_allocate(_PBF_LOCKABLE);
+	pb = pagebuf_allocate(0);
 	if (pb)
-		_pagebuf_initialize(pb, target, 0, len, _PBF_LOCKABLE);
+		_pagebuf_initialize(pb, target, 0, len, 0);
 	return pb;
 }
 
@@ -946,7 +943,7 @@ pagebuf_get_no_daddr(
 {
 	int			rval;
 	void			*rmem = NULL;
-	page_buf_flags_t	flags = _PBF_LOCKABLE | PBF_FORCEIO;
+	page_buf_flags_t	flags = PBF_FORCEIO;
 	page_buf_t		*pb;
 	size_t			tlen = 0;
 
@@ -1066,7 +1063,6 @@ pagebuf_cond_lock(			/* lock buffer, if not locked	*/
 {
 	int			locked;
 
-	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 	locked = down_trylock(&pb->pb_sema) == 0;
 	if (locked) {
 		PB_SET_OWNER(pb);
@@ -1084,7 +1080,6 @@ int
 pagebuf_lock_value(
 	page_buf_t		*pb)
 {
-	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 	return(atomic_read(&pb->pb_sema.count));
 }
 
@@ -1100,8 +1095,6 @@ int
 pagebuf_lock(
 	page_buf_t		*pb)
 {
-	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
-
 	PB_TRACE(pb, "lock", 0);
 	if (atomic_read(&pb->pb_io_remaining))
 		blk_run_queues();
@@ -1122,7 +1115,6 @@ void
 pagebuf_unlock(				/* unlock buffer		*/
 	page_buf_t		*pb)	/* buffer to unlock		*/
 {
-	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 	PB_CLEAR_OWNER(pb);
 	up(&pb->pb_sema);
 	PB_TRACE(pb, "unlock", 0);
@@ -1231,7 +1223,7 @@ pagebuf_iodone_work(
 	}
 
 	if (pb->pb_flags & PBF_ASYNC) {
-		if ((pb->pb_flags & _PBF_LOCKABLE) && !pb->pb_relse)
+		if (!pb->pb_relse)
 			pagebuf_unlock(pb);
 		pagebuf_rele(pb);
 	}
@@ -1344,7 +1336,7 @@ _pagebuf_iolocked(
 	ASSERT(pb->pb_flags & (PBF_READ|PBF_WRITE));
 	if (pb->pb_flags & PBF_READ)
 		return pb->pb_locked;
-	return ((pb->pb_flags & _PBF_LOCKABLE) == 0);
+	return 0;
 }
 
 STATIC __inline__ void
@@ -1670,9 +1662,8 @@ pagebuf_delwri_queue(
 	pb->pb_flushtime = jiffies + pb_params.age_buffer.val;
 	spin_unlock(&pbd_delwrite_lock);
 
-	if (unlock && (pb->pb_flags & _PBF_LOCKABLE)) {
+	if (unlock)
 		pagebuf_unlock(pb);
-	}
 }
 
 void
@@ -1740,10 +1731,8 @@ pagebuf_daemon(
 
 			PB_TRACE(pb, "walkq1", (long)pagebuf_ispin(pb));
 
-			if ((pb->pb_flags & PBF_DELWRI) && !pagebuf_ispin(pb) &&
-			    (((pb->pb_flags & _PBF_LOCKABLE) == 0) ||
-			     !pagebuf_cond_lock(pb))) {
-
+			if ((pb->pb_flags & PBF_DELWRI) &&
+			     !pagebuf_ispin(pb) && !pagebuf_cond_lock(pb)) {
 				if (!force_flush &&
 				    time_before(jiffies, pb->pb_flushtime)) {
 					pagebuf_unlock(pb);

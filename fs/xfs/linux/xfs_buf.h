@@ -88,7 +88,6 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_DONT_BLOCK = (1 << 15), /* do not block in current thread	   */
 
 	/* flags used only internally */
-	_PBF_LOCKABLE = (1 << 16), /* page_buf_t may be locked		   */
 	_PBF_ALL_PAGES_MAPPED = (1 << 18), /* all pages in range mapped	   */
 	_PBF_ADDR_ALLOCATED = (1 << 19), /* pb_addr space was allocated	   */
 	_PBF_MEM_ALLOCATED = (1 << 20), /* underlying pages are allocated  */
@@ -197,7 +196,7 @@ extern page_buf_t *pagebuf_lookup(
 		loff_t,			/* starting offset of range	*/
 		size_t,			/* length of range		*/
 		page_buf_flags_t);	/* PBF_READ, PBF_WRITE,		*/
-					/* PBF_FORCEIO, _PBF_LOCKABLE	*/
+					/* PBF_FORCEIO, 		*/
 
 extern page_buf_t *pagebuf_get_empty(	/* allocate pagebuf struct with	*/
 					/*  no memory or disk address	*/
@@ -531,7 +530,7 @@ static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
 
 static inline void	xfs_buf_relse(page_buf_t *bp)
 {
-	if ((bp->pb_flags & _PBF_LOCKABLE) && !bp->pb_relse)
+	if (!bp->pb_relse)
 		pagebuf_unlock(bp);
 	pagebuf_rele(bp);
 }
