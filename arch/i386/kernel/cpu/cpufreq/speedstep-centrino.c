@@ -75,7 +75,7 @@ static int centrino_verify_cpu_id(const struct cpuinfo_x86 *c, const struct cpu_
 
 /* Operating points for current CPU */
 static struct cpu_model *centrino_model;
-static int 		centrino_cpu;
+static int centrino_cpu;
 
 #ifdef CONFIG_X86_SPEEDSTEP_CENTRINO_TABLE
 
@@ -88,7 +88,7 @@ static int 		centrino_cpu;
 		.index = (((mhz)/100) << 8) | ((mv - 700) / 16)		\
 	}
 
-/* 
+/*
  * These voltage tables were derived from the Intel Pentium M
  * datasheet, document 25261202.pdf, Table 5.  I have verified they
  * are consistent with my IBM ThinkPad X31, which has a 1.3GHz Pentium
@@ -139,7 +139,7 @@ static struct cpufreq_frequency_table banias_1200[] =
 };
 
 /* Intel Pentium M processor 1.30GHz (Banias) */
-static struct cpufreq_frequency_table banias_1300[] = 
+static struct cpufreq_frequency_table banias_1300[] =
 {
 	OP( 600,  956),
 	OP( 800, 1260),
@@ -150,7 +150,7 @@ static struct cpufreq_frequency_table banias_1300[] =
 };
 
 /* Intel Pentium M processor 1.40GHz (Banias) */
-static struct cpufreq_frequency_table banias_1400[] = 
+static struct cpufreq_frequency_table banias_1400[] =
 {
 	OP( 600,  956),
 	OP( 800, 1180),
@@ -161,7 +161,7 @@ static struct cpufreq_frequency_table banias_1400[] =
 };
 
 /* Intel Pentium M processor 1.50GHz (Banias) */
-static struct cpufreq_frequency_table banias_1500[] = 
+static struct cpufreq_frequency_table banias_1500[] =
 {
 	OP( 600,  956),
 	OP( 800, 1116),
@@ -173,7 +173,7 @@ static struct cpufreq_frequency_table banias_1500[] =
 };
 
 /* Intel Pentium M processor 1.60GHz (Banias) */
-static struct cpufreq_frequency_table banias_1600[] = 
+static struct cpufreq_frequency_table banias_1600[] =
 {
 	OP( 600,  956),
 	OP( 800, 1036),
@@ -207,7 +207,7 @@ static struct cpufreq_frequency_table banias_1700[] =
 
 /* CPU models, their operating frequency range, and freq/voltage
    operating points */
-static struct cpu_model models[] = 
+static struct cpu_model models[] =
 {
 	_BANIAS(&cpu_ids[CPU_BANIAS], 900, " 900"),
 	BANIAS(1000),
@@ -238,7 +238,7 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 		    (model->model_name == NULL ||
 		     strcmp(cpu->x86_model_id, model->model_name) == 0))
 			break;
-	
+
 	if (model->cpu_id == NULL) {
 		/* No match at all */
 		printk(KERN_INFO PFX "no support for CPU model \"%s\": "
@@ -254,9 +254,9 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 		printk(KERN_INFO PFX "try compiling with CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI enabled\n");
 		return -ENOENT;
 	}
-		
+
 	centrino_model = model;
-		
+
 	printk(KERN_INFO PFX "found \"%s\": max frequency: %dkHz\n",
 	       model->model_name, model->max_freq);
 
@@ -281,7 +281,7 @@ static unsigned extract_clock(unsigned msr)
 {
 	int i;
 
-	/* 
+	/*
 	 * Extract clock in kHz from PERF_CTL value
 	 * for centrino, as some DSDTs are buggy.
 	 * Ideally, this can be done using the acpi_data structure.
@@ -295,9 +295,7 @@ static unsigned extract_clock(unsigned msr)
 		return 0;
 
 	msr &= 0xffff;
-	for (i = 0; 
-	     centrino_model->op_points[i].frequency != CPUFREQ_TABLE_END; 
-	     i++) {
+	for (i=0;centrino_model->op_points[i].frequency != CPUFREQ_TABLE_END; i++) {
 		if (msr == centrino_model->op_points[i].index)
 		return centrino_model->op_points[i].frequency;
 	}
@@ -326,7 +324,7 @@ static unsigned int get_cur_freq(unsigned int cpu)
 static struct acpi_processor_performance p;
 
 /*
- * centrino_cpu_init_acpi - register with ACPI P-States library 
+ * centrino_cpu_init_acpi - register with ACPI P-States library
  *
  * Register with the ACPI P-States library (part of drivers/acpi/processor.c)
  * in order to determine correct frequency and voltage pairings by reading
@@ -336,7 +334,7 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 {
 	union acpi_object		arg0 = {ACPI_TYPE_BUFFER};
 	u32				arg0_buf[3];
-	struct acpi_object_list 	arg_list = {1, &arg0};
+	struct acpi_object_list		arg_list = {1, &arg0};
 	unsigned long			cur_freq;
 	int				result = 0, i;
 
@@ -358,7 +356,7 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
                 printk(KERN_DEBUG "No P-States\n");
                 result = -ENODEV;
                 goto err_unreg;
- 	}
+	}
 
 	if ((p.control_register.space_id != ACPI_ADR_SPACE_FIXED_HARDWARE) ||
 	    (p.status_register.space_id != ACPI_ADR_SPACE_FIXED_HARDWARE)) {
@@ -396,7 +394,7 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 
 	centrino_model->model_name=NULL;
 	centrino_model->max_freq = p.states[0].core_frequency * 1000;
-	centrino_model->op_points =  kmalloc(sizeof(struct cpufreq_frequency_table) * 
+	centrino_model->op_points =  kmalloc(sizeof(struct cpufreq_frequency_table) *
 					     (p.state_count + 1), GFP_KERNEL);
         if (!centrino_model->op_points) {
                 result = -ENOMEM;
@@ -426,7 +424,7 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 	}
 
 	return 0;
-	
+
  err_kfree_all:
 	kfree(centrino_model->op_points);
  err_kfree:
@@ -464,7 +462,7 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 
 		if (!centrino_cpu) {
 			printk(KERN_INFO PFX "found unsupported CPU with "
-			"Enhanced SpeedStep: send /proc/cpuinfo to " 
+			"Enhanced SpeedStep: send /proc/cpuinfo to "
 			MAINTAINER "\n");
 			return -ENODEV;
 		}
@@ -477,11 +475,11 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 	/* Check to see if Enhanced SpeedStep is enabled, and try to
 	   enable it if not. */
 	rdmsr(MSR_IA32_MISC_ENABLE, l, h);
-		
+
 	if (!(l & (1<<16))) {
 		l |= (1<<16);
 		wrmsr(MSR_IA32_MISC_ENABLE, l, h);
-		
+
 		/* check to see if it stuck */
 		rdmsr(MSR_IA32_MISC_ENABLE, l, h);
 		if (!(l & (1<<16))) {
@@ -498,7 +496,7 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 
 	dprintk(KERN_INFO PFX "centrino_cpu_init: policy=%d cur=%dkHz\n",
 		policy->policy, policy->cur);
-	
+
 	ret = cpufreq_frequency_table_cpuinfo(policy, centrino_model->op_points);
 	if (ret)
 		return (ret);
@@ -592,7 +590,7 @@ static int centrino_target (struct cpufreq_policy *policy,
 	   tell us something happened, but it may leave the things on
 	   the notifier chain confused; we therefore stick to using
 	   the last programmed speed rather than the current speed for
-	   "old". 
+	   "old".
 
 	   TODO: work out how the TCC interrupts work, and try to
 	   catch the CPU changing things under us.
@@ -600,18 +598,18 @@ static int centrino_target (struct cpufreq_policy *policy,
 	freqs.cpu = policy->cpu;
 	freqs.old = extract_clock(oldmsr);
 	freqs.new = extract_clock(msr);
-	
+
 	dprintk(KERN_INFO PFX "target=%dkHz old=%d new=%d msr=%04x\n",
 		target_freq, freqs.old, freqs.new, msr);
 
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);	
+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
 	/* all but 16 LSB are "reserved", so treat them with
 	   care */
 	oldmsr &= ~0xffff;
 	msr &= 0xffff;
 	oldmsr |= msr;
-	
+
 	wrmsr(MSR_IA32_PERF_CTL, oldmsr, h);
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
@@ -628,12 +626,12 @@ static struct freq_attr* centrino_attr[] = {
 };
 
 static struct cpufreq_driver centrino_driver = {
-	.name		= "centrino", /* should be speedstep-centrino, 
+	.name		= "centrino", /* should be speedstep-centrino,
 					 but there's a 16 char limit */
 	.init		= centrino_cpu_init,
 	.exit		= centrino_cpu_exit,
-	.verify 	= centrino_verify,
-	.target 	= centrino_target,
+	.verify		= centrino_verify,
+	.target		= centrino_target,
 	.get		= get_cur_freq,
 	.attr           = centrino_attr,
 	.owner		= THIS_MODULE,
