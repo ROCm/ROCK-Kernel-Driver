@@ -33,6 +33,7 @@
 #include <asm/chafsr.h>
 #include <asm/psrcompat.h>
 #include <asm/processor.h>
+#include <asm/timer.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
 #endif
@@ -588,7 +589,7 @@ unsigned long __init cheetah_tune_scheduling(void)
 	flush_linesize = ecache_flush_linesize;
 	flush_size = ecache_flush_size >> 1;
 
-	__asm__ __volatile__("rd %%tick, %0" : "=r" (tick1));
+	tick1 = tick_ops->get_tick();
 
 	__asm__ __volatile__("1: subcc	%0, %4, %0\n\t"
 			     "   bne,pt	%%xcc, 1b\n\t"
@@ -597,7 +598,7 @@ unsigned long __init cheetah_tune_scheduling(void)
 			     : "0" (flush_size), "r" (flush_base),
 			       "i" (ASI_PHYS_USE_EC), "r" (flush_linesize));
 
-	__asm__ __volatile__("rd %%tick, %0" : "=r" (tick2));
+	tick2 = tick_ops->get_tick();
 
 	raw = (tick2 - tick1);
 

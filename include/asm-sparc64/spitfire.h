@@ -45,8 +45,6 @@ enum ultra_tlb_layout {
 
 extern enum ultra_tlb_layout tlb_type;
 
-#define SPARC64_USE_STICK	(tlb_type != spitfire)
-
 #define CHEETAH_HIGHEST_LOCKED_TLBENT	(16 - 1)
 
 #define L1DCACHE_SIZE		0x4000

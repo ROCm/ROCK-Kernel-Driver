@@ -719,12 +719,8 @@ void handler_irq(int irq, struct pt_regs *regs)
 	 */
 	{
 		unsigned long clr_mask = 1 << irq;
-		unsigned long tick_mask;
+		unsigned long tick_mask = tick_ops->softint_mask;
 
-		if (SPARC64_USE_STICK)
-			tick_mask = (1UL << 16);
-		else
-			tick_mask = (1UL << 0);
 		if ((irq == 14) && (get_softint() & tick_mask)) {
 			irq = 0;
 			clr_mask = tick_mask;
@@ -944,113 +940,6 @@ unsigned long probe_irq_on(void)
 int probe_irq_off(unsigned long mask)
 {
 	return 0;
-}
-
-/* This is gets the master TICK_INT timer going. */
-void sparc64_init_timers(void (*cfunc)(int, void *, struct pt_regs *),
-			 unsigned long *clock)
-{
-	unsigned long pstate;
-	extern unsigned long timer_tick_offset;
-	int node, err;
-#ifdef CONFIG_SMP
-	extern void smp_tick_init(void);
-#endif
-
-	if (!SPARC64_USE_STICK) {
-		node = linux_cpus[0].prom_node;
-		*clock = prom_getint(node, "clock-frequency");
-	} else {
-		node = prom_root_node;
-		*clock = prom_getint(node, "stick-frequency");
-	}
-	timer_tick_offset = *clock / HZ;
-#ifdef CONFIG_SMP
-	smp_tick_init();
-#endif
-
-	/* Register IRQ handler. */
-	err = request_irq(build_irq(0, 0, 0UL, 0UL), cfunc, SA_STATIC_ALLOC,
-			  "timer", NULL);
-
-	if (err) {
-		prom_printf("Serious problem, cannot register TICK_INT\n");
-		prom_halt();
-	}
-
-	/* Guarentee that the following sequences execute
-	 * uninterrupted.
-	 */
-	__asm__ __volatile__("rdpr	%%pstate, %0\n\t"
-			     "wrpr	%0, %1, %%pstate"
-			     : "=r" (pstate)
-			     : "i" (PSTATE_IE));
-
-	/* Set things up so user can access tick register for profiling
-	 * purposes.  Also workaround BB_ERRATA_1 by doing a dummy
-	 * read back of %tick after writing it.
-	 */
-	__asm__ __volatile__(
-	"	sethi	%%hi(0x80000000), %%g1\n"
-	"	ba,pt	%%xcc, 1f\n"
-	"	 sllx	%%g1, 32, %%g1\n"
-	"	.align	64\n"
-	"1:	rd	%%tick, %%g2\n"
-	"	add	%%g2, 6, %%g2\n"
-	"	andn	%%g2, %%g1, %%g2\n"
-	"	wrpr	%%g2, 0, %%tick\n"
-	"	rdpr	%%tick, %%g0"
-	: /* no outputs */
-	: /* no inputs */
-	: "g1", "g2");
-
-	/* Workaround for Spitfire Errata (#54 I think??), I discovered
-	 * this via Sun BugID 4008234, mentioned in Solaris-2.5.1 patch
-	 * number 103640.
-	 *
-	 * On Blackbird writes to %tick_cmpr can fail, the
-	 * workaround seems to be to execute the wr instruction
-	 * at the start of an I-cache line, and perform a dummy
-	 * read back from %tick_cmpr right after writing to it. -DaveM
-	 */
-	if (!SPARC64_USE_STICK) {
-	__asm__ __volatile__(
-	"	rd	%%tick, %%g1\n"
-	"	ba,pt	%%xcc, 1f\n"
-	"	 add	%%g1, %0, %%g1\n"
-	"	.align	64\n"
-	"1:	wr	%%g1, 0x0, %%tick_cmpr\n"
-	"	rd	%%tick_cmpr, %%g0"
-	: /* no outputs */
-	: "r" (timer_tick_offset)
-	: "g1");
-	} else {
-	/* Let the user get at STICK too. */
-	__asm__ __volatile__(
-	"	sethi	%%hi(0x80000000), %%g1\n"
-	"	sllx	%%g1, 32, %%g1\n"
-	"	rd	%%asr24, %%g2\n"
-	"	andn	%%g2, %%g1, %%g2\n"
-	"	wr	%%g2, 0, %%asr24"
-	: /* no outputs */
-	: /* no inputs */
-	: "g1", "g2");
-
-	__asm__ __volatile__(
-	"	rd	%%asr24, %%g1\n"
-	"	add	%%g1, %0, %%g1\n"
-	"	wr	%%g1, 0x0, %%asr25"
-	: /* no outputs */
-	: "r" (timer_tick_offset)
-	: "g1");
-	}
-
-	/* Restore PSTATE_IE. */
-	__asm__ __volatile__("wrpr	%0, 0x0, %%pstate"
-			     : /* no outputs */
-			     : "r" (pstate));
-
-	local_irq_enable();
 }
 
 #ifdef CONFIG_SMP
