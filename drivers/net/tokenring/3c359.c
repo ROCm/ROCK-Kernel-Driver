@@ -1793,10 +1793,10 @@ static void __devexit xl_remove_one (struct pci_dev *pdev)
 }
 
 static struct pci_driver xl_3c359_driver = {
-	name:		"3c359",
-	id_table:	xl_pci_tbl,
-	probe:		xl_probe,
-	remove:		__devexit_p(xl_remove_one),
+	.name		= "3c359",
+	.id_table	= xl_pci_tbl,
+	.probe		= xl_probe,
+	.remove		= __devexit_p(xl_remove_one),
 };
 
 static int __init xl_pci_init (void)

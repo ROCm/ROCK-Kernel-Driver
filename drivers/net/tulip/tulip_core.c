@@ -1752,13 +1752,13 @@ static void __devexit tulip_remove_one (struct pci_dev *pdev)
 
 
 static struct pci_driver tulip_driver = {
-	name:		DRV_NAME,
-	id_table:	tulip_pci_tbl,
-	probe:		tulip_init_one,
-	remove:		__devexit_p(tulip_remove_one),
+	.name		= DRV_NAME,
+	.id_table	= tulip_pci_tbl,
+	.probe		= tulip_init_one,
+	.remove		= __devexit_p(tulip_remove_one),
 #ifdef CONFIG_PM
-	suspend:	tulip_suspend,
-	resume:		tulip_resume,
+	.suspend	= tulip_suspend,
+	.resume		= tulip_resume,
 #endif /* CONFIG_PM */
 };
 

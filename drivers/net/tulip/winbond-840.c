@@ -1729,13 +1729,13 @@ out:
 #endif
 
 static struct pci_driver w840_driver = {
-	name:		DRV_NAME,
-	id_table:	w840_pci_tbl,
-	probe:		w840_probe1,
-	remove:		__devexit_p(w840_remove1),
+	.name		= DRV_NAME,
+	.id_table	= w840_pci_tbl,
+	.probe		= w840_probe1,
+	.remove		= __devexit_p(w840_remove1),
 #ifdef CONFIG_PM
-	suspend:	w840_suspend,
-	resume:		w840_resume,
+	.suspend	= w840_suspend,
+	.resume		= w840_resume,
 #endif
 };
 

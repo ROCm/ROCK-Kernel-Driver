@@ -235,10 +235,10 @@ static void __devexit tms_pci_detach (struct pci_dev *pdev)
 }
 
 static struct pci_driver tms_pci_driver = {
-	name:		"tmspci",
-	id_table:	tmspci_pci_tbl,
-	probe:		tms_pci_attach,
-	remove:		__devexit_p(tms_pci_detach),
+	.name		= "tmspci",
+	.id_table	= tmspci_pci_tbl,
+	.probe		= tms_pci_attach,
+	.remove		= __devexit_p(tms_pci_detach),
 };
 
 static int __init tms_pci_init (void)

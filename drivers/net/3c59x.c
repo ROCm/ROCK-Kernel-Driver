@@ -2955,13 +2955,13 @@ static void __devexit vortex_remove_one (struct pci_dev *pdev)
 
 
 static struct pci_driver vortex_driver = {
-	name:		"3c59x",
-	probe:		vortex_init_one,
-	remove:		__devexit_p(vortex_remove_one),
-	id_table:	vortex_pci_tbl,
+	.name		= "3c59x",
+	.probe		= vortex_init_one,
+	.remove		= __devexit_p(vortex_remove_one),
+	.id_table	= vortex_pci_tbl,
 #ifdef CONFIG_PM
-	suspend:	vortex_suspend,
-	resume:		vortex_resume,
+	.suspend	= vortex_suspend,
+	.resume		= vortex_resume,
 #endif
 };
 

@@ -1937,10 +1937,10 @@ static int streamer_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 #endif
 
 static struct pci_driver streamer_pci_driver = {
-  name:       "lanstreamer",
-  id_table:   streamer_pci_tbl,
-  probe:      streamer_init_one,
-  remove:     __devexit_p(streamer_remove_one),
+  .name     = "lanstreamer",
+  .id_table = streamer_pci_tbl,
+  .probe    = streamer_init_one,
+  .remove   = __devexit_p(streamer_remove_one),
 };
 
 static int __init streamer_init_module(void) {

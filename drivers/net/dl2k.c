@@ -1688,10 +1688,10 @@ rio_remove1 (struct pci_dev *pdev)
 }
 
 static struct pci_driver rio_driver = {
-	name:		"dl2k",
-	id_table:	rio_pci_tbl,
-	probe:		rio_probe1,
-	remove:		__devexit_p(rio_remove1),
+	.name		= "dl2k",
+	.id_table	= rio_pci_tbl,
+	.probe		= rio_probe1,
+	.remove		= __devexit_p(rio_remove1),
 };
 
 static int __init

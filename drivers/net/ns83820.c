@@ -1675,13 +1675,13 @@ static struct pci_device_id ns83820_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"ns83820",
-	id_table:	ns83820_pci_tbl,
-	probe:		ns83820_init_one,
-	remove:		__devexit_p(ns83820_remove_one),
+	.name		= "ns83820",
+	.id_table	= ns83820_pci_tbl,
+	.probe		= ns83820_init_one,
+	.remove		= __devexit_p(ns83820_remove_one),
 #if 0	/* FIXME: implement */
-	suspend:	,
-	resume:		,
+	.suspend	= ,
+	.resume		= ,
 #endif
 };
 

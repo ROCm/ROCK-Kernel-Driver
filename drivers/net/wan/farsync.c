@@ -1660,12 +1660,12 @@ fst_remove_one ( struct pci_dev *pdev )
 }
 
 static struct pci_driver fst_driver = {
-        name:           FST_NAME,
-        id_table:       fst_pci_dev_id,
-        probe:          fst_add_one,
-        remove:         __devexit_p(fst_remove_one),
-        suspend:        NULL,
-        resume:         NULL,
+        .name		= FST_NAME,
+        .id_table	= fst_pci_dev_id,
+        .probe		= fst_add_one,
+        .remove	= __devexit_p(fst_remove_one),
+        .suspend	= NULL,
+        .resume	= NULL,
 };
 
 static int __init

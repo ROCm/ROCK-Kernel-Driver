@@ -1953,13 +1953,13 @@ static int netdrv_resume (struct pci_dev *pdev)
 
 
 static struct pci_driver netdrv_pci_driver = {
-	name:		MODNAME,
-	id_table:	netdrv_pci_tbl,
-	probe:		netdrv_init_one,
-	remove:		__devexit_p(netdrv_remove_one),
+	.name		= MODNAME,
+	.id_table	= netdrv_pci_tbl,
+	.probe		= netdrv_init_one,
+	.remove		= __devexit_p(netdrv_remove_one),
 #ifdef CONFIG_PM
-	suspend:	netdrv_suspend,
-	resume:		netdrv_resume,
+	.suspend	= netdrv_suspend,
+	.resume		= netdrv_resume,
 #endif /* CONFIG_PM */
 };
 

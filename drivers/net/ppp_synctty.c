@@ -404,17 +404,17 @@ ppp_sync_wakeup(struct tty_struct *tty)
 
 
 static struct tty_ldisc ppp_sync_ldisc = {
-	magic:	TTY_LDISC_MAGIC,
-	name:	"pppsync",
-	open:	ppp_sync_open,
-	close:	ppp_sync_close,
-	read:	ppp_sync_read,
-	write:	ppp_sync_write,
-	ioctl:	ppp_synctty_ioctl,
-	poll:	ppp_sync_poll,
-	receive_room: ppp_sync_room,
-	receive_buf: ppp_sync_receive,
-	write_wakeup: ppp_sync_wakeup,
+	.magic	= TTY_LDISC_MAGIC,
+	.name	= "pppsync",
+	.open	= ppp_sync_open,
+	.close	= ppp_sync_close,
+	.read	= ppp_sync_read,
+	.write	= ppp_sync_write,
+	.ioctl	= ppp_synctty_ioctl,
+	.poll	= ppp_sync_poll,
+	.receive_room = ppp_sync_room,
+	.receive_buf = ppp_sync_receive,
+	.write_wakeup = ppp_sync_wakeup,
 };
 
 static int __init

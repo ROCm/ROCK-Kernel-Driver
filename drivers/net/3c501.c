@@ -1011,9 +1011,9 @@ static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 #ifdef MODULE
 
 static struct net_device dev_3c501 = {
-	init:		el1_probe,
-	base_addr:	0x280,
-	irq:		5,
+	.init		= el1_probe,
+	.base_addr	= 0x280,
+	.irq		= 5,
 };
 
 static int io=0x280;

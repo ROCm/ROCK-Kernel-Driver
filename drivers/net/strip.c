@@ -2812,14 +2812,14 @@ static int strip_ioctl(struct tty_struct *tty, struct file *file,
 /* Initialization							*/
 
 static struct tty_ldisc strip_ldisc = {
-	magic:		TTY_LDISC_MAGIC,
-	name:		"strip",
-	open:		strip_open,
-	close:		strip_close,
-	ioctl:		strip_ioctl,
-	receive_buf:	strip_receive_buf,
-	receive_room:	strip_receive_room,
-	write_wakeup:	strip_write_some_more,
+	.magic		= TTY_LDISC_MAGIC,
+	.name		= "strip",
+	.open		= strip_open,
+	.close		= strip_close,
+	.ioctl		= strip_ioctl,
+	.receive_buf	= strip_receive_buf,
+	.receive_room	= strip_receive_room,
+	.write_wakeup	= strip_write_some_more,
 };
 
 /*

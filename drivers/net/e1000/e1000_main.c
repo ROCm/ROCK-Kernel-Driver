@@ -186,9 +186,9 @@ static int e1000_resume(struct pci_dev *pdev);
 #endif
 
 struct notifier_block e1000_notifier = {
-	notifier_call:	e1000_notify_reboot,
-	next:		NULL,
-	priority:	0
+	.notifier_call	= e1000_notify_reboot,
+	.next		= NULL,
+	.priority	= 0
 };
 
 /* Exported from other modules */
@@ -199,14 +199,14 @@ extern void e1000_proc_dev_free(struct e1000_adapter *adapter);
 extern int e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr);
 
 static struct pci_driver e1000_driver = {
-	name:     e1000_driver_name,
-	id_table: e1000_pci_tbl,
-	probe:    e1000_probe,
-	remove:   __devexit_p(e1000_remove),
+	.name     = e1000_driver_name,
+	.id_table = e1000_pci_tbl,
+	.probe    = e1000_probe,
+	.remove   = __devexit_p(e1000_remove),
 	/* Power Managment Hooks */
 #ifdef CONFIG_PM
-	suspend:  e1000_suspend,
-	resume:   e1000_resume
+	.suspend  = e1000_suspend,
+	.resume   = e1000_resume
 #endif
 };
 

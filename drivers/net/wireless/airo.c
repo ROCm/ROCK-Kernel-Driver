@@ -61,10 +61,10 @@ static int airo_pci_probe(struct pci_dev *, const struct pci_device_id *);
 static void airo_pci_remove(struct pci_dev *);
 
 static struct pci_driver airo_driver = {
-	name:     "airo",
-	id_table: card_ids,
-	probe:    airo_pci_probe,
-	remove:   __devexit_p(airo_pci_remove),
+	.name     = "airo",
+	.id_table = card_ids,
+	.probe    = airo_pci_probe,
+	.remove   = __devexit_p(airo_pci_remove),
 };
 #endif /* CONFIG_PCI */
 
@@ -2562,56 +2562,56 @@ static int proc_config_open( struct inode *inode, struct file *file );
 static int proc_wepkey_open( struct inode *inode, struct file *file );
 
 static struct file_operations proc_statsdelta_ops = {
-	read:           proc_read,
-	open:           proc_statsdelta_open,
-	release:        proc_close
+	.read		= proc_read,
+	.open		= proc_statsdelta_open,
+	.release	= proc_close
 };
 
 static struct file_operations proc_stats_ops = {
-	read:           proc_read,
-	open:           proc_stats_open,
-	release:        proc_close
+	.read		= proc_read,
+	.open		= proc_stats_open,
+	.release	= proc_close
 };
 
 static struct file_operations proc_status_ops = {
-	read:            proc_read,
-	open:            proc_status_open,
-	release:         proc_close
+	.read		= proc_read,
+	.open		= proc_status_open,
+	.release	= proc_close
 };
 
 static struct file_operations proc_SSID_ops = {
-	read:          proc_read,
-	write:         proc_write,
-	open:          proc_SSID_open,
-	release:       proc_close
+	.read		= proc_read,
+	.write		= proc_write,
+	.open		= proc_SSID_open,
+	.release	= proc_close
 };
 
 static struct file_operations proc_BSSList_ops = {
-	read:          proc_read,
-	write:         proc_write,
-	open:          proc_BSSList_open,
-	release:       proc_close
+	.read		= proc_read,
+	.write		= proc_write,
+	.open		= proc_BSSList_open,
+	.release	= proc_close
 };
 
 static struct file_operations proc_APList_ops = {
-	read:          proc_read,
-	write:         proc_write,
-	open:          proc_APList_open,
-	release:       proc_close
+	.read		= proc_read,
+	.write		= proc_write,
+	.open		= proc_APList_open,
+	.release	= proc_close
 };
 
 static struct file_operations proc_config_ops = {
-	read:          proc_read,
-	write:         proc_write,
-	open:          proc_config_open,
-	release:       proc_close
+	.read		= proc_read,
+	.write		= proc_write,
+	.open		= proc_config_open,
+	.release	= proc_close
 };
 
 static struct file_operations proc_wepkey_ops = {
-	read:          proc_read,
-	write:         proc_write,
-	open:          proc_wepkey_open,
-	release:       proc_close
+	.read		= proc_read,
+	.write		= proc_write,
+	.open		= proc_wepkey_open,
+	.release	= proc_close
 };
 
 static struct proc_dir_entry *airo_entry = 0;
@@ -5208,12 +5208,12 @@ static const iw_handler		airo_private_handler[] =
 
 static const struct iw_handler_def	airo_handler_def =
 {
-	num_standard:	sizeof(airo_handler)/sizeof(iw_handler),
-	num_private:	sizeof(airo_private_handler)/sizeof(iw_handler),
-	num_private_args: sizeof(airo_private_args)/sizeof(struct iw_priv_args),
-	standard:	(iw_handler *) airo_handler,
-	private:	(iw_handler *) airo_private_handler,
-	private_args:	(struct iw_priv_args *) airo_private_args,
+	.num_standard	= sizeof(airo_handler)/sizeof(iw_handler),
+	.num_private	= sizeof(airo_private_handler)/sizeof(iw_handler),
+	.num_private_args = sizeof(airo_private_args)/sizeof(struct iw_priv_args),
+	.standard	= (iw_handler *) airo_handler,
+	.private	= (iw_handler *) airo_private_handler,
+	.private_args	= (struct iw_priv_args *) airo_private_args,
 };
 
 #endif /* WIRELESS_EXT > 12 */

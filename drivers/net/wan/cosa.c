@@ -311,16 +311,16 @@ static int cosa_fasync(struct inode *inode, struct file *file, int on);
 #endif
 
 static struct file_operations cosa_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		cosa_read,
-	write:		cosa_write,
-	poll:		cosa_poll,
-	ioctl:		cosa_chardev_ioctl,
-	open:		cosa_open,
-	release:	cosa_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= cosa_read,
+	.write		= cosa_write,
+	.poll		= cosa_poll,
+	.ioctl		= cosa_chardev_ioctl,
+	.open		= cosa_open,
+	.release	= cosa_release,
 #ifdef COSA_FASYNC_WORKING
-	fasync:		cosa_fasync,
+	.fasync		= cosa_fasync,
 #endif
 };
 

@@ -1753,10 +1753,10 @@ static void __devexit olympic_remove_one(struct pci_dev *pdev)
 }
 
 static struct pci_driver olympic_driver = { 
-	name:		"olympic",
-	id_table:	olympic_pci_tbl,
-	probe:		olympic_probe,
-	remove:		__devexit_p(olympic_remove_one),
+	.name		= "olympic",
+	.id_table	= olympic_pci_tbl,
+	.probe		= olympic_probe,
+	.remove		= __devexit_p(olympic_remove_one),
 };
 
 static int __init olympic_pci_init(void) 

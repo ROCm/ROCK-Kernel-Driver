@@ -466,10 +466,10 @@ static int fcif_probe(struct net_device *dev)
 
 #ifdef CONFIG_ETHERTAP
 static struct net_device tap0_dev = {
-	name:		"tap0",
-	base_addr:	NETLINK_TAPBASE,
-	next:		NEXT_DEV,
-	init:		ethertap_probe,
+	.name		= "tap0",
+	.base_addr	= NETLINK_TAPBASE,
+	.next		= NEXT_DEV,
+	.init		= ethertap_probe,
 };
 #undef NEXT_DEV
 #define NEXT_DEV	(&tap0_dev)
@@ -478,9 +478,9 @@ static struct net_device tap0_dev = {
 #ifdef CONFIG_SDLA
 extern int sdla_init(struct net_device *);
 static struct net_device sdla0_dev = {
-	name:		 "sdla0",
-	next:		 NEXT_DEV,
-	init:		 sdla_init,
+	.name		=  "sdla0",
+	.next		=  NEXT_DEV,
+	.init		=  sdla_init,
 };
 #undef NEXT_DEV
 #define NEXT_DEV	(&sdla0_dev)
@@ -489,9 +489,9 @@ static struct net_device sdla0_dev = {
 #if defined(CONFIG_LTPC)
 extern int ltpc_probe(struct net_device *);
 static struct net_device dev_ltpc = {
-	name:		"lt0",
-	next:		NEXT_DEV,
-	init:		ltpc_probe
+	.name		= "lt0",
+	.next		= NEXT_DEV,
+	.init		= ltpc_probe
 };
 #undef NEXT_DEV
 #define NEXT_DEV	(&dev_ltpc)
@@ -500,63 +500,63 @@ static struct net_device dev_ltpc = {
 #if defined(CONFIG_COPS)
 extern int cops_probe(struct net_device *);
 static struct net_device cops2_dev = {
-	name:		"lt2",
-	next:		NEXT_DEV,
-	init:		cops_probe,
+	.name		= "lt2",
+	.next		= NEXT_DEV,
+	.init		= cops_probe,
 };
 static struct net_device cops1_dev = {
-	name:		"lt1",
-	next:		&cops2_dev,
-	init:		cops_probe,
+	.name		= "lt1",
+	.next		= &cops2_dev,
+	.init		= cops_probe,
 };
 static struct net_device cops0_dev = {
-	name:		"lt0",
-	next:		&cops1_dev,
-	init:		cops_probe,
+	.name		= "lt0",
+	.next		= &cops1_dev,
+	.init		= cops_probe,
 };
 #undef NEXT_DEV
 #define NEXT_DEV     (&cops0_dev)
 #endif  /* COPS */
 
 static struct net_device eth7_dev = {
-	name:		"eth%d",
-	next:		NEXT_DEV,
-	init:		ethif_probe,
+	.name		= "eth%d",
+	.next		= NEXT_DEV,
+	.init		= ethif_probe,
 };
 static struct net_device eth6_dev = {
-	name:		"eth%d",
-	next:		&eth7_dev,
-	init:		ethif_probe,
+	.name		= "eth%d",
+	.next		= &eth7_dev,
+	.init		= ethif_probe,
 };
 static struct net_device eth5_dev = {
-	name:		"eth%d",
-	next:		&eth6_dev,
-	init:		ethif_probe,
+	.name		= "eth%d",
+	.next		= &eth6_dev,
+	.init		= ethif_probe,
 };
 static struct net_device eth4_dev = {
-	name:		"eth%d",
-	next:		&eth5_dev,
-	init:		ethif_probe,
+	.name		= "eth%d",
+	.next		= &eth5_dev,
+	.init		= ethif_probe,
 };
 static struct net_device eth3_dev = {
-	name:		"eth%d",
-	next:		&eth4_dev,
-	init:		ethif_probe,
+	.name		= "eth%d",
+	.next		= &eth4_dev,
+	.init		= ethif_probe,
 };
 static struct net_device eth2_dev = {
-	name:		"eth%d",
-	next:		&eth3_dev,
-	init:		ethif_probe,
+	.name		= "eth%d",
+	.next		= &eth3_dev,
+	.init		= ethif_probe,
 };
 static struct net_device eth1_dev = {
-	name:		"eth%d",
-	next:		&eth2_dev,
-	init:		ethif_probe,
+	.name		= "eth%d",
+	.next		= &eth2_dev,
+	.init		= ethif_probe,
 };
 static struct net_device eth0_dev = {
-	name:		"eth%d",
-	next:		&eth1_dev,
-	init:		ethif_probe,
+	.name		= "eth%d",
+	.next		= &eth1_dev,
+	.init		= ethif_probe,
 };
 
 #undef NEXT_DEV
@@ -585,44 +585,44 @@ trif_probe(struct net_device *dev)
     return 0;
 }
 static struct net_device tr7_dev = {
-	name:		"tr%d",
-	next:		NEXT_DEV,
-	init:		trif_probe,
+	.name		= "tr%d",
+	.next		= NEXT_DEV,
+	.init		= trif_probe,
 };
 static struct net_device tr6_dev = {
-	name:		"tr%d",
-	next:		&tr7_dev,
-	init:		trif_probe,
+	.name		= "tr%d",
+	.next		= &tr7_dev,
+	.init		= trif_probe,
 };
 static struct net_device tr5_dev = {
-	name:		"tr%d",
-	next:		&tr6_dev,
-	init:		trif_probe,
+	.name		= "tr%d",
+	.next		= &tr6_dev,
+	.init		= trif_probe,
 };
 static struct net_device tr4_dev = {
-	name:		"tr%d",
-	next:		&tr5_dev,
-	init:		trif_probe,
+	.name		= "tr%d",
+	.next		= &tr5_dev,
+	.init		= trif_probe,
 };
 static struct net_device tr3_dev = {
-	name:		"tr%d",
-	next:		&tr4_dev,
-	init:		trif_probe,
+	.name		= "tr%d",
+	.next		= &tr4_dev,
+	.init		= trif_probe,
 };
 static struct net_device tr2_dev = {
-	name:		"tr%d",
-	next:		&tr3_dev,
-	init:		trif_probe,
+	.name		= "tr%d",
+	.next		= &tr3_dev,
+	.init		= trif_probe,
 };
 static struct net_device tr1_dev = {
-	name:		"tr%d",
-	next:		&tr2_dev,
-	init:		trif_probe,
+	.name		= "tr%d",
+	.next		= &tr2_dev,
+	.init		= trif_probe,
 };
 static struct net_device tr0_dev = {
-	name:		"tr%d",
-	next:		&tr1_dev,
-	init:		trif_probe,
+	.name		= "tr%d",
+	.next		= &tr1_dev,
+	.init		= trif_probe,
 };
 #undef       NEXT_DEV
 #define      NEXT_DEV        (&tr0_dev)
@@ -631,44 +631,44 @@ static struct net_device tr0_dev = {
 
 #ifdef CONFIG_FDDI
 static struct net_device fddi7_dev = {
-	name:		"fddi7",
-	next:		 NEXT_DEV,
-	init:		fddiif_probe
+	.name		= "fddi7",
+	.next		=  NEXT_DEV,
+	.init		= fddiif_probe
 };
 static struct net_device fddi6_dev = {
-	name:		"fddi6",
-	next:		&fddi7_dev,
-	init:		fddiif_probe
+	.name		= "fddi6",
+	.next		= &fddi7_dev,
+	.init		= fddiif_probe
 };
 static struct net_device fddi5_dev = {
-	name:		"fddi5",
-	next:		&fddi6_dev,
-	init:		fddiif_probe
+	.name		= "fddi5",
+	.next		= &fddi6_dev,
+	.init		= fddiif_probe
 };
 static struct net_device fddi4_dev = {
-	name:		"fddi4",
-	next:		&fddi5_dev,
-	init:		fddiif_probe
+	.name		= "fddi4",
+	.next		= &fddi5_dev,
+	.init		= fddiif_probe
 };
 static struct net_device fddi3_dev = {
-	name:		"fddi3",
-	next:		&fddi4_dev,
-	init:		fddiif_probe
+	.name		= "fddi3",
+	.next		= &fddi4_dev,
+	.init		= fddiif_probe
 };
 static struct net_device fddi2_dev = {
-	name:		"fddi2",
-	next:		&fddi3_dev,
-	init:		fddiif_probe
+	.name		= "fddi2",
+	.next		= &fddi3_dev,
+	.init		= fddiif_probe
 };
 static struct net_device fddi1_dev = {
-	name:		"fddi1",
-	next:		&fddi2_dev,
-	init:		fddiif_probe
+	.name		= "fddi1",
+	.next		= &fddi2_dev,
+	.init		= fddiif_probe
 };
 static struct net_device fddi0_dev = {
-	name:		"fddi0",
-	next:		&fddi1_dev,
-	init:		fddiif_probe
+	.name		= "fddi0",
+	.next		= &fddi1_dev,
+	.init		= fddiif_probe
 };
 #undef	NEXT_DEV
 #define	NEXT_DEV	(&fddi0_dev)
@@ -677,14 +677,14 @@ static struct net_device fddi0_dev = {
 
 #ifdef CONFIG_NET_FC
 static struct net_device fc1_dev = {
-	name:		"fc1",
-	next:		NEXT_DEV,
-	init:		fcif_probe
+	.name		= "fc1",
+	.next		= NEXT_DEV,
+	.init		= fcif_probe
 };
 static struct net_device fc0_dev = {
-	name:		"fc0",
-	next:		 &fc1_dev,
-	init:		fcif_probe
+	.name		= "fc0",
+	.next		=  &fc1_dev,
+	.init		= fcif_probe
 };
 #undef       NEXT_DEV
 #define      NEXT_DEV        (&fc0_dev)
@@ -693,44 +693,44 @@ static struct net_device fc0_dev = {
 
 #ifdef CONFIG_SBNI
 static struct net_device sbni7_dev = {
-	name:		"sbni7",
-	next:		NEXT_DEV,
-	init:		sbni_probe,
+	.name		= "sbni7",
+	.next		= NEXT_DEV,
+	.init		= sbni_probe,
 };
 static struct net_device sbni6_dev = {
-	name:		"sbni6",
-	next:		&sbni7_dev,
-	init:		sbni_probe,
+	.name		= "sbni6",
+	.next		= &sbni7_dev,
+	.init		= sbni_probe,
 };
 static struct net_device sbni5_dev = {
-	name:		"sbni5",
-	next:		&sbni6_dev,
-	init:		sbni_probe,
+	.name		= "sbni5",
+	.next		= &sbni6_dev,
+	.init		= sbni_probe,
 };
 static struct net_device sbni4_dev = {
-	name:		"sbni4",
-	next:		&sbni5_dev,
-	init:		sbni_probe,
+	.name		= "sbni4",
+	.next		= &sbni5_dev,
+	.init		= sbni_probe,
 };
 static struct net_device sbni3_dev = {
-	name:		"sbni3",
-	next:		&sbni4_dev,
-	init:		sbni_probe,
+	.name		= "sbni3",
+	.next		= &sbni4_dev,
+	.init		= sbni_probe,
 };
 static struct net_device sbni2_dev = {
-	name:		"sbni2",
-	next:		&sbni3_dev,
-	init:		sbni_probe,
+	.name		= "sbni2",
+	.next		= &sbni3_dev,
+	.init		= sbni_probe,
 };
 static struct net_device sbni1_dev = {
-	name:		"sbni1",
-	next:		&sbni2_dev,
-	init:		sbni_probe,
+	.name		= "sbni1",
+	.next		= &sbni2_dev,
+	.init		= sbni_probe,
 };
 static struct net_device sbni0_dev = {
-	name:		"sbni0",
-	next:		&sbni1_dev,
-	init:		sbni_probe,
+	.name		= "sbni0",
+	.next		= &sbni1_dev,
+	.init		= sbni_probe,
 };
 
 #undef	NEXT_DEV
@@ -744,9 +744,9 @@ static struct net_device sbni0_dev = {
 
 extern int loopback_init(struct net_device *dev);
 struct net_device loopback_dev = {
-	name:		"lo",
-	next:		NEXT_DEV,
-	init:		loopback_init
+	.name		= "lo",
+	.next		= NEXT_DEV,
+	.init		= loopback_init
 };
 
 /*

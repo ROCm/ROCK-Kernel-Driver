@@ -2202,7 +2202,7 @@ static int bond_event(struct notifier_block *this, unsigned long event,
 }
 
 static struct notifier_block bond_netdev_notifier = {
-	notifier_call: bond_event,
+	.notifier_call = bond_event,
 };
 
 static int __init bond_init(struct net_device *dev)
