@@ -93,68 +93,62 @@ __initcall(graphicsmaster_init);
  * Handlers for GraphicsMaster's external IRQ logic
  */
 
-static void ADS_IRQ_demux( int irq, void *dev_id, struct pt_regs *regs )
+static void
+gm_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
-	int i;
+	unsigned int mask;
 
-	while( (irq = ADS_INT_ST1 | (ADS_INT_ST2 << 8)) ){
-		for( i = 0; i < 16; i++ )
-			if( irq & (1<<i) ) {
-				do_IRQ( ADS_EXT_IRQ(i), regs );
-			}
+	while ((mask = ADS_INT_ST1 | (ADS_INT_ST2 << 8))) {
+		/* clear the parent IRQ */
+		GEDR = GPIO_GPIO0;
+
+		irq = ADS_EXT_IRQ(0);
+		desc = irq_desc + irq;
+
+		do {
+			if (mask & 1)
+				desc->handle(irq, desc, regs);
+			mask >>= 1;
+			irq++;
+			desc++;
+		} while (mask);
 	}
 }
 
-static struct irqaction ADS_ext_irq = {
-	name:		"ADS_ext_IRQ",
-	handler:	ADS_IRQ_demux,
-	flags:		SA_INTERRUPT
-};
-
-static void ADS_mask_and_ack_irq0(unsigned int irq)
+static void gm_mask_irq1(unsigned int irq)
 {
 	int mask = (1 << (irq - ADS_EXT_IRQ(0)));
 	ADS_INT_EN1 &= ~mask;
 	ADS_INT_ST1 = mask;
 }
 
-static void ADS_mask_irq0(unsigned int irq)
-{
-	ADS_INT_ST1 = (1 << (irq - ADS_EXT_IRQ(0)));
-}
-
-static void ADS_unmask_irq0(unsigned int irq)
+static void gm_unmask_irq1(unsigned int irq)
 {
 	ADS_INT_EN1 |= (1 << (irq - ADS_EXT_IRQ(0)));
 }
 
-static struct irqchip ADS0_chip = {
-	ack:	ADS_mask_and_ack_irq0,
-	mask:	ADS_mask_irq0,
-	unmask:	ADS_unmask_irq0,
+static struct irqchip gm_irq1_chip = {
+	ack:	gm_mask_irq1,
+	mask:	gm_mask_irq1,
+	unmask:	gm_unmask_irq1,
 };
 
-static void ADS_mask_and_ack_irq1(unsigned int irq)
+static void gm_mask_irq2(unsigned int irq)
 {
 	int mask = (1 << (irq - ADS_EXT_IRQ(8)));
 	ADS_INT_EN2 &= ~mask;
 	ADS_INT_ST2 = mask;
 }
 
-static void ADS_mask_irq1(unsigned int irq)
-{
-	ADS_INT_ST2 = (1 << (irq - ADS_EXT_IRQ(8)));
-}
-
-static void ADS_unmask_irq1(unsigned int irq)
+static void gm_unmask_irq2(unsigned int irq)
 {
 	ADS_INT_EN2 |= (1 << (irq - ADS_EXT_IRQ(8)));
 }
 
-static struct irqchip ADS1_chip = {
-	ack:	ADS_mask_irq1,
-	mask:	ADS_mask_irq1,
-	unmask:	ADS_mask_irq1,
+static struct irqchip gm_irq2_chip = {
+	ack:	gm_mask_irq2,
+	mask:	gm_mask_irq2,
+	unmask:	gm_unmask_irq2,
 };
 
 static void __init graphicsmaster_init_irq(void)
@@ -167,22 +161,23 @@ static void __init graphicsmaster_init_irq(void)
 	/* disable all IRQs */
 	ADS_INT_EN1 = 0;
 	ADS_INT_EN2 = 0;
+
 	/* clear all IRQs */
 	ADS_INT_ST1 = 0xff;
 	ADS_INT_ST2 = 0xff;
 
 	for (irq = ADS_EXT_IRQ(0); irq <= ADS_EXT_IRQ(7); irq++) {
-		set_irq_chip(irq, &ADS0_chip);
+		set_irq_chip(irq, &gm_irq1_chip);
 		set_irq_handler(irq, do_level_IRQ);
 		set_irq_flags(irq, IRQF_PROBE | IRQF_VALID);
 	}
 	for (irq = ADS_EXT_IRQ(8); irq <= ADS_EXT_IRQ(15); irq++) {
-		set_irq_chip(irq, &ADS1_chip);
+		set_irq_chip(irq, &gm_irq2_chip);
 		set_irq_handler(irq, do_level_IRQ);
 		set_irq_flags(irq, IRQF_PROBE | IRQF_VALID);
 	}
-	set_GPIO_IRQ_edge(GPIO_GPIO0, GPIO_FALLING_EDGE);
-	setup_arm_irq( IRQ_GPIO0, &ADS_ext_irq );
+	set_irq_type(IRQ_GPIO0, IRQT_FALLING);
+	set_irq_chained_handler(IRQ_GPIO0, gm_irq_handler);
 }
 
 
