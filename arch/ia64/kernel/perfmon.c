@@ -2714,7 +2714,7 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 		 * pfm_read_pmds().
 		 */
 		old_val = ctx->ctx_soft_pmds[i].val;
-		ctx->ctx_soft_pmds[i].val = 1 + pmu_conf.perf_ovfl_val;
+		ctx->ctx_soft_pmds[i].val += 1 + pmu_conf.perf_ovfl_val;
 
 		/*
 		 * check for overflow condition
