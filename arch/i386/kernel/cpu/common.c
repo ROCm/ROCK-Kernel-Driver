@@ -516,7 +516,7 @@ void __init cpu_init (void)
 		BUG();
 	enter_lazy_tlb(&init_mm, current, cpu);
 
-	t->esp0 = thread->esp0;
+	load_esp0(t, thread->esp0);
 	set_tss_desc(cpu,t);
 	cpu_gdt_table[cpu][GDT_ENTRY_TSS].b &= 0xfffffdff;
 	load_TR_desc();
