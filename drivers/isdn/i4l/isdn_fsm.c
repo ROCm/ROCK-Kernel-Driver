@@ -18,6 +18,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
+#include <linux/string.h>
 #include "isdn_fsm.h"
 
 int

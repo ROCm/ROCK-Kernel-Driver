@@ -11,9 +11,10 @@
  *
  */
 
-#ifndef __FSM_H__
-#define __FSM_H__
+#ifndef __ISDN_FSM_H__
+#define __ISDN_FSM_H__
 
+#include <linux/kernel.h>
 #include <linux/timer.h>
 
 struct fsm_inst;

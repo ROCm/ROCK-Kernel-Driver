@@ -44,6 +44,7 @@ enum {
 	ST_IN_WAIT_DCONN,
 	ST_IN_WAIT_BCONN,
 	ST_ACTIVE,
+	ST_WAIT_DHUP,
 	ST_WAIT_BEFORE_CB,
 	ST_OUT_DIAL_WAIT,
 };
@@ -55,6 +56,7 @@ static char *isdn_net_st_str[] = {
 	"ST_IN_WAIT_DCONN",
 	"ST_IN_WAIT_BCONN",
 	"ST_ACTIVE",
+	"ST_WAIT_DHUP",
 	"ST_WAIT_BEFORE_CB",
 	"ST_OUT_DIAL_WAIT",
 };
@@ -72,6 +74,7 @@ enum {
 	EV_STAT_BHUP,
 	EV_STAT_CINF,
 	EV_STAT_BSENT,
+	EV_CMD_DIAL,
 };
 
 static char *isdn_net_ev_str[] = {
@@ -87,6 +90,7 @@ static char *isdn_net_ev_str[] = {
 	"EV_STAT_BHUP",
 	"EV_STAT_CINF",
 	"EV_STAT_BSENT",
+	"EV_CMD_DIAL",
 };
 
 /* ====================================================================== */
@@ -1083,9 +1087,6 @@ isdn_net_tasklet(unsigned long data)
 /* call control state machine                                             */
 /* ====================================================================== */
 
-static void dialout_first(struct fsm_inst *fi, int pr, void *arg);
-static void dialout_next(struct fsm_inst *fi, int pr, void *arg);
-
 // FIXME
 int isdn_net_online(isdn_net_dev *idev)
 {
@@ -1182,8 +1183,7 @@ isdn_net_dial(isdn_net_dev *idev)
 		goto err;
 
 	/* Initiate dialing */
-	dialout_first(&idev->fi, 0, NULL); // FIXME
-
+	fsm_event(&idev->fi, EV_CMD_DIAL, NULL);
 	return 0;
 
  err:
@@ -1203,7 +1203,7 @@ isdn_net_accept(isdn_net_dev *idev, int slot, char *nr)
 	
 	idev->outgoing = 0;
 	idev->charge_state = ST_CHARGE_NULL;
-	/* Got incoming Call, setup L2 and L3 protocols,
+	/* Got incoming call, setup L2 and L3 protocols,
 	 * then wait for D-Channel-connect
 	 */
 	cmd.arg = mlp->l2_proto << 8;
@@ -1277,6 +1277,8 @@ get_outgoing_phone(isdn_net_dev *idev)
 	}
 	return NULL;
 }
+
+static void dialout_next(struct fsm_inst *fi, int pr, void *arg);
 
 /* Initiate dialout. */
 
@@ -1432,6 +1434,31 @@ bconn(struct fsm_inst *fi, int pr, void *arg)
 		isdn_net_dev_wake_queue(idev);
 }
 
+static void
+bhup(struct fsm_inst *fi, int pr, void *arg)
+{
+	isdn_net_dev *idev = fi->userdata;
+	isdn_net_local *mlp = idev->mlp;
+
+	del_timer(&idev->dial_timer);
+	if (mlp->ops->disconnected)
+		mlp->ops->disconnected(idev);
+
+	printk(KERN_INFO "%s: disconnected\n", idev->name);
+	fsm_change_state(fi, ST_WAIT_DHUP);
+	isdn_net_rm_from_bundle(idev);
+}
+
+static void
+dhup(struct fsm_inst *fi, int pr, void *arg)
+{
+	isdn_net_dev *idev = fi->userdata;
+
+	printk(KERN_INFO "%s: Chargesum is %d\n", idev->name, idev->charge);
+	isdn_slot_all_eaz(idev->isdn_slot);
+	isdn_net_unbind_channel(idev);
+}
+
 /* Check if it's time for idle hang-up */
 
 static void
@@ -1481,25 +1508,6 @@ got_cinf(struct fsm_inst *fi, int pr, void *arg)
 	}
 	idev->chargetime = jiffies;
 	dbg_net_dial("%s: got CINF\n", idev->name);
-}
-
-static void
-disconnected(struct fsm_inst *fi, int pr, void *arg)
-{
-	isdn_net_dev *idev = fi->userdata;
-	isdn_net_local *mlp = idev->mlp;
-
-	del_timer(&idev->dial_timer);
-	if (mlp->ops->disconnected)
-		mlp->ops->disconnected(idev);
-	
-	isdn_net_rm_from_bundle(idev);
-
-	printk(KERN_INFO "%s: disconnected\n", idev->name);
-	printk(KERN_INFO "%s: Chargesum is %d\n", idev->name,
-	       idev->charge);
-	isdn_slot_all_eaz(idev->isdn_slot);
-	isdn_net_unbind_channel(idev);
 }
 
 /* Perform hangup for a net-interface. */
@@ -1577,6 +1585,8 @@ got_bsent(struct fsm_inst *fi, int pr, void *arg)
 }
 
 static struct fsm_node isdn_net_fn_tbl[] = {
+	{ ST_NULL,           EV_CMD_DIAL,        dialout_first },
+
 	{ ST_OUT_WAIT_DCONN, EV_TIMER_DIAL,      dial_timeout  },
 	{ ST_OUT_WAIT_DCONN, EV_STAT_DCONN,      out_dconn     },
 	{ ST_OUT_WAIT_DCONN, EV_STAT_DHUP,       connect_fail  },
@@ -1595,9 +1605,11 @@ static struct fsm_node isdn_net_fn_tbl[] = {
 	{ ST_IN_WAIT_BCONN,  EV_STAT_DHUP,       connect_fail  },
 
 	{ ST_ACTIVE,         EV_TIMER_HUP,       check_hup     },
-	{ ST_ACTIVE,         EV_STAT_BHUP,       disconnected  },
+	{ ST_ACTIVE,         EV_STAT_BHUP,       bhup          },
 	{ ST_ACTIVE,         EV_STAT_CINF,       got_cinf      },
 	{ ST_ACTIVE,         EV_STAT_BSENT,      got_bsent     },
+
+	{ ST_WAIT_DHUP,      EV_STAT_DHUP,       dhup          },
 
 	{ ST_WAIT_BEFORE_CB, EV_TIMER_CB_IN,     dialout_first },
 
