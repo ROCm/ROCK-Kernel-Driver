@@ -379,7 +379,7 @@ struct tulip_private {
 	int ttimer;
 	int susp_rx;
 	unsigned long nir;
-	unsigned long base_addr;
+	void __iomem *base_addr;
 	int csr12_shadow;
 	int pad0;		/* Used for 8-byte alignment */
 };
@@ -446,40 +446,23 @@ extern struct tulip_chip_table tulip_tbl[];
 void oom_timer(unsigned long data);
 extern u8 t21040_csr13[];
 
-#ifndef USE_IO_OPS
-#undef inb
-#undef inw
-#undef inl
-#undef outb
-#undef outw
-#undef outl
-#define inb(addr) readb((void*)(addr))
-#define inw(addr) readw((void*)(addr))
-#define inl(addr) readl((void*)(addr))
-#define outb(val,addr) writeb((val), (void*)(addr))
-#define outw(val,addr) writew((val), (void*)(addr))
-#define outl(val,addr) writel((val), (void*)(addr))
-#endif /* !USE_IO_OPS */
-
-
-
 static inline void tulip_start_rxtx(struct tulip_private *tp)
 {
-	long ioaddr = tp->base_addr;
-	outl(tp->csr6 | RxTx, ioaddr + CSR6);
+	void __iomem *ioaddr = tp->base_addr;
+	iowrite32(tp->csr6 | RxTx, ioaddr + CSR6);
 	barrier();
-	(void) inl(ioaddr + CSR6); /* mmio sync */
+	(void) ioread32(ioaddr + CSR6); /* mmio sync */
 }
 
 static inline void tulip_stop_rxtx(struct tulip_private *tp)
 {
-	long ioaddr = tp->base_addr;
-	u32 csr6 = inl(ioaddr + CSR6);
+	void __iomem *ioaddr = tp->base_addr;
+	u32 csr6 = ioread32(ioaddr + CSR6);
 
 	if (csr6 & RxTx) {
-		outl(csr6 & ~RxTx, ioaddr + CSR6);
+		iowrite32(csr6 & ~RxTx, ioaddr + CSR6);
 		barrier();
-		(void) inl(ioaddr + CSR6); /* mmio sync */
+		(void) ioread32(ioaddr + CSR6); /* mmio sync */
 	}
 }
 

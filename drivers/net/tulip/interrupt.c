@@ -89,11 +89,11 @@ int tulip_refill_rx(struct net_device *dev)
 		tp->rx_ring[entry].status = cpu_to_le32(DescOwned);
 	}
 	if(tp->chip_id == LC82C168) {
-		if(((inl(dev->base_addr + CSR5)>>17)&0x07) == 4) {
+		if(((ioread32(tp->base_addr + CSR5)>>17)&0x07) == 4) {
 			/* Rx stopped due to out of buffers,
 			 * restart it
 			 */
-			outl(0x01, dev->base_addr + CSR2);
+			iowrite32(0x01, tp->base_addr + CSR2);
 		}
 	}
 	return refilled;
@@ -133,12 +133,12 @@ int tulip_poll(struct net_device *dev, int *budget)
 			   tp->rx_ring[entry].status);
 
        do {
-		if (inl(dev->base_addr + CSR5) == 0xffffffff) {
+		if (ioread32(tp->base_addr + CSR5) == 0xffffffff) {
 			printk(KERN_DEBUG " In tulip_poll(), hardware disappeared.\n");
 			break;
 		}
                /* Acknowledge current RX interrupt sources. */
-               outl((RxIntr | RxNoBuf), dev->base_addr + CSR5);
+               iowrite32((RxIntr | RxNoBuf), tp->base_addr + CSR5);
  
  
                /* If we own the next entry, it is a new packet. Send it up. */
@@ -258,7 +258,7 @@ int tulip_poll(struct net_device *dev, int *budget)
                 * No idea how to fix this if "playing with fire" will fail
                 * tomorrow (night 011029). If it will not fail, we won
                 * finally: amount of IO did not increase at all. */
-       } while ((inl(dev->base_addr + CSR5) & RxIntr));
+       } while ((ioread32(tp->base_addr + CSR5) & RxIntr));
  
 done:
  
@@ -285,13 +285,13 @@ done:
                  if( received > 1 ) {
                          if( ! tp->mit_on ) {
                                  tp->mit_on = 1;
-                                 outl(mit_table[MIT_TABLE], dev->base_addr + CSR11);
+                                 iowrite32(mit_table[MIT_TABLE], tp->base_addr + CSR11);
                          }
                   }
                  else {
                          if( tp->mit_on ) {
                                  tp->mit_on = 0;
-                                 outl(0, dev->base_addr + CSR11);
+                                 iowrite32(0, tp->base_addr + CSR11);
                          }
                   }
           }
@@ -309,7 +309,7 @@ done:
          /* Remove us from polling list and enable RX intr. */
  
          netif_rx_complete(dev);
-         outl(tulip_tbl[tp->chip_id].valid_intrs, dev->base_addr+CSR7);
+         iowrite32(tulip_tbl[tp->chip_id].valid_intrs, tp->base_addr+CSR7);
  
          /* The last op happens after poll completion. Which means the following:
           * 1. it can race with disabling irqs in irq handler
@@ -474,19 +474,19 @@ static int tulip_rx(struct net_device *dev)
 static inline unsigned int phy_interrupt (struct net_device *dev)
 {
 #ifdef __hppa__
-	int csr12 = inl(dev->base_addr + CSR12) & 0xff;
 	struct tulip_private *tp = netdev_priv(dev);
+	int csr12 = ioread32(tp->base_addr + CSR12) & 0xff;
 
 	if (csr12 != tp->csr12_shadow) {
 		/* ack interrupt */
-		outl(csr12 | 0x02, dev->base_addr + CSR12);
+		iowrite32(csr12 | 0x02, tp->base_addr + CSR12);
 		tp->csr12_shadow = csr12;
 		/* do link change stuff */
 		spin_lock(&tp->lock);
 		tulip_check_duplex(dev);
 		spin_unlock(&tp->lock);
 		/* clear irq ack bit */
-		outl(csr12 & ~0x02, dev->base_addr + CSR12);
+		iowrite32(csr12 & ~0x02, tp->base_addr + CSR12);
 
 		return 1;
 	}
@@ -501,7 +501,7 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_instance;
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = tp->base_addr;
 	int csr5;
 	int missed;
 	int rx = 0;
@@ -519,7 +519,7 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	unsigned int handled = 0;
 
 	/* Let's see whether the interrupt really is for us */
-	csr5 = inl(ioaddr + CSR5);
+	csr5 = ioread32(ioaddr + CSR5);
 
         if (tp->flags & HAS_PHY_IRQ) 
 	        handled = phy_interrupt (dev);
@@ -536,7 +536,7 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		if (!rxd && (csr5 & (RxIntr | RxNoBuf))) {
 			rxd++;
 			/* Mask RX intrs and add the device to poll list. */
-			outl(tulip_tbl[tp->chip_id].valid_intrs&~RxPollInt, ioaddr + CSR7);
+			iowrite32(tulip_tbl[tp->chip_id].valid_intrs&~RxPollInt, ioaddr + CSR7);
 			netif_rx_schedule(dev);
 			
 			if (!(csr5&~(AbnormalIntr|NormalIntr|RxPollInt|TPLnkPass)))
@@ -546,11 +546,11 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
                /* Acknowledge the interrupt sources we handle here ASAP
                   the poll function does Rx and RxNoBuf acking */
 		
-		outl(csr5 & 0x0001ff3f, ioaddr + CSR5);
+		iowrite32(csr5 & 0x0001ff3f, ioaddr + CSR5);
 
 #else 
 		/* Acknowledge all of the current interrupt sources ASAP. */
-		outl(csr5 & 0x0001ffff, ioaddr + CSR5);
+		iowrite32(csr5 & 0x0001ffff, ioaddr + CSR5);
 
 
 		if (csr5 & (RxIntr | RxNoBuf)) {
@@ -562,7 +562,7 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		
 		if (tulip_debug > 4)
 			printk(KERN_DEBUG "%s: interrupt  csr5=%#8.8x new csr5=%#8.8x.\n",
-			       dev->name, csr5, inl(dev->base_addr + CSR5));
+			       dev->name, csr5, ioread32(ioaddr + CSR5));
 		
 
 		if (csr5 & (TxNoBuf | TxDied | TxIntr | TimerInt)) {
@@ -637,7 +637,7 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				if (tulip_debug > 2)
 					printk(KERN_WARNING "%s: The transmitter stopped."
 						   "  CSR5 is %x, CSR6 %x, new CSR6 %x.\n",
-						   dev->name, csr5, inl(ioaddr + CSR6), tp->csr6);
+						   dev->name, csr5, ioread32(ioaddr + CSR6), tp->csr6);
 				tulip_restart_rxtx(tp);
 			}
 			spin_unlock(&tp->lock);
@@ -655,16 +655,16 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					tp->csr6 |= 0x00200000;  /* Store-n-forward. */
 				/* Restart the transmit process. */
 				tulip_restart_rxtx(tp);
-				outl(0, ioaddr + CSR1);
+				iowrite32(0, ioaddr + CSR1);
 			}
 			if (csr5 & (RxDied | RxNoBuf)) {
 				if (tp->flags & COMET_MAC_ADDR) {
-					outl(tp->mc_filter[0], ioaddr + 0xAC);
-					outl(tp->mc_filter[1], ioaddr + 0xB0);
+					iowrite32(tp->mc_filter[0], ioaddr + 0xAC);
+					iowrite32(tp->mc_filter[1], ioaddr + 0xB0);
 				}
 			}
 			if (csr5 & RxDied) {		/* Missed a Rx frame. */
-                                tp->stats.rx_missed_errors += inl(ioaddr + CSR8) & 0xffff;
+                                tp->stats.rx_missed_errors += ioread32(ioaddr + CSR8) & 0xffff;
 				tp->stats.rx_errors++;
 				tulip_start_rxtx(tp);
 			}
@@ -692,7 +692,7 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					dev->name, tp->nir, error);
 			}
 			/* Clear all error sources, included undocumented ones! */
-			outl(0x0800f7ba, ioaddr + CSR5);
+			iowrite32(0x0800f7ba, ioaddr + CSR5);
 			oi++;
 		}
 		if (csr5 & TimerInt) {
@@ -700,7 +700,7 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 			if (tulip_debug > 2)
 				printk(KERN_ERR "%s: Re-enabling interrupts, %8.8x.\n",
 					   dev->name, csr5);
-			outl(tulip_tbl[tp->chip_id].valid_intrs, ioaddr + CSR7);
+			iowrite32(tulip_tbl[tp->chip_id].valid_intrs, ioaddr + CSR7);
 			tp->ttimer = 0;
 			oi++;
 		}
@@ -710,20 +710,20 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					   "csr5=0x%8.8x. (%lu) (%d,%d,%d)\n", dev->name, csr5, tp->nir, tx, rx, oi);
 
                        /* Acknowledge all interrupt sources. */
-                        outl(0x8001ffff, ioaddr + CSR5);
+                        iowrite32(0x8001ffff, ioaddr + CSR5);
                         if (tp->flags & HAS_INTR_MITIGATION) {
                      /* Josip Loncaric at ICASE did extensive experimentation
 			to develop a good interrupt mitigation setting.*/
-                                outl(0x8b240000, ioaddr + CSR11);
+                                iowrite32(0x8b240000, ioaddr + CSR11);
                         } else if (tp->chip_id == LC82C168) {
 				/* the LC82C168 doesn't have a hw timer.*/
-				outl(0x00, ioaddr + CSR7);
+				iowrite32(0x00, ioaddr + CSR7);
 				mod_timer(&tp->timer, RUN_AT(HZ/50));
 			} else {
                           /* Mask all interrupting sources, set timer to
 				re-enable. */
-                                outl(((~csr5) & 0x0001ebef) | AbnormalIntr | TimerInt, ioaddr + CSR7);
-                                outl(0x0012, ioaddr + CSR11);
+                                iowrite32(((~csr5) & 0x0001ebef) | AbnormalIntr | TimerInt, ioaddr + CSR7);
+                                iowrite32(0x0012, ioaddr + CSR11);
                         }
 			break;
 		}
@@ -732,7 +732,7 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		if (work_count == 0)
 			break;
 
-		csr5 = inl(ioaddr + CSR5);
+		csr5 = ioread32(ioaddr + CSR5);
 
 #ifdef CONFIG_TULIP_NAPI
 		if (rxd)
@@ -758,29 +758,29 @@ irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		if (tulip_debug > 1)
 			printk(KERN_WARNING "%s: in rx suspend mode: (%lu) (tp->cur_rx = %u, ttimer = %d, rx = %d) go/stay in suspend mode\n", dev->name, tp->nir, tp->cur_rx, tp->ttimer, rx);
 		if (tp->chip_id == LC82C168) {
-			outl(0x00, ioaddr + CSR7);
+			iowrite32(0x00, ioaddr + CSR7);
 			mod_timer(&tp->timer, RUN_AT(HZ/50));
 		} else {
-			if (tp->ttimer == 0 || (inl(ioaddr + CSR11) & 0xffff) == 0) {
+			if (tp->ttimer == 0 || (ioread32(ioaddr + CSR11) & 0xffff) == 0) {
 				if (tulip_debug > 1)
 					printk(KERN_WARNING "%s: in rx suspend mode: (%lu) set timer\n", dev->name, tp->nir);
-				outl(tulip_tbl[tp->chip_id].valid_intrs | TimerInt,
+				iowrite32(tulip_tbl[tp->chip_id].valid_intrs | TimerInt,
 					ioaddr + CSR7);
-				outl(TimerInt, ioaddr + CSR5);
-				outl(12, ioaddr + CSR11);
+				iowrite32(TimerInt, ioaddr + CSR5);
+				iowrite32(12, ioaddr + CSR11);
 				tp->ttimer = 1;
 			}
 		}
 	}
 #endif /* CONFIG_TULIP_NAPI */
 
-	if ((missed = inl(ioaddr + CSR8) & 0x1ffff)) {
+	if ((missed = ioread32(ioaddr + CSR8) & 0x1ffff)) {
 		tp->stats.rx_dropped += missed & 0x10000 ? 0x10000 : missed;
 	}
 
 	if (tulip_debug > 4)
 		printk(KERN_DEBUG "%s: exiting interrupt, csr5=%#4.4x.\n",
-			   dev->name, inl(ioaddr + CSR5));
+			   dev->name, ioread32(ioaddr + CSR5));
 
 	return IRQ_HANDLED;
 }
