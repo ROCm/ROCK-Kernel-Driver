@@ -118,7 +118,7 @@ make_resource(unsigned long b, unsigned long n, int flags, char *name)
 		res->name = name;
 		res->start = b;
 		res->end = b + n - 1;
-		res->flags = flags | IORESOURCE_BUSY;
+		res->flags = flags;
 	}
 	return res;
 }
@@ -634,7 +634,7 @@ int adjust_io_region(struct resource *res, unsigned long r_start,
 struct resource *find_io_region(unsigned long base, int num,
 		   unsigned long align, char *name, struct pcmcia_socket *s)
 {
-	struct resource *res = make_resource(0, num, IORESOURCE_IO, name);
+	struct resource *res = make_resource(0, num, IORESOURCE_IO, s->dev.class_id);
 	struct pcmcia_align_data data;
 	unsigned long min = base;
 	int ret;
@@ -667,7 +667,7 @@ struct resource *find_io_region(unsigned long base, int num,
 struct resource *find_mem_region(u_long base, u_long num, u_long align,
 				 int low, char *name, struct pcmcia_socket *s)
 {
-	struct resource *res = make_resource(0, num, IORESOURCE_MEM, name);
+	struct resource *res = make_resource(0, num, IORESOURCE_MEM, s->dev.class_id);
 	struct pcmcia_align_data data;
 	unsigned long min, max;
 	int ret, i;
