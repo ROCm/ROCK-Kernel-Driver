@@ -18,6 +18,7 @@
 #include <linux/device.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 
@@ -64,7 +65,7 @@ static void __init omap_generic_map_io(void)
 	omap_map_io();
 }
 
-MACHINE_START(OMAP_GENERIC, "Generic OMAP-1510/1610")
+MACHINE_START(OMAP_GENERIC, "Generic OMAP-1510/1610/1710")
 	MAINTAINER("Tony Lindgren <tony@atomide.com>")
 	BOOT_MEM(0x10000000, 0xfff00000, 0xfef00000)
 	BOOT_PARAMS(0x10000100)
