@@ -916,12 +916,8 @@ typedef volatile struct bridge_s {
 
 #define PCIBR_TYPE1_CFG(ps)         PCIBRIDGE_TYPE1_CFG((ps)->bs_busnum)
 #define PCIBR_BUS_TYPE0_CFG_DEV0(ps) PCIBR_TYPE0_CFG_DEV(ps, 0)
-#define PCIBR_TYPE0_CFG_DEV(ps, s) \
-    ((IS_PIC_SOFT(ps)) ? PCIBRIDGE_TYPE0_CFG_DEV((ps)->bs_busnum, s+1) : \
-		  	     PCIBRIDGE_TYPE0_CFG_DEV((ps)->bs_busnum, s))
-#define PCIBR_BUS_TYPE0_CFG_DEVF(ps,s,f) \
-    ((IS_PIC_SOFT(ps)) ? PCIBRIDGE_TYPE0_CFG_DEVF((ps)->bs_busnum,(s+1),f) : \
-			     PCIBRIDGE_TYPE0_CFG_DEVF((ps)->bs_busnum,s,f))
+#define PCIBR_TYPE0_CFG_DEV(ps, s) PCIBRIDGE_TYPE0_CFG_DEV((ps)->bs_busnum, s+1)
+#define PCIBR_BUS_TYPE0_CFG_DEVF(ps,s,f) PCIBRIDGE_TYPE0_CFG_DEVF((ps)->bs_busnum,(s+1),f)
 
 #endif				/* LANGUAGE_C */
 

@@ -90,6 +90,7 @@
 #define L1_BRICKTYPE_IP45       0x34            /* 4 */
 #define L1_BRICKTYPE_C          0x43            /* C */
 #define L1_BRICKTYPE_R          0x52            /* R */
+#define L1_BRICKTYPE_CHI_CG	0x76		/* v */
 #define L1_BRICKTYPE_N          0x4e            /* N */
 #define L1_BRICKTYPE_PX		0x23		/* # */
 #define L1_BRICKTYPE_IX		0x3d		/* = */
