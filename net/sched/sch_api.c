@@ -1103,42 +1103,34 @@ int psched_tod_diff(int delta_sec, int bound)
 EXPORT_SYMBOL(psched_tod_diff);
 #endif
 
-psched_time_t psched_time_base;
-
 #if PSCHED_CLOCK_SOURCE == PSCHED_CPU
 psched_tdiff_t psched_clock_per_hz;
 int psched_clock_scale;
 EXPORT_SYMBOL(psched_clock_per_hz);
 EXPORT_SYMBOL(psched_clock_scale);
-#endif
 
-#ifdef PSCHED_WATCHER
-PSCHED_WATCHER psched_time_mark;
+psched_time_t psched_time_base;
+cycles_t psched_time_mark;
 EXPORT_SYMBOL(psched_time_mark);
 EXPORT_SYMBOL(psched_time_base);
 
+/*
+ * Periodically adjust psched_time_base to avoid overflow
+ * with 32-bit get_cycles(). Safe up to 4GHz CPU.
+ */
 static void psched_tick(unsigned long);
-
 static struct timer_list psched_timer = TIMER_INITIALIZER(psched_tick, 0, 0);
 
 static void psched_tick(unsigned long dummy)
 {
-#if PSCHED_CLOCK_SOURCE == PSCHED_CPU
-	psched_time_t dummy_stamp;
-	PSCHED_GET_TIME(dummy_stamp);
-	/* It is OK up to 4GHz cpu */
-	psched_timer.expires = jiffies + 1*HZ;
-#else
-	unsigned long now = jiffies;
-	psched_time_base += ((u64)(now-psched_time_mark))<<PSCHED_JSCALE;
-	psched_time_mark = now;
-	psched_timer.expires = now + 60*60*HZ;
-#endif
-	add_timer(&psched_timer);
+	if (sizeof(cycles_t) == sizeof(u32)) {
+		psched_time_t dummy_stamp;
+		PSCHED_GET_TIME(dummy_stamp);
+		psched_timer.expires = jiffies + 1*HZ;
+		add_timer(&psched_timer);
+	}
 }
-#endif
 
-#if PSCHED_CLOCK_SOURCE == PSCHED_CPU
 int __init psched_calibrate_clock(void)
 {
 	psched_time_t stamp, stamp1;
@@ -1147,9 +1139,7 @@ int __init psched_calibrate_clock(void)
 	long rdelay;
 	unsigned long stop;
 
-#ifdef PSCHED_WATCHER
 	psched_tick(0);
-#endif
 	stop = jiffies + HZ/10;
 	PSCHED_GET_TIME(stamp);
 	do_gettimeofday(&tv);
@@ -1185,9 +1175,6 @@ static int __init pktsched_init(void)
 #elif PSCHED_CLOCK_SOURCE == PSCHED_JIFFIES
 	psched_tick_per_us = HZ<<PSCHED_JSCALE;
 	psched_us_per_tick = 1000000;
-#ifdef PSCHED_WATCHER
-	psched_tick(0);
-#endif
 #endif
 
 	link_p = rtnetlink_links[PF_UNSPEC];
