@@ -28,7 +28,6 @@ bootmem_data_t plat_node_bdata[MAX_NUMNODES];
 int memnode_shift;
 u8  memnodemap[NODEMAPSIZE];
 
-#define NUMA_NO_NODE 0xff
 unsigned char cpu_to_node[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
 cpumask_t     node_to_cpumask[MAX_NUMNODES];
 

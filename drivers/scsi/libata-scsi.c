@@ -282,7 +282,8 @@ void ata_to_sense_error(struct ata_queued_cmd *qc, u8 drv_stat)
 	/* No immediate match */
 	if(err)
 		printk(KERN_DEBUG "ata%u: no sense translation for 0x%02x\n", qc->ap->id, err);
-	
+
+	i = 0;
 	/* Fall back to interpreting status bits */
 	while(stat_table[i][0] != 0xFF)
 	{
