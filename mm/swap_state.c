@@ -6,7 +6,7 @@
  *
  *  Rewritten to use page cache, (C) 1998 Stephen Tweedie
  */
-
+#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/kernel_stat.h>
 #include <linux/swap.h>
@@ -38,6 +38,7 @@ struct address_space swapper_space = {
 	.a_ops		= &swap_aops,
 	.backing_dev_info = &swap_backing_dev_info,
 };
+EXPORT_SYMBOL(swapper_space);
 
 #define INC_CACHE_INFO(x)	do { swap_cache_info.x++; } while (0)
 

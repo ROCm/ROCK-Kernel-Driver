@@ -145,7 +145,7 @@ static __inline__ long long atomic64_inc_return(volatile atomic64_t * v)
 }
 static __inline__ long long atomic64_inc_and_test(volatile atomic64_t * v)
 {
-	return __CSG_LOOP(v, 1, "agr") != 0;
+	return __CSG_LOOP(v, 1, "agr") == 0;
 }
 static __inline__ void atomic64_dec(volatile atomic64_t * v)
 {

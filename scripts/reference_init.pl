@@ -1,10 +1,19 @@
 #!/usr/bin/perl -w
 #
-# reference_discarded.pl (C) Keith Owens 2001 <kaos@ocs.com.au>
+# reference_init.pl (C) Keith Owens 2002 <kaos@ocs.com.au>
 #
-# Released under GPL V2.
+# List references to vmlinux init sections from non-init sections.
+
+# Unfortunately I had to exclude references from read only data to .init
+# sections, almost all of these are false positives, they are created by
+# gcc.  The downside of excluding rodata is that there really are some
+# user references from rodata to init code, e.g. drivers/video/vgacon.c
 #
-# List dangling references to vmlinux discarded sections.
+# const struct consw vga_con = {
+#        con_startup:            vgacon_startup,
+#
+# where vgacon_startup is __init.  If you want to wade through the false
+# positives, take out the check for rodata.
 
 use strict;
 die($0 . " takes no arguments\n") if($#ARGV >= 0);
@@ -13,11 +22,10 @@ my %object;
 my $object;
 my $line;
 my $ignore;
-my $errorcount;
 
 $| = 1;
 
-# printf("Finding objects, ");
+printf("Finding objects, ");
 open(OBJDUMP_LIST, "find . -name '*.o' | xargs objdump -h |") || die "getting objdump list failed";
 while (defined($line = <OBJDUMP_LIST>)) {
 	chomp($line);
@@ -35,7 +43,7 @@ while (defined($line = <OBJDUMP_LIST>)) {
 	}
 }
 close(OBJDUMP_LIST);
-# printf("%d objects, ", scalar keys(%object));
+printf("%d objects, ", scalar keys(%object));
 $ignore = 0;
 foreach $object (keys(%object)) {
 	if ($object{$object}->{'module'}) {
@@ -43,14 +51,14 @@ foreach $object (keys(%object)) {
 		delete($object{$object});
 	}
 }
-# printf("ignoring %d module(s)\n", $ignore);
+printf("ignoring %d module(s)\n", $ignore);
 
 # Ignore conglomerate objects, they have been built from multiple objects and we
 # only care about the individual objects.  If an object has more than one GCC:
 # string in the comment section then it is conglomerate.  This does not filter
 # out conglomerates that consist of exactly one object, can't be helped.
 
-# printf("Finding conglomerates, ");
+printf("Finding conglomerates, ");
 $ignore = 0;
 foreach $object (keys(%object)) {
 	if (exists($object{$object}->{'off'})) {
@@ -68,11 +76,10 @@ foreach $object (keys(%object)) {
 		}
 	}
 }
-# printf("ignoring %d conglomerate(s)\n", $ignore);
+printf("ignoring %d conglomerate(s)\n", $ignore);
 
-# printf("Scanning objects\n");
-$errorcount = 0;
-foreach $object (keys(%object)) {
+printf("Scanning objects\n");
+foreach $object (sort(keys(%object))) {
 	my $from;
 	open(OBJDUMP, "objdump -r $object|") || die "cannot objdump -r $object";
 	while (defined($line = <OBJDUMP>)) {
@@ -80,30 +87,16 @@ foreach $object (keys(%object)) {
 		if ($line =~ /RELOCATION RECORDS FOR /) {
 			($from = $line) =~ s/.*\[([^]]*).*/$1/;
 		}
-		if (($line =~ /\.text\.exit$/ ||
-		     $line =~ /\.exit\.text$/ ||
-		     $line =~ /\.data\.exit$/ ||
-		     $line =~ /\.exit\.data$/ ||
-		     $line =~ /\.exitcall\.exit$/) &&
-		    ($from !~ /\.text\.exit$/ &&
-		     $from !~ /\.exit\.text$/ &&
-		     $from !~ /\.data\.exit$/ &&
-		     $from !~ /\.exit\.data$/ &&
-		     $from !~ /\.altinstructions$/ &&
-		     $from !~ /\.debug_info$/ &&
-		     $from !~ /\.debug_aranges$/ &&
-		     $from !~ /\.debug_ranges$/ &&
-		     $from !~ /\.debug_line$/ &&
-		     $from !~ /\.debug_frame$/ &&
-		     $from !~ /\.exitcall\.exit$/ &&
-		     $from !~ /\.eh_frame$/ &&
-		     $from !~ /\.stab$/)) {
+		if (($line =~ /\.init$/ || $line =~ /\.init\./) &&
+		    ($from !~ /\.init$/ &&
+		     $from !~ /\.init\./ &&
+		     $from !~ /\.stab$/ &&
+		     $from !~ /\.rodata$/ &&
+		     $from !~ /\.text\.lock$/ &&
+		     $from !~ /\.debug_/)) {
 			printf("Error: %s %s refers to %s\n", $object, $from, $line);
-			$errorcount = $errorcount + 1;
 		}
 	}
 	close(OBJDUMP);
 }
-# printf("Done\n");
-
-exit(0);
+printf("Done\n");

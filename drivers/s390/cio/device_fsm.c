@@ -459,20 +459,6 @@ ccw_device_nopath_notify(void *data)
 }
 
 void
-device_call_nopath_notify(struct subchannel *sch)
-{
-	struct ccw_device *cdev;
-
-	if (!sch->dev.driver_data)
-		return;
-	cdev = sch->dev.driver_data;
-	PREPARE_WORK(&cdev->private->kick_work,
-		     ccw_device_nopath_notify, (void *)cdev);
-	queue_work(ccw_device_notify_work, &cdev->private->kick_work);
-}
-
-
-void
 ccw_device_verify_done(struct ccw_device *cdev, int err)
 {
 	cdev->private->flags.doverify = 0;

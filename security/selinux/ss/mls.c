@@ -290,7 +290,7 @@ int mls_context_to_sid(char oldc,
 		if (rc)
 			goto out;
 	}
-	*scontext = p;
+	*scontext = ++p;
 	rc = 0;
 out:
 	return rc;

@@ -354,7 +354,7 @@ static int futex_requeue(unsigned long uaddr1, unsigned long uaddr2,
 		   before *uaddr1.  */
 		smp_mb();
 
-		if (get_user(curval, (int *)uaddr1) != 0) {
+		if (get_user(curval, (int __user *)uaddr1) != 0) {
 			ret = -EFAULT;
 			goto out;
 		}
