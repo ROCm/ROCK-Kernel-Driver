@@ -345,13 +345,12 @@ io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 			return;
 		}
 
-		board = find_lboard_class(
-				(lboard_t *)KL_CONFIG_INFO(nasid),
-				KLCLASS_IOBRICK);
+		board = find_lboard_class_nasid( (lboard_t *)KL_CONFIG_INFO(nasid),
+				nasid, KLCLASS_IOBRICK);
 		if (!board && NODEPDA(cnode)->xbow_peer != INVALID_NASID) {
-		    	board = find_lboard_class(
-					(lboard_t *)KL_CONFIG_INFO( NODEPDA(cnode)->xbow_peer),
-						KLCLASS_IOBRICK);
+		    	board = find_lboard_class_nasid(
+				(lboard_t *)KL_CONFIG_INFO( NODEPDA(cnode)->xbow_peer),
+					NODEPDA(cnode)->xbow_peer, KLCLASS_IOBRICK);
 		}
 
 		if (board) {
@@ -366,7 +365,7 @@ io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 		{
 			lboard_t *brd;
 
-			brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
+			brd = find_lboard_any((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
 			if ( brd != (lboard_t *)0 ) {
 				board->brd_geoid = brd->brd_geoid;
 			}

@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
@@ -70,8 +71,7 @@ u64 sn_partition_serial_number;
 
 short physical_node_map[MAX_PHYSNODE_ID];
 
-int     numionodes;
-
+int	numionodes;
 /*
  * This is the address of the RRegs in the HSpace of the global
  * master.  It is used by a hack in serial.c (serial_[in|out],
@@ -340,7 +340,7 @@ sn_init_pdas(char **cmdline_p)
 	/*
 	 * Now copy the array of nodepda pointers to each nodepda.
 	 */
-        for (cnode=0; cnode < numnodes; cnode++)
+        for (cnode=0; cnode < numionodes; cnode++)
 		memcpy(nodepdaindr[cnode]->pernode_pdaindr, nodepdaindr, sizeof(nodepdaindr));
 
 
@@ -437,8 +437,10 @@ sn_cpu_init(void)
  */
 
 void
-scan_for_ionodes(void) {
+scan_for_ionodes(void)
+{
 	int nasid = 0;
+	lboard_t *brd;
 
 	/* Setup ionodes with memory */
 	for (nasid = 0; nasid < MAX_PHYSNODE_ID; nasid +=2) {
@@ -457,5 +459,30 @@ scan_for_ionodes(void) {
 					NODE_OFFSET_TO_LBOARD( (nasid),
 					((kl_config_hdr_t *)(klgraph_header))->
 					ch_board_info);
+	}
+
+	/* Scan headless/memless IO Nodes. */
+	for (nasid = 0; nasid < MAX_PHYSNODE_ID; nasid +=2) {
+		/* if there's no nasid, don't try to read the klconfig on the node */
+		if (physical_node_map[nasid] == -1) continue;
+		brd = find_lboard_any((lboard_t *)root_lboard[nasid_to_cnodeid(nasid)], KLTYPE_SNIA);
+		if (brd) {
+			brd = KLCF_NEXT_ANY(brd); /* Skip this node's lboard */
+			if (!brd)
+				continue;
+		}
+
+		brd = find_lboard_any(brd, KLTYPE_SNIA);
+		while (brd) {
+			pda->cnodeid_to_nasid_table[numionodes] = brd->brd_nasid;
+			physical_node_map[brd->brd_nasid] = numionodes;
+			root_lboard[numionodes] = brd;
+			numionodes++;
+			brd = KLCF_NEXT_ANY(brd);
+			if (!brd)
+				break;
+
+			brd = find_lboard_any(brd, KLTYPE_SNIA);
+		}
 	}
 }

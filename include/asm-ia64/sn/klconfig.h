@@ -672,18 +672,19 @@ typedef union kldev_s {      /* for device structure allocation */
 /* external declarations of Linux kernel functions. */
 
 extern lboard_t *root_lboard[];
-extern lboard_t *find_lboard(lboard_t *start, unsigned char type);
+extern lboard_t *find_lboard_any(lboard_t *start, unsigned char type);
+extern lboard_t *find_lboard_nasid(lboard_t *start, nasid_t, unsigned char type);
 extern klinfo_t *find_component(lboard_t *brd, klinfo_t *kli, unsigned char type);
 extern klinfo_t *find_first_component(lboard_t *brd, unsigned char type);
 extern klcpu_t *nasid_slice_to_cpuinfo(nasid_t, int);
 
 
 extern lboard_t *find_gfxpipe(int pipenum);
-extern lboard_t *find_lboard_class(lboard_t *start, unsigned char brd_class);
+extern lboard_t *find_lboard_class_any(lboard_t *start, unsigned char brd_class);
+extern lboard_t *find_lboard_class_nasid(lboard_t *start, nasid_t, unsigned char brd_class);
 extern lboard_t *find_nic_lboard(lboard_t *, nic_t);
 extern lboard_t *find_nic_type_lboard(nasid_t, unsigned char, nic_t);
 extern lboard_t *find_lboard_modslot(lboard_t *start, geoid_t geoid);
-extern lboard_t *find_lboard_module(lboard_t *start, geoid_t geoid);
 extern int	config_find_nic_router(nasid_t, nic_t, lboard_t **, klrou_t**);
 extern int	config_find_nic_hub(nasid_t, nic_t, lboard_t **, klhub_t**);
 extern int	config_find_xbow(nasid_t, lboard_t **, klxbow_t**);

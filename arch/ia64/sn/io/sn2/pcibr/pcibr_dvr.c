@@ -2638,14 +2638,18 @@ pcibr_bridge_ptr_get(vertex_hdl_t widget_vhdl, int bus_num)
 
 
 int
-isIO9(nasid_t nasid) {
+isIO9(nasid_t nasid)
+{
 	lboard_t *brd = (lboard_t *)KL_CONFIG_INFO(nasid);
 
 	while (brd) {
 		if (brd->brd_flags & LOCAL_MASTER_IO6) {
 			return 1;
 		}
-		brd = KLCF_NEXT(brd);
+                if (numionodes == numnodes)
+                        brd = KLCF_NEXT_ANY(brd);
+                else
+                        brd = KLCF_NEXT(brd);
 	}
 	/* if it's dual ported, check the peer also */
 	nasid = NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->xbow_peer;
@@ -2655,7 +2659,11 @@ isIO9(nasid_t nasid) {
 		if (brd->brd_flags & LOCAL_MASTER_IO6) {
 			return 1;
 		}
-		brd = KLCF_NEXT(brd);
+                if (numionodes == numnodes)
+                        brd = KLCF_NEXT_ANY(brd);
+                else
+                        brd = KLCF_NEXT(brd);
+
 	}
 	return 0;
 }
