@@ -387,7 +387,7 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 		/* Copy scratch regs to sigcontext if the signal didn't interrupt a syscall. */
 		err |= __put_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);		/* ar.ccv */
 		err |= __put_user(scr->pt.b7, &sc->sc_br[7]);			/* b7 */
-		err |= __put_user(sc->sc_gr[14], &scr->pt.r14);			/* r14 */
+		err |= __put_user(scr->pt.r14, &sc->sc_gr[14]);			/* r14 */
 		err |= __copy_to_user(&scr->pt.ar_csd, &sc->sc_ar25, 2*8); /* ar.csd & ar.ssd */
 		err |= __copy_to_user(&sc->sc_gr[2], &scr->pt.r2, 2*8);		/* r2-r3 */
 		err |= __copy_to_user(&sc->sc_gr[16], &scr->pt.r16, 16*8);	/* r16-r31 */
