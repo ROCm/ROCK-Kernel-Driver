@@ -20,7 +20,7 @@
 	Linux Kernel Additions:
 	
  	0.99H+lk0.9 - David S. Miller - softnet, PCI DMA updates
- 	0.99H+lk1.0 - Jeff Garzik <jgarzik@mandrakesoft.com>
+ 	0.99H+lk1.0 - Jeff Garzik <jgarzik@pobox.com>
 		Remove compatibility defines for kernel versions < 2.2.x.
 		Update for new 2.3.x module interface
 	LK1.1.2 (March 19, 2000)

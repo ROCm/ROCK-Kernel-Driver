@@ -1,7 +1,7 @@
 /*
  * linux/include/video/vga.h -- standard VGA chipset interaction
  *
- * Copyright 1999 Jeff Garzik <jgarzik@mandrakesoft.com>
+ * Copyright 1999 Jeff Garzik <jgarzik@pobox.com>
  * 
  * Copyright history from vga16fb.c:
  *	Copyright 1999 Ben Pfaff and Petr Vandrovec

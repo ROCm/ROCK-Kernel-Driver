@@ -43,7 +43,7 @@
 		v1.18 12Mar2001 Andrew Morton <andrewm@uow.edu.au>
 			- Avoid bogus detect of 3c590's (Andrzej Krzysztofowicz)
 			- Reviewed against 1.18 from scyld.com
-		v1.18a 17Nov2001 Jeff Garzik <jgarzik@mandrakesoft.com>
+		v1.18a 17Nov2001 Jeff Garzik <jgarzik@pobox.com>
 			- ethtool support
 		v1.18b 1Mar2002 Zwane Mwaikambo <zwane@commfireservices.com>
 			- Power Management support

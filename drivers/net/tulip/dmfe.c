@@ -29,7 +29,7 @@
     Reformatted, fixing spelling etc as I went
     Removed IRQ 0-15 assumption
 
-    Jeff Garzik <jgarzik@mandrakesoft.com> :
+    Jeff Garzik <jgarzik@pobox.com> :
     Updated to use new PCI driver API.
     Resource usage cleanups.
     Report driver version to user.
