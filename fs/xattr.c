@@ -163,7 +163,7 @@ getxattr(struct dentry *d, char *name, void *value, size_t size)
 	}
 
 	if (kvalue && error > 0)
-		if (copy_to_user(value, kvalue, size))
+		if (copy_to_user(value, kvalue, error))
 			error = -EFAULT;
 	xattr_free(kvalue, size);
 	return error;
@@ -232,7 +232,7 @@ listxattr(struct dentry *d, char *list, size_t size)
 	}
 
 	if (klist && error > 0)
-		if (copy_to_user(list, klist, size))
+		if (copy_to_user(list, klist, error))
 			error = -EFAULT;
 	xattr_free(klist, size);
 	return error;
