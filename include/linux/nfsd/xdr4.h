@@ -173,6 +173,9 @@ struct nfsd4_read {
 	stateid_t	rd_stateid;         /* request */
 	u64		rd_offset;          /* request */
 	u32		rd_length;          /* request */
+	struct iovec	rd_iov[RPCSVC_MAXPAGES];
+	int		rd_vlen;
+	
 	struct svc_rqst *rd_rqstp;          /* response */
 	struct svc_fh * rd_fhp;             /* response */
 };
@@ -311,6 +314,8 @@ struct nfsd4_compoundres {
 	/* scratch variables for XDR encode */
 	u32 *				p;
 	u32 *				end;
+	struct xdr_buf *		xbuf;
+	struct svc_rqst *		rqstp;
 
 	u32				taglen;
 	char *				tag;

@@ -566,11 +566,14 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	fh_init(&current_fh, NFS4_FHSIZE);
 	fh_init(&save_fh, NFS4_FHSIZE);
 
-	resp->p = rqstp->rq_resbuf.buf + 3 + XDR_QUADLEN(args->taglen);
-	resp->end = rqstp->rq_resbuf.base + rqstp->rq_resbuf.buflen;
+	resp->xbuf = &rqstp->rq_res;
+	resp->p = rqstp->rq_res.head[0].iov_base + rqstp->rq_res.head[0].iov_len;
+	resp->p += 3 + XDR_QUADLEN(args->taglen);
+	resp->end = rqstp->rq_res.head[0].iov_base + PAGE_SIZE;
 	resp->taglen = args->taglen;
 	resp->tag = args->tag;
 	resp->opcnt = 0;
+	resp->rqstp = rqstp;
 
 	/*
 	 * According to RFC3010, this takes precedence over all other errors.
@@ -596,6 +599,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		 * failed response to the next operation.  If we don't
 		 * have enough room, fail with ERR_RESOURCE.
 		 */
+/* FIXME - is slack_space *really* words, or bytes??? - neilb */
 		slack_space = (char *)resp->end - (char *)resp->p;
 		if (slack_space < COMPOUND_SLACK_SPACE + COMPOUND_ERR_SLACK_SPACE) {
 			BUG_ON(slack_space < COMPOUND_ERR_SLACK_SPACE);
