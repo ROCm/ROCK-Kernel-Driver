@@ -86,7 +86,7 @@ static int pcwd_ioports[] = { 0x270, 0x350, 0x370, 0x000 };
 #define	WD_TIMEOUT		4	/* 2 seconds for a timeout */
 static int timeout_val = WD_TIMEOUT;
 static int timeout = 2;
-static int expect_close = 0;
+static char expect_close;
 
 module_param(timeout, int, 0);
 MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default=2)"); 
@@ -415,7 +415,7 @@ static ssize_t pcwd_write(struct file *file, const char *buf, size_t len,
 				if (get_user(c, buf + i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
 		pcwd_send_heartbeat();
@@ -477,7 +477,7 @@ static ssize_t pcwd_read(struct file *file, char *buf, size_t count,
 static int pcwd_close(struct inode *ino, struct file *filep)
 {
 	if (iminor(ino)==WATCHDOG_MINOR) {
-		if (expect_close) {
+		if (expect_close == 42) {
 			/*  Disable the board  */
 			if (revision == PCWD_REVISION_C) {
 				spin_lock(&io_lock);
@@ -488,6 +488,7 @@ static int pcwd_close(struct inode *ino, struct file *filep)
 			atomic_inc( &open_allowed );
 		}
 	}
+	expect_close = 0;
 	return 0;
 }
 

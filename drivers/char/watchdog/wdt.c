@@ -49,7 +49,7 @@
 #include "wd501p.h"
 
 static unsigned long wdt_is_open;
-static int expect_close;
+static char expect_close;
 
 /*
  *	You must set these - there is no sane way to probe for this board.
@@ -261,7 +261,7 @@ static ssize_t wdt_write(struct file *file, const char *buf, size_t count, loff_
 				if (get_user(c, buf + i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
 		wdt_ping();
@@ -414,13 +414,14 @@ static int wdt_release(struct inode *inode, struct file *file)
 {
 	if(iminor(inode)==WATCHDOG_MINOR)
 	{
-		if (expect_close) {
+		if (expect_close == 42) {
 			inb_p(WDT_DC);		/* Disable counters */
 			wdt_ctr_load(2,0);	/* 0 length reset pulses now */
 		} else {
 			printk(KERN_CRIT "wdt: WDT device closed unexpectedly.  WDT will not stop!\n");
 		}
 		clear_bit(0, &wdt_is_open);
+		expect_close = 0;
 	}
 	return 0;
 }

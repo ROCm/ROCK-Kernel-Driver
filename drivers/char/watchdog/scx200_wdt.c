@@ -51,7 +51,7 @@ MODULE_PARM_DESC(nowayout, "Disable watchdog shutdown on close");
 
 static u16 wdto_restart;
 static struct semaphore open_semaphore;
-static unsigned expect_close;
+static char expect_close;
 
 /* Bits of the WDCNFG register */
 #define W_ENABLE 0x00fa		/* Enable watchdog */
@@ -98,18 +98,18 @@ static int scx200_wdt_open(struct inode *inode, struct file *file)
         if (down_trylock(&open_semaphore))
                 return -EBUSY;
 	scx200_wdt_enable();
-	expect_close = 0;
 
 	return 0;
 }
 
 static int scx200_wdt_release(struct inode *inode, struct file *file)
 {
-	if (!expect_close) {
+	if (expect_close != 42) {
 		printk(KERN_WARNING NAME ": watchdog device closed unexpectedly, will not disable the watchdog timer\n");
 	} else if (!nowayout) {
 		scx200_wdt_disable();
 	}
+	expect_close = 0;
         up(&open_semaphore);
 
 	return 0;
@@ -149,7 +149,7 @@ static ssize_t scx200_wdt_write(struct file *file, const char *data,
 			if (get_user(c, data+i))
 				return -EFAULT;
 			if (c == 'V')
-				expect_close = 1;
+				expect_close = 42;
 		}
 
 		return len;

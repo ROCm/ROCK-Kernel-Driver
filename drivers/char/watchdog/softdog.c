@@ -49,7 +49,7 @@
 
 #define TIMER_MARGIN	60		/* (secs) Default is 1 minute */
 
-static int expect_close = 0;
+static char expect_close;
 static int soft_margin = TIMER_MARGIN;	/* in seconds */
 #ifdef ONLY_TESTING
 static int soft_noboot = 1;
@@ -120,12 +120,13 @@ static int softdog_release(struct inode *inode, struct file *file)
 	 *	Shut off the timer.
 	 * 	Lock it in if it's a module and we set nowayout
 	 */
-	if (expect_close) {
+	if (expect_close == 42) {
 		del_timer(&watchdog_ticktock);
 	} else {
 		printk(KERN_CRIT "SOFTDOG: WDT device closed unexpectedly.  WDT will not stop!\n");
 	}
 	clear_bit(0, &timer_alive);
+	expect_close = 0;
 	return 0;
 }
 
@@ -151,7 +152,7 @@ static ssize_t softdog_write(struct file *file, const char *data, size_t len, lo
 				if (get_user(c, data + i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
 		mod_timer(&watchdog_ticktock, jiffies+(soft_margin*HZ));

@@ -57,7 +57,7 @@ static u32 pmbase;		/* PMxx I/O base */
 static struct pci_dev *dev;
 static struct semaphore open_sem;
 static spinlock_t amdtco_lock;	/* only for device access */
-static int expect_close = 0;
+static char expect_close;
 
 MODULE_PARM(timeout, "i");
 MODULE_PARM_DESC(timeout, "range is 0-38 seconds, default is 38");
@@ -223,7 +223,7 @@ static int amdtco_fop_ioctl(struct inode *inode, struct file *file, unsigned int
 
 static int amdtco_fop_release(struct inode *inode, struct file *file)
 {
-	if (expect_close) {
+	if (expect_close == 42) {
 		amdtco_disable();	
 		printk(KERN_INFO PFX "Watchdog disabled\n");
 	} else {
@@ -231,6 +231,7 @@ static int amdtco_fop_release(struct inode *inode, struct file *file)
 		printk(KERN_CRIT PFX "Unexpected close!, timeout in %d seconds\n", timeout);
 	}	
 	
+	expect_close = 0;
 	up(&open_sem);
 	return 0;
 }
@@ -252,7 +253,7 @@ static ssize_t amdtco_fop_write(struct file *file, const char *data, size_t len,
 				return -EFAULT;
 
 			if (c == 'V')
-				expect_close = 1;
+				expect_close = 42;
 		}
 #endif
 		amdtco_ping();

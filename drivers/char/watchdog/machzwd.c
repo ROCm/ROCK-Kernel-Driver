@@ -131,7 +131,7 @@ MODULE_PARM_DESC(action, "after watchdog resets, generate: 0 = RESET(*)  1 = SMI
 
 static int zf_action = GEN_RESET;
 static int zf_is_open = 0;
-static int zf_expect_close = 0;
+static char zf_expect_close;
 static spinlock_t zf_lock;
 static spinlock_t zf_port_lock;
 static struct timer_list zf_timer;
@@ -330,8 +330,8 @@ static ssize_t zf_write(struct file *file, const char *buf, size_t count,
 				if (get_user(c, buf + ofs))
 					return -EFAULT;
 				if (c == 'V'){
-					zf_expect_close = 1;
-					dprintk("zf_expect_close 1\n");
+					zf_expect_close = 42;
+					dprintk("zf_expect_close = 42\n");
 				}
 			}
 		}
@@ -396,7 +396,7 @@ static int zf_open(struct inode *inode, struct file *file)
 
 static int zf_close(struct inode *inode, struct file *file)
 {
-	if(zf_expect_close){
+	if(zf_expect_close == 42){
 		zf_timer_off();
 	} else {
 		del_timer(&zf_timer);

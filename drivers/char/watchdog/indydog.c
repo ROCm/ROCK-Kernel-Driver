@@ -26,7 +26,7 @@
 
 static unsigned long indydog_alive;
 static struct sgimc_misc_ctrl *mcmisc_regs; 
-static int expect_close = 0;
+static char expect_close;
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -77,7 +77,7 @@ static int indydog_release(struct inode *inode, struct file *file)
 	 * 	Lock it in if it's a module and we set nowayout
 	 */
 
-	if (expect_close) {
+	if (expect_close == 42) {
 		u32 mc_ctrl0 = mcmisc_regs->cpuctrl0; 
 		mc_ctrl0 &= ~SGIMC_CCTRL0_WDOG;
 		mcmisc_regs->cpuctrl0 = mc_ctrl0;
@@ -86,6 +86,7 @@ static int indydog_release(struct inode *inode, struct file *file)
 		printk(KERN_CRIT "WDT device closed unexpectedly.  WDT will not stop!\n");
 	}
 	clear_bit(0,&indydog_alive);
+	expect_close = 0;
 	return 0;
 }
 
@@ -109,7 +110,7 @@ static ssize_t indydog_write(struct file *file, const char *data, size_t len, lo
 				if (get_user(c, data + i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
 		indydog_ping();

@@ -60,7 +60,7 @@ static long mixcomwd_opened; /* long req'd for setbit --RR */
 static int watchdog_port;
 static int mixcomwd_timer_alive;
 static struct timer_list mixcomwd_timer = TIMER_INITIALIZER(NULL, 0, 0);
-static int expect_close = 0;
+static char expect_close;
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -113,7 +113,7 @@ static int mixcomwd_open(struct inode *inode, struct file *file)
 
 static int mixcomwd_release(struct inode *inode, struct file *file)
 {
-	if (expect_close) {
+	if (expect_close == 42) {
 		if(mixcomwd_timer_alive) {
 			printk(KERN_ERR "mixcomwd: release called while internal timer alive");
 			return -EBUSY;
@@ -129,6 +129,7 @@ static int mixcomwd_release(struct inode *inode, struct file *file)
 	}
 
 	clear_bit(0,&mixcomwd_opened);
+	expect_close=0;
 	return 0;
 }
 
@@ -152,7 +153,7 @@ static ssize_t mixcomwd_write(struct file *file, const char *data, size_t len, l
 				if (get_user(c, data + i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
 		mixcomwd_ping();

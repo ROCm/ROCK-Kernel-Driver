@@ -72,7 +72,7 @@
 
 static struct semaphore open_sem;
 static spinlock_t wdtpci_lock;
-static int expect_close = 0;
+static char expect_close;
 
 static int io;
 static int irq;
@@ -247,7 +247,7 @@ static ssize_t wdtpci_write(struct file *file, const char *buf, size_t count, lo
 				if(get_user(c, buf+i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
 		wdtpci_ping();
@@ -425,7 +425,7 @@ static int wdtpci_release(struct inode *inode, struct file *file)
 
 	if (iminor(inode)==WATCHDOG_MINOR) {
 		unsigned long flags;
-		if (expect_close) {
+		if (expect_close == 42) {
 			spin_lock_irqsave(&wdtpci_lock, flags);
 			inb_p(WDT_DC);		/* Disable counters */
 			wdtpci_ctr_load(2,0);	/* 0 length reset pulses now */
@@ -434,6 +434,7 @@ static int wdtpci_release(struct inode *inode, struct file *file)
 			printk(KERN_CRIT PFX "Unexpected close, not stopping timer!");
 			wdtpci_ping();
 		}
+		expect_close = 0;
 		up(&open_sem);
 	}
 	return 0;

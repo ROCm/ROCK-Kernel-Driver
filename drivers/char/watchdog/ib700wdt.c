@@ -50,7 +50,7 @@
 
 static int ibwdt_is_open;
 static spinlock_t ibwdt_lock;
-static int expect_close = 0;
+static char expect_close;
 
 #define PFX "ib700wdt: "
 
@@ -157,7 +157,7 @@ ibwdt_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 				if (get_user(c, buf + i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
 		ibwdt_ping();
@@ -236,12 +236,13 @@ static int
 ibwdt_close(struct inode *inode, struct file *file)
 {
 	spin_lock(&ibwdt_lock);
-	if (expect_close)
+	if (expect_close == 42)
 		outb_p(wd_times[wd_margin], WDT_STOP);
 	else
 		printk(KERN_CRIT PFX "WDT device closed unexpectedly.  WDT will not stop!\n");
 
 	ibwdt_is_open = 0;
+	expect_close = 0;
 	spin_unlock(&ibwdt_lock);
 	return 0;
 }
