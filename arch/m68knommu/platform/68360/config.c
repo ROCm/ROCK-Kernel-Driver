@@ -205,9 +205,4 @@ void config_BSP(char *command, int len)
   mach_hwclk           = NULL;
   mach_set_clock_mmss  = NULL;
   mach_reset           = BSP_reset;
-
-  //Kendrick's Change
-  mach_trap_init        = M68360_init_IRQ;
-
-  config_M68360_irq();
 }
