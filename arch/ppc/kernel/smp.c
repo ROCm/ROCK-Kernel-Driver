@@ -42,8 +42,6 @@ struct cpuinfo_PPC cpu_data[NR_CPUS];
 struct klock_info_struct klock_info = { KLOCK_CLEAR, 0 };
 atomic_t ipi_recv;
 atomic_t ipi_sent;
-DEFINE_PER_CPU(unsigned int, prof_multiplier);
-DEFINE_PER_CPU(unsigned int, prof_counter);
 unsigned long cache_decay_ticks = HZ/100;
 cpumask_t cpu_online_map;
 cpumask_t cpu_possible_map;
@@ -88,16 +86,6 @@ smp_message_pass(int target, int msg, unsigned long data, int wait)
 /*
  * Common functions
  */
-void smp_local_timer_interrupt(struct pt_regs * regs)
-{
-	int cpu = smp_processor_id();
-
-	if (!--per_cpu(prof_counter, cpu)) {
-		update_process_times(user_mode(regs));
-		per_cpu(prof_counter, cpu) = per_cpu(prof_multiplier, cpu);
-	}
-}
-
 void smp_message_recv(int msg, struct pt_regs *regs)
 {
 	atomic_inc(&ipi_recv);
@@ -296,8 +284,6 @@ static void __devinit smp_store_cpu_info(int id)
 	/* assume bogomips are same for everything */
         c->loops_per_jiffy = loops_per_jiffy;
         c->pvr = mfspr(PVR);
-	per_cpu(prof_counter, id) = 1;
-	per_cpu(prof_multiplier, id) = 1;
 }
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
