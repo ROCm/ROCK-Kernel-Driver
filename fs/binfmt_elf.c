@@ -627,8 +627,10 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 				executable_stack = EXSTACK_DISABLE_X;
 			break;
 		}
+#ifdef LEGACY_BINARIES
 	if (i == elf_ex.e_phnum)
-		def_flags |= VM_EXEC | VM_MAYEXEC;
+		current->personality |= READ_IMPLIES_EXEC;
+#endif
 
 	/* Some simple consistency checks for the interpreter */
 	if (elf_interpreter) {
