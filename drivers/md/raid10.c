@@ -1237,8 +1237,8 @@ static void raid10d(mddev_t *mddev)
 			int mirror;
 			bio = r10_bio->devs[r10_bio->read_slot].bio;
 			r10_bio->devs[r10_bio->read_slot].bio = NULL;
+			bio_put(bio);
 			mirror = read_balance(conf, r10_bio);
-			r10_bio->devs[r10_bio->read_slot].bio = bio;
 			if (mirror == -1) {
 				printk(KERN_ALERT "raid10: %s: unrecoverable I/O"
 				       " read error for block %llu\n",
@@ -1252,15 +1252,14 @@ static void raid10d(mddev_t *mddev)
 					       " another mirror\n",
 					       bdevname(rdev->bdev,b),
 					       (unsigned long long)r10_bio->sector);
-				bio->bi_bdev = rdev->bdev;
+				bio = bio_clone(r10_bio->master_bio, GFP_NOIO);
+				r10_bio->devs[r10_bio->read_slot].bio = bio;
 				bio->bi_sector = r10_bio->devs[r10_bio->read_slot].addr
 					+ rdev->data_offset;
-				bio->bi_next = NULL;
-				bio->bi_flags &= (1<<BIO_CLONED);
-				bio->bi_flags |= 1 << BIO_UPTODATE;
-				bio->bi_idx = 0;
-				bio->bi_size = r10_bio->sectors << 9;
+				bio->bi_bdev = rdev->bdev;
 				bio->bi_rw = READ;
+				bio->bi_private = r10_bio;
+				bio->bi_end_io = raid10_end_read_request;
 				unplug = 1;
 				generic_make_request(bio);
 			}

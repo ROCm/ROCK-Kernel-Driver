@@ -943,6 +943,8 @@ static void raid1d(mddev_t *mddev)
 			} else {
 				r1_bio->bios[r1_bio->read_disk] = NULL;
 				r1_bio->read_disk = disk;
+				bio_put(bio);
+				bio = bio_clone(r1_bio->master_bio, GFP_NOIO);
 				r1_bio->bios[r1_bio->read_disk] = bio;
 				rdev = conf->mirrors[disk].rdev;
 				if (printk_ratelimit())
@@ -950,9 +952,11 @@ static void raid1d(mddev_t *mddev)
 					       " another mirror\n",
 					       bdevname(rdev->bdev,b),
 					       (unsigned long long)r1_bio->sector);
-				bio->bi_bdev = rdev->bdev;
 				bio->bi_sector = r1_bio->sector + rdev->data_offset;
+				bio->bi_bdev = rdev->bdev;
+				bio->bi_end_io = raid1_end_read_request;
 				bio->bi_rw = READ;
+				bio->bi_private = r1_bio;
 				unplug = 1;
 				generic_make_request(bio);
 			}
