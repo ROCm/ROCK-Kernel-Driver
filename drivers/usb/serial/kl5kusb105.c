@@ -273,6 +273,7 @@ static int klsi_105_startup (struct usb_serial *serial)
 
 	/* allocate the private data structure */
 	for (i=0; i<serial->num_ports; i++) {
+		int j;
 		priv = kmalloc(sizeof(struct klsi_105_private),
 						   GFP_KERNEL);
 		if (!priv) {
@@ -293,10 +294,10 @@ static int klsi_105_startup (struct usb_serial *serial)
 		usb_set_serial_port_data(serial->port[i], priv);
 
 		spin_lock_init (&priv->lock);
-		for (i=0; i<NUM_URBS; i++) {
+		for (j=0; j<NUM_URBS; j++) {
 			struct urb* urb = usb_alloc_urb(0, GFP_KERNEL);
 
-			priv->write_urb_pool[i] = urb;
+			priv->write_urb_pool[j] = urb;
 			if (urb == NULL) {
 				err("No more urbs???");
 				continue;
