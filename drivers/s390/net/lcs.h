@@ -6,7 +6,7 @@
 #include <linux/workqueue.h>
 #include <asm/ccwdev.h>
 
-#define VERSION_LCS_H "$Revision: 1.15 $"
+#define VERSION_LCS_H "$Revision: 1.16 $"
 
 #define LCS_DBF_TEXT(level, name, text) \
 	do { \
@@ -273,6 +273,7 @@ struct lcs_channel {
  */
 struct lcs_card {
 	spinlock_t lock;
+	spinlock_t ipm_lock;
 	enum lcs_dev_states state;
 	struct net_device *dev;
 	struct net_device_stats stats;

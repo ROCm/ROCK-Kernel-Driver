@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.28 2004/04/15 06:34:58 braunu Exp $
+ * $Id: iucv.c,v 1.30 2004/05/13 09:21:23 braunu Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.28 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.30 $
  *
  */
 
@@ -98,7 +98,7 @@ typedef struct {
 	__u8  res3[24];
 } iucv_GeneralInterrupt;
 
-static iucv_GeneralInterrupt *iucv_external_int_buffer;
+static iucv_GeneralInterrupt *iucv_external_int_buffer = NULL;
 
 /* Spin Lock declaration */
 
@@ -351,7 +351,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.28 $";
+	char vbuf[] = "$Revision: 1.30 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -403,6 +403,7 @@ iucv_init(void)
 		       "%s: Could not allocate external interrupt buffer\n",
 		       __FUNCTION__);
 		s390_root_dev_unregister(iucv_root);
+		bus_unregister(&iucv_bus);
 		return -ENOMEM;
 	}
 	memset(iucv_external_int_buffer, 0, sizeof(iucv_GeneralInterrupt));
@@ -416,6 +417,7 @@ iucv_init(void)
 		kfree(iucv_external_int_buffer);
 		iucv_external_int_buffer = NULL;
 		s390_root_dev_unregister(iucv_root);
+		bus_unregister(&iucv_bus);
 		return -ENOMEM;
 	}
 	memset(iucv_param_pool, 0, sizeof(iucv_param) * PARAM_POOL_SIZE);
@@ -441,10 +443,14 @@ static void
 iucv_exit(void)
 {
 	iucv_retrieve_buffer();
-      	if (iucv_external_int_buffer)
+      	if (iucv_external_int_buffer) {
 		kfree(iucv_external_int_buffer);
-	if (iucv_param_pool)
+		iucv_external_int_buffer = NULL;
+	}
+	if (iucv_param_pool) {
 		kfree(iucv_param_pool);
+		iucv_param_pool = NULL;
+	}
 	s390_root_dev_unregister(iucv_root);
 	bus_unregister(&iucv_bus);
 	printk(KERN_INFO "IUCV lowlevel driver unloaded\n");

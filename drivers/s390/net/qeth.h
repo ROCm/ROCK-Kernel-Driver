@@ -23,7 +23,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.102 $"
+#define VERSION_QETH_H 		"$Revision: 1.107 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -186,6 +186,8 @@ struct qeth_perf_stats {
 	__u64 outbound_start_time;
 	unsigned int outbound_cnt;
 	unsigned int outbound_time;
+	unsigned int inbound_do_qdio;
+	unsigned int outbound_do_qdio;
 };
 #endif /* CONFIG_QETH_PERF_STATS */
 
@@ -279,7 +281,7 @@ qeth_is_ipa_enabled(struct qeth_ipa_info *ipa, enum qeth_ipa_funcs func)
 #define QETH_IN_BUF_COUNT_MAX 128
 #define QETH_MAX_BUFFER_ELEMENTS(card) ((card)->qdio.in_buf_size >> 12)
 #define QETH_IN_BUF_REQUEUE_THRESHOLD(card) \
-		((card)->qdio.in_buf_pool.buf_count / 4)
+		((card)->qdio.in_buf_pool.buf_count / 2)
 
 /* buffers we have to be behind before we get a PCI */
 #define QETH_PCI_THRESHOLD_A(card) ((card)->qdio.in_buf_pool.buf_count+1)
@@ -606,6 +608,7 @@ struct qeth_reply {
 	wait_queue_head_t wait_q;
 	int (*callback)(struct qeth_card *,struct qeth_reply *,unsigned long);
  	int seqno;
+	unsigned long offset;
 	int received;
 	int rc;
 	void *param;
@@ -613,8 +616,10 @@ struct qeth_reply {
 	atomic_t refcnt;
 };
 
-struct qeth_card_info {
+#define QETH_BROADCAST_WITH_ECHO    1
+#define QETH_BROADCAST_WITHOUT_ECHO 2
 
+struct qeth_card_info {
 	char if_name[IF_NAME_LEN];
 	unsigned short unit_addr2;
 	unsigned short cula;
@@ -646,7 +651,6 @@ struct qeth_card_options {
 	enum qeth_checksum_types checksum_type;
 	int broadcast_mode;
 	int macaddr_mode;
-	int enable_takeover;
 	int fake_broadcast;
 	int add_hhlen;
 	int fake_ll;

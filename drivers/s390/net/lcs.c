@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.74 $	 $Date: 2004/04/05 00:01:04 $
+ *    $Revision: 1.80 $	 $Date: 2004/05/13 08:22:06 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.74 $"
+#define VERSION_LCS_C  "$Revision: 1.80 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 static char debug_buffer[255];
@@ -99,9 +99,9 @@ lcs_register_debug_facility(void)
 		return -ENOMEM;
 	}
 	debug_register_view(lcs_dbf_setup, &debug_hex_ascii_view);
-	debug_set_level(lcs_dbf_setup, 5);
+	debug_set_level(lcs_dbf_setup, 2);
 	debug_register_view(lcs_dbf_trace, &debug_hex_ascii_view);
-	debug_set_level(lcs_dbf_trace, 5);
+	debug_set_level(lcs_dbf_trace, 2);
 	return 0;
 }
 
@@ -338,6 +338,7 @@ lcs_setup_card(struct lcs_card *card)
 		  (void *)lcs_start_kernel_thread,card);
 	card->thread_mask = 0;
 	spin_lock_init(&card->lock);
+	spin_lock_init(&card->ipm_lock);
 #ifdef CONFIG_IP_MULTICAST
 	INIT_LIST_HEAD(&card->ipm_list);
 #endif
@@ -935,18 +936,14 @@ lcs_check_multicast_support(struct lcs_card *card)
 /**
  * set or del multicast address on LCS card
  */
-static int
-lcs_fix_multicast_list(void *data)
+static void
+lcs_fix_multicast_list(struct lcs_card *card)
 {
 	struct list_head *l, *n;
 	struct lcs_ipm_list *ipm;
-	struct lcs_card *card;
 
-	card = (struct lcs_card *) data;
-
-	daemonize("fixipm");
 	LCS_DBF_TEXT(4,trace, "fixipm");
-	spin_lock(&card->lock);
+	spin_lock(&card->ipm_lock);
 	list_for_each_safe(l, n, &card->ipm_list) {
 		ipm = list_entry(l, struct lcs_ipm_list, list);
 		switch (ipm->ipm_state) {
@@ -968,8 +965,7 @@ lcs_fix_multicast_list(void *data)
 	}
 	if (card->state == DEV_STATE_UP)
 		netif_wake_queue(card->dev);
-	spin_unlock(&card->lock);
-	return 0;
+	spin_unlock(&card->ipm_lock);
 }
 
 /**
@@ -988,28 +984,30 @@ lcs_get_mac_for_ipm(__u32 ipm, char *mac, struct net_device *dev)
 /**
  * function called by net device to handle multicast address relevant things
  */
-static void
-lcs_set_multicast_list(struct net_device *dev)
+static int
+lcs_register_mc_addresses(void *data)
 {
+	struct lcs_card *card;
 	char buf[MAX_ADDR_LEN];
 	struct list_head *l;
 	struct ip_mc_list *im4;
 	struct in_device *in4_dev;
 	struct lcs_ipm_list *ipm, *tmp;
-	struct lcs_card *card;
 
-	LCS_DBF_TEXT(4, trace, "setmulti");
-	in4_dev = in_dev_get(dev);
+	daemonize("regipm");
+	LCS_DBF_TEXT(4, trace, "regmulti");
+
+	card = (struct lcs_card *) data;
+	in4_dev = in_dev_get(card->dev);
 	if (in4_dev == NULL)
-		return;
+		return 0;
 	read_lock(&in4_dev->lock);
-	card = (struct lcs_card *) dev->priv;
-	spin_lock(&card->lock);
+	spin_lock(&card->ipm_lock);
 	/* Check for multicast addresses to be removed. */
 	list_for_each(l, &card->ipm_list) {
 		ipm = list_entry(l, struct lcs_ipm_list, list);
 		for (im4 = in4_dev->mc_list; im4 != NULL; im4 = im4->next) {
-			lcs_get_mac_for_ipm(im4->multiaddr, buf, dev);
+			lcs_get_mac_for_ipm(im4->multiaddr, buf, card->dev);
 			if (memcmp(buf, &ipm->ipm.mac_addr,
 				   LCS_MAC_LENGTH) == 0 &&
 			    ipm->ipm.ip_addr == im4->multiaddr)
@@ -1020,7 +1018,7 @@ lcs_set_multicast_list(struct net_device *dev)
 	}
 	/* Check for multicast addresses to be added. */
 	for (im4 = in4_dev->mc_list; im4; im4 = im4->next) {
-		lcs_get_mac_for_ipm(im4->multiaddr, buf, dev);
+		lcs_get_mac_for_ipm(im4->multiaddr, buf, card->dev);
 		ipm = NULL;
 		list_for_each(l, &card->ipm_list) {
 			tmp = list_entry(l, struct lcs_ipm_list, list);
@@ -1046,13 +1044,55 @@ lcs_set_multicast_list(struct net_device *dev)
 		ipm->ipm_state = LCS_IPM_STATE_SET_REQUIRED;
 		list_add(&ipm->list, &card->ipm_list);
 	}
-	spin_unlock(&card->lock);
+	spin_unlock(&card->ipm_lock);
 	read_unlock(&in4_dev->lock);
-	set_bit(3, &card->thread_mask);
-	schedule_work(&card->kernel_thread_starter);
+	lcs_fix_multicast_list(card);
+	in_dev_put(in4_dev);
+	return 0;
+}
+/**
+ * function called by net device to
+ * handle multicast address relevant things
+ */
+static void
+lcs_set_multicast_list(struct net_device *dev)
+{
+        struct lcs_card *card;
+
+        LCS_DBF_TEXT(4, trace, "setmulti");
+        card = (struct lcs_card *) dev->priv;
+        set_bit(3, &card->thread_mask);
+        schedule_work(&card->kernel_thread_starter);
 }
 
 #endif /* CONFIG_IP_MULTICAST */
+
+static long
+lcs_check_irb_error(struct ccw_device *cdev, struct irb *irb)
+{
+	if (!IS_ERR(irb))
+		return 0;
+
+	switch (PTR_ERR(irb)) {
+	case -EIO:
+		PRINT_WARN("i/o-error on device %s\n", cdev->dev.bus_id);
+		LCS_DBF_TEXT(2, trace, "ckirberr");
+		LCS_DBF_TEXT_(2, trace, "  rc%d", -EIO);
+		break;
+	case -ETIMEDOUT:
+		PRINT_WARN("timeout on device %s\n", cdev->dev.bus_id);
+		LCS_DBF_TEXT(2, trace, "ckirberr");
+		LCS_DBF_TEXT_(2, trace, "  rc%d", -ETIMEDOUT);
+		break;
+	default:
+		PRINT_WARN("unknown error %ld on device %s\n", PTR_ERR(irb),
+			   cdev->dev.bus_id);
+		LCS_DBF_TEXT(2, trace, "ckirberr");
+		LCS_DBF_TEXT(2, trace, "  rc???");
+	}
+	return PTR_ERR(irb);
+}
+
 
 /**
  * IRQ Handler for LCS channels
@@ -1063,6 +1103,9 @@ lcs_irq(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 	struct lcs_card *card;
 	struct lcs_channel *channel;
 	int index;
+
+	if (lcs_check_irb_error(cdev, irb))
+		return;
 
 	card = CARD_FROM_DEV(cdev);
 	if (card->read.ccwdev == cdev)
@@ -1513,7 +1556,7 @@ lcs_start_kernel_thread(struct lcs_card *card)
 		kernel_thread(lcs_lgw_stoplan_thread, (void *) card, SIGCHLD);
 #ifdef CONFIG_IP_MULTICAST
 	if (test_and_clear_bit(3, &card->thread_mask))
-		kernel_thread(lcs_fix_multicast_list, (void *) card, SIGCHLD);
+		kernel_thread(lcs_register_mc_addresses, (void *) card, SIGCHLD);
 #endif
 }
 
@@ -1903,7 +1946,7 @@ netdev_out:
 		goto out;
 	memcpy(card->dev->dev_addr, card->mac, LCS_MAC_LENGTH);
 #ifdef CONFIG_IP_MULTICAST
-	if (lcs_check_multicast_support(card))
+	if (!lcs_check_multicast_support(card))
 		card->dev->set_multicast_list = lcs_set_multicast_list;
 #endif
 	netif_stop_queue(card->dev);
