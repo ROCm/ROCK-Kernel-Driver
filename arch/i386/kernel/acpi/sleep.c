@@ -78,7 +78,7 @@ void __init acpi_reserve_bootmem(void)
 		return;
 	}
 #ifdef CONFIG_X86_PAE
-	printk(KERN_ERR "ACPI: S3 and PAE do not like each other for now, S3 disabled.\n");
+	//printk(KERN_ERR "ACPI: S3 and PAE do not like each other for now, S3 disabled.\n");
 	return;
 #endif
 	acpi_wakeup_address = (unsigned long)alloc_bootmem_low(PAGE_SIZE);
