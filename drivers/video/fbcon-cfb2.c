@@ -61,14 +61,14 @@ void fbcon_cfb2_bmove(struct display *p, int sy, int sx, int dy, int dx,
 	u8 *src,*dst;
 
 	if (sx == 0 && dx == 0 && width * 2 == bytes) {
-		fb_memmove(p->screen_base + dy * linesize,
-			  p->screen_base + sy * linesize,
+		fb_memmove(p->fb_info->screen_base + dy * linesize,
+			  p->fb_info->screen_base + sy * linesize,
 			  height * linesize);
 	}
 	else {
 		if (dy < sy || (dy == sy && dx < sx)) {
-			src = p->screen_base + sy * linesize + sx * 2;
-			dst = p->screen_base + dy * linesize + dx * 2;
+			src = p->fb_info->screen_base + sy * linesize + sx * 2;
+			dst = p->fb_info->screen_base + dy * linesize + dx * 2;
 			for (rows = height * fontheight(p) ; rows-- ;) {
 				fb_memmove(dst, src, width * 2);
 				src += bytes;
@@ -76,10 +76,8 @@ void fbcon_cfb2_bmove(struct display *p, int sy, int sx, int dy, int dx,
 			}
 		}
 		else {
-			src = p->screen_base + (sy+height) * linesize + sx * 2
-				- bytes;
-			dst = p->screen_base + (dy+height) * linesize + dx * 2
-				- bytes;
+			src = p->fb_info->screen_base + (sy+height) * linesize + sx * 2 - bytes;
+			dst = p->fb_info->screen_base + (dy+height) * linesize + dx * 2 - bytes;
 			for (rows = height * fontheight(p) ; rows-- ;) {
 				fb_memmove(dst, src, width * 2);
 				src -= bytes;
@@ -96,7 +94,7 @@ void fbcon_cfb2_clear(struct vc_data *conp, struct display *p, int sy, int sx,
 	int bytes=p->next_line,lines=height * fontheight(p), rows, i;
 	u32 bgx;
 
-	dest = p->screen_base + sy * fontheight(p) * bytes + sx * 2;
+	dest = p->fb_info->screen_base + sy * fontheight(p) * bytes + sx * 2;
 
 	bgx=attr_bgcol_ec(p,conp);
 	bgx |= (bgx << 2);	/* expand the colour to 16 bits */
@@ -128,7 +126,7 @@ void fbcon_cfb2_putc(struct vc_data *conp, struct display *p, int c, int yy,
 	int bytes=p->next_line,rows;
 	u32 eorx,fgx,bgx;
 
-	dest = p->screen_base + yy * fontheight(p) * bytes + xx * 2;
+	dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * 2;
 	cdat = p->fontdata + (c & p->charmask) * fontheight(p);
 
 	fgx=3;/*attr_fgcol(p,c);*/
@@ -153,7 +151,7 @@ void fbcon_cfb2_putcs(struct vc_data *conp, struct display *p, const unsigned sh
 	int rows,bytes=p->next_line;
 	u32 eorx, fgx, bgx;
 
-	dest0 = p->screen_base + yy * fontheight(p) * bytes + xx * 2;
+	dest0 = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * 2;
 	c = scr_readw(s);
 	fgx = 3/*attr_fgcol(p, c)*/;
 	bgx = attr_bgcol(p, c);
@@ -179,7 +177,7 @@ void fbcon_cfb2_revc(struct display *p, int xx, int yy)
 	u8 *dest;
 	int bytes=p->next_line, rows;
 
-	dest = p->screen_base + yy * fontheight(p) * bytes + xx * 2;
+	dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * 2;
 	for (rows = fontheight(p) ; rows-- ; dest += bytes) {
 		fb_writew(fb_readw(dest) ^ 0xffff, dest);
 	}

@@ -103,20 +103,20 @@ void fbcon_vga_bmove(struct display *p, int sy, int sx, int dy, int dx,
     int rows;
 
     if (sx == 0 && dx == 0 && width == p->next_line/2) {
-	src = (u16 *)(p->screen_base+sy*p->next_line);
-	dst = (u16 *)(p->screen_base+dy*p->next_line);
+	src = (u16 *)(p->fb_info->screen_base+sy*p->next_line);
+	dst = (u16 *)(p->fb_info->screen_base+dy*p->next_line);
 	vga_memmovew(dst, src, height*width);
     } else if (dy < sy || (dy == sy && dx < sx)) {
-	src = (u16 *)(p->screen_base+sy*p->next_line+sx*2);
-	dst = (u16 *)(p->screen_base+dy*p->next_line+dx*2);
+	src = (u16 *)(p->fb_info->screen_base+sy*p->next_line+sx*2);
+	dst = (u16 *)(p->fb_info->screen_base+dy*p->next_line+dx*2);
 	for (rows = height; rows-- ;) {
 	    vga_memmovew(dst, src, width);
 	    src += p->next_line/2;
 	    dst += p->next_line/2;
 	}
     } else {
-	src = (u16 *)(p->screen_base+(sy+height-1)*p->next_line+sx*2);
-	dst = (u16 *)(p->screen_base+(dy+height-1)*p->next_line+dx*2);
+	src = (u16 *)(p->fb_info->screen_base+(sy+height-1)*p->next_line+sx*2);
+	dst = (u16 *)(p->fb_info->screen_base+(dy+height-1)*p->next_line+dx*2);
 	for (rows = height; rows-- ;) {
 	    vga_memmovew(dst, src, width);
 	    src -= p->next_line/2;
@@ -128,7 +128,7 @@ void fbcon_vga_bmove(struct display *p, int sy, int sx, int dy, int dx,
 void fbcon_vga_clear(struct vc_data *conp, struct display *p, int sy, int sx,
 		     int height, int width)
 {
-    u16 *dest = (u16 *)(p->screen_base+sy*p->next_line+sx*2);
+    u16 *dest = (u16 *)(p->fb_info->screen_base+sy*p->next_line+sx*2);
     int rows;
 
     if (sx == 0 && width*2 == p->next_line)      
@@ -141,7 +141,7 @@ void fbcon_vga_clear(struct vc_data *conp, struct display *p, int sy, int sx,
 void fbcon_vga_putc(struct vc_data *conp, struct display *p, int c, int y,
 		    int x)
 {
-    u16 *dst = (u16 *)(p->screen_base+y*p->next_line+x*2);
+    u16 *dst = (u16 *)(p->fb_info->screen_base+y*p->next_line+x*2);
     if (conp->vc_can_do_color)
     	vga_writew(c, dst);
     else
@@ -151,7 +151,7 @@ void fbcon_vga_putc(struct vc_data *conp, struct display *p, int c, int y,
 void fbcon_vga_putcs(struct vc_data *conp, struct display *p, 
 		     const unsigned short *s, int count, int y, int x)
 {
-    u16 *dst = (u16 *)(p->screen_base+y*p->next_line+x*2);
+    u16 *dst = (u16 *)(p->fb_info->screen_base+y*p->next_line+x*2);
     u16 sattr;
     if (conp->vc_can_do_color)
     	while (count--)
@@ -165,7 +165,7 @@ void fbcon_vga_putcs(struct vc_data *conp, struct display *p,
 
 void fbcon_vga_revc(struct display *p, int x, int y)
 {
-    u16 *dst = (u16 *)(p->screen_base+y*p->next_line+x*2);
+    u16 *dst = (u16 *)(p->fb_info->screen_base+y*p->next_line+x*2);
     u16 val = vga_readw(dst);
     val = (val & 0x88ff) | ((val<<4) & 0x7000) | ((val>>4) & 0x0700);
     vga_writew(val, dst);

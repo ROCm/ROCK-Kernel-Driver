@@ -2625,7 +2625,7 @@ static int atyfbcon_switch(int con, struct fb_info *fb)
 
 #ifdef CONFIG_FB_ATY_CT
     /* Erase HW Cursor */
-    if (info->cursor)
+    if (info->cursor && (fb->currcon >= 0))
 	atyfb_cursor(&fb_display[fb->currcon], CM_ERASE,
 		     info->cursor->pos.x, info->cursor->pos.y);
 #endif /* CONFIG_FB_ATY_CT */
