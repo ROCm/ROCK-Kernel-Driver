@@ -24,8 +24,6 @@ enum {
 	PROC_ROOT_INO = 1,
 };
 
-/* Finally, the dynamically allocatable proc entries are reserved: */
-
 #define PROC_SUPER_MAGIC 0x9fa0
 
 /*
