@@ -754,7 +754,7 @@ static int __devinit sonypi_probe(void)
 
 	init_waitqueue_head(&sonypi_device.fifo_proc_list);
 	init_MUTEX(&sonypi_device.lock);
-	sonypi_device.bluetooth_power = 0;
+	sonypi_device.bluetooth_power = -1;
 	
 	if (pcidev && pci_enable_device(pcidev)) {
 		printk(KERN_ERR "sonypi: pci_enable_device failed\n");
