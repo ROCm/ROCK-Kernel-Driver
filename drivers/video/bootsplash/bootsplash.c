@@ -451,16 +451,22 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 		if (boxcnt) {
 		    i = splash_gets(ndata, len);
 		    if (boxcnt + i <= sd->splash_boxcount && ndata + len + 2 + boxcnt * 12 <= end) {
-			memcpy(sd->splash_boxes + i * 12, ndata + len + 2, boxcnt * 12);
-			up |= 1;
+
+			if (splash_geti(ndata, len + 2) != 0x7ffd7fff || !memcmp(ndata + len + 2, sd->splash_boxes + i * 12, 8)) {
+
+			    memcpy(sd->splash_boxes + i * 12, ndata + len + 2, boxcnt * 12);
+			    up |= 1;
+			}
 		    }
 		    len += boxcnt * 12 + 2;
 		}
 		if (sboxcnt) {
 		    i = splash_gets(ndata, len);
 		    if (sboxcnt + i <= sd->splash_sboxcount && ndata + len + 2 + sboxcnt * 12 <= end) {
-			memcpy(sd->splash_sboxes + i * 12, ndata + len + 2, sboxcnt * 12);
-			up |= 2;
+			if (splash_geti(ndata, len + 2) != 0x7ffd7fff || !memcmp(ndata + len + 2, sd->splash_sboxes + i * 12, 8)) {
+			    memcpy(sd->splash_sboxes + i * 12, ndata + len + 2, sboxcnt * 12);
+			    up |= 2;
+			}
 		    }
 		}
 		if (update)
