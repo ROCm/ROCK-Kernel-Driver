@@ -370,8 +370,6 @@ static int ipaq_write(struct usb_serial_port *port, int from_user, const unsigne
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	usb_serial_debug_data(__FILE__, __FUNCTION__, count, buf);
-	
 	while (count > 0) {
 		transfer_size = min(count, PACKET_SIZE);
 		if (ipaq_write_bulk(port, from_user, current_position, transfer_size)) {
