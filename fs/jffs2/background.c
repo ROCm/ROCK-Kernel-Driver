@@ -114,7 +114,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 			unsigned long signr;
 
 			spin_lock_irq(&current_sig_lock);
-			signr = dequeue_signal(&current->blocked, &info);
+			signr = dequeue_signal(current, &current->blocked, &info);
 			spin_unlock_irq(&current_sig_lock);
 
 			switch(signr) {
