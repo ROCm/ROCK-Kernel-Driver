@@ -543,10 +543,11 @@ wait_for_iobuf:
 		bh = jh2bh(jh);
 		if (buffer_locked(bh)) {
 			wait_on_buffer(bh);
-			if (unlikely(!buffer_uptodate(bh)))
-				err = -EIO;
 			goto wait_for_iobuf;
 		}
+
+		if (unlikely(!buffer_uptodate(bh)))
+			err = -EIO;
 
 		clear_buffer_jwrite(bh);
 
@@ -603,10 +604,11 @@ wait_for_iobuf:
 		bh = jh2bh(jh);
 		if (buffer_locked(bh)) {
 			wait_on_buffer(bh);
-			if (unlikely(!buffer_uptodate(bh)))
-				err = -EIO;
 			goto wait_for_ctlbuf;
 		}
+
+		if (unlikely(!buffer_uptodate(bh)))
+			err = -EIO;
 
 		BUFFER_TRACE(bh, "ph5: control buffer writeout done: unfile");
 		clear_buffer_jwrite(bh);
