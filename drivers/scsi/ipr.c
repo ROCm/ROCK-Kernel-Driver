@@ -1,7 +1,7 @@
 /*
  * ipr.c -- driver for IBM Power Linux RAID adapters
  *
- * Written By: Brian King, IBM Corporation
+ * Written By: Brian King <brking@us.ibm.com>, IBM Corporation
  *
  * Copyright (C) 2003, 2004 IBM Corporation
  *
