@@ -95,7 +95,7 @@ struct agp_bridge_driver sis_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-struct agp_device_ids sis_agp_device_ids[] __initdata =
+static struct agp_device_ids sis_agp_device_ids[] __initdata =
 {
 	{
 		.device_id	= PCI_DEVICE_ID_SI_530,

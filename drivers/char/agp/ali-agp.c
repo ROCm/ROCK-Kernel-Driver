@@ -231,7 +231,7 @@ struct agp_bridge_driver ali_m1541_bridge = {
 };
 
 
-struct agp_device_ids ali_agp_device_ids[] __initdata =
+static struct agp_device_ids ali_agp_device_ids[] __initdata =
 {
 	{
 		.device_id	= PCI_DEVICE_ID_AL_M1541,
