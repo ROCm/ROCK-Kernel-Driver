@@ -1036,13 +1036,14 @@ e100_close(struct net_device *dev)
 {
 	struct e100_private *bdp = dev->priv;
 
+	e100_disable_clear_intr(bdp);
+	free_irq(dev->irq, dev);
 	bdp->intr_mask = SCB_INT_MASK;
 	e100_isolate_driver(bdp);
 
 	netif_carrier_off(bdp->device);
 	bdp->cur_line_speed = 0;
 	bdp->cur_dplx_mode = 0;
-	free_irq(dev->irq, dev);
 	e100_clear_pools(bdp);
 
 	return 0;
@@ -1840,7 +1841,8 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 	bdp = dev->priv;
 
 	intr_status = readw(&bdp->scb->scb_status);
-	if (!intr_status || (intr_status == 0xffff)) {
+	/* If not my interrupt, just return */
+	if (!(intr_status & SCB_STATUS_ACK_MASK) || (intr_status == 0xffff)) {
 		return;
 	}
 
