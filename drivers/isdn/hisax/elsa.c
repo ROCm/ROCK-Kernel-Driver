@@ -1073,7 +1073,7 @@ setup_elsa(struct IsdnCard *card)
 		}
 	
 	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI)) {
-		if (!pci_request_region(cs->hw.elsa.cfg, 0x80, "elsa isdn pci")) {
+		if (!request_region(cs->hw.elsa.cfg, 0x80, "elsa isdn pci")) {
 			printk(KERN_WARNING
 			       "HiSax: %s pci port %x-%x already in use\n",
 				CardType[card->typ],
