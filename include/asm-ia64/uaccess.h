@@ -140,25 +140,25 @@ asm (".section \"__ex_table\", \"a\"\n\t.previous");
 
 #define __get_user_64(addr)									\
 	asm ("\n"_LL"\tld8 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-	     "\t.xdata4 \"__ex_table\", @secrel(1b), @secrel(1f)+4\n"				\
+	     "\t.xdata4 \"__ex_table\", 1b-., 1f-.+4\n"				\
 	     _LL										\
 	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
 #define __get_user_32(addr)									\
 	asm ("\n"_LL"\tld4 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-	     "\t.xdata4 \"__ex_table\", @secrel(1b), @secrel(1f)+4\n"				\
+	     "\t.xdata4 \"__ex_table\", 1b-., 1f-.+4\n"				\
 	     _LL										\
 	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
 #define __get_user_16(addr)									\
 	asm ("\n"_LL"\tld2 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-	     "\t.xdata4 \"__ex_table\", @secrel(1b), @secrel(1f)+4\n"				\
+	     "\t.xdata4 \"__ex_table\", 1b-., 1f-.+4\n"				\
 	     _LL										\
 	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
 #define __get_user_8(addr)									\
 	asm ("\n"_LL"\tld1 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-	     "\t.xdata4 \"__ex_table\", @secrel(1b), @secrel(1f)+4\n"				\
+	     "\t.xdata4 \"__ex_table\", 1b-., 1f-.+4\n"				\
 	     _LL										\
 	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
@@ -202,28 +202,28 @@ extern void __put_user_unknown (void);
 #define __put_user_64(x,addr)								\
 	asm volatile (									\
 		"\n"_LL"\tst8 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		"\t.xdata4 \"__ex_table\", @secrel(1b), @secrel(1f)\n"			\
+		"\t.xdata4 \"__ex_table\", 1b-., 1f-.\n"				\
 		_LL									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 
 #define __put_user_32(x,addr)								\
 	asm volatile (									\
 		"\n"_LL"\tst4 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		"\t.xdata4 \"__ex_table\", @secrel(1b), @secrel(1f)\n"			\
+		"\t.xdata4 \"__ex_table\", 1b-., 1f-.\n"				\
 		_LL									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 
 #define __put_user_16(x,addr)								\
 	asm volatile (									\
 		"\n"_LL"\tst2 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		"\t.xdata4 \"__ex_table\", @secrel(1b), @secrel(1f)\n"			\
+		"\t.xdata4 \"__ex_table\", 1b-., 1f-.\n"				\
 		_LL									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 
 #define __put_user_8(x,addr)								\
 	asm volatile (									\
 		"\n"_LL"\tst1 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		"\t.xdata4 \"__ex_table\", @secrel(1b), @secrel(1f)\n"			\
+		"\t.xdata4 \"__ex_table\", 1b-., 1f-.\n"				\
 		_LL									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 

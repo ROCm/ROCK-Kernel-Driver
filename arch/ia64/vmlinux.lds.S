@@ -30,28 +30,9 @@ SECTIONS
   _text = .;
   _stext = .;
 
-  .text.ivt : AT(ADDR(.text.ivt) - PAGE_OFFSET)
-    {
-	*(.text.ivt)
-    }
-
-  /*
-   * Due to a linker bug (still present as of binutils 2.13.90.0.10),
-   * the exception table must come before any code that uses the
-   * uaccess.h macros; otherwise, the linker will silently truncate negative @secrel()
-   * values to 0!!  Just love it when bugs like these sneak in...
-   */
-  /* Exception table */
-  . = ALIGN(16);
-  __ex_table : AT(ADDR(__ex_table) - PAGE_OFFSET)
-	{
-	  __start___ex_table = .;
-	  *(__ex_table)
-	  __stop___ex_table = .;
-	}
-
   .text : AT(ADDR(.text) - PAGE_OFFSET)
     {
+	*(.text.ivt)
 	*(.text)
     }
   .text2 : AT(ADDR(.text2) - PAGE_OFFSET)
@@ -63,6 +44,15 @@ SECTIONS
   _etext = .;
 
   /* Read-only data */
+
+  /* Exception table */
+  . = ALIGN(16);
+  __ex_table : AT(ADDR(__ex_table) - PAGE_OFFSET)
+	{
+	  __start___ex_table = .;
+	  *(__ex_table)
+	  __stop___ex_table = .;
+	}
 
   /* Global data */
   _data = .;
