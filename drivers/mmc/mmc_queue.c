@@ -80,7 +80,7 @@ static int mmc_queue_thread(void *d)
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!blk_queue_plugged(q))
 			mq->req = req = elv_next_request(q);
-		spin_unlock(q->queue_lock);
+		spin_unlock_irq(q->queue_lock);
 
 		if (!req) {
 			if (mq->flags & MMC_QUEUE_EXIT)
