@@ -62,6 +62,19 @@ static inline int uncached_access(struct file *file, unsigned long addr)
 		  test_bit(X86_FEATURE_CYRIX_ARR, boot_cpu_data.x86_capability) ||
 		  test_bit(X86_FEATURE_CENTAUR_MCR, boot_cpu_data.x86_capability) )
 	  && addr >= __pa(high_memory);
+#elif defined(__x86_64__)
+	/* 
+	 * This is broken because it can generate memory type aliases,
+	 * which can cause cache corruptions
+	 * But it is only available for root and we have to be bug-to-bug
+	 * compatible with i386.
+	 */
+	if (file->f_flags & O_SYNC)
+		return 1;
+	/* same behaviour as i386. PAT always set to cached and MTRRs control the
+	   caching behaviour. 
+	   Hopefully a full PAT implementation will fix that soon. */	   
+	return 0;
 #elif defined(CONFIG_IA64)
 	/*
 	 * On ia64, we ignore O_SYNC because we cannot tolerate memory attribute aliases.
