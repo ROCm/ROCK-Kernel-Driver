@@ -607,7 +607,12 @@ struct vm_area_struct *vma_prio_tree_next(
 
 /* mmap.c */
 extern void vma_adjust(struct vm_area_struct *vma, unsigned long start,
-	unsigned long end, pgoff_t pgoff, struct vm_area_struct *next);
+	unsigned long end, pgoff_t pgoff, struct vm_area_struct *insert);
+extern struct vm_area_struct *vma_merge(struct mm_struct *,
+	struct vm_area_struct *prev, unsigned long addr, unsigned long end,
+	unsigned long vm_flags, struct file *, pgoff_t, struct mempolicy *);
+extern int split_vma(struct mm_struct *,
+	struct vm_area_struct *, unsigned long addr, int new_below);
 extern void insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
 extern void __vma_link_rb(struct mm_struct *, struct vm_area_struct *,
 	struct rb_node **, struct rb_node *);
@@ -637,26 +642,6 @@ out:
 extern int do_munmap(struct mm_struct *, unsigned long, size_t);
 
 extern unsigned long do_brk(unsigned long, unsigned long);
-
-static inline void
-__vma_unlink(struct mm_struct *mm, struct vm_area_struct *vma,
-		struct vm_area_struct *prev)
-{
-	prev->vm_next = vma->vm_next;
-	rb_erase(&vma->vm_rb, &mm->mm_rb);
-	if (mm->mmap_cache == vma)
-		mm->mmap_cache = prev;
-}
-
-static inline int
-can_vma_merge(struct vm_area_struct *vma, unsigned long vm_flags)
-{
-#ifdef CONFIG_MMU
-	if (!vma->vm_file && vma->vm_flags == vm_flags)
-		return 1;
-#endif
-	return 0;
-}
 
 /* filemap.c */
 extern unsigned long page_unuse(struct page *);
@@ -691,8 +676,6 @@ extern int expand_stack(struct vm_area_struct * vma, unsigned long address);
 extern struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr);
 extern struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned long addr,
 					     struct vm_area_struct **pprev);
-extern int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
-		     unsigned long addr, int new_below);
 
 /* Look up the first VMA which intersects the interval start_addr..end_addr-1,
    NULL if none.  Assume start_addr < end_addr. */

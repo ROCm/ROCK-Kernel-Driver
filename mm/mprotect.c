@@ -107,53 +107,6 @@ change_protection(struct vm_area_struct *vma, unsigned long start,
 	spin_unlock(&current->mm->page_table_lock);
 	return;
 }
-/*
- * Try to merge a vma with the previous flag, return 1 if successful or 0 if it
- * was impossible.
- */
-static int
-mprotect_attempt_merge(struct vm_area_struct *vma, struct vm_area_struct *prev,
-		unsigned long end, int newflags)
-{
-	struct mm_struct * mm;
-
-	if (!prev || !vma)
-		return 0;
-	mm = vma->vm_mm;
-	if (prev->vm_end != vma->vm_start)
-		return 0;
-	if (!can_vma_merge(prev, newflags))
-		return 0;
-	if (vma->vm_file || (vma->vm_flags & VM_SHARED))
-		return 0;
-	if (!vma_mpol_equal(vma, prev))
-		return 0;
-
-	/*
-	 * If the whole area changes to the protection of the previous one
-	 * we can just get rid of it.
-	 */
-	if (end == vma->vm_end) {
-		spin_lock(&mm->page_table_lock);
-		prev->vm_end = end;
-		__vma_unlink(mm, vma, prev);
-		spin_unlock(&mm->page_table_lock);
-
-		mpol_free(vma_policy(vma));
-		kmem_cache_free(vm_area_cachep, vma);
-		mm->map_count--;
-		return 1;
-	} 
-
-	/*
-	 * Otherwise extend it.
-	 */
-	spin_lock(&mm->page_table_lock);
-	prev->vm_end = end;
-	vma->vm_start = end;
-	spin_unlock(&mm->page_table_lock);
-	return 1;
-}
 
 static int
 mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
@@ -162,6 +115,7 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 	struct mm_struct * mm = vma->vm_mm;
 	unsigned long charged = 0;
 	pgprot_t newprot;
+	pgoff_t pgoff;
 	int error;
 
 	if (newflags == vma->vm_flags) {
@@ -188,15 +142,18 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 
 	newprot = protection_map[newflags & 0xf];
 
-	if (start == vma->vm_start) {
-		/*
-		 * Try to merge with the previous vma.
-		 */
-		if (mprotect_attempt_merge(vma, *pprev, end, newflags)) {
-			vma = *pprev;
-			goto success;
-		}
-	} else {
+	/*
+	 * First try to merge with previous and/or next vma.
+	 */
+	pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
+	*pprev = vma_merge(mm, *pprev, start, end, newflags,
+				vma->vm_file, pgoff, vma_policy(vma));
+	if (*pprev) {
+		vma = *pprev;
+		goto success;
+	}
+
+	if (start != vma->vm_start) {
 		error = split_vma(mm, vma, start, 1);
 		if (error)
 			goto fail;
@@ -213,13 +170,13 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 			goto fail;
 	}
 
+success:
 	/*
 	 * vm_flags and vm_page_prot are protected by the mmap_sem
 	 * held in write mode.
 	 */
 	vma->vm_flags = newflags;
 	vma->vm_page_prot = newprot;
-success:
 	change_protection(vma, start, end, newprot);
 	return 0;
 
@@ -232,7 +189,7 @@ asmlinkage long
 sys_mprotect(unsigned long start, size_t len, unsigned long prot)
 {
 	unsigned long vm_flags, nstart, end, tmp;
-	struct vm_area_struct * vma, * next, * prev;
+	struct vm_area_struct *vma, *prev;
 	int error = -EINVAL;
 	const int grows = prot & (PROT_GROWSDOWN|PROT_GROWSUP);
 	prot &= ~(PROT_GROWSDOWN|PROT_GROWSUP);
@@ -276,10 +233,11 @@ sys_mprotect(unsigned long start, size_t len, unsigned long prot)
 				goto out;
 		}
 	}
+	if (start > vma->vm_start)
+		prev = vma;
 
 	for (nstart = start ; ; ) {
 		unsigned int newflags;
-		int last = 0;
 
 		/* Here we know that  vma->vm_start <= nstart < vma->vm_end. */
 
@@ -299,40 +257,24 @@ sys_mprotect(unsigned long start, size_t len, unsigned long prot)
 		if (error)
 			goto out;
 
-		if (vma->vm_end > end) {
-			error = mprotect_fixup(vma, &prev, nstart, end, newflags);
-			goto out;
-		}
-		if (vma->vm_end == end)
-			last = 1;
-
 		tmp = vma->vm_end;
-		next = vma->vm_next;
+		if (tmp > end)
+			tmp = end;
 		error = mprotect_fixup(vma, &prev, nstart, tmp, newflags);
 		if (error)
 			goto out;
-		if (last)
-			break;
 		nstart = tmp;
-		vma = next;
+
+		if (nstart < prev->vm_end)
+			nstart = prev->vm_end;
+		if (nstart >= end)
+			goto out;
+
+		vma = prev->vm_next;
 		if (!vma || vma->vm_start != nstart) {
 			error = -ENOMEM;
 			goto out;
 		}
-	}
-
-	if (next && prev->vm_end == next->vm_start &&
-			can_vma_merge(next, prev->vm_flags) &&
-	    	vma_mpol_equal(prev, next) &&
-			!prev->vm_file && !(prev->vm_flags & VM_SHARED)) {
-		spin_lock(&prev->vm_mm->page_table_lock);
-		prev->vm_end = next->vm_end;
-		__vma_unlink(prev->vm_mm, next, prev);
-		spin_unlock(&prev->vm_mm->page_table_lock);
-
-		mpol_free(vma_policy(next));
-		kmem_cache_free(vm_area_cachep, next);
-		prev->vm_mm->map_count--;
 	}
 out:
 	up_write(&current->mm->mmap_sem);
