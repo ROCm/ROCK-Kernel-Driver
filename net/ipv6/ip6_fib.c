@@ -452,7 +452,6 @@ static int fib6_add_rt2node(struct fib6_node *fn, struct rt6_info *rt)
 			 */
 
 			if ((iter->rt6i_dev == rt->rt6i_dev) &&
-			    (iter->rt6i_flowr == rt->rt6i_flowr) &&
 			    (ipv6_addr_cmp(&iter->rt6i_gateway,
 					   &rt->rt6i_gateway) == 0)) {
 				if (!(iter->rt6i_flags&RTF_EXPIRES))

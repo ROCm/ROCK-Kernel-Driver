@@ -1013,7 +1013,8 @@ static inline int select_size(struct sock *sk, struct tcp_opt *tp)
 	return tmp;
 }
 
-int tcp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
+int tcp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
+		int size)
 {
 	struct iovec *iov;
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -1475,7 +1476,7 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
  *	Probably, code can be easily improved even more.
  */
 
-int tcp_recvmsg(struct sock *sk, struct msghdr *msg,
+int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		int len, int nonblock, int flags, int *addr_len)
 {
 	struct tcp_opt *tp = tcp_sk(sk);

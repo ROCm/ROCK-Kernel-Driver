@@ -2599,20 +2599,33 @@ asmlinkage int sys32_recvmsg(int fd, struct msghdr32 *user_msg, unsigned int use
 
 	sock = sockfd_lookup(fd, &err);
 	if (sock != NULL) {
-		struct scm_cookie scm;
+		struct sock_iocb *si;
+		struct kiocb iocb;
 
 		if (sock->file->f_flags & O_NONBLOCK)
 			user_flags |= MSG_DONTWAIT;
-		memset(&scm, 0, sizeof(scm));
-		err = sock->ops->recvmsg(sock, &kern_msg, total_len,
-					 user_flags, &scm);
+
+		init_sync_kiocb(&iocb, NULL);
+		si = kiocb_to_siocb(&iocb);
+		si->sock = sock;
+		si->scm = &si->async_scm;
+		si->msg = &kern_msg;
+		si->size = total_len;
+		si->flags = user_flags;
+		memset(si->scm, 0, sizeof(*si->scm));
+
+		err = sock->ops->recvmsg(&iocb, sock, &kern_msg, total_len,
+					 user_flags, si->scm);
+		if (-EIOCBQUEUED == err)
+			err = wait_on_sync_kiocb(&iocb);
+
 		if(err >= 0) {
 			len = err;
 			if(!kern_msg.msg_control) {
-				if(sock->passcred || scm.fp)
+				if(sock->passcred || si->scm->fp)
 					kern_msg.msg_flags |= MSG_CTRUNC;
-				if(scm.fp)
-					__scm_destroy(&scm);
+				if(si->scm->fp)
+					__scm_destroy(si->scm);
 			} else {
 				/* If recvmsg processing itself placed some
 				 * control messages into user space, it's is
@@ -2626,9 +2639,10 @@ asmlinkage int sys32_recvmsg(int fd, struct msghdr32 *user_msg, unsigned int use
 				if(sock->passcred)
 					put_cmsg32(&kern_msg,
 						   SOL_SOCKET, SCM_CREDENTIALS,
-						   sizeof(scm.creds), &scm.creds);
-				if(scm.fp != NULL)
-					scm_detach_fds32(&kern_msg, &scm);
+						   sizeof(si->scm->creds),
+						   &si->scm->creds);
+				if(si->scm->fp != NULL)
+					scm_detach_fds32(&kern_msg, si->scm);
 			}
 		}
 		sockfd_put(sock);

@@ -147,7 +147,7 @@ int  bluez_sock_unregister(int proto);
 struct sock *bluez_sock_alloc(struct socket *sock, int proto, int pi_size, int prio);
 void bluez_sock_link(struct bluez_sock_list *l, struct sock *s);
 void bluez_sock_unlink(struct bluez_sock_list *l, struct sock *s);
-int  bluez_sock_recvmsg(struct socket *sock, struct msghdr *msg, int len, int flags, struct scm_cookie *scm);
+int  bluez_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int len, int flags, struct scm_cookie *scm);
 uint bluez_sock_poll(struct file * file, struct socket *sock, poll_table *wait);
 int  bluez_sock_w4_connect(struct sock *sk, int flags);
 

@@ -207,8 +207,12 @@ static int igmp_send_report(struct net_device *dev, u32 group, int type)
 	if (type == IGMP_HOST_LEAVE_MESSAGE)
 		dst = IGMP_ALL_ROUTER;
 
-	if (ip_route_output(&rt, dst, 0, 0, dev->ifindex))
-		return -1;
+	{
+		struct flowi fl = { .nl_u = { .ip4_u = { .daddr = dst } },
+				    .oif = dev->ifindex };
+		if (ip_route_output_key(&rt, &fl))
+			return -1;
+	}
 	if (rt->rt_src == 0) {
 		ip_rt_put(rt);
 		return -1;
@@ -374,7 +378,7 @@ int igmp_rcv(struct sk_buff *skb)
 	case IGMP_HOST_MEMBERSHIP_REPORT:
 	case IGMP_HOST_NEW_MEMBERSHIP_REPORT:
 		/* Is it our report looped back? */
-		if (((struct rtable*)skb->dst)->key.iif == 0)
+		if (((struct rtable*)skb->dst)->fl.iif == 0)
 			break;
 		igmp_heard_report(in_dev, ih->group);
 		break;
@@ -608,6 +612,8 @@ void ip_mc_destroy_dev(struct in_device *in_dev)
 
 static struct in_device * ip_mc_find_dev(struct ip_mreqn *imr)
 {
+	struct flowi fl = { .nl_u = { .ip4_u =
+				      { .daddr = imr->imr_address.s_addr } } };
 	struct rtable *rt;
 	struct net_device *dev = NULL;
 	struct in_device *idev = NULL;
@@ -619,7 +625,7 @@ static struct in_device * ip_mc_find_dev(struct ip_mreqn *imr)
 		__dev_put(dev);
 	}
 
-	if (!dev && !ip_route_output(&rt, imr->imr_multiaddr.s_addr, 0, 0, 0)) {
+	if (!dev && !ip_route_output_key(&rt, &fl)) {
 		dev = rt->u.dst.dev;
 		ip_rt_put(rt);
 	}

@@ -131,9 +131,6 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		inode->i_blksize =
 		    (pTcon->ses->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;
 		inode->i_blocks = do_div(findData.NumOfBytes, inode->i_blksize);
-		cFYI(1,
-		     ("\nFinddata alloc size (from smb) %lld",
-		      findData.NumOfBytes));
 		if (findData.NumOfBytes < findData.EndOfFile)
 			cFYI(1, ("\nServer inconsistency Error: it says allocation size less than end of file "));
 		cFYI(1,

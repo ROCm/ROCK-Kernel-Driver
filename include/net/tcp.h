@@ -472,6 +472,7 @@ extern int sysctl_tcp_rmem[3];
 extern int sysctl_tcp_app_win;
 extern int sysctl_tcp_adv_win_scale;
 extern int sysctl_tcp_tw_reuse;
+extern int sysctl_tcp_frto;
 
 extern atomic_t tcp_memory_allocated;
 extern atomic_t tcp_sockets_allocated;
@@ -648,7 +649,8 @@ extern int			tcp_v4_remember_stamp(struct sock *sk);
 
 extern int		    	tcp_v4_tw_remember_stamp(struct tcp_tw_bucket *tw);
 
-extern int			tcp_sendmsg(struct sock *sk, struct msghdr *msg, int size);
+extern int			tcp_sendmsg(struct kiocb *iocb, struct sock *sk,
+					    struct msghdr *msg, int size);
 extern ssize_t			tcp_sendpage(struct socket *sock, struct page *page, int offset, size_t size, int flags);
 
 extern int			tcp_ioctl(struct sock *sk, 
@@ -722,6 +724,7 @@ extern struct sock *		tcp_check_req(struct sock *sk,struct sk_buff *skb,
 extern int			tcp_child_process(struct sock *parent,
 						  struct sock *child,
 						  struct sk_buff *skb);
+extern void			tcp_enter_frto(struct sock *sk);
 extern void			tcp_enter_loss(struct sock *sk, int how);
 extern void			tcp_clear_retrans(struct tcp_opt *tp);
 extern void			tcp_update_metrics(struct sock *sk);
@@ -739,7 +742,7 @@ extern int			tcp_setsockopt(struct sock *sk, int level,
 					       int optname, char *optval, 
 					       int optlen);
 extern void			tcp_set_keepalive(struct sock *sk, int val);
-extern int			tcp_recvmsg(struct sock *sk, 
+extern int			tcp_recvmsg(struct kiocb *iocb, struct sock *sk,
 					    struct msghdr *msg,
 					    int len, int nonblock, 
 					    int flags, int *addr_len);
@@ -1854,5 +1857,18 @@ static inline void tcp_v4_setup_caps(struct sock *sk, struct dst_entry *dst)
 }
 
 #define TCP_CHECK_TIMER(sk) do { } while (0)
+
+static inline int tcp_use_frto(const struct sock *sk)
+{
+	const struct tcp_opt *tp = tcp_sk(sk);
+	
+	/* F-RTO must be activated in sysctl and there must be some
+	 * unsent new data, and the advertised window should allow
+	 * sending it.
+	 */
+	return (sysctl_tcp_frto && tp->send_head &&
+		!after(TCP_SKB_CB(tp->send_head)->end_seq,
+		       tp->snd_una + tp->snd_wnd));
+}
 
 #endif	/* _TCP_H */

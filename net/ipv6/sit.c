@@ -502,9 +502,16 @@ static int ipip6_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		dst = addr6->s6_addr32[3];
 	}
 
-	if (ip_route_output(&rt, dst, tiph->saddr, RT_TOS(tos), tunnel->parms.link)) {
-		tunnel->stat.tx_carrier_errors++;
-		goto tx_error_icmp;
+	{
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = dst,
+						.saddr = tiph->saddr,
+						.tos = RT_TOS(tos) } },
+				    .oif = tunnel->parms.link };
+		if (ip_route_output_key(&rt, &fl)) {
+			tunnel->stat.tx_carrier_errors++;
+			goto tx_error_icmp;
+		}
 	}
 	if (rt->rt_type != RTN_UNICAST) {
 		tunnel->stat.tx_carrier_errors++;
@@ -777,8 +784,13 @@ static int ipip6_tunnel_init(struct net_device *dev)
 	ipip6_tunnel_init_gen(dev);
 
 	if (iph->daddr) {
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = iph->daddr,
+						.saddr = iph->saddr,
+						.tos = RT_TOS(iph->tos) } },
+				    .oif = tunnel->parms.link };
 		struct rtable *rt;
-		if (!ip_route_output(&rt, iph->daddr, iph->saddr, RT_TOS(iph->tos), tunnel->parms.link)) {
+		if (!ip_route_output_key(&rt, &fl)) {
 			tdev = rt->u.dst.dev;
 			ip_rt_put(rt);
 		}

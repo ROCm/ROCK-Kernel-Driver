@@ -1,13 +1,30 @@
-/*
- *  presto's super.c
+/* -*- mode: c; c-basic-offset: 8; indent-tabs-mode: nil; -*-
+ * vim:expandtab:shiftwidth=8:tabstop=8:
  *
- *  Copyright (C) 1998 Peter J. Braam
+ *  Copyright (C) 1998 Peter J. Braam <braam@clusterfs.com>
  *  Copyright (C) 2000 Stelias Computing, Inc.
  *  Copyright (C) 2000 Red Hat, Inc.
  *
+ *   This file is part of InterMezzo, http://www.inter-mezzo.org.
  *
+ *   InterMezzo is free software; you can redistribute it and/or
+ *   modify it under the terms of version 2 of the GNU General Public
+ *   License as published by the Free Software Foundation.
+ *
+ *   InterMezzo is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with InterMezzo; if not, write to the Free Software
+ *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ *  presto's super.c
  */
 
+static char rcsid[] __attribute ((unused)) = "$Id: super.c,v 1.4 2002/10/12 02:16:19 rread Exp $";
+#define INTERMEZZO_VERSION "$Revision: 1.4 $"
 
 #include <stdarg.h>
 
@@ -20,16 +37,17 @@
 #include <linux/ext2_fs.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
-#include <linux/time.h>
+#include <linux/sched.h>
 #include <linux/stat.h>
 #include <linux/string.h>
+#include <linux/smp_lock.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
+#include <linux/devfs_fs_kernel.h>
 #define __NO_VERSION__
 #include <linux/module.h>
 
 #include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_upcall.h>
 #include <linux/intermezzo_psdev.h>
 
 #ifdef PRESTO_DEBUG
@@ -37,23 +55,8 @@ long presto_vmemory = 0;
 long presto_kmemory = 0;
 #endif
 
-extern struct presto_cache *presto_init_cache(void);
-extern inline void presto_cache_add(struct presto_cache *cache, struct super_block *sb);
-extern inline void presto_init_cache_hash(void);
-
-int presto_remount(struct super_block *, int *, char *);
-extern ssize_t presto_file_write(struct file *file, const char *buf, 
-                                 size_t size, loff_t *off);
-
-/*
- *  Reading the super block.
- *
- *
- *
- */
-
 /* returns an allocated string, copied out from data if opt is found */
-static char *read_opt(const char *opt, char *data)
+static char *opt_read(const char *opt, char *data)
 {
         char *value;
         char *retval;
@@ -66,9 +69,9 @@ static char *read_opt(const char *opt, char *data)
                 return NULL;
 
         value++;
-        PRESTO_ALLOC(retval, char *, strlen(value) + 1);
+        PRESTO_ALLOC(retval, strlen(value) + 1);
         if ( !retval ) {
-                printk("InterMezzo: Out of memory!\n");
+                CERROR("InterMezzo: Out of memory!\n");
                 return NULL;
         }
 
@@ -77,21 +80,30 @@ static char *read_opt(const char *opt, char *data)
         return retval;
 }
 
-static void store_opt(char **dst, char *opt, char *defval)
+static void opt_store(char **dst, char *opt)
 {
-        if (dst) {
-                if (*dst) { 
-                        PRESTO_FREE(*dst, strlen(*dst) + 1);
-                }
-                *dst = opt;
-        } else {
-                printk("presto: store_opt, error dst == NULL\n"); 
-        }
+        if (!dst) 
+                CERROR("intermezzo: store_opt, error dst == NULL\n"); 
 
+        if (*dst)
+                PRESTO_FREE(*dst, strlen(*dst) + 1);
+        *dst = opt;
+}
 
-        if (!opt && defval) {
+static void opt_set_default(char **dst, char *defval)
+{
+        if (!dst) 
+                CERROR("intermezzo: store_opt, error dst == NULL\n"); 
+
+        if (*dst)
+                PRESTO_FREE(*dst, strlen(*dst) + 1);
+        if (defval) {
                 char *def_alloced; 
-                PRESTO_ALLOC(def_alloced, char *, strlen(defval)+1);
+                PRESTO_ALLOC(def_alloced, strlen(defval)+1);
+                if (!def_alloced) {
+                        CERROR("InterMezzo: Out of memory!\n");
+                        return ;
+                }
                 strcpy(def_alloced, defval);
                 *dst = def_alloced; 
         }
@@ -104,256 +116,197 @@ static void store_opt(char **dst, char *opt, char *defval)
  * to the read_super operation of the cache).  The return value will
  * be a pointer to the end of the cache_data.
  */
-static char *presto_options(char *options, char *cache_data,
+static char *presto_options(struct file_system_type *fstype, 
+                            char *options, char *cache_data,
                             char **cache_type, char **fileset,
-                            char **prestodev,  char **mtpt)
+                            char **channel)
 {
         char *this_char;
+        char *opt_ptr = options;
         char *cache_data_end = cache_data;
 
+        /* set the defaults */ 
+        if (strcmp(fstype->name, "intermezzo") == 0)
+            opt_set_default(cache_type, "ext3"); 
+        else 
+            opt_set_default(cache_type, "tmpfs"); 
+            
         if (!options || !cache_data)
                 return cache_data_end;
 
-        /* set the defaults */ 
-        store_opt(cache_type, NULL, "ext3"); 
-        store_opt(prestodev, NULL, PRESTO_PSDEV_NAME "0"); 
 
         CDEBUG(D_SUPER, "parsing options\n");
-        while ((this_char = strsep (&options, ",")) != NULL) {
+        while ((this_char = strsep (&opt_ptr, ",")) != NULL) {
                 char *opt;
+                if (!*this_char)
+                        continue;
                 CDEBUG(D_SUPER, "this_char %s\n", this_char);
 
-        	if (!*this_char)
-        		continue;
-                if ( (opt = read_opt("fileset", this_char)) ) {
-                        store_opt(fileset, opt, NULL);
+                if ( (opt = opt_read("fileset", this_char)) ) {
+                        opt_store(fileset, opt);
                         continue;
                 }
-                if ( (opt = read_opt("cache_type", this_char)) ) {
-                        store_opt(cache_type, opt, "ext3");
+                if ( (opt = opt_read("cache_type", this_char)) ) {
+                        opt_store(cache_type, opt);
                         continue;
                 }
-                if ( (opt = read_opt("mtpt", this_char)) ) {
-                        store_opt(mtpt, opt, NULL);
-                        continue;
-                }
-                if ( (opt = read_opt("prestodev", this_char)) ) {
-                        store_opt(prestodev, opt, PRESTO_PSDEV_NAME);
+                if ( (opt = opt_read("channel", this_char)) ) {
+                        opt_store(channel, opt);
                         continue;
                 }
 
-                cache_data_end += sprintf(cache_data_end, "%s%s",
-                                          cache_data_end != cache_data ? ",":"",
-                                          this_char);
+                cache_data_end += 
+                        sprintf(cache_data_end, "%s%s",
+                                cache_data_end != cache_data ? ",":"", 
+                                this_char);
         }
 
         return cache_data_end;
 }
 
-/*
-    map a /dev/intermezzoX path to a minor:
-    used to validate mount options passed to InterMezzo
- */
-static int presto_get_minor(char *dev_path, int *minor)
+static int presto_set_channel(struct presto_cache *cache, char *channel)
 {
-        struct nameidata nd;
-        struct dentry *dentry;
-        kdev_t devno = NODEV;
-        int error; 
+        int minor; 
+
         ENTRY;
-
-        /* Special case for root filesystem - use minor 0 always. */
-        if ( current->pid == 1 ) {
-                *minor = 0;
-                return 0;
+        if (!channel) {
+                minor = izo_psdev_get_free_channel();
+        } else {
+                minor = simple_strtoul(channel, NULL, 0); 
         }
+        if (minor < 0 || minor >= MAX_CHANNEL) { 
+                CERROR("all channels in use or channel too large %d\n", 
+                       minor);
+                return -EINVAL;
+        }
+        
+        cache->cache_psdev = &(izo_channels[minor]);
+        list_add(&cache->cache_channel_list, 
+                 &cache->cache_psdev->uc_cache_list); 
 
-        error = presto_walk(dev_path, &nd);
-        if (error) {
-		EXIT;
-                return error;
-	}
-        dentry = nd.dentry;
-
-	error = -ENODEV;
-        if (!dentry->d_inode) { 
-		EXIT;
-		goto out;
-	}
-
-        if (!S_ISCHR(dentry->d_inode->i_mode)) {
-		EXIT;
-		goto out;
-	}
-
-        devno = dentry->d_inode->i_rdev;
-        if ( major(devno) != PRESTO_PSDEV_MAJOR ) { 
-		EXIT;
-		goto out;
-	}
-
-        if ( minor(devno) >= MAX_PRESTODEV ) {
-		EXIT;
-		goto out;
-	}
-
-	EXIT;
- out:
-        *minor = minor(devno);
-        path_release(&nd);
-        return 0;
+        EXIT;
+        return minor;
 }
 
-/* We always need to remove the presto options before passing to bottom FS */
-struct super_block * presto_read_super(struct super_block * presto_sb,
-                                       void * data, int silent)
+/* We always need to remove the presto options before passing 
+   mount options to cache FS */
+struct super_block * presto_get_sb(struct file_system_type *izo_type, 
+                                   int flags, char *devname, void * data)
 {
-        struct super_block *mysb = NULL;
         struct file_system_type *fstype;
         struct presto_cache *cache = NULL;
         char *cache_data = NULL;
         char *cache_data_end;
         char *cache_type = NULL;
         char *fileset = NULL;
-        char *presto_mtpt = NULL;
-        char *prestodev = NULL;
-        struct filter_fs *ops;
-        int minor;
-        struct upc_comm *psdev;
+        char *channel = NULL;
+        struct super_block *sb;
+        int err; 
+        unsigned int minor;
 
         ENTRY;
-        CDEBUG(D_MALLOC, "before parsing: kmem %ld, vmem %ld\n",
-               presto_kmemory, presto_vmemory);
 
         /* reserve space for the cache's data */
-        PRESTO_ALLOC(cache_data, void *, PAGE_SIZE);
+        PRESTO_ALLOC(cache_data, PAGE_SIZE);
         if ( !cache_data ) {
-                printk("presto_read_super: Cannot allocate data page.\n");
+                CERROR("presto_read_super: Cannot allocate data page.\n");
                 EXIT;
                 goto out_err;
         }
 
-        CDEBUG(D_SUPER, "mount opts: %s\n", data ? (char *)data : "(none)");
-
         /* read and validate options */
-        cache_data_end = presto_options(data, cache_data, &cache_type, &fileset,
-                                        &prestodev, &presto_mtpt);
+        cache_data_end = presto_options(izo_type, data, cache_data, &cache_type, 
+                                        &fileset, &channel);
 
         /* was there anything for the cache filesystem in the data? */
         if (cache_data_end == cache_data) {
                 PRESTO_FREE(cache_data, PAGE_SIZE);
-                cache_data = NULL;
+                cache_data_end = cache_data = NULL;
         } else {
                 CDEBUG(D_SUPER, "cache_data at %p is: %s\n", cache_data,
                        cache_data);
         }
 
-        /* prepare the communication channel */
-        if ( presto_get_minor(prestodev, &minor) ) {
-                /* if (!silent) */
-                printk("InterMezzo: %s not a valid presto dev\n", prestodev);
-                EXIT;
-                goto out_err;
-        }
-        psdev = &upc_comms[minor];
-        CDEBUG(D_SUPER, "\n");
-        psdev->uc_no_filter = 1;
-
-        CDEBUG(D_SUPER, "presto minor is %d\n", minor);
-
         /* set up the cache */
-        cache = presto_init_cache();
+        cache = presto_cache_init();
         if ( !cache ) {
-                printk("presto_read_super: failure allocating cache.\n");
+                CERROR("presto_read_super: failure allocating cache.\n");
                 EXIT;
                 goto out_err;
         }
-
-        /* no options were passed: likely we are "/" readonly */
-        if ( !presto_mtpt || !fileset ) {
-                cache->cache_flags |= CACHE_LENTO_RO | CACHE_CLIENT_RO;
-        }
-        cache->cache_psdev = psdev;
-        /* no options were passed: likely we are "/" readonly */
-        /* before the journaling infrastructure can work, these
-           need to be set; that happens in presto_remount */
-        if ( !presto_mtpt || !fileset ) {
-                if (!presto_mtpt) 
-                        printk("No mountpoint marking cache RO\n");
-                if (!fileset) 
-                        printk("No fileset marking cache RO\n");
-                cache->cache_flags |= CACHE_LENTO_RO | CACHE_CLIENT_RO;
-        }
-
-        cache->cache_mtpt = presto_mtpt;
-        cache->cache_root_fileset = fileset;
         cache->cache_type = cache_type;
 
-        printk("Presto: type=%s, vol=%s, dev=%s (minor %d), mtpt %s, flags %x\n",
-               cache_type, fileset ? fileset : "NULL", prestodev, minor,
-               presto_mtpt ? presto_mtpt : "NULL", cache->cache_flags);
+        /* link cache to channel */ 
+        minor = presto_set_channel(cache, channel);
+        if (minor < 0) { 
+                EXIT;
+                goto out_err;
+        }
 
+        CDEBUG(D_SUPER, "Presto: type=%s, fset=%s, dev= %d, flags %x\n",
+               cache_type, fileset?fileset:"NULL", minor, cache->cache_flags);
 
         MOD_INC_USE_COUNT;
-        fstype = get_fs_type(cache_type);
 
+        /* get the filter for the cache */
+        fstype = get_fs_type(cache_type);
         cache->cache_filter = filter_get_filter_fs((const char *)cache_type); 
         if ( !fstype || !cache->cache_filter) {
-                printk("Presto: unrecognized fs type or cache type\n");
+                CERROR("Presto: unrecognized fs type or cache type\n");
                 MOD_DEC_USE_COUNT;
                 EXIT;
                 goto out_err;
         }
-        mysb = fstype->read_super(presto_sb, cache_data, silent);
+
+        sb = fstype->get_sb(fstype, flags, devname, cache_data);
+
+        if ( !sb || IS_ERR(sb)) {
+                CERROR("InterMezzo: cache mount failure.\n");
+                MOD_DEC_USE_COUNT;
+                EXIT;
+                goto out_err;
+        }
+
+        /* can we in fact mount the cache */ 
+        if (sb->s_bdev && (strcmp(fstype->name, "vintermezzo") == 0)) {
+                CERROR("vintermezzo must not be used with a  block device\n");
+                MOD_DEC_USE_COUNT;
+                EXIT;
+                goto out_err;
+        }
+
         /* this might have been freed above */
         if (cache_data) {
                 PRESTO_FREE(cache_data, PAGE_SIZE);
                 cache_data = NULL;
         }
-        if ( !mysb ) {
-                /* if (!silent) */
-                printk("InterMezzo: cache mount failure.\n");
-                MOD_DEC_USE_COUNT;
-                EXIT;
-                goto out_err;
-        }
 
-	cache->cache_sb = mysb;
-        ops = filter_get_filter_fs(cache_type);
+        cache->cache_sb = sb;
+        cache->cache_root = dget(sb->s_root);
+
+        /* we now know the dev of the cache: hash the cache */
+        presto_cache_add(cache, to_kdev_t(sb->s_dev));
+        err = izo_prepare_fileset(sb->s_root, fileset); 
 
         filter_setup_journal_ops(cache->cache_filter, cache->cache_type); 
 
-        /* we now know the dev of the cache: hash the cache */
-        presto_cache_add(cache, mysb);
-
-        /* make sure we have our own super operations: mysb
+        /* make sure we have our own super operations: sb
            still contains the cache operations */
-        filter_setup_super_ops(cache->cache_filter, mysb->s_op, 
+        filter_setup_super_ops(cache->cache_filter, sb->s_op, 
                                &presto_super_ops);
-        mysb->s_op = filter_c2usops(cache->cache_filter);
+        sb->s_op = filter_c2usops(cache->cache_filter);
 
-        /* now get our own directory operations */
-        if ( mysb->s_root && mysb->s_root->d_inode ) {
-                CDEBUG(D_SUPER, "\n");
-                filter_setup_dir_ops(cache->cache_filter, 
-                                     mysb->s_root->d_inode,
-                                     &presto_dir_iops, &presto_dir_fops);
-                mysb->s_root->d_inode->i_op = filter_c2udiops(cache->cache_filter);
-                CDEBUG(D_SUPER, "lookup at %p\n", 
-                       mysb->s_root->d_inode->i_op->lookup);
-                filter_setup_dentry_ops(cache->cache_filter, 
-                                        mysb->s_root->d_op, 
-                                        &presto_dentry_ops);
-                presto_sb->s_root->d_op = filter_c2udops(cache->cache_filter);
-                cache->cache_mtde = mysb->s_root;
-                presto_set_dd(mysb->s_root);
-        }
-
-        CDEBUG(D_MALLOC, "after mounting: kmem %ld, vmem %ld\n",
-               presto_kmemory, presto_vmemory);
+        /* get izo directory operations: sb->s_root->d_inode exists now */
+        filter_setup_dir_ops(cache->cache_filter, sb->s_root->d_inode,
+                             &presto_dir_iops, &presto_dir_fops);
+        filter_setup_dentry_ops(cache->cache_filter, sb->s_root->d_op, 
+                                &presto_dentry_ops);
+        sb->s_root->d_inode->i_op = filter_c2udiops(cache->cache_filter);
+        sb->s_root->d_inode->i_fop = filter_c2udfops(cache->cache_filter);
+        sb->s_root->d_op = filter_c2udops(cache->cache_filter);
 
         EXIT;
-        return mysb;
+        return sb;
 
  out_err:
         CDEBUG(D_SUPER, "out_err called\n");
@@ -363,10 +316,8 @@ struct super_block * presto_read_super(struct super_block * presto_sb,
                 PRESTO_FREE(cache_data, PAGE_SIZE);
         if (fileset)
                 PRESTO_FREE(fileset, strlen(fileset) + 1);
-        if (presto_mtpt)
-                PRESTO_FREE(presto_mtpt, strlen(presto_mtpt) + 1);
-        if (prestodev)
-                PRESTO_FREE(prestodev, strlen(prestodev) + 1);
+        if (channel)
+                PRESTO_FREE(channel, strlen(channel) + 1);
         if (cache_type)
                 PRESTO_FREE(cache_type, strlen(cache_type) + 1);
 
@@ -375,153 +326,90 @@ struct super_block * presto_read_super(struct super_block * presto_sb,
         return NULL;
 }
 
-int presto_remount(struct super_block * sb, int *flags, char *data)
-{
-        char *cache_data = NULL;
-        char *cache_data_end;
-        char **type;
-        char **fileset;
-        char **mtpt;
-        char **prestodev;
-        struct super_operations *sops;
-        struct presto_cache *cache = NULL;
-        int err = 0;
 
-        ENTRY;
-        CDEBUG(D_MALLOC, "before remount: kmem %ld, vmem %ld\n",
-               presto_kmemory, presto_vmemory);
-        CDEBUG(D_SUPER, "remount opts: %s\n", data ? (char *)data : "(none)");
-        if (data) {
-                /* reserve space for the cache's data */
-                PRESTO_ALLOC(cache_data, void *, PAGE_SIZE);
-                if ( !cache_data ) {
-                        err = -ENOMEM;
-                        EXIT;
-                        goto out_err;
-                }
-        }
 
-        cache = presto_find_cache(sb);
-        if (!cache) {
-                printk(__FUNCTION__ ": cannot find cache on remount\n");
-                err = -ENODEV;
-                EXIT;
-                goto out_err;
-        }
 
-        /* If an option has not yet been set, we allow it to be set on
-         * remount.  If an option already has a value, we pass NULL for
-         * the option pointer, which means that the InterMezzo option
-         * will be parsed but discarded.
-         */
-        type = cache->cache_type ? NULL : &cache->cache_type;
-        fileset = cache->cache_root_fileset ? NULL : &cache->cache_root_fileset;
-        prestodev = cache->cache_psdev ? NULL : &cache->cache_psdev->uc_devname;
-        mtpt = cache->cache_mtpt ? NULL : &cache->cache_mtpt;
-        cache_data_end = presto_options(data, cache_data, type, fileset,
-                                        prestodev, mtpt);
-
-        if (cache_data) {
-                if (cache_data_end == cache_data) {
-                        PRESTO_FREE(cache_data, PAGE_SIZE);
-                        cache_data = NULL;
-                } else {
-                        CDEBUG(D_SUPER, "cache_data at %p is: %s\n", cache_data,
-                               cache_data);
-                }
-        }
-
-        if (cache->cache_root_fileset && cache->cache_mtpt) {
-                cache->cache_flags &= ~(CACHE_LENTO_RO|CACHE_CLIENT_RO);
-        }
-
-        sops = filter_c2csops(cache->cache_filter);
-        if (sops->remount_fs) {
-                err = sops->remount_fs(sb, flags, cache_data);
-        }
-
-        CDEBUG(D_MALLOC, "after remount: kmem %ld, vmem %ld\n",
-               presto_kmemory, presto_vmemory);
-        EXIT;
-out_err:
-        if (cache_data)
-                PRESTO_FREE(cache_data, PAGE_SIZE);
-        return err;
-}
-
-struct file_system_type presto_fs_type = {
 #ifdef PRESTO_DEVEL
-        "izofs",
+static DECLARE_FSTYPE(presto_fs_type, "izo", presto_read_super, FS_REQUIRES_DEV);
+static DECLARE_FSTYPE(vpresto_fs_type, "vintermezzo", presto_read_super, FS_LITTER);
 #else 
-        "intermezzo",
-#endif
-        FS_REQUIRES_DEV, /* can use Ibaskets when ext2 does */
-        presto_read_super,
-        NULL
+static struct file_system_type vpresto_fs_type = {
+	.owner		= THIS_MODULE,
+	.name		= "vintermezzo",
+	.get_sb		= presto_get_sb,
+	.kill_sb	= kill_litter_super,
 };
+static struct file_system_type presto_fs_type = {
+	.owner		= THIS_MODULE,
+	.name		= "intermezzo",
+	.get_sb		= presto_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
+};
+#endif
 
 
-int /* __init */ init_intermezzo_fs(void)
+
+int __init init_intermezzo_fs(void)
 {
         int status;
 
-        printk(KERN_INFO "InterMezzo Kernel/Lento communications, "
-               "v1.04, braam@inter-mezzo.org\n");
+        printk(KERN_INFO "InterMezzo Kernel/Intersync communications " INTERMEZZO_VERSION
+               " info@clusterfs.com\n");
 
         status = presto_psdev_init();
         if ( status ) {
-                printk("Problem (%d) in init_intermezzo_psdev\n", status);
+                CERROR("Problem (%d) in init_intermezzo_psdev\n", status);
                 return status;
         }
 
         status = init_intermezzo_sysctl();
         if (status) {
-                printk("presto: failed in init_intermezzo_sysctl!\n");
+                CERROR("presto: failed in init_intermezzo_sysctl!\n");
         }
 
-        presto_init_cache_hash();
-        presto_init_ddata_cache();
+        presto_cache_init_hash();
+
+        if (!presto_init_ddata_cache()) {
+                CERROR("presto out of memory!\n");
+                return -ENOMEM;
+        }
 
         status = register_filesystem(&presto_fs_type);
         if (status) {
-                printk("presto: failed in register_filesystem!\n");
+                CERROR("presto: failed in register_filesystem!\n");
+        }
+        status = register_filesystem(&vpresto_fs_type);
+        if (status) {
+                CERROR("vpresto: failed in register_filesystem!\n");
         }
         return status;
 }
 
-
-#ifdef MODULE
-MODULE_AUTHOR("Peter J. Braam <braam@inter-mezzo.org>");
-MODULE_DESCRIPTION("InterMezzo Kernel/Lento communications, v1.0.5.1");
-
-int init_module(void)
-{
-        return init_intermezzo_fs();
-}
-
-
-void cleanup_module(void)
+void __exit exit_intermezzo_fs(void)
 {
         int err;
 
         ENTRY;
 
         if ( (err = unregister_filesystem(&presto_fs_type)) != 0 ) {
-                printk("presto: failed to unregister filesystem\n");
+                CERROR("presto: failed to unregister filesystem\n");
+        }
+        if ( (err = unregister_filesystem(&vpresto_fs_type)) != 0 ) {
+                CERROR("vpresto: failed to unregister filesystem\n");
         }
 
         presto_psdev_cleanup();
         cleanup_intermezzo_sysctl();
         presto_cleanup_ddata_cache();
-
-#ifdef PRESTO_DEVEL
-        unregister_chrdev(PRESTO_PSDEV_MAJOR, "intermezzo_psdev_devel");
-#else 
-        unregister_chrdev(PRESTO_PSDEV_MAJOR, "intermezzo_psdev");
-#endif
-        CDEBUG(D_MALLOC, "after cleanup: kmem %ld, vmem %ld\n",
+        CERROR("after cleanup: kmem %ld, vmem %ld\n",
                presto_kmemory, presto_vmemory);
 }
 
-#endif
 
+MODULE_AUTHOR("Cluster Filesystems Inc. <info@clusterfs.com>");
+MODULE_DESCRIPTION("InterMezzo Kernel/Intersync communications " INTERMEZZO_VERSION);
+MODULE_LICENSE("GPL");
+
+module_init(init_intermezzo_fs)
+module_exit(exit_intermezzo_fs)

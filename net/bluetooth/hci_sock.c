@@ -316,7 +316,7 @@ static inline void hci_sock_cmsg(struct sock *sk, struct msghdr *msg, struct sk_
         	put_cmsg(msg, SOL_HCI, HCI_CMSG_TSTAMP, sizeof(skb->stamp), &skb->stamp);
 }
  
-static int hci_sock_recvmsg(struct socket *sock, struct msghdr *msg, int len, int flags, struct scm_cookie *scm)
+static int hci_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int len, int flags, struct scm_cookie *scm)
 {
 	int noblock = flags & MSG_DONTWAIT;
 	struct sock *sk = sock->sk;
@@ -352,7 +352,7 @@ static int hci_sock_recvmsg(struct socket *sock, struct msghdr *msg, int len, in
 	return err ? : copied;
 }
 
-static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg, int len,
+static int hci_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int len,
                             struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;

@@ -733,7 +733,8 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 
 SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *, sctp_cmsgs_t *);
 
-SCTP_STATIC int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
+SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
+			     struct msghdr *msg, int size)
 {
 	sctp_opt_t *sp;
 	sctp_endpoint_t *ep;
@@ -1098,8 +1099,8 @@ do_interrupted:
  */
 static struct sk_buff *sctp_skb_recv_datagram(struct sock *, int, int, int *);
 
-SCTP_STATIC int sctp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
-			     int noblock, int flags, int *addr_len)
+SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
+			     int len, int noblock, int flags, int *addr_len)
 {
 	sctp_ulpevent_t *event = NULL;
 	sctp_opt_t *sp = sctp_sk(sk);

@@ -157,7 +157,7 @@ ip6t_local_hook(unsigned int hook,
 	hop_limit = (*pskb)->nh.ipv6h->hop_limit;
 
 	/* flowlabel and prio (includes version, which shouldn't change either */
-	flowlabel = (u_int32_t) (*pskb)->nh.ipv6h;
+	flowlabel = *((u_int32_t *) (*pskb)->nh.ipv6h);
 
 	ret = ip6t_do_table(pskb, hook, in, out, &packet_mangler, NULL);
 

@@ -718,6 +718,9 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		newtp->snd_cwnd = 2;
 		newtp->snd_cwnd_cnt = 0;
 
+		newtp->frto_counter = 0;
+		newtp->frto_highmark = 0;
+
 		newtp->ca_state = TCP_CA_Open;
 		tcp_init_xmit_timers(newsk);
 		skb_queue_head_init(&newtp->out_of_order_queue);

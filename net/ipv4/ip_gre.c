@@ -412,6 +412,7 @@ out:
 	u16 flags;
 	int grehlen = (iph->ihl<<2) + 4;
 	struct sk_buff *skb2;
+	struct flowi fl;
 	struct rtable *rt;
 
 	if (p[1] != htons(ETH_P_IP))
@@ -488,7 +489,10 @@ out:
 	skb2->nh.raw = skb2->data;
 
 	/* Try to guess incoming interface */
-	if (ip_route_output(&rt, eiph->saddr, 0, RT_TOS(eiph->tos), 0)) {
+	memset(&fl, 0, sizeof(fl));
+	fl.fl4_dst = eiph->saddr;
+	fl.fl4_tos = RT_TOS(eiph->tos);
+	if (ip_route_output_key(&rt, &fl)) {
 		kfree_skb(skb2);
 		return;
 	}
@@ -498,7 +502,10 @@ out:
 	if (rt->rt_flags&RTCF_LOCAL) {
 		ip_rt_put(rt);
 		rt = NULL;
-		if (ip_route_output(&rt, eiph->daddr, eiph->saddr, eiph->tos, 0) ||
+		fl.fl4_dst = eiph->daddr;
+		fl.fl4_src = eiph->saddr;
+		fl.fl4_tos = eiph->tos;
+		if (ip_route_output_key(&rt, &fl) ||
 		    rt->u.dst.dev->type != ARPHRD_IPGRE) {
 			ip_rt_put(rt);
 			kfree_skb(skb2);
@@ -619,7 +626,7 @@ int ipgre_rcv(struct sk_buff *skb)
 #ifdef CONFIG_NET_IPGRE_BROADCAST
 		if (MULTICAST(iph->daddr)) {
 			/* Looped back packet, drop it! */
-			if (((struct rtable*)skb->dst)->key.iif == 0)
+			if (((struct rtable*)skb->dst)->fl.iif == 0)
 				goto drop;
 			tunnel->stat.multicast++;
 			skb->pkt_type = PACKET_BROADCAST;
@@ -749,9 +756,16 @@ static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		tos &= ~1;
 	}
 
-	if (ip_route_output(&rt, dst, tiph->saddr, RT_TOS(tos), tunnel->parms.link)) {
-		tunnel->stat.tx_carrier_errors++;
-		goto tx_error;
+	{
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = dst,
+						.saddr = tiph->saddr,
+						.tos = RT_TOS(tos) } },
+				    .oif = tunnel->parms.link };
+		if (ip_route_output_key(&rt, &fl)) {
+			tunnel->stat.tx_carrier_errors++;
+			goto tx_error;
+		}
 	}
 	tdev = rt->u.dst.dev;
 
@@ -1104,10 +1118,13 @@ static int ipgre_open(struct net_device *dev)
 
 	MOD_INC_USE_COUNT;
 	if (MULTICAST(t->parms.iph.daddr)) {
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = t->parms.iph.daddr,
+						.saddr = t->parms.iph.saddr,
+						.tos = RT_TOS(t->parms.iph.tos) } },
+				    .oif = t->parms.link };
 		struct rtable *rt;
-		if (ip_route_output(&rt, t->parms.iph.daddr,
-				    t->parms.iph.saddr, RT_TOS(t->parms.iph.tos), 
-				    t->parms.link)) {
+		if (ip_route_output_key(&rt, &fl)) {
 			MOD_DEC_USE_COUNT;
 			return -EADDRNOTAVAIL;
 		}
@@ -1177,8 +1194,13 @@ static int ipgre_tunnel_init(struct net_device *dev)
 	/* Guess output device to choose reasonable mtu and hard_header_len */
 
 	if (iph->daddr) {
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = iph->daddr,
+						.saddr = iph->saddr,
+						.tos = RT_TOS(iph->tos) } },
+				    .oif = tunnel->parms.link };
 		struct rtable *rt;
-		if (!ip_route_output(&rt, iph->daddr, iph->saddr, RT_TOS(iph->tos), tunnel->parms.link)) {
+		if (!ip_route_output_key(&rt, &fl)) {
 			tdev = rt->u.dst.dev;
 			ip_rt_put(rt);
 		}

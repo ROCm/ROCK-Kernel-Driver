@@ -14,7 +14,6 @@
 #include <linux/tty.h>
 #include <asm/bitops.h>
 
-extern struct tty_driver *tty_drivers;	/* linked list of tty drivers */
 extern struct tty_ldisc ldiscs[];
 
 
@@ -40,7 +39,7 @@ static int tty_drivers_read_proc(char *page, char **start, off_t off,
 	char	range[20], deftype[20];
 	char	*type;
 
-	for (p = tty_drivers; p; p = p->next) {
+	list_for_each_entry(p, &tty_drivers, tty_drivers) {
 		if (p->num > 1)
 			sprintf(range, "%d-%d", p->minor_start,
 				p->minor_start + p->num - 1);

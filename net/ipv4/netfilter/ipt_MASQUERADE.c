@@ -69,7 +69,6 @@ masquerade_target(struct sk_buff **pskb,
 	struct ip_nat_multi_range newrange;
 	u_int32_t newsrc;
 	struct rtable *rt;
-	struct rt_key key;
 
 	IP_NF_ASSERT(hooknum == NF_IP_POST_ROUTING);
 
@@ -84,17 +83,21 @@ masquerade_target(struct sk_buff **pskb,
 
 	mr = targinfo;
 
-	key.dst = (*pskb)->nh.iph->daddr;
-	key.src = 0; /* Unknown: that's what we're trying to establish */
-	key.tos = RT_TOS((*pskb)->nh.iph->tos)|RTO_CONN;
-	key.oif = out->ifindex;
+	{
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = (*pskb)->nh.iph->daddr,
+						.tos = (RT_TOS((*pskb)->nh.iph->tos) |
+							RTO_CONN),
 #ifdef CONFIG_IP_ROUTE_FWMARK
-	key.fwmark = (*pskb)->nfmark;
+						.fwmark = (*pskb)->nfmark
 #endif
-	if (ip_route_output_key(&rt, &key) != 0) {
-		/* Shouldn't happen */
-		printk("MASQUERADE: No route: Rusty's brain broke!\n");
-		return NF_DROP;
+					      } },
+				    .oif = out->ifindex };
+		if (ip_route_output_key(&rt, &fl) != 0) {
+			/* Shouldn't happen */
+			printk("MASQUERADE: No route: Rusty's brain broke!\n");
+			return NF_DROP;
+		}
 	}
 
 	newsrc = rt->rt_src;

@@ -209,10 +209,11 @@ find_appropriate_src(const struct ip_conntrack_tuple *tuple,
 static int
 do_extra_mangle(u_int32_t var_ip, u_int32_t *other_ipp)
 {
+	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = var_ip } } };
 	struct rtable *rt;
 
 	/* FIXME: IPTOS_TOS(iph->tos) --RR */
-	if (ip_route_output(&rt, var_ip, 0, 0, 0) != 0) {
+	if (ip_route_output_key(&rt, &fl) != 0) {
 		DEBUGP("do_extra_mangle: Can't get route to %u.%u.%u.%u\n",
 		       NIPQUAD(var_ip));
 		return 0;
