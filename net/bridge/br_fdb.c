@@ -157,9 +157,28 @@ void br_fdb_delete_by_port(struct net_bridge *br, struct net_bridge_port *p)
 		hlist_for_each_safe(h, g, &br->hash[i]) {
 			struct net_bridge_fdb_entry *f
 				= hlist_entry(h, struct net_bridge_fdb_entry, hlist);
-			if (f->dst == p) {
-				fdb_delete(f);
+			if (f->dst != p) 
+				continue;
+
+			/*
+			 * if multiple ports all have the same device address
+			 * then when one port is deleted, assign
+			 * the local entry to other port
+			 */
+			if (f->is_local) {
+				struct net_bridge_port *op;
+				list_for_each_entry(op, &br->port_list, list) {
+					if (op != p && 
+					    !memcmp(op->dev->dev_addr,
+						    f->addr.addr, ETH_ALEN)) {
+						f->dst = op;
+						goto skip_delete;
+					}
+				}
 			}
+
+			fdb_delete(f);
+		skip_delete: ;
 		}
 	}
 	write_unlock_bh(&br->hash_lock);
