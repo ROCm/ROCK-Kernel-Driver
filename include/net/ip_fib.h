@@ -23,8 +23,7 @@
 /* WARNING: The ordering of these elements must match ordering
  *          of RTA_* rtnetlink attribute numbers.
  */
-struct kern_rta
-{
+struct kern_rta {
 	void		*rta_dst;
 	void		*rta_src;
 	int		*rta_iif;
@@ -40,9 +39,12 @@ struct kern_rta
 	struct rta_session *rta_sess;
 };
 
-struct fib_nh
-{
-	struct net_device		*nh_dev;
+struct fib_info;
+
+struct fib_nh {
+	struct net_device	*nh_dev;
+	struct hlist_node	nh_hash;
+	struct fib_info		*nh_parent;
 	unsigned		nh_flags;
 	unsigned char		nh_scope;
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
@@ -60,9 +62,9 @@ struct fib_nh
  * This structure contains data shared by many of routes.
  */
 
-struct fib_info
-{
-	struct list_head	fib_list;
+struct fib_info {
+	struct hlist_node	fib_hash;
+	struct hlist_node	fib_lhash;
 	int			fib_treeref;
 	atomic_t		fib_clntref;
 	int			fib_dead;
@@ -88,8 +90,7 @@ struct fib_info
 struct fib_rule;
 #endif
 
-struct fib_result
-{
+struct fib_result {
 	unsigned char	prefixlen;
 	unsigned char	nh_sel;
 	unsigned char	type;
@@ -118,8 +119,7 @@ struct fib_result
 #define FIB_RES_DEV(res)		(FIB_RES_NH(res).nh_dev)
 #define FIB_RES_OIF(res)		(FIB_RES_NH(res).nh_oif)
 
-struct fib_table
-{
+struct fib_table {
 	unsigned char	tb_id;
 	unsigned	tb_stamp;
 	int		(*tb_lookup)(struct fib_table *tb, const struct flowi *flp, struct fib_result *res);
