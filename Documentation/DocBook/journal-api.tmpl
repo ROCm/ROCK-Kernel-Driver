@@ -196,6 +196,8 @@ listed against them. Ext3 does this in ext3_test_allocatable().
 Lock is also providing through journal_{un,}lock_updates(),
 ext3 uses this when it wants a window with a clean and stable fs for a moment.
 eg. 
+</para>
+
 <programlisting>
 
 	journal_lock_updates() //stop new stuff happening..
@@ -216,9 +218,13 @@ calls.
 Using the journal is a matter of wrapping the different context changes,
 being each mount, each modification (transaction) and each changed buffer
 to tell the journalling layer about them.
+</para>
 
+<para>
 Here is a some pseudo code to give you an idea of how it works, as
 an example.
+</para>
+
 <programlisting>
   journal_t* my_jnrl = journal_create();
   journal_init_{dev,inode}(jnrl,...)
