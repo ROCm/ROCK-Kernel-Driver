@@ -1119,7 +1119,7 @@ int usb_new_device(struct usb_device *dev)
 		dev_err(&dev->dev, "can't device_add, error %d\n", err);
 		goto fail;
 	}
-	usb_create_driverfs_dev_files (dev);
+	usb_create_sysfs_dev_files (dev);
 
 	/* choose and set the configuration. that registers the interfaces
 	 * with the driver core, and lets usb device drivers bind to them.
