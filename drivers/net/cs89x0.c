@@ -1598,7 +1598,9 @@ static void release_dma_buff(struct net_local *lp)
 static int
 net_close(struct net_device *dev)
 {
+#if ALLOW_DMA
 	struct net_local *lp = netdev_priv(dev);
+#endif
 
 	netif_stop_queue(dev);
 	
