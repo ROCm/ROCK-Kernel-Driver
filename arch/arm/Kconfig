@@ -108,6 +108,9 @@ config ARCH_IOP3XX
 config ARCH_IXP4XX
 	bool "IXP4xx-based"
 
+config ARCH_IXP2000
+	bool "IXP2400/2800-based"
+
 config ARCH_L7200
 	bool "LinkUp-L7200"
 	help
@@ -174,6 +177,8 @@ source "arch/arm/mach-integrator/Kconfig"
 source "arch/arm/mach-iop3xx/Kconfig"
 
 source "arch/arm/mach-ixp4xx/Kconfig"
+
+source "arch/arm/mach-ixp2000/Kconfig"
 
 source "arch/arm/mach-pxa/Kconfig"
 
@@ -269,7 +274,7 @@ config DISCONTIGMEM
 # Now handle the bus types
 config PCI
 	bool "PCI support" if ARCH_INTEGRATOR_AP
-	default y if ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX || ARCH_IXP4XX
+	default y if ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX || ARCH_IXP4XX || ARCH_IXP2000
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
