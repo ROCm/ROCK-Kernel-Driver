@@ -1,0 +1,23 @@
+# uClinux H8/300 Target Board Selection Menu (IDE)
+
+menu "IDE Extra configuration"
+
+config H8300_IDE_BASE
+	hex "IDE regitser base address"
+	depends on IDE
+	help
+	  IDE registers base address
+
+config H8300_IDE_ALT
+	hex "IDE regitser alternate address"
+	depends on IDE
+	help
+	  IDE alternate registers address
+
+config H8300_IDE_IRQNO
+	int "IDE IRQ no"
+	depends on IDE
+	help
+	  IDE I/F using IRQ no
+
+endmenu

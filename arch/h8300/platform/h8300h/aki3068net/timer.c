@@ -27,10 +27,10 @@
 
 void __init platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
-	outb(H8300_TIMER_COUNT_DATA,TCORA2);
-	outb(0x00,_8TCSR2);
+	ctrl_outb(H8300_TIMER_COUNT_DATA,TCORA2);
+	ctrl_outb(0x00,_8TCSR2);
 	request_irq(40,timer_int,0,"timer",0);
-	outb(0x40|0x08|0x03,_8TCR2);
+	ctrl_outb(0x40|0x08|0x03,_8TCR2);
 }
 
 void platform_timer_eoi(void)

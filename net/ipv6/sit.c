@@ -805,13 +805,11 @@ static struct inet_protocol sit_protocol = {
 	.err_handler	=	ipip6_err,
 };
 
-#ifdef MODULE
-void sit_cleanup(void)
+void __exit sit_cleanup(void)
 {
 	inet_del_protocol(&sit_protocol, IPPROTO_IPV6);
 	unregister_netdev(ipip6_fb_tunnel_dev);
 }
-#endif
 
 int __init sit_init(void)
 {
