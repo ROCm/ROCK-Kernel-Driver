@@ -8,8 +8,6 @@
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  */
 
-#include <linux/kernel.h>
-#include <linux/sysrq.h>
 #include <linux/delay.h>
 #include <linux/irq.h>
 #include <linux/pm.h>
@@ -265,23 +263,6 @@ acpi_suspend (
 	return status;
 }
 
-#if defined(CONFIG_MAGIC_SYSRQ) && defined(CONFIG_PM)
-
-/* Simple wrapper calling power down function. */
-static void acpi_sysrq_power_off(int key, struct pt_regs *pt_regs,
-	struct tty_struct *tty)
-{
-	acpi_power_off();
-}
-
-struct sysrq_key_op sysrq_acpi_poweroff_op = {
-	.handler =	&acpi_sysrq_power_off,
-	.help_msg =	"Off",
-	.action_msg =	"Power Off\n"
-};
-
-#endif  /* CONFIG_MAGIC_SYSRQ */
-
 static int __init acpi_sleep_init(void)
 {
 	acpi_status		status = AE_OK;
@@ -308,7 +289,6 @@ static int __init acpi_sleep_init(void)
 	/* Install the soft-off (S5) handler. */
 	if (sleep_states[ACPI_STATE_S5]) {
 		pm_power_off = acpi_power_off;
-		register_sysrq_key('o', &sysrq_acpi_poweroff_op);
 
 		/* workaround: some systems don't claim S4 support, but they
                    do support S5 (power-down). That is all we need, so
