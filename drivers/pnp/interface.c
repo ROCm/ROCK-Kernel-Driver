@@ -333,6 +333,13 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 		pnp_init_resources(&dev->res);
 		goto done;
 	}
+	if (!strnicmp(buf,"get",3)) {
+		down(&pnp_res_mutex);
+		if (pnp_can_read(dev))
+			dev->protocol->get(dev, &dev->res);
+		up(&pnp_res_mutex);
+		goto done;
+	}
 	if (!strnicmp(buf,"set",3)) {
 		int nport = 0, nmem = 0, nirq = 0, ndma = 0;
 		if (dev->active)
