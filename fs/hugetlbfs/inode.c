@@ -48,7 +48,7 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	struct inode *inode = file->f_dentry->d_inode;
 	struct address_space *mapping = inode->i_mapping;
 	struct hugetlbfs_sb_info *sbinfo = HUGETLBFS_SB(inode->i_sb);
-	loff_t len;
+	loff_t len, vma_len;
 	int ret;
 
 	if (vma->vm_start & ~HPAGE_MASK)
@@ -60,11 +60,11 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	if (vma->vm_end - vma->vm_start < HPAGE_SIZE)
 		return -EINVAL;
 
-	len = (loff_t)(vma->vm_end - vma->vm_start);
+	vma_len = (loff_t)(vma->vm_end - vma->vm_start);
 	if (sbinfo->free_blocks >= 0) { /* Check if there is any size limit. */
 		spin_lock(&sbinfo->stat_lock);
-		if ((len >> HPAGE_SHIFT) <= sbinfo->free_blocks) {
-			sbinfo->free_blocks -= (len >> HPAGE_SHIFT);
+		if ((vma_len >> HPAGE_SHIFT) <= sbinfo->free_blocks) {
+			sbinfo->free_blocks -= (vma_len >> HPAGE_SHIFT);
 			spin_unlock(&sbinfo->stat_lock);
 		} else {
 			spin_unlock(&sbinfo->stat_lock);
@@ -78,8 +78,7 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_flags |= VM_HUGETLB | VM_RESERVED;
 	vma->vm_ops = &hugetlb_vm_ops;
 	ret = hugetlb_prefault(mapping, vma);
-	len = (loff_t)(vma->vm_end - vma->vm_start) +
-			((loff_t)vma->vm_pgoff << PAGE_SHIFT);
+	len = vma_len +	((loff_t)vma->vm_pgoff << PAGE_SHIFT);
 	if (ret == 0 && inode->i_size < len)
 		inode->i_size = len;
 	up(&inode->i_sem);
@@ -89,7 +88,7 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	 */
 	if ((ret != 0) && (sbinfo->free_blocks >= 0)) {
 		spin_lock(&sbinfo->stat_lock);
-		sbinfo->free_blocks += (len >> HPAGE_SHIFT);
+		sbinfo->free_blocks += (vma_len >> HPAGE_SHIFT);
 		spin_unlock(&sbinfo->stat_lock);
 	}
 
