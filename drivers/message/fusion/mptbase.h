@@ -561,7 +561,7 @@ typedef struct _MPT_ADAPTER
 	u32			 sense_buf_low_dma;
 	int			 mtrr_reg;
 	struct pci_dev		*pcidev;	/* struct pci_dev pointer */
-	u8			*memmap;	/* mmap address */
+	u8			__iomem *memmap;	/* mmap address */
 	struct Scsi_Host	*sh;		/* Scsi Host pointer */
 	ScsiCfgData		spi_data;	/* Scsi config. data */
 	MPT_IOCTL		*ioctl;		/* ioctl data pointer */
