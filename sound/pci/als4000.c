@@ -99,9 +99,11 @@ MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable ALS4000 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_INDEX_DESC);
+#ifdef SUPPORT_JOYSTICK
 MODULE_PARM(joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(joystick_port, "Joystick port address for ALS4000 soundcard. (0 = disabled)");
 MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED);
+#endif
 
 #define chip_t sb_t
 
