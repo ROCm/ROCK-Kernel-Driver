@@ -618,6 +618,7 @@ void fastcall kick_iocb(struct kiocb *iocb)
 		queue_work(aio_wq, &ctx->wq);
 	}
 }
+EXPORT_SYMBOL(kick_iocb);
 
 /* aio_complete
  *	Called when the io request on the given iocb is complete.
