@@ -86,9 +86,6 @@ static const char version[] =
 #include <linux/skbuff.h>
 
 #include <asm/io.h>
-#ifdef CONFIG_ARM
-#include <asm/hardware.h>
-#endif
 #include <asm/irq.h>
 
 #include "smc91x.h"
