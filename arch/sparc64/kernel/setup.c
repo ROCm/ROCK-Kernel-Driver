@@ -573,8 +573,6 @@ void __init setup_arch(char **cmdline_p)
 		serial_console = 2;
 		break;
 	};
-	if (serial_console)
-		conswitchp = NULL;
 
 	paging_init();
 }
