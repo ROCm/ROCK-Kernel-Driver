@@ -270,6 +270,9 @@ MODULE_DEVICE_TABLE (usb, scanner_device_ids);
 /* send/recv a control message to the scanner */
 #define SCANNER_IOCTL_CTRLMSG _IOWR('U', 0x22, struct usb_ctrlrequest)
 
+/* USB bInterfaceClass used by Hewlett-Packard ScanJet 3300c and Genius HR6
+   USB - Vivid III */
+#define SCN_CLASS_SCANJET 16
 
 #ifdef CONFIG_USB_DYNAMIC_MINORS
 #define SCN_MAX_MNR 256
