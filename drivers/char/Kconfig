@@ -636,6 +636,8 @@ comment "from the tpqic02-support package.  It is available at"
 comment "metalab.unc.edu or ftp://titus.cfw.com/pub/Linux/util/"
 	depends on QIC02_TAPE && QIC02_DYNCONF
 
+source "drivers/char/ipmi/Kconfig"
+
 source "drivers/char/watchdog/Kconfig"
 
 config DS1620
