@@ -1122,7 +1122,7 @@ int usb_reset_device(struct usb_device *dev)
 					dev->devpath,
 					sizeof(dev->descriptor), ret);
         
-			clear_bit(dev->devnum, &dev->bus->devmap.devicemap);
+			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 			dev->devnum = -1;
 			return -EIO;
 		}
@@ -1131,7 +1131,7 @@ int usb_reset_device(struct usb_device *dev)
 		if (ret < 0) {
 			err("unable to get configuration (error=%d)", ret);
 			usb_destroy_configuration(dev);
-			clear_bit(dev->devnum, &dev->bus->devmap.devicemap);
+			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 			dev->devnum = -1;
 			return 1;
 		}
