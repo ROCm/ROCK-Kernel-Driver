@@ -66,47 +66,12 @@ spinlock_t rtas_data_buf_lock = SPIN_LOCK_UNLOCKED;
 char rtas_data_buf[RTAS_DATA_BUF_SIZE]__page_aligned;
 
 void
-phys_call_rtas(int token, int nargs, int nret, ...)
-{
-	va_list list;
-	unsigned long offset = reloc_offset();
-	struct rtas_args *rtas = PTRRELOC(&(get_paca()->xRtas));
-	int i;
-
-	rtas->token = token;
-	rtas->nargs = nargs;
-	rtas->nret  = nret;
-	rtas->rets  = (rtas_arg_t *)PTRRELOC(&(rtas->args[nargs]));
-
-	va_start(list, nret);
-	for (i = 0; i < nargs; i++)
-	  rtas->args[i] = (rtas_arg_t)LONG_LSW(va_arg(list, ulong));
-	va_end(list);
-
-        enter_rtas(rtas);	
-}
-
-void
-phys_call_rtas_display_status(char c)
-{
-	unsigned long offset = reloc_offset();
-	struct rtas_args *rtas = PTRRELOC(&(get_paca()->xRtas));
-
-	rtas->token = 10;
-	rtas->nargs = 1;
-	rtas->nret  = 1;
-	rtas->rets  = (rtas_arg_t *)PTRRELOC(&(rtas->args[1]));
-	rtas->args[0] = (int)c;
-
-	enter_rtas(rtas);	
-}
-
-void
 call_rtas_display_status(char c)
 {
 	struct rtas_args *args = &(get_paca()->xRtas);
+	unsigned long s;
 
-	local_irq_disable();
+	spin_lock_irqsave(&rtas.lock, s);
 
 	args->token = 10;
 	args->nargs = 1;
@@ -115,6 +80,8 @@ call_rtas_display_status(char c)
 	args->args[0] = (int)c;
 
 	enter_rtas((void *)__pa((unsigned long)args));	
+
+	spin_unlock_irqrestore(&rtas.lock, s);
 }
 
 int
@@ -538,6 +505,8 @@ void rtas_stop_self(void)
 {
 	struct rtas_args *rtas_args = &(get_paca()->xRtas);
 
+	local_irq_disable();
+
 	rtas_args->token = rtas_token("stop-self");
 	BUG_ON(rtas_args->token == RTAS_UNKNOWN_SERVICE);
 	rtas_args->nargs = 0;
@@ -547,6 +516,7 @@ void rtas_stop_self(void)
 	printk("%u %u Ready to die...\n",
 	       smp_processor_id(), hard_smp_processor_id());
 	enter_rtas((void *)__pa(rtas_args));
+
 	panic("Alas, I survived.\n");
 }
 #endif /* CONFIG_HOTPLUG_CPU */
