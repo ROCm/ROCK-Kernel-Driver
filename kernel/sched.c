@@ -1775,6 +1775,8 @@ out:
 	preempt_enable();
 }
 
+static __initdata int master_migration_thread;
+
 static int migration_thread(void * bind_cpu)
 {
 	int cpu = (int) (long) bind_cpu;
@@ -1786,14 +1788,12 @@ static int migration_thread(void * bind_cpu)
 	sigfillset(&current->blocked);
 	set_fs(KERNEL_DS);
 
-	/* FIXME: First CPU may not be zero, but this crap code
-           vanishes with hotplug cpu patch anyway. --RR */
 	/*
-	 * The first migration thread is started on CPU #0. This one can
-	 * migrate the other migration threads to their destination CPUs.
+	 * The first migration thread is started on the boot CPU, it
+	 * migrates the other migration threads to their destination CPUs.
 	 */
-	if (cpu != 0) {
-		while (!cpu_rq(0)->migration_thread)
+	if (cpu != master_migration_thread) {
+		while (!cpu_rq(master_migration_thread)->migration_thread)
 			yield();
 		set_cpus_allowed(current, 1UL << cpu);
 	}
@@ -1857,7 +1857,9 @@ void __init migration_init(void)
 {
 	int cpu;
 
-	current->cpus_allowed = 1UL << 0;
+	master_migration_thread = smp_processor_id();
+	current->cpus_allowed = 1UL << master_migration_thread;
+	
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		if (!cpu_online(cpu))
 			continue;
