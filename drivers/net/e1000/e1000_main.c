@@ -68,7 +68,7 @@
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.2.30.1-k1";
+char e1000_driver_version[] = "5.2.30.1-k2";
 char e1000_copyright[] = "Copyright (c) 1999-2004 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -328,14 +328,16 @@ e1000_reset(struct e1000_adapter *adapter)
 		adapter->tx_fifo_head = 0;
 		adapter->tx_head_addr = pba << E1000_TX_HEAD_ADDR_SHIFT;
 		adapter->tx_fifo_size =
-			(E1000_PBA_40K - pba) << E1000_TX_FIFO_SIZE_SHIFT;
+			(E1000_PBA_40K - pba) << E1000_PBA_BYTES_SHIFT;
 		atomic_set(&adapter->tx_fifo_stall, 0);
 	}
 	E1000_WRITE_REG(&adapter->hw, PBA, pba);
 
 	/* flow control settings */
-	adapter->hw.fc_high_water = pba - E1000_FC_HIGH_DIFF;
-	adapter->hw.fc_low_water = pba - E1000_FC_LOW_DIFF;
+	adapter->hw.fc_high_water =
+		(pba << E1000_PBA_BYTES_SHIFT) - E1000_FC_HIGH_DIFF;
+	adapter->hw.fc_low_water =
+		(pba << E1000_PBA_BYTES_SHIFT) - E1000_FC_LOW_DIFF;
 	adapter->hw.fc_pause_time = E1000_FC_PAUSE_TIME;
 	adapter->hw.fc_send_xon = 1;
 	adapter->hw.fc = adapter->hw.original_fc;
@@ -472,9 +474,14 @@ e1000_probe(struct pci_dev *pdev,
 	}
 
 #ifdef NETIF_F_TSO
+#ifdef BROKEN_ON_NON_IA_ARCHS
+	/* Disbaled for now until root-cause is found for
+	 * hangs reported against non-IA archs.  TSO can be
+	 * enabled using ethtool -K eth<x> tso on */
 	if((adapter->hw.mac_type >= e1000_82544) &&
 	   (adapter->hw.mac_type != e1000_82547))
 		netdev->features |= NETIF_F_TSO;
+#endif
 #endif
 
 	if(pci_using_dac)
@@ -522,7 +529,8 @@ e1000_probe(struct pci_dev *pdev,
 	INIT_WORK(&adapter->tx_timeout_task,
 		(void (*)(void *))e1000_tx_timeout_task, netdev);
 
-	register_netdev(netdev);
+	if((err = register_netdev(netdev)))
+		goto err_register;
 
 	/* we're going to reset, so assume we have no link for now */
 
@@ -567,6 +575,7 @@ e1000_probe(struct pci_dev *pdev,
 	cards_found++;
 	return 0;
 
+err_register:
 err_sw_init:
 err_eeprom:
 	iounmap(adapter->hw.hw_addr);
@@ -2124,26 +2133,10 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		__netif_rx_schedule(netdev);
 	}
 #else
-        /* Writing IMC and IMS is needed for 82547.
-	   Due to Hub Link bus being occupied, an interrupt 
-	   de-assertion message is not able to be sent. 
-	   When an interrupt assertion message is generated later,
-	   two messages are re-ordered and sent out.
-	   That causes APIC to think 82547 is in de-assertion
-	   state, while 82547 is in assertion state, resulting 
-	   in dead lock. Writing IMC forces 82547 into 
-	   de-assertion state.
-        */
-	if(hw->mac_type == e1000_82547 || hw->mac_type == e1000_82547_rev_2)
-		e1000_irq_disable(adapter);
-
 	for(i = 0; i < E1000_MAX_INTR; i++)
 		if(!e1000_clean_rx_irq(adapter) &
 		   !e1000_clean_tx_irq(adapter))
 			break;
-
-	if(hw->mac_type == e1000_82547 || hw->mac_type == e1000_82547_rev_2)
-		e1000_irq_enable(adapter);
 #endif
 
 	return IRQ_HANDLED;

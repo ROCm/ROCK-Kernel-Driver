@@ -342,7 +342,7 @@ static int __init lance_probe( struct net_device *dev)
 
 	REGA(CSR0) = CSR0_STOP; 
 
-	request_irq(LANCE_IRQ, lance_interrupt, 0, "SUN3 Lance", dev);
+	request_irq(LANCE_IRQ, lance_interrupt, SA_INTERRUPT, "SUN3 Lance", dev);
 	dev->irq = (unsigned short)LANCE_IRQ;
 
 
@@ -504,6 +504,9 @@ static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev )
 	int entry, len;
 	struct lance_tx_head *head;
 	unsigned long flags;
+
+	DPRINTK( 1, ( "%s: transmit start.\n",
+		      dev->name));
 
 	/* Transmitter timeout, serious problems. */
 	if (netif_queue_stopped(dev)) {

@@ -484,7 +484,7 @@ static HADDR
 	    !acsi_wait_for_IRQ(TIMEOUTDMA) ||
 	    get_status())
 		goto bad;
-	ret = phys_to_virt(&(((DMAHWADDR *)buffer)->hwaddr));
+	ret = phys_to_virt((unsigned long)&(((DMAHWADDR *)buffer)->hwaddr));
 	dma_cache_maintenance((unsigned long)buffer, 512, 0);
 bad:
 	return (ret);
