@@ -18,9 +18,6 @@ CFLAGS_aha152x.o =   -DAHA152X_STAT -DAUTOCONF
 CFLAGS_gdth.o    = # -DDEBUG_GDTH=2 -D__SERIAL__ -D__COM2__ -DGDTH_STATISTICS
 CFLAGS_seagate.o =   -DARBITRATE -DPARITY -DSEAGATE_USE_ASM
 
-
-O_TARGET := scsidrv.o
-
 export-objs	:= scsi_syms.o 53c700.o
 mod-subdirs	:= pcmcia ../acorn/scsi
 

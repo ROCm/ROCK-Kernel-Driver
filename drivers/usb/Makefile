@@ -2,8 +2,6 @@
 # Makefile for the kernel USB device drivers.
 #
 
-O_TARGET	:= usbdrv.o
-
 # Object files in subdirectories
 mod-subdirs	:= serial
 

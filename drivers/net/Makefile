@@ -1,17 +1,9 @@
-# File: drivers/net/Makefile
 #
 # Makefile for the Linux network (ethercard) device drivers.
 #
 
-obj-y           :=
-obj-m           :=
-obj-n           :=
-obj-            :=
-
 mod-subdirs     := appletalk arcnet fc irda tokenring tulip pcmcia wireless \
 		   wan ../acorn/net
-
-O_TARGET := net.o
 
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.

@@ -2,8 +2,6 @@
 # 5 Aug 1999, James Simmons, <mailto:jsimmons@users.sf.net>
 # Rewritten to use lists instead of if-statements.
 
-O_TARGET := video.o
-
 mod-subdirs	:= matrox
 
 # All of the (potential) objects that export symbols.

@@ -11,8 +11,6 @@ obj-m           :=
 obj-n           :=
 obj-            :=
 
-O_TARGET	:= mtdlink.o
-
 export-objs	:= mtdcore.o mtdpart.o redboot.o bootldr.o afs.o
 
 mod-subdirs	:= 
