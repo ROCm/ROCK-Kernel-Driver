@@ -157,8 +157,12 @@ do {									\
 
 /* debug macro */
 #if G_SERIAL_DEBUG
-
 static int debug = G_SERIAL_DEBUG;
+#else
+static int debug = 0;
+#endif
+
+#if G_SERIAL_DEBUG
 
 #define gs_debug(format, arg...) \
 	do { if (debug) printk(KERN_DEBUG format, ## arg); } while(0)
