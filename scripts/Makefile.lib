@@ -18,6 +18,12 @@ extra-y	+= $(EXTRA_TARGETS)
 
 obj-m := $(filter-out $(obj-y),$(obj-m))
 
+# Libraries are always collected in one lib file.
+# Filter out objects already built-in
+
+lib-y := $(filter-out $(obj-y), $(sort $(lib-y) $(lib-m)))
+
+
 # Handle objects in subdirs
 # ---------------------------------------------------------------------------
 # o if we encounter foo/ in $(obj-y), replace it by foo/built-in.o
@@ -91,6 +97,7 @@ always		:= $(addprefix $(obj)/,$(always))
 targets		:= $(addprefix $(obj)/,$(targets))
 obj-y		:= $(addprefix $(obj)/,$(obj-y))
 obj-m		:= $(addprefix $(obj)/,$(obj-m))
+lib-y		:= $(addprefix $(obj)/,$(lib-y))
 subdir-obj-y	:= $(addprefix $(obj)/,$(subdir-obj-y))
 real-objs-y	:= $(addprefix $(obj)/,$(real-objs-y))
 real-objs-m	:= $(addprefix $(obj)/,$(real-objs-m))
