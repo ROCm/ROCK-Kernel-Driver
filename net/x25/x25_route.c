@@ -1,8 +1,9 @@
 /*
  *	X.25 Packet Layer release 002
  *
- *	This is ALPHA test software. This code may break your machine, randomly fail to work with new 
- *	releases, misbehave and/or generally screw up. It might even work. 
+ *	This is ALPHA test software. This code may break your machine,
+ *	randomly fail to work with new releases, misbehave and/or generally
+ *	screw up. It might even work. 
  *
  *	This code REQUIRES 2.1.15 or higher
  *
@@ -43,7 +44,7 @@
 #include <linux/init.h>
 #include <net/x25.h>
 
-static struct x25_route *x25_route_list /* = NULL initially */;
+static struct x25_route *x25_route_list; /* = NULL initially */
 
 /*
  *	Add a new route.
@@ -53,13 +54,17 @@ static int x25_add_route(struct x25_address *address, unsigned int sigdigits,
 {
 	struct x25_route *x25_route;
 	unsigned long flags;
+	int rc = -EINVAL;
 
-	for (x25_route = x25_route_list; x25_route != NULL; x25_route = x25_route->next)
-		if (memcmp(&x25_route->address, address, sigdigits) == 0 && x25_route->sigdigits == sigdigits)
-			return -EINVAL;
+	for (x25_route = x25_route_list; x25_route; x25_route = x25_route->next)
+		if (!memcmp(&x25_route->address, address, sigdigits) &&
+		    x25_route->sigdigits == sigdigits)
+			goto out;
 
-	if ((x25_route = kmalloc(sizeof(*x25_route), GFP_ATOMIC)) == NULL)
-		return -ENOMEM;
+	x25_route = kmalloc(sizeof(*x25_route), GFP_ATOMIC);
+	rc = -ENOMEM;
+	if (!x25_route)
+		goto out;
 
 	strcpy(x25_route->address.x25_addr, "000000000000000");
 	memcpy(x25_route->address.x25_addr, address->x25_addr, sigdigits);
@@ -71,8 +76,9 @@ static int x25_add_route(struct x25_address *address, unsigned int sigdigits,
 	x25_route->next = x25_route_list;
 	x25_route_list  = x25_route;
 	restore_flags(flags);
-
-	return 0;
+	rc = 0;
+out:
+	return rc;
 }
 
 static void x25_remove_route(struct x25_route *x25_route)
@@ -86,37 +92,41 @@ static void x25_remove_route(struct x25_route *x25_route)
 	if ((s = x25_route_list) == x25_route) {
 		x25_route_list = x25_route->next;
 		restore_flags(flags);
-		kfree(x25_route);
 		return;
 	}
 
-	while (s != NULL && s->next != NULL) {
+	while (s && s->next) {
 		if (s->next == x25_route) {
 			s->next = x25_route->next;
-			restore_flags(flags);
-			kfree(x25_route);
-			return;
+			goto out_kfree_route;
 		}
 
 		s = s->next;
 	}
-
+out:
 	restore_flags(flags);
+	return;
+out_kfree_route:
+	kfree(x25_route);
+	goto out;
 }
 
 static int x25_del_route(struct x25_address *address, unsigned int sigdigits,
 			 struct net_device *dev)
 {
-	struct x25_route *x25_route;
+	struct x25_route *x25_route = x25_route_list;
+	int rc = -EINVAL;
 
-	for (x25_route = x25_route_list; x25_route != NULL; x25_route = x25_route->next) {
-		if (memcmp(&x25_route->address, address, sigdigits) == 0 && x25_route->sigdigits == sigdigits && x25_route->dev == dev) {
+	for (; x25_route; x25_route = x25_route->next)
+		if (!memcmp(&x25_route->address, address, sigdigits) &&
+		    x25_route->sigdigits == sigdigits &&
+		    x25_route->dev == dev) {
 			x25_remove_route(x25_route);
-			return 0;
+			rc = 0;
+			break;
 		}
-	}
 
-	return -EINVAL;
+	return rc;
 }
 
 /*
@@ -126,7 +136,7 @@ void x25_route_device_down(struct net_device *dev)
 {
 	struct x25_route *route, *x25_route = x25_route_list;
 
-	while (x25_route != NULL) {
+	while (x25_route) {
 		route     = x25_route;
 		x25_route = x25_route->next;
 
@@ -140,21 +150,17 @@ void x25_route_device_down(struct net_device *dev)
  */
 struct net_device *x25_dev_get(char *devname)
 {
-	struct net_device *dev;
+	struct net_device *dev = dev_get_by_name(devname);
 
-	if ((dev = dev_get_by_name(devname)) == NULL)
-		return NULL;
-
-	if ((dev->flags & IFF_UP) && (dev->type == ARPHRD_X25
+	if (dev &&
+	    (!(dev->flags & IFF_UP) || (dev->type != ARPHRD_X25
 #if defined(CONFIG_LLC) || defined(CONFIG_LLC_MODULE)
-	   || dev->type == ARPHRD_ETHER
+					&& dev->type != ARPHRD_ETHER
 #endif
-	   ))
-		return dev;
+					)))
+		dev_put(dev);
 
-	dev_put(dev);
-
-	return NULL;
+	return dev;
 }
 
 /*
@@ -164,18 +170,15 @@ struct net_device *x25_get_route(struct x25_address *addr)
 {
 	struct x25_route *route, *use = NULL;
 
-	for (route = x25_route_list; route != NULL; route = route->next) {
-		if (memcmp(&route->address, addr, route->sigdigits) == 0) {
-			if (use == NULL) {
+	for (route = x25_route_list; route; route = route->next)
+		if (!memcmp(&route->address, addr, route->sigdigits)) {
+			if (!use)
 				use = route;
-			} else {
-				if (route->sigdigits > use->sigdigits)
-					use = route;
-			}
+			else if (route->sigdigits > use->sigdigits)
+				use = route;
 		}
-	}
 
-	return (use != NULL) ? use->dev : NULL;
+	return use ? use->dev : NULL;
 }
 
 /*
@@ -185,55 +188,48 @@ int x25_route_ioctl(unsigned int cmd, void *arg)
 {
 	struct x25_route_struct x25_route;
 	struct net_device *dev;
-	int err;
+	int rc = -EINVAL;
 
-	switch (cmd) {
+	if (cmd != SIOCADDRT && cmd != SIOCDELRT)
+		goto out;
 
-		case SIOCADDRT:
-			if (copy_from_user(&x25_route, arg, sizeof(struct x25_route_struct)))
-				return -EFAULT;
-			if (x25_route.sigdigits < 0 || x25_route.sigdigits > 15)
-				return -EINVAL;
-			if ((dev = x25_dev_get(x25_route.device)) == NULL)
-				return -EINVAL;
-			err = x25_add_route(&x25_route.address, x25_route.sigdigits, dev);
-			dev_put(dev);
-			return err;
+	rc = -EFAULT;
+	if (copy_from_user(&x25_route, arg, sizeof(x25_route)))
+		goto out;
 
-		case SIOCDELRT:
-			if (copy_from_user(&x25_route, arg, sizeof(struct x25_route_struct)))
-				return -EFAULT;
-			if (x25_route.sigdigits < 0 || x25_route.sigdigits > 15)
-				return -EINVAL;
-			if ((dev = x25_dev_get(x25_route.device)) == NULL)
-				return -EINVAL;
-			err = x25_del_route(&x25_route.address, x25_route.sigdigits, dev);
-			dev_put(dev);
-			return err;
+	rc = -EINVAL;
+	if (x25_route.sigdigits < 0 || x25_route.sigdigits > 15)
+		goto out;
 
-		default:
-			return -EINVAL;
-	}
+	dev = x25_dev_get(x25_route.device);
+	if (!dev)
+		goto out;
 
-	return 0;
+	if (cmd == SIOCADDRT)
+		rc = x25_add_route(&x25_route.address, x25_route.sigdigits, dev);
+	else
+		rc = x25_del_route(&x25_route.address, x25_route.sigdigits, dev);
+	dev_put(dev);
+out:
+	return rc;
 }
 
 int x25_routes_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	struct x25_route *x25_route;
-	int len     = 0;
+	int len;
 	off_t pos   = 0;
 	off_t begin = 0;
 
 	cli();
 
-	len += sprintf(buffer, "address          digits  device\n");
+	len = sprintf(buffer, "address          digits  device\n");
 
-	for (x25_route = x25_route_list; x25_route != NULL; x25_route = x25_route->next) {
+	for (x25_route = x25_route_list; x25_route; x25_route = x25_route->next) {
 		len += sprintf(buffer + len, "%-15s  %-6d  %-5s\n",
-			x25_route->address.x25_addr,
-			x25_route->sigdigits,
-			(x25_route->dev != NULL) ? x25_route->dev->name : "???");
+			       x25_route->address.x25_addr,
+			       x25_route->sigdigits,
+			       x25_route->dev ? x25_route->dev->name : "???");
 
 		pos = begin + len;
 
@@ -251,7 +247,8 @@ int x25_routes_get_info(char *buffer, char **start, off_t offset, int length)
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
 
-	if (len > length) len = length;
+	if (len > length)
+		len = length;
 
 	return len;
 } 
@@ -263,7 +260,7 @@ void __exit x25_route_free(void)
 {
 	struct x25_route *route, *x25_route = x25_route_list;
 
-	while (x25_route != NULL) {
+	while (x25_route) {
 		route     = x25_route;
 		x25_route = x25_route->next;
 
