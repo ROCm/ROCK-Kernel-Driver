@@ -660,7 +660,6 @@ void pci_enable_bridges(struct pci_bus *bus);
 /* New-style probing supporting hot-pluggable devices */
 int pci_register_driver(struct pci_driver *);
 void pci_unregister_driver(struct pci_driver *);
-void pci_insert_device(struct pci_dev *, struct pci_bus *);
 void pci_remove_bus_device(struct pci_dev *);
 void pci_remove_behind_bridge(struct pci_dev *);
 struct pci_driver *pci_dev_driver(const struct pci_dev *);

@@ -207,26 +207,6 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
 
 #endif /* CONFIG_HOTPLUG */
 
-/**
- * pci_insert_device - insert a pci device
- * @dev: the device to insert
- * @bus: where to insert it
- *
- * Link the device to both the global PCI device chain and the 
- * per-bus list of devices, add the /proc entry.
- */
-void
-pci_insert_device(struct pci_dev *dev, struct pci_bus *bus)
-{
-	list_add_tail(&dev->bus_list, &bus->devices);
-	list_add_tail(&dev->global_list, &pci_devices);
-#ifdef CONFIG_PROC_FS
-	pci_proc_attach_device(dev);
-#endif
-	/* add sysfs device files */
-	pci_create_sysfs_dev_files(dev);
-}
-
 static void
 pci_free_resources(struct pci_dev *dev)
 {
@@ -300,7 +280,6 @@ void pci_remove_behind_bridge(struct pci_dev *dev)
 }
 
 #ifdef CONFIG_HOTPLUG
-EXPORT_SYMBOL(pci_insert_device);
 EXPORT_SYMBOL(pci_remove_bus_device);
 EXPORT_SYMBOL(pci_remove_behind_bridge);
 #endif
