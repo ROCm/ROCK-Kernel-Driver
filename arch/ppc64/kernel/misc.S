@@ -743,7 +743,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* reserved for alloc_hugepages */
 	.llong .sys_ni_syscall		/* reserved for free_hugepages */
 	.llong .sys_exit_group
-	.llong .sys_lookup_dcookie	/* 245 */
+	.llong .sys32_lookup_dcookie	/* 245 */
 	.llong .sys_epoll_create
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait

@@ -46,6 +46,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/time.h>
 #include <linux/init.h>
+#include <linux/profile.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>
@@ -95,20 +96,34 @@ extern unsigned long wall_jiffies;
 extern unsigned long lpEvent_count;
 extern int smp_tb_synchronized;
 
-extern unsigned long prof_cpu_mask;
-extern unsigned int * prof_buffer;
-extern unsigned long prof_len;
-extern unsigned long prof_shift;
-extern char _stext;
-
 void ppc_adjtimex(void);
 
 static unsigned adjusting_time = 0;
 
-static inline void ppc_do_profile (unsigned long nip)
+/*
+ * The profiling function is SMP safe. (nothing can mess
+ * around with "current", and the profiling counters are
+ * updated with atomic operations). This is especially
+ * useful with a profiling multiplier != 1
+ */
+static inline void ppc64_do_profile(struct pt_regs *regs)
 {
+	unsigned long nip;
+	extern unsigned long prof_cpu_mask;
+	extern char _stext;
+#ifdef CONFIG_PROFILING
+	extern void ppc64_profile_hook(struct pt_regs *);
+
+	ppc64_profile_hook(regs);
+#endif
+
+	if (user_mode(regs))
+		return;
+
 	if (!prof_buffer)
 		return;
+
+	nip = instruction_pointer(regs);
 
 	/*
 	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
@@ -128,7 +143,6 @@ static inline void ppc_do_profile (unsigned long nip)
 		nip = prof_len-1;
 	atomic_inc((atomic_t *)&prof_buffer[nip]);
 }
-
 
 static __inline__ void timer_check_rtc(void)
 {
@@ -259,8 +273,7 @@ int timer_interrupt(struct pt_regs * regs)
 	irq_enter();
 
 #ifndef CONFIG_PPC_ISERIES
-	if (!user_mode(regs))
-		ppc_do_profile(instruction_pointer(regs));
+	ppc64_do_profile(regs);
 #endif
 
 	lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 0;

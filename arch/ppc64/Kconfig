@@ -503,6 +503,7 @@ config VIOPATH
 	depends on PPC_ISERIES
 	default y
 
+source "arch/ppc64/oprofile/Kconfig"
 
 menu "Kernel hacking"
 

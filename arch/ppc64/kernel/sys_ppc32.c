@@ -4522,3 +4522,12 @@ unsigned long sys32_mmap2(unsigned long addr, size_t len,
 	/* This should remain 12 even if PAGE_SIZE changes */
 	return sys_mmap(addr, len, prot, flags, fd, pgoff << 12);
 }
+
+extern int sys_lookup_dcookie(u64 cookie64, char *buf, size_t len);
+
+long sys32_lookup_dcookie(u32 cookie_high, u32 cookie_low, char *buf,
+			  size_t len)
+{
+	return sys_lookup_dcookie((u64)cookie_high << 32 | cookie_low,
+				  buf, len);
+}

@@ -35,6 +35,8 @@ obj-$(CONFIG_RTAS_FLASH) += rtas_flash.o
 
 obj-$(CONFIG_SMP) += smp.o
 
+obj-$(CONFIG_PROFILING)	+= profile.o
+
 obj-y += prom.o lmb.o rtas.o rtas-proc.o chrp_setup.o i8259.o
 
 include $(TOPDIR)/Rules.make

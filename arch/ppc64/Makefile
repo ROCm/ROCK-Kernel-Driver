@@ -30,6 +30,9 @@ HEAD := arch/ppc64/kernel/head.o
 core-y			+= arch/ppc64/kernel/ arch/ppc64/mm/ arch/ppc64/lib/
 core-$(CONFIG_XMON)	+= arch/ppc64/xmon/
 
+# FIXME: is drivers- right ?
+drivers-$(CONFIG_OPROFILE)		+= arch/ppc64/oprofile/
+
 makeboot = $(call descend,arch/ppc64/boot,$(1))
 
 ifdef CONFIG_PPC_PSERIES
