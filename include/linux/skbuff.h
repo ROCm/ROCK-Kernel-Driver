@@ -777,7 +777,7 @@ static inline int skb_is_nonlinear(const struct sk_buff *skb)
 	return skb->data_len;
 }
 
-static inline int skb_headlen(const struct sk_buff *skb)
+static inline unsigned int skb_headlen(const struct sk_buff *skb)
 {
 	return skb->len - skb->data_len;
 }
