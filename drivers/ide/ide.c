@@ -689,8 +689,8 @@ void ide_unregister (unsigned int index)
 #ifdef CONFIG_PROC_FS
 	destroy_proc_ide_drives(hwif);
 #endif
-	hwgroup = hwif->hwgroup;
 
+	hwgroup = hwif->hwgroup;
 	/*
 	 * free the irq if we were the only hwif using it
 	 */
@@ -745,7 +745,11 @@ void ide_unregister (unsigned int index)
 			drive->id = NULL;
 		}
 		drive->present = 0;
+		/* Messed up locking ... */
+		spin_unlock_irq(&ide_lock);
 		blk_cleanup_queue(drive->queue);
+		device_unregister(&drive->gendev);
+		spin_lock_irq(&ide_lock);
 		drive->queue = NULL;
 	}
 	if (hwif->next == hwif) {
@@ -771,6 +775,11 @@ void ide_unregister (unsigned int index)
 		BUG_ON(hwgroup->hwif == hwif);
 	}
 
+	/* More messed up locking ... */
+	spin_unlock_irq(&ide_lock);
+	device_unregister(&hwif->gendev);
+	spin_lock_irq(&ide_lock);
+
 #if !defined(CONFIG_DMA_NONPCI)
 	if (hwif->dma_base) {
 		(void) ide_release_dma(hwif);
@@ -795,6 +804,7 @@ void ide_unregister (unsigned int index)
 		put_disk(disk);
 	}
 	unregister_blkdev(hwif->major, hwif->name);
+
 	old_hwif			= *hwif;
 	init_hwif_data(index);	/* restore hwif data to pristine status */
 	hwif->hwgroup			= old_hwif.hwgroup;
@@ -813,6 +823,7 @@ void ide_unregister (unsigned int index)
 	hwif->swdma_mask		= old_hwif.swdma_mask;
 
 	hwif->chipset			= old_hwif.chipset;
+	hwif->hold			= old_hwif.hold;
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
 	hwif->pci_dev			= old_hwif.pci_dev;
@@ -865,6 +876,13 @@ void ide_unregister (unsigned int index)
 	hwif->ide_dma_retune		= old_hwif.ide_dma_retune;
 	hwif->ide_dma_lostirq		= old_hwif.ide_dma_lostirq;
 	hwif->ide_dma_timeout		= old_hwif.ide_dma_timeout;
+	hwif->ide_dma_queued_on		= old_hwif.ide_dma_queued_on;
+	hwif->ide_dma_queued_off	= old_hwif.ide_dma_queued_off;
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+	hwif->ide_dma_queued_read	= old_hwif.ide_dma_queued_read;
+	hwif->ide_dma_queued_write	= old_hwif.ide_dma_queued_write;
+	hwif->ide_dma_queued_start	= old_hwif.ide_dma_queued_start;
+#endif
 #endif
 
 #if 0
