@@ -7,6 +7,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/swap.h>
 #include <linux/file.h>
 #include <linux/mman.h>
 #include <linux/pagemap.h>

@@ -24,6 +24,7 @@
 #include <linux/percpu.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/swap.h>
 #include <linux/notifier.h>
 #include <linux/thread_info.h>
 #include <linux/time.h>

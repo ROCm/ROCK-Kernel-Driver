@@ -20,6 +20,7 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <linux/swap.h>
 #include <linux/slab.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
