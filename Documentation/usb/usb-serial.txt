@@ -221,8 +221,8 @@ FTDI Single Port Serial Driver
 
 ZyXEL omni.net lcd plus ISDN TA
 
-  This is an ISDN TA. Please report both successes and troubles to the
-  author at omninet@kroah.com
+  This is an ISDN TA. Please report both successes and troubles to
+  azummo@towertech.it
 
 
 Digi AccelePort Driver
