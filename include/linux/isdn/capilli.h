@@ -88,15 +88,11 @@ struct capi_driver {
 	char *(*procinfo)(struct capi_ctr *);
 	int (*ctr_read_proc)(char *page, char **start, off_t off,
 			     int count, int *eof, struct capi_ctr *card);
-	int (*driver_read_proc)(char *page, char **start, off_t off,
-				int count, int *eof, struct capi_driver *driver);
 	
 	/* intitialized by kcapi */
 	struct list_head contr_head;		/* list of controllers */
 	struct list_head driver_list;
 	int ncontroller;
-	struct proc_dir_entry *procent;
-	char procfn[128];
 };
 
 void attach_capi_driver(struct capi_driver *driver);

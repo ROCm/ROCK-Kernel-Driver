@@ -167,7 +167,6 @@ static struct capi_driver b1pci_driver = {
 	
 	procinfo: b1pci_procinfo,
 	ctr_read_proc: b1ctl_read_proc,
-	driver_read_proc: 0,	/* use standard driver_read_proc */
 };
 
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
@@ -318,7 +317,6 @@ static struct capi_driver b1pciv4_driver = {
 	
 	procinfo: b1pciv4_procinfo,
 	ctr_read_proc: b1dmactl_read_proc,
-	driver_read_proc: 0,	/* use standard driver_read_proc */
 };
 
 #endif /* CONFIG_ISDN_DRV_AVMB1_B1PCIV4 */

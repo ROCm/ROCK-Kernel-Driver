@@ -1216,7 +1216,6 @@ static struct capi_driver c2_driver = {
 
 	procinfo: c4_procinfo,
 	ctr_read_proc: c4_read_proc,
-	driver_read_proc: 0,	/* use standard driver_read_proc */
 };
 
 static struct capi_driver c4_driver = {
@@ -1231,7 +1230,6 @@ static struct capi_driver c4_driver = {
 	
 	procinfo: c4_procinfo,
 	ctr_read_proc: c4_read_proc,
-	driver_read_proc: 0,	/* use standard driver_read_proc */
 };
 
 static int __devinit c4_probe(struct pci_dev *dev,

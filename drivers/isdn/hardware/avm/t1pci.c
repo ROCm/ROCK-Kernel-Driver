@@ -191,7 +191,6 @@ static struct capi_driver t1pci_driver = {
 	
 	procinfo: t1pci_procinfo,
 	ctr_read_proc: b1dmactl_read_proc,
-	driver_read_proc: 0,	/* use standard driver_read_proc */
 };
 
 /* ------------------------------------------------------------- */

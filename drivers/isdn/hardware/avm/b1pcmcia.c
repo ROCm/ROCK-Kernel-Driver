@@ -154,7 +154,6 @@ static struct capi_driver b1pcmcia_driver = {
 	
 	procinfo: b1pcmcia_procinfo,
 	ctr_read_proc: b1ctl_read_proc,
-	driver_read_proc: 0,	/* use standard driver_read_proc */
 };
 
 /* ------------------------------------------------------------- */

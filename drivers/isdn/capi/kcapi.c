@@ -515,26 +515,6 @@ EXPORT_SYMBOL(detach_capi_ctr);
 
 /* ------------------------------------------------------------- */
 
-/* fallback if no driver read_proc function defined by driver */
-
-static int driver_read_proc(char *page, char **start, off_t off,
-        		int count, int *eof, void *data)
-{
-	struct capi_driver *driver = (struct capi_driver *)data;
-	int len = 0;
-
-	len += sprintf(page+len, "%-16s %s\n", "name", driver->name);
-	len += sprintf(page+len, "%-16s %s\n", "revision", driver->revision);
-
-	if (len < off) 
-           return 0;
-	*eof = 1;
-	*start = page + off;
-	return ((count < len-off) ? count : len-off);
-}
-
-/* ------------------------------------------------------------- */
-
 void attach_capi_driver(struct capi_driver *driver)
 {
 	INIT_LIST_HEAD(&driver->contr_head);
@@ -544,18 +524,6 @@ void attach_capi_driver(struct capi_driver *driver)
 	spin_unlock(&capi_drivers_lock);
 
 	printk(KERN_NOTICE "kcapi: driver %s attached\n", driver->name);
-	sprintf(driver->procfn, "capi/drivers/%s", driver->name);
-	driver->procent = create_proc_entry(driver->procfn, 0, 0);
-	if (driver->procent) {
-	   if (driver->driver_read_proc) {
-		   driver->procent->read_proc = 
-	       		(int (*)(char *,char **,off_t,int,int *,void *))
-					driver->driver_read_proc;
-	   } else {
-		   driver->procent->read_proc = driver_read_proc;
-	   }
-	   driver->procent->data = driver;
-	}
 }
 
 EXPORT_SYMBOL(attach_capi_driver);
@@ -567,10 +535,6 @@ void detach_capi_driver(struct capi_driver *driver)
 	spin_unlock(&capi_drivers_lock);
 
 	printk(KERN_NOTICE "kcapi: driver %s detached\n", driver->name);
-	if (driver->procent) {
-	   remove_proc_entry(driver->procfn, 0);
-	   driver->procent = 0;
-	}
 }
 
 EXPORT_SYMBOL(detach_capi_driver);

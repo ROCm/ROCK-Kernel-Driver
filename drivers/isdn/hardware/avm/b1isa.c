@@ -160,7 +160,6 @@ static struct capi_driver b1isa_driver = {
 	
 	procinfo: b1isa_procinfo,
 	ctr_read_proc: b1ctl_read_proc,
-	driver_read_proc: 0,	/* use standard driver_read_proc */
 };
 
 #define MAX_CARDS 4
