@@ -22,7 +22,7 @@
  * second extended file system inode data in memory
  */
 struct ext3_inode_info {
-	__u32	i_data[15];
+	__le32	i_data[15];	/* unconverted */
 	__u32	i_flags;
 #ifdef EXT3_FRAGMENTS
 	__u32	i_faddr;
