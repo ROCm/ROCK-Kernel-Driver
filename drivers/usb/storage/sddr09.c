@@ -1092,69 +1092,33 @@ sddr09_get_cardinfo(struct us_data *us, unsigned char flags) {
 static int
 sddr09_read_map(struct us_data *us) {
 
-	struct scatterlist *sg;
 	struct sddr09_card_info *info = (struct sddr09_card_info *) us->extra;
 	int numblocks, alloc_len, alloc_blocks;
 	int i, j, result;
-	unsigned char *ptr;
+	unsigned char *buffer, *buffer_end, *ptr;
 	unsigned int lba, lbact;
 
 	if (!info->capacity)
 		return -1;
 
-	// read 64 (1<<6) bytes for every block 
-	// ( 1 << ( blockshift + pageshift ) bytes)
-	//	 of capacity:
-	// (1<<6)*capacity/(1<<(b+p)) =
-	// ((1<<6)*capacity)>>(b+p) =
-	// capacity>>(b+p-6)
-
-	alloc_len = info->capacity >> 
-		(info->blockshift + info->pageshift - CONTROL_SHIFT);
-
-	// Allocate a number of scatterlist structures according to
-	// the number of 128k blocks in the alloc_len. Adding 128k-1
-	// and then dividing by 128k gives the correct number of blocks.
-	// 128k = 1<<17
-
-	alloc_blocks = (alloc_len + (1<<17) - 1) >> 17;
-	sg = kmalloc(alloc_blocks*sizeof(struct scatterlist),
-		     GFP_NOIO);
-	if (sg == NULL)
-		return 0;
-
-	for (i=0; i<alloc_blocks; i++) {
-		int alloc_req = (i < alloc_blocks-1 ? 1 << 17 : alloc_len);
-		char *vaddr = kmalloc(alloc_req, GFP_NOIO);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,3)
-		sg[i].page = virt_to_page(vaddr);
-		sg[i].offset = offset_in_page(vaddr);
-#else
-		sg[i].address = vaddr;
-#endif
-		sg[i].length = alloc_req;
-		alloc_len -= alloc_req;
-	}
-
-	for (i=0; i<alloc_blocks; i++)
-		if (sg[i].page == NULL) {
-			for (i=0; i<alloc_blocks; i++)
-				if (sg[i].page != NULL)
-					kfree(sg_address(sg[i]));
-			kfree(sg);
-			return 0;
-		}
+	// size of a block is 1 << (blockshift + pageshift) bytes
+	// divide into the total capacity to get the number of blocks
 
 	numblocks = info->capacity >> (info->blockshift + info->pageshift);
 
-	result = sddr09_read_control(us, 0, numblocks,
-				     (unsigned char *)sg, alloc_blocks);
-	if (result != USB_STOR_TRANSPORT_GOOD) {
-		for (i=0; i<alloc_blocks; i++)
-			kfree(sg_address(sg[i]));
-		kfree(sg);
-		return -1;
-	}
+	// read 64 bytes for every block (actually 1 << CONTROL_SHIFT)
+	// but only use a 64 KB buffer
+	// buffer size used must be a multiple of (1 << CONTROL_SHIFT)
+#define SDDR09_READ_MAP_BUFSZ 65536
+
+	alloc_blocks = min(numblocks, SDDR09_READ_MAP_BUFSZ >> CONTROL_SHIFT);
+	alloc_len = (alloc_blocks << CONTROL_SHIFT);
+	buffer = kmalloc(alloc_len, GFP_NOIO);
+	if (buffer == NULL)
+		return 0;
+	buffer_end = buffer + alloc_len;
+
+#undef SDDR09_READ_MAP_BUFSZ
 
 	kfree(info->lba_to_pba);
 	kfree(info->pba_to_lba);
@@ -1162,29 +1126,31 @@ sddr09_read_map(struct us_data *us) {
 	info->pba_to_lba = kmalloc(numblocks*sizeof(int), GFP_NOIO);
 
 	if (info->lba_to_pba == NULL || info->pba_to_lba == NULL) {
-		kfree(info->lba_to_pba);
-		kfree(info->pba_to_lba);
-		info->lba_to_pba = NULL;
-		info->pba_to_lba = NULL;
-		for (i=0; i<alloc_blocks; i++)
-			kfree(sg_address(sg[i]));
-		kfree(sg);
-		return 0;
+		result = -1;
+		goto done;
 	}
 
 	for (i = 0; i < numblocks; i++)
 		info->lba_to_pba[i] = info->pba_to_lba[i] = UNDEF;
 
-	ptr = sg_address(sg[0]);
-
 	/*
 	 * Define lba-pba translation table
 	 */
-	// Each block is 64 bytes of control data, so block i is located in
-	// scatterlist block i*64/128k = i*(2^6)*(2^-17) = i*(2^-11)
 
-	for (i=0; i<numblocks; i++) {
-		ptr = sg_address(sg[i>>11]) + ((i&0x7ff)<<6);
+	ptr = buffer_end;
+	for (i = 0; i < numblocks; i++) {
+		ptr += (1 << CONTROL_SHIFT);
+		if (ptr >= buffer_end) {
+			ptr = buffer;
+			result = sddr09_read_control(
+				us, i << (info->blockshift + 8),
+				min(alloc_blocks, numblocks - i),
+				buffer, 0);
+			if (result != USB_STOR_TRANSPORT_GOOD) {
+				result = -1;
+				goto done;
+			}
+		}
 
 		if (i == 0 || i == 1) {
 			info->pba_to_lba[i] = UNUSABLE;
@@ -1292,11 +1258,17 @@ sddr09_read_map(struct us_data *us) {
 	}
 	info->lbact = lbact;
 	US_DEBUGP("Found %d LBA's\n", lbact);
+	result = 0;
 
-	for (i=0; i<alloc_blocks; i++)
-		kfree(sg_address(sg[i]));
-	kfree(sg);
-	return 0;
+ done:
+	if (result != 0) {
+		kfree(info->lba_to_pba);
+		kfree(info->pba_to_lba);
+		info->lba_to_pba = NULL;
+		info->pba_to_lba = NULL;
+	}
+	kfree(buffer);
+	return result;
 }
 
 static void
