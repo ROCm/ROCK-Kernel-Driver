@@ -65,6 +65,8 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	int c1, c2 = 0;
 	int ret = 0;
 
+	lock_kernel();
+
 	if (hpfs_sb(inode->i_sb)->sb_chk) {
 		if (hpfs_chk_sectors(inode->i_sb, inode->i_ino, 1, "dir_fnode")) {
 			ret = -EFSERROR;
