@@ -475,10 +475,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	paging_init();
 
-#ifndef CONFIG_SMP
-	/* Temporary hack: disable the IO-APIC for UP Nvidia and VIA. */
-		check_ioapic();
-#endif
+	check_ioapic();
 #ifdef CONFIG_ACPI_BOOT
        /*
         * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).

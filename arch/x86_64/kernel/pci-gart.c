@@ -849,6 +849,7 @@ fs_initcall(pci_iommu_init);
    forcesac For SAC mode for masks <40bits  (experimental)
    fullflush Flush IOMMU on each allocation (default) 
    nofullflush Don't use IOMMU fullflush
+   allowed  overwrite iommu off workarounds for specific chipsets.
    soft	 Use software bounce buffering (default for Intel machines)
 */
 __init int iommu_setup(char *opt) 
@@ -861,8 +862,12 @@ __init int iommu_setup(char *opt)
 		    no_agp = 1;
 	    if (!memcmp(p,"off", 3))
 		    no_iommu = 1;
-	    if (!memcmp(p,"force", 5))
+	    if (!memcmp(p,"force", 5)) {
 		    force_iommu = 1;
+		    iommu_aperture_allowed = 1;
+	    } 
+	    if (!memcmp(p,"allowed",7))
+		    iommu_aperture_allowed = 1;
 	    if (!memcmp(p,"noforce", 7)) { 
 		    iommu_merge = 0;
 		    force_iommu = 0;

@@ -34,6 +34,7 @@
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/desc.h>
+#include <asm/proto.h>
 
 int sis_apic_bug; /* not actually supported, dummy for compile */
 
@@ -220,7 +221,11 @@ __setup("apic", enable_ioapic_setup);
    off. Check for an Nvidia or VIA PCI bridge and turn it off.
    Use pci direct infrastructure because this runs before the PCI subsystem. 
 
-   Can be overwritten with "apic" */
+   Can be overwritten with "apic" 
+   
+   And another hack to disable the IOMMU on VIA chipsets.
+
+   Kludge-O-Rama. */
 void __init check_ioapic(void) 
 { 
 	int num,slot,func; 
@@ -245,12 +250,21 @@ void __init check_ioapic(void)
 							 PCI_VENDOR_ID);
 				vendor &= 0xffff;
 				switch (vendor) { 
-				case PCI_VENDOR_ID_NVIDIA: 
 				case PCI_VENDOR_ID_VIA:
+					if (end_pfn >= (0xffffffff>>PAGE_SHIFT) &&
+					    !iommu_aperture_allowed) { 
+						printk(KERN_INFO
+    "Looks like a VIA chipset. Disabling IOMMU. Overwrite with \"iommu=allowed\"\n"); 
+						iommu_aperture_disabled = 1; 
+					} 
+					/* FALL THROUGH */
+				case PCI_VENDOR_ID_NVIDIA:
+#ifndef CONFIG_SMP
 					printk(KERN_INFO 
      "PCI bridge %02x:%02x from %x found. Setting \"noapic\". Overwrite with \"apic\"\n",
 					       num,slot,vendor); 
 					skip_ioapic_setup = 1;
+#endif
 					return;
 				} 
 
