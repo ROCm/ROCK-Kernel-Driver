@@ -238,7 +238,7 @@ int __init iph5526_probe(struct net_device *dev)
 
 static int __init iph5526_probe_pci(struct net_device *dev)
 {
-	struct fc_info *fi = netdev_priv(dev);
+	struct fc_info *fi = dev->priv;
 	fi->dev = dev;
 	dev->base_addr = fi->base_addr;
 	dev->irq = fi->irq;
@@ -2908,7 +2908,7 @@ static int iph5526_close(struct net_device *dev)
 
 static void iph5526_timeout(struct net_device *dev)
 {
-	struct fc_info *fi = netdev_priv(dev);
+	struct fc_info *fi = dev->priv;
 	printk(KERN_WARNING "%s: timed out on send.\n", dev->name);
 	fi->fc_stats.rx_dropped++;
 	dev->trans_start = jiffies;
@@ -2917,7 +2917,7 @@ static void iph5526_timeout(struct net_device *dev)
 
 static int iph5526_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct fc_info *fi = netdev_priv(dev);
+	struct fc_info *fi = dev->priv;
 	int status = 0;
 	short type = 0;
 	u_long flags;
@@ -3688,7 +3688,7 @@ int count = 0, j;
 
 static struct net_device_stats * iph5526_get_stats(struct net_device *dev)
 {	
-struct fc_info *fi = netdev_priv(dev);
+struct fc_info *fi = dev->priv;
 	return (struct net_device_stats *) &fi->fc_stats;
 }
 

@@ -119,7 +119,7 @@ struct comx_debugflags_struct	comx_debugflags[] = {
 
 int comx_debug(struct net_device *dev, char *fmt, ...)
 {
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 	char *page,*str;
 	va_list args;
 	int len;
@@ -162,7 +162,7 @@ int comx_debug(struct net_device *dev, char *fmt, ...)
 
 int comx_debug_skb(struct net_device *dev, struct sk_buff *skb, char *msg)
 {
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 
 	if (!ch->debug_area) return 0;
 	if (!skb) comx_debug(dev, "%s: %s NULL skb\n\n", dev->name, msg);
@@ -175,7 +175,7 @@ int comx_debug_bytes(struct net_device *dev, unsigned char *bytes, int len,
 		char *msg)
 {
 	int pos = 0;
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 
 	if (!ch->debug_area) return 0;
 
@@ -207,7 +207,7 @@ int comx_debug_bytes(struct net_device *dev, unsigned char *bytes, int len,
 static void comx_loadavg_timerfun(unsigned long d)
 {
 	struct net_device *dev = (struct net_device *)d;
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 
 	ch->avg_bytes[ch->loadavg_counter] = ch->current_stats->rx_bytes;
 	ch->avg_bytes[ch->loadavg_counter + ch->loadavg_size] = 
@@ -222,7 +222,7 @@ static void comx_loadavg_timerfun(unsigned long d)
 static void comx_reset_timerfun(unsigned long d)
 { 
 	struct net_device *dev = (struct net_device *)d;
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 
 	if(!(ch->line_status & (PROTO_LOOP | PROTO_UP))) {
 		if(test_and_set_bit(0,&ch->reset_pending) && ch->HW_reset) {
@@ -236,7 +236,7 @@ static void comx_reset_timerfun(unsigned long d)
 
 static int comx_open(struct net_device *dev)
 {
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 	struct proc_dir_entry *comxdir = ch->procdir->subdir;
 	int ret=0;
 
@@ -268,7 +268,7 @@ static int comx_open(struct net_device *dev)
 
 static int comx_close(struct net_device *dev)
 {
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 	struct proc_dir_entry *comxdir = ch->procdir->subdir;
 	int ret = -ENODEV;
 
@@ -303,7 +303,7 @@ static int comx_close(struct net_device *dev)
 
 void comx_status(struct net_device *dev, int status)
 {
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 
 #if 0
 	if(status & (PROTO_UP | PROTO_LOOP)) {
@@ -321,7 +321,7 @@ void comx_status(struct net_device *dev, int status)
 
 static int comx_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 	int rc;
 
 	if (skb->len > dev->mtu + dev->hard_header_len) {
@@ -342,7 +342,7 @@ static int comx_xmit(struct sk_buff *skb, struct net_device *dev)
 static int comx_header(struct sk_buff *skb, struct net_device *dev, 
 	unsigned short type, void *daddr, void *saddr, unsigned len) 
 {
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 
 	if (ch->LINE_header) {
 		return (ch->LINE_header(skb, dev, type, daddr, saddr, len));
@@ -354,7 +354,7 @@ static int comx_header(struct sk_buff *skb, struct net_device *dev,
 static int comx_rebuild_header(struct sk_buff *skb) 
 {
 	struct net_device *dev = skb->dev;
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 
 	if (ch->LINE_rebuild_header) {
 		return(ch->LINE_rebuild_header(skb));
@@ -365,7 +365,7 @@ static int comx_rebuild_header(struct sk_buff *skb)
 
 int comx_rx(struct net_device *dev, struct sk_buff *skb)
 {
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 
 	if (ch->debug_flags & DEBUG_COMX_RX) {
 		comx_debug_skb(dev, skb, "comx_rx skb");
@@ -379,7 +379,7 @@ int comx_rx(struct net_device *dev, struct sk_buff *skb)
 
 static struct net_device_stats *comx_stats(struct net_device *dev)
 {
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 
 	return ch->current_stats;
 }
@@ -387,7 +387,7 @@ static struct net_device_stats *comx_stats(struct net_device *dev)
 void comx_lineup_func(unsigned long d)
 {
 	struct net_device *dev = (struct net_device *)d;
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 
 	del_timer(&ch->lineup_timer);
 	clear_bit(0, &ch->lineup_pending);
@@ -405,7 +405,7 @@ void comx_lineup_func(unsigned long d)
 
 static int comx_statistics(struct net_device *dev, char *page)
 {
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 	int len = 0;
 	int tmp;
 	int i = 0;
@@ -472,7 +472,7 @@ static int comx_statistics(struct net_device *dev, char *page)
 
 static int comx_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 
 	if (ch->LINE_ioctl) {
 		return(ch->LINE_ioctl(dev, ifr, cmd));
@@ -535,7 +535,7 @@ static int comx_read_proc(char *page, char **start, off_t off, int count,
 {
 	struct proc_dir_entry *file = (struct proc_dir_entry *)data;
 	struct net_device *dev = file->parent->data;
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 	int len = 0;
 
 	if (strcmp(file->name, FILENAME_STATUS) == 0) {
@@ -599,7 +599,7 @@ static int comx_write_proc(struct file *file, const char *buffer, u_long count,
 {
 	struct proc_dir_entry *entry = (struct proc_dir_entry *)data;
 	struct net_device *dev = (struct net_device *)entry->parent->data;
-	struct comx_channel *ch = netdev_priv(dev);
+	struct comx_channel *ch = dev->priv;
 	char *page;
 	struct comx_hardware *hw = comx_channels;
 	struct comx_protocol *line = comx_lines;
@@ -821,7 +821,7 @@ static int comx_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	if (register_netdevice(dev)) {
 		goto cleanup_filename_debug;
 	}
-	ch = netdev_priv(dev);
+	ch = dev->priv;
 	if((ch->if_ptr = (void *)kmalloc(sizeof(struct ppp_device), 
 				 GFP_KERNEL)) == NULL) {
 		goto cleanup_register;
@@ -874,7 +874,7 @@ static int comx_rmdir(struct inode *dir, struct dentry *dentry)
 
 	lock_kernel();
 	dev = entry->data;
-	ch = netdev_priv(dev);
+	ch = dev->priv;
 	if (dev->flags & IFF_UP) {
 		printk(KERN_ERR "%s: down interface before removing it\n", dev->name);
 		unlock_kernel();
