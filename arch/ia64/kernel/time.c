@@ -45,7 +45,11 @@ EXPORT_SYMBOL(last_cli_ip);
 
 #endif
 
-static struct time_interpolator itc_interpolator;
+static struct time_interpolator itc_interpolator = {
+	.shift = 16,
+	.mask = 0xffffffffffffffffLL,
+	.source = TIME_SOURCE_CPU
+};
 
 static irqreturn_t
 timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
@@ -206,9 +210,7 @@ ia64_init_itm (void)
 
 	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
 		itc_interpolator.frequency = local_cpu_data->itc_freq;
-		itc_interpolator.shift = 16;
 		itc_interpolator.drift = itc_drift;
-		itc_interpolator.source = TIME_SOURCE_CPU;
 #ifdef CONFIG_SMP
 		/* On IA64 in an SMP configuration ITCs are never accurately synchronized.
 		 * Jitter compensation requires a cmpxchg which may limit
@@ -222,7 +224,6 @@ ia64_init_itm (void)
 		 */
 		if (!nojitter) itc_interpolator.jitter = 1;
 #endif
-		itc_interpolator.addr = NULL;
 		register_time_interpolator(&itc_interpolator);
 	}
 
