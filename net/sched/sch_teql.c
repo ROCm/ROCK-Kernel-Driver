@@ -177,8 +177,6 @@ teql_destroy(struct Qdisc* sch)
 				
 		} while ((prev = q) != master->slaves);
 	}
-
-	MOD_DEC_USE_COUNT;
 }
 
 static int teql_qdisc_init(struct Qdisc *sch, struct rtattr *opt)
@@ -222,8 +220,6 @@ static int teql_qdisc_init(struct Qdisc *sch, struct rtattr *opt)
 		m->dev.mtu = dev->mtu;
 		m->dev.flags = (m->dev.flags&~FMASK)|(dev->flags&FMASK);
 	}
-	
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -386,14 +382,12 @@ static int teql_master_open(struct net_device *dev)
 	m->dev.mtu = mtu;
 	m->dev.flags = (m->dev.flags&~FMASK) | flags;
 	netif_start_queue(&m->dev);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static int teql_master_close(struct net_device *dev)
 {
 	netif_stop_queue(dev);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -440,20 +434,19 @@ static int teql_master_init(struct net_device *dev)
 
 static struct teql_master the_master = {
 {
-	.next		= NULL,
-	.cl_ops		= NULL,
-	.id		= "",
-	.priv_size	= sizeof(struct teql_sched_data),
-
-	.enqueue	= teql_enqueue,
-	.dequeue	= teql_dequeue,
-	.requeue	= teql_requeue,
-	.drop		= NULL,
-
-	.init		= teql_qdisc_init,
-	.reset		= teql_reset,
-	.destroy	= teql_destroy,
-	.dump		= NULL,
+	.next		=	NULL,
+	.cl_ops		=	NULL,
+	.id		=	"",
+	.priv_size	=	sizeof(struct teql_sched_data),
+	.enqueue	=	teql_enqueue,
+	.dequeue	=	teql_dequeue,
+	.requeue	=	teql_requeue,
+	.drop		=	NULL,
+	.init		=	teql_qdisc_init,
+	.reset		=	teql_reset,
+	.destroy	=	teql_destroy,
+	.dump		=	NULL,
+	.owner		=	THIS_MODULE,
 },};
 
 
@@ -474,6 +467,7 @@ int __init teql_init(void)
 	memcpy(the_master.qops.id, the_master.dev.name, IFNAMSIZ);
 	the_master.dev.init = teql_master_init;
 
+	SET_MODULE_OWNER(&the_master.dev);
 	err = register_netdevice(&the_master.dev);
 	if (err == 0) {
 		err = register_qdisc(&the_master.qops);
