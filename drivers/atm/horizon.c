@@ -1398,7 +1398,8 @@ static inline void rx_data_av_handler (hrz_dev * dev) {
 
 /********** interrupt handler **********/
 
-static void interrupt_handler (int irq, void * dev_id, struct pt_regs * pt_regs) {
+static irqreturn_t interrupt_handler(int irq, void *dev_id,
+					struct pt_regs *pt_regs) {
   hrz_dev * dev = hrz_devs;
   u32 int_source;
   unsigned int irq_ok;
@@ -1408,7 +1409,7 @@ static void interrupt_handler (int irq, void * dev_id, struct pt_regs * pt_regs)
   
   if (!dev_id) {
     PRINTD (DBG_IRQ|DBG_ERR, "irq with NULL dev_id: %d", irq);
-    return;
+    return IRQ_NONE;
   }
   // Did one of our cards generate the interrupt?
   while (dev) {
@@ -1418,11 +1419,11 @@ static void interrupt_handler (int irq, void * dev_id, struct pt_regs * pt_regs)
   }
   if (!dev) {
     PRINTD (DBG_IRQ, "irq not for me: %d", irq);
-    return;
+    return IRQ_NONE;
   }
   if (irq != dev->irq) {
     PRINTD (DBG_IRQ|DBG_ERR, "irq mismatch: %d", irq);
-    return;
+    return IRQ_NONE;
   }
   
   // definitely for us
@@ -1468,6 +1469,9 @@ static void interrupt_handler (int irq, void * dev_id, struct pt_regs * pt_regs)
   }
   
   PRINTD (DBG_IRQ|DBG_FLOW, "interrupt_handler done: %p", dev_id);
+  if (irq_ok)
+	return IRQ_HANDLED;
+  return IRQ_NONE;
 }
 
 /********** housekeeping **********/
