@@ -9,6 +9,7 @@
  *	published by the Free Software Foundation; either version 2 of
  *	the License, or (at your option) any later version.
  */
+#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/wait.h>
@@ -27,7 +28,6 @@
 #include <linux/dvb/frontend.h>
 #include <linux/dvb/dmx.h>
 #include <linux/pci.h>
-#include <linux/usb.h>
 
 #include "dvb_functions.h"
 

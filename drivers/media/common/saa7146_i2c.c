@@ -1,3 +1,4 @@
+#include <linux/version.h>
 #include <media/saa7146_vv.h>
 
 /* helper function */

@@ -18,6 +18,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <linux/version.h>
 #include <linux/pci.h>
 #include <linux/i2c.h>
 #include <linux/videodev.h>
