@@ -623,9 +623,9 @@ extern int                      sock_no_ioctl(struct socket *, unsigned int,
 extern int			sock_no_listen(struct socket *, int);
 extern int                      sock_no_shutdown(struct socket *, int);
 extern int			sock_no_getsockopt(struct socket *, int , int,
-						   char *, int *);
+						   char __user *, int __user *);
 extern int			sock_no_setsockopt(struct socket *, int, int,
-						   char *, int);
+						   char __user *, int);
 extern int                      sock_no_sendmsg(struct kiocb *, struct socket *,
 						struct msghdr *, size_t);
 extern int                      sock_no_recvmsg(struct kiocb *, struct socket *,

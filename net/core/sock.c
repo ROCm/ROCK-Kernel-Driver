@@ -973,13 +973,13 @@ int sock_no_shutdown(struct socket *sock, int how)
 }
 
 int sock_no_setsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int optlen)
+		    char __user *optval, int optlen)
 {
 	return -EOPNOTSUPP;
 }
 
 int sock_no_getsockopt(struct socket *sock, int level, int optname,
-		    char *optval, int *optlen)
+		    char __user *optval, int __user *optlen)
 {
 	return -EOPNOTSUPP;
 }
