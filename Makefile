@@ -319,36 +319,31 @@ define cmd_vmlinux__
 endef
 
 #	set -e makes the rule exit immediately on error
-#	Final awk script makes sure per-cpu vars are in per-cpu section, as
-#	old gcc (eg egcs 2.92.11) ignores section attribute if uninitialized.
 
 define rule_vmlinux__
-	set -e
-	$(if $(filter .tmp_kallsyms%,$^),,
-	  echo '  Generating build number'
-	  . $(src)/scripts/mkversion > .tmp_version
-	  mv -f .tmp_version .version
-	  $(Q)$(MAKE) $(build)=init
+	set -e;								\
+	$(if $(filter .tmp_kallsyms%,$^),,				\
+	  echo '  GEN     .version';					\
+	  . $(src)/scripts/mkversion > .tmp_version;			\
+	  mv -f .tmp_version .version;					\
+	  $(MAKE) $(build)=init;					\
 	)
-	$(call cmd,vmlinux__)
+	$(call cmd,vmlinux__);						\
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
 
-define rule_vmlinux_no_percpu
+ifdef CONFIG_SMP
+#	Final awk script makes sure per-cpu vars are in per-cpu section, as
+#	old gcc (eg egcs 2.92.11) ignores section attribute if uninitialized.
+
+check_per_cpu =	$(AWK) -f $(srctree)/scripts/per-cpu-check.awk < System.map
+endif
+
+define rule_vmlinux
 	$(rule_vmlinux__)
 	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+	$(check_per_cpu)
 endef
-
-ifdef CONFIG_SMP
-define rule_vmlinux
-	$(rule_vmlinux_no_percpu)
-	$(AWK) -f $(srctree)/scripts/per-cpu-check.awk < System.map
-endef
-else
-define rule_vmlinux
-	$(rule_vmlinux_no_percpu)
-endef
-endif
 
 LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
 
