@@ -217,12 +217,12 @@ struct proc_inode {
 	struct inode vfs_inode;
 };
 
-static inline struct proc_inode *PROC_I(struct inode *inode)
+static inline struct proc_inode *PROC_I(const struct inode *inode)
 {
 	return list_entry(inode, struct proc_inode, vfs_inode);
 }
 
-static inline struct proc_dir_entry *PDE(struct inode *inode)
+static inline struct proc_dir_entry *PDE(const struct inode *inode)
 {
 	return PROC_I(inode)->pde;
 }
