@@ -103,7 +103,7 @@ unsigned long channel_mask = 0;
 module_param(channel_mask, ulong, 444);
 MODULE_PARM_DESC(channel_mask, "Bitmask of remote control channels to ignore");
 
-int debug = 0;
+static int debug = 0;
 module_param(debug, int, 444);
 MODULE_PARM_DESC(debug, "Enable extra debug messages and information");
 
