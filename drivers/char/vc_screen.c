@@ -32,7 +32,6 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/vt_kern.h>
-#include <linux/console_struct.h>
 #include <linux/selection.h>
 #include <linux/kbd_kern.h>
 #include <linux/console.h>

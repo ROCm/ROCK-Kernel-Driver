@@ -982,7 +982,7 @@ int __init tgafb_init(void)
     if (register_framebuffer(&fb_info.gen.info) < 0)
 	return -EINVAL;
     printk(KERN_INFO "fb%d: %s frame buffer device at 0x%lx\n", 
-	    GET_FB_IDX(fb_info.gen.info.node), fb_info.gen.info.modename, 
+	    minor(fb_info.gen.info.node), fb_info.gen.info.modename, 
 	    pdev->resource[0].start);
     return 0;
 }
