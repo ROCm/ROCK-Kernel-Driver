@@ -303,22 +303,22 @@ do_lo_receive(struct loop_device *lo,
 		struct bio_vec *bvec, int bsize, loff_t pos)
 {
 	struct lo_read_data cookie;
-	read_descriptor_t desc;
 	struct file *file;
+	int error;
 
 	cookie.lo = lo;
 	cookie.data = kmap(bvec->bv_page) + bvec->bv_offset;
 	cookie.bsize = bsize;
-	desc.written = 0;
-	desc.count = bvec->bv_len;
-	desc.buf = (char*)&cookie;
-	desc.error = 0;
+
+	/* umm, what does this lock actually try to protect? */
 	spin_lock_irq(&lo->lo_lock);
 	file = lo->lo_backing_file;
 	spin_unlock_irq(&lo->lo_lock);
-	do_generic_file_read(file, &pos, &desc, lo_read_actor);
+
+	error = file->f_op->sendfile(file, &pos, bvec->bv_len,
+			lo_read_actor, &cookie);
 	kunmap(bvec->bv_page);
-	return desc.error;
+	return error;
 }
 
 static int
@@ -682,7 +682,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		 * If we can't read - sorry. If we only can't write - well,
 		 * it's going to be read-only.
 		 */
-		if (!aops->readpage)
+		if (!inode->i_fop->sendfile)
 			goto out_putf;
 
 		if (!aops->prepare_write || !aops->commit_write)

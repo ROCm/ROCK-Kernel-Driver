@@ -34,7 +34,6 @@ static int fifo_open(struct inode *inode, struct file *filp)
 	int ret;
 
 	ret = -ERESTARTSYS;
-	lock_kernel();
 	if (down_interruptible(PIPE_SEM(*inode)))
 		goto err_nolock_nocleanup;
 
@@ -117,7 +116,6 @@ static int fifo_open(struct inode *inode, struct file *filp)
 
 	/* Ok! */
 	up(PIPE_SEM(*inode));
-	unlock_kernel();
 	return 0;
 
 err_rd:
@@ -144,7 +142,6 @@ err_nocleanup:
 	up(PIPE_SEM(*inode));
 
 err_nolock_nocleanup:
-	unlock_kernel();
 	return ret;
 }
 
