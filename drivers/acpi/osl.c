@@ -702,7 +702,7 @@ acpi_status
 acpi_os_wait_semaphore(
 	acpi_handle		handle,
 	u32			units,
-	u32			timeout)
+	u16			timeout)
 {
 	acpi_status		status = AE_OK;
 	struct semaphore	*sem = (struct semaphore*)handle;
@@ -739,7 +739,7 @@ acpi_os_wait_semaphore(
 		 * Wait Indefinitely:
 		 * ------------------
 		 */
-		case WAIT_FOREVER:
+		case ACPI_WAIT_FOREVER:
 		ret = down_interruptible(sem);
 		if (ret < 0)
 			status = AE_ERROR;

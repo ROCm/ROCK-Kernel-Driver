@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evmisc - Miscellaneous event manager support functions
- *              $Revision: 57 $
+ *              $Revision: 58 $
  *
  *****************************************************************************/
 
@@ -433,7 +433,7 @@ acpi_ev_init_global_lock_handler (void)
 
 acpi_status
 acpi_ev_acquire_global_lock (
-	u32                     timeout)
+	u16                     timeout)
 {
 	acpi_status             status = AE_OK;
 	u8                      acquired = FALSE;
