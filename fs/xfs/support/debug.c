@@ -86,12 +86,13 @@ cmn_err(register int level, char *fmt, ...)
 {
 	char	*fp = fmt;
 	int	len;
+	int	flags;
 	va_list	ap;
 
 	level &= XFS_ERR_MASK;
 	if (level > XFS_MAX_ERR_LEVEL)
 		level = XFS_MAX_ERR_LEVEL;
-	spin_lock(&xfs_err_lock);
+	spin_lock_irqsave(&xfs_err_lock,flags);
 	va_start(ap, fmt);
 	if (*fmt == '!') fp++;
 	len = vsprintf(message, fp, ap);
@@ -99,7 +100,7 @@ cmn_err(register int level, char *fmt, ...)
 		strcat(message, "\n");
 	printk("%s%s", err_level[level], message);
 	va_end(ap);
-	spin_unlock(&xfs_err_lock);
+	spin_unlock_irqrestore(&xfs_err_lock,flags);
 
 	if (level == CE_PANIC)
 		BUG();
@@ -110,15 +111,16 @@ void
 icmn_err(register int level, char *fmt, va_list ap)
 {
 	int	len;
+	int	flags;
 
 	level &= XFS_ERR_MASK;
 	if(level > XFS_MAX_ERR_LEVEL)
 		level = XFS_MAX_ERR_LEVEL;
-	spin_lock(&xfs_err_lock);
+	spin_lock_irqsave(&xfs_err_lock,flags);
 	len = vsprintf(message, fmt, ap);
 	if (message[len-1] != '\n')
 		strcat(message, "\n");
-	spin_unlock(&xfs_err_lock);
+	spin_unlock_irqrestore(&xfs_err_lock,flags);
 	printk("%s%s", err_level[level], message);
 	if (level == CE_PANIC)
 		BUG();
