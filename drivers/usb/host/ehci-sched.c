@@ -908,6 +908,7 @@ itd_urb_transaction (
 
 		if (unlikely (0 == itd)) {
 			iso_sched_free (stream, sched);
+			spin_unlock_irqrestore (&ehci->lock, flags);
 			return -ENOMEM;
 		}
 		memset (itd, 0, sizeof *itd);
