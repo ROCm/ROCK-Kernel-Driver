@@ -72,19 +72,20 @@ extern void show_registers(struct pt_regs *regs);
 
 int __init check_nmi_watchdog (void)
 {
-	irq_cpustat_t tmp[NR_CPUS];
+	unsigned int prev_nmi_count[NR_CPUS];
 	int cpu;
 
 	printk(KERN_INFO "testing NMI watchdog ... ");
 
-	memcpy(tmp, irq_stat, sizeof(tmp));
+	for (cpu = 0; cpu < NR_CPUS; cpu++)
+		prev_nmi_count[cpu] = irq_stat[cpu].__nmi_count;
 	local_irq_enable();
 	mdelay((10*1000)/nmi_hz); // wait 10 ticks
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		if (!cpu_online(cpu))
 			continue;
-		if (nmi_count(cpu) - tmp[cpu].__nmi_count <= 5) {
+		if (nmi_count(cpu) - prev_nmi_count[cpu] <= 5) {
 			printk("CPU#%d: NMI appears to be stuck!\n", cpu);
 			return -1;
 		}
