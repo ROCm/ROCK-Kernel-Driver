@@ -13,15 +13,12 @@
 #include <linux/types.h>
 #include <linux/kdev_t.h>
 #include <linux/ioctl.h>
-#include <linux/list.h>
 #include <linux/dcache.h>
 #include <linux/stat.h>
 #include <linux/cache.h>
-#include <linux/radix-tree.h>
 #include <linux/prio_tree.h>
 #include <linux/kobject.h>
 #include <asm/atomic.h>
-#include <linux/audit.h>
 
 struct iovec;
 struct nameidata;
@@ -214,6 +211,9 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 
 #ifdef __KERNEL__
 
+#include <linux/list.h>
+#include <linux/radix-tree.h>
+#include <linux/audit.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 
