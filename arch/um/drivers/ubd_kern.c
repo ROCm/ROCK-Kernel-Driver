@@ -110,8 +110,8 @@ static inline void ubd_set_bit(__u64 bit, unsigned char *data)
 
 #define DRIVER_NAME "uml-blkdev"
 
-static spinlock_t ubd_io_lock = SPIN_LOCK_UNLOCKED;
-static spinlock_t ubd_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ubd_io_lock);
+static DEFINE_SPINLOCK(ubd_lock);
 
 static void (*do_ubd)(void);
 

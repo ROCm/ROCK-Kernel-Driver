@@ -161,7 +161,7 @@ void timer_handler(int sig, union uml_pt_regs *regs)
 		timer_irq(regs);
 }
 
-static spinlock_t timer_spinlock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(timer_spinlock);
 
 unsigned long time_lock(void)
 {

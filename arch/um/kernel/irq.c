@@ -109,7 +109,7 @@ int um_request_irq(unsigned int irq, int fd, int type,
 EXPORT_SYMBOL(um_request_irq);
 EXPORT_SYMBOL(reactivate_fd);
 
-static spinlock_t irq_spinlock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(irq_spinlock);
 
 unsigned long irq_lock(void)
 {

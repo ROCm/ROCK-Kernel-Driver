@@ -216,7 +216,7 @@ int hard_smp_processor_id(void)
 	return(pid_to_processor_id(os_getpid()));
 }
 
-static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(call_lock);
 static atomic_t scf_started;
 static atomic_t scf_finished;
 static void (*func)(void *info);

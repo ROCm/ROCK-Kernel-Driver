@@ -221,7 +221,7 @@ void trap_init(void)
 {
 }
 
-spinlock_t trap_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(trap_lock);
 
 static int trap_index = 0;
 
