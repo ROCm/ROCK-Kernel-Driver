@@ -740,9 +740,9 @@ void brioctl_set(int (*hook)(unsigned int, void __user *))
 EXPORT_SYMBOL(brioctl_set);
 
 static DECLARE_MUTEX(vlan_ioctl_mutex);
-static int (*vlan_ioctl_hook)(unsigned long arg);
+static int (*vlan_ioctl_hook)(void __user *arg);
 
-void vlan_ioctl_set(int (*hook)(unsigned long))
+void vlan_ioctl_set(int (*hook)(void __user *))
 {
 	down(&vlan_ioctl_mutex);
 	vlan_ioctl_hook = hook;
@@ -816,7 +816,7 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 			down(&vlan_ioctl_mutex);
 			if (vlan_ioctl_hook)
-				err = vlan_ioctl_hook(arg);
+				err = vlan_ioctl_hook(argp);
 			up(&vlan_ioctl_mutex);
 			break;
 		case SIOCGIFDIVERT:
