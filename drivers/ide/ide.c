@@ -1798,9 +1798,7 @@ int __init ide_setup (char *s)
 	if (strncmp(s,"hd",2) == 0 && s[2] == '=')	/* hd= is for hd.c   */
 		return 0;				/* driver and not us */
 
-	if (strncmp(s,"ide",3) &&
-	    strncmp(s,"idebus",6) &&
-	    strncmp(s,"hd",2))		/* hdx= & hdxlun= */
+	if (strncmp(s,"ide",3) && strncmp(s,"idebus",6) && strncmp(s,"hd",2))
 		return 0;
 
 	printk(KERN_INFO "ide_setup: %s", s);
@@ -1845,19 +1843,6 @@ int __init ide_setup (char *s)
 		drive = &hwif->drives[unit];
 		if (strncmp(s + 4, "ide-", 4) == 0) {
 			strlcpy(drive->driver_req, s + 4, sizeof(drive->driver_req));
-			goto done;
-		}
-		/*
-		 * Look for last lun option:  "hdxlun="
-		 */
-		if (s[3] == 'l' && s[4] == 'u' && s[5] == 'n') {
-			if (match_parm(&s[6], NULL, vals, 1) != 1)
-				goto bad_option;
-			if (vals[0] >= 0 && vals[0] <= 7) {
-				drive->last_lun = vals[0];
-				drive->forced_lun = 1;
-			} else
-				printk(" -- BAD LAST LUN! Expected value from 0 to 7");
 			goto done;
 		}
 		switch (match_parm(&s[3], hd_words, vals, 3)) {
