@@ -1,16 +1,23 @@
 /* 
- * Copyright (C) 2001 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
-#ifndef __UM_ETHERTAP_KERN_H
-#define __UM_ETHERTAP_KERN_H
+#include "net_user.h"
 
-#include "net_kern.h"
+struct pcap_data {
+	char *host_if;
+	int promisc;
+	int optimize;
+	char *filter;
+	void *compiled;
+	void *pcap;
+	void *dev;
+};
 
-extern int ethertap_setup(char *arg, struct uml_net *dev);
+extern struct net_user_info pcap_user_info;
 
-#endif
+extern int pcap_user_read(int fd, void *buf, int len, struct pcap_data *pri);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

@@ -10,8 +10,6 @@ struct mcast_data {
 	unsigned short port;
 	void *mcast_addr;
 	int ttl;
-	unsigned char hwaddr[ETH_ADDR_LEN];
-	int hw_setup;
 	void *dev;
 };
 

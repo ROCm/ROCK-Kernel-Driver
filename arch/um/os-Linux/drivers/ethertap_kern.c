@@ -12,42 +12,32 @@
 #include "net_kern.h"
 #include "net_user.h"
 #include "etap.h"
-#include "etap_kern.h"
 
-struct ethertap_setup {
+struct ethertap_init {
 	char *dev_name;
 	char *gate_addr;
 };
 
-struct ethertap_setup ethertap_priv[MAX_UML_NETDEV] = { 
-	[ 0 ... MAX_UML_NETDEV - 1 ] =
-	{
-		dev_name:	NULL,
-		gate_addr:	NULL,
-	}
-};
-
-static void etap_init(struct net_device *dev, int index)
+static void etap_init(struct net_device *dev, void *data)
 {
 	struct uml_net_private *pri;
 	struct ethertap_data *epri;
+	struct ethertap_init *init = data;
 
 	init_etherdev(dev, 0);
 	pri = dev->priv;
 	epri = (struct ethertap_data *) pri->user;
-	epri->dev_name = ethertap_priv[index].dev_name;
-	epri->gate_addr = ethertap_priv[index].gate_addr;
+	*epri = ((struct ethertap_data)
+		{ dev_name :		init->dev_name,
+		  gate_addr :		init->gate_addr,
+		  data_fd :		-1,
+		  control_fd :		-1,
+		  dev :			dev });
+
 	printk("ethertap backend - %s", epri->dev_name);
 	if(epri->gate_addr != NULL) 
 		printk(", IP = %s", epri->gate_addr);
 	printk("\n");
-	epri->data_fd = -1;
-	epri->control_fd = -1;
-}
-
-static unsigned short etap_protocol(struct sk_buff *skb)
-{
-	return(eth_type_trans(skb, skb->dev));
 }
 
 static int etap_read(int fd, struct sk_buff **skb, struct uml_net_private *lp)
@@ -80,38 +70,36 @@ static int etap_write(int fd, struct sk_buff **skb, struct uml_net_private *lp)
 
 struct net_kern_info ethertap_kern_info = {
 	init:			etap_init,
-	protocol:		etap_protocol,
+	protocol:		eth_protocol,
 	read:			etap_read,
 	write: 			etap_write,
 };
 
-static int ethertap_count = 0;
-
-int ethertap_setup(char *str, struct uml_net *dev)
+int ethertap_setup(char *str, char **mac_out, void *data)
 {
-	struct ethertap_setup *pri;
-	int err;
+	struct ethertap_init *init = data;
 
-	pri = &ethertap_priv[ethertap_count];
-	err = tap_setup_common(str, "ethertap", &pri->dev_name, dev->mac,
-			       &dev->have_mac, &pri->gate_addr);
-	if(err) return(err);
-	if(pri->dev_name == NULL){
+	*init = ((struct ethertap_init)
+		{ dev_name :	NULL,
+		  gate_addr :	NULL });
+	if(tap_setup_common(str, "ethertap", &init->dev_name, mac_out,
+			    &init->gate_addr))
+		return(0);
+	if(init->dev_name == NULL){
 		printk("ethertap_setup : Missing tap device name\n");
-		return(1);
+		return(0);
 	}
 
-	dev->user = &ethertap_user_info;
-	dev->kern = &ethertap_kern_info;
-	dev->private_size = sizeof(struct ethertap_data);
-	dev->transport_index = ethertap_count++;
-	return(0);
+	return(1);
 }
 
 static struct transport ethertap_transport = {
-	list :	LIST_HEAD_INIT(ethertap_transport.list),
-	name :	"ethertap",
-	setup : ethertap_setup
+	list :		LIST_HEAD_INIT(ethertap_transport.list),
+	name :		"ethertap",
+	setup : 	ethertap_setup,
+	user :		&ethertap_user_info,
+	kern :		&ethertap_kern_info,
+	private_size :	sizeof(struct ethertap_data),
 };
 
 static int register_ethertap(void)

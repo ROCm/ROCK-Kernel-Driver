@@ -8,6 +8,7 @@ CHAN_OBJS := chan_kern.o chan_user.o line.o
 slip-objs := slip_kern.o slip_user.o
 daemon-objs := daemon_kern.o daemon_user.o
 mcast-objs := mcast_kern.o mcast_user.o
+pcap-objs := pcap_kern.o pcap_user.o
 net-objs := net_kern.o net_user.o
 mconsole-objs := mconsole_kern.o mconsole_user.o
 hostaudio-objs := hostaudio_kern.o hostaudio_user.o
@@ -22,6 +23,7 @@ obj-$(CONFIG_SSL) += ssl.o
 obj-$(CONFIG_UML_NET_SLIP) += slip.o
 obj-$(CONFIG_UML_NET_DAEMON) += daemon.o 
 obj-$(CONFIG_UML_NET_MCAST) += mcast.o 
+obj-$(CONFIG_UML_NET_PCAP) += pcap.o 
 obj-$(CONFIG_UML_NET) += net.o 
 obj-$(CONFIG_MCONSOLE) += mconsole.o
 obj-$(CONFIG_MMAPPER) += mmapper_kern.o 
@@ -34,6 +36,8 @@ obj-$(CONFIG_PTY_CHAN) += pty.o
 obj-$(CONFIG_TTY_CHAN) += tty.o 
 obj-$(CONFIG_XTERM_CHAN) += xterm.o
 obj-$(CONFIG_UML_WATCHDOG) += harddog.o
+
+CFLAGS_pcap_user.o = -I/usr/include/pcap
 
 obj-y += stdio_console.o $(CHAN_OBJS)
 
