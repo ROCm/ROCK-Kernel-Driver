@@ -958,9 +958,13 @@ e1000_set_phy_loopback(struct e1000_adapter *adapter)
 	case e1000_82544:
 	case e1000_82540:
 	case e1000_82545:
+	case e1000_82545_rev_3:
 	case e1000_82546:
+	case e1000_82546_rev_3:
 	case e1000_82541:
+	case e1000_82541_rev_2:
 	case e1000_82547:
+	case e1000_82547_rev_2:
 		return e1000_integrated_phy_loopback(adapter);
 		break;
 
@@ -983,9 +987,12 @@ e1000_setup_loopback_test(struct e1000_adapter *adapter)
 {
 	uint32_t rctl;
 
-	if(adapter->hw.media_type == e1000_media_type_fiber) {
+	if(adapter->hw.media_type == e1000_media_type_fiber ||
+	   adapter->hw.media_type == e1000_media_type_internal_serdes) {
 		if(adapter->hw.mac_type == e1000_82545 ||
-		   adapter->hw.mac_type == e1000_82546)
+		   adapter->hw.mac_type == e1000_82546 ||
+		   adapter->hw.mac_type == e1000_82545_rev_3 ||
+		   adapter->hw.mac_type == e1000_82546_rev_3)
 			return e1000_set_phy_loopback(adapter);
 		else {
 			rctl = E1000_READ_REG(&adapter->hw, RCTL);
@@ -1010,9 +1017,12 @@ e1000_loopback_cleanup(struct e1000_adapter *adapter)
 	E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
 
 	if(adapter->hw.media_type == e1000_media_type_copper ||
-	   (adapter->hw.media_type == e1000_media_type_fiber &&
+	   ((adapter->hw.media_type == e1000_media_type_fiber ||
+	     adapter->hw.media_type == e1000_media_type_internal_serdes) &&
 	    (adapter->hw.mac_type == e1000_82545 ||
-	     adapter->hw.mac_type == e1000_82546))) {
+	     adapter->hw.mac_type == e1000_82546 ||
+	     adapter->hw.mac_type == e1000_82545_rev_3 ||
+	     adapter->hw.mac_type == e1000_82546_rev_3))) {
 		adapter->hw.autoneg = TRUE;
 		e1000_read_phy_reg(&adapter->hw, PHY_CTRL, &phy_reg);
 		if(phy_reg & MII_CR_LOOPBACK) {
@@ -1162,6 +1172,7 @@ e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		return;
 
 	case E1000_DEV_ID_82546EB_FIBER:
+	case E1000_DEV_ID_82546GB_FIBER:
 		/* Wake events only supported on port A for dual fiber */
 		if(E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1) {
 			wol->supported = 0;
@@ -1200,6 +1211,7 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		return wol->wolopts ? -EOPNOTSUPP : 0;
 
 	case E1000_DEV_ID_82546EB_FIBER:
+	case E1000_DEV_ID_82546GB_FIBER:
 		/* Wake events only supported on port A for dual fiber */
 		if(E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)
 			return wol->wolopts ? -EOPNOTSUPP : 0;

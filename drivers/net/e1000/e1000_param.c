@@ -458,6 +458,7 @@ e1000_check_options(struct e1000_adapter *adapter)
 
 	switch(adapter->hw.media_type) {
 	case e1000_media_type_fiber:
+	case e1000_media_type_internal_serdes:
 		e1000_check_fiber_options(adapter);
 		break;
 	case e1000_media_type_copper:

@@ -71,15 +71,28 @@ static struct pci_device_id e1000_pci_tbl[] = {
 	{0x8086, 0x100D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x100E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x100F, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0x8086, 0x1011, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1010, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1011, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1013, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1014, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1015, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1016, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1017, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0x8086, 0x101E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0x8086, 0x101D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0x8086, 0x1013, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1018, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1019, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x101D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x101E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1026, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1027, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1028, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1075, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1076, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1077, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1078, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1079, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x107A, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x107B, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	/* required last entry */
 	{0,}
 };
@@ -426,6 +439,11 @@ e1000_probe(struct pci_dev *pdev,
 	if(pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
 
+	/* before reading the EEPROM, reset the controller to 
+	 * put the device in a known good starting state */
+	
+	e1000_reset_hw(&adapter->hw);
+
 	/* make sure the EEPROM is good */
 
 	if(e1000_validate_eeprom_checksum(&adapter->hw) < 0) {
@@ -584,7 +602,10 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	hw->fc_pause_time = E1000_FC_PAUSE_TIME;
 	hw->fc_send_xon = 1;
 
-	if((hw->mac_type == e1000_82541) || (hw->mac_type == e1000_82547))
+	if((hw->mac_type == e1000_82541) ||
+	   (hw->mac_type == e1000_82547) ||
+	   (hw->mac_type == e1000_82541_rev_2) ||
+	   (hw->mac_type == e1000_82547_rev_2))
 		hw->phy_init_script = 1;
 
 	/* Media type - copper or fiber */
@@ -763,7 +784,8 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 		tipg |= DEFAULT_82542_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
 		break;
 	default:
-		if(adapter->hw.media_type == e1000_media_type_fiber)
+		if(adapter->hw.media_type == e1000_media_type_fiber ||
+		   adapter->hw.media_type == e1000_media_type_internal_serdes)
 			tipg = DEFAULT_82543_TIPG_IPGT_FIBER;
 		else
 			tipg = DEFAULT_82543_TIPG_IPGT_COPPER;
@@ -2387,7 +2409,7 @@ e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 	uint16_t mii_reg;
 	uint16_t spddplx;
 
-	if(adapter->hw.media_type == e1000_media_type_fiber)
+	if(adapter->hw.media_type != e1000_media_type_copper)
 		return -EOPNOTSUPP;
 
 	switch (cmd) {
@@ -2706,7 +2728,8 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 			E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
 		}
 
-		if(adapter->hw.media_type == e1000_media_type_fiber) {
+		if(adapter->hw.media_type == e1000_media_type_fiber ||
+		   adapter->hw.media_type == e1000_media_type_internal_serdes) {
 			/* keep the laser running in D3 */
 			ctrl_ext = E1000_READ_REG(&adapter->hw, CTRL_EXT);
 			ctrl_ext |= E1000_CTRL_EXT_SDP7_DATA;
