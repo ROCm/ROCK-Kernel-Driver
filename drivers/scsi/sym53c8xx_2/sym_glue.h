@@ -74,10 +74,6 @@
 #define bzero(d, n)	memset((d), 0, (n))
 #endif
 
-#ifndef bcmp
-#define bcmp(a, b, n)	memcmp((a), (b), (n))
-#endif
-
 /*
  *  General driver includes.
  */
@@ -96,7 +92,6 @@
 #define SYM_OPT_SNIFF_INQUIRY
 #define SYM_OPT_LIMIT_COMMAND_REORDERING
 #define	SYM_OPT_ANNOUNCE_TRANSFER_RATE
-#define	SYM_OPT_BUS_DMA_ABSTRACTION
 
 /*
  *  Print a message with severity.
