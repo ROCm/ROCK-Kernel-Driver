@@ -247,12 +247,19 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 	if (pdc4030_cmd(drive, PROMISE_GET_CONFIG)) {
 		return 0;
 	}
+
+	/* FIXME: Make this go away. */
+	spin_lock_irq(hwif->lock);
 	if (ata_status_poll(drive, DATA_READY, BAD_W_STAT,
 				WAIT_DRQ, NULL, &startstop)) {
 		printk(KERN_INFO
 			"%s: Failed Promise read config!\n",hwif->name);
+		spin_unlock_irq(hwif->lock);
+
 		return 0;
 	}
+	spin_unlock_irq(hwif->lock);
+
 	promise_read(drive, &ident, SECTOR_WORDS);
 	if (ident.id[1] != 'P' || ident.id[0] != 'T') {
 		return 0;
@@ -720,21 +727,34 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 
 	case WRITE: {
 		ide_startstop_t startstop;
-/*
- * Strategy on write is:
- *	look for the DRQ that should have been immediately asserted
- *	copy the request into the hwgroup's scratchpad
- *	call the promise_write function to deal with writing the data out
- * NOTE: No interrupts are generated on writes. Write completion must be polled
- */
+		unsigned long flags;
+		struct ata_channel *ch = drive->channel;
+
+		/*
+		 * Strategy on write is: look for the DRQ that should have been
+		 * immediately asserted copy the request into the hwgroup's
+		 * scratchpad call the promise_write function to deal with
+		 * writing the data out.
+		 *
+		 * NOTE: No interrupts are generated on writes. Write
+		 * completion must be polled
+		 */
+
+		/* FIXME: Move this lock upwards.
+		 */
+		spin_lock_irqsave(ch->lock, flags);
 		if (ata_status_poll(drive, DATA_READY, drive->bad_wstat,
 					WAIT_DRQ, rq, &startstop )) {
 			printk(KERN_ERR "%s: no DRQ after issuing "
 			       "PROMISE_WRITE\n", drive->name);
+			spin_unlock_irqrestore(ch->lock, flags);
+
 			return startstop;
 		}
 		if (!drive->channel->unmask)
 			__cli();	/* local CPU only */
+		spin_unlock_irqrestore(ch->lock, flags);
+
 		return promise_do_write(drive, rq);
 	}
 

@@ -177,9 +177,9 @@ int drive_is_ready(struct ata_device *drive)
 }
 
 /*
- * FIXME: Channel lock should be held on entry.
+ * Channel lock should be held on entry.
  */
-ide_startstop_t ata_taskfile(struct ata_device *drive,
+ide_startstop_t ata_do_taskfile(struct ata_device *drive,
 		struct ata_taskfile *ar, struct request *rq)
 {
 	struct hd_driveid *id = drive->id;
@@ -196,27 +196,21 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 	if ((id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400) &&
 	    (drive->addressing == 1))
 		ata_out_regfile(drive, &ar->hobfile);
+
 	ata_out_regfile(drive, &ar->taskfile);
 
 	OUT_BYTE((ar->taskfile.device_head & (drive->addressing ? 0xE0 : 0xEF)) | drive->select.all,
 			IDE_SELECT_REG);
 
 	if (ar->handler) {
-		unsigned long flags;
 		struct ata_channel *ch = drive->channel;
 
 		/* This is apparently supposed to reset the wait timeout for
 		 * the interrupt to accur.
 		 */
 
-		/* FIXME: this locking should encompass the above register
-		 * file access too.
-		 */
-
-		spin_lock_irqsave(ch->lock, flags);
 		ata_set_handler(drive, ar->handler, WAIT_CMD, NULL);
 		OUT_BYTE(ar->cmd, IDE_COMMAND_REG);
-		spin_unlock_irqrestore(ch->lock, flags);
 
 		/* FIXME: Warning check for race between handler and prehandler
 		 * for writing first block of data.  however since we are well
@@ -240,6 +234,7 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 						WAIT_DRQ, rq, &startstop)) {
 				printk(KERN_ERR "%s: no DRQ after issuing %s\n",
 						drive->name, drive->mult_count ? "MULTWRITE" : "WRITE");
+
 				return startstop;
 			}
 
@@ -261,6 +256,7 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 				return ide_started;
 			} else {
 				int i;
+				int ret;
 
 				/* Polling wait until the drive is ready.
 				 *
@@ -278,7 +274,12 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 				if (!drive_is_ready(drive)) {
 					printk(KERN_ERR "DISASTER WAITING TO HAPPEN!\n");
 				}
-				return ar->handler(drive, rq);
+				/* FIXME: make this unlocking go away*/
+				spin_unlock_irq(ch->lock);
+				ret =  ar->handler(drive, rq);
+				spin_lock_irq(ch->lock);
+
+				return ret;
 			}
 		}
 	} else {
@@ -448,6 +449,6 @@ EXPORT_SYMBOL(drive_is_ready);
 EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(ata_read);
 EXPORT_SYMBOL(ata_write);
-EXPORT_SYMBOL(ata_taskfile);
+EXPORT_SYMBOL(ata_do_taskfile);
 EXPORT_SYMBOL(ata_special_intr);
 EXPORT_SYMBOL(ide_raw_taskfile);

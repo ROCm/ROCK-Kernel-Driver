@@ -732,46 +732,49 @@ static ide_startstop_t cdrom_start_packet_command(struct ata_device *drive,
 	struct ata_channel *ch = drive->channel;
 	ide_startstop_t startstop;
 	struct cdrom_info *info = drive->driver_data;
-
-	/* Wait for the controller to be idle. */
-	if (ata_status_poll(drive, 0, BUSY_STAT, WAIT_READY, rq, &startstop))
-		return startstop;
+	int ret;
 
 	spin_lock_irqsave(ch->lock, flags);
+	/* Wait for the controller to be idle. */
+	if (ata_status_poll(drive, 0, BUSY_STAT, WAIT_READY, rq, &startstop))
+		ret = startstop;
+	else {
+		if (info->dma) {
+			if (info->cmd == READ || info->cmd == WRITE)
+				info->dma = !udma_init(drive, rq);
+			else
+				printk("ide-cd: DMA set, but not allowed\n");
+		}
 
-	if (info->dma) {
-		if (info->cmd == READ || info->cmd == WRITE)
-			info->dma = !udma_init(drive, rq);
-		else
-			printk("ide-cd: DMA set, but not allowed\n");
+		/* Set up the controller registers. */
+		OUT_BYTE(info->dma, IDE_FEATURE_REG);
+		OUT_BYTE(0, IDE_NSECTOR_REG);
+		OUT_BYTE(0, IDE_SECTOR_REG);
+
+		OUT_BYTE(xferlen & 0xff, IDE_LCYL_REG);
+		OUT_BYTE(xferlen >> 8  , IDE_HCYL_REG);
+		ata_irq_enable(drive, 1);
+		if (info->dma)
+			udma_start(drive, rq);
+
+		if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
+			ata_set_handler(drive, handler, WAIT_CMD, cdrom_timer_expiry);
+			OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG); /* packet command */
+			ret = ide_started;
+		} else {
+			OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG); /* packet command */
+
+			/* FIXME: Oj kurwa! We have to ungrab the lock before
+			 * the IRQ handler gets called.
+			 */
+			spin_unlock_irqrestore(ch->lock, flags);
+			ret = handler(drive, rq);
+			spin_lock_irqsave(ch->lock, flags);
+		}
 	}
+	spin_unlock_irqrestore(ch->lock, flags);
 
-	/* Set up the controller registers. */
-	OUT_BYTE(info->dma, IDE_FEATURE_REG);
-	OUT_BYTE(0, IDE_NSECTOR_REG);
-	OUT_BYTE(0, IDE_SECTOR_REG);
-
-	OUT_BYTE(xferlen & 0xff, IDE_LCYL_REG);
-	OUT_BYTE(xferlen >> 8  , IDE_HCYL_REG);
-	ata_irq_enable(drive, 1);
-	if (info->dma)
-		udma_start(drive, rq);
-
-	if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
-		ata_set_handler(drive, handler, WAIT_CMD, cdrom_timer_expiry);
-		OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG); /* packet command */
-		spin_unlock_irqrestore(ch->lock, flags);
-
-		return ide_started;
-	} else {
-		OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG); /* packet command */
-		spin_unlock_irqrestore(ch->lock, flags);
-
-		/* FIXME: Woah we have to ungrab the lock before the IRQ
-		 * handler gets called.
-		 */
-		return handler(drive, rq);
-	}
+	return ret;
 }
 
 /*
@@ -797,10 +800,16 @@ static ide_startstop_t cdrom_transfer_packet_command(struct ata_device *drive,
 		if (cdrom_decode_status(&startstop, drive, rq, DRQ_STAT, &stat_dum))
 			return startstop;
 	} else {
+		/* FIXME: make this locking go away */
+		spin_lock_irqsave(ch->lock, flags);
 		/* Otherwise, we must wait for DRQ to get set. */
 		if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
-					WAIT_READY, rq, &startstop))
+					WAIT_READY, rq, &startstop)) {
+			spin_unlock_irqrestore(ch->lock, flags);
+
 			return startstop;
+		}
+		spin_unlock_irqrestore(ch->lock, flags);
 	}
 
 	/* Arm the interrupt handler and send the command to the device. */
@@ -1687,8 +1696,6 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 
 		return ret;
 	} else if (rq->flags & REQ_SPECIAL) {
-	        /* FIXME: make this unlocking go away*/
-		spin_unlock_irq(ch->lock);
 		/*
 		 * FIXME: Kill REQ_SEPCIAL and replace it with commands queued
 		 * at the request queue instead as suggested by Linus.
@@ -1696,6 +1703,8 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 		 * right now this can only be a reset...
 		 */
 
+	        /* FIXME: make this unlocking go away*/
+		spin_unlock_irq(ch->lock);
 		cdrom_end_request(drive, rq, 1);
 		spin_lock_irq(ch->lock);
 
@@ -1704,8 +1713,6 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 		struct packet_command pc;
 		ide_startstop_t startstop;
 
-		/* FIXME: make this unlocking go away*/
-		spin_unlock_irq(ch->lock);
 		memset(&pc, 0, sizeof(pc));
 		pc.quiet = 1;
 		pc.timeout = 60 * HZ;
@@ -1713,10 +1720,13 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 		/* FIXME --mdcki */
 		rq->special = (char *) &pc;
 
+		/* FIXME: make this unlocking go away*/
+		spin_unlock_irq(ch->lock);
 		startstop = cdrom_do_packet_command(drive, rq);
+		spin_lock_irq(ch->lock);
+
 		if (pc.stat)
 			++rq->errors;
-		spin_lock_irq(ch->lock);
 
 		return startstop;
 	}
@@ -2990,7 +3000,7 @@ static struct ata_operations ide_cdrom_driver = {
 	attach:			ide_cdrom_attach,
 	cleanup:		ide_cdrom_cleanup,
 	standby:		NULL,
-	XXX_do_request:		ide_cdrom_do_request,
+	do_request:		ide_cdrom_do_request,
 	end_request:		NULL,
 	ioctl:			ide_cdrom_ioctl,
 	open:			ide_cdrom_open,

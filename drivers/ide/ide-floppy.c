@@ -958,27 +958,25 @@ static ide_startstop_t idefloppy_transfer_pc(struct ata_device *drive, struct re
 	idefloppy_ireason_reg_t ireason;
 	int ret;
 
+	/* FIXME: Move this lock upwards.
+	 */
+	spin_lock_irqsave(ch->lock, flags);
 	if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
 				WAIT_READY, rq, &startstop)) {
 		printk (KERN_ERR "ide-floppy: Strange, packet command initiated yet DRQ isn't asserted\n");
 
-		return startstop;
-	}
-
-	/* FIXME: this locking should encompass the above register
-	 * file access too.
-	 */
-
-	spin_lock_irqsave(ch->lock, flags);
-	ireason.all=IN_BYTE (IDE_IREASON_REG);
-
-	if (!ireason.b.cod || ireason.b.io) {
-		printk (KERN_ERR "ide-floppy: (IO,CoD) != (0,1) while issuing a packet command\n");
-		ret = ide_stopped;
+		ret = startstop;
 	} else {
-		ata_set_handler (drive, idefloppy_pc_intr, IDEFLOPPY_WAIT_CMD, NULL);	/* Set the interrupt routine */
-		atapi_write(drive, floppy->pc->c, 12); /* Send the actual packet */
-		ret = ide_started;
+		ireason.all=IN_BYTE (IDE_IREASON_REG);
+
+		if (!ireason.b.cod || ireason.b.io) {
+			printk (KERN_ERR "ide-floppy: (IO,CoD) != (0,1) while issuing a packet command\n");
+			ret = ide_stopped;
+		} else {
+			ata_set_handler (drive, idefloppy_pc_intr, IDEFLOPPY_WAIT_CMD, NULL);	/* Set the interrupt routine */
+			atapi_write(drive, floppy->pc->c, 12); /* Send the actual packet */
+			ret = ide_started;
+		}
 	}
 	spin_unlock_irqrestore(ch->lock, flags);
 
@@ -2047,7 +2045,7 @@ static struct ata_operations idefloppy_driver = {
 	attach:			idefloppy_attach,
 	cleanup:		idefloppy_cleanup,
 	standby:		NULL,
-	XXX_do_request:		idefloppy_do_request,
+	do_request:		idefloppy_do_request,
 	end_request:		idefloppy_end_request,
 	ioctl:			idefloppy_ioctl,
 	open:			idefloppy_open,

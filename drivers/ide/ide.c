@@ -671,28 +671,12 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 		block = 1;  /* redirect MBR access to EZ-Drive partn table */
 
 	ata_select(drive, 0);
-	spin_unlock_irq(ch->lock);
 	if (ata_status_poll(drive, drive->ready_stat, BUSY_STAT | DRQ_STAT,
 				WAIT_READY, rq, &ret)) {
 		printk(KERN_WARNING "%s: drive not ready for command\n", drive->name);
-		spin_lock_irq(ch->lock);
 
-		return ret;
+		goto kill_rq;
 	}
-	spin_lock_irq(ch->lock);
-
-	/* This issues a special drive command.
-	 *
-	 * FIXME: move this down to idedisk_do_request().
-	 */
-	if (rq->flags & REQ_SPECIAL)
-		if (drive->type == ATA_DISK) {
-			spin_unlock_irq(ch->lock);
-			ret = ata_taskfile(drive, rq->special, NULL);
-			spin_lock_irq(ch->lock);
-
-			return ret;
-		}
 
 	if (!ata_ops(drive)) {
 		printk(KERN_WARNING "%s: device type %d not supported\n",
@@ -704,8 +688,8 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 	 * handler down to the device type driver.
 	 */
 
-	if (ata_ops(drive)->XXX_do_request) {
-		ret = ata_ops(drive)->XXX_do_request(drive, rq, block);
+	if (ata_ops(drive)->do_request) {
+		ret = ata_ops(drive)->do_request(drive, rq, block);
 	} else {
 		__ata_end_request(drive, rq, 0, 0);
 		ret = ide_stopped;

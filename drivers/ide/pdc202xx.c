@@ -364,12 +364,12 @@ static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
  * 180, 120,  90,  90,  90,  60,  30
  *  11,   5,   4,   3,   2,   1,   0
  */
-static void config_chipset_for_pio(struct ata_device *drive, byte pio)
+static void pdc202xx_tune_drive(struct ata_device *drive, u8 pio)
 {
-	byte speed;
+	u8 speed;
 
 	if (pio == 255)
-		speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
+		speed = ata_best_pio_mode(drive);
 	else	speed = XFER_PIO_0 + min_t(byte, pio, 4);
 
 	pdc202xx_tune_chipset(drive, speed);
@@ -543,7 +543,7 @@ try_dma_modes:
 		} else goto no_dma_set;
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 no_dma_set:
-		config_chipset_for_pio(drive, 5);
+		pdc202xx_tune_drive(drive, 255);
 	}
 
 	udma_enable(drive, on, verbose);
@@ -723,7 +723,7 @@ static unsigned int __init pdc202xx_tx_ata66_check(struct ata_channel *ch)
 
 static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 {
-	hwif->tuneproc  = &config_chipset_for_pio;
+	hwif->tuneproc  = &pdc202xx_tune_drive;
 	hwif->quirkproc = &check_in_drive_lists;
 
         switch(hwif->pci_dev->device) {

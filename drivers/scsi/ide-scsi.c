@@ -403,25 +403,24 @@ static ide_startstop_t idescsi_transfer_pc(struct ata_device *drive, struct requ
 	ide_startstop_t startstop;
 	int ret;
 
+	/* FIXME: Move this lock upwards.
+	 */
+	spin_lock_irqsave(ch->lock, flags);
 	if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
 				WAIT_READY, rq, &startstop)) {
 		printk (KERN_ERR "ide-scsi: Strange, packet command initiated yet DRQ isn't asserted\n");
-		return startstop;
-	}
-
-	/* FIXME: this locking should encompass the above register
-	 * file access too.
-	 */
-	spin_lock_irqsave(ch->lock, flags);
-	ireason = IN_BYTE(IDE_IREASON_REG);
-
-	if ((ireason & (IDESCSI_IREASON_IO | IDESCSI_IREASON_COD)) != IDESCSI_IREASON_COD) {
-		printk (KERN_ERR "ide-scsi: (IO,CoD) != (0,1) while issuing a packet command\n");
-		ret = ide_stopped;
+		ret = startstop;
 	} else {
-		ata_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);
-		atapi_write(drive, scsi->pc->c, 12);
-		ret = ide_started;
+		ireason = IN_BYTE(IDE_IREASON_REG);
+
+		if ((ireason & (IDESCSI_IREASON_IO | IDESCSI_IREASON_COD)) != IDESCSI_IREASON_COD) {
+			printk (KERN_ERR "ide-scsi: (IO,CoD) != (0,1) while issuing a packet command\n");
+			ret = ide_stopped;
+		} else {
+			ata_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);
+			atapi_write(drive, scsi->pc->c, 12);
+			ret = ide_started;
+		}
 	}
 	spin_unlock_irqrestore(ch->lock, flags);
 
@@ -549,7 +548,7 @@ static struct ata_operations ata_ops = {
 	owner:			THIS_MODULE,
 	attach:			idescsi_attach,
 	cleanup:		idescsi_cleanup,
-	XXX_do_request:		idescsi_do_request,
+	do_request:		idescsi_do_request,
 	end_request:		idescsi_end_request,
 	open:			idescsi_open,
 	release:		idescsi_release,

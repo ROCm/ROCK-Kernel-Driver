@@ -545,7 +545,7 @@ struct ata_operations {
 	void (*attach) (struct ata_device *);
 	int (*cleanup)(struct ata_device *);
 	int (*standby)(struct ata_device *);
-	ide_startstop_t	(*XXX_do_request)(struct ata_device *, struct request *, sector_t);
+	ide_startstop_t	(*do_request)(struct ata_device *, struct request *, sector_t);
 	int (*end_request)(struct ata_device *, struct request *, int);
 
 	int (*ioctl)(struct ata_device *, struct inode *, struct file *, unsigned int, unsigned long);
@@ -658,7 +658,7 @@ struct ata_taskfile {
 extern void ata_read(struct ata_device *, void *, unsigned int);
 extern void ata_write(struct ata_device *, void *, unsigned int);
 
-extern ide_startstop_t ata_taskfile(struct ata_device *,
+extern ide_startstop_t ata_do_taskfile(struct ata_device *,
 	struct ata_taskfile *, struct request *);
 
 /*

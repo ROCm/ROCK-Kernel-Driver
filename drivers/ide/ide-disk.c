@@ -456,7 +456,7 @@ static ide_startstop_t chs_do_request(struct ata_device *drive, struct request *
 
 	rq->special = &args;
 
-	return ata_taskfile(drive, &args, rq);
+	return ata_do_taskfile(drive, &args, rq);
 }
 
 static ide_startstop_t lba28_do_request(struct ata_device *drive, struct request *rq, sector_t block)
@@ -496,7 +496,7 @@ static ide_startstop_t lba28_do_request(struct ata_device *drive, struct request
 
 	rq->special = &args;
 
-	return ata_taskfile(drive, &args, rq);
+	return ata_do_taskfile(drive, &args, rq);
 }
 
 /*
@@ -548,7 +548,7 @@ static ide_startstop_t lba48_do_request(struct ata_device *drive, struct request
 
 	rq->special = &args;
 
-	return ata_taskfile(drive, &args, rq);
+	return ata_do_taskfile(drive, &args, rq);
 }
 
 /*
@@ -560,14 +560,16 @@ static ide_startstop_t lba48_do_request(struct ata_device *drive, struct request
  */
 static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
-	unsigned long flags;
-	struct ata_channel *ch = drive->channel;
-	int ret;
+	/* This issues a special drive command.
+	 */
+	if (rq->flags & REQ_SPECIAL)
+		return ata_do_taskfile(drive, rq->special, rq);
 
 	/* FIXME: this check doesn't make sense */
 	if (!(rq->flags & REQ_CMD)) {
 		blk_dump_rq_flags(rq, "idedisk_do_request - bad command");
 		__ata_end_request(drive, rq, 0, 0);
+
 		return ide_stopped;
 	}
 
@@ -590,6 +592,7 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 
 		if (st) {
 			BUG_ON(!ata_pending_commands(drive));
+
 			return ide_started;
 		}
 	}
@@ -1405,7 +1408,7 @@ static struct ata_operations idedisk_driver = {
 	attach:			idedisk_attach,
 	cleanup:		idedisk_cleanup,
 	standby:		idedisk_standby,
-	XXX_do_request:		idedisk_do_request,
+	do_request:		idedisk_do_request,
 	end_request:		NULL,
 	ioctl:			idedisk_ioctl,
 	open:			idedisk_open,

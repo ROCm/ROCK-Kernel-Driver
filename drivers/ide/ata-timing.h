@@ -83,5 +83,6 @@ void ata_timing_merge_8bit(struct ata_timing *t);
 extern struct ata_timing* ata_timing_data(short speed);
 extern int ata_timing_compute(struct ata_device *drive,
 		short speed, struct ata_timing *t, int T, int UT);
+extern u8 ata_best_pio_mode(struct ata_device *drive);
 
 #endif

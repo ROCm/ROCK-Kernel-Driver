@@ -67,43 +67,6 @@ static int hpt34x_tune_chipset(struct ata_device *drive, u8 speed)
 	return ide_config_drive_speed(drive, speed);
 }
 
-static void config_chipset_for_pio(struct ata_device *drive)
-{
-	unsigned short eide_pio_timing[6] = {960, 480, 240, 180, 120, 90};
-	unsigned short xfer_pio = drive->id->eide_pio_modes;
-
-	u8 timing, speed, pio;
-
-	pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
-
-	if (xfer_pio > 4)
-		xfer_pio = 0;
-
-	if (drive->id->eide_pio_iordy > 0) {
-		for (xfer_pio = 5;
-			xfer_pio>0 &&
-			drive->id->eide_pio_iordy>eide_pio_timing[xfer_pio];
-			xfer_pio--);
-	} else {
-		xfer_pio = (drive->id->eide_pio_modes & 4) ? 0x05 :
-			   (drive->id->eide_pio_modes & 2) ? 0x04 :
-			   (drive->id->eide_pio_modes & 1) ? 0x03 : xfer_pio;
-	}
-
-	timing = (xfer_pio >= pio) ? xfer_pio : pio;
-
-	switch(timing) {
-		case 4: speed = XFER_PIO_4;break;
-		case 3: speed = XFER_PIO_3;break;
-		case 2: speed = XFER_PIO_2;break;
-		case 1: speed = XFER_PIO_1;break;
-		default:
-			speed = (!drive->id->tPIO) ? XFER_PIO_0 : XFER_PIO_SLOW;
-			break;
-		}
-	(void) hpt34x_tune_chipset(drive, speed);
-}
-
 static void hpt34x_tune_drive(struct ata_device *drive, u8 pio)
 {
 	(void) hpt34x_tune_chipset(drive, XFER_PIO_0 + min_t(u8, pio, 4));
@@ -177,7 +140,7 @@ fast_ata_pio:
 		on = 0;
 		verbose = 0;
 no_dma_set:
-		config_chipset_for_pio(drive);
+		hpt34x_tune_chipset(drive, ata_best_pio_mode(drive));
 	}
 
 #ifndef CONFIG_HPT34X_AUTODMA

@@ -176,11 +176,6 @@ static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
 	return ide_config_drive_speed(drive, speed);
 }
 
-static void config_chipset_for_pio(struct ata_device *drive)
-{
-	ali15x3_tune_drive(drive, 5);
-}
-
 #ifdef CONFIG_BLK_DEV_IDEDMA
 static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 {
@@ -253,7 +248,7 @@ fast_ata_pio:
 		on = 0;
 		verbose = 0;
 no_dma_set:
-		config_chipset_for_pio(drive);
+		ali15x3_tune_drive(drive, 255);
 	}
 
 	udma_enable(drive, on, verbose);
