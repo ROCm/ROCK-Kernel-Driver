@@ -148,14 +148,6 @@
 #define EP_ITEM_FROM_EPQUEUE(p) (container_of(p, struct ep_pqueue, pt)->epi)
 
 /*
- * This is used to optimize the event transfer to userspace. Since this
- * is kept on stack, it should be pretty small.
- */
-#define EP_MAX_BUF_EVENTS 32
-
-
-
-/*
  * Node that is linked into the "wake_task_list" member of the "struct poll_safewake".
  * It is used to keep track on all tasks that are currently inside the wake_up() code
  * to 1) short-circuit the one coming from the same task and same wait queue head
@@ -1430,11 +1422,10 @@ static int ep_collect_ready_items(struct eventpoll *ep, struct list_head *txlist
 static int ep_send_events(struct eventpoll *ep, struct list_head *txlist,
 			  struct epoll_event __user *events)
 {
-	int eventcnt = 0, eventbuf = 0;
+	int eventcnt = 0;
 	unsigned int revents;
 	struct list_head *lnk;
 	struct epitem *epi;
-	struct epoll_event event[EP_MAX_BUF_EVENTS];
 
 	/*
 	 * We can loop without lock because this is a task private list.
@@ -1460,28 +1451,17 @@ static int ep_send_events(struct eventpoll *ep, struct list_head *txlist,
 		epi->revents = revents & epi->event.events;
 
 		if (epi->revents) {
-			event[eventbuf] = epi->event;
-			event[eventbuf].events &= revents;
-			eventbuf++;
-			if (eventbuf == EP_MAX_BUF_EVENTS) {
-				if (__copy_to_user(&events[eventcnt], event,
-						   eventbuf * sizeof(struct epoll_event)))
-					return -EFAULT;
-				eventcnt += eventbuf;
-				eventbuf = 0;
-			}
+			if (__put_user(epi->event.events,
+					&events[eventcnt].events))
+				return -EFAULT;
+			if (__put_user(epi->event.data,
+					&events[eventcnt].data))
+				return -EFAULT;
 			if (epi->event.events & EPOLLONESHOT)
 				epi->event.events &= EP_PRIVATE_BITS;
+			eventcnt++;
 		}
 	}
-
-	if (eventbuf) {
-		if (__copy_to_user(&events[eventcnt], event,
-				   eventbuf * sizeof(struct epoll_event)))
-			return -EFAULT;
-		eventcnt += eventbuf;
-	}
-
 	return eventcnt;
 }
 
