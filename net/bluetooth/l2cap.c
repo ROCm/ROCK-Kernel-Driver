@@ -1526,18 +1526,35 @@ static inline int l2cap_config_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 	if (!(sk = l2cap_get_chan_by_scid(&conn->chan_list, scid)))
 		return -ENOENT;
 
-	if (result) {
-		struct l2cap_disconn_req req;
+	switch (result) {
+	case L2CAP_CONF_SUCCESS:
+		break;
 
-		/* They didn't like our options. Well... we do not negotiate.
-		 * Close channel.
-		 */
+	case L2CAP_CONF_UNACCEPT:
+		if (++l2cap_pi(sk)->conf_retry < L2CAP_CONF_MAX_RETRIES) {
+			char req[128];
+			/* 
+			   It does not make sense to adjust L2CAP parameters 
+			   that are currently defined in the spec. We simply 
+			   resend config request that we sent earlier. It is
+			   stupid :) but it helps qualification testing
+			   which expects at least some response from us.
+			*/
+			l2cap_send_req(conn, L2CAP_CONF_REQ,
+				l2cap_build_conf_req(sk, req), req);
+			goto done;
+		}
+
+	default: 
 		sk->sk_state = BT_DISCONN;
+		sk->sk_err   = ECONNRESET;
 		l2cap_sock_set_timer(sk, HZ * 5);
-
-		req.dcid = __cpu_to_le16(l2cap_pi(sk)->dcid);
-		req.scid = __cpu_to_le16(l2cap_pi(sk)->scid);
-		l2cap_send_req(conn, L2CAP_DISCONN_REQ, sizeof(req), &req);
+		{
+			struct l2cap_disconn_req req;
+			req.dcid = __cpu_to_le16(l2cap_pi(sk)->dcid);
+			req.scid = __cpu_to_le16(l2cap_pi(sk)->scid);
+			l2cap_send_req(conn, L2CAP_DISCONN_REQ, sizeof(req), &req);
+		}
 		goto done;
 	}
 
