@@ -124,9 +124,15 @@
  +		a structure, which will be supplied by a filesystem driver
  *		If NULL is given, then the defaults (none or defaults
  *		supplied by ioctl (MEMSETOOBSEL) are used.
- *		For partitions the partition defaults are used (mtdpart.c)		
+ *		For partitions the partition defaults are used (mtdpart.c)
+ *
+ *  06-04-2003  tglx: fix compile errors and fix write verify problem for
+ *		some chips, which need either a delay between the readback
+ *		and the next write command or have the CE removed. The
+ *		CE disable/enable is much faster than a 20us delay and
+ *		it should work on all available chips.
  *	
- * $Id: nand.c,v 1.45 2003/05/20 21:01:30 dwmw2 Exp $
+ * $Id: nand.c,v 1.46 2003/06/04 17:10:36 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -141,6 +147,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/nand_ecc.h>
+#include <linux/mtd/compatmac.h>
 #include <linux/interrupt.h>
 #include <asm/io.h>
 
@@ -510,6 +517,13 @@ static int nand_write_page (struct mtd_info *mtd, struct nand_chip *this, int pa
 			}
 		}
 	}
+	/* 
+	 * Terminate the read command. This is faster than sending a reset command or 
+	 * applying a 20us delay before issuing the next programm sequence.
+	 * This is not a problem for all chips, but I have found a bunch of them.
+	 */
+	nand_deselect();
+	nand_select();
 #endif
 	return 0;
 }

@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: mtdpart.c,v 1.39 2003/05/21 15:15:03 dwmw2 Exp $
+ * $Id: mtdpart.c,v 1.41 2003/06/18 14:53:02 dwmw2 Exp $
  *
  * 	02-21-2002	Thomas Gleixner <gleixner@autronix.de>
  *			added support for read_oob, write_oob
@@ -120,7 +120,7 @@ static int part_read_fact_prot_reg (struct mtd_info *mtd, loff_t from, size_t le
 			size_t *retlen, u_char *buf)
 {
 	struct mtd_part *part = PART(mtd);
-	return part->master->read_user_prot_reg (part->master, from, 
+	return part->master->read_fact_prot_reg (part->master, from, 
 					len, retlen, buf);
 }
 

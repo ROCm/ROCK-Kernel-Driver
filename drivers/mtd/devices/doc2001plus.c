@@ -6,7 +6,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2001plus.c,v 1.4 2003/05/23 11:28:46 dwmw2 Exp $
+ * $Id: doc2001plus.c,v 1.5 2003/06/11 09:45:19 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -458,6 +458,7 @@ static void DoCMilPlus_init(struct mtd_info *mtd)
 
 	mtd->type = MTD_NANDFLASH;
 	mtd->flags = MTD_CAP_NANDFLASH;
+	mtd->ecctype = MTD_ECC_RS_DiskOnChip;
 	mtd->size = 0;
 
 	mtd->erasesize = 0;

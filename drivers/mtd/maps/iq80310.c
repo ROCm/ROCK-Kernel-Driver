@@ -1,5 +1,5 @@
 /*
- * $Id: iq80310.c,v 1.16 2003/05/21 15:15:07 dwmw2 Exp $
+ * $Id: iq80310.c,v 1.17 2003/06/23 11:48:18 dwmw2 Exp $
  *
  * Mapping for the Intel XScale IQ80310 evaluation board
  *
@@ -57,8 +57,6 @@ static struct mtd_partition iq80310_partitions[4] = {
 	}
 };
 
-#define NB_OF(x)  (sizeof(x)/sizeof(x[0]))
-
 static struct mtd_info *mymtd;
 static struct mtd_partition *parsed_parts;
 static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
@@ -94,7 +92,7 @@ static int __init init_iq80310(void)
 		nb_parts = parsed_nr_parts;
 	} else {
 		parts = iq80310_partitions;
-		nb_parts = NB_OF(iq80310_partitions);
+		nb_parts = ARRAY_SIZE(iq80310_partitions);
 	}
 	add_mtd_partitions(mymtd, parts, nb_parts);
 	return 0;

@@ -1,5 +1,5 @@
 /*
- * $Id: lubbock-flash.c,v 1.8 2003/05/21 12:45:19 dwmw2 Exp $
+ * $Id: lubbock-flash.c,v 1.9 2003/06/23 11:48:18 dwmw2 Exp $
  *
  * Map driver for the Lubbock developer platform.
  *
@@ -51,8 +51,6 @@ static struct mtd_partition lubbock_partitions[] = {
 		.offset =	0x00140000
 	}
 };
-
-#define NB_OF(x)  (sizeof(x)/sizeof(x[0]))
 
 static struct mtd_info *mymtds[2];
 static struct mtd_partition *parsed_parts[2];
@@ -116,7 +114,7 @@ static int __init init_lubbock(void)
 			add_mtd_partitions(mymtds[i], parsed_parts[i], nr_parsed_parts[i]);
 		} else if (!i) {
 			printk("Using static partitions on %s\n", lubbock_maps[i].name);
-			add_mtd_partitions(mymtds[i], lubbock_partitions, NB_OF(lubbock_partitions));
+			add_mtd_partitions(mymtds[i], lubbock_partitions, ARRAY_SIZE(lubbock_partitions));
 		} else {
 			printk("Registering %s as whole device\n", lubbock_maps[i].name);
 			add_mtd_device(mymtds[i]);
