@@ -14,6 +14,7 @@
 #include <net/xfrm.h>
 #include <linux/pfkeyv2.h>
 #include <linux/ipsec.h>
+#include <asm/uaccess.h>
 
 /* Each xfrm_state may be linked to two tables:
 
