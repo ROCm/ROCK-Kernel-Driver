@@ -210,14 +210,14 @@ void hfs_delete_inode(struct inode *inode)
 	dprint(DBG_INODE, "delete_inode: %lu\n", inode->i_ino);
 	if (S_ISDIR(inode->i_mode)) {
 		HFS_SB(sb)->folder_count--;
-		if (HFS_I(inode)->cat_key.ParID == be32_to_cpu(HFS_ROOT_CNID))
+		if (HFS_I(inode)->cat_key.ParID == cpu_to_be32(HFS_ROOT_CNID))
 			HFS_SB(sb)->root_dirs--;
 		set_bit(HFS_FLG_MDB_DIRTY, &HFS_SB(sb)->flags);
 		sb->s_dirt = 1;
 		return;
 	}
 	HFS_SB(sb)->file_count--;
-	if (HFS_I(inode)->cat_key.ParID == be32_to_cpu(HFS_ROOT_CNID))
+	if (HFS_I(inode)->cat_key.ParID == cpu_to_be32(HFS_ROOT_CNID))
 		HFS_SB(sb)->root_files--;
 	if (S_ISREG(inode->i_mode)) {
 		if (!inode->i_nlink) {
@@ -230,9 +230,10 @@ void hfs_delete_inode(struct inode *inode)
 }
 
 void hfs_inode_read_fork(struct inode *inode, struct hfs_extent *ext,
-			 u32 log_size, u32 phys_size, u32 clump_size)
+			 __be32 __log_size, __be32 phys_size, u32 clump_size)
 {
 	struct super_block *sb = inode->i_sb;
+	u32 log_size = be32_to_cpu(__log_size);
 	u16 count;
 	int i;
 
@@ -241,7 +242,6 @@ void hfs_inode_read_fork(struct inode *inode, struct hfs_extent *ext,
 		count += be16_to_cpu(ext[i].count);
 	HFS_I(inode)->first_blocks = count;
 
-	log_size = be32_to_cpu(log_size);
 	inode->i_size = HFS_I(inode)->phys_size = log_size;
 	inode->i_blocks = (log_size + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
 	HFS_I(inode)->alloc_blocks = be32_to_cpu(phys_size) /
@@ -370,7 +370,7 @@ struct inode *hfs_iget(struct super_block *sb, struct hfs_cat_key *key, hfs_cat_
 }
 
 void hfs_inode_write_fork(struct inode *inode, struct hfs_extent *ext,
-			  u32 *log_size, u32 *phys_size)
+			  __be32 *log_size, __be32 *phys_size)
 {
 	memcpy(ext, HFS_I(inode)->first_extents, sizeof(hfs_extent_rec));
 
