@@ -114,11 +114,10 @@ static int tosh_fn_status(void)
 	if (tosh_fn!=0) {
 		scan = inb(tosh_fn);
 	} else {
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		outb(0x8e, 0xe4);
 		scan = inb(0xe5);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 
         return (int) scan;
@@ -141,35 +140,32 @@ static int tosh_emulate_fan(SMMRegisters *regs)
 	if (tosh_id==0xfccb) {
 		if (eax==0xfe00) {
 			/* fan status */
-			save_flags(flags);
-			cli();
+			local_irq_save(flags);
 			outb(0xbe, 0xe4);
 			al = inb(0xe5);
-			restore_flags(flags);
+			local_irq_restore(flags);
 			regs->eax = 0x00;
 			regs->ecx = (unsigned int) (al & 0x01);
 		}
 		if ((eax==0xff00) && (ecx==0x0000)) {
 			/* fan off */
-			save_flags(flags);
-			cli();
+			local_irq_save(flags);
 			outb(0xbe, 0xe4);
 			al = inb(0xe5);
 			outb(0xbe, 0xe4);
 			outb (al | 0x01, 0xe5);
-			restore_flags(flags);
+			local_irq_restore(flags);
 			regs->eax = 0x00;
 			regs->ecx = 0x00;
 		}
 		if ((eax==0xff00) && (ecx==0x0001)) {
 			/* fan on */
-			save_flags(flags);
-			cli();
+			local_irq_save(flags);
 			outb(0xbe, 0xe4);
 			al = inb(0xe5);
 			outb(0xbe, 0xe4);
 			outb(al & 0xfe, 0xe5);
-			restore_flags(flags);
+			local_irq_restore(flags);
 			regs->eax = 0x00;
 			regs->ecx = 0x01;
 		}
@@ -180,33 +176,30 @@ static int tosh_emulate_fan(SMMRegisters *regs)
 	if (tosh_id==0xfccc) {
 		if (eax==0xfe00) {
 			/* fan status */
-			save_flags(flags);
-			cli();
+			local_irq_save(flags);
 			outb(0xe0, 0xe4);
 			al = inb(0xe5);
-			restore_flags(flags);
+			local_irq_restore(flags);
 			regs->eax = 0x00;
 			regs->ecx = al & 0x01;
 		}
 		if ((eax==0xff00) && (ecx==0x0000)) {
 			/* fan off */
-			save_flags(flags);
-			cli();
+			local_irq_save(flags);
 			outb(0xe0, 0xe4);
 			al = inb(0xe5);
 			outw(0xe0 | ((al & 0xfe) << 8), 0xe4);
-			restore_flags(flags);
+			local_irq_restore(flags);
 			regs->eax = 0x00;
 			regs->ecx = 0x00;
 		}
 		if ((eax==0xff00) && (ecx==0x0001)) {
 			/* fan on */
-			save_flags(flags);
-			cli();
+			local_irq_save(flags);
 			outb(0xe0, 0xe4);
 			al = inb(0xe5);
 			outw(0xe0 | ((al | 0x01) << 8), 0xe4);
-			restore_flags(flags);
+			local_irq_restore(flags);
 			regs->eax = 0x00;
 			regs->ecx = 0x01;
 		}
