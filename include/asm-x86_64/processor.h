@@ -269,7 +269,7 @@ struct mm_struct;
 extern void release_thread(struct task_struct *);
 
 /* Prepare to copy thread state - unlazy all lazy status */
-#define prepare_to_copy(tsk)	do { } while (0)
+extern void prepare_to_copy(struct task_struct *tsk);
 
 /*
  * create a kernel thread without removing it from tasklists
@@ -308,8 +308,8 @@ extern inline void sync_core(void)
 #define ARCH_HAS_PREFETCHW
 #define ARCH_HAS_SPINLOCK_PREFETCH
 
-#define prefetch(x) __builtin_prefetch((x),0)
-#define prefetchw(x) __builtin_prefetch((x),1)
+#define prefetch(x) __builtin_prefetch((x),0,1)
+#define prefetchw(x) __builtin_prefetch((x),1,1)
 #define spin_lock_prefetch(x)  prefetchw(x)
 #define cpu_relax()   rep_nop()
 

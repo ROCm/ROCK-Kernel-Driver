@@ -8,7 +8,7 @@
  * This allows to access 64bit processes too; but there is no way to see the extended 
  * register contents.
  *
- * $Id: ptrace32.c,v 1.12 2002/03/24 13:02:02 ak Exp $
+ * $Id: ptrace32.c,v 1.16 2003/03/14 16:06:35 ak Exp $
  */ 
 
 #include <linux/kernel.h>
@@ -22,11 +22,9 @@
 #include <asm/errno.h>
 #include <asm/debugreg.h>
 #include <asm/i387.h>
-#include <asm/desc.h>
-#include <asm/ldt.h>
 #include <asm/fpu32.h>
-#include <linux/mm.h>
 #include <linux/ptrace.h>
+#include <linux/mm.h>
 
 #define R32(l,q) \
 	case offsetof(struct user32, regs.l): stack[offsetof(struct pt_regs, q)/8] = val; break
@@ -39,29 +37,26 @@ static int putreg32(struct task_struct *child, unsigned regno, u32 val)
 	switch (regno) {
 	case offsetof(struct user32, regs.fs):
 		if (val && (val & 3) != 3) return -EIO; 
-	        child->thread.fs = val; 
+		child->thread.fs = val & 0xffff; 
 		break;
 	case offsetof(struct user32, regs.gs):
 		if (val && (val & 3) != 3) return -EIO; 
-		child->thread.gs = val;
+		child->thread.gs = val & 0xffff;
 		break;
 	case offsetof(struct user32, regs.ds):
 		if (val && (val & 3) != 3) return -EIO; 
-		child->thread.ds = val;
+		child->thread.ds = val & 0xffff;
 		break;
 	case offsetof(struct user32, regs.es):
-		if (val && (val & 3) != 3) return -EIO; 
-		child->thread.es = val;
+		child->thread.es = val & 0xffff;
 		break;
-
 	case offsetof(struct user32, regs.ss): 
 		if ((val & 3) != 3) return -EIO;
-		stack[offsetof(struct pt_regs, ss)/8] = val; 
+        	stack[offsetof(struct pt_regs, ss)/8] = val & 0xffff;
 		break;
-
 	case offsetof(struct user32, regs.cs): 
 		if ((val & 3) != 3) return -EIO;
-		stack[offsetof(struct pt_regs, cs)/8] = val; 
+		stack[offsetof(struct pt_regs, cs)/8] = val & 0xffff;
 		break;
 
 	R32(ebx, rbx); 
@@ -79,8 +74,16 @@ static int putreg32(struct task_struct *child, unsigned regno, u32 val)
 		stack[offsetof(struct pt_regs, eflags)/8] = val & 0x44dd5; 
 		break;
 
-	case offsetof(struct user32, u_debugreg[0]) ... offsetof(struct user32, u_debugreg[6]):
-		child->thread.debugreg[(regno-offsetof(struct user32, u_debugreg[0]))/4] = val; 
+	case offsetof(struct user32, u_debugreg[4]): 
+	case offsetof(struct user32, u_debugreg[5]):
+		return -EIO;
+
+	case offsetof(struct user32, u_debugreg[0]) ...
+	     offsetof(struct user32, u_debugreg[3]):
+	case offsetof(struct user32, u_debugreg[6]):
+		child->thread.debugreg
+			[(regno-offsetof(struct user32, u_debugreg[0]))/4] 
+			= val; 
 		break; 
 
 	case offsetof(struct user32, u_debugreg[7]):
@@ -170,11 +173,19 @@ static struct task_struct *find_target(int request, int pid, int *err)
 	if (child)
 		get_task_struct(child);
 	read_unlock(&tasklist_lock);
-	*err = ptrace_check_attach(child,0);
-	if (*err == 0)
+	if (child) { 
+		*err = -EPERM;
+		if (child->pid == 1) 
+			goto out;
+		*err = ptrace_check_attach(child, request == PTRACE_KILL); 
+		if (*err < 0) 
+			goto out;
 		return child; 
+	} 
+ out:
 	put_task_struct(child);
 	return NULL; 
+	
 } 
 
 extern asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, unsigned long data);
@@ -187,6 +198,9 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	__u32 val;
 
 	switch (request) { 
+	default:
+		return sys_ptrace(request, pid, addr, data); 
+
 	case PTRACE_PEEKTEXT:
 	case PTRACE_PEEKDATA:
 	case PTRACE_POKEDATA:
@@ -201,9 +215,6 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	case PTRACE_GETFPXREGS:
 		break;
 		
-	default:
-		ret = sys_ptrace(request, pid, addr, data); 
-		return ret;
 	} 
 
 	child = find_target(request, pid, &ret);
@@ -261,7 +272,6 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 			ret = -EIO;
 			break;
 		}
-		empty_fpu(child); 
 		ret = 0; 
 		for ( i = 0; i <= 16*4; i += sizeof(u32) ) {
 			ret |= __get_user(tmp, (u32 *) (unsigned long) data);
@@ -271,33 +281,47 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 		break;
 	}
 
-	case PTRACE_SETFPREGS:
-		empty_fpu(child); 
+	case PTRACE_GETFPREGS:
+		ret = -EIO; 
+		if (!access_ok(VERIFY_READ, (void *)(u64)data, 
+			       sizeof(struct user_i387_struct)))
+			break;
 		save_i387_ia32(child, (void *)(u64)data, childregs, 1);
 		ret = 0; 
 			break;
 
-	case PTRACE_GETFPREGS:
-		empty_fpu(child); 
-		restore_i387_ia32(child, (void *)(u64)data, 1);
+	case PTRACE_SETFPREGS:
+		ret = -EIO;
+		if (!access_ok(VERIFY_WRITE, (void *)(u64)data, 
+			       sizeof(struct user_i387_struct)))
+			break;
 		ret = 0;
+		/* don't check EFAULT to be bug-to-bug compatible to i386 */
+		restore_i387_ia32(child, (void *)(u64)data, 1);
 		break;
 
 	case PTRACE_GETFPXREGS: { 
 		struct user32_fxsr_struct *u = (void *)(u64)data; 
-		empty_fpu(child); 
-		ret = copy_to_user(u, &child->thread.i387.fxsave, sizeof(*u));
-		ret |= __put_user(childregs->cs, &u->fcs);
-		ret |= __put_user(child->thread.ds, &u->fos); 
-		if (ret) 
+		init_fpu(child); 
+		ret = -EIO;
+		if (!access_ok(VERIFY_WRITE, u, sizeof(*u)))
+			break;
 			ret = -EFAULT;
+		if (__copy_to_user(u, &child->thread.i387.fxsave, sizeof(*u)))
+			break;
+		ret = __put_user(childregs->cs, &u->fcs);
+		ret |= __put_user(child->thread.ds, &u->fos); 
 		break; 
 	} 
 	case PTRACE_SETFPXREGS: { 
 		struct user32_fxsr_struct *u = (void *)(u64)data; 
-		empty_fpu(child); 
-		/* no error checking to be bug to bug compatible with i386 */ 
-		copy_from_user(&child->thread.i387.fxsave, u, sizeof(*u));
+		unlazy_fpu(child);
+		ret = -EIO;
+		if (!access_ok(VERIFY_READ, u, sizeof(*u)))
+			break;
+		/* no checking to be bug-to-bug compatible with i386 */
+		__copy_from_user(&child->thread.i387.fxsave, u, sizeof(*u));
+		child->used_math = 1;
 	        child->thread.i387.fxsave.mxcsr &= 0xffbf;
 		ret = 0; 
 			break;

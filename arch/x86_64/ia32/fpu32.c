@@ -77,17 +77,20 @@ static inline int convert_fxsr_from_user(struct i387_fxsave_struct *fxsave,
 	struct _fpxreg *to;
 	struct _fpreg *from;
 	int i;
-	int err; 
-	__u32 v;
+	u32 v;
+	int err = 0;
 
-	err = __get_user(fxsave->cwd, &buf->cw); 
-	err |= __get_user(fxsave->swd, &buf->sw);
-	err |= __get_user(fxsave->twd, &buf->tag);
+#define G(num,val) err |= __get_user(val, num + (u32 *)buf)
+	G(0, fxsave->cwd);
+	G(1, fxsave->swd);
+	G(2, fxsave->twd);
 	fxsave->twd = twd_i387_to_fxsr(fxsave->twd);
-	err |= __get_user(fxsave->rip, &buf->ipoff); 
-	err |= __get_user(fxsave->rdp, &buf->dataoff); 
-	err |= __get_user(v, &buf->cssel); 
-	fxsave->fop = v >> 16;
+	G(3, fxsave->rip);
+	G(4, v);
+	fxsave->fop = v>>16;	/* cs ignored */
+	G(5, fxsave->rdp);
+	/* 6: ds ignored */
+#undef G
 	if (err) 
 		return -1; 
 
@@ -109,21 +112,29 @@ static inline int convert_fxsr_to_user(struct _fpstate_ia32 *buf,
 	struct _fpreg *to;
 	struct _fpxreg *from;
 	int i;
-	u32 ds; 
-	int err; 
+	u16 cs,ds; 
+	int err = 0; 
 
-	err = __put_user((unsigned long)fxsave->cwd | 0xffff0000, &buf->cw);
-	err |= __put_user((unsigned long)fxsave->swd | 0xffff0000, &buf->sw);
-	err |= __put_user((u32)fxsave->rip, &buf->ipoff); 
-	err |= __put_user((u32)(regs->cs | ((u32)fxsave->fop << 16)), 
-			  &buf->cssel); 
-	err |= __put_user((u32)twd_fxsr_to_i387(fxsave), &buf->tag); 
-	err |= __put_user((u32)fxsave->rdp, &buf->dataoff); 
-	if (tsk == current) 
-		asm("movl %%ds,%0 " : "=r" (ds)); 
-	else /* ptrace. task has stopped. */
+	if (tsk == current) {
+		/* should be actually ds/cs at fpu exception time,
+		   but that information is not available in 64bit mode. */
+		asm("movw %%ds,%0 " : "=r" (ds)); 
+		asm("movw %%cs,%0 " : "=r" (cs)); 		
+	} else { /* ptrace. task has stopped. */
 		ds = tsk->thread.ds;
-	err |= __put_user(ds, &buf->datasel); 
+		cs = regs->cs;
+	} 
+
+#define P(num,val) err |= __put_user(val, num + (u32 *)buf)
+	P(0, (u32)fxsave->cwd | 0xffff0000);
+	P(1, (u32)fxsave->swd | 0xffff0000);
+	P(2, twd_fxsr_to_i387(fxsave));
+	P(3, (u32)fxsave->rip);
+	P(4,  cs | ((u32)fxsave->fop) << 16); 
+	P(5, fxsave->rdp);
+	P(6, 0xffff0000 | ds);
+#undef P
+
 	if (err) 
 		return -1; 
 
@@ -144,9 +155,9 @@ int restore_i387_ia32(struct task_struct *tsk, struct _fpstate_ia32 *buf, int fs
 				     &buf->_fxsr_env[0],
 				     sizeof(struct i387_fxsave_struct)))
 			return -1;
-	} 
 	tsk->thread.i387.fxsave.mxcsr &= 0xffbf;
-	current->used_math = 1;
+		tsk->used_math = 1;
+	} 
 	return convert_fxsr_from_user(&tsk->thread.i387.fxsave, buf);
 }  
 
@@ -157,12 +168,11 @@ int save_i387_ia32(struct task_struct *tsk,
 {
 	int err = 0;
 
-	if (!tsk->used_math) 
-		return 0;
-	tsk->used_math = 0; 
-	unlazy_fpu(tsk);
+	init_fpu(tsk);
 	if (convert_fxsr_to_user(buf, &tsk->thread.i387.fxsave, regs, tsk))
 		return -1;
+	if (fsave)
+		return 0;
 	err |= __put_user(tsk->thread.i387.fxsave.swd, &buf->status);
 	if (fsave) 
 		return err ? -1 : 1; 	

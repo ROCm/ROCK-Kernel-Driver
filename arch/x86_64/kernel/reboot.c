@@ -101,7 +101,6 @@ void machine_restart(char * __unused)
 	 * Stop all CPUs and turn off local APICs and the IO-APIC, so
 	 * other OSs see a clean IRQ state.
 	 */
-	if (notify_die(DIE_STOP,"cpustop",0,0) != NOTIFY_BAD)
 	smp_send_stop();
 	disable_IO_APIC();
 #endif

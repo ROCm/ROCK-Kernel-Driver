@@ -187,12 +187,58 @@ ipc_parse_version32 (int *cmd)
 	}
 }
 
+static int put_semid(void *user_semid, struct semid64_ds *s, int version)
+{
+	int err2;
+	switch (version) { 
+	case IPC_64: { 
+		struct semid64_ds32 *usp64 = (struct semid64_ds32 *) user_semid;
+		
+		if (!access_ok(VERIFY_WRITE, usp64, sizeof(*usp64))) {
+			err2 = -EFAULT;
+			break;
+		} 
+		err2 = __put_user(s->sem_perm.key, &usp64->sem_perm.key);
+		err2 |= __put_user(s->sem_perm.uid, &usp64->sem_perm.uid);
+		err2 |= __put_user(s->sem_perm.gid, &usp64->sem_perm.gid);
+		err2 |= __put_user(s->sem_perm.cuid, &usp64->sem_perm.cuid);
+		err2 |= __put_user(s->sem_perm.cgid, &usp64->sem_perm.cgid);
+		err2 |= __put_user(s->sem_perm.mode, &usp64->sem_perm.mode);
+		err2 |= __put_user(s->sem_perm.seq, &usp64->sem_perm.seq);
+		err2 |= __put_user(s->sem_otime, &usp64->sem_otime);
+		err2 |= __put_user(s->sem_ctime, &usp64->sem_ctime);
+		err2 |= __put_user(s->sem_nsems, &usp64->sem_nsems);
+		break;
+	}
+	default: {
+		struct semid_ds32 *usp32 = (struct semid_ds32 *) user_semid;
+		
+		if (!access_ok(VERIFY_WRITE, usp32, sizeof(*usp32))) {
+			err2 = -EFAULT;
+			break;
+		} 
+		err2 = __put_user(s->sem_perm.key, &usp32->sem_perm.key);
+		err2 |= __put_user(s->sem_perm.uid, &usp32->sem_perm.uid);
+		err2 |= __put_user(s->sem_perm.gid, &usp32->sem_perm.gid);
+		err2 |= __put_user(s->sem_perm.cuid, &usp32->sem_perm.cuid);
+		err2 |= __put_user(s->sem_perm.cgid, &usp32->sem_perm.cgid);
+		err2 |= __put_user(s->sem_perm.mode, &usp32->sem_perm.mode);
+		err2 |= __put_user(s->sem_perm.seq, &usp32->sem_perm.seq);
+		err2 |= __put_user(s->sem_otime, &usp32->sem_otime);
+		err2 |= __put_user(s->sem_ctime, &usp32->sem_ctime);
+		err2 |= __put_user(s->sem_nsems, &usp32->sem_nsems);
+		break;
+	}
+	}
+	return err2;
+}
+
 static int
 semctl32 (int first, int second, int third, void *uptr)
 {
 	union semun fourth;
 	u32 pad;
-	int err = 0, err2;
+	int err;
 	struct semid64_ds s;
 	mm_segment_t old_fs;
 	int version = ipc_parse_version32(&third);
@@ -225,46 +271,10 @@ semctl32 (int first, int second, int third, void *uptr)
 		fourth.__pad = &s;
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		err = sys_semctl(first, second|IPC_64, third, fourth);
+		err = sys_semctl(first, second, third|IPC_64, fourth);
 		set_fs(old_fs);
-
-		if (version == IPC_64) {
-			struct semid64_ds32 *usp64 = (struct semid64_ds32 *) A(pad);
-
-			if (!access_ok(VERIFY_WRITE, usp64, sizeof(*usp64))) {
-				err = -EFAULT;
-				break;
-			}
-			err2 = __put_user(s.sem_perm.key, &usp64->sem_perm.key);
-			err2 |= __put_user(s.sem_perm.uid, &usp64->sem_perm.uid);
-			err2 |= __put_user(s.sem_perm.gid, &usp64->sem_perm.gid);
-			err2 |= __put_user(s.sem_perm.cuid, &usp64->sem_perm.cuid);
-			err2 |= __put_user(s.sem_perm.cgid, &usp64->sem_perm.cgid);
-			err2 |= __put_user(s.sem_perm.mode, &usp64->sem_perm.mode);
-			err2 |= __put_user(s.sem_perm.seq, &usp64->sem_perm.seq);
-			err2 |= __put_user(s.sem_otime, &usp64->sem_otime);
-			err2 |= __put_user(s.sem_ctime, &usp64->sem_ctime);
-			err2 |= __put_user(s.sem_nsems, &usp64->sem_nsems);
-		} else {
-			struct semid_ds32 *usp32 = (struct semid_ds32 *) A(pad);
-
-			if (!access_ok(VERIFY_WRITE, usp32, sizeof(*usp32))) {
-				err = -EFAULT;
-				break;
-			}
-			err2 = __put_user(s.sem_perm.key, &usp32->sem_perm.key);
-			err2 |= __put_user(s.sem_perm.uid, &usp32->sem_perm.uid);
-			err2 |= __put_user(s.sem_perm.gid, &usp32->sem_perm.gid);
-			err2 |= __put_user(s.sem_perm.cuid, &usp32->sem_perm.cuid);
-			err2 |= __put_user(s.sem_perm.cgid, &usp32->sem_perm.cgid);
-			err2 |= __put_user(s.sem_perm.mode, &usp32->sem_perm.mode);
-			err2 |= __put_user(s.sem_perm.seq, &usp32->sem_perm.seq);
-			err2 |= __put_user(s.sem_otime, &usp32->sem_otime);
-			err2 |= __put_user(s.sem_ctime, &usp32->sem_ctime);
-			err2 |= __put_user(s.sem_nsems, &usp32->sem_nsems);
-		}
-		if (err2)
-		    err = -EFAULT;
+		if (!err)
+			err = put_semid((void *)A(pad), &s, version);
 		break;
 	default:
 		err = -EINVAL;
@@ -343,6 +353,7 @@ out:
 	return err;
 }
 
+
 static int
 msgctl32 (int first, int second, void *uptr)
 {
@@ -387,7 +398,6 @@ msgctl32 (int first, int second, void *uptr)
 		set_fs(KERNEL_DS);
 		err = sys_msgctl(first, second|IPC_64, (void *) &m64);
 		set_fs(old_fs);
-
 		if (version == IPC_64) {
 			if (!access_ok(VERIFY_WRITE, up64, sizeof(*up64))) {
 				err = -EFAULT;
@@ -608,7 +618,9 @@ shmctl32 (int first, int second, void *uptr)
 		if (err2)
 			err = -EFAULT;
 		break;
-
+	default:
+		err = -EINVAL;
+		break;
 	}
 	return err;
 }

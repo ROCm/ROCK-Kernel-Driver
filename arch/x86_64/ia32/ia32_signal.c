@@ -47,9 +47,16 @@ static int ia32_copy_siginfo_to_user(siginfo_t32 *to, siginfo_t *from)
 {
 	if (!access_ok (VERIFY_WRITE, to, sizeof(siginfo_t)))
 		return -EFAULT;
-	if (from->si_code < 0)
-		return __copy_to_user(to, from, sizeof(siginfo_t));
-	else {
+	if (from->si_code < 0) { 
+		/* the only field that's different is the alignment
+		   of the pointer in sigval_t. Move that 4 bytes down including
+		   padding. */
+		memmove(&((siginfo_t32 *)&from)->si_int,
+			&from->si_int, 
+			sizeof(siginfo_t) - offsetof(siginfo_t, si_int));
+		/* last 4 bytes stay the same */
+		return __copy_to_user(to, from, sizeof(siginfo_t32));
+	} else {
 		int err;
 
 		/* If you change siginfo_t structure, please be sure
@@ -59,7 +66,7 @@ static int ia32_copy_siginfo_to_user(siginfo_t32 *to, siginfo_t *from)
 		   3 ints plus the relevant union member.  */
 		err = __put_user(from->si_signo, &to->si_signo);
 		err |= __put_user(from->si_errno, &to->si_errno);
-		err |= __put_user((short)from->si_code, &to->si_code);
+		err |= __put_user(from->si_code, &to->si_code);
 		/* First 32bits of unions are always present.  */
 		err |= __put_user(from->si_pid, &to->si_pid);
 		switch (from->si_code >> 16) {
@@ -108,6 +115,7 @@ sys32_sigaltstack(const stack_ia32_t *uss_ptr, stack_ia32_t *uoss_ptr,
 	mm_segment_t seg; 
 	if (uss_ptr) { 
 		u32 ptr;
+		memset(&uss,0,sizeof(stack_t));
 	if (!access_ok(VERIFY_READ,uss_ptr,sizeof(stack_ia32_t)) ||
 		    __get_user(ptr, &uss_ptr->ss_sp) ||
 		    __get_user(uss.ss_flags, &uss_ptr->ss_flags) ||
@@ -340,8 +348,11 @@ ia32_setup_sigcontext(struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate,
 	tmp = save_i387_ia32(current, fpstate, regs, 0);
 	if (tmp < 0)
 	  err = -EFAULT;
-	else
+	else { 
+		current->used_math = 0;
+		stts();
 	  err |= __put_user((u32)(u64)(tmp ? fpstate : NULL), &sc->fpstate);
+	}
 
 	/* non-iBCS2 extensions.. */
 	err |= __put_user(mask, &sc->oldmask);

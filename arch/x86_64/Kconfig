@@ -179,9 +179,7 @@ config SMP
 
 	  If you don't know what to do here, say N.
 
-# broken currently
 config PREEMPT
-	depends on NOT_WORKING
 	bool "Preemptible Kernel"
 	---help---
 	  This option reduces the latency of the kernel when reacting to
@@ -200,7 +198,7 @@ config PREEMPT
 # someone write a better help text please.
 config K8_NUMA
        bool "K8 NUMA support"
-       depends on SMP && NOT_WORKING
+       depends on SMP
        help
 	  Enable NUMA (Non Unified Memory Architecture) support for
 	  AMD Opteron Multiprocessor systems. The kernel will try to allocate
@@ -590,10 +588,8 @@ config DEBUG_SLAB
 	  allocation as well as poisoning memory on free to catch use of freed
 	  memory.
 
-#   bool '  Memory mapped I/O debugging' CONFIG_DEBUG_IOVIRT
 config MAGIC_SYSRQ
 	bool "Magic SysRq key"
-	depends on DEBUG_KERNEL
 	help
 	  If you say Y here, you will have some control over the system even
 	  if the system crashes for example during kernel debugging (e.g., you
@@ -639,13 +635,36 @@ config KALLSYMS
 
 config FRAME_POINTER
        bool "Compile the kernel with frame pointers"
-       depends on DEBUG_KERNEL	
        help
 	 Compile the kernel with frame pointers. This may help for some 
 	 debugging with external debuggers. Note the standard oops backtracer 
-	 doesn't make use of it and the x86-64 kernel doesn't ensure an consistent
+	 doesn't make use of this  and the x86-64 kernel doesn't ensure an consistent
 	 frame pointer through inline assembly (semaphores etc.)
 	 Normally you should say N.
+
+config IOMMU_DEBUG
+       bool "Force IOMMU to on" 
+       help
+         Force the IOMMU to on even when you have less than 4GB of memory and add 
+	 debugging code. 
+	 Can be disabled at boot time with iommu=noforce.
+
+config IOMMU_LEAK
+       bool "IOMMU leak tracing"
+       depends on DEBUG_KERNEL
+       help
+         Add a simple leak tracer to the IOMMU code. This is useful when you
+	 are debugging a buggy device driver that leaks IOMMU mappings.
+       
+config MCE_DEBUG
+       bool "K8 Machine check debugging mode"
+       default y 
+       help
+         Turn on all Machine Check debugging for device driver problems.	  
+	 This can cause panics, but is useful to find device driver problems.
+
+#config X86_REMOTE_DEBUG
+#       bool "kgdb debugging stub"
 
 endmenu
 

@@ -22,18 +22,18 @@
 struct save_context_frame { 
 	unsigned long rbp; 
 	unsigned long rbx;
+	unsigned long r11;
+	unsigned long r10;
+	unsigned long r9;
+	unsigned long r8;
 	unsigned long rcx;
 	unsigned long rdx;	
-	unsigned long rsi;
-	unsigned long rdi; 
 	unsigned long r15;
 	unsigned long r14;
 	unsigned long r13;
 	unsigned long r12;
-	unsigned long r11;
-	unsigned long r10;
-	unsigned long r9;
-	unsigned long r8; 
+	unsigned long rdi;
+	unsigned long rsi;
 }; 
 
 /* frame pointer must be last for get_wchan */
@@ -43,19 +43,20 @@ struct save_context_frame {
    rbp needs to be always explicitely saved because gcc cannot clobber the
    frame pointer and the scheduler is compiled with frame pointers. -AK */
 #define SAVE_CONTEXT \
-	__PUSH(r8) __PUSH(r9) __PUSH(r10) __PUSH(r11) __PUSH(r12) __PUSH(r13) \
-	__PUSH(r14) __PUSH(r15) \
-	__PUSH(rdi) __PUSH(rsi) \
-	__PUSH(rdx) __PUSH(rcx) \
+	__PUSH(rsi) __PUSH(rdi) \
+    __PUSH(r12) __PUSH(r13) __PUSH(r14) __PUSH(r15)  \
+	__PUSH(rdx) __PUSH(rcx) __PUSH(r8) __PUSH(r9) __PUSH(r10) __PUSH(r11)  \
 	__PUSH(rbx) __PUSH(rbp) 
 #define RESTORE_CONTEXT \
 	__POP(rbp) __POP(rbx) \
-	__POP(rcx) __POP(rdx) \
-	__POP(rsi) __POP(rdi) \
-	__POP(r15) __POP(r14) __POP(r13) __POP(r12) __POP(r11) __POP(r10) \
-	__POP(r9) __POP(r8)
+	__POP(r11) __POP(r10) __POP(r9) __POP(r8) __POP(rcx) __POP(rdx) \
+	__POP(r15) __POP(r14) __POP(r13) __POP(r12) \
+	__POP(rdi) __POP(rsi)
 
 /* RED-PEN: pipeline stall on ret because it is not predicted */
+/* RED-PEN: the register saving could be optimized */
+/* frame pointer must be last for get_wchan */
+
 #define switch_to(prev,next,last) \
 	asm volatile(SAVE_CONTEXT						    \
 		     "movq %%rsp,%[prevrsp]\n\t"				    \

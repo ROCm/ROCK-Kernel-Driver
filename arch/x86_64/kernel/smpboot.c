@@ -318,8 +318,6 @@ void __init smp_callin(void)
 	 */
  	smp_store_cpu_info(cpuid);
 
-	notify_die(DIE_CPUINIT, "cpuinit", NULL, 0);
-
 	local_irq_disable();
 
 	/*
@@ -898,6 +896,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 */
 	if (!skip_ioapic_setup && nr_ioapics)
 		setup_IO_APIC();
+	else
+		nr_ioapics = 0;
 
 	setup_boot_APIC_clock();
 

@@ -194,7 +194,7 @@ ENTRY(no_long_mode)
 	jmp	1b
 
 .org 0xf00
-pGDT32:
+ENTRY(pGDT32):
 	.word	gdt32_end-gdt_table32
 	.long	gdt_table32-__START_KERNEL_map
 
@@ -307,6 +307,15 @@ ENTRY(level3_physmem_pgt)
 	.quad	0x0000000000105007		/* -> level2_kernel_pgt (so that __va works even before pagetable_init) */
 
 .org 0xb000
+ENTRY(wakeup_level4_pgt)
+	.quad	0x0000000000102007		/* -> level3_ident_pgt */
+	.fill	255,8,0
+	.quad	0x000000000010a007
+	.fill	254,8,0
+	/* (2^48-(2*1024*1024*1024))/(2^39) = 511 */
+	.quad	0x0000000000103007		/* -> level3_kernel_pgt */
+
+.org 0xc000
 .data
 
 	.align 16
@@ -371,3 +380,4 @@ ENTRY(idt_table)
 	.quad   0
 	.quad 	0
 	.endr
+

@@ -57,6 +57,7 @@
 #include <linux/binfmts.h>
 #include <linux/init.h>
 #include <linux/aio_abi.h>
+#include <linux/aio.h>
 #include <linux/compat.h>
 #include <linux/vfs.h>
 #include <linux/ptrace.h>
@@ -74,6 +75,7 @@
 
 #define A(__x)		((unsigned long)(__x))
 #define AA(__x)		((unsigned long)(__x))
+#define u32_to_ptr(x)	((void *)(u64)(x))
 #define ROUND_UP(x,a)	((__typeof__(x))(((unsigned long)(x) + ((a) - 1)) & ~((a) - 1)))
 #define NAME_OFFSET(de) ((int) ((de)->d_name - (char *) (de)))
 
@@ -738,7 +740,7 @@ asmlinkage ssize_t sys_readv(unsigned long,const struct iovec *,unsigned long);
 asmlinkage ssize_t sys_writev(unsigned long,const struct iovec *,unsigned long);
 
 static struct iovec *
-get_compat_iovec(struct compat_iovec *iov32, struct iovec *iov_buf, u32 count, int type, int *errp)
+get_compat_iovec(struct compat_iovec *iov32, struct iovec *iov_buf, u32 *count, int type, int *errp)
 {
 	int i;
 	u32 buf, len;
@@ -747,15 +749,18 @@ get_compat_iovec(struct compat_iovec *iov32, struct iovec *iov_buf, u32 count, i
 
 	/* Get the "struct iovec" from user memory */
 
-	if (!count)
+	*errp = 0;
+	if (!*count)
 		return 0;
-	if (count > UIO_MAXIOV)
+	*errp = -EINVAL;
+	if (*count > UIO_MAXIOV)
 		return(struct iovec *)0;
-	if(verify_area(VERIFY_READ, iov32, sizeof(struct compat_iovec)*count))
+	*errp = -EFAULT;
+	if(verify_area(VERIFY_READ, iov32, sizeof(struct compat_iovec)*(*count)))
 		return(struct iovec *)0;
-	if (count > UIO_FASTIOV) {
+	if (*count > UIO_FASTIOV) {
 		*errp = -ENOMEM; 
-		iov = kmalloc(count*sizeof(struct iovec), GFP_KERNEL);
+		iov = kmalloc(*count*sizeof(struct iovec), GFP_KERNEL);
 		if (!iov)
 			return((struct iovec *)0);
 	} else
@@ -763,14 +768,19 @@ get_compat_iovec(struct compat_iovec *iov32, struct iovec *iov_buf, u32 count, i
 
 	ivp = iov;
 	totlen = 0;
-	for (i = 0; i < count; i++) {
+	for (i = 0; i < *count; i++) {
 		*errp = __get_user(len, &iov32->iov_len) |
 		  	__get_user(buf, &iov32->iov_base);	
 		if (*errp)
 			goto error;
 		*errp = verify_area(type, (void *)A(buf), len);
-		if (*errp) 
+		if (*errp) {
+			if (i > 0) { 
+				*count = i;
+				break;
+			} 
 			goto error;
+		}
 		/* SuS checks: */
 		*errp = -EINVAL; 
 		if ((int)len < 0)
@@ -799,7 +809,7 @@ sys32_readv(int fd, struct compat_iovec *vector, u32 count)
 	int ret;
 	mm_segment_t old_fs = get_fs();
 
-	if ((iov = get_compat_iovec(vector, iovstack, count, VERIFY_WRITE, &ret)) == NULL)
+	if ((iov = get_compat_iovec(vector, iovstack, &count, VERIFY_WRITE, &ret)) == NULL)
 		return ret;
 	set_fs(KERNEL_DS);
 	ret = sys_readv(fd, iov, count);
@@ -817,7 +827,7 @@ sys32_writev(int fd, struct compat_iovec *vector, u32 count)
 	int ret;
 	mm_segment_t old_fs = get_fs();
 
-	if ((iov = get_compat_iovec(vector, iovstack, count, VERIFY_READ, &ret)) == NULL)
+	if ((iov = get_compat_iovec(vector, iovstack, &count, VERIFY_READ, &ret)) == NULL)
 		return ret;
 	set_fs(KERNEL_DS);
 	ret = sys_writev(fd, iov, count);
@@ -1672,21 +1682,26 @@ static int nargs(u32 src, char **dst)
 	return cnt; 
 } 
 
-long sys32_execve(char *name, u32 argv, u32 envp, struct pt_regs regs)
+asmlinkage long sys32_execve(char *name, u32 argv, u32 envp, struct pt_regs regs)
 { 
 	mm_segment_t oldseg; 
-	char **buf; 
-	int na,ne;
+	char **buf = NULL; 
+	int na = 0,ne = 0;
 	int ret;
-	unsigned sz; 
+	unsigned sz = 0; 
 
+	if (argv) {
 	na = nargs(argv, NULL); 
 	if (na < 0) 
 		return -EFAULT; 
+	} 	
+	if (envp) { 
 	ne = nargs(envp, NULL); 
 	if (ne < 0) 
 		return -EFAULT; 
+	}
 
+	if (argv || envp) { 
 	sz = (na+ne)*sizeof(void *); 
 	if (sz > PAGE_SIZE) 
 		buf = vmalloc(sz); 
@@ -1694,14 +1709,19 @@ long sys32_execve(char *name, u32 argv, u32 envp, struct pt_regs regs)
 		buf = kmalloc(sz, GFP_KERNEL); 
 	if (!buf)
 		return -ENOMEM; 
+	} 
 	
+	if (argv) { 
 	ret = nargs(argv, buf);
 	if (ret < 0)
 		goto free;
+	}
 
+	if (envp) { 
 	ret = nargs(envp, buf + na); 
 	if (ret < 0)
 		goto free; 
+	}
 
 	name = getname(name); 
 	ret = PTR_ERR(name); 
@@ -1710,7 +1730,7 @@ long sys32_execve(char *name, u32 argv, u32 envp, struct pt_regs regs)
 
 	oldseg = get_fs(); 
 	set_fs(KERNEL_DS);
-	ret = do_execve(name, buf, buf+na, &regs);  
+	ret = do_execve(name, argv ? buf : NULL, envp ? buf+na : NULL, &regs);  
 	set_fs(oldseg); 
 
 	if (ret == 0)
@@ -1719,10 +1739,12 @@ long sys32_execve(char *name, u32 argv, u32 envp, struct pt_regs regs)
 	putname(name);
  
 free:
+	if (argv || envp) { 
 	if (sz > PAGE_SIZE)
 		vfree(buf); 
 	else
 	kfree(buf);
+	}
 	return ret; 
 } 
 
@@ -2012,12 +2034,8 @@ long asmlinkage sys32_nfsservctl(int cmd, void *notused, void *notused2)
 
 long sys32_module_warning(void)
 { 
-	static long warn_time = -(60*HZ); 
-	if (time_before(warn_time + 60*HZ,jiffies) && strcmp(current->comm,"klogd")) { 
 		printk(KERN_INFO "%s: 32bit 2.4.x modutils not supported on 64bit kernel\n",
 		       current->comm);
-		warn_time = jiffies;
-	} 
 	return -ENOSYS ;
 } 
 
@@ -2055,6 +2073,7 @@ long sys32_sched_getaffinity(pid_t pid, unsigned int len,
 	return err;
 }
 
+
 extern long sys_io_setup(unsigned nr_reqs, aio_context_t *ctx);
 
 long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)
@@ -2071,48 +2090,47 @@ long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)
 	return ret;
 } 
 
-extern asmlinkage long sys_io_submit(aio_context_t ctx_id, long nr,
-				     struct iocb **iocbpp);
-
-long sys32_io_submit(aio_context_t ctx_id, unsigned long nr,
+asmlinkage long sys32_io_submit(aio_context_t ctx_id, int nr,
 		   u32 *iocbpp)
 {
-	mm_segment_t oldfs = get_fs(); 
-	int k, err = 0;
-	struct iocb **iocb64; 
-	if (nr > 128) 
-		return -EINVAL; 
-	iocb64 = kmalloc(sizeof(struct iocb *) * nr, GFP_KERNEL);
-	if (!iocb64)
-		return -ENOMEM;
-	for (k = 0; k < nr && !err; k++) { 
-		u64 val1, val2;
-		u32 iocb32;
-		struct iocb *iocb; 	
-		err = get_user(iocb32, (u32 *)(u64)iocbpp[k]); 
-		iocb64[k] = iocb = (void *)(u64)iocb32; 
-		
-		if (get_user(val1, &iocb->aio_buf) ||
-		    get_user(val2, &iocb->aio_nbytes)) 
-			err = -EFAULT; 
-		else if (!val1) /* should check cmd */ 
-			;
-		else if (verify_area(VERIFY_WRITE, (void*)val1, val2))
-			err = -EFAULT; 
+	struct kioctx *ctx;
+	long ret = 0;
+	int i;
+	
+	if (unlikely(nr < 0))
+		return -EINVAL;
 
-		/* paranoia check - remove it when you are sure they
-		   are not pointers */
-		if (get_user(val1, &iocb->aio_reserved2) || val1 ||
-		    get_user(val2, &iocb->aio_reserved2) || val2)
-			err = -EFAULT; 		    		   
+	if (unlikely(!access_ok(VERIFY_READ, iocbpp, (nr*sizeof(*iocbpp)))))
+		return -EFAULT;
+
+	ctx = lookup_ioctx(ctx_id);
+	if (unlikely(!ctx)) {
+		pr_debug("EINVAL: io_submit: invalid context id\n");
+		return -EINVAL; 
 	} 
-	if (!err) {
-		set_fs(KERNEL_DS);
-		err = sys_io_submit(ctx_id, nr, iocb64);
-		set_fs(oldfs); 
+
+	for (i=0; i<nr; i++) {
+		u32 p32;
+		struct iocb *user_iocb, tmp;
+
+		if (unlikely(__get_user(p32, iocbpp + i))) {
+			ret = -EFAULT;
+			break;
 	} 
-	kfree(iocb64);
-	return err;		
+		user_iocb = u32_to_ptr(p32);
+
+		if (unlikely(copy_from_user(&tmp, user_iocb, sizeof(tmp)))) {
+			ret = -EFAULT;
+			break;
+		}
+
+		ret = io_submit_one(ctx, user_iocb, &tmp);
+		if (ret)
+			break;
+	}
+
+	put_ioctx(ctx);
+	return i ? i : ret;
 }
 
 extern asmlinkage long sys_io_getevents(aio_context_t ctx_id,
@@ -2140,7 +2158,7 @@ asmlinkage long sys32_io_getevents(aio_context_t ctx_id,
 	set_fs(KERNEL_DS); 
 	ret = sys_io_getevents(ctx_id,min_nr,nr,events,timeout ? &t : NULL); 
 	set_fs(oldfs); 
-	if (timeout && put_compat_timespec(&t, timeout))
+	if (!ret && timeout && put_compat_timespec(&t, timeout))
 		return -EFAULT; 		
 	return ret;
 } 
@@ -2172,12 +2190,8 @@ asmlinkage long sys32_open(const char * filename, int flags, int mode)
 
 long sys32_vm86_warning(void)
 { 
-	static long warn_time = -(60*HZ); 
-	if (time_before(warn_time + 60*HZ,jiffies)) { 
 		printk(KERN_INFO "%s: vm86 mode not supported on 64 bit kernel\n",
 		       current->comm);
-		warn_time = jiffies;
-	} 
 	return -ENOSYS ;
 } 
 

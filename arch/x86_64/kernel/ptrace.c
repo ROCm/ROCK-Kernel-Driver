@@ -240,8 +240,8 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		unsigned long tmp;
 
 		ret = -EIO;
-		if ((addr & 3) || addr < 0 || 
-		    addr > sizeof(struct user) - 3)
+		if ((addr & 7) || addr < 0 || 
+		    addr > sizeof(struct user) - 7)
 			break;
 
 		tmp = 0;  /* Default return condition */
@@ -250,7 +250,7 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		if(addr >= (long) &dummy->u_debugreg[0] &&
 		   addr <= (long) &dummy->u_debugreg[7]){
 			addr -= (long) &dummy->u_debugreg[0];
-			addr = addr >> 2;
+			addr = addr >> 3;
 			tmp = child->thread.debugreg[addr];
 		}
 		ret = put_user(tmp,(unsigned long *) data);
@@ -268,8 +268,8 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 
 	case PTRACE_POKEUSR: /* write the word at location addr in the USER area */
 		ret = -EIO;
-		if ((addr & 3) || addr < 0 || 
-		    addr > sizeof(struct user) - 3)
+		if ((addr & 7) || addr < 0 || 
+		    addr > sizeof(struct user) - 7)
 			break;
 
 		if (addr < sizeof(struct user_regs_struct)) {
@@ -290,6 +290,11 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 			  if(addr < (long) &dummy->u_debugreg[4] &&
 			     ((unsigned long) data) >= TASK_SIZE-3) break;
 			  
+			  if (addr == (long) &dummy->u_debugreg[6]) {
+				  if (data >> 32)
+					  goto out_tsk;
+			  }
+
 			  if(addr == (long) &dummy->u_debugreg[7]) {
 				  data &= ~DR_CONTROL_RESERVED;
 				  for(i=0; i<4; i++)
@@ -298,7 +303,7 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 			  }
 
 			  addr -= (long) &dummy->u_debugreg;
-			  addr = addr >> 2;
+			  addr = addr >> 3;
 			  child->thread.debugreg[addr] = data;
 			  ret = 0;
 		  }
