@@ -23,7 +23,7 @@
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *  TBD:
- *	1. Make # power/performance states dynamic.
+ *	1. Make # power states dynamic.
  *	2. Support duty_cycle values that span bit 4.
  *	3. Optimize by having scheduler determine business instead of
  *	   having us try to calculate it here.
@@ -986,14 +986,12 @@ acpi_processor_get_performance_states (
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found %d performance states\n", 
 		pss->package.count));
 
-	if (pss->package.count > ACPI_PROCESSOR_MAX_PERFORMANCE) {
-		pr->performance->state_count = ACPI_PROCESSOR_MAX_PERFORMANCE;
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-			"Limiting number of states to max (%d)\n", 
-			ACPI_PROCESSOR_MAX_PERFORMANCE));
+	pr->performance->state_count = pss->package.count;
+	pr->performance->states = kmalloc(sizeof(struct acpi_processor_px) * pss->package.count, GFP_KERNEL);
+	if (!pr->performance->states) {
+		result = -ENOMEM;
+		goto end;
 	}
-	else
-		pr->performance->state_count = pss->package.count;
 
 	for (i = 0; i < pr->performance->state_count; i++) {
 
@@ -1009,6 +1007,7 @@ acpi_processor_get_performance_states (
 		if (ACPI_FAILURE(status)) {
 			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSS data\n"));
 			result = -EFAULT;
+			kfree(pr->performance->states);
 			goto end;
 		}
 
@@ -1025,6 +1024,7 @@ acpi_processor_get_performance_states (
 		if (!px->core_frequency) {
 			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "core_frequency is 0\n"));
 			result = -EFAULT;
+			kfree(pr->performance->states);
 			goto end;
 		}
 	}
@@ -1281,6 +1281,7 @@ acpi_processor_unregister_performance (
 		return_VOID;
 	}
 
+	kfree(pr->performance->states);
 	pr->performance = NULL;
 
 	acpi_cpufreq_remove_file(pr);

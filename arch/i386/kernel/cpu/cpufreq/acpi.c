@@ -53,7 +53,7 @@ MODULE_LICENSE("GPL");
 
 struct cpufreq_acpi_io {
 	struct acpi_processor_performance	acpi_data;
-	struct cpufreq_frequency_table		freq_table[ACPI_PROCESSOR_MAX_PERFORMANCE];
+	struct cpufreq_frequency_table		*freq_table;
 };
 
 static struct cpufreq_acpi_io	*acpi_io_data[NR_CPUS];
@@ -263,6 +263,7 @@ acpi_cpufreq_cpu_init (
 	/* capability check */
 	if (data->acpi_data.state_count <= 1) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "No P-States\n"));
+		result = -ENODEV;
 		goto err_unreg;
 	}
 	if ((data->acpi_data.control_register.space_id != ACPI_ADR_SPACE_SYSTEM_IO) ||
@@ -270,6 +271,14 @@ acpi_cpufreq_cpu_init (
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unsupported address space [%d, %d]\n",
 				  (u32) (data->acpi_data.control_register.space_id),
 				  (u32) (data->acpi_data.status_register.space_id)));
+		result = -ENODEV;
+		goto err_unreg;
+	}
+
+	/* alloc freq_table */
+	data->freq_table = kmalloc(sizeof(struct cpufreq_frequency_table) * (data->acpi_data.state_count + 1), GFP_KERNEL);
+	if (!data->freq_table) {
+		result = -ENOMEM;
 		goto err_unreg;
 	}
 
@@ -298,6 +307,10 @@ acpi_cpufreq_cpu_init (
 	}
 
 	result = cpufreq_frequency_table_cpuinfo(policy, &data->freq_table[0]);
+	if (result) {
+		goto err_freqfree;
+	}
+		
 
 	printk(KERN_INFO "cpufreq: CPU%u - ACPI performance management activated.\n",
 	       cpu);
@@ -310,6 +323,8 @@ acpi_cpufreq_cpu_init (
 
 	return_VALUE(result);
 
+ err_freqfree:
+	kfree(data->freq_table);
  err_unreg:
 	acpi_processor_unregister_performance(&data->acpi_data, cpu);
  err_free:

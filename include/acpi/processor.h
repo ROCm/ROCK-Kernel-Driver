@@ -9,8 +9,6 @@
 #define ACPI_PROCESSOR_MAX_C2_LATENCY	100
 #define ACPI_PROCESSOR_MAX_C3_LATENCY	1000
 
-#define ACPI_PROCESSOR_MAX_PERFORMANCE	8
-
 #define ACPI_PROCESSOR_MAX_THROTTLING	16
 #define ACPI_PROCESSOR_MAX_THROTTLE	250	/* 25% */
 #define ACPI_PROCESSOR_MAX_DUTY_WIDTH	4
@@ -75,7 +73,7 @@ struct acpi_processor_performance {
 	struct acpi_pct_register control_register;
 	struct acpi_pct_register status_register;
 	unsigned int		 state_count;
-	struct acpi_processor_px states[ACPI_PROCESSOR_MAX_PERFORMANCE];
+	struct acpi_processor_px *states;
 
 	/* the _PDC objects passed by the driver, if any */
 	struct acpi_object_list *pdc;
