@@ -83,7 +83,7 @@ struct appIdentSuffix
 {
 	uint8_t		impUse[8];
 } __attribute__ ((packed));
- 
+
 /* Logical Volume Integrity Descriptor (UDF 2.01 2.2.6) */
 /* Implementation Use (UDF 2.01 2.2.6.4) */
 struct logicalVolIntegrityDescImpUse

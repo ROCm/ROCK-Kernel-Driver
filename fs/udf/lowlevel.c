@@ -71,15 +71,10 @@ unsigned long
 udf_get_last_block(struct super_block *sb)
 {
 	struct block_device *bdev = sb->s_bdev;
-	int ret;
 	unsigned long lblock = 0;
 
-	ret = ioctl_by_bdev(bdev, CDROM_LAST_WRITTEN, (unsigned long) &lblock);
-
-	if (ret) /* Hard Disk */
-	{
+	if (ioctl_by_bdev(bdev, CDROM_LAST_WRITTEN, (unsigned long) &lblock))
 		lblock = bdev->bd_inode->i_size >> sb->s_blocksize_bits;
-	}
 
 	if (lblock)
 		return lblock - 1;

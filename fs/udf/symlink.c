@@ -38,7 +38,7 @@
 #include <linux/buffer_head.h>
 #include "udf_i.h"
 
-static void udf_pc_to_char(char *from, int fromlen, char *to)
+static void udf_pc_to_char(struct super_block *sb, char *from, int fromlen, char *to)
 {
 	struct pathComponent *pc;
 	int elen = 0;
@@ -66,9 +66,9 @@ static void udf_pc_to_char(char *from, int fromlen, char *to)
 				/* that would be . - just ignore */
 				break;
 			case 5:
-				memcpy(p, pc->componentIdent, pc->lengthComponentIdent);
-				p += pc->lengthComponentIdent;
+				p += udf_get_filename(sb, pc->componentIdent, p, pc->lengthComponentIdent);
 				*p++ = '/';
+				break;
 		}
 		elen += sizeof(struct pathComponent) + pc->lengthComponentIdent;
 	}
@@ -85,17 +85,10 @@ static int udf_symlink_filler(struct file *file, struct page *page)
 	char *symlink;
 	int err = -EIO;
 	char *p = kmap(page);
-	
+
 	lock_kernel();
 	if (UDF_I_ALLOCTYPE(inode) == ICBTAG_FLAG_AD_IN_ICB)
-	{
-		bh = udf_tread(inode->i_sb, inode->i_ino);
-
-		if (!bh)
-			goto out;
-
-		symlink = bh->b_data + udf_file_entry_alloc_offset(inode);
-	}
+		symlink = UDF_I_DATA(inode) + UDF_I_LENEATTR(inode);
 	else
 	{
 		bh = sb_bread(inode->i_sb, udf_block_map(inode, 0));
@@ -106,7 +99,7 @@ static int udf_symlink_filler(struct file *file, struct page *page)
 		symlink = bh->b_data;
 	}
 
-	udf_pc_to_char(symlink, inode->i_size, p);
+	udf_pc_to_char(inode->i_sb, symlink, inode->i_size, p);
 	udf_release_data(bh);
 
 	unlock_kernel();

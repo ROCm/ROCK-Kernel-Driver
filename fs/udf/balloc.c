@@ -461,8 +461,7 @@ static void udf_table_free_blocks(struct super_block * sb,
 	elen = 0;
 	obloc = nbloc = UDF_I_LOCATION(table);
 
-	obh = nbh = udf_tread(sb, udf_get_lb_pblock(sb, nbloc, 0));
-	atomic_inc(&nbh->b_count);
+	obh = nbh = NULL;
 
 	while (count && (etype =
 		udf_next_aext(table, &nbloc, &nextoffset, &eloc, &elen, &nbh, 1)) != -1)
@@ -506,7 +505,7 @@ static void udf_table_free_blocks(struct super_block * sb,
 			udf_write_aext(table, obloc, &oextoffset, eloc, elen, obh, 1);
 		}
 
-		if (memcmp(&nbloc, &obloc, sizeof(lb_addr)))
+		if (nbh != obh)
 		{
 			i = -1;
 			obloc = nbloc;
@@ -580,7 +579,10 @@ static void udf_table_free_blocks(struct super_block * sb,
 			{
 				loffset = nextoffset;
 				aed->lengthAllocDescs = cpu_to_le32(adsize);
-				sptr = (obh)->b_data + nextoffset - adsize;
+				if (obh)
+					sptr = UDF_I_DATA(inode) + nextoffset -  udf_file_entry_alloc_offset(inode) + UDF_I_LENEATTR(inode) - adsize;
+				else
+					sptr = obh->b_data + nextoffset - adsize;
 				dptr = nbh->b_data + sizeof(struct allocExtDesc);
 				memcpy(dptr, sptr, adsize);
 				nextoffset = sizeof(struct allocExtDesc) + adsize;
@@ -591,8 +593,8 @@ static void udf_table_free_blocks(struct super_block * sb,
 				aed->lengthAllocDescs = cpu_to_le32(0);
 				sptr = (obh)->b_data + nextoffset;
 				nextoffset = sizeof(struct allocExtDesc);
-	
-				if (memcmp(&UDF_I_LOCATION(table), &obloc, sizeof(lb_addr)))
+
+				if (obh)
 				{
 					aed = (struct allocExtDesc *)(obh)->b_data;
 					aed->lengthAllocDescs =
@@ -631,15 +633,20 @@ static void udf_table_free_blocks(struct super_block * sb,
 					break;
 				}
 			}
-			udf_update_tag(obh->b_data, loffset);
-			mark_buffer_dirty(obh);
+			if (obh)
+			{
+				udf_update_tag(obh->b_data, loffset);
+				mark_buffer_dirty(obh);
+			}
+			else
+				mark_inode_dirty(table);
 		}
 
 		if (elen) /* It's possible that stealing the block emptied the extent */
 		{
 			udf_write_aext(table, nbloc, &nextoffset, eloc, elen, nbh, 1);
 
-			if (!memcmp(&UDF_I_LOCATION(table), &nbloc, sizeof(lb_addr)))
+			if (!nbh)
 			{
 				UDF_I_LENALLOC(table) += adsize;
 				mark_inode_dirty(table);
@@ -690,7 +697,7 @@ static int udf_table_prealloc_blocks(struct super_block * sb,
 	extoffset = sizeof(struct unallocSpaceEntry);
 	bloc = UDF_I_LOCATION(table);
 
-	bh = udf_tread(sb, udf_get_lb_pblock(sb, bloc, 0));
+	bh = NULL;
 	eloc.logicalBlockNum = 0xFFFFFFFF;
 
 	while (first_block != eloc.logicalBlockNum && (etype =
@@ -768,8 +775,7 @@ static int udf_table_new_block(struct super_block * sb,
 	extoffset = sizeof(struct unallocSpaceEntry);
 	bloc = UDF_I_LOCATION(table);
 
-	goal_bh = bh = udf_tread(sb, udf_get_lb_pblock(sb, bloc, 0));
-	atomic_inc(&goal_bh->b_count);
+	goal_bh = bh = NULL;
 
 	while (spread && (etype =
 		udf_next_aext(table, &bloc, &extoffset, &eloc, &elen, &bh, 1)) != -1)
