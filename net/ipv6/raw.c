@@ -12,6 +12,7 @@
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
  *	YOSHIFUJI,H.@USAGI	:	raw checksum (RFC2292(bis) compliance) 
+ *	Kazunori MIYAZAWA @USAGI:	change process style to use ip6_append_data
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -29,6 +30,8 @@
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
 #include <linux/icmpv6.h>
+#include <linux/netfilter.h>
+#include <linux/netfilter_ipv6.h>
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
 
@@ -438,87 +441,115 @@ csum_copy_err:
 	goto out_free;
 }
 
-/*
- *	Sending...
- */
-
-struct rawv6_fakehdr {
-	struct iovec	*iov;
-	struct sock	*sk;
-	__u32		len;
-	__u32		cksum;
-	__u32		proto;
-	struct in6_addr *daddr;
-};
-
-static int rawv6_getfrag(const void *data, struct in6_addr *saddr, 
-			  char *buff, unsigned int offset, unsigned int len)
+static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct raw6_opt *opt, int len)
 {
-	struct iovec *iov = (struct iovec *) data;
+	struct sk_buff *skb;
+	int err = 0;
+	u16 *csum;
 
-	return memcpy_fromiovecend(buff, iov, offset, len);
-}
+	if ((skb = skb_peek(&sk->write_queue)) == NULL)
+		goto out;
 
-static int rawv6_frag_cksum(const void *data, struct in6_addr *addr,
-			     char *buff, unsigned int offset, 
-			     unsigned int len)
-{
-	struct rawv6_fakehdr *hdr = (struct rawv6_fakehdr *) data;
-	
-	if (csum_partial_copy_fromiovecend(buff, hdr->iov, offset, 
-						    len, &hdr->cksum))
-		return -EFAULT;
-	
-	if (offset == 0) {
-		struct sock *sk;
-		struct raw6_opt *opt;
-		struct in6_addr *daddr;
-		
-		sk = hdr->sk;
-		opt = raw6_sk(sk);
+	if (opt->offset + 1 < len)
+		csum = (u16 *)(skb->h.raw + opt->offset);
+	else {
+		err = -EINVAL;
+		goto out;
+	}
 
-		if (hdr->daddr)
-			daddr = hdr->daddr;
-		else
-			daddr = addr + 1;
-		
-		hdr->cksum = csum_ipv6_magic(addr, daddr, hdr->len,
-					     hdr->proto, hdr->cksum);
-		
-		if (opt->offset + 1 < len) {
-			__u16 *csum;
+	if (skb_queue_len(&sk->write_queue) == 1) {
+		/*
+		 * Only one fragment on the socket.
+		 */
+		/* should be check HW csum miyazawa */
+		*csum = csum_ipv6_magic(fl->fl6_src,
+					     fl->fl6_dst,
+					     len, fl->proto, skb->csum);
+	} else {
+		u32 tmp_csum = 0;
 
-			csum = (__u16 *) (buff + opt->offset);
-			if (*csum) {
-				/* in case cksum was not initialized */
-				__u32 sum = hdr->cksum;
-				sum += *csum;
-				*csum = hdr->cksum = (sum + (sum>>16));
-			} else {
-				*csum = hdr->cksum;
-			}
-		} else {
-			if (net_ratelimit())
-				printk(KERN_DEBUG "icmp: cksum offset too big\n");
-			return -EINVAL;
+		skb_queue_walk(&sk->write_queue, skb) {
+			tmp_csum = csum_add(tmp_csum, skb->csum);
 		}
-	}	
-	return 0; 
+
+		tmp_csum = csum_ipv6_magic(fl->fl6_src,
+					fl->fl6_dst,
+					len, fl->proto, tmp_csum);
+		*csum = tmp_csum;
+	}
+	if (*csum == 0)
+		*csum = -1;
+	ip6_push_pending_frames(sk);
+out:
+	return err;
 }
 
+static int rawv6_send_hdrinc(struct sock *sk, void *from, int length,
+			struct flowi *fl, struct rt6_info *rt, 
+			unsigned int flags)
+{
+	struct inet_opt *inet = inet_sk(sk);
+	struct ipv6hdr *iph;
+	struct sk_buff *skb;
+	unsigned int hh_len;
+	int err;
 
+	if (length > rt->u.dst.dev->mtu) {
+		ipv6_local_error(sk, EMSGSIZE, fl, rt->u.dst.dev->mtu);
+		return -EMSGSIZE;
+	}
+	if (flags&MSG_PROBE)
+		goto out;
+
+	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
+
+	skb = sock_alloc_send_skb(sk, length+hh_len+15,
+				  flags&MSG_DONTWAIT, &err);
+	if (skb == NULL)
+		goto error; 
+	skb_reserve(skb, hh_len);
+
+	skb->priority = sk->priority;
+	skb->dst = dst_clone(&rt->u.dst);
+
+	skb->nh.ipv6h = iph = (struct ipv6hdr *)skb_put(skb, length);
+
+	skb->ip_summed = CHECKSUM_NONE;
+
+	skb->h.raw = skb->nh.raw;
+	err = memcpy_fromiovecend((void *)iph, from, 0, length);
+	if (err)
+		goto error_fault;
+
+	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
+		      dst_output);
+	if (err > 0)
+		err = inet->recverr ? net_xmit_errno(err) : 0;
+	if (err)
+		goto error;
+out:
+	return 0;
+
+error_fault:
+	err = -EFAULT;
+	kfree_skb(skb);
+error:
+	IP6_INC_STATS(Ip6OutDiscards);
+	return err; 
+}
 static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, int len)
 {
 	struct ipv6_txoptions opt_space;
 	struct sockaddr_in6 * sin6 = (struct sockaddr_in6 *) msg->msg_name;
+	struct in6_addr *daddr, *saddr = NULL;
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
+	struct raw6_opt *raw_opt = raw6_sk(sk);
 	struct ipv6_txoptions *opt = NULL;
 	struct ip6_flowlabel *flowlabel = NULL;
+	struct dst_entry *dst = NULL;
 	struct flowi fl;
 	int addr_len = msg->msg_namelen;
-	struct in6_addr *daddr;
-	struct raw6_opt *raw_opt;
 	int hlimit = -1;
 	u16 proto;
 	int err;
@@ -552,6 +583,8 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 
 		if (!proto)
 			proto = inet->num;
+		else if (proto != inet->num)
+			return(-EINVAL);
 
 		if (proto > 255)
 			return(-EINVAL);
@@ -590,6 +623,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		 * unspecfied destination address 
 		 * treated as error... is this correct ?
 		 */
+		fl6_sock_release(flowlabel);
 		return(-EINVAL);
 	}
 
@@ -619,39 +653,71 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	if (flowlabel)
 		opt = fl6_merge_options(&opt_space, flowlabel, opt);
 
-	raw_opt = raw6_sk(sk);
-
 	fl.proto = proto;
 	fl.fl6_dst = daddr;
 	if (fl.fl6_src == NULL && !ipv6_addr_any(&np->saddr))
 		fl.fl6_src = &np->saddr;
 	fl.fl_icmp_type = 0;
 	fl.fl_icmp_code = 0;
-	
-	if (raw_opt->checksum) {
-		struct rawv6_fakehdr hdr;
-		
-		hdr.iov = msg->msg_iov;
-		hdr.sk  = sk;
-		hdr.len = len;
-		hdr.cksum = 0;
-		hdr.proto = proto;
 
-		if (opt && opt->srcrt)
-			hdr.daddr = daddr;
-		else
-			hdr.daddr = NULL;
-
-		err = ip6_build_xmit(sk, rawv6_frag_cksum, &hdr, &fl, len,
-				     opt, hlimit, msg->msg_flags);
-	} else {
-		err = ip6_build_xmit(sk, rawv6_getfrag, msg->msg_iov, &fl, len,
-				     opt, hlimit, msg->msg_flags);
+	/* merge ip6_build_xmit from ip6_output */
+	if (opt && opt->srcrt) {
+		struct rt0_hdr *rt0 = (struct rt0_hdr *) opt->srcrt;
+		fl.fl6_dst = rt0->addr;
 	}
 
-	fl6_sock_release(flowlabel);
+	if (!fl.oif && ipv6_addr_is_multicast(fl.nl_u.ip6_u.daddr))
+		fl.oif = np->mcast_oif;
 
+	err = ip6_dst_lookup(sk, &dst, &fl, &saddr);
+	if (err) goto out;
+
+	if (hlimit < 0) {
+		if (ipv6_addr_is_multicast(fl.fl6_dst))
+			hlimit = np->mcast_hops;
+		else
+			hlimit = np->hop_limit;
+		if (hlimit < 0)
+			hlimit = ((struct rt6_info*)dst)->rt6i_hoplimit;
+	}
+
+	if (msg->msg_flags&MSG_CONFIRM)
+		goto do_confirm;
+
+back_from_confirm:
+	if (inet->hdrincl) {
+		err = rawv6_send_hdrinc(sk, msg->msg_iov, len, &fl, (struct rt6_info*)dst, msg->msg_flags);
+	} else {
+		lock_sock(sk);
+		err = ip6_append_data(sk, ip_generic_getfrag, msg->msg_iov, len, 0,
+					hlimit, opt, &fl, (struct rt6_info*)dst, msg->msg_flags);
+
+		if (err)
+			ip6_flush_pending_frames(sk);
+		else if (!(msg->msg_flags & MSG_MORE)) {
+			if (raw_opt->checksum) {
+				err = rawv6_push_pending_frames(sk, &fl, raw_opt, len);
+			} else {
+				err = ip6_push_pending_frames(sk);
+			}
+		}
+	}
+done:
+	ip6_dst_store(sk, dst, fl.nl_u.ip6_u.daddr == &np->daddr ? &np->daddr : NULL);
+	if (err > 0)
+		err = np->recverr ? net_xmit_errno(err) : 0;
+
+	release_sock(sk);
+out:	
+	fl6_sock_release(flowlabel);
+	if (saddr) kfree(saddr);
 	return err<0?err:len;
+do_confirm:
+	dst_confirm(dst);
+	if (!(msg->msg_flags & MSG_PROBE) || len)
+		goto back_from_confirm;
+	err = 0;
+	goto done;
 }
 
 static int rawv6_seticmpfilter(struct sock *sk, int level, int optname, 
