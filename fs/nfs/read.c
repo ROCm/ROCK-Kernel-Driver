@@ -424,9 +424,14 @@ nfs_readpage_result(struct rpc_task *task)
 				memset(p + count, 0, PAGE_CACHE_SIZE - count);
 				kunmap(page);
 				count = 0;
-			} else
+				if (data->res.eof)
+					SetPageUptodate(page);
+				else
+					SetPageError(page);
+			} else {
 				count -= PAGE_CACHE_SIZE;
-			SetPageUptodate(page);
+				SetPageUptodate(page);
+			}
 		} else
 			SetPageError(page);
 		flush_dcache_page(page);
