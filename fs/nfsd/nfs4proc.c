@@ -55,12 +55,6 @@
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
 
-/* Note: The organization of the OPEN code seems a little strange; it
- * has been superfluously split into three routines, one of which is named
- * nfsd4_process_open2() even though there is no nfsd4_process_open1()!
- * This is because the code has been organized in anticipation of a
- * subsequent patch which will implement more of the NFSv4 state model.
- */
 static int
 do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
 {
