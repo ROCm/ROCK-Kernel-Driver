@@ -85,7 +85,8 @@ extern int udp6_proc_init(void);
 extern void udp6_proc_exit(void);
 extern int ipv6_misc_proc_init(void);
 extern void ipv6_misc_proc_exit(void);
-extern int anycast6_get_info(char *, char **, off_t, int);
+extern int ac6_proc_init(void);
+extern void ac6_proc_exit(void);
 extern int if6_proc_init(void);
 extern void if6_proc_exit(void);
 #endif
@@ -799,7 +800,7 @@ static int __init inet6_init(void)
 	if (ipv6_misc_proc_init())
 		goto proc_misc6_fail;
 
-	if (!proc_net_create("anycast6", 0, anycast6_get_info))
+	if (ac6_proc_init())
 		goto proc_anycast6_fail;
 	if (if6_proc_init())
 		goto proc_if6_fail;
@@ -825,7 +826,7 @@ static int __init inet6_init(void)
 
 #ifdef CONFIG_PROC_FS
 proc_if6_fail:
-	proc_net_remove("anycast6");
+	ac6_proc_exit();
 proc_anycast6_fail:
 	ipv6_misc_proc_exit();
 proc_misc6_fail:
@@ -863,7 +864,7 @@ static void inet6_exit(void)
 	sock_unregister(PF_INET6);
 #ifdef CONFIG_PROC_FS
 	if6_proc_exit();
- 	proc_net_remove("anycast6");
+	ac6_proc_exit();
  	ipv6_misc_proc_exit();
  	udp6_proc_exit();
  	tcp6_proc_exit();

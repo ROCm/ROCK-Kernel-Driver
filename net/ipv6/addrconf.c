@@ -66,6 +66,7 @@
 #include <net/ndisc.h>
 #include <net/ip6_route.h>
 #include <net/addrconf.h>
+#include <net/tcp.h>
 #include <net/ip.h>
 #include <linux/if_tunnel.h>
 #include <linux/rtnetlink.h>
@@ -701,7 +702,7 @@ retry:
 	ift = ipv6_count_addresses(idev) < IPV6_MAX_ADDRESSES ?
 		ipv6_add_addr(idev, &addr, tmp_plen,
 			      ipv6_addr_type(&addr)&IPV6_ADDR_SCOPE_MASK, IFA_F_TEMPORARY) : 0;
-	if (IS_ERR(ift)) {
+	if (!ift || IS_ERR(ift)) {
 		in6_dev_put(idev);
 		in6_ifa_put(ifp);
 		printk(KERN_INFO
@@ -967,6 +968,43 @@ struct inet6_ifaddr * ipv6_get_ifaddr(struct in6_addr *addr, struct net_device *
 	read_unlock_bh(&addrconf_hash_lock);
 
 	return ifp;
+}
+
+int ipv6_rcv_saddr_equal(const struct sock *sk, const struct sock *sk2)
+{
+	struct ipv6_pinfo *np = inet6_sk(sk);
+	int addr_type = ipv6_addr_type(&np->rcv_saddr);
+
+	if (!inet_sk(sk2)->rcv_saddr && !ipv6_only_sock(sk))
+		return 1;
+
+	if (sk2->sk_family == AF_INET6 &&
+	    ipv6_addr_any(&inet6_sk(sk2)->rcv_saddr) &&
+	    !(ipv6_only_sock(sk2) && addr_type == IPV6_ADDR_MAPPED))
+		return 1;
+
+	if (addr_type == IPV6_ADDR_ANY &&
+	    (!ipv6_only_sock(sk) ||
+	     !(sk2->sk_family == AF_INET6 ?
+	       (ipv6_addr_type(&inet6_sk(sk2)->rcv_saddr) == IPV6_ADDR_MAPPED) :
+	        1)))
+		return 1;
+
+	if (sk2->sk_family == AF_INET6 &&
+	    !ipv6_addr_cmp(&np->rcv_saddr,
+			   (sk2->sk_state != TCP_TIME_WAIT ?
+			    &inet6_sk(sk2)->rcv_saddr :
+			    &tcptw_sk(sk)->tw_v6_rcv_saddr)))
+		return 1;
+
+	if (addr_type == IPV6_ADDR_MAPPED &&
+	    !ipv6_only_sock(sk2) &&
+	    (!inet_sk(sk2)->rcv_saddr ||
+	     !inet_sk(sk)->rcv_saddr ||
+	     inet_sk(sk)->rcv_saddr == inet_sk(sk2)->rcv_saddr))
+		return 1;
+
+	return 0;
 }
 
 /* Gets referenced address, destroys ifaddr */
@@ -1372,7 +1410,7 @@ ok:
 				ifp = ipv6_add_addr(in6_dev, &addr, pinfo->prefix_len,
 						    addr_type&IPV6_ADDR_SCOPE_MASK, 0);
 
-			if (IS_ERR(ifp)) {
+			if (!ifp || IS_ERR(ifp)) {
 				in6_dev_put(in6_dev);
 				return;
 			}

@@ -29,6 +29,7 @@
 #include <linux/route.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include <net/sock.h>
 #include <net/snmp.h>
@@ -435,56 +436,159 @@ int ipv6_chk_acast_addr(struct net_device *dev, struct in6_addr *addr)
 
 
 #ifdef CONFIG_PROC_FS
-int anycast6_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	off_t pos=0, begin=0;
-	struct ifacaddr6 *im;
-	int len=0;
+struct ac6_iter_state {
 	struct net_device *dev;
-	
-	read_lock(&dev_base_lock);
-	for (dev = dev_base; dev; dev = dev->next) {
+	struct inet6_dev *idev;
+};
+
+#define ac6_seq_private(seq)	((struct ac6_iter_state *)&seq->private)
+
+static inline struct ifacaddr6 *ac6_get_first(struct seq_file *seq)
+{
+	struct ifacaddr6 *im = NULL;
+	struct ac6_iter_state *state = ac6_seq_private(seq);
+
+	for (state->dev = dev_base, state->idev = NULL;
+	     state->dev;
+	     state->dev = state->dev->next) {
 		struct inet6_dev *idev;
-
-		if ((idev = in6_dev_get(dev)) == NULL)
+		idev = in6_dev_get(state->dev);
+		if (!idev)
 			continue;
-
 		read_lock_bh(&idev->lock);
-		for (im = idev->ac_list; im; im = im->aca_next) {
-			int i;
-
-			len += sprintf(buffer+len,"%-4d %-15s ", dev->ifindex, dev->name);
-
-			for (i=0; i<16; i++)
-				len += sprintf(buffer+len, "%02x", im->aca_addr.s6_addr[i]);
-
-			len += sprintf(buffer+len, " %5d\n", im->aca_users);
-
-			pos=begin+len;
-			if (pos < offset) {
-				len=0;
-				begin=pos;
-			}
-			if (pos > offset+length) {
-				read_unlock_bh(&idev->lock);
-				in6_dev_put(idev);
-				goto done;
-			}
+		im = idev->ac_list;
+		if (im) {
+			state->idev = idev;
+			break;
 		}
 		read_unlock_bh(&idev->lock);
-		in6_dev_put(idev);
 	}
-
-done:
-	read_unlock(&dev_base_lock);
-
-	*start=buffer+(offset-begin);
-	len-=(offset-begin);
-	if(len>length)
-		len=length;
-	if (len<0)
-		len=0;
-	return len;
+	return im;
 }
 
+static struct ifacaddr6 *ac6_get_next(struct seq_file *seq, struct ifacaddr6 *im)
+{
+	struct ac6_iter_state *state = ac6_seq_private(seq);
+
+	im = im->aca_next;
+	while (!im) {
+		if (likely(state->idev != NULL)) {
+			read_unlock_bh(&state->idev->lock);
+			in6_dev_put(state->idev);
+		}
+		state->dev = state->dev->next;
+		if (!state->dev) {
+			state->idev = NULL;
+			break;
+		}
+		state->idev = in6_dev_get(state->dev);
+		if (!state->idev)
+			continue;
+		read_lock_bh(&state->idev->lock);
+		im = state->idev->ac_list;
+	}
+	return im;
+}
+
+static struct ifacaddr6 *ac6_get_idx(struct seq_file *seq, loff_t pos)
+{
+	struct ifacaddr6 *im = ac6_get_first(seq);
+	if (im)
+		while (pos && (im = ac6_get_next(seq, im)) != NULL)
+			--pos;
+	return pos ? NULL : im;
+}
+
+static void *ac6_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	read_lock(&dev_base_lock);
+	return *pos ? ac6_get_idx(seq, *pos) : ac6_get_first(seq);
+}
+
+static void *ac6_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct ifacaddr6 *im;
+	im = ac6_get_next(seq, v);
+	++*pos;
+	return im;
+}
+
+static void ac6_seq_stop(struct seq_file *seq, void *v)
+{
+	struct ac6_iter_state *state = ac6_seq_private(seq);
+	if (likely(state->idev != NULL)) {
+		read_unlock_bh(&state->idev->lock);
+		in6_dev_put(state->idev);
+	}
+	read_unlock(&dev_base_lock);
+}
+
+static int ac6_seq_show(struct seq_file *seq, void *v)
+{
+	struct ifacaddr6 *im = (struct ifacaddr6 *)v;
+	struct ac6_iter_state *state = ac6_seq_private(seq);
+
+	seq_printf(seq,
+		   "%-4d %-15s "
+		   "%04x%04x%04x%04x%04x%04x%04x%04x "
+		   "%5d\n",
+		   state->dev->ifindex, state->dev->name,
+		   NIP6(im->aca_addr),
+		   im->aca_users);
+	return 0;
+}
+
+static struct seq_operations ac6_seq_ops = {
+	.start	=	ac6_seq_start,
+	.next	=	ac6_seq_next,
+	.stop	=	ac6_seq_stop,
+	.show	=	ac6_seq_show,
+};
+
+static int ac6_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct ac6_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &ac6_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static struct file_operations ac6_seq_fops = {
+	.owner		=	THIS_MODULE,
+	.open		=	ac6_seq_open,
+	.read		=	seq_read,
+	.llseek		=	seq_lseek,
+	.release	=	seq_release_private,
+};
+
+int __init ac6_proc_init(void)
+{
+	struct proc_dir_entry *p;
+
+	p = create_proc_entry("anycast6", S_IRUGO, proc_net);
+	if (p)
+		p->proc_fops = &ac6_seq_fops;
+	return 0;
+}
+
+void ac6_proc_exit(void)
+{
+	proc_net_remove("anycast6");
+}
 #endif
+
