@@ -360,8 +360,10 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 		return -EINVAL;
 
 	policy = kmalloc(sizeof(struct cpufreq_policy), GFP_KERNEL);
-	if (!policy)
-		return -ENOMEM;
+	if (!policy) {
+		ret = -ENOMEM;
+		goto nomem_out;
+	}
 	memset(policy, 0, sizeof(struct cpufreq_policy));
 
 	policy->cpu = cpu;
@@ -410,7 +412,7 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	return 0;
 
 
- err_out_unregister:
+err_out_unregister:
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	cpufreq_cpu_data[cpu] = NULL;
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
@@ -418,8 +420,10 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	kobject_unregister(&policy->kobj);
 	wait_for_completion(&policy->kobj_unregister);
 
- err_out:
+err_out:
 	kfree(policy);
+
+nomem_out:
 	module_put(cpufreq_driver->owner);
 	return ret;
 }
