@@ -682,7 +682,7 @@ static struct Qdisc_class_ops atm_class_ops = {
 	.dump		=	atm_tc_dump_class,
 };
 
-struct Qdisc_ops atm_qdisc_ops = {
+static struct Qdisc_ops atm_qdisc_ops = {
 	.next		=	NULL,
 	.cl_ops		=	&atm_class_ops,
 	.id		=	"atm",
@@ -700,15 +700,15 @@ struct Qdisc_ops atm_qdisc_ops = {
 };
 
 
-#ifdef MODULE
-int init_module(void)
+static int __init atm_init(void)
 {
 	return register_qdisc(&atm_qdisc_ops);
 }
 
-
-void cleanup_module(void) 
+static void __exit atm_exit(void) 
 {
 	unregister_qdisc(&atm_qdisc_ops);
 }
-#endif
+
+module_init(atm_init)
+module_exit(atm_exit)

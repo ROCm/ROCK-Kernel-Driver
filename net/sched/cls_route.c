@@ -602,7 +602,7 @@ rtattr_failure:
 	return -1;
 }
 
-struct tcf_proto_ops cls_route4_ops = {
+static struct tcf_proto_ops cls_route4_ops = {
 	.next		=	NULL,
 	.kind		=	"route",
 	.classify	=	route4_classify,
@@ -617,15 +617,16 @@ struct tcf_proto_ops cls_route4_ops = {
 	.owner		=	THIS_MODULE,
 };
 
-#ifdef MODULE
-int init_module(void)
+static int __init init_route4(void)
 {
 	return register_tcf_proto_ops(&cls_route4_ops);
 }
 
-void cleanup_module(void)
+static void __exit exit_route4(void)
 {
 	unregister_tcf_proto_ops(&cls_route4_ops);
 }
-#endif
+
+module_init(init_route4)
+module_exit(exit_route4)
 MODULE_LICENSE("GPL");

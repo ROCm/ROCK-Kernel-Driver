@@ -684,7 +684,7 @@ rtattr_failure:
 	return -1;
 }
 
-struct tcf_proto_ops cls_u32_ops = {
+static struct tcf_proto_ops cls_u32_ops = {
 	.next		=	NULL,
 	.kind		=	"u32",
 	.classify	=	u32_classify,
@@ -699,15 +699,16 @@ struct tcf_proto_ops cls_u32_ops = {
 	.owner		=	THIS_MODULE,
 };
 
-#ifdef MODULE
-int init_module(void)
+static int __init init_u32(void)
 {
 	return register_tcf_proto_ops(&cls_u32_ops);
 }
 
-void cleanup_module(void) 
+static void __exit exit_u32(void) 
 {
 	unregister_tcf_proto_ops(&cls_u32_ops);
 }
-#endif
+
+module_init(init_u32)
+module_exit(exit_u32)
 MODULE_LICENSE("GPL");

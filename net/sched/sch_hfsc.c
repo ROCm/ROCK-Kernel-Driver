@@ -1831,7 +1831,7 @@ static struct Qdisc_class_ops hfsc_class_ops = {
 	.walk		= hfsc_walk
 };
 
-struct Qdisc_ops hfsc_qdisc_ops = {
+static struct Qdisc_ops hfsc_qdisc_ops = {
 	.id		= "hfsc",
 	.init		= hfsc_init_qdisc,
 	.change		= hfsc_change_qdisc,

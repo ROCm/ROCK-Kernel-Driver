@@ -440,9 +440,6 @@ int qdisc_new_estimator(struct tc_stats *stats, struct rtattr *opt);
 void qdisc_kill_estimator(struct tc_stats *stats);
 struct qdisc_rate_table *qdisc_get_rtab(struct tc_ratespec *r, struct rtattr *tab);
 void qdisc_put_rtab(struct qdisc_rate_table *tab);
-int teql_init(void);
-int tc_filter_init(void);
-int pktsched_init(void);
 
 extern int qdisc_restart(struct net_device *dev);
 

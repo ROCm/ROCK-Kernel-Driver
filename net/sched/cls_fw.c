@@ -347,7 +347,7 @@ rtattr_failure:
 	return -1;
 }
 
-struct tcf_proto_ops cls_fw_ops = {
+static struct tcf_proto_ops cls_fw_ops = {
 	.next		=	NULL,
 	.kind		=	"fw",
 	.classify	=	fw_classify,
@@ -362,15 +362,16 @@ struct tcf_proto_ops cls_fw_ops = {
 	.owner		=	THIS_MODULE,
 };
 
-#ifdef MODULE
-int init_module(void)
+static int __init init_fw(void)
 {
 	return register_tcf_proto_ops(&cls_fw_ops);
 }
 
-void cleanup_module(void) 
+static void __exit exit_fw(void) 
 {
 	unregister_tcf_proto_ops(&cls_fw_ops);
 }
-#endif
+
+module_init(init_fw)
+module_exit(exit_fw)
 MODULE_LICENSE("GPL");

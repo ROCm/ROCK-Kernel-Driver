@@ -447,7 +447,7 @@ static struct Qdisc_class_ops dsmark_class_ops = {
 	.dump		=	dsmark_dump_class,
 };
 
-struct Qdisc_ops dsmark_qdisc_ops = {
+static struct Qdisc_ops dsmark_qdisc_ops = {
 	.next		=	NULL,
 	.cl_ops		=	&dsmark_class_ops,
 	.id		=	"dsmark",
@@ -464,16 +464,14 @@ struct Qdisc_ops dsmark_qdisc_ops = {
 	.owner		=	THIS_MODULE,
 };
 
-#ifdef MODULE
-int init_module(void)
+static int __init dsmark_module_init(void)
 {
 	return register_qdisc(&dsmark_qdisc_ops);
 }
-
-
-void cleanup_module(void) 
+static void __exit dsmark_module_exit(void) 
 {
 	unregister_qdisc(&dsmark_qdisc_ops);
 }
-#endif
+module_init(dsmark_module_init)
+module_exit(dsmark_module_exit)
 MODULE_LICENSE("GPL");

@@ -510,7 +510,7 @@ static struct Qdisc_class_ops tbf_class_ops =
 	.dump		=	tbf_dump_class,
 };
 
-struct Qdisc_ops tbf_qdisc_ops = {
+static struct Qdisc_ops tbf_qdisc_ops = {
 	.next		=	NULL,
 	.cl_ops		=	&tbf_class_ops,
 	.id		=	"tbf",
@@ -527,16 +527,15 @@ struct Qdisc_ops tbf_qdisc_ops = {
 	.owner		=	THIS_MODULE,
 };
 
-
-#ifdef MODULE
-int init_module(void)
+static int __init tbf_module_init(void)
 {
 	return register_qdisc(&tbf_qdisc_ops);
 }
 
-void cleanup_module(void) 
+static void __exit tbf_module_exit(void) 
 {
 	unregister_qdisc(&tbf_qdisc_ops);
 }
-#endif
+module_init(tbf_module_init)
+module_exit(tbf_module_exit)
 MODULE_LICENSE("GPL");

@@ -382,7 +382,7 @@ static struct Qdisc_class_ops prio_class_ops = {
 	.dump		=	prio_dump_class,
 };
 
-struct Qdisc_ops prio_qdisc_ops = {
+static struct Qdisc_ops prio_qdisc_ops = {
 	.next		=	NULL,
 	.cl_ops		=	&prio_class_ops,
 	.id		=	"prio",
@@ -399,17 +399,17 @@ struct Qdisc_ops prio_qdisc_ops = {
 	.owner		=	THIS_MODULE,
 };
 
-#ifdef MODULE
-
-int init_module(void)
+static int __init prio_module_init(void)
 {
 	return register_qdisc(&prio_qdisc_ops);
 }
 
-void cleanup_module(void) 
+static void __exit prio_module_exit(void) 
 {
 	unregister_qdisc(&prio_qdisc_ops);
 }
 
-#endif
+module_init(prio_module_init)
+module_exit(prio_module_exit)
+
 MODULE_LICENSE("GPL");
