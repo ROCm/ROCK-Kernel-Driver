@@ -57,12 +57,7 @@ static spinlock_t wafwdt_lock;
  */
 
 static int wdt_stop = 0x843;
-module_param(wdt_stop, int, 0);
-MODULE_PARM_DESC(wdt_stop, "Wafer 5823 WDT 'stop' io port (default 0x843)");
-
 static int wdt_start = 0x443;
-module_param(wdt_start, int, 0);
-MODULE_PARM_DESC(wdt_start, "Wafer 5823 WDT 'start' io port (default 0x443)");
 
 static int timeout = WD_TIMO;  /* in seconds */
 module_param(timeout, int, 0);
@@ -269,7 +264,7 @@ static int __init wafwdt_init(void)
 
 	spin_lock_init(&wafwdt_lock);
 
-	if (timeout < 1 || timeout > 63) {
+	if (timeout < 1 || timeout > 255) {
 		timeout = WD_TIMO;
 		printk (KERN_INFO PFX "timeout value must be 1<=x<=255, using %d\n",
 			timeout);
