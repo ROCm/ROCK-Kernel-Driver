@@ -4,9 +4,97 @@
 
 #include <linux/device.h>
 #include <linux/module.h>
+#include <linux/init.h>
 #include "base.h"
 
 static LIST_HEAD(class_list);
+
+#define to_class_attr(_attr) container_of(_attr,struct devclass_attribute,attr)
+#define to_class(obj) container_of(obj,struct device_class,subsys.kobj)
+
+static ssize_t
+devclass_attr_show(struct kobject * kobj, struct attribute * attr,
+	      char * buf, size_t count, loff_t off)
+{
+	struct devclass_attribute * class_attr = to_class_attr(attr);
+	struct device_class * dc = to_class(kobj);
+	ssize_t ret = 0;
+
+	if (class_attr->show)
+		ret = class_attr->show(dc,buf,count,off);
+	return ret;
+}
+
+static ssize_t
+devclass_attr_store(struct kobject * kobj, struct attribute * attr,
+	       const char * buf, size_t count, loff_t off)
+{
+	struct devclass_attribute * class_attr = to_class_attr(attr);
+	struct device_class * dc = to_class(kobj);
+	ssize_t ret = 0;
+
+	if (class_attr->store)
+		ret = class_attr->store(dc,buf,count,off);
+	return ret;
+}
+
+static struct sysfs_ops class_sysfs_ops = {
+	show:	devclass_attr_show,
+	store:	devclass_attr_store,
+};
+
+static struct subsystem class_subsys = {
+	.kobj	= { .name = "class", },
+	.sysfs_ops	= &class_sysfs_ops,
+};
+
+
+int devclass_dev_link(struct device_class * cls, struct device * dev)
+{
+	char	linkname[16];
+	snprintf(linkname,16,"%u",dev->class_num);
+	return sysfs_create_link(&cls->devsubsys.kobj,&dev->kobj,linkname);
+}
+
+void devclass_dev_unlink(struct device_class * cls, struct device * dev)
+{
+	char	linkname[16];
+	snprintf(linkname,16,"%u",dev->class_num);
+	sysfs_remove_link(&cls->devsubsys.kobj,linkname);
+}
+
+int devclass_drv_link(struct device_driver * drv)
+{
+	char	name[KOBJ_NAME_LEN * 3];
+	snprintf(name,KOBJ_NAME_LEN * 3,"%s:%s",drv->bus->name,drv->name);
+	return sysfs_create_link(&drv->devclass->drvsubsys.kobj,&drv->kobj,name);
+}
+
+void devclass_drv_unlink(struct device_driver * drv)
+{
+	char	name[KOBJ_NAME_LEN * 3];
+	snprintf(name,KOBJ_NAME_LEN * 3,"%s:%s",drv->bus->name,drv->name);
+	return sysfs_remove_link(&drv->devclass->drvsubsys.kobj,name);
+}
+
+
+int devclass_create_file(struct device_class * cls, struct devclass_attribute * attr)
+{
+	int error;
+	if (cls) {
+		error = sysfs_create_file(&cls->subsys.kobj,&attr->attr);
+	} else
+		error = -EINVAL;
+	return error;
+}
+
+void devclass_remove_file(struct device_class * cls, struct devclass_attribute * attr)
+{
+	if (cls)
+		sysfs_remove_file(&cls->subsys.kobj,&attr->attr);
+}
+
+
 
 int devclass_add_driver(struct device_driver * drv)
 {
@@ -150,6 +238,18 @@ int devclass_register(struct device_class * cls)
 	cls->present = 1;
 	pr_debug("device class '%s': registering\n",cls->name);
 
+	strncpy(cls->subsys.kobj.name,cls->name,KOBJ_NAME_LEN);
+	cls->subsys.parent = &class_subsys;
+	subsystem_register(&cls->subsys);
+
+	snprintf(cls->devsubsys.kobj.name,"devices",KOBJ_NAME_LEN);
+	cls->devsubsys.parent = &cls->subsys;
+	subsystem_register(&cls->devsubsys);
+
+	snprintf(cls->drvsubsys.kobj.name,"drivers",KOBJ_NAME_LEN);
+	cls->drvsubsys.parent = &cls->subsys;
+	subsystem_register(&cls->drvsubsys);
+
 	spin_lock(&device_lock);
 	list_add_tail(&cls->node,&class_list);
 	spin_unlock(&device_lock);
@@ -166,6 +266,13 @@ void devclass_unregister(struct device_class * cls)
 	pr_debug("device class '%s': unregistering\n",cls->name);
 	put_devclass(cls);
 }
+
+static int __init class_subsys_init(void)
+{
+	return subsystem_register(&class_subsys);
+}
+
+core_initcall(class_subsys_init);
 
 EXPORT_SYMBOL(devclass_register);
 EXPORT_SYMBOL(devclass_unregister);

@@ -182,6 +182,9 @@ struct device_class {
 
 	u32			devnum;
 
+	struct subsystem	subsys;
+	struct subsystem	devsubsys;
+	struct subsystem	drvsubsys;
 	struct list_head	node;
 	struct list_head	drivers;
 	struct list_head	intf_list;
