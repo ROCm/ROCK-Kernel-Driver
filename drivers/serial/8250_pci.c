@@ -1068,6 +1068,9 @@ enum pci_board_num_t {
 	pbn_computone_6,
 	pbn_computone_8,
 	pbn_sbsxrsio,
+	pbn_exar_XR17C152,
+	pbn_exar_XR17C154,
+	pbn_exar_XR17C158,
 };
 
 /*
@@ -1488,7 +1491,30 @@ static struct pci_board pci_boards[] __devinitdata = {
 		.base_baud	= 460800,
 		.uart_offset	= 256,
 		.reg_shift	= 4,
-	}
+	},
+	/*
+	 * Exar Corp. XR17C15[248] Dual/Quad/Octal UART
+	 *  Only basic 16550A support.
+	 *  XR17C15[24] are not tested, but they should work.
+	 */
+	[pbn_exar_XR17C152] = {
+		.flags		= FL_BASE0,
+		.num_ports	= 2,
+		.base_baud	= 921600,
+		.uart_offset	= 0x200,
+	},
+	[pbn_exar_XR17C154] = {
+		.flags		= FL_BASE0,
+		.num_ports	= 4,
+		.base_baud	= 921600,
+		.uart_offset	= 0x200,
+	},
+	[pbn_exar_XR17C158] = {
+		.flags		= FL_BASE0,
+		.num_ports	= 8,
+		.base_baud	= 921600,
+		.uart_offset	= 0x200,
+	},
 };
 
 /*
@@ -2146,6 +2172,22 @@ static struct pci_device_id serial_pci_tbl[] = {
 	{	PCI_VENDOR_ID_DCI, PCI_DEVICE_ID_DCI_PCCOM8,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b3_8_115200 },
+
+	/*
+	 * Exar Corp. XR17C15[248] Dual/Quad/Octal UART
+	 */
+	{	PCI_VENDOR_ID_EXAR, PCI_DEVICE_ID_EXAR_XR17C152,
+		PCI_ANY_ID, PCI_ANY_ID,
+		0,
+		0, pbn_exar_XR17C152 },
+	{	PCI_VENDOR_ID_EXAR, PCI_DEVICE_ID_EXAR_XR17C154,
+		PCI_ANY_ID, PCI_ANY_ID,
+		0,
+		0, pbn_exar_XR17C154 },
+	{	PCI_VENDOR_ID_EXAR, PCI_DEVICE_ID_EXAR_XR17C158,
+		PCI_ANY_ID, PCI_ANY_ID,
+		0,
+		0, pbn_exar_XR17C158 },
 
 	/*
 	 * These entries match devices with class COMMUNICATION_SERIAL,
