@@ -904,13 +904,13 @@ static int sci_startup(struct uart_port *port)
 {
 	struct sci_port *s = &sci_ports[port->line];
 
-	sci_request_irq(s);
-	sci_start_tx(port, 1);
-	sci_start_rx(port, 1);
-
 #if defined(__H8300S__)
 	h8300_sci_enable(port, sci_enable);
 #endif
+
+	sci_request_irq(s);
+	sci_start_tx(port, 1);
+	sci_start_rx(port, 1);
 
 	return 0;
 }
@@ -1328,6 +1328,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 	int bits = 8;
 	int parity = 'n';
 	int flow = 'n';
+	int ret;
 
 	if (co->index >= SCI_NPORTS)
 		co->index = 0;
@@ -1345,10 +1346,19 @@ static int __init serial_console_setup(struct console *co, char *options)
 #else
 	port->uartclk = CONFIG_CPU_CLOCK;
 #endif
+#if defined(__H8300S__)
+	h8300_sci_enable(port, sci_enable);
+#endif
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
 
-	return uart_set_options(port, co, baud, parity, bits, flow);
+	ret = uart_set_options(port, co, baud, parity, bits, flow);
+#if defined(__H8300H__) || defined(__H8300S__)
+	/* disable rx interrupt */
+	if (ret == 0)
+		sci_stop_rx(port);
+#endif
+	return ret;
 }
 
 static struct console serial_console = {
