@@ -332,7 +332,7 @@ pcibios_fixup_device_resources (struct pci_dev *dev, struct pci_bus *bus)
 	struct pci_window *window;
 	int i, j;
 	int limit = (dev->hdr_type == PCI_HEADER_TYPE_NORMAL) ? \
-		PCI_ROM_RESOURCE : PCI_NUM_RESOURCES;
+		PCI_BRIDGE_RESOURCES : PCI_NUM_RESOURCES;
 
 	for (i = 0; i < limit; i++) {
 		if (!dev->resource[i].start)
