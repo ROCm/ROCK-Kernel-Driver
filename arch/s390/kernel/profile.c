@@ -6,6 +6,7 @@
  *
  */
 #include <linux/proc_fs.h>
+#include <linux/profile.h>
 
 static struct proc_dir_entry * root_irq_dir;
 

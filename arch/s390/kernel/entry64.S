@@ -304,7 +304,10 @@ sysc_tracenogo:
 ret_from_fork:
 	lg	%r13,__LC_SVC_NEW_PSW+8
 	lg	%r9,__LC_THREAD_INFO	# load pointer to thread_info struct
-        brasl   %r14,schedule_tail
+	tm	SP_PSW+1(%r15),0x01	# forking a kernel thread ?
+	jo	0f
+	stg	%r15,SP_R15(%r15)	# store stack pointer for new kthread
+0:	brasl   %r14,schedule_tail
         stosm   24(%r15),0x03     # reenable interrupts
 	j	sysc_return
 

@@ -186,41 +186,20 @@ void show_regs(struct pt_regs *regs)
 
 extern void kernel_thread_starter(void);
 
-#ifndef CONFIG_ARCH_S390X
-
 __asm__(".align 4\n"
 	"kernel_thread_starter:\n"
-	"    l     15,0(8)\n"
-	"    sr    15,7\n"
-	"    stosm 24(15),3\n"
-	"    lr    2,10\n"
+	"    la    2,0(10)\n"
 	"    basr  14,9\n"
-	"    sr    2,2\n"
+	"    la    2,0\n"
 	"    br    11\n");
-
-#else /* CONFIG_ARCH_S390X */
-
-__asm__(".align 4\n"
-	"kernel_thread_starter:\n"
-	"    lg    15,0(8)\n"
-	"    sgr   15,7\n"
-	"    stosm 48(15),3\n"
-	"    lgr   2,10\n"
-	"    basr  14,9\n"
-	"    sgr   2,2\n"
-	"    br    11\n");
-
-#endif /* CONFIG_ARCH_S390X */
 
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
 	struct pt_regs regs;
 
 	memset(&regs, 0, sizeof(regs));
-	regs.psw.mask = PSW_KERNEL_BITS;
+	regs.psw.mask = PSW_KERNEL_BITS | PSW_MASK_IO | PSW_MASK_EXT;
 	regs.psw.addr = (unsigned long) kernel_thread_starter | PSW_ADDR_AMODE;
-	regs.gprs[7] = STACK_FRAME_OVERHEAD + sizeof(struct pt_regs);
-	regs.gprs[8] = __LC_KERNEL_STACK;
 	regs.gprs[9] = (unsigned long) fn;
 	regs.gprs[10] = (unsigned long) arg;
 	regs.gprs[11] = (unsigned long) do_exit;
