@@ -551,5 +551,5 @@ MODULE_AUTHOR ("Jeremy Fitzhardinge <jeremy@goop.org>");
 MODULE_DESCRIPTION ("Enhanced SpeedStep driver for Intel Pentium M processors.");
 MODULE_LICENSE ("GPL");
 
-module_init(centrino_init);
+late_initcall(centrino_init);
 module_exit(centrino_exit);
