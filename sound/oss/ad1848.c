@@ -624,6 +624,7 @@ static void ad1848_mixer_reset(ad1848_info * devc)
 			devc->supported_devices = MODE3_MIXER_DEVICES;
 			break;
 		case MD_4232:
+		case MD_4235:
 		case MD_4236:
 			devc->supported_devices = MODE3_MIXER_DEVICES;
 			break;
