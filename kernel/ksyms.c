@@ -221,15 +221,6 @@ EXPORT_SYMBOL(unregister_filesystem);
 EXPORT_SYMBOL(__mntput);
 EXPORT_SYMBOL(may_umount);
 
-/* executable format registration */
-EXPORT_SYMBOL(register_binfmt);
-EXPORT_SYMBOL(unregister_binfmt);
-EXPORT_SYMBOL(search_binary_handler);
-EXPORT_SYMBOL(prepare_binprm);
-EXPORT_SYMBOL(compute_creds);
-EXPORT_SYMBOL(remove_arg_zero);
-EXPORT_SYMBOL(set_binfmt);
-
 /* interrupt handling */
 EXPORT_SYMBOL(request_irq);
 EXPORT_SYMBOL(free_irq);
@@ -332,16 +323,6 @@ EXPORT_SYMBOL(seq_lseek);
 EXPORT_SYMBOL(single_open);
 EXPORT_SYMBOL(single_release);
 EXPORT_SYMBOL(seq_release_private);
-
-/* Program loader interfaces */
-#ifdef CONFIG_MMU
-EXPORT_SYMBOL(setup_arg_pages);
-#endif
-EXPORT_SYMBOL(copy_strings_kernel);
-EXPORT_SYMBOL(do_execve);
-EXPORT_SYMBOL(flush_old_exec);
-EXPORT_SYMBOL(kernel_read);
-EXPORT_SYMBOL(open_exec);
 
 /* Miscellaneous access points */
 EXPORT_SYMBOL(si_meminfo);
