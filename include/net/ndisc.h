@@ -109,6 +109,10 @@ extern int 			ndisc_ifinfo_sysctl_change(ctl_table *ctl,
 extern void 			inet6_ifinfo_notify(int event,
 						    struct inet6_dev *idev);
 
+extern void			inet6_ifra_notify(int event,
+						  struct inet6_dev *idev,
+						  struct ra_msg *ra_msg);
+
 static inline struct neighbour * ndisc_get_neigh(struct net_device *dev, struct in6_addr *addr)
 {
 

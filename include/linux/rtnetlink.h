@@ -44,6 +44,8 @@
 #define	RTM_DELTFILTER	(RTM_BASE+29)
 #define	RTM_GETTFILTER	(RTM_BASE+30)
 
+#define RTM_NEWRA	(RTM_BASE+32)
+
 #define RTM_NEWPREFIX	(RTM_BASE+36)
 #define RTM_GETPREFIX	(RTM_BASE+38)
 
@@ -444,6 +446,38 @@ struct rtgenmsg
 };
 
 /*****************************************************************
+ *		Route Advertisement specific messages.
+ * ******/
+
+/* struct iframsg
+ * passes router advertisement specific information
+ */
+
+struct iframsg
+{
+	unsigned char   ifra_family;
+	unsigned	ifra_flags;
+	int		ifra_index;
+};
+
+enum
+{
+	IFRA_UNSPEC,
+	IFRA_LMTU,
+	IFRA_CACHEINFO
+};
+
+/* max_adver_interval, min_adver_interval should be gotten from user level */
+struct ifra_cacheinfo {
+	__u32		hop_limit;
+	__u32		lifetime;
+	__u32		reachable_time;
+	__u32		retrans_time;
+};
+
+#define IFRA_MAX IFRA_CACHEINFO
+
+/*****************************************************************
  *		Link layer specific messages.
  ****/
 
@@ -657,6 +691,8 @@ enum
 #define RTMGRP_DECnet_ROUTE     0x4000
 
 #define RTMGRP_IPV6_PREFIX	0x20000
+
+#define RTMGRP_IPV6_IFRA	0x10000
 
 /* End of information exported to user level */
 
