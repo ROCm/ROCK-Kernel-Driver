@@ -2621,7 +2621,7 @@ static irqreturn_t BusLogic_InterruptHandler(int IRQ_Channel, void *DeviceIdenti
 	/*
 	   Acquire exclusive access to Host Adapter.
 	 */
-	BusLogic_AcquireHostAdapterLockIH(HostAdapter, &ProcessorFlags);
+	spin_lock_irqsave(HostAdapter->SCSI_Host->host_lock, ProcessorFlags);
 	/*
 	   Handle Interrupts appropriately for each Host Adapter type.
 	 */
@@ -2689,7 +2689,7 @@ static irqreturn_t BusLogic_InterruptHandler(int IRQ_Channel, void *DeviceIdenti
 	/*
 	   Release exclusive access to Host Adapter.
 	 */
-	BusLogic_ReleaseHostAdapterLockIH(HostAdapter, &ProcessorFlags);
+	spin_unlock_irqrestore(HostAdapter->SCSI_Host->host_lock, ProcessorFlags);
 	return IRQ_HANDLED;
 }
 
@@ -2777,9 +2777,9 @@ static int BusLogic_QueueCommand(struct scsi_cmnd *Command, void (*CompletionRou
 	 */
 	CCB = BusLogic_AllocateCCB(HostAdapter);
 	if (CCB == NULL) {
-		BusLogic_ReleaseHostAdapterLock(HostAdapter);
+		spin_unlock_irq(HostAdapter->SCSI_Host->host_lock);
 		BusLogic_Delay(1);
-		BusLogic_AcquireHostAdapterLock(HostAdapter);
+		spin_lock_irq(HostAdapter->SCSI_Host->host_lock);
 		CCB = BusLogic_AllocateCCB(HostAdapter);
 		if (CCB == NULL) {
 			Command->result = DID_ERROR << 16;
@@ -2903,10 +2903,10 @@ static int BusLogic_QueueCommand(struct scsi_cmnd *Command, void (*CompletionRou
 		   error as a Host Adapter Hard Reset should be initiated soon.
 		 */
 		if (!BusLogic_WriteOutgoingMailbox(HostAdapter, BusLogic_MailboxStartCommand, CCB)) {
-			BusLogic_ReleaseHostAdapterLock(HostAdapter);
+			spin_unlock_irq(HostAdapter->SCSI_Host->host_lock);
 			BusLogic_Warning("Unable to write Outgoing Mailbox - " "Pausing for 1 second\n", HostAdapter);
 			BusLogic_Delay(1);
-			BusLogic_AcquireHostAdapterLock(HostAdapter);
+			spin_lock_irq(HostAdapter->SCSI_Host->host_lock);
 			if (!BusLogic_WriteOutgoingMailbox(HostAdapter, BusLogic_MailboxStartCommand, CCB)) {
 				BusLogic_Warning("Still unable to write Outgoing Mailbox - " "Host Adapter Dead?\n", HostAdapter);
 				BusLogic_DeallocateCCB(CCB);
@@ -3044,9 +3044,9 @@ static int BusLogic_ResetHostAdapter(struct BusLogic_HostAdapter *HostAdapter, b
 	 */
 
 	if (HardReset) {
-		BusLogic_ReleaseHostAdapterLock(HostAdapter);
+		spin_unlock_irq(HostAdapter->SCSI_Host->host_lock);
 		BusLogic_Delay(HostAdapter->BusSettleTime);
-		BusLogic_AcquireHostAdapterLock(HostAdapter);
+		spin_lock_irq(HostAdapter->SCSI_Host->host_lock);
 	}
 
 	for (TargetID = 0; TargetID < HostAdapter->MaxTargetDevices; TargetID++) {
