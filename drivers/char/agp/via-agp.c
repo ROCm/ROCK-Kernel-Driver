@@ -353,6 +353,11 @@ static struct agp_device_ids via_agp_device_ids[] __devinitdata =
 		.device_id	= PCI_DEVICE_ID_VIA_3269_0,
 		.chipset_name	= "KT880",
 	},
+	/* KTxxx/Px8xx */
+	{
+		.device_id	= PCI_DEVICE_ID_VIA_83_87XX_1,
+		.chipset_name	= "VT83xx/VT87xx/KTxxx/Px8xx",
+	},
 
 	{ }, /* dummy final entry, always present */
 };
@@ -464,6 +469,7 @@ static struct pci_device_id agp_via_pci_table[] = {
 	ID(PCI_DEVICE_ID_VIA_8783_0),
 	ID(PCI_DEVICE_ID_VIA_PX8X0_0),
 	ID(PCI_DEVICE_ID_VIA_3269_0),
+	ID(PCI_DEVICE_ID_VIA_83_87XX_1),
 	{ }
 };
 
