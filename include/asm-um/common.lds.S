@@ -64,6 +64,7 @@
   __uml_initcall_start = .;
   .uml.initcall.init : { *(.uml.initcall.init) }
   __uml_initcall_end = .;
+  SECURITY_INIT
   __init_end = .;
 
   __exitcall_begin = .;
