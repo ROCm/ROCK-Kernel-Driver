@@ -58,14 +58,16 @@ struct lap_cb;
  *  Slot timer must never exceed 85 ms, and must always be at least 25 ms, 
  *  suggested to  75-85 msec by IrDA lite. This doesn't work with a lot of
  *  devices, and other stackes uses a lot more, so it's best we do it as well
+ *  (Note : this is the default value and sysctl overides it - Jean II)
  */
 #define SLOT_TIMEOUT            (90*HZ/1000)
 
 /* 
- *  We set the query timeout to 100 ms and then expect the value to be 
- *  multiplied with the number of slots to product the actual timeout value
+ *  The latest discovery frame (XID) is longer due to the extra discovery
+ *  information (hints, device name...). This is its extra length.
+ *  We use that when setting the query timeout. Jean II
  */
-#define QUERY_TIMEOUT           (HZ/10)       
+#define XIDEXTRA_TIMEOUT        (34*HZ/1000)  /* 34 msec */
 
 #define WATCHDOG_TIMEOUT        (20*HZ)       /* 20 sec */
 
@@ -85,7 +87,7 @@ static inline void irda_start_timer(struct timer_list *ptimer, int timeout,
 
 
 void irlap_start_slot_timer(struct irlap_cb *self, int timeout);
-void irlap_start_query_timer(struct irlap_cb *self, int timeout);
+void irlap_start_query_timer(struct irlap_cb *self, int S, int s);
 void irlap_start_final_timer(struct irlap_cb *self, int timeout);
 void irlap_start_wd_timer(struct irlap_cb *self, int timeout);
 void irlap_start_backoff_timer(struct irlap_cb *self, int timeout);
