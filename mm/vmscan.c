@@ -458,35 +458,20 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			 * pinned it and after the I/O to the page is finished,
 			 * so the direct writes to the page cannot get lost.
 			 */
-			struct address_space_operations *a_ops;
 			int (*writeback)(struct page *, int *);
-			int (*writepage)(struct page *);
+			const int nr_pages = SWAP_CLUSTER_MAX;
+			int nr_to_write = nr_pages;
 
-			/*
-			 * There's no guarantee that writeback() will actually
-			 * start I/O against *this* page.  Which is broken if we're
-			 * trying to free memory in a particular zone.  FIXME.
-			 */
-			a_ops = mapping->a_ops;
-			writeback = a_ops->vm_writeback;
-			writepage = a_ops->writepage;
-			if (writeback || writepage) {
-				SetPageLaunder(page);
-				page_cache_get(page);
-				spin_unlock(&pagemap_lru_lock);
-				ClearPageDirty(page);
-
-				if (writeback) {
-					int nr_to_write = WRITEOUT_PAGES;
-					writeback(page, &nr_to_write);
-				} else {
-					writepage(page);
-				}
-				page_cache_release(page);
-
-				spin_lock(&pagemap_lru_lock);
-				continue;
-			}
+			writeback = mapping->a_ops->vm_writeback;
+			if (writeback == NULL)
+				writeback = generic_vm_writeback;
+			page_cache_get(page);
+			spin_unlock(&pagemap_lru_lock);
+			(*writeback)(page, &nr_to_write);
+			max_scan -= (nr_pages - nr_to_write);
+			page_cache_release(page);
+			spin_lock(&pagemap_lru_lock);
+			continue;
 		}
 
 		/*
@@ -647,6 +632,8 @@ static int shrink_caches(zone_t * classzone, int priority, unsigned int gfp_mask
 	nr_pages = shrink_cache(nr_pages, classzone, gfp_mask, priority);
 	if (nr_pages <= 0)
 		return 0;
+
+	wakeup_bdflush();
 
 	shrink_dcache_memory(priority, gfp_mask);
 

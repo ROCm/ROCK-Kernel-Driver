@@ -31,7 +31,25 @@ static int swap_writepage(struct page *page)
 	return 0;
 }
 
+/*
+ * swapper_space doesn't have a real inode, so it gets a special vm_writeback()
+ * so we don't need swap special cases in generic_vm_writeback().
+ *
+ * FIXME: swap pages are locked, but not PageWriteback while under writeout.
+ * This will confuse throttling in shrink_cache().  It may be advantageous to
+ * set PG_writeback against swap pages while they're also locked.  Either that,
+ * or special-case swap pages in shrink_cache().
+ */
+static int swap_vm_writeback(struct page *page, int *nr_to_write)
+{
+	struct address_space *mapping = page->mapping;
+
+	unlock_page(page);
+	return generic_writeback_mapping(mapping, nr_to_write);
+}
+
 static struct address_space_operations swap_aops = {
+	vm_writeback: swap_vm_writeback,
 	writepage: swap_writepage,
 	sync_page: block_sync_page,
 };

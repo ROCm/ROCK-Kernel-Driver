@@ -402,14 +402,6 @@ void prune_icache(int goal)
 	spin_unlock(&inode_lock);
 
 	dispose_list(freeable);
-
-	/* 
-	 * If we didn't free enough clean inodes then schedule writeback of
-	 * the dirty inodes.  We cannot do it from here or we're either
-	 * synchronously dogslow or we deadlock with oom.
-	 */
-	if (goal)
-		pdflush_operation(try_to_writeback_unused_inodes, 0);
 }
 
 /*

@@ -46,17 +46,9 @@ static inline void wait_on_inode(struct inode *inode)
 /*
  * mm/page-writeback.c
  */
-/*
- * How much data to write out at a time in various places.  This isn't
- * really very important - it's just here to prevent any thread from
- * locking an inode for too long and blocking other threads which wish
- * to write the same file for allocation throttling purposes.
- */
-#define WRITEOUT_PAGES	((4096 * 1024) / PAGE_CACHE_SIZE)
-
 void balance_dirty_pages(struct address_space *mapping);
 void balance_dirty_pages_ratelimited(struct address_space *mapping);
-int pdflush_flush(unsigned long nr_pages);
 int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);
+int writeback_mapping(struct address_space *mapping, int *nr_to_write);
 
 #endif		/* WRITEBACK_H */

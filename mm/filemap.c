@@ -453,9 +453,7 @@ EXPORT_SYMBOL(fail_writepage);
  */
 int filemap_fdatawrite(struct address_space *mapping)
 {
-	if (mapping->a_ops->writeback_mapping)
-		return mapping->a_ops->writeback_mapping(mapping, NULL);
-	return generic_writeback_mapping(mapping, NULL);
+	return writeback_mapping(mapping, NULL);
 }
 
 /**

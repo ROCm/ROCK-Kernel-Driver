@@ -2408,11 +2408,6 @@ asmlinkage long sys_bdflush(int func, long data)
 	return 0;
 }
 
-void wakeup_bdflush(void)
-{
- 	pdflush_flush(0);
-}
-
 /*
  * Buffer-head allocation
  */
