@@ -3,8 +3,7 @@
 #
 
 export-objs  := ip_conntrack_standalone.o ip_fw_compat.o ip_nat_standalone.o \
-		ip_tables.o arp_tables.o ip_conntrack_ftp.o \
-		ip_conntrack_irc.o
+		ip_tables.o arp_tables.o
 
 # objects for the conntrack and NAT core (used by standalone and backw. compat)
 ip_nf_conntrack-objs	:= ip_conntrack_core.o ip_conntrack_proto_generic.o ip_conntrack_proto_tcp.o ip_conntrack_proto_udp.o ip_conntrack_proto_icmp.o
@@ -25,7 +24,13 @@ obj-$(CONFIG_IP_NF_CONNTRACK) += ip_conntrack.o
 
 # connection tracking helpers
 obj-$(CONFIG_IP_NF_FTP) += ip_conntrack_ftp.o
+ifdef CONFIG_IP_NF_NAT_FTP
+	export-objs += ip_conntrack_ftp.o
+endif
 obj-$(CONFIG_IP_NF_IRC) += ip_conntrack_irc.o
+ifdef CONFIG_IP_NF_NAT_IRC
+	export-objs += ip_conntrack_irc.o
+endif
 
 # NAT helpers 
 obj-$(CONFIG_IP_NF_NAT_FTP) += ip_nat_ftp.o

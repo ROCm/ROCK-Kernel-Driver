@@ -45,7 +45,7 @@ static inline int ip_conntrack_confirm(struct sk_buff *skb)
 }
 
 extern struct list_head *ip_conntrack_hash;
-extern struct list_head expect_list;
+extern struct list_head ip_conntrack_expect_list;
 DECLARE_RWLOCK_EXTERN(ip_conntrack_lock);
 #endif /* _IP_CONNTRACK_CORE_H */
 

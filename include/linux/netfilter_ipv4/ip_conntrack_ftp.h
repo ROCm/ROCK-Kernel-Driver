@@ -2,9 +2,7 @@
 #define _IP_CONNTRACK_FTP_H
 /* FTP tracking. */
 
-#ifndef __KERNEL__
-#error Only in kernel.
-#endif
+#ifdef __KERNEL__
 
 #include <linux/netfilter_ipv4/lockhelp.h>
 
@@ -12,6 +10,8 @@
 DECLARE_LOCK_EXTERN(ip_ftp_lock);
 
 #define FTP_PORT	21
+
+#endif /* __KERNEL__ */
 
 enum ip_ct_ftp_type
 {

@@ -203,7 +203,6 @@ find_appropriate_src(const struct ip_conntrack_tuple *tuple,
 		return NULL;
 }
 
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 /* If it's really a local destination manip, it may need to do a
    source manip too. */
 static int
@@ -222,7 +221,6 @@ do_extra_mangle(u_int32_t var_ip, u_int32_t *other_ipp)
 	ip_rt_put(rt);
 	return 1;
 }
-#endif
 
 /* Simple way to iterate through all. */
 static inline int fake_cmp(const struct ip_nat_hash *i,
@@ -738,11 +736,10 @@ static inline int exp_for_packet(struct ip_conntrack_expect *exp,
 	struct ip_conntrack_protocol *proto;
 	int ret = 1;
 
-	READ_LOCK(&ip_conntrack_lock);
+	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
 	proto = ip_ct_find_proto((*pskb)->nh.iph->protocol);
 	if (proto->exp_matches_pkt)
 		ret = proto->exp_matches_pkt(exp, pskb);
-	READ_UNLOCK(&ip_conntrack_lock);
 
 	return ret;
 }
