@@ -279,6 +279,8 @@
 struct meye_grab_buffer {
 	int state;			/* state of buffer */
 	unsigned long size;		/* size of jpg frame */
+	struct timeval timestamp;	/* timestamp */
+	unsigned long sequence;		/* sequence number */
 };
 
 /* size of kfifos containings buffer indices */
@@ -302,6 +304,7 @@ struct meye {
 	unsigned char *grab_temp;	/* temporary buffer */
 					/* list of buffers */
 	struct meye_grab_buffer grab_buffer[MEYE_MAX_BUFNBRS];
+	int vma_use_count[MEYE_MAX_BUFNBRS]; /* mmap count */
 
 	/* other */
 	struct semaphore lock;		/* semaphore for open/mmap... */

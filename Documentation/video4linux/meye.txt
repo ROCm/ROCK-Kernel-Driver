@@ -46,6 +46,8 @@ module argument syntax (<param>=<value> when passing the option to the
 module or meye.<param>=<value> on the kernel boot line when meye is
 statically linked into the kernel). Those options are:
 
+	forcev4l1:	force use of V4L1 API instead of V4L2
+
 	gbuffers:	number of capture buffers, default is 2 (32 max)
 
 	gbufsize:	size of each capture buffer, default is 614400
@@ -78,8 +80,9 @@ Usage:
 Private API:
 ------------
 
-	The driver supports frame grabbing with the video4linux API, so
-	all video4linux tools (like xawtv) should work with this driver.
+	The driver supports frame grabbing with the video4linux API
+	(either v4l1 or v4l2), so all video4linux tools (like xawtv)
+	should work with this driver.
 
 	Besides the video4linux interface, the driver has a private interface
 	for accessing the Motion Eye extended parameters (camera sharpness,
@@ -121,13 +124,7 @@ Private API:
 Bugs / Todo:
 ------------
 
-	- overlay output is not supported (although the camera is capable of).
-	  	(it should not be too hard to to it, provided we found how...)
-		
-	- mjpeg hardware playback doesn't work (depends on overlay...)
+	- the driver could be much cleaned up by removing the v4l1 support.
+	  However, this means all v4l1-only applications will stop working.
 
-	- rewrite the driver to use some common video4linux API for snapshot
-	  and mjpeg capture. Unfortunately, video4linux1 does not permit it,
-	  the BUZ API seems to be targeted to TV cards only. The video4linux 2
-	  API may be an option, if it goes into the kernel (maybe 2.5 
-	  material ?).
+	- 'motioneye' still uses the meye private v4l1 API extensions.
