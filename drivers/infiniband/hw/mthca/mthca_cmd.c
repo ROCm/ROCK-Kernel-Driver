@@ -36,6 +36,7 @@
 #include <linux/pci.h>
 #include <linux/errno.h>
 #include <asm/io.h>
+#include <ib_mad.h>
 
 #include "mthca_dev.h"
 #include "mthca_config_reg.h"
@@ -1626,13 +1627,24 @@ int mthca_CONF_SPECIAL_QP(struct mthca_dev *dev, int type, u32 qpn,
 			 CMD_TIME_CLASS_B, status);
 }
 
-int mthca_MAD_IFC(struct mthca_dev *dev, int ignore_mkey, int port,
-		  void *in_mad, void *response_mad, u8 *status) {
+int mthca_MAD_IFC(struct mthca_dev *dev, int ignore_mkey, int ignore_bkey,
+		  int port, struct ib_wc* in_wc, struct ib_grh* in_grh,
+		  void *in_mad, void *response_mad, u8 *status)
+{
 	void *box;
 	dma_addr_t dma;
 	int err;
+	u32 in_modifier = port;
+	u8 op_modifier = 0;
 
-#define MAD_IFC_BOX_SIZE 512
+#define MAD_IFC_BOX_SIZE      0x400
+#define MAD_IFC_MY_QPN_OFFSET 0x100
+#define MAD_IFC_RQPN_OFFSET   0x104
+#define MAD_IFC_SL_OFFSET     0x108
+#define MAD_IFC_G_PATH_OFFSET 0x109
+#define MAD_IFC_RLID_OFFSET   0x10a
+#define MAD_IFC_PKEY_OFFSET   0x10e
+#define MAD_IFC_GRH_OFFSET    0x140
 
 	box = pci_alloc_consistent(dev->pdev, MAD_IFC_BOX_SIZE, &dma);
 	if (!box)
@@ -1640,11 +1652,46 @@ int mthca_MAD_IFC(struct mthca_dev *dev, int ignore_mkey, int port,
 
 	memcpy(box, in_mad, 256);
 
-	err = mthca_cmd_box(dev, dma, dma + 256, port, !!ignore_mkey,
+	/*
+	 * Key check traps can't be generated unless we have in_wc to
+	 * tell us where to send the trap.
+	 */
+	if (ignore_mkey || !in_wc)
+		op_modifier |= 0x1;
+	if (ignore_bkey || !in_wc)
+		op_modifier |= 0x2;
+
+	if (in_wc) {
+		u8 val;
+
+		memset(box + 256, 0, 256);
+
+		MTHCA_PUT(box, in_wc->qp_num, 	  MAD_IFC_MY_QPN_OFFSET);
+		MTHCA_PUT(box, in_wc->src_qp, 	  MAD_IFC_RQPN_OFFSET);
+
+		val = in_wc->sl << 4;
+		MTHCA_PUT(box, val,               MAD_IFC_SL_OFFSET);
+
+		val = in_wc->dlid_path_bits |
+			(in_wc->wc_flags & IB_WC_GRH ? 0x80 : 0);
+		MTHCA_PUT(box, val,               MAD_IFC_GRH_OFFSET);
+
+		MTHCA_PUT(box, in_wc->slid,       MAD_IFC_RLID_OFFSET);
+		MTHCA_PUT(box, in_wc->pkey_index, MAD_IFC_PKEY_OFFSET);
+
+		if (in_grh)
+			memcpy((u8 *) box + MAD_IFC_GRH_OFFSET, in_grh, 40);
+
+		op_modifier |= 0x10;
+
+		in_modifier |= in_wc->slid << 16;
+	}
+
+	err = mthca_cmd_box(dev, dma, dma + 512, in_modifier, op_modifier,
 			    CMD_MAD_IFC, CMD_TIME_CLASS_C, status);
 
 	if (!err && !*status)
-		memcpy(response_mad, box + 256, 256);
+		memcpy(response_mad, box + 512, 256);
 
 	pci_free_consistent(dev->pdev, MAD_IFC_BOX_SIZE, box, dma);
 	return err;

@@ -280,7 +280,8 @@ int mthca_QUERY_QP(struct mthca_dev *dev, u32 num, int is_ee,
 		   void *qp_context, u8 *status);
 int mthca_CONF_SPECIAL_QP(struct mthca_dev *dev, int type, u32 qpn,
 			  u8 *status);
-int mthca_MAD_IFC(struct mthca_dev *dev, int ignore_mkey, int port,
+int mthca_MAD_IFC(struct mthca_dev *dev, int ignore_mkey, int ignore_bkey,
+		  int port, struct ib_wc* in_wc, struct ib_grh* in_grh,
 		  void *in_mad, void *response_mad, u8 *status);
 int mthca_READ_MGM(struct mthca_dev *dev, int index, void *mgm,
 		   u8 *status);

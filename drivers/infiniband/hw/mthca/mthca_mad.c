@@ -232,8 +232,9 @@ int mthca_process_mad(struct ib_device *ibdev,
 		return IB_MAD_RESULT_SUCCESS;
 
 	err = mthca_MAD_IFC(to_mdev(ibdev),
-			    !!(mad_flags & IB_MAD_IGNORE_MKEY),
-			    port_num, in_mad, out_mad,
+			    mad_flags & IB_MAD_IGNORE_MKEY,
+			    mad_flags & IB_MAD_IGNORE_BKEY,
+			    port_num, in_wc, in_grh, in_mad, out_mad,
 			    &status);
 	if (err) {
 		mthca_err(to_mdev(ibdev), "MAD_IFC failed\n");

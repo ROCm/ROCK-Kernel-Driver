@@ -59,8 +59,8 @@ static int mthca_query_device(struct ib_device *ibdev,
 	in_mad->method         	   = IB_MGMT_METHOD_GET;
 	in_mad->attr_id   	   = IB_SMP_ATTR_NODE_INFO;
 
-	err = mthca_MAD_IFC(to_mdev(ibdev), 1,
-			    1, in_mad, out_mad,
+	err = mthca_MAD_IFC(to_mdev(ibdev), 1, 1,
+			    1, NULL, NULL, in_mad, out_mad,
 			    &status);
 	if (err)
 		goto out;
@@ -104,8 +104,8 @@ static int mthca_query_port(struct ib_device *ibdev,
 	in_mad->attr_id   	   = IB_SMP_ATTR_PORT_INFO;
 	in_mad->attr_mod           = cpu_to_be32(port);
 
-	err = mthca_MAD_IFC(to_mdev(ibdev), 1,
-			    port, in_mad, out_mad,
+	err = mthca_MAD_IFC(to_mdev(ibdev), 1, 1,
+			    port, NULL, NULL, in_mad, out_mad,
 			    &status);
 	if (err)
 		goto out;
@@ -189,8 +189,8 @@ static int mthca_query_pkey(struct ib_device *ibdev,
 	in_mad->attr_id   	   = IB_SMP_ATTR_PKEY_TABLE;
 	in_mad->attr_mod           = cpu_to_be32(index / 32);
 
-	err = mthca_MAD_IFC(to_mdev(ibdev), 1,
-			    port, in_mad, out_mad,
+	err = mthca_MAD_IFC(to_mdev(ibdev), 1, 1,
+			    port, NULL, NULL, in_mad, out_mad,
 			    &status);
 	if (err)
 		goto out;
@@ -228,8 +228,8 @@ static int mthca_query_gid(struct ib_device *ibdev, u8 port,
 	in_mad->attr_id   	   = IB_SMP_ATTR_PORT_INFO;
 	in_mad->attr_mod           = cpu_to_be32(port);
 
-	err = mthca_MAD_IFC(to_mdev(ibdev), 1,
-			    port, in_mad, out_mad,
+	err = mthca_MAD_IFC(to_mdev(ibdev), 1, 1,
+			    port, NULL, NULL, in_mad, out_mad,
 			    &status);
 	if (err)
 		goto out;
@@ -248,8 +248,8 @@ static int mthca_query_gid(struct ib_device *ibdev, u8 port,
 	in_mad->attr_id   	   = IB_SMP_ATTR_GUID_INFO;
 	in_mad->attr_mod           = cpu_to_be32(index / 8);
 
-	err = mthca_MAD_IFC(to_mdev(ibdev), 1,
-			    port, in_mad, out_mad,
+	err = mthca_MAD_IFC(to_mdev(ibdev), 1, 1,
+			    port, NULL, NULL, in_mad, out_mad,
 			    &status);
 	if (err)
 		goto out;
