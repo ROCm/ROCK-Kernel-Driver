@@ -3257,7 +3257,7 @@ static int dvb_get_stc(struct dmx_demux *demux, unsigned int num,
 	DEB_EE(("av7110: fwstc = %04hx %04hx %04hx %04hx\n",
 			fwstc[0], fwstc[1], fwstc[2], fwstc[3]));
 
-	*stc =  (((uint64_t)fwstc[2] & 1) << 32) |
+	*stc =  (((uint64_t)(~fwstc[2]) & 1) << 32) |
 		(((uint64_t)fwstc[1])     << 16) | ((uint64_t)fwstc[0]);
 	*base = 1;
 
@@ -4327,6 +4327,9 @@ struct saa7146_extension_ioctls ioctls[] = {
 	{ 0, 0 }
 };
 
+static struct saa7146_ext_vv av7110_vv_data_st;
+static struct saa7146_ext_vv av7110_vv_data_c;
+
 static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_data *pci_ext)
 {
 	struct av7110 *av7110 = NULL;
@@ -4344,7 +4347,16 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 
 	DEB_EE(("dev: %p, av7110: %p\n",dev,av7110));
 
-	if (saa7146_vv_init(dev)) {
+	/* special case DVB-C: these cards have an analog tuner
+	   plus need some special handling, so we have separate
+	   saa7146_ext_vv data for these... */
+	if (dev->pci->subsystem_vendor == 0x110a) {
+		ret = saa7146_vv_init(dev, &av7110_vv_data_c);
+	} else {
+		ret = saa7146_vv_init(dev, &av7110_vv_data_st);
+	}
+	
+	if ( 0 != ret) {
 		ERR(("cannot init capture device. skipping.\n"));
 		kfree(av7110);
 		return -1;
@@ -4689,10 +4701,10 @@ static int std_callback(struct saa7146_dev* dev, struct saa7146_standard *std)
 }
 
 
-static struct saa7146_ext_vv av7110_vv_data = {
+static struct saa7146_ext_vv av7110_vv_data_st = {
 	.inputs		= 1,
 	.audios 	= 1,
-	.capabilities	= V4L2_CAP_TUNER,
+	.capabilities	= 0,
 	.flags		= SAA7146_EXT_SWAP_ODD_EVEN,
 
 	.stds		= &standard[0],
@@ -4703,9 +4715,23 @@ static struct saa7146_ext_vv av7110_vv_data = {
 	.ioctl		= av7110_ioctl,
 };
 
+static struct saa7146_ext_vv av7110_vv_data_c = {
+	.inputs		= 1,
+	.audios 	= 1,
+	.capabilities	= V4L2_CAP_TUNER,
+	.flags		= 0,
+
+	.stds		= &standard[0],
+	.num_stds	= sizeof(standard)/sizeof(struct saa7146_standard),
+	.std_callback	= &std_callback, 
+
+	.ioctls		= &ioctls[0],
+	.ioctl		= av7110_ioctl,
+};
+
+
 static struct saa7146_extension av7110_extension = {
 	.name		= "dvb\0",
-	.ext_vv_data	= &av7110_vv_data,
 
 	.module		= THIS_MODULE,
 	.pci_tbl	= &pci_tbl[0],
