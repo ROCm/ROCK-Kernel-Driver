@@ -295,8 +295,8 @@ static void sa1100_pcmcia_task_handler(void *data)
 			events & SS_BATWARN ? "BATWARN " : "",
 			events & SS_STSCHG  ? "STSCHG "  : "");
 
-		if (events && skt->handler != NULL)
-			skt->handler(skt->handler_info, events);
+		if (events)
+			pcmcia_parse_events(&skt->socket, events);
 	} while (events);
 }
 
@@ -333,36 +333,6 @@ static irqreturn_t sa1100_pcmcia_interrupt(int irq, void *dev, struct pt_regs *r
 	schedule_work(&skt->work);
 
 	return IRQ_HANDLED;
-}
-
-/* sa1100_pcmcia_register_callback()
- * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
- * Implements the register_callback() operation for the in-kernel
- * PCMCIA service (formerly SS_RegisterCallback in Card Services). If 
- * the function pointer `handler' is not NULL, remember the callback 
- * location in the state for `sock', and increment the usage counter 
- * for the driver module. (The callback is invoked from the interrupt
- * service routine, sa1100_pcmcia_interrupt(), to notify Card Services
- * of interesting events.) Otherwise, clear the callback pointer in the
- * socket state and decrement the module usage count.
- *
- * Returns: 0
- */
-static int
-sa1100_pcmcia_register_callback(struct pcmcia_socket *sock,
-				void (*handler)(void *, unsigned int),
-				void *info)
-{
-	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
-
-	if (handler) {
-		skt->handler_info = info;
-		skt->handler = handler;
-	} else {
-		skt->handler = NULL;
-	}
-
-	return 0;
 }
 
 
@@ -654,7 +624,6 @@ static CLASS_DEVICE_ATTR(status, S_IRUGO, show_status, NULL);
 static struct pccard_operations sa11xx_pcmcia_operations = {
 	.init			= sa1100_pcmcia_sock_init,
 	.suspend		= sa1100_pcmcia_suspend,
-	.register_callback	= sa1100_pcmcia_register_callback,
 	.get_status		= sa1100_pcmcia_get_status,
 	.get_socket		= sa1100_pcmcia_get_socket,
 	.set_socket		= sa1100_pcmcia_set_socket,

@@ -429,8 +429,8 @@ static void yenta_bh(void *data)
 	events = socket->events;
 	socket->events = 0;
 	spin_unlock_irq(&socket->event_lock);
-	if (socket->handler)
-		socket->handler(socket->info, events);
+	if (events)
+		pcmcia_parse_events(&socket->socket, events);
 }
 
 static irqreturn_t yenta_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -771,20 +771,9 @@ static void yenta_close(struct pci_dev *dev)
 }
 
 
-static int yenta_register_callback(struct pcmcia_socket *sock, void (*handler)(void *, unsigned int), void * info)
-{
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-
-	socket->handler = handler;
-	socket->info = info;
-	return 0;
-}
-
-
 static struct pccard_operations yenta_socket_operations = {
 	.init			= yenta_init,
 	.suspend		= yenta_suspend,
-	.register_callback	= yenta_register_callback,
 	.get_status		= yenta_get_status,
 	.get_socket		= yenta_get_socket,
 	.set_socket		= yenta_set_socket,

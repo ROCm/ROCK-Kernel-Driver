@@ -59,8 +59,6 @@ struct sa1100_pcmcia_socket {
 
 	unsigned int		status;
 	socket_state_t		cs_state;
-	void			(*handler)(void *, unsigned int);
-	void			*handler_info;
 
 	unsigned short		spd_io[MAX_IO_WIN];
 	unsigned short		spd_mem[MAX_WIN];

@@ -164,8 +164,6 @@ struct i82365_socket {
     ioaddr_t		ioaddr;
     u_short		psock;
     u_char		cs_irq, intr;
-    void		(*handler)(void *info, u_int events);
-    void		*info;
     union {
 	cirrus_state_t		cirrus;
 	vg46x_state_t		vg46x;
@@ -883,8 +881,8 @@ static void pcic_bh(void *dummy)
 		*/
 		if (events & SS_DETECT) 
 			mdelay(4);
-		if (socket[i].handler)
-			socket[i].handler(socket[i].info, events);
+		if (events)
+			pcmcia_parse_events(&socket[i].socket, events);
 	}
 }
 
@@ -911,8 +909,7 @@ static irqreturn_t pcic_interrupt(int irq, void *dev,
 	    handled = 1;
 	    ISA_LOCK(i, flags);
 	    csc = i365_get(i, I365_CSC);
-	    if ((csc == 0) || (!socket[i].handler) ||
-		(i365_get(i, I365_IDENT) & 0x70)) {
+	    if ((csc == 0) || (i365_get(i, I365_IDENT) & 0x70)) {
 		ISA_UNLOCK(i, flags);
 		continue;
 	    }
@@ -965,16 +962,6 @@ static void pcic_interrupt_wrapper(u_long data)
     poll_timer.expires = jiffies + poll_interval;
     add_timer(&poll_timer);
 }
-
-/*====================================================================*/
-
-static int pcic_register_callback(struct pcmcia_socket *s, void (*handler)(void *, unsigned int), void * info)
-{
-    unsigned int sock = container_of(s, struct i82365_socket, socket)->number;
-    socket[sock].handler = handler;
-    socket[sock].info = info;
-    return 0;
-} /* pcic_register_callback */
 
 /*====================================================================*/
 
@@ -1402,7 +1389,6 @@ static int pcic_suspend(struct pcmcia_socket *sock)
 static struct pccard_operations pcic_operations = {
 	.init			= pcic_init,
 	.suspend		= pcic_suspend,
-	.register_callback	= pcic_register_callback,
 	.get_status		= pcic_get_status,
 	.get_socket		= pcic_get_socket,
 	.set_socket		= pcic_set_socket,

@@ -235,6 +235,7 @@ struct pcmcia_socket * pcmcia_get_socket_by_nr(unsigned int nr);
 
 
 
+extern void pcmcia_parse_events(struct pcmcia_socket *socket, unsigned int events);
 extern int pcmcia_register_socket(struct pcmcia_socket *socket);
 extern void pcmcia_unregister_socket(struct pcmcia_socket *socket);
 

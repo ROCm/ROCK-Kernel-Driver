@@ -231,11 +231,6 @@ static const lookup_t service_table[] = {
 
 ======================================================================*/
 
-static int register_callback(struct pcmcia_socket *s, void (*handler)(void *, unsigned int), void * info)
-{
-	return s->ss_entry->register_callback(s, handler, info);
-}
-
 static int get_socket_status(struct pcmcia_socket *s, int *val)
 {
 	return s->ss_entry->get_status(s, val);
@@ -356,6 +351,7 @@ static int pcmcia_add_socket(struct class_device *class_dev)
 
 	wait_for_completion(&socket->thread_done);
 	BUG_ON(!socket->thread);
+	pcmcia_parse_events(socket, SS_DETECT);
 
 	return 0;
 }
@@ -872,16 +868,14 @@ static int pccardd(void *__skt)
 	complete_and_exit(&skt->thread_done, 0);
 }
 
-static void parse_events(void *info, u_int events)
+void pcmcia_parse_events(struct pcmcia_socket *s, u_int events)
 {
-	struct pcmcia_socket *s = info;
-
 	spin_lock(&s->thread_lock);
 	s->thread_events |= events;
 	spin_unlock(&s->thread_lock);
 
 	wake_up(&s->thread_wait);
-} /* parse_events */
+} /* pcmcia_parse_events */
 
 
 /*======================================================================
@@ -1142,9 +1136,6 @@ int pcmcia_deregister_client(client_handle_t handle)
 	handle->event_handler = NULL;
     }
 
-    if (--s->real_clients == 0)
-        register_callback(s, NULL, NULL);
-    
     return CS_SUCCESS;
 } /* deregister_client */
 
@@ -1558,11 +1549,6 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
     up_read(&pcmcia_socket_list_rwsem);
     if (client == NULL)
 	return CS_OUT_OF_RESOURCE;
-
-    if (++s->real_clients == 1) {
-	register_callback(s, &parse_events, s);
-	parse_events(s, SS_DETECT);
-    }
 
     *handle = client;
     client->state &= ~CLIENT_UNBOUND;
@@ -2532,6 +2518,7 @@ EXPORT_SYMBOL(pcmcia_write_memory);
 EXPORT_SYMBOL(dead_socket);
 EXPORT_SYMBOL(CardServices);
 EXPORT_SYMBOL(MTDHelperEntry);
+EXPORT_SYMBOL(pcmcia_parse_events);
 
 struct class pcmcia_socket_class = {
 	.name = "pcmcia_socket",

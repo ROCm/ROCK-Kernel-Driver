@@ -66,7 +66,6 @@ static struct pci_driver i82092aa_pci_drv = {
 static struct pccard_operations i82092aa_operations = {
 	.init 		 	= i82092aa_init,
 	.suspend	   	= i82092aa_suspend,
-	.register_callback 	= i82092aa_register_callback,
 	.get_status		= i82092aa_get_status,
 	.get_socket		= i82092aa_get_socket,
 	.set_socket		= i82092aa_set_socket,
@@ -85,10 +84,6 @@ struct socket_info {
 	int 	io_base; 	/* base io address of the socket */
 	
 	unsigned int pending_events; /* Pending events on this interface */
-	
-	void	(*handler)(void *info, u_int events); 
-				/* callback to the driver of the card */
-	void	*info;		/* to be passed to the handler */
 	
 	struct pcmcia_socket socket;
 	struct pci_dev *dev;	/* The PCI device for the socket */
@@ -332,8 +327,8 @@ static void i82092aa_bh(void *dummy)
         for (i=0; i < socket_count; i++) {
         	events = xchg(&(sockets[i].pending_events),0);
         	printk("events = %x \n",events);
-                if (sockets[i].handler)
-                	sockets[i].handler(sockets[i].info, events);
+        	if (events)
+			pcmcia_parse_events(&sockets[i].socket, events);
 	}
 }
                                                                                                                                         
@@ -367,8 +362,7 @@ static irqreturn_t i82092aa_interrupt(int irq, void *dev, struct pt_regs *regs)
 			
 			csc = indirect_read(i,I365_CSC); /* card status change register */
 			
-			if ((csc==0) ||  /* no events on this socket */
-			   (sockets[i].handler==NULL)) /* no way to handle events */
+			if (csc==0)  /* no events on this socket */
 			   	continue;
 			handled = 1;
 			events = 0;
@@ -475,16 +469,6 @@ static int i82092aa_suspend(struct pcmcia_socket *sock)
         return retval;
 }
        
-static int i82092aa_register_callback(struct pcmcia_socket *socket, void (*handler)(void *, unsigned int), void * info)
-{
-	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
-	enter("i82092aa_register_callback");
-	sockets[sock].handler = handler;
-        sockets[sock].info = info;
-	leave("i82092aa_register_callback");
-	return 0;
-} /* i82092aa_register_callback */
-                                        
 static int i82092aa_get_status(struct pcmcia_socket *socket, u_int *value)
 {
 	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
