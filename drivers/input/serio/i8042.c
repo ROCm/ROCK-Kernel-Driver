@@ -161,7 +161,7 @@ static int i8042_command(unsigned char *param, int command)
 				param[i] = ~i8042_read_data();
 			else
 				param[i] = i8042_read_data();
-			dbg("%02x <- i8042 (return)\n", param[i]);
+			dbg("%02x <- i8042 (return)", param[i]);
 		}
 
 	spin_unlock_irqrestore(&i8042_lock, flags);
@@ -407,10 +407,10 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		}
 
 		if (data > 0x7f) {
+			if (i8042_last_e0 && (data == 0xaa || data == 0xb6))
+				set_bit((data & 0x7f) | (i8042_last_e0 << 7), i8042_unxlate_seen);
 			if (test_and_clear_bit((data & 0x7f) | (i8042_last_e0 << 7), i8042_unxlate_seen)) {
 				serio_interrupt(&i8042_kbd_port, 0xf0, dfl);
-				if (i8042_last_e0 && (data == 0xaa || data == 0xb6))
-					set_bit((data & 0x7f) | (i8042_last_e0 << 7), i8042_unxlate_seen);
 				data = i8042_unxlate_table[data & 0x7f];
 			}
 		} else {
