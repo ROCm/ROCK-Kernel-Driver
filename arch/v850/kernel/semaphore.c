@@ -13,6 +13,7 @@
  * which was derived from the i386 version, linux/arch/i386/kernel/semaphore.c
  */
 
+#include <linux/errno.h>
 #include <linux/sched.h>
 
 #include <asm/semaphore.h>

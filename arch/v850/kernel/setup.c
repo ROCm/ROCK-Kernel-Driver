@@ -11,7 +11,6 @@
  * Written by Miles Bader <miles@gnu.org>
  */
 
-#include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/bootmem.h>
 #include <linux/irq.h>

@@ -15,7 +15,6 @@
  * This file was derived from the sh version, arch/sh/kernel/signal.c
  */
 
-#include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
