@@ -73,8 +73,4 @@
 
 #define MPC85XX_PCI2_IO_SIZE         0x01000000
 
-#define SERIAL_PORT_DFNS		\
-	       STD_UART_OP(0)		\
-	       STD_UART_OP(1)
-
 #endif /* __MACH_MPC85XX_CDS_H__ */
