@@ -517,8 +517,6 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 
 	switch (cmd) {
 	case BLKFLSBUF:
-		if(!capable(CAP_SYS_ADMIN))
-			return -EACCES;
 		fsync_bdev(inode->i_bdev);
 		invalidate_bdev(inode->i_bdev, 0);
 		down(&mtdblk->cache_sem);

@@ -793,41 +793,12 @@ int blkdev_close(struct inode * inode, struct file * filp)
 	return blkdev_put(inode->i_bdev, BDEV_FILE);
 }
 
-static int blkdev_reread_part(struct block_device *bdev)
-{
-	int part;
-	struct gendisk *disk = get_gendisk(bdev->bd_dev, &part);
-	int res = 0;
-
-	if (!disk || disk->minors == 1 || bdev != bdev->bd_contains)
-		return -EINVAL;
-	if (part)
-		BUG();
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-	if (down_trylock(&bdev->bd_sem))
-		return -EBUSY;
-	res = rescan_partitions(disk, bdev);
-	up(&bdev->bd_sem);
-	return res;
-}
-
 static ssize_t blkdev_file_write(struct file *file, const char *buf,
 				   size_t count, loff_t *ppos)
 {
 	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
 
 	return generic_file_write_nolock(file, &local_iov, 1, ppos);
-}
-
-static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
-			unsigned long arg)
-{
-	struct block_device *bdev = inode->i_bdev;
-	int ret = blk_ioctl(bdev, cmd, arg);
-	if (ret == -ENOTTY && bdev->bd_op->ioctl)
-		ret = bdev->bd_op->ioctl(inode, file, cmd, arg);
-	return ret;
 }
 
 struct address_space_operations def_blk_aops = {

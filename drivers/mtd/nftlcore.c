@@ -770,7 +770,6 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 		return copy_to_user((void *)arg, &g, sizeof g) ? -EFAULT : 0;
 	}
 	case BLKFLSBUF:
-		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
 		fsync_bdev(inode->i_bdev);
 		invalidate_bdev(inode->i_bdev, 0);
 		if (nftl->mtd->sync)

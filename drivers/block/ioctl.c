@@ -1,0 +1,231 @@
+#include <linux/sched.h>		/* for capable() */
+#include <linux/blk.h>			/* for set_device_ro() */
+#include <linux/blkpg.h>
+#include <linux/backing-dev.h>
+#include <linux/buffer_head.h>
+#include <asm/uaccess.h>
+
+static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
+{
+	struct block_device *bdevp;
+	int holder;
+	struct gendisk *disk;
+	struct blkpg_ioctl_arg a;
+	struct blkpg_partition p;
+	long long start, length;
+	int part;
+	int i;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+	if (copy_from_user(&a, arg, sizeof(struct blkpg_ioctl_arg)))
+		return -EFAULT;
+	if (copy_from_user(&p, a.data, sizeof(struct blkpg_partition)))
+		return -EFAULT;
+	disk = get_gendisk(bdev->bd_dev, &part);
+	if (!disk)
+		return -ENXIO;
+	if (bdev != bdev->bd_contains)
+		return -EINVAL;
+	if (part)
+		BUG();
+	part = p.pno;
+	if (part <= 0 || part >= disk->minors)
+		return -EINVAL;
+
+	switch (a.op) {
+		case BLKPG_ADD_PARTITION:
+			start = p.start >> 9;
+			length = p.length >> 9;
+			/* check for fit in a hd_struct */ 
+			if (sizeof(sector_t) == sizeof(long) && 
+			    sizeof(long long) > sizeof(long)) {
+				long pstart = start, plength = length;
+				if (pstart != start || plength != length
+				    || pstart < 0 || plength < 0)
+					return -EINVAL;
+			}
+
+			/* partition number in use? */
+			if (disk->part[part - 1].nr_sects != 0)
+				return -EBUSY;
+
+			/* overlap? */
+			for (i = 0; i < disk->minors - 1; i++) {
+				struct hd_struct *s = &disk->part[i];
+				if (!(start+length <= s->start_sect ||
+				      start >= s->start_sect + s->nr_sects))
+					return -EBUSY;
+			}
+			/* all seems OK */
+			disk->part[part - 1].start_sect = start;
+			disk->part[part - 1].nr_sects = length;
+			update_partition(disk, part);
+			return 0;
+		case BLKPG_DEL_PARTITION:
+			if (disk->part[part - 1].nr_sects == 0)
+				return -ENXIO;
+
+			/* partition in use? Incomplete check for now. */
+			bdevp = bdget(MKDEV(disk->major, disk->first_minor) + part);
+			if (!bdevp)
+				return -ENOMEM;
+			if (bd_claim(bdevp, &holder) < 0) {
+				bdput(bdevp);
+				return -EBUSY;
+			}
+
+			/* all seems OK */
+			fsync_bdev(bdevp);
+			invalidate_bdev(bdevp, 0);
+
+			disk->part[part].start_sect = 0;
+			disk->part[part].nr_sects = 0;
+			update_partition(disk, part);
+			bd_release(bdevp);
+			bdput(bdevp);
+			return 0;
+		default:
+			return -EINVAL;
+	}
+}
+
+static int blkdev_reread_part(struct block_device *bdev)
+{
+	int part;
+	struct gendisk *disk = get_gendisk(bdev->bd_dev, &part);
+	int res = 0;
+
+	if (!disk || disk->minors == 1 || bdev != bdev->bd_contains)
+		return -EINVAL;
+	if (part)
+		BUG();
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+	if (down_trylock(&bdev->bd_sem))
+		return -EBUSY;
+	res = rescan_partitions(disk, bdev);
+	up(&bdev->bd_sem);
+	return res;
+}
+
+static int put_ushort(unsigned long arg, unsigned short val)
+{
+	return put_user(val, (unsigned short *)arg);
+}
+
+static int put_int(unsigned long arg, int val)
+{
+	return put_user(val, (int *)arg);
+}
+
+static int put_long(unsigned long arg, long val)
+{
+	return put_user(val, (long *)arg);
+}
+
+static int put_ulong(unsigned long arg, unsigned long val)
+{
+	return put_user(val, (unsigned long *)arg);
+}
+
+static int put_u64(unsigned long arg, u64 val)
+{
+	return put_user(val, (u64 *)arg);
+}
+
+int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
+			unsigned long arg)
+{
+	struct block_device *bdev = inode->i_bdev;
+	struct backing_dev_info *bdi;
+	int holder;
+	int ret, n;
+
+	switch (cmd) {
+	case BLKELVGET:
+	case BLKELVSET:
+		/* deprecated, use the /proc/iosched interface instead */
+		return -ENOTTY;
+	case BLKRAGET:
+	case BLKFRAGET:
+		if (!arg)
+			return -EINVAL;
+		bdi = blk_get_backing_dev_info(bdev);
+		if (bdi == NULL)
+			return -ENOTTY;
+		return put_long(arg, (bdi->ra_pages * PAGE_CACHE_SIZE) / 512);
+	case BLKROGET:
+		return put_int(arg, bdev_read_only(bdev) != 0);
+	case BLKBSZGET: /* get the logical block size (cf. BLKSSZGET) */
+		return put_int(arg, block_size(bdev));
+	case BLKSSZGET: /* get block device hardware sector size */
+		return put_int(arg, bdev_hardsect_size(bdev));
+	case BLKSECTGET:
+		return put_ushort(arg, bdev->bd_queue->max_sectors);
+	case BLKRASET:
+	case BLKFRASET:
+		if(!capable(CAP_SYS_ADMIN))
+			return -EACCES;
+		bdi = blk_get_backing_dev_info(bdev);
+		if (bdi == NULL)
+			return -ENOTTY;
+		bdi->ra_pages = (arg * 512) / PAGE_CACHE_SIZE;
+		return 0;
+	case BLKBSZSET:
+		/* set the logical block size */
+		if (!capable(CAP_SYS_ADMIN))
+			return -EACCES;
+		if (!arg)
+			return -EINVAL;
+		if (get_user(n, (int *) arg))
+			return -EFAULT;
+		if (n > PAGE_SIZE || n < 512 || (n & (n - 1)))
+			return -EINVAL;
+		if (bd_claim(bdev, &holder) < 0)
+			return -EBUSY;
+		set_blocksize(bdev, n);
+		bd_release(bdev);
+		return 0;
+	case BLKPG:
+		return blkpg_ioctl(bdev, (struct blkpg_ioctl_arg *) arg);
+	case BLKRRPART:
+		return blkdev_reread_part(bdev);
+	case BLKGETSIZE:
+		if ((bdev->bd_inode->i_size >> 9) > ~0UL)
+			return -EFBIG;
+		return put_ulong(arg, bdev->bd_inode->i_size >> 9);
+	case BLKGETSIZE64:
+		return put_u64(arg, bdev->bd_inode->i_size);
+	case BLKFLSBUF:
+		if (!capable(CAP_SYS_ADMIN))
+			return -EACCES;
+		if (bdev->bd_op->ioctl) {
+			ret = bdev->bd_op->ioctl(inode, file, cmd, arg);
+			if (ret != -EINVAL)
+				return ret;
+		}
+		fsync_bdev(bdev);
+		invalidate_bdev(bdev, 0);
+		return 0;
+	case BLKROSET:
+		if (bdev->bd_op->ioctl) {
+			ret = bdev->bd_op->ioctl(inode, file, cmd, arg);
+			if (ret != -EINVAL)
+				return ret;
+		}
+		if (!capable(CAP_SYS_ADMIN))
+			return -EACCES;
+		if (get_user(n, (int *)(arg)))
+			return -EFAULT;
+		set_device_ro(to_kdev_t(bdev->bd_dev), n);
+		return 0;
+	default:
+		if (bdev->bd_op->ioctl) {
+			ret = bdev->bd_op->ioctl(inode, file, cmd, arg);
+			if (ret != -EINVAL)
+				return ret;
+		}
+	}
+	return -ENOTTY;
+}

@@ -201,8 +201,6 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 	if (!mtd || cmd != BLKFLSBUF)
 		return -EINVAL;
 
-	if(!capable(CAP_SYS_ADMIN))
-		return -EACCES;
 	fsync_bdev(inode->i_bdev);
 	invalidate_bdev(inode->i_bdev, 0);
 	if (mtd->sync)

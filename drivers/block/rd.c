@@ -291,8 +291,6 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 	if (cmd != BLKFLSBUF)
 		return -EINVAL;
 
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
 	/* special: we want to release the ramdisk memory,
 	   it's not like with the other blockdevices where
 	   this ioctl only flushes away the buffer cache. */
