@@ -104,11 +104,7 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 	memset(host, 0, sizeof(*host));
 
 	addr = sin->sin_addr.s_addr;
-	sprintf(host->h_name, "%d.%d.%d.%d",
-			(unsigned char) (ntohl(addr) >> 24),
-			(unsigned char) (ntohl(addr) >> 16),
-			(unsigned char) (ntohl(addr) >>  8),
-			(unsigned char) (ntohl(addr) >>  0));
+	sprintf(host->h_name, "%u.%u.%u.%u", NIPQUAD(addr));
 
 	host->h_addr       = *sin;
 	host->h_addr.sin_port = 0;	/* ouch! */

@@ -55,16 +55,16 @@ static inline u32 *nlm_decode_cookie(u32 *p, struct nlm_cookie *c)
 		c->len=4;
 		memset(c->data, 0, 4);	/* hockeypux brain damage */
 	}
-	else if(len<=8)
+	else if(len<=NLM_MAXCOOKIELEN)
 	{
 		c->len=len;
 		memcpy(c->data, p, len);
-		p+=(len+3)>>2;
+		p+=XDR_QUADLEN(len);
 	}
 	else 
 	{
 		printk(KERN_NOTICE
-			"lockd: bad cookie size %d (only cookies under 8 bytes are supported.)\n", len);
+			"lockd: bad cookie size %d (only cookies under %d bytes are supported.)\n", len, NLM_MAXCOOKIELEN);
 		return NULL;
 	}
 	return p;
@@ -75,7 +75,7 @@ nlm_encode_cookie(u32 *p, struct nlm_cookie *c)
 {
 	*p++ = htonl(c->len);
 	memcpy(p, c->data, c->len);
-	p+=(c->len+3)>>2;
+	p+=XDR_QUADLEN(c->len);
 	return p;
 }
 
@@ -86,7 +86,7 @@ nlm_decode_fh(u32 *p, struct nfs_fh *f)
 
 	if ((len = ntohl(*p++)) != NFS2_FHSIZE) {
 		printk(KERN_NOTICE
-			"lockd: bad fhandle size %x (should be %d)\n",
+			"lockd: bad fhandle size %d (should be %d)\n",
 			len, NFS2_FHSIZE);
 		return NULL;
 	}
@@ -512,11 +512,11 @@ nlmclt_decode_res(struct rpc_rqst *req, u32 *p, struct nlm_res *resp)
  * Buffer requirements for NLM
  */
 #define NLM_void_sz		0
-#define NLM_cookie_sz		3	/* 1 len , 2 data */
-#define NLM_caller_sz		1+QUADLEN(sizeof(system_utsname.nodename))
-#define NLM_netobj_sz		1+QUADLEN(XDR_MAX_NETOBJ)
-/* #define NLM_owner_sz		1+QUADLEN(NLM_MAXOWNER) */
-#define NLM_fhandle_sz		1+QUADLEN(NFS2_FHSIZE)
+#define NLM_cookie_sz		1+XDR_QUADLEN(NLM_MAXCOOKIELEN)
+#define NLM_caller_sz		1+XDR_QUADLEN(sizeof(system_utsname.nodename))
+#define NLM_netobj_sz		1+XDR_QUADLEN(XDR_MAX_NETOBJ)
+/* #define NLM_owner_sz		1+XDR_QUADLEN(NLM_MAXOWNER) */
+#define NLM_fhandle_sz		1+XDR_QUADLEN(NFS2_FHSIZE)
 #define NLM_lock_sz		3+NLM_caller_sz+NLM_netobj_sz+NLM_fhandle_sz
 #define NLM_holder_sz		4+NLM_netobj_sz
 
@@ -604,3 +604,32 @@ struct rpc_program		nlm_program = {
 		.stats		= &nlm_stats,
 };
 
+#ifdef RPC_DEBUG
+const char *nlmdbg_cookie2a(const struct nlm_cookie *cookie)
+{
+	/*
+	 * We can get away with a static buffer because we're only
+	 * called with BKL held.
+	 */
+	static char buf[2*NLM_MAXCOOKIELEN+1];
+	int i;
+	int len = sizeof(buf);
+	char *p = buf;
+
+	len--;	/* allow for trailing \0 */
+	if (len < 3)
+		return "???";
+	for (i = 0 ; i < cookie->len ; i++) {
+		if (len < 2) {
+			strcpy(p-3, "...");
+			break;
+		}
+		sprintf(p, "%02x", cookie->data[i]);
+		p += 2;
+		len -= 2;
+	}
+	*p = '\0';
+
+	return buf;
+}
+#endif
