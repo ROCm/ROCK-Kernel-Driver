@@ -13,9 +13,6 @@ qla2322-y := ql2322.o ql2322_fw.o
 qla6312-y := ql6312.o ql6312_fw.o
 qla6322-y := ql6322.o ql6322_fw.o
 
-host-progs := extras/qla_nvr
-always := $(host-progs)
-
 obj-$(CONFIG_SCSI_QLA21XX) += qla2xxx.o qla2100.o
 obj-$(CONFIG_SCSI_QLA22XX) += qla2xxx.o qla2200.o
 obj-$(CONFIG_SCSI_QLA2300) += qla2xxx.o qla2300.o

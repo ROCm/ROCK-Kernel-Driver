@@ -23,6 +23,58 @@
 #include "exioct.h"
 #include "inioct.h"
 
+static int qla2x00_read_option_rom_ext(scsi_qla_host_t *, EXT_IOCTL *, int);
+static int qla2x00_update_option_rom_ext(scsi_qla_host_t *, EXT_IOCTL *, int);
+static void qla2x00_get_option_rom_table(scsi_qla_host_t *,
+    INT_OPT_ROM_REGION **, unsigned long *);
+
+/* Option ROM definitions. */
+INT_OPT_ROM_REGION OptionRomTable6312[] = // 128k x20000
+{
+    {INT_OPT_ROM_REGION_ALL,	INT_OPT_ROM_SIZE_2312,
+	    0, INT_OPT_ROM_SIZE_2312-1},
+    {INT_OPT_ROM_REGION_PHBIOS,	0xC400,
+	    0, 0xC400-1},
+    {INT_OPT_ROM_REGION_BCFW,	INT_OPT_ROM_SIZE_2312-0xC400-0x200,
+	    0xC400, INT_OPT_ROM_SIZE_2312-0x200-1},
+    {INT_OPT_ROM_REGION_VPD,	0x200,
+	    INT_OPT_ROM_SIZE_2312-0x200, INT_OPT_ROM_SIZE_2312-1},
+    {INT_OPT_ROM_REGION_NONE,	0,	0,	0}
+};
+// ISP2312 Version 3 Chip.
+INT_OPT_ROM_REGION OptionRomTable6826A[] = // 128k x20000
+{
+    {INT_OPT_ROM_REGION_ALL,	INT_OPT_ROM_SIZE_2312,
+	    0, INT_OPT_ROM_SIZE_2312-1},
+    {INT_OPT_ROM_REGION_PHEFI_PHECFW_PHVPD,	INT_OPT_ROM_SIZE_2312,
+	    0, INT_OPT_ROM_SIZE_2312-1},
+    {INT_OPT_ROM_REGION_NONE,	0,	0,	0}
+};
+
+INT_OPT_ROM_REGION OptionRomTable2312[] = // 128k x20000
+{
+    {INT_OPT_ROM_REGION_ALL,	INT_OPT_ROM_SIZE_2312,
+	    0, INT_OPT_ROM_SIZE_2312-1},
+    {INT_OPT_ROM_REGION_PHBIOS_FCODE_EFI_FW,	INT_OPT_ROM_SIZE_2312,
+	    0, INT_OPT_ROM_SIZE_2312-1},
+    {INT_OPT_ROM_REGION_NONE,	0,	0,	0}
+};
+
+INT_OPT_ROM_REGION OptionRomTable2322[] = // 1 M x100000
+{
+    {INT_OPT_ROM_REGION_ALL, INT_OPT_ROM_SIZE_2322,
+	    0, INT_OPT_ROM_SIZE_2322-1},
+    {INT_OPT_ROM_REGION_PHBIOS_PHFCODE_PHEFI, 0x40000,
+	    0, 0x40000-1},
+    {INT_OPT_ROM_REGION_VPD,	0x200,
+	    0x40000, 0x40000+0x200-1},
+    {INT_OPT_ROM_REGION_FW1,	0x80000,
+	    0x80000, INT_OPT_ROM_SIZE_2322-1},
+    {INT_OPT_ROM_REGION_NONE,	0,	0,	0}
+};
+
+/* ========================================================================= */
+
 int
 qla2x00_read_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 {
@@ -192,7 +244,7 @@ qla2x00_update_nvram(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
 	up(ha->dpc_wait);
 
-	return 0;
+	return qla2x00_wait_for_hba_online(ha);
 }
 
 static int
@@ -462,6 +514,9 @@ qla2x00_read_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	device_reg_t	*reg = ha->iobase;
 	unsigned long	cpu_flags;
 
+	if (pext->SubCode)
+		return qla2x00_read_option_rom_ext(ha, pext, mode);
+
 	DEBUG9(printk("%s: entered.\n", __func__);)
 
 	/* The ISP2312 v2 chip cannot access the FLASH registers via MMIO. */
@@ -484,6 +539,7 @@ qla2x00_read_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	spin_lock_irqsave(&ha->hardware_lock, cpu_flags);
 	qla2x00_flash_enable(ha);
 	WRT_REG_WORD(&reg->nvram, 0);
+	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
 	for (addr = 0; addr < transfer_size; addr++, usr_tmp++) {
 		if (addr == midpoint)
 			WRT_REG_WORD(&reg->nvram, NVR_SELECT);
@@ -504,6 +560,77 @@ qla2x00_read_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	return (0);
 }
 
+int
+qla2x00_read_option_rom_ext(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
+{
+	uint8_t		*usr_tmp;
+	uint8_t		data;
+	device_reg_t	*reg = ha->iobase;
+	unsigned long	cpu_flags;
+	int		iter, found;
+	uint32_t	saddr, length, ilength;
+
+	DEBUG9(printk("%s: entered.\n", __func__);)
+
+	found = 0;
+	saddr = length = 0;
+	/* Retrieve region or raw starting address. */
+	if (pext->SubCode == 0xFFFF) {
+		saddr = pext->Reserved1;
+		length = pext->RequestLen;
+		found++;
+	} else {
+		INT_OPT_ROM_REGION *OptionRomTable = NULL;
+		unsigned long OptionRomTableSize;
+		/* Pick the right OptionRom table based on device id */
+		qla2x00_get_option_rom_table(ha, &OptionRomTable,
+		    &OptionRomTableSize);
+		for (iter = 0; OptionRomTable != NULL && iter <
+		    (OptionRomTableSize / sizeof(INT_OPT_ROM_REGION));
+		    iter++) {
+			if (OptionRomTable[iter].Region == pext->SubCode) {
+				saddr = OptionRomTable[iter].Beg;
+				length = OptionRomTable[iter].Size;
+				found++;
+				break;
+			}
+		}
+	}
+	if (!found) {
+		pext->Status = EXT_STATUS_ERR;
+		return 1;
+	}
+	if (pext->ResponseLen < length) {
+		pext->Status = EXT_STATUS_COPY_ERR;
+		return 1;
+	}
+
+	usr_tmp = (uint8_t *)pext->ResponseAdr;
+
+	/* Dump FLASH. */
+	spin_lock_irqsave(&ha->hardware_lock, cpu_flags);
+	qla2x00_flash_enable(ha);
+	WRT_REG_WORD(&reg->nvram, 0);
+	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
+	WRT_REG_WORD(&reg->nvram, NVR_SELECT);
+	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
+	for (ilength = 0; ilength < length; saddr++, ilength++, usr_tmp++) {
+		data = qla2x00_read_flash_byte(ha, saddr);
+		if (saddr % 100)
+			udelay(10);
+		__put_user(data, usr_tmp);
+	}
+	qla2x00_flash_disable(ha);
+	spin_unlock_irqrestore(&ha->hardware_lock, cpu_flags);
+
+	pext->Status = EXT_STATUS_OK;
+	pext->DetailStatus = EXT_STATUS_OK;
+
+	DEBUG9(printk("%s: exiting.\n", __func__);)
+
+	return 0;
+}
+
 int qla2x00_update_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 {
 	int		ret;
@@ -511,6 +638,9 @@ int qla2x00_update_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	uint8_t		*kern_tmp;
 	uint16_t	status;
 	unsigned long	cpu_flags;
+
+	if (pext->SubCode)
+		return qla2x00_update_option_rom_ext(ha, pext, mode);
 
 	DEBUG9(printk("%s: entered.\n", __func__);)
 
@@ -567,5 +697,204 @@ int qla2x00_update_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 
 	DEBUG9(printk("%s: exiting.\n", __func__);)
 
-	return (ret);
+	return qla2x00_wait_for_hba_online(ha);
+}
+
+
+int
+qla2x00_update_option_rom_ext(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
+{
+	int		ret;
+	uint8_t		*usr_tmp;
+	uint8_t		*kern_tmp;
+	uint16_t	status;
+	unsigned long	cpu_flags;
+	int		iter, found;
+	uint32_t	saddr, length;
+
+	DEBUG9(printk("%s: entered.\n", __func__);)
+
+	found = 0;
+	saddr = length = 0;
+	/* Retrieve region or raw starting address. */
+	if (pext->SubCode == 0xFFFF) {
+		saddr = pext->Reserved1;
+		length = pext->RequestLen;
+		found++;
+	} else {
+		INT_OPT_ROM_REGION *OptionRomTable = NULL;
+		unsigned long  OptionRomTableSize;
+		/* Pick the right OptionRom table based on device id */
+		qla2x00_get_option_rom_table(ha, &OptionRomTable,
+		    &OptionRomTableSize);
+		for (iter = 0; OptionRomTable != NULL && iter <
+		    (OptionRomTableSize / sizeof(INT_OPT_ROM_REGION));
+		    iter++) {
+			if (OptionRomTable[iter].Region == pext->SubCode) {
+				saddr = OptionRomTable[iter].Beg;
+				length = OptionRomTable[iter].Size;
+				found++;
+				break;
+			}
+		}
+	}
+	if (!found) {
+		pext->Status = EXT_STATUS_ERR;
+		return 1;
+	}
+	if (pext->RequestLen < length) {
+		pext->Status = EXT_STATUS_COPY_ERR;
+		return 1;
+	}
+
+	pext->Status = EXT_STATUS_OK;
+	pext->DetailStatus = EXT_STATUS_OK;
+
+	/* Read from user buffer */
+	usr_tmp = (uint8_t *)pext->RequestAdr;
+
+	kern_tmp = kmalloc(length, GFP_KERNEL);
+	if (kern_tmp == NULL) {
+		pext->Status = EXT_STATUS_COPY_ERR;
+		printk(KERN_WARNING
+		    "%s: ERROR in flash allocation.\n", __func__);
+		return 1;
+	}
+	ret = copy_from_user(kern_tmp, usr_tmp, length);
+	if (ret) {
+		kfree(kern_tmp);
+		pext->Status = EXT_STATUS_COPY_ERR;
+		DEBUG9_10(printk("%s: ERROR in buffer copy READ. "
+		    "RequestAdr=%p\n", __func__, pext->RequestAdr));
+		return (ret);
+	}
+
+	/* Go with update */
+	spin_lock_irqsave(&ha->hardware_lock, cpu_flags);
+	status = qla2x00_set_flash_image(ha, kern_tmp, saddr, length);
+	spin_unlock_irqrestore(&ha->hardware_lock, cpu_flags);
+
+	kfree(kern_tmp);
+
+	if (status) {
+		ret = 1;
+		pext->Status = EXT_STATUS_COPY_ERR;
+		DEBUG9_10(printk("%s: ERROR updating flash.\n", __func__);)
+	}
+
+
+	/* Schedule DPC to restart the RISC */
+	set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
+	up(ha->dpc_wait);
+
+	DEBUG9(printk("%s: exiting.\n", __func__);)
+
+	return qla2x00_wait_for_hba_online(ha);
+}
+
+int
+qla2x00_get_option_rom_layout(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
+{
+	int	ret, iter;
+	INT_OPT_ROM_REGION *OptionRomTable = NULL;
+	INT_OPT_ROM_LAYOUT *optrom_layout;	
+	unsigned long  OptionRomTableSize; 
+
+	DEBUG9(printk("%s: entered.\n", __func__);)
+
+	/* Pick the right OptionRom table based on device id */
+	qla2x00_get_option_rom_table(ha, &OptionRomTable, &OptionRomTableSize);
+
+	if (OptionRomTable == NULL) {
+		pext->Status = EXT_STATUS_DEV_NOT_FOUND;
+		DEBUG9_10(printk("%s(%ld) Option Rom Table for device_id=0x%x "
+		    "not defined\n", __func__, ha->host_no, ha->pdev->device));
+		return pext->Status;
+	}
+
+	if (pext->ResponseLen < OptionRomTableSize) {
+		pext->Status = EXT_STATUS_BUFFER_TOO_SMALL;
+		DEBUG9_10(printk("%s(%ld) buffer too small: response_len = %d "
+		    "optrom_table_len=%ld.\n", __func__, ha->host_no,
+		    pext->ResponseLen, OptionRomTableSize));
+		return pext->Status;
+	}
+	if (qla2x00_get_ioctl_scrap_mem(ha, (void **)&optrom_layout,
+	    OptionRomTableSize)) {
+		/* not enough memory */
+		pext->Status = EXT_STATUS_NO_MEMORY;
+		DEBUG9_10(printk("%s(%ld): inst=%ld scrap not big enough. "
+		    "size requested=%ld.\n", __func__, ha->host_no,
+		    ha->instance, OptionRomTableSize));
+		return pext->Status;
+	}
+
+	// Dont Count the NULL Entry.
+	optrom_layout->NoOfRegions = (UINT32)
+	    (OptionRomTableSize / sizeof(INT_OPT_ROM_REGION) - 1);
+
+	for (iter = 0; iter < optrom_layout->NoOfRegions; iter++) {
+		optrom_layout->Region[iter].Region =
+		    OptionRomTable[iter].Region;
+		optrom_layout->Region[iter].Size =
+		    OptionRomTable[iter].Size;
+
+		if (OptionRomTable[iter].Region == INT_OPT_ROM_REGION_ALL)
+			optrom_layout->Size = OptionRomTable[iter].Size;
+	}
+
+	ret = copy_to_user(pext->ResponseAdr, optrom_layout,
+	    OptionRomTableSize);
+	if (ret) {
+		pext->Status = EXT_STATUS_COPY_ERR;
+		DEBUG9_10(printk("%s(%ld): inst=%ld ERROR copy rsp buffer.\n",
+		    __func__, ha->host_no, ha->instance));
+		qla2x00_free_ioctl_scrap_mem(ha);
+		return ret;
+	}
+
+	pext->Status       = EXT_STATUS_OK;
+	pext->DetailStatus = EXT_STATUS_OK;
+
+	qla2x00_free_ioctl_scrap_mem(ha);
+
+	DEBUG9(printk("%s: exiting.\n", __func__));
+
+	return ret;
+}
+
+static void
+qla2x00_get_option_rom_table(scsi_qla_host_t *ha,
+    INT_OPT_ROM_REGION **pOptionRomTable, unsigned long  *OptionRomTableSize)
+{
+	DEBUG9(printk("%s: entered.\n", __func__));
+
+	switch (ha->pdev->device) {
+	case PCI_DEVICE_ID_QLOGIC_ISP6312:
+		*pOptionRomTable = OptionRomTable6312;
+		*OptionRomTableSize = sizeof(OptionRomTable6312);
+		break;		       	
+	case PCI_DEVICE_ID_QLOGIC_ISP2312:
+		/* HBA Model 6826A - is 2312 V3 Chip */
+		if (ha->pdev->subsystem_vendor == 0x103C &&
+		    ha->pdev->subsystem_device == 0x12BA) {
+			*pOptionRomTable = OptionRomTable6826A;
+			*OptionRomTableSize = sizeof(OptionRomTable6826A);
+		} else {
+			*pOptionRomTable = OptionRomTable2312;
+			*OptionRomTableSize = sizeof(OptionRomTable2312);
+		}
+		break;
+	case PCI_DEVICE_ID_QLOGIC_ISP2322:
+	case PCI_DEVICE_ID_QLOGIC_ISP6322:
+		*pOptionRomTable = OptionRomTable2322;
+		*OptionRomTableSize = sizeof(OptionRomTable2322);
+		break;
+	default: 
+		DEBUG9_10(printk("%s(%ld) Option Rom Table for device_id=0x%x "
+		    "not defined\n", __func__, ha->host_no, ha->pdev->device));
+		break;
+	}
+
+	DEBUG9(printk("%s: exiting.\n", __func__);)
 }

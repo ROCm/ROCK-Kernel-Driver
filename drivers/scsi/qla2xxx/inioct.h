@@ -147,24 +147,27 @@ typedef struct _INT_LOOPBACK_RSP
 #define INT_OPT_ROM_REGION_PHEFI  	0x13 //Efi with pci hdr
 #define INT_OPT_ROM_REGION_PHVPD  	0x14 // Vpd with pci hdr
 #define INT_OPT_ROM_REGION_PHEC_FW	0x15 // Efi compressed Fw with pci hdr
-#define INT_OPT_ROM_REGION_BCFW	               0x16 // Bios compressed Fw
+#define INT_OPT_ROM_REGION_BCFW	        0x16 // Bios compressed Fw
+#define INT_OPT_ROM_REGION_PHEFI_PHECFW_PHVPD 0x17
+#define INT_OPT_ROM_REGION_PHBIOS_FCODE_EFI_FW 0x18
+#define INT_OPT_ROM_REGION_PHBIOS_PHFCODE_PHEFI 0x19
 #define INT_OPT_ROM_REGION_INVALID	0xFFFFFFFF
 
 // Image device id (PCI_DATA_STRUCTURE.DeviceId) 
 
-#define INT_PDS_DID_VPD                  0x0001
-#define INT_PDS_DID_ISP23XX_FW  0x0003
+#define INT_PDS_DID_VPD		0x0001
+#define INT_PDS_DID_ISP23XX_FW	0x0003
 
 // Image code type (PCI_DATA_STRUCTURE.CodeType)
 
-#define INT_PDS_CT_X86                      0x0000
-#define INT_PDS_CT_PCI_OPEN_FW  0x0001
-#define INT_PDS_CT_HP_PA_RISC     0x0002
-#define INT_PDS_CT_EFI                      0x0003
+#define INT_PDS_CT_X86		0x0000
+#define INT_PDS_CT_PCI_OPEN_FW	0x0001
+#define INT_PDS_CT_HP_PA_RISC	0x0002
+#define INT_PDS_CT_EFI		0x0003
 
 // Last image indicator (PCI_DATA_STRUCTURE.Indicator)
 
-#define INT_PDS_ID_LAST_IMAGE   0x80
+#define INT_PDS_ID_LAST_IMAGE	0x80
 
 typedef struct _INT_PCI_ROM_HEADER
 {
@@ -173,7 +176,7 @@ typedef struct _INT_PCI_ROM_HEADER
     UINT16 PcirOffset;      // Relative pointer to pci data structure
 
 } INT_PCI_ROM_HEADER, *PINT_PCI_ROM_HEADER;
-#define INT_PCI_ROM_HEADER_SIGNATURE            0xAA55
+#define INT_PCI_ROM_HEADER_SIGNATURE	0xAA55
 
 typedef struct _INT_PCI_DATA_STRUCT
 {
@@ -224,9 +227,13 @@ typedef struct _INT_OPT_ROM_LAYOUT
     INT_OPT_ROM_REGION	Region[1];
 } INT_OPT_ROM_LAYOUT, *PINT_OPT_ROM_LAYOUT;
 
-#define	OPT_ROM_MAX_REGIONS	0xF
-#define OPT_ROM_SIZE_1      0x20000  // 128k
-#define OPT_ROM_SIZE_2      0x100000 // M
+#define INT_OPT_ROM_MAX_REGIONS     0xF
+#define INT_OPT_ROM_SIZE_2312       0x20000     /* 128k */
+#define INT_OPT_ROM_SIZE_2322       0x100000    /* 1 M  */
+#define INT_OPT_ROM_6312_BC_FW_ADR  0xC400      /* 49k  */
+#define INT_OPT_ROM_2322_VPD_ADR    0x40000     /* 256k */
+#define INT_OPT_ROM_2322_FW_ADR     0x80000     /* 512k */
+#define INT_OPT_ROM_2400_PH_ADR     0x100       /* 256  */
 
 typedef struct _OPT_ROM_TABLE
 {

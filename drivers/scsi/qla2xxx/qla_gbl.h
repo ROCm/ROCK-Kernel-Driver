@@ -64,6 +64,7 @@ extern int qlport_down_retry;
 extern int ql2xmaxqdepth;
 extern int displayConfig;
 extern int ql2xplogiabsentdevice;
+extern int ql2xenablezio;
 extern int ql2xintrdelaytimer;
 extern int ql2xloginretrycount;
 #ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
@@ -77,8 +78,12 @@ extern int ql2xsuspendcount;
 #if defined(MODULE)
 extern char *ql2xopts;
 #endif
+#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
 extern struct list_head qla_hostlist;
 extern rwlock_t qla_hostlist_lock;
+
+extern int qla2x00_wait_for_hba_online(scsi_qla_host_t *);
+#endif
 
 extern char *qla2x00_get_fw_version_str(struct scsi_qla_host *, char *);
 

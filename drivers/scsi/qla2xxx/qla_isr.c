@@ -827,7 +827,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 	uint16_t	comp_status;
 	uint16_t	scsi_status;
 	uint8_t		lscsi_status;
-	uint32_t	resid;
+	int32_t		resid;
 	uint8_t		sense_sz = 0;
 	uint16_t	rsp_info_len;
 
@@ -948,6 +948,11 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 			cp->result = DID_OK << 16;
 			break;
 		}
+		if (scsi_status & (SS_RESIDUAL_UNDER | SS_RESIDUAL_OVER)) {
+			resid = le32_to_cpu(pkt->residual_length);
+			cp->resid = resid;
+			CMD_RESID_LEN(cp) = resid;
+		}
 		if (lscsi_status == SS_BUSY_CONDITION) {
 			cp->result = DID_BUS_BUSY << 16 | lscsi_status;
 			break;
@@ -1009,7 +1014,10 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 		    ha->host_no, t, l, comp_status, scsi_status));
 
 		resid = le32_to_cpu(pkt->residual_length);
-		CMD_RESID_LEN(cp) = resid;
+		if (scsi_status & SS_RESIDUAL_UNDER) {
+			cp->resid = resid;
+			CMD_RESID_LEN(cp) = resid;
+		}
 
 		/*
 		 * Check to see if SCSI Status is non zero. If so report SCSI 
@@ -1085,7 +1093,6 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 			}
 
 			/* Handle mid-layer underflow */
-			cp->resid = resid;
 			if ((unsigned)(cp->request_bufflen - resid) <
 			    cp->underflow) {
 				qla_printk(KERN_INFO, ha,

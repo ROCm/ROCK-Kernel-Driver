@@ -678,10 +678,6 @@ qla2x00_fo_set_lun_data(EXT_IOCTL *pext, FO_LUN_DATA_INPUT  *bp, int mode)
 			 * LUN mask values in lun_mask field of this port.
 			 */
 
-			if (entry->TargetId >= MAX_FIBRE_DEVICES)
-				/* ERROR */
-				continue;
-
 			if (!(ostgt = ha->otgt[entry->TargetId]))
 				/* ERROR */
 				continue;

@@ -25,40 +25,40 @@
 #include "qla_foln.h"
 
 int ql2xfailover = 1;
-module_param(ql2xfailover, int, 0);
+module_param(ql2xfailover, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(ql2xfailover,
 		"Driver failover support: 0 to disable; 1 to enable.");
 
 int ql2xrecoveryTime = MAX_RECOVERYTIME;
-module_param_named(recoveryTime, ql2xrecoveryTime, int, 0);
+module_param_named(recoveryTime, ql2xrecoveryTime, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(recoveryTime,
 		"Recovery time in seconds before a target device is sent I/O "
 		"after a failback is performed.");
 
 int ql2xfailbackTime = MAX_FAILBACKTIME;
-module_param_named(failbackTime, ql2xfailbackTime, int, 0);
+module_param_named(failbackTime, ql2xfailbackTime, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(failbackTime,
 		"Delay in seconds before a failback is performed.");
 
 int MaxPathsPerDevice = 0;
-module_param(MaxPathsPerDevice, int, 0);
+module_param(MaxPathsPerDevice, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(MaxPathsPerDevice,
 		"Maximum number of paths to a device.  Default 8.");
 
 int MaxRetriesPerPath = 0;
-module_param(MaxRetriesPerPath, int, 0);
+module_param(MaxRetriesPerPath, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(MaxRetriesPerPath,
 		"How many retries to perform on the current path before "
 		"failing over to the next path in the path list.");
 
 int MaxRetriesPerIo = 0;
-module_param(MaxRetriesPerIo, int, 0);
+module_param(MaxRetriesPerIo, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(MaxRetriesPerIo,
 		"How many total retries to do before failing the command and "
 		"returning to the OS with a DID_NO_CONNECT status.");
 
 int qlFailoverNotifyType = 0;
-module_param(qlFailoverNotifyType, int, 0);
+module_param(qlFailoverNotifyType, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(qlFailoverNotifyType,
 		"Failover notification mechanism to use when a failover or "
 		"failback occurs.");

@@ -34,7 +34,6 @@ static int qla2x00_sns_gid_pt(scsi_qla_host_t *, sw_info_t *);
 static int qla2x00_sns_gpn_id(scsi_qla_host_t *, sw_info_t *);
 static int qla2x00_sns_gnn_id(scsi_qla_host_t *, sw_info_t *);
 static int qla2x00_sns_rft_id(scsi_qla_host_t *);
-static int qla2x00_sns_rff_id(scsi_qla_host_t *);
 static int qla2x00_sns_rnn_id(scsi_qla_host_t *);
 
 /**
@@ -113,7 +112,7 @@ qla2x00_ga_nxt(scsi_qla_host_t *ha, fc_port_t *fcport)
 	struct ct_sns_req	*ct_req;
 	struct ct_sns_rsp	*ct_rsp;
 
-	if (IS_QLA2200(ha)) {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 		return (qla2x00_sns_ga_nxt(ha, fcport));
 	}
 
@@ -201,7 +200,7 @@ qla2x00_gid_pt(scsi_qla_host_t *ha, sw_info_t *list)
 
 	struct ct_sns_gid_pt_data *gid_data;
 
-	if (IS_QLA2200(ha)) {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 		return (qla2x00_sns_gid_pt(ha, list));
 	}
 
@@ -278,7 +277,7 @@ qla2x00_gpn_id(scsi_qla_host_t *ha, sw_info_t *list)
 	struct ct_sns_req	*ct_req;
 	struct ct_sns_rsp	*ct_rsp;
 
-	if (IS_QLA2200(ha)) {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 		return (qla2x00_sns_gpn_id(ha, list));
 	}
 
@@ -343,7 +342,7 @@ qla2x00_gnn_id(scsi_qla_host_t *ha, sw_info_t *list)
 	struct ct_sns_req	*ct_req;
 	struct ct_sns_rsp	*ct_rsp;
 
-	if (IS_QLA2200(ha)) {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 		return (qla2x00_sns_gnn_id(ha, list));
 	}
 
@@ -422,7 +421,7 @@ qla2x00_rft_id(scsi_qla_host_t *ha)
 	struct ct_sns_req	*ct_req;
 	struct ct_sns_rsp	*ct_rsp;
 
-	if (IS_QLA2200(ha)) {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 		return (qla2x00_sns_rft_id(ha));
 	}
 
@@ -479,8 +478,10 @@ qla2x00_rff_id(scsi_qla_host_t *ha)
 	struct ct_sns_req	*ct_req;
 	struct ct_sns_rsp	*ct_rsp;
 
-	if (IS_QLA2200(ha)) {
-		return (qla2x00_sns_rff_id(ha));
+	if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
+		DEBUG2(printk("scsi(%ld): RFF_ID call unsupported on "
+		    "ISP2100/ISP2200.\n", ha->host_no));
+		return (QLA_SUCCESS);
 	}
 
 	/* Issue RFF_ID */
@@ -536,7 +537,7 @@ qla2x00_rnn_id(scsi_qla_host_t *ha)
 	struct ct_sns_req	*ct_req;
 	struct ct_sns_rsp	*ct_rsp;
 
-	if (IS_QLA2200(ha)) {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 		return (qla2x00_sns_rnn_id(ha));
 	}
 
@@ -595,9 +596,9 @@ qla2x00_rsnn_nn(scsi_qla_host_t *ha)
 	struct ct_sns_req	*ct_req;
 	struct ct_sns_rsp	*ct_rsp;
 
-	if (IS_QLA2200(ha)) {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 		DEBUG2(printk("scsi(%ld): RSNN_ID call unsupported on "
-		    "ISP2200.\n", ha->host_no));
+		    "ISP2100/ISP2200.\n", ha->host_no));
 		return (QLA_SUCCESS);
 	}
 
@@ -997,55 +998,6 @@ qla2x00_sns_rft_id(scsi_qla_host_t *ha)
 		rval = QLA_FUNCTION_FAILED;
 	} else {
 		DEBUG2(printk("scsi(%ld): RFT_ID exiting normally.\n",
-		    ha->host_no));
-	}
-
-	return (rval);
-}
-
-/**
- * qla2x00_sns_rff_id() - SNS Register FC-4 Features (RFF_ID) supported by the
- * HBA.
- * @ha: HA context
- *
- * This command uses the old Exectute SNS Command mailbox routine.
- *
- * Returns 0 on success.
- */
-static int
-qla2x00_sns_rff_id(scsi_qla_host_t *ha)
-{
-	int		rval;
-
-	struct sns_cmd_pkt	*sns_cmd;
-
-	/* Issue RFF_ID. */
-	/* Prepare SNS command request. */
-	sns_cmd = qla2x00_prep_sns_cmd(ha, RFF_ID_CMD, RFF_ID_SNS_SCMD_LEN,
-	    RFF_ID_SNS_DATA_SIZE);
-
-	/* Prepare SNS command arguments -- port_id, FC-4 feature, FC-4 type */
-	sns_cmd->p.cmd.param[0] = ha->d_id.b.al_pa;
-	sns_cmd->p.cmd.param[1] = ha->d_id.b.area;
-	sns_cmd->p.cmd.param[2] = ha->d_id.b.domain;
-
-	sns_cmd->p.cmd.param[6] = 0x08;			/* SCSI - FCP */
-
-	/* Execute SNS command. */
-	rval = qla2x00_send_sns(ha, ha->sns_cmd_dma, RFF_ID_SNS_CMD_SIZE / 2,
-	    sizeof(struct sns_cmd_pkt));
-	if (rval != QLA_SUCCESS) {
-		/*EMPTY*/
-		DEBUG2_3(printk("scsi(%ld): RFF_ID Send SNS failed (%d).\n",
-		    ha->host_no, rval));
-	} else if (sns_cmd->p.rff_data[8] != 0x80 ||
-	    sns_cmd->p.rff_data[9] != 0x02) {
-		DEBUG2_3(printk("scsi(%ld): RFF_ID failed, rejected request, "
-		    "rff_rsp:\n", ha->host_no));
-		DEBUG2_3(qla2x00_dump_buffer(sns_cmd->p.rff_data, 16));
-		rval = QLA_FUNCTION_FAILED;
-	} else {
-		DEBUG2(printk("scsi(%ld): RFF_ID exiting normally.\n",
 		    ha->host_no));
 	}
 

@@ -160,6 +160,12 @@
 #define WRT_REG_BYTE(addr, data)	writeb(data,addr)
 #define WRT_REG_WORD(addr, data)	writew(data,addr)
 #define WRT_REG_DWORD(addr, data)	writel(data,addr)
+/*
+ * The ISP2312 v2 chip cannot access the FLASH/GPIO registers via MMIO in an
+ * 133Mhz slot.
+ */
+#define RD_REG_WORD_IOMEM(addr)		(inw((unsigned long)addr))
+#define WRT_REG_WORD_IOMEM(addr, data)	(outw(data,(unsigned long)addr))
 
 /*
  * Fibre Channel device definitions.
@@ -263,10 +269,6 @@ typedef struct srb {
 #define SRB_ERR_LOOP	2		/* Request failed -- "loop down" */
 #define SRB_ERR_DEVICE	3		/* Request failed -- "device error" */
 #define SRB_ERR_OTHER	4
-
-	/* Segment/entries counts */
-	uint16_t	req_cnt;	/* !0 indicates counts determined */
-	uint16_t	tot_dsds;
 
 	/* SRB magic number */
 	uint16_t magic;
@@ -1939,10 +1941,6 @@ struct ct_sns_pkt {
 #define	RFT_ID_SNS_CMD_SIZE	60
 #define	RFT_ID_SNS_DATA_SIZE	16
 
-#define	RFF_ID_SNS_SCMD_LEN	8
-#define	RFF_ID_SNS_CMD_SIZE	32
-#define	RFF_ID_SNS_DATA_SIZE	16
-
 #define	RNN_ID_SNS_SCMD_LEN	10
 #define	RNN_ID_SNS_CMD_SIZE	36
 #define	RNN_ID_SNS_DATA_SIZE	16
@@ -1978,7 +1976,6 @@ struct sns_cmd_pkt {
 		} cmd;
 
 		uint8_t rft_data[RFT_ID_SNS_DATA_SIZE];
-		uint8_t rff_data[RFF_ID_SNS_DATA_SIZE];
 		uint8_t rnn_data[RNN_ID_SNS_DATA_SIZE];
 		uint8_t gan_data[GA_NXT_SNS_DATA_SIZE];
 		uint8_t gid_data[GID_PT_SNS_DATA_SIZE];

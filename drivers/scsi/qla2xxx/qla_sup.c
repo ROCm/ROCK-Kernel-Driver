@@ -365,16 +365,16 @@ qla2x00_read_flash_byte(scsi_qla_host_t *ha, uint32_t addr)
 	}
 
 	/* The ISP2312 v2 chip cannot access the FLASH registers via MMIO. */
-	if (IS_QLA2312(ha) && ha->product_id[3] == 0x2 && ha->pio_address) {
+	if (IS_QLA2312(ha) && ha->pio_address) {
 		uint16_t data2;
 
 		reg = (device_reg_t *)ha->pio_address;
-		outw((uint16_t)addr, (unsigned long)(&reg->flash_address));
+		WRT_REG_WORD_IOMEM(&reg->flash_address, (uint16_t)addr);
 		do {
-			data = inw((unsigned long)(&reg->flash_data));
+			data = RD_REG_WORD_IOMEM(&reg->flash_data);
 			barrier();
 			cpu_relax();
-			data2 = inw((unsigned long)(&reg->flash_data));
+			data2 = RD_REG_WORD_IOMEM(&reg->flash_data);
 		} while (data != data2);
 	} else {
 		WRT_REG_WORD(&reg->flash_address, (uint16_t)addr);
@@ -427,10 +427,10 @@ qla2x00_write_flash_byte(scsi_qla_host_t *ha, uint32_t addr, uint8_t data)
 	}
 
 	/* The ISP2312 v2 chip cannot access the FLASH registers via MMIO. */
-	if (IS_QLA2312(ha) && ha->product_id[3] == 0x2 && ha->pio_address) {
+	if (IS_QLA2312(ha) && ha->pio_address) {
 		reg = (device_reg_t *)ha->pio_address;
-		outw((uint16_t)addr, (unsigned long)(&reg->flash_address));
-		outw((uint16_t)data, (unsigned long)(&reg->flash_data));
+		WRT_REG_WORD_IOMEM(&reg->flash_address, (uint16_t)addr);
+		WRT_REG_WORD_IOMEM(&reg->flash_data, (uint16_t)data);
 	} else {
 		WRT_REG_WORD(&reg->flash_address, (uint16_t)addr);
 		RD_REG_WORD(&reg->ctrl_status);		/* PCI Posting. */
@@ -580,7 +580,7 @@ qla2x00_get_flash_version(scsi_qla_host_t *ha)
 	uint32_t	pcihdr, pcids;
 
 	/* The ISP2312 v2 chip cannot access the FLASH registers via MMIO. */
-	if (IS_QLA2312(ha) && ha->product_id[3] == 0x2 && !ha->pio_address)
+	if (IS_QLA2312(ha) && !ha->pio_address)
 		return QLA_FUNCTION_FAILED;
 
 	qla2x00_flash_enable(ha);
@@ -796,7 +796,6 @@ qla2x00_set_flash_image(scsi_qla_host_t *ha, uint8_t *image, uint32_t saddr,
 	uint16_t	status;
 	uint32_t	addr;
 	uint32_t	liter;
-	uint32_t	midpoint;
 	uint32_t	sec_mask;
 	uint32_t	rest_addr;
 	uint8_t		man_id, flash_id;
@@ -879,15 +878,11 @@ qla2x00_set_flash_image(scsi_qla_host_t *ha, uint8_t *image, uint32_t saddr,
 			break;
 		}
 
-		midpoint = FLASH_IMAGE_SIZE / 2;
-		for (addr = saddr, liter = 0; liter < length; liter++, addr++)
-		{
+		for (addr = saddr, liter = 0; liter < length; liter++, addr++) {
 			data = image[liter];
 			/* Are we at the beginning of a sector? */
 			if ((addr & rest_addr) == 0) {
-#if defined(ISP2300) 
-				if (ha->device_id == QLA2322_DEVICE_ID ||
-				    ha->device_id == QLA6322_DEVICE_ID) {
+				if (IS_QLA2322(ha) || IS_QLA6322(ha)) {
 					if (addr >= 0x10000UL) {
 						if (((addr >> 12) & 0xf0) &&
 						    ((man_id == 0x01 && flash_id == 0x3e) ||
@@ -906,9 +901,7 @@ qla2x00_set_flash_image(scsi_qla_host_t *ha, uint8_t *image, uint32_t saddr,
 							}         
 						}                           
 					}    
-				} else
-#endif
-				if (addr == FLASH_IMAGE_SIZE / 2) {
+				} else if (addr == FLASH_IMAGE_SIZE / 2) {
 					WRT_REG_WORD(&reg->nvram, NVR_SELECT);
 					RD_REG_WORD(&reg->nvram);
 				}

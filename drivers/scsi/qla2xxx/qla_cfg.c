@@ -60,7 +60,7 @@ static uint32_t qla2x00_update_mp_tree (void);
 
 static fc_lun_t *qla2x00_find_matching_lun(uint8_t , mp_device_t *, mp_path_t *);
 static mp_path_t *qla2x00_find_path_by_id(mp_device_t *, uint8_t);
-static mp_device_t *qla2x00_find_mp_dev_by_id(mp_host_t *, uint8_t);
+static mp_device_t *qla2x00_find_mp_dev_by_id(mp_host_t *, uint16_t);
 static mp_device_t *qla2x00_find_mp_dev_by_nodename(mp_host_t *, uint8_t *);
 static mp_device_t *qla2x00_find_mp_dev_by_portname(mp_host_t *, uint8_t *,
     uint16_t *);
@@ -1717,7 +1717,7 @@ qla2x00_alloc_host(scsi_qla_host_t *ha)
 static uint32_t
 qla2x00_add_portname_to_mp_dev(mp_device_t *dp, uint8_t *portname, uint8_t *nodename)
 {
-	uint8_t		index;
+	uint16_t	index;
 	uint32_t	rval = QLA_SUCCESS;
 
 	ENTER("qla2x00_add_portname_to_mp_dev");
@@ -4792,7 +4792,7 @@ qla2x00_find_path_by_id(mp_device_t *dp, uint8_t id)
  *      Kernel context.
  */
 static mp_device_t  *
-qla2x00_find_mp_dev_by_id(mp_host_t *host, uint8_t id )
+qla2x00_find_mp_dev_by_id(mp_host_t *host, uint16_t id )
 {
 	if (id < MAX_MP_DEVICES)
 		return host->mp_devs[id];

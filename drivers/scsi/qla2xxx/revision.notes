@@ -5,6 +5,25 @@
  *
  * Revision History
  *
+ *  Rev  8.00.00b13	May 21, 2004	DG/RA/AV
+ *	- Resync with Linux Kernel 2.6.6-mm3.
+ *	- Resync with 7.00.00b27.
+ *	- Add permissions to module_param()s.
+ *	- Fix fabric scan and SNS registration logic for ISP2100.
+ *	- Don't use the 'point-to-point preferred, else loop'
+ *	  connection mode setting on an ISP2200.
+ *	- Interrogate the proper CDB array when attempting to
+ *	  determine data direction.
+ *	- Restructure qla2x00_start_scsi() so that PCI mappings are
+ *	  done after we've verified command list and request queue
+ *	  resource availability.
+ *	- Properly calculate data-transfer residuals during command
+ *	  post-processing (Tony Battersby [tonyb@cybernetics.com]).
+ *	- Fixup nested spinlock usage in error-hanlding functions.
+ *	- Add wmb() to selected locations during request-queue
+ *	  modifications.
+ *	- Add new 2300/2322 IPX and 6312/6322 FLX firmwares (3.02.29):
+ *
  *  Rev  8.00.00b12	April 23, 2004	DG/RA/AV
  *	- Resync with Linux Kernel 2.6.6-rc2-mm1.
  *	- Resync with 7.00.00b27.

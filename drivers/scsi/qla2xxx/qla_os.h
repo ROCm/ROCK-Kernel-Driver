@@ -64,6 +64,11 @@
 #include <scsi/scsicam.h>
 #include <scsi/scsi_ioctl.h>
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,6)
+#include <scsi/scsi_transport.h>
+#include <scsi/scsi_transport_fc.h>
+#endif
+
 //TODO Fix this!!!
 /*
 * String arrays

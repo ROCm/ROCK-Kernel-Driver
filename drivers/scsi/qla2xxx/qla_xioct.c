@@ -82,6 +82,7 @@ extern int qla2x00_update_nvram(scsi_qla_host_t *, EXT_IOCTL *, int);
 extern int qla2x00_send_loopback(scsi_qla_host_t *, EXT_IOCTL *, int);
 extern int qla2x00_read_option_rom(scsi_qla_host_t *, EXT_IOCTL *, int);
 extern int qla2x00_update_option_rom(scsi_qla_host_t *, EXT_IOCTL *, int);
+extern int qla2x00_get_option_rom_layout(scsi_qla_host_t *, EXT_IOCTL *, int);
 
 /*
  * Local prototypes
@@ -617,29 +618,27 @@ qla2x00_ioctl(struct scsi_device *dev, int cmd, void *arg)
 
 	case INT_CC_READ_NVRAM:
 		ret = qla2x00_read_nvram(ha, pext, mode);
-
 		break;
 
 	case INT_CC_UPDATE_NVRAM:
 		ret = qla2x00_update_nvram(ha, pext, mode);
-
 		break;
 
 	case INT_CC_LOOPBACK:
 		ret = qla2x00_send_loopback(ha, pext, mode);
-
 		break;
 
 	case INT_CC_READ_OPTION_ROM:
 		ret = qla2x00_read_option_rom(ha, pext, mode);
-
 		break;
 
 	case INT_CC_UPDATE_OPTION_ROM:
 		ret = qla2x00_update_option_rom(ha, pext, mode);
-
 		break;
 
+	case INT_CC_GET_OPTION_ROM_LAYOUT:
+		ret = qla2x00_get_option_rom_layout(ha, pext, mode);
+		break; 
 
 	case EXT_CC_SEND_ELS_PASSTHRU:
 		if (IS_QLA2100(ha) || IS_QLA2200(ha))
@@ -2030,10 +2029,11 @@ qla2x00_query_chip(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	ptmp_isp->PciBusNumber   = ha->pdev->bus->number;
 	ptmp_isp->PciDevFunc     = ha->pdev->devfn;
 	ptmp_isp->PciSlotNumber  = PCI_SLOT(ha->pdev->devfn);
-	ptmp_isp->IoAddr         = (UINT32)ha->pio_address;
-	ptmp_isp->IoAddrLen      = (UINT32)ha->pio_length;
-	ptmp_isp->MemAddr        = (UINT32)ha->mmio_address;
-	ptmp_isp->MemAddrLen     = (UINT32)ha->mmio_length;
+	/* These values are not 64bit architecture safe. */
+	ptmp_isp->IoAddr         = 0; //(UINT32)ha->pio_address;
+	ptmp_isp->IoAddrLen      = 0; //(UINT32)ha->pio_length;
+	ptmp_isp->MemAddr        = 0; //(UINT32)ha->mmio_address;
+	ptmp_isp->MemAddrLen     = 0; //(UINT32)ha->mmio_length;
 	ptmp_isp->ChipType       = 0; /* ? */
 	ptmp_isp->InterruptLevel = host->irq;
 
@@ -5651,18 +5651,33 @@ qla2x00_set_led_state(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 			return (ret);
 		}
 
+		if (IS_QLA2312(ha) && ha->pio_address)
+			reg = (device_reg_t *)ha->pio_address;
+
 		/* Turn of both LEDs */
 		spin_lock_irqsave(&ha->hardware_lock, cpu_flags);
-		gpio_enable = RD_REG_WORD(&reg->gpioe);
-		gpio_data   = RD_REG_WORD(&reg->gpiod);
+		if (IS_QLA2312(ha) && ha->pio_address) {
+			gpio_enable = RD_REG_WORD_IOMEM(&reg->gpioe);
+			gpio_data   = RD_REG_WORD_IOMEM(&reg->gpiod);
+		} else {
+			gpio_enable = RD_REG_WORD(&reg->gpioe);
+			gpio_data   = RD_REG_WORD(&reg->gpiod);
+		}
 		gpio_enable |= GPIO_LED_MASK;
 
 		/* Set the modified gpio_enable values */
 		WRT_REG_WORD(&reg->gpioe,gpio_enable);
+		if (IS_QLA2312(ha) && ha->pio_address)
+			WRT_REG_WORD_IOMEM(&reg->gpioe, gpio_enable);
+		else
+			WRT_REG_WORD(&reg->gpioe, gpio_enable);
 
 		/* Clear out previously set LED colour */
 		gpio_data &= ~GPIO_LED_MASK;
-		WRT_REG_WORD(&reg->gpiod,gpio_data);
+		if (IS_QLA2312(ha) && ha->pio_address)
+			WRT_REG_WORD_IOMEM(&reg->gpiod, gpio_data);
+		else
+			WRT_REG_WORD(&reg->gpiod, gpio_data);
 		spin_unlock_irqrestore(&ha->hardware_lock, cpu_flags);
 
 		/* Let the per HBA timer kick off the blinking process*/
