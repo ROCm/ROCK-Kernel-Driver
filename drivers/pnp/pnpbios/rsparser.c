@@ -346,12 +346,12 @@ pnpbios_parse_resource_option_data(unsigned char * p, unsigned char * end, struc
 {
 	unsigned int len, tag;
 	int priority = 0;
-	struct pnp_option *option;
+	struct pnp_option *option, *option_independent;
 
 	if (!p)
 		return NULL;
 
-	option = pnp_register_independent_option(dev);
+	option_independent = option = pnp_register_independent_option(dev);
 	if (!option)
 		return NULL;
 
@@ -428,9 +428,14 @@ pnpbios_parse_resource_option_data(unsigned char * p, unsigned char * end, struc
 		case SMALL_TAG_ENDDEP:
 			if (len != 0)
 				goto len_err;
+			if (option_independent == option)
+				printk(KERN_WARNING "PnPBIOS: Missing SMALL_TAG_STARTDEP tag\n");
+			option = option_independent;
 			break;
 
 		case SMALL_TAG_END:
+			if (option_independent != option)
+				printk(KERN_WARNING "PnPBIOS: Missing SMALL_TAG_ENDDEP tag\n");
 			p = p + 2;
         		return (unsigned char *)p;
 			break;
