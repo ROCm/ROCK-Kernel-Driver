@@ -1903,6 +1903,12 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	}
 
 	/*
+	 * mm->mmap_sem is required to protect against another thread
+	 * changing the mappings in case we sleep.
+	 */
+	WARN_ON(down_read_trylock(&mm->mmap_sem));
+
+	/*
 	 * Clear old maps.  this also does some error checking for us
 	 */
  munmap_back:
