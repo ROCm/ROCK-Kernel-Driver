@@ -139,22 +139,23 @@ static void __init probe_roms(void)
 	probe_extension_roms(roms);
 }
 
-static void __init limit_regions (unsigned long long size)
+static void __init limit_regions(unsigned long long size)
 {
+	unsigned long long current_addr = 0;
 	int i;
-	unsigned long long current_size = 0;
 
 	for (i = 0; i < e820.nr_map; i++) {
 		if (e820.map[i].type == E820_RAM) {
-			current_size += e820.map[i].size;
-			if (current_size >= size) {
-				e820.map[i].size -= current_size-size;
+			current_addr = e820.map[i].addr + e820.map[i].size;
+			if (current_addr >= size) {
+				e820.map[i].size -= current_addr-size;
 				e820.nr_map = i + 1;
 				return;
 			}
 		}
 	}
 }
+
 static void __init add_memory_region(unsigned long long start,
                                   unsigned long long size, int type)
 {
