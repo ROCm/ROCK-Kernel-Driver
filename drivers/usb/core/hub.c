@@ -634,7 +634,6 @@ static void hub_disconnect(struct usb_interface *intf)
 {
 	struct usb_hub *hub = usb_get_intfdata (intf);
 	DECLARE_COMPLETION(urb_complete);
-	unsigned long flags;
 
 	if (!hub)
 		return;
@@ -643,16 +642,13 @@ static void hub_disconnect(struct usb_interface *intf)
 		highspeed_hubs--;
 
 	usb_set_intfdata (intf, NULL);
-	spin_lock_irqsave(&hub_event_lock, flags);
+	spin_lock_irq(&hub_event_lock);
 	hub->urb_complete = &urb_complete;
 
 	/* Delete it and then reset it */
 	list_del_init(&hub->event_list);
 
-	spin_unlock_irqrestore(&hub_event_lock, flags);
-
-	down(&hub->khubd_sem); /* Wait for khubd to leave this hub alone. */
-	up(&hub->khubd_sem);
+	spin_unlock_irq(&hub_event_lock);
 
 	/* assuming we used keventd, it must quiesce too */
 	if (hub->has_indicators)
@@ -738,7 +734,6 @@ descriptor_error:
 
 	INIT_LIST_HEAD(&hub->event_list);
 	hub->intf = intf;
-	init_MUTEX(&hub->khubd_sem);
 	INIT_WORK(&hub->leds, led_work, hub);
 
 	usb_set_intfdata (intf, hub);
@@ -1721,7 +1716,6 @@ done:
 
 static void hub_events(void)
 {
-	unsigned long flags;
 	struct list_head *tmp;
 	struct usb_device *hdev;
 	struct usb_hub *hub;
@@ -1740,24 +1734,32 @@ static void hub_events(void)
 	 * Not the most efficient, but avoids deadlocks.
 	 */
 	while (1) {
-		spin_lock_irqsave(&hub_event_lock, flags);
 
-		if (list_empty(&hub_event_list))
+		/* Grab the first entry at the beginning of the list */
+		spin_lock_irq(&hub_event_lock);
+		if (list_empty(&hub_event_list)) {
+			spin_unlock_irq(&hub_event_lock);
 			break;
+		}
 
-		/* Grab the next entry from the beginning of the list */
 		tmp = hub_event_list.next;
+		list_del_init(tmp);
 
 		hub = list_entry(tmp, struct usb_hub, event_list);
 		hdev = interface_to_usbdev(hub->intf);
 		hub_dev = &hub->intf->dev;
 
-		list_del_init(tmp);
+		usb_get_dev(hdev);
+		spin_unlock_irq(&hub_event_lock);
 
-		if (unlikely(down_trylock(&hub->khubd_sem)))
-			BUG();	/* never blocks, we were on list */
-
-		spin_unlock_irqrestore(&hub_event_lock, flags);
+		/* Lock the device, then check to see if we were
+		 * disconnected while waiting for the lock to succeed. */
+		down(&hdev->serialize);
+		if (hdev->state != USB_STATE_CONFIGURED ||
+				!hdev->actconfig ||
+				hub != usb_get_intfdata(
+					hdev->actconfig->interface[0]))
+			goto loop;
 
 		if (hub->error) {
 			dev_dbg (hub_dev, "resetting for error %d\n",
@@ -1766,9 +1768,8 @@ static void hub_events(void)
 			if (hub_reset(hub)) {
 				dev_dbg (hub_dev,
 					"can't reset; disconnecting\n");
-				up(&hub->khubd_sem);
 				hub_start_disconnect(hdev);
-				continue;
+				goto loop;
 			}
 
 			hub->nerrors = 0;
@@ -1859,10 +1860,12 @@ static void hub_events(void)
                         	hub_power_on(hub);
 			}
 		}
-		up(&hub->khubd_sem);
-        } /* end while (1) */
 
-	spin_unlock_irqrestore(&hub_event_lock, flags);
+loop:
+		up(&hdev->serialize);
+		usb_put_dev(hdev);
+
+        } /* end while (1) */
 }
 
 static int hub_thread(void *__unused)

@@ -205,7 +205,6 @@ struct usb_hub {
 	struct list_head	event_list;	/* hubs w/data or errs ready */
 
 	struct usb_hub_descriptor *descriptor;	/* class descriptor */
-	struct semaphore	khubd_sem;
 	struct usb_tt		tt;		/* Transaction Translator */
 
 	u8			power_budget;	/* in 2mA units; or zero */
