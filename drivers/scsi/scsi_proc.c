@@ -214,8 +214,8 @@ out:
 	return error;
 }
 
-static int proc_scsi_write(struct file *file, const char* buf,
-                           size_t length, loff_t *ppos)
+static ssize_t proc_scsi_write(struct file *file, const char __user *buf,
+			       size_t length, loff_t *ppos)
 {
 	int host, channel, id, lun;
 	char *buffer, *p;
