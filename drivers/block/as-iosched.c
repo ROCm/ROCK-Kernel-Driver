@@ -43,7 +43,7 @@
  * read_batch_expire describes how long we will allow a stream of reads to
  * persist before looking to see whether it is time to switch over to writes.
  */
-#define default_read_batch_expire (HZ / 4)
+#define default_read_batch_expire (HZ / 2)
 
 /*
  * write_batch_expire describes how long we want a stream of writes to run for.
@@ -51,7 +51,7 @@
  * See, the problem is: we can send a lot of writes to disk cache / TCQ in
  * a short amount of time...
  */
-#define default_write_batch_expire (HZ / 16)
+#define default_write_batch_expire (HZ / 8)
 
 /*
  * max time we may wait to anticipate a read (default around 6ms)
