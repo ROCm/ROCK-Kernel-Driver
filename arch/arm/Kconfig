@@ -418,20 +418,6 @@ config XIP_PHYS_ADDR
 	  be linked for and stored to.  This address is dependent on your
 	  own flash usage.
 
-	  Please note that, if you're using MTD, you must use a flash chip
-	  that is NOT handled by MTD or the flash will be turned into non
-	  data mode for status and query purposes which will instantaneously
-	  crash the kernel.
-
-	  MTD can however be used with a XIP kernel on the same flash chip
-	  but only if the flash memory supports multiple partitions in
-	  hardware, like with the Intel K3 flash parts, and only if the
-	  kernel is not stored within the firrst hardware partition of the
-	  chip.
-
-	  In any case, make sure that MTD support is configured out for
-	  the first attempt.
-
 if (ARCH_SA1100 || ARCH_INTEGRATOR)
 
 source "drivers/cpufreq/Kconfig"
