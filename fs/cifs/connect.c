@@ -1574,14 +1574,15 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 		capabilities |= CAP_DFS;
 	}
 	pSMB->req_no_secext.Capabilities = cpu_to_le32(capabilities);
-	/* pSMB->req_no_secext.CaseInsensitivePasswordLength =
-	   CIFS_SESSION_KEY_SIZE; */
-	pSMB->req_no_secext.CaseInsensitivePasswordLength = 0;
+
+	pSMB->req_no_secext.CaseInsensitivePasswordLength = 
+		cpu_to_le16(CIFS_SESSION_KEY_SIZE);
+
 	pSMB->req_no_secext.CaseSensitivePasswordLength =
 	    cpu_to_le16(CIFS_SESSION_KEY_SIZE);
 	bcc_ptr = pByteArea(smb_buffer);
-	/* memcpy(bcc_ptr, (char *) lm_session_key, CIFS_SESSION_KEY_SIZE);
-	   bcc_ptr += CIFS_SESSION_KEY_SIZE; */
+	memcpy(bcc_ptr, (char *) session_key, CIFS_SESSION_KEY_SIZE);
+	bcc_ptr += CIFS_SESSION_KEY_SIZE;
 	memcpy(bcc_ptr, (char *) session_key, CIFS_SESSION_KEY_SIZE);
 	bcc_ptr += CIFS_SESSION_KEY_SIZE;
 
