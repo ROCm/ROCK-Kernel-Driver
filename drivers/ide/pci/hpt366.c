@@ -821,7 +821,7 @@ static int __init init_hpt37x(struct pci_dev *dev)
 	 */
 	pci_read_config_word(dev, 0x78, &freq);
 	freq &= 0x1FF;
-	if (freq < 0x9c) {
+	if (freq < 0xa0) {
 		pll = F_LOW_PCI_33;
 		if (hpt_minimum_revision(dev,8))
 			pci_set_drvdata(dev, (void *) thirty_three_base_hpt374);
@@ -897,7 +897,7 @@ static int __init init_hpt37x(struct pci_dev *dev)
 						       pll & ~0x100);
 				pci_write_config_byte(dev, 0x5b, 0x21);
 				if (hpt_minimum_revision(dev,8))
-					return -EOPNOTSUPP;
+					pci_set_drvdata(dev, (void *) fifty_base_hpt370a);
 				else if (hpt_minimum_revision(dev,5))
 					pci_set_drvdata(dev, (void *) fifty_base_hpt372);
 				else if (hpt_minimum_revision(dev,4))
