@@ -164,7 +164,7 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 	/* Some BIOS will set up the chipset incorrectly and leave a register
 	   in an undefined state (causing I2C to act very strangely). */
 	if (temp & 0x02) {
-		dev_info(&PIIX4_dev->dev, "Fixed I2C problem on Force CPCI735\n");
+		dev_info(&PIIX4_dev->dev, "Worked around buggy BIOS (I2C)\n");
 		temp = temp & 0xfd;
 		pci_write_config_byte(PIIX4_dev, SMBHSTCFG, temp);
 	}
