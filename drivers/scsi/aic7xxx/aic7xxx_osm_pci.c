@@ -54,7 +54,7 @@ static int	ahc_linux_pci_reserve_io_region(struct ahc_softc *ahc,
 						u_long *base);
 static int	ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 						 u_long *bus_addr,
-						 uint8_t **maddr);
+						 uint8_t __iomem **maddr);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static void	ahc_linux_pci_dev_remove(struct pci_dev *pdev);
 
@@ -326,7 +326,7 @@ ahc_linux_pci_reserve_io_region(struct ahc_softc *ahc, u_long *base)
 static int
 ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 				 u_long *bus_addr,
-				 uint8_t **maddr)
+				 uint8_t __iomem **maddr)
 {
 	u_long	start;
 	u_long	base_page;
@@ -370,7 +370,7 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 {
 	uint32_t command;
 	u_long	 base;
-	uint8_t	*maddr;
+	uint8_t	__iomem *maddr;
 	int	 error;
 
 	/*
