@@ -544,7 +544,7 @@ static int __devinit snd_cs423x_pnp_detect(struct pnp_card_link *card,
 	int res;
 
 	for ( ; dev < SNDRV_CARDS; dev++) {
-		if (!enable[dev])
+		if (!enable[dev] || !isapnp[dev])
 			continue;
 		res = snd_card_cs423x_probe(dev, card, id);
 		if (res < 0)
