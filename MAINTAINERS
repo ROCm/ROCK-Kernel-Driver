@@ -373,6 +373,12 @@ M:	maxk@qualcomm.com
 W:	http://bluez.sf.net
 S:	Maintained
 
+BLUETOOTH HCI BCM203X DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
 BLUETOOTH HCI BFUSB DRIVER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org

@@ -64,6 +64,18 @@ config BT_HCIUART_BCSP_TXCRC
 	  every BCSP (BlueCore Serial Protocol) packet sent to the Bluetooth chip.
 	  This increases reliability, but slightly reduces efficiency.
 
+config BT_HCIBCM203X
+	tristate "HCI BCM203x USB driver"
+	depends on USB && BT
+	select FW_LOADER
+	help
+	  Bluetooth HCI BCM203x USB driver.
+	  This driver provides the firmware loading mechanism for the Broadcom
+	  Blutonium based devices.
+
+	  Say Y here to compile support for HCI BCM203x devices into the
+	  kernel or say M to compile it as module (bcm203x).
+
 config BT_HCIBFUSB
 	tristate "HCI BlueFRITZ! USB driver"
 	depends on USB && BT
@@ -75,7 +87,7 @@ config BT_HCIBFUSB
 	     AVM BlueFRITZ! USB
 
 	  Say Y here to compile support for HCI BFUSB devices into the
-	  kernel or say M to compile it as module (bfusb.o).
+	  kernel or say M to compile it as module (bfusb).
 
 config BT_HCIDTL1
 	tristate "HCI DTL1 (PC Card) driver"
