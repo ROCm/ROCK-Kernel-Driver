@@ -48,21 +48,21 @@ extern void ctrl_alt_del(void);
  * Exported functions/variables
  */
 
-#ifndef KBD_DEFMODE
 #define KBD_DEFMODE ((1 << VC_REPEAT) | (1 << VC_META))
-#endif
 
-#ifndef KBD_DEFLEDS
 /*
  * Some laptops take the 789uiojklm,. keys as number pad when NumLock is on.
- * This seems a good reason to start with NumLock off.
+ * This seems a good reason to start with NumLock off. On PC9800 however there
+ * is no NumLock key and everyone expects the keypad to be used for numbers.
  */
+
+#ifdef CONFIG_X86_PC9800
+#define KBD_DEFLEDS (1 << VC_NUMLOCK)
+#else
 #define KBD_DEFLEDS 0
 #endif
 
-#ifndef KBD_DEFLOCK
 #define KBD_DEFLOCK 0
-#endif
 
 void compute_shiftstate(void);
 
