@@ -14,43 +14,19 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-#include <asm/ptrace.h>
-#include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/fs.h> 
 #include <linux/mm.h> 
-#include <linux/file.h> 
-#include <linux/signal.h>
-#include <linux/utime.h>
-#include <linux/resource.h>
-#include <linux/times.h>
-#include <linux/utsname.h>
-#include <linux/timex.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
-#include <linux/sem.h>
-#include <linux/msg.h>
-#include <linux/shm.h>
-#include <linux/slab.h>
-#include <linux/uio.h>
-#include <linux/nfs_fs.h>
-#include <linux/smb_fs.h>
-#include <linux/smb_mount.h>
-#include <linux/ncp_fs.h>
-#include <linux/module.h>
-#include <linux/poll.h>
-#include <linux/personality.h>
-#include <linux/stat.h>
-#include <linux/filter.h>
-#include <linux/tty.h>
-#include <linux/binfmts.h>
+#include <linux/kernel.h>
+#include <linux/signal.h>
+#include <linux/errno.h>
 #include <linux/elf.h>
-#include <asm/types.h>
-#include <asm/ipc.h>
-#include <asm/uaccess.h>
 #include <asm/ppc32.h>
+#include <asm/uaccess.h>
 #include <asm/ppcdebug.h>
 #include <asm/unistd.h>
+#include <asm/cacheflush.h>
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 /* 
@@ -112,9 +88,6 @@ struct rt_sigframe_32 {
 };
 
 
-extern asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr,
-		int options, struct rusage * ru);
-
 
 /*
  *  Start of nonRT signal support
@@ -133,7 +106,7 @@ extern asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr,
  *        setup_frame32
  */
 
-asmlinkage long sys32_sigaction(int sig, struct old_sigaction32 *act,
+long sys32_sigaction(int sig, struct old_sigaction32 *act,
 		struct old_sigaction32 *oact)
 {
 	struct k_sigaction new_ka, old_ka;
@@ -145,32 +118,30 @@ asmlinkage long sys32_sigaction(int sig, struct old_sigaction32 *act,
 	if (act) {
 		old_sigset_t32 mask;
 
-		ret = get_user((long)new_ka.sa.sa_handler, &act->sa_handler);
-		ret |= __get_user((long)new_ka.sa.sa_restorer, &act->sa_restorer);
-		ret |= __get_user(new_ka.sa.sa_flags, &act->sa_flags);
-		ret |= __get_user(mask, &act->sa_mask);
-		if (ret)
-			return ret;
+		if (get_user((long)new_ka.sa.sa_handler, &act->sa_handler) ||
+		    __get_user((long)new_ka.sa.sa_restorer, &act->sa_restorer) ||
+		    __get_user(new_ka.sa.sa_flags, &act->sa_flags) ||
+		    __get_user(mask, &act->sa_mask))
+			return -EFAULT;
 		siginitset(&new_ka.sa.sa_mask, mask);
 	}
 
 	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
 	if (!ret && oact) {
-		ret = put_user((long)old_ka.sa.sa_handler, &oact->sa_handler);
-		ret |= __put_user((long)old_ka.sa.sa_restorer, &oact->sa_restorer);
-		ret |= __put_user(old_ka.sa.sa_flags, &oact->sa_flags);
-		ret |= __put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask);
+		if (put_user((long)old_ka.sa.sa_handler, &oact->sa_handler) ||
+		    __put_user((long)old_ka.sa.sa_restorer, &oact->sa_restorer) ||
+		    __put_user(old_ka.sa.sa_flags, &oact->sa_flags) ||
+		    __put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask))
+			return -EFAULT;
 	}
 
 	return ret;
 }
 
 
+extern long sys_sigpending(old_sigset_t *set);
 
-
-extern asmlinkage long sys_sigpending(old_sigset_t *set);
-
-asmlinkage long sys32_sigpending(old_sigset_t32 *set)
+long sys32_sigpending(old_sigset_t32 *set)
 {
 	old_sigset_t s;
 	int ret;
@@ -185,9 +156,7 @@ asmlinkage long sys32_sigpending(old_sigset_t32 *set)
 }
 
 
-
-
-extern asmlinkage long sys_sigprocmask(int how, old_sigset_t *set,
+extern long sys_sigprocmask(int how, old_sigset_t *set,
 		old_sigset_t *oset);
 
 /*
@@ -197,7 +166,7 @@ extern asmlinkage long sys_sigprocmask(int how, old_sigset_t *set,
  * of a signed int (msr in 32-bit mode) and the register representation
  * of a signed int (msr in 64-bit mode) is performed.
  */
-asmlinkage long sys32_sigprocmask(u32 how, old_sigset_t32 *set,
+long sys32_sigprocmask(u32 how, old_sigset_t32 *set,
 		old_sigset_t32 *oset)
 {
 	old_sigset_t s;
@@ -252,23 +221,21 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	 * Note that PPC32 puts the upper 32 bits of the sigmask in the
 	 * unused part of the signal stackframe
 	 */
-	set.sig[0] = sigctx.oldmask + ((long)(sigctx._unused[3])<< 32);
+	set.sig[0] = sigctx.oldmask + ((long)(sigctx._unused[3]) << 32);
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = set;
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
-
-	/* Last stacked signal - restore registers */
-	sr = (struct sigregs32*)(u64)sigctx.regs;
 	if (regs->msr & MSR_FP )
 		giveup_fpu(current);
+	/* Last stacked signal - restore registers */
+	sr = (struct sigregs32*)(u64)sigctx.regs;
 	/*
 	 * copy the 32 bit register values off the user stack
 	 * into the 32 bit register area
 	 */
-	if (copy_from_user(saved_regs, &sr->gp_regs,
-				sizeof(sr->gp_regs)))
+	if (copy_from_user(saved_regs, &sr->gp_regs, sizeof(sr->gp_regs)))
 		goto badframe;
 	/*
 	 * The saved reg structure in the frame is an elf_grepset_t32,
@@ -323,7 +290,6 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 		goto badframe;
 
 	ret = regs->result;
-
 	return ret;
 
 badframe:
@@ -387,12 +353,13 @@ static void setup_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 	 */
 	if (__copy_to_user(&frame->fp_regs, current->thread.fpr,
 			   ELF_NFPREG * sizeof(double))
-	    || __put_user(0x38000000U + __NR_sigreturn, &frame->tramp[0])    /* li r0, __NR_sigreturn */
-	    || __put_user(0x44000002U, &frame->tramp[1]))   /* sc */
+	    /* li r0, __NR_sigreturn */
+	    || __put_user(0x38000000U + __NR_sigreturn, &frame->tramp[0])
+	    /* sc */
+	    || __put_user(0x44000002U, &frame->tramp[1]))
 		goto badframe;
-
-	flush_icache_range((unsigned long) &frame->tramp[0],
-			   (unsigned long) &frame->tramp[2]);
+	flush_icache_range((unsigned long)&frame->tramp[0],
+			   (unsigned long)&frame->tramp[2]);
 	current->thread.fpscr = 0;	/* turn off all fp exceptions */
 
 	newsp -= __SIGNAL_FRAMESIZE32;
@@ -451,50 +418,45 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 			unsigned long r6, unsigned long r7, unsigned long r8,
 			struct pt_regs * regs)
 {
-	struct rt_sigframe_32 *rt_stack_frame;
+	struct rt_sigframe_32 *rt_sf;
 	struct sigcontext32_struct sigctx;
-	struct sigregs32 *signalregs;
+	struct sigregs32 *sr;
 	int ret;
 	elf_gregset_t32 saved_regs;   /* an array of 32 bit register values */
-	sigset_t signal_set; 
-	stack_t stack;
+	sigset_t set; 
+	stack_t st;
 	int i;
 
-	ret = 0;
 	/* Adjust the inputted reg1 to point to the first rt signal frame */
-	rt_stack_frame = (struct rt_sigframe_32 *)(regs->gpr[1] + __SIGNAL_FRAMESIZE32);
+	rt_sf = (struct rt_sigframe_32 *)(regs->gpr[1] + __SIGNAL_FRAMESIZE32);
 	/* Copy the information from the user stack  */
-	if (copy_from_user(&sigctx, &rt_stack_frame->uc.uc_mcontext,
-				sizeof(sigctx))
-	    || copy_from_user(&signal_set, &rt_stack_frame->uc.uc_sigmask,
-		    sizeof(signal_set))
-	    || copy_from_user(&stack,&rt_stack_frame->uc.uc_stack,
-		    sizeof(stack)))
+	if (copy_from_user(&sigctx, &rt_sf->uc.uc_mcontext, sizeof(sigctx))
+	    || copy_from_user(&set, &rt_sf->uc.uc_sigmask, sizeof(set))
+	    || copy_from_user(&st,&rt_sf->uc.uc_stack, sizeof(st)))
 		goto badframe;
 
 	/*
 	 * Unblock the signal that was processed 
 	 *   After a signal handler runs - 
 	 *     if the signal is blockable - the signal will be unblocked  
-	 *       ( sigkill and sigstop are not blockable)
+	 *       (sigkill and sigstop are not blockable)
 	 */
-	sigdelsetmask(&signal_set, ~_BLOCKABLE); 
+	sigdelsetmask(&set, ~_BLOCKABLE); 
 	/* update the current based on the sigmask found in the rt_stackframe */
 	spin_lock_irq(&current->sigmask_lock);
-	current->blocked = signal_set;
+	current->blocked = set;
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
+	/* If currently owning the floating point - give them up */
+	if (regs->msr & MSR_FP)
+		giveup_fpu(current);
 	/*
 	 * Set to point to the next rt_sigframe - this is used to
 	 * determine whether this is the last signal to process
 	 */
-	signalregs = (struct sigregs32 *) (u64)sigctx.regs;
-	/* If currently owning the floating point - give them up */
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
-	if (copy_from_user(saved_regs, &signalregs->gp_regs,
-				sizeof(signalregs->gp_regs))) 
+	sr = (struct sigregs32 *)(u64)sigctx.regs;
+	if (copy_from_user(saved_regs, &sr->gp_regs, sizeof(sr->gp_regs))) 
 		goto badframe;
 	/*
 	 * The saved reg structure in the frame is an elf_grepset_t32,
@@ -544,7 +506,7 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 
 
 
-asmlinkage long sys32_rt_sigaction(int sig, const struct sigaction32 *act,
+long sys32_rt_sigaction(int sig, const struct sigaction32 *act,
 		struct sigaction32 *oact, size_t sigsetsize)
 {
 	struct k_sigaction new_ka, old_ka;
@@ -599,7 +561,7 @@ asmlinkage long sys32_rt_sigaction(int sig, const struct sigaction32 *act,
 }
 
 
-extern asmlinkage long sys_rt_sigprocmask(int how, sigset_t *set,
+extern long sys_rt_sigprocmask(int how, sigset_t *set,
 		sigset_t *oset, size_t sigsetsize);
 
 /*
@@ -609,7 +571,7 @@ extern asmlinkage long sys_rt_sigprocmask(int how, sigset_t *set,
  * of a signed int (msr in 32-bit mode) and the register representation
  * of a signed int (msr in 64-bit mode) is performed.
  */
-asmlinkage long sys32_rt_sigprocmask(u32 how, sigset32_t *set,
+long sys32_rt_sigprocmask(u32 how, sigset32_t *set,
 		sigset32_t *oset, size_t sigsetsize)
 {
 	sigset_t s;
@@ -649,10 +611,10 @@ asmlinkage long sys32_rt_sigprocmask(u32 how, sigset32_t *set,
 }
 
 
-extern asmlinkage long sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
+extern long sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
 
 
-asmlinkage long sys32_rt_sigpending(sigset32_t *set,
+long sys32_rt_sigpending(sigset32_t *set,
 		__kernel_size_t32 sigsetsize)
 {
 	sigset_t s;
@@ -716,11 +678,12 @@ siginfo_t32 *siginfo64to32(siginfo_t32 *d, siginfo_t *s)
 	return d;
 }
 
-extern asmlinkage long sys_rt_sigtimedwait(const sigset_t *uthese,
+
+extern long sys_rt_sigtimedwait(const sigset_t *uthese,
 		siginfo_t *uinfo, const struct timespec *uts,
 		size_t sigsetsize);
 
-asmlinkage long sys32_rt_sigtimedwait(sigset32_t *uthese, siginfo_t32 *uinfo,
+long sys32_rt_sigtimedwait(sigset32_t *uthese, siginfo_t32 *uinfo,
 		struct timespec32 *uts, __kernel_size_t32 sigsetsize)
 {
 	sigset_t s;
@@ -800,7 +763,7 @@ siginfo_t * siginfo32to64(siginfo_t *d, siginfo_t32 *s)
 }
 
 
-extern asmlinkage long sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo);
+extern long sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo);
 
 /*
  * Note: it is necessary to treat pid and sig as unsigned ints, with the
@@ -809,7 +772,7 @@ extern asmlinkage long sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo);
  * (msr in 32-bit mode) and the register representation of a signed int
  * (msr in 64-bit mode) is performed.
  */
-asmlinkage long sys32_rt_sigqueueinfo(u32 pid, u32 sig, siginfo_t32 *uinfo)
+long sys32_rt_sigqueueinfo(u32 pid, u32 sig, siginfo_t32 *uinfo)
 {
 	siginfo_t info;
 	siginfo_t32 info32;
@@ -986,7 +949,7 @@ static void handle_signal32(unsigned long sig, siginfo_t *info,
 
 	/*
 	 * Set up the signal frame
-	 * Determine if an real time frame - siginfo required
+	 * Determine if a real time frame and a siginfo is required
 	 */
 	if (ka->sa.sa_flags & SA_SIGINFO) {
 		siginfo64to32(&siginfo32bit,info);
@@ -1048,7 +1011,6 @@ static void handle_signal32(unsigned long sig, siginfo_t *info,
 		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 	}
-	
 	return;
 
 badframe:
@@ -1068,7 +1030,7 @@ badframe:
  *       sigaltatck               sys32_sigaltstack
  */
 
-asmlinkage int sys32_sigaltstack(u32 newstack, u32 oldstack, int p3,
+int sys32_sigaltstack(u32 newstack, u32 oldstack, int p3,
 		int p4, int p6, int p7, struct pt_regs *regs)
 {
 	stack_t uss, uoss;
@@ -1114,7 +1076,7 @@ asmlinkage int sys32_sigaltstack(u32 newstack, u32 oldstack, int p3,
 /*
  *  Start of do_signal32 routine
  *
- *   This routine gets control when a pemding signal needs to be processed
+ *   This routine gets control when a pending signal needs to be processed
  *     in the 32 bit target thread -
  *
  *   It handles both rt and non-rt signals
@@ -1141,13 +1103,13 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 	signr = get_signal_to_deliver(&info, regs);
 	if (signr > 0) {
 		ka = &current->sig->action[signr-1];
-
-		if ((ka->sa.sa_flags & SA_ONSTACK) &&
-				(!on_sig_stack(regs->gpr[1])))
+		if ((ka->sa.sa_flags & SA_ONSTACK)
+		     && (!on_sig_stack(regs->gpr[1])))
 			newsp = (current->sas_ss_sp + current->sas_ss_size);
 		else
 			newsp = regs->gpr[1];
 		newsp = frame = newsp - sizeof(struct sigregs32);
+
 		/* Whee!  Actually deliver the signal.  */
 		handle_signal32(signr, &info, oldset, regs, &newsp, frame);
 	}
@@ -1165,10 +1127,9 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 		return 0;		/* no signals delivered */
 
 	/* Invoke correct stack setup routine */
-	if (ka->sa.sa_flags & SA_SIGINFO) 
+	if (ka->sa.sa_flags & SA_SIGINFO)
 		setup_rt_frame32(regs, (struct sigregs32*)(u64)frame, newsp);
 	else
 		setup_frame32(regs, (struct sigregs32*)(u64)frame, newsp);
-
 	return 1;
 }
