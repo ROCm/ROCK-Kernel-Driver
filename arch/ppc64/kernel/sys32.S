@@ -21,33 +21,9 @@
 
 	.text
 
-_GLOBAL(sys32_mmap)
-	clrldi		r7, r7, 32	/* int fd parm */
-	clrldi		r8, r8, 32	/* off_t offset parm */
-	b		.sys_mmap
-
-_GLOBAL(sys32_lseek)
+_GLOBAL(ppc32_lseek)
 	extsw		r4,r4		/* sign extend off_t offset parm */
 	b		.sys_lseek
-
-_GLOBAL(sys32_sendto)
-	clrldi		r7, r7, 32	/* struct sockaddr *addr parm */
-	clrldi		r8, r8, 32	/* int addr_len parm */
-	b		.sys_sendto
-
-_GLOBAL(sys32_recvfrom)
-	clrldi		r7, r7, 32	/* struct sockaddr *addr parm */
-	clrldi		r8, r8, 32	/* int *addr_len parm */
-	b		.sys_recvfrom
-
-_GLOBAL(ppc32_mmap2)
-	clrldi		r7, r7, 32	/* unsigned long fd parm */
-	clrldi		r8, r8, 32	/* unsigned long pgoff */
-	b		.sys32_mmap2
-
-_GLOBAL(ppc32_remap_file_pages)
-	clrldi		r7, r7, 32
-	b		.sys_remap_file_pages
 
 _GLOBAL(sys32_socketcall)	/* r3=call, r4=args */
 	cmpwi		r3, 1
@@ -141,8 +117,8 @@ _STATIC(do_sys_sendto) /* sys32_sendto(int, u32, compat_size_t, unsigned int, u3
 	lwz		r5,8(r10)
 	lwz		r6,12(r10)
 	lwz		r7,16(r10)
-	lwa		r8,20(r10)
-	b		.sys32_sendto
+	lwz		r8,20(r10)
+	b		.sys_sendto
 
 _STATIC(do_sys_recvfrom) /* sys32_recvfrom(int, u32, compat_size_t, unsigned int, u32, u32) */
 	mr		r10,r4
@@ -152,7 +128,7 @@ _STATIC(do_sys_recvfrom) /* sys32_recvfrom(int, u32, compat_size_t, unsigned int
 	lwz		r6,12(r10)
 	lwz		r7,16(r10)
 	lwz		r8,20(r10)
-	b		.sys32_recvfrom
+	b		.sys_recvfrom
 
 _STATIC(do_sys_shutdown) /* sys_shutdown(int, int) */
 	mr		r10,r4

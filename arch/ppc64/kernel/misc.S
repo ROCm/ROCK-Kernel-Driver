@@ -487,7 +487,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_lchown
 	.llong .sys_ni_syscall		/* old break syscall */
 	.llong .sys_ni_syscall		/* old stat syscall */
-	.llong .sys32_lseek
+	.llong .ppc32_lseek
 	.llong .sys_getpid              /* 20 */
 	.llong .sys32_mount
 	.llong .sys_oldumount
@@ -558,7 +558,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_swapon
 	.llong .sys_reboot
 	.llong .old32_readdir
-	.llong .sys32_mmap		/* 90 */
+	.llong .sys_mmap		/* 90 */
 	.llong .sys_munmap
 	.llong .sys_truncate
 	.llong .sys_ftruncate
@@ -660,7 +660,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_vfork
 	.llong .sys32_getrlimit	        /* 190 */
 	.llong .sys32_readahead
-	.llong .ppc32_mmap2
+	.llong .sys32_mmap2
 	.llong .sys32_truncate64
 	.llong .sys32_ftruncate64
 	.llong .sys_stat64      	/* 195 */
@@ -707,7 +707,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_epoll_create
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait
-	.llong .ppc32_remap_file_pages
+	.llong .sys_remap_file_pages
 
 	.rept NR_syscalls-239
 		.llong .sys_ni_syscall
