@@ -54,11 +54,14 @@ asmlinkage long sys_capget(cap_user_header_t header, cap_user_data_t dataptr)
      spin_lock(&task_capability_lock);
      read_lock(&tasklist_lock); 
 
-     target = find_task_by_pid(pid);
-     if (!target) {
-          ret = -ESRCH;
-          goto out;
-     }
+     if (pid && pid != current->pid) {
+	     target = find_task_by_pid(pid);
+	     if (!target) {
+	          ret = -ESRCH;
+	          goto out;
+	     }
+     } else
+	     target = current;
 
      data.permitted = cap_t(target->cap_permitted);
      data.inheritable = cap_t(target->cap_inheritable); 
