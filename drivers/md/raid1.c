@@ -975,7 +975,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	sector_t max_sector, nr_sectors;
 	int disk, partial;
 
-	if (sector_nr == 0)
+	if (!conf->r1buf_pool)
 		if (init_resync(conf))
 			return -ENOMEM;
 
@@ -1149,7 +1149,7 @@ static int run(mddev_t *mddev)
 	conf->mddev = mddev;
 	conf->device_lock = SPIN_LOCK_UNLOCKED;
 	if (conf->working_disks == 1)
-		mddev->state |= (1 << MD_SB_CLEAN);
+		mddev->recovery_cp = MaxSector;
 
 	conf->resync_lock = SPIN_LOCK_UNLOCKED;
 	init_waitqueue_head(&conf->wait_idle);

@@ -131,11 +131,16 @@ typedef struct mdp_superblock_s {
 #ifdef __BIG_ENDIAN
 	__u32 events_hi;	/*  7 high-order of superblock update count   */
 	__u32 events_lo;	/*  8 low-order of superblock update count    */
+	__u32 cp_events_hi;	/*  9 high-order of checkpoint update count   */
+	__u32 cp_events_lo;	/* 10 low-order of checkpoint update count    */
 #else
 	__u32 events_lo;	/*  7 low-order of superblock update count    */
 	__u32 events_hi;	/*  8 high-order of superblock update count   */
+	__u32 cp_events_lo;	/*  9 low-order of checkpoint update count    */
+	__u32 cp_events_hi;	/* 10 high-order of checkpoint update count   */
 #endif
-	__u32 gstate_sreserved[MD_SB_GENERIC_STATE_WORDS - 9];
+	__u32 recovery_cp;	/* 11 recovery checkpoint sector count	      */
+	__u32 gstate_sreserved[MD_SB_GENERIC_STATE_WORDS - 12];
 
 	/*
 	 * Personality information

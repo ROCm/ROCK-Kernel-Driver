@@ -1471,7 +1471,7 @@ static int run (mddev_t *mddev)
 	}
 
 	if (mddev->degraded == 1 &&
-	    !(mddev->state & (1<<MD_SB_CLEAN))) {
+	    mddev->recovery_cp != MaxSector) {
 		printk(KERN_ERR "raid5: cannot start dirty degraded array for md%d\n", mdidx(mddev));
 		goto abort;
 	}
