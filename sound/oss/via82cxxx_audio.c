@@ -354,8 +354,6 @@ static inline void via_card_cleanup_proc (struct via_info *card) {}
 static struct pci_device_id via_pci_tbl[] __initdata = {
 	{ PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686_5,
 	  PCI_ANY_ID, PCI_ANY_ID, },
-	{ PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8233_5,
-	  PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0, }
 };
 MODULE_DEVICE_TABLE(pci,via_pci_tbl);
