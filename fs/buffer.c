@@ -945,12 +945,12 @@ void invalidate_inode_buffers(struct inode *inode)
  * the size of each buffer.. Use the bh->b_this_page linked list to
  * follow the buffers created.  Return NULL if unable to create more
  * buffers.
- * The async flag is used to differentiate async IO (paging, swapping)
- * from ordinary buffer allocations, and only async requests are allowed
- * to sleep waiting for buffer heads. 
+ *
+ * The retry flag is used to differentiate async IO (paging, swapping)
+ * which may not fail from ordinary buffer allocations.
  */
 static struct buffer_head *
-create_buffers(struct page * page, unsigned long size, int async)
+create_buffers(struct page * page, unsigned long size, int retry)
 {
 	struct buffer_head *bh, *head;
 	long offset;
@@ -959,7 +959,7 @@ try_again:
 	head = NULL;
 	offset = PAGE_SIZE;
 	while ((offset -= size) >= 0) {
-		bh = alloc_buffer_head(async);
+		bh = alloc_buffer_head();
 		if (!bh)
 			goto no_grow;
 
@@ -996,7 +996,7 @@ no_grow:
 	 * become available.  But we don't want tasks sleeping with 
 	 * partially complete buffers, so all were released above.
 	 */
-	if (!async)
+	if (!retry)
 		return NULL;
 
 	/* We're _really_ low on memory. Now we just
@@ -2392,7 +2392,7 @@ asmlinkage long sys_bdflush(int func, long data)
 static kmem_cache_t *bh_cachep;
 static mempool_t *bh_mempool;
 
-struct buffer_head *alloc_buffer_head(int async)
+struct buffer_head *alloc_buffer_head(void)
 {
 	return mempool_alloc(bh_mempool, GFP_NOFS);
 }

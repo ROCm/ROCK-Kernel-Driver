@@ -181,7 +181,7 @@ void __brelse(struct buffer_head *);
 void __bforget(struct buffer_head *);
 struct buffer_head * __bread(struct block_device *, int, int);
 void wakeup_bdflush(void);
-struct buffer_head *alloc_buffer_head(int async);
+struct buffer_head *alloc_buffer_head(void);
 void free_buffer_head(struct buffer_head * bh);
 void FASTCALL(unlock_buffer(struct buffer_head *bh));
 
