@@ -818,6 +818,10 @@ acpi_boot_init (void)
 		return error;
 	}
 
+#ifdef __i386__
+	check_acpi_pci();
+#endif
+
 	acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
 
 	/*
