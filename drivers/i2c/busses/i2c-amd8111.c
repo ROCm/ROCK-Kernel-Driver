@@ -74,7 +74,7 @@ unsigned int amd_ec_wait_write(struct amd_smbus *smbus)
 		udelay(1);
 
 	if (!timeout) {
-		printk(KERN_WARNING "i2c-amd8111.c: Timeout while waiting for IBF to clear\n");
+		dev_warn(&smbus->dev->dev, "Timeout while waiting for IBF to clear\n");
 		return -1;
 	}
 
@@ -89,7 +89,7 @@ unsigned int amd_ec_wait_read(struct amd_smbus *smbus)
 		udelay(1);
 
 	if (!timeout) {
-		printk(KERN_WARNING "i2c-amd8111.c: Timeout while waiting for OBF to set\n");
+		dev_warn(&smbus->dev->dev, "Timeout while waiting for OBF to set\n");
 		return -1;
 	}
 
@@ -256,11 +256,11 @@ s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 		case I2C_SMBUS_BLOCK_DATA_PEC:
 		case I2C_SMBUS_PROC_CALL_PEC:
 		case I2C_SMBUS_BLOCK_PROC_CALL_PEC:
-			printk(KERN_WARNING "i2c-amd8111.c: Unexpected software PEC transaction %d\n.", size);
+			dev_warn(&adap->dev, "Unexpected software PEC transaction %d\n.", size);
 			return -1;
 
 		default:
-			printk(KERN_WARNING "i2c-amd8111.c: Unsupported transaction %d\n", size);
+			dev_warn(&adap->dev, "Unsupported transaction %d\n", size);
 			return -1;
 	}
 
@@ -392,7 +392,7 @@ static void __devexit amd8111_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver amd8111_driver = {
-	.name		= "amd8111 smbus",
+	.name		= "amd8111 smbus 2",
 	.id_table	= amd8111_ids,
 	.probe		= amd8111_probe,
 	.remove		= __devexit_p(amd8111_remove),
