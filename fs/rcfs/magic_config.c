@@ -35,9 +35,8 @@
 #include <linux/parser.h>
 #include <asm/uaccess.h>
 
-#include "rcfs.h"
-#include "MOVETOCORE.h"
-
+#include <linux/rcfs.h>
+#include "magic.h"
 
 /* Currently there are no per-class config parameters defined.
  * 
@@ -166,7 +165,7 @@ config_show(struct seq_file *s, void *v)
 /*		if (ckrm_isregd(resid) && 
 		    ckrm_get_res_ctrlrs[resid].get_config) {
 		    if ((*(ckrm_get_res_ctrlrs[resid].get_config)(s)) < 0)
-		           goto config_out;
+		           goto show_out;
                 }
 */
 		seq_printf(s, "Showing configs 1 2 3 for res %d\n",resid);
@@ -174,7 +173,7 @@ config_show(struct seq_file *s, void *v)
 
 	return 0;
 
-show_out:
+//show_out:
 
 	seq_printf(s,"Error retrieving contents of next RC. Aborting\n");
 	return 0;

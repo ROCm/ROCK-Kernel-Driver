@@ -30,6 +30,7 @@
 #include <linux/ckrm.h>
 #include <linux/ckrm_rc.h>
 #include <net/tcp.h>
+#include <linux/rcfs.h>
 
 #define DEBUG_CKRM_SAQ 1
 
@@ -39,6 +40,7 @@ typedef struct ckrm_saq_res {
 	struct ckrm_hnode  hnode;    /* build our own hierarchy */
 	struct ckrm_shares shares;
 	struct ckrm_core_class *core;
+	int my_depth;
 } ckrm_saq_res_t;
 
 static int my_resid = -1;
@@ -53,6 +55,7 @@ rcfs_create_internal(struct dentry *parent, const char *name, int mfmode, int ma
 /* Initialize rescls values
  */
 
+#if 0
 static void
 saq_res_initcls_zero(void *my_res)
 {
@@ -67,6 +70,7 @@ saq_res_initcls_zero(void *my_res)
 	
 	/* Don't initiate propagation to children here, caller will do it if needed */
 }
+#endif
 
 static void
 saq_res_initcls_one(void *my_res)
@@ -105,18 +109,28 @@ saq_res_alloc(struct ckrm_core_class *core, struct ckrm_core_class *parent)
 	res = kmalloc(sizeof(ckrm_saq_res_t), GFP_KERNEL);
 	if (res) {
 		struct ckrm_hnode *parhnode = NULL;
-		
+		ckrm_saq_res_t  *parres = NULL;
+
+		memset(res, 0, sizeof(res));
+
 		if (parent) {
-			ckrm_saq_res_t  *parres;
 			parres = ckrm_get_res_class(parent,my_resid,
-								ckrm_saq_res_t);
+							ckrm_saq_res_t);
+			printk(KERN_WARNING "net root %p %p %p\n",
+					&ckrm_net_root, parent, parres);
 			parhnode = &parres->hnode;
 		}
+
+		if (parhnode)
+			res->my_depth = parres->my_depth + 1;
+		else
+			res->my_depth = 1;
+
 		res->core = core;
 		ckrm_hnode_add(&res->hnode, parhnode);
-		printk(KERN_ERR "saq_res_alloc: Adding saq res class %p to %p\n",res,parent);
 
-		/* rescls in place, now initialize contents other than hierarchy pointers */
+		// rescls in place, now initialize contents other than 
+		// hierarchy pointers
 		saq_res_initcls_one(res);
 	}
 	return res;
@@ -153,19 +167,30 @@ saq_set_aq_values(ckrm_saq_res_t *my_res, struct ckrm_shares *shares)
 	int j;
 	char name[4];
 	struct dentry *parent = my_res->core->dentry;
+	struct dentry *sp = NULL;
 
 #ifdef CONFIG_ACCEPT_QUEUES
 	int cnt = NUM_ACCEPT_QUEUES;
 #else
 	int cnt = 8;
 #endif
+	printk(KERN_WARNING "setting values for core %p empty %d %d\n",
+			my_res, list_empty(&my_res->hnode.children),
+			my_res->my_depth);
 
-	if (list_empty(&my_res->hnode.children)) {
+	if ((my_res->my_depth == 2) && list_empty(&my_res->hnode.children)) {
 		for( i = 1; i < cnt; i++) {
 			j = sprintf(name, "%d",i);
 			name[j] = '\0';
-			rcfs_create_internal(parent,name, 
-					parent->d_inode->i_mode,1);
+			// Now create all the socket accept queue 
+			// subdirectories and their share files.
+			sp = rcfs_create_internal(parent,name, 
+					parent->d_inode->i_mode,0);
+			rcfs_make_core(sp, my_res->core);
+			(void)rcfs_create_internal(sp, "shares",
+			   S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH,0);
+			(void)rcfs_create_internal(sp, "stats",
+			   S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH,0);
 		}
 	}
 
@@ -196,14 +221,12 @@ saq_set_share_values(void *my_res, struct ckrm_shares *shares)
 	parent = get_parent(res);
 
 	// we have to ensure that the set of parameters is OK
-
 	// ensure that lim/guarantees are ok wrt to parent total values 
 	// don't have to consider negative special values
 
-	/* FIXME following doesn't appear to be working */
 	if (parent) {
 		if ((shares->my_guarantee > parent->shares.unused_guarantee) ||
-		    (shares->my_limit > parent->shares.unused_limit))
+		     (shares->my_limit > parent->shares.unused_limit))
 			goto set_share_err;
 	}
 
@@ -214,10 +237,11 @@ saq_set_share_values(void *my_res, struct ckrm_shares *shares)
 		shares->total_limit = res->shares.total_limit;
 
 	// we don't allow DONTCARE for totals
-	if ((shares->total_guarantee <= CKRM_SHARE_DONTCARE) || (shares->total_limit <= CKRM_SHARE_DONTCARE))
+	if ((shares->total_guarantee <= CKRM_SHARE_DONTCARE) || 
+			(shares->total_limit <= CKRM_SHARE_DONTCARE))
 		goto set_share_err;
 
-	// check whether total shares still exceeds sum of children (total - unused)
+	// check whether total shares exceeds sum of children(total - unused)
 	if (((reduce_by = shares->total_guarantee - res->shares.total_guarantee) > 0) &&
 	    (reduce_by > res->shares.unused_guarantee))
 		goto set_share_err;
@@ -237,12 +261,14 @@ saq_set_share_values(void *my_res, struct ckrm_shares *shares)
 		if (parent) { 
 			parent->shares.unused_guarantee -= shares->my_guarantee;
 			if (res->shares.my_guarantee >= 0)
-				parent->shares.unused_guarantee += res->shares.my_guarantee;
+				parent->shares.unused_guarantee += 
+						res->shares.my_guarantee;
 		}
 		res->shares.my_guarantee = shares->my_guarantee;
 	} else if (shares->my_guarantee == CKRM_SHARE_DONTCARE) {
 		if (parent) 
-			parent->shares.unused_guarantee += res->shares.my_guarantee;
+			parent->shares.unused_guarantee += 
+						res->shares.my_guarantee;
 		res->shares.my_guarantee = CKRM_SHARE_DONTCARE;
 	}
 
@@ -260,14 +286,16 @@ saq_set_share_values(void *my_res, struct ckrm_shares *shares)
 	}
 
 
-	res->shares.unused_guarantee += (shares->total_guarantee - res->shares.total_guarantee);
-	res->shares.unused_limit     += (shares->total_limit     - res->shares.total_limit);
+	res->shares.unused_guarantee += 
+			(shares->total_guarantee - res->shares.total_guarantee);
+	res->shares.unused_limit  += 
+			(shares->total_limit     - res->shares.total_limit);
 
 	res->shares.total_guarantee  = shares->total_guarantee;
 	res->shares.total_limit      = shares->total_limit;
 
 	/* Here we should force the propagation of share values */
-	rc = saq_set_aq_values(my_res,shares);
+	rc = saq_set_aq_values(res,shares);
 	goto out;
 
 set_share_err:
@@ -299,15 +327,19 @@ saq_get_stats(void *my_res, struct seq_file *sfile)
 	if (!res) 
 		return -EINVAL;
 
+	// TODO
+	// If have children sum up the values are return.
+	// Otherwise update values from each of the sockets - as in the 
+	// ns list and update the shares. Then print them.
 	seq_printf(sfile, "res=saq: these are my stats <none>\n");
 
 	return 0;
 }
 
 static void
-saq_change_resclass(struct task_struct *tsk, void *old, void *new)
+saq_change_resclass(void *tsk, void *old, void *new)
 {
-	// does nothing
+	// need to move from olde core class to new core class
 	return;
 }
 

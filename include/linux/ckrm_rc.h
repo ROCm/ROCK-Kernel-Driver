@@ -40,12 +40,6 @@ enum {
 	CKRM_NET_CLASS,
 };
 
-// Modes of CKRM   Hubertus... Mode can disappear ? no implicitely through DONTCARE'S
-#define CKRM_MONITOR_MODE		1
-#define CKRM_MANAGE_MODE		2
-
-extern int ckrm_mode;   /* are we in monitor or in managed mode */
-
 // predefined constants
 #define CKRM_MAX_RES_CTLRS 32
 #define CKRM_MAX_RES_NAME		128
@@ -78,13 +72,28 @@ typedef struct ckrm_shares {
 #define CKRM_SHARE_DFLT_TOTAL_GUARANTEE (100) // Start off with these values
 #define CKRM_SHARE_DFLT_TOTAL_LIMIT     (100) // to simplify set_res_shares logic
 
+/* CKRM net struct used to keep track of the network members.
+ */
+struct ckrm_net_struct {
+	int family;			// IPPROTO_IPV4 || IPPROTO_IPV6
+					// Currently only IPV4 is supported
+	__u32 daddr4;			// V4 listener's address
+	__u16 dport;			// listener's port
+	struct ckrm_core_class	*core;
+	struct list_head ckrm_link;
+};
+
 /* basic definition of a hierarchy that is to be used by the the CORE classes
  * and can be used by the resource class objects
  */
 
 struct ckrm_hnode {
+#ifndef NEW_HNODE_IMPLMN
 	struct ckrm_hnode *parent;
-	struct list_head   siblings; /* anchor for sibling list */
+#else
+	struct ckrm_core_class *parent;
+#endif
+	struct list_head   siblings; /* linked list of siblings */
 	struct list_head   children; /* anchor for children     */
 };
 
@@ -99,6 +108,9 @@ typedef struct ckrm_core_class {
 	int magic;
 	void *res_class[CKRM_MAX_RES_CTLRS]; // per registered resource
 	struct ckrm_hnode  hnode;    // hierarchy
+	rwlock_t hnode_rwlock; // rw_clock protecting the hnode above.
+	atomic_t refcnt;
+	char name[100];// debug only
 } ckrm_core_class_t;
 
 #define ckrm_get_res_class(rescls,resid,type)   ((type*)((rescls)->res_class[resid]))
@@ -112,8 +124,7 @@ typedef struct ckrm_res_callback {
 	int  resid;		// (for now) same as the enum resid
 
 	/* allocate/free new resource class object for resource controller */
-	void * (*res_alloc)  (struct ckrm_core_class *core, 
-					struct ckrm_core_class *parent);
+	void * (*res_alloc)  (struct ckrm_core_class *, struct ckrm_core_class *);
 	void (*res_free)     (void *);
 	/* reinitialize existing resource class object */
 	void (*res_initcls)  (void *);
@@ -123,17 +134,17 @@ typedef struct ckrm_res_callback {
 	int  (*get_share_values)    (void *, struct ckrm_shares *);
 
 	/* statistics access */
-	int  (*get_stats)    (void *, struct seq_file *s);
+	int  (*get_stats)    (void *, struct seq_file *);
 
-	void (*change_resclass)(struct task_struct *, void *, void *);
+	void (*change_resclass)(void *, void *, void *);
 } ckrm_res_callback_t;
 
 extern int ckrm_register_res_ctlr(ckrm_res_callback_t *);
 extern int ckrm_unregister_res_ctlr(int);
 
-extern inline unsigned int is_core_valid(ckrm_core_class_t *core);
-extern inline unsigned int is_res_regd(int resid);
-extern inline int ckrm_resid_lookup (char *resname);
+extern inline unsigned int is_core_valid(ckrm_core_class_t *);
+extern inline unsigned int is_res_regd(int);
+extern inline int ckrm_resid_lookup (char *);
 
 #define for_each_resid(rid) \
 	for (rid=0; rid < CKRM_MAX_RES_CTLRS; rid++) 
@@ -144,17 +155,20 @@ extern inline int ckrm_resid_lookup (char *resname);
 extern struct ckrm_core_class ckrm_dflt_class;
 extern struct ckrm_core_class ckrm_net_root;
 
-extern struct ckrm_core_class *ckrm_alloc_core_class(struct ckrm_core_class *parent, struct dentry *dentry);
-extern int ckrm_free_core_class(struct ckrm_core_class *cls);
+extern struct ckrm_core_class *ckrm_alloc_core_class(struct ckrm_core_class *,
+				struct dentry *);
+extern int ckrm_free_core_class(struct ckrm_core_class *);
 
-// Reclassify the given task to the given core class.
-extern void ckrm_reclassify_task(struct task_struct *, struct ckrm_core_class *);
+// Reclassify the given pid to the given core class by force
+extern void ckrm_forced_reclassify_pid(int, struct ckrm_core_class *);
 
-// Reclassify the given task to the given core class by force
-extern void ckrm_forced_reclassify_task(struct task_struct *, struct ckrm_core_class *);
+// Reclassify the given net_struct  to the given core class by force
+extern void ckrm_forced_reclassify_net(struct ckrm_net_struct *, 
+		struct ckrm_core_class *);
 
-extern void ckrm_hnode_add(struct ckrm_hnode *node,struct ckrm_hnode *parent );
-extern int  ckrm_hnode_remove(struct ckrm_hnode *node);
+
+extern void ckrm_hnode_add(struct ckrm_hnode *,struct ckrm_hnode *);
+extern int  ckrm_hnode_remove(struct ckrm_hnode *);
 
 
 #endif // CONFIG_CKRM

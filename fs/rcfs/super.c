@@ -39,8 +39,7 @@
 
 #include <asm/uaccess.h>
 
-#include "rcfs.h"
-#include "MOVETOCORE.h"
+#include <linux/rcfs.h>
 
 
 
@@ -93,31 +92,22 @@ rcfs_init_inodecache(void)
 
 void rcfs_destroy_inodecache(void)
 {
+	printk(KERN_WARNING "destroy inodecache was called\n");
 	if (kmem_cache_destroy(rcfs_inode_cachep))
 		printk(KERN_INFO "rcfs_inode_cache: not all structures were freed\n");
 }
+
 
 /* exported operations */
 struct super_operations rcfs_super_ops =
 {
 	.alloc_inode	= rcfs_alloc_inode,
 	.destroy_inode	= rcfs_destroy_inode,
-//	.clear_inode	= rcfs_clear_inode,
 	.statfs		= simple_statfs,
 	.drop_inode     = generic_delete_inode,
 };
 
 
-
-/*
-static 
-int res_initialize(void)
-{
-
-	printk (KERN_ERR "initialized res_ctrlr data in rcfs\n");
-	return 0;
-}
-*/
 
 struct dentry *rcfs_rootde, *rcfs_nwde, *rcfs_nw_aqde;
 struct inode *rcfs_root, *rcfs_nw, *rcfs_nw_aq;
@@ -128,8 +118,6 @@ static int rcfs_fill_super(struct super_block * sb, void * data, int silent)
 	struct inode * inode;
 	struct dentry * root;
 	struct rcfs_inode_info *rootri;
-	struct ckrm_core_class *core ;
-	struct task_struct *tsk;
 
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
@@ -150,16 +138,23 @@ static int rcfs_fill_super(struct super_block * sb, void * data, int silent)
 
 	rootri = RCFS_I(inode);
 	rootri->core = &ckrm_dflt_class;
-	ckrm_dflt_class.dentry = rcfs_rootde;
 
 
 	rcfs_root = inode;
 	rcfs_rootde = root ;
 	rcfs_rootri = rootri ;
 
+	ckrm_dflt_class.dentry = rcfs_rootde;
+
 
 	printk("get_alloc_super: root class created (%s, de-%p ri-%p in-%p ri->core-%p ri->core->in-%p",root->d_name.name, root, rootri, inode, rootri->core, ((struct ckrm_core_class *)(rootri->core))->dentry);
 	
+#ifdef CONFIG_CKRM_RES_SOCKETAQ
+
+	// Currently both /rcfs/network and /rcfs/network/socket_aq are configured by 
+	// the same option. 
+
+
 	// Create the network root
 	// XXX -- add error reporting
 	rcfs_nwde = rcfs_create_internal(rcfs_rootde, "network", 
@@ -178,33 +173,8 @@ static int rcfs_fill_super(struct super_block * sb, void * data, int silent)
 		ckrm_alloc_core_class((ckrm_core_class_t *)&ckrm_net_root,
 						rcfs_nw_aqde);
 
-#if 0
-	core = &ckrm_dflt_class ;
-	spin_lock(&core->ckrm_lock);
-
-	
-	read_lock(&tasklist_lock);
-	for_each_process(tsk) {
-		
-		/* Should take a task lock here but its too early for any other
-		   CKRM component to touch the element. So safe to modify directly.
-		*/
-		task_lock(tsk);
-		tsk->ckrm_core = core;
-		INIT_LIST_HEAD(&tsk->ckrm_link);
-		list_add(&tsk->ckrm_link, &core->tasklist);
-		printk("ckrm_init: Added %ld to %p\n",(long)tsk->pid,core);
-		task_unlock(tsk);
-	}
-	read_unlock(&tasklist_lock);
-
-	spin_unlock(&core->ckrm_lock);	
 #endif
-	
-	// Other post-mount initializations here */
-	//if (res_initialize())
-	//	return -EINVAL;
-	
+
 	return 0;
 	
 }
@@ -247,9 +217,9 @@ static void __exit exit_rcfs_fs(void)
 	unregister_filesystem(&rcfs_fs_type);
 }
 
-
 module_init(init_rcfs_fs)
 module_exit(exit_rcfs_fs)
 
 
+EXPORT_SYMBOL(RCFS_I);
 MODULE_LICENSE("GPL");

@@ -1,4 +1,0 @@
-#ifndef _LINUX_MOVETOCORE_H
-#define _LINUX_MOVETOCORE_H
-
-#endif /* _LINUX_MOVETOCORE_H */

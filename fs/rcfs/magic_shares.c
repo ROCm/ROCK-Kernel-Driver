@@ -35,18 +35,12 @@
 #include <linux/parser.h>
 #include <asm/uaccess.h>
 
-#include "rcfs.h"
-#include "MOVETOCORE.h"
+#include <linux/rcfs.h>
 #include "magic.h"
 
 
-/* Token matching for parsing input to this magic file */
-
-//NOTNEEDED #define SHARE_UNCHANGED -1
-
 /* Next few are dependent on number of share types */
 
-//NOTNEEDED #define NUM_SHAREVAL 4
 #define SHARES_MAX_INPUT_SIZE  300
 
 /* The enums for the share types should match the indices expected by
@@ -59,6 +53,7 @@ enum share_token_t {
         MY_GUAR, MY_LIM, TOT_GUAR, TOT_LIM, RES_TYPE, SHARE_ERR
 };
 
+/* Token matching for parsing input to this magic file */
 static match_table_t tokens = {
 	{RES_TYPE, "res=%s"},
         {MY_GUAR, "guarantee=%d"},
@@ -136,9 +131,8 @@ shares_write(struct file *file, const char __user *buf,
 	struct inode *inode = file->f_dentry->d_inode;
 	struct rcfs_inode_info *ri;
 	char *optbuf;
-	int i,done, resid, retval;
+	int done, resid, retval;
 
-	//newval[NUM_SHAREVAL]; ;
 	struct ckrm_shares newshares = {
 		CKRM_SHARE_UNCHANGED,
 		CKRM_SHARE_UNCHANGED,
@@ -170,18 +164,15 @@ shares_write(struct file *file, const char __user *buf,
 	if (optbuf[count-1] == '\n')
 		optbuf[count-1]='\0';
 
-	/* Set default values */
-	//for (i=0; i<NUM_SHAREVAL; i++)
-	//	newval[i] = SHARE_UNCHANGED;
-
 	done = shares_parse(optbuf, &resid, &newshares);
 	if (!done) {
 		printk(KERN_ERR "Error parsing shares\n");
 		retval = -EINVAL;
 		goto write_out;
 	}
+	printk(KERN_WARNING "resid is %d is_res_regd is %d\n",resid, is_res_regd(resid));
 
-	if (resid && is_res_regd(resid)) {
+	if (is_res_regd(resid)) {
 
 #if 1
 		ckrm_res_callback_t *rcbs = &ckrm_res_ctlrs[resid];
@@ -221,8 +212,6 @@ shares_show(struct seq_file *s, void *v)
 	struct ckrm_shares curshares;
 	struct rcfs_inode_info *ri = s->private;
 
-	// USEME struct rcfs_inode_info *rinfo = RCFS_I(s->private) ;
-
 	/* Get and "display" share data for each registered resource.
 	 * Data from each resource is atomic but not across resources
 	 */
@@ -260,7 +249,6 @@ shares_show(struct seq_file *s, void *v)
 					   curshares.total_limit);
 			}
 #endif
-//			seq_printf(s,"Fake res output for %d\n",resid);
 		} /* is_res_regd(resid) */
 	} /* for_each_resid(resid) */
 
@@ -285,12 +273,6 @@ shares_open(struct inode *inode, struct file *file)
 
 		ret = single_open(file, shares_show, (void *)ri);
 	}
-
-	/* Allow core class retrieval using seq_file */
-	/*
-	if (ret)
-		((struct seq_file *)(file->private_data))->private = RCFS_I(file->f_dentry->d_parent->d_inode);
-	*/
 
 	return ret;
 }

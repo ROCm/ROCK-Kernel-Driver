@@ -37,15 +37,12 @@
 #define DEBUG_CKRM_DUMMY 1
 
 typedef struct ckrm_dummy_res {
-	struct ckrm_hnode  hnode;    /* build our own hierarchy */
+	struct ckrm_core_class *core; // the core i am part of...
+	struct ckrm_core_class *parent; // parent of the core i am part of....
 	struct ckrm_shares shares;
 } ckrm_dummy_res_t;
 
 static int my_resid = -1;
-
-#define get_parent(res)  (container_of((res)->hnode.parent,ckrm_dummy_res_t,hnode))
-
-
 
 /* Initialize rescls values
  * May be called on each rcfs unmount or as part of error recovery
@@ -68,6 +65,7 @@ dummy_res_initcls_one(void *my_res)
 	/* Don't initiate propagation to children here, caller will do it if needed */
 }
 
+#if 0	
 static void
 dummy_res_initcls(void *my_res)
 {
@@ -77,6 +75,7 @@ dummy_res_initcls(void *my_res)
 	   and replace rcbs callback with that version */
 	
 }
+#endif
 
 ckrm_dummy_res_t *dres;
 struct ckrm_hnode  *dparhnode;
@@ -91,6 +90,7 @@ dummy_res_alloc(struct ckrm_core_class *core, struct ckrm_core_class *parent)
 	dres = kmalloc(sizeof(ckrm_dummy_res_t), GFP_ATOMIC);
 	
 	if (dres) {
+#if 0
 		//struct ckrm_hnode *parhnode = NULL;
 		dparhnode = NULL ;
 
@@ -103,6 +103,9 @@ dummy_res_alloc(struct ckrm_core_class *core, struct ckrm_core_class *parent)
 		printk(KERN_ERR "dummy_res_alloc: Adding dummy res class %p to %p\n",dres,parent);
 		
 		/* rescls in place, now initialize contents other than hierarchy pointers */
+#endif
+		dres->core = core;
+		dres->parent = parent;
 		dummy_res_initcls_one(dres);
 		
 		/*
@@ -132,8 +135,7 @@ dummy_res_free(void *my_res)
 	if (!d2res) 
 		return;
 
-	d2parres = get_parent(d2res);
-	ckrm_hnode_remove(&d2res->hnode);
+	d2parres = ckrm_get_res_class(d2res->parent, my_resid, ckrm_dummy_res_t);
 
 	// return child's limit/guarantee to parent node
 	if (d2parres) {
@@ -157,7 +159,7 @@ dummy_set_share_values(void *my_res, struct ckrm_shares *shares)
 	if (!res) 
 		return -EINVAL;
 
-	parent = get_parent(res);
+	parent = ckrm_get_res_class(res->parent, my_resid, ckrm_dummy_res_t);
 
 	// we have to ensure that the set of parameters is OK
 
@@ -270,7 +272,7 @@ dummy_get_stats(void *my_res, struct seq_file *sfile)
 }
 
 static void
-dummy_change_resclass(struct task_struct *tsk, void *old, void *new)
+dummy_change_resclass(void *tsk, void *old, void *new)
 {
 	// does nothing
 	return;

@@ -8,5 +8,6 @@ else
 	obj-y = ckrmstub.o
 endif
 
-obj-$(CONFIG_CKRM_RES_DUMMY) += ckrm_dummy.o ckrm_socketaq.o
+obj-$(CONFIG_CKRM_RES_DUMMY) += ckrm_dummy.o 
+obj-$(CONFIG_CKRM_RES_SOCKETAQ) += ckrm_socketaq.o
 

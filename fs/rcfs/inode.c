@@ -43,7 +43,7 @@
 
 #include <asm/uaccess.h>
 
-#include "rcfs.h"
+#include <linux/rcfs.h>
 #include "magic.h"
 
 
@@ -142,19 +142,15 @@ _rcfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 int
 rcfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
-	struct inode *inode;
-	int err = -ENOSPC, i = 0;
 
         // printk(KERN_ERR "rcfs_mknod called with dir=%p dentry=%p mode=%d\n",dir,dentry,mode);
 	// Do not allow creation of files by the user. Only directories i.e.
 	// the classes can be created.
 
-	/*
 	if ((mode & S_IFMT) == S_IFREG)
 		return -EINVAL;
 	else 
-	*/
-	return _rcfs_mknod(dir, dentry, mode, dev);
+		return _rcfs_mknod(dir, dentry, mode, dev);
 }
 
 
@@ -202,6 +198,14 @@ rcfs_create_magic(struct dentry *parent, struct magf_t *magf)
 }
 #endif
 
+void
+rcfs_make_core(struct dentry *sp, struct ckrm_core_class *core)
+{
+	RCFS_I(sp->d_inode)->core = ckrm_alloc_core_class(core, sp);	
+	return;
+}
+EXPORT_SYMBOL(rcfs_make_core);
+
 struct dentry * 
 rcfs_create_internal(struct dentry *parent, const char *name, int mfmode, 
 			int magic)
@@ -216,13 +220,15 @@ rcfs_create_internal(struct dentry *parent, const char *name, int mfmode,
 	qstr.hash = full_name_hash(name,qstr.len);
 	mfdentry = lookup_hash(&qstr,parent);
 
-	printk(KERN_INFO "parent %p name %s mfdentry is %x\n",parent, name, mfdentry);
+	printk(KERN_INFO "parent %p name %s mfdentry is %p\n",parent, name, (void *)mfdentry);
+
 	if (!IS_ERR(mfdentry)) {
 		int err; 
 
 		down(&parent->d_inode->i_sem);
-		if (magic)
-			err = rcfs_mkdir(parent->d_inode, mfdentry, mfmode, 0);
+//		if (magic)
+		if (S_ISDIR(mfmode))
+			err = rcfs_mkdir(parent->d_inode, mfdentry, mfmode);
 		else
 			err = _rcfs_mknod(parent->d_inode, mfdentry, mfmode, 0);
 		parent->d_inode->i_nlink++;
@@ -237,52 +243,47 @@ rcfs_create_internal(struct dentry *parent, const char *name, int mfmode,
 }
 EXPORT_SYMBOL(rcfs_create_internal);
 
-int 
-rcfs_delete_all_magic(struct dentry *parent)
+rcfs_delete_internal(struct dentry *mfdentry)
 {
-	struct dentry *mftmp, *mfdentry ;
-	umode_t mfmode;
+	struct dentry *parent ;
 
-//	if (!(magf && magf->name))
-//		return NULL;
-	
-	down(&parent->d_inode->i_sem);
-
-	//dget(parent);
-
-	list_for_each_entry_safe(mfdentry, mftmp, &parent->d_subdirs, d_child) {
-		int x=0;
-		if (!rcfs_is_magic(mfdentry))
-			continue ;
-
-		mfmode =  (mfdentry->d_inode->i_mode);
-			
-		if (mfmode & S_IFREG)
-			simple_unlink(parent->d_inode, mfdentry);
-		if (mfmode & S_IFDIR)
-			simple_rmdir(parent->d_inode, mfdentry);
-
-		d_delete(mfdentry);
-		dput(mfdentry);
-	}
-	up(&parent->d_inode->i_sem);		
-		
-#if 0
-	if (!parent || (parent->d_inode != dir))
+	if (!mfdentry || !mfdentry->d_parent)
 		return -EINVAL;
-//	down(&parent->d_inode->i_sem);
-	d_delete(magf->dentry);
-	simple_unlink(parent->d_inode, magf->dentry);
-	dput(magf->dentry);
-//	up(&parent->d_inode->i_sem);
-#endif
+	
+	parent = mfdentry->d_parent;
+
+	down(&mfdentry->d_inode->i_sem);
+	if (S_ISDIR(mfdentry->d_inode->i_mode))
+		simple_rmdir(parent->d_inode, mfdentry);
+	else
+		simple_unlink(parent->d_inode, mfdentry);
+	up(&mfdentry->d_inode->i_sem);
+
+	d_delete(mfdentry);
+	dput(mfdentry);
 
 	return 0;
 }
 
+int 
+rcfs_clear_magic(struct dentry *parent)
+{
+	struct dentry *mftmp, *mfdentry ;
+	
+	list_for_each_entry_safe(mfdentry, mftmp, &parent->d_subdirs, d_child) {
+		
+		if (!rcfs_is_magic(mfdentry))
+			continue ;
+		
+		if (rcfs_delete_internal(mfdentry)) 
+			printk(KERN_ERR "rcfs_clear_magic: error deleting one\n");
+	}
+	
+	return 0;
+}
 
 struct inode_operations rcfs_file_inode_operations = {
-//	.getattr	= simple_getattr,
+	.getattr	= simple_getattr,
 };
 		
 

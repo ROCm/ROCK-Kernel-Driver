@@ -212,14 +212,58 @@ menuconfig EMBEDDED
 	  a "non-standard" kernel.  Only use this if you really know what you
 	  are doing.
 
+menu "Class Based Kernel Resource Management"
+
+config CKRM
+	bool "Class Based Kernel Resource Management Core"
+	depends on EXPERIMENTAL
+	help
+	  Class-based Kernel Resource Management is a framework for controlling
+	  and monitoring resource allocation of user-defined groups of tasks or
+	  incoming socket connections. For more information, please visit
+	  http://ckrm.sf.net. 
+
+	  If you say Y here, enable the Resource Class File System and atleast
+	  one of the resource controllers below. Say N if you are unsure. 
+
+config RCFS_FS
+       tristate "Resource Class File System (User API)"
+       depends on CKRM
+       help
+	  RCFS is the filesystem API for CKRM. This separate configuration option
+          is provided only for debugging and will eventually disappear since rcfs
+          will be automounted whenever CKRM is configured. 
+
+          Say N if unsure, Y if you've enabled CKRM, M to debug rcfs initialization.
+
+config CKRM_RES_DUMMY
+	tristate "Dummy Resource Manager"
+	depends on CKRM
+	default m
+	help
+	  Provides a Dummy Resource Controller for CKRM that does no useful
+	  work but illustrates how to write and integrate a resource controller
+	  for CKRM.
+	
+	  Say N if unsure, Y if testing CKRM. 
+
+config CKRM_RES_SOCKETAQ
+	tristate "Multiple Accept Queues Resource Manager"
+	depends on CKRM
+	help
+	  Provides a  resource controller for CKRM to prioritize accept queues.
+ 
+	  Say N if unsure. Not needed for testing CKRM framework and API.
+
+endmenu
+
 config DELAY_ACCT
 	bool "Enable delay accounting (EXPERIMENTAL)"
 	help
 	  In addition to counting frequency the total delay in ns is also
-	  recorded. CPU delays are specified as cpu-wait and cpu-run. Memory
-	  delay is recorded for minor and major faults. Information is
-	  accessible through /proc/<pid>/delay.
-
+	  recorded. CPU delays are specified as cpu-wait and cpu-run. 
+	  I/O delays are recorded for memory and regular I/O.
+	  Information is accessible through /proc/<pid>/delay.
 
 config KALLSYMS
 	 bool "Load all symbols for debugging/kksymoops" if EMBEDDED
@@ -342,23 +386,5 @@ config STOP_MACHINE
 	help
 	  Need stop_machine() primitive.
 
-config CKRM
-	bool "Class Based Kernel Resource Management"
-	depends on EXPERIMENTAL
-	help
-	  This option adds CKRM support to the Kernel. Say N if you are unsure.
-
-config CKRM_RES_DUMMY
-	tristate "Dummy Resource Manager for CKRM"
-	depends on CKRM
-	default m
-	help
-	  Provides a Dummy Resource Manager for CKRM
-config CKRM_RES_SOCKETAQ
-	tristate "Multiple Accept Queues Resource Manager for CKRM"
-	depends on CKRM
-	help
-	  Provides a  Resource Manager for CKRM to manage the accept queue 
-	  weights. Say N if you are unsure.
 
 endmenu

@@ -30,8 +30,15 @@ inline struct rcfs_inode_info *RCFS_I(struct inode *inode);
 
 struct inode *rcfs_get_inode(struct super_block *sb, int mode, dev_t dev);
 int rcfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev);
-struct dentry * rcfs_create_internal(struct dentry *parent, const char *name, 
-				     int mfmode, int magic);
+int rcfs_mkdir(struct inode *dir, struct dentry *dentry, int mode);
+struct dentry * rcfs_create_internal(struct dentry *parent, const char *name, int mfmode, 
+				     int magic);
+void rcfs_make_core(struct dentry *sp, struct ckrm_core_class *core);
+
+
+int rcfs_delete_internal(struct dentry *mfdentry);
+int rcfs_clear_magic(struct dentry *parent);
+
 
 extern struct super_operations rcfs_super_ops;
 extern struct address_space_operations rcfs_aops;

@@ -34,8 +34,7 @@
 #include <linux/parser.h>
 #include <asm/uaccess.h>
 
-#include "rcfs.h"
-#include "MOVETOCORE.h"
+#include <linux/rcfs.h>
 #include "magic.h"
 
 static int 

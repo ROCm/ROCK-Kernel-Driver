@@ -25,37 +25,57 @@
 #ifndef _LINUX_CKRM_CE_H
 #define _LINUX_CKRM_CE_H
 
-#ifdef __KERNEL__
-
 #ifdef CONFIG_CKRM
-
-//#include <linux/ckrm.h>
 
 // Max engine name length
 #define CKRM_MAX_ENG_NAME 128
 
+/* Action parameters identifying the cause of a task<->class notify callback 
+ * these can perculate up to user daemon consuming records send by the classification
+ * engine
+ */
+
+enum {
+	CKRM_ACTION_RECLASSIFY,
+	CKRM_ACTION_MANUAL,
+	CKRM_ACTION_FORK,
+	CKRM_ACTION_EXEC,
+	CKRM_ACTION_GID,
+	CKRM_ACTION_UID,
+	CKRM_ACTION_LISTEN,
+
+	CKRM_ACTION_LAST  /* always the last entry */
+};
+
+#ifdef __KERNEL__
+
 typedef struct ckrm_eng_callback {
+	/* general state information */
 	char ckrm_eng_name[CKRM_MAX_ENG_NAME];
-	void * (*fork)(struct task_struct*); // on fork
-	void * (*exec)(struct task_struct*,const char *filename); // on exec
+	int  always_callback;  /* set if CE should always be called back regardless of numclasses */
+
+	/* callbacks which are called without holding locks */
+
+	void * (*fork)      (struct task_struct*); // on fork
+	void * (*exec)      (struct task_struct*,const char *filename); // on exec
 
 	void * (*reclassify)(struct task_struct *); // on need
-	void * (*uid)(struct task_struct*);  // on uid change
-	void * (*gid)(struct task_struct*);  // on gid change
+	void * (*uid)       (struct task_struct*);  // on uid change
+	void * (*gid)       (struct task_struct*);  // on gid change
+	void * (*listen)    (void *n); // listen callback
 
-	void (*manual)(struct task_struct *);  /* manual reclassification */
-	void (*exit)(struct task_struct *);  /* on exit - just notification */
+	void   (*manual)    (struct task_struct *);  /* mark manual */
 
-	void (*class_add)(const char *name, void *core);   /* class added */
-	void (*class_delete)(const char *name, void *core);      /* class deleted */
+	void   (*class_add) (const char *name, void *core);   /* class added */
+	void   (*class_delete)(const char *name, void *core); /* class deleted */
 
-	void * (*listen_cb)(void *n); // listen callback
-	int always_callback;
+
+	/* callba which are called while holding task_lock(tsk) */
+	void (*notify)(struct task_struct *tsk, void *core, int action); /* notify on class switch */
+	void (*exit)  (struct task_struct *tsk);                         /* on exit */
+
 	/* and more to come */
 
-	/* Hubertus.. this should be removed in the final version when API 
-	   transition was done */
-	int  (*engine_ctl)(unsigned int op, void *data); /* user level ctl api */
 } ckrm_eng_callback_t;
 
 typedef struct rbce_eng_callback {
@@ -66,12 +86,15 @@ typedef struct rbce_eng_callback {
 extern int ckrm_register_engine(ckrm_eng_callback_t *);
 extern int ckrm_unregister_engine(ckrm_eng_callback_t *);
 extern void *ckrm_classobj(char *);
-extern void ckrm_reclassify(int);
 extern int get_exe_path_name(struct task_struct *t, char *filename, int max_size);
 
 extern int rcfs_register_engine(rbce_eng_callback_t *);
 extern int rcfs_unregister_engine(rbce_eng_callback_t *);
 
+extern int ckrm_reclassify(int pid);
+
+extern void ckrm_core_grab(void *);
+extern void ckrm_core_drop(void *);
 
 #endif // CONFIG_CKRM
 

@@ -2,6 +2,7 @@
  * fs/rcfs/magic_members.c 
  *
  * Copyright (C) Shailabh Nagar,  IBM Corp. 2004
+ * Copyright (C) Vivek Kashyap,  IBM Corp. 2004
  *           
  * 
  * virtual file for getting pids belonging to a class
@@ -37,38 +38,45 @@
 #include <linux/parser.h>
 #include <asm/uaccess.h>
 
-#include "rcfs.h"
-
+#include <linux/rcfs.h>
+#include "magic.h"
 
 
 static int 
 members_show(struct seq_file *s, void *v)
 {
-	int retval;
 	ckrm_core_class_t *core ;
 	struct list_head *lh;
 	struct task_struct *tsk;
+	struct ckrm_net_struct *ns = NULL;
 
 	/* Get and "display" statistics for each registered resource.
 	 * Data from each resource is "atomic" (depends on RC) 
 	 * but not across resources
 	 */
 
-	core = (ckrm_core_class_t *)(((struct rcfs_inode_info *)s->private)->core);
+	core = (ckrm_core_class_t *)
+		(((struct rcfs_inode_info *)s->private)->core);
 
 	if (!is_core_valid(core))
 		return -EINVAL;
 
-	seq_printf(s,"Printing tasks in members of %p\n",core);
+	seq_printf(s,"Printing  members of %p\n",core);
 	
 	spin_lock(&core->ckrm_lock);
-//	read_lock(&tasklist_lock);
-//	for_each_process(tsk) {
 	list_for_each(lh, &core->tasklist) {	
-		tsk = container_of(lh, struct task_struct, ckrm_link);
-		seq_printf(s,"%ld\n", (long)tsk->pid);
+		if (core->class_type == CKRM_TASK_CLASS) {
+			tsk = container_of(lh, struct task_struct, ckrm_link);
+			seq_printf(s,"%ld\n", (long)tsk->pid);
+		}
+		else if (core->class_type == CKRM_NET_CLASS) {
+			ns = container_of(lh, struct ckrm_net_struct,ckrm_link);
+			seq_printf(s, "%x\\%x\n", ns->daddr4,ns->dport);
+			// To be modified to
+			// seq_printf(s, "%s\\%s\n", 
+		        // 		ntoa(ns->daddr),ntoa(ns->dport));
+ 		}
 	}
-//	read_unlock(&tasklist_lock);
 	spin_unlock(&core->ckrm_lock);
 
 	return 0;

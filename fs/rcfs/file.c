@@ -41,8 +41,7 @@
 
 #include <asm/uaccess.h>
 
-#include "rcfs.h"
-#include "MOVETOCORE.h"
+#include <linux/rcfs.h>
 #include "magic.h"
 
 
@@ -87,17 +86,6 @@ struct magf_t magf[NR_MAGF] = {
 
 
 /*******************************Generic file ops ********************/
-
-
-static struct seq_operations rcfile_seq_ops;
-
-static int rcfs_open(struct inode *inode, struct file *file)
-{
-	return -EPERM;
-//	return seq_open(file, &rcfile_seq_ops);
-}
-
-
 
 
 struct address_space_operations rcfs_aops = {

@@ -2,6 +2,7 @@
  * fs/rcfs/magic_target.c 
  *
  * Copyright (C) Shailabh Nagar,  IBM Corp. 2004
+ * Copyright (C) Vivek Kashyap,  IBM Corp. 2004
  *           
  * 
  * virtual file assisting in reclassification in rcfs. 
@@ -34,8 +35,7 @@
 #include <linux/parser.h>
 #include <asm/uaccess.h>
 
-#include "rcfs.h"
-#include "MOVETOCORE.h"
+#include <linux/rcfs.h>
 #include "magic.h"
 
 
@@ -48,20 +48,28 @@
    the remaining ones are for token matching purposes */
 
 enum target_token_t {
-        PID, RES_TYPE, TARGET_ERR
+        PID, IPV4, IPV6, RES_TYPE, TARGET_ERR
 };
 
 static match_table_t tokens = {
         {PID, "pid=%u"},
+	{IPV4, "ipv4=%s"},
+	{IPV6, "ipv6=%s"},
         {TARGET_ERR, NULL},
 };
 
 
-static int target_parse(char *options, pid_t *mpid )
+struct target_data {
+	int flag;
+	pid_t mpid;
+	char addr[64];
+};
+
+static int target_parse(char *options, struct target_data *value)
 {
 	char *p;
 	int option;
-
+	int flag = TARGET_ERR;
 
 	if (!options)
 		return 1;
@@ -82,10 +90,26 @@ static int target_parse(char *options, pid_t *mpid )
 		switch (token) {
 			
 		case PID:
+			if (flag == TARGET_ERR)
+				flag = PID;
+			else
+				break;
 			if (match_int(args, &option))
 				return 0;
-			*mpid = (pid_t)(option);
+			value->mpid = (pid_t)(option);
 			break;
+
+		case IPV4:
+			if (flag == TARGET_ERR)
+				flag = IPV4;
+			else
+				break;
+			match_strcpy(value->addr,args);
+			break;
+
+		case IPV6:
+			printk(KERN_INFO "rcfs: IPV6 not supported yet\n");
+			return 0;	
 		default:
 			return 0;
 		}
@@ -93,6 +117,16 @@ static int target_parse(char *options, pid_t *mpid )
 	}
 	return 1;
 }	
+
+#if 0
+static int
+magic_aton(char *s)
+{
+	// TODO
+	// Add alpha to IP address conversion.
+	return 1;
+}
+#endif
 
 
 static ssize_t
@@ -102,9 +136,7 @@ target_write(struct file *file, const char __user *buf,
 	struct rcfs_inode_info *ri= RCFS_I(file->f_dentry->d_inode);
 	char *optbuf;
 	int done;
-	pid_t mpid;
-	struct task_struct *mtsk;
-	
+ 	struct target_data value;
 
 	if ((ssize_t) count < 0 || (ssize_t) count > TARGET_MAX_INPUT_SIZE)
 		return -EINVAL;
@@ -121,37 +153,44 @@ target_write(struct file *file, const char __user *buf,
 	if (optbuf[count-1] == '\n')
 		optbuf[count-1]='\0';
 
-	done = target_parse(optbuf, &mpid);
+	done = target_parse(optbuf, &value);
 
 	if (!done) {
 		printk(KERN_ERR "Error parsing target \n");
 		goto target_out;
 	}
 
-	/* USEMELATER */
-	   
-	mtsk = find_task_by_pid(mpid);
-	if (!mtsk) {
-		printk(KERN_ERR "No such pid \n");
-		goto target_out;
+	if (value.flag == PID) {
+		ckrm_forced_reclassify_pid(value.mpid, ri->core);
 	}
 
-#if 0
-	/* Error control ? */
-	if (callbacks_active)
-		if (ckrm_eng_callbacks.relinquish_tsk)
-			(*ckrm_eng_callbacks.relinquish_tsk)(mtsk) ;
-				
-	/* Error control ? */
-	/* Do manual reclassification after CE relinquishes control to
-	   avoid races with other operations which might reclassify task
-	 */
-	ckrm_reclassify_task(mtsk, ri->core);
+#ifdef MAGIC_TARGET_TODO
+	else if (value.flag == IPV4) {
+		// Get the socket. Find the listening socket's back-pointer
+		// to ns (set in lopt when SOCKETAQ option chosen). 
+		// Dissociate from old class and join the new one.
+		
+		u32 daddr;
+		u16 dport;
+
+		memset(&saddr, 0, sizeof(saddr));
+
+		daddr = magic_aton(value.addr);
+		dport = magic_aton(value.port);
+
+		local_bh_disable();
+		sk = find_tcpv4_listener_byaddr(daddr,port);
+		sock_hold(sk);
+		local_bh_enable();
+		lock_sock(sk);
+		__sock_put(sk);	
+		ns = tcp_sk(sk)->tp->lopt->ns;
+		ckrm_forced_reclassify_net(ns, ri->core);
+		release_sock(sk);
+	}
+
 #endif
 	
-	
-	printk(KERN_ERR "Reclassifying task pid %d cmd %s \n",
-	       (int) mpid, mtsk->comm);
 	
 
 target_out:	
