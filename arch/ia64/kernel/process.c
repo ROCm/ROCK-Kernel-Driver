@@ -199,8 +199,10 @@ ia64_save_extra (struct task_struct *task)
 # endif
 #endif
 
+#ifdef CONFIG_IA32_SUPPORT
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))
 		ia32_save_state(task);
+#endif
 }
 
 void
@@ -218,8 +220,10 @@ ia64_load_extra (struct task_struct *task)
 # endif
 #endif
 
+#ifdef CONFIG_IA32_SUPPORT
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))
 		ia32_load_state(task);
+#endif
 }
 
 /*

@@ -69,13 +69,6 @@ ifdef CONFIG_IA64_SGI_SN
 				$(CORE_FILES)
 endif
 
-ifdef CONFIG_IA64_SOFTSDV
-        SUBDIRS         :=      arch/$(ARCH)/dig	\
-				$(SUBDIRS)
-        CORE_FILES      :=      arch/$(ARCH)/dig/dig.a	\
-				$(CORE_FILES)
-endif
-
 ifdef CONFIG_IA64_DIG
         SUBDIRS         :=      arch/$(ARCH)/dig	\
 				$(SUBDIRS)
