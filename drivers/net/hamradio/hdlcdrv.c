@@ -223,6 +223,7 @@ static void hdlc_rx_flag(struct net_device *dev, struct hdlcdrv_state *s)
 	skb->protocol = htons(ETH_P_AX25);
 	skb->mac.raw = skb->data;
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	s->stats.rx_packets++;
 }
 

@@ -706,6 +706,7 @@ static void do_rxpacket(struct net_device *dev)
 	skb->protocol = htons(ETH_P_AX25);
 	skb->mac.raw = skb->data;
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	bc->stats.rx_packets++;
 }
 

@@ -1661,6 +1661,7 @@ static void scc_net_rx(struct scc_channel *scc, struct sk_buff *skb)
 	skb->pkt_type = PACKET_HOST;
 	
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	return;
 }
 

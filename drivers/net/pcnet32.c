@@ -1349,6 +1349,7 @@ pcnet32_rx(struct net_device *dev)
 		lp->stats.rx_bytes += skb->len;
 		skb->protocol=eth_type_trans(skb,dev);
 		netif_rx(skb);
+		dev->last_rx = jiffies;
 		lp->stats.rx_packets++;
 	    }
 	}

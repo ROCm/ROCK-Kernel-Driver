@@ -839,6 +839,7 @@ static void irda_usb_receive(struct urb *urb)
         new->mac.raw  = new->data;
         new->protocol = htons(ETH_P_IRDA);
         netif_rx(new);
+		self->netdev->last_rx = jiffies;
 
 done:
 	/* Note : at this point, the URB we've just received (urb)

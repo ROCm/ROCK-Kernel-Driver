@@ -685,6 +685,7 @@ static int lan_saa9730_rx(struct net_device *dev)
 						 len, 0);
 				skb->protocol = eth_type_trans(skb, dev);
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 			}
 		} else {
 			/* We got an error packet. */

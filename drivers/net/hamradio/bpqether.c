@@ -254,6 +254,7 @@ static int bpq_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_ty
 	skb->pkt_type = PACKET_HOST;
 
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 
 	return 0;
 }

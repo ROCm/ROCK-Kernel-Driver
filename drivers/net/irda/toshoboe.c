@@ -433,8 +433,10 @@ toshoboe_interrupt (int irq, void *dev_id, struct pt_regs *regs)
           self->rxs++;
           self->rxs %= RX_SLOTS;
 
-          if (skb)
+          if (skb) {
             netif_rx (skb);
+            self->netdev->last_rx = jiffies;
+          }
 
         }
 
