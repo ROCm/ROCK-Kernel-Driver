@@ -22,6 +22,7 @@
 #include <asm/bitops.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
+#include <asm/dma.h>
 
 /* #define IOUNIT_DEBUG */
 #ifdef IOUNIT_DEBUG
