@@ -564,19 +564,16 @@ static u8 wait_drive_not_busy(ide_drive_t *drive)
 ide_startstop_t task_in_intr (ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	u8 stat, good_stat;
+	u8 stat = HWIF(drive)->INB(IDE_STATUS_REG);
 
-	good_stat = DATA_READY;
-	stat = HWIF(drive)->INB(IDE_STATUS_REG);
-check_status:
-	if (!OK_STAT(stat, good_stat, BAD_R_STAT)) {
+	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & (ERR_STAT | DRQ_STAT))
 			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
 		/* BUSY_STAT: No data yet, so wait for another IRQ. */
 		ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
-
+finish_rq:
 	/*
 	 * Complete previously submitted bios (if any).
 	 * Status was already verifyied.
@@ -595,9 +592,10 @@ check_status:
 
 	/* If it was the last datablock check status and finish transfer. */
 	if (!rq->nr_sectors) {
-		good_stat = 0;
 		stat = wait_drive_not_busy(drive);
-		goto check_status;
+		if (!OK_STAT(stat, 0, BAD_R_STAT))
+			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		goto finish_rq;
 	}
 
 	/* Still data left to transfer. */
@@ -615,19 +613,16 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 	struct request *rq = HWGROUP(drive)->rq;
 	unsigned int msect = drive->mult_count;
 	unsigned int nsect;
-	u8 stat, good_stat;
+	u8 stat = HWIF(drive)->INB(IDE_STATUS_REG);
 
-	good_stat = DATA_READY;
-	stat = HWIF(drive)->INB(IDE_STATUS_REG);
-check_status:
-	if (!OK_STAT(stat, good_stat, BAD_R_STAT)) {
+	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & (ERR_STAT | DRQ_STAT))
 			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
 		/* BUSY_STAT: No data yet, so wait for another IRQ. */
 		ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
 		return ide_started;
 	}
-
+finish_rq:
 	/*
 	 * Complete previously submitted bios (if any).
 	 * Status was already verifyied.
@@ -657,9 +652,10 @@ check_status:
 
 	/* If it was the last datablock check status and finish transfer. */
 	if (!rq->nr_sectors) {
-		good_stat = 0;
 		stat = wait_drive_not_busy(drive);
-		goto check_status;
+		if (!OK_STAT(stat, 0, BAD_R_STAT))
+			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		goto finish_rq;
 	}
 
 	/* Still data left to transfer. */
