@@ -1458,10 +1458,10 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 	} else
 		xprt_default_timeout(&xprt->timeout, xprt->prot);
 
-	INIT_RPC_WAITQ(&xprt->pending, "xprt_pending");
-	INIT_RPC_WAITQ(&xprt->sending, "xprt_sending");
-	INIT_RPC_WAITQ(&xprt->resend, "xprt_resend");
-	INIT_RPC_WAITQ(&xprt->backlog, "xprt_backlog");
+	rpc_init_wait_queue(&xprt->pending, "xprt_pending");
+	rpc_init_wait_queue(&xprt->sending, "xprt_sending");
+	rpc_init_wait_queue(&xprt->resend, "xprt_resend");
+	rpc_init_priority_wait_queue(&xprt->backlog, "xprt_backlog");
 
 	/* initialize free list */
 	for (req = &xprt->slot[entries-1]; req >= &xprt->slot[0]; req--)

@@ -234,6 +234,7 @@ static void nfs_read_rpcsetup(struct nfs_page *req, struct nfs_read_data *data,
 
 	NFS_PROTO(inode)->read_setup(data);
 
+	data->task.tk_cookie = (unsigned long)inode;
 	data->task.tk_calldata = data;
 	/* Release requests */
 	data->task.tk_release = nfs_readdata_release;

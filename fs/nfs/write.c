@@ -173,15 +173,14 @@ static void nfs_mark_uptodate(struct page *page, unsigned int base, unsigned int
  * Write a page synchronously.
  * Offset is the data offset within the page.
  */
-static int
-nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
-		   unsigned int offset, unsigned int count)
+static int nfs_writepage_sync(struct file *file, struct inode *inode,
+		struct page *page, unsigned int offset, unsigned int count,
+		int how)
 {
 	unsigned int	wsize = NFS_SERVER(inode)->wsize;
 	int		result, written = 0;
-	int		swapfile = IS_SWAPFILE(inode);
 	struct nfs_write_data	wdata = {
-		.flags		= swapfile ? NFS_RPC_SWAPFLAGS : 0,
+		.flags		= how,
 		.cred		= NULL,
 		.inode		= inode,
 		.args		= {
@@ -205,7 +204,7 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 
 	nfs_begin_data_update(inode);
 	do {
-		if (count < wsize && !swapfile)
+		if (count < wsize)
 			wdata.args.count = count;
 		wdata.args.offset = page_offset(page) + wdata.args.pgbase;
 
@@ -260,6 +259,15 @@ static int nfs_writepage_async(struct file *file, struct inode *inode,
 	return status;
 }
 
+static int wb_priority(struct writeback_control *wbc)
+{
+	if (wbc->for_reclaim)
+		return FLUSH_HIGHPRI;
+	if (wbc->for_kupdate)
+		return FLUSH_LOWPRI;
+	return 0;
+}
+
 /*
  * Write an mmapped page to the server.
  */
@@ -270,6 +278,7 @@ int nfs_writepage(struct page *page, struct writeback_control *wbc)
 	unsigned offset = PAGE_CACHE_SIZE;
 	loff_t i_size = i_size_read(inode);
 	int inode_referenced = 0;
+	int priority = wb_priority(wbc);
 	int err;
 
 	/*
@@ -285,7 +294,7 @@ int nfs_writepage(struct page *page, struct writeback_control *wbc)
 	end_index = i_size >> PAGE_CACHE_SHIFT;
 
 	/* Ensure we've flushed out any previous writes */
-	nfs_wb_page(inode,page);
+	nfs_wb_page_priority(inode, page, priority);
 
 	/* easy case */
 	if (page->index < end_index)
@@ -307,7 +316,7 @@ do_it:
 				err = WRITEPAGE_ACTIVATE;
 		}
 	} else {
-		err = nfs_writepage_sync(NULL, inode, page, 0, offset); 
+		err = nfs_writepage_sync(NULL, inode, page, 0, offset, priority); 
 		if (err == offset)
 			err = 0;
 	}
@@ -338,7 +347,7 @@ int nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 			return 0;
 		nfs_wait_on_write_congestion(mapping, 0);
 	}
-	err = nfs_flush_inode(inode, 0, 0, 0);
+	err = nfs_flush_inode(inode, 0, 0, wb_priority(wbc));
 	if (err < 0)
 		goto out;
 	wbc->nr_to_write -= err;
@@ -347,7 +356,7 @@ int nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 		if (err < 0)
 			goto out;
 	}
-	err = nfs_commit_inode(inode, 0, 0, 0);
+	err = nfs_commit_inode(inode, 0, 0, wb_priority(wbc));
 	if (err > 0)
 		wbc->nr_to_write -= err;
 out:
@@ -719,8 +728,8 @@ nfs_flush_incompatible(struct file *file, struct page *page)
  * XXX: Keep an eye on generic_file_read to make sure it doesn't do bad
  * things with a page scheduled for an RPC call (e.g. invalidate it).
  */
-int
-nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsigned int count)
+int nfs_updatepage(struct file *file, struct page *page,
+		unsigned int offset, unsigned int count)
 {
 	struct dentry	*dentry = file->f_dentry;
 	struct inode	*inode = page->mapping->host;
@@ -732,7 +741,7 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 		count, (long long)(page_offset(page) +offset));
 
 	if (IS_SYNC(inode)) {
-		status = nfs_writepage_sync(file, inode, page, offset, count);
+		status = nfs_writepage_sync(file, inode, page, offset, count, 0);
 		if (status > 0) {
 			if (offset == 0 && status == PAGE_CACHE_SIZE)
 				SetPageUptodate(page);
@@ -819,6 +828,17 @@ out:
 	nfs_unlock_request(req);
 }
 
+static inline int flush_task_priority(int how)
+{
+	switch (how & (FLUSH_HIGHPRI|FLUSH_LOWPRI)) {
+		case FLUSH_HIGHPRI:
+			return RPC_PRIORITY_HIGH;
+		case FLUSH_LOWPRI:
+			return RPC_PRIORITY_LOW;
+	}
+	return RPC_PRIORITY_NORMAL;
+}
+
 /*
  * Set up the argument/result storage required for the RPC call.
  */
@@ -851,6 +871,8 @@ static void nfs_write_rpcsetup(struct nfs_page *req,
 
 	NFS_PROTO(inode)->write_setup(data, how);
 
+	data->task.tk_priority = flush_task_priority(how);
+	data->task.tk_cookie = (unsigned long)inode;
 	data->task.tk_calldata = data;
 	/* Release requests */
 	data->task.tk_release = nfs_writedata_release;
@@ -1212,6 +1234,8 @@ static void nfs_commit_rpcsetup(struct list_head *head,
 	
 	NFS_PROTO(inode)->commit_setup(data, how);
 
+	data->task.tk_priority = flush_task_priority(how);
+	data->task.tk_cookie = (unsigned long)inode;
 	data->task.tk_calldata = data;
 	/* Release requests */
 	data->task.tk_release = nfs_commit_release;

@@ -162,6 +162,26 @@ rpc_delete_timer(struct rpc_task *task)
 }
 
 /*
+ * Add new request to a priority queue.
+ */
+static void __rpc_add_wait_queue_priority(struct rpc_wait_queue *queue, struct rpc_task *task)
+{
+	struct list_head *q;
+	struct rpc_task *t;
+
+	q = &queue->tasks[task->tk_priority];
+	if (unlikely(task->tk_priority > queue->maxpriority))
+		q = &queue->tasks[queue->maxpriority];
+	list_for_each_entry(t, q, tk_list) {
+		if (t->tk_cookie == task->tk_cookie) {
+			list_add_tail(&task->tk_list, &t->tk_links);
+			return;
+		}
+	}
+	list_add_tail(&task->tk_list, q);
+}
+
+/*
  * Add new request to wait queue.
  *
  * Swapper tasks always get inserted at the head of the queue.
@@ -169,8 +189,7 @@ rpc_delete_timer(struct rpc_task *task)
  * improve overall performance.
  * Everyone else gets appended to the queue to ensure proper FIFO behavior.
  */
-static inline int
-__rpc_add_wait_queue(struct rpc_wait_queue *queue, struct rpc_task *task)
+static int __rpc_add_wait_queue(struct rpc_wait_queue *queue, struct rpc_task *task)
 {
 	if (task->tk_rpcwait == queue)
 		return 0;
@@ -179,10 +198,12 @@ __rpc_add_wait_queue(struct rpc_wait_queue *queue, struct rpc_task *task)
 		printk(KERN_WARNING "RPC: doubly enqueued task!\n");
 		return -EWOULDBLOCK;
 	}
-	if (RPC_IS_SWAPPER(task))
-		list_add(&task->tk_list, &queue->tasks);
+	if (RPC_IS_PRIORITY(queue))
+		__rpc_add_wait_queue_priority(queue, task);
+	else if (RPC_IS_SWAPPER(task))
+		list_add(&task->tk_list, &queue->tasks[0]);
 	else
-		list_add_tail(&task->tk_list, &queue->tasks);
+		list_add_tail(&task->tk_list, &queue->tasks[0]);
 	task->tk_rpcwait = queue;
 
 	dprintk("RPC: %4d added to queue %p \"%s\"\n",
@@ -191,8 +212,7 @@ __rpc_add_wait_queue(struct rpc_wait_queue *queue, struct rpc_task *task)
 	return 0;
 }
 
-int
-rpc_add_wait_queue(struct rpc_wait_queue *q, struct rpc_task *task)
+int rpc_add_wait_queue(struct rpc_wait_queue *q, struct rpc_task *task)
 {
 	int		result;
 
@@ -203,18 +223,35 @@ rpc_add_wait_queue(struct rpc_wait_queue *q, struct rpc_task *task)
 }
 
 /*
+ * Remove request from a priority queue.
+ */
+static void __rpc_remove_wait_queue_priority(struct rpc_task *task)
+{
+	struct rpc_task *t;
+
+	if (!list_empty(&task->tk_links)) {
+		t = list_entry(task->tk_links.next, struct rpc_task, tk_list);
+		list_move(&t->tk_list, &task->tk_list);
+		list_splice_init(&task->tk_links, &t->tk_links);
+	}
+	list_del(&task->tk_list);
+}
+
+/*
  * Remove request from queue.
  * Note: must be called with spin lock held.
  */
-static inline void
-__rpc_remove_wait_queue(struct rpc_task *task)
+static void __rpc_remove_wait_queue(struct rpc_task *task)
 {
 	struct rpc_wait_queue *queue = task->tk_rpcwait;
 
 	if (!queue)
 		return;
 
-	list_del(&task->tk_list);
+	if (RPC_IS_PRIORITY(queue))
+		__rpc_remove_wait_queue_priority(task);
+	else
+		list_del(&task->tk_list);
 	task->tk_rpcwait = NULL;
 
 	dprintk("RPC: %4d removed from queue %p \"%s\"\n",
@@ -230,6 +267,48 @@ rpc_remove_wait_queue(struct rpc_task *task)
 	__rpc_remove_wait_queue(task);
 	spin_unlock_bh(&rpc_queue_lock);
 }
+
+static inline void rpc_set_waitqueue_priority(struct rpc_wait_queue *queue, int priority)
+{
+	queue->priority = priority;
+	queue->count = 1 << (priority * 2);
+}
+
+static inline void rpc_set_waitqueue_cookie(struct rpc_wait_queue *queue, unsigned long cookie)
+{
+	queue->cookie = cookie;
+	queue->nr = RPC_BATCH_COUNT;
+}
+
+static inline void rpc_reset_waitqueue_priority(struct rpc_wait_queue *queue)
+{
+	rpc_set_waitqueue_priority(queue, queue->maxpriority);
+	rpc_set_waitqueue_cookie(queue, 0);
+}
+
+static void __rpc_init_priority_wait_queue(struct rpc_wait_queue *queue, const char *qname, int maxprio)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(queue->tasks); i++)
+		INIT_LIST_HEAD(&queue->tasks[i]);
+	queue->maxpriority = maxprio;
+	rpc_reset_waitqueue_priority(queue);
+#ifdef RPC_DEBUG
+	queue->name = qname;
+#endif
+}
+
+void rpc_init_priority_wait_queue(struct rpc_wait_queue *queue, const char *qname)
+{
+	__rpc_init_priority_wait_queue(queue, qname, RPC_PRIORITY_HIGH);
+}
+
+void rpc_init_wait_queue(struct rpc_wait_queue *queue, const char *qname)
+{
+	__rpc_init_priority_wait_queue(queue, qname, 0);
+}
+EXPORT_SYMBOL(rpc_init_wait_queue);
 
 /*
  * Make an RPC task runnable.
@@ -403,17 +482,72 @@ rpc_wake_up_task(struct rpc_task *task)
 }
 
 /*
+ * Wake up the next task on a priority queue.
+ */
+static struct rpc_task * __rpc_wake_up_next_priority(struct rpc_wait_queue *queue)
+{
+	struct list_head *q;
+	struct rpc_task *task;
+
+	/*
+	 * Service a batch of tasks from a single cookie.
+	 */
+	q = &queue->tasks[queue->priority];
+	if (!list_empty(q)) {
+		task = list_entry(q->next, struct rpc_task, tk_list);
+		if (queue->cookie == task->tk_cookie) {
+			if (--queue->nr)
+				goto out;
+			list_move_tail(&task->tk_list, q);
+		}
+		/*
+		 * Check if we need to switch queues.
+		 */
+		if (--queue->count)
+			goto new_cookie;
+	}
+
+	/*
+	 * Service the next queue.
+	 */
+	do {
+		if (q == &queue->tasks[0])
+			q = &queue->tasks[queue->maxpriority];
+		else
+			q = q - 1;
+		if (!list_empty(q)) {
+			task = list_entry(q->next, struct rpc_task, tk_list);
+			goto new_queue;
+		}
+	} while (q != &queue->tasks[queue->priority]);
+
+	rpc_reset_waitqueue_priority(queue);
+	return NULL;
+
+new_queue:
+	rpc_set_waitqueue_priority(queue, (unsigned int)(q - &queue->tasks[0]));
+new_cookie:
+	rpc_set_waitqueue_cookie(queue, task->tk_cookie);
+out:
+	__rpc_wake_up_task(task);
+	return task;
+}
+
+/*
  * Wake up the next task on the wait queue.
  */
-struct rpc_task *
-rpc_wake_up_next(struct rpc_wait_queue *queue)
+struct rpc_task * rpc_wake_up_next(struct rpc_wait_queue *queue)
 {
 	struct rpc_task	*task = NULL;
 
 	dprintk("RPC:      wake_up_next(%p \"%s\")\n", queue, rpc_qname(queue));
 	spin_lock_bh(&rpc_queue_lock);
-	task_for_first(task, &queue->tasks)
-		__rpc_wake_up_task(task);
+	if (RPC_IS_PRIORITY(queue))
+		task = __rpc_wake_up_next_priority(queue);
+	else {
+		task_for_first(task, &queue->tasks[0])
+			__rpc_wake_up_task(task);
+	}
 	spin_unlock_bh(&rpc_queue_lock);
 
 	return task;
@@ -425,15 +559,22 @@ rpc_wake_up_next(struct rpc_wait_queue *queue)
  *
  * Grabs rpc_queue_lock
  */
-void
-rpc_wake_up(struct rpc_wait_queue *queue)
+void rpc_wake_up(struct rpc_wait_queue *queue)
 {
 	struct rpc_task *task;
 
+	struct list_head *head;
 	spin_lock_bh(&rpc_queue_lock);
-	while (!list_empty(&queue->tasks))
-		task_for_first(task, &queue->tasks)
+	head = &queue->tasks[queue->maxpriority];
+	for (;;) {
+		while (!list_empty(head)) {
+			task = list_entry(head->next, struct rpc_task, tk_list);
 			__rpc_wake_up_task(task);
+		}
+		if (head == &queue->tasks[0])
+			break;
+		head--;
+	}
 	spin_unlock_bh(&rpc_queue_lock);
 }
 
@@ -444,17 +585,22 @@ rpc_wake_up(struct rpc_wait_queue *queue)
  *
  * Grabs rpc_queue_lock
  */
-void
-rpc_wake_up_status(struct rpc_wait_queue *queue, int status)
+void rpc_wake_up_status(struct rpc_wait_queue *queue, int status)
 {
+	struct list_head *head;
 	struct rpc_task *task;
 
 	spin_lock_bh(&rpc_queue_lock);
-	while (!list_empty(&queue->tasks)) {
-		task_for_first(task, &queue->tasks) {
+	head = &queue->tasks[queue->maxpriority];
+	for (;;) {
+		while (!list_empty(head)) {
+			task = list_entry(head->next, struct rpc_task, tk_list);
 			task->tk_status = status;
 			__rpc_wake_up_task(task);
 		}
+		if (head == &queue->tasks[0])
+			break;
+		head--;
 	}
 	spin_unlock_bh(&rpc_queue_lock);
 }
@@ -642,7 +788,7 @@ __rpc_schedule(void)
 	while (1) {
 		spin_lock_bh(&rpc_queue_lock);
 
-		task_for_first(task, &schedq.tasks) {
+		task_for_first(task, &schedq.tasks[0]) {
 			__rpc_remove_wait_queue(task);
 			spin_unlock_bh(&rpc_queue_lock);
 
@@ -706,9 +852,7 @@ rpc_free(struct rpc_task *task)
 /*
  * Creation and deletion of RPC task structures
  */
-inline void
-rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt,
-				rpc_action callback, int flags)
+void rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt, rpc_action callback, int flags)
 {
 	memset(task, 0, sizeof(*task));
 	init_timer(&task->tk_timer);
@@ -725,6 +869,10 @@ rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt,
 	task->tk_garb_retry = 2;
 	task->tk_cred_retry = 2;
 	task->tk_suid_retry = 1;
+
+	task->tk_priority = RPC_PRIORITY_NORMAL;
+	task->tk_cookie = (unsigned long)current;
+	INIT_LIST_HEAD(&task->tk_links);
 
 	/* Add to global list of all tasks */
 	spin_lock(&rpc_sched_lock);
@@ -863,7 +1011,7 @@ rpc_find_parent(struct rpc_task *child)
 	struct list_head *le;
 
 	parent = (struct rpc_task *) child->tk_calldata;
-	task_for_each(task, le, &childq.tasks)
+	task_for_each(task, le, &childq.tasks[0])
 		if (task == parent)
 			return parent;
 
@@ -943,7 +1091,7 @@ static DECLARE_MUTEX_LOCKED(rpciod_running);
 static inline int
 rpciod_task_pending(void)
 {
-	return !list_empty(&schedq.tasks);
+	return !list_empty(&schedq.tasks[0]);
 }
 
 

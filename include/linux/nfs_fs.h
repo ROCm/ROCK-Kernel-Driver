@@ -69,6 +69,8 @@
 #define FLUSH_SYNC		1	/* file being synced, or contention */
 #define FLUSH_WAIT		2	/* wait for completion */
 #define FLUSH_STABLE		4	/* commit to stable storage */
+#define FLUSH_LOWPRI		8	/* low priority background flush */
+#define FLUSH_HIGHPRI		16	/* high priority memory reclaim flush */
 
 #ifdef __KERNEL__
 
@@ -374,12 +376,16 @@ nfs_wb_all(struct inode *inode)
 /*
  * Write back all requests on one page - we do this before reading it.
  */
-static inline int
-nfs_wb_page(struct inode *inode, struct page* page)
+static inline int nfs_wb_page_priority(struct inode *inode, struct page* page, int how)
 {
 	int error = nfs_sync_inode(inode, page->index, 1,
-						FLUSH_WAIT | FLUSH_STABLE);
+			how | FLUSH_WAIT | FLUSH_STABLE);
 	return (error < 0) ? error : 0;
+}
+
+static inline int nfs_wb_page(struct inode *inode, struct page* page)
+{
+	return nfs_wb_page_priority(inode, page, 0);
 }
 
 /* Hack for future NFS swap support */
