@@ -12,16 +12,19 @@
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
-
+#include <linux/module.h>
 #include <asm/mman.h>
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
+long    htlbpagemem = 0;
+int     htlbpage_max;
+long    htlbzone_pages;
+
 struct vm_operations_struct hugetlb_vm_ops;
-struct list_head htlbpage_freelist;
-spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
-extern long htlbpagemem;
+static LIST_HEAD(htlbpage_freelist);
+static spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 
 #define MAX_ID 	32
 struct htlbpagekey {
@@ -542,6 +545,35 @@ int set_hugetlb_mem_size(int count)
 	}
 	return (int) htlbzone_pages;
 }
+
+static int __init hugetlb_setup(char *s)
+{
+	if (sscanf(s, "%d", &htlbpage_max) <= 0)
+		htlbpage_max = 0;
+	return 1;
+}
+__setup("hugepages=", hugetlb_setup);
+
+static int __init hugetlb_init(void)
+{
+	int i, j;
+	struct page *page;
+
+	for (i = 0; i < htlbpage_max; ++i) {
+		page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
+		if (!page)
+			break;
+		for (j = 0; j < HPAGE_SIZE/PAGE_SIZE; ++j)
+			SetPageReserved(&page[j]);
+		spin_lock(&htlbpage_lock);
+		list_add(&page->list, &htlbpage_freelist);
+		spin_unlock(&htlbpage_lock);
+	}
+	htlbpage_max = htlbpagemem = htlbzone_pages = i;
+	printk("Total HugeTLB memory allocated, %ld\n", htlbpagemem);
+	return 0;
+}
+module_init(hugetlb_init);
 
 static struct page * hugetlb_nopage(struct vm_area_struct * area, unsigned long address, int unused)
 {
