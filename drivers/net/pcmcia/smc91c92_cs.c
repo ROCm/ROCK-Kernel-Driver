@@ -304,6 +304,7 @@ static void mdio_sync(ioaddr_t addr);
 static int mdio_read(struct net_device *dev, int phy_id, int loc);
 static void mdio_write(struct net_device *dev, int phy_id, int loc, int value);
 static int smc_link_ok(struct net_device *dev);
+static struct ethtool_ops ethtool_ops;
 
 /*======================================================================
 
@@ -357,6 +358,7 @@ static dev_link_t *smc91c92_attach(void)
     dev->open = &smc_open;
     dev->stop = &smc_close;
     dev->do_ioctl = &smc_ioctl;
+    SET_ETHTOOL_OPS(dev, &ethtool_ops);
 #ifdef HAVE_TX_TIMEOUT
     dev->tx_timeout = smc_tx_timeout;
     dev->watchdog_timeo = TX_TIMEOUT;
@@ -2118,131 +2120,130 @@ static int smc_netdev_set_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
     return 0;
 }
 
-static int smc_ethtool_ioctl (struct net_device *dev, void __user *useraddr)
+static int check_if_running(struct net_device *dev)
 {
-    u32 ethcmd;
-    struct smc_private *smc = netdev_priv(dev);
-
-    if (get_user(ethcmd, (u32 __user *)useraddr))
-	return -EFAULT;
-
-    switch (ethcmd) {
-
-    case ETHTOOL_GDRVINFO: {
-	struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-	strcpy(info.driver, DRV_NAME);
-	strcpy(info.version, DRV_VERSION);
-	if (copy_to_user(useraddr, &info, sizeof(info)))
-	    return -EFAULT;
+	if (!netif_running(dev))
+		return -EINVAL;
 	return 0;
-    }
+}
 
-    /* get settings */
-    case ETHTOOL_GSET: {
+static void smc_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+}
+
+static int smc_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct smc_private *smc = netdev_priv(dev);
+	ioaddr_t ioaddr = dev->base_addr;
+	u16 saved_bank = inw(ioaddr + BANK_SELECT);
 	int ret;
-	struct ethtool_cmd ecmd = { ETHTOOL_GSET };
+
+	SMC_SELECT_BANK(3);
 	spin_lock_irq(&smc->lock);
 	if (smc->cfg & CFG_MII_SELECT)
-	    ret = mii_ethtool_gset(&smc->mii_if, &ecmd);
+		ret = mii_ethtool_gset(&smc->mii_if, ecmd);
 	else
-	    ret = smc_netdev_get_ecmd(dev, &ecmd);
+		ret = smc_netdev_get_ecmd(dev, ecmd);
 	spin_unlock_irq(&smc->lock);
-	if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-	    return -EFAULT;
+	SMC_SELECT_BANK(saved_bank);
 	return ret;
-    }
+}
 
-    /* set settings */
-    case ETHTOOL_SSET: {
+static int smc_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct smc_private *smc = netdev_priv(dev);
+	ioaddr_t ioaddr = dev->base_addr;
+	u16 saved_bank = inw(ioaddr + BANK_SELECT);
 	int ret;
-	struct ethtool_cmd ecmd;
-	if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-	    return -EFAULT;
+
+	SMC_SELECT_BANK(3);
 	spin_lock_irq(&smc->lock);
 	if (smc->cfg & CFG_MII_SELECT)
-	    ret = mii_ethtool_sset(&smc->mii_if, &ecmd);
+		ret = mii_ethtool_sset(&smc->mii_if, ecmd);
 	else
-	    ret = smc_netdev_set_ecmd(dev, &ecmd);
+		ret = smc_netdev_set_ecmd(dev, ecmd);
 	spin_unlock_irq(&smc->lock);
+	SMC_SELECT_BANK(saved_bank);
 	return ret;
-    }
+}
 
-    /* get link status */
-    case ETHTOOL_GLINK: {
-	struct ethtool_value edata = { ETHTOOL_GLINK };
+static u32 smc_get_link(struct net_device *dev)
+{
+	struct smc_private *smc = netdev_priv(dev);
+	ioaddr_t ioaddr = dev->base_addr;
+	u16 saved_bank = inw(ioaddr + BANK_SELECT);
+	u32 ret;
+
+	SMC_SELECT_BANK(3);
 	spin_lock_irq(&smc->lock);
-	edata.data = smc_link_ok(dev);
+	ret = smc_link_ok(dev);
 	spin_unlock_irq(&smc->lock);
-	if (copy_to_user(useraddr, &edata, sizeof(edata)))
-	    return -EFAULT;
-	return 0;
-    }
+	SMC_SELECT_BANK(saved_bank);
+	return ret;
+}
 
 #ifdef PCMCIA_DEBUG
-    /* get message-level */
-    case ETHTOOL_GMSGLVL: {
-	struct ethtool_value edata = { ETHTOOL_GMSGLVL };
-	edata.data = pc_debug;
-	if (copy_to_user(useraddr, &edata, sizeof(edata)))
-	    return -EFAULT;
-	return 0;
-    }
-
-    /* set message-level */
-    case ETHTOOL_SMSGLVL: {
-	struct ethtool_value edata;
-	if (copy_from_user(&edata, useraddr, sizeof(edata)))
-	    return -EFAULT;
-	pc_debug = edata.data;
-	return 0;
-    }
-#endif
-    /* restart autonegotiation */
-    case ETHTOOL_NWAY_RST: {
-	if (smc->cfg & CFG_MII_SELECT)
-	    return mii_nway_restart(&smc->mii_if);
-	else
-	    return -EOPNOTSUPP;
-    }
-
-    default:
-	break;
-    }
-
-    return -EOPNOTSUPP;
+static u32 smc_get_msglevel(struct net_device *dev)
+{
+	return pc_debug;
 }
+
+static void smc_set_msglevel(struct net_device *dev, u32 val)
+{
+	pc_debug = val;
+}
+#endif
+
+static int smc_nway_reset(struct net_device *dev)
+{
+	struct smc_private *smc = netdev_priv(dev);
+	if (smc->cfg & CFG_MII_SELECT) {
+		ioaddr_t ioaddr = dev->base_addr;
+		u16 saved_bank = inw(ioaddr + BANK_SELECT);
+		int res;
+
+		SMC_SELECT_BANK(3);
+		res = mii_nway_restart(&smc->mii_if);
+		SMC_SELECT_BANK(saved_bank);
+
+		return res;
+	} else
+		return -EOPNOTSUPP;
+}
+
+static struct ethtool_ops ethtool_ops = {
+	.begin = check_if_running,
+	.get_drvinfo = smc_get_drvinfo,
+	.get_settings = smc_get_settings,
+	.set_settings = smc_set_settings,
+	.get_link = smc_get_link,
+#ifdef PCMCIA_DEBUG
+	.get_msglevel = smc_get_msglevel,
+	.set_msglevel = smc_set_msglevel,
+#endif
+	.nway_reset = smc_nway_reset,
+};
 
 static int smc_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
-    struct smc_private *smc = netdev_priv(dev);
-    struct mii_ioctl_data *mii;
-    int rc = 0;
-    u_short saved_bank;
-    ioaddr_t ioaddr = dev->base_addr;
+	struct smc_private *smc = netdev_priv(dev);
+	struct mii_ioctl_data *mii = if_mii(rq);
+	int rc = 0;
+	u16 saved_bank;
+	ioaddr_t ioaddr = dev->base_addr;
 
-    mii = if_mii(rq);
-    if (!netif_running(dev))
-    	return -EINVAL;
+	if (!netif_running(dev))
+		return -EINVAL;
 
-    switch (cmd) {
-    case SIOCETHTOOL:
-	saved_bank = inw(ioaddr + BANK_SELECT);
-	SMC_SELECT_BANK(3);
-	rc = smc_ethtool_ioctl(dev, rq->ifr_data);
-	SMC_SELECT_BANK(saved_bank);
-	break;
-
-    default:
 	spin_lock_irq(&smc->lock);
 	saved_bank = inw(ioaddr + BANK_SELECT);
 	SMC_SELECT_BANK(3);
 	rc = generic_mii_ioctl(&smc->mii_if, mii, cmd, NULL);
 	SMC_SELECT_BANK(saved_bank);
 	spin_unlock_irq(&smc->lock);
-	break;
-    }
-
-    return rc;
+	return rc;
 }
 
 static struct pcmcia_driver smc91c92_cs_driver = {
