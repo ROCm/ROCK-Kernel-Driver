@@ -69,6 +69,7 @@
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
+#include <linux/cache.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -334,35 +335,35 @@ struct cp_extra_stats {
 };
 
 struct cp_private {
-	unsigned		tx_head;
-	unsigned		tx_tail;
-	unsigned		rx_tail;
-
 	void			*regs;
 	struct net_device	*dev;
 	spinlock_t		lock;
-
-	struct cp_desc		*rx_ring;
-	struct cp_desc		*tx_ring;
-	struct ring_info	tx_skb[CP_TX_RING_SIZE];
-	struct ring_info	rx_skb[CP_RX_RING_SIZE];
-	unsigned		rx_buf_sz;
-	dma_addr_t		ring_dma;
-
-#if CP_VLAN_TAG_USED
-	struct vlan_group	*vlgrp;
-#endif
-
 	u32			msg_enable;
+
+	struct pci_dev		*pdev;
+	u32			rx_config;
+	u16			cpcmd;
 
 	struct net_device_stats net_stats;
 	struct cp_extra_stats	cp_stats;
 	struct cp_dma_stats	*nic_stats;
 	dma_addr_t		nic_stats_dma;
 
-	struct pci_dev		*pdev;
-	u32			rx_config;
-	u16			cpcmd;
+	unsigned		rx_tail		____cacheline_aligned;
+	struct cp_desc		*rx_ring;
+	struct ring_info	rx_skb[CP_RX_RING_SIZE];
+	unsigned		rx_buf_sz;
+
+	unsigned		tx_head		____cacheline_aligned;
+	unsigned		tx_tail;
+
+	struct cp_desc		*tx_ring;
+	struct ring_info	tx_skb[CP_TX_RING_SIZE];
+	dma_addr_t		ring_dma;
+
+#if CP_VLAN_TAG_USED
+	struct vlan_group	*vlgrp;
+#endif
 
 	unsigned int		wol_enabled : 1; /* Is Wake-on-LAN enabled? */
 	u32			power_state[16];
