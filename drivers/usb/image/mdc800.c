@@ -401,6 +401,7 @@ static void mdc800_usb_download_notify (struct urb *urb)
  ***************************************************************************/
 
 static struct usb_driver mdc800_usb_driver;
+static struct file_operations mdc800_device_ops;
 
 /*
  * Callback to search the Mustek MDC800 on the USB Bus
@@ -476,7 +477,7 @@ static void* mdc800_usb_probe (struct usb_device *dev ,unsigned int ifnum,
 
 	down (&mdc800->io_lock);
 
-	retval = usb_register_dev (&mdc800_usb_driver, 1, &mdc800->minor);
+	retval = usb_register_dev (&mdc800_device_ops, MDC800_DEVICE_MINOR_BASE, 1, &mdc800->minor);
 	if (retval && (retval != -ENODEV)) {
 		err ("Not able to get a minor for this device.");
 		return 0;
@@ -537,7 +538,7 @@ static void mdc800_usb_disconnect (struct usb_device *dev,void* ptr)
 	if (mdc800->state == NOT_CONNECTED)
 		return;
 	
-	usb_deregister_dev (&mdc800_usb_driver, 1, mdc800->minor);
+	usb_deregister_dev (1, mdc800->minor);
 
 	mdc800->state=NOT_CONNECTED;
 
@@ -942,12 +943,10 @@ MODULE_DEVICE_TABLE (usb, mdc800_table);
  */
 static struct usb_driver mdc800_usb_driver =
 {
+	owner:		THIS_MODULE,
 	name:		"mdc800",
 	probe:		mdc800_usb_probe,
 	disconnect:	mdc800_usb_disconnect,
-	fops:		&mdc800_device_ops,
-	minor:		MDC800_DEVICE_MINOR_BASE,
-	num_minors:	1,
 	id_table:	mdc800_table
 };
 

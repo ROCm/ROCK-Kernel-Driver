@@ -246,9 +246,6 @@ static struct usb_driver brlvger_driver =
 	name:		"brlvger",
 	probe:		brlvger_probe,
 	disconnect:	brlvger_disconnect,
-	fops:		&brlvger_fops,
-	minor:		BRLVGER_MINOR,
-	num_minors:	MAX_NR_BRLVGER_DEVS,
 	id_table:	brlvger_ids,
 };
 
@@ -316,21 +313,10 @@ brlvger_probe (struct usb_device *dev, unsigned ifnum,
 
 	down(&reserve_sem);
 
-	retval = usb_register_dev(&brlvger_driver, 1, &i);
+	retval = usb_register_dev(&brlvger_fops, BRLVGER_MINOR, 1, &i);
 	if (retval) {
-		if (retval != -ENODEV) {
-			err("Not able to get a minor for this device.");
-			goto error;
-		}
-		for( i = 0; i < MAX_NR_BRLVGER_DEVS; i++ )
-			if( display_table[i] == NULL )
-				break;
-
-		if( i == MAX_NR_BRLVGER_DEVS ) {
-			err( "This driver cannot handle more than %d "
-					"braille displays", MAX_NR_BRLVGER_DEVS);
-			goto error;
-		}
+		err("Not able to get a minor for this device.");
+		goto error;
 	}
 
 	if( !(priv = kmalloc (sizeof *priv, GFP_KERNEL)) ){
@@ -431,7 +417,7 @@ brlvger_disconnect(struct usb_device *dev, void *ptr)
 		info("Display %d disconnecting", priv->subminor);
 
 		devfs_unregister(priv->devfs);
-		usb_deregister_dev(&brlvger_driver, 1, priv->subminor);
+		usb_deregister_dev(1, priv->subminor);
 
 		down(&disconnect_sem);
 		display_table[priv->subminor] = NULL;
