@@ -34,7 +34,7 @@
 void
 toUpper(const struct nls_table *n, char *mixed_string)
 {
-	int i;
+	unsigned int i;
 	char temp;
 
 	for (i = 0; i < strlen(mixed_string); i++) {
