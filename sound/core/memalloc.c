@@ -783,6 +783,7 @@ void snd_free_sbus_pages(struct sbus_dev *sdev,
  * allocation of buffers for pre-defined devices
  */
 
+#ifdef CONFIG_PCI
 /* FIXME: for pci only - other bus? */
 struct prealloc_dev {
 	unsigned short vendor;
@@ -854,6 +855,9 @@ static void __init preallocate_cards(void)
 		}
 	}
 }
+#else
+#define preallocate_cards()	/* NOP */
+#endif
 
 
 #ifdef CONFIG_PROC_FS
