@@ -19,7 +19,10 @@
 # define DBG(x...)
 #endif
 
-static struct device * device_root = NULL;
+static struct device device_root = {
+	bus_id:		"root",
+	name:		"System root",
+};
 
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
@@ -27,7 +30,7 @@ int (*platform_notify_remove)(struct device * dev) = NULL;
 extern int device_make_dir(struct device * dev);
 extern void device_remove_dir(struct device * dev);
 
-static spinlock_t device_lock;
+static spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
 
 /**
  * device_register - register a device
@@ -35,10 +38,7 @@ static spinlock_t device_lock;
  *
  * First, make sure that the device has a parent, create
  * a directory for it, then add it to the parent's list of
- * children.  Note that the first device to be registered 
- * becomes the device_root, implying that the system root
- * driver (e.g. ACPI, PnP BIOS, etc.) begins the device
- * enumeration process.
+ * children.
  */
 int device_register(struct device *dev)
 {
@@ -47,28 +47,15 @@ int device_register(struct device *dev)
 	if (!dev || !strlen(dev->bus_id))
 		return -EINVAL;
 
-	/* perform first-time initialization (system root device) */
-	if (!device_root) {
-		spin_lock_init(&device_lock);
-
-		error = init_driverfs_fs();
-		if (error) {
-			panic("DEV: could not initialise driverfs\n");
-			return error;
-		}
-
-		device_root = dev;
-	}
-
 	spin_lock(&device_lock);
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->children);
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
 
-	if (dev != device_root) {
+	if (dev != &device_root) {
 		if (!dev->parent)
-			dev->parent = device_root;
+			dev->parent = &device_root;
 		get_device(dev->parent);
 		list_add_tail(&dev->node,&dev->parent->children);
 	}
@@ -134,32 +121,22 @@ void put_device(struct device * dev)
 
 static int __init device_init_root(void)
 {
-	int error = 0;
-
-	device_root = kmalloc(sizeof(struct device),GFP_KERNEL);
-	if (!device_root)
-		return -ENOMEM;
-	memset(device_root,0,sizeof(struct device));
-
-	if ((error = device_register(device_root)))
-		printk(KERN_ERR "%s: device root init failed!\n", __FUNCTION__);
-
-	return error;
+	return device_register(&device_root);
 }
 
-/**
- * device_init - initialize the root device
- *
- * Ensures creation of the system root device (device_root)
- * in the absence of a system root enumerator (e.g. ACPI,
- * PnP BIOS, <insert non-IA paradigm here>, etc.).
- */
 static int __init device_init(void)
 {
-	if (!device_root)
-		return device_init_root();
+	int error;
 
-	return 0;
+	error = init_driverfs_fs();
+	if (error) {
+		panic("DEV: could not initialize driverfs");
+		return error;
+	}
+	error = device_init_root();
+	if (error)
+		printk(KERN_ERR "%s: device root init failed!\n", __FUNCTION__);
+	return error;
 }
 
 subsys_initcall(device_init);
