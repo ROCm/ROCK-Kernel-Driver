@@ -2,7 +2,7 @@
  * acenic.c: Linux driver for the Alteon AceNIC Gigabit Ethernet card
  *           and other Tigon based cards.
  *
- * Copyright 1998-2001 by Jes Sorensen, <jes@trained-monkey.org>.
+ * Copyright 1998-2002 by Jes Sorensen, <jes@trained-monkey.org>.
  *
  * Thanks to Alteon and 3Com for providing hardware and documentation
  * enabling me to write this driver.
@@ -30,6 +30,7 @@
  *   Pierrick Pinasseau (CERN): For lending me an Ultra 5 to test the
  *                              driver under Linux/Sparc64
  *   Matt Domsch <Matt_Domsch@dell.com>: Detect Alteon 1000baseT cards
+ *                                       ETHTOOL_GDRVINFO support
  *   Chip Salzenberg <chip@valinux.com>: Fix race condition between tx
  *                                       handler and close() cleanup.
  *   Ken Aaker <kdaaker@rchland.vnet.ibm.com>: Correct check for whether
@@ -553,7 +554,7 @@ static int tx_ratio[ACE_MAX_MOD_PARMS];
 static int dis_pci_mem_inval[ACE_MAX_MOD_PARMS] = {1, 1, 1, 1, 1, 1, 1, 1};
 
 static char version[] __initdata = 
-  "acenic.c: v0.85 11/08/2001  Jes Sorensen, linux-acenic@SunSITE.dk\n"
+  "acenic.c: v0.87 03/14/2002  Jes Sorensen, linux-acenic@SunSITE.dk\n"
   "                            http://home.cern.ch/~jes/gige/acenic.html\n";
 
 static struct net_device *root_dev;
@@ -620,7 +621,6 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 		ap = dev->priv;
 		ap->pdev = pdev;
 
-		dev->irq = pdev->irq;
 		dev->open = &ace_open;
 		dev->hard_start_xmit = &ace_start_xmit;
 		dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
@@ -725,9 +725,9 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 		ap->name [sizeof (ap->name) - 1] = '\0';
 		printk("Gigabit Ethernet at 0x%08lx, ", dev->base_addr);
 #ifdef __sparc__
-		printk("irq %s\n", __irq_itoa(dev->irq));
+		printk("irq %s\n", __irq_itoa(pdev->irq));
 #else
-		printk("irq %i\n", dev->irq);
+		printk("irq %i\n", pdev->irq);
 #endif
 
 #ifdef CONFIG_ACENIC_OMIT_TIGON_I
@@ -1086,6 +1086,7 @@ static int __init ace_init(struct net_device *dev)
 	struct ace_private *ap;
 	struct ace_regs *regs;
 	struct ace_info *info = NULL;
+	struct pci_dev *pdev;
 	unsigned long myjif;
 	u64 tmp_ptr;
 	u32 tig_ver, mac1, mac2, tmp, pci_state;
@@ -1224,7 +1225,8 @@ static int __init ace_init(struct net_device *dev)
 	 * Ie. having two NICs in the machine, one will have the cache
 	 * line set at boot time, the other will not.
 	 */
-	pci_read_config_byte(ap->pdev, PCI_CACHE_LINE_SIZE, &cache_size);
+	pdev = ap->pdev;
+	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE, &cache_size);
 	cache_size <<= 2;
 	if (cache_size != SMP_CACHE_BYTES) {
 		printk(KERN_INFO "  PCI cache line size set incorrectly "
@@ -1233,7 +1235,7 @@ static int __init ace_init(struct net_device *dev)
 			printk("expecting %i\n", SMP_CACHE_BYTES);
 		else {
 			printk("correcting to %i\n", SMP_CACHE_BYTES);
-			pci_write_config_byte(ap->pdev, PCI_CACHE_LINE_SIZE,
+			pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE,
 					      SMP_CACHE_BYTES >> 2);
 		}
 	}
@@ -1265,7 +1267,7 @@ static int __init ace_init(struct net_device *dev)
 		    dis_pci_mem_inval[board_idx]) {
 			if (ap->pci_command & PCI_COMMAND_INVALIDATE) {
 				ap->pci_command &= ~PCI_COMMAND_INVALIDATE;
-				pci_write_config_word(ap->pdev, PCI_COMMAND,
+				pci_write_config_word(pdev, PCI_COMMAND,
 						      ap->pci_command);
 				printk(KERN_INFO "  Disabling PCI memory "
 				       "write and invalidate\n");
@@ -1292,7 +1294,7 @@ static int __init ace_init(struct net_device *dev)
 				       "supported, PCI write and invalidate "
 				       "disabled\n", SMP_CACHE_BYTES);
 				ap->pci_command &= ~PCI_COMMAND_INVALIDATE;
-				pci_write_config_word(ap->pdev, PCI_COMMAND,
+				pci_write_config_word(pdev, PCI_COMMAND,
 						      ap->pci_command);
 			}
 		}
@@ -1334,16 +1336,16 @@ static int __init ace_init(struct net_device *dev)
 	if (!(ap->pci_command & PCI_COMMAND_FAST_BACK)) {
 		printk(KERN_INFO "  Enabling PCI Fast Back to Back\n");
 		ap->pci_command |= PCI_COMMAND_FAST_BACK;
-		pci_write_config_word(ap->pdev, PCI_COMMAND, ap->pci_command);
+		pci_write_config_word(pdev, PCI_COMMAND, ap->pci_command);
 	}
 #endif
 		
 	/*
 	 * Configure DMA attributes.
 	 */
-	if (!pci_set_dma_mask(ap->pdev, 0xffffffffffffffffULL)) {
+	if (!pci_set_dma_mask(pdev, 0xffffffffffffffffULL)) {
 		ap->pci_using_dac = 1;
-	} else if (!pci_set_dma_mask(ap->pdev, 0xffffffffULL)) {
+	} else if (!pci_set_dma_mask(pdev, 0xffffffffULL)) {
 		ap->pci_using_dac = 0;
 	} else {
 		ecode = -ENODEV;
@@ -1370,12 +1372,14 @@ static int __init ace_init(struct net_device *dev)
 		goto init_error;
 	}
 
-	ecode = request_irq(dev->irq, ace_interrupt, SA_SHIRQ, dev->name, dev);
+	ecode = request_irq(pdev->irq, ace_interrupt, SA_SHIRQ,
+			    dev->name, dev);
 	if (ecode) {
 		printk(KERN_WARNING "%s: Requested IRQ %d is busy\n",
-		       dev->name, dev->irq);
+		       dev->name, pdev->irq);
 		goto init_error;
-	}
+	} else
+		dev->irq = pdev->irq;
 
 	/*
 	 * Register the device here to be able to catch allocated
@@ -2562,6 +2566,7 @@ static int ace_close(struct net_device *dev)
 	return 0;
 }
 
+
 static inline dma_addr_t
 ace_map_tx_skb(struct ace_private *ap, struct sk_buff *skb,
 	       struct sk_buff *tail, u32 idx)
@@ -2606,7 +2611,6 @@ static int ace_start_xmit(struct sk_buff *skb, struct net_device *dev)
  	 */
 	if (early_stop_netif_stop_queue(dev))
  		return 1;
-
 
 restart:
 	idx = ap->tx_prd;
@@ -2776,8 +2780,8 @@ static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		return -EOPNOTSUPP;
 	if (copy_from_user(&ecmd, ifr->ifr_data, sizeof(ecmd)))
 		return -EFAULT;
-
-	if (ecmd.cmd == ETHTOOL_GSET) {
+	switch (ecmd.cmd) {
+	case ETHTOOL_GSET: {
 		ecmd.supported =
 			(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
 			 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
@@ -2825,7 +2829,8 @@ static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if(copy_to_user(ifr->ifr_data, &ecmd, sizeof(ecmd)))
 			return -EFAULT;
 		return 0;
-	} else if (ecmd.cmd == ETHTOOL_SSET) {
+	}
+	case ETHTOOL_SSET: {
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
@@ -2883,6 +2888,23 @@ static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		}
 		return 0;
 	}
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strncpy(info.driver, "acenic", sizeof(info.driver) - 1);
+		sprintf(info.fw_version, "%i.%i.%i", 
+			 tigonFwReleaseMajor, tigonFwReleaseMinor,
+			 tigonFwReleaseFix);
+		strncpy(info.version, version, sizeof(info.version) - 1);
+		if (ap && ap->pdev)
+			strcpy(info.bus_info, ap->pdev->slot_name);
+		if (copy_to_user(ifr->ifr_data, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+	default:
+		break;
+	}
+	
 #endif
 
 	return -EOPNOTSUPP;
