@@ -1615,8 +1615,12 @@ static irqreturn_t ixgb_intr(int irq, void *data, struct pt_regs *regs)
 	}
 #else
 	for (i = 0; i < IXGB_MAX_INTR; i++)
-		if (!ixgb_clean_rx_irq(adapter) & !ixgb_clean_tx_irq(adapter))
+		if (ixgb_clean_rx_irq(adapter) == FALSE)
 			break;
+	for (i = 0; i < IXGB_MAX_INTR; i++)
+		if (ixgb_clean_tx_irq(adapter) == FALSE)
+			break;
+
 	/* if RAIDC:EN == 1 and ICR:RXDMT0 == 1, we need to
 	 * set IMS:RXDMT0 to 1 to restart the RBD timer (POLL)
 	 */
