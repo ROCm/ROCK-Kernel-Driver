@@ -10,18 +10,15 @@
 
 #include <linux/config.h>
 #include <linux/device.h>
-#include <linux/kdev_t.h>
 #include <linux/err.h>
 
 struct class_simple {
-	struct class_device_attribute attr;
 	struct class class;
 };
 #define to_class_simple(d) container_of(d, struct class_simple, class)
 
 struct simple_dev {
 	struct list_head node;
-	dev_t dev;
 	struct class_device class_dev;
 };
 #define to_simple_dev(d) container_of(d, struct simple_dev, class_dev)
@@ -33,12 +30,6 @@ static void release_simple_dev(struct class_device *class_dev)
 {
 	struct simple_dev *s_dev = to_simple_dev(class_dev);
 	kfree(s_dev);
-}
-
-static ssize_t show_dev(struct class_device *class_dev, char *buf)
-{
-	struct simple_dev *s_dev = to_simple_dev(class_dev);
-	return print_dev_t(buf, s_dev->dev);
 }
 
 static void class_simple_release(struct class *class)
@@ -74,12 +65,6 @@ struct class_simple *class_simple_create(struct module *owner, char *name)
 	cs->class.name = name;
 	cs->class.class_release = class_simple_release;
 	cs->class.release = release_simple_dev;
-
-	cs->attr.attr.name = "dev";
-	cs->attr.attr.mode = S_IRUGO;
-	cs->attr.attr.owner = owner;
-	cs->attr.show = show_dev;
-	cs->attr.store = NULL;
 
 	retval = class_register(&cs->class);
 	if (retval)
@@ -143,7 +128,7 @@ struct class_device *class_simple_device_add(struct class_simple *cs, dev_t dev,
 	}
 	memset(s_dev, 0x00, sizeof(*s_dev));
 
-	s_dev->dev = dev;
+	s_dev->class_dev.devt = dev;
 	s_dev->class_dev.dev = device;
 	s_dev->class_dev.class = &cs->class;
 
@@ -153,8 +138,6 @@ struct class_device *class_simple_device_add(struct class_simple *cs, dev_t dev,
 	retval = class_device_register(&s_dev->class_dev);
 	if (retval)
 		goto error;
-
-	class_device_create_file(&s_dev->class_dev, &cs->attr);
 
 	spin_lock(&simple_dev_list_lock);
 	list_add(&s_dev->node, &simple_dev_list);
@@ -200,7 +183,7 @@ void class_simple_device_remove(dev_t dev)
 
 	spin_lock(&simple_dev_list_lock);
 	list_for_each_entry(s_dev, &simple_dev_list, node) {
-		if (s_dev->dev == dev) {
+		if (s_dev->class_dev.devt == dev) {
 			found = 1;
 			break;
 		}

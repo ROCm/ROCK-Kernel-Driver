@@ -430,42 +430,57 @@ static int block_hotplug_filter(struct kset *kset, struct kobject *kobj)
 static int block_hotplug(struct kset *kset, struct kobject *kobj, char **envp,
 			 int num_envp, char *buffer, int buffer_size)
 {
-	struct device *dev = NULL;
 	struct kobj_type *ktype = get_ktype(kobj);
+	struct device *physdev;
+	struct gendisk *disk;
+	struct hd_struct *part;
 	int length = 0;
 	int i = 0;
 
-	/* get physical device backing disk or partition */
 	if (ktype == &ktype_block) {
-		struct gendisk *disk = container_of(kobj, struct gendisk, kobj);
-		dev = disk->driverfs_dev;
+		disk = container_of(kobj, struct gendisk, kobj);
+		add_hotplug_env_var(envp, num_envp, &i, buffer, buffer_size,
+				    &length, "MINOR=%u", disk->first_minor);
 	} else if (ktype == &ktype_part) {
-		struct gendisk *disk = container_of(kobj->parent, struct gendisk, kobj);
-		dev = disk->driverfs_dev;
-	}
+		disk = container_of(kobj->parent, struct gendisk, kobj);
+		part = container_of(kobj, struct hd_struct, kobj);
+		add_hotplug_env_var(envp, num_envp, &i, buffer, buffer_size,
+				    &length, "MINOR=%u",
+				    disk->first_minor + part->partno);
+	} else
+		return 0;
 
-	if (dev) {
-		/* add physical device, backing this device  */
-		char *path = kobject_get_path(&dev->kobj, GFP_KERNEL);
+	add_hotplug_env_var(envp, num_envp, &i, buffer, buffer_size, &length,
+			    "MAJOR=%u", disk->major);
+
+	/* add physical device, backing this device  */
+	physdev = disk->driverfs_dev;
+	if (physdev) {
+		char *path = kobject_get_path(&physdev->kobj, GFP_KERNEL);
 
 		add_hotplug_env_var(envp, num_envp, &i, buffer, buffer_size,
 				    &length, "PHYSDEVPATH=%s", path);
 		kfree(path);
 
-		/* add bus name of physical device */
-		if (dev->bus)
+		if (physdev->bus)
 			add_hotplug_env_var(envp, num_envp, &i,
 					    buffer, buffer_size, &length,
-					    "PHYSDEVBUS=%s", dev->bus->name);
+					    "PHYSDEVBUS=%s",
+					    physdev->bus->name);
 
-		/* add driver name of physical device */
-		if (dev->driver)
+		if (physdev->driver)
 			add_hotplug_env_var(envp, num_envp, &i,
 					    buffer, buffer_size, &length,
-					    "PHYSDEVDRIVER=%s", dev->driver->name);
-
-		envp[i] = NULL;
+					    "PHYSDEVDRIVER=%s",
+					    physdev->driver->name);
 	}
+
+	/* terminate, set to next free slot, shrink available space */
+	envp[i] = NULL;
+	envp = &envp[i];
+	num_envp -= i;
+	buffer = &buffer[length];
+	buffer_size -= length;
 
 	return 0;
 }

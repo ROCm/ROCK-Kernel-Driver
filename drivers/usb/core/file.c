@@ -107,13 +107,6 @@ void usb_major_cleanup(void)
 	unregister_chrdev(USB_MAJOR, "usb");
 }
 
-static ssize_t show_dev(struct class_device *class_dev, char *buf)
-{
-	int minor = (int)(long)class_get_devdata(class_dev);
-	return print_dev_t(buf, MKDEV(USB_MAJOR, minor));
-}
-static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
-
 /**
  * usb_register_dev - register a USB device, and ask for a minor number
  * @intf: pointer to the usb_interface that is being registered
@@ -184,6 +177,7 @@ int usb_register_dev(struct usb_interface *intf,
 	class_dev = kmalloc(sizeof(*class_dev), GFP_KERNEL);
 	if (class_dev) {
 		memset(class_dev, 0x00, sizeof(struct class_device));
+		class_dev->devt = MKDEV(USB_MAJOR, minor);
 		class_dev->class = &usb_class;
 		class_dev->dev = &intf->dev;
 
@@ -195,7 +189,6 @@ int usb_register_dev(struct usb_interface *intf,
 		snprintf(class_dev->class_id, BUS_ID_SIZE, "%s", temp);
 		class_set_devdata(class_dev, (void *)(long)intf->minor);
 		class_device_register(class_dev);
-		class_device_create_file(class_dev, &class_device_attr_dev);
 		intf->class_dev = class_dev;
 	}
 exit:

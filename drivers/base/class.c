@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/string.h>
+#include <linux/kdev_t.h>
 #include "base.h"
 
 #define to_class_attr(_attr) container_of(_attr, struct class_attribute, attr)
@@ -195,33 +196,6 @@ void class_device_remove_bin_file(struct class_device *class_dev,
 		sysfs_remove_bin_file(&class_dev->kobj, attr);
 }
 
-static int class_device_dev_link(struct class_device * class_dev)
-{
-	if (class_dev->dev)
-		return sysfs_create_link(&class_dev->kobj,
-					 &class_dev->dev->kobj, "device");
-	return 0;
-}
-
-static void class_device_dev_unlink(struct class_device * class_dev)
-{
-	sysfs_remove_link(&class_dev->kobj, "device");
-}
-
-static int class_device_driver_link(struct class_device * class_dev)
-{
-	if ((class_dev->dev) && (class_dev->dev->driver))
-		return sysfs_create_link(&class_dev->kobj,
-					 &class_dev->dev->driver->kobj, "driver");
-	return 0;
-}
-
-static void class_device_driver_unlink(struct class_device * class_dev)
-{
-	sysfs_remove_link(&class_dev->kobj, "driver");
-}
-
-
 static ssize_t
 class_device_attr_show(struct kobject * kobj, struct attribute * attr,
 		       char * buf)
@@ -298,9 +272,9 @@ static int class_hotplug(struct kset *kset, struct kobject *kobj, char **envp,
 			 int num_envp, char *buffer, int buffer_size)
 {
 	struct class_device *class_dev = to_class_dev(kobj);
-	int retval = 0;
 	int i = 0;
 	int length = 0;
+	int retval = 0;
 
 	pr_debug("%s - name = %s\n", __FUNCTION__, class_dev->class_id);
 
@@ -313,25 +287,33 @@ static int class_hotplug(struct kset *kset, struct kobject *kobj, char **envp,
 				    &length, "PHYSDEVPATH=%s", path);
 		kfree(path);
 
-		/* add bus name of physical device */
 		if (dev->bus)
 			add_hotplug_env_var(envp, num_envp, &i,
 					    buffer, buffer_size, &length,
 					    "PHYSDEVBUS=%s", dev->bus->name);
 
-		/* add driver name of physical device */
 		if (dev->driver)
 			add_hotplug_env_var(envp, num_envp, &i,
 					    buffer, buffer_size, &length,
 					    "PHYSDEVDRIVER=%s", dev->driver->name);
-
-		/* terminate, set to next free slot, shrink available space */
-		envp[i] = NULL;
-		envp = &envp[i];
-		num_envp -= i;
-		buffer = &buffer[length];
-		buffer_size -= length;
 	}
+
+	if (MAJOR(class_dev->devt)) {
+		add_hotplug_env_var(envp, num_envp, &i,
+				    buffer, buffer_size, &length,
+				    "MAJOR=%u", MAJOR(class_dev->devt));
+
+		add_hotplug_env_var(envp, num_envp, &i,
+				    buffer, buffer_size, &length,
+				    "MINOR=%u", MINOR(class_dev->devt));
+	}
+
+	/* terminate, set to next free slot, shrink available space */
+	envp[i] = NULL;
+	envp = &envp[i];
+	num_envp -= i;
+	buffer = &buffer[length];
+	buffer_size -= length;
 
 	if (class_dev->class->hotplug) {
 		/* have the bus specific function add its stuff */
@@ -388,6 +370,12 @@ static void class_device_remove_attrs(struct class_device * cd)
 	}
 }
 
+static ssize_t show_dev(struct class_device *class_dev, char *buf)
+{
+	return print_dev_t(buf, class_dev->devt);
+}
+static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
+
 void class_device_initialize(struct class_device *class_dev)
 {
 	kobj_set_kset_s(class_dev, class_obj_subsys);
@@ -432,9 +420,14 @@ int class_device_add(struct class_device *class_dev)
 				class_intf->add(class_dev);
 		up_write(&parent->subsys.rwsem);
 	}
+
+	if (MAJOR(class_dev->devt))
+		class_device_create_file(class_dev, &class_device_attr_dev);
+
 	class_device_add_attrs(class_dev);
-	class_device_dev_link(class_dev);
-	class_device_driver_link(class_dev);
+	if (class_dev->dev)
+		sysfs_create_link(&class_dev->kobj,
+				  &class_dev->dev->kobj, "device");
 
  register_done:
 	if (error && parent)
@@ -463,8 +456,8 @@ void class_device_del(struct class_device *class_dev)
 		up_write(&parent->subsys.rwsem);
 	}
 
-	class_device_dev_unlink(class_dev);
-	class_device_driver_unlink(class_dev);
+	if (class_dev->dev)
+		sysfs_remove_link(&class_dev->kobj, "device");
 	class_device_remove_attrs(class_dev);
 
 	kobject_del(&class_dev->kobj);

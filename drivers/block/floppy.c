@@ -4370,6 +4370,10 @@ int __init floppy_init(void)
 		goto out_flush_work;
 	}
 
+	err = platform_device_register(&floppy_device);
+	if (err)
+		goto out_flush_work;
+
 	for (drive = 0; drive < N_DRIVE; drive++) {
 		if (!(allowed_drive_mask & (1 << drive)))
 			continue;
@@ -4379,23 +4383,12 @@ int __init floppy_init(void)
 		disks[drive]->private_data = (void *)(long)drive;
 		disks[drive]->queue = floppy_queue;
 		disks[drive]->flags |= GENHD_FL_REMOVABLE;
+		disks[drive]->driverfs_dev = &floppy_device.dev;
 		add_disk(disks[drive]);
 	}
 
-	err = platform_device_register(&floppy_device);
-	if (err)
-		goto out_del_disk;
-
 	return 0;
 
-out_del_disk:
-	for (drive = 0; drive < N_DRIVE; drive++) {
-		if (!(allowed_drive_mask & (1 << drive)))
-			continue;
-		if (fdc_state[FDC(drive)].version == FDC_NONE)
-			continue;
-		del_gendisk(disks[drive]);
-	}
 out_flush_work:
 	flush_scheduled_work();
 	if (usage_count)
@@ -4600,7 +4593,6 @@ void cleanup_module(void)
 	int drive;
 
 	init_completion(&device_release);
-	platform_device_unregister(&floppy_device);
 	blk_unregister_region(MKDEV(FLOPPY_MAJOR, 0), 256);
 	unregister_blkdev(FLOPPY_MAJOR, "fd");
 
@@ -4614,6 +4606,7 @@ void cleanup_module(void)
 		}
 		put_disk(disks[drive]);
 	}
+	platform_device_unregister(&floppy_device);
 	devfs_remove("floppy");
 
 	del_timer_sync(&fd_timeout);

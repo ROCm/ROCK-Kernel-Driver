@@ -108,13 +108,6 @@ static void return_i2c_dev(struct i2c_dev *i2c_dev)
 	spin_unlock(&i2c_dev_array_lock);
 }
 
-static ssize_t show_dev(struct class_device *class_dev, char *buf)
-{
-	struct i2c_dev *i2c_dev = to_i2c_dev(class_dev);
-	return print_dev_t(buf, MKDEV(I2C_MAJOR, i2c_dev->minor));
-}
-static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
-
 static ssize_t show_adapter_name(struct class_device *class_dev, char *buf)
 {
 	struct i2c_dev *i2c_dev = to_i2c_dev(class_dev);
@@ -451,11 +444,11 @@ static int i2cdev_attach_adapter(struct i2c_adapter *adap)
 	else
 		i2c_dev->class_dev.dev = adap->dev.parent;
 	i2c_dev->class_dev.class = &i2c_dev_class;
+	i2c_dev->class_dev.devt = MKDEV(I2C_MAJOR, i2c_dev->minor);
 	snprintf(i2c_dev->class_dev.class_id, BUS_ID_SIZE, "i2c-%d", i2c_dev->minor);
 	retval = class_device_register(&i2c_dev->class_dev);
 	if (retval)
 		goto error;
-	class_device_create_file(&i2c_dev->class_dev, &class_device_attr_dev);
 	class_device_create_file(&i2c_dev->class_dev, &class_device_attr_name);
 	return 0;
 error:

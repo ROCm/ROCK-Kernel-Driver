@@ -46,15 +46,7 @@ static ssize_t show_name(struct class_device *cd, char *buf)
 	return sprintf(buf,"%.*s\n",(int)sizeof(vfd->name),vfd->name);
 }
 
-static ssize_t show_dev(struct class_device *cd, char *buf)
-{
-	struct video_device *vfd = container_of(cd, struct video_device, class_dev);
-	dev_t dev = MKDEV(VIDEO_MAJOR, vfd->minor);
-	return print_dev_t(buf,dev);
-}
-
 static CLASS_DEVICE_ATTR(name, S_IRUGO, show_name, NULL);
-static CLASS_DEVICE_ATTR(dev,  S_IRUGO, show_dev, NULL);
 
 struct video_device *video_device_alloc(void)
 {
@@ -347,12 +339,11 @@ int video_register_device(struct video_device *vfd, int type, int nr)
 	if (vfd->dev)
 		vfd->class_dev.dev = vfd->dev;
 	vfd->class_dev.class       = &video_class;
+	vfd->class_dev.devt       = MKDEV(VIDEO_MAJOR, vfd->minor);
 	strlcpy(vfd->class_dev.class_id, vfd->devfs_name + 4, BUS_ID_SIZE);
 	class_device_register(&vfd->class_dev);
 	class_device_create_file(&vfd->class_dev,
 				 &class_device_attr_name);
-	class_device_create_file(&vfd->class_dev,
-				 &class_device_attr_dev);
 
 #if 1 /* needed until all drivers are fixed */
 	if (!vfd->release)
