@@ -385,12 +385,7 @@ static void __exit ali1563_remove(struct pci_dev * dev)
 }
 
 static struct pci_device_id __devinitdata ali1563_id_table[] = {
-	{
-		.vendor		= PCI_VENDOR_ID_AL,
-		.device		= PCI_DEVICE_ID_AL_M1563,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-	},
+	{ PCI_DEVICE(PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1563) },
 	{},
 };
 

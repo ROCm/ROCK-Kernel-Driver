@@ -96,13 +96,6 @@ struct s_i2c_chip {
 /* 
  * S3/VIA 8365/8375 registers
  */
-#ifndef PCI_DEVICE_ID_S3_SAVAGE4
-#define PCI_DEVICE_ID_S3_SAVAGE4	0x8a25
-#endif
-#ifndef PCI_DEVICE_ID_S3_PROSAVAGE8
-#define PCI_DEVICE_ID_S3_PROSAVAGE8	0x8d04
-#endif
-
 #define VGA_CR_IX	0x3d4
 #define VGA_CR_DATA	0x3d5
 

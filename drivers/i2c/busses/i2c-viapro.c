@@ -395,62 +395,22 @@ static void __devexit vt596_remove(struct pci_dev *pdev)
 }
 
 static struct pci_device_id vt596_ids[] = {
-	{
-		.vendor		= PCI_VENDOR_ID_VIA,
-		.device 	= PCI_DEVICE_ID_VIA_82C596_3,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data	= SMBBA1,
-	},
-	{
-		.vendor		= PCI_VENDOR_ID_VIA,
-		.device		= PCI_DEVICE_ID_VIA_82C596B_3,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data	= SMBBA1,
-	},
-	{
-		.vendor		= PCI_VENDOR_ID_VIA,
-		.device 	= PCI_DEVICE_ID_VIA_82C686_4,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data	= SMBBA1,
-	},
-	{
-		.vendor		= PCI_VENDOR_ID_VIA,
-		.device 	= PCI_DEVICE_ID_VIA_8233_0,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data	= SMBBA3
-	},
-	{
-		.vendor		= PCI_VENDOR_ID_VIA,
-		.device 	= PCI_DEVICE_ID_VIA_8233A,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data	= SMBBA3,
-	},
-	{
-		.vendor		= PCI_VENDOR_ID_VIA,
-		.device 	= PCI_DEVICE_ID_VIA_8235,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data	= SMBBA3
-	},
-	{
-		.vendor		= PCI_VENDOR_ID_VIA,
-		.device 	= PCI_DEVICE_ID_VIA_8237,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data	= SMBBA3
-	},
-	{
-		.vendor		= PCI_VENDOR_ID_VIA,
-		.device 	= PCI_DEVICE_ID_VIA_8231_4,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.driver_data	= SMBBA1,
-	},
+	{ PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C596_3),
+	  .driver_data = SMBBA1 },
+	{ PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C596B_3),
+	  .driver_data = SMBBA1 },
+	{ PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686_4),
+	  .driver_data = SMBBA1 },
+	{ PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8233_0),
+	  .driver_data = SMBBA3 },
+	{ PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8233A),
+	  .driver_data = SMBBA3 },
+	{ PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8235),
+	  .driver_data = SMBBA3 },
+	{ PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8237),
+	  .driver_data = SMBBA3 },
+	{ PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8231_4),
+	  .driver_data = SMBBA1 },
 	{ 0, }
 };
 
