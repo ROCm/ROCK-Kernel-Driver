@@ -151,6 +151,7 @@ enum
 	VM_DIRTY_EXPIRE_CS=15,	/* dirty_expire_centisecs */
 	VM_NR_PDFLUSH_THREADS=16, /* nr_pdflush_threads */
 	VM_OVERCOMMIT_RATIO=17, /* percent of RAM to allow overcommit in */
+	VM_PAGEBUF=18		/* struct: Control pagebuf parameters */
 };
 
 
@@ -554,6 +555,7 @@ enum
 	FS_DIR_NOTIFY=14,	/* int: directory notification enabled */
 	FS_LEASE_TIME=15,	/* int: maximum time to wait for a lease break */
 	FS_DQSTATS=16,	/* disc quota usage statistics */
+	FS_XFS=17,	/* struct: control xfs parameters */
 };
 
 /* /proc/sys/fs/quota/ */
