@@ -1288,18 +1288,11 @@ static u32 nfs4_ftypes[16] = {
         NF4SOCK, NF4BAD,  NF4LNK, NF4BAD,
 };
 
-static inline int
-xdr_padding(int l)
-{
-       return 3 - ((l - 1) & 3); /* smallest i>=0 such that (l+i)%4 = 0 */
-}
-
 static int
 nfsd4_encode_name(struct svc_rqst *rqstp, int group, uid_t id,
 			u32 **p, int *buflen)
 {
 	int status;
-	u32 len;
 
 	if (*buflen < (XDR_QUADLEN(IDMAP_NAMESZ) << 2) + 4)
 		return nfserr_resource;
@@ -1309,11 +1302,8 @@ nfsd4_encode_name(struct svc_rqst *rqstp, int group, uid_t id,
 		status = nfsd_map_uid_to_name(rqstp, id, (u8 *)(*p + 1));
 	if (status < 0)
 		return nfserrno(status);
-	len = (unsigned)status;
-	*(*p)++ = htonl(len);
-	memset((u8 *)*p + len, 0, xdr_padding(len));
-	*p += XDR_QUADLEN(len);
-	*buflen -= (XDR_QUADLEN(len) << 2) + 4;
+	*p = xdr_encode_opaque(*p, NULL, status);
+	*buflen -= (XDR_QUADLEN(status) << 2) + 4;
 	BUG_ON(*buflen < 0);
 	return 0;
 }
