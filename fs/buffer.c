@@ -1622,6 +1622,7 @@ void unmap_underlying_metadata(struct block_device *bdev, sector_t block)
 		__brelse(old_bh);
 	}
 }
+EXPORT_SYMBOL(unmap_underlying_metadata);
 
 /*
  * NOTE! All mapped/uptodate combinations are valid:
