@@ -290,7 +290,7 @@ restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr, int sig)
 
 	/* force the process to reload the FP registers from
 	   current->thread when it next does FP instructions */
-	regs->msr &= ~MSR_FP;
+	regs->msr &= ~(MSR_FP | MSR_FE0 | MSR_FE1);
 	if (__copy_from_user(current->thread.fpr, &sr->mc_fregs,
 			     sizeof(sr->mc_fregs)))
 		return 1;
@@ -330,9 +330,14 @@ restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr, int sig)
 #endif /* CONFIG_SPE */
 
 #ifndef CONFIG_SMP
-	last_task_used_math = NULL;
-	last_task_used_altivec = NULL;
-	last_task_used_spe = NULL;
+	preempt_disable();
+	if (last_task_used_math == current)
+		last_task_used_math = NULL;
+	if (last_task_used_altivec == current)
+		last_task_used_altivec = NULL;
+	if (last_task_used_spe == current)
+		last_task_used_spe = NULL;
+	preempt_enable();
 #endif
 	return 0;
 }
