@@ -467,10 +467,10 @@ smp_build_cpu_map (void)
 #ifdef CONFIG_NUMA
 
 /* on which node is each logical CPU (one cacheline even for 64 CPUs) */
-volatile u8 cpu_to_node_map[NR_CPUS] __cacheline_aligned;
+u8 cpu_to_node_map[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(cpu_to_node_map);
 /* which logical CPUs are on which nodes */
-volatile cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
+cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
 
 /*
  * Build cpu to node mapping and initialize the per node cpu masks.
@@ -566,8 +566,8 @@ smp_cpus_done (unsigned int dummy)
 		if (cpu_online(cpu))
 			bogosum += cpu_data(cpu)->loops_per_jiffy;
 
-	printk(KERN_INFO "Total of %lu processors activated (%lu.%02lu BogoMIPS).\n",
-	       num_online_cpus(), bogosum/(500000/HZ), (bogosum/(5000/HZ))%100);
+	printk(KERN_INFO "Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
+	       (int)num_online_cpus(), bogosum/(500000/HZ), (bogosum/(5000/HZ))%100);
 }
 
 int __devinit
