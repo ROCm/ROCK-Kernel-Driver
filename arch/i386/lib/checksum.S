@@ -149,6 +149,8 @@ csum_partial:
 30:	subl $2, %ecx          
 	ja 20b                 
 	je 32f
+	addl $2, %ecx
+	jz 80f
 	movzbl (%esi),%ebx	# csumming 1 byte, 2-aligned
 	addl %ebx, %eax
 	adcl $0, %eax
