@@ -3095,36 +3095,52 @@ static int get_async_struct(int line, struct async_struct **ret_info)
 
 	sstate = rs_table + line;
 	sstate->count++;
-	if (sstate->info) {
-		*ret_info = sstate->info;
-		return 0;
-	}
+	info = sstate->info;
+
+	/*
+	 * If the async_struct is already allocated, do the fastpath.
+	 */
+	if (info)
+		goto out;
+
 	info = kmalloc(sizeof(struct async_struct), GFP_KERNEL);
 	if (!info) {
 		sstate->count--;
 		return -ENOMEM;
 	}
+
 	memset(info, 0, sizeof(struct async_struct));
 	init_waitqueue_head(&info->open_wait);
 	init_waitqueue_head(&info->close_wait);
 	init_waitqueue_head(&info->delta_msr_wait);
 	info->magic = SERIAL_MAGIC;
 	info->port = sstate->port;
+	info->hub6 = sstate->hub6;
 	info->flags = sstate->flags;
-	info->io_type = sstate->io_type;
+	info->xmit_fifo_size = sstate->xmit_fifo_size;
+	info->state = sstate;
+	info->line = line;
 	info->iomem_base = sstate->iomem_base;
 	info->iomem_reg_shift = sstate->iomem_reg_shift;
-	info->xmit_fifo_size = sstate->xmit_fifo_size;
-	info->line = line;
+	info->io_type = sstate->io_type;
 	info->tqueue.routine = do_softint;
 	info->tqueue.data = info;
-	info->state = sstate;
+
 	if (sstate->info) {
 		kfree(info);
-		*ret_info = sstate->info;
-		return 0;
+		info = sstate->info;
+	} else {
+		sstate->info = info;
 	}
-	*ret_info = sstate->info = info;
+
+out:
+	/*
+	 * If this is the first open, copy over some timeouts.
+	 */
+	if (sstate->count == 1) {
+		info->closing_wait = sstate->closing_wait;
+	}
+	*ret_info = info;
 	return 0;
 }
 

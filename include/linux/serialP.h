@@ -70,7 +70,7 @@ struct async_struct {
 	int			x_char;	/* xon/xoff character */
 	int			close_delay;
 	unsigned short		closing_wait;
-	unsigned short		closing_wait2;
+	unsigned short		closing_wait2; /* obsolete */
 	int			IER; 	/* Interrupt Enable Register */
 	int			MCR; 	/* Modem control register */
 	int			LCR; 	/* Line control register */
