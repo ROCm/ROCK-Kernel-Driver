@@ -144,7 +144,7 @@ static int cs5530_config_dma (ide_drive_t *drive)
 	/*
 	 * Default to DMA-off in case we run into trouble here.
 	 */
-	(void)hwif->dmaproc(ide_dma_off_quietly, drive);	/* turn off DMA while we fiddle */
+	hwif->udma(ide_dma_off_quietly, drive, NULL);
 	outb(inb(hwif->dma_base+2)&~(unit?0x40:0x20), hwif->dma_base+2); /* clear DMA_capable bit */
 
 	/*
@@ -158,7 +158,7 @@ static int cs5530_config_dma (ide_drive_t *drive)
 	 */
 	if (mate->present) {
 		struct hd_driveid *mateid = mate->id;
-		if (mateid && (mateid->capability & 1) && !hwif->dmaproc(ide_dma_bad_drive, mate)) {
+		if (mateid && (mateid->capability & 1) && !hwif->udma(ide_dma_bad_drive, mate, NULL)) {
 			if ((mateid->field_valid & 4) && (mateid->dma_ultra & 7))
 				udma_ok = 1;
 			else if ((mateid->field_valid & 2) && (mateid->dma_mword & 7))
@@ -172,7 +172,7 @@ static int cs5530_config_dma (ide_drive_t *drive)
 	 * Now see what the current drive is capable of,
 	 * selecting UDMA only if the mate said it was ok.
 	 */
-	if (id && (id->capability & 1) && hwif->autodma && !hwif->dmaproc(ide_dma_bad_drive, drive)) {
+	if (id && (id->capability & 1) && hwif->autodma && !hwif->udma(ide_dma_bad_drive, drive, NULL)) {
 		if (udma_ok && (id->field_valid & 4) && (id->dma_ultra & 7)) {
 			if      (id->dma_ultra & 4)
 				mode = XFER_UDMA_2;
@@ -229,7 +229,7 @@ static int cs5530_config_dma (ide_drive_t *drive)
 	/*
 	 * Finally, turn DMA on in software, and exit.
 	 */
-	return hwif->dmaproc(ide_dma_on, drive);	/* success */
+	return hwif->udma(ide_dma_on, drive, NULL);	/* success */
 }
 
 /*
@@ -237,7 +237,7 @@ static int cs5530_config_dma (ide_drive_t *drive)
  * We need it for our custom "ide_dma_check" function.
  * All other requests are forwarded to the standard ide_dmaproc().
  */
-int cs5530_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+int cs5530_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	switch (func) {
 		case ide_dma_check:
@@ -246,7 +246,7 @@ int cs5530_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			break;
 	}
 	/* Other cases are done by generic IDE-DMA code. */
-	return ide_dmaproc(func, drive);
+	return ide_dmaproc(func, drive, rq);
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
@@ -353,7 +353,7 @@ void __init ide_init_cs5530(struct ata_channel *hwif)
 		unsigned int basereg, d0_timings;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	hwif->dmaproc  = &cs5530_dmaproc;
+	hwif->udma = cs5530_dmaproc;
 	hwif->highmem = 1;
 #else
 	hwif->autodma = 0;

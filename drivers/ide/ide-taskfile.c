@@ -260,7 +260,7 @@ int drive_is_ready(ide_drive_t *drive)
 {
 	byte stat = 0;
 	if (drive->waiting_for_dma)
-		return drive->channel->dmaproc(ide_dma_test_irq, drive);
+		return drive->channel->udma(ide_dma_test_irq, drive, NULL);
 #if 0
 	/* need to guarantee 400ns since last command was issued */
 	udelay(1);
@@ -294,7 +294,6 @@ void ata_poll_drive_ready(ide_drive_t *drive)
 {
 	int i;
 
-
 	if (drive_is_ready(drive))
 		return;
 
@@ -306,30 +305,24 @@ void ata_poll_drive_ready(ide_drive_t *drive)
 	}
 }
 
-static ide_startstop_t pre_task_mulout_intr(ide_drive_t *drive, struct request *rq)
+static ide_startstop_t pre_task_mulout_intr(struct ata_device *drive, struct request *rq)
 {
 	struct ata_taskfile *args = rq->special;
 	ide_startstop_t startstop;
-
-	/*
-	 * assign private copy for multi-write
-	 */
-	memcpy(&HWGROUP(drive)->wrq, rq, sizeof(struct request));
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ))
 		return startstop;
 
 	ata_poll_drive_ready(drive);
 
-	return args->handler(drive);
+	return args->handler(drive, rq);
 }
 
-static ide_startstop_t task_mulout_intr (ide_drive_t *drive)
+static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request *rq)
 {
-	byte stat		= GET_STAT();
-	struct request *rq	= &HWGROUP(drive)->wrq;
-	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
-	int mcount		= drive->mult_count;
+	u8 stat = GET_STAT();
+	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	int mcount = drive->mult_count;
 	ide_startstop_t startstop;
 
 	/*
@@ -339,11 +332,11 @@ static ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	if (!rq->nr_sectors) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
 			startstop = ide_error(drive, "task_mulout_intr", stat);
-			memcpy(rq, HWGROUP(drive)->rq, sizeof(struct request));
+
 			return startstop;
 		}
 
-		__ide_end_request(drive, 1, rq->hard_nr_sectors);
+		__ide_end_request(drive, rq, 1, rq->hard_nr_sectors);
 		rq->bio = NULL;
 
 		return ide_stopped;
@@ -352,7 +345,7 @@ static ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & (ERR_STAT | DRQ_STAT)) {
 			startstop = ide_error(drive, "task_mulout_intr", stat);
-			memcpy(rq, HWGROUP(drive)->rq, sizeof(struct request));
+
 			return startstop;
 		}
 
@@ -425,7 +418,7 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 	else
 		printk("   rq->                   = null\n");
 #endif
- 
+
 	/* (ks/hs): Moved to start, do not use for multiple out commands */
 	if (args->handler != task_mulout_intr) {
 		if (IDE_CONTROL_REG)
@@ -465,9 +458,9 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 	} else {
 		/* for dma commands we down set the handler */
 		if (drive->using_dma &&
-		!(drive->channel->dmaproc(((args->taskfile.command == WIN_WRITEDMA)
+		!(drive->channel->udma(((args->taskfile.command == WIN_WRITEDMA)
 					|| (args->taskfile.command == WIN_WRITEDMA_EXT))
-					? ide_dma_write : ide_dma_read, drive)));
+					? ide_dma_write : ide_dma_read, drive, rq)));
 	}
 
 	return ide_started;
@@ -476,11 +469,11 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 /*
  * This is invoked on completion of a WIN_SETMULT cmd.
  */
-ide_startstop_t set_multmode_intr(struct ata_device *drive)
+ide_startstop_t set_multmode_intr(struct ata_device *drive, struct request *__rq)
 {
 	u8 stat;
 
-	if (OK_STAT(stat=GET_STAT(),READY_STAT,BAD_STAT)) {
+	if (OK_STAT(stat = GET_STAT(),READY_STAT,BAD_STAT)) {
 		drive->mult_count = drive->mult_req;
 	} else {
 		drive->mult_req = drive->mult_count = 0;
@@ -493,9 +486,9 @@ ide_startstop_t set_multmode_intr(struct ata_device *drive)
 /*
  * This is invoked on completion of a WIN_SPECIFY cmd.
  */
-ide_startstop_t set_geometry_intr (ide_drive_t *drive)
+ide_startstop_t set_geometry_intr(struct ata_device *drive, struct request *__rq)
 {
-	byte stat;
+	u8 stat;
 
 	if (OK_STAT(stat=GET_STAT(),READY_STAT,BAD_STAT))
 		return ide_stopped;
@@ -503,18 +496,18 @@ ide_startstop_t set_geometry_intr (ide_drive_t *drive)
 	if (stat & (ERR_STAT|DRQ_STAT))
 		return ide_error(drive, "set_geometry_intr", stat);
 
-	ide_set_handler(drive, &set_geometry_intr, WAIT_CMD, NULL);
+	ide_set_handler(drive, set_geometry_intr, WAIT_CMD, NULL);
 	return ide_started;
 }
 
 /*
  * This is invoked on completion of a WIN_RESTORE (recalibrate) cmd.
  */
-ide_startstop_t recal_intr(ide_drive_t *drive)
+ide_startstop_t recal_intr(struct ata_device *drive, struct request *__rq)
 {
-	byte stat = GET_STAT();
+	u8 stat;
 
-	if (!OK_STAT(stat,READY_STAT,BAD_STAT))
+	if (!OK_STAT(stat = GET_STAT(),READY_STAT,BAD_STAT))
 		return ide_error(drive, "recal_intr", stat);
 	return ide_stopped;
 }
@@ -522,14 +515,14 @@ ide_startstop_t recal_intr(ide_drive_t *drive)
 /*
  * Handler for commands without a data phase
  */
-ide_startstop_t task_no_data_intr (ide_drive_t *drive)
+ide_startstop_t task_no_data_intr(struct ata_device *drive, struct request *rq)
 {
-	struct ata_taskfile *args = HWGROUP(drive)->rq->special;
-	byte stat		= GET_STAT();
+	u8 stat;
+	struct ata_taskfile *args = rq->special;
 
 	ide__sti();	/* local CPU only */
 
-	if (!OK_STAT(stat, READY_STAT, BAD_STAT))
+	if (!OK_STAT(stat = GET_STAT(), READY_STAT, BAD_STAT))
 		return ide_error(drive, "task_no_data_intr", stat);
 		/* calls ide_end_drive_cmd */
 	if (args)
@@ -541,11 +534,10 @@ ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 /*
  * Handler for command with PIO data-in phase
  */
-static ide_startstop_t task_in_intr (ide_drive_t *drive)
+static ide_startstop_t task_in_intr (struct ata_device *drive, struct request *rq)
 {
-	byte stat		= GET_STAT();
-	struct request *rq	= HWGROUP(drive)->rq;
-	char *pBuf		= NULL;
+	u8 stat	= GET_STAT();
+	char *pBuf = NULL;
 	unsigned long flags;
 
 	if (!OK_STAT(stat,DATA_READY,BAD_R_STAT)) {
@@ -554,7 +546,7 @@ static ide_startstop_t task_in_intr (ide_drive_t *drive)
 		}
 		if (!(stat & BUSY_STAT)) {
 			DTF("task_in_intr to Soon wait for next interrupt\n");
-			ide_set_handler(drive, &task_in_intr, WAIT_CMD, NULL);
+			ide_set_handler(drive, task_in_intr, WAIT_CMD, NULL);
 			return ide_started;
 		}
 	}
@@ -572,18 +564,18 @@ static ide_startstop_t task_in_intr (ide_drive_t *drive)
 	 */
 	if (--rq->current_nr_sectors <= 0) {
 		DTF("Request Ended stat: %02x\n", GET_STAT());
-		if (!ide_end_request(drive, 1))
+		if (!ide_end_request(drive, rq, 1))
 			return ide_stopped;
 	}
 
 	/*
 	 * still data left to transfer
 	 */
-	ide_set_handler(drive, &task_in_intr,  WAIT_CMD, NULL);
+	ide_set_handler(drive, task_in_intr,  WAIT_CMD, NULL);
 	return ide_started;
 }
 
-static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
+static ide_startstop_t pre_task_out_intr(struct ata_device *drive, struct request *rq)
 {
 	struct ata_taskfile *args = rq->special;
 	ide_startstop_t startstop;
@@ -604,7 +596,7 @@ static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
 		ide_unmap_rq(rq, buf, &flags);
 	} else {
 		ata_poll_drive_ready(drive);
-		return args->handler(drive);
+		return args->handler(drive, rq);
 	}
 	return ide_started;
 }
@@ -612,22 +604,20 @@ static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
 /*
  * Handler for command with PIO data-out phase
  */
-static ide_startstop_t task_out_intr(ide_drive_t *drive)
+static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *rq)
 {
-	byte stat		= GET_STAT();
-	struct request *rq	= HWGROUP(drive)->rq;
-	char *pBuf		= NULL;
+	u8 stat = GET_STAT();
+	char *pBuf = NULL;
 	unsigned long flags;
 
 	if (!OK_STAT(stat,DRIVE_READY,drive->bad_wstat))
 		return ide_error(drive, "task_out_intr", stat);
 
 	if (!rq->current_nr_sectors)
-		if (!ide_end_request(drive, 1))
+		if (!ide_end_request(drive, rq, 1))
 			return ide_stopped;
 
 	if ((rq->current_nr_sectors==1) ^ (stat & DRQ_STAT)) {
-		rq = HWGROUP(drive)->rq;
 		pBuf = ide_map_rq(rq, &flags);
 		DTF("write: %p, rq->current_nr_sectors: %d\n", pBuf, (int) rq->current_nr_sectors);
 
@@ -644,15 +634,14 @@ static ide_startstop_t task_out_intr(ide_drive_t *drive)
 /*
  * Handler for command with Read Multiple
  */
-static ide_startstop_t task_mulin_intr(ide_drive_t *drive)
+static ide_startstop_t task_mulin_intr(struct ata_device *drive, struct request *rq)
 {
-	unsigned int		msect, nsect;
-	byte stat		= GET_STAT();
-	struct request *rq	= HWGROUP(drive)->rq;
-	char *pBuf		= NULL;
+	u8 stat;
+	char *pBuf = NULL;
+	unsigned int msect, nsect;
 	unsigned long flags;
 
-	if (!OK_STAT(stat,DATA_READY,BAD_R_STAT)) {
+	if (!OK_STAT(stat = GET_STAT(),DATA_READY,BAD_R_STAT)) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
 			return ide_error(drive, "task_mulin_intr", stat);
 		}
@@ -679,7 +668,7 @@ static ide_startstop_t task_mulin_intr(ide_drive_t *drive)
 		rq->current_nr_sectors -= nsect;
 		msect -= nsect;
 		if (!rq->current_nr_sectors) {
-			if (!ide_end_request(drive, 1))
+			if (!ide_end_request(drive, rq, 1))
 				return ide_stopped;
 		}
 	} while (msect);

@@ -363,7 +363,7 @@ static void via82cxxx_tune_drive(ide_drive_t *drive, unsigned char pio)
  * else to the default ide_dmaproc().
  */
 
-int via82cxxx_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
+int via82cxxx_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 
 	if (func == ide_dma_check) {
@@ -383,7 +383,7 @@ int via82cxxx_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			? ide_dma_on : ide_dma_off_quietly;
 	}
 
-	return ide_dmaproc(func, drive);
+	return ide_dmaproc(func, drive, rq);
 }
 
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -546,7 +546,7 @@ void __init ide_init_via82cxxx(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->highmem = 1;
-		hwif->dmaproc = &via82cxxx_dmaproc;
+		hwif->udma = &via82cxxx_dmaproc;
 #ifdef CONFIG_IDEDMA_AUTO
 		if (!noautodma)
 			hwif->autodma = 1;

@@ -1384,8 +1384,7 @@ int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		drive->waiting_for_dma = 1;
 		if (drive->type != ATA_DISK)
 			return 0;
-		BUG_ON(HWGROUP(drive)->handler);
-		ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
+		ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
 		if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_ACB) &&
 		    (drive->addressing == 1)) {
 			struct ata_taskfile *args = HWGROUP(drive)->rq->special;

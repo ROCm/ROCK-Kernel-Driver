@@ -275,7 +275,7 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 
 	if (!(rq->flags & REQ_CMD)) {
 		blk_dump_rq_flags(rq, "idedisk_do_request - bad command");
-		ide_end_request(drive, 0);
+		ide_end_request(drive, rq, 0);
 		return ide_stopped;
 	}
 
@@ -1050,7 +1050,7 @@ static void idedisk_setup(struct ata_device *drive)
 	       drive->bios_cyl, drive->bios_head, drive->bios_sect);
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
-		(void) drive->channel->dmaproc(ide_dma_verbose, drive);
+		(void) drive->channel->udma(ide_dma_verbose, drive, NULL);
 #endif
 	printk("\n");
 

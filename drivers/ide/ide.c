@@ -369,14 +369,12 @@ int drive_is_flashcard (ide_drive_t *drive)
 	return 0;	/* no, it is not a flash memory card */
 }
 
-int __ide_end_request(struct ata_device *drive, int uptodate, int nr_secs)
+int __ide_end_request(struct ata_device *drive, struct request *rq, int uptodate, int nr_secs)
 {
-	struct request *rq;
 	unsigned long flags;
 	int ret = 1;
 
 	spin_lock_irqsave(&ide_lock, flags);
-	rq = HWGROUP(drive)->rq;
 
 	BUG_ON(!(rq->flags & REQ_STARTED));
 
@@ -394,7 +392,7 @@ int __ide_end_request(struct ata_device *drive, int uptodate, int nr_secs)
 
 	if (drive->state == DMA_PIO_RETRY && drive->retry_pio <= 3) {
 		drive->state = 0;
-		drive->channel->dmaproc(ide_dma_on, drive);
+		drive->channel->udma(ide_dma_on, drive, rq);
 	}
 
 	if (!end_that_request_first(rq, uptodate, nr_secs)) {
@@ -416,8 +414,8 @@ int __ide_end_request(struct ata_device *drive, int uptodate, int nr_secs)
  * timer is started to prevent us from waiting forever in case
  * something goes wrong (see the ide_timer_expiry() handler later on).
  */
-void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
-		      unsigned int timeout, ide_expiry_t *expiry)
+void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
+		      unsigned long timeout, ata_expiry_t expiry)
 {
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
@@ -434,7 +432,7 @@ void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
-static void ata_pre_reset(ide_drive_t *drive)
+static void ata_pre_reset(struct ata_device *drive)
 {
 	if (ata_ops(drive) && ata_ops(drive)->pre_reset)
 		ata_ops(drive)->pre_reset(drive);
@@ -444,13 +442,13 @@ static void ata_pre_reset(ide_drive_t *drive)
 
 	/* check the DMA crc count */
 	if (drive->crc_count) {
-		drive->channel->dmaproc(ide_dma_off_quietly, drive);
+		drive->channel->udma(ide_dma_off_quietly, drive, NULL);
 		if ((drive->channel->speedproc) != NULL)
 		        drive->channel->speedproc(drive, ide_auto_reduce_xfer(drive));
 		if (drive->current_speed >= XFER_SW_DMA_0)
-			drive->channel->dmaproc(ide_dma_on, drive);
+			drive->channel->udma(ide_dma_on, drive, NULL);
 	} else
-		drive->channel->dmaproc(ide_dma_off, drive);
+		drive->channel->udma(ide_dma_off, drive, NULL);
 }
 
 /*
@@ -536,7 +534,7 @@ static ide_startstop_t do_reset1(ide_drive_t *, int);		/* needed below */
  * operation. If the drive has not yet responded, and we have not yet hit our
  * maximum waiting time, then the timer is restarted for another 50ms.
  */
-static ide_startstop_t atapi_reset_pollfunc (ide_drive_t *drive)
+static ide_startstop_t atapi_reset_pollfunc(struct ata_device *drive, struct request *__rq)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	byte stat;
@@ -548,8 +546,7 @@ static ide_startstop_t atapi_reset_pollfunc (ide_drive_t *drive)
 		printk("%s: ATAPI reset complete\n", drive->name);
 	} else {
 		if (time_before(jiffies, hwgroup->poll_timeout)) {
-			BUG_ON(HWGROUP(drive)->handler);
-			ide_set_handler (drive, &atapi_reset_pollfunc, HZ/20, NULL);
+			ide_set_handler (drive, atapi_reset_pollfunc, HZ/20, NULL);
 			return ide_started;	/* continue polling */
 		}
 		hwgroup->poll_timeout = 0;	/* end of polling */
@@ -557,6 +554,7 @@ static ide_startstop_t atapi_reset_pollfunc (ide_drive_t *drive)
 		return do_reset1 (drive, 1);	/* do it the old fashioned way */
 	}
 	hwgroup->poll_timeout = 0;	/* done polling */
+
 	return ide_stopped;
 }
 
@@ -565,7 +563,7 @@ static ide_startstop_t atapi_reset_pollfunc (ide_drive_t *drive)
  * If the drives have not yet responded, and we have not yet hit our maximum
  * waiting time, then the timer is restarted for another 50ms.
  */
-static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
+static ide_startstop_t reset_pollfunc(struct ata_device *drive, struct request *__rq)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	struct ata_channel *hwif = drive->channel;
@@ -573,8 +571,7 @@ static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 
 	if (!OK_STAT(stat=GET_STAT(), 0, BUSY_STAT)) {
 		if (time_before(jiffies, hwgroup->poll_timeout)) {
-			BUG_ON(HWGROUP(drive)->handler);
-			ide_set_handler (drive, &reset_pollfunc, HZ/20, NULL);
+			ide_set_handler(drive, reset_pollfunc, HZ/20, NULL);
 			return ide_started;	/* continue polling */
 		}
 		printk("%s: reset timed-out, status=0x%02x\n", hwif->name, stat);
@@ -589,7 +586,7 @@ static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 
 #if FANCY_STATUS_DUMPS
 			u8 val;
-			static const char *messages[5] = {
+			static char *messages[5] = {
 				" passed",
 				" formatter device",
 				" sector buffer",
@@ -645,11 +642,10 @@ static ide_startstop_t do_reset1 (ide_drive_t *drive, int do_not_try_atapi)
 		ata_pre_reset(drive);
 		SELECT_DRIVE(hwif,drive);
 		udelay (20);
-		OUT_BYTE (WIN_SRST, IDE_COMMAND_REG);
+		OUT_BYTE(WIN_SRST, IDE_COMMAND_REG);
 		hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
-		BUG_ON(HWGROUP(drive)->handler);
-		ide_set_handler (drive, &atapi_reset_pollfunc, HZ/20, NULL);
-		__restore_flags (flags);	/* local CPU only */
+		ide_set_handler(drive, atapi_reset_pollfunc, HZ/20, NULL);
+		__restore_flags(flags);	/* local CPU only */
 		return ide_started;
 	}
 
@@ -682,8 +678,7 @@ static ide_startstop_t do_reset1 (ide_drive_t *drive, int do_not_try_atapi)
 	}
 	udelay(10);			/* more than enough time */
 	hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
-	BUG_ON(HWGROUP(drive)->handler);
-	ide_set_handler(drive, &reset_pollfunc, HZ/20, NULL);
+	ide_set_handler(drive, reset_pollfunc, HZ/20, NULL);
 
 	/*
 	 * Some weird controller like resetting themselves to a strange
@@ -912,9 +907,9 @@ ide_startstop_t ide_error(ide_drive_t *drive, const char *msg, byte stat)
 
 	if (rq->errors >= ERROR_MAX) {
 		if (ata_ops(drive) && ata_ops(drive)->end_request)
-			ata_ops(drive)->end_request(drive, 0);
+			ata_ops(drive)->end_request(drive, rq, 0);
 		else
-			ide_end_request(drive, 0);
+			ide_end_request(drive, rq, 0);
 	} else {
 		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
 			++rq->errors;
@@ -930,9 +925,8 @@ ide_startstop_t ide_error(ide_drive_t *drive, const char *msg, byte stat)
 /*
  * Issue a simple drive command.  The drive must be selected beforehand.
  */
-void ide_cmd(ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler)
+void ide_cmd(ide_drive_t *drive, byte cmd, byte nsect, ata_handler_t handler)
 {
-	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler (drive, handler, WAIT_CMD, NULL);
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);	/* clear nIEN */
@@ -944,9 +938,8 @@ void ide_cmd(ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler)
 /*
  * Invoked on completion of a special DRIVE_CMD.
  */
-static ide_startstop_t drive_cmd_intr(ide_drive_t *drive)
+static ide_startstop_t drive_cmd_intr(struct ata_device *drive, struct request *rq)
 {
-	struct request *rq = HWGROUP(drive)->rq;
 	u8 *args = rq->buffer;
 	u8 stat = GET_STAT();
 	int retries = 10;
@@ -1135,7 +1128,7 @@ static ide_startstop_t start_request(ide_drive_t *drive, struct request *rq)
 		if (ata_ops(drive)->do_request)
 			return ata_ops(drive)->do_request(drive, rq, block);
 		else {
-			ide_end_request(drive, 0);
+			ide_end_request(drive, rq, 0);
 			return ide_stopped;
 		}
 	}
@@ -1149,9 +1142,9 @@ static ide_startstop_t start_request(ide_drive_t *drive, struct request *rq)
 
 kill_rq:
 	if (ata_ops(drive) && ata_ops(drive)->end_request)
-		ata_ops(drive)->end_request(drive, 0);
+		ata_ops(drive)->end_request(drive, rq, 0);
 	else
-		ide_end_request(drive, 0);
+		ide_end_request(drive, rq, 0);
 
 	return ide_stopped;
 
@@ -1368,21 +1361,20 @@ void do_ide_request(request_queue_t *q)
  * retry the current request in PIO mode instead of risking tossing it
  * all away
  */
-void ide_dma_timeout_retry(ide_drive_t *drive)
+static void dma_timeout_retry(ide_drive_t *drive, struct request *rq)
 {
 	struct ata_channel *hwif = drive->channel;
-	struct request *rq;
 
 	/*
 	 * end current dma transaction
 	 */
-	hwif->dmaproc(ide_dma_end, drive);
+	hwif->udma(ide_dma_end, drive, rq);
 
 	/*
 	 * complain a little, later we might remove some of this verbosity
 	 */
 	printk("%s: timeout waiting for DMA\n", drive->name);
-	hwif->dmaproc(ide_dma_timeout, drive);
+	hwif->udma(ide_dma_timeout, drive, rq);
 
 	/*
 	 * Disable dma for now, but remember that we did so because of
@@ -1391,13 +1383,12 @@ void ide_dma_timeout_retry(ide_drive_t *drive)
 	 */
 	drive->retry_pio++;
 	drive->state = DMA_PIO_RETRY;
-	hwif->dmaproc(ide_dma_off_quietly, drive);
+	hwif->udma(ide_dma_off_quietly, drive, rq);
 
 	/*
 	 * un-busy drive etc (hwgroup->busy is cleared on return) and
 	 * make sure request is sane
 	 */
-	rq = HWGROUP(drive)->rq;
 	HWGROUP(drive)->rq = NULL;
 
 	rq->errors = 0;
@@ -1415,11 +1406,11 @@ void ide_dma_timeout_retry(ide_drive_t *drive)
  */
 void ide_timer_expiry(unsigned long data)
 {
-	ide_hwgroup_t	*hwgroup = (ide_hwgroup_t *) data;
-	ide_handler_t	*handler;
-	ide_expiry_t	*expiry;
-	unsigned long	flags;
-	unsigned long	wait;
+	ide_hwgroup_t *hwgroup = (ide_hwgroup_t *) data;
+	ata_handler_t *handler;
+	ata_expiry_t *expiry;
+	unsigned long flags;
+	unsigned long wait;
 
 	/*
 	 * A global lock protects timers etc -- shouldn't get contention
@@ -1454,7 +1445,7 @@ void ide_timer_expiry(unsigned long data)
 				printk("%s: ide_timer_expiry: hwgroup was not busy??\n", drive->name);
 			if ((expiry = hwgroup->expiry) != NULL) {
 				/* continue */
-				if ((wait = expiry(drive)) != 0) {
+				if ((wait = expiry(drive, HWGROUP(drive)->rq)) != 0) {
 					/* reengage timer */
 					hwgroup->timer.expires  = jiffies + wait;
 					add_timer(&hwgroup->timer);
@@ -1477,17 +1468,17 @@ void ide_timer_expiry(unsigned long data)
 #endif
 			__cli();	/* local CPU only, as if we were handling an interrupt */
 			if (hwgroup->poll_timeout != 0) {
-				startstop = handler(drive);
+				startstop = handler(drive, ch->hwgroup->rq);
 			} else if (drive_is_ready(drive)) {
 				if (drive->waiting_for_dma)
-					ch->dmaproc(ide_dma_lostirq, drive);
+					ch->udma(ide_dma_lostirq, drive, ch->hwgroup->rq);
 				(void) ide_ack_intr(ch);
 				printk("%s: lost interrupt\n", drive->name);
-				startstop = handler(drive);
+				startstop = handler(drive, ch->hwgroup->rq);
 			} else {
 				if (drive->waiting_for_dma) {
 					startstop = ide_stopped;
-					ide_dma_timeout_retry(drive);
+					dma_timeout_retry(drive, ch->hwgroup->rq);
 				} else
 					startstop = ide_error(drive, "irq timeout", GET_STAT());
 			}
@@ -1559,7 +1550,7 @@ static void unexpected_irq(int irq)
 }
 
 /*
- * entry point for all interrupts, caller does __cli() for us
+ * Entry point for all interrupts, caller does __cli() for us.
  */
 void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 {
@@ -1568,7 +1559,7 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 
 	unsigned long flags;
 	struct ata_device *drive;
-	ide_handler_t *handler;
+	ata_handler_t *handler = hwgroup->handler;
 	ide_startstop_t startstop;
 
 	spin_lock_irqsave(&ide_lock, flags);
@@ -1576,7 +1567,7 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 	if (!ide_ack_intr(ch))
 		goto out_lock;
 
-	if ((handler = hwgroup->handler) == NULL || hwgroup->poll_timeout != 0) {
+	if (handler == NULL || hwgroup->poll_timeout != 0) {
 #if 0
 		printk(KERN_INFO "ide: unexpected interrupt %d %d\n", ch->unit, irq);
 #endif
@@ -1636,7 +1627,9 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 
 	if (ch->unmask)
 		ide__sti();	/* local CPU only */
-	startstop = handler(drive);		/* service this interrupt, may set handler for next interrupt */
+
+	/* service this interrupt, may set handler for next interrupt */
+	startstop = handler(drive, hwgroup->rq);
 	spin_lock_irq(&ide_lock);
 
 	/*
@@ -2123,7 +2116,7 @@ void ide_unregister(struct ata_channel *ch)
 	ch->ata_write = old_hwif.ata_write;
 	ch->atapi_read = old_hwif.atapi_read;
 	ch->atapi_write = old_hwif.atapi_write;
-	ch->dmaproc = old_hwif.dmaproc;
+	ch->udma = old_hwif.udma;
 	ch->busproc = old_hwif.busproc;
 	ch->bus_state = old_hwif.bus_state;
 	ch->dma_base = old_hwif.dma_base;
@@ -2398,13 +2391,13 @@ static int set_io_32bit(struct ata_device *drive, int arg)
 	return 0;
 }
 
-static int set_using_dma (ide_drive_t *drive, int arg)
+static int set_using_dma(ide_drive_t *drive, int arg)
 {
 	if (!drive->driver)
 		return -EPERM;
-	if (!drive->id || !(drive->id->capability & 1) || !drive->channel->dmaproc)
+	if (!drive->id || !(drive->id->capability & 1) || !drive->channel->udma)
 		return -EPERM;
-	if (drive->channel->dmaproc(arg ? ide_dma_on : ide_dma_off, drive))
+	if (drive->channel->udma(arg ? ide_dma_on : ide_dma_off, drive, NULL))
 		return -EIO;
 	return 0;
 }
@@ -3122,9 +3115,9 @@ done:
 /****************************************************************************/
 
 /* This is the default end request function as well */
-int ide_end_request(ide_drive_t *drive, int uptodate)
+int ide_end_request(struct ata_device *drive, struct request *rq, int uptodate)
 {
-	return __ide_end_request(drive, uptodate, 0);
+	return __ide_end_request(drive, rq, uptodate, 0);
 }
 
 /*
@@ -3173,7 +3166,7 @@ int ide_register_subdriver(ide_drive_t *drive, struct ata_operations *driver)
 	restore_flags(flags);		/* all CPUs */
 	/* FIXME: Check what this magic number is supposed to be about? */
 	if (drive->autotune != 2) {
-		if (drive->channel->dmaproc != NULL) {
+		if (drive->channel->udma) {
 
 			/*
 			 * Force DMAing for the beginning of the check.  Some
@@ -3183,8 +3176,8 @@ int ide_register_subdriver(ide_drive_t *drive, struct ata_operations *driver)
 			 *   PARANOIA!!!
 			 */
 
-			drive->channel->dmaproc(ide_dma_off_quietly, drive);
-			drive->channel->dmaproc(ide_dma_check, drive);
+			drive->channel->udma(ide_dma_off_quietly, drive, NULL);
+			drive->channel->udma(ide_dma_check, drive, NULL);
 		}
 		/* Only CD-ROMs and tape drives support DSC overlap. */
 		drive->dsc_overlap = (drive->next != drive

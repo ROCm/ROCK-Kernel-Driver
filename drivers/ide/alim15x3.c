@@ -437,11 +437,11 @@ static int ali15x3_config_drive_for_dma(ide_drive_t *drive)
 	byte can_ultra_dma = ali15x3_can_ultra(drive);
 
 	if ((m5229_revision<=0x20) && (drive->type != ATA_DISK))
-		return hwif->dmaproc(ide_dma_off_quietly, drive);
+		return hwif->udma(ide_dma_off_quietly, drive, NULL);
 
 	if ((id != NULL) && ((id->capability & 1) != 0) && hwif->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
+		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
 			dma_func = ide_dma_off;
 			goto fast_ata_pio;
 		}
@@ -463,7 +463,7 @@ try_dma_modes:
 				if (dma_func != ide_dma_on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive)) {
+		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
@@ -480,10 +480,10 @@ fast_ata_pio:
 no_dma_set:
 		config_chipset_for_pio(drive);
 	}
-	return hwif->dmaproc(dma_func, drive);
+	return hwif->udma(dma_func, drive, NULL);
 }
 
-static int ali15x3_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+static int ali15x3_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	switch(func) {
 		case ide_dma_check:
@@ -495,7 +495,7 @@ static int ali15x3_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		default:
 			break;
 	}
-	return ide_dmaproc(func, drive);	/* use standard DMA stuff */
+	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
@@ -672,14 +672,14 @@ void __init ide_init_ali15x3(struct ata_channel *hwif)
 	hwif->tuneproc = &ali15x3_tune_drive;
 	hwif->drives[0].autotune = 1;
 	hwif->drives[1].autotune = 1;
-	hwif->speedproc = &ali15x3_tune_chipset;
+	hwif->speedproc = ali15x3_tune_chipset;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if ((hwif->dma_base) && (m5229_revision >= 0x20)) {
 		/*
 		 * M1543C or newer for DMAing
 		 */
-		hwif->dmaproc = &ali15x3_dmaproc;
+		hwif->udma = ali15x3_dmaproc;
 		hwif->autodma = 1;
 	}
 

@@ -234,7 +234,7 @@ static void cy82c693_dma_enable (ide_drive_t *drive, int mode, int single)
 /* 
  * used to set DMA mode for CY82C693 (single and multi modes)
  */
-static int cy82c693_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
+static int cy82c693_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	/*
 	 * if the function is dma on, set dma mode for drive everything
@@ -247,14 +247,14 @@ static int cy82c693_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		printk (KERN_INFO "dma_on: %s\n", drive->name);
 #endif /* CY82C693_DEBUG_INFO */
 
-		if (id != NULL) {		
+		if (id != NULL) {
                        /* Enable DMA on any drive that has DMA (multi or single) enabled */
                        if (id->field_valid & 2) {       /* regular DMA */
 			       int mmode, smode;
 
 			       mmode = id->dma_mword & (id->dma_mword >> 8);
 			       smode = id->dma_1word & (id->dma_1word >> 8);
-			       		      
+
 		               if (mmode != 0)
 				     cy82c693_dma_enable(drive, (mmode >> 1), 0); /* enable multi */
 			       else if (smode != 0)
@@ -262,7 +262,7 @@ static int cy82c693_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			}
 		}
 	}
-        return ide_dmaproc(func, drive);
+        return ide_dmaproc(func, drive, rq);
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
@@ -442,7 +442,7 @@ void __init ide_init_cy82c693(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->highmem = 1;
-		hwif->dmaproc = cy82c693_dmaproc;
+		hwif->udma = cy82c693_dmaproc;
 		if (!noautodma)
 			hwif->autodma = 1;
 	}
