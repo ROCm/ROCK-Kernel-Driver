@@ -1421,7 +1421,9 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 	return ret;
 }
 
-void
+/* "asmlinkage" so the input arguments are preserved... */
+
+asmlinkage void
 syscall_trace (void)
 {
 	if (!test_thread_flag(TIF_SYSCALL_TRACE))

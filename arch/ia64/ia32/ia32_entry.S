@@ -1,4 +1,5 @@
 #include <asm/asmmacro.h>
+#include <asm/ia32.h>
 #include <asm/offsets.h>
 #include <asm/signal.h>
 #include <asm/thread_info.h>
@@ -141,27 +142,35 @@ GLOBAL_ENTRY(ia32_trace_syscall)
 	adds r2=IA64_PT_REGS_R8_OFFSET+16,sp
 	;;
 	st8 [r2]=r3				// initialize return code to -ENOSYS
-	br.call.sptk.few rp=invoke_syscall_trace // give parent a chance to catch syscall args
-	// Need to reload arguments (they may be changed by the tracing process)
-	adds r2=IA64_PT_REGS_R9_OFFSET+16,sp	// r2 = &pt_regs.r9
+	br.call.sptk.few rp=syscall_trace	// give parent a chance to catch syscall args
+.ret2:	// Need to reload arguments (they may be changed by the tracing process)
+	adds r2=IA64_PT_REGS_R1_OFFSET+16,sp	// r2 = &pt_regs.r1
 	adds r3=IA64_PT_REGS_R13_OFFSET+16,sp	// r3 = &pt_regs.r13
+	mov r15=IA32_NR_syscalls
+	;;
+	ld4 r8=[r2],IA64_PT_REGS_R9_OFFSET-IA64_PT_REGS_R1_OFFSET
+	movl r16=ia32_syscall_table
 	;;
 	ld4 r33=[r2],8				// r9 == ecx
 	ld4 r37=[r3],16				// r13 == ebp
+	cmp.ltu.unc p6,p7=r8,r15
 	;;
 	ld4 r34=[r2],8				// r10 == edx
 	ld4 r36=[r3],8				// r15 == edi
+(p6)	shladd r16=r8,3,r16	// force ni_syscall if not valid syscall number
+	;;
+	ld8 r16=[r16]
 	;;
 	ld4 r32=[r2],8				// r11 == ebx
+	mov b6=r16
 	ld4 r35=[r3],8				// r14 == esi
-	;;
-.ret2:	br.call.sptk.few rp=b6			// do the syscall
+	br.call.sptk.few rp=b6			// do the syscall
 .ia32_strace_check_retval:
 	cmp.lt p6,p0=r8,r0			// syscall failed?
 	adds r2=IA64_PT_REGS_R8_OFFSET+16,sp	// r2 = &pt_regs.r8
 	;;
 	st8.spill [r2]=r8			// store return value in slot for r8
-	br.call.sptk.few rp=invoke_syscall_trace // give parent a chance to catch return value
+	br.call.sptk.few rp=syscall_trace	// give parent a chance to catch return value
 .ret4:	alloc r2=ar.pfs,0,0,0,0			// drop the syscall argument frame
 	br.cond.sptk.many ia64_leave_kernel
 END(ia32_trace_syscall)
@@ -469,10 +478,6 @@ ia32_syscall_table:
 	data8 sys_ni_syscall
 	data8 sys_statfs64
 	data8 sys_fstatfs64
-	data8 sys_ni_syscall
-	
-	/*
-	 *  CAUTION: If any system calls are added beyond this point
-	 *	then the check in `arch/ia64/kernel/ivt.S' will have
-	 *	to be modified also.  You've been warned.
-	 */
+
+	// guard against failures to increase IA32_NR_syscalls
+	.org ia32_syscall_table + 8*IA32_NR_syscalls

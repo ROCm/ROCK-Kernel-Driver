@@ -42,6 +42,7 @@
 
 #include <asm/asmmacro.h>
 #include <asm/break.h>
+#include <asm/ia32.h>
 #include <asm/kregs.h>
 #include <asm/offsets.h>
 #include <asm/pgtable.h>
@@ -705,13 +706,14 @@ ENTRY(break_fault)
 	movl r2=ia64_ret_from_syscall
 	;;
 	shladd r20=r15,3,r16			// r20 = sys_call_table + 8*(syscall-1024)
-	cmp.geu p0,p7=r3,r15			// (syscall > 0 && syscall < 1024 + NR_syscalls) ?
+	cmp.leu p6,p7=r15,r3			// (syscall > 0 && syscall < 1024 + NR_syscalls) ?
 	mov rp=r2				// set the real return addr
 	;;
-(p7)	add r20=(__NR_ni_syscall-1024)*8,r16	// force __NR_ni_syscall
+(p6)	ld8 r20=[r20]				// load address of syscall entry point
+(p7)	movl r20=sys_ni_syscall
+
 	add r2=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
-	ld8 r20=[r20]				// load address of syscall entry point
 	ld4 r2=[r2]				// r2 = current_thread_info()->flags
 	;;
 	tbit.z p8,p0=r2,TIF_SYSCALL_TRACE
@@ -1513,7 +1515,7 @@ ENTRY(dispatch_to_ia32_handler)
 	alloc r15=ar.pfs,0,0,6,0	// must first in an insn group
 	;;
 	ld4 r8=[r14],8		// r8 == eax (syscall number)
-	mov r15=270		// number of entries in ia32 system call table
+	mov r15=IA32_NR_syscalls
 	;;
 	cmp.ltu.unc p6,p7=r8,r15
 	ld4 out1=[r14],8	// r9 == ecx
