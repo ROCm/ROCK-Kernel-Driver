@@ -385,7 +385,7 @@ nfssvc_encode_statfsres(struct svc_rqst *rqstp, u32 *p,
 {
 	struct statfs	*stat = &resp->stats;
 
-	*p++ = htonl(8 * 1024);		/* max transfer size */
+	*p++ = htonl(NFSSVC_MAXBLKSIZE);	/* max transfer size */
 	*p++ = htonl(stat->f_bsize);
 	*p++ = htonl(stat->f_blocks);
 	*p++ = htonl(stat->f_bfree);
