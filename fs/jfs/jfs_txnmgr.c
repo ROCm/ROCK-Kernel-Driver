@@ -318,11 +318,12 @@ tid_t txBegin(struct super_block *sb, int flag)
 	TXN_LOCK();
 
       retry:
-	if (flag != COMMIT_FORCE) {
+	if (!(flag & COMMIT_FORCE)) {
 		/*
 		 * synchronize with logsync barrier
 		 */
-		if (log->syncbarrier) {
+		if (test_bit(log_SYNCBARRIER, &log->flag) ||
+		    test_bit(log_QUIESCE, &log->flag)) {
 			TXN_SLEEP(&log->syncwait);
 			goto retry;
 		}
@@ -330,8 +331,8 @@ tid_t txBegin(struct super_block *sb, int flag)
 	if (flag == 0) {
 		/*
 		 * Don't begin transaction if we're getting starved for tlocks
-		 * unless COMMIT_FORCE (imap changes) or COMMIT_INODE (which
-		 * may ultimately free tlocks)
+		 * unless COMMIT_FORCE or COMMIT_INODE (which may ultimately
+		 * free tlocks)
 		 */
 		if (TlocksLow) {
 			TXN_SLEEP(&TxAnchor.lowlockwait);
@@ -411,7 +412,8 @@ void txBeginAnon(struct super_block *sb)
 	/*
 	 * synchronize with logsync barrier
 	 */
-	if (log->syncbarrier) {
+	if (test_bit(log_SYNCBARRIER, &log->flag) ||
+	    test_bit(log_QUIESCE, &log->flag)) {
 		TXN_SLEEP(&log->syncwait);
 		goto retry;
 	}
@@ -490,14 +492,14 @@ void txEnd(tid_t tid)
 	/*
 	 * synchronize with logsync barrier
 	 */
-	if (log->syncbarrier && log->active == 0) {
+	if (test_bit(log_SYNCBARRIER, &log->flag) && log->active == 0) {
 		/* forward log syncpt */
 		/* lmSync(log); */
 
 		jFYI(1, ("     log barrier off: 0x%x\n", log->lsn));
 
 		/* enable new transactions start */
-		log->syncbarrier = 0;
+		clear_bit(log_SYNCBARRIER, &log->flag);
 
 		/* wakeup all waitors for logsync barrier */
 		TXN_WAKEUP(&log->syncwait);
@@ -823,36 +825,21 @@ static void txRelease(tblock_t * tblk)
  *
  * FUNCTION:    Initiates pageout of pages modified by tid in journalled
  *              objects and frees their lockwords.
- *
- * PARAMETER:
- *              flag    -
- *
- * RETURN:      Errors from subroutines.
  */
-static void txUnlock(tblock_t * tblk, int flag)
+static void txUnlock(tblock_t * tblk)
 {
 	tlock_t *tlck;
 	linelock_t *linelock;
 	lid_t lid, next, llid, k;
 	metapage_t *mp;
 	log_t *log;
-	int force;
 	int difft, diffp;
 
 	jFYI(1, ("txUnlock: tblk = 0x%p\n", tblk));
 	log = (log_t *) JFS_SBI(tblk->sb)->log;
-	force = flag & COMMIT_FLUSH;
-	if (log->syncbarrier)
-		force |= COMMIT_FORCE;
 
 	/*
 	 * mark page under tlock homeok (its log has been written):
-	 * if caller has specified FORCE (e.g., iRecycle()), or
-	 * if syncwait for the log is set (i.e., the log sync point
-	 * has fallen behind), or
-	 * if syncpt is set for the page, or
-	 * if the page is new, initiate pageout;
-	 * otherwise, leave the page in memory.
 	 */
 	for (lid = tblk->next; lid; lid = next) {
 		tlck = lid_to_tlock(lid);
@@ -1268,7 +1255,7 @@ int txCommit(tid_t tid,		/* transaction identifier */
 	txRelease(tblk);
 
 	if ((tblk->flag & tblkGC_LAZY) == 0)
-		txUnlock(tblk, flag);
+		txUnlock(tblk);
 
 
 	/*
@@ -2753,7 +2740,7 @@ void txLazyCommit(tblock_t * tblk)
 	spin_unlock_irq(&log->gclock);	// LOGGC_UNLOCK
 
 	if (tblk->flag & tblkGC_LAZY) {
-		txUnlock(tblk, 0);
+		txUnlock(tblk);
 		tblk->flag &= ~tblkGC_LAZY;
 		txEnd(tblk - TxBlock);	/* Convert back to tid */
 	}
@@ -2888,6 +2875,77 @@ static void LogSyncRelease(metapage_t * mp)
 }
 
 /*
+ *	txQuiesce
+ *
+ *	Block all new transactions and push anonymous transactions to
+ *	completion
+ *
+ *	This does almost the same thing as jfs_sync below.  We don't
+ *	worry about deadlocking when TlocksLow is set, since we would
+ *	expect jfs_sync to get us out of that jam.
+ */
+void txQuiesce(struct super_block *sb)
+{
+	struct inode *ip;
+	struct jfs_inode_info *jfs_ip;
+	log_t *log = JFS_SBI(sb)->log;
+	int rc;
+	tid_t tid;
+
+	set_bit(log_QUIESCE, &log->flag);
+
+	TXN_LOCK();
+restart:
+	while (!list_empty(&TxAnchor.anon_list)) {
+		jfs_ip = list_entry(TxAnchor.anon_list.next,
+				    struct jfs_inode_info,
+				    anon_inode_list);
+		ip = &jfs_ip->vfs_inode;
+
+		/*
+		 * inode will be removed from anonymous list
+		 * when it is committed
+		 */
+		TXN_UNLOCK();
+		tid = txBegin(ip->i_sb, COMMIT_INODE | COMMIT_FORCE);
+		down(&jfs_ip->commit_sem);
+		rc = txCommit(tid, 1, &ip, 0);
+		txEnd(tid);
+		up(&jfs_ip->commit_sem);
+		/*
+		 * Just to be safe.  I don't know how
+		 * long we can run without blocking
+		 */
+		cond_resched();
+		TXN_LOCK();
+	}
+
+	/*
+	 * If jfs_sync is running in parallel, there could be some inodes
+	 * on anon_list2.  Let's check.
+	 */
+	if (!list_empty(&TxAnchor.anon_list2)) {
+		list_splice(&TxAnchor.anon_list2, &TxAnchor.anon_list);
+		INIT_LIST_HEAD(&TxAnchor.anon_list2);
+		goto restart;
+	}
+	TXN_UNLOCK();
+}
+
+/*
+ * txResume()
+ *
+ * Allows transactions to start again following txQuiesce
+ */
+void txResume(struct super_block *sb)
+{
+	log_t *log = JFS_SBI(sb)->log;
+
+	clear_bit(log_QUIESCE, &log->flag);
+	TXN_WAKEUP(&log->syncwait);
+}
+
+/*
  *      jfs_sync(void)
  *
  *	To be run as a kernel daemon.  This is awakened when tlocks run low.
@@ -2898,6 +2956,8 @@ int jfs_sync(void)
 {
 	struct inode *ip;
 	struct jfs_inode_info *jfs_ip;
+	int rc;
+	tid_t tid;
 
 	lock_kernel();
 
@@ -2927,17 +2987,20 @@ int jfs_sync(void)
 			ip = &jfs_ip->vfs_inode;
 
 			/*
-			 * We must release the TXN_LOCK since our
-			 * IWRITE_TRYLOCK implementation may still block
+			 * down_trylock returns 0 on success.  This is
+			 * inconsistent with spin_trylock.
 			 */
-			TXN_UNLOCK();
-			if (IWRITE_TRYLOCK(ip)) {
+			if (! down_trylock(&jfs_ip->commit_sem)) {
 				/*
 				 * inode will be removed from anonymous list
 				 * when it is committed
 				 */
-				jfs_commit_inode(ip, 0);
-				IWRITE_UNLOCK(ip);
+				TXN_UNLOCK();
+				tid = txBegin(ip->i_sb,
+					      COMMIT_INODE | COMMIT_FORCE);
+				rc = txCommit(tid, 1, &ip, 0);
+				txEnd(tid);
+				up(&jfs_ip->commit_sem);
 				/*
 				 * Just to be safe.  I don't know how
 				 * long we can run without blocking
@@ -2945,20 +3008,11 @@ int jfs_sync(void)
 				cond_resched();
 				TXN_LOCK();
 			} else {
-				/* We can't get the write lock.  It may
+				/* We can't get the commit semaphore.  It may
 				 * be held by a thread waiting for tlock's
 				 * so let's not block here.  Save it to
 				 * put back on the anon_list.
 				 */
-
-				/*
-				 * We released TXN_LOCK, let's make sure
-				 * this inode is still there
-				 */
-				TXN_LOCK();
-				if (TxAnchor.anon_list.next !=
-				    &jfs_ip->anon_inode_list)
-					continue;
 
 				/* Take off anon_list */
 				list_del(&jfs_ip->anon_inode_list);

@@ -379,8 +379,7 @@ typedef struct jfs_log {
 	int size;		/* 4: log size in log page (in page) */
 	int l2bsize;		/* 4: log2 of bsize */
 
-	uint flag;		/* 4: flag */
-	uint state;		/* 4: state */
+	long flag;		/* 4: flag */
 
 	struct lbuf *lbuf_free;	/* 4: free lbufs */
 	wait_queue_head_t free_wait;	/* 4: */
@@ -396,7 +395,6 @@ typedef struct jfs_log {
 	/* syncpt */
 	int nextsync;		/* 4: bytes to write before next syncpt */
 	int active;		/* 4: */
-	int syncbarrier;	/* 4: */
 	wait_queue_head_t syncwait;	/* 4: */
 
 	/* commit */
@@ -419,6 +417,13 @@ typedef struct jfs_log {
 	int count;		/* 4: count */
 	char uuid[16];		/* 16: 128-bit uuid of log device */
 } log_t;
+
+/*
+ * Log flag
+ */
+#define log_INLINELOG	1
+#define log_SYNCBARRIER	2
+#define log_QUIESCE	3
 
 /*
  * group commit flag
@@ -499,8 +504,8 @@ extern int lmLogOpen(struct super_block *sb, log_t ** log);
 extern void lmLogWait(log_t * log);
 extern int lmLogClose(struct super_block *sb, log_t * log);
 extern int lmLogSync(log_t * log, int nosyncwait);
-extern int lmLogQuiesce(log_t * log);
-extern int lmLogResume(log_t * log, struct super_block *sb);
-extern int lmLogFormat(struct super_block *sb, s64 logAddress, int logSize);
+extern int lmLogShutdown(log_t * log);
+extern int lmLogInit(log_t * log);
+extern int lmLogFormat(log_t *log, s64 logAddress, int logSize);
 
 #endif				/* _H_JFS_LOGMGR */
