@@ -430,10 +430,8 @@ page_is_mapped:
 
 alloc_new:
 	if (bio == NULL) {
-		const unsigned __nr_pages = 64;	/* FIXME */
-
 		bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
-					__nr_pages, GFP_NOFS|__GFP_HIGH);
+				bio_get_nr_vecs(bdev), GFP_NOFS|__GFP_HIGH);
 		if (bio == NULL)
 			goto confused;
 	}
