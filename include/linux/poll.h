@@ -10,21 +10,16 @@
 #include <linux/mm.h>
 #include <asm/uaccess.h>
 
-struct poll_table_page;
 struct poll_table_struct;
 
+/* 
+ * structures and helpers for f_op->poll implementations
+ */
 typedef void (*poll_queue_proc)(struct file *, wait_queue_head_t *, struct poll_table_struct *);
-typedef void (*poll_free_proc)(struct poll_table_struct *);
 
 typedef struct poll_table_struct {
 	poll_queue_proc qproc;
-	poll_free_proc fproc;
-	int error;
-	struct poll_table_page * table;
 } poll_table;
-
-extern void __pollwait(struct file * filp, wait_queue_head_t * wait_address, poll_table *p);
-extern void __pollfreewait(poll_table* pt);
 
 static inline void poll_wait(struct file * filp, wait_queue_head_t * wait_address, poll_table *p)
 {
@@ -32,27 +27,22 @@ static inline void poll_wait(struct file * filp, wait_queue_head_t * wait_addres
 		p->qproc(filp, wait_address, p);
 }
 
-static inline void poll_initwait_ex(poll_table* pt, poll_queue_proc qproc, poll_free_proc fproc)
+static inline void init_poll_funcptr(poll_table *pt, poll_queue_proc qproc)
 {
 	pt->qproc = qproc;
-	pt->fproc = fproc;
-	pt->error = 0;
-	pt->table = NULL;
 }
 
-static inline void poll_initwait(poll_table* pt)
-{
+/*
+ * Structures and helpers for sys_poll/sys_poll
+ */
+struct poll_wqueues {
+	poll_table pt;
+	struct poll_table_page * table;
+	int error;
+};
 
-	poll_initwait_ex(pt, __pollwait, __pollfreewait);
-}
-
-static inline void poll_freewait(poll_table* pt)
-{
-
-	if (pt && pt->fproc)
-		pt->fproc(pt);
-}
-
+extern void poll_initwait(struct poll_wqueues *pwq);
+extern void poll_freewait(struct poll_wqueues *pwq);
 
 /*
  * Scaleable version of the fd_set.
