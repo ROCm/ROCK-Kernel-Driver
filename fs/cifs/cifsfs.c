@@ -653,10 +653,11 @@ cifs_init_mids(void)
 static void
 cifs_destroy_mids(void)
 {
+	mempool_destroy(cifs_mid_poolp);
 	if (kmem_cache_destroy(cifs_mid_cachep))
 		printk(KERN_WARNING
 		       "cifs_destroy_mids: error not all structures were freed\n");
-	mempool_destroy(cifs_mid_poolp);
+
 	if (kmem_cache_destroy(cifs_oplock_cachep))
 		printk(KERN_WARNING
 		       "error not all oplock structures were freed\n");
