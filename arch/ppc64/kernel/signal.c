@@ -154,7 +154,7 @@ static long setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
 	/* We always copy to/from vrsave, it's 0 if we don't have or don't
 	 * use altivec.
 	 */
-	err |= __put_user(current->thread.vrsave, (u32 *)&v_regs[33]);
+	err |= __put_user(current->thread.vrsave, (u32 __user *)&v_regs[33]);
 #else /* CONFIG_ALTIVEC */
 	err |= __put_user(0, &sc->v_regs);
 #endif /* CONFIG_ALTIVEC */
@@ -216,7 +216,7 @@ static long restore_sigcontext(struct pt_regs *regs, sigset_t *set, int sig,
 		memset(&current->thread.vr, 0, 33);
 	/* Always get VRSAVE back */
 	if (v_regs != 0)
-		err |= __get_user(current->thread.vrsave, (u32 *)&v_regs[33]);
+		err |= __get_user(current->thread.vrsave, (u32 __user *)&v_regs[33]);
 	else
 		current->thread.vrsave = 0;
 #endif /* CONFIG_ALTIVEC */
@@ -311,8 +311,8 @@ int sys_swapcontext(struct ucontext __user *old_ctx,
 	if (new_ctx == NULL)
 		return 0;
 	if (verify_area(VERIFY_READ, new_ctx, sizeof(*new_ctx))
-	    || __get_user(tmp, (u8 *) new_ctx)
-	    || __get_user(tmp, (u8 *) (new_ctx + 1) - 1))
+	    || __get_user(tmp, (u8 __user *) new_ctx)
+	    || __get_user(tmp, (u8 __user *) (new_ctx + 1) - 1))
 		return -EFAULT;
 
 	/*
@@ -384,7 +384,7 @@ static void setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 	 * descriptor is the entry address of signal and the second
 	 * entry is the TOC value we need to use.
 	 */
-	func_descr_t *funct_desc_ptr;
+	func_descr_t __user *funct_desc_ptr;
 	struct rt_sigframe __user *frame;
 	unsigned long newsp = 0;
 	long err = 0;
@@ -418,11 +418,11 @@ static void setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 	if (err)
 		goto badframe;
 
-	funct_desc_ptr = (func_descr_t *) ka->sa.sa_handler;
+	funct_desc_ptr = (func_descr_t __user *) ka->sa.sa_handler;
 
 	/* Allocate a dummy caller frame for the signal handler. */
 	newsp = (unsigned long)frame - __SIGNAL_FRAMESIZE;
-	err |= put_user(0, (unsigned long *)newsp);
+	err |= put_user(0, (unsigned long __user *)newsp);
 
 	/* Set up "regs" so we "return" to the signal handler. */
 	err |= get_user(regs->nip, &funct_desc_ptr->entry);
@@ -432,8 +432,8 @@ static void setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 	regs->gpr[3] = signr;
 	regs->result = 0;
 	if (ka->sa.sa_flags & SA_SIGINFO) {
-		err |= get_user(regs->gpr[4], (unsigned long *)&frame->pinfo);
-		err |= get_user(regs->gpr[5], (unsigned long *)&frame->puc);
+		err |= get_user(regs->gpr[4], (unsigned long __user *)&frame->pinfo);
+		err |= get_user(regs->gpr[5], (unsigned long __user *)&frame->puc);
 		regs->gpr[6] = (unsigned long) frame;
 	} else {
 		regs->gpr[4] = (unsigned long)&frame->uc.uc_mcontext;
