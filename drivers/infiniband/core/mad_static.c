@@ -49,6 +49,7 @@ void ib_mad_static_compute_base(void)
   struct in_device *idev;
 
   read_lock(&dev_base_lock);
+  rcu_read_lock();
   for (dev = dev_base; dev; dev = dev->next) {
     if (dev->flags & IFF_LOOPBACK) {
       continue;
@@ -59,10 +60,10 @@ void ib_mad_static_compute_base(void)
       continue;
     }
 
-    read_lock(&idev->lock);
+    read_lock(&idev->mc_list_lock);
 
     if (!idev->ifa_list) {
-      read_unlock(&idev->lock);
+      read_unlock(&idev->mc_list_lock);
       in_dev_put(idev);
       continue;
     }
@@ -87,10 +88,11 @@ void ib_mad_static_compute_base(void)
                dev->name, i[0], i[1], i[2], i[3], lid_base);
     }
 
-    read_unlock(&idev->lock);
+    read_unlock(&idev->mc_list_lock);
     in_dev_put(idev);
     break;
   }
+  rcu_read_unlock();
   read_unlock(&dev_base_lock);
 
   if (!lid_base) {

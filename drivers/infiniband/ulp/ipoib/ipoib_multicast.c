@@ -1100,14 +1100,17 @@ void tsIpoibDeviceMulticastRestartTask(
                                        ) {
   struct net_device *dev = dev_ptr;
   struct tTS_IPOIB_DEVICE_PRIVATE_STRUCT *priv = dev->priv;
-  struct in_device *in_dev = in_dev_get(dev);
+  struct in_device *in_dev;
   struct list_head *ptr, *tmp;
   struct ip_mc_list *im;
   tTS_IPOIB_MULTICAST_GROUP mcast;
   LIST_HEAD(remove_list);
   unsigned long flags;
 
+  rcu_read_lock();
+  in_dev = __in_dev_get(dev);
   if (!in_dev) {
+    rcu_read_unlock();
     return;
   }
 
@@ -1136,7 +1139,7 @@ void tsIpoibDeviceMulticastRestartTask(
     clear_bit(TS_IPOIB_MCAST_FLAG_FOUND, &mcast->flags);
   }
 
-  read_lock(&in_dev->lock);
+  read_lock(&in_dev->mc_list_lock);
 
   /* Mark all of the entries that are found or don't exist */
   for (im = in_dev->mc_list; im; im = im->next) {
@@ -1199,7 +1202,8 @@ void tsIpoibDeviceMulticastRestartTask(
     }
   }
 
-  read_unlock(&in_dev->lock);
+  read_unlock(&in_dev->mc_list_lock);
+  rcu_read_unlock();
 
   /* Remove all of the entries don't exist anymore */
   list_for_each_safe(ptr, tmp, &priv->multicast_list) {
