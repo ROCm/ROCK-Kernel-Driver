@@ -27,7 +27,6 @@ LD		+= -EB
 AFLAGS		+= -mbig-endian
 endif
 
-check_gcc = $(shell if $(CC) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi)
 comma = ,
 
 # This selects which instruction set is used.
