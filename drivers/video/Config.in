@@ -208,7 +208,7 @@ if [ "$CONFIG_FB" = "y" ]; then
       bool '  TMPTX3912/PR31700 frame buffer support' CONFIG_FB_TX3912
    fi
    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-      tristate '  Virtual Frame Buffer support (ONLY FOR TESTING!)' CONFIG_FB_VIRTUAL
+      tristate '  Virtual Frame Buffer support (ONLY FOR TESTING!) (EXPERIMENTAL)' CONFIG_FB_VIRTUAL
    fi
 
    bool '  Advanced low level driver options' CONFIG_FBCON_ADVANCED
