@@ -228,6 +228,13 @@ EXPORT_SYMBOL(_raw_read_lock);
 EXPORT_SYMBOL(cpu_present_mask);
 #endif /* CONFIG_SMP */
 
+/*
+ * NUMA specific symbols
+ */
+#ifdef CONFIG_DISCONTIGMEM
+EXPORT_SYMBOL(node_data);
+#endif /* CONFIG_DISCONTIGMEM */
+
 EXPORT_SYMBOL(rtc_lock);
 
 /*

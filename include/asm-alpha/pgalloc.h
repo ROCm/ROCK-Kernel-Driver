@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <linux/mmzone.h>
 
 /*      
  * Allocate and free page tables. The xxx_kernel() versions are
@@ -13,7 +14,7 @@
 static inline void
 pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
 {
-	pmd_set(pmd, (pte_t *)(((pte - mem_map) << PAGE_SHIFT) + PAGE_OFFSET));
+	pmd_set(pmd, (pte_t *)(page_to_pa(pte) + PAGE_OFFSET));
 }
 
 static inline void

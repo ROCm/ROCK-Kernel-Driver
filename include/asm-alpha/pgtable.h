@@ -192,14 +192,8 @@ extern unsigned long __zero_page(void);
  * and a page entry and page directory to the page they refer to.
  */
 #ifndef CONFIG_DISCONTIGMEM
-#define PAGE_TO_PA(page)	((page - mem_map) << PAGE_SHIFT)
-#else
-#define PAGE_TO_PA(page) \
-		((( (page) - (page)->zone->zone_mem_map ) \
-		+ (page)->zone->zone_start_pfn) << PAGE_SHIFT)
-#endif
+#define page_to_pa(page)	((page - mem_map) << PAGE_SHIFT)
 
-#ifndef CONFIG_DISCONTIGMEM
 #define pte_pfn(pte)	(pte_val(pte) >> 32)
 #define pte_page(pte)	pfn_to_page(pte_pfn(pte))
 #define mk_pte(page, pgprot)						\
@@ -208,28 +202,6 @@ extern unsigned long __zero_page(void);
 									\
 	pte_val(pte) = (page_to_pfn(page) << 32) | pgprot_val(pgprot);	\
 	pte;								\
-})
-#else
-#define mk_pte(page, pgprot)							\
-({										\
-	pte_t pte;								\
-	unsigned long pfn;							\
-										\
-	pfn = ((unsigned long)((page)-(page)->zone->zone_mem_map)) << 32;	\
-	pfn += (page)->zone->zone_start_pfn << 32);				\
-	pte_val(pte) = pfn | pgprot_val(pgprot);				\
-										\
-	pte;									\
-})
-#define pte_page(x)							\
-({									\
-	unsigned long kvirt;						\
-	struct page * __xx;						\
-									\
-	kvirt = (unsigned long)__va(pte_val(x) >> (32-PAGE_SHIFT));	\
-	__xx = virt_to_page(kvirt);					\
-									\
-	__xx;								\
 })
 #endif
 
@@ -252,7 +224,9 @@ pmd_page_kernel(pmd_t pmd)
 	return ((pmd_val(pmd) & _PFN_MASK) >> (32-PAGE_SHIFT)) + PAGE_OFFSET;
 }
 
+#ifndef CONFIG_DISCONTIGMEM
 #define pmd_page(pmd)	(mem_map + ((pmd_val(pmd) & _PFN_MASK) >> 32))
+#endif
 
 extern inline unsigned long pgd_page(pgd_t pgd)
 { return PAGE_OFFSET + ((pgd_val(pgd) & _PFN_MASK) >> (32-PAGE_SHIFT)); }

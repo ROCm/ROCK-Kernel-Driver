@@ -82,6 +82,10 @@ extern void wildfire_init_arch(void);
 extern void wildfire_kill_arch(int);
 extern void wildfire_machine_check(u64, u64, struct pt_regs *);
 extern void wildfire_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
+extern int wildfire_pa_to_nid(unsigned long);
+extern int wildfire_cpuid_to_nid(int);
+extern unsigned long wildfire_node_mem_start(int);
+extern unsigned long wildfire_node_mem_size(int);
 
 /* setup.c */
 extern unsigned long srm_hae;

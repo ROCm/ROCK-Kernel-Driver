@@ -83,7 +83,7 @@ static inline void * phys_to_virt(unsigned long address)
 }
 #endif
 
-#define page_to_phys(page)	PAGE_TO_PA(page)
+#define page_to_phys(page)	page_to_pa(page)
 
 /* This depends on working iommu.  */
 #define BIO_VMERGE_BOUNDARY	(alpha_mv.mv_pci_tbi ? PAGE_SIZE : 0)

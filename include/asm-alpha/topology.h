@@ -1,15 +1,50 @@
 #ifndef _ASM_ALPHA_TOPOLOGY_H
 #define _ASM_ALPHA_TOPOLOGY_H
 
-#if defined(CONFIG_NUMA) && defined(CONFIG_ALPHA_WILDFIRE)
+#include <linux/smp.h>
+#include <linux/threads.h>
+#include <asm/machvec.h>
 
-/* With wildfire assume 4 CPUs per node */
-#define __cpu_to_node(cpu)		((cpu) >> 2)
+#ifdef CONFIG_NUMA
+static inline int __cpu_to_node(int cpu)
+{
+	int node;
+	
+	if (!alpha_mv.cpuid_to_nid)
+		return 0;
 
-#else /* !CONFIG_NUMA || !CONFIG_ALPHA_WILDFIRE */
+	node = alpha_mv.cpuid_to_nid(cpu);
 
-#include <asm-generic/topology.h>
+#ifdef DEBUG_NUMA
+	if (node < 0)
+		BUG();
+#endif
 
-#endif /* CONFIG_NUMA && CONFIG_ALPHA_WILDFIRE */
+	return node;
+}
+
+static inline int __node_to_cpu_mask(int node)
+{
+	unsigned long node_cpu_mask = 0;
+	int cpu;
+
+	for(cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (cpu_online(cpu) && (__cpu_to_node(cpu) == node))
+			node_cpu_mask |= 1UL << cpu;
+	}
+
+#if DEBUG_NUMA
+	printk("node %d: cpu_mask: %016lx\n", node, node_cpu_mask);
+#endif
+
+	return node_cpu_mask;
+}
+
+# define __node_to_memblk(node)		(node)
+# define __memblk_to_node(memblk)	(memblk)
+
+#else /* CONFIG_NUMA */
+# include <asm-generic/topology.h>
+#endif /* !CONFIG_NUMA */
 
 #endif /* _ASM_ALPHA_TOPOLOGY_H */

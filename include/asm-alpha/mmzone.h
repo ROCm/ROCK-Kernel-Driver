@@ -6,25 +6,7 @@
 #define _ASM_MMZONE_H_
 
 #include <linux/config.h>
-#ifdef CONFIG_NUMA_SCHED
-#include <linux/numa_sched.h>
-#endif
-#ifdef NOTYET
-#include <asm/sn/types.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/arch.h>
-#include <asm/sn/klkernvars.h>
-#endif /* NOTYET */
-
-typedef struct plat_pglist_data {
-	pg_data_t	gendata;
-#ifdef NOTYET
-	kern_vars_t	kern_vars;
-#endif
-#if defined(CONFIG_NUMA) && defined(CONFIG_NUMA_SCHED)
-	struct numa_schedule_data schedule_data;
-#endif
-} plat_pg_data_t;
+#include <asm/smp.h>
 
 struct bootmem_data_t; /* stupid forward decl. */
 
@@ -32,19 +14,26 @@ struct bootmem_data_t; /* stupid forward decl. */
  * Following are macros that are specific to this numa platform.
  */
 
-extern plat_pg_data_t *plat_node_data[];
+extern pg_data_t node_data[];
 
-#ifdef CONFIG_ALPHA_WILDFIRE
-# define ALPHA_PA_TO_NID(pa)	((pa) >> 36)	/* 16 nodes max due 43bit kseg */
-# define NODE_MAX_MEM_SIZE	(64L * 1024L * 1024L * 1024L) /* 64 GB */
-#else
-# define ALPHA_PA_TO_NID(pa)	(0)
-# define NODE_MAX_MEM_SIZE	(~0UL)
-#endif
+#define alpha_pa_to_nid(pa)		\
+        (alpha_mv.pa_to_nid 		\
+	 ? alpha_mv.pa_to_nid(pa)	\
+	 : (0))
+#define node_mem_start(nid)		\
+        (alpha_mv.node_mem_start 	\
+	 ? alpha_mv.node_mem_start(nid) \
+	 : (0UL))
+#define node_mem_size(nid)		\
+        (alpha_mv.node_mem_size 	\
+	 ? alpha_mv.node_mem_size(nid) 	\
+	 : ((nid) ? (0UL) : (~0UL)))
 
-#define PHYSADDR_TO_NID(pa)		ALPHA_PA_TO_NID(pa)
-#define PLAT_NODE_DATA(n)		(plat_node_data[(n)])
-#define PLAT_NODE_DATA_SIZE(n)		(PLAT_NODE_DATA(n)->gendata.node_size)
+#define pa_to_nid(pa)		alpha_pa_to_nid(pa)
+#define NODE_DATA(nid)		(&node_data[(nid)])
+#define node_size(nid)		(NODE_DATA(nid)->node_size)
+
+#define node_localnr(pfn, nid)	((pfn) - NODE_DATA(nid)->node_start_pfn)
 
 #if 1
 #define PLAT_NODE_DATA_LOCALNR(p, n)	\
@@ -68,46 +57,76 @@ PLAT_NODE_DATA_LOCALNR(unsigned long p, int n)
 /*
  * Given a kernel address, find the home node of the underlying memory.
  */
-#define KVADDR_TO_NID(kaddr)	PHYSADDR_TO_NID(__pa(kaddr))
+#define kvaddr_to_nid(kaddr)	pa_to_nid(__pa(kaddr))
+#define node_mem_map(nid)	(NODE_DATA(nid)->node_mem_map)
+#define node_start_pfn(nid)	(NODE_DATA(nid)->node_start_pfn)
 
-/*
- * Return a pointer to the node data for node n.
- */
-#define NODE_DATA(n)	(&((PLAT_NODE_DATA(n))->gendata))
-
-/*
- * NODE_MEM_MAP gives the kaddr for the mem_map of the node.
- */
-#define NODE_MEM_MAP(nid)	(NODE_DATA(nid)->node_mem_map)
-
-/*
- * Given a kaddr, ADDR_TO_MAPBASE finds the owning node of the memory
- * and returns the mem_map of that node.
- */
-#define ADDR_TO_MAPBASE(kaddr) \
-			NODE_MEM_MAP(KVADDR_TO_NID((unsigned long)(kaddr)))
+#define local_mapnr(kvaddr) \
+      ((__pa(kvaddr) >> PAGE_SHIFT) - node_start_pfn(kvaddr_to_nid(kvaddr)))
 
 /*
  * Given a kaddr, LOCAL_BASE_ADDR finds the owning node of the memory
  * and returns the kaddr corresponding to first physical page in the
  * node's mem_map.
  */
-#define LOCAL_BASE_ADDR(kaddr)	((unsigned long)__va(NODE_DATA(KVADDR_TO_NID(kaddr))->node_start_pfn << PAGE_SHIFT))
+#define LOCAL_BASE_ADDR(kaddr)						  \
+    ((unsigned long)__va(NODE_DATA(kvaddr_to_nid(kaddr))->node_start_pfn  \
+			 << PAGE_SHIFT))
 
-#define LOCAL_MAP_NR(kvaddr) \
-	(((unsigned long)(kvaddr)-LOCAL_BASE_ADDR(kvaddr)) >> PAGE_SHIFT)
+#define kern_addr_valid(kaddr)						  \
+    test_bit(local_mapnr(kaddr), 					  \
+	     NODE_DATA(kvaddr_to_nid(kaddr))->valid_addr_bitmap)
 
-#define kern_addr_valid(kaddr)	test_bit(LOCAL_MAP_NR(kaddr), \
-					 NODE_DATA(KVADDR_TO_NID(kaddr))->valid_addr_bitmap)
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 
-#define virt_to_page(kaddr)	(ADDR_TO_MAPBASE(kaddr) + LOCAL_MAP_NR(kaddr))
 #define VALID_PAGE(page)	(((page) - mem_map) < max_mapnr)
 
-#ifdef CONFIG_NUMA
-#ifdef CONFIG_NUMA_SCHED
-#define NODE_SCHEDULE_DATA(nid)	(&((PLAT_NODE_DATA(nid))->schedule_data))
-#endif
-#endif /* CONFIG_NUMA */
+#define pmd_page(pmd)		(pfn_to_page(pmd_val(pmd) >> 32))
+#define pte_pfn(pte)		(pte_val(pte) >> 32)
+
+#define mk_pte(page, pgprot)						     \
+({								 	     \
+	pte_t pte;                                                           \
+	unsigned long pfn;                                                   \
+									     \
+	pfn = ((unsigned long)((page)-page_zone(page)->zone_mem_map)) << 32; \
+	pfn += page_zone(page)->zone_start_pfn << 32;			     \
+	pte_val(pte) = pfn | pgprot_val(pgprot);			     \
+									     \
+	pte;								     \
+})
+
+#define pte_page(x)							\
+({									\
+       	unsigned long kvirt;						\
+	struct page * __xx;						\
+									\
+	kvirt = (unsigned long)__va(pte_val(x) >> (32-PAGE_SHIFT));	\
+	__xx = virt_to_page(kvirt);					\
+									\
+	__xx;                                                           \
+})
+
+#define pfn_to_page(pfn)						\
+({									\
+ 	unsigned long kaddr = (unsigned long)__va(pfn << PAGE_SHIFT);	\
+	(node_mem_map(kvaddr_to_nid(kaddr)) + local_mapnr(kaddr));	\
+})
+
+#define page_to_pfn(page)						\
+	((page) - page_zone(page)->zone_mem_map +			\
+	 (page_zone(page)->zone_start_pfn))
+
+#define page_to_pa(page)						\
+	((( (page) - page_zone(page)->zone_mem_map )			\
+	+ page_zone(page)->zone_start_pfn) << PAGE_SHIFT)
+
+#define pfn_to_nid(pfn)		pa_to_nid(((u64)pfn << PAGE_SHIFT))
+#define pfn_valid(pfn)							\
+	(((pfn) - node_start_pfn(pfn_to_nid(pfn))) <			\
+	 node_size(pfn_to_nid(pfn)))					\
+
+#define virt_addr_valid(kaddr)	pfn_valid((__pa(kaddr) >> PAGE_SHIFT))
 
 #endif /* CONFIG_DISCONTIGMEM */
 
