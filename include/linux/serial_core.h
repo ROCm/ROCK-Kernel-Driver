@@ -91,11 +91,14 @@
 /* MPC52xx type numbers */
 #define PORT_MPC52xx	59
 
-/*IBM icom*/
-#define PORT_ICOM      60
+/* IBM icom */
+#define PORT_ICOM	60
 
 /* Samsung S3C2440 SoC */
 #define PORT_S3C2440	61
+
+/* Motorola i.MX SoC */
+#define PORT_IMX	62
 
 #ifdef __KERNEL__
 
