@@ -397,7 +397,7 @@ static struct bio_map_data *bio_alloc_map_data(int nr_segs)
 		return NULL;
 
 	bmd->iovecs = kmalloc(sizeof(struct bio_vec) * nr_segs, GFP_KERNEL);
-	if (bmd)
+	if (bmd->iovecs)
 		return bmd;
 
 	kfree(bmd);
