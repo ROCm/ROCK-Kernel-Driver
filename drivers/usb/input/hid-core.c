@@ -1691,11 +1691,20 @@ static struct usb_driver hid_driver = {
 
 static int __init hid_init(void)
 {
-	hiddev_init();
-	usb_register(&hid_driver);
+	int retval;
+	retval = hiddev_init();
+	if (retval)
+		goto hiddev_init_fail;
+	retval = usb_register(&hid_driver);
+	if (retval)
+		goto usb_register_fail;
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
+usb_register_fail:
+	hiddev_exit();
+hiddev_init_fail:
+	return retval;
 }
 
 static void __exit hid_exit(void)
