@@ -1012,7 +1012,7 @@ static int acpi_bus_scan (struct acpi_device	*start)
 
 	return_VALUE(0);
 }
-EXPORT_SYMBOL(acpi_bus_register_driver);
+EXPORT_SYMBOL(acpi_bus_scan);
 
 
 static int
@@ -1040,7 +1040,6 @@ acpi_bus_scan_fixed (
 
 	return_VALUE(result);
 }
-EXPORT_SYMBOL(acpi_bus_unregister_driver);
 
 
 static int __init acpi_scan_init(void)
@@ -1075,6 +1074,5 @@ static int __init acpi_scan_init(void)
  Done:
 	return_VALUE(result);
 }
-EXPORT_SYMBOL(acpi_bus_scan);
 
 subsys_initcall(acpi_scan_init);
