@@ -1103,9 +1103,9 @@ static void speedo_timer(unsigned long data)
 			mdio_read(ioaddr, phy_num, 1);
 			/* If link beat has returned... */
 			if (mdio_read(ioaddr, phy_num, 1) & 0x0004)
-				dev->flags |= IFF_RUNNING;
+				netif_carrier_on(dev);
 			else
-				dev->flags &= ~IFF_RUNNING;
+				netif_carrier_off(dev);
 		}
 	}
 	if (speedo_debug > 3) {
