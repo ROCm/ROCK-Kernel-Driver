@@ -125,14 +125,14 @@ int ic_proto_enabled __initdata = 0
 
 int ic_host_name_set __initdata = 0;		/* Host name set by us? */
 
-u32 ic_myaddr __initdata = INADDR_NONE;		/* My IP address */
-u32 ic_netmask __initdata = INADDR_NONE;	/* Netmask for local subnet */
-u32 ic_gateway __initdata = INADDR_NONE;	/* Gateway IP address */
+u32 ic_myaddr = INADDR_NONE;		/* My IP address */
+u32 ic_netmask = INADDR_NONE;	/* Netmask for local subnet */
+u32 ic_gateway = INADDR_NONE;	/* Gateway IP address */
 
-u32 ic_servaddr __initdata = INADDR_NONE;	/* Boot server IP address */
+u32 ic_servaddr = INADDR_NONE;	/* Boot server IP address */
 
-u32 root_server_addr __initdata = INADDR_NONE;	/* Address of NFS server */
-u8 root_server_path[256] __initdata = { 0, };	/* Path to mount as root */
+u32 root_server_addr = INADDR_NONE;	/* Address of NFS server */
+u8 root_server_path[256] = { 0, };	/* Path to mount as root */
 
 /* Persistent data: */
 
