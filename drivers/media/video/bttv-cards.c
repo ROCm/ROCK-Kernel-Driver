@@ -4045,7 +4045,7 @@ void __devinit bttv_check_chipset(void)
 
 #if 0
 	/* print which chipset we have */
-	while ((dev = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8,dev)))
+	while ((dev = pci_get_class(PCI_CLASS_BRIDGE_HOST << 8,dev)))
 		printk(KERN_INFO "bttv: Host bridge is %s\n",pci_name(dev));
 #endif
 
@@ -4064,8 +4064,8 @@ void __devinit bttv_check_chipset(void)
 	if (UNSET != latency)
 		printk(KERN_INFO "bttv: pci latency fixup [%d]\n",latency);
 
-	while ((dev = pci_find_device(PCI_VENDOR_ID_INTEL,
-				      PCI_DEVICE_ID_INTEL_82441, dev))) {
+	while ((dev = pci_get_device(PCI_VENDOR_ID_INTEL,
+				     PCI_DEVICE_ID_INTEL_82441, dev))) {
                 unsigned char b;
 		pci_read_config_byte(dev, 0x53, &b);
 		if (bttv_debug)

@@ -726,7 +726,7 @@ void __init setup_arch(char **cmdline_p)
 	 * Set up various architecture-specific pointers
 	 */
 	init_arch_irq = mdesc->init_irq;
-	init_arch_time = mdesc->init_time;
+	system_timer = mdesc->timer;
 	init_machine = mdesc->init_machine;
 
 #ifdef CONFIG_VT

@@ -15,6 +15,7 @@
 
 #include <linux/module.h>
 #include <linux/i2o.h>
+#include <linux/delay.h>
 
 /* Exec OSM functions */
 extern struct bus_type i2o_bus_type;
@@ -106,8 +107,7 @@ int i2o_device_claim_release(struct i2o_device *dev)
 		if (!rc)
 			break;
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ);
+		ssleep(1);
 	}
 
 	if (!rc)

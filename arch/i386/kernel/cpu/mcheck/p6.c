@@ -72,6 +72,7 @@ static asmlinkage void intel_machine_check(struct pt_regs * regs, long error_cod
 			wrmsr (msr, 0UL, 0UL);
 			/* Serialize */
 			wmb();
+			add_taint(TAINT_MACHINE_CHECK);
 		}
 	}
 	mcgstl &= ~(1<<2);

@@ -14,27 +14,6 @@
  *  Registration of PCI drivers and handling of hot-pluggable devices.
  */
 
-/**
- * pci_match_one_device - Tell if a PCI device structure has a matching
- *                        PCI device id structure
- * @id: single PCI device id structure to match
- * @dev: the PCI device structure to match against
- * 
- * Returns the matching pci_device_id structure or %NULL if there is no match.
- */
-
-static inline const struct pci_device_id *
-pci_match_one_device(const struct pci_device_id *id, const struct pci_dev *dev)
-{
-	if ((id->vendor == PCI_ANY_ID || id->vendor == dev->vendor) &&
-	    (id->device == PCI_ANY_ID || id->device == dev->device) &&
-	    (id->subvendor == PCI_ANY_ID || id->subvendor == dev->subsystem_vendor) &&
-	    (id->subdevice == PCI_ANY_ID || id->subdevice == dev->subsystem_device) &&
-	    !((id->class ^ dev->class) & id->class_mask))
-		return id;
-	return NULL;
-}
-
 /*
  * Dynamic device IDs are disabled for !CONFIG_HOTPLUG
  */
@@ -291,6 +270,19 @@ static int pci_device_remove(struct device * dev)
 			drv->remove(pci_dev);
 		pci_dev->driver = NULL;
 	}
+
+#ifdef CONFIG_DEBUG_KERNEL
+	/*
+	 * If the driver decides to stop using the device, it should
+	 * call pci_disable_device().
+	 */
+	if (pci_dev->is_enabled) {
+		dev_warn(&pci_dev->dev, "Device was removed without properly "
+			 "calling pci_disable_device(). This may need fixing.\n");
+		/* WARN_ON(1); */
+	}
+#endif /* CONFIG_DEBUG_KERNEL */
+
 	pci_dev_put(pci_dev);
 	return 0;
 }
@@ -317,7 +309,7 @@ static int pci_device_suspend(struct device * dev, u32 state)
 	if (drv && drv->suspend)
 		i = drv->suspend(pci_dev, dev_state);
 		
-	pci_save_state(pci_dev, pci_dev->saved_config_space);
+	pci_save_state(pci_dev);
 	return i;
 }
 
@@ -329,7 +321,7 @@ static int pci_device_suspend(struct device * dev, u32 state)
 static void pci_default_resume(struct pci_dev *pci_dev)
 {
 	/* restore the PCI config space */
-	pci_restore_state(pci_dev, pci_dev->saved_config_space);
+	pci_restore_state(pci_dev);
 	/* if the device was enabled before suspend, reenable */
 	if (pci_dev->is_enabled)
 		pci_enable_device(pci_dev);
@@ -404,30 +396,30 @@ pci_populate_driver_dir(struct pci_driver *drv)
  * @drv: the driver structure to register
  * 
  * Adds the driver structure to the list of registered drivers.
- * Returns a negative value on error. The driver remains registered
- * even if no device was claimed during registration.
+ * Returns a negative value on error, otherwise 0. 
+ * If no error occured, the driver remains registered even if 
+ * no device was claimed during registration.
  */
-int
-pci_register_driver(struct pci_driver *drv)
+int pci_register_driver(struct pci_driver *drv)
 {
-	int count = 0;
+	int error;
 
 	/* initialize common driver fields */
 	drv->driver.name = drv->name;
 	drv->driver.bus = &pci_bus_type;
 	drv->driver.probe = pci_device_probe;
 	drv->driver.remove = pci_device_remove;
+	drv->driver.owner = drv->owner;
 	drv->driver.kobj.ktype = &pci_driver_kobj_type;
 	pci_init_dynids(&drv->dynids);
 
 	/* register with core */
-	count = driver_register(&drv->driver);
+	error = driver_register(&drv->driver);
 
-	if (count >= 0) {
+	if (!error)
 		pci_populate_driver_dir(drv);
-	}
 
-	return count ? count : 1;
+	return error;
 }
 
 /**
@@ -512,16 +504,9 @@ static int pci_bus_match(struct device * dev, struct device_driver * drv)
  */
 struct pci_dev *pci_dev_get(struct pci_dev *dev)
 {
-	struct device *tmp;
-
-	if (!dev)
-		return NULL;
-
-	tmp = get_device(&dev->dev);
-	if (tmp)        
-		return to_pci_dev(tmp);
-	else
-		return NULL;
+	if (dev)
+		get_device(&dev->dev);
+	return dev;
 }
 
 /**

@@ -30,5 +30,5 @@ int __init firmware_init(void)
 	return subsystem_register(&firmware_subsys);
 }
 
-EXPORT_SYMBOL(firmware_register);
-EXPORT_SYMBOL(firmware_unregister);
+EXPORT_SYMBOL_GPL(firmware_register);
+EXPORT_SYMBOL_GPL(firmware_unregister);

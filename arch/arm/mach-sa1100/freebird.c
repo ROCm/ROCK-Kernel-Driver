@@ -77,5 +77,5 @@ MACHINE_START(FREEBIRD, "Freebird-HPC-1.1")
 #endif
 	MAPIO(freebird_map_io)
 	INITIRQ(sa1100_init_irq)
-	INITTIME(sa1100_init_time)
+	.timer		= &sa1100_timer,
 MACHINE_END

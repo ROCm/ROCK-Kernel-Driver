@@ -510,6 +510,7 @@ struct net_local
   iw_stats	wstats;		/* Wireless-specific statistics */
 
   struct iw_spy_data	spy_data;
+  struct iw_public_data	wireless_data;
 #endif
 
 #ifdef HISTOGRAM
@@ -614,6 +615,8 @@ static inline void
 /* ------------------- IOCTL, STATS & RECONFIG ------------------- */
 static en_stats	*
 	wavelan_get_stats(struct net_device *);	/* Give stats /proc/net/dev */
+static iw_stats *
+	wavelan_get_wireless_stats(struct net_device *);
 static void
 	wavelan_set_multicast_list(struct net_device *);
 /* ----------------------- PACKET RECEPTION ----------------------- */

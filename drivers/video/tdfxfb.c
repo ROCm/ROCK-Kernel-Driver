@@ -202,7 +202,6 @@ static unsigned long do_lfb_size(struct tdfx_par *par, unsigned short);
  */
 static int  nopan   = 0;
 static int  nowrap  = 1;      // not implemented (yet)
-static int  inverse = 0;
 static char *mode_option __initdata = NULL;
 
 /* ------------------------------------------------------------------------- 
@@ -921,7 +920,6 @@ static void tdfxfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect
 	tdfx_outl(par,	COMMAND_2D, COMMAND_2D_FILLRECT | (tdfx_rop << 24));
 	tdfx_outl(par,	DSTSIZE,    rect->width | (rect->height << 16));
 	tdfx_outl(par,	LAUNCH_2D,  rect->dx | (rect->dy << 16));
-	banshee_wait_idle(info);
 }
 
 /*
@@ -957,7 +955,6 @@ static void tdfxfb_copyarea(struct fb_info *info, const struct fb_copyarea *area
 	tdfx_outl(par,	DSTSIZE,   area->width | (area->height << 16));
 	tdfx_outl(par,	DSTXY,     dx | (dy << 16));
 	tdfx_outl(par,	LAUNCH_2D, sx | (sy << 16)); 
-	banshee_wait_idle(info);
 }
 
 static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *image) 
@@ -1025,7 +1022,6 @@ static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *image)
 		case 2:  tdfx_outl(par,	LAUNCH_2D,*(u16*)chardata); break;
 		case 3:  tdfx_outl(par,	LAUNCH_2D,*(u16*)chardata | ((chardata[3]) << 24)); break;
 	}
-	banshee_wait_idle(info);
 }
 #endif /* CONFIG_FB_3DFX_ACCEL */
 
@@ -1397,10 +1393,7 @@ void tdfxfb_setup(char *options)
 	while ((this_opt = strsep(&options, ",")) != NULL) {	
 		if (!*this_opt)
 			continue;
-		if (!strcmp(this_opt, "inverse")) {
-			inverse = 1;
-			fb_invert_cmaps();
-		} else if(!strcmp(this_opt, "nopan")) {
+		if(!strcmp(this_opt, "nopan")) {
 			nopan = 1;
 		} else if(!strcmp(this_opt, "nowrap")) {
 			nowrap = 1;

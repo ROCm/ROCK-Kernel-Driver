@@ -336,6 +336,8 @@ static struct pci_device_id amd8111_ids[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, amd8111_ids);
+
 static int __devinit amd8111_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	struct amd_smbus *smbus;
@@ -400,7 +402,7 @@ static struct pci_driver amd8111_driver = {
 
 static int __init i2c_amd8111_init(void)
 {
-	return pci_module_init(&amd8111_driver);
+	return pci_register_driver(&amd8111_driver);
 }
 
 

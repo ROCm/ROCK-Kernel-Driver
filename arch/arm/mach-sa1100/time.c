@@ -99,11 +99,10 @@ static struct irqaction sa1100_timer_irq = {
 	.handler	= sa1100_timer_interrupt
 };
 
-void __init sa1100_init_time(void)
+static void __init sa1100_timer_init(void)
 {
 	struct timespec tv;
 
-	gettimeoffset = sa1100_gettimeoffset;
 	set_rtc = sa1100_set_rtc;
 
 	tv.tv_nsec = 0;
@@ -117,3 +116,40 @@ void __init sa1100_init_time(void)
 	OSCR = 0;		/* initialize free-running timer, force first match */
 }
 
+#ifdef CONFIG_PM
+unsigned long osmr[4], oier;
+
+static void sa1100_timer_suspend(void)
+{
+	osmr[0] = OSMR0;
+	osmr[1] = OSMR1;
+	osmr[2] = OSMR2;
+	osmr[3] = OSMR3;
+	oier = OIER;
+}
+
+static void sa1100_timer_resume(void)
+{
+	OSSR = 0x0f;
+	OSMR0 = osmr[0];
+	OSMR1 = osmr[1];
+	OSMR2 = osmr[2];
+	OSMR3 = osmr[3];
+	OIER = oier;
+
+	/*
+	 * OSMR0 is the system timer: make sure OSCR is sufficiently behind
+	 */
+	OSCR = OSMR0 - LATCH;
+}
+#else
+#define sa1100_timer_suspend NULL
+#define sa1100_timer_resume NULL
+#endif
+
+struct sys_timer sa1100_timer = {
+	.init		= sa1100_timer_init,
+	.suspend	= sa1100_timer_suspend,
+	.resume		= sa1100_timer_resume,
+	.offset		= sa1100_gettimeoffset,
+};

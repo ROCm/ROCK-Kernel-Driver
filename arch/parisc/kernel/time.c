@@ -79,6 +79,8 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	while (nticks--) {
 #ifdef CONFIG_SMP
 		smp_do_timer(regs);
+#else
+		update_process_times(user_mode(regs));
 #endif
 		if (cpu == 0) {
 			write_seqlock(&xtime_lock);

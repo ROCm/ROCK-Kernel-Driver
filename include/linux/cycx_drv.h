@@ -48,17 +48,17 @@
 struct cycx_hw {
 	u32 fwid;
 	int irq;
-	void *dpmbase;
+	void __iomem *dpmbase;
 	u32 dpmsize;
 	u32 reserved[5];
 };
 
 /* Function Prototypes */
-extern int cycx_setup(struct cycx_hw *hw, void *sfm, u32 len);
+extern int cycx_setup(struct cycx_hw *hw, void *sfm, u32 len, unsigned long base);
 extern int cycx_down(struct cycx_hw *hw);
 extern int cycx_peek(struct cycx_hw *hw, u32 addr, void *buf, u32 len);
 extern int cycx_poke(struct cycx_hw *hw, u32 addr, void *buf, u32 len);
-extern int cycx_exec(void *addr);
+extern int cycx_exec(void __iomem *addr);
 
 extern void cycx_inten(struct cycx_hw *hw);
 extern void cycx_intr(struct cycx_hw *hw);

@@ -3,10 +3,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2000-2004 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <asm/sn/sn2/shub_mmr.h>
+#include <asm/sn/shub_mmr.h>
 
 #define ZEROVAL		0x3f		// "zero" value for outstanding PIO requests
 #define DEADLOCKBIT	SH_PIO_WRITE_STATUS_0_WRITE_DEADLOCK_SHFT

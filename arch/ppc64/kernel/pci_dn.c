@@ -42,7 +42,7 @@
  * Traverse_func that inits the PCI fields of the device node.
  * NOTE: this *must* be done before read/write config to the device.
  */
-static void * __init update_dn_pci_info(struct device_node *dn, void *data)
+static void * __devinit update_dn_pci_info(struct device_node *dn, void *data)
 {
 	struct pci_controller *phb = data;
 	u32 *regs;
@@ -139,6 +139,12 @@ static void *traverse_all_pci_devices(traverse_func pre)
 	return NULL;
 }
 
+void __devinit pci_devs_phb_init_dynamic(struct pci_controller *phb)
+{
+	/* Update dn->phb ptrs for new phb and children devices */
+	traverse_pci_devices((struct device_node *)phb->arch_data,
+			update_dn_pci_info, phb);
+}
 
 /*
  * Traversal func that looks for a <busno,devfcn> value.
@@ -196,11 +202,9 @@ void __init pci_devs_phb_init(void)
 
 static void __init pci_fixup_bus_sysdata_list(struct list_head *bus_list)
 {
-	struct list_head *ln;
 	struct pci_bus *bus;
 
-	for (ln = bus_list->next; ln != bus_list; ln = ln->next) {
-		bus = pci_bus_b(ln);
+	list_for_each_entry(bus, bus_list, node) {
 		if (bus->self)
 			bus->sysdata = bus->self->sysdata;
 		pci_fixup_bus_sysdata_list(&bus->children);

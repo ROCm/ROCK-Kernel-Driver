@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/sched.h>
 #include "isdnloop.h"
 
 static char *revision = "$Revision: 1.11.6.7 $";
@@ -1161,8 +1162,10 @@ isdnloop_command(isdn_ctrl * c, isdnloop_card * card)
 						if (!card->leased) {
 							card->leased = 1;
 							while (card->ptype == ISDN_PTYPE_UNKNOWN) {
+								set_current_state(TASK_INTERRUPTIBLE);
 								schedule_timeout(10);
 							}
+							set_current_state(TASK_INTERRUPTIBLE);
 							schedule_timeout(10);
 							sprintf(cbuf, "00;FV2ON\n01;EAZ1\n02;EAZ2\n");
 							i = isdnloop_writecmd(cbuf, strlen(cbuf), 0, card);

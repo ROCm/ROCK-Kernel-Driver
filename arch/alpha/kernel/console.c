@@ -47,7 +47,7 @@ locate_and_init_vga(void *(*sel_func)(void *, void *))
 
 	if (!sel_func) sel_func = (void *)default_vga_hose_select;
 
-	for(dev=NULL; (dev=pci_find_class(PCI_CLASS_DISPLAY_VGA << 8, dev));) {
+	for(dev=NULL; (dev=pci_get_class(PCI_CLASS_DISPLAY_VGA << 8, dev));) {
 		if (!hose) hose = dev->sysdata;
 		else hose = sel_func(hose, dev->sysdata);
 	}

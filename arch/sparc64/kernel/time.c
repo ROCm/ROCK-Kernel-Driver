@@ -64,7 +64,16 @@ static unsigned long mstk48t59_regs = 0UL;
 
 static int set_rtc_mmss(unsigned long);
 
-struct sparc64_tick_ops *tick_ops;
+static __init unsigned long dummy_get_tick(void)
+{
+	return 0;
+}
+
+static __initdata struct sparc64_tick_ops dummy_tick_ops = {
+	.get_tick	= dummy_get_tick,
+};
+
+struct sparc64_tick_ops *tick_ops = &dummy_tick_ops;
 
 #define TICK_PRIV_BIT	(1UL << 63)
 
@@ -462,6 +471,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	do {
 #ifndef CONFIG_SMP
 		profile_tick(CPU_PROFILING, regs);
+		update_process_times(user_mode(regs));
 #endif
 		do_timer(regs);
 

@@ -27,6 +27,7 @@
 
 #include <linux/module.h>
 #include <linux/i2o.h>
+#include <linux/delay.h>
 
 /* global I2O controller list */
 LIST_HEAD(i2o_controllers);
@@ -117,7 +118,7 @@ u32 i2o_msg_get_wait(struct i2o_controller *c, struct i2o_message **msg,
  *
  *	Returns context id > 0 on success or 0 on failure.
  */
-u32 i2o_cntxt_list_add(struct i2o_controller *c, void *ptr)
+u32 i2o_cntxt_list_add(struct i2o_controller * c, void *ptr)
 {
 	struct i2o_context_list_element *entry;
 	unsigned long flags;
@@ -162,7 +163,7 @@ u32 i2o_cntxt_list_add(struct i2o_controller *c, void *ptr)
  *
  *	Returns context id on succes or 0 on failure.
  */
-u32 i2o_cntxt_list_remove(struct i2o_controller *c, void *ptr)
+u32 i2o_cntxt_list_remove(struct i2o_controller * c, void *ptr)
 {
 	struct i2o_context_list_element *entry;
 	u32 context = 0;
@@ -470,7 +471,7 @@ static int i2o_iop_reset(struct i2o_controller *c)
 	if (m == I2O_QUEUE_EMPTY)
 		return -ETIMEDOUT;
 
-	memset(status, 0, 4);
+	memset(status, 0, 8);
 
 	/* Quiesce all IOPs first */
 	i2o_iop_quiesce_all();
@@ -495,6 +496,13 @@ static int i2o_iop_reset(struct i2o_controller *c)
 			rc = -ETIMEDOUT;
 			goto exit;
 		}
+
+		/* Promise bug */
+		if (status[1] || status[4]) {
+			*status = 0;
+			break;
+		}
+
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
 
@@ -605,9 +613,27 @@ int i2o_iop_init_outbound_queue(struct i2o_controller *c)
 	/* Post frames */
 	for (i = 0; i < NMBR_MSG_FRAMES; i++) {
 		i2o_flush_reply(c, m);
+		udelay(1);	/* Promise */
 		m += MSG_FRAME_SIZE * 4;
 	}
 
+	return 0;
+}
+
+/**
+ *	i2o_iop_send_nop - send a core NOP message
+ *	@c: controller
+ *
+ *	Send a no-operation message with a reply set to cause no
+ *	action either. Needed for bringing up promise controllers.
+ */
+static int i2o_iop_send_nop(struct i2o_controller *c)
+{
+	struct i2o_message *msg;
+	u32 m = i2o_msg_get_wait(c, &msg, HZ);
+	if (m == I2O_QUEUE_EMPTY)
+		return -ETIMEDOUT;
+	i2o_msg_nop(c, m);
 	return 0;
 }
 
@@ -622,8 +648,27 @@ int i2o_iop_init_outbound_queue(struct i2o_controller *c)
  */
 static int i2o_iop_activate(struct i2o_controller *c)
 {
+	struct pci_dev *i960 = NULL;
 	i2o_status_block *sb = c->status_block.virt;
 	int rc;
+
+	if (c->promise) {
+		/* Beat up the hardware first of all */
+		i960 =
+		    pci_find_slot(c->pdev->bus->number,
+				  PCI_DEVFN(PCI_SLOT(c->pdev->devfn), 0));
+		if (i960)
+			pci_write_config_word(i960, 0x42, 0);
+
+		/* Follow this sequence precisely or the controller
+		   ceases to perform useful functions until reboot */
+		if ((rc = i2o_iop_send_nop(c)))
+			return rc;
+
+		if ((rc = i2o_iop_reset(c)))
+			return rc;
+	}
+
 	/* In INIT state, Wait Inbound Q to initialize (in i2o_status_get) */
 	/* In READY state, Get status */
 
@@ -659,13 +704,22 @@ static int i2o_iop_activate(struct i2o_controller *c)
 	if (rc)
 		return rc;
 
+	if (c->promise) {
+		if ((rc = i2o_iop_send_nop(c)))
+			return rc;
+
+		if ((rc = i2o_status_get(c)))
+			return rc;
+
+		if (i960)
+			pci_write_config_word(i960, 0x42, 0x3FF);
+	}
+
 	/* In HOLD state */
 
 	rc = i2o_hrt_get(c);
-	if (rc)
-		return rc;
 
-	return 0;
+	return rc;
 };
 
 /**
@@ -691,10 +745,11 @@ static int i2o_iop_systab_set(struct i2o_controller *c)
 		res->flags = IORESOURCE_MEM;
 		res->start = 0;
 		res->end = 0;
-		printk("%s: requires private memory resources.\n", c->name);
+		printk(KERN_INFO "%s: requires private memory resources.\n",
+		       c->name);
 		root = pci_find_parent_resource(c->pdev, res);
 		if (root == NULL)
-			printk("Can't find parent resource!\n");
+			printk(KERN_WARNING "Can't find parent resource!\n");
 		if (root && allocate_resource(root, res, sb->desired_mem_size, sb->desired_mem_size, sb->desired_mem_size, 1 << 20,	/* Unspecified, so use 1Mb and play safe */
 					      NULL, NULL) >= 0) {
 			c->mem_alloc = 1;
@@ -712,10 +767,11 @@ static int i2o_iop_systab_set(struct i2o_controller *c)
 		res->flags = IORESOURCE_IO;
 		res->start = 0;
 		res->end = 0;
-		printk("%s: requires private memory resources.\n", c->name);
+		printk(KERN_INFO "%s: requires private memory resources.\n",
+		       c->name);
 		root = pci_find_parent_resource(c->pdev, res);
 		if (root == NULL)
-			printk("Can't find parent resource!\n");
+			printk(KERN_WARNING "Can't find parent resource!\n");
 		if (root && allocate_resource(root, res, sb->desired_io_size, sb->desired_io_size, sb->desired_io_size, 1 << 20,	/* Unspecified, so use 1Mb and play safe */
 					      NULL, NULL) >= 0) {
 			c->io_alloc = 1;

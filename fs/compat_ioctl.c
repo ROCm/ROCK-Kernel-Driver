@@ -115,6 +115,7 @@
 #include <linux/random.h>
 #include <linux/filter.h>
 #include <linux/msdos_fs.h>
+#include <linux/pktcdvd.h>
 
 #include <linux/hiddev.h>
 

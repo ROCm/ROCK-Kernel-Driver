@@ -70,8 +70,8 @@ MODULE_LICENSE("GPL");
 static int load_cyc2x(struct cycx_hw *hw, struct cycx_firmware *cfm, u32 len);
 static void cycx_bootcfg(struct cycx_hw *hw);
 
-static int reset_cyc2x(void *addr);
-static int detect_cyc2x(void *addr);
+static int reset_cyc2x(void __iomem *addr);
+static int detect_cyc2x(void __iomem *addr);
 
 /* Miscellaneous functions */
 static void delay_cycx(int sec);
@@ -135,9 +135,8 @@ void cycx_drv_cleanup(void)
  * Return:	0	ok.
  *		< 0	error */
 EXPORT_SYMBOL(cycx_setup);
-int cycx_setup(struct cycx_hw *hw, void *cfm, u32 len)
+int cycx_setup(struct cycx_hw *hw, void *cfm, u32 len, unsigned long dpmbase)
 {
-	long dpmbase = (long)hw->dpmbase;
 	int err;
 
 	/* Verify IRQ configuration options */
@@ -203,7 +202,7 @@ void cycx_intr(struct cycx_hw *hw)
  * o Set exec flag.
  * o Busy-wait until flag is reset. */
 EXPORT_SYMBOL(cycx_exec);
-int cycx_exec(void *addr)
+int cycx_exec(void __iomem *addr)
 {
 	u16 i = 0;
 	/* wait till addr content is zeroed */
@@ -249,7 +248,7 @@ int cycx_poke(struct cycx_hw *hw, u32 addr, void *buf, u32 len)
 /* Load Aux Routines */
 /* Reset board hardware.
    return 1 if memory exists at addr and 0 if not. */
-static int memory_exists(void *addr)
+static int memory_exists(void __iomem *addr)
 {
 	int tries = 0;
 
@@ -267,9 +266,9 @@ static int memory_exists(void *addr)
 }
 
 /* Load reset code. */
-static void reset_load(void *addr, u8 *buffer, u32 cnt)
+static void reset_load(void __iomem *addr, u8 *buffer, u32 cnt)
 {
-	void *pt_code = addr + RESET_OFFSET;
+	void __iomem *pt_code = addr + RESET_OFFSET;
 	u16 i; /*, j; */
 
 	for (i = 0 ; i < cnt ; i++) {
@@ -281,7 +280,7 @@ static void reset_load(void *addr, u8 *buffer, u32 cnt)
 /* Load buffer using boot interface.
  * o copy data from buffer to Cyclom-X memory
  * o wait for reset code to copy it to right portion of memory */
-static int buffer_load(void *addr, u8 *buffer, u32 cnt)
+static int buffer_load(void __iomem *addr, u8 *buffer, u32 cnt)
 {
 	memcpy_toio(addr + DATA_OFFSET, buffer, cnt);
 	writew(GEN_BOOT_DAT, addr + CMD_OFFSET);
@@ -290,7 +289,7 @@ static int buffer_load(void *addr, u8 *buffer, u32 cnt)
 }
 
 /* Set up entry point and kick start Cyclom-X CPU. */
-static void cycx_start(void *addr)
+static void cycx_start(void __iomem *addr)
 {
 	/* put in 0x30 offset the jump instruction to the code entry point */
 	writeb(0xea, addr + 0x30);
@@ -304,9 +303,9 @@ static void cycx_start(void *addr)
 }
 
 /* Load and boot reset code. */
-static void cycx_reset_boot(void *addr, u8 *code, u32 len)
+static void cycx_reset_boot(void __iomem *addr, u8 *code, u32 len)
 {
-	void *pt_start = addr + START_OFFSET;
+	void __iomem *pt_start = addr + START_OFFSET;
 
 	writeb(0xea, pt_start++); /* jmp to f000:3f00 */
 	writeb(0x00, pt_start++);
@@ -321,9 +320,9 @@ static void cycx_reset_boot(void *addr, u8 *code, u32 len)
 }
 
 /* Load data.bin file through boot (reset) interface. */
-static int cycx_data_boot(void *addr, u8 *code, u32 len)
+static int cycx_data_boot(void __iomem *addr, u8 *code, u32 len)
 {
-	void *pt_boot_cmd = addr + CMD_OFFSET;
+	void __iomem *pt_boot_cmd = addr + CMD_OFFSET;
 	u32 i;
 
 	/* boot buffer lenght */
@@ -352,9 +351,9 @@ static int cycx_data_boot(void *addr, u8 *code, u32 len)
 
 
 /* Load code.bin file through boot (reset) interface. */
-static int cycx_code_boot(void *addr, u8 *code, u32 len)
+static int cycx_code_boot(void __iomem *addr, u8 *code, u32 len)
 {
-	void *pt_boot_cmd = addr + CMD_OFFSET;
+	void __iomem *pt_boot_cmd = addr + CMD_OFFSET;
 	u32 i;
 
 	/* boot buffer lenght */
@@ -391,7 +390,7 @@ static int load_cyc2x(struct cycx_hw *hw, struct cycx_firmware *cfm, u32 len)
 	u8 *reset_image,
 	   *data_image,
 	   *code_image;
-	void *pt_cycld = hw->dpmbase + 0x400;
+	void __iomem *pt_cycld = hw->dpmbase + 0x400;
 	u16 cksum;
 
 	/* Announce */
@@ -523,7 +522,7 @@ static void cycx_bootcfg(struct cycx_hw *hw)
  *	Return 1 if detected o.k. or 0 if failed.
  *	Note:	This test is destructive! Adapter will be left in shutdown
  *		state after the test. */
-static int detect_cyc2x(void *addr)
+static int detect_cyc2x(void __iomem *addr)
 {
 	reset_cyc2x(addr);
 
@@ -545,7 +544,7 @@ static int get_option_index(long *optlist, long optval)
 }
 
 /* Reset adapter's CPU. */
-static int reset_cyc2x(void *addr)
+static int reset_cyc2x(void __iomem *addr)
 {
 	writeb(0, addr + RST_ENABLE);
 	delay_cycx(2);

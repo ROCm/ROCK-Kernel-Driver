@@ -150,15 +150,15 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 		case WIN_WRITEDMA_ONCE:
 		case WIN_WRITEDMA:
 		case WIN_WRITEDMA_EXT:
-			if (!hwif->ide_dma_write(drive))
-				return ide_started;
-			break;
 		case WIN_READDMA_ONCE:
 		case WIN_READDMA:
 		case WIN_READDMA_EXT:
 		case WIN_IDENTIFY_DMA:
-			if (!hwif->ide_dma_read(drive))
+			if (!hwif->dma_setup(drive)) {
+				hwif->dma_exec_cmd(drive, taskfile->command);
+				hwif->dma_start(drive);
 				return ide_started;
+			}
 			break;
 		default:
 			if (task->handler == NULL)
@@ -517,6 +517,9 @@ int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_
 
 		rq.hard_nr_sectors = rq.nr_sectors;
 		rq.hard_cur_sectors = rq.current_nr_sectors = rq.nr_sectors;
+
+		if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
+			rq.flags |= REQ_RW;
 	}
 
 	rq.special = args;
@@ -896,12 +899,11 @@ ide_startstop_t flagged_taskfile (ide_drive_t *drive, ide_task_t *task)
 
    	        case TASKFILE_OUT_DMAQ:
 		case TASKFILE_OUT_DMA:
-			hwif->ide_dma_write(drive);
-			break;
-
 		case TASKFILE_IN_DMAQ:
 		case TASKFILE_IN_DMA:
-			hwif->ide_dma_read(drive);
+			hwif->dma_setup(drive);
+			hwif->dma_exec_cmd(drive, taskfile->command);
+			hwif->dma_start(drive);
 			break;
 
 	        default:

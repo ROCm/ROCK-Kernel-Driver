@@ -428,7 +428,7 @@ struct rx_info {
 
 struct ns83820 {
 	struct net_device_stats	stats;
-	u8			*base;
+	u8			__iomem *base;
 
 	struct pci_dev		*pci_dev;
 
@@ -1164,7 +1164,7 @@ again:
 
 static void ns83820_update_stats(struct ns83820 *dev)
 {
-	u8 *base = dev->base;
+	u8 __iomem *base = dev->base;
 
 	/* the DP83820 will freeze counters, so we need to read all of them */
 	dev->stats.rx_errors		+= readl(base + 0x60) & 0xffff;
@@ -1192,58 +1192,25 @@ static struct net_device_stats *ns83820_get_stats(struct net_device *ndev)
 	return &dev->stats;
 }
 
-static int ns83820_ethtool_ioctl (struct ns83820 *dev, void __user *useraddr)
-{
-	u32 ethcmd;
-
-	if (copy_from_user(&ethcmd, useraddr, sizeof (ethcmd)))
-		return -EFAULT;
-
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO:
-		{
-			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-			strcpy(info.driver, "ns83820");
-			strcpy(info.version, VERSION);
-			strcpy(info.bus_info, pci_name(dev->pci_dev));
-			if (copy_to_user(useraddr, &info, sizeof (info)))
-				return -EFAULT;
-			return 0;
-		}
-
-	/* get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = { ETHTOOL_GLINK };
-		u32 cfg = readl(dev->base + CFG) ^ SPDSTS_POLARITY;
-
-		if (cfg & CFG_LNKSTS)
-			edata.data = 1;
-		else
-			edata.data = 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
-}
-
-static int ns83820_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
+static void ns83820_get_drvinfo(struct net_device *ndev, struct ethtool_drvinfo *info)
 {
 	struct ns83820 *dev = PRIV(ndev);
-
-	switch(cmd) {
-	case SIOCETHTOOL:
-		return ns83820_ethtool_ioctl(dev, rq->ifr_data);
-
-	default:
-		return -EOPNOTSUPP;
-	}
+	strcpy(info->driver, "ns83820");
+	strcpy(info->version, VERSION);
+	strcpy(info->bus_info, pci_name(dev->pci_dev));
 }
+
+static u32 ns83820_get_link(struct net_device *ndev)
+{
+	struct ns83820 *dev = PRIV(ndev);
+	u32 cfg = readl(dev->base + CFG) ^ SPDSTS_POLARITY;
+	return cfg & CFG_LNKSTS ? 1 : 0;
+}
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = ns83820_get_drvinfo,
+	.get_link = ns83820_get_link
+};
 
 static void ns83820_mib_isr(struct ns83820 *dev)
 {
@@ -1545,7 +1512,7 @@ static int ns83820_change_mtu(struct net_device *ndev, int new_mtu)
 static void ns83820_set_multicast(struct net_device *ndev)
 {
 	struct ns83820 *dev = PRIV(ndev);
-	u8 *rfcr = dev->base + RFCR;
+	u8 __iomem *rfcr = dev->base + RFCR;
 	u32 and_mask = 0xffffffff;
 	u32 or_mask = 0;
 	u32 val;
@@ -1849,7 +1816,7 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 
 	dev->IMR_cache = 0;
 
-	setup_ee_mem_bitbanger(&dev->ee, (long)dev->base + MEAR, 3, 2, 1, 0,
+	setup_ee_mem_bitbanger(&dev->ee, dev->base + MEAR, 3, 2, 1, 0,
 		0);
 
 	err = request_irq(pci_dev->irq, ns83820_irq, SA_SHIRQ,
@@ -1884,7 +1851,7 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	ndev->get_stats = ns83820_get_stats;
 	ndev->change_mtu = ns83820_change_mtu;
 	ndev->set_multicast_list = ns83820_set_multicast;
-	ndev->do_ioctl = ns83820_ioctl;
+	SET_ETHTOOL_OPS(ndev, &ops);
 	ndev->tx_timeout = ns83820_tx_timeout;
 	ndev->watchdog_timeo = 5 * HZ;
 

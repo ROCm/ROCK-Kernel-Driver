@@ -138,13 +138,13 @@ static int __devinit i2o_pci_alloc(struct i2o_controller *c)
 				 * If we know what card it is, set the size
 				 * correctly. Code is taken from dpt_i2o.c
 				 */
-				if(pdev->device == 0xa501) {
-					if(pdev->subsystem_device >= 0xc032 &&
-					   pdev->subsystem_device <= 0xc03b) {
-						if(c->base.len > 0x400000)
+				if (pdev->device == 0xa501) {
+					if (pdev->subsystem_device >= 0xc032 &&
+					    pdev->subsystem_device <= 0xc03b) {
+						if (c->base.len > 0x400000)
 							c->base.len = 0x400000;
 					} else {
-						if(c->base.len > 0x100000)
+						if (c->base.len > 0x100000)
 							c->base.len = 0x100000;
 					}
 				}
@@ -231,7 +231,7 @@ static int __devinit i2o_pci_alloc(struct i2o_controller *c)
 	}
 #endif
 
-	if (i2o_dma_alloc(dev, &c->status, 4, GFP_KERNEL)) {
+	if (i2o_dma_alloc(dev, &c->status, 8, GFP_KERNEL)) {
 		i2o_pci_free(c);
 		return -ENOMEM;
 	}
@@ -277,7 +277,6 @@ static irqreturn_t i2o_pci_interrupt(int irq, void *dev_id, struct pt_regs *r)
 	struct device *dev = &c->pdev->dev;
 	struct i2o_message *m;
 	u32 mv;
-	u32 *msg;
 
 	/*
 	 * Old 960 steppings had a bug in the I2O unit that caused
@@ -298,11 +297,7 @@ static irqreturn_t i2o_pci_interrupt(int irq, void *dev_id, struct pt_regs *r)
 		 * Because bus_to_virt is deprecated, we have calculate the
 		 * location by ourself!
 		 */
-		m = (struct i2o_message *)(mv -
-					   (unsigned long)c->out_queue.phys +
-					   (unsigned long)c->out_queue.virt);
-
-		msg = (u32 *) m;
+		m = i2o_msg_out_to_virt(c, mv);
 
 		/*
 		 *      Ensure this message is seen coherently but cachably by

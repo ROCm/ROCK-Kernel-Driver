@@ -1597,10 +1597,10 @@ static int __init dgrs_init_module (void)
 #endif
 #ifdef CONFIG_PCI
 	pcicount = pci_register_driver(&dgrs_pci_driver);
-	if (pcicount < 0)
+	if (pcicount)
 		return pcicount;
 #endif
-	return (eisacount + pcicount) == 0 ? -ENODEV : 0;
+	return 0;
 }
 
 static void __exit dgrs_cleanup_module (void)

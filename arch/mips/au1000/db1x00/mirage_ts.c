@@ -68,7 +68,7 @@ int wm97xx_comodule_present = 1;
 #define err(format, arg...) printk(KERN_ERR TS_NAME ": " format "\n" , ## arg)
 #define info(format, arg...) printk(KERN_INFO TS_NAME ": " format "\n" , ## arg)
 #define warn(format, arg...) printk(KERN_WARNING TS_NAME ": " format "\n" , ## arg)
-#define DPRINTK(format, arg...) printk(__FUNCTION__ ": " format "\n" , ## arg)
+#define DPRINTK(format, arg...) printk("%s: " format "\n", __FUNCTION__ , ## arg)
 
 
 #define PEN_DOWN_IRQ	AU1000_GPIO_7

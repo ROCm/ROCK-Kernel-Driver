@@ -1474,6 +1474,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	 */
 	sb->s_op = &ext3_sops;
 	sb->s_export_op = &ext3_export_ops;
+	sb->s_xattr = ext3_xattr_handlers;
 #ifdef CONFIG_QUOTA
 	sb->s_qcop = &ext3_qctl_operations;
 	sb->dq_op = &ext3_quota_operations;

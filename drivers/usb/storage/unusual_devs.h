@@ -36,13 +36,16 @@
 /* If you edit this file, please try to keep it sorted first by VendorID,
  * then by ProductID.
  *
- * If you want to add an entry for this file, please send the following
- * to greg@kroah.com:
- *	- patch that adds the entry for your device which includes your
- *	  email address right above the entry.
+ * If you want to add an entry for this file, be sure to include the
+ * following information:
+ *	- a patch that adds the entry for your device, including your
+ *	  email address right above the entry (plus maybe a brief
+ *	  explanation of the reason for the entry),
  *	- a copy of /proc/bus/usb/devices with your device plugged in
  *	  running with this patch.
- *
+ * Send your submission to either Phil Dibowitz <phil@ipom.com> or
+ * Alan Stern <stern@rowland.harvard.edu>, and don't forget to CC: the
+ * USB development list <linux-usb-devel@lists.sourceforge.net>.
  */
 
 UNUSUAL_DEV(  0x03ee, 0x6901, 0x0000, 0x0100,
@@ -68,16 +71,6 @@ UNUSUAL_DEV(  0x03f0, 0x0307, 0x0001, 0x0001,
 		US_SC_8070, US_PR_SCM_ATAPI, init_8200e, 0), 
 #endif
 
-/* <torsten.scherer@uni-bielefeld.de>: I don't know the name of the bridge
- * manufacturer, but I've got an external USB drive by the Revoltec company
- * that needs this. otherwise the drive is recognized as /dev/sda, but any
- * access to it blocks indefinitely.
- */
-UNUSUAL_DEV(  0x0402, 0x5621, 0x0103, 0x0103,
-		"Revoltec",
-		"USB/IDE Bridge (ATA/ATAPI)",
-		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
-
 /* Deduced by Jonathan Woithe <jwoithe@physics.adelaide.edu.au>
  * Entry needed for flags: US_FL_FIX_INQUIRY because initial inquiry message
  * always fails and confuses drive.
@@ -94,12 +87,6 @@ UNUSUAL_DEV(  0x0436, 0x0005, 0x0100, 0x0100,
 		"CameraMate (DPCM_USB)",
  		US_SC_SCSI, US_PR_DPCM_USB, NULL, 0 ),
 #endif
-
-/* Patch submitted by Alessandro Fracchetti <al.fracchetti@tin.it> */
-UNUSUAL_DEV(  0x0482, 0x0105, 0x0100, 0x0100,
-		"Kyocera",
-		"Finecam L3",
-		US_SC_SCSI, US_PR_BULK, NULL, US_FL_FIX_INQUIRY),
 
 /* Patch submitted by Philipp Friedrich <philipp@void.at> */
 UNUSUAL_DEV(  0x0482, 0x0100, 0x0100, 0x0100,
@@ -121,6 +108,7 @@ UNUSUAL_DEV(  0x0482, 0x0103, 0x0100, 0x0100,
 
 /* Patch for Kyocera Finecam L3
  * Submitted by Michael Krauth <michael.krauth@web.de>
+ * and Alessandro Fracchetti <al.fracchetti@tin.it>
  */
 UNUSUAL_DEV(  0x0482, 0x0105, 0x0100, 0x0100,
 		"Kyocera",
@@ -149,10 +137,13 @@ UNUSUAL_DEV(  0x04b8, 0x0602, 0x0110, 0x0110,
 		"785EPX Storage",
 		US_SC_SCSI, US_PR_BULK, NULL, US_FL_SINGLE_LUN),
 
+/* Not sure who reported this originally but
+ * Pavel Machek <pavel@ucw.cz> reported that the extra US_FL_SINGLE_LUN
+ * flag be added */
 UNUSUAL_DEV(  0x04cb, 0x0100, 0x0000, 0x2210,
 		"Fujifilm",
 		"FinePix 1400Zoom",
-		US_SC_UFI, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
+		US_SC_UFI, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY | US_FL_SINGLE_LUN),
 
 /* Reported by Peter Wächtler <pwaechtler@loewe-komp.de>
  * The device needs the flags only.
@@ -179,6 +170,16 @@ UNUSUAL_DEV(  0x04da, 0x0d05, 0x0000, 0x0000,
 		"Sharp CE-CW05",
 		"CD-R/RW Drive",
 		US_SC_8070, US_PR_CB, NULL, 0),
+
+/* Reported by Adriaan Penning <a.penning@luon.net>
+ * Note that these cameras report "Medium not present" after
+ * ALLOW_MEDIUM_REMOVAL, so they also need to be marked
+ * NOT_LOCKABLE in the SCSI blacklist (and the vendor is MATSHITA). */
+UNUSUAL_DEV(  0x04da, 0x2372, 0x0000, 0x9999,
+		"Panasonic",
+		"DMC-LCx Camera",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
 
 /* Most of the following entries were developed with the help of
  * Shuttle/SCM directly.
@@ -264,6 +265,21 @@ UNUSUAL_DEV(  0x0525, 0xa140, 0x0100, 0x0100,
 		"USB Clik! 40",
 		US_SC_8070, US_PR_BULK, NULL,
 		US_FL_FIX_INQUIRY ),
+
+/* Reported by Iacopo Spalletti <avvisi@spalletti.it> */
+UNUSUAL_DEV(  0x052b, 0x1807, 0x0100, 0x0100,
+		"Tekom Technologies, Inc",
+		"300_CAMERA",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
+/* Yakumo Mega Image 37
+ * Submitted by Stephan Fuhrmann <atomenergie@t-online.de> */
+UNUSUAL_DEV(  0x052b, 0x1801, 0x0100, 0x0100,
+		"Tekom Technologies, Inc",
+		"300_CAMERA",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
 
 /* This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450, 
@@ -383,10 +399,17 @@ UNUSUAL_DEV(  0x0595, 0x4343, 0x0000, 0x2210,
 		"Digital Camera EX-20 DSC",
 		US_SC_8070, US_PR_DEVICE, NULL, 0 ),
 
+/* The entry was here before I took over, and had US_SC_RBC. It turns
+ * out that isn't needed. Additionally, Torsten Eriksson
+ * <Torsten.Eriksson@bergianska.se> is able to use his device fine
+ * without this entry at all - but I don't suspect that will be true
+ * for all users (the protocol is likely needed), so is staying at
+ * this time. - Phil Dibowitz <phil@ipom.com>
+ */
 UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200, 
 		"LaCie",
 		"USB Hard Disk",
-		US_SC_RBC, US_PR_CB, NULL, 0 ), 
+		US_SC_DEVICE, US_PR_CB, NULL, 0 ),
 
 /* Submitted by Joel Bourquard <numlock@freesurf.ch>
  * Some versions of this device need the SubClass and Protocol overrides
@@ -436,36 +459,6 @@ UNUSUAL_DEV(  0x05dc, 0x0001, 0x0000, 0x0001,
 UNUSUAL_DEV(  0x05dc, 0xb002, 0x0000, 0x0113,
 		"Lexar",
 		"USB CF Reader",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_INQUIRY ),
-
-/* Reported by Carlos Villegas <cav@uniscope.co.jp>
- * This device needs an INQUIRY of exactly 36-bytes to function.
- * That is the only reason this entry is needed.
- */
-UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0xffff,
-		"Genesys Logic",
-		"USB to IDE Card Reader",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_INQUIRY ),
-
-/* Submitted Alexander Oltu <alexander@all-2.com> */
-UNUSUAL_DEV(  0x05e3, 0x0701, 0x0000, 0xffff, 
-		"Genesys Logic", 
-		"USB to IDE Optical",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_MODE_XLATE ), 
-
-/* Reported by Peter Marks <peter.marks@turner.com>
- * Like the SIIG unit above, this unit needs an INQUIRY to ask for exactly
- * 36 bytes of data.  No more, no less. That is the only reason this entry
- * is needed.
- *
- * ST818 slim drives (rev 0.02) don't need special care.
-*/
-UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0xffff,
-		"Genesys Logic",
-		"USB to IDE Disk",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
@@ -553,6 +546,13 @@ UNUSUAL_DEV(  0x07ab, 0xfc01, 0x0000, 0x9999,
 		"USB-IDE",
 		US_SC_QIC, US_PR_FREECOM, freecom_init, 0),
 #endif
+
+/* Reported by Eero Volotinen <eero@ping-viini.org> */
+UNUSUAL_DEV(  0x07ab, 0xfccd, 0x0406, 0x0406,
+		"Freecom Technologies",
+		"FHD-Classic",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY),
 
 UNUSUAL_DEV(  0x07af, 0x0004, 0x0100, 0x0133, 
 		"Microtech",
@@ -724,12 +724,6 @@ UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
  		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MODE_XLATE ),
 
-UNUSUAL_DEV(  0x0a16, 0x8888, 0x0100, 0x0100,
-		"IBM",
-		"IBM USB Memory Key",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_INQUIRY ),
-
 /* This Pentax still camera is not conformant
  * to the USB storage specification: -
  * - It does not like the INQUIRY command. So we must handle this command
@@ -802,13 +796,28 @@ UNUSUAL_DEV( 0x0dd8, 0x1060, 0x0000, 0xffff,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
+/* Patch by Stephan Walter <stephan.walter@epfl.ch>
+ * I don't know why, but it works... */
+UNUSUAL_DEV( 0x0dda, 0x0001, 0x0012, 0x0012,
+		"WINWARD",
+		"Music Disk",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* Submitted by Antoine Mairesse <antoine.mairesse@free.fr> */
 UNUSUAL_DEV( 0x0ed1, 0x6660, 0x0100, 0x0300,
 		"USB",
 		"Solid state disk",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
-		
+
+/* Reported by Rastislav Stanik <rs_kernel@yahoo.com> */
+UNUSUAL_DEV(  0x0ea0, 0x6828, 0x0110, 0x0110,
+		"USB",
+		"Flash Disk",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
  * Tested on hardware version 1.10.
  * Entry is needed only for the initializer function override.
@@ -829,6 +838,13 @@ UNUSUAL_DEV(  0x1065, 0x2136, 0x0000, 0x9999,
 		"EasyDisk Portable Device",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MODE_XLATE ),
+
+/* Reported by Kotrla Vitezslav <kotrla@ceb.cz> */
+UNUSUAL_DEV(  0x1370, 0x6828, 0x0110, 0x0110,
+		"SWISSBIT",
+		"Black Silver",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
 
 #ifdef CONFIG_USB_STORAGE_SDDR55
 UNUSUAL_DEV(  0x55aa, 0xa103, 0x0000, 0x9999, 

@@ -368,6 +368,9 @@ int fb_prepare_logo(struct fb_info *info)
 
 	memset(&fb_logo, 0, sizeof(struct logo_data));
 
+	if (info->flags & FBINFO_MISC_TILEBLITTING)
+		return 0;
+
 	if (info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
 		depth = info->var.blue.length;
 		if (info->var.red.length < depth)
@@ -504,7 +507,8 @@ fb_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	struct inode *inode = file->f_dentry->d_inode;
 	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
-	u32 *buffer, *dst, *src;
+	u32 *buffer, *dst;
+	u32 __iomem *src;
 	int c, i, cnt = 0, err = 0;
 	unsigned long total_size;
 
@@ -534,7 +538,7 @@ fb_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	if (!buffer)
 		return -ENOMEM;
 
-	src = (u32 *) (info->screen_base + p);
+	src = (u32 __iomem *) (info->screen_base + p);
 
 	if (info->fbops->fb_sync)
 		info->fbops->fb_sync(info);
@@ -546,12 +550,12 @@ fb_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 			*dst++ = fb_readl(src++);
 		if (c & 3) {
 			u8 *dst8 = (u8 *) dst;
-			u8 *src8 = (u8 *) src;
+			u8 __iomem *src8 = (u8 __iomem *) src;
 
 			for (i = c & 3; i--;)
 				*dst8++ = fb_readb(src8++);
 
-			src = (u32 *) src8;
+			src = (u32 __iomem *) src8;
 		}
 
 		if (copy_to_user(buf, buffer, c)) {
@@ -575,7 +579,8 @@ fb_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 	struct inode *inode = file->f_dentry->d_inode;
 	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
-	u32 *buffer, *dst, *src;
+	u32 *buffer, *src;
+	u32 __iomem *dst;
 	int c, i, cnt = 0, err;
 	unsigned long total_size;
 
@@ -607,7 +612,7 @@ fb_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 	if (!buffer)
 		return -ENOMEM;
 
-	dst = (u32 *) (info->screen_base + p);
+	dst = (u32 __iomem *) (info->screen_base + p);
 
 	if (info->fbops->fb_sync)
 		info->fbops->fb_sync(info);
@@ -623,12 +628,12 @@ fb_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 			fb_writel(*src++, dst++);
 		if (c & 3) {
 			u8 *src8 = (u8 *) src;
-			u8 *dst8 = (u8 *) dst;
+			u8 __iomem *dst8 = (u8 __iomem *) dst;
 
 			for (i = c & 3; i--; )
 				fb_writeb(*src8++, dst8++);
 
-			dst = (u32 *) dst8;
+			dst = (u32 __iomem *) dst8;
 		}
 		*ppos += c;
 		buf += c;
@@ -654,7 +659,8 @@ fb_load_cursor_image(struct fb_info *info)
 	u8 *data = (u8 *) info->cursor.image.data;
 
 	if (info->sprite.outbuf)
-	    info->sprite.outbuf(info, info->sprite.addr, data, width);
+	    info->sprite.outbuf(info, info->sprite.addr, data,
+				width);
 	else
 	    memcpy(info->sprite.addr, data, width);
 }
@@ -679,6 +685,7 @@ fb_cursor(struct fb_info *info, struct fb_cursor_user __user *sprite)
 	cursor.image.cmap.blue = info->cursor.image.cmap.blue;
 	cursor.image.cmap.transp = info->cursor.image.cmap.transp;
 	cursor.data = NULL;
+	cursor.flash = 0;
 
 	if (cursor.set & FB_CUR_SETCUR)
 		info->cursor.enable = 1;
@@ -847,20 +854,28 @@ int
 fb_blank(struct fb_info *info, int blank)
 {	
 	/* ??? Variable sized stack allocation.  */
-	u16 black[info->cmap.len];
 	struct fb_cmap cmap;
+	u16 *black = NULL;
+	int err = 0;
 	
 	if (info->fbops->fb_blank && !info->fbops->fb_blank(blank, info))
 		return 0;
 	if (blank) { 
-		memset(black, 0, info->cmap.len * sizeof(u16));
-		cmap.red = cmap.green = cmap.blue = black;
-		cmap.transp = info->cmap.transp ? black : NULL;
-		cmap.start = info->cmap.start;
-		cmap.len = info->cmap.len;
+		black = kmalloc(sizeof(u16) * info->cmap.len, GFP_KERNEL);
+		if (!black) {
+			memset(black, 0, info->cmap.len * sizeof(u16));
+			cmap.red = cmap.green = cmap.blue = black;
+			cmap.transp = info->cmap.transp ? black : NULL;
+			cmap.start = info->cmap.start;
+			cmap.len = info->cmap.len;
+		}
 	} else
 		cmap = info->cmap;
-	return fb_set_cmap(&cmap, info);
+
+	err = fb_set_cmap(&cmap, info);
+	kfree(black);
+
+	return err;
 }
 
 static int 
@@ -948,14 +963,11 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 #endif /* CONFIG_KMOD */
 		if (!registered_fb[con2fb.framebuffer])
 		    return -EINVAL;
-		if (con2fb.console > 0 && con2fb.console < MAX_NR_CONSOLES) {
-			event.info = info;
-			event.data = &con2fb;
-			return notifier_call_chain(&fb_notifier_list,
-						   FB_EVENT_SET_CONSOLE_MAP,
-						   &event);
-		}
-		return -EINVAL;
+		event.info = info;
+		event.data = &con2fb;
+		return notifier_call_chain(&fb_notifier_list,
+					   FB_EVENT_SET_CONSOLE_MAP,
+					   &event);
 	case FBIOBLANK:
 		acquire_console_sem();
 		i = fb_blank(info, arg);
@@ -1144,7 +1156,8 @@ register_framebuffer(struct fb_info *fb_info)
 			break;
 	fb_info->node = i;
 
-	c = class_simple_device_add(fb_class, MKDEV(FB_MAJOR, i), NULL, "fb%d", i);
+	c = class_simple_device_add(fb_class, MKDEV(FB_MAJOR, i),
+				    fb_info->device, "fb%d", i);
 	if (IS_ERR(c)) {
 		/* Not fatal */
 		printk(KERN_WARNING "Unable to create class_device for framebuffer %d; errno = %ld\n", i, PTR_ERR(c));

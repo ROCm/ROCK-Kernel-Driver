@@ -69,11 +69,11 @@ static struct pci_bus *bus0;
 static struct pci_dev *hc_dev;
 
 /* Host controller register addresses */
-static void *hc_registers;
-static void *csr_hc_index;
-static void *csr_hc_data;
-static void *csr_int_status;
-static void *csr_int_mask;
+static void __iomem *hc_registers;
+static void __iomem *csr_hc_index;
+static void __iomem *csr_hc_data;
+static void __iomem *csr_int_status;
+static void __iomem *csr_int_mask;
 
 
 static int zt5550_hc_config(struct pci_dev *pdev)
@@ -219,12 +219,13 @@ static int zt5550_hc_init_one (struct pci_dev *pdev, const struct pci_device_id 
 	dbg("registered controller");
 
 	/* Look for first device matching cPCI bus's bridge vendor and device IDs */
-	if(!(bus0_dev = pci_find_device(PCI_VENDOR_ID_DEC,
+	if(!(bus0_dev = pci_get_device(PCI_VENDOR_ID_DEC,
 					 PCI_DEVICE_ID_DEC_21154, NULL))) {
 		status = -ENODEV;
 		goto init_register_error;
 	}
 	bus0 = bus0_dev->subordinate;
+	pci_dev_put(bus0_dev);
 
 	status = cpci_hp_register_bus(bus0, 0x0a, 0x0f);
 	if(status != 0) {
@@ -282,7 +283,7 @@ static int __init zt5550_init(void)
 	if(!r)
 		return -EBUSY;
 
-	return pci_module_init(&zt5550_hc_driver);
+	return pci_register_driver(&zt5550_hc_driver);
 }
 
 static void __exit

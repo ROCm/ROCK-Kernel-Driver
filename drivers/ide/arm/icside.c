@@ -16,6 +16,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/device.h>
 #include <linux/init.h>
+#include <linux/scatterlist.h>
 
 #include <asm/dma.h>
 #include <asm/ecard.h>
@@ -223,10 +224,7 @@ static void icside_build_sglist(ide_drive_t *drive, struct request *rq)
 		else
 			hwif->sg_dma_direction = DMA_FROM_DEVICE;
 
-		memset(sg, 0, sizeof(*sg));
-		sg->page   = virt_to_page(rq->buffer);
-		sg->offset = offset_in_page(rq->buffer);
-		sg->length = rq->nr_sectors * SECTOR_SIZE;
+		sg_init_one(sg, rq->buffer, rq->nr_sectors * SECTOR_SIZE);
 		nents = 1;
 	} else {
 		nents = blk_rq_map_sg(drive->queue, rq, sg);
@@ -402,14 +400,13 @@ static int icside_dma_end(ide_drive_t *drive)
 	return get_dma_residue(hwif->hw.dma) != 0;
 }
 
-static int icside_dma_begin(ide_drive_t *drive)
+static void icside_dma_start(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 
 	/* We can not enable DMA on both channels simultaneously. */
 	BUG_ON(dma_channel_active(hwif->hw.dma));
 	enable_dma(hwif->hw.dma);
-	return 0;
 }
 
 /*
@@ -441,11 +438,16 @@ static ide_startstop_t icside_dmaintr(ide_drive_t *drive)
 	return DRIVER(drive)->error(drive, __FUNCTION__, stat);
 }
 
-static int
-icside_dma_common(ide_drive_t *drive, struct request *rq,
-		  unsigned int dma_mode)
+static int icside_dma_setup(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
+	struct request *rq = hwif->hwgroup->rq;
+	unsigned int dma_mode;
+
+	if (rq_data_dir(rq))
+		dma_mode = DMA_MODE_WRITE;
+	else
+		dma_mode = DMA_MODE_READ;
 
 	/*
 	 * We can not enable DMA on both channels.
@@ -481,79 +483,10 @@ icside_dma_common(ide_drive_t *drive, struct request *rq,
 	return 0;
 }
 
-static int icside_dma_read(ide_drive_t *drive)
+static void icside_dma_exec_cmd(ide_drive_t *drive, u8 command)
 {
-	struct request *rq = HWGROUP(drive)->rq;
-	task_ioreg_t cmd;
-
-	if (icside_dma_common(drive, rq, DMA_MODE_READ))
-		return 1;
-
-	if (drive->media != ide_disk)
-		return 0;
-
-	BUG_ON(HWGROUP(drive)->handler != NULL);
-
-	/*
-	 * FIX ME to use only ACB ide_task_t args Struct
-	 */
-#if 0
-	{
-		ide_task_t *args = rq->special;
-		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#else
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		ide_task_t *args = rq->special;
-		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
-	} else if (drive->addressing == 1) {
-		cmd = WIN_READDMA_EXT;
-	} else {
-		cmd = WIN_READDMA;
-	}
-#endif
 	/* issue cmd to drive */
 	ide_execute_command(drive, cmd, icside_dmaintr, 2*WAIT_CMD, NULL);
-
-	return icside_dma_begin(drive);
-}
-
-static int icside_dma_write(ide_drive_t *drive)
-{
-	struct request *rq = HWGROUP(drive)->rq;
-	task_ioreg_t cmd;
-
-	if (icside_dma_common(drive, rq, DMA_MODE_WRITE))
-		return 1;
-
-	if (drive->media != ide_disk)
-		return 0;
-
-	BUG_ON(HWGROUP(drive)->handler != NULL);
-
-	/*
-	 * FIX ME to use only ACB ide_task_t args Struct
-	 */
-#if 0
-	{
-		ide_task_t *args = rq->special;
-		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#else
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		ide_task_t *args = rq->special;
-		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
-	} else if (drive->addressing == 1) {
-		cmd = WIN_WRITEDMA_EXT;
-	} else {
-		cmd = WIN_WRITEDMA;
-	}
-#endif
-
-	/* issue cmd to drive */
-	ide_execute_command(drive, cmd, icside_dmaintr, 2*WAIT_CMD, NULL);
-
-	return icside_dma_begin(drive);
 }
 
 static int icside_dma_test_irq(ide_drive_t *drive)
@@ -623,9 +556,9 @@ static int icside_dma_init(ide_hwif_t *hwif)
 	hwif->ide_dma_off_quietly = icside_dma_off_quietly;
 	hwif->ide_dma_host_on	= icside_dma_host_on;
 	hwif->ide_dma_on	= icside_dma_on;
-	hwif->ide_dma_read	= icside_dma_read;
-	hwif->ide_dma_write	= icside_dma_write;
-	hwif->ide_dma_begin	= icside_dma_begin;
+	hwif->dma_setup		= icside_dma_setup;
+	hwif->dma_exec_cmd	= icside_dma_exec_cmd;
+	hwif->dma_start		= icside_dma_start;
 	hwif->ide_dma_end	= icside_dma_end;
 	hwif->ide_dma_test_irq	= icside_dma_test_irq;
 	hwif->ide_dma_verbose	= icside_dma_verbose;

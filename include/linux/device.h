@@ -106,6 +106,8 @@ struct device_driver {
 	struct kobject		kobj;
 	struct list_head	devices;
 
+	struct module 		* owner;
+
 	int	(*probe)	(struct device * dev);
 	int 	(*remove)	(struct device * dev);
 	void	(*shutdown)	(struct device * dev);

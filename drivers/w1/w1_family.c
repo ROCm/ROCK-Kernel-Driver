@@ -84,8 +84,15 @@ void w1_unregister_family(struct w1_family *fent)
 
 	spin_unlock(&w1_flock);
 
-	while (atomic_read(&fent->refcnt))
-		schedule_timeout(10);
+	while (atomic_read(&fent->refcnt)) {
+		printk(KERN_INFO "Waiting for family %u to become free: refcnt=%d.\n",
+				fent->fid, atomic_read(&fent->refcnt));
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(HZ);
+
+		if (signal_pending(current))
+			flush_signals(current);
+	}
 }
 
 /*

@@ -129,11 +129,11 @@ struct device_driver *driver_find(const char *name, struct bus_type *bus)
 	return NULL;
 }
 
-EXPORT_SYMBOL(driver_register);
-EXPORT_SYMBOL(driver_unregister);
-EXPORT_SYMBOL(get_driver);
-EXPORT_SYMBOL(put_driver);
-EXPORT_SYMBOL(driver_find);
+EXPORT_SYMBOL_GPL(driver_register);
+EXPORT_SYMBOL_GPL(driver_unregister);
+EXPORT_SYMBOL_GPL(get_driver);
+EXPORT_SYMBOL_GPL(put_driver);
+EXPORT_SYMBOL_GPL(driver_find);
 
-EXPORT_SYMBOL(driver_create_file);
-EXPORT_SYMBOL(driver_remove_file);
+EXPORT_SYMBOL_GPL(driver_create_file);
+EXPORT_SYMBOL_GPL(driver_remove_file);

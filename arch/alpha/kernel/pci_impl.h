@@ -166,7 +166,6 @@ struct pdev_srm_saved_conf
 {
 	struct pdev_srm_saved_conf *next;
 	struct pci_dev *dev;
-	u32 regs[16];
 };
 
 extern void pci_restore_srm_config(void);

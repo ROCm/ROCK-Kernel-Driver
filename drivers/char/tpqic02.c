@@ -554,10 +554,9 @@ static int wait_for_ready(time_t timeout)
 	    /* not ready and no exception && timeout not expired yet */
 	while (((stat = inb_p(QIC02_STAT_PORT) & QIC02_STAT_MASK) == QIC02_STAT_MASK) && time_before(jiffies, spin_t)) {
 		/* be `nice` to other processes on long operations... */
-		current->state = TASK_INTERRUPTIBLE;
 		/* nap 0.30 sec between checks, */
 		/* but could be woken up earlier by signals... */
-		schedule_timeout(3 * HZ / 10);
+		msleep_interruptible(300);
 	}
 
 	/* don't use jiffies for this test because it may have changed by now */

@@ -55,7 +55,9 @@
 /* macro to force the IBCT0 value valid */
 #define BTE_VALID_MODE(x) ((x) & (IBCT_NOTIFY | IBCT_ZFIL_MODE))
 
-#define BTE_ACTIVE	(IBLS_BUSY | IBLS_ERROR)
+#define BTE_ACTIVE		(IBLS_BUSY | IBLS_ERROR)
+#define BTE_WORD_AVAILABLE	(IBLS_BUSY << 1)
+#define BTE_WORD_BUSY		(~BTE_WORD_AVAILABLE)
 
 /*
  * Some macros to simplify reading.

@@ -120,6 +120,8 @@ static struct pci_device_id hydra_ids[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, hydra_ids);
+
 static int __devinit hydra_probe(struct pci_dev *dev,
 				 const struct pci_device_id *id)
 {
@@ -166,7 +168,7 @@ static struct pci_driver hydra_driver = {
 
 static int __init i2c_hydra_init(void)
 {
-	return pci_module_init(&hydra_driver);
+	return pci_register_driver(&hydra_driver);
 }
 
 

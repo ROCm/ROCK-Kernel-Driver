@@ -319,8 +319,8 @@ islpci_mgt_receive(struct net_device *ndev)
 		}
 
 		/* Ensure the results of device DMA are visible to the CPU. */
-		pci_dma_sync_single(priv->pdev, buf->pci_addr,
-				    buf->size, PCI_DMA_FROMDEVICE);
+		pci_dma_sync_single_for_cpu(priv->pdev, buf->pci_addr,
+					    buf->size, PCI_DMA_FROMDEVICE);
 
 		/* Perform endianess conversion for PIMFOR header in-place. */
 		header = pimfor_decode_header(buf->mem, frag_len);

@@ -3622,12 +3622,10 @@ static int __init init_via82cxxx_audio(void)
 	}
 
 	rc = pci_register_driver (&via_driver);
-	if (rc < 1) {
-		if (rc == 0)
-			pci_unregister_driver (&via_driver);
+	if (rc) {
 		via_cleanup_proc ();
-		DPRINTK ("EXIT, returning -ENODEV\n");
-		return -ENODEV;
+		DPRINTK ("EXIT, returning %d\n", rc);
+		return rc;
 	}
 
 	DPRINTK ("EXIT, returning 0\n");

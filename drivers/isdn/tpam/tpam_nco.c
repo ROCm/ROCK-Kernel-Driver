@@ -84,7 +84,7 @@ struct sk_buff *build_ACreateNCOReq(const u8 *phone) {
 	struct sk_buff *skb;
 	u8 *tlv;
 
-	dprintk("TurboPAM(build_ACreateNCOReq): phone=%s\n", phone);
+	pr_debug("TurboPAM(build_ACreateNCOReq): phone=%s\n", phone);
 
 	/* build the NCO packet */
 	if (!(skb = build_NCOpacket(ID_ACreateNCOReq, 23 + strlen(phone), 0, 0, 0))) 
@@ -141,7 +141,7 @@ struct sk_buff *build_ADestroyNCOReq(u32 ncoid) {
 	struct sk_buff *skb;
 	u8 *tlv;
 
-	dprintk("TurboPAM(build_ADestroyNCOReq): ncoid=%lu\n", 
+	pr_debug("TurboPAM(build_ADestroyNCOReq): ncoid=%lu\n",
 		(unsigned long)ncoid);
 
 	/* build the NCO packet */
@@ -170,7 +170,7 @@ struct sk_buff *build_CConnectReq(u32 ncoid, const u8 *called, u8 hdlc) {
 	struct sk_buff *skb;
 	u8 *tlv;
 
-	dprintk("TurboPAM(build_CConnectReq): ncoid=%lu, called=%s, hdlc=%d\n",
+	pr_debug("TurboPAM(build_CConnectReq): ncoid=%lu, called=%s, hdlc=%d\n",
 		(unsigned long)ncoid, called, hdlc);
 
 	/* build the NCO packet */
@@ -220,7 +220,7 @@ struct sk_buff *build_CConnectRsp(u32 ncoid) {
 	struct sk_buff *skb;
 	u8 *tlv;
 
-	dprintk("TurboPAM(build_CConnectRsp): ncoid=%lu\n",
+	pr_debug("TurboPAM(build_CConnectRsp): ncoid=%lu\n",
 		(unsigned long)ncoid);
 
 	/* build the NCO packet */
@@ -247,7 +247,7 @@ struct sk_buff *build_CDisconnectReq(u32 ncoid) {
 	struct sk_buff *skb;
 	u8 *tlv;
 
-	dprintk("TurboPAM(build_CDisconnectReq): ncoid=%lu\n",
+	pr_debug("TurboPAM(build_CDisconnectReq): ncoid=%lu\n",
 		(unsigned long)ncoid);
 
 	/* build the NCO packet */
@@ -274,7 +274,7 @@ struct sk_buff *build_CDisconnectRsp(u32 ncoid) {
 	struct sk_buff *skb;
 	u8 *tlv;
 
-	dprintk("TurboPAM(build_CDisconnectRsp): ncoid=%lu\n",
+	pr_debug("TurboPAM(build_CDisconnectRsp): ncoid=%lu\n",
 		(unsigned long)ncoid);
 
 	/* build the NCO packet */
@@ -307,7 +307,7 @@ struct sk_buff *build_U3DataReq(u32 ncoid, void *data, u16 len,
 	u8 *tlv;
 	void *p;
 
-	dprintk("TurboPAM(build_U3DataReq): "
+	pr_debug("TurboPAM(build_U3DataReq): "
 		"ncoid=%lu, len=%d, ack=%d, ack_size=%d\n", 
 		(unsigned long)ncoid, len, ack, ack_size);
 
@@ -397,7 +397,7 @@ int parse_ACreateNCOCnf(struct sk_buff *skb, u8 *status, u32 *ncoid) {
 	}
 
 	if (*status) {
-		dprintk("TurboPAM(parse_ACreateNCOCnf): status=%d\n", *status);
+		pr_debug("TurboPAM(parse_ACreateNCOCnf): status=%d\n", *status);
 		return 0;
 	}
 
@@ -408,7 +408,7 @@ int parse_ACreateNCOCnf(struct sk_buff *skb, u8 *status, u32 *ncoid) {
 		return -1;
 	}
 
-	dprintk("TurboPAM(parse_ACreateNCOCnf): ncoid=%lu, status=%d\n",
+	pr_debug("TurboPAM(parse_ACreateNCOCnf): ncoid=%lu, status=%d\n",
 		(unsigned long)*ncoid, *status);
 	return 0;
 }
@@ -432,7 +432,7 @@ int parse_ADestroyNCOCnf(struct sk_buff *skb, u8 *status, u32 *ncoid) {
 	}
 
 	if (*status) {
-		dprintk("TurboPAM(parse_ADestroyNCOCnf): status=%d\n", *status);
+		pr_debug("TurboPAM(parse_ADestroyNCOCnf): status=%d\n", *status);
 		return 0;
 	}
 
@@ -443,7 +443,7 @@ int parse_ADestroyNCOCnf(struct sk_buff *skb, u8 *status, u32 *ncoid) {
 		return -1;
 	}
 
-	dprintk("TurboPAM(parse_ADestroyNCOCnf): ncoid=%lu, status=%d\n", 
+	pr_debug("TurboPAM(parse_ADestroyNCOCnf): ncoid=%lu, status=%d\n",
 		(unsigned long)*ncoid, *status);
 	return 0;
 }
@@ -464,7 +464,7 @@ int parse_CConnectCnf(struct sk_buff *skb, u32 *ncoid) {
 		       "NCOID not found\n");
 		return -1;
 	}
-	dprintk("TurboPAM(parse_CConnectCnf): ncoid=%lu\n", 
+	pr_debug("TurboPAM(parse_CConnectCnf): ncoid=%lu\n",
 		(unsigned long)*ncoid);
 	return 0;
 }
@@ -522,7 +522,7 @@ int parse_CConnectInd(struct sk_buff *skb, u32 *ncoid, u8 *hdlc,
 	}
 	memcpy(called, phone + 2, PHONE_MAXIMUMSIZE);
 
-	dprintk("TurboPAM(parse_CConnectInd): "
+	pr_debug("TurboPAM(parse_CConnectInd): "
 		"ncoid=%lu, hdlc=%d, plan=%d, scr=%d, calling=%s, called=%s\n",
 		(unsigned long)*ncoid, *hdlc, *plan, *screen, calling, called);
 	return 0;
@@ -553,7 +553,7 @@ int parse_CDisconnectCnf(struct sk_buff *skb, u32 *ncoid, u32 *causetopuf) {
 		return -1;
 	}
 
-	dprintk("TurboPAM(parse_CDisconnectCnf): ncoid=%lu, causetopuf=%lu\n", 
+	pr_debug("TurboPAM(parse_CDisconnectCnf): ncoid=%lu, causetopuf=%lu\n",
 		(unsigned long)*ncoid, (unsigned long)*causetopuf);
 	return 0;
 }
@@ -583,7 +583,7 @@ int parse_CDisconnectInd(struct sk_buff *skb, u32 *ncoid, u32 *causetopuf) {
 		return -1;
 	}
 
-	dprintk("TurboPAM(parse_CDisconnectInd): ncoid=%lu, causetopuf=%lu\n", 
+	pr_debug("TurboPAM(parse_CDisconnectInd): ncoid=%lu, causetopuf=%lu\n",
 		(unsigned long)*ncoid, (unsigned long)*causetopuf);
 	return 0;
 }
@@ -613,7 +613,7 @@ int parse_U3ReadyToReceiveInd(struct sk_buff *skb, u32 *ncoid, u8 *ready) {
 		return -1;
 	}
 
-	dprintk("TurboPAM(parse_U3ReadyToReceiveInd): ncoid=%lu, ready=%d\n", 
+	pr_debug("TurboPAM(parse_U3ReadyToReceiveInd): ncoid=%lu, ready=%d\n",
 		(unsigned long)*ncoid, *ready);
 	return 0;
 }
@@ -644,7 +644,7 @@ int parse_U3DataInd(struct sk_buff *skb, u32 *ncoid, u8 **data, u16 *len) {
 		 sizeof(skb_header) + sizeof(pci_mpb) + p->actualBlockTLVSize);
 	*data = skb->data;
 
-	dprintk("TurboPAM(parse_U3DataInd): ncoid=%lu, datalen=%d\n", 
+	pr_debug("TurboPAM(parse_U3DataInd): ncoid=%lu, datalen=%d\n",
 		(unsigned long)*ncoid, *len);
 	return 0;
 }

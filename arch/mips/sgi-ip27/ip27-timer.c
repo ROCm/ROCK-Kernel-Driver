@@ -112,9 +112,7 @@ again:
 	if (cpu == 0)
 		do_timer(regs);
 
-#ifdef CONFIG_SMP
 	update_process_times(user_mode(regs));
-#endif /* CONFIG_SMP */
 
 	/*
 	 * If we have an externally synchronized Linux clock, then update

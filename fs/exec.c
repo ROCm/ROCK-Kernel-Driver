@@ -34,6 +34,7 @@
 #include <linux/pagemap.h>
 #include <linux/highmem.h>
 #include <linux/spinlock.h>
+#include <linux/key.h>
 #include <linux/personality.h>
 #include <linux/binfmts.h>
 #include <linux/swap.h>
@@ -848,8 +849,10 @@ int flush_old_exec(struct linux_binprm * bprm)
 
 	if (bprm->e_uid != current->euid || bprm->e_gid != current->egid || 
 	    permission(bprm->file->f_dentry->d_inode,MAY_READ, NULL) ||
-	    (bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP))
+	    (bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP)) {
+		suid_keys(current);
 		current->mm->dumpable = 0;
+	}
 
 	/* An exec changes our domain. We are no longer part of the thread
 	   group */
@@ -883,7 +886,7 @@ int prepare_binprm(struct linux_binprm *bprm)
 	mode = inode->i_mode;
 	/*
 	 * Check execute perms again - if the caller has CAP_DAC_OVERRIDE,
-	 * vfs_permission lets a non-executable through
+	 * generic_permission lets a non-executable through
 	 */
 	if (!(mode & 0111))	/* with at least _one_ execute bit set */
 		return -EACCES;
@@ -943,6 +946,11 @@ static inline int unsafe_exec(struct task_struct *p)
 void compute_creds(struct linux_binprm *bprm)
 {
 	int unsafe;
+
+	if (bprm->e_uid != current->uid)
+		suid_keys(current);
+	exec_keys(current);
+
 	task_lock(current);
 	unsafe = unsafe_exec(current);
 	security_bprm_apply_creds(bprm, unsafe);
@@ -1178,8 +1186,6 @@ out_file:
 out_ret:
 	return retval;
 }
-
-EXPORT_SYMBOL(do_execve);
 
 int set_binfmt(struct linux_binfmt *new)
 {

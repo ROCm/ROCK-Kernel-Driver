@@ -193,13 +193,18 @@ static int __init ixdp2x01_clock_setup(char *str)
 
 __setup("ixdp2x01_clock=", ixdp2x01_clock_setup);
 
-static void __init ixdp2x01_init_time(void)
+static void __init ixdp2x01_timer_init(void)
 {
 	if (!ixdp2x01_clock)
 		ixdp2x01_clock = 50000000;
 
 	ixp2000_init_time(ixdp2x01_clock);
 }
+
+static struct sys_timer ixdp2x01_timer = {
+	.init		= ixdp2x01_timer_init,
+	.offset		= ixp2000_gettimeoffset,
+};
 
 /*************************************************************************
  * IXDP2x01 PCI
@@ -361,7 +366,7 @@ MACHINE_START(IXDP2401, "Intel IXDP2401 Development Platform")
 	BOOT_PARAMS(0x00000100)
 	MAPIO(ixdp2x01_map_io)
 	INITIRQ(ixdp2x01_init_irq)
-	INITTIME(ixdp2x01_init_time)
+	.timer		= &ixdp2x01_timer,
 	INIT_MACHINE(ixdp2x01_init_machine)
 MACHINE_END
 #endif
@@ -373,7 +378,7 @@ MACHINE_START(IXDP2801, "Intel IXDP2801 Development Platform")
 	BOOT_PARAMS(0x00000100)
 	MAPIO(ixdp2x01_map_io)
 	INITIRQ(ixdp2x01_init_irq)
-	INITTIME(ixdp2x01_init_time)
+	.timer		= &ixdp2x01_timer,
 	INIT_MACHINE(ixdp2x01_init_machine)
 MACHINE_END
 #endif

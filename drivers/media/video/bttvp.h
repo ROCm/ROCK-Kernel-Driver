@@ -277,7 +277,6 @@ struct bttv_input {
 };
 
 struct bttv_suspend_state {
-	u32  pci_cfg[64 / sizeof(u32)];
 	u32  gpio_enable;
 	u32  gpio_data;
 	int  disabled;

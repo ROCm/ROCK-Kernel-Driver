@@ -124,7 +124,7 @@ pci_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val
 				  devfn, where, size, value);
 }
 
-static struct pci_ops pci_root_ops = {
+struct pci_ops pci_root_ops = {
 	.read = pci_read,
 	.write = pci_write,
 };
@@ -365,10 +365,10 @@ pcibios_fixup_device_resources (struct pci_dev *dev, struct pci_bus *bus)
 void __devinit
 pcibios_fixup_bus (struct pci_bus *b)
 {
-	struct list_head *ln;
+	struct pci_dev *dev;
 
-	for (ln = b->devices.next; ln != &b->devices; ln = ln->next)
-		pcibios_fixup_device_resources(pci_dev_b(ln), b);
+	list_for_each_entry(dev, &b->devices, bus_list)
+		pcibios_fixup_device_resources(dev, b);
 
 	return;
 }

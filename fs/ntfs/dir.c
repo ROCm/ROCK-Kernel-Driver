@@ -21,8 +21,14 @@
  */
 
 #include <linux/smp_lock.h>
-#include "ntfs.h"
+#include <linux/buffer_head.h>
+
 #include "dir.h"
+#include "aops.h"
+#include "attrib.h"
+#include "mft.h"
+#include "debug.h"
+#include "ntfs.h"
 
 /**
  * The little endian Unicode string $I30 as a global constant.
@@ -1272,7 +1278,7 @@ get_next_bmp_page:
 	ntfs_debug("Reading bitmap with page index 0x%llx, bit ofs 0x%llx",
 			(unsigned long long)bmp_pos >> (3 + PAGE_CACHE_SHIFT),
 			(unsigned long long)bmp_pos &
-			((PAGE_CACHE_SIZE * 8) - 1));
+			(unsigned long long)((PAGE_CACHE_SIZE * 8) - 1));
 	bmp_page = ntfs_map_page(bmp_mapping,
 			bmp_pos >> (3 + PAGE_CACHE_SHIFT));
 	if (IS_ERR(bmp_page)) {
@@ -1386,8 +1392,8 @@ find_next_index_buffer:
 	 */
 	for (;; ie = (INDEX_ENTRY*)((u8*)ie + le16_to_cpu(ie->length))) {
 		ntfs_debug("In index allocation, offset 0x%llx.",
-				(unsigned long long)ia_start + ((u8*)ie -
-				(u8*)ia));
+				(unsigned long long)ia_start +
+				(unsigned long long)((u8*)ie - (u8*)ia));
 		/* Bounds checks. */
 		if (unlikely((u8*)ie < (u8*)ia || (u8*)ie +
 				sizeof(INDEX_ENTRY_HEADER) > index_end ||

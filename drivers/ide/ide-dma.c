@@ -85,6 +85,7 @@
 #include <linux/init.h>
 #include <linux/ide.h>
 #include <linux/delay.h>
+#include <linux/scatterlist.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -253,18 +254,12 @@ int ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
 #else
 	while (sector_count > 128) {
 #endif
-		memset(&sg[nents], 0, sizeof(*sg));
-		sg[nents].page = virt_to_page(virt_addr);
-		sg[nents].offset = offset_in_page(virt_addr);
-		sg[nents].length = 128  * SECTOR_SIZE;
+		sg_init_one(&sg[nents], virt_addr, 128 * SECTOR_SIZE);
 		nents++;
 		virt_addr = virt_addr + (128 * SECTOR_SIZE);
 		sector_count -= 128;
 	}
-	memset(&sg[nents], 0, sizeof(*sg));
-	sg[nents].page = virt_to_page(virt_addr);
-	sg[nents].offset = offset_in_page(virt_addr);
-	sg[nents].length =  sector_count  * SECTOR_SIZE;
+	sg_init_one(&sg[nents], virt_addr, sector_count * SECTOR_SIZE);
 	nents++;
 
 	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
@@ -590,10 +585,8 @@ int __ide_dma_check (ide_drive_t *drive)
 EXPORT_SYMBOL(__ide_dma_check);
 
 /**
- *	ide_start_dma	-	begin a DMA phase
- *	@hwif: interface
+ *	ide_dma_setup	-	begin a DMA phase
  *	@drive: target device
- *	@reading: set if reading, clear if writing
  *
  *	Build an IDE DMA PRD (IDE speak for scatter gather table)
  *	and then set up the DMA transfer registers for a device
@@ -603,11 +596,18 @@ EXPORT_SYMBOL(__ide_dma_check);
  *	Returns 0 on success. If a PIO fallback is required then 1
  *	is returned. 
  */
- 
-int ide_start_dma(ide_hwif_t *hwif, ide_drive_t *drive, int reading)
+
+int ide_dma_setup(ide_drive_t *drive)
 {
+	ide_hwif_t *hwif = drive->hwif;
 	struct request *rq = HWGROUP(drive)->rq;
+	unsigned int reading;
 	u8 dma_stat;
+
+	if (rq_data_dir(rq))
+		reading = 0;
+	else
+		reading = 1 << 3;
 
 	/* fall back to pio! */
 	if (!ide_build_dmatable(drive, rq))
@@ -628,73 +628,15 @@ int ide_start_dma(ide_hwif_t *hwif, ide_drive_t *drive, int reading)
 	return 0;
 }
 
-EXPORT_SYMBOL(ide_start_dma);
+EXPORT_SYMBOL_GPL(ide_dma_setup);
 
-int __ide_dma_read (ide_drive_t *drive /*, struct request *rq */)
+static void ide_dma_exec_cmd(ide_drive_t *drive, u8 command)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
-	struct request *rq	= HWGROUP(drive)->rq;
-	unsigned int reading	= 1 << 3;
-	u8 lba48		= (drive->addressing == 1) ? 1 : 0;
-	task_ioreg_t command	= WIN_NOP;
-
-	/* try pio */
-	if (ide_start_dma(hwif, drive, reading))
-		return 1;
-
-	if (drive->media != ide_disk)
-		return 0;
-
-	command = (lba48) ? WIN_READDMA_EXT : WIN_READDMA;
-	
-	if (drive->vdma)
-		command = (lba48) ? WIN_READ_EXT: WIN_READ;
-		
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-
 	/* issue cmd to drive */
 	ide_execute_command(drive, command, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
-	return hwif->ide_dma_begin(drive);
 }
 
-EXPORT_SYMBOL(__ide_dma_read);
-
-int __ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
-{
-	ide_hwif_t *hwif	= HWIF(drive);
-	struct request *rq	= HWGROUP(drive)->rq;
-	unsigned int reading	= 0;
-	u8 lba48		= (drive->addressing == 1) ? 1 : 0;
-	task_ioreg_t command	= WIN_NOP;
-
-	/* try PIO instead of DMA */
-	if (ide_start_dma(hwif, drive, reading))
-		return 1;
-
-	if (drive->media != ide_disk)
-		return 0;
-
-	command = (lba48) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
-	if (drive->vdma)
-		command = (lba48) ? WIN_WRITE_EXT: WIN_WRITE;
-		
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
-		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-
-	/* issue cmd to drive */
-	ide_execute_command(drive, command, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
-
-	return hwif->ide_dma_begin(drive);
-}
-
-EXPORT_SYMBOL(__ide_dma_write);
-
-int __ide_dma_begin (ide_drive_t *drive)
+void ide_dma_start(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 dma_cmd		= hwif->INB(hwif->dma_command);
@@ -708,10 +650,9 @@ int __ide_dma_begin (ide_drive_t *drive)
 	hwif->OUTB(dma_cmd|1, hwif->dma_command);
 	hwif->dma = 1;
 	wmb();
-	return 0;
 }
 
-EXPORT_SYMBOL(__ide_dma_begin);
+EXPORT_SYMBOL_GPL(ide_dma_start);
 
 /* returns 1 on error, 0 otherwise */
 int __ide_dma_end (ide_drive_t *drive)
@@ -1009,12 +950,12 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		hwif->ide_dma_host_on = &__ide_dma_host_on;
 	if (!hwif->ide_dma_check)
 		hwif->ide_dma_check = &__ide_dma_check;
-	if (!hwif->ide_dma_read)
-		hwif->ide_dma_read = &__ide_dma_read;
-	if (!hwif->ide_dma_write)
-		hwif->ide_dma_write = &__ide_dma_write;
-	if (!hwif->ide_dma_begin)
-		hwif->ide_dma_begin = &__ide_dma_begin;
+	if (!hwif->dma_setup)
+		hwif->dma_setup = &ide_dma_setup;
+	if (!hwif->dma_exec_cmd)
+		hwif->dma_exec_cmd = &ide_dma_exec_cmd;
+	if (!hwif->dma_start)
+		hwif->dma_start = &ide_dma_start;
 	if (!hwif->ide_dma_end)
 		hwif->ide_dma_end = &__ide_dma_end;
 	if (!hwif->ide_dma_test_irq)

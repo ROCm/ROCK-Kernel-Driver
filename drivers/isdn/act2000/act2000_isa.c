@@ -18,13 +18,6 @@
 
 static act2000_card *irq2card_map[16];
 
-static void
-act2000_isa_delay(long t)
-{
-        set_current_state(TASK_INTERRUPTIBLE);
-        schedule_timeout(t);
-}
-
 /*
  * Reset Controller, then try to read the Card's signature.
  + Return:
@@ -419,7 +412,7 @@ act2000_isa_download(act2000_card * card, act2000_ddef __user * cb)
 
         if (!act2000_isa_reset(card->port))
                 return -ENXIO;
-        act2000_isa_delay(HZ / 2);
+        msleep_interruptible(500);
         if(copy_from_user(&cblock, cb, sizeof(cblock)))
         	return -EFAULT;
         length = cblock.length;
@@ -452,6 +445,6 @@ act2000_isa_download(act2000_card * card, act2000_ddef __user * cb)
                 p += l;
         }
         kfree(buf);
-        act2000_isa_delay(HZ / 2);
+        msleep_interruptible(500);
         return (act2000_isa_getid(card));
 }

@@ -24,6 +24,7 @@
 
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
+#include <linux/highmem.h>
 
 /**
  * ntfs_malloc_nofs - allocate memory in multiples of pages

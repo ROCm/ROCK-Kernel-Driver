@@ -159,6 +159,6 @@ void sysfs_put_link(struct dentry *dentry, struct nameidata *nd)
 		free_page((unsigned long)page);
 }
 
-EXPORT_SYMBOL(sysfs_create_link);
-EXPORT_SYMBOL(sysfs_remove_link);
+EXPORT_SYMBOL_GPL(sysfs_create_link);
+EXPORT_SYMBOL_GPL(sysfs_remove_link);
 

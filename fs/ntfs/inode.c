@@ -25,11 +25,15 @@
 #include <linux/quotaops.h>
 #include <linux/mount.h>
 
-#include "ntfs.h"
+#include "aops.h"
 #include "dir.h"
+#include "debug.h"
 #include "inode.h"
 #include "attrib.h"
+#include "malloc.h"
+#include "mft.h"
 #include "time.h"
+#include "ntfs.h"
 
 /**
  * ntfs_test_inode - compare two (possibly fake) inodes for equality
@@ -369,20 +373,20 @@ void ntfs_destroy_extent_inode(ntfs_inode *ni)
  *
  * Return zero on success and -ENOMEM on error.
  */
-static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
+void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 {
 	ntfs_debug("Entering.");
 	ni->initialized_size = ni->allocated_size = 0;
 	ni->seq_no = 0;
 	atomic_set(&ni->count, 1);
 	ni->vol = NTFS_SB(sb);
-	init_runlist(&ni->runlist);
+	ntfs_init_runlist(&ni->runlist);
 	init_MUTEX(&ni->mrec_lock);
 	ni->page = NULL;
 	ni->page_ofs = 0;
 	ni->attr_list_size = 0;
 	ni->attr_list = NULL;
-	init_runlist(&ni->attr_list_rl);
+	ntfs_init_runlist(&ni->attr_list_rl);
 	ni->itype.index.bmp_ino = NULL;
 	ni->itype.index.block_size = 0;
 	ni->itype.index.vcn_size = 0;
@@ -392,17 +396,6 @@ static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 	init_MUTEX(&ni->extent_lock);
 	ni->nr_extents = 0;
 	ni->ext.base_ntfs_ino = NULL;
-	return;
-}
-
-static inline void ntfs_init_big_inode(struct inode *vi)
-{
-	ntfs_inode *ni = NTFS_I(vi);
-
-	ntfs_debug("Entering.");
-	__ntfs_init_inode(vi->i_sb, ni);
-	ni->mft_no = vi->i_ino;
-	return;
 }
 
 inline ntfs_inode *ntfs_new_extent_inode(struct super_block *sb,
@@ -601,14 +594,26 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	 * Also if not a directory, it could be something else, rather than
 	 * a regular file. But again, will do for now.
 	 */
+	/* Everyone gets all permissions. */
+	vi->i_mode |= S_IRWXUGO;
+	/* If read-only, noone gets write permissions. */
+	if (IS_RDONLY(vi))
+		vi->i_mode &= ~S_IWUGO;
 	if (m->flags & MFT_RECORD_IS_DIRECTORY) {
 		vi->i_mode |= S_IFDIR;
+		/*
+		 * Apply the directory permissions mask set in the mount
+		 * options.
+		 */
+		vi->i_mode &= ~vol->dmask;
 		/* Things break without this kludge! */
 		if (vi->i_nlink > 1)
 			vi->i_nlink = 1;
-	} else
+	} else {
 		vi->i_mode |= S_IFREG;
-
+		/* Apply the file permissions mask set in the mount options. */
+		vi->i_mode &= ~vol->fmask;
+	}
 	/*
 	 * Find the standard information attribute in the mft record. At this
 	 * stage we haven't setup the attribute list stuff yet, so this could
@@ -701,7 +706,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 			 * Setup the runlist. No need for locking as we have
 			 * exclusive access to the inode at this time.
 			 */
-			ni->attr_list_rl.rl = decompress_mapping_pairs(vol,
+			ni->attr_list_rl.rl = ntfs_mapping_pairs_decompress(vol,
 					ctx->attr, NULL);
 			if (IS_ERR(ni->attr_list_rl.rl)) {
 				err = PTR_ERR(ni->attr_list_rl.rl);
@@ -951,20 +956,9 @@ skip_attr_list_load:
 			goto unm_err_out;
 		}
 skip_large_dir_stuff:
-		/* Everyone gets read and scan permissions. */
-		vi->i_mode |= S_IRUGO | S_IXUGO;
-		/* If not read-only, set write permissions. */
-		if (!IS_RDONLY(vi))
-			vi->i_mode |= S_IWUGO;
-		/*
-		 * Apply the directory permissions mask set in the mount
-		 * options.
-		 */
-		vi->i_mode &= ~vol->dmask;
 		/* Setup the operations for this inode. */
 		vi->i_op = &ntfs_dir_inode_ops;
 		vi->i_fop = &ntfs_dir_ops;
-		vi->i_mapping->a_ops = &ntfs_mst_aops;
 	} else {
 		/* It is a file. */
 		ntfs_attr_reinit_search_ctx(ctx);
@@ -1098,18 +1092,14 @@ no_data_attr_special_case:
 		unmap_mft_record(ni);
 		m = NULL;
 		ctx = NULL;
-		/* Everyone gets all permissions. */
-		vi->i_mode |= S_IRWXUGO;
-		/* If read-only, noone gets write permissions. */
-		if (IS_RDONLY(vi))
-			vi->i_mode &= ~S_IWUGO;
-		/* Apply the file permissions mask set in the mount options. */
-		vi->i_mode &= ~vol->fmask;
 		/* Setup the operations for this inode. */
 		vi->i_op = &ntfs_file_inode_ops;
 		vi->i_fop = &ntfs_file_ops;
-		vi->i_mapping->a_ops = &ntfs_aops;
 	}
+	if (NInoMstProtected(ni))
+		vi->i_mapping->a_ops = &ntfs_mst_aops;
+	else
+		vi->i_mapping->a_ops = &ntfs_aops;
 	/*
 	 * The number of 512-byte blocks used on disk (for stat). This is in so
 	 * far inaccurate as it doesn't account for any named streams or other
@@ -1672,8 +1662,8 @@ err_out:
  *
  * We solve these problems by starting with the $DATA attribute before anything
  * else and iterating using ntfs_attr_lookup($DATA) over all extents.  As each
- * extent is found, we decompress_mapping_pairs() including the implied
- * ntfs_merge_runlists().  Each step of the iteration necessarily provides
+ * extent is found, we ntfs_mapping_pairs_decompress() including the implied
+ * ntfs_runlists_merge().  Each step of the iteration necessarily provides
  * sufficient information for the next step to complete.
  *
  * This should work but there are two possible pit falls (see inline comments
@@ -1762,7 +1752,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 	vi->i_generation = ni->seq_no = le16_to_cpu(m->sequence_number);
 
 	/* Provides readpage() and sync_page() for map_mft_record(). */
-	vi->i_mapping->a_ops = &ntfs_mft_aops;
+	vi->i_mapping->a_ops = &ntfs_mst_aops;
 
 	ctx = ntfs_attr_get_search_ctx(ni, m);
 	if (!ctx) {
@@ -1810,7 +1800,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 				goto put_err_out;
 			}
 			/* Setup the runlist. */
-			ni->attr_list_rl.rl = decompress_mapping_pairs(vol,
+			ni->attr_list_rl.rl = ntfs_mapping_pairs_decompress(vol,
 					ctx->attr, NULL);
 			if (IS_ERR(ni->attr_list_rl.rl)) {
 				err = PTR_ERR(ni->attr_list_rl.rl);
@@ -1942,11 +1932,11 @@ int ntfs_read_inode_mount(struct inode *vi)
 		 * as we have exclusive access to the inode at this time and we
 		 * are a mount in progress task, too.
 		 */
-		nrl = decompress_mapping_pairs(vol, attr, ni->runlist.rl);
+		nrl = ntfs_mapping_pairs_decompress(vol, attr, ni->runlist.rl);
 		if (IS_ERR(nrl)) {
-			ntfs_error(sb, "decompress_mapping_pairs() failed with "
-					"error code %ld. $MFT is corrupt.",
-					PTR_ERR(nrl));
+			ntfs_error(sb, "ntfs_mapping_pairs_decompress() "
+					"failed with error code %ld.  $MFT is "
+					"corrupt.", PTR_ERR(nrl));
 			goto put_err_out;
 		}
 		ni->runlist.rl = nrl;
@@ -2024,8 +2014,6 @@ int ntfs_read_inode_mount(struct inode *vi)
 			/* No VFS initiated operations allowed for $MFT. */
 			vi->i_op = &ntfs_empty_inode_ops;
 			vi->i_fop = &ntfs_empty_file_ops;
-			/* Put back our special address space operations. */
-			vi->i_mapping->a_ops = &ntfs_mft_aops;
 		}
 
 		/* Get the lowest vcn for the next extent. */
@@ -2091,37 +2079,24 @@ err_out:
  * dropped, we need to put the attribute inode for the directory index bitmap,
  * if it is present, otherwise the directory inode would remain pinned for
  * ever.
- *
- * If the inode @vi is an index inode with only one reference which is being
- * dropped, we need to put the attribute inode for the index bitmap, if it is
- * present, otherwise the index inode would disappear and the attribute inode
- * for the index bitmap would no longer be referenced from anywhere and thus it
- * would remain pinned for ever.
  */
 void ntfs_put_inode(struct inode *vi)
 {
-	ntfs_inode *ni;
-
-	if (S_ISDIR(vi->i_mode)) {
-		if (atomic_read(&vi->i_count) == 2) {
-			ni = NTFS_I(vi);
-			if (NInoIndexAllocPresent(ni) &&
-					ni->itype.index.bmp_ino) {
-				iput(ni->itype.index.bmp_ino);
-				ni->itype.index.bmp_ino = NULL;
+	if (S_ISDIR(vi->i_mode) && atomic_read(&vi->i_count) == 2) {
+		ntfs_inode *ni = NTFS_I(vi);
+		if (NInoIndexAllocPresent(ni)) {
+			struct inode *bvi = NULL;
+			down(&vi->i_sem);
+			if (atomic_read(&vi->i_count) == 2) {
+				bvi = ni->itype.index.bmp_ino;
+				if (bvi)
+					ni->itype.index.bmp_ino = NULL;
 			}
+			up(&vi->i_sem);
+			if (bvi)
+				iput(bvi);
 		}
-		return;
 	}
-	if (atomic_read(&vi->i_count) != 1)
-		return;
-	ni = NTFS_I(vi);
-	if (NInoAttr(ni) && (ni->type == AT_INDEX_ALLOCATION) &&
-			NInoIndexAllocPresent(ni) && ni->itype.index.bmp_ino) {
-		iput(ni->itype.index.bmp_ino);
-		ni->itype.index.bmp_ino = NULL;
-	}
-	return;
 }
 
 void __ntfs_clear_inode(ntfs_inode *ni)
@@ -2189,6 +2164,18 @@ void ntfs_clear_big_inode(struct inode *vi)
 {
 	ntfs_inode *ni = NTFS_I(vi);
 
+	/*
+	 * If the inode @vi is an index inode we need to put the attribute
+	 * inode for the index bitmap, if it is present, otherwise the index
+	 * inode would disappear and the attribute inode for the index bitmap
+	 * would no longer be referenced from anywhere and thus it would remain
+	 * pinned for ever.
+	 */
+	if (NInoAttr(ni) && (ni->type == AT_INDEX_ALLOCATION) &&
+			NInoIndexAllocPresent(ni) && ni->itype.index.bmp_ino) {
+		iput(ni->itype.index.bmp_ino);
+		ni->itype.index.bmp_ino = NULL;
+	}
 #ifdef NTFS_RW
 	if (NInoDirty(ni)) {
 		BOOL was_bad = (is_bad_inode(vi));
@@ -2268,7 +2255,7 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
  * ntfs_truncate - called when the i_size of an ntfs inode is changed
  * @vi:		inode for which the i_size was changed
  *
- * We don't support i_size changes yet.
+ * We do not support i_size changes yet.
  *
  * The kernel guarantees that @vi is a regular file (S_ISREG() is true) and
  * that the change is allowed.
@@ -2289,6 +2276,8 @@ void ntfs_truncate(struct inode *vi)
 	MFT_RECORD *m;
 	int err;
 
+	BUG_ON(NInoAttr(ni));
+	BUG_ON(ni->nr_extents < 0);
 	m = map_mft_record(ni);
 	if (IS_ERR(m)) {
 		ntfs_error(vi->i_sb, "Failed to map mft record for inode 0x%lx "
@@ -2500,9 +2489,16 @@ int ntfs_write_inode(struct inode *vi, int sync)
 	 * dirty, since we are going to write this mft record below in any case
 	 * and the base mft record may actually not have been modified so it
 	 * might not need to be written out.
+	 * NOTE: It is not a problem when the inode for $MFT itself is being
+	 * written out as mark_ntfs_record_dirty() will only set I_DIRTY_PAGES
+	 * on the $MFT inode and hence ntfs_write_inode() will not be
+	 * re-invoked because of it which in turn is ok since the dirtied mft
+	 * record will be cleaned and written out to disk below, i.e. before
+	 * this function returns.
 	 */
 	if (modified && !NInoTestSetDirty(ctx->ntfs_ino))
-		__set_page_dirty_nobuffers(ctx->ntfs_ino->page);
+		mark_ntfs_record_dirty(ctx->ntfs_ino->page,
+				ctx->ntfs_ino->page_ofs);
 	ntfs_attr_put_search_ctx(ctx);
 	/* Now the access times are updated, write the base mft record. */
 	if (NInoDirty(ni))

@@ -17,6 +17,8 @@
 
 #include <linux/config.h>
 
+int serial8250_register_port(struct uart_port *);
+void serial8250_unregister_port(int line);
 void serial8250_get_irq_map(unsigned int *map);
 void serial8250_suspend_port(int line);
 void serial8250_resume_port(int line);
@@ -38,14 +40,16 @@ struct old_serial_port {
  */
 struct serial8250_config {
 	const char	*name;
-	unsigned int	fifo_size;
-	unsigned int	tx_loadsz;
+	unsigned short	fifo_size;
+	unsigned short	tx_loadsz;
+	unsigned char	fcr;
 	unsigned int	flags;
 };
 
 #define UART_CAP_FIFO	(1 << 8)	/* UART has FIFO */
 #define UART_CAP_EFR	(1 << 9)	/* UART has EFR */
 #define UART_CAP_SLEEP	(1 << 10)	/* UART has IER sleep */
+#define UART_CAP_AFE	(1 << 11)	/* MCR-based hw flow control */
 
 #undef SERIAL_DEBUG_PCI
 

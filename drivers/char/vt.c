@@ -3077,6 +3077,10 @@ int con_font_get(int currcons, struct console_font_op *op)
 	if (rc)
 		goto out;
 
+	op->height = font.height;
+	op->width = font.width;
+	op->charcount = font.charcount;
+
 	if (op->data && copy_to_user(op->data, font.data, c))
 		rc = -EFAULT;
 

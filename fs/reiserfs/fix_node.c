@@ -163,7 +163,7 @@ static void create_virtual_node (struct tree_balance * tb, int h)
   
     /* set right merge flag we take right delimiting key and check whether it is a mergeable item */
     if (tb->CFR[0]) {
-	struct key * key;
+	struct reiserfs_key * key;
 
 	key = B_N_PDELIM_KEY (tb->CFR[0], tb->rkey[0]);
 	if (op_is_left_mergeable (key, Sh->b_size) && (vn->vn_mode != M_DELETE ||
@@ -1140,7 +1140,7 @@ static inline int can_node_be_removed (int mode, int lfree, int sfree, int rfree
     struct buffer_head * Sh = PATH_H_PBUFFER (tb->tb_path, h);
     int levbytes = tb->insert_size[h];
     struct item_head * ih;
-    struct key * r_key = NULL;
+    struct reiserfs_key * r_key = NULL;
 
     ih = B_N_PITEM_HEAD (Sh, 0);
     if ( tb->CFR[h] )

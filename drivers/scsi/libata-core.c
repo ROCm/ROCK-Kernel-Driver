@@ -39,6 +39,7 @@
 #include <linux/workqueue.h>
 #include <scsi/scsi.h>
 #include "scsi.h"
+#include "scsi_priv.h"
 #include <scsi/scsi_host.h>
 #include <linux/libata.h>
 #include <asm/io.h>
@@ -58,6 +59,7 @@ static int ata_choose_xfer_mode(struct ata_port *ap,
 				u8 *xfer_mode_out,
 				unsigned int *xfer_shift_out);
 static int ata_qc_complete_noop(struct ata_queued_cmd *qc, u8 drv_stat);
+static void __ata_qc_complete(struct ata_queued_cmd *qc);
 
 static unsigned int ata_unique_id = 1;
 static struct workqueue_struct *ata_wq;
@@ -2193,11 +2195,50 @@ static void ata_pio_sector(struct ata_queued_cmd *qc)
 	kunmap(page);
 }
 
-static void atapi_pio_sector(struct ata_queued_cmd *qc)
+static void __atapi_pio_bytes(struct ata_queued_cmd *qc, unsigned int bytes)
+{
+	int do_write = (qc->tf.flags & ATA_TFLAG_WRITE);
+	struct scatterlist *sg = qc->sg;
+	struct ata_port *ap = qc->ap;
+	struct page *page;
+	unsigned char *buf;
+	unsigned int count;
+
+	if (qc->curbytes == qc->nbytes - bytes)
+		ap->pio_task_state = PIO_ST_LAST;
+
+next_sg:
+	sg = &qc->sg[qc->cursg];
+	page = sg->page;
+
+	count = min(sg_dma_len(sg) - qc->cursg_ofs, bytes);
+	buf = kmap(page) + sg->offset + qc->cursg_ofs;
+
+	bytes -= count;
+	qc->curbytes += count;
+	qc->cursg_ofs += count;
+
+	if (qc->cursg_ofs == sg_dma_len(sg)) {
+		qc->cursg++;
+		qc->cursg_ofs = 0;
+	}
+
+	DPRINTK("data %s\n", qc->tf.flags & ATA_TFLAG_WRITE ? "write" : "read");
+
+	/* do the actual data transfer */
+	ata_data_xfer(ap, buf, count, do_write);
+
+	kunmap(page);
+
+	if (bytes)
+		goto next_sg;
+}
+
+static void atapi_pio_bytes(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	struct ata_device *dev = qc->dev;
-	unsigned int i, ireason, bc_lo, bc_hi, bytes;
+	unsigned int ireason, bc_lo, bc_hi, bytes;
 	int i_write, do_write = (qc->tf.flags & ATA_TFLAG_WRITE) ? 1 : 0;
 
 	ap->ops->tf_read(ap, &qc->tf);
@@ -2215,16 +2256,7 @@ static void atapi_pio_sector(struct ata_queued_cmd *qc)
 	if (do_write != i_write)
 		goto err_out;
 
-	/* make sure byte count is multiple of sector size; not
-	* required by standard (warning! warning!), but IDE driver
-	* does this to simplify things a bit.  We are lazy, and
-	* follow suit.
-	*/
-	if (bytes & (ATA_SECT_SIZE - 1))
-		goto err_out;
-
-	for (i = 0; i < (bytes >> 9); i++)
-		ata_pio_sector(qc);
+	__atapi_pio_bytes(qc, bytes);
 
 	return;
 
@@ -2265,19 +2297,30 @@ static void ata_pio_block(struct ata_port *ap)
 		}
 	}
 
-	/* handle BSY=0, DRQ=0 as error */
-	if ((status & ATA_DRQ) == 0) {
-		ap->pio_task_state = PIO_ST_ERR;
-		return;
-	}
-
 	qc = ata_qc_from_tag(ap, ap->active_tag);
 	assert(qc != NULL);
 
-	if (is_atapi_taskfile(&qc->tf))
-		atapi_pio_sector(qc);
-	else
+	if (is_atapi_taskfile(&qc->tf)) {
+		/* no more data to transfer or unsupported ATAPI command */
+		if ((status & ATA_DRQ) == 0) {
+			ap->pio_task_state = PIO_ST_IDLE;
+
+			ata_irq_on(ap);
+
+			ata_qc_complete(qc, status);
+			return;
+		}
+
+		atapi_pio_bytes(qc);
+	} else {
+		/* handle BSY=0, DRQ=0 as error */
+		if ((status & ATA_DRQ) == 0) {
+			ap->pio_task_state = PIO_ST_ERR;
+			return;
+		}
+
 		ata_pio_sector(qc);
+	}
 }
 
 static void ata_pio_error(struct ata_port *ap)
@@ -2335,6 +2378,59 @@ static void ata_pio_task(void *_data)
 	}
 }
 
+static void atapi_request_sense(struct ata_port *ap, struct ata_device *dev,
+				struct scsi_cmnd *cmd)
+{
+	DECLARE_COMPLETION(wait);
+	struct ata_queued_cmd *qc;
+	unsigned long flags;
+	int using_pio = dev->flags & ATA_DFLAG_PIO;
+	int rc;
+
+	DPRINTK("ATAPI request sense\n");
+
+	qc = ata_qc_new_init(ap, dev);
+	BUG_ON(qc == NULL);
+
+	/* FIXME: is this needed? */
+	memset(cmd->sense_buffer, 0, sizeof(cmd->sense_buffer));
+
+	ata_sg_init_one(qc, cmd->sense_buffer, sizeof(cmd->sense_buffer));
+	qc->pci_dma_dir = PCI_DMA_FROMDEVICE;
+
+	memset(&qc->cdb, 0, sizeof(ap->cdb_len));
+	qc->cdb[0] = REQUEST_SENSE;
+	qc->cdb[4] = SCSI_SENSE_BUFFERSIZE;
+
+	qc->tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
+	qc->tf.command = ATA_CMD_PACKET;
+
+	if (using_pio) {
+		qc->tf.protocol = ATA_PROT_ATAPI;
+		qc->tf.lbam = (8 * 1024) & 0xff;
+		qc->tf.lbah = (8 * 1024) >> 8;
+
+		qc->nbytes = SCSI_SENSE_BUFFERSIZE;
+	} else {
+		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
+		qc->tf.feature |= ATAPI_PKT_DMA;
+	}
+
+	qc->waiting = &wait;
+	qc->complete_fn = ata_qc_complete_noop;
+
+	spin_lock_irqsave(&ap->host_set->lock, flags);
+	rc = ata_qc_issue(qc);
+	spin_unlock_irqrestore(&ap->host_set->lock, flags);
+
+	if (rc)
+		ata_port_disable(ap);
+	else
+		wait_for_completion(&wait);
+
+	DPRINTK("EXIT\n");
+}
+
 /**
  *	ata_qc_timeout - Handle timeout of queued command
  *	@qc: Command that timed out
@@ -2356,9 +2452,28 @@ static void ata_pio_task(void *_data)
 static void ata_qc_timeout(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
+	struct ata_device *dev = qc->dev;
 	u8 host_stat = 0, drv_stat;
 
 	DPRINTK("ENTER\n");
+
+	/* FIXME: doesn't this conflict with timeout handling? */
+	if (qc->dev->class == ATA_DEV_ATAPI && qc->scsicmd) {
+		struct scsi_cmnd *cmd = qc->scsicmd;
+
+		if (!scsi_eh_eflags_chk(cmd, SCSI_EH_CANCEL_CMD)) {
+
+			/* finish completing original command */
+			__ata_qc_complete(qc);
+
+			atapi_request_sense(ap, dev, cmd);
+
+			cmd->result = (CHECK_CONDITION << 1) | (DID_OK << 16);
+			scsi_finish_command(cmd);
+
+			goto out;
+		}
+	}
 
 	/* hack alert!  We cannot use the supplied completion
 	 * function from inside the ->eh_strategy_handler() thread.
@@ -2393,7 +2508,7 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 		ata_qc_complete(qc, drv_stat);
 		break;
 	}
-
+out:
 	DPRINTK("EXIT\n");
 }
 
@@ -2482,6 +2597,7 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 		qc->dev = dev;
 		qc->cursect = qc->cursg = qc->cursg_ofs = 0;
 		qc->nsect = 0;
+		qc->nbytes = qc->curbytes = 0;
 
 		ata_tf_init(ap, &qc->tf, dev->devno);
 
@@ -2497,35 +2613,10 @@ static int ata_qc_complete_noop(struct ata_queued_cmd *qc, u8 drv_stat)
 	return 0;
 }
 
-/**
- *	ata_qc_complete - Complete an active ATA command
- *	@qc: Command to complete
- *	@drv_stat: ATA status register contents
- *
- *	LOCKING:
- *
- */
-
-void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
+static void __ata_qc_complete(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	unsigned int tag, do_clear = 0;
-	int rc;
-
-	assert(qc != NULL);	/* ata_qc_from_tag _might_ return NULL */
-	assert(qc->flags & ATA_QCFLAG_ACTIVE);
-
-	if (likely(qc->flags & ATA_QCFLAG_DMAMAP))
-		ata_sg_clean(qc);
-
-	/* call completion callback */
-	rc = qc->complete_fn(qc, drv_stat);
-
-	/* if callback indicates not to complete command (non-zero),
-	 * return immediately
-	 */
-	if (rc != 0)
-		return;
 
 	qc->flags = 0;
 	tag = qc->tag;
@@ -2544,6 +2635,37 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 
 	if (likely(do_clear))
 		clear_bit(tag, &ap->qactive);
+}
+
+/**
+ *	ata_qc_complete - Complete an active ATA command
+ *	@qc: Command to complete
+ *	@drv_stat: ATA status register contents
+ *
+ *	LOCKING:
+ *
+ */
+
+void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
+{
+	int rc;
+
+	assert(qc != NULL);	/* ata_qc_from_tag _might_ return NULL */
+	assert(qc->flags & ATA_QCFLAG_ACTIVE);
+
+	if (likely(qc->flags & ATA_QCFLAG_DMAMAP))
+		ata_sg_clean(qc);
+
+	/* call completion callback */
+	rc = qc->complete_fn(qc, drv_stat);
+
+	/* if callback indicates not to complete command (non-zero),
+	 * return immediately
+	 */
+	if (rc != 0)
+		return;
+
+	__ata_qc_complete(qc);
 
 	VPRINTK("EXIT\n");
 }

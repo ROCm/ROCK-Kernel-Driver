@@ -436,7 +436,7 @@ void sysfs_remove_file(struct kobject * kobj, const struct attribute * attr)
 }
 
 
-EXPORT_SYMBOL(sysfs_create_file);
-EXPORT_SYMBOL(sysfs_remove_file);
-EXPORT_SYMBOL(sysfs_update_file);
+EXPORT_SYMBOL_GPL(sysfs_create_file);
+EXPORT_SYMBOL_GPL(sysfs_remove_file);
+EXPORT_SYMBOL_GPL(sysfs_update_file);
 

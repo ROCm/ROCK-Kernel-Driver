@@ -10,69 +10,14 @@
 
 MKIMAGE         := $(srctree)/scripts/mkuboot.sh
 
+ifneq ($(MACHINE),)
+include $(srctree)/$(MACHINE)/Makefile.boot
+endif
+
 # Note: the following conditions must always be true:
 #   ZRELADDR == virt_to_phys(TEXTADDR)
-#   PARAMS_PHYS must be with 4MB of ZRELADDR
+#   PARAMS_PHYS must be within 4MB of ZRELADDR
 #   INITRD_PHYS must be in RAM
-
-   zreladdr-$(CONFIG_ARCH_RPC)		:= 0x10008000
-params_phys-$(CONFIG_ARCH_RPC)		:= 0x10000100
-initrd_phys-$(CONFIG_ARCH_RPC)		:= 0x18000000
-   zreladdr-$(CONFIG_ARCH_CLPS7500)	:= 0x10008000
-   zreladdr-$(CONFIG_ARCH_CLPS7500)	:= 0x10008000
-   zreladdr-$(CONFIG_ARCH_EBSA110)	:= 0x00008000
-params_phys-$(CONFIG_ARCH_EBSA110)	:= 0x00000400
-initrd_phys-$(CONFIG_ARCH_EBSA110)	:= 0x00800000
-  ztextaddr-$(CONFIG_ARCH_SHARK)	:= 0x08508000
-   zreladdr-$(CONFIG_ARCH_SHARK)	:= 0x08008000
-   zreladdr-$(CONFIG_FOOTBRIDGE)	:= 0x00008000
-params_phys-$(CONFIG_FOOTBRIDGE)	:= 0x00000100
-initrd_phys-$(CONFIG_FOOTBRIDGE)	:= 0x00800000
-   zreladdr-$(CONFIG_ARCH_INTEGRATOR)	:= 0x00008000
-params_phys-$(CONFIG_ARCH_INTEGRATOR)	:= 0x00000100
-initrd_phys-$(CONFIG_ARCH_INTEGRATOR)	:= 0x00800000
-   zreladdr-$(CONFIG_ARCH_CAMELOT)	:= 0x00008000
-   zreladdr-$(CONFIG_ARCH_NEXUSPCI)	:= 0x40008000
-   zreladdr-$(CONFIG_ARCH_L7200)	:= 0xf0008000
-# The standard locations for stuff on CLPS711x type processors
-   zreladdr-$(CONFIG_ARCH_CLPS711X)	:= 0xc0028000 
-params_phys-$(CONFIG_ARCH_CLPS711X)	:= 0xc0000100
-# Should probably have some agreement on these...
-initrd_phys-$(CONFIG_ARCH_P720T)	:= 0xc0400000
-initrd_phys-$(CONFIG_ARCH_CDB89712)	:= 0x00700000
-   zreladdr-$(CONFIG_ARCH_SA1100)	:= 0xc0008000
-ifeq ($(CONFIG_ARCH_SA1100),y)
-   zreladdr-$(CONFIG_SA1111)		:= 0xc0208000
-endif
-params_phys-$(CONFIG_ARCH_SA1100)	:= 0xc0000100
-initrd_phys-$(CONFIG_ARCH_SA1100)	:= 0xc0800000
-   zreladdr-$(CONFIG_ARCH_PXA)		:= 0xa0008000
-   zreladdr-$(CONFIG_ARCH_MX1ADS)	:= 0x08008000
-   zreladdr-$(CONFIG_ARCH_IOP3XX)	:= 0xa0008000
-params_phys-$(CONFIG_ARCH_IOP3XX)	:= 0xa0000100
-initrd_phys-$(CONFIG_ARCH_IOP3XX)   	:= 0xa0800000
-ifeq ($(CONFIG_ARCH_IOP331),y)
-   zreladdr-$(CONFIG_ARCH_IOP3XX)      	:= 0x00008000
-params_phys-$(CONFIG_ARCH_IOP3XX)      	:= 0x00000100
-initrd_phys-$(CONFIG_ARCH_IOP3XX)      	:= 0x00800000
-endif
-   zreladdr-$(CONFIG_ARCH_IXP4XX)	:= 0x00008000
-params-phys-$(CONFIG_ARCH_IXP4XX)	:= 0x00000100
-   zreladdr-$(CONFIG_ARCH_IXP2000)	:= 0x00008000
-params-phys-$(CONFIG_ARCH_IXP2000)	:= 0x00000100
-   zreladdr-$(CONFIG_ARCH_OMAP)		:= 0x10008000
-params_phys-$(CONFIG_ARCH_OMAP)		:= 0x10000100
-initrd_phys-$(CONFIG_ARCH_OMAP)		:= 0x10800000
-   zreladdr-$(CONFIG_ARCH_LH7A40X)	:= 0xc0008000
-params_phys-$(CONFIG_ARCH_LH7A40X)	:= 0xc0000100
-initrd_phys-$(CONFIG_ARCH_LH7A40X)	:= 0xc4000000
-   zreladdr-$(CONFIG_ARCH_S3C2410)	:= 0x30008000
-params_phys-$(CONFIG_ARCH_S3C2410)	:= 0x30000100
-   zreladdr-$(CONFIG_ARCH_VERSATILE_PB)	:= 0x00008000
-params_phys-$(CONFIG_ARCH_VERSATILE_PB)	:= 0x00000100
-initrd_phys-$(CONFIG_ARCH_VERSATILE_PB)	:= 0x00800000
-   zreladdr-$(CONFIG_ARCH_H720X)	:= 0x40008000
-
 ZRELADDR    := $(zreladdr-y)
 PARAMS_PHYS := $(params_phys-y)
 INITRD_PHYS := $(initrd_phys-y)

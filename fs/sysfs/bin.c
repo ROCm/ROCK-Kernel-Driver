@@ -199,5 +199,5 @@ int sysfs_remove_bin_file(struct kobject * kobj, struct bin_attribute * attr)
 	return 0;
 }
 
-EXPORT_SYMBOL(sysfs_create_bin_file);
-EXPORT_SYMBOL(sysfs_remove_bin_file);
+EXPORT_SYMBOL_GPL(sysfs_create_bin_file);
+EXPORT_SYMBOL_GPL(sysfs_remove_bin_file);

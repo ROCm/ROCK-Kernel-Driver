@@ -134,6 +134,10 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	clear_clock_irq();
 
 	do_timer(regs);
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(regs));
+#endif
+
 
 	/* Determine when to update the Mostek clock. */
 	if ((time_status & STA_UNSYNC) == 0 &&

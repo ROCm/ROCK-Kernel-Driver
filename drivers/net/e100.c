@@ -513,7 +513,7 @@ struct nic {
 
 	spinlock_t cb_lock			____cacheline_aligned;
 	spinlock_t cmd_lock;
-	struct csr *csr;
+	struct csr __iomem *csr;
 	enum scb_cmd_lo cuc_cmd;
 	unsigned int cbs_avail;
 	struct cb *cbs;
@@ -563,7 +563,6 @@ struct nic {
 	u16 leds;
 	u16 eeprom_wc;
 	u16 eeprom[256];
-	u32 pm_state[16];
 };
 
 static inline void e100_write_flush(struct nic *nic)
@@ -2310,7 +2309,7 @@ static int e100_suspend(struct pci_dev *pdev, u32 state)
 	e100_hw_reset(nic);
 	netif_device_detach(netdev);
 
-	pci_save_state(pdev, nic->pm_state);
+	pci_save_state(pdev);
 	pci_enable_wake(pdev, state, nic->flags & (wol_magic | e100_asf(nic)));
 	pci_disable_device(pdev);
 	pci_set_power_state(pdev, state);
@@ -2324,7 +2323,7 @@ static int e100_resume(struct pci_dev *pdev)
 	struct nic *nic = netdev_priv(netdev);
 
 	pci_set_power_state(pdev, 0);
-	pci_restore_state(pdev, nic->pm_state);
+	pci_restore_state(pdev);
 	e100_hw_init(nic);
 
 	netif_device_attach(netdev);

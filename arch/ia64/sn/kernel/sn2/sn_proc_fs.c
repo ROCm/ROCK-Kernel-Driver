@@ -11,7 +11,6 @@
 #ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
-#include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
 
 static int partition_id_show(struct seq_file *s, void *p)

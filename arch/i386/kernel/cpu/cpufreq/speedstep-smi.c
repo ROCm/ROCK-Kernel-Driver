@@ -260,12 +260,6 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 	if (result) {
 		/* fall back to speedstep_lib.c dection mechanism: try both states out */
 		dprintk(KERN_INFO PFX "could not detect low and high frequencies by SMI call.\n");
-		if (!speedstep_processor)
-			speedstep_processor = speedstep_detect_processor();
-
-		if (!speedstep_processor)
-			return -ENODEV;
-
 		result = speedstep_get_freqs(speedstep_processor,
 				&speedstep_freqs[SPEEDSTEP_LOW].frequency,
 				&speedstep_freqs[SPEEDSTEP_HIGH].frequency,
@@ -310,10 +304,6 @@ static unsigned int speedstep_get(unsigned int cpu)
 {
 	if (cpu)
 		return -ENODEV;
-	if (!speedstep_processor)
-		speedstep_processor = speedstep_detect_processor();
-	if (!speedstep_processor)
-		return 0;
 	return speedstep_get_processor_frequency(speedstep_processor);
 }
 
@@ -354,10 +344,19 @@ static struct cpufreq_driver speedstep_driver = {
  */
 static int __init speedstep_init(void)
 {
-    struct cpuinfo_x86 *c = cpu_data;
+	speedstep_processor = speedstep_detect_processor();
 
-    if (c->x86_vendor != X86_VENDOR_INTEL) {
-		printk (KERN_INFO PFX "No Intel CPU detected.\n");
+	switch (speedstep_processor) {
+	case SPEEDSTEP_PROCESSOR_PIII_T:
+	case SPEEDSTEP_PROCESSOR_PIII_C:
+	case SPEEDSTEP_PROCESSOR_PIII_C_EARLY:
+		break;
+	default:
+		speedstep_processor = 0;
+	}
+
+	if (!speedstep_processor) {
+		dprintk (KERN_INFO PFX "No supported Intel CPU detected.\n");
 		return -ENODEV;
 	}
 

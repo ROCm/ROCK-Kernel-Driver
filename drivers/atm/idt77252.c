@@ -1266,8 +1266,9 @@ idt77252_rx_raw(struct idt77252_dev *card)
 	head = IDT77252_PRV_PADDR(queue) + (queue->data - queue->head - 16);
 	tail = readl(SAR_REG_RAWCT);
 
-	pci_dma_sync_single(card->pcidev, IDT77252_PRV_PADDR(queue),
-			    queue->end - queue->head - 16, PCI_DMA_FROMDEVICE);
+	pci_dma_sync_single_for_cpu(card->pcidev, IDT77252_PRV_PADDR(queue),
+				    queue->end - queue->head - 16,
+				    PCI_DMA_FROMDEVICE);
 
 	while (head != tail) {
 		unsigned int vpi, vci, pti;
@@ -1360,10 +1361,10 @@ drop:
 			if (next) {
 				card->raw_cell_head = next;
 				queue = card->raw_cell_head;
-				pci_dma_sync_single(card->pcidev,
-						    IDT77252_PRV_PADDR(queue),
-						    queue->end - queue->data,
-						    PCI_DMA_FROMDEVICE);
+				pci_dma_sync_single_for_cpu(card->pcidev,
+							    IDT77252_PRV_PADDR(queue),
+							    queue->end - queue->data,
+							    PCI_DMA_FROMDEVICE);
 			} else {
 				card->raw_cell_head = NULL;
 				printk("%s: raw cell queue overrun\n",
@@ -3840,11 +3841,7 @@ static int __init idt77252_init(void)
 		return -EIO;
 	}
 
-	if (pci_register_driver(&idt77252_driver) > 0)
-		return 0;
-
-	pci_unregister_driver(&idt77252_driver);
-	return -ENODEV;
+	return pci_register_driver(&idt77252_driver);
 }
 
 static void __exit idt77252_exit(void)

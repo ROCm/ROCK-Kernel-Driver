@@ -63,7 +63,6 @@ static int get_power_status(struct hotplug_slot *slot, u8 * value);
 static int get_attention_status(struct hotplug_slot *slot, u8 * value);
 static int get_adapter_status(struct hotplug_slot *slot, u8 * value);
 static int get_max_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value);
-static int rpaphp_disable_slot(struct pci_dev *dev);
 
 struct hotplug_slot_ops rpaphp_hotplug_slot_ops = {
 	.owner = THIS_MODULE,
@@ -212,32 +211,91 @@ int rpaphp_remove_slot(struct slot *slot)
 	return deregister_slot(slot);
 }
 
-static int get_dn_properties(struct device_node *dn, int **indexes, int **names, 
-	int **types, int **power_domains)
+static int get_children_props(struct device_node *dn, int **drc_indexes,
+		int **drc_names, int **drc_types, int **drc_power_domains)
 {
-	*indexes = (int *) get_property(dn, "ibm,drc-indexes", NULL);
+	int *indexes, *names;
+	int *types, *domains;
 
-	/* &names[1] contains NULL terminated slot names */
-	*names = (int *) get_property(dn, "ibm,drc-names", NULL);
+	indexes = (int *) get_property(dn, "ibm,drc-indexes", NULL);
+	names = (int *) get_property(dn, "ibm,drc-names", NULL);
+	types = (int *) get_property(dn, "ibm,drc-types", NULL);
+	domains = (int *) get_property(dn, "ibm,drc-power-domains", NULL);
 
-	/* &types[1] contains NULL terminated slot types */
-	*types = (int *) get_property(dn, "ibm,drc-types", NULL);
+	if (!indexes || !names || !types || !domains) {
+		/* Slot does not have dynamically-removable children */
+		return 1;
+	}
+	if (drc_indexes)
+		*drc_indexes = indexes;
+	if (drc_names)
+		/* &drc_names[1] contains NULL terminated slot names */
+		*drc_names = names;
+	if (drc_types)
+		/* &drc_types[1] contains NULL terminated slot types */
+		*drc_types = types;
+	if (drc_power_domains)
+		*drc_power_domains = domains;
 
-	/* power_domains[1...n] are the slot power domains */
-	*power_domains = (int *) get_property(dn, "ibm,drc-power-domains", NULL);
-	
-	if (*indexes && *names && *types && *power_domains) 
-		return (1);
-	
-	return (0);
+	return 0;
+}
+
+/* To get the DRC props describing the current node, first obtain it's
+ * my-drc-index property.  Next obtain the DRC list from it's parent.  Use
+ * the my-drc-index for correlation, and obtain the requested properties.
+ */
+int rpaphp_get_drc_props(struct device_node *dn, int *drc_index,
+		char **drc_name, char **drc_type, int *drc_power_domain)
+{
+	int *indexes, *names;
+	int *types, *domains;
+	unsigned int *my_index;
+	char *name_tmp, *type_tmp;
+	int i, rc;
+
+	my_index = (int *) get_property(dn, "ibm,my-drc-index", NULL);
+	if (!my_index) {
+		/* Node isn't DLPAR/hotplug capable */
+		return 1;
+	}
+
+	rc = get_children_props(dn->parent, &indexes, &names, &types, &domains);
+	if (rc) {
+		return 1;
+	}
+
+	name_tmp = (char *) &names[1];
+	type_tmp = (char *) &types[1];
+
+	/* Iterate through parent properties, looking for my-drc-index */
+	for (i = 0; i < indexes[0]; i++) {
+		if ((unsigned int) indexes[i + 1] == *my_index) {
+			if (drc_name)
+                		*drc_name = name_tmp;
+			if (drc_type)
+				*drc_type = type_tmp;
+			if (drc_index)
+				*drc_index = *my_index;
+			if (drc_power_domain)
+				*drc_power_domain = domains[i+1];
+			return 0;
+		}
+		name_tmp += (strlen(name_tmp) + 1);
+		type_tmp += (strlen(type_tmp) + 1);
+	}
+
+	return 1;
 }
 
 static int is_php_dn(struct device_node *dn, int **indexes, int **names, int **types,
 	  int **power_domains)
 {
+	int rc;
+
 	if (!is_hotplug_capable(dn))
 		return (0);
-	if (!get_dn_properties(dn, indexes, names, types, power_domains))
+	rc = get_children_props(dn, indexes, names, types, power_domains);
+	if (rc)
 		return (0);
 	return (1);
 }
@@ -245,8 +303,7 @@ static int is_php_dn(struct device_node *dn, int **indexes, int **names, int **t
 static int is_dr_dn(struct device_node *dn, int **indexes, int **names, int **types,
 	  int **power_domains, int **my_drc_index)
 {
-	if (!is_hotplug_capable(dn))
-		return (0);
+	int rc;
 
 	*my_drc_index = (int *) get_property(dn, "ibm,my-drc-index", NULL);
 	if(!*my_drc_index) 		
@@ -255,7 +312,9 @@ static int is_dr_dn(struct device_node *dn, int **indexes, int **names, int **ty
 	if (!dn->parent)
 		return (0);
 
-	return get_dn_properties(dn->parent, indexes, names, types, power_domains);
+	rc = get_children_props(dn->parent, indexes, names, types,
+				power_domains);
+	return (rc == 0);
 }
 
 static inline int is_vdevice_root(struct device_node *dn)
@@ -263,34 +322,10 @@ static inline int is_vdevice_root(struct device_node *dn)
 	return !strcmp(dn->name, "vdevice");
 }
 
-char *rpaphp_get_drc_name(struct device_node *dn)
+int is_dlpar_type(const char *type_str)
 {
-	char *name, *ptr = NULL;
-	int *drc_names, *drc_indexes, i;
-	struct device_node *parent = dn->parent;	
-	u32 *my_drc_index;
-
-	if (!parent)
-		return NULL;
-
-	my_drc_index = (u32 *) get_property(dn, "ibm,my-drc-index", NULL);
-	if (!my_drc_index)
-		return NULL;	
-
-	drc_names = (int *) get_property(parent, "ibm,drc-names", NULL);
-	drc_indexes = (int *) get_property(parent, "ibm,drc-indexes", NULL);
-	if (!drc_names || !drc_indexes)
-		return NULL;
-
-	name = (char *) &drc_names[1];
-	for (i = 0; i < drc_indexes[0]; i++, name += (strlen(name) + 1)) {
-		if (drc_indexes[i + 1] == *my_drc_index) {
-			ptr = (char *) name;
-			break;
-		}
-	}
-
-	return ptr;
+	/* Only register DLPAR-capable nodes of drc-type PHB or SLOT */
+	return (!strcmp(type_str, "PHB") || !strcmp(type_str, "SLOT"));
 }
 
 /****************************************************************
@@ -329,15 +364,18 @@ int rpaphp_add_slot(struct device_node *dn)
 		for (i = 0; i < indexes[0]; i++,
 	     		name += (strlen(name) + 1), type += (strlen(type) + 1)) {
 
-			if ( slot_type == HOTPLUG || 
-				(slot_type == EMBEDDED && indexes[i + 1] == my_drc_index[0])) {
-				
+			if (slot_type == HOTPLUG ||
+			    (slot_type == EMBEDDED &&
+			     indexes[i + 1] == my_drc_index[0] &&
+			     is_dlpar_type(type))) {
 				if (!(slot = alloc_slot_struct(dn, indexes[i + 1], name,
 					       power_domains[i + 1]))) {
 					retval = -ENOMEM;
 					goto exit;
 				}
-				if (slot_type == EMBEDDED)
+				if (!strcmp(type, "PHB"))
+					slot->type = PHB;
+				else if (slot_type == EMBEDDED)
 					slot->type = EMBEDDED;
 				else
 					slot->type = simple_strtoul(type, NULL, 10);
@@ -442,11 +480,6 @@ exit:
 	return retval;
 }
 
-static int rpaphp_disable_slot(struct pci_dev *dev)
-{
-	return disable_slot(rpaphp_find_hotplug_slot(dev));
-}
-
 static int disable_slot(struct hotplug_slot *hotplug_slot)
 {
 	int retval = -EINVAL;
@@ -483,4 +516,4 @@ module_exit(rpaphp_exit);
 EXPORT_SYMBOL_GPL(rpaphp_add_slot);
 EXPORT_SYMBOL_GPL(rpaphp_remove_slot);
 EXPORT_SYMBOL_GPL(rpaphp_slot_head);
-EXPORT_SYMBOL_GPL(rpaphp_get_drc_name);
+EXPORT_SYMBOL_GPL(rpaphp_get_drc_props);

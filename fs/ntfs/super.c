@@ -31,12 +31,15 @@
 #include <linux/moduleparam.h>
 #include <linux/smp_lock.h>
 
-#include "ntfs.h"
 #include "sysctl.h"
 #include "logfile.h"
 #include "quota.h"
 #include "dir.h"
+#include "debug.h"
 #include "index.h"
+#include "aops.h"
+#include "malloc.h"
+#include "ntfs.h"
 
 /* Number of mounted file systems which have compression enabled. */
 static unsigned long ntfs_nr_compression_users;
@@ -827,12 +830,12 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 }
 
 /**
- * setup_lcn_allocator - initialize the cluster allocator
- * @vol:	volume structure for which to setup the lcn allocator
+ * ntfs_setup_allocators - initialize the cluster and mft allocators
+ * @vol:	volume structure for which to setup the allocators
  *
- * Setup the cluster (lcn) allocator to the starting values.
+ * Setup the cluster (lcn) and mft allocators to the starting values.
  */
-static void setup_lcn_allocator(ntfs_volume *vol)
+static void ntfs_setup_allocators(ntfs_volume *vol)
 {
 #ifdef NTFS_RW
 	LCN mft_zone_size, mft_lcn;
@@ -902,6 +905,11 @@ static void setup_lcn_allocator(ntfs_volume *vol)
 	vol->data2_zone_pos = 0;
 	ntfs_debug("vol->data2_zone_pos = 0x%llx",
 			(unsigned long long)vol->data2_zone_pos);
+
+	/* Set the mft data allocation position to mft record 24. */
+	vol->mft_data_pos = 24;
+	ntfs_debug("vol->mft_data_pos = 0x%llx",
+			(unsigned long long)vol->mft_data_pos);
 #endif /* NTFS_RW */
 }
 
@@ -938,8 +946,8 @@ static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
 	/* No VFS initiated operations allowed for $MFTMirr. */
 	tmp_ino->i_op = &ntfs_empty_inode_ops;
 	tmp_ino->i_fop = &ntfs_empty_file_ops;
-	/* Put back our special address space operations. */
-	tmp_ino->i_mapping->a_ops = &ntfs_mft_aops;
+	/* Put in our special address space operations. */
+	tmp_ino->i_mapping->a_ops = &ntfs_mst_aops;
 	tmp_ni = NTFS_I(tmp_ino);
 	/* The $MFTMirr, like the $MFT is multi sector transfer protected. */
 	NInoSetMstProtected(tmp_ni);
@@ -2334,8 +2342,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	 */
 	result = parse_ntfs_boot_sector(vol, (NTFS_BOOT_SECTOR*)bh->b_data);
 
-	/* Initialize the cluster allocator. */
-	setup_lcn_allocator(vol);
+	/* Initialize the cluster and mft allocators. */
+	ntfs_setup_allocators(vol);
 
 	brelse(bh);
 

@@ -42,6 +42,7 @@
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/device.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -512,7 +513,6 @@ static int	stl_clrportstats(stlport_t *portp, comstats_t __user *cp);
 static int	stl_getportstruct(stlport_t __user *arg);
 static int	stl_getbrdstruct(stlbrd_t __user *arg);
 static int	stl_waitcarrier(stlport_t *portp, struct file *filp);
-static void	stl_delay(int len);
 static void	stl_eiointr(stlbrd_t *brdp);
 static void	stl_echatintr(stlbrd_t *brdp);
 static void	stl_echmcaintr(stlbrd_t *brdp);
@@ -1204,32 +1204,13 @@ static void stl_close(struct tty_struct *tty, struct file *filp)
 
 	if (portp->openwaitcnt) {
 		if (portp->close_delay)
-			stl_delay(portp->close_delay);
+			msleep_interruptible(jiffies_to_msecs(portp->close_delay));
 		wake_up_interruptible(&portp->open_wait);
 	}
 
 	portp->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&portp->close_wait);
 	restore_flags(flags);
-}
-
-/*****************************************************************************/
-
-/*
- *	Wait for a specified delay period, this is not a busy-loop. It will
- *	give up the processor while waiting. Unfortunately this has some
- *	rather intimate knowledge of the process management stuff.
- */
-
-static void stl_delay(int len)
-{
-#ifdef DEBUG
-	printk("stl_delay(len=%d)\n", len);
-#endif
-	if (len > 0) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(len);
-	}
 }
 
 /*****************************************************************************/
@@ -1854,7 +1835,7 @@ static void stl_waituntilsent(struct tty_struct *tty, int timeout)
 	while (stl_datastate(portp)) {
 		if (signal_pending(current))
 			break;
-		stl_delay(2);
+		msleep_interruptible(20);
 		if (time_after_eq(jiffies, tend))
 			break;
 	}

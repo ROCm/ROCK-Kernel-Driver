@@ -57,10 +57,12 @@ struct file_operations ext2_file_operations = {
 
 struct inode_operations ext2_file_inode_operations = {
 	.truncate	= ext2_truncate,
-	.setxattr	= ext2_setxattr,
-	.getxattr	= ext2_getxattr,
+#ifdef CONFIG_EXT2_FS_XATTR
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= ext2_listxattr,
-	.removexattr	= ext2_removexattr,
+	.removexattr	= generic_removexattr,
+#endif
 	.setattr	= ext2_setattr,
 	.permission	= ext2_permission,
 };

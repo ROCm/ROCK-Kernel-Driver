@@ -35,8 +35,6 @@
 
 #include "common.h"
 
-extern void __init omap_init_time(void);
-
 static struct map_desc h2_io_desc[] __initdata = {
 { OMAP1610_ETHR_BASE, OMAP1610_ETHR_START, OMAP1610_ETHR_SIZE,MT_DEVICE },
 { OMAP1610_NOR_FLASH_BASE, OMAP1610_NOR_FLASH_START, OMAP1610_NOR_FLASH_SIZE,
@@ -111,5 +109,5 @@ MACHINE_START(OMAP_H2, "TI-H2")
 	MAPIO(h2_map_io)
 	INITIRQ(h2_init_irq)
 	INIT_MACHINE(h2_init)
-	INITTIME(omap_init_time)
+	.timer		= &omap_timer,
 MACHINE_END

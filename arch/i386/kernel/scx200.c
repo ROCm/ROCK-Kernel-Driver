@@ -22,8 +22,46 @@ MODULE_LICENSE("GPL");
 unsigned scx200_gpio_base = 0;
 long scx200_gpio_shadow[2];
 
+static struct pci_device_id scx200_tbl[] = {
+	{ PCI_DEVICE(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SCx200_BRIDGE) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SC1100_BRIDGE) },
+	{ },
+};
+MODULE_DEVICE_TABLE(pci,scx200_tbl);
+
+static int __devinit scx200_probe(struct pci_dev *, const struct pci_device_id *);
+
+static struct pci_driver scx200_pci_driver = {
+	.name = "scx200",
+	.id_table = scx200_tbl,
+	.probe = scx200_probe,
+};
+
 spinlock_t scx200_gpio_lock = SPIN_LOCK_UNLOCKED;
 static spinlock_t scx200_gpio_config_lock = SPIN_LOCK_UNLOCKED;
+
+static int __devinit scx200_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+{
+	int bank;
+	unsigned base;
+
+	base = pci_resource_start(pdev, 0);
+	printk(KERN_INFO NAME ": GPIO base 0x%x\n", base);
+
+	if (request_region(base, SCx200_GPIO_SIZE, "NatSemi SCx200 GPIO") == 0) {
+		printk(KERN_ERR NAME ": can't allocate I/O for GPIOs\n");
+		return -EBUSY;
+	}
+
+	scx200_gpio_base = base;
+
+	/* read the current values driven on the GPIO signals */
+	for (bank = 0; bank < 2; ++bank)
+		scx200_gpio_shadow[bank] = inl(scx200_gpio_base + 0x10 * bank);
+
+	return 0;
+
+}
 
 u32 scx200_gpio_configure(int index, u32 mask, u32 bits)
 {
@@ -77,39 +115,14 @@ void scx200_gpio_dump(unsigned index)
 
 int __init scx200_init(void)
 {
-	struct pci_dev *bridge;
-	int bank;
-	unsigned base;
-
 	printk(KERN_INFO NAME ": NatSemi SCx200 Driver\n");
 
-	if ((bridge = pci_find_device(PCI_VENDOR_ID_NS, 
-				      PCI_DEVICE_ID_NS_SCx200_BRIDGE,
-				      NULL)) == NULL
-	    && (bridge = pci_find_device(PCI_VENDOR_ID_NS,
-					 PCI_DEVICE_ID_NS_SC1100_BRIDGE,
-					 NULL)) == NULL)
-		return -ENODEV;
-
-	base = pci_resource_start(bridge, 0);
-	printk(KERN_INFO NAME ": GPIO base 0x%x\n", base);
-
-	if (request_region(base, SCx200_GPIO_SIZE, "NatSemi SCx200 GPIO") == 0) {
-		printk(KERN_ERR NAME ": can't allocate I/O for GPIOs\n");
-		return -EBUSY;
-	}
-
-	scx200_gpio_base = base;
-
-	/* read the current values driven on the GPIO signals */
-	for (bank = 0; bank < 2; ++bank)
-		scx200_gpio_shadow[bank] = inl(scx200_gpio_base + 0x10 * bank);
-
-	return 0;
+	return pci_module_init(&scx200_pci_driver);
 }
 
 void __exit scx200_cleanup(void)
 {
+	pci_unregister_driver(&scx200_pci_driver);
 	release_region(scx200_gpio_base, SCx200_GPIO_SIZE);
 }
 

@@ -1840,8 +1840,7 @@ cy_close(struct tty_struct * tty, struct file * filp)
     info->tty = 0;
     if (info->blocked_open) {
 	if (info->close_delay) {
-	    current->state = TASK_INTERRUPTIBLE;
-	    schedule_timeout(info->close_delay);
+	    msleep_interruptible(jiffies_to_msecs(info->close_delay));
 	}
 	wake_up_interruptible(&info->open_wait);
     }

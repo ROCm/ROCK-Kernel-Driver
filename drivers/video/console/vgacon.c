@@ -901,8 +901,10 @@ static int vgacon_adjust_height(struct vc_data *vc, unsigned fontheight)
 	for (i = 0; i < MAX_NR_CONSOLES; i++) {
 		struct vc_data *c = vc_cons[i].d;
 
-		if (c && c->vc_sw == &vga_con)
+		if (c && c->vc_sw == &vga_con) {
+			c->vc_font.height = fontheight;
 			vc_resize(c->vc_num, 0, rows);	/* Adjust console size */
+		}
 	}
 	return 0;
 }

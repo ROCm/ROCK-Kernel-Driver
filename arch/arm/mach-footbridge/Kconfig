@@ -4,6 +4,7 @@ menu "Footbridge Implementations"
 
 config ARCH_CATS
 	bool "CATS"
+	select FOOTBRIDGE_HOST
 	help
 	  Say Y here if you intend to run this kernel on the CATS.
 
@@ -11,6 +12,7 @@ config ARCH_CATS
 
 config ARCH_PERSONAL_SERVER
 	bool "Compaq Personal Server"
+	select FOOTBRIDGE_HOST
 	---help---
 	  Say Y here if you intend to run this kernel on the Compaq
 	  Personal Server.
@@ -28,6 +30,8 @@ config ARCH_PERSONAL_SERVER
 
 config ARCH_EBSA285_ADDIN
 	bool "EBSA285 (addin mode)"
+	select ARCH_EBSA285
+	select FOOTBRIDGE_ADDIN
 	help
 	  Say Y here if you intend to run this kernel on the EBSA285 card
 	  in addin mode.
@@ -36,6 +40,8 @@ config ARCH_EBSA285_ADDIN
 
 config ARCH_EBSA285_HOST
 	bool "EBSA285 (host mode)"
+	select ARCH_EBSA285
+	select FOOTBRIDGE_HOST
 	help
 	  Say Y here if you intend to run this kernel on the EBSA285 card
 	  in host ("central function") mode.
@@ -44,6 +50,7 @@ config ARCH_EBSA285_HOST
 
 config ARCH_NETWINDER
 	bool "NetWinder"
+	select FOOTBRIDGE_HOST
 	help
 	  Say Y here if you intend to run this kernel on the Rebel.COM
 	  NetWinder.  Information about this machine can be found at:
@@ -53,5 +60,21 @@ config ARCH_NETWINDER
 	  Saying N will reduce the size of the Footbridge kernel.
 
 endmenu
+
+# Footbridge support
+config FOOTBRIDGE
+	bool
+
+# Footbridge in host mode
+config FOOTBRIDGE_HOST
+	bool
+
+# Footbridge in addin mode
+config FOOTBRIDGE_ADDIN
+	bool
+
+# EBSA285 board in either host or addin mode
+config ARCH_EBSA285
+	bool
 
 endif

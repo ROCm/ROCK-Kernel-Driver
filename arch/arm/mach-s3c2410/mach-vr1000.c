@@ -170,16 +170,11 @@ void __init vr1000_init_irq(void)
 	s3c2410_init_irq();
 }
 
-void __init vr1000_init_time(void)
-{
-	s3c2410_init_time();
-}
-
 MACHINE_START(VR1000, "Thorcom-VR1000")
      MAINTAINER("Ben Dooks <ben@simtec.co.uk>")
      BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, S3C2410_VA_UART)
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(vr1000_map_io)
      INITIRQ(vr1000_init_irq)
-     INITTIME(vr1000_init_time)
+     .timer		= &s3c2410_timer,
 MACHINE_END

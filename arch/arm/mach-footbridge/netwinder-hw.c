@@ -12,9 +12,15 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 
+#include <asm/hardware/dec21285.h>
 #include <asm/io.h>
 #include <asm/leds.h>
 #include <asm/mach-types.h>
+#include <asm/setup.h>
+
+#include <asm/mach/arch.h>
+
+#include "common.h"
 
 #define IRDA_IO_BASE		0x180
 #define GP1_IO_BASE		0x338
@@ -618,3 +624,37 @@ static int __init nw_hw_init(void)
 }
 
 __initcall(nw_hw_init);
+
+/*
+ * Older NeTTroms either do not provide a parameters
+ * page, or they don't supply correct information in
+ * the parameter page.
+ */
+static void __init
+fixup_netwinder(struct machine_desc *desc, struct tag *tags,
+		char **cmdline, struct meminfo *mi)
+{
+#ifdef CONFIG_ISAPNP
+	extern int isapnp_disable;
+
+	/*
+	 * We must not use the kernels ISAPnP code
+	 * on the NetWinder - it will reset the settings
+	 * for the WaveArtist chip and render it inoperable.
+	 */
+	isapnp_disable = 1;
+#endif
+}
+
+MACHINE_START(NETWINDER, "Rebel-NetWinder")
+	MAINTAINER("Russell King/Rebel.com")
+	BOOT_MEM(0x00000000, DC21285_ARMCSR_BASE, 0xfe000000)
+	BOOT_PARAMS(0x00000100)
+	VIDEO(0x000a0000, 0x000bffff)
+	DISABLE_PARPORT(0)
+	DISABLE_PARPORT(2)
+	FIXUP(fixup_netwinder)
+	MAPIO(footbridge_map_io)
+	INITIRQ(footbridge_init_irq)
+	.timer		= &isa_timer,
+MACHINE_END

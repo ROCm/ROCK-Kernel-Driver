@@ -31,10 +31,12 @@
 #include <linux/topology.h>
 #include <linux/sysctl.h>
 #include <linux/cpu.h>
+#include <linux/nodemask.h>
 
 #include <asm/tlbflush.h>
 
-DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
+nodemask_t node_online_map = NODE_MASK_NONE;
+nodemask_t node_possible_map = NODE_MASK_ALL;
 struct pglist_data *pgdat_list;
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
@@ -92,6 +94,7 @@ static void bad_page(const char *function, struct page *page)
 	set_page_count(page, 0);
 	reset_page_mapcount(page);
 	page->mapping = NULL;
+	tainted |= TAINT_BAD_PAGE;
 }
 
 #ifndef CONFIG_HUGETLB_PAGE

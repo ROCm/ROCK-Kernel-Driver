@@ -40,7 +40,9 @@
 #include <asm/mach/flash.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/map.h>
+#include <asm/mach/time.h>
 
+#include "common.h"
 
 /* 
  * All IO addresses are mapped onto VA 0xFFFx.xxxx, where x.xxxx
@@ -281,10 +283,15 @@ static void __init ap_init(void)
 	}
 }
 
-static void ap_time_init(void)
+static void __init ap_init_timer(void)
 {
 	integrator_time_init(1000000 * TICKS_PER_uSEC / HZ, 0);
 }
+
+static struct sys_timer ap_timer = {
+	.init		= ap_init_timer,
+	.offset		= integrator_gettimeoffset,
+};
 
 MACHINE_START(INTEGRATOR, "ARM-Integrator")
 	MAINTAINER("ARM Ltd/Deep Blue Solutions Ltd")
@@ -292,6 +299,6 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
 	BOOT_PARAMS(0x00000100)
 	MAPIO(ap_map_io)
 	INITIRQ(ap_init_irq)
-	INITTIME(ap_time_init)
+	.timer		= &ap_timer,
 	INIT_MACHINE(ap_init)
 MACHINE_END

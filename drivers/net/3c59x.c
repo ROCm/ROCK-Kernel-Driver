@@ -798,7 +798,7 @@ struct vortex_private {
 
 	/* PCI configuration space information. */
 	struct device *gendev;
-	char *cb_fn_base;					/* CardBus function status addr space. */
+	char __iomem *cb_fn_base;		/* CardBus function status addr space. */
 
 	/* Some values here only for performance evaluation and path-coverage */
 	int rx_nocopy, rx_copy, queued_packet, rx_csumhits;
@@ -817,7 +817,7 @@ struct vortex_private {
 		partner_flow_ctrl:1,			/* Partner supports flow control */
 		has_nway:1,
 		enable_wol:1,					/* Wake-on-LAN is enabled */
-		pm_state_valid:1,				/* power_state[] has sane contents */
+		pm_state_valid:1,				/* pci_dev->saved_config_space has sane contents */
 		open:1,
 		medialock:1,
 		must_free_region:1,				/* Flag: if zero, Cardbus owns the I/O region */
@@ -834,7 +834,6 @@ struct vortex_private {
 	u16 io_size;						/* Size of PCI region (for release_region) */
 	spinlock_t lock;					/* Serialise access to device & its vortex_private */
 	spinlock_t mdio_lock;				/* Serialise access to mdio hardware */
-	u32 power_state[16];
 };
 
 #ifdef CONFIG_PCI
@@ -1494,7 +1493,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 #endif
 	if (pdev && vp->enable_wol) {
 		vp->pm_state_valid = 1;
- 		pci_save_state(VORTEX_PCI(vp), vp->power_state);
+ 		pci_save_state(VORTEX_PCI(vp));
  		acpi_set_WOL(dev);
 	}
 	retval = register_netdev(dev);
@@ -1551,7 +1550,7 @@ vortex_up(struct net_device *dev)
 
 	if (VORTEX_PCI(vp) && vp->enable_wol) {
 		pci_set_power_state(VORTEX_PCI(vp), 0);	/* Go active */
-		pci_restore_state(VORTEX_PCI(vp), vp->power_state);
+		pci_restore_state(VORTEX_PCI(vp));
 	}
 
 	/* Before initializing select the active media port. */
@@ -2708,7 +2707,7 @@ vortex_down(struct net_device *dev, int final_down)
 		outl(0, ioaddr + DownListPtr);
 
 	if (final_down && VORTEX_PCI(vp) && vp->enable_wol) {
-		pci_save_state(VORTEX_PCI(vp), vp->power_state);
+		pci_save_state(VORTEX_PCI(vp));
 		acpi_set_WOL(dev);
 	}
 }
@@ -3166,7 +3165,7 @@ static void __devexit vortex_remove_one (struct pci_dev *pdev)
 	if (VORTEX_PCI(vp) && vp->enable_wol) {
 		pci_set_power_state(VORTEX_PCI(vp), 0);	/* Go active */
 		if (vp->pm_state_valid)
-			pci_restore_state(VORTEX_PCI(vp), vp->power_state);
+			pci_restore_state(VORTEX_PCI(vp));
 	}
 	/* Should really use issue_and_wait() here */
 	outw(TotalReset|0x14, dev->base_addr + EL3_CMD);
