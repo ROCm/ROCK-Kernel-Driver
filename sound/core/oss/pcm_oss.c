@@ -124,11 +124,10 @@ int snd_pcm_plugin_append(snd_pcm_plugin_t *plugin)
 static long snd_pcm_oss_bytes(snd_pcm_substream_t *substream, long frames)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	if (runtime->period_size == runtime->oss.period_bytes)
+	snd_pcm_uframes_t buffer_size = snd_pcm_lib_buffer_bytes(substream);
+	if (buffer_size == runtime->oss.buffer_bytes)
 		return frames;
-	if (runtime->period_size < runtime->oss.period_bytes)
-		return (frames * runtime->period_size) / runtime->oss.period_bytes;
-	return (frames * runtime->oss.period_bytes) / runtime->period_size;
+	return (runtime->oss.buffer_bytes * frames_to_bytes(runtime, frames)) / buffer_size;
 }
 
 static int snd_pcm_oss_format_from(int format)
