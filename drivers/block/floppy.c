@@ -1787,10 +1787,11 @@ irqreturn_t floppy_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		} while ((ST0 & 0x83) != UNIT(current_drive) && inr == 2
 			 && max_sensei);
 	}
-	if (handler)
-		schedule_bh(handler);
-	else
+	if (!handler) {
 		FDCS->reset = 1;
+		return IRQ_NONE;
+	}
+	schedule_bh(handler);
 	is_alive("normal interrupt end");
 
 	/* FIXME! Was it really for us? */
