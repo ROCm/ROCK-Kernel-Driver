@@ -634,17 +634,9 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		}
 	}
 	if (bdev->bd_contains == bdev) {
-		if (!bdev->bd_openers)
+		if (!bdev->bd_openers) {
 			bdev->bd_disk = disk;
-		if (!bdev->bd_queue) {
-			if (disk->queue)
-				bdev->bd_queue = disk->queue;
-			else {
-				struct blk_dev_struct *p = blk_dev + major(dev);
-				bdev->bd_queue = &p->request_queue;
-				if (p->queue)
-					bdev->bd_queue =  p->queue(dev);
-			}
+			bdev->bd_queue = disk->queue;
 		}
 		if (bdev->bd_op->open) {
 			ret = bdev->bd_op->open(inode, file);

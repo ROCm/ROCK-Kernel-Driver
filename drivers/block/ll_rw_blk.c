@@ -39,12 +39,6 @@ static kmem_cache_t *request_cachep;
 static LIST_HEAD(blk_plug_list);
 static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
-/* blk_dev_struct is:
- *	request_queue
- *	*queue
- */
-struct blk_dev_struct blk_dev[MAX_BLKDEV]; /* initialized by blk_dev_init() */
-
 /*
  * Number of requests per queue.  This many for reads and for writes (twice
  * this number, total).
@@ -136,22 +130,6 @@ void io_schedule_timeout(long timeout)
 	atomic_inc(&nr_iowait_tasks);
 	schedule_timeout(timeout);
 	atomic_dec(&nr_iowait_tasks);
-}
-
-/**
- * bdev_get_queue: - return the queue that matches the given device
- * @bdev:    device
- *
- * Description:
- *     Given a specific device, return the queue that will hold I/O
- *     for it. This is either a &struct blk_dev_struct lookup and a
- *     call to the ->queue() function defined, or the default queue
- *     stored in the same location.
- *
- **/
-inline request_queue_t *bdev_get_queue(struct block_device *bdev)
-{
-	return bdev->bd_queue;
 }
 
 /**
@@ -2186,7 +2164,6 @@ EXPORT_SYMBOL(end_that_request_first);
 EXPORT_SYMBOL(end_that_request_chunk);
 EXPORT_SYMBOL(end_that_request_last);
 EXPORT_SYMBOL(blk_init_queue);
-EXPORT_SYMBOL(bdev_get_queue);
 EXPORT_SYMBOL(blk_cleanup_queue);
 EXPORT_SYMBOL(blk_queue_make_request);
 EXPORT_SYMBOL(blk_queue_bounce_limit);

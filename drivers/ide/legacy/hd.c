@@ -45,9 +45,6 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-
-#define MAJOR_NR HD_MAJOR
-#define QUEUE (&hd_queue)
 #include <linux/blk.h>
 
 #ifdef __arm__
@@ -100,6 +97,10 @@
 static spinlock_t hd_lock = SPIN_LOCK_UNLOCKED;
 static struct request_queue hd_queue;
 
+#define MAJOR_NR HD_MAJOR
+#define QUEUE (&hd_queue)
+#define CURRENT elv_next_request(&hd_queue)
+
 #define TIMEOUT_VALUE	(6*HZ)
 #define	HD_DELAY	0
 
@@ -116,8 +117,6 @@ static void bad_rw_intr(void);
 
 static int reset;
 static int hd_error;
-
-#define SUBSECTOR(block) (CURRENT->current_nr_sectors > 0)
 
 /*
  *  This struct defines the HD's and their types.

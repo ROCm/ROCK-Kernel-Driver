@@ -166,9 +166,6 @@
 */
 
 #include <linux/version.h>
-
-#define MAJOR_NR AZTECH_CDROM_MAJOR
-#define QUEUE (&azt_queue)
 #include <linux/blk.h>
 #include "aztcd.h"
 
@@ -196,6 +193,10 @@
   Defines
   ###########################################################################
 */
+
+#define MAJOR_NR AZTECH_CDROM_MAJOR
+#define QUEUE (&azt_queue)
+#define CURRENT elv_next_request(&azt_queue)
 #define SET_TIMER(func, jifs)   delay_timer.expires = jiffies + (jifs); \
                                 delay_timer.function = (void *) (func); \
                                 add_timer(&delay_timer);

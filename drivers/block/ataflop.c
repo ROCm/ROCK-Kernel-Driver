@@ -91,10 +91,6 @@
 #include <asm/atariints.h>
 #include <asm/atari_stdma.h>
 #include <asm/atari_stram.h>
-
-#define MAJOR_NR FLOPPY_MAJOR
-#define DEVICE_NAME "floppy"
-#define QUEUE (&floppy_queue)
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 
@@ -103,6 +99,11 @@
 #undef DEBUG
 
 static struct request_queue floppy_queue;
+
+#define MAJOR_NR FLOPPY_MAJOR
+#define DEVICE_NAME "floppy"
+#define QUEUE (&floppy_queue)
+#define CURRENT elv_next_request(&floppy_queue)
 
 /* Disk types: DD, HD, ED */
 static struct atari_disk_type {

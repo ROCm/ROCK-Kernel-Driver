@@ -152,11 +152,6 @@
 #include <asm/uaccess.h>
 
 
-#define MAJOR_NR FLOPPY_MAJOR
-#define FLOPPY_DMA 0
-#define DEVICE_NAME "floppy"
-#define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
-#define QUEUE (&floppy_queue)
 #include <linux/blk.h>
 
 /* Note: FD_MAX_UNITS could be redefined to 2 for the Atari (with
@@ -181,6 +176,12 @@
 #endif
 
 static struct request_queue floppy_queue;
+
+#define MAJOR_NR FLOPPY_MAJOR
+#define FLOPPY_DMA 0
+#define DEVICE_NAME "floppy"
+#define QUEUE (&floppy_queue)
+#define CURRENT elv_next_request(&floppy_queue)
 
 /* Disk types: DD */
 static struct archy_disk_type {

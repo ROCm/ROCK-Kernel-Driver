@@ -53,19 +53,6 @@ static inline void blkdev_dequeue_request(struct request *req)
 		elv_remove_request(req->q, req);
 }
 
-#if defined(MAJOR_NR) || defined(IDE_DRIVER)
-#if (MAJOR_NR != SCSI_TAPE_MAJOR) && (MAJOR_NR != OSST_MAJOR)
-#if !defined(IDE_DRIVER)
-
-#ifndef QUEUE
-# define QUEUE (&blk_dev[MAJOR_NR].request_queue)
-#endif
-#ifndef CURRENT
-# define CURRENT elv_next_request(QUEUE)
-#endif
-
-#endif /* !defined(IDE_DRIVER) */
-
 /*
  * If we have our own end_request, we do not want to include this mess
  */
@@ -80,7 +67,5 @@ static inline void end_request(struct request *req, int uptodate)
 	end_that_request_last(req);
 }
 #endif /* !LOCAL_END_REQUEST */
-#endif /* (MAJOR_NR != SCSI_TAPE_MAJOR) */
-#endif /* defined(MAJOR_NR) || defined(IDE_DRIVER) */
 
 #endif /* _BLK_H */

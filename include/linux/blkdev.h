@@ -287,33 +287,13 @@ inline void blk_queue_bounce(request_queue_t *q, struct bio **bio);
 	if ((rq->bio))			\
 		for (bio = (rq)->bio; bio; bio = bio->bi_next)
 
-struct blk_dev_struct {
-	/*
-	 * queue_proc has to be atomic
-	 */
-	request_queue_t		request_queue;
-	queue_proc		*queue;
-	void			*data;
-};
-
 struct sec_size {
 	unsigned block_size;
 	unsigned block_size_bits;
 };
 
-/*
- * Used to indicate the default queue for drivers that don't bother
- * to implement multiple queues.  We have this access macro here
- * so as to eliminate the need for each and every block device
- * driver to know about the internal structure of blk_dev[].
- */
-#define BLK_DEFAULT_QUEUE(_MAJOR)  &blk_dev[_MAJOR].request_queue
-
-extern struct sec_size * blk_sec[MAX_BLKDEV];
-extern struct blk_dev_struct blk_dev[MAX_BLKDEV];
 extern void register_disk(struct gendisk *dev);
 extern void generic_make_request(struct bio *bio);
-extern inline request_queue_t *bdev_get_queue(struct block_device *bdev);
 extern void blk_put_request(struct request *);
 extern void blk_attempt_remerge(request_queue_t *, struct request *);
 extern void __blk_attempt_remerge(request_queue_t *, struct request *);
@@ -330,6 +310,11 @@ extern int scsi_cmd_ioctl(struct block_device *, unsigned int, unsigned long);
 extern void blk_start_queue(request_queue_t *q);
 extern void blk_stop_queue(request_queue_t *q);
 extern void __blk_stop_queue(request_queue_t *q);
+
+static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
+{
+	return bdev->bd_queue;
+}
 
 /*
  * get ready for proper ref counting

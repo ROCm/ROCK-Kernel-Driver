@@ -75,14 +75,15 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-
-#define MAJOR_NR SANYO_CDROM_MAJOR
-#define QUEUE (&sjcd_queue)
 #include <linux/blk.h>
 #include "sjcd.h"
 
 static int sjcd_present = 0;
 static struct request_queue sjcd_queue;
+
+#define MAJOR_NR SANYO_CDROM_MAJOR
+#define QUEUE (&sjcd_queue)
+#define CURRENT elv_next_request(&sjcd_queue)
 
 #define SJCD_BUF_SIZ 32		/* cdr-h94a has internal 64K buffer */
 

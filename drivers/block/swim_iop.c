@@ -24,12 +24,6 @@
  * be sent.
  */
 
-/* This has to be defined before some of the #includes below */
-
-#define MAJOR_NR  FLOPPY_MAJOR
-#define DEVICE_NAME "floppy"
-#define QUEUE (&swim_queue)
-
 #include <linux/stddef.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -83,6 +77,11 @@ static int floppy_count;
 
 static struct floppy_state floppy_states[MAX_FLOPPIES];
 static spinlock_t swim_iop_lock = SPIN_LOCK_UNLOCKED;
+
+#define MAJOR_NR  FLOPPY_MAJOR
+#define DEVICE_NAME "floppy"
+#define QUEUE (&swim_queue)
+#define CURRENT elv_next_request(&swim_queue)
 
 static char *drive_names[7] = {
 	"not installed",	/* DRV_NONE    */
