@@ -41,7 +41,7 @@
 #include <linux/percpu.h>
 #include <linux/kthread.h>
 
-#ifdef CONFIG_NUMA
+#ifdef CONFIG_NUMA_SCHED
 #define cpu_to_node_mask(cpu) node_to_cpumask(cpu_to_node(cpu))
 #else
 #define cpu_to_node_mask(cpu) (cpu_online_map)
@@ -1099,7 +1099,7 @@ enum idle_type
 };
 
 #ifdef CONFIG_SMP
-#ifdef CONFIG_NUMA
+#ifdef CONFIG_NUMA_SCHED
 /*
  * If dest_cpu is allowed for this process, migrate the task to it.
  * This is accomplished by forcing the cpu_allowed mask to only
@@ -1198,7 +1198,7 @@ void sched_balance_exec(void)
 out:
 	put_cpu();
 }
-#endif /* CONFIG_NUMA */
+#endif /* CONFIG_NUMA_SCHED */
 
 /*
  * double_lock_balance - lock the busiest runqueue, this_rq is locked already.
@@ -3442,7 +3442,7 @@ extern void __init arch_init_sched_domains(void);
 #else
 static struct sched_group sched_group_cpus[NR_CPUS];
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
-#ifdef CONFIG_NUMA
+#ifdef CONFIG_NUMA_SCHED
 static struct sched_group sched_group_nodes[MAX_NUMNODES];
 static DEFINE_PER_CPU(struct sched_domain, node_domains);
 static void __init arch_init_sched_domains(void)
@@ -3513,7 +3513,7 @@ static void __init arch_init_sched_domains(void)
 	}
 }
 
-#else /* !CONFIG_NUMA */
+#else /* !CONFIG_NUMA_SCHED */
 static void __init arch_init_sched_domains(void)
 {
 	int i;
@@ -3551,7 +3551,7 @@ static void __init arch_init_sched_domains(void)
 	}
 }
 
-#endif /* CONFIG_NUMA */
+#endif /* CONFIG_NUMA_SCHED */
 #endif /* ARCH_HAS_SCHED_DOMAIN */
 
 #define SCHED_DOMAIN_DEBUG

@@ -31,6 +31,10 @@
 #include <linux/percpu.h>
 #include <linux/mempolicy.h>
 
+#if defined(CONFIG_NUMA) && !defined(__x86_64__)
+#define CONFIG_NUMA_SCHED 1 
+#endif
+
 struct exec_domain;
 
 /*
@@ -656,7 +660,7 @@ struct sched_domain {
 	.nr_balance_failed	= 0,			\
 }
 
-#ifdef CONFIG_NUMA
+#ifdef CONFIG_NUMA_SCHED
 /* Common values for NUMA nodes */
 #define SD_NODE_INIT (struct sched_domain) {		\
 	.span			= CPU_MASK_NONE,	\
@@ -689,7 +693,7 @@ static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 
 extern unsigned long long sched_clock(void);
 
-#ifdef CONFIG_NUMA
+#ifdef CONFIG_NUMA_SCHED
 extern void sched_balance_exec(void);
 #else
 #define sched_balance_exec()   {}
