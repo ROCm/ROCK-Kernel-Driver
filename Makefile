@@ -273,7 +273,8 @@ AFLAGS_KERNEL	=
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
 CPPFLAGS        := -D__KERNEL__ -Iinclude \
-		   $(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include)
+		   $(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include) \
+		   $(if $(CONFIG_CFGNAME),-DCONFIG_FLAVOR_$(shell echo $(CONFIG_CFGNAME) |tr a-z A-Z))
 
 CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  	   -fno-strict-aliasing -fno-common

@@ -2,42 +2,54 @@
 # Kernel configuration targets
 # These targets are used from top-level makefile
 
-.PHONY: oldconfig xconfig gconfig menuconfig config silentoldconfig
+.PHONY: oldconfig xconfig gconfig menuconfig config silentoldconfig check-meta check-meta
 
-xconfig: $(obj)/qconf
+check-meta:
+	@if [ -e .config ] && \
+	   grep /var/adm/running-kernel.make .config ; then \
+		echo ; \
+		echo "The .config file is a merged configuration; please" \
+		     "remove it by hand before creating your own" \
+		     "configuration. You can use one of the files" \
+		     "arch/$(ARCH)/defconfig.* as template." ; \
+		echo ; \
+		exit 1 ; \
+	fi
+
+xconfig: $(obj)/qconf check-meta
 	$< arch/$(ARCH)/Kconfig
 
-gconfig: $(obj)/gconf
+gconfig: $(obj)/gconf check-meta
 	./$<  arch/$(ARCH)/Kconfig
 
-menuconfig: $(obj)/mconf
+menuconfig: $(obj)/mconf check-meta
 	$(Q)$(MAKE) $(build)=scripts/lxdialog
 	$< arch/$(ARCH)/Kconfig
 
-config: $(obj)/conf
+config: $(obj)/conf check-meta
 	$< arch/$(ARCH)/Kconfig
 
-oldconfig: $(obj)/conf
+oldconfig: $(obj)/conf check-meta
 	$< -o arch/$(ARCH)/Kconfig
 
-silentoldconfig: $(obj)/conf
+silentoldconfig: $(obj)/conf check-meta
 	$< -s arch/$(ARCH)/Kconfig
 
 .PHONY: randconfig allyesconfig allnoconfig allmodconfig defconfig
 
-randconfig: $(obj)/conf
+randconfig: $(obj)/conf check-meta
 	$< -r arch/$(ARCH)/Kconfig
 
-allyesconfig: $(obj)/conf
+allyesconfig: $(obj)/conf check-meta
 	$< -y arch/$(ARCH)/Kconfig
 
-allnoconfig: $(obj)/conf
+allnoconfig: $(obj)/conf check-meta
 	$< -n arch/$(ARCH)/Kconfig
 
-allmodconfig: $(obj)/conf
+allmodconfig: $(obj)/conf check-meta
 	$< -m arch/$(ARCH)/Kconfig
 
-defconfig: $(obj)/conf
+defconfig: $(obj)/conf check-meta
 	$< -d arch/$(ARCH)/Kconfig
 
 %_defconfig: $(obj)/conf
