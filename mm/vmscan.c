@@ -924,8 +924,41 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 	for (priority = DEF_PRIORITY; priority; priority--) {
 		int all_zones_ok = 1;
 		int pages_scanned = 0;
+		int end_zone = 0;	/* Inclusive.  0 = ZONE_DMA */
 
-		for (i = pgdat->nr_zones - 1; i >= 0; i--) {
+
+		if (nr_pages == 0) {
+			/*
+			 * Scan in the highmem->dma direction for the highest
+			 * zone which needs scanning
+			 */
+			for (i = pgdat->nr_zones - 1; i >= 0; i--) {
+				struct zone *zone = pgdat->node_zones + i;
+
+				if (zone->all_unreclaimable &&
+						priority != DEF_PRIORITY)
+					continue;
+
+				if (zone->free_pages <= zone->pages_high) {
+					end_zone = i;
+					goto scan;
+				}
+			}
+			goto out;
+		} else {
+			end_zone = pgdat->nr_zones - 1;
+		}
+scan:
+		/*
+		 * Now scan the zone in the dma->highmem direction, stopping
+		 * at the last zone which needs scanning.
+		 *
+		 * We do this because the page allocator works in the opposite
+		 * direction.  This prevents the page allocator from allocating
+		 * pages behind kswapd's direction of progress, which would
+		 * cause too much scanning of the lower zones.
+		 */
+		for (i = 0; i <= end_zone; i++) {
 			struct zone *zone = pgdat->node_zones + i;
 			int total_scanned = 0;
 			int max_scan;
@@ -965,7 +998,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 		if (pages_scanned)
 			blk_congestion_wait(WRITE, HZ/10);
 	}
-
+out:
 	for (i = 0; i < pgdat->nr_zones; i++) {
 		struct zone *zone = pgdat->node_zones + i;
 
