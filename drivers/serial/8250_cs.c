@@ -100,7 +100,7 @@ static struct multi_id multi_id[] = {
 };
 #define MULTI_COUNT (sizeof(multi_id)/sizeof(struct multi_id))
 
-typedef struct serial_info {
+struct serial_info {
 	dev_link_t		link;
 	int			ndev;
 	int			multi;
@@ -109,7 +109,7 @@ typedef struct serial_info {
 	dev_node_t		node[4];
 	int			line[4];
 	struct work_struct	remove;
-} serial_info_t;
+};
 
 static void serial_config(dev_link_t * link);
 static int serial_event(event_t event, int priority,
@@ -187,7 +187,7 @@ static void serial_remove(dev_link_t *link)
 
 static dev_link_t *serial_attach(void)
 {
-	serial_info_t *info;
+	struct serial_info *info;
 	client_reg_t client_reg;
 	dev_link_t *link;
 	int i, ret;
@@ -254,7 +254,7 @@ static dev_link_t *serial_attach(void)
 
 static void serial_detach(dev_link_t * link)
 {
-	serial_info_t *info = link->priv;
+	struct serial_info *info = link->priv;
 	dev_link_t **linkp;
 	int ret;
 
@@ -290,7 +290,7 @@ static void serial_detach(dev_link_t * link)
 
 /*====================================================================*/
 
-static int setup_serial(serial_info_t * info, ioaddr_t port, int irq)
+static int setup_serial(struct serial_info * info, ioaddr_t port, int irq)
 {
 	struct serial_struct serial;
 	int line;
@@ -341,7 +341,7 @@ static int simple_config(dev_link_t * link)
 {
 	static ioaddr_t base[5] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8, 0x0 };
 	client_handle_t handle = link->handle;
-	serial_info_t *info = link->priv;
+	struct serial_info *info = link->priv;
 	tuple_t tuple;
 	u_char buf[256];
 	cisparse_t parse;
@@ -445,7 +445,7 @@ static int simple_config(dev_link_t * link)
 static int multi_config(dev_link_t * link)
 {
 	client_handle_t handle = link->handle;
-	serial_info_t *info = link->priv;
+	struct serial_info *info = link->priv;
 	tuple_t tuple;
 	u_char buf[256];
 	cisparse_t parse;
@@ -548,7 +548,7 @@ while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
 void serial_config(dev_link_t * link)
 {
 	client_handle_t handle = link->handle;
-	serial_info_t *info = link->priv;
+	struct serial_info *info = link->priv;
 	tuple_t tuple;
 	u_short buf[128];
 	cisparse_t parse;
@@ -647,7 +647,7 @@ static int
 serial_event(event_t event, int priority, event_callback_args_t * args)
 {
 	dev_link_t *link = args->client_data;
-	serial_info_t *info = link->priv;
+	struct serial_info *info = link->priv;
 
 	DEBUG(1, "serial_event(0x%06x)\n", event);
 
