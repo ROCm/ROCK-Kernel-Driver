@@ -199,7 +199,7 @@ struct prio_array {
 struct runqueue {
 	spinlock_t lock;
 	unsigned long nr_running, nr_switches, expired_timestamp,
-			nr_uninterruptible;
+			nr_uninterruptible, timestamp_last_tick;
 	task_t *curr, *idle;
 	struct mm_struct *prev_mm;
 	prio_array_t *active, *expired, arrays[2];
@@ -1137,6 +1137,7 @@ static inline void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t
 	set_task_cpu(p, this_cpu);
 	nr_running_inc(this_rq);
 	enqueue_task(p, this_rq->active);
+	p->timestamp = sched_clock() - (src_rq->timestamp_last_tick - p->timestamp);
 	/*
 	 * Note that idle threads have a prio of MAX_PRIO, for this test
 	 * to be always true for them.
@@ -1157,7 +1158,7 @@ static inline void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t
 static inline int
 can_migrate_task(task_t *tsk, runqueue_t *rq, int this_cpu, int idle)
 {
-	unsigned long delta = sched_clock() - tsk->timestamp;
+	unsigned long delta = rq->timestamp_last_tick - tsk->timestamp;
 
 	if (!idle && (delta <= JIFFIES_TO_NS(cache_decay_ticks)))
 		return 0;
@@ -1364,6 +1365,8 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
 	runqueue_t *rq = this_rq();
 	task_t *p = current;
+
+	rq->timestamp_last_tick = sched_clock();
 
 	if (rcu_pending(cpu))
 		rcu_check_callbacks(cpu, user_ticks);
@@ -2641,6 +2644,8 @@ static void move_task_away(struct task_struct *p, int dest_cpu)
 		if (p->prio < rq_dest->curr->prio)
 			resched_task(rq_dest->curr);
 	}
+	p->timestamp = rq_dest->timestamp_last_tick;
+
  out:
 	double_rq_unlock(this_rq(), rq_dest);
 	local_irq_restore(flags);
