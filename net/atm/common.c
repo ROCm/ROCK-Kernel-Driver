@@ -235,6 +235,14 @@ static void vcc_sock_destruct(struct sock *sk)
 
 	kfree(sk->sk_protinfo);
 }
+
+static void vcc_def_wakeup(struct sock *sk)
+{
+	read_lock(&sk->sk_callback_lock);
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+		wake_up(sk->sk_sleep);
+	read_unlock(&sk->sk_callback_lock);
+}
  
 int vcc_create(struct socket *sock, int protocol, int family)
 {
@@ -248,6 +256,7 @@ int vcc_create(struct socket *sock, int protocol, int family)
 	if (!sk)
 		return -ENOMEM;
 	sock_init_data(NULL, sk);
+	sk->sk_state_change = vcc_def_wakeup;
 
 	vcc = atm_sk(sk) = kmalloc(sizeof(*vcc), GFP_KERNEL);
 	if (!vcc) {
@@ -258,7 +267,6 @@ int vcc_create(struct socket *sock, int protocol, int family)
 	memset(vcc, 0, sizeof(*vcc));
 	vcc->sk = sk;
 	vcc->dev = NULL;
-	vcc->callback = NULL;
 	memset(&vcc->local,0,sizeof(struct sockaddr_atmsvc));
 	memset(&vcc->remote,0,sizeof(struct sockaddr_atmsvc));
 	vcc->qos.txtp.max_sdu = 1 << 16; /* for meta VCs */

@@ -137,11 +137,8 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 			}
 			vcc->sk->sk_ack_backlog++;
 			skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
-			if (vcc->callback) {
-				DPRINTK("waking vcc->sleep 0x%p\n",
-				    &vcc->sleep);
-				vcc->callback(vcc);
-			}
+			DPRINTK("waking vcc->sleep 0x%p\n", &vcc->sleep);
+			vcc->sk->sk_state_change(vcc->sk);
 as_indicate_complete:
 			release_sock(vcc->sk);
 			return 0;
@@ -159,7 +156,7 @@ as_indicate_complete:
 			    (int) msg->type);
 			return -EINVAL;
 	}
-	if (vcc->callback) vcc->callback(vcc);
+	vcc->sk->sk_state_change(vcc->sk);
 	dev_kfree_skb(skb);
 	return 0;
 }

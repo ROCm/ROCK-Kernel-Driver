@@ -43,14 +43,6 @@ static int svc_create(struct socket *sock,int protocol);
  */
 
 
-void svc_callback(struct atm_vcc *vcc)
-{
-	wake_up(&vcc->sleep);
-}
-
-
-
-
 static int svc_shutdown(struct socket *sock,int how)
 {
 	return 0;
@@ -547,7 +539,6 @@ static int svc_create(struct socket *sock,int protocol)
 	sock->ops = &svc_proto_ops;
 	error = vcc_create(sock, protocol, AF_ATMSVC);
 	if (error) return error;
-	ATM_SD(sock)->callback = svc_callback;
 	ATM_SD(sock)->local.sas_family = AF_ATMSVC;
 	ATM_SD(sock)->remote.sas_family = AF_ATMSVC;
 	return 0;
