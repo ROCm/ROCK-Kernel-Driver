@@ -434,6 +434,10 @@ int eeh_dn_check_failure(struct device_node *dn, struct pci_dev *dev)
 
 		spin_unlock_irqrestore(&slot_errbuf_lock, flags);
 
+		printk(KERN_ERR "EEH: MMIO failure (%d) on device:%s %s\n",
+		       rets[0], pci_name(dev), pci_pretty_name(dev));
+		WARN_ON(1);
+
 		/*
 		 * XXX We should create a separate sysctl for this.
 		 *
