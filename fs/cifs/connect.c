@@ -155,7 +155,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		}
 	}
 	spin_unlock(&GlobalMid_Lock);
-	up(&ses->server->tcpSem); 
+	up(&server->tcpSem); 
 
 	while ((server->tcpStatus != CifsExiting) && (server->tcpStatus != CifsGood))
 	{

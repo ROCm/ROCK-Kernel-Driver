@@ -267,7 +267,7 @@ static int cifs_relock_file(struct cifsFileInfo * cifsFile)
 	return rc;
 }
 
-static int cifs_reopen_file(struct inode *inode, struct file *file)
+static int cifs_reopen_file(struct inode *inode, struct file *file, int can_flush)
 {
 	int rc = -EACCES;
 	int xid, oplock;
@@ -358,19 +358,25 @@ and we can never tell if the caller already has the rename_sem */
 		up(&pCifsFile->fh_sem);
 		pCifsInode = CIFS_I(inode);
 		if(pCifsInode) {
-			filemap_fdatawrite(inode->i_mapping);
-			filemap_fdatawait(inode->i_mapping);
+			if(can_flush) {
+				filemap_fdatawrite(inode->i_mapping);
+				filemap_fdatawait(inode->i_mapping);
 			/* temporarily disable caching while we
 			go to server to get inode info */
-			pCifsInode->clientCanCacheAll = FALSE;
-			pCifsInode->clientCanCacheRead = FALSE;
-			if (pTcon->ses->capabilities & CAP_UNIX)
-				rc = cifs_get_inode_info_unix(&inode,
+				pCifsInode->clientCanCacheAll = FALSE;
+				pCifsInode->clientCanCacheRead = FALSE;
+				if (pTcon->ses->capabilities & CAP_UNIX)
+					rc = cifs_get_inode_info_unix(&inode,
 						full_path, inode->i_sb);
-			else
-				rc = cifs_get_inode_info(&inode,
+				else
+					rc = cifs_get_inode_info(&inode,
 						full_path, NULL, inode->i_sb);
-
+			} /* else we are writing out data to server already
+			and could deadlock if we tried to flush data, and 
+			since we do not know if we have data that would
+			invalidate the current end of file on the server
+			we can not go to the server to get the new
+			inod info */
 			if((oplock & 0xF) == OPLOCK_EXCLUSIVE) {
 				pCifsInode->clientCanCacheAll =  TRUE;
 				pCifsInode->clientCanCacheRead = TRUE;
@@ -621,7 +627,11 @@ cifs_write(struct file * file, const char *write_data,
 					FreeXid(xid);
 					return total_written;
 				}
-				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
+				/* we could deadlock if we called
+				 filemap_fdatawait from here so tell
+				reopen_file not to flush data to server now */
+				rc = cifs_reopen_file(file->f_dentry->d_inode,
+					file,FALSE);
 				if(rc != 0)
 					break;
 			}
@@ -977,7 +987,8 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 		rc = -EAGAIN;
 		while(rc == -EAGAIN) {
 			if ((open_file->invalidHandle) && (!open_file->closePend)) {
-				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
+				rc = cifs_reopen_file(file->f_dentry->d_inode,
+					file,TRUE);
 				if(rc != 0)
 					break;
 			}
@@ -1132,7 +1143,8 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		rc = -EAGAIN;
 		while(rc == -EAGAIN) {
 			if ((open_file->invalidHandle) && (!open_file->closePend)) {
-				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
+				rc = cifs_reopen_file(file->f_dentry->d_inode,
+					file, TRUE);
 				if(rc != 0)
 					break;
 			}
