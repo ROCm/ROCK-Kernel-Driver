@@ -107,10 +107,10 @@ static void uart_start(struct tty_struct *tty)
 
 static void uart_tasklet_action(unsigned long data)
 {
-	struct uart_info *info = (struct uart_info *)data;
+	struct uart_state *state = (struct uart_state *)data;
 	struct tty_struct *tty;
 
-	tty = info->tty;
+	tty = state->info->tty;
 	if (tty) {
 		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
 		    tty->ldisc.write_wakeup)
@@ -1529,7 +1529,7 @@ static struct uart_state *uart_get(struct uart_driver *drv, int line)
 			state->info->state = state;
 
 			tasklet_init(&state->info->tlet, uart_tasklet_action,
-				     (unsigned long)state->info);
+				     (unsigned long)state);
 			up(&port_sem);
 		} else {
 			state->count--;
