@@ -239,6 +239,7 @@ static int pcd_bufblk = -1;	/* block in buffer, in CD units,
 */
 
 static struct pcd_unit *pcd_current; /* current request's drive */
+static struct request *pcd_req;
 static int pcd_retries;		/* retries on current request */
 static int pcd_busy;		/* request being processed ? */
 static int pcd_sector;		/* address of next requested sector */
@@ -738,30 +739,41 @@ static int pcd_detect(void)
 }
 
 /* I/O request processing */
+static struct request_queue pcd_queue;
 
 static void do_pcd_request(request_queue_t * q)
 {
 	if (pcd_busy)
 		return;
 	while (1) {
-		struct request *req;
-		if (blk_queue_empty(QUEUE))
+		if (blk_queue_empty(q))
 			return;
-		req = CURRENT;
-		if (rq_data_dir(req) == READ) {
-			struct pcd_unit *cd = pcd + minor(req->rq_dev);
+		pcd_req = elv_next_request(q);
+		if (rq_data_dir(pcd_req) == READ) {
+			struct pcd_unit *cd = pcd_req->rq_disk->private_data;
 			if (cd != pcd_current)
 				pcd_bufblk = -1;
 			pcd_current = cd;
-			pcd_sector = req->sector;
-			pcd_count = req->current_nr_sectors;
-			pcd_buf = req->buffer;
+			pcd_sector = pcd_req->sector;
+			pcd_count = pcd_req->current_nr_sectors;
+			pcd_buf = pcd_req->buffer;
 			pcd_busy = 1;
 			ps_set_intr(do_pcd_read, 0, 0, nice);
 			return;
 		} else
-			end_request(req, 0);
+			end_request(pcd_req, 0);
 	}
+}
+
+static inline void next_request(int success)
+{
+	long saved_flags;
+
+	spin_lock_irqsave(&pcd_lock, saved_flags);
+	end_request(pcd_req, success);
+	pcd_busy = 0;
+	do_pcd_request(&pcd_queue);
+	spin_unlock_irqrestore(&pcd_lock, saved_flags);
 }
 
 static int pcd_ready(void)
@@ -785,7 +797,6 @@ static void pcd_start(void)
 {
 	int b, i;
 	char rd_cmd[12] = { 0xa8, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 };
-	unsigned long saved_flags;
 
 	pcd_bufblk = pcd_sector / 4;
 	b = pcd_bufblk;
@@ -796,11 +807,7 @@ static void pcd_start(void)
 
 	if (pcd_command(pcd_current, rd_cmd, 2048, "read block")) {
 		pcd_bufblk = -1;
-		spin_lock_irqsave(&pcd_lock, saved_flags);
-		pcd_busy = 0;
-		end_request(CURRENT, 0);
-		do_pcd_request(NULL);
-		spin_unlock_irqrestore(&pcd_lock, saved_flags);
+		next_request(0);
 		return;
 	}
 
@@ -815,12 +822,7 @@ static void do_pcd_read(void)
 	pcd_retries = 0;
 	pcd_transfer();
 	if (!pcd_count) {
-		unsigned long saved_flags;
-		spin_lock_irqsave(&pcd_lock, saved_flags);
-		end_request(CURRENT, 1);
-		pcd_busy = 0;
-		do_pcd_request(NULL);
-		spin_unlock_irqrestore(&pcd_lock, saved_flags);
+		next_request(1);
 		return;
 	}
 
@@ -838,18 +840,14 @@ static void do_pcd_read_drq(void)
 			pi_do_claimed(pcd_current->pi, pcd_start);
 			return;
 		}
-		spin_lock_irqsave(&pcd_lock, saved_flags);
-		pcd_busy = 0;
 		pcd_bufblk = -1;
-		end_request(CURRENT, 0);
-		do_pcd_request(NULL);
-		spin_unlock_irqrestore(&pcd_lock, saved_flags);
+		next_request(0);
 		return;
 	}
 
 	do_pcd_read();
 	spin_lock_irqsave(&pcd_lock, saved_flags);
-	do_pcd_request(NULL);
+	do_pcd_request(&pcd_queue);
 	spin_unlock_irqrestore(&pcd_lock, saved_flags);
 }
 
@@ -958,15 +956,16 @@ static int __init pcd_init(void)
 		return -1;
 	}
 
+	blk_init_queue(&pcd_queue, do_pcd_request, &pcd_lock);
+
 	for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++) {
 		if (cd->present) {
 			register_cdrom(&cd->info);
 			cd->disk->private_data = cd;
+			cd->disk->queue = &pcd_queue;
 			add_disk(cd->disk);
 		}
 	}
-
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_pcd_request, &pcd_lock);
 
 	return 0;
 }
@@ -984,6 +983,7 @@ static void __exit pcd_exit(void)
 		}
 		put_disk(cd->disk);
 	}
+	blk_cleanup_queue(&pcd_queue);
 	unregister_blkdev(MAJOR_NR, name);
 }
 
