@@ -1,10 +1,8 @@
 /*
- * $Id: stinger.c,v 1.4 2001/05/23 09:25:02 vojtech Exp $
+ * $Id: stinger.c,v 1.10 2002/01/22 20:29:31 vojtech Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *  Copyright (c) 2000 Mark Fletcher
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -28,7 +26,7 @@
  *
  *  Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -37,6 +35,10 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/init.h>
+
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Gravis Stinger gamepad driver");
+MODULE_LICENSE("GPL");
 
 /*
  * Constants.
@@ -54,6 +56,7 @@ struct stinger {
 	struct input_dev dev;
 	int idx;
 	unsigned char data[STINGER_MAX_LENGTH];
+	char phys[32];
 };
 
 /*
@@ -145,7 +148,10 @@ static void stinger_connect(struct serio *serio, struct serio_dev *dev)
 					   BIT(BTN_START) | BIT(BTN_SELECT);
 	stinger->dev.absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
 
+	sprintf(stinger->phys, "%s/serio0", serio->phys);
+
 	stinger->dev.name = stinger_name;
+	stinger->dev.phys = stinger->phys;
 	stinger->dev.idbus = BUS_RS232;
 	stinger->dev.idvendor = SERIO_STINGER;
 	stinger->dev.idproduct = 0x0001;
@@ -168,7 +174,7 @@ static void stinger_connect(struct serio *serio, struct serio_dev *dev)
 
 	input_register_device(&stinger->dev);
 
-	printk(KERN_INFO "input%d: %s on serio%d\n", stinger->dev.number, stinger_name, serio->number);
+	printk(KERN_INFO "input: %s on %s\n",  stinger_name, serio->phys);
 }
 
 /*
@@ -198,5 +204,3 @@ void __exit stinger_exit(void)
 
 module_init(stinger_init);
 module_exit(stinger_exit);
-
-MODULE_LICENSE("GPL");

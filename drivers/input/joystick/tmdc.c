@@ -1,13 +1,10 @@
 /*
- * $Id: tmdc.c,v 1.23 2000/11/29 19:52:24 vojtech Exp $
+ * $Id: tmdc.c,v 1.31 2002/01/22 20:29:52 vojtech Exp $
  *
- *  Copyright (c) 1998-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1998-2001 Vojtech Pavlik
  *
  *   Based on the work of:
  *	Trystan Larey-Williams 
- *
  */
 
 /*
@@ -30,8 +27,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  * 
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/delay.h>
@@ -41,6 +38,10 @@
 #include <linux/init.h>
 #include <linux/gameport.h>
 #include <linux/input.h>
+
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("ThrustMaster DirectConnect joystick driver");
+MODULE_LICENSE("GPL");
 
 #define TMDC_MAX_START		400	/* 400 us */
 #define TMDC_MAX_STROBE		45	/* 45 us */
@@ -94,6 +95,7 @@ struct tmdc {
 	struct timer_list timer;
 	struct input_dev dev[2];
 	char name[2][64];
+	char phys[2][32];
 	int mode[2];
 	signed char *abs[2];
 	short *btn[2];
@@ -172,6 +174,7 @@ static void tmdc_timer(unsigned long private)
 
 	if ((r = tmdc_read_packet(tmdc->gameport, data)) != tmdc->exists)
 		bad = 1;
+	else
 
 	for (j = 0; j < 2; j++) 
 		if (r & (1 << j) & tmdc->exists) {
@@ -302,11 +305,14 @@ static void tmdc_connect(struct gameport *gameport, struct gameport_dev *dev)
 			sprintf(tmdc->name[j], models[m].name, models[m].abs,
 				(data[j][TMDC_BYTE_DEF] & 0xf) << 3, tmdc->mode[j]);
 
+			sprintf(tmdc->phys[j], "%s/input%d", gameport->phys, j);
+
 			tmdc->dev[j].private = tmdc;
 			tmdc->dev[j].open = tmdc_open;
 			tmdc->dev[j].close = tmdc_close;
 
 			tmdc->dev[j].name = tmdc->name[j];
+			tmdc->dev[j].phys = tmdc->phys[j];
 			tmdc->dev[j].idbus = BUS_GAMEPORT;
 			tmdc->dev[j].idvendor = GAMEPORT_ID_VENDOR_THRUSTMASTER;
 			tmdc->dev[j].idproduct = models[m].id;
@@ -336,8 +342,7 @@ static void tmdc_connect(struct gameport *gameport, struct gameport_dev *dev)
 			}
 
 			input_register_device(tmdc->dev + j);
-			printk(KERN_INFO "input%d: %s on gameport%d.%d\n",
-				tmdc->dev[j].number, tmdc->name[j], gameport->number, j);
+			printk(KERN_INFO "input: %s on %s\n", tmdc->name[j], gameport->phys);
 		}
 
 	return;
@@ -374,5 +379,3 @@ void __exit tmdc_exit(void)
 
 module_init(tmdc_init);
 module_exit(tmdc_exit);
-
-MODULE_LICENSE("GPL");

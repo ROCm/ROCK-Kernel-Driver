@@ -1,9 +1,7 @@
 /*
- * $Id: adi.c,v 1.15 2001/01/09 13:32:39 vojtech Exp $
+ * $Id: adi.c,v 1.23 2002/01/22 20:26:17 vojtech Exp $
  *
- *  Copyright (c) 1998-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1998-2001 Vojtech Pavlik
  */
 
 /*
@@ -26,8 +24,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  * 
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/delay.h>
@@ -38,6 +36,10 @@
 #include <linux/input.h>
 #include <linux/gameport.h>
 #include <linux/init.h>
+
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Logitech ADI joystick family driver");
+MODULE_LICENSE("GPL");
 
 /*
  * Times, array sizes, flags, ids.
@@ -55,6 +57,7 @@
 #define ADI_MIN_ID_LENGTH	66
 #define ADI_MAX_NAME_LENGTH	48
 #define ADI_MAX_CNAME_LENGTH	16
+#define ADI_MAX_PHYS_LENGTH	32
 
 #define ADI_FLAG_HAT		0x04
 #define ADI_FLAG_10BIT		0x08
@@ -118,6 +121,7 @@ struct adi {
 	short *key;
 	char name[ADI_MAX_NAME_LENGTH];
 	char cname[ADI_MAX_CNAME_LENGTH];
+	char phys[ADI_MAX_PHYS_LENGTH];
 	unsigned char data[ADI_MAX_LENGTH];
 };
 
@@ -392,7 +396,7 @@ static void adi_id_decode(struct adi *adi, struct adi_port *port)
 	}
 }
 
-static void adi_init_input(struct adi *adi, struct adi_port *port)
+static void adi_init_input(struct adi *adi, struct adi_port *port, int half)
 {
 	int i, t;
 	char buf[ADI_MAX_NAME_LENGTH];
@@ -403,6 +407,7 @@ static void adi_init_input(struct adi *adi, struct adi_port *port)
 
 	sprintf(buf, adi_names[t], adi->id);
 	sprintf(adi->name, "Logitech %s", buf);
+	sprintf(adi->phys, "%s/input%d", port->gameport->phys, half);
 
 	adi->abs = adi_abs[t];
 	adi->key = adi_key[t];
@@ -411,6 +416,7 @@ static void adi_init_input(struct adi *adi, struct adi_port *port)
 	adi->dev.close = adi_close;
 
 	adi->dev.name = adi->name;
+	adi->dev.phys = adi->phys;
 	adi->dev.idbus = BUS_GAMEPORT;
 	adi->dev.idvendor = GAMEPORT_ID_VENDOR_LOGITECH;
 	adi->dev.idproduct = adi->id;
@@ -419,7 +425,7 @@ static void adi_init_input(struct adi *adi, struct adi_port *port)
 	adi->dev.private = port;
 	adi->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 
-	for (i = 0; i < adi->axes10 + adi->axes8 + (adi->hats + (adi->pad > 0)) * 2; i++)
+	for (i = 0; i < adi->axes10 + adi->axes8 + (adi->hats + (adi->pad != -1)) * 2; i++)
 		set_bit(adi->abs[i], &adi->dev.absbit);
 
 	for (i = 0; i < adi->buttons; i++)
@@ -432,7 +438,7 @@ static void adi_init_center(struct adi *adi)
 
 	if (!adi->length) return;
 
-	for (i = 0; i < adi->axes10 + adi->axes8 + (adi->hats + (adi->pad > 0)) * 2; i++) {
+	for (i = 0; i < adi->axes10 + adi->axes8 + (adi->hats + (adi->pad != -1)) * 2; i++) {
 
 		t = adi->abs[i];
 		x = adi->dev.abs[t];
@@ -495,7 +501,7 @@ static void adi_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	for (i = 0; i < 2; i++) {
 		adi_id_decode(port->adi + i, port);
-		adi_init_input(port->adi + i, port);
+		adi_init_input(port->adi + i, port, i);
 	}
 
 	if (!port->adi[0].length && !port->adi[1].length) {
@@ -514,8 +520,8 @@ static void adi_connect(struct gameport *gameport, struct gameport_dev *dev)
 		if (port->adi[i].length > 0) {
 			adi_init_center(port->adi + i);
 			input_register_device(&port->adi[i].dev);
-			printk(KERN_INFO "input%d: %s [%s] on gameport%d.%d\n",
-				port->adi[i].dev.number, port->adi[i].name, port->adi[i].cname, gameport->number, i);
+			printk(KERN_INFO "input: %s [%s] on %s\n",
+				port->adi[i].name, port->adi[i].cname, gameport->phys);
 		}
 }
 
@@ -553,5 +559,3 @@ void __exit adi_exit(void)
 
 module_init(adi_init);
 module_exit(adi_exit);
-
-MODULE_LICENSE("GPL");

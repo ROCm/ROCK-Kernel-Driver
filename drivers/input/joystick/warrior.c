@@ -1,9 +1,7 @@
 /*
- * $Id: warrior.c,v 1.8 2000/05/31 13:17:12 vojtech Exp $
+ * $Id: warrior.c,v 1.14 2002/01/22 20:32:10 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  */
 
 /*
@@ -27,7 +25,7 @@
  * 
  *  Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -36,6 +34,10 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/init.h>
+
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Logitech WingMan Warrior joystick driver");
+MODULE_LICENSE("GPL");
 
 /*
  * Constants.
@@ -53,6 +55,7 @@ struct warrior {
 	struct input_dev dev;
 	int idx, len;
 	unsigned char data[WARRIOR_MAX_LENGTH];
+	char phys[32];
 };
 
 /*
@@ -149,7 +152,10 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
 	warrior->dev.relbit[0] = BIT(REL_DIAL);
 	warrior->dev.absbit[0] = BIT(ABS_X) | BIT(ABS_Y) | BIT(ABS_THROTTLE) | BIT(ABS_HAT0X) | BIT(ABS_HAT0Y);
 
+	sprintf(warrior->phys, "%s/input0", serio->phys);
+
 	warrior->dev.name = warrior_name;
+	warrior->dev.phys = warrior->phys;
 	warrior->dev.idbus = BUS_RS232;
 	warrior->dev.idvendor = SERIO_WARRIOR;
 	warrior->dev.idproduct = 0x0001;
@@ -180,7 +186,7 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
 
 	input_register_device(&warrior->dev);
 
-	printk(KERN_INFO "input%d: Logitech WingMan Warrior on serio%d\n", warrior->dev.number, serio->number);
+	printk(KERN_INFO "input: Logitech WingMan Warrior on %s\n", serio->phys);
 }
 
 /*
@@ -210,5 +216,3 @@ void __exit warrior_exit(void)
 
 module_init(warrior_init);
 module_exit(warrior_exit);
-
-MODULE_LICENSE("GPL");

@@ -1,12 +1,10 @@
 /*
- * $Id: interact.c,v 1.8 2000/05/29 11:19:51 vojtech Exp $
+ * $Id: interact.c,v 1.16 2002/01/22 20:28:25 vojtech Exp $
  *
- *  Copyright (c) 2000 Vojtech Pavlik
+ *  Copyright (c) 2001 Vojtech Pavlik
  *
  *  Based on the work of:
  *	Toby Deshane
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -29,8 +27,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -40,6 +38,10 @@
 #include <linux/init.h>
 #include <linux/gameport.h>
 #include <linux/input.h>
+
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("InterAct digital joystick driver");
+MODULE_LICENSE("GPL");
 
 #define INTERACT_MAX_START	400	/* 400 us */
 #define INTERACT_MAX_STROBE	40	/* 40 us */
@@ -58,6 +60,7 @@ struct interact {
 	int reads;
 	unsigned char type;
 	unsigned char length;
+	char phys[32];
 };
 
 static short interact_abs_hhfx[] = 
@@ -137,40 +140,41 @@ static void interact_timer(unsigned long private)
 
 	if (interact_read_packet(interact->gameport, interact->length, data) < interact->length) {
 		interact->bads++;
-	} else
+	} else {
 
-	for (i = 0; i < 3; i++)
-		data[i] <<= INTERACT_MAX_LENGTH - interact->length;
+		for (i = 0; i < 3; i++)
+			data[i] <<= INTERACT_MAX_LENGTH - interact->length;
 
-	switch (interact->type) {
+		switch (interact->type) {
 
-		case INTERACT_TYPE_HHFX:
+			case INTERACT_TYPE_HHFX:
 
-			for (i = 0; i < 4; i++)
-				input_report_abs(dev, interact_abs_hhfx[i], (data[i & 1] >> ((i >> 1) << 3)) & 0xff);
+				for (i = 0; i < 4; i++)
+					input_report_abs(dev, interact_abs_hhfx[i], (data[i & 1] >> ((i >> 1) << 3)) & 0xff);
 
-			for (i = 0; i < 2; i++)
-				input_report_abs(dev, ABS_HAT0Y - i,
-					((data[1] >> ((i << 1) + 17)) & 1)  - ((data[1] >> ((i << 1) + 16)) & 1));
+				for (i = 0; i < 2; i++)
+					input_report_abs(dev, ABS_HAT0Y - i,
+						((data[1] >> ((i << 1) + 17)) & 1)  - ((data[1] >> ((i << 1) + 16)) & 1));
 
-			for (i = 0; i < 8; i++)
-				input_report_key(dev, interact_btn_hhfx[i], (data[0] >> (i + 16)) & 1);
+				for (i = 0; i < 8; i++)
+					input_report_key(dev, interact_btn_hhfx[i], (data[0] >> (i + 16)) & 1);
 
-			for (i = 0; i < 4; i++)
-				input_report_key(dev, interact_btn_hhfx[i + 8], (data[1] >> (i + 20)) & 1);
+				for (i = 0; i < 4; i++)
+					input_report_key(dev, interact_btn_hhfx[i + 8], (data[1] >> (i + 20)) & 1);
 
-			break;
+				break;
 
-		case INTERACT_TYPE_PP8D:
+			case INTERACT_TYPE_PP8D:
 
-			for (i = 0; i < 2; i++)
-				input_report_abs(dev, interact_abs_pp8d[i], 
-					((data[0] >> ((i << 1) + 20)) & 1)  - ((data[0] >> ((i << 1) + 21)) & 1));
+				for (i = 0; i < 2; i++)
+					input_report_abs(dev, interact_abs_pp8d[i], 
+						((data[0] >> ((i << 1) + 20)) & 1)  - ((data[0] >> ((i << 1) + 21)) & 1));
 
-			for (i = 0; i < 8; i++)
-				input_report_key(dev, interact_btn_pp8d[i], (data[1] >> (i + 16)) & 1);
+				for (i = 0; i < 8; i++)
+					input_report_key(dev, interact_btn_pp8d[i], (data[1] >> (i + 16)) & 1);
 
-			break;
+				break;
+		}
 	}
 
 	mod_timer(&interact->timer, jiffies + INTERACT_REFRESH_TIME);
@@ -235,10 +239,12 @@ static void interact_connect(struct gameport *gameport, struct gameport_dev *dev
 			break;
 
 	if (!interact_type[i].length) {
-		printk(KERN_WARNING "interact.c: Unknown joystick on gameport%d. [len %d d0 %08x d1 %08x i2 %08x]\n",
-			gameport->number, i, data[0], data[1], data[2]);
+		printk(KERN_WARNING "interact.c: Unknown joystick on %s. [len %d d0 %08x d1 %08x i2 %08x]\n",
+			gameport->phys, i, data[0], data[1], data[2]);
 		goto fail2;	
 	}
+
+	sprintf(interact->phys, "%s/input0", gameport->phys);
 
 	interact->type = i;
 	interact->length = interact_type[i].length;
@@ -248,6 +254,7 @@ static void interact_connect(struct gameport *gameport, struct gameport_dev *dev
 	interact->dev.close = interact_close;
 
 	interact->dev.name = interact_type[i].name;
+	interact->dev.phys = interact->phys;
 	interact->dev.idbus = BUS_GAMEPORT;
 	interact->dev.idvendor = GAMEPORT_ID_VENDOR_INTERACT;
 	interact->dev.idproduct = interact_type[i].id;
@@ -270,8 +277,8 @@ static void interact_connect(struct gameport *gameport, struct gameport_dev *dev
 		set_bit(t, interact->dev.keybit);
 
 	input_register_device(&interact->dev);
-	printk(KERN_INFO "input%d: %s on gameport%d.0\n",
-		interact->dev.number, interact_type[interact->type].name, gameport->number);
+	printk(KERN_INFO "input: %s on %s\n",
+		interact_type[interact->type].name, gameport->phys);
 
 	return;
 fail2:	gameport_close(gameport);
@@ -304,5 +311,3 @@ void __exit interact_exit(void)
 
 module_init(interact_init);
 module_exit(interact_exit);
-
-MODULE_LICENSE("GPL");

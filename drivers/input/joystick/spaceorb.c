@@ -1,12 +1,10 @@
 /*
- * $Id: spaceorb.c,v 1.7 2000/05/29 11:19:51 vojtech Exp $
+ * $Id: spaceorb.c,v 1.15 2002/01/22 20:29:19 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  * 
  *  Based on the work of:
  *  	David Thompson
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -29,8 +27,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  * 
  *  Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -40,15 +38,19 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("SpaceTec SpaceOrb 360 and Avenger 6dof controller driver");
+MODULE_LICENSE("GPL");
+
 /*
  * Constants.
  */
 
 #define SPACEORB_MAX_LENGTH	64
 
-static int spaceorb_buttons[] = { BTN_TL, BTN_TR, BTN_Y, BTN_X, BTN_B, BTN_A, BTN_MODE};
-static int spaceorb_axes[] = { ABS_X, ABS_Y, ABS_Z, ABS_RX, ABS_RY, ABS_RZ};
-static char *spaceorb_name = "SpaceTec SpaceOrb 360";
+static int spaceorb_buttons[] = { BTN_TL, BTN_TR, BTN_Y, BTN_X, BTN_B, BTN_A };
+static int spaceorb_axes[] = { ABS_X, ABS_Y, ABS_Z, ABS_RX, ABS_RY, ABS_RZ };
+static char *spaceorb_name = "SpaceTec SpaceOrb 360 / Avenger";
 
 /*
  * Per-Orb data.
@@ -59,6 +61,7 @@ struct spaceorb {
 	struct serio *serio;
 	int idx;
 	unsigned char data[SPACEORB_MAX_LENGTH];
+	char phys[32];
 };
 
 static unsigned char spaceorb_xor[] = "SpaceWare";
@@ -88,8 +91,8 @@ static void spaceorb_process_packet(struct spaceorb *spaceorb)
 		case 'R':				/* Reset packet */
 			spaceorb->data[spaceorb->idx - 1] = 0;
 			for (i = 1; i < spaceorb->idx && spaceorb->data[i] == ' '; i++);
-			printk(KERN_INFO "input%d: %s [%s] on serio%d\n",
-				 spaceorb->dev.number, spaceorb_name, spaceorb->data + i, spaceorb->serio->number);
+			printk(KERN_INFO "input: %s [%s] on %s\n",
+				 spaceorb_name, spaceorb->data + i, spaceorb->serio->phys);
 			break;
 
 		case 'D':				/* Ball + button data */
@@ -103,7 +106,7 @@ static void spaceorb_process_packet(struct spaceorb *spaceorb)
 			axes[5] = ((data[9] & 0x3f) << 4) | (data[10] >> 3);
 			for (i = 0; i < 6; i++)
 				input_report_abs(dev, spaceorb_axes[i], axes[i] - ((axes[i] & 0x200) ? 1024 : 0));
-			for (i = 0; i < 8; i++)
+			for (i = 0; i < 6; i++)
 				input_report_key(dev, spaceorb_buttons[i], (data[1] >> i) & 1);
 			break;
 
@@ -167,8 +170,8 @@ static void spaceorb_connect(struct serio *serio, struct serio_dev *dev)
 
 	spaceorb->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);	
 
-	for (i = 0; i < 7; i++)
-		set_bit(spaceorb_buttons[i], &spaceorb->dev.keybit);
+	for (i = 0; i < 6; i++)
+		set_bit(spaceorb_buttons[i], spaceorb->dev.keybit);
 
 	for (i = 0; i < 6; i++) {
 		t = spaceorb_axes[i];
@@ -180,7 +183,10 @@ static void spaceorb_connect(struct serio *serio, struct serio_dev *dev)
 	spaceorb->serio = serio;
 	spaceorb->dev.private = spaceorb;
 
+	sprintf(spaceorb->phys, "%s/input0", serio->phys);
+
 	spaceorb->dev.name = spaceorb_name;
+	spaceorb->dev.phys = spaceorb->phys;
 	spaceorb->dev.idbus = BUS_RS232;
 	spaceorb->dev.idvendor = SERIO_SPACEORB;
 	spaceorb->dev.idproduct = 0x0001;
@@ -223,5 +229,3 @@ void __exit spaceorb_exit(void)
 
 module_init(spaceorb_init);
 module_exit(spaceorb_exit);
-
-MODULE_LICENSE("GPL");

@@ -1,13 +1,11 @@
 /*
- * $Id: cobra.c,v 1.10 2000/06/08 10:23:45 vojtech Exp $
+ * $Id: cobra.c,v 1.19 2002/01/22 20:26:52 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  */
 
 /*
- * Creative Labd Blaster GamePad Cobra driver for Linux
+ * Creative Labs Blaster GamePad Cobra driver for Linux
  */
 
 /*
@@ -26,8 +24,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -36,6 +34,10 @@
 #include <linux/init.h>
 #include <linux/gameport.h>
 #include <linux/input.h>
+
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Creative Labs Blaster GamePad Cobra driver");
+MODULE_LICENSE("GPL");
 
 #define COBRA_MAX_STROBE	45	/* 45 us max wait for first strobe */
 #define COBRA_REFRESH_TIME	HZ/50	/* 20 ms between reads */
@@ -53,6 +55,7 @@ struct cobra {
 	int reads;
 	int bads;
 	unsigned char exists;
+	char phys[2][32];
 };
 
 static unsigned char cobra_read_packet(struct gameport *gameport, unsigned int *data)
@@ -121,6 +124,7 @@ static void cobra_timer(unsigned long private)
 
 	if ((r = cobra_read_packet(cobra->gameport, data)) != cobra->exists)
 		cobra->bads++;
+	else
 
 	for (i = 0; i < 2; i++)
 		if (cobra->exists & r & (1 << i)) {
@@ -177,8 +181,8 @@ static void cobra_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	for (i = 0; i < 2; i++) 
 		if ((cobra->exists >> i) & data[i] & 1) {
-			printk(KERN_WARNING "cobra.c: Device on gameport%d.%d has the Ext bit set. ID is: %d"
-				" Contact vojtech@suse.cz\n", gameport->number, i, (data[i] >> 2) & 7);
+			printk(KERN_WARNING "cobra.c: Device %d on %s has the Ext bit set. ID is: %d"
+				" Contact vojtech@ucw.cz\n", i, gameport->phys, (data[i] >> 2) & 7);
 			cobra->exists &= ~(1 << i);
 		}
 
@@ -188,11 +192,14 @@ static void cobra_connect(struct gameport *gameport, struct gameport_dev *dev)
 	for (i = 0; i < 2; i++)
 		if ((cobra->exists >> i) & 1) {
 
+			sprintf(cobra->phys[i], "%s/input%d", gameport->phys, i);
+
 			cobra->dev[i].private = cobra;
 			cobra->dev[i].open = cobra_open;
 			cobra->dev[i].close = cobra_close;
 
 			cobra->dev[i].name = cobra_name;
+			cobra->dev[i].phys = cobra->phys[i];
 			cobra->dev[i].idbus = BUS_GAMEPORT;
 			cobra->dev[i].idvendor = GAMEPORT_ID_VENDOR_CREATIVE;
 			cobra->dev[i].idproduct = 0x0008;
@@ -208,10 +215,8 @@ static void cobra_connect(struct gameport *gameport, struct gameport_dev *dev)
 			cobra->dev[i].absmin[ABS_Y] = -1; cobra->dev[i].absmax[ABS_Y] = 1;
 
 			input_register_device(cobra->dev + i);
-			printk(KERN_INFO "input%d: %s on gameport%d.%d\n",
-				cobra->dev[i].number, cobra_name, gameport->number, i);
+			printk(KERN_INFO "input: %s on %s\n", cobra_name, gameport->phys);
 		}
-
 
 	return;
 fail2:	gameport_close(gameport);
@@ -248,5 +253,3 @@ void __exit cobra_exit(void)
 
 module_init(cobra_init);
 module_exit(cobra_exit);
-
-MODULE_LICENSE("GPL");
