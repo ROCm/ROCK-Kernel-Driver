@@ -646,13 +646,13 @@ fail:
  */
 
 static struct dst_entry *
-xfrm_find_bundle(struct flowi *fl, struct rtable *rt, struct xfrm_policy *policy, unsigned short family)
+xfrm_find_bundle(struct flowi *fl, struct xfrm_policy *policy, unsigned short family)
 {
 	struct dst_entry *x;
 	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
 	if (unlikely(afinfo == NULL))
 		return ERR_PTR(-EINVAL);
-	x = afinfo->find_bundle(fl, rt, policy);
+	x = afinfo->find_bundle(fl, policy);
 	xfrm_policy_put_afinfo(afinfo);
 	return x;
 }
@@ -762,7 +762,7 @@ restart:
 		 * LATER: help from flow cache. It is optional, this
 		 * is required only for output policy.
 		 */
-		dst = xfrm_find_bundle(fl, rt, policy, family);
+		dst = xfrm_find_bundle(fl, policy, family);
 		if (IS_ERR(dst)) {
 			xfrm_pol_put(policy);
 			return PTR_ERR(dst);

@@ -40,6 +40,7 @@
 extern void setup_default_decr(void);
 
 extern unsigned long ppc_tb_freq;
+extern unsigned long ppc_proc_freq;
 
 /* Apparently the RTC stores seconds since 1 Jan 1904 */
 #define RTC_OFFSET	2082844800
@@ -154,6 +155,11 @@ void __init pmac_calibrate_decr(void)
 	div128_by_32( 1024*1024, 0, tb_ticks_per_sec, &divres );
 	tb_to_xs = divres.result_low;
 	ppc_tb_freq = freq;
+
+	fp = (unsigned int *)get_property(cpu, "clock-frequency", NULL);
+	if (fp == 0)
+		panic("can't get cpu processor frequency");
+	ppc_proc_freq = *fp;
 
 	setup_default_decr();
 }

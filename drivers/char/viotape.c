@@ -913,8 +913,6 @@ int __init viotap_init(void)
 	char tapename[32];
 	int i;
 
-	printk(VIOTAPE_KERN_INFO "driver version " VIOTAPE_VERSION "\n");
-
 	op_struct_list = NULL;
 	if ((ret = add_op_structs(VIOTAPE_MAXREQ)) < 0) {
 		printk(VIOTAPE_KERN_WARN "couldn't allocate op structs\n");
@@ -932,8 +930,6 @@ int __init viotap_init(void)
 		}
 	}
 
-	printk(VIOTAPE_KERN_INFO "init - open path to hosting (%d)\n",
-			viopath_hostLp);
 	ret = viopath_open(viopath_hostLp, viomajorsubtype_tape,
 			VIOTAPE_MAXREQ + 2);
 	if (ret) {
@@ -942,6 +938,9 @@ int __init viotap_init(void)
 		ret = -EIO;
 		goto clear_op;
 	}
+
+	printk(VIOTAPE_KERN_INFO "vers " VIOTAPE_VERSION
+			", hosting partition %d\n", viopath_hostLp);
 
 	vio_setHandler(viomajorsubtype_tape, vioHandleTapeEvent);
 

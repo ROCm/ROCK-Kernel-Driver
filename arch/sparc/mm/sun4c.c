@@ -2088,7 +2088,7 @@ void __init sun4c_paging_init(void)
 		for (znum = 0; znum < MAX_NR_ZONES; znum++)
 			zones_size[znum] = zholes_size[znum] = 0;
 
-		npages = max_low_pfn - (phys_base >> PAGE_SHIFT);
+		npages = max_low_pfn - pfn_base;
 
 		zones_size[ZONE_DMA] = npages;
 		zholes_size[ZONE_DMA] = npages - pages_avail;
@@ -2098,7 +2098,7 @@ void __init sun4c_paging_init(void)
 		zholes_size[ZONE_HIGHMEM] = npages - calc_highpages();
 
 		free_area_init_node(0, &contig_page_data, NULL, zones_size,
-				    phys_base >> PAGE_SHIFT, zholes_size);
+				    pfn_base, zholes_size);
 		mem_map = contig_page_data.node_mem_map;
 	}
 

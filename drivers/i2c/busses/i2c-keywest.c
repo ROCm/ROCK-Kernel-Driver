@@ -608,6 +608,7 @@ create_iface(struct device_node *np, struct device *dev)
 	}
 #endif /* POLLED_MODE */
 
+	pmac_low_i2c_unlock(np);
 	dev_set_drvdata(dev, iface);
 	
 	for (i=0; i<nchan; i++) {
@@ -645,7 +646,6 @@ create_iface(struct device_node *np, struct device *dev)
 	printk(KERN_INFO "Found KeyWest i2c on \"%s\", %d channel%s, stepping: %d bits\n",
 		np->parent->name, nchan, nchan > 1 ? "s" : "", bsteps);
 		
-	pmac_low_i2c_unlock(np);
 	return 0;
 }
 

@@ -1,9 +1,8 @@
-/* $Id: os_pri.c,v 1.29 2003/08/25 13:41:27 schindler Exp $ */
+/* $Id: os_pri.c,v 1.32 2004/03/21 17:26:01 armin Exp $ */
 
 #include "platform.h"
 #include "debuglib.h"
 #include "cardtype.h"
-#include "dlist.h"
 #include "pc.h"
 #include "pr_pc.h"
 #include "di_defs.h"

@@ -29,13 +29,6 @@
 	srl	%reg, 12, %reg; \
 	and	%reg, 3, %reg;
 
-#define GET_PROCESSOR_OFFSET(reg, tmp) \
-	GET_PROCESSOR_ID(reg) \
-	sethi	%hi(cpu_offset), %tmp; \
-	sll	%reg, 2, %reg; \
-	or	%tmp, %lo(cpu_offset), %tmp; \
-	ld	[%tmp + %reg], %reg;
-
 /* All trap entry points _must_ begin with this macro or else you
  * lose.  It makes sure the kernel has a proper window so that
  * c-code can be called.

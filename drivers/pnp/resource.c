@@ -231,15 +231,9 @@ void pnp_free_option(struct pnp_option *option)
 
 #define length(start, end) (*(end) - *(start) + 1)
 
-/* ranged_conflict - used to determine if two resource ranges conflict
- * condition 1: check if the start of a is within b
- * condition 2: check if the end of a is within b
- * condition 3: check if b is engulfed by a */
-
+/* Two ranges conflict if one doesn't end before the other starts */
 #define ranged_conflict(starta, enda, startb, endb) \
-((*(starta) >= *(startb) && *(starta) <= *(endb)) || \
- (*(enda) >= *(startb) && *(enda) <= *(endb)) || \
- (*(starta) < *(startb) && *(enda) > *(endb)))
+	!((*(enda) < *(startb)) || (*(endb) < *(starta)))
 
 #define cannot_compare(flags) \
 ((flags) & (IORESOURCE_UNSET | IORESOURCE_DISABLED))

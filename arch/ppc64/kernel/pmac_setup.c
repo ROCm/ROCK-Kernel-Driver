@@ -95,7 +95,6 @@ void __pmac pmac_show_cpuinfo(struct seq_file *m)
 					PMAC_MB_INFO_MODEL, 0);
 	unsigned int mbflags = pmac_call_feature(PMAC_FTR_GET_MB_INFO, NULL,
 						 PMAC_MB_INFO_FLAGS, 0);
-	extern unsigned long ppc_tb_freq;
 
 	if (pmac_call_feature(PMAC_FTR_GET_MB_INFO, NULL, PMAC_MB_INFO_NAME,
 			      (long)&mbname) != 0)
@@ -130,9 +129,6 @@ void __pmac pmac_show_cpuinfo(struct seq_file *m)
 
 	/* Indicate newworld */
 	seq_printf(m, "pmac-generation\t: NewWorld\n");
-
-	/* Indicate timebase value */
-	seq_printf(m, "timebase\t: %lu\n", ppc_tb_freq);
 }
 
 

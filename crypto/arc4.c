@@ -45,10 +45,6 @@ static int arc4_set_key(void *ctx_arg, const u8 *in_key, unsigned int key_len, u
 			k = 0;
 	}
 
-	/* TODO: dump the first 768 bytes generated as recommended
-	   by Ilya Mironov (http://eprint.iacr.org/2002/067/) to 
-	   increase the statistical strength of the state table */
-
 	return 0;
 }
 

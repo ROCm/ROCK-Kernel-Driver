@@ -148,7 +148,7 @@ log_rtas_error(struct rtas_args	*rtas_args)
 	       (void *)__pa((unsigned long)&err_args));
 	enter_rtas((void *)__pa((unsigned long)&get_paca()->xRtas));
 	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
-	
+
 
 	err_args = get_paca()->xRtas;
 	get_paca()->xRtas = temp_args;

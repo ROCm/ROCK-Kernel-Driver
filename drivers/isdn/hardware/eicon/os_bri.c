@@ -1,9 +1,8 @@
-/* $Id: os_bri.c,v 1.18 2003/06/21 17:10:29 schindler Exp $ */
+/* $Id: os_bri.c,v 1.21 2004/03/21 17:26:01 armin Exp $ */
 
 #include "platform.h"
 #include "debuglib.h"
 #include "cardtype.h"
-#include "dlist.h"
 #include "pc.h"
 #include "pr_pc.h"
 #include "di_defs.h"

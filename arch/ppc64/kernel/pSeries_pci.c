@@ -699,7 +699,8 @@ void __init pSeries_final_fixup(void)
 	phbs_fixup_io();
 	chrp_request_regions();
 	pci_fix_bus_sysdata();
-	iommu_setup_pSeries();
+	if (!ppc64_iommu_off)
+		iommu_setup_pSeries();
 }
 
 /*********************************************************************** 
