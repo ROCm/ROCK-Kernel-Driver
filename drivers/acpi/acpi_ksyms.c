@@ -80,6 +80,7 @@ EXPORT_SYMBOL(acpi_get_current_resources);
 EXPORT_SYMBOL(acpi_get_possible_resources);
 EXPORT_SYMBOL(acpi_walk_resources);
 EXPORT_SYMBOL(acpi_set_current_resources);
+EXPORT_SYMBOL(acpi_resource_to_address64);
 EXPORT_SYMBOL(acpi_enable_event);
 EXPORT_SYMBOL(acpi_disable_event);
 EXPORT_SYMBOL(acpi_clear_event);
