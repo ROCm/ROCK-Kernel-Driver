@@ -435,12 +435,9 @@ CONFIG_NET_PCI=y
 # CONFIG_AC3200 is not set
 # CONFIG_APRICOT is not set
 # CONFIG_CS89x0 is not set
-# CONFIG_DE2104X is not set
-# CONFIG_TULIP is not set
-# CONFIG_DE4X5 is not set
 # CONFIG_DGRS is not set
-# CONFIG_DM9102 is not set
-CONFIG_EEPRO100=y
+# CONFIG_EEPRO100 is not set
+CONFIG_E100=y
 # CONFIG_LNE390 is not set
 # CONFIG_FEALNX is not set
 # CONFIG_NATSEMI is not set
@@ -459,7 +456,6 @@ CONFIG_EEPRO100=y
 # CONFIG_TLAN is not set
 # CONFIG_VIA_RHINE is not set
 # CONFIG_VIA_RHINE_MMIO is not set
-# CONFIG_WINBOND_840 is not set
 # CONFIG_NET_POCKET is not set
 
 #
@@ -473,6 +469,7 @@ CONFIG_EEPRO100=y
 # CONFIG_HAMACHI is not set
 # CONFIG_YELLOWFIN is not set
 # CONFIG_SK98LIN is not set
+# CONFIG_TIGON3 is not set
 # CONFIG_FDDI is not set
 # CONFIG_PLIP is not set
 # CONFIG_PPP is not set
@@ -495,6 +492,11 @@ CONFIG_EEPRO100=y
 # CONFIG_WAN is not set
 
 #
+# "Tulip" family network device support
+#
+# CONFIG_NET_TULIP is not set
+
+#
 # PCMCIA network device support
 #
 CONFIG_NET_PCMCIA=y
@@ -508,8 +510,6 @@ CONFIG_PCMCIA_PCNET=y
 # CONFIG_PCMCIA_AXNET is not set
 # CONFIG_ARCNET_COM20020_CS is not set
 # CONFIG_PCMCIA_IBMTR is not set
-# CONFIG_PCMCIA_XIRCOM is not set
-# CONFIG_PCMCIA_XIRTULIP is not set
 CONFIG_NET_PCMCIA_RADIO=y
 CONFIG_PCMCIA_RAYCS=y
 # CONFIG_AIRONET4500_CS is not set
