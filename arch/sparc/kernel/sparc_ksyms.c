@@ -92,31 +92,21 @@ extern void ___set_bit(void);
 extern void ___clear_bit(void);
 extern void ___change_bit(void);
 
-/* One thing to note is that the way the symbols of the mul/div
- * support routines are named is a mess, they all start with
- * a '.' which makes it a bitch to export, here is the trick:
+/* Alias functions whose names begin with "." and export the aliases.
+ * The module references will be fixed up by module_frob_arch_sections.
  */
+#define DOT_ALIAS2(__ret, __x, __arg1, __arg2) \
+	extern __ret __x(__arg1, __arg2) \
+	             __attribute__((weak, alias("." # __x)));
 
-/* If the interface of any of these special functions does ever
- * change in an incompatible way, you must modify this.
- */
-#define DOT_PROTO(sym) extern int __dot_##sym(int, int)
+DOT_ALIAS2(int, div, int, int)
+DOT_ALIAS2(int, mul, int, int)
+DOT_ALIAS2(int, rem, int, int)
+DOT_ALIAS2(unsigned, udiv, unsigned, unsigned)
+DOT_ALIAS2(unsigned, umul, unsigned, unsigned)
+DOT_ALIAS2(unsigned, urem, unsigned, unsigned)
 
-#ifdef __GENKSYMS__
-#define EXPORT_SYMBOL_DOT(sym)						\
-	DOT_PROTO(sym);							\
-	EXPORT_SYMBOL(__dot_ ## sym)
-#else /* !__GENKSYMS__ */
-#define EXPORT_SYMBOL_DOT(sym)						\
-	DOT_PROTO(sym) __asm__("." # sym);				\
-	__CRC_SYMBOL(__dot_##sym, "")					\
-	static const char __kstrtab___dot_##sym[]			\
-	__attribute__((section("__ksymtab_strings")))			\
-	= "." #sym;							\
-	static const struct kernel_symbol __ksymtab___dot_##sym		\
-	__attribute__((section("__ksymtab")))				\
-	= { (unsigned long)&__dot_##sym, __kstrtab___dot_##sym }
-#endif
+#undef DOT_ALIAS2
 
 /* used by various drivers */
 EXPORT_SYMBOL(sparc_cpu_model);
@@ -325,12 +315,12 @@ EXPORT_SYMBOL_NOVERS(__lshrdi3);
 EXPORT_SYMBOL_NOVERS(__muldi3);
 EXPORT_SYMBOL_NOVERS(__divdi3);
 
-EXPORT_SYMBOL_DOT(rem);
-EXPORT_SYMBOL_DOT(urem);
-EXPORT_SYMBOL_DOT(mul);
-EXPORT_SYMBOL_DOT(umul);
-EXPORT_SYMBOL_DOT(div);
-EXPORT_SYMBOL_DOT(udiv);
+EXPORT_SYMBOL(rem);
+EXPORT_SYMBOL(urem);
+EXPORT_SYMBOL(mul);
+EXPORT_SYMBOL(umul);
+EXPORT_SYMBOL(div);
+EXPORT_SYMBOL(udiv);
 
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 EXPORT_SYMBOL(do_BUG);
