@@ -772,7 +772,7 @@ int vlan_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	case SIOCGMIIREG:
 	case SIOCSMIIREG:
 		if (real_dev->do_ioctl && netif_device_present(real_dev)) 
-			err = real_dev->do_ioctl(dev, &ifrr, cmd);
+			err = real_dev->do_ioctl(real_dev, &ifrr, cmd);
 		break;
 
 	case SIOCETHTOOL:
