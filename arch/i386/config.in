@@ -442,12 +442,7 @@ source drivers/usb/Config.in
 
 source net/bluetooth/Config.in
 
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   mainmenu_option next_comment
-   comment 'Profiling support'
-   bool 'Profiling support (EXPERIMENTAL)' CONFIG_PROFILING
-   endmenu
-fi
+source arch/i386/oprofile/Config.in
  
 mainmenu_option next_comment
 comment 'Kernel hacking'
