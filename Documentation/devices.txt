@@ -430,12 +430,11 @@ Your cooperation is appreciated.
 		The raw keyboard device is used on Linux/SPARC only.
 
  11 block	SCSI CD-ROM devices
-		  0 = /dev/sr0		First SCSI CD-ROM
-		  1 = /dev/sr1		Second SCSI CD-ROM
+		  0 = /dev/scd0		First SCSI CD-ROM
+		  1 = /dev/scd1		Second SCSI CD-ROM
 		    ...
 
-		The prefix /dev/scd instead of /dev/sr has been used
-		as well, and might make more sense.
+		The prefix /dev/sr (instead of /dev/scd) has been deprecated.
 
  12 char	QIC-02 tape
 		  2 = /dev/ntpqic11	QIC-11, no rewind-on-close
@@ -700,15 +699,33 @@ Your cooperation is appreciated.
  30 char	iBCS-2 compatibility devices
 		  0 = /dev/socksys	Socket access
 		  1 = /dev/spx		SVR3 local X interface
-		  2 = /dev/inet/arp	Network access
-		  2 = /dev/inet/icmp	Network access
-		  2 = /dev/inet/ip	Network access
-		  2 = /dev/inet/udp	Network access
-		  2 = /dev/inet/tcp	Network access
+		 32 = /dev/inet/ip	Network access
+		 33 = /dev/inet/icmp
+		 34 = /dev/inet/ggp
+		 35 = /dev/inet/ipip
+		 36 = /dev/inet/tcp
+		 37 = /dev/inet/egp
+		 38 = /dev/inet/pup
+		 39 = /dev/inet/udp
+		 40 = /dev/inet/idp
+		 41 = /dev/inet/rawip
 
-		Additionally, iBCS-2 requires /dev/nfsd to be a link
-		to /dev/socksys, and /dev/X0R to be a link to
-		/dev/null.
+		Additionally, iBCS-2 requires the following links:
+
+		/dev/ip -> /dev/inet/ip
+		/dev/icmp -> /dev/inet/icmp
+		/dev/ggp -> /dev/inet/ggp
+		/dev/ipip -> /dev/inet/ipip
+		/dev/tcp -> /dev/inet/tcp
+		/dev/egp -> /dev/inet/egp
+		/dev/pup -> /dev/inet/pup
+		/dev/udp -> /dev/inet/udp
+		/dev/idp -> /dev/inet/idp
+		/dev/rawip -> /dev/inet/rawip
+		/dev/inet/arp -> /dev/inet/udp
+		/dev/inet/rip -> /dev/inet/udp
+		/dev/nfsd -> /dev/socksys
+		/dev/X0R -> /dev/null (? apparently not required ?)
 
  30 block	Philips LMS CM-205 CD-ROM
 		  0 = /dev/cm205cd	Philips LMS CM-205 CD-ROM
@@ -996,7 +1013,7 @@ Your cooperation is appreciated.
 		    ...
 		248 = /dev/rd/c2d31	32nd disk, whole disk
 
- 51 char	Baycom radio modem
+ 51 char	Baycom radio modem OR Radio Tech BIM-XXX-RS232 radio modem
 		  0 = /dev/bc0		First Baycom radio modem
 		  1 = /dev/bc1		Second Baycom radio modem
 		    ...
@@ -1148,9 +1165,9 @@ Your cooperation is appreciated.
 		<jth@prosig.demon.co.uk> for information.
 
  65 block	SCSI disk devices (16-31)
-		  0 = /dev/sdq		16th SCSI disk whole disk
-		 16 = /dev/sdr		17th SCSI disk whole disk
-		 32 = /dev/sds		18th SCSI disk whole disk
+		  0 = /dev/sdq		17th SCSI disk whole disk
+		 16 = /dev/sdr		18th SCSI disk whole disk
+		 32 = /dev/sds		19th SCSI disk whole disk
 		    ...
 		240 = /dev/sdaf		32nd SCSI disk whole disk
 
@@ -1201,9 +1218,9 @@ Your cooperation is appreciated.
 		applications; currently supports the AVM B1 card.
 
  68 block	SCSI disk devices (64-79)
-		  0 = /dev/sdbm		64th SCSI disk whole disk
-		 16 = /dev/sdbn		65th SCSI disk whole disk
-		 32 = /dev/sdbo		66th SCSI disk whole disk
+		  0 = /dev/sdbm		65th SCSI disk whole disk
+		 16 = /dev/sdbn		66th SCSI disk whole disk
+		 32 = /dev/sdbo		67th SCSI disk whole disk
 		    ...
 		240 = /dev/sdcb		80th SCSI disk whole disk
 
@@ -1633,17 +1650,6 @@ Your cooperation is appreciated.
 		  1 = /dev/dcxx1	Second capture card
 		    ...
 
- 94 block	IBM S/390 DASD block storage
-		  0 = /dev/dasda	First DASD device, major
-		  1 = /dev/dasda1	First DASD device, block 1
-		  2 = /dev/dasda2	First DASD device, block 2
-		  3 = /dev/dasda3	First DASD device, block 3
-		  4 = /dev/dasdb	Second DASD device, major
-		  5 = /dev/dasdb1	Second DASD device, block 1
-		  6 = /dev/dasdb2	Second DASD device, block 2
-		  7 = /dev/dasdb3	Second DASD device, block 3
-		    ...
-
  95 char	IP filter
 		  0 = /dev/ipl		Filter control device/log file
 		  1 = /dev/ipnat	NAT control device/log file
@@ -1651,9 +1657,15 @@ Your cooperation is appreciated.
 		  3 = /dev/ipauth	Authentication control device/log file
 		    ...		
 
- 95 block	IBM S/390 VM/ESA minidisk
-		  0 = /dev/mnda		First VM/ESA minidisk
-		  1 = /dev/mndb		Second VM/ESA minidisk
+ 95 block	IBM S/390 DASD block storage
+		  0 = /dev/dasd0	First DASD device, major
+		  1 = /dev/dasd0a	First DASD device, block 1
+		  2 = /dev/dasd0b	First DASD device, block 2
+		  3 = /dev/dasd0c	First DASD device, block 3
+		  4 = /dev/dasd1	Second DASD device, major
+		  5 = /dev/dasd1a	Second DASD device, block 1
+		  6 = /dev/dasd1b	Second DASD device, block 2
+		  7 = /dev/dasd1c	Second DASD device, block 3
 		    ...
 
  96 char	Parallel port ATAPI tape devices
@@ -1662,6 +1674,11 @@ Your cooperation is appreciated.
 		    ...
 		128 = /dev/npt0		First p.p. ATAPI tape, no rewind
 		129 = /dev/npt1		Second p.p. ATAPI tape, no rewind
+		    ...
+
+ 96 block	IBM S/390 VM/ESA minidisk
+		  0 = /dev/msd0		First VM/ESA minidisk
+		  1 = /dev/msd1		Second VM/ESA minidisk
 		    ...
 
  97 char	Parallel port generic ATAPI interface
@@ -1878,7 +1895,7 @@ Your cooperation is appreciated.
 		200 = /dev/iseries/vdz	26th virtual disk, whole disk
 		208 = /dev/iseries/vdaa	27th virtual disk, whole disk
 		    ...
-		240 = /dev/iseries/vdaf	32nd virtual disk, whole disk
+		248 = /dev/iseries/vdaf	32nd virtual disk, whole disk
 
 		Partitions are handled in the same way as for IDE
 		disks (see major number 3) except that the limit on
@@ -1908,11 +1925,6 @@ Your cooperation is appreciated.
 		I/O access to the board, the /dev/isex0 nodes command
 		nodes used to control the board.
 
-115 char	Console driver speaker
-		  0 = /dev/speaker	Speaker device file
-
-		Plays music using IBM BASIC style strings.
-
 116 char	Advanced Linux Sound Driver (ALSA)
 
 117 char	COSA/SRP synchronous serial card
@@ -1938,6 +1950,9 @@ Your cooperation is appreciated.
 
 120-127 char	LOCAL/EXPERIMENTAL USE
 120-127 block	LOCAL/EXPERIMENTAL USE
+		Allocated for local/experimental use.  For devices not
+		assigned official numbers, these ranges should be
+		used in order to avoid conflicting with future assignments.
 
 128-135 char	Unix98 PTY masters
 
@@ -2094,10 +2109,7 @@ Your cooperation is appreciated.
 		  2 = /dev/raw/raw2	Second raw I/O device
 		    ...
 
-163 char	Radio Tech BIM-XXX-RS232 radio modem
-		  0 = /dev/bimrt0	First BIM radio modem
-		  1 = /dev/bimrt1	Second BIM radio modem
-		    ...
+163 char	UNASSIGNED (was Radio Tech BIM-XXX-RS232 radio modem - see 51)
 
 164 char	Chase Research AT/PCI-Fast serial card
 		  0 = /dev/ttyCH0	AT/PCI-Fast board 0, port 0
@@ -2331,7 +2343,7 @@ Your cooperation is appreciated.
 		    ...
 199 block	Veritas volume manager (VxVM) volumes
 		  0 = /dev/vx/dsk/*/*		First volume
-		  1 = /dev/vx/dsk/*/*		First volume
+		  1 = /dev/vx/dsk/*/*		Second volume
 		    ...
 
 		The namespace in these directories is maintained by
@@ -2611,6 +2623,9 @@ Your cooperation is appreciated.
 
 240-254 char	LOCAL/EXPERIMENTAL USE
 240-254 block	LOCAL/EXPERIMENTAL USE
+		Allocated for local/experimental use.  For devices not
+		assigned official numbers, these ranges should be
+		used in order to avoid conflicting with future assignments.
 
 255 char	RESERVED
 255 block	RESERVED
