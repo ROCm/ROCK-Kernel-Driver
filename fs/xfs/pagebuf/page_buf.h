@@ -296,8 +296,6 @@ extern int pagebuf_lock_value(		/* return count on lock		*/
 extern int pagebuf_lock(		/* lock buffer			*/
 		page_buf_t *);		/* buffer to lock		*/
 
-extern void pagebuf_target_clear(struct pb_target *);
-
 extern void pagebuf_unlock(		/* unlock buffer		*/
 		page_buf_t *);		/* buffer to unlock		*/
 

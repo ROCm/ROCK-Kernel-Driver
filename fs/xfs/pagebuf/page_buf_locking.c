@@ -121,14 +121,6 @@ pagebuf_lock(
 	return 0;
 }
 
-void
-pagebuf_target_clear(
-	pb_target_t		*target)
-{
-	invalidate_bdev(target->pbr_bdev, 1);
-	truncate_inode_pages(target->pbr_mapping, 0LL);
-}
-
 /*
  *	pagebuf_unlock
  *

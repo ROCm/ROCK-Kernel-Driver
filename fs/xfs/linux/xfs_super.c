@@ -509,6 +509,14 @@ xfs_free_buftarg(
 }
 
 void
+xfs_relse_buftarg(
+	xfs_buftarg_t		*btp)
+{
+	invalidate_bdev(btp->pbr_bdev, 1);
+	truncate_inode_pages(btp->pbr_mapping, 0LL);
+}
+
+void
 xfs_size_buftarg(
 	xfs_buftarg_t		*btp,
 	unsigned int		blocksize,

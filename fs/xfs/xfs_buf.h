@@ -300,8 +300,7 @@ extern void XFS_bflush(xfs_buftarg_t *);
 #define xfs_binval(buftarg) XFS_bflush(buftarg)
 
 #define xfs_incore_relse(buftarg,delwri_only,wait)	\
-       pagebuf_target_clear(buftarg)
-
+	xfs_relse_buftarg(buftarg)
 
 #define xfs_baread(target, rablkno, ralen)  \
 	pagebuf_readahead((target), (rablkno), \
