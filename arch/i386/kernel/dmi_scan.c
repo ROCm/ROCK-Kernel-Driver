@@ -272,6 +272,16 @@ static __init int disable_acpi_pci(struct dmi_blacklist *d)
 }  
 #endif
 
+static __init int hp_ht_bigsmp(struct dmi_blacklist *d) 
+{ 
+#ifdef CONFIG_X86_GENERICARCH
+ 	extern int dmi_bigsmp;
+ 	printk(KERN_NOTICE "%s detected: force use of apic=bigsmp\n", d->ident);
+ 	dmi_bigsmp = 1;
+#endif
+ 	return 0;
+} 
+
 /*
  *	Process the DMI blacklists
  */
@@ -353,21 +363,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	{ force_acpi_ht, "HP VISUALIZE NT Workstation", {
 			MATCH(DMI_BOARD_VENDOR, "Hewlett-Packard"),
 			MATCH(DMI_PRODUCT_NAME, "HP VISUALIZE NT Workstation"),
-			NO_MATCH, NO_MATCH }},
-
-	{ force_acpi_ht, "Compaq ProLiant DL380 G2", {
-			MATCH(DMI_SYS_VENDOR, "Compaq"),
-			MATCH(DMI_PRODUCT_NAME, "ProLiant DL380 G2"),
-			NO_MATCH, NO_MATCH }},
-
-	{ force_acpi_ht, "Compaq ProLiant ML530 G2", {
-			MATCH(DMI_SYS_VENDOR, "Compaq"),
-			MATCH(DMI_PRODUCT_NAME, "ProLiant ML530 G2"),
-			NO_MATCH, NO_MATCH }},
-
-	{ force_acpi_ht, "Compaq ProLiant ML350 G3", {
-			MATCH(DMI_SYS_VENDOR, "Compaq"),
-			MATCH(DMI_PRODUCT_NAME, "ProLiant ML350 G3"),
 			NO_MATCH, NO_MATCH }},
 
 	{ force_acpi_ht, "Compaq Workstation W8000", {
@@ -460,6 +455,17 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 #endif	// CONFIG_ACPI_BOOT
 
 #ifdef	CONFIG_ACPI_PCI
+
+	{ hp_ht_bigsmp, "HP ProLiant DL760 G2", {
+			MATCH(DMI_BIOS_VENDOR, "HP"),
+			MATCH(DMI_BIOS_VERSION, "P44-"),
+			NO_MATCH, NO_MATCH }},
+
+	{ hp_ht_bigsmp, "HP ProLiant DL740", {
+			MATCH(DMI_BIOS_VENDOR, "HP"),
+			MATCH(DMI_BIOS_VERSION, "P47-"),
+			NO_MATCH, NO_MATCH }},
+
 	/*
 	 *	Boxes that need ACPI PCI IRQ routing disabled
 	 */

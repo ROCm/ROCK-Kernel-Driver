@@ -253,7 +253,6 @@ acpi_os_table_override (struct acpi_table_header *existing_table,
 		return AE_OK;
 	 }
 	 else{
-		printk(KERN_INFO "No customized DSDT found!\n");
                 *new_table = NULL;
 		return AE_OK;
 	 }

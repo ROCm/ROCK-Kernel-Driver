@@ -3809,7 +3809,7 @@ static void __init arch_init_sched_domains(void)
 #endif /* CONFIG_NUMA */
 #endif /* ARCH_HAS_SCHED_DOMAIN */
 
-#define SCHED_DOMAIN_DEBUG
+#undef SCHED_DOMAIN_DEBUG
 #ifdef SCHED_DOMAIN_DEBUG
 void sched_domain_debug(void)
 {
