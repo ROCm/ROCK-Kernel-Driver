@@ -387,7 +387,91 @@ static inline const float32 getSingleConstant(const unsigned int nIndex)
 	return float32Constant[nIndex];
 }
 
-extern unsigned int getRegisterCount(const unsigned int opcode);
-extern unsigned int getDestinationSize(const unsigned int opcode);
+static inline unsigned int getTransferLength(const unsigned int opcode)
+{
+	unsigned int nRc;
+
+	switch (opcode & MASK_TRANSFER_LENGTH) {
+	case 0x00000000:
+		nRc = 1;
+		break;		/* single precision */
+	case 0x00008000:
+		nRc = 2;
+		break;		/* double precision */
+	case 0x00400000:
+		nRc = 3;
+		break;		/* extended precision */
+	default:
+		nRc = 0;
+	}
+
+	return (nRc);
+}
+
+static inline unsigned int getRegisterCount(const unsigned int opcode)
+{
+	unsigned int nRc;
+
+	switch (opcode & MASK_REGISTER_COUNT) {
+	case 0x00000000:
+		nRc = 4;
+		break;
+	case 0x00008000:
+		nRc = 1;
+		break;
+	case 0x00400000:
+		nRc = 2;
+		break;
+	case 0x00408000:
+		nRc = 3;
+		break;
+	default:
+		nRc = 0;
+	}
+
+	return (nRc);
+}
+
+static inline unsigned int getRoundingPrecision(const unsigned int opcode)
+{
+	unsigned int nRc;
+
+	switch (opcode & MASK_ROUNDING_PRECISION) {
+	case 0x00000000:
+		nRc = 1;
+		break;
+	case 0x00000080:
+		nRc = 2;
+		break;
+	case 0x00080000:
+		nRc = 3;
+		break;
+	default:
+		nRc = 0;
+	}
+
+	return (nRc);
+}
+
+static inline unsigned int getDestinationSize(const unsigned int opcode)
+{
+	unsigned int nRc;
+
+	switch (opcode & MASK_DESTINATION_SIZE) {
+	case 0x00000000:
+		nRc = typeSingle;
+		break;
+	case 0x00000080:
+		nRc = typeDouble;
+		break;
+	case 0x00080000:
+		nRc = typeExtended;
+		break;
+	default:
+		nRc = typeNone;
+	}
+
+	return (nRc);
+}
 
 #endif
