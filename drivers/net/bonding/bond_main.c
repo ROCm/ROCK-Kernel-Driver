@@ -3775,7 +3775,7 @@ static int __init bond_init(struct net_device *bond_dev)
 		return -EINVAL;
 	}
 
-	dev->destructor = free_netdev;
+	bond_dev->destructor = free_netdev;
 #ifdef CONFIG_NET_FASTROUTE
 	bond_dev->accept_fastpath = bond_accept_fastpath;
 #endif
