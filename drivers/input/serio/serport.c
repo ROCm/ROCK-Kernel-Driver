@@ -70,13 +70,9 @@ static int serport_ldisc_open(struct tty_struct *tty)
 	struct serport *serport;
 	char name[64];
 
-	MOD_INC_USE_COUNT;
-
-	if (!(serport = kmalloc(sizeof(struct serport), GFP_KERNEL))) {
-		MOD_DEC_USE_COUNT;
+	serport = kmalloc(sizeof(struct serport), GFP_KERNEL);
+	if (unlikely(!serport))
 		return -ENOMEM;
-	}
-
 	memset(serport, 0, sizeof(struct serport));
 
 	set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
@@ -107,7 +103,6 @@ static void serport_ldisc_close(struct tty_struct *tty)
 {
 	struct serport *serport = (struct serport*) tty->disc_data;
 	kfree(serport);
-	MOD_DEC_USE_COUNT;
 }
 
 /*
@@ -188,6 +183,7 @@ static void serport_ldisc_write_wakeup(struct tty_struct * tty)
  */
 
 static struct tty_ldisc serport_ldisc = {
+	.owner =	THIS_MODULE,
 	.name =		"input",
 	.open =		serport_ldisc_open,
 	.close =	serport_ldisc_close,
@@ -202,7 +198,7 @@ static struct tty_ldisc serport_ldisc = {
  * The functions for insering/removing us as a module.
  */
 
-int __init serport_init(void)
+static int __init serport_init(void)
 {
         if (tty_register_ldisc(N_MOUSE, &serport_ldisc)) {
                 printk(KERN_ERR "serport.c: Error registering line discipline.\n");
@@ -212,7 +208,7 @@ int __init serport_init(void)
 	return  0;
 }
 
-void __exit serport_exit(void)
+static void __exit serport_exit(void)
 {
 	tty_register_ldisc(N_MOUSE, NULL);
 }
