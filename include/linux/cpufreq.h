@@ -205,6 +205,8 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu);
 int cpufreq_restore(void);
 #endif
 
+/* the proc_intf.c needs this */
+int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpufreq_governor **governor);
 
 #ifdef CONFIG_CPU_FREQ_24_API
 /*********************************************************************
