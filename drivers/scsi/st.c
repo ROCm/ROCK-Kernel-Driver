@@ -3128,10 +3128,10 @@ static int st_ioctl(struct inode *inode, struct file *file,
 	 * may try and take the device offline, in which case all further
 	 * access to the device is prohibited.
 	 */
-	if (!scsi_block_when_processing_errors(STp->device)) {
-		retval = (-ENXIO);
+	retval = scsi_nonblockable_ioctl(STp->device, cmd_in, p, file);
+	if (!scsi_block_when_processing_errors(STp->device) || !retval)
 		goto out;
-	}
+
 	cmd_type = _IOC_TYPE(cmd_in);
 	cmd_nr = _IOC_NR(cmd_in);
 
