@@ -1553,13 +1553,17 @@ static void digi_close( struct usb_serial_port *port, struct file *filp )
 dbg( "digi_close: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_count );
 
 
+	/* if disconnected, just clear flags */
+	if (!usb_get_intfdata(port->serial->interface))
+		goto exit;
+
 	/* do cleanup only after final close on this port */
 	spin_lock_irqsave( &priv->dp_port_lock, flags );
 	priv->dp_in_close = 1;
 	spin_unlock_irqrestore( &priv->dp_port_lock, flags );
 
 	/* tell line discipline to process only XON/XOFF */
-        tty->closing = 1;
+	tty->closing = 1;
 
 	/* wait for output to drain */
 	if( (filp->f_flags&(O_NDELAY|O_NONBLOCK)) == 0 ) {
@@ -1624,6 +1628,7 @@ dbg( "digi_close: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_co
 
 	tty->closing = 0;
 
+exit:
 	spin_lock_irqsave( &priv->dp_port_lock, flags );
 	priv->dp_write_urb_in_use = 0;
 	priv->dp_in_close = 0;
