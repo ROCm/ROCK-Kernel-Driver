@@ -58,14 +58,14 @@ MAKEMAN   = $(PERL) $(srctree)/scripts/makeman
 # The following rules are used to generate the .sgml documentation
 # required to generate the final targets. (ps, pdf, html).
 quiet_cmd_docproc = DOCPROC $@
-      cmd_docproc = $(DOCPROC) doc $< >$@
+      cmd_docproc = SRCTREE=$(srctree)/ $(DOCPROC) doc $< >$@
 define rule_docproc
 	set -e;								\
         $(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) 	\
         $(cmd_$(1)); 							\
         ( 								\
           echo 'cmd_$@ := $(cmd_$(1))'; 				\
-          echo $@: `$(DOCPROC) depend $<`; 				\
+          echo $@: `SRCTREE=$(srctree) $(DOCPROC) depend $<`; 		\
         ) > $(dir $@).$(notdir $@).cmd
 endef
 
@@ -129,6 +129,9 @@ quiet_cmd_db2html = DB2HTML $@
 # Rule to generate man files - output is placed in the man subdirectory
 
 %.9:	%.sgml
+ifneq ($(KBUILD_SRC),)
+	$(Q)mkdir -p $(objtree)/Documentation/DocBook/man
+endif
 	$(SPLITMAN) $< $(objtree)/Documentation/DocBook/man "$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)"
 	$(MAKEMAN) convert $(objtree)/Documentation/DocBook/man $<
 
