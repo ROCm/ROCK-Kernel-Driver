@@ -504,13 +504,6 @@ static void pcmcia_nonstatic_validate_mem(struct pcmcia_socket *s)
 	}
 }
 
-void pcmcia_validate_mem(struct pcmcia_socket *s)
-{
-	if (s->resource_ops->validate_mem)
-		s->resource_ops->validate_mem(s);
-}
-EXPORT_SYMBOL(pcmcia_validate_mem);
-
 struct pcmcia_align_data {
 	unsigned long	mask;
 	unsigned long	offset;
@@ -599,14 +592,6 @@ static int nonstatic_adjust_io_region(struct resource *res, unsigned long r_star
 	return ret;
 }
 
-int adjust_io_region(struct resource *res, unsigned long r_start,
-		     unsigned long r_end, struct pcmcia_socket *s)
-{
-	if (s->resource_ops->adjust_io_region)
-		return s->resource_ops->adjust_io_region(res, r_start, r_end, s);
-	return -ENOMEM;
-}
-
 /*======================================================================
 
     These find ranges of I/O ports or memory addresses that are not
@@ -620,7 +605,7 @@ int adjust_io_region(struct resource *res, unsigned long r_start,
     
 ======================================================================*/
 
-struct resource *find_io_region(unsigned long base, int num,
+struct resource *nonstatic_find_io_region(unsigned long base, int num,
 		   unsigned long align, struct pcmcia_socket *s)
 {
 	struct resource *res = make_resource(0, num, IORESOURCE_IO, s->dev.class_id);
@@ -997,12 +982,38 @@ void release_resource_db(struct pcmcia_socket *s)
 }
 
 
+void pcmcia_validate_mem(struct pcmcia_socket *s)
+{
+	if (s->resource_ops->validate_mem)
+		s->resource_ops->validate_mem(s);
+}
+EXPORT_SYMBOL(pcmcia_validate_mem);
+
+int adjust_io_region(struct resource *res, unsigned long r_start,
+		     unsigned long r_end, struct pcmcia_socket *s)
+{
+	if (s->resource_ops->adjust_io_region)
+		return s->resource_ops->adjust_io_region(res, r_start, r_end, s);
+	return -ENOMEM;
+}
+
+struct resource *find_io_region(unsigned long base, int num,
+		   unsigned long align, struct pcmcia_socket *s)
+{
+	if (s->resource_ops->find_io)
+		return s->resource_ops->find_io(base, num, align, s);
+	return NULL;
+}
+
+
 struct pccard_resource_ops pccard_static_ops = {
 	.validate_mem = NULL,
 	.adjust_io_region = NULL,
+	.find_io = NULL,
 };
 
 struct pccard_resource_ops pccard_nonstatic_ops = {
 	.validate_mem = pcmcia_nonstatic_validate_mem,
 	.adjust_io_region = nonstatic_adjust_io_region,
+	.find_io = nonstatic_find_io_region,
 };

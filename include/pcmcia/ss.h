@@ -121,6 +121,9 @@ struct pccard_resource_ops {
 					 unsigned long r_start,
 					 unsigned long r_end,
 					 struct pcmcia_socket *s);
+	struct resource* (*find_io)	(unsigned long base, int num,
+					 unsigned long align,
+					 struct pcmcia_socket *s);
 };
 
 /*
