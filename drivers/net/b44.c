@@ -88,6 +88,7 @@ static int b44_debug = -1;	/* -1 == use B44_DEF_MSG_ENABLE as value */
 static struct pci_device_id b44_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_BCM4401,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ }	/* terminate list with empty entry */
 };
 
 MODULE_DEVICE_TABLE(pci, b44_pci_tbl);
