@@ -64,6 +64,7 @@ extern int qlport_down_retry;
 extern int ql2xmaxqdepth;
 extern int displayConfig;
 extern int ql2xplogiabsentdevice;
+extern int ql2xenablezio;
 extern int ql2xintrdelaytimer;
 extern int ql2xloginretrycount;
 

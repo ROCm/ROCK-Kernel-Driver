@@ -1110,7 +1110,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 	nvram_t *nv    = (nvram_t *)ha->request_ring;
 	uint16_t  *wptr  = (uint16_t *)ha->request_ring;
 	device_reg_t *reg = ha->iobase;
-	uint16_t  timer_mode;
+	uint8_t  timer_mode;
 
 	rval = QLA_SUCCESS;
 
@@ -1164,7 +1164,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 		} else if (IS_QLA2200(ha)) {
 			nv->firmware_options[0] = BIT_2 | BIT_1;
 			nv->firmware_options[1] = BIT_7 | BIT_5;
-			nv->add_firmware_options[0] = BIT_5 | BIT_4;
+			nv->add_firmware_options[0] = BIT_5;
 			nv->add_firmware_options[1] = BIT_5 | BIT_4;
 			nv->frame_payload_size = __constant_cpu_to_le16(1024);
 		} else if (IS_QLA2100(ha)) {
@@ -1262,6 +1262,16 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 		}
 	} else if (IS_QLA2200(ha)) {
 		nv->firmware_options[0] |= BIT_2;
+		/*
+		 * 'Point-to-point preferred, else loop' is not a safe
+		 * connection mode setting.
+		 */
+		if ((nv->add_firmware_options[0] & (BIT_6 | BIT_5 | BIT_4)) ==
+		    (BIT_5 | BIT_4)) {
+			/* Force 'loop preferred, else point-to-point'. */
+			nv->add_firmware_options[0] &= ~(BIT_6 | BIT_5 | BIT_4);
+			nv->add_firmware_options[0] |= BIT_5;
+		}
 		strcpy(ha->model_number, "QLA22xx");
 	} else /*if (IS_QLA2100(ha))*/ {
 		strcpy(ha->model_number, "QLA2100");
@@ -1417,23 +1427,22 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 
 		ha->flags.process_response_queue = 1;
 	} else {
-		/* TEST ZIO:
-		 *
-		 * icb->add_firmware_options[0] &=
-		 *    ~(BIT_3 | BIT_2 | BIT_1 | BIT_0);
-		 * icb->add_firmware_options[0] |= (BIT_2 | BIT_0);
-		 */
+		/* Enable ZIO -- Support mode 5 only. */
 		timer_mode = icb->add_firmware_options[0] &
 		    (BIT_3 | BIT_2 | BIT_1 | BIT_0);
-		if (timer_mode == 5) {
+		icb->add_firmware_options[0] &=
+		    ~(BIT_3 | BIT_2 | BIT_1 | BIT_0);
+		if (ql2xenablezio)
+			timer_mode = BIT_2 | BIT_0;
+		if (timer_mode == (BIT_2 | BIT_0)) {
 			DEBUG2(printk("scsi(%ld): ZIO enabled; timer delay "
 			    "(%d).\n", ha->host_no, ql2xintrdelaytimer));
 			qla_printk(KERN_INFO, ha,
 			    "ZIO enabled; timer delay (%d).\n",
 			    ql2xintrdelaytimer);
 
+			icb->add_firmware_options[0] |= timer_mode;
 			icb->interrupt_delay_timer = ql2xintrdelaytimer;
-	
 			ha->flags.process_response_queue = 1;
 		}
 	}
@@ -2328,7 +2337,7 @@ qla2x00_configure_fabric(scsi_qla_host_t *ha)
 	do {
 		/* Ensure we are logged into the SNS. */
 		qla2x00_login_fabric(ha, SIMPLE_NAME_SERVER, 0xff, 0xff, 0xfc,
-		    mb, BIT_0);
+		    mb, BIT_1 | BIT_0);
 		if (mb[0] != MBS_COMMAND_COMPLETE) {
 			qla_printk(KERN_INFO, ha,
 			    "Failed SNS login: loop_id=%x mb[0]=%x mb[1]=%x "
@@ -2578,11 +2587,6 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *ha, struct list_head *new_fcports)
 		if ((new_fcport->d_id.b.domain & 0xf0) == 0xf0)
 			continue;
 
-		/* Bypass if same domain and area of adapter. */
-		if ((new_fcport->d_id.b24 & 0xffff00) ==
-		    (ha->d_id.b24 & 0xffff00))
-			continue;
-
 		/* Locate matching device in database. */
 		found = 0;
 		list_for_each_entry(fcport, &ha->fcports, list) {
@@ -2593,6 +2597,15 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *ha, struct list_head *new_fcports)
 			found++;
 
 			/*
+			 * If address the same and state FCS_ONLINE, nothing
+			 * changed.
+			 */
+			if (fcport->d_id.b24 == new_fcport->d_id.b24 &&
+			    atomic_read(&fcport->state) == FCS_ONLINE) {
+				break;
+			}
+
+			/*
 			 * If device was not a fabric device before.
 			 */
 			if ((fcport->flags & FCF_FABRIC_DEVICE) == 0) {
@@ -2601,15 +2614,6 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *ha, struct list_head *new_fcports)
 				fcport->flags |= (FCF_FABRIC_DEVICE |
 				    FCF_LOGIN_NEEDED);
 				fcport->flags &= ~FCF_PERSISTENT_BOUND;
-				break;
-			}
-
-			/*
-			 * If address the same and state FCS_ONLINE, nothing
-			 * changed.
-			 */
-			if (fcport->d_id.b24 == new_fcport->d_id.b24 &&
-			    atomic_read(&fcport->state) == FCS_ONLINE) {
 				break;
 			}
 

@@ -79,6 +79,13 @@ MODULE_PARM_DESC(ql2xplogiabsentdevice,
 		"a Fabric scan.  This is needed for several broken switches."
 		"Default is 0 - no PLOGI. 1 - perfom PLOGI.");
 
+int ql2xenablezio = 0;
+module_param(ql2xenablezio, int, S_IRUGO|S_IRUSR);
+MODULE_PARM_DESC(ql2xenablezio,
+		"Option to enable ZIO:If 1 then enable it otherwise" 
+		" use the default set in the NVRAM."
+		" Default is 0 : disabled");
+
 int ql2xintrdelaytimer = 10;
 module_param(ql2xintrdelaytimer, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(ql2xintrdelaytimer,
