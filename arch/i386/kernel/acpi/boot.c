@@ -310,11 +310,12 @@ acpi_boot_init (void)
 
 	result = acpi_blacklisted();
 	if (result) {
+		printk(KERN_WARNING PREFIX "BIOS listed in blacklist, disabling ACPI support\n");
 		acpi_disabled = 1;
 		return result;
 	}
 	else
-		printk(KERN_NOTICE PREFIX "BIOS passes blacklist\n");
+		printk(KERN_NOTICE PREFIX "BIOS not listed in blacklist\n");
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
