@@ -2836,7 +2836,7 @@ char name[] = "ElmerLinux";
  	return 0; 
    final:
    	printk(KERN_ERR "aironet init failed \n");
-   	return NODEV;
+   	return -ENODEV;
    	
  };
 
