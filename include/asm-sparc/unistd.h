@@ -249,8 +249,8 @@
 #define __NR_time               231 /* Linux Specific                              */
 /* #define __NR_oldstat         232    Linux Specific                              */
 #define __NR_stime              233 /* Linux Specific                              */
-/* #define __NR_oldfstat        234    Linux Specific                              */
-/* #define __NR_phys            235    Linux Specific                              */
+#define __NR_alloc_hugepages    234 /* Linux Specific                              */
+#define __NR_free_hugepages     235 /* Linux Specific                              */
 #define __NR__llseek            236 /* Linux Specific                              */
 #define __NR_mlock              237
 #define __NR_munlock            238
