@@ -72,6 +72,7 @@ extern void openpic_init_IRQ(void);
 
 extern void find_and_init_phbs(void);
 
+extern void pSeries_get_boot_time(struct rtc_time *rtc_time);
 extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
 extern int  pSeries_set_rtc_time(struct rtc_time *rtc_time);
 void pSeries_calibrate_decr(void);
@@ -256,7 +257,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.power_off      = rtas_power_off;
 	ppc_md.halt           = rtas_halt;
 
-	ppc_md.get_boot_time  = pSeries_get_rtc_time;
+	ppc_md.get_boot_time  = pSeries_get_boot_time;
 	ppc_md.get_rtc_time   = pSeries_get_rtc_time;
 	ppc_md.set_rtc_time   = pSeries_set_rtc_time;
 	ppc_md.calibrate_decr = pSeries_calibrate_decr;
