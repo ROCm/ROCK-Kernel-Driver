@@ -157,20 +157,7 @@
 #include <linux/dma-mapping.h>
 
 
-/* minidrivers _could_ be individually configured */
-#define	CONFIG_USB_AN2720
-#define	CONFIG_USB_BELKIN
-#undef	CONFIG_USB_CDCETHER
-//#define	CONFIG_USB_CDCETHER		/* NYET */
-#define	CONFIG_USB_EPSON2888
-#define	CONFIG_USB_GENESYS
-#define	CONFIG_USB_NET1080
-#define	CONFIG_USB_PL2301
-#define	CONFIG_USB_ARMLINUX
-#define	CONFIG_USB_ZAURUS
-
-
-#define DRIVER_VERSION		"31-Mar-2003"
+#define DRIVER_VERSION		"25-Apr-2003"
 
 /*-------------------------------------------------------------------------*/
 
@@ -256,6 +243,7 @@ struct driver_info {
 #define FLAG_FRAMING_Z	0x0004		/* zaurus adds a trailer */
 
 #define FLAG_NO_SETINT	0x0010		/* device can't set_interface() */
+#define FLAG_ETHER	0x0020		/* maybe use "eth%d" names */
 
 	/* init device ... can sleep, or cause probe() failure */
 	int	(*bind)(struct usbnet *, struct usb_interface *);
@@ -396,6 +384,7 @@ found:
 
 
 #ifdef	CONFIG_USB_AN2720
+#define	HAVE_HARDWARE
 
 /*-------------------------------------------------------------------------
  *
@@ -421,6 +410,7 @@ static const struct driver_info	an2720_info = {
 
 
 #ifdef	CONFIG_USB_BELKIN
+#define	HAVE_HARDWARE
 
 /*-------------------------------------------------------------------------
  *
@@ -447,7 +437,11 @@ static const struct driver_info	belkin_info = {
  * Takes two interfaces.  The DATA interface is inactive till an altsetting
  * is selected.  Configuration data includes class descriptors.
  *
- * Zaurus uses nonstandard framing, but is otherwise CDC Ether.
+ * Zaurus uses nonstandard framing, and doesn't uniquify its Ethernet
+ * addresses, but is otherwise CDC Ether.
+ *
+ * This should interop with whatever the 2.4 "CDCEther.c" driver
+ * (by Brad Hards) talked with.
  *
  *-------------------------------------------------------------------------*/
 
@@ -589,9 +583,17 @@ next_desc:
 	if (!info->header || !info ->u || !info->ether)
 		goto bad_desc;
 
-	status = get_ethernet_addr (dev, info->ether);
-	if (status < 0)
-		return status;
+#ifdef CONFIG_USB_ZAURUS
+	/* Zaurus ethernet addresses aren't unique ... */
+	if ((dev->driver_info->flags & FLAG_FRAMING_Z) != 0)
+		/* ignore */ ;
+	else
+#endif
+	{
+		status = get_ethernet_addr (dev, info->ether);
+		if (status < 0)
+			return status;
+	}
 
 	/* claim data interface and set it up ... with side effects.
 	 * network traffic can't flow until an altsetting is enabled.
@@ -609,8 +611,6 @@ next_desc:
 
 	dev->net.mtu = cpu_to_le16p (&info->ether->wMaxSegmentSize)
 		- ETH_HLEN;
-	if ((dev->driver_info->flags & FLAG_FRAMING_Z) == 0)
-		strcpy (dev->net.name, "eth%d");
 	return 0;
 
 bad_desc:
@@ -640,9 +640,11 @@ static void cdc_unbind (struct usbnet *dev, struct usb_interface *intf)
 
 
 #ifdef	CONFIG_USB_CDCETHER
+#define	HAVE_HARDWARE
 
 static const struct driver_info	cdc_info = {
 	.description =	"CDC Ethernet Device",
+	.flags =	FLAG_ETHER,
 	// .check_connect = cdc_check_connect,
 	.bind =		cdc_bind,
 	.unbind =	cdc_unbind,
@@ -653,6 +655,7 @@ static const struct driver_info	cdc_info = {
 
 
 #ifdef	CONFIG_USB_EPSON2888
+#define	HAVE_HARDWARE
 
 /*-------------------------------------------------------------------------
  *
@@ -662,6 +665,8 @@ static const struct driver_info	cdc_info = {
  * device might not be Tux-powered.  Epson provides reference firmware that
  * implements this interface.  Product developers can reuse or modify that
  * code, such as by using their own product and vendor codes.
+ *
+ * Support was from Juro Bystricky <bystricky.juro@erd.epson.com>
  *
  *-------------------------------------------------------------------------*/
 
@@ -676,6 +681,7 @@ static const struct driver_info	epson2888_info = {
 
 
 #ifdef CONFIG_USB_GENESYS
+#define	HAVE_HARDWARE
 
 /*-------------------------------------------------------------------------
  *
@@ -692,6 +698,9 @@ static const struct driver_info	epson2888_info = {
  *  - For the half duplex type, a control/interrupt handshake settles
  *    the transfer direction.  (That's disabled here, partially coded.)
  *    A control URB would block until other side writes an interrupt.
+ *
+ * Original code from Jiun-Jie Huang <huangjj@genesyslogic.com.tw>
+ * and merged into "usbnet" by Stanislav Brabec <utx@penguin.cz>.
  *
  *-------------------------------------------------------------------------*/
 
@@ -1011,6 +1020,7 @@ static const struct driver_info	genelink_info = {
 
 
 #ifdef	CONFIG_USB_NET1080
+#define	HAVE_HARDWARE
 
 /*-------------------------------------------------------------------------
  *
@@ -1526,10 +1536,14 @@ static const struct driver_info	net1080_info = {
 
 
 #ifdef CONFIG_USB_PL2301
+#define	HAVE_HARDWARE
 
 /*-------------------------------------------------------------------------
  *
  * Prolific PL-2301/PL-2302 driver ... http://www.prolifictech.com
+ *
+ * The protocol and handshaking used here should be bug-compatible
+ * with the Linux 2.2 "plusb" driver, by Deti Fliegl.
  *
  *-------------------------------------------------------------------------*/
 
@@ -1590,6 +1604,7 @@ static const struct driver_info	prolific_info = {
 
 
 #ifdef	CONFIG_USB_ARMLINUX
+#define	HAVE_HARDWARE
 
 /*-------------------------------------------------------------------------
  *
@@ -1622,6 +1637,7 @@ static const struct driver_info	yopy_info = {
 
 
 #ifdef CONFIG_USB_ZAURUS
+#define	HAVE_HARDWARE
 
 #include <linux/crc32.h>
 
@@ -1736,7 +1752,9 @@ static struct net_device_stats *usbnet_get_stats (struct net_device *net)
 
 /*-------------------------------------------------------------------------*/
 
-/* urb completions may be in_irq; avoid doing real work then. */
+/* some LK 2.4 HCDs oopsed if we freed or resubmitted urbs from
+ * completion callbacks.  2.5 should have fixed those bugs...
+ */
 
 static void defer_bh (struct usbnet *dev, struct sk_buff *skb)
 {
@@ -2502,6 +2520,10 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	int				status;
 
 	info = (struct driver_info *) prod->driver_info;
+	if (!info) {
+		dev_dbg (&udev->dev, "blacklisted by %s\n", driver_name);
+		return -ENODEV;
+	}
 	xdev = interface_to_usbdev (udev);
 	interface = &udev->altsetting [udev->act_altsetting];
 
@@ -2553,9 +2575,15 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 	// allow device-specific bind/init procedures
 	// NOTE net->name still not usable ...
-	if (info->bind)
+	if (info->bind) {
 		status = info->bind (dev, udev);
-	else if (!info->in || info->out)
+		// heuristic:  "usb%d" for links we know are two-host,
+		// else "eth%d" when there's reasonable doubt.  userspace
+		// can rename the link if it knows better.
+		if ((dev->driver_info->flags & FLAG_ETHER) != 0
+				&& (net->dev_addr [0] & 0x02) == 0)
+			strcpy (net->name, "eth%d");
+	} else if (!info->in || info->out)
 		status = get_endpoints (dev, udev);
 	else {
 		dev->in = usb_rcvbulkpipe (xdev, info->in);
@@ -2591,6 +2619,10 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 
 /*-------------------------------------------------------------------------*/
+
+#ifndef	HAVE_HARDWARE
+#error You need to configure some hardware for this driver
+#endif
 
 /*
  * chip vendor names won't normally be on the cables, and
@@ -2716,6 +2748,22 @@ static const struct usb_device_id	products [] = {
 #endif
 
 #ifdef	CONFIG_USB_CDCETHER
+
+#ifndef	CONFIG_USB_ZAURUS
+	/* if we couldn't whitelist Zaurus, we must blacklist it */
+{
+	.match_flags	=   USB_DEVICE_ID_MATCH_INT_INFO
+			  | USB_DEVICE_ID_MATCH_DEVICE, 
+	.idVendor		= 0x04DD,
+	.idProduct		= 0x8004,
+	/* match the master interface */
+	.bInterfaceClass	= USB_CLASS_COMM,
+	.bInterfaceSubClass	= 6 /* Ethernet model */,
+	.bInterfaceProtocol	= 0,
+	.driver_info 		= 0, /* BLACKLIST */
+},
+#endif
+
 {
 	/* CDC Ether uses two interfaces, not necessarily consecutive.
 	 * We match the main interface, ignoring the optional device
@@ -2725,10 +2773,7 @@ static const struct usb_device_id	products [] = {
 	 * NOTE:  this match must come AFTER entries working around
 	 * bugs/quirks in a given product (like Zaurus, above).
 	 */
-	.match_flags		= USB_DEVICE_ID_MATCH_INT_INFO,
-	.bInterfaceClass	= USB_CLASS_COMM,
-	.bInterfaceSubClass	= 6 /* Ethernet model */,
-	.bInterfaceProtocol	= 0,
+	USB_INTERFACE_INFO (USB_CLASS_COMM, 6 /* Ethernet model */, 0),
 	.driver_info = (unsigned long) &cdc_info,
 },
 #endif
