@@ -1108,10 +1108,6 @@ static struct inet_protocol icmp_protocol = {
 	.handler =	icmp_rcv,
 };
 
-/*
- *	Called by socket.c on kernel startup.  
- */
-
 static int __init inet_init(void)
 {
 	struct sk_buff *dummy_skb;
