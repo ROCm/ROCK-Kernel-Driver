@@ -73,7 +73,6 @@ static const char *mcdx_c_version
 
 #include <linux/major.h>
 #define MAJOR_NR MITSUMI_X_CDROM_MAJOR
-#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>
 
@@ -197,7 +196,6 @@ struct s_drive_stuff {
 	void *rreg_status;	/* r status */
 
 	int irq;		/* irq used by this drive */
-	int minor;		/* minor number of this drive */
 	int present;		/* drive present and its capabilities */
 	unsigned char readcmd;	/* read cmd depends on single/double speed */
 	unsigned char playcmd;	/* play should always be single speed */
@@ -207,6 +205,7 @@ struct s_drive_stuff {
 	int lastsector;		/* last block accessible */
 	int status;		/* last operation's error / status */
 	int readerrs;		/* # of blocks read w/o error */
+	struct cdrom_device_info info;
 };
 
 
@@ -305,21 +304,13 @@ static struct cdrom_device_ops mcdx_dops = {
 	    CDC_PLAY_AUDIO | CDC_DRIVE_STATUS,
 };
 
-static struct cdrom_device_info mcdx_info = {
-	ops:&mcdx_dops,
-	speed:2,
-	capacity:1,
-	name:"mcdx",
-};
-
-
 /* KERNEL INTERFACE FUNCTIONS **************************************/
 
 
 static int mcdx_audio_ioctl(struct cdrom_device_info *cdi,
 			    unsigned int cmd, void *arg)
 {
-	struct s_drive_stuff *stuffp = mcdx_stuffp[minor(cdi->dev)];
+	struct s_drive_stuff *stuffp = cdi->handle;
 
 	if (!stuffp->present)
 		return -ENXIO;
@@ -627,7 +618,7 @@ static int mcdx_open(struct cdrom_device_info *cdi, int purpose)
 {
 	struct s_drive_stuff *stuffp;
 	xtrace(OPENCLOSE, "open()\n");
-	stuffp = mcdx_stuffp[minor(cdi->dev)];
+	stuffp = cdi->handle;
 	if (!stuffp->present)
 		return -ENXIO;
 
@@ -776,7 +767,7 @@ static void mcdx_close(struct cdrom_device_info *cdi)
 
 	xtrace(OPENCLOSE, "close()\n");
 
-	stuffp = mcdx_stuffp[minor(cdi->dev)];
+	stuffp = cdi->handle;
 
 	--stuffp->users;
 }
@@ -787,10 +778,9 @@ static int mcdx_media_changed(struct cdrom_device_info *cdi, int disc_nr)
 {
 	struct s_drive_stuff *stuffp;
 
-	xinfo("mcdx_media_changed called for device %s\n",
-	      kdevname(cdi->dev));
+	xinfo("mcdx_media_changed called for device %s\n", cdi->name);
 
-	stuffp = mcdx_stuffp[minor(cdi->dev)];
+	stuffp = cdi->handle;
 	mcdx_getstatus(stuffp, 1);
 
 	if (stuffp->yyy == 0)
@@ -1027,14 +1017,13 @@ void __exit mcdx_exit(void)
 	xinfo("cleanup_module called\n");
 
 	for (i = 0; i < MCDX_NDRIVES; i++) {
-		struct s_drive_stuff *stuffp;
-		if (unregister_cdrom(&mcdx_info)) {
+		struct s_drive_stuff *stuffp = mcdx_stuffp[i];
+		if (!stuffp)
+			continue;
+		if (unregister_cdrom(&stuffp->info)) {
 			printk(KERN_WARNING "Can't unregister cdrom mcdx\n");
 			return;
 		}
-		stuffp = mcdx_stuffp[i];
-		if (!stuffp)
-			continue;
 		release_region((unsigned long) stuffp->wreg_data,
 			       MCDX_IO_SIZE);
 		free_irq(stuffp->irq, NULL);
@@ -1208,15 +1197,19 @@ int __init mcdx_init_drive(int drive)
 	xtrace(INIT, "init() set non dma but irq mode\n");
 	mcdx_config(stuffp, 1);
 
-	stuffp->minor = drive;
+	stuffp->info.ops = &mcdx_dops;
+	stuffp->info.speed = 2;
+	stuffp->info.capacity = 1;
+	stuffp->info.handle = stuffp;
+	sprintf(stuffp->info.name, "mcdx%d", drive);
+	stuffp->info.dev = mk_kdev(MAJOR_NR, drive);
 
 	sprintf(msg, " mcdx: Mitsumi CD-ROM installed at 0x%3p, irq %d."
 		" (Firmware version %c %x)\n",
 		stuffp->wreg_data, stuffp->irq, version.code, version.ver);
 	mcdx_stuffp[drive] = stuffp;
 	xtrace(INIT, "init() mcdx_stuffp[%d] = %p\n", drive, stuffp);
-	mcdx_info.dev = mk_kdev(MAJOR_NR, 0);
-	if (register_cdrom(&mcdx_info) != 0) {
+	if (register_cdrom(&stuffp->info) != 0) {
 		printk("Cannot register Mitsumi CD-ROM!\n");
 		release_region((unsigned long) stuffp->wreg_data,
 			       MCDX_IO_SIZE);
@@ -1227,7 +1220,7 @@ int __init mcdx_init_drive(int drive)
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		return 2;
 	}
-	devfs_plain_cdrom(&mcdx_info, &mcdx_bdops);
+	devfs_plain_cdrom(&stuffp->info, &mcdx_bdops);
 	printk(msg);
 	return 0;
 }
@@ -1685,7 +1678,7 @@ mcdx_playtrk(struct s_drive_stuff *stuffp, const struct cdrom_ti *ti)
 
 static int mcdx_tray_move(struct cdrom_device_info *cdi, int position)
 {
-	struct s_drive_stuff *stuffp = mcdx_stuffp[minor(cdi->dev)];
+	struct s_drive_stuff *stuffp = cdi->handle;
 
 	if (!stuffp->present)
 		return -ENXIO;
@@ -1875,7 +1868,7 @@ static int mcdx_reset(struct s_drive_stuff *stuffp, enum resetmodes mode, int tr
 
 static int mcdx_lockdoor(struct cdrom_device_info *cdi, int lock)
 {
-	struct s_drive_stuff *stuffp = mcdx_stuffp[minor(cdi->dev)];
+	struct s_drive_stuff *stuffp = cdi->handle;
 	char cmd[2] = { 0xfe };
 
 	if (!(stuffp->present & DOOR))

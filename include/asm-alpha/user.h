@@ -1,6 +1,7 @@
 #ifndef _ALPHA_USER_H
 #define _ALPHA_USER_H
 
+#include <linux/sched.h>
 #include <linux/ptrace.h>
 
 #include <asm/page.h>

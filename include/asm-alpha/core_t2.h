@@ -19,7 +19,7 @@
  *
  */
 
-#define T2_MEM_R1_MASK 0x03ffffff  /* Mem sparse region 1 mask is 26 bits */
+#define T2_MEM_R1_MASK 0x07ffffff  /* Mem sparse region 1 mask is 26 bits */
 
 /* GAMMA-SABLE is a SABLE with EV5-based CPUs */
 #define _GAMMA_BIAS		0x8000000000UL
@@ -402,13 +402,17 @@ __EXTERN_INLINE void t2_outl(u32 b, unsigned long addr)
  *
  */
 
+#define t2_set_hae { \
+	msb = addr  >> 27; \
+	addr &= T2_MEM_R1_MASK; \
+	set_hae(msb); \
+}
+
 __EXTERN_INLINE u8 t2_readb(unsigned long addr)
 {
 	unsigned long result, msb;
 
-	msb = addr & 0xE0000000;
-	addr &= T2_MEM_R1_MASK;
-	set_hae(msb);
+	t2_set_hae;
 
 	result = *(vip) ((addr << 5) + T2_SPARSE_MEM + 0x00);
 	return __kernel_extbl(result, addr & 3);
@@ -418,9 +422,7 @@ __EXTERN_INLINE u16 t2_readw(unsigned long addr)
 {
 	unsigned long result, msb;
 
-	msb = addr & 0xE0000000;
-	addr &= T2_MEM_R1_MASK;
-	set_hae(msb);
+	t2_set_hae;
 
 	result = *(vuip) ((addr << 5) + T2_SPARSE_MEM + 0x08);
 	return __kernel_extwl(result, addr & 3);
@@ -431,9 +433,7 @@ __EXTERN_INLINE u32 t2_readl(unsigned long addr)
 {
 	unsigned long msb;
 
-	msb = addr & 0xE0000000;
-	addr &= T2_MEM_R1_MASK;
-	set_hae(msb);
+	t2_set_hae;
 
 	return *(vuip) ((addr << 5) + T2_SPARSE_MEM + 0x18);
 }
@@ -442,9 +442,7 @@ __EXTERN_INLINE u64 t2_readq(unsigned long addr)
 {
 	unsigned long r0, r1, work, msb;
 
-	msb = addr & 0xE0000000;
-	addr &= T2_MEM_R1_MASK;
-	set_hae(msb);
+	t2_set_hae;
 
 	work = (addr << 5) + T2_SPARSE_MEM + 0x18;
 	r0 = *(vuip)(work);
@@ -456,9 +454,7 @@ __EXTERN_INLINE void t2_writeb(u8 b, unsigned long addr)
 {
 	unsigned long msb, w;
 
-	msb = addr & 0xE0000000;
-	addr &= T2_MEM_R1_MASK;
-	set_hae(msb);
+	t2_set_hae;
 
 	w = __kernel_insbl(b, addr & 3);
 	*(vuip) ((addr << 5) + T2_SPARSE_MEM + 0x00) = w;
@@ -468,9 +464,7 @@ __EXTERN_INLINE void t2_writew(u16 b, unsigned long addr)
 {
 	unsigned long msb, w;
 
-	msb = addr & 0xE0000000;
-	addr &= T2_MEM_R1_MASK;
-	set_hae(msb);
+	t2_set_hae;
 
 	w = __kernel_inswl(b, addr & 3);
 	*(vuip) ((addr << 5) + T2_SPARSE_MEM + 0x08) = w;
@@ -481,9 +475,7 @@ __EXTERN_INLINE void t2_writel(u32 b, unsigned long addr)
 {
 	unsigned long msb;
 
-	msb = addr & 0xE0000000;
-	addr &= T2_MEM_R1_MASK;
-	set_hae(msb);
+	t2_set_hae;
 
 	*(vuip) ((addr << 5) + T2_SPARSE_MEM + 0x18) = b;
 }
@@ -492,9 +484,7 @@ __EXTERN_INLINE void t2_writeq(u64 b, unsigned long addr)
 {
 	unsigned long msb, work;
 
-	msb = addr & 0xE0000000;
-	addr &= T2_MEM_R1_MASK;
-	set_hae(msb);
+	t2_set_hae;
 
 	work = (addr << 5) + T2_SPARSE_MEM + 0x18;
 	*(vuip)work = b;

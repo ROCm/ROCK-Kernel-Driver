@@ -49,16 +49,6 @@
 
 /* Linux-specific block device functions */
 
-/* I _HATE_ the Linux block device setup more than anything else I've ever
- *  encountered, except ...
- */
-
-/* .. for the Linux partition table handling. */
-/* So why didn't you fucking go and clean it up? -- AV */
-struct hd_struct part_table[256];
-
-static struct block_device_operations nftl_fops;
-
 struct NFTLrecord *NFTLs[MAX_NFTLS];
 
 static void NFTL_setup(struct mtd_info *mtd)
@@ -150,9 +140,7 @@ static void NFTL_setup(struct mtd_info *mtd)
 	gd->major = MAJOR_NR;
 	gd->first_minor = firstfree << NFTL_PARTN_BITS;
 	gd->minor_shift = NFTL_PARTN_BITS;
-	gd->part = part_table + (firstfree << NFTL_PARTN_BITS);
 	gd->major_name = name;
-	gd->nr_real = 1;
 	nftl->disk = gd;
 	add_gendisk(gd);
 	register_disk(gd, mk_kdev(MAJOR_NR,firstfree<<NFTL_PARTN_BITS),
@@ -847,10 +835,10 @@ void nftl_request(RQFUNC_ARG)
 		down(&nftl->mutex);
 		DEBUG(MTD_DEBUG_LEVEL3, "Got mutex\n");
 
-		if (block + nsect > part_table[dev].nr_sects) {
+		if (block + nsect > get_capacity(nftl->disk)) {
 			/* access past the end of device */
 			printk("nftl%c%d: bad access: block = %d, count = %d\n",
-			       (minor(req->rq_dev)>>6)+'a', dev & 0xf, block, nsect);
+			       unit+'a', dev & 0xf, block, nsect);
 			up(&nftl->mutex);
 			res = 0; /* fail */
 			goto repeat;

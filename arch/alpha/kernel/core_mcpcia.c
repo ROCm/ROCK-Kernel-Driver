@@ -171,11 +171,11 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1,
 }
 
 static int
-mk_conf_addr(struct pci_dev *dev, int where, struct pci_controller *hose,
-	     unsigned long *pci_addr, unsigned char *type1)
+mk_conf_addr(struct pci_bus *pbus, unsigned int devfn, int where,
+	     struct pci_controller *hose, unsigned long *pci_addr,
+	     unsigned char *type1)
 {
-	u8 bus = dev->bus->number;
-	u8 devfn = dev->devfn;
+	u8 bus = pbus->number;
 	unsigned long addr;
 
 	DBG_CFG(("mk_conf_addr(bus=%d,devfn=0x%x,hose=%d,where=0x%x,"
@@ -185,7 +185,7 @@ mk_conf_addr(struct pci_dev *dev, int where, struct pci_controller *hose,
 	/* Type 1 configuration cycle for *ALL* busses.  */
 	*type1 = 1;
 
-	if (dev->bus->number == hose->first_busno)
+	if (bus == hose->first_busno)
 		bus = 0;
 	addr = (bus << 16) | (devfn << 8) | (where);
 	addr <<= 5; /* swizzle for SPARSE */
@@ -197,94 +197,53 @@ mk_conf_addr(struct pci_dev *dev, int where, struct pci_controller *hose,
 }
 
 static int
-mcpcia_read_config_byte(struct pci_dev *dev, int where, u8 *value)
+mcpcia_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+		   int size, u32 *value)
 {
-	struct pci_controller *hose = dev->sysdata;
+	struct pci_controller *hose = bus->sysdata;
 	unsigned long addr, w;
 	unsigned char type1;
 
-	if (mk_conf_addr(dev, where, hose, &addr, &type1))
+	if (mk_conf_addr(bus, devfn, where, hose, &addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	addr |= 0x00;
+	addr |= (size - 1) * 8;
 	w = conf_read(addr, type1, hose);
-	*value = __kernel_extbl(w, where & 3);
+	switch (size) {
+	case 1:
+		*value = __kernel_extbl(w, where & 3);
+		break;
+	case 2:
+		*value = __kernel_extwl(w, where & 3);
+		break;
+	case 4:
+		*value = w;
+		break;
+	}
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int
-mcpcia_read_config_word(struct pci_dev *dev, int where, u16 *value)
+mcpcia_write_config(struct pci_bus *bus, unsigned int devfn, int where,
+		    int size, u32 value)
 {
-	struct pci_controller *hose = dev->sysdata;
-	unsigned long addr, w;
-	unsigned char type1;
-
-	if (mk_conf_addr(dev, where, hose, &addr, &type1))
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	addr |= 0x08;
-	w = conf_read(addr, type1, hose);
-	*value = __kernel_extwl(w, where & 3);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-mcpcia_read_config_dword(struct pci_dev *dev, int where, u32 *value)
-{
-	struct pci_controller *hose = dev->sysdata;
+	struct pci_controller *hose = bus->sysdata;
 	unsigned long addr;
 	unsigned char type1;
 
-	if (mk_conf_addr(dev, where, hose, &addr, &type1))
+	if (mk_conf_addr(bus, devfn, where, hose, &addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	addr |= 0x18;
-	*value = conf_read(addr, type1, hose);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-mcpcia_write_config(struct pci_dev *dev, int where, u32 value, long mask)
-{
-	struct pci_controller *hose = dev->sysdata;
-	unsigned long addr;
-	unsigned char type1;
-
-	if (mk_conf_addr(dev, where, hose, &addr, &type1))
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	addr |= mask;
+	addr |= (size - 1) * 8;
 	value = __kernel_insql(value, where & 3);
 	conf_write(addr, value, type1, hose);
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int
-mcpcia_write_config_byte(struct pci_dev *dev, int where, u8 value)
-{
-	return mcpcia_write_config(dev, where, value, 0x00);
-}
-
-static int
-mcpcia_write_config_word(struct pci_dev *dev, int where, u16 value)
-{
-	return mcpcia_write_config(dev, where, value, 0x08);
-}
-
-static int
-mcpcia_write_config_dword(struct pci_dev *dev, int where, u32 value)
-{
-	return mcpcia_write_config(dev, where, value, 0x18);
-}
-
 struct pci_ops mcpcia_pci_ops = 
 {
-	read_byte:	mcpcia_read_config_byte,
-	read_word:	mcpcia_read_config_word,
-	read_dword:	mcpcia_read_config_dword,
-	write_byte:	mcpcia_write_config_byte,
-	write_word:	mcpcia_write_config_word,
-	write_dword:	mcpcia_write_config_dword
+	.read =		mcpcia_read_config,
+	.write =	mcpcia_write_config,
 };
 
 void

@@ -219,22 +219,9 @@ cia_read_config(struct pci_bus *bus, unsigned int devfn, int where, int size,
 	if (mk_conf_addr(bus, devfn, where, &pci_addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	switch (size) {
-	case 1:
-		mask = 0x00;
-		shift = (where & 3) * 8;
-		break;
-	case 2:
-		mask = 0x08;
-		shift = (where & 3) * 8;
-		break;
-	case 4:
-		mase = 0x18;
-		shift = 0;
-		break;
-	}
-
-	addr = (pci_addr << 5) + 0x18 + CIA_CONF;
+	mask = (size - 1) * 8;
+	shift = (where & 3) * 8;
+	addr = (pci_addr << 5) + mask + CIA_CONF;
 	*value = conf_read(addr, type1) >> (shift);
 	return PCIBIOS_SUCCESSFUL;
 }
@@ -250,18 +237,7 @@ cia_write_config(struct pci_bus *bus, unsigned int devfn, int where, int size,
 	if (mk_conf_addr(bus, devfn, where, &pci_addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	switch (size) {
-	case 1:
-		mask = 0x00;
-		break;
-	case 2:
-		mask = 0x08;
-		break;
-	case 4:
-		mase = 0x18;
-		break;
-	}
-
+	mask = (size - 1) * 8;
 	addr = (pci_addr << 5) + mask + CIA_CONF;
 	conf_write(addr, value << ((where & 3) * 8), type1);
 	return PCIBIOS_SUCCESSFUL;

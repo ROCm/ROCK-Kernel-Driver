@@ -65,10 +65,10 @@
  */
 
 static int
-mk_conf_addr(struct pci_bus *bus_dev, unsigned int device_fn, int where,
+mk_conf_addr(struct pci_bus *pbus, unsigned int device_fn, int where,
 	     unsigned long *pci_addr, u8 *type1)
 {
-	u8 bus = bus_dev->number;
+	u8 bus = pbus->number;
 
 	*type1 = (bus == 0) ? 0 : 1;
 	*pci_addr = (bus << 16) | (device_fn << 8) | (where) |
@@ -85,13 +85,24 @@ static int
 polaris_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 		    int size, u32 *value)
 {
-	unsigned long pci_addr;
+	unsigned long addr;
 	unsigned char type1;
 
-	if (mk_conf_addr(bus, devfn, where, &pci_addr, &type1))
+	if (mk_conf_addr(bus, devfn, where, &addr, &type1))
                 return PCIBIOS_DEVICE_NOT_FOUND;
 
-	*value = __kernel_ldbu(*(vucp)pci_addr);
+	switch (size) {
+	case 1:
+		*value = __kernel_ldbu(*(vucp)addr);
+		break;
+	case 2:
+		*value = __kernel_ldwu(*(vusp)addr);
+		break;
+	case 4:
+		*value = *(vuip)addr;
+		break;
+	}
+
 	return PCIBIOS_SUCCESSFUL;
 }
 
@@ -100,15 +111,30 @@ static int
 polaris_write_config(struct pci_bus *bus, unsigned int devfn, int where,
 		     int size, u32 value)
 {
-	unsigned long pci_addr;
+	unsigned long addr;
 	unsigned char type1;
 
-	if (mk_conf_addr(bus, devfn, where, &pci_addr, &type1))
+	if (mk_conf_addr(bus, devfn, where, &addr, &type1))
                 return PCIBIOS_DEVICE_NOT_FOUND;
 
-        __kernel_stb(value, *(vucp)pci_addr);
-	mb();
-	__kernel_ldbu(*(vucp)pci_addr);
+	switch (size) {
+	case 1:
+		__kernel_stb(value, *(vucp)addr);
+		mb();
+		__kernel_ldbu(*(vucp)addr);
+		break;
+	case 2:
+		__kernel_stw(value, *(vusp)addr);
+		mb();
+		__kernel_ldwu(*(vusp)addr);
+		break;
+	case 4:
+		*(vuip)addr = value;
+		mb();
+		*(vuip)addr;
+		break;
+	}
+
 	return PCIBIOS_SUCCESSFUL;
 }
 

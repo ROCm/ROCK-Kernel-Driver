@@ -71,7 +71,6 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 	long pstart, plength;
 	int i;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
-	struct hd_struct *part;
 
 	/* convert bytes to sectors, check for fit in a hd_struct */
 	ppstart = (p->start >> 9);
@@ -86,7 +85,6 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 	g = get_gendisk(dev);
 	if (!g)
 		return -ENXIO;
-	part = g->part + minor(dev) - g->first_minor;
 
 	/* existing drive? */
 
@@ -97,19 +95,19 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 		return -EINVAL;
 
 	/* partition number in use? */
-	if (part[p->pno].nr_sects != 0)
+	if (g->part[p->pno - 1].nr_sects != 0)
 		return -EBUSY;
 
 	/* overlap? */
-	for (i = 1; i < (1<<g->minor_shift); i++)
-		if (!(pstart+plength <= part[i].start_sect ||
-		      pstart >= part[i].start_sect + part[i].nr_sects))
+	for (i = 0; i < (1<<g->minor_shift) - 1; i++)
+		if (!(pstart+plength <= g->part[i].start_sect ||
+		      pstart >= g->part[i].start_sect + g->part[i].nr_sects))
 			return -EBUSY;
 
 	/* all seems OK */
-	part[p->pno].start_sect = pstart;
-	part[p->pno].nr_sects = plength;
-	devfs_register_partitions (g, minor(dev), 0);
+	g->part[p->pno - 1].start_sect = pstart;
+	g->part[p->pno - 1].nr_sects = plength;
+	update_partition(g, p->pno);
 	return 0;
 }
 
@@ -128,22 +126,19 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct gendisk *g;
 	struct block_device *bdevp;
-	struct hd_struct *part;
 	int holder;
 
 	/* find the drive major */
 	g = get_gendisk(dev);
 	if (!g)
 		return -ENXIO;
-	part = g->part + minor(dev) - g->first_minor;
-
 	if (bdev != bdev->bd_contains)
 		return -EINVAL;
 	if (p->pno <= 0 || p->pno >= (1 << g->minor_shift))
   		return -EINVAL;
 
 	/* existing drive and partition? */
-	if (part[p->pno].nr_sects == 0)
+	if (g->part[p->pno - 1].nr_sects == 0)
 		return -ENXIO;
 
 	/* partition in use? Incomplete check for now. */
@@ -159,9 +154,9 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 	fsync_bdev(bdevp);
 	invalidate_bdev(bdevp, 0);
 
-	part[p->pno].start_sect = 0;
-	part[p->pno].nr_sects = 0;
-	devfs_register_partitions (g, minor(dev), 0);
+	g->part[p->pno - 1].start_sect = 0;
+	g->part[p->pno - 1].nr_sects = 0;
+	update_partition(g, p->pno);
 	bd_release(bdevp);
 	bdput(bdevp);
 
