@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.5 05/21/01 00:48:24 cort
+# BK Id: %F% %I% %G% %U% %#%
 #
 #
 # Makefile for Linux arch/m68k/amiga source directory
@@ -10,6 +10,8 @@
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
 O_TARGET := amiga.o
+
+export-objs	:= amiga_ksyms.o
 
 obj-y		:= config.o amiints.o cia.o time.o bootinfo.o amisound.o \
 			chipram.o amiga_ksyms.o
