@@ -70,6 +70,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/inet.h>
+#include <linux/rcupdate.h>
 #include <asm/byteorder.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -263,14 +264,17 @@ static struct net_device *setup_inject(struct pktgen_info* info)
 	info->saddr_min = 0;
 	info->saddr_max = 0;
 	if (strlen(info->src_min) == 0) {
-		struct in_device *in_dev = in_dev_get(odev);
+		struct in_device *in_dev;
+
+		rcu_read_lock();
+		in_dev = __in_dev_get(odev);
 		if (in_dev) {
 			if (in_dev->ifa_list) {
 				info->saddr_min = in_dev->ifa_list->ifa_address;
 				info->saddr_max = info->saddr_min;
 			}
-			in_dev_put(in_dev);
 		}
+		rcu_read_unlock();
 	}
 	else {
 		info->saddr_min = in_aton(info->src_min);

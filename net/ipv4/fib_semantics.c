@@ -124,17 +124,10 @@ static struct
 		.error	= -EAGAIN,
 		.scope	= RT_SCOPE_UNIVERSE,
 	},	/* RTN_THROW */
-#ifdef CONFIG_IP_ROUTE_NAT
-	{
-		.error	= 0,
-		.scope	= RT_SCOPE_HOST,
-	},	/* RTN_NAT */
-#else
 	{
 		.error	= -EINVAL,
 		.scope	= RT_SCOPE_NOWHERE,
 	},	/* RTN_NAT */
-#endif
 	{
 		.error	= -EINVAL,
 		.scope	= RT_SCOPE_NOWHERE,
@@ -543,15 +536,6 @@ fib_create_info(const struct rtmsg *r, struct kern_rta *rta,
 #endif
 	}
 
-#ifdef CONFIG_IP_ROUTE_NAT
-	if (r->rtm_type == RTN_NAT) {
-		if (rta->rta_gw == NULL || nhs != 1 || rta->rta_oif)
-			goto err_inval;
-		memcpy(&fi->fib_nh->nh_gw, rta->rta_gw, 4);
-		goto link_it;
-	}
-#endif
-
 	if (fib_props[r->rtm_type].error) {
 		if (rta->rta_gw || rta->rta_oif || rta->rta_mp)
 			goto err_inval;
@@ -629,12 +613,6 @@ fib_semantic_match(int type, struct fib_info *fi, const struct flowi *flp, struc
 		res->fi = fi;
 
 		switch (type) {
-#ifdef CONFIG_IP_ROUTE_NAT
-		case RTN_NAT:
-			FIB_RES_RESET(*res);
-			atomic_inc(&fi->fib_clntref);
-			return 0;
-#endif
 		case RTN_UNICAST:
 		case RTN_LOCAL:
 		case RTN_BROADCAST:

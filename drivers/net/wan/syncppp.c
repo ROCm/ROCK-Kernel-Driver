@@ -50,6 +50,7 @@
 #include <linux/random.h>
 #include <linux/pkt_sched.h>
 #include <linux/spinlock.h>
+#include <linux/rcupdate.h>
 
 #include <net/syncppp.h>
 
@@ -767,9 +768,9 @@ static void sppp_cisco_input (struct sppp *sp, struct sk_buff *skb)
 		struct in_ifaddr *ifa;
 		u32 addr = 0, mask = ~0; /* FIXME: is the mask correct? */
 #ifdef CONFIG_INET
-		if ((in_dev=in_dev_get(dev)) != NULL)
+		rcu_read_lock();
+		if ((in_dev = __in_dev_get(dev)) != NULL)
 		{
-			read_lock(&in_dev->lock);
 			for (ifa=in_dev->ifa_list; ifa != NULL;
 				ifa=ifa->ifa_next) {
 				if (strcmp(dev->name, ifa->ifa_label) == 0) 
@@ -779,9 +780,8 @@ static void sppp_cisco_input (struct sppp *sp, struct sk_buff *skb)
 					break;
 				}
 			}
-			read_unlock(&in_dev->lock);
-			in_dev_put(in_dev);
 		}
+		rcu_read_unlock();
 #endif		
 		/* I hope both addr and mask are in the net order */
 		sppp_cisco_send (sp, CISCO_ADDR_REPLY, addr, mask);

@@ -508,16 +508,6 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 	 *	Construct source address and options.
 	 */
 
-#ifdef CONFIG_IP_ROUTE_NAT
-	/*
-	 *	Restore original addresses if packet has been translated.
-	 */
-	if (rt->rt_flags & RTCF_NAT && IPCB(skb_in)->flags & IPSKB_TRANSLATED) {
-		iph->daddr = rt->fl.fl4_dst;
-		iph->saddr = rt->fl.fl4_src;
-	}
-#endif
-
 	saddr = iph->daddr;
 	if (!(rt->rt_flags & RTCF_LOCAL))
 		saddr = 0;
@@ -892,7 +882,7 @@ static void icmp_address_reply(struct sk_buff *skb)
 	in_dev = in_dev_get(dev);
 	if (!in_dev)
 		goto out;
-	read_lock(&in_dev->lock);
+	rcu_read_lock();
 	if (in_dev->ifa_list &&
 	    IN_DEV_LOG_MARTIANS(in_dev) &&
 	    IN_DEV_FORWARD(in_dev)) {
@@ -912,7 +902,7 @@ static void icmp_address_reply(struct sk_buff *skb)
 			       NIPQUAD(*mp), dev->name, NIPQUAD(rt->rt_src));
 		}
 	}
-	read_unlock(&in_dev->lock);
+	rcu_read_unlock();
 	in_dev_put(in_dev);
 out:;
 }

@@ -106,6 +106,7 @@ static const char StripVersion[] = "1.3A-STUART.CHESHIRE";
 #include <linux/seq_file.h>
 #include <linux/serial.h>
 #include <linux/serialP.h>
+#include <linux/rcupdate.h>
 #include <net/arp.h>
 
 #include <linux/ip.h>
@@ -1348,14 +1349,17 @@ static unsigned char *strip_make_packet(unsigned char *buffer,
 	 */
 	if (haddr.c[0] == 0xFF) {
 		u32 brd = 0;
-		struct in_device *in_dev = in_dev_get(strip_info->dev);
-		if (in_dev == NULL)
+		struct in_device *in_dev;
+
+		rcu_read_lock();
+		in_dev = __in_dev_get(strip_info->dev);
+		if (in_dev == NULL) {
+			rcu_read_unlock();
 			return NULL;
-		read_lock(&in_dev->lock);
+		}
 		if (in_dev->ifa_list)
 			brd = in_dev->ifa_list->ifa_broadcast;
-		read_unlock(&in_dev->lock);
-		in_dev_put(in_dev);
+		rcu_read_unlock();
 
 		/* arp_query returns 1 if it succeeds in looking up the address, 0 if it fails */
 		if (!arp_query(haddr.c, brd, strip_info->dev)) {
@@ -1500,17 +1504,18 @@ static void strip_send(struct strip *strip_info, struct sk_buff *skb)
 	}
 
 	if (1) {
-		struct in_device *in_dev = in_dev_get(strip_info->dev);
+		struct in_device *in_dev;
+
 		brd = addr = 0;
+		rcu_read_lock();
+		in_dev = __in_dev_get(strip_info->dev);
 		if (in_dev) {
-			read_lock(&in_dev->lock);
 			if (in_dev->ifa_list) {
 				brd = in_dev->ifa_list->ifa_broadcast;
 				addr = in_dev->ifa_list->ifa_local;
 			}
-			read_unlock(&in_dev->lock);
-			in_dev_put(in_dev);
 		}
+		rcu_read_unlock();
 	}
 
 

@@ -21,13 +21,14 @@
 #include <linux/if_ether.h>
 #include <linux/if_vlan.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/netfilter_bridge/ebtables.h>
 #include <linux/netfilter_bridge/ebt_vlan.h>
 
-static unsigned char debug;
+static int debug;
 #define MODULE_VERS "0.6"
 
-MODULE_PARM(debug, "0-1b");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "debug=1 is turn on debug messages");
 MODULE_AUTHOR("Nick Fedchik <nick@fedchik.org.ua>");
 MODULE_DESCRIPTION("802.1Q match module (ebtables extension), v"

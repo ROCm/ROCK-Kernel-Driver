@@ -182,7 +182,7 @@ config CRYPTO_TEA
 	  many rounds for security.  It is very fast and uses
 	  little memory.
 
-	  Xtendend Tiny Encryption Algorithm is a modifcation to
+	  Xtendend Tiny Encryption Algorithm is a modification to
 	  the TEA algorithm to address a potential key weakness
 	  in the TEA algorithm.
 
