@@ -142,10 +142,21 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
 	if (page_mapping(page)) {
 		int dirty = test_and_clear_bit(PG_dcache_dirty, &page->flags);
 
-		if (dirty)
+		if (dirty) {
+			/*
+			 * This is our first userspace mapping of this page.
+			 * Ensure that the physical page is coherent with
+			 * the kernel mapping.
+			 *
+			 * FIXME: only need to do this on VIVT and aliasing
+			 *        VIPT cache architectures.  We can do that
+			 *	  by choosing whether to set this bit...
+			 */
 			__cpuc_flush_dcache_page(page_address(page));
+		}
 
-		make_coherent(vma, addr, page, dirty);
+		if (cache_is_vivt())
+			make_coherent(vma, addr, page, dirty);
 	}
 }
 
