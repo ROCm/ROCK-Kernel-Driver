@@ -43,7 +43,7 @@ struct mtrr_ops {
 	void	(*set_all)(void);
 
 	void	(*get)(unsigned int reg, unsigned long *base,
-		       unsigned long *size, mtrr_type * type);
+		       unsigned int *size, mtrr_type * type);
 	int	(*get_free_region) (unsigned long base, unsigned long size);
 
 	int	(*validate_add_page)(unsigned long base, unsigned long size,
@@ -84,9 +84,6 @@ void set_mtrr_prepare_save(struct set_mtrr_context *ctxt);
 void get_mtrr_state(void);
 
 extern void set_mtrr_ops(struct mtrr_ops * ops);
-
-/* Don't even ask... */
-extern void compute_ascii(void);
 
 extern u32 size_or_mask, size_and_mask;
 extern struct mtrr_ops * mtrr_if;

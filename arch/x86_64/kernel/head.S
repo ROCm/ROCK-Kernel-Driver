@@ -79,13 +79,11 @@ startup_32:
 	/* Enable System Call */
 	btsl	$_EFER_SCE, %eax
 
-#if 0
 	/* No Execute supported? */	
 	btl	$20,%edi
 	jnc     1f
 	btsl	$_EFER_NX, %eax
 1:	
-#endif
 				
 	/* Make changes effective */
 	wrmsr

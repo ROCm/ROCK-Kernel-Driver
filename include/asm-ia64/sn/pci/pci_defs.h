@@ -39,7 +39,7 @@
  * the PCI spec.
  */
 #define	PCI_TYPE1_BUS_MASK	0x00FF0000
-#define	PCI_TYPE1_SLOT_MASK	0x0000F100
+#define	PCI_TYPE1_SLOT_MASK	0x0000F800
 #define	PCI_TYPE1_FUNC_MASK	0x00000700
 #define	PCI_TYPE1_REG_MASK	0x000000FF
 
@@ -68,14 +68,14 @@
 
 /* NOTE: if you are using a C "switch" statement to
  * differentiate between the Config space registers, be
- * aware that PCI_CFG_CLASS_CODE and PCI_CFG_BASE_CLASS
+ * aware that PCI_CFG_CLASS_CODE and PCI_CFG_PROG_IF
  * are the same offset.
  */
 #define	PCI_CFG_REV_ID		0x08		/* Revision Id (1 byte) */
 #define	PCI_CFG_CLASS_CODE	0x09		/* Class Code (3 bytes) */
-#define	PCI_CFG_BASE_CLASS	0x09		/* Base Class (1 byte) */
+#define	PCI_CFG_PROG_IF		0x09		/* Prog Interface (1 byte) */
 #define	PCI_CFG_SUB_CLASS	0x0A		/* Sub Class (1 byte) */
-#define	PCI_CFG_PROG_IF		0x0B		/* Prog Interface (1 byte) */
+#define	PCI_CFG_BASE_CLASS	0x0B		/* Base Class (1 byte) */
 
 #define	PCI_CFG_CACHE_LINE	0x0C		/* Cache line size (1 byte) */
 #define	PCI_CFG_LATENCY_TIMER	0x0D		/* Latency Timer (1 byte) */
@@ -99,11 +99,10 @@
 #define	PCI_CFG_SUBSYS_ID	0x2E		/* Subsystem ID */
 
 #define	PCI_EXPANSION_ROM	0x30		/* Expansion Rom Base (4B) */
+#define	PCI_CAPABILITIES_PTR	0x34		/* Capabilities Pointer */
 
 #define	PCI_INTR_LINE		0x3C		/* Interrupt Line (1B) */
 #define	PCI_INTR_PIN		0x3D		/* Interrupt Pin (1B) */
-#define	PCI_MIN_GNT		0x3E		/* Minimum Grant (1B) */
-#define	PCI_MAX_LAT		0x3F		/* Maximum Latency (1B) */
 
 #define PCI_CFG_VEND_SPECIFIC	0x40		/* first vendor specific reg */
 
@@ -126,6 +125,8 @@
 #define PCI_CFG_PPB_IOLIMHI		0x32	/* IO Limit Addr bits 16..31 */
 #define	PCI_CFG_PPB_SUB_VENDOR		0x34	/* Subsystem Vendor ID */
 #define	PCI_CFG_PPB_SUB_DEVICE		0x36	/* Subsystem Device ID */
+#define	PCI_CFG_PPB_ROM_BASE		0x38	/* ROM base address */
+#define	PCI_CFG_PPB_INT_LINE		0x3C	/* Interrupt Line */
 #define	PCI_CFG_PPB_INT_PIN		0x3D	/* Interrupt Pin */
 #define	PCI_CFG_PPB_BRIDGE_CTRL		0x3E	/* Bridge Control */
      /* XXX- these might be DEC 21152 specific */
@@ -165,6 +166,7 @@
 #define	PCI_STAT_F_BK_BK_CAP	0x0080		/* Fast Back-to-Back Capable */
 #define	PCI_STAT_UDF_SUPP	0x0040		/* UDF Supported */
 #define	PCI_STAT_66MHZ_CAP	0x0020		/* 66 MHz Capable */
+#define	PCI_STAT_CAP_LIST	0x0010		/* Capabilities List */
 
 /* BIST Register Layout (0x0F) */
 #define	PCI_BIST_BIST_CAP	0x80		/* BIST Capable */
@@ -173,12 +175,62 @@
 #define	PCI_BIST_CMPL_OK	0x00		/* 0 value is completion OK */
 
 /* Base Address Register 0x10 */
+#define PCI_BA_IO_CODEMASK	0x3		/* bottom 2 bits encode I/O BAR type */
 #define	PCI_BA_IO_SPACE		0x1		/* I/O Space Marker */
+
+#define PCI_BA_MEM_CODEMASK	0xf		/* bottom 4 bits encode MEM BAR type */
 #define	PCI_BA_MEM_LOCATION	0x6		/* 2 bits for location avail */
 #define	PCI_BA_MEM_32BIT	0x0		/* Anywhere in 32bit space */
 #define	PCI_BA_MEM_1MEG		0x2		/* Locate below 1 Meg */
 #define	PCI_BA_MEM_64BIT	0x4		/* Anywhere in 64bit space */
 #define	PCI_BA_PREFETCH		0x8		/* Prefetchable, no side effect */
+
+#define PCI_BA_ROM_CODEMASK	0x1		/* bottom bit control expansion ROM enable */
+#define PCI_BA_ROM_ENABLE	0x1		/* enable expansion ROM */
+
+/* Bridge Control Register 0x3e */
+#define PCI_BCTRL_DTO_SERR	0x0800		/* Discard Timer timeout generates SERR on primary bus */
+#define PCI_BCTRL_DTO		0x0400		/* Discard Timer timeout status */
+#define PCI_BCTRL_DTO_SEC	0x0200		/* Secondary Discard Timer: 0 => 2^15 PCI clock cycles, 1 => 2^10 */
+#define PCI_BCTRL_DTO_PRI	0x0100		/* Primary Discard Timer: 0 => 2^15 PCI clock cycles, 1 => 2^10 */
+#define PCI_BCTRL_F_BK_BK_ENABLE 0x0080		/* Enable Fast Back-to-Back on secondary bus */
+#define PCI_BCTRL_RESET_SEC	0x0040		/* Reset Secondary bus */
+#define PCI_BCTRL_MSTR_ABT_MODE	0x0020		/* Master Abort Mode: 0 => do not report Master-Aborts */
+#define PCI_BCTRL_VGA_AF_ENABLE	0x0008		/* Enable VGA Address Forwarding */
+#define PCI_BCTRL_ISA_AF_ENABLE	0x0004		/* Enable ISA Address Forwarding */
+#define PCI_BCTRL_SERR_ENABLE	0x0002		/* Enable forwarding of SERR from secondary bus to primary bus */
+#define PCI_BCTRL_PAR_ERR_RESP	0x0001		/* Enable Parity Error Response reporting on secondary interface */
+
+/*
+ * PCI 2.2 introduces the concept of ``capability lists.''  Capability lists
+ * provide a flexible mechanism for a device or bridge to advertise one or
+ * more standardized capabilities such as the presense of a power management
+ * interface, etc.  The presense of a capability list is indicated by
+ * PCI_STAT_CAP_LIST being non-zero in the PCI_CFG_STATUS register.  If
+ * PCI_STAT_CAP_LIST is set, then PCI_CFG_CAP_PTR is a ``pointer'' into the
+ * device-specific portion of the configuration header where the first
+ * capability block is stored.  This ``pointer'' is a single byte which
+ * contains an offset from the beginning of the configuration header.  The
+ * bottom two bits of the pointer are reserved and should be masked off to
+ * determine the offset.  Each capability block contains a capability ID, a
+ * ``pointer'' to the next capability (another offset where a zero terminates
+ * the list) and capability-specific data.  Each capability block starts with
+ * the capability ID and the ``next capability pointer.''  All data following
+ * this are capability-dependent.
+ */
+#define PCI_CAP_ID		0x00		/* Capability ID (1B) */
+#define PCI_CAP_PTR		0x01		/* Capability ``pointer'' (1B) */
+
+/* PCI Capability IDs */
+#define	PCI_CAP_PM		0x01		/* PCI Power Management */
+#define	PCI_CAP_AGP		0x02		/* Accelerated Graphics Port */
+#define	PCI_CAP_VPD		0x03		/* Vital Product Data (VPD) */
+#define	PCI_CAP_SID		0x04		/* Slot Identification */
+#define PCI_CAP_MSI		0x05		/* Message Signaled Intr */
+#define	PCI_CAP_HS		0x06		/* CompactPCI Hot Swap */
+#define	PCI_CAP_PCIX		0x07		/* PCI-X */
+#define PCI_CAP_ID_HT		0x08		/* HyperTransport */
+
 
 /* PIO interface macros */
 
@@ -210,10 +262,6 @@ extern void pci_write(void * address, int data, int type);
 #endif /* !IOC3_EMULATION */
 						/* effects on reads, merges */
 
-#ifdef CONFIG_SGI_IP22
-#define BYTECOUNT_W_GIO	    0xbf400000
-#endif
-
 /*
  * Definition of address layouts for PCI Config mechanism #1
  * XXX- These largely duplicate PCI_TYPE1 constants at the top
@@ -240,4 +288,139 @@ extern void pci_write(void * address, int data, int type);
 #define PCI_IO_MAP_INCR			0x1000
 #endif /* CONFIG_SGI_IP32 */
 
+/*
+ * Class codes
+ */
+#define PCI_CFG_CLASS_PRE20	0x00
+#define PCI_CFG_CLASS_STORAGE	0x01
+#define PCI_CFG_CLASS_NETWORK	0x02
+#define PCI_CFG_CLASS_DISPLAY	0x03
+#define PCI_CFG_CLASS_MMEDIA	0x04
+#define PCI_CFG_CLASS_MEMORY	0x05
+#define PCI_CFG_CLASS_BRIDGE	0x06
+#define PCI_CFG_CLASS_COMM	0x07
+#define PCI_CFG_CLASS_BASE	0x08
+#define PCI_CFG_CLASS_INPUT	0x09
+#define PCI_CFG_CLASS_DOCK	0x0A
+#define PCI_CFG_CLASS_PROC	0x0B
+#define PCI_CFG_CLASS_SERIALBUS	0x0C
+#define PCI_CFG_CLASS_OTHER	0xFF
+
+/*
+ * Important Subclasses
+ */
+#define PCI_CFG_SUBCLASS_BRIDGE_HOST	0x00
+#define PCI_CFG_SUBCLASS_BRIDGE_ISA	0x01
+#define PCI_CFG_SUBCLASS_BRIDGE_EISA	0x02
+#define PCI_CFG_SUBCLASS_BRIDGE_MC	0x03
+#define PCI_CFG_SUBCLASS_BRIDGE_PCI	0x04
+#define PCI_CFG_SUBCLASS_BRIDGE_PCMCIA	0x05
+#define PCI_CFG_SUBCLASS_BRIDGE_NUBUS	0x06
+#define PCI_CFG_SUBCLASS_BRIDGE_CARDBUS	0x07
+#define PCI_CFG_SUBCLASS_BRIDGE_OTHER	0x80
+
+#ifndef __ASSEMBLY__
+
+/*
+ * PCI config space definition
+ */
+typedef volatile struct pci_cfg_s {
+	uint16_t	dev_id;
+	uint16_t	vendor_id;
+	uint16_t	status;
+	uint16_t	cmd;
+	uchar_t		class;
+	uchar_t		sub_class;
+	uchar_t		prog_if;
+	uchar_t		rev;
+	uchar_t		bist;
+	uchar_t		hdr_type;
+	uchar_t		lt;
+	uchar_t		line_size;
+	uint32_t	bar[6];
+	uint32_t	cardbus;
+	uint16_t	subsys_dev_id;
+	uint16_t	subsys_vendor_id;
+	uint32_t	exp_rom;
+	uint32_t	res[2];
+	uchar_t		max_lat;
+	uchar_t		min_gnt;
+	uchar_t		int_pin;
+	uchar_t		int_line;
+} pci_cfg_t;
+
+/*
+ * PCI Type 1 config space definition for PCI to PCI Bridges (PPBs)
+ */
+typedef volatile struct pci_cfg1_s {
+	uint16_t	dev_id;
+	uint16_t	vendor_id;
+	uint16_t	status;
+	uint16_t	cmd;
+	uchar_t		class;
+	uchar_t		sub_class;
+	uchar_t		prog_if;
+	uchar_t		rev;
+	uchar_t		bist;
+	uchar_t		hdr_type;
+	uchar_t		lt;
+	uchar_t		line_size;
+	uint32_t	bar[2];
+	uchar_t		slt;
+	uchar_t		sub_bus_num;
+	uchar_t		snd_bus_num;
+	uchar_t		pri_bus_num;
+	uint16_t	snd_status;
+	uchar_t		io_limit;
+	uchar_t		io_base;
+	uint16_t	mem_limit;
+	uint16_t	mem_base;
+	uint16_t	pmem_limit;
+	uint16_t	pmem_base;
+	uint32_t	pmem_limit_upper;
+	uint32_t	pmem_base_upper;
+	uint16_t	io_limit_upper;
+	uint16_t	io_base_upper;
+	uint32_t	res;
+	uint32_t	exp_rom;
+	uint16_t	ppb_control;
+	uchar_t		int_pin;
+	uchar_t		int_line;
+} pci_cfg1_t;
+
+/*
+ * PCI-X Capability
+ */
+typedef volatile struct cap_pcix_cmd_reg_s {
+	uint16_t	reserved1:              9,
+			max_split:		3,
+			max_mem_read_cnt:	2,
+			enable_relaxed_order:	1,
+			data_parity_enable:	1;
+} cap_pcix_cmd_reg_t;
+
+typedef volatile struct cap_pcix_stat_reg_s {
+	uint32_t	reserved1:		2,
+			split_complt_err:	1,
+			max_cum_read:		3,
+			max_out_split:		3,
+			max_mem_read_cnt:	2,
+			device_complex:		1,
+			unexpect_split_complt:	1,
+			split_complt_discard:	1,
+			mhz133_capable:		1,
+			bit64_device:		1,
+			bus_num:		8,
+			dev_num:		5,
+			func_num:		3;
+} cap_pcix_stat_reg_t;
+
+typedef volatile struct cap_pcix_type0_s {
+	cap_pcix_cmd_reg_t	pcix_type0_command;
+	uchar_t			pcix_cap_nxt;
+	uchar_t			pcix_cap_id;
+	cap_pcix_stat_reg_t	pcix_type0_status;
+} cap_pcix_type0_t;
+
+#endif	/* __ASSEMBLY__ */
 #endif /* _ASM_SN_PCI_PCI_DEFS_H */

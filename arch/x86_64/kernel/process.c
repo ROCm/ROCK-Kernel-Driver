@@ -24,6 +24,7 @@
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/elfcore.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
@@ -223,6 +224,7 @@ void flush_thread(void)
 	struct task_struct *tsk = current;
 
 	memset(tsk->thread.debugreg, 0, sizeof(unsigned long)*8);
+	memset(tsk->thread.tls_array, 0, sizeof(tsk->thread.tls_array));	
 	/*
 	 * Forget coprocessor state..
 	 */
@@ -259,7 +261,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	if (rsp == ~0) {
 		childregs->rsp = (unsigned long)childregs;
 	}
-	p->user_tid = NULL;
+	p->set_child_tid = p->clear_child_tid = NULL;
 
 	p->thread.rsp = (unsigned long) childregs;
 	p->thread.rsp0 = (unsigned long) (childregs+1);
@@ -322,10 +324,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 /*
  *	switch_to(x,y) should switch tasks from x to y.
  *
- * We fsave/fwait so that an exception goes off at the right time
- * (as a call from the fsave or fwait in effect) rather than to
- * the wrong process. 
- * 
  * This could still be optimized: 
  * - fold all the options into a flag word and test it with a single test.
  * - could test fs/gs bitsliced
@@ -356,44 +354,37 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	if (unlikely(next->ds | prev->ds))
 		loadsegment(ds, next->ds);
 
+	load_TLS(next, cpu);
+
 	/* 
 	 * Switch FS and GS.
-	 * XXX Check if this is safe on SMP (!= -> |)
-	 * Need to simplify this.
 	 */
 	{ 
-		unsigned int fsindex;
-		unsigned int gsindex;
-
+		unsigned fsindex;
 		asm volatile("movl %%fs,%0" : "=g" (fsindex)); 
-		asm volatile("movl %%gs,%0" : "=g" (gsindex)); 
-
-		/*
-		 * Load the per-thread Thread-Local Storage descriptor.
-		 */
-		if (load_TLS(next, cpu)) {
-			loadsegment(fs,next->fsindex);
-			/* should find a way to optimize this away - it is
-			   slow */
-			goto loadgs;    
-		} else { 
-			if (fsindex  != next->fsindex)
-				loadsegment(fs,next->fsindex); 
-			if (gsindex != next->gsindex) {
-			loadgs:
-				load_gs_index(next->gsindex); 
-			} 	
-		}
-				
+		/* segment register != 0 always requires a reload. 
+		   also reload when it has changed. 
+		   when prev process used 64bit base always reload
+		   to avoid an information leak. */
+		if (unlikely((fsindex | next->fsindex) || prev->fs))
+			loadsegment(fs, next->fsindex);
+		/* check if the user changed the selector
+		   if yes clear 64bit base. */
 		if (unlikely(fsindex != prev->fsindex))
 			prev->fs = 0;				
-		if ((fsindex != prev->fsindex) || (prev->fs != next->fs))
+		/* when next process has a 64bit base use it */
+		if (next->fs) 
 			wrmsrl(MSR_FS_BASE, next->fs); 
 		prev->fsindex = fsindex;
-
+	}
+	{ 
+		unsigned gsindex;
+		asm volatile("movl %%gs,%0" : "=g" (gsindex)); 
+		if (unlikely((gsindex | next->gsindex) || prev->gs))
+			load_gs_index(next->gsindex);
 		if (unlikely(gsindex != prev->gsindex)) 
 			prev->gs = 0;				
-		if (gsindex != prev->gsindex || prev->gs != next->gs)
+		if (next->gs)
 			wrmsrl(MSR_KERNEL_GS_BASE, next->gs); 
 		prev->gsindex = gsindex;
 	}
@@ -477,16 +468,17 @@ void set_personality_64bit(void)
 asmlinkage long sys_fork(struct pt_regs regs)
 {
 	struct task_struct *p;
-	p = do_fork(SIGCHLD, regs.rsp, &regs, 0, NULL);
+	p = do_fork(SIGCHLD, regs.rsp, &regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
-asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void *user_tid, struct pt_regs regs)
+asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void *parent_tid, void *child_tid, struct pt_regs regs)
 {
 	struct task_struct *p;
 	if (!newsp)
 		newsp = regs.rsp;
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, user_tid);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, 
+		    parent_tid, child_tid);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -503,7 +495,8 @@ asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void *
 asmlinkage long sys_vfork(struct pt_regs regs)
 {
 	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.rsp, &regs, 0, NULL);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.rsp, &regs, 0, 
+		    NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -547,7 +540,8 @@ int sys_arch_prctl(int code, unsigned long addr)
 	case ARCH_SET_GS:
 		if (addr >= TASK_SIZE) 
 			return -EPERM; 
-		asm volatile("movw %%gs,%0" : "=g" (current->thread.gsindex)); 
+		load_gs_index(0);
+		current->thread.gsindex = 0;
 		current->thread.gs = addr;
 		ret = checking_wrmsrl(MSR_KERNEL_GS_BASE, addr); 
 		break;
@@ -556,7 +550,8 @@ int sys_arch_prctl(int code, unsigned long addr)
 		   with gs */
 		if (addr >= TASK_SIZE)
 			return -EPERM; 
-		asm volatile("movw %%fs,%0" : "=g" (current->thread.fsindex)); 
+		asm volatile("movl %0,%%fs" :: "r" (0));
+		current->thread.fsindex = 0;
 		current->thread.fs = addr;
 		ret = checking_wrmsrl(MSR_FS_BASE, addr); 
 		break;
@@ -690,4 +685,23 @@ asmlinkage int sys_get_thread_area(struct user_desc *u_info)
 	if (copy_to_user(u_info, &info, sizeof(info)))
 		return -EFAULT;
 	return 0;
+}
+
+/* 
+ * Capture the user space registers if the task is not running (in user space)
+ */
+int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
+{
+	struct pt_regs *pp, ptregs;
+
+	pp = (struct pt_regs *)(tsk->thread.rsp0);
+	--pp; 
+
+	ptregs = *pp; 
+	ptregs.cs &= 0xffff;
+	ptregs.ss &= 0xffff;
+
+	elf_core_copy_regs(regs, &ptregs);
+ 
+	return 1;
 }

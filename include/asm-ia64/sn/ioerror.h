@@ -121,7 +121,7 @@
  */
 
 typedef struct io_error_s {
-    /* Bit fields indicating which sturcture fields are valid */
+    /* Bit fields indicating which structure fields are valid */
     union {
 	struct {
 	    unsigned                ievb_errortype:1;
@@ -138,6 +138,7 @@ typedef struct io_error_s {
 	    unsigned                ievb_memaddr:1;
 	    unsigned		    ievb_epc:1;
 	    unsigned		    ievb_ef:1;
+	    unsigned		    ievb_tnum:1;
 	} iev_b;
 	unsigned                iev_a;
     } ie_v;
@@ -156,13 +157,14 @@ typedef struct io_error_s {
     paddr_t                 ie_memaddr;		/* Physical memory address       */
     caddr_t		    ie_epc;		/* pc when error reported	 */
     caddr_t		    ie_ef;		/* eframe when error reported	 */
-
+    short		    ie_tnum;		/* Xtalk TNUM field */
 } ioerror_t;
 
 #define	IOERROR_INIT(e)		do { (e)->ie_v.iev_a = 0; } while (0)
 #define	IOERROR_SETVALUE(e,f,v)	do { (e)->ie_ ## f = (v); (e)->ie_v.iev_b.ievb_ ## f = 1; } while (0)
-#define	IOERROR_FIELDVALID(e,f)	(((e)->ie_v.iev_b.ievb_ ## f) != 0)
-#define	IOERROR_GETVALUE(e,f)	(ASSERT(IOERROR_FIELDVALID(e,f)),((e)->ie_ ## f))
+#define	IOERROR_FIELDVALID(e,f)	((unsigned long long)((e)->ie_v.iev_b.ievb_ ## f) != (unsigned long long) 0)
+#define	IOERROR_NOGETVALUE(e,f)	(ASSERT(IOERROR_FIELDVALID(e,f)), ((e)->ie_ ## f))
+#define	IOERROR_GETVALUE(p,e,f)	ASSERT(IOERROR_FIELDVALID(e,f)); p=((e)->ie_ ## f)
 
 /* hub code likes to call the SysAD address "hubaddr" ... */
 #define	ie_hubaddr	ie_sysioaddr

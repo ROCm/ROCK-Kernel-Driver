@@ -35,6 +35,8 @@
 #include <asm/smp.h>
 #include <asm/desc.h>
 
+int sis_apic_bug; /* not actually supported, dummy for compile */
+
 #undef APIC_LOCKUP_DEBUG
 
 #define APIC_LOCKUP_DEBUG

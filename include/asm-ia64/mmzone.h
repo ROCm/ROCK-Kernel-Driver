@@ -104,12 +104,22 @@ extern unsigned long max_low_pfn;
 
 /*
  * Bank definitions.
- * Current settings for DIG: 512MB/bank, 16GB/node.
+ * Configurable settings for DIG: 512MB/bank:  16GB/node,
+ *                               2048MB/bank:  64GB/node,
+ *                               8192MB/bank: 256GB/node.
  */
 #define NR_BANKS_PER_NODE	32
-#define BANK_OFFSET(addr)	((unsigned long)(addr) & (BANKSIZE-1))
-#define DIG_BANKSHIFT		29
+#if defined(CONFIG_IA64_NODESIZE_16GB)
+# define DIG_BANKSHIFT		29
+#elif defined(CONFIG_IA64_NODESIZE_64GB)
+# define DIG_BANKSHIFT		31
+#elif defined(CONFIG_IA64_NODESIZE_256GB)
+# define DIG_BANKSHIFT		33
+#else
+# error Unsupported bank and nodesize!
+#endif
 #define BANKSIZE		(1UL << DIG_BANKSHIFT)
+#define BANK_OFFSET(addr)	((unsigned long)(addr) & (BANKSIZE-1))
 #define NR_BANKS		(NR_BANKS_PER_NODE * NR_NODES)
 
 /*

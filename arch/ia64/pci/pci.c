@@ -44,10 +44,6 @@
 #define DBG(x...)
 #endif
 
-#ifdef CONFIG_IA64_MCA
-extern void ia64_mca_check_errors( void );
-#endif
-
 struct pci_fixup pcibios_fixups[1];
 
 /*

@@ -21,7 +21,6 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/random.h>
-#include <linux/sched.h>
 #include <linux/seq_file.h>
 
 #include <asm/system.h>

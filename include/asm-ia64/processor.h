@@ -17,7 +17,6 @@
 
 #include <asm/ptrace.h>
 #include <asm/kregs.h>
-#include <asm/system.h>
 #include <asm/types.h>
 
 #define IA64_NUM_DBG_REGS	8
@@ -79,12 +78,12 @@
 
 #include <linux/cache.h>
 #include <linux/compiler.h>
-#include <linux/percpu.h>
 #include <linux/threads.h>
 
 #include <asm/fpu.h>
 #include <asm/offsets.h>
 #include <asm/page.h>
+#include <asm/percpu.h>
 #include <asm/rse.h>
 #include <asm/unwind.h>
 #include <asm/atomic.h>

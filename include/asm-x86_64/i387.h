@@ -43,6 +43,12 @@ static inline int need_signal_i387(struct task_struct *me)
 		save_init_fpu(tsk); \
 } while (0)
 
+#define unlazy_current_fpu() do { \
+	if (test_thread_flag(TIF_USEDFPU)) \
+		save_init_fpu(tsk); \
+} while (0)
+
+
 #define clear_fpu(tsk) do { \
 	if (test_tsk_thread_flag(tsk, TIF_USEDFPU)) {		\
 		asm volatile("fwait");				\
@@ -63,12 +69,6 @@ extern int get_fpregs(struct user_i387_struct *buf,
 		      struct task_struct *tsk);
 extern int set_fpregs(struct task_struct *tsk,
 		      struct user_i387_struct *buf);
-
-/*
- * FPU state for core dumps...
- */
-extern int dump_fpu(struct pt_regs *regs,
-		    struct user_i387_struct *fpu);
 
 /*
  * i387 state interaction

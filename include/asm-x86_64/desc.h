@@ -165,30 +165,13 @@ static inline void set_ldt_desc(unsigned cpu, void *addr, int size)
 # error update this code.
 #endif
 
-
-static inline u64 load_TLS(struct thread_struct *t, int cpu) 
+static inline void load_TLS(struct thread_struct *t, unsigned int cpu)
 {
-	u64 *p, old, new, change; 
-	union u { 
-		struct desc_struct d;
-		u64 i; 
-	}; 
-	change = 0; 
-
-	/* check assembly! */
-#define C(i) \
-	p = ((u64 *)cpu_gdt_table[cpu]) + GDT_ENTRY_TLS_MIN + i; \
-	old = *p; \
-	new = t->tls_array[i]; \
-	change |= old - new;  \
-	*p = new;
-
-	C(0); C(1); C(2); 
-	return change; 
+	u64 *gdt = (u64 *)(cpu_gdt_table[cpu] + GDT_ENTRY_TLS_MIN);
+	gdt[0] = t->tls_array[0];
+	gdt[1] = t->tls_array[1];
+	gdt[2] = t->tls_array[2];
 } 
-
-#undef C
-
 
 /*
  * load one particular LDT into the current CPU

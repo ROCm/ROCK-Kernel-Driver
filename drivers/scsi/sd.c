@@ -301,10 +301,10 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 	
 	if (block > 0xffffffff) {
 		SCpnt->cmnd[0] += READ_16 - READ_6;
-		SCpnt->cmnd[2] = (unsigned char) (block >> 56) & 0xff;
-		SCpnt->cmnd[3] = (unsigned char) (block >> 48) & 0xff;
-		SCpnt->cmnd[4] = (unsigned char) (block >> 40) & 0xff;
-		SCpnt->cmnd[5] = (unsigned char) (block >> 32) & 0xff;
+		SCpnt->cmnd[2] = sizeof(block) > 4 ? (unsigned char) (block >> 56) & 0xff : 0;
+		SCpnt->cmnd[3] = sizeof(block) > 4 ? (unsigned char) (block >> 48) & 0xff : 0;
+		SCpnt->cmnd[4] = sizeof(block) > 4 ? (unsigned char) (block >> 40) & 0xff : 0;
+		SCpnt->cmnd[5] = sizeof(block) > 4 ? (unsigned char) (block >> 32) & 0xff : 0;
 		SCpnt->cmnd[6] = (unsigned char) (block >> 24) & 0xff;
 		SCpnt->cmnd[7] = (unsigned char) (block >> 16) & 0xff;
 		SCpnt->cmnd[8] = (unsigned char) (block >> 8) & 0xff;
@@ -931,7 +931,7 @@ repeat:
 		if (longrc) {
 			memset((void *) cmd, 0, 16);
 			cmd[0] = SERVICE_ACTION_IN;
-			cmd[1] = 0x10; /* READ CAPACITY (16) */
+			cmd[1] = SAI_READ_CAPACITY_16;
 			cmd[13] = 12;
 			memset((void *) buffer, 0, 12);
 		} else {
@@ -1002,21 +1002,25 @@ repeat:
 		sector_size = (buffer[4] << 24) |
 			(buffer[5] << 16) | (buffer[6] << 8) | buffer[7];
 		if (buffer[0] == 0xff && buffer[1] == 0xff &&
-			buffer[2] == 0xff && buffer[3] == 0xff) {
-			printk(KERN_NOTICE "%s : very big device. try to use"
-				" READ CAPACITY(16).\n", diskname);
-			longrc = 1;
-			goto repeat;
+		    buffer[2] == 0xff && buffer[3] == 0xff) {
+			if(sizeof(sdkp->capacity) > 4) {
+				printk(KERN_NOTICE "%s : very big device. try to use"
+				       " READ CAPACITY(16).\n", diskname);
+				longrc = 1;
+				goto repeat;
+			} else {
+				printk(KERN_ERR "%s: too big for kernel.  Assuming maximum 2Tb\n", diskname);
+			}
 		}
 		sdkp->capacity = 1 + (((sector_t)buffer[0] << 24) |
 			(buffer[1] << 16) |
 			(buffer[2] << 8) |
 			buffer[3]);			
 	} else {
-		sdkp->capacity = 1 + (((sector_t)buffer[0] << 56) |
-			((sector_t)buffer[1] << 48) |
-			((sector_t)buffer[2] << 40) |
-			((sector_t)buffer[3] << 32) |
+		sdkp->capacity = 1 + (((u64)buffer[0] << 56) |
+			((u64)buffer[1] << 48) |
+			((u64)buffer[2] << 40) |
+			((u64)buffer[3] << 32) |
 			((sector_t)buffer[4] << 24) |
 			((sector_t)buffer[5] << 16) |
 			((sector_t)buffer[6] << 8)  |
@@ -1056,7 +1060,7 @@ got_data:
 		 */
 		int hard_sector = sector_size;
 		sector_t sz = sdkp->capacity * (hard_sector/256);
-		request_queue_t *queue = &sdp->request_queue;
+		request_queue_t *queue = sdp->request_queue;
 		sector_t mb;
 
 		blk_queue_hardsect_size(queue, hard_sector);
@@ -1291,7 +1295,7 @@ static int sd_attach(struct scsi_device * sdp)
 	if (sdp->removable)
 		gd->flags |= GENHD_FL_REMOVABLE;
 	gd->private_data = &sdkp->driver;
-	gd->queue = &sdkp->device->request_queue;
+	gd->queue = sdkp->device->request_queue;
 
 	sd_devlist_insert(sdkp);
 	set_capacity(gd, sdkp->capacity);

@@ -7,6 +7,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/user.h>
+#include <asm/processor.h>
 
 typedef unsigned long elf_greg_t;
 
@@ -14,7 +15,6 @@ typedef unsigned long elf_greg_t;
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 
 typedef struct user_i387_struct elf_fpregset_t;
-typedef struct user_fxsr_struct elf_fpxregset_t;
 
 /*
  * This is used to ensure we don't load something for the wrong architecture.
@@ -123,6 +123,17 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
 extern void set_personality_64bit(void);
 #define SET_PERSONALITY(ex, ibcs2) set_personality_64bit()
 	
+extern int dump_task_regs (struct task_struct *, elf_gregset_t *);
+extern int dump_task_fpu (struct task_struct *, elf_fpregset_t *);
+
+#define ELF_CORE_COPY_TASK_REGS(tsk, elf_regs) dump_task_regs(tsk, elf_regs)
+#define ELF_CORE_COPY_FPREGS(tsk, elf_fpregs) dump_task_fpu(tsk, elf_fpregs)
+
+#ifdef CONFIG_SMP
+extern void dump_smp_unlazy_fpu(void);
+#define ELF_CORE_SYNC dump_smp_unlazy_fpu
+#endif
+
 #endif
 
 #endif

@@ -5,29 +5,18 @@
 
 #ifdef CONFIG_IA32_EMULATION
 
+#include <linux/compat.h>
+
 /*
  * 32 bit structures for IA32 support.
  */
 
 /* 32bit compatibility types */
-typedef unsigned int	       __kernel_size_t32;
-typedef int		       __kernel_ssize_t32;
-typedef int		       __kernel_ptrdiff_t32;
-typedef int		       __kernel_time_t32;
-typedef int		       __kernel_clock_t32;
-typedef int		       __kernel_pid_t32;
 typedef unsigned short	       __kernel_ipc_pid_t32;
-typedef unsigned short	       __kernel_uid_t32;
 typedef unsigned 				__kernel_uid32_t32;
-typedef unsigned short	       __kernel_gid_t32;
 typedef unsigned 				__kernel_gid32_t32;
-typedef unsigned short	       __kernel_dev_t32;
-typedef unsigned int	       __kernel_ino_t32;
-typedef unsigned short	       __kernel_mode_t32;
 typedef unsigned short	       __kernel_umode_t32;
-typedef short		       __kernel_nlink_t32;
 typedef int		       __kernel_daddr_t32;
-typedef int		       __kernel_off_t32;
 typedef unsigned int	       __kernel_caddr_t32;
 typedef long		       __kernel_loff_t32;
 typedef __kernel_fsid_t	       __kernel_fsid_t32;
@@ -37,9 +26,9 @@ typedef __kernel_fsid_t	       __kernel_fsid_t32;
 struct flock32 {
        short l_type;
        short l_whence;
-       __kernel_off_t32 l_start;
-       __kernel_off_t32 l_len;
-       __kernel_pid_t32 l_pid;
+       compat_off_t l_start;
+       compat_off_t l_len;
+       compat_pid_t l_pid;
 };
 
 
@@ -98,30 +87,6 @@ struct ucontext_ia32 {
 	sigset32_t	  uc_sigmask;	/* mask last for extensibility */
 };
 
-struct stat32 {
-       unsigned short st_dev;
-       unsigned short __pad1;
-       unsigned int st_ino;
-       unsigned short st_mode;
-       unsigned short st_nlink;
-       unsigned short st_uid;
-       unsigned short st_gid;
-       unsigned short st_rdev;
-       unsigned short __pad2;
-       unsigned int  st_size;
-       unsigned int  st_blksize;
-       unsigned int  st_blocks;
-       unsigned int  st_atime;
-       unsigned int  __unused1;
-       unsigned int  st_mtime;
-       unsigned int  __unused2;
-       unsigned int  st_ctime;
-       unsigned int  __unused3;
-       unsigned int  __unused4;
-       unsigned int  __unused5;
-};
-
-
 /* This matches struct stat64 in glibc2.2, hence the absolutely
  * insane amounts of padding around dev_t's.
  */
@@ -146,9 +111,12 @@ struct stat64 {
 
 	long long		st_blocks;/* Number 512-byte blocks allocated. */
 
-	unsigned long long	st_atime;
-	unsigned long long	st_mtime;
-	unsigned long long	st_ctime;
+	unsigned 		st_atime;
+	unsigned 		st_atime_nsec;
+	unsigned 		st_mtime;
+	unsigned 		st_mtime_nsec;
+	unsigned 		st_ctime;
+	unsigned 		st_ctime_nsec;
 
 	unsigned long long	st_ino;
 } __attribute__((packed));
@@ -204,8 +172,8 @@ typedef struct siginfo32 {
 			unsigned int _pid;	/* which child */
 			unsigned int _uid;	/* sender's uid */
 			int _status;		/* exit code */
-			__kernel_clock_t32 _utime;
-			__kernel_clock_t32 _stime;
+			compat_clock_t _utime;
+			compat_clock_t _stime;
 		} _sigchld;
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
@@ -224,7 +192,7 @@ typedef struct siginfo32 {
 
 struct ustat32 {
 	__u32	f_tfree;
-	__kernel_ino_t32		f_tinode;
+	compat_ino_t		f_tinode;
 	char			f_fname[6];
 	char			f_fpack[6];
 };
@@ -234,6 +202,8 @@ struct iovec32 {
 	int iov_len; 
 };
 
+#define IA32_PAGE_OFFSET 0xffff0000
+#define IA32_STACK_TOP IA32_PAGE_OFFSET
 
 #endif /* !CONFIG_IA32_SUPPORT */
  

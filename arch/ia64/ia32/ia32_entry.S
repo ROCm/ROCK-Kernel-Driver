@@ -196,7 +196,7 @@ ia32_syscall_table:
 	data8 sys32_fork
 	data8 sys_read
 	data8 sys_write
-	data8 sys_open		  /* 5 */
+	data8 sys32_open	  /* 5 */
 	data8 sys_close
 	data8 sys32_waitpid
 	data8 sys_creat
@@ -221,7 +221,7 @@ ia32_syscall_table:
 	data8 sys32_alarm
 	data8 sys32_ni_syscall
 	data8 sys32_pause
-	data8 sys32_utime	  /* 30 */
+	data8 compat_sys_utime	  /* 30 */
 	data8 sys32_ni_syscall	  /* old stty syscall holder */
 	data8 sys32_ni_syscall	  /* old gtty syscall holder */
 	data8 sys_access
@@ -234,7 +234,7 @@ ia32_syscall_table:
 	data8 sys_rmdir		  /* 40 */
 	data8 sys_dup
 	data8 sys32_pipe
-	data8 sys32_times
+	data8 compat_sys_times
 	data8 sys32_ni_syscall	  /* old prof syscall holder */
 	data8 sys32_brk		  /* 45 */
 	data8 sys_setgid	/* 16-bit version */
@@ -295,11 +295,11 @@ ia32_syscall_table:
 	data8 sys32_ioperm
 	data8 sys32_socketcall
 	data8 sys_syslog
-	data8 sys32_setitimer
-	data8 sys32_getitimer	  /* 105 */
-	data8 sys32_newstat
-	data8 sys32_newlstat
-	data8 sys32_newfstat
+	data8 compat_sys_setitimer
+	data8 compat_sys_getitimer	  /* 105 */
+	data8 compat_sys_newstat
+	data8 compat_sys_newlstat
+	data8 compat_sys_newfstat
 	data8 sys32_ni_syscall
 	data8 sys32_iopl		  /* 110 */
 	data8 sys_vhangup
@@ -353,7 +353,7 @@ ia32_syscall_table:
 	data8 sys_sched_get_priority_max
 	data8 sys_sched_get_priority_min	 /* 160 */
 	data8 sys32_sched_rr_get_interval
-	data8 sys32_nanosleep
+	data8 compat_sys_nanosleep
 	data8 sys_mremap
 	data8 sys_setresuid	/* 16-bit version */
 	data8 sys32_getresuid16	/* 16-bit version */	  /* 165 */

@@ -1487,7 +1487,7 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 			break;
 		}
 
-		__blk_run_queue(&sdev->request_queue);
+		__blk_run_queue(sdev->request_queue);
 	}
 	spin_unlock_irqrestore(shost->host_lock, flags);
 }

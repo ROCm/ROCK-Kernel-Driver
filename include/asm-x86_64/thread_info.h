@@ -29,6 +29,7 @@ struct thread_info {
 	int 			preempt_count;
 
 	mm_segment_t		addr_limit;	
+	struct restart_block    restart_block;
 };
 
 #endif
@@ -46,6 +47,9 @@ struct thread_info {
 	.cpu	       = 0,			\
 	.preempt_count = 1,			\
 	.addr_limit     = KERNEL_DS,		\
+	.restart_block = {			\
+		.fn = do_no_restart_syscall,	\
+	},					\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)

@@ -696,7 +696,7 @@ static int sunsu_startup(struct uart_port *port)
 				     SA_SHIRQ, su_typev[up->su_type], up);
 	}
 	if (retval) {
-		printk("su: Cannot register IRQ\n");
+		printk("su: Cannot register IRQ %d\n", up->irq);
 		return retval;
 	}
 
@@ -783,6 +783,8 @@ static void sunsu_shutdown(struct uart_port *port)
 	 * Read data port to reset things.
 	 */
 	(void) serial_in(up, UART_RX);
+
+	free_irq(up->irq, up);
 }
 
 static void

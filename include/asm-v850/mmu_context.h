@@ -1,8 +1,6 @@
 #ifndef __V850_MMU_CONTEXT_H__
 #define __V850_MMU_CONTEXT_H__
 
-#include <linux/sched.h>
-
 #define destroy_context(mm)		((void)0)
 #define init_new_context(tsk,mm)	0
 #define switch_mm(prev,next,tsk,cpu)	((void)0)

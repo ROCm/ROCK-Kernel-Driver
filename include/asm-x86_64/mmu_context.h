@@ -12,8 +12,8 @@
 /*
  * possibly do the LDT unload here?
  */
-#define destroy_context(mm)		do { } while(0)
 int init_new_context(struct task_struct *tsk, struct mm_struct *mm);
+void destroy_context(struct mm_struct *mm);
 
 #ifdef CONFIG_SMP
 

@@ -11,6 +11,7 @@
 
 #if defined(__KERNEL__)
 
+#include <linux/config.h>
 #include <asm/sn/dmamap.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/pio.h>
@@ -75,6 +76,7 @@ extern int		pcibr_attach(devfs_handle_t);
  */
 
 extern pciio_provider_t pcibr_provider;
+extern pciio_provider_t pci_pic_provider;
 
 /* =====================================================================
  *    secondary entry points: pcibr PCI bus provider
@@ -182,7 +184,11 @@ extern pcibr_intr_t	pcibr_intr_alloc(devfs_handle_t dev,
 
 extern void		pcibr_intr_free(pcibr_intr_t intr);
 
+#ifdef CONFIG_IA64_SGI_SN1
 extern int		pcibr_intr_connect(pcibr_intr_t intr);
+#else
+extern int		pcibr_intr_connect(pcibr_intr_t intr, intr_func_t, intr_arg_t);
+#endif
 
 extern void		pcibr_intr_disconnect(pcibr_intr_t intr);
 
@@ -215,9 +221,11 @@ extern void		pcibr_config_set(devfs_handle_t conn,
 extern int		pcibr_error_devenable(devfs_handle_t pconn_vhdl,
 					      int error_code);
 
+#ifdef PIC_LATER
 extern pciio_slot_t	pcibr_error_extract(devfs_handle_t pcibr_vhdl,
 					    pciio_space_t *spacep,
 					    iopaddr_t *addrp);
+#endif
 
 extern int		pcibr_wrb_flush(devfs_handle_t pconn_vhdl);
 extern int		pcibr_rrb_check(devfs_handle_t pconn_vhdl,
@@ -226,11 +234,13 @@ extern int		pcibr_rrb_check(devfs_handle_t pconn_vhdl,
 					int *count_reserved,
 					int *count_pool);
 
+#ifndef CONFIG_IA64_SGI_SN1
 extern int		pcibr_alloc_all_rrbs(devfs_handle_t vhdl, int even_odd,
 					     int dev_1_rrbs, int virt1,
 					     int dev_2_rrbs, int virt2,
 					     int dev_3_rrbs, int virt3,
 					     int dev_4_rrbs, int virt4);
+#endif
 
 typedef void
 rrb_alloc_funct_f	(devfs_handle_t xconn_vhdl,
@@ -340,7 +350,11 @@ extern void		pcibr_hints_dualslot(devfs_handle_t, pciio_slot_t, pciio_slot_t);
 extern void		pcibr_hints_subdevs(devfs_handle_t, pciio_slot_t, ulong);
 extern void		pcibr_hints_handsoff(devfs_handle_t);
 
+#ifdef CONFIG_IA64_SGI_SN1
 typedef unsigned	pcibr_intr_bits_f(pciio_info_t, pciio_intr_line_t);
+#else
+typedef unsigned	pcibr_intr_bits_f(pciio_info_t, pciio_intr_line_t, int);
+#endif
 extern void		pcibr_hints_intr_bits(devfs_handle_t, pcibr_intr_bits_f *);
 
 extern int		pcibr_asic_rev(devfs_handle_t);
@@ -414,13 +428,9 @@ struct pcibr_slot_down_resp_s {
     char                    resp_l1_msg[L1_QSIZE + 1];
 };
 
-struct pcibr_slot_info_req_s {
-   int                      req_slot;
-   pcibr_slot_info_resp_t   req_respp;
-   int                      req_size;
-};
-
 struct pcibr_slot_info_resp_s {
+    short		    resp_bs_bridge_type;
+    short		    resp_bs_bridge_mode;
     int                     resp_has_host;
     char                    resp_host_slot;
     devfs_handle_t            resp_slot_conn;
@@ -438,17 +448,22 @@ struct pcibr_slot_info_resp_s {
     unsigned                resp_bss_d64_flags;
     iopaddr_t               resp_bss_d32_base;
     unsigned                resp_bss_d32_flags;
-    int                     resp_bss_ext_ates_active;
+    atomic_t                resp_bss_ext_ates_active;
     volatile unsigned      *resp_bss_cmd_pointer;
     unsigned                resp_bss_cmd_shadow;
     int                     resp_bs_rrb_valid;
-    int                     resp_bs_rrb_valid_v;
+    int                     resp_bs_rrb_valid_v1;
+    int                     resp_bs_rrb_valid_v2;
+    int                     resp_bs_rrb_valid_v3;
     int                     resp_bs_rrb_res;
     bridgereg_t             resp_b_resp;
     bridgereg_t             resp_b_int_device;
     bridgereg_t             resp_b_int_enable;
     bridgereg_t             resp_b_int_host;
-
+#ifndef CONFIG_IA64_SGI_SN1
+    picreg_t		    resp_p_int_enable;
+    picreg_t		    resp_p_int_host;
+#endif
     struct pcibr_slot_func_info_resp_s {
         int                     resp_f_status;
         char                    resp_f_slot_name[MAXDEVNAME];
@@ -507,6 +522,9 @@ struct pcibr_slot_info_resp_s {
 #define PCI_SLOT_RRB_ALLOC_ERR   24     /* slot initial rrb alloc error */
 #define PCI_SLOT_DRV_ATTACH_ERR  25     /* driver attach error */
 #define PCI_SLOT_DRV_DETACH_ERR  26     /* driver detach error */
+/* EFBIG                         27    */
+#define PCI_MULTI_FUNC_ERR       28     /* multi-function card error */
+#define PCI_SLOT_RBAR_ALLOC_ERR  29     /* slot PCI-X RBAR alloc error */
 /* ERANGE                        34    */
 /* EUNATCH                       42    */
 

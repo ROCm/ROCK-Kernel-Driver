@@ -26,12 +26,12 @@ sys_call_table32:
 /*20*/	.word sys_getpid, sys_capget, sys_capset, sys32_setuid16, sys32_getuid16
 /*25*/	.word sys_time, sys_ptrace, sys_alarm, sys32_sigaltstack, sys32_pause
 /*30*/	.word compat_sys_utime, sys_lchown, sys_fchown, sys_access, sys_nice
-	.word sys_chown, sys_sync, sys_kill, sys32_newstat, sys32_sendfile
-/*40*/	.word sys32_newlstat, sys_dup, sys_pipe, sys32_times, sys_getuid
+	.word sys_chown, sys_sync, sys_kill, compat_sys_newstat, sys32_sendfile
+/*40*/	.word compat_sys_newlstat, sys_dup, sys_pipe, compat_sys_times, sys_getuid
 	.word sys_umount, sys32_setgid16, sys32_getgid16, sys_signal, sys32_geteuid16
 /*50*/	.word sys32_getegid16, sys_acct, sys_nis_syscall, sys_getgid, sys32_ioctl
 	.word sys_reboot, sys32_mmap2, sys_symlink, sys_readlink, sys32_execve
-/*60*/	.word sys_umask, sys_chroot, sys32_newfstat, sys_fstat64, sys_getpagesize
+/*60*/	.word sys_umask, sys_chroot, compat_sys_newfstat, sys_fstat64, sys_getpagesize
 	.word sys_msync, sys_vfork, sys32_pread64, sys32_pwrite64, sys_geteuid
 /*70*/	.word sys_getegid, sys32_mmap, sys_setreuid, sys_munmap, sys_mprotect
 	.word sys_madvise, sys_vhangup, sys32_truncate64, sys_mincore, sys32_getgroups16
@@ -59,7 +59,7 @@ sys_call_table32:
 	.word sys_setpgid, sys_fremovexattr, sys_tkill, sys_exit_group, sparc64_newuname
 /*190*/	.word sys32_init_module, sparc64_personality, sys_remap_file_pages, sys_epoll_create, sys_epoll_ctl
 	.word sys_epoll_wait, sys_nis_syscall, sys_getppid, sys32_sigaction, sys_sgetmask
-/*200*/	.word sys_ssetmask, sys_sigsuspend, sys32_newlstat, sys_uselib, old32_readdir
+/*200*/	.word sys_ssetmask, sys_sigsuspend, compat_sys_newlstat, sys_uselib, old32_readdir
 	.word sys32_readahead, sys32_socketcall, sys_syslog, sys32_lookup_dcookie, sys_nis_syscall
 /*210*/	.word sys_nis_syscall, sys_nis_syscall, sys_waitpid, sys_swapoff, sys32_sysinfo
 	.word sys32_ipc, sys32_sigreturn, sys_clone, sys_nis_syscall, sys32_adjtimex
@@ -150,8 +150,8 @@ sunos_sys_table:
 	.word sunos_nosys, sunos_nosys, sunos_nosys
 	.word sunos_nosys, sunos_nosys, sunos_nosys
 	.word sys_access, sunos_nosys, sunos_nosys
-	.word sys_sync, sys_kill, sys32_newstat
-	.word sunos_nosys, sys32_newlstat, sys_dup
+	.word sys_sync, sys_kill, compat_sys_newstat
+	.word sunos_nosys, compat_sys_newlstat, sys_dup
 	.word sys_pipe, sunos_nosys, sunos_nosys
 	.word sunos_nosys, sunos_nosys, sunos_getgid
 	.word sunos_nosys, sunos_nosys
@@ -159,7 +159,7 @@ sunos_sys_table:
 	.word sunos_mctl, sunos_ioctl, sys_reboot
 	.word sunos_nosys, sys_symlink, sys_readlink
 	.word sys32_execve, sys_umask, sys_chroot
-	.word sys32_newfstat, sunos_nosys, sys_getpagesize
+	.word compat_sys_newfstat, sunos_nosys, sys_getpagesize
 	.word sys_msync, sys_vfork, sunos_nosys
 	.word sunos_nosys, sunos_sbrk, sunos_sstk
 	.word sunos_mmap, sunos_vadvise, sys_munmap

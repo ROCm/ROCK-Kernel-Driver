@@ -337,7 +337,7 @@ fork_by_hand (void)
 	 * don't care about the eip and regs settings since we'll never reschedule the
 	 * forked task.
 	 */
-	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, 0, 0, NULL);
+	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, 0, 0, NULL, NULL);
 }
 
 static int __init
@@ -499,7 +499,7 @@ smp_prepare_cpus (unsigned int max_cpus)
 	/*
 	 * If SMP should be disabled, then really disable it!
 	 */
-	if (!max_cpus || (max_cpus < -1)) {
+	if (!max_cpus) {
 		printk(KERN_INFO "SMP mode deactivated.\n");
 		cpu_online_map = phys_cpu_present_map = 1;
 		return;

@@ -29,6 +29,9 @@
  *
  * Changelog:
  *
+ *  10 Dec 2002 - Matt Domsch <Matt_Domsch@dell.com>
+ *   fix locking per Peter Chubb's findings
+ * 
  *  25 Mar 2002 - Matt Domsch <Matt_Domsch@dell.com>
  *   move uuid_unparse() to include/asm-ia64/efi.h:efi_guid_unparse()
  *
@@ -73,7 +76,7 @@ MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("/proc interface to EFI Variables");
 MODULE_LICENSE("GPL");
 
-#define EFIVARS_VERSION "0.05 2002-Mar-26"
+#define EFIVARS_VERSION "0.06 2002-Dec-10"
 
 static int
 efivar_read(char *page, char **start, off_t off,
@@ -106,6 +109,14 @@ typedef struct _efivar_entry_t {
 	struct list_head        list;
 } efivar_entry_t;
 
+/*
+  efivars_lock protects two things:
+  1) efivar_list - adds, removals, reads, writes
+  2) efi.[gs]et_variable() calls.
+  It must not be held when creating proc entries or calling kmalloc.
+  efi.get_next_variable() is only called from efivars_init(),
+  which is protected by the BKL, so that path is safe.
+*/
 static spinlock_t efivars_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(efivar_list);
 static struct proc_dir_entry *efi_vars_dir = NULL;
@@ -150,6 +161,7 @@ proc_calc_metrics(char *page, char **start, off_t off,
  *    variable_name_size = number of bytes required to hold
  *                         variable_name (not counting the NULL
  *                         character at the end.
+ *    efivars_lock is not held on entry or exit.
  * Returns 1 on failure, 0 on success
  */
 static int
@@ -160,10 +172,12 @@ efivar_create_proc_entry(unsigned long variable_name_size,
 
 	int i, short_name_size = variable_name_size /
 		sizeof(efi_char16_t) + 38;
-	char *short_name = kmalloc(short_name_size+1,
-				   GFP_KERNEL);
-	efivar_entry_t *new_efivar = kmalloc(sizeof(efivar_entry_t),
-					     GFP_KERNEL);
+	char *short_name;
+	efivar_entry_t *new_efivar;
+
+        short_name = kmalloc(short_name_size+1, GFP_KERNEL);
+        new_efivar = kmalloc(sizeof(efivar_entry_t), GFP_KERNEL);
+
 	if (!short_name || !new_efivar)  {
 		if (short_name)        kfree(short_name);
 		if (new_efivar)        kfree(new_efivar);
@@ -188,20 +202,19 @@ efivar_create_proc_entry(unsigned long variable_name_size,
 	*(short_name + strlen(short_name)) = '-';
 	efi_guid_unparse(vendor_guid, short_name + strlen(short_name));
 
-
 	/* Create the entry in proc */
 	new_efivar->entry = create_proc_entry(short_name, 0600, efi_vars_dir);
 	kfree(short_name); short_name = NULL;
 	if (!new_efivar->entry) return 1;
-
 
 	new_efivar->entry->owner = THIS_MODULE;
 	new_efivar->entry->data = new_efivar;
 	new_efivar->entry->read_proc = efivar_read;
 	new_efivar->entry->write_proc = efivar_write;
 
-	list_add(&new_efivar->list, &efivar_list);
-
+        spin_lock(&efivars_lock);
+        list_add(&new_efivar->list, &efivar_list);
+        spin_unlock(&efivars_lock);
 
 	return 0;
 }
@@ -319,6 +332,8 @@ efivar_write(struct file *file, const char *buffer,
 		kfree(efivar);
 	}
 
+	spin_unlock(&efivars_lock);
+
 	/* If this is a new variable, set up the proc entry for it. */
 	if (!found) {
 		efivar_create_proc_entry(utf8_strsize(var_data->VariableName,
@@ -328,7 +343,6 @@ efivar_write(struct file *file, const char *buffer,
 	}
 
 	kfree(var_data);
-	spin_unlock(&efivars_lock);
 	return size;
 }
 
@@ -343,8 +357,6 @@ efivars_init(void)
 	efi_char16_t *variable_name = kmalloc(1024, GFP_KERNEL);
 	unsigned long variable_name_size = 1024;
 
-	spin_lock(&efivars_lock);
-
 	printk(KERN_INFO "EFI Variables Facility v%s\n", EFIVARS_VERSION);
 
         /* Since efi.c happens before procfs is available,
@@ -356,8 +368,6 @@ efivars_init(void)
                 efi_dir = proc_mkdir("efi", NULL);
 
 	efi_vars_dir = proc_mkdir("vars", efi_dir);
-
-
 
 	/* Per EFI spec, the maximum storage allocated for both
 	   the variable name and variable data is 1024 bytes.
@@ -390,7 +400,6 @@ efivars_init(void)
 	} while (status != EFI_NOT_FOUND);
 
 	kfree(variable_name);
-	spin_unlock(&efivars_lock);
 	return 0;
 }
 
@@ -400,17 +409,16 @@ efivars_exit(void)
 	struct list_head *pos, *n;
 	efivar_entry_t *efivar;
 
-	spin_lock(&efivars_lock);
-
+        spin_lock(&efivars_lock);
 	list_for_each_safe(pos, n, &efivar_list) {
 		efivar = efivar_entry(pos);
 		remove_proc_entry(efivar->entry->name, efi_vars_dir);
 		list_del(&efivar->list);
 		kfree(efivar);
 	}
-	remove_proc_entry(efi_vars_dir->name, efi_dir);
 	spin_unlock(&efivars_lock);
 
+	remove_proc_entry(efi_vars_dir->name, efi_dir);
 }
 
 module_init(efivars_init);

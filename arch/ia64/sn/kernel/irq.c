@@ -59,34 +59,33 @@
 #include <asm/sn/addrs.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/arch.h>
+#include <asm/sn/nodepda.h>
 
 int irq_to_bit_pos(int irq);
 
-
-
 static unsigned int
-sn1_startup_irq(unsigned int irq)
+sn_startup_irq(unsigned int irq)
 {
         return(0);
 }
 
 static void
-sn1_shutdown_irq(unsigned int irq)
+sn_shutdown_irq(unsigned int irq)
 {
 }
 
 static void
-sn1_disable_irq(unsigned int irq)
+sn_disable_irq(unsigned int irq)
 {
 }
 
 static void
-sn1_enable_irq(unsigned int irq)
+sn_enable_irq(unsigned int irq)
 {
 }
 
 static void
-sn1_ack_irq(unsigned int irq)
+sn_ack_irq(unsigned int irq)
 {
 #ifdef CONFIG_IA64_SGI_SN1
 	int bit = -1;
@@ -149,7 +148,7 @@ sn1_ack_irq(unsigned int irq)
 }
 
 static void
-sn1_end_irq(unsigned int irq)
+sn_end_irq(unsigned int irq)
 {
 #ifdef CONFIG_IA64_SGI_SN1
 	unsigned long long intpend_val, mask = 0x70L;
@@ -187,87 +186,82 @@ sn1_end_irq(unsigned int irq)
 }
 
 static void
-sn1_set_affinity_irq(unsigned int irq, unsigned long mask)
+sn_set_affinity_irq(unsigned int irq, unsigned long mask)
 {
 }
 
 
 struct hw_interrupt_type irq_type_iosapic_level = {
 	"SN hub",
-	sn1_startup_irq,
-	sn1_shutdown_irq,
-	sn1_enable_irq,
-	sn1_disable_irq,
-	sn1_ack_irq, 
-	sn1_end_irq,
-	sn1_set_affinity_irq
+	sn_startup_irq,
+	sn_shutdown_irq,
+	sn_enable_irq,
+	sn_disable_irq,
+	sn_ack_irq, 
+	sn_end_irq,
+	sn_set_affinity_irq
 };
 
 
-#define irq_type_sn1 irq_type_iosapic_level
-struct irq_desc *_sn1_irq_desc[NR_CPUS];
+#define irq_type_sn irq_type_iosapic_level
+struct irq_desc *_sn_irq_desc[NR_CPUS];
 
 struct irq_desc *
-sn1_irq_desc(unsigned int irq) {
+sn_irq_desc(unsigned int irq) {
 	int cpu = irq >> 8;
 
 	irq = irq & 0xff;
 
-	return(_sn1_irq_desc[cpu] + irq);
+	return(_sn_irq_desc[cpu] + irq);
 }
 
 u8
-sn1_irq_to_vector(u8 irq) {
+sn_irq_to_vector(u8 irq) {
 	return(irq & 0xff);
 }
 
-unsigned int
-sn1_local_vector_to_irq(u8 vector) {
-	return ( (smp_processor_id() << 8) + vector);
+int gsi_to_vector(u32 irq) {
+	return irq & 0xff;
 }
 
-int
-sn1_valid_irq(u8 irq) {
+int gsi_to_irq(u32 irq) {
+	return irq & 0xff;
+}
 
-	return( ((irq & 0xff) < NR_IRQS) && ((irq >> 8) < NR_CPUS) );
+unsigned int
+sn_local_vector_to_irq(u8 vector) {
+	return (CPU_VECTOR_TO_IRQ(smp_processor_id(), vector));
 }
 
 void *kmalloc(size_t, int);
 
 void
-sn1_irq_init (void)
+sn_irq_init (void)
 {
 	int i;
 	irq_desc_t *base_desc = _irq_desc;
 
-	for (i=IA64_FIRST_DEVICE_VECTOR; i<NR_IRQS; i++) {
+	for (i=IA64_FIRST_DEVICE_VECTOR; i<NR_IVECS; i++) {
 		if (base_desc[i].handler == &no_irq_type) {
-			base_desc[i].handler = &irq_type_sn1;
+			base_desc[i].handler = &irq_type_sn;
 		}
 	}
 }
 
 void
-sn1_init_irq_desc(void) {
+sn_init_irq_desc(void) {
 	int i;
 	irq_desc_t *base_desc = _irq_desc, *p;
 
 	for (i=0; i < NR_CPUS; i++) {
-		p =  page_address(alloc_pages_node(local_cnodeid(), GFP_KERNEL,
-			get_order(sizeof(struct irq_desc) * NR_IRQS) ) );
+		p =  page_address(alloc_pages_node(local_nodeid, GFP_KERNEL,
+			get_order(sizeof(struct irq_desc) * NR_IVECS) ) );
 		ASSERT(p);
-		memcpy(p, base_desc, sizeof(struct irq_desc) * NR_IRQS);
-		_sn1_irq_desc[i] = p;
+		memcpy(p, base_desc, sizeof(struct irq_desc) * NR_IVECS);
+		_sn_irq_desc[i] = p;
 	}
 }
 
-
-#if !defined(CONFIG_IA64_SGI_SN)
-void
-sn1_pci_fixup(void)
-{
-}
-#endif
 
 int
 bit_pos_to_irq(int bit) {

@@ -2,7 +2,6 @@
 #include <linux/module.h>
 #include <linux/smp.h>
 #include <linux/user.h>
-#include <linux/mca.h>
 #include <linux/sched.h>
 #include <linux/in6.h>
 #include <linux/interrupt.h>
@@ -46,7 +45,7 @@ extern unsigned long get_cmos_time(void);
 
 /* platform dependent support */
 EXPORT_SYMBOL(boot_cpu_data);
-EXPORT_SYMBOL(dump_fpu);
+//EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(ioremap_nocache);
 EXPORT_SYMBOL(iounmap);
@@ -118,10 +117,6 @@ EXPORT_SYMBOL_NOVERS(__read_lock_failed);
 EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(smp_call_function);
 
-#endif
-
-#ifdef CONFIG_MCA
-EXPORT_SYMBOL(machine_id);
 #endif
 
 #ifdef CONFIG_VT
@@ -199,3 +194,6 @@ void out_of_line_bug(void);
 EXPORT_SYMBOL(out_of_line_bug);
 
 EXPORT_SYMBOL(init_level4_pgt);
+
+extern unsigned long __supported_pte_mask;
+EXPORT_SYMBOL(__supported_pte_mask);

@@ -41,6 +41,23 @@ struct desc_ptr idt_descr = { 256 * 16, (unsigned long) idt_table };
 
 char boot_cpu_stack[IRQSTACKSIZE] __cacheline_aligned;
 
+unsigned long __supported_pte_mask = ~0UL;
+static int do_not_nx = 0;
+
+static int __init nonx_setup(char *str)
+{
+        if (!strncmp(str,"off",3)) { 
+                __supported_pte_mask &= ~_PAGE_NX; 
+                do_not_nx = 1; 
+        } else if (!strncmp(str, "on",3)) { 
+                do_not_nx = 0; 
+                __supported_pte_mask |= _PAGE_NX; 
+        } 
+        return 1;
+} 
+
+__setup("noexec=", nonx_setup); 
+
 #ifndef  __GENERIC_PER_CPU
 
 unsigned long __per_cpu_offset[NR_CPUS];
@@ -127,7 +144,7 @@ void __init cpu_init (void)
 	int cpu = smp_processor_id();
 #endif
 	struct tss_struct * t = &init_tss[cpu];
-	unsigned long v; 
+	unsigned long v, efer; 
 	char *estacks; 
 	struct task_struct *me;
 
@@ -188,6 +205,11 @@ void __init cpu_init (void)
 	wrmsrl(MSR_FS_BASE, 0);
 	wrmsrl(MSR_KERNEL_GS_BASE, 0);
 	barrier(); 
+
+	rdmsrl(MSR_EFER, efer); 
+        if (!(efer & EFER_NX) || do_not_nx) { 
+                __supported_pte_mask &= ~_PAGE_NX; 
+        }       
 
 	/*
 	 * set up and load the per-CPU TSS

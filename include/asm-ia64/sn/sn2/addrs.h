@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2001 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (c) 2001-2002 Silicon Graphics, Inc.  All rights reserved.
  */
 
 #ifndef _ASM_IA64_SN_SN2_ADDRS_H
@@ -53,19 +53,26 @@ typedef union ia64_sn2_pa {
 
 /* Regions determined by AS */
 #define LOCAL_MMR_SPACE		0xc000008000000000	/* Local MMR space */
+#define LOCAL_PHYS_MMR_SPACE	0x8000008000000000	/* Local PhysicalMMR space */
 #define LOCAL_MEM_SPACE		0xc000010000000000	/* Local Memory space */
 #define GLOBAL_MMR_SPACE	0xc000000800000000	/* Global MMR space */
+#define GLOBAL_PHYS_MMR_SPACE	0x0000000800000000	/* Global Physical MMR space */
 #define GET_SPACE		0xc000001000000000	/* GET space */
 #define AMO_SPACE		0xc000002000000000	/* AMO space */
 #define CACHEABLE_MEM_SPACE	0xe000003000000000	/* Cacheable memory space */
 #define UNCACHED                0xc000000000000000      /* UnCacheable memory space */
+#define UNCACHED_PHYS           0x8000000000000000      /* UnCacheable physical memory space */
+
+#define PHYS_MEM_SPACE		0x0000003000000000	/* physical memory space */
 
 /* SN2 address macros */
 #define NID_SHFT		38
 #define LOCAL_MMR_ADDR(a)	(UNCACHED | LOCAL_MMR_SPACE | (a))
+#define LOCAL_MMR_PHYS_ADDR(a)	(UNCACHED_PHYS | LOCAL_PHYS_MMR_SPACE | (a))
 #define LOCAL_MEM_ADDR(a)	(LOCAL_MEM_SPACE | (a))
 #define REMOTE_ADDR(n,a)	((((unsigned long)(n))<<NID_SHFT) | (a))
 #define GLOBAL_MMR_ADDR(n,a)	(UNCACHED | GLOBAL_MMR_SPACE | REMOTE_ADDR(n,a))
+#define GLOBAL_MMR_PHYS_ADDR(n,a) (UNCACHED_PHYS | GLOBAL_PHYS_MMR_SPACE | REMOTE_ADDR(n,a))
 #define GET_ADDR(n,a)		(GET_SPACE | REMOTE_ADDR(n,a))
 #define AMO_ADDR(n,a)		(UNCACHED | AMO_SPACE | REMOTE_ADDR(n,a))
 #define GLOBAL_MEM_ADDR(n,a)	(CACHEABLE_MEM_SPACE | REMOTE_ADDR(n,a))
@@ -104,8 +111,18 @@ typedef union ia64_sn2_pa {
 #define NASID_MASK              (UINT64_CAST NASID_BITMASK << NASID_SHFT)
 #define NASID_GET(_pa)          (int) ((UINT64_CAST (_pa) >>            \
                                         NASID_SHFT) & NASID_BITMASK)
+#define PHYS_TO_DMA(x)          ( ((x & NASID_MASK) >> 2) |             \
+                                  (x & (NODE_ADDRSPACE_SIZE - 1)) )
 
 #define CHANGE_NASID(n,x)	({ia64_sn2_pa_t _v; _v.l = (long) (x); _v.f.nasid = n; _v.p;})
+
+/*
+ * Determine if a physical address should be referenced as cached or uncached. 
+ * For now, assume all memory is cached and everything else is noncached.
+ * (Later, we may need to special case areas of memory to be reference uncached).
+ */
+#define IS_CACHED_ADDRESS(x)	(((x) & PHYS_MEM_SPACE) == PHYS_MEM_SPACE)
+
 
 #ifndef __ASSEMBLY__
 #define NODE_SWIN_BASE(nasid, widget)                                   \

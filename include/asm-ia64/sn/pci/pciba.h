@@ -91,6 +91,13 @@ typedef u_int32_t uint32_t;
 #define	PCIIOCDMAALLOC		_IOWR(0,1,uint64_t)
 #define	PCIIOCDMAFREE		_IOW(0,1,uint64_t)
 
+/* pio cache-mode ioctl defines.  current only uncached accelerated */
+#define PCIBA_CACHE_MODE_SET	1
+#define PCIBA_CACHE_MODE_CLEAR	2
+#ifdef PIOMAP_UNC_ACC
+#define PCIBA_UNCACHED_ACCEL	PIOMAP_UNC_ACC
+#endif
+
 /* The parameter for PCIIOCDMAALLOC needs to contain
  * both the size of the request and the flag values
  * to be used in setting up the DMA.

@@ -15,7 +15,6 @@
  * This file was derived from the sh version, arch/sh/kernel/signal.c
  */
 
-#include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -147,8 +146,6 @@ struct sigframe
 
 struct rt_sigframe
 {
-	struct siginfo *pinfo;
-	void *puc;
 	struct siginfo info;
 	struct ucontext uc;
 	unsigned long tramp[2];	/* signal trampoline */
@@ -330,10 +327,12 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	if (err)
 		goto give_sigsegv;
 
-	/* Set up registers for signal handler */
-	regs->gpr[GPR_SP] = (unsigned long) frame;
-	regs->gpr[GPR_ARG0] = signal; /* Arg for signal handler */
-	regs->pc = (unsigned long) ka->sa.sa_handler;
+	/* Set up registers for signal handler.  */
+	regs->pc = (v850_reg_t) ka->sa.sa_handler;
+	regs->gpr[GPR_SP] = (v850_reg_t)frame;
+	/* Signal handler args:  */
+	regs->gpr[GPR_ARG0] = signal; /* arg 0: signum */
+	regs->gpr[GPR_ARG1] = (v850_reg_t)&frame->sc;/* arg 1: sigcontext */
 
 	set_fs(USER_DS);
 
@@ -368,8 +367,6 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		? current_thread_info()->exec_domain->signal_invmap[sig]
 		: sig;
 
-	err |= __put_user(&frame->info, &frame->pinfo);
-	err |= __put_user(&frame->uc, &frame->puc);
 	err |= copy_siginfo_to_user(&frame->info, info);
 
 	/* Create the ucontext.  */
@@ -406,10 +403,13 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	if (err)
 		goto give_sigsegv;
 
-	/* Set up registers for signal handler */
-	regs->gpr[GPR_SP] = (unsigned long) frame;
-	regs->gpr[GPR_ARG0] = signal; /* Arg for signal handler */
-	regs->pc = (unsigned long) ka->sa.sa_handler;
+	/* Set up registers for signal handler.  */
+	regs->pc = (v850_reg_t) ka->sa.sa_handler;
+	regs->gpr[GPR_SP] = (v850_reg_t)frame;
+	/* Signal handler args:  */
+	regs->gpr[GPR_ARG0] = signal; /* arg 0: signum */
+	regs->gpr[GPR_ARG1] = (v850_reg_t)&frame->info; /* arg 1: siginfo */
+	regs->gpr[GPR_ARG2] = (v850_reg_t)&frame->uc; /* arg 2: ucontext */
 
 	set_fs(USER_DS);
 
@@ -440,19 +440,23 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	if (PT_REGS_SYSCALL (regs)) {
 		/* If so, check system call restarting.. */
 		switch (regs->gpr[GPR_RVAL]) {
-			case -ERESTARTNOHAND:
+		case -ERESTART_RESTARTBLOCK:
+			current_thread_info()->restart_block.fn =
+				do_no_restart_syscall;
+			/* fall through */
+		case -ERESTARTNOHAND:
+			regs->gpr[GPR_RVAL] = -EINTR;
+			break;
+
+		case -ERESTARTSYS:
+			if (!(ka->sa.sa_flags & SA_RESTART)) {
 				regs->gpr[GPR_RVAL] = -EINTR;
 				break;
-
-			case -ERESTARTSYS:
-				if (!(ka->sa.sa_flags & SA_RESTART)) {
-					regs->gpr[GPR_RVAL] = -EINTR;
-					break;
-				}
+			}
 			/* fallthrough */
-			case -ERESTARTNOINTR:
-				regs->gpr[12] = PT_REGS_SYSCALL (regs);
-				regs->pc -= 4; /* Size of `trap 0' insn.  */
+		case -ERESTARTNOINTR:
+			regs->gpr[12] = PT_REGS_SYSCALL (regs);
+			regs->pc -= 4; /* Size of `trap 0' insn.  */
 		}
 
 		PT_REGS_SET_SYSCALL (regs, 0);
@@ -511,12 +515,17 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 
 	/* Did we come from a system call? */
 	if (PT_REGS_SYSCALL (regs)) {
+		int rval = (int)regs->gpr[GPR_RVAL];
 		/* Restart the system call - no handlers present */
-		if (regs->gpr[GPR_RVAL] == (v850_reg_t)-ERESTARTNOHAND ||
-		    regs->gpr[GPR_RVAL] == (v850_reg_t)-ERESTARTSYS ||
-		    regs->gpr[GPR_RVAL] == (v850_reg_t)-ERESTARTNOINTR)
+		if (rval == -ERESTARTNOHAND
+		    || rval == -ERESTARTSYS
+		    || rval == -ERESTARTNOINTR)
 		{
 			regs->gpr[12] = PT_REGS_SYSCALL (regs);
+			regs->pc -= 4; /* Size of `trap 0' insn.  */
+		}
+		else if (rval == -ERESTART_RESTARTBLOCK) {
+			regs->gpr[12] = __NR_restart_syscall;
 			regs->pc -= 4; /* Size of `trap 0' insn.  */
 		}
 	}

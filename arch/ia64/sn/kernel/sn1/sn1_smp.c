@@ -59,11 +59,16 @@
  * to other cpus for flushing TLB ranges.
  */
 typedef struct {
-	unsigned long	start;
-	unsigned long	end;
-	unsigned long	nbits;
-	unsigned int	rid;
-	atomic_t	unfinished_count;
+	union {
+		struct {
+			unsigned long	start;
+			unsigned long	end;
+			unsigned long	nbits;
+			unsigned int	rid;
+			atomic_t	unfinished_count;
+		} ptc;
+		char pad[SMP_CACHE_BYTES];
+	};
 } ptc_params_t;
 
 #define NUMPTC	512
@@ -149,11 +154,11 @@ sn1_received_flush_tlb(void)
 		return;
 
 	do {
-		start = ptcParams->start;
+		start = ptcParams->ptc.start;
 		saved_rid = (unsigned int) ia64_get_rr(start);
-		end = ptcParams->end;
-		nbits = ptcParams->nbits;
-		rid = ptcParams->rid;
+		end = ptcParams->ptc.end;
+		nbits = ptcParams->ptc.nbits;
+		rid = ptcParams->ptc.rid;
 
 		if (saved_rid != rid) {
 			ia64_set_rr(start, (unsigned long)rid);
@@ -167,7 +172,7 @@ sn1_received_flush_tlb(void)
 
 		ia64_srlz_i();
 
-		result = atomic_dec(&ptcParams->unfinished_count);
+		result = atomic_dec(&ptcParams->ptc.unfinished_count);
 #ifdef PTCDEBUG
 		{
 		    int i = ptcParams-&ptcParamArray[0];
@@ -203,7 +208,7 @@ sn1_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 	int		backlog = 0;
 #endif
 
-	if (num_online_cpus() == 1) {
+	if (smp_num_cpus == 1) {
 		sn1_ptc_l_range(start, end, nbits);
 		return;
 	}
@@ -256,7 +261,7 @@ sn1_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 		/* check the current pointer to the beginning */
 		ptr = params;
 		while(--ptr >= &ptcParamArray[0]) {
-			if (atomic_read(&ptr->unfinished_count) == 0)
+			if (atomic_read(&ptr->ptc.unfinished_count) == 0)
 				break;
 			++backlog;
 		}
@@ -265,7 +270,7 @@ sn1_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 			/* check the end of the array */
 			ptr = &ptcParamArray[NUMPTC];
 			while (--ptr > params) {
-				if (atomic_read(&ptr->unfinished_count) == 0)
+				if (atomic_read(&ptr->ptc.unfinished_count) == 0)
 					break;
 				++backlog;
 			}
@@ -275,12 +280,12 @@ sn1_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 #endif	/* PTCDEBUG */
 
 	/* wait for the next entry to clear...should be rare */
-	if (atomic_read(&next->unfinished_count) > 0) {
+	if (atomic_read(&next->ptc.unfinished_count) > 0) {
 #ifdef PTCDEBUG
 		ptcParamsAllBusy++;
 
-		if (atomic_read(&nextnext->unfinished_count) == 0) {
-		    if (atomic_read(&next->unfinished_count) > 0) {
+		if (atomic_read(&nextnext->ptc.unfinished_count) == 0) {
+		    if (atomic_read(&next->ptc.unfinished_count) > 0) {
 			panic("\nnonzero next zero nextnext %lx %lx\n",
 			    (long)next, (long)nextnext);
 		    }
@@ -293,16 +298,16 @@ sn1_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 		local_irq_restore(irqflags);
 
 		/* now we know it's not this cpu, so just wait */
-		while (atomic_read(&next->unfinished_count) > 0) {
+		while (atomic_read(&next->ptc.unfinished_count) > 0) {
 			barrier();
 		}
 	}
 
-	params->start = start;
-	params->end = end;
-	params->nbits = nbits;
-	params->rid = (unsigned int) ia64_get_rr(start);
-	atomic_set(&params->unfinished_count, num_online_cpus());
+	params->ptc.start = start;
+	params->ptc.end = end;
+	params->ptc.nbits = nbits;
+	params->ptc.rid = (unsigned int) ia64_get_rr(start);
+	atomic_set(&params->ptc.unfinished_count, smp_num_cpus);
 
 	/* The atomic_set above can hit memory *after* the update
 	 * to ptcParamsEmpty below, which opens a timing window
@@ -335,15 +340,53 @@ sn1_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 	 * shouldn't be using user TLB entries.  To change this to wait
 	 * for all the flushes to complete, enable the following code.
 	 */
-#ifdef SN1_SYNCHRONOUS_GLOBAL_TLB_PURGE
+#if defined(SN1_SYNCHRONOUS_GLOBAL_TLB_PURGE) || defined(BUS_INT_WAR)
 	/* this code is not tested */
 	/* wait for the flush to complete */
-	while (atomic_read(&params.unfinished_count) > 1)
+	while (atomic_read(&params->ptc.unfinished_count) > 0)
 		barrier();
-
-	atomic_set(&params->unfinished_count, 0);
 #endif
 }
+
+/**
+ * sn_send_IPI_phys - send an IPI to a Nasid and slice
+ * @physid: physical cpuid to receive the interrupt.
+ * @vector: command to send
+ * @delivery_mode: delivery mechanism
+ *
+ * Sends an IPI (interprocessor interrupt) to the processor specified by
+ * @physid
+ *
+ * @delivery_mode can be one of the following
+ *
+ * %IA64_IPI_DM_INT - pend an interrupt
+ * %IA64_IPI_DM_PMI - pend a PMI
+ * %IA64_IPI_DM_NMI - pend an NMI
+ * %IA64_IPI_DM_INIT - pend an INIT interrupt
+ */
+void
+sn_send_IPI_phys(long physid, int vector, int delivery_mode)
+{
+	long		*p;
+	long		nasid, slice;
+
+	static int 	off[4] = {0x1800080, 0x1800088, 0x1a00080, 0x1a00088};
+
+#ifdef BUS_INT_WAR
+	if (vector != ap_wakeup_vector) {
+		return;
+	}
+#endif
+
+	nasid = cpu_physical_id_to_nasid(physid);
+        slice = cpu_physical_id_to_slice(physid);
+
+	p = (long*)(0xc0000a0000000000LL | (nasid<<33) | off[slice]);
+
+	mb();
+	*p = (delivery_mode << 8) | (vector & 0xff);
+}
+
 
 /**
  * sn1_send_IPI - send an IPI to a processor
@@ -363,28 +406,12 @@ sn1_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 void
 sn1_send_IPI(int cpuid, int vector, int delivery_mode, int redirect)
 {
-	long		*p, nasid, slice;
-	static int 	off[4] = {0x1800080, 0x1800088, 0x1a00080, 0x1a00088};
+	long		physid;
 
-	/*
-	 * ZZZ - Replace with standard macros when available.
-	 */
-	nasid = cpuid_to_nasid(cpuid);
-	slice = cpuid_to_slice(cpuid);
-	p = (long*)(0xc0000a0000000000LL | (nasid<<33) | off[slice]);
+	physid = cpu_physical_id(cpuid);
 
-#if defined(ZZZBRINGUP)
-	{
-	static int count=0;
-	if (count++ < 10) printk("ZZ sendIPI 0x%x->0x%x, vec %d, nasid 0x%lx, slice %ld, adr 0x%lx\n",
-		smp_processor_id(), cpuid, vector, nasid, slice, (long)p);
-	}
-#endif
-	mb();
-	*p = (delivery_mode << 8) | (vector & 0xff);
+	sn_send_IPI_phys(physid, vector, delivery_mode);
 }
-
-
 #ifdef CONFIG_SMP
 
 #ifdef PTC_NOTYET
@@ -425,7 +452,7 @@ init_sn1_smp_config(void)
 {
 	if (!ia64_ptc_domain_info)  {
 		printk("SMP: Can't find PTC domain info. Forcing UP mode\n");
-		cpu_online_map = 1;
+		smp_num_cpus = 1;
 		return;
 	}
 

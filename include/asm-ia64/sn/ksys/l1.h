@@ -10,10 +10,14 @@
 #ifndef _ASM_SN_KSYS_L1_H
 #define _ASM_SN_KSYS_L1_H
 
+#include <linux/config.h>
 #include <asm/sn/vector.h>
 #include <asm/sn/addrs.h>
 #include <asm/atomic.h>
 #include <asm/sn/sv.h>
+
+
+#ifdef CONFIG_IA64_SGI_SN1
 
 #define BRL1_QSIZE	128	/* power of 2 is more efficient */
 #define BRL1_BUFSZ	264	/* needs to be large enough
@@ -109,8 +113,6 @@ typedef struct brl1_sch_s {
 #define BRL1_RESET	7
 
 
-#ifndef __ASSEMBLY__
-
 /*
  * l1sc_t structure-- tracks protocol state, open subchannels, etc.
  */
@@ -148,7 +150,6 @@ typedef struct l1sc_s {
 
     sc_cq_t	 garbage_q;	/* a place to put unsolicited packets */
     sc_cq_t	 oq[BRL1_OQS];	/* elscuart output queues */
-
 } l1sc_t;
 
 
@@ -169,6 +170,7 @@ typedef struct l1sc_s {
 #define SC_TIMEDOUT	(-9)
 #define SC_NSUBCH	(-10)
 
+#endif	/* CONFIG_IA64_SGI_SN1 */
 
 /* L1 Target Addresses */
 /*
@@ -179,21 +181,38 @@ typedef struct l1sc_s {
  * id (L1 functionality is divided into several independent "tasks"
  * that can each receive command requests and transmit responses)
  */
+#ifdef CONFIG_IA64_SGI_SN1
 #define L1_ADDR_TYPE_SHFT	28
 #define L1_ADDR_TYPE_MASK	0xF0000000
+#else
+#define L1_ADDR_TYPE_SHFT	8
+#define L1_ADDR_TYPE_MASK	0xFF00
+#endif	/* CONFIG_IA64_SGI_SN1 */
 #define L1_ADDR_TYPE_L1		0x00	/* L1 system controller */
 #define L1_ADDR_TYPE_L2		0x01	/* L2 system controller */
 #define L1_ADDR_TYPE_L3		0x02	/* L3 system controller */
 #define L1_ADDR_TYPE_CBRICK	0x03	/* attached C brick	*/
 #define L1_ADDR_TYPE_IOBRICK	0x04	/* attached I/O brick	*/
 
+#ifdef CONFIG_IA64_SGI_SN1
 #define L1_ADDR_RACK_SHFT	18
 #define L1_ADDR_RACK_MASK	0x0FFC0000
 #define	L1_ADDR_RACK_LOCAL	0x3ff	/* local brick's rack	*/
+#else
+#define L1_ADDR_RACK_SHFT	16
+#define L1_ADDR_RACK_MASK	0xFFFF00
+#define	L1_ADDR_RACK_LOCAL	0xffff	/* local brick's rack	*/
+#endif /* CONFIG_IA64_SGI_SN1 */
 
+#ifdef CONFIG_IA64_SGI_SN1
 #define L1_ADDR_BAY_SHFT	12
 #define L1_ADDR_BAY_MASK	0x0003F000
 #define	L1_ADDR_BAY_LOCAL	0x3f	/* local brick's bay	*/
+#else
+#define L1_ADDR_BAY_SHFT	0
+#define L1_ADDR_BAY_MASK	0xFF
+#define	L1_ADDR_BAY_LOCAL	0xff	/* local brick's bay	*/
+#endif	/* CONFIG_IA64_SGI_SN1 */
 
 #define L1_ADDR_TASK_SHFT	0
 #define L1_ADDR_TASK_MASK	0x0000001F
@@ -268,13 +287,16 @@ typedef struct l1sc_s {
 #define L1_REQ_EXEC_CMD		0x0000	/* interpret and execute an ASCII
 					   command string */
 
-
 /* brick type response codes */
-#define L1_BRICKTYPE_C	0x43
-#define L1_BRICKTYPE_I	0x49
-#define L1_BRICKTYPE_P	0x50
-#define L1_BRICKTYPE_R  0x52
-#define L1_BRICKTYPE_X  0x58
+#define L1_BRICKTYPE_IP45       0x34            /* 4 */
+#define L1_BRICKTYPE_C          0x43            /* C */
+#define L1_BRICKTYPE_I          0x49            /* I */
+#define L1_BRICKTYPE_P          0x50            /* P */
+#define L1_BRICKTYPE_R          0x52            /* R */
+#define L1_BRICKTYPE_X          0x58            /* X */
+#define L1_BRICKTYPE_X2         0x59            /* Y */
+#define L1_BRICKTYPE_N          0x4e            /* N */
+#define L1_BRICKTYPE_PX		0x23		/* # */
 
 /* EEPROM codes (for the "read EEPROM" request) */
 /* c brick */
@@ -306,7 +328,6 @@ typedef uint32_t l1addr_t;
     (*(l1addr_t *)(addr) = (l1addr_t)(trb) |				\
     			     ((l1addr_t)(tsk) << L1_ADDR_TASK_SHFT))
 
-
 #define L1_DISPLAY_LINE_LENGTH	12	/* L1 display characters/line */
 
 #ifdef L1_DISP_2LINES
@@ -316,9 +337,11 @@ typedef uint32_t l1addr_t;
 					 * to system software */
 #endif
 
-#define SC_EVENT_CLASS_MASK ((unsigned short)0xff00)
-
 #define bzero(d, n)	memset((d), 0, (n))
+
+#ifdef CONFIG_IA64_SGI_SN1
+
+#define SC_EVENT_CLASS_MASK ((unsigned short)0xff00)
 
 /* public interfaces to L1 system controller */
 
@@ -348,15 +371,18 @@ extern l1sc_t *get_elsc( void );
 #define get_l1sc	get_elsc
 #define get_master_l1sc get_l1sc
 
-int	router_module_get( nasid_t nasid, net_vec_t path );
-
 int	iobrick_rack_bay_type_get( l1sc_t *sc, uint *rack,
 				   uint *bay, uint *brick_type );
 int	iobrick_module_get( l1sc_t *sc );
 int	iobrick_pci_slot_pwr( l1sc_t *sc, int bus, int slot, int up );
 int	iobrick_pci_bus_pwr( l1sc_t *sc, int bus, int up );
 int	iobrick_sc_version( l1sc_t *sc, char *result );
+#else
+int	elsc_display_line(nasid_t nasid, char *line, int lnum);
+int	iobrick_rack_bay_type_get( nasid_t nasid, uint *rack,
+				   uint *bay, uint *brick_type );
+int	iobrick_module_get( nasid_t nasid );
+#endif	/* CONFIG_IA64_SGI_SN1 */
 
 
-#endif /* !__ASSEMBLY__ */
 #endif /* _ASM_SN_KSYS_L1_H */

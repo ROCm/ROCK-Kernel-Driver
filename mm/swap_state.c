@@ -145,15 +145,12 @@ int add_to_swap(struct page * page)
 
 		pf_flags = current->flags;
 		current->flags &= ~PF_MEMALLOC;
-		current->flags |= PF_NOWARN;
 
 		/*
 		 * Add it to the swap cache and mark it dirty
 		 */
 		err = add_to_page_cache(page, &swapper_space, entry.val);
 
-		if (!(pf_flags & PF_NOWARN))
-			current->flags &= ~PF_NOWARN;
 		if (pf_flags & PF_MEMALLOC)
 			current->flags |= PF_MEMALLOC;
 

@@ -68,6 +68,7 @@ struct cpuinfo_x86 {
 #define X86_VENDOR_CENTAUR 5
 #define X86_VENDOR_RISE 6
 #define X86_VENDOR_TRANSMETA 7
+#define X86_VENDOR_NUM 8
 #define X86_VENDOR_UNKNOWN 0xff
 
 extern struct cpuinfo_x86 boot_cpu_data;
@@ -256,7 +257,7 @@ static inline void clear_in_cr4 (unsigned long mask)
  * space during mmap's.
  */
 #define TASK_UNMAPPED_32 0x40000000
-#define TASK_UNMAPPED_64 (TASK_SIZE/3) 
+#define TASK_UNMAPPED_64 PAGE_ALIGN(TASK_SIZE/3) 
 #define TASK_UNMAPPED_BASE	\
 	(test_thread_flag(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)  
 
@@ -337,8 +338,8 @@ struct thread_struct {
 #define EXCEPTION_STKSZ 1024
 
 #define start_thread(regs,new_rip,new_rsp) do { \
-	__asm__("movl %0,%%fs; movl %0,%%es; movl %0,%%ds": :"r" (0));		 \
-	wrmsrl(MSR_KERNEL_GS_BASE, 0);						 \
+	asm volatile("movl %0,%%fs; movl %0,%%es; movl %0,%%ds": :"r" (0));	 \
+	load_gs_index(0);							\
 	(regs)->rip = (new_rip);						 \
 	(regs)->rsp = (new_rsp);						 \
 	write_pda(oldrsp, (new_rsp));						 \
@@ -358,7 +359,7 @@ extern void release_thread(struct task_struct *);
  */
 extern long kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
-extern void release_segments(struct mm_struct * mm);
+static inline void release_segments(struct mm_struct *mm) { }
 
 /*
  * Return saved PC of a blocked thread.
@@ -388,5 +389,32 @@ extern inline void rep_nop(void)
 #define spin_lock_prefetch(x)  prefetchw(x)
 #define cpu_relax()   rep_nop()
 
+
+/*
+ *      NSC/Cyrix CPU configuration register indexes
+ */
+#define CX86_CCR0 0xc0
+#define CX86_CCR1 0xc1
+#define CX86_CCR2 0xc2
+#define CX86_CCR3 0xc3
+#define CX86_CCR4 0xe8
+#define CX86_CCR5 0xe9
+#define CX86_CCR6 0xea
+#define CX86_CCR7 0xeb
+#define CX86_DIR0 0xfe
+#define CX86_DIR1 0xff
+#define CX86_ARR_BASE 0xc4
+#define CX86_RCR_BASE 0xdc
+
+/*
+ *      NSC/Cyrix CPU indexed register access macros
+ */
+
+#define getCx86(reg) ({ outb((reg), 0x22); inb(0x23); })
+
+#define setCx86(reg, data) do { \
+	outb((reg), 0x22); \
+	outb((data), 0x23); \
+} while (0)
 
 #endif /* __ASM_X86_64_PROCESSOR_H */

@@ -70,7 +70,11 @@ struct nodepda_s {
 	nasid_t		xbow_peer;	/* NASID of our peer hub on xbow */
 	struct semaphore xbow_sema;	/* Sema for xbow synchronization */
 	slotid_t	slotdesc;
+#ifdef CONFIG_IA64_SGI_SN2
+	geoid_t		geoid;
+#else
 	moduleid_t	module_id;	/* Module ID (redundant local copy) */
+#endif
 	module_t	*module;	/* Pointer to containing module */
 	xwidgetnum_t 	basew_id;
 	devfs_handle_t 	basew_xc;
@@ -91,7 +95,8 @@ struct nodepda_s {
 	/*
 	 * The BTEs on this node are shared by the local cpus
 	 */
-	bteinfo_t	node_bte_info[BTES_PER_NODE];
+	bteinfo_t	bte_if[BTES_PER_NODE];	/* Virtual Interface */
+	char		bte_cleanup[5 * L1_CACHE_BYTES] ____cacheline_aligned;
 
 #if defined(CONFIG_IA64_SGI_SN1)
 	subnode_pda_t	snpda[NUM_SUBNODES];
@@ -122,9 +127,10 @@ struct nodepda_s {
 typedef struct nodepda_s nodepda_t;
 
 #ifdef CONFIG_IA64_SGI_SN2
+#define NR_IVECS 256
 struct irqpda_s {
 	int num_irq_used;
-	char irq_flags[NR_IRQS];
+	char irq_flags[NR_IVECS];
 };
 
 typedef struct irqpda_s irqpda_t;
@@ -147,7 +153,7 @@ typedef struct irqpda_s irqpda_t;
  *	SUBNODEPDA(cnode,sn)	-> to access subnode PDA for cnodeid/subnode
  */
 
-#define	nodepda		pda.p_nodepda		/* Ptr to this node's PDA */
+#define	nodepda		pda->p_nodepda		/* Ptr to this node's PDA */
 #define	NODEPDA(cnode)		(nodepda->pernode_pdaindr[cnode])
 
 #if defined(CONFIG_IA64_SGI_SN1)
@@ -160,7 +166,11 @@ typedef struct irqpda_s irqpda_t;
 /*
  * Macros to access data structures inside nodepda 
  */
+#ifdef CONFIG_IA64_SGI_SN2
+#define NODE_MODULEID(cnode)    geo_module((NODEPDA(cnode)->geoid))
+#else
 #define NODE_MODULEID(cnode)	(NODEPDA(cnode)->module_id)
+#endif
 #define NODE_SLOTID(cnode)	(NODEPDA(cnode)->slotdesc)
 
 
@@ -174,8 +184,8 @@ typedef struct irqpda_s irqpda_t;
  * Check if given a compact node id the corresponding node has all the
  * cpus disabled. 
  */
-#define is_headless_node(cnode)		((cnode == CNODEID_NONE) ||			\
-					 (node_data(cnode)->active_cpu_count == 0))
+#define is_headless_node(cnode)		0 /*((cnode == CNODEID_NONE) ||			\
+					    (node_data(cnode)->active_cpu_count == 0)) */
 
 /*
  * Check if given a node vertex handle the corresponding node has all the

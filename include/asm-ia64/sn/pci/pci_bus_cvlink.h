@@ -35,30 +35,33 @@
 #define MAX_ATE_MAPS 1024
 
 #define SET_PCIA64(dev) \
-	(((struct sn1_device_sysdata *)((dev)->sysdata))->isa64) = 1
+	(((struct sn_device_sysdata *)((dev)->sysdata))->isa64) = 1
 #define IS_PCIA64(dev)	(((dev)->dma_mask == 0xffffffffffffffffUL) || \
-		(((struct sn1_device_sysdata *)((dev)->sysdata))->isa64))
+		(((struct sn_device_sysdata *)((dev)->sysdata))->isa64))
 #define IS_PCI32G(dev)	((dev)->dma_mask >= 0xffffffff)
 #define IS_PCI32L(dev)	((dev)->dma_mask < 0xffffffff)
 
+#define IS_PIC_DEVICE(dev) ((struct sn_device_sysdata *)dev->sysdata)->isPIC
+
 #define PCIDEV_VERTEX(pci_dev) \
-	(((struct sn1_device_sysdata *)((pci_dev)->sysdata))->vhdl)
+	(((struct sn_device_sysdata *)((pci_dev)->sysdata))->vhdl)
 
 #define PCIBUS_VERTEX(pci_bus) \
-	(((struct sn1_widget_sysdata *)((pci_bus)->sysdata))->vhdl)
+	(((struct sn_widget_sysdata *)((pci_bus)->sysdata))->vhdl)
 
-struct sn1_widget_sysdata {
+struct sn_widget_sysdata {
         devfs_handle_t  vhdl;
 };
 
-struct sn1_device_sysdata {
+struct sn_device_sysdata {
         devfs_handle_t  vhdl;
 	int		isa64;
+	int		isPIC;
 	volatile unsigned int *dma_buf_sync;
 	volatile unsigned int *xbow_buf_sync;
 };
 
-struct sn1_dma_maps_s{
+struct sn_dma_maps_s{
 	struct pcibr_dmamap_s dma_map;
         dma_addr_t      dma_addr;
 };

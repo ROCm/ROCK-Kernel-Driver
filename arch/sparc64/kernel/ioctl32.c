@@ -973,8 +973,8 @@ static int fbiogscursor(unsigned int fd, unsigned int cmd, unsigned long arg)
 	mm_segment_t old_fs = get_fs();
 	
 	ret = copy_from_user (&f, (struct fbcursor32 *)arg, 2 * sizeof (short) + 2 * sizeof(struct fbcurpos));
-	ret |= __get_user(f.size.fbx, &(((struct fbcursor32 *)arg)->size.fbx));
-	ret |= __get_user(f.size.fby, &(((struct fbcursor32 *)arg)->size.fby));
+	ret |= __get_user(f.size.x, &(((struct fbcursor32 *)arg)->size.x));
+	ret |= __get_user(f.size.y, &(((struct fbcursor32 *)arg)->size.y));
 	ret |= __get_user(f.cmap.index, &(((struct fbcursor32 *)arg)->cmap.index));
 	ret |= __get_user(f.cmap.count, &(((struct fbcursor32 *)arg)->cmap.count));
 	ret |= __get_user(r, &(((struct fbcursor32 *)arg)->cmap.red));
@@ -985,10 +985,10 @@ static int fbiogscursor(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (ret)
 		return -EFAULT;
 	if (f.set & FB_CUR_SETCMAP) {
-		if ((uint) f.size.fby > 32)
+		if ((uint) f.size.y > 32)
 			return -EINVAL;
-		ret = copy_from_user (mask, (char *)A(m), f.size.fby * 4);
-		ret |= copy_from_user (image, (char *)A(i), f.size.fby * 4);
+		ret = copy_from_user (mask, (char *)A(m), f.size.y * 4);
+		ret |= copy_from_user (image, (char *)A(i), f.size.y * 4);
 		if (ret)
 			return -EFAULT;
 		f.image = image; f.mask = mask;
@@ -4346,11 +4346,6 @@ COMPATIBLE_IOCTL(FBIOGCURMAX)
 COMPATIBLE_IOCTL(FBIOGET_VSCREENINFO)
 COMPATIBLE_IOCTL(FBIOPUT_VSCREENINFO)
 COMPATIBLE_IOCTL(FBIOPAN_DISPLAY)
-COMPATIBLE_IOCTL(FBIOGET_FCURSORINFO)
-COMPATIBLE_IOCTL(FBIOGET_VCURSORINFO)
-COMPATIBLE_IOCTL(FBIOPUT_VCURSORINFO)
-COMPATIBLE_IOCTL(FBIOGET_CURSORSTATE)
-COMPATIBLE_IOCTL(FBIOPUT_CURSORSTATE)
 COMPATIBLE_IOCTL(FBIOGET_CON2FBMAP)
 COMPATIBLE_IOCTL(FBIOPUT_CON2FBMAP)
 /* Little f */

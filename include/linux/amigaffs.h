@@ -28,7 +28,7 @@ affs_set_blocksize(struct super_block *sb, int size)
 static inline struct buffer_head *
 affs_bread(struct super_block *sb, int block)
 {
-	pr_debug(KERN_DEBUG "affs_bread: %d\n", block);
+	pr_debug("affs_bread: %d\n", block);
 	if (block >= AFFS_SB(sb)->s_reserved && block < AFFS_SB(sb)->s_partition_size)
 		return sb_bread(sb, block);
 	return NULL;
@@ -36,7 +36,7 @@ affs_bread(struct super_block *sb, int block)
 static inline struct buffer_head *
 affs_getblk(struct super_block *sb, int block)
 {
-	pr_debug(KERN_DEBUG "affs_getblk: %d\n", block);
+	pr_debug("affs_getblk: %d\n", block);
 	if (block >= AFFS_SB(sb)->s_reserved && block < AFFS_SB(sb)->s_partition_size)
 		return sb_getblk(sb, block);
 	return NULL;
@@ -45,7 +45,7 @@ static inline struct buffer_head *
 affs_getzeroblk(struct super_block *sb, int block)
 {
 	struct buffer_head *bh;
-	pr_debug(KERN_DEBUG "affs_getzeroblk: %d\n", block);
+	pr_debug("affs_getzeroblk: %d\n", block);
 	if (block >= AFFS_SB(sb)->s_reserved && block < AFFS_SB(sb)->s_partition_size) {
 		bh = sb_getblk(sb, block);
 		lock_buffer(bh);
@@ -60,7 +60,7 @@ static inline struct buffer_head *
 affs_getemptyblk(struct super_block *sb, int block)
 {
 	struct buffer_head *bh;
-	pr_debug(KERN_DEBUG "affs_getemptyblk: %d\n", block);
+	pr_debug("affs_getemptyblk: %d\n", block);
 	if (block >= AFFS_SB(sb)->s_reserved && block < AFFS_SB(sb)->s_partition_size) {
 		bh = sb_getblk(sb, block);
 		wait_on_buffer(bh);
@@ -73,7 +73,7 @@ static inline void
 affs_brelse(struct buffer_head *bh)
 {
 	if (bh)
-		pr_debug(KERN_DEBUG "affs_brelse: %ld\n", bh->b_blocknr);
+		pr_debug("affs_brelse: %ld\n", bh->b_blocknr);
 	brelse(bh);
 }
 

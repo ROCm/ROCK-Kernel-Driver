@@ -16,6 +16,7 @@
 #define PSR_I		14
 #define	PSR_DT		17
 #define PSR_RT		27
+#define PSR_MC		35
 #define PSR_IT		36
 #define PSR_BN		44
 
@@ -106,6 +107,8 @@
 	dep	temp1 = 0, temp1, PSR_I, 1;						\
 	;;										\
 	dep	temp1 = 0, temp1, PSR_IC, 1;						\
+	;;										\
+	dep	temp1 = -1, temp1, PSR_MC, 1;						\
 	;;										\
 	movl	temp2 = start_addr;							\
 	mov	cr.ipsr = temp1;							\

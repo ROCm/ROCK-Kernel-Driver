@@ -9,9 +9,10 @@
  *	    scheduler patch
  */
 
+#include <linux/compiler.h>
 #include <linux/types.h>
 
-#include <asm/system.h>
+#include <asm/intrinsics.h>
 
 /**
  * set_bit - Atomically set a bit in memory

@@ -371,7 +371,7 @@ static void print_inquiry(unsigned char *inq_result)
  */
 static void scsi_initialize_merge_fn(struct scsi_device *sd)
 {
-	request_queue_t *q = &sd->request_queue;
+	request_queue_t *q = sd->request_queue;
 	struct Scsi_Host *sh = sd->host;
 	struct device *dev = scsi_get_device(sh);
 	u64 bounce_limit;
@@ -407,14 +407,12 @@ static void scsi_initialize_merge_fn(struct scsi_device *sd)
  *     Scsi_Device pointer, or NULL on failure.
  **/
 static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
-					   uint channel, uint id, uint lun)
+	       	struct request_queue **q, uint channel, uint id, uint lun)
 {
 	struct scsi_device *sdev, *device;
 
 	sdev = kmalloc(sizeof(*sdev), GFP_ATOMIC);
-	if (sdev == NULL)
-		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
-	else {
+	if (sdev != NULL) {
 		memset(sdev, 0, sizeof(Scsi_Device));
 		sdev->vendor = scsi_null_device_strs;
 		sdev->model = scsi_null_device_strs;
@@ -436,18 +434,32 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 		 * doesn't
 		 */
 		sdev->borken = 1;
-		if (shost->hostt->slave_alloc)
-			if (shost->hostt->slave_alloc(sdev)) {
-				kfree(sdev);
-				return NULL;
+
+		if(!q || *q == NULL) {
+			sdev->request_queue = kmalloc(sizeof(struct request_queue), GFP_ATOMIC);
+			if(sdev->request_queue == NULL) {
+				goto out_bail;
 			}
-
-		scsi_initialize_queue(sdev, shost);
-		sdev->request_queue.queuedata = (void *) sdev;
-
-		scsi_initialize_merge_fn(sdev);
+			memset(sdev->request_queue, 0,
+				       	sizeof(struct request_queue));
+			scsi_initialize_queue(sdev, shost);
+			scsi_initialize_merge_fn(sdev);
+		} else {
+			sdev->request_queue = *q;
+			*q = NULL;
+		}
+		sdev->request_queue->queuedata = sdev;
+		scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
+		scsi_build_commandblocks(sdev);
+		if (sdev->current_queue_depth == 0) {
+			goto out_bail;
+		}
 		init_waitqueue_head(&sdev->scpnt_wait);
 
+		if (shost->hostt->slave_alloc)
+			if (shost->hostt->slave_alloc(sdev)) {
+				goto out_bail;
+			}
 		/*
 		 * If there are any same target siblings, add this to the
 		 * sibling list
@@ -457,15 +469,35 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 			   device->channel == sdev->channel) {
 				list_add_tail(&sdev->same_target_siblings,
 					      &device->same_target_siblings);
+				sdev->scsi_level = device->scsi_level;
 				break;
 			}
 		}
 		/*
+		 * If there wasn't another lun already configured at this
+		 * target, then default this device to SCSI_2 until we
+		 * know better
+		 */
+		if(!sdev->scsi_level)
+			sdev->scsi_level = SCSI_2;
+		/*
 		 * Add it to the end of the shost->my_devices list.
 		 */
 		list_add_tail(&sdev->siblings, &shost->my_devices);
+		return (sdev);
 	}
-	return (sdev);
+out_bail:
+	printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+	if(q && sdev->request_queue) {
+		*q = sdev->request_queue;
+		sdev->request_queue = NULL;
+	} else if(sdev->request_queue) {
+		blk_cleanup_queue(sdev->request_queue);
+		kfree(sdev->request_queue);
+	}
+	scsi_release_commandblocks(sdev);
+	kfree(sdev);
+	return NULL;
 }
 
 /**
@@ -481,7 +513,10 @@ static void scsi_free_sdev(struct scsi_device *sdev)
 	list_del(&sdev->siblings);
 	list_del(&sdev->same_target_siblings);
 
-	blk_cleanup_queue(&sdev->request_queue);
+	if(sdev->request_queue != NULL) {
+		blk_cleanup_queue(sdev->request_queue);
+		kfree(sdev->request_queue);
+	}
 	scsi_release_commandblocks(sdev);
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
@@ -1188,18 +1223,11 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
  *     SCSI_SCAN_NO_RESPONSE: could not allocate or setup a Scsi_Device
  *     SCSI_SCAN_LUN_PRESENT: a new Scsi_Device was allocated and initialized
  **/
-static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
-			Scsi_Request *sreq, char *inq_result, int *bflags)
+static int scsi_add_lun(Scsi_Device *sdev, Scsi_Request *sreq,
+		char *inq_result, int *bflags)
 {
-	Scsi_Device *sdev;
 	char devname[64];
 
-	sdev = scsi_alloc_sdev(sdevscan->host, sdevscan->channel,
-				     sdevscan->id, sdevscan->lun);
-	if (sdev == NULL)
-		return SCSI_SCAN_NO_RESPONSE;
-
-	sdev->scsi_level = sdevscan->scsi_level;
 	/*
 	 * XXX do not save the inquiry, since it can change underneath us,
 	 * save just vendor/model/rev.
@@ -1210,10 +1238,8 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 	 * scanning run at their own risk, or supply a user level program
 	 * that can correctly scan.
 	 */
-	sdev->inquiry_len = sdevscan->inquiry_len;
 	sdev->inquiry = kmalloc(sdev->inquiry_len, GFP_ATOMIC);
 	if (sdev->inquiry == NULL) {
-		scsi_free_sdev(sdev);
 		return SCSI_SCAN_NO_RESPONSE;
 	}
 
@@ -1335,8 +1361,8 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 	 * function */
 	sdev->max_device_blocked = SCSI_DEFAULT_DEVICE_BLOCKED;
 
-	if (sdevnew != NULL)
-		*sdevnew = sdev;
+	if(sdev->host->hostt->slave_configure)
+		sdev->host->hostt->slave_configure(sdev);
 
 	return SCSI_SCAN_LUN_PRESENT;
 }
@@ -1365,8 +1391,9 @@ static void scsi_remove_lun(struct scsi_device *sdev)
  *         attached at the LUN
  *     SCSI_SCAN_LUN_PRESENT: a new Scsi_Device was allocated and initialized
  **/
-static int scsi_probe_and_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
-				  int *bflagsp)
+static int scsi_probe_and_add_lun(struct Scsi_Host *host,
+		struct request_queue **q, uint channel, uint id,
+	       	uint lun, int *bflagsp)
 {
 	Scsi_Device *sdev = NULL;
 	Scsi_Request *sreq = NULL;
@@ -1374,47 +1401,27 @@ static int scsi_probe_and_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 	int bflags;
 	int res;
 
-	/*
-	 * Any command blocks allocated are fixed to use sdevscan->lun,
-	 * so they must be allocated and released if sdevscan->lun
-	 * changes.
-	 *
-	 * XXX optimize and don't call build/release commandblocks, instead
-	 * modify the LUN value of the existing command block - this means
-	 * the build/release calls would be moved to the alloc/free of
-	 * sdevscan, and the modifying function would be called here.
-	 *
-	 * XXX maybe change scsi_release_commandblocks to not reset
-	 * queue_depth to 0.
-	 */
-	sdevscan->new_queue_depth = 1;
-	scsi_build_commandblocks(sdevscan);
-	if (sdevscan->current_queue_depth == 0)
-		goto alloc_failed;
-
-	/*
-	 * Since we reuse the same sdevscan over and over with different
-	 * target and lun values, we have to destroy and then recreate
-	 * any possible low level attachments since they very will might
-	 * also store the id and lun numbers in some form and need updating
-	 * with each scan.
-	 */
-	if (sdevscan->host->hostt->slave_destroy)
-		sdevscan->host->hostt->slave_destroy(sdevscan);
-	if (sdevscan->host->hostt->slave_alloc)
-		sdevscan->host->hostt->slave_alloc(sdevscan);
-	sreq = scsi_allocate_request(sdevscan);
-	if (sreq == NULL)
-		goto alloc_failed;
+	sdev = scsi_alloc_sdev(host, q, channel, id, lun);
+	if (sdev == NULL)
+		return SCSI_SCAN_NO_RESPONSE;
+	sreq = scsi_allocate_request(sdev);
+	if (sreq == NULL) {
+		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+		res = SCSI_SCAN_NO_RESPONSE;
+		goto bail_out;
+	}
 	/*
 	 * The sreq is for use only with sdevscan.
 	 */
 
 	scsi_result = kmalloc(256, GFP_ATOMIC |
-			      (sdevscan->host->unchecked_isa_dma) ?
+			      (host->unchecked_isa_dma) ?
 			      GFP_DMA : 0);
-	if (scsi_result == NULL)
-		goto alloc_failed;
+	if (scsi_result == NULL) {
+		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+		res = SCSI_SCAN_NO_RESPONSE;
+		goto bail_out;
+	}
 
 	scsi_probe_lun(sreq, scsi_result, &bflags);
 	if (sreq->sr_result)
@@ -1439,10 +1446,8 @@ static int scsi_probe_and_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 					" no device added\n"));
 			res = SCSI_SCAN_TARGET_PRESENT;
 		} else {
-			res = scsi_add_lun(sdevscan, &sdev, sreq, scsi_result,
-					   &bflags);
+			res = scsi_add_lun(sdev, sreq, scsi_result, &bflags);
 			if (res == SCSI_SCAN_LUN_PRESENT) {
-				BUG_ON(sdev == NULL);
 				if ((bflags & BLIST_KEY) != 0) {
 					sdev->lockable = 0;
 					scsi_unlock_floptical(sreq,
@@ -1452,31 +1457,25 @@ static int scsi_probe_and_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 					 * the INQUIRY data.
 					 */
 				}
-				/*
-				 * "hardcoded" scans of a single LUN need
-				 * to know the sdev just allocated.
-				 */
-				if (sdevnew != NULL)
-					*sdevnew = sdev;
 				if (bflagsp != NULL)
 					*bflagsp = bflags;
 			}
 		}
 	}
-	kfree(scsi_result);
-	scsi_release_request(sreq);
-	scsi_release_commandblocks(sdevscan);
-	return res;
-
-alloc_failed:
-	printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+bail_out:
 	if (scsi_result != NULL)
 		kfree(scsi_result);
 	if (sreq != NULL)
 		scsi_release_request(sreq);
-	if (sdevscan->current_queue_depth != 0)
-		scsi_release_commandblocks(sdevscan);
-	return SCSI_SCAN_NO_RESPONSE;
+	if (res != SCSI_SCAN_LUN_PRESENT) {
+		if(q) {
+			*q = sdev->request_queue;
+			sdev->request_queue = NULL;
+		}
+		scsi_free_sdev(sdev);
+	}
+	return res;
+
 }
 
 /**
@@ -1492,16 +1491,15 @@ alloc_failed:
  *
  *     Modifies sdevscan->lun.
  **/
-static void scsi_sequential_lun_scan(Scsi_Device *sdevscan, int bflags,
-				     int lun0_res)
+static void scsi_sequential_lun_scan(struct Scsi_Host *shost,
+	       	struct request_queue **q, uint channel, uint id,
+	       	int bflags, int lun0_res, int scsi_level)
 {
-	struct Scsi_Host *shost = sdevscan->host;
-	unsigned int sparse_lun;
-	unsigned int max_dev_lun;
+	unsigned int sparse_lun, lun, max_dev_lun;
 
 	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: Sequential scan of"
-			" host %d channel %d id %d\n", sdevscan->host->host_no,
-			sdevscan->channel, sdevscan->id));
+			" host %d channel %d id %d\n", shost->host_no,
+			channel, id));
 
 	max_dev_lun = min(max_scsi_luns, shost->max_lun);
 	/*
@@ -1526,11 +1524,19 @@ static void scsi_sequential_lun_scan(Scsi_Device *sdevscan, int bflags,
 	 * If less than SCSI_1_CSS, and no special lun scaning, stop
 	 * scanning; this matches 2.4 behaviour, but could just be a bug
 	 * (to continue scanning a SCSI_1_CSS device).
-	 */
+	 *
+	 * This test is broken.  We might not have any device on lun0 for
+	 * a sparselun device, and if that's the case then how would we
+	 * know the real scsi_level, eh?  It might make sense to just not
+	 * scan any SCSI_1 device for non-0 luns, but that check would best
+	 * go into scsi_alloc_sdev() and just have it return null when asked
+	 * to alloc an sdev for lun > 0 on an already found SCSI_1 device.
+	 *
 	if ((sdevscan->scsi_level < SCSI_1_CCS) &&
 	    ((bflags & (BLIST_FORCELUN | BLIST_SPARSELUN | BLIST_MAX5LUN))
 	     == 0))
 		return;
+	 */
 	/*
 	 * If this device is known to support multiple units, override
 	 * the other settings, and scan all of them.
@@ -1546,7 +1552,7 @@ static void scsi_sequential_lun_scan(Scsi_Device *sdevscan, int bflags,
 	 * Do not scan SCSI-2 or lower device past LUN 7, unless
 	 * BLIST_LARGELUN.
 	 */
-	if ((sdevscan->scsi_level < SCSI_3) && !(bflags & BLIST_LARGELUN))
+	if (scsi_level < SCSI_3 && !(bflags & BLIST_LARGELUN))
 		max_dev_lun = min(8U, max_dev_lun);
 
 	/*
@@ -1554,8 +1560,8 @@ static void scsi_sequential_lun_scan(Scsi_Device *sdevscan, int bflags,
 	 * until we reach the max, or no LUN is found and we are not
 	 * sparse_lun.
 	 */
-	for (sdevscan->lun = 1; sdevscan->lun < max_dev_lun; ++sdevscan->lun)
-		if ((scsi_probe_and_add_lun(sdevscan, NULL, NULL)
+	for (lun = 1; lun < max_dev_lun; ++lun)
+		if ((scsi_probe_and_add_lun(shost, q, channel, id, lun, NULL)
 		     != SCSI_SCAN_LUN_PRESENT) && !sparse_lun)
 			return;
 }
@@ -1608,7 +1614,8 @@ static int scsilun_to_int(ScsiLun *scsilun)
  *     0: scan completed (or no memory, so further scanning is futile)
  *     1: no report lun scan, or not configured
  **/
-static int scsi_report_lun_scan(Scsi_Device *sdevscan)
+static int scsi_report_lun_scan(Scsi_Device *sdev, struct request_queue **q,
+		int bflags)
 {
 #ifdef CONFIG_SCSI_REPORT_LUNS
 
@@ -1625,38 +1632,19 @@ static int scsi_report_lun_scan(Scsi_Device *sdevscan)
 	/*
 	 * Only support SCSI-3 and up devices.
 	 */
-	if (sdevscan->scsi_level < SCSI_3)
+	if (sdev->scsi_level < SCSI_3)
 		return 1;
+	if (bflags & BLIST_NOLUN)
+		return 0;
 
-	sdevscan->new_queue_depth = 1;
-	scsi_build_commandblocks(sdevscan);
-	if (sdevscan->current_queue_depth == 0) {
+	sreq = scsi_allocate_request(sdev);
+	if (sreq == NULL) {
 		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
-		/*
-		 * We are out of memory, don't try scanning any further.
-		 */
 		return 0;
 	}
-	/*
-	 * Since we reuse the same sdevscan over and over with different
-	 * target and lun values, we have to destroy and then recreate
-	 * any possible low level attachments since they very will might
-	 * also store the id and lun numbers in some form and need updating
-	 * with each scan.
-	 *
-	 * This is normally handled in probe_and_add_lun, but since this
-	 * one particular function wants to scan lun 0 on each device
-	 * itself and will possibly pick up a resed sdevscan when doing
-	 * so, it also needs this hack.
-	 */
-	if (sdevscan->host->hostt->slave_destroy)
-		sdevscan->host->hostt->slave_destroy(sdevscan);
-	if (sdevscan->host->hostt->slave_alloc)
-		sdevscan->host->hostt->slave_alloc(sdevscan);
-	sreq = scsi_allocate_request(sdevscan);
 
-	sprintf(devname, "host %d channel %d id %d", sdevscan->host->host_no,
-		sdevscan->channel, sdevscan->id);
+	sprintf(devname, "host %d channel %d id %d", sdev->host->host_no,
+		sdev->channel, sdev->id);
 	/*
 	 * Allocate enough to hold the header (the same size as one ScsiLun)
 	 * plus the max number of luns we are requesting.
@@ -1669,11 +1657,11 @@ static int scsi_report_lun_scan(Scsi_Device *sdevscan)
 	 */
 	length = (max_scsi_report_luns + 1) * sizeof(ScsiLun);
 	lun_data = (ScsiLun *) kmalloc(length, GFP_ATOMIC |
-					   (sdevscan->host->unchecked_isa_dma ?
+					   (sdev->host->unchecked_isa_dma ?
 					    GFP_DMA : 0));
 	if (lun_data == NULL) {
 		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
-		scsi_release_commandblocks(sdevscan);
+		scsi_release_request(sreq);
 		/*
 		 * We are out of memory, don't try scanning any further.
 		 */
@@ -1723,7 +1711,6 @@ static int scsi_report_lun_scan(Scsi_Device *sdevscan)
 		    || sreq->sr_sense_buffer[2] != UNIT_ATTENTION)
 			break;
 	}
-	scsi_release_commandblocks(sdevscan);
 
 	if (sreq->sr_result) {
 		/*
@@ -1751,8 +1738,8 @@ static int scsi_report_lun_scan(Scsi_Device *sdevscan)
 		num_luns = (length / sizeof(ScsiLun));
 
 	SCSI_LOG_SCAN_BUS(3, printk (KERN_INFO "scsi scan: REPORT LUN scan of"
-			" host %d channel %d id %d\n", sdevscan->host->host_no,
-			sdevscan->channel, sdevscan->id));
+			" host %d channel %d id %d\n", sdev->host->host_no,
+			sdev->channel, sdev->id));
 	/*
 	 * Scan the luns in lun_data. The entry at offset 0 is really
 	 * the header, so start at 1 and go up to and including num_luns.
@@ -1782,22 +1769,22 @@ static int scsi_report_lun_scan(Scsi_Device *sdevscan)
 			/*
 			 * LUN 0 has already been scanned.
 			 */
-		} else if (lun > sdevscan->host->max_lun) {
+		} else if (lun > sdev->host->max_lun) {
 			printk(KERN_WARNING "scsi: %s lun%d has a LUN larger"
 			       " than allowed by the host adapter\n",
 			       devname, lun);
 		} else {
 			int res;
 
-			sdevscan->lun = lun;
-			res = scsi_probe_and_add_lun(sdevscan, NULL, NULL);
+			res = scsi_probe_and_add_lun(sdev->host, q,
+				       	sdev->channel, sdev->id, lun, NULL);
 			if (res == SCSI_SCAN_NO_RESPONSE) {
 				/*
 				 * Got some results, but now none, abort.
 				 */
 				printk(KERN_ERR "scsi: Unexpected response"
 				       " from %s lun %d while scanning, scan"
-				       " aborted\n", devname, sdevscan->lun);
+				       " aborted\n", devname, lun);
 				break;
 			}
 		}
@@ -1814,38 +1801,22 @@ static int scsi_report_lun_scan(Scsi_Device *sdevscan)
 
 int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
 {
-	struct scsi_device *sdevscan, *sdev;
 	struct Scsi_Host *shost;
 	int error = -ENODEV;
+	struct scsi_device *sdev;
 
 	shost = scsi_host_hn_get(host);
 	if (!shost)
 		return -ENODEV;
-	sdev = scsi_find_device(shost, channel, id, lun);
-	if (sdev)
+	if(scsi_find_device(shost, channel, id, lun) != NULL)
 		goto out;
 
-	error = -ENOMEM;
-	sdevscan = scsi_alloc_sdev(shost, channel, id, lun);
-	if (!sdevscan)
-		goto out;
-
-	if(!list_empty(&sdevscan->same_target_siblings)) {
-		sdev = list_entry(&sdevscan->same_target_siblings, Scsi_Device,
-					same_target_siblings);
-		sdevscan->scsi_level = sdev->scsi_level;
-		sdev = NULL;
-	} else
-		sdevscan->scsi_level = SCSI_2;
-	error = scsi_probe_and_add_lun(sdevscan, &sdev, NULL);
-	scsi_free_sdev(sdevscan);
-
-	if (error != SCSI_SCAN_LUN_PRESENT) 
-		goto out;
-
-	scsi_attach_device(sdev);
-	error = 0;
-
+	if (scsi_probe_and_add_lun(shost, NULL, channel, id, lun, NULL) ==
+			SCSI_SCAN_LUN_PRESENT) {
+		error = 0;
+		sdev = scsi_find_device(shost, channel, id, lun);
+		scsi_attach_device(sdev);
+	}
 out:
 	scsi_host_put(shost);
 	return error;
@@ -1898,11 +1869,12 @@ out:
  *     First try a REPORT LUN scan, if that does not scan the target, do a
  *     sequential scan of LUNs on the target id.
  **/
-static void scsi_scan_target(Scsi_Device *sdevscan, struct Scsi_Host *shost,
+static void scsi_scan_target(struct Scsi_Host *shost, struct request_queue **q,
 			     unsigned int channel, unsigned int id)
 {
-	int bflags;
+	int bflags = 0;
 	int res;
+	struct scsi_device *sdev;
 
 	if (shost->this_id == id)
 		/*
@@ -1910,36 +1882,29 @@ static void scsi_scan_target(Scsi_Device *sdevscan, struct Scsi_Host *shost,
 		 */
 		return;
 
-	sdevscan->host = shost;
-	sdevscan->id = id;
-	sdevscan->channel = channel;
 	/*
 	 * Scan LUN 0, if there is some response, scan further. Ideally, we
 	 * would not configure LUN 0 until all LUNs are scanned.
-	 *
-	 * The scsi_level is set (in scsi_probe_lun) if a target responds.
 	 */
-	sdevscan->lun = 0;
-	res = scsi_probe_and_add_lun(sdevscan, NULL, &bflags);
-	if (res != SCSI_SCAN_NO_RESPONSE) {
-		/*
-		 * Some scsi devices cannot properly handle a lun != 0.
-		 * BLIST_NOLUN also prevents a REPORT LUN from being sent.
-		 * Any multi-lun SCSI-3 device that hangs because of a
-		 * REPORT LUN command is seriously broken.
-		 */
-		if (!(bflags & BLIST_NOLUN))
+	res = scsi_probe_and_add_lun(shost, q, channel, id, 0, &bflags);
+	if (res == SCSI_SCAN_LUN_PRESENT) {
+		sdev = scsi_find_device(shost, channel, id, 0);
+		if (scsi_report_lun_scan(sdev, q, bflags) != 0)
 			/*
-			 * Ending the scan here if max_scsi_luns == 1
-			 * breaks scanning of SPARSE, FORCE, MAX5 LUN
-			 * devices, and the report lun scan.
+			 * The REPORT LUN did not scan the target,
+			 * do a sequential scan.
 			 */
-			if (scsi_report_lun_scan(sdevscan) != 0)
-				/*
-				 * The REPORT LUN did not scan the target,
-				 * do a sequential scan.
-				 */
-				scsi_sequential_lun_scan(sdevscan, bflags, res);
+			scsi_sequential_lun_scan(shost, q, channel, id, bflags,
+				       	res, sdev->scsi_level);
+	} else if (res == SCSI_SCAN_TARGET_PRESENT) {
+		/*
+		 * There's a target here, but lun 0 is offline so we
+		 * can't use the report_lun scan.  Fall back to a
+		 * sequential lun scan with a bflags of SPARSELUN and
+		 * a default scsi level of SCSI_2
+		 */
+		scsi_sequential_lun_scan(shost, q, channel, id, BLIST_SPARSELUN,
+				SCSI_SCAN_TARGET_PRESENT, SCSI_2);
 	}
 }
 
@@ -1953,22 +1918,9 @@ static void scsi_scan_target(Scsi_Device *sdevscan, struct Scsi_Host *shost,
  **/
 void scsi_scan_host(struct Scsi_Host *shost)
 {
-	struct scsi_device *sdevscan;
+	struct request_queue *q = NULL;
 	uint channel, id, order_id;
 
-	/*
-	 * The blk layer queue allocation is a bit expensive to
-	 * repeat for each channel and id - for FCP max_id is near
-	 * 255: each call to scsi_alloc_sdev() implies a call to
-	 * blk_init_queue, and then blk_init_free_list, where 2 *
-	 * queue_nr_requests requests are allocated. Don't do so
-	 * here for scsi_scan_selected_lun, since we end up
-	 * calling select_queue_depths with an extra Scsi_Device
-	 * on the host_queue list.
-	 */
-	sdevscan = scsi_alloc_sdev(shost, 0, 0, 0);
-	if (sdevscan == NULL)
-		return;
 	/*
 	 * The sdevscan host, channel, id and lun are filled in as
 	 * needed to scan.
@@ -1991,11 +1943,13 @@ void scsi_scan_host(struct Scsi_Host *shost)
 				order_id = shost->max_id - id - 1;
 			else
 				order_id = id;
-			scsi_scan_target(sdevscan, shost, channel,
-					 order_id);
+			scsi_scan_target(shost, &q, channel, order_id);
 		}
 	}
-	scsi_free_sdev(sdevscan);
+	if(q) {
+		blk_cleanup_queue(q);
+		kfree(q);
+	}
 }
 
 void scsi_forget_host(struct Scsi_Host *shost)
@@ -2030,19 +1984,11 @@ struct scsi_device *scsi_get_host_dev(struct Scsi_Host *shost)
 {
 	struct scsi_device *sdev;
 
-	sdev = scsi_alloc_sdev(shost, 0, shost->this_id, 0);
+	sdev = scsi_alloc_sdev(shost, NULL, 0, shost->this_id, 0);
 	if (sdev) {
-		scsi_build_commandblocks(sdev);
-		if (sdev->current_queue_depth == 0)
-			goto fail;
 		sdev->borken = 0;
 	}
-
 	return sdev;
-
-fail:
-	kfree(sdev);
-	return NULL;
 }
 
 /*

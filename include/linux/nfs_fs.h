@@ -222,7 +222,7 @@ loff_t page_offset(struct page *page)
 static inline
 loff_t req_offset(struct nfs_page *req)
 {
-	return ((loff_t)req->wb_index) << PAGE_CACHE_SHIFT;
+	return (((loff_t)req->wb_index) << PAGE_CACHE_SHIFT) + req->wb_offset;
 }
 
 /*
@@ -295,8 +295,7 @@ extern int  nfs_writepage(struct page *page, struct writeback_control *wbc);
 extern int  nfs_writepages(struct address_space *, struct writeback_control *);
 extern int  nfs_flush_incompatible(struct file *file, struct page *page);
 extern int  nfs_updatepage(struct file *, struct page *, unsigned int, unsigned int);
-extern void nfs_writeback_done(struct rpc_task *task, int stable,
-			       unsigned int arg_count, unsigned int res_count);
+extern void nfs_writeback_done(struct rpc_task *task);
 extern void nfs_writedata_release(struct rpc_task *task);
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
@@ -369,7 +368,7 @@ extern int  nfs_readpage(struct file *, struct page *);
 extern int  nfs_readpages(struct file *, struct address_space *,
 		struct list_head *, unsigned);
 extern int  nfs_pagein_list(struct list_head *, int);
-extern void nfs_readpage_result(struct rpc_task *, unsigned int count, int eof);
+extern void nfs_readpage_result(struct rpc_task *);
 extern void nfs_readdata_release(struct rpc_task *);
 
 /*

@@ -32,10 +32,6 @@ CFLAGS += -m32
 
 host-progs	:= tools/build
 
-# 	Default
-
-boot: bzImage
-
 # ---------------------------------------------------------------------------
 
 $(obj)/zImage:  IMAGE_OFFSET := 0x1000
@@ -62,9 +58,8 @@ $(obj)/setup $(obj)/bootsect: %: %.o FORCE
 	$(call if_changed,ld)
 
 $(obj)/compressed/vmlinux: FORCE
-	+@$(call descend,$(obj)/compressed,IMAGE_OFFSET=$(IMAGE_OFFSET) \
-		$(obj)/compressed/vmlinux)
-
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(obj)/compressed \
+					IMAGE_OFFSET=$(IMAGE_OFFSET) $@
 
 zdisk: $(BOOTIMAGE)
 	dd bs=8192 if=$(BOOTIMAGE) of=/dev/fd0

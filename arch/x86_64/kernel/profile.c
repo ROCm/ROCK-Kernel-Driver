@@ -1,5 +1,5 @@
 /*
- *	linux/arch/i386/kernel/profile.c
+ *	linux/arch/x86_64/kernel/profile.c
  *
  *	(C) 2002 John Levon <levon@movementarian.org>
  *

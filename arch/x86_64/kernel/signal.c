@@ -24,9 +24,11 @@
 #include <linux/stddef.h>
 #include <linux/personality.h>
 #include <linux/compiler.h>
+#include <linux/suspend.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/i387.h>
+#include <asm/proto.h>
 
 /* #define DEBUG_SIG 1 */
 
@@ -184,11 +186,10 @@ badframe:
  * Set up a signal frame.
  */
 
-static int
-setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs, unsigned long mask)
+static inline int
+setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs, unsigned long mask, struct task_struct *me)
 {
 	int tmp, err = 0;
-	struct task_struct *me = current;
 
 	tmp = 0;
 	__asm__("movl %%gs,%0" : "=r"(tmp): "0"(tmp));
@@ -226,8 +227,6 @@ setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs, unsigned long mask
  * Determine which stack to use..
  */
 
-#define round_down(p, r) ((void *)  ((unsigned long)((p) - (r) + 1) & ~((r)-1)))
-
 static void *
 get_stack(struct k_sigaction *ka, struct pt_regs *regs, unsigned long size)
 {
@@ -242,19 +241,20 @@ get_stack(struct k_sigaction *ka, struct pt_regs *regs, unsigned long size)
 			rsp = current->sas_ss_sp + current->sas_ss_size;
 	}
 
-	return round_down(rsp - size, 16); 
+	return (void *)round_down(rsp - size, 16); 
 }
 
 static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 			   sigset_t *set, struct pt_regs * regs)
 {
-	struct rt_sigframe *frame = NULL;
+	struct rt_sigframe *frame;
 	struct _fpstate *fp = NULL; 
 	int err = 0;
+	struct task_struct *me = current;
 
-	if (current->used_math) {
+	if (me->used_math) {
 		fp = get_stack(ka, regs, sizeof(struct _fpstate)); 
-		frame = round_down((char *)fp - sizeof(struct rt_sigframe), 16) - 8;
+		frame = (void *)round_down((u64)fp - sizeof(struct rt_sigframe), 16) - 8;
 
 		if (!access_ok(VERIFY_WRITE, fp, sizeof(struct _fpstate))) { 
 		goto give_sigsegv;
@@ -262,10 +262,9 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 		if (save_i387(fp) < 0) 
 			err |= -1; 
-	}
-
-	if (!frame)
+	} else {
 		frame = get_stack(ka, regs, sizeof(struct rt_sigframe)) - 8;
+	}
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame))) {
 		goto give_sigsegv;
@@ -281,13 +280,18 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Create the ucontext.  */
 	err |= __put_user(0, &frame->uc.uc_flags);
 	err |= __put_user(0, &frame->uc.uc_link);
-	err |= __put_user(current->sas_ss_sp, &frame->uc.uc_stack.ss_sp);
+	err |= __put_user(me->sas_ss_sp, &frame->uc.uc_stack.ss_sp);
 	err |= __put_user(sas_ss_flags(regs->rsp),
 			  &frame->uc.uc_stack.ss_flags);
-	err |= __put_user(current->sas_ss_size, &frame->uc.uc_stack.ss_size);
-	err |= setup_sigcontext(&frame->uc.uc_mcontext, regs, set->sig[0]);
+	err |= __put_user(me->sas_ss_size, &frame->uc.uc_stack.ss_size);
+	err |= setup_sigcontext(&frame->uc.uc_mcontext, regs, set->sig[0], me);
 	err |= __put_user(fp, &frame->uc.uc_mcontext.fpstate);
+	if (sizeof(*set) == 16) { 
+		__put_user(set->sig[0], &frame->uc.uc_sigmask.sig[0]);
+		__put_user(set->sig[1], &frame->uc.uc_sigmask.sig[1]); 
+	} else { 		
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
+	}
 
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
@@ -295,7 +299,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	if (ka->sa.sa_flags & SA_RESTORER) {
 		err |= __put_user(ka->sa.sa_restorer, &frame->pretcode);
 	} else {
-		printk("%s forgot to set SA_RESTORER for signal %d.\n", current->comm, sig); 
+		printk("%s forgot to set SA_RESTORER for signal %d.\n", me->comm, sig); 
 		goto give_sigsegv; 
 	}
 
@@ -338,7 +342,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 give_sigsegv:
 	if (sig == SIGSEGV)
 		ka->sa.sa_handler = SIG_DFL;
-	signal_fault(regs,frame,"signal setup");
+	signal_fault(regs,frame,"signal deliver");
 }
 
 /*
@@ -360,6 +364,9 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	if (regs->orig_rax >= 0) {
 		/* If so, check system call restarting.. */
 		switch (regs->rax) {
+		        case -ERESTART_RESTARTBLOCK:
+				current_thread_info()->restart_block.fn = do_no_restart_syscall;
+				/* FALL THROUGH */
 			case -ERESTARTNOHAND:
 				regs->rax = -EINTR;
 				break;
@@ -374,6 +381,10 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 				regs->rax = regs->orig_rax;
 				regs->rip -= 2;
 		}
+		if (regs->rax == -ERESTART_RESTARTBLOCK){
+			regs->rax = __NR_restart_syscall;
+ 			regs->rip -= 2;
+ 		}		
 	}
 
 #ifdef CONFIG_IA32_EMULATION
@@ -418,6 +429,11 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 		return 1;
 	} 	
 
+	if (current->flags & PF_FREEZE) {
+		refrigerator(0);
+		goto no_signal;
+	}
+
 	if (!oldset)
 		oldset = &current->blocked;
 
@@ -435,6 +451,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 		return 1;
 	}
 
+ no_signal:
 	/* Did we come from a system call? */
 	if (regs->orig_rax >= 0) {
 		/* Restart the system call - no handlers present */

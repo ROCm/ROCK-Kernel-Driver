@@ -1,11 +1,7 @@
 #include <linux/list.h>
 #include <linux/pci.h>
-
-
-//#include <linux/pagemap.h>
-//#include <linux/miscdevice.h>
-//#include <linux/pm.h>
 #include <linux/agp_backend.h>
+#include <linux/module.h>
 
 #include "agp.h"
 
@@ -529,7 +525,7 @@ get_out:
  * (AGP 3.0 devices are required to operate as AGP 2.0 devices 
  * when not using 3.0 electricals.
  */
-void agp_generic_agp_3_0_enable(u32 mode)
+int agp_generic_agp_3_0_enable(u32 mode)
 {
 	u32 ncapid, major, minor, agp_3_0;
 
@@ -548,9 +544,11 @@ void agp_generic_agp_3_0_enable(u32 mode)
 		 */
 		if((agp_3_0 >> 3) & 0x1) {
 			agp_3_0_node_enable(mode, minor);
-			return;
+			return TRUE;
 		}
 	}
-	agp_generic_agp_enable(mode);
+	return FALSE;
 }
+
+EXPORT_SYMBOL(agp_generic_agp_3_0_enable);
 

@@ -399,15 +399,15 @@ __SYSCALL(__NR_iopl, stub_iopl)
 __SYSCALL(__NR_ioperm, sys_ioperm)
 
 #define __NR_create_module                     174
-__SYSCALL(__NR_create_module, sys_create_module)
+__SYSCALL(__NR_create_module, sys_ni_syscall)
 #define __NR_init_module                       175
 __SYSCALL(__NR_init_module, sys_init_module)
 #define __NR_delete_module                     176
 __SYSCALL(__NR_delete_module, sys_delete_module)
 #define __NR_get_kernel_syms                   177
-__SYSCALL(__NR_get_kernel_syms, sys_get_kernel_syms)
+__SYSCALL(__NR_get_kernel_syms, sys_ni_syscall)
 #define __NR_query_module                      178
-__SYSCALL(__NR_query_module, sys_query_module)
+__SYSCALL(__NR_query_module, sys_ni_syscall)
 
 #define __NR_quotactl                          179
 __SYSCALL(__NR_quotactl, sys_quotactl)
@@ -426,7 +426,8 @@ __SYSCALL(__NR_afs_syscall, sys_ni_syscall)
 #define __NR_tuxcall      		184 /* reserved for tux */
 __SYSCALL(__NR_tuxcall, sys_ni_syscall)
 
-/* 165 currently unused */
+#define __NR_security			185
+__SYSCALL(__NR_security, sys_ni_syscall)
 
 #define __NR_gettid		186
 __SYSCALL(__NR_gettid, sys_gettid)
@@ -483,8 +484,24 @@ __SYSCALL(__NR_io_cancel, sys_io_cancel)
 __SYSCALL(__NR_get_thread_area, sys_get_thread_area)
 #define __NR_lookup_dcookie	212
 __SYSCALL(__NR_lookup_dcookie, sys_lookup_dcookie)
+#define __NR_epoll_create	213
+__SYSCALL(__NR_epoll_create, sys_epoll_create)
+#define __NR_epoll_ctl	214
+__SYSCALL(__NR_epoll_ctl, sys_epoll_ctl)
+#define __NR_epoll_wait	215
+__SYSCALL(__NR_epoll_wait, sys_epoll_wait)
+#define __NR_remap_file_pages	216
+__SYSCALL(__NR_remap_file_pages, sys_remap_file_pages)
+#define __NR_getdents64	217
+__SYSCALL(__NR_getdents64, sys_getdents64)
+#define __NR_set_tid_address	218
+__SYSCALL(__NR_set_tid_address, sys_set_tid_address)
+#define __NR_restart_syscall	219
+__SYSCALL(__NR_restart_syscall, sys_restart_syscall)
+#define __NR_semtimedop		220
+__SYSCALL(__NR_semtimedop, sys_semtimedop)
 
-#define __NR_syscall_max __NR_lookup_dcookie
+#define __NR_syscall_max __NR_semtimedop
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */
@@ -605,7 +622,7 @@ static inline pid_t setsid(void)
 	return sys_setsid();
 }
 
-extern ssize_t sys_write(unsigned int, char *, size_t);
+long sys_write(int fd, const char *buf, size_t size);
 static inline ssize_t write(unsigned int fd, char * buf, size_t count)
 {
 	return sys_write(fd, buf, count);
@@ -651,7 +668,7 @@ extern inline long exit(int error_code)
 }
 
 struct rusage; 
-asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr, 
+long sys_wait4(pid_t pid,unsigned int * stat_addr, 
 			int options, struct rusage * ru);
 static inline pid_t waitpid(int pid, int * wait_stat, int flags)
 {

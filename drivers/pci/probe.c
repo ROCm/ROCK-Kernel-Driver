@@ -548,7 +548,7 @@ int __devinit pci_bus_exists(const struct list_head *list, int nr)
 	return 0;
 }
 
-struct pci_bus * __devinit pci_alloc_primary_bus(int bus)
+struct pci_bus * __devinit pci_alloc_primary_bus_parented(struct device *parent, int bus)
 {
 	struct pci_bus *b;
 
@@ -567,6 +567,7 @@ struct pci_bus * __devinit pci_alloc_primary_bus(int bus)
 	memset(b->dev,0,sizeof(*(b->dev)));
 	sprintf(b->dev->bus_id,"pci%d",bus);
 	strcpy(b->dev->name,"Host/PCI Bridge");
+	b->dev->parent = parent;
 	device_register(b->dev);
 
 	b->number = b->secondary = bus;
@@ -575,9 +576,9 @@ struct pci_bus * __devinit pci_alloc_primary_bus(int bus)
 	return b;
 }
 
-struct pci_bus * __devinit pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata)
+struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus, struct pci_ops *ops, void *sysdata)
 {
-	struct pci_bus *b = pci_alloc_primary_bus(bus);
+	struct pci_bus *b = pci_alloc_primary_bus_parented(parent, bus);
 	if (b) {
 		b->sysdata = sysdata;
 		b->ops = ops;

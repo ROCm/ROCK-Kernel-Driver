@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2001 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #ifdef STANDALONE
@@ -103,5 +103,5 @@ typedef struct {
 
 
 
-int llsc_main (int cpuid, long mbasex);
+int llsc_main (int cpuid);
 

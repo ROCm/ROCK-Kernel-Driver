@@ -36,6 +36,7 @@ export IA32_CC IA32_LD IA32_AS IA32_OBJCOPY IA32_CPP
 LDFLAGS		:= -m elf_x86_64
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux := -e stext
+LDFLAGS_BLOB	:= --format binary --oformat elf64-x86-64
 
 CFLAGS += -mno-red-zone
 CFLAGS += -mcmodel=kernel
@@ -54,8 +55,7 @@ core-y					+= arch/x86_64/kernel/ arch/x86_64/mm/
 core-$(CONFIG_IA32_EMULATION)		+= arch/x86_64/ia32/
 drivers-$(CONFIG_PCI)			+= arch/x86_64/pci/
 
-MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
-makeboot = $(call descend,arch/x86_64/boot,$(1))
+makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/x86_64/boot $(1)
 
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper
@@ -64,21 +64,21 @@ BOOTIMAGE=arch/x86_64/boot/bzImage
 zImage zlilo zdisk: BOOTIMAGE=arch/x86_64/boot/zImage
 
 zImage bzImage: vmlinux
-	+@$(call makeboot,$(BOOTIMAGE))
+	$(call makeboot,$(BOOTIMAGE))
 
 compressed: zImage
 
 zlilo bzlilo: vmlinux
-	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zlilo)
+	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zlilo)
 
 zdisk bzdisk: vmlinux
-	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zdisk)
+	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zdisk)
 
 install: vmlinux
-	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
+	$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
 
 archclean:
-	+@$(call makeboot,clean)
+	$(call makeboot,clean)
 
 archmrproper:
 

@@ -41,7 +41,8 @@
  * use some new ANSI preprocessor stuff to paste these on where needed.
  */
 
-#define CAC_BASE                0xe000000000000000
+#define CACHEABLE_MEM_SPACE     0xe000000000000000
+#define CAC_BASE		CACHEABLE_MEM_SPACE
 #define HSPEC_BASE              0xc0000b0000000000
 #define HSPEC_SWIZ_BASE         0xc000030000000000
 #define IO_BASE                 0xc0000a0000000000

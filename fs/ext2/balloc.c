@@ -315,9 +315,12 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
     u32 * prealloc_count, u32 * prealloc_block, int * err)
 {
 	struct buffer_head *bitmap_bh = NULL;
-	struct buffer_head *bh2;
+	struct buffer_head *gdp_bh;	/* bh2 */
 	struct ext2_group_desc *desc;
-	int i, j, k, tmp;
+	int group_no;			/* i */
+	int ret_block;			/* j */
+	int bit;		/* k */
+	int target_block;		/* tmp */
 	int block = 0;
 	struct super_block *sb = inode->i_sb;
 	struct ext2_sb_info *sbi = EXT2_SB(sb);
@@ -353,82 +356,88 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 	if (goal < le32_to_cpu(es->s_first_data_block) ||
 	    goal >= le32_to_cpu(es->s_blocks_count))
 		goal = le32_to_cpu(es->s_first_data_block);
-	i = (goal - le32_to_cpu(es->s_first_data_block)) / group_size;
-	desc = ext2_get_group_desc (sb, i, &bh2);
+	group_no = (goal - le32_to_cpu(es->s_first_data_block)) / group_size;
+	desc = ext2_get_group_desc (sb, group_no, &gdp_bh);
 	if (!desc)
 		goto io_error;
 
-	group_alloc = group_reserve_blocks(desc, bh2, es_alloc);
+	group_alloc = group_reserve_blocks(desc, gdp_bh, es_alloc);
 	if (group_alloc) {
-		j = ((goal - le32_to_cpu(es->s_first_data_block)) % group_size);
+		ret_block = ((goal - le32_to_cpu(es->s_first_data_block)) %
+					group_size);
 		brelse(bitmap_bh);
-		bitmap_bh = read_block_bitmap(sb, i);
+		bitmap_bh = read_block_bitmap(sb, group_no);
 		if (!bitmap_bh)
 			goto io_error;
 		
-		ext2_debug ("goal is at %d:%d.\n", i, j);
+		ext2_debug("goal is at %d:%d.\n", group_no, ret_block);
 
-		j = grab_block(bitmap_bh->b_data, group_size, j);
-		if (j >= 0)
+		ret_block = grab_block(bitmap_bh->b_data,
+				group_size, ret_block);
+		if (ret_block >= 0)
 			goto got_block;
-		group_release_blocks(desc, bh2, group_alloc);
+		group_release_blocks(desc, gdp_bh, group_alloc);
 		group_alloc = 0;
 	}
 
-	ext2_debug ("Bit not found in block group %d.\n", i);
+	ext2_debug ("Bit not found in block group %d.\n", group_no);
 
 	/*
 	 * Now search the rest of the groups.  We assume that 
 	 * i and desc correctly point to the last group visited.
 	 */
-	for (k = 0; !group_alloc && k < sbi->s_groups_count; k++) {
-		i++;
-		if (i >= sbi->s_groups_count)
-			i = 0;
-		desc = ext2_get_group_desc (sb, i, &bh2);
+	for (bit = 0; !group_alloc &&
+			bit < sbi->s_groups_count; bit++) {
+		group_no++;
+		if (group_no >= sbi->s_groups_count)
+			group_no = 0;
+		desc = ext2_get_group_desc(sb, group_no, &gdp_bh);
 		if (!desc)
 			goto io_error;
-		group_alloc = group_reserve_blocks(desc, bh2, es_alloc);
+		group_alloc = group_reserve_blocks(desc, gdp_bh, es_alloc);
 	}
-	if (k >= sbi->s_groups_count)
+	if (bit >= sbi->s_groups_count)
 		goto out_release;
 	brelse(bitmap_bh);
-	bitmap_bh = read_block_bitmap(sb, i);
+	bitmap_bh = read_block_bitmap(sb, group_no);
 	if (!bitmap_bh)
 		goto io_error;
-	
-	j = grab_block(bitmap_bh->b_data, group_size, 0);
-	if (j < 0) {
+
+	ret_block = grab_block(bitmap_bh->b_data, group_size, 0);
+	if (ret_block < 0) {
 		ext2_error (sb, "ext2_new_block",
-			    "Free blocks count corrupted for block group %d", i);
+			"Free blocks count corrupted for block group %d",
+				group_no);
 		group_alloc = 0;
 		goto out_release;
 	}
 
 got_block:
-	ext2_debug("using block group %d(%d)\n", i, desc->bg_free_blocks_count);
+	ext2_debug("using block group %d(%d)\n",
+		group_no, desc->bg_free_blocks_count);
 
-	tmp = j + i * group_size + le32_to_cpu(es->s_first_data_block);
+	target_block = ret_block + group_no * group_size +
+			le32_to_cpu(es->s_first_data_block);
 
-	if (tmp == le32_to_cpu(desc->bg_block_bitmap) ||
-	    tmp == le32_to_cpu(desc->bg_inode_bitmap) ||
-	    in_range (tmp, le32_to_cpu(desc->bg_inode_table),
+	if (target_block == le32_to_cpu(desc->bg_block_bitmap) ||
+	    target_block == le32_to_cpu(desc->bg_inode_bitmap) ||
+	    in_range(target_block, le32_to_cpu(desc->bg_inode_table),
 		      sbi->s_itb_per_group))
 		ext2_error (sb, "ext2_new_block",
 			    "Allocating block in system zone - "
-			    "block = %u", tmp);
+			    "block = %u", target_block);
 
-	if (tmp >= le32_to_cpu(es->s_blocks_count)) {
+	if (target_block >= le32_to_cpu(es->s_blocks_count)) {
 		ext2_error (sb, "ext2_new_block",
 			    "block(%d) >= blocks count(%d) - "
-			    "block_group = %d, es == %p ",j,
-			le32_to_cpu(es->s_blocks_count), i, es);
+			    "block_group = %d, es == %p ", ret_block,
+			le32_to_cpu(es->s_blocks_count), group_no, es);
 		goto out_release;
 	}
-	block = tmp;
+	block = target_block;
 
 	/* OK, we _had_ allocated something */
-	ext2_debug ("found bit %d\n", j);
+	ext2_debug("found bit %d\n", ret_block);
 
 	dq_alloc--;
 	es_alloc--;
@@ -441,8 +450,8 @@ got_block:
 	if (group_alloc && !*prealloc_count) {
 		unsigned n;
 
-		for (n = 0; n < group_alloc && ++j < group_size; n++) {
-			if (ext2_set_bit(j, bitmap_bh->b_data))
+		for (n = 0; n < group_alloc && ++ret_block < group_size; n++) {
+			if (ext2_set_bit(ret_block, bitmap_bh->b_data))
  				break;
 		}
 		*prealloc_block = block + 1;
@@ -462,7 +471,7 @@ got_block:
 	ext2_debug ("allocating block %d. ", block);
 
 out_release:
-	group_release_blocks(desc, bh2, group_alloc);
+	group_release_blocks(desc, gdp_bh, group_alloc);
 	release_blocks(sb, es_alloc);
 	*err = 0;
 out_unlock:

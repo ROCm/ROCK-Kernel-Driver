@@ -67,6 +67,20 @@ nfs3_async_handle_jukebox(struct rpc_task *task)
 	return 1;
 }
 
+static void
+nfs3_write_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
+{
+	if (fattr->valid & NFS_ATTR_FATTR) {
+		if (!(fattr->valid & NFS_ATTR_WCC)) {
+			fattr->pre_size  = NFS_CACHE_ISIZE(inode);
+			fattr->pre_mtime = NFS_CACHE_MTIME(inode);
+			fattr->pre_ctime = NFS_CACHE_CTIME(inode);
+			fattr->valid |= NFS_ATTR_WCC;
+		}
+		nfs_refresh_inode(inode, fattr);
+	}
+}
+
 /*
  * Bare-bones access to getattr: this is for nfs_read_super.
  */
@@ -239,6 +253,8 @@ nfs3_proc_read(struct inode *inode, struct rpc_cred *cred,
 	dprintk("NFS call  read %d @ %Ld\n", count, (long long)offset);
 	fattr->valid = 0;
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, flags);
+	if (status >= 0)
+		nfs_refresh_inode(inode, fattr);
 	dprintk("NFS reply read: %d\n", status);
 	*eofp = res.eof;
 	return status;
@@ -278,6 +294,9 @@ nfs3_proc_write(struct inode *inode, struct rpc_cred *cred,
 	arg.stable = (flags & NFS_RW_SYNC) ? NFS_FILE_SYNC : NFS_UNSTABLE;
 
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, rpcflags);
+
+	if (status >= 0)
+		nfs3_write_refresh_inode(inode, fattr);
 
 	dprintk("NFS reply read: %d\n", status);
 	return status < 0? status : res.count;
@@ -685,11 +704,14 @@ extern u32 *nfs3_decode_dirent(u32 *, struct nfs_entry *, int);
 static void
 nfs3_read_done(struct rpc_task *task)
 {
-	struct nfs_read_data *data = (struct nfs_read_data *) task->tk_calldata;
+	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
 
 	if (nfs3_async_handle_jukebox(task))
 		return;
-	nfs_readpage_result(task, data->u.v3.res.count, data->u.v3.res.eof);
+	/* Call back common NFS readpage processing */
+	if (task->tk_status >= 0)
+		nfs_refresh_inode(data->inode, &data->fattr);
+	nfs_readpage_result(task);
 }
 
 static void
@@ -701,20 +723,20 @@ nfs3_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	int			flags;
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs3_procedures[NFS3PROC_READ],
-		.rpc_argp	= &data->u.v3.args,
-		.rpc_resp	= &data->u.v3.res,
+		.rpc_argp	= &data->args,
+		.rpc_resp	= &data->res,
 		.rpc_cred	= data->cred,
 	};
 	
 	req = nfs_list_entry(data->pages.next);
-	data->u.v3.args.fh     = NFS_FH(inode);
-	data->u.v3.args.offset = req_offset(req) + req->wb_offset;
-	data->u.v3.args.pgbase = req->wb_offset;
-	data->u.v3.args.pages  = data->pagevec;
-	data->u.v3.args.count  = count;
-	data->u.v3.res.fattr   = &data->fattr;
-	data->u.v3.res.count   = count;
-	data->u.v3.res.eof     = 0;
+	data->args.fh     = NFS_FH(inode);
+	data->args.offset = req_offset(req);
+	data->args.pgbase = req->wb_offset;
+	data->args.pages  = data->pagevec;
+	data->args.count  = count;
+	data->res.fattr   = &data->fattr;
+	data->res.count   = count;
+	data->res.eof     = 0;
 	
 	/* N.B. Do we need to test? Never called for swapfile inode */
 	flags = RPC_TASK_ASYNC | (IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0);
@@ -735,8 +757,9 @@ nfs3_write_done(struct rpc_task *task)
 
 	if (nfs3_async_handle_jukebox(task))
 		return;
-	nfs_writeback_done(task, data->u.v3.args.stable,
-			   data->u.v3.args.count, data->u.v3.res.count);
+	if (task->tk_status >= 0)
+		nfs3_write_refresh_inode(data->inode, data->res.fattr);
+	nfs_writeback_done(task);
 }
 
 static void
@@ -749,8 +772,8 @@ nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	int			flags;
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs3_procedures[NFS3PROC_WRITE],
-		.rpc_argp	= &data->u.v3.args,
-		.rpc_resp	= &data->u.v3.res,
+		.rpc_argp	= &data->args,
+		.rpc_resp	= &data->res,
 		.rpc_cred	= data->cred,
 	};
 
@@ -763,15 +786,15 @@ nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 		stable = NFS_UNSTABLE;
 	
 	req = nfs_list_entry(data->pages.next);
-	data->u.v3.args.fh     = NFS_FH(inode);
-	data->u.v3.args.offset = req_offset(req) + req->wb_offset;
-	data->u.v3.args.pgbase = req->wb_offset;
-	data->u.v3.args.count  = count;
-	data->u.v3.args.stable = stable;
-	data->u.v3.args.pages  = data->pagevec;
-	data->u.v3.res.fattr   = &data->fattr;
-	data->u.v3.res.count   = count;
-	data->u.v3.res.verf    = &data->verf;
+	data->args.fh     = NFS_FH(inode);
+	data->args.offset = req_offset(req);
+	data->args.pgbase = req->wb_offset;
+	data->args.count  = count;
+	data->args.stable = stable;
+	data->args.pages  = data->pagevec;
+	data->res.fattr   = &data->fattr;
+	data->res.count   = count;
+	data->res.verf    = &data->verf;
 
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
@@ -788,8 +811,12 @@ nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 static void
 nfs3_commit_done(struct rpc_task *task)
 {
+	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
+
 	if (nfs3_async_handle_jukebox(task))
 		return;
+	if (task->tk_status >= 0)
+		nfs3_write_refresh_inode(data->inode, data->res.fattr);
 	nfs_commit_done(task);
 }
 
@@ -801,17 +828,17 @@ nfs3_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 	int			flags;
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs3_procedures[NFS3PROC_COMMIT],
-		.rpc_argp	= &data->u.v3.args,
-		.rpc_resp	= &data->u.v3.res,
+		.rpc_argp	= &data->args,
+		.rpc_resp	= &data->res,
 		.rpc_cred	= data->cred,
 	};
 
-	data->u.v3.args.fh     = NFS_FH(data->inode);
-	data->u.v3.args.offset = start;
-	data->u.v3.args.count  = len;
-	data->u.v3.res.count   = len;
-	data->u.v3.res.fattr   = &data->fattr;
-	data->u.v3.res.verf    = &data->verf;
+	data->args.fh     = NFS_FH(data->inode);
+	data->args.offset = start;
+	data->args.count  = len;
+	data->res.count   = len;
+	data->res.fattr   = &data->fattr;
+	data->res.verf    = &data->verf;
 	
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;

@@ -1,4 +1,4 @@
-/* $Id: klgraph_init.c,v 1.2 2001/12/05 16:58:41 jh Exp $
+/* $Id: klgraph_init.c,v 1.1 2002/02/28 17:31:25 marcelo Exp $
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -49,8 +49,9 @@ void
 klgraph_init(void)
 {
 
-	u64	*temp;
-
+#ifdef CONFIG_IA64_SGI_SN1
+	u64 *temp;
+#endif
 	/*
 	 * Initialize some hub/xbow registers that allows access to 
 	 * Xbridge etc.  These are normally done in PROM.
@@ -108,6 +109,8 @@ klgraph_init(void)
 // [PI]       *(volatile u32 *)0xc00000080f000280L = 0xba98;
 // [PI]       *(volatile u32 *)0xc00000080f000288L = 0xba98;
 #endif	/* CONFIG_IA64_SGI_SN1 */
+
+#ifdef CONFIG_IA64_SGI_SN1
 
 	/*
 	 * kldir entries initialization - mankato
@@ -282,6 +285,7 @@ klgraph_init(void)
 	convert(0x8000000000002560, 0xffffffffffffffff, 0xffffffffffffffff);
 	convert(0x8000000000002570, 0xffffffffffffffff, 0xffffffffffffffff);
 	convert(0x8000000000002580, 0x000000000000ffff, 0x0000000000000000);
+#endif
 	
 }
 

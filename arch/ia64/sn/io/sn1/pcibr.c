@@ -9,7 +9,6 @@
 int NeedXbridgeSwap = 0;
 
 #include <linux/types.h>
-#include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <asm/sn/sgi.h>
@@ -307,22 +306,22 @@ extern void free_pciio_dmamap(pcibr_dmamap_t);
  * appropriate function name below.
  */
 struct file_operations pcibr_fops = {
-        .owner = THIS_MODULE,
-        .llseek = NULL,
-        .read = NULL,
-        .write = NULL,
-        .readdir = NULL,
-        .poll = NULL,
-        .ioctl = NULL,
-        .mmap = NULL,
-        .open = NULL,
-        .flush = NULL,
-        .release = NULL,
-        .fsync = NULL,
-        .fasync = NULL,
-        .lock = NULL,
-        .readv = NULL,
-        .writev = NULL
+        owner:  THIS_MODULE,
+        llseek: NULL,
+        read: NULL,
+        write: NULL,
+        readdir: NULL,
+        poll: NULL,
+        ioctl: NULL,
+        mmap: NULL,
+        open: NULL,
+        flush: NULL,
+        release: NULL,
+        fsync: NULL,
+        fasync: NULL,
+        lock: NULL,
+        readv: NULL,
+        writev: NULL
 };
 
 extern devfs_handle_t hwgraph_root;
@@ -332,7 +331,6 @@ extern uint64_t rmalloc(struct map *mp, size_t size);
 extern void rmfree(struct map *mp, size_t size, uint64_t a);
 extern int hwgraph_vertex_name_get(devfs_handle_t vhdl, char *buf, uint buflen);
 extern long atoi(register char *p);
-extern void *swap_ptr(void **loc, void *new);
 extern char *dev_to_name(devfs_handle_t dev, char *buf, uint buflen);
 extern cnodeid_t nodevertex_to_cnodeid(devfs_handle_t vhdl);
 extern graph_error_t hwgraph_edge_remove(devfs_handle_t from, char *name, devfs_handle_t *toptr);
@@ -1626,243 +1624,6 @@ char *pci_space_name[] = {"NONE",
 			  "WIN5",
 			  "",
 			  "BAD"};
-
-
-#ifdef LATER
-
-void
-pcibr_slot_func_info_return(pcibr_info_h pcibr_infoh,
-                            int func,
-                            pcibr_slot_func_info_resp_t funcp)
-{
-    pcibr_info_t                 pcibr_info = pcibr_infoh[func];
-    int                          win;
-
-    funcp->resp_f_status = 0;
-
-    if (!pcibr_info) {
-        return;
-    }
-
-    funcp->resp_f_status |= FUNC_IS_VALID;
-#ifdef SUPPORT_PRINTING_V_FORMAT
-    sprintf(funcp->resp_f_slot_name, "%v", pcibr_info->f_vertex);
-#else
-    sprintf(funcp->resp_f_slot_name, "%x", pcibr_info->f_vertex);
-#endif
-
-    if(is_sys_critical_vertex(pcibr_info->f_vertex)) {
-        funcp->resp_f_status |= FUNC_IS_SYS_CRITICAL;
-    }
-
-    funcp->resp_f_bus = pcibr_info->f_bus;
-    funcp->resp_f_slot = pcibr_info->f_slot;
-    funcp->resp_f_func = pcibr_info->f_func;
-#ifdef SUPPORT_PRINTING_V_FORMAT
-    sprintf(funcp->resp_f_master_name, "%v", pcibr_info->f_master);
-#else
-    sprintf(funcp->resp_f_master_name, "%x", pcibr_info->f_master);
-#endif
-    funcp->resp_f_pops = pcibr_info->f_pops;
-    funcp->resp_f_efunc = pcibr_info->f_efunc;
-    funcp->resp_f_einfo = pcibr_info->f_einfo;
-
-    funcp->resp_f_vendor = pcibr_info->f_vendor;
-    funcp->resp_f_device = pcibr_info->f_device;
-
-    for(win = 0 ; win < 6 ; win++) {
-        funcp->resp_f_window[win].resp_w_base =
-                                  pcibr_info->f_window[win].w_base;
-        funcp->resp_f_window[win].resp_w_size =
-                                  pcibr_info->f_window[win].w_size;
-        sprintf(funcp->resp_f_window[win].resp_w_space,
-                "%s",
-                pci_space_name[pcibr_info->f_window[win].w_space]);
-    }
-
-    funcp->resp_f_rbase = pcibr_info->f_rbase;
-    funcp->resp_f_rsize = pcibr_info->f_rsize;
-
-    for (win = 0 ; win < 4; win++) {
-        funcp->resp_f_ibit[win] = pcibr_info->f_ibit[win];
-    }
-
-    funcp->resp_f_att_det_error = pcibr_info->f_att_det_error;
-
-}
-
-int
-pcibr_slot_info_return(pcibr_soft_t             pcibr_soft,
-                       pciio_slot_t             slot,
-                       pcibr_slot_info_resp_t   respp)
-{
-    pcibr_soft_slot_t            pss;
-    int                          func;
-    bridge_t                    *bridge = pcibr_soft->bs_base;
-    reg_p                        b_respp;
-    pcibr_slot_info_resp_t       slotp;
-    pcibr_slot_func_info_resp_t  funcp;
-
-    slotp = snia_kmem_zalloc(sizeof(*slotp), KM_SLEEP);
-    if (slotp == NULL) {
-        return(ENOMEM);
-    }
-
-    pss = &pcibr_soft->bs_slot[slot];
-    
-    printk("\nPCI INFRASTRUCTURAL INFO FOR SLOT %d\n\n", slot);
-
-    slotp->resp_has_host = pss->has_host;
-    slotp->resp_host_slot = pss->host_slot;
-#ifdef SUPPORT_PRINTING_V_FORMAT
-    sprintf(slotp->resp_slot_conn_name, "%v", pss->slot_conn);
-#else
-    sprintf(slotp->resp_slot_conn_name, "%x", pss->slot_conn);
-#endif
-    slotp->resp_slot_status = pss->slot_status;
-    slotp->resp_l1_bus_num = io_path_map_widget(pcibr_soft->bs_vhdl);
-
-    if (is_sys_critical_vertex(pss->slot_conn)) {
-        slotp->resp_slot_status |= SLOT_IS_SYS_CRITICAL;
-    }
-
-    slotp->resp_bss_ninfo = pss->bss_ninfo;
-
-    for (func = 0; func < pss->bss_ninfo; func++) {
-        funcp = &(slotp->resp_func[func]);
-        pcibr_slot_func_info_return(pss->bss_infos, func, funcp);
-    }
-
-    sprintf(slotp->resp_bss_devio_bssd_space, "%s",
-            pci_space_name[pss->bss_devio.bssd_space]);
-    slotp->resp_bss_devio_bssd_base = pss->bss_devio.bssd_base;
-    slotp->resp_bss_device = pss->bss_device;
-
-    slotp->resp_bss_pmu_uctr = pss->bss_pmu_uctr;
-    slotp->resp_bss_d32_uctr = pss->bss_d32_uctr;
-    slotp->resp_bss_d64_uctr = pss->bss_d64_uctr;
-
-    slotp->resp_bss_d64_base = pss->bss_d64_base;
-    slotp->resp_bss_d64_flags = pss->bss_d64_flags;
-    slotp->resp_bss_d32_base = pss->bss_d32_base;
-    slotp->resp_bss_d32_flags = pss->bss_d32_flags;
-
-    slotp->resp_bss_ext_ates_active = atomic_read(&pss->bss_ext_ates_active);
-
-    slotp->resp_bss_cmd_pointer = pss->bss_cmd_pointer;
-    slotp->resp_bss_cmd_shadow = pss->bss_cmd_shadow;
-
-    slotp->resp_bs_rrb_valid = pcibr_soft->bs_rrb_valid[slot];
-    slotp->resp_bs_rrb_valid_v = pcibr_soft->bs_rrb_valid[slot +
-                                                      PCIBR_RRB_SLOT_VIRTUAL];
-    slotp->resp_bs_rrb_res = pcibr_soft->bs_rrb_res[slot];
-
-    if (slot & 1) {
-        b_respp = &bridge->b_odd_resp;
-    } else {
-        b_respp = &bridge->b_even_resp;
-    }
-
-    slotp->resp_b_resp = *b_respp;
-
-    slotp->resp_b_int_device = bridge->b_int_device;
-    slotp->resp_b_int_enable = bridge->b_int_enable;
-    slotp->resp_b_int_host = bridge->b_int_addr[slot].addr;
-
-    if (COPYOUT(slotp, respp, sizeof(*respp))) {
-        return(EFAULT);
-    }
-
-    snia_kmem_free(slotp, sizeof(*slotp));
-
-    return(0);
-}
-
-/*
- * pcibr_slot_query
- *	Return information about the PCI slot maintained by the infrastructure.
- *	Information is requested in the request structure.
- *
- *      Information returned in the response structure:
- *		Slot hwgraph name
- *		Vendor/Device info
- *		Base register info
- *		Interrupt mapping from device pins to the bridge pins
- *		Devio register
- *		Software RRB info
- *		RRB register info
- *		Host/Gues info
- *		PCI Bus #,slot #, function #
- *		Slot provider hwgraph name
- *		Provider Functions
- *		Error handler
- *		DMA mapping usage counters
- *		DMA direct translation info
- *		External SSRAM workaround info
- */
-int
-pcibr_slot_query(devfs_handle_t pcibr_vhdl, pcibr_slot_info_req_t reqp)
-{
-    pcibr_soft_t            pcibr_soft = pcibr_soft_get(pcibr_vhdl);
-    pciio_slot_t            slot = reqp->req_slot;
-    pciio_slot_t            tmp_slot;
-    pcibr_slot_info_resp_t  respp = (pcibr_slot_info_resp_t) reqp->req_respp;
-    int                     size = reqp->req_size;
-    int                     error;
-
-    /* Make sure that we are dealing with a bridge device vertex */
-    if (!pcibr_soft) {
-        return(EINVAL);
-    }
-
-    /* Make sure that we have a valid PCI slot number or PCIIO_SLOT_NONE */
-    if ((!PCIBR_VALID_SLOT(slot)) && (slot != PCIIO_SLOT_NONE)) {
-        return(EINVAL);
-    }
-
-    /* Return information for the requested PCI slot */
-    if (slot != PCIIO_SLOT_NONE) {
-        if (size < sizeof(*respp)) {
-            return(EINVAL);
-        }
-
-        /* Acquire read access to the slot */
-        mrlock(pcibr_soft->bs_slot[slot].slot_lock, MR_ACCESS, PZERO);
-
-        error = pcibr_slot_info_return(pcibr_soft, slot, respp);
-
-        /* Release the slot lock */
-        mrunlock(pcibr_soft->bs_slot[slot].slot_lock);
-
-        return(error);
-    }
-
-    /* Return information for all the slots */
-    for (tmp_slot = 0; tmp_slot < 8; tmp_slot++) {
-
-        if (size < sizeof(*respp)) {
-            return(EINVAL);
-        }
-
-        /* Acquire read access to the slot */
-        mrlock(pcibr_soft->bs_slot[tmp_slot].slot_lock, MR_ACCESS, PZERO);
-
-        error = pcibr_slot_info_return(pcibr_soft, tmp_slot, respp);
-
-        /* Release the slot lock */
-        mrunlock(pcibr_soft->bs_slot[tmp_slot].slot_lock);
-
-        if (error) {
-            return(error);
-        }
-
-        ++respp;
-        size -= sizeof(*respp);
-    }
-
-    return(error);
-}
-#endif	/* LATER */
 
 
 /*ARGSUSED */
@@ -3617,7 +3378,7 @@ pcibr_attach(devfs_handle_t xconn_vhdl)
 	self->bl_soft = pcibr_soft;
 	self->bl_vhdl = pcibr_vhdl;
 	self->bl_next = pcibr_list;
-	self->bl_next = swap_ptr((void **) &pcibr_list, (void *)self);
+        pcibr_list = self; 
     }
 #endif
 
@@ -6455,9 +6216,7 @@ pcibr_force_interrupt(pcibr_intr_wrap_t wrap)
 
 	    intr_bit = (short) xtalk_intr_vector_get(xtalk_intr);
 	    cpu = cpuvertex_to_cpuid(xtalk_intr_cpu_get(xtalk_intr));
-#if defined(CONFIG_IA64_SGI_SN1)
 	    REMOTE_CPU_SEND_INTR(cpu, intr_bit);
-#endif
 	}
 }
 
@@ -6822,13 +6581,8 @@ pcibr_setpciint(xtalk_intr_t xtalk_intr)
     bridgereg_t            *int_addr = (bridgereg_t *)
     xtalk_intr_sfarg_get(xtalk_intr);
 
-#ifdef CONFIG_IA64_SGI_SN2
-    *int_addr = ((BRIDGE_INT_ADDR_HOST & (addr >> 26)) |
-		 (BRIDGE_INT_ADDR_FLD & vect));
-#elif CONFIG_IA64_SGI_SN1
     *int_addr = ((BRIDGE_INT_ADDR_HOST & (addr >> 30)) |
 		 (BRIDGE_INT_ADDR_FLD & vect));
-#endif
 }
 
 /*ARGSUSED */
@@ -7485,7 +7239,7 @@ pcibr_device_flags_set(devfs_handle_t pconn_vhdl,
 
 #ifdef LITTLE_ENDIAN
 /*
- * on sn-ia we need to twiddle the addresses going out
+ * on sn-ia we need to twiddle the the addresses going out
  * the pci bus because we use the unswizzled synergy space
  * (the alternative is to use the swizzled synergy space
  * and byte swap the data)

@@ -91,11 +91,12 @@ ENTRY(ia64_execve)
 END(ia64_execve)
 
 /*
- * sys_clone2(u64 flags, u64 ustack_base, u64 ustack_size, u64 user_tid, u64 tls)
+ * sys_clone2(u64 flags, u64 ustack_base, u64 ustack_size, u64 child_tidptr, u64 parent_tidptr,
+ *	      u64 tls)
  */
 GLOBAL_ENTRY(sys_clone2)
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(2)
-	alloc r16=ar.pfs,5,2,5,0
+	alloc r16=ar.pfs,6,2,6,0
 	DO_SAVE_SWITCH_STACK
 	adds r2=PT(R16)+IA64_SWITCH_STACK_SIZE+16,sp
 	mov loc0=rp
@@ -104,9 +105,10 @@ GLOBAL_ENTRY(sys_clone2)
 	mov out1=in1
 	mov out3=in2
 	tbit.nz p6,p0=in0,CLONE_SETTLS_BIT
-	mov out4=in3				// valid only w/CLONE_SETTID and/or CLONE_CLEARTID
+	mov out4=in3	// child_tidptr:  valid only w/CLONE_CHILD_SETTID or CLONE_CHILD_CLEARTID
 	;;
-(p6)	st8 [r2]=in4				// store TLS in r13 (tp)
+(p6)	st8 [r2]=in5				// store TLS in r16 for copy_thread()
+	mov out5=in4	// parent_tidptr: valid only w/CLONE_PARENT_SETTID
 	adds out2=IA64_SWITCH_STACK_SIZE+16,sp	// out2 = &regs
 	dep out0=0,in0,CLONE_IDLETASK_BIT,1	// out0 = clone_flags & ~CLONE_IDLETASK
 	br.call.sptk.many rp=do_fork
@@ -535,7 +537,6 @@ END(ia64_trace_syscall)
 
 GLOBAL_ENTRY(ia64_ret_from_clone)
 	PT_REGS_UNWIND_INFO(0)
-#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 	/*
 	 * We need to call schedule_tail() to complete the scheduling process.
 	 * Called by ia64_switch_to() after do_fork()->copy_thread().  r8 contains the
@@ -543,7 +544,6 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
 	 */
 	br.call.sptk.many rp=ia64_invoke_schedule_tail
 .ret8:
-#endif
 	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
 	ld4 r2=[r2]
@@ -844,7 +844,6 @@ ENTRY(handle_syscall_error)
 	br.cond.sptk ia64_leave_kernel
 END(handle_syscall_error)
 
-#ifdef CONFIG_SMP
 	/*
 	 * Invoke schedule_tail(task) while preserving in0-in7, which may be needed
 	 * in case a system call gets restarted.
@@ -860,8 +859,6 @@ GLOBAL_ENTRY(ia64_invoke_schedule_tail)
 	mov rp=loc0
 	br.ret.sptk.many rp
 END(ia64_invoke_schedule_tail)
-
-#endif /* CONFIG_SMP */
 
 #if __GNUC__ < 3
 
@@ -1129,18 +1126,18 @@ sys_call_table:
 	data8 ia64_ni_syscall					/* was: ia64_oldfstat */
 	data8 sys_vhangup
 	data8 sys_lchown
-	data8 sys_vm86				// 1125
+	data8 sys_remap_file_pages		// 1125
 	data8 sys_wait4
 	data8 sys_sysinfo
 	data8 sys_clone
 	data8 sys_setdomainname
 	data8 sys_newuname			// 1130
 	data8 sys_adjtimex
-	data8 ia64_create_module
+	data8 ia64_ni_syscall					/* was: ia64_create_module */
 	data8 sys_init_module
 	data8 sys_delete_module
-	data8 sys_get_kernel_syms		// 1135
-	data8 sys_query_module
+	data8 ia64_ni_syscall			// 1135		/* was: sys_get_kernel_syms */
+	data8 ia64_ni_syscall					/* was: sys_query_module */
 	data8 sys_quotactl
 	data8 sys_bdflush
 	data8 sys_sysfs
@@ -1160,7 +1157,7 @@ sys_call_table:
 	data8 sys_mlock
 	data8 sys_mlockall
 	data8 sys_mprotect			// 1155
-	data8 sys_mremap
+	data8 ia64_mremap
 	data8 sys_msync
 	data8 sys_munlock
 	data8 sys_munlockall
@@ -1173,11 +1170,7 @@ sys_call_table:
 	data8 sys_sched_get_priority_min
 	data8 sys_sched_rr_get_interval
 	data8 sys_nanosleep
-#if defined(CONFIG_NFSD) || defined(CONFIG_NFSD_MODULE)
 	data8 sys_nfsservctl
-#else
-	data8 sys_ni_syscall
-#endif
 	data8 sys_prctl				// 1170
 	data8 sys_getpagesize
 	data8 sys_mmap2
@@ -1241,7 +1234,7 @@ sys_call_table:
 	data8 sys_futex				// 1230
 	data8 sys_sched_setaffinity
 	data8 sys_sched_getaffinity
-	data8 sys_ni_syscall
+	data8 sys_set_tid_address
 	data8 sys_alloc_hugepages
 	data8 sys_free_hugepages		// 1235
 	data8 sys_exit_group
@@ -1254,8 +1247,8 @@ sys_call_table:
 	data8 sys_epoll_create
 	data8 sys_epoll_ctl
 	data8 sys_epoll_wait			// 1245
+	data8 sys_restart_syscall
 	data8 sys_semtimedop
-	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall			// 1250

@@ -18,12 +18,14 @@
 #define MAP_FIXED	0x10		/* Interpret addr exactly */
 #define MAP_ANONYMOUS	0x20		/* don't use a file */
 
-#define MAP_GROWSDOWN	0x0100		/* stack-like segment */
-#define MAP_GROWSUP	0x0200		/* register stack-like segment */
-#define MAP_DENYWRITE	0x0800		/* ETXTBSY */
-#define MAP_EXECUTABLE	0x1000		/* mark it as an executable */
-#define MAP_LOCKED	0x2000		/* pages are locked */
-#define MAP_NORESERVE	0x4000		/* don't check for reservations */
+#define MAP_GROWSDOWN	0x00100		/* stack-like segment */
+#define MAP_GROWSUP	0x00200		/* register stack-like segment */
+#define MAP_DENYWRITE	0x00800		/* ETXTBSY */
+#define MAP_EXECUTABLE	0x01000		/* mark it as an executable */
+#define MAP_LOCKED	0x02000		/* pages are locked */
+#define MAP_NORESERVE	0x04000		/* don't check for reservations */
+#define MAP_POPULATE	0x08000		/* populate (prefault) pagetables */
+#define MAP_NONBLOCK	0x10000		/* do not block on IO */
 
 #define MS_ASYNC	1		/* sync memory asynchronously */
 #define MS_INVALIDATE	2		/* invalidate the caches */

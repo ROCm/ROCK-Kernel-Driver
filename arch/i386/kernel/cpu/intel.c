@@ -11,7 +11,6 @@
 
 #include "cpu.h"
 
-static int disable_x86_serial_nr __initdata = 1;
 static int disable_P4_HT __initdata = 0;
 extern int trap_init_f00f_bug(void);
 
@@ -69,29 +68,6 @@ int __init ppro_with_ram_bug(void)
 	return 0;
 }
 	
-static void __init squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
-{
-	if (cpu_has(c, X86_FEATURE_PN) && disable_x86_serial_nr ) {
-		/* Disable processor serial number */
-		unsigned long lo,hi;
-		rdmsr(MSR_IA32_BBL_CR_CTL,lo,hi);
-		lo |= 0x200000;
-		wrmsr(MSR_IA32_BBL_CR_CTL,lo,hi);
-		printk(KERN_NOTICE "CPU serial number disabled.\n");
-		clear_bit(X86_FEATURE_PN, c->x86_capability);
-
-		/* Disabling the serial number may affect the cpuid level */
-		c->cpuid_level = cpuid_eax(0);
-	}
-}
-
-static int __init x86_serial_nr_setup(char *s)
-{
-	disable_x86_serial_nr = 0;
-	return 1;
-}
-__setup("serialnumber", x86_serial_nr_setup);
-
 static int __init P4_disable_ht(char *s)
 {
 	disable_P4_HT = 1;
@@ -351,9 +327,6 @@ too_many_siblings:
 	if (disable_P4_HT)
 		clear_bit(X86_FEATURE_HT, c->x86_capability);
 #endif
-
-	/* Disable the PN if appropriate */
-	squash_the_stupid_serial_number(c);
 
 	/* Work around errata */
 	Intel_errata_workarounds(c);

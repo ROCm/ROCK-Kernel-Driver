@@ -48,23 +48,10 @@ pbus_assign_resources_sorted(struct pci_bus *bus)
 	for (ln=bus->devices.next; ln != &bus->devices; ln=ln->next) {
 		struct pci_dev *dev = pci_dev_b(ln);
 		u16 class = dev->class >> 8;
-		u16 cmd;
 
-		/* First, disable the device to avoid side
-		   effects of possibly overlapping I/O and
-		   memory ranges.
-		   Leave VGA enabled - for obvious reason. :-)
-		   Same with all sorts of bridges - they may
-		   have VGA behind them.  */
 		if (class == PCI_CLASS_DISPLAY_VGA
 				|| class == PCI_CLASS_NOT_DEFINED_VGA)
 			found_vga = 1;
-		else if (class >> 8 != PCI_BASE_CLASS_BRIDGE) {
-			pci_read_config_word(dev, PCI_COMMAND, &cmd);
-			cmd &= ~(PCI_COMMAND_IO | PCI_COMMAND_MEMORY
-						| PCI_COMMAND_MASTER);
-			pci_write_config_word(dev, PCI_COMMAND, cmd);
-		}
 
 		pdev_sort_resources(dev, &head);
 	}
@@ -387,7 +374,6 @@ void __init
 pci_assign_unassigned_resources(void)
 {
 	struct list_head *ln;
-	struct pci_dev *dev;
 
 	/* Depth first, calculate sizes and alignments of all
 	   subordinate buses. */
@@ -396,8 +382,4 @@ pci_assign_unassigned_resources(void)
 	/* Depth last, allocate resources and update the hardware. */
 	for(ln=pci_root_buses.next; ln != &pci_root_buses; ln=ln->next)
 		pci_bus_assign_resources(pci_bus_b(ln));
-
-	pci_for_each_dev(dev) {
-		pdev_enable_device(dev);
-	}
 }

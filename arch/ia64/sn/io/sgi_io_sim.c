@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/config.h>
@@ -71,6 +71,9 @@ void initialize_io(void)
  */
 static __psunsigned_t master_bridge_base = (__psunsigned_t)NULL;
 nasid_t console_nasid = (nasid_t)-1;
+#if !defined(CONFIG_IA64_SGI_SN1)
+char master_baseio_wid;
+#endif
 static char console_wid;
 static char console_pcislot;
 
@@ -92,6 +95,7 @@ check_nasid_equiv(nasid_t nasida, nasid_t nasidb)
                 return 0;
 }
 
+#if defined(CONFIG_IA64_SGI_SN1)
 int
 is_master_nasid_widget(nasid_t test_nasid, xwidgetnum_t test_wid)
 {
@@ -111,6 +115,29 @@ is_master_nasid_widget(nasid_t test_nasid, xwidgetnum_t test_wid)
                 return 0;
         }
 }
+#else
+int
+is_master_baseio_nasid_widget(nasid_t test_nasid, xwidgetnum_t test_wid)
+{
+	extern nasid_t master_baseio_nasid;
+
+        /*
+         * If the widget numbers are different, we're not the master.
+         */
+        if (test_wid != (xwidgetnum_t)master_baseio_wid) {
+                return 0;
+	}
+
+        /*
+         * If the NASIDs are the same or equivalent, we're the master.
+         */
+        if (check_nasid_equiv(test_nasid, master_baseio_nasid)) {
+                return 1;
+        } else {
+                return 0;
+        }
+}
+#endif	/* CONFIG_IA64_SGI_SN1 */
 
 /*
  * Routines provided by ml/SN/nvram.c

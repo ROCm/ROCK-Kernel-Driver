@@ -8,6 +8,7 @@
  */
 #ifndef _ASM_SN_XTALK_XTALK_H
 #define _ASM_SN_XTALK_XTALK_H
+#include <linux/config.h>
 
 /*
  * xtalk.h -- platform-independent crosstalk interface
@@ -202,10 +203,19 @@ xtalk_intr_alloc_f      (devfs_handle_t dev,	/* which crosstalk device */
 typedef void
 xtalk_intr_free_f       (xtalk_intr_t intr_hdl);
 
+#ifdef CONFIG_IA64_SGI_SN1
 typedef int
 xtalk_intr_connect_f    (xtalk_intr_t intr_hdl,		/* xtalk intr resource handle */
 			 xtalk_intr_setfunc_f *setfunc,		/* func to set intr hw */
 			 void *setfunc_arg);	/* arg to setfunc */
+#else
+typedef int
+xtalk_intr_connect_f    (xtalk_intr_t intr_hdl,		/* xtalk intr resource handle */
+			intr_func_t intr_func,         /* xtalk intr handler */
+			void *intr_arg,	/* arg to intr handler */
+			xtalk_intr_setfunc_f *setfunc,		/* func to set intr hw */
+			void *setfunc_arg);	/* arg to setfunc */
+#endif
 
 typedef void
 xtalk_intr_disconnect_f (xtalk_intr_t intr_hdl);
@@ -390,9 +400,6 @@ typedef xtalk_intr_setfunc_f *xtalk_intr_setfunc_t;
 typedef void		xtalk_iter_f(devfs_handle_t vhdl);
 
 extern void		xtalk_iterate(char *prefix, xtalk_iter_f *func);
-
-extern int		xtalk_device_powerup(devfs_handle_t, xwidgetnum_t);
-extern int		xtalk_device_shutdown(devfs_handle_t, xwidgetnum_t);
 
 #endif				/* __KERNEL__ */
 #endif				/* _ASM_SN_XTALK_XTALK_H */

@@ -13,6 +13,8 @@
 
 #ifdef __KERNEL__
 
+#include <asm/compat.h>
+
 typedef union sigval32 {
 	int sival_int;
 	u32 sival_ptr;
@@ -50,8 +52,8 @@ typedef struct siginfo32 {
 			__kernel_pid_t32 _pid;		/* which child */
 			unsigned int _uid;		/* sender's uid */
 			int _status;			/* exit code */
-			__kernel_clock_t32 _utime;
-			__kernel_clock_t32 _stime;
+			compat_clock_t _utime;
+			compat_clock_t _stime;
 		} _sigchld;
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS, SIGEMT */

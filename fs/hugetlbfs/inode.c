@@ -44,6 +44,7 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct inode *inode =file->f_dentry->d_inode;
 	struct address_space *mapping = inode->i_mapping;
+	size_t len;
 	int ret;
 
 	if (!capable(CAP_IPC_LOCK))
@@ -64,9 +65,11 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_flags |= VM_HUGETLB | VM_RESERVED;
 	vma->vm_ops = &hugetlb_vm_ops;
 	ret = hugetlb_prefault(mapping, vma);
+	len = (vma->vm_end - vma->vm_start) + (vma->vm_pgoff << PAGE_SHIFT);
+	if (inode->i_size < len)
+		inode->i_size = len;
 
 	up(&inode->i_sem);
-
 	return ret;
 }
 

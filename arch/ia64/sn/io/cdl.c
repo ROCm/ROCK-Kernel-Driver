@@ -7,6 +7,7 @@
  * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
+#include <linux/config.h>
 #include <linux/types.h>
 #include <asm/sn/sgi.h>
 #include <asm/io.h>
@@ -19,6 +20,8 @@
 /* these get called directly in cdl_add_connpt in fops bypass hack */
 extern int pcibr_attach(devfs_handle_t);
 extern int xbow_attach(devfs_handle_t);
+extern int pic_attach(devfs_handle_t);
+
 
 /*
  *    cdl: Connection and Driver List
@@ -35,13 +38,24 @@ struct cdl {
     int (*attach) (devfs_handle_t);
 } dummy_reg;
 
+#ifdef CONFIG_IA64_SGI_SN1
 #define MAX_SGI_IO_INFRA_DRVR 4
-struct cdl sgi_infrastructure_drivers[MAX_SGI_IO_INFRA_DRVR] =
+#else
+#define MAX_SGI_IO_INFRA_DRVR 7
+#endif
+static struct cdl sgi_infrastructure_drivers[MAX_SGI_IO_INFRA_DRVR] =
 {
 	{ XBRIDGE_WIDGET_PART_NUM, XBRIDGE_WIDGET_MFGR_NUM, pcibr_attach /* &pcibr_fops  */},
 	{ BRIDGE_WIDGET_PART_NUM,  BRIDGE_WIDGET_MFGR_NUM,  pcibr_attach /* &pcibr_fops */},
+#ifndef CONFIG_IA64_SGI_SN1
+	{ PIC_WIDGET_PART_NUM_BUS0,  PIC_WIDGET_MFGR_NUM,   pic_attach /* &pic_fops */},
+	{ PIC_WIDGET_PART_NUM_BUS1,  PIC_WIDGET_MFGR_NUM,   pic_attach /* &pic_fops */},
+#endif
 	{ XXBOW_WIDGET_PART_NUM,   XXBOW_WIDGET_MFGR_NUM,   xbow_attach /* &xbow_fops */},
 	{ XBOW_WIDGET_PART_NUM,    XBOW_WIDGET_MFGR_NUM,    xbow_attach /* &xbow_fops */},
+#ifndef CONFIG_IA64_SGI_SN1
+	{ PXBOW_WIDGET_PART_NUM,   XXBOW_WIDGET_MFGR_NUM,   xbow_attach /* &xbow_fops */},
+#endif
 };
 
 /*

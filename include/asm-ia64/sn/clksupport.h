@@ -29,22 +29,30 @@
 #include <asm/sn/addrs.h>
 
 typedef long clkreg_t;
-extern long sn_rtc_cycles_per_second;
+extern unsigned long sn_rtc_cycles_per_second;
 
 
 #if defined(CONFIG_IA64_SGI_SN1)
 #include <asm/sn/sn1/bedrock.h>
 #include <asm/sn/sn1/hubpi_next.h>
+
+extern nasid_t master_nasid;
+
+#define RTC_MASK		(0x007fffffffffffff)
 /* clocks are not synchronized yet on SN1  - used node 0 (problem if no NASID 0) */
-#define RTC_COUNTER_ADDR	((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_COUNTER))
-#define RTC_COMPARE_A_ADDR      ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_COMPARE_A))
-#define RTC_COMPARE_B_ADDR      ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_COMPARE_B))
-#define RTC_INT_PENDING_A_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_INT_PEND_A))
-#define RTC_INT_PENDING_B_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_INT_PEND_B))
-#define RTC_INT_ENABLED_A_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_INT_EN_A))
-#define RTC_INT_ENABLED_B_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(0, PI_RT_INT_EN_B))
-#else
+#define RTC_COUNTER_ADDR	((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_COUNTER))
+#define RTC_COMPARE_A_ADDR      ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_COMPARE_A))
+#define RTC_COMPARE_B_ADDR      ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_COMPARE_B))
+#define RTC_INT_PENDING_A_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_INT_PEND_A))
+#define RTC_INT_PENDING_B_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_INT_PEND_B))
+#define RTC_INT_ENABLED_A_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_INT_EN_A))
+#define RTC_INT_ENABLED_B_ADDR  ((clkreg_t*)REMOTE_HUB_ADDR(master_nasid, PI_RT_INT_EN_B))
+#else	/* !CONFIG_IA64_SGI_SN1 */
+#include <asm/sn/addrs.h>
+#include <asm/sn/sn2/addrs.h>
+#include <asm/sn/sn2/shubio.h>
 #include <asm/sn/sn2/shub_mmr.h>
+#define RTC_MASK		(SH_RTC_MASK)
 #define RTC_COUNTER_ADDR	((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #define RTC_COMPARE_A_ADDR      ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #define RTC_COMPARE_B_ADDR      ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
@@ -52,7 +60,7 @@ extern long sn_rtc_cycles_per_second;
 #define RTC_INT_PENDING_B_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #define RTC_INT_ENABLED_A_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #define RTC_INT_ENABLED_B_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
-#endif
+#endif	/* CONFIG_IA64_SGI_SN1 */
 
 
 #define GET_RTC_COUNTER()	(*RTC_COUNTER_ADDR)

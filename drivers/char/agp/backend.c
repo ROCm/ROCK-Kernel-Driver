@@ -112,22 +112,12 @@ static struct agp_version agp_current_version =
 	.minor = AGPGART_VERSION_MINOR,
 };
 
-static int __init agp_backend_initialize(struct pci_dev *dev)
+static int agp_backend_initialize(struct pci_dev *dev)
 {
 	int size_value, rc, got_gatt=0, got_keylist=0;
-	u8 cap_ptr = 0;
 
 	agp_bridge.max_memory_agp = agp_find_max();
 	agp_bridge.version = &agp_current_version;
-
-	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
-	if (cap_ptr == 0)
-		return -ENODEV;
-	agp_bridge.capndx = cap_ptr;
-
-	/* Fill in the mode register */
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx + 4, &agp_bridge.mode);
-
 
 	if (agp_bridge.needs_scratch_page == TRUE) {
 		void *addr;
@@ -254,7 +244,7 @@ int agp_register_driver (struct pci_dev *dev)
 	}
 
 	inter_module_register("drm_agp", THIS_MODULE, &drm_agp);
-	
+
 	pm_register(PM_PCI_DEV, PM_PCI_ID(agp_bridge.dev), agp_power);
 
 	agp_count++;
@@ -272,13 +262,6 @@ int agp_unregister_driver(void)
 	return 0;
 }
 
-int __exit agp_exit(void)
-{
-	if (agp_count==0)
-		return -EBUSY;
-
-	return 0;
-}
 
 int __init agp_init(void)
 {
@@ -295,6 +278,12 @@ int __init agp_init(void)
 	printk(KERN_INFO "Linux agpgart interface v%d.%d (c) Dave Jones\n",
 	       AGPGART_VERSION_MAJOR, AGPGART_VERSION_MINOR);
 	return 0;
+}
+
+void __exit agp_exit(void)
+{
+	if (agp_count!=0)
+		BUG();
 }
 
 #ifndef CONFIG_GART_IOMMU

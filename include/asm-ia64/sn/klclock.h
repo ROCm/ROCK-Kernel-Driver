@@ -10,6 +10,7 @@
 #define _ASM_IA64_SN_KLCLOCK_H
 
 #include <asm/sn/ioc3.h>
+#include <asm/sn/ioc4.h>
 
 #define RTC_BASE_ADDR		(unsigned char *)(nvram_base)
 

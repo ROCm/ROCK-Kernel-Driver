@@ -32,6 +32,7 @@
 #define EDGE_LBL_CONTROLLER		"controller"
 #define EDGE_LBL_CPU			"cpu"
 #define EDGE_LBL_CPUNUM			"cpunum"
+#define EDGE_LBL_DIRECT			"direct"
 #define EDGE_LBL_DISABLED		"disabled"
 #define EDGE_LBL_DISK			"disk"
 #define EDGE_LBL_DMA_ENGINE             "dma_engine"    /* Only available on
@@ -67,6 +68,7 @@
 #define EDGE_LBL_HPC			"hpc"
 #define EDGE_LBL_GFX			"gfx"
 #define EDGE_LBL_HUB			"hub"		/* For SN0 */
+#define EDGE_LBL_HW			"hw"
 #define EDGE_LBL_SYNERGY		"synergy"	/* For SNIA only */
 #define EDGE_LBL_IBUS			"ibus"		/* For EVEREST */
 #define EDGE_LBL_INTERCONNECT		"link"
@@ -74,6 +76,8 @@
 #define EDGE_LBL_IO4			"io4"		/* For EVEREST */
 #define EDGE_LBL_IOC3			"ioc3"
 #define EDGE_LBL_LUN                    "lun"
+#define EDGE_LBL_LINUX                  "linux"
+#define EDGE_LBL_LINUX_BUS              EDGE_LBL_LINUX "/busnum"
 #define EDGE_LBL_MACE                   "mace" 		/* O2 mace */
 #define EDGE_LBL_MACHDEP                "machdep"       /* Platform depedent devices */
 #define EDGE_LBL_MASTER			".master"
@@ -86,6 +90,9 @@
 #define EDGE_LBL_NVRAM			"nvram"
 #define EDGE_LBL_PARTITION		"partition"
 #define EDGE_LBL_PCI			"pci"
+#define EDGE_LBL_PCIX			"pci-x"
+#define EDGE_LBL_PCIX_0			EDGE_LBL_PCIX "/0"
+#define EDGE_LBL_PCIX_1			EDGE_LBL_PCIX "/1"
 #define EDGE_LBL_PORT			"port"
 #define EDGE_LBL_PROM			"prom"
 #define EDGE_LBL_RACK			"rack"
@@ -112,6 +119,7 @@
 #define EDGE_LBL_XPLINK			"xplink" 	/* Cross partition */
 #define	EDGE_LBL_XPLINK_NET		"net" 		/* XP network devs */
 #define	EDGE_LBL_XPLINK_RAW		"raw"		/* XP Raw devs */
+#define EDGE_LBL_SLAB			"slab"		/* Slab of a module */
 #define	EDGE_LBL_XPLINK_KERNEL		"kernel"	/* XP kernel devs */
 #define	EDGE_LBL_XPLINK_ADMIN		"admin"	   	/* Partition admin */
 #define	EDGE_LBL_KAIO			"kaio"	   	/* Kernel async i/o poll */
@@ -202,7 +210,7 @@ void init_all_devices(void);
 
 #include <asm/sn/xtalk/xbow.h>	/* For get MAX_PORT_NUM */
 
-int io_brick_map_widget(char, int);
+int io_brick_map_widget(int, int);
 int io_path_map_widget(devfs_handle_t);
 
 /*
@@ -210,8 +218,7 @@ int io_path_map_widget(devfs_handle_t);
  */
 
 struct io_brick_map_s {
-    char                ibm_type;                  /* brick type, e.g. */
-                                                   /* 'I' for Ibrick   */
+    int                 ibm_type;                  /* brick type */
     int                 ibm_map_wid[MAX_PORT_NUM]; /* wid to int map */
 };
 

@@ -23,7 +23,7 @@
 #include "../drivers/scsi/hosts.h"
 #include "simscsi.h"
 
-#define DEBUG_SIMSCSI	1
+#define DEBUG_SIMSCSI	0
 
 /* Simulator system calls: */
 
@@ -377,6 +377,12 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 	return 0;
 }
 
+int
+simscsi_host_reset (Scsi_Cmnd *sc)
+{
+	printk ("simscsi_host_reset: not implemented\n");
+	return 0;
+}
 
 static Scsi_Host_Template driver_template = SIMSCSI;
 

@@ -19,6 +19,7 @@
 #include <linux/icmpv6.h>
 #include <linux/socket.h>
 #include <linux/filter.h>
+#include <linux/compat.h>
 
 #include <net/scm.h>
 #include <net/sock.h>
@@ -28,6 +29,9 @@
 
 #define A(__x)		((unsigned long)(__x))
 #define AA(__x)		((unsigned long)(__x))
+
+extern asmlinkage long sys_getsockopt(int fd, int level, int optname,
+				       void * optval, int *optlen);
 
 
 static inline int iov_from_user32_to_kern(struct iovec *kiov,
@@ -123,7 +127,7 @@ static int cmsghdr_from_user32_to_kern(struct msghdr *kmsg,
 {
 	struct cmsghdr32 *ucmsg;
 	struct cmsghdr *kcmsg, *kcmsg_base;
-	__kernel_size_t32 ucmlen;
+	compat_size_t ucmlen;
 	__kernel_size_t kcmlen, tmp;
 
 	kcmlen = 0;
@@ -362,7 +366,7 @@ fail:
 	kmsg->msg_control = (void *) orig_cmsg_uptr;
 }
 
-asmlinkage int sys32_sendmsg(int fd, struct msghdr32 *user_msg, unsigned user_flags)
+asmlinkage long sys32_sendmsg(int fd, struct msghdr32 *user_msg, unsigned user_flags)
 {
 	struct socket *sock;
 	char address[MAX_SOCK_ADDR];
@@ -407,7 +411,7 @@ out:
 	return err;
 }
 
-asmlinkage int sys32_recvmsg(int fd, struct msghdr32 *user_msg, unsigned int user_flags)
+asmlinkage long sys32_recvmsg(int fd, struct msghdr32 *user_msg, unsigned int user_flags)
 {
 	struct iovec iovstack[UIO_FASTIOV];
 	struct msghdr kern_msg;
@@ -489,7 +493,7 @@ asmlinkage int sys32_recvmsg(int fd, struct msghdr32 *user_msg, unsigned int use
 		err = move_addr_to_user(addr, kern_msg.msg_namelen, uaddr, uaddr_len);
 	if(cmsg_ptr != 0 && err >= 0) {
 		unsigned long ucmsg_ptr = ((unsigned long)kern_msg.msg_control);
-		__kernel_size_t32 uclen = (__kernel_size_t32) (ucmsg_ptr - cmsg_ptr);
+		compat_size_t uclen = (compat_size_t) (ucmsg_ptr - cmsg_ptr);
 		err |= __put_user(uclen, &user_msg->msg_controllen);
 	}
 	if(err >= 0)
@@ -575,12 +579,34 @@ static int do_set_icmpv6_filter(int fd, int level, int optname,
 	return ret;
 }
 
-asmlinkage int sys32_setsockopt(int fd, int level, int optname,
+static int do_set_sock_timeout(int fd, int level, int optname, char *optval, int optlen)
+{
+	struct compat_timeval *up = (struct compat_timeval *) optval;
+	struct timeval ktime;
+	mm_segment_t old_fs;
+	int err;
+
+	if (optlen < sizeof(*up))
+		return -EINVAL;
+	if (get_user(ktime.tv_sec, &up->tv_sec) ||
+	    __get_user(ktime.tv_usec, &up->tv_usec))
+		return -EFAULT;
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_setsockopt(fd, level, optname, (char *) &ktime, sizeof(ktime));
+	set_fs(old_fs);
+
+	return err;
+}
+
+asmlinkage long sys32_setsockopt(int fd, int level, int optname,
 				char *optval, int optlen)
 {
 	if (optname == SO_ATTACH_FILTER)
 		return do_set_attach_filter(fd, level, optname,
 					    optval, optlen);
+	if (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO)
+		return do_set_sock_timeout(fd, level, optname, optval, optlen);
 	if (level == SOL_ICMPV6 && optname == ICMPV6_FILTER)
 		return do_set_icmpv6_filter(fd, level, optname,
 					    optval, optlen);
@@ -588,6 +614,39 @@ asmlinkage int sys32_setsockopt(int fd, int level, int optname,
 	return sys_setsockopt(fd, level, optname, optval, optlen);
 }
 
+static int do_get_sock_timeout(int fd, int level, int optname, char *optval, int *optlen)
+{
+	struct compat_timeval *up = (struct compat_timeval *) optval;
+	struct timeval ktime;
+	mm_segment_t old_fs;
+	int len, err;
+
+	if (get_user(len, optlen))
+		return -EFAULT;
+	if (len < sizeof(*up))
+		return -EINVAL;
+	len = sizeof(ktime);
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_getsockopt(fd, level, optname, (char *) &ktime, &len);
+	set_fs(old_fs);
+
+	if (!err) {
+		if (put_user(sizeof(*up), optlen) ||
+		    put_user(ktime.tv_sec, &up->tv_sec) ||
+		    __put_user(ktime.tv_usec, &up->tv_usec))
+			err = -EFAULT;
+	}
+	return err;
+}
+
+asmlinkage long sys32_getsockopt(int fd, int level, int optname,
+				char *optval, int *optlen)
+{
+	if (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO)
+		return do_get_sock_timeout(fd, level, optname, optval, optlen);
+	return sys_getsockopt(fd, level, optname, optval, optlen);
+}
 
 /* Argument list sizes for sys_socketcall */
 #define AL(x) ((x) * sizeof(u32))
@@ -606,14 +665,11 @@ extern asmlinkage long sys_getsockname(int fd, struct sockaddr *usockaddr,
 extern asmlinkage long sys_getpeername(int fd, struct sockaddr *usockaddr,
 				      int *usockaddr_len);
 extern asmlinkage long sys_send(int fd, void *buff, size_t len, unsigned flags);
-extern asmlinkage long sys_sendto(int fd, u32 buff, __kernel_size_t32 len,
+extern asmlinkage long sys_sendto(int fd, u32 buff, compat_size_t len,
 				   unsigned flags, u32 addr, int addr_len);
 extern asmlinkage long sys_recv(int fd, void *ubuf, size_t size, unsigned flags);
-extern asmlinkage long sys_recvfrom(int fd, u32 ubuf, __kernel_size_t32 size,
+extern asmlinkage long sys_recvfrom(int fd, u32 ubuf, compat_size_t size,
 				     unsigned flags, u32 addr, u32 addr_len);
-extern asmlinkage long sys_getsockopt(int fd, int level, int optname,
-				       u32 optval, u32 optlen);
-
 extern asmlinkage long sys_socket(int family, int type, int protocol);
 extern asmlinkage long sys_socketpair(int family, int type, int protocol,
 				     int usockvec[2]);
@@ -678,11 +734,11 @@ asmlinkage long sys32_socketcall(int call, u32 *args)
 			ret = sys_shutdown(a0,a1);
 			break;
 		case SYS_SETSOCKOPT:
-			ret = sys_setsockopt(a0, a1, a[2], (char *)A(a[3]),
+			ret = sys32_setsockopt(a0, a1, a[2], (char *)A(a[3]),
 					      a[4]);
 			break;
 		case SYS_GETSOCKOPT:
-			ret = sys_getsockopt(a0, a1, a[2], a[3], a[4]);
+			ret = sys32_getsockopt(a0, a1, a[2], (char *)(u64)a[3], (int *)(u64)a[4]);
 			break;
 		case SYS_SENDMSG:
 			ret = sys32_sendmsg(a0, (struct msghdr32 *)A(a1),

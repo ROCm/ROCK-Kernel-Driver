@@ -1637,9 +1637,9 @@ static void	printinode(struct inode *ip)
 	if (ip == NULL)
 		return;
 
-	kdb_printf(" i_ino = %lu i_count = %u i_dev = 0x%x i_size %Ld\n",
+	kdb_printf(" i_ino = %lu i_count = %u i_size %Ld\n",
 					ip->i_ino, atomic_read(&ip->i_count),
-					ip->i_sb->s_dev, ip->i_size);
+					ip->i_size);
 
 	kdb_printf(
 		" i_mode = 0x%x	 i_nlink = %d  i_rdev = 0x%x i_state = 0x%lx\n",

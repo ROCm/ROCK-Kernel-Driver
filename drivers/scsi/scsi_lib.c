@@ -57,9 +57,8 @@ struct scsi_host_sg_pool scsi_sg_pools[SG_MEMPOOL_NR] = {
  */
 int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int at_head)
 {
-	request_queue_t *q = &SCpnt->device->request_queue;
-
-	blk_insert_request(q, SCpnt->request, at_head, SCpnt);
+	blk_insert_request(SCpnt->device->request_queue, SCpnt->request,
+		       	   at_head, SCpnt);
 	return 0;
 }
 
@@ -85,16 +84,13 @@ int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int at_head)
  */
 int scsi_insert_special_req(Scsi_Request * SRpnt, int at_head)
 {
-	request_queue_t *q = &SRpnt->sr_device->request_queue;
-
 	/* This is used to insert SRpnt specials.  Because users of
 	 * this function are apt to reuse requests with no modification,
 	 * we have to sanitise the request flags here
 	 */
-
 	SRpnt->sr_request->flags &= ~REQ_DONTPREP;
-
-	blk_insert_request(q, SRpnt->sr_request, at_head, SRpnt);
+	blk_insert_request(SRpnt->sr_device->request_queue, SRpnt->sr_request,
+		       	   at_head, SRpnt);
 	return 0;
 }
 
@@ -215,7 +211,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 {
 	int all_clear;
 	unsigned long flags;
-	Scsi_Device *SDpnt;
+	Scsi_Device *SDpnt, *SDpnt2;
 	struct Scsi_Host *SHpnt;
 
 	ASSERT_LOCK(q->queue_lock, 0);
@@ -256,17 +252,17 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	 * with special case code, then spin off separate versions and
 	 * use function pointers to pick the right one.
 	 */
-	if (SDpnt->single_lun && blk_queue_empty(q) && SDpnt->device_busy ==0) {
-		list_for_each_entry(SDpnt, &SHpnt->my_devices, siblings) {
-			if (((SHpnt->can_queue > 0)
-			     && (SHpnt->host_busy >= SHpnt->can_queue))
-			    || (SHpnt->host_blocked)
-			    || (SHpnt->host_self_blocked)
-			    || (SDpnt->device_blocked)) {
+	if (SDpnt->single_lun && blk_queue_empty(q) && SDpnt->device_busy ==0 &&
+			!SHpnt->host_blocked && !SHpnt->host_self_blocked &&
+			!((SHpnt->can_queue > 0) && (SHpnt->host_busy >=
+				       		     SHpnt->can_queue))) {
+		list_for_each_entry(SDpnt2, &SDpnt->same_target_siblings,
+			       same_target_siblings) {
+			if (!SDpnt2->device_blocked &&
+			    !blk_queue_empty(SDpnt2->request_queue)) {
+				__blk_run_queue(SDpnt2->request_queue);
 				break;
 			}
-
-			__blk_run_queue(&SDpnt->request_queue);
 		}
 	}
 
@@ -289,7 +285,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 			if (SDpnt->device_blocked || !SDpnt->starved) {
 				continue;
 			}
-			__blk_run_queue(&SDpnt->request_queue);
+			__blk_run_queue(SDpnt->request_queue);
 			all_clear = 0;
 		}
 		if (SDpnt == NULL && all_clear) {
@@ -327,7 +323,7 @@ static Scsi_Cmnd *scsi_end_request(Scsi_Cmnd * SCpnt,
 				     int sectors,
 				     int requeue)
 {
-	request_queue_t *q = &SCpnt->device->request_queue;
+	request_queue_t *q = SCpnt->device->request_queue;
 	struct request *req = SCpnt->request;
 	unsigned long flags;
 
@@ -497,7 +493,7 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 {
 	int result = SCpnt->result;
 	int this_count = SCpnt->bufflen >> 9;
-	request_queue_t *q = &SCpnt->device->request_queue;
+	request_queue_t *q = SCpnt->device->request_queue;
 	struct request *req = SCpnt->request;
 
 	/*
@@ -1094,7 +1090,7 @@ void scsi_unblock_requests(struct Scsi_Host * SHpnt)
 	SHpnt->host_self_blocked = FALSE;
 	/* Now that we are unblocked, try to start the queues. */
 	list_for_each_entry(SDloop, &SHpnt->my_devices, siblings)
-		scsi_queue_next_request(&SDloop->request_queue, NULL);
+		scsi_queue_next_request(SDloop->request_queue, NULL);
 }
 
 /*

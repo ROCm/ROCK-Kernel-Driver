@@ -419,42 +419,64 @@ xfs_xlatesb(
 int
 xfs_readsb(xfs_mount_t *mp)
 {
+	unsigned int	sector_size;
+	unsigned int	extra_flags;
 	xfs_buf_t	*bp;
 	xfs_sb_t	*sbp;
-	int		error = 0;
+	int		error;
 
-	ASSERT(mp->m_sb_bp == 0);
+	ASSERT(mp->m_sb_bp == NULL);
+	ASSERT(mp->m_ddev_targp != NULL);
 
 	/*
 	 * Allocate a (locked) buffer to hold the superblock.
-	 * This will be kept around at all time to optimize
+	 * This will be kept around at all times to optimize
 	 * access to the superblock.
 	 */
-	bp = xfs_buf_read_flags(mp->m_ddev_targp, XFS_SB_DADDR, 1,
-		PBF_LOCK|PBF_READ|PBF_MAPPED|PBF_MAPPABLE|PBF_FS_MANAGED);
-	ASSERT(bp != NULL);
-	ASSERT(XFS_BUF_ISBUSY(bp) && XFS_BUF_VALUSEMA(bp) <= 0);
+	sector_size = xfs_getsize_buftarg(mp->m_ddev_targp);
+	extra_flags = XFS_BUF_LOCK | XFS_BUF_MANAGE | XFS_BUF_MAPPED;
+
+	bp = xfs_buf_read_flags(mp->m_ddev_targp, XFS_SB_DADDR,
+				BTOBB(sector_size), extra_flags);
+	ASSERT(bp);
+	ASSERT(XFS_BUF_ISBUSY(bp));
+	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 
 	/*
 	 * Initialize the mount structure from the superblock.
 	 * But first do some basic consistency checking.
 	 */
 	sbp = XFS_BUF_TO_SBP(bp);
-	xfs_xlatesb(XFS_BUF_PTR(bp), &(mp->m_sb), 1, ARCH_CONVERT, XFS_SB_ALL_BITS);
-	if ((error = xfs_mount_validate_sb(mp, &(mp->m_sb)))) {
+	xfs_xlatesb(XFS_BUF_PTR(bp), &(mp->m_sb), 1,
+				ARCH_CONVERT, XFS_SB_ALL_BITS);
+
+	error = xfs_mount_validate_sb(mp, &(mp->m_sb));
+	if (error) {
 		cmn_err(CE_WARN, "XFS: SB validate failed");
-		goto err;
+		XFS_BUF_UNMANAGE(bp);
+		xfs_buf_relse(bp);
+		return error;
+	}
+
+	/*
+	 * Re-read the superblock so that our buffer is correctly sized.
+	 * We only need to do this if sector size on-disk is different.
+	 */
+	if (sector_size != mp->m_sb.sb_sectsize) {
+		XFS_BUF_UNMANAGE(bp);
+		xfs_buf_relse(bp);
+		sector_size = mp->m_sb.sb_sectsize;
+		bp = xfs_buf_read_flags(mp->m_ddev_targp, XFS_SB_DADDR,
+					BTOBB(sector_size), extra_flags);
+		ASSERT(bp);
+		ASSERT(XFS_BUF_ISBUSY(bp));
+		ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 	}
 
 	mp->m_sb_bp = bp;
 	xfs_buf_relse(bp);
 	ASSERT(XFS_BUF_VALUSEMA(bp) > 0);
 	return 0;
-
- err:
-	bp->pb_flags &= ~PBF_FS_MANAGED;
-	xfs_buf_relse(bp);
-	return error;
 }
 
 
@@ -1531,10 +1553,10 @@ xfs_freesb(
 
 	/*
 	 * Use xfs_getsb() so that the buffer will be locked
-	 * when we call nfreerbuf().
+	 * when we call xfs_buf_relse().
 	 */
 	bp = xfs_getsb(mp, 0);
-	bp->pb_flags &= ~PBF_FS_MANAGED;
+	XFS_BUF_UNMANAGE(bp);
 	xfs_buf_relse(bp);
 	mp->m_sb_bp = NULL;
 }

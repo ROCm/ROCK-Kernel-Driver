@@ -160,14 +160,12 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt);
  */
 void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 {
-	request_queue_t *q = &SDpnt->request_queue;
+	request_queue_t *q = SDpnt->request_queue;
 
 	/*
 	 * tell block layer about assigned host_lock for this host
 	 */
 	blk_init_queue(q, scsi_request_fn, SHpnt->host_lock);
-
-	q->queuedata = (void *) SDpnt;
 
 	/* Hardware imposed limit. */
 	blk_queue_max_hw_segments(q, SHpnt->sg_tablesize);
@@ -223,7 +221,7 @@ __setup("scsi_logging=", scsi_logging_setup);
 static void scsi_wait_done(Scsi_Cmnd * SCpnt)
 {
 	struct request *req = SCpnt->request;
-        struct request_queue *q = &SCpnt->device->request_queue;
+        struct request_queue *q = SCpnt->device->request_queue;
         unsigned long flags;
 
         ASSERT_LOCK(q->queue_lock, 0);
@@ -656,17 +654,14 @@ int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
  */
 void scsi_release_command(Scsi_Cmnd * SCpnt)
 {
-        request_queue_t *q = &SCpnt->device->request_queue;
-
         __scsi_release_command(SCpnt);
-
         /*
          * Finally, hit the queue request function to make sure that
          * the device is actually busy if there are requests present.
          * This won't block - if the device cannot take any more, life
          * will go on.  
          */
-        scsi_queue_next_request(q, NULL);                
+        scsi_queue_next_request(SCpnt->device->request_queue, NULL);
 }
 
 /*
@@ -810,13 +805,12 @@ void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
  		  int timeout, int retries)
 {
 	DECLARE_COMPLETION(wait);
-	request_queue_t *q = &SRpnt->sr_device->request_queue;
 	
 	SRpnt->sr_request->waiting = &wait;
 	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
 	scsi_do_req (SRpnt, (void *) cmnd,
 		buffer, bufflen, scsi_wait_done, timeout, retries);
-	generic_unplug_device(q);
+	generic_unplug_device(SRpnt->sr_device->request_queue);
 	wait_for_completion(&wait);
 	SRpnt->sr_request->waiting = NULL;
 	if( SRpnt->sr_command != NULL )
@@ -1912,10 +1906,8 @@ void scsi_device_put(struct scsi_device *sdev)
  */
 int scsi_slave_attach(struct scsi_device *sdev)
 {
+	/* all this code is now handled elsewhere 
 	if (sdev->attached++ == 0) {
-		/*
-		 * No one was attached.
-		 */
 		scsi_build_commandblocks(sdev);
 		if (sdev->current_queue_depth == 0) {
 			printk(KERN_ERR "scsi: Allocation failure during"
@@ -1935,6 +1927,8 @@ int scsi_slave_attach(struct scsi_device *sdev)
 			scsi_adjust_queue_depth(sdev, 0,
 						sdev->host->cmd_per_lun);
 	}
+		 */
+	sdev->attached++;
 	return 0;
 }
 
@@ -1950,9 +1944,12 @@ int scsi_slave_attach(struct scsi_device *sdev)
  */
 void scsi_slave_detach(struct scsi_device *sdev)
 {
+	/*
 	if (--sdev->attached == 0) {
 		scsi_release_commandblocks(sdev);
 	}
+	*/
+	sdev->attached--;
 }
 /*
  * This entry point should be called by a loadable module if it is trying

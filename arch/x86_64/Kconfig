@@ -175,6 +175,14 @@ config MTRR
 
 	  See <file:Documentation/mtrr.txt> for more information.
 
+config HUGETLB_PAGE
+	bool "Huge TLB Page Support"
+	help
+	  This enables support for huge pages.  User space applications
+	  can make use of this support with the hugetlbfs file system
+	  To actually use it you need to pass an hugepages= argument
+	  to the kernel at boot time.
+
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---
@@ -284,6 +292,35 @@ config PM
 	  Note that, even if you say N here, Linux on the x86 architecture
 	  will issue the hlt instruction if nothing is to be done, thereby
 	  sending the processor to sleep and saving power.
+
+config SOFTWARE_SUSPEND
+	bool "Software Suspend (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && PM
+	---help---
+	  Enable the possibilty of suspendig machine. It doesn't need APM.
+	  You may suspend your machine by 'swsusp' or 'shutdown -z <time>' 
+	  (patch for sysvinit needed). 
+
+	  It creates an image which is saved in your active swaps. By the next
+	  booting the, pass 'resume=/path/to/your/swap/file' and kernel will 
+	  detect the saved image, restore the memory from
+	  it and then it continues to run as before you've suspended.
+	  If you don't want the previous state to continue use the 'noresume'
+	  kernel option. However note that your partitions will be fsck'd and
+	  you must re-mkswap your swap partitions/files.
+
+	  Right now you may boot without resuming and then later resume but
+	  in meantime you cannot use those swap partitions/files which were
+	  involved in suspending. Also in this case there is a risk that buffers
+	  on disk won't match with saved ones.
+
+	  SMP is supported ``as-is''. There's a code for it but doesn't work.
+	  There have been problems reported relating SCSI.
+
+	  This option is about getting stable. However there is still some
+	  absence of features.
+
+	  For more information take a look at Documentation/swsusp.txt.
 
 source "drivers/acpi/Kconfig"
 
@@ -424,6 +461,11 @@ config IA32_EMULATION
 	  Include code to run 32bit programs under an 64bit kernel. You should likely
 	  turn this on, unless you're 100% sure that you don't have any 32bit programs
 	  left.
+
+config COMPAT
+	bool
+	depends on IA32_EMULATION
+	default y
 
 endmenu
 
@@ -691,6 +733,16 @@ config KALLSYMS
 	  Say Y here to let the kernel print out symbolic crash information and
 	  symbolic stack backtraces. This increases the size of the kernel
 	  somewhat, as all symbols have to be loaded into the kernel image.
+
+config FRAME_POINTER
+       bool "Compile the kernel with frame pointers"
+       depends on DEBUG_KERNEL	
+       help
+         If you say Y here the resulting kernel image will be slightly larger
+         and slower, but it will give very useful debugging information.
+         If you don't debug the kernel, you can say N, but we may not be able
+         to solve problems without frame pointers.
+	 Note this is normally not needed on x86-64.
 
 endmenu
 

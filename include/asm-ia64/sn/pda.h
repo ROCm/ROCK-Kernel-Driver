@@ -10,6 +10,7 @@
 
 #include <linux/config.h>
 #include <linux/cache.h>
+#include <asm/percpu.h>
 #include <asm/system.h>
 #include <asm/processor.h>
 #include <asm/page.h>
@@ -25,7 +26,14 @@
  * all SN per-cpu data structures. 
  */
 
-
+#ifdef BUS_INT_WAR
+#define POLL_ENTRIES	50
+typedef struct {
+	int	irq;
+	int	interval;
+	short	tick;
+} sn_poll_entry_t;
+#endif
 
 typedef struct pda_s {
 
@@ -38,11 +46,15 @@ typedef struct pda_s {
 	struct subnodepda_s *p_subnodepda;	/* Pointer to CPU  subnode PDA */
 
 	/*
-	 * Support for blinking SN LEDs
+	 * Support for SN LEDs
 	 */
-	long		*led_address;
+#ifdef CONFIG_IA64_SGI_SN1
+	volatile long	*led_address;
+#else
+	volatile short	*led_address;
+#endif
 	u8		led_state;
-	char		hb_state;	/* supports blinking heartbeat leds */
+	u8		hb_state;	/* supports blinking heartbeat leds */
 	unsigned int	hb_count;
 
 	unsigned int	idle_flag;
@@ -52,8 +64,15 @@ typedef struct pda_s {
 #endif
 	volatile unsigned long *bedrock_rev_id;
 	volatile unsigned long *pio_write_status_addr;
+	volatile unsigned long *pio_shub_war_cam_addr;
+	volatile unsigned long *mem_write_status_addr;
 
-	bteinfo_t *cpubte[BTES_PER_NODE];
+	bteinfo_t *cpu_bte_if[BTES_PER_NODE];	/* cpu interface order */
+
+#ifdef BUS_INT_WAR
+	sn_poll_entry_t	pda_poll_entries[POLL_ENTRIES];
+	int		pda_poll_entry_count;
+#endif
 } pda_t;
 
 
@@ -71,10 +90,11 @@ typedef struct pda_s {
  * size of the cpu_data area dont change cache layout. Should we align to 32, 64, 128
  * or 512 boundary. Each has merits. For now, pick 128 but should be revisited later.
  */
-#define CPU_DATA_END	CACHE_ALIGN((long)&(((struct cpuinfo_ia64*)0)->platform_specific))
-#define PDAADDR		(PERCPU_ADDR+CPU_DATA_END)
+DECLARE_PER_CPU(struct pda_s, pda_percpu);
 
-#define pda		(*((pda_t *) PDAADDR))
+#define pda		(&__get_cpu_var(pda_percpu))
+
+#define pdacpu(cpu)	(&per_cpu(pda_percpu, cpu))
 
 
 #endif /* _ASM_IA64_SN_PDA_H */

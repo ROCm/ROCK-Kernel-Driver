@@ -443,8 +443,6 @@ acpi_boot_init (
 
 #error not ported to x86-64 yet
 
-#define DEBUG
-
 #ifdef DEBUG
 #include <linux/serial.h>
 #endif

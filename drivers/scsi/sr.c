@@ -563,7 +563,7 @@ static int sr_attach(struct scsi_device *sdev)
 	register_cdrom(&cd->cdi);
 	set_capacity(disk, cd->capacity);
 	disk->private_data = &cd->driver;
-	disk->queue = &sdev->request_queue;
+	disk->queue = sdev->request_queue;
 
 	add_disk(disk);
 	sr_devlist_insert(cd);
@@ -672,7 +672,7 @@ static void get_sectorsize(struct scsi_cd *cd)
 		set_capacity(cd->disk, cd->capacity);
 	}
 
-	queue = &cd->device->request_queue;
+	queue = cd->device->request_queue;
 	blk_queue_hardsect_size(queue, sector_size);
 out:
 	kfree(buffer);

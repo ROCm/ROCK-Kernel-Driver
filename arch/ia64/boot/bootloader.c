@@ -3,12 +3,14 @@
  *
  * Loads an ELF kernel.
  *
- * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
- * Copyright (C) 1998, 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
- * Copyright (C) 1998, 1999 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * 01/07/99 S.Eranian modified to pass command line arguments to kernel
  */
+struct task_struct;	/* forward declaration for elf.h */
+
 #include <linux/config.h>
 #include <linux/elf.h>
 #include <linux/init.h>
@@ -52,6 +54,15 @@ struct disk_stat {
 };
 
 #include "../kernel/fw-emu.c"
+
+/*
+ * Set a break point on this function so that symbols are available to set breakpoints in
+ * the kernel being debugged.
+ */
+static void
+debug_break (void)
+{
+}
 
 static void
 cons_write (const char *buf)
@@ -187,6 +198,7 @@ _start (void)
 
 	ssc(0, (long) kpath, 0, 0, SSC_LOAD_SYMBOLS);
 
+	debug_break();
 	asm volatile ("mov sp=%2; mov r28=%1; br.sptk.few %0"
 		      :: "b"(e_entry), "r"(bp), "r"(__pa(&stack)));
 

@@ -781,7 +781,7 @@ C_END(trap_table)
 	
 	.align 4
 C_DATA(sys_call_table):
-	.long CSYM(sys_ni_syscall)	// 0  -  old "setup()" system call
+	.long CSYM(sys_restart_syscall)	// 0
 	.long CSYM(sys_exit)
 	.long sys_fork_wrapper
 	.long CSYM(sys_read)

@@ -7,6 +7,7 @@
  * Copyright (C) 1992-1997, 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <asm/sn/types.h>
@@ -31,21 +32,6 @@ extern xtalk_provider_t hub_provider;
 extern void hub_intr_init(devfs_handle_t hubv);
 
 
-/*      
- * hub_device_desc_update               
- *      Update the passed in device descriptor with the actual the
- *      target cpu number and interrupt priority level.
- *      NOTE : These might be the same as the ones passed in thru
- *      the descriptor.
- */     
-void
-hub_device_desc_update(device_desc_t    dev_desc,
-                       ilvl_t           intr_swlevel, 
-                       cpuid_t          cpu)
-{       
-}
-
-
 /*
  * Perform any initializations needed to support hub-based I/O.
  * Called once during startup.
@@ -53,11 +39,6 @@ hub_device_desc_update(device_desc_t    dev_desc,
 void
 hubio_init(void)
 {
-#ifdef	LATER
-	/* This isn't needed unless we port the entire sio driver ... */
-        extern void early_brl1_port_init( void );
-	early_brl1_port_init();
-#endif
 }
 
 /* 
@@ -149,6 +130,10 @@ hub_piomap_alloc(devfs_handle_t dev,	/* set up mapping for this device */
 	nasid_t nasid;
 	volatile hubreg_t junk;
 	unsigned long s;
+	caddr_t kvaddr;
+#ifdef PIOMAP_UNC_ACC_SPACE
+	uint64_t addr;
+#endif
 
 	/* sanity check */
 	if (byte_count_max > byte_count)
@@ -159,8 +144,19 @@ hub_piomap_alloc(devfs_handle_t dev,	/* set up mapping for this device */
 	/* If xtalk_addr range is mapped by a small window, we don't have 
 	 * to do much 
 	 */
-	if (xtalk_addr + byte_count <= SWIN_SIZE)
-		return(hubinfo_swin_piomap_get(hubinfo, (int)widget));
+	if (xtalk_addr + byte_count <= SWIN_SIZE) {
+		hub_piomap_t piomap;
+
+		piomap = hubinfo_swin_piomap_get(hubinfo, (int)widget);
+#ifdef PIOMAP_UNC_ACC_SPACE
+		if (flags & PIOMAP_UNC_ACC) {
+			addr = (uint64_t)piomap->hpio_xtalk_info.xp_kvaddr;
+			addr |= PIOMAP_UNC_ACC_SPACE;
+			piomap->hpio_xtalk_info.xp_kvaddr = (caddr_t)addr;
+		}
+#endif
+		return piomap;
+	}
 
 	/* We need to use a big window mapping.  */
 
@@ -257,7 +253,15 @@ tryagain:
 	bw_piomap->hpio_xtalk_info.xp_dev = dev;
 	bw_piomap->hpio_xtalk_info.xp_target = widget;
 	bw_piomap->hpio_xtalk_info.xp_xtalk_addr = xtalk_addr;
-	bw_piomap->hpio_xtalk_info.xp_kvaddr = (caddr_t)NODE_BWIN_BASE(nasid, free_bw_index);
+	kvaddr = (caddr_t)NODE_BWIN_BASE(nasid, free_bw_index);
+#ifdef PIOMAP_UNC_ACC_SPACE
+	if (flags & PIOMAP_UNC_ACC) {
+		addr = (uint64_t)kvaddr;
+		addr |= PIOMAP_UNC_ACC_SPACE;
+		kvaddr = (caddr_t)addr;
+	}
+#endif
+	bw_piomap->hpio_xtalk_info.xp_kvaddr = kvaddr;
 	bw_piomap->hpio_holdcnt++;
 	bw_piomap->hpio_bigwin_num = free_bw_index;
 
@@ -378,12 +382,22 @@ hub_piotrans_addr(	devfs_handle_t dev,	/* translate to this device */
 	devfs_handle_t hubv = xwidget_info_master_get(widget_info);
 	hub_piomap_t hub_piomap;
 	hubinfo_t hubinfo;
+	caddr_t addr;
 
 	hubinfo_get(hubv, &hubinfo);
 
 	if (xtalk_addr + byte_count <= SWIN_SIZE) {
 		hub_piomap = hubinfo_swin_piomap_get(hubinfo, (int)widget);
-		return(hub_piomap_addr(hub_piomap, xtalk_addr, byte_count));
+		addr = hub_piomap_addr(hub_piomap, xtalk_addr, byte_count);
+#ifdef PIOMAP_UNC_ACC_SPACE
+		if (flags & PIOMAP_UNC_ACC) {
+			uint64_t iaddr;
+			iaddr = (uint64_t)addr;
+			iaddr |= PIOMAP_UNC_ACC_SPACE;
+			addr = (caddr_t)iaddr;
+		}
+#endif
+		return(addr);
 	} else
 		return(0);
 }
@@ -391,19 +405,6 @@ hub_piotrans_addr(	devfs_handle_t dev,	/* translate to this device */
 
 /* DMA MANAGEMENT */
 /* Mapping from crosstalk space to system physical space */
-
-/* 
- * There's not really very much to do here, since crosstalk maps
- * directly to system physical space.  It's quite possible that this
- * DMA layer will be bypassed in performance kernels.
- */
-
-
-/* ARGSUSED */
-void
-hub_dma_init(devfs_handle_t hubv)
-{
-}
 
 
 /*
@@ -478,7 +479,12 @@ hub_dmamap_addr(	hub_dmamap_t dmamap,	/* use these mapping resources */
 	}
 
 	/* There isn't actually any DMA mapping hardware on the hub. */
-	return(paddr);
+#ifdef CONFIG_IA64_SGI_SN2
+        return( (PHYS_TO_DMA(paddr)) );
+#else
+        /* no translation needed */
+        return(paddr);
+#endif
 }
 
 /*
@@ -549,8 +555,12 @@ hub_dmatrans_addr(	devfs_handle_t dev,	/* translate for this device */
 			size_t byte_count,	/* length */
 			unsigned flags)		/* defined in dma.h */
 {
+#ifdef CONFIG_IA64_SGI_SN2
+	return( (PHYS_TO_DMA(paddr)) );
+#else
 	/* no translation needed */
 	return(paddr);
+#endif
 }
 
 /*
@@ -565,6 +575,7 @@ hub_dmatrans_list(	devfs_handle_t dev,	/* translate for this device */
 			alenlist_t palenlist,	/* system address/length list */
 			unsigned flags)		/* defined in dma.h */
 {
+	BUG();
 	/* no translation needed */
 	return(palenlist);
 }
@@ -603,11 +614,9 @@ hub_dmalist_drain(	devfs_handle_t vhdl,
 void
 hub_provider_startup(devfs_handle_t hubv)
 {
-	extern void hub_dma_init(devfs_handle_t hubv);
 	extern void hub_pio_init(devfs_handle_t hubv);
 
 	hub_pio_init(hubv);
-	hub_dma_init(hubv);
 	hub_intr_init(hubv);
 }
 
@@ -707,14 +716,12 @@ hub_setup_prb(nasid_t nasid, int prbnum, int credits, int conveyor)
 {
 	iprb_t prb;
 	int prb_offset;
-#ifdef LATER
 	extern int force_fire_and_forget;
 	extern volatile int ignore_conveyor_override;
 
 	if (force_fire_and_forget && !ignore_conveyor_override)
 	    if (conveyor == HUB_PIO_CONVEYOR)
 		conveyor = HUB_PIO_FIRE_N_FORGET;
-#endif
 
 	/*
 	 * Get the current register value.

@@ -558,8 +558,16 @@ void pcibios_fixup_pbus_ranges(struct pci_bus *, struct pbus_set_ranges_data *);
 /* Generic PCI functions used internally */
 
 int pci_bus_exists(const struct list_head *list, int nr);
-struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
-struct pci_bus *pci_alloc_primary_bus(int bus);
+struct pci_bus *pci_scan_bus_parented(struct device *parent, int bus, struct pci_ops *ops, void *sysdata);
+static inline struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata)
+{
+	return pci_scan_bus_parented(NULL, bus, ops, sysdata);
+}
+struct pci_bus *pci_alloc_primary_bus_parented(struct device * parent, int bus);
+static inline struct pci_bus *pci_alloc_primary_bus(int bus)
+{
+	return pci_alloc_primary_bus_parented(NULL, bus);
+}
 struct pci_dev *pci_scan_slot(struct pci_dev *temp);
 int pci_proc_attach_device(struct pci_dev *dev);
 int pci_proc_detach_device(struct pci_dev *dev);
@@ -825,6 +833,93 @@ extern int pci_pci_problems;
 #define PCIPCI_NATOMA		4
 #define PCIPCI_VIAETBF		8
 #define PCIPCI_VSFX		16
+
+#include <linux/dma-mapping.h>
+
+/* If you define PCI_NEW_DMA_COMPAT_API it means you support the new DMA API
+ * and you want the pci_ DMA API to be implemented using it.
+ */
+#if defined(PCI_NEW_DMA_COMPAT_API) && defined(CONFIG_PCI)
+
+/* note pci_set_dma_mask isn't here, since it's a public function
+ * exported from drivers/pci, use dma_supported instead */
+
+static inline int
+pci_dma_supported(struct pci_dev *hwdev, u64 mask)
+{
+	return dma_supported(&hwdev->dev, mask);
+}
+
+static inline void *
+pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
+		     dma_addr_t *dma_handle)
+{
+	return dma_alloc_coherent(&hwdev->dev, size, dma_handle);
+}
+
+static inline void
+pci_free_consistent(struct pci_dev *hwdev, size_t size,
+		    void *vaddr, dma_addr_t dma_handle)
+{
+	dma_free_coherent(&hwdev->dev, size, vaddr, dma_handle);
+}
+
+static inline dma_addr_t
+pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
+{
+	return dma_map_single(&hwdev->dev, ptr, size, (enum dma_data_direction)direction);
+}
+
+static inline void
+pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
+		 size_t size, int direction)
+{
+	dma_unmap_single(&hwdev->dev, dma_addr, size, (enum dma_data_direction)direction);
+}
+
+static inline dma_addr_t
+pci_map_page(struct pci_dev *hwdev, struct page *page,
+	     unsigned long offset, size_t size, int direction)
+{
+	return dma_map_page(&hwdev->dev, page, offset, size, (enum dma_data_direction)direction);
+}
+
+static inline void
+pci_unmap_page(struct pci_dev *hwdev, dma_addr_t dma_address,
+	       size_t size, int direction)
+{
+	dma_unmap_page(&hwdev->dev, dma_address, size, (enum dma_data_direction)direction);
+}
+
+static inline int
+pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+	   int nents, int direction)
+{
+	return dma_map_sg(&hwdev->dev, sg, nents, (enum dma_data_direction)direction);
+}
+
+static inline void
+pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+	     int nents, int direction)
+{
+	dma_unmap_sg(&hwdev->dev, sg, nents, (enum dma_data_direction)direction);
+}
+
+static inline void
+pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle,
+		    size_t size, int direction)
+{
+	dma_sync_single(&hwdev->dev, dma_handle, size, (enum dma_data_direction)direction);
+}
+
+static inline void
+pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg,
+		int nelems, int direction)
+{
+	dma_sync_sg(&hwdev->dev, sg, nelems, (enum dma_data_direction)direction);
+}
+
+#endif
 
 #endif /* __KERNEL__ */
 #endif /* LINUX_PCI_H */

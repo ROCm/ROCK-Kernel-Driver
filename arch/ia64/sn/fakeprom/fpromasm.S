@@ -180,7 +180,7 @@ initx:
 
 
 // Now call main & pass it the current LID value.
-	alloc 		r0=ar.pfs,0,0,2,0
+	alloc 		r2=ar.pfs,0,0,2,0
 	mov    		r32=r26
 	mov   		r33=r8;;
 	br.call.sptk.few rp=fmain

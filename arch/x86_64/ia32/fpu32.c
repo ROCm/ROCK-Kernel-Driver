@@ -70,6 +70,10 @@ static inline unsigned long twd_fxsr_to_i387(struct i387_fxsave_struct *fxsave)
 	return ret;
 }
 
+struct s10 { 
+	u64 a;
+	u16 b;
+} __attribute__((packed)); 
 
 static inline int convert_fxsr_from_user(struct i387_fxsave_struct *fxsave,
 					 struct _fpstate_ia32 *buf)
@@ -94,7 +98,9 @@ static inline int convert_fxsr_from_user(struct i387_fxsave_struct *fxsave,
 	to = (struct _fpxreg *)&fxsave->st_space[0];
 	from = &buf->_st[0];
 	for (i = 0 ; i < 8 ; i++, to++, from++) {
-		if (__copy_from_user(to, from, sizeof(*from)))
+		struct s10 *top = (void *)to, *fromp = (void *)from; 
+		if (__put_user(fromp->a, &top->a) ||
+		    __put_user(fromp->b, &top->b))
 			return -1;
 	}
 	return 0;
@@ -130,7 +136,9 @@ static inline int convert_fxsr_to_user(struct _fpstate_ia32 *buf,
 	to = &buf->_st[0];
 	from = (struct _fpxreg *) &fxsave->st_space[0];
 	for ( i = 0 ; i < 8 ; i++, to++, from++ ) {
-		if (__copy_to_user(to, from, sizeof(*to)))
+		struct s10 *top = (void *)top, *fromp = (void *)from;
+		if (__get_user(fromp->a, &top->a) || 
+		    __get_user(fromp->b, &top->b))
 			return -1;
 	}
 	return 0;

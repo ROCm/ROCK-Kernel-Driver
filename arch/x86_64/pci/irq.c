@@ -151,30 +151,7 @@ static void write_config_nybble(struct pci_dev *router, unsigned offset, unsigne
 	pci_write_config_byte(router, reg, x);
 }
 
-/*
- * ALI pirq entries are damn ugly, and completely undocumented.
- * This has been figured out from pirq tables, and it's not a pretty
- * picture.
- */
-static int pirq_ali_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
-{
-	static unsigned char irqmap[16] = { 0, 9, 3, 10, 4, 5, 7, 6, 1, 11, 0, 12, 0, 14, 0, 15 };
-
-	return irqmap[read_config_nybble(router, 0x48, pirq-1)];
-}
-
-static int pirq_ali_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
-{
-	static unsigned char irqmap[16] = { 0, 8, 0, 2, 4, 5, 7, 6, 0, 1, 3, 9, 11, 0, 13, 15 };
-	unsigned int val = irqmap[irq];
-		
-	if (val) {
-		write_config_nybble(router, 0x48, pirq-1, val);
-		return 1;
-	}
-	return 0;
-}
-
+#if 0 /* enable when pci ids ae known */
 /*
  * The VIA pirq rules are nibble-based, like ALI,
  * but without the ugly irq number munging.
@@ -295,6 +272,8 @@ static int pirq_sis_set(struct pci_dev *router, struct pci_dev *dev, int pirq, i
 
 	return 1;
 }
+
+#endif
 
 /* Support for AMD756 PCI IRQ Routing
  * Jhon H. Caicedo <jhcaiced@osso.org.co>
@@ -529,7 +508,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	return 1;
 }
 
-static void __init pcibios_fixup_irqs(void)
+void __init pcibios_fixup_irqs(void)
 {
 	struct pci_dev *dev;
 	u8 pin;
@@ -641,7 +620,6 @@ int pirq_enable_irq(struct pci_dev *dev)
 	u8 pin;
 	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
 	if (pin && !pcibios_lookup_irq(dev, 1) && !dev->irq) {
-		char *msg;
 		printk(KERN_WARNING "PCI: No IRQ known for interrupt pin %c of device %s.\n",
 		       'A' + pin - 1, dev->slot_name);
 	}

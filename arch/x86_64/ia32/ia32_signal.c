@@ -76,7 +76,7 @@ static int ia32_copy_siginfo_to_user(siginfo_t32 *to, siginfo_t *from)
 	}
 }
 
-asmlinkage int
+asmlinkage long
 sys32_sigsuspend(int history0, int history1, old_sigset_t mask, struct pt_regs regs)
 {
 	sigset_t saveset;
@@ -97,7 +97,7 @@ sys32_sigsuspend(int history0, int history1, old_sigset_t mask, struct pt_regs r
 	}
 }
 
-asmlinkage int
+asmlinkage long
 sys32_sigaltstack(const stack_ia32_t *uss_ptr, stack_ia32_t *uoss_ptr, 
 				  struct pt_regs regs)
 {
@@ -227,7 +227,7 @@ badframe:
 	return 1;
 }
 
-asmlinkage int sys32_sigreturn(struct pt_regs regs)
+asmlinkage long sys32_sigreturn(struct pt_regs regs)
 {
 	struct sigframe *frame = (struct sigframe *)(regs.rsp - 8);
 	sigset_t set;
@@ -256,7 +256,7 @@ badframe:
 	return 0;
 }	
 
-asmlinkage int sys32_rt_sigreturn(struct pt_regs regs)
+asmlinkage long sys32_rt_sigreturn(struct pt_regs regs)
 {
 	struct rt_sigframe *frame = (struct rt_sigframe *)(regs.rsp - 4);
 	sigset_t set;

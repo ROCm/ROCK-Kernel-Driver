@@ -54,33 +54,40 @@ enter_lazy_tlb (struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 static inline void
 delayed_tlb_flush (void)
 {
-	extern void __flush_tlb_all (void);
+	extern void local_flush_tlb_all (void);
 
 	if (unlikely(__get_cpu_var(ia64_need_tlb_flush))) {
-		__flush_tlb_all();
+		local_flush_tlb_all();
 		__get_cpu_var(ia64_need_tlb_flush) = 0;
 	}
 }
 
-static inline void
-get_new_mmu_context (struct mm_struct *mm)
-{
-	spin_lock(&ia64_ctx.lock);
-	{
-		if (ia64_ctx.next >= ia64_ctx.limit)
-			wrap_mmu_context(mm);
-		mm->context = ia64_ctx.next++;
-	}
-	spin_unlock(&ia64_ctx.lock);
-}
-
-static inline void
+static inline mm_context_t
 get_mmu_context (struct mm_struct *mm)
 {
-	if (mm->context == 0)
-		get_new_mmu_context(mm);
+	mm_context_t context = mm->context;
+
+	if (context)
+		return context;
+
+	spin_lock(&ia64_ctx.lock);
+	{
+		/* re-check, now that we've got the lock: */
+		context = mm->context;
+		if (context == 0) {
+			if (ia64_ctx.next >= ia64_ctx.limit)
+				wrap_mmu_context(mm);
+			mm->context = context = ia64_ctx.next++;
+		}
+	}
+	spin_unlock(&ia64_ctx.lock);
+	return context;
 }
 
+/*
+ * Initialize context number to some sane value.  MM is guaranteed to be a brand-new
+ * address-space, so no TLB flushing is needed, ever.
+ */
 static inline int
 init_new_context (struct task_struct *p, struct mm_struct *mm)
 {
@@ -95,13 +102,13 @@ destroy_context (struct mm_struct *mm)
 }
 
 static inline void
-reload_context (struct mm_struct *mm)
+reload_context (mm_context_t context)
 {
 	unsigned long rid;
 	unsigned long rid_incr = 0;
 	unsigned long rr0, rr1, rr2, rr3, rr4;
 
-	rid = mm->context << 3;	/* make space for encoding the region number */
+	rid = context << 3;	/* make space for encoding the region number */
 	rid_incr = 1 << 8;
 
 	/* encode the region id, preferred page size, and VHPT enable bit: */
@@ -124,6 +131,18 @@ reload_context (struct mm_struct *mm)
 	ia64_insn_group_barrier();
 }
 
+static inline void
+activate_context (struct mm_struct *mm)
+{
+	mm_context_t context;
+
+	do {
+		context = get_mmu_context(mm);
+		reload_context(context);
+		/* in the unlikely event of a TLB-flush by another thread, redo the load: */
+	} while (unlikely(context != mm->context));
+}
+
 /*
  * Switch from address space PREV to address space NEXT.
  */
@@ -133,12 +152,11 @@ activate_mm (struct mm_struct *prev, struct mm_struct *next)
 	delayed_tlb_flush();
 
 	/*
-	 * We may get interrupts here, but that's OK because interrupt
-	 * handlers cannot touch user-space.
+	 * We may get interrupts here, but that's OK because interrupt handlers cannot
+	 * touch user-space.
 	 */
 	ia64_set_kr(IA64_KR_PT_BASE, __pa(next->pgd));
-	get_mmu_context(next);
-	reload_context(next);
+	activate_context(next);
 }
 
 #define switch_mm(prev_mm,next_mm,next_task,cpu)	activate_mm(prev_mm, next_mm)

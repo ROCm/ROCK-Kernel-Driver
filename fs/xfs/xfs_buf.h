@@ -35,28 +35,34 @@
 /* These are just for xfs_syncsub... it sets an internal variable
  * then passes it to VOP_FLUSH_PAGES or adds the flags to a newly gotten buf_t
  */
-#define XFS_B_ASYNC  PBF_ASYNC
-#define XFS_B_DELWRI PBF_DELWRI
-#define XFS_B_READ   PBF_READ
-#define XFS_B_WRITE  PBF_WRITE
-#define XFS_B_STALE  PBF_STALE
+#define XFS_B_ASYNC		PBF_ASYNC
+#define XFS_B_DELWRI		PBF_DELWRI
+#define XFS_B_READ		PBF_READ
+#define XFS_B_WRITE		PBF_WRITE
+#define XFS_B_STALE		PBF_STALE
+
 #define XFS_BUF_TRYLOCK		PBF_TRYLOCK
 #define XFS_INCORE_TRYLOCK	PBF_TRYLOCK
 #define XFS_BUF_LOCK		PBF_LOCK
 #define XFS_BUF_MAPPED		PBF_MAPPED
 
-#define BUF_BUSY	PBF_DONT_BLOCK
+#define BUF_BUSY		PBF_DONT_BLOCK
 
-#define XFS_BUF_BFLAGS(x)	 ((x)->pb_flags)  /* debugging routines might need this */
+#define XFS_BUF_BFLAGS(x)	((x)->pb_flags)
 #define XFS_BUF_ZEROFLAGS(x)	\
 	((x)->pb_flags &= ~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_DELWRI))
 
-#define XFS_BUF_STALE(x)	     ((x)->pb_flags |= XFS_B_STALE)
-#define XFS_BUF_UNSTALE(x)	     ((x)->pb_flags &= ~XFS_B_STALE)
-#define XFS_BUF_ISSTALE(x)	     ((x)->pb_flags & XFS_B_STALE)
-#define XFS_BUF_SUPER_STALE(x)	 (x)->pb_flags |= XFS_B_STALE;\
-				 xfs_buf_undelay(x);\
-				 (x)->pb_flags &= ~(PBF_PARTIAL|PBF_NONE)
+#define XFS_BUF_STALE(x)	((x)->pb_flags |= XFS_B_STALE)
+#define XFS_BUF_UNSTALE(x)	((x)->pb_flags &= ~XFS_B_STALE)
+#define XFS_BUF_ISSTALE(x)	((x)->pb_flags & XFS_B_STALE)
+#define XFS_BUF_SUPER_STALE(x)	do {				\
+					XFS_BUF_STALE(x);	\
+					xfs_buf_undelay(x);	\
+					XFS_BUF_DONE(x);	\
+				} while (0)
+
+#define XFS_BUF_MANAGE		PBF_FS_MANAGED
+#define XFS_BUF_UNMANAGE(x)	((x)->pb_flags &= ~PBF_FS_MANAGED)
 
 static inline void xfs_buf_undelay(page_buf_t *pb)
 {

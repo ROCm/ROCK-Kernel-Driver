@@ -1,4 +1,4 @@
-/* $Id$
+/* $Id: arch.h,v 1.1 2002/02/28 17:31:25 marcelo Exp $
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -60,7 +60,5 @@
 #define LOCALCPU(slice)	(((slice) & LOCALCPU_MASK) >> LOCALCPU_SHFT)
 #define TO_SLICE(subn, local)	(((subn) << SUBNODE_SHFT) | \
 				 ((local) << LOCALCPU_SHFT))
-
-typedef u64 mmr_t;
 
 #endif /* _ASM_IA64_SN_SN2_ARCH_H */

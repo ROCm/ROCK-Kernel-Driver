@@ -1,10 +1,10 @@
-/* $Id:$
+/* $Id: hubcounters.c,v 1.1 2002/02/28 17:31:25 marcelo Exp $
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 - 2001 Silicon Graphics, Inc.
+ * Copyright (C) 1992-1997,2000-2002 Silicon Graphics, Inc.
  * All rights reserved.
  */
 #include <linux/kernel.h>
@@ -24,7 +24,7 @@ extern void hubni_error_handler(char *, int); /* huberror.c */
 
 static int hubstats_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
 struct file_operations hub_mon_fops = {
-        .ioctl =        hubstats_ioctl,
+        ioctl:          hubstats_ioctl,
 };
 
 #define HUB_CAPTURE_TICKS	(2 * HZ)

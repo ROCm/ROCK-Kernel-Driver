@@ -48,6 +48,18 @@
 
 extern struct rpc_procinfo nfs_procedures[];
 
+static void
+nfs_write_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
+{
+	if (!(fattr->valid & NFS_ATTR_WCC)) {
+		fattr->pre_size  = NFS_CACHE_ISIZE(inode);
+		fattr->pre_mtime = NFS_CACHE_MTIME(inode);
+		fattr->pre_ctime = NFS_CACHE_CTIME(inode);
+		fattr->valid |= NFS_ATTR_WCC;
+	}
+	nfs_refresh_inode(inode, fattr);
+}
+
 /*
  * Bare-bones access to getattr: this is for nfs_read_super.
  */
@@ -166,6 +178,8 @@ nfs_proc_read(struct inode *inode, struct rpc_cred *cred,
 	fattr->valid = 0;
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, flags);
 
+	if (status >= 0)
+		nfs_refresh_inode(inode, fattr);
 	dprintk("NFS reply read: %d\n", status);
 	*eofp = res.eof;
 	return status;
@@ -204,6 +218,9 @@ nfs_proc_write(struct inode *inode, struct rpc_cred *cred,
 	if (how & NFS_RW_SWAP)
 		flags |= NFS_RPC_SWAPFLAGS;
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, flags);
+
+	if (status >= 0)
+		nfs_write_refresh_inode(inode, fattr);
 
 	dprintk("NFS reply write: %d\n", status);
 	verf->committed = NFS_FILE_SYNC;      /* NFSv2 always syncs data */
@@ -524,7 +541,10 @@ static void
 nfs_read_done(struct rpc_task *task)
 {
 	struct nfs_read_data *data = (struct nfs_read_data *) task->tk_calldata;
-	nfs_readpage_result(task, data->u.v3.res.count, data->u.v3.res.eof);
+
+	if (task->tk_status >= 0)
+		nfs_refresh_inode(data->inode, data->res.fattr);
+	nfs_readpage_result(task);
 }
 
 static void
@@ -536,20 +556,20 @@ nfs_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	int			flags;
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs_procedures[NFSPROC_READ],
-		.rpc_argp	= &data->u.v3.args,
-		.rpc_resp	= &data->u.v3.res,
+		.rpc_argp	= &data->args,
+		.rpc_resp	= &data->res,
 		.rpc_cred	= data->cred,
 	};
 	
 	req = nfs_list_entry(data->pages.next);
-	data->u.v3.args.fh     = NFS_FH(inode);
-	data->u.v3.args.offset = req_offset(req) + req->wb_offset;
-	data->u.v3.args.pgbase = req->wb_offset;
-	data->u.v3.args.pages  = data->pagevec;
-	data->u.v3.args.count  = count;
-	data->u.v3.res.fattr   = &data->fattr;
-	data->u.v3.res.count   = count;
-	data->u.v3.res.eof     = 0;
+	data->args.fh     = NFS_FH(inode);
+	data->args.offset = req_offset(req);
+	data->args.pgbase = req->wb_offset;
+	data->args.pages  = data->pagevec;
+	data->args.count  = count;
+	data->res.fattr   = &data->fattr;
+	data->res.count   = count;
+	data->res.eof     = 0;
 	
 	/* N.B. Do we need to test? Never called for swapfile inode */
 	flags = RPC_TASK_ASYNC | (IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0);
@@ -567,8 +587,10 @@ static void
 nfs_write_done(struct rpc_task *task)
 {
 	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
-	nfs_writeback_done(task, data->u.v3.args.stable,
-			   data->u.v3.args.count, data->u.v3.res.count);
+
+	if (task->tk_status >= 0)
+		nfs_write_refresh_inode(data->inode, data->res.fattr);
+	nfs_writeback_done(task);
 }
 
 static void
@@ -580,23 +602,23 @@ nfs_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	int			flags;
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs_procedures[NFSPROC_WRITE],
-		.rpc_argp	= &data->u.v3.args,
-		.rpc_resp	= &data->u.v3.res,
+		.rpc_argp	= &data->args,
+		.rpc_resp	= &data->res,
 		.rpc_cred	= data->cred,
 	};
 
 	/* Note: NFSv2 ignores @stable and always uses NFS_FILE_SYNC */
 	
 	req = nfs_list_entry(data->pages.next);
-	data->u.v3.args.fh     = NFS_FH(inode);
-	data->u.v3.args.offset = req_offset(req) + req->wb_offset;
-	data->u.v3.args.pgbase = req->wb_offset;
-	data->u.v3.args.count  = count;
-	data->u.v3.args.stable = NFS_FILE_SYNC;
-	data->u.v3.args.pages  = data->pagevec;
-	data->u.v3.res.fattr   = &data->fattr;
-	data->u.v3.res.count   = count;
-	data->u.v3.res.verf    = &data->verf;
+	data->args.fh     = NFS_FH(inode);
+	data->args.offset = req_offset(req);
+	data->args.pgbase = req->wb_offset;
+	data->args.count  = count;
+	data->args.stable = NFS_FILE_SYNC;
+	data->args.pages  = data->pagevec;
+	data->res.fattr   = &data->fattr;
+	data->res.count   = count;
+	data->res.verf    = &data->verf;
 
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;

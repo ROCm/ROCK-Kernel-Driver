@@ -20,6 +20,7 @@
 
 #include <sound/driver.h>
 #include <linux/time.h>
+#include <linux/fs.h>
 #include <sound/core.h>
 #include <sound/timer.h>
 #include <asm/uaccess.h>

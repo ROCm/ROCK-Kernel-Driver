@@ -98,7 +98,7 @@ typedef signed short cnodeid_t;
  * absent. Each node consists of a number of possibly discontiguous chunks.
  */
 #define SN1_CHUNKSHIFT			26			/* 64 MB */
-#define SN1_CHUNKSIZE			(1UL << SN1_CHUNKSHIFT)
+#define PLAT_CHUNKSIZE			(1UL << SN1_CHUNKSHIFT)
 #define PLAT_CHUNKNUM(addr)		(((addr) & (PLAT_MAX_PHYS_MEMORY-1)) >> SN1_CHUNKSHIFT)
 
 
@@ -134,8 +134,8 @@ typedef signed short cnodeid_t;
  * This macro takes an address of the end of previous allocation, rounds it to a page boundary & 
  * changes the node number.
  */
-#define PLAT_BOOTMEM_ALLOC_GOAL(cnode,kaddr)	SN1_KADDR(PLAT_PXM_TO_PHYS_NODE_NUMBER(nid_to_pxm_map[cnodeid]),	\
-						  (SN1_NODE_OFFSET(kaddr) + PAGE_SIZE - 1) >> PAGE_SHIFT << PAGE_SHIFT)
+#define PLAT_BOOTMEM_ALLOC_GOAL(cnode,kaddr)	__pa(SN1_KADDR(PLAT_PXM_TO_PHYS_NODE_NUMBER(nid_to_pxm_map[cnode]),		\
+						  (SN1_NODE_OFFSET(kaddr) + PAGE_SIZE - 1) >> PAGE_SHIFT << PAGE_SHIFT))
 
 
 

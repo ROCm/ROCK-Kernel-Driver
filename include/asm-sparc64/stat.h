@@ -3,28 +3,6 @@
 #define _SPARC64_STAT_H
 
 #include <linux/types.h>
-#include <linux/compat.h>
-#include <linux/time.h>
-
-struct stat32 {
-	__kernel_dev_t32   st_dev;
-	__kernel_ino_t32   st_ino;
-	__kernel_mode_t32  st_mode;
-	short   	   st_nlink;
-	__kernel_uid_t32   st_uid;
-	__kernel_gid_t32   st_gid;
-	__kernel_dev_t32   st_rdev;
-	__kernel_off_t32   st_size;
-	compat_time_t    st_atime;
-	unsigned int       __unused1;
-	compat_time_t    st_mtime;
-	unsigned int       __unused2;
-	compat_time_t    st_ctime;
-	unsigned int       __unused3;
-	__kernel_off_t32   st_blksize;
-	__kernel_off_t32   st_blocks;
-	unsigned int  __unused4[2];
-};
 
 struct stat {
 	dev_t   st_dev;

@@ -54,9 +54,6 @@
 
 #define WRITE_LOCAL_SYNERGY_REG(addr, value)	__synergy_out(addr, value)
 
-#define HUB_L(_a)               *(_a)
-#define HUB_S(_a, _d)           *(_a) = (_d)
-
 #define HSPEC_SYNERGY0_0        0x04000000    /* Synergy0 Registers     */
 #define HSPEC_SYNERGY1_0        0x05000000    /* Synergy1 Registers     */
 #define HS_SYNERGY_STRIDE       (HSPEC_SYNERGY1_0 - HSPEC_SYNERGY0_0)

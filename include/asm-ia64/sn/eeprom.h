@@ -11,6 +11,7 @@
 #ifndef _ASM_IA64_SN_EEPROM_H
 #define _ASM_IA64_SN_EEPROM_H
 
+#include <linux/config.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/vector.h>
 #include <asm/sn/xtalk/xbow.h>
@@ -291,6 +292,8 @@ typedef struct eeprom_brd_record_t
 /* functions & macros for obtaining "NIC-like" strings from EEPROMs
  */
 
+#ifdef CONFIG_IA64_SGI_SN1
+
 int eeprom_str( char *nic_str, nasid_t nasid, int component );
 int vector_eeprom_str( char *nic_str, nasid_t nasid,
 		       int component, net_vec_t path );
@@ -300,6 +303,7 @@ int vector_eeprom_str( char *nic_str, nasid_t nasid,
 #define RBRICK_EEPROM_STR(s,n,p)  vector_eeprom_str((s),(n),R_BRICK,p)
 #define VECTOR_EEPROM_STR(s,n,p)  vector_eeprom_str((s),(n),VECTOR,p)
 
+#endif	/* CONFIG_IA64_SGI_SN1 */
 
 
 /* functions for obtaining formatted records from EEPROMs
@@ -312,13 +316,6 @@ int iobrick_eeprom_read( eeprom_brd_record_t *buf, nasid_t nasid,
 int vector_eeprom_read( eeprom_brd_record_t *buf, nasid_t nasid,
 			net_vec_t path, int component );
 
-
-/* functions providing unique id's for duplonet and i/o discovery
- */
-
-int cbrick_uid_get( nasid_t nasid, uint64_t *uid );
-int rbrick_uid_get( nasid_t nasid, net_vec_t path, uint64_t *uid );
-int iobrick_uid_get( nasid_t nasid, uint64_t *uid );
 
 
 /* retrieve the ethernet MAC address for an I-brick
@@ -383,9 +380,5 @@ int is_iobrick( int nasid, int widget_num );
     ( IS_IOBRICK((r)) ? eeprom_vertex_info_set \
 		          ( IO_BRICK, NASID_GET((r)), (v), 0 ) \
 		      : nic_bridge_vertex_info((v), (r)) )
-
-#define HUB_UID_GET(n,v,p)	cbrick_uid_get((n),(p))
-#define ROUTER_UID_GET(d,p)	rbrick_uid_get(get_nasid(),(d),(p))
-#define XBOW_UID_GET(n,p)	iobrick_uid_get((n),(p))
 
 #endif /* _ASM_IA64_SN_EEPROM_H */

@@ -1,4 +1,4 @@
-/* $Id$
+/* $Id: sn_private.h,v 1.1 2002/02/28 17:31:26 marcelo Exp $
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -27,7 +27,7 @@ extern int check_nasid_equiv(nasid_t, nasid_t);
 extern nasid_t get_console_nasid(void);
 extern char get_console_pcislot(void);
 
-extern int is_master_nasid_widget(nasid_t test_nasid, xwidgetnum_t test_wid);
+extern int is_master_baseio_nasid_widget(nasid_t test_nasid, xwidgetnum_t test_wid);
 
 /* memsupport.c */
 extern void poison_state_alter_range(__psunsigned_t start, int len, int poison);
@@ -43,8 +43,10 @@ extern void set_dir_state_POISONED(paddr_t);
 extern void set_dir_state_UNOWNED(paddr_t);
 extern int is_POISONED_dir_state(paddr_t);
 extern int is_UNOWNED_dir_state(paddr_t);
+#ifdef LATER
 extern void get_dir_ent(paddr_t paddr, int *state,
 			uint64_t *vec_ptr, hubreg_t *elo);
+#endif
 
 /* intr.c */
 extern int intr_reserve_level(cpuid_t cpu, int level, int err, devfs_handle_t owner_dev, char *name);

@@ -323,12 +323,6 @@ void __init smp_callin(void)
 
 	local_irq_enable();
 
-#ifdef CONFIG_MTRR
-	/*
-	 * Must be done before calibration delay is computed
-	 */
-	mtrr_init_cpu (cpuid);
-#endif
 	/*
 	 * Get our bogomips.
 	 */
@@ -343,6 +337,8 @@ void __init smp_callin(void)
  	smp_store_cpu_info(cpuid);
 
 	notify_die(DIE_CPUINIT, "cpuinit", NULL, 0);
+
+	local_irq_disable();
 
 	/*
 	 * Allow the master to continue.
@@ -436,7 +432,7 @@ static struct task_struct * __init fork_by_hand(void)
 	 * don't care about the rip and regs settings since
 	 * we'll never reschedule the forked task.
 	 */
-	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL);
+	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
 #if APIC_DEBUG
@@ -969,12 +965,17 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 int __devinit __cpu_up(unsigned int cpu)
 {
 	/* This only works at boot for x86.  See "rewrite" above. */
-	if (test_bit(cpu, &smp_commenced_mask))
+	if (test_bit(cpu, &smp_commenced_mask)) { 
+		local_irq_enable();
 		return -ENOSYS;
+	}
 
 	/* In case one didn't come up */
-	if (!test_bit(cpu, &cpu_callin_map))
+	if (!test_bit(cpu, &cpu_callin_map)) { 
+		local_irq_enable();
 		return -EIO;
+	}
+	local_irq_enable();
 
 	/* Unleash the CPU! */
 	Dprintk("waiting for cpu %d\n", cpu);

@@ -216,8 +216,7 @@ static void hp_zx1_tlbflush(agp_memory * mem)
 {
 	struct _hp_private *hp = &hp_private;
 
-	OUTREG64(hp->registers, HP_ZX1_PCOM, 
-		hp->gart_base | log2(hp->gart_size));
+	OUTREG64(hp->registers, HP_ZX1_PCOM, hp->gart_base | log2(hp->gart_size));
 	INREG64(hp->registers, HP_ZX1_PCOM);
 }
 
@@ -251,7 +250,7 @@ static int hp_zx1_create_gatt_table(void)
 static int hp_zx1_free_gatt_table(void)
 {
 	struct _hp_private *hp = &hp_private;
-	
+
 	if (hp->io_pdir_owner)
 		free_pages((unsigned long) hp->io_pdir,
 			    get_order(hp->io_pdir_size));
@@ -329,7 +328,7 @@ static unsigned long hp_zx1_mask_memory(unsigned long addr, int type)
 	return HP_ZX1_PDIR_VALID_BIT | addr;
 }
 
-int __init hp_zx1_setup (struct pci_dev *pdev __attribute__((unused)))
+static int __init hp_zx1_setup (struct pci_dev *pdev __attribute__((unused)))
 {
 	agp_bridge.masks = hp_zx1_masks;
 	agp_bridge.num_of_masks = 1;
@@ -368,21 +367,22 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 		return hp_zx1_setup(dev);
 	}
 	return -ENODEV;
+}
 
-static int agp_hp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_hp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	if (agp_find_supported_device(dev) == 0) {
 		agp_register_driver(dev);
 		return 0;
 	}
-	return -ENODEV;	
+	return -ENODEV;
 }
 
 static struct pci_device_id agp_hp_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
-	.vendor_id	= PCI_VENDOR_ID_HP,
+	.vendor		= PCI_VENDOR_ID_HP,
 	.device		= PCI_DEVICE_ID_HP_ZX1_LBA,
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
@@ -392,7 +392,7 @@ static struct pci_device_id agp_hp_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_pci_table);
 
-static struct pci_driver agp_hp_pci_driver = {
+static struct __initdata pci_driver agp_hp_pci_driver = {
 	.name		= "agpgart-hp",
 	.id_table	= agp_hp_pci_table,
 	.probe		= agp_hp_probe,
@@ -412,7 +412,7 @@ static int __init agp_hp_init(void)
 static void __exit agp_hp_cleanup(void)
 {
 	agp_unregister_driver();
-	pci_unregister_driver(&agp_pci_driver);
+	pci_unregister_driver(&agp_hp_pci_driver);
 }
 
 module_init(agp_hp_init);

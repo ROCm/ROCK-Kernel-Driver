@@ -15,13 +15,13 @@
 
 static __inline__ void
 snidle(void) {
-
+#if 0
 #ifdef CONFIG_IA64_SGI_AUTOTEST
 	{
 		extern int	autotest_enabled;
 		if (autotest_enabled) {
-			extern void llsc_main(int, long, long);
-			llsc_main(smp_processor_id(), 0xe000000000000000LL, 0xe000000001000000LL);
+			extern void llsc_main(int);
+			llsc_main(smp_processor_id());
 		}
 	}
 #endif
@@ -39,16 +39,19 @@ snidle(void) {
 #endif
 
 	pda.idle_flag = 1;
+#endif
 }
 
 static __inline__ void
 snidleoff(void) {
+#if 0
 	/* 
 	 * Turn the activity LED on.
 	 */
 	set_led_bits(LED_CPU_ACTIVITY, LED_CPU_ACTIVITY);
 
 	pda.idle_flag = 0;
+#endif
 }
 
 #endif /* _ASM_IA64_SN_IDLE_H */

@@ -208,7 +208,7 @@ int find_dirent_page(nfs_readdir_descriptor_t *desc)
 
 	/* NOTE: Someone else may have changed the READDIRPLUS flag */
 	desc->page = page;
-	desc->ptr = kmap(page);
+	desc->ptr = kmap(page);		/* matching kunmap in nfs_do_filldir */
 	status = find_dirent(desc, page);
 	if (status < 0)
 		dir_page_release(desc);
@@ -345,7 +345,7 @@ int uncached_readdir(nfs_readdir_descriptor_t *desc, void *dirent,
 						NFS_SERVER(inode)->dtsize,
 						desc->plus);
 	desc->page = page;
-	desc->ptr = kmap(page);
+	desc->ptr = kmap(page);		/* matching kunmap in nfs_do_filldir */
 	if (desc->error >= 0) {
 		if ((status = dir_decode(desc)) == 0)
 			desc->entry->prev_cookie = desc->target;
@@ -717,9 +717,9 @@ int nfs_cached_lookup(struct inode *dir, struct dentry *dentry,
 
 		res = -EIO;
 		if (PageUptodate(page)) {
-			desc.ptr = kmap(page);
+			desc.ptr = kmap_atomic(page, KM_USER0);
 			res = find_dirent_name(&desc, page, dentry);
-			kunmap(page);
+			kunmap_atomic(desc.ptr, KM_USER0);
 		}
 		page_cache_release(page);
 

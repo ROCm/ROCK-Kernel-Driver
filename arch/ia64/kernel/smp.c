@@ -206,8 +206,27 @@ smp_send_reschedule_all (void)
 void
 smp_flush_tlb_all (void)
 {
-	smp_call_function((void (*)(void *))__flush_tlb_all, 0, 1, 1);
-	__flush_tlb_all();
+	smp_call_function((void (*)(void *))local_flush_tlb_all, 0, 1, 1);
+	local_flush_tlb_all();
+}
+
+void
+smp_flush_tlb_mm (struct mm_struct *mm)
+{
+	local_finish_flush_tlb_mm(mm);
+
+	/* this happens for the common case of a single-threaded fork():  */
+	if (likely(mm == current->active_mm && atomic_read(&mm->mm_users) == 1))
+		return;
+
+	/*
+	 * We could optimize this further by using mm->cpu_vm_mask to track which CPUs
+	 * have been running in the address space.  It's not clear that this is worth the
+	 * trouble though: to avoid races, we have to raise the IPI on the target CPU
+	 * anyhow, and once a CPU is interrupted, the cost of local_flush_tlb_all() is
+	 * rather trivial.
+	 */
+	smp_call_function((void (*)(void *))local_finish_flush_tlb_mm, mm, 1, 1);
 }
 
 /*

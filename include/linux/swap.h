@@ -7,12 +7,18 @@
 #include <linux/linkage.h>
 #include <linux/mmzone.h>
 #include <linux/list.h>
+#include <linux/sched.h>
 #include <asm/atomic.h>
 #include <asm/page.h>
 
 #define SWAP_FLAG_PREFER	0x8000	/* set if swap priority specified */
 #define SWAP_FLAG_PRIO_MASK	0x7fff
 #define SWAP_FLAG_PRIO_SHIFT	0
+
+static inline int current_is_kswapd(void)
+{
+	return current->flags & PF_KSWAPD;
+}
 
 /*
  * MAX_SWAPFILES defines the maximum number of swaptypes: things which can

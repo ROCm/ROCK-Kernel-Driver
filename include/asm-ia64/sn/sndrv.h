@@ -27,6 +27,13 @@
 #define SNDRV_SYNERGY_ENABLE		34
 #define SNDRV_SYNERGY_FREQ		35
 
+/* see shubstats_ioctl() */
+#define SNDRV_SHUB_INFOSIZE		40
+#define SNDRV_SHUB_CONFIGURE		41
+#define SNDRV_SHUB_RESETSTATS		42
+#define SNDRV_SHUB_GETSTATS		43
+#define SNDRV_SHUB_GETNASID		44
+
 /* Devices */
 #define SNDRV_UKNOWN_DEVICE		-1
 #define SNDRV_ROUTER_DEVICE		1

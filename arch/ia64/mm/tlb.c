@@ -84,7 +84,7 @@ wrap_mmu_context (struct mm_struct *mm)
 	for (i = 0; i < NR_CPUS; ++i)
 		if (i != smp_processor_id())
 			per_cpu(ia64_need_tlb_flush, i) = 1;
-	__flush_tlb_all();
+	local_flush_tlb_all();
 }
 
 void
@@ -108,7 +108,7 @@ ia64_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbi
 }
 
 void
-__flush_tlb_all (void)
+local_flush_tlb_all (void)
 {
 	unsigned long i, j, flags, count0, count1, stride0, stride1, addr;
 
@@ -194,5 +194,5 @@ ia64_tlb_init (void)
 	local_cpu_data->ptce_stride[0] = ptce_info.stride[0];
 	local_cpu_data->ptce_stride[1] = ptce_info.stride[1];
 
-	__flush_tlb_all();		/* nuke left overs from bootstrapping... */
+	local_flush_tlb_all();		/* nuke left overs from bootstrapping... */
 }

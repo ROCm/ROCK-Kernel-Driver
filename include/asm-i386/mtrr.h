@@ -31,7 +31,7 @@
 struct mtrr_sentry
 {
     unsigned long base;    /*  Base address     */
-    unsigned long size;    /*  Size of region   */
+    unsigned int size;    /*  Size of region   */
     unsigned int type;     /*  Type of region   */
 };
 
@@ -39,7 +39,7 @@ struct mtrr_gentry
 {
     unsigned int regnum;   /*  Register number  */
     unsigned long base;    /*  Base address     */
-    unsigned long size;    /*  Size of region   */
+    unsigned int size;    /*  Size of region   */
     unsigned int type;     /*  Type of region   */
 };
 
@@ -65,20 +65,9 @@ struct mtrr_gentry
 #define MTRR_TYPE_WRBACK     6
 #define MTRR_NUM_TYPES       7
 
-#ifdef MTRR_NEED_STRINGS
-static char *mtrr_strings[MTRR_NUM_TYPES] =
-{
-    "uncachable",               /* 0 */
-    "write-combining",          /* 1 */
-    "?",                        /* 2 */
-    "?",                        /* 3 */
-    "write-through",            /* 4 */
-    "write-protect",            /* 5 */
-    "write-back",               /* 6 */
-};
-#endif
-
 #ifdef __KERNEL__
+
+extern char *mtrr_strings[]; 
 
 /*  The following functions are for use by other drivers  */
 # ifdef CONFIG_MTRR

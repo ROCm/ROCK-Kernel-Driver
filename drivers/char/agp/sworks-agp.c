@@ -169,9 +169,7 @@ static int serverworks_create_gatt_table(void)
 	 * used to program the agp master not the cpu
 	 */
 
-	pci_read_config_dword(agp_bridge.dev,
-			      serverworks_private.gart_addr_ofs,
-			      &temp);
+	pci_read_config_dword(agp_bridge.dev,serverworks_private.gart_addr_ofs,&temp);
 	agp_bridge.gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 
 	/* Calculate the agp offset */	
@@ -206,18 +204,11 @@ static int serverworks_fetch_size(void)
 	struct aper_size_info_lvl2 *values;
 
 	values = A_SIZE_LVL2(agp_bridge.aperture_sizes);
-	pci_read_config_dword(agp_bridge.dev,
-			      serverworks_private.gart_addr_ofs,
-			      &temp);
-	pci_write_config_dword(agp_bridge.dev,
-			       serverworks_private.gart_addr_ofs,
-			       SVWRKS_SIZE_MASK);
-	pci_read_config_dword(agp_bridge.dev,
-			      serverworks_private.gart_addr_ofs,
-			      &temp2);
-	pci_write_config_dword(agp_bridge.dev,
-			       serverworks_private.gart_addr_ofs,
-			       temp);
+	pci_read_config_dword(agp_bridge.dev,serverworks_private.gart_addr_ofs,&temp);
+	pci_write_config_dword(agp_bridge.dev,serverworks_private.gart_addr_ofs,
+					SVWRKS_SIZE_MASK);
+	pci_read_config_dword(agp_bridge.dev,serverworks_private.gart_addr_ofs,&temp2);
+	pci_write_config_dword(agp_bridge.dev,serverworks_private.gart_addr_ofs,temp);
 	temp2 &= SVWRKS_SIZE_MASK;
 
 	for (i = 0; i < agp_bridge.num_aperture_sizes; i++) {
@@ -245,9 +236,7 @@ static int serverworks_configure(void)
 	current_size = A_SIZE_LVL2(agp_bridge.current_size);
 
 	/* Get the memory mapped registers */
-	pci_read_config_dword(agp_bridge.dev,
-			      serverworks_private.mm_addr_ofs,
-			      &temp);
+	pci_read_config_dword(agp_bridge.dev, serverworks_private.mm_addr_ofs, &temp);
 	temp = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 	serverworks_private.registers = (volatile u8 *) ioremap(temp, 4096);
 
@@ -269,7 +258,7 @@ static int serverworks_configure(void)
 	agp_bridge.tlb_flush(NULL);
 
 	pci_read_config_byte(serverworks_private.svrwrks_dev, 0x34, &cap_ptr);
-	if (cap_ptr != 0x00) {
+	if (cap_ptr != 0) {
 		do {
 			pci_read_config_dword(serverworks_private.svrwrks_dev,
 					      cap_ptr, &cap_id);
@@ -277,30 +266,21 @@ static int serverworks_configure(void)
 			if ((cap_id & 0xff) != 0x02)
 				cap_ptr = (cap_id >> 8) & 0xff;
 		}
-		while (((cap_id & 0xff) != 0x02) && (cap_ptr != 0x00));
+		while (((cap_id & 0xff) != 0x02) && (cap_ptr != 0));
 	}
 	agp_bridge.capndx = cap_ptr;
 
 	/* Fill in the mode register */
 	pci_read_config_dword(serverworks_private.svrwrks_dev,
-			      agp_bridge.capndx + 4,
-			      &agp_bridge.mode);
+			      agp_bridge.capndx+4, &agp_bridge.mode);
 
-	pci_read_config_byte(agp_bridge.dev,
-			     SVWRKS_CACHING,
-			     &enable_reg);
+	pci_read_config_byte(agp_bridge.dev, SVWRKS_CACHING, &enable_reg);
 	enable_reg &= ~0x3;
-	pci_write_config_byte(agp_bridge.dev,
-			      SVWRKS_CACHING,
-			      enable_reg);
+	pci_write_config_byte(agp_bridge.dev, SVWRKS_CACHING, enable_reg);
 
-	pci_read_config_byte(agp_bridge.dev,
-			     SVWRKS_FEATURE,
-			     &enable_reg);
+	pci_read_config_byte(agp_bridge.dev, SVWRKS_FEATURE, &enable_reg);
 	enable_reg |= (1<<6);
-	pci_write_config_byte(agp_bridge.dev,
-			      SVWRKS_FEATURE,
-			      enable_reg);
+	pci_write_config_byte(agp_bridge.dev,SVWRKS_FEATURE, enable_reg);
 
 	return 0;
 }
@@ -532,7 +512,7 @@ static void serverworks_agp_enable(u32 mode)
 	}
 }
 
-int __init serverworks_setup (struct pci_dev *pdev)
+static int __init serverworks_setup (struct pci_dev *pdev)
 {
 	u32 temp;
 	u32 temp2;
@@ -606,7 +586,6 @@ int __init serverworks_setup (struct pci_dev *pdev)
 static int __init agp_find_supported_device(struct pci_dev *dev)
 {
 	struct pci_dev *bridge_dev;
-	agp_bridge.dev = dev;
 
 	/* Everything is on func 1 here so we are hardcoding function one */
 	bridge_dev = pci_find_slot ((unsigned int)dev->bus->number, PCI_DEVFN(0, 1));
@@ -616,6 +595,8 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 		       "device.\n");
 		return -ENODEV;
 	}
+
+	agp_bridge.dev = dev;
 
 	switch (dev->device) {
 	case PCI_DEVICE_ID_SERVERWORKS_HE:
@@ -638,7 +619,7 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 }
 
 
-static int agp_serverworks_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_serverworks_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	if (agp_find_supported_device(dev) == 0) {
 		agp_register_driver(dev);
@@ -661,7 +642,7 @@ static struct pci_device_id agp_serverworks_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_serverworks_pci_table);
 
-static struct pci_driver agp_serverworks_pci_driver = {
+static struct __initdata pci_driver agp_serverworks_pci_driver = {
 	.name		= "agpgart-serverworks",
 	.id_table	= agp_serverworks_pci_table,
 	.probe		= agp_serverworks_probe,

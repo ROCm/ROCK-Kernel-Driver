@@ -67,7 +67,7 @@
 #define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - BBSHIFT)) - 1)
 
 #ifndef GFP_READAHEAD
-#define GFP_READAHEAD	0
+#define GFP_READAHEAD	__GFP_NOWARN
 #endif
 
 /*
@@ -806,11 +806,7 @@ pagebuf_readahead(
 		return;
 
 	flags |= (PBF_TRYLOCK|PBF_READ|PBF_ASYNC|PBF_MAPPABLE|PBF_READ_AHEAD);
-
-	/* don't complain on allocation failure, it's fine with us */
-	current->flags |= PF_NOWARN;
 	pagebuf_get(target, ioff, isize, flags);
-	current->flags &= ~PF_NOWARN;
 }
 
 page_buf_t *

@@ -1,7 +1,7 @@
 /*
  * Simulated SCSI driver.
  *
- * Copyright (C) 1999 Hewlett-Packard Co
+ * Copyright (C) 1999, 2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #ifndef SIMSCSI_H
@@ -21,14 +21,17 @@ extern int simscsi_biosparam (struct scsi_device *, struct block_device *,
 		sector_t, int[]);
 
 #define SIMSCSI {						\
+	.name			= "simscsi",			\
 	.detect			= simscsi_detect,		\
 	.release		= simscsi_release,		\
 	.info			= simscsi_info,			\
 	.queuecommand		= simscsi_queuecommand,		\
+	.eh_host_reset_handler	= simscsi_host_reset,		\
 	.bios_param		= simscsi_biosparam,		\
 	.can_queue		= SIMSCSI_REQ_QUEUE_LEN,	\
 	.this_id		= -1,				\
 	.sg_tablesize		= SG_ALL,			\
+	.max_sectors		= 1024,				\
 	.cmd_per_lun		= SIMSCSI_REQ_QUEUE_LEN,	\
 	.present		= 0,				\
 	.unchecked_isa_dma	= 0,				\

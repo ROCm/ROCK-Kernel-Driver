@@ -98,7 +98,7 @@ synergy_init(int nasid, int syn)
 
 	/*
 	 * Enable all FSB flashed interrupts.
-	 * ZZZ - I'd really like defines for this......
+	 * I'd really like defines for this......
 	 */
 	base = (long*)0x80000e0000000000LL;		/* base of synergy regs */
 	for (off = 0x2a0; off < 0x2e0; off+=8)		/* offset for VEC_MASK_{0-3}_A/B */

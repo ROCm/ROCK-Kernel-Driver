@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -93,6 +93,33 @@ master_node_get(devfs_handle_t vhdl)
 		}
 
 		vhdl = master;
+	}
+}
+
+static devfs_handle_t hwgraph_all_cpuids = GRAPH_VERTEX_NONE;
+extern int maxcpus;
+
+void
+mark_cpuvertex_as_cpu(devfs_handle_t vhdl, cpuid_t cpuid)
+{
+	if (cpuid == CPU_NONE)
+		return;
+
+	(void)labelcl_info_add_LBL(vhdl, INFO_LBL_CPUID, INFO_DESC_EXPORT,
+			(arbitrary_info_t)cpuid);
+	{
+		char cpuid_buffer[10];
+
+		if (hwgraph_all_cpuids == GRAPH_VERTEX_NONE) {
+			(void)hwgraph_path_add( hwgraph_root,
+						EDGE_LBL_CPUNUM,
+						&hwgraph_all_cpuids);
+		}
+
+		sprintf(cpuid_buffer, "%ld", cpuid);
+		(void)hwgraph_edge_add( hwgraph_all_cpuids,
+							vhdl,
+							cpuid_buffer);
 	}
 }
 

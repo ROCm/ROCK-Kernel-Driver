@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/time.h>
 #include <linux/slab.h>
+#include <linux/fs.h>
 #include <linux/init.h>
 #include <sound/core.h>
 #include <sound/control.h>
@@ -248,17 +249,14 @@ static int get_ctl_type(struct file *file, snd_ctl_elem_id_t *id)
 
 	ctl = snd_magic_cast(snd_ctl_file_t, file->private_data, return -ENXIO);
 
-	read_lock(&ctl->card->control_rwlock);
 	kctl = snd_ctl_find_id(ctl->card, id);
-	if (! kctl) {
-		read_unlock(&ctl->card->control_rwlock);
+	if (! kctl)
 		return -ENXIO;
-	}
+
 	info.id = *id;
 	err = kctl->info(kctl, &info);
 	if (err >= 0)
 		err = info.type;
-	read_unlock(&ctl->card->control_rwlock);
 	return err;
 }
 

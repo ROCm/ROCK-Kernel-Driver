@@ -15,9 +15,11 @@
 #define __V850_PROCESSOR_H__
 
 #include <linux/config.h>
+#ifndef __ASSEMBLY__ /* <linux/thread_info.h> is not asm-safe.  */
+#include <linux/thread_info.h>
+#endif
 
 #include <asm/ptrace.h>
-#include <asm/thread_info.h>
 #include <asm/entry.h>
 
 /* Some code expects `segment' stuff to be defined here.  */

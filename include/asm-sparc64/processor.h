@@ -18,7 +18,6 @@
 #include <asm/a.out.h>
 #include <asm/pstate.h>
 #include <asm/ptrace.h>
-#include <asm/signal.h>
 #include <asm/segment.h>
 #include <asm/page.h>
 #include <asm/delay.h>
@@ -92,6 +91,8 @@ struct thread_struct {
 #endif /* !(CONFIG_DEBUG_SPINLOCK) */
 
 #ifndef __ASSEMBLY__
+
+#include <linux/types.h>
 
 /* Return saved PC of a blocked thread. */
 struct task_struct;

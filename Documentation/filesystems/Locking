@@ -92,7 +92,7 @@ prototypes:
 	void (*delete_inode) (struct inode *);
 	void (*put_super) (struct super_block *);
 	void (*write_super) (struct super_block *);
-	void (*sync_fs) (struct super_block *sb, int wait);
+	int (*sync_fs) (struct super_block *sb, int wait);
 	int (*statfs) (struct super_block *, struct statfs *);
 	int (*remount_fs) (struct super_block *, int *, char *);
 	void (*clear_inode) (struct inode *);

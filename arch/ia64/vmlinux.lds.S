@@ -97,6 +97,12 @@ SECTIONS
 
   .init.data : AT(ADDR(.init.data) - PAGE_OFFSET)
 	{ *(.init.data) }
+
+  __initramfs_start = .;
+  .init.ramfs : AT(ADDR(.init.ramfs) - PAGE_OFFSET)
+	{ *(.init.ramfs) }
+  __initramfs_end = .;
+
    . = ALIGN(16);
   __setup_start = .;
   .init.setup : AT(ADDR(.init.setup) - PAGE_OFFSET)

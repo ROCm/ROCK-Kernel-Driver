@@ -488,7 +488,7 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 	int hdrlen, recvd;
 	int status, nr;
 	unsigned int len, pglen;
-	u32 *entry, *end;
+	u32 *entry, *end, *kaddr;
 
 	status = ntohl(*p++);
 	/* Decode post_op_attrs */
@@ -518,7 +518,7 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 	if (pglen > recvd)
 		pglen = recvd;
 	page = rcvbuf->pages;
-	p = kmap(*page);
+	kaddr = p = (u32 *)kmap_atomic(*page, KM_USER0);
 	end = (u32 *)((char *)p + pglen);
 	entry = p;
 	for (nr = 0; *p++; nr++) {
@@ -563,7 +563,7 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 	if (!nr && (entry[0] != 0 || entry[1] == 0))
 		goto short_pkt;
  out:
-	kunmap(*page);
+	kunmap_atomic(kaddr, KM_USER0);
 	return nr;
  short_pkt:
 	entry[0] = entry[1] = 0;
@@ -574,8 +574,8 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 	}
 	goto out;
 err_unmap:
-	kunmap(*page);
-	return -errno_NFSERR_IO;
+	nr = -errno_NFSERR_IO;
+	goto out;
 }
 
 u32 *
@@ -738,7 +738,7 @@ nfs3_xdr_readlinkres(struct rpc_rqst *req, u32 *p, struct nfs_fattr *fattr)
 		xdr_shift_buf(rcvbuf, iov->iov_len - hdrlen);
 	}
 
-	strlen = (u32*)kmap(rcvbuf->pages[0]);
+	strlen = (u32*)kmap_atomic(rcvbuf->pages[0], KM_USER0);
 	/* Convert length of symlink */
 	len = ntohl(*strlen);
 	if (len > rcvbuf->page_len)
@@ -747,7 +747,7 @@ nfs3_xdr_readlinkres(struct rpc_rqst *req, u32 *p, struct nfs_fattr *fattr)
 	/* NULL terminate the string we got */
 	string = (char *)(strlen + 1);
 	string[len] = 0;
-	kunmap(rcvbuf->pages[0]);
+	kunmap_atomic(strlen, KM_USER0);
 	return 0;
 }
 

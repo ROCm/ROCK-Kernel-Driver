@@ -125,23 +125,6 @@ void nfs_commit_release(struct rpc_task *task)
 }
 
 /*
- * This function will be used to simulate weak cache consistency
- * under NFSv2 when the NFSv3 attribute patch is included.
- * For the moment, we just call nfs_refresh_inode().
- */
-static __inline__ int
-nfs_write_attributes(struct inode *inode, struct nfs_fattr *fattr)
-{
-	if ((fattr->valid & NFS_ATTR_FATTR) && !(fattr->valid & NFS_ATTR_WCC)) {
-		fattr->pre_size  = NFS_CACHE_ISIZE(inode);
-		fattr->pre_mtime = NFS_CACHE_MTIME(inode);
-		fattr->pre_ctime = NFS_CACHE_CTIME(inode);
-		fattr->valid |= NFS_ATTR_WCC;
-	}
-	return nfs_refresh_inode(inode, fattr);
-}
-
-/*
  * Write a page synchronously.
  * Offset is the data offset within the page.
  */
@@ -178,7 +161,6 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 
 		result = NFS_PROTO(inode)->write(inode, cred, &fattr, flags,
 						 offset, wsize, page, &verf);
-		nfs_write_attributes(inode, &fattr);
 
 		if (result < 0) {
 			/* Must mark the page invalid after I/O error */
@@ -768,7 +750,7 @@ nfs_write_rpcsetup(struct list_head *head, struct nfs_write_data *data, int how)
 		inode->i_sb->s_id,
 		(long long)NFS_FILEID(inode),
 		count,
-		(unsigned long long)req_offset(req) + req->wb_offset);
+		(unsigned long long)req_offset(req));
 }
 
 /*
@@ -841,10 +823,11 @@ nfs_flush_list(struct list_head *head, int wpages, int how)
  * This function is called when the WRITE call is complete.
  */
 void
-nfs_writeback_done(struct rpc_task *task, int stable,
-		   unsigned int arg_count, unsigned int res_count)
+nfs_writeback_done(struct rpc_task *task)
 {
 	struct nfs_write_data	*data = (struct nfs_write_data *) task->tk_calldata;
+	struct nfs_writeargs	*argp = &data->args;
+	struct nfs_writeres	*resp = &data->res;
 	struct inode		*inode = data->inode;
 	struct nfs_page		*req;
 	struct page		*page;
@@ -853,7 +836,7 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 		task->tk_pid, task->tk_status);
 
 	/* We can't handle that yet but we check for it nevertheless */
-	if (res_count < arg_count && task->tk_status >= 0) {
+	if (resp->count < argp->count && task->tk_status >= 0) {
 		static unsigned long    complain;
 		if (time_before(complain, jiffies)) {
 			printk(KERN_WARNING
@@ -865,7 +848,7 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 		task->tk_status = -EIO;
 	}
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-	if (data->verf.committed < stable && task->tk_status >= 0) {
+	if (data->verf.committed < argp->stable && task->tk_status >= 0) {
 		/* We tried a write call, but the server did not
 		 * commit data to stable storage even though we
 		 * requested it.
@@ -880,7 +863,7 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 			dprintk("NFS: faulty NFS server %s:"
 				" (committed = %d) != (stable = %d)\n",
 				NFS_SERVER(inode)->hostname,
-				data->verf.committed, stable);
+				data->verf.committed, argp->stable);
 			complain = jiffies + 300 * HZ;
 		}
 	}
@@ -892,7 +875,6 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 	 *	  writebacks since the page->count is kept > 1 for as long
 	 *	  as the page has a write request pending.
 	 */
-	nfs_write_attributes(inode, &data->fattr);
 	while (!list_empty(&data->pages)) {
 		req = nfs_list_entry(data->pages.next);
 		nfs_list_remove_request(req);
@@ -902,7 +884,7 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 			req->wb_inode->i_sb->s_id,
 			(long long)NFS_FILEID(req->wb_inode),
 			req->wb_bytes,
-			(long long)(req_offset(req) + req->wb_offset));
+			(long long)req_offset(req));
 
 		if (task->tk_status < 0) {
 			ClearPageUptodate(page);
@@ -917,7 +899,7 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 		end_page_writeback(page);
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-		if (stable != NFS_UNSTABLE || data->verf.committed == NFS_FILE_SYNC) {
+		if (argp->stable != NFS_UNSTABLE || data->verf.committed == NFS_FILE_SYNC) {
 			nfs_inode_remove_request(req);
 			dprintk(" OK\n");
 			goto next;
@@ -958,8 +940,8 @@ nfs_commit_rpcsetup(struct list_head *head, struct nfs_write_data *data, int how
 	 * Determine the offset range of requests in the COMMIT call.
 	 * We rely on the fact that data->pages is an ordered list...
 	 */
-	start = req_offset(first) + first->wb_offset;
-	end = req_offset(last) + (last->wb_offset + last->wb_bytes);
+	start = req_offset(first);
+	end = req_offset(last) + last->wb_bytes;
 	len = end - start;
 	/* If 'len' is not a 32-bit quantity, pass '0' in the COMMIT call */
 	if (end >= inode->i_size || len < 0 || len > (~((u32)0) >> 1))
@@ -1017,12 +999,10 @@ nfs_commit_done(struct rpc_task *task)
 {
 	struct nfs_write_data	*data = (struct nfs_write_data *)task->tk_calldata;
 	struct nfs_page		*req;
-	struct inode		*inode = data->inode;
 
         dprintk("NFS: %4d nfs_commit_done (status %d)\n",
                                 task->tk_pid, task->tk_status);
 
-	nfs_write_attributes(inode, &data->fattr);
 	while (!list_empty(&data->pages)) {
 		req = nfs_list_entry(data->pages.next);
 		nfs_list_remove_request(req);
@@ -1031,7 +1011,7 @@ nfs_commit_done(struct rpc_task *task)
 			req->wb_inode->i_sb->s_id,
 			(long long)NFS_FILEID(req->wb_inode),
 			req->wb_bytes,
-			(long long)(req_offset(req) + req->wb_offset));
+			(long long)req_offset(req));
 		if (task->tk_status < 0) {
 			if (req->wb_file)
 				req->wb_file->f_error = task->tk_status;

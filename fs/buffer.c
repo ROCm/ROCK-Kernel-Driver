@@ -221,9 +221,9 @@ int fsync_super(struct super_block *sb)
 	lock_super(sb);
 	if (sb->s_dirt && sb->s_op->write_super)
 		sb->s_op->write_super(sb);
+	unlock_super(sb);
 	if (sb->s_op->sync_fs)
 		sb->s_op->sync_fs(sb, 1);
-	unlock_super(sb);
 	sync_blockdev(sb->s_bdev);
 	sync_inodes_sb(sb, 1);
 
@@ -923,11 +923,7 @@ try_again:
 	head = NULL;
 	offset = PAGE_SIZE;
 	while ((offset -= size) >= 0) {
-		int pf_flags = current->flags;
-
-		current->flags |= PF_NOWARN;
 		bh = alloc_buffer_head();
-		current->flags = pf_flags;
 		if (!bh)
 			goto no_grow;
 
@@ -1453,6 +1449,7 @@ static inline void discard_buffer(struct buffer_head * bh)
 	clear_buffer_mapped(bh);
 	clear_buffer_req(bh);
 	clear_buffer_new(bh);
+	clear_buffer_delay(bh);
 	unlock_buffer(bh);
 }
 
@@ -1871,7 +1868,7 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 				set_buffer_uptodate(bh);
 			continue; 
 		}
-		if (!buffer_uptodate(bh) &&
+		if (!buffer_uptodate(bh) && !buffer_delay(bh) &&
 		     (block_start < from || block_end > to)) {
 			ll_rw_block(READ, 1, &bh);
 			*wait_bh++=bh;
@@ -2457,7 +2454,7 @@ int block_truncate_page(struct address_space *mapping,
 	if (PageUptodate(page))
 		set_buffer_uptodate(bh);
 
-	if (!buffer_uptodate(bh)) {
+	if (!buffer_uptodate(bh) && !buffer_delay(bh)) {
 		err = -EIO;
 		ll_rw_block(READ, 1, &bh);
 		wait_on_buffer(bh);

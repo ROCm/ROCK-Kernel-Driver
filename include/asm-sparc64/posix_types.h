@@ -49,7 +49,6 @@ typedef struct {
 
 /* Now 32bit compatibility types */
 typedef int                    __kernel_ptrdiff_t32;
-typedef int                    __kernel_clock_t32;
 typedef int                    __kernel_pid_t32;
 typedef unsigned short         __kernel_ipc_pid_t32;
 typedef unsigned short         __kernel_uid_t32;

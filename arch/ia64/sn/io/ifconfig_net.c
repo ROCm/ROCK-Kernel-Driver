@@ -1,4 +1,4 @@
-/* $Id$
+/* $Id: ifconfig_net.c,v 1.1 2002/02/28 17:31:25 marcelo Exp $
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -202,30 +202,16 @@ static int ifconfig_net_ioctl(struct inode * inode, struct file * file,
 	 * Read in the header and see how big of a buffer we really need to 
 	 * allocate.
 	 */
-	ifname_num = kmalloc(sizeof(struct ifname_num), GFP_KERNEL);
-	if (!ifname_num)
-		return -ENOMEM;
-	if (copy_from_user(ifname_num, (char *)arg,
-			   sizeof(struct ifname_num))) {
-		kfree(ifname_num);
-		return -EFAULT;
-	}
+	ifname_num = (struct ifname_num *) kmalloc(sizeof(struct ifname_num), 
+			GFP_KERNEL);
+	copy_from_user( ifname_num, (char *) arg, sizeof(struct ifname_num));
 	size = ifname_num->size;
 	kfree(ifname_num);
-	ifname_num = kmalloc(size, GFP_KERNEL);
-	if (!ifname_num)
-		return -ENOMEM;
+	ifname_num = (struct ifname_num *) kmalloc(size, GFP_KERNEL);
 	ifname_MAC = (struct ifname_MAC *) ((char *)ifname_num + (sizeof(struct ifname_num)) );
 
-	if (copy_from_user(ifname_num, (char *)arg, size)) {
-		kfree(ifname_num);
-		return -EFAULT;
-	}
+	copy_from_user( ifname_num, (char *) arg, size);
 	new_devices =  kmalloc(size - sizeof(struct ifname_num), GFP_KERNEL);
-	if (!new_devices) {
-		kfree(ifname_num);
-		return -EFAULT;
-	}
 	temp_new_devices = new_devices;
 
 	memset(new_devices, 0, size - sizeof(struct ifname_num));
@@ -271,17 +257,17 @@ static int ifconfig_net_ioctl(struct inode * inode, struct file * file,
 	/*
 	 * Copy back to the User Buffer area any new devices encountered.
 	 */
-	if (copy_to_user((char *)arg + (sizeof(struct ifname_num)),
-			 new_devices, size - sizeof(struct ifname_num)))
-		return -EFAULT;
+	copy_to_user((char *)arg + (sizeof(struct ifname_num)), new_devices, 
+			size - sizeof(struct ifname_num));
+
 	return(0);
 
 }
 
 struct file_operations ifconfig_net_fops = {
-	.ioctl =ifconfig_net_ioctl,	/* ioctl */
-	.open =ifconfig_net_open,		/* open */
-	.release =ifconfig_net_close	/* release */
+	ioctl:ifconfig_net_ioctl,	/* ioctl */
+	open:ifconfig_net_open,		/* open */
+	release:ifconfig_net_close	/* release */
 };
 
 

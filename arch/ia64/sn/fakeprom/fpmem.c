@@ -54,10 +54,10 @@ sn_config_t	*sn_config ;
 #define PROMRESERVED_SIZE	(1*MB)
 
 #ifdef CONFIG_IA64_SGI_SN1
-#define PHYS_ADDRESS(_n, _x)		(((long)_n<<33L) | (long)_x)
+#define PHYS_ADDRESS(_n, _x)		(((long)_n<<33) | (long)_x)
 #define MD_BANK_SHFT 30
 #else
-#define PHYS_ADDRESS(_n, _x)		(((long)_n<<38L) | (long)_x | 0x3000000000UL)
+#define PHYS_ADDRESS(_n, _x)		(((long)_n<<38) | (long)_x | 0x3000000000UL)
 #define MD_BANK_SHFT 34
 #endif
 
@@ -94,7 +94,7 @@ GetMemBankInfo(int index)
 int
 IsCpuPresent(int cnode, int cpu)
 {
-	return  sn_memmap[cnode].cpuconfig & (1<<cpu);
+	return  sn_memmap[cnode].cpuconfig & (1UL<<cpu);
 }
 
 
@@ -142,10 +142,10 @@ int
 IsBankPresent(int index, node_memmap_t nmemmap)
 {
 	switch (index) {
-		case 0:return nmemmap.ena0;
-		case 1:return nmemmap.ena1;
-		case 2:return nmemmap.ena2;
-		case 3:return nmemmap.ena3;
+		case 0:return BankPresent(nmemmap.b0size);
+		case 1:return BankPresent(nmemmap.b1size);
+		case 2:return BankPresent(nmemmap.b2size);
+		case 3:return BankPresent(nmemmap.b3size);
 		default:return -1 ;
 	}
 }
@@ -153,11 +153,14 @@ IsBankPresent(int index, node_memmap_t nmemmap)
 int
 GetBankSize(int index, node_memmap_t nmemmap)
 {
+	/*
+	 * Add 2 because there are 4 dimms per bank.
+	 */
         switch (index) {
-                case 0:return (long)nmemmap.b0size + nmemmap.b0dou;
-                case 1:return (long)nmemmap.b1size + nmemmap.b1dou;
-                case 2:return (long)nmemmap.b2size + nmemmap.b2dou;
-                case 3:return (long)nmemmap.b3size + nmemmap.b3dou;
+                case 0:return 2 + ((long)nmemmap.b0size + nmemmap.b0dou);
+                case 1:return 2 + ((long)nmemmap.b1size + nmemmap.b1dou);
+                case 2:return 2 + ((long)nmemmap.b2size + nmemmap.b2dou);
+                case 3:return 2 + ((long)nmemmap.b3size + nmemmap.b3dou);
                 default:return -1 ;
         }
 }
@@ -189,14 +192,30 @@ build_efi_memmap(void *md, int mdsize)
 	for (cnode=0;cnode<numnodes;cnode++) {
 		nasid = GetNasid(cnode) ;
 		membank_info = GetMemBankInfo(cnode) ;
-		for (bank=0;bank<PLAT_CLUMPS_PER_NODE;bank++) {
+		for (bank=0;bank<NR_BANKS_PER_NODE;bank++) {
 			if (IsBankPresent(bank, membank_info)) {
 				bsize = GetBankSize(bank, membank_info) ;
                                 paddr = PHYS_ADDRESS(nasid, (long)bank<<MD_BANK_SHFT);
                                 numbytes = BankSizeBytes(bsize);
 #ifdef CONFIG_IA64_SGI_SN2
+				/* 
+				 * Ignore directory.
+				 * Shorten memory chunk by 1 page - makes a better
+				 * testcase & is more like the real PROM.
+				 */
 				numbytes = numbytes * 31 / 32;
 #endif
+				/*
+				 * Only emulate the memory prom grabs
+				 * if we have lots of memory, to allow
+				 * us to simulate smaller memory configs than
+				 * we can actually run on h/w.  Otherwise,
+				 * linux throws away a whole "granule".
+				 */
+				if (cnode == 0 && bank == 0 &&
+				    numbytes > 128*1024*1024) {
+					numbytes -= 1000;
+				}
 
                                 /*
                                  * Check for the node 0 hole. Since banks cant
