@@ -1,7 +1,7 @@
 /*
  *  linux/drivers/mmc/mmc.c
  *
- *  Copyright (C) 2003 Russell King, All Rights Reserved.
+ *  Copyright (C) 2003-2004 Russell King, All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -14,6 +14,7 @@
 #include <linux/completion.h>
 #include <linux/device.h>
 #include <linux/delay.h>
+#include <linux/pagemap.h>
 #include <linux/err.h>
 
 #include <linux/mmc/card.h>
@@ -721,6 +722,15 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 		INIT_WORK(&host->detect, mmc_rescan, host);
 
 		host->dev = dev;
+
+		/*
+		 * By default, hosts do not support SGIO or large requests.
+		 * They have to set these according to their abilities.
+		 */
+		host->max_hw_segs = 1;
+		host->max_phys_segs = 1;
+		host->max_sectors = 1 << (PAGE_CACHE_SHIFT - 9);
+		host->max_seg_size = PAGE_CACHE_SIZE;
 	}
 
 	return host;

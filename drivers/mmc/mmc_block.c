@@ -43,7 +43,6 @@
 #define MMC_SHIFT	3
 
 static int mmc_major;
-static int maxsectors = 8;
 
 /*
  * There is one mmc_blk_data per slot.
@@ -336,7 +335,6 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 
 		md->block_bits = card->csd.read_blkbits;
 
-		blk_queue_max_sectors(md->queue.queue, maxsectors);
 		blk_queue_hardsect_size(md->queue.queue, 1 << md->block_bits);
 		set_capacity(md->disk, card->csd.capacity);
 	}
@@ -489,9 +487,6 @@ static void __exit mmc_blk_exit(void)
 
 module_init(mmc_blk_init);
 module_exit(mmc_blk_exit);
-module_param(maxsectors, int, 0444);
-
-MODULE_PARM_DESC(maxsectors, "Maximum number of sectors for a single request");
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Multimedia Card (MMC) block device driver");

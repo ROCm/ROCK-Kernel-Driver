@@ -69,6 +69,13 @@ struct mmc_host {
 	u32			ocr_avail;
 	char			host_name[8];
 
+	/* host specific block data */
+	unsigned int		max_seg_size;	/* see blk_queue_max_segment_size */
+	unsigned short		max_hw_segs;	/* see blk_queue_max_hw_segments */
+	unsigned short		max_phys_segs;	/* see blk_queue_max_phys_segments */
+	unsigned short		max_sectors;	/* see blk_queue_max_sectors */
+	unsigned short		unused;
+
 	/* private data */
 	struct mmc_ios		ios;		/* current io bus settings */
 	u32			ocr;		/* the current OCR setting */
