@@ -446,7 +446,7 @@ ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	iounmap(adapter->hw.hw_addr);
       err_ioremap:
 	pci_release_regions(pdev);
-	kfree(netdev);
+	free_netdev(netdev);
       err_alloc_etherdev:
 	return -ENOMEM;
 }

@@ -1938,7 +1938,7 @@ static int __init ibmtr_init(void)
 		dev_ibmtr[i]->mem_start = mem[i];
 		dev_ibmtr[i]->init = &ibmtr_probe;
 		if (register_netdev(dev_ibmtr[i]) != 0) {
-			kfree(dev_ibmtr[i]);
+			free_netdev(dev_ibmtr[i]);
 			dev_ibmtr[i] = NULL;
 			continue;
 		}
