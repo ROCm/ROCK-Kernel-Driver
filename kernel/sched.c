@@ -3005,6 +3005,101 @@ void fastcall __sched wait_for_completion(struct completion *x)
 }
 EXPORT_SYMBOL(wait_for_completion);
 
+unsigned long fastcall __sched
+wait_for_completion_timeout(struct completion *x, unsigned long timeout)
+{
+	might_sleep();
+
+	spin_lock_irq(&x->wait.lock);
+	if (!x->done) {
+		DECLARE_WAITQUEUE(wait, current);
+
+		wait.flags |= WQ_FLAG_EXCLUSIVE;
+		__add_wait_queue_tail(&x->wait, &wait);
+		do {
+			__set_current_state(TASK_UNINTERRUPTIBLE);
+			spin_unlock_irq(&x->wait.lock);
+			timeout = schedule_timeout(timeout);
+			if (!timeout)
+				goto out;
+			spin_lock_irq(&x->wait.lock);
+		} while (!x->done);
+		__remove_wait_queue(&x->wait, &wait);
+	}
+	x->done--;
+	spin_unlock_irq(&x->wait.lock);
+out:
+	return timeout;
+}
+EXPORT_SYMBOL(wait_for_completion_timeout);
+
+int fastcall __sched wait_for_completion_interruptible(struct completion *x)
+{
+	int ret = 0;
+
+	might_sleep();
+
+	spin_lock_irq(&x->wait.lock);
+	if (!x->done) {
+		DECLARE_WAITQUEUE(wait, current);
+
+		wait.flags |= WQ_FLAG_EXCLUSIVE;
+		__add_wait_queue_tail(&x->wait, &wait);
+		do {
+			if (signal_pending(current)) {
+				ret = -ERESTARTSYS;
+				goto out;
+			}
+			__set_current_state(TASK_INTERRUPTIBLE);
+			spin_unlock_irq(&x->wait.lock);
+			schedule();
+			spin_lock_irq(&x->wait.lock);
+		} while (!x->done);
+		__remove_wait_queue(&x->wait, &wait);
+	}
+	x->done--;
+out:
+	spin_unlock_irq(&x->wait.lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(wait_for_completion_interruptible);
+
+unsigned long fastcall __sched
+wait_for_completion_interruptible_timeout(struct completion *x,
+					  unsigned long timeout)
+{
+	might_sleep();
+
+	spin_lock_irq(&x->wait.lock);
+	if (!x->done) {
+		DECLARE_WAITQUEUE(wait, current);
+
+		wait.flags |= WQ_FLAG_EXCLUSIVE;
+		__add_wait_queue_tail(&x->wait, &wait);
+		do {
+			if (signal_pending(current)) {
+				timeout = -ERESTARTSYS;
+				goto out_unlock;
+			}
+			__set_current_state(TASK_INTERRUPTIBLE);
+			spin_unlock_irq(&x->wait.lock);
+			timeout = schedule_timeout(timeout);
+			if (!timeout)
+				goto out;
+			spin_lock_irq(&x->wait.lock);
+		} while (!x->done);
+		__remove_wait_queue(&x->wait, &wait);
+	}
+	x->done--;
+out_unlock:
+	spin_unlock_irq(&x->wait.lock);
+out:
+	return timeout;
+}
+EXPORT_SYMBOL(wait_for_completion_interruptible_timeout);
+
+
 #define	SLEEP_ON_VAR					\
 	unsigned long flags;				\
 	wait_queue_t wait;				\
