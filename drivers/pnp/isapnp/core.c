@@ -102,7 +102,6 @@ static int isapnp_detected;
 /* some prototypes */
 
 static int isapnp_config_prepare(struct pnp_dev *dev);
-extern struct pnp_protocol isapnp_card_protocol;
 extern struct pnp_protocol isapnp_protocol;
 
 static inline void write_data(unsigned char x)
@@ -454,6 +453,10 @@ static struct pnp_dev * __init isapnp_parse_device(struct pnp_card *card, int si
 	if (size > 5)
 		dev->regs |= tmp[5] << 8;
 	dev->protocol = &isapnp_protocol;
+	dev->capabilities |= PNP_CONFIGURABLE;
+	dev->capabilities |= PNP_READ;
+	dev->capabilities |= PNP_WRITE;
+	dev->capabilities |= PNP_DISABLE;
 	return dev;
 }
 
@@ -889,7 +892,7 @@ static int __init isapnp_build_device_list(void)
 		if (isapnp_checksum_value != 0x00)
 			printk(KERN_ERR "isapnp: checksum for device %i is not valid (0x%x)\n", csn, isapnp_checksum_value);
 		card->checksum = isapnp_checksum_value;
-		card->protocol = &isapnp_card_protocol;
+		card->protocol = &isapnp_protocol;
 		pnpc_add_card(card);
 	}
 	return 0;
@@ -903,7 +906,7 @@ int isapnp_present(void)
 {
 	struct pnp_card *card;
 	pnp_for_each_card(card) {
-		if (card->protocol == &isapnp_card_protocol)
+		if (card->protocol == &isapnp_protocol)
 			return 1;
 	}
 	return 0;
@@ -956,19 +959,25 @@ static int isapnp_config_prepare(struct pnp_dev *dev)
 		dev->irq_resource[idx].name = NULL;
 		dev->irq_resource[idx].start = -1;
 		dev->irq_resource[idx].end = -1;
-		dev->irq_resource[idx].flags = 0;
+		dev->irq_resource[idx].flags = IORESOURCE_IRQ|IORESOURCE_UNSET;
 	}
 	for (idx = 0; idx < DEVICE_COUNT_DMA; idx++) {
 		dev->dma_resource[idx].name = NULL;
 		dev->dma_resource[idx].start = -1;
 		dev->dma_resource[idx].end = -1;
-		dev->dma_resource[idx].flags = 0;
+		dev->dma_resource[idx].flags = IORESOURCE_DMA|IORESOURCE_UNSET;
 	}
-	for (idx = 0; idx < DEVICE_COUNT_RESOURCE; idx++) {
-		dev->resource[idx].name = NULL;
-		dev->resource[idx].start = 0;
-		dev->resource[idx].end = 0;
-		dev->resource[idx].flags = 0;
+	for (idx = 0; idx < DEVICE_COUNT_IO; idx++) {
+		dev->io_resource[idx].name = NULL;
+		dev->io_resource[idx].start = 0;
+		dev->io_resource[idx].end = 0;
+		dev->io_resource[idx].flags = IORESOURCE_IO|IORESOURCE_UNSET;
+	}
+	for (idx = 0; idx < DEVICE_COUNT_MEM; idx++) {
+		dev->mem_resource[idx].name = NULL;
+		dev->mem_resource[idx].start = 0;
+		dev->mem_resource[idx].end = 0;
+		dev->mem_resource[idx].flags = IORESOURCE_MEM|IORESOURCE_UNSET;
 	}
 	return 0;
 }
@@ -993,16 +1002,17 @@ EXPORT_SYMBOL(isapnp_device);
 static int isapnp_get_resources(struct pnp_dev *dev)
 {
 	/* We don't need to do anything but this, the rest is taken care of */
-	if ((dev->resource[0].start == 0) &&
-	    (dev->irq_resource[0].start == -1) &&
-	    (dev->dma_resource[0].start == -1))
+	if (pnp_port_valid(dev, 0) == 0 &&
+	    pnp_mem_valid(dev, 0) == 0 &&
+	    pnp_irq_valid(dev, 0) == 0 &&
+	    pnp_dma_valid(dev, 0) == 0)
 		dev->active = 0;
 	else
 		dev->active = 1;
 	return 0;
 }
 
-static int isapnp_set_resources(struct pnp_dev *dev, struct pnp_cfg *cfg, char flags)
+static int isapnp_set_resources(struct pnp_dev *dev, struct pnp_cfg *cfg)
 {
 	int tmp;
       	isapnp_cfg_begin(dev->card->number, dev->number);
@@ -1011,21 +1021,22 @@ static int isapnp_set_resources(struct pnp_dev *dev, struct pnp_cfg *cfg, char f
 	dev->irq_resource[1] = cfg->request.irq_resource[1];
 	dev->dma_resource[0] = cfg->request.dma_resource[0];
 	dev->dma_resource[1] = cfg->request.dma_resource[1];
-	for (tmp = 0; tmp < 12; tmp++) {
-		dev->resource[tmp] = cfg->request.resource[tmp];
-	}
-	for (tmp = 0; tmp < 8 && dev->resource[tmp].flags; tmp++)
-		isapnp_write_word(ISAPNP_CFG_PORT+(tmp<<1), dev->resource[tmp].start);
-	for (tmp = 0; tmp < 2 && dev->irq_resource[tmp].flags; tmp++) {
-		int irq = dev->irq_resource[tmp].start;
+	for (tmp = 0; tmp < DEVICE_COUNT_IO; tmp++)
+		dev->io_resource[tmp] = cfg->request.io_resource[tmp];
+	for (tmp = 0; tmp < DEVICE_COUNT_MEM; tmp++)
+		dev->mem_resource[tmp] = cfg->request.mem_resource[tmp];
+	for (tmp = 0; tmp < 8 && pnp_port_valid(dev, tmp); tmp++)
+		isapnp_write_word(ISAPNP_CFG_PORT+(tmp<<1), pnp_port_start(dev, tmp));
+	for (tmp = 0; tmp < 2 && pnp_irq_valid(dev, tmp); tmp++) {
+		int irq = pnp_irq(dev, tmp);
 		if (irq == 2)
 			irq = 9;
 		isapnp_write_byte(ISAPNP_CFG_IRQ+(tmp<<1), irq);
 	}
-	for (tmp = 0; tmp < 2 && dev->dma_resource[tmp].flags; tmp++)
-		isapnp_write_byte(ISAPNP_CFG_DMA+tmp, dev->dma_resource[tmp].start);
-	for (tmp = 0; tmp < 4 && dev->resource[tmp+8].flags; tmp++)
-		isapnp_write_word(ISAPNP_CFG_MEM+(tmp<<2), (dev->resource[tmp + 8].start >> 8) & 0xffff);
+	for (tmp = 0; tmp < 2 && pnp_dma_valid(dev, tmp); tmp++)
+		isapnp_write_byte(ISAPNP_CFG_DMA+tmp, pnp_dma(dev, tmp));
+	for (tmp = 0; tmp < 4 && pnp_mem_valid(dev, tmp); tmp++)
+		isapnp_write_word(ISAPNP_CFG_MEM+(tmp<<2), (pnp_mem_start(dev, tmp) >> 8) & 0xffff);
 	isapnp_activate(dev->number);
 	isapnp_cfg_end();
 	return 0;
@@ -1042,15 +1053,8 @@ static int isapnp_disable_resources(struct pnp_dev *dev)
 	return 0;
 }
 
-struct pnp_protocol isapnp_card_protocol = {
-	.name	= "ISA Plug and Play - card",
-	.get	= NULL,
-	.set	= NULL,
-	.disable = NULL,
-};
-
 struct pnp_protocol isapnp_protocol = {
-	.name	= "ISA Plug and Play - device",
+	.name	= "ISA Plug and Play",
 	.get	= isapnp_get_resources,
 	.set	= isapnp_set_resources,
 	.disable = isapnp_disable_resources,
@@ -1080,9 +1084,6 @@ int __init isapnp_init(void)
 #endif
 		return -EBUSY;
 	}
-
-	if(pnp_register_protocol(&isapnp_card_protocol)<0)
-		return -EBUSY;
 
 	if(pnp_register_protocol(&isapnp_protocol)<0)
 		return -EBUSY;
@@ -1144,7 +1145,7 @@ int __init isapnp_init(void)
 	return 0;
 }
 
-device_initcall(isapnp_init);
+subsys_initcall(isapnp_init);
 
 /* format is: noisapnp */
 

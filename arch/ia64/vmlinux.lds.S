@@ -65,6 +65,11 @@ SECTIONS
 	{ *(__ksymtab) }
   __stop___ksymtab = .;
 
+  __start___gpl_ksymtab = .;	/* Kernel symbol table:	GPL only */
+  __gpl_ksymtab : AT(ADDR(__gpl_ksymtab) - PAGE_OFFSET)
+	{ *(__gpl_ksymtab) }
+  __stop___gpl_ksymtab = .;
+
   __kallsyms : AT(ADDR(__kallsyms) - PAGE_OFFSET)
 	{
 	  __start___kallsyms = .;	/* All kernel symbols */

@@ -572,3 +572,10 @@ releasehfc(struct IsdnCardState *cs)
 		cs->bcs[1].hw.hfc.send = NULL;
 	}
 }
+
+int
+hfc_setup(struct IsdnCardState *cs, struct bc_hw_ops *hfc_ops)
+{
+	cs->bc_hw_ops = hfc_ops;
+	return 0;
+}

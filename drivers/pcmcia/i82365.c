@@ -839,18 +839,24 @@ static void __init isa_probe(void)
 
     for (devid = id_table; devid->vendor; devid++) {
 	if ((dev = pnp_find_dev(NULL, devid->vendor, devid->function, NULL))) {
+	
+	    if (pnp_device_attach(dev) < 0)
+	    	continue;
+	
 	    printk("PNP ");
-
+	    
 	    if (pnp_activate_dev(dev, NULL) < 0) {
 		printk("activate failed\n");
+		pnp_device_detach(dev);
 		break;
 	    }
 
-	    i365_base = pnp_port_start(dev, 0);
-	    if (i365_base) {
-		printk("no resources ?\n");
+	    if (pnp_port_valid(dev, 0)) {
+		printk("invalid resources ?\n");
+		pnp_device_detach(dev);
 		break;
 	    }
+	    i365_base = pnp_port_start(dev, 0);
 	    i82365_pnpdev = dev;
 	    break;
 	}

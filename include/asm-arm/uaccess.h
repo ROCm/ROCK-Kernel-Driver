@@ -74,7 +74,7 @@ extern int __get_user_bad(void);
 	   __asm__ __volatile__ ("bl	__get_user_" #__s		\
 		: "=&r" (__e), "=r" (__r1)				\
 		: "0" (__p)						\
-		: __i)
+		: __i, "cc")
 
 #define get_user(x,p)							\
 	({								\
@@ -100,8 +100,31 @@ extern int __get_user_bad(void);
 		__e;							\
 	})
 
-#define __get_user(x,p)		__get_user_nocheck((x),(p),sizeof(*(p)))
-#define __get_user_error(x,p,e)	__get_user_nocheck_error((x),(p),sizeof(*(p)),(e))
+#define __get_user(x,ptr)						\
+({									\
+	long __gu_err = 0;						\
+	__get_user_err((x),(ptr),__gu_err);				\
+	__gu_err;							\
+})
+
+#define __get_user_error(x,ptr,err)					\
+({									\
+	__get_user_err((x),(ptr),err);					\
+	(void) 0;							\
+})
+
+#define __get_user_err(x,ptr,err)					\
+do {									\
+	unsigned long __gu_addr = (unsigned long)(ptr);			\
+	unsigned long __gu_val;						\
+	switch (sizeof(*(ptr))) {					\
+	case 1:	__get_user_asm_byte(__gu_val,__gu_addr,err);	break;	\
+	case 2:	__get_user_asm_half(__gu_val,__gu_addr,err);	break;	\
+	case 4:	__get_user_asm_word(__gu_val,__gu_addr,err);	break;	\
+	default: (__gu_val) = __get_user_bad();				\
+	}								\
+	(x) = (__typeof__(*(ptr)))__gu_val;				\
+} while (0)
 
 extern int __put_user_1(void *, unsigned int);
 extern int __put_user_2(void *, unsigned int);
@@ -113,7 +136,7 @@ extern int __put_user_bad(void);
 	   __asm__ __volatile__ ("bl	__put_user_" #__s		\
 		: "=&r" (__e)						\
 		: "0" (__p), "r" (__r1)					\
-		: __i)
+		: __i, "cc")
 
 #define put_user(x,p)							\
 	({								\
@@ -138,8 +161,31 @@ extern int __put_user_bad(void);
 		__e;							\
 	})
 
-#define __put_user(x,p)		__put_user_nocheck((__typeof(*(p)))(x),(p),sizeof(*(p)))
-#define __put_user_error(x,p,e)	__put_user_nocheck_error((x),(p),sizeof(*(p)),(e))
+#define __put_user(x,ptr)						\
+({									\
+	long __pu_err = 0;						\
+	__put_user_err((x),(ptr),__pu_err);				\
+	__pu_err;							\
+})
+
+#define __put_user_error(x,ptr,err)					\
+({									\
+	__put_user_err((x),(ptr),err);					\
+	(void) 0;							\
+})
+
+#define __put_user_err(x,ptr,err)					\
+do {									\
+	unsigned long __pu_addr = (unsigned long)(ptr);			\
+	__typeof__(*(ptr)) __pu_val = (x);				\
+	switch (sizeof(*(ptr))) {					\
+	case 1: __put_user_asm_byte(__pu_val,__pu_addr,err);	break;	\
+	case 2: __put_user_asm_half(__pu_val,__pu_addr,err);	break;	\
+	case 4: __put_user_asm_word(__pu_val,__pu_addr,err);	break;	\
+	case 8:	__put_user_asm_dword(__pu_val,__pu_addr,err);	break;	\
+	default: __put_user_bad();					\
+	}								\
+} while (0)
 
 static __inline__ unsigned long copy_from_user(void *to, const void *from, unsigned long n)
 {
@@ -208,86 +254,5 @@ static inline long strnlen_user(const char *s, long n)
 
 	return res;
 }
-
-/*
- * These are the work horses of the get/put_user functions
- */
-#if 0
-#define __get_user_check(x,ptr,size)					\
-({									\
-	long __gu_err = -EFAULT, __gu_val = 0;				\
-	const __typeof__(*(ptr)) *__gu_addr = (ptr);			\
-	if (access_ok(VERIFY_READ,__gu_addr,size)) {			\
-		__gu_err = 0;						\
-		__get_user_size(__gu_val,__gu_addr,(size),__gu_err);	\
-	}								\
-	(x) = (__typeof__(*(ptr)))__gu_val;				\
-	__gu_err;							\
-})
-#endif
-
-#define __get_user_nocheck(x,ptr,size)					\
-({									\
-	long __gu_err = 0, __gu_val;					\
-	__get_user_size(__gu_val,(ptr),(size),__gu_err);		\
-	(x) = (__typeof__(*(ptr)))__gu_val;				\
-	__gu_err;							\
-})
-
-#define __get_user_nocheck_error(x,ptr,size,err)			\
-({									\
-	long __gu_val;							\
-	__get_user_size(__gu_val,(ptr),(size),(err));			\
-	(x) = (__typeof__(*(ptr)))__gu_val;				\
-	(void) 0;							\
-})
-
-#define __put_user_check(x,ptr,size)					\
-({									\
-	long __pu_err = -EFAULT;					\
-	__typeof__(*(ptr)) *__pu_addr = (ptr);				\
-	if (access_ok(VERIFY_WRITE,__pu_addr,size)) {			\
-		__pu_err = 0;						\
-		__put_user_size((x),__pu_addr,(size),__pu_err);		\
-	}								\
-	__pu_err;							\
-})
-
-#define __put_user_nocheck(x,ptr,size)					\
-({									\
-	long __pu_err = 0;						\
-	unsigned long __pu_addr = (unsigned long)(ptr);			\
-	__put_user_size((x),__pu_addr,(size),__pu_err);			\
-	__pu_err;							\
-})
-
-#define __put_user_nocheck_error(x,ptr,size,err)			\
-({									\
-	unsigned long __pu_addr = (unsigned long)(ptr);			\
-	__put_user_size((x),__pu_addr,(size),err);			\
-	(void) 0;							\
-})
-
-#define __get_user_size(x,ptr,size,retval)				\
-do {									\
-	switch (size) {							\
-	case 1:	__get_user_asm_byte(x,ptr,retval);	break;		\
-	case 2:	__get_user_asm_half(x,ptr,retval);	break;		\
-	case 4:	__get_user_asm_word(x,ptr,retval);	break;		\
-	case 8:	__get_user_asm_dword(x,ptr,retval);	break;		\
-	default: (x) = __get_user_bad();				\
-	}								\
-} while (0)
-
-#define __put_user_size(x,ptr,size,retval)				\
-do {									\
-	switch (size) {							\
-	case 1: __put_user_asm_byte(x,ptr,retval);	break;		\
-	case 2: __put_user_asm_half(x,ptr,retval);	break;		\
-	case 4: __put_user_asm_word(x,ptr,retval);	break;		\
-	case 8:	__put_user_asm_dword(x,ptr,retval);	break;		\
-	default: __put_user_bad();					\
-	}								\
-} while (0)
 
 #endif /* _ASMARM_UACCESS_H */

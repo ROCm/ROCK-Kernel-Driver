@@ -557,12 +557,6 @@ avm_pcipnp_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 static int
-AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
-static int
 avm_pcipnp_reset(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "AVM PCI/PnP: reset\n");
@@ -592,7 +586,7 @@ static void
 avm_pcipnp_release(struct IsdnCardState *cs)
 {
 	outb(0, cs->hw.avm.cfg_reg + 2);
-	release_region(cs->hw.avm.cfg_reg, 32);
+	hisax_release_resources(cs);
 }
 
 static struct card_ops avm_pci_ops = {
@@ -604,8 +598,8 @@ static struct card_ops avm_pci_ops = {
 
 static struct pci_dev *dev_avm __initdata = NULL;
 #ifdef __ISAPNP__
-static struct pci_bus *bus_avm __initdata = NULL;
-static struct pci_dev *pnp_avm __initdata = NULL;
+static struct pnp_card *card_avm __initdata = NULL;
+static struct pnp_dev *pnp_avm __initdata = NULL;
 #endif
 
 int __init
@@ -617,8 +611,6 @@ setup_avm_pcipnp(struct IsdnCard *card)
 
 	strcpy(tmp, avm_pci_rev);
 	printk(KERN_INFO "HiSax: AVM PCI driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_FRITZPCI)
-		return (0);
 	if (card->para[1]) {
 		/* old manual method */
 		cs->hw.avm.cfg_reg = card->para[1];
@@ -627,32 +619,36 @@ setup_avm_pcipnp(struct IsdnCard *card)
 	} else {
 #ifdef __ISAPNP__
 		if (isapnp_present()) {
-			struct pci_bus *ba;
-			if ((ba = isapnp_find_card(
+			struct pnp_card *ba;
+			if ((ba = pnp_find_card(
 				ISAPNP_VENDOR('A', 'V', 'M'),
-				ISAPNP_FUNCTION(0x0900), bus_avm))) {
-				bus_avm = ba;
+				ISAPNP_FUNCTION(0x0900), card_avm))) {
+				card_avm = ba;
 				pnp_avm = NULL;
-				if ((pnp_avm = isapnp_find_dev(bus_avm,
+				if ((pnp_avm = pnp_find_dev(card_avm,
 					ISAPNP_VENDOR('A', 'V', 'M'),
 					ISAPNP_FUNCTION(0x0900), pnp_avm))) {
-					pnp_avm->prepare(pnp_avm);
-					pnp_avm->deactivate(pnp_avm);
-					pnp_avm->activate(pnp_avm);
-					cs->hw.avm.cfg_reg =
-						pnp_avm->resource[0].start;
-					cs->irq = 
-						pnp_avm->irq_resource[0].start;
-					if (!cs->irq) {
+					if (pnp_device_attach(pnp_avm) < 0) {
+						printk(KERN_ERR "FritzPnP: attach failed\n");
+						return 0;
+					}
+					if (pnp_activate_dev(pnp_avm, NULL) < 0) {
+						printk(KERN_ERR "FritzPnP: activate failed\n");
+						pnp_device_detach(pnp_avm);
+						return 0;
+					}
+					if (!pnp_irq_valid(pnp_avm, 0)) {
 						printk(KERN_ERR "FritzPnP:No IRQ\n");
-						pnp_avm->deactivate(pnp_avm);
+						pnp_device_detach(pnp_avm);
 						return(0);
 					}
-					if (!cs->hw.avm.cfg_reg) {
+					if (!pnp_port_valid(pnp_avm, 0)) {
 						printk(KERN_ERR "FritzPnP:No IO address\n");
-						pnp_avm->deactivate(pnp_avm);
+						pnp_device_detach(pnp_avm);
 						return(0);
 					}
+					cs->hw.avm.cfg_reg = pnp_port_start(pnp_avm, 0);
+					cs->irq = pnp_irq(pnp_avm, 0);
 					cs->subtyp = AVM_FRITZ_PNP;
 					goto ready;
 				}
@@ -662,10 +658,6 @@ setup_avm_pcipnp(struct IsdnCard *card)
 		}
 #endif
 #if CONFIG_PCI
-		if (!pci_present()) {
-			printk(KERN_ERR "FritzPCI: no PCI bus present\n");
-			return(0);
-		}
 		if ((dev_avm = pci_find_device(PCI_VENDOR_ID_AVM,
 			PCI_DEVICE_ID_AVM_A1,  dev_avm))) {
 			cs->irq = dev_avm->irq;
@@ -686,22 +678,14 @@ setup_avm_pcipnp(struct IsdnCard *card)
 			return(0);
 		}
 		cs->irq_flags |= SA_SHIRQ;
-#else
-		printk(KERN_WARNING "FritzPCI: NO_PCI_BIOS\n");
-		return (0);
 #endif /* CONFIG_PCI */
 	}
 ready:
 	cs->hw.avm.isac = cs->hw.avm.cfg_reg + 0x10;
-	if (!request_region((cs->hw.avm.cfg_reg), 32, (cs->subtyp == AVM_FRITZ_PCI)
-			 ? "avm PCI" : "avm PnP")) {
-		printk(KERN_WARNING
-		       "HiSax: %s config port %x-%x already in use\n",
-		       CardType[card->typ],
-		       cs->hw.avm.cfg_reg,
-		       cs->hw.avm.cfg_reg + 31);
-		return (0);
-	}
+	if (!request_io(&cs->rs, cs->hw.avm.cfg_reg, 32,
+		 cs->subtyp == AVM_FRITZ_PCI ? "avm PCI" : "avm PnP"))
+		goto err;
+	
 	switch (cs->subtyp) {
 	  case AVM_FRITZ_PCI:
 		val = inl(cs->hw.avm.cfg_reg);
@@ -720,11 +704,12 @@ ready:
 		(cs->subtyp == AVM_FRITZ_PCI) ? "AVM Fritz!PCI" : "AVM Fritz!PnP",
 		cs->irq, cs->hw.avm.cfg_reg);
 
-	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hdlc_hw_ops;
 	cs->bc_l1_ops = &hdlc_l1_ops;
-	cs->cardmsg = &AVM_card_msg;
 	cs->card_ops = &avm_pci_ops;
-	ISACVersion(cs, (cs->subtyp == AVM_FRITZ_PCI) ? "AVM PCI:" : "AVM PnP:");
-	return (1);
+	isac_setup(cs, &isac_ops);
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }

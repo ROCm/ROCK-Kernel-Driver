@@ -58,3 +58,4 @@
 extern void main_irq_hfc(struct BCState *bcs);
 extern void inithfc(struct IsdnCardState *cs);
 extern void releasehfc(struct IsdnCardState *cs);
+extern int  hfc_setup(struct IsdnCardState *cs, struct bc_hw_ops *hfc_ops);

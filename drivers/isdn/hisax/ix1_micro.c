@@ -140,13 +140,6 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static void
-ix1_release(struct IsdnCardState *cs)
-{
-	if (cs->hw.ix1.cfg_reg)
-		release_region(cs->hw.ix1.cfg_reg, 4);
-}
-
 static int
 ix1_reset(struct IsdnCardState *cs)
 {
@@ -162,16 +155,10 @@ ix1_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static int
-ix1_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static struct card_ops ix1_ops = {
 	.init     = inithscxisac,
 	.reset    = ix1_reset,
-	.release  = ix1_release,
+	.release  = hisax_release_resources,
 	.irq_func = hscxisac_irq,
 };
 
@@ -187,7 +174,7 @@ static struct isapnp_device_id itk_ids[] __initdata = {
 };
 
 static struct isapnp_device_id *idev = &itk_ids[0];
-static struct pci_bus *pnp_c __devinitdata = NULL;
+static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 
 
@@ -199,34 +186,41 @@ setup_ix1micro(struct IsdnCard *card)
 
 	strcpy(tmp, ix1_revision);
 	printk(KERN_INFO "HiSax: ITK IX1 driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_IX1MICROR2)
-		return (0);
 
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
-		struct pci_bus *pb;
-		struct pci_dev *pd;
+		struct pnp_card *pb;
+		struct pnp_dev *pd;
 
 		while(idev->card_vendor) {
-			if ((pb = isapnp_find_card(idev->card_vendor,
-				idev->card_device, pnp_c))) {
+			if ((pb = pnp_find_card(idev->card_vendor,
+						idev->card_device,
+						pnp_c))) {
 				pnp_c = pb;
 				pd = NULL;
-				if ((pd = isapnp_find_dev(pnp_c,
-					idev->vendor, idev->function, pd))) {
+				if ((pd = pnp_find_dev(pnp_c,
+						       idev->vendor,
+						       idev->function,
+						       pd))) {
 					printk(KERN_INFO "HiSax: %s detected\n",
 						(char *)idev->driver_data);
-					pd->prepare(pd);
-					pd->deactivate(pd);
-					pd->activate(pd);
-					card->para[1] = pd->resource[0].start;
-					card->para[0] = pd->irq_resource[0].start;
-					if (!card->para[0] || !card->para[1]) {
+					if (pnp_device_attach(pd) < 0) {
+						printk(KERN_ERR "ITK PnP: attach failed\n");
+						return 0;
+					}
+					if (pnp_activate_dev(pd, NULL) < 0) {
+						printk(KERN_ERR "ITK PnP: activate failed\n");
+						pnp_device_detach(pd);
+						return 0;
+					}
+					if (!pnp_port_valid(pd, 0) || !pnp_irq_valid(pd, 0)) {
 						printk(KERN_ERR "ITK PnP:some resources are missing %ld/%lx\n",
-						card->para[0], card->para[1]);
-						pd->deactivate(pd);
+							pnp_irq(pd, 0), pnp_port_start(pd, 0));
+						pnp_device_detach(pd);
 						return(0);
 					}
+					card->para[1] = pnp_port_start(pd, 0);
+					card->para[0] = pnp_irq(pd, 0);
 					break;
 				} else {
 					printk(KERN_ERR "ITK PnP: PnP error card found, no device\n");
@@ -247,32 +241,17 @@ setup_ix1micro(struct IsdnCard *card)
 	cs->hw.ix1.hscx = card->para[1] + HSCX_DATA_OFFSET;
 	cs->hw.ix1.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
-	if (cs->hw.ix1.cfg_reg) {
-		if (check_region((cs->hw.ix1.cfg_reg), 4)) {
-			printk(KERN_WARNING
-			  "HiSax: %s config port %x-%x already in use\n",
-			       CardType[card->typ],
-			       cs->hw.ix1.cfg_reg,
-			       cs->hw.ix1.cfg_reg + 4);
-			return (0);
-		} else
-			request_region(cs->hw.ix1.cfg_reg, 4, "ix1micro cfg");
-	}
-	printk(KERN_INFO
-	       "HiSax: %s config irq:%d io:0x%X\n",
-	       CardType[cs->typ], cs->irq,
-	       cs->hw.ix1.cfg_reg);
+	if (!request_io(&cs->rs, cs->hw.ix1.cfg_reg, 4, "ix1micro cfg"))
+		goto err;
+	
+	printk(KERN_INFO "HiSax: %s config irq:%d io:0x%X\n",
+	       CardType[cs->typ], cs->irq, cs->hw.ix1.cfg_reg);
 	ix1_reset(cs);
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
-	cs->cardmsg = &ix1_card_msg;
 	cs->card_ops = &ix1_ops;
-	ISACVersion(cs, "ix1-Micro:");
-	if (HscxVersion(cs, "ix1-Micro:")) {
-		printk(KERN_WARNING
-		    "ix1-Micro: wrong HSCX versions check IO address\n");
-		ix1_release(cs);
-		return (0);
-	}
-	return (1);
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+		goto err;
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }

@@ -273,16 +273,17 @@ static void awc_pci_release(void) {
 #include <linux/isapnp.h>
 #define AIRONET4X00_IO_SIZE 	0x40
 
-#define isapnp_logdev pci_dev
-#define isapnp_dev    pci_bus
-#define isapnp_find_device isapnp_find_card
-#define isapnp_find_logdev isapnp_find_dev
-#define PNP_BUS bus
+#define isapnp_logdev pnp_dev
+#define isapnp_dev    pnp_card
+#define isapnp_find_device pnp_find_card
+#define isapnp_find_logdev pnp_find_dev
+#define PNP_BUS card
 #define PNP_BUS_NUMBER number
-#define PNP_DEV_NUMBER devfn
+#define PNP_DEV_NUMBER number
 
 
 int awc4500_pnp_hw_reset(struct net_device *dev){
+
 	struct isapnp_logdev *logdev;
 
 	DEBUG(0, "awc_pnp_reset \n");
@@ -299,22 +300,15 @@ int awc4500_pnp_hw_reset(struct net_device *dev){
 		return -1;
 	};
 
-	if (isapnp_cfg_begin(logdev->PNP_BUS->PNP_BUS_NUMBER, logdev->PNP_DEV_NUMBER)<0)
-		printk("isapnp cfg failed at release \n");
-	isapnp_deactivate(logdev->PNP_DEV_NUMBER);
-	isapnp_cfg_end();
+	pnp_disable_dev(logdev);
 
 	udelay(100);
 
-
-	if (isapnp_cfg_begin(logdev->PNP_BUS->PNP_BUS_NUMBER, logdev->PNP_DEV_NUMBER) < 0) {
+	if (pnp_activate_dev(logdev, NULL) < 0) {
 		printk("%s cfg begin failed in hw_reset for csn %x devnum %x \n",
 				dev->name, logdev->PNP_BUS->PNP_BUS_NUMBER, logdev->PNP_DEV_NUMBER);
 		return -EAGAIN;
 	}
-
-	isapnp_activate(logdev->PNP_DEV_NUMBER);	/* activate device */
-	isapnp_cfg_end();
 
 	return 0;
 }
@@ -341,32 +335,33 @@ int awc4500_pnp_probe(struct net_device *dev)
 		isa_index++;
 
 		logdev = isapnp_find_logdev(pnp_dev, ISAPNP_VENDOR('A','W','L'),
-				    ISAPNP_FUNCTION(1),
-				    0);
+					    ISAPNP_FUNCTION(1),
+					    0);
 		if (!logdev){
 			printk("No logical device found on Aironet board \n");
 			return -ENODEV;
 		}
-		if (isapnp_cfg_begin(logdev->PNP_BUS->PNP_BUS_NUMBER, logdev->PNP_DEV_NUMBER) < 0) {
-			printk("cfg begin failed for csn %x devnum %x \n",
+		if (pnp_device_attach(logdev) < 0) {
+			printk("pnp_device_attach failed for csn %x devnum %x \n",
 					logdev->PNP_BUS->PNP_BUS_NUMBER, logdev->PNP_DEV_NUMBER);
 			return -EAGAIN;
 		}
-		isapnp_activate(logdev->PNP_DEV_NUMBER);	/* activate device */
-		isapnp_cfg_end();
+		if (pnp_activate_dev(logdev, NULL) < 0) {
+			printk("pnp_activate_dev failed for csn %x devnum %x \n",
+					logdev->PNP_BUS->PNP_BUS_NUMBER, logdev->PNP_DEV_NUMBER);
+			pnp_device_detach(logdev);
+			return -EIO;
+		}
 
-		isa_irq_line = logdev->irq;
-		isa_ioaddr = logdev->resource[0].start;
+		isa_irq_line = pnp_irq(logdev, 0);
+		isa_ioaddr = pnp_port_start(logdev, 0);
 		request_region(isa_ioaddr, AIRONET4X00_IO_SIZE, "aironet4x00 ioaddr");
 
 		if (!dev) {
 			dev = init_etherdev(NULL, 0);	
 			if (!dev) {
 				release_region(isa_ioaddr, AIRONET4X00_IO_SIZE);
-				isapnp_cfg_begin(logdev->PNP_BUS->PNP_BUS_NUMBER,
-						 logdev->PNP_DEV_NUMBER);
-				isapnp_deactivate(logdev->PNP_DEV_NUMBER);
-				isapnp_cfg_end();
+				pnp_device_detach(logdev);
 				return -ENOMEM;
 			}
 		}
@@ -460,10 +455,7 @@ static void awc_pnp_release(void) {
 
 		if (awc_proc_unset_fun)
 			awc_proc_unset_fun(i);
-		if (isapnp_cfg_begin(logdev->PNP_BUS->PNP_BUS_NUMBER, logdev->PNP_DEV_NUMBER)<0)
-			printk("isapnp cfg failed at release \n");
-		isapnp_deactivate(logdev->PNP_DEV_NUMBER);
-		isapnp_cfg_end();
+		pnp_device_detach(logdev);
 
 		release_region(aironet4500_devices[i]->base_addr, AIRONET4X00_IO_SIZE);
 //		release_region(isa_cisaddr, AIRONET4X00_CIS_SIZE, "aironet4x00 cis");

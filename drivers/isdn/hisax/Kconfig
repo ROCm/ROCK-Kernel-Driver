@@ -109,6 +109,7 @@ config HISAX_16_3
 
 config HISAX_TELESPCI
 	bool "Teles PCI"
+	depends on PCI
 	help
 	  This enables HiSax support for the Teles PCI.
 	  See <file:Documentation/isdn/README.HiSax> on how to configure it.
@@ -235,6 +236,7 @@ config HISAX_MIC
 
 config HISAX_NETJET
 	bool "NETjet card"
+	depends on PCI
 	help
 	  This enables HiSax support for the NetJet from Traverse
 	  Technologies.
@@ -245,6 +247,7 @@ config HISAX_NETJET
 
 config HISAX_NETJET_U
 	bool "NETspider U card"
+	depends on PCI
 	help
 	  This enables HiSax support for the Netspider U interface ISDN card
 	  from Traverse Technologies.
@@ -283,6 +286,7 @@ config HISAX_HSTSAPHIR
 
 config HISAX_BKM_A4T
 	bool "Telekom A4T card"
+	depends on PCI
 	help
 	  This enables HiSax support for the Telekom A4T card.
 
@@ -292,6 +296,7 @@ config HISAX_BKM_A4T
 
 config HISAX_SCT_QUADRO
 	bool "Scitel Quadro card"
+	depends on PCI
 	help
 	  This enables HiSax support for the Scitel Quadro card.
 
@@ -310,6 +315,7 @@ config HISAX_GAZEL
 
 config HISAX_HFC_PCI
 	bool "HFC PCI-Bus cards"
+	depends on PCI
 	help
 	  This enables HiSax support for the HFC-S PCI 2BDS0 based cards.
 
@@ -318,6 +324,7 @@ config HISAX_HFC_PCI
 
 config HISAX_W6692
 	bool "Winbond W6692 based cards"
+	depends on PCI
 	help
 	  This enables HiSax support for Winbond W6692 based PCI ISDN cards.
 
@@ -335,7 +342,7 @@ config HISAX_HFC_SX
 
 config HISAX_ENTERNOW_PCI
 	bool "Formula-n enter:now PCI card (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	depends on PCI && EXPERIMENTAL
 	help
 	  This enables HiSax support for the Formula-n enter:now PCI
 	  ISDN card.
@@ -397,14 +404,14 @@ config HISAX_FRITZ_PCIPNP
 
 config HISAX_FRITZ_CLASSIC
 	tristate "AVM Fritz!Card classic support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	depends on ISA && EXPERIMENTAL
 	help
 	  This enables the driver for the AVM Fritz!Card classic, formerly
 	  known as AVM A1.
 
 config HISAX_HFCPCI
 	tristate "HFC PCI support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	depends on PCI && EXPERIMENTAL
 	help
 	  This enables the driver for CCD HFC PCI based cards.
 

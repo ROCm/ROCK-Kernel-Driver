@@ -167,6 +167,9 @@ struct el3_private {
 #ifdef CONFIG_PM
 	struct pm_dev *pmdev;
 #endif
+#ifdef __ISAPNP__
+	struct pnp_dev *pnpdev;
+#endif
 };
 static int id_port __initdata = 0x110;	/* Start with 0x110 to avoid new sound cards.*/
 static struct net_device *el3_root_dev;
@@ -247,6 +250,7 @@ int __init el3_probe(struct net_device *dev, int card_idx)
 	int mca_slot = -1;
 #ifdef __ISAPNP__
 	static int pnp_cards;
+	struct pnp_dev *idev = NULL;
 #endif /* __ISAPNP__ */
 
 	if (dev) SET_MODULE_OWNER(dev);
@@ -356,23 +360,26 @@ int __init el3_probe(struct net_device *dev, int card_idx)
 		goto no_pnp;
 
 	for (i=0; el3_isapnp_adapters[i].vendor != 0; i++) {
-		struct pci_dev *idev = NULL;
 		int j;
-		while ((idev = isapnp_find_dev(NULL,
-						el3_isapnp_adapters[i].vendor,
-						el3_isapnp_adapters[i].function,
-						idev))) {
-			idev->prepare(idev);
-			/* Deactivation is needed if the driver was called
-			   with "nopnp=1" before, does not harm if not. */
-			idev->deactivate(idev);
-			idev->activate(idev);
-			if (!idev->resource[0].start || check_region(idev->resource[0].start, EL3_IO_EXTENT))
+		while ((idev = pnp_find_dev(NULL,
+					    el3_isapnp_adapters[i].vendor,
+					    el3_isapnp_adapters[i].function,
+					    idev))) {
+			if (pnp_device_attach(idev) < 0)
 				continue;
-			ioaddr = idev->resource[0].start;
-			if (!request_region(ioaddr, EL3_IO_EXTENT, "3c509 PnP"))
+			if (pnp_activate_dev(idev, NULL) < 0) {
+			      __again:
+			      	pnp_device_detach(idev);
+			      	continue;
+			}
+			if (!pnp_port_valid(idev, 0) || !pnp_irq_valid(idev, 0))
+				goto __again;
+			ioaddr = pnp_port_start(idev, 0);
+			if (!request_region(ioaddr, EL3_IO_EXTENT, "3c509 PnP")) {
+				pnp_device_detach(idev);
 				return -EBUSY;
-			irq = idev->irq_resource[0].start;
+			}
+			irq = pnp_irq(idev, 0);
 			if (el3_debug > 3)
 				printk ("ISAPnP reports %s at i/o 0x%x, irq %d\n",
 					(char*) el3_isapnp_adapters[i].driver_data, ioaddr, irq);
@@ -531,6 +538,9 @@ no_pnp:
 	memset(dev->priv, 0, sizeof(struct el3_private));
 	
 	lp = dev->priv;
+#ifdef __ISAPNP__
+	lp->pnpdev = idev;
+#endif
 	lp->mca_slot = mca_slot;
 	lp->next_dev = el3_root_dev;
 	spin_lock_init(&lp->lock);
@@ -1466,6 +1476,10 @@ cleanup_module(void)
 		next_dev = lp->next_dev;
 		unregister_netdev(el3_root_dev);
 		release_region(el3_root_dev->base_addr, EL3_IO_EXTENT);
+#ifdef __ISAPNP__
+		if (lp->pnpdev)
+			pnp_device_detach(lp->pnpdev);
+#endif
 		kfree(el3_root_dev);
 		el3_root_dev = next_dev;
 	}

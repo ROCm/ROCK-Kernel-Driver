@@ -16,11 +16,6 @@ struct cpu_tlb_fns;
 struct cpu_user_fns;
 struct processor;
 
-struct proc_info_item {
-	const char	 *manufacturer;
-	const char	 *cpu_name;
-};
-
 /*
  * Note!  struct processor is always defined if we're
  * using MULTI_CPU, otherwise this entry is unused,
@@ -38,7 +33,7 @@ struct proc_info_list {
 	const char		*arch_name;
 	const char		*elf_name;
 	unsigned int		elf_hwcap;
-	struct proc_info_item	*info;
+	const char		*cpu_name;
 	struct processor	*proc;
 	struct cpu_tlb_fns	*tlb;
 	struct cpu_user_fns	*user;

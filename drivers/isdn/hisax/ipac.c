@@ -91,3 +91,15 @@ Start_IPAC:
 	ipac_write(cs, IPAC_MASK, 0xC0);
 	spin_unlock(&cs->lock);
 }
+
+int
+ipac_setup(struct IsdnCardState *cs, struct dc_hw_ops *ipac_dc_ops,
+	   struct bc_hw_ops *ipac_bc_ops)
+{
+	u8 val;
+
+	cs->dc_hw_ops = ipac_dc_ops;
+	cs->bc_hw_ops = ipac_bc_ops;
+	val = ipac_read(cs, IPAC_ID);
+	printk(KERN_INFO "HiSax: IPAC version %#x\n", val);
+}

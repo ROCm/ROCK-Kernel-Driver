@@ -75,15 +75,11 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 		location = (u8 *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			+ rel[i].r_offset;
 		loc32 = (u32 *) location;
-		/* This is the symbol it is referring to */
+		/* This is the symbol it is referring to.  Note that all
+		   undefined symbols have been resolved.  */
 		sym = (Elf32_Sym *)sechdrs[symindex].sh_addr
 			+ ELF32_R_SYM(rel[i].r_info);
-		if (!(v = sym->st_value)) {
-			printk(KERN_WARNING "%s: Unknown symbol %s\n",
-			       me->name, strtab + sym->st_name);
-			return -ENOENT;
-		}
-		v += rel[i].r_addend;
+		v = sym->st_value + rel[i].r_addend;
 
 		switch (ELF32_R_TYPE(rel[i].r_info)) {
 		case R_SPARC_32:

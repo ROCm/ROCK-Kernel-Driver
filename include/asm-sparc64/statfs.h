@@ -5,24 +5,10 @@
 #ifndef __KERNEL_STRICT_NAMES
 
 #include <linux/types.h>
-#include <linux/compat.h>	/* for compat_fsid_t */
 
 typedef __kernel_fsid_t	fsid_t;
 
 #endif
-
-struct statfs32 {
-	int f_type;
-	int f_bsize;
-	int f_blocks;
-	int f_bfree;
-	int f_bavail;
-	int f_files;
-	int f_ffree;
-	compat_fsid_t f_fsid;
-	int f_namelen;  /* SunOS ignores this field. */
-	int f_spare[6];
-};
 
 struct statfs {
 	long f_type;

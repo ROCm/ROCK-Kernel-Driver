@@ -47,7 +47,7 @@ static unsigned char rdsbuf[RDS_BUFFER];
 static int cadet_lock=0;
 
 static int cadet_probe(void);
-static struct pci_dev *dev;
+static struct pnp_dev *dev = NULL;
 static int isapnp_cadet_probe(void);
 
 /*
@@ -543,23 +543,26 @@ static struct video_device cadet_radio=
 
 static int isapnp_cadet_probe(void)
 {
-	dev = isapnp_find_dev (NULL, ISAPNP_VENDOR('M','S','M'),
-	                       ISAPNP_FUNCTION(0x0c24), NULL);
+	dev = pnp_find_dev (NULL, ISAPNP_VENDOR('M','S','M'),
+			    ISAPNP_FUNCTION(0x0c24), NULL);
 
 	if (!dev)
 		return -ENODEV;
-	if (dev->prepare(dev)<0)
+	if (pnp_device_attach(dev) < 0)
 		return -EAGAIN;
-	if (!(dev->resource[0].flags & IORESOURCE_IO))
+	if (pnp_activate_dev(dev, NULL) < 0) {
+		printk ("radio-cadet: pnp configure failed (out of resources?)\n");
+		pnp_device_detach(dev);
+		return -EIO;
+	}
+	if (!pnp_port_valid(dev, 0)) {
+		pnp_device_detach(dev);
 		return -ENODEV;
-	if (dev->activate(dev)<0) {
-		printk ("radio-cadet: isapnp configure failed (out of resources?)\n");
-		return -ENOMEM;
 	}
 
-	io = dev->resource[0].start;
+	io = pnp_port_start(dev, 0);
 
-	printk ("radio-cadet: ISAPnP reports card at %#x\n", io);
+	printk ("radio-cadet: PnP reports device at %#x\n", io);
 
 	return io;
 }
@@ -645,7 +648,7 @@ static void __exit cadet_cleanup_module(void)
 	release_region(io,2);
 
 	if (dev)
-		dev->deactivate(dev);
+		pnp_device_detach(dev);
 }
 
 module_init(cadet_init);

@@ -78,6 +78,12 @@ SECTIONS
 		__stop___ksymtab = .;
 	}
 
+	__gpl_ksymtab : {		/* Kernel symbol table: GPL-only */
+		__start___gpl_ksymtab = .;
+			*(__gpl_ksymtab)
+		__stop___gpl_ksymtab = .;
+	}
+
 	.data : {
 		/*
 		 * The cacheline aligned data

@@ -50,7 +50,7 @@ sys_call_table32:
 /*140*/	.word sys32_sendfile64, sys_nis_syscall, sys_futex, sys_gettid, sys32_getrlimit
 	.word sys32_setrlimit, sys_pivot_root, sys32_prctl, sys32_pciconfig_read, sys32_pciconfig_write
 /*150*/	.word sys_nis_syscall, sys_nis_syscall, sys_nis_syscall, sys_poll, sys_getdents64
-	.word sys32_fcntl64, sys_ni_syscall, sys32_statfs, sys32_fstatfs, sys_oldumount
+	.word sys32_fcntl64, sys_ni_syscall, compat_sys_statfs, compat_sys_fstatfs, sys_oldumount
 /*160*/	.word sys32_sched_setaffinity, sys32_sched_getaffinity, sys_getdomainname, sys_setdomainname, sys_nis_syscall
 	.word sys_quotactl, sys_set_tid_address, sys32_mount, sys_ustat, sys_setxattr
 /*170*/	.word sys_lsetxattr, sys_fsetxattr, sys_getxattr, sys_lgetxattr, sys32_getdents
@@ -197,7 +197,7 @@ sunos_sys_table:
 	.word sunos_nosys, sunos_nosys
 /*150*/	.word sys_getsockname, sunos_nosys, sunos_nosys
 	.word sys_poll, sunos_nosys, sunos_nosys
-	.word sunos_getdirentries, sys32_statfs, sys32_fstatfs
+	.word sunos_getdirentries, compat_sys_statfs, compat_sys_fstatfs
 	.word sys_oldumount, sunos_nosys, sunos_nosys
 	.word sys_getdomainname, sys_setdomainname
 	.word sunos_nosys, sys_quotactl, sunos_nosys

@@ -43,14 +43,15 @@ drv_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 }
 
 static ssize_t
-drv_attr_store(struct kobject * kobj, struct attribute * attr, const char * buf)
+drv_attr_store(struct kobject * kobj, struct attribute * attr, 
+	       const char * buf, size_t count)
 {
 	struct driver_attribute * drv_attr = to_drv_attr(attr);
 	struct device_driver * drv = to_driver(kobj);
 	ssize_t ret = 0;
 
 	if (drv_attr->store)
-		ret = drv_attr->store(drv,buf);
+		ret = drv_attr->store(drv,buf,count);
 	return ret;
 }
 
@@ -90,14 +91,15 @@ bus_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 }
 
 static ssize_t
-bus_attr_store(struct kobject * kobj, struct attribute * attr, const char * buf)
+bus_attr_store(struct kobject * kobj, struct attribute * attr, 
+	       const char * buf, size_t count)
 {
 	struct bus_attribute * bus_attr = to_bus_attr(attr);
 	struct bus_type * bus = to_bus(kobj);
 	ssize_t ret = 0;
 
 	if (bus_attr->store)
-		ret = bus_attr->store(bus,buf);
+		ret = bus_attr->store(bus,buf,count);
 	return ret;
 }
 

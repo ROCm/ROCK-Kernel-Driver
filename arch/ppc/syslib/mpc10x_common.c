@@ -243,6 +243,8 @@ mpc10x_bridge_init(struct pci_controller *hose,
 
 #ifdef CONFIG_MPC10X_STORE_GATHERING
 	mpc10x_enable_store_gathering(hose);
+#else
+	mpc10x_disable_store_gathering(hose);
 #endif
 
 	if (ppc_md.progress) ppc_md.progress("mpc10x:exit", 0x100);
@@ -367,6 +369,28 @@ mpc10x_enable_store_gathering(struct pci_controller *hose)
 			        &picr1);
 
 	picr1 |= MPC10X_CFG_PICR1_ST_GATH_EN;
+
+	early_write_config_dword(hose,
+				0,
+				PCI_DEVFN(0,0),
+				MPC10X_CFG_PICR1_REG,
+				picr1);
+
+	return 0;
+}
+
+int __init
+mpc10x_disable_store_gathering(struct pci_controller *hose)
+{
+	uint picr1;
+
+	early_read_config_dword(hose,
+				0,
+				PCI_DEVFN(0,0),
+			        MPC10X_CFG_PICR1_REG,
+			        &picr1);
+
+	picr1 &= ~MPC10X_CFG_PICR1_ST_GATH_EN;
 
 	early_write_config_dword(hose,
 				0,

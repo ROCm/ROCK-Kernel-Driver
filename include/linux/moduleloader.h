@@ -5,14 +5,6 @@
 #include <linux/module.h>
 #include <linux/elf.h>
 
-/* Helper function for arch-specific module loaders */
-unsigned long find_symbol_internal(Elf_Shdr *sechdrs,
-				   unsigned int symindex,
-				   const char *strtab,
-				   const char *name,
-				   struct module *mod,
-				   struct kernel_symbol_group **group);
-
 /* These must be implemented by the specific architecture */
 
 /* Adjust arch-specific sections.  Return 0 on success.  */

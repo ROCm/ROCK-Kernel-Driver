@@ -1259,16 +1259,16 @@ netiucv_change_mtu (net_device * dev, int new_mtu)
 #define CTRL_BUFSIZE 40
 
 static ssize_t
-user_show (struct device *dev, char *buf, size_t count, loff_t off)
+user_show (struct device *dev, char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 
-	return off ? 0 : snprintf(buf, count, "%s\n", 
-				  netiucv_printname(priv->conn->userid));
+	return snprintf(buf, PAGE_SIZE, "%s\n", 
+			netiucv_printname(priv->conn->userid));
 }
 
 static ssize_t
-user_write (struct device *dev, const char *buf, size_t count, loff_t off)
+user_write (struct device *dev, const char *buf, size_t count)
 {
 	netiucv_priv *priv = dev->driver_data;
 	struct net_device *ndev = container_of((void *)priv, struct net_device, priv);
@@ -1305,16 +1305,16 @@ user_write (struct device *dev, const char *buf, size_t count, loff_t off)
 static DEVICE_ATTR(user, 0644, user_show, user_write);
 
 static ssize_t
-buffer_show (struct device *dev, char *buf, size_t count, loff_t off)
+buffer_show (struct device *dev, char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 
-	return off ? 0 : snprintf(buf, count, "%d\n", 
-				  priv->conn->max_buffsize);
+	return sprintf(buf, "%d\n", 
+		       priv->conn->max_buffsize);
 }
 
 static ssize_t
-buffer_write (struct device *dev, const char *buf, size_t count, loff_t off)
+buffer_write (struct device *dev, const char *buf, size_t count)
 {
 	netiucv_priv *priv = dev->driver_data;
 	struct net_device *ndev = container_of((void *)priv, struct net_device, priv);
@@ -1352,38 +1352,37 @@ buffer_write (struct device *dev, const char *buf, size_t count, loff_t off)
 static DEVICE_ATTR(buffer, 0644, buffer_show, buffer_write);
 
 static ssize_t
-dev_fsm_show (struct device *dev, char *buf, size_t count, loff_t off)
+dev_fsm_show (struct device *dev, char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
-	return off ? 0 : snprintf(buf, count, "%s\n",
-				  fsm_getstate_str(priv->fsm));
+	return snprintf(buf, PAGE_SIZE, "%s\n",
+			fsm_getstate_str(priv->fsm));
 }
 
 static DEVICE_ATTR(device_fsm_state, 0444, dev_fsm_show, NULL);
 
 static ssize_t
-conn_fsm_show (struct device *dev, char *buf, size_t count, loff_t off)
+conn_fsm_show (struct device *dev, char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
-	return off ? 0 : snprintf(buf, count, "%s\n",
-				  fsm_getstate_str(priv->conn->fsm));
+	return snprintf(buf, PAGE_SIZE, "%s\n",
+			fsm_getstate_str(priv->conn->fsm));
 }
 
 static DEVICE_ATTR(connection_fsm_state, 0444, conn_fsm_show, NULL);
 
 static ssize_t
-maxmulti_show (struct device *dev, char *buf, size_t count, loff_t off)
+maxmulti_show (struct device *dev, char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
-	return off ? 0 : snprintf(buf, count, "%ld\n",
-				  priv->conn->prof.maxmulti);
+	return sprintf(buf, "%ld\n", priv->conn->prof.maxmulti);
 }
 
 static ssize_t
-maxmulti_write (struct device *dev, const char *buf, size_t count, loff_t off)
+maxmulti_write (struct device *dev, const char *buf, size_t count)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
@@ -1394,16 +1393,15 @@ maxmulti_write (struct device *dev, const char *buf, size_t count, loff_t off)
 static DEVICE_ATTR(max_tx_buffer_used, 0644, maxmulti_show, maxmulti_write);
 
 static ssize_t
-maxcq_show (struct device *dev, char *buf, size_t count, loff_t off)
+maxcq_show (struct device *dev, char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
-	return off ? 0 : snprintf(buf, count, "%ld\n",
-				  priv->conn->prof.maxcqueue);
+	return sprintf(buf, "%ld\n", priv->conn->prof.maxcqueue);
 }
 
 static ssize_t
-maxcq_write (struct device *dev, const char *buf, size_t count, loff_t off)
+maxcq_write (struct device *dev, const char *buf, size_t count)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
@@ -1414,16 +1412,15 @@ maxcq_write (struct device *dev, const char *buf, size_t count, loff_t off)
 static DEVICE_ATTR(max_chained_skbs, 0644, maxcq_show, maxcq_write);
 
 static ssize_t
-sdoio_show (struct device *dev, char *buf, size_t count, loff_t off)
+sdoio_show (struct device *dev, char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
-	return off ? 0 : snprintf(buf, count, "%ld\n",
-				  priv->conn->prof.doios_single);
+	return sprintf(buf, "%ld\n", priv->conn->prof.doios_single);
 }
 
 static ssize_t
-sdoio_write (struct device *dev, const char *buf, size_t count, loff_t off)
+sdoio_write (struct device *dev, const char *buf, size_t count)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
@@ -1434,16 +1431,15 @@ sdoio_write (struct device *dev, const char *buf, size_t count, loff_t off)
 static DEVICE_ATTR(tx_single_write_ops, 0644, sdoio_show, sdoio_write);
 
 static ssize_t
-mdoio_show (struct device *dev, char *buf, size_t count, loff_t off)
+mdoio_show (struct device *dev, char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
-	return off ? 0 : snprintf(buf, count, "%ld\n",
-				  priv->conn->prof.doios_multi);
+	return sprintf(buf, "%ld\n", priv->conn->prof.doios_multi);
 }
 
 static ssize_t
-mdoio_write (struct device *dev, const char *buf, size_t count, loff_t off)
+mdoio_write (struct device *dev, const char *buf, size_t count)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
@@ -1454,16 +1450,15 @@ mdoio_write (struct device *dev, const char *buf, size_t count, loff_t off)
 static DEVICE_ATTR(tx_multi_write_ops, 0644, mdoio_show, mdoio_write);
 
 static ssize_t
-txlen_show (struct device *dev, char *buf, size_t count, loff_t off)
+txlen_show (struct device *dev, char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
-	return off ? 0 : snprintf(buf, count, "%ld\n",
-				  priv->conn->prof.txlen);
+	return sprintf(buf, "%ld\n", priv->conn->prof.txlen);
 }
 
 static ssize_t
-txlen_write (struct device *dev, const char *buf, size_t count, loff_t off)
+txlen_write (struct device *dev, const char *buf, size_t count)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
@@ -1474,16 +1469,15 @@ txlen_write (struct device *dev, const char *buf, size_t count, loff_t off)
 static DEVICE_ATTR(netto_bytes, 0644, txlen_show, txlen_write);
 
 static ssize_t
-txtime_show (struct device *dev, char *buf, size_t count, loff_t off)
+txtime_show (struct device *dev, char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
-	return off ? 0 : snprintf(buf, count, "%ld\n",
-				  priv->conn->prof.tx_time);
+	return snprintf(buf, count, "%ld\n", priv->conn->prof.tx_time);
 }
 
 static ssize_t
-txtime_write (struct device *dev, const char *buf, size_t count, loff_t off)
+txtime_write (struct device *dev, const char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 	

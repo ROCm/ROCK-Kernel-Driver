@@ -978,6 +978,8 @@ ecard_probe(int slot, card_type_t type)
 	strcpy(ec->dev.name, "fixme!");
 	ec->dev.parent = NULL;
 	ec->dev.bus    = &ecard_bus_type;
+	ec->dev.dma_mask = &ec->dma_mask;
+	ec->dma_mask = (u64)0xffffffff;
 
 	device_register(&ec->dev);
 

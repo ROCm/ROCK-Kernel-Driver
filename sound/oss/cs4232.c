@@ -357,7 +357,7 @@ MODULE_PARM_DESC(isapnp,"Enable ISAPnP probing (default 1)");
 
 /* All cs4232 based cards have the main ad1848 card either as CSC0000 or
  * CSC0100. */
-static const struct pnp_id cs4232_pnp_table[] = {
+static const struct pnp_device_id cs4232_pnp_table[] = {
 	{ .id = "CSC0100", .driver_data = 0 },
 	{ .id = "CSC0000", .driver_data = 0 },
 	/* Guillemot Turtlebeach something appears to be cs4232 compatible
@@ -366,9 +366,9 @@ static const struct pnp_id cs4232_pnp_table[] = {
 	{ .id = ""}
 };
 
-/*MODULE_DEVICE_TABLE(isapnp, isapnp_cs4232_list);*/
+MODULE_DEVICE_TABLE(pnp, cs4232_pnp_table);
 
-static int cs4232_pnp_probe(struct pnp_dev *dev, const struct pnp_id *card_id, const struct pnp_id *dev_id)
+static int cs4232_pnp_probe(struct pnp_dev *dev, const struct pnp_device_id *dev_id)
 {
 	struct address_info *isapnpcfg;
 
@@ -376,30 +376,31 @@ static int cs4232_pnp_probe(struct pnp_dev *dev, const struct pnp_id *card_id, c
 	if (!isapnpcfg)
 		return -ENOMEM;
 
-	isapnpcfg->irq		= dev->irq_resource[0].start;
-	isapnpcfg->dma		= dev->dma_resource[0].start;
-	isapnpcfg->dma2		= dev->dma_resource[1].start;
-	isapnpcfg->io_base	= dev->resource[0].start;
+	isapnpcfg->irq		= pnp_irq(dev, 0);
+	isapnpcfg->dma		= pnp_dma(dev, 0);
+	isapnpcfg->dma2		= pnp_dma(dev, 1);
+	isapnpcfg->io_base	= pnp_port_start(dev, 0);
 	if (probe_cs4232(isapnpcfg,TRUE) == 0) {
 		printk(KERN_ERR "cs4232: ISA PnP card found, but not detected?\n");
 		kfree(isapnpcfg);
 		return -ENODEV;
 	}
 	attach_cs4232(isapnpcfg);
-	pci_set_drvdata(dev,isapnpcfg);
+	pnp_set_drvdata(dev,isapnpcfg);
 	return 0;
 }
 
 static void cs4232_pnp_remove(struct pnp_dev *dev)
 {
-	struct address_info *cfg = (struct address_info*) dev->driver_data;
-	if (cfg)
+	struct address_info *cfg = pnp_get_drvdata(dev);
+	if (cfg) {
 		unload_cs4232(cfg);
+		kfree(cfg);
+	}
 }
 
 static struct pnp_driver cs4232_driver = {
 	.name		= "cs4232",
-	.card_id_table	= NULL,
 	.id_table	= cs4232_pnp_table,
 	.probe		= cs4232_pnp_probe,
 	.remove		= cs4232_pnp_remove,

@@ -98,7 +98,7 @@ int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
 struct bus_attribute {
 	struct attribute	attr;
 	ssize_t (*show)(struct bus_type *, char * buf);
-	ssize_t (*store)(struct bus_type *, const char * buf);
+	ssize_t (*store)(struct bus_type *, const char * buf, size_t count);
 };
 
 #define BUS_ATTR(_name,_mode,_show,_store)	\
@@ -141,7 +141,7 @@ extern void put_driver(struct device_driver * drv);
 struct driver_attribute {
 	struct attribute	attr;
 	ssize_t (*show)(struct device_driver *, char * buf);
-	ssize_t (*store)(struct device_driver *, const char * buf);
+	ssize_t (*store)(struct device_driver *, const char * buf, size_t count);
 };
 
 #define DRIVER_ATTR(_name,_mode,_show,_store)	\
@@ -182,7 +182,7 @@ extern void put_devclass(struct device_class *);
 struct devclass_attribute {
 	struct attribute	attr;
 	ssize_t (*show)(struct device_class *, char * buf);
-	ssize_t (*store)(struct device_class *, const char * buf);
+	ssize_t (*store)(struct device_class *, const char * buf, size_t count);
 };
 
 #define DEVCLASS_ATTR(_name,_str,_mode,_show,_store)	\
@@ -320,7 +320,7 @@ extern void device_release_driver(struct device * dev);
 struct device_attribute {
 	struct attribute	attr;
 	ssize_t (*show)(struct device * dev, char * buf);
-	ssize_t (*store)(struct device * dev, const char * buf);
+	ssize_t (*store)(struct device * dev, const char * buf, size_t count);
 };
 
 #define DEVICE_ATTR(_name,_mode,_show,_store) \

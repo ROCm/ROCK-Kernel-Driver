@@ -10,8 +10,7 @@
  *  Infra-red driver for the StrongARM SA1100 embedded microprocessor
  *
  *  Note that we don't have to worry about the SA1111's DMA bugs in here,
- *  so we use the straight forward pci_map_* functions with a null pointer.
- *  IMHO we should really be using our own machine specific set.
+ *  so we use the straight forward dma_map_* functions with a null pointer.
  *
  *  This driver takes one kernel command line parameter, sa1100ir=, with
  *  the following options:
@@ -29,8 +28,8 @@
 #include <linux/rtnetlink.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
-#include <linux/pci.h>
-#include <linux/pm.h>
+#include <linux/device.h>
+#include <linux/dma-mapping.h>
 
 #include <net/irda/irda.h>
 #include <net/irda/wrapper.h>
@@ -57,11 +56,6 @@ static int power_level = 3;
 static int tx_lpm;
 static int max_rate = 4000000;
 
-/*
- * Our netdevice.  There is only ever one of these.
- */
-static struct net_device *netdev;
-
 struct sa1100_irda {
 	unsigned char		hscr0;
 	unsigned char		utcr4;
@@ -79,8 +73,8 @@ struct sa1100_irda {
 	dma_regs_t		*rxdma;
 
 	struct net_device_stats	stats;
+	struct device		*dev;
 	struct irlap_cb		*irlap;
-	struct pm_dev		*pmdev;
 	struct qos_info		qos;
 
 	iobuff_t		tx_buff;
@@ -112,9 +106,9 @@ static int sa1100_irda_rx_alloc(struct sa1100_irda *si)
 	 */
 	skb_reserve(si->rxskb, 1);
 
-	si->rxbuf_dma = pci_map_single(NULL, si->rxskb->data,
+	si->rxbuf_dma = dma_map_single(si->dev, si->rxskb->data,
 					HPSIR_MAX_RXLEN,
-					PCI_DMA_FROMDEVICE);
+					DMA_FROM_DEVICE);
 	return 0;
 }
 
@@ -361,11 +355,12 @@ static void sa1100_irda_shutdown(struct sa1100_irda *si)
 /*
  * Suspend the IrDA interface.
  */
-static int sa1100_irda_suspend(struct net_device *dev, int state)
+static int sa1100_irda_suspend(struct device *_dev, u32 state, u32 level)
 {
+	struct net_device *dev = dev_get_drvdata(_dev);
 	struct sa1100_irda *si = dev->priv;
 
-	if (si && si->open) {
+	if (si && si->open && level == SUSPEND_DISABLE) {
 		/*
 		 * Stop the transmit queue
 		 */
@@ -381,11 +376,12 @@ static int sa1100_irda_suspend(struct net_device *dev, int state)
 /*
  * Resume the IrDA interface.
  */
-static int sa1100_irda_resume(struct net_device *dev)
+static int sa1100_irda_resume(struct device *_dev, u32 level)
 {
+	struct net_device *dev = dev_get_drvdata(_dev);
 	struct sa1100_irda *si = dev->priv;
 
-	if (si && si->open) {
+	if (si && si->open && level == RESUME_ENABLE) {
 		/*
 		 * If we missed a speed change, initialise at the new speed
 		 * directly.  It is debatable whether this is actually
@@ -410,31 +406,9 @@ static int sa1100_irda_resume(struct net_device *dev)
 
 	return 0;
 }
-
-static int sa1100_irda_pmproc(struct pm_dev *dev, pm_request_t rqst, void *data)
-{
-	int ret;
-
-	if (!dev->data)
-		return -EINVAL;
-
-	switch (rqst) {
-	case PM_SUSPEND:
-		ret = sa1100_irda_suspend((struct net_device *)dev->data,
-					  (int)data);
-		break;
-
-	case PM_RESUME:
-		ret = sa1100_irda_resume((struct net_device *)dev->data);
-		break;
-
-	default:
-		ret = -EINVAL;
-		break;
-	}
-
-	return ret;
-}
+#else
+#define sa1100_irda_suspend	NULL
+#define sa1100_irda_resume	NULL
 #endif
 
 /*
@@ -555,7 +529,7 @@ static void sa1100_irda_fir_error(struct sa1100_irda *si, struct net_device *dev
 	len = dma_addr - si->rxbuf_dma;
 	if (len > HPSIR_MAX_RXLEN)
 		len = HPSIR_MAX_RXLEN;
-	pci_unmap_single(NULL, si->rxbuf_dma, len, PCI_DMA_FROMDEVICE);
+	dma_unmap_single(si->dev, si->rxbuf_dma, len, DMA_FROM_DEVICE);
 
 	do {
 		/*
@@ -603,9 +577,9 @@ static void sa1100_irda_fir_error(struct sa1100_irda *si, struct net_device *dev
 		/*
 		 * Remap the buffer.
 		 */
-		si->rxbuf_dma = pci_map_single(NULL, si->rxskb->data,
+		si->rxbuf_dma = dma_map_single(si->dev, si->rxskb->data,
 						HPSIR_MAX_RXLEN,
-						PCI_DMA_FROMDEVICE);
+						DMA_FROM_DEVICE);
 	}
 }
 
@@ -716,7 +690,7 @@ static void sa1100_irda_txdma_irq(void *id)
 	 * Account and free the packet.
 	 */
 	if (skb) {
-		pci_unmap_single(NULL, si->txbuf_dma, skb->len, PCI_DMA_TODEVICE);
+		dma_unmap_single(si->dev, si->txbuf_dma, skb->len, DMA_TO_DEVICE);
 		si->stats.tx_packets ++;
 		si->stats.tx_bytes += skb->len;
 		dev_kfree_skb_irq(skb);
@@ -782,8 +756,8 @@ static int sa1100_irda_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 		netif_stop_queue(dev);
 
 		si->txskb = skb;
-		si->txbuf_dma = pci_map_single(NULL, skb->data,
-					 skb->len, PCI_DMA_TODEVICE);
+		si->txbuf_dma = dma_map_single(si->dev, skb->data,
+					 skb->len, DMA_TO_DEVICE);
 
 		sa1100_start_dma(si->txdma, si->txbuf_dma, skb->len);
 
@@ -931,8 +905,8 @@ static int sa1100_irda_stop(struct net_device *dev)
 	 * tidy that up cleanly.
 	 */
 	if (si->rxskb) {
-		pci_unmap_single(NULL, si->rxbuf_dma, HPSIR_MAX_RXLEN,
-				 PCI_DMA_FROMDEVICE);
+		dma_unmap_single(si->dev, si->rxbuf_dma, HPSIR_MAX_RXLEN,
+				 DMA_FROM_DEVICE);
 		dev_kfree_skb(si->rxskb);
 		si->rxskb = NULL;
 	}
@@ -972,6 +946,24 @@ static int sa1100_irda_init_iobuf(iobuff_t *io, int size)
 	return io->head ? 0 : -ENOMEM;
 }
 
+static struct device_driver sa1100ir_driver = {
+	.name		= "sa1100ir",
+	.bus		= &system_bus_type,
+	.suspend	= sa1100_irda_suspend,
+	.resume		= sa1100_irda_resume,
+};
+
+static struct sys_device sa1100ir_device = {
+	.name		= "sa1100ir",
+	.id		= 0,
+	.root		= NULL,
+	.dev		= {
+		.name	= "Intel Corporation SA11x0 [IrDA]",
+		.bus_id	= "0",
+		.driver	= &sa1100ir_driver,
+	},
+};
+
 static int sa1100_irda_net_init(struct net_device *dev)
 {
 	struct sa1100_irda *si = dev->priv;
@@ -983,6 +975,8 @@ static int sa1100_irda_net_init(struct net_device *dev)
 		goto out;
 
 	memset(si, 0, sizeof(*si));
+
+	si->dev = &sa1100ir_device.dev;
 
 	/*
 	 * Initialise the HP-SIR buffers
@@ -1035,15 +1029,6 @@ static int sa1100_irda_net_init(struct net_device *dev)
 	Ser2UTCR4 = si->utcr4;
 	Ser2HSCR0 = HSCR0_UART;
 
-#ifdef CONFIG_PM
-	/*
-	 * Power-Management is optional.
-	 */
-	si->pmdev = pm_register(PM_SYS_DEV, PM_SYS_IRDA, sa1100_irda_pmproc);
-	if (si->pmdev)
-		si->pmdev->data = dev;
-#endif
-
 	return 0;
 
 	kfree(si->tx_buff.head);
@@ -1071,15 +1056,12 @@ static void sa1100_irda_net_uninit(struct net_device *dev)
 	dev->get_stats		= NULL;
 	dev->priv		= NULL;
 
-	pm_unregister(si->pmdev);
-
 	kfree(si->tx_buff.head);
 	kfree(si->rx_buff.head);
 	kfree(si);
 }
 
-static
-int __init sa1100_irda_init(void)
+static int __init sa1100_irda_init(void)
 {
 	struct net_device *dev;
 	int err;
@@ -1102,6 +1084,9 @@ int __init sa1100_irda_init(void)
 	if (err)
 		goto err_mem_3;
 
+	driver_register(&sa1100ir_driver);
+	sys_device_register(&sa1100ir_device);
+
 	rtnl_lock();
 	dev = dev_alloc("irda%d", &err);
 	if (dev) {
@@ -1114,11 +1099,14 @@ int __init sa1100_irda_init(void)
 		if (err)
 			kfree(dev);
 		else
-			netdev = dev;
+			dev_set_drvdata(&sa1100ir_device.dev, dev);
 	}
 	rtnl_unlock();
 
 	if (err) {
+		sys_device_unregister(&sa1100ir_device);
+		driver_unregister(&sa1100ir_driver);
+
 		release_mem_region(__PREG(Ser2HSCR2), 0x04);
 err_mem_3:
 		release_mem_region(__PREG(Ser2HSCR0), 0x1c);
@@ -1131,14 +1119,16 @@ err_mem_1:
 
 static void __exit sa1100_irda_exit(void)
 {
-	struct net_device *dev = netdev;
+	struct net_device *dev = dev_get_drvdata(&sa1100ir_device.dev);
 
-	netdev = NULL;
 	if (dev) {
 		rtnl_lock();
 		unregister_netdevice(dev);
 		rtnl_unlock();
 	}
+
+	sys_device_unregister(&sa1100ir_device);
+	driver_unregister(&sa1100ir_driver);
 
 	release_mem_region(__PREG(Ser2HSCR2), 0x04);
 	release_mem_region(__PREG(Ser2HSCR0), 0x1c);

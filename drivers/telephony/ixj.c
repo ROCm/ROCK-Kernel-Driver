@@ -7574,8 +7574,8 @@ static void cleanup(void)
 				kfree(j->read_buffer);
 			if (j->write_buffer)
 				kfree(j->write_buffer);
-			if (j->dev && j->dev->deactivate)
-				j->dev->deactivate(j->dev);
+			if (j->dev)
+				pnp_device_detach(j->dev);
 			if (ixjdebug & 0x0002)
 				printk(KERN_INFO "IXJ: Unregistering /dev/phone%d from LTAPI\n", cnt);
 			phone_unregister_device(&j->p);
@@ -7700,7 +7700,7 @@ int __init ixj_probe_isapnp(int *cnt)
 {               
 	int probe = 0;
 	int func = 0x110;
-        struct pci_dev *dev = NULL, *old_dev = NULL;
+        struct pnp_dev *dev = NULL, *old_dev = NULL;
 
 	while (1) {
 		do {
@@ -7708,30 +7708,29 @@ int __init ixj_probe_isapnp(int *cnt)
 			int result;
 
 			old_dev = dev;
-			dev = isapnp_find_dev(NULL, ISAPNP_VENDOR('Q', 'T', 'I'),
+			dev = pnp_find_dev(NULL, ISAPNP_VENDOR('Q', 'T', 'I'),
 					 ISAPNP_FUNCTION(func), old_dev);
-			if (!dev)
+			if (!dev || !dev->card)
 				break;
-			result = dev->prepare(dev);
+			result = pnp_device_attach(dev);
 			if (result < 0) {
-				printk("preparing failed %d \n", result);
+				printk("pnp attach failed %d \n", result);
 				break;
 			}
-
-			if (!(dev->resource[0].flags & IORESOURCE_IO))
-				return -ENODEV;
-
-			dev->resource[0].flags |= IORESOURCE_AUTO;
-			if (func != 0x110)
-				dev->resource[1].flags |= IORESOURCE_AUTO;
-			if (dev->activate(dev) < 0) {
-				printk("isapnp configure failed (out of resources?)\n");
+			if (pnp_activate_dev(dev, NULL) < 0) {
+				printk("pnp activate failed (out of resources?)\n");
+				pnp_device_detach(dev);
 				return -ENOMEM;
 			}
 
-			result = check_region(dev->resource[0].start, 16);
+			if (!pnp_port_valid(dev, 0)) {
+				pnp_device_detach(dev);
+				return -ENODEV;
+			}
+
+			result = check_region(pnp_port_start(dev, 0), 16);
 			if (result) {
-				printk(KERN_INFO "ixj: can't get I/O address 0x%lx\n", dev->resource[0].start);
+				printk(KERN_INFO "ixj: can't get I/O address 0x%lx\n", pnp_port_start(dev, 0));
 				break;
 			}
 
@@ -7739,7 +7738,7 @@ int __init ixj_probe_isapnp(int *cnt)
 			request_region(j->DSPbase, 16, "ixj DSP");
 
 			if (func != 0x110)
-				j->XILINXbase = dev->resource[1].start;	/* get real port */
+				j->XILINXbase = pnp_port_start(dev, 1);	/* get real port */
 
 			switch (func) {
 			case (0x110):
@@ -7755,7 +7754,7 @@ int __init ixj_probe_isapnp(int *cnt)
 			j->board = *cnt;
 			probe = ixj_selfprobe(j);
 			if(!probe) {
-				j->serial = dev->bus->serial;
+				j->serial = dev->card->serial;
 				j->dev = dev;
 				switch (func) {
 				case 0x110:

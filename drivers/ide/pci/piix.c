@@ -1,8 +1,10 @@
 /*
- *  linux/drivers/ide/piix.c		Version 0.40	August 18, 2002
+ *  linux/drivers/ide/piix.c		Version 0.42	January 11, 2003
  *
  *  Copyright (C) 1998-1999 Andrzej Krzysztofowicz, Author and Maintainer
  *  Copyright (C) 1998-2000 Andre Hedrick <andre@linux-ide.org>
+ *  Copyright (C) 2003 Red Hat Inc <alan@redhat.com>
+ *
  *  May be copied or modified under the terms of the GNU General Public License
  *
  *  PIO mode setting function for Intel chipsets.  
@@ -51,6 +53,41 @@
  * pci_read_config_word(HWIF(drive)->pci_dev, 0x4a, &reg4a);
  * pci_read_config_word(HWIF(drive)->pci_dev, 0x54, &reg54);
  *
+ * Documentation
+ *	Publically available from Intel web site. Errata documentation
+ * is also publically available. As an aide to anyone hacking on this
+ * driver the list of errata that are relevant is below.going back to
+ * PIIX4. Older device documentation is now a bit tricky to find.
+ *
+ * Errata of note:
+ *
+ * Unfixable
+ *	PIIX4    errata #9	- Only on ultra obscure hw
+ *	ICH3	 errata #13     - Not observed to affect real hw
+ *				  by Intel
+ *
+ * Things we must deal with
+ *	PIIX4	errata #10	- BM IDE hang with non UDMA
+ *				  (must stop/start dma to recover)
+ *	440MX   errata #15	- As PIIX4 errata #10
+ *	PIIX4	errata #15	- Must not read control registers
+ * 				  during a PIO transfer
+ *	440MX   errata #13	- As PIIX4 errata #15
+ *	ICH2	errata #21	- DMA mode 0 doesn't work right
+ *	ICH0/1  errata #55	- As ICH2 errata #21
+ *	ICH2	spec c #9	- Extra operations needed to handle
+ *				  drive hotswap [NOT YET SUPPORTED]
+ *	ICH2    spec c #20	- IDE PRD must not cross a 64K boundary
+ *				  and must be dword aligned
+ *	ICH2    spec c #24	- UDMA mode 4,5 t85/86 should be 6ns not 3.3
+ *
+ * Should have been BIOS fixed:
+ *	450NX:	errata #19	- DMA hangs on old 450NX
+ *	450NX:  errata #20	- DMA hangs on old 450NX
+ *	450NX:  errata #25	- Corruption with DMA on old 450NX
+ *	ICH3    errata #15      - IDE deadlock under high load
+ *				  (BIOS must set dev 31 fn 0 bit 23)
+ *	ICH3	errata #18	- Don't use native mode
  */
 
 #include <linux/config.h>
@@ -77,6 +114,7 @@ static u8 piix_proc = 0;
 #define PIIX_MAX_DEVS		5
 static struct pci_dev *piix_devs[PIIX_MAX_DEVS];
 static int n_piix_devs;
+static int no_piix_dma = 0;
 
 /**
  *	piix_get_info		-	fill in /proc for PIIX ide
@@ -443,6 +481,33 @@ static int piix_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 }
 
 /**
+ *	piix_faulty_dma0		-	check for DMA0 errata
+ *	@hwif: IDE interface to check
+ *
+ *	If an ICH/ICH0/ICH2 interface is is operating in multi-word
+ *	DMA mode with 600nS cycle time the IDE PIO prefetch buffer will
+ *	inadvertently provide an extra piece of secondary data to the primary
+ *	device resulting in data corruption.
+ *
+ *	With such a device this test function returns true. This allows
+ *	our tuning code to follow Intel recommendations and use PIO on
+ *	such devices.
+ */
+ 
+static int piix_faulty_dma0(ide_hwif_t *hwif)
+{
+	switch(hwif->pci_dev->device)
+	{
+		case PCI_DEVICE_ID_INTEL_82801AA_1:	/* ICH */
+		case PCI_DEVICE_ID_INTEL_82801AB_1:	/* ICH0 */
+		case PCI_DEVICE_ID_INTEL_82801BA_8:	/* ICH2 */
+		case PCI_DEVICE_ID_INTEL_82801BA_9:	/* ICH2 */
+			return 1;
+	}
+	return 0;
+}
+
+/**
  *	piix_config_drive_for_dma	-	configure drive for DMA
  *	@drive: IDE drive to configure
  *
@@ -454,8 +519,15 @@ static int piix_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 static int piix_config_drive_for_dma (ide_drive_t *drive)
 {
 	u8 speed = ide_dma_speed(drive, piix_ratemask(drive));
+	
+	/* Some ICH devices cannot support DMA mode 0 */
+	if(speed == XFER_MW_DMA_0 && piix_faulty_dma0(HWIF(drive)))
+		speed = 0;
 
-	if (!(speed)) {
+	/* If no DMA speed was available or the chipset has DMA bugs
+	   then disable DMA and use PIO */
+	   
+	if (!speed || no_piix_dma) {
 		u8 tspeed = ide_get_best_pio_mode(drive, 255, 5, NULL);
 		speed = piix_dma_2_pio(XFER_PIO_0 + tspeed);
 	}
@@ -675,6 +747,37 @@ static int __devinit piix_init_one(struct pci_dev *dev, const struct pci_device_
 	return 0;
 }
 
+/**
+ *	piix_check_450nx	-	Check for problem 450NX setup
+ *	
+ *	Check for the present of 450NX errata #19 and errata #25. If
+ *	they are found, disable use of DMA IDE
+ */
+ 
+static void __init piix_check_450nx(void)
+{
+	struct pci_dev *pdev = NULL;
+	u16 cfg;
+	u8 rev;
+	while((pdev=pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82454NX, pdev))!=NULL)
+	{
+		/* Look for 450NX PXB. Check for problem configurations
+		   A PCI quirk checks bit 6 already */
+		pci_read_config_byte(pdev, PCI_REVISION_ID, &rev);
+		pci_read_config_word(pdev, 0x41, &cfg);
+		/* Only on the original revision: IDE DMA can hang */
+		if(rev == 0x00)
+			no_piix_dma = 1;
+		/* On all revisions PXB bus lock must be disabled for IDE */
+		else if(cfg & (1<<14))
+			no_piix_dma = 2;
+	}
+	if(no_piix_dma)
+		printk(KERN_WARNING "piix: 450NX errata present, disabling IDE DMA.\n");
+	if(no_piix_dma == 2)
+		printk(KERN_WARNING "piix: A BIOS update may resolve this.\n");
+}		
+
 static struct pci_device_id piix_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371FB_0, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371FB_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
@@ -703,6 +806,7 @@ static struct pci_driver driver = {
 
 static int piix_ide_init(void)
 {
+	piix_check_450nx();
 	return ide_pci_register_driver(&driver);
 }
 

@@ -297,26 +297,7 @@ static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 	}
 
 	kernel_trap: {
-		const struct exception_table_entry *fixup;
-#ifdef CONFIG_PNPBIOS
-		if (unlikely((regs->xcs | 8) == 0x88)) /* 0x80 or 0x88 */
-		{
-			extern u32 pnp_bios_fault_eip, pnp_bios_fault_esp;
-			extern u32 pnp_bios_is_utter_crap;
-			pnp_bios_is_utter_crap = 1;
-			printk(KERN_CRIT "PNPBIOS fault.. attempting recovery.\n");
-			__asm__ volatile(
-				"movl %0, %%esp\n\t"
-				"jmp *%1\n\t"
-				: "=a" (pnp_bios_fault_esp), "=b" (pnp_bios_fault_eip));
-			panic("do_trap: can't hit this");
-		}
-#endif	
-		
-		fixup = search_exception_tables(regs->eip);
-		if (fixup)
-			regs->eip = fixup->fixup;
-		else	
+		if (!fixup_exception(regs))
 			die(str, regs, error_code);
 		return;
 	}
@@ -393,15 +374,8 @@ gp_in_vm86:
 	return;
 
 gp_in_kernel:
-	{
-		const struct exception_table_entry *fixup;
-		fixup = search_exception_tables(regs->eip);
-		if (fixup) {
-			regs->eip = fixup->fixup;
-			return;
-		}
+	if (!fixup_exception(regs))
 		die("general protection fault", regs, error_code);
-	}
 }
 
 static void mem_parity_error(unsigned char reason, struct pt_regs * regs)

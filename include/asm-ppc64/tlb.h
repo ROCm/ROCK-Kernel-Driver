@@ -17,8 +17,7 @@
 #include <asm/page.h>
 #include <asm/mmu.h>
 
-struct free_pte_ctx;
-static inline void tlb_flush(struct free_pte_ctx *tlb);
+static inline void tlb_flush(struct mmu_gather *tlb);
 
 /* Avoid pulling in another include just for this */
 #define check_pgt_cache()	do { } while (0)
@@ -74,7 +73,7 @@ static inline void __tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep,
 	batch->index = i;
 }
 
-static inline void tlb_flush(struct free_pte_ctx *tlb)
+static inline void tlb_flush(struct mmu_gather *tlb)
 {
 	int cpu = smp_processor_id();
 	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[cpu];

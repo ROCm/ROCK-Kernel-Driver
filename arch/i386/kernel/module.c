@@ -70,14 +70,10 @@ int apply_relocate(Elf32_Shdr *sechdrs,
 		/* This is where to make the change */
 		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			+ rel[i].r_offset;
-		/* This is the symbol it is referring to */
+		/* This is the symbol it is referring to.  Note that all
+		   undefined symbols have been resolved.  */
 		sym = (Elf32_Sym *)sechdrs[symindex].sh_addr
 			+ ELF32_R_SYM(rel[i].r_info);
-		if (!sym->st_value) {
-			printk(KERN_WARNING "%s: Unknown symbol %s\n",
-			       me->name, strtab + sym->st_name);
-			return -ENOENT;
-		}
 
 		switch (ELF32_R_TYPE(rel[i].r_info)) {
 		case R_386_32:

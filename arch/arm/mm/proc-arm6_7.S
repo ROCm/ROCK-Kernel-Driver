@@ -287,14 +287,12 @@ ENTRY(cpu_arm7_reset)
 		mcr	p15, 0, r1, c1, c0, 0		@ turn off MMU etc
 		mov	pc, r0
 
-cpu_armvlsi_name:
-		.asciz	"ARM/VLSI"
-cpu_arm6_name:	.asciz	"ARM 6"
+cpu_arm6_name:	.asciz	"ARM6"
 cpu_arm610_name:
-		.asciz	"ARM 610"
-cpu_arm7_name:	.asciz	"ARM 7"
+		.asciz	"ARM610"
+cpu_arm7_name:	.asciz	"ARM7"
 cpu_arm710_name:
-		.asciz	"ARM 710"
+		.asciz	"ARM710"
 		.align
 
 		__INIT
@@ -387,30 +385,6 @@ ENTRY(arm7_processor_functions)
 
 		.size	arm7_processor_functions, . - arm7_processor_functions
 
-		.type	cpu_arm6_info, #object
-cpu_arm6_info:
-		.long	cpu_armvlsi_name
-		.long	cpu_arm6_name
-		.size	cpu_arm6_info, . - cpu_arm6_info
-
-		.type	cpu_arm610_info, #object
-cpu_arm610_info:
-		.long	cpu_armvlsi_name
-		.long	cpu_arm610_name
-		.size	cpu_arm610_info, . - cpu_Arm610_info
-
-		.type	cpu_arm7_info, #object
-cpu_arm7_info:
-		.long	cpu_armvlsi_name
-		.long	cpu_arm7_name
-		.size	cpu_arm7_info, . - cpu_arm7_info
-
-		.type	cpu_arm710_info, #object
-cpu_arm710_info:
-		.long	cpu_armvlsi_name
-		.long	cpu_arm710_name
-		.size	cpu_arm710_info, . - cpu_arm710_info
-
 		.type	cpu_arch_name, #object
 cpu_arch_name:	.asciz	"armv3"
 		.size	cpu_arch_name, . - cpu_arch_name
@@ -431,7 +405,7 @@ __arm6_proc_info:
 		.long	cpu_arch_name
 		.long	cpu_elf_name
 		.long	HWCAP_SWP | HWCAP_26BIT
-		.long	cpu_arm6_info
+		.long	cpu_arm6_name
 		.long	arm6_processor_functions
 		.long	v3_tlb_fns
 		.long	v3_user_fns
@@ -446,7 +420,7 @@ __arm610_proc_info:
 		.long	cpu_arch_name
 		.long	cpu_elf_name
 		.long	HWCAP_SWP | HWCAP_26BIT
-		.long	cpu_arm610_info
+		.long	cpu_arm610_name
 		.long	arm6_processor_functions
 		.long	v3_tlb_fns
 		.long	v3_user_fns
@@ -461,7 +435,7 @@ __arm7_proc_info:
 		.long	cpu_arch_name
 		.long	cpu_elf_name
 		.long	HWCAP_SWP | HWCAP_26BIT
-		.long	cpu_arm7_info
+		.long	cpu_arm7_name
 		.long	arm7_processor_functions
 		.long	v3_tlb_fns
 		.long	v3_user_fns
@@ -476,7 +450,7 @@ __arm710_proc_info:
 		.long	cpu_arch_name
 		.long	cpu_elf_name
 		.long	HWCAP_SWP | HWCAP_26BIT
-		.long	cpu_arm710_info
+		.long	cpu_arm710_name
 		.long	arm7_processor_functions
 		.long	v3_tlb_fns
 		.long	v3_user_fns

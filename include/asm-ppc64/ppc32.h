@@ -40,19 +40,6 @@
 
 /* These are here to support 32-bit syscalls on a 64-bit kernel. */
 
-struct statfs32 {
-	int f_type;
-	int f_bsize;
-	int f_blocks;
-	int f_bfree;
-	int f_bavail;
-	int f_files;
-	int f_ffree;
-	compat_fsid_t f_fsid;
-	int f_namelen;  /* SunOS ignores this field. */
-	int f_spare[6];
-};
-
 typedef union sigval32 {
 	int sival_int;
 	unsigned int sival_ptr;

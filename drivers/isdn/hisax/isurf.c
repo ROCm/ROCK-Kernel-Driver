@@ -133,14 +133,6 @@ isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 static void
-isurf_release(struct IsdnCardState *cs)
-{
-	release_region(cs->hw.isurf.reset, 1);
-	iounmap((unsigned char *)cs->hw.isurf.isar);
-	release_mem_region(cs->hw.isurf.phymem, ISURF_IOMEM_SIZE);
-}
-
-static void
 reset_isurf(struct IsdnCardState *cs, u8 chips)
 {
 	printk(KERN_INFO "ISurf: resetting card\n");
@@ -151,12 +143,6 @@ reset_isurf(struct IsdnCardState *cs, u8 chips)
 	byteout(cs->hw.isurf.reset, ISURF_ISAR_EA); /* Reset Off */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
-}
-
-static int
-ISurf_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
 }
 
 static int
@@ -193,60 +179,64 @@ isurf_reset(struct IsdnCardState *cs)
 static struct card_ops isurf_ops = {
 	.init     = isurf_init,
 	.reset    = isurf_reset,
-	.release  = isurf_release,
+	.release  = hisax_release_resources,
 	.irq_func = isurf_interrupt,
 };
 
 #ifdef __ISAPNP__
-static struct pci_bus *pnp_surf __devinitdata = NULL;
+static struct pnp_card *pnp_surf __devinitdata = NULL;
 #endif
 
 int __init
 setup_isurf(struct IsdnCard *card)
 {
-	int ver;
 	struct IsdnCardState *cs = card->cs;
+	unsigned long phymem;
 	char tmp[64];
 
 	strcpy(tmp, ISurf_revision);
 	printk(KERN_INFO "HiSax: ISurf driver Rev. %s\n", HiSax_getrev(tmp));
 	
- 	if (cs->typ != ISDN_CTYPE_ISURF)
- 		return(0);
 	if (card->para[1] && card->para[2]) {
 		cs->hw.isurf.reset = card->para[1];
-		cs->hw.isurf.phymem = card->para[2];
+		phymem = card->para[2];
 		cs->irq = card->para[0];
 	} else {
 #ifdef __ISAPNP__
-		struct pci_bus *pb;
-		struct pci_dev *pd;
+		struct pnp_card *pb;
+		struct pnp_dev *pd;
 
 		if (isapnp_present()) {
 			cs->subtyp = 0;
-			if ((pb = isapnp_find_card(
+			if ((pb = pnp_find_card(
 				ISAPNP_VENDOR('S', 'I', 'E'),
 				ISAPNP_FUNCTION(0x0010), pnp_surf))) {
 				pnp_surf = pb;
 				pd = NULL;
-				if (!(pd = isapnp_find_dev(pnp_surf,
+				if (!(pd = pnp_find_dev(pnp_surf,
 					ISAPNP_VENDOR('S', 'I', 'E'),
 					ISAPNP_FUNCTION(0x0010), pd))) {
 					printk(KERN_ERR "ISurfPnP: PnP error card found, no device\n");
 					return (0);
 				}
-				pd->prepare(pd);
-				pd->deactivate(pd);
-				pd->activate(pd);
-				cs->hw.isurf.reset = pd->resource[0].start;
-				cs->hw.isurf.phymem = pd->resource[1].start;
-				cs->irq = pd->irq_resource[0].start;
-				if (!cs->irq || !cs->hw.isurf.reset || !cs->hw.isurf.phymem) {
-					printk(KERN_ERR "ISurfPnP:some resources are missing %d/%x/%lx\n",
-						cs->irq, cs->hw.isurf.reset, cs->hw.isurf.phymem);
-					pd->deactivate(pd);
+				if (pnp_device_attach(pd) < 0) {
+					printk(KERN_ERR "ISurfPnP: attach failed\n");
+					return 0;
+				}
+				if (pnp_activate_dev(pd, NULL) < 0) {
+					printk(KERN_ERR "ISurfPnP: activate failed\n");
+					pnp_device_detach(pd);
+					return 0;
+				}
+				if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0) || !pnp_port_valid(pd, 1)) {
+					printk(KERN_ERR "ISurfPnP:some resources are missing %ld/%lx/%lx\n",
+						pnp_irq(pd, 0), pnp_port_start(pd, 0), pnp_port_start(pd, 1));
+					pnp_device_detach(pd);
 					return(0);
 				}
+				cs->hw.isurf.reset = pnp_port_start(pd, 0);
+				phymem = pnp_port_start(pd, 1);
+				cs->irq = pnp_irq(pd, 0);
 			} else {
 				printk(KERN_INFO "ISurfPnP: no ISAPnP card found\n");
 				return(0);
@@ -261,50 +251,31 @@ setup_isurf(struct IsdnCard *card)
 		return (0);
 #endif
 	}
-	if (!request_region(cs->hw.isurf.reset, 1, "isurf isdn")) {
-		printk(KERN_WARNING
-			"HiSax: %s config port %x already in use\n",
-			CardType[card->typ],
-			cs->hw.isurf.reset);
-			return (0);
-	}
-	if (check_mem_region(cs->hw.isurf.phymem, ISURF_IOMEM_SIZE)) {
-		printk(KERN_WARNING
-			"HiSax: %s memory region %lx-%lx already in use\n",
-			CardType[card->typ],
-			cs->hw.isurf.phymem,
-			cs->hw.isurf.phymem + ISURF_IOMEM_SIZE);
-		release_region(cs->hw.isurf.reset, 1);
-		return (0);
-	} else {
-		request_mem_region(cs->hw.isurf.phymem, ISURF_IOMEM_SIZE,
-			"isurf iomem");
-	}
-	cs->hw.isurf.isar =
-		(unsigned long) ioremap(cs->hw.isurf.phymem, ISURF_IOMEM_SIZE);
+	if (!request_io(&cs->rs, cs->hw.isurf.reset, 1, "isurf isdn"))
+		goto err;
+	cs->hw.isurf.isar = request_mmio(&cs->rs, phymem, ISURF_IOMEM_SIZE, "isurf iomem");
+	if (!cs->hw.isurf.isar)
+		goto err;
+
 	cs->hw.isurf.isac = cs->hw.isurf.isar + ISURF_ISAC_OFFSET;
 	printk(KERN_INFO
 	       "ISurf: defined at 0x%x 0x%lx IRQ %d\n",
 	       cs->hw.isurf.reset,
-	       cs->hw.isurf.phymem,
+	       card->para[2],
 	       cs->irq);
 
-	cs->cardmsg = &ISurf_card_msg;
 	cs->auxcmd = &isurf_auxcmd;
 	cs->card_ops = &isurf_ops;
-	cs->dc_hw_ops = &isac_ops;
 	cs->bcs[0].hw.isar.reg = &cs->hw.isurf.isar_r;
 	cs->bcs[1].hw.isar.reg = &cs->hw.isurf.isar_r;
 	reset_isurf(cs, ISURF_RESET);
 	test_and_set_bit(HW_ISAR, &cs->HW_Flags);
-	ISACVersion(cs, "ISurf:");
-	cs->bc_hw_ops = &isar_ops;
-	ver = ISARVersion(cs, "ISurf:");
-	if (ver < 0) {
-		printk(KERN_WARNING
-			"ISurf: wrong ISAR version (ret = %d)\n", ver);
-		isurf_release(cs);
-		return (0);
-	}
-	return (1);
+	isac_setup(cs, &isac_ops);
+	if (isar_setup(cs, &isar_ops))
+		goto err;
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
+
 }

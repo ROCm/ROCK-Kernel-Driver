@@ -16,7 +16,6 @@
 #include <linux/init.h>
 #include <linux/gameport.h>
 #include <linux/slab.h>
-#include <linux/isapnp.h>
 #include <linux/stddef.h>
 #include <linux/delay.h>
 
