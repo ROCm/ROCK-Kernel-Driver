@@ -61,7 +61,7 @@ static void sigd_put_skb(struct sk_buff *skb)
 #endif
 	atm_force_charge(sigd,skb->truesize);
 	skb_queue_tail(&sigd->sk->sk_receive_queue,skb);
-	wake_up(sigd->sk->sk_sleep);
+	sigd->sk->sk_data_ready(sigd->sk, skb->len);
 }
 
 
@@ -204,7 +204,7 @@ static void purge_vcc(struct atm_vcc *vcc)
 		set_bit(ATM_VF_RELEASED,&vcc->flags);
 		vcc->reply = -EUNATCH;
 		vcc->sk->sk_err = EUNATCH;
-		wake_up(vcc->sk->sk_sleep);
+		vcc->sk->sk_state_change(vcc->sk);
 	}
 }
 

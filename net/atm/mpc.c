@@ -669,7 +669,7 @@ static void mpc_push(struct atm_vcc *vcc, struct sk_buff *skb)
 		dprintk("mpoa: (%s) mpc_push: control packet arrived\n", dev->name);
 		/* Pass control packets to daemon */
 		skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
-		wake_up(vcc->sk->sk_sleep);
+		vcc->sk->sk_data_ready(vcc->sk, skb->len);
 		return;
 	}
 
@@ -947,7 +947,7 @@ int msg_to_mpoad(struct k_message *mesg, struct mpoa_client *mpc)
 	memcpy(skb->data, mesg, sizeof(struct k_message));
 	atm_force_charge(mpc->mpoad_vcc, skb->truesize);
 	skb_queue_tail(&mpc->mpoad_vcc->sk->sk_receive_queue, skb);
-	wake_up(mpc->mpoad_vcc->sk->sk_sleep);
+	mpc->mpoad_vcc->sk->sk_data_ready(mpc->mpoad_vcc->sk, skb->len);
 
 	return 0;
 }
@@ -1226,7 +1226,7 @@ static void purge_egress_shortcut(struct atm_vcc *vcc, eg_cache_entry *entry)
 
 	atm_force_charge(vcc, skb->truesize);
 	skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
-	wake_up(vcc->sk->sk_sleep);
+	vcc->sk->sk_data_ready(vcc->sk, skb->len);
 	dprintk("mpoa: purge_egress_shortcut: exiting:\n");
 
 	return;

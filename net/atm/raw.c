@@ -29,7 +29,7 @@ void atm_push_raw(struct atm_vcc *vcc,struct sk_buff *skb)
 {
 	if (skb) {
 		skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
-		wake_up(vcc->sk->sk_sleep);
+		vcc->sk->sk_data_ready(vcc->sk, skb->len);
 	}
 }
 

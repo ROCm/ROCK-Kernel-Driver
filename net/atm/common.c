@@ -328,7 +328,7 @@ void vcc_release_async(struct atm_vcc *vcc, int reply)
 	set_bit(ATM_VF_CLOSE, &vcc->flags);
 	vcc->reply = reply;
 	vcc->sk->sk_err = -reply;
-	wake_up(vcc->sk->sk_sleep);
+	vcc->sk->sk_state_change(vcc->sk);
 }
 
 
