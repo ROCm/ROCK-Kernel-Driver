@@ -1562,7 +1562,7 @@ config SMB_NLS_REMOTE
 	  smbmount from samba 2.2.0 or later supports this.
 
 config CIFS
-	tristate "CIFS support (advanced network filesystem for Samba, Window and other CIFS compliant servers)(EXPERIMENTAL)"
+	tristate "CIFS support (advanced network filesystem for Samba, Window and other CIFS compliant servers)"
 	depends on INET
 	select NLS
 	help
@@ -1592,7 +1592,16 @@ config CIFS_STATS
         depends on CIFS
         help
           Enabling this option will cause statistics for each server share
-	  mounted by the cifs client to be displayed in /proc/fs/cifs/DebugData
+	  mounted by the cifs client to be displayed in /proc/fs/cifs/Stats
+
+config CIFS_POSIX
+        bool "CIFS statistics (EXPERIMENTAL)"
+        depends on CIFS
+        help
+          Enabling this option will cause the cifs client to attempt to
+	  negotiate a newer dialect with servers, such as Samba 3.0.5
+	  or later, that optionally can handle more POSIX like (rather
+	  than Windows like) file behavior.  If unsure, say N.
 
 config NCP_FS
 	tristate "NCP file system support (to mount NetWare volumes)"

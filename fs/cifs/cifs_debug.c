@@ -62,12 +62,17 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		     int count, int *eof, void *data)
 {
 	struct list_head *tmp;
+	struct list_head *tmp1;
+	struct mid_q_entry * mid_entry;
 	struct cifsSesInfo *ses;
 	struct cifsTconInfo *tcon;
 	int i;
 	int length = 0;
-	char *buf_start = buf;
+	char * original_buf = buf;
 
+	*beginBuffer = buf + offset;
+
+	
 	length =
 	    sprintf(buf,
 		    "Display Internal CIFS Data Structures for Debugging\n"
@@ -94,7 +99,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 				ses->server->secMode,
 				atomic_read(&ses->server->inFlight));
 			
-			/* length = sprintf(buf, "\nMIDs: \n");
+			length = sprintf(buf, "\nMIDs: \n");
 			buf += length;
 
 			spin_lock(&GlobalMid_Lock);
@@ -107,7 +112,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 					buf += length;
 				}
 			}
-			spin_unlock(&GlobalMid_Lock); */
+			spin_unlock(&GlobalMid_Lock); 
 		}
 
 	}
@@ -152,19 +157,22 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 	length = sprintf(buf, "\n");
 	buf += length;
 
-	*eof = 1;
 	/* BB add code to dump additional info such as TCP session info now */
-	/*
-	   if (offset >= (buf - buf_start)) 
-	   {
-	   *beginBuffer = buf;
-	   return 0;
-	   }
-	   *beginBuffer = buf + offset;
-	   if ((buf - buf_start - offset) > count)
-	   return count;
-   else */
-	return (buf - buf_start - offset);
+	/* Now calculate total size of returned data */
+	length = buf - original_buf;
+
+	if(offset + count >= length)
+		*eof = 1;
+	if(length < offset) {
+		*eof = 1;
+		return 0;
+	} else {
+		length = length - offset;
+	}
+	if (length > count)
+		length = count;
+
+	return length;
 }
 
 int
@@ -183,11 +191,13 @@ cifs_total_xid_read(char *buf, char **beginBuffer, off_t offset,
 #ifdef CONFIG_CIFS_STATS
 int
 cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
-		  int length, int *eof, void *data)
+		  int count, int *eof, void *data)
 {
-	int item_length,i;
+	int item_length,i,length;
 	struct list_head *tmp;
 	struct cifsTconInfo *tcon;
+
+	*beginBuffer = buf + offset;
 
 	length = sprintf(buf,
 			"Resources in use\nCIFS Session: %d\n",
@@ -235,10 +245,12 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 			atomic_read(&tcon->num_reads),
 			(long long)(tcon->bytes_read));
 		buf += item_length;
+		length += item_length;
 		item_length = sprintf(buf,"\nWrites: %d Bytes: %lld",
 			atomic_read(&tcon->num_writes),
 			(long long)(tcon->bytes_written));
 		buf += item_length;
+		length += item_length;
 		item_length = sprintf(buf,
 			"\nOpens: %d Deletes: %d\nMkdirs: %d Rmdirs: %d",
 			atomic_read(&tcon->num_opens),
@@ -250,7 +262,20 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 	}
 	read_unlock(&GlobalSMBSeslock);
 
+	buf += sprintf(buf,"\n");
+	length++;
 
+	if(offset + count >= length)
+		*eof = 1;
+	if(length < offset) {
+		*eof = 1;
+		return 0;
+	} else {
+		length = length - offset;
+	}
+	if (length > count)
+		length = count;
+		
 	return length;
 }
 #endif
