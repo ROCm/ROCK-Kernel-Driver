@@ -156,6 +156,7 @@ static int __devinit radeon_get_panel_info_BIOS(struct radeonfb_info *rinfo)
 
 	if (!(tmp = BIOS_IN16(rinfo->fp_bios_start + 0x40))) {
 		printk(KERN_ERR "radeonfb: Failed to detect DFP panel info using BIOS\n");
+		rinfo->panel_info.pwr_delay = 200;
 		return 0;
 	}
 
@@ -169,7 +170,8 @@ static int __devinit radeon_get_panel_info_BIOS(struct radeonfb_info *rinfo)
 		rinfo->panel_info.xres, rinfo->panel_info.yres);
 
 	rinfo->panel_info.pwr_delay = BIOS_IN16(tmp + 44);
-	if (rinfo->panel_info.pwr_delay > 2000 || rinfo->panel_info.pwr_delay < 0)
+	RTRACE("BIOS provided panel power delay: %d\n", rinfo->panel_info.pwr_delay);
+	if (rinfo->panel_info.pwr_delay > 2000 || rinfo->panel_info.pwr_delay <= 0)
 		rinfo->panel_info.pwr_delay = 2000;
 
 	/*
@@ -182,11 +184,16 @@ static int __devinit radeon_get_panel_info_BIOS(struct radeonfb_info *rinfo)
 	    rinfo->panel_info.fbk_divider > 3) {
 		rinfo->panel_info.use_bios_dividers = 1;
 		printk(KERN_INFO "radeondb: BIOS provided dividers will be used\n");
+		RTRACE("ref_divider = %x\n", rinfo->panel_info.ref_divider);
+		RTRACE("post_divider = %x\n", rinfo->panel_info.post_divider);
+		RTRACE("fbk_divider = %x\n", rinfo->panel_info.fbk_divider);
 	}
+	RTRACE("Scanning BIOS table ...\n");
 	for(i=0; i<32; i++) {
 		tmp0 = BIOS_IN16(tmp+64+i*2);
 		if (tmp0 == 0)
 			break;
+		RTRACE(" %d x %d\n", BIOS_IN16(tmp0), BIOS_IN16(tmp0+2));
 		if ((BIOS_IN16(tmp0) == rinfo->panel_info.xres) &&
 		    (BIOS_IN16(tmp0+2) == rinfo->panel_info.yres)) {
 			rinfo->panel_info.hblank = (BIOS_IN16(tmp0+17) - BIOS_IN16(tmp0+19)) * 8;
@@ -205,12 +212,67 @@ static int __devinit radeon_get_panel_info_BIOS(struct radeonfb_info *rinfo)
 			/* Mark panel infos valid */
 			rinfo->panel_info.valid = 1;
 
+			RTRACE("Found panel in BIOS table:\n");
+			RTRACE("  hblank: %d\n", rinfo->panel_info.hblank);
+			RTRACE("  hOver_plus: %d\n", rinfo->panel_info.hOver_plus);
+			RTRACE("  hSync_width: %d\n", rinfo->panel_info.hSync_width);
+			RTRACE("  vblank: %d\n", rinfo->panel_info.vblank);
+			RTRACE("  vOver_plus: %d\n", rinfo->panel_info.vOver_plus);
+			RTRACE("  vSync_width: %d\n", rinfo->panel_info.vSync_width);
+			RTRACE("  clock: %d\n", rinfo->panel_info.clock);
+				
 			return 1;
 		}
 	}
+	RTRACE("Didn't find panel in BIOS table !\n");
 
 	return 0;
 }
+
+/* Try to extract the connector informations from the BIOS. This
+ * doesn't quite work yet, but it's output is still useful for
+ * debugging
+ */
+static void __devinit radeon_parse_connector_info(struct radeonfb_info *rinfo)
+{
+	int offset, chips, connectors, tmp, i, conn, type;
+
+	static char* __conn_type_table[16] = {
+		"NONE", "Proprietary", "CRT", "DVI-I", "DVI-D", "Unknown", "Unknown",
+		"Unknown", "Unknown", "Unknown", "Unknown", "Unknown", "Unknown",
+		"Unknown", "Unknown", "Unknown"
+	};
+
+	if (!rinfo->bios_seg)
+		return;
+
+	offset = BIOS_IN16(rinfo->fp_bios_start + 0x50);
+	if (offset == 0) {
+		printk(KERN_WARNING "radeonfb: No connector info table detected\n");
+		return;
+	}
+
+	/* Don't do much more at this point but displaying the data if
+	 * DEBUG is enabled
+	 */
+	chips = BIOS_IN8(offset++) >> 4;
+	RTRACE("%d chips in connector info\n", chips);
+	for (i = 0; i < chips; i++) {
+		tmp = BIOS_IN8(offset++);
+		connectors = tmp & 0x0f;
+		RTRACE(" - chip %d has %d connectors\n", tmp >> 4, connectors);
+		for (conn = 0; ; conn++) {
+			tmp = BIOS_IN16(offset);
+			if (tmp == 0)
+				break;
+			offset += 2;
+			type = (tmp >> 12) & 0x0f;
+			RTRACE("  * connector %d of type %d (%s) : %04x\n",
+			       conn, type, __conn_type_table[type], tmp);
+		}
+	}
+}
+
 
 /*
  * Probe physical connection of a CRT. This code comes from XFree
@@ -224,7 +286,7 @@ static int __devinit radeon_crt_is_connected(struct radeonfb_info *rinfo, int is
     /* the monitor either wasn't connected or it is a non-DDC CRT.
      * try to probe it
      */
-    if(is_crt_dac) {
+    if (is_crt_dac) {
 	unsigned long ulOrigVCLK_ECP_CNTL;
 	unsigned long ulOrigDAC_CNTL;
 	unsigned long ulOrigDAC_EXT_CNTL;
@@ -353,9 +415,11 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
 				    const char *monitor_layout, int ignore_edid)
 {
 #ifdef CONFIG_FB_RADEON_I2C
-	int ddc_crt2_used = 0;
+	int ddc_crt2_used = 0;	
 #endif
 	int tmp, i;
+
+	radeon_parse_connector_info(rinfo);
 
 	if (radeon_parse_monitor_layout(rinfo, monitor_layout)) {
 
@@ -392,13 +456,23 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
 			rinfo->mon2_EDID = NULL;
 		}
 	} else {
-
 		/*
 		 * Auto-detecting display type (well... trying to ...)
 		 */
 		
 		RTRACE("Starting monitor auto detection...\n");
 
+#if DEBUG
+		{
+			u8 *EDIDs[4] = { NULL, NULL, NULL, NULL };
+			int mon_types[4] = {MT_NONE, MT_NONE, MT_NONE, MT_NONE};
+			int i;
+
+			for (i = 0; i < 4; i++)
+				mon_types[i] = radeon_probe_i2c_connector(rinfo,
+									  i+1, &EDIDs[i]);
+		}
+#endif /* DEBUG */
 		/*
 		 * Old single head cards
 		 */
