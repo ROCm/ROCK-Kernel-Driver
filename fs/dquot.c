@@ -1314,12 +1314,14 @@ int vfs_quota_off(struct super_block *sb, int type)
 {
 	int cnt;
 	struct quota_info *dqopt = sb_dqopt(sb);
-	struct inode *toput[MAXQUOTAS];
+	struct inode *toputinode[MAXQUOTAS];
+	struct vfsmount *toputmnt[MAXQUOTAS];
 
 	/* We need to serialize quota_off() for device */
 	down(&dqopt->dqonoff_sem);
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
-		toput[cnt] = NULL;
+		toputinode[cnt] = NULL;
+		toputmnt[cnt] = NULL;
 		if (type != -1 && cnt != type)
 			continue;
 		if (!sb_has_quota_enabled(sb, cnt))
@@ -1339,8 +1341,10 @@ int vfs_quota_off(struct super_block *sb, int type)
 			dqopt->ops[cnt]->free_file_info(sb, cnt);
 		put_quota_format(dqopt->info[cnt].dqi_format);
 
-		toput[cnt] = dqopt->files[cnt];
+		toputinode[cnt] = dqopt->files[cnt];
+		toputmnt[cnt] = dqopt->mnt[cnt];
 		dqopt->files[cnt] = NULL;
+		dqopt->mnt[cnt] = NULL;
 		dqopt->info[cnt].dqi_flags = 0;
 		dqopt->info[cnt].dqi_igrace = 0;
 		dqopt->info[cnt].dqi_bgrace = 0;
@@ -1348,7 +1352,10 @@ int vfs_quota_off(struct super_block *sb, int type)
 	}
 	up(&dqopt->dqonoff_sem);
 	/* Sync the superblock so that buffers with quota data are written to
-         * disk (and so userspace sees correct data afterwards) */
+	 * disk (and so userspace sees correct data afterwards).
+	 * The reference to vfsmnt we are still holding protects us from
+	 * umount (we don't have it only when quotas are turned on/off for
+	 * journal replay but in that case we are guarded by the fs anyway). */
 	if (sb->s_op->sync_fs)
 		sb->s_op->sync_fs(sb, 1);
 	sync_blockdev(sb->s_bdev);
@@ -1358,13 +1365,24 @@ int vfs_quota_off(struct super_block *sb, int type)
 	 * must also discard the blockdev buffers so that we see the
 	 * changes done by userspace on the next quotaon() */
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++)
-		if (toput[cnt]) {
-			down(&toput[cnt]->i_sem);
-			toput[cnt]->i_flags &= ~(S_IMMUTABLE | S_NOATIME | S_NOQUOTA);
-			truncate_inode_pages(&toput[cnt]->i_data, 0);
-			up(&toput[cnt]->i_sem);
-			mark_inode_dirty(toput[cnt]);
-			iput(toput[cnt]);
+		if (toputinode[cnt]) {
+			down(&dqopt->dqonoff_sem);
+			/* If quota was reenabled in the meantime, we have
+			 * nothing to do */
+			if (!sb_has_quota_enabled(sb, cnt)) {
+				down(&toputinode[cnt]->i_sem);
+				toputinode[cnt]->i_flags &= ~(S_IMMUTABLE |
+				  S_NOATIME | S_NOQUOTA);
+				truncate_inode_pages(&toputinode[cnt]->i_data, 0);
+				up(&toputinode[cnt]->i_sem);
+				mark_inode_dirty(toputinode[cnt]);
+				iput(toputinode[cnt]);
+			}
+			up(&dqopt->dqonoff_sem);
+			/* We don't hold the reference when we turned on quotas
+			 * just for the journal replay... */
+			if (toputmnt[cnt])
+				mntput(toputmnt[cnt]);
 		}
 	if (sb->s_bdev)
 		invalidate_bdev(sb->s_bdev, 0);
@@ -1478,8 +1496,11 @@ int vfs_quota_on(struct super_block *sb, int type, int format_id, char *path)
 	/* Quota file not on the same filesystem? */
 	if (nd.mnt->mnt_sb != sb)
 		error = -EXDEV;
-	else
+	else {
 		error = vfs_quota_on_inode(nd.dentry->d_inode, type, format_id);
+		if (!error)
+			sb_dqopt(sb)->mnt[type] = mntget(nd.mnt);
+	}
 out_path:
 	path_release(&nd);
 	return error;
