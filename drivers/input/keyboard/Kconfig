@@ -41,6 +41,19 @@ config KEYBOARD_SUNKBD
 	  To compile this driver as a module, choose M here: the
 	  module will be called sunkbd.
 
+config KEYBOARD_LKKBD
+	tristate "DECstation/VAXstation LK201/LK401 keyboard support"
+	depends on INPUT && INPUT_KEYBOARD
+	select SERIO
+	help
+	  Say Y here if you want to use a LK201 or LK401 style serial
+	  keyboard. This keyboard is also useable on PCs if you attach
+	  it with the inputattach program. The connector pinout is
+	  described within lkkbd.c.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called lkkbd.
+
 config KEYBOARD_XTKBD
 	tristate "XT Keyboard support"
 	depends on INPUT && INPUT_KEYBOARD
