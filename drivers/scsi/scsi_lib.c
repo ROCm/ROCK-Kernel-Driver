@@ -411,7 +411,7 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
  */
 void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 {
-	struct scsi_device *sdev, *sdev2;
+	struct scsi_device *sdev;
 	struct Scsi_Host *shost;
 	unsigned long flags;
 
@@ -460,14 +460,14 @@ void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 		 * scsi_request_fn must get the host_lock before checking
 		 * or modifying starved_list or starved_entry.
 		 */
-		sdev2 = list_entry(shost->starved_list.next,
+		sdev = list_entry(shost->starved_list.next,
 					  struct scsi_device, starved_entry);
-		list_del_init(&sdev2->starved_entry);
+		list_del_init(&sdev->starved_entry);
 		spin_unlock_irqrestore(shost->host_lock, flags);
 
-		spin_lock_irqsave(sdev2->request_queue->queue_lock, flags);
-		__blk_run_queue(sdev2->request_queue);
-		spin_unlock_irqrestore(sdev2->request_queue->queue_lock, flags);
+		spin_lock_irqsave(sdev->request_queue->queue_lock, flags);
+		__blk_run_queue(sdev->request_queue);
+		spin_unlock_irqrestore(sdev->request_queue->queue_lock, flags);
 
 		spin_lock_irqsave(shost->host_lock, flags);
 		if (unlikely(!list_empty(&sdev->starved_entry)))
@@ -1123,15 +1123,7 @@ static inline int scsi_host_queue_ready(struct request_queue *q,
 		return 0;
 	if ((shost->can_queue > 0 && shost->host_busy >= shost->can_queue) ||
 	    shost->host_blocked || shost->host_self_blocked) {
-		SCSI_LOG_MLQUEUE(3,
-			printk("add starved dev <%d,%d,%d,%d>; host "
-			       "limit %d, busy %d, blocked %d selfblocked %d\n",
-			       sdev->host->host_no, sdev->channel,
-			       sdev->id, sdev->lun,
-			       shost->can_queue, shost->host_busy,
-			       shost->host_blocked, shost->host_self_blocked));
-		list_add_tail(&sdev->starved_entry,
-			      &shost->starved_list);
+		list_add_tail(&sdev->starved_entry, &shost->starved_list);
 		return 0;
 	}
 
