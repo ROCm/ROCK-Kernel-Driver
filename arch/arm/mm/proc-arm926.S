@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/mm/arm926.S: MMU functions for ARM926EJ-S
+ *  linux/arch/arm/mm/proc-arm926.S: MMU functions for ARM926EJ-S
  *
  *  Copyright (C) 1999-2001 ARM Limited
  *  Copyright (C) 2000 Deep Blue Solutions Ltd.
@@ -378,8 +378,6 @@ ENTRY(cpu_arm926_set_pmd)
  */
 	.align	5
 ENTRY(cpu_arm926_set_pte)
-	tst	r0, #2048
-	streq	r0, [r0, -r0]			@ BUG_ON
 	str	r1, [r0], #-2048		@ linux version
 
 	eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
@@ -442,7 +440,7 @@ __arm926_setup:
 	mcr	p15, 0, r4, c2, c0		@ load page table pointer
 
 
-#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH 
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
 	mov	r0, #4				@ disable write-back on caches explicitly
 	mcr	p15, 7, r0, c15, c0, 0
 #endif 
@@ -519,12 +517,12 @@ cpu_arm926_info:
 
 	.type	cpu_arch_name, #object
 cpu_arch_name:
-	.asciz	"armv5EJ"
+	.asciz	"armv5tej"
 	.size	cpu_arch_name, . - cpu_arch_name
 
 	.type	cpu_elf_name, #object
 cpu_elf_name:
-	.asciz	"v5EJ"
+	.asciz	"v5"
 	.size	cpu_elf_name, . - cpu_elf_name
 	.align
 
@@ -538,7 +536,8 @@ __arm926_proc_info:
 	b	__arm926_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
-	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT
+	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | \
+		HWCAP_FAST_MULT | HWCAP_JAVA
 	.long	cpu_arm926_info
 	.long	arm926_processor_functions
 	.long	v4wbi_tlb_fns
