@@ -316,16 +316,16 @@ asmlinkage void do_IRQ(void)
 			do_softirq();
 
 #ifdef CONFIG_PREEMPT
-	cli();
+	local_irq_disable();
 	while (--current->preempt_count == 0) {
-		if (!(__frame->psr & PSR_S)
-		    || (current->need_resched == 0)
-		    || in_interrupt())
+		if (!(__frame->psr & PSR_S) ||
+		    current->need_resched == 0 ||
+		    in_interrupt())
 			break;
 		current->preempt_count++;
-		sti();
+		local_irq_enable();
 		preempt_schedule();
-		cli();
+		local_irq_disable();
 	}
 #endif
 
