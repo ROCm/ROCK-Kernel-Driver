@@ -32,6 +32,7 @@
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
+#include <linux/tqueue.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>

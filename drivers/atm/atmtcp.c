@@ -275,7 +275,7 @@ static int atmtcp_c_send(struct atm_vcc *vcc,struct sk_buff *skb)
 		result = -ENOBUFS;
 		goto done;
 	}
-	new_skb->stamp = xtime;
+	do_gettimeofday(&new_skb->stamp);
 	memcpy(skb_put(new_skb,skb->len),skb->data,skb->len);
 	out_vcc->push(out_vcc,new_skb);
 	atomic_inc(&vcc->stats->tx);
