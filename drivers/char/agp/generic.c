@@ -311,12 +311,15 @@ EXPORT_SYMBOL(agp_copy_info);
  *	It returns -EINVAL if the pointer == NULL.
  *	It returns -EBUSY if the area of the table requested is already in use.
  */
-int agp_bind_memory(agp_memory * curr, off_t pg_start)
+int agp_bind_memory(agp_memory *curr, off_t pg_start)
 {
 	int ret_val;
 
-	if ((agp_bridge->type == NOT_SUPPORTED) ||
-	    (curr == NULL) || (curr->is_bound == TRUE)) {
+	if ((agp_bridge->type == NOT_SUPPORTED) || (curr == NULL))
+		return -EINVAL;
+
+	if (curr->is_bound == TRUE) {
+		printk (KERN_INFO PFX "memory %p is already bound!\n", curr);
 		return -EINVAL;
 	}
 	if (curr->is_flushed == FALSE) {
@@ -343,15 +346,17 @@ EXPORT_SYMBOL(agp_bind_memory);
  * It returns -EINVAL if this piece of agp_memory is not currently bound to
  * the graphics aperture translation table or if the agp_memory pointer == NULL
  */
-int agp_unbind_memory(agp_memory * curr)
+int agp_unbind_memory(agp_memory *curr)
 {
 	int ret_val;
 
 	if ((agp_bridge->type == NOT_SUPPORTED) || (curr == NULL))
 		return -EINVAL;
 
-	if (curr->is_bound != TRUE)
+	if (curr->is_bound != TRUE) {
+		printk (KERN_INFO PFX "memory %p was not bound!\n", curr);
 		return -EINVAL;
+	}
 
 	ret_val = agp_bridge->driver->remove_memory(curr, curr->pg_start, curr->type);
 
