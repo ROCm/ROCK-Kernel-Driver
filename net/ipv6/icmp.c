@@ -388,6 +388,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	/* KK : Following two from MIPL */
 	plen = msg.offset;
 	__skb_pull(skb, plen);
+	msg.offset = 0;
 
 	len = skb->len - msg.offset;
 	len = min_t(unsigned int, len, IPV6_MIN_MTU - sizeof(struct ipv6hdr) -sizeof(struct icmp6hdr));
