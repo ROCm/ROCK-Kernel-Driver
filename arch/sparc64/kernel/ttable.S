@@ -1,4 +1,4 @@
-/* $Id: ttable.S,v 1.37 2002/01/23 11:27:32 davem Exp $
+/* $Id: ttable.S,v 1.38 2002/02/09 19:49:30 davem Exp $
  * ttable.S: Sparc V9 Trap Table(s) with SpitFire/Cheetah extensions.
  *
  * Copyright (C) 1996, 2001 David S. Miller (davem@caip.rutgers.edu)
@@ -211,20 +211,20 @@ tl1_ivec:	TRAP_IVEC
 tl1_paw:	TRAPTL1(do_paw_tl1)
 tl1_vaw:	TRAPTL1(do_vaw_tl1)
 
-		/* The grotty trick to save %g1 into current->thread.kernel_cntd0
+		/* The grotty trick to save %g1 into current->thread.cee_stuff
 		 * is because when we take this trap we could be interrupting trap
-		 * code already using the trap alternate global registers.  It is
-		 * better to corrupt a performance counter than corrupt trap register
-		 * state.  We cross our fingers and pray that this store/load does
+		 * code already using the trap alternate global registers.
+		 *
+		 * We cross our fingers and pray that this store/load does
 		 * not cause yet another CEE trap.
 		 */
 tl1_cee:	membar	#Sync
-		stx	%g1, [%g6 + AOFF_task_thread + AOFF_thread_kernel_cntd0]
+		stx	%g1, [%g6 + TI_CEE_STUFF]
 		ldxa	[%g0] ASI_AFSR, %g1
 		membar	#Sync
 		stxa	%g1, [%g0] ASI_AFSR
 		membar	#Sync
-		ldx	[%g6 + AOFF_task_thread + AOFF_thread_kernel_cntd0], %g1
+		ldx	[%g6 + TI_CEE_STUFF], %g1
 		retry
 
 tl1_iamiss:	BTRAPTL1(0x64) BTRAPTL1(0x65) BTRAPTL1(0x66) BTRAPTL1(0x67)

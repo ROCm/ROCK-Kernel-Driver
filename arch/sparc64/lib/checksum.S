@@ -18,7 +18,7 @@
 #include <asm/ptrace.h>
 #include <asm/asi.h>
 #include <asm/page.h>
-#include <asm/asm_offsets.h>
+#include <asm/thread_info.h>
 
 	/* The problem with the "add with carry" instructions on Ultra
 	 * are two fold.  Firstly, they cannot pair with jack shit,
@@ -498,7 +498,7 @@ cpc_user_end:
 	.globl	cpc_handler
 cpc_handler:
 	ldx	[%sp + 0x7ff + 128], %g1
-	ldub	[%g6 + AOFF_task_thread + AOFF_thread_current_ds], %g3
+	ldub	[%g6 + TI_CURRENT_DS], %g3
 	sub	%g0, EFAULT, %g2
 	brnz,a,pt %g1, 1f
 	 st	%g2, [%g1]

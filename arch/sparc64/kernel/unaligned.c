@@ -1,4 +1,4 @@
-/* $Id: unaligned.c,v 1.23 2001/04/09 04:29:03 davem Exp $
+/* $Id: unaligned.c,v 1.24 2002/02/09 19:49:31 davem Exp $
  * unaligned.c: Unaligned load/store trap handling with special
  *              cases for the kernel to do them more quickly.
  *
@@ -42,7 +42,7 @@ static inline enum direction decode_direction(unsigned int insn)
 {
 	unsigned long tmp = (insn >> 21) & 1;
 
-	if(!tmp)
+	if (!tmp)
 		return load;
 	else {
 		switch ((insn>>19)&0xf) {
@@ -63,15 +63,15 @@ static inline int decode_access_size(unsigned int insn)
 	if (tmp == 11 || tmp == 14) /* ldx/stx */
 		return 8;
 	tmp &= 3;
-	if(!tmp)
+	if (!tmp)
 		return 4;
-	else if(tmp == 3)
+	else if (tmp == 3)
 		return 16;	/* ldd/std - Although it is actually 8 */
-	else if(tmp == 2)
+	else if (tmp == 2)
 		return 2;
 	else {
 		printk("Impossible unaligned trap. insn=%08x\n", insn);
-		die_if_kernel("Byte sized unaligned access?!?!", current->thread.kregs);
+		die_if_kernel("Byte sized unaligned access?!?!", current_thread_info()->kregs);
 	}
 }
 
@@ -95,8 +95,8 @@ static inline int decode_signedness(unsigned int insn)
 static inline void maybe_flush_windows(unsigned int rs1, unsigned int rs2,
 				       unsigned int rd, int from_kernel)
 {
-	if(rs2 >= 16 || rs1 >= 16 || rd >= 16) {
-		if(from_kernel != 0)
+	if (rs2 >= 16 || rs1 >= 16 || rd >= 16) {
+		if (from_kernel != 0)
 			__asm__ __volatile__("flushw");
 		else
 			flushw_user();
@@ -112,13 +112,13 @@ static unsigned long fetch_reg(unsigned int reg, struct pt_regs *regs)
 {
 	unsigned long value;
 	
-	if(reg < 16)
+	if (reg < 16)
 		return (!reg ? 0 : regs->u_regs[reg]);
 	if (regs->tstate & TSTATE_PRIV) {
 		struct reg_window *win;
 		win = (struct reg_window *)(regs->u_regs[UREG_FP] + STACK_BIAS);
 		value = win->locals[reg - 16];
-	} else if (current->thread.flags & SPARC_FLAG_32BIT) {
+	} else if (test_thread_flag(TIF_32BIT)) {
 		struct reg_window32 *win32;
 		win32 = (struct reg_window32 *)((unsigned long)((u32)regs->u_regs[UREG_FP]));
 		get_user(value, &win32->locals[reg - 16]);
@@ -132,13 +132,13 @@ static unsigned long fetch_reg(unsigned int reg, struct pt_regs *regs)
 
 static unsigned long *fetch_reg_addr(unsigned int reg, struct pt_regs *regs)
 {
-	if(reg < 16)
+	if (reg < 16)
 		return &regs->u_regs[reg];
 	if (regs->tstate & TSTATE_PRIV) {
 		struct reg_window *win;
 		win = (struct reg_window *)(regs->u_regs[UREG_FP] + STACK_BIAS);
 		return &win->locals[reg - 16];
-	} else if (current->thread.flags & SPARC_FLAG_32BIT) {
+	} else if (test_thread_flag(TIF_32BIT)) {
 		struct reg_window32 *win32;
 		win32 = (struct reg_window32 *)((unsigned long)((u32)regs->u_regs[UREG_FP]));
 		return (unsigned long *)&win32->locals[reg - 16];
@@ -156,7 +156,7 @@ static inline unsigned long compute_effective_address(struct pt_regs *regs,
 	unsigned int rs2 = insn & 0x1f;
 	int from_kernel = (regs->tstate & TSTATE_PRIV) != 0;
 
-	if(insn & 0x2000) {
+	if (insn & 0x2000) {
 		maybe_flush_windows(rs1, 0, rd, from_kernel);
 		return (fetch_reg(rs1, regs) + sign_extend_imm13(insn));
 	} else {
@@ -335,7 +335,7 @@ static inline void advance(struct pt_regs *regs)
 {
 	regs->tpc   = regs->tnpc;
 	regs->tnpc += 4;
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc &= 0xffffffff;
 		regs->tnpc &= 0xffffffff;
 	}
@@ -360,7 +360,7 @@ void kernel_mna_trap_fault(struct pt_regs *regs, unsigned int insn)
 
 	if (!fixup) {
 		unsigned long address = compute_effective_address(regs, insn, ((insn >> 25) & 0x1f));
-        	if(address < PAGE_SIZE) {
+        	if (address < PAGE_SIZE) {
                 	printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference in mna handler");
         	} else
                 	printk(KERN_ALERT "Unable to handle kernel paging request in mna handler");
@@ -387,7 +387,7 @@ asmlinkage void kernel_unaligned_trap(struct pt_regs *regs, unsigned int insn, u
 	enum direction dir = decode_direction(insn);
 	int size = decode_access_size(insn);
 
-	if(!ok_for_kernel(insn) || dir == both) {
+	if (!ok_for_kernel(insn) || dir == both) {
 		printk("Unsupported unaligned load/store trap for kernel at <%016lx>.\n",
 		       regs->tpc);
 		unaligned_panic("Kernel does fpu/atomic unaligned load/store.", regs);
@@ -408,7 +408,7 @@ asmlinkage void kernel_unaligned_trap(struct pt_regs *regs, unsigned int insn, u
 		printk("KMNA: pc=%016lx [dir=%s addr=%016lx size=%d] retpc[%016lx]\n",
 		       regs->tpc, dirstrings[dir], addr, size, regs->u_regs[UREG_RETPC]);
 #endif
-		switch(dir) {
+		switch (dir) {
 		case load:
 			do_integer_load(fetch_reg_addr(((insn>>25)&0x1f), regs),
 					size, (unsigned long *) addr,
@@ -459,11 +459,11 @@ int handle_popc(u32 insn, struct pt_regs *regs)
 		ret += popc_helper[value & 0xf];
 		value >>= 4;
 	}
-	if(rd < 16) {
+	if (rd < 16) {
 		if (rd)
 			regs->u_regs[rd] = ret;
 	} else {
-		if (current->thread.flags & SPARC_FLAG_32BIT) {
+		if (test_thread_flag(TIF_32BIT)) {
 			struct reg_window32 *win32;
 			win32 = (struct reg_window32 *)((unsigned long)((u32)regs->u_regs[UREG_FP]));
 			put_user(ret, &win32->locals[rd - 16]);
@@ -490,9 +490,9 @@ int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 	int flag = (freg < 32) ? FPRS_DL : FPRS_DU;
 
 	save_and_clear_fpu();
-	current->thread.xfsr[0] &= ~0x1c000;
+	current_thread_info()->xfsr[0] &= ~0x1c000;
 	if (freg & 3) {
-		current->thread.xfsr[0] |= (6 << 14) /* invalid_fp_register */;
+		current_thread_info()->xfsr[0] |= (6 << 14) /* invalid_fp_register */;
 		do_fpother(regs);
 		return 0;
 	}
@@ -500,7 +500,7 @@ int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 		/* STQ */
 		u64 first = 0, second = 0;
 		
-		if (current->thread.fpsaved[0] & flag) {
+		if (current_thread_info()->fpsaved[0] & flag) {
 			first = *(u64 *)&f->regs[freg];
 			second = *(u64 *)&f->regs[freg+2];
 		}
@@ -575,18 +575,18 @@ int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 				break;
 			}
 		}
-		if (!(current->thread.fpsaved[0] & FPRS_FEF)) {
-			current->thread.fpsaved[0] = FPRS_FEF;
-			current->thread.gsr[0] = 0;
+		if (!(current_thread_info()->fpsaved[0] & FPRS_FEF)) {
+			current_thread_info()->fpsaved[0] = FPRS_FEF;
+			current_thread_info()->gsr[0] = 0;
 		}
-		if (!(current->thread.fpsaved[0] & flag)) {
+		if (!(current_thread_info()->fpsaved[0] & flag)) {
 			if (freg < 32)
 				memset(f->regs, 0, 32*sizeof(u32));
 			else
 				memset(f->regs+32, 0, 32*sizeof(u32));
 		}
 		memcpy(f->regs + freg, data, size * 4);
-		current->thread.fpsaved[0] |= flag;
+		current_thread_info()->fpsaved[0] |= flag;
 	}
 	advance(regs);
 	return 1;
@@ -604,7 +604,7 @@ void handle_ld_nf(u32 insn, struct pt_regs *regs)
 		reg[0] = 0;
 		if ((insn & 0x780000) == 0x180000)
 			reg[1] = 0;
-	} else if (current->thread.flags & SPARC_FLAG_32BIT) {
+	} else if (test_thread_flag(TIF_32BIT)) {
 		put_user(0, (int *)reg);
 		if ((insn & 0x780000) == 0x180000)
 			put_user(0, ((int *)reg) + 1);
@@ -627,9 +627,9 @@ void handle_lddfmna(struct pt_regs *regs, unsigned long sfar, unsigned long sfsr
 	int flag;
 	struct fpustate *f = FPUSTATE;
 
-	if(tstate & TSTATE_PRIV)
+	if (tstate & TSTATE_PRIV)
 		die_if_kernel("lddfmna from kernel", regs);
-	if(current->thread.flags & SPARC_FLAG_32BIT)
+	if (test_thread_flag(TIF_32BIT))
 		pc = (u32)pc;
 	if (get_user(insn, (u32 *)pc) != -EFAULT) {
 		asi = sfsr >> 16;
@@ -649,18 +649,18 @@ void handle_lddfmna(struct pt_regs *regs, unsigned long sfar, unsigned long sfsr
 		if (asi & 0x8) /* Little */
 			value = __swab64p(&value);
 		flag = (freg < 32) ? FPRS_DL : FPRS_DU;
-		if (!(current->thread.fpsaved[0] & FPRS_FEF)) {
-			current->thread.fpsaved[0] = FPRS_FEF;
-			current->thread.gsr[0] = 0;
+		if (!(current_thread_info()->fpsaved[0] & FPRS_FEF)) {
+			current_thread_info()->fpsaved[0] = FPRS_FEF;
+			current_thread_info()->gsr[0] = 0;
 		}
-		if (!(current->thread.fpsaved[0] & flag)) {
+		if (!(current_thread_info()->fpsaved[0] & flag)) {
 			if (freg < 32)
 				memset(f->regs, 0, 32*sizeof(u32));
 			else
 				memset(f->regs+32, 0, 32*sizeof(u32));
 		}
 		*(u64 *)(f->regs + freg) = value;
-		current->thread.fpsaved[0] |= flag;
+		current_thread_info()->fpsaved[0] |= flag;
 	} else {
 daex:		data_access_exception(regs);
 		return;
@@ -679,9 +679,9 @@ void handle_stdfmna(struct pt_regs *regs, unsigned long sfar, unsigned long sfsr
 	int flag;
 	struct fpustate *f = FPUSTATE;
 
-	if(tstate & TSTATE_PRIV)
+	if (tstate & TSTATE_PRIV)
 		die_if_kernel("stdfmna from kernel", regs);
-	if(current->thread.flags & SPARC_FLAG_32BIT)
+	if (test_thread_flag(TIF_32BIT))
 		pc = (u32)pc;
 	if (get_user(insn, (u32 *)pc) != -EFAULT) {
 		freg = ((insn >> 25) & 0x1e) | ((insn >> 20) & 0x20);
@@ -692,7 +692,7 @@ void handle_stdfmna(struct pt_regs *regs, unsigned long sfar, unsigned long sfsr
 		    (asi < ASI_P))
 			goto daex;
 		save_and_clear_fpu();
-		if (current->thread.fpsaved[0] & flag)
+		if (current_thread_info()->fpsaved[0] & flag)
 			value = *(u64 *)&f->regs[freg];
 		switch (asi) {
 		case ASI_P:

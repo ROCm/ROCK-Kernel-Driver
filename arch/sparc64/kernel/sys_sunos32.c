@@ -1,4 +1,4 @@
-/* $Id: sys_sunos32.c,v 1.62 2002/01/08 16:00:14 davem Exp $
+/* $Id: sys_sunos32.c,v 1.64 2002/02/09 19:49:31 davem Exp $
  * sys_sunos32.c: SunOS binary compatability layer on sparc64.
  *
  * Copyright (C) 1995, 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -455,8 +455,8 @@ asmlinkage int sunos_nosys(void)
 	siginfo_t info;
 	static int cnt;
 
-	regs = current->thread.kregs;
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	regs = current_thread_info()->kregs;
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc &= 0xffffffff;
 		regs->tnpc &= 0xffffffff;
 	}
@@ -1046,7 +1046,7 @@ asmlinkage int sunos_msgsys(int op, u32 arg1, u32 arg2, u32 arg3, u32 arg4)
 		if(!kmbuf)
 			break;
 		sp = (struct sparc_stackf32 *)
-			(current->thread.kregs->u_regs[UREG_FP] & 0xffffffffUL);
+			(current_thread_info()->kregs->u_regs[UREG_FP] & 0xffffffffUL);
 		if(get_user(arg5, &sp->xxargs[0])) {
 			rval = -EFAULT;
 			kfree(kmbuf);

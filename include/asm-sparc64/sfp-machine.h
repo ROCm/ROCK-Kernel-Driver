@@ -74,7 +74,7 @@
 
 /* Obtain the current rounding mode. */
 #ifndef FP_ROUNDMODE
-#define FP_ROUNDMODE	((current->thread.xfsr[0] >> 30) & 0x3)
+#define FP_ROUNDMODE	((current_thread_info()->xfsr[0] >> 30) & 0x3)
 #endif
 
 /* Exception flags. */
@@ -86,6 +86,6 @@
 
 #define FP_HANDLE_EXCEPTIONS return _fex
 
-#define FP_INHIBIT_RESULTS ((current->thread.xfsr[0] >> 23) & _fex)
+#define FP_INHIBIT_RESULTS ((current_thread_info()->xfsr[0] >> 23) & _fex)
 
 #endif

@@ -1338,7 +1338,7 @@ repeat:
 		spin_unlock_irqrestore(&kbd_queue_lock, flags);
 
 #ifdef CONFIG_SPARC32_COMPAT
-		if (current->thread.flags & SPARC_FLAG_32BIT) {
+		if (test_thread_flag(TIF_32BIT)) {
 			if (copy_to_user((Firm_event *)p, &this_event,
 					 sizeof(Firm_event)-sizeof(struct timeval)))
 				return -EFAULT;

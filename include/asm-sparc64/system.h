@@ -1,12 +1,12 @@
-/* $Id: system.h,v 1.68 2001/11/18 00:12:56 davem Exp $ */
+/* $Id: system.h,v 1.69 2002/02/09 19:49:31 davem Exp $ */
 #ifndef __SPARC64_SYSTEM_H
 #define __SPARC64_SYSTEM_H
 
 #include <linux/config.h>
 #include <asm/ptrace.h>
 #include <asm/processor.h>
-#include <asm/asm_offsets.h>
 #include <asm/visasm.h>
+#include <asm/thread_info.h>
 
 #ifndef __ASSEMBLY__
 /*
@@ -174,19 +174,19 @@ if ((PREV)->thread.smp_lock_count) {					\
 	 */
 #define switch_to(prev, next, last)						\
 do {	CHECK_LOCKS(prev);							\
-	if (current->thread.flags & SPARC_FLAG_PERFCTR) {			\
+	if (test_thread_flag(TIF_PERFCTR)) {					\
 		unsigned long __tmp;						\
 		read_pcr(__tmp);						\
-		current->thread.pcr_reg = __tmp;				\
+		current_thread_info()->pcr_reg = __tmp;				\
 		read_pic(__tmp);						\
-		current->thread.kernel_cntd0 += (unsigned int)(__tmp);		\
-		current->thread.kernel_cntd1 += ((__tmp) >> 32);		\
+		current_thread_info()->kernel_cntd0 += (unsigned int)(__tmp);	\
+		current_thread_info()->kernel_cntd1 += ((__tmp) >> 32);		\
 	}									\
 	save_and_clear_fpu();							\
 	/* If you are tempted to conditionalize the following */		\
 	/* so that ASI is only written if it changes, think again. */		\
 	__asm__ __volatile__("wr %%g0, %0, %%asi"				\
-			     : : "r" (next->thread.current_ds.seg));		\
+	: : "r" (__thread_flag_byte_ptr(next->thread_info)[TI_FLAG_BYTE_CURRENT_DS]));	\
 	__asm__ __volatile__(							\
 	"mov	%%g6, %%g5\n\t"							\
 	"wrpr	%%g0, 0x95, %%pstate\n\t"					\
@@ -202,7 +202,7 @@ do {	CHECK_LOCKS(prev);							\
 	"wrpr	%%g1, %%cwp\n\t"						\
 	"ldx	[%%g6 + %3], %%o6\n\t"						\
 	"ldub	[%%g6 + %2], %%o5\n\t"						\
-	"ldub	[%%g6 + %4], %%o7\n\t"						\
+	"ldx	[%%g6 + %4], %%o7\n\t"						\
 	"mov	%%g6, %%l2\n\t"							\
 	"wrpr	%%o5, 0x0, %%wstate\n\t"					\
 	"ldx	[%%sp + 2047 + 0x70], %%i6\n\t"					\
@@ -212,21 +212,18 @@ do {	CHECK_LOCKS(prev);							\
 	"wrpr	%%g0, 0x96, %%pstate\n\t"					\
 	"andcc	%%o7, %6, %%g0\n\t"						\
 	"bne,pn	%%icc, ret_from_syscall\n\t"					\
-	" mov	%%g5, %0\n\t"							\
+	" ldx	[%%g5 + %7], %0\n\t"						\
 	: "=&r" (last)								\
-	: "r" (next),								\
-	  "i" ((const unsigned long)(&((struct task_struct *)0)->thread.wstate)),\
-	  "i" ((const unsigned long)(&((struct task_struct *)0)->thread.ksp)),	\
-	  "i" ((const unsigned long)(&((struct task_struct *)0)->thread.flags)),\
-	  "i" ((const unsigned long)(&((struct task_struct *)0)->thread.cwp)),	\
-	  "i" (SPARC_FLAG_NEWCHILD)						\
+	: "r" (next->thread_info),						\
+	  "i" (TI_WSTATE), "i" (TI_KSP), "i" (TI_FLAGS), "i" (TI_CWP),		\
+	  "i" (_TIF_NEWCHILD), "i" (TI_TASK)					\
 	: "cc", "g1", "g2", "g3", "g5", "g7",					\
 	  "l2", "l3", "l4", "l5", "l6", "l7",					\
 	  "i0", "i1", "i2", "i3", "i4", "i5",					\
 	  "o0", "o1", "o2", "o3", "o4", "o5", "o7");				\
 	/* If you fuck with this, update ret_from_syscall code too. */		\
-	if (current->thread.flags & SPARC_FLAG_PERFCTR) {			\
-		write_pcr(current->thread.pcr_reg);				\
+	if (test_thread_flag(TIF_PERFCTR)) {					\
+		write_pcr(current_thread_info()->pcr_reg);			\
 		reset_pic();							\
 	}									\
 } while(0)

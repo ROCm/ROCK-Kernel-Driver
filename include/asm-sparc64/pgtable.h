@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.155 2001/12/21 04:56:17 davem Exp $
+/* $Id: pgtable.h,v 1.156 2002/02/09 19:49:31 davem Exp $
  * pgtable.h: SpitFire page table operations.
  *
  * Copyright 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -76,7 +76,7 @@
  * is different so we can optimize correctly for 32-bit tasks.
  */
 #define REAL_PTRS_PER_PMD	(1UL << PMD_BITS)
-#define PTRS_PER_PMD		((const int)((current->thread.flags & SPARC_FLAG_32BIT) ? \
+#define PTRS_PER_PMD		((const int)(test_thread_flag(TIF_32BIT) ? \
 				 (1UL << (32 - (PAGE_SHIFT-3) - PAGE_SHIFT)) : (REAL_PTRS_PER_PMD)))
 
 /*
@@ -90,8 +90,8 @@
 			(PAGE_SHIFT-3) + PMD_BITS)))
 
 /* Kernel has a separate 44bit address space. */
-#define USER_PTRS_PER_PGD	((const int)((current->thread.flags & SPARC_FLAG_32BIT) ? \
-				 (1) : (PTRS_PER_PGD)))
+#define USER_PTRS_PER_PGD	((const int)(test_thread_flag(TIF_32BIT)) ? \
+				 (1) : (PTRS_PER_PGD))
 #define FIRST_USER_PGD_NR	0
 
 #define pte_ERROR(e)	__builtin_trap()

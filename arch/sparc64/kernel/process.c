@@ -1,4 +1,4 @@
-/*  $Id: process.c,v 1.130 2002/01/31 03:30:06 davem Exp $
+/*  $Id: process.c,v 1.131 2002/02/09 19:49:30 davem Exp $
  *  arch/sparc64/kernel/process.c
  *
  *  Copyright (C) 1995, 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -79,10 +79,13 @@ int cpu_idle(void)
 #define unidle_me()		(cpu_data[smp_processor_id()].idle_volume = 0)
 int cpu_idle(void)
 {
+	set_thread_flag(TIF_POLLING_NRFLAG);
 	while(1) {
 		if (need_resched()) {
 			unidle_me();
+			clear_thread_flag(TIF_POLLING_NRFLAG);
 			schedule();
+			set_thread_flag(TIF_POLLING_NRFLAG);
 			check_pgt_cache();
 		}
 		idle_me_harder();
@@ -176,7 +179,7 @@ static void show_regwindow(struct pt_regs *regs)
 	struct reg_window r_w;
 	mm_segment_t old_fs;
 
-	if ((regs->tstate & TSTATE_PRIV) || !(current->thread.flags & SPARC_FLAG_32BIT)) {
+	if ((regs->tstate & TSTATE_PRIV) || !(test_thread_flag(TIF_32BIT))) {
 		__asm__ __volatile__ ("flushw");
 		rw = (struct reg_window *)(regs->u_regs[14] + STACK_BIAS);
 		if (!(regs->tstate & TSTATE_PRIV)) {
@@ -364,34 +367,29 @@ void show_regs32(struct pt_regs32 *regs)
 	       regs->u_regs[15]);
 }
 
-void show_thread(struct thread_struct *thread)
+unsigned long thread_saved_pc(struct task_struct *tsk)
 {
-	int i;
-
-#if 0
-	printk("kregs:             0x%016lx\n", (unsigned long)thread->kregs);
-	show_regs(thread->kregs);
-#endif	
-	printk("ksp:               0x%016lx\n", thread->ksp);
-
-	if (thread->w_saved) {
-		for (i = 0; i < NSWINS; i++) {
-			if (!thread->rwbuf_stkptrs[i])
-				continue;
-			printk("reg_window[%d]:\n", i);
-			printk("stack ptr:         0x%016lx\n", thread->rwbuf_stkptrs[i]);
+	struct thread_info *ti = tsk->thread_info;
+	unsigned long ret = 0xdeadbeefUL;
+	
+	if (ti && ti->ksp) {
+		unsigned long *sp;
+		sp = (unsigned long *)(ti->ksp + STACK_BIAS);
+		if (((unsigned long)sp & (sizeof(long) - 1)) == 0UL &&
+		    sp[14]) {
+			unsigned long *fp;
+			fp = (unsigned long *)(sp[14] + STACK_BIAS);
+			if (((unsigned long)fp & (sizeof(long) - 1)) == 0UL)
+				ret = fp[15];
 		}
-		printk("w_saved:           0x%04x\n", thread->w_saved);
 	}
-
-	printk("flags:             0x%08x\n", thread->flags);
-	printk("current_ds:        0x%x\n", thread->current_ds.seg);
+	return ret;
 }
 
 /* Free current thread data structures etc.. */
 void exit_thread(void)
 {
-	struct thread_struct *t = &current->thread;
+	struct thread_info *t = current_thread_info();
 
 	if (t->utraps) {
 		if (t->utraps[0] < 2)
@@ -400,22 +398,20 @@ void exit_thread(void)
 			t->utraps[0]--;
 	}
 
-	/* Turn off performance counters if on. */
-	if (t->flags & SPARC_FLAG_PERFCTR) {
+	if (test_and_clear_thread_flag(TIF_PERFCTR)) {
 		t->user_cntd0 = t->user_cntd1 = NULL;
 		t->pcr_reg = 0;
-		t->flags &= ~(SPARC_FLAG_PERFCTR);
 		write_pcr(0);
 	}
 }
 
 void flush_thread(void)
 {
-	struct thread_struct *t = &current->thread;
+	struct thread_info *t = current_thread_info();
 
-	if (current->mm) {
-		if (t->flags & SPARC_FLAG_32BIT) {
-			struct mm_struct *mm = current->mm;
+	if (t->task->mm) {
+		if (test_thread_flag(TIF_32BIT)) {
+			struct mm_struct *mm = t->task->mm;
 			pgd_t *pgd0 = &mm->pgd[0];
 			unsigned long pgd_cache;
 
@@ -434,24 +430,23 @@ void flush_thread(void)
 					       "i" (ASI_DMMU));
 		}
 	}
-	t->w_saved = 0;
+	set_thread_wsaved(0);
 
 	/* Turn off performance counters if on. */
-	if (t->flags & SPARC_FLAG_PERFCTR) {
+	if (test_and_clear_thread_flag(TIF_PERFCTR)) {
 		t->user_cntd0 = t->user_cntd1 = NULL;
 		t->pcr_reg = 0;
-		t->flags &= ~(SPARC_FLAG_PERFCTR);
 		write_pcr(0);
 	}
 
 	/* Clear FPU register state. */
 	t->fpsaved[0] = 0;
 	
-	if (t->current_ds.seg != ASI_AIUS)
+	if (get_thread_current_ds() != ASI_AIUS)
 		set_fs(USER_DS);
 
 	/* Init new signal delivery disposition. */
-	t->flags &= ~SPARC_FLAG_NEWSIGNALS;
+	clear_thread_flag(TIF_NEWSIGNALS);
 }
 
 /* It's a bit more tricky when 64-bit tasks are involved... */
@@ -459,7 +454,7 @@ static unsigned long clone_stackframe(unsigned long csp, unsigned long psp)
 {
 	unsigned long fp, distance, rval;
 
-	if (!(current->thread.flags & SPARC_FLAG_32BIT)) {
+	if (!(test_thread_flag(TIF_32BIT))) {
 		csp += STACK_BIAS;
 		psp += STACK_BIAS;
 		__get_user(fp, &(((struct reg_window *)psp)->ins[6]));
@@ -477,7 +472,7 @@ static unsigned long clone_stackframe(unsigned long csp, unsigned long psp)
 	rval = (csp - distance);
 	if (copy_in_user(rval, psp, distance))
 		rval = 0;
-	else if (current->thread.flags & SPARC_FLAG_32BIT) {
+	else if (test_thread_flag(TIF_32BIT)) {
 		if (put_user(((u32)csp), &(((struct reg_window32 *)rval)->ins[6])))
 			rval = 0;
 	} else {
@@ -493,7 +488,7 @@ static unsigned long clone_stackframe(unsigned long csp, unsigned long psp)
 
 /* Standard stuff. */
 static inline void shift_window_buffer(int first_win, int last_win,
-				       struct thread_struct *t)
+				       struct thread_info *t)
 {
 	int i;
 
@@ -506,15 +501,15 @@ static inline void shift_window_buffer(int first_win, int last_win,
 
 void synchronize_user_stack(void)
 {
-	struct thread_struct *t = &current->thread;
+	struct thread_info *t = current_thread_info();
 	unsigned long window;
 
 	flush_user_windows();
-	if ((window = t->w_saved) != 0) {
+	if ((window = get_thread_wsaved()) != 0) {
 		int winsize = REGWIN_SZ;
 		int bias = 0;
 
-		if (t->flags & SPARC_FLAG_32BIT)
+		if (test_thread_flag(TIF_32BIT))
 			winsize = REGWIN32_SZ;
 		else
 			bias = STACK_BIAS;
@@ -525,8 +520,8 @@ void synchronize_user_stack(void)
 			struct reg_window *rwin = &t->reg_window[window];
 
 			if (!copy_to_user((char *)sp, rwin, winsize)) {
-				shift_window_buffer(window, t->w_saved - 1, t);
-				t->w_saved--;
+				shift_window_buffer(window, get_thread_wsaved() - 1, t);
+				set_thread_wsaved(get_thread_wsaved() - 1);
 			}
 		} while (window--);
 	}
@@ -534,18 +529,18 @@ void synchronize_user_stack(void)
 
 void fault_in_user_windows(void)
 {
-	struct thread_struct *t = &current->thread;
+	struct thread_info *t = current_thread_info();
 	unsigned long window;
 	int winsize = REGWIN_SZ;
 	int bias = 0;
 
-	if (t->flags & SPARC_FLAG_32BIT)
+	if (test_thread_flag(TIF_32BIT))
 		winsize = REGWIN32_SZ;
 	else
 		bias = STACK_BIAS;
 
 	flush_user_windows();
-	window = t->w_saved;
+	window = get_thread_wsaved();
 
 	if (window != 0) {
 		window -= 1;
@@ -557,11 +552,11 @@ void fault_in_user_windows(void)
 				goto barf;
 		} while (window--);
 	}
-	t->w_saved = 0;
+	set_thread_wsaved(0);
 	return;
 
 barf:
-	t->w_saved = window + 1;
+	set_thread_wsaved(window + 1);
 	do_exit(SIGILL);
 }
 
@@ -581,21 +576,23 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		unsigned long unused,
 		struct task_struct *p, struct pt_regs *regs)
 {
-	struct thread_struct *t = &p->thread;
+	struct thread_info *t = p->thread_info;
 	char *child_trap_frame;
 
 #ifdef CONFIG_DEBUG_SPINLOCK
-	t->smp_lock_count = 0;
-	t->smp_lock_pc = 0;
+	p->thread.smp_lock_count = 0;
+	p->thread.smp_lock_pc = 0;
 #endif
 
 	/* Calculate offset to stack_frame & pt_regs */
-	child_trap_frame = ((char *)p) + (THREAD_SIZE - (TRACEREG_SZ+REGWIN_SZ));
+	child_trap_frame = ((char *)t) + (THREAD_SIZE - (TRACEREG_SZ+REGWIN_SZ));
 	memcpy(child_trap_frame, (((struct reg_window *)regs)-1), (TRACEREG_SZ+REGWIN_SZ));
+
+	t->flags = (t->flags & ~((0xffUL << TI_FLAG_CWP_SHIFT) | (0xffUL << TI_FLAG_CURRENT_DS_SHIFT))) |
+		_TIF_NEWCHILD |
+		(((regs->tstate + 1) & TSTATE_CWP) << TI_FLAG_CWP_SHIFT);
 	t->ksp = ((unsigned long) child_trap_frame) - STACK_BIAS;
-	t->flags |= SPARC_FLAG_NEWCHILD;
 	t->kregs = (struct pt_regs *)(child_trap_frame+sizeof(struct reg_window));
-	t->cwp = (regs->tstate + 1) & TSTATE_CWP;
 	t->fpsaved[0] = 0;
 
 	if (regs->tstate & TSTATE_PRIV) {
@@ -604,25 +601,25 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		 * disable performance counters in the child because the
 		 * address space and protection realm are changing.
 		 */
-		if (t->flags & SPARC_FLAG_PERFCTR) {
+		if (t->flags & _TIF_PERFCTR) {
 			t->user_cntd0 = t->user_cntd1 = NULL;
 			t->pcr_reg = 0;
-			t->flags &= ~(SPARC_FLAG_PERFCTR);
+			t->flags &= ~_TIF_PERFCTR;
 		}
-		t->kregs->u_regs[UREG_FP] = p->thread.ksp;
-		t->current_ds = KERNEL_DS;
+		t->kregs->u_regs[UREG_FP] = t->ksp;
+		t->flags |= ((long)ASI_P << TI_FLAG_CURRENT_DS_SHIFT);
 		flush_register_windows();
 		memcpy((void *)(t->ksp + STACK_BIAS),
 		       (void *)(regs->u_regs[UREG_FP] + STACK_BIAS),
 		       sizeof(struct reg_window));
-		t->kregs->u_regs[UREG_G6] = (unsigned long) p;
+		t->kregs->u_regs[UREG_G6] = (unsigned long) t;
 	} else {
-		if (t->flags & SPARC_FLAG_32BIT) {
+		if (t->flags & _TIF_32BIT) {
 			sp &= 0x00000000ffffffffUL;
 			regs->u_regs[UREG_FP] &= 0x00000000ffffffffUL;
 		}
 		t->kregs->u_regs[UREG_FP] = sp;
-		t->current_ds = USER_DS;
+		t->flags |= ((long)ASI_AIUS << TI_FLAG_CURRENT_DS_SHIFT);
 		if (sp != regs->u_regs[UREG_FP]) {
 			unsigned long csp;
 
@@ -688,33 +685,10 @@ pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
  */
 void dump_thread(struct pt_regs * regs, struct user * dump)
 {
-#if 1
 	/* Only should be used for SunOS and ancient a.out
-	 * SparcLinux binaries...  Fixme some day when bored.
-	 * But for now at least plug the security hole :-)
+	 * SparcLinux binaries...  Not worth implementing.
 	 */
 	memset(dump, 0, sizeof(struct user));
-#else
-	unsigned long first_stack_page;
-	dump->magic = SUNOS_CORE_MAGIC;
-	dump->len = sizeof(struct user);
-	dump->regs.psr = regs->psr;
-	dump->regs.pc = regs->pc;
-	dump->regs.npc = regs->npc;
-	dump->regs.y = regs->y;
-	/* fuck me plenty */
-	memcpy(&dump->regs.regs[0], &regs->u_regs[1], (sizeof(unsigned long) * 15));
-	dump->u_tsize = (((unsigned long) current->mm->end_code) -
-		((unsigned long) current->mm->start_code)) & ~(PAGE_SIZE - 1);
-	dump->u_dsize = ((unsigned long) (current->mm->brk + (PAGE_SIZE-1)));
-	dump->u_dsize -= dump->u_tsize;
-	dump->u_dsize &= ~(PAGE_SIZE - 1);
-	first_stack_page = (regs->u_regs[UREG_FP] & ~(PAGE_SIZE - 1));
-	dump->u_ssize = (TASK_SIZE - first_stack_page) & ~(PAGE_SIZE - 1);
-	memcpy(&dump->fpu.fpstatus.fregs.regs[0], &current->thread.float_regs[0], (sizeof(unsigned long) * 32));
-	dump->fpu.fpstatus.fsr = current->thread.fsr;
-	dump->fpu.fpstatus.flags = dump->fpu.fpstatus.extra = 0;
-#endif	
 }
 
 typedef struct {
@@ -735,10 +709,10 @@ typedef struct {
  */
 int dump_fpu (struct pt_regs * regs, elf_fpregset_t * fpregs)
 {
-	unsigned long *kfpregs = (unsigned long *)(((char *)current) + AOFF_task_fpregs);
-	unsigned long fprs = current->thread.fpsaved[0];
+	unsigned long *kfpregs = current_thread_info()->fpregs;
+	unsigned long fprs = current_thread_info()->fpsaved[0];
 
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		elf_fpregset_t32 *fpregs32 = (elf_fpregset_t32 *)fpregs;
 
 		if (fprs & FPRS_DL)
@@ -752,7 +726,7 @@ int dump_fpu (struct pt_regs * regs, elf_fpregset_t * fpregs)
 		memset(&fpregs32->pr_q[0], 0,
 		       (sizeof(unsigned int) * 64));
 		if (fprs & FPRS_FEF) {
-			fpregs32->pr_fsr = (unsigned int) current->thread.xfsr[0];
+			fpregs32->pr_fsr = (unsigned int) current_thread_info()->xfsr[0];
 			fpregs32->pr_en = 1;
 		} else {
 			fpregs32->pr_fsr = 0;
@@ -772,8 +746,8 @@ int dump_fpu (struct pt_regs * regs, elf_fpregset_t * fpregs)
 			memset(&fpregs->pr_regs[16], 0,
 			       sizeof(unsigned int) * 32);
 		if(fprs & FPRS_FEF) {
-			fpregs->pr_fsr = current->thread.xfsr[0];
-			fpregs->pr_gsr = current->thread.gsr[0];
+			fpregs->pr_fsr = current_thread_info()->xfsr[0];
+			fpregs->pr_gsr = current_thread_info()->gsr[0];
 		} else {
 			fpregs->pr_fsr = fpregs->pr_gsr = 0;
 		}
@@ -806,8 +780,8 @@ asmlinkage int sparc_execve(struct pt_regs *regs)
 	putname(filename);
 	if (!error) {
 		fprs_write(0);
-		current->thread.xfsr[0] = 0;
-		current->thread.fpsaved[0] = 0;
+		current_thread_info()->xfsr[0] = 0;
+		current_thread_info()->fpsaved[0] = 0;
 		regs->tstate &= ~TSTATE_PEF;
 	}
 out:

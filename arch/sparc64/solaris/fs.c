@@ -1,4 +1,4 @@
-/* $Id: fs.c,v 1.26 2002/01/08 16:00:21 davem Exp $
+/* $Id: fs.c,v 1.27 2002/02/08 03:57:14 davem Exp $
  * fs.c: fs related syscall emulation for Solaris
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)

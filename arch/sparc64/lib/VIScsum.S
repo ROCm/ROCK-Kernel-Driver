@@ -1,4 +1,4 @@
-/* $Id: VIScsum.S,v 1.6 2000/02/20 23:21:39 davem Exp $
+/* $Id: VIScsum.S,v 1.7 2002/02/09 19:49:30 davem Exp $
  * VIScsum.S: High bandwidth IP checksumming utilizing the UltraSparc
  *            Visual Instruction Set.
  *
@@ -28,7 +28,7 @@
 #include <asm/head.h>
 #include <asm/asi.h>
 #include <asm/visasm.h>
-#include <asm/asm_offsets.h>
+#include <asm/thread_info.h>
 #else
 #define ASI_BLK_P	0xf0
 #define FRPS_FEF	0x04
@@ -342,7 +342,7 @@ csum_partial:
 	DO_THE_TRICK(f44,f46,f48,f50,f52,f54,f56,f58,f60,f62,f0,f2,f4,f6,f8,f10,f12,f14)
 	END_THE_TRICK(f60,f62,f0,f2,f4,f6,f8,f10,f12,f14,f16,f18,f20,f22,f24,f26,f28,f30)
 #ifdef __KERNEL__
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_current_ds], %g7
+	ldub		[%g6 + TI_CURRENT_DS], %g7
 #endif
 	and		%o1, 0x3f, %o1		/*  IEU0	Group		*/
 #ifdef __KERNEL__

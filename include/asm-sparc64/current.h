@@ -1,7 +1,8 @@
 #ifndef _SPARC64_CURRENT_H
 #define _SPARC64_CURRENT_H
 
-/* Sparc rules... */
-register struct task_struct *current asm("g6");
+#include <asm/thread_info.h>
+
+#define current		(current_thread_info()->task)
 
 #endif /* !(_SPARC64_CURRENT_H) */

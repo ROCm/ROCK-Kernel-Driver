@@ -1,4 +1,4 @@
-/* $Id: checksum.h,v 1.17 2001/04/24 01:09:12 davem Exp $ */
+/* $Id: checksum.h,v 1.19 2002/02/09 19:49:31 davem Exp $ */
 #ifndef __SPARC64_CHECKSUM_H
 #define __SPARC64_CHECKSUM_H
 
@@ -16,7 +16,8 @@
  *      RFC1071 Computing the Internet Checksum
  */
 
-#include <asm/uaccess.h> 
+#include <linux/in6.h>
+#include <asm/uaccess.h>
 
 /* computes the checksum of a memory block at buff, length len,
  * and adds in "sum" (32-bit)
@@ -44,7 +45,7 @@ csum_partial_copy_nocheck (const char *src, char *dst, int len,
 			   unsigned int sum)
 {
 	int ret;
-	unsigned char cur_ds = current->thread.current_ds.seg;
+	unsigned char cur_ds = get_thread_current_ds();
 	__asm__ __volatile__ ("wr %%g0, %0, %%asi" : : "i" (ASI_P));
 	ret = csum_partial_copy_sparc64(src, dst, len, sum);
 	__asm__ __volatile__ ("wr %%g0, %0, %%asi" : : "r" (cur_ds));

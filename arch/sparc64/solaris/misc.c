@@ -1,4 +1,4 @@
-/* $Id: misc.c,v 1.35 2002/01/08 16:00:21 davem Exp $
+/* $Id: misc.c,v 1.36 2002/02/09 19:49:31 davem Exp $
  * misc.c: Miscelaneous syscall emulation for Solaris
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -739,6 +739,8 @@ extern u32 solaris_sparc_syscall[];
 extern u32 solaris_syscall[];
 extern void cleanup_socksys(void);
 
+extern u32 entry64_personality_patch;
+
 int init_module(void)
 {
 	int ret;
@@ -750,6 +752,11 @@ int init_module(void)
 		return ret;
 	}
 	update_ttable(solaris_sparc_syscall);
+	entry64_personality_patch |=
+		(offsetof(struct task_struct, personality) +
+		 (sizeof(unsigned long) - 1));
+	__asm__ __volatile__("membar #StoreStore; flush %0"
+			     : : "r" (&entry64_personality_patch));
 	return 0;
 }
 

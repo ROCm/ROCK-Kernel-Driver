@@ -1,4 +1,4 @@
-/* $Id: entry64.S,v 1.6 2000/01/12 02:59:26 davem Exp $
+/* $Id: entry64.S,v 1.7 2002/02/09 19:49:31 davem Exp $
  * entry64.S:  Solaris syscall emulation entry point.
  *
  * Copyright (C) 1996,1997,1998 Jakub Jelinek   (jj@sunsite.mff.cuni.cz)
@@ -68,9 +68,11 @@ linux_syscall_for_solaris:
 
 	/* Solaris system calls enter here... */
 	.align	32
-	.globl	solaris_sparc_syscall
+	.globl	solaris_sparc_syscall, entry64_personality_patch
 solaris_sparc_syscall:
-	ldub		[%g6 + AOFF_task_personality + ASIZ_task_personality - 1], %l0
+	ldx		[%g6 + TI_TASK], %l0
+entry64_personality_patch:
+	ldub		[%l0 + 0x0], %l0
 	cmp		%g1, 255
 	bg,pn		%icc, solaris_unimplemented
 	 srl		%g1, 0, %g1
@@ -83,7 +85,7 @@ solaris_sparc_syscall:
 1:	 srl		%i0, 0, %o0
 	lduw		[%l7 + %l4], %l3
 	srl		%i1, 0, %o1
-	ldx		[%g6 + AOFF_task_flags], %l5
+	ldx		[%g6 + TI_FLAGS], %l5
 	cmp		%l3, NR_SYSCALLS
 	bleu,a,pn	%xcc, linux_syscall_for_solaris
 	 sethi		%hi(sys_call_table32), %l6
@@ -93,21 +95,21 @@ solaris_sparc_syscall:
 10:	srl		%i2, 0, %o2
 	mov		%i5, %o5
 	andn		%l3, 3, %l7
-	andcc		%l5, 0x20, %g0				
+	andcc		%l5, _TIF_SYSCALL_TRACE, %g0				
 	bne,pn		%icc, solaris_syscall_trace		
 	 mov		%i0, %l5
 2:	call		%l7
 	 srl		%i3, 0, %o3
 ret_from_solaris:
 	stx		%o0, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I0]
-	ldx		[%g6 + AOFF_task_flags], %l6
+	ldx		[%g6 + TI_FLAGS], %l6
 	sra		%o0, 0, %o0
 	mov		%ulo(TSTATE_XCARRY | TSTATE_ICARRY), %g2
 	ldx		[%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TSTATE], %g3
 	cmp		%o0, -ENOIOCTLCMD
 	sllx		%g2, 32, %g2
 	bgeu,pn		%xcc, 1f
-	 andcc		%l6, 0x20, %l6	
+	 andcc		%l6, _TIF_SYSCALL_TRACE, %l6	
 
 	/* System call success, clear Carry condition code. */
 	andn		%g3, %g2, %g3
@@ -175,25 +177,30 @@ solaris_sigsuspend:
 
 	.globl		solaris_getpid
 solaris_getpid:
-	call		sys_getppid	/* This is tricky, so don't do it in assembly */
+	call		sys_getppid
 	 nop
-	stx		%o0, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I1]
+	call		sys_getpid
+	 stx		%o0, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I1]
 	b,pt		%xcc, ret_from_solaris
-	 lduw		[%g6 + AOFF_task_pid], %o0
+	 nop
 
 	.globl	solaris_getuid
 solaris_getuid:
-	lduw		[%g6 + AOFF_task_euid], %o1
-	lduw		[%g6 + AOFF_task_uid], %o0
-	b,pt		%xcc, ret_from_solaris
+	call		sys_geteuid
+	 nop
+	call		sys_getuid
 	 stx		%o1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I1]
+	b,pt		%xcc, ret_from_solaris
+	 nop
 
 	.globl	solaris_getgid
 solaris_getgid:
-	lduw		[%g6 + AOFF_task_egid], %o1
-	lduw		[%g6 + AOFF_task_gid], %o0
-	b,pt		%xcc, ret_from_solaris
+	call		sys_getegid
+	 nop
+	call		sys_getgid
 	 stx		%o1, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I1]
+	b,pt		%xcc, ret_from_solaris
+	 nop
 
 	.globl		solaris_unimplemented
 solaris_unimplemented:

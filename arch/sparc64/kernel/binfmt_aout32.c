@@ -314,7 +314,7 @@ beyond_if:
 
 	current->mm->start_stack =
 		(unsigned long) create_aout32_tables((char *)bprm->p, bprm);
-	if (!(current->thread.flags & SPARC_FLAG_32BIT)) {
+	if (!(test_thread_flag(TIF_32BIT))) {
 		unsigned long pgd_cache;
 
 		pgd_cache = ((unsigned long)current->mm->pgd[0])<<11UL;
@@ -323,7 +323,7 @@ beyond_if:
 				     : /* no outputs */
 				     : "r" (pgd_cache),
 				       "r" (TSB_REG), "i" (ASI_DMMU));
-		current->thread.flags |= SPARC_FLAG_32BIT;
+		set_thread_flag(TIF_32BIT);
 	}
 	start_thread32(regs, ex.a_entry, current->mm->start_stack);
 	if (current->ptrace & PT_PTRACED)

@@ -439,9 +439,9 @@ extern void release_segments(struct mm_struct * mm);
 /*
  * Return saved PC of a blocked thread.
  */
-static inline unsigned long thread_saved_pc(struct thread_struct *t)
+static inline unsigned long thread_saved_pc(struct task_struct *tsk)
 {
-	return ((unsigned long *)t->esp)[3];
+	return ((unsigned long *)tsk->thread->esp)[3];
 }
 
 unsigned long get_wchan(struct task_struct *p);

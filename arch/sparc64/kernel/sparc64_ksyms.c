@@ -1,4 +1,4 @@
-/* $Id: sparc64_ksyms.c,v 1.120 2001/12/21 04:56:15 davem Exp $
+/* $Id: sparc64_ksyms.c,v 1.121 2002/02/09 19:49:31 davem Exp $
  * arch/sparc64/kernel/sparc64_ksyms.c: Sparc64 specific ksyms support.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -80,6 +80,11 @@ extern u32 sunos_sys_table[], sys_call_table32[];
 extern void tl0_solaris(void);
 extern void sys_sigsuspend(void);
 extern int sys_getppid(void);
+extern int sys_getpid(void);
+extern int sys_geteuid(void);
+extern int sys_getuid(void);
+extern int sys_getegid(void);
+extern int sys_getgid(void);
 extern int svr4_getcontext(svr4_ucontext_t *uc, struct pt_regs *regs);
 extern int svr4_setcontext(svr4_ucontext_t *uc, struct pt_regs *regs);
 extern int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
@@ -307,6 +312,11 @@ EXPORT_SYMBOL(sys_call_table32);
 EXPORT_SYMBOL(tl0_solaris);
 EXPORT_SYMBOL(sys_sigsuspend);
 EXPORT_SYMBOL(sys_getppid);
+EXPORT_SYMBOL(sys_getpid);
+EXPORT_SYMBOL(sys_geteuid);
+EXPORT_SYMBOL(sys_getuid);
+EXPORT_SYMBOL(sys_getegid);
+EXPORT_SYMBOL(sys_getgid);
 EXPORT_SYMBOL(svr4_getcontext);
 EXPORT_SYMBOL(svr4_setcontext);
 EXPORT_SYMBOL(prom_cpu_nodes);

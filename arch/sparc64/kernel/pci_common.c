@@ -1,4 +1,4 @@
-/* $Id: pci_common.c,v 1.28 2002/01/14 05:47:02 davem Exp $
+/* $Id: pci_common.c,v 1.29 2002/02/01 00:56:03 davem Exp $
  * pci_common.c: PCI controller common support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -669,6 +669,20 @@ static void __init pdev_fixup_irq(struct pci_dev *pdev)
 	unsigned int prom_irq;
 	int prom_node = pcp->prom_node;
 	int err;
+
+	/* If this is an empty EBUS device, sometimes OBP fails to
+	 * give it a valid fully specified interrupts property.
+	 * The EBUS hooked up to SunHME on PCI I/O boards of
+	 * Ex000 systems is one such case.
+	 *
+	 * The interrupt is not important so just ignore it.
+	 */
+	if (pdev->vendor == PCI_VENDOR_ID_SUN &&
+	    pdev->device == PCI_DEVICE_ID_SUN_EBUS &&
+	    !prom_getchild(prom_node)) {
+		pdev->irq = 0;
+		return;
+	}
 
 	err = prom_getproperty(prom_node, "interrupts",
 			       (char *)&prom_irq, sizeof(prom_irq));

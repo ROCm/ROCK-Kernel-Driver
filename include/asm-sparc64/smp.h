@@ -103,7 +103,7 @@ extern __inline__ int hard_smp_processor_id(void)
 	}
 }
 
-#define smp_processor_id() (current->cpu)
+#define smp_processor_id() (current_thread_info()->cpu)
 
 /* This needn't do anything as we do not sleep the cpu
  * inside of the idler task, so an interrupt is not needed

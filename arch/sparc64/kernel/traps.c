@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.84 2002/01/30 01:39:56 davem Exp $
+/* $Id: traps.c,v 1.85 2002/02/09 19:49:31 davem Exp $
  * arch/sparc64/kernel/traps.c
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -51,7 +51,7 @@ void bad_trap (struct pt_regs *regs, long lvl)
 		sprintf(buffer, "Kernel bad sw trap %lx", lvl);
 		die_if_kernel (buffer, regs);
 	}
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc &= 0xffffffff;
 		regs->tnpc &= 0xffffffff;
 	}
@@ -89,7 +89,7 @@ void instruction_access_exception (struct pt_regs *regs,
 		       sfsr, sfar);
 		die_if_kernel("Iax", regs);
 	}
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc &= 0xffffffff;
 		regs->tnpc &= 0xffffffff;
 	}
@@ -1311,14 +1311,14 @@ void cheetah_deferred_handler(struct pt_regs *regs, unsigned long afsr, unsigned
 
 void do_fpe_common(struct pt_regs *regs)
 {
-	if(regs->tstate & TSTATE_PRIV) {
+	if (regs->tstate & TSTATE_PRIV) {
 		regs->tpc = regs->tnpc;
 		regs->tnpc += 4;
 	} else {
-		unsigned long fsr = current->thread.xfsr[0];
+		unsigned long fsr = current_thread_info()->xfsr[0];
 		siginfo_t info;
 
-		if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		if (test_thread_flag(TIF_32BIT)) {
 			regs->tpc &= 0xffffffff;
 			regs->tnpc &= 0xffffffff;
 		}
@@ -1355,7 +1355,7 @@ void do_fpother(struct pt_regs *regs)
 	struct fpustate *f = FPUSTATE;
 	int ret = 0;
 
-	switch ((current->thread.xfsr[0] & 0x1c000)) {
+	switch ((current_thread_info()->xfsr[0] & 0x1c000)) {
 	case (2 << 14): /* unfinished_FPop */
 	case (3 << 14): /* unimplemented_FPop */
 		ret = do_mathemu(regs, f);
@@ -1370,9 +1370,9 @@ void do_tof(struct pt_regs *regs)
 {
 	siginfo_t info;
 
-	if(regs->tstate & TSTATE_PRIV)
+	if (regs->tstate & TSTATE_PRIV)
 		die_if_kernel("Penguin overflow trap from kernel mode", regs);
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc &= 0xffffffff;
 		regs->tnpc &= 0xffffffff;
 	}
@@ -1388,7 +1388,7 @@ void do_div0(struct pt_regs *regs)
 {
 	siginfo_t info;
 
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc &= 0xffffffff;
 		regs->tnpc &= 0xffffffff;
 	}
@@ -1404,11 +1404,11 @@ void instruction_dump (unsigned int *pc)
 {
 	int i;
 
-	if((((unsigned long) pc) & 3))
+	if ((((unsigned long) pc) & 3))
 		return;
 
 	printk("Instruction DUMP:");
-	for(i = -3; i < 6; i++)
+	for (i = -3; i < 6; i++)
 		printk("%c%08x%c",i?' ':'<',pc[i],i?' ':'>');
 	printk("\n");
 }
@@ -1418,14 +1418,14 @@ void user_instruction_dump (unsigned int *pc)
 	int i;
 	unsigned int buf[9];
 	
-	if((((unsigned long) pc) & 3))
+	if ((((unsigned long) pc) & 3))
 		return;
 		
-	if(copy_from_user(buf, pc - 3, sizeof(buf)))
+	if (copy_from_user(buf, pc - 3, sizeof(buf)))
 		return;
 
 	printk("Instruction DUMP:");
-	for(i = 0; i < 9; i++)
+	for (i = 0; i < 9; i++)
 		printk("%c%08x%c",i==3?' ':'<',buf[i],i==3?' ':'>');
 	printk("\n");
 }
@@ -1433,18 +1433,18 @@ void user_instruction_dump (unsigned int *pc)
 void show_trace_task(struct task_struct *tsk)
 {
 	unsigned long pc, fp;
-	unsigned long task_base = (unsigned long)tsk;
+	unsigned long thread_base = (unsigned long) tsk->thread_info;
 	struct reg_window *rw;
 	int count = 0;
 
 	if (!tsk)
 		return;
 
-	fp = tsk->thread.ksp + STACK_BIAS;
+	fp = tsk->thread_info->ksp + STACK_BIAS;
 	do {
 		/* Bogus frame pointer? */
-		if (fp < (task_base + sizeof(struct task_struct)) ||
-		    fp >= (task_base + THREAD_SIZE))
+		if (fp < (thread_base + sizeof(struct thread_info)) ||
+		    fp >= (thread_base + THREAD_SIZE))
 			break;
 		rw = (struct reg_window *)fp;
 		pc = rw->ins[7];
@@ -1471,7 +1471,7 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 	printk("%s(%d): %s\n", current->comm, current->pid, str);
 	__asm__ __volatile__("flushw");
 	__show_regs(regs);
-	if(regs->tstate & TSTATE_PRIV) {
+	if (regs->tstate & TSTATE_PRIV) {
 		struct reg_window *rw = (struct reg_window *)
 			(regs->u_regs[UREG_FP] + STACK_BIAS);
 
@@ -1479,12 +1479,12 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 		 * find some badly aligned kernel stack.
 		 */
 		lastrw = (struct reg_window *)current;
-		while(rw					&&
-		      count++ < 30				&&
-		      rw >= lastrw				&&
-		      (char *) rw < ((char *) current)
-		        + sizeof (union task_union) 		&&
-		      !(((unsigned long) rw) & 0x7)) {
+		while (rw					&&
+		       count++ < 30				&&
+		       rw >= lastrw				&&
+		       (char *) rw < ((char *) current)
+		       + sizeof (union thread_union) 		&&
+		       !(((unsigned long) rw) & 0x7)) {
 			printk("Caller[%016lx]\n", rw->ins[7]);
 			lastrw = rw;
 			rw = (struct reg_window *)
@@ -1492,7 +1492,7 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 		}
 		instruction_dump ((unsigned int *) regs->tpc);
 	} else {
-		if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		if (test_thread_flag(TIF_32BIT)) {
 			regs->tpc &= 0xffffffff;
 			regs->tnpc &= 0xffffffff;
 		}
@@ -1502,7 +1502,7 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 	smp_report_regs();
 #endif
                                                 	
-	if(regs->tstate & TSTATE_PRIV)
+	if (regs->tstate & TSTATE_PRIV)
 		do_exit(SIGKILL);
 	do_exit(SIGSEGV);
 }
@@ -1517,9 +1517,9 @@ void do_illegal_instruction(struct pt_regs *regs)
 	u32 insn;
 	siginfo_t info;
 
-	if(tstate & TSTATE_PRIV)
+	if (tstate & TSTATE_PRIV)
 		die_if_kernel("Kernel illegal instruction", regs);
-	if(current->thread.flags & SPARC_FLAG_32BIT)
+	if (test_thread_flag(TIF_32BIT))
 		pc = (u32)pc;
 	if (get_user(insn, (u32 *)pc) != -EFAULT) {
 		if ((insn & 0xc1ffc000) == 0x81700000) /* POPC */ {
@@ -1542,7 +1542,7 @@ void mem_address_unaligned(struct pt_regs *regs, unsigned long sfar, unsigned lo
 {
 	siginfo_t info;
 
-	if(regs->tstate & TSTATE_PRIV) {
+	if (regs->tstate & TSTATE_PRIV) {
 		extern void kernel_unaligned_trap(struct pt_regs *regs,
 						  unsigned int insn, 
 						  unsigned long sfar, unsigned long sfsr);
@@ -1561,7 +1561,7 @@ void do_privop(struct pt_regs *regs)
 {
 	siginfo_t info;
 
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc &= 0xffffffff;
 		regs->tnpc &= 0xffffffff;
 	}
@@ -1669,15 +1669,41 @@ void do_getpsr(struct pt_regs *regs)
 	regs->u_regs[UREG_I0] = tstate_to_psr(regs->tstate);
 	regs->tpc   = regs->tnpc;
 	regs->tnpc += 4;
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc &= 0xffffffff;
 		regs->tnpc &= 0xffffffff;
 	}
 }
 
+extern void thread_info_offsets_are_bolixed_dave(void);
+
 /* Only invoked on boot processor. */
 void trap_init(void)
 {
+	/* Compile time sanity check. */
+	if (TI_TASK != offsetof(struct thread_info, task) ||
+	    TI_FLAGS != offsetof(struct thread_info, flags) ||
+	    TI_CPU != offsetof(struct thread_info, cpu) ||
+	    TI_FPSAVED != offsetof(struct thread_info, fpsaved) ||
+	    TI_KSP != offsetof(struct thread_info, ksp) ||
+	    TI_FAULT_ADDR != offsetof(struct thread_info, fault_address) ||
+	    TI_KREGS != offsetof(struct thread_info, kregs) ||
+	    TI_UTRAPS != offsetof(struct thread_info, utraps) ||
+	    TI_EXEC_DOMAIN != offsetof(struct thread_info, exec_domain) ||
+	    TI_REG_WINDOW != offsetof(struct thread_info, reg_window) ||
+	    TI_RWIN_SPTRS != offsetof(struct thread_info, rwbuf_stkptrs) ||
+	    TI_GSR != offsetof(struct thread_info, gsr) ||
+	    TI_XFSR != offsetof(struct thread_info, xfsr) ||
+	    TI_USER_CNTD0 != offsetof(struct thread_info, user_cntd0) ||
+	    TI_USER_CNTD1 != offsetof(struct thread_info, user_cntd1) ||
+	    TI_KERN_CNTD0 != offsetof(struct thread_info, kernel_cntd0) ||
+	    TI_KERN_CNTD1 != offsetof(struct thread_info, kernel_cntd1) ||
+	    TI_PCR != offsetof(struct thread_info, pcr_reg) ||
+	    TI_CEE_STUFF != offsetof(struct thread_info, cee_stuff) ||
+	    TI_FPREGS != offsetof(struct thread_info, fpregs) ||
+	    (TI_FPREGS & (64 - 1)))
+		thread_info_offsets_are_bolixed_dave();
+
 	/* Attach to the address space of init_task.  On SMP we
 	 * do this in smp.c:smp_callin for other cpus.
 	 */
@@ -1685,6 +1711,6 @@ void trap_init(void)
 	current->active_mm = &init_mm;
 
 #ifdef CONFIG_SMP
-	current->cpu = hard_smp_processor_id();
+	current_thread_info()->cpu = hard_smp_processor_id();
 #endif
 }

@@ -462,7 +462,7 @@ repeat:
 			spin_unlock_irqrestore(&sunmouse.lock, flags);
 
 #ifdef CONFIG_SPARC32_COMPAT
-			if (current->thread.flags & SPARC_FLAG_32BIT) {
+			if (test_thread_flag(TIF_32BIT)) {
 				if ((end - p) <
 				    ((sizeof(Firm_event) - sizeof(struct timeval) +
 				      (sizeof(u32) * 2))))

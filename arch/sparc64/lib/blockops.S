@@ -1,4 +1,4 @@
-/* $Id: blockops.S,v 1.41 2001/12/05 06:05:35 davem Exp $
+/* $Id: blockops.S,v 1.42 2002/02/09 19:49:30 davem Exp $
  * blockops.S: UltraSparc block zero optimized routines.
  *
  * Copyright (C) 1996, 1998, 1999, 2000 David S. Miller (davem@redhat.com)
@@ -7,9 +7,9 @@
 
 #include "VIS.h"
 #include <asm/visasm.h>
+#include <asm/thread_info.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
-#include <asm/asm_offsets.h>
 
 #define TOUCH(reg0, reg1, reg2, reg3, reg4, reg5, reg6, reg7)	\
 	fmovd	%reg0, %f48; 	fmovd	%reg1, %f50;		\
@@ -61,7 +61,7 @@ cheetah_patch_1:
 	 * so we do not risk a multiple TLB match condition later when
 	 * restoring those entries.
 	 */
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_use_blkcommit], %g3
+	ldx		[%g6 + TI_FLAGS], %g3
 
 	/* Spitfire Errata #32 workaround */
 	mov		0x8, %o4
@@ -100,7 +100,7 @@ cheetah_patch_1:
 	stxa		%g2, [%o3] ASI_DTLB_DATA_ACCESS
 	membar		#Sync
 
-	cmp		%g3, 0
+	andcc		%g3, _TIF_BLKCOMMIT, %g0
 	bne,pn		%xcc, copy_page_using_blkcommit
 	 nop
 

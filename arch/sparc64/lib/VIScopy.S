@@ -1,4 +1,4 @@
-/* $Id: VIScopy.S,v 1.26 2001/09/27 04:36:24 kanoj Exp $
+/* $Id: VIScopy.S,v 1.27 2002/02/09 19:49:30 davem Exp $
  * VIScopy.S: High speed copy operations utilizing the UltraSparc
  *            Visual Instruction Set.
  *
@@ -26,24 +26,24 @@
 #ifdef __KERNEL__
 
 #include <asm/visasm.h>
-#include <asm/asm_offsets.h>
+#include <asm/thread_info.h>
 
-#define FPU_CLEAN_RETL								\
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_current_ds], %o1;	\
-	VISExit									\
-	clr		%o0;							\
-	retl;									\
+#define FPU_CLEAN_RETL					\
+	ldub		[%g6 + TI_CURRENT_DS], %o1;	\
+	VISExit						\
+	clr		%o0;				\
+	retl;						\
 	 wr		%o1, %g0, %asi;
-#define FPU_RETL								\
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_current_ds], %o1;	\
-	VISExit									\
-	clr		%o0;							\
-	retl;									\
+#define FPU_RETL					\
+	ldub		[%g6 + TI_CURRENT_DS], %o1;	\
+	VISExit						\
+	clr		%o0;				\
+	retl;						\
 	 wr		%o1, %g0, %asi;
-#define NORMAL_RETL								\
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_current_ds], %o1;	\
-	clr		%o0;							\
-	retl;									\
+#define NORMAL_RETL					\
+	ldub		[%g6 + TI_CURRENT_DS], %o1;	\
+	clr		%o0;				\
+	retl;						\
 	 wr		%o1, %g0, %asi;
 #define EX(x,y,a,b) 				\
 98: 	x,y;					\
@@ -1032,7 +1032,7 @@ VIScopyfixup_ret:
 		/* If this is copy_from_user(), zero out the rest of the
 		 * kernel buffer.
 		 */
-		ldub		[%g6 + AOFF_task_thread + AOFF_thread_current_ds], %o4
+		ldub		[%g6 + TI_CURRENT_DS], %o4
 		andcc		asi_src, 0x1, %g0
 		be,pt		%icc, 1f
 		 VISExit

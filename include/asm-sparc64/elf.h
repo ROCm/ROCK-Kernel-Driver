@@ -1,4 +1,4 @@
-/* $Id: elf.h,v 1.31 2002/01/08 16:00:20 davem Exp $ */
+/* $Id: elf.h,v 1.32 2002/02/09 19:49:31 davem Exp $ */
 #ifndef __ASM_SPARC64_ELF_H
 #define __ASM_SPARC64_ELF_H
 
@@ -69,16 +69,11 @@ typedef struct {
 
 #ifdef __KERNEL__
 #define SET_PERSONALITY(ex, ibcs2)			\
-do {	unsigned char flags = current->thread.flags;	\
-	if ((ex).e_ident[EI_CLASS] == ELFCLASS32)	\
-		flags |= SPARC_FLAG_32BIT;		\
+do {	if ((ex).e_ident[EI_CLASS] == ELFCLASS32)	\
+		set_thread_flag(TIF_32BIT);		\
 	else						\
-		flags &= ~SPARC_FLAG_32BIT;		\
-	if (flags != current->thread.flags) {		\
-		/* flush_thread will update pgd cache */\
-		current->thread.flags = flags;		\
-	}						\
-							\
+		clear_thread_flag(TIF_32BIT);		\
+	/* flush_thread will update pgd cache */	\
 	if (ibcs2)					\
 		set_personality(PER_SVR4);		\
 	else if (current->personality != PER_LINUX32)	\
