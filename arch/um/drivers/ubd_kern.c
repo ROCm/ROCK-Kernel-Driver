@@ -337,6 +337,11 @@ static int ubd_setup_common(char *str, int *index_out)
 
 	err = 0;
 	backing_file = strchr(str, ',');
+
+	if (!backing_file) {
+		backing_file = strchr(str, ':');
+	}
+
 	if(backing_file){
 		if(dev->no_cow)
 			printk(KERN_ERR "Can't specify both 'd' and a "
@@ -362,13 +367,22 @@ static int ubd_setup(char *str)
 
 __setup("ubd", ubd_setup);
 __uml_help(ubd_setup,
-"ubd<n>=<filename>\n"
+"ubd<n><flags>=<filename>[(:|,)<filename2>]\n"
 "    This is used to associate a device with a file in the underlying\n"
-"    filesystem. Usually, there is a filesystem in the file, but \n"
+"    filesystem. When specifying two filenames, the first one is the\n"
+"    COW name and the second is the backing file name. As separator you can\n"
+"    use either a ':' or a ',': the first one allows writing things like;\n"
+"	ubd0=~/Uml/root_cow:~/Uml/root_backing_file\n"
+"    while with a ',' the shell would not expand the 2nd '~'.\n"
+"    When using only one filename, UML will detect whether to thread it like\n"
+"    a COW file or a backing file. To override this detection, add the 'd'\n"
+"    flag:\n"
+"	ubd0d=BackingFile\n"
+"    Usually, there is a filesystem in the file, but \n"
 "    that's not required. Swap devices containing swap files can be\n"
 "    specified like this. Also, a file which doesn't contain a\n"
 "    filesystem can have its contents read in the virtual \n"
-"    machine by running dd on the device. n must be in the range\n"
+"    machine by running 'dd' on the device. <n> must be in the range\n"
 "    0 to 7. Appending an 'r' to the number will cause that device\n"
 "    to be mounted read-only. For example ubd1r=./ext_fs. Appending\n"
 "    an 's' (has to be _after_ 'r', if there is one) will cause data\n"
