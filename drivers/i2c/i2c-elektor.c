@@ -74,11 +74,12 @@ static void pcf_isa_setbyte(void *data, int ctl, int val)
 {
 	int address = ctl ? (base + 1) : base;
 
-	if (ctl && irq) {
+	/* enable irq if any specified for serial operation */
+	if (ctl && irq && (val & I2C_PCF_ESO)) {
 		val |= I2C_PCF_ENI;
 	}
 
-	DEB3(printk("i2c-elektor.o: Write 0x%X 0x%02X\n", address, val & 255));
+	DEB3(printk(KERN_DEBUG "i2c-elektor.o: Write 0x%X 0x%02X\n", address, val & 255));
 
 	switch (mmapped) {
 	case 0: /* regular I/O */
@@ -99,7 +100,7 @@ static int pcf_isa_getbyte(void *data, int ctl)
 	int address = ctl ? (base + 1) : base;
 	int val = mmapped ? readb(address) : inb(address);
 
-	DEB3(printk("i2c-elektor.o: Read 0x%X 0x%02X\n", address, val));
+	DEB3(printk(KERN_DEBUG "i2c-elektor.o: Read 0x%X 0x%02X\n", address, val));
 
 	return (val);
 }
@@ -142,7 +143,7 @@ static int pcf_isa_init(void)
 {
 	if (!mmapped) {
 		if (check_region(base, 2) < 0 ) {
-			printk("i2c-elektor.o: requested I/O region (0x%X:2) is in use.\n", base);
+			printk(KERN_ERR "i2c-elektor.o: requested I/O region (0x%X:2) is in use.\n", base);
 			return -ENODEV;
 		} else {
 			request_region(base, 2, "i2c (isa bus adapter)");
@@ -150,7 +151,7 @@ static int pcf_isa_init(void)
 	}
 	if (irq > 0) {
 		if (request_irq(irq, pcf_isa_handler, 0, "PCF8584", 0) < 0) {
-			printk("i2c-elektor.o: Request irq%d failed\n", irq);
+			printk(KERN_ERR "i2c-elektor.o: Request irq%d failed\n", irq);
 			irq = 0;
 		} else
 			enable_irq(irq);
@@ -238,7 +239,7 @@ int __init i2c_pcfisa_init(void)
 			/* yeap, we've found cypress, let's check config */
 			if (!pci_read_config_byte(cy693_dev, 0x47, &config)) {
 				
-				DEB3(printk("i2c-elektor.o: found cy82c693, config register 0x47 = 0x%02x.\n", config));
+				DEB3(printk(KERN_DEBUG "i2c-elektor.o: found cy82c693, config register 0x47 = 0x%02x.\n", config));
 
 				/* UP2000 board has this register set to 0xe1,
                                    but the most significant bit as seems can be 
@@ -260,7 +261,7 @@ int __init i2c_pcfisa_init(void)
 					   8.25 MHz (PCI/4) clock
 					   (this can be read from cypress) */
 					clock = I2C_PCF_CLK | I2C_PCF_TRNS90;
-					printk("i2c-elektor.o: found API UP2000 like board, will probe PCF8584 later.\n");
+					printk(KERN_INFO "i2c-elektor.o: found API UP2000 like board, will probe PCF8584 later.\n");
 				}
 			}
 		}
@@ -269,11 +270,11 @@ int __init i2c_pcfisa_init(void)
 
 	/* sanity checks for mmapped I/O */
 	if (mmapped && base < 0xc8000) {
-		printk("i2c-elektor.o: incorrect base address (0x%0X) specified for mmapped I/O.\n", base);
+		printk(KERN_ERR "i2c-elektor.o: incorrect base address (0x%0X) specified for mmapped I/O.\n", base);
 		return -ENODEV;
 	}
 
-	printk("i2c-elektor.o: i2c pcf8584-isa adapter module\n");
+	printk(KERN_INFO "i2c-elektor.o: i2c pcf8584-isa adapter module version %s (%s)\n", I2C_VERSION, I2C_DATE);
 
 	if (base == 0) {
 		base = DEFAULT_BASE;
@@ -283,13 +284,15 @@ int __init i2c_pcfisa_init(void)
 	init_waitqueue_head(&pcf_wait);
 #endif
 	if (pcf_isa_init() == 0) {
-		if (i2c_pcf_add_bus(&pcf_isa_ops) < 0)
+		if (i2c_pcf_add_bus(&pcf_isa_ops) < 0) {
+			pcf_isa_exit();
 			return -ENODEV;
+		}
 	} else {
 		return -ENODEV;
 	}
 	
-	printk("i2c-elektor.o: found device at %#x.\n", base);
+	printk(KERN_ERR "i2c-elektor.o: found device at %#x.\n", base);
 
 	return 0;
 }
