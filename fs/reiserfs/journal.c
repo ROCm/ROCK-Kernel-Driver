@@ -1659,7 +1659,7 @@ static int journal_read(struct super_block *p_s_sb) {
 
   cur_dblock = SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) ;
   printk("reiserfs: checking transaction log (%s) for (%s)\n",
-	 __bdevname(SB_JOURNAL_DEV(p_s_sb)), reiserfs_bdevname(p_s_sb));
+	 bdevname(SB_JOURNAL(p_s_sb)->j_dev_bd), reiserfs_bdevname(p_s_sb));
   start = CURRENT_TIME ;
 
   /* step 1, read in the journal header block.  Check the transaction it says 
