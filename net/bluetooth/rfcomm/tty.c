@@ -349,7 +349,7 @@ static int rfcomm_get_dev_list(unsigned long arg)
 	struct rfcomm_dev_list_req *dl;
 	struct rfcomm_dev_info *di;
 	struct list_head *p;
-	int n = 0, size;
+	int n = 0, size, err;
 	u16 dev_num;
 
 	BT_DBG("");
@@ -357,13 +357,10 @@ static int rfcomm_get_dev_list(unsigned long arg)
 	if (get_user(dev_num, (u16 *) arg))
 		return -EFAULT;
 
-	if (!dev_num)
+	if (!dev_num || dev_num > (PAGE_SIZE * 4) / sizeof(*di))
 		return -EINVAL;
 
 	size = sizeof(*dl) + dev_num * sizeof(*di);
-
-	if (verify_area(VERIFY_WRITE, (void *)arg, size))
-		return -EFAULT;
 
 	if (!(dl = kmalloc(size, GFP_KERNEL)))
 		return -ENOMEM;
@@ -389,9 +386,10 @@ static int rfcomm_get_dev_list(unsigned long arg)
 	dl->dev_num = n;
 	size = sizeof(*dl) + n * sizeof(*di);
 
-	copy_to_user((void *) arg, dl, size);
+	err = copy_to_user((void *) arg, dl, size);
 	kfree(dl);
-	return 0;
+
+	return err ? -EFAULT : 0;
 }
 
 static int rfcomm_get_dev_info(unsigned long arg)
@@ -563,8 +561,10 @@ static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 	set_bit(RFCOMM_TTY_ATTACHED, &dev->flags);
 
 	err = rfcomm_dlc_open(dlc, &dev->src, &dev->dst, dev->channel);
-	if (err < 0)
+	if (err < 0) {
+		rfcomm_dev_put(dev);
 		return err;
+	}
 
 	/* Wait for DLC to connect */
 	add_wait_queue(&dev->wait, &wait);
@@ -588,6 +588,9 @@ static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 	}
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&dev->wait, &wait);
+
+	if (err < 0)
+		rfcomm_dev_put(dev);
 
 	return err;
 }
