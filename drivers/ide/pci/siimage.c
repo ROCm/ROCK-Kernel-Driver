@@ -871,12 +871,11 @@ static void __devinit init_mmio_iops_siimage(ide_hwif_t *hwif)
 	 *	the MMIO layout isnt the same as the the standard port
 	 *	based I/O
 	 */
-	 
-	memset(&hw, 0, sizeof(hw_regs_t));
-	hw.priv				= addr;
 
-	base				= (unsigned long)addr;
-	if(ch)
+	memset(&hw, 0, sizeof(hw_regs_t));
+
+	base = (unsigned long)addr;
+	if (ch)
 		base += 0xC0;
 	else
 		base += 0x80;
@@ -901,27 +900,22 @@ static void __devinit init_mmio_iops_siimage(ide_hwif_t *hwif)
 
 	hw.io_ports[IDE_IRQ_OFFSET]	= 0;
 
-        if (pdev_is_sata(dev)) {
-        	base = (unsigned long) addr;
-        	if(ch)
-        		base += 0x80;
-		hw.sata_scr[SATA_STATUS_OFFSET]	= base + 0x104;
-		hw.sata_scr[SATA_ERROR_OFFSET]	= base + 0x108;
-		hw.sata_scr[SATA_CONTROL_OFFSET]= base + 0x100;
-		hw.sata_misc[SATA_MISC_OFFSET]	= base + 0x140;
-		hw.sata_misc[SATA_PHY_OFFSET]	= base + 0x144;
-		hw.sata_misc[SATA_IEN_OFFSET]	= base + 0x148;
+	if (pdev_is_sata(dev)) {
+		base = (unsigned long)addr;
+		if (ch)
+			base += 0x80;
+		hwif->sata_scr[SATA_STATUS_OFFSET]	= base + 0x104;
+		hwif->sata_scr[SATA_ERROR_OFFSET]	= base + 0x108;
+		hwif->sata_scr[SATA_CONTROL_OFFSET]	= base + 0x100;
+		hwif->sata_misc[SATA_MISC_OFFSET]	= base + 0x140;
+		hwif->sata_misc[SATA_PHY_OFFSET]	= base + 0x144;
+		hwif->sata_misc[SATA_IEN_OFFSET]	= base + 0x148;
 	}
 
 	hw.irq				= hwif->pci_dev->irq;
 
 	memcpy(&hwif->hw, &hw, sizeof(hw));
 	memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->hw.io_ports));
-
-	if (is_sata(hwif)) {
-		memcpy(hwif->sata_scr, hwif->hw.sata_scr, sizeof(hwif->hw.sata_scr));
-		memcpy(hwif->sata_misc, hwif->hw.sata_misc, sizeof(hwif->hw.sata_misc));
-	}
 
 	hwif->irq			= hw.irq;
 

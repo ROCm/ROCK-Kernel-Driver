@@ -256,10 +256,7 @@ typedef struct hw_regs_s {
 	int		irq;			/* our irq number */
 	int		dma;			/* our dma entry */
 	ide_ack_intr_t	*ack_intr;		/* acknowledge interrupt */
-	void		*priv;			/* interface specific data */
 	hwif_chipset_t  chipset;
-	unsigned long	sata_scr[SATA_NR_PORTS];
-	unsigned long	sata_misc[SATA_NR_PORTS];
 } hw_regs_t;
 
 /*
