@@ -909,10 +909,11 @@ static long snd_rawmidi_kernel_read1(snd_rawmidi_substream_t *substream,
 		if (kernel) {
 			memcpy(buf + result, runtime->buffer + runtime->appl_ptr, count1);
 		} else {
+			spin_unlock_irqrestore(&runtime->lock, flags);
 			if (copy_to_user(buf + result, runtime->buffer + runtime->appl_ptr, count1)) {
-				spin_unlock_irqrestore(&runtime->lock, flags);
 				return result > 0 ? result : -EFAULT;
 			}
+			spin_lock_irqsave(&runtime->lock, flags);
 		}
 		runtime->appl_ptr += count1;
 		runtime->appl_ptr %= runtime->buffer_size;
@@ -1133,10 +1134,13 @@ static long snd_rawmidi_kernel_write1(snd_rawmidi_substream_t * substream, const
 		if (kernel) {
 			memcpy(runtime->buffer + runtime->appl_ptr, buf, count1);
 		} else {
+			spin_unlock_irqrestore(&runtime->lock, flags);
 			if (copy_from_user(runtime->buffer + runtime->appl_ptr, buf, count1)) {
+				spin_lock_irqsave(&runtime->lock, flags);
 				result = result > 0 ? result : -EFAULT;
 				goto __end;
 			}
+			spin_lock_irqsave(&runtime->lock, flags);
 		}
 		runtime->appl_ptr += count1;
 		runtime->appl_ptr %= runtime->buffer_size;
