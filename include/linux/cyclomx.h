@@ -43,7 +43,7 @@
  * This structure is needed because we handle multiple cards, otherwise
  * static data would do it.
  */
-typedef struct cycx {
+struct cycx_device {
 	char devname[WAN_DRVNAME_SZ+1];	/* card name */
 	cycxhw_t hw;			/* hardware configuration */
 	struct wan_device wandev;	/* WAN device data space */
@@ -54,8 +54,8 @@ typedef struct cycx {
 	char buff_int_mode_unbusy;      /* flag for carrying out dev_tint */
 	wait_queue_head_t wait_stats;  /* to wait for the STATS indication */
 	u32 mbox;			/* -> mailbox */
-	void (*isr)(struct cycx* card);	/* interrupt service routine */
-	int (*exec)(struct cycx* card, void* u_cmd, void* u_data);
+	void (*isr)(struct cycx_device* card);	/* interrupt service routine */
+	int (*exec)(struct cycx_device* card, void* u_cmd, void* u_data);
 	union {
 #ifdef CONFIG_CYCLOMX_X25
 		struct { /* X.25 specific data */
@@ -69,15 +69,15 @@ typedef struct cycx {
 		} x;
 #endif
 	} u;
-} cycx_t;
+};
 
 /* Public Functions */
-void cyclomx_mod_inc_use_count (cycx_t *card);		/* cycx_main.c */
-void cyclomx_mod_dec_use_count (cycx_t *card);		/* cycx_main.c */
-void cyclomx_set_state (cycx_t *card, int state);	/* cycx_main.c */
+void cyclomx_mod_inc_use_count(struct cycx_device *card);
+void cyclomx_mod_dec_use_count(struct cycx_device *card);
+void cyclomx_set_state(struct cycx_device *card, int state);
 
 #ifdef CONFIG_CYCLOMX_X25
-int cyx_init (cycx_t *card, wandev_conf_t *conf);	/* cycx_x25.c */
+int cyx_init(struct cycx_device *card, wandev_conf_t *conf);
 #endif
 #endif	/* __KERNEL__ */
 #endif	/* _CYCLOMX_H */

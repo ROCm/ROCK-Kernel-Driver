@@ -87,7 +87,7 @@ static char fullname[]	= "CYCLOM 2X(tm) Sync Card Driver";
 static char copyright[] = "(c) 1998-2001 Arnaldo Carvalho de Melo "
 			  "<acme@conectiva.com.br>";
 static int ncards = CONFIG_CYCLOMX_CARDS;
-static cycx_t *card_array;	/* adapter data space */
+static struct cycx_device *card_array;	/* adapter data space */
 
 /* Kernel Loadable Module Entry Points */
 
@@ -113,15 +113,15 @@ int __init cyclomx_init (void)
 	/* Verify number of cards and allocate adapter data space */
 	ncards = min_t(int, ncards, MAX_CARDS);
 	ncards = max_t(int, ncards, 1);
-	card_array = kmalloc(sizeof(cycx_t) * ncards, GFP_KERNEL);
+	card_array = kmalloc(sizeof(struct cycx_device) * ncards, GFP_KERNEL);
 	if (!card_array)
 		goto out;
 
-	memset(card_array, 0, sizeof(cycx_t) * ncards);
+	memset(card_array, 0, sizeof(struct cycx_device) * ncards);
 
 	/* Register adapters with WAN router */
 	for (cnt = 0; cnt < ncards; ++cnt) {
-		cycx_t *card = &card_array[cnt];
+		struct cycx_device *card = &card_array[cnt];
 		struct wan_device *wandev = &card->wandev;
 
 		sprintf(card->devname, "%s%d", drvname, cnt + 1);
@@ -161,7 +161,7 @@ static void __exit cyclomx_cleanup (void)
 	int i = 0;
 
 	for (; i < ncards; ++i) {
-		cycx_t *card = &card_array[i];
+		struct cycx_device *card = &card_array[i];
 		unregister_wan_device(card->devname);
 	}
 
@@ -184,7 +184,7 @@ static void __exit cyclomx_cleanup (void)
 static int setup(struct wan_device *wandev, wandev_conf_t *conf)
 {
 	int err = -EFAULT;
-	cycx_t *card;
+	struct cycx_device *card;
 	int irq;
 
 	/* Sanity checks */
@@ -276,7 +276,7 @@ out_irq:
 static int shutdown(struct wan_device *wandev)
 {
 	int ret = -EFAULT;
-	cycx_t *card;
+	struct cycx_device *card;
 
 	/* sanity checks */
 	if (!wandev || !wandev->private)
@@ -318,7 +318,7 @@ static int ioctl(struct wan_device *wandev, unsigned cmd, unsigned long arg)
  */
 static irqreturn_t cycx_isr (int irq, void *dev_id, struct pt_regs *regs)
 {
-	cycx_t *card = (cycx_t *)dev_id;
+	struct cycx_device *card = (struct cycx_device *)dev_id;
 
 	if (!card || card->wandev.state == WAN_UNCONFIGURED)
 		goto out;
@@ -341,7 +341,7 @@ out:	return IRQ_NONE;
  * have to call MOD_INC_USE_COUNT, but cannot include 'module.h' where it's
  * defined more than once into the same kernel module.
  */
-void cyclomx_mod_inc_use_count (cycx_t *card)
+void cyclomx_mod_inc_use_count(struct cycx_device *card)
 {
 	++card->open_cnt;
 	MOD_INC_USE_COUNT;
@@ -353,14 +353,14 @@ void cyclomx_mod_inc_use_count (cycx_t *card)
  * have to call MOD_DEC_USE_COUNT, but cannot include 'module.h' where it's
  * defined more than once into the same kernel module.
  */
-void cyclomx_mod_dec_use_count (cycx_t *card)
+void cyclomx_mod_dec_use_count(struct cycx_device *card)
 {
 	--card->open_cnt;
 	MOD_DEC_USE_COUNT;
 }
 
 /* Set WAN device state.  */
-void cyclomx_set_state (cycx_t *card, int state)
+void cyclomx_set_state(struct cycx_device *card, int state)
 {
 	unsigned long flags;
 	char *string_state = NULL;
