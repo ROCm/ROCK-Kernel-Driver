@@ -60,9 +60,6 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		sval = sval | 0x01;	
 	if (sval != cs->hw.njet.last_is0) /* we have a DMA interrupt */
 	{
-		if (test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-			goto unlock;
-		}
 		cs->hw.njet.irqstat0 = sval;
 		if ((cs->hw.njet.irqstat0 & NETJET_IRQM0_READ) != 
 			(cs->hw.njet.last_is0 & NETJET_IRQM0_READ))
@@ -73,7 +70,6 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			/* we have a write dma int */
 			write_tiger(cs);
 		/* end new code 13/07/00 GE */
-		test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
 	}
 /*	if (!testcnt--) {
 		cs->hw.njet.dmactrl = 0;
@@ -82,7 +78,6 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		byteout(cs->hw.njet.base + NETJET_IRQMASK0, 0);
 	}
 */
- unlock:
 	spin_unlock(&cs->lock);
 }
 
@@ -146,7 +141,6 @@ setup_netjet_u(struct IsdnCard *card)
 	printk(KERN_INFO "HiSax: Traverse Tech. NETspider-U driver Rev. %s\n", HiSax_getrev(tmp));
 	if (cs->typ != ISDN_CTYPE_NETJET_U)
 		return(0);
-	test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
 
 #if CONFIG_PCI
 

@@ -121,13 +121,10 @@ static int
 SelFiFo(struct IsdnCardState *cs, u_char FiFo)
 {
 	u_char cip;
-	long flags;
-
 
 	if (cs->hw.hfcD.fifo == FiFo)
 		return(1);
-	save_flags(flags);
-	cli();
+
 	switch(FiFo) {
 		case 0: cip = HFCB_FIFO | HFCB_Z1 | HFCB_SEND | HFCB_B1;
 			break;
@@ -142,16 +139,13 @@ SelFiFo(struct IsdnCardState *cs, u_char FiFo)
 		case 5: cip = HFCD_FIFO | HFCD_Z1 | HFCD_REC;
 			break;
 		default:
-			restore_flags(flags);
 			debugl1(cs, "SelFiFo Error");
 			return(0);
 	}
 	cs->hw.hfcD.fifo = FiFo;
 	WaitNoBusy(cs);
 	cs->BC_Write_Reg(cs, HFCD_DATA, cip, 0);
-	sti();
 	WaitForBusy(cs);
-	restore_flags(flags);
 	return(2);
 }
 static int
@@ -202,22 +196,18 @@ static struct sk_buff
 	struct IsdnCardState *cs = bcs->cs;
 	int idx;
 	int chksum;
-	long flags;
 	u_char stat, cip;
 	
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "hfc_empty_fifo");
 	idx = 0;
-	save_flags(flags);
 	if (count > HSCX_BUFMAX + 3) {
 		if (cs->debug & L1_DEB_WARN)
 			debugl1(cs, "hfc_empty_fifo: incoming packet too large");
 		cip = HFCB_FIFO | HFCB_FIFO_OUT | HFCB_REC | HFCB_CHANNEL(bcs->channel);
 		while (idx++ < count) {
-			cli();
 			WaitNoBusy(cs);
 			ReadReg(cs, HFCD_DATA_NODEB, cip);
-			sti();
 		}
 		skb = NULL;
 	} else if (count < 4) {
@@ -227,7 +217,6 @@ static struct sk_buff
 #ifdef ERROR_STATISTIC
 		bcs->err_inv++;
 #endif
-		cli();
 		while ((idx++ < count) && WaitNoBusy(cs))
 			ReadReg(cs, HFCD_DATA_NODEB, cip);
 		skb = NULL;
@@ -237,31 +226,25 @@ static struct sk_buff
 		ptr = skb_put(skb, count - 3);
 		idx = 0;
 		cip = HFCB_FIFO | HFCB_FIFO_OUT | HFCB_REC | HFCB_CHANNEL(bcs->channel);
-		cli();
 		while (idx < (count - 3)) {
-			cli();
 			if (!WaitNoBusy(cs))
 				break;
 			*ptr = ReadReg(cs,  HFCD_DATA_NODEB, cip);
-			sti();
 			ptr++;
 			idx++;
 		}
 		if (idx != count - 3) {
-			sti();
 			debugl1(cs, "RFIFO BUSY error");
 			printk(KERN_WARNING "HFC FIFO channel %d BUSY Error\n", bcs->channel);
 			dev_kfree_skb_irq(skb);
 			skb = NULL;
 		} else {
-			cli();
 			WaitNoBusy(cs);
 			chksum = (ReadReg(cs, HFCD_DATA, cip) << 8);
 			WaitNoBusy(cs);
 			chksum += ReadReg(cs, HFCD_DATA, cip);
 			WaitNoBusy(cs);
 			stat = ReadReg(cs, HFCD_DATA, cip);
-			sti();
 			if (cs->debug & L1_DEB_HSCX)
 				debugl1(cs, "hfc_empty_fifo %d chksum %x stat %x",
 					bcs->channel, chksum, stat);
@@ -275,15 +258,11 @@ static struct sk_buff
 			}
 		}
 	}
-	sti();
 	WaitForBusy(cs);
-	cli();
 	WaitNoBusy(cs);
 	stat = ReadReg(cs, HFCD_DATA, HFCB_FIFO | HFCB_F2_INC |
 		HFCB_REC | HFCB_CHANNEL(bcs->channel));
-	sti();
 	WaitForBusy(cs);
-	restore_flags(flags);
 	return (skb);
 }
 
@@ -291,7 +270,6 @@ static void
 hfc_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	long flags;
 	int idx, fcnt;
 	int count;
 	u_char cip;
@@ -300,8 +278,6 @@ hfc_fill_fifo(struct BCState *bcs)
 		return;
 	if (bcs->tx_skb->len <= 0)
 		return;
-	save_flags(flags);
-	cli();
 	SelFiFo(cs, HFCB_SEND | HFCB_CHANNEL(bcs->channel)); 
 	cip = HFCB_FIFO | HFCB_F1 | HFCB_SEND | HFCB_CHANNEL(bcs->channel);
 	WaitNoBusy(cs);
@@ -311,7 +287,6 @@ hfc_fill_fifo(struct BCState *bcs)
 	WaitNoBusy(cs);
 	bcs->hw.hfc.f2 = ReadReg(cs, HFCD_DATA, cip);
 	bcs->hw.hfc.send[bcs->hw.hfc.f1] = ReadZReg(cs, HFCB_FIFO | HFCB_Z1 | HFCB_SEND | HFCB_CHANNEL(bcs->channel));
-	sti();
  	if (cs->debug & L1_DEB_HSCX)
 		debugl1(cs, "hfc_fill_fifo %d f1(%d) f2(%d) z1(%x)",
 			bcs->channel, bcs->hw.hfc.f1, bcs->hw.hfc.f2,
@@ -322,7 +297,6 @@ hfc_fill_fifo(struct BCState *bcs)
 	if (fcnt > 30) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "hfc_fill_fifo more as 30 frames");
-		restore_flags(flags);
 		return;
 	}
 	count = GetFreeFifoBytes_B(bcs);
@@ -333,25 +307,20 @@ hfc_fill_fifo(struct BCState *bcs)
 	if (count < bcs->tx_skb->len) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "hfc_fill_fifo no fifo mem");
-		restore_flags(flags);
 		return;
 	}
 	cip = HFCB_FIFO | HFCB_FIFO_IN | HFCB_SEND | HFCB_CHANNEL(bcs->channel);
 	idx = 0;
-	cli();
 	WaitForBusy(cs);
 	WaitNoBusy(cs);
 	WriteReg(cs, HFCD_DATA_NODEB, cip, bcs->tx_skb->data[idx++]);
 	while (idx < bcs->tx_skb->len) {
-		cli();
 		if (!WaitNoBusy(cs))
 			break;
 		WriteReg(cs, HFCD_DATA_NODEB, cip, bcs->tx_skb->data[idx]);
-		sti();
 		idx++;
 	}
 	if (idx != bcs->tx_skb->len) {
-		sti();
 		debugl1(cs, "FIFO Send BUSY error");
 		printk(KERN_WARNING "HFC S FIFO channel %d BUSY Error\n", bcs->channel);
 	} else {
@@ -359,47 +328,24 @@ hfc_fill_fifo(struct BCState *bcs)
 		xmit_complete_b(bcs);
 	}
 	WaitForBusy(cs);
-	cli();
 	WaitNoBusy(cs);
 	ReadReg(cs, HFCD_DATA, HFCB_FIFO | HFCB_F1_INC | HFCB_SEND | HFCB_CHANNEL(bcs->channel));
-	sti();
 	WaitForBusy(cs);
 	test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-	restore_flags(flags);
 	return;
-}
-
-static void
-hfc_send_data(struct BCState *bcs)
-{
-	struct IsdnCardState *cs = bcs->cs;
-	
-	if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-		hfc_fill_fifo(bcs);
-		test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-	} else
-		debugl1(cs,"send_data %d blocked", bcs->channel);
 }
 
 void
 main_rec_2bds0(struct BCState *bcs)
 {
-	long flags;
 	struct IsdnCardState *cs = bcs->cs;
 	int z1, z2, rcnt;
 	u_char f1, f2, cip;
 	int receive, count = 5;
 	struct sk_buff *skb;
 
-	save_flags(flags);
     Begin:
 	count--;
-	cli();
-	if (test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-		debugl1(cs,"rec_data %d blocked", bcs->channel);
-		restore_flags(flags);
-		return;
-	}
 	SelFiFo(cs, HFCB_REC | HFCB_CHANNEL(bcs->channel));
 	cip = HFCB_FIFO | HFCB_F1 | HFCB_REC | HFCB_CHANNEL(bcs->channel);
 	WaitNoBusy(cs);
@@ -407,15 +353,12 @@ main_rec_2bds0(struct BCState *bcs)
 	cip = HFCB_FIFO | HFCB_F2 | HFCB_REC | HFCB_CHANNEL(bcs->channel);
 	WaitNoBusy(cs);
 	f2 = ReadReg(cs, HFCD_DATA, cip);
-	sti();
 	if (f1 != f2) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "hfc rec %d f1(%d) f2(%d)",
 				bcs->channel, f1, f2);
-		cli();
 		z1 = ReadZReg(cs, HFCB_FIFO | HFCB_Z1 | HFCB_REC | HFCB_CHANNEL(bcs->channel));
 		z2 = ReadZReg(cs, HFCB_FIFO | HFCB_Z2 | HFCB_REC | HFCB_CHANNEL(bcs->channel));
-		sti();
 		rcnt = z1 - z2;
 		if (rcnt < 0)
 			rcnt += cs->hw.hfcD.bfifosize;
@@ -424,9 +367,7 @@ main_rec_2bds0(struct BCState *bcs)
 			debugl1(cs, "hfc rec %d z1(%x) z2(%x) cnt(%d)",
 				bcs->channel, z1, z2, rcnt);
 		if ((skb = hfc_empty_fifo(bcs, rcnt))) {
-			cli();
 			skb_queue_tail(&bcs->rqueue, skb);
-			sti();
 			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 		rcnt = f1 -f2;
@@ -438,10 +379,8 @@ main_rec_2bds0(struct BCState *bcs)
 			receive = 0;
 	} else
 		receive = 0;
-	test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
 	if (count && receive)
 		goto Begin;	
-	restore_flags(flags);
 	return;
 }
 
@@ -500,7 +439,7 @@ hfc_l2l1(struct PStack *st, int pr, void *arg)
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			xmit_data_req(st->l1.bcs, skb);
+			xmit_data_req_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | INDICATION):
 			xmit_pull_ind_b(st->l1.bcs, skb);
@@ -607,7 +546,6 @@ static
 int receive_dmsg(struct IsdnCardState *cs)
 {
 	struct sk_buff *skb;
-	long flags;
 	int idx;
 	int rcnt, z1, z2;
 	u_char stat, cip, f1, f2;
@@ -615,13 +553,6 @@ int receive_dmsg(struct IsdnCardState *cs)
 	int count=5;
 	u_char *ptr;
 
-	save_flags(flags);
-	cli();
-	if (test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-		debugl1(cs, "rec_dmsg blocked");
-		restore_flags(flags);
-		return(1);
-	}
 	SelFiFo(cs, 4 | HFCD_REC);
 	cip = HFCD_FIFO | HFCD_F1 | HFCD_REC;
 	WaitNoBusy(cs);
@@ -639,39 +570,32 @@ int receive_dmsg(struct IsdnCardState *cs)
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "hfcd recd f1(%d) f2(%d) z1(%x) z2(%x) cnt(%d)",
 				f1, f2, z1, z2, rcnt);
-		sti();
 		idx = 0;
 		cip = HFCD_FIFO | HFCD_FIFO_OUT | HFCD_REC;
 		if (rcnt > MAX_DFRAME_LEN + 3) {
 			if (cs->debug & L1_DEB_WARN)
 				debugl1(cs, "empty_fifo d: incoming packet too large");
 			while (idx < rcnt) {
-				cli();
 				if (!(WaitNoBusy(cs)))
 					break;
 				ReadReg(cs, HFCD_DATA_NODEB, cip);
-				sti();
 				idx++;
 			}
 		} else if (rcnt < 4) {
 			if (cs->debug & L1_DEB_WARN)
 				debugl1(cs, "empty_fifo d: incoming packet too small");
-			cli();
 			while ((idx++ < rcnt) && WaitNoBusy(cs))
 				ReadReg(cs, HFCD_DATA_NODEB, cip);
 		} else if ((skb = dev_alloc_skb(rcnt - 3))) {
 			ptr = skb_put(skb, rcnt - 3);
 			while (idx < (rcnt - 3)) {
-				cli();
 				if (!(WaitNoBusy(cs)))
 					break;
 				*ptr = ReadReg(cs, HFCD_DATA_NODEB, cip);
-				sti();
 				idx++;
 				ptr++;
 			}
 			if (idx != (rcnt - 3)) {
-				sti();
 				debugl1(cs, "RFIFO D BUSY error");
 				printk(KERN_WARNING "HFC DFIFO channel BUSY Error\n");
 				dev_kfree_skb_irq(skb);
@@ -680,14 +604,12 @@ int receive_dmsg(struct IsdnCardState *cs)
 				cs->err_rx++;
 #endif
 			} else {
-				cli();
 				WaitNoBusy(cs);
 				chksum = (ReadReg(cs, HFCD_DATA, cip) << 8);
 				WaitNoBusy(cs);
 				chksum += ReadReg(cs, HFCD_DATA, cip);
 				WaitNoBusy(cs);
 				stat = ReadReg(cs, HFCD_DATA, cip);
-				sti();
 				if (cs->debug & L1_DEB_ISAC)
 					debugl1(cs, "empty_dfifo chksum %x stat %x",
 						chksum, stat);
@@ -705,28 +627,21 @@ int receive_dmsg(struct IsdnCardState *cs)
 			}
 		} else
 			printk(KERN_WARNING "HFC: D receive out of memory\n");
-		sti();
 		WaitForBusy(cs);
 		cip = HFCD_FIFO | HFCD_F2_INC | HFCD_REC;
-		cli();
 		WaitNoBusy(cs);
 		stat = ReadReg(cs, HFCD_DATA, cip);
-		sti();
 		WaitForBusy(cs);
 		cip = HFCD_FIFO | HFCD_F2 | HFCD_REC;
-		cli();
 		WaitNoBusy(cs);
 		f2 = cs->readisac(cs, cip) & 0xf;
 	}
-	test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-	restore_flags(flags);
 	return(1);
 } 
 
 static void
 hfc_fill_dfifo(struct IsdnCardState *cs)
 {
-	long flags;
 	int idx, fcnt;
 	int count;
 	u_char cip;
@@ -736,8 +651,6 @@ hfc_fill_dfifo(struct IsdnCardState *cs)
 	if (cs->tx_skb->len <= 0)
 		return;
 
-	save_flags(flags);
-	cli();
 	SelFiFo(cs, 4 | HFCD_SEND);
 	cip = HFCD_FIFO | HFCD_F1 | HFCD_SEND;
 	WaitNoBusy(cs);
@@ -746,7 +659,6 @@ hfc_fill_dfifo(struct IsdnCardState *cs)
 	cip = HFCD_FIFO | HFCD_F2 | HFCD_SEND;
 	cs->hw.hfcD.f2 = ReadReg(cs, HFCD_DATA, cip) & 0xf;
 	cs->hw.hfcD.send[cs->hw.hfcD.f1] = ReadZReg(cs, HFCD_FIFO | HFCD_Z1 | HFCD_SEND);
-	sti();
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "hfc_fill_Dfifo f1(%d) f2(%d) z1(%x)",
 			cs->hw.hfcD.f1, cs->hw.hfcD.f2,
@@ -757,7 +669,6 @@ hfc_fill_dfifo(struct IsdnCardState *cs)
 	if (fcnt > 14) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "hfc_fill_Dfifo more as 14 frames");
-		restore_flags(flags);
 		return;
 	}
 	count = GetFreeFifoBytes_D(cs);
@@ -767,37 +678,29 @@ hfc_fill_dfifo(struct IsdnCardState *cs)
 	if (count < cs->tx_skb->len) {
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "hfc_fill_Dfifo no fifo mem");
-		restore_flags(flags);
 		return;
 	}
 	cip = HFCD_FIFO | HFCD_FIFO_IN | HFCD_SEND;
 	idx = 0;
-	cli();
 	WaitForBusy(cs);
 	WaitNoBusy(cs);
 	WriteReg(cs, HFCD_DATA_NODEB, cip, cs->tx_skb->data[idx++]);
 	while (idx < cs->tx_skb->len) {
-		cli();
 		if (!(WaitNoBusy(cs)))
 			break;
 		WriteReg(cs, HFCD_DATA_NODEB, cip, cs->tx_skb->data[idx]);
-		sti();
 		idx++;
 	}
 	if (idx != cs->tx_skb->len) {
-		sti();
 		debugl1(cs, "DFIFO Send BUSY error");
 		printk(KERN_WARNING "HFC S DFIFO channel BUSY Error\n");
 	}
 	WaitForBusy(cs);
-	cli();
 	WaitNoBusy(cs);
 	ReadReg(cs, HFCD_DATA, HFCD_FIFO | HFCD_F1_INC | HFCD_SEND);
 	dev_kfree_skb_any(cs->tx_skb);
 	cs->tx_skb = NULL;
-	sti();
 	WaitForBusy(cs);
-	restore_flags(flags);
 	return;
 }
 
@@ -818,12 +721,10 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
        	u_char exval;
        	struct BCState *bcs;
 	int count=15;
-	long flags;
 
 	if (cs->debug & L1_DEB_ISAC)
-		debugl1(cs, "HFCD irq %x %s", val,
-			test_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags) ?
-			"locked" : "unlocked");
+		debugl1(cs, "HFCD irq %x", val);
+
 	val &= cs->hw.hfcD.int_m1;
 	if (val & 0x40) { /* TE state machine irq */
 		exval = cs->readisac(cs, HFCD_STATES) & 0xf;
@@ -835,13 +736,6 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 		val &= ~0x40;
 	}
 	while (val) {
-		save_flags(flags);
-		cli();
-		if (test_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-			cs->hw.hfcD.int_s1 |= val;
-			restore_flags(flags);
-			return;
-		}
 		if (cs->hw.hfcD.int_s1 & 0x18) {
 			exval = val;
 			val =  cs->hw.hfcD.int_s1;
@@ -866,15 +760,7 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 				if (cs->debug)
 					debugl1(cs, "hfcd spurious 0x01 IRQ");
 			} else {
-				if (bcs->tx_skb) {
-					if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-						hfc_fill_fifo(bcs);
-						test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-					} else
-						debugl1(cs,"fill_data %d blocked", bcs->channel);
-				} else {
-					xmit_ready_b(bcs);
-				}
+				xmit_xpr_b(bcs);
 			}
 		}
 		if (val & 0x02) {
@@ -882,43 +768,15 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 				if (cs->debug)
 					debugl1(cs, "hfcd spurious 0x02 IRQ");
 			} else {
-				if (bcs->tx_skb) {
-					if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-						hfc_fill_fifo(bcs);
-						test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-					} else
-						debugl1(cs,"fill_data %d blocked", bcs->channel);
-				} else {
-					xmit_ready_b(bcs);
-				}
+				xmit_xpr_b(bcs);
 			}
 		}
 		if (val & 0x20) {	/* receive dframe */
 			receive_dmsg(cs);
 		}
 		if (val & 0x04) {	/* dframe transmitted */
-			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
-				del_timer(&cs->dbusytimer);
-			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				sched_d_event(cs, D_CLEARBUSY);
-			if (cs->tx_skb) {
-				if (cs->tx_skb->len) {
-					if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-						hfc_fill_dfifo(cs);
-						test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-					} else {
-						debugl1(cs, "hfc_fill_dfifo irq blocked");
-					}
-					goto afterXPR;
-				} else {
-					dev_kfree_skb_irq(cs->tx_skb);
-					cs->tx_cnt = 0;
-					cs->tx_skb = NULL;
-				}
-			}
-			xmit_ready(cs);
+			xmit_xpr_d(cs);
 		}
-      afterXPR:
 		if (cs->hw.hfcD.int_s1 && count--) {
 			val = cs->hw.hfcD.int_s1;
 			cs->hw.hfcD.int_s1 = 0;
@@ -926,7 +784,6 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 				debugl1(cs, "HFCD irq %x loop %d", val, 15-count);
 		} else
 			val = 0;
-		restore_flags(flags);
 	}
 }
 
@@ -1013,7 +870,7 @@ init2bds0(struct IsdnCardState *cs)
 		cs->bcs[0].hw.hfc.send = init_send_hfcd(32);
 	if (!cs->bcs[1].hw.hfc.send)
 		cs->bcs[1].hw.hfc.send = init_send_hfcd(32);
-	cs->BC_Send_Data = hfc_send_data;
+	cs->BC_Send_Data = hfc_fill_fifo;
 	cs->DC_Send_Data = hfc_fill_dfifo;
 	cs->bcs[0].BC_SetStack = setstack_2b;
 	cs->bcs[1].BC_SetStack = setstack_2b;

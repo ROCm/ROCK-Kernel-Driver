@@ -866,7 +866,6 @@ struct icc_chip {
 #define FLG_TWO_DCHAN		4
 #define FLG_L1_DBUSY		5
 #define FLG_DBUSY_TIMER 	6
-#define FLG_LOCK_ATOMIC 	7
 #define FLG_ARCOFI_TIMER	8
 #define FLG_ARCOFI_ERROR	9
 #define FLG_HW_L1_UINT		10

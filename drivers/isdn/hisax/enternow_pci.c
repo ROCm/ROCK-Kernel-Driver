@@ -75,7 +75,6 @@
 
 
 const char *enternow_pci_rev = "$Revision: 1.1.2.1 $";
-static spinlock_t enternow_pci_lock = SPIN_LOCK_UNLOCKED;
 
 /* *************************** I/O-Interface functions ************************************* */
 
@@ -231,13 +230,8 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	BYTE sval, ir;
-	unsigned long flags;
 
-
-	if (!cs) {
-		printk(KERN_WARNING "enter:now PCI: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 
 	sval = InByte(cs->hw.njet.base + NETJET_IRQSTAT1);
 
@@ -251,7 +245,6 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	/* DMA-Interrupt: B-channel-stuff */
 	/* set bits in sval to indicate which page is free */
 
-	spin_lock_irqsave(&enternow_pci_lock, flags);
 	/* set bits in sval to indicate which page is free */
 	if (inl(cs->hw.njet.base + NETJET_DMA_WRITE_ADR) <
 		inl(cs->hw.njet.base + NETJET_DMA_WRITE_IRQ))
@@ -265,14 +258,8 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		sval = sval | 0x02;
 	else	/* the 1st read page is free */
 		sval = sval | 0x01;
-	if (sval != cs->hw.njet.last_is0) /* we have a DMA interrupt */
-	{
-		if (test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-			spin_unlock_irqrestore(&enternow_pci_lock, flags);
-			return;
-		}
+	if (sval != cs->hw.njet.last_is0) { /* we have a DMA interrupt */
 		cs->hw.njet.irqstat0 = sval;
-		spin_unlock_irqrestore(&enternow_pci_lock, flags);
 		if ((cs->hw.njet.irqstat0 & NETJET_IRQM0_READ) !=
 			(cs->hw.njet.last_is0 & NETJET_IRQM0_READ))
 			/* we have a read dma int */
@@ -281,9 +268,8 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			(cs->hw.njet.last_is0 & NETJET_IRQM0_WRITE))
 			/* we have a write dma int */
 			write_tiger(cs);
-		test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-	} else
-		spin_unlock_irqrestore(&enternow_pci_lock, flags);
+	}
+	spin_unlock(&cs->lock);
 }
 
 
@@ -296,7 +282,6 @@ setup_enternow_pci(struct IsdnCard *card)
 	int bytecnt;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	unsigned long flags;
 
 #if CONFIG_PCI
 #ifdef __BIG_ENDIAN
@@ -306,7 +291,6 @@ setup_enternow_pci(struct IsdnCard *card)
 	printk(KERN_INFO "HiSax: Formula-n Europe AG enter:now ISDN PCI driver Rev. %s\n", HiSax_getrev(tmp));
 	if (cs->typ != ISDN_CTYPE_ENTERNOW)
 		return(0);
-	test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
 
 	for ( ;; )
 	{
@@ -343,9 +327,6 @@ setup_enternow_pci(struct IsdnCard *card)
 		cs->hw.njet.auxa = cs->hw.njet.base + NETJET_AUXDATA;
 		cs->hw.njet.isac = cs->hw.njet.base + 0xC0; // Fenster zum AMD
 
-		save_flags(flags);
-		sti();
-
 		/* Reset an */
 		cs->hw.njet.ctrl_reg = 0x07;  // geändert von 0xff
 		OutByte(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
@@ -359,8 +340,6 @@ setup_enternow_pci(struct IsdnCard *card)
 
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout((10*HZ)/1000);	/* Timeout 10ms */
-
-		restore_flags(flags);
 
 		cs->hw.njet.auxd = 0x00; // war 0xc0
 		cs->hw.njet.dmactrl = 0;
