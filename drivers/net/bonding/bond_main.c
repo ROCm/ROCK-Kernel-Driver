@@ -452,6 +452,12 @@
  *	  o Change struct member names and types.
  *	  o Chomp trailing spaces, remove empty lines, fix indentations.
  *	  o Re-organize code according to context.
+ *
+ * 2003/12/30 - Amir Noam <amir.noam at intel dot com>
+ *	- Fixed: Cannot remove and re-enslave the original active slave.
+ *	- Fixed: Releasing the original active slave causes mac address duplication.
+ *	- Add support for slaves that use ethtool_ops.
+ *	  Set version to 2.5.3.
  */
 
 //#define BONDING_DEBUG 1
