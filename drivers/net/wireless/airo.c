@@ -469,7 +469,7 @@ typedef struct {
 typedef struct {
 	u16 len;
 	u16 kindex;
-	u8 mac[6];
+	u8 mac[ETH_ALEN];
 	u16 klen;
 	u8 key[16];
 } WepKeyRid;
@@ -519,7 +519,7 @@ typedef struct {
 #define RXMODE_NORMALIZED_RSSI (1<<9) /* return normalized RSSI */
 	u16 fragThresh;
 	u16 rtsThres;
-	u8 macAddr[6];
+	u8 macAddr[ETH_ALEN];
 	u8 rates[8];
 	u16 shortRetryLimit;
 	u16 longRetryLimit;
@@ -614,14 +614,14 @@ typedef struct {
 
 typedef struct {
 	u16 len;
-	u8 mac[6];
+	u8 mac[ETH_ALEN];
 	u16 mode;
 	u16 errorCode;
 	u16 sigQuality;
 	u16 SSIDlen;
 	char SSID[32];
 	char apName[16];
-	char bssid[4][6];
+	char bssid[4][ETH_ALEN];
 	u16 beaconPeriod;
 	u16 dimPeriod;
 	u16 atimDuration;
@@ -650,7 +650,7 @@ typedef struct {
 
 typedef struct {
 	u16 len;
-	u8 ap[4][6];
+	u8 ap[4][ETH_ALEN];
 } APListRid;
 
 typedef struct {
@@ -661,11 +661,11 @@ typedef struct {
 	char manName[32];
 	char prodName[16];
 	char prodVer[8];
-	char factoryAddr[6];
-	char aironetAddr[6];
+	char factoryAddr[ETH_ALEN];
+	char aironetAddr[ETH_ALEN];
 	u16 radioType;
 	u16 country;
-	char callid[6];
+	char callid[ETH_ALEN];
 	char supportedRates[8];
 	char rxDiversity;
 	char txDiversity;
@@ -688,7 +688,7 @@ typedef struct {
 #define RADIO_DS 2 /* Direct sequence radio type */
 #define RADIO_TMA 4 /* Proprietary radio used in old cards (2500) */
   u16 radioType;
-  u8 bssid[6]; /* Mac address of the BSS */
+  u8 bssid[ETH_ALEN]; /* Mac address of the BSS */
   u8 zero;
   u8 ssidLen;
   u8 ssid[32];
@@ -914,7 +914,7 @@ struct airo_info {
 	struct tq_struct	event_task;
 #ifdef WIRELESS_SPY
 	int			spy_number;
-	u_char			spy_address[IW_MAX_SPY][6];
+	u_char			spy_address[IW_MAX_SPY][ETH_ALEN];
 	struct iw_quality	spy_stat[IW_MAX_SPY];
 #endif /* WIRELESS_SPY */
 #endif /* WIRELESS_EXT */
@@ -1849,7 +1849,7 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 							hdrlen = 24;
 					}
 				} else
-					hdrlen = 12;
+					hdrlen = ETH_ALEN * 2;
 
 				skb = dev_alloc_skb( len + hdrlen + 2 );
 				if ( !skb ) {
@@ -1888,7 +1888,7 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 					sa = (char*)buffer + ((apriv->flags & FLAG_802_11) ? 10 : 6);
 
 					for (i=0; i<apriv->spy_number; i++)
-						if (!memcmp(sa,apriv->spy_address[i],6))
+						if (!memcmp(sa,apriv->spy_address[i],ETH_ALEN))
 						{
 							if (!(apriv->flags & FLAG_802_11)) {
 								bap_setup (apriv, fid, 8, BAP0);
@@ -2113,7 +2113,7 @@ static u16 setup_card(struct airo_info *ai, u8 *mac)
 		ai->config.opmode = adhoc ? MODE_STA_IBSS : MODE_STA_ESS;
 
 		/* Save off the MAC */
-		for( i = 0; i < 6; i++ ) {
+		for( i = 0; i < ETH_ALEN; i++ ) {
 			mac[i] = ai->config.macAddr[i];
 		}
 
@@ -2505,7 +2505,7 @@ static int transmit_802_3_packet(struct airo_info *ai, int len, char *pPacket)
 	u16 txFid = len;
 	len >>= 16;
 
-	if (len < 12) {
+	if (len < ETH_ALEN * 2) {
 		printk( KERN_WARNING "Short packet %d\n", len );
 		return ERROR;
 	}
@@ -2534,7 +2534,7 @@ static int transmit_802_11_packet(struct airo_info *ai, int len, char *pPacket)
 	Resp rsp;
 	int hdrlen;
 	struct {
-		u8 addr4[6];
+		u8 addr4[ETH_ALEN];
 		u16 gaplen;
 		u8 gap[6];
 	} gap;
@@ -3402,7 +3402,7 @@ static int get_wep_key(struct airo_info *ai, u16 index) {
 
 static int set_wep_key(struct airo_info *ai, u16 index,
 		       const char *key, u16 keylen, int perm ) {
-	static const unsigned char macaddr[6] = { 0x01, 0, 0, 0, 0, 0 };
+	static const unsigned char macaddr[ETH_ALEN] = { 0x01, 0, 0, 0, 0, 0 };
 	WepKeyRid wkr;
 
 	memset(&wkr, 0, sizeof(wkr));
@@ -3419,7 +3419,7 @@ static int set_wep_key(struct airo_info *ai, u16 index,
 		wkr.kindex = index;
 		wkr.klen = keylen;
 		memcpy( wkr.key, key, keylen );
-		memcpy( wkr.mac, macaddr, 6 );
+		memcpy( wkr.mac, macaddr, ETH_ALEN );
 		printk(KERN_INFO "Setting key %d\n", index);
 	}
 
@@ -4029,11 +4029,11 @@ static int airo_set_wap(struct net_device *dev,
 	Cmd cmd;
 	Resp rsp;
 	APListRid APList_rid;
-	static const unsigned char bcast[6] = { 255, 255, 255, 255, 255, 255 };
+	static const unsigned char bcast[ETH_ALEN] = { 255, 255, 255, 255, 255, 255 };
 
 	if (awrq->sa_family != ARPHRD_ETHER)
 		return -EINVAL;
-	else if (!memcmp(bcast, awrq->sa_data, 6)) {
+	else if (!memcmp(bcast, awrq->sa_data, ETH_ALEN)) {
 		memset(&cmd, 0, sizeof(cmd));
 		cmd.cmd=CMD_LOSE_SYNC;
 		if (down_interruptible(&local->sem))
@@ -4043,7 +4043,7 @@ static int airo_set_wap(struct net_device *dev,
 	} else {
 		memset(&APList_rid, 0, sizeof(APList_rid));
 		APList_rid.len = sizeof(APList_rid);
-		memcpy(APList_rid.ap[0], awrq->sa_data, 6);
+		memcpy(APList_rid.ap[0], awrq->sa_data, ETH_ALEN);
 		disable_MAC(local);
 		writeAPListRid(local, &APList_rid);
 		enable_MAC(local, &rsp);
@@ -4066,7 +4066,7 @@ static int airo_get_wap(struct net_device *dev,
 	readStatusRid(local, &status_rid);
 
 	/* Tentative. This seems to work, wow, I'm lucky !!! */
-	memcpy(awrq->sa_data, status_rid.bssid[0], 6);
+	memcpy(awrq->sa_data, status_rid.bssid[0], ETH_ALEN);
 	awrq->sa_family = ARPHRD_ETHER;
 
 	return 0;
@@ -4850,7 +4850,7 @@ static int airo_get_aplist(struct net_device *dev,
 		if (readBSSListRid(local, loseSync, &BSSList))
 			break;
 		loseSync = 0;
-		memcpy(address[i].sa_data, BSSList.bssid, 6);
+		memcpy(address[i].sa_data, BSSList.bssid, ETH_ALEN);
 		address[i].sa_family = ARPHRD_ETHER;
 		if (local->rssi)
 			qual[i].level = 0x100 - local->rssi[BSSList.rssi].rssidBm;
@@ -4880,7 +4880,7 @@ static int airo_get_aplist(struct net_device *dev,
 			      | status_rid.bssid[i][5]);
 		     i++) {
 			memcpy(address[i].sa_data,
-			       status_rid.bssid[i], 6);
+			       status_rid.bssid[i], ETH_ALEN);
 			address[i].sa_family = ARPHRD_ETHER;
 		}
 	} else {
@@ -5105,7 +5105,7 @@ static int airo_set_spy(struct net_device *dev,
 
 		/* Copy addresses */
 		for (i = 0; i < dwrq->length; i++)
-			memcpy(local->spy_address[i], address[i].sa_data, 6);
+			memcpy(local->spy_address[i], address[i].sa_data, ETH_ALEN);
 		/* Reset stats */
 		memset(local->spy_stat, 0, sizeof(struct iw_quality) * IW_MAX_SPY);
 	}
@@ -5132,7 +5132,7 @@ static int airo_get_spy(struct net_device *dev,
 
 	/* Copy addresses. */
 	for(i = 0; i < local->spy_number; i++) 	{
-		memcpy(address[i].sa_data, local->spy_address[i], 6);
+		memcpy(address[i].sa_data, local->spy_address[i], ETH_ALEN);
 		address[i].sa_family = AF_UNIX;
 	}
 	/* Copy stats to the user buffer (just after). */
