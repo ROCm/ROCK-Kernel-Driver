@@ -29,6 +29,7 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
+#include <linux/ioport.h>
 #include <asm/semaphore.h>
 #include <asm/atomic.h>
 
@@ -388,6 +389,8 @@ struct platform_device {
 	char		* name;
 	u32		id;
 	struct device	dev;
+	struct resource	res;
+	unsigned int	irq;
 };
 
 extern int platform_device_register(struct platform_device *);
