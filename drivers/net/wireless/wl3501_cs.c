@@ -717,9 +717,7 @@ static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 	signal.timeout = 10;
 	memcpy((char *)&(signal.beacon_period),
 	       (char *)&(this->bss_set[stas].beacon_period), 72);
-	/* FIXME: next two stmts should be reverted or deleted, study */
-	this->cap_info = signal.cap_info;
-	this->chan = signal.phy_pset[2];
+	signal.phy_pset[2] = this->chan;
 
 	if (wl3501_esbq_req_test(this)) {
 		u16 ptr = wl3501_get_tx_buffer(this, sizeof(signal));
@@ -1842,7 +1840,7 @@ static void wl3501_flush_stale_links(void)
 static int wl3501_get_name(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
-	strlcpy(wrqu->name, "IEEE 802.11-FH", sizeof(wrqu->name));
+	strlcpy(wrqu->name, "IEEE 802.11-DS", sizeof(wrqu->name));
 	return 0;
 }
 
@@ -1858,12 +1856,9 @@ static int wl3501_set_freq(struct net_device *dev, struct iw_request_info *info,
 		rc = -EINVAL;
 	else {
 		struct wl3501_card *this = (struct wl3501_card *)dev->priv;
-		unsigned long flags;
 
-		spin_lock_irqsave(&this->lock, flags);
 		this->chan = channel;
-		rc = wl3501_mgmt_start(this);
-		spin_unlock_irqrestore(&this->lock, flags);
+		rc = wl3501_reset(dev);
 	}
 
 	return rc;
@@ -1888,12 +1883,9 @@ static int wl3501_set_mode(struct net_device *dev, struct iw_request_info *info,
 	    wrqu->mode == IW_MODE_ADHOC ||
 	    wrqu->mode == IW_MODE_AUTO) {
 		struct wl3501_card *this = (struct wl3501_card *)dev->priv;
-		unsigned long flags;
 
-		spin_lock_irqsave(&this->lock, flags);
 		this->net_type = wrqu->mode;
-		rc = wl3501_mgmt_start(this);
-		spin_unlock_irqrestore(&this->lock, flags);
+		rc = wl3501_reset(dev);
 	}
 	return rc;
 }
@@ -1975,14 +1967,14 @@ static int wl3501_set_essid(struct net_device *dev,
 			    union iwreq_data *wrqu, char *extra)
 {
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
-	unsigned long flags;
+	int rc = 0;
 
-	spin_lock_irqsave(&this->lock, flags);
-	if (wrqu->data.flags)
+	if (wrqu->data.flags) {
 		strlcpy(this->essid, extra, min_t(u16, wrqu->data.length,
 						  IW_ESSID_MAX_SIZE));
-	spin_unlock_irqrestore(&this->lock, flags);
-	return 0;
+		rc = wl3501_reset(dev);
+	}
+	return rc;
 }
 
 static int wl3501_get_essid(struct net_device *dev,
@@ -2257,7 +2249,6 @@ static void wl3501_config(dev_link_t *link)
 	/* initialize card parameter - added by jss */
 	this->net_type		= IW_MODE_INFRA;
 	this->llc_type		= 1;
-	this->def_chan		= 1;
 	this->bss_cnt		= 0;
 	this->join_sta_bss	= 0;
 	this->adhoc_times	= 0;
