@@ -203,36 +203,34 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
 		return 0;
 	}
 	bio->bi_bdev = tmp_dev->rdev->bdev;
-	bio->bi_sector = bio->bi_sector - (tmp_dev->offset << 1);
+	bio->bi_sector = bio->bi_sector - (tmp_dev->offset << 1) + tmp_dev->rdev->data_offset;
 
 	return 1;
 }
 
-static int linear_status (char *page, mddev_t *mddev)
+static void linear_status (struct seq_file *seq, mddev_t *mddev)
 {
-	int sz = 0;
 
 #undef MD_DEBUG
 #ifdef MD_DEBUG
 	int j;
 	linear_conf_t *conf = mddev_to_conf(mddev);
   
-	sz += sprintf(page+sz, "      ");
+	seq_printf(seq, "      ");
 	for (j = 0; j < conf->nr_zones; j++)
 	{
-		sz += sprintf(page+sz, "[%s",
+		seq_printf(seq, "[%s",
 			bdev_partition_name(conf->hash_table[j].dev0->rdev->bdev));
 
 		if (conf->hash_table[j].dev1)
-			sz += sprintf(page+sz, "/%s] ",
+			seq_printf(seq, "/%s] ",
 			  bdev_partition_name(conf->hash_table[j].dev1->rdev->bdev));
 		else
-			sz += sprintf(page+sz, "] ");
+			seq_printf(seq, "] ");
 	}
-	sz += sprintf(page+sz, "\n");
+	seq_printf(seq, "\n");
 #endif
-	sz += sprintf(page+sz, " %dk rounding", mddev->chunk_size/1024);
-	return sz;
+	seq_printf(seq, " %dk rounding", mddev->chunk_size/1024);
 }
 
 

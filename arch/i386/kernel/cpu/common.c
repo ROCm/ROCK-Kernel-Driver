@@ -211,9 +211,10 @@ void __init generic_identify(struct cpuinfo_x86 * c)
 	
 		/* Intel-defined flags: level 0x00000001 */
 		if ( c->cpuid_level >= 0x00000001 ) {
-			u32 capability;
-			cpuid(0x00000001, &tfms, &junk, &junk, &capability);
+			u32 capability, excap;
+			cpuid(0x00000001, &tfms, &junk, &excap, &capability);
 			c->x86_capability[0] = capability;
+			c->x86_capability[4] = excap;
 			c->x86 = (tfms >> 8) & 15;
 			c->x86_model = (tfms >> 4) & 15;
 			c->x86_mask = tfms & 15;

@@ -349,7 +349,7 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 	 * is the only IO operation happening on this bh.
 	 */
 	bio->bi_bdev = tmp_dev->bdev;
-	bio->bi_sector = rsect;
+	bio->bi_sector = rsect + tmp_dev->data_offset;
 
 	/*
 	 * Let the main block layer submit the IO and resolve recursion:
@@ -372,41 +372,40 @@ bad_zone1:
 	return 0;
 }
 			   
-static int raid0_status (char *page, mddev_t *mddev)
+static void raid0_status (struct seq_file *seq, mddev_t *mddev)
 {
-	int sz = 0;
 #undef MD_DEBUG
 #ifdef MD_DEBUG
 	int j, k;
 	raid0_conf_t *conf = mddev_to_conf(mddev);
   
-	sz += sprintf(page + sz, "      ");
+	seq_printf(seq, "      ");
 	for (j = 0; j < conf->nr_zones; j++) {
-		sz += sprintf(page + sz, "[z%d",
+		seq_printf(seq, "[z%d",
 				conf->hash_table[j].zone0 - conf->strip_zone);
 		if (conf->hash_table[j].zone1)
-			sz += sprintf(page+sz, "/z%d] ",
+			seq_printf(seq, "/z%d] ",
 				conf->hash_table[j].zone1 - conf->strip_zone);
 		else
-			sz += sprintf(page+sz, "] ");
+			seq_printf(seq, "] ");
 	}
   
-	sz += sprintf(page + sz, "\n");
+	seq_printf(seq, "\n");
   
 	for (j = 0; j < conf->nr_strip_zones; j++) {
-		sz += sprintf(page + sz, "      z%d=[", j);
+		seq_printf(seq, "      z%d=[", j);
 		for (k = 0; k < conf->strip_zone[j].nb_dev; k++)
-			sz += sprintf (page+sz, "%s/", bdev_partition_name(
+			seq_printf (seq, "%s/", bdev_partition_name(
 				conf->strip_zone[j].dev[k]->bdev));
-		sz--;
-		sz += sprintf (page+sz, "] zo=%d do=%d s=%d\n",
+
+		seq_printf (seq, "] zo=%d do=%d s=%d\n",
 				conf->strip_zone[j].zone_offset,
 				conf->strip_zone[j].dev_offset,
 				conf->strip_zone[j].size);
 	}
 #endif
-	sz += sprintf(page + sz, " %dk chunks", mddev->chunk_size/1024);
-	return sz;
+	seq_printf(seq, " %dk chunks", mddev->chunk_size/1024);
+	return;
 }
 
 static mdk_personality_t raid0_personality=

@@ -155,6 +155,7 @@ struct mdk_rdev_s
 
 	struct page	*sb_page;
 	int		sb_loaded;
+	sector_t	data_offset;	/* start of data in array */
 	sector_t	sb_offset;
 	int		preferred_minor;	/* autorun support */
 
@@ -206,22 +207,31 @@ struct mddev_s
 
 	char				uuid[16];
 
+	struct mdk_thread_s		*thread;	/* management thread */
 	struct mdk_thread_s		*sync_thread;	/* doing resync or reconstruct */
 	unsigned long			curr_resync;	/* blocks scheduled */
 	unsigned long			resync_mark;	/* a recent timestamp */
 	unsigned long			resync_mark_cnt;/* blocks written at resync_mark */
-	/* recovery_running is 0 for no recovery/resync,
-	 * 1 for active recovery
-	 * 2 for active resync
-	 * -error for an error (e.g. -EINTR)
-	 * it can only be set > 0 under reconfig_sem
+
+	/* recovery/resync flags 
+	 * NEEDED:   we might need to start a resync/recover
+	 * RUNNING:  a thread is running, or about to be started
+	 * SYNC:     actually doing a resync, not a recovery
+	 * ERR:      and IO error was detected - abort the resync/recovery
+	 * INTR:     someone requested a (clean) early abort.
+	 * DONE:     thread is done and is waiting to be reaped
 	 */
-	int				recovery_running;
-	int				recovery_error;	/* error from recovery write */
+#define	MD_RECOVERY_RUNNING	0
+#define	MD_RECOVERY_SYNC	1
+#define	MD_RECOVERY_ERR		2
+#define	MD_RECOVERY_INTR	3
+#define	MD_RECOVERY_DONE	4
+#define	MD_RECOVERY_NEEDED	5
+	unsigned long			recovery;
+
 	int				in_sync;	/* know to not need resync */
 	struct semaphore		reconfig_sem;
 	atomic_t			active;
-	int				spares;
 
 	int				degraded;	/* whether md should consider
 							 * adding a spare
@@ -230,9 +240,11 @@ struct mddev_s
 	atomic_t			recovery_active; /* blocks scheduled, but not written */
 	wait_queue_head_t		recovery_wait;
 	sector_t			recovery_cp;
-	int				safemode;	/* if set, update "clean" superblock
+	unsigned int			safemode;	/* if set, update "clean" superblock
 							 * when no writes pending.
 							 */ 
+	unsigned int			safemode_delay;
+	struct timer_list		safemode_timer;
 	atomic_t			writes_pending; 
 	request_queue_t			queue;	/* for plugging ... */
 
@@ -245,7 +257,7 @@ struct mdk_personality_s
 	int (*make_request)(request_queue_t *q, struct bio *bio);
 	int (*run)(mddev_t *mddev);
 	int (*stop)(mddev_t *mddev);
-	int (*status)(char *page, mddev_t *mddev);
+	void (*status)(struct seq_file *seq, mddev_t *mddev);
 	/* error_handler must set ->faulty and clear ->in_sync
 	 * if appropriate, and should abort recovery if needed 
 	 */
@@ -292,8 +304,8 @@ extern mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr);
 	ITERATE_RDEV_GENERIC(pending_raid_disks,rdev,tmp)
 
 typedef struct mdk_thread_s {
-	void			(*run) (void *data);
-	void			*data;
+	void			(*run) (mddev_t *mddev);
+	mddev_t			*mddev;
 	wait_queue_head_t	wqueue;
 	unsigned long           flags;
 	struct completion	*event;
