@@ -274,8 +274,7 @@ int f_setown(struct file *filp, unsigned long arg, int force)
 {
 	int err;
 	
-	err = security_ops->file_set_fowner(filp);
-	if (err)
+	if ((err = security_file_set_fowner(filp)))
 		return err;
 
 	f_modown(filp, arg, current->uid, current->euid, force);
@@ -368,8 +367,7 @@ asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (!filp)
 		goto out;
 
-	err = security_ops->file_fcntl(filp, cmd, arg);
-	if (err) {
+	if ((err = security_file_fcntl(filp, cmd, arg))) {
 		fput(filp);
 		return err;
 	}
@@ -392,8 +390,7 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 	if (!filp)
 		goto out;
 
-	err = security_ops->file_fcntl(filp, cmd, arg);
-	if (err) {
+	if ((err = security_file_fcntl(filp, cmd, arg))) {
 		fput(filp);
 		return err;
 	}
@@ -444,7 +441,7 @@ static void send_sigio_to_task(struct task_struct *p,
 	if (!sigio_perm(p, fown))
 		return;
 
-	if (security_ops->file_send_sigiotask(p, fown, fd, reason))
+	if (security_file_send_sigiotask(p, fown, fd, reason))
 		return;
 
 	switch (fown->signum) {

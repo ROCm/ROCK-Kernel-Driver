@@ -86,9 +86,7 @@ setxattr(struct dentry *d, char *name, void *value, size_t size, int flags)
 
 	error = -EOPNOTSUPP;
 	if (d->d_inode->i_op && d->d_inode->i_op->setxattr) {
-		error = security_ops->inode_setxattr(d, kname, kvalue,
-				size, flags);
-		if (error)
+		if ((error = security_inode_setxattr(d, kname, kvalue, size, flags)))
 			goto out;
 		down(&d->d_inode->i_sem);
 		error = d->d_inode->i_op->setxattr(d, kname, kvalue, size, flags);
@@ -164,8 +162,7 @@ getxattr(struct dentry *d, char *name, void *value, size_t size)
 
 	error = -EOPNOTSUPP;
 	if (d->d_inode->i_op && d->d_inode->i_op->getxattr) {
-		error = security_ops->inode_getxattr(d, kname);
-		if (error)
+		if ((error = security_inode_getxattr(d, kname)))
 			goto out;
 		down(&d->d_inode->i_sem);
 		error = d->d_inode->i_op->getxattr(d, kname, kvalue, size);
@@ -237,8 +234,7 @@ listxattr(struct dentry *d, char *list, size_t size)
 
 	error = -EOPNOTSUPP;
 	if (d->d_inode->i_op && d->d_inode->i_op->listxattr) {
-		error = security_ops->inode_listxattr(d);
-		if (error)
+		if ((error = security_inode_listxattr(d)))
 			goto out;
 		down(&d->d_inode->i_sem);
 		error = d->d_inode->i_op->listxattr(d, klist, size);
@@ -312,8 +308,7 @@ removexattr(struct dentry *d, char *name)
 
 	error = -EOPNOTSUPP;
 	if (d->d_inode->i_op && d->d_inode->i_op->removexattr) {
-		error = security_ops->inode_removexattr(d, kname);
-		if (error)
+		if ((error = security_inode_removexattr(d, kname)))
 			goto out;
 		down(&d->d_inode->i_sem);
 		error = d->d_inode->i_op->removexattr(d, kname);

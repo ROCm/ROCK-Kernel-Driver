@@ -22,8 +22,7 @@ int vfs_readdir(struct file *file, filldir_t filler, void *buf)
 	if (!file->f_op || !file->f_op->readdir)
 		goto out;
 
-	res = security_ops->file_permission(file, MAY_READ);
-	if (res)
+	if ((res = security_file_permission(file, MAY_READ)))
 		goto out;
 
 	down(&inode->i_sem);

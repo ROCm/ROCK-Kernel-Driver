@@ -193,8 +193,7 @@ ssize_t vfs_read(struct file *file, char *buf, size_t count, loff_t *pos)
 
 	ret = locks_verify_area(FLOCK_VERIFY_READ, inode, file, *pos, count);
 	if (!ret) {
-		ret = security_ops->file_permission (file, MAY_READ);
-		if (!ret) {
+		if (!(ret = security_file_permission (file, MAY_READ))) {
 			if (file->f_op->read)
 				ret = file->f_op->read(file, buf, count, pos);
 			else
@@ -233,8 +232,7 @@ ssize_t vfs_write(struct file *file, const char *buf, size_t count, loff_t *pos)
 
 	ret = locks_verify_area(FLOCK_VERIFY_WRITE, inode, file, *pos, count);
 	if (!ret) {
-		ret = security_ops->file_permission (file, MAY_WRITE);
-		if (!ret) {
+		if (!(ret = security_file_permission (file, MAY_WRITE))) {
 			if (file->f_op->write)
 				ret = file->f_op->write(file, buf, count, pos);
 			else
@@ -465,8 +463,7 @@ sys_readv(unsigned long fd, const struct iovec *vector, unsigned long nr_segs)
 		goto bad_file;
 	if (file->f_op && (file->f_mode & FMODE_READ) &&
 	    (file->f_op->readv || file->f_op->read)) {
-		ret = security_ops->file_permission (file, MAY_READ);
-		if (!ret)
+		if (!(ret = security_file_permission (file, MAY_READ)))
 			ret = do_readv_writev(READ, file, vector, nr_segs);
 	}
 	fput(file);
@@ -488,8 +485,7 @@ sys_writev(unsigned long fd, const struct iovec * vector, unsigned long nr_segs)
 		goto bad_file;
 	if (file->f_op && (file->f_mode & FMODE_WRITE) &&
 	    (file->f_op->writev || file->f_op->write)) {
-		ret = security_ops->file_permission (file, MAY_WRITE);
-		if (!ret)
+		if (!(ret = security_file_permission (file, MAY_WRITE)))
 			ret = do_readv_writev(WRITE, file, vector, nr_segs);
 	}
 	fput(file);
