@@ -119,10 +119,8 @@ nargs (unsigned int arg, char **ap)
 
 asmlinkage long
 sys32_execve (char *filename, unsigned int argv, unsigned int envp,
-	      int dummy3, int dummy4, int dummy5, int dummy6, int dummy7,
-	      int stack)
+	      struct pt_regs *regs)
 {
-	struct pt_regs *regs = (struct pt_regs *)&stack;
 	unsigned long old_map_base, old_task_size, tssd;
 	char **av, **ae;
 	int na, ne, len;
