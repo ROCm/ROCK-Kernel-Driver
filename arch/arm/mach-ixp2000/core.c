@@ -167,15 +167,28 @@ void __init ixp2000_map_io(void)
  *************************************************************************/
 static unsigned ticks_per_jiffy;
 static unsigned ticks_per_usec;
+static unsigned next_jiffy_time;
 
 unsigned long ixp2000_gettimeoffset (void)
 {
-	unsigned long elapsed;
+ 	unsigned long elapsed1, elapsed2, pending;
+ 	unsigned long offset;
 
-	/* Get ticks since last perfect jiffy */
-	elapsed = ticks_per_jiffy - *IXP2000_T1_CSR;
+	elapsed1 = *IXP2000_T1_CSR;
+ 	pending = (*IXP2000_IRQ_STATUS & IRQ_MASK_TIMER1);
+ 	elapsed2 = *IXP2000_T1_CSR;
 
-	return elapsed / ticks_per_usec;
+ 	offset = ticks_per_jiffy - elapsed2;
+
+ 	/*
+ 	 * We have two cases to cover, one where we were pending
+   	 * already, and another where it overflowed while we were
+   	 * checking the timers.
+   	 */
+ 	if ((elapsed2 > elapsed1) || pending)
+ 		offset += ticks_per_jiffy;
+
+	return offset / ticks_per_usec;
 }
 
 static int ixp2000_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -185,7 +198,10 @@ static int ixp2000_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* clear timer 1 */
 	ixp2000_reg_write(IXP2000_T1_CLR, 1);
 	
-	timer_tick(regs);
+	while ((next_jiffy_time - *IXP2000_T4_CSR) > ticks_per_jiffy) {
+		timer_tick(regs);
+		next_jiffy_time -= ticks_per_jiffy;
+	}
 
 	write_sequnlock(&xtime_lock);
 
@@ -201,13 +217,20 @@ static struct irqaction ixp2000_timer_irq = {
 void __init ixp2000_init_time(unsigned long tick_rate)
 {
 	ixp2000_reg_write(IXP2000_T1_CLR, 0);
-	ixp2000_reg_write(IXP2000_T2_CLR, 0);
+	ixp2000_reg_write(IXP2000_T4_CLR, 0);
 
 	ticks_per_jiffy = (tick_rate + HZ/2) / HZ;
 	ticks_per_usec = tick_rate / 1000000;
 
 	ixp2000_reg_write(IXP2000_T1_CLD, ticks_per_jiffy);
 	ixp2000_reg_write(IXP2000_T1_CTL, (1 << 7));
+
+	/*
+	 * We use T4 as a monotonic counter to track missed jiffies
+	 */
+	ixp2000_reg_write(IXP2000_T4_CLD, -1);
+	ixp2000_reg_write(IXP2000_T4_CTL, (1 << 7));
+ 	next_jiffy_time = 0xffffffff - ticks_per_jiffy;
 
 	/* register for interrupt */
 	setup_irq(IRQ_IXP2000_TIMER1, &ixp2000_timer_irq);
