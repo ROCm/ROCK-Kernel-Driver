@@ -634,11 +634,7 @@ mega_build_cmd(adapter_t *adapter, Scsi_Cmnd *cmd, int *busy)
 			}
 
 			if(!(scb = mega_allocate_scb(adapter, cmd))) {
-
-				cmd->result = (DID_ERROR << 16);
-				cmd->scsi_done(cmd);
 				*busy = 1;
-
 				return NULL;
 			}
 
@@ -677,11 +673,7 @@ mega_build_cmd(adapter_t *adapter, Scsi_Cmnd *cmd, int *busy)
 
 			/* Allocate a SCB and initialize passthru */
 			if(!(scb = mega_allocate_scb(adapter, cmd))) {
-
-				cmd->result = (DID_ERROR << 16);
-				cmd->scsi_done(cmd);
 				*busy = 1;
-
 				return NULL;
 			}
 			pthru = scb->pthru;
@@ -723,11 +715,7 @@ mega_build_cmd(adapter_t *adapter, Scsi_Cmnd *cmd, int *busy)
 
 			/* Allocate a SCB and initialize mailbox */
 			if(!(scb = mega_allocate_scb(adapter, cmd))) {
-
-				cmd->result = (DID_ERROR << 16);
-				cmd->scsi_done(cmd);
 				*busy = 1;
-
 				return NULL;
 			}
 			mbox = (mbox_t *)scb->raw_mbox;
@@ -867,11 +855,7 @@ mega_build_cmd(adapter_t *adapter, Scsi_Cmnd *cmd, int *busy)
 
 			/* Allocate a SCB and initialize mailbox */
 			if(!(scb = mega_allocate_scb(adapter, cmd))) {
-
-				cmd->result = (DID_ERROR << 16);
-				cmd->scsi_done(cmd);
 				*busy = 1;
-
 				return NULL;
 			}
 
@@ -899,11 +883,7 @@ mega_build_cmd(adapter_t *adapter, Scsi_Cmnd *cmd, int *busy)
 	else {
 		/* Allocate a SCB and initialize passthru */
 		if(!(scb = mega_allocate_scb(adapter, cmd))) {
-
-			cmd->result = (DID_ERROR << 16);
-			cmd->scsi_done(cmd);
 			*busy = 1;
-
 			return NULL;
 		}
 
