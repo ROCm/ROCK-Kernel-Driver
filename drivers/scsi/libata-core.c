@@ -1725,6 +1725,7 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 	int dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 	struct scatterlist *sg = qc->sg;
 	unsigned int have_sg = (qc->flags & ATA_QCFLAG_SG);
+	dma_addr_t dma_address;
 
 	assert(sg == &qc->sgent);
 	assert(qc->n_elem == 1);
@@ -1736,9 +1737,12 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 	if (!have_sg)
 		return 0;
 
-	sg_dma_address(sg) = pci_map_single(ap->host_set->pdev,
-					 cmd->request_buffer,
-					 cmd->request_bufflen, dir);
+	dma_address = pci_map_single(ap->host_set->pdev, cmd->request_buffer,
+				     cmd->request_bufflen, dir);
+	if (pci_dma_error(dma_address))
+		return -1;
+
+	sg_dma_address(sg) = dma_address;
 
 	DPRINTK("mapped buffer of %d bytes for %s\n", cmd->request_bufflen,
 		qc->flags & ATA_QCFLAG_WRITE ? "write" : "read");
