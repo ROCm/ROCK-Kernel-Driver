@@ -189,6 +189,8 @@ void prom_dump_lmb(void);
 extern unsigned long reloc_offset(void);
 
 extern void enter_prom(void *dummy,...);
+extern void copy_and_flush(unsigned long dest, unsigned long src,
+			   unsigned long size, unsigned long offset);
 
 extern char cmd_line[512];	/* XXX */
 unsigned long dev_tree_size;
@@ -1262,6 +1264,9 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	if ((long)_prom->chosen <= 0)
 		prom_panic(RELOC("cannot find chosen")); /* msg won't be printed :( */
 
+	/* On pSeries, copy the CPU hold code */
+	if (_systemcfg->platform == PLATFORM_PSERIES)
+		copy_and_flush(0, KERNELBASE - offset, 0x100, 0);
         if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
 			    RELOC("stdout"), &getprop_rval,
 			    sizeof(getprop_rval)) <= 0)
