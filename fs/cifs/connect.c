@@ -26,6 +26,7 @@
 #include <linux/version.h>
 #include <linux/ipv6.h>
 #include <linux/pagemap.h>
+#include <linux/ctype.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 #include "cifspdu.h"
@@ -67,8 +68,11 @@ struct smb_vol {
 	unsigned short int port;
 };
 
-static int ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket);
-static int ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket);
+static int ipv4_connect(struct sockaddr_in *psin_server, 
+			struct socket **csocket,
+			char * netb_name);
+static int ipv6_connect(struct sockaddr_in6 *psin_server, 
+			struct socket **csocket);
 
 
 	/* 
@@ -149,7 +153,9 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		if(server->protocolType == IPV6) {
 			rc = ipv6_connect(&server->addr.sockAddr6,&server->ssocket);
 		} else {
-			rc = ipv4_connect(&server->addr.sockAddr, &server->ssocket);
+			rc = ipv4_connect(&server->addr.sockAddr, 
+					&server->ssocket,
+					server->workstation_RFC1001_name);
 		}
 		if(rc) {
 			set_current_state(TASK_INTERRUPTIBLE);
@@ -160,7 +166,6 @@ cifs_reconnect(struct TCP_Server_Info *server)
 			wake_up(&server->response_q);
 		}
 	}
-
 	return rc;
 }
 
@@ -456,11 +461,20 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 {
 	char *value;
 	char *data;
-	int  temp_len, i, j;
+	unsigned int  temp_len, i, j;
 	char separator[2];
 
 	separator[0] = ',';
 	separator[1] = 0; 
+
+	memset(vol->source_rfc1001_name,0x20,15);
+	for(i=0;i < strnlen(system_utsname.nodename,15);i++) {
+		/* does not have to be a perfect mapping since the field is
+		informational, only used for servers that do not support
+		port 445 and it can be overridden at mount time */
+		vol->source_rfc1001_name[i] = toupper(system_utsname.nodename[i]);
+	}
+	vol->source_rfc1001_name[15] = 0;
 
 	vol->linux_uid = current->uid;	/* current->euid instead? */
 	vol->linux_gid = current->gid;
@@ -654,15 +668,25 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 					simple_strtoul(value, &value, 0);
 			}
 		} else if (strnicmp(data, "netbiosname", 4) == 0) {
-			if (!value || !*value) {
+			if (!value || !*value || (*value == ' ')) {
 				cFYI(1,("invalid (empty) netbiosname specified"));
-			} else if (strnlen(value, 16) < 16) {
-				/* BB are there cases in which a comma can be 
-				valid in the workstation name (and need special
-				case handling)? */
-				strncpy(vol->source_rfc1001_name,value,16);
 			} else {
-				printk(KERN_WARNING "CIFS: netbiosname too long (more than 15)\n");
+				memset(vol->source_rfc1001_name,0x20,15);
+				for(i=0;i<15;i++) {
+				/* BB are there cases in which a comma can be 
+				valid in this workstation netbios name (and need
+				special handling)? */
+
+				/* We do not uppercase netbiosname for user */
+					if (value[i]==0)
+						break;
+					else 
+						vol->source_rfc1001_name[i] = value[i];
+				}
+				/* The string has 16th byte zero still from
+				set at top of the function  */
+				if((i==15) && (value[i] != 0))
+					printk(KERN_WARNING "CIFS: netbiosname longer than 15 and was truncated.\n");
 			}
 		} else if (strnicmp(data, "version", 3) == 0) {
 			/* ignore */
@@ -853,7 +877,7 @@ get_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 /* See RFC1001 section 14 on representation of Netbios names */
 static void rfc1002mangle(char * target,char * source, unsigned int length)
 {
-	int i,j;
+	unsigned int i,j;
 
 	for(i=0,j=0;i<(length);i++) {
 		/* mask a nibble at a time and encode */
@@ -866,7 +890,8 @@ static void rfc1002mangle(char * target,char * source, unsigned int length)
 
 
 static int
-ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
+ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket, 
+			 char * netbios_name)
 {
 	int rc = 0;
 	int connected = 0;
@@ -946,8 +971,13 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 			rfc1002mangle(ses_init_buf->trailer.session_req.called_name,
 				DEFAULT_CIFS_CALLED_NAME,16);
 			ses_init_buf->trailer.session_req.calling_len = 32;
-			rfc1002mangle(ses_init_buf->trailer.session_req.calling_name,
-				"LINUX_CIFS_CLNT",16);
+			if(netbios_name && (netbios_name[0] !=0)) {
+				rfc1002mangle(ses_init_buf->trailer.session_req.calling_name,
+					netbios_name,16);
+			} else {
+				rfc1002mangle(ses_init_buf->trailer.session_req.calling_name,
+					"LINUX_CIFS_CLNT",16);
+			}
 			ses_init_buf->trailer.session_req.scope1 = 0;
 			ses_init_buf->trailer.session_req.scope2 = 0;
 		/* BB fixme ensure calling space padded w/null terminate*/
@@ -1142,7 +1172,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			sin_server.sin_port = htons(volume_info.port);
 		else
 			sin_server.sin_port = 0;
-		rc = ipv4_connect(&sin_server, &csocket);
+		rc = ipv4_connect(&sin_server,&csocket,volume_info.source_rfc1001_name);
 		if (rc < 0) {
 			cERROR(1,
 			       ("Error connecting to IPv4 socket. Aborting operation"));
@@ -1178,6 +1208,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			init_MUTEX(&srvTcp->tcpSem);
 			kernel_thread((void *)(void *)cifs_demultiplex_thread, srvTcp,
 				      CLONE_FS | CLONE_FILES | CLONE_VM);
+			memcpy(srvTcp->workstation_RFC1001_name, volume_info.source_rfc1001_name,16);
 		}
 	}
 
