@@ -2,12 +2,12 @@
  *
  * Module Name: dbfileio - Debugger file I/O commands.  These can't usually
  *              be used when running the debugger in Ring 0 (Kernel mode)
- *              $Revision: 53 $
+ *              $Revision: 59 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@
 #ifdef ENABLE_DEBUGGER
 
 #define _COMPONENT          ACPI_DEBUGGER
-	 MODULE_NAME         ("dbfileio")
+	 ACPI_MODULE_NAME    ("dbfileio")
 
 
 /*
@@ -64,7 +64,7 @@ acpi_table_header           *acpi_gbl_db_table_ptr = NULL;
  *
  ******************************************************************************/
 
-acpi_object_type8
+acpi_object_type
 acpi_db_match_argument (
 	NATIVE_CHAR             *user_argument,
 	ARGUMENT_INFO           *arguments)
@@ -77,8 +77,8 @@ acpi_db_match_argument (
 	}
 
 	for (i = 0; arguments[i].name; i++) {
-		if (STRSTR (arguments[i].name, user_argument) == arguments[i].name) {
-			return ((acpi_object_type8) i);
+		if (ACPI_STRSTR (arguments[i].name, user_argument) == arguments[i].name) {
+			return (i);
 		}
 	}
 
@@ -141,7 +141,7 @@ acpi_db_open_debug_file (
 	acpi_gbl_debug_file = fopen (name, "w+");
 	if (acpi_gbl_debug_file) {
 		acpi_os_printf ("Debug output file %s opened\n", name);
-		STRCPY (acpi_gbl_db_debug_filename, name);
+		ACPI_STRCPY (acpi_gbl_db_debug_filename, name);
 		acpi_gbl_db_output_to_file = TRUE;
 	}
 	else {
@@ -200,11 +200,11 @@ acpi_db_load_table(
 
 	/* We only support a limited number of table types */
 
-	if (STRNCMP ((char *) table_header.signature, DSDT_SIG, 4) &&
-		STRNCMP ((char *) table_header.signature, PSDT_SIG, 4) &&
-		STRNCMP ((char *) table_header.signature, SSDT_SIG, 4)) {
+	if (ACPI_STRNCMP ((char *) table_header.signature, DSDT_SIG, 4) &&
+		ACPI_STRNCMP ((char *) table_header.signature, PSDT_SIG, 4) &&
+		ACPI_STRNCMP ((char *) table_header.signature, SSDT_SIG, 4)) {
 		acpi_os_printf ("Table signature is invalid\n");
-		DUMP_BUFFER (&table_header, sizeof (acpi_table_header));
+		ACPI_DUMP_BUFFER (&table_header, sizeof (acpi_table_header));
 		return (AE_ERROR);
 	}
 
@@ -224,7 +224,7 @@ acpi_db_load_table(
 
 	/* Copy the header to the buffer */
 
-	MEMCPY (*table_ptr, &table_header, sizeof (table_header));
+	ACPI_MEMCPY (*table_ptr, &table_header, sizeof (table_header));
 
 	/* Get the rest of the table */
 
@@ -275,7 +275,7 @@ ae_local_load_table (
 	acpi_table_desc         table_info;
 
 
-	FUNCTION_TRACE ("Ae_local_load_table");
+	ACPI_FUNCTION_TRACE ("Ae_local_load_table");
 
 	if (!table_ptr) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
@@ -354,7 +354,7 @@ acpi_db_load_acpi_table (
 
 	status = ae_local_load_table (acpi_gbl_db_table_ptr);
 	if (ACPI_FAILURE (status)) {
-		if (status == AE_EXIST) {
+		if (status == AE_ALREADY_EXISTS) {
 			acpi_os_printf ("Table %4.4s is already installed\n",
 					  &acpi_gbl_db_table_ptr->signature);
 		}
@@ -363,7 +363,6 @@ acpi_db_load_acpi_table (
 					  acpi_format_exception (status));
 		}
 
-		acpi_os_free (acpi_gbl_db_table_ptr);
 		return (status);
 	}
 

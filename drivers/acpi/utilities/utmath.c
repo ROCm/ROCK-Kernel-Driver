@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: utmath - Integer math support routines
- *              $Revision: 7 $
+ *              $Revision: 10 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@
 
 
 #define _COMPONENT          ACPI_UTILITIES
-	 MODULE_NAME         ("utmath")
+	 ACPI_MODULE_NAME    ("utmath")
 
 /*
  * Support for double-precision integer divide.  This code is included here
@@ -66,14 +66,14 @@ acpi_ut_short_divide (
 	u32                     remainder32;
 
 
-	FUNCTION_TRACE ("Ut_short_divide");
+	ACPI_FUNCTION_TRACE ("Ut_short_divide");
 
 	dividend.full = *in_dividend;
 
 	/* Always check for a zero divisor */
 
 	if (divisor == 0) {
-		REPORT_ERROR (("Acpi_ut_short_divide: Divide by zero\n"));
+		ACPI_REPORT_ERROR (("Acpi_ut_short_divide: Divide by zero\n"));
 		return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
 	}
 
@@ -132,13 +132,13 @@ acpi_ut_divide (
 	uint64_overlay          partial3;
 
 
-	FUNCTION_TRACE ("Ut_divide");
+	ACPI_FUNCTION_TRACE ("Ut_divide");
 
 
 	/* Always check for a zero divisor */
 
 	if (*in_divisor == 0) {
-		REPORT_ERROR (("Acpi_ut_divide: Divide by zero\n"));
+		ACPI_REPORT_ERROR (("Acpi_ut_divide: Divide by zero\n"));
 		return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
 	}
 
@@ -257,13 +257,13 @@ acpi_ut_short_divide (
 	u32                     *out_remainder)
 {
 
-	FUNCTION_TRACE ("Ut_short_divide");
+	ACPI_FUNCTION_TRACE ("Ut_short_divide");
 
 
 	/* Always check for a zero divisor */
 
 	if (divisor == 0) {
-		REPORT_ERROR (("Acpi_ut_short_divide: Divide by zero\n"));
+		ACPI_REPORT_ERROR (("Acpi_ut_short_divide: Divide by zero\n"));
 		return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
 	}
 
@@ -286,13 +286,13 @@ acpi_ut_divide (
 	acpi_integer            *out_quotient,
 	acpi_integer            *out_remainder)
 {
-	FUNCTION_TRACE ("Ut_divide");
+	ACPI_FUNCTION_TRACE ("Ut_divide");
 
 
 	/* Always check for a zero divisor */
 
 	if (*in_divisor == 0) {
-		REPORT_ERROR (("Acpi_ut_divide: Divide by zero\n"));
+		ACPI_REPORT_ERROR (("Acpi_ut_divide: Divide by zero\n"));
 		return_ACPI_STATUS (AE_AML_DIVIDE_BY_ZERO);
 	}
 

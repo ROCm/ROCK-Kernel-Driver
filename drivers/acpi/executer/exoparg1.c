@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 120 $
+ *              $Revision: 134 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@
 
 
 #define _COMPONENT          ACPI_EXECUTER
-	 MODULE_NAME         ("exoparg1")
+	 ACPI_MODULE_NAME    ("exoparg1")
 
 
 /*!
@@ -81,10 +81,10 @@ acpi_ex_opcode_1A_0T_0R (
 	acpi_status             status = AE_OK;
 
 
-	FUNCTION_TRACE_STR ("Ex_opcode_1A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_1A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
-	/* Examine the opcode */
+	/* Examine the AML opcode */
 
 	switch (walk_state->opcode) {
 	case AML_RELEASE_OP:    /*  Release (Mutex_object) */
@@ -107,13 +107,13 @@ acpi_ex_opcode_1A_0T_0R (
 
 	case AML_SLEEP_OP:      /*  Sleep (Msec_time) */
 
-		acpi_ex_system_do_suspend ((u32) operand[0]->integer.value);
+		status = acpi_ex_system_do_suspend ((u32) operand[0]->integer.value);
 		break;
 
 
 	case AML_STALL_OP:      /*  Stall (Usec_time) */
 
-		acpi_ex_system_do_stall ((u32) operand[0]->integer.value);
+		status = acpi_ex_system_do_stall ((u32) operand[0]->integer.value);
 		break;
 
 
@@ -125,7 +125,7 @@ acpi_ex_opcode_1A_0T_0R (
 
 	default:                /*  Unknown opcode  */
 
-		REPORT_ERROR (("Acpi_ex_opcode_1A_0T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_0T_0R: Unknown opcode %X\n",
 			walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		break;
@@ -156,19 +156,20 @@ acpi_ex_opcode_1A_1T_0R (
 	acpi_operand_object     **operand = &walk_state->operands[0];
 
 
-	FUNCTION_TRACE_STR ("Ex_opcode_1A_1T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_1A_1T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
 
+
+	/* Examine the AML opcode */
 
 	switch (walk_state->opcode) {
-
 	case AML_LOAD_OP:
 
-		status = acpi_ex_load_op (operand[0], operand[1]);
+		status = acpi_ex_load_op (operand[0], operand[1], walk_state);
 		break;
 
 	default:                        /* Unknown opcode */
 
-		REPORT_ERROR (("Acpi_ex_opcode_1A_1T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_1T_0R: Unknown opcode %X\n",
 			walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
@@ -208,7 +209,7 @@ acpi_ex_opcode_1A_1T_1R (
 	acpi_integer            digit;
 
 
-	FUNCTION_TRACE_STR ("Ex_opcode_1A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_1A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/* Create a return object of type Integer for most opcodes */
@@ -230,6 +231,7 @@ acpi_ex_opcode_1A_1T_1R (
 		break;
 	}
 
+	/* Examine the AML opcode */
 
 	switch (walk_state->opcode) {
 
@@ -240,7 +242,6 @@ acpi_ex_opcode_1A_1T_1R (
 
 
 	case AML_FIND_SET_LEFT_BIT_OP:  /* Find_set_left_bit (Operand, Result) */
-
 
 		return_desc->integer.value = operand[0]->integer.value;
 
@@ -257,7 +258,6 @@ acpi_ex_opcode_1A_1T_1R (
 
 
 	case AML_FIND_SET_RIGHT_BIT_OP: /* Find_set_right_bit (Operand, Result) */
-
 
 		return_desc->integer.value = operand[0]->integer.value;
 
@@ -312,7 +312,8 @@ acpi_ex_opcode_1A_1T_1R (
 
 		if (operand[0]->integer.value > ACPI_MAX_BCD_VALUE) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "BCD overflow: %8.8X%8.8X\n",
-				HIDWORD(operand[0]->integer.value), LODWORD(operand[0]->integer.value)));
+				ACPI_HIDWORD(operand[0]->integer.value),
+				ACPI_LODWORD(operand[0]->integer.value)));
 			status = AE_AML_NUMERIC_OVERFLOW;
 			goto cleanup;
 		}
@@ -330,7 +331,7 @@ acpi_ex_opcode_1A_1T_1R (
 			/* Create the BCD digit from the remainder above */
 
 			if (digit > 0) {
-				return_desc->integer.value += (temp32 << (i * 4));
+				return_desc->integer.value += ((acpi_integer) temp32 << (i * 4));
 			}
 		}
 		break;
@@ -371,7 +372,6 @@ acpi_ex_opcode_1A_1T_1R (
 
 		return_desc->integer.value = ACPI_INTEGER_MAX;
 		goto cleanup;
-		break;
 
 
 	case AML_STORE_OP:              /* Store (Source, Target) */
@@ -395,7 +395,6 @@ acpi_ex_opcode_1A_1T_1R (
 		walk_state->result_obj = operand[0];
 		walk_state->operands[0] = NULL; /* Prevent deletion */
 		return_ACPI_STATUS (status);
-		break;
 
 
 	/*
@@ -403,8 +402,7 @@ acpi_ex_opcode_1A_1T_1R (
 	 */
 	case AML_COPY_OP:               /* Copy (Source, Target) */
 
-		status = AE_NOT_IMPLEMENTED;
-		goto cleanup;
+		status = acpi_ut_copy_iobject_to_iobject (operand[0], &return_desc, walk_state);
 		break;
 
 
@@ -432,28 +430,25 @@ acpi_ex_opcode_1A_1T_1R (
 		break;
 
 
-	/*
-	 * These are two obsolete opcodes
-	 */
 	case AML_SHIFT_LEFT_BIT_OP:     /*  Shift_left_bit (Source, Bit_num) */
 	case AML_SHIFT_RIGHT_BIT_OP:    /*  Shift_right_bit (Source, Bit_num) */
 
-
+		/*
+		 * These are two obsolete opcodes
+		 */
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%s is obsolete and not implemented\n",
 				  acpi_ps_get_opcode_name (walk_state->opcode)));
 		status = AE_SUPPORT;
 		goto cleanup;
-		break;
 
 
 	default:                        /* Unknown opcode */
 
-		REPORT_ERROR (("Acpi_ex_opcode_1A_1T_1R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_1T_1R: Unknown opcode %X\n",
 			walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
 	}
-
 
 	/*
 	 * Store the return value computed above into the target object
@@ -499,13 +494,12 @@ acpi_ex_opcode_1A_0T_1R (
 	acpi_integer            value;
 
 
-	FUNCTION_TRACE_STR ("Ex_opcode_1A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_1A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
-	/* Get the operand and decode the opcode */
+	/* Examine the AML opcode */
 
 	switch (walk_state->opcode) {
-
 	case AML_LNOT_OP:               /* LNot (Operand) */
 
 		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
@@ -523,10 +517,10 @@ acpi_ex_opcode_1A_0T_1R (
 
 		/*
 		 * Since we are expecting a Reference operand, it
-		 * can be either a Node or an internal object.
+		 * can be either a NS Node or an internal object.
 		 */
 		return_desc = operand[0];
-		if (VALID_DESCRIPTOR_TYPE (operand[0], ACPI_DESC_TYPE_INTERNAL)) {
+		if (ACPI_GET_DESCRIPTOR_TYPE (operand[0]) == ACPI_DESC_TYPE_INTERNAL) {
 			/* Internal reference object - prevent deletion */
 
 			acpi_ut_add_reference (return_desc);
@@ -582,7 +576,7 @@ acpi_ex_opcode_1A_0T_1R (
 
 			case AML_DEBUG_OP:
 
-				/* Per 1.0b spec, Debug object is of type "Debug_object" */
+				/* The Debug Object is of type "Debug_object" */
 
 				type = ACPI_TYPE_DEBUG_OBJECT;
 				break;
@@ -601,7 +595,6 @@ acpi_ex_opcode_1A_0T_1R (
 					 */
 					type = (*(operand[0]->reference.where))->common.type;
 				}
-
 				break;
 
 
@@ -615,13 +608,12 @@ acpi_ex_opcode_1A_0T_1R (
 
 			default:
 
-				REPORT_ERROR (("Acpi_ex_opcode_1A_0T_1R/Type_op: Internal error - Unknown Reference subtype %X\n",
+				ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_0T_1R/Type_op: Internal error - Unknown Reference subtype %X\n",
 					operand[0]->reference.opcode));
 				status = AE_AML_INTERNAL;
 				goto cleanup;
 			}
 		}
-
 		else {
 			/*
 			 * It's not a Reference, so it must be a direct name pointer.
@@ -655,15 +647,19 @@ acpi_ex_opcode_1A_0T_1R (
 	case AML_SIZE_OF_OP:            /* Size_of (Source_object) */
 
 		temp_desc = operand[0];
-		if (VALID_DESCRIPTOR_TYPE (operand[0], ACPI_DESC_TYPE_NAMED)) {
+		if (ACPI_GET_DESCRIPTOR_TYPE (operand[0]) == ACPI_DESC_TYPE_NAMED) {
 			temp_desc = acpi_ns_get_attached_object ((acpi_namespace_node *) operand[0]);
 		}
 
 		if (!temp_desc) {
 			value = 0;
 		}
-
 		else {
+			/*
+			 * Type is guaranteed to be a buffer, string, or package at this
+			 * point (even if the original operand was an object reference, it
+			 * will be resolved and typechecked during operand resolution.)
+			 */
 			switch (temp_desc->common.type) {
 			case ACPI_TYPE_BUFFER:
 				value = temp_desc->buffer.length;
@@ -677,16 +673,9 @@ acpi_ex_opcode_1A_0T_1R (
 				value = temp_desc->package.count;
 				break;
 
-			case INTERNAL_TYPE_REFERENCE:
-
-				/* TBD: this must be a reference to a buf/str/pkg?? */
-
-				value = 4;
-				break;
-
 			default:
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Not Buf/Str/Pkg - found type %X\n",
-					temp_desc->common.type));
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Size_of, Not Buf/Str/Pkg - found type %s\n",
+					acpi_ut_get_type_name (temp_desc->common.type)));
 				status = AE_AML_OPERAND_TYPE;
 				goto cleanup;
 			}
@@ -715,75 +704,93 @@ acpi_ex_opcode_1A_0T_1R (
 		break;
 
 
-	case AML_DEREF_OF_OP:           /* Deref_of (Obj_reference) */
+	case AML_DEREF_OF_OP:           /* Deref_of (Obj_reference | String) */
 
-		/* Check for a method local or argument */
+		/* Check for a method local or argument, or standalone String */
 
-		if (!VALID_DESCRIPTOR_TYPE (operand[0], ACPI_DESC_TYPE_NAMED)) {
-			/*
-			 * Must resolve/dereference the local/arg reference first
-			 */
-			switch (operand[0]->reference.opcode) {
-			/* Set Operand[0] to the value of the local/arg */
+		if (ACPI_GET_DESCRIPTOR_TYPE (operand[0]) != ACPI_DESC_TYPE_NAMED) {
+			switch (ACPI_GET_OBJECT_TYPE (operand[0])) {
+			case INTERNAL_TYPE_REFERENCE:
+				/*
+				 * This is a Deref_of (Local_x | Arg_x)
+				 *
+				 * Must resolve/dereference the local/arg reference first
+				 */
+				switch (operand[0]->reference.opcode) {
+				case AML_LOCAL_OP:
+				case AML_ARG_OP:
 
-			case AML_LOCAL_OP:
-			case AML_ARG_OP:
+					/* Set Operand[0] to the value of the local/arg */
 
-				acpi_ds_method_data_get_value (operand[0]->reference.opcode,
-						operand[0]->reference.offset, walk_state, &temp_desc);
+					acpi_ds_method_data_get_value (operand[0]->reference.opcode,
+							operand[0]->reference.offset, walk_state, &temp_desc);
+
+					/*
+					 * Delete our reference to the input object and
+					 * point to the object just retrieved
+					 */
+					acpi_ut_remove_reference (operand[0]);
+					operand[0] = temp_desc;
+					break;
+
+				default:
+
+					/* Must be an Index op - handled below */
+					break;
+				}
+				break;
+
+
+			case ACPI_TYPE_STRING:
 
 				/*
-				 * Delete our reference to the input object and
-				 * point to the object just retrieved
+				 * This is a Deref_of (String). The string is a reference to a named ACPI object.
+				 *
+				 * 1) Find the owning Node
+				 * 2) Dereference the node to an actual object.  Could be a Field, so we nee
+				 *    to resolve the node to a value.
 				 */
-				acpi_ut_remove_reference (operand[0]);
-				operand[0] = temp_desc;
-				break;
+				status = acpi_ns_get_node_by_path (operand[0]->string.pointer, walk_state->scope_info->scope.node,
+						  ACPI_NS_SEARCH_PARENT, (acpi_namespace_node **) &return_desc);
+				if (ACPI_FAILURE (status)) {
+					goto cleanup;
+				}
+
+				status = acpi_ex_resolve_node_to_value ((acpi_namespace_node **) &return_desc, walk_state);
+				goto cleanup;
+
 
 			default:
 
-				/* Index op - handled below */
-				break;
+				status = AE_AML_OPERAND_TYPE;
+				goto cleanup;
 			}
 		}
-
 
 		/* Operand[0] may have changed from the code above */
 
-		if (VALID_DESCRIPTOR_TYPE (operand[0], ACPI_DESC_TYPE_NAMED)) {
-			/* Get the actual object from the Node (This is the dereference) */
-
-			return_desc = ((acpi_namespace_node *) operand[0])->object;
-
-			/* Returning a pointer to the object, add another reference! */
-
-			acpi_ut_add_reference (return_desc);
+		if (ACPI_GET_DESCRIPTOR_TYPE (operand[0]) == ACPI_DESC_TYPE_NAMED) {
+			/*
+			 * This is a Deref_of (Object_reference)
+			 * Get the actual object from the Node (This is the dereference).
+			 * -- This case may only happen when a Local_x or Arg_x is dereferenced above.
+			 */
+			return_desc = acpi_ns_get_attached_object ((acpi_namespace_node *) operand[0]);
 		}
-
 		else {
 			/*
-			 * This must be a reference object produced by the Index
-			 * ASL operation -- check internal opcode
+			 * This must be a reference object produced by either the Index() or
+			 * Ref_of() operator
 			 */
-			if ((operand[0]->reference.opcode != AML_INDEX_OP) &&
-				(operand[0]->reference.opcode != AML_REF_OF_OP)) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown opcode in ref(%p) - %X\n",
-					operand[0], operand[0]->reference.opcode));
-
-				status = AE_TYPE;
-				goto cleanup;
-			}
-
-
 			switch (operand[0]->reference.opcode) {
 			case AML_INDEX_OP:
 
 				/*
-				 * Supported target types for the Index operator are
-				 * 1) A Buffer
-				 * 2) A Package
+				 * The target type for the Index operator must be
+				 * either a Buffer or a Package
 				 */
-				if (operand[0]->reference.target_type == ACPI_TYPE_BUFFER_FIELD) {
+				switch (operand[0]->reference.target_type) {
+				case ACPI_TYPE_BUFFER_FIELD:
 					/*
 					 * The target is a buffer, we must create a new object that
 					 * contains one element of the buffer, the element pointed
@@ -799,16 +806,19 @@ acpi_ex_opcode_1A_0T_1R (
 						goto cleanup;
 					}
 
+					/*
+					 * Since we are returning the value of the buffer at the
+					 * indexed location, we don't need to add an additional
+					 * reference to the buffer itself.
+					 */
 					temp_desc = operand[0]->reference.object;
 					return_desc->integer.value =
 						temp_desc->buffer.pointer[operand[0]->reference.offset];
+					break;
 
-					/* TBD: [Investigate] (see below) Don't add an additional
-					 * ref!
-					 */
-				}
 
-				else if (operand[0]->reference.target_type == ACPI_TYPE_PACKAGE) {
+				case ACPI_TYPE_PACKAGE:
+
 					/*
 					 * The target is a package, we want to return the referenced
 					 * element of the package.  We must add another reference to
@@ -821,7 +831,6 @@ acpi_ex_opcode_1A_0T_1R (
 						 * an uninitialized package element and is thus a
 						 * severe error.
 						 */
-
 						ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "NULL package element obj %p\n",
 							operand[0]));
 						status = AE_AML_UNINITIALIZED_ELEMENT;
@@ -829,15 +838,16 @@ acpi_ex_opcode_1A_0T_1R (
 					}
 
 					acpi_ut_add_reference (return_desc);
-				}
+					break;
 
-				else {
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Target_type %X in obj %p\n",
+
+				default:
+
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Index Target_type %X in obj %p\n",
 						operand[0]->reference.target_type, operand[0]));
 					status = AE_AML_OPERAND_TYPE;
 					goto cleanup;
 				}
-
 				break;
 
 
@@ -849,15 +859,22 @@ acpi_ex_opcode_1A_0T_1R (
 
 				acpi_ut_add_reference (return_desc);
 				break;
+
+
+			default:
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown opcode in ref(%p) - %X\n",
+					operand[0], operand[0]->reference.opcode));
+
+				status = AE_TYPE;
+				goto cleanup;
 			}
 		}
-
 		break;
 
 
 	default:
 
-		REPORT_ERROR (("Acpi_ex_opcode_1A_0T_1R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_0T_1R: Unknown opcode %X\n",
 			walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;

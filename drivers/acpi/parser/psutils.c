@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: psutils - Parser miscellaneous utilities (Parser only)
- *              $Revision: 44 $
+ *              $Revision: 49 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -29,14 +29,7 @@
 #include "amlcode.h"
 
 #define _COMPONENT          ACPI_PARSER
-	 MODULE_NAME         ("psutils")
-
-
-#define PARSEOP_GENERIC     0x01
-#define PARSEOP_NAMED       0x02
-#define PARSEOP_DEFERRED    0x04
-#define PARSEOP_BYTELIST    0x08
-#define PARSEOP_IN_CACHE    0x80
+	 ACPI_MODULE_NAME    ("psutils")
 
 
 /*******************************************************************************
@@ -58,19 +51,14 @@ acpi_ps_init_op (
 	acpi_parse_object       *op,
 	u16                     opcode)
 {
-	const acpi_opcode_info  *aml_op;
-
-
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	op->data_type = ACPI_DESC_TYPE_PARSER;
 	op->opcode = opcode;
 
-	aml_op = acpi_ps_get_opcode_info (opcode);
-
-	DEBUG_ONLY_MEMBERS (STRNCPY (op->op_name, aml_op->name,
-			   sizeof (op->op_name)));
+	ACPI_DEBUG_ONLY_MEMBERS (ACPI_STRNCPY (op->op_name,
+			(acpi_ps_get_opcode_info (opcode))->name, sizeof (op->op_name)));
 }
 
 
@@ -98,7 +86,7 @@ acpi_ps_alloc_op (
 	const acpi_opcode_info  *op_info;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	op_info = acpi_ps_get_opcode_info (opcode);
@@ -107,22 +95,22 @@ acpi_ps_alloc_op (
 
 	if (op_info->flags & AML_DEFER) {
 		size = sizeof (acpi_parse2_object);
-		flags = PARSEOP_DEFERRED;
+		flags = ACPI_PARSEOP_DEFERRED;
 	}
 
 	else if (op_info->flags & AML_NAMED) {
 		size = sizeof (acpi_parse2_object);
-		flags = PARSEOP_NAMED;
+		flags = ACPI_PARSEOP_NAMED;
 	}
 
 	else if (opcode == AML_INT_BYTELIST_OP) {
 		size = sizeof (acpi_parse2_object);
-		flags = PARSEOP_BYTELIST;
+		flags = ACPI_PARSEOP_BYTELIST;
 	}
 
 	else {
 		size = sizeof (acpi_parse_object);
-		flags = PARSEOP_GENERIC;
+		flags = ACPI_PARSEOP_GENERIC;
 	}
 
 
@@ -165,14 +153,14 @@ void
 acpi_ps_free_op (
 	acpi_parse_object       *op)
 {
-	PROC_NAME ("Ps_free_op");
+	ACPI_FUNCTION_NAME ("Ps_free_op");
 
 
 	if (op->opcode == AML_INT_RETURN_VALUE_OP) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Free retval op: %p\n", op));
 	}
 
-	if (op->flags == PARSEOP_GENERIC) {
+	if (op->flags == ACPI_PARSEOP_GENERIC) {
 		acpi_ut_release_to_cache (ACPI_MEM_LIST_PSNODE, op);
 	}
 
@@ -198,7 +186,7 @@ void
 acpi_ps_delete_parse_cache (
 	void)
 {
-	FUNCTION_TRACE ("Ps_delete_parse_cache");
+	ACPI_FUNCTION_TRACE ("Ps_delete_parse_cache");
 
 
 	acpi_ut_delete_generic_cache (ACPI_MEM_LIST_PSNODE);
@@ -249,7 +237,7 @@ acpi_ps_get_name (
 
 	/* The "generic" object has no name associated with it */
 
-	if (op->flags & PARSEOP_GENERIC) {
+	if (op->flags & ACPI_PARSEOP_GENERIC) {
 		return (0);
 	}
 
@@ -270,7 +258,7 @@ acpi_ps_set_name (
 
 	/* The "generic" object has no name associated with it */
 
-	if (op->flags & PARSEOP_GENERIC) {
+	if (op->flags & ACPI_PARSEOP_GENERIC) {
 		return;
 	}
 

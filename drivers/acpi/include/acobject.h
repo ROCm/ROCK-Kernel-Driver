@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Name: acobject.h - Definition of acpi_operand_object  (Internal object only)
- *       $Revision: 93 $
+ *       $Revision: 106 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -58,44 +58,40 @@
  */
 
 
-#define ACPI_OBJECT_COMMON_HEADER           /* SIZE/ALIGNMENT: 32-bits plus trailing 8-bit flag */\
-	u8                          data_type;          /* To differentiate various internal objs */\
+#define ACPI_OBJECT_COMMON_HEADER           /* SIZE/ALIGNMENT: 32 bits, one ptr plus trailing 8-bit flag */\
+	u8                          descriptor;         /* To differentiate various internal objs */\
 	u8                          type;               /* acpi_object_type */\
 	u16                         reference_count;    /* For object deletion management */\
+	union acpi_operand_obj      *next_object;       /* Objects linked to parent NS node */\
 	u8                          flags; \
 
 /* Defines for flag byte above */
 
-#define AOPOBJ_STATIC_ALLOCATION    0x1
-#define AOPOBJ_STATIC_POINTER       0x2
-#define AOPOBJ_DATA_VALID           0x4
-#define AOPOBJ_ZERO_CONST           0x4
-#define AOPOBJ_INITIALIZED          0x8
+#define AOPOBJ_RESERVED             0x01
+#define AOPOBJ_STATIC_POINTER       0x02
+#define AOPOBJ_DATA_VALID           0x04
+#define AOPOBJ_OBJECT_INITIALIZED   0x08
+#define AOPOBJ_SETUP_COMPLETE       0x10
+#define AOPOBJ_SINGLE_DATUM         0x20
 
 
 /*
  * Common bitfield for the field objects
- * "Field Datum"    -- a datum from the actual field object
- * "Buffer Datum"   -- a datum from a user buffer, read from or to be written to the field
+ * "Field Datum"  -- a datum from the actual field object
+ * "Buffer Datum" -- a datum from a user buffer, read from or to be written to the field
  */
 #define ACPI_COMMON_FIELD_INFO              /* SIZE/ALIGNMENT: 24 bits + three 32-bit values */\
-	u8                          access_flags;\
-	u16                         bit_length;         /* Length of field in bits */\
-	u32                         base_byte_offset;   /* Byte offset within containing object */\
-	u8                          access_bit_width;   /* Read/Write size in bits (from ASL Access_type)*/\
+	u8                          field_flags;        /* Access, update, and lock bits */\
+	u8                          attribute;          /* From Access_as keyword */\
 	u8                          access_byte_width;  /* Read/Write size in bytes */\
-	u8                          update_rule;        /* How neighboring field bits are handled */\
-	u8                          lock_rule;          /* Global Lock: 1 = "Must Lock" */\
+	u32                         bit_length;         /* Length of field in bits */\
+	u32                         base_byte_offset;   /* Byte offset within containing object */\
 	u8                          start_field_bit_offset;/* Bit offset within first field datum (0-63) */\
 	u8                          datum_valid_bits;   /* Valid bit in first "Field datum" */\
 	u8                          end_field_valid_bits; /* Valid bits in the last "field datum" */\
 	u8                          end_buffer_valid_bits; /* Valid bits in the last "buffer datum" */\
-	u32                         value;              /* Value to store into the Bank or Index register */
-
-
-/* Access flag bits */
-
-#define AFIELD_SINGLE_DATUM         0x1
+	u32                         value;              /* Value to store into the Bank or Index register */\
+	acpi_namespace_node         *node;              /* Link back to parent node */
 
 
 /*
@@ -150,6 +146,7 @@ typedef struct /* BUFFER - has length and pointer - not null terminated */
 	ACPI_OBJECT_COMMON_HEADER
 	ACPI_COMMON_BUFFER_INFO
 	u8                          *pointer;           /* Buffer value in AML stream or in allocated space */
+	acpi_namespace_node         *node;              /* Link back to parent node */
 
 } ACPI_OBJECT_BUFFER;
 
@@ -210,8 +207,8 @@ typedef struct acpi_obj_mutex /* MUTEX */
 	u16                         sync_level;
 	u16                         acquisition_depth;
 
+	struct acpi_thread_state    *owner_thread;
 	void                        *semaphore;
-	void                        *owner;
 	union acpi_operand_obj      *prev;              /* Link for list of acquired mutexes */
 	union acpi_operand_obj      *next;              /* Link for list of acquired mutexes */
 
@@ -225,7 +222,6 @@ typedef struct /* REGION */
 	u8                          space_id;
 	u32                         length;
 	ACPI_PHYSICAL_ADDRESS       address;
-	union acpi_operand_obj      *extra;             /* Pointer to executable AML (in region definition) */
 
 	union acpi_operand_obj      *addr_handler;      /* Handler for system notifies */
 	acpi_namespace_node         *node;              /* containing object */
@@ -301,7 +297,7 @@ typedef struct /* BANK FIELD */
 	ACPI_COMMON_FIELD_INFO
 
 	union acpi_operand_obj      *region_obj;        /* Containing Op_region object */
-	union acpi_operand_obj      *bank_register_obj; /* Bank_select Register object */
+	union acpi_operand_obj      *bank_obj;          /* Bank_select Register object */
 
 } ACPI_OBJECT_BANK_FIELD;
 
@@ -329,8 +325,6 @@ typedef struct /* BUFFER FIELD */
 	ACPI_OBJECT_COMMON_HEADER
 	ACPI_COMMON_FIELD_INFO
 
-	union acpi_operand_obj      *extra;             /* Pointer to executable AML (in field definition) */
-	acpi_namespace_node         *node;              /* Parent (containing) object node */
 	union acpi_operand_obj      *buffer_obj;        /* Containing Buffer object */
 
 } ACPI_OBJECT_BUFFER_FIELD;
@@ -353,7 +347,7 @@ typedef struct /* NOTIFY HANDLER */
 
 /* Flags for address handler */
 
-#define ADDR_HANDLER_DEFAULT_INSTALLED  0x1
+#define ACPI_ADDR_HANDLER_DEFAULT_INSTALLED  0x1
 
 
 typedef struct /* ADDRESS HANDLER */
@@ -414,6 +408,15 @@ typedef struct /* EXTRA */
 } ACPI_OBJECT_EXTRA;
 
 
+typedef struct /* DATA */
+{
+	ACPI_OBJECT_COMMON_HEADER
+	ACPI_OBJECT_HANDLER         handler;
+	void                        *pointer;
+
+} ACPI_OBJECT_DATA;
+
+
 /******************************************************************************
  *
  * acpi_operand_object  Descriptor - a giant union of all of the above
@@ -445,6 +448,7 @@ typedef union acpi_operand_obj
 	ACPI_OBJECT_NOTIFY_HANDLER  notify_handler;
 	ACPI_OBJECT_ADDR_HANDLER    addr_handler;
 	ACPI_OBJECT_EXTRA           extra;
+	ACPI_OBJECT_DATA            data;
 
 } acpi_operand_object;
 

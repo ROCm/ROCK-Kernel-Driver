@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: dsfield - Dispatcher field routines
- *              $Revision: 46 $
+ *              $Revision: 62 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 
 
 #define _COMPONENT          ACPI_DISPATCHER
-	 MODULE_NAME         ("dsfield")
+	 ACPI_MODULE_NAME    ("dsfield")
 
 
 /*******************************************************************************
@@ -65,9 +65,11 @@ acpi_ds_create_buffer_field (
 	acpi_namespace_node     *node;
 	acpi_status             status;
 	acpi_operand_object     *obj_desc;
+	acpi_operand_object     *second_desc = NULL;
+	u32                     flags;
 
 
-	FUNCTION_TRACE ("Ds_create_buffer_field");
+	ACPI_FUNCTION_TRACE ("Ds_create_buffer_field");
 
 
 	/* Get the Name_string argument */
@@ -86,12 +88,23 @@ acpi_ds_create_buffer_field (
 	}
 
 	/*
+	 * During the load phase, we want to enter the name of the field into
+	 * the namespace.  During the execute phase (when we evaluate the size
+	 * operand), we want to lookup the name
+	 */
+	if (walk_state->parse_flags & ACPI_PARSE_EXECUTE) {
+		flags = ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE;
+	}
+	else {
+		flags = ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE | ACPI_NS_ERROR_IF_FOUND;
+	}
+
+	/*
 	 * Enter the Name_string into the namespace
 	 */
 	status = acpi_ns_lookup (walk_state->scope_info, arg->value.string,
-			 INTERNAL_TYPE_DEF_ANY, IMODE_LOAD_PASS1,
-			 NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
-			 walk_state, &(node));
+			 INTERNAL_TYPE_DEF_ANY, ACPI_IMODE_LOAD_PASS1,
+			 flags, walk_state, &(node));
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -107,7 +120,8 @@ acpi_ds_create_buffer_field (
 	 * we need to create the field object.  Otherwise, this was a lookup of an
 	 * existing node and we don't want to create the field object again.
 	 */
-	if (node->object) {
+	obj_desc = acpi_ns_get_attached_object (node);
+	if (obj_desc) {
 		return_ACPI_STATUS (AE_OK);
 	}
 
@@ -125,27 +139,21 @@ acpi_ds_create_buffer_field (
 	}
 
 	/*
-	 * Allocate a method object for this field unit
-	 */
-	obj_desc->buffer_field.extra = acpi_ut_create_internal_object (
-			   INTERNAL_TYPE_EXTRA);
-	if (!obj_desc->buffer_field.extra) {
-		status = AE_NO_MEMORY;
-		goto cleanup;
-	}
-
-	/*
 	 * Remember location in AML stream of the field unit
 	 * opcode and operands -- since the buffer and index
 	 * operands must be evaluated.
 	 */
-	obj_desc->buffer_field.extra->extra.aml_start = ((acpi_parse2_object *) op)->data;
-	obj_desc->buffer_field.extra->extra.aml_length = ((acpi_parse2_object *) op)->length;
+	second_desc                 = obj_desc->common.next_object;
+	second_desc->extra.aml_start = ((acpi_parse2_object *) op)->data;
+	second_desc->extra.aml_length = ((acpi_parse2_object *) op)->length;
 	obj_desc->buffer_field.node = node;
 
-	/* Attach constructed field descriptor to parent node */
+	/* Attach constructed field descriptors to parent node */
 
 	status = acpi_ns_attach_object (node, obj_desc, ACPI_TYPE_BUFFER_FIELD);
+	if (ACPI_FAILURE (status)) {
+		goto cleanup;
+	}
 
 
 cleanup:
@@ -181,7 +189,7 @@ acpi_ds_get_field_names (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE_U32 ("Ds_get_field_names", info);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_get_field_names", info);
 
 
 	/* First field starts at bit zero */
@@ -200,6 +208,12 @@ acpi_ds_get_field_names (
 		switch (arg->opcode) {
 		case AML_INT_RESERVEDFIELD_OP:
 
+			if (((acpi_integer) info->field_bit_position + arg->value.size) >
+				ACPI_UINT32_MAX) {
+				ACPI_REPORT_ERROR (("Bit offset within field too large (> 0xFFFFFFFF)\n"));
+				return_ACPI_STATUS (AE_SUPPORT);
+			}
+
 			info->field_bit_position += arg->value.size;
 			break;
 
@@ -207,37 +221,54 @@ acpi_ds_get_field_names (
 		case AML_INT_ACCESSFIELD_OP:
 
 			/*
-			 * Get a new Access_type and Access_attribute for all
-			 * entries (until end or another Access_as keyword)
+			 * Get a new Access_type and Access_attribute -- to be used for all
+			 * field units that follow, until field end or another Access_as keyword.
+			 *
+			 * In Field_flags, preserve the flag bits other than the ACCESS_TYPE bits
 			 */
-			info->field_flags = (u8) ((info->field_flags & FIELD_ACCESS_TYPE_MASK) ||
-					  ((u8) (arg->value.integer >> 8)));
+			info->field_flags = (u8) ((info->field_flags & ~(AML_FIELD_ACCESS_TYPE_MASK)) |
+					  ((u8) (arg->value.integer32 >> 8)));
+
+			info->attribute = (u8) (arg->value.integer32);
 			break;
 
 
 		case AML_INT_NAMEDFIELD_OP:
 
-			/* Enter a new field name into the namespace */
+			/* Lookup the name */
 
 			status = acpi_ns_lookup (walk_state->scope_info,
 					  (NATIVE_CHAR *) &((acpi_parse2_object *)arg)->name,
-					  info->field_type, IMODE_LOAD_PASS1,
-					  NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
-					  NULL, &info->field_node);
+					  info->field_type, ACPI_IMODE_EXECUTE, ACPI_NS_DONT_OPEN_SCOPE,
+					  walk_state, &info->field_node);
 			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
+				if (status != AE_ALREADY_EXISTS) {
+					return_ACPI_STATUS (status);
+				}
+
+				ACPI_REPORT_ERROR (("Field name [%4.4s] already exists in current scope\n",
+						  &((acpi_parse2_object *)arg)->name));
 			}
+			else {
+				arg->node = info->field_node;
+				info->field_bit_length = arg->value.size;
 
-			/* Create and initialize an object for the new Field Node */
+				/* Create and initialize an object for the new Field Node */
 
-			info->field_bit_length = arg->value.size;
-
-			status = acpi_ex_prep_field_value (info);
-			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
+				status = acpi_ex_prep_field_value (info);
+				if (ACPI_FAILURE (status)) {
+					return_ACPI_STATUS (status);
+				}
 			}
 
 			/* Keep track of bit position for the next field */
+
+			if (((acpi_integer) info->field_bit_position + arg->value.size) >
+				ACPI_UINT32_MAX) {
+				ACPI_REPORT_ERROR (("Field [%4.4s] bit offset too large (> 0xFFFFFFFF)\n",
+					&info->field_node->name));
+				return_ACPI_STATUS (AE_SUPPORT);
+			}
 
 			info->field_bit_position += info->field_bit_length;
 			break;
@@ -248,7 +279,6 @@ acpi_ds_get_field_names (
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid opcode in field list: %X\n",
 				arg->opcode));
 			return_ACPI_STATUS (AE_AML_ERROR);
-			break;
 		}
 
 		arg = arg->next;
@@ -283,7 +313,7 @@ acpi_ds_create_field (
 	ACPI_CREATE_FIELD_INFO  info;
 
 
-	FUNCTION_TRACE_PTR ("Ds_create_field", op);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_create_field", op);
 
 
 	/* First arg is the name of the parent Op_region (must already exist) */
@@ -291,8 +321,8 @@ acpi_ds_create_field (
 	arg = op->value.arg;
 	if (!region_node) {
 		status = acpi_ns_lookup (walk_state->scope_info, arg->value.name,
-				  ACPI_TYPE_REGION, IMODE_EXECUTE,
-				  NS_SEARCH_PARENT, walk_state, &region_node);
+				  ACPI_TYPE_REGION, ACPI_IMODE_EXECUTE,
+				  ACPI_NS_SEARCH_PARENT, walk_state, &region_node);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
@@ -302,6 +332,7 @@ acpi_ds_create_field (
 
 	arg = arg->next;
 	info.field_flags = arg->value.integer8;
+	info.attribute = 0;
 
 	/* Each remaining arg is a Named Field */
 
@@ -309,6 +340,85 @@ acpi_ds_create_field (
 	info.region_node = region_node;
 
 	status = acpi_ds_get_field_names (&info, walk_state, arg->next);
+
+	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ds_init_field_objects
+ *
+ * PARAMETERS:  Op              - Op containing the Field definition and args
+ *  `           Walk_state      - Current method state
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: For each "Field Unit" name in the argument list that is
+ *              part of the field declaration, enter the name into the
+ *              namespace.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ds_init_field_objects (
+	acpi_parse_object       *op,
+	acpi_walk_state         *walk_state)
+{
+	acpi_status             status = AE_AML_ERROR;
+	acpi_parse_object       *arg = NULL;
+	acpi_namespace_node     *node;
+	u8                      type = 0;
+
+
+	ACPI_FUNCTION_TRACE_PTR ("Ds_init_field_objects", op);
+
+
+	switch (walk_state->opcode) {
+	case AML_FIELD_OP:
+		arg = acpi_ps_get_arg (op, 2);
+		type = INTERNAL_TYPE_REGION_FIELD;
+		break;
+
+	case AML_BANK_FIELD_OP:
+		arg = acpi_ps_get_arg (op, 4);
+		type = INTERNAL_TYPE_BANK_FIELD;
+		break;
+
+	case AML_INDEX_FIELD_OP:
+		arg = acpi_ps_get_arg (op, 3);
+		type = INTERNAL_TYPE_INDEX_FIELD;
+		break;
+	}
+
+	/*
+	 * Walk the list of entries in the Field_list
+	 */
+	while (arg) {
+		/* Ignore OFFSET and ACCESSAS terms here */
+
+		if (arg->opcode == AML_INT_NAMEDFIELD_OP) {
+			status = acpi_ns_lookup (walk_state->scope_info,
+					  (NATIVE_CHAR *) &((acpi_parse2_object *)arg)->name,
+					  type, ACPI_IMODE_LOAD_PASS1,
+					  ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE | ACPI_NS_ERROR_IF_FOUND,
+					  walk_state, &node);
+			if (ACPI_FAILURE (status)) {
+				if (status != AE_ALREADY_EXISTS) {
+					return_ACPI_STATUS (status);
+				}
+
+				ACPI_REPORT_ERROR (("Field name [%4.4s] already exists in current scope\n",
+						  &((acpi_parse2_object *)arg)->name));
+			}
+
+			arg->node = node;
+		}
+
+		/* Move to next field in the list */
+
+		arg = arg->next;
+	}
 
 	return_ACPI_STATUS (status);
 }
@@ -339,7 +449,7 @@ acpi_ds_create_bank_field (
 	ACPI_CREATE_FIELD_INFO  info;
 
 
-	FUNCTION_TRACE_PTR ("Ds_create_bank_field", op);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_create_bank_field", op);
 
 
 	/* First arg is the name of the parent Op_region (must already exist) */
@@ -347,8 +457,8 @@ acpi_ds_create_bank_field (
 	arg = op->value.arg;
 	if (!region_node) {
 		status = acpi_ns_lookup (walk_state->scope_info, arg->value.name,
-				  ACPI_TYPE_REGION, IMODE_EXECUTE,
-				  NS_SEARCH_PARENT, walk_state, &region_node);
+				  ACPI_TYPE_REGION, ACPI_IMODE_EXECUTE,
+				  ACPI_NS_SEARCH_PARENT, walk_state, &region_node);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
@@ -358,8 +468,8 @@ acpi_ds_create_bank_field (
 
 	arg = arg->next;
 	status = acpi_ns_lookup (walk_state->scope_info, arg->value.string,
-			  INTERNAL_TYPE_BANK_FIELD_DEFN, IMODE_EXECUTE,
-			  NS_SEARCH_PARENT, walk_state, &info.register_node);
+			  INTERNAL_TYPE_BANK_FIELD_DEFN, ACPI_IMODE_EXECUTE,
+			  ACPI_NS_SEARCH_PARENT, walk_state, &info.register_node);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -410,15 +520,15 @@ acpi_ds_create_index_field (
 	ACPI_CREATE_FIELD_INFO  info;
 
 
-	FUNCTION_TRACE_PTR ("Ds_create_index_field", op);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_create_index_field", op);
 
 
 	/* First arg is the name of the Index register (must already exist) */
 
 	arg = op->value.arg;
 	status = acpi_ns_lookup (walk_state->scope_info, arg->value.string,
-			  ACPI_TYPE_ANY, IMODE_EXECUTE,
-			  NS_SEARCH_PARENT, walk_state, &info.register_node);
+			  ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
+			  ACPI_NS_SEARCH_PARENT, walk_state, &info.register_node);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -427,8 +537,8 @@ acpi_ds_create_index_field (
 
 	arg = arg->next;
 	status = acpi_ns_lookup (walk_state->scope_info, arg->value.string,
-			  INTERNAL_TYPE_INDEX_FIELD_DEFN, IMODE_EXECUTE,
-			  NS_SEARCH_PARENT, walk_state, &info.data_register_node);
+			  INTERNAL_TYPE_INDEX_FIELD_DEFN, ACPI_IMODE_EXECUTE,
+			  ACPI_NS_SEARCH_PARENT, walk_state, &info.data_register_node);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}

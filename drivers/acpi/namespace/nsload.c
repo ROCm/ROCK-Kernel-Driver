@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: nsload - namespace loading/expanding/contracting procedures
- *              $Revision: 47 $
+ *              $Revision: 53 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,14 +34,14 @@
 
 
 #define _COMPONENT          ACPI_NAMESPACE
-	 MODULE_NAME         ("nsload")
+	 ACPI_MODULE_NAME    ("nsload")
 
 
 /*******************************************************************************
  *
  * FUNCTION:    Acpi_load_namespace
  *
- * PARAMETERS:  Display_aml_during_load
+ * PARAMETERS:  None
  *
  * RETURN:      Status
  *
@@ -57,7 +57,7 @@ acpi_ns_load_namespace (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Acpi_load_name_space");
+	ACPI_FUNCTION_TRACE ("Acpi_load_name_space");
 
 
 	/* There must be at least a DSDT installed */
@@ -66,7 +66,6 @@ acpi_ns_load_namespace (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "DSDT is not in memory\n"));
 		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
-
 
 	/*
 	 * Load the namespace.  The DSDT is required,
@@ -82,11 +81,9 @@ acpi_ns_load_namespace (
 	acpi_ns_load_table_by_type (ACPI_TABLE_SSDT);
 	acpi_ns_load_table_by_type (ACPI_TABLE_PSDT);
 
-
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
 		"ACPI Namespace successfully loaded at root %p\n",
 		acpi_gbl_root_node));
-
 
 	return_ACPI_STATUS (status);
 }
@@ -96,11 +93,12 @@ acpi_ns_load_namespace (
  *
  * FUNCTION:    Acpi_ns_one_parse_pass
  *
- * PARAMETERS:
+ * PARAMETERS:  Pass_number             - 1 or 2
+ *              Table_desc              - The table to be parsed.
  *
  * RETURN:      Status
  *
- * DESCRIPTION:
+ * DESCRIPTION: Perform one complete parse of an ACPI/AML table.
  *
  ******************************************************************************/
 
@@ -114,7 +112,7 @@ acpi_ns_one_complete_parse (
 	acpi_walk_state         *walk_state;
 
 
-	FUNCTION_TRACE ("Ns_one_complete_parse");
+	ACPI_FUNCTION_TRACE ("Ns_one_complete_parse");
 
 
 	/* Create and init a Root Node */
@@ -125,7 +123,6 @@ acpi_ns_one_complete_parse (
 	}
 
 	((acpi_parse2_object *) parse_root)->name = ACPI_ROOT_NAME;
-
 
 	/* Create and initialize a new walk state */
 
@@ -174,7 +171,7 @@ acpi_ns_parse_table (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ns_parse_table");
+	ACPI_FUNCTION_TRACE ("Ns_parse_table");
 
 
 	/*
@@ -191,7 +188,6 @@ acpi_ns_parse_table (
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
-
 
 	/*
 	 * AML Parse, pass 2
@@ -232,8 +228,18 @@ acpi_ns_load_table (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ns_load_table");
+	ACPI_FUNCTION_TRACE ("Ns_load_table");
 
+
+	/* Check if table contains valid AML (must be DSDT, PSDT, SSDT, etc.) */
+
+	if (!(acpi_gbl_acpi_table_data[table_desc->type].flags & ACPI_TABLE_EXECUTABLE)) {
+		/* Just ignore this table */
+
+		return_ACPI_STATUS (AE_OK);
+	}
+
+	/* Check validity of the AML start and length */
 
 	if (!table_desc->aml_start) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null AML pointer\n"));
@@ -242,12 +248,10 @@ acpi_ns_load_table (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "AML block at %p\n", table_desc->aml_start));
 
-
 	if (!table_desc->aml_length) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Zero-length AML block\n"));
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
-
 
 	/*
 	 * Parse the table and load the namespace with all named
@@ -260,9 +264,13 @@ acpi_ns_load_table (
 	 */
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** Loading table into namespace ****\n"));
 
-	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
 	status = acpi_ns_parse_table (table_desc, node->child);
-	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
@@ -305,22 +313,23 @@ acpi_ns_load_table_by_type (
 	acpi_table_type         table_type)
 {
 	u32                     i;
-	acpi_status             status = AE_OK;
+	acpi_status             status;
 	acpi_table_desc         *table_desc;
 
 
-	FUNCTION_TRACE ("Ns_load_table_by_type");
+	ACPI_FUNCTION_TRACE ("Ns_load_table_by_type");
 
 
-	acpi_ut_acquire_mutex (ACPI_MTX_TABLES);
-
+	status = acpi_ut_acquire_mutex (ACPI_MTX_TABLES);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	/*
 	 * Table types supported are:
 	 * DSDT (one), SSDT/PSDT (multiple)
 	 */
 	switch (table_type) {
-
 	case ACPI_TABLE_DSDT:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Loading DSDT\n"));
@@ -408,11 +417,8 @@ acpi_ns_load_table_by_type (
 
 
 unlock_and_exit:
-
-	acpi_ut_release_mutex (ACPI_MTX_TABLES);
-
+	(void) acpi_ut_release_mutex (ACPI_MTX_TABLES);
 	return_ACPI_STATUS (status);
-
 }
 
 
@@ -427,8 +433,8 @@ unlock_and_exit:
  * DESCRIPTION: Walks the namespace starting at the given handle and deletes
  *              all objects, entries, and scopes in the entire subtree.
  *
- *              TBD: [Investigate] What if any part of this subtree is in use?
- *              (i.e. on one of the object stacks?)
+ *              Namespace/Interpreter should be locked or the subsystem should
+ *              be in shutdown before this routine is called.
  *
  ******************************************************************************/
 
@@ -444,7 +450,7 @@ acpi_ns_delete_subtree (
 	u32                     level;
 
 
-	FUNCTION_TRACE ("Ns_delete_subtree");
+	ACPI_FUNCTION_TRACE ("Ns_delete_subtree");
 
 
 	parent_handle = start_handle;
@@ -463,7 +469,6 @@ acpi_ns_delete_subtree (
 
 		child_handle = next_child_handle;
 
-
 		/* Did we get a new object? */
 
 		if (ACPI_SUCCESS (status)) {
@@ -480,7 +485,6 @@ acpi_ns_delete_subtree (
 				child_handle = 0;
 			}
 		}
-
 		else {
 			/*
 			 * No more children in this object, go back up to
@@ -526,7 +530,7 @@ acpi_ns_unload_namespace (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ns_unload_name_space");
+	ACPI_FUNCTION_TRACE ("Ns_unload_name_space");
 
 
 	/* Parameter validation */
@@ -538,7 +542,6 @@ acpi_ns_unload_namespace (
 	if (!handle) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
-
 
 	/* This function does the real work */
 

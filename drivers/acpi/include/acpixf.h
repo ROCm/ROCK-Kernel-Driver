@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -66,6 +66,10 @@ acpi_get_system_info (
 const char *
 acpi_format_exception (
 	acpi_status             exception);
+
+acpi_status
+acpi_purge_cached_objects (
+	void);
 
 
 /*
@@ -158,6 +162,23 @@ acpi_get_handle (
 	acpi_string             pathname,
 	acpi_handle             *ret_handle);
 
+acpi_status
+acpi_attach_data (
+	acpi_handle             obj_handle,
+	ACPI_OBJECT_HANDLER     handler,
+	void                    *data);
+
+acpi_status
+acpi_detach_data (
+	acpi_handle             obj_handle,
+	ACPI_OBJECT_HANDLER     handler);
+
+acpi_status
+acpi_get_data (
+	acpi_handle             obj_handle,
+	ACPI_OBJECT_HANDLER     handler,
+	void                    **data);
+
 
 /*
  * Object manipulation and enumeration
@@ -244,11 +265,12 @@ acpi_install_gpe_handler (
 
 acpi_status
 acpi_acquire_global_lock (
-	void);
+	u32                     timeout,
+	u32                     *handle);
 
 acpi_status
 acpi_release_global_lock (
-	void);
+	u32                     handle);
 
 acpi_status
 acpi_remove_gpe_handler (
@@ -314,6 +336,11 @@ acpi_set_firmware_waking_vector (
 acpi_status
 acpi_get_firmware_waking_vector (
 	ACPI_PHYSICAL_ADDRESS   *physical_address);
+
+
+acpi_status
+acpi_enter_sleep_state_prep (
+	u8 sleep_state);
 
 acpi_status
 acpi_enter_sleep_state (

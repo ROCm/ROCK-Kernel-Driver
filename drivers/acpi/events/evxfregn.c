@@ -2,12 +2,12 @@
  *
  * Module Name: evxfregn - External Interfaces, ACPI Operation Regions and
  *                         Address Spaces.
- *              $Revision: 40 $
+ *              $Revision: 48 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 #include "acinterp.h"
 
 #define _COMPONENT          ACPI_EVENTS
-	 MODULE_NAME         ("evxfregn")
+	 ACPI_MODULE_NAME    ("evxfregn")
 
 
 /*******************************************************************************
@@ -63,23 +63,24 @@ acpi_install_address_space_handler (
 	acpi_operand_object     *obj_desc;
 	acpi_operand_object     *handler_obj;
 	acpi_namespace_node     *node;
-	acpi_status             status = AE_OK;
-	acpi_object_type8       type;
+	acpi_status             status;
+	acpi_object_type        type;
 	u16                     flags = 0;
 
 
-	FUNCTION_TRACE ("Acpi_install_address_space_handler");
+	ACPI_FUNCTION_TRACE ("Acpi_install_address_space_handler");
 
 
 	/* Parameter validation */
 
-	if ((!device)   ||
-		((!handler)  && (handler != ACPI_DEFAULT_HANDLER)) ||
-		(space_id > ACPI_MAX_ADDRESS_SPACE)) {
+	if (!device) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	/* Convert and validate the device handle */
 
@@ -103,7 +104,7 @@ acpi_install_address_space_handler (
 	}
 
 	if (handler == ACPI_DEFAULT_HANDLER) {
-		flags = ADDR_HANDLER_DEFAULT_INSTALLED;
+		flags = ACPI_ADDR_HANDLER_DEFAULT_INSTALLED;
 
 		switch (space_id) {
 		case ACPI_ADR_SPACE_SYSTEM_MEMORY:
@@ -131,10 +132,14 @@ acpi_install_address_space_handler (
 			setup   = acpi_ev_pci_bar_region_setup;
 			break;
 
+		case ACPI_ADR_SPACE_DATA_TABLE:
+			handler = acpi_ex_data_table_space_handler;
+			setup   = NULL;
+			break;
+
 		default:
 			status = AE_NOT_EXIST;
 			goto unlock_and_exit;
-			break;
 		}
 	}
 
@@ -164,7 +169,7 @@ acpi_install_address_space_handler (
 			 * address space.
 			 */
 			if(handler_obj->addr_handler.space_id == space_id) {
-				status = AE_EXIST;
+				status = AE_ALREADY_EXISTS;
 				goto unlock_and_exit;
 			}
 
@@ -174,7 +179,6 @@ acpi_install_address_space_handler (
 			handler_obj = handler_obj->addr_handler.next;
 		}
 	}
-
 	else {
 		ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
 			"Creating object on Device %p while installing handler\n", node));
@@ -200,7 +204,7 @@ acpi_install_address_space_handler (
 
 		/* Attach the new object to the Node */
 
-		status = acpi_ns_attach_object (node, obj_desc, (u8) type);
+		status = acpi_ns_attach_object (node, obj_desc, type);
 		if (ACPI_FAILURE (status)) {
 			acpi_ut_remove_reference (obj_desc);
 			goto unlock_and_exit;
@@ -246,7 +250,7 @@ acpi_install_address_space_handler (
 	 * of the branch
 	 */
 	status = acpi_ns_walk_namespace (ACPI_TYPE_ANY, device,
-			 ACPI_UINT32_MAX, NS_WALK_UNLOCK,
+			 ACPI_UINT32_MAX, ACPI_NS_WALK_UNLOCK,
 			 acpi_ev_addr_handler_helper,
 			 handler_obj, NULL);
 
@@ -260,7 +264,7 @@ acpi_install_address_space_handler (
 
 
 unlock_and_exit:
-	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
 
@@ -289,21 +293,22 @@ acpi_remove_address_space_handler (
 	acpi_operand_object     *region_obj;
 	acpi_operand_object     **last_obj_ptr;
 	acpi_namespace_node     *node;
-	acpi_status             status = AE_OK;
+	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Acpi_remove_address_space_handler");
+	ACPI_FUNCTION_TRACE ("Acpi_remove_address_space_handler");
 
 
 	/* Parameter validation */
 
-	if ((!device)   ||
-		((!handler)  && (handler != ACPI_DEFAULT_HANDLER)) ||
-		(space_id > ACPI_MAX_ADDRESS_SPACE)) {
+	if (!device) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	/* Convert and validate the device handle */
 
@@ -312,7 +317,6 @@ acpi_remove_address_space_handler (
 		status = AE_BAD_PARAMETER;
 		goto unlock_and_exit;
 	}
-
 
 	/* Make sure the internal object exists */
 
@@ -396,7 +400,7 @@ acpi_remove_address_space_handler (
 
 
 unlock_and_exit:
-	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
 

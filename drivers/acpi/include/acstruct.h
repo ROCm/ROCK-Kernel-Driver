@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acstruct.h - Internal structs
- *       $Revision: 10 $
+ *       $Revision: 16 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -39,12 +39,12 @@
  * the tree (for whatever reason), and for control method execution.
  */
 
-#define NEXT_OP_DOWNWARD    1
-#define NEXT_OP_UPWARD      2
+#define ACPI_NEXT_OP_DOWNWARD    1
+#define ACPI_NEXT_OP_UPWARD      2
 
-#define WALK_NON_METHOD     0
-#define WALK_METHOD         1
-#define WALK_METHOD_RESTART 2
+#define ACPI_WALK_NON_METHOD     0
+#define ACPI_WALK_METHOD         1
+#define ACPI_WALK_METHOD_RESTART 2
 
 typedef struct acpi_walk_state
 {
@@ -56,12 +56,12 @@ typedef struct acpi_walk_state
 	u8                      num_operands;                       /* Stack pointer for Operands[] array */
 	u8                      return_used;
 	u8                      walk_type;
-	u16                     current_sync_level;                 /* Mutex Sync (nested acquire) level */
 	u16                     opcode;                             /* Current AML opcode */
 	u32                     arg_count;                          /* push for fixed or var args */
 	u32                     aml_offset;
 	u32                     arg_types;
 	u32                     method_breakpoint;                  /* For single stepping */
+	u32                     user_breakpoint;                    /* User AML breakpoint */
 	u32                     parse_flags;
 	u32                     prev_arg_types;
 
@@ -86,31 +86,15 @@ typedef struct acpi_walk_state
 	union acpi_operand_obj  *return_desc;                       /* Return object, if any */
 	acpi_generic_state      *scope_info;                        /* Stack of nested scopes */
 
-/* TBD: Obsolete with removal of WALK procedure ? */
 	acpi_parse_object       *prev_op;                           /* Last op that was processed */
 	acpi_parse_object       *next_op;                           /* next op to be processed */
-
-
 	acpi_parse_downwards    descending_callback;
 	acpi_parse_upwards      ascending_callback;
-	struct acpi_walk_list   *walk_list;
+	ACPI_THREAD_STATE       *thread;
 	struct acpi_walk_state  *next;                              /* Next Walk_state in list */
 
 
 } acpi_walk_state;
-
-
-/*
- * Walk list - head of a tree of walk states.  Multiple walk states are created when there
- * are nested control methods executing.
- */
-typedef struct acpi_walk_list
-{
-
-	acpi_walk_state         *walk_state;
-	ACPI_OBJECT_MUTEX       acquired_mutex_list;               /* List of all currently acquired mutexes */
-
-} acpi_walk_list;
 
 
 /* Info used by Acpi_ps_init_objects */
@@ -128,7 +112,7 @@ typedef struct acpi_init_walk_info
 } acpi_init_walk_info;
 
 
-/* Info used by TBD */
+/* Info used by Acpi_ns_initialize_devices */
 
 typedef struct acpi_device_walk_info
 {

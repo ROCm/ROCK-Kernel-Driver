@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: actbl.h - Table data structures defined in ACPI specification
- *       $Revision: 46 $
+ *       $Revision: 52 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,7 +30,6 @@
 /*
  *  Values for description table header signatures
  */
-
 #define RSDP_NAME               "RSDP"
 #define RSDP_SIG                "RSD PTR "  /* RSDT Pointer signature */
 #define APIC_SIG                "APIC"      /* Multiple APIC Description Table */
@@ -42,7 +41,7 @@
 #define XSDT_SIG                "XSDT"      /* Extended  System Description Table */
 #define SSDT_SIG                "SSDT"      /* Secondary System Description Table */
 #define SBST_SIG                "SBST"      /* Smart Battery Specification Table */
-#define SPIC_SIG                "SPIC"      /* iosapic table */
+#define SPIC_SIG                "SPIC"      /* IOSAPIC table */
 #define BOOT_SIG                "BOOT"      /* Boot table */
 
 
@@ -75,29 +74,27 @@
  * Architecture-independent tables
  * The architecture dependent tables are in separate files
  */
-
 typedef struct  /* Root System Descriptor Pointer */
 {
-	NATIVE_CHAR             signature [8];          /* contains "RSD PTR " */
-	u8                      checksum;               /* to make sum of struct == 0 */
+	NATIVE_CHAR             signature [8];          /* ACPI signature, contains "RSD PTR " */
+	u8                      checksum;               /* To make sum of struct == 0 */
 	NATIVE_CHAR             oem_id [6];             /* OEM identification */
 	u8                      revision;               /* Must be 0 for 1.0, 2 for 2.0 */
 	u32                     rsdt_physical_address;  /* 32-bit physical address of RSDT */
 	u32                     length;                 /* XSDT Length in bytes including hdr */
 	u64                     xsdt_physical_address;  /* 64-bit physical address of XSDT */
 	u8                      extended_checksum;      /* Checksum of entire table */
-	NATIVE_CHAR             reserved [3];           /* reserved field must be 0 */
+	NATIVE_CHAR             reserved [3];           /* Reserved field must be 0 */
 
 } RSDP_DESCRIPTOR;
 
 
 typedef struct  /* ACPI common table header */
 {
-	NATIVE_CHAR             signature [4];          /* identifies type of table */
-	u32                     length;                 /* length of table, in bytes,
-			  * including header */
-	u8                      revision;               /* specification minor version # */
-	u8                      checksum;               /* to make sum of entire table == 0 */
+	NATIVE_CHAR             signature [4];          /* ACPI signature (4 ASCII characters) */
+	u32                     length;                 /* Length of table, in bytes, including header */
+	u8                      revision;               /* ACPI Specification minor version # */
+	u8                      checksum;               /* To make sum of entire table == 0 */
 	NATIVE_CHAR             oem_id [6];             /* OEM identification */
 	NATIVE_CHAR             oem_table_id [8];       /* OEM table identification */
 	u32                     oem_revision;           /* OEM revision number */
@@ -118,7 +115,7 @@ typedef struct  /* Common FACS for internal use */
 
 typedef struct  /* APIC Table */
 {
-	acpi_table_header       header;                 /* table header */
+	acpi_table_header       header;                 /* ACPI table header */
 	u32                     local_apic_address;     /* Physical address for accessing local APICs */
 	u32                     PCATcompat      : 1;    /* a one indicates system also has dual 8259s */
 	u32                     reserved1       : 31;
@@ -138,7 +135,7 @@ typedef struct  /* Processor APIC */
 {
 	APIC_HEADER             header;
 	u8                      processor_apic_id;      /* ACPI processor id */
-	u8                      local_apic_id;          /* processor's local APIC id */
+	u8                      local_apic_id;          /* Processor's local APIC id */
 	u32                     processor_enabled: 1;   /* Processor is usable if set */
 	u32                     reserved1       : 31;
 
@@ -149,21 +146,21 @@ typedef struct  /* IO APIC */
 {
 	APIC_HEADER             header;
 	u8                      io_apic_id;             /* I/O APIC ID */
-	u8                      reserved;               /* reserved - must be zero */
+	u8                      reserved;               /* Reserved - must be zero */
 	u32                     io_apic_address;        /* APIC's physical address */
-	u32                     vector;                 /* interrupt vector index where INTI
+	u32                     vector;                 /* Interrupt vector index where INTI
 			  * lines start */
 } IO_APIC;
 
 
 /*
-**  IA64 TODO:  Add SAPIC Tables
-*/
+ *  IA64 TBD:  Add SAPIC Tables
+ */
 
 /*
-**  IA64 TODO:  Modify Smart Battery Description to comply with ACPI IA64
-**              extensions.
-*/
+ *  IA64 TBD:   Modify Smart Battery Description to comply with ACPI IA64
+ *              extensions.
+ */
 typedef struct  /* Smart Battery Description Table */
 {
 	acpi_table_header       header;
@@ -182,7 +179,6 @@ typedef struct  /* Smart Battery Description Table */
  * and type of memory allocation (mapped or allocated) for each
  * table for 1) when we exit, and 2) if a new table is installed
  */
-
 #define ACPI_MEM_NOT_ALLOCATED  0
 #define ACPI_MEM_ALLOCATED      1
 #define ACPI_MEM_MAPPED         2
@@ -191,7 +187,7 @@ typedef struct  /* Smart Battery Description Table */
 
 #define ACPI_TABLE_SINGLE       0
 #define ACPI_TABLE_MULTIPLE     1
-
+#define ACPI_TABLE_EXECUTABLE   2
 
 /* Data about each known table type */
 
@@ -199,19 +195,17 @@ typedef struct _acpi_table_support
 {
 	NATIVE_CHAR             *name;
 	NATIVE_CHAR             *signature;
+	void                    **global_ptr;
 	u8                      sig_length;
 	u8                      flags;
-	u16                     status;
-	void                    **global_ptr;
 
 } ACPI_TABLE_SUPPORT;
+
 
 /*
  * Get the architecture-specific tables
  */
-
-#include "actbl1.h"   /* Acpi 1.0 table defintions */
-#include "actbl71.h"  /* Acpi 0.71 IA-64 Extension table defintions */
+#include "actbl1.h"   /* Acpi 1.0 table definitions */
 #include "actbl2.h"   /* Acpi 2.0 table definitions */
 
 #endif /* __ACTBL_H__ */

@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: dbinput - user front-end to the AML debugger
- *              $Revision: 72 $
+ *              $Revision: 81 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -35,56 +35,14 @@
 #ifdef ENABLE_DEBUGGER
 
 #define _COMPONENT          ACPI_DEBUGGER
-	 MODULE_NAME         ("dbinput")
+	 ACPI_MODULE_NAME    ("dbinput")
 
-
-/*
- * Globals that are specific to the debugger
- */
-
-NATIVE_CHAR                 acpi_gbl_db_line_buf[80];
-NATIVE_CHAR                 acpi_gbl_db_parsed_buf[80];
-NATIVE_CHAR                 acpi_gbl_db_scope_buf[40];
-NATIVE_CHAR                 acpi_gbl_db_debug_filename[40];
-NATIVE_CHAR                 *acpi_gbl_db_args[DB_MAX_ARGS];
-NATIVE_CHAR                 *acpi_gbl_db_buffer = NULL;
-NATIVE_CHAR                 *acpi_gbl_db_filename = NULL;
-u8                          acpi_gbl_db_output_to_file = FALSE;
-
-u32                         acpi_gbl_db_debug_level = ACPI_LV_VERBOSITY2;
-u32                         acpi_gbl_db_console_debug_level = NORMAL_DEFAULT | ACPI_LV_TABLES;
-u8                          acpi_gbl_db_output_flags = DB_CONSOLE_OUTPUT;
-
-
-u8                          acpi_gbl_db_opt_tables    = FALSE;
-u8                          acpi_gbl_db_opt_disasm    = FALSE;
-u8                          acpi_gbl_db_opt_stats     = FALSE;
-u8                          acpi_gbl_db_opt_parse_jit = FALSE;
-u8                          acpi_gbl_db_opt_verbose   = TRUE;
-u8                          acpi_gbl_db_opt_ini_methods = TRUE;
-
-/*
- * Statistic globals
- */
-u16                         acpi_gbl_obj_type_count[INTERNAL_TYPE_NODE_MAX+1];
-u16                         acpi_gbl_node_type_count[INTERNAL_TYPE_NODE_MAX+1];
-u16                         acpi_gbl_obj_type_count_misc;
-u16                         acpi_gbl_node_type_count_misc;
-u32                         acpi_gbl_num_nodes;
-u32                         acpi_gbl_num_objects;
-
-
-u32                         acpi_gbl_size_of_parse_tree;
-u32                         acpi_gbl_size_of_method_trees;
-u32                         acpi_gbl_size_of_node_entries;
-u32                         acpi_gbl_size_of_acpi_objects;
 
 /*
  * Top-level debugger commands.
  *
  * This list of commands must match the string table below it
  */
-
 enum acpi_ex_debugger_commands
 {
 	CMD_NOT_FOUND = 0,
@@ -224,13 +182,11 @@ acpi_db_display_help (
 
 	}
 
-
 	/*
 	 * Parameter is the command class
 	 *
 	 * The idea here is to keep each class of commands smaller than a screenful
 	 */
-
 	switch (help_type[0])
 	{
 	case 'G':
@@ -321,13 +277,13 @@ acpi_db_get_next_token (
 {
 	NATIVE_CHAR             *start;
 
+
 	/* At end of buffer? */
 
 	if (!string || !(*string))
 	{
 		return (NULL);
 	}
-
 
 	/* Get rid of any spaces at the beginning */
 
@@ -353,12 +309,10 @@ acpi_db_get_next_token (
 		string++;
 	}
 
-
 	if (!(*string))
 	{
 		*next = NULL;
 	}
-
 	else
 	{
 		*string = 0;
@@ -392,11 +346,11 @@ acpi_db_get_line (
 	NATIVE_CHAR             *this;
 
 
-	STRCPY (acpi_gbl_db_parsed_buf, input_buffer);
-	STRUPR (acpi_gbl_db_parsed_buf);
+	ACPI_STRCPY (acpi_gbl_db_parsed_buf, input_buffer);
+	ACPI_STRUPR (acpi_gbl_db_parsed_buf);
 
 	this = acpi_gbl_db_parsed_buf;
-	for (i = 0; i < DB_MAX_ARGS; i++)
+	for (i = 0; i < ACPI_DEBUGGER_MAX_ARGS; i++)
 	{
 		acpi_gbl_db_args[i] = acpi_db_get_next_token (this, &next);
 		if (!acpi_gbl_db_args[i])
@@ -407,12 +361,11 @@ acpi_db_get_line (
 		this = next;
 	}
 
-
 	/* Uppercase the actual command */
 
 	if (acpi_gbl_db_args[0])
 	{
-		STRUPR (acpi_gbl_db_args[0]);
+		ACPI_STRUPR (acpi_gbl_db_args[0]);
 	}
 
 	count = i;
@@ -451,7 +404,8 @@ acpi_db_match_command (
 
 	for (i = CMD_FIRST_VALID; acpi_gbl_db_commands[i].name; i++)
 	{
-		if (STRSTR (acpi_gbl_db_commands[i].name, user_command) == acpi_gbl_db_commands[i].name)
+		if (ACPI_STRSTR (acpi_gbl_db_commands[i].name, user_command) ==
+				   acpi_gbl_db_commands[i].name)
 		{
 			return (i);
 		}
@@ -601,7 +555,6 @@ acpi_db_command_dispatch (
 			status = AE_CTRL_TRUE;
 		}
 		return (status);
-		break;
 
 	case CMD_HISTORY_LAST:
 		command_line = acpi_db_get_from_history (NULL);
@@ -625,9 +578,6 @@ acpi_db_command_dispatch (
 		if (op)
 		{
 			acpi_gbl_cm_single_step = TRUE;
-
-/* TBD: Must get current walk state */
-			/* Acpi_gbl_Method_breakpoint = 0; */
 			return (AE_OK);
 		}
 		break;
@@ -641,13 +591,13 @@ acpi_db_command_dispatch (
 		else if (param_count == 2)
 		{
 			temp = acpi_gbl_db_console_debug_level;
-			acpi_gbl_db_console_debug_level = STRTOUL (acpi_gbl_db_args[1], NULL, 16);
+			acpi_gbl_db_console_debug_level = ACPI_STRTOUL (acpi_gbl_db_args[1], NULL, 16);
 			acpi_os_printf ("Debug Level for console output was %8.8lX, now %8.8lX\n", temp, acpi_gbl_db_console_debug_level);
 		}
 		else
 		{
 			temp = acpi_gbl_db_debug_level;
-			acpi_gbl_db_debug_level = STRTOUL (acpi_gbl_db_args[1], NULL, 16);
+			acpi_gbl_db_debug_level = ACPI_STRTOUL (acpi_gbl_db_args[1], NULL, 16);
 			acpi_os_printf ("Debug Level for file output was %8.8lX, now %8.8lX\n", temp, acpi_gbl_db_debug_level);
 		}
 		break;
@@ -681,12 +631,12 @@ acpi_db_command_dispatch (
 		break;
 
 	case CMD_NOTIFY:
-		temp = STRTOUL (acpi_gbl_db_args[2], NULL, 0);
+		temp = ACPI_STRTOUL (acpi_gbl_db_args[2], NULL, 0);
 		acpi_db_send_notify (acpi_gbl_db_args[1], temp);
 		break;
 
 	case CMD_OBJECT:
-		acpi_db_display_objects (STRUPR (acpi_gbl_db_args[1]), acpi_gbl_db_args[2]);
+		acpi_db_display_objects (ACPI_STRUPR (acpi_gbl_db_args[1]), acpi_gbl_db_args[2]);
 		break;
 
 	case CMD_OPEN:
@@ -723,14 +673,13 @@ acpi_db_command_dispatch (
 
 	case CMD_STOP:
 		return (AE_AML_ERROR);
-		break;
 
 	case CMD_TABLES:
 		acpi_db_display_table_info (acpi_gbl_db_args[1]);
 		break;
 
 	case CMD_TERMINATE:
-		acpi_db_set_output_destination (DB_REDIRECTABLE_OUTPUT);
+		acpi_db_set_output_destination (ACPI_DB_REDIRECTABLE_OUTPUT);
 		acpi_ut_subsystem_shutdown ();
 
 		/* TBD: [Restructure] Need some way to re-initialize without re-creating the semaphores! */
@@ -798,11 +747,12 @@ acpi_db_command_dispatch (
  *
  ******************************************************************************/
 
-void
+void ACPI_SYSTEM_XFACE
 acpi_db_execute_thread (
 	void                    *context)
 {
 	acpi_status             status = AE_OK;
+	acpi_status             Mstatus;
 
 
 	while (status != AE_CTRL_TERMINATE)
@@ -810,9 +760,19 @@ acpi_db_execute_thread (
 		acpi_gbl_method_executing = FALSE;
 		acpi_gbl_step_to_next_call = FALSE;
 
-		acpi_ut_acquire_mutex (ACPI_MTX_DEBUG_CMD_READY);
+		Mstatus = acpi_ut_acquire_mutex (ACPI_MTX_DEBUG_CMD_READY);
+		if (ACPI_FAILURE (Mstatus))
+		{
+			return;
+		}
+
 		status = acpi_db_command_dispatch (acpi_gbl_db_line_buf, NULL, NULL);
-		acpi_ut_release_mutex (ACPI_MTX_DEBUG_CMD_COMPLETE);
+
+		Mstatus = acpi_ut_release_mutex (ACPI_MTX_DEBUG_CMD_COMPLETE);
+		if (ACPI_FAILURE (Mstatus))
+		{
+			return;
+		}
 	}
 }
 
@@ -834,7 +794,7 @@ void
 acpi_db_single_thread (
 	void)
 {
-	acpi_status             status = AE_OK;
+	acpi_status             status;
 
 
 	acpi_gbl_method_executing = FALSE;
@@ -872,17 +832,17 @@ acpi_db_user_commands (
 	{
 		/* Force output to console until a command is entered */
 
-		acpi_db_set_output_destination (DB_CONSOLE_OUTPUT);
+		acpi_db_set_output_destination (ACPI_DB_CONSOLE_OUTPUT);
 
 		/* Different prompt if method is executing */
 
 		if (!acpi_gbl_method_executing)
 		{
-			acpi_os_printf ("%1c ", DB_COMMAND_PROMPT);
+			acpi_os_printf ("%1c ", ACPI_DEBUGGER_COMMAND_PROMPT);
 		}
 		else
 		{
-			acpi_os_printf ("%1c ", DB_EXECUTE_PROMPT);
+			acpi_os_printf ("%1c ", ACPI_DEBUGGER_EXECUTE_PROMPT);
 		}
 
 		/* Get the user input line */
@@ -898,10 +858,18 @@ acpi_db_user_commands (
 			 * Signal the debug thread that we have a command to execute,
 			 * and wait for the command to complete.
 			 */
-			acpi_ut_release_mutex (ACPI_MTX_DEBUG_CMD_READY);
-			acpi_ut_acquire_mutex (ACPI_MTX_DEBUG_CMD_COMPLETE);
-		}
+			status = acpi_ut_release_mutex (ACPI_MTX_DEBUG_CMD_READY);
+			if (ACPI_FAILURE (status))
+			{
+				return (status);
+			}
 
+			status = acpi_ut_acquire_mutex (ACPI_MTX_DEBUG_CMD_COMPLETE);
+			if (ACPI_FAILURE (status))
+			{
+				return (status);
+			}
+		}
 		else
 		{
 			/* Just call to the command line interpreter */
@@ -909,7 +877,6 @@ acpi_db_user_commands (
 			acpi_db_single_thread ();
 		}
 	}
-
 
 	/*
 	 * Only this thread (the original thread) should actually terminate the subsystem,

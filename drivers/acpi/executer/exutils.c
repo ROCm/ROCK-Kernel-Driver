@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 85 $
+ *              $Revision: 93 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -50,7 +50,7 @@
 #include "acparser.h"
 
 #define _COMPONENT          ACPI_EXECUTER
-	 MODULE_NAME         ("exutils")
+	 ACPI_MODULE_NAME    ("exutils")
 
 
 /*******************************************************************************
@@ -59,8 +59,8 @@
  *
  * PARAMETERS:  None
  *
- * DESCRIPTION: Enter the interpreter execution region
- *              TBD: should be a macro
+ * DESCRIPTION: Enter the interpreter execution region.  Failure to enter
+ *              the interpreter region is a fatal system error
  *
  ******************************************************************************/
 
@@ -69,10 +69,14 @@ acpi_ex_enter_interpreter (void)
 {
 	acpi_status             status;
 
-	FUNCTION_TRACE ("Ex_enter_interpreter");
+	ACPI_FUNCTION_TRACE ("Ex_enter_interpreter");
 
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_EXECUTE);
+	if (ACPI_FAILURE (status)) {
+		ACPI_REPORT_ERROR (("Fatal - Could not acquire interpreter lock\n"));
+	}
+
 	return_ACPI_STATUS (status);
 }
 
@@ -95,17 +99,18 @@ acpi_ex_enter_interpreter (void)
  *          already executing
  *      7) About to invoke a user-installed opregion handler
  *
- *              TBD: should be a macro
- *
  ******************************************************************************/
 
 void
 acpi_ex_exit_interpreter (void)
 {
-	FUNCTION_TRACE ("Ex_exit_interpreter");
+	acpi_status             status;
 
 
-	acpi_ut_release_mutex (ACPI_MTX_EXECUTE);
+	ACPI_FUNCTION_TRACE ("Ex_exit_interpreter");
+
+
+	status = acpi_ut_release_mutex (ACPI_MTX_EXECUTE);
 
 	return_VOID;
 }
@@ -126,7 +131,7 @@ acpi_ex_validate_object_type (
 	acpi_object_type        type)
 {
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	if ((type > ACPI_TYPE_MAX && type < INTERNAL_TYPE_BEGIN) ||
@@ -159,7 +164,7 @@ acpi_ex_truncate_for32bit_table (
 	acpi_walk_state         *walk_state)
 {
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/*
@@ -186,7 +191,8 @@ acpi_ex_truncate_for32bit_table (
  *
  * FUNCTION:    Acpi_ex_acquire_global_lock
  *
- * PARAMETERS:  Rule            - Lock rule: Always_lock, Never_lock
+ * PARAMETERS:  Field_flags           - Flags with Lock rule:
+ *                                      Always_lock or Never_lock
  *
  * RETURN:      TRUE/FALSE indicating whether the lock was actually acquired
  *
@@ -198,25 +204,24 @@ acpi_ex_truncate_for32bit_table (
 
 u8
 acpi_ex_acquire_global_lock (
-	u32                     rule)
+	u32                     field_flags)
 {
 	u8                      locked = FALSE;
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ex_acquire_global_lock");
+	ACPI_FUNCTION_TRACE ("Ex_acquire_global_lock");
 
 
-	/* Only attempt lock if the Rule says so */
+	/* Only attempt lock if the Always_lock bit is set */
 
-	if (rule == (u32) GLOCK_ALWAYS_LOCK) {
-		/* We should attempt to get the lock */
+	if (field_flags & AML_FIELD_LOCK_RULE_MASK) {
+		/* We should attempt to get the lock, wait forever */
 
-		status = acpi_ev_acquire_global_lock ();
+		status = acpi_ev_acquire_global_lock (ACPI_UINT32_MAX);
 		if (ACPI_SUCCESS (status)) {
 			locked = TRUE;
 		}
-
 		else {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not acquire Global Lock, %s\n",
 				acpi_format_exception (status)));
@@ -245,7 +250,7 @@ acpi_ex_release_global_lock (
 	u8                      locked_by_me)
 {
 
-	FUNCTION_TRACE ("Ex_release_global_lock");
+	ACPI_FUNCTION_TRACE ("Ex_release_global_lock");
 
 
 	/* Only attempt unlock if the caller locked it */
@@ -255,7 +260,6 @@ acpi_ex_release_global_lock (
 
 		acpi_ev_release_global_lock ();
 	}
-
 
 	return_ACPI_STATUS (AE_OK);
 }
@@ -280,13 +284,12 @@ acpi_ex_digits_needed (
 	u32                     num_digits = 0;
 
 
-	FUNCTION_TRACE ("Ex_digits_needed");
+	ACPI_FUNCTION_TRACE ("Ex_digits_needed");
 
 
 	if (base < 1) {
-		REPORT_ERROR (("Ex_digits_needed: Internal error - Invalid base\n"));
+		ACPI_REPORT_ERROR (("Ex_digits_needed: Internal error - Invalid base\n"));
 	}
-
 	else {
 		/*
 		 * acpi_integer is unsigned, which is why we don't worry about a '-'
@@ -325,7 +328,7 @@ _ntohl (
 	} in;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	in.value = value;
@@ -358,7 +361,7 @@ acpi_ex_eisa_id_to_string (
 	u32                     id;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/* swap to big-endian to get contiguous bits */
@@ -399,7 +402,7 @@ acpi_ex_unsigned_integer_to_string (
 	u32                     remainder;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	digits_needed = acpi_ex_digits_needed (value, 10);

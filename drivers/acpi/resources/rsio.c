@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: rsio - IO and DMA resource descriptors
- *              $Revision: 14 $
+ *              $Revision: 17 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@
 #include "acresrc.h"
 
 #define _COMPONENT          ACPI_RESOURCES
-	 MODULE_NAME         ("rsio")
+	 ACPI_MODULE_NAME    ("rsio")
 
 
 /*******************************************************************************
@@ -37,13 +37,12 @@
  *
  * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
  *                                        stream
- *              Bytes_consumed          - u32 pointer that is filled with
- *                                        the number of bytes consumed from
- *                                        the Byte_stream_buffer
- *              Output_buffer           - Pointer to the user's return buffer
- *              Structure_size          - u32 pointer that is filled with
- *                                        the number of bytes in the filled
- *                                        in structure
+ *              Bytes_consumed          - Pointer to where the number of bytes
+ *                                        consumed the Byte_stream_buffer is
+ *                                        returned
+ *              Output_buffer           - Pointer to the return data buffer
+ *              Structure_size          - Pointer to where the number of bytes
+ *                                        in the return data struct is returned
  *
  * RETURN:      Status
  *
@@ -56,18 +55,18 @@
 acpi_status
 acpi_rs_io_resource (
 	u8                      *byte_stream_buffer,
-	u32                     *bytes_consumed,
+	ACPI_SIZE               *bytes_consumed,
 	u8                      **output_buffer,
-	u32                     *structure_size)
+	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_io);
+	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_io);
 
 
-	FUNCTION_TRACE ("Rs_io_resource");
+	ACPI_FUNCTION_TRACE ("Rs_io_resource");
 
 
 	/*
@@ -89,7 +88,7 @@ acpi_rs_io_resource (
 	 * Check Min_base Address
 	 */
 	buffer += 1;
-	MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
 
 	output_struct->data.io.min_base_address = temp16;
 
@@ -97,7 +96,7 @@ acpi_rs_io_resource (
 	 * Check Max_base Address
 	 */
 	buffer += 2;
-	MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
 
 	output_struct->data.io.max_base_address = temp16;
 
@@ -136,13 +135,12 @@ acpi_rs_io_resource (
  *
  * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
  *                                        stream
- *              Bytes_consumed          - u32 pointer that is filled with
- *                                        the number of bytes consumed from
- *                                        the Byte_stream_buffer
- *              Output_buffer           - Pointer to the user's return buffer
- *              Structure_size          - u32 pointer that is filled with
- *                                        the number of bytes in the filled
- *                                        in structure
+ *              Bytes_consumed          - Pointer to where the number of bytes
+ *                                        consumed the Byte_stream_buffer is
+ *                                        returned
+ *              Output_buffer           - Pointer to the return data buffer
+ *              Structure_size          - Pointer to where the number of bytes
+ *                                        in the return data struct is returned
  *
  * RETURN:      Status
  *
@@ -155,18 +153,18 @@ acpi_rs_io_resource (
 acpi_status
 acpi_rs_fixed_io_resource (
 	u8                      *byte_stream_buffer,
-	u32                     *bytes_consumed,
+	ACPI_SIZE               *bytes_consumed,
 	u8                      **output_buffer,
-	u32                     *structure_size)
+	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_fixed_io);
+	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_fixed_io);
 
 
-	FUNCTION_TRACE ("Rs_fixed_io_resource");
+	ACPI_FUNCTION_TRACE ("Rs_fixed_io_resource");
 
 
 	/*
@@ -180,7 +178,7 @@ acpi_rs_fixed_io_resource (
 	 * Check Range Base Address
 	 */
 	buffer += 1;
-	MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
 
 	output_struct->data.fixed_io.base_address = temp16;
 
@@ -211,9 +209,8 @@ acpi_rs_fixed_io_resource (
  *
  * PARAMETERS:  Linked_list             - Pointer to the resource linked list
  *              Output_buffer           - Pointer to the user's return buffer
- *              Bytes_consumed          - u32 pointer that is filled with
- *                                        the number of bytes of the
- *                                        Output_buffer used
+ *              Bytes_consumed          - Pointer to where the number of bytes
+ *                                        used in the Output_buffer is returned
  *
  * RETURN:      Status
  *
@@ -226,14 +223,14 @@ acpi_status
 acpi_rs_io_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	u32                     *bytes_consumed)
+	ACPI_SIZE               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 
 
-	FUNCTION_TRACE ("Rs_io_stream");
+	ACPI_FUNCTION_TRACE ("Rs_io_stream");
 
 
 	/*
@@ -255,7 +252,7 @@ acpi_rs_io_stream (
 	 */
 	temp16 = (u16) linked_list->data.io.min_base_address;
 
-	MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
+	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
 	buffer += 2;
 
 	/*
@@ -263,7 +260,7 @@ acpi_rs_io_stream (
 	 */
 	temp16 = (u16) linked_list->data.io.max_base_address;
 
-	MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
+	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
 	buffer += 2;
 
 	/*
@@ -285,7 +282,7 @@ acpi_rs_io_stream (
 	/*
 	 * Return the number of bytes consumed in this operation
 	 */
-	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
+	*bytes_consumed = ACPI_PTR_DIFF (buffer, *output_buffer);
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -296,9 +293,8 @@ acpi_rs_io_stream (
  *
  * PARAMETERS:  Linked_list             - Pointer to the resource linked list
  *              Output_buffer           - Pointer to the user's return buffer
- *              Bytes_consumed          - u32 pointer that is filled with
- *                                        the number of bytes of the
- *                                        Output_buffer used
+ *              Bytes_consumed          - Pointer to where the number of bytes
+ *                                        used in the Output_buffer is returned
  *
  * RETURN:      Status
  *
@@ -311,14 +307,14 @@ acpi_status
 acpi_rs_fixed_io_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	u32                     *bytes_consumed)
+	ACPI_SIZE               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 
 
-	FUNCTION_TRACE ("Rs_fixed_io_stream");
+	ACPI_FUNCTION_TRACE ("Rs_fixed_io_stream");
 
 
 	/*
@@ -333,7 +329,7 @@ acpi_rs_fixed_io_stream (
 	 */
 	temp16 = (u16) linked_list->data.fixed_io.base_address;
 
-	MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
+	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
 	buffer += 2;
 
 	/*
@@ -347,7 +343,7 @@ acpi_rs_fixed_io_stream (
 	/*
 	 * Return the number of bytes consumed in this operation
 	 */
-	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
+	*bytes_consumed = ACPI_PTR_DIFF (buffer, *output_buffer);
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -358,13 +354,12 @@ acpi_rs_fixed_io_stream (
  *
  * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
  *                                        stream
- *              Bytes_consumed          - u32 pointer that is filled with
- *                                        the number of bytes consumed from
- *                                        the Byte_stream_buffer
- *              Output_buffer           - Pointer to the user's return buffer
- *              Structure_size          - u32 pointer that is filled with
- *                                        the number of bytes in the filled
- *                                        in structure
+ *              Bytes_consumed          - Pointer to where the number of bytes
+ *                                        consumed the Byte_stream_buffer is
+ *                                        returned
+ *              Output_buffer           - Pointer to the return data buffer
+ *              Structure_size          - Pointer to where the number of bytes
+ *                                        in the return data struct is returned
  *
  * RETURN:      Status
  *
@@ -377,19 +372,19 @@ acpi_rs_fixed_io_stream (
 acpi_status
 acpi_rs_dma_resource (
 	u8                      *byte_stream_buffer,
-	u32                     *bytes_consumed,
+	ACPI_SIZE               *bytes_consumed,
 	u8                      **output_buffer,
-	u32                     *structure_size)
+	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
 	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
 	u8                      temp8 = 0;
 	u8                      index;
 	u8                      i;
-	u32                     struct_size = SIZEOF_RESOURCE (acpi_resource_dma);
+	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_dma);
 
 
-	FUNCTION_TRACE ("Rs_dma_resource");
+	ACPI_FUNCTION_TRACE ("Rs_dma_resource");
 
 
 	/*
@@ -464,9 +459,8 @@ acpi_rs_dma_resource (
  *
  * PARAMETERS:  Linked_list             - Pointer to the resource linked list
  *              Output_buffer           - Pointer to the user's return buffer
- *              Bytes_consumed          - u32 pointer that is filled with
- *                                        the number of bytes of the
- *                                        Output_buffer used
+ *              Bytes_consumed          - Pointer to where the number of bytes
+ *                                        used in the Output_buffer is returned
  *
  * RETURN:      Status
  *
@@ -479,7 +473,7 @@ acpi_status
 acpi_rs_dma_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	u32                     *bytes_consumed)
+	ACPI_SIZE               *bytes_consumed)
 {
 	u8                      *buffer = *output_buffer;
 	u16                     temp16 = 0;
@@ -487,7 +481,7 @@ acpi_rs_dma_stream (
 	u8                      index;
 
 
-	FUNCTION_TRACE ("Rs_dma_stream");
+	ACPI_FUNCTION_TRACE ("Rs_dma_stream");
 
 
 	/*
@@ -523,7 +517,7 @@ acpi_rs_dma_stream (
 	/*
 	 * Return the number of bytes consumed in this operation
 	 */
-	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
+	*bytes_consumed = ACPI_PTR_DIFF (buffer, *output_buffer);
 	return_ACPI_STATUS (AE_OK);
 }
 

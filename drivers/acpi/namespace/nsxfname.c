@@ -2,12 +2,12 @@
  *
  * Module Name: nsxfname - Public interfaces to the ACPI subsystem
  *                         ACPI Namespace oriented interfaces
- *              $Revision: 82 $
+ *              $Revision: 89 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@
 
 
 #define _COMPONENT          ACPI_NAMESPACE
-	 MODULE_NAME         ("nsxfname")
+	 ACPI_MODULE_NAME    ("nsxfname")
 
 
 /****************************************************************************
@@ -67,7 +67,7 @@ acpi_get_handle (
 	acpi_namespace_node     *prefix_node = NULL;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/* Parameter Validation */
@@ -79,20 +79,26 @@ acpi_get_handle (
 	/* Convert a parent handle to a prefix node */
 
 	if (parent) {
-		acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+		status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+		if (ACPI_FAILURE (status)) {
+			return (status);
+		}
 
 		prefix_node = acpi_ns_map_handle_to_node (parent);
 		if (!prefix_node) {
-			acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+			(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 			return (AE_BAD_PARAMETER);
 		}
 
-		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+		status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+		if (ACPI_FAILURE (status)) {
+			return (status);
+		}
 	}
 
 	/* Special case for root, since we can't search for it */
 
-	if (STRCMP (pathname, NS_ROOT_PATH) == 0) {
+	if (ACPI_STRCMP (pathname, ACPI_NS_ROOT_PATH) == 0) {
 		*ret_handle = acpi_ns_convert_entry_to_handle (acpi_gbl_root_node);
 		return (AE_OK);
 	}
@@ -100,7 +106,7 @@ acpi_get_handle (
 	/*
 	 *  Find the Node and convert to a handle
 	 */
-	status = acpi_ns_get_node (pathname, prefix_node, &node);
+	status = acpi_ns_get_node_by_path (pathname, prefix_node, ACPI_NS_NO_UPSEARCH, &node);
 
 	*ret_handle = NULL;
 	if (ACPI_SUCCESS (status)) {
@@ -117,7 +123,7 @@ acpi_get_handle (
  *
  * PARAMETERS:  Handle          - Handle to be converted to a pathname
  *              Name_type       - Full pathname or single segment
- *              Ret_path_ptr    - Buffer for returned path
+ *              Buffer          - Buffer for returned path
  *
  * RETURN:      Pointer to a string containing the fully qualified Name.
  *
@@ -131,63 +137,63 @@ acpi_status
 acpi_get_name (
 	acpi_handle             handle,
 	u32                     name_type,
-	acpi_buffer             *ret_path_ptr)
+	acpi_buffer             *buffer)
 {
 	acpi_status             status;
 	acpi_namespace_node     *node;
 
 
-	/* Buffer pointer must be valid always */
+	/* Parameter validation */
 
-	if (!ret_path_ptr || (name_type > ACPI_NAME_TYPE_MAX)) {
+	if (name_type > ACPI_NAME_TYPE_MAX) {
 		return (AE_BAD_PARAMETER);
 	}
 
-	/* Allow length to be zero and ignore the pointer */
-
-	if ((ret_path_ptr->length) &&
-	   (!ret_path_ptr->pointer)) {
-		return (AE_BAD_PARAMETER);
+	status = acpi_ut_validate_buffer (buffer);
+	if (ACPI_FAILURE (status)) {
+		return (status);
 	}
 
 	if (name_type == ACPI_FULL_PATHNAME) {
 		/* Get the full pathname (From the namespace root) */
 
-		status = acpi_ns_handle_to_pathname (handle, &ret_path_ptr->length,
-				   ret_path_ptr->pointer);
+		status = acpi_ns_handle_to_pathname (handle, buffer);
 		return (status);
 	}
 
 	/*
 	 * Wants the single segment ACPI name.
-	 * Validate handle and convert to an Node
+	 * Validate handle and convert to a namespace Node
 	 */
-	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	node = acpi_ns_map_handle_to_node (handle);
 	if (!node) {
 		status = AE_BAD_PARAMETER;
 		goto unlock_and_exit;
 	}
 
-	/* Check if name will fit in buffer */
+	/* Validate/Allocate/Clear caller buffer */
 
-	if (ret_path_ptr->length < PATH_SEGMENT_LENGTH) {
-		ret_path_ptr->length = PATH_SEGMENT_LENGTH;
-		status = AE_BUFFER_OVERFLOW;
+	status = acpi_ut_initialize_buffer (buffer, PATH_SEGMENT_LENGTH);
+	if (ACPI_FAILURE (status)) {
 		goto unlock_and_exit;
 	}
 
 	/* Just copy the ACPI name from the Node and zero terminate it */
 
-	STRNCPY (ret_path_ptr->pointer, (NATIVE_CHAR *) &node->name,
+	ACPI_STRNCPY (buffer->pointer, (NATIVE_CHAR *) &node->name,
 			 ACPI_NAME_SIZE);
-	((NATIVE_CHAR *) ret_path_ptr->pointer) [ACPI_NAME_SIZE] = 0;
+	((NATIVE_CHAR *) buffer->pointer) [ACPI_NAME_SIZE] = 0;
 	status = AE_OK;
 
 
 unlock_and_exit:
 
-	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return (status);
 }
 
@@ -226,18 +232,24 @@ acpi_get_object_info (
 		return (AE_BAD_PARAMETER);
 	}
 
-	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
 
 	node = acpi_ns_map_handle_to_node (handle);
 	if (!node) {
-		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+		(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		return (AE_BAD_PARAMETER);
 	}
 
 	info->type      = node->type;
 	info->name      = node->name;
 
-	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
 
 	/*
 	 * If not a device, we are all done.
@@ -260,8 +272,7 @@ acpi_get_object_info (
 
 	status = acpi_ut_execute_HID (node, &hid);
 	if (ACPI_SUCCESS (status)) {
-		STRNCPY (info->hardware_id, hid.buffer, sizeof(info->hardware_id));
-
+		ACPI_STRNCPY (info->hardware_id, hid.buffer, sizeof(info->hardware_id));
 		info->valid |= ACPI_VALID_HID;
 	}
 
@@ -269,8 +280,7 @@ acpi_get_object_info (
 
 	status = acpi_ut_execute_UID (node, &uid);
 	if (ACPI_SUCCESS (status)) {
-		STRCPY (info->unique_id, uid.buffer);
-
+		ACPI_STRCPY (info->unique_id, uid.buffer);
 		info->valid |= ACPI_VALID_UID;
 	}
 

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 97 $
+ *       $Revision: 115 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,37 +31,10 @@
  * Data manipulation macros
  */
 
-#ifndef LOWORD
-#define LOWORD(l)                       ((u16)(NATIVE_UINT)(l))
-#endif
-
-#ifndef HIWORD
-#define HIWORD(l)                       ((u16)((((NATIVE_UINT)(l)) >> 16) & 0xFFFF))
-#endif
-
-#ifndef LOBYTE
-#define LOBYTE(l)                       ((u8)(u16)(l))
-#endif
-
-#ifndef HIBYTE
-#define HIBYTE(l)                       ((u8)((((u16)(l)) >> 8) & 0xFF))
-#endif
-
-#define BIT0(x)                         ((((x) & 0x01) > 0) ? 1 : 0)
-#define BIT1(x)                         ((((x) & 0x02) > 0) ? 1 : 0)
-#define BIT2(x)                         ((((x) & 0x04) > 0) ? 1 : 0)
-
-#define BIT3(x)                         ((((x) & 0x08) > 0) ? 1 : 0)
-#define BIT4(x)                         ((((x) & 0x10) > 0) ? 1 : 0)
-#define BIT5(x)                         ((((x) & 0x20) > 0) ? 1 : 0)
-#define BIT6(x)                         ((((x) & 0x40) > 0) ? 1 : 0)
-#define BIT7(x)                         ((((x) & 0x80) > 0) ? 1 : 0)
-
-#define LOW_BASE(w)                     ((u16) ((w) & 0x0000FFFF))
-#define MID_BASE(b)                     ((u8) (((b) & 0x00FF0000) >> 16))
-#define HI_BASE(b)                      ((u8) (((b) & 0xFF000000) >> 24))
-#define LOW_LIMIT(w)                    ((u16) ((w) & 0x0000FFFF))
-#define HI_LIMIT(b)                     ((u8) (((b) & 0x00FF0000) >> 16))
+#define ACPI_LOWORD(l)                  ((u16)(NATIVE_UINT)(l))
+#define ACPI_HIWORD(l)                  ((u16)((((NATIVE_UINT)(l)) >> 16) & 0xFFFF))
+#define ACPI_LOBYTE(l)                  ((u8)(u16)(l))
+#define ACPI_HIBYTE(l)                  ((u8)((((u16)(l)) >> 8) & 0xFF))
 
 
 #ifdef _IA16
@@ -69,13 +42,8 @@
  * For 16-bit addresses, we have to assume that the upper 32 bits
  * are zero.
  */
-#ifndef LODWORD
-#define LODWORD(l)                      (l)
-#endif
-
-#ifndef HIDWORD
-#define HIDWORD(l)                      (0)
-#endif
+#define ACPI_LODWORD(l)                 (l)
+#define ACPI_HIDWORD(l)                 (0)
 
 #define ACPI_GET_ADDRESS(a)             ((a).lo)
 #define ACPI_STORE_ADDRESS(a,b)         {(a).hi=0;(a).lo=(b);}
@@ -86,13 +54,8 @@
 /*
  * acpi_integer is 32-bits, no 64-bit support on this platform
  */
-#ifndef LODWORD
-#define LODWORD(l)                      ((u32)(l))
-#endif
-
-#ifndef HIDWORD
-#define HIDWORD(l)                      (0)
-#endif
+#define ACPI_LODWORD(l)                 ((u32)(l))
+#define ACPI_HIDWORD(l)                 (0)
 
 #define ACPI_GET_ADDRESS(a)             (a)
 #define ACPI_STORE_ADDRESS(a,b)         ((a)=(b))
@@ -103,13 +66,8 @@
 /*
  * Full 64-bit address/integer on both 32-bit and 64-bit platforms
  */
-#ifndef LODWORD
-#define LODWORD(l)                      ((u32)(u64)(l))
-#endif
-
-#ifndef HIDWORD
-#define HIDWORD(l)                      ((u32)(((*(uint64_struct *)(&l))).hi))
-#endif
+#define ACPI_LODWORD(l)                 ((u32)(u64)(l))
+#define ACPI_HIDWORD(l)                 ((u32)(((*(uint64_struct *)(&l))).hi))
 
 #define ACPI_GET_ADDRESS(a)             (a)
 #define ACPI_STORE_ADDRESS(a,b)         ((a)=(b))
@@ -121,13 +79,28 @@
   * Extract a byte of data using a pointer.  Any more than a byte and we
   * get into potential aligment issues -- see the STORE macros below
   */
-#define GET8(addr)                      (*(u8*)(addr))
+#define ACPI_GET8(addr)                 (*(u8*)(addr))
 
 /* Pointer arithmetic */
 
+#define ACPI_PTR_ADD(t,a,b)             (t *) ((char *)(a) + (b))
+#define ACPI_PTR_DIFF(a,b)              (NATIVE_UINT) ((char *)(a) - (char *)(b))
 
-#define POINTER_ADD(t,a,b)              (t *) ((NATIVE_UINT)(a) + (NATIVE_UINT)(b))
-#define POINTER_DIFF(a,b)               ((u32) ((NATIVE_UINT)(a) - (NATIVE_UINT)(b)))
+/* Pointer/Integer type conversions */
+
+#define ACPI_TO_POINTER(i)              ACPI_PTR_ADD (void,NULL,(NATIVE_UINT)i)
+#define ACPI_TO_INTEGER(p)              ACPI_PTR_DIFF (p,NULL)
+#define ACPI_OFFSET(d,o)                ((ACPI_SIZE) ACPI_TO_INTEGER (&(((d *)0)->o)))
+#define ACPI_FADT_OFFSET(o)             ACPI_OFFSET (FADT_DESCRIPTOR, o)
+
+
+#ifdef _IA16
+#define ACPI_PHYSADDR_TO_PTR(i)         (void *)(i)
+#define ACPI_PTR_TO_PHYSADDR(i)         (char *)(i)
+#else
+#define ACPI_PHYSADDR_TO_PTR(i)         ACPI_TO_POINTER(i)
+#define ACPI_PTR_TO_PHYSADDR(i)         ACPI_TO_INTEGER(i)
+#endif
 
 /*
  * Macros for moving data around to/from buffers that are possibly unaligned.
@@ -139,10 +112,10 @@
 
 /* The hardware supports unaligned transfers, just do the move */
 
-#define MOVE_UNALIGNED16_TO_16(d,s)     *(u16*)(d) = *(u16*)(s)
-#define MOVE_UNALIGNED32_TO_32(d,s)     *(u32*)(d) = *(u32*)(s)
-#define MOVE_UNALIGNED16_TO_32(d,s)     *(u32*)(d) = *(u16*)(s)
-#define MOVE_UNALIGNED64_TO_64(d,s)     *(u64*)(d) = *(u64*)(s)
+#define ACPI_MOVE_UNALIGNED16_TO_16(d,s)    *(u16 *)(d) = *(u16 *)(s)
+#define ACPI_MOVE_UNALIGNED32_TO_32(d,s)    *(u32 *)(d) = *(u32 *)(s)
+#define ACPI_MOVE_UNALIGNED16_TO_32(d,s)    *(u32 *)(d) = *(u16 *)(s)
+#define ACPI_MOVE_UNALIGNED64_TO_64(d,s)    *(u64 *)(d) = *(u64 *)(s)
 
 #else
 /*
@@ -151,24 +124,24 @@
  * the destination (or both) is/are unaligned.
  */
 
-#define MOVE_UNALIGNED16_TO_16(d,s)     {((u8 *)(d))[0] = ((u8 *)(s))[0];\
-	 ((u8 *)(d))[1] = ((u8 *)(s))[1];}
+#define ACPI_MOVE_UNALIGNED16_TO_16(d,s)    {((u8 *)(d))[0] = ((u8 *)(s))[0];\
+	  ((u8 *)(d))[1] = ((u8 *)(s))[1];}
 
-#define MOVE_UNALIGNED32_TO_32(d,s)     {((u8 *)(d))[0] = ((u8 *)(s))[0];\
-			  ((u8 *)(d))[1] = ((u8 *)(s))[1];\
-			  ((u8 *)(d))[2] = ((u8 *)(s))[2];\
-			  ((u8 *)(d))[3] = ((u8 *)(s))[3];}
+#define ACPI_MOVE_UNALIGNED32_TO_32(d,s)    {((u8 *)(d))[0] = ((u8 *)(s))[0];\
+			   ((u8 *)(d))[1] = ((u8 *)(s))[1];\
+			   ((u8 *)(d))[2] = ((u8 *)(s))[2];\
+			   ((u8 *)(d))[3] = ((u8 *)(s))[3];}
 
-#define MOVE_UNALIGNED16_TO_32(d,s)     {(*(u32*)(d)) = 0; MOVE_UNALIGNED16_TO_16(d,s);}
+#define ACPI_MOVE_UNALIGNED16_TO_32(d,s)    {(*(u32*)(d)) = 0; ACPI_MOVE_UNALIGNED16_TO_16(d,s);}
 
-#define MOVE_UNALIGNED64_TO_64(d,s)     {((u8 *)(d))[0] = ((u8 *)(s))[0];\
-					   ((u8 *)(d))[1] = ((u8 *)(s))[1];\
-					   ((u8 *)(d))[2] = ((u8 *)(s))[2];\
-					   ((u8 *)(d))[3] = ((u8 *)(s))[3];\
-					   ((u8 *)(d))[4] = ((u8 *)(s))[4];\
-					   ((u8 *)(d))[5] = ((u8 *)(s))[5];\
-					   ((u8 *)(d))[6] = ((u8 *)(s))[6];\
-					   ((u8 *)(d))[7] = ((u8 *)(s))[7];}
+#define ACPI_MOVE_UNALIGNED64_TO_64(d,s)    {((u8 *)(d))[0] = ((u8 *)(s))[0];\
+					 ((u8 *)(d))[1] = ((u8 *)(s))[1];\
+					 ((u8 *)(d))[2] = ((u8 *)(s))[2];\
+					 ((u8 *)(d))[3] = ((u8 *)(s))[3];\
+					 ((u8 *)(d))[4] = ((u8 *)(s))[4];\
+					 ((u8 *)(d))[5] = ((u8 *)(s))[5];\
+					 ((u8 *)(d))[6] = ((u8 *)(s))[6];\
+					 ((u8 *)(d))[7] = ((u8 *)(s))[7];}
 
 #endif
 
@@ -177,52 +150,50 @@
  * Fast power-of-two math macros for non-optimized compilers
  */
 
-#define _DIV(value,power_of2)           ((u32) ((value) >> (power_of2)))
-#define _MUL(value,power_of2)           ((u32) ((value) << (power_of2)))
-#define _MOD(value,divisor)             ((u32) ((value) & ((divisor) -1)))
+#define _ACPI_DIV(value,power_of2)      ((u32) ((value) >> (power_of2)))
+#define _ACPI_MUL(value,power_of2)      ((u32) ((value) << (power_of2)))
+#define _ACPI_MOD(value,divisor)        ((u32) ((value) & ((divisor) -1)))
 
-#define DIV_2(a)                        _DIV(a,1)
-#define MUL_2(a)                        _MUL(a,1)
-#define MOD_2(a)                        _MOD(a,2)
+#define ACPI_DIV_2(a)                   _ACPI_DIV(a,1)
+#define ACPI_MUL_2(a)                   _ACPI_MUL(a,1)
+#define ACPI_MOD_2(a)                   _ACPI_MOD(a,2)
 
-#define DIV_4(a)                        _DIV(a,2)
-#define MUL_4(a)                        _MUL(a,2)
-#define MOD_4(a)                        _MOD(a,4)
+#define ACPI_DIV_4(a)                   _ACPI_DIV(a,2)
+#define ACPI_MUL_4(a)                   _ACPI_MUL(a,2)
+#define ACPI_MOD_4(a)                   _ACPI_MOD(a,4)
 
-#define DIV_8(a)                        _DIV(a,3)
-#define MUL_8(a)                        _MUL(a,3)
-#define MOD_8(a)                        _MOD(a,8)
+#define ACPI_DIV_8(a)                   _ACPI_DIV(a,3)
+#define ACPI_MUL_8(a)                   _ACPI_MUL(a,3)
+#define ACPI_MOD_8(a)                   _ACPI_MOD(a,8)
 
-#define DIV_16(a)                       _DIV(a,4)
-#define MUL_16(a)                       _MUL(a,4)
-#define MOD_16(a)                       _MOD(a,16)
+#define ACPI_DIV_16(a)                  _ACPI_DIV(a,4)
+#define ACPI_MUL_16(a)                  _ACPI_MUL(a,4)
+#define ACPI_MOD_16(a)                  _ACPI_MOD(a,16)
 
 
 /*
  * Rounding macros (Power of two boundaries only)
  */
-#define ROUND_DOWN(value,boundary)      ((value) & (~((boundary)-1)))
-#define ROUND_UP(value,boundary)        (((value) + ((boundary)-1)) & (~((boundary)-1)))
+#define ACPI_ROUND_DOWN(value,boundary)      (((NATIVE_UINT)(value)) & (~((boundary)-1)))
+#define ACPI_ROUND_UP(value,boundary)        ((((NATIVE_UINT)(value)) + ((boundary)-1)) & (~((boundary)-1)))
 
-#define ROUND_DOWN_TO_32_BITS(a)        ROUND_DOWN(a,4)
-#define ROUND_DOWN_TO_64_BITS(a)        ROUND_DOWN(a,8)
-#define ROUND_DOWN_TO_NATIVE_WORD(a)    ROUND_DOWN(a,ALIGNED_ADDRESS_BOUNDARY)
+#define ACPI_ROUND_DOWN_TO_32_BITS(a)        ACPI_ROUND_DOWN(a,4)
+#define ACPI_ROUND_DOWN_TO_64_BITS(a)        ACPI_ROUND_DOWN(a,8)
+#define ACPI_ROUND_DOWN_TO_NATIVE_WORD(a)    ACPI_ROUND_DOWN(a,ALIGNED_ADDRESS_BOUNDARY)
 
-#define ROUND_UP_TO_32_bITS(a)          ROUND_UP(a,4)
-#define ROUND_UP_TO_64_bITS(a)          ROUND_UP(a,8)
-#define ROUND_UP_TO_NATIVE_WORD(a)      ROUND_UP(a,ALIGNED_ADDRESS_BOUNDARY)
+#define ACPI_ROUND_UP_TO_32_bITS(a)          ACPI_ROUND_UP(a,4)
+#define ACPI_ROUND_UP_TO_64_bITS(a)          ACPI_ROUND_UP(a,8)
+#define ACPI_ROUND_UP_TO_NATIVE_WORD(a)      ACPI_ROUND_UP(a,ALIGNED_ADDRESS_BOUNDARY)
 
-#define ROUND_PTR_UP_TO_4(a,b)          ((b *)(((NATIVE_UINT)(a) + 3) & ~3))
-#define ROUND_PTR_UP_TO_8(a,b)          ((b *)(((NATIVE_UINT)(a) + 7) & ~7))
 
-#define ROUND_BITS_UP_TO_BYTES(a)       DIV_8((a) + 7)
-#define ROUND_BITS_DOWN_TO_BYTES(a)     DIV_8((a))
+#define ACPI_ROUND_BITS_UP_TO_BYTES(a)       ACPI_DIV_8((a) + 7)
+#define ACPI_ROUND_BITS_DOWN_TO_BYTES(a)     ACPI_DIV_8((a))
 
-#define ROUND_UP_TO_1K(a)               (((a) + 1023) >> 10)
+#define ACPI_ROUND_UP_TO_1K(a)               (((a) + 1023) >> 10)
 
 /* Generic (non-power-of-two) rounding */
 
-#define ROUND_UP_TO(value,boundary)     (((value) + ((boundary)-1)) / (boundary))
+#define ACPI_ROUND_UP_TO(value,boundary)     (((value) + ((boundary)-1)) / (boundary))
 
 /*
  * Bitmask creation
@@ -230,9 +201,10 @@
  * MASK_BITS_ABOVE creates a mask starting AT the position and above
  * MASK_BITS_BELOW creates a mask starting one bit BELOW the position
  */
-#define MASK_BITS_ABOVE(position)       (~(((u32)(-1)) << ((u32) (position))))
-#define MASK_BITS_BELOW(position)       (((u32)(-1)) << ((u32) (position)))
+#define ACPI_MASK_BITS_ABOVE(position)       (~(((acpi_integer)(-1)) << ((u32) (position))))
+#define ACPI_MASK_BITS_BELOW(position)       (((acpi_integer)(-1)) << ((u32) (position)))
 
+#define ACPI_IS_OCTAL_DIGIT(d)               (((char)(d) >= '0') && ((char)(d) <= '7'))
 
 /* Macros for GAS addressing */
 
@@ -256,23 +228,30 @@
 
 #endif
 
+
+/* Bitfields within ACPI registers */
+
+#define ACPI_REGISTER_PREPARE_BITS(val, pos, mask)      ((val << pos) & mask)
+#define ACPI_REGISTER_INSERT_VALUE(reg, pos, mask, val)  reg = (reg & (~(mask))) | ACPI_REGISTER_PREPARE_BITS(val, pos, mask)
+
 /*
- * An acpi_handle (which is actually an acpi_namespace_node *) can appear in some contexts,
- * such as on ap_obj_stack, where a pointer to an acpi_operand_object can also
+ * An acpi_namespace_node * can appear in some contexts,
+ * where a pointer to an acpi_operand_object  can also
  * appear.  This macro is used to distinguish them.
  *
- * The Data_type field is the first field in both structures.
+ * The "Descriptor" field is the first field in both structures.
  */
-#define VALID_DESCRIPTOR_TYPE(d,t)      (((acpi_namespace_node *)d)->data_type == t)
+#define ACPI_GET_DESCRIPTOR_TYPE(d)     (((acpi_namespace_node *)d)->descriptor)
+#define ACPI_SET_DESCRIPTOR_TYPE(d,t)   (((acpi_namespace_node *)d)->descriptor = t)
 
 
 /* Macro to test the object type */
 
-#define IS_THIS_OBJECT_TYPE(d,t)        (((acpi_operand_object  *)d)->common.type == (u8)t)
+#define ACPI_GET_OBJECT_TYPE(d)         (((acpi_operand_object *)d)->common.type)
 
 /* Macro to check the table flags for SINGLE or MULTIPLE tables are allowed */
 
-#define IS_SINGLE_TABLE(x)              (((x) & 0x01) == ACPI_TABLE_SINGLE ? 1 : 0)
+#define ACPI_IS_SINGLE_TABLE(x)         (((x) & 0x01) == ACPI_TABLE_SINGLE ? 1 : 0)
 
 /*
  * Macro to check if a pointer is within an ACPI table.
@@ -281,11 +260,11 @@
  * and ((u8 *)b+b->Length) points one byte past the end of the table.
  */
 #ifndef _IA16
-#define IS_IN_ACPI_TABLE(a,b)           (((u8 *)(a) >= (u8 *)(b + 1)) &&\
-							   ((u8 *)(a) < ((u8 *)b + b->length)))
+#define ACPI_IS_IN_ACPI_TABLE(a,b)      (((u8 *)(a) >= (u8 *)(b + 1)) &&\
+							 ((u8 *)(a) < ((u8 *)b + b->length)))
 
 #else
-#define IS_IN_ACPI_TABLE(a,b)           (_segment)(a) == (_segment)(b) &&\
+#define ACPI_IS_IN_ACPI_TABLE(a,b)      (_segment)(a) == (_segment)(b) &&\
 									 (((u8 *)(a) >= (u8 *)(b + 1)) &&\
 									 ((u8 *)(a) < ((u8 *)b + b->length)))
 #endif
@@ -294,9 +273,9 @@
  * Macros for the master AML opcode table
  */
 #ifdef ACPI_DEBUG
-#define ACPI_OP(name,Pargs,Iargs,class,type,flags)     {Pargs,Iargs,flags,class,type,name}
+#define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {name,Pargs,Iargs,flags,obj_type,class,type}
 #else
-#define ACPI_OP(name,Pargs,Iargs,class,type,flags)     {Pargs,Iargs,flags,class,type}
+#define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {Pargs,Iargs,flags,obj_type,class,type}
 #endif
 
 #define ARG_TYPE_WIDTH                  5
@@ -335,7 +314,7 @@
  * 5) Expand address to 64 bits
  */
 #define ASL_BUILD_GAS_FROM_ENTRY(a,b,c,d)   {a.address_space_id = (u8) d;\
-											 a.register_bit_width = (u8) MUL_8 (b);\
+											 a.register_bit_width = (u8) ACPI_MUL_8 (b);\
 											 a.register_bit_offset = 0;\
 											 a.reserved = 0;\
 											 ACPI_STORE_ADDRESS (a.address,c);}
@@ -349,7 +328,7 @@
  * Reporting macros that are never compiled out
  */
 
-#define PARAM_LIST(pl)                  pl
+#define ACPI_PARAM_LIST(pl)                  pl
 
 /*
  * Error reporting.  These versions add callers module and line#.  Since
@@ -359,32 +338,32 @@
 
 #ifdef ACPI_DEBUG
 
-#define REPORT_INFO(fp)                 {acpi_ut_report_info(_THIS_MODULE,__LINE__,_COMPONENT); \
-											acpi_os_printf PARAM_LIST(fp);}
-#define REPORT_ERROR(fp)                {acpi_ut_report_error(_THIS_MODULE,__LINE__,_COMPONENT); \
-											acpi_os_printf PARAM_LIST(fp);}
-#define REPORT_WARNING(fp)              {acpi_ut_report_warning(_THIS_MODULE,__LINE__,_COMPONENT); \
-											acpi_os_printf PARAM_LIST(fp);}
+#define ACPI_REPORT_INFO(fp)                {acpi_ut_report_info(_THIS_MODULE,__LINE__,_COMPONENT); \
+												acpi_os_printf ACPI_PARAM_LIST(fp);}
+#define ACPI_REPORT_ERROR(fp)               {acpi_ut_report_error(_THIS_MODULE,__LINE__,_COMPONENT); \
+												acpi_os_printf ACPI_PARAM_LIST(fp);}
+#define ACPI_REPORT_WARNING(fp)             {acpi_ut_report_warning(_THIS_MODULE,__LINE__,_COMPONENT); \
+												acpi_os_printf ACPI_PARAM_LIST(fp);}
 
 #else
 
-#define REPORT_INFO(fp)                 {acpi_ut_report_info("ACPI",__LINE__,_COMPONENT); \
-											acpi_os_printf PARAM_LIST(fp);}
-#define REPORT_ERROR(fp)                {acpi_ut_report_error("ACPI",__LINE__,_COMPONENT); \
-											acpi_os_printf PARAM_LIST(fp);}
-#define REPORT_WARNING(fp)              {acpi_ut_report_warning("ACPI",__LINE__,_COMPONENT); \
-											acpi_os_printf PARAM_LIST(fp);}
+#define ACPI_REPORT_INFO(fp)                {acpi_ut_report_info("ACPI",__LINE__,_COMPONENT); \
+												acpi_os_printf ACPI_PARAM_LIST(fp);}
+#define ACPI_REPORT_ERROR(fp)               {acpi_ut_report_error("ACPI",__LINE__,_COMPONENT); \
+												acpi_os_printf ACPI_PARAM_LIST(fp);}
+#define ACPI_REPORT_WARNING(fp)             {acpi_ut_report_warning("ACPI",__LINE__,_COMPONENT); \
+												acpi_os_printf ACPI_PARAM_LIST(fp);}
 
 #endif
 
 /* Error reporting.  These versions pass thru the module and line# */
 
-#define _REPORT_INFO(a,b,c,fp)          {acpi_ut_report_info(a,b,c); \
-											acpi_os_printf PARAM_LIST(fp);}
-#define _REPORT_ERROR(a,b,c,fp)         {acpi_ut_report_error(a,b,c); \
-											acpi_os_printf PARAM_LIST(fp);}
-#define _REPORT_WARNING(a,b,c,fp)       {acpi_ut_report_warning(a,b,c); \
-											acpi_os_printf PARAM_LIST(fp);}
+#define _ACPI_REPORT_INFO(a,b,c,fp)         {acpi_ut_report_info(a,b,c); \
+												acpi_os_printf ACPI_PARAM_LIST(fp);}
+#define _ACPI_REPORT_ERROR(a,b,c,fp)        {acpi_ut_report_error(a,b,c); \
+												acpi_os_printf ACPI_PARAM_LIST(fp);}
+#define _ACPI_REPORT_WARNING(a,b,c,fp)      {acpi_ut_report_warning(a,b,c); \
+												acpi_os_printf ACPI_PARAM_LIST(fp);}
 
 /*
  * Debug macros that are conditionally compiled
@@ -392,7 +371,7 @@
 
 #ifdef ACPI_DEBUG
 
-#define MODULE_NAME(name)               static char *_THIS_MODULE = name;
+#define ACPI_MODULE_NAME(name)               static char *_THIS_MODULE = name;
 
 /*
  * Function entry tracing.
@@ -400,21 +379,21 @@
  * as a local string ("_Proc_name) so that it can be also used by the function exit macros below.
  */
 
-#define PROC_NAME(a)                    acpi_debug_print_info _dbg;     \
+#define ACPI_FUNCTION_NAME(a)           acpi_debug_print_info _dbg;     \
 										_dbg.component_id = _COMPONENT; \
 										_dbg.proc_name   = a;           \
 										_dbg.module_name = _THIS_MODULE;
 
-#define FUNCTION_TRACE(a)               PROC_NAME(a)\
-										acpi_ut_trace(__LINE__,&_dbg)
-#define FUNCTION_TRACE_PTR(a,b)         PROC_NAME(a)\
-										acpi_ut_trace_ptr(__LINE__,&_dbg,(void *)b)
-#define FUNCTION_TRACE_U32(a,b)         PROC_NAME(a)\
-										acpi_ut_trace_u32(__LINE__,&_dbg,(u32)b)
-#define FUNCTION_TRACE_STR(a,b)         PROC_NAME(a)\
-										acpi_ut_trace_str(__LINE__,&_dbg,(NATIVE_CHAR *)b)
+#define ACPI_FUNCTION_TRACE(a)          ACPI_FUNCTION_NAME(a)\
+											acpi_ut_trace(__LINE__,&_dbg)
+#define ACPI_FUNCTION_TRACE_PTR(a,b)    ACPI_FUNCTION_NAME(a)\
+											acpi_ut_trace_ptr(__LINE__,&_dbg,(void *)b)
+#define ACPI_FUNCTION_TRACE_U32(a,b)    ACPI_FUNCTION_NAME(a)\
+											acpi_ut_trace_u32(__LINE__,&_dbg,(u32)b)
+#define ACPI_FUNCTION_TRACE_STR(a,b)    ACPI_FUNCTION_NAME(a)\
+											acpi_ut_trace_str(__LINE__,&_dbg,(NATIVE_CHAR *)b)
 
-#define FUNCTION_ENTRY()                acpi_ut_track_stack_ptr()
+#define ACPI_FUNCTION_ENTRY()           acpi_ut_track_stack_ptr()
 
 /*
  * Function exit tracing.
@@ -431,38 +410,39 @@
 
 /* Conditional execution */
 
-#define DEBUG_EXEC(a)                   a
-#define NORMAL_EXEC(a)
+#define ACPI_DEBUG_EXEC(a)              a
+#define ACPI_NORMAL_EXEC(a)
 
-#define DEBUG_DEFINE(a)                 a;
-#define DEBUG_ONLY_MEMBERS(a)           a;
+#define ACPI_DEBUG_DEFINE(a)            a;
+#define ACPI_DEBUG_ONLY_MEMBERS(a)      a;
 #define _OPCODE_NAMES
 #define _VERBOSE_STRUCTURES
 
 
 /* Stack and buffer dumping */
 
-#define DUMP_STACK_ENTRY(a)             acpi_ex_dump_operand(a)
-#define DUMP_OPERANDS(a,b,c,d,e)        acpi_ex_dump_operands(a,b,c,d,e,_THIS_MODULE,__LINE__)
+#define ACPI_DUMP_STACK_ENTRY(a)        acpi_ex_dump_operand(a)
+#define ACPI_DUMP_OPERANDS(a,b,c,d,e)   acpi_ex_dump_operands(a,b,c,d,e,_THIS_MODULE,__LINE__)
 
 
-#define DUMP_ENTRY(a,b)                 acpi_ns_dump_entry (a,b)
-#define DUMP_TABLES(a,b)                acpi_ns_dump_tables(a,b)
-#define DUMP_PATHNAME(a,b,c,d)          acpi_ns_dump_pathname(a,b,c,d)
-#define DUMP_RESOURCE_LIST(a)           acpi_rs_dump_resource_list(a)
-#define DUMP_BUFFER(a,b)                acpi_ut_dump_buffer((u8 *)a,b,DB_BYTE_DISPLAY,_COMPONENT)
-#define BREAK_MSG(a)                    acpi_os_signal (ACPI_SIGNAL_BREAKPOINT,(a))
+#define ACPI_DUMP_ENTRY(a,b)            acpi_ns_dump_entry (a,b)
+#define ACPI_DUMP_TABLES(a,b)           acpi_ns_dump_tables(a,b)
+#define ACPI_DUMP_PATHNAME(a,b,c,d)     acpi_ns_dump_pathname(a,b,c,d)
+#define ACPI_DUMP_RESOURCE_LIST(a)      acpi_rs_dump_resource_list(a)
+#define ACPI_DUMP_BUFFER(a,b)           acpi_ut_dump_buffer((u8 *)a,b,DB_BYTE_DISPLAY,_COMPONENT)
+#define ACPI_BREAK_MSG(a)               acpi_os_signal (ACPI_SIGNAL_BREAKPOINT,(a))
 
 
 /*
  * Generate INT3 on ACPI_ERROR (Debug only!)
  */
 
-#define ERROR_BREAK
-#ifdef  ERROR_BREAK
-#define BREAK_ON_ERROR(lvl)              if ((lvl)&ACPI_ERROR) acpi_os_signal(ACPI_SIGNAL_BREAKPOINT,"Fatal error encountered\n")
+#define ACPI_ERROR_BREAK
+#ifdef  ACPI_ERROR_BREAK
+#define ACPI_BREAK_ON_ERROR(lvl)        if ((lvl)&ACPI_ERROR) \
+											acpi_os_signal(ACPI_SIGNAL_BREAKPOINT,"Fatal error encountered\n")
 #else
-#define BREAK_ON_ERROR(lvl)
+#define ACPI_BREAK_ON_ERROR(lvl)
 #endif
 
 /*
@@ -472,8 +452,8 @@
  *    2) Debug error level or trace level for the print statement is enabled
  */
 
-#define ACPI_DEBUG_PRINT(pl)            acpi_ut_debug_print PARAM_LIST(pl)
-#define ACPI_DEBUG_PRINT_RAW(pl)        acpi_ut_debug_print_raw PARAM_LIST(pl)
+#define ACPI_DEBUG_PRINT(pl)            acpi_ut_debug_print ACPI_PARAM_LIST(pl)
+#define ACPI_DEBUG_PRINT_RAW(pl)        acpi_ut_debug_print_raw ACPI_PARAM_LIST(pl)
 
 
 #else
@@ -482,33 +462,33 @@
  * leaving no executable debug code!
  */
 
-#define MODULE_NAME(name)
+#define ACPI_MODULE_NAME(name)
 #define _THIS_MODULE ""
 
-#define DEBUG_EXEC(a)
-#define NORMAL_EXEC(a)                  a;
+#define ACPI_DEBUG_EXEC(a)
+#define ACPI_NORMAL_EXEC(a)             a;
 
-#define DEBUG_DEFINE(a)
-#define DEBUG_ONLY_MEMBERS(a)
-#define PROC_NAME(a)
-#define FUNCTION_TRACE(a)
-#define FUNCTION_TRACE_PTR(a,b)
-#define FUNCTION_TRACE_U32(a,b)
-#define FUNCTION_TRACE_STR(a,b)
-#define FUNCTION_EXIT
-#define FUNCTION_STATUS_EXIT(s)
-#define FUNCTION_VALUE_EXIT(s)
-#define FUNCTION_ENTRY()
-#define DUMP_STACK_ENTRY(a)
-#define DUMP_OPERANDS(a,b,c,d,e)
-#define DUMP_ENTRY(a,b)
-#define DUMP_TABLES(a,b)
-#define DUMP_PATHNAME(a,b,c,d)
-#define DUMP_RESOURCE_LIST(a)
-#define DUMP_BUFFER(a,b)
+#define ACPI_DEBUG_DEFINE(a)
+#define ACPI_DEBUG_ONLY_MEMBERS(a)
+#define ACPI_FUNCTION_NAME(a)
+#define ACPI_FUNCTION_TRACE(a)
+#define ACPI_FUNCTION_TRACE_PTR(a,b)
+#define ACPI_FUNCTION_TRACE_U32(a,b)
+#define ACPI_FUNCTION_TRACE_STR(a,b)
+#define ACPI_FUNCTION_EXIT
+#define ACPI_FUNCTION_STATUS_EXIT(s)
+#define ACPI_FUNCTION_VALUE_EXIT(s)
+#define ACPI_FUNCTION_ENTRY()
+#define ACPI_DUMP_STACK_ENTRY(a)
+#define ACPI_DUMP_OPERANDS(a,b,c,d,e)
+#define ACPI_DUMP_ENTRY(a,b)
+#define ACPI_DUMP_TABLES(a,b)
+#define ACPI_DUMP_PATHNAME(a,b,c,d)
+#define ACPI_DUMP_RESOURCE_LIST(a)
+#define ACPI_DUMP_BUFFER(a,b)
 #define ACPI_DEBUG_PRINT(pl)
 #define ACPI_DEBUG_PRINT_RAW(pl)
-#define BREAK_MSG(a)
+#define ACPI_BREAK_MSG(a)
 
 #define return_VOID                     return
 #define return_ACPI_STATUS(s)           return(s)
@@ -523,9 +503,9 @@
  * DEBUG_PRINT stuff (set by ACPI_DEBUG) is on, or not.
  */
 #ifdef ENABLE_DEBUGGER
-#define DEBUGGER_EXEC(a)                a
+#define ACPI_DEBUGGER_EXEC(a)           a
 #else
-#define DEBUGGER_EXEC(a)
+#define ACPI_DEBUGGER_EXEC(a)
 #endif
 
 
@@ -534,9 +514,9 @@
  * we are using ACPI_DEBUG to get the debug output
  */
 #ifdef _IA16
-#undef DEBUG_ONLY_MEMBERS
+#undef ACPI_DEBUG_ONLY_MEMBERS
 #undef _VERBOSE_STRUCTURES
-#define DEBUG_ONLY_MEMBERS(a)
+#define ACPI_DEBUG_ONLY_MEMBERS(a)
 #endif
 
 
@@ -545,11 +525,11 @@
  * 1) Set name to blanks
  * 2) Copy the object name
  */
-#define ADD_OBJECT_NAME(a,b)            MEMSET (a->common.name, ' ', sizeof (a->common.name));\
-										STRNCPY (a->common.name, acpi_gbl_ns_type_names[b], sizeof (a->common.name))
+#define ACPI_ADD_OBJECT_NAME(a,b)       ACPI_MEMSET (a->common.name, ' ', sizeof (a->common.name));\
+										ACPI_STRNCPY (a->common.name, acpi_gbl_ns_type_names[b], sizeof (a->common.name))
 #else
 
-#define ADD_OBJECT_NAME(a,b)
+#define ACPI_ADD_OBJECT_NAME(a,b)
 #endif
 
 
@@ -561,8 +541,8 @@
 
 /* Memory allocation */
 
-#define ACPI_MEM_ALLOCATE(a)            acpi_os_allocate(a)
-#define ACPI_MEM_CALLOCATE(a)           acpi_os_callocate(a)
+#define ACPI_MEM_ALLOCATE(a)            acpi_ut_allocate(a,_COMPONENT,_THIS_MODULE,__LINE__)
+#define ACPI_MEM_CALLOCATE(a)           acpi_ut_callocate(a, _COMPONENT,_THIS_MODULE,__LINE__)
 #define ACPI_MEM_FREE(a)                acpi_os_free(a)
 #define ACPI_MEM_TRACKING(a)
 
@@ -571,9 +551,9 @@
 
 /* Memory allocation */
 
-#define ACPI_MEM_ALLOCATE(a)            acpi_ut_allocate(a,_COMPONENT,_THIS_MODULE,__LINE__)
-#define ACPI_MEM_CALLOCATE(a)           acpi_ut_callocate(a, _COMPONENT,_THIS_MODULE,__LINE__)
-#define ACPI_MEM_FREE(a)                acpi_ut_free(a,_COMPONENT,_THIS_MODULE,__LINE__)
+#define ACPI_MEM_ALLOCATE(a)            acpi_ut_allocate_and_track(a,_COMPONENT,_THIS_MODULE,__LINE__)
+#define ACPI_MEM_CALLOCATE(a)           acpi_ut_callocate_and_track(a, _COMPONENT,_THIS_MODULE,__LINE__)
+#define ACPI_MEM_FREE(a)                acpi_ut_free_and_track(a,_COMPONENT,_THIS_MODULE,__LINE__)
 #define ACPI_MEM_TRACKING(a)            a
 
 #endif /* ACPI_DBG_TRACK_ALLOCATIONS */

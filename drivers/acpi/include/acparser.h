@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: acparser.h - AML Parser subcomponent prototypes and defines
- *       $Revision: 54 $
+ *       $Revision: 58 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -28,15 +28,11 @@
 #define __ACPARSER_H__
 
 
-#define OP_HAS_RETURN_VALUE         1
+#define OP_HAS_RETURN_VALUE             1
 
 /* variable # arguments */
 
-#define ACPI_VAR_ARGS               ACPI_UINT32_MAX
-
-/* maximum virtual address */
-
-#define ACPI_MAX_AML                ((u8 *)(~0UL))
+#define ACPI_VAR_ARGS                   ACPI_UINT32_MAX
 
 
 #define ACPI_PARSE_DELETE_TREE          0x0001
@@ -48,7 +44,8 @@
 #define ACPI_PARSE_EXECUTE              0x0030
 #define ACPI_PARSE_MODE_MASK            0x0030
 
-/* psapi - Parser external interfaces */
+
+/* Parser external interfaces */
 
 acpi_status
 acpi_psx_load_table (
@@ -60,6 +57,7 @@ acpi_psx_execute (
 	acpi_namespace_node     *method_node,
 	acpi_operand_object     **params,
 	acpi_operand_object     **return_obj_desc);
+
 
 /******************************************************************************
  *
@@ -85,8 +83,8 @@ acpi_ps_get_next_namestring (
 void
 acpi_ps_get_next_simple_arg (
 	acpi_parse_state        *parser_state,
-	u32                     arg_type,       /* type of argument */
-	acpi_parse_object       *arg);           /* (OUT) argument data */
+	u32                     arg_type,
+	acpi_parse_object       *arg);
 
 void
 acpi_ps_get_next_namepath (
@@ -106,6 +104,19 @@ acpi_ps_get_next_arg (
 	u32                     *arg_count);
 
 
+/* psfind */
+
+acpi_parse_object *
+acpi_ps_find_name (
+	acpi_parse_object       *scope,
+	u32                     name,
+	u32                     opcode);
+
+acpi_parse_object*
+acpi_ps_get_parent (
+	acpi_parse_object       *op);
+
+
 /* psopcode - AML Opcode information */
 
 const acpi_opcode_info *
@@ -118,6 +129,21 @@ acpi_ps_get_opcode_name (
 
 
 /* psparse - top level parsing routines */
+
+u32
+acpi_ps_get_opcode_size (
+	u32                     opcode);
+
+u8
+acpi_ps_complete_this_op (
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op);
+
+acpi_status
+acpi_ps_next_parse_state (
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op,
+	acpi_status             callback_status);
 
 acpi_status
 acpi_ps_find_object (
@@ -232,6 +258,10 @@ acpi_ps_get_next_walk_op (
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op,
 	acpi_parse_upwards      ascending_callback);
+
+acpi_status
+acpi_ps_delete_completed_op (
+	acpi_walk_state         *walk_state);
 
 
 /* psutils - parser utilities */
