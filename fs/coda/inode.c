@@ -33,7 +33,6 @@
 #include <linux/coda_cache.h>
 
 /* VFS super_block ops */
-static struct super_block *coda_read_super(struct super_block *, void *, int);
 static void coda_read_inode(struct inode *);
 static void coda_clear_inode(struct inode *);
 static void coda_put_super(struct super_block *);
@@ -140,8 +139,7 @@ static int get_device_index(struct coda_mount_data *data)
 	return idx;
 }
 
-static struct super_block * coda_read_super(struct super_block *sb, 
-					    void *data, int silent)
+static int coda_fill_super(struct super_block *sb, void *data, int silent)
 {
         struct inode *root = 0; 
 	struct coda_sb_info *sbi = NULL;
@@ -161,17 +159,17 @@ static struct super_block * coda_read_super(struct super_block *sb,
 	vc = &coda_comms[idx];
 	if (!vc->vc_inuse) {
 		printk("coda_read_super: No pseudo device\n");
-		return NULL;
+		return -EINVAL;
 	}
 
         if ( vc->vc_sb ) {
 		printk("coda_read_super: Device already mounted\n");
-		return NULL;
+		return -EBUSY;
 	}
 
 	sbi = kmalloc(sizeof(struct coda_sb_info), GFP_KERNEL);
 	if(!sbi) {
-		return NULL;
+		return -ENOMEM;
 	}
 
 	vc->vc_sb = sb;
@@ -192,7 +190,7 @@ static struct super_block * coda_read_super(struct super_block *sb,
 	        printk("coda_read_super: coda_get_rootfid failed with %d\n",
 		       error);
 		goto error;
-	}	  
+	}
 	printk("coda_read_super: rootfid is %s\n", coda_f2s(&fid));
 	
 	/* make root inode */
@@ -205,7 +203,7 @@ static struct super_block * coda_read_super(struct super_block *sb,
 	printk("coda_read_super: rootinode is %ld dev %x\n", 
 	       root->i_ino, kdev_val(root->i_dev));
 	sb->s_root = d_alloc_root(root);
-        return sb;
+        return 0;
 
  error:
 	if (sbi) {
@@ -216,7 +214,7 @@ static struct super_block * coda_read_super(struct super_block *sb,
 	if (root)
                 iput(root);
 
-        return NULL;
+        return -EINVAL;
 }
 
 static void coda_put_super(struct super_block *sb)
@@ -313,5 +311,14 @@ static int coda_statfs(struct super_block *sb, struct statfs *buf)
 
 /* init_coda: used by filesystems.c to register coda */
 
-DECLARE_FSTYPE( coda_fs_type, "coda", coda_read_super, 0);
+static struct super_block *coda_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags, data, coda_fill_super);
+}
 
+struct file_system_type coda_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"coda",
+	get_sb:		coda_get_sb,
+};
