@@ -10,8 +10,6 @@
 #include <asm/pci-bridge.h>
 #include "agp.h"
 
-static int agp_try_unsupported __initdata = 0;
-
 static int uninorth_fetch_size(void)
 {
 	int i;
@@ -324,15 +322,9 @@ static int __init agp_uninorth_probe(struct pci_dev *pdev,
 		}
 	}
 
-	if (!agp_try_unsupported) {
-		printk(KERN_ERR PFX "Unsupported Apple chipset"
-		       " (device id: %04x).\n", pdev->device);
-		printk(KERN_ERR PFX "You might want to try"
-		       " agp_try_unsupported=1\n");
-		return -ENODEV;
-	}
-	printk(KERN_ERR PFX "Trying generic Uninorth routines"
-	       " for device id %04x\n", pdev->device);
+	printk(KERN_ERR PFX "Unsupported Apple chipset (device id: %04x).\n",
+		pdev->device);
+	return -ENODEV;
 
  found:
 	bridge = agp_alloc_bridge();
@@ -392,6 +384,5 @@ static void __exit agp_uninorth_cleanup(void)
 module_init(agp_uninorth_init);
 module_exit(agp_uninorth_cleanup);
 
-MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_AUTHOR("Ben Herrenschmidt & Paul Mackerras");
 MODULE_LICENSE("GPL");
