@@ -45,7 +45,7 @@ hscx_write_fifo(struct BCState *bcs, u8 *p, int len)
 	cs->bc_hw_ops->write_fifo(cs, bcs->unit, p, len);
 }
 
-int __init
+static int
 HscxVersion(struct IsdnCardState *cs, char *s)
 {
 	int verA, verB;
@@ -230,11 +230,24 @@ inithscx(struct IsdnCardState *cs)
 	hscx_write(&cs->bcs[1], HSCX_MASK, 0x0);
 }
 
-void __init
+void
 inithscxisac(struct IsdnCardState *cs)
 {
 	initisac(cs);
 	inithscx(cs);
+}
+
+int
+hscxisac_setup(struct IsdnCardState *cs, struct dc_hw_ops *isac_ops,
+	       struct bc_hw_ops *hscx_ops)
+{
+	isac_setup(cs, isac_ops);
+	cs->bc_hw_ops = hscx_ops;
+	if (HscxVersion(cs, "HiSax:")) {
+		printk(KERN_WARNING "HiSax: invalid HSCX version\n");
+		return -ENODEV;
+	}
+	return 0;
 }
 
 #include "hscx_irq.c"

@@ -24,6 +24,10 @@ SECTIONS
   __ksymtab : { *(__ksymtab) }
   __stop___ksymtab = .;
 
+  __start___gpl_ksymtab = .;	/* Kernel symbol table: GPL only */
+  __gpl_ksymtab : { *(__gpl_ksymtab) }
+  __stop___gpl_ksymtab = .;
+
   _etext = .;			/* End of text section */
 
   .data : {			/* Data */

@@ -30,6 +30,10 @@ SECTIONS
   __ksymtab : { *(__ksymtab) }
   __stop___ksymtab = .;
 
+  __start___gpl_ksymtab = .;	/* Kernel symbol table:	GPL-only symbols */
+  __gpl_ksymtab : { *(__gpl_ksymtab) }
+  __stop___gpl_ksymtab = .;
+
 #ifdef CONFIG_SHARED_KERNEL
   . = ALIGN(1048576);		/* VM shared segments are 1MB aligned */
 

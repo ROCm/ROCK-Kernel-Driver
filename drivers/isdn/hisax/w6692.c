@@ -639,15 +639,9 @@ static void
 w6692_release(struct IsdnCardState *cs)
 {
 	w6692_write_reg(cs, W_IMASK, 0xff);
-	release_region(cs->hw.w6692.iobase, 256);
 	if (cs->subtyp == W6692_USR)
 		w6692_write_reg(cs, W_XDATA, 0x04);
-}
-
-static int
-w6692_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return (0);
+	hisax_release_resources(cs);
 }
 
 static struct card_ops w6692_ops = {
@@ -674,6 +668,23 @@ static int id_idx ;
 
 static struct pci_dev *dev_w6692 __initdata = NULL;
 
+static int
+w6692_setup(struct IsdnCardState *cs, struct dc_hw_ops *dc_ops,
+	    struct bc_hw_ops *bc_ops)
+{
+	cs->dc_hw_ops = dc_ops;
+	cs->bc_hw_ops = bc_ops;
+	dc_l1_init(cs, &w6692_dc_l1_ops);
+	cs->bc_l1_ops = &w6692_bc_l1_ops;
+	W6692Version(cs, "W6692:");
+	printk(KERN_INFO "W6692 ISTA=0x%X\n", w6692_read_reg(cs, W_ISTA));
+	printk(KERN_INFO "W6692 IMASK=0x%X\n", w6692_read_reg(cs, W_IMASK));
+	printk(KERN_INFO "W6692 D_EXIR=0x%X\n", w6692_read_reg(cs, W_D_EXIR));
+	printk(KERN_INFO "W6692 D_EXIM=0x%X\n", w6692_read_reg(cs, W_D_EXIM));
+	printk(KERN_INFO "W6692 D_RSTA=0x%X\n", w6692_read_reg(cs, W_D_RSTA));
+	return 0;
+}
+
 int __init 
 setup_w6692(struct IsdnCard *card)
 {
@@ -688,13 +699,6 @@ setup_w6692(struct IsdnCard *card)
 #endif
 	strcpy(tmp, w6692_revision);
 	printk(KERN_INFO "HiSax: W6692 driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_W6692)
-		return (0);
-#if CONFIG_PCI
-	if (!pci_present()) {
-		printk(KERN_ERR "W6692: no PCI bus present\n");
-		return (0);
-	}
 	while (id_list[id_idx].vendor_id) {
 		dev_w6692 = pci_find_device(id_list[id_idx].vendor_id,
 					    id_list[id_idx].device_id,
@@ -738,38 +742,16 @@ setup_w6692(struct IsdnCard *card)
 	printk(KERN_INFO "Found: %s %s, I/O base: 0x%x, irq: %d\n",
 	       id_list[cs->subtyp].vendor_name, id_list[cs->subtyp].card_name,
 	       pci_ioaddr, pci_irq);
-	if (!request_region((cs->hw.w6692.iobase), 256,
-			    id_list[cs->subtyp].card_name)) {
-		printk(KERN_WARNING
-		       "HiSax: %s I/O ports %x-%x already in use\n",
-		       id_list[cs->subtyp].card_name,
-		       cs->hw.w6692.iobase,
-		       cs->hw.w6692.iobase + 255);
-		return (0);
-	}
-#else
-	printk(KERN_WARNING "HiSax: W6692 and NO_PCI_BIOS\n");
-	printk(KERN_WARNING "HiSax: W6692 unable to config\n");
-	return (0);
-#endif				/* CONFIG_PCI */
-
+	if (!request_io(&cs->rs, cs->hw.w6692.iobase, 0x100, id_list[cs->subtyp].card_name))
+		return 0;
+	
 	printk(KERN_INFO
 	       "HiSax: %s config irq:%d I/O:%x\n",
 	       id_list[cs->subtyp].card_name, cs->irq,
 	       cs->hw.w6692.iobase);
 
-	cs->dc_hw_ops = &w6692_dc_hw_ops;
-	cs->bc_hw_ops = &w6692_bc_hw_ops;
-	dc_l1_init(cs, &w6692_dc_l1_ops);
-	cs->bc_l1_ops = &w6692_bc_l1_ops;
-	cs->cardmsg = &w6692_card_msg;
-	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &w6692_ops;
-	W6692Version(cs, "W6692:");
-	printk(KERN_INFO "W6692 ISTA=0x%X\n", w6692_read_reg(cs, W_ISTA));
-	printk(KERN_INFO "W6692 IMASK=0x%X\n", w6692_read_reg(cs, W_IMASK));
-	printk(KERN_INFO "W6692 D_EXIR=0x%X\n", w6692_read_reg(cs, W_D_EXIR));
-	printk(KERN_INFO "W6692 D_EXIM=0x%X\n", w6692_read_reg(cs, W_D_EXIM));
-	printk(KERN_INFO "W6692 D_RSTA=0x%X\n", w6692_read_reg(cs, W_D_RSTA));
+	w6692_setup(cs, &w6692_dc_hw_ops, &w6692_bc_hw_ops);
+	cs->irq_flags |= SA_SHIRQ;
 	return (1);
 }

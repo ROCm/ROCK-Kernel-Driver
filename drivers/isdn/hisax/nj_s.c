@@ -92,12 +92,6 @@ nj_s_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static int
-NETjet_S_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
-}
-
 static void
 nj_s_init(struct IsdnCardState *cs)
 {
@@ -117,7 +111,6 @@ static struct pci_dev *dev_netjet __initdata = NULL;
 int __init
 setup_netjet_s(struct IsdnCard *card)
 {
-	int bytecnt;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
@@ -126,17 +119,8 @@ setup_netjet_s(struct IsdnCard *card)
 #endif
 	strcpy(tmp, NETjet_S_revision);
 	printk(KERN_INFO "HiSax: Traverse Tech. NETjet-S driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_NETJET_S)
-		return(0);
 
-#if CONFIG_PCI
-
-	for ( ;; )
-	{
-		if (!pci_present()) {
-			printk(KERN_ERR "Netjet: no PCI bus present\n");
-			return(0);
-		}
+	for ( ;; ) {
 		if ((dev_netjet = pci_find_device(PCI_VENDOR_ID_TIGERJET,
 			PCI_DEVICE_ID_TIGERJET_300,  dev_netjet))) {
 			if (pci_enable_device(dev_netjet))
@@ -203,34 +187,15 @@ setup_netjet_s(struct IsdnCard *card)
                 }
                 break;
 	}
-#else
-
-	printk(KERN_WARNING "NETjet-S: NO_PCI_BIOS\n");
-	printk(KERN_WARNING "NETjet-S: unable to config NETJET-S PCI\n");
-	return (0);
-
-#endif /* CONFIG_PCI */
-
-	bytecnt = 256;
-
 	printk(KERN_INFO
 		"NETjet-S: PCI card configured at %#lx IRQ %d\n",
 		cs->hw.njet.base, cs->irq);
-	if (check_region(cs->hw.njet.base, bytecnt)) {
-		printk(KERN_WARNING
-		       "HiSax: %s config port %#lx-%#lx already in use\n",
-		       CardType[card->typ],
-		       cs->hw.njet.base,
-		       cs->hw.njet.base + bytecnt);
-		return (0);
-	} else {
-		request_region(cs->hw.njet.base, bytecnt, "netjet-s isdn");
-	}
+	if (!request_io(&cs->rs, cs->hw.njet.base, 0x100, "netjet-s isdn"))
+		return 0;
+	
 	nj_s_reset(cs);
-	cs->dc_hw_ops = &netjet_dc_ops;
-	cs->cardmsg = &NETjet_S_card_msg;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &nj_s_ops;
-	ISACVersion(cs, "NETjet-S:");
-	return (1);
+	isac_setup(cs, &netjet_dc_ops);
+	return 1;
 }

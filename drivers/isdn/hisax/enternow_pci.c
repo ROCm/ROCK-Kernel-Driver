@@ -110,13 +110,14 @@ WriteByteAmd7930(struct IsdnCardState *cs, BYTE offset, BYTE value)
 }
 
 
-static struct dc_hw_ops enternow_ops = {
+static struct dc_hw_ops amd7930_ops = {
 	.read_reg   = ReadByteAmd7930,
 	.write_reg  = WriteByteAmd7930,
 };
 
-void
-enpci_setIrqMask(struct IsdnCardState *cs, BYTE val) {
+static void
+enpci_setIrqMask(struct IsdnCardState *cs, BYTE val)
+{
         if (!val)
 	        OutByte(cs->hw.njet.base+NETJET_IRQMASK1, 0x00);
         else
@@ -152,57 +153,44 @@ reset_enpci(struct IsdnCardState *cs)
 	OutByte(cs->hw.njet.auxa, cs->hw.njet.auxd); // LED off
 }
 
-
-static int
-enpci_card_msg(struct IsdnCardState *cs, int mt, void *arg)
+static void
+enpci_bc_activate(struct IsdnCardState *cs, int chan)
 {
-        BYTE *chan;
-
 	if (cs->debug & L1_DEB_ISAC)
-		debugl1(cs, "enter:now PCI: card_msg: 0x%04X", mt);
+		debugl1(cs, "enter:now PCI: assign phys. BC %d in AMD LMR1", chan);
+	
+	cs->dc.amd7930.ph_command(cs, (cs->dc.amd7930.lmr1 | (chan + 1)), "MDL_BC_ASSIGN");
+	/* at least one b-channel in use, LED 2 on */
+	cs->hw.njet.auxd |= TJ_AMD_IRQ << 2;
+	OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
+}
 
-        switch (mt) {
-                case MDL_ASSIGN:
-                        /* TEI assigned, LED1 on */
-                        cs->hw.njet.auxd = TJ_AMD_IRQ << 1;
-                        OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
-                        break;
-                case MDL_REMOVE:
-                        /* TEI removed, LEDs off */
-	                cs->hw.njet.auxd = 0;
-                        OutByte(cs->hw.njet.base + NETJET_AUXDATA, 0x00);
-                        break;
-                case MDL_BC_ASSIGN:
-                        /* activate B-channel */
-                        chan = (BYTE *)arg;
-
-                        if (cs->debug & L1_DEB_ISAC)
-		                debugl1(cs, "enter:now PCI: assign phys. BC %d in AMD LMR1", *chan);
-
-                        cs->dc.amd7930.ph_command(cs, (cs->dc.amd7930.lmr1 | (*chan + 1)), "MDL_BC_ASSIGN");
-                        /* at least one b-channel in use, LED 2 on */
-                        cs->hw.njet.auxd |= TJ_AMD_IRQ << 2;
-                        OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
-                        break;
-                case MDL_BC_RELEASE:
-                        /* deactivate B-channel */
-                        chan = (BYTE *)arg;
-
-                        if (cs->debug & L1_DEB_ISAC)
-		                debugl1(cs, "enter:now PCI: release phys. BC %d in Amd LMR1", *chan);
-
-                        cs->dc.amd7930.ph_command(cs, (cs->dc.amd7930.lmr1 & ~(*chan + 1)), "MDL_BC_RELEASE");
-                        /* no b-channel active -> LED2 off */
-                        if (!(cs->dc.amd7930.lmr1 & 3)) {
-                                cs->hw.njet.auxd &= ~(TJ_AMD_IRQ << 2);
-                                OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
-                        }
-                        break;
-                default:
-                        break;
-
+static void
+enpci_bc_deactivate(struct IsdnCardState *cs, int chan)
+{
+	if (cs->debug & L1_DEB_ISAC)
+		debugl1(cs, "enter:now PCI: release phys. BC %d in Amd LMR1", chan);
+	
+	cs->dc.amd7930.ph_command(cs, (cs->dc.amd7930.lmr1 & ~(chan + 1)), "MDL_BC_RELEASE");
+	/* no b-channel active -> LED2 off */
+	if (!(cs->dc.amd7930.lmr1 & 3)) {
+		cs->hw.njet.auxd &= ~(TJ_AMD_IRQ << 2);
+		OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
 	}
-	return(0);
+}
+
+static void
+enpci_led_handler(struct IsdnCardState *cs)
+{
+	if (cs->status & 0x0001) {
+		/* TEI assigned, LED1 on */
+		cs->hw.njet.auxd = TJ_AMD_IRQ << 1;
+		OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
+	} else {
+		/* TEI removed, LEDs off */
+		cs->hw.njet.auxd = 0;
+		OutByte(cs->hw.njet.base + NETJET_AUXDATA, 0x00);
+	}
 }
 
 static void
@@ -268,10 +256,11 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 static struct card_ops enpci_ops = {
-	.init     = enpci_init,
-	.reset    = enpci_reset,
-	.release  = netjet_release,
-	.irq_func = enpci_interrupt,
+	.init        = enpci_init,
+	.reset       = enpci_reset,
+	.release     = netjet_release,
+	.led_handler = enpci_led_handler,
+	.irq_func    = enpci_interrupt,
 };
 
 static struct pci_dev *dev_netjet __initdata = NULL;
@@ -280,25 +269,16 @@ static struct pci_dev *dev_netjet __initdata = NULL;
 int __init
 setup_enternow_pci(struct IsdnCard *card)
 {
-	int bytecnt;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
-#if CONFIG_PCI
 #ifdef __BIG_ENDIAN
 #error "not running on big endian machines now"
 #endif
         strcpy(tmp, enternow_pci_rev);
 	printk(KERN_INFO "HiSax: Formula-n Europe AG enter:now ISDN PCI driver Rev. %s\n", HiSax_getrev(tmp));
-	if (cs->typ != ISDN_CTYPE_ENTERNOW)
-		return(0);
 
-	for ( ;; )
-	{
-		if (!pci_present()) {
-			printk(KERN_ERR "enter:now PCI: no PCI bus present\n");
-			return(0);
-		}
+	for ( ;; ) {
 		if ((dev_netjet = pci_find_device(PCI_VENDOR_ID_TIGERJET,
 			PCI_DEVICE_ID_TIGERJET_300,  dev_netjet))) {
 			if (pci_enable_device(dev_netjet))
@@ -351,61 +331,19 @@ setup_enternow_pci(struct IsdnCard *card)
 
 			   break;
 	}
-#else
-
-	printk(KERN_WARNING "enter:now PCI: NO_PCI_BIOS\n");
-	printk(KERN_WARNING "enter:now PCI: unable to config Formula-n enter:now ISDN PCI ab\n");
-	return (0);
-
-#endif /* CONFIG_PCI */
-
-	bytecnt = 256;
-
 	printk(KERN_INFO
 		"enter:now PCI: PCI card configured at 0x%lx IRQ %d\n",
 		cs->hw.njet.base, cs->irq);
-	if (!request_region(cs->hw.njet.base, bytecnt, "Fn_ISDN")) {
-		printk(KERN_WARNING
-			   "HiSax: %s config port %lx-%lx already in use\n",
-			   CardType[card->typ],
-			   cs->hw.njet.base,
-			   cs->hw.njet.base + bytecnt);
-		return (0);
-	}
+	if (!request_io(&cs->rs, cs->hw.njet.base, 0x100, "Fn_ISDN"))
+		return 0;
 	reset_enpci(cs);
 	cs->hw.njet.last_is0 = 0;
-	cs->dc_hw_ops = &enternow_ops;
-        cs->dc.amd7930.setIrqMask = &enpci_setIrqMask;
+	cs->hw.njet.bc_activate = enpci_bc_activate;
+	cs->hw.njet.bc_deactivate = enpci_bc_deactivate;
+	amd7930_setup(cs, &amd7930_ops, &enpci_setIrqMask);
 
-	cs->cardmsg = &enpci_card_msg;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &enpci_ops;
 
-        return (1);
+        return 1;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

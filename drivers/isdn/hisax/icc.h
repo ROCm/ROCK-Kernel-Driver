@@ -65,6 +65,6 @@
 #define ICC_IND_AIL    0xE
 #define ICC_IND_DC     0xF
 
-extern void ICCVersion(struct IsdnCardState *cs, char *s);
+extern int  icc_setup(struct IsdnCardState *cs, struct dc_hw_ops *icc_ops);
 extern void initicc(struct IsdnCardState *cs);
 extern void icc_interrupt(struct IsdnCardState *cs, u8 val);

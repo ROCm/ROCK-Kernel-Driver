@@ -282,12 +282,6 @@ r742_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-static int
-Gazel_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return (0);
-}
-
 static void
 gazel_init(struct IsdnCardState *cs)
 {
@@ -300,127 +294,85 @@ gazel_init(struct IsdnCardState *cs)
 	inithscxisac(cs);
 }
 
-static struct resource *
-gazel_request_region(unsigned long start, unsigned long n, const char *name)
-{
-	struct resource *rc = request_region(start, n, name);
-
-	if (!rc)
-		printk(KERN_WARNING "Gazel: io %#lx-%#lx already in use\n",
-		       start, start + n);
-	return rc;
-}
-
 static int
 r647_reserve_regions(struct IsdnCardState *cs)
 {
-	int i, base;
+	int i, base = cs->hw.gazel.hscx[0];
 
-	base = cs->hw.gazel.hscx[0];
-	for (i = 0x0000; i < 0xC000; i += 0x1000) {
-		if (!gazel_request_region(i + base, 16, "gazel")) {
-			for (i -= 0x1000; i >= 0; i -= 0x1000)
-				release_region (i + base, 16);					
-			return -EBUSY;
-		}
+	for (i = 0; i < 0xc000; i += 0x1000) {
+		if (!request_io(&cs->rs, i + base, 16, "gazel"))
+			goto err;
 	}
-	if (!gazel_request_region(0xC000 + base, 1, "gazel")) {
-		for (i = 0x0000; i < 0xC000; i += 0x1000) 
-			release_region (i + base, 16);
-		return -EBUSY;
-	}
+	if (!request_io(&cs->rs, 0xc000 + base, 1, "gazel"))
+		goto err;
 	return 0;
-}
-
-static void
-r647_release(struct IsdnCardState *cs)
-{
-	int i;
-
-	for (i = 0x0000; i < 0xC000; i += 0x1000)
-		release_region(i + cs->hw.gazel.hscx[0], 16);
-	release_region(0xC000 + cs->hw.gazel.hscx[0], 1);
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
 }
 
 static int
 r685_reserve_regions(struct IsdnCardState *cs)
 {
-	if (!gazel_request_region(cs->hw.gazel.hscx[0], 0x100, "gazel")) {
-		return -EBUSY;
-	}
-	if (!gazel_request_region(cs->hw.gazel.cfg_reg, 0x80, "gazel")) {
-		release_region (cs->hw.gazel.hscx[0], 0x100);
-		return -EBUSY;
-	}
+	if (!request_io(&cs->rs, cs->hw.gazel.hscx[0], 0x100, "gazel"))
+		goto err;
+	if (!request_io(&cs->rs, cs->hw.gazel.cfg_reg, 0x80, "gazel"))
+		goto err;
 	return 0;
-}
-
-static void
-r685_release(struct IsdnCardState *cs)
-{
-	release_region(cs->hw.gazel.hscx[0], 0x100);
-	release_region(cs->hw.gazel.cfg_reg, 0x80);
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
 }
 
 static int
 r742_reserve_regions(struct IsdnCardState *cs)
 {
-	if (!gazel_request_region(cs->hw.gazel.ipac, 0x8, "gazel"))
-		return -EBUSY;
+	if (!request_io(&cs->rs, cs->hw.gazel.ipac, 0x8, "gazel"))
+		goto err;
 	return 0;
-}
-
-static void
-r742_release(struct IsdnCardState *cs)
-{
-	release_region(cs->hw.gazel.ipac, 8);
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
 }
 
 static int
 r753_reserve_regions(struct IsdnCardState *cs)
 {
-	if (!gazel_request_region(cs->hw.gazel.ipac, 0x8, "gazel")) {
-		return -EBUSY;
-	}
-	if (!gazel_request_region(cs->hw.gazel.cfg_reg, 0x80, "gazel")) {
-		release_region (cs->hw.gazel.ipac, 0x8);
-		return -EBUSY;
-	}
+	if (!request_io(&cs->rs, cs->hw.gazel.ipac, 0x8, "gazel"))
+		goto err;
+	if (!request_io(&cs->rs, cs->hw.gazel.cfg_reg, 0x80, "gazel"))
+		goto err;
 	return 0;
-}
-
-static void
-r753_release(struct IsdnCardState *cs)
-{
-	release_region(cs->hw.gazel.ipac, 0x8);
-	release_region(cs->hw.gazel.cfg_reg, 0x80);
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
 }
 
 static struct card_ops r647_ops = {
 	.init     = gazel_init,
 	.reset    = r647_reset,
-	.release  = r647_release,
+	.release  = hisax_release_resources,
 	.irq_func = hscxisac_irq,
 };
 
 static struct card_ops r685_ops = {
 	.init     = gazel_init,
 	.reset    = r685_reset,
-	.release  = r685_release,
+	.release  = hisax_release_resources,
 	.irq_func = hscxisac_irq,
 };
 
 static struct card_ops r742_ops = {
 	.init     = ipac_init,
 	.reset    = r742_reset,
-	.release  = r742_release,
+	.release  = hisax_release_resources,
 	.irq_func = ipac_irq,
 };
 
 static struct card_ops r753_ops = {
 	.init     = ipac_init,
 	.reset    = r753_reset,
-	.release  = r753_release,
+	.release  = hisax_release_resources,
 	.irq_func = ipac_irq,
 };
 
@@ -573,13 +525,9 @@ setup_gazel(struct IsdnCard *card)
 {
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	u8 val;
 
 	strcpy(tmp, gazel_revision);
 	printk(KERN_INFO "Gazel: Driver Revision %s\n", HiSax_getrev(tmp));
-
-	if (cs->typ != ISDN_CTYPE_GAZEL)
-		return (0);
 
 	if (card->para[0]) {
 		if (setup_gazelisa(card, cs))
@@ -589,28 +537,19 @@ setup_gazel(struct IsdnCard *card)
 			return (0);
 	}
 
-	cs->cardmsg = &Gazel_card_msg;
-
 	switch (cs->subtyp) {
 	case R647:
 	case R685:
 		if (cs->subtyp == R647) {
-			cs->dc_hw_ops = &r647_isac_ops;
-			cs->bc_hw_ops = &r647_hscx_ops;
 			cs->card_ops  = &r647_ops;
+			if (hscxisac_setup(cs, &r647_isac_ops, &r647_hscx_ops))
+				goto err;
 		} else {
-			cs->dc_hw_ops = &r685_isac_ops;
-			cs->bc_hw_ops = &r685_hscx_ops;
 			cs->card_ops  = &r685_ops;
+			if (hscxisac_setup(cs, &r685_isac_ops, &r685_hscx_ops))
+				goto err;
 		}
 		cs->card_ops->reset(cs);
-		ISACVersion(cs, "Gazel:");
-		if (HscxVersion(cs, "Gazel:")) {
-			printk(KERN_WARNING
-			       "Gazel: wrong HSCX versions check IO address\n");
-			cs->card_ops->release(cs);
-				return (0);
-		}
 		break;
 	case R742:
 	case R753:
@@ -619,13 +558,13 @@ setup_gazel(struct IsdnCard *card)
 		} else {
 			cs->card_ops = &r753_ops;
 		}
-		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->bc_hw_ops = &ipac_bc_ops;
+		if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
+			goto err;
 		cs->card_ops->reset(cs);
-		val = ipac_read(cs, IPAC_ID);
-		printk(KERN_INFO "Gazel: IPAC version %x\n", val);
 		break;
 	}
-
 	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }

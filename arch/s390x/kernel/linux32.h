@@ -25,19 +25,6 @@ struct ipc_kludge_32 {
 #define F_SETLK64       13
 #define F_SETLKW64      14    
 
-struct statfs32 {
-	__s32			f_type;
-	__s32			f_bsize;
-	__s32			f_blocks;
-	__s32			f_bfree;
-	__s32			f_bavail;
-	__s32			f_files;
-	__s32			f_ffree;
-	__kernel_fsid_t		f_fsid;
-	__s32			f_namelen;  
-	__s32			f_spare[6];
-};
-
 typedef __u32 old_sigset_t32;       /* at least 32 bits */ 
 
 struct old_sigaction32 {

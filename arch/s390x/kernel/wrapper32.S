@@ -440,17 +440,17 @@ sys32_setpriority_wrapper:
 	lgfr	%r4,%r4			# int
 	jg	sys_setpriority		# branch to system call
 
-	.globl  sys32_statfs_wrapper 
-sys32_statfs_wrapper:
+	.globl  compat_sys_statfs_wrapper 
+compat_sys_statfs_wrapper:
 	llgtr	%r2,%r2			# char *
-	llgtr	%r3,%r3			# struct statfs_emu31 *
-	jg	sys32_statfs		# branch to system call
+	llgtr	%r3,%r3			# struct compat_statfs *
+	jg	compat_sys_statfs	# branch to system call
 
-	.globl  sys32_fstatfs_wrapper 
-sys32_fstatfs_wrapper:
+	.globl  compat_sys_fstatfs_wrapper 
+compat_sys_fstatfs_wrapper:
 	llgfr	%r2,%r2			# unsigned int
-	llgtr	%r3,%r3			# struct statfs_emu31 *
-	jg	sys32_fstatfs		# branch to system call
+	llgtr	%r3,%r3			# struct compat_statfs *
+	jg	compat_sys_fstatfs	# branch to system call
 
 	.globl  sys32_socketcall_wrapper 
 sys32_socketcall_wrapper:

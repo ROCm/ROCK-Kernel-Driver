@@ -679,19 +679,19 @@ static int obsolete_params(const char *name,
 	if (!kp)
 		return -ENOMEM;
 
-	DEBUGP("Module %s has %u obsolete params\n", name, num);
-	for (i = 0; i < num; i++)
-		DEBUGP("Param %i: %s type %s\n",
-		       num, obsparm[i].name, obsparm[i].type);
-
 	for (i = 0; i < num; i++) {
+		char sym_name[128 + sizeof(MODULE_SYMBOL_PREFIX)];
+
+		snprintf(sym_name, sizeof(sym_name), "%s%s",
+			 MODULE_SYMBOL_PREFIX, obsparm[i].name);
+
 		kp[i].name = obsparm[i].name;
 		kp[i].perm = 000;
 		kp[i].set = set_obsolete;
 		kp[i].get = NULL;
 		obsparm[i].addr
 			= (void *)find_local_symbol(sechdrs, symindex, strtab,
-						    obsparm[i].name);
+						    sym_name);
 		if (!obsparm[i].addr) {
 			printk("%s: falsely claims to have parameter %s\n",
 			       name, obsparm[i].name);
@@ -1096,17 +1096,17 @@ static struct module *load_module(void *umod,
 	mod = (void *)sechdrs[modindex].sh_addr;
 
 	/* Now copy in args */
-	err = strlen_user(uargs);
-	if (err < 0)
+	arglen = strlen_user(uargs);
+	if (!arglen) {
+		err = -EFAULT;
 		goto free_hdr;
-	arglen = err;
-
-	args = kmalloc(arglen+1, GFP_KERNEL);
+	}
+	args = kmalloc(arglen, GFP_KERNEL);
 	if (!args) {
 		err = -ENOMEM;
 		goto free_hdr;
 	}
-	if (copy_from_user(args, uargs, arglen+1) != 0) {
+	if (copy_from_user(args, uargs, arglen) != 0) {
 		err = -EFAULT;
 		goto free_mod;
 	}

@@ -67,4 +67,17 @@ struct compat_flock {
 	short		__unused;
 };
 
+struct compat_statfs {
+	s32		f_type;
+	s32		f_bsize;
+	s32		f_blocks;
+	s32		f_bfree;
+	s32		f_bavail;
+	s32		f_files;
+	s32		f_ffree;
+	compat_fsid_t	f_fsid;
+	s32		f_namelen;  
+	s32		f_spare[6];
+};
+
 #endif /* _ASM_S390X_COMPAT_H */

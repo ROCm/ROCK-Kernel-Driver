@@ -40,7 +40,7 @@ jade_write_fifo(struct BCState *bcs, u8 *p, int len)
 	cs->bc_hw_ops->write_fifo(cs, bcs->unit, p, len);
 }
 
-int __init
+static int
 JadeVersion(struct IsdnCardState *cs, char *s)
 {
     int ver,i;
@@ -268,6 +268,13 @@ initjade(struct IsdnCardState *cs)
 	/* once again TRANSPARENT */	
 	modejade(cs->bcs, 0, 0);
 	modejade(cs->bcs + 1, 0, 0);
+}
+
+int
+jade_setup(struct IsdnCardState *cs, struct bc_hw_ops *jade_ops)
+{
+	cs->bc_hw_ops = jade_ops;
+	return JadeVersion(cs, "HiSax:");
 }
 
 #include "jade_irq.c"
