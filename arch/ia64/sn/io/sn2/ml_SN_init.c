@@ -11,12 +11,12 @@
 #include <linux/bootmem.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/io.h>
-#include <asm/sn/iograph.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/sn_private.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/sn_cpuid.h>
+#include <asm/sn/simulator.h>
 
 int		maxcpus;
 
@@ -69,12 +69,15 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 }
 
 void
-init_platform_hubinfo(nodepda_t **nodepdaindr) {
+init_platform_hubinfo(nodepda_t **nodepdaindr)
+{
 	cnodeid_t       cnode;
 	hubinfo_t hubinfo;
 	nodepda_t *npda;
 	extern int numionodes;
 
+	if (IS_RUNNING_ON_SIMULATOR())
+		return;
 	for (cnode = 0; cnode < numionodes; cnode++) {
 		npda = nodepdaindr[cnode];
 		hubinfo = (hubinfo_t)npda->pdinfo;

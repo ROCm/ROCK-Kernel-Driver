@@ -474,8 +474,6 @@ board_serial_number_get(lboard_t *board,char *serial_number)
 	return(0);
 }
 
-#include "asm/sn/sn_private.h"
-
 /*
  * Format a module id for printing.
  *

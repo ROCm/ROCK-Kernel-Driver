@@ -11,7 +11,7 @@
 #include <linux/types.h>
 #include <asm/sn/sgi.h>
 
-#if __KERNEL__
+#ifdef __KERNEL__
 
 /*
  * Basic types required for io error handling interfaces.
@@ -154,89 +154,6 @@ enum error_class_e {
 	/* Illegal response packet */
 	ERROR_CLASS_BAD_RESP_PKT
 };
-
-typedef uint64_t  error_class_t;
-
-
-/* 
- * Error context which the error action can use.
- */
-typedef void			*error_context_t;
-#define ERROR_CONTEXT_IGNORE	((error_context_t)-1ll)
-
-
-/* 
- * Error action type.
- */
-typedef error_return_code_t 	(*error_action_f)( error_context_t);
-#define ERROR_ACTION_IGNORE	((error_action_f)-1ll)
-
-/* Typical set of error actions */
-typedef struct error_action_set_s {
-	error_action_f		eas_panic;
-	error_action_f		eas_shutdown;
-	error_action_f		eas_abort;
-	error_action_f		eas_retry;
-	error_action_f		eas_failover;
-	error_action_f		eas_log_n_ignore;
-	error_action_f		eas_reset;
-} error_action_set_t;
-
-
-/* Set of priorites for in case mutliple error actions/states
- * are trying to be prescribed for a device.
- * NOTE : The ordering below encapsulates the priorities. Highest value
- * corresponds to highest priority.
- */
-enum error_priority_e {
-	ERROR_PRIORITY_IGNORE,
-	ERROR_PRIORITY_NONE,
-	ERROR_PRIORITY_NORMAL,
-	ERROR_PRIORITY_LOG,
-	ERROR_PRIORITY_FAILOVER,
-	ERROR_PRIORITY_RETRY,
-	ERROR_PRIORITY_ABORT,
-	ERROR_PRIORITY_SHUTDOWN,
-	ERROR_PRIORITY_RESTART,
-	ERROR_PRIORITY_PANIC
-};
-
-typedef uint64_t  error_priority_t;
-
-/* Error action interfaces */
-
-extern error_return_code_t	error_action_set(vertex_hdl_t,
-						 error_action_f,
-						 error_context_t,
-						 error_priority_t);
-extern error_return_code_t	error_action_perform(vertex_hdl_t);
-
-
-#define INFO_LBL_ERROR_SKIP_ENV	"error_skip_env"
-
-#define v_error_skip_env_get(v, l)		\
-hwgraph_info_get_LBL(v, INFO_LBL_ERROR_SKIP_ENV, (arbitrary_info_t *)&l)
-
-#define v_error_skip_env_set(v, l, r)		\
-(r ? 						\
- hwgraph_info_replace_LBL(v, INFO_LBL_ERROR_SKIP_ENV, (arbitrary_info_t)l,0) :\
- hwgraph_info_add_LBL(v, INFO_LBL_ERROR_SKIP_ENV, (arbitrary_info_t)l))
-
-#define v_error_skip_env_clear(v)		\
-hwgraph_info_remove_LBL(v, INFO_LBL_ERROR_SKIP_ENV, 0)
-
-typedef uint64_t		counter_t;
-
-extern counter_t		error_retry_count_get(vertex_hdl_t);
-extern error_return_code_t	error_retry_count_set(vertex_hdl_t,counter_t);
-extern counter_t		error_retry_count_increment(vertex_hdl_t);
-extern counter_t		error_retry_count_decrement(vertex_hdl_t);
-
-/* Except for the PIO Read error typically the other errors are handled in
- * the context of an asynchronous error interrupt.
- */
-#define	IS_ERROR_INTR_CONTEXT(_ec)	((_ec & IOECODE_DMA) 		|| \
-					 (_ec == IOECODE_PIO_WRITE))
 
 #endif /* __KERNEL__ */
 #endif /* _ASM_IA64_SN_IOERROR_HANDLING_H */

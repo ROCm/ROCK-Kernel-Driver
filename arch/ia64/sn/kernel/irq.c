@@ -18,7 +18,6 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/iograph.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/types.h>
 #include <asm/sn/pci/pciio.h>

@@ -13,7 +13,6 @@
 #include <linux/config.h>
 
 #include <asm/sn/types.h>
-#include <asm/uaccess.h>		/* for copy_??_user */
 #include <asm/sn/hwgfs.h>
 
 typedef hwgfs_handle_t vertex_hdl_t;

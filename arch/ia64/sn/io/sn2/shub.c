@@ -17,7 +17,6 @@
 #include <asm/system.h>
 #include <asm/sn/sgi.h>
 #include <asm/uaccess.h>
-#include <asm/sn/iograph.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/io.h>

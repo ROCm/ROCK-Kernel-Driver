@@ -127,7 +127,7 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 	/*
 	 * Get hwgraph vertex for the device
 	 */
-	device_sysdata = (struct sn_device_sysdata *) hwdev->sysdata;
+	device_sysdata = SN_DEVICE_SYSDATA(hwdev);
 	vhdl = device_sysdata->vhdl;
 
 	/*
@@ -240,7 +240,7 @@ sn_pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int dire
 	/*
 	 * Get the hwgraph vertex for the device
 	 */
-	device_sysdata = (struct sn_device_sysdata *) hwdev->sysdata;
+	device_sysdata = SN_DEVICE_SYSDATA(hwdev);
 	vhdl = device_sysdata->vhdl;
 
 	/*
@@ -367,7 +367,7 @@ sn_pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 	/*
 	 * find vertex for the device
 	 */
-	device_sysdata = (struct sn_device_sysdata *)hwdev->sysdata;
+	device_sysdata = SN_DEVICE_SYSDATA(hwdev);
 	vhdl = device_sysdata->vhdl;
 
 	/*

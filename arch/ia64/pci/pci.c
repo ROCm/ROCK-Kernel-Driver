@@ -153,8 +153,10 @@ alloc_resource (char *name, struct resource *root, unsigned long start, unsigned
 	res->end = end;
 	res->flags = flags;
 
-	if (insert_resource(root, res))
+	if (insert_resource(root, res))	{
+		kfree(res);
 		return -EBUSY;
+	}
 
 	return 0;
 }
