@@ -691,7 +691,7 @@ static const char *pci_status_source[] =
 
 static const char *split_status_strings[] =
 {
-	"%s: Received split response in %s.\n"
+	"%s: Received split response in %s.\n",
 	"%s: Received split completion error message in %s\n",
 	"%s: Receive overrun in %s\n",
 	"%s: Count not complete in %s\n",

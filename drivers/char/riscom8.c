@@ -1090,7 +1090,7 @@ static int rc_open(struct tty_struct * tty, struct file * filp)
 	unsigned long flags;
 	
 	board = RC_BOARD(minor(tty->device));
-	if (board > RC_NBOARD || !(rc_board[board].flags & RC_BOARD_PRESENT))
+	if (board >= RC_NBOARD || !(rc_board[board].flags & RC_BOARD_PRESENT))
 		return -ENODEV;
 	
 	bp = &rc_board[board];
