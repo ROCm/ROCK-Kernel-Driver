@@ -2876,7 +2876,6 @@ MODULE_DEVICE_TABLE(pci, cmpci_pci_tbl);
 void initialize_chip(struct pci_dev *pcidev)
 {
 	struct cm_state *s;
-	mm_segment_t fs;
 	int i, val;
 #if defined(CONFIG_SOUND_CMPCI_MIDI) || defined(CONFIG_SOUND_CMPCI_FM)
 	unsigned char reg_mask = 0;
@@ -3038,8 +3037,6 @@ void initialize_chip(struct pci_dev *pcidev)
 #endif
 		pci_set_master(pcidev);	/* enable bus mastering */
 		/* initialize the chips */
-		fs = get_fs();
-		set_fs(KERNEL_DS);
 		/* set mixer output */
 		frobindir(s, DSP_MIX_OUTMIXIDX, 0x1f, 0x1f);
 		/* set mixer input */
