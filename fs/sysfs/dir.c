@@ -56,7 +56,7 @@ int sysfs_make_dirent(struct sysfs_dirent * parent_sd, struct dentry * dentry,
 
 	sd = sysfs_new_dirent(parent_sd, element);
 	if (!sd)
-		return -ENOMEM;
+		return 0;
 
 	sd->s_mode = mode;
 	sd->s_type = type;
@@ -201,7 +201,7 @@ static int sysfs_attach_link(struct sysfs_dirent * sd, struct dentry * dentry)
 	return err;
 }
 
-struct dentry * sysfs_lookup(struct inode *dir, struct dentry *dentry,
+static struct dentry * sysfs_lookup(struct inode *dir, struct dentry *dentry,
 				struct nameidata *nd)
 {
 	struct sysfs_dirent * parent_sd = dentry->d_parent->d_fsdata;
