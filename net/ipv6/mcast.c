@@ -605,8 +605,6 @@ static void igmp6_join_group(struct ifmcaddr6 *ma)
 
 static void igmp6_leave_group(struct ifmcaddr6 *ma)
 {
-	int addr_type;
-
 	if (IPV6_ADDR_MC_SCOPE(&ma->mca_addr) < IPV6_ADDR_SCOPE_LINKLOCAL ||
 	    ipv6_addr_is_ll_all_nodes(&ma->mca_addr))
 		return;
