@@ -148,6 +148,7 @@ nfsd_proc_read(struct svc_rqst *rqstp, struct nfsd_readargs *argp,
 				argp->count);
 		argp->count = avail << 2;
 	}
+	svc_reserve(rqstp, (19<<2) + argp->count + 4);
 
 	resp->count = argp->count;
 	nfserr = nfsd_read(rqstp, fh_copy(&resp->fh, &argp->fh),
@@ -522,7 +523,7 @@ nfsd_proc_statfs(struct svc_rqst * rqstp, struct nfsd_fhandle   *argp,
 #define nfssvc_release_none	NULL
 struct nfsd_void { int dummy; };
 
-#define PROC(name, argt, rest, relt, cache)	\
+#define PROC(name, argt, rest, relt, cache, respsize)	\
  { (svc_procfunc) nfsd_proc_##name,		\
    (kxdrproc_t) nfssvc_decode_##argt,		\
    (kxdrproc_t) nfssvc_encode_##rest,		\
@@ -530,27 +531,28 @@ struct nfsd_void { int dummy; };
    sizeof(struct nfsd_##argt),			\
    sizeof(struct nfsd_##rest),			\
    0,						\
-   cache					\
+   cache,					\
+   respsize,				       	\
  }
 struct svc_procedure		nfsd_procedures2[18] = {
-  PROC(null,	 void,		void,		none,		RC_NOCACHE),
-  PROC(getattr,	 fhandle,	attrstat,	fhandle,	RC_NOCACHE),
-  PROC(setattr,  sattrargs,	attrstat,	fhandle,	RC_REPLBUFF),
-  PROC(none,	 void,		void,		none,		RC_NOCACHE),
-  PROC(lookup,	 diropargs,	diropres,	fhandle,	RC_NOCACHE),
-  PROC(readlink, fhandle,	readlinkres,	none,		RC_NOCACHE),
-  PROC(read,	 readargs,	readres,	fhandle,	RC_NOCACHE),
-  PROC(none,	 void,		void,		none,		RC_NOCACHE),
-  PROC(write,	 writeargs,	attrstat,	fhandle,	RC_REPLBUFF),
-  PROC(create,	 createargs,	diropres,	fhandle,	RC_REPLBUFF),
-  PROC(remove,	 diropargs,	void,		none,		RC_REPLSTAT),
-  PROC(rename,	 renameargs,	void,		none,		RC_REPLSTAT),
-  PROC(link,	 linkargs,	void,		none,		RC_REPLSTAT),
-  PROC(symlink,	 symlinkargs,	void,		none,		RC_REPLSTAT),
-  PROC(mkdir,	 createargs,	diropres,	fhandle,	RC_REPLBUFF),
-  PROC(rmdir,	 diropargs,	void,		none,		RC_REPLSTAT),
-  PROC(readdir,	 readdirargs,	readdirres,	none,		RC_REPLBUFF),
-  PROC(statfs,	 fhandle,	statfsres,	none,		RC_NOCACHE),
+  PROC(null,	 void,		void,		none,		RC_NOCACHE, 1),
+  PROC(getattr,	 fhandle,	attrstat,	fhandle,	RC_NOCACHE, 1+18),
+  PROC(setattr,  sattrargs,	attrstat,	fhandle,	RC_REPLBUFF, 1+18),
+  PROC(none,	 void,		void,		none,		RC_NOCACHE, 1),
+  PROC(lookup,	 diropargs,	diropres,	fhandle,	RC_NOCACHE, 1+8+18),
+  PROC(readlink, fhandle,	readlinkres,	none,		RC_NOCACHE, 1+1+256),
+  PROC(read,	 readargs,	readres,	fhandle,	RC_NOCACHE, 1+18+1+NFSSVC_MAXBLKSIZE),
+  PROC(none,	 void,		void,		none,		RC_NOCACHE, 1),
+  PROC(write,	 writeargs,	attrstat,	fhandle,	RC_REPLBUFF, 1+18),
+  PROC(create,	 createargs,	diropres,	fhandle,	RC_REPLBUFF, 1+8+18),
+  PROC(remove,	 diropargs,	void,		none,		RC_REPLSTAT, 1),
+  PROC(rename,	 renameargs,	void,		none,		RC_REPLSTAT, 1),
+  PROC(link,	 linkargs,	void,		none,		RC_REPLSTAT, 1),
+  PROC(symlink,	 symlinkargs,	void,		none,		RC_REPLSTAT, 1),
+  PROC(mkdir,	 createargs,	diropres,	fhandle,	RC_REPLBUFF, 1+8+18),
+  PROC(rmdir,	 diropargs,	void,		none,		RC_REPLSTAT, 1),
+  PROC(readdir,	 readdirargs,	readdirres,	none,		RC_REPLBUFF, 0),
+  PROC(statfs,	 fhandle,	statfsres,	none,		RC_NOCACHE, 1+5),
 };
 
 
