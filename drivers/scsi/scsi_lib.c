@@ -92,6 +92,7 @@ int scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 {
 	struct Scsi_Host *host = cmd->device->host;
 	struct scsi_device *device = cmd->device;
+	unsigned long flags;
 
 	SCSI_LOG_MLQUEUE(1,
 		 printk("Inserting command %p into mlqueue\n", cmd));
@@ -130,6 +131,9 @@ int scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 	 * Decrement the counters, since these commands are no longer
 	 * active on the host/device.
 	 */
+	spin_lock_irqsave(device->request_queue->queue_lock, flags);
+	device->device_busy--;
+	spin_unlock_irqrestore(device->request_queue->queue_lock, flags);
 	scsi_host_busy_dec_and_test(host, device);
 
 	/*
@@ -174,14 +178,18 @@ void scsi_do_req(struct scsi_request *sreq, const void *cmnd,
 		 void (*done)(struct scsi_cmnd *),
 		 int timeout, int retries)
 {
+	struct request_queue *q;
+
 	/*
 	 * If the upper level driver is reusing these things, then
 	 * we should release the low-level block now.  Another one will
 	 * be allocated later when this request is getting queued.
 	 */
 	if (sreq->sr_command) {
+		q = sreq->sr_command->device->request_queue;
 		scsi_put_command(sreq->sr_command);
 		sreq->sr_command = NULL;
+		scsi_queue_next_request(q, NULL);
 	}
 
 	/*
@@ -228,6 +236,7 @@ static void scsi_wait_done(struct scsi_cmnd *cmd)
 void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 		   unsigned bufflen, int timeout, int retries)
 {
+	struct request_queue *q;
 	DECLARE_COMPLETION(wait);
 	
 	sreq->sr_request->waiting = &wait;
@@ -239,7 +248,9 @@ void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 	sreq->sr_request->waiting = NULL;
 
 	if (sreq->sr_command) {
+		q = sreq->sr_command->device->request_queue;
 		scsi_put_command(sreq->sr_command);
+		scsi_queue_next_request(q, NULL);
 		sreq->sr_command = NULL;
 	}
 }
@@ -316,6 +327,39 @@ void scsi_setup_cmd_retry(struct scsi_cmnd *cmd)
 }
 
 /*
+ * Called for single_lun devices on IO completion. Clear starget_busy, and
+ * Call __blk_run_queue for all the scsi_devices on the target - including
+ * current_sdev first.
+ *
+ * Called with *no* scsi locks held.
+ */
+static void scsi_single_lun_run(struct scsi_device *current_sdev)
+{
+	struct scsi_device *sdev;
+	unsigned int flags, flags2;
+
+	spin_lock_irqsave(current_sdev->request_queue->queue_lock, flags2);
+	spin_lock_irqsave(current_sdev->host->host_lock, flags);
+	WARN_ON(!current_sdev->sdev_target->starget_busy);
+	if (current_sdev->device_busy == 0)
+		current_sdev->sdev_target->starget_busy = 0;
+	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
+
+	/*
+	 * Call __blk_run_queue for all LUNs on the target, starting with
+	 * current_sdev.
+	 */
+	__blk_run_queue(current_sdev->request_queue);
+	spin_unlock_irqrestore(current_sdev->request_queue->queue_lock, flags2);
+	list_for_each_entry(sdev, &current_sdev->same_target_siblings,
+			    same_target_siblings) {
+		spin_lock_irqsave(sdev->request_queue->queue_lock, flags2);
+		__blk_run_queue(sdev->request_queue);
+		spin_unlock_irqrestore(sdev->request_queue->queue_lock, flags2);
+	}
+}
+
+/*
  * Function:    scsi_queue_next_request()
  *
  * Purpose:     Handle post-processing of completed commands.
@@ -351,16 +395,12 @@ void scsi_setup_cmd_retry(struct scsi_cmnd *cmd)
  *		permutations grows as 2**N, and if too many more special cases
  *		get added, we start to get screwed.
  */
-static void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
+void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 {
 	struct scsi_device *sdev, *sdev2;
 	struct Scsi_Host *shost;
 	unsigned long flags;
-	int all_clear;
 
-	ASSERT_LOCK(q->queue_lock, 0);
-
-	spin_lock_irqsave(q->queue_lock, flags);
 	if (cmd != NULL) {
 
 		/*
@@ -369,6 +409,7 @@ static void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 		 * in which case we need to request the blocks that come after
 		 * the bad sector.
 		 */
+		spin_lock_irqsave(q->queue_lock, flags);
 		cmd->request->special = cmd;
 		if (blk_rq_tagged(cmd->request))
 			blk_queue_end_tag(q, cmd->request);
@@ -381,62 +422,45 @@ static void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 		cmd->request->flags |= REQ_SPECIAL;
 		cmd->request->flags &= ~REQ_DONTPREP;
 		__elv_add_request(q, cmd->request, 0, 0);
+		spin_unlock_irqrestore(q->queue_lock, flags);
 	}
-
-	/*
-	 * Just hit the requeue function for the queue.
-	 */
-	__blk_run_queue(q);
 
 	sdev = q->queuedata;
+
+	if (sdev->single_lun)
+		scsi_single_lun_run(sdev);
+
 	shost = sdev->host;
+	spin_lock_irqsave(shost->host_lock, flags);
+	while (!list_empty(&shost->starved_list) &&
+	       !shost->host_blocked && !shost->host_self_blocked &&
+		!((shost->can_queue > 0) &&
+		  (shost->host_busy >= shost->can_queue))) {
+		/*
+		 * As long as shost is accepting commands and we have
+		 * starved queues, call __blk_run_queue. scsi_request_fn
+		 * drops the queue_lock and can add us back to the
+		 * starved_list.
+		 *
+		 * host_lock protects the starved_list and starved_entry.
+		 * scsi_request_fn must get the host_lock before checking
+		 * or modifying starved_list or starved_entry.
+		 */
+		sdev2 = list_entry(shost->starved_list.next,
+					  struct scsi_device, starved_entry);
+		list_del_init(&sdev2->starved_entry);
+		spin_unlock_irqrestore(shost->host_lock, flags);
 
-	/*
-	 * If this is a single-lun device, and we are currently finished
-	 * with this device, then see if we need to get another device
-	 * started.  FIXME(eric) - if this function gets too cluttered
-	 * with special case code, then spin off separate versions and
-	 * use function pointers to pick the right one.
-	 */
-	if (sdev->single_lun && sdev->device_busy == 0 &&
-	    !shost->host_blocked && !shost->host_self_blocked &&
-	    !((shost->can_queue > 0) && (shost->host_busy >= shost->can_queue))
-	    && elv_queue_empty(q)) {
-		list_for_each_entry(sdev2, &sdev->same_target_siblings,
-			       same_target_siblings) {
-			if (!sdev2->device_blocked &&
-			    !elv_queue_empty(sdev2->request_queue)) {
-				__blk_run_queue(sdev2->request_queue);
-				break;
-			}
-		}
+		spin_lock_irqsave(sdev2->request_queue->queue_lock, flags);
+		__blk_run_queue(sdev2->request_queue);
+		spin_unlock_irqrestore(sdev2->request_queue->queue_lock, flags);
+
+		spin_lock_irqsave(shost->host_lock, flags);
 	}
+	spin_unlock_irqrestore(shost->host_lock, flags);
 
-	/*
-	 * Now see whether there are other devices on the bus which
-	 * might be starved.  If so, hit the request function.  If we
-	 * don't find any, then it is safe to reset the flag.  If we
-	 * find any device that it is starved, it isn't safe to reset the
-	 * flag as the queue function releases the lock and thus some
-	 * other device might have become starved along the way.
-	 */
-	all_clear = 1;
-	if (shost->some_device_starved) {
-		list_for_each_entry(sdev, &shost->my_devices, siblings) {
-			if (shost->can_queue > 0 &&
-			    shost->host_busy >= shost->can_queue)
-				break;
-			if (shost->host_blocked || shost->host_self_blocked)
-				break;
-			if (sdev->device_blocked || !sdev->starved)
-				continue;
-			__blk_run_queue(sdev->request_queue);
-			all_clear = 0;
-		}
-
-		if (sdev == NULL && all_clear)
-			shost->some_device_starved = 0;
-	}
+	spin_lock_irqsave(q->queue_lock, flags);
+	__blk_run_queue(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
@@ -469,8 +493,6 @@ static struct scsi_cmnd *scsi_end_request(struct scsi_cmnd *cmd, int uptodate,
 	request_queue_t *q = cmd->device->request_queue;
 	struct request *req = cmd->request;
 	unsigned long flags;
-
-	ASSERT_LOCK(q->queue_lock, 0);
 
 	/*
 	 * If there are blocks left over at the end, set up the command
@@ -569,8 +591,6 @@ static void scsi_release_buffers(struct scsi_cmnd *cmd)
 {
 	struct request *req = cmd->request;
 
-	ASSERT_LOCK(cmd->device->host->host_lock, 0);
-
 	/*
 	 * Free up any indirection buffers we allocated for DMA purposes. 
 	 */
@@ -651,8 +671,6 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 	 *	would be used if we just wanted to retry, for example.
 	 *
 	 */
-	ASSERT_LOCK(q->queue_lock, 0);
-
 	/*
 	 * Free up any indirection buffers we allocated for DMA purposes. 
 	 * For the case of a READ, we need to copy the data out of the
@@ -923,22 +941,6 @@ static int scsi_init_io(struct scsi_cmnd *cmd)
 	return BLKPREP_KILL;
 }
 
-/*
- * The target associated with myself can only handle one active command at
- * a time. Scan through all of the luns on the same target as myself,
- * return 1 if any are active.
- */
-static int check_all_luns(struct scsi_device *myself)
-{
-	struct scsi_device *sdev;
-
-	list_for_each_entry(sdev, &myself->same_target_siblings,
-			    same_target_siblings)
-		if (sdev->device_busy)
-			return 1;
-	return 0;
-}
-
 static int scsi_prep_fn(struct request_queue *q, struct request *req)
 {
 	struct Scsi_Device_Template *sdt;
@@ -1040,6 +1042,81 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 }
 
 /*
+ * scsi_dev_queue_ready: if we can send requests to sdev, return 1 else
+ * return 0.
+ *
+ * Called with the queue_lock held.
+ */
+static inline int scsi_dev_queue_ready(struct request_queue *q,
+				  struct scsi_device *sdev)
+{
+	if (sdev->device_busy >= sdev->queue_depth)
+		return 0;
+	if (sdev->device_busy == 0 && sdev->device_blocked) {
+		/*
+		 * unblock after device_blocked iterates to zero
+		 */
+		if (--sdev->device_blocked == 0) {
+			SCSI_LOG_MLQUEUE(3,
+				printk("scsi%d (%d:%d) unblocking device at"
+				       " zero depth\n", sdev->host->host_no,
+				       sdev->id, sdev->lun));
+		} else {
+			blk_plug_device(q);
+			return 0;
+		}
+	}
+	if (sdev->device_blocked)
+		return 0;
+
+	return 1;
+}
+
+/*
+ * scsi_host_queue_ready: if we can send requests to shost, return 1 else
+ * return 0.
+ *
+ * Called with queue_lock and host_lock held.
+ */
+static inline int scsi_host_queue_ready(struct request_queue *q,
+				   struct Scsi_Host *shost,
+				   struct scsi_device *sdev)
+{
+	if (shost->in_recovery)
+		return 0;
+	if (shost->host_busy == 0 && shost->host_blocked) {
+		/*
+		 * unblock after host_blocked iterates to zero
+		 */
+		if (--shost->host_blocked == 0) {
+			SCSI_LOG_MLQUEUE(3,
+				printk("scsi%d unblocking host at zero depth\n",
+					shost->host_no));
+		} else {
+			blk_plug_device(q);
+			return 0;
+		}
+	}
+	if (!list_empty(&sdev->starved_entry))
+		return 0;
+	if ((shost->can_queue > 0 && shost->host_busy >= shost->can_queue) ||
+	    shost->host_blocked || shost->host_self_blocked) {
+		SCSI_LOG_MLQUEUE(3,
+			printk("add starved dev <%d,%d,%d,%d>; host "
+			       "limit %d, busy %d, blocked %d selfblocked %d\n",
+			       sdev->host->host_no, sdev->channel,
+			       sdev->id, sdev->lun,
+			       shost->can_queue, shost->host_busy,
+			       shost->host_blocked, shost->host_self_blocked));
+		list_add_tail(&sdev->starved_entry,
+			      &shost->starved_list);
+		return 0;
+	}
+
+	return 1;
+}
+
+/*
  * Function:    scsi_request_fn()
  *
  * Purpose:     Main strategy routine for SCSI.
@@ -1056,74 +1133,26 @@ static void scsi_request_fn(request_queue_t *q)
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_cmnd *cmd;
 	struct request *req;
-
-	ASSERT_LOCK(q->queue_lock, 1);
+	unsigned int flags;
 
 	/*
 	 * To start with, we keep looping until the queue is empty, or until
 	 * the host is no longer able to accept any more requests.
 	 */
 	for (;;) {
-		/*
-		 * Check this again - each time we loop through we will have
-		 * released the lock and grabbed it again, so each time
-		 * we need to check to see if the queue is plugged or not.
-		 */
-		if (shost->in_recovery || blk_queue_plugged(q))
-			return;
+		if (blk_queue_plugged(q))
+			goto completed;
 
-		if (sdev->device_busy >= sdev->queue_depth)
-			break;
+		if (!scsi_dev_queue_ready(q, sdev))
+			goto completed;
 
-		if (sdev->single_lun && check_all_luns(sdev))
-			break;
+		spin_lock_irqsave(shost->host_lock, flags);
+		if (!scsi_host_queue_ready(q, shost, sdev))
+			goto after_host_lock;
 
-		if (shost->host_busy == 0 && shost->host_blocked) {
-			/* unblock after host_blocked iterates to zero */
-			if (--shost->host_blocked == 0) {
-				SCSI_LOG_MLQUEUE(3,
-					printk("scsi%d unblocking host at zero depth\n",
-						shost->host_no));
-			} else {
-				blk_plug_device(q);
-				break;
-			}
-		}
-
-		if (sdev->device_busy == 0 && sdev->device_blocked) {
-			/* unblock after device_blocked iterates to zero */
-			if (--sdev->device_blocked == 0) {
-				SCSI_LOG_MLQUEUE(3,
-					printk("scsi%d (%d:%d) unblocking device at zero depth\n",
-						shost->host_no, sdev->id, sdev->lun));
-			} else {
-				blk_plug_device(q);
-				break;
-			}
-		}
-
-		/*
-		 * If the device cannot accept another request, then quit.
-		 */
-		if (sdev->device_blocked)
-			break;
-		if ((shost->can_queue > 0 && shost->host_busy >= shost->can_queue) ||
-		    shost->host_blocked || shost->host_self_blocked) {
-			/*
-			 * If we are unable to process any commands at all for
-			 * this device, then we consider it to be starved.
-			 * What this means is that there are no outstanding
-			 * commands for this device and hence we need a
-			 * little help getting it started again
-			 * once the host isn't quite so busy.
-			 */
-			if (sdev->device_busy == 0) {
-				sdev->starved = 1;
-				shost->some_device_starved = 1;
-			}
-			break;
-		} else
-			sdev->starved = 0;
+		if (sdev->single_lun && !sdev->device_busy &&
+		    sdev->sdev_target->starget_busy)
+			goto after_host_lock;
 
 		/*
 		 * get next queueable request.  We do this early to make sure
@@ -1137,9 +1166,9 @@ static void scsi_request_fn(request_queue_t *q)
 			/* If the device is busy, a returning I/O
 			 * will restart the queue.  Otherwise, we have
 			 * to plug the queue */
-			if(sdev->device_busy == 0)
+			if (sdev->device_busy == 1)
 				blk_plug_device(q);
-			break;
+			goto after_host_lock;
 		}
 
 		cmd = req->special;
@@ -1161,11 +1190,12 @@ static void scsi_request_fn(request_queue_t *q)
 		if (!(blk_queue_tagged(q) && (blk_queue_start_tag(q, req) == 0)))
 			blkdev_dequeue_request(req);
 	
-		/*
-		 * Now bump the usage count for both the host and the
-		 * device.
-		 */
+		if (sdev->single_lun)
+			sdev->sdev_target->starget_busy = 1;
+
 		shost->host_busy++;
+		spin_unlock_irqrestore(shost->host_lock, flags);
+
 		sdev->device_busy++;
 		spin_unlock_irq(q->queue_lock);
 
@@ -1186,6 +1216,11 @@ static void scsi_request_fn(request_queue_t *q)
 		 */
 		spin_lock_irq(q->queue_lock);
 	}
+completed:
+	return;
+
+after_host_lock:
+	spin_unlock_irqrestore(shost->host_lock, flags);
 }
 
 u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
@@ -1207,15 +1242,20 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
 	return BLK_BOUNCE_HIGH;
 }
 
-request_queue_t *scsi_alloc_queue(struct Scsi_Host *shost)
+request_queue_t *scsi_alloc_queue(struct scsi_device *sdev)
 {
 	request_queue_t *q;
+	struct Scsi_Host *shost;
 
 	q = kmalloc(sizeof(*q), GFP_ATOMIC);
 	if (!q)
 		return NULL;
 	memset(q, 0, sizeof(*q));
 
+	/*
+	 * XXX move host code to scsi_register
+	 */
+	shost = sdev->host;
 	if (!shost->max_sectors) {
 		/*
 		 * Driver imposes no hard sector transfer limit.
@@ -1224,7 +1264,7 @@ request_queue_t *scsi_alloc_queue(struct Scsi_Host *shost)
 		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
 	}
 
-	blk_init_queue(q, scsi_request_fn, shost->host_lock);
+	blk_init_queue(q, scsi_request_fn, &sdev->sdev_lock);
 	blk_queue_prep_rq(q, scsi_prep_fn);
 
 	blk_queue_max_hw_segments(q, shost->sg_tablesize);
