@@ -1,5 +1,6 @@
 #include <net/xfrm.h>
 #include <linux/pfkeyv2.h>
+#include <linux/ipsec.h>
 
 /* Each xfrm_state is linked to three tables:
 
@@ -91,7 +92,7 @@ void xfrm_state_flush(u8 proto)
 	for (i = 0; i < XFRM_DST_HSIZE; i++) {
 restart:
 		list_for_each_entry(x, xfrm_state_bydst+i, bydst) {
-			if (!proto || x->id.proto == proto) {
+			if (proto == IPSEC_PROTO_ANY || x->id.proto == proto) {
 				atomic_inc(&x->refcnt);
 				spin_unlock_bh(&xfrm_state_lock);
 
@@ -389,7 +390,7 @@ int xfrm_state_walk(u8 proto, int (*func)(struct xfrm_state *, int, void*),
 	spin_lock_bh(&xfrm_state_lock);
 	for (i = 0; i < XFRM_DST_HSIZE; i++) {
 		list_for_each_entry(x, xfrm_state_bydst+i, bydst) {
-			if (proto == 255 || x->id.proto == proto)
+			if (proto == IPSEC_PROTO_ANY || x->id.proto == proto)
 				count++;
 		}
 	}
@@ -400,7 +401,7 @@ int xfrm_state_walk(u8 proto, int (*func)(struct xfrm_state *, int, void*),
 
 	for (i = 0; i < XFRM_DST_HSIZE; i++) {
 		list_for_each_entry(x, xfrm_state_bydst+i, bydst) {
-			if (proto != 255 && x->id.proto != proto)
+			if (proto != IPSEC_PROTO_ANY && x->id.proto != proto)
 				continue;
 			err = func(x, --count, data);
 			if (err)
