@@ -72,22 +72,27 @@ udp_unique_tuple(struct ip_conntrack_tuple *tuple,
 	return 0;
 }
 
-static void
-udp_manip_pkt(struct iphdr *iph, size_t len,
+static int
+udp_manip_pkt(struct sk_buff **pskb,
+	      unsigned int hdroff,
 	      const struct ip_conntrack_manip *manip,
 	      enum ip_nat_manip_type maniptype)
 {
-	struct udphdr *hdr = (struct udphdr *)((u_int32_t *)iph + iph->ihl);
+	struct udphdr *hdr;
 	u_int32_t oldip;
 	u_int16_t *portptr;
 
+	if (!skb_ip_make_writable(pskb, hdroff + sizeof(hdr)))
+		return 0;
+
+	hdr = (void *)(*pskb)->data + hdroff;
 	if (maniptype == IP_NAT_MANIP_SRC) {
 		/* Get rid of src ip and src pt */
-		oldip = iph->saddr;
+		oldip = (*pskb)->nh.iph->saddr;
 		portptr = &hdr->source;
 	} else {
 		/* Get rid of dst ip and dst pt */
-		oldip = iph->daddr;
+		oldip = (*pskb)->nh.iph->daddr;
 		portptr = &hdr->dest;
 	}
 	if (hdr->check) /* 0 is a special case meaning no checksum */
@@ -96,6 +101,7 @@ udp_manip_pkt(struct iphdr *iph, size_t len,
 							   manip->u.udp.port,
 							   hdr->check));
 	*portptr = manip->u.udp.port;
+	return 1;
 }
 
 static unsigned int
