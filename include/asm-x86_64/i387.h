@@ -20,6 +20,8 @@
 #include <asm/uaccess.h>
 
 extern void fpu_init(void);
+extern unsigned int mxcsr_feature_mask;
+extern void mxcsr_feature_mask_init(void);
 extern void init_fpu(struct task_struct *child);
 extern int save_i387(struct _fpstate *buf);
 
@@ -52,11 +54,6 @@ static inline int need_signal_i387(struct task_struct *me)
 	}							\
 } while (0)
 
-#define load_mxcsr(val) do { \
-		unsigned long __mxcsr = ((unsigned long)(val) & 0xffbf); \
-		asm volatile("ldmxcsr %0" : : "m" (__mxcsr)); \
-} while (0)
-
 /*
  * ptrace request handers...
  */
@@ -75,7 +72,6 @@ extern int set_fpregs(struct task_struct *tsk,
 #define set_fpu_cwd(t,val) ((t)->thread.i387.fxsave.cwd = (val))
 #define set_fpu_swd(t,val) ((t)->thread.i387.fxsave.swd = (val))
 #define set_fpu_fxsr_twd(t,val) ((t)->thread.i387.fxsave.twd = (val))
-#define set_fpu_mxcsr(t,val) ((t)->thread.i387.fxsave.mxcsr = (val)&0xffbf)
 
 static inline int restore_fpu_checking(struct i387_fxsave_struct *fx) 
 { 

@@ -72,6 +72,7 @@ do_fpu_end(void)
         /* restore FPU regs if necessary */
 	/* Do it out of line so that gcc does not move cr0 load to some stupid place */
         kernel_fpu_end();
+	mxcsr_feature_mask_init();
 }
 
 void restore_processor_state(void)
