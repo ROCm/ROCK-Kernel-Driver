@@ -23,6 +23,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/proc_fs.h>
@@ -35,129 +36,116 @@
 /**************************************************/
 /* the actual current config file                 */
 
+/* This one is for extraction from the kernel binary file image. */
 #include "ikconfig.h"
 
 #ifdef CONFIG_IKCONFIG_PROC
 
+/* This is the data that can be read from /proc/config.gz. */
+#include "config_data.h"
+
 /**************************************************/
 /* globals and useful constants                   */
 
-static const char IKCONFIG_NAME[] = "ikconfig";
 static const char IKCONFIG_VERSION[] = "0.6";
 
-static int ikconfig_size;
-static struct proc_dir_entry *ikconfig_dir;
-
 static ssize_t
-ikconfig_read(struct file *file, char __user *buf, 
-		   size_t len, loff_t *offset)
+ikconfig_read_current(struct file *file, char __user *buf,
+		      size_t len, loff_t * offset)
 {
 	loff_t pos = *offset;
 	ssize_t count;
-	
-	if (pos >= ikconfig_size)
+
+	if (pos >= kernel_config_data_size)
 		return 0;
 
-	count = min(len, (size_t)(ikconfig_size - pos));
-	if(copy_to_user(buf, ikconfig_config + pos, count))
+	count = min(len, (size_t)(kernel_config_data_size - pos));
+	if(copy_to_user(buf, kernel_config_data + pos, count))
 		return -EFAULT;
 
 	*offset += count;
 	return count;
 }
 
-static struct file_operations config_fops = {
+static struct file_operations ikconfig_file_ops = {
 	.owner = THIS_MODULE,
-	.read  = ikconfig_read,
+	.read = ikconfig_read_current,
 };
 
+
 /***************************************************/
-/* built_with_show: let people read the info  */
+/* build_info_show: let people read the info       */
 /* we have on the tools used to build this kernel  */
 
-static int builtwith_show(struct seq_file *seq, void *v)
+static int build_info_show(struct seq_file *seq, void *v)
 {
-	seq_printf(seq, 
+	seq_printf(seq,
 		   "Kernel:    %s\nCompiler:  %s\nVersion_in_Makefile: %s\n",
-		   ikconfig_built_with, LINUX_COMPILER, UTS_RELEASE);
+		   ikconfig_build_info, LINUX_COMPILER, UTS_RELEASE);
 	return 0;
 }
 
-static int built_with_open(struct inode *inode, struct file *file)
+static int build_info_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, builtwith_show, PDE(inode)->data);
+	return single_open(file, build_info_show, PDE(inode)->data);
 }
-	
-static struct file_operations builtwith_fops = {
+
+static struct file_operations build_info_file_ops = {
 	.owner = THIS_MODULE,
-	.open  = built_with_open,
+	.open  = build_info_open,
 	.read  = seq_read,
 	.llseek = seq_lseek,
 	.release = single_release,
-};	
+};
 
 /***************************************************/
 /* ikconfig_init: start up everything we need to */
 
-int __init
-ikconfig_init(void)
+static int __init ikconfig_init(void)
 {
 	struct proc_dir_entry *entry;
 
-	printk(KERN_INFO "ikconfig %s with /proc/ikconfig\n",
+	printk(KERN_INFO "ikconfig %s with /proc/config*\n",
 	       IKCONFIG_VERSION);
 
-	/* create the ikconfig directory */
-	ikconfig_dir = proc_mkdir(IKCONFIG_NAME, NULL);
-	if (ikconfig_dir == NULL) 
-		goto leave;
-	ikconfig_dir->owner = THIS_MODULE;
-
 	/* create the current config file */
-	entry = create_proc_entry("config", S_IFREG | S_IRUGO, ikconfig_dir);
+	entry = create_proc_entry("config.gz", S_IFREG | S_IRUGO,
+				  &proc_root);
 	if (!entry)
-		goto leave2;
+		goto leave;
 
-	entry->proc_fops = &config_fops;
-	entry->size = ikconfig_size = strlen(ikconfig_config);
+	entry->proc_fops = &ikconfig_file_ops;
+	entry->size = kernel_config_data_size;
 
-	/* create the "built with" file */
-	entry = create_proc_entry("built_with", S_IFREG | S_IRUGO,
-				  ikconfig_dir);
+	/* create the "build_info" file */
+	entry = create_proc_entry("config_build_info",
+				  S_IFREG | S_IRUGO, &proc_root);
 	if (!entry)
-		goto leave3;
-	entry->proc_fops = &builtwith_fops;
+		goto leave_gz;
+	entry->proc_fops = &build_info_file_ops;
 
 	return 0;
 
-leave3:
+leave_gz:
 	/* remove the file from proc */
-	remove_proc_entry("config", ikconfig_dir);
-
-leave2:
-	/* remove the ikconfig directory */
-	remove_proc_entry(IKCONFIG_NAME, NULL);
+	remove_proc_entry("config.gz", &proc_root);
 
 leave:
 	return -ENOMEM;
 }
 
 /***************************************************/
-/* cleanup_ikconfig: clean up our mess           */
+/* ikconfig_cleanup: clean up our mess           */
 
-static void
-cleanup_ikconfig(void)
+static void __exit ikconfig_cleanup(void)
 {
 	/* remove the files */
-	remove_proc_entry("config", ikconfig_dir);
-	remove_proc_entry("built_with", ikconfig_dir);
-
-	/* remove the ikconfig directory */
-	remove_proc_entry(IKCONFIG_NAME, NULL);
+	remove_proc_entry("config.gz", &proc_root);
+	remove_proc_entry("config_build_info", &proc_root);
 }
 
 module_init(ikconfig_init);
-module_exit(cleanup_ikconfig);
+module_exit(ikconfig_cleanup);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Randy Dunlap");
