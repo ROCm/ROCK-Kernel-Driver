@@ -745,6 +745,8 @@ static int snd_emu10k1x_ac97(emu10k1x_t *chip)
   
 	if ((err = snd_ac97_bus(chip->card, 0, &ops, NULL, &pbus)) < 0)
 		return err;
+	pbus->no_vra = 1; /* we don't need VRA */
+
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
 	return snd_ac97_mixer(pbus, &ac97, &chip->ac97);

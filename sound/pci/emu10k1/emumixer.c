@@ -519,6 +519,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 
 		if ((err = snd_ac97_bus(emu->card, 0, &ops, NULL, &pbus)) < 0)
 			return err;
+		pbus->no_vra = 1; /* we don't need VRA */
 		
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.private_data = emu;
