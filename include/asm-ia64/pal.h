@@ -622,7 +622,8 @@ typedef struct pal_min_state_area_s {
 	u64	pmsa_xip;		/* previous iip		   */
 	u64	pmsa_xpsr;		/* previous psr		   */
 	u64	pmsa_xfs;		/* previous ifs		   */
-	u64	pmsa_reserved[71];	/* pal_min_state_area should total to 1KB */
+	u64	pmsa_br1;		/* branch register 1	   */
+	u64	pmsa_reserved[70];	/* pal_min_state_area should total to 1KB */
 } pal_min_state_area_t;
 
 

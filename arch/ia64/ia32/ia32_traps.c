@@ -103,7 +103,7 @@ ia32_exception (struct pt_regs *regs, unsigned long isr)
 			 * C1 reg you need in case of a stack fault, 0x040 is the stack
 			 * fault bit.  We should only be taking one exception at a time,
 			 * so if this combination doesn't produce any single exception,
-			 * then we have a bad program that isn't syncronizing its FPU usage
+			 * then we have a bad program that isn't synchronizing its FPU usage
 			 * and it will suffer the consequences since we won't be able to
 			 * fully reproduce the context of the exception
 			 */

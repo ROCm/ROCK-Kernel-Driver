@@ -33,9 +33,11 @@
 #include <linux/config.h>
 
 #ifdef CONFIG_IA64_SGI_SN1
-#define MACHVEC_PLATFORM_NAME	sn1
+#define MACHVEC_PLATFORM_NAME		sn1
+#define MACHVEC_PLATFORM_HEADER		<asm/machvec_sn1.h>
 #else CONFIG_IA64_SGI_SN1
-#define MACHVEC_PLATFORM_NAME	sn2
+#define MACHVEC_PLATFORM_NAME		sn2
+#define MACHVEC_PLATFORM_HEADER		<asm/machvec_sn2.h>
 #else
 #error "unknown platform"
 #endif

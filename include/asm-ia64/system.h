@@ -212,48 +212,39 @@ extern void ia64_load_extra (struct task_struct *task);
 # define PERFMON_IS_SYSWIDE() (0)
 #endif
 
-#define __switch_to(prev,next,last) do {						\
-	if (((prev)->thread.flags & (IA64_THREAD_DBG_VALID|IA64_THREAD_PM_VALID))	\
-	    || IS_IA32_PROCESS(ia64_task_regs(prev)) || PERFMON_IS_SYSWIDE())		\
-		ia64_save_extra(prev);							\
-	if (((next)->thread.flags & (IA64_THREAD_DBG_VALID|IA64_THREAD_PM_VALID))	\
-	    || IS_IA32_PROCESS(ia64_task_regs(next)) || PERFMON_IS_SYSWIDE())		\
-		ia64_load_extra(next);							\
-	(last) = ia64_switch_to((next));						\
+#define IA64_HAS_EXTRA_STATE(t)							\
+	((t)->thread.flags & (IA64_THREAD_DBG_VALID|IA64_THREAD_PM_VALID)	\
+	 || IS_IA32_PROCESS(ia64_task_regs(t)) || PERFMON_IS_SYSWIDE())
+
+#define __switch_to(prev,next,last) do {							 \
+	struct task_struct *__fpu_owner = ia64_get_fpu_owner();					 \
+	if (IA64_HAS_EXTRA_STATE(prev))								 \
+		ia64_save_extra(prev);								 \
+	if (IA64_HAS_EXTRA_STATE(next))								 \
+		ia64_load_extra(next);								 \
+	ia64_psr(ia64_task_regs(next))->dfh =							 \
+		!(__fpu_owner == (next) && ((next)->thread.last_fph_cpu == smp_processor_id())); \
+	(last) = ia64_switch_to((next));							 \
 } while (0)
 
 #ifdef CONFIG_SMP
-
 /*
- * In the SMP case, we save the fph state when context-switching
- * away from a thread that modified fph.  This way, when the thread
- * gets scheduled on another CPU, the CPU can pick up the state from
- * task->thread.fph, avoiding the complication of having to fetch
- * the latest fph state from another CPU.
+ * In the SMP case, we save the fph state when context-switching away from a thread that
+ * modified fph.  This way, when the thread gets scheduled on another CPU, the CPU can
+ * pick up the state from task->thread.fph, avoiding the complication of having to fetch
+ * the latest fph state from another CPU.  In other words: eager save, lazy restore.
  */
-# define switch_to(prev,next,last) do {					\
-	if (ia64_psr(ia64_task_regs(prev))->mfh) {			\
-		ia64_psr(ia64_task_regs(prev))->mfh = 0;		\
-		(prev)->thread.flags |= IA64_THREAD_FPH_VALID;		\
-		__ia64_save_fpu((prev)->thread.fph);			\
-		(prev)->thread.last_fph_cpu = smp_processor_id();	\
-	}								\
-	if ((next)->thread.flags & IA64_THREAD_FPH_VALID) {		\
-		if (((next)->thread.last_fph_cpu == smp_processor_id())	\
-		    && (ia64_get_fpu_owner() == next))			\
-		{							\
-			ia64_psr(ia64_task_regs(next))->dfh = 0;	\
-			ia64_psr(ia64_task_regs(next))->mfh = 0;	\
-		} else							\
-			ia64_psr(ia64_task_regs(next))->dfh = 1;	\
-	}								\
-	__switch_to(prev,next,last);					\
-  } while (0)
-#else
 # define switch_to(prev,next,last) do {						\
-	ia64_psr(ia64_task_regs(next))->dfh = (ia64_get_fpu_owner() != (next));	\
-	__switch_to(prev,next,last);						\
+	if (ia64_psr(ia64_task_regs(prev))->mfh) {				\
+		ia64_psr(ia64_task_regs(prev))->mfh = 0;			\
+		(prev)->thread.flags |= IA64_THREAD_FPH_VALID;			\
+		__ia64_save_fpu((prev)->thread.fph);				\
+		(prev)->thread.last_fph_cpu = smp_processor_id();		\
+	}									\
+	__switch_to(prev, next, last);						\
 } while (0)
+#else
+# define switch_to(prev,next,last)	__switch_to(prev, next, last)
 #endif
 
 /*

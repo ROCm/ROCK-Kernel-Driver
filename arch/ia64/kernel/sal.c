@@ -116,7 +116,7 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 	p = (char *) (systab + 1);
 	for (i = 0; i < systab->entry_count; i++) {
 		/*
-		 * The first byte of each entry type contains the type desciptor.
+		 * The first byte of each entry type contains the type descriptor.
 		 */
 		switch (*p) {
 		      case SAL_DESC_ENTRY_POINT:

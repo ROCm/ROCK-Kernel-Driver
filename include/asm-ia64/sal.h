@@ -226,7 +226,7 @@ enum {
 
 /* Encodings for machine check parameter types */
 enum {
-	SAL_MC_PARAM_RENDEZ_INT    = 1,	/* Rendezevous interrupt */
+	SAL_MC_PARAM_RENDEZ_INT    = 1,	/* Rendezvous interrupt */
 	SAL_MC_PARAM_RENDEZ_WAKEUP = 2,	/* Wakeup */
 	SAL_MC_PARAM_CPE_INT	   = 3	/* Corrected Platform Error Int */
 };
