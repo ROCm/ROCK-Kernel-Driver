@@ -900,7 +900,7 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
 	unsigned int retries;
 	struct scsi_lun *lunp, *lun_data;
 	struct scsi_request *sreq;
-	char *data;
+	u8 *data;
 
 	/*
 	 * Only support SCSI-3 and up devices.
@@ -991,7 +991,7 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
 	/*
 	 * Get the length from the first four bytes of lun_data.
 	 */
-	data = (char *) lun_data->scsi_lun;
+	data = (u8 *) lun_data->scsi_lun;
 	length = ((data[0] << 24) | (data[1] << 16) |
 		  (data[2] << 8) | (data[3] << 0));
 
