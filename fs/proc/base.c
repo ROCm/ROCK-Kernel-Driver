@@ -1463,7 +1463,8 @@ static struct inode_operations proc_tid_attr_inode_operations = {
 /*
  * /proc/self:
  */
-static int proc_self_readlink(struct dentry *dentry, char *buffer, int buflen)
+static int proc_self_readlink(struct dentry *dentry, char __user *buffer,
+			      int buflen)
 {
 	char tmp[30];
 	sprintf(tmp, "%d", current->tgid);
@@ -1747,7 +1748,9 @@ int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir)
 		ino_t ino = fake_ino(tgid,PROC_TGID_INO);
 		unsigned long j = PROC_NUMBUF;
 
-		do buf[--j] = '0' + (tgid % 10); while (tgid/=10);
+		do
+			buf[--j] = '0' + (tgid % 10);
+		while ((tgid /= 10) != 0);
 
 		if (filldir(dirent, buf+j, PROC_NUMBUF-j, filp->f_pos, ino, DT_DIR) < 0) {
 			filp->f_version = tgid;
@@ -1799,7 +1802,7 @@ static int proc_task_readdir(struct file * filp, void * dirent, filldir_t filldi
 
 		do
 			buf[--j] = '0' + (tid % 10);
-		while (tid /= 10);
+		while ((tid /= 10) != 0);
 
 		if (filldir(dirent, buf+j, PROC_NUMBUF-j, pos, ino, DT_DIR) < 0)
 			break;

@@ -66,7 +66,7 @@
 /* ioctls */
 struct cosa_download {
 	int addr, len;
-	char *code;
+	char __user *code;
 };
 
 /* Reset the device */

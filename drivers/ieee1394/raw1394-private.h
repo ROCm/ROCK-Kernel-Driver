@@ -35,11 +35,11 @@ struct file_info {
 
         struct list_head addr_list;
 
-        u8 *fcp_buffer;
+        u8 __user *fcp_buffer;
 
 	/* old ISO API */
         u64 listen_channels;
-        quadlet_t *iso_buffer;
+        quadlet_t __user *iso_buffer;
         size_t iso_buffer_length;
 
         u8 notification; /* (busreset-notification) RAW1394_NOTIFY_OFF/ON */
