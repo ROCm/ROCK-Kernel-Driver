@@ -173,7 +173,7 @@ static inline int __test_and_change_bit(int nr, volatile unsigned long *p)
  */
 static inline int __test_bit(int nr, const unsigned long * p)
 {
-	return p[nr >> 5] & (1UL << (nr & 31));
+	return (p[nr >> 5] >> (nr & 31)) & 1UL;
 }
 
 /*
