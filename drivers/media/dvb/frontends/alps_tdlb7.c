@@ -665,11 +665,14 @@ static int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
 static int tdlb7_attach (struct dvb_i2c_bus *i2c, void **data)
 {
-	struct i2c_msg msg = { addr: 0x71, flags: 0, buf: NULL, len: 0 };
+        u8 b0 [] = { 0x02 , 0x00 };
+        u8 b1 [] = { 0, 0 };
+        struct i2c_msg msg [] = { { addr: 0x71, flags: 0, buf: b0, len: 2 },
+                                  { addr: 0x71, flags: I2C_M_RD, buf: b1, len: 2 } };
 
 	dprintk ("%s\n", __FUNCTION__);
 
-	if (i2c->xfer (i2c, &msg, 1) != 1)
+        if (i2c->xfer (i2c, msg, 2) != 2)
                 return -ENODEV;
 
 	sp8870_firmware_upload(i2c);

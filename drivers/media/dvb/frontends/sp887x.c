@@ -58,7 +58,7 @@ static char *sp887x_firmware = DVB_SP887X_FIRMWARE_FILE;
 
 static
 struct dvb_frontend_info sp887x_info = {
-	.name = "Microtune MT7072DTF",
+	.name = "Microtune MT7202DTF",
 	.type = FE_OFDM,
 	.frequency_min =  50500000,
 	.frequency_max = 858000000,
