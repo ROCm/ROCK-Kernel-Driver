@@ -314,7 +314,8 @@ e1000_check_options(struct e1000_adapter *adapter)
 		};
 		struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 		e1000_mac_type mac_type = adapter->hw.mac_type;
-		opt.arg.r.max = mac_type < e1000_82544 ? MAX_TXD : MAX_82544_TXD;
+		opt.arg.r.max = mac_type < e1000_82544 ? 
+			MAX_TXD : MAX_82544_TXD;
 
 		tx_ring->count = TxDescriptors[bd];
 		e1000_validate_option(&tx_ring->count, &opt);

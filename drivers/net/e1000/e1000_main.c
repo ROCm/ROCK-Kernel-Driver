@@ -31,6 +31,19 @@
 
 /* Change Log
  *
+ * 4.4.12       10/15/02
+ *   o Clean up: use members of pci_device rather than direct calls to
+ *     pci_read_config_word.
+ *   o Bug fix: changed default flow control settings.
+ *   o Clean up: ethtool file now has an inclusive list for adapters in the
+ *     Wake-On-LAN capabilities instead of an exclusive list.
+ *   o Bug fix: miscellaneous WoL bug fixes.
+ *   o Added software interrupt for clearing rx ring
+ *   o Bug fix: easier to undo "forcing" of 1000/fd using ethtool.
+ *   o Now setting netdev->mem_end in e1000_probe.
+ *   o Clean up: Moved tx_timeout from interrupt context to process context
+ *     using schedule_task.
+ *
  *   o Feature: merged in modified NAPI patch from Robert Olsson
  *     <Robert.Olsson@its.uu.se> Uppsala Univeristy, Sweden.
  *
@@ -47,26 +60,8 @@
  *   o Feature: exposed two Tx and one Rx interrupt delay knobs for finer
  *     control over interurpt rate tuning.
  *   o Misc ethtool bug fixes.
- *         
- * 4.3.2       7/5/02
- *   o Bug fix: perform controller reset using I/O rather than mmio because
- *     some chipsets try to perform a 64-bit write, but the controller ignores
- *     the upper 32-bit write once the reset is intiated by the lower 32-bit
- *     write, causing a master abort.
- *   o Bug fix: fixed jumbo frames sized from 1514 to 2048.
- *   o ASF support: disable ARP when driver is loaded or resumed; enable when 
- *     driver is removed or suspended.
- *   o Bug fix: changed default setting for RxIntDelay to 0 for 82542/3/4
- *     controllers to workaround h/w errata where controller will hang when
- *     RxIntDelay <> 0 under certian network conditions.
- *   o Clean up: removed unused and undocumented user-settable settings for
- *     PHY.
- *   o Bug fix: ethtool GEEPROM was using byte address rather than word
- *     addressing.
- *   o Feature: added support for ethtool SEEPROM.
- *   o Feature: added support for entropy pool.
  *
- * 4.2.17      5/30/02
+ * 4.3.2       7/5/02
  */
  
 char e1000_driver_name[] = "e1000";
@@ -543,7 +538,7 @@ e1000_remove(struct pci_dev *pdev)
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct e1000_adapter *adapter = netdev->priv;
 	uint32_t manc;
-	
+
 	if(adapter->hw.mac_type >= e1000_82540) {
 		manc = E1000_READ_REG(&adapter->hw, MANC);
 		if(manc & E1000_MANC_SMBUS_EN) {
@@ -551,7 +546,7 @@ e1000_remove(struct pci_dev *pdev)
 			E1000_WRITE_REG(&adapter->hw, MANC, manc);
 		}
 	}
-		
+
 	unregister_netdev(netdev);
 
 	e1000_phy_hw_reset(&adapter->hw);
@@ -1514,7 +1509,6 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	int tx_flags = 0, count;
 
 	int f;
-
 
 	count = TXD_USE_COUNT(skb->len - skb->data_len,
 	                      adapter->max_data_per_txd);

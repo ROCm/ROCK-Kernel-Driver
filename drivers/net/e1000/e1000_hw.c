@@ -47,9 +47,9 @@ static void e1000_lower_ee_clk(struct e1000_hw *hw, uint32_t *eecd);
 static void e1000_shift_out_ee_bits(struct e1000_hw *hw, uint16_t data, uint16_t count);
 static uint16_t e1000_shift_in_ee_bits(struct e1000_hw *hw);
 static void e1000_setup_eeprom(struct e1000_hw *hw);
-static void e1000_standby_eeprom(struct e1000_hw *hw);
 static void e1000_clock_eeprom(struct e1000_hw *hw);
 static void e1000_cleanup_eeprom(struct e1000_hw *hw);
+static void e1000_standby_eeprom(struct e1000_hw *hw);
 static int32_t e1000_id_led_init(struct e1000_hw * hw);
 
 /******************************************************************************
@@ -1014,7 +1014,6 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
     /* Write the configured values back to the Device Control Reg. */
     E1000_WRITE_REG(hw, CTRL, ctrl);
 
-    /* Write the MII Control Register with the new PHY configuration. */
     if(e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, &phy_data) < 0) {
         DEBUGOUT("PHY Read Error\n");
         return -E1000_ERR_PHY;
@@ -1029,9 +1028,11 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
         return -E1000_ERR_PHY;
     }
     DEBUGOUT1("M88E1000 PSCR: %x \n", phy_data);
-    
+
     /* Need to reset the PHY or these changes will be ignored */
     mii_ctrl_reg |= MII_CR_RESET;
+
+    /* Write back the modified PHY MII control register. */
     if(e1000_write_phy_reg(hw, PHY_CTRL, mii_ctrl_reg) < 0) {
         DEBUGOUT("PHY Write Error\n");
         return -E1000_ERR_PHY;
@@ -2249,7 +2250,7 @@ e1000_raise_ee_clk(struct e1000_hw *hw,
                    uint32_t *eecd)
 {
     /* Raise the clock input to the EEPROM (by setting the SK bit), and then
-     * wait 50 microseconds.
+     * wait <delay> microseconds.
      */
     *eecd = *eecd | E1000_EECD_SK;
     E1000_WRITE_REG(hw, EECD, *eecd);
@@ -2338,11 +2339,11 @@ e1000_shift_in_ee_bits(struct e1000_hw *hw)
     uint32_t i;
     uint16_t data;
 
-    /* In order to read a register from the EEPROM, we need to shift 16 bits 
-     * in from the EEPROM. Bits are "shifted in" by raising the clock input to
-     * the EEPROM (setting the SK bit), and then reading the value of the "DO"
-     * bit.  During this "shifting in" process the "DI" bit should always be 
-     * clear..
+    /* In order to read a register from the EEPROM, we need to shift 'count'
+     * bits in from the EEPROM. Bits are "shifted in" by raising the clock
+     * input to the EEPROM (setting the SK bit), and then reading the value of
+     * the "DO" bit.  During this "shifting in" process the "DI" bit should
+     * always be clear.
      */
 
     eecd = E1000_READ_REG(hw, EECD);
