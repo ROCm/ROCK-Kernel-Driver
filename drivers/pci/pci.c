@@ -729,6 +729,7 @@ device_initcall(pci_init);
 __setup("pci=", pci_setup);
 
 #if defined(CONFIG_ISA) || defined(CONFIG_EISA)
+/* FIXME: Some boxes have multiple ISA bridges! */
 struct pci_dev *isa_bridge;
 EXPORT_SYMBOL(isa_bridge);
 #endif
