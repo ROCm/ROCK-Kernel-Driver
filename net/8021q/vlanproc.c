@@ -18,6 +18,7 @@
  *****************************************************************************/
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
 #include <linux/kernel.h>
