@@ -250,7 +250,7 @@ static int ubd_setup_common(char *str, int *index_out)
 	struct ubd *dev;
 	struct openflags flags = global_openflags;
 	char *backing_file;
-	int n, err;
+	int n, err, i;
 
 	if(index_out) *index_out = -1;
 	n = *str;
@@ -312,29 +312,40 @@ static int ubd_setup_common(char *str, int *index_out)
 	dev = &ubd_dev[n];
 	if(dev->file != NULL){
 		printk(KERN_ERR "ubd_setup : device already configured\n");
-		goto out2;
+		goto out;
 	}
 
-	if(index_out) *index_out = n;
+	if (index_out)
+		*index_out = n;
 
-	if (*str == 'r'){
-		flags.w = 0;
-		str++;
-	}
-	if (*str == 's'){
-		flags.s = 1;
-		str++;
-	}
-	if (*str == 'd'){
-		dev->no_cow = 1;
+	for (i = 0; i < 4; i++) {
+		switch (*str) {
+		case 'r':
+			flags.w = 0;
+			break;
+		case 's':
+			flags.s = 1;
+			break;
+		case 'd':
+			dev->no_cow = 1;
+			break;
+		case '=':
+			str++;
+			goto break_loop;
+		default:
+			printk(KERN_ERR "ubd_setup : Expected '=' or flag letter (r,s or d)\n");
+			goto out;
+		}
 		str++;
 	}
 
-	if(*str++ != '='){
+        if (*str == '=')
+		printk(KERN_ERR "ubd_setup : Too many flags specified\n");
+        else
 		printk(KERN_ERR "ubd_setup : Expected '='\n");
-		goto out2;
-	}
+	goto out;
 
+break_loop:
 	err = 0;
 	backing_file = strchr(str, ',');
 
@@ -354,7 +365,7 @@ static int ubd_setup_common(char *str, int *index_out)
 	dev->file = str;
 	dev->cow.file = backing_file;
 	dev->boot_openflags = flags;
- out2:
+out:
 	spin_unlock(&ubd_lock);
 	return(err);
 }
@@ -385,8 +396,7 @@ __uml_help(ubd_setup,
 "    machine by running 'dd' on the device. <n> must be in the range\n"
 "    0 to 7. Appending an 'r' to the number will cause that device\n"
 "    to be mounted read-only. For example ubd1r=./ext_fs. Appending\n"
-"    an 's' (has to be _after_ 'r', if there is one) will cause data\n"
-"    to be written to disk on the host immediately.\n\n"
+"    an 's' will cause data to be written to disk on the host immediately.\n\n"
 );
 
 static int fakehd_set = 0;
