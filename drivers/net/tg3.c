@@ -891,6 +891,20 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 
 	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x02);
 
+	/* Some third-party PHYs need to be reset on link going
+	 * down.
+	 *
+	 * XXX 5705 note: This workaround also applies to 5705_a0
+	 */
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) &&
+	    netif_carrier_ok(tp->pdev)) {
+		tg3_readphy(tp, MII_BMSR, &bmsr);
+		tg3_readphy(tp, MII_BMSR, &bmsr);
+		if (!(bmsr & BMSR_LSTATUS))
+			tg3_phy_reset(tp, 1);
+	}
+
 	if ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5401) {
 		tg3_readphy(tp, MII_BMSR, &bmsr);
 		tg3_readphy(tp, MII_BMSR, &bmsr);
