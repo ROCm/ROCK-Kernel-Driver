@@ -447,10 +447,8 @@ static void	usa2x_outdat_callback(struct urb *urb)
 	p_priv = (struct keyspan_port_private *)(port->private);
 	dbg ("%s - urb %d", __FUNCTION__, urb == p_priv->out_urbs[1]); 
 
-	if (port->open_count) {
-		queue_task(&port->tqueue, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
-	}
+	if (port->open_count)
+		schedule_task(&port->tqueue);
 }
 
 static void	usa26_inack_callback(struct urb *urb)

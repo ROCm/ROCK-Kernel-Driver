@@ -1092,10 +1092,7 @@ static void generic_write_bulk_callback (struct urb *urb)
 
 	usb_serial_port_softint((void *)port);
 
-	queue_task(&port->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
-
-	return;
+	schedule_tasks(&port->tqueue);
 }
 
 static void generic_shutdown (struct usb_serial *serial)
