@@ -66,7 +66,7 @@
  * Ver 0.94  Oct 27 00   Tidied up to remove strstr(Clik) everywhere
  * Ver 0.95  Nov  7 00   Brought across to kernel 2.4
  * Ver 0.96  Jan  7 01   Actually in line with release version of 2.4.0
- *                       including set_bit patch from Rusty Russel
+ *                       including set_bit patch from Rusty Russell
  * Ver 0.97  Jul 22 01   Merge 0.91-0.96 onto 0.9.sv for ac series
  * Ver 0.97.sv Aug 3 01  Backported from 2.4.7-ac3
  * Ver 0.98  Oct 26 01   Split idefloppy_transfer_pc into two pieces to
