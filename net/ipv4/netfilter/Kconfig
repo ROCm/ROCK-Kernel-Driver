@@ -74,8 +74,7 @@ config IP_NF_AMANDA
 	  <file:Documentation/modules.txt>.  If unsure, say `Y'.
 
 config IP_NF_QUEUE
-	tristate "Userspace queueing via NETLINK (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	tristate "Userspace queueing via NETLINK"
 	help
 	  Netfilter has the ability to queue packets to user space: the
 	  netlink device can be used to access them using this driver.
@@ -272,8 +271,8 @@ config IP_NF_MATCH_CONNTRACK
 	  Documentation/modules.txt.  If unsure, say `N'.
 
 config IP_NF_MATCH_OWNER
-	tristate "Owner match support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && IP_NF_IPTABLES
+	tristate "Owner match support"
+	depends on IP_NF_IPTABLES
 	help
 	  Packet owner matching allows you to match locally-generated packets
 	  based on who created them: the user, group, process or session.
