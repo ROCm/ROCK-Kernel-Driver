@@ -102,25 +102,30 @@ int register_blkdev(unsigned int major, const char *name)
 	int index, ret = 0;
 	unsigned long flags;
 
+	down_write(&block_subsys.rwsem);
+
 	/* temporary */
 	if (major == 0) {
-		down_read(&block_subsys.rwsem);
-		for (index = ARRAY_SIZE(major_names)-1; index > 0; index--)
+		for (index = ARRAY_SIZE(major_names)-1; index > 0; index--) {
 			if (major_names[index] == NULL)
 				break;
-		up_read(&block_subsys.rwsem);
+		}
 
 		if (index == 0) {
 			printk("register_blkdev: failed to get major for %s\n",
 			       name);
-			return -EBUSY;
+			ret = -EBUSY;
+			goto out;
 		}
-		ret = major = index;
+		major = index;
+		ret = major;
 	}
 
 	p = kmalloc(sizeof(struct blk_major_name), GFP_KERNEL);
-	if (p == NULL)
-		return -ENOMEM;
+	if (p == NULL) {
+		ret = -ENOMEM;
+		goto out;
+	}
 
 	p->major = major;
 	strncpy(p->name, name, sizeof(p->name)-1);
@@ -128,22 +133,24 @@ int register_blkdev(unsigned int major, const char *name)
 	p->next = 0;
 	index = major_to_index(major);
 
-	down_write(&block_subsys.rwsem);
 	spin_lock_irqsave(&major_names_lock, flags);
-	for (n = &major_names[index]; *n; n = &(*n)->next)
+	for (n = &major_names[index]; *n; n = &(*n)->next) {
 		if ((*n)->major == major)
 			break;
+	}
 	if (!*n)
 		*n = p;
 	else
 		ret = -EBUSY;
 	spin_unlock_irqrestore(&major_names_lock, flags);
-	up_write(&block_subsys.rwsem);
 
-	if (ret < 0)
+	if (ret < 0) {
 		printk("register_blkdev: cannot get major %d for %s\n",
 		       major, name);
-
+		kfree(p);
+	}
+out:
+	up_write(&block_subsys.rwsem);
 	return ret;
 }
 
