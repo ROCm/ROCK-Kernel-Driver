@@ -1207,6 +1207,9 @@ ia64_mca_init(void)
 	s64 rc;
 	struct ia64_sal_retval isrv;
 	u64 timeout = IA64_MCA_RENDEZ_TIMEOUT;	/* platform specific */
+	u64 mca_flags = SAL_MC_PARAM_RZ_ALWAYS;	/* platform specific */
+	if (ia64_platform_is("sn2"))
+		mca_flags |= 0x8;		/* SGI prom specific */
 
 	IA64_MCA_DEBUG("%s: begin\n", __FUNCTION__);
 
@@ -1224,7 +1227,7 @@ ia64_mca_init(void)
 					      SAL_MC_PARAM_MECHANISM_INT,
 					      IA64_MCA_RENDEZ_VECTOR,
 					      timeout,
-					      SAL_MC_PARAM_RZ_ALWAYS);
+					      mca_flags);
 		rc = isrv.status;
 		if (rc == 0)
 			break;
