@@ -176,14 +176,7 @@ static void __devinit quirk_ali_ide_ports(struct pci_dev *dev)
 	dev->resource[4].end   = 0xf00f;
 	dev->resource[4].flags = IORESOURCE_IO;
 }
-
-
-/* Add future fixups here... */
-struct pci_fixup pcibios_fixups[] = {
-	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_AL,
-	  PCI_DEVICE_ID_AL_M5229, quirk_ali_ide_ports },
-	{ 0 }
-};
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M5229, quirk_ali_ide_ports);
 
 char * __devinit pcibios_setup(char *str)
 {

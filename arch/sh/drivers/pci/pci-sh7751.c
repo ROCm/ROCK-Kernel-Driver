@@ -177,15 +177,8 @@ static void __init pci_fixup_ide_bases(struct pci_dev *d)
 		}
 	}
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, pci_fixup_ide_bases);
 #endif
-
-/* Add future fixups here... */
-struct pci_fixup pcibios_fixups[] = {
-#if !defined(CONFIG_SH_HS7751RVOIP) && !defined(CONFIG_SH_RTS7751R2D)
-	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,	PCI_ANY_ID,	pci_fixup_ide_bases },
-#endif
-	{ 0 }
-};
 
 /*
  *  Called after each bus is probed, but before its children

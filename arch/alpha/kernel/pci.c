@@ -67,6 +67,7 @@ quirk_isa_bridge(struct pci_dev *dev)
 {
 	dev->class = PCI_CLASS_BRIDGE_ISA << 8;
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82378, quirk_isa_bridge);
 
 static void __init
 quirk_cypress(struct pci_dev *dev)
@@ -100,6 +101,7 @@ quirk_cypress(struct pci_dev *dev)
 		}
 	}
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_CONTAQ, PCI_DEVICE_ID_CONTAQ_82C693, quirk_cypress);
 
 /* Called for each device after PCI setup is done. */
 static void __init
@@ -112,17 +114,10 @@ pcibios_fixup_final(struct pci_dev *dev)
 		isa_bridge = dev;
 	}
 }
+DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, pcibios_fixup_final);
 
-struct pci_fixup pcibios_fixups[] __initdata = {
-	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82378,
-	  quirk_isa_bridge },
-	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_CONTAQ, PCI_DEVICE_ID_CONTAQ_82C693,
-	  quirk_cypress },
-	{ PCI_FIXUP_FINAL,  PCI_ANY_ID,	PCI_ANY_ID,
-	  pcibios_fixup_final },
-	{ 0 }
-};
-
+/* Just declaring that the power-of-ten prefixes are actually the
+   power-of-two ones doesn't make it true :) */
 #define KB			1024
 #define MB			(1024*KB)
 #define GB			(1024*MB)
