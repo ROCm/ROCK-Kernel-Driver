@@ -347,10 +347,6 @@ typedef LM_UINT32 LM_WAKE_UP_MODE, *PLM_WAKE_UP_MODE;
 typedef LM_UINT32 LM_COUNTER_TYPE, *PLM_COUNTER_TYPE;
 
 
-typedef LM_UINT32 LM_RESET_TYPE;
-#define LM_SHUTDOWN_RESET     0
-#define LM_INIT_RESET         1
-#define LM_SUSPEND_RESET      2
 
 /******************************************************************************/
 /* Forward definition. */
@@ -379,6 +375,7 @@ LM_STATUS LM_QueueRxPackets(PLM_DEVICE_BLOCK pDevice);
 LM_STATUS LM_SetReceiveMask(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Mask);
 LM_STATUS LM_Halt(PLM_DEVICE_BLOCK pDevice);
 LM_STATUS LM_Abort(PLM_DEVICE_BLOCK pDevice);
+LM_STATUS LM_ResetChip(PLM_DEVICE_BLOCK pDevice);
 LM_STATUS LM_MulticastAdd(PLM_DEVICE_BLOCK pDevice, PLM_UINT8 pMcAddress);
 LM_STATUS LM_MulticastDel(PLM_DEVICE_BLOCK pDevice, PLM_UINT8 pMcAddress);
 LM_STATUS LM_MulticastClear(PLM_DEVICE_BLOCK pDevice);
@@ -414,10 +411,6 @@ LM_STATUS LM_NvramRead(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Offset,
 LM_STATUS LM_NvramWriteBlock(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Offset,
     LM_UINT32 *pData, LM_UINT32 Size);
 LM_VOID LM_ResetPhy(PLM_DEVICE_BLOCK pDevice);
-LM_STATUS LM_ShutdownChip(PLM_DEVICE_BLOCK pDevice, LM_RESET_TYPE Mode);
-LM_STATUS LM_HaltCpu(PLM_DEVICE_BLOCK pDevice,LM_UINT32 cpu_number);
-LM_UINT32 ComputeCrc32(LM_UINT8 *pBuffer, LM_UINT32 BufferSize);
-LM_STATUS LM_SwitchClocks(PLM_DEVICE_BLOCK pDevice);
 
 
 

@@ -39,20 +39,15 @@ STATIC LM_STATUS LM_SetupCopperPhy(PLM_DEVICE_BLOCK pDevice);
 STATIC LM_VOID LM_SetEthWireSpeed(LM_DEVICE_BLOCK *pDevice);
 STATIC LM_STATUS LM_PhyAdvertiseAll(LM_DEVICE_BLOCK *pDevice);
 STATIC PLM_ADAPTER_INFO LM_GetAdapterInfoBySsid(LM_UINT16 Svid, LM_UINT16 Ssid);
+STATIC LM_STATUS LM_SwitchClocks(PLM_DEVICE_BLOCK pDevice);
 LM_VOID LM_SwitchVaux(PLM_DEVICE_BLOCK pDevice, PLM_DEVICE_BLOCK pDevice2);
 STATIC LM_STATUS LM_DmaTest(PLM_DEVICE_BLOCK pDevice, PLM_UINT8 pBufferVirt,
            LM_PHYSICAL_ADDRESS BufferPhy, LM_UINT32 BufferSize);
+STATIC LM_STATUS LM_HaltCpu(PLM_DEVICE_BLOCK pDevice,LM_UINT32 cpu_number);
 STATIC LM_STATUS LM_DisableChip(PLM_DEVICE_BLOCK pDevice);
-STATIC LM_STATUS LM_ResetChip(PLM_DEVICE_BLOCK pDevice);
 STATIC LM_STATUS LM_DisableFW(PLM_DEVICE_BLOCK pDevice);
 STATIC LM_STATUS LM_Test4GBoundary(PLM_DEVICE_BLOCK pDevice, PLM_PACKET pPacket,
     PT3_SND_BD pSendBd);
-STATIC LM_VOID LM_WritePreResetSignatures(LM_DEVICE_BLOCK *pDevice,
-    LM_RESET_TYPE Mode);
-STATIC LM_VOID LM_WritePostResetSignatures(LM_DEVICE_BLOCK *pDevice,
-    LM_RESET_TYPE Mode);
-STATIC LM_VOID LM_WriteLegacySignatures(LM_DEVICE_BLOCK *pDevice,
-    LM_RESET_TYPE Mode);
 
 
 /******************************************************************************/
@@ -77,27 +72,6 @@ LM_RegRd(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Register)
 #endif
     {
         return (REG_RD_OFFSET(pDevice, Register));
-    }
-}
-
-/* Mainly used to flush posted write before delaying */
-LM_VOID
-LM_RegRdBack(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Register)
-{
-    LM_UINT32 dummy;
-
-#if PCIX_TARGET_WORKAROUND
-    if (pDevice->EnablePciXFix)
-    {
-        return;
-    }
-    else
-#endif
-    {
-        if (pDevice->RegReadBack)
-            return;
-
-        dummy = REG_RD_OFFSET(pDevice, Register);
     }
 }
 
@@ -216,7 +190,7 @@ PLM_DEVICE_BLOCK pDevice) {
 #if T3_JUMBO_RCV_RCB_ENTRY_COUNT
     LM_UINT32 JumboBdAdded = 0;
 #endif /* T3_JUMBO_RCV_RCB_ENTRY_COUNT */
-    LM_UINT32 ConIdx, Idx;
+    LM_UINT32 ConIdx;
     LM_UINT32 Diff = 0;
 
     Lmstatus = LM_STATUS_SUCCESS;
@@ -244,13 +218,13 @@ PLM_DEVICE_BLOCK pDevice) {
 #if T3_JUMBO_RCV_RCB_ENTRY_COUNT
             case T3_JUMBO_RCV_PROD_RING:        /* Jumbo Receive Ring. */
                 /* Initialize the buffer descriptor. */
-                Idx = pDevice->RxJumboProdIdx;
-                pRcvBd = &pDevice->pRxJumboBdVirt[Idx];
+                pRcvBd = 
+                    &pDevice->pRxJumboBdVirt[pDevice->RxJumboProdIdx];
+                pRcvBd->Flags = RCV_BD_FLAG_END | RCV_BD_FLAG_JUMBO_RING;
+                pRcvBd->Len = (LM_UINT16) pDevice->RxJumboBufferSize;
 
-                pPacket->u.Rx.RcvRingProdIdx = Idx;
-                pDevice->RxJumboRing[Idx] = pPacket;
                 /* Update the producer index. */
-                pDevice->RxJumboProdIdx = (Idx + 1) & 
+                pDevice->RxJumboProdIdx = (pDevice->RxJumboProdIdx + 1) & 
                     T3_JUMBO_RCV_RCB_ENTRY_COUNT_MASK;
 
                 JumboBdAdded++;
@@ -259,13 +233,12 @@ PLM_DEVICE_BLOCK pDevice) {
 
             case T3_STD_RCV_PROD_RING:      /* Standard Receive Ring. */
                 /* Initialize the buffer descriptor. */
-                Idx = pDevice->RxStdProdIdx;
-                pRcvBd = &pDevice->pRxStdBdVirt[Idx];
+                pRcvBd = &pDevice->pRxStdBdVirt[pDevice->RxStdProdIdx];
+                pRcvBd->Flags = RCV_BD_FLAG_END;
+                pRcvBd->Len = MAX_STD_RCV_BUFFER_SIZE;
 
-                pPacket->u.Rx.RcvRingProdIdx = Idx;
-                pDevice->RxStdRing[Idx] = pPacket;
                 /* Update the producer index. */
-                pDevice->RxStdProdIdx = (Idx + 1) & 
+                pDevice->RxStdProdIdx = (pDevice->RxStdProdIdx + 1) & 
                     T3_STD_RCV_RCB_ENTRY_COUNT_MASK;
 
                 StdBdAdded++;
@@ -344,7 +317,6 @@ LM_NvramInit(
     Value32 = SEEPROM_ADDR_CLK_PERD(SEEPROM_CLOCK_PERIOD) |
         SEEPROM_ADDR_FSM_RESET;
     REG_WR(pDevice, Grc.EepromAddr, Value32);
-    REG_RD_BACK(pDevice, Grc.EepromAddr);
 
     MM_Wait(100);
 
@@ -359,27 +331,18 @@ LM_NvramInit(
         Value32 = REG_RD(pDevice, Nvram.Config1);
         if((Value32 & FLASH_INTERFACE_ENABLE) == 0)
         {
-            if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-            {
-                REG_WR(pDevice, Nvram.NvmAccess,
-                    REG_RD(pDevice, Nvram.NvmAccess) | ACCESS_EN);
-            }
             /* Use the new interface to read EEPROM. */
             Value32 &= ~FLASH_COMPAT_BYPASS;
 
             REG_WR(pDevice, Nvram.Config1, Value32);
-
-            if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-            {
-                REG_WR(pDevice, Nvram.NvmAccess,
-                    REG_RD(pDevice, Nvram.NvmAccess) & ~ACCESS_EN);
-            }
         }
         else {
             pDevice->NvramSize = 0x20000;
             pDevice->Flash = TRUE;
         }
     }
+
+    MM_Wait(100);
 
     if (pDevice->NvramSize == 0)
     {
@@ -484,7 +447,6 @@ LM_EepromWriteBlock(
     {
         REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
                     GRC_MISC_LOCAL_CTRL_GPIO_OE1);
-        REG_RD_BACK(pDevice, Grc.LocalCtrl);
         MM_Wait(40);
 
         Value32 = REG_RD(pDevice, Grc.LocalCtrl);
@@ -525,7 +487,6 @@ LM_EepromWriteBlock(
     {
         REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
             GRC_MISC_LOCAL_CTRL_GPIO_OE1 | GRC_MISC_LOCAL_CTRL_GPIO_OUTPUT1);
-        REG_RD_BACK(pDevice, Grc.LocalCtrl);
         MM_Wait(40);
     }
 
@@ -538,7 +499,6 @@ LM_EepromWriteBlock(
 } /* LM_EepromWriteBlock */
 #endif
 
-#define NVRAM_MAXWAIT 8000
 LM_STATUS
 LM_NvramGetLock(LM_DEVICE_BLOCK *pDevice)
 {
@@ -547,7 +507,7 @@ LM_NvramGetLock(LM_DEVICE_BLOCK *pDevice)
     REG_WR(pDevice, Nvram.SwArb, SW_ARB_REQ_SET1);
     /* worst case wait time for Nvram arbitration using serial eprom is */
     /* about 45 msec on a 5704 with the other channel loading boot code */
-    for (j = 0; j < NVRAM_MAXWAIT; j++)
+    for (j = 0; j < 3000; j++)
     {
         if (REG_RD(pDevice, Nvram.SwArb) & SW_ARB_GNT1)
         {
@@ -555,7 +515,7 @@ LM_NvramGetLock(LM_DEVICE_BLOCK *pDevice)
         }
         MM_Wait(20);
     }
-    if (j == NVRAM_MAXWAIT)
+    if (j == 3000)
     {
         return LM_STATUS_FAILURE;
     }
@@ -608,12 +568,6 @@ LM_NvramRead(
             return LM_STATUS_FAILURE;
 	}
 
-        if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-        {
-            REG_WR(pDevice, Nvram.NvmAccess,
-                REG_RD(pDevice, Nvram.NvmAccess) | ACCESS_EN);
-        }
-
         /* Read from flash or EEPROM with the new 5703/02 interface. */
         REG_WR(pDevice, Nvram.Addr, Offset & NVRAM_ADDRESS_MASK);
 
@@ -653,12 +607,6 @@ LM_NvramRead(
         }
     }
 
-    if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-    {
-        REG_WR(pDevice, Nvram.NvmAccess,
-            REG_RD(pDevice, Nvram.NvmAccess) & ~ACCESS_EN);
-    }
-
     return Status;
 } /* LM_NvramRead */
 
@@ -695,28 +643,16 @@ LM_NvramWriteBlock(
             return LM_STATUS_FAILURE;
 	}
 
-        if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-        {
-            REG_WR(pDevice, Nvram.NvmAccess,
-                REG_RD(pDevice, Nvram.NvmAccess) | ACCESS_EN);
-        }
-
         /* Enable EEPROM write. */
         if(pDevice->EepromWp)
         {
             REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
                         GRC_MISC_LOCAL_CTRL_GPIO_OE1);
-            REG_RD_BACK(pDevice, Grc.LocalCtrl);
             MM_Wait(40);
 
             Value32 = REG_RD(pDevice, Grc.LocalCtrl);
             if(Value32 & GRC_MISC_LOCAL_CTRL_GPIO_OUTPUT1)
             {
-                if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-                {
-                    REG_WR(pDevice, Nvram.NvmAccess,
-                        REG_RD(pDevice, Nvram.NvmAccess) & ~ACCESS_EN);
-                }
                 return LM_STATUS_FAILURE;
              }
         }
@@ -805,18 +741,11 @@ LM_NvramWriteBlock(
         {
             REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE1 | GRC_MISC_LOCAL_CTRL_GPIO_OUTPUT1);
-            REG_RD_BACK(pDevice, Grc.LocalCtrl);
             MM_Wait(40);
         }
 
         /* Relinquish nvram interface. */
         LM_NvramReleaseLock(pDevice);
-
-        if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-        {
-            REG_WR(pDevice, Nvram.NvmAccess,
-                REG_RD(pDevice, Nvram.NvmAccess) & ~ACCESS_EN);
-        }
 
         if(Value32 & NVRAM_CMD_DONE)
         {
@@ -984,11 +913,6 @@ LM_GetBusSpeed(PLM_DEVICE_BLOCK pDevice)
     LM_UINT32 ClockCtrl;
     char *SpeedStr = "";
 
-    if (pDevice->PciExpress == TRUE)
-    {
-        strcpy(pDevice->BusSpeedStr, "PCI Express");
-        return;
-    }
     if (PciState & T3_PCI_STATE_32BIT_PCI_BUS)
     {
         strcpy(pDevice->BusSpeedStr, "32-bit ");
@@ -1087,22 +1011,6 @@ PLM_DEVICE_BLOCK pDevice)
     Status = MM_ReadConfig32(pDevice, T3_PCI_MISC_HOST_CTRL_REG, &Value32);
     pDevice->ChipRevId = Value32 >> 16;
 
-    pDevice->PciExpress = FALSE;
-    /* detremine if it is PCIE system */
-    if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-    {
-        Status = MM_ReadConfig32(pDevice, T3_MSI_CAPABILITY_ID_REG, &Value32);
-        if (((Value32 >> 8) & 0xff) == T3_PCIE_CAPABILITY_ID_REG)
-        {
-            Status = MM_ReadConfig32(pDevice, T3_PCIE_CAPABILITY_ID_REG,
-                &Value32);
-            if ((Value32 & 0xff) == T3_PCIE_CAPABILITY_ID)
-            {
-                pDevice->PciExpress = TRUE;
-	    }
-        }
-    }
-
     /* Get subsystem vendor. */
     Status = MM_ReadConfig32(pDevice, PCI_SUBSYSTEM_VENDOR_ID_REG, &Value32);
     if(Status != LM_STATUS_SUCCESS)
@@ -1149,12 +1057,6 @@ PLM_DEVICE_BLOCK pDevice)
     {
         pDevice->RegReadBack = TRUE;
     }
-#ifdef INCLUDE_5750_A0_FIX
-    if ((pDevice->PciExpress) && (pDevice->ChipRevId == T3_CHIP_ID_5750_A0))
-    {
-        pDevice->RegReadBack = TRUE;
-    }
-#endif
 #if PCIX_TARGET_WORKAROUND
     /* store whether we are in PCI are PCI-X mode */
     pDevice->EnablePciXFix = FALSE;
@@ -1250,7 +1152,6 @@ PLM_DEVICE_BLOCK pDevice)
     {
         REG_WR(pDevice, Grc.LocalCtrl, GRC_MISC_LOCAL_CTRL_GPIO_OUTPUT1 |
             GRC_MISC_LOCAL_CTRL_GPIO_OE1);
-        REG_RD_BACK(pDevice, Grc.LocalCtrl);
     }
     MM_Wait(40);
 
@@ -1267,13 +1168,11 @@ PLM_DEVICE_BLOCK pDevice)
     {
         LM_DisableInterrupt(pDevice);
         /* assume ASF is enabled */
-        pDevice->AsfFlags = ASF_ENABLED;
-        if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-        {
-            pDevice->AsfFlags |= ASF_NEW_HANDSHAKE;
-        }
-        LM_ShutdownChip(pDevice, LM_SHUTDOWN_RESET);
-        pDevice->AsfFlags = 0;
+        pDevice->EnableAsf = TRUE;
+        LM_DisableFW(pDevice);
+        LM_DisableChip(pDevice);
+        LM_ResetChip(pDevice);
+        MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX, T3_DRV_STATE_UNLOAD);
     }
 #if PCIX_TARGET_WORKAROUND
     MM_ReadConfig32(pDevice, T3_PCI_STATE_REG, &Value32);
@@ -1588,15 +1487,11 @@ PLM_DEVICE_BLOCK pDevice)
                 pDevice->EepromWp = TRUE;
             }
         }
-        pDevice->AsfFlags = 0;
+        pDevice->EnableAsf = FALSE;
 #ifdef BCM_ASF
         if (Value32 & T3_NIC_CFG_ENABLE_ASF)
         {
-            pDevice->AsfFlags |= ASF_ENABLED;
-            if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-            {
-                pDevice->AsfFlags |= ASF_NEW_HANDSHAKE;
-	    }
+            pDevice->EnableAsf = TRUE;
         }
 #endif
         if (Value32 & T3_NIC_FIBER_WOL_CAPABLE)
@@ -1636,10 +1531,9 @@ PLM_DEVICE_BLOCK pDevice)
     /* Disable auto polling. */
     pDevice->MiMode = 0xc0000;
     REG_WR(pDevice, MacCtrl.MiMode, pDevice->MiMode);
-    REG_RD_BACK(pDevice, MacCtrl.MiMode);
     MM_Wait(40);
 
-    if (pDevice->AsfFlags & ASF_ENABLED)
+    if (pDevice->EnableAsf)
     {
         /* Reading PHY registers will contend with ASF */
         pDevice->PhyId = 0;
@@ -1722,19 +1616,17 @@ PLM_DEVICE_BLOCK pDevice)
 
     if ((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5700) ||
         (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5701) ||
-        (pDevice->ChipRevId == T3_CHIP_ID_5705_A0))
+        (pDevice->ChipRevId == T3_CHIP_ID_5705_A0) ||
+        (pDevice->Bcm5788))
     {
         pDevice->TaskOffloadCap &= ~LM_TASK_OFFLOAD_TCP_SEGMENTATION;
     }
 #endif
 
 #ifdef BCM_ASF
-    if (pDevice->AsfFlags & ASF_ENABLED)
+    if (pDevice->EnableAsf)
     {
-        if (T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5750)
-        {
-       	    pDevice->TaskOffloadCap &= ~LM_TASK_OFFLOAD_TCP_SEGMENTATION;
-	}
+       	pDevice->TaskOffloadCap &= ~LM_TASK_OFFLOAD_TCP_SEGMENTATION;
     }
 #endif
 
@@ -1751,7 +1643,7 @@ PLM_DEVICE_BLOCK pDevice)
     }
 
     /* Save the current phy link status. */
-    if ((!pDevice->EnableTbi) && !(pDevice->AsfFlags & ASF_ENABLED))
+    if ((!pDevice->EnableTbi) && (!pDevice->EnableAsf))
     {
         LM_ReadPhy(pDevice, PHY_STATUS_REG, &Value32);
         LM_ReadPhy(pDevice, PHY_STATUS_REG, &Value32);
@@ -2072,9 +1964,8 @@ PLM_DEVICE_BLOCK pDevice)
 
     pDevice->RxBDLimit64 = FALSE;
     pDevice->DmaReadFifoSize = 0;
-    if (((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) &&
-        (pDevice->ChipRevId != T3_CHIP_ID_5705_A0)) ||
-        (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750))
+    if ((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) &&
+        (pDevice->ChipRevId != T3_CHIP_ID_5705_A0))
     {
 #if INCLUDE_TCP_SEG_SUPPORT
         if ((pDevice->TaskToOffload & LM_TASK_OFFLOAD_TCP_SEGMENTATION) &&
@@ -2086,8 +1977,8 @@ PLM_DEVICE_BLOCK pDevice)
         else
 #endif
         {
-            if ((!(pDevice->PciState & T3_PCI_STATE_HIGH_BUS_SPEED) &&
-                !pDevice->Bcm5788) || pDevice->PciExpress)
+            if (!(pDevice->PciState & T3_PCI_STATE_HIGH_BUS_SPEED) &&
+                !pDevice->Bcm5788)
             {
                 pDevice->DmaReadFifoSize = DMA_READ_MODE_FIFO_LONG_BURST;
                 if (pDevice->ChipRevId == T3_CHIP_ID_5705_A1)
@@ -2185,9 +2076,10 @@ PLM_DEVICE_BLOCK pDevice)
         MAX_RX_PACKET_DESC_COUNT);
 
     QQ_InitQueue(&pDevice->TxPacketFreeQ.Container,MAX_TX_PACKET_DESC_COUNT);
+    QQ_InitQueue(&pDevice->TxPacketActiveQ.Container,MAX_TX_PACKET_DESC_COUNT);
     QQ_InitQueue(&pDevice->TxPacketXmittedQ.Container,MAX_TX_PACKET_DESC_COUNT);
 
-    if(T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705)
     {
         pDevice->RcvRetRcbEntryCount = 512;
         pDevice->RcvRetRcbEntryCountMask = 511;
@@ -2223,16 +2115,9 @@ PLM_DEVICE_BLOCK pDevice)
     /* Program DMA Read/Write */
     if (pDevice->PciState & T3_PCI_STATE_NOT_PCI_X_BUS)
     {
-        if(T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+        if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705)
         {
-            if (pDevice->PciExpress)
-            {
-                pDevice->DmaReadWriteCtrl = 0x761f0000;
-	    }
-	    else
-            {
-                pDevice->DmaReadWriteCtrl = 0x763f0000;
-	    }
+            pDevice->DmaReadWriteCtrl = 0x763f0000;
         }
         else
         {
@@ -2453,7 +2338,7 @@ LM_DisableChip(PLM_DEVICE_BLOCK pDevice)
     {
         MM_Wait(20);
     }
-    if(!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         data = REG_RD(pDevice, RcvListSel.Mode);
         data &= ~RCV_LIST_SEL_MODE_ENABLE;
@@ -2519,7 +2404,7 @@ LM_DisableChip(PLM_DEVICE_BLOCK pDevice)
     {
         MM_Wait(20);
     }
-    if(!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         data = REG_RD(pDevice,DmaComp.Mode);
         data &= ~DMA_COMP_MODE_ENABLE;
@@ -2559,7 +2444,7 @@ LM_DisableChip(PLM_DEVICE_BLOCK pDevice)
     {
         MM_Wait(20);
     }
-    if(!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         data = REG_RD(pDevice, MbufClusterFree.Mode);
         data &= ~MBUF_CLUSTER_FREE_MODE_ENABLE;
@@ -2573,7 +2458,7 @@ LM_DisableChip(PLM_DEVICE_BLOCK pDevice)
     REG_WR(pDevice, Ftq.Reset, 0xffffffff);
     REG_WR(pDevice, Ftq.Reset, 0x0);
 
-    if(!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         data = REG_RD(pDevice, BufMgr.Mode);
         data &= ~BUFMGR_MODE_ENABLE;
@@ -2600,7 +2485,7 @@ LM_DisableFW(PLM_DEVICE_BLOCK pDevice)
     int j;
     LM_UINT32 Value32;
 
-    if (pDevice->AsfFlags & ASF_ENABLED)
+    if (pDevice->EnableAsf)
     {
         MEM_WR_OFFSET(pDevice, T3_CMD_MAILBOX, T3_CMD_NICDRV_PAUSE_FW);
         Value32 = REG_RD(pDevice, Grc.RxCpuEvent);
@@ -2643,7 +2528,6 @@ restart_reset:
     /* May get a spurious interrupt */
     pDevice->pStatusBlkVirt->Status = STATUS_BLOCK_UPDATED;
 
-    LM_WritePreResetSignatures(pDevice, LM_INIT_RESET);
     /* Disable transmit and receive DMA engines.  Abort all pending requests. */
     if(pDevice->InitDone)
     {
@@ -2654,11 +2538,20 @@ restart_reset:
 
     LM_ResetChip(pDevice);
 
-    LM_WriteLegacySignatures(pDevice, LM_INIT_RESET);
+#ifdef BCM_ASF
+    if (pDevice->EnableAsf)
+    {
+        MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX, T3_DRV_STATE_START);
+    }
+    else
+#endif
+    {
+        MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX, T3_DRV_STATE_SUSPEND);
+    }
 
     /* Bug: Athlon fix for B3 silicon only.  This bit does not do anything */
     /* in other chip revisions. */
-    if (pDevice->DelayPciGrant && !pDevice->PciExpress)
+    if(pDevice->DelayPciGrant)
     {
         REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl | BIT_31);
     }
@@ -2710,8 +2603,6 @@ restart_reset:
     {
        pDevice->pRxStdBdVirt[k].HostAddr.High = 0;
        pDevice->pRxStdBdVirt[k].HostAddr.Low = 0;
-       pDevice->pRxStdBdVirt[k].Flags = RCV_BD_FLAG_END;
-       pDevice->pRxStdBdVirt[k].Len = MAX_STD_RCV_BUFFER_SIZE;
     }
 
 #if T3_JUMBO_RCV_RCB_ENTRY_COUNT
@@ -2720,9 +2611,6 @@ restart_reset:
     {
         pDevice->pRxJumboBdVirt[k].HostAddr.High = 0;
         pDevice->pRxJumboBdVirt[k].HostAddr.Low = 0;
-        pDevice->pRxJumboBdVirt[k].Flags = RCV_BD_FLAG_END |
-            RCV_BD_FLAG_JUMBO_RING;
-        pDevice->pRxJumboBdVirt[k].Len = (LM_UINT16) pDevice->RxJumboBufferSize;
     }
 #endif
 
@@ -2789,7 +2677,7 @@ restart_reset:
         }
 #endif
     }
-    else if (T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5750)
+    else
     {
         REG_WR(pDevice, BufMgr.MbufPoolAddr, pDevice->MbufBase);
         REG_WR(pDevice, BufMgr.MbufPoolSize, pDevice->MbufSize);
@@ -2804,7 +2692,7 @@ restart_reset:
     /* Configure the DMA read MBUF low water mark. */
     if(pDevice->TxMtu < MAX_ETHERNET_PACKET_BUFFER_SIZE)
     {
-        if(T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+        if(T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705)
         {
             REG_WR(pDevice, BufMgr.MbufReadDmaLowWaterMark,
                 T3_DEF_DMA_MBUF_LOW_WMARK_5705);
@@ -2851,8 +2739,6 @@ restart_reset:
         return LM_STATUS_FAILURE;
     }
 
-/* GRC reset will reset FTQ */
-#if 0
     /* Enable the FTQs. */
     REG_WR(pDevice, Ftq.Reset, 0xffffffff);
     REG_WR(pDevice, Ftq.Reset, 0);
@@ -2869,7 +2755,6 @@ restart_reset:
     {
         return LM_STATUS_FAILURE;
     }
-#endif
 
     /* Receive BD Ring replenish threshold. */
     REG_WR(pDevice, RcvBdIn.StdRcvThreshold, pDevice->RxStdDescCnt/8);
@@ -2882,7 +2767,7 @@ restart_reset:
     REG_WR(pDevice, RcvDataBdIn.StdRcvRcb.NicRingAddr,
         (LM_UINT32) T3_NIC_STD_RCV_BUFFER_DESC_ADDR);
 
-    if(T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705)
     {
         REG_WR(pDevice, RcvDataBdIn.StdRcvRcb.u.MaxLen_Flags,
             512 << 16);
@@ -2925,9 +2810,7 @@ restart_reset:
     pDevice->SendConIdx = 0;
 
     MB_REG_WR(pDevice, Mailbox.SendHostProdIdx[0].Low, 0); 
-    MB_REG_RD(pDevice, Mailbox.SendHostProdIdx[0].Low); 
     MB_REG_WR(pDevice, Mailbox.SendNicProdIdx[0].Low, 0);
-    MB_REG_RD(pDevice, Mailbox.SendNicProdIdx[0].Low); 
 
     /* Set up host or NIC based send RCB. */
     if(pDevice->NicSendBd == FALSE)
@@ -2941,7 +2824,7 @@ restart_reset:
         MEM_WR(pDevice, SendRcb[0].u.MaxLen_Flags,
             T3_SEND_RCB_ENTRY_COUNT << 16);
 
-        if(!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+        if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
         {
             /* Set up the NIC ring address in the RCB. */
             MEM_WR(pDevice, SendRcb[0].NicRingAddr,T3_NIC_SND_BUFFER_DESC_ADDR);
@@ -2994,11 +2877,8 @@ restart_reset:
 
     /* Reinitialize RX ring producer index */
     MB_REG_WR(pDevice, Mailbox.RcvStdProdIdx.Low, 0);
-    MB_REG_RD(pDevice, Mailbox.RcvStdProdIdx.Low);
     MB_REG_WR(pDevice, Mailbox.RcvJumboProdIdx.Low, 0);
-    MB_REG_RD(pDevice, Mailbox.RcvJumboProdIdx.Low);
     MB_REG_WR(pDevice, Mailbox.RcvMiniProdIdx.Low, 0);
-    MB_REG_RD(pDevice, Mailbox.RcvMiniProdIdx.Low);
 
 #if T3_JUMBO_RCV_RCB_ENTRY_COUNT
     pDevice->RxJumboProdIdx = 0;
@@ -3082,7 +2962,7 @@ restart_reset:
         pDevice->RxMaxCoalescedFrames);
     REG_WR(pDevice, HostCoalesce.TxMaxCoalescedFrames,
         pDevice->TxMaxCoalescedFrames);
-    if(!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         REG_WR(pDevice, HostCoalesce.RxCoalescedTickDuringInt,
             pDevice->RxCoalescingTicksDuringInt);
@@ -3103,7 +2983,7 @@ restart_reset:
 
     /* Initialize the address of the statistics block.  The NIC will DMA */
     /* the statistics to this block of memory. */
-    if(!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         REG_WR(pDevice, HostCoalesce.StatsBlkHostAddr.High, 
             pDevice->StatsBlkPhy.High);
@@ -3128,7 +3008,7 @@ restart_reset:
     /* Enable the Receive List Placement state machine. */
     REG_WR(pDevice, RcvListPlmt.Mode, RCV_LIST_PLMT_MODE_ENABLE);
 
-    if(!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         /* Enable the Receive List Selector state machine. */
         REG_WR(pDevice, RcvListSel.Mode, RCV_LIST_SEL_MODE_ENABLE |
@@ -3159,7 +3039,6 @@ restart_reset:
     }
 
     REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl);
-    REG_RD_BACK(pDevice, Grc.LocalCtrl);
     MM_Wait(40);
 
     /* Reset RX counters. */
@@ -3175,10 +3054,9 @@ restart_reset:
     }
 
     MB_REG_WR(pDevice, Mailbox.Interrupt[0].Low, 0);
-    MB_REG_RD(pDevice, Mailbox.Interrupt[0].Low);
     pDevice->LastTag = 0;
 
-    if(!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         /* Enable the DMA Completion state machine. */
         REG_WR(pDevice, DmaComp.Mode, DMA_COMP_MODE_ENABLE);
@@ -3195,12 +3073,11 @@ restart_reset:
         DMA_WRITE_MODE_FIFO_OVERREAD_ATTN_ENABLE |
         DMA_WRITE_MODE_LONG_READ_ATTN_ENABLE;
 
-    if (((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) &&
-        (pDevice->ChipRevId != T3_CHIP_ID_5705_A0)) ||
-        (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750))
+    if ((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) &&
+        (pDevice->ChipRevId != T3_CHIP_ID_5705_A0))
     {
         if (!(pDevice->PciState & T3_PCI_STATE_HIGH_BUS_SPEED) &&
-            !pDevice->Bcm5788 && !pDevice->PciExpress)
+            !pDevice->Bcm5788)
         {
             Value32 |= DMA_WRITE_MODE_RECEIVE_ACCELERATE;
         }
@@ -3247,18 +3124,10 @@ restart_reset:
         Value32 |= DMA_READ_MODE_SPLIT_ENABLE;
     }
 
-    if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705)
     {
         Value32 |= pDevice->DmaReadFifoSize;
     }
-#if INCLUDE_TCP_SEG_SUPPORT
-    if ((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750) &&
-        (pDevice->TaskToOffload & LM_TASK_OFFLOAD_TCP_SEGMENTATION))
-    {
-        Value32 |= BIT_27;
-    }
-#endif
-
 
     REG_WR(pDevice, DmaRead.Mode, Value32);
 
@@ -3266,7 +3135,7 @@ restart_reset:
     REG_WR(pDevice, RcvDataComp.Mode, RCV_DATA_COMP_MODE_ENABLE |
         RCV_DATA_COMP_MODE_ATTN_ENABLE);
 
-    if (!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         /* Enable the Mbuf Cluster Free state machine. */
         REG_WR(pDevice, MbufClusterFree.Mode, MBUF_CLUSTER_FREE_MODE_ENABLE);
@@ -3289,14 +3158,6 @@ restart_reset:
 
     /* Enable the Send Data Initiator state machine. */
     REG_WR(pDevice, SndDataIn.Mode, T3_SND_DATA_IN_MODE_ENABLE);
-
-#if INCLUDE_TCP_SEG_SUPPORT
-    if ((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750) &&
-        (pDevice->TaskToOffload & LM_TASK_OFFLOAD_TCP_SEGMENTATION))
-    {
-        REG_WR(pDevice, SndDataIn.Mode, T3_SND_DATA_IN_MODE_ENABLE | 0x8);
-    }
-#endif
 
     /* Enable the Send BD Initiator state machine. */
     REG_WR(pDevice, SndBdIn.Mode, SND_BD_IN_MODE_ENABLE |
@@ -3387,7 +3248,6 @@ restart_reset:
     if (pDevice->EnableTbi)
     {
         REG_WR(pDevice, MacCtrl.RxMode, RX_MODE_RESET);
-        REG_RD_BACK(pDevice, MacCtrl.RxMode);
         MM_Wait(10);
         REG_WR(pDevice, MacCtrl.RxMode, pDevice->RxMode);
         if (pDevice->ChipRevId == T3_CHIP_ID_5703_A1)
@@ -3433,7 +3293,6 @@ restart_reset:
         }
     }
 #endif
-    LM_WritePostResetSignatures(pDevice, LM_INIT_RESET);
 
     return LM_STATUS_SUCCESS;
 } /* LM_ResetAdapter */
@@ -3475,16 +3334,16 @@ LM_EnableInterrupt(
     PLM_DEVICE_BLOCK pDevice)
 {
     MB_REG_WR(pDevice, Mailbox.Interrupt[0].Low, pDevice->LastTag << 24);
-    if (pDevice->FlushPostedWrites)
-    {
-        MB_REG_RD(pDevice, Mailbox.Interrupt[0].Low);
-    }
-
     REG_WR(pDevice, PciCfg.MiscHostCtrl, pDevice->MiscHostCtrl &
         ~MISC_HOST_CTRL_MASK_PCI_INT);
 
     REG_WR(pDevice, HostCoalesce.Mode, pDevice->CoalesceMode |
         HOST_COALESCE_ENABLE | HOST_COALESCE_NOW);
+
+    if (pDevice->FlushPostedWrites)
+    {
+        MB_REG_RD(pDevice, Mailbox.Interrupt[0].Low);
+    }
 
     return LM_STATUS_SUCCESS;
 }
@@ -3544,11 +3403,7 @@ LM_SendPacket(PLM_DEVICE_BLOCK pDevice, PLM_PACKET pPacket)
 #if INCLUDE_TCP_SEG_SUPPORT
             if (Value32 & (SND_BD_FLAG_CPU_PRE_DMA | SND_BD_FLAG_CPU_POST_DMA))
             {
-                if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-                {
-                    pSendBd->u2.s2.Reserved = pPacket->u.Tx.MaxSegmentSize;
-                }
-		else if (FragCount == 0)
+                if (FragCount == 0)
                 {
                     pSendBd->u2.s2.Reserved = pPacket->u.Tx.MaxSegmentSize;
                 }
@@ -3577,9 +3432,6 @@ LM_SendPacket(PLM_DEVICE_BLOCK pDevice, PLM_PACKET pPacket)
             {
                 pSendBd = &pDevice->pSendBdVirt[0];
             }
-
-            pDevice->SendRing[Idx] = 0;
-
         } /* for */
         if (pDevice->Tx4GWorkaround == TRUE)
         {
@@ -3597,7 +3449,7 @@ LM_SendPacket(PLM_DEVICE_BLOCK pDevice, PLM_PACKET pPacket)
         break;
     }
     /* Put the packet descriptor in the ActiveQ. */
-    pDevice->SendRing[StartIdx] = pPacket;
+    QQ_PushTail(&pDevice->TxPacketActiveQ.Container, pPacket);
 
 #ifdef BCM_NIC_SEND_BD
     if (pDevice->NicSendBd)
@@ -3719,12 +3571,13 @@ LM_Test4GBoundary(PLM_DEVICE_BLOCK pDevice, PLM_PACKET pPacket,
 /*                                                                            */
 /* Return:                                                                    */
 /******************************************************************************/
-LM_UINT32
-ComputeCrc32(LM_UINT8 *pBuffer, LM_UINT32 BufferSize)
-{
-    LM_UINT32 Reg;
-    LM_UINT32 Tmp;
-    int j, k;
+__inline static unsigned long
+ComputeCrc32(
+unsigned char *pBuffer,
+unsigned long BufferSize) {
+    unsigned long Reg;
+    unsigned long Tmp;
+    unsigned long j, k;
 
     Reg = 0xffffffff;
 
@@ -3875,7 +3728,7 @@ LM_SetReceiveMask(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Mask)
             REJECT_BROADCAST_RULE2_VALUE);
     }
 
-    if (!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         k = 16;
     }
@@ -3884,7 +3737,7 @@ LM_SetReceiveMask(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Mask)
         k = 8;
     }
 #ifdef BCM_ASF
-    if (pDevice->AsfFlags & ASF_ENABLED)
+    if (pDevice->EnableAsf)
     {
         k -= 4;
     }
@@ -3923,33 +3776,23 @@ PLM_DEVICE_BLOCK pDevice)
     LM_DisableChip(pDevice);
 
     /* Abort packets that have already queued to go out. */
-    Idx = pDevice->SendConIdx; 
-    for ( ; ; )
+    pPacket = (PLM_PACKET) QQ_PopHead(&pDevice->TxPacketActiveQ.Container);
+    while(pPacket)
     {
-        if ((pPacket = pDevice->SendRing[Idx]))
-        {
-            pDevice->SendRing[Idx] = 0;
-            pPacket->PacketStatus = LM_STATUS_TRANSMIT_ABORTED;
-            pDevice->TxCounters.TxPacketAbortedCnt++;
 
-            MM_ATOMIC_ADD(&pDevice->SendBdLeft, pPacket->u.Tx.FragCount);
-            Idx = (Idx + pPacket->u.Tx.FragCount) & 
-                T3_SEND_RCB_ENTRY_COUNT_MASK;
+        pPacket->PacketStatus = LM_STATUS_TRANSMIT_ABORTED;
+        pDevice->TxCounters.TxPacketAbortedCnt++;
 
-            QQ_PushTail(&pDevice->TxPacketXmittedQ.Container, pPacket);
-	}
-        else
-	{
-            break;
-	}
+        MM_ATOMIC_ADD(&pDevice->SendBdLeft, pPacket->u.Tx.FragCount);
+
+        QQ_PushTail(&pDevice->TxPacketXmittedQ.Container, pPacket);
+
+        pPacket = (PLM_PACKET) 
+            QQ_PopHead(&pDevice->TxPacketActiveQ.Container);
     }
 
     /* Cleanup the receive return rings. */
-#ifdef BCM_NAPI_RXPOLL
-    LM_ServiceRxPoll(pDevice, T3_RCV_RETURN_RCB_ENTRY_COUNT);
-#else
     LM_ServiceRxInterrupt(pDevice);
-#endif
 
     /* Don't want to indicate rx packets in Ndis miniport shutdown context. */
     /* Doing so may cause system crash. */
@@ -3979,20 +3822,16 @@ PLM_DEVICE_BLOCK pDevice)
     }
 
     /* Clean up the Std Receive Producer ring. */
-    /* Don't always trust the consumer idx in the status block in case of  */
-    /* hw failure */
-    Idx = 0;
+    Idx = pDevice->pStatusBlkVirt->RcvStdConIdx;
 
-    while(Idx < T3_STD_RCV_RCB_ENTRY_COUNT)
-    {
-        if ((pPacket = pDevice->RxStdRing[Idx]))
-        {
-            MM_UnmapRxDma(pDevice, pPacket);
-            QQ_PushTail(&pDevice->RxPacketFreeQ.Container, pPacket);
-            pDevice->RxStdRing[Idx] = 0;
-        }
+    while(Idx != pDevice->RxStdProdIdx) {
+        pPacket = (PLM_PACKET) (MM_UINT_PTR(pDevice->pPacketDescBase) +
+            MM_UINT_PTR(pDevice->pRxStdBdVirt[Idx].Opaque));
 
-        Idx++;
+        MM_UnmapRxDma(pDevice, pPacket);
+        QQ_PushTail(&pDevice->RxPacketFreeQ.Container, pPacket);
+
+        Idx = (Idx + 1) & T3_STD_RCV_RCB_ENTRY_COUNT_MASK;
     } /* while */
 
     /* Reinitialize our copy of the indices. */
@@ -4000,17 +3839,16 @@ PLM_DEVICE_BLOCK pDevice)
 
 #if T3_JUMBO_RCV_RCB_ENTRY_COUNT
     /* Clean up the Jumbo Receive Producer ring. */
-    Idx = 0;
+    Idx = pDevice->pStatusBlkVirt->RcvJumboConIdx;
 
-    while(Idx < T3_JUMBO_RCV_RCB_ENTRY_COUNT)
-    {
-        if ((pPacket = pDevice->RxJumboRing[Idx]))
-        {
-            MM_UnmapRxDma(pDevice, pPacket);
-            QQ_PushTail(&pDevice->RxPacketFreeQ.Container, pPacket);
-            pDevice->RxJumboRing[Idx] = 0;
-        }
-        Idx++;
+    while(Idx != pDevice->RxJumboProdIdx) {
+        pPacket = (PLM_PACKET) (MM_UINT_PTR(pDevice->pPacketDescBase) +
+            MM_UINT_PTR(pDevice->pRxJumboBdVirt[Idx].Opaque));
+
+        MM_UnmapRxDma(pDevice, pPacket);
+        QQ_PushTail(&pDevice->RxPacketFreeQ.Container, pPacket);
+
+        Idx = (Idx + 1) & T3_JUMBO_RCV_RCB_ENTRY_COUNT_MASK;
     } /* while */
 
     /* Reinitialize our copy of the indices. */
@@ -4038,14 +3876,13 @@ PLM_DEVICE_BLOCK pDevice)
 /*    LM_STATUS_SUCCESS                                                       */
 /******************************************************************************/
 LM_STATUS
-LM_DoHalt(LM_DEVICE_BLOCK *pDevice)
-{
+LM_Halt(
+PLM_DEVICE_BLOCK pDevice) {
     PLM_PACKET pPacket;
     LM_UINT32 EntryCnt;
 
     LM_DisableFW(pDevice);
 
-    LM_WritePreResetSignatures(pDevice, LM_SHUTDOWN_RESET);
     LM_Abort(pDevice);
 
     /* Get the number of entries in the queue. */
@@ -4064,8 +3901,13 @@ LM_DoHalt(LM_DEVICE_BLOCK *pDevice)
     }
 
     LM_ResetChip(pDevice);
-    LM_WriteLegacySignatures(pDevice, LM_SHUTDOWN_RESET);
 
+#ifdef BCM_ASF
+    if (pDevice->EnableAsf)
+    {
+        MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX, T3_DRV_STATE_UNLOAD);
+    }
+#endif
     /* Restore PCI configuration registers. */
     MM_WriteConfig32(pDevice, PCI_CACHE_LINE_SIZE_REG,
         pDevice->SavedCacheLineReg);
@@ -4076,86 +3918,10 @@ LM_DoHalt(LM_DEVICE_BLOCK *pDevice)
     LM_SetMacAddress(pDevice, pDevice->NodeAddress);
 
     return LM_STATUS_SUCCESS;
-} /* LM_DoHalt */
+} /* LM_Halt */
 
 
 LM_STATUS
-LM_Halt(LM_DEVICE_BLOCK *pDevice)
-{
-    LM_STATUS status;
-
-    status = LM_DoHalt(pDevice);
-    LM_WritePostResetSignatures(pDevice, LM_SHUTDOWN_RESET);
-    return status;
-}
-
-
-STATIC LM_VOID
-LM_WritePreResetSignatures(LM_DEVICE_BLOCK *pDevice, LM_RESET_TYPE Mode)
-{
-    MEM_WR_OFFSET(pDevice, T3_FIRMWARE_MAILBOX,T3_MAGIC_NUM_FIRMWARE_INIT_DONE);
-#ifdef BCM_ASF
-    if (pDevice->AsfFlags & ASF_NEW_HANDSHAKE)
-    {
-        if (Mode == LM_INIT_RESET)
-        {
-            MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX, T3_DRV_STATE_START);
-        }
-	else if (Mode == LM_SHUTDOWN_RESET)
-        {
-            MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX, T3_DRV_STATE_UNLOAD);
-        }
-	else if (Mode == LM_SUSPEND_RESET)
-        {
-            MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX, T3_DRV_STATE_SUSPEND);
-        }
-    }
-#endif
-}
-
-STATIC LM_VOID
-LM_WritePostResetSignatures(LM_DEVICE_BLOCK *pDevice, LM_RESET_TYPE Mode)
-{
-#ifdef BCM_ASF
-    if (pDevice->AsfFlags & ASF_NEW_HANDSHAKE)
-    {
-        if (Mode == LM_INIT_RESET)
-        {
-            MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX,
-                T3_DRV_STATE_START_DONE);
-        }
-	else if (Mode == LM_SHUTDOWN_RESET)
-        {
-            MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX,
-                T3_DRV_STATE_UNLOAD_DONE);
-        }
-    }
-#endif
-}
-
-STATIC LM_VOID
-LM_WriteLegacySignatures(LM_DEVICE_BLOCK *pDevice, LM_RESET_TYPE Mode)
-{
-#ifdef BCM_ASF
-    if (pDevice->AsfFlags & ASF_ENABLED)
-    {
-        if (Mode == LM_INIT_RESET)
-        {
-            MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX, T3_DRV_STATE_START);
-        }
-	else if (Mode == LM_SHUTDOWN_RESET)
-        {
-            MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX, T3_DRV_STATE_UNLOAD);
-        }
-	else if (Mode == LM_SUSPEND_RESET)
-        {
-            MEM_WR_OFFSET(pDevice, T3_DRV_STATE_MAILBOX, T3_DRV_STATE_SUSPEND);
-        }
-    }
-#endif
-}
-
-STATIC LM_STATUS
 LM_ResetChip(PLM_DEVICE_BLOCK pDevice)
 {
     LM_UINT32 Value32;
@@ -4170,36 +3936,15 @@ LM_ResetChip(PLM_DEVICE_BLOCK pDevice)
         LM_NvramGetLock(pDevice);
     }
 
-    if (pDevice->PciExpress)
-    {
-        Value32 = REG_RD_OFFSET(pDevice, 0x7e2c);
-        if (Value32 == 0x60)
-        {
-            REG_WR_OFFSET(pDevice, 0x7e2c, 0x20);
-	}
-    }
     Value32 = GRC_MISC_CFG_CORE_CLOCK_RESET;
-    if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705)
     {
         Value32 |= GRC_MISC_GPHY_KEEP_POWER_DURING_RESET;
     }
+
     /* Global reset. */
     RAW_REG_WR(pDevice, Grc.MiscCfg, Value32);
     MM_Wait(40); MM_Wait(40); MM_Wait(40);
-
-#ifdef INCLUDE_5750_A0_FIX
-    if ((pDevice->PciExpress) && (pDevice->ChipRevId == T3_CHIP_ID_5750_A0))
-    {
-        /* 500 msec wait */
-        for (j = 0; j < 5000; j++)
-        {
-            MM_Wait(100);
-	}
-        MM_ReadConfig32(pDevice, 0xc4, &Value32);
-        MM_WriteConfig32(pDevice, 0xc4, Value32 | BIT_15);
-        MM_WriteConfig32(pDevice, 0xd8, 0x5000);
-    }
-#endif
 
     /* make sure we re-enable indirect accesses */
     MM_WriteConfig32(pDevice, T3_PCI_MISC_HOST_CTRL_REG,
@@ -4240,13 +3985,6 @@ LM_ResetChip(PLM_DEVICE_BLOCK pDevice)
 #endif
     REG_WR(pDevice, Grc.Mode, Value32);
 
-#ifdef INCLUDE_5750_A0_FIX
-    if (pDevice->ChipRevId == T3_CHIP_ID_5750_A0)
-    {
-        Value32 = REG_RD_OFFSET(pDevice, 0xc4);
-        REG_WR_OFFSET(pDevice, 0xc4, Value32 | BIT_15);
-    }
-#endif
     if (pDevice->MiniPci &&
         (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705))
     {
@@ -4257,6 +3995,9 @@ LM_ResetChip(PLM_DEVICE_BLOCK pDevice)
         }
         REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl);
     }
+
+    /* Prevent PXE from restarting. */
+    MEM_WR_OFFSET(pDevice, T3_FIRMWARE_MAILBOX,T3_MAGIC_NUM_FIRMWARE_INIT_DONE);
 
     if(pDevice->EnableTbi) {
         pDevice->MacMode = MAC_MODE_PORT_MODE_TBI;
@@ -4310,42 +4051,18 @@ LM_ResetChip(PLM_DEVICE_BLOCK pDevice)
     }
 
 #ifdef BCM_ASF
-    pDevice->AsfFlags = 0;
+    pDevice->EnableAsf = FALSE;
     Value32 = MEM_RD_OFFSET(pDevice, T3_NIC_DATA_SIG_ADDR);
     if (Value32 == T3_NIC_DATA_SIG)
     {
         Value32 = MEM_RD_OFFSET(pDevice, T3_NIC_DATA_NIC_CFG_ADDR);
         if (Value32 & T3_NIC_CFG_ENABLE_ASF)
         {
-            pDevice->AsfFlags = ASF_ENABLED;
-            if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-            {
-                pDevice->AsfFlags |= ASF_NEW_HANDSHAKE;
-	    }
+            pDevice->EnableAsf = TRUE;
         }
     }
 #endif
 
-    return LM_STATUS_SUCCESS;
-}
-
-
-LM_STATUS
-LM_ShutdownChip(PLM_DEVICE_BLOCK pDevice, LM_RESET_TYPE Mode)
-{
-    LM_DisableFW(pDevice);
-    LM_WritePreResetSignatures(pDevice, Mode);
-    if (pDevice->InitDone)
-    {
-        LM_Abort(pDevice);
-    }
-    else
-    {
-        LM_DisableChip(pDevice);
-    }
-    LM_ResetChip(pDevice);
-    LM_WriteLegacySignatures(pDevice, Mode);
-    LM_WritePostResetSignatures(pDevice, Mode);
     return LM_STATUS_SUCCESS;
 }
 
@@ -4372,8 +4089,9 @@ PLM_DEVICE_BLOCK pDevice) {
     /* descriptors that are between SwConIdx and HwConIdx. */
     while(SwConIdx != HwConIdx)
     {
-        pPacket = pDevice->SendRing[SwConIdx];
-        pDevice->SendRing[SwConIdx] = 0;
+        /* Get the packet that was sent from the TxPacketActiveQ. */
+        pPacket = (PLM_PACKET) QQ_PopHead(
+            &pDevice->TxPacketActiveQ.Container);
 
         /* Set the return status. */
         pPacket->PacketStatus = LM_STATUS_SUCCESS;
@@ -4424,17 +4142,6 @@ LM_ServiceRxPoll(PLM_DEVICE_BLOCK pDevice, int limit)
         /* Get the received packet descriptor. */
         pPacket = (PLM_PACKET) (MM_UINT_PTR(pDevice->pPacketDescBase) +
             MM_UINT_PTR(pRcvBd->Opaque));
-
-        switch(pPacket->u.Rx.RcvProdRing) {
-#if T3_JUMBO_RCV_RCB_ENTRY_COUNT
-        case T3_JUMBO_RCV_PROD_RING:        /* Jumbo Receive Ring. */
-            pDevice->RxJumboRing[pPacket->u.Rx.RcvRingProdIdx] = 0;
-	    break;
-#endif
-        case T3_STD_RCV_PROD_RING:      /* Standard Receive Ring. */
-            pDevice->RxStdRing[pPacket->u.Rx.RcvRingProdIdx] = 0;
-	    break;
-        }
 
         /* Check the error flag. */
         if(pRcvBd->ErrorFlag &&
@@ -4572,17 +4279,6 @@ LM_ServiceRxInterrupt(PLM_DEVICE_BLOCK pDevice)
         /* Get the received packet descriptor. */
         pPacket = (PLM_PACKET) (MM_UINT_PTR(pDevice->pPacketDescBase) +
             MM_UINT_PTR(pRcvBd->Opaque));
-
-        switch(pPacket->u.Rx.RcvProdRing) {
-#if T3_JUMBO_RCV_RCB_ENTRY_COUNT
-        case T3_JUMBO_RCV_PROD_RING:        /* Jumbo Receive Ring. */
-            pDevice->RxJumboRing[pPacket->u.Rx.RcvRingProdIdx] = 0;
-	    break;
-#endif
-        case T3_STD_RCV_PROD_RING:      /* Standard Receive Ring. */
-            pDevice->RxStdRing[pPacket->u.Rx.RcvRingProdIdx] = 0;
-	    break;
-        }
 
         /* Check the error flag. */
         if(pRcvBd->ErrorFlag &&
@@ -5408,7 +5104,6 @@ LM_SetupFiberPhy(
                 }
                 REG_WR(pDevice, MacCtrl.SgDigControl, ExpectedSgDigCtrl |
                     BIT_30);
-                REG_RD_BACK(pDevice, MacCtrl.SgDigControl);
 		MM_Wait(5);
                 REG_WR(pDevice, MacCtrl.SgDigControl, ExpectedSgDigCtrl);
                 pDevice->AutoNegJustInited = TRUE;
@@ -5463,7 +5158,6 @@ LM_SetupFiberPhy(
                         }
                         /* turn off autoneg. to allow traffic to pass */
                         REG_WR(pDevice, MacCtrl.SgDigControl, 0x01388400);
-                        REG_RD_BACK(pDevice, MacCtrl.SgDigControl);
                         MM_Wait(40);
                         MacStatus = REG_RD(pDevice, MacCtrl.Status);
                         if (MacStatus & MAC_STATUS_PCS_SYNCED)
@@ -5547,12 +5241,10 @@ LM_SetupFiberPhy(
 
                 Value32 = pDevice->MacMode & ~MAC_MODE_PORT_MODE_MASK;
                 REG_WR(pDevice, MacCtrl.Mode, Value32);
-                REG_RD_BACK(pDevice, MacCtrl.Mode);
                 MM_Wait(20);
 
                 REG_WR(pDevice, MacCtrl.Mode, pDevice->MacMode |
                     MAC_MODE_SEND_CONFIGS);
-                REG_RD_BACK(pDevice, MacCtrl.Mode);
 
                 MM_Wait(20);
 
@@ -5634,7 +5326,6 @@ LM_SetupFiberPhy(
                 MM_Wait(20);
                 REG_WR(pDevice, MacCtrl.Status, MAC_STATUS_SYNC_CHANGED |
                     MAC_STATUS_CFG_CHANGED);
-                REG_RD_BACK(pDevice, MacCtrl.Status);
                 MM_Wait(20);
                 if ((REG_RD(pDevice, MacCtrl.Status) &
                     (MAC_STATUS_SYNC_CHANGED | MAC_STATUS_CFG_CHANGED)) == 0)
@@ -5682,7 +5373,6 @@ LM_SetupFiberPhy(
     {
         REG_WR(pDevice, MacCtrl.Status, MAC_STATUS_SYNC_CHANGED |
             MAC_STATUS_CFG_CHANGED);
-        REG_RD_BACK(pDevice, MacCtrl.Status);
         MM_Wait(5);
         if ((REG_RD(pDevice, MacCtrl.Status) &
             (MAC_STATUS_SYNC_CHANGED | MAC_STATUS_CFG_CHANGED)) == 0)
@@ -5697,7 +5387,6 @@ LM_SetupFiberPhy(
         {
             REG_WR(pDevice, MacCtrl.Mode, pDevice->MacMode |
                 MAC_MODE_SEND_CONFIGS);
-            REG_RD_BACK(pDevice, MacCtrl.Mode);
             MM_Wait(1);
             REG_WR(pDevice, MacCtrl.Mode, pDevice->MacMode);
         }
@@ -5761,7 +5450,6 @@ LM_SetupCopperPhy(
     /* Disable auto-polling for the moment. */
     pDevice->MiMode = 0xc0000;
     REG_WR(pDevice, MacCtrl.MiMode, pDevice->MiMode);
-    REG_RD_BACK(pDevice, MacCtrl.MiMode);
     MM_Wait(40);
 
     /* Determine the requested line speed and duplex. */
@@ -5807,7 +5495,6 @@ LM_SetupCopperPhy(
             pDevice->MacMode &= ~MAC_MODE_PORT_MODE_MASK;
             pDevice->MacMode |= MAC_MODE_PORT_MODE_GMII;
             REG_WR(pDevice, MacCtrl.Mode, pDevice->MacMode);
-            REG_RD_BACK(pDevice, MacCtrl.Mode);
             MM_Wait(40);
 
             /* Configure PHY led mode. */
@@ -6415,19 +6102,6 @@ LM_ResetPhy(LM_DEVICE_BLOCK *pDevice)
         LM_WritePhy(pDevice, 0x1c, 0x8d68);
         LM_WritePhy(pDevice, 0x1c, 0x8d68);
     }
-    if((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM5401_PHY_ID)
-    {
-        LM_WritePhy(pDevice, BCM5401_AUX_CTRL, 0x4c20);
-    }
-    else if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
-    {
-        LM_WritePhy(pDevice, BCM5401_AUX_CTRL, 0x0400);
-    }
-    else
-    {
-        LM_WritePhy(pDevice, BCM5401_AUX_CTRL, 0x4400);
-    }
-
     LM_SetEthWireSpeed(pDevice);
 }
 
@@ -6486,7 +6160,6 @@ PLM_UINT32 pData32) {
     {
         REG_WR(pDevice, MacCtrl.MiMode, pDevice->MiMode &
             ~MI_MODE_AUTO_POLLING_ENABLE);
-        REG_RD_BACK(pDevice, MacCtrl.MiMode);
         MM_Wait(40);
     }
 
@@ -6521,7 +6194,6 @@ PLM_UINT32 pData32) {
     if(pDevice->PhyIntMode == T3_PHY_INT_MODE_AUTO_POLLING)
     {
         REG_WR(pDevice, MacCtrl.MiMode, pDevice->MiMode);
-        REG_RD_BACK(pDevice, MacCtrl.MiMode);
         MM_Wait(40);
     }
 } /* LM_ReadPhy */
@@ -6545,7 +6217,6 @@ LM_UINT32 Data32) {
     {
         REG_WR(pDevice, MacCtrl.MiMode, pDevice->MiMode &
             ~MI_MODE_AUTO_POLLING_ENABLE);
-        REG_RD_BACK(pDevice, MacCtrl.MiMode);
         MM_Wait(40);
     }
 
@@ -6571,7 +6242,6 @@ LM_UINT32 Data32) {
     if(pDevice->PhyIntMode == T3_PHY_INT_MODE_AUTO_POLLING)
     {
         REG_WR(pDevice, MacCtrl.MiMode, pDevice->MiMode);
-        REG_RD_BACK(pDevice, MacCtrl.MiMode);
         MM_Wait(40);
     }
 } /* LM_WritePhy */
@@ -6681,7 +6351,7 @@ LM_POWER_STATE PowerLevel)
         MM_WriteConfig32(pDevice, T3_PCI_PM_STATUS_CTRL_REG, PmCtrl);
 
         Value32 = REG_RD(pDevice, Grc.LocalCtrl);
-        RAW_REG_WR(pDevice, Grc.LocalCtrl, Value32 &
+        REG_WR(pDevice, Grc.LocalCtrl, Value32 &
             ~(GRC_MISC_LOCAL_CTRL_GPIO_OE0 | 
               GRC_MISC_LOCAL_CTRL_GPIO_OE1 |
               GRC_MISC_LOCAL_CTRL_GPIO_OE2 |
@@ -6737,9 +6407,9 @@ LM_POWER_STATE PowerLevel)
 
     /* Put the driver in the initial state, and go through the power down */
     /* sequence. */
-    LM_DoHalt(pDevice);
+    LM_Halt(pDevice);
 
-    if (!(pDevice->AsfFlags & ASF_ENABLED))
+    if (!pDevice->EnableAsf)
     {
         for(j = 0; j < 20000; j++)
         {
@@ -6811,7 +6481,6 @@ LM_POWER_STATE PowerLevel)
             }
         }
         REG_WR(pDevice, MacCtrl.Mode, Value32);
-        REG_RD_BACK(pDevice, MacCtrl.Mode);
         MM_Wait(40); MM_Wait(40); MM_Wait(40);
 
         /* Always enable magic packet wake-up if we have vaux. */
@@ -6822,7 +6491,7 @@ LM_POWER_STATE PowerLevel)
         }
 
 #ifdef BCM_ASF
-        if (pDevice->AsfFlags & ASF_ENABLED)
+        if (pDevice->EnableAsf)
         {
             Value32 &= ~MAC_MODE_ACPI_POWER_ON_ENABLE;
         }
@@ -6832,7 +6501,7 @@ LM_POWER_STATE PowerLevel)
         /* Enable the receiver. */
         REG_WR(pDevice, MacCtrl.RxMode, RX_MODE_ENABLE);
     }
-    else if (!(pDevice->AsfFlags & ASF_ENABLED))
+    else if (!pDevice->EnableAsf)
     {
         if (pDevice->EnableTbi)
         {
@@ -6871,7 +6540,7 @@ LM_POWER_STATE PowerLevel)
             Value32 = T3_PCI_DISABLE_RX_CLOCK | T3_PCI_DISABLE_TX_CLOCK |
                 T3_PCI_SELECT_ALTERNATE_CLOCK;
         }
-        else if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+        else if(T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705)
         {
             Value32 = T3_PCI_625_CORE_CLOCK;
         }
@@ -6879,7 +6548,7 @@ LM_POWER_STATE PowerLevel)
         {
             Value32 = T3_PCI_SELECT_ALTERNATE_CLOCK;
         }
-        RAW_REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl | Value32);
+        REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl | Value32);
 
         MM_Wait(40);
 
@@ -6889,7 +6558,7 @@ LM_POWER_STATE PowerLevel)
             Value32 = T3_PCI_DISABLE_RX_CLOCK | T3_PCI_DISABLE_TX_CLOCK |
                 T3_PCI_SELECT_ALTERNATE_CLOCK | T3_PCI_44MHZ_CORE_CLOCK;
         }
-        else if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+        else if(T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705)
         {
             Value32 = T3_PCI_SELECT_ALTERNATE_CLOCK | T3_PCI_625_CORE_CLOCK;
         }
@@ -6898,9 +6567,9 @@ LM_POWER_STATE PowerLevel)
             Value32 = T3_PCI_SELECT_ALTERNATE_CLOCK | T3_PCI_44MHZ_CORE_CLOCK;
         }
 
-        RAW_REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl | Value32);
+        REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl | Value32);
 
-        if (!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+        if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
         {
             MM_Wait(40);
 
@@ -6915,7 +6584,7 @@ LM_POWER_STATE PowerLevel)
                 Value32 = T3_PCI_44MHZ_CORE_CLOCK;
             }
 
-            RAW_REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl | Value32);
+            REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl | Value32);
         }
     }
 
@@ -6933,12 +6602,8 @@ LM_POWER_STATE PowerLevel)
     /* Set the phy to low power mode. */
     /* Put the the hardware in low power mode. */
     MM_WriteConfig32(pDevice, T3_PCI_PM_STATUS_CTRL_REG, PmCtrl);
-
     pDevice->PowerLevel = PowerLevel;
-
 #endif
-    LM_WritePostResetSignatures(pDevice, LM_SHUTDOWN_RESET);
-
     return LM_STATUS_SUCCESS;
 } /* LM_SetPowerState */
 
@@ -6948,15 +6613,15 @@ LM_SwitchVaux(PLM_DEVICE_BLOCK pDevice, PLM_DEVICE_BLOCK pDevice2)
 {
     /* Switch adapter to auxilliary power if WOL enabled */
     if ((pDevice->WakeUpModeCap != LM_WAKE_UP_MODE_NONE) ||
-        (pDevice->AsfFlags & ASF_ENABLED) ||
+        (pDevice->EnableAsf) ||
         (pDevice2 && ((pDevice2->WakeUpModeCap != LM_WAKE_UP_MODE_NONE) ||
-        (pDevice2->AsfFlags & ASF_ENABLED))))
+        pDevice2->EnableAsf)))
     {
         if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5700 ||
             T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5701)
         {
             /* GPIO0 = 1, GPIO1 = 1, GPIO2 = 0. */
-            RAW_REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
+            REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE0 |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE1 |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE2 | 
@@ -6972,7 +6637,7 @@ LM_SwitchVaux(PLM_DEVICE_BLOCK pDevice, PLM_DEVICE_BLOCK pDevice2)
             }
 
             /* GPIO0 = 0, GPIO1 = 1, GPIO2 = 1. */
-            RAW_REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
+            REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE0 |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE1 |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE2 | 
@@ -6981,7 +6646,7 @@ LM_SwitchVaux(PLM_DEVICE_BLOCK pDevice, PLM_DEVICE_BLOCK pDevice2)
             MM_Wait(40);
 
             /* GPIO0 = 1, GPIO1 = 1, GPIO2 = 1. */
-            RAW_REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
+            REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE0 |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE1 |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE2 | 
@@ -6991,7 +6656,7 @@ LM_SwitchVaux(PLM_DEVICE_BLOCK pDevice, PLM_DEVICE_BLOCK pDevice2)
             MM_Wait(40);
 
             /* GPIO0 = 1, GPIO1 = 1, GPIO2 = 0. */
-            RAW_REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
+            REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE0 | 
                 GRC_MISC_LOCAL_CTRL_GPIO_OE1 |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE2 | 
@@ -7011,18 +6676,18 @@ LM_SwitchVaux(PLM_DEVICE_BLOCK pDevice, PLM_DEVICE_BLOCK pDevice2)
             }
 
             /* GPIO1 = 1 */
-            RAW_REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
+            REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE1 |
                 GRC_MISC_LOCAL_CTRL_GPIO_OUTPUT1);
             MM_Wait(40);
 
             /* GPIO1 = 0 */
-            RAW_REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
+            REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE1);
             MM_Wait(40);
 
             /* GPIO1 = 1 */
-            RAW_REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
+            REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
                 GRC_MISC_LOCAL_CTRL_GPIO_OE1 |
                 GRC_MISC_LOCAL_CTRL_GPIO_OUTPUT1);
             MM_Wait(40);
@@ -7094,17 +6759,12 @@ LM_ForceAutoNeg(PLM_DEVICE_BLOCK pDevice)
     /* Exit ext. loop back, in case it was in ext. loopback mode */
     if((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM5401_PHY_ID)
     {
-        LM_WritePhy(pDevice, BCM5401_AUX_CTRL, 0x4c20);
-    }
-    else if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
-    {
-        LM_WritePhy(pDevice, BCM5401_AUX_CTRL, 0x0400);
+        LM_WritePhy(pDevice, BCM5401_AUX_CTRL, 0x0c20);
     }
     else
     {
-        LM_WritePhy(pDevice, BCM5401_AUX_CTRL, 0x4400);
+        LM_WritePhy(pDevice, BCM5401_AUX_CTRL, 0x0400);
     }
-
 
 #ifdef BCM_WOL
     if (pDevice->RestoreOnWakeUp)
@@ -7431,7 +7091,6 @@ LM_STATUS LM_LoadFirmware(PLM_DEVICE_BLOCK pDevice,
           REG_WR(pDevice,rxCpu.reg.state, 0xffffffff);
           REG_WR(pDevice,rxCpu.reg.mode,CPU_MODE_HALT);
           REG_WR(pDevice,rxCpu.reg.PC,pFwImg->StartAddress);
-          REG_RD_BACK(pDevice,rxCpu.reg.PC);
           MM_Wait(1000);
         }
 
@@ -7453,7 +7112,6 @@ LM_STATUS LM_LoadFirmware(PLM_DEVICE_BLOCK pDevice,
           REG_WR(pDevice,txCpu.reg.state, 0xffffffff);
           REG_WR(pDevice,txCpu.reg.mode,CPU_MODE_HALT);
           REG_WR(pDevice,txCpu.reg.PC,pFwImg->StartAddress);
-          REG_RD_BACK(pDevice,txCpu.reg.PC);
           MM_Wait(1000);
         }
         
@@ -7487,7 +7145,6 @@ LM_STATUS LM_HaltCpu(PLM_DEVICE_BLOCK pDevice,LM_UINT32 cpu_number)
 
         REG_WR(pDevice,rxCpu.reg.state, 0xffffffff);
         REG_WR(pDevice,rxCpu.reg.mode,CPU_MODE_HALT);
-        REG_RD_BACK(pDevice,rxCpu.reg.mode);
         MM_Wait(10);
     }
     else
@@ -7555,7 +7212,7 @@ LM_BlinkLED(PLM_DEVICE_BLOCK pDevice, LM_UINT32 BlinkDurationSec)
 	return ret;
 }
 
-LM_STATUS
+STATIC LM_STATUS
 LM_SwitchClocks(PLM_DEVICE_BLOCK pDevice)
 {
     LM_UINT32 ClockCtrl;
@@ -7563,20 +7220,20 @@ LM_SwitchClocks(PLM_DEVICE_BLOCK pDevice)
     ClockCtrl = REG_RD(pDevice, PciCfg.ClockCtrl);
     pDevice->ClockCtrl = ClockCtrl & (T3_PCI_FORCE_CLKRUN |
         T3_PCI_CLKRUN_OUTPUT_EN | 0x1f);
-    if (!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if (T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         if (ClockCtrl & T3_PCI_44MHZ_CORE_CLOCK)
         {
-            RAW_REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl |
+            REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl |
                 T3_PCI_44MHZ_CORE_CLOCK | T3_PCI_SELECT_ALTERNATE_CLOCK);
             MM_Wait(40);  /* required delay is 27usec */
-            RAW_REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl |
+            REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl |
                 T3_PCI_SELECT_ALTERNATE_CLOCK);
             MM_Wait(40);  /* required delay is 27usec */
         }
     }
 
-    RAW_REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl);
+    REG_WR(pDevice, PciCfg.ClockCtrl, pDevice->ClockCtrl);
     MM_Wait(40);  /* required delay is 27usec */
     return LM_STATUS_SUCCESS;
 }
@@ -7597,7 +7254,7 @@ int t3_do_dma(PLM_DEVICE_BLOCK pDevice,
     dma_desc.host_addr.Low = host_addr_phy.Low;
     dma_desc.nic_mbuf = 0x2100;
     dma_desc.len = length;
-    dma_desc.flags = 0x00000005; /* Generate Rx-CPU event */
+    dma_desc.flags = 0x00000004; /* Generate Rx-CPU event */
 
     if (dma_read)
     {
@@ -7729,7 +7386,7 @@ LM_GetStats(PLM_DEVICE_BLOCK pDevice)
 {
     PT3_STATS_BLOCK pStats = (PT3_STATS_BLOCK) pDevice->pStatsBlkVirt;
 
-    if (!T3_ASIC_5705_OR_5750(pDevice->ChipRevId))
+    if(T3_ASIC_REV(pDevice->ChipRevId) != T3_ASIC_REV_5705)
     {
         return LM_STATUS_FAILURE;
     }

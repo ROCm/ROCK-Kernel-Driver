@@ -1,6 +1,6 @@
 /******************************************************************************/
 /*                                                                            */
-/* Broadcom BCM5700 Linux Network Driver, Copyright (c) 2000 - 2004 Broadcom  */
+/* Broadcom BCM5700 Linux Network Driver, Copyright (c) 2000 - 2003 Broadcom  */
 /* Corporation.                                                               */
 /* All rights reserved.                                                       */
 /*                                                                            */
@@ -12,8 +12,8 @@
 
 
 char bcm5700_driver[] = "bcm5700";
-char bcm5700_version[] = "7.2.15";
-char bcm5700_date[] = "(02/12/04)";
+char bcm5700_version[] = "7.1.22";
+char bcm5700_date[] = "(01/07/04)";
 
 #define B57UM
 #include "mm.h"
@@ -109,14 +109,13 @@ static int enable_wol[MAX_UNITS] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 #ifdef BCM_TSO
 static int enable_tso[MAX_UNITS] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 #endif
+
 #ifdef BCM_NIC_SEND_BD
 static int nic_tx_bd[MAX_UNITS] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 #endif
+
 #ifdef BCM_ASF
 static int vlan_tag_mode[MAX_UNITS] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-#endif
-#ifdef INCLUDE_5750_A0_FIX
-static int shasta_smp_fix[MAX_UNITS] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 #endif
 
 /* Operational parameters that usually are not changed. */
@@ -378,9 +377,6 @@ MODULE_PARM(nic_tx_bd, "1-" __MODULE_STRING(MAX_UNITS) "i");
 #ifdef BCM_ASF
 MODULE_PARM(vlan_tag_mode, "1-" __MODULE_STRING(MAX_UNITS) "i");
 #endif
-#ifdef INCLUDE_5750_A0_FIX
-MODULE_PARM(shasta_smp_fix, "1-" __MODULE_STRING(MAX_UNITS) "i");
-#endif
 #endif
 
 #define RUN_AT(x) (jiffies + (x))
@@ -549,7 +545,7 @@ typedef enum {
 	TC998SX,
 	TC999T,
 	NC6770,
-	NC7722,
+	NC1020,
 	NC7760,
 	NC7761,
 	NC7770,
@@ -567,13 +563,7 @@ typedef enum {
 	BCM5705F,
 	BCM5901,
 	BCM5782,
-	BCM5788,
-	BCM5750,
-	BCM5750M,
-	BCM5720,
-	BCM5751,
-	BCM5751M,
-	BCM5721,
+	BCM5788
 } board_t;
 
 
@@ -612,7 +602,7 @@ static struct {
 	{ "3Com 3C998-SX Dual Port 1000-SX PCI-X Server NIC" },
 	{ "3Com 3C999-T Quad Port 10/100/1000 PCI-X Server NIC" },
 	{ "HP NC6770 Gigabit Server Adapter" },
-	{ "HP NC7722 Gigabit Server Adapter" },
+	{ "NC1020 HP ProLiant Gigabit Server Adapter 32 PCI" },
 	{ "HP NC7760 Gigabit Server Adapter" },
 	{ "HP NC7761 Gigabit Server Adapter" },
 	{ "HP NC7770 Gigabit Server Adapter" },
@@ -630,13 +620,7 @@ static struct {
 	{ "Broadcom 570x 10/100 Integrated Controller" },
 	{ "Broadcom BCM5901 100Base-TX" },
 	{ "Broadcom NetXtreme Gigabit Ethernet for hp" },
-	{ "Broadcom BCM5788 NetLink 1000Base-T" },
-	{ "Broadcom BCM5750 1000Base-T PCI" },
-	{ "Broadcom BCM5750M 1000Base-T PCI" },
-	{ "Broadcom BCM5720 1000Base-T PCI" },
-	{ "Broadcom BCM5751 1000Base-T PCI Express" },
-	{ "Broadcom BCM5751M 1000Base-T PCI Express" },
-	{ "Broadcom BCM5721 1000Base-T PCI Express" },
+	{ "Broadcom BCM5788 1000Base-T" },
 	{ 0 },
 	};
 
@@ -710,7 +694,7 @@ static struct pci_device_id bcm5700_pci_tbl[] __devinitdata = {
 	{0x14e4, 0x1653, 0x0e11, 0x00e3, 0, 0, NC7761 },
 	{0x14e4, 0x1653, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5705 },
 	{0x14e4, 0x1654, 0x0e11, 0x00e3, 0, 0, NC7761 },
-	{0x14e4, 0x1654, 0x103c, 0x3100, 0, 0, NC7722 },
+	{0x14e4, 0x1654, 0x103c, 0x3100, 0, 0, NC1020 },
 	{0x14e4, 0x1654, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5705 },
 	{0x14e4, 0x165d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5705M },
 	{0x14e4, 0x165e, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5705M },
@@ -719,12 +703,6 @@ static struct pci_device_id bcm5700_pci_tbl[] __devinitdata = {
 	{0x14e4, 0x169c, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5788 },
 	{0x14e4, 0x170d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5901 },
 	{0x14e4, 0x170e, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5901 },
-	{0x14e4, 0x1676, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5750 },
-	{0x14e4, 0x167c, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5750M },
-	{0x14e4, 0x1677, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5751 },
-	{0x14e4, 0x167d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5751M },
-	{0x14e4, 0x1658, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5720 },
-	{0x14e4, 0x1659, PCI_ANY_ID, PCI_ANY_ID, 0, 0, BCM5721 },
 	{0,}
 };
 
@@ -824,7 +802,7 @@ static int __devinit bcm5700_init_board(struct pci_dev *pdev,
 		goto err_out_unmap;
 	}
 
-	if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId)) {
+	if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) {
 		if (dev->mtu > 1500) {
 			dev->mtu = 1500;
 			printk(KERN_WARNING "%s-%d: Jumbo mtu sizes not supported, using mtu=1500\n", bcm5700_driver, pUmDevice->index);
@@ -844,19 +822,6 @@ static int __devinit bcm5700_init_board(struct pci_dev *pdev,
 		/* accesses on certain machines. */
 		pUmDevice->do_global_lock = 1;
 	}
-#ifdef INCLUDE_5750_A0_FIX
-	if ((pDevice->PciExpress) && (pDevice->ChipRevId == T3_CHIP_ID_5750_A0))
-	{
-		if (shasta_smp_fix[pUmDevice->index]) {
-			pUmDevice->do_global_lock = 1;
-			pDevice->FlushPostedWrites = TRUE;
-        		pDevice->RegReadBack = TRUE;
-		}
-		else {
-        		pDevice->RegReadBack = FALSE;
-		}
-	}
-#endif
 	if ((T3_ASIC_REV(pUmDevice->lm_dev.ChipRevId) == T3_ASIC_REV_5701) &&
 		((pDevice->PciState & T3_PCI_STATE_NOT_PCI_X_BUS) == 0)) {
 
@@ -1020,8 +985,6 @@ bcm5700_init_one(struct pci_dev *pdev,
 	}
 	else if ((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM5705_PHY_ID)
 		printk("Broadcom BCM5705 Integrated Copper ");
-	else if ((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM5750_PHY_ID)
-		printk("Broadcom BCM5750 Integrated Copper ");
 	else if ((pDevice->PhyId & PHY_ID_MASK) == PHY_BCM8002_PHY_ID)
 		printk("Broadcom BCM8002 SerDes ");
 	else if (pDevice->EnableTbi) {
@@ -1256,12 +1219,10 @@ bcm5700_timer(unsigned long data)
 		return;
 	}
 
-	if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId) &&
+	if ((T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) &&
 		(pDevice->LinkStatus == LM_STATUS_LINK_ACTIVE)) {
 
-		BCM5700_LOCK(pUmDevice, flags);
 		LM_GetStats(pDevice);
-		BCM5700_UNLOCK(pUmDevice, flags);
 	}
 
 #if INCLUDE_TBI_SUPPORT
@@ -1356,7 +1317,7 @@ bcm5700_timer(unsigned long data)
 	}
 
 #ifdef BCM_ASF
-	if (pDevice->AsfFlags & ASF_ENABLED) {
+	if (pDevice->EnableAsf) {
 		pUmDevice->asf_heartbeat--;
 		if (pUmDevice->asf_heartbeat == 0) {
 			MEM_WR_OFFSET(pDevice, T3_CMD_MAILBOX,
@@ -1526,7 +1487,7 @@ bcm5700_set_vlan_mode(UM_DEVICE_BLOCK *pUmDevice)
 	int vlan_tag_mode = pUmDevice->vlan_tag_mode;
 
 	if (vlan_tag_mode == VLAN_TAG_MODE_AUTO_STRIP) {
-	        if (pDevice->AsfFlags & ASF_ENABLED) {
+		if (pDevice->EnableAsf) {
 			vlan_tag_mode = VLAN_TAG_MODE_FORCED_STRIP;
 		}
 		else {
@@ -1691,20 +1652,12 @@ bcm5700_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		}
 		ip_tcp_len = (skb->nh.iph->ihl << 2) + sizeof(struct tcphdr);
 		skb->nh.iph->check = 0;
-
-		if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750) {
-			skb->h.th->check = 0;
-			pPacket->Flags &= ~SND_BD_FLAG_TCP_UDP_CKSUM;
-		}
-		else {
-			skb->h.th->check = ~csum_tcpudp_magic(
-				skb->nh.iph->saddr, skb->nh.iph->daddr,
-				0, IPPROTO_TCP, 0);
-		}
+		skb->h.th->check = ~csum_tcpudp_magic(skb->nh.iph->saddr,
+			skb->nh.iph->daddr, 0, IPPROTO_TCP, 0);
 
 		skb->nh.iph->tot_len = htons(mss + ip_tcp_len + tcp_opt_len);
 		tcp_seg_flags = 0;
-		if (T3_ASIC_5705_OR_5750(pDevice->ChipRevId)) {
+		if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) {
 			if (tcp_opt_len || (skb->nh.iph->ihl > 5)) {
 				tcp_seg_flags =
 					((skb->nh.iph->ihl - 5) +
@@ -1744,12 +1697,10 @@ bcm5700_poll(struct net_device *dev, int *budget)
 	int work_done;
 	UM_DEVICE_BLOCK *pUmDevice = (UM_DEVICE_BLOCK *) dev->priv;
 	LM_DEVICE_BLOCK *pDevice = &pUmDevice->lm_dev;
-	unsigned long flags = 0;
 
 	if (orig_budget > dev->quota)
 		orig_budget = dev->quota;
 
-	BCM5700_LOCK(pUmDevice, flags);
 	work_done = LM_ServiceRxPoll(pDevice, orig_budget);
 	*budget -= work_done;
 	dev->quota -= work_done;
@@ -1757,18 +1708,14 @@ bcm5700_poll(struct net_device *dev, int *budget)
 	if (QQ_GetEntryCnt(&pUmDevice->rx_out_of_buf_q.Container)) {
 		replenish_rx_buffers(pUmDevice, 0);
 	}
-	BCM5700_UNLOCK(pUmDevice, flags);
 	if (work_done) {
 		MM_IndicateRxPackets(pDevice);
-		BCM5700_LOCK(pUmDevice, flags);
 		LM_QueueRxPackets(pDevice);
-		BCM5700_UNLOCK(pUmDevice, flags);
 	}
 	if ((work_done < orig_budget) || atomic_read(&pUmDevice->intr_sem) ||
 		pUmDevice->suspended) {
 
 		netif_rx_complete(dev);
-		BCM5700_LOCK(pUmDevice, flags);
 		REG_WR(pDevice, Grc.Mode, pDevice->GrcMode);
 		pDevice->RxPoll = FALSE;
 		if ((pDevice->pStatusBlkVirt->Status & STATUS_BLOCK_UPDATED) ||
@@ -1779,7 +1726,6 @@ bcm5700_poll(struct net_device *dev, int *budget)
 				pDevice->CoalesceMode | HOST_COALESCE_ENABLE |
 				HOST_COALESCE_NOW);
 		}
-		BCM5700_UNLOCK(pUmDevice, flags);
 		return 0;
 	}
 	return 1;
@@ -1804,19 +1750,13 @@ bcm5700_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		return IRQ_RETVAL(handled);
 	}
 
-	bcm5700_intr_lock(pUmDevice);
 	if (atomic_read(&pUmDevice->intr_sem)) {
 		MB_REG_WR(pDevice, Mailbox.Interrupt[0].Low, 1);
-#ifdef INCLUDE_5750_A0_FIX
-		if (pDevice->FlushPostedWrites) {
-			MB_REG_RD(pDevice, Mailbox.Interrupt[0].Low);
-		}
-#endif
-		bcm5700_intr_unlock(pUmDevice);
 		handled = 0;
 		return IRQ_RETVAL(handled);
 	}
 
+	bcm5700_intr_lock(pUmDevice);
 	if (test_and_set_bit(0, (void*)&pUmDevice->interrupt)) {
 		printk(KERN_ERR "%s: Duplicate entry of the interrupt handler by "
 			   "processor %d.\n",
@@ -1850,11 +1790,6 @@ bcm5700_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 #endif
 		if (pDevice->UseTaggedStatus) {
 			MB_REG_WR(pDevice, Mailbox.Interrupt[0].Low, 1);
-#ifdef INCLUDE_5750_A0_FIX
-			if (pDevice->FlushPostedWrites) {
-				MB_REG_RD(pDevice, Mailbox.Interrupt[0].Low);
-			}
-#endif
 			oldtag = pDevice->pStatusBlkVirt->StatusTag;
 
 			for (i = 0; ; i++) {
@@ -1867,12 +1802,6 @@ bcm5700_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					MB_REG_WR(pDevice,
 						Mailbox.Interrupt[0].Low,
 						oldtag << 24);
-#ifdef INCLUDE_5750_A0_FIX
-					if (pDevice->FlushPostedWrites) {
-						MB_REG_RD(pDevice,
-						Mailbox.Interrupt[0].Low);
-					}
-#endif
 					pDevice->LastTag = oldtag;
 					if (pDevice->UndiFix) {
 						REG_WR(pDevice, Grc.LocalCtrl,
@@ -1959,7 +1888,6 @@ STATIC void
 bcm5700_tasklet(unsigned long data)
 {
 	PUM_DEVICE_BLOCK pUmDevice = (PUM_DEVICE_BLOCK)data;
-	unsigned long flags = 0;
 
 	/* RH 7.2 Beta 3 tasklets are reentrant */
 	if (test_and_set_bit(0, &pUmDevice->tasklet_busy)) {
@@ -1968,11 +1896,8 @@ bcm5700_tasklet(unsigned long data)
 	}
 
 	pUmDevice->tasklet_pending = 0;
-	if (pUmDevice->opened && !pUmDevice->suspended) {
-		BCM5700_LOCK(pUmDevice, flags);
+	if (pUmDevice->opened && !pUmDevice->suspended)
 		replenish_rx_buffers(pUmDevice, 0);
-		BCM5700_UNLOCK(pUmDevice, flags);
-	}
 
 	clear_bit(0, &pUmDevice->tasklet_busy);
 }
@@ -2002,14 +1927,7 @@ bcm5700_close(struct net_device *dev)
 #if (LINUX_VERSION_CODE < 0x020300)
 	MOD_DEC_USE_COUNT;
 #endif
-#ifdef INCLUDE_5750_A0_FIX
-	if (!((pDevice->PciExpress) &&
-		(pDevice->ChipRevId == T3_CHIP_ID_5750_A0)))
-#endif
-	{
-
-		LM_SetPowerState(pDevice, LM_POWER_STATE_D3);
-	}
+	LM_SetPowerState(pDevice, LM_POWER_STATE_D3);
 	bcm5700_freemem(dev);
 
 	return 0;
@@ -2174,66 +2092,6 @@ bcm5700_get_stats(struct net_device *dev)
 	return p_netstats;
 }
 
-void
-b57_suspend_chip(UM_DEVICE_BLOCK *pUmDevice)
-{
-	LM_DEVICE_BLOCK *pDevice = &pUmDevice->lm_dev;
-
-	if (pUmDevice->opened) {
-		bcm5700_intr_off(pUmDevice);
-		netif_carrier_off(pUmDevice->dev);
-		netif_stop_queue(pUmDevice->dev);
-#ifdef BCM_TASKLET
-		tasklet_kill(&pUmDevice->tasklet);
-#endif
-#ifdef BCM_NAPI_RXPOLL
-		while (pDevice->RxPoll)
-			yield();
-#endif
-	}
-	pUmDevice->suspended = 1;
-	LM_ShutdownChip(pDevice, LM_SUSPEND_RESET);
-}
-
-void
-b57_resume_chip(UM_DEVICE_BLOCK *pUmDevice)
-{
-	LM_DEVICE_BLOCK *pDevice = &pUmDevice->lm_dev;
-
-	if (pUmDevice->suspended) {
-		pUmDevice->suspended = 0;
-		if (pUmDevice->opened) {
-			bcm5700_reset(pUmDevice->dev);
-		}
-		else {
-			LM_ShutdownChip(pDevice, LM_SHUTDOWN_RESET);
-		}
-	}
-}
-
-/* Returns 0 on failure, 1 on success */
-int
-b57_test_intr(UM_DEVICE_BLOCK *pUmDevice)
-{
-	LM_DEVICE_BLOCK *pDevice = &pUmDevice->lm_dev;
-	int j;
-
-	if (!pUmDevice->opened)
-		return 0;
-	pUmDevice->intr_test_result = 0;
-	pUmDevice->intr_test = 1;
-	REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
-		GRC_MISC_LOCAL_CTRL_SET_INT);
-	for (j = 0; j < 10; j++) {
-		if (pUmDevice->intr_test_result)
-			break;
-		REG_WR(pDevice, Grc.LocalCtrl, pDevice->GrcLocalCtrl |
-			GRC_MISC_LOCAL_CTRL_SET_INT);
-		MM_Sleep(pDevice, 1);
-	}
-	return pUmDevice->intr_test_result;
-}
-
 #ifdef SIOCETHTOOL
 
 #ifdef ETHTOOL_GSTRINGS
@@ -2310,26 +2168,6 @@ unsigned long bcm5700_stats_offset_arr[ETH_NUM_STATS] = {
 
 #endif /* ETHTOOL_GSTRINGS */
 
-#ifdef ETHTOOL_TEST
-#define ETH_NUM_TESTS 6
-struct {
-	char string[ETH_GSTRING_LEN];
-} bcm5700_tests_str_arr[ETH_NUM_STATS] = {
-	{ "register test (offline)" },
-	{ "memory test (offline)" },
-	{ "loopback test (offline)" },
-	{ "nvram test (online)" },
-	{ "interrupt test (online)" },
-	{ "link test (online)" },
-};
-
-extern LM_STATUS b57_test_registers(UM_DEVICE_BLOCK *pUmDevice);
-extern LM_STATUS b57_test_memory(UM_DEVICE_BLOCK *pUmDevice);
-extern LM_STATUS b57_test_nvram(UM_DEVICE_BLOCK *pUmDevice);
-extern LM_STATUS b57_test_link(UM_DEVICE_BLOCK *pUmDevice);
-extern LM_STATUS b57_test_loopback(UM_DEVICE_BLOCK *pUmDevice);
-#endif
-
 static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 {
 	struct ethtool_cmd ethcmd;
@@ -2367,9 +2205,6 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 #endif
 #ifdef ETHTOOL_GSTATS
 		info.n_stats = ETH_NUM_STATS;
-#endif
-#ifdef ETHTOOL_TEST
-		info.testinfo_len = ETH_NUM_TESTS;
 #endif
 		if (copy_to_user(useraddr, &info, sizeof(info)))
 			return -EFAULT;
@@ -2777,8 +2612,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	case ETHTOOL_GPAUSEPARAM: {
 		struct ethtool_pauseparam epause = { ETHTOOL_GPAUSEPARAM };
 
-		epause.autoneg = (pDevice->FlowControlCap &
-			LM_FLOW_CONTROL_AUTO_PAUSE) != 0;
+		epause.autoneg = !pDevice->DisableAutoNeg;
 		epause.rx_pause = 
 			(pDevice->FlowControlCap &
 			LM_FLOW_CONTROL_RECEIVE_PAUSE) != 0;
@@ -2955,33 +2789,16 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 
 		if (copy_from_user(&egstr, useraddr, sizeof(egstr)))
 			return -EFAULT;
-		switch(egstr.string_set) {
-#ifdef ETHTOOL_GSTATS
-		case ETH_SS_STATS:
-			egstr.len = ETH_NUM_STATS;
-			if (copy_to_user(useraddr, &egstr, sizeof(egstr)))
-				return -EFAULT;
-			if (copy_to_user(useraddr + sizeof(egstr), 
-				bcm5700_stats_str_arr,
-				sizeof(bcm5700_stats_str_arr)))
-				return -EFAULT;
-			return 0;
-#endif
-#ifdef ETHTOOL_TEST
-		case ETH_SS_TEST:
-			egstr.len = ETH_NUM_TESTS;
-			if (copy_to_user(useraddr, &egstr, sizeof(egstr)))
-				return -EFAULT;
-			if (copy_to_user(useraddr + sizeof(egstr), 
-				bcm5700_tests_str_arr,
-				sizeof(bcm5700_tests_str_arr)))
-				return -EFAULT;
-			return 0;
-#endif
-		default:
-			return -EOPNOTSUPP;
-		}
-		}
+		if (egstr.string_set != ETH_SS_STATS)
+			return -EINVAL;
+		egstr.len = ETH_NUM_STATS;
+		if (copy_to_user(useraddr, &egstr, sizeof(egstr)))
+			return -EFAULT;
+		if (copy_to_user(useraddr + sizeof(egstr), 
+			bcm5700_stats_str_arr, sizeof(bcm5700_stats_str_arr)))
+			return -EFAULT;
+		return 0;
+	}
 #endif
 #ifdef ETHTOOL_GSTATS
 	case ETHTOOL_GSTATS: {
@@ -2990,6 +2807,9 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		int i;
 		uint64_t *pStats =
 			(uint64_t *) pDevice->pStatsBlkVirt;
+
+		if (copy_to_user(useraddr, &estats, sizeof(estats)))
+			return -EFAULT;
 
 		estats.n_stats = ETH_NUM_STATS;
 		if (pStats == 0) {
@@ -3001,75 +2821,9 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 					bcm5700_stats_offset_arr[i]));
 			}
 		}
-		if (copy_to_user(useraddr, &estats, sizeof(estats))) {
-			return -EFAULT;
-		}
 		if (copy_to_user(useraddr + sizeof(estats), &stats,
-			sizeof(stats))) {
+			sizeof(stats)))
 			return -EFAULT;
-		}
-		return 0;
-	}
-#endif
-#ifdef ETHTOOL_TEST
-	case ETHTOOL_TEST: {
-		struct ethtool_test etest;
-		uint64_t tests[ETH_NUM_TESTS] = {0, 0, 0, 0, 0, 0};
-		LM_POWER_STATE old_power_level;
-
-		if (copy_from_user(&etest, useraddr, sizeof(etest)))
-			return -EFAULT;
-
-		etest.len = ETH_NUM_TESTS;
-		old_power_level = pDevice->PowerLevel;
-		if (old_power_level != LM_POWER_STATE_D0) {
-			LM_SetPowerState(pDevice, LM_POWER_STATE_D0);
-			LM_SwitchClocks(pDevice);
-		}
-		if (etest.flags & ETH_TEST_FL_OFFLINE) {
-			b57_suspend_chip(pUmDevice);
-			LM_HaltCpu(pDevice,T3_RX_CPU_ID);
-			if (!T3_ASIC_5705_OR_5750(pDevice->ChipRevId)) {
-				LM_HaltCpu(pDevice,T3_TX_CPU_ID);
-			}
-			if (b57_test_registers(pUmDevice) == 0) {
-				etest.flags |= ETH_TEST_FL_FAILED;
-				tests[0] = 1;
-			}
-			if (b57_test_memory(pUmDevice) == 0) {
-				etest.flags |= ETH_TEST_FL_FAILED;
-				tests[1] = 1;
-			}
-			if (b57_test_loopback(pUmDevice) == 0) {
-				etest.flags |= ETH_TEST_FL_FAILED;
-				tests[2] = 1;
-			}
-			b57_resume_chip(pUmDevice);
-			/* wait for link to come up for the link test */
-			MM_Sleep(pDevice, 4000);
-		}
-		if (b57_test_nvram(pUmDevice) == 0) {
-			etest.flags |= ETH_TEST_FL_FAILED;
-			tests[3] = 1;
-		}
-		if (b57_test_intr(pUmDevice) == 0) {
-			etest.flags |= ETH_TEST_FL_FAILED;
-			tests[4] = 1;
-		}
-		if (b57_test_link(pUmDevice) == 0) {
-			etest.flags |= ETH_TEST_FL_FAILED;
-			tests[5] = 1;
-		}
-		if (old_power_level != LM_POWER_STATE_D0) {
-			LM_SetPowerState(pDevice, old_power_level);
-		}
-		if (copy_to_user(useraddr, &etest, sizeof(etest))) {
-			return -EFAULT;
-		}
-		if (copy_to_user(useraddr + sizeof(etest), tests,
-			sizeof(tests))) {
-			return -EFAULT;
-		}
 		return 0;
 	}
 #endif
@@ -3207,6 +2961,8 @@ STATIC int bcm5700_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			return 0;
 		}
 		else {
+			int j;
+
 			if (!pUmDevice->opened)
 				return -EINVAL;
 
@@ -3219,11 +2975,26 @@ STATIC int bcm5700_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				return -EINTR;
 
 			case NICE_CMD_DIAG_SUSPEND:
-				b57_suspend_chip(pUmDevice);
+				bcm5700_intr_off(pUmDevice);
+				pUmDevice->suspended = 1;
+				netif_carrier_off(dev);
+				netif_stop_queue(dev);
+#ifdef BCM_TASKLET
+				tasklet_kill(&pUmDevice->tasklet);
+#endif
+#ifdef BCM_NAPI_RXPOLL
+				while (pDevice->RxPoll)
+					yield();
+#endif
+				LM_Abort(pDevice);
+				LM_ResetChip(pDevice);
 				return 0;
 
 			case NICE_CMD_DIAG_RESUME:
-				b57_resume_chip(pUmDevice);
+				if (pUmDevice->suspended) {
+					pUmDevice->suspended = 0;
+					bcm5700_reset(dev);
+				}
 				return 0;
 
 			case NICE_CMD_REG_READ:
@@ -3384,8 +3155,21 @@ STATIC int bcm5700_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				return 0;
 
 			case NICE_CMD_INTERRUPT_TEST:
+				pUmDevice->intr_test_result = 0;
+				pUmDevice->intr_test = 1;
+				REG_WR(pDevice, Grc.LocalCtrl,
+					pDevice->GrcLocalCtrl |
+					GRC_MISC_LOCAL_CTRL_SET_INT);
+				for (j = 0; j < 10; j++) {
+					if (pUmDevice->intr_test_result)
+						break;
+					REG_WR(pDevice, Grc.LocalCtrl,
+						pDevice->GrcLocalCtrl |
+						GRC_MISC_LOCAL_CTRL_SET_INT);
+					MM_Sleep(pDevice, 1);
+				}
 				nrq->nrq_intr_test_result =
-					b57_test_intr(pUmDevice);
+					pUmDevice->intr_test_result;
 				return 0;
 
 			case NICE_CMD_KMALLOC_PHYS: {

@@ -110,8 +110,6 @@ struct ethtool_eeprom {
 #define BCM_WOL 1
 #define BCM_TASKLET 1
 
-#define INCLUDE_5750_A0_FIX 1
-
 #if HAVE_NETIF_RECEIVE_SKB
 #define BCM_NAPI_RXPOLL 1
 #undef BCM_TASKLET
@@ -124,7 +122,6 @@ struct ethtool_eeprom {
 #undef ETHTOOL_GREGS
 #undef ETHTOOL_GPAUSEPARAM
 #undef ETHTOOL_GRXCSUM
-#undef ETHTOOL_TEST
 #undef BCM_INT_COAL
 #undef BCM_NIC_SEND_BD
 #undef BCM_WOL
@@ -340,9 +337,9 @@ typedef struct _UM_DEVICE_BLOCK {
 #ifdef NICE_SUPPORT
 	void (*nice_rx)( struct sk_buff*, void* );
 	void* nice_ctx;
-#endif /* NICE_SUPPORT */
 	int intr_test;
 	int intr_test_result;
+#endif /* NICE_SUPPORT */
 #ifdef NETIF_F_HW_VLAN_TX
 	struct vlan_group *vlgrp;
 #endif

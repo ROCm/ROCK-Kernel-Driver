@@ -22,10 +22,6 @@ LM_UINT32 LM_GetStkOffLdFirmwareSize(PLM_DEVICE_BLOCK pDevice)
 {
   LM_UINT32 FwSize;
 
-  if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-  {
-      return 0;
-  }
   if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) 
     {
       FwSize =  (LM_UINT32)(t3StkOffLd05FwTextLen + 
@@ -51,10 +47,6 @@ LM_STATUS LM_LoadStkOffLdFirmware(PLM_DEVICE_BLOCK pDevice)
   T3_FWIMG_INFO FwImgInfo;
   LM_UINT32 Cpu;
 
-  if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5750)
-  {
-      return LM_STATUS_SUCCESS;
-  }
   if (T3_ASIC_REV(pDevice->ChipRevId) == T3_ASIC_REV_5705) 
     {
       FwImgInfo.StartAddress = t3StkOffLd05FwStartAddr;

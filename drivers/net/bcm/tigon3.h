@@ -107,9 +107,7 @@
 
 #define T3_DRV_STATE_MAILBOX                0x0c04
 #define T3_DRV_STATE_START                  0x01
-#define T3_DRV_STATE_START_DONE             0x80000001
 #define T3_DRV_STATE_UNLOAD                 0x02
-#define T3_DRV_STATE_UNLOAD_DONE            0x80000002
 #define T3_DRV_STATE_WOL                    0x03
 #define T3_DRV_STATE_SUSPEND                0x04
 
@@ -367,8 +365,6 @@ typedef struct T3_FWIMG_INFO
 #define T3_CHIP_ID_5705_A2                  0x3002
 #define T3_CHIP_ID_5705_A3                  0x3003
 
-#define T3_CHIP_ID_5750_A0                  0x4000
-
 /* Chip Id. */
 #define T3_ASIC_REV(_ChipRevId)             ((_ChipRevId) >> 12)
 #define T3_ASIC_REV_5700                    0x07
@@ -376,11 +372,6 @@ typedef struct T3_FWIMG_INFO
 #define T3_ASIC_REV_5703                    0x01
 #define T3_ASIC_REV_5704                    0x02
 #define T3_ASIC_REV_5705                    0x03
-#define T3_ASIC_REV_5750                    0x04
-
-#define T3_ASIC_5705_OR_5750(_ChipRevId)              \
-    ((T3_ASIC_REV(_ChipRevId) == T3_ASIC_REV_5705) || \
-    (T3_ASIC_REV(_ChipRevId) == T3_ASIC_REV_5750))
 
 /* Chip id and revision. */
 #define T3_CHIP_REV(_ChipRevId)             ((_ChipRevId) >> 8)
@@ -434,8 +425,6 @@ typedef struct T3_FWIMG_INFO
 #define T3_PM_PME_ENABLE                    BIT_8
 #define T3_PM_PME_ASSERTED                  BIT_15
 
-#define T3_MSI_CAPABILITY_ID_REG            0x58
-#define T3_MSI_NEXT_CAPABILITY_PTR          0x59
 
 /* PCI state register. */
 #define T3_PCI_STATE_REG                    0x70
@@ -496,10 +485,6 @@ typedef struct T3_FWIMG_INFO
 #define T3_SSID_COMPAQ_NC7780                       0x0085
 #define T3_SSID_COMPAQ_NC7780_2                     0x0099
 
-#define T3_PCIE_CAPABILITY_ID_REG           0xD0
-#define T3_PCIE_CAPABILITY_ID               0x10
-
-#define T3_PCIE_CAPABILITY_REG              0xD2
 
 /******************************************************************************/
 /* MII registers. */
@@ -580,7 +565,6 @@ typedef struct T3_FWIMG_INFO
 #define PHY_BCM5703_PHY_ID                          0x60008160
 #define PHY_BCM5704_PHY_ID                          0x60008190
 #define PHY_BCM5705_PHY_ID                          0x600081a0
-#define PHY_BCM5750_PHY_ID                          0x60008180
 #define PHY_BCM8002_PHY_ID                          0x60010140
 
 #define PHY_BCM5401_B0_REV                          0x1
@@ -601,7 +585,6 @@ typedef struct T3_FWIMG_INFO
                             (((x) & PHY_ID_MASK) != PHY_BCM5703_PHY_ID) && \
                             (((x) & PHY_ID_MASK) != PHY_BCM5704_PHY_ID) && \
                             (((x) & PHY_ID_MASK) != PHY_BCM5705_PHY_ID) && \
-                            (((x) & PHY_ID_MASK) != PHY_BCM5750_PHY_ID) && \
                             (((x) & PHY_ID_MASK) != PHY_BCM8002_PHY_ID))
 
 
@@ -2662,12 +2645,8 @@ typedef struct
     #define SW_ARB_REQ2                                 BIT_14
     #define SW_ARB_REQ3                                 BIT_15
 
-    T3_32BIT_REGISTER NvmAccess;
-    #define ACCESS_EN                                   BIT_0
-    #define ACCESS_WR_EN                                BIT_1
-
     /* Unused space. */
-    LM_UINT8 Unused[984];
+    LM_UINT8 Unused[988];
 } T3_NVRAM, *PT3_NVRAM;
 
 
@@ -2915,14 +2894,14 @@ typedef struct _LM_PACKET {
 
 #if INCLUDE_TCP_SEG_SUPPORT
             LM_UINT32 MaxSegmentSize;
+            LM_UINT32 LastFragmentChksum;
 #endif
         } Tx;
 
         /* Receive info. */
         struct {
             /* This descriptor belongs to either Std, Mini, or Jumbo ring. */
-            LM_UINT16 RcvProdRing;
-            LM_UINT16 RcvRingProdIdx;
+            T3_RCV_PROD_RING RcvProdRing;
 
             /* Receive buffer size */
             LM_UINT32 RxBufferSize;
@@ -2973,11 +2952,6 @@ typedef struct _LM_DEVICE_BLOCK {
     LM_RX_PACKET_Q RxPacketFreeQ;
     LM_RX_PACKET_Q RxPacketReceivedQ;
 
-    LM_PACKET *RxStdRing[T3_STD_RCV_RCB_ENTRY_COUNT];
-#if T3_JUMBO_RCV_RCB_ENTRY_COUNT
-    LM_PACKET *RxJumboRing[T3_JUMBO_RCV_RCB_ENTRY_COUNT];
-#endif
-
     /* Receive info. */
     PT3_RCV_BD pRcvRetBdVirt;
     LM_PHYSICAL_ADDRESS RcvRetBdPhy;
@@ -3023,6 +2997,7 @@ typedef struct _LM_DEVICE_BLOCK {
 
     /* Tx info. */
     LM_TX_PACKET_Q TxPacketFreeQ;
+    LM_TX_PACKET_Q TxPacketActiveQ;
     LM_TX_PACKET_Q TxPacketXmittedQ;
 
     /* Pointers to SendBd. */
@@ -3037,7 +3012,6 @@ typedef struct _LM_DEVICE_BLOCK {
     MM_ATOMIC_T SendBdLeft;
 
     T3_SND_BD ShadowSendBd[T3_SEND_RCB_ENTRY_COUNT];
-    LM_PACKET *SendRing[T3_SEND_RCB_ENTRY_COUNT];
 
     /* Counters. */
     LM_RX_COUNTERS RxCounters;
@@ -3126,7 +3100,6 @@ typedef struct _LM_DEVICE_BLOCK {
 #if PCIX_TARGET_WORKAROUND
     LM_UINT32 EnablePciXFix;
 #endif
-    LM_UINT32 PciExpress;
     LM_UINT32 Tx4GWorkaround;
     LM_UINT32 UndiFix;
     LM_UINT32 FlushPostedWrites;
@@ -3221,10 +3194,7 @@ typedef struct _LM_DEVICE_BLOCK {
     /* Use NIC or Host based send BD. */
     LM_UINT32 NicSendBd;
 
-    LM_UINT32 AsfFlags;
-
-#define ASF_ENABLED         1
-#define ASF_NEW_HANDSHAKE   2 /* if set, this bit implies ASF enabled as well */
+    LM_UINT32 EnableAsf;
 
     /* Athlon fix. */
     LM_UINT32 DelayPciGrant;
@@ -3488,8 +3458,6 @@ LM_STATUS LM_LoadFirmware(PLM_DEVICE_BLOCK pDevice,
 /* MAC register access. */
 LM_UINT32 LM_RegRd(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Register);
 
-LM_VOID LM_RegRdBack(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Register);
-
 LM_VOID LM_RegWr(PLM_DEVICE_BLOCK pDevice, LM_UINT32 Register,
     LM_UINT32 Value32, LM_UINT32 ReadBack);
 
@@ -3516,9 +3484,6 @@ LM_VOID LM_MemWrInd(PLM_DEVICE_BLOCK pDevice, LM_UINT32 MemAddr,
 
 #define REG_RD(pDevice, OffsetName)                                         \
     LM_RegRd(pDevice, OFFSETOF(T3_STD_MEM_MAP, OffsetName))
-
-#define REG_RD_BACK(pDevice, OffsetName)                                    \
-    LM_RegRdBack(pDevice, OFFSETOF(T3_STD_MEM_MAP, OffsetName))
 
 #define REG_WR(pDevice, OffsetName, Value32)                                \
     LM_RegWr(pDevice, OFFSETOF(T3_STD_MEM_MAP, OffsetName), Value32, TRUE)
