@@ -1339,6 +1339,8 @@ int __init fec_enet_init(void)
 	fip = fcc_ports;
 
 	while (np-- > 0) {
+		/* Create an Ethernet device instance.
+		*/
 		dev = alloc_etherdev(sizeof(*cep));
 		if (!dev)
 			return -ENOMEM;
@@ -1346,11 +1348,6 @@ int __init fec_enet_init(void)
 		cep = dev->priv;
 		spin_lock_init(&cep->lock);
 		cep->fip = fip;
-
-		/* Create an Ethernet device instance.
-		*/
-		dev = init_etherdev(0, 0);
-		dev->priv = cep;
 
 		init_fcc_shutdown(fip, cep, immap);
 		init_fcc_ioports(fip, io, immap);
