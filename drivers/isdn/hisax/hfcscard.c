@@ -133,6 +133,50 @@ static struct card_ops hfcs_ops = {
 	.irq_func = hfcs_interrupt,
 };
 
+static int __init
+hfcs_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->irq = card->para[0];
+	cs->hw.hfcD.addr = card->para[1];
+
+	if (!request_io(&cs->rs, cs->hw.hfcD.addr, 2, "HFCS isdn"))
+		goto err;
+
+	printk(KERN_INFO "HFCS: defined at 0x%x IRQ %d\n",
+	       cs->hw.hfcD.addr, cs->irq);
+
+	cs->hw.hfcD.cip = 0;
+	cs->hw.hfcD.int_s1 = 0;
+	cs->hw.hfcD.send = NULL;
+	cs->bcs[0].hw.hfc.send = NULL;
+	cs->bcs[1].hw.hfc.send = NULL;
+	cs->hw.hfcD.dfifosize = 512;
+	cs->dc.hfcd.ph_state = 0;
+	cs->hw.hfcD.fifo = 255;
+
+	if (cs->typ == ISDN_CTYPE_TELES3C) {
+		cs->hw.hfcD.bfifosize = 1024 + 512;
+		/* Teles 16.3c IO ADR is 0x200 | YY0U (YY Bit 15/14 address) */
+		outb(0x00, cs->hw.hfcD.addr);
+		outb(0x56, cs->hw.hfcD.addr | 1);
+	} else if (cs->typ == ISDN_CTYPE_ACERP10) {
+		cs->hw.hfcD.bfifosize = 7*1024 + 512;
+		/* Acer P10 IO ADR is 0x300 */
+		outb(0x00, cs->hw.hfcD.addr);
+		outb(0x57, cs->hw.hfcD.addr | 1);
+	}
+	set_cs_func(cs);
+	init_timer(&cs->hw.hfcD.timer);
+	cs->hw.hfcD.timer.function = (void *) hfcs_Timer;
+	cs->hw.hfcD.timer.data = (long) cs;
+	hfcs_reset(cs);
+	cs->card_ops = &hfcs_ops;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
 #ifdef __ISAPNP__
 static struct isapnp_device_id hfc_ids[] __initdata = {
 	{ ISAPNP_VENDOR('A', 'N', 'X'), ISAPNP_FUNCTION(0x1114),
@@ -166,7 +210,6 @@ static struct pnp_card *pnp_c __devinitdata = NULL;
 int __init
 setup_hfcs(struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
 	strcpy(tmp, hfcs_revision);
@@ -220,42 +263,8 @@ setup_hfcs(struct IsdnCard *card)
 		}
 	}
 #endif
-	cs->hw.hfcD.addr = card->para[1] & 0xfffe;
-	cs->irq = card->para[0];
-	cs->hw.hfcD.cip = 0;
-	cs->hw.hfcD.int_s1 = 0;
-	cs->hw.hfcD.send = NULL;
-	cs->bcs[0].hw.hfc.send = NULL;
-	cs->bcs[1].hw.hfc.send = NULL;
-	cs->hw.hfcD.dfifosize = 512;
-	cs->dc.hfcd.ph_state = 0;
-	cs->hw.hfcD.fifo = 255;
-	if (cs->typ == ISDN_CTYPE_TELES3C) {
-		cs->hw.hfcD.bfifosize = 1024 + 512;
-	} else if (cs->typ == ISDN_CTYPE_ACERP10) {
-		cs->hw.hfcD.bfifosize = 7*1024 + 512;
-	} else
-		return (0);
-	if (!request_io(&cs->rs, cs->hw.hfcD.addr, 2, "HFCS isdn"))
+	if (hfcs_probe(card->cs, card) < 0)
 		return 0;
-	printk(KERN_INFO
-	       "HFCS: defined at 0x%x IRQ %d HZ %d\n",
-	       cs->hw.hfcD.addr,
-	       cs->irq, HZ);
-	if (cs->typ == ISDN_CTYPE_TELES3C) {
-		/* Teles 16.3c IO ADR is 0x200 | YY0U (YY Bit 15/14 address) */
-		outb(0x00, cs->hw.hfcD.addr);
-		outb(0x56, cs->hw.hfcD.addr | 1);
-	} else if (cs->typ == ISDN_CTYPE_ACERP10) {
-		/* Acer P10 IO ADR is 0x300 */
-		outb(0x00, cs->hw.hfcD.addr);
-		outb(0x57, cs->hw.hfcD.addr | 1);
-	}
-	set_cs_func(cs);
-	cs->hw.hfcD.timer.function = (void *) hfcs_Timer;
-	cs->hw.hfcD.timer.data = (long) cs;
-	init_timer(&cs->hw.hfcD.timer);
-	hfcs_reset(cs);
-	cs->card_ops = &hfcs_ops;
-	return (1);
+	return 1;
+	
 }

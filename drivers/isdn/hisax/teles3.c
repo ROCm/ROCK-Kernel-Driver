@@ -176,6 +176,152 @@ static struct card_ops teles3_ops = {
 	.irq_func = hscxisac_irq,
 };
 
+static int
+teles_hw_init(struct IsdnCardState *cs)
+{
+	
+	printk(KERN_INFO "HiSax: %s config irq:%d isac:0x%X  cfg:0x%X\n",
+	       CardType[cs->typ], cs->irq,
+	       cs->hw.teles3.isac + 32, cs->hw.teles3.cfg_reg);
+	printk(KERN_INFO "HiSax: hscx A:0x%X  hscx B:0x%X\n",
+	       cs->hw.teles3.hscx[0] + 32, cs->hw.teles3.hscx[1] + 32);
+
+	if (teles3_reset(cs)) {
+		printk(KERN_WARNING "Teles3: wrong IRQ\n");
+		return -EBUSY;
+	}
+	cs->card_ops = &teles3_ops;
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+		return -EBUSY;
+	return 0;
+}
+
+static void __init
+teles_setup_io(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->irq = card->para[0];
+	cs->hw.teles3.isacfifo = cs->hw.teles3.isac + 0x3e;
+	cs->hw.teles3.hscxfifo[0] = cs->hw.teles3.hscx[0] + 0x3e;
+	cs->hw.teles3.hscxfifo[1] = cs->hw.teles3.hscx[1] + 0x3e;
+}
+
+static int __init
+telespcmcia_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->hw.teles3.cfg_reg = 0;
+	cs->hw.teles3.hscx[0] = card->para[1] - 0x20;
+	cs->hw.teles3.hscx[1] = card->para[1];
+	cs->hw.teles3.isac = card->para[1] + 0x20;
+	teles_setup_io(cs, card);
+	if (!request_io(&cs->rs, cs->hw.teles3.hscx[1], 96, 
+			"HiSax Teles PCMCIA"))
+		goto err;
+	if (teles_hw_init(cs) < 0)
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+teles_request_io(struct IsdnCardState *cs)
+{
+	if (!request_io(&cs->rs, cs->hw.teles3.isac + 32, 32, "HiSax isac"))
+		return -EBUSY;
+	if (!request_io(&cs->rs, cs->hw.teles3.hscx[0]+32, 32, "HiSax hscx A"))
+		return -EBUSY;
+	if (!request_io(&cs->rs, cs->hw.teles3.hscx[1]+32, 32, "HiSax hscx B"))
+		return -EBUSY;
+	return 0;
+}
+
+static int __init
+teles16_3_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	u8 val;
+
+	cs->hw.teles3.cfg_reg = card->para[1];
+	switch (cs->hw.teles3.cfg_reg) {
+	case 0x180:
+	case 0x280:
+	case 0x380:
+		cs->hw.teles3.cfg_reg |= 0xc00;
+		break;
+	}
+	cs->hw.teles3.isac = cs->hw.teles3.cfg_reg - 0x420;
+	cs->hw.teles3.hscx[0] = cs->hw.teles3.cfg_reg - 0xc20;
+	cs->hw.teles3.hscx[1] = cs->hw.teles3.cfg_reg - 0x820;
+	teles_setup_io(cs, card);
+	if (!request_io(&cs->rs, cs->hw.teles3.cfg_reg, 8, "teles3 cfg"))
+		goto err;
+	if (teles_request_io(cs) < 0)
+		goto err;
+	if ((val = bytein(cs->hw.teles3.cfg_reg + 0)) != 0x51) {
+		printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
+		       cs->hw.teles3.cfg_reg + 0, val);
+		goto err;
+	}
+	if ((val = bytein(cs->hw.teles3.cfg_reg + 1)) != 0x93) {
+		printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
+		       cs->hw.teles3.cfg_reg + 1, val);
+		goto err;
+	}
+	/* 0x1e without AB, 0x1f with AB,  0x1c 16.3 ???, 
+	 * 0x39 16.3 1.1,   0x38 16.3 1.3, 0x46 16.3 with AB + Video */
+	val = bytein(cs->hw.teles3.cfg_reg + 2);
+	if (val != 0x46 && val != 0x39 && val != 0x38 && 
+	    val != 0x1c && val != 0x1e && val != 0x1f) {
+		printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
+		       cs->hw.teles3.cfg_reg + 2, val);
+		goto err;
+	}
+	if (teles_hw_init(cs) < 0)
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+compaq_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->hw.teles3.cfg_reg = card->para[3];
+	cs->hw.teles3.isac = card->para[2] - 32;
+	cs->hw.teles3.hscx[0] = card->para[1] - 32;
+	cs->hw.teles3.hscx[1] = card->para[1];
+	teles_setup_io(cs, card);
+	if (!request_io(&cs->rs, cs->hw.teles3.cfg_reg, 1, "teles3 cfg"))
+		goto err;
+	if (teles_request_io(cs) < 0)
+		goto err;
+	if (teles_hw_init(cs) < 0)
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+telespnp_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->hw.teles3.cfg_reg = 0;
+	cs->hw.teles3.isac = card->para[1] - 32;
+	cs->hw.teles3.hscx[0] = card->para[2] - 32;
+	cs->hw.teles3.hscx[1] = card->para[2];
+	teles_setup_io(cs, card);
+	if (teles_request_io(cs) < 0)
+		goto err;
+	if (teles_hw_init(cs) < 0)
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
 #ifdef __ISAPNP__
 static struct isapnp_device_id teles_ids[] __initdata = {
 	{ ISAPNP_VENDOR('T', 'A', 'G'), ISAPNP_FUNCTION(0x2110),
@@ -197,16 +343,10 @@ static struct pnp_card *pnp_c __devinitdata = NULL;
 int __devinit
 setup_teles3(struct IsdnCard *card)
 {
-	u8 val;
-	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
 	strcpy(tmp, teles3_revision);
 	printk(KERN_INFO "HiSax: Teles IO driver Rev. %s\n", HiSax_getrev(tmp));
-	if ((cs->typ != ISDN_CTYPE_16_3) && (cs->typ != ISDN_CTYPE_PNP)
-	    && (cs->typ != ISDN_CTYPE_TELESPCMCIA) && (cs->typ != ISDN_CTYPE_COMPAQ_ISA))
-		return (0);
-
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
 		struct pnp_card *pnp_card;
@@ -258,100 +398,18 @@ setup_teles3(struct IsdnCard *card)
 		}
 	}
 #endif
-	if (cs->typ == ISDN_CTYPE_16_3) {
-		cs->hw.teles3.cfg_reg = card->para[1];
-		switch (cs->hw.teles3.cfg_reg) {
-			case 0x180:
-			case 0x280:
-			case 0x380:
-				cs->hw.teles3.cfg_reg |= 0xc00;
-				break;
-		}
-		cs->hw.teles3.isac = cs->hw.teles3.cfg_reg - 0x420;
-		cs->hw.teles3.hscx[0] = cs->hw.teles3.cfg_reg - 0xc20;
-		cs->hw.teles3.hscx[1] = cs->hw.teles3.cfg_reg - 0x820;
-	} else if (cs->typ == ISDN_CTYPE_TELESPCMCIA) {
-		cs->hw.teles3.cfg_reg = 0;
-		cs->hw.teles3.hscx[0] = card->para[1] - 0x20;
-		cs->hw.teles3.hscx[1] = card->para[1];
-		cs->hw.teles3.isac = card->para[1] + 0x20;
-	} else if (cs->typ == ISDN_CTYPE_COMPAQ_ISA) {
-		cs->hw.teles3.cfg_reg = card->para[3];
-		cs->hw.teles3.isac = card->para[2] - 32;
-		cs->hw.teles3.hscx[0] = card->para[1] - 32;
-		cs->hw.teles3.hscx[1] = card->para[1];
+	if (card->cs->typ == ISDN_CTYPE_16_3) {
+		if (teles16_3_probe(card->cs, card) < 0)
+			return 0;
+	} else if (card->cs->typ == ISDN_CTYPE_TELESPCMCIA) {
+		if (telespcmcia_probe(card->cs, card) < 0)
+			return 0;
+	} else if (card->cs->typ == ISDN_CTYPE_COMPAQ_ISA) {
+		if (compaq_probe(card->cs, card) < 0)
+			return 0;
 	} else {	/* PNP */
-		cs->hw.teles3.cfg_reg = 0;
-		cs->hw.teles3.isac = card->para[1] - 32;
-		cs->hw.teles3.hscx[0] = card->para[2] - 32;
-		cs->hw.teles3.hscx[1] = card->para[2];
+		if (telespnp_probe(card->cs, card) < 0)
+			return 0;
 	}
-	cs->irq = card->para[0];
-	cs->hw.teles3.isacfifo = cs->hw.teles3.isac + 0x3e;
-	cs->hw.teles3.hscxfifo[0] = cs->hw.teles3.hscx[0] + 0x3e;
-	cs->hw.teles3.hscxfifo[1] = cs->hw.teles3.hscx[1] + 0x3e;
-	if (cs->typ == ISDN_CTYPE_TELESPCMCIA) {
-		if (!request_io(&cs->rs, cs->hw.teles3.hscx[1], 96, "HiSax Teles PCMCIA"))
-			goto err;
-	} else {
-		if (cs->hw.teles3.cfg_reg) {
-			if (cs->typ == ISDN_CTYPE_COMPAQ_ISA) {
-				if (!request_io(&cs->rs, cs->hw.teles3.cfg_reg, 1, "teles3 cfg"))
-					goto err;
-			} else {
-				if (!request_io(&cs->rs, cs->hw.teles3.cfg_reg, 8, "teles3 cfg"))
-					goto err;
-			}
-		}
-		if (!request_io(&cs->rs, cs->hw.teles3.isac + 32, 32, "HiSax isac"))
-			goto err;
-		if (!request_io(&cs->rs, cs->hw.teles3.hscx[0] + 32, 32, "HiSax hscx A"))
-			goto err;
-		if (!request_io(&cs->rs, cs->hw.teles3.hscx[1] + 32, 32, "HiSax hscx B"))
-			goto err;
-	}
-	if ((cs->hw.teles3.cfg_reg) && (cs->typ != ISDN_CTYPE_COMPAQ_ISA)) {
-		if ((val = bytein(cs->hw.teles3.cfg_reg + 0)) != 0x51) {
-			printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
-			       cs->hw.teles3.cfg_reg + 0, val);
-			goto err;
-		}
-		if ((val = bytein(cs->hw.teles3.cfg_reg + 1)) != 0x93) {
-			printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
-			       cs->hw.teles3.cfg_reg + 1, val);
-			goto err;
-		}
-		val = bytein(cs->hw.teles3.cfg_reg + 2);/* 0x1e=without AB
-							 * 0x1f=with AB
-							 * 0x1c 16.3 ???
-							 * 0x39 16.3 1.1
-							 * 0x38 16.3 1.3
-							 * 0x46 16.3 with AB + Video (Teles-Vision)
-							 */
-		if (val != 0x46 && val != 0x39 && val != 0x38 && val != 0x1c && val != 0x1e && val != 0x1f) {
-			printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
-			       cs->hw.teles3.cfg_reg + 2, val);
-			goto err;
-		}
-	}
-	printk(KERN_INFO
-	       "HiSax: %s config irq:%d isac:0x%X  cfg:0x%X\n",
-	       CardType[cs->typ], cs->irq,
-	       cs->hw.teles3.isac + 32, cs->hw.teles3.cfg_reg);
-	printk(KERN_INFO
-	       "HiSax: hscx A:0x%X  hscx B:0x%X\n",
-	       cs->hw.teles3.hscx[0] + 32, cs->hw.teles3.hscx[1] + 32);
-
-	if (teles3_reset(cs)) {
-		printk(KERN_WARNING "Teles3: wrong IRQ\n");
-		goto err;
-	}
-	cs->card_ops = &teles3_ops;
-	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
-		goto err;
 	return 1;
- err:
-	hisax_release_resources(cs);
-	return 0;
-
 }

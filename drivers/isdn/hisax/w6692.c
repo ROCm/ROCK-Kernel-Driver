@@ -669,11 +669,11 @@ static int id_idx ;
 static struct pci_dev *dev_w6692 __initdata = NULL;
 
 static int
-w6692_setup(struct IsdnCardState *cs, struct dc_hw_ops *dc_ops,
-	    struct bc_hw_ops *bc_ops)
+w6692_hw_init(struct IsdnCardState *cs)
 {
-	cs->dc_hw_ops = dc_ops;
-	cs->bc_hw_ops = bc_ops;
+	cs->card_ops = &w6692_ops;
+	cs->dc_hw_ops = &w6692_dc_hw_ops, 
+	cs->bc_hw_ops = &w6692_bc_hw_ops;
 	dc_l1_init(cs, &w6692_dc_l1_ops);
 	cs->bc_l1_ops = &w6692_bc_l1_ops;
 	W6692Version(cs, "W6692:");
@@ -685,14 +685,45 @@ w6692_setup(struct IsdnCardState *cs, struct dc_hw_ops *dc_ops,
 	return 0;
 }
 
+static int __init
+w6692_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
+{
+	int rc;
+
+	printk(KERN_INFO "W6692: %s %s at %#lx IRQ %d\n",
+	       id_list[cs->subtyp].vendor_name, id_list[cs->subtyp].card_name,
+	       pci_resource_start(pdev, 1), pdev->irq);
+	
+	rc = -EBUSY;
+	if (pci_enable_device(pdev))
+		goto err;
+			
+	/* USR ISDN PCI card TA need some special handling */
+	if (cs->subtyp == W6692_WINBOND) {
+		if (pdev->subsystem_vendor == W6692_SV_USR  &&
+		    pdev->subsystem_device == W6692_SD_USR) {
+			cs->subtyp = W6692_USR;
+		}
+	}
+	cs->irq = pdev->irq;
+	cs->irq_flags |= SA_SHIRQ;
+	cs->hw.w6692.iobase = pci_resource_start(pdev, 1);
+	
+	if (!request_io(&cs->rs, cs->hw.w6692.iobase, 0x100,
+			id_list[cs->subtyp].card_name))
+		goto err;
+
+	w6692_hw_init(cs);
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return rc;
+}
+
 int __init 
 setup_w6692(struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	u8 found = 0;
-	u8 pci_irq = 0;
-	u_int pci_ioaddr = 0;
 
 #ifdef __BIG_ENDIAN
 #error "not running on big endian machines now"
@@ -704,54 +735,13 @@ setup_w6692(struct IsdnCard *card)
 					    id_list[id_idx].device_id,
 					    dev_w6692);
 		if (dev_w6692) {
-			if (pci_enable_device(dev_w6692))
-				continue;
-			cs->subtyp = id_idx;
-			break;
+			card->cs->subtyp = id_idx;
+			if (w6692_probe(card->cs, dev_w6692) < 0)
+				return 0;
+			return 1;
 		}
 		id_idx++;
 	}
-	if (dev_w6692) {
-		found = 1;
-		pci_irq = dev_w6692->irq;
-		/* I think address 0 is allways the configuration area */
-		/* and address 1 is the real IO space KKe 03.09.99 */
-		pci_ioaddr = pci_resource_start(dev_w6692, 1);
-		/* USR ISDN PCI card TA need some special handling */
-		if (cs->subtyp == W6692_WINBOND) {
-			if ((W6692_SV_USR == dev_w6692->subsystem_vendor) &&
-			    (W6692_SD_USR == dev_w6692->subsystem_device)) {
-				cs->subtyp = W6692_USR;
-			}
-		}
-	}
-	if (!found) {
-		printk(KERN_WARNING "W6692: No PCI card found\n");
-		return (0);
-	}
-	cs->irq = pci_irq;
-	if (!cs->irq) {
-		printk(KERN_WARNING "W6692: No IRQ for PCI card found\n");
-		return (0);
-	}
-	if (!pci_ioaddr) {
-		printk(KERN_WARNING "W6692: NO I/O Base Address found\n");
-		return (0);
-	}
-	cs->hw.w6692.iobase = pci_ioaddr;
-	printk(KERN_INFO "Found: %s %s, I/O base: 0x%x, irq: %d\n",
-	       id_list[cs->subtyp].vendor_name, id_list[cs->subtyp].card_name,
-	       pci_ioaddr, pci_irq);
-	if (!request_io(&cs->rs, cs->hw.w6692.iobase, 0x100, id_list[cs->subtyp].card_name))
-		return 0;
-	
-	printk(KERN_INFO
-	       "HiSax: %s config irq:%d I/O:%x\n",
-	       id_list[cs->subtyp].card_name, cs->irq,
-	       cs->hw.w6692.iobase);
-
-	cs->card_ops = &w6692_ops;
-	w6692_setup(cs, &w6692_dc_hw_ops, &w6692_bc_hw_ops);
-	cs->irq_flags |= SA_SHIRQ;
-	return (1);
+	printk(KERN_WARNING "W6692: No PCI card found\n");
+	return 0;
 }
