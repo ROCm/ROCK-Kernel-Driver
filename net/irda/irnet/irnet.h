@@ -225,6 +225,10 @@
  *
  * v13 - 30.5.02 - Jean II
  *	o Update module init code
+ *
+ * v14 - 20.2.03 - Jean II
+ *	o Add discovery hint bits in the control channel.
+ *	o Remove obsolete MOD_INC/DEC_USE_COUNT in favor of .owner
  */
 
 /***************************** INCLUDES *****************************/
@@ -476,6 +480,7 @@ typedef struct irnet_log
   __u32		saddr;
   __u32		daddr;
   char		name[NICKNAME_MAX_LEN + 1];	/* 21 + 1 */
+  __u16_host_order hints;			/* Discovery hint bits */
 } irnet_log;
 
 /*

@@ -1511,6 +1511,8 @@ static struct device_driver i82365_driver = {
 	.name = "i82365",
 	.bus = &platform_bus_type,
 	.devclass = &pcmcia_socket_class,
+	.suspend = pcmcia_socket_dev_suspend,
+	.resume = pcmcia_socket_dev_resume,
 };
 
 static struct platform_device i82365_device = {

@@ -230,8 +230,10 @@ static void schedule_next_timer(struct k_itimer *timr)
 		return;
 	}
 	posix_get_now(&now);
-	while (posix_time_before(&timr->it_timer, &now))
+	do {
 		posix_bump_timer(timr);
+	}while (posix_time_before(&timr->it_timer, &now));
+
 	timr->it_overrun_last = timr->it_overrun;
 	timr->it_overrun = -1;
 	timr->it_requeue_pending = 0;
@@ -587,7 +589,6 @@ static struct k_itimer * lock_timer(timer_t timer_id, unsigned long *flags)
 void inline
 do_timer_gettime(struct k_itimer *timr, struct itimerspec *cur_setting)
 {
-	long sub_expires;
 	unsigned long expires;
 	struct now_struct now;
 
@@ -607,7 +608,7 @@ do_timer_gettime(struct k_itimer *timr, struct itimerspec *cur_setting)
 				posix_bump_timer(timr);
 		else
 			if (!timer_pending(&timr->it_timer))
-				sub_expires = expires = 0;
+				expires = 0;
 		if (expires)
 			expires -= now.jiffies;
 	}

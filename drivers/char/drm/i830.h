@@ -45,22 +45,37 @@
 
 #define DRIVER_NAME		"i830"
 #define DRIVER_DESC		"Intel 830M"
-#define DRIVER_DATE		"20020828"
+#define DRIVER_DATE		"20021108"
 
+/* Interface history:
+ *
+ * 1.1: Original.
+ * 1.2: ?
+ * 1.3: New irq emit/wait ioctls.
+ *      New pageflip ioctl.
+ *      New getparam ioctl.
+ *      State for texunits 3&4 in sarea.
+ *      New (alternative) layout for texture state.
+ */
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		2
-#define DRIVER_PATCHLEVEL	1
+#define DRIVER_MINOR		3
+#define DRIVER_PATCHLEVEL	2
 
 #define DRIVER_IOCTLS							    \
 	[DRM_IOCTL_NR(DRM_IOCTL_I830_INIT)]   = { i830_dma_init,    1, 1 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_VERTEX)] = { i830_dma_vertex,  1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_CLEAR)]  = { i830_clear_bufs,  1, 0 }, \
-      	[DRM_IOCTL_NR(DRM_IOCTL_I830_FLUSH)]  = { i830_flush_ioctl, 1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_GETAGE)] = { i830_getage,      1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_VERTEX)] = { i830_dma_vertex,  1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_CLEAR)]  = { i830_clear_bufs,  1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_FLUSH)]  = { i830_flush_ioctl, 1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_GETAGE)] = { i830_getage,      1, 0 }, \
 	[DRM_IOCTL_NR(DRM_IOCTL_I830_GETBUF)] = { i830_getbuf,      1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_SWAP)]   = { i830_swap_bufs,   1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_COPY)]   = { i830_copybuf,     1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_DOCOPY)] = { i830_docopy,      1, 0 },
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_SWAP)]   = { i830_swap_bufs,   1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_COPY)]   = { i830_copybuf,     1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_DOCOPY)] = { i830_docopy,      1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_FLIP)]   = { i830_flip_bufs,   1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_IRQ_EMIT)] = { i830_irq_emit,  1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_IRQ_WAIT)] = { i830_irq_wait,  1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_GETPARAM)] = { i830_getparam,  1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I830_SETPARAM)] = { i830_setparam,  1, 0 } 
 
 #define __HAVE_COUNTERS         4
 #define __HAVE_COUNTER6         _DRM_STAT_IRQ
@@ -72,7 +87,7 @@
  */
 #define __HAVE_RELEASE		1
 #define DRIVER_RELEASE() do {						\
-	i830_reclaim_buffers( dev, priv->pid );				\
+	i830_reclaim_buffers( filp );				\
 } while (0)
 
 /* DMA customization:
@@ -87,10 +102,49 @@
 	i830_dma_quiescent( dev );					\
 } while (0)
 
-/* Don't need an irq any more.  The template code will make sure that
- * a noop stub is generated for compatibility.
+
+/* Driver will work either way: IRQ's save cpu time when waiting for
+ * the card, but are subject to subtle interactions between bios,
+ * hardware and the driver.
  */
-#define __HAVE_DMA_IRQ		0
+#define USE_IRQS 0
+
+
+#if USE_IRQS
+#define __HAVE_DMA_IRQ		1
+#define __HAVE_SHARED_IRQ	1
+
+#define DRIVER_PREINSTALL() do {			\
+	drm_i830_private_t *dev_priv =			\
+		(drm_i830_private_t *)dev->dev_private;	\
+							\
+   	I830_WRITE16( I830REG_HWSTAM, 0xffff );	\
+        I830_WRITE16( I830REG_INT_MASK_R, 0x0 );	\
+      	I830_WRITE16( I830REG_INT_ENABLE_R, 0x0 );	\
+} while (0)
+
+
+#define DRIVER_POSTINSTALL() do {				\
+	drm_i830_private_t *dev_priv =				\
+		(drm_i830_private_t *)dev->dev_private;		\
+   	I830_WRITE16( I830REG_INT_ENABLE_R, 0x2 );		\
+   	atomic_set(&dev_priv->irq_received, 0);			\
+   	atomic_set(&dev_priv->irq_emitted, 0);			\
+	init_waitqueue_head(&dev_priv->irq_queue);		\
+} while (0)
+
+
+/* This gets called too late to be useful: dev_priv has already been
+ * freed.
+ */
+#define DRIVER_UNINSTALL() do {					\
+} while (0)
+
+#else
+#define __HAVE_DMA_IRQ          0
+#endif
+
+
 
 /* Buffer customization:
  */

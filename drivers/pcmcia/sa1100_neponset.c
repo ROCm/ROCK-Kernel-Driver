@@ -15,7 +15,6 @@
 #include <asm/arch/neponset.h>
 #include <asm/hardware/sa1111.h>
 
-#include "sa1100_generic.h"
 #include "sa1111_generic.h"
 
 /*
@@ -42,52 +41,27 @@
  * the corresponding truth table.
  */
 
-static int neponset_pcmcia_init(struct pcmcia_init *init)
-{
-	NCR_0 &= ~(NCR_A0VPP | NCR_A1VPP);
-
-	/*
-	 * Set GPIO_A<3:0> to be outputs for the MAX1600,
-	 * and switch to standby mode.
-	 */
-	PA_DDR = 0;
-	PA_SDR = 0;
-	PA_DWR = 0;
-	PA_SSR = 0;
-
-	return sa1111_pcmcia_init(init);
-}
-
 static int
-neponset_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
+neponset_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_state_t *state)
 {
-	unsigned int ncr_mask, pa_dwr_mask;
-	unsigned int ncr_set, pa_dwr_set;
+	unsigned int ncr_mask, ncr_set, pa_dwr_mask, pa_dwr_set;
 	int ret;
 
-	switch (sock) {
+	switch (skt->nr) {
 	case 0:
 		pa_dwr_mask = GPIO_GPIO0 | GPIO_GPIO1;
 		ncr_mask = NCR_A0VPP | NCR_A1VPP;
 
-		switch (conf->vcc) {
-		default:
-		case 0:		pa_dwr_set = 0;			break;
-		case 33:	pa_dwr_set = GPIO_GPIO1;	break;
-		case 50:	pa_dwr_set = GPIO_GPIO0;	break;
-		}
-
-		switch (conf->vpp) {
-		case 0:		ncr_set = 0;			break;
-		case 120:	ncr_set = NCR_A1VPP;		break;
-		default:
-			if (conf->vpp == conf->vcc)
-				ncr_set = NCR_A0VPP;
-			else {
-				printk(KERN_ERR "%s(): unrecognized VPP %u\n",
-				       __FUNCTION__, conf->vpp);
-				return -1;
-			}
+		if (state->Vpp == 0)
+			ncr_set = 0;
+		else if (state->Vpp == 120)
+			ncr_set = NCR_A1VPP;
+		else if (state->Vpp == state->Vcc)
+			ncr_set = NCR_A0VPP;
+		else {
+			printk(KERN_ERR "%s(): unrecognized VPP %u\n",
+			       __FUNCTION__, state->Vpp);
+			return -1;
 		}
 		break;
 
@@ -96,16 +70,9 @@ neponset_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 		ncr_mask = 0;
 		ncr_set = 0;
 
-		switch (conf->vcc) {
-		default:
-		case 0:		pa_dwr_set = 0;			break;
-		case 33:	pa_dwr_set = GPIO_GPIO2;	break;
-		case 50:	pa_dwr_set = GPIO_GPIO3;	break;
-		}
-
-		if (conf->vpp != conf->vcc && conf->vpp != 0) {
+		if (state->Vpp != state->Vcc && state->Vpp != 0) {
 			printk(KERN_ERR "%s(): CF slot cannot support VPP %u\n",
-			       __FUNCTION__, conf->vpp);
+			       __FUNCTION__, state->Vpp);
 			return -1;
 		}
 		break;
@@ -114,41 +81,64 @@ neponset_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 		return -1;
 	}
 
-	ret = sa1111_pcmcia_configure_socket(sock, conf);
+	/*
+	 * pa_dwr_set is the mask for selecting Vcc on both sockets.
+	 * pa_dwr_mask selects which bits (and therefore socket) we change.
+	 */
+	switch (state->Vcc) {
+	default:
+	case 0:  pa_dwr_set = 0;			break;
+	case 33: pa_dwr_set = GPIO_GPIO1|GPIO_GPIO2;	break;
+	case 50: pa_dwr_set = GPIO_GPIO0|GPIO_GPIO3;	break;
+	}
+
+	ret = sa1111_pcmcia_configure_socket(skt, state);
 	if (ret == 0) {
 		unsigned long flags;
 
 		local_irq_save(flags);
 		NCR_0 = (NCR_0 & ~ncr_mask) | ncr_set;
-		PA_DWR = (PA_DWR & ~pa_dwr_mask) | pa_dwr_set;
+
+		PA_DWR = (PA_DWR & ~pa_dwr_mask) | (pa_dwr_set & pa_dwr_mask);
 		local_irq_restore(flags);
 	}
 
 	return 0;
 }
 
-static struct pcmcia_low_level neponset_pcmcia_ops = {
-	.owner			= THIS_MODULE,
-	.init			= neponset_pcmcia_init,
-	.shutdown		= sa1111_pcmcia_shutdown,
-	.socket_state		= sa1111_pcmcia_socket_state,
-	.configure_socket	= neponset_pcmcia_configure_socket,
+static void neponset_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+{
+	if (skt->nr == 0)
+		NCR_0 &= ~(NCR_A0VPP | NCR_A1VPP);
 
-	.socket_init		= sa1111_pcmcia_socket_init,
-	.socket_suspend		= sa1111_pcmcia_socket_suspend,
+        sa1111_pcmcia_socket_init(skt);
+}
+
+static struct pcmcia_low_level neponset_pcmcia_ops = {
+        .owner                  = THIS_MODULE,
+        .hw_init                = sa1111_pcmcia_hw_init,
+        .hw_shutdown            = sa1111_pcmcia_hw_shutdown,
+        .socket_state           = sa1111_pcmcia_socket_state,
+        .configure_socket       = neponset_pcmcia_configure_socket,
+        .socket_init            = neponset_pcmcia_socket_init,
+        .socket_suspend         = sa1111_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_neponset_init(struct device *dev)
 {
-	int ret = -ENODEV;
+        int ret = -ENODEV;
 
-	if (machine_is_assabet())
-		ret = sa1100_register_pcmcia(&neponset_pcmcia_ops, dev);
+        if (machine_is_assabet()) {
+                /*
+                 * Set GPIO_A<3:0> to be outputs for the MAX1600,
+                 * and switch to standby mode.
+                 */
+                PA_DDR = 0;
+                PA_DWR = 0;
+		PA_SDR = 0;
+		PA_SSR = 0;
+		ret = sa11xx_drv_pcmcia_probe(dev, &neponset_pcmcia_ops, 0, 2);
+	}
 
 	return ret;
-}
-
-void __devexit pcmcia_neponset_exit(struct device *dev)
-{
-	sa1100_unregister_pcmcia(&neponset_pcmcia_ops, dev);
 }

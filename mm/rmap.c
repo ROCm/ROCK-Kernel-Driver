@@ -415,7 +415,6 @@ out_unlock:
  * SWAP_SUCCESS	- we succeeded in removing all mappings
  * SWAP_AGAIN	- we missed a trylock, try again later
  * SWAP_FAIL	- the page is unswappable
- * SWAP_ERROR	- an error occurred
  */
 int try_to_unmap(struct page * page)
 {
@@ -482,9 +481,6 @@ int try_to_unmap(struct page * page)
 				continue;
 			case SWAP_FAIL:
 				ret = SWAP_FAIL;
-				goto out;
-			case SWAP_ERROR:
-				ret = SWAP_ERROR;
 				goto out;
 			}
 		}
