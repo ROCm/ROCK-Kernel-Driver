@@ -63,12 +63,12 @@ static struct sa1111_dev usb_dev = {
 	.skpcr_mask	= SKPCR_UCLKEN,
 	.devid		= SA1111_DEVID_USB,
 	.irq = {
-		USBPWR
-		NIRQHCIM,
-		HCIBUFFACC,
-		HCIRMTWKP,
-		NHCIMFCIR,
-		USB_PORT_RESUME
+		IRQ_USBPWR,
+		IRQ_NHCIM,
+		IRQ_HCIBUFFACC,
+		IRQ_HCIRMTWKP,
+		IRQ_NHCIMFCIR,
+		IRQ_USB_PORT_RESUME
 	},
 };
 
@@ -133,12 +133,12 @@ static struct sa1111_dev pcmcia_dev = {
 	.skpcr_mask	= 0,
 	.devid		= SA1111_DEVID_PCMCIA,
 	.irq = {
-		S0_READY_NINT,
-		S0_CD_VALID,
-		S0_BVD1_STSCHG,
-		S1_READY_NINT,
-		S1_CD_VALID,
-		S1_BVD1_STSCHG,
+		IRQ_S0_READY_NINT,
+		IRQ_S0_CD_VALID,
+		IRQ_S0_BVD1_STSCHG,
+		IRQ_S1_READY_NINT,
+		IRQ_S1_CD_VALID,
+		IRQ_S1_BVD1_STSCHG,
 	},
 };
 
@@ -345,8 +345,8 @@ static void __init sa1111_init_irq(struct sa1111_dev *sadev)
 	 * specifies that S0ReadyInt and S1ReadyInt should be '1'.
 	 */
 	sa1111_writel(0, sadev->mapbase + SA1111_INTPOL0);
-	sa1111_writel(SA1111_IRQMASK_HI(S0_READY_NINT) |
-		      SA1111_IRQMASK_HI(S1_READY_NINT),
+	sa1111_writel(SA1111_IRQMASK_HI(IRQ_S0_READY_NINT) |
+		      SA1111_IRQMASK_HI(IRQ_S1_READY_NINT),
 		      sadev->mapbase + SA1111_INTPOL1);
 
 	/* clear all IRQs */
@@ -359,7 +359,7 @@ static void __init sa1111_init_irq(struct sa1111_dev *sadev)
 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 
-	for (irq = AUDXMTDMADONEA; irq <= S1_BVD1_STSCHG; irq++) {
+	for (irq = AUDXMTDMADONEA; irq <= IRQ_S1_BVD1_STSCHG; irq++) {
 		set_irq_chip(irq, &sa1111_high_chip);
 		set_irq_handler(irq, do_edge_IRQ);
 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
