@@ -812,16 +812,13 @@ pagebuf_get_no_daddr(
 	void			*data;
 	int			error;
 
-	if (unlikely(len > 0x20000))
-		goto fail;
-
 	bp = pagebuf_allocate(0);
 	if (unlikely(bp == NULL))
 		goto fail;
 	_pagebuf_initialize(bp, target, 0, len, PBF_FORCEIO);
 
  try_again:
-	data = kmem_alloc(malloc_len, KM_SLEEP);
+	data = kmem_alloc(malloc_len, KM_SLEEP | KM_MAYFAIL);
 	if (unlikely(data == NULL))
 		goto fail_free_buf;
 

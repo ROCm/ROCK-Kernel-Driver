@@ -497,7 +497,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 		if (readonly)
 			vfsp->vfs_flag |= VFS_RDONLY;
 		if (error) {
-			cmn_err(CE_WARN, "XFS: log mount/recovery failed");
+			cmn_err(CE_WARN, "XFS: log mount/recovery failed: error %d", error);
 			xlog_unalloc_log(mp->m_log);
 			return error;
 		}
