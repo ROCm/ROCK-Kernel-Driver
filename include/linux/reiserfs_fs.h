@@ -90,7 +90,7 @@ if( !( cond ) ) 								\
 #define RFALSE( cond, format, args... ) do {;} while( 0 )
 #endif
 
-#define CONSTF __attribute__( ( const ) )
+#define CONSTF __attribute_const__
 /*
  * Disk Data Structures
  */
@@ -1781,25 +1781,25 @@ int reiserfs_convert_objectid_map_v1(struct super_block *) ;
 /* stree.c */
 int B_IS_IN_TREE(const struct buffer_head *);
 extern inline void copy_short_key (void * to, const void * from);
-extern inline void copy_item_head(struct item_head * p_v_to, 
+extern void copy_item_head(struct item_head * p_v_to,
 								  const struct item_head * p_v_from);
 
 // first key is in cpu form, second - le
-extern inline int comp_keys (const struct key * le_key, 
+extern int comp_keys (const struct key * le_key,
 			     const struct cpu_key * cpu_key);
-extern inline int  comp_short_keys (const struct key * le_key, 
+extern int  comp_short_keys (const struct key * le_key,
 				    const struct cpu_key * cpu_key);
-extern inline void le_key2cpu_key (struct cpu_key * to, const struct key * from);
+extern void le_key2cpu_key (struct cpu_key * to, const struct key * from);
 
 // both are cpu keys
-extern inline int comp_cpu_keys (const struct cpu_key *, const struct cpu_key *);
-extern inline int comp_short_cpu_keys (const struct cpu_key *, 
+extern  int comp_cpu_keys (const struct cpu_key *, const struct cpu_key *);
+extern int comp_short_cpu_keys (const struct cpu_key *,
 				       const struct cpu_key *);
-extern inline void cpu_key2cpu_key (struct cpu_key *, const struct cpu_key *);
+extern void cpu_key2cpu_key (struct cpu_key *, const struct cpu_key *);
 
 // both are in le form
-extern inline int comp_le_keys (const struct key *, const struct key *);
-extern inline int comp_short_le_keys (const struct key *, const struct key *);
+extern int comp_le_keys (const struct key *, const struct key *);
+extern int comp_short_le_keys (const struct key *, const struct key *);
 
 //
 // get key version from on disk key - kludge
@@ -1834,7 +1834,7 @@ int search_by_key (struct super_block *, const struct cpu_key *,
 int search_for_position_by_key (struct super_block * p_s_sb, 
 								const struct cpu_key * p_s_cpu_key, 
 								struct path * p_s_search_path);
-extern inline void decrement_bcount (struct buffer_head * p_s_bh);
+extern void decrement_bcount (struct buffer_head * p_s_bh);
 void decrement_counters_in_path (struct path * p_s_search_path);
 void pathrelse (struct path * p_s_search_path);
 int reiserfs_check_path(struct path *p) ;
@@ -1916,7 +1916,7 @@ void sd_attrs_to_i_attrs( __u16 sd_attrs, struct inode *inode );
 void i_attrs_to_sd_attrs( struct inode *inode, __u16 *sd_attrs );
 
 /* namei.c */
-inline void set_de_name_and_namelen (struct reiserfs_dir_entry * de);
+void set_de_name_and_namelen (struct reiserfs_dir_entry * de);
 int search_by_entry_key (struct super_block * sb, const struct cpu_key * key, 
 			 struct path * path, 
 			 struct reiserfs_dir_entry * de);
@@ -2037,7 +2037,7 @@ int balance_internal (struct tree_balance * , int, int, struct item_head * ,
                       struct buffer_head **);
 
 /* do_balance.c */
-inline void do_balance_mark_leaf_dirty (struct tree_balance * tb, 
+void do_balance_mark_leaf_dirty (struct tree_balance * tb,
 					struct buffer_head * bh, int flag);
 #define do_balance_mark_internal_dirty do_balance_mark_leaf_dirty
 #define do_balance_mark_sb_dirty do_balance_mark_leaf_dirty

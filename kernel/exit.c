@@ -794,6 +794,7 @@ NORET_TYPE void do_exit(long code)
 	/* Avoid "noreturn function does return".  */
 	for (;;) ;
 }
+EXPORT_SYMBOL(do_exit);
 
 NORET_TYPE void complete_and_exit(struct completion *comp, long code)
 {

@@ -346,7 +346,9 @@ unsigned long do_mremap(unsigned long addr,
 		if ((addr <= new_addr) && (addr+old_len) > new_addr)
 			goto out;
 
-		do_munmap(current->mm, new_addr, new_len);
+		ret = do_munmap(current->mm, new_addr, new_len);
+		if (ret)
+			goto out;
 	}
 
 	/*
@@ -354,9 +356,11 @@ unsigned long do_mremap(unsigned long addr,
 	 * the unnecessary pages..
 	 * do_munmap does all the needed commit accounting
 	 */
-	ret = addr;
 	if (old_len >= new_len) {
-		do_munmap(current->mm, addr+new_len, old_len - new_len);
+		ret = do_munmap(current->mm, addr+new_len, old_len - new_len);
+		if (ret && old_len != new_len)
+			goto out;
+		ret = addr;
 		if (!(flags & MREMAP_FIXED) || (new_addr == addr))
 			goto out;
 		old_len = new_len;

@@ -1426,7 +1426,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 	writel(0, dev->base_addr + IMR);
 
 	ioaddr = dev->base_addr;
-	np = (struct netdev_private *) dev->priv;
+	np = dev->priv;
 
 	do {
 		u32 intr_status = readl(ioaddr + ISR);

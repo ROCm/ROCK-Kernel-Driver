@@ -32,9 +32,6 @@
 #ifndef cpu_to_node
 #define cpu_to_node(cpu)	(0)
 #endif
-#ifndef memblk_to_node
-#define memblk_to_node(memblk)	(0)
-#endif
 #ifndef parent_node
 #define parent_node(node)	(0)
 #endif
@@ -43,9 +40,6 @@
 #endif
 #ifndef node_to_first_cpu
 #define node_to_first_cpu(node)	(0)
-#endif
-#ifndef node_to_memblk
-#define node_to_memblk(node)	(0)
 #endif
 #ifndef pcibus_to_cpumask
 #define pcibus_to_cpumask(bus)	(cpu_online_map)

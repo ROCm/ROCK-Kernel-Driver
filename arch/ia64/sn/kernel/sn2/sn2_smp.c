@@ -21,6 +21,7 @@
 
 #include <asm/processor.h>
 #include <asm/irq.h>
+#include <asm/sn/sgi.h>
 #include <asm/sal.h>
 #include <asm/system.h>
 #include <asm/delay.h>

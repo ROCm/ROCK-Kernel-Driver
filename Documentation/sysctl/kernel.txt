@@ -254,8 +254,8 @@ the different loglevels.
 printk_ratelimit:
 
 Some warning messages are rate limited. printk_ratelimit specifies
-the minimum length of time between these messages, by default we
-allow one every 5 seconds.
+the minimum length of time between these messages (in jiffies), by
+default we allow one every 5 seconds.
 
 A value of 0 will disable rate limiting.
 

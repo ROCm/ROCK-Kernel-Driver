@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include "crc32defs.h"
-#include <sys/types.h>
+#include <inttypes.h>
 
 #define ENTRIES_PER_LINE 4
 
 #define LE_TABLE_SIZE (1 << CRC_LE_BITS)
 #define BE_TABLE_SIZE (1 << CRC_BE_BITS)
 
-static u_int32_t crc32table_le[LE_TABLE_SIZE];
-static u_int32_t crc32table_be[BE_TABLE_SIZE];
+static uint32_t crc32table_le[LE_TABLE_SIZE];
+static uint32_t crc32table_be[BE_TABLE_SIZE];
 
 /**
  * crc32init_le() - allocate and initialize LE table data
@@ -20,7 +20,7 @@ static u_int32_t crc32table_be[BE_TABLE_SIZE];
 static void crc32init_le(void)
 {
 	unsigned i, j;
-	u_int32_t crc = 1;
+	uint32_t crc = 1;
 
 	crc32table_le[0] = 0;
 
@@ -37,7 +37,7 @@ static void crc32init_le(void)
 static void crc32init_be(void)
 {
 	unsigned i, j;
-	u_int32_t crc = 0x80000000;
+	uint32_t crc = 0x80000000;
 
 	crc32table_be[0] = 0;
 
@@ -48,7 +48,7 @@ static void crc32init_be(void)
 	}
 }
 
-static void output_table(u_int32_t table[], int len, char *trans)
+static void output_table(uint32_t table[], int len, char *trans)
 {
 	int i;
 

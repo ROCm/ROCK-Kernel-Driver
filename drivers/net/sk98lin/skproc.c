@@ -2,8 +2,6 @@
  *
  * Name:	skproc.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.11 $
- * Date:	$Date: 2003/12/11 16:03:57 $
  * Purpose:	Funktions to display statictic data
  *
  ******************************************************************************/
@@ -22,98 +20,6 @@
  *	Author: Mirko Lindner (mlindner@syskonnect.de)
  *
  *	The information in this file is provided "AS IS" without warranty.
- *
- ******************************************************************************/
-/******************************************************************************
- *
- * History:
- *
- *	$Log: skproc.c,v $
- *	Revision 1.11  2003/12/11 16:03:57  mlindner
- *	Fix: Create backup from pnmi data structure
- *	
- *	Revision 1.10  2003/11/19 16:25:36  mlindner
- *	Fix: Print output as 64-bit digit
- *	
- *	Revision 1.9  2003/11/17 13:29:05  mlindner
- *	Fix: Editorial changes
- *	
- *	Revision 1.8  2003/11/13 14:18:48  rroesler
- *	Fix: added latest changes regarding the use of the proc system
- *	
- *	Revision 1.7  2003/11/10 09:35:07  rroesler
- *	Fix: diag backup restore of PNMI structure
- *	
- *	Revision 1.6  2003/11/07 17:31:39  rroesler
- *	Add: security counter for the proc file system
- *	
- *	Revision 1.5  2003/10/07 08:17:08  mlindner
- *	Fix: Copyright changes
- *	
- *	Revision 1.4  2003/09/01 15:29:24  mlindner
- *	Fix: Editorial changes
- *	
- *	Revision 1.3  2003/08/29 12:30:58  mlindner
- *	Add: Version entry in the proc file system
- *	
- *	Revision 1.2  2003/08/12 16:45:29  mlindner
- *	Add: Removed SkNumber and SkDoDiv
- *	Add: Counter output as (unsigned long long)
- *	
- *	Revision 1.1  2003/07/18 13:39:57  rroesler
- *	Fix: Re-enter after CVS crash
- *	
- *	Revision 1.8  2003/06/27 14:41:42  rroesler
- *	Corrected compiler-warning kernel 2.2
- *	
- *	Revision 1.7  2003/06/27 12:09:51  rroesler
- *	corrected minor edits
- *	
- *	Revision 1.6  2003/05/26 12:58:53  mlindner
- *	Add: Support for Kernel 2.5/2.6
- *	
- *	Revision 1.5  2003/03/19 14:40:47  mlindner
- *	Fix: Editorial changes
- *	
- *	Revision 1.4  2003/02/25 14:16:37  mlindner
- *	Fix: Copyright statement
- *	
- *	Revision 1.3  2002/10/02 12:59:51  mlindner
- *	Add: Support for Yukon
- *	Add: Speed check and setup
- *	Add: Merge source for kernel 2.2.x and 2.4.x
- *	Add: Read sensor names directly from VPD
- *	Fix: Volt values
- *	
- *	Revision 1.2.2.7  2002/01/14 12:45:15  mlindner
- *	Fix: Editorial changes
- *	
- *	Revision 1.2.2.6  2001/12/06 15:26:07  mlindner
- *	Fix: Return value of proc_read
- *	
- *	Revision 1.2.2.5  2001/12/06 09:57:39  mlindner
- *	New ProcFs entries
- *	
- *	Revision 1.2.2.4  2001/09/05 12:16:02  mlindner
- *	Add: New ProcFs entries
- *	Fix: Counter Errors (Jumbo == to long errors)
- *	Fix: Kernel error compilation
- *	Fix: too short counters
- *	
- *	Revision 1.2.2.3  2001/06/25 07:26:26  mlindner
- *	Add: More error messages
- *	
- *	Revision 1.2.2.2  2001/03/15 12:50:13  mlindner
- *	fix: ProcFS owner protection
- *	
- *	Revision 1.2.2.1  2001/03/12 16:43:48  mlindner
- *	chg: 2.4 requirements for procfs
- *	
- *	Revision 1.1  2001/01/22 14:15:31  mlindner
- *	added ProcFs functionality
- *	Dual Net functionality integrated
- *	Rlmt networks added
- *	
  *
  ******************************************************************************/
 

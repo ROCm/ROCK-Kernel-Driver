@@ -131,7 +131,7 @@ sgi_master_io_infr_init(void)
 	klhwg_add_all_modules(hwgraph_root);
 	klhwg_add_all_nodes(hwgraph_root);
 
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for (cnode = 0; cnode < numionodes; cnode++) {
 		extern void per_hub_init(cnodeid_t);
 		per_hub_init(cnode);
 	}

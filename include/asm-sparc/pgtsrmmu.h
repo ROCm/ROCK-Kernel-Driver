@@ -36,6 +36,25 @@
 #define SRMMU_PMD_TABLE_SIZE    0x100 /* 64 entries, 4 bytes a piece */
 #define SRMMU_PGD_TABLE_SIZE    0x400 /* 256 entries, 4 bytes a piece */
 
+/*
+ * To support pagetables in highmem, Linux introduces APIs which
+ * return struct page* and generally manipulate page tables when
+ * they are not mapped into kernel space. Our hardware page tables
+ * are smaller than pages. We lump hardware tabes into big, page sized
+ * software tables.
+ *
+ * PMD_SHIFT determines the size of the area a second-level page table entry
+ * can map, and our pmd_t is 16 times larger than normal.
+ */
+#define SRMMU_PTRS_PER_PTE_SOFT	(PAGE_SIZE/4)	/* 16 hard tables per 4K page */
+#define SRMMU_PTRS_PER_PMD_SOFT	4	/* Each pmd_t contains 16 hard PTPs */
+#define SRMMU_PTE_SZ_SOFT       PAGE_SIZE	/* same as above, in bytes */
+
+#define SRMMU_PMD_SHIFT_SOFT	22
+#define SRMMU_PMD_SIZE_SOFT	(1UL << SRMMU_PMD_SHIFT_SOFT)
+#define SRMMU_PMD_MASK_SOFT	(~(SRMMU_PMD_SIZE_SOFT-1))
+#define SRMMU_PMD_ALIGN_SOFT(addr)  (((addr)+SRMMU_PMD_SIZE_SOFT-1)&SRMMU_PMD_MASK_SOFT)
+
 /* Definition of the values in the ET field of PTD's and PTE's */
 #define SRMMU_ET_MASK         0x3
 #define SRMMU_ET_INVALID      0x0

@@ -148,7 +148,7 @@ static void elan_104nc_copy_from(struct map_info *map, void *to, unsigned long f
 		elan_104nc_page(map, from);
 		memcpy_fromio(to, iomapadr + (from & WINDOW_MASK), thislen);
 		spin_unlock(&elan_104nc_spin);
-		(__u8*)to += thislen;
+		to += thislen;
 		from += thislen;
 		len -= thislen;
 	}

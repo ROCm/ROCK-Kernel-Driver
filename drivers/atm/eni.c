@@ -1875,7 +1875,7 @@ static void eni_close(struct atm_vcc *vcc)
 	DPRINTK("eni_close: done waiting\n");
 	/* deallocate memory */
 	kfree(ENI_VCC(vcc));
-	ENI_VCC(vcc) = NULL;
+	vcc->dev_data = NULL;
 	clear_bit(ATM_VF_ADDR,&vcc->flags);
 	/*foo();*/
 }
@@ -1891,7 +1891,8 @@ static int eni_open(struct atm_vcc *vcc)
 
 	DPRINTK(">eni_open\n");
 	EVENT("eni_open\n",0,0);
-	if (!test_bit(ATM_VF_PARTIAL,&vcc->flags)) ENI_VCC(vcc) = NULL;
+	if (!test_bit(ATM_VF_PARTIAL,&vcc->flags))
+		vcc->dev_data = NULL;
 	eni_dev = ENI_DEV(vcc->dev);
 	if (vci != ATM_VPI_UNSPEC && vpi != ATM_VCI_UNSPEC)
 		set_bit(ATM_VF_ADDR,&vcc->flags);
@@ -1902,7 +1903,7 @@ static int eni_open(struct atm_vcc *vcc)
 	if (!test_bit(ATM_VF_PARTIAL,&vcc->flags)) {
 		eni_vcc = kmalloc(sizeof(struct eni_vcc),GFP_KERNEL);
 		if (!eni_vcc) return -ENOMEM;
-		ENI_VCC(vcc) = eni_vcc;
+		vcc->dev_data = eni_vcc;
 		eni_vcc->tx = NULL; /* for eni_close after open_rx */
 		if ((error = open_rx_first(vcc))) {
 			eni_close(vcc);
@@ -2230,7 +2231,7 @@ static int __devinit eni_init_one(struct pci_dev *pci_dev,
 	if (!dev) goto out2;
 	pci_set_drvdata(pci_dev, dev);
 	eni_dev->pci_dev = pci_dev;
-	ENI_DEV(dev) = eni_dev;
+	dev->dev_data = eni_dev;
 	eni_dev->asic = ent->driver_data;
 	error = eni_do_init(dev);
 	if (error) goto out3;

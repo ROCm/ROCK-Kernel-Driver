@@ -144,6 +144,7 @@
 void init_all_devices(void);
 #endif /* __KERNEL__ */
 
+#include <asm/sn/sgi.h>
 #include <asm/sn/xtalk/xbow.h>	/* For get MAX_PORT_NUM */
 
 int io_brick_map_widget(int, int);

@@ -321,8 +321,9 @@ int cap_vm_enough_memory(long pages)
 		return 0;
 
 	if (sysctl_overcommit_memory == 0) {
+		unsigned long n;
+
 		free = get_page_cache_size();
-		free += nr_free_pages();
 		free += nr_swap_pages;
 
 		/*
@@ -338,6 +339,18 @@ int cap_vm_enough_memory(long pages)
 		 */
 		if (!capable(CAP_SYS_ADMIN))
 			free -= free / 32;
+
+		if (free > pages)
+			return 0;
+
+		/*
+		 * nr_free_pages() is very expensive on large systems,
+		 * only call if we're about to fail.
+		 */
+		n = nr_free_pages();
+		if (!capable(CAP_SYS_ADMIN))
+			n -= n / 32;
+		free += n;
 
 		if (free > pages)
 			return 0;

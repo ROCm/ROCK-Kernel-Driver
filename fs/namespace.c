@@ -755,6 +755,9 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 	if (dev_name && !memchr(dev_name, 0, PAGE_SIZE))
 		return -EINVAL;
 
+	if (data_page)
+		((char *)data_page)[PAGE_SIZE - 1] = 0;
+
 	/* Separate the per-mountpoint flags */
 	if (flags & MS_NOSUID)
 		mnt_flags |= MNT_NOSUID;
@@ -814,12 +817,16 @@ int copy_namespace(int flags, struct task_struct *tsk)
 
 	atomic_set(&new_ns->count, 1);
 	init_rwsem(&new_ns->sem);
-	new_ns->root = NULL;
 	INIT_LIST_HEAD(&new_ns->list);
 
 	down_write(&tsk->namespace->sem);
 	/* First pass: copy the tree topology */
 	new_ns->root = copy_tree(namespace->root, namespace->root->mnt_root);
+	if (!new_ns->root) {
+		up_write(&tsk->namespace->sem);
+		kfree(new_ns);
+		goto out;
+	}
 	spin_lock(&vfsmount_lock);
 	list_add_tail(&new_ns->list, &new_ns->root->mnt_list);
 	spin_unlock(&vfsmount_lock);

@@ -99,7 +99,9 @@ u32 attribute((pure)) crc32_le(u32 crc, unsigned char const *p, size_t len)
 	/* Align it */
 	if(unlikely(((long)b)&3 && len)){
 		do {
-			DO_CRC(*((u8 *)b)++);
+			u8 *p = (u8 *)b;
+			DO_CRC(*p++);
+			b = (void *)p;
 		} while ((--len) && ((long)b)&3 );
 	}
 	if(likely(len >= 4)){
@@ -120,7 +122,9 @@ u32 attribute((pure)) crc32_le(u32 crc, unsigned char const *p, size_t len)
 	/* And the last few bytes */
 	if(len){
 		do {
-			DO_CRC(*((u8 *)b)++);
+			u8 *p = (u8 *)b;
+			DO_CRC(*p++);
+			b = (void *)p;
 		} while (--len);
 	}
 
@@ -200,7 +204,9 @@ u32 attribute((pure)) crc32_be(u32 crc, unsigned char const *p, size_t len)
 	/* Align it */
 	if(unlikely(((long)b)&3 && len)){
 		do {
-			DO_CRC(*((u8 *)b)++);
+			u8 *p = (u8 *)b;
+			DO_CRC(*p++);
+			b = (u32 *)p;
 		} while ((--len) && ((long)b)&3 );
 	}
 	if(likely(len >= 4)){
@@ -221,7 +227,9 @@ u32 attribute((pure)) crc32_be(u32 crc, unsigned char const *p, size_t len)
 	/* And the last few bytes */
 	if(len){
 		do {
-			DO_CRC(*((u8 *)b)++);
+			u8 *p = (u8 *)b;
+			DO_CRC(*p++);
+			b = (void *)p;
 		} while (--len);
 	}
 	return __be32_to_cpu(crc);

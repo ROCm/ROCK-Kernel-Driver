@@ -140,8 +140,9 @@ int request_irq(unsigned int irq,
 	if (use_kmalloc)
 		irq_handle = (irq_handler_t *)kmalloc(sizeof(irq_handler_t), GFP_ATOMIC);
 	else {
-		irq_handle = alloc_bootmem(sizeof(irq_handler_t));
-		(unsigned long)irq_handle |= 0x80000000; /* bootmem allocater */
+		/* use bootmem allocater */
+		irq_handle = (irq_handler_t *)alloc_bootmem(sizeof(irq_handler_t));
+		irq_handle = (irq_handler_t *)((unsigned long)irq_handle | 0x80000000);
 	}
 
 	if (irq_handle == NULL)
@@ -230,11 +231,9 @@ int show_interrupts(struct seq_file *p, void *v)
 {
 	int i = *(loff_t *) v;
 
-	if (i < NR_IRQS) {
-		if (irq_list[i]) {
-			seq_printf(p, "%3d: %10u ",i,irq_list[i]->count);
-			seq_printf(p, "%s\n", irq_list[i]->devname);
-		}
+	if ((i < NR_IRQS) && (irq_list[i]!=NULL)) {
+		seq_printf(p, "%3d: %10u ",i,irq_list[i]->count);
+		seq_printf(p, "%s\n", irq_list[i]->devname);
 	}
 
 	return 0;

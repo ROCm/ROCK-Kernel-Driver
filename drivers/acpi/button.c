@@ -316,35 +316,35 @@ acpi_button_add (
 	 */
 	if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_POWER)) {
 		button->type = ACPI_BUTTON_TYPE_POWER;
-		sprintf(acpi_device_name(device), "%s",
+		strcpy(acpi_device_name(device),
 			ACPI_BUTTON_DEVICE_NAME_POWER);
 		sprintf(acpi_device_class(device), "%s/%s", 
 			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_POWER);
 	}
 	else if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_POWERF)) {
 		button->type = ACPI_BUTTON_TYPE_POWERF;
-		sprintf(acpi_device_name(device), "%s",
+		strcpy(acpi_device_name(device),
 			ACPI_BUTTON_DEVICE_NAME_POWERF);
 		sprintf(acpi_device_class(device), "%s/%s", 
 			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_POWER);
 	}
 	else if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_SLEEP)) {
 		button->type = ACPI_BUTTON_TYPE_SLEEP;
-		sprintf(acpi_device_name(device), "%s",
+		strcpy(acpi_device_name(device),
 			ACPI_BUTTON_DEVICE_NAME_SLEEP);
 		sprintf(acpi_device_class(device), "%s/%s", 
 			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_SLEEP);
 	}
 	else if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_SLEEPF)) {
 		button->type = ACPI_BUTTON_TYPE_SLEEPF;
-		sprintf(acpi_device_name(device), "%s",
+		strcpy(acpi_device_name(device),
 			ACPI_BUTTON_DEVICE_NAME_SLEEPF);
 		sprintf(acpi_device_class(device), "%s/%s", 
 			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_SLEEP);
 	}
 	else if (!strcmp(acpi_device_hid(device), ACPI_BUTTON_HID_LID)) {
 		button->type = ACPI_BUTTON_TYPE_LID;
-		sprintf(acpi_device_name(device), "%s",
+		strcpy(acpi_device_name(device),
 			ACPI_BUTTON_DEVICE_NAME_LID);
 		sprintf(acpi_device_class(device), "%s/%s", 
 			ACPI_BUTTON_CLASS, ACPI_BUTTON_SUBCLASS_LID);

@@ -62,7 +62,7 @@ typedef struct external_alenlist *external_alenlist_t;
 
 
 /* Create an Address/Length List, and clear it of all entries.  */
-extern alenlist_t alenlist_create(unsigned flags);
+extern alenlist_t alenlist_create(unsigned int flags);
 
 /* Grow/shrink an Address/Length List and FIX its size. */
 extern int alenlist_grow(alenlist_t, size_t npairs);
@@ -103,7 +103,7 @@ alenlist_done(alenlist_t alenlist);
 extern int alenlist_append(alenlist_t alenlist, 	/* append to this list */
 			alenaddr_t address,		/* address to append */
 			size_t length,			/* length to append */
-			unsigned flags);
+			unsigned int flags);
 
 /* 
  * Replace a Pair in the middle of a List, and return old values.
@@ -114,7 +114,7 @@ alenlist_replace(	alenlist_t alenlist, 		/* in: replace in this list */
 			alenlist_cursor_t cursorp,	/* inout: which item to replace */
 			alenaddr_t *addrp, 		/* inout: address */
 			size_t *lengthp,		/* inout: length */
-			unsigned flags);
+			unsigned int flags);
 
 
 /* Get the next Pair from a List */
@@ -123,7 +123,7 @@ extern int alenlist_get(alenlist_t alenlist, 		/* in: get from this list */
 			size_t maxlength,		/* in: at most length */
 			alenaddr_t *addr, 		/* out: address */
 			size_t *length,			/* out: length */
-			unsigned flags);
+			unsigned int flags);
 
 
 /* Return the number of Pairs stored in this List */
@@ -135,11 +135,11 @@ extern void alenlist_concat(	alenlist_t from, 	/* copy from this list */
 
 /* Create a copy of an Address/Length List */
 extern alenlist_t alenlist_clone(alenlist_t old,	/* clone this list */
-				 unsigned flags);
+				 unsigned int flags);
 
 
 /* Allocate and initialize an Address/Length List Cursor */
-extern alenlist_cursor_t alenlist_cursor_create(alenlist_t alenlist, unsigned flags);
+extern alenlist_cursor_t alenlist_cursor_create(alenlist_t alenlist, unsigned int flags);
 
 /* Free an Address/Length List Cursor */
 extern void alenlist_cursor_destroy(alenlist_cursor_t cursorp);
@@ -170,19 +170,19 @@ extern size_t alenlist_cursor_offset(alenlist_t alenlist, alenlist_cursor_t curs
 extern alenlist_t kvaddr_to_alenlist(	alenlist_t alenlist, 
 					caddr_t kvaddr, 
 					size_t length, 
-					unsigned flags);
+					unsigned int flags);
 
 /* Convert from a User Virtual Address to a Physical Address/Length List */
 extern alenlist_t uvaddr_to_alenlist(	alenlist_t alenlist,
 					uvaddr_t vaddr, 
 					size_t length,
-					unsigned flags);
+					unsigned int flags);
 
 /* Convert from a buf struct to a Physical Address/Length List */
 struct buf;
 extern alenlist_t buf_to_alenlist(	alenlist_t alenlist, 
 					struct buf *buf, 
-					unsigned flags);
+					unsigned int flags);
 
 
 /* 

@@ -1317,6 +1317,7 @@ static int idefloppy_get_flexible_disk_page (ide_drive_t *drive)
 	}
 	header = (idefloppy_mode_parameter_header_t *) pc.buffer;
 	floppy->wp = header->wp;
+	set_disk_ro(drive->disk, floppy->wp);
 	page = (idefloppy_flexible_disk_page_t *) (header + 1);
 
 	page->transfer_rate = ntohs(page->transfer_rate);

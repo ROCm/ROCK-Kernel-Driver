@@ -73,7 +73,7 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 
 	/* Pause RISC. */
 	WRT_REG_WORD(&reg->hccr, HCCR_PAUSE_RISC); 
-	if (!IS_QLA2312(ha) && !IS_QLA2322(ha)) {
+	if (IS_QLA2300(ha)) {
 		for (cnt = 30000;
 		    (RD_REG_WORD(&reg->hccr) & HCCR_RISC_PAUSE) == 0 &&
 			rval == QLA_SUCCESS; cnt--) {
@@ -180,7 +180,7 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 		}
 	}
 
-	if (IS_QLA2312(ha) || IS_QLA2322(ha)) {
+	if (!IS_QLA2300(ha)) {
 		for (cnt = 30000; RD_MAILBOX_REG(ha, reg, 0) != 0 &&
 		    rval == QLA_SUCCESS; cnt--) {
 			if (cnt)
@@ -1070,18 +1070,6 @@ qla2x00_print_scsi_cmd(struct scsi_cmnd * cmd)
 	    sp->lun_queue->fclun->fcport->cur_path);
 }
 
-/*
- * qla2x00_print_q_info
- * 	 Prints queue info
- * Input
- *      q: lun queue	 
- */ 
-void 
-qla2x00_print_q_info(struct os_lun *q) 
-{
-	printk("Queue info: flags=0x%lx\n", q->q_flag);
-}
-
 #if defined(QL_DEBUG_ROUTINES)
 /*
  * qla2x00_formatted_dump_buffer
@@ -1163,67 +1151,4 @@ qla2x00_formatted_dump_buffer(char *string, uint8_t * buffer,
 			break;
 	}
 }
-
 #endif
-
-
-#if STOP_ON_ERROR
-/**************************************************************************
-*   qla2x00_panic
-*
-**************************************************************************/
-static void 
-qla2x00_panic(char *cp, struct Scsi_Host *host) 
-{
-	struct scsi_qla_host *ha;
-	long *fp;
-
-	ha = (struct scsi_qla_host *) host->hostdata;
-	DEBUG2(ql2x_debug_print = 1;);
-	printk("qla2100 - PANIC:  %s\n", cp);
-	printk("Current time=0x%lx\n", jiffies);
-	printk("Number of pending commands =0x%lx\n", ha->actthreads);
-	printk("Number of queued commands =0x%lx\n", ha->qthreads);
-	printk("Number of free entries = (%d)\n", ha->req_q_cnt);
-	printk("Request Queue @ 0x%lx, Response Queue @ 0x%lx\n",
-			       ha->request_dma, ha->response_dma);
-	printk("Request In Ptr %d\n", ha->req_ring_index);
-	fp = (long *) &ha->flags;
-	printk("HA flags =0x%lx\n", *fp);
-	qla2x00_dump_requests(ha);
-	qla2x00_dump_regs(ha);
-	cli();
-	for (;;) {
-		udelay(2);
-		barrier();
-		/* cpu_relax();*/
-	}
-	sti();
-}
-
-#endif
-
-/**************************************************************************
-*   qla2x00_dump_requests
-*
-**************************************************************************/
-void
-qla2x00_dump_requests(scsi_qla_host_t *ha) 
-{
-
-	struct scsi_cmnd       *cp;
-	srb_t           *sp;
-	int i;
-
-	printk("Outstanding Commands on controller:\n");
-
-	for (i = 1; i < MAX_OUTSTANDING_COMMANDS; i++) {
-		if ((sp = ha->outstanding_cmds[i]) == NULL)
-			continue;
-		if ((cp = sp->cmd) == NULL)
-			continue;
-
-		printk("(%d): Pid=%ld, sp flags=0x%x, cmd=0x%p\n",
-		    i, sp->cmd->serial_number, sp->flags, CMD_SP(sp->cmd));
-	}
-}

@@ -869,8 +869,8 @@ static int __init asus_hotk_add(struct acpi_device *device)
 	memset(hotk, 0, sizeof(struct asus_hotk));
 
 	hotk->handle = device->handle;
-	sprintf(acpi_device_name(device), "%s", ACPI_HOTK_DEVICE_NAME);
-	sprintf(acpi_device_class(device), "%s", ACPI_HOTK_CLASS);
+	strcpy(acpi_device_name(device), ACPI_HOTK_DEVICE_NAME);
+	strcpy(acpi_device_class(device), ACPI_HOTK_CLASS);
 	acpi_driver_data(device) = hotk;
 	hotk->device = device;
 

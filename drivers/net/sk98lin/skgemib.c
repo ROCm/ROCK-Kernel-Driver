@@ -2,8 +2,6 @@
  *
  * Name:	skgemib.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.11 $
- * Date:	$Date: 2003/09/15 13:38:12 $
  * Purpose:	Private Network Management Interface Management Database
  *
  ****************************************************************************/
@@ -21,54 +19,6 @@
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
-
-/*****************************************************************************
- *
- * History:
- *
- *	$Log: skgemib.c,v $
- *	Revision 1.11  2003/09/15 13:38:12  tschilli
- *	OID_SKGE_PHY_LP_MODE included only after using #define SK_PHY_LP_MODE.
- *	
- *	Revision 1.10  2003/08/15 12:28:59  tschilli
- *	Added new OIDs:
- *	OID_SKGE_DRIVER_RELDATE
- *	OID_SKGE_DRIVER_FILENAME
- *	OID_SKGE_CHIPID
- *	OID_SKGE_RAMSIZE
- *	OID_SKGE_VAUXAVAIL
- *	OID_SKGE_PHY_TYPE
- *	OID_SKGE_PHY_LP_MODE
- *	
- *	Revision 1.9  2003/05/23 12:55:20  tschilli
- *	OID_SKGE_BOARDLEVEL added.
- *	
- *	Revision 1.8  2003/03/27 11:19:15  tschilli
- *	Copyright messages changed.
- *	
- *	Revision 1.7  2002/12/16 09:04:34  tschilli
- *	Code for VCT handling added.
- *	
- *	Revision 1.6  2002/08/09 15:40:21  rwahl
- *	Editorial change (renamed ConfSpeedCap).
- *	
- *	Revision 1.5  2002/08/09 11:05:34  rwahl
- *	Added oid handling for link speed cap.
- *	
- *	Revision 1.4  2002/08/09 09:40:27  rwahl
- *	Added support for NDIS OID_PNP_xxx.
- *	
- *	Revision 1.3  2002/07/17 19:39:54  rwahl
- *	Added handler for OID_SKGE_SPEED_MODE & OID_SKGE_SPEED_STATUS.
- *	
- *	Revision 1.2  2002/05/22 08:59:00  rwahl
- *	- static functions only for release build.
- *	- Source file must be included.
- *	
- *	Revision 1.1  2002/05/22 08:12:42  rwahl
- *	Initial version.
- *	
- ****************************************************************************/
 
 /*
  * PRIVATE OID handler function prototypes

@@ -18,6 +18,8 @@
  *                    Matthew Hawkins <matt@mh.dropbear.id.au>
  * -  Kissed strtok() goodbye
  */
+
+#define IN_STRING_C 1
  
 #include <linux/types.h>
 #include <linux/string.h>
@@ -437,12 +439,13 @@ void * memset(void * s,int c,size_t count)
  * You should not use this function to access IO space, use memcpy_toio()
  * or memcpy_fromio() instead.
  */
-void bcopy(const char * src, char * dest, int count)
+void bcopy(const void * srcp, void * destp, size_t count)
 {
-	char *tmp = dest;
+	const char *src = srcp;
+	char *dest = destp;
 
 	while (count--)
-		*tmp++ = *src++;
+		*dest++ = *src++;
 }
 #endif
 

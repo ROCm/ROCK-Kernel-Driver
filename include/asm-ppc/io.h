@@ -58,6 +58,9 @@ extern unsigned long pci_dram_offset;
 #define writel(b,addr) out_le32((volatile u32 *)(addr),(b))
 #endif /* CONFIG_APUS */
 
+#define readb_relaxed(addr) readb(addr)
+#define readw_relaxed(addr) readw(addr)
+#define readl_relaxed(addr) readl(addr)
 
 #define __raw_readb(addr)	(*(volatile unsigned char *)(addr))
 #define __raw_readw(addr)	(*(volatile unsigned short *)(addr))
@@ -208,7 +211,7 @@ extern void *ioremap64(unsigned long long address, unsigned long size);
 #define ioremap_nocache(addr, size)	ioremap((addr), (size))
 extern void iounmap(void *addr);
 extern unsigned long iopa(unsigned long addr);
-extern unsigned long mm_ptov(unsigned long addr) __attribute__ ((const));
+extern unsigned long mm_ptov(unsigned long addr) __attribute_const__;
 extern void io_block_mapping(unsigned long virt, phys_addr_t phys,
 			     unsigned int size, int flags);
 

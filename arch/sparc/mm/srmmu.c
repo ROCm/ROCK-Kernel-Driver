@@ -51,26 +51,6 @@
 
 #include <asm/btfixup.h>
 
-/*
- * To support pagetables in highmem, Linux introduces APIs which
- * return struct page* and generally manipulate page tables when
- * they are not mapped into kernel space. Our hardware page tables
- * are smaller than pages. We lump hardware tabes into big, page sized
- * software tables.
- *
- * PMD_SHIFT determines the size of the area a second-level page table entry
- * can map, and our pmd_t is 16 times larger than normal.
- */
-#define SRMMU_PTRS_PER_PMD_SOFT    0x4	/* Each pmd_t contains 16 hard PTPs */
-#define SRMMU_PTRS_PER_PTE_SOFT  0x400	/* 16 hard tables per 4K page */
-#define SRMMU_PTE_SZ_SOFT       0x1000	/* same as above, in bytes */
-
-#define SRMMU_PMD_SHIFT_SOFT	22
-#define SRMMU_PMD_SIZE_SOFT	(1UL << SRMMU_PMD_SHIFT_SOFT)
-#define SRMMU_PMD_MASK_SOFT	(~(SRMMU_PMD_SIZE_SOFT-1))
-// #define SRMMU_PMD_ALIGN(addr)  (((addr)+SRMMU_PMD_SIZE-1)&SRMMU_PMD_MASK)
-
-
 enum mbus_module srmmu_modtype;
 unsigned int hwbug_bitmask;
 int vac_cache_size;

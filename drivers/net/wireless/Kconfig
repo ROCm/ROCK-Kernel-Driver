@@ -270,8 +270,8 @@ config AIRO_CS
 config PCMCIA_ATMEL
       tristate "Atmel at76c502/at76c504 PCMCIA cards"
       depends on NET_RADIO && EXPERIMENTAL && PCMCIA
-      enable FW_LOADER
-      enable CRC32
+      select FW_LOADER
+      select CRC32
        ---help---
          A driver for PCMCIA 802.11 wireless cards based on the 
          Atmel fast-vnet chips. This driver supports standard

@@ -2,8 +2,6 @@
  *
  * Name:	skcsum.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.12 $
- * Date:	$Date: 2003/08/20 13:55:53 $
  * Purpose:	Store/verify Internet checksum in send/receive packets.
  *
  ******************************************************************************/
@@ -18,63 +16,6 @@
  *	(at your option) any later version.
  *
  *	The information in this file is provided "AS IS" without warranty.
- *
- ******************************************************************************/
-
-/******************************************************************************
- *
- * History:
- *
- *	$Log: skcsum.c,v $
- *	Revision 1.12  2003/08/20 13:55:53  mschmid
- *	Changed notation of #ifndef SkCsCalculateChecksum to
- *	#ifndef SK_CS_CALCULATE_CHECKSUM
- *	
- *	Revision 1.11  2003/03/11 14:05:55  rschmidt
- *	Replaced memset() by macro SK_MEMSET()
- *	Editorial changes
- *	
- *	Revision 1.10  2002/04/11 10:02:04  rwahl
- *	Fix in SkCsGetSendInfo():
- *	- function did not return ProtocolFlags in every case.
- *	- pseudo header csum calculated wrong for big endian.
- *	
- *	Revision 1.9  2001/06/13 07:42:08  gklug
- *	fix: NetNumber was wrong in CLEAR_STAT event
- *	add: check for good NetNumber in Clear STAT
- *	
- *	Revision 1.8  2001/02/06 11:15:36  rassmann
- *	Supporting two nets on dual-port adapters.
- *	
- *	Revision 1.7  2000/06/29 13:17:05  rassmann
- *	Corrected reception of a packet with UDP checksum == 0 (which means there
- *	is no UDP checksum).
- *	
- *	Revision 1.6  2000/02/21 12:35:10  cgoos
- *	Fixed license header comment.
- *	
- *	Revision 1.5  2000/02/21 11:05:19  cgoos
- *	Merged changes back to common source.
- *	Fixed rx path for BIG ENDIAN architecture.
- *	
- *	Revision 1.1  1999/07/26 15:28:12  mkarl
- *	added return SKCS_STATUS_IP_CSUM_ERROR_UDP and
- *	SKCS_STATUS_IP_CSUM_ERROR_TCP to pass the NidsTester
- *	changed from common source to windows specific source
- *	therefore restarting with v1.0
- *	
- *	Revision 1.3  1999/05/10 08:39:33  mkarl
- *	prevent overflows in SKCS_HTON16
- *	fixed a bug in pseudo header checksum calculation
- *	added some comments
- *	
- *	Revision 1.2  1998/10/22 11:53:28  swolf
- *	Now using SK_DBG_MSG.
- *	
- *	Revision 1.1  1998/09/01 15:35:41  swolf
- *	initial revision
- *
- *	13-May-1998 sw	Created.
  *
  ******************************************************************************/
 

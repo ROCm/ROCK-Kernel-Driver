@@ -8,6 +8,9 @@
  *
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
+
+#include <asm/types.h>
+
 typedef struct dentry *hwgfs_handle_t;
 
 extern hwgfs_handle_t hwgfs_register(hwgfs_handle_t dir, const char *name,

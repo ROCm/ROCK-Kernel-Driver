@@ -10,6 +10,7 @@
 
 #ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
+#include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
 
 

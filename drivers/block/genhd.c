@@ -260,8 +260,10 @@ static int show_partition(struct seq_file *part, void *v)
 	if (&sgp->kobj.entry == block_subsys.kset.list.next)
 		seq_puts(part, "major minor  #blocks  name\n\n");
 
-	/* Don't show non-partitionable devices or empty devices */
-	if (!get_capacity(sgp) || sgp->minors == 1)
+	/* Don't show non-partitionable removeable devices or empty devices */
+	if (!get_capacity(sgp) ||
+	    (sgp->minors == 1 && (sgp->flags & GENHD_FL_REMOVABLE))
+		)
 		return 0;
 
 	/* show the full disk and all non-0 size partitions of it */

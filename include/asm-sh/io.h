@@ -130,6 +130,10 @@
 # define writel(v,a)	({ __raw_writel((v),(unsigned long)(a)); mb(); })
 #endif
 
+#define readb_relaxed(a) readb(a)
+#define readw_relaxed(a) readw(a)
+#define readl_relaxed(a) readl(a)
+
 /*
  * If the platform has PC-like I/O, this function converts the offset into
  * an address.

@@ -144,8 +144,7 @@ _hostcxx_flags = $(HOSTCXXFLAGS) $(HOST_EXTRACXXFLAGS) $(HOSTCXXFLAGS_$(*F).o)
 
 
 # If building the kernel in a separate objtree expand all occurrences
-# of -Idir to -Idir -I$(srctree)/dir.
-# hereby allowing gcc to locate files in both trees. Local tree first.
+# of -Idir to -I$(srctree)/dir except for absolute paths (starting with '/').
 
 ifeq ($(KBUILD_SRC),)
 __c_flags	= $(_c_flags)
@@ -153,16 +152,20 @@ __a_flags	= $(_a_flags)
 __hostc_flags	= $(_hostc_flags)
 __hostcxx_flags	= $(_hostcxx_flags)
 else
-flags = $(foreach o,$($(1)),\
-	$(if $(filter -I%,$(o)),$(patsubst -I%,-I$(srctree)/%,$(o)),$(o)))
 
-# -I$(obj) locate generated .h files
-# -I$(srctree)/$(src) locate .h files in srctree, from generated .c files
-# FIXME: Replace both with specific EXTRA_CFLAGS statements
-__c_flags	= -I$(obj) -I$(srctree)/$(src) $(call flags,_c_flags)
-__a_flags	=                              $(call flags,_a_flags)
-__hostc_flags	= -I$(obj)                     $(call flags,_hostc_flags)
-__hostcxx_flags	=                              $(call flags,_hostcxx_flags)
+# Prefix -I with $(srctree) if it is not an absolute path
+addtree = $(if $(filter-out -I/%,$(1)),$(patsubst -I%,-I$(srctree)/%,$(1))) $(1)
+# Find all -I options and call addtree
+flags = $(foreach o,$($(1)),$(if $(filter -I%,$(o)),$(call addtree,$(o)),$(o)))
+
+# -I$(obj) locates generated .h files
+# $(call addtree,-I$(obj)) locates .h files in srctree, from generated .c files
+#   and locates generated .h files
+# FIXME: Replace both with specific CFLAGS* statements in the makefiles
+__c_flags	= $(call addtree,-I$(obj)) $(call flags,_c_flags)
+__a_flags	=                          $(call flags,_a_flags)
+__hostc_flags	= -I$(obj)                 $(call flags,_hostc_flags)
+__hostcxx_flags	= -I$(obj)                 $(call flags,_hostcxx_flags)
 endif
 
 c_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(CPPFLAGS) \

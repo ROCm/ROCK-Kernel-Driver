@@ -28,8 +28,8 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/delay.h>
 #include <asm/div64.h>
-#include <asm/delay.h>
 
 #include "dvb_frontend.h"
 #include "dvb_functions.h"

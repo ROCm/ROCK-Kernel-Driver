@@ -49,6 +49,7 @@
 #include <linux/tty_driver.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
+#include <linux/init.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -292,7 +293,7 @@ static struct tty_operations moxa_ops = {
 
 static int __init moxa_init(void)
 {
-	int i, n, numBoards;
+	int i, numBoards;
 	struct moxa_str *ch;
 
 	printk(KERN_INFO "MOXA Intellio family driver version %s\n", MOXA_VERSION);
@@ -410,7 +411,7 @@ static int __init moxa_init(void)
 #ifdef CONFIG_PCI
 	{
 		struct pci_dev *p = NULL;
-		n = (sizeof(moxa_pcibrds) / sizeof(moxa_pcibrds[0])) - 1;
+		int n = (sizeof(moxa_pcibrds) / sizeof(moxa_pcibrds[0])) - 1;
 		i = 0;
 		while (i < n) {
 			while ((p = pci_find_device(moxa_pcibrds[i].vendor, moxa_pcibrds[i].device, p))!=NULL)

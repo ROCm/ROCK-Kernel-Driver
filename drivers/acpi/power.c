@@ -503,9 +503,9 @@ acpi_power_add (
 	memset(resource, 0, sizeof(struct acpi_power_resource));
 
 	resource->handle = device->handle;
-	sprintf(resource->name, "%s", device->pnp.bus_id);
-	sprintf(acpi_device_name(device), "%s", ACPI_POWER_DEVICE_NAME);
-	sprintf(acpi_device_class(device), "%s", ACPI_POWER_CLASS);
+	strcpy(resource->name, device->pnp.bus_id);
+	strcpy(acpi_device_name(device), ACPI_POWER_DEVICE_NAME);
+	strcpy(acpi_device_class(device), ACPI_POWER_CLASS);
 	acpi_driver_data(device) = resource;
 
 	/* Evalute the object to get the system level and resource order. */

@@ -1417,7 +1417,7 @@ fore200e_open(struct atm_vcc *vcc)
 	return -ENOMEM;
     }
 
-    FORE200E_VCC(vcc) = fore200e_vcc;
+    vcc->dev_data = fore200e_vcc;
     
     if (fore200e_activate_vcin(fore200e, 1, vcc, vcc->qos.rxtp.max_sdu) < 0) {
 	kfree(fore200e_vcc);
@@ -2482,7 +2482,7 @@ fore200e_register(struct fore200e* fore200e)
 	return -ENODEV;
     }
 
-    FORE200E_DEV(atm_dev) = fore200e;
+    atm_dev->dev_data = fore200e;
     fore200e->atm_dev = atm_dev;
 
     atm_dev->ci_range.vpi_bits = 8;

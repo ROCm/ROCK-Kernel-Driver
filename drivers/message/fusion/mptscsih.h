@@ -98,13 +98,14 @@
 #define MPT_SCSI_SG_DEPTH	40
 #endif
 
-/* To disable domain validation, uncomment the
+/* To disable domain validation, comment the
  * following line. No effect for FC devices.
  * For SCSI devices, driver will negotiate to
  * NVRAM settings (if available) or to maximum adapter
  * capabilities.
  */
-/* #define MPTSCSIH_DISABLE_DOMAIN_VALIDATION */
+
+#define MPTSCSIH_ENABLE_DOMAIN_VALIDATION
 
 
 /* SCSI driver setup structure. Settings can be overridden
@@ -138,15 +139,6 @@ struct mptscsih_driver_setup
  */
 
 /*
- *	Conditionalizing with "#ifdef MODULE/#endif" around:
- *		static Scsi_Host_Template driver_template = XX;
- *		#include <../../scsi/scsi_module.c>
- *	lines was REMOVED @ lk-2.4.0-test9
- *	Issue discovered 20001213 by: sshirron
- */
-#define MPT_SCSIHOST_NEED_ENTRY_EXIT_HOOKUPS			1
-
-/*
  *	tq_scheduler disappeared @ lk-2.4.0-test12
  *	(right when <linux/sched.h> newly defined TQ_ACTIVE)
  *	tq_struct reworked in 2.5.41. Include workqueue.h.
@@ -160,8 +152,6 @@ struct mptscsih_driver_setup
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
-#define x_scsi_detect		mptscsih_detect
-#define x_scsi_release		mptscsih_release
 #define x_scsi_info		mptscsih_info
 #define x_scsi_queuecommand	mptscsih_qcmd
 #define x_scsi_abort		mptscsih_abort
@@ -170,9 +160,6 @@ struct mptscsih_driver_setup
 #define x_scsi_host_reset	mptscsih_host_reset
 #define x_scsi_bios_param	mptscsih_bios_param
 
-#define x_scsi_taskmgmt_bh	mptscsih_taskmgmt_bh
-#define x_scsi_old_abort	mptscsih_old_abort
-#define x_scsi_old_reset	mptscsih_old_reset
 #define x_scsi_slave_alloc	mptscsih_slave_alloc
 #define x_scsi_slave_configure	mptscsih_slave_configure
 #define x_scsi_slave_destroy	mptscsih_slave_destroy
@@ -182,8 +169,6 @@ struct mptscsih_driver_setup
 /*
  *	MPT SCSI Host / Initiator decls...
  */
-extern	int		 x_scsi_detect(Scsi_Host_Template *);
-extern	int		 x_scsi_release(struct Scsi_Host *host);
 extern	const char	*x_scsi_info(struct Scsi_Host *);
 extern	int		 x_scsi_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 extern	int		 x_scsi_abort(Scsi_Cmnd *);
@@ -191,8 +176,7 @@ extern	int		 x_scsi_bus_reset(Scsi_Cmnd *);
 extern	int		 x_scsi_dev_reset(Scsi_Cmnd *);
 extern	int		 x_scsi_host_reset(Scsi_Cmnd *);
 extern int		 x_scsi_bios_param(struct scsi_device * sdev, struct block_device *bdev,
-				sector_t capacity, int *ip);
-extern	void		 x_scsi_taskmgmt_bh(void *);
+				sector_t capacity, int geom[]);
 extern	int		 x_scsi_slave_alloc(Scsi_Device *);
 extern	int		 x_scsi_slave_configure(Scsi_Device *);
 extern	void		 x_scsi_slave_destroy(Scsi_Device *);

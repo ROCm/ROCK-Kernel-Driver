@@ -31,6 +31,8 @@
 #define DBG(x...)
 #endif /* DEBUG_KLGRAPH */
 
+extern int numionodes;
+
 lboard_t *root_lboard[MAX_COMPACT_NODES];
 static int hasmetarouter;
 
@@ -38,13 +40,13 @@ static int hasmetarouter;
 char brick_types[MAX_BRICK_TYPES + 1] = "crikxdpn%#=vo^34567890123456789...";
 
 lboard_t *
-find_lboard(lboard_t *start, unsigned char brd_type)
+find_lboard_any(lboard_t *start, unsigned char brd_type)
 {
 	/* Search all boards stored on this node. */
 	while (start) {
 		if (start->brd_type == brd_type)
 			return start;
-		start = KLCF_NEXT(start);
+		start = KLCF_NEXT_ANY(start);
 	}
 
 	/* Didn't find it. */
@@ -52,18 +54,58 @@ find_lboard(lboard_t *start, unsigned char brd_type)
 }
 
 lboard_t *
-find_lboard_class(lboard_t *start, unsigned char brd_type)
+find_lboard_nasid(lboard_t *start, nasid_t nasid, unsigned char brd_type)
 {
-	/* Search all boards stored on this node. */
+
 	while (start) {
-		if (KLCLASS(start->brd_type) == KLCLASS(brd_type))
+		if ((start->brd_type == brd_type) && 
+		    (start->brd_nasid == nasid))
 			return start;
-		start = KLCF_NEXT(start);
+
+		if (numionodes == numnodes)
+			start = KLCF_NEXT_ANY(start);
+		else
+			start = KLCF_NEXT(start);
 	}
 
 	/* Didn't find it. */
 	return (lboard_t *)NULL;
 }
+
+lboard_t *
+find_lboard_class_any(lboard_t *start, unsigned char brd_type)
+{
+        /* Search all boards stored on this node. */
+	while (start) {
+		if (KLCLASS(start->brd_type) == KLCLASS(brd_type))
+			return start;
+		start = KLCF_NEXT_ANY(start);
+	}
+
+	/* Didn't find it. */
+	return (lboard_t *)NULL;
+}
+
+lboard_t *
+find_lboard_class_nasid(lboard_t *start, nasid_t nasid, unsigned char brd_type)
+{
+	/* Search all boards stored on this node. */
+	while (start) {
+		if (KLCLASS(start->brd_type) == KLCLASS(brd_type) && 
+		    (start->brd_nasid == nasid))
+			return start;
+
+		if (numionodes == numnodes)
+			start = KLCF_NEXT_ANY(start);
+		else
+			start = KLCF_NEXT(start);
+	}
+
+	/* Didn't find it. */
+	return (lboard_t *)NULL;
+}
+
+
 
 klinfo_t *
 find_component(lboard_t *brd, klinfo_t *kli, unsigned char struct_type)
@@ -114,20 +156,6 @@ find_lboard_modslot(lboard_t *start, geoid_t geoid)
 
 	/* Didn't find it. */
 	return (lboard_t *)NULL;
-}
-
-lboard_t *
-find_lboard_module(lboard_t *start, geoid_t geoid)
-{
-        /* Search all boards stored on this node. */
-        while (start) {
-                if (geo_cmp(start->brd_geoid, geoid))
-                        return start;
-                start = KLCF_NEXT(start);
-        }
-
-        /* Didn't find it. */
-        return (lboard_t *)NULL;
 }
 
 /*
@@ -218,7 +246,7 @@ xbow_port_io_enabled(nasid_t nasid, int link)
 	/*
 	 * look for boards that might contain an xbow or xbridge
 	 */
-	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_IOBRICK_XBOW);
+	brd = find_lboard_nasid((lboard_t *)KL_CONFIG_INFO(nasid), nasid, KLTYPE_IOBRICK_XBOW);
 	if (brd == NULL) return 0;
 		
 	if ((xbow_p = (klxbow_t *)find_component(brd, NULL, KLSTRUCT_XBOW))
@@ -284,40 +312,6 @@ board_to_path(lboard_t *brd, char *path)
 }
 
 #define MHZ	1000000
-
-
-/* Get the canonical hardware graph name for the given pci component
- * on the given io board.
- */
-void
-device_component_canonical_name_get(lboard_t 	*brd,
-				    klinfo_t 	*component,
-				    char 	*name)
-{
-	slotid_t 	slot;
-	char 		board_name[20];
-
-	ASSERT(brd);
-
-	/* Convert the [ CLASS | TYPE ] kind of slotid
-	 * into a string
-	 */
-	slot = brd->brd_slot;
-
-	/* Get the io board name  */
-	if (!brd || (brd->brd_sversion < 2)) {
-		strcpy(name, EDGE_LBL_XWIDGET);
-	} else {
-		nic_name_convert(brd->brd_name, board_name);
-	}
-
-	/* Give out the canonical  name of the pci device*/
-	sprintf(name,
-		"/dev/hw/"EDGE_LBL_MODULE "/%x/"EDGE_LBL_SLAB"/%d/"
-		EDGE_LBL_SLOT"/%s/"EDGE_LBL_PCI"/%d",
-		geo_module(brd->brd_geoid), geo_slab(brd->brd_geoid), 
-		board_name, KLCF_BRIDGE_W_ID(component));
-}
 
 /*
  * Get the serial number of the main  component of a board
@@ -506,7 +500,7 @@ void
 format_module_id(char *buffer, moduleid_t m, int fmt)
 {
 	int rack, position;
-	char brickchar;
+	unsigned char brickchar;
 
 	rack = MODULE_GET_RACK(m);
 	ASSERT(MODULE_GET_BTYPE(m) < MAX_BRICK_TYPES);
@@ -560,112 +554,21 @@ format_module_id(char *buffer, moduleid_t m, int fmt)
 
 }
 
-/*
- * Parse a module id, in either brief or long form.
- * Returns < 0 on error.
- * The long form does not include a brick type, so it defaults to 0 (CBrick)
- */
-int
-parse_module_id(char *buffer)
-{
-	unsigned int	v, rack, bay, type, form;
-	moduleid_t	m;
-	char 		c;
-
-	if (strstr(buffer, EDGE_LBL_RACK "/") == buffer) {
-		form = MODULE_FORMAT_LONG;
-		buffer += strlen(EDGE_LBL_RACK "/");
-
-		/* A long module ID must be exactly 5 non-template chars. */
-		if (strlen(buffer) != strlen("/" EDGE_LBL_RPOS "/") + 5)
-			return -1;
-	}
-	else {
-		form = MODULE_FORMAT_BRIEF;
-
-		/* A brief module id must be exactly 6 characters */
-		if (strlen(buffer) != 6)
-			return -2;
-	}
-
-	/* The rack number must be exactly 3 digits */
-	if (!(isdigit(buffer[0]) && isdigit(buffer[1]) && isdigit(buffer[2])))
-		return -3;
-
-	rack = 0;
-	v = *buffer++ - '0';
-	if (v > RACK_CLASS_MASK(rack) >> RACK_CLASS_SHFT(rack))
-		return -4;
-	RACK_ADD_CLASS(rack, v);
-
-	v = *buffer++ - '0';
-	if (v > RACK_GROUP_MASK(rack) >> RACK_GROUP_SHFT(rack))
-		return -5;
-	RACK_ADD_GROUP(rack, v);
-
-	v = *buffer++ - '0';
-	/* rack numbers are 1-based */
-	if (v-1 > RACK_NUM_MASK(rack) >> RACK_NUM_SHFT(rack))
-		return -6;
-	RACK_ADD_NUM(rack, v);
-
-	if (form == MODULE_FORMAT_BRIEF) {
-		/* Next should be a module type character.  Accept ucase or lcase. */
-		c = *buffer++;
-		if (!isalpha(c))
-			return -7;
-
-		/* strchr() returns a pointer into brick_types[], or NULL */
-		type = (unsigned int)(strchr(brick_types, tolower(c)) - brick_types);
-		if (type > MODULE_BTYPE_MASK >> MODULE_BTYPE_SHFT)
-			return -8;
-	}
-	else {
-		/* Hardcode the module type, and skip over the boilerplate */
-		type = MODULE_CBRICK;
-
-		if (strstr(buffer, "/" EDGE_LBL_RPOS "/") != buffer)
-			return -9;
-
-		buffer += strlen("/" EDGE_LBL_RPOS "/");
-	}
-		
-	/* The bay number is last.  Make sure it's exactly two digits */
-
-	if (!(isdigit(buffer[0]) && isdigit(buffer[1]) && !buffer[2]))
-		return -10;
-
-	bay = 10 * (buffer[0] - '0') + (buffer[1] - '0');
-
-	if (bay > MODULE_BPOS_MASK >> MODULE_BPOS_SHFT)
-		return -11;
-
-	m = RBT_TO_MODULE(rack, bay, type);
-
-	/* avoid sign extending the moduleid_t */
-	return (int)(unsigned short)m;
-}
-
 int
 cbrick_type_get_nasid(nasid_t nasid)
 {
-	lboard_t *brd;
 	moduleid_t module;
-	uint type;
 	int t;
 
-	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
-	module = geo_module(brd->brd_geoid);
-	type = (module & MODULE_BTYPE_MASK) >> MODULE_BTYPE_SHFT;
-	/* convert brick_type to lower case */
-	if ((type >= 'A') && (type <= 'Z'))
-		type = type - 'A' + 'a';
-    
-	/* convert to a module.h brick type */
-	for( t = 0; t < MAX_BRICK_TYPES; t++ ) {
-		if( brick_types[t] == type ) {
-			return t;
-		}
-	} 
+	module = iomoduleid_get(nasid);
+	if (module < 0 ) {
+		return MODULE_CBRICK;
+	}
+	t = MODULE_GET_BTYPE(module);
+	if ((char)t == 'o') {
+		return MODULE_OPUSBRICK;
+	} else {
+		return MODULE_CBRICK;
+	}
 	return -1;
 }

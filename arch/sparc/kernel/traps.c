@@ -121,7 +121,6 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 		      !(((unsigned long) rw) & 0x7)) {
 			printk("Caller[%08lx]", rw->ins[7]);
 			print_symbol(": %s\n", rw->ins[7]);
-			printk("\n");
 			rw = (struct reg_window *)rw->ins[6];
 		}
 	}

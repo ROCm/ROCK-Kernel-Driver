@@ -134,8 +134,8 @@ acpi_pci_root_add (
 	memset(root, 0, sizeof(struct acpi_pci_root));
 
 	root->handle = device->handle;
-	sprintf(acpi_device_name(device), "%s", ACPI_PCI_ROOT_DEVICE_NAME);
-	sprintf(acpi_device_class(device), "%s", ACPI_PCI_ROOT_CLASS);
+	strcpy(acpi_device_name(device), ACPI_PCI_ROOT_DEVICE_NAME);
+	strcpy(acpi_device_class(device), ACPI_PCI_ROOT_CLASS);
 	acpi_driver_data(device) = root;
 
 	/*

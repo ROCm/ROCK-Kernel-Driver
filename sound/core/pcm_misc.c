@@ -553,8 +553,9 @@ int snd_pcm_format_set_silence(snd_pcm_format_t format, void *data, unsigned int
 		if (! silence)
 			memset(data, 0, samples * 2);
 		else {
+			u_int16_t *data16 = data;
 			while (samples-- > 0)
-				*((u_int16_t *)data)++ = silence;
+				*data16++ = silence;
 		}
 		break;
 	}
@@ -564,14 +565,15 @@ int snd_pcm_format_set_silence(snd_pcm_format_t format, void *data, unsigned int
 			memset(data, 0, samples * 3);
 		else {
 			while (samples-- > 0) {
+				u_int8_t *data8 = data;
 #ifdef SNDRV_LITTLE_ENDIAN
-				*((u_int8_t *)data)++ = silence >> 0;
-				*((u_int8_t *)data)++ = silence >> 8;
-				*((u_int8_t *)data)++ = silence >> 16;
+				*data8++ = silence >> 0;
+				*data8++ = silence >> 8;
+				*data8++ = silence >> 16;
 #else
-				*((u_int8_t *)data)++ = silence >> 16;
-				*((u_int8_t *)data)++ = silence >> 8;
-				*((u_int8_t *)data)++ = silence >> 0;
+				*data8++ = silence >> 16;
+				*data8++ = silence >> 8;
+				*data8++ = silence >> 0;
 #endif
 			}
 		}
@@ -582,8 +584,9 @@ int snd_pcm_format_set_silence(snd_pcm_format_t format, void *data, unsigned int
 		if (! silence)
 			memset(data, 0, samples * 4);
 		else {
+			u_int32_t *data32 = data;
 			while (samples-- > 0)
-				*((u_int32_t *)data)++ = silence;
+				*data32++ = silence;
 		}
 		break;
 	}
@@ -592,8 +595,9 @@ int snd_pcm_format_set_silence(snd_pcm_format_t format, void *data, unsigned int
 		if (! silence)
 			memset(data, 0, samples * 8);
 		else {
+			u_int64_t *data64 = data;
 			while (samples-- > 0)
-				*((u_int64_t *)data)++ = silence;
+				*data64++ = silence;
 		}
 		break;
 	}

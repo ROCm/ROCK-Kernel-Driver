@@ -5,4 +5,4 @@ obj-y			:= core.o sys.o interface.o bus.o \
 			   cpu.o firmware.o init.o map.o
 obj-y			+= power/
 obj-$(CONFIG_FW_LOADER)	+= firmware_class.o
-obj-$(CONFIG_NUMA)	+= node.o  memblk.o
+obj-$(CONFIG_NUMA)	+= node.o

@@ -40,10 +40,9 @@ My primary goals in writing this completely new BusLogic driver for Linux are
 to achieve the full performance that BusLogic SCSI Host Adapters and modern
 SCSI peripherals are capable of, and to provide a highly robust driver that can
 be depended upon for high performance mission critical applications.  All of
-the major performance and error recovery features can be configured from the
-Linux kernel command line or at module initialization time, allowing individual
-installations to tune driver performance and error recovery to their particular
-needs.
+the major performance features can be configured from the Linux kernel command
+line or at module initialization time, allowing individual installations to
+tune driver performance and error recovery to their particular needs.
 
 The latest information on Linux support for BusLogic SCSI Host Adapters, as
 well as the most recent release of this driver and the latest firmware for the
@@ -95,10 +94,10 @@ o Configuration Reporting and Testing
   adapter hardware configuration, including the synchronous transfer parameters
   requested and negotiated with each target device.  AutoSCSI settings for
   Synchronous Negotiation, Wide Negotiation, and Disconnect/Reconnect are
-  reported for each target device, as well as the status of Tagged Queuing and
-  Error Recovery.  If the same setting is in effect for all target devices,
-  then a single word or phrase is used; otherwise, a letter is provided for
-  each target device to indicate the individual status.  The following examples
+  reported for each target device, as well as the status of Tagged Queuing.
+  If the same setting is in effect for all target devices, then a single word
+  or phrase is used; otherwise, a letter is provided for each target device to
+  indicate the individual status.  The following examples
   should clarify this reporting format:
 
     Synchronous Negotiation: Ultra
@@ -130,9 +129,6 @@ o Configuration Reporting and Testing
 
     The status of Wide Negotiation, Disconnect/Reconnect, and Tagged Queuing
     are reported as "Enabled", Disabled", or a sequence of "Y" and "N" letters.
-
-    The Error Recovery option is reported as "Default", "Hard Reset",
-    "Bus Device Reset", "None" or a sequence of "D", "H", "B", and "N" letters.
 
 o Performance Features
 
@@ -476,48 +472,6 @@ TaggedQueuing:<Target-Spec>
   Target Device 1, and so on; if the sequence of "Y", "N", and "X" characters
   does not cover all the Target Devices, unspecified characters are assumed
   to be "X".
-
-The BusLogic Driver Error Recovery Option allows for explicitly specifying
-the Error Recovery action to be performed when BusLogic_ResetCommand is
-called due to a SCSI Command failing to complete successfully.  The following
-options are available:
-
-ErrorRecovery:Default
-
-  The "ErrorRecovery:Default" or "ER:Default" option selects between the Hard
-  Reset and Bus Device Reset options based on the recommendation of the SCSI
-  Subsystem.
-
-ErrorRecovery:HardReset
-
-  The "ErrorRecovery:HardReset" or "ER:HardReset" option will initiate a Host
-  Adapter Hard Reset which also causes a SCSI Bus Reset.
-
-ErrorRecovery:BusDeviceReset
-
-  The "ErrorRecovery:BusDeviceReset" or "ER:BusDeviceReset" option will send
-  a Bus Device Reset message to the individual Target Device causing the
-  error.  If Error Recovery is again initiated for this Target Device and no
-  SCSI Command to this Target Device has completed successfully since the Bus
-  Device Reset message was sent, then a Hard Reset will be attempted.
-
-ErrorRecovery:None
-
-  The "ErrorRecovery:None" or "ER:None" option suppresses Error Recovery.
-  This option should only be selected if a SCSI Bus Reset or Bus Device Reset
-  will cause the Target Device or a critical operation to suffer a complete
-  and unrecoverable failure.
-
-ErrorRecovery:<Target-Spec>
-
-  The "ErrorRecovery:<Target-Spec>" or "ER:<Target-Spec>" option controls
-  Error Recovery individually for each Target Device.  <Target-Spec> is a
-  sequence of "D", "H", "B", and "N" characters.  "D" selects Default, "H"
-  selects Hard Reset, "B" selects Bus Device Reset, and "N" selects None.
-  The first character refers to Target Device 0, the second to Target Device
-  1, and so on; if the sequence of "D", "H", "B", and "N" characters does not
-  cover all the possible Target Devices, unspecified characters are assumed
-  to be "D".
 
 The BusLogic Driver Miscellaneous Options comprise the following:
 

@@ -1296,10 +1296,14 @@ static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 			break;
 		if (dentry == vfsmnt->mnt_root || IS_ROOT(dentry)) {
 			/* Global root? */
-			if (vfsmnt->mnt_parent == vfsmnt)
+			spin_lock(&vfsmount_lock);
+			if (vfsmnt->mnt_parent == vfsmnt) {
+				spin_unlock(&vfsmount_lock);
 				goto global_root;
+			}
 			dentry = vfsmnt->mnt_mountpoint;
 			vfsmnt = vfsmnt->mnt_parent;
+			spin_unlock(&vfsmount_lock);
 			continue;
 		}
 		parent = dentry->d_parent;
@@ -1429,15 +1433,23 @@ out:
  *
  * Returns 1 if new_dentry is a subdirectory of the parent (at any depth).
  * Returns 0 otherwise.
+ * Caller must ensure that "new_dentry" is pinned before calling is_subdir()
  */
   
 int is_subdir(struct dentry * new_dentry, struct dentry * old_dentry)
 {
 	int result;
+	struct dentry * saved = new_dentry;
 	unsigned long seq;
 
 	result = 0;
+	/* need rcu_readlock to protect against the d_parent trashing due to
+	 * d_move
+	 */
+	rcu_read_lock();
         do {
+		/* for restarting inner loop in case of seq retry */
+		new_dentry = saved;
 		seq = read_seqbegin(&rename_lock);
 		for (;;) {
 			if (new_dentry != old_dentry) {
@@ -1451,6 +1463,7 @@ int is_subdir(struct dentry * new_dentry, struct dentry * old_dentry)
 			break;
 		}
 	} while (read_seqretry(&rename_lock, seq));
+	rcu_read_unlock();
 
 	return result;
 }

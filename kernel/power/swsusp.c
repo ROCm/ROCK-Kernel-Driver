@@ -59,6 +59,7 @@
 #include <linux/buffer_head.h>
 #include <linux/swapops.h>
 #include <linux/bootmem.h>
+#include <linux/console.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -283,8 +284,8 @@ static void lock_swapdevices(void) /* This is called after saving image so modif
  *    would happen on next reboot -- corrupting data.
  *
  *    Note: The buffer we allocate to use to write the suspend header is
- *    not freed; its not needed since system is going down anyway
- *    (plus it causes oops and I'm lazy^H^H^H^Htoo busy).
+ *    not freed; its not needed since the system is going down anyway
+ *    (plus it causes an oops and I'm lazy^H^H^H^Htoo busy).
  */
 static int write_suspend_image(void)
 {
@@ -340,6 +341,7 @@ static int write_suspend_image(void)
 	printk("H");
 	BUG_ON (sizeof(struct suspend_header) > PAGE_SIZE-sizeof(swp_entry_t));
 	BUG_ON (sizeof(union diskpage) != PAGE_SIZE);
+	BUG_ON (sizeof(struct link) != PAGE_SIZE);
 	if (!(entry = get_swap_page()).val)
 		panic( "\nNot enough swapspace when writing header" );
 	if (swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
@@ -488,33 +490,6 @@ static void free_some_memory(void)
 	printk("|\n");
 }
 
-/* Make disk drivers accept operations, again */
-static void drivers_unsuspend(void)
-{
-	device_resume();
-}
-
-/* Called from process context */
-static int drivers_suspend(void)
-{
-	return device_suspend(4);
-}
-
-#define RESUME_PHASE1 1 /* Called from interrupts disabled */
-#define RESUME_PHASE2 2 /* Called with interrupts enabled */
-#define RESUME_ALL_PHASES (RESUME_PHASE1 | RESUME_PHASE2)
-static void drivers_resume(int flags)
-{
-	if (flags & RESUME_PHASE1) {
-		device_resume();
-	}
-  	if (flags & RESUME_PHASE2) {
-#ifdef SUSPEND_CONSOLE
-		update_screen(fg_console);	/* Hmm, is this the problem? */
-#endif
-	}
-}
-
 static int suspend_prepare_image(void)
 {
 	struct sysinfo i;
@@ -569,7 +544,7 @@ static int suspend_prepare_image(void)
 
 static void suspend_save_image(void)
 {
-	drivers_unsuspend();
+	device_resume();
 
 	lock_swapdevices();
 	write_suspend_image();
@@ -615,6 +590,7 @@ void do_magic_resume_1(void)
 	mb();
 	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
 
+	device_power_down(4);
 	PRINTK( "Waiting for DMAs to settle down...\n");
 	mdelay(1000);	/* We do not want some readahead with DMA to corrupt our memory, right?
 			   Do it with disabled interrupts for best effect. That way, if some
@@ -630,8 +606,13 @@ void do_magic_resume_2(void)
 
 	PRINTK( "Freeing prev allocated pagedir\n" );
 	free_suspend_pagedir((unsigned long) pagedir_save);
+	device_power_up();
 	spin_unlock_irq(&suspend_pagedir_lock);
-	drivers_resume(RESUME_ALL_PHASES);
+	device_resume();
+
+	acquire_console_sem();
+	update_screen(fg_console);	/* Hmm, is this the problem? */
+	release_console_sem();
 
 	PRINTK( "Fixing swap signatures... " );
 	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
@@ -672,7 +653,9 @@ void do_magic_suspend_2(void)
 {
 	int is_problem;
 	read_swapfiles();
+	device_power_down(4);
 	is_problem = suspend_prepare_image();
+	device_power_up();
 	spin_unlock_irq(&suspend_pagedir_lock);
 	if (!is_problem) {
 		kernel_fpu_end();	/* save_processor_state() does kernel_fpu_begin, and we need to revert it in order to pass in_atomic() checks */
@@ -694,11 +677,22 @@ void do_magic_suspend_2(void)
 	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
 }
 
-static void do_software_suspend(void)
+/*
+ * This is main interface to the outside world. It needs to be
+ * called from process context.
+ */
+int software_suspend(void)
 {
+	int res;
+	if (!software_suspend_enabled)
+		return -EAGAIN;
+
+	software_suspend_enabled = 0;
+	might_sleep();
+
 	if (arch_prepare_suspend()) {
 		printk("%sArchitecture failed to prepare\n", name_suspend);
-		return;
+		return -EPERM;
 	}		
 	if (pm_prepare_console())
 		printk( "%sCan't allocate a console... proceeding\n", name_suspend);
@@ -716,7 +710,7 @@ static void do_software_suspend(void)
 		blk_run_queues();
 
 		/* Save state of all device drivers, and stop them. */		   
-		if(drivers_suspend()==0)
+		if ((res = device_suspend(4))==0)
 			/* If stopping device drivers worked, we proceed basically into
 			 * suspend_save_image.
 			 *
@@ -728,24 +722,12 @@ static void do_software_suspend(void)
 			 */
 			do_magic(0);
 		thaw_processes();
-	}
+	} else
+		res = -EBUSY;
 	software_suspend_enabled = 1;
 	MDELAY(1000);
 	pm_restore_console();
-}
-
-/*
- * This is main interface to the outside world. It needs to be
- * called from process context.
- */
-void software_suspend(void)
-{
-	if(!software_suspend_enabled)
-		return;
-
-	software_suspend_enabled = 0;
-	might_sleep();
-	do_software_suspend();
+	return res;
 }
 
 /* More restore stuff */
@@ -856,23 +838,23 @@ static int relocate_pagedir(void)
 
 static int sanity_check_failed(char *reason)
 {
-	printk(KERN_ERR "%s%s\n",name_resume,reason);
+	printk(KERN_ERR "%s%s\n", name_resume, reason);
 	return -EPERM;
 }
 
 static int sanity_check(struct suspend_header *sh)
 {
-	if(sh->version_code != LINUX_VERSION_CODE)
+	if (sh->version_code != LINUX_VERSION_CODE)
 		return sanity_check_failed("Incorrect kernel version");
-	if(sh->num_physpages != num_physpages)
+	if (sh->num_physpages != num_physpages)
 		return sanity_check_failed("Incorrect memory size");
-	if(strncmp(sh->machine, system_utsname.machine, 8))
+	if (strncmp(sh->machine, system_utsname.machine, 8))
 		return sanity_check_failed("Incorrect machine type");
-	if(strncmp(sh->version, system_utsname.version, 20))
+	if (strncmp(sh->version, system_utsname.version, 20))
 		return sanity_check_failed("Incorrect version");
-	if(sh->num_cpus != num_online_cpus())
+	if (sh->num_cpus != num_online_cpus())
 		return sanity_check_failed("Incorrect number of cpus");
-	if(sh->page_size != PAGE_SIZE)
+	if (sh->page_size != PAGE_SIZE)
 		return sanity_check_failed("Incorrect PAGE_SIZE");
 	return 0;
 }
@@ -915,7 +897,7 @@ static int bdev_write_page(struct block_device *bdev, long pos, void *buf)
 
 extern dev_t __init name_to_dev_t(const char *line);
 
-static int __read_suspend_image(struct block_device *bdev, union diskpage *cur, int noresume)
+static int __init __read_suspend_image(struct block_device *bdev, union diskpage *cur, int noresume)
 {
 	swp_entry_t next;
 	int i, nr_pgdir_pages;
@@ -1091,6 +1073,7 @@ static int __init software_resume(void)
 	printk( "resuming from %s\n", resume_file);
 	if (read_suspend_image(resume_file, 0))
 		goto read_failure;
+	device_suspend(4);
 	do_magic(1);
 	panic("This never returns");
 

@@ -181,7 +181,7 @@ config CPU_FREQ_TABLE
 
 config PPC601_SYNC_FIX
 	bool "Workarounds for PPC601 bugs"
-	depends on 6xx
+	depends on 6xx && (PPC_PREP || PPC_PMAC)
 	help
 	  Some versions of the PPC601 (the first PowerPC chip) have bugs which
 	  mean that extra synchronization instructions are required near
@@ -583,11 +583,6 @@ config PPC_CHRP
 	depends on PPC_MULTIPLATFORM
 	default y
 
-config PPC_GEN550
-	bool
-	depends on SANDPOINT
-	default y
-
 config PPC_PMAC
 	bool
 	depends on PPC_MULTIPLATFORM
@@ -601,6 +596,11 @@ config PPC_PREP
 config PPC_OF
 	bool
 	depends on PPC_PMAC || PPC_CHRP
+	default y
+
+config PPC_GEN550
+	bool
+	depends on SANDPOINT || MCPN765
 	default y
 
 config FORCE
@@ -1404,7 +1404,7 @@ config BOOTX_TEXT
 
 config SERIAL_TEXT_DEBUG
 	bool "Support for early boot texts over serial port"
-	depends on 4xx || GT64260 || LOPEC || MCPN765 || PPLUS || PRPMC800 || SANDPOINT
+	depends on 4xx || GT64260 || LOPEC || PPLUS || PRPMC800 || PPC_GEN550
 
 config OCP
 	bool

@@ -114,15 +114,16 @@ static int map_area_pmd(pmd_t *pmd, unsigned long address,
 			       unsigned long size, pgprot_t prot,
 			       struct page ***pages)
 {
-	unsigned long end;
+	unsigned long base, end;
 
+	base = address & PGDIR_MASK;
 	address &= ~PGDIR_MASK;
 	end = address + size;
 	if (end > PGDIR_SIZE)
 		end = PGDIR_SIZE;
 
 	do {
-		pte_t * pte = pte_alloc_kernel(&init_mm, pmd, address);
+		pte_t * pte = pte_alloc_kernel(&init_mm, pmd, base + address);
 		if (!pte)
 			return -ENOMEM;
 		if (map_area_pte(pte, address, end - address, prot, pages))

@@ -2288,8 +2288,6 @@ restore_via_state(void)
 }
 
 extern long sys_sync(void);
-extern void pm_prepare_console(void);
-extern void pm_restore_console(void);
 
 static int __pmac
 pmac_suspend_devices(void)
