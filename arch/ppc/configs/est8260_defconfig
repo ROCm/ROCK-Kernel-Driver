@@ -461,11 +461,6 @@ CONFIG_SCC_ENET=y
 CONFIG_SCC_CONSOLE=y
 
 #
-# Generic MPC8260 Options
-#
-# CONFIG_DCACHE_DISABLE is not set
-
-#
 # USB support
 #
 # CONFIG_USB_GADGET is not set
