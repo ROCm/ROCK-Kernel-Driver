@@ -522,7 +522,7 @@ static inline void unmap_cpu_to_node(int cpu)
 	printk("Unmapping cpu %d from all nodes\n", cpu);
 	for (node = 0; node < MAX_NUMNODES; node ++)
 		cpu_clear(cpu, node_2_cpu_mask[node]);
-	cpu_2_node[cpu] = -1;
+	cpu_2_node[cpu] = 0;
 }
 #else /* !CONFIG_NUMA */
 
