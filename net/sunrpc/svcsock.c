@@ -324,10 +324,8 @@ svc_wake_up(struct svc_serv *serv)
 static int
 svc_sendto(struct svc_rqst *rqstp, struct xdr_buf *xdr)
 {
-	mm_segment_t	oldfs;
 	struct svc_sock	*svsk = rqstp->rq_sock;
 	struct socket	*sock = svsk->sk_sock;
-	struct msghdr	msg;
 	int		slen;
 	int		len = 0;
 	int		result;
@@ -339,23 +337,23 @@ svc_sendto(struct svc_rqst *rqstp, struct xdr_buf *xdr)
 
 	slen = xdr->len;
 
-	msg.msg_name    = &rqstp->rq_addr;
-	msg.msg_namelen = sizeof(rqstp->rq_addr);
-	msg.msg_iov     = NULL;
-	msg.msg_iovlen  = 0;
-	msg.msg_control = NULL;
-	msg.msg_controllen = 0;
-	msg.msg_flags	= MSG_MORE;
-
 	/* Grab svsk->sk_sem to serialize outgoing data. */
 	down(&svsk->sk_sem);
 
-	/* set the destination */
-	oldfs = get_fs(); set_fs(KERNEL_DS);
-	len = sock_sendmsg(sock, &msg, 0);
-	set_fs(oldfs);
-	if (len < 0)
-		goto out;
+	if (rqstp->rq_prot == IPPROTO_UDP) {
+		/* set the destination */
+		struct msghdr	msg;
+		msg.msg_name    = &rqstp->rq_addr;
+		msg.msg_namelen = sizeof(rqstp->rq_addr);
+		msg.msg_iov     = NULL;
+		msg.msg_iovlen  = 0;
+		msg.msg_control = NULL;
+		msg.msg_controllen = 0;
+		msg.msg_flags	= MSG_MORE;
+
+		if (sock_sendmsg(sock, &msg, 0) < 0)
+			goto out;
+	}
 
 	/* send head */
 	if (slen == xdr->head[0].iov_len)
