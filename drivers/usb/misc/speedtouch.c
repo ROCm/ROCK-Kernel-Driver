@@ -82,7 +82,7 @@
 #endif
 
 #define DRIVER_AUTHOR	"Johan Verrept, Johan.Verrept@advalvas.be"
-#define DRIVER_DESC	"Driver for the Alcatel Speed Touch USB ADSL modem"
+#define DRIVER_DESC	"Driver for the Alcatel SpeedTouch USB ADSL modem"
 #define DRIVER_VERSION	"1.5A"
 
 #define SPEEDTOUCH_VENDORID		0x06b9
@@ -287,7 +287,7 @@ static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page
 	int left = *pos;
 
 	if (!left--)
-		return sprintf (page, "Speed Touch USB %s-%s (%02x:%02x:%02x:%02x:%02x:%02x)\n",
+		return sprintf (page, "SpeedTouch USB %s-%s (%02x:%02x:%02x:%02x:%02x:%02x)\n",
 				instance->usb_dev->bus->bus_name, instance->usb_dev->devpath,
 				atm_dev->esi[0], atm_dev->esi[1], atm_dev->esi[2],
 				atm_dev->esi[3], atm_dev->esi[4], atm_dev->esi[5]);
