@@ -57,6 +57,7 @@
 #include <asm/keyboard.h>
 #include <asm/vga.h>
 #include <asm/time.h>
+#include <asm/mpc10x.h>
 #include <asm/i8259.h>
 #include <asm/open_pic.h>
 
@@ -700,7 +701,7 @@ prep_init_IRQ(void)
 		openpic_init(1, NUM_8259_INTERRUPTS, 0, -1);
 	for ( i = 0 ; i < NUM_8259_INTERRUPTS ; i++ )
 		irq_desc[i].handler = &i8259_pic;
-	i8259_init(0xbffffff0); /* PCI interrupt ack address for MPC105 and 106 */
+	i8259_init(MPC10X_MAPA_PCI_INTACK_ADDR);
 }
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
