@@ -77,25 +77,17 @@ static int file_ioctl(struct file *filp, unsigned int cmd,
 	return do_ioctl(filp, cmd, arg);
 }
 
-
 /*
  * When you add any new common ioctls to the switches above and below
  * please update compat_sys_ioctl() too.
+ *
+ * vfs_ioctl() is not for drivers and not intended to be EXPORT_SYMBOL()'d.
+ * It's just a simple helper for sys_ioctl and compat_sys_ioctl.
  */
-asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+int vfs_ioctl(struct file *filp, unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	struct file * filp;
 	unsigned int flag;
-	int on, error = -EBADF;
-	int fput_needed;
-
-	filp = fget_light(fd, &fput_needed);
-	if (!filp)
-		goto out;
-
-	error = security_file_ioctl(filp, cmd, arg);
-	if (error)
-		goto out_fput;
+	int on, error = 0;
 
 	switch (cmd) {
 		case FIOCLEX:
@@ -161,6 +153,24 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 				error = do_ioctl(filp, cmd, arg);
 			break;
 	}
+	return error;
+}
+
+asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct file * filp;
+	int error = -EBADF;
+	int fput_needed;
+
+	filp = fget_light(fd, &fput_needed);
+	if (!filp)
+		goto out;
+
+	error = security_file_ioctl(filp, cmd, arg);
+	if (error)
+		goto out_fput;
+
+	error = vfs_ioctl(filp, fd, cmd, arg);
  out_fput:
 	fput_light(filp, fput_needed);
  out:

@@ -439,6 +439,11 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 	if (!filp)
 		goto out;
 
+	/* RED-PEN how should LSM module know it's handling 32bit? */
+	error = security_file_ioctl(filp, cmd, arg);
+	if (error)
+		goto out_fput;
+
 	/*
 	 * To allow the compat_ioctl handlers to be self contained
 	 * we need to check the common ioctls here first.
@@ -496,11 +501,6 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 
  found_handler:
 	if (t->handler) {
-		/* RED-PEN how should LSM module know it's handling 32bit? */
-		error = security_file_ioctl(filp, cmd, arg);
-		if (error)
-			goto out_fput;
-
 		lock_kernel();
 		error = t->handler(fd, cmd, arg, filp);
 		unlock_kernel();
@@ -510,7 +510,7 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 
 	up_read(&ioctl32_sem);
  do_ioctl:
-	error = sys_ioctl(fd, cmd, arg);
+	error = vfs_ioctl(filp, fd, cmd, arg);
  out_fput:
 	fput_light(filp, fput_needed);
  out:
