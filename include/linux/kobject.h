@@ -37,6 +37,7 @@ struct subsystem {
 	struct subsystem	* parent;
 	void (*release)(struct kobject *);
 	struct sysfs_ops	* sysfs_ops;
+	struct attribute	** default_attrs;
 };
 
 extern void subsystem_init(struct subsystem *);

@@ -22,7 +22,7 @@ struct kobject {
 	struct list_head	entry;
 	struct kobject		* parent;
 	struct subsystem	* subsys;
-	struct sysfs_dir	dir;
+	struct dentry		* dentry;
 };
 
 void kobject_init(struct kobject *);
@@ -41,13 +41,15 @@ contain lists of kobjects that belong to that subsystem. Objects of a
 subsystem (the embedder objects in which kobjects live) are all of the
 same type. The interface looks like:
 
+
 struct subsystem {
 	struct kobject		kobj;
 	struct list_head	list;
 	struct rw_semaphore	rwsem;
 	struct subsystem	* parent;
-	struct sysfs_ops	* sysfs_ops;
 	void (*release)(struct kobject *);
+	struct sysfs_ops	* sysfs_ops;
+	struct attribute	** default_attrs;
 };
 
 void subsystem_init(struct subsystem *);
@@ -123,6 +125,14 @@ of struct driver_dir_entry. Since all kobjects belong to a subsystem
 that contains kobjects all of the same type, the sysfs operations
 have been moved to reside in the subsystem, since they are common for
 all kobjects.
+
+
+Default Attributes
+
+Most subsystems have a set of default attributes associated with an
+object that registers with them. A subsystem definition may contain a
+NULL-terminated array of attributes that will be exported when an
+object is registered with the subsystem. 
 
 
 Reference Counting

@@ -9,6 +9,34 @@
 #include <linux/stat.h>
 
 /**
+ *	kobject_populate_dir - populate directory with attributes.
+ *	@kobj:	object we're working on.
+ *
+ *	Most subsystems have a set of default attributes that 
+ *	are associated with an object that registers with them.
+ *	This is a helper called during object registration that 
+ *	loops through the default attributes of the subsystem 
+ *	and creates attributes files for them in sysfs.
+ *
+ */
+
+static int kobject_populate_dir(struct kobject * kobj)
+{
+	struct subsystem * s = kobj->subsys;
+	struct attribute * attr;
+	int error = 0;
+	int i;
+	
+	if (s && s->default_attrs) {
+		for (i = 0; (attr = s->default_attrs[i]); i++) {
+			if ((error = sysfs_create_file(kobj,attr)))
+				break;
+		}
+	}
+	return error;
+}
+
+/**
  *	kobject_init - initialize object.
  *	@kobj:	object in question.
  */
@@ -31,10 +59,13 @@ void kobject_init(struct kobject * kobj)
 
 int kobject_register(struct kobject * kobj)
 {
+	int error = 0;
 	struct subsystem * s = subsys_get(kobj->subsys);
 	struct kobject * parent = kobject_get(kobj->parent);
 
 	pr_debug("kobject %s: registering\n",kobj->name);
+	if (parent)
+		pr_debug("  parent is %s\n",parent->name);
 	if (s) {
 		down_write(&s->rwsem);
 		if (parent) 
@@ -45,7 +76,13 @@ int kobject_register(struct kobject * kobj)
 		}
 		up_write(&s->rwsem);
 	}
-	return sysfs_create_dir(kobj);
+	error = sysfs_create_dir(kobj);
+	if (!error) {
+		error = kobject_populate_dir(kobj);
+		if (error)
+			sysfs_remove_dir(kobj);
+	}
+	return error;
 }
 
 /**
@@ -141,6 +178,8 @@ int subsystem_register(struct subsystem * s)
 	if (s->parent)
 		s->kobj.parent = &s->parent->kobj;
 	pr_debug("subsystem %s: registering\n",s->kobj.name);
+	if (s->parent)
+		pr_debug("  parent is %s\n",s->parent->kobj.name);
 	return kobject_register(&s->kobj);
 }
 
