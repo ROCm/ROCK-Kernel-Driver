@@ -829,10 +829,10 @@ snd_pmac_awacs_init(pmac_t *chip)
 				snd_pmac_awacs_mixers)) < 0)
 		return err;
 	if (chip->model == PMAC_SCREAMER)
-		err = build_mixers(chip, num_controls(snd_pmac_screamer_mixers2),
+		err = build_mixers(chip, ARRAY_SIZE(snd_pmac_screamer_mixers2),
 				   snd_pmac_screamer_mixers2);
 	else
-		err = build_mixers(chip, num_controls(snd_pmac_awacs_mixers2),
+		err = build_mixers(chip, ARRAY_SIZE(snd_pmac_awacs_mixers2),
 				   snd_pmac_awacs_mixers2);
 	if (err < 0)
 		return err;
