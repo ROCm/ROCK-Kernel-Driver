@@ -32,18 +32,19 @@
 	* Rx checksumming
 	* Tx checksumming
 	* ETHTOOL_GREGS, ETHTOOL_[GS]WOL,
-	* Jumbo frames / dev->change_mtu
 	* Investigate using skb->priority with h/w VLAN priority
 	* Investigate using High Priority Tx Queue with skb->priority
 	* Adjust Rx FIFO threshold and Max Rx DMA burst on Rx FIFO error
 	* Adjust Tx FIFO threshold and Max Tx DMA burst on Tx FIFO error
         * Implement Tx software interrupt mitigation via
 	          Tx descriptor bit
+	* Determine correct value for CP_{MIN,MAX}_MTU, instead of
+	  using conservative guesses.
 
  */
 
 #define DRV_NAME		"8139cp"
-#define DRV_VERSION		"0.0.6cvs"
+#define DRV_VERSION		"0.0.6"
 #define DRV_RELDATE		"Nov 19, 2001"
 
 
@@ -55,7 +56,6 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/ethtool.h>
-#include <linux/crc32.h>
 #include <linux/mii.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -107,8 +107,11 @@ MODULE_PARM_DESC (multicast_filter_limit, "8139cp maximum number of filtered mul
 #define TX_EARLY_THRESH		256	/* Early Tx threshold, in bytes */
 
 /* Time in jiffies before concluding the transmitter is hung. */
-#define TX_TIMEOUT  (6*HZ)
+#define TX_TIMEOUT		(6*HZ)
 
+/* hardware minimum and maximum for a single frame's data payload */
+#define CP_MIN_MTU		60	/* FIXME: this is a guess */
+#define CP_MAX_MTU		1500	/* FIXME: this is a guess */
 
 enum {
 	/* NIC register offsets */
@@ -320,6 +323,17 @@ static struct pci_device_id cp_pci_tbl[] __devinitdata = {
 	{ },
 };
 MODULE_DEVICE_TABLE(pci, cp_pci_tbl);
+
+static inline void cp_set_rxbufsize (struct cp_private *cp)
+{
+	unsigned int mtu = cp->dev->mtu;
+	
+	if (mtu > ETH_DATA_LEN)
+		/* MTU + ethernet header + FCS + optional VLAN tag */
+		cp->rx_buf_sz = mtu + ETH_HLEN + 8;
+	else
+		cp->rx_buf_sz = PKT_BUF_SZ;
+}
 
 static inline void cp_rx_skb (struct cp_private *cp, struct sk_buff *skb)
 {
@@ -708,6 +722,22 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 /* Set or clear the multicast filter for this adaptor.
    This routine is not state sensitive and need not be SMP locked. */
 
+static unsigned const ethernet_polynomial = 0x04c11db7U;
+static inline u32 ether_crc (int length, unsigned char *data)
+{
+	int crc = -1;
+
+	while (--length >= 0) {
+		unsigned char current_octet = *data++;
+		int bit;
+		for (bit = 0; bit < 8; bit++, current_octet >>= 1)
+			crc = (crc << 1) ^ ((crc < 0) ^ (current_octet & 1) ?
+			     ethernet_polynomial : 0);
+	}
+
+	return crc;
+}
+
 static void __cp_set_rx_mode (struct net_device *dev)
 {
 	struct cp_private *cp = dev->priv;
@@ -812,6 +842,12 @@ static void cp_reset_hw (struct cp_private *cp)
 	printk(KERN_ERR "%s: hardware reset timeout\n", cp->dev->name);
 }
 
+static inline void cp_start_hw (struct cp_private *cp)
+{
+	cpw8(Cmd, RxOn | TxOn);
+	cpw16(CpCmd, PCIMulRW | CpRxOn | CpTxOn);
+}
+
 static void cp_init_hw (struct cp_private *cp)
 {
 	struct net_device *dev = cp->dev;
@@ -824,8 +860,7 @@ static void cp_init_hw (struct cp_private *cp)
 	cpw32_f (MAC0 + 0, cpu_to_le32 (*(u32 *) (dev->dev_addr + 0)));
 	cpw32_f (MAC0 + 4, cpu_to_le32 (*(u32 *) (dev->dev_addr + 4)));
 
-	cpw8(Cmd, RxOn | TxOn);
-	cpw16(CpCmd, PCIMulRW | CpRxOn | CpTxOn);
+	cp_start_hw(cp);
 	cpw8(TxThresh, 0x06); /* XXX convert magic num to a constant */
 
 	__cp_set_rx_mode(dev);
@@ -957,8 +992,6 @@ static int cp_open (struct net_device *dev)
 	if (netif_msg_ifup(cp))
 		printk(KERN_DEBUG "%s: enabling interface\n", dev->name);
 
-	cp->rx_buf_sz = (dev->mtu <= 1500 ? PKT_BUF_SZ : dev->mtu + 32);
-
 	rc = cp_alloc_rings(cp);
 	if (rc)
 		return rc;
@@ -991,6 +1024,36 @@ static int cp_close (struct net_device *dev)
 	free_irq(dev->irq, dev);
 	cp_free_rings(cp);
 	return 0;
+}
+
+static int cp_change_mtu(struct net_device *dev, int new_mtu)
+{
+	struct cp_private *cp = dev->priv;
+	int rc;
+
+	/* check for invalid MTU, according to hardware limits */
+	if (new_mtu < CP_MIN_MTU || new_mtu > CP_MAX_MTU)
+		return -EINVAL;
+
+	/* if network interface not up, no need for complexity */
+	if (!netif_running(dev)) {
+		cp_set_rxbufsize(cp);	/* set new rx buf size */
+		return 0;
+	}
+
+	spin_lock_irq(&cp->lock);
+
+	cp_stop_hw(cp);			/* stop h/w and free rings */
+	cp_clean_rings(cp);
+
+	cp_set_rxbufsize(cp);		/* set new rx buf size */
+
+	rc = cp_init_rings(cp);		/* realloc and restart h/w */
+	cp_start_hw(cp);
+
+	spin_unlock_irq(&cp->lock);
+
+	return rc;
 }
 
 static char mii_2_8139_map[8] = {
@@ -1231,6 +1294,7 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	cp->mii_if.mdio_read = mdio_read;
 	cp->mii_if.mdio_write = mdio_write;
 	cp->mii_if.phy_id = CP_INTERNAL_PHY;
+	cp_set_rxbufsize(cp);
 
 	rc = pci_enable_device(pdev);
 	if (rc)
@@ -1284,6 +1348,7 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	dev->hard_start_xmit = cp_start_xmit;
 	dev->get_stats = cp_get_stats;
 	dev->do_ioctl = cp_ioctl;
+	dev->change_mtu = cp_change_mtu;
 #if 0
 	dev->tx_timeout = cp_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
