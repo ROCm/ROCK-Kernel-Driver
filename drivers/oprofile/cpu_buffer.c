@@ -28,8 +28,8 @@
 struct oprofile_cpu_buffer cpu_buffer[NR_CPUS] __cacheline_aligned;
 
 static void wq_sync_buffer(void *);
-static void timer_ping(unsigned long data);
-#define DEFAULT_TIMER_EXPIRE (HZ / 2)
+
+#define DEFAULT_TIMER_EXPIRE (HZ / 10)
 int timers_enabled;
 
 static void __free_cpu_buffers(int num)
@@ -64,10 +64,6 @@ int alloc_cpu_buffers(void)
 		b->sample_received = 0;
 		b->sample_lost_overflow = 0;
 		b->cpu = i;
-		init_timer(&b->timer);
-		b->timer.function = timer_ping;
-		b->timer.data = i;
-		b->timer.expires = jiffies + DEFAULT_TIMER_EXPIRE;
 		INIT_WORK(&b->work, wq_sync_buffer, b);
 	}
 	return 0;
@@ -93,7 +89,11 @@ void start_cpu_timers(void)
 	for_each_online_cpu(i) {
 		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
 
-		add_timer_on(&b->timer, i);
+		/*
+		 * Spread the work by 1 jiffy per cpu so they dont all
+		 * fire at once.
+		 */
+		schedule_delayed_work_on(i, &b->work, DEFAULT_TIMER_EXPIRE + i);
 	}
 }
 
@@ -107,7 +107,7 @@ void end_cpu_timers(void)
 	for_each_online_cpu(i) {
 		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
 
-		del_timer_sync(&b->timer);
+		cancel_delayed_work(&b->work);
 	}
 
 	flush_scheduled_work();
@@ -203,7 +203,13 @@ void cpu_buffer_reset(struct oprofile_cpu_buffer * cpu_buf)
 }
 
 
-/* FIXME: not guaranteed to be on our CPU */
+/*
+ * This serves to avoid cpu buffer overflow, and makes sure
+ * the task mortuary progresses
+ *
+ * By using schedule_delayed_work_on and then schedule_delayed_work
+ * we guarantee this will stay on the correct cpu
+ */
 static void wq_sync_buffer(void * data)
 {
 	struct oprofile_cpu_buffer * b = (struct oprofile_cpu_buffer *)data;
@@ -213,24 +219,7 @@ static void wq_sync_buffer(void * data)
 	}
 	sync_buffer(b->cpu);
 
-	/* don't re-add the timer if we're shutting down */
-	if (timers_enabled) {
-		del_timer_sync(&b->timer);
-		add_timer_on(&b->timer, b->cpu);
-	}
-}
-
-
-/* This serves to avoid cpu buffer overflow, and makes sure
- * the task mortuary progresses
- */
-static void timer_ping(unsigned long data)
-{
-	struct oprofile_cpu_buffer * b = &cpu_buffer[data];
-	if (b->cpu != smp_processor_id()) {
-		printk("Timer on CPU%d, prefer CPU%d\n",
-		       smp_processor_id(), b->cpu);
-	}
-	schedule_work(&b->work);
-	/* work will re-enable our timer */
+	/* don't re-add the work if we're shutting down */
+	if (timers_enabled)
+		schedule_delayed_work(&b->work, DEFAULT_TIMER_EXPIRE);
 }
