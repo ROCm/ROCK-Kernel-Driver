@@ -279,6 +279,9 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 			DEBUG2_3_11(printk("qla2x00_mailbox_command(%ld): "
 			    "timeout schedule isp_abort_needed.\n",
 			    ha->host_no);)
+			qla_printk(KERN_WARNING, ha,
+			    "Mailbox command timeout occured. Scheduling ISP "
+			    "abort.\n");
 			set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
 			if (ha->dpc_wait && !ha->dpc_active) 
 				up(ha->dpc_wait);
@@ -290,6 +293,9 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 			    "calling abort_isp\n", ha->host_no);)
 			DEBUG2_3_11(printk("qla2x00_mailbox_command(%ld): "
 			    "timeout calling abort_isp\n", ha->host_no);)
+			qla_printk(KERN_WARNING, ha,
+			    "Mailbox command timeout occured. Issuing ISP "
+			    "abort.\n");
 
 			set_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags);
 			clear_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
@@ -1062,6 +1068,9 @@ qla2x00_abort_device(scsi_qla_host_t *ha, uint16_t loop_id, uint16_t lun)
 	qla2x00_marker(ha, loop_id, lun, MK_SYNC_ID_LUN);
 
 	if (rval != QLA_SUCCESS) {
+		qla_printk(KERN_WARNING, ha,
+		    "Failed Abort Device Mailbox command. Scheduling ISP "
+		    "abort.\n");
 		set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
 		if (ha->dpc_wait && !ha->dpc_active) 
 			up(ha->dpc_wait);

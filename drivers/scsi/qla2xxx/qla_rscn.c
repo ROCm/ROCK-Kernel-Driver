@@ -283,6 +283,8 @@ qla2x00_iodesc_timeout(unsigned long data)
 
 	qla2x00_free_iodesc(iodesc);
 
+	qla_printk(KERN_WARNING, iodesc->ha,
+	    "IO descriptor timeout. Scheduling ISP abort.\n");
 	set_bit(ISP_ABORT_NEEDED, &iodesc->ha->dpc_flags);
 }
 

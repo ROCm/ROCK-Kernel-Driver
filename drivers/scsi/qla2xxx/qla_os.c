@@ -3856,6 +3856,8 @@ qla2x00_timer(scsi_qla_host_t *ha)
 				DEBUG(printk("scsi(%ld): Loop down - "
 				    "aborting ISP.\n",
 				    ha->host_no));
+				qla_printk(KERN_WARNING, ha,
+				    "Loop down - aborting ISP.\n");
 
 				set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
 			}
