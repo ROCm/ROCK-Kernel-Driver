@@ -2215,9 +2215,26 @@ static int intel8x0_resume(snd_card_t *card, unsigned int state)
 	pci_enable_device(chip->pci);
 	pci_set_master(chip->pci);
 	snd_intel8x0_chip_init(chip, 0);
+
+	/* refill nocache */
+	if (chip->fix_nocache)
+		fill_nocache(chip->bdbars.area, chip->bdbars.bytes, 1);
+
 	for (i = 0; i < 3; i++)
 		if (chip->ac97[i])
 			snd_ac97_resume(chip->ac97[i]);
+
+	/* refill nocache */
+	if (chip->fix_nocache) {
+		for (i = 0; i < chip->bdbars_count; i++) {
+			ichdev_t *ichdev = &chip->ichd[i];
+			if (ichdev->substream) {
+				snd_pcm_runtime_t *runtime = ichdev->substream->runtime;
+				if (runtime->dma_area)
+					fill_nocache(runtime->dma_area, runtime->dma_bytes, 1);
+			}
+		}
+	}
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
