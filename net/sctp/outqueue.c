@@ -1056,8 +1056,10 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_sackhdr *sack)
 	}
 
 	/* Get the highest TSN in the sack. */
-	highest_tsn = sack_ctsn +
-		ntohs(frags[ntohs(sack->num_gap_ack_blocks) - 1].gab.end);
+	highest_tsn = sack_ctsn;
+	if (sack->num_gap_ack_blocks)
+		highest_tsn +=
+		    ntohs(frags[ntohs(sack->num_gap_ack_blocks) - 1].gab.end);
 
 	if (TSN_lt(asoc->highest_sacked, highest_tsn)) {
 		highest_new_tsn = highest_tsn;
