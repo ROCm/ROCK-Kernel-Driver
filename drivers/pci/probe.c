@@ -2,7 +2,9 @@
  * probe.c - PCI detection and setup code
  */
 
+#include <linux/init.h>
 #include <linux/pci.h>
+#include <linux/slab.h>
 #include <linux/module.h>
 
 #undef DEBUG
