@@ -30,7 +30,7 @@
 static void quirk_awe32_resources(struct pnp_dev *dev)
 {
 	struct pnp_port *port, *port2, *port3;
-	struct pnp_resources *res = dev->possible->dep;
+	struct pnp_option *res = dev->dependent;
 
 	/*
 	 * Unfortunately the isapnp_add_port_resource is too tightly bound
@@ -38,7 +38,7 @@ static void quirk_awe32_resources(struct pnp_dev *dev)
 	 * two extra ports (at offset 0x400 and 0x800 from the one given) by
 	 * hand.
 	 */
-	for ( ; res ; res = res->dep ) {
+	for ( ; res ; res = res->next ) {
 		port2 = pnp_alloc(sizeof(struct pnp_port));
 		if (!port2)
 			return;
@@ -62,9 +62,9 @@ static void quirk_awe32_resources(struct pnp_dev *dev)
 
 static void quirk_cmi8330_resources(struct pnp_dev *dev)
 {
-	struct pnp_resources *res = dev->possible->dep;
+	struct pnp_option *res = dev->dependent;
 
-	for ( ; res ; res = res->dep ) {
+	for ( ; res ; res = res->next ) {
 
 		struct pnp_irq *irq;
 		struct pnp_dma *dma;
@@ -82,7 +82,7 @@ static void quirk_cmi8330_resources(struct pnp_dev *dev)
 static void quirk_sb16audio_resources(struct pnp_dev *dev)
 {
 	struct pnp_port *port;
-	struct pnp_resources *res = dev->possible->dep;
+	struct pnp_option *res = dev->dependent;
 	int    changed = 0;
 
 	/*
@@ -91,7 +91,7 @@ static void quirk_sb16audio_resources(struct pnp_dev *dev)
 	 * auto-configured.
 	 */
 
-	for( ; res ; res = res->dep ) {
+	for( ; res ; res = res->next ) {
 		port = res->port;
 		if(!port)
 			continue;
@@ -118,11 +118,11 @@ static void quirk_opl3sax_resources(struct pnp_dev *dev)
 	 * doesn't allow a DMA channel of 0, afflicted card is an
 	 * OPL3Sax where x=4.
 	 */
-	struct pnp_resources *res;
+	struct pnp_option *res;
 	int max;
-	res = dev->possible;
+	res = dev->dependent;
 	max = 0;
-	for (res = res->dep; res; res = res->dep) {
+	for (; res; res = res->next) {
 		if (res->dma->map > max)
 			max = res->dma->map;
 	}

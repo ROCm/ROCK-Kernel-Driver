@@ -1,7 +1,7 @@
 /*
  * support.c - provides standard pnp functions for the use of pnp protocol drivers,
  *
- * Copyright 2002 Adam Belay <ambx1@neo.rr.com>
+ * Copyright 2003 Adam Belay <ambx1@neo.rr.com>
  *
  * Resource parsing functions are based on those in the linux pnpbios driver.
  * Copyright Christian Schmidt, Tom Lees, David Hinds, Alan Cox, Thomas Hood,
@@ -10,6 +10,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/ctype.h>
 
 #ifdef CONFIG_PNP_DEBUG
 	#define DEBUG
@@ -122,7 +123,7 @@ unsigned char * pnp_parse_current_resources(unsigned char * p, unsigned char * e
 		return NULL;
 
 	/* Blank the resource table values */
-	pnp_init_resource_table(res);
+	pnp_init_resources(res);
 
 	while ((char *)p < (char *)end) {
 
@@ -250,51 +251,51 @@ unsigned char * pnp_parse_current_resources(unsigned char * p, unsigned char * e
  * Possible resource reading functions *
  */
 
-static void possible_mem(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+static void possible_mem(unsigned char *p, int size, struct pnp_option *option)
 {
 	struct pnp_mem * mem;
 	mem = pnp_alloc(sizeof(struct pnp_mem));
 	if (!mem)
 		return;
-	mem->min = ((p[3] << 8) | p[2]) << 8;
-	mem->max = ((p[5] << 8) | p[4]) << 8;
-	mem->align = (p[7] << 8) | p[6];
-	mem->size = ((p[9] << 8) | p[8]) << 8;
-	mem->flags = p[1];
-	pnp_add_mem_resource(dev,depnum,mem);
+	mem->min = ((p[5] << 8) | p[4]) << 8;
+	mem->max = ((p[7] << 8) | p[6]) << 8;
+	mem->align = (p[9] << 8) | p[8];
+	mem->size = ((p[11] << 8) | p[10]) << 8;
+	mem->flags = p[3];
+	pnp_register_mem_resource(option,mem);
 	return;
 }
 
-static void possible_mem32(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+static void possible_mem32(unsigned char *p, int size, struct pnp_option *option)
 {
 	struct pnp_mem * mem;
 	mem = pnp_alloc(sizeof(struct pnp_mem));
 	if (!mem)
 		return;
-	mem->min = (p[5] << 24) | (p[4] << 16) | (p[3] << 8) | p[2];
-	mem->max = (p[9] << 24) | (p[8] << 16) | (p[7] << 8) | p[6];
-	mem->align = (p[13] << 24) | (p[12] << 16) | (p[11] << 8) | p[10];
-	mem->size = (p[17] << 24) | (p[16] << 16) | (p[15] << 8) | p[14];
-	mem->flags = p[1];
-	pnp_add_mem_resource(dev,depnum,mem);
+	mem->min = (p[7] << 24) | (p[6] << 16) | (p[5] << 8) | p[4];
+	mem->max = (p[11] << 24) | (p[10] << 16) | (p[9] << 8) | p[8];
+	mem->align = (p[15] << 24) | (p[14] << 16) | (p[13] << 8) | p[12];
+	mem->size = (p[19] << 24) | (p[18] << 16) | (p[17] << 8) | p[16];
+	mem->flags = p[3];
+	pnp_register_mem_resource(option,mem);
 	return;
 }
 
-static void possible_fixed_mem32(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+static void possible_fixed_mem32(unsigned char *p, int size, struct pnp_option *option)
 {
 	struct pnp_mem * mem;
 	mem = pnp_alloc(sizeof(struct pnp_mem));
 	if (!mem)
 		return;
-	mem->min = mem->max = (p[5] << 24) | (p[4] << 16) | (p[3] << 8) | p[2];
-	mem->size = (p[9] << 24) | (p[8] << 16) | (p[7] << 8) | p[6];
+	mem->min = mem->max = (p[7] << 24) | (p[6] << 16) | (p[5] << 8) | p[4];
+	mem->size = (p[11] << 24) | (p[10] << 16) | (p[9] << 8) | p[8];
 	mem->align = 0;
-	mem->flags = p[1];
-	pnp_add_mem_resource(dev,depnum,mem);
+	mem->flags = p[3];
+	pnp_register_mem_resource(option,mem);
 	return;
 }
 
-static void possible_irq(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+static void possible_irq(unsigned char *p, int size, struct pnp_option *option)
 {
 	struct pnp_irq * irq;
 	irq = pnp_alloc(sizeof(struct pnp_irq));
@@ -303,11 +304,13 @@ static void possible_irq(unsigned char *p, int size, int depnum, struct pnp_dev 
 	irq->map = (p[2] << 8) | p[1];
 	if (size > 2)
 		irq->flags = p[3];
-	pnp_add_irq_resource(dev,depnum,irq);
+	else
+		irq->flags = IORESOURCE_IRQ_HIGHEDGE;
+	pnp_register_irq_resource(option,irq);
 	return;
 }
 
-static void possible_dma(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+static void possible_dma(unsigned char *p, int size, struct pnp_option *option)
 {
 	struct pnp_dma * dma;
 	dma = pnp_alloc(sizeof(struct pnp_dma));
@@ -315,11 +318,11 @@ static void possible_dma(unsigned char *p, int size, int depnum, struct pnp_dev 
 		return;
 	dma->map = p[1];
 	dma->flags = p[2];
-	pnp_add_dma_resource(dev,depnum,dma);
+	pnp_register_dma_resource(option,dma);
 	return;
 }
 
-static void possible_port(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+static void possible_port(unsigned char *p, int size, struct pnp_option *option)
 {
 	struct pnp_port * port;
 	port = pnp_alloc(sizeof(struct pnp_port));
@@ -330,11 +333,11 @@ static void possible_port(unsigned char *p, int size, int depnum, struct pnp_dev
 	port->align = p[6];
 	port->size = p[7];
 	port->flags = p[1] ? PNP_PORT_FLAG_16BITADDR : 0;
-	pnp_add_port_resource(dev,depnum,port);
+	pnp_register_port_resource(option,port);
 	return;
 }
 
-static void possible_fixed_port(unsigned char *p, int size, int depnum, struct pnp_dev *dev)
+static void possible_fixed_port(unsigned char *p, int size, struct pnp_option *option)
 {
 	struct pnp_port * port;
 	port = pnp_alloc(sizeof(struct pnp_port));
@@ -344,7 +347,7 @@ static void possible_fixed_port(unsigned char *p, int size, int depnum, struct p
 	port->size = p[3];
 	port->align = 0;
 	port->flags = PNP_PORT_FLAG_FIXED;
-	pnp_add_port_resource(dev,depnum,port);
+	pnp_register_port_resource(option,port);
 	return;
 }
 
@@ -358,12 +361,14 @@ static void possible_fixed_port(unsigned char *p, int size, int depnum, struct p
 
 unsigned char * pnp_parse_possible_resources(unsigned char * p, unsigned char * end, struct pnp_dev *dev)
 {
-	int len, depnum = 0, dependent = 0;
+	int len, priority = 0;
+	struct pnp_option *option;
 
 	if (!p)
 		return NULL;
 
-	if (pnp_build_resource(dev, 0) == NULL)
+	option = pnp_register_independent_option(dev);
+	if (!option)
 		return NULL;
 
 	while ((char *)p < (char *)end) {
@@ -375,21 +380,21 @@ unsigned char * pnp_parse_possible_resources(unsigned char * p, unsigned char * 
 			{
 				if (len != 9)
 					goto lrg_err;
-				possible_mem(p,len,depnum,dev);
+				possible_mem(p,len,option);
 				break;
 			}
 			case LARGE_TAG_MEM32:
 			{
 				if (len != 17)
 					goto lrg_err;
-				possible_mem32(p,len,depnum,dev);
+				possible_mem32(p,len,option);
 				break;
 			}
 			case LARGE_TAG_FIXEDMEM32:
 			{
 				if (len != 9)
 					goto lrg_err;
-				possible_fixed_mem32(p,len,depnum,dev);
+				possible_fixed_mem32(p,len,option);
 				break;
 			}
 			default: /* an unkown tag */
@@ -410,46 +415,46 @@ unsigned char * pnp_parse_possible_resources(unsigned char * p, unsigned char * 
 		{
 			if (len < 2 || len > 3)
 				goto sm_err;
-			possible_irq(p,len,depnum,dev);
+			possible_irq(p,len,option);
 			break;
 		}
 		case SMALL_TAG_DMA:
 		{
 			if (len != 2)
 				goto sm_err;
-			possible_dma(p,len,depnum,dev);
+			possible_dma(p,len,option);
 			break;
 		}
 		case SMALL_TAG_STARTDEP:
 		{
 			if (len > 1)
 				goto sm_err;
-			dependent = 0x100 | PNP_RES_PRIORITY_ACCEPTABLE;
+			priority = 0x100 | PNP_RES_PRIORITY_ACCEPTABLE;
 			if (len > 0)
-				dependent = 0x100 | p[1];
-			pnp_build_resource(dev,dependent);
-			depnum = pnp_get_max_depnum(dev);
+				priority = 0x100 | p[1];
+			option = pnp_register_dependent_option(dev, priority);
+			if (!option)
+				return NULL;
 			break;
 		}
 		case SMALL_TAG_ENDDEP:
 		{
 			if (len != 0)
 				goto sm_err;
-			depnum = 0;
 			break;
 		}
 		case SMALL_TAG_PORT:
 		{
 			if (len != 7)
 				goto sm_err;
-			possible_port(p,len,depnum,dev);
+			possible_port(p,len,option);
 			break;
 		}
 		case SMALL_TAG_FIXEDPORT:
 		{
 			if (len != 3)
 				goto sm_err;
-			possible_fixed_port(p,len,depnum,dev);
+			possible_fixed_port(p,len,option);
 			break;
 		}
 		case SMALL_TAG_END:
@@ -481,12 +486,12 @@ static void write_mem(unsigned char *p, struct resource * res)
 {
 	unsigned long base = res->start;
 	unsigned long len = res->end - res->start + 1;
-	p[2] = (base >> 8) & 0xff;
-	p[3] = ((base >> 8) >> 8) & 0xff;
 	p[4] = (base >> 8) & 0xff;
 	p[5] = ((base >> 8) >> 8) & 0xff;
-	p[8] = (len >> 8) & 0xff;
-	p[9] = ((len >> 8) >> 8) & 0xff;
+	p[6] = (base >> 8) & 0xff;
+	p[7] = ((base >> 8) >> 8) & 0xff;
+	p[10] = (len >> 8) & 0xff;
+	p[11] = ((len >> 8) >> 8) & 0xff;
 	return;
 }
 
@@ -494,32 +499,32 @@ static void write_mem32(unsigned char *p, struct resource * res)
 {
 	unsigned long base = res->start;
 	unsigned long len = res->end - res->start + 1;
-	p[2] = base & 0xff;
-	p[3] = (base >> 8) & 0xff;
-	p[4] = (base >> 16) & 0xff;
-	p[5] = (base >> 24) & 0xff;
-	p[6] = base & 0xff;
-	p[7] = (base >> 8) & 0xff;
-	p[8] = (base >> 16) & 0xff;
-	p[9] = (base >> 24) & 0xff;
-	p[14] = len & 0xff;
-	p[15] = (len >> 8) & 0xff;
-	p[16] = (len >> 16) & 0xff;
-	p[17] = (len >> 24) & 0xff;
+	p[4] = base & 0xff;
+	p[5] = (base >> 8) & 0xff;
+	p[6] = (base >> 16) & 0xff;
+	p[7] = (base >> 24) & 0xff;
+	p[8] = base & 0xff;
+	p[9] = (base >> 8) & 0xff;
+	p[10] = (base >> 16) & 0xff;
+	p[11] = (base >> 24) & 0xff;
+	p[16] = len & 0xff;
+	p[17] = (len >> 8) & 0xff;
+	p[18] = (len >> 16) & 0xff;
+	p[19] = (len >> 24) & 0xff;
 	return;
 }
 
 static void write_fixed_mem32(unsigned char *p, struct resource * res)
 {	unsigned long base = res->start;
 	unsigned long len = res->end - res->start + 1;
-	p[2] = base & 0xff;
-	p[3] = (base >> 8) & 0xff;
-	p[4] = (base >> 16) & 0xff;
-	p[5] = (base >> 24) & 0xff;
-	p[6] = len & 0xff;
-	p[7] = (len >> 8) & 0xff;
-	p[8] = (len >> 16) & 0xff;
-	p[9] = (len >> 24) & 0xff;
+	p[4] = base & 0xff;
+	p[5] = (base >> 8) & 0xff;
+	p[6] = (base >> 16) & 0xff;
+	p[7] = (base >> 24) & 0xff;
+	p[8] = len & 0xff;
+	p[9] = (len >> 8) & 0xff;
+	p[10] = (len >> 16) & 0xff;
+	p[11] = (len >> 24) & 0xff;
 	return;
 }
 
@@ -630,7 +635,7 @@ unsigned char * pnp_write_resources(unsigned char * p, unsigned char * end, stru
 		{
 			if (len != 2)
 				goto sm_err;
-			write_dma(p, &res->dma_resource[irq]);
+			write_dma(p, &res->dma_resource[dma]);
 			dma++;
 			break;
 		}
