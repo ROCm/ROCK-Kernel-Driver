@@ -332,8 +332,8 @@ static struct usb_device_id id_table [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table);
 
-static struct
-usb_driver lcd_driver = {
+static struct usb_driver lcd_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"usblcd",
 	.probe =	(void *)probe_lcd,
 	.disconnect =	disconnect_lcd,
