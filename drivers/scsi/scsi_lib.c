@@ -1095,13 +1095,16 @@ static inline int scsi_host_queue_ready(struct request_queue *q,
 			return 0;
 		}
 	}
-	if (!list_empty(&sdev->starved_entry))
-		return 0;
 	if ((shost->can_queue > 0 && shost->host_busy >= shost->can_queue) ||
 	    shost->host_blocked || shost->host_self_blocked) {
-		list_add_tail(&sdev->starved_entry, &shost->starved_list);
+		if (list_empty(&sdev->starved_entry))
+			list_add_tail(&sdev->starved_entry, &shost->starved_list);
 		return 0;
 	}
+
+	/* We're OK to process the command, so we can't be starved */
+	if (!list_empty(&sdev->starved_entry))
+		list_del_init(&sdev->starved_entry);
 
 	return 1;
 }
@@ -1129,6 +1132,7 @@ static void scsi_request_fn(struct request_queue *q)
 	 * the host is no longer able to accept any more requests.
 	 */
 	while (!blk_queue_plugged(q)) {
+		int rtn;
 		/*
 		 * get next queueable request.  We do this early to make sure
 		 * that the request is fully prepared even if we cannot 
@@ -1182,8 +1186,17 @@ static void scsi_request_fn(struct request_queue *q)
 		/*
 		 * Dispatch the command to the low-level driver.
 		 */
-		scsi_dispatch_cmd(cmd);
+		rtn = scsi_dispatch_cmd(cmd);
 		spin_lock_irq(q->queue_lock);
+		if(rtn) {
+			/* we're refusing the command; because of
+			 * the way locks get dropped, we need to 
+			 * check here if plugging is required */
+			if(sdev->device_busy == 0)
+				blk_plug_device(q);
+
+			break;
+		}
 	}
 
 	return;
@@ -1204,6 +1217,8 @@ static void scsi_request_fn(struct request_queue *q)
 		blk_queue_end_tag(q, req);
 	__elv_add_request(q, req, 0, 0);
 	sdev->device_busy--;
+	if(sdev->device_busy == 0)
+		blk_plug_device(q);
 }
 
 u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
