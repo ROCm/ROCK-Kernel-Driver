@@ -158,8 +158,9 @@ sort_regions (struct rsvd_region *rsvd_region, int max)
 /**
  * reserve_memory - setup reserved memory areas
  *
- * Setup the reserved memory areas set aside for the boot parameters, initrd,
- * etc.
+ * Setup the reserved memory areas set aside for the boot parameters,
+ * initrd, etc.  There are currently %IA64_MAX_RSVD_REGIONS defined,
+ * see include/asm-ia64/meminit.h if you need to define more.
  */
 void
 reserve_memory (void)
