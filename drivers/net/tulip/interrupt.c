@@ -133,6 +133,10 @@ int tulip_poll(struct net_device *dev, int *budget)
 			   tp->rx_ring[entry].status);
 
        do {
+		if (inl(dev->base_addr + CSR5) == 0xffffffff) {
+			printk(KERN_DEBUG " In tulip_poll(), hardware disappeared.\n");
+			break;
+		}
                /* Acknowledge current RX interrupt sources. */
                outl((RxIntr | RxNoBuf), dev->base_addr + CSR5);
  
