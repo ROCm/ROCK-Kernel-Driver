@@ -99,13 +99,6 @@ MODULE_LICENSE("GPL");
 
 static int my_host_number;
 
-/*
- * kernel thread actions
- */
-
-#define US_ACT_COMMAND		1
-#define US_ACT_EXIT		5
-
 /* The list of structures and the protective lock for them */
 struct us_data *us_list;
 struct semaphore us_list_semaphore;
@@ -426,7 +419,7 @@ static int usb_stor_control_thread(void * __us)
 		down(&(us->dev_semaphore));
 
 		/* our device has gone - pretend not ready */
-		if (atomic_read(&us->device_state) == US_STATE_DETACHED) {
+		if (!test_bit(DEV_ATTACHED, &us->bitflags)) {
 			US_DEBUGP("Request is for removed device\n");
 			/* For REQUEST_SENSE, it's the data.  But
 			 * for anything else, it should look like
@@ -450,7 +443,7 @@ static int usb_stor_control_thread(void * __us)
 				       sizeof(usb_stor_sense_notready));
 				us->srb->result = CHECK_CONDITION << 1;
 			}
-		} else { /* atomic_read(&us->device_state) == STATE_DETACHED */
+		} else { /* test_bit(DEV_ATTACHED, &us->bitflags) */
 
 			/* Handle those devices which need us to fake 
 			 * their inquiry data */
@@ -695,7 +688,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	 */
 	ss = us_list;
 	while ((ss != NULL) && 
-	           ((atomic_read(&ss->device_state) == US_STATE_ATTACHED) ||
+	           (test_bit(DEV_ATTACHED, &ss->bitflags) ||
 		    !GUID_EQUAL(guid, ss->guid)))
 		ss = ss->next;
 
@@ -710,7 +703,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		/* establish the connection to the new device upon reconnect */
 		ss->ifnum = ifnum;
 		ss->pusb_dev = dev;
-		atomic_set(&ss->device_state, US_STATE_ATTACHED);
+		set_bit(DEV_ATTACHED, &ss->bitflags);
 
 		/* copy over the endpoint data */
 		ss->ep_in = ep_in->bEndpointAddress & 
@@ -979,7 +972,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		/* start up our control thread */
 		atomic_set(&ss->sm_state, US_STATE_IDLE);
-		atomic_set(&ss->device_state, US_STATE_ATTACHED);
+		set_bit(DEV_ATTACHED, &ss->bitflags);
 		ss->pid = kernel_thread(usb_stor_control_thread, ss,
 					CLONE_VM);
 		if (ss->pid < 0) {
@@ -1040,7 +1033,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		ss->current_urb = NULL;
 	}
 
-	atomic_set(&ss->device_state, US_STATE_DETACHED);
+	clear_bit(DEV_ATTACHED, &ss->bitflags);
 	ss->pusb_dev = NULL;
 	if (new_device)
 		kfree(ss);
@@ -1088,7 +1081,7 @@ static void storage_disconnect(struct usb_device *dev, void *ptr)
 	/* mark the device as gone */
 	usb_put_dev(ss->pusb_dev);
 	ss->pusb_dev = NULL;
-	atomic_set(&ss->sm_state, US_STATE_DETACHED);
+	clear_bit(DEV_ATTACHED, &ss->bitflags);
 
 	/* unlock access to the device data structure */
 	up(&(ss->dev_semaphore));
