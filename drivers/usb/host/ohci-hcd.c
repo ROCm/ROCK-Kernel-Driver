@@ -621,9 +621,12 @@ static void ohci_stop (struct usb_hcd *hcd)
 		hc_reset (ohci);
 	
 	ohci_mem_cleanup (ohci);
-
-	pci_free_consistent (ohci->hcd.pdev, sizeof *ohci->hcca,
-		ohci->hcca, ohci->hcca_dma);
+	if (ohci->hcca) {
+		pci_free_consistent (ohci->hcd.pdev, sizeof *ohci->hcca,
+					ohci->hcca, ohci->hcca_dma);
+		ohci->hcca = NULL;
+		ohci->hcca_dma = 0;
+	}
 }
 
 /*-------------------------------------------------------------------------*/
