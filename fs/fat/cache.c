@@ -287,7 +287,49 @@ out:
 	spin_unlock(&sbi->cache_lock);
 }
 
-static int fat_get_cluster(struct inode *inode, int cluster)
+int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
+{
+	struct super_block *sb = inode->i_sb;
+	const int limit = sb->s_maxbytes >> MSDOS_SB(sb)->cluster_bits;
+	int nr;
+
+	BUG_ON(MSDOS_I(inode)->i_start == 0);
+	
+	*fclus = 0;
+	*dclus = MSDOS_I(inode)->i_start;
+	if (cluster == 0)
+		return 0;
+
+	fat_cache_lookup(inode, cluster, fclus, dclus);
+	while (*fclus < cluster) {
+		/* prevent the infinite loop of cluster chain */
+		if (*fclus > limit) {
+			fat_fs_panic(sb, "%s: detected the cluster chain loop"
+				     " (i_pos %llu)", __FUNCTION__,
+				     MSDOS_I(inode)->i_pos);
+			return -EIO;
+		}
+
+		nr = fat_access(sb, *dclus, -1);
+		if (nr < 0)
+ 			return nr;
+		else if (nr == FAT_ENT_FREE) {
+			fat_fs_panic(sb, "%s: invalid cluster chain"
+				     " (i_pos %llu)", __FUNCTION__,
+				     MSDOS_I(inode)->i_pos);
+			return -EIO;
+		} else if (nr == FAT_ENT_EOF) {
+			fat_cache_add(inode, *fclus, *dclus);
+			return FAT_ENT_EOF;
+		}
+		(*fclus)++;
+		*dclus = nr;
+	}
+	fat_cache_add(inode, *fclus, *dclus);
+	return 0;
+}
+
+static int fat_bmap_cluster(struct inode *inode, int cluster)
 {
 	struct super_block *sb = inode->i_sb;
 	int nr,count;
@@ -336,7 +378,7 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys)
 
 	cluster = sector >> (sbi->cluster_bits - sb->s_blocksize_bits);
 	offset  = sector & (sbi->cluster_size - 1);
-	cluster = fat_get_cluster(inode, cluster);
+	cluster = fat_bmap_cluster(inode, cluster);
 	if (cluster < 0)
 		return cluster;
 	else if (cluster) {

@@ -237,6 +237,8 @@ extern void fat_cache_lookup(struct inode *inode, int cluster, int *f_clu,
 			     int *d_clu);
 extern void fat_cache_add(struct inode *inode, int f_clu, int d_clu);
 extern void fat_cache_inval_inode(struct inode *inode);
+extern int fat_get_cluster(struct inode *inode, int cluster,
+			   int *fclus, int *dclus);
 extern int fat_free(struct inode *inode, int skip);
 
 /* fat/dir.c */
