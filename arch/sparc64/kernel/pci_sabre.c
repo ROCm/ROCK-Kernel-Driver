@@ -18,6 +18,7 @@
 #include <asm/iommu.h>
 #include <asm/irq.h>
 #include <asm/smp.h>
+#include <asm/oplib.h>
 
 #include "pci_impl.h"
 #include "iommu_common.h"
@@ -1518,11 +1519,12 @@ void __init sabre_init(int pnode, char *model_name)
 		    !strcmp(compat, "pci108e,a001")) {
 			hummingbird_p = 1;
 		} else {
-			int cpu_node = linux_cpus[0].prom_node;
+			int cpu_node;
 
 			/* Of course, Sun has to encode things a thousand
 			 * different ways, inconsistently.
 			 */
+			cpu_find_by_instance(0, &cpu_node, NULL);
 			if (prom_getproperty(cpu_node, "name",
 					     compat, sizeof(compat)) > 0 &&
 			    !strcmp(compat, "SUNW,UltraSPARC-IIe"))

@@ -25,6 +25,7 @@
 #include <asm/atomic.h>
 #include <asm/tlbflush.h>
 #include <asm/mmu_context.h>
+#include <asm/cpudata.h>
 
 #include <asm/irq.h>
 #include <asm/page.h>
@@ -40,8 +41,6 @@
 
 extern int linux_num_cpus;
 extern void calibrate_delay(void);
-
-cpuinfo_sparc cpu_data[NR_CPUS];
 
 /* Please don't make this stuff initdata!!!  --DaveM */
 static unsigned char boot_cpu_id;
@@ -73,35 +72,29 @@ void smp_bogo(struct seq_file *m)
 			seq_printf(m,
 				   "Cpu%dBogo\t: %lu.%02lu\n"
 				   "Cpu%dClkTck\t: %016lx\n",
-				   i, cpu_data[i].udelay_val / (500000/HZ),
-				   (cpu_data[i].udelay_val / (5000/HZ)) % 100,
-				   i, cpu_data[i].clock_tick);
+				   i, cpu_data(i).udelay_val / (500000/HZ),
+				   (cpu_data(i).udelay_val / (5000/HZ)) % 100,
+				   i, cpu_data(i).clock_tick);
 }
 
 void __init smp_store_cpu_info(int id)
 {
-	int i, no;
+	int cpu_node;
 
 	/* multiplier and counter set by
 	   smp_setup_percpu_timer()  */
-	cpu_data[id].udelay_val			= loops_per_jiffy;
+	cpu_data(id).udelay_val			= loops_per_jiffy;
 
-	for (no = 0; no < linux_num_cpus; no++)
-		if (linux_cpus[no].mid == id)
-			break;
-
-	cpu_data[id].clock_tick = prom_getintdefault(linux_cpus[no].prom_node,
+	cpu_find_by_mid(id, &cpu_node);
+	cpu_data(id).clock_tick = prom_getintdefault(cpu_node,
 						     "clock-frequency", 0);
 
-	cpu_data[id].pgcache_size		= 0;
-	cpu_data[id].pte_cache[0]		= NULL;
-	cpu_data[id].pte_cache[1]		= NULL;
-	cpu_data[id].pgdcache_size		= 0;
-	cpu_data[id].pgd_cache			= NULL;
-	cpu_data[id].idle_volume		= 1;
-
-	for (i = 0; i < 16; i++)
-		cpu_data[id].irq_worklists[i] = 0;
+	cpu_data(id).pgcache_size		= 0;
+	cpu_data(id).pte_cache[0]		= NULL;
+	cpu_data(id).pte_cache[1]		= NULL;
+	cpu_data(id).pgdcache_size		= 0;
+	cpu_data(id).pgd_cache			= NULL;
+	cpu_data(id).idle_volume		= 1;
 }
 
 static void smp_setup_percpu_timer(void);
@@ -109,7 +102,6 @@ static void smp_setup_percpu_timer(void);
 static volatile unsigned long callin_flag = 0;
 
 extern void inherit_locked_prom_mappings(int save_p);
-extern void cpu_probe(void);
 
 void __init smp_callin(void)
 {
@@ -128,8 +120,6 @@ void __init smp_callin(void)
 
 	__flush_cache_all();
 	__flush_tlb_all();
-
-	cpu_probe();
 
 	smp_setup_percpu_timer();
 
@@ -300,8 +290,6 @@ static void smp_synchronize_one_tick(int cpu)
 	spin_unlock_irqrestore(&itc_sync_lock, flags);
 }
 
-extern struct prom_cpuinfo linux_cpus[NR_CPUS];
-
 extern unsigned long sparc64_cpu_startup;
 
 /* The OBP cpu startup callback truncates the 3rd arg cookie to
@@ -317,7 +305,7 @@ static int __devinit smp_boot_one_cpu(unsigned int cpu)
 	unsigned long cookie =
 		(unsigned long)(&cpu_new_thread);
 	struct task_struct *p;
-	int timeout, no, ret;
+	int timeout, ret, cpu_node;
 
 	kernel_thread(NULL, NULL, CLONE_IDLETASK);
 
@@ -328,19 +316,18 @@ static int __devinit smp_boot_one_cpu(unsigned int cpu)
 	unhash_process(p);
 
 	callin_flag = 0;
-	for (no = 0; no < linux_num_cpus; no++)
-		if (linux_cpus[no].mid == cpu)
-			break;
 	cpu_new_thread = p->thread_info;
 	cpu_set(cpu, cpu_callout_map);
-	prom_startcpu(linux_cpus[no].prom_node, entry, cookie);
+
+	cpu_find_by_mid(cpu, &cpu_node);
+	prom_startcpu(cpu_node, entry, cookie);
+
 	for (timeout = 0; timeout < 5000000; timeout++) {
 		if (callin_flag)
 			break;
 		udelay(100);
 	}
 	if (callin_flag) {
-		prom_cpu_nodes[cpu] = linux_cpus[no].prom_node;
 		ret = 0;
 	} else {
 		printk("Processor %d is stuck.\n", cpu);
@@ -1048,8 +1035,8 @@ void smp_promstop_others(void)
 
 extern void sparc64_do_profile(struct pt_regs *regs);
 
-#define prof_multiplier(__cpu)		cpu_data[(__cpu)].multiplier
-#define prof_counter(__cpu)		cpu_data[(__cpu)].counter
+#define prof_multiplier(__cpu)		cpu_data(__cpu).multiplier
+#define prof_counter(__cpu)		cpu_data(__cpu).counter
 
 void smp_percpu_timer_interrupt(struct pt_regs *regs)
 {
@@ -1141,7 +1128,6 @@ void __init smp_tick_init(void)
 	}
 
 	cpu_set(boot_cpu_id, cpu_online_map);
-	prom_cpu_nodes[boot_cpu_id] = linux_cpus[0].prom_node;
 	prof_counter(boot_cpu_id) = prof_multiplier(boot_cpu_id) = 1;
 }
 
@@ -1155,6 +1141,7 @@ static void __init smp_tune_scheduling(void)
 	unsigned long orig_flush_base, flush_base, flags, *p;
 	unsigned int ecache_size, order;
 	cycles_t tick1, tick2, raw;
+	int cpu_node;
 
 	/* Approximate heuristic for SMP scheduling.  It is an
 	 * estimation of the time it takes to flush the L2 cache
@@ -1172,7 +1159,8 @@ static void __init smp_tune_scheduling(void)
 		goto report;
 	}
 
-	ecache_size = prom_getintdefault(linux_cpus[0].prom_node,
+	cpu_find_by_instance(0, &cpu_node, NULL);
+	ecache_size = prom_getintdefault(cpu_node,
 					 "ecache-size", (512 * 1024));
 	if (ecache_size > (4 * 1024 * 1024))
 		ecache_size = (4 * 1024 * 1024);
@@ -1254,22 +1242,27 @@ int setup_profiling_timer(unsigned int multiplier)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int i;
+	int instance, mid;
 
-	for (i = 0; i < linux_num_cpus; i++) {
-		if (linux_cpus[i].mid < max_cpus) {
-			cpu_set(linux_cpus[i].mid, phys_cpu_present_map);
+	instance = 0;
+	while (!cpu_find_by_instance(instance, NULL, &mid)) {
+		if (mid < max_cpus) {
+			cpu_set(mid, phys_cpu_present_map);
 			atomic_inc(&sparc64_num_cpus_possible);
 		}
+		instance++;
 	}
+
 	if (atomic_read(&sparc64_num_cpus_possible) > max_cpus) {
-		for (i = linux_num_cpus - 1; i >= 0; i--) {
-			if (linux_cpus[i].mid != boot_cpu_id) {
-				cpu_clear(linux_cpus[i].mid, phys_cpu_present_map);
+		instance = 0;
+		while (!cpu_find_by_instance(instance, NULL, &mid)) {
+			if (mid != boot_cpu_id) {
+				cpu_clear(mid, phys_cpu_present_map);
 				atomic_dec(&sparc64_num_cpus_possible);
 				if (atomic_read(&sparc64_num_cpus_possible) <= max_cpus)
 					break;
 			}
+			instance++;
 		}
 	}
 
@@ -1306,7 +1299,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 	for (i = 0; i < NR_CPUS; i++) {
 		if (cpu_online(i))
-			bogosum += cpu_data[i].udelay_val;
+			bogosum += cpu_data(i).udelay_val;
 	}
 	printk("Total of %ld processors activated "
 	       "(%lu.%02lu BogoMIPS).\n",
@@ -1319,3 +1312,27 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	 */
 	smp_tune_scheduling();
 }
+
+/* This needn't do anything as we do not sleep the cpu
+ * inside of the idler task, so an interrupt is not needed
+ * to get a clean fast response.
+ *
+ * XXX Reverify this assumption... -DaveM
+ *
+ * Addendum: We do want it to do something for the signal
+ *           delivery case, we detect that by just seeing
+ *           if we are trying to send this to an idler or not.
+ */
+void smp_send_reschedule(int cpu)
+{
+	if (cpu_data(cpu).idle_volume == 0)
+		smp_receive_signal(cpu);
+}
+
+/* This is a nop because we capture all other cpus
+ * anyways when making the PROM active.
+ */
+void smp_send_stop(void)
+{
+}
+
