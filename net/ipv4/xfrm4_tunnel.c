@@ -68,7 +68,7 @@ static int ipip_rcv(struct sk_buff *skb)
 	if (handler && handler->handler(skb) == 0)
 		return 0;
 
-	return xfrm4_rcv_encap(skb, 0);
+	return xfrm4_rcv(skb);
 }
 
 static void ipip_err(struct sk_buff *skb, u32 info)
