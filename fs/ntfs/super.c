@@ -29,6 +29,7 @@
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
 #include <linux/moduleparam.h>
+#include <linux/smp_lock.h>
 
 #include "ntfs.h"
 #include "sysctl.h"
@@ -2291,6 +2292,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->fmask = 0177;
 	vol->dmask = 0077;
 
+	unlock_kernel();
+
 	/* Important to get the mount options dealt with now. */
 	if (!parse_options(vol, (char*)opt))
 		goto err_out_now;
@@ -2427,6 +2430,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 		}
 		up(&ntfs_lock);
 		sb->s_export_op = &ntfs_export_ops;
+		lock_kernel();
 		return 0;
 	}
 	ntfs_error(sb, "Failed to allocate root directory.");
@@ -2530,6 +2534,7 @@ iput_tmp_ino_err_out_now:
 	}
 	/* Errors at this stage are irrelevant. */
 err_out_now:
+	lock_kernel();
 	sb->s_fs_info = NULL;
 	kfree(vol);
 	ntfs_debug("Failed, returning -EINVAL.");

@@ -127,7 +127,7 @@ void __ntfs_debug (const char *file, int line, const char *function,
 	va_start(args, fmt);
 	vsnprintf(err_buf, sizeof(err_buf), fmt, args);
 	va_end(args);
-	printk(KERN_DEBUG "NTFS-fs DEBUG (%s, %d): %s: %s\n",
+	printk(KERN_DEBUG "NTFS-fs DEBUG (%s, %d): %s(): %s\n",
 		file, line, flen ? function : "", err_buf);
 	spin_unlock(&err_buf_lock);
 }

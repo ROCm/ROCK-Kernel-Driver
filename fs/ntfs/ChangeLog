@@ -25,6 +25,9 @@ ToDo/Notes:
 
 	- Remove vol->nr_mft_records as it was pretty meaningless and optimize
 	  the calculation of total/free inodes as used by statfs().
+	- Fix scheduling latencies in ntfs_fill_super() by dropping the BKL
+	  because the code itself is using the ntfs_lock semaphore which
+	  provides safe locking.  (Ingo Molnar)
 
 2.1.17 - Fix bugs in mount time error code paths and other updates.
 
