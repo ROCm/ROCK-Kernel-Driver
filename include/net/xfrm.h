@@ -509,8 +509,8 @@ struct xfrm_dst
  * check
  */
 struct xfrm_decap_state {
+	char	decap_data[20];
 	__u16	decap_type;
-	char	decap_data[30];
 };   
 
 struct sec_decap_state {

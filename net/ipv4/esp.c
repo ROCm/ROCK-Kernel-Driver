@@ -12,11 +12,11 @@
 
 #define MAX_SG_ONSTACK 4
 
-/* encapsulation data for use when post-processing the decapsulation */
-struct esp_encap_data {
-	__u8		proto;
+/* decapsulation data for use when post-processing */
+struct esp_decap_data {
 	xfrm_address_t	saddr;
 	__u16		sport;
+	__u8		proto;
 };
 
 int esp_output(struct sk_buff *skb)
@@ -285,10 +285,10 @@ int esp_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 		/* ... check padding bits here. Silly. :-) */ 
 
 		if (x->encap && decap && decap->decap_type) {
-			struct esp_encap_data *encap_data;
+			struct esp_decap_data *encap_data;
 			struct udphdr *uh = (struct udphdr *) (iph+1);
 
-			encap_data = (struct esp_encap_data *) (decap->decap_data);
+			encap_data = (struct esp_decap_data *) (decap->decap_data);
 			encap_data->proto = 0;
 
 			switch (decap->decap_type) {
@@ -338,10 +338,10 @@ int esp_post_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct 
   
 	if (x->encap) {
 		struct xfrm_encap_tmpl *encap;
-		struct esp_encap_data *decap_data;
+		struct esp_decap_data *decap_data;
 
 		encap = x->encap;
-		decap_data = (struct esp_encap_data *)(decap->decap_data);
+		decap_data = (struct esp_decap_data *)(decap->decap_data);
 
 		/* first, make sure that the decap type == the encap type */
 		if (encap->encap_type != decap->decap_type)
@@ -569,6 +569,15 @@ static struct inet_protocol esp4_protocol = {
 
 int __init esp4_init(void)
 {
+	struct xfrm_decap_state decap;
+
+	if (sizeof(struct esp_decap_data)  <
+	    sizeof(decap.decap_data)) {
+		extern void decap_data_too_small(void);
+
+		decap_data_too_small();
+	}
+
 	SET_MODULE_OWNER(&esp_type);
 	if (xfrm_register_type(&esp_type, AF_INET) < 0) {
 		printk(KERN_INFO "ip esp init: can't add xfrm type\n");
