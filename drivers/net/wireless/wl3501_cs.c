@@ -2126,6 +2126,33 @@ static int wl3501_get_txpow(struct net_device *dev,
 	return rc;
 }
 
+static int wl3501_get_retry(struct net_device *dev,
+			    struct iw_request_info *info,
+			    union iwreq_data *wrqu, char *extra)
+{
+	u16 retry;
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	int rc = wl3501_get_mib_value(this,
+				      WL3501_MIB_ATTR_LONG_RETRY_LIMIT,
+				      &retry, sizeof(retry));
+	if (rc)
+		goto out;
+	if (wrqu->retry.flags & IW_RETRY_MAX) {
+		wrqu->retry.flags = IW_RETRY_LIMIT | IW_RETRY_MAX;
+		goto set_value;
+	}
+	rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_SHORT_RETRY_LIMIT,
+				  &retry, sizeof(retry));
+	if (rc)
+		goto out;
+	wrqu->retry.flags = IW_RETRY_LIMIT | IW_RETRY_MIN;
+set_value:
+	wrqu->retry.value = retry;
+	wrqu->retry.disabled = 0;
+out:
+	return rc;
+}
+
 static int wl3501_get_encode(struct net_device *dev,
 			     struct iw_request_info *info,
 			     union iwreq_data *wrqu, char *extra)
@@ -2203,6 +2230,7 @@ static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWRTS	- SIOCIWFIRST] = wl3501_get_rts_threshold,
 	[SIOCGIWFRAG	- SIOCIWFIRST] = wl3501_get_frag_threshold,
 	[SIOCGIWTXPOW	- SIOCIWFIRST] = wl3501_get_txpow,
+	[SIOCGIWRETRY	- SIOCIWFIRST] = wl3501_get_retry,
 	[SIOCGIWENCODE	- SIOCIWFIRST] = wl3501_get_encode,
 	[SIOCGIWPOWER	- SIOCIWFIRST] = wl3501_get_power,
 };
