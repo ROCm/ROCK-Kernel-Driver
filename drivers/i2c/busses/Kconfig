@@ -95,6 +95,8 @@ config I2C_I801
 	    82801CA/CAM
 	    82801DB
 	    82801EB
+	    6300ESB
+	    ICH6
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-i801.
