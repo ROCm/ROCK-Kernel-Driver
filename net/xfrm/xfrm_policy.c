@@ -536,8 +536,11 @@ void xfrm_policy_delete(struct xfrm_policy *pol, int dir)
 	write_lock_bh(&xfrm_policy_lock);
 	pol = __xfrm_policy_unlink(pol, dir);
 	write_unlock_bh(&xfrm_policy_lock);
-	if (pol)
+	if (pol) {
+		if (dir < XFRM_POLICY_MAX)
+			atomic_inc(&flow_cache_genid);
 		xfrm_policy_kill(pol);
+	}
 }
 
 int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)

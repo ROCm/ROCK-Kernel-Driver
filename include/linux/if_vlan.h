@@ -22,6 +22,7 @@ struct sk_buff;
 struct packet_type;
 struct vlan_collection;
 struct vlan_dev_info;
+struct hlist_node;
 
 #include <linux/proc_fs.h> /* for proc_dir_entry */
 #include <linux/netdevice.h>
@@ -67,9 +68,9 @@ extern void vlan_ioctl_set(int (*hook)(void __user *));
 
 struct vlan_group {
 	int real_dev_ifindex; /* The ifindex of the ethernet(like) device the vlan is attached to. */
+	struct hlist_node	hlist;	/* linked list */
 	struct net_device *vlan_devices[VLAN_GROUP_ARRAY_LEN];
-
-	struct vlan_group *next; /* the next in the list */
+	struct rcu_head		rcu;
 };
 
 struct vlan_priority_tci_mapping {

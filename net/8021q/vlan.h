@@ -33,8 +33,7 @@ extern unsigned short vlan_name_type;
 #define VLAN_GRP_HASH_SHIFT	5
 #define VLAN_GRP_HASH_SIZE	(1 << VLAN_GRP_HASH_SHIFT)
 #define VLAN_GRP_HASH_MASK	(VLAN_GRP_HASH_SIZE - 1)
-extern struct vlan_group *vlan_group_hash[VLAN_GRP_HASH_SIZE];
-extern spinlock_t vlan_group_lock;
+extern struct  hlist_head vlan_group_hash[VLAN_GRP_HASH_SIZE];
 
 /*  Find a VLAN device by the MAC address of its Ethernet device, and
  *  it's VLAN ID.  The default configuration is to have VLAN's scope
@@ -44,10 +43,8 @@ extern spinlock_t vlan_group_lock;
  *  NOT follow the spec for VLANs, but may be useful for doing very
  *  large quantities of VLAN MUX/DEMUX onto FrameRelay or ATM PVCs.
  *
- *  Must be invoked with vlan_group_lock held and that lock MUST NOT
- *  be dropped until a reference is obtained on the returned device.
- *  You may drop the lock earlier if you are running under the RTNL
- *  semaphore, however.
+ *  Must be invoked with rcu_read_lock (ie preempt disabled)
+ *  or with RTNL.
  */
 struct net_device *__find_vlan_dev(struct net_device* real_dev,
 				   unsigned short VID); /* vlan.c */
@@ -65,6 +62,7 @@ int vlan_dev_change_mtu(struct net_device *dev, int new_mtu);
 int vlan_dev_set_mac_address(struct net_device *dev, void* addr);
 int vlan_dev_open(struct net_device* dev);
 int vlan_dev_stop(struct net_device* dev);
+int vlan_dev_ioctl(struct net_device* dev, struct ifreq *ifr, int cmd);
 int vlan_dev_set_ingress_priority(char* dev_name, __u32 skb_prio, short vlan_prio);
 int vlan_dev_set_egress_priority(char* dev_name, __u32 skb_prio, short vlan_prio);
 int vlan_dev_set_vlan_flag(char* dev_name, __u32 flag, short flag_val);
