@@ -103,43 +103,6 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 }
 
 struct inode_operations ntfs_dir_inode_ops = {
-	create:		NULL,		/* . */
 	lookup:		ntfs_lookup,	/* lookup directory. */
-	link:		NULL,		/* . */
-	unlink:		NULL,		/* . */
-	symlink:	NULL,		/* . */
-	mkdir:		NULL,		/* . */
-	rmdir:		NULL,		/* . */
-	mknod:		NULL,		/* . */
-	rename:		NULL,		/* . */
-	readlink:	NULL,		/* . */
-	follow_link:	NULL,		/* . */
-	truncate:	NULL,		/* . */
-	permission:	NULL,		/* . */
-	revalidate:	NULL,		/* . */
-	setattr:	NULL,		/* . */
-	getattr:	NULL,		/* . */
 };
-
-#if 0
-struct inode_operations {
-	int (*create) (struct inode *,struct dentry *,int);
-	struct dentry * (*lookup) (struct inode *,struct dentry *);
-	int (*link) (struct dentry *,struct inode *,struct dentry *);
-	int (*unlink) (struct inode *,struct dentry *);
-	int (*symlink) (struct inode *,struct dentry *,const char *);
-	int (*mkdir) (struct inode *,struct dentry *,int);
-	int (*rmdir) (struct inode *,struct dentry *);
-	int (*mknod) (struct inode *,struct dentry *,int,int);
-	int (*rename) (struct inode *, struct dentry *,
-			struct inode *, struct dentry *);
-	int (*readlink) (struct dentry *, char *,int);
-	int (*follow_link) (struct dentry *, struct nameidata *);
-	void (*truncate) (struct inode *);
-	int (*permission) (struct inode *, int);
-	int (*revalidate) (struct dentry *);
-	int (*setattr) (struct dentry *, struct iattr *);
-	int (*getattr) (struct dentry *, struct iattr *);
-};
-#endif
 

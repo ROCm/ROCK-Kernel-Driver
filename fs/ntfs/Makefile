@@ -7,7 +7,7 @@ obj-y   := aops.o attrib.o compress.o debug.o dir.o file.o inode.o mft.o \
 
 obj-m   := $(O_TARGET)
 
-EXTRA_CFLAGS = -DNTFS_VERSION=\"2.0.6\"
+EXTRA_CFLAGS = -DNTFS_VERSION=\"2.0.7\"
 
 ifeq ($(CONFIG_NTFS_DEBUG),y)
 EXTRA_CFLAGS += -DDEBUG

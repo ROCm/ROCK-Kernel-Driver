@@ -114,13 +114,6 @@ struct address_space_operations ntfs_mft_aops = {
 						   disk request queue. */
 	prepare_write:	NULL,			/* . */
 	commit_write:	NULL,			/* . */
-	bmap:		NULL,			/* Needed for FIBMAP.
-						   Don't use it. */
-	flushpage:	NULL,			/* . */
-	releasepage:	NULL,			/* . */
-#ifdef KERNEL_HAS_O_DIRECT
-	direct_IO:	NULL,			/* . */
-#endif
 };
 
 /**
