@@ -23,9 +23,6 @@
 #include <linux/netlink.h>
 #include <linux/ptrace.h>
 
-#ifdef CONFIG_SECURITY
-
-
 static struct security_operations capability_ops = {
 	.ptrace =			cap_ptrace,
 	.capget =			cap_capget,
@@ -99,5 +96,3 @@ module_exit (capability_exit);
 
 MODULE_DESCRIPTION("Standard Linux Capabilities Security Module");
 MODULE_LICENSE("GPL");
-
-#endif	/* CONFIG_SECURITY */

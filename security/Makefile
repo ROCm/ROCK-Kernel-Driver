@@ -6,7 +6,7 @@ subdir-$(CONFIG_SECURITY_SELINUX)	+= selinux
 
 # if we don't select a security model, use the default capabilities
 ifneq ($(CONFIG_SECURITY),y)
-obj-y		+= commoncap.o capability.o
+obj-y		+= commoncap.o
 endif
 
 # Object file lists
