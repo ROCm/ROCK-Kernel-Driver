@@ -644,10 +644,20 @@ config FB_RADEON
 
 config FB_RADEON_I2C
 	bool "DDC/I2C for ATI Radeon support"
-	depends on FB_RADEON && (I2C_ALGOBIT=FB_RADEON || I2C_ALGOBIT=y)
+	depends on FB_RADEON && I2C
+	select I2C_ALGOBIT
 	default y
 	help
 	  Say Y here if you want DDC/I2C support for your Radeon board. 
+
+config FB_RADEON_DEBUG
+	bool "Lots of debug output from Radeon driver"
+	depends on FB_RADEON
+	default n
+	help
+	  Say Y here if you want the Radeon driver to output all sorts
+	  of debugging informations to provide to the maintainer when
+	  something goes wrong.
 
 config FB_ATY128
 	tristate "ATI Rage128 display support"

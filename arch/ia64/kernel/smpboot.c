@@ -10,10 +10,6 @@
  *						smp_boot_cpus()/smp_commence() is replaced by
  *						smp_prepare_cpus()/__cpu_up()/smp_cpus_done().
  */
-
-
-#define __KERNEL_SYSCALLS__
-
 #include <linux/config.h>
 
 #include <linux/module.h>
@@ -306,7 +302,6 @@ smp_callin (void)
 
 #ifdef CONFIG_IA64_MCA
 	ia64_mca_cmc_vector_setup();	/* Setup vector on AP & enable */
-	ia64_mca_check_errors();	/* For post-failure MCA error logging */
 #endif
 
 #ifdef CONFIG_PERFMON

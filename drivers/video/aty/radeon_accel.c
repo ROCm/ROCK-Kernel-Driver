@@ -28,7 +28,7 @@ void radeonfb_fillrect(struct fb_info *info, const struct fb_fillrect *region)
 	struct fb_fillrect modded;
 	int vxres, vyres;
   
-	if (rinfo->asleep)
+	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 	if (radeon_accel_disabled()) {
 		cfb_fillrect(info, region);
@@ -81,7 +81,7 @@ void radeonfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 	modded.width  = area->width;
 	modded.height = area->height;
   
-	if (rinfo->asleep)
+	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 	if (radeon_accel_disabled()) {
 		cfb_copyarea(info, area);
@@ -108,7 +108,7 @@ void radeonfb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct radeonfb_info *rinfo = info->par;
 
-	if (rinfo->asleep)
+	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 	radeon_engine_idle();
 
@@ -119,7 +119,7 @@ int radeonfb_sync(struct fb_info *info)
 {
 	struct radeonfb_info *rinfo = info->par;
 
-	if (rinfo->asleep)
+	if (info->state != FBINFO_STATE_RUNNING)
 		return 0;
 	radeon_engine_idle();
 

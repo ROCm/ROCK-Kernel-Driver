@@ -282,6 +282,7 @@ struct radeonfb_info {
 	u8			family;
 	u8			rev;
 	unsigned long		video_ram;
+	unsigned long		mapped_vram;
 
 	int			pitch, bpp, depth;
 
@@ -332,7 +333,11 @@ struct radeonfb_info {
 /*
  * Debugging stuffs
  */
+#ifdef CONFIG_FB_RADEON_DEBUG
+#define DEBUG		1
+#else
 #define DEBUG		0
+#endif
 
 #if DEBUG
 #define RTRACE		printk

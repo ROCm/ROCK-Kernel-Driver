@@ -487,7 +487,7 @@ void __init get_smp_config (void)
 
 	/*
  	 * ACPI may be used to obtain the entire SMP configuration or just to 
- 	 * enumerate/configure processors (CONFIG_ACPI_HT_ONLY).  Note that 
+ 	 * enumerate/configure processors (CONFIG_ACPI_BOOT).  Note that 
  	 * ACPI supports both logical (e.g. Hyper-Threading) and physical 
  	 * processors, where MPS only supports physical.
  	 */
@@ -787,7 +787,7 @@ void __init mp_override_legacy_irq (
 	 *      erroneously sets the trigger to level, resulting in a HUGE 
 	 *      increase of timer interrupts!
 	 */
-	if ((bus_irq == 0) && (global_irq == 2) && (trigger == 3))
+	if ((bus_irq == 0) && (trigger == 3))
 		trigger = 1;
 
 	intsrc.mpc_type = MP_INTSRC;
@@ -808,8 +808,8 @@ void __init mp_override_legacy_irq (
 	 * Otherwise create a new entry (e.g. global_irq == 2).
 	 */
 	for (i = 0; i < mp_irq_entries; i++) {
-		if ((mp_irqs[i].mpc_dstapic == intsrc.mpc_dstapic) 
-			&& (mp_irqs[i].mpc_dstirq == intsrc.mpc_dstirq)) {
+		if ((mp_irqs[i].mpc_srcbus == intsrc.mpc_srcbus) 
+			&& (mp_irqs[i].mpc_srcbusirq == intsrc.mpc_srcbusirq)) {
 			mp_irqs[i] = intsrc;
 			found = 1;
 			break;
@@ -855,9 +855,10 @@ void __init mp_config_acpi_legacy_irqs (void)
 	 */
 	for (i = 0; i < 16; i++) {
 
-		if (i == 2) continue;			/* Don't connect IRQ2 */
+		if (i == 2)
+			continue;			/* Don't connect IRQ2 */
 
-		intsrc.mpc_irqtype = i ? mp_INT : mp_ExtINT;   /* 8259A to #0 */
+		intsrc.mpc_irqtype = mp_INT;
 		intsrc.mpc_srcbusirq = i;		   /* Identity mapped */
 		intsrc.mpc_dstirq = i;
 

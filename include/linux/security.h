@@ -171,6 +171,16 @@ struct swap_info_struct;
  *	@flags contains the mount flags.
  *	@data contains the filesystem-specific data.
  *	Return 0 if permission is granted.
+ * @sb_copy_data:
+ *	Allow mount option data to be copied prior to parsing by the filesystem,
+ *	so that the security module can extract security-specific mount
+ *	options cleanly (a filesystem may modify the data e.g. with strsep()).
+ *	This also allows the original mount data to be stripped of security-
+ *	specific options to avoid having to make filesystems aware of them.
+ *	@fstype the type of filesystem being mounted.
+ *	@orig the original mount data copied from userspace.
+ *	@copy copied data which will be passed to the security module.
+ *	Returns 0 if the copy was successful.
  * @sb_check_sb:
  *	Check permission before the device with superblock @mnt->sb is mounted
  *	on the mount point named by @nd.
@@ -1024,7 +1034,8 @@ struct security_operations {
 
 	int (*sb_alloc_security) (struct super_block * sb);
 	void (*sb_free_security) (struct super_block * sb);
-	int (*sb_kern_mount) (struct super_block *sb);
+	int (*sb_copy_data)(const char *fstype, void *orig, void *copy);
+	int (*sb_kern_mount) (struct super_block *sb, void *data);
 	int (*sb_statfs) (struct super_block * sb);
 	int (*sb_mount) (char *dev_name, struct nameidata * nd,
 			 char *type, unsigned long flags, void *data);
@@ -1308,9 +1319,14 @@ static inline void security_sb_free (struct super_block *sb)
 	security_ops->sb_free_security (sb);
 }
 
-static inline int security_sb_kern_mount (struct super_block *sb)
+static inline int security_sb_copy_data (const char *fstype, void *orig, void *copy)
 {
-	return security_ops->sb_kern_mount (sb);
+	return security_ops->sb_copy_data (fstype, orig, copy);
+}
+
+static inline int security_sb_kern_mount (struct super_block *sb, void *data)
+{
+	return security_ops->sb_kern_mount (sb, data);
 }
 
 static inline int security_sb_statfs (struct super_block *sb)
@@ -1973,7 +1989,12 @@ static inline int security_sb_alloc (struct super_block *sb)
 static inline void security_sb_free (struct super_block *sb)
 { }
 
-static inline int security_sb_kern_mount (struct super_block *sb)
+static inline int security_sb_copy_data (const char *fstype, void *orig, void *copy)
+{
+	return 0;
+}
+
+static inline int security_sb_kern_mount (struct super_block *sb, void *data)
 {
 	return 0;
 }

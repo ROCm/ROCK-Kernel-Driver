@@ -73,11 +73,10 @@ static struct bpt iabr;
 static unsigned bpinstr = 0x7fe00008;	/* trap */
 
 /* Prototypes */
-extern void (*debugger_fault_handler)(struct pt_regs *);
 static int cmds(struct pt_regs *);
 static int mread(unsigned long, void *, int);
 static int mwrite(unsigned long, void *, int);
-static void handle_fault(struct pt_regs *);
+static int handle_fault(struct pt_regs *);
 static void byterev(unsigned char *, int);
 static void memex(void);
 static int bsesc(void);
@@ -115,10 +114,7 @@ static void cpu_cmd(void);
 #endif /* CONFIG_SMP */
 static void csum(void);
 static void bootcmds(void);
-static void mem_translate(void);
-static void mem_check(void);
-static void mem_find_real(void);
-static void mem_find_vsid(void);
+void dump_segments(void);
 
 static void debug_trace(void);
 
@@ -149,7 +145,15 @@ Commands:\n\
   b	show breakpoints\n\
   bd	set data breakpoint\n\
   bi	set instruction breakpoint\n\
-  bc	clear breakpoint\n\
+  bc	clear breakpoint\n"
+#ifdef CONFIG_SMP
+  "\
+  c	print cpus stopped in xmon\n\
+  ci	send xmon interrupt to all other cpus\n\
+  c#	try to switch to cpu number h (in hex)\n"
+#endif
+  "\
+  C	checksum\n\
   d	dump bytes\n\
   di	dump instructions\n\
   df	dump float values\n\
@@ -162,7 +166,6 @@ Commands:\n\
   md	compare two blocks of memory\n\
   ml	locate a block of memory\n\
   mz	zero a block of memory\n\
-  mx	translation information for an effective address\n\
   mi	show information about memory allocation\n\
   p 	show the task list\n\
   r	print registers\n\
@@ -171,7 +174,14 @@ Commands:\n\
   t	print backtrace\n\
   T	Enable/Disable PPCDBG flags\n\
   x	exit monitor\n\
-";
+  u	dump segment table or SLB\n\
+  ?	help\n"
+#ifndef CONFIG_PPC_ISERIES
+  "\
+  zr	reboot\n\
+  zh	halt\n"
+#endif
+;
 
 static int xmon_trace[NR_CPUS];
 #define SSTEP	1		/* stepping because of 's' command */
@@ -224,7 +234,7 @@ static inline void disable_surveillance(void)
 #endif
 }
 
-void
+int
 xmon(struct pt_regs *excp)
 {
 	struct pt_regs regs;
@@ -308,6 +318,7 @@ xmon(struct pt_regs *excp)
 #endif /* CONFIG_SMP */
 	remove_bpts();
 	disable_surveillance();
+	printf("press ? for help ");
 	cmd = cmds(excp);
 	if (cmd == 's') {
 		xmon_trace[smp_processor_id()] = SSTEP;
@@ -330,17 +341,8 @@ xmon(struct pt_regs *excp)
 	cpu_clear(smp_processor_id(), cpus_in_xmon);
 #endif /* CONFIG_SMP */
 	set_msrd(msr);		/* restore interrupt enable */
-}
 
-void
-xmon_irq(int irq, void *d, struct pt_regs *regs)
-{
-	unsigned long flags;
-	local_save_flags(flags);
-	local_irq_disable();
-	printf("Keyboard interrupt\n");
-	xmon(regs);
-	local_irq_restore(flags);
+	return 0;
 }
 
 int
@@ -524,18 +526,6 @@ cmds(struct pt_regs *excp)
 			case 'z':
 				memzcan();
 				break;
-			case 'x':
-				mem_translate();
-				break;
-			case 'c':
-				mem_check();
-				break;
-			case 'f':
-				mem_find_real();
-				break;
-			case 'e':
-				mem_find_vsid();
-				break;
 			case 'i':
 				show_mem();
 				break;
@@ -587,10 +577,15 @@ cmds(struct pt_regs *excp)
 			cpu_cmd();
 			break;
 #endif /* CONFIG_SMP */
+#ifndef CONFIG_PPC_ISERIES
 		case 'z':
 			bootcmds();
+#endif
 		case 'T':
 			debug_trace();
+			break;
+		case 'u':
+			dump_segments();
 			break;
 		default:
 			printf("Unrecognized command: ");
@@ -633,7 +628,7 @@ static void cpu_cmd(void)
 		printf("stopping all cpus\n");
 		/* interrupt other cpu(s) */
 		cpu = MSG_ALL_BUT_SELF;
-		smp_send_xmon_break(cpu);
+		smp_send_debugger_break(cpu);
 		return;
 	}
 	termch = cmd;
@@ -1057,14 +1052,23 @@ cacheflush(void)
 		termch = 0;
 	nflush = 1;
 	scanhex(&nflush);
-	nflush = (nflush + 31) / 32;
-	if (cmd != 'i') {
-		for (; nflush > 0; --nflush, adrs += 0x20)
-			cflush((void *) adrs);
-	} else {
-		for (; nflush > 0; --nflush, adrs += 0x20)
-			cinval((void *) adrs);
+	nflush = (nflush + L1_CACHE_BYTES - 1) / L1_CACHE_BYTES;
+	if (setjmp(bus_error_jmp) == 0) {
+		__debugger_fault_handler = handle_fault;
+		sync();
+
+		if (cmd != 'i') {
+			for (; nflush > 0; --nflush, adrs += L1_CACHE_BYTES)
+				cflush((void *) adrs);
+		} else {
+			for (; nflush > 0; --nflush, adrs += L1_CACHE_BYTES)
+				cinval((void *) adrs);
+		}
+		sync();
+		/* wait a little while to see if we get a machine check */
+		__delay(200);
 	}
+	__debugger_fault_handler = 0;
 }
 
 unsigned long
@@ -1073,6 +1077,7 @@ read_spr(int n)
 	unsigned int instrs[2];
 	unsigned long (*code)(void);
 	unsigned long opd[3];
+	unsigned long ret = -1UL;
 
 	instrs[0] = 0x7c6002a6 + ((n & 0x1F) << 16) + ((n & 0x3e0) << 6);
 	instrs[1] = 0x4e800020;
@@ -1083,7 +1088,22 @@ read_spr(int n)
 	store_inst(instrs+1);
 	code = (unsigned long (*)(void)) opd;
 
-	return code();
+	if (setjmp(bus_error_jmp) == 0) {
+		__debugger_fault_handler = handle_fault;
+		sync();
+
+		ret = code();
+
+		sync();
+		/* wait a little while to see if we get a machine check */
+		__delay(200);
+	} else {
+		printf("*** Error reading spr %x\n", n);
+	}
+
+	__debugger_fault_handler = 0;
+
+	return ret;
 }
 
 void
@@ -1102,7 +1122,20 @@ write_spr(int n, unsigned long val)
 	store_inst(instrs+1);
 	code = (unsigned long (*)(unsigned long)) opd;
 
-	code(val);
+	if (setjmp(bus_error_jmp) == 0) {
+		__debugger_fault_handler = handle_fault;
+		sync();
+
+		code(val);
+
+		sync();
+		/* wait a little while to see if we get a machine check */
+		__delay(200);
+	} else {
+		printf("*** Error writing spr %x\n", n);
+	}
+
+	__debugger_fault_handler = 0;
 }
 
 static unsigned long regno;
@@ -1112,11 +1145,14 @@ extern char dec_exc;
 void
 super_regs()
 {
-	int i, cmd;
+	int cmd;
 	unsigned long val;
-	struct paca_struct*  ptrPaca = NULL;
-	struct ItLpPaca*  ptrLpPaca = NULL;
-	struct ItLpRegSave*  ptrLpRegSave = NULL;
+#ifdef CONFIG_PPC_ISERIES
+	int i;
+	struct paca_struct *ptrPaca = NULL;
+	struct ItLpPaca *ptrLpPaca = NULL;
+	struct ItLpRegSave *ptrLpRegSave = NULL;
+#endif
 
 	cmd = skipbl();
 	if (cmd == '\n') {
@@ -1130,10 +1166,7 @@ super_regs()
 		printf("sp   = %.16lx  sprg3= %.16lx\n", sp, get_sprg3());
 		printf("toc  = %.16lx  dar  = %.16lx\n", toc, get_dar());
 		printf("srr0 = %.16lx  srr1 = %.16lx\n", get_srr0(), get_srr1());
-		printf("asr  = %.16lx\n", mfasr());
-		for (i = 0; i < 8; ++i)
-			printf("sr%.2ld = %.16lx  sr%.2ld = %.16lx\n", i, get_sr(i), i+8, get_sr(i+8));
-
+#ifdef CONFIG_PPC_ISERIES
 		// Dump out relevant Paca data areas.
 		printf("Paca: \n");
 		ptrPaca = get_paca();
@@ -1149,7 +1182,8 @@ super_regs()
 		printf("    Saved Sprg0=%.16lx  Saved Sprg1=%.16lx \n", ptrLpRegSave->xSPRG0, ptrLpRegSave->xSPRG0);
 		printf("    Saved Sprg2=%.16lx  Saved Sprg3=%.16lx \n", ptrLpRegSave->xSPRG2, ptrLpRegSave->xSPRG3);
 		printf("    Saved Msr  =%.16lx  Saved Nia  =%.16lx \n", ptrLpRegSave->xMSR, ptrLpRegSave->xNIA);
-    
+#endif
+
 		return;
 	}
 
@@ -1162,11 +1196,6 @@ super_regs()
 		/* fall through */
 	case 'r':
 		printf("spr %lx = %lx\n", regno, read_spr(regno));
-		break;
-	case 's':
-		val = get_sr(regno);
-		scanhex(&val);
-		set_sr(regno, val);
 		break;
 	case 'm':
 		val = get_msr();
@@ -1185,7 +1214,7 @@ mread(unsigned long adrs, void *buf, int size)
 
 	n = 0;
 	if (setjmp(bus_error_jmp) == 0) {
-		debugger_fault_handler = handle_fault;
+		__debugger_fault_handler = handle_fault;
 		sync();
 		p = (char *)adrs;
 		q = (char *)buf;
@@ -1210,7 +1239,7 @@ mread(unsigned long adrs, void *buf, int size)
 		__delay(200);
 		n = size;
 	}
-	debugger_fault_handler = 0;
+	__debugger_fault_handler = 0;
 	return n;
 }
 
@@ -1222,7 +1251,7 @@ mwrite(unsigned long adrs, void *buf, int size)
 
 	n = 0;
 	if (setjmp(bus_error_jmp) == 0) {
-		debugger_fault_handler = handle_fault;
+		__debugger_fault_handler = handle_fault;
 		sync();
 		p = (char *) adrs;
 		q = (char *) buf;
@@ -1249,14 +1278,14 @@ mwrite(unsigned long adrs, void *buf, int size)
 	} else {
 		printf("*** Error writing address %x\n", adrs + n);
 	}
-	debugger_fault_handler = 0;
+	__debugger_fault_handler = 0;
 	return n;
 }
 
 static int fault_type;
 static char *fault_chars[] = { "--", "**", "##" };
 
-static void
+static int
 handle_fault(struct pt_regs *regs)
 {
 	switch (regs->trap) {
@@ -1272,6 +1301,8 @@ handle_fault(struct pt_regs *regs)
 	}
 
 	longjmp(bus_error_jmp, 1);
+
+	return 0;
 }
 
 #define SWAP(a, b, t)	((t) = (a), (a) = (b), (b) = (t))
@@ -1885,7 +1916,7 @@ void __xmon_print_symbol(const char *fmt, unsigned long address)
 	char namebuf[128];
 
 	if (setjmp(bus_error_jmp) == 0) {
-		debugger_fault_handler = handle_fault;
+		__debugger_fault_handler = handle_fault;
 		sync();
 		name = kallsyms_lookup(address, &size, &offset, &modname,
 				       namebuf);
@@ -1896,7 +1927,7 @@ void __xmon_print_symbol(const char *fmt, unsigned long address)
 		name = "symbol lookup failed";
 	}
 
-	debugger_fault_handler = 0;
+	__debugger_fault_handler = 0;
 
 	if (!name) {
 		char addrstr[sizeof("0x%lx") + (BITS_PER_LONG*3/10)];
@@ -1924,240 +1955,8 @@ void __xmon_print_symbol(const char *fmt, unsigned long address)
 	}
 }
 
-void
-mem_translate()
+static void debug_trace(void)
 {
-	int c;
-	unsigned long ea, va, vsid, vpn, page, hpteg_slot_primary, hpteg_slot_secondary, primary_hash, i, *steg, esid, stabl;
-	HPTE *  hpte;
-	struct mm_struct * mm;
-	pte_t  *ptep = NULL;
-	void * pgdir;
- 
-	c = inchar();
-	if ((isxdigit(c) && c != 'f' && c != 'd') || c == '\n')
-		termch = c;
-	scanhex((void *)&ea);
-  
-	if ((ea >= KRANGE_START) && (ea <= (KRANGE_START + (1UL<<60)))) {
-		ptep = 0;
-		vsid = get_kernel_vsid(ea);
-		va = ( vsid << 28 ) | ( ea & 0x0fffffff );
-	} else {
-		// if in vmalloc range, use the vmalloc page directory
-		if ( ( ea >= VMALLOC_START ) && ( ea <= VMALLOC_END ) ) {
-			mm = &init_mm;
-			vsid = get_kernel_vsid( ea );
-		}
-		// if in ioremap range, use the ioremap page directory
-		else if ( ( ea >= IMALLOC_START ) && ( ea <= IMALLOC_END ) ) {
-			mm = &ioremap_mm;
-			vsid = get_kernel_vsid( ea );
-		}
-		// if in user range, use the current task's page directory
-		else if ( ( ea >= USER_START ) && ( ea <= USER_END ) ) {
-			mm = current->mm;
-			vsid = get_vsid(mm->context, ea );
-		}
-		pgdir = mm->pgd;
-		va = ( vsid << 28 ) | ( ea & 0x0fffffff );
-		ptep = find_linux_pte( pgdir, ea );
-	}
-
-	vpn = ((vsid << 28) | (((ea) & 0xFFFF000))) >> 12;
-	page = vpn & 0xffff;
-	esid = (ea >> 28)  & 0xFFFFFFFFF;
-
-  // Search the primary group for an available slot
-	primary_hash = ( vsid & 0x7fffffffff ) ^ page;
-	hpteg_slot_primary = ( primary_hash & htab_data.htab_hash_mask ) * HPTES_PER_GROUP;
-	hpteg_slot_secondary = ( ~primary_hash & htab_data.htab_hash_mask ) * HPTES_PER_GROUP;
-
-	printf("ea             : %.16lx\n", ea);
-	printf("esid           : %.16lx\n", esid);
-	printf("vsid           : %.16lx\n", vsid);
-
-	printf("\nSoftware Page Table\n-------------------\n");
-	printf("ptep           : %.16lx\n", ((unsigned long *)ptep));
-	if(ptep) {
-		printf("*ptep          : %.16lx\n", *((unsigned long *)ptep));
-	}
-
-	hpte  = htab_data.htab  + hpteg_slot_primary;
-	printf("\nHardware Page Table\n-------------------\n");
-	printf("htab base      : %.16lx\n", htab_data.htab);
-	printf("slot primary   : %.16lx\n", hpteg_slot_primary);
-	printf("slot secondary : %.16lx\n", hpteg_slot_secondary);
-	printf("\nPrimary Group\n");
-	for (i=0; i<8; ++i) {
-		if ( hpte->dw0.dw0.v != 0 ) {
-			printf("%d: (hpte)%.16lx %.16lx\n", i, hpte->dw0.dword0, hpte->dw1.dword1);
-			printf("          vsid: %.13lx   api: %.2lx  hash: %.1lx\n", 
-			       (hpte->dw0.dw0.avpn)>>5, 
-			       (hpte->dw0.dw0.avpn) & 0x1f,
-			       (hpte->dw0.dw0.h));
-			printf("          rpn: %.13lx \n", (hpte->dw1.dw1.rpn));
-			printf("           pp: %.1lx \n", 
-			       ((hpte->dw1.dw1.pp0)<<2)|(hpte->dw1.dw1.pp));
-			printf("        wimgn: %.2lx  reference: %.1lx  change: %.1lx\n", 
-			       ((hpte->dw1.dw1.w)<<4)|
-			       ((hpte->dw1.dw1.i)<<3)|
-			       ((hpte->dw1.dw1.m)<<2)|
-			       ((hpte->dw1.dw1.g)<<1)|
-			       ((hpte->dw1.dw1.n)<<0),
-			       hpte->dw1.dw1.r, hpte->dw1.dw1.c);
-		}
-		hpte++;
-	}
-
-	printf("\nSecondary Group\n");
-	// Search the secondary group
-	hpte  = htab_data.htab  + hpteg_slot_secondary;
-	for (i=0; i<8; ++i) {
-		if(hpte->dw0.dw0.v) {
-			printf("%d: (hpte)%.16lx %.16lx\n", i, hpte->dw0.dword0, hpte->dw1.dword1);
-			printf("          vsid: %.13lx   api: %.2lx  hash: %.1lx\n", 
-			       (hpte->dw0.dw0.avpn)>>5, 
-			       (hpte->dw0.dw0.avpn) & 0x1f,
-			       (hpte->dw0.dw0.h));
-			printf("          rpn: %.13lx \n", (hpte->dw1.dw1.rpn));
-			printf("           pp: %.1lx \n", 
-			       ((hpte->dw1.dw1.pp0)<<2)|(hpte->dw1.dw1.pp));
-			printf("        wimgn: %.2lx  reference: %.1lx  change: %.1lx\n", 
-			       ((hpte->dw1.dw1.w)<<4)|
-			       ((hpte->dw1.dw1.i)<<3)|
-			       ((hpte->dw1.dw1.m)<<2)|
-			       ((hpte->dw1.dw1.g)<<1)|
-			       ((hpte->dw1.dw1.n)<<0),
-			       hpte->dw1.dw1.r, hpte->dw1.dw1.c);
-		}
-		hpte++;
-	}
-
-	printf("\nHardware Segment Table\n-----------------------\n");
-	stabl = (unsigned long)(KERNELBASE+(_ASR&0xFFFFFFFFFFFFFFFE));
-	steg = (unsigned long *)((stabl) | ((esid & 0x1f) << 7));
-
-	printf("stab base      : %.16lx\n", stabl);
-	printf("slot           : %.16lx\n", steg);
-
-	for (i=0; i<8; ++i) {
-		printf("%d: (ste) %.16lx %.16lx\n", i,
-		       *((unsigned long *)(steg+i*2)),*((unsigned long *)(steg+i*2+1)) );
-	}
-}
-
-void mem_check()
-{
-	unsigned long htab_size_bytes;
-	unsigned long htab_end;
-	unsigned long last_rpn;
-	HPTE *hpte1, *hpte2;
-
-	htab_size_bytes = htab_data.htab_num_ptegs * 128; // 128B / PTEG
-	htab_end = (unsigned long)htab_data.htab + htab_size_bytes;
-	// last_rpn = (naca->physicalMemorySize-1) >> PAGE_SHIFT;
-	last_rpn = 0xfffff;
-
-	printf("\nHardware Page Table Check\n-------------------\n");
-	printf("htab base      : %.16lx\n", htab_data.htab);
-	printf("htab size      : %.16lx\n", htab_size_bytes);
-
-#if 1
-	for(hpte1 = htab_data.htab; hpte1 < (HPTE *)htab_end; hpte1++) {
-		if ( hpte1->dw0.dw0.v != 0 ) {
-			if ( hpte1->dw1.dw1.rpn <= last_rpn ) {
-				for(hpte2 = hpte1+1; hpte2 < (HPTE *)htab_end; hpte2++) {
-					if ( hpte2->dw0.dw0.v != 0 ) {
-						if(hpte1->dw1.dw1.rpn == hpte2->dw1.dw1.rpn) {
-							printf(" Duplicate rpn: %.13lx \n", (hpte1->dw1.dw1.rpn));
-							printf("   hpte1: %16.16lx  *hpte1: %16.16lx %16.16lx\n",
-							       hpte1, hpte1->dw0.dword0, hpte1->dw1.dword1);
-							printf("   hpte2: %16.16lx  *hpte2: %16.16lx %16.16lx\n",
-							       hpte2, hpte2->dw0.dword0, hpte2->dw1.dword1);
-						}
-					}
-				}
-			} else {
-				printf(" Bogus rpn: %.13lx \n", (hpte1->dw1.dw1.rpn));
-				printf("   hpte: %16.16lx  *hpte: %16.16lx %16.16lx\n",
-				       hpte1, hpte1->dw0.dword0, hpte1->dw1.dword1);
-			}
-		}
-	}
-#endif
-	printf("\nDone -------------------\n");
-}
-
-void mem_find_real()
-{
-	unsigned long htab_size_bytes;
-	unsigned long htab_end;
-	unsigned long last_rpn;
-	HPTE *hpte1;
-	unsigned long pa, rpn;
-	int c;
-
-	c = inchar();
-	if ((isxdigit(c) && c != 'f' && c != 'd') || c == '\n')
-		termch = c;
-	scanhex((void *)&pa);
-	rpn = pa >> 12;
-  
-	htab_size_bytes = htab_data.htab_num_ptegs * 128; // 128B / PTEG
-	htab_end = (unsigned long)htab_data.htab + htab_size_bytes;
-	// last_rpn = (naca->physicalMemorySize-1) >> PAGE_SHIFT;
-	last_rpn = 0xfffff;
-
-	printf("\nMem Find RPN\n-------------------\n");
-	printf("htab base      : %.16lx\n", htab_data.htab);
-	printf("htab size      : %.16lx\n", htab_size_bytes);
-
-	for(hpte1 = htab_data.htab; hpte1 < (HPTE *)htab_end; hpte1++) {
-		if ( hpte1->dw0.dw0.v != 0 ) {
-			if ( hpte1->dw1.dw1.rpn == rpn ) {
-				printf(" Found rpn: %.13lx \n", (hpte1->dw1.dw1.rpn));
-				printf("      hpte: %16.16lx  *hpte1: %16.16lx %16.16lx\n",
-				       hpte1, hpte1->dw0.dword0, hpte1->dw1.dword1);
-			}
-		}
-	}
-	printf("\nDone -------------------\n");
-}
-
-void mem_find_vsid()
-{
-	unsigned long htab_size_bytes;
-	unsigned long htab_end;
-	HPTE *hpte1;
-	unsigned long vsid;
-	int c;
-
-	c = inchar();
-	if ((isxdigit(c) && c != 'f' && c != 'd') || c == '\n')
-		termch = c;
-	scanhex((void *)&vsid);
-  
-	htab_size_bytes = htab_data.htab_num_ptegs * 128; // 128B / PTEG
-	htab_end = (unsigned long)htab_data.htab + htab_size_bytes;
-
-	printf("\nMem Find VSID\n-------------------\n");
-	printf("htab base      : %.16lx\n", htab_data.htab);
-	printf("htab size      : %.16lx\n", htab_size_bytes);
-
-	for(hpte1 = htab_data.htab; hpte1 < (HPTE *)htab_end; hpte1++) {
-		if ( hpte1->dw0.dw0.v != 0 ) {
-			if ( ((hpte1->dw0.dw0.avpn)>>5) == vsid ) {
-				printf(" Found vsid: %.16lx \n", ((hpte1->dw0.dw0.avpn) >> 5));
-				printf("       hpte: %16.16lx  *hpte1: %16.16lx %16.16lx\n",
-				       hpte1, hpte1->dw0.dword0, hpte1->dw1.dword1);
-			}
-		}
-	}
-	printf("\nDone -------------------\n");
-}
-
-static void debug_trace(void) {
         unsigned long val, cmd, on;
 
 	cmd = skipbl();
@@ -2203,4 +2002,57 @@ static void debug_trace(void) {
 		}
 		cmd = skipbl();
 	}
+}
+
+static void dump_slb(void)
+{
+	int i;
+	unsigned long tmp;
+
+	printf("SLB contents of cpu %d\n", smp_processor_id());
+
+	for (i = 0; i < naca->slb_size; i++) {
+		asm volatile("slbmfee  %0,%1" : "=r" (tmp) : "r" (i));
+		printf("%02d %016lx ", i, tmp);
+
+		asm volatile("slbmfev  %0,%1" : "=r" (tmp) : "r" (i));
+		printf("%016lx\n", tmp);
+	}
+}
+
+static void dump_stab(void)
+{
+	int i;
+	unsigned long *tmp = (unsigned long *)get_paca()->xStab_data.virt;
+
+	printf("Segment table contents of cpu %d\n", smp_processor_id());
+
+	for (i = 0; i < PAGE_SIZE/16; i++) {
+		unsigned long a, b;
+
+		a = *tmp++;
+		b = *tmp++;
+
+		if (a || b) {
+			printf("%03d %016lx ", i, a);
+			printf("%016lx\n", b);
+		}
+	}
+}
+
+void xmon_init(void)
+{
+	__debugger = xmon;
+	__debugger_bpt = xmon_bpt;
+	__debugger_sstep = xmon_sstep;
+	__debugger_iabr_match = xmon_iabr_match;
+	__debugger_dabr_match = xmon_dabr_match;
+}
+
+void dump_segments(void)
+{
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB)
+		dump_slb();
+	else
+		dump_stab();
 }

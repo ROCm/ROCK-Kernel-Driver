@@ -645,9 +645,9 @@ void openpic_request_IPIs(void)
 	request_irq(openpic_vec_ipi+1, openpic_ipi_action, SA_INTERRUPT,
 		   "IPI1 (reschedule)", 0);
 	request_irq(openpic_vec_ipi+2, openpic_ipi_action, SA_INTERRUPT,
-		   "IPI2 (invalidate tlb)", 0);
+		   "IPI2 (unused)", 0);
 	request_irq(openpic_vec_ipi+3, openpic_ipi_action, SA_INTERRUPT,
-		   "IPI3 (xmon break)", 0);
+		   "IPI3 (debugger break)", 0);
 
 	for ( i = 0; i < OPENPIC_NUM_IPI ; i++ )
 		openpic_enable_ipi(openpic_vec_ipi+i);

@@ -11,9 +11,6 @@
 #include <linux/string.h>
 #include <linux/ctype.h>
 
-#define BITS_PER_LONG 32
-#include <asm/div64.h>
-
 int (*prom)(void *);
 
 void *chosen_handle;
@@ -27,6 +24,9 @@ int getprop(void *phandle, const char *name, void *buf, int buflen);
 void chrpboot(int a1, int a2, void *prom);	/* in main.c */
 
 void printk(char *fmt, ...);
+
+/* there is no convenient header to get this from...  -- paulus */
+extern unsigned long strlen(const char *);
 
 int
 write(void *handle, void *ptr, int nb)
@@ -352,7 +352,7 @@ static int skip_atoi(const char **s)
 #define SPECIAL	32		/* 0x */
 #define LARGE	64		/* use 'ABCDEF' instead of 'abcdef' */
 
-static char * number(char * str, long long num, int base, int size, int precision, int type)
+static char * number(char * str, long num, int base, int size, int precision, int type)
 {
 	char c,sign,tmp[66];
 	const char *digits="0123456789abcdefghijklmnopqrstuvwxyz";
@@ -388,8 +388,10 @@ static char * number(char * str, long long num, int base, int size, int precisio
 	i = 0;
 	if (num == 0)
 		tmp[i++]='0';
-	else while (num != 0)
-		tmp[i++] = digits[do_div(num,base)];
+	else while (num != 0) {
+		tmp[i++] = digits[num % base];
+		num /= base;
+	}
 	if (i > precision)
 		precision = i;
 	size -= precision;
@@ -424,7 +426,7 @@ int sprintf(char * buf, const char *fmt, ...);
 int vsprintf(char *buf, const char *fmt, va_list args)
 {
 	int len;
-	unsigned long long num;
+	unsigned long num;
 	int i, base;
 	char * str;
 	const char *s;
@@ -575,9 +577,7 @@ int vsprintf(char *buf, const char *fmt, va_list args)
 				--fmt;
 			continue;
 		}
-		if (qualifier == 'L')
-			num = va_arg(args, long long);
-		else if (qualifier == 'l') {
+		if (qualifier == 'l') {
 			num = va_arg(args, unsigned long);
 			if (flags & SIGN)
 				num = (signed long) num;

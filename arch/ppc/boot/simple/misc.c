@@ -1,5 +1,5 @@
 /*
- * arch/ppc/common/misc-simple.c
+ * arch/ppc/simple/misc.c
  *
  * Misc. bootloader code for many machines.  This assumes you have are using
  * a 6xx/7xx/74xx CPU in your machine.  This assumes the chunk of memory
@@ -46,6 +46,15 @@
 #define HAS_KEYB 0
 #endif
 
+/* Will / Can the user give input?
+ * Val Henson has requested that Gemini doesn't wait for the
+ * user to edit the cmdline or not.
+ */
+#if (defined(CONFIG_SERIAL_8250_CONSOLE) || defined(CONFIG_VGA_CONSOLE)) \
+	&& !defined(CONFIG_GEMINI)
+#define INTERACTIVE_CONSOLE	1
+#endif
+
 char *avail_ram;
 char *end_avail;
 char *zimage_start;
@@ -66,19 +75,28 @@ extern char _end[];
 extern unsigned long start;
 
 extern int CRT_tstc(void);
-extern unsigned long get_mem_size(void);
 extern unsigned long serial_init(int chan, void *ignored);
 extern void serial_close(unsigned long com_port);
 extern void gunzip(void *, int, unsigned char *, int *);
 extern void serial_fixups(void);
 
+/* Allow get_mem_size to be hooked into.  This is the default. */
+unsigned long __attribute__ ((weak))
+get_mem_size(void)
+{
+	return 0;
+}
+
 struct bi_record *
 decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 {
+#ifdef INTERACTIVE_CONSOLE
 	int timer = 0;
-	char *cp, ch;
+	char ch;
+#endif
+	char *cp;
 	struct bi_record *rec;
-	unsigned long TotalMemory = 0, rec_loc, initrd_loc;
+	unsigned long initrd_loc, TotalMemory = 0;
 
 	serial_fixups();
 	com_port = serial_init(0, NULL);
@@ -93,13 +111,11 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	__asm__ __volatile__("eieio");
 #endif
 
-#if defined(CONFIG_LOPEC) || defined(CONFIG_PAL4)
 	/*
 	 * Call get_mem_size(), which is memory controller dependent,
 	 * and we must have the correct file linked in here.
 	 */
 	TotalMemory = get_mem_size();
-#endif
 
 	/* assume the chunk below 8M is free */
 	end_avail = (char *)0x00800000;
@@ -170,9 +186,11 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	memcpy (cmd_line, cmd_preset, sizeof(cmd_preset));
 	while ( *cp ) putc(*cp++);
 
-#ifndef CONFIG_GEMINI
-	/* Val Henson has requested that Gemini doesn't wait for the
-	 * user to edit the cmdline or not. */
+#ifdef INTERACTIVE_CONSOLE
+	/*
+	 * If they have a console, allow them to edit the command line.
+	 * Otherwise, don't bother wasting the five seconds.
+	 */
 	while (timer++ < 5*1000) {
 		if (tstc()) {
 			while ((ch = getc()) != '\n' && ch != '\r') {
@@ -205,16 +223,13 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	gunzip(0, 0x400000, zimage_start, &zimage_size);
 	puts("done.\n");
 
-	/*
-	 * Create bi_recs for cmd_line and initrds
-	 */
-	rec_loc = _ALIGN((unsigned long)(zimage_size) +
-			(1 << 20) - 1, (1 << 20));
-	rec = (struct bi_record *)rec_loc;
+	/* get the bi_rec address */
+	rec = bootinfo_addr(zimage_size);
 
 	/* We need to make sure that the initrd and bi_recs do not
 	 * overlap. */
 	if ( initrd_size ) {
+		unsigned long rec_loc = (unsigned long) rec;
 		initrd_loc = (unsigned long)(&__ramdisk_begin);
 		/* If the bi_recs are in the middle of the current
 		 * initrd, move the initrd to the next MB
@@ -231,39 +246,25 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 		}
 	}
 
-	rec->tag = BI_FIRST;
-	rec->size = sizeof(struct bi_record);
-	rec = (struct bi_record *)((unsigned long)rec + rec->size);
+	bootinfo_init(rec);
+	if ( TotalMemory )
+		bootinfo_append(BI_MEMSIZE, sizeof(int), (void*)&TotalMemory);
 
-	if ( TotalMemory ) {
-		rec->tag = BI_MEMSIZE;
-		rec->data[0] = TotalMemory;
-		rec->size = sizeof(struct bi_record) + sizeof(unsigned long);
-		rec = (struct bi_record *)((unsigned long)rec + rec->size);
+	bootinfo_append(BI_CMD_LINE, strlen(cmd_line)+1, (void*)cmd_line);
+
+	/* add a bi_rec for the initrd if it exists */
+	if (initrd_size) {
+		unsigned long initrd[2];
+
+		initrd[0] = initrd_loc;
+		initrd[1] = initrd_size;
+
+		bootinfo_append(BI_INITRD, sizeof(initrd), &initrd);
 	}
-
-	rec->tag = BI_CMD_LINE;
-	memcpy( (char *)rec->data, cmd_line, strlen(cmd_line)+1);
-	rec->size = sizeof(struct bi_record) + strlen(cmd_line) + 1;
-	rec = (struct bi_record *)((unsigned long)rec + rec->size);
-
-	if ( initrd_size ) {
-		rec->tag = BI_INITRD;
-		rec->data[0] = initrd_loc;
-		rec->data[1] = initrd_size;
-		rec->size = sizeof(struct bi_record) + 2 *
-			sizeof(unsigned long);
-		rec = (struct bi_record *)((unsigned long)rec +
-				rec->size);
-	}
-
-	rec->tag = BI_LAST;
-	rec->size = sizeof(struct bi_record);
-	rec = (struct bi_record *)((unsigned long)rec + rec->size);
 	puts("Now booting the kernel\n");
 	serial_close(com_port);
 
-	return (struct bi_record *)rec_loc;
+	return rec;
 }
 
 /* Allow decompress_kernel to be hooked into.  This is the default. */

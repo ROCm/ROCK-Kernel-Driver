@@ -346,16 +346,14 @@ typedef struct _P601_BAT {
 #define PPC44x_TLB_EPN_MASK	0xfffffc00      /* Effective Page Number */
 #define	PPC44x_TLB_VALID	0x00000200      /* Valid flag */
 #define PPC44x_TLB_TS		0x00000100	/* Translation address space */
-#define PPC44x_TLB_PAGESZ_MASK	0x000000f0
-#define PPC44x_TLB_PAGESZ(x)	(x << 4)
-#define PPC44x_PAGESZ_1K	0
-#define PPC44x_PAGESZ_4K	1
-#define PPC44x_PAGESZ_16K	2
-#define PPC44x_PAGESZ_64K	3
-#define PPC44x_PAGESZ_256K	4
-#define PPC44x_PAGESZ_1M	5
-#define PPC44x_PAGESZ_16M	7
-#define	PPC44x_PAGESZ_256M	9
+#define PPC44x_TLB_1K		0x00000000	/* Page sizes */
+#define PPC44x_TLB_4K		0x00000010
+#define PPC44x_TLB_16K		0x00000020
+#define PPC44x_TLB_64K		0x00000030
+#define PPC44x_TLB_256K		0x00000040
+#define PPC44x_TLB_1M		0x00000050
+#define PPC44x_TLB_16M		0x00000070
+#define	PPC44x_TLB_256M		0x00000090
 
 /* Translation fields */
 #define PPC44x_TLB_RPN_MASK	0xfffffc00      /* Real Page Number */

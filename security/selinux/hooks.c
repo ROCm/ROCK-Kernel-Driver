@@ -56,6 +56,8 @@
 #include <linux/quota.h>
 #include <linux/un.h>		/* for Unix socket types */
 #include <net/af_unix.h>	/* for Unix socket types */
+#include <linux/parser.h>
+#include <linux/nfs_mount.h>
 
 #include "avc.h"
 #include "objsec.h"
@@ -223,6 +225,7 @@ static int superblock_alloc_security(struct super_block *sb)
 	sbsec->magic = SELINUX_MAGIC;
 	sbsec->sb = sb;
 	sbsec->sid = SECINITSID_UNLABELED;
+	sbsec->def_sid = SECINITSID_FILE;
 	sb->s_security = sbsec;
 
 	return 0;
@@ -283,12 +286,13 @@ extern int ss_initialized;
 
 /* The file system's label must be initialized prior to use. */
 
-static char *labeling_behaviors[5] = {
+static char *labeling_behaviors[6] = {
 	"uses xattr",
 	"uses transition SIDs",
 	"uses task SIDs",
 	"uses genfs_contexts",
-	"not configured for labeling"
+	"not configured for labeling",
+	"uses mountpoint labeling",
 };
 
 static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dentry);
@@ -298,7 +302,200 @@ static inline int inode_doinit(struct inode *inode)
 	return inode_doinit_with_dentry(inode, NULL);
 }
 
-static int superblock_doinit(struct super_block *sb)
+enum {
+	Opt_context = 1,
+	Opt_fscontext = 2,
+	Opt_defcontext = 4,
+};
+
+static match_table_t tokens = {
+	{Opt_context, "context=%s"},
+	{Opt_fscontext, "fscontext=%s"},
+	{Opt_defcontext, "defcontext=%s"},
+};
+
+#define SEL_MOUNT_FAIL_MSG "SELinux:  duplicate or incompatible mount options\n"
+
+static int try_context_mount(struct super_block *sb, void *data)
+{
+	char *context = NULL, *defcontext = NULL;
+	const char *name;
+	u32 sid;
+	int alloc = 0, rc = 0, seen = 0;
+	struct task_security_struct *tsec = current->security;
+	struct superblock_security_struct *sbsec = sb->s_security;
+
+	if (!data)
+		goto out;
+
+	name = sb->s_type->name;
+
+	/* Ignore these fileystems with binary mount option data. */
+	if (!strcmp(name, "coda") ||
+	    !strcmp(name, "afs") || !strcmp(name, "smbfs"))
+		goto out;
+
+	/* NFS we understand. */
+	if (!strcmp(name, "nfs")) {
+		struct nfs_mount_data *d = data;
+
+		if (d->version <  NFS_MOUNT_VERSION)
+			goto out;
+
+		if (d->context[0]) {
+			context = d->context;
+			seen |= Opt_context;
+		}
+
+	/* Standard string-based options. */
+	} else {
+		char *p, *options = data;
+
+		while ((p = strsep(&options, ",")) != NULL) {
+			int token;
+			substring_t args[MAX_OPT_ARGS];
+
+			if (!*p)
+				continue;
+
+			token = match_token(p, tokens, args);
+
+			switch (token) {
+			case Opt_context:
+				if (seen) {
+					rc = -EINVAL;
+					printk(KERN_WARNING SEL_MOUNT_FAIL_MSG);
+					goto out_free;
+				}
+				context = match_strdup(&args[0]);
+				if (!context) {
+					rc = -ENOMEM;
+					goto out_free;
+				}
+				if (!alloc)
+					alloc = 1;
+				seen |= Opt_context;
+				break;
+
+			case Opt_fscontext:
+				if (sbsec->behavior != SECURITY_FS_USE_XATTR) {
+					rc = -EINVAL;
+					printk(KERN_WARNING "SELinux:  "
+					       "fscontext option is invalid for"
+					       " this filesystem type\n");
+					goto out_free;
+				}
+				if (seen & (Opt_context|Opt_fscontext)) {
+					rc = -EINVAL;
+					printk(KERN_WARNING SEL_MOUNT_FAIL_MSG);
+					goto out_free;
+				}
+				context = match_strdup(&args[0]);
+				if (!context) {
+					rc = -ENOMEM;
+					goto out_free;
+				}
+				if (!alloc)
+					alloc = 1;
+				seen |= Opt_fscontext;
+				break;
+
+			case Opt_defcontext:
+				if (sbsec->behavior != SECURITY_FS_USE_XATTR) {
+					rc = -EINVAL;
+					printk(KERN_WARNING "SELinux:  "
+					       "defcontext option is invalid "
+					       "for this filesystem type\n");
+					goto out_free;
+				}
+				if (seen & (Opt_context|Opt_defcontext)) {
+					rc = -EINVAL;
+					printk(KERN_WARNING SEL_MOUNT_FAIL_MSG);
+					goto out_free;
+				}
+				defcontext = match_strdup(&args[0]);
+				if (!defcontext) {
+					rc = -ENOMEM;
+					goto out_free;
+				}
+				if (!alloc)
+					alloc = 1;
+				seen |= Opt_defcontext;
+				break;
+
+			default:
+				rc = -EINVAL;
+				printk(KERN_WARNING "SELinux:  unknown mount "
+				       "option\n");
+				goto out_free;
+
+			}
+		}
+	}
+
+	if (!seen)
+		goto out;
+
+	if (context) {
+		rc = security_context_to_sid(context, strlen(context), &sid);
+		if (rc) {
+			printk(KERN_WARNING "SELinux: security_context_to_sid"
+			       "(%s) failed for (dev %s, type %s) errno=%d\n",
+			       context, sb->s_id, name, rc);
+			goto out_free;
+		}
+
+		rc = avc_has_perm(tsec->sid, sbsec->sid, SECCLASS_FILESYSTEM,
+		                  FILESYSTEM__RELABELFROM, NULL, NULL);
+		if (rc)
+			goto out_free;
+
+		rc = avc_has_perm(tsec->sid, sid, SECCLASS_FILESYSTEM,
+		                  FILESYSTEM__RELABELTO, NULL, NULL);
+		if (rc)
+			goto out_free;
+
+		sbsec->sid = sid;
+
+		if (seen & Opt_context)
+			sbsec->behavior = SECURITY_FS_USE_MNTPOINT;
+	}
+
+	if (defcontext) {
+		rc = security_context_to_sid(defcontext, strlen(defcontext), &sid);
+		if (rc) {
+			printk(KERN_WARNING "SELinux: security_context_to_sid"
+			       "(%s) failed for (dev %s, type %s) errno=%d\n",
+			       defcontext, sb->s_id, name, rc);
+			goto out_free;
+		}
+
+		if (sid == sbsec->def_sid)
+			goto out_free;
+
+		rc = avc_has_perm(tsec->sid, sbsec->sid, SECCLASS_FILESYSTEM,
+				  FILESYSTEM__RELABELFROM, NULL, NULL);
+		if (rc)
+			goto out_free;
+
+		rc = avc_has_perm(sid, sbsec->sid, SECCLASS_FILESYSTEM,
+				  FILESYSTEM__ASSOCIATE, NULL, NULL);
+		if (rc)
+			goto out_free;
+
+		sbsec->def_sid = sid;
+	}
+
+out_free:
+	if (alloc) {
+		kfree(context);
+		kfree(defcontext);
+	}
+out:
+	return rc;
+}
+
+static int superblock_doinit(struct super_block *sb, void *data)
 {
 	struct superblock_security_struct *sbsec = sb->s_security;
 	struct dentry *root = sb->s_root;
@@ -327,6 +524,10 @@ static int superblock_doinit(struct super_block *sb)
 		       __FUNCTION__, sb->s_type->name, rc);
 		goto out;
 	}
+
+	rc = try_context_mount(sb, data);
+	if (rc)
+		goto out;
 
 	if (sbsec->behavior == SECURITY_FS_USE_XATTR) {
 		/* Make sure that the xattr handler exists and that no
@@ -530,7 +731,7 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 	switch (sbsec->behavior) {
 	case SECURITY_FS_USE_XATTR:
 		if (!inode->i_op->getxattr) {
-			isec->sid = SECINITSID_FILE;
+			isec->sid = sbsec->def_sid;
 			break;
 		}
 
@@ -589,7 +790,7 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 				goto out;
 			}
 			/* Map ENODATA to the default file SID */
-			sid = SECINITSID_FILE;
+			sid = sbsec->def_sid;
 			rc = 0;
 		} else {
 			rc = security_context_to_sid(context, rc, &sid);
@@ -829,6 +1030,7 @@ static int may_create(struct inode *dir,
 
 	tsec = current->security;
 	dsec = dir->i_security;
+	sbsec = dir->i_sb->s_security;
 
 	AVC_AUDIT_DATA_INIT(&ad, FS);
 	ad.u.fs.dentry = dentry;
@@ -839,7 +1041,7 @@ static int may_create(struct inode *dir,
 	if (rc)
 		return rc;
 
-	if (tsec->create_sid) {
+	if (tsec->create_sid && sbsec->behavior != SECURITY_FS_USE_MNTPOINT) {
 		newsid = tsec->create_sid;
 	} else {
 		rc = security_transition_sid(tsec->sid, dsec->sid, tclass,
@@ -851,8 +1053,6 @@ static int may_create(struct inode *dir,
 	rc = avc_has_perm(tsec->sid, newsid, tclass, FILE__CREATE, NULL, &ad);
 	if (rc)
 		return rc;
-
-	sbsec = dir->i_sb->s_security;
 
 	return avc_has_perm(newsid, sbsec->sid,
 			    SECCLASS_FILESYSTEM,
@@ -1061,6 +1261,7 @@ static int post_create(struct inode *dir,
 
 	tsec = current->security;
 	dsec = dir->i_security;
+	sbsec = dir->i_sb->s_security;
 
 	inode = dentry->d_inode;
 	if (!inode) {
@@ -1072,7 +1273,7 @@ static int post_create(struct inode *dir,
 		return 0;
 	}
 
-	if (tsec->create_sid) {
+	if (tsec->create_sid && sbsec->behavior != SECURITY_FS_USE_MNTPOINT) {
 		newsid = tsec->create_sid;
 	} else {
 		rc = security_transition_sid(tsec->sid, dsec->sid,
@@ -1094,10 +1295,6 @@ static int post_create(struct inode *dir,
 		       -rc, inode->i_sb->s_id, inode->i_ino);
 		return rc;
 	}
-
-	sbsec = dir->i_sb->s_security;
-	if (!sbsec)
-		return 0;
 
 	if (sbsec->behavior == SECURITY_FS_USE_XATTR &&
 	    inode->i_op->setxattr) {
@@ -1660,12 +1857,83 @@ static void selinux_sb_free_security(struct super_block *sb)
 	superblock_free_security(sb);
 }
 
-static int selinux_sb_kern_mount(struct super_block *sb)
+static inline int match_prefix(char *prefix, int plen, char *option, int olen)
+{
+	if (plen > olen)
+		return 0;
+
+	return !memcmp(prefix, option, plen);
+}
+
+static inline int selinux_option(char *option, int len)
+{
+	return (match_prefix("context=", sizeof("context=")-1, option, len) ||
+	        match_prefix("fscontext=", sizeof("fscontext=")-1, option, len) ||
+	        match_prefix("defcontext=", sizeof("defcontext=")-1, option, len));
+}
+
+static inline void take_option(char **to, char *from, int *first, int len)
+{
+	if (!*first) {
+		**to = ',';
+		*to += 1;
+	}
+	else
+		*first = 0;
+	memcpy(*to, from, len);
+	*to += len;
+}
+
+static int selinux_sb_copy_data(const char *fstype, void *orig, void *copy)
+{
+	int fnosec, fsec, rc = 0;
+	char *in_save, *in_curr, *in_end;
+	char *sec_curr, *nosec_save, *nosec;
+
+	in_curr = orig;
+	sec_curr = copy;
+
+	/* Binary mount data: just copy */
+	if (!strcmp(fstype, "nfs") || !strcmp(fstype, "coda") ||
+	    !strcmp(fstype, "smbfs") || !strcmp(fstype, "afs")) {
+		copy_page(sec_curr, in_curr);
+		goto out;
+	}
+
+	nosec = (char *)get_zeroed_page(GFP_KERNEL);
+	if (!nosec) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	nosec_save = nosec;
+	fnosec = fsec = 1;
+	in_save = in_end = orig;
+
+	do {
+		if (*in_end == ',' || *in_end == '\0') {
+			int len = in_end - in_curr;
+
+			if (selinux_option(in_curr, len))
+				take_option(&sec_curr, in_curr, &fsec, len);
+			else
+				take_option(&nosec, in_curr, &fnosec, len);
+
+			in_curr = in_end + 1;
+		}
+	} while (*in_end++);
+
+	copy_page(in_save, nosec_save);
+out:
+	return rc;
+}
+
+static int selinux_sb_kern_mount(struct super_block *sb, void *data)
 {
 	struct avc_audit_data ad;
 	int rc;
 
-	rc = superblock_doinit(sb);
+	rc = superblock_doinit(sb, data);
 	if (rc)
 		return rc;
 
@@ -1857,6 +2125,10 @@ static int selinux_inode_setxattr(struct dentry *dentry, char *name, void *value
 		return dentry_has_perm(current, NULL, dentry, FILE__SETATTR);
 	}
 
+	sbsec = inode->i_sb->s_security;
+	if (sbsec->behavior == SECURITY_FS_USE_MNTPOINT)
+		return -ENOTSUPP;
+
 	AVC_AUDIT_DATA_INIT(&ad,FS);
 	ad.u.fs.dentry = dentry;
 
@@ -1874,10 +2146,6 @@ static int selinux_inode_setxattr(struct dentry *dentry, char *name, void *value
 			  FILE__RELABELTO, NULL, &ad);
 	if (rc)
 		return rc;
-
-	sbsec = inode->i_sb->s_security;
-	if (!sbsec)
-		return 0;
 
 	return avc_has_perm(newsid,
 			    sbsec->sid,
@@ -1913,6 +2181,12 @@ static void selinux_inode_post_setxattr(struct dentry *dentry, char *name,
 
 static int selinux_inode_getxattr (struct dentry *dentry, char *name)
 {
+	struct inode *inode = dentry->d_inode;
+	struct superblock_security_struct *sbsec = inode->i_sb->s_security;
+
+	if (sbsec->behavior == SECURITY_FS_USE_MNTPOINT)
+		return -ENOTSUPP;
+
 	return dentry_has_perm(current, NULL, dentry, FILE__GETATTR);
 }
 
@@ -2905,8 +3179,9 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 		
 	/* Fixme: this lookup is inefficient */
 	iph = skb->nh.iph;
-	err = security_node_sid(PF_INET, &iph->daddr, sizeof(iph->daddr), &node_sid);
-	if (err)
+	err = security_node_sid(PF_INET, &iph->daddr, sizeof(iph->daddr),
+				&node_sid) ? NF_DROP : NF_ACCEPT;
+	if (err != NF_ACCEPT)
 		goto out;
 	
 	err = avc_has_perm(isec->sid, node_sid, SECCLASS_NODE,
@@ -3555,6 +3830,7 @@ struct security_operations selinux_ops = {
 
 	.sb_alloc_security =		selinux_sb_alloc_security,
 	.sb_free_security =		selinux_sb_free_security,
+	.sb_copy_data =			selinux_sb_copy_data,
 	.sb_kern_mount =	        selinux_sb_kern_mount,
 	.sb_statfs =			selinux_sb_statfs,
 	.sb_mount =			selinux_mount,
@@ -3731,7 +4007,7 @@ next_sb:
 		spin_unlock(&sb_security_lock);
 		down_read(&sb->s_umount);
 		if (sb->s_root)
-			superblock_doinit(sb);
+			superblock_doinit(sb, NULL);
 		drop_super(sb);
 		spin_lock(&sb_security_lock);
 		list_del_init(&sbsec->list);

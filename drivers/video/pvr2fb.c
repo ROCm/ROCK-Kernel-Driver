@@ -436,10 +436,11 @@ static int pvr2fb_set_par(struct fb_info *info)
 
 static int pvr2fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
+	struct pvr2fb_par *par = (struct pvr2fb_par *)info->par;
 	unsigned int vtotal, hsync_total;
 	unsigned long line_length;
 
-	if (var->pixclock != TV_CLK || var->pixclock != VGA_CLK) {
+	if (var->pixclock != TV_CLK && var->pixclock != VGA_CLK) {
 		pr_debug("Invalid pixclock value %d\n", var->pixclock);
 		return -EINVAL;
 	}
@@ -481,11 +482,31 @@ static int pvr2fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	 * PAL/NTSC output).
 	 */
 	if (var->yres < 480 && video_output == VO_VGA)
-		var->vmode = FB_VMODE_DOUBLE;
+		var->vmode |= FB_VMODE_DOUBLE;
 
-	if (video_output != VO_VGA)
-		var->sync = FB_SYNC_BROADCAST | FB_VMODE_INTERLACED;
+	if (video_output != VO_VGA) {
+		var->sync |= FB_SYNC_BROADCAST;
+		var->vmode |= FB_VMODE_INTERLACED;
+	} else {
+		var->sync &= ~FB_SYNC_BROADCAST;
+		var->vmode &= ~FB_VMODE_INTERLACED;
+		var->vmode |= pvr2_var.vmode;
+	}
 
+	if ((var->activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_TEST) {
+		var->right_margin = par->borderstop_h -
+				   (par->diwstart_h + var->xres);
+		var->left_margin  = par->diwstart_h - par->borderstart_h;
+		var->hsync_len    = par->borderstart_h +
+		                   (par->hsync_total - par->borderstop_h);
+
+		var->upper_margin = par->diwstart_v - par->borderstart_v;
+		var->lower_margin = par->borderstop_v -
+				   (par->diwstart_v + var->yres);
+		var->vsync_len    = par->borderstop_v +
+				   (par->vsync_total - par->borderstop_v);
+	}
+		
 	hsync_total = var->left_margin + var->xres + var->right_margin +
 		      var->hsync_len;
 	vtotal = var->upper_margin + var->yres + var->lower_margin +
@@ -509,6 +530,7 @@ static int pvr2fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 			}
 		}
 	}
+	
 	/* Check memory sizes */
 	line_length = get_line_length(var->xres_virtual, var->bits_per_pixel);
 	if (line_length * var->yres_virtual > info->fix.smem_len)
@@ -746,7 +768,6 @@ static int __init pvr2fb_common_init(void)
 {
 	struct pvr2fb_par *par = currentpar;
 	unsigned long modememused, rev;
-	int size;
 
 	fb_info->screen_base = ioremap_nocache(pvr2_fix.smem_start,
 					       pvr2_fix.smem_len);
@@ -763,7 +784,7 @@ static int __init pvr2fb_common_init(void)
 		goto out_err;
 	}
 
-	memset_io((unsigned long)fb_info->screen_base, 0, pvr2_fix.smem_len);
+	fb_memset((unsigned long)fb_info->screen_base, 0, pvr2_fix.smem_len);
 
 	pvr2_fix.ypanstep	= nopan  ? 0 : 1;
 	pvr2_fix.ywrapstep	= nowrap ? 0 : 1;
@@ -784,8 +805,7 @@ static int __init pvr2fb_common_init(void)
 	                  NUM_TOTAL_MODES, &pvr2_modedb[defmode], 16))
 		fb_info->var = pvr2_var;
 
-	size = (fb_info->var.bits_per_pixel == 8) ? 256 : 16;
-	fb_alloc_cmap(&fb_info->cmap, size, 0);
+	fb_alloc_cmap(&fb_info->cmap, 256, 0);
 
 	if (register_framebuffer(fb_info) < 0)
 		goto out_err;

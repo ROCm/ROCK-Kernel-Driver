@@ -29,8 +29,7 @@
 #ifdef CONFIG_SMP
 
 extern void smp_message_pass(int target, int msg, unsigned long data, int wait);
-extern void smp_send_tlb_invalidate(int);
-extern void smp_send_xmon_break(int cpu);
+extern void smp_send_debugger_break(int cpu);
 struct pt_regs;
 extern void smp_message_recv(int, struct pt_regs *);
 
@@ -63,17 +62,22 @@ extern cpumask_t cpu_available_map;
  * in /proc/interrupts will be wrong!!! --Troy */
 #define PPC_MSG_CALL_FUNCTION   0
 #define PPC_MSG_RESCHEDULE      1
+/* This is unused now */
+#if 0
 #define PPC_MSG_MIGRATE_TASK    2
-#define PPC_MSG_XMON_BREAK      3
+#endif
+#define PPC_MSG_DEBUGGER_BREAK  3
 
 void smp_init_iSeries(void);
 void smp_init_pSeries(void);
 
 #endif /* !(CONFIG_SMP) */
-#endif /* __ASSEMBLY__ */
 
 #define get_hard_smp_processor_id(CPU) (paca[(CPU)].xHwProcNum)
-#define set_hard_smp_processor_id(CPU, VAL) do { (paca[(CPU)].xHwProcNum = VAL); } while (0)
+#define set_hard_smp_processor_id(CPU, VAL) \
+	do { (paca[(CPU)].xHwProcNum = VAL); } while (0)
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* !(_PPC64_SMP_H) */
 #endif /* __KERNEL__ */

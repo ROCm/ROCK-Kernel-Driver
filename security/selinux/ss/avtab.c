@@ -98,7 +98,7 @@ void avtab_destroy(struct avtab *h)
 	int i;
 	struct avtab_node *cur, *temp;
 
-	if (!h)
+	if (!h || !h->htable)
 		return;
 
 	for (i = 0; i < AVTAB_SIZE; i++) {
@@ -111,6 +111,7 @@ void avtab_destroy(struct avtab *h)
 		h->htable[i] = NULL;
 	}
 	vfree(h->htable);
+	h->htable = NULL;
 }
 
 

@@ -535,7 +535,7 @@ void __exit ax25_rt_free(void)
 {
 	ax25_route *s, *ax25_rt = ax25_route_list;
 
-	write_unlock(&ax25_route_lock);
+	write_lock(&ax25_route_lock);
 	while (ax25_rt != NULL) {
 		s       = ax25_rt;
 		ax25_rt = ax25_rt->next;

@@ -9,7 +9,7 @@
 /* An unsigned long type for operations which are atomic for a single
  * CPU.  Usually used in combination with per-cpu variables. */
 
-#if BITS_PER_LONG == 32 && !defined(CONFIG_SPARC32)
+#if BITS_PER_LONG == 32
 /* Implement in terms of atomics. */
 
 /* Don't use typedef: don't want them to be mixed with atomic_t's. */
