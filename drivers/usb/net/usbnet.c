@@ -2125,7 +2125,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
 	struct usbnet			*dev;
 	struct net_device 		*net;
-	struct usb_interface_descriptor	*interface;
+	struct usb_host_interface	*interface;
 	struct driver_info		*info;
 	struct usb_device		*xdev;
 
@@ -2135,8 +2135,8 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	interface = &udev->altsetting [udev->act_altsetting];
 
 	if (!(info->flags & FLAG_NO_SETINT)) {
-		if (usb_set_interface (xdev, interface->bInterfaceNumber,
-				interface->bAlternateSetting) < 0) {
+		if (usb_set_interface (xdev, interface->desc.bInterfaceNumber,
+				interface->desc.bAlternateSetting) < 0) {
 			err ("set_interface failed");
 			return -EIO;
 		}

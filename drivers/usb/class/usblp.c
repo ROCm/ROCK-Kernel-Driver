@@ -814,7 +814,7 @@ static int usblp_probe(struct usb_interface *intf,
 	usblp->dev = dev;
 	init_MUTEX (&usblp->sem);
 	init_waitqueue_head(&usblp->wait);
-	usblp->ifnum = intf->altsetting->bInterfaceNumber;
+	usblp->ifnum = intf->altsetting->desc.bInterfaceNumber;
 
 	retval = usb_register_dev(&usblp_fops, USBLP_MINOR_BASE, 1, &usblp->minor);
 	if (retval) {
@@ -931,7 +931,7 @@ abort:
 static int usblp_select_alts(struct usblp *usblp)
 {
 	struct usb_interface *if_alt;
-	struct usb_interface_descriptor *ifd;
+	struct usb_host_interface *ifd;
 	struct usb_endpoint_descriptor *epd, *epwrite, *epread;
 	int p, i, e;
 
@@ -944,17 +944,17 @@ static int usblp_select_alts(struct usblp *usblp)
 	for (i = 0; i < if_alt->num_altsetting; i++) {
 		ifd = &if_alt->altsetting[i];
 
-		if (ifd->bInterfaceClass != 7 || ifd->bInterfaceSubClass != 1)
+		if (ifd->desc.bInterfaceClass != 7 || ifd->desc.bInterfaceSubClass != 1)
 			continue;
 
-		if (ifd->bInterfaceProtocol < USBLP_FIRST_PROTOCOL ||
-		    ifd->bInterfaceProtocol > USBLP_LAST_PROTOCOL)
+		if (ifd->desc.bInterfaceProtocol < USBLP_FIRST_PROTOCOL ||
+		    ifd->desc.bInterfaceProtocol > USBLP_LAST_PROTOCOL)
 			continue;
 
 		/* Look for bulk OUT and IN endpoints. */
 		epwrite = epread = 0;
-		for (e = 0; e < ifd->bNumEndpoints; e++) {
-			epd = &ifd->endpoint[e];
+		for (e = 0; e < ifd->desc.bNumEndpoints; e++) {
+			epd = &ifd->endpoint[e].desc;
 
 			if ((epd->bmAttributes&USB_ENDPOINT_XFERTYPE_MASK)!=
 			    USB_ENDPOINT_XFER_BULK)
@@ -969,12 +969,12 @@ static int usblp_select_alts(struct usblp *usblp)
 		}
 
 		/* Ignore buggy hardware without the right endpoints. */
-		if (!epwrite || (ifd->bInterfaceProtocol > 1 && !epread))
+		if (!epwrite || (ifd->desc.bInterfaceProtocol > 1 && !epread))
 			continue;
 
 		/* Turn off reads for 7/1/1 (unidirectional) interfaces
 		 * and buggy bidirectional printers. */
-		if (ifd->bInterfaceProtocol == 1) {
+		if (ifd->desc.bInterfaceProtocol == 1) {
 			epread = NULL;
 		} else if (usblp->quirks & USBLP_QUIRK_BIDIR) {
 			info("Disabling reads from problem bidirectional "
@@ -982,9 +982,9 @@ static int usblp_select_alts(struct usblp *usblp)
 			epread = NULL;
 		}
 
-		usblp->protocol[ifd->bInterfaceProtocol].alt_setting = i;
-		usblp->protocol[ifd->bInterfaceProtocol].epwrite = epwrite;
-		usblp->protocol[ifd->bInterfaceProtocol].epread = epread;
+		usblp->protocol[ifd->desc.bInterfaceProtocol].alt_setting = i;
+		usblp->protocol[ifd->desc.bInterfaceProtocol].epwrite = epwrite;
+		usblp->protocol[ifd->desc.bInterfaceProtocol].epread = epread;
 	}
 
 	/* If our requested protocol is supported, then use it. */

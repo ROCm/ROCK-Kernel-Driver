@@ -5988,7 +5988,7 @@ ov518_configure(struct usb_ov511 *ov)
 	if (ov->bridge == BRG_OV518)
 	{
 		struct usb_interface *ifp = &ov->dev->config[0].interface[0];
-		__u16 mxps = ifp->altsetting[7].endpoint[0].wMaxPacketSize;
+		__u16 mxps = ifp->altsetting[7].endpoint[0].desc.wMaxPacketSize;
 
 		/* Some OV518s have packet numbering by default, some don't */
 		if (mxps == 897)
@@ -6083,7 +6083,7 @@ ov51x_probe(struct usb_interface *intf,
 	if (dev->descriptor.bNumConfigurations != 1)
 		return -ENODEV;
 
-	interface = &intf->altsetting[0];
+	interface = &intf->altsetting[0].desc;
 
 	/* Checking vendor/product should be enough, but what the hell */
 	if (interface->bInterfaceClass != 0xFF)

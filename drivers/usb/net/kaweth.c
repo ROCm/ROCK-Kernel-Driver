@@ -449,7 +449,7 @@ static int kaweth_reset(struct kaweth_device *kaweth)
 				usb_sndctrlpipe(kaweth->dev, 0),
 				USB_REQ_SET_CONFIGURATION,
 				0,
-				kaweth->dev->config[0].bConfigurationValue,
+				kaweth->dev->config[0].desc.bConfigurationValue,
 				0,
 				NULL,
 				0,

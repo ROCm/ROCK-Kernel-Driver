@@ -290,7 +290,7 @@ brlvger_probe (struct usb_interface *intf,
 	int i;
 	int retval;
 	struct usb_endpoint_descriptor *endpoint;
-	struct usb_interface_descriptor *actifsettings;
+	struct usb_host_interface *actifsettings;
 	/* protects against reentrance: once we've found a free slot
 	   we reserve it.*/
 	static DECLARE_MUTEX(reserve_sem);
@@ -299,13 +299,13 @@ brlvger_probe (struct usb_interface *intf,
 	actifsettings = dev->actconfig->interface->altsetting;
 
 	if( dev->descriptor.bNumConfigurations != 1
-			|| dev->config->bNumInterfaces != 1 
-			|| actifsettings->bNumEndpoints != 1 ) {
+			|| dev->config->desc.bNumInterfaces != 1 
+			|| actifsettings->desc.bNumEndpoints != 1 ) {
 		err ("Bogus braille display config info");
 		return -ENODEV;
 	}
 
-	endpoint = actifsettings->endpoint;
+	endpoint = &actifsettings->endpoint [0].desc;
 	if (!(endpoint->bEndpointAddress & 0x80) ||
 		((endpoint->bmAttributes & 3) != 0x03)) {
 		err ("Bogus braille display config info, wrong endpoints");

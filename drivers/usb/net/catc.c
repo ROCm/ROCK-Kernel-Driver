@@ -783,7 +783,8 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 	u8 broadcast[6];
 	int i, pktsz;
 
-	if (usb_set_interface(usbdev, intf->altsetting->bInterfaceNumber, 1)) {
+	if (usb_set_interface(usbdev,
+			intf->altsetting->desc.bInterfaceNumber, 1)) {
                 err("Can't set altsetting 1.");
 		return -EIO;
 	}

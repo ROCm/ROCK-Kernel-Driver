@@ -1456,7 +1456,7 @@ static int se401_probe(struct usb_interface *intf,
         if (dev->descriptor.bNumConfigurations != 1)
                 return -ENODEV;
 
-        interface = &intf->altsetting[0];
+        interface = &intf->altsetting[0].desc;
 
         /* Is it an se401? */
         if (dev->descriptor.idVendor == 0x03e8 &&

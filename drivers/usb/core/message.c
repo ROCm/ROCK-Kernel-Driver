@@ -640,31 +640,33 @@ int usb_get_status(struct usb_device *dev, int type, int target, void *data)
 
 
 // hub-only!! ... and only exported for reset/reinit path.
-// otherwise used internally, for config/altsetting reconfig.
+// otherwise used internally, when setting up a config
 void usb_set_maxpacket(struct usb_device *dev)
 {
 	int i, b;
 
-	for (i=0; i<dev->actconfig->bNumInterfaces; i++) {
+	for (i=0; i<dev->actconfig->desc.bNumInterfaces; i++) {
 		struct usb_interface *ifp = dev->actconfig->interface + i;
-		struct usb_interface_descriptor *as = ifp->altsetting + ifp->act_altsetting;
-		struct usb_endpoint_descriptor *ep = as->endpoint;
+		struct usb_host_interface *as = ifp->altsetting + ifp->act_altsetting;
+		struct usb_host_endpoint *ep = as->endpoint;
 		int e;
 
-		for (e=0; e<as->bNumEndpoints; e++) {
-			b = ep[e].bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
-			if ((ep[e].bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
+		for (e=0; e<as->desc.bNumEndpoints; e++) {
+			struct usb_endpoint_descriptor	*d;
+			d = &ep [e].desc;
+			b = d->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+			if ((d->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
 				USB_ENDPOINT_XFER_CONTROL) {	/* Control => bidirectional */
-				dev->epmaxpacketout[b] = ep[e].wMaxPacketSize;
-				dev->epmaxpacketin [b] = ep[e].wMaxPacketSize;
+				dev->epmaxpacketout[b] = d->wMaxPacketSize;
+				dev->epmaxpacketin [b] = d->wMaxPacketSize;
 				}
-			else if (usb_endpoint_out(ep[e].bEndpointAddress)) {
-				if (ep[e].wMaxPacketSize > dev->epmaxpacketout[b])
-					dev->epmaxpacketout[b] = ep[e].wMaxPacketSize;
+			else if (usb_endpoint_out(d->bEndpointAddress)) {
+				if (d->wMaxPacketSize > dev->epmaxpacketout[b])
+					dev->epmaxpacketout[b] = d->wMaxPacketSize;
 			}
 			else {
-				if (ep[e].wMaxPacketSize > dev->epmaxpacketin [b])
-					dev->epmaxpacketin [b] = ep[e].wMaxPacketSize;
+				if (d->wMaxPacketSize > dev->epmaxpacketin [b])
+					dev->epmaxpacketin [b] = d->wMaxPacketSize;
 			}
 		}
 	}
@@ -764,7 +766,7 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 {
 	struct usb_interface *iface;
-	struct usb_interface_descriptor *iface_as;
+	struct usb_host_interface *iface_as;
 	int i, ret;
 
 	iface = usb_ifnum_to_if(dev, interface);
@@ -786,7 +788,8 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 
 	if ((ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 				   USB_REQ_SET_INTERFACE, USB_RECIP_INTERFACE,
-				   iface->altsetting[alternate].bAlternateSetting,
+				   iface->altsetting[alternate]
+				   	.desc.bAlternateSetting,
 				   interface, NULL, 0, HZ * 5)) < 0)
 		return ret;
 
@@ -798,8 +801,8 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 
 	/* prevent submissions using previous endpoint settings */
 	iface_as = iface->altsetting + iface->act_altsetting;
-	for (i = 0; i < iface_as->bNumEndpoints; i++) {
-		u8	ep = iface_as->endpoint [i].bEndpointAddress;
+	for (i = 0; i < iface_as->desc.bNumEndpoints; i++) {
+		u8	ep = iface_as->endpoint [i].desc.bEndpointAddress;
 		int	out = !(ep & USB_DIR_IN);
 
 		ep &= USB_ENDPOINT_NUMBER_MASK;
@@ -821,14 +824,14 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	 */
 
 	iface_as = &iface->altsetting[alternate];
-	for (i = 0; i < iface_as->bNumEndpoints; i++) {
-		u8	ep = iface_as->endpoint[i].bEndpointAddress;
+	for (i = 0; i < iface_as->desc.bNumEndpoints; i++) {
+		u8	ep = iface_as->endpoint[i].desc.bEndpointAddress;
 		int	out = !(ep & USB_DIR_IN);
 
 		ep &= USB_ENDPOINT_NUMBER_MASK;
 		usb_settoggle (dev, ep, out, 0);
 		(out ? dev->epmaxpacketout : dev->epmaxpacketin) [ep]
-			= iface_as->endpoint [i].wMaxPacketSize;
+			= iface_as->endpoint [i].desc.wMaxPacketSize;
 	}
 
 	return 0;
@@ -867,10 +870,10 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 int usb_set_configuration(struct usb_device *dev, int configuration)
 {
 	int i, ret;
-	struct usb_config_descriptor *cp = NULL;
+	struct usb_host_config *cp = NULL;
 	
 	for (i=0; i<dev->descriptor.bNumConfigurations; i++) {
-		if (dev->config[i].bConfigurationValue == configuration) {
+		if (dev->config[i].desc.bConfigurationValue == configuration) {
 			cp = &dev->config[i];
 			break;
 		}

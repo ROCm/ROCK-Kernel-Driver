@@ -337,7 +337,8 @@ static int claimintf(struct dev_state *ps, unsigned int intf)
 	struct usb_interface *iface;
 	int err;
 
-	if (intf >= 8*sizeof(ps->ifclaimed) || !dev || intf >= dev->actconfig->bNumInterfaces)
+	if (intf >= 8*sizeof(ps->ifclaimed) || !dev
+			|| intf >= dev->actconfig->desc.bNumInterfaces)
 		return -EINVAL;
 	/* already claimed */
 	if (test_bit(intf, &ps->ifclaimed))
@@ -390,17 +391,17 @@ static int findintfep(struct usb_device *dev, unsigned int ep)
 {
 	unsigned int i, j, e;
         struct usb_interface *iface;
-	struct usb_interface_descriptor *alts;
+	struct usb_host_interface *alts;
 	struct usb_endpoint_descriptor *endpt;
 
 	if (ep & ~(USB_DIR_IN|0xf))
 		return -EINVAL;
-	for (i = 0; i < dev->actconfig->bNumInterfaces; i++) {
+	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		iface = &dev->actconfig->interface[i];
 		for (j = 0; j < iface->num_altsetting; j++) {
                         alts = &iface->altsetting[j];
-			for (e = 0; e < alts->bNumEndpoints; e++) {
-				endpt = &alts->endpoint[e];
+			for (e = 0; e < alts->desc.bNumEndpoints; e++) {
+				endpt = &alts->endpoint[e].desc;
 				if (endpt->bEndpointAddress == ep)
 					return i;
 			}
@@ -413,15 +414,15 @@ static int findintfif(struct usb_device *dev, unsigned int ifn)
 {
 	unsigned int i, j;
         struct usb_interface *iface;
-	struct usb_interface_descriptor *alts;
+	struct usb_host_interface *alts;
 
 	if (ifn & ~0xff)
 		return -EINVAL;
-	for (i = 0; i < dev->actconfig->bNumInterfaces; i++) {
+	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		iface = &dev->actconfig->interface[i];
 		for (j = 0; j < iface->num_altsetting; j++) {
                         alts = &iface->altsetting[j];
-			if (alts->bInterfaceNumber == ifn)
+			if (alts->desc.bInterfaceNumber == ifn)
 				return i;
 		}
 	}
@@ -693,7 +694,7 @@ static int proc_resetdevice(struct dev_state *ps)
 	if (ret < 0)
 		return ret;
 
-	for (i = 0; i < ps->dev->actconfig->bNumInterfaces; i++) {
+	for (i = 0; i < ps->dev->actconfig->desc.bNumInterfaces; i++) {
 		struct usb_interface *intf = &ps->dev->actconfig->interface[i];
 
 		/* Don't simulate interfaces we've claimed */

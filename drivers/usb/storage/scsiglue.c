@@ -249,7 +249,7 @@ static int bus_reset( Scsi_Cmnd *srb )
 	/* FIXME: This needs to lock out driver probing while it's working
 	 * or we can have race conditions */
 	/* This functionality really should be provided by the khubd thread */
-	for (i = 0; i < pusb_dev_save->actconfig->bNumInterfaces; i++) {
+	for (i = 0; i < pusb_dev_save->actconfig->desc.bNumInterfaces; i++) {
  		struct usb_interface *intf =
 			&pusb_dev_save->actconfig->interface[i];
 

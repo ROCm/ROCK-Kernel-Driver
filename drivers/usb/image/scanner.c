@@ -839,7 +839,7 @@ probe_scanner(struct usb_interface *intf,
 {
 	struct usb_device *dev = interface_to_usbdev (intf);
 	struct scn_usb_data *scn;
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct usb_endpoint_descriptor *endpoint;
 
 	int ep_cnt;
@@ -905,13 +905,13 @@ probe_scanner(struct usb_interface *intf,
 		return -ENODEV;
 	}
 
-	if (dev->config[0].bNumInterfaces != 1) {
+	if (dev->config[0].desc.bNumInterfaces != 1) {
 		info("probe_scanner: Only one device interface is supported.");
 		return -ENODEV;
 	}
 
 	interface = intf->altsetting;
-	endpoint = interface->endpoint;
+	endpoint = &interface->endpoint[0].desc;
 
 /*
  * Start checking for two bulk endpoints OR two bulk endpoints *and* one
@@ -919,16 +919,16 @@ probe_scanner(struct usb_interface *intf,
  * setup the handler. FIXME: This is a future enhancement...
  */
 
-	dbg("probe_scanner: Number of Endpoints:%d", (int) interface->bNumEndpoints);
+	dbg("probe_scanner: Number of Endpoints:%d", (int) interface->desc.bNumEndpoints);
 
-	if ((interface->bNumEndpoints != 2) && (interface->bNumEndpoints != 3)) {
+	if ((interface->desc.bNumEndpoints != 2) && (interface->desc.bNumEndpoints != 3)) {
 		info("probe_scanner: Only two or three endpoints supported.");
 		return -ENODEV;
 	}
 
 	ep_cnt = have_bulk_in = have_bulk_out = have_intr = 0;
 
-	while (ep_cnt < interface->bNumEndpoints) {
+	while (ep_cnt < interface->desc.bNumEndpoints) {
 
 		if (!have_bulk_in && IS_EP_BULK_IN(endpoint[ep_cnt])) {
 			ep_cnt++;
@@ -960,7 +960,7 @@ probe_scanner(struct usb_interface *intf,
  * should have.
  */
 
-	switch(interface->bNumEndpoints) {
+	switch(interface->desc.bNumEndpoints) {
 	case 2:
 		if (!have_bulk_in || !have_bulk_out) {
 			info("probe_scanner: Two bulk endpoints required.");

@@ -410,7 +410,7 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 			       const struct usb_device_id *id)
 {
 	int i,j;
-	struct usb_interface_descriptor	*intf_desc;
+	struct usb_host_interface *intf_desc;
 	struct usb_device *dev = interface_to_usbdev (intf);
 	int irq_interval=0;
 	int retval;
@@ -432,10 +432,10 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 	intf_desc = &intf->altsetting[0];
 
 	if (
-			( intf_desc->bInterfaceClass != 0xff )
-		||	( intf_desc->bInterfaceSubClass != 0 )
-		|| ( intf_desc->bInterfaceProtocol != 0 )
-		|| ( intf_desc->bNumEndpoints != 4)
+			( intf_desc->desc.bInterfaceClass != 0xff )
+		||	( intf_desc->desc.bInterfaceSubClass != 0 )
+		|| ( intf_desc->desc.bInterfaceProtocol != 0 )
+		|| ( intf_desc->desc.bNumEndpoints != 4)
 	)
 	{
 		err ("probe fails -> wrong Interface");
@@ -448,12 +448,12 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 		mdc800->endpoint[i]=-1;
 		for (j=0; j<4; j++)
 		{
-			if (mdc800_endpoint_equals (&intf_desc->endpoint [j],&mdc800_ed [i]))
+			if (mdc800_endpoint_equals (&intf_desc->endpoint [j].desc,&mdc800_ed [i]))
 			{
-				mdc800->endpoint[i]=intf_desc->endpoint [j].bEndpointAddress ;
+				mdc800->endpoint[i]=intf_desc->endpoint [j].desc.bEndpointAddress ;
 				if (i==1)
 				{
-					irq_interval=intf_desc->endpoint [j].bInterval;
+					irq_interval=intf_desc->endpoint [j].desc.bInterval;
 				}
 
 				continue;
@@ -468,7 +468,7 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 
 
 	usb_driver_claim_interface (&mdc800_usb_driver, intf, mdc800);
-	if (usb_set_interface (dev, intf_desc->bInterfaceNumber, 0) < 0)
+	if (usb_set_interface (dev, intf_desc->desc.bInterfaceNumber, 0) < 0)
 	{
 		err ("MDC800 Configuration fails.");
 		return -ENODEV;

@@ -35,14 +35,14 @@ hpusbscsi_usb_probe (struct usb_interface *intf,
 {
 	struct hpusbscsi *new;
 	struct usb_device *dev = interface_to_usbdev (intf);
-	struct usb_interface_descriptor *altsetting =
+	struct usb_host_interface *altsetting =
 		&(intf->altsetting[0]);
 
 	int i, result;
 
 	/* basic check */
 
-	if (altsetting->bNumEndpoints != 3) {
+	if (altsetting->desc.bNumEndpoints != 3) {
 		printk (KERN_ERR "Wrong number of endpoints\n");
 		return -ENODEV;
 	}
@@ -76,34 +76,34 @@ hpusbscsi_usb_probe (struct usb_interface *intf,
 
 	/* finding endpoints */
 
-	for (i = 0; i < altsetting->bNumEndpoints; i++) {
+	for (i = 0; i < altsetting->desc.bNumEndpoints; i++) {
 		if (
-		    (altsetting->endpoint[i].
+		    (altsetting->endpoint[i].desc.
 		     bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
 		    USB_ENDPOINT_XFER_BULK) {
-			if (altsetting->endpoint[i].
+			if (altsetting->endpoint[i].desc.
 			    bEndpointAddress & USB_DIR_IN) {
 				new->ep_in =
-					altsetting->endpoint[i].
+					altsetting->endpoint[i].desc.
 					bEndpointAddress &
 					USB_ENDPOINT_NUMBER_MASK;
 			} else {
 				new->ep_out =
-					altsetting->endpoint[i].
+					altsetting->endpoint[i].desc.
 					bEndpointAddress &
 					USB_ENDPOINT_NUMBER_MASK;
 			}
 		} else {
 			new->ep_int =
-				altsetting->endpoint[i].
+				altsetting->endpoint[i].desc.
 				bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
-			new->interrupt_interval= altsetting->endpoint[i].bInterval;
+			new->interrupt_interval= altsetting->endpoint[i].desc.bInterval;
 		}
 	}
 
 	/* USB initialisation magic for the simple case */
 
-	result = usb_set_interface (dev, altsetting->bInterfaceNumber, 0);
+	result = usb_set_interface (dev, altsetting->desc.bInterfaceNumber, 0);
 
 	switch (result) {
 	case 0:		/* no error */

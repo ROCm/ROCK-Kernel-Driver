@@ -789,7 +789,7 @@ static int rtl8150_probe(struct usb_interface *intf,
 	rtl8150_t *dev;
 	struct net_device *netdev;
 
-	if (usb_set_configuration(udev, udev->config[0].bConfigurationValue)) {
+	if (usb_set_configuration(udev, udev->config[0].desc.bConfigurationValue)) {
 		err("usb_set_configuration() failed");
 		return -EIO;
 	}

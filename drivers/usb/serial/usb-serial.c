@@ -1147,7 +1147,7 @@ int usb_serial_probe(struct usb_interface *interface,
 	struct usb_device *dev = interface_to_usbdev (interface);
 	struct usb_serial *serial = NULL;
 	struct usb_serial_port *port;
-	struct usb_interface_descriptor *iface_desc;
+	struct usb_host_interface *iface_desc;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_endpoint_descriptor *interrupt_in_endpoint[MAX_NUM_PORTS];
 	struct usb_endpoint_descriptor *bulk_in_endpoint[MAX_NUM_PORTS];
@@ -1208,8 +1208,8 @@ int usb_serial_probe(struct usb_interface *interface,
 	/* descriptor matches, let's find the endpoints needed */
 	/* check out the endpoints */
 	iface_desc = &interface->altsetting[0];
-	for (i = 0; i < iface_desc->bNumEndpoints; ++i) {
-		endpoint = &iface_desc->endpoint[i];
+	for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {
+		endpoint = &iface_desc->endpoint[i].desc;
 		
 		if ((endpoint->bEndpointAddress & 0x80) &&
 		    ((endpoint->bmAttributes & 3) == 0x02)) {
@@ -1249,7 +1249,7 @@ int usb_serial_probe(struct usb_interface *interface,
 			//interface = &dev->actconfig->interface[ifnum ^ 1];
 			interface = &dev->actconfig->interface[0];
 			iface_desc = &interface->altsetting[0];
-			for (i = 0; i < iface_desc->bNumEndpoints; ++i) {
+			for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {
 				endpoint = &iface_desc->endpoint[i];
 				if ((endpoint->bEndpointAddress & 0x80) &&
 				    ((endpoint->bmAttributes & 3) == 0x03)) {

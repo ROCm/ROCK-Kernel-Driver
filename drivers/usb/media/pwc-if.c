@@ -761,7 +761,7 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 	struct urb *urb;
 	int i, j, ret;
 
-	struct usb_interface_descriptor *idesc;
+	struct usb_host_interface *idesc;
 	int cur_alt;
 
 	if (pdev == NULL)
@@ -781,9 +781,9 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 
 	/* Search video endpoint */
 	pdev->vmax_packet_size = -1;
-	for (i = 0; i < idesc->bNumEndpoints; i++)
-		if ((idesc->endpoint[i].bEndpointAddress & 0xF) == pdev->vendpoint) {
-			pdev->vmax_packet_size = idesc->endpoint[i].wMaxPacketSize;
+	for (i = 0; i < idesc->desc.bNumEndpoints; i++)
+		if ((idesc->endpoint[i].desc.bEndpointAddress & 0xF) == pdev->vendpoint) {
+			pdev->vmax_packet_size = idesc->endpoint[i].desc.wMaxPacketSize;
 			break;
 		}
 	
@@ -1552,13 +1552,15 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 	free_mem_leak();
 	
 	/* Check if we can handle this device */
-	Trace(TRACE_PROBE, "probe() called [%04X %04X], if %d\n", udev->descriptor.idVendor, udev->descriptor.idProduct, intf->altsetting->bInterfaceNumber);
+	Trace(TRACE_PROBE, "probe() called [%04X %04X], if %d\n",
+			udev->descriptor.idVendor, udev->descriptor.idProduct,
+			intf->altsetting->desc.bInterfaceNumber);
 
 	/* the interfaces are probed one by one. We are only interested in the
 	   video interface (0) now.
 	   Interface 1 is the Audio Control, and interface 2 Audio itself.
 	 */
-	if (intf->altsetting->bInterfaceNumber > 0)
+	if (intf->altsetting->desc.bInterfaceNumber > 0)
 		return -ENODEV;
 
 	vendor_id = udev->descriptor.idVendor;

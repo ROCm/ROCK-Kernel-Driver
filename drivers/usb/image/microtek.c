@@ -851,7 +851,7 @@ static int mts_usb_probe (struct usb_interface *intf,
 	struct usb_device *dev = interface_to_usbdev (intf);
 
 	/* the altsettting 0 on the interface we're probing */
-	struct usb_interface_descriptor *altsetting;
+	struct usb_host_interface *altsetting;
 
 	MTS_DEBUG_GOT_HERE();
 	MTS_DEBUG( "usb-device descriptor at %x\n", (int)dev );
@@ -877,23 +877,23 @@ static int mts_usb_probe (struct usb_interface *intf,
 
 	/* Check if the config is sane */
 
-	if ( altsetting->bNumEndpoints != MTS_EP_TOTAL ) {
+	if ( altsetting->desc.bNumEndpoints != MTS_EP_TOTAL ) {
 		MTS_WARNING( "expecting %d got %d endpoints! Bailing out.\n",
-			     (int)MTS_EP_TOTAL, (int)altsetting->bNumEndpoints );
+			     (int)MTS_EP_TOTAL, (int)altsetting->desc.bNumEndpoints );
 		return -ENODEV;
 	}
 
-	for( i = 0; i < altsetting->bNumEndpoints; i++ ) {
-		if ((altsetting->endpoint[i].bmAttributes &
+	for( i = 0; i < altsetting->desc.bNumEndpoints; i++ ) {
+		if ((altsetting->endpoint[i].desc.bmAttributes &
 		     USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_BULK) {
 
 			MTS_WARNING( "can only deal with bulk endpoints; endpoint %d is not bulk.\n",
-			     (int)altsetting->endpoint[i].bEndpointAddress );
+			     (int)altsetting->endpoint[i].desc.bEndpointAddress );
 		} else {
-			if (altsetting->endpoint[i].bEndpointAddress &
+			if (altsetting->endpoint[i].desc.bEndpointAddress &
 			    USB_DIR_IN)
 				*ep_in_current++
-					= altsetting->endpoint[i].bEndpointAddress &
+					= altsetting->endpoint[i].desc.bEndpointAddress &
 					USB_ENDPOINT_NUMBER_MASK;
 			else {
 				if ( ep_out != -1 ) {
@@ -901,7 +901,7 @@ static int mts_usb_probe (struct usb_interface *intf,
 					return -ENODEV;
 				}
 
-				ep_out = altsetting->endpoint[i].bEndpointAddress &
+				ep_out = altsetting->endpoint[i].desc.bEndpointAddress &
 					USB_ENDPOINT_NUMBER_MASK;
 			}
 		}

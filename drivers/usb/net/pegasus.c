@@ -1061,7 +1061,7 @@ static int pegasus_probe(struct usb_interface *intf,
 	pegasus_t *pegasus;
 	int dev_index = id - pegasus_ids;
 
-	if (usb_set_configuration(dev, dev->config[0].bConfigurationValue)) {
+	if (usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue)) {
 		err("usb_set_configuration() failed");
 		return -ENODEV;
 	}

@@ -561,7 +561,7 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 	wacom->dev.id.version = dev->descriptor.bcdDevice;
 	wacom->usbdev = dev;
 
-	endpoint = intf->altsetting[0].endpoint + 0;
+	endpoint = &intf->altsetting[0].endpoint[0].desc;
 
 	if (wacom->features->pktlen > 10)
 		BUG();

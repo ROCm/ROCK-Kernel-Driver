@@ -555,7 +555,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	/* check out the endpoints */
 	iface_desc = &interface->altsetting[0];
 	for (i = 0; i < iface_desc->bNumEndpoints; ++i) {
-		endpoint = &iface_desc->endpoint[i];
+		endpoint = &iface_desc->endpoint[i].desc;
 
 		if ((endpoint->bEndpointAddress & 0x80) &&
 		    ((endpoint->bmAttributes & 3) == 0x02)) {

@@ -1053,7 +1053,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 {
 	struct usb_device *dev = interface_to_usbdev (intf);
 	struct usb_bluetooth *bluetooth = NULL;
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_endpoint_descriptor *interrupt_in_endpoint[8];
 	struct usb_endpoint_descriptor *bulk_in_endpoint[8];
@@ -1068,11 +1068,11 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 	int num_bulk_out = 0;
 
 	interface = &intf->altsetting[0];
-	control_out_endpoint = interface->bInterfaceNumber;
+	control_out_endpoint = interface->desc.bInterfaceNumber;
 
 	/* find the endpoints that we need */
-	for (i = 0; i < interface->bNumEndpoints; ++i) {
-		endpoint = &interface->endpoint[i];
+	for (i = 0; i < interface->desc.bNumEndpoints; ++i) {
+		endpoint = &interface->endpoint[i].desc;
 
 		if ((endpoint->bEndpointAddress & 0x80) &&
 		    ((endpoint->bmAttributes & 3) == 0x02)) {

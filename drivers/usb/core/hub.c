@@ -478,7 +478,7 @@ static void hub_disconnect(struct usb_interface *intf)
 
 static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
-	struct usb_interface_descriptor *desc;
+	struct usb_host_interface *desc;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_device *dev;
 	struct usb_hub *hub;
@@ -489,21 +489,21 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	/* Some hubs have a subclass of 1, which AFAICT according to the */
 	/*  specs is not defined, but it works */
-	if ((desc->bInterfaceSubClass != 0) &&
-	    (desc->bInterfaceSubClass != 1)) {
+	if ((desc->desc.bInterfaceSubClass != 0) &&
+	    (desc->desc.bInterfaceSubClass != 1)) {
 		err("invalid subclass (%d) for USB hub device #%d",
-			desc->bInterfaceSubClass, dev->devnum);
+			desc->desc.bInterfaceSubClass, dev->devnum);
 		return -EIO;
 	}
 
 	/* Multiple endpoints? What kind of mutant ninja-hub is this? */
-	if (desc->bNumEndpoints != 1) {
+	if (desc->desc.bNumEndpoints != 1) {
 		err("invalid bNumEndpoints (%d) for USB hub device #%d",
-			desc->bNumEndpoints, dev->devnum);
+			desc->desc.bNumEndpoints, dev->devnum);
 		return -EIO;
 	}
 
-	endpoint = &desc->endpoint[0];
+	endpoint = &desc->endpoint[0].desc;
 
 	/* Output endpoint? Curiousier and curiousier.. */
 	if (!(endpoint->bEndpointAddress & USB_DIR_IN)) {
@@ -1244,18 +1244,18 @@ int usb_reset_device(struct usb_device *dev)
 		return 1;
 	}
 
-	ret = usb_set_configuration(dev, dev->actconfig->bConfigurationValue);
+	ret = usb_set_configuration(dev, dev->actconfig->desc.bConfigurationValue);
 	if (ret < 0) {
 		err("failed to set dev %s active configuration (error=%d)",
 			dev->devpath, ret);
 		return ret;
 	}
 
-	for (i = 0; i < dev->actconfig->bNumInterfaces; i++) {
+	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		struct usb_interface *intf = &dev->actconfig->interface[i];
 		struct usb_interface_descriptor *as;
 
-		as = &intf->altsetting[intf->act_altsetting];
+		as = &intf->altsetting[intf->act_altsetting].desc;
 		ret = usb_set_interface(dev, as->bInterfaceNumber,
 			as->bAlternateSetting);
 		if (ret < 0) {

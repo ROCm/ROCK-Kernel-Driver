@@ -1943,7 +1943,7 @@ static int auerswald_probe (struct usb_interface *intf,
 		return -ENODEV;
 
         /* we use only the first -and only- interface */
-        if (intf->altsetting->bInterfaceNumber != 0)
+        if (intf->altsetting->desc.bInterfaceNumber != 0)
 		return -ENODEV;
 
 	/* prevent module unloading while sleeping */

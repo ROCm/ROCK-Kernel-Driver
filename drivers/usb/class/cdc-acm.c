@@ -166,7 +166,9 @@ static struct acm *acm_table[ACM_TTY_MINORS];
 static int acm_ctrl_msg(struct acm *acm, int request, int value, void *buf, int len)
 {
 	int retval = usb_control_msg(acm->dev, usb_sndctrlpipe(acm->dev, 0),
-		request, USB_RT_ACM, value, acm->iface[0].altsetting[0].bInterfaceNumber, buf, len, HZ * 5);
+		request, USB_RT_ACM, value,
+		acm->iface[0].altsetting[0].desc.bInterfaceNumber,
+		buf, len, HZ * 5);
 	dbg("acm_control_msg: rq: 0x%02x val: %#x len: %#x result: %d", request, value, len, retval);
 	return retval < 0 ? retval : 0;
 }
@@ -528,8 +530,8 @@ static int acm_probe (struct usb_interface *intf,
 {
 	struct usb_device *dev;
 	struct acm *acm;
-	struct usb_config_descriptor *cfacm;
-	struct usb_interface_descriptor *ifcom, *ifdata;
+	struct usb_host_config *cfacm;
+	struct usb_host_interface *ifcom, *ifdata;
 	struct usb_endpoint_descriptor *epctrl, *epread, *epwrite;
 	int readsize, ctrlsize, minor, i;
 	unsigned char *buf;
@@ -541,7 +543,7 @@ static int acm_probe (struct usb_interface *intf,
 
 		dbg("probing config %d", cfacm->bConfigurationValue);
 
-		if (cfacm->bNumInterfaces != 2 ||
+		if (cfacm->desc.bNumInterfaces != 2 ||
 		    usb_interface_claimed(cfacm->interface + 0) ||
 		    usb_interface_claimed(cfacm->interface + 1))
 			continue;
@@ -549,20 +551,20 @@ static int acm_probe (struct usb_interface *intf,
 		ifcom = cfacm->interface[0].altsetting + 0;
 		ifdata = cfacm->interface[1].altsetting + 0;
 
-		if (ifdata->bInterfaceClass != 10 || ifdata->bNumEndpoints < 2) {
+		if (ifdata->desc.bInterfaceClass != 10 || ifdata->desc.bNumEndpoints < 2) {
 			ifcom = cfacm->interface[1].altsetting + 0;
 			ifdata = cfacm->interface[0].altsetting + 0;
-			if (ifdata->bInterfaceClass != 10 || ifdata->bNumEndpoints < 2)
+			if (ifdata->desc.bInterfaceClass != 10 || ifdata->desc.bNumEndpoints < 2)
 				continue;
 		}
 
-		if (ifcom->bInterfaceClass != 2 || ifcom->bInterfaceSubClass != 2 ||
-		    ifcom->bInterfaceProtocol != 1 || ifcom->bNumEndpoints < 1)
+		if (ifcom->desc.bInterfaceClass != 2 || ifcom->desc.bInterfaceSubClass != 2 ||
+		    ifcom->desc.bInterfaceProtocol != 1 || ifcom->desc.bNumEndpoints < 1)
 			continue;
 
-		epctrl = ifcom->endpoint + 0;
-		epread = ifdata->endpoint + 0;
-		epwrite = ifdata->endpoint + 1;
+		epctrl = &ifcom->endpoint[0].desc;
+		epread = &ifdata->endpoint[0].desc;
+		epwrite = &ifdata->endpoint[1].desc;
 
 		if ((epctrl->bEndpointAddress & 0x80) != 0x80 || (epctrl->bmAttributes & 3) != 3 ||
 		   (epread->bmAttributes & 3) != 2 || (epwrite->bmAttributes & 3) != 2 ||
@@ -570,11 +572,11 @@ static int acm_probe (struct usb_interface *intf,
 			continue;
 
 		if ((epread->bEndpointAddress & 0x80) != 0x80) {
-			epread = ifdata->endpoint + 1;
-			epwrite = ifdata->endpoint + 0;
+			epread = &ifdata->endpoint[1].desc;
+			epwrite = &ifdata->endpoint[0].desc;
 		}
 
-		usb_set_configuration(dev, cfacm->bConfigurationValue);
+		usb_set_configuration(dev, cfacm->desc.bConfigurationValue);
 
 		for (minor = 0; minor < ACM_TTY_MINORS && acm_table[minor]; minor++);
 		if (acm_table[minor]) {
