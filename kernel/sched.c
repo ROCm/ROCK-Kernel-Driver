@@ -1880,10 +1880,6 @@ asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
 	if (copy_from_user(&new_mask, user_mask_ptr, sizeof(new_mask)))
 		return -EFAULT;
 
-	new_mask &= cpu_online_map;
-	if (!new_mask)
-		return -EINVAL;
-
 	read_lock(&tasklist_lock);
 
 	p = find_process_by_pid(pid);
@@ -1905,8 +1901,7 @@ asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
 			!capable(CAP_SYS_NICE))
 		goto out_unlock;
 
-	retval = 0;
-	set_cpus_allowed(p, new_mask);
+	retval = set_cpus_allowed(p, new_mask);
 
 out_unlock:
 	put_task_struct(p);
@@ -2269,17 +2264,14 @@ typedef struct {
  * task must not exit() & deallocate itself prematurely.  The
  * call is not atomic; no spinlocks may be held.
  */
-void set_cpus_allowed(task_t *p, unsigned long new_mask)
+int set_cpus_allowed(task_t *p, unsigned long new_mask)
 {
 	unsigned long flags;
 	migration_req_t req;
 	runqueue_t *rq;
 
-#if 0 /* FIXME: Grab cpu_lock, return error on this case. --RR */
-	new_mask &= cpu_online_map;
-	if (!new_mask)
-		BUG();
-#endif
+	if (any_online_cpu(new_mask) == NR_CPUS)
+		return -EINVAL;
 
 	rq = task_rq_lock(p, &flags);
 	p->cpus_allowed = new_mask;
@@ -2289,7 +2281,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 */
 	if (new_mask & (1UL << task_cpu(p))) {
 		task_rq_unlock(rq, &flags);
-		return;
+		return 0;
 	}
 	/*
 	 * If the task is not on a runqueue (and not running), then
@@ -2298,7 +2290,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	if (!p->array && !task_running(rq, p)) {
 		set_task_cpu(p, any_online_cpu(p->cpus_allowed));
 		task_rq_unlock(rq, &flags);
-		return;
+		return 0;
 	}
 	init_completion(&req.done);
 	req.task = p;
@@ -2308,6 +2300,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	wake_up_process(rq->migration_thread);
 
 	wait_for_completion(&req.done);
+	return 0;
 }
 
 /* Move (not current) task off this cpu, onto dest cpu. */

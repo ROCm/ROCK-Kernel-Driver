@@ -483,9 +483,12 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_LESS_THROTTLE 0x01000000	/* Throttle me less: I clena memory */
 
 #ifdef CONFIG_SMP
-extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
+extern int set_cpus_allowed(task_t *p, unsigned long new_mask);
 #else
-# define set_cpus_allowed(p, new_mask) do { } while (0)
+static inline int set_cpus_allowed(task_t *p, unsigned long new_mask)
+{
+	return 0;
+}
 #endif
 
 #ifdef CONFIG_NUMA
