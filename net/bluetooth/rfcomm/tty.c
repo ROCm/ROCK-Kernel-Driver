@@ -442,7 +442,7 @@ static void rfcomm_dev_data_ready(struct rfcomm_dlc *dlc, struct sk_buff *skb)
 	struct tty_struct *tty;
        
 	if (!dev || !(tty = dev->tty)) {
-		kfree(skb);
+		kfree_skb(skb);
 		return;
 	}
 
