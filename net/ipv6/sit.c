@@ -68,7 +68,8 @@ static struct net_device ipip6_fb_tunnel_dev = {
 };
 
 static struct ip_tunnel ipip6_fb_tunnel = {
-	NULL, &ipip6_fb_tunnel_dev, {0, }, 0, 0, 0, 0, 0, 0, 0, {"sit0", }
+	.dev = &ipip6_fb_tunnel_dev,
+	.parms = { .name = "sit0" }
 };
 
 static struct ip_tunnel *tunnels_r_l[HASH_SIZE];

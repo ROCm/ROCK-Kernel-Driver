@@ -2319,75 +2319,163 @@ static struct addrconf_sysctl_table
 	ctl_table addrconf_proto_dir[2];
 	ctl_table addrconf_root_dir[2];
 } addrconf_sysctl = {
-	NULL,
-        {{NET_IPV6_FORWARDING, "forwarding",
-         &ipv6_devconf.forwarding, sizeof(int), 0644, NULL,
-         &addrconf_sysctl_forward},
-
-	{NET_IPV6_HOP_LIMIT, "hop_limit",
-         &ipv6_devconf.hop_limit, sizeof(int), 0644, NULL,
-         &proc_dointvec},
-
-	{NET_IPV6_MTU, "mtu",
-         &ipv6_devconf.mtu6, sizeof(int), 0644, NULL,
-         &proc_dointvec},
-
-	{NET_IPV6_ACCEPT_RA, "accept_ra",
-         &ipv6_devconf.accept_ra, sizeof(int), 0644, NULL,
-         &proc_dointvec},
-
-	{NET_IPV6_ACCEPT_REDIRECTS, "accept_redirects",
-         &ipv6_devconf.accept_redirects, sizeof(int), 0644, NULL,
-         &proc_dointvec},
-
-	{NET_IPV6_AUTOCONF, "autoconf",
-         &ipv6_devconf.autoconf, sizeof(int), 0644, NULL,
-         &proc_dointvec},
-
-	{NET_IPV6_DAD_TRANSMITS, "dad_transmits",
-         &ipv6_devconf.dad_transmits, sizeof(int), 0644, NULL,
-         &proc_dointvec},
-
-	{NET_IPV6_RTR_SOLICITS, "router_solicitations",
-         &ipv6_devconf.rtr_solicits, sizeof(int), 0644, NULL,
-         &proc_dointvec},
-
-	{NET_IPV6_RTR_SOLICIT_INTERVAL, "router_solicitation_interval",
-         &ipv6_devconf.rtr_solicit_interval, sizeof(int), 0644, NULL,
-         &proc_dointvec_jiffies},
-
-	{NET_IPV6_RTR_SOLICIT_DELAY, "router_solicitation_delay",
-         &ipv6_devconf.rtr_solicit_delay, sizeof(int), 0644, NULL,
-         &proc_dointvec_jiffies},
-
+	.sysctl_header = NULL,
+	.addrconf_vars = {
+        	{
+			.ctl_name	=	NET_IPV6_FORWARDING,
+			.procname	=	"forwarding",
+         		.data		=	&ipv6_devconf.forwarding,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+         		.proc_handler	=	&addrconf_sysctl_forward,
+		},
+		{
+			.ctl_name	=	NET_IPV6_HOP_LIMIT,
+			.procname	=	"hop_limit",
+         		.data		=	&ipv6_devconf.hop_limit,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+			.proc_handler	=	proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_MTU,
+			.procname	=	"mtu",
+			.data		=	&ipv6_devconf.mtu6,
+         		.maxlen		=	sizeof(int),
+			.mode		=	0644,
+         		.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_ACCEPT_RA,
+			.procname	=	"accept_ra",
+         		.data		=	&ipv6_devconf.accept_ra,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+         		.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_ACCEPT_REDIRECTS,
+			.procname	=	"accept_redirects",
+         		.data		=	&ipv6_devconf.accept_redirects,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+         		.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_AUTOCONF,
+			.procname	=	"autoconf",
+         		.data		=	&ipv6_devconf.autoconf,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+         		.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_DAD_TRANSMITS,
+			.procname	=	"dad_transmits",
+         		.data		=	&ipv6_devconf.dad_transmits,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+         		.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_RTR_SOLICITS,
+			.procname	=	"router_solicitations",
+         		.data		=	&ipv6_devconf.rtr_solicits,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+         		.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_RTR_SOLICIT_INTERVAL,
+			.procname	=	"router_solicitation_interval",
+         		.data		=	&ipv6_devconf.rtr_solicit_interval,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+         		.proc_handler	=	&proc_dointvec_jiffies,
+		},
+		{
+			.ctl_name	=	NET_IPV6_RTR_SOLICIT_DELAY,
+			.procname	=	"router_solicitation_delay",
+         		.data		=	&ipv6_devconf.rtr_solicit_delay,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+         		.proc_handler	=	&proc_dointvec_jiffies,
+		},
 #ifdef CONFIG_IPV6_PRIVACY
-	{NET_IPV6_USE_TEMPADDR, "use_tempaddr",
-	 &ipv6_devconf.use_tempaddr, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-
-	{NET_IPV6_TEMP_VALID_LFT, "temp_valid_lft",
-	 &ipv6_devconf.temp_valid_lft, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-
-	{NET_IPV6_TEMP_PREFERED_LFT, "temp_prefered_lft",
-	 &ipv6_devconf.temp_prefered_lft, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-
-	{NET_IPV6_REGEN_MAX_RETRY, "regen_max_retry",
-	 &ipv6_devconf.regen_max_retry, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-
-	{NET_IPV6_MAX_DESYNC_FACTOR, "max_desync_factor",
-	 &ipv6_devconf.max_desync_factor, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
+		{
+			.ctl_name	=	NET_IPV6_USE_TEMPADDR,
+			.procname	=	"use_tempaddr",
+	 		.data		=	&ipv6_devconf.use_tempaddr,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+	 		.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_TEMP_VALID_LFT,
+			.procname	=	"temp_valid_lft",
+	 		.data		=	&ipv6_devconf.temp_valid_lft,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+	 		.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_TEMP_PREFERED_LFT,
+			.procname	=	"temp_prefered_lft",
+	 		.data		=	&ipv6_devconf.temp_prefered_lft,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+	 		.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_REGEN_MAX_RETRY,
+			.procname	=	"regen_max_retry",
+	 		.data		=	&ipv6_devconf.regen_max_retry,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+	 		.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_MAX_DESYNC_FACTOR,
+			.procname	=	"max_desync_factor",
+	 		.data		=	&ipv6_devconf.max_desync_factor,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+	 		.proc_handler	=	&proc_dointvec,
+		},
 #endif
-
-	{0}},
-
-	{{NET_PROTO_CONF_ALL, "all", NULL, 0, 0555, addrconf_sysctl.addrconf_vars},{0}},
-	{{NET_IPV6_CONF, "conf", NULL, 0, 0555, addrconf_sysctl.addrconf_dev},{0}},
-	{{NET_IPV6, "ipv6", NULL, 0, 0555, addrconf_sysctl.addrconf_conf_dir},{0}},
-	{{CTL_NET, "net", NULL, 0, 0555, addrconf_sysctl.addrconf_proto_dir},{0}}
+	},
+	.addrconf_dev = {
+		{
+			.ctl_name	=	NET_PROTO_CONF_ALL,
+			.procname	=	"all",
+			.mode		=	0555,
+			.child		=	addrconf_sysctl.addrconf_vars,
+		},
+	},
+	.addrconf_conf_dir = {
+		{
+			.ctl_name	=	NET_IPV6_CONF,
+			.procname	=	"conf",
+			.mode		=	0555,
+			.child		=	addrconf_sysctl.addrconf_dev,
+		},
+	},
+	.addrconf_proto_dir = {
+		{
+			.ctl_name	=	NET_IPV6,
+			.procname	=	"ipv6",
+			.mode		=	0555,
+			.child		=	addrconf_sysctl.addrconf_conf_dir,
+		},
+	},
+	.addrconf_root_dir = {
+		{
+			.ctl_name	=	CTL_NET,
+			.procname	=	"net",
+			.mode		=	0555,
+			.child		=	addrconf_sysctl.addrconf_proto_dir,
+		},
+	},
 };
 
 static void addrconf_sysctl_register(struct inet6_dev *idev, struct ipv6_devconf *p)
