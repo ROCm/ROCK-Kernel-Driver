@@ -1266,6 +1266,8 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 		zone->zone_pgdat = pgdat;
 		zone->free_pages = 0;
 
+		zone->temp_priority = zone->prev_priority = DEF_PRIORITY;
+
 		/*
 		 * The per-cpu-pages pools are set to around 1000th of the
 		 * size of the zone.  But no more than 1/4 of a meg - there's
