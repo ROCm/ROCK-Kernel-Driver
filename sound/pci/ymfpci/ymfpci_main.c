@@ -1880,9 +1880,12 @@ int __devinit snd_ymfpci_joystick(ymfpci_t *chip)
 static void snd_ymfpci_proc_read(snd_info_entry_t *entry, 
 				 snd_info_buffer_t * buffer)
 {
-	// ymfpci_t *chip = snd_magic_cast(ymfpci_t, private_data, return);
+	ymfpci_t *chip = snd_magic_cast(ymfpci_t, entry->private_data, return);
+	int i;
 	
 	snd_iprintf(buffer, "YMFPCI\n\n");
+	for (i = 0; i <= YDSXGR_WORKBASE; i += 4)
+		snd_iprintf(buffer, "%04x: %04x\n", i, snd_ymfpci_readl(chip, i));
 }
 
 static int __devinit snd_ymfpci_proc_init(snd_card_t * card, ymfpci_t *chip)
@@ -2285,13 +2288,13 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 	pci_set_master(pci);
 
 	if ((chip->res_reg_area = request_mem_region(chip->reg_area_phys, 0x8000, "YMFPCI")) == NULL) {
-		snd_ymfpci_free(chip);
 		snd_printk("unable to grab memory region 0x%lx-0x%lx\n", chip->reg_area_phys, chip->reg_area_phys + 0x8000 - 1);
+		snd_ymfpci_free(chip);
 		return -EBUSY;
 	}
 	if (request_irq(pci->irq, snd_ymfpci_interrupt, SA_INTERRUPT|SA_SHIRQ, "YMFPCI", (void *) chip)) {
-		snd_ymfpci_free(chip);
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_ymfpci_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;

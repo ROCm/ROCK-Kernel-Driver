@@ -80,14 +80,14 @@ void __devinit pci_name_device(struct pci_dev *dev)
 		}
 
 		/* Ok, found the vendor, but unknown device */
-		sprintf(name, "PCI device %04x:%04x (%." DEVICE_NAME_HALF "s)",
+		sprintf(name, "PCI device %04x:%04x (%." PCI_NAME_HALF "s)",
 				dev->vendor, dev->device, vendor_p->name);
 		return;
 
 		/* Full match */
 		match_device: {
-			char *n = name + sprintf(name, "%." DEVICE_NAME_HALF
-					"s %." DEVICE_NAME_HALF "s",
+			char *n = name + sprintf(name, "%." PCI_NAME_HALF
+					"s %." PCI_NAME_HALF "s",
 					vendor_p->name, device_p->name);
 			int nr = device_p->seen + 1;
 			device_p->seen = nr;

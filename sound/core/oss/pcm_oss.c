@@ -1614,8 +1614,12 @@ static int snd_pcm_oss_open_file(struct file *file,
 	if ((f_mode & FMODE_READ) && !(csetup && csetup->disable)) {
 		if ((err = snd_pcm_open_substream(pcm, SNDRV_PCM_STREAM_CAPTURE, 
 					       &csubstream)) < 0) {
-			snd_pcm_oss_release_file(pcm_oss_file);
-			return err;
+			if (!(f_mode & FMODE_WRITE) || err != -ENODEV) {
+				snd_pcm_oss_release_file(pcm_oss_file);
+				return err;
+			} else {
+				csubstream = NULL;
+			}
 		}
 		pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE] = csubstream;
 	}
