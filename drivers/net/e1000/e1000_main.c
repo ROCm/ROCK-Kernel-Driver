@@ -318,7 +318,13 @@ e1000_reset(struct e1000_adapter *adapter)
 	}
 	E1000_WRITE_REG(&adapter->hw, PBA, pba);
 
+	/* flow control settings */
+	adapter->hw.fc_high_water = pba - E1000_FC_HIGH_DIFF;
+	adapter->hw.fc_low_water = pba - E1000_FC_LOW_DIFF;
+	adapter->hw.fc_pause_time = E1000_FC_PAUSE_TIME;
+	adapter->hw.fc_send_xon = 1;
 	adapter->hw.fc = adapter->hw.original_fc;
+
 	e1000_reset_hw(&adapter->hw);
 	if(adapter->hw.mac_type >= e1000_82544)
 		E1000_WRITE_REG(&adapter->hw, WUC, 0);
@@ -620,13 +626,6 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	/* initialize eeprom parameters */
 
 	e1000_init_eeprom_params(hw);
-
-	/* flow control settings */
-
-	hw->fc_high_water = E1000_FC_HIGH_THRESH;
-	hw->fc_low_water = E1000_FC_LOW_THRESH;
-	hw->fc_pause_time = E1000_FC_PAUSE_TIME;
-	hw->fc_send_xon = 1;
 
 	if((hw->mac_type == e1000_82541) ||
 	   (hw->mac_type == e1000_82547) ||

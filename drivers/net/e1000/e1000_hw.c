@@ -1865,11 +1865,12 @@ e1000_config_fc_after_link_up(struct e1000_hw *hw)
              * be asked to delay transmission of packets than asking
              * our link partner to pause transmission of frames.
              */
-            else if(hw->original_fc == e1000_fc_none ||
-                    hw->original_fc == e1000_fc_tx_pause) {
+            else if((hw->original_fc == e1000_fc_none ||
+                     hw->original_fc == e1000_fc_tx_pause) ||
+                    hw->fc_strict_ieee) {
                 hw->fc = e1000_fc_none;
                 DEBUGOUT("Flow Control = NONE.\r\n");
-            } else if(!hw->fc_strict_ieee) {
+            } else {
                 hw->fc = e1000_fc_rx_pause;
                 DEBUGOUT("Flow Control = RX PAUSE frames only.\r\n");
             }

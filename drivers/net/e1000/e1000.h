@@ -107,11 +107,11 @@ struct e1000_adapter;
 #define E1000_TX_HEAD_ADDR_SHIFT 7
 #define E1000_PBA_TX_MASK 0xFFFF0000
 
-/* Flow Control High-Watermark: 43464 bytes */
-#define E1000_FC_HIGH_THRESH 0xA9C8
+/* Flow Control High-Watermark: 5688 bytes below Rx FIFO size */
+#define E1000_FC_HIGH_DIFF 0x1638
 
-/* Flow Control Low-Watermark: 43456 bytes */
-#define E1000_FC_LOW_THRESH 0xA9C0
+/* Flow Control Low-Watermark: 5696 bytes below Rx FIFO size */
+#define E1000_FC_LOW_DIFF 0x1640
 
 /* Flow Control Pause Time: 858 usec */
 #define E1000_FC_PAUSE_TIME 0x0680
