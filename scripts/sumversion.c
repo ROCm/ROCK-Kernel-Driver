@@ -323,12 +323,12 @@ static int parse_file(const char *fname, struct md4_ctx *md)
  * figure out source file. */
 static int parse_source_files(const char *objfile, struct md4_ctx *md)
 {
-	char *cmd, *file, *p, *end;
+	char *cmd, *file, *line, *dir;
 	const char *base;
-	unsigned long flen;
-	int dirlen, ret = 0;
+	unsigned long flen, pos = 0;
+	int dirlen, ret = 0, check_files = 0;
 
-	cmd = malloc(strlen(objfile) + sizeof("..cmd"));
+	cmd = NOFAIL(malloc(strlen(objfile) + sizeof("..cmd")));
 
 	base = strrchr(objfile, '/');
 	if (base) {
@@ -339,6 +339,9 @@ static int parse_source_files(const char *objfile, struct md4_ctx *md)
 		dirlen = 0;
 		sprintf(cmd, ".%s.cmd", objfile);
 	}
+	dir = NOFAIL(malloc(dirlen + 1));
+	strncpy(dir, objfile, dirlen);
+	dir[dirlen] = '\0';
 
 	file = grab_file(cmd, &flen);
 	if (!file) {
@@ -357,48 +360,38 @@ static int parse_source_files(const char *objfile, struct md4_ctx *md)
 
 	   Sum all files in the same dir or subdirs.
 	*/
-	/* Strictly illegal: file is not nul terminated. */
-	p = strstr(file, "\ndeps_");
-	if (!p) {
-		fprintf(stderr, "Warning: could not find deps_ line in %s\n",
-			cmd);
-		goto out_file;
-	}
-	p = strstr(p, ":=");
-	if (!p) {
-		fprintf(stderr, "Warning: could not find := line in %s\n",
-			cmd);
-		goto out_file;
-	}
-	p += strlen(":=");
-	p += strspn(p, " \\\n");
+	while ((line = get_next_line(&pos, file, flen)) != NULL) {
+		char* p = line;
+		if (strncmp(line, "deps_", sizeof("deps_")-1) == 0) {
+			check_files = 1;
+			continue;
+		}
+		if (!check_files)
+			continue;
 
-	end = strstr(p, "\n\n");
-	if (!end) {
-		fprintf(stderr, "Warning: could not find end line in %s\n",
-			cmd);
-		goto out_file;
-	}
+		/* Continue until line does not end with '\' */
+		if ( *(p + strlen(p)-1) != '\\')
+			break;
+		/* Terminate line at first space, to get rid of final ' \' */
+		while (*p) {
+			if isspace(*p) {
+				*p = '\0';
+				break;
+			}
+			p++;
+		}
 
-	while (p < end) {
-		unsigned int len;
-
-		len = strcspn(p, " \\\n");
-		if (memcmp(objfile, p, dirlen) == 0) {
-			char source[len + 1];
-
-			memcpy(source, p, len);
-			source[len] = '\0';
-			printf("parsing %s\n", source);
-			if (!parse_file(source, md)) {
+		/* Check if this file is in same dir as objfile */
+		if ((strstr(line, dir)+strlen(dir)-1) == strrchr(line, '/')) {
+			if (!parse_file(line, md)) {
 				fprintf(stderr,
 					"Warning: could not open %s: %s\n",
-					source, strerror(errno));
+					line, strerror(errno));
 				goto out_file;
 			}
+
 		}
-		p += len;
-		p += strspn(p, " \\\n");
+
 	}
 
 	/* Everyone parsed OK */
@@ -406,6 +399,7 @@ static int parse_source_files(const char *objfile, struct md4_ctx *md)
 out_file:
 	release_file(file, flen);
 out:
+	free(dir);
 	free(cmd);
 	return ret;
 }
