@@ -7,7 +7,7 @@ menu "PCMCIA SCSI adapter support"
 
 config PCMCIA_AHA152X
 	tristate "Adaptec AHA152X PCMCIA support"
-	depends on m
+	depends on m && !64BIT
 	help
 	  Say Y here if you intend to attach this type of PCMCIA SCSI host
 	  adapter to your computer.
