@@ -93,7 +93,7 @@ struct __dump_header_asm dump_header_asm; /* the arch-specific dump header */
 static int lcrash_init_dump_header(const char *panic_str)
 {
 	struct timeval dh_time;
-	unsigned long temp_dha_stack[DUMP_MAX_NUM_CPUS];
+	unsigned long temp_dha_stack[NR_CPUS];
 	u64 temp_memsz = dump_header.dh_memory_size;
 
 	/* make sure the dump header isn't TOO big */
@@ -107,12 +107,12 @@ static int lcrash_init_dump_header(const char *panic_str)
 	/* initialize the dump headers to zero */
 	/* save dha_stack pointer because it may contains pointer for stack! */
 	memcpy(&(temp_dha_stack[0]), &(dump_header_asm.dha_stack[0]),
-		DUMP_MAX_NUM_CPUS * sizeof(unsigned long));
+		NR_CPUS * sizeof(unsigned long));
 	memset(&dump_header, 0, sizeof(dump_header));
 	memset(&dump_header_asm, 0, sizeof(dump_header_asm));
 	dump_header.dh_memory_size = temp_memsz;
 	memcpy(&(dump_header_asm.dha_stack[0]), &(temp_dha_stack[0]),
-		DUMP_MAX_NUM_CPUS * sizeof(unsigned long));
+		NR_CPUS * sizeof(unsigned long));
 
 	/* configure dump header values */
 	dump_header.dh_magic_number = DUMP_MAGIC_NUMBER;

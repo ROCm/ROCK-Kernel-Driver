@@ -21,9 +21,6 @@
 #define DUMP_ASM_MAGIC_NUMBER     0xdeaddeadULL  /* magic number            */
 #define DUMP_ASM_VERSION_NUMBER   0x5            /* version number          */
 
-/* max number of cpus */
-#define DUMP_MAX_NUM_CPUS 32
-
 /*
  * Structure: __dump_header_asm
  *  Function: This is the header for architecture-specific stuff.  It
@@ -46,10 +43,10 @@ struct __dump_header_asm {
 	/* smp specific */
 	uint32_t	     dha_smp_num_cpus;
 	int		     dha_dumping_cpu;	
-	struct pt_regs	     dha_smp_regs[DUMP_MAX_NUM_CPUS];
-	uint64_t	     dha_smp_current_task[DUMP_MAX_NUM_CPUS];
-	uint64_t	     dha_stack[DUMP_MAX_NUM_CPUS];
-	uint64_t     	     dha_stack_ptr[DUMP_MAX_NUM_CPUS];
+	struct pt_regs	     dha_smp_regs[NR_CPUS];
+	uint64_t	     dha_smp_current_task[NR_CPUS];
+	uint64_t	     dha_stack[NR_CPUS];
+	uint64_t     	     dha_stack_ptr[NR_CPUS];
 } __attribute__((packed));
 
 #ifdef __KERNEL__
