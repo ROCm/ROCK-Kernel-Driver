@@ -261,8 +261,8 @@ __writeback_single_inode(struct inode *inode,
 		do {
 			__iget(inode);
 			spin_unlock(&inode_lock);
-			__wait_on_bit(wqh, &wq, &inode->i_state, __I_LOCK,
-					inode_wait, TASK_UNINTERRUPTIBLE);
+			__wait_on_bit(wqh, &wq, inode_wait,
+							TASK_UNINTERRUPTIBLE);
 			iput(inode);
 			spin_lock(&inode_lock);
 		} while (inode->i_state & I_LOCK);
