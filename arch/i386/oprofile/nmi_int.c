@@ -12,6 +12,7 @@
 #include <linux/smp.h>
 #include <linux/oprofile.h>
 #include <linux/sysdev.h>
+#include <linux/slab.h>
 #include <asm/nmi.h>
 #include <asm/msr.h>
 #include <asm/apic.h>
@@ -91,24 +92,66 @@ static void nmi_save_registers(struct op_msrs * msrs)
 {
 	unsigned int const nr_ctrs = model->num_counters;
 	unsigned int const nr_ctrls = model->num_controls; 
-	struct op_msr_group * counters = &msrs->counters;
-	struct op_msr_group * controls = &msrs->controls;
+	struct op_msr * counters = msrs->counters;
+	struct op_msr * controls = msrs->controls;
 	unsigned int i;
 
 	for (i = 0; i < nr_ctrs; ++i) {
-		rdmsr(counters->addrs[i],
-			counters->saved[i].low,
-			counters->saved[i].high);
+		rdmsr(counters[i].addr,
+			counters[i].saved.low,
+			counters[i].saved.high);
 	}
  
 	for (i = 0; i < nr_ctrls; ++i) {
-		rdmsr(controls->addrs[i],
-			controls->saved[i].low,
-			controls->saved[i].high);
+		rdmsr(controls[i].addr,
+			controls[i].saved.low,
+			controls[i].saved.high);
 	}
 }
 
- 
+
+static void free_msrs(void)
+{
+	int i;
+	for (i = 0; i < NR_CPUS; ++i) {
+		kfree(cpu_msrs[i].counters);
+		cpu_msrs[i].counters = NULL;
+		kfree(cpu_msrs[i].controls);
+		cpu_msrs[i].controls = NULL;
+	}
+}
+
+
+static int allocate_msrs(void)
+{
+	int success = 1;
+	size_t controls_size = sizeof(struct op_msr) * model->num_controls;
+	size_t counters_size = sizeof(struct op_msr) * model->num_counters;
+
+	int i;
+	for (i = 0; i < NR_CPUS; ++i) {
+		if (!cpu_online(i))
+			continue;
+
+		cpu_msrs[i].counters = kmalloc(counters_size, GFP_KERNEL);
+		if (!cpu_msrs[i].counters) {
+			success = 0;
+			break;
+		}
+		cpu_msrs[i].controls = kmalloc(controls_size, GFP_KERNEL);
+		if (!cpu_msrs[i].controls) {
+			success = 0;
+			break;
+		}
+	}
+
+	if (!success)
+		free_msrs();
+
+	return success;
+}
+
+
 static void nmi_cpu_setup(void * dummy)
 {
 	int cpu = smp_processor_id();
@@ -125,6 +168,9 @@ static void nmi_cpu_setup(void * dummy)
 
 static int nmi_setup(void)
 {
+	if (!allocate_msrs())
+		return -ENOMEM;
+
 	/* We walk a thin line between law and rape here.
 	 * We need to be careful to install our NMI handler
 	 * without actually triggering any NMIs as this will
@@ -142,20 +188,20 @@ static void nmi_restore_registers(struct op_msrs * msrs)
 {
 	unsigned int const nr_ctrs = model->num_counters;
 	unsigned int const nr_ctrls = model->num_controls; 
-	struct op_msr_group * counters = &msrs->counters;
-	struct op_msr_group * controls = &msrs->controls;
+	struct op_msr * counters = msrs->counters;
+	struct op_msr * controls = msrs->controls;
 	unsigned int i;
 
 	for (i = 0; i < nr_ctrls; ++i) {
-		wrmsr(controls->addrs[i],
-			controls->saved[i].low,
-			controls->saved[i].high);
+		wrmsr(controls[i].addr,
+			controls[i].saved.low,
+			controls[i].saved.high);
 	}
  
 	for (i = 0; i < nr_ctrs; ++i) {
-		wrmsr(counters->addrs[i],
-			counters->saved[i].low,
-			counters->saved[i].high);
+		wrmsr(counters[i].addr,
+			counters[i].saved.low,
+			counters[i].saved.high);
 	}
 }
  
@@ -185,6 +231,7 @@ static void nmi_shutdown(void)
 	on_each_cpu(nmi_cpu_shutdown, NULL, 0, 1);
 	unset_nmi_callback();
 	enable_lapic_nmi_watchdog();
+	free_msrs();
 }
 
  
