@@ -116,7 +116,7 @@ error:
 	return err;
 }
 
-int ah_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
+static int ah_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
 	int ah_hlen;
 	struct iphdr *iph;
@@ -184,7 +184,7 @@ out:
 	return -EINVAL;
 }
 
-void ah4_err(struct sk_buff *skb, u32 info)
+static void ah4_err(struct sk_buff *skb, u32 info)
 {
 	struct iphdr *iph = (struct iphdr*)skb->data;
 	struct ip_auth_hdr *ah = (struct ip_auth_hdr*)(skb->data+(iph->ihl<<2));

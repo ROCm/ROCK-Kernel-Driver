@@ -37,7 +37,7 @@
 #include <net/ipv6.h>
 #include <linux/icmpv6.h>
 
-int esp6_output(struct sk_buff *skb)
+static int esp6_output(struct sk_buff *skb)
 {
 	int err;
 	int hdr_len;
@@ -129,7 +129,7 @@ error:
 	return err;
 }
 
-int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
+static int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
 	struct ipv6hdr *iph;
 	struct ipv6_esp_hdr *esph;
@@ -252,8 +252,8 @@ static u32 esp6_get_max_size(struct xfrm_state *x, int mtu)
 	return mtu + x->props.header_len + esp->auth.icv_full_len;
 }
 
-void esp6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
-		int type, int code, int offset, __u32 info)
+static void esp6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
+                     int type, int code, int offset, __u32 info)
 {
 	struct ipv6hdr *iph = (struct ipv6hdr*)skb->data;
 	struct ipv6_esp_hdr *esph = (struct ipv6_esp_hdr*)(skb->data+offset);
@@ -272,7 +272,7 @@ void esp6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	xfrm_state_put(x);
 }
 
-void esp6_destroy(struct xfrm_state *x)
+static void esp6_destroy(struct xfrm_state *x)
 {
 	struct esp_data *esp = x->data;
 
@@ -298,7 +298,7 @@ void esp6_destroy(struct xfrm_state *x)
 	kfree(esp);
 }
 
-int esp6_init_state(struct xfrm_state *x, void *args)
+static int esp6_init_state(struct xfrm_state *x, void *args)
 {
 	struct esp_data *esp = NULL;
 
@@ -402,7 +402,7 @@ static struct inet6_protocol esp6_protocol = {
 	.flags		=	INET6_PROTO_NOPOLICY,
 };
 
-int __init esp6_init(void)
+static int __init esp6_init(void)
 {
 	if (xfrm_register_type(&esp6_type, AF_INET6) < 0) {
 		printk(KERN_INFO "ipv6 esp init: can't add xfrm type\n");

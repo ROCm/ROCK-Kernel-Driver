@@ -17,7 +17,7 @@ struct esp_decap_data {
 	__u8		proto;
 };
 
-int esp_output(struct sk_buff *skb)
+static int esp_output(struct sk_buff *skb)
 {
 	int err;
 	struct dst_entry *dst = skb->dst;
@@ -139,7 +139,7 @@ error:
  * expensive, so we only support truncated data, which is the recommended
  * and common case.
  */
-int esp_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
+static int esp_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
 	struct iphdr *iph;
 	struct ip_esp_hdr *esph;
@@ -246,7 +246,7 @@ out:
 	return -EINVAL;
 }
 
-int esp_post_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
+static int esp_post_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
   
 	if (x->encap) {
@@ -320,7 +320,7 @@ static u32 esp4_get_max_size(struct xfrm_state *x, int mtu)
 	return mtu + x->props.header_len + esp->auth.icv_trunc_len;
 }
 
-void esp4_err(struct sk_buff *skb, u32 info)
+static void esp4_err(struct sk_buff *skb, u32 info)
 {
 	struct iphdr *iph = (struct iphdr*)skb->data;
 	struct ip_esp_hdr *esph = (struct ip_esp_hdr*)(skb->data+(iph->ihl<<2));
@@ -338,7 +338,7 @@ void esp4_err(struct sk_buff *skb, u32 info)
 	xfrm_state_put(x);
 }
 
-void esp_destroy(struct xfrm_state *x)
+static void esp_destroy(struct xfrm_state *x)
 {
 	struct esp_data *esp = x->data;
 
@@ -364,7 +364,7 @@ void esp_destroy(struct xfrm_state *x)
 	kfree(esp);
 }
 
-int esp_init_state(struct xfrm_state *x, void *args)
+static int esp_init_state(struct xfrm_state *x, void *args)
 {
 	struct esp_data *esp = NULL;
 

@@ -12,8 +12,8 @@
 #include <net/xfrm.h>
 #include <net/ip.h>
 
-extern struct dst_ops xfrm4_dst_ops;
-extern struct xfrm_policy_afinfo xfrm4_policy_afinfo;
+static struct dst_ops xfrm4_dst_ops;
+static struct xfrm_policy_afinfo xfrm4_policy_afinfo;
 
 static struct xfrm_type_map xfrm4_type_map = { .lock = RW_LOCK_UNLOCKED };
 
@@ -243,7 +243,7 @@ static void xfrm4_update_pmtu(struct dst_entry *dst, u32 mtu)
 	path->ops->update_pmtu(path, mtu);
 }
 
-struct dst_ops xfrm4_dst_ops = {
+static struct dst_ops xfrm4_dst_ops = {
 	.family =		AF_INET,
 	.protocol =		__constant_htons(ETH_P_IP),
 	.gc =			xfrm4_garbage_collect,
@@ -252,7 +252,7 @@ struct dst_ops xfrm4_dst_ops = {
 	.entry_size =		sizeof(struct xfrm_dst),
 };
 
-struct xfrm_policy_afinfo xfrm4_policy_afinfo = {
+static struct xfrm_policy_afinfo xfrm4_policy_afinfo = {
 	.family = 		AF_INET,
 	.lock = 		RW_LOCK_UNLOCKED,
 	.type_map = 		&xfrm4_type_map,
@@ -263,12 +263,12 @@ struct xfrm_policy_afinfo xfrm4_policy_afinfo = {
 	.decode_session =	_decode_session4,
 };
 
-void __init xfrm4_policy_init(void)
+static void __init xfrm4_policy_init(void)
 {
 	xfrm_policy_register_afinfo(&xfrm4_policy_afinfo);
 }
 
-void __exit xfrm4_policy_fini(void)
+static void __exit xfrm4_policy_fini(void)
 {
 	xfrm_policy_unregister_afinfo(&xfrm4_policy_afinfo);
 }
