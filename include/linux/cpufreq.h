@@ -109,19 +109,29 @@ static inline unsigned long cpufreq_scale(unsigned long old, u_int div, u_int mu
  *                      CPUFREQ DRIVER INTERFACE                     *
  *********************************************************************/
 
+#define CPUFREQ_NAME_LEN 16
+
 struct cpufreq_driver {
 	/* needed by all drivers */
 	int     (*verify)       (struct cpufreq_policy *policy);
 	int     (*setpolicy)    (struct cpufreq_policy *policy);
 	struct cpufreq_policy   *policy;
+	char           		name[CPUFREQ_NAME_LEN];
+	/* optional, for the moment */
+	int     (*init)        (struct cpufreq_policy *policy);
+	int     (*exit)        (struct cpufreq_policy *policy);
 	/* 2.4. compatible API */
 #ifdef CONFIG_CPU_FREQ_24_API
 	unsigned int            cpu_cur_freq[NR_CPUS];
 #endif
 };
 
-int cpufreq_register(struct cpufreq_driver *driver_data);
-int cpufreq_unregister(void);
+int cpufreq_register_driver(struct cpufreq_driver *driver_data);
+int cpufreq_unregister_driver(struct cpufreq_driver *driver_data);
+/* deprecated */
+#define cpufreq_register(x)   cpufreq_register_driver(x)
+#define cpufreq_unregister(x) cpufreq_unregister_driver(NULL)
+
 
 void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state);
 

@@ -690,6 +690,9 @@ static int __init speedstep_init(void)
 
 	driver->verify      = &speedstep_verify;
 	driver->setpolicy   = &speedstep_setpolicy;
+	driver->init = NULL;
+	driver->exit = NULL;
+	strncpy(driver->name, "speedstep", CPUFREQ_NAME_LEN);
 
 	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 

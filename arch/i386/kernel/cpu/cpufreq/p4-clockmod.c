@@ -240,6 +240,9 @@ static int __init cpufreq_p4_init(void)
 
 	driver->verify        = &cpufreq_p4_verify;
 	driver->setpolicy     = &cpufreq_p4_setpolicy;
+	driver->init = NULL;
+	driver->exit = NULL;
+	strncpy(driver->name, "p4-clockmod", CPUFREQ_NAME_LEN);
 
 	for (i=0;i<NR_CPUS;i++) {
 		driver->policy[i].cpu    = i;
