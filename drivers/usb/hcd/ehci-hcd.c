@@ -208,6 +208,7 @@ static int ehci_start (struct usb_hcd *hcd)
 	/* controller state:  unknown --> reset */
 
 	/* EHCI spec section 4.1 */
+	// FIXME require STS_HALT before reset...
 	ehci_reset (ehci);
 	writel (INTR_MASK, &ehci->regs->intr_enable);
 	writel (ehci->periodic_dma, &ehci->regs->frame_list);
@@ -215,16 +216,17 @@ static int ehci_start (struct usb_hcd *hcd)
 	/*
 	 * hcc_params controls whether ehci->regs->segment must (!!!)
 	 * be used; it constrains QH/ITD/SITD and QTD locations.
-	 * By default, pci_alloc_consistent() won't hand out addresses
-	 * above 4GB (via pdev->dma_mask) so we know this value.
-	 *
-	 * NOTE:  that pdev->dma_mask setting means that all DMA mappings
-	 * for I/O buffers will have the same restriction, though it's
-	 * neither necessary nor desirable in that case.
+	 * pci_pool consistent memory always uses segment zero.
 	 */
 	if (HCC_64BIT_ADDR (hcc_params)) {
 		writel (0, &ehci->regs->segment);
-		info ("using segment 0 for 64bit DMA addresses ...");
+		/*
+		 * FIXME Enlarge pci_set_dma_mask() when possible.  The DMA
+		 * mapping API spec now says that'll affect only single shot
+		 * mappings, and the pci_pool data will stay safe in seg 0.
+		 * That's what we want:  no extra copies for USB transfers.
+		 */
+		info ("restricting 64bit DMA mappings to segment 0 ...");
 	}
 
 	/* clear interrupt enables, set irq latency */
@@ -234,6 +236,9 @@ static int ehci_start (struct usb_hcd *hcd)
 	temp |= 1 << (16 + log2_irq_thresh);
 	// keeping default periodic framelist size
 	temp &= ~(CMD_IAAD | CMD_ASE | CMD_PSE),
+	// Philips, Intel, and maybe others need CMD_RUN before the
+	// root hub will detect new devices (why?); NEC doesn't
+	temp |= CMD_RUN;
 	writel (temp, &ehci->regs->command);
 	dbg_cmd (ehci, "init", temp);
 
@@ -260,7 +265,7 @@ done2:
 	readl (&ehci->regs->command);	/* unblock posted write */
 
         /* PCI Serial Bus Release Number is at 0x60 offset */
-	pci_read_config_byte(hcd->pdev, 0x60, &tempbyte);
+	pci_read_config_byte (hcd->pdev, 0x60, &tempbyte);
 	temp = readw (&ehci->caps->hci_version);
 	info ("USB %x.%x support enabled, EHCI rev %x.%2x",
 	      ((tempbyte & 0xf0)>>4),
@@ -387,6 +392,8 @@ static int ehci_resume (struct usb_hcd *hcd)
 // restore pci FLADJ value
 	// khubd and drivers will set HC running, if needed;
 	hcd->state = USB_STATE_READY;
+	// FIXME Philips/Intel/... etc don't really have a "READY"
+	// state ... turn on CMD_RUN too
 	for (i = 0; i < ports; i++) {
 		int	temp = readl (&ehci->regs->port_status [i]);
 
