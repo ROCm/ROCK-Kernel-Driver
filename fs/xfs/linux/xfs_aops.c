@@ -410,7 +410,6 @@ map_unwritten(
 	/* get an "empty" pagebuf to manage IO completion
 	 * Proper values will be set before returning */
 	pb = pagebuf_lookup(iomapp->iomap_target, 0, 0, 0);
-
 	if (!pb)
 		return -EAGAIN;
 
@@ -473,7 +472,7 @@ map_unwritten(
 			nblocks += bs;
 			atomic_add(bs, &pb->pb_io_remaining);
 			convert_page(inode, page, iomapp, pb, startio, all_bh);
-                        /* stop if converting the next page might add
+			/* stop if converting the next page might add
 			 * enough blocks that the corresponding byte
 			 * count won't fit in our ulong page buf length */
 			if (nblocks >= ((ULONG_MAX - PAGE_SIZE) >> block_bits))
@@ -1181,6 +1180,12 @@ linvfs_release_page(
 		goto free_buffers;
 
 	if (!(gfp_mask & __GFP_FS))
+		return 0;
+
+	/* If we are already inside a transaction or the thread cannot
+	 * do I/O, we cannot release this page.
+	 */
+	if (PFLAGS_TEST_FSTRANS())
 		return 0;
 
 	/*
