@@ -1893,6 +1893,37 @@ struct module *module_get_kallsym(unsigned int symnum,
 	up(&module_mutex);
 	return NULL;
 }
+
+static unsigned long mod_find_symname(struct module *mod, const char *name)
+{
+	unsigned int i;
+
+	for (i = 0; i < mod->num_symtab; i++)
+		if (strcmp(name, mod->strtab+mod->symtab[i].st_name) == 0)
+			return mod->symtab[i].st_value;
+	return 0;
+}
+
+/* Look for this name: can be of form module:name. */
+unsigned long module_kallsyms_lookup_name(const char *name)
+{
+	struct module *mod;
+	char *colon;
+	unsigned long ret = 0;
+
+	/* Don't lock: we're in enough trouble already. */
+	if ((colon = strchr(name, ':')) != NULL) {
+		*colon = '\0';
+		if ((mod = find_module(name)) != NULL)
+			ret = mod_find_symname(mod, colon+1);
+		*colon = ':';
+	} else {
+		list_for_each_entry(mod, &modules, list)
+			if ((ret = mod_find_symname(mod, name)) != 0)
+				break;
+	}
+	return ret;
+}
 #endif /* CONFIG_KALLSYMS */
 
 /* Called by the /proc file system to return a list of modules. */

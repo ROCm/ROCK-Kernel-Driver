@@ -282,6 +282,10 @@ struct module *module_get_kallsym(unsigned int symnum,
 				  unsigned long *value,
 				  char *type,
 				  char namebuf[128]);
+
+/* Look for this name: can be of form module:name. */
+unsigned long module_kallsyms_lookup_name(const char *name);
+
 int is_exported(const char *name, const struct module *mod);
 
 extern void __module_put_and_exit(struct module *mod, long code)
@@ -432,6 +436,11 @@ static inline struct module *module_get_kallsym(unsigned int symnum,
 						char namebuf[128])
 {
 	return NULL;
+}
+
+static inline unsigned long module_kallsyms_lookup_name(const char *name)
+{
+	return 0;
 }
 
 static inline int is_exported(const char *name, const struct module *mod)
