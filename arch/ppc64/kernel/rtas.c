@@ -115,8 +115,6 @@ call_rtas_display_status(char c)
 	args->args[0] = (int)c;
 
 	enter_rtas((void *)__pa((unsigned long)args));	
-
-	spin_unlock_irqrestore(&rtas.lock, s);
 }
 
 int
@@ -539,9 +537,7 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 void rtas_stop_self(void)
 {
 	struct rtas_args *rtas_args = &(get_paca()->xRtas);
-	unsigned long s;
 
-	spin_lock_irqsave(&rtas.lock, s);
 	rtas_args->token = rtas_token("stop-self");
 	BUG_ON(rtas_args->token == RTAS_UNKNOWN_SERVICE);
 	rtas_args->nargs = 0;
