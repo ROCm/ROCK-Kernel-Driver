@@ -28,20 +28,6 @@
 
 #include "util.h"
 
-struct shmid_kernel /* private to the kernel */
-{	
-	struct kern_ipc_perm	shm_perm;
-	struct file *		shm_file;
-	int			id;
-	unsigned long		shm_nattch;
-	unsigned long		shm_segsz;
-	time_t			shm_atim;
-	time_t			shm_dtim;
-	time_t			shm_ctim;
-	pid_t			shm_cprid;
-	pid_t			shm_lprid;
-};
-
 #define shm_flags	shm_perm.mode
 
 static struct file_operations shm_file_operations;
@@ -193,6 +179,10 @@ static int newseg (key_t key, int shmflg, size_t size)
 	shp = (struct shmid_kernel *) kmalloc (sizeof (*shp), GFP_USER);
 	if (!shp)
 		return -ENOMEM;
+
+	shp->shm_perm.key = key;
+	shp->shm_flags = (shmflg & S_IRWXUGO);
+
 	sprintf (name, "SYSV%08x", key);
 	file = shmem_file_setup(name, size);
 	error = PTR_ERR(file);
@@ -203,8 +193,7 @@ static int newseg (key_t key, int shmflg, size_t size)
 	id = shm_addid(shp);
 	if(id == -1) 
 		goto no_id;
-	shp->shm_perm.key = key;
-	shp->shm_flags = (shmflg & S_IRWXUGO);
+
 	shp->shm_cprid = current->pid;
 	shp->shm_lprid = 0;
 	shp->shm_atim = shp->shm_dtim = 0;

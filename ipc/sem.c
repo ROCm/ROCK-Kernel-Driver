@@ -129,15 +129,16 @@ static int newary (key_t key, int nsems, int semflg)
 		return -ENOMEM;
 	}
 	memset (sma, 0, size);
+
+	sma->sem_perm.mode = (semflg & S_IRWXUGO);
+	sma->sem_perm.key = key;
+
 	id = ipc_addid(&sem_ids, &sma->sem_perm, sc_semmni);
 	if(id == -1) {
 		ipc_free(sma, size);
 		return -ENOSPC;
 	}
 	used_sems += nsems;
-
-	sma->sem_perm.mode = (semflg & S_IRWXUGO);
-	sma->sem_perm.key = key;
 
 	sma->sem_base = (struct sem *) &sma[1];
 	/* sma->sem_pending = NULL; */
