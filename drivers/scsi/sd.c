@@ -85,6 +85,7 @@
 
 struct scsi_disk {
 	struct scsi_device *device;
+	struct gendisk	*disk;
 	sector_t	capacity;	/* size in 512-byte sectors */
 	u8		media_present;
 	u8		write_prot;
@@ -257,25 +258,6 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 			return scsi_ioctl(sdp, cmd, (void *)arg);
 	}
 }
-
-static void sd_dskname(unsigned int dsk_nr, char *buffer)
-{
-	if (dsk_nr < 26)
-		sprintf(buffer, "sd%c", 'a' + dsk_nr);
-	else {
-		unsigned int min1;
-		unsigned int min2;
-		/*
-		 * For larger numbers of disks, we need to go to a new
-		 * naming scheme.
-		 */
-		min1 = dsk_nr / 26;
-		min2 = dsk_nr % 26;
-		sprintf(buffer, "sd%c%c", 'a' + min1 - 1, 'a' + min2);
-	}
-}
-
-static struct gendisk **sd_disks;
 
 /**
  *	sd_init_command - build a scsi (read or write) command from
@@ -1271,11 +1253,8 @@ static int sd_init()
 			sd_dsk_arr[k] = sdkp;
 		}
 	}
-	init_mem_lth(sd_disks, sd_template.dev_max);
-	if (sd_disks)
-		zero_mem_lth(sd_disks, sd_template.dev_max);
 
-	if (!sd_dsk_arr || !sd_disks)
+	if (!sd_dsk_arr)
 		goto cleanup_mem;
 
 	return 0;
@@ -1284,8 +1263,6 @@ static int sd_init()
 #undef zero_mem_lth
 
 cleanup_mem:
-	vfree(sd_disks);
-	sd_disks = NULL;
 	if (sd_dsk_arr) {
                 for (k = 0; k < sd_template.dev_max; ++k)
 			vfree(sd_dsk_arr[k]);
@@ -1394,8 +1371,7 @@ static int sd_attach(struct scsi_device * sdp)
 
 	set_capacity(gd, sdkp->capacity);
 	add_disk(gd);
-
-	sd_disks[dsk_nr] = gd;
+	sdkp->disk = gd;
 
 	printk(KERN_NOTICE "Attached scsi %sdisk %s at scsi%d, channel %d, "
 	       "id %d, lun %d\n", sdp->removable ? "removable " : "",
@@ -1461,12 +1437,11 @@ static void sd_detach(struct scsi_device * sdp)
 	sdkp->capacity = 0;
 	/* sdkp->detaching = 1; */
 
-	del_gendisk(sd_disks[dsk_nr]);
+	del_gendisk(sdkp->disk);
 	sdp->attached--;
 	sd_template.dev_noticed--;
 	sd_template.nr_dev--;
-	put_disk(sd_disks[dsk_nr]);
-	sd_disks[dsk_nr] = NULL;
+	put_disk(sdkp->disk);
 }
 
 /**
@@ -1556,13 +1531,8 @@ static int sd_synchronize_cache(int index, int verbose)
 	if (!SDpnt->online)
 		return 0;
 
-	if(verbose) {
-		char buf[16];
-
-		sd_dskname(index, buf);
-
-		printk("%s ", buf);
-	}
+	if (verbose)
+		printk("%s ", sdkp->disk->disk_name);
 
 	SRpnt = scsi_allocate_request(SDpnt);
 	if(!SRpnt) {
