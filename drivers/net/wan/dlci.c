@@ -520,6 +520,7 @@ static int dlci_dev_event(struct notifier_block *unused,
 
 		list_for_each_entry(dlp, &dlci_devs, list) {
 			if (dlp->slave == dev) {
+				list_del(&dlp->list);
 				unregister_netdevice(dlp->master);
 				dev_put(dlp->slave);
 				break;
