@@ -102,7 +102,7 @@ restart:
 void local_bh_enable(void)
 {
 	__local_bh_enable();
-	BUG_ON(irqs_disabled());
+	WARN_ON(irqs_disabled());
 	if (unlikely(!in_interrupt() &&
 		     local_softirq_pending()))
 		invoke_softirq();
