@@ -255,7 +255,7 @@ int pnp_check_port(struct pnp_dev * dev, int idx)
 	/* check if the resource is already in use, skip if the
 	 * device is active because it itself may be in use */
 	if(!dev->active) {
-		if (check_region(*port, length(port,end)))
+		if (__check_region(&ioport_resource, *port, length(port,end)))
 			return 0;
 	}
 
@@ -309,7 +309,7 @@ int pnp_check_mem(struct pnp_dev * dev, int idx)
 	/* check if the resource is already in use, skip if the
 	 * device is active because it itself may be in use */
 	if(!dev->active) {
-		if (__check_region(&iomem_resource, *addr, length(addr,end)))
+		if (check_mem_region(*addr, length(addr,end)))
 			return 0;
 	}
 
