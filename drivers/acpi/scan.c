@@ -28,6 +28,8 @@ static spinlock_t acpi_device_lock = SPIN_LOCK_UNLOCKED;
 static void acpi_device_release(struct kobject * kobj)
 {
 	struct acpi_device * dev = container_of(kobj,struct acpi_device,kobj);
+	if (dev->pnp.cid_list)
+		kfree(dev->pnp.cid_list);
 	kfree(dev);
 }
 
@@ -201,32 +203,15 @@ acpi_bus_match (
 			goto Done;
 
 	if (device->flags.compatible_ids) {
-		acpi_status		status = AE_OK;
-		union acpi_object	*object = NULL;
-		char			cid[256] = {};
+		struct acpi_compatible_id_list *cid_list = device->pnp.cid_list;
+		int i;
 
-		status = acpi_evaluate_object(device->handle, "_CID", NULL, 
-			&buffer);
-		if (ACPI_FAILURE(status) || !buffer.pointer)
-			return -ENOENT;
-
-		object = (union acpi_object *) buffer.pointer;
-
-		switch (object->type) {
-		case ACPI_TYPE_INTEGER:
-			acpi_ex_eisa_id_to_string((u32) object->integer.value, 
-				cid);
-			break;
-		case ACPI_TYPE_STRING:
-			strncpy(cid, object->string.pointer, sizeof(cid) - 1);
-			break;
-		case ACPI_TYPE_PACKAGE:
-			/* TBD: Support CID packages */
-			break;
+		/* compare multiple _CID entries against driver ids */
+		for (i = 0; i < cid_list->count; i++)
+		{
+			if (strstr(driver->ids, cid_list->id[i].value))
+				goto Done;
 		}
-
-		if (strlen(cid) && strstr(driver->ids,cid))
-			goto Done;
 	}
 	error = -ENOENT;
 
@@ -523,27 +508,30 @@ static void acpi_device_get_busid(struct acpi_device * device, acpi_handle handl
 static void acpi_device_set_id(struct acpi_device * device, struct acpi_device * parent,
 			       acpi_handle handle, int type)
 {
-	struct acpi_device_info	info;
+	struct acpi_device_info	*info;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 	char			*hid = NULL;
 	char			*uid = NULL;
+	struct acpi_compatible_id_list *cid_list = NULL;
 	acpi_status		status;
 
 	switch (type) {
 	case ACPI_BUS_TYPE_DEVICE:
-		status = acpi_get_object_info(handle, &info);
+		status = acpi_get_object_info(handle, &buffer);
 		if (ACPI_FAILURE(status)) {
 			printk("%s: Error reading device info\n",__FUNCTION__);
 			return;
 		}
-		/* Clean up info strings (not NULL terminated) */
-		info.hardware_id[sizeof(info.hardware_id)-1] = '\0';
-		info.unique_id[sizeof(info.unique_id)-1] = '\0';
-		if (info.valid & ACPI_VALID_HID)
-			hid = info.hardware_id;
-		if (info.valid & ACPI_VALID_UID)
-			uid = info.unique_id;
-		if (info.valid & ACPI_VALID_ADR) {
-			device->pnp.bus_address = info.address;
+
+		info = buffer.pointer;
+		if (info->valid & ACPI_VALID_HID)
+			hid = info->hardware_id.value;
+		if (info->valid & ACPI_VALID_UID)
+			uid = info->unique_id.value;
+		if (info->valid & ACPI_VALID_CID)
+			cid_list = &info->compatibility_id;
+		if (info->valid & ACPI_VALID_ADR) {
+			device->pnp.bus_address = info->address;
 			device->flags.bus_address = 1;
 		}
 		break;
@@ -586,6 +574,15 @@ static void acpi_device_set_id(struct acpi_device * device, struct acpi_device *
 		sprintf(device->pnp.unique_id, "%s", uid);
 		device->flags.unique_id = 1;
 	}
+	if (cid_list) {
+		device->pnp.cid_list = kmalloc(cid_list->size, GFP_KERNEL);
+		if (device->pnp.cid_list)
+			memcpy(device->pnp.cid_list, cid_list, cid_list->size);
+		else
+			printk(KERN_ERR "Memory allocation error\n");
+	}
+
+	acpi_os_free(buffer.pointer);
 }
 
 int acpi_device_set_context(struct acpi_device * device, int type)
@@ -781,8 +778,12 @@ acpi_bus_add (
 end:
 	if (!result)
 		*child = device;
-	else
+	else {
+		if (device->pnp.cid_list)
+			kfree(device->pnp.cid_list);
 		kfree(device);
+	}
+
 	return_VALUE(result);
 }
 
