@@ -154,7 +154,6 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_write(WRITE_12),
 		safe_for_write(WRITE_VERIFY_12),
 		safe_for_write(WRITE_16),
-		safe_for_write(WRITE_BUFFER),
 		safe_for_write(WRITE_LONG),
 	};
 	unsigned char type = cmd_type[cmd[0]];
