@@ -722,7 +722,11 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_lremovexattr
 	.llong .sys_fremovexattr	/* 220 */
 	.llong .sys_futex
-	.rept NR_syscalls-221
+	.llong .sys_ni_syscall		/* reserved for tux */
+	.llong .sys32_sched_setaffinity
+	.llong .sys32_sched_getaffinity
+
+	.rept NR_syscalls-224
 		.llong .sys_ni_syscall
 	.endr
 #endif
@@ -951,6 +955,10 @@ _GLOBAL(sys_call_table)
 	.llong .sys_lremovexattr
 	.llong .sys_fremovexattr	/* 220 */
 	.llong .sys_futex
-	.rept NR_syscalls-221
+	.llong .sys_ni_syscall		/* reserved for tux */
+	.llong .sys_sched_setaffinity
+	.llong .sys_sched_getaffinity
+
+	.rept NR_syscalls-224
 	.llong .sys_ni_syscall
 	.endr
