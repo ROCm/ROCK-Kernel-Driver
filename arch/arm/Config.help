@@ -836,3 +836,15 @@ CONFIG_DEBUG_BUGVERBOSE
   of the BUG call as well as the EIP and oops trace.  This aids
   debugging but costs about 70-100K of memory.
 
+CONFIG_ZBOOT_ROM
+  Say Y here if you intend to execute your compressed kernel image (zImage)
+  directly from ROM or flash.  If unsure, say N.
+
+CONFIG_ZBOOT_ROM_TEXT
+  The base address for zImage.  Unless you have special requirements, you
+  should not change this value.
+
+CONFIG_ZBOOT_ROM_BSS
+  The base address of 64KiB of read/write memory, which must be available
+  while the decompressor is running.  Unless you have special requirements,
+  you should not change this value.
