@@ -145,5 +145,3 @@ clean:
 	$(RM) Image zImage bootpImage
 	@$(MAKE) -C compressed clean
 	@$(MAKE) -C bootp clean
-
-dep:
