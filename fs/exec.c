@@ -1166,7 +1166,7 @@ void format_corename(char *corename, const char *pattern, long signr)
 			case 'p':
 				pid_in_pattern = 1;
 				rc = snprintf(out_ptr, out_end - out_ptr,
-					      "%d", current->pid);
+					      "%d", current->tgid);
 				if (rc > out_end - out_ptr)
 					goto out;
 				out_ptr += rc;
@@ -1238,7 +1238,7 @@ void format_corename(char *corename, const char *pattern, long signr)
 	if (!pid_in_pattern
             && (core_uses_pid || atomic_read(&current->mm->mm_users) != 1)) {
 		rc = snprintf(out_ptr, out_end - out_ptr,
-			      ".%d", current->pid);
+			      ".%d", current->tgid);
 		if (rc > out_end - out_ptr)
 			goto out;
 		out_ptr += rc;
