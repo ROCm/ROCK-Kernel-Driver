@@ -203,7 +203,7 @@ void sctp_endpoint_destroy(struct sctp_endpoint *ep)
 
 	/* Free up the HMAC transform. */
 	if (sctp_sk(ep->base.sk)->hmac)
-		crypto_free_tfm(sctp_sk(ep->base.sk)->hmac);
+		sctp_crypto_free_tfm(sctp_sk(ep->base.sk)->hmac);
 
 	/* Cleanup. */
 	sctp_inq_free(&ep->base.inqueue);

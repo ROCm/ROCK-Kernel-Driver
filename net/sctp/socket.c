@@ -2745,7 +2745,7 @@ int sctp_inet_listen(struct socket *sock, int backlog)
 
 	/* Allocate HMAC for generating cookie. */
 	if (sctp_hmac_alg) {
-		tfm = crypto_alloc_tfm(sctp_hmac_alg, 0);
+		tfm = sctp_crypto_alloc_tfm(sctp_hmac_alg, 0);
 		if (!tfm) {
 			err = -ENOSYS;
 			goto out;
@@ -2772,7 +2772,7 @@ out:
 	return err;
 cleanup:	
 	if (tfm)
-		crypto_free_tfm(tfm);
+		sctp_crypto_free_tfm(tfm);
 	goto out;
 }
 

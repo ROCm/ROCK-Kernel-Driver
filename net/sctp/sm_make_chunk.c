@@ -1358,7 +1358,7 @@ sctp_cookie_param_t *sctp_pack_cookie(const struct sctp_endpoint *ep,
 	sctp_signed_cookie_t *cookie;
 	struct scatterlist sg;
 	int headersize, bodysize;
-	unsigned int keylen = SCTP_SECRET_SIZE;
+	unsigned int keylen;
 	char *key;
 
 	headersize = sizeof(sctp_paramhdr_t) + SCTP_SECRET_SIZE;
@@ -1412,10 +1412,11 @@ sctp_cookie_param_t *sctp_pack_cookie(const struct sctp_endpoint *ep,
 		sg.page = virt_to_page(&cookie->c);
 		sg.offset = (unsigned long)(&cookie->c) % PAGE_SIZE;
 		sg.length = bodysize;
+		keylen = SCTP_SECRET_SIZE;
 		key = (char *)ep->secret_key[ep->current_key];
 		
-		crypto_hmac(sctp_sk(ep->base.sk)->hmac, key, &keylen, &sg, 1,
-			    cookie->signature);
+		sctp_crypto_hmac(sctp_sk(ep->base.sk)->hmac, key, &keylen, 
+				 &sg, 1, cookie->signature);
 	}
 
 nodata:
@@ -1471,14 +1472,15 @@ struct sctp_association *sctp_unpack_cookie(
 	key = (char *)ep->secret_key[ep->current_key];
 
 	memset(digest, 0x00, sizeof(digest));
-	crypto_hmac(sctp_sk(ep->base.sk)->hmac, key, &keylen, &sg, 1, digest);
+	sctp_crypto_hmac(sctp_sk(ep->base.sk)->hmac, key, &keylen, &sg, 
+			 1, digest);
 
 	if (memcmp(digest, cookie->signature, SCTP_SIGNATURE_SIZE)) {
 		/* Try the previous key. */	
 		key = (char *)ep->secret_key[ep->last_key];
 		memset(digest, 0x00, sizeof(digest));
-		crypto_hmac(sctp_sk(ep->base.sk)->hmac, key, &keylen, &sg, 1,
-			    digest);
+		sctp_crypto_hmac(sctp_sk(ep->base.sk)->hmac, key, &keylen, 
+				 &sg, 1, digest);
 		
 		if (memcmp(digest, cookie->signature, SCTP_SIGNATURE_SIZE)) {
 			/* Yikes!  Still bad signature! */
