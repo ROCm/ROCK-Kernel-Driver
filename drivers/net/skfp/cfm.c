@@ -96,14 +96,13 @@ static const u_char cf_to_ptype[] = {
 /*
  * function declarations
  */
-static void cfm_fsm() ;
+static void cfm_fsm(struct s_smc *smc, int cmd);
 
 /*
 	init CFM state machine
 	clear all CFM vars and flags
 */
-void cfm_init(smc)
-struct s_smc *smc ;
+void cfm_init(struct s_smc *smc)
 {
 	smc->mib.fddiSMTCF_State = ACTIONS(SC0_ISOLATED) ;
 	smc->r.rm_join = 0 ;
@@ -118,9 +117,7 @@ struct s_smc *smc ;
 #define THRU_ENABLED(smc)	(smc->y[PA].pc_mode != PM_TREE && \
 				 smc->y[PB].pc_mode != PM_TREE)
 /* Selection criteria for the ports */
-static void	selection_criteria (smc,phy)
-struct s_smc	*smc ;
-struct s_phy	*phy ;
+static void selection_criteria (struct s_smc *smc, struct s_phy *phy)
 {
 
 	switch (phy->mib->fddiPORTMy_Type) {
@@ -146,8 +143,7 @@ struct s_phy	*phy ;
 
 }
 
-void	all_selection_criteria (smc)
-struct s_smc *smc ;
+void all_selection_criteria(struct s_smc *smc)
 {
 	struct s_phy	*phy ;
 	int		p ;
@@ -158,9 +154,7 @@ struct s_smc *smc ;
 	}
 }
 
-static void	cem_priv_state (smc, event)
-struct s_smc *smc ;
-int event ;
+static void cem_priv_state(struct s_smc *smc, int event)
 /* State machine for private PORT states: used to optimize dual homing */
 {
 	int	np;	/* Number of the port */
@@ -216,9 +210,7 @@ int event ;
 		process event
 	until SM is stable
 */
-void cfm(smc,event)
-struct s_smc *smc ;
-int event ;
+void cfm(struct s_smc *smc, int event)
 {
 	int	state ;		/* remember last state */
 	int	cond ;
@@ -290,9 +282,7 @@ int event ;
 	process CFM event
 */
 /*ARGSUSED1*/
-static void cfm_fsm(smc,cmd)
-struct s_smc *smc ;
-int cmd ;
+static void cfm_fsm(struct s_smc *smc, int cmd)
 {
 	switch(smc->mib.fddiSMTCF_State) {
 	case ACTIONS(SC0_ISOLATED) :
@@ -550,8 +540,7 @@ int cmd ;
  *	return :
  *		PA or PB
  */
-int cfm_get_mac_input(smc)
-struct s_smc *smc ;
+int cfm_get_mac_input(struct s_smc *smc)
 {
 	return((smc->mib.fddiSMTCF_State == SC10_C_WRAP_B ||
 		smc->mib.fddiSMTCF_State == SC5_THRU_B) ? PB : PA) ;
@@ -562,8 +551,7 @@ struct s_smc *smc ;
  *	return :
  *		PA or PB
  */
-int cfm_get_mac_output(smc)
-struct s_smc *smc ;
+int cfm_get_mac_output(struct s_smc *smc)
 {
 	return((smc->mib.fddiSMTCF_State == SC10_C_WRAP_B ||
 		smc->mib.fddiSMTCF_State == SC4_THRU_A) ? PB : PA) ;
@@ -603,10 +591,7 @@ static char path_iso_s[] = {
 	0,0,	0,RES_MAC,	0,INDEX_MAC,		0,PATH_ISO,
 } ;
 
-int cem_build_path(smc,to,path_index)
-struct s_smc *smc ;
-char *to ;
-int path_index ;
+int cem_build_path(struct s_smc *smc, char *to, int path_index)
 {
 	char	*path ;
 	int	len ;

@@ -307,6 +307,7 @@ int32_t e1000_led_off(struct e1000_hw *hw);
 /* Adaptive IFS Functions */
 
 /* Everything else */
+uint32_t e1000_enable_mng_pass_thru(struct e1000_hw *hw);
 void e1000_clear_hw_cntrs(struct e1000_hw *hw);
 void e1000_reset_adaptive(struct e1000_hw *hw);
 void e1000_update_adaptive(struct e1000_hw *hw);
@@ -983,6 +984,7 @@ struct e1000_hw {
     e1000_ms_type master_slave;
     e1000_ms_type original_master_slave;
     e1000_ffe_config ffe_config_state;
+    uint32_t asf_firmware_present;
     unsigned long io_base;
     uint32_t phy_id;
     uint32_t phy_revision;
