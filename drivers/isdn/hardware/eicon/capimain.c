@@ -160,8 +160,6 @@ static int DIVA_INIT_FUNCTION divacapi_init(void)
 	char tmprev[32];
 	int ret = 0;
 
-	MOD_INC_USE_COUNT;
-
 	sprintf(DRIVERRELEASE, "%d.%d%s", DRRELMAJOR, DRRELMINOR,
 		DRRELEXTRA);
 
@@ -177,7 +175,6 @@ static int DIVA_INIT_FUNCTION divacapi_init(void)
 		ret = -EIO;
 	}
 
-	MOD_DEC_USE_COUNT;
 	return ret;
 }
 
