@@ -154,6 +154,7 @@ struct uart_port {
 	unsigned int		flags;
 
 #define UPF_HUP_NOTIFY		(1 << 0)
+#define UPF_FOURPORT		(1 << 1)
 #define UPF_SAK			(1 << 2)
 #define UPF_SPD_MASK		(0x1030)
 #define UPF_SPD_HI		(0x0010)
@@ -167,6 +168,9 @@ struct uart_port {
 #define UPF_LOW_LATENCY		(1 << 13)
 #define UPF_BUGGY_UART		(1 << 14)
 #define UPF_AUTOPROBE		(1 << 15)
+#define UPF_BOOT_ONLYMCA	(1 << 22)
+#define UPF_CONS_FLOW		(1 << 23)
+#define UPF_SHARE_IRQ		(1 << 24)
 #define UPF_BOOT_AUTOCONF	(1 << 28)
 #define UPF_RESOURCES		(1 << 30)
 #define UPF_IOREMAP		(1 << 31)

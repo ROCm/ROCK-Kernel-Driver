@@ -455,7 +455,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 	spin_lock_irqsave(&up->port.lock, flags);
 //	save_flags(flags); cli();
 
-	if (!(up->port.flags & ASYNC_BUGGY_UART)) {
+	if (!(up->port.flags & UPF_BUGGY_UART)) {
 		/*
 		 * Do a simple existence test first; if we fail this,
 		 * there's no point trying anything else.
@@ -501,7 +501,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 	 * manufacturer would be stupid enough to design a board
 	 * that conflicts with COM 1-4 --- we hope!
 	 */
-	if (!(up->port.flags & ASYNC_SKIP_TEST)) {
+	if (!(up->port.flags & UPF_SKIP_TEST)) {
 		serial_outp(up, UART_MCR, UART_MCR_LOOP | 0x0A);
 		status1 = serial_inp(up, UART_MSR) & 0xF0;
 		serial_outp(up, UART_MCR, save_mcr);
@@ -638,7 +638,7 @@ static void autoconfig_irq(struct uart_8250_port *up)
 	unsigned long irqs;
 	int irq;
 
-	if (up->port.flags & ASYNC_FOURPORT) {
+	if (up->port.flags & UPF_FOURPORT) {
 		ICP = (up->port.iobase & 0xfe0) | 0x1f;
 		save_ICP = inb_p(ICP);
 		outb_p(0x80, ICP);
@@ -654,7 +654,7 @@ static void autoconfig_irq(struct uart_8250_port *up)
 	irqs = probe_irq_on();
 	serial_outp(up, UART_MCR, 0);
 	udelay (10);
-	if (up->port.flags & ASYNC_FOURPORT)  {
+	if (up->port.flags & UPF_FOURPORT)  {
 		serial_outp(up, UART_MCR,
 			    UART_MCR_DTR | UART_MCR_RTS);
 	} else {
@@ -673,7 +673,7 @@ static void autoconfig_irq(struct uart_8250_port *up)
 	serial_outp(up, UART_MCR, save_mcr);
 	serial_outp(up, UART_IER, save_ier);
 
-	if (up->port.flags & ASYNC_FOURPORT)
+	if (up->port.flags & UPF_FOURPORT)
 		outb_p(save_ICP, ICP);
 
 	up->port.irq = (irq > 0) ? irq : 0;
@@ -948,10 +948,26 @@ static void serial8250_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * line being stuck active, and, since ISA irqs are edge triggered,
  * no more IRQs will be seen.
  */
+static void serial_do_unlink(struct irq_info *i, struct uart_8250_port *up)
+{
+	spin_lock_irq(&i->lock);
+
+	if (!list_empty(i->head)) {
+		if (i->head == &up->list)
+			i->head = i->head->next;
+		list_del(&up->list);
+	} else {
+		BUG_ON(i->head != &up->list);
+		i->head = NULL;
+	}
+
+	spin_unlock_irq(&i->lock);
+}
+
 static int serial_link_irq_chain(struct uart_8250_port *up)
 {
 	struct irq_info *i = irq_lists + up->port.irq;
-	int ret, irq_flags = share_irqs ? SA_SHIRQ : 0;
+	int ret, irq_flags = up->port.flags & UPF_SHARE_IRQ ? SA_SHIRQ : 0;
 
 	spin_lock_irq(&i->lock);
 
@@ -967,6 +983,8 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
 
 		ret = request_irq(up->port.irq, serial8250_interrupt,
 				  irq_flags, "serial", i);
+		if (ret)
+			serial_do_unlink(i, up);
 	}
 
 	return ret;
@@ -981,18 +999,7 @@ static void serial_unlink_irq_chain(struct uart_8250_port *up)
 	if (list_empty(i->head))
 		free_irq(up->port.irq, i);
 
-	spin_lock_irq(&i->lock);
-
-	if (!list_empty(i->head)) {
-		if (i->head == &up->list)
-			i->head = i->head->next;
-		list_del(&up->list);
-	} else {
-		BUG_ON(i->head != &up->list);
-		i->head = NULL;
-	}
-
-	spin_unlock_irq(&i->lock);
+	serial_do_unlink(i, up);
 }
 
 /*
@@ -1139,7 +1146,7 @@ static int serial8250_startup(struct uart_port *port)
 	 * if it is, then bail out, because there's likely no UART
 	 * here.
 	 */
-	if (!(up->port.flags & ASYNC_BUGGY_UART) &&
+	if (!(up->port.flags & UPF_BUGGY_UART) &&
 	    (serial_inp(up, UART_LSR) == 0xff)) {
 		printk("ttyS%d: LSR safety check engaged!\n", up->port.line);
 		return -ENODEV;
@@ -1169,7 +1176,7 @@ static int serial8250_startup(struct uart_port *port)
 	serial_outp(up, UART_LCR, UART_LCR_WLEN8);
 
 	spin_lock_irqsave(&up->port.lock, flags);
-	if (up->port.flags & ASYNC_FOURPORT) {
+	if (up->port.flags & UPF_FOURPORT) {
 		if (!is_real_interrupt(up->port.irq))
 			up->port.mctrl |= TIOCM_OUT1;
 	} else
@@ -1190,7 +1197,7 @@ static int serial8250_startup(struct uart_port *port)
 	up->ier = UART_IER_RLSI | UART_IER_RDI;
 	serial_outp(up, UART_IER, up->ier);
 
-	if (up->port.flags & ASYNC_FOURPORT) {
+	if (up->port.flags & UPF_FOURPORT) {
 		unsigned int icp;
 		/*
 		 * Enable interrupts on the AST Fourport board
@@ -1223,7 +1230,7 @@ static void serial8250_shutdown(struct uart_port *port)
 	serial_outp(up, UART_IER, 0);
 
 	spin_lock_irqsave(&up->port.lock, flags);
-	if (up->port.flags & ASYNC_FOURPORT) {
+	if (up->port.flags & UPF_FOURPORT) {
 		/* reset interrupts on the AST Fourport board */
 		inb((up->port.iobase & 0xfe0) | 0x1f);
 		up->port.mctrl |= TIOCM_OUT1;
@@ -1604,7 +1611,7 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 	/*
 	 * Don't probe for MCA ports on non-MCA machines.
 	 */
-	if (up->port.flags & ASYNC_BOOT_ONLYMCA && !MCA_bus)
+	if (up->port.flags & UPF_BOOT_ONLYMCA && !MCA_bus)
 		return;
 #endif
 
@@ -1704,6 +1711,8 @@ static void __init serial8250_isa_init_ports(void)
 		up->port.iotype   = old_serial_port[i].io_type;
 		up->port.regshift = old_serial_port[i].iomem_reg_shift;
 		up->port.ops      = &serial8250_pops;
+		if (share_irqs)
+			up->port.flags |= UPF_SHARE_IRQ;
 	}
 }
 
@@ -1746,7 +1755,7 @@ static inline void wait_for_xmitr(struct uart_8250_port *up)
 	} while ((status & BOTH_EMPTY) != BOTH_EMPTY);
 
 	/* Wait up to 1s for flow control if necessary */
-	if (up->port.flags & ASYNC_CONS_FLOW) {
+	if (up->port.flags & UPF_CONS_FLOW) {
 		tmout = 1000000;
 		while (--tmout &&
 		       ((serial_in(up, UART_MSR) & UART_MSR_CTS) == 0))
@@ -1881,8 +1890,11 @@ static int __register_serial(struct serial_struct *req, int line)
 	port.fifosize = req->xmit_fifo_size;
 	port.regshift = req->iomem_reg_shift;
 	port.iotype   = req->io_type;
-	port.flags    = req->flags | ASYNC_BOOT_AUTOCONF;
+	port.flags    = req->flags | UPF_BOOT_AUTOCONF;
 	port.line     = line;
+
+	if (share_irqs)
+		port.flags |= UPF_SHARE_IRQ;
 
 	if (HIGH_BITS_OFFSET)
 		port.iobase |= (long) req->port_high << HIGH_BITS_OFFSET;
