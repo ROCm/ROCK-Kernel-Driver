@@ -668,6 +668,7 @@ static struct pccard_operations yenta_socket_operations = {
 #include "ti113x.h"
 #include "ricoh.h"
 #include "topic.h"
+#include "o2micro.h"
 
 enum {
 	CARDBUS_TYPE_DEFAULT = -1,
@@ -676,7 +677,8 @@ enum {
 	CARDBUS_TYPE_TI12XX,
 	CARDBUS_TYPE_TI1250,
 	CARDBUS_TYPE_RICOH,
-	CARDBUS_TYPE_TOPIC97
+	CARDBUS_TYPE_TOPIC97,
+	CARDBUS_TYPE_O2MICRO,
 };
 
 /*
@@ -715,6 +717,10 @@ struct cardbus_type cardbus_type[] = {
 	},
 	[CARDBUS_TYPE_TOPIC97]	= {
 		.override	= topic97_override,
+	},
+	[CARDBUS_TYPE_O2MICRO]	= {
+		.override	= o2micro_override,
+		.restore_state	= o2micro_restore_state,
 	},
 };
 
@@ -1099,6 +1105,8 @@ static struct pci_device_id yenta_table [] = {
 
 	CB_ID(PCI_VENDOR_ID_TOSHIBA, PCI_DEVICE_ID_TOSHIBA_TOPIC97, TOPIC97),
 	CB_ID(PCI_VENDOR_ID_TOSHIBA, PCI_DEVICE_ID_TOSHIBA_TOPIC100, TOPIC97),
+
+	CB_ID(PCI_VENDOR_ID_O2, PCI_ANY_ID, O2MICRO),
 
 	/* match any cardbus bridge */
 	CB_ID(PCI_ANY_ID, PCI_ANY_ID, DEFAULT),
