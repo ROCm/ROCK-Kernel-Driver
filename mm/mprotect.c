@@ -221,7 +221,7 @@ fail:
 	return error;
 }
 
-asmlinkage long
+long
 do_mprotect(struct mm_struct *mm, unsigned long start, size_t len, 
 	     unsigned long prot)
 {
