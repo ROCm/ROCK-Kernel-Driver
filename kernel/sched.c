@@ -1124,16 +1124,19 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 	runqueue_t *rq;
 	unsigned long flags;
 
-	lock_cpu_hotplug();
 	rq = task_rq_lock(p, &flags);
-	if (!cpu_isset(dest_cpu, p->cpus_allowed))
+	if (!cpu_isset(dest_cpu, p->cpus_allowed)
+	    || unlikely(cpu_is_offline(dest_cpu)))
 		goto out;
 
 	/* force the process onto the specified CPU */
 	if (migrate_task(p, dest_cpu, &req)) {
-		/* Need to wait for migration thread. */
+		/* Need to wait for migration thread (might exit: take ref). */
+		struct task_struct *mt = rq->migration_thread;
+		get_task_struct(mt);
 		task_rq_unlock(rq, &flags);
-		wake_up_process(rq->migration_thread);
+		wake_up_process(mt);
+		put_task_struct(mt);
 		wait_for_completion(&req.done);
 
 		/*
@@ -1142,13 +1145,11 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 		 * the migration.
 		 */
 		tlb_migrate_prepare(current->mm);
-		unlock_cpu_hotplug();
 
 		return;
 	}
 out:
 	task_rq_unlock(rq, &flags);
-	unlock_cpu_hotplug();
 }
 
 /*
@@ -3191,6 +3192,9 @@ static void __migrate_task(struct task_struct *p, int dest_cpu)
 {
 	runqueue_t *rq_dest;
 
+	if (unlikely(cpu_is_offline(dest_cpu)))
+		return;
+
 	rq_dest = cpu_rq(dest_cpu);
 
 	double_rq_lock(this_rq(), rq_dest);
@@ -3349,9 +3353,24 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 		/* Unbind it from offline cpu so it can run.  Fall thru. */
 		kthread_bind(cpu_rq(cpu)->migration_thread,smp_processor_id());
 	case CPU_DEAD:
-		kthread_stop(cpu_rq(cpu)->migration_thread);
-		cpu_rq(cpu)->migration_thread = NULL;
- 		BUG_ON(cpu_rq(cpu)->nr_running != 0);
+		rq = cpu_rq(cpu);
+		kthread_stop(rq->migration_thread);
+		rq->migration_thread = NULL;
+		BUG_ON(rq->nr_running != 0);
+
+		/* No need to migrate the tasks: it was best-effort if
+		 * they didn't do lock_cpu_hotplug().  Just wake up
+		 * the requestors. */
+		spin_lock_irq(&rq->lock);
+		while (!list_empty(&rq->migration_queue)) {
+			migration_req_t *req;
+			req = list_entry(rq->migration_queue.next,
+					 migration_req_t, list);
+			BUG_ON(req->type != REQ_MOVE_TASK);
+			list_del_init(&req->list);
+			complete(&req->done);
+		}
+		spin_unlock_irq(&rq->lock);
  		break;
 #endif
 	}
