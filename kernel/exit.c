@@ -66,7 +66,8 @@ static void release_task(struct task_struct * p)
 	atomic_dec(&p->user->processes);
 	security_ops->task_free_security(p);
 	free_uid(p->user);
-	BUG_ON(!list_empty(&p->ptrace_list) || !list_empty(&p->ptrace_children));
+	BUG_ON(p->ptrace || !list_empty(&p->ptrace_list) ||
+					!list_empty(&p->ptrace_children));
 	unhash_process(p);
 
 	release_thread(p);
@@ -718,8 +719,14 @@ repeat:
 					ptrace_unlink(p);
 					do_notify_parent(p, SIGCHLD);
 					write_unlock_irq(&tasklist_lock);
-				} else
+				} else {
+					if (p->ptrace) {
+						write_lock_irq(&tasklist_lock);
+						ptrace_unlink(p);
+						write_unlock_irq(&tasklist_lock);
+					}
 					release_task(p);
+				}
 				goto end_wait4;
 			default:
 				continue;

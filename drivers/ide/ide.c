@@ -3347,7 +3347,7 @@ static ide_startstop_t default_error (ide_drive_t *drive, const char *msg, byte 
 static int default_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long arg)
 {
-	return -EIO;
+	return -EINVAL;
 }
 
 static int default_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
