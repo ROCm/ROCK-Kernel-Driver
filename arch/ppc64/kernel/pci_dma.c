@@ -805,6 +805,7 @@ void create_pci_bus_tce_table( unsigned long token ) {
 /***********************************************************************/
 static struct TceTable* findHwTceTable(struct TceTable * newTceTable )
 {
+#ifdef CONFIG_PPC_ISERIES
 	struct list_head* Device_Node_Ptr    = iSeries_Global_Device_List.next;
 	/* Cache the compare values. */
 	u64  startOffset = newTceTable->startOffset;
@@ -825,6 +826,7 @@ static struct TceTable* findHwTceTable(struct TceTable * newTceTable )
 		/* Get next Device Node in List             */
 		Device_Node_Ptr = Device_Node_Ptr->next;
 	}
+#endif
 	return NULL;
 }
 

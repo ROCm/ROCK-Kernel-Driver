@@ -302,7 +302,6 @@ find_and_init_phbs(void)
 				res->name = Pci_Node->full_name;
 				res->flags = IORESOURCE_IO;
 				phb->io_base_virt = __ioremap(phb->io_base_phys, range.size, _PAGE_NO_CACHE);
-				printk("back\n");
 				if (!pci_io_base) {
 					pci_io_base = (unsigned long)phb->io_base_virt;
 					if (has_isa)
@@ -602,7 +601,6 @@ pSeries_pcibios_fixup(void)
 	struct pci_dev *dev;
 
 	PPCDBG(PPCDBG_PHBINIT, "pSeries_pcibios_fixup: start\n");
-	pci_assign_all_busses = 0;
 
 	check_s7a();
 	
@@ -661,26 +659,4 @@ pSeries_pcibios_init_early(void)
 {
 	ppc_md.pcibios_read_config = rtas_read_config;
 	ppc_md.pcibios_write_config = rtas_write_config;
-}
-/************************************************************************/
-/* Get a char* of the device physical location(U0.3-P1-I8)              */
-/* See the Product Topology in the RS/6000 Architecture.                */
-/************************************************************************/
-int device_Location(struct pci_dev *PciDev, char *BufPtr)
-{
-	struct device_node *DevNode = (struct device_node *)PciDev->sysdata;
-	return sprintf(BufPtr,"PCI: Bus%3d, Device%3d, Vendor %04X, Location %-12s",
-		       PciDev->bus->number,
-		       PCI_SLOT(PciDev->devfn),
-		       PciDev->vendor,
-		       (char*)get_property(DevNode,"ibm,loc-code",0));
-}
-/************************************************************************/
-/* Set the slot reset line to the state passed in.                      */
-/* This is the platform specific for code for the pci_reset_device      */
-/* function.                                                            */
-/************************************************************************/
-int pci_set_reset(struct pci_dev *PciDev, int state)
-{
-	return -1;
 }

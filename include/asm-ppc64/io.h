@@ -25,13 +25,7 @@
 #undef __IO_DEBUG
 
 extern unsigned long isa_io_base;
-extern unsigned long isa_mem_base;
 extern unsigned long pci_io_base;
-extern unsigned long pci_dram_offset;
-extern int have_print;
-#define _IO_BASE	isa_io_base
-#define _ISA_MEM_BASE	isa_mem_base
-#define PCI_DRAM_OFFSET	pci_dram_offset
 
 #ifdef CONFIG_PPC_ISERIES
 #define readb(addr)		iSeries_Read_Byte((void*)(addr))  

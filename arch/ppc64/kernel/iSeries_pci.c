@@ -95,9 +95,22 @@ void  list_device_nodes(void);
 
 struct pci_dev;
 
-extern struct list_head iSeries_Global_Device_List;
+LIST_HEAD(iSeries_Global_Device_List);
 
 int DeviceCount = 0;
+
+
+/* Counters and control flags. */
+static long   Pci_Io_Read_Count  = 0;
+static long   Pci_Io_Write_Count = 0;
+static long   Pci_Cfg_Read_Count = 0;
+static long   Pci_Cfg_Write_Count= 0;
+static long   Pci_Error_Count    = 0;
+
+static int    Pci_Retry_Max      = 3;	/* Only retry 3 times  */	
+static int    Pci_Error_Flag     = 1;	/* Set Retry Error on. */
+static int    Pci_Trace_Flag     = 0;
+
 
 /**********************************************************************************
  * Log Error infor in Flight Recorder to system Console.
@@ -912,17 +925,3 @@ iSeries_pcibios_init_early(void)
 	//ppc_md.pcibios_write_config_dword = iSeries_Node_write_config_dword;
 }
 
-/************************************************************************/
-/* Set the slot reset line to the state passed in.                      */
-/* This is the platform specific for code for the pci_reset_device      */
-/* function.                                                            */
-/************************************************************************/
-int pci_set_reset(struct pci_dev* PciDev, int State) {
-	struct iSeries_Device_Node* DeviceNode = (struct iSeries_Device_Node*)PciDev->sysdata;
- 	if (DeviceNode == NULL) { 
-		printk("PCI: Pci Reset Failed, Device Node not found for pci_dev %p\n",PciDev);
-		return -1;
-	}
-	DeviceNode->ReturnCode = HvCallPci_setSlotReset(ISERIES_BUS(DeviceNode),0x00,DeviceNode->AgentId,State);
-	return DeviceNode->ReturnCode;
-}

@@ -9,18 +9,17 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-/* Values for the `which' argument to sys_pciconfig_iobase syscall.  */
-#define IOBASE_BRIDGE_NUMBER	0
-#define IOBASE_MEMORY		1
-#define IOBASE_IO		2
-#define IOBASE_ISA_IO           3
-#define IOBASE_ISA_MEM          4
+#include <linux/types.h>
+#include <linux/slab.h>
+#include <linux/string.h>
+#include <asm/scatterlist.h>
+#include <asm/io.h>
+#include <asm/prom.h>
 
-/* Can be used to override the logic in pci_scan_bus for skipping
- * already-configured bus numbers - to be used for buggy BIOSes
- * or architectures with incomplete PCI setup by the loader.
- */
-extern int pcibios_assign_all_busses(void);
+static inline int pcibios_assign_all_busses(void)
+{
+	return 0;
+}
 
 #define PCIBIOS_MIN_IO		0x1000
 #define PCIBIOS_MIN_MEM		0x10000000
@@ -35,31 +34,8 @@ static inline void pcibios_penalize_isa_irq(int irq)
 	/* We don't do dynamic PCI IRQ allocation */
 }
 
-#include <linux/types.h>
-#include <linux/slab.h>
-#include <linux/string.h>
-#include <asm/scatterlist.h>
-#include <asm/io.h>
-#include <asm/prom.h>
-
 struct pci_dev;
-#define REG_SAVE_SIZE 64
-/************************************************************************
- * Structure to hold the data for PCI Register Save/Restore functions.  *
- ************************************************************************/
-struct pci_config_reg_save_area {
-	struct pci_dev* PciDev;	    /* Pointer to device(Sanity Check)     */ 
-	int    Flags;               /* Control & Info Flags                */
-	int    RCode;               /* Return Code on Save/Restore         */
-	int    Register;            /* Pointer to current register.        */
-	u8     Regs[REG_SAVE_SIZE]; /* Save Area                           */ 
-};
-/************************************************************************
- * Functions to support device reset                                    *
- ************************************************************************/
-extern int   pci_reset_device(struct pci_dev*, int, int);
-extern int   pci_save_config_regs(struct pci_dev*,struct pci_config_reg_save_area*);
-extern int   pci_restore_config_regs(struct pci_dev*,struct pci_config_reg_save_area*);
+
 extern char* pci_card_location(struct pci_dev*);
 
 extern void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
@@ -68,7 +44,7 @@ extern void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 				void *vaddr, dma_addr_t dma_handle);
 
 extern dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
-					size_t size, int direction);
+				 size_t size, int direction);
 extern void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
                              size_t size, int direction);
 extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
