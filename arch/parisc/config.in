@@ -24,14 +24,14 @@ bool 'Kernel Debugger support' CONFIG_KWDB
 # bool 'GSC/Gecko bus support' CONFIG_GSC y
 define_bool CONFIG_GSC y
 
-bool 'U2/Uturn I/O MMU' CONFIG_IOMMU_CCIO y
-bool 'LASI I/O support' CONFIG_GSC_LASI y
+bool 'U2/Uturn I/O MMU' CONFIG_IOMMU_CCIO
+bool 'LASI I/O support' CONFIG_GSC_LASI
 
-bool 'PCI support' CONFIG_PCI y
+bool 'PCI support' CONFIG_PCI
 
 if [ "$CONFIG_PCI" = "y" ]; then
-	bool 'GSCtoPCI/DINO PCI support' CONFIG_GSC_DINO y
-	bool 'LBA/Elroy PCI support' CONFIG_PCI_LBA n
+	bool 'GSCtoPCI/DINO PCI support' CONFIG_GSC_DINO
+	bool 'LBA/Elroy PCI support' CONFIG_PCI_LBA
 fi 
 
 if [ "$CONFIG_PCI_LBA" = "y" ]; then
