@@ -699,7 +699,8 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 	}
 }
 
-static int send_signal(int sig, struct siginfo *info, struct sigpending *signals)
+static int send_signal(int sig, struct siginfo *info, struct task_struct *t,
+			struct sigpending *signals)
 {
 	struct sigqueue * q = NULL;
 	int ret = 0;
@@ -798,7 +799,7 @@ specific_send_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 	if (LEGACY_QUEUE(&t->pending, sig))
 		goto out;
 
-	ret = send_signal(sig, info, &t->pending);
+	ret = send_signal(sig, info, t, &t->pending);
 	if (!ret && !sigismember(&t->blocked, sig))
 		signal_wake_up(t, sig == SIGKILL);
 out:
@@ -999,7 +1000,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	 * We always use the shared queue for process-wide signals,
 	 * to avoid several races.
 	 */
-	ret = send_signal(sig, info, &p->signal->shared_pending);
+	ret = send_signal(sig, info, p, &p->signal->shared_pending);
 	if (unlikely(ret))
 		return ret;
 
