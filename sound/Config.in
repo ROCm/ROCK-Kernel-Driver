@@ -31,5 +31,11 @@ fi
 if [ "$CONFIG_SND" != "n" -a "$CONFIG_ARM" = "y" ]; then
   source sound/arm/Config.in
 fi
+if [ "$CONFIG_SND" != "n" -a "$CONFIG_SPARC32" = "y" ]; then
+  source sound/sparc/Config.in
+fi
+if [ "$CONFIG_SND" != "n" -a "$CONFIG_SPARC64" = "y" ]; then
+  source sound/sparc/Config.in
+fi
 
 endmenu

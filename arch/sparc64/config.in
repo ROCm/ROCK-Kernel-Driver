@@ -78,7 +78,6 @@ endmenu
 
 source drivers/serial/Config.in
 source drivers/sbus/char/Config.in
-source drivers/sbus/audio/Config.in
 source drivers/mtd/Config.in
 mainmenu_option next_comment
 comment 'Block devices'
