@@ -3,7 +3,7 @@
  *
  * Written By: Jyoti Shah, IBM Corporation
  *
- * Copyright (c) 2001,2001 IBM Corp.
+ * Copyright (c) 2001-2002 IBM Corp.
  *
  * All rights reserved.
  *
@@ -27,16 +27,13 @@
  *
  */
 
-//#include <linux/delay.h>
 #include <linux/wait.h>
 #include <linux/time.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/smp_lock.h>
+#include <linux/init.h>
 #include "ibmphp.h"
-
-#define POLL_NO		0x01
-#define POLL_YES	0x00
 
 static int to_debug = FALSE;
 #define debug_polling(fmt, arg...)	do { if (to_debug) debug (fmt, arg); } while (0)
@@ -98,19 +95,15 @@ static int to_debug = FALSE;
 // if bits 20,22,25,26,27,29,30 are OFF return TRUE
 #define HPC_I2CSTATUS_CHECK(s)	((u8)((s & 0x00000A76) ? FALSE : TRUE))
 
-// return code 0:poll slots, 1-POLL_LATCH_CNT:poll latch register
-#define INCREMENT_POLLCNT(i)	((i < POLL_LATCH_CNT) ? i++ : (i=0))
 //----------------------------------------------------------------------------
 // global variables
 //----------------------------------------------------------------------------
 static int ibmphp_shutdown;
 static int tid_poll;
-static int stop_polling;		// 2 values: poll, don't poll
 static struct semaphore sem_hpcaccess;	// lock access to HPC
 static struct semaphore semOperations;	// lock all operations and
 					// access to data structures
 static struct semaphore sem_exit;	// make sure polling thread goes away
-static struct semaphore sem_poll;	// make sure poll is idle 
 //----------------------------------------------------------------------------
 // local function prototypes
 //----------------------------------------------------------------------------
@@ -134,15 +127,13 @@ static int hpc_wait_ctlr_notworking (int, struct controller *, void *, u8 *);
 *
 * Action:  initialize semaphores and variables
 *---------------------------------------------------------------------*/
-void ibmphp_hpc_initvars (void)
+void __init ibmphp_hpc_initvars (void)
 {
 	debug ("%s - Entry\n", __FUNCTION__);
 
 	init_MUTEX (&sem_hpcaccess);
 	init_MUTEX (&semOperations);
 	init_MUTEX_LOCKED (&sem_exit);
-	init_MUTEX_LOCKED (&sem_poll);
-	stop_polling = POLL_YES;
 	to_debug = FALSE;
 	ibmphp_shutdown = FALSE;
 	tid_poll = 0;
@@ -710,11 +701,6 @@ void free_hpc_access (void)
 void ibmphp_lock_operations (void)
 {
 	down (&semOperations);
-	stop_polling = POLL_NO;
-	to_debug = TRUE;
-
-	/* waiting for polling to actually stop */
-	down (&sem_poll);
 }
 
 /*----------------------------------------------------------------------
@@ -723,8 +709,6 @@ void ibmphp_lock_operations (void)
 void ibmphp_unlock_operations (void)
 {
 	debug ("%s - Entry\n", __FUNCTION__);
-	stop_polling = POLL_YES;
-	to_debug = FALSE;
 	up (&semOperations);
 	debug ("%s - Exit\n", __FUNCTION__);
 }
@@ -732,34 +716,30 @@ void ibmphp_unlock_operations (void)
 /*----------------------------------------------------------------------
 * Name:    poll_hpc()
 *---------------------------------------------------------------------*/
+#define POLL_LATCH_REGISTER	0
+#define POLL_SLOTS		1
+#define POLL_SLEEP		2
 static void poll_hpc (void)
 {
-	struct slot myslot, *pslot = NULL;
+	struct slot myslot;
+	struct slot *pslot = NULL;
 	struct list_head *pslotlist;
 	int rc;
+	int poll_state = POLL_LATCH_REGISTER;
 	u8 oldlatchlow = 0x00;
 	u8 curlatchlow = 0x00;
-	int pollcnt = 0;
+	int poll_count = 0;
 	u8 ctrl_count = 0x00;
 
-	debug ("poll_hpc - Entry\n");
+	debug ("%s - Entry\n", __FUNCTION__);
 
 	while (!ibmphp_shutdown) {
-		if (stop_polling) {
-			debug ("poll_hpc - stop_polling\n");
-			up (&sem_poll); 
-			/* to prevent deadlock */
-			if (ibmphp_shutdown)
-				break;
-			/* to make the thread sleep */
-			down (&semOperations);
-			up (&semOperations);
-			debug ("poll_hpc - after stop_polling sleep\n");
-		} else {
-			if (pollcnt) {
-				// only poll the latch register
-				oldlatchlow = curlatchlow;
+		/* try to get the lock to do some kind of harware access */
+		down (&semOperations);
 
+		switch (poll_state) {
+			case POLL_LATCH_REGISTER:
+				oldlatchlow = curlatchlow;
 				ctrl_count = 0x00;
 				list_for_each (pslotlist, &ibmphp_slot_head) {
 					if (ctrl_count >= ibmphp_get_total_controllers())
@@ -773,14 +753,16 @@ static void poll_hpc (void)
 										  &curlatchlow);
 							if (oldlatchlow != curlatchlow)
 								process_changeinlatch (oldlatchlow,
-											curlatchlow, pslot->ctrl);
+										       curlatchlow,
+										       pslot->ctrl);
 						}
 					}
 				}
-			} else {
+				poll_state = POLL_SLOTS;
+				break;
+
+			case POLL_SLOTS:
 				list_for_each (pslotlist, &ibmphp_slot_head) {
-					if (stop_polling)
-						break;
 					pslot = list_entry (pslotlist, struct slot, ibm_slot_list);
 					// make a copy of the old status
 					memcpy ((void *) &myslot, (void *) pslot,
@@ -791,31 +773,45 @@ static void poll_hpc (void)
 						process_changeinstatus (pslot, &myslot);
 				}
 
-				if (!stop_polling) {
-					ctrl_count = 0x00;
-					list_for_each (pslotlist, &ibmphp_slot_head) {
-						if (ctrl_count >= ibmphp_get_total_controllers())
-							break;
-						pslot =
-						    list_entry (pslotlist, struct slot,
-								ibm_slot_list);
-						if (pslot->ctrl->ctlr_relative_id == ctrl_count) {
-							ctrl_count++;
-							if (READ_SLOT_LATCH (pslot->ctrl))
-								rc = ibmphp_hpc_readslot (pslot,
-											  READ_SLOTLATCHLOWREG,
-											  &curlatchlow);
-						}
+				ctrl_count = 0x00;
+				list_for_each (pslotlist, &ibmphp_slot_head) {
+					if (ctrl_count >= ibmphp_get_total_controllers())
+						break;
+					pslot = list_entry (pslotlist, struct slot, ibm_slot_list);
+					if (pslot->ctrl->ctlr_relative_id == ctrl_count) {
+						ctrl_count++;
+						if (READ_SLOT_LATCH (pslot->ctrl))
+							rc = ibmphp_hpc_readslot (pslot,
+										  READ_SLOTLATCHLOWREG,
+										  &curlatchlow);
 					}
 				}
-			}
-			INCREMENT_POLLCNT (pollcnt);
-			long_delay (POLL_INTERVAL_SEC * HZ);	// snooze
+				++poll_count;
+				if (poll_count >= POLL_LATCH_CNT) {
+					poll_count = 0;
+					poll_state = POLL_SLEEP;
+				}
+				break;
+
+			case POLL_SLEEP:
+				/* don't sleep with a lock on the hardware */
+				up (&semOperations);
+				long_delay (POLL_INTERVAL_SEC * HZ);
+				down (&semOperations);
+				poll_state = POLL_LATCH_REGISTER;
+				break;
 		}
+
+		/* give up the harware semaphore */
+		up (&semOperations);
+
+		/* sleep for a short time just for good measure */
+		set_current_state (TASK_INTERRUPTIBLE);
+		schedule_timeout (HZ/10);
 	}
-	up (&sem_poll);
+
 	up (&sem_exit);
-	debug ("poll_hpc - Exit\n");
+	debug ("%s - Exit\n", __FUNCTION__);
 }
 
 
@@ -1049,19 +1045,19 @@ static int hpc_poll_thread (void *data)
 *
 * Action:  start polling thread
 *---------------------------------------------------------------------*/
-int ibmphp_hpc_start_poll_thread (void)
+int __init ibmphp_hpc_start_poll_thread (void)
 {
 	int rc = 0;
 
-	debug ("ibmphp_hpc_start_poll_thread - Entry\n");
+	debug ("%s - Entry\n", __FUNCTION__);
 
 	tid_poll = kernel_thread (hpc_poll_thread, 0, 0);
 	if (tid_poll < 0) {
-		err ("ibmphp_hpc_start_poll_thread - Error, thread not started\n");
+		err ("%s - Error, thread not started\n", __FUNCTION__);
 		rc = -1;
 	}
 
-	debug ("ibmphp_hpc_start_poll_thread - Exit tid_poll[%d] rc[%d]\n", tid_poll, rc);
+	debug ("%s - Exit tid_poll[%d] rc[%d]\n", __FUNCTION__, tid_poll, rc);
 	return rc;
 }
 
@@ -1070,9 +1066,9 @@ int ibmphp_hpc_start_poll_thread (void)
 *
 * Action:  stop polling thread and cleanup
 *---------------------------------------------------------------------*/
-void ibmphp_hpc_stop_poll_thread (void)
+void __exit ibmphp_hpc_stop_poll_thread (void)
 {
-	debug ("ibmphp_hpc_stop_poll_thread - Entry\n");
+	debug ("%s - Entry\n", __FUNCTION__);
 
 	ibmphp_shutdown = TRUE;
 	ibmphp_lock_operations ();
@@ -1083,10 +1079,9 @@ void ibmphp_hpc_stop_poll_thread (void)
 	// cleanup
 	free_hpc_access ();
 	ibmphp_unlock_operations ();
-	up (&sem_poll);
 	up (&sem_exit);
 
-	debug ("ibmphp_hpc_stop_poll_thread - Exit\n");
+	debug ("%s - Exit\n", __FUNCTION__);
 }
 
 /*----------------------------------------------------------------------
