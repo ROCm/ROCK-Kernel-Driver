@@ -92,7 +92,7 @@ static char *errbuf;
 
 static kmem_cache_t *uhci_up_cachep;	/* urb_priv */
 
-static int uhci_get_current_frame_number(struct uhci_hcd *uhci);
+static unsigned int uhci_get_current_frame_number(struct uhci_hcd *uhci);
 static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb);
 static void uhci_unlink_generic(struct uhci_hcd *uhci, struct urb *urb);
 static void uhci_remove_pending_urbps(struct uhci_hcd *uhci);
@@ -174,7 +174,7 @@ static inline void uhci_fill_td(struct uhci_td *td, u32 status,
  */
 static void uhci_insert_td_frame_list(struct uhci_hcd *uhci, struct uhci_td *td, unsigned framenum)
 {
-	framenum %= UHCI_NUMFRAMES;
+	framenum &= (UHCI_NUMFRAMES - 1);
 
 	td->frame = framenum;
 
@@ -1145,15 +1145,14 @@ static int isochronous_find_start(struct uhci_hcd *uhci, struct urb *urb)
 	limits = isochronous_find_limits(uhci, urb, &start, &end);
 
 	if (urb->transfer_flags & URB_ISO_ASAP) {
-		if (limits) {
-			int curframe;
-
-			curframe = uhci_get_current_frame_number(uhci) % UHCI_NUMFRAMES;
-			urb->start_frame = (curframe + 10) % UHCI_NUMFRAMES;
-		} else
+		if (limits)
+			urb->start_frame =
+					(uhci_get_current_frame_number(uhci) +
+						10) & (UHCI_NUMFRAMES - 1);
+		else
 			urb->start_frame = end;
 	} else {
-		urb->start_frame %= UHCI_NUMFRAMES;
+		urb->start_frame &= (UHCI_NUMFRAMES - 1);
 		/* FIXME: Sanity check */
 	}
 
@@ -1514,7 +1513,7 @@ static int uhci_fsbr_timeout(struct uhci_hcd *uhci, struct urb *urb)
  *
  * returns the current frame number for a USB bus/controller.
  */
-static int uhci_get_current_frame_number(struct uhci_hcd *uhci)
+static unsigned int uhci_get_current_frame_number(struct uhci_hcd *uhci)
 {
 	return inw(uhci->io_addr + USBFRNUM);
 }
