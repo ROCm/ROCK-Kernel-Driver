@@ -28,6 +28,37 @@
  * For further information regarding this notice, see:
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
+ *
+ * Portions Copyright (c) 1989, 1993
+ *      The Regents of the University of California.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *      This product includes software developed by the University of
+ *      California, Berkeley and its contributors.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 #ifndef __XFS_VNODE_H__
 #define __XFS_VNODE_H__
@@ -39,19 +70,9 @@ struct page_buf_bmap_s;
 struct attrlist_cursor_kern;
 
 /*
- * Vnode types (unrelated to on-disk inodes).  VNON means no type.
+ * Vnode types.  VNON means no type.
  */
-typedef enum vtype {
-	VNON	= 0,
-	VREG	= 1,
-	VDIR	= 2,
-	VBLK	= 3,
-	VCHR	= 4,
-	VLNK	= 5,
-	VFIFO	= 6,
-	VBAD	= 7,
-	VSOCK	= 8
-} vtype_t;
+enum vtype	{ VNON, VREG, VDIR, VBLK, VCHR, VLNK, VFIFO, VBAD, VSOCK };
 
 typedef xfs_ino_t vnumber_t;
 typedef struct dentry vname_t;
@@ -115,14 +136,15 @@ typedef enum {
 #define LINVFS_GET_IP(vp)	(&(vp)->v_inode)
 
 /*
- * Conversion between vnode types/modes and encoded type/mode as
- * seen by stat(2) and mknod(2).
+ * Convert between vnode types and inode formats (since POSIX.1
+ * defines mode word of stat structure in terms of inode formats).
  */
-extern enum vtype       iftovt_tab[];
-extern ushort           vttoif_tab[];
-#define IFTOVT(M)       (iftovt_tab[((M) & S_IFMT) >> 12])
-#define VTTOIF(T)       (vttoif_tab[(int)(T)])
-#define MAKEIMODE(T, M)	(VTTOIF(T) | ((M) & ~S_IFMT))
+extern enum vtype	iftovt_tab[];
+extern u_short		vttoif_tab[];
+#define IFTOVT(mode)	(iftovt_tab[((mode) & S_IFMT) >> 12])
+#define VTTOIF(indx)	(vttoif_tab[(int)(indx)])
+#define MAKEIMODE(indx, mode)	(int)(VTTOIF(indx) | (mode))
+
 
 /*
  * Vnode flags.
@@ -370,30 +392,29 @@ typedef struct vnodeops {
 
 /*
  * Vnode attributes.  va_mask indicates those attributes the caller
- * wants to set (setattr) or extract (getattr).
+ * wants to set or extract.
  */
 typedef struct vattr {
-	int		va_mask;	/* bit-mask of attributes */
-	vtype_t		va_type;	/* vnode type (for create) */
-	mode_t		va_mode;	/* file access mode */
+	int		va_mask;	/* bit-mask of attributes present */
+	enum vtype	va_type;	/* vnode type (for create) */
+	mode_t		va_mode;	/* file access mode and type */
+	nlink_t		va_nlink;	/* number of references to file */
 	uid_t		va_uid;		/* owner user id */
 	gid_t		va_gid;		/* owner group id */
-	xfs_ino_t	va_nodeid;	/* node id */
-	nlink_t		va_nlink;	/* number of references to file */
+	xfs_ino_t	va_nodeid;	/* file id */
 	xfs_off_t	va_size;	/* file size in bytes */
-	timespec_t	va_atime;	/* time of last access */
-	timespec_t	va_mtime;	/* time of last modification */
-	timespec_t	va_ctime;	/* time file ``created'' */
-	xfs_dev_t	va_rdev;	/* device the file represents */
-	u_long		va_blksize;	/* fundamental block size */
-	__int64_t	va_nblocks;	/* # of blocks allocated */
-	u_long		va_vcode;	/* version code */
+	u_long		va_blocksize;	/* blocksize preferred for i/o */
+	struct timespec	va_atime;	/* time of last access */
+	struct timespec	va_mtime;	/* time of last modification */
+	struct timespec	va_ctime;	/* time file changed */
+	u_int		va_gen;		/* generation number of file */
+	xfs_dev_t	va_rdev;	/* device the special file represents */
+	__int64_t	va_nblocks;	/* number of blocks allocated */
 	u_long		va_xflags;	/* random extended file flags */
 	u_long		va_extsize;	/* file extent size */
 	u_long		va_nextents;	/* number of extents in file */
 	u_long		va_anextents;	/* number of attr extents in file */
 	int		va_projid;	/* project id */
-	u_int		va_gencount;	/* object generation count */
 } vattr_t;
 
 /*
@@ -449,11 +470,17 @@ typedef struct vattr {
 		XFS_AT_TYPE|XFS_AT_BLKSIZE|XFS_AT_NBLOCKS|XFS_AT_VCODE|\
 		XFS_AT_NEXTENTS|XFS_AT_ANEXTENTS|XFS_AT_GENCOUNT)
 
-#define VREAD		00400
-#define VWRITE		00200
-#define VEXEC		00100
-#define VSGID		02000		/* set group id on execution */
-#define MODEMASK	07777		/* mode bits plus permission bits */
+/*
+ *  Modes.
+ */
+#define VSUID	S_ISUID		/* set user id on execution */
+#define VSGID	S_ISGID		/* set group id on execution */
+#define VSVTX	S_ISVTX		/* save swapped text even after use */
+#define VREAD	S_IRUSR		/* read, write, execute permissions */
+#define VWRITE	S_IWUSR
+#define VEXEC	S_IXUSR
+
+#define MODEMASK S_IALLUGO	/* mode bits plus permission bits */
 
 /*
  * Check whether mandatory file locking is enabled.
@@ -568,13 +595,9 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
  * Flags to VOP_SETATTR/VOP_GETATTR.
  */
 #define	ATTR_UTIME	0x01	/* non-default utime(2) request */
-#define	ATTR_EXEC	0x02	/* invocation from exec(2) */
-#define	ATTR_COMM	0x04	/* yield common vp attributes */
 #define	ATTR_DMI	0x08	/* invocation from a DMI function */
 #define	ATTR_LAZY	0x80	/* set/get attributes lazily */
 #define	ATTR_NONBLOCK	0x100	/* return EAGAIN if operation would block */
-#define ATTR_NOLOCK	0x200	/* Don't grab any conflicting locks */
-#define ATTR_NOSIZETOK	0x400	/* Don't get the DVN_SIZE_READ token */
 
 /*
  * Flags to VOP_FSYNC and VOP_RECLAIM.

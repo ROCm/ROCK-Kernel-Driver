@@ -386,6 +386,7 @@ linvfs_readlink(
 	uio.uio_segflg = UIO_USERSPACE;
 	uio.uio_resid = size;
 	uio.uio_iovcnt = 1;
+	uio.uio_fmode = 0;
 
 	VOP_READLINK(vp, &uio, NULL, error);
 	if (error)

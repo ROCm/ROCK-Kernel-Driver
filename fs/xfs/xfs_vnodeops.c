@@ -188,7 +188,7 @@ xfs_getattr(
 			 * stripe size through is not a good
 			 * idea for now.
 			 */
-			vap->va_blksize = mp->m_swidth ?
+			vap->va_blocksize = mp->m_swidth ?
 				/*
 				 * If the underlying volume is a stripe, then
 				 * return the stripe width in bytes as the
@@ -205,7 +205,7 @@ xfs_getattr(
 					       mp->m_writeio_log));
 
 #else
-			vap->va_blksize =
+			vap->va_blocksize =
 				/*
 				 * Return the largest of the preferred buffer
 				 * sizes since doing small I/Os into larger
@@ -223,13 +223,13 @@ xfs_getattr(
 			 * realtime extent size or the realtime volume's
 			 * extent size.
 			 */
-			vap->va_blksize = ip->i_d.di_extsize ?
+			vap->va_blocksize = ip->i_d.di_extsize ?
 				(ip->i_d.di_extsize << mp->m_sb.sb_blocklog) :
 				(mp->m_sb.sb_rextsize << mp->m_sb.sb_blocklog);
 		}
 	} else {
 		vap->va_rdev = ip->i_df.if_u2.if_rdev;
-		vap->va_blksize = BLKDEV_IOSIZE;
+		vap->va_blocksize = BLKDEV_IOSIZE;
 	}
 
 	vap->va_atime.tv_sec = ip->i_d.di_atime.t_sec;
@@ -289,8 +289,7 @@ xfs_getattr(
 				 ip->i_d.di_anextents;
 	else
 		vap->va_anextents = 0;
-	vap->va_gencount = ip->i_d.di_gen;
-	vap->va_vcode = 0L;
+	vap->va_gen = ip->i_d.di_gen;
 
  all_done:
 	if (!(flags & ATTR_LAZY))
@@ -1044,7 +1043,7 @@ xfs_readlink(
 	pathlen = (int)ip->i_d.di_size;
 
 	if (ip->i_df.if_flags & XFS_IFINLINE) {
-		error = uiomove(ip->i_df.if_u1.if_data, pathlen, UIO_READ, uiop);
+		error = uio_read(ip->i_df.if_u1.if_data, pathlen, uiop);
 	}
 	else {
 		/*
@@ -1075,8 +1074,7 @@ xfs_readlink(
 				byte_cnt = pathlen;
 			pathlen -= byte_cnt;
 
-			error = uiomove(XFS_BUF_PTR(bp), byte_cnt,
-					 UIO_READ, uiop);
+			error = uio_read(XFS_BUF_PTR(bp), byte_cnt, uiop);
 			xfs_buf_relse (bp);
 		}
 
