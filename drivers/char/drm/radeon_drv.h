@@ -799,6 +799,8 @@ extern int radeon_postcleanup( struct drm_device *dev );
 
 #define R200_RB3D_BLENDCOLOR              0x3218
 
+#define R200_SE_TCL_POINT_SPRITE_CNTL     0x22c4
+
 /* Constants */
 #define RADEON_MAX_USEC_TIMEOUT		100000	/* 100 ms */
 
