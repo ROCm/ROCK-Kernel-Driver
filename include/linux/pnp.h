@@ -12,13 +12,12 @@
 #include <linux/device.h>
 #include <linux/list.h>
 #include <linux/errno.h>
+#include <linux/mod_devicetable.h>
 
 #define PNP_MAX_PORT		8
 #define PNP_MAX_MEM		4
 #define PNP_MAX_IRQ		2
 #define PNP_MAX_DMA		2
-#define PNP_MAX_DEVICES		8
-#define PNP_ID_LEN		8
 #define PNP_NAME_LEN		50
 
 struct pnp_protocol;
@@ -285,19 +284,6 @@ extern struct pnp_protocol pnpbios_protocol;
 struct pnp_id {
 	char id[PNP_ID_LEN];
 	struct pnp_id * next;
-};
-
-struct pnp_device_id {
-	char id[PNP_ID_LEN];
-	unsigned long driver_data;	/* data private to the driver */
-};
-
-struct pnp_card_device_id {
-	char id[PNP_ID_LEN];
-	unsigned long driver_data;	/* data private to the driver */
-	struct {
-		char id[PNP_ID_LEN];
-	} devs[PNP_MAX_DEVICES];	/* logical devices */
 };
 
 struct pnp_driver {
