@@ -60,7 +60,7 @@ int ircomm_open_tsap(struct ircomm_cb *self)
 	notify.flow_indication       = ircomm_ttp_flow_indication;
 	notify.disconnect_indication = ircomm_ttp_disconnect_indication;
 	notify.instance = self;
-	strncpy(notify.name, "IrCOMM", NOTIFY_MAX_NAME);
+	strlcpy(notify.name, "IrCOMM", sizeof(notify.name));
 
 	self->tsap = irttp_open_tsap(LSAP_ANY, DEFAULT_INITIAL_CREDIT,
 				     &notify);

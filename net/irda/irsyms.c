@@ -250,7 +250,7 @@ void irda_notify_init(notify_t *notify)
 	notify->flow_indication = NULL;
 	notify->status_indication = NULL;
 	notify->instance = NULL;
-	strncpy(notify->name, "Unknown", NOTIFY_MAX_NAME);
+	strlcpy(notify->name, "Unknown", sizeof(notify->name));
 }
 
 /*

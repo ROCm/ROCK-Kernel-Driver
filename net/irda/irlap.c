@@ -122,8 +122,7 @@ struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
 	self->qos_dev = qos;
 	/* Copy hardware name */
 	if(hw_name != NULL) {
-		strncpy(self->hw_name, hw_name, 2*IFNAMSIZ);
-		self->hw_name[2*IFNAMSIZ] = '\0';
+		strlcpy(self->hw_name, hw_name, sizeof(self->hw_name));
 	} else {
 		self->hw_name[0] = '\0';
 	}
