@@ -2068,6 +2068,7 @@ __u32 secure_tcpv6_sequence_number(__u32 *saddr, __u32 *daddr,
 	seq += tv.tv_usec + tv.tv_sec*1000000;
 	return seq;
 }
+EXPORT_SYMBOL(secure_tcpv6_sequence_number);
 
 __u32 secure_ipv6_id(__u32 *daddr)
 {
@@ -2088,6 +2089,7 @@ __u32 secure_ipv6_id(__u32 *daddr)
 	return twothirdsMD4Transform(daddr, secret);
 }
 
+EXPORT_SYMBOL(secure_ipv6_id);
 #endif
 
 
