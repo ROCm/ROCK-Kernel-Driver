@@ -8,10 +8,13 @@
  *
  */
 
+#define DEBUG
+
 #include <linux/suspend.h>
 #include <linux/kobject.h>
 #include <linux/reboot.h>
 #include <linux/string.h>
+#include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/pm.h>
@@ -122,12 +125,9 @@ static int power_down(u32 mode)
 	switch(mode) {
 	case PM_DISK_PLATFORM:
 		error = pm_ops->enter(PM_SUSPEND_DISK);
-		if (error) {
-			device_power_up();
-			local_irq_restore(flags);
-			return error;
-		}
+		break;
 	case PM_DISK_SHUTDOWN:
+		printk("Powering off system\n");
 		machine_power_off();
 		break;
 	case PM_DISK_REBOOT:
@@ -135,6 +135,8 @@ static int power_down(u32 mode)
 		break;
 	}
 	machine_halt();
+	device_power_up();
+	local_irq_restore(flags);
 	return 0;
 }
 
@@ -183,11 +185,19 @@ static int pm_suspend_disk(void)
 
 	pr_debug("PM: snapshotting memory.\n");
 	in_suspend = 1;
+	local_irq_disable();
 	if ((error = swsusp_save()))
 		goto Done;
 
 	if (in_suspend) {
 		pr_debug("PM: writing image.\n");
+
+		/* 
+		 * FIXME: Leftover from swsusp. Are they necessary? 
+		 */
+		mb();
+		barrier();
+
 		error = swsusp_write();
 		if (!error)
 			error = power_down(pm_disk_mode);
@@ -196,6 +206,7 @@ static int pm_suspend_disk(void)
 		pr_debug("PM: Image restored successfully.\n");
 	swsusp_free();
  Done:
+	local_irq_enable();
 	return error;
 }
 
@@ -304,7 +315,7 @@ static int enter_state(u32 state)
 		goto Unlock;
 	}
 
-	pr_debug("PM: Preparing system for suspend.\n");
+	pr_debug("PM: Preparing system for suspend\n");
 	if ((error = suspend_prepare(state)))
 		goto Unlock;
 
@@ -364,9 +375,23 @@ static int pm_resume(void)
 	if ((error = suspend_prepare(PM_SUSPEND_DISK)))
 		goto Free;
 
+	barrier();
+	mb();
+	local_irq_disable();
+
+	/* FIXME: The following (comment and mdelay()) are from swsusp. 
+	 * Are they really necessary? 
+	 *
+	 * We do not want some readahead with DMA to corrupt our memory, right?
+	 * Do it with disabled interrupts for best effect. That way, if some
+	 * driver scheduled DMA, we have good chance for DMA to finish ;-).
+	 */
+	pr_debug("PM: Waiting for DMAs to settle down.\n");
+	mdelay(1000);
+
 	pr_debug("PM: Restoring saved image.\n");
 	swsusp_restore();
-
+	local_irq_enable();
 	pr_debug("PM: Restore failed, recovering.n");
 	suspend_finish(PM_SUSPEND_DISK);
  Free:
@@ -480,27 +505,28 @@ power_attr(disk);
 
 static ssize_t state_show(struct subsystem * subsys, char * buf)
 {
-	struct pm_state * state;
+	int i;
 	char * s = buf;
 
-	for (state = &pm_states[0]; state->name; state++)
-		s += sprintf(s,"%s ",state->name);
+	for (i = 0; i < PM_SUSPEND_MAX; i++) {
+		if (pm_states[i].name)
+			s += sprintf(s,"%s ",pm_states[i].name);
+	}
 	s += sprintf(s,"\n");
 	return (s - buf);
 }
 
 static ssize_t state_store(struct subsystem * subsys, const char * buf, size_t n)
 {
-	u32 state;
+	u32 state = PM_SUSPEND_STANDBY;
 	struct pm_state * s;
 	int error;
 
-	for (state = 0; state < PM_SUSPEND_MAX; state++) {
-		s = &pm_states[state];
-		if (s->name && !strcmp(buf,s->name))
+	for (s = &pm_states[state]; s->name; s++, state++) {
+		if (!strcmp(buf,s->name))
 			break;
 	}
-	if (s)
+	if (s->name)
 		error = enter_state(state);
 	else
 		error = -EINVAL;

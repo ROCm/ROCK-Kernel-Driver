@@ -8,7 +8,7 @@
 #include <linux/kbd_kern.h>
 #include "power.h"
 
-static int new_loglevel = 7;
+static int new_loglevel = 10;
 static int orig_loglevel;
 static int orig_fgconsole, orig_kmsg;
 
