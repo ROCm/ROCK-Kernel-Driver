@@ -861,36 +861,29 @@ int bt3c_event(event_t event, int priority, event_callback_args_t *args)
 	return 0;
 }
 
+static struct pcmcia_driver bt3c_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "bt3c_cs",
+	},
+	.attach		= bt3c_attach,
+	.detach		= bt3c_detach,
+};
 
-
-/* ======================== Module initialization ======================== */
-
-
-int __init init_bt3c_cs(void)
+static int __init init_bt3c_cs(void)
 {
-	servinfo_t serv;
-	int err;
-
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE "bt3c_cs: Card Services release does not match!\n");
-		return -1;
-	}
-
-	err = register_pccard_driver(&dev_info, &bt3c_attach, &bt3c_detach);
-
-	return err;
+	return pcmcia_register_driver(&bt3c_driver);
 }
 
 
-void __exit exit_bt3c_cs(void)
+static void __exit exit_bt3c_cs(void)
 {
-	unregister_pccard_driver(&dev_info);
+	pcmcia_unregister_driver(&bt3c_driver);
 
+	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL)
 		bt3c_detach(dev_list);
 }
-
 
 module_init(init_bt3c_cs);
 module_exit(exit_bt3c_cs);
