@@ -41,10 +41,14 @@ extern int m68k_pgtable_cachemode;
  * processors >= '040. It is used in pte_mkcache(), and the variable is
  * defined and initialized in head.S */
 
-#if defined(CONFIG_060_WRITETHROUGH)
-extern int m68k_supervisor_cachemode;
-#else
+#if defined(CPU_M68060_ONLY) && defined(CONFIG_060_WRITETHROUGH)
+#define m68k_supervisor_cachemode _PAGE_CACHE040W
+#elif defined(CPU_M68040_OR_M68060_ONLY)
 #define m68k_supervisor_cachemode _PAGE_CACHE040
+#elif defined(CPU_M68020_OR_M68030_ONLY)
+#define m68k_supervisor_cachemode 0
+#else
+extern int m68k_supervisor_cachemode;
 #endif
 
 #if defined(CPU_M68040_OR_M68060_ONLY)
