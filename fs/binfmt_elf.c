@@ -88,7 +88,10 @@ static int set_brk(unsigned long start, unsigned long end)
 	start = ELF_PAGEALIGN(start);
 	end = ELF_PAGEALIGN(end);
 	if (end > start) {
-		unsigned long addr = do_brk(start, end - start);
+		unsigned long addr;
+		down_write(&current->mm->mmap_sem);
+		addr = do_brk(start, end - start);
+		up_write(&current->mm->mmap_sem);
 		if (BAD_ADDR(addr))
 			return addr;
 	}
@@ -409,7 +412,9 @@ static unsigned long load_elf_interp(struct elfhdr * interp_elf_ex,
 
 	/* Map the last of the bss segment */
 	if (last_bss > elf_bss) {
+		down_write(&current->mm->mmap_sem);
 		error = do_brk(elf_bss, last_bss - elf_bss);
+		up_write(&current->mm->mmap_sem);
 		if (BAD_ADDR(error))
 			goto out_close;
 	}
@@ -449,7 +454,9 @@ static unsigned long load_aout_interp(struct exec * interp_ex,
 		goto out;
 	}
 
+	down_write(&current->mm->mmap_sem);	
 	do_brk(0, text_data);
+	up_write(&current->mm->mmap_sem);
 	if (!interpreter->f_op || !interpreter->f_op->read)
 		goto out;
 	if (interpreter->f_op->read(interpreter, addr, text_data, &offset) < 0)
@@ -457,8 +464,11 @@ static unsigned long load_aout_interp(struct exec * interp_ex,
 	flush_icache_range((unsigned long)addr,
 	                   (unsigned long)addr + text_data);
 
+
+	down_write(&current->mm->mmap_sem);	
 	do_brk(ELF_PAGESTART(text_data + ELF_MIN_ALIGN - 1),
 		interp_ex->a_bss);
+	up_write(&current->mm->mmap_sem);
 	elf_entry = interp_ex->a_entry;
 
 out:

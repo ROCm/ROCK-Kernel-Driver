@@ -47,6 +47,10 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 	int nodeid, i, nb; 
 	int found = 0;
 	u32 reg;
+	unsigned numnodes;
+	nodemask_t nodes_parsed;
+
+	nodes_clear(nodes_parsed);
 
 	nb = find_northbridge(); 
 	if (nb < 0) 
@@ -55,10 +59,9 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 	printk(KERN_INFO "Scanning NUMA topology in Northbridge %d\n", nb); 
 
 	reg = read_pci_config(0, nb, 0, 0x60); 
-	for (i = 0; i <= ((reg >> 4) & 7); i++)
-		node_set_online(i);
+	numnodes = ((reg >> 4) & 7) + 1;
 
-	printk(KERN_INFO "Number of nodes %d (%x)\n", num_online_nodes(), reg);
+	printk(KERN_INFO "Number of nodes %d\n", numnodes);
 
 	memset(&nodes,0,sizeof(nodes)); 
 	prevbase = 0;
@@ -70,11 +73,11 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 
 		nodeid = limit & 7; 
 		if ((base & 3) == 0) { 
-			if (i < num_online_nodes())
+			if (i < numnodes)
 				printk("Skipping disabled node %d\n", i); 
 			continue;
 		} 
-		if (nodeid >= num_online_nodes()) {
+		if (nodeid >= numnodes) {
 			printk("Ignoring excess node %d (%lx:%lx)\n", nodeid,
 			       base, limit); 
 			continue;
@@ -90,7 +93,7 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 			       nodeid, (base>>8)&3, (limit>>8) & 3); 
 			return -1; 
 		}	
-		if (node_online(nodeid)) { 
+		if (node_isset(nodeid, nodes_parsed)) { 
 			printk(KERN_INFO "Node %d already present. Skipping\n", 
 			       nodeid);
 			continue;
@@ -138,12 +141,14 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 		nodes[nodeid].end = limit;
 
 		prevbase = base;
+
+		node_set(nodeid, nodes_parsed);
 	} 
 
 	if (!found)
 		return -1; 
 
-	memnode_shift = compute_hash_shift(nodes);
+	memnode_shift = compute_hash_shift(nodes, numnodes);
 	if (memnode_shift < 0) { 
 		printk(KERN_ERR "No NUMA node hash function found. Contact maintainer\n"); 
 		return -1; 
@@ -154,8 +159,8 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 		if (nodes[i].start != nodes[i].end) { 
 			/* assume 1:1 NODE:CPU */
 			cpu_to_node[i] = i; 
-		setup_node_bootmem(i, nodes[i].start, nodes[i].end); 
-	} 
+			setup_node_bootmem(i, nodes[i].start, nodes[i].end); 
+		} 
 	}
 
 	numa_init_array();
