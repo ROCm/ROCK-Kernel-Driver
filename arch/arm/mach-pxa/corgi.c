@@ -35,16 +35,14 @@
 #include <asm/arch/corgi.h>
 
 #include <asm/hardware/scoop.h>
+#include <video/w100fb.h>
 
 #include "generic.h"
 
-extern void corgi_ssp_lcdtg_send (u8 adrs, u8 data);
 
-static void __init corgi_init_irq(void)
-{
-	pxa_init_irq();
-}
-
+/*
+ * Corgi SCOOP Device
+ */
 static struct resource corgi_scoop_resources[] = {
 	[0] = {
 		.start		= 0x10800000,
@@ -68,19 +66,63 @@ static struct platform_device corgiscoop_device = {
 	.resource	= corgi_scoop_resources,
 };
 
+
+/*
+ * Corgi SSP Device
+ *
+ * Set the parent as the scoop device because a lot of SSP devices
+ * also use scoop functions and this makes the power up/down order
+ * work correctly.
+ */
+extern void corgi_ssp_lcdtg_send (u8 adrs, u8 data);
+
 static struct platform_device corgissp_device = {
 	.name		= "corgi-ssp",
+	.dev		= {
+ 		.parent = &corgiscoop_device.dev,
+	},
 	.id		= -1,
 };
+
+
+/*
+ * Corgi w100 Frame Buffer Device
+ */
+static struct w100fb_mach_info corgi_fb_info = {
+	.w100fb_ssp_send 	= corgi_ssp_lcdtg_send,
+	.comadj 			= -1,
+	.phadadj 			= -1,
+};
+
+static struct resource corgi_fb_resources[] = {
+	[0] = {
+		.start		= 0x08000000,
+		.end		= 0x08ffffff,
+		.flags		= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device corgifb_device = {
+	.name		= "w100fb",
+	.id		= -1,
+	.dev		= {
+ 		.platform_data	= &corgi_fb_info,
+ 		.parent = &corgissp_device.dev,
+	},
+	.num_resources	= ARRAY_SIZE(corgi_fb_resources),
+	.resource	= corgi_fb_resources,
+};
+
 
 static struct platform_device *devices[] __initdata = {
 	&corgiscoop_device,
 	&corgissp_device,
+	&corgifb_device,
 };
 
 static struct sharpsl_flash_param_info sharpsl_flash_param;
 
-void corgi_get_param(void)
+static void corgi_get_param(void)
 {
 	sharpsl_flash_param.comadj_keyword = readl(FLASH_MEM_BASE + FLASH_COMADJ_MAGIC_ADR);
 	sharpsl_flash_param.comadj = readl(FLASH_MEM_BASE + FLASH_COMADJ_DATA_ADR);
@@ -91,6 +133,16 @@ void corgi_get_param(void)
 
 static void __init corgi_init(void)
 {
+	if (sharpsl_flash_param.comadj_keyword == FLASH_COMADJ_MAJIC)
+		corgi_fb_info.comadj=sharpsl_flash_param.comadj;
+	else
+		corgi_fb_info.comadj=-1;
+
+	if (sharpsl_flash_param.phad_keyword == FLASH_PHAD_MAJIC)
+		corgi_fb_info.phadadj=sharpsl_flash_param.phadadj;
+	else
+		corgi_fb_info.phadadj=-1;
+
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 
@@ -105,6 +157,11 @@ static void __init fixup_corgi(struct machine_desc *desc,
 		mi->bank[0].size = (32*1024*1024);
 	else
 		mi->bank[0].size = (64*1024*1024);
+}
+
+static void __init corgi_init_irq(void)
+{
+	pxa_init_irq();
 }
 
 static struct map_desc corgi_io_desc[] __initdata = {
