@@ -1325,9 +1325,9 @@ config SCSI_QLOGIC_FC_FIRMWARE
 	bool "Include loadable firmware in driver"
 	depends on SCSI_QLOGIC_FC
   	help
-	  Say Y to include ISP2100 Fabric Initiator/Target Firmware, with
+	  Say Y to include ISP2X00 Fabric Initiator/Target Firmware, with
 	  expanded LUN addressing and FcTape (FCP-2) support, in the
-	  Qlogic QLA 1280 driver. This is required on some platforms.
+	  qlogicfc driver. This is required on some platforms.
 
 config SCSI_QLOGIC_1280
 	tristate "Qlogic QLA 1280 SCSI support"
