@@ -4,8 +4,7 @@
 #include <linux/config.h>
 
 /*
- * Tell the user there is some problem. Beep too, so we can
- * see^H^H^Hhear bugs in early bootup as well!
+ * Tell the user there is some problem.
  * The offending file and line are encoded after the "officially
  * undefined" opcode for parsing in the trap handler.
  */
