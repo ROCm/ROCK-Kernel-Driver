@@ -35,8 +35,7 @@ typedef struct sndrv_ctl_elem_value snd_ctl_elem_value_t;
 typedef enum sndrv_ctl_event_type snd_ctl_event_type_t;
 typedef struct sndrv_ctl_event snd_ctl_event_t;
 
-#define _snd_kcontrol_chip(kcontrol) ((kcontrol)->private_data)
-#define snd_kcontrol_chip(kcontrol) snd_magic_cast1(chip_t, _snd_kcontrol_chip(kcontrol), return -ENXIO)
+#define snd_kcontrol_chip(kcontrol) ((kcontrol)->private_data)
 
 typedef int (snd_kcontrol_info_t) (snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo);
 typedef int (snd_kcontrol_get_t) (snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);

@@ -61,6 +61,4 @@ void snd_wrapper_vfree(void *);
 #undef vfree
 #endif
 
-#include "sndmagic.h"
-
 #endif /* __SOUND_DRIVER_H */

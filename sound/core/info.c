@@ -139,7 +139,7 @@ static loff_t snd_info_entry_llseek(struct file *file, loff_t offset, int orig)
 	struct snd_info_entry *entry;
 	loff_t ret;
 
-	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
+	data = file->private_data;
 	entry = data->entry;
 	lock_kernel();
 	switch (entry->content) {
@@ -182,7 +182,7 @@ static ssize_t snd_info_entry_read(struct file *file, char __user *buffer,
 	snd_info_buffer_t *buf;
 	size_t size = 0;
 
-	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
+	data = file->private_data;
 	snd_assert(data != NULL, return -ENXIO);
 	entry = data->entry;
 	switch (entry->content) {
@@ -216,7 +216,7 @@ static ssize_t snd_info_entry_write(struct file *file, const char __user *buffer
 	snd_info_buffer_t *buf;
 	size_t size = 0;
 
-	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
+	data = file->private_data;
 	snd_assert(data != NULL, return -ENXIO);
 	entry = data->entry;
 	switch (entry->content) {
@@ -284,7 +284,7 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 		    	goto __error;
 		}
 	}
-	data = snd_magic_kcalloc(snd_info_private_data_t, 0, GFP_KERNEL);
+	data = kcalloc(1, sizeof(*data), GFP_KERNEL);
 	if (data == NULL) {
 		err = -ENOMEM;
 		goto __error;
@@ -295,7 +295,7 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 		if (mode == O_RDONLY || mode == O_RDWR) {
 			buffer = kcalloc(1, sizeof(*buffer), GFP_KERNEL);
 			if (buffer == NULL) {
-				snd_magic_kfree(data);
+				kfree(data);
 				err = -ENOMEM;
 				goto __error;
 			}
@@ -304,7 +304,7 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 			buffer->buffer = vmalloc(buffer->len);
 			if (buffer->buffer == NULL) {
 				kfree(buffer);
-				snd_magic_kfree(data);
+				kfree(data);
 				err = -ENOMEM;
 				goto __error;
 			}
@@ -318,7 +318,7 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 					vfree(data->rbuffer->buffer);
 					kfree(data->rbuffer);
 				}
-				snd_magic_kfree(data);
+				kfree(data);
 				err = -ENOMEM;
 				goto __error;
 			}
@@ -331,7 +331,7 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 					kfree(data->rbuffer);
 				}
 				kfree(buffer);
-				snd_magic_kfree(data);
+				kfree(data);
 				err = -ENOMEM;
 				goto __error;
 			}
@@ -343,7 +343,7 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 		if (entry->c.ops->open) {
 			if ((err = entry->c.ops->open(entry, mode,
 						      &data->file_private_data)) < 0) {
-				snd_magic_kfree(data);
+				kfree(data);
 				goto __error;
 			}
 		}
@@ -375,7 +375,7 @@ static int snd_info_entry_release(struct inode *inode, struct file *file)
 	int mode;
 
 	mode = file->f_flags & O_ACCMODE;
-	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
+	data = file->private_data;
 	entry = data->entry;
 	switch (entry->content) {
 	case SNDRV_INFO_CONTENT_TEXT:
@@ -403,7 +403,7 @@ static int snd_info_entry_release(struct inode *inode, struct file *file)
 		break;
 	}
 	module_put(entry->module);
-	snd_magic_kfree(data);
+	kfree(data);
 	return 0;
 }
 
@@ -413,7 +413,7 @@ static unsigned int snd_info_entry_poll(struct file *file, poll_table * wait)
 	struct snd_info_entry *entry;
 	unsigned int mask;
 
-	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
+	data = file->private_data;
 	if (data == NULL)
 		return 0;
 	entry = data->entry;
@@ -439,7 +439,7 @@ static int snd_info_entry_ioctl(struct inode *inode, struct file *file,
 	snd_info_private_data_t *data;
 	struct snd_info_entry *entry;
 
-	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
+	data = file->private_data;
 	if (data == NULL)
 		return 0;
 	entry = data->entry;
@@ -460,7 +460,7 @@ static int snd_info_entry_mmap(struct file *file, struct vm_area_struct *vma)
 	snd_info_private_data_t *data;
 	struct snd_info_entry *entry;
 
-	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
+	data = file->private_data;
 	if (data == NULL)
 		return 0;
 	entry = data->entry;
@@ -730,12 +730,12 @@ char *snd_info_get_str(char *dest, char *src, int len)
 static snd_info_entry_t *snd_info_create_entry(const char *name)
 {
 	snd_info_entry_t *entry;
-	entry = snd_magic_kcalloc(snd_info_entry_t, 0, GFP_KERNEL);
+	entry = kcalloc(1, sizeof(*entry), GFP_KERNEL);
 	if (entry == NULL)
 		return NULL;
 	entry->name = snd_kmalloc_strdup(name, GFP_KERNEL);
 	if (entry->name == NULL) {
-		snd_magic_kfree(entry);
+		kfree(entry);
 		return NULL;
 	}
 	entry->mode = S_IFREG | S_IRUGO;
@@ -791,27 +791,27 @@ snd_info_entry_t *snd_info_create_card_entry(snd_card_t * card,
 
 static int snd_info_dev_free_entry(snd_device_t *device)
 {
-	snd_info_entry_t *entry = snd_magic_cast(snd_info_entry_t, device->device_data, return -ENXIO);
+	snd_info_entry_t *entry = device->device_data;
 	snd_info_free_entry(entry);
 	return 0;
 }
 
 static int snd_info_dev_register_entry(snd_device_t *device)
 {
-	snd_info_entry_t *entry = snd_magic_cast(snd_info_entry_t, device->device_data, return -ENXIO);
+	snd_info_entry_t *entry = device->device_data;
 	return snd_info_register(entry);
 }
 
 static int snd_info_dev_disconnect_entry(snd_device_t *device)
 {
-	snd_info_entry_t *entry = snd_magic_cast(snd_info_entry_t, device->device_data, return -ENXIO);
+	snd_info_entry_t *entry = device->device_data;
 	entry->disconnected = 1;
 	return 0;
 }
 
 static int snd_info_dev_unregister_entry(snd_device_t *device)
 {
-	snd_info_entry_t *entry = snd_magic_cast(snd_info_entry_t, device->device_data, return -ENXIO);
+	snd_info_entry_t *entry = device->device_data;
 	return snd_info_unregister(entry);
 }
 
@@ -873,7 +873,7 @@ void snd_info_free_entry(snd_info_entry_t * entry)
 		kfree((char *)entry->name);
 	if (entry->private_free)
 		entry->private_free(entry);
-	snd_magic_kfree(entry);
+	kfree(entry);
 }
 
 /**

@@ -1527,7 +1527,7 @@ static int snd_pcm_link(snd_pcm_substream_t *substream, int fd)
 	file = snd_pcm_file_fd(fd);
 	if (!file)
 		return -EBADFD;
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream1 = pcm_file->substream;
 	write_lock_irq(&snd_pcm_link_rwlock);
 	if (substream->runtime->status->state != substream1->runtime->status->state) {
@@ -1947,7 +1947,7 @@ static int snd_pcm_release_file(snd_pcm_file_t * pcm_file)
 	substream->ffile = NULL;
 	snd_pcm_remove_file(str, pcm_file);
 	snd_pcm_release_substream(substream);
-	snd_magic_kfree(pcm_file);
+	kfree(pcm_file);
 	return 0;
 }
 
@@ -1964,13 +1964,13 @@ static int snd_pcm_open_file(struct file *file,
 	snd_assert(rpcm_file != NULL, return -EINVAL);
 	*rpcm_file = NULL;
 
-	pcm_file = snd_magic_kcalloc(snd_pcm_file_t, 0, GFP_KERNEL);
+	pcm_file = kcalloc(1, sizeof(*pcm_file), GFP_KERNEL);
 	if (pcm_file == NULL) {
 		return -ENOMEM;
 	}
 
 	if ((err = snd_pcm_open_substream(pcm, stream, &substream)) < 0) {
-		snd_magic_kfree(pcm_file);
+		kfree(pcm_file);
 		return err;
 	}
 
@@ -2074,7 +2074,7 @@ int snd_pcm_release(struct inode *inode, struct file *file)
 	snd_pcm_substream_t *substream;
 	snd_pcm_file_t *pcm_file;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
 	snd_assert(!atomic_read(&substream->runtime->mmap_count), );
@@ -2641,7 +2641,7 @@ static int snd_pcm_playback_ioctl(struct inode *inode, struct file *file,
 {
 	snd_pcm_file_t *pcm_file;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 
 	if (((cmd >> 8) & 0xff) != 'A')
 		return -ENOTTY;
@@ -2654,7 +2654,7 @@ static int snd_pcm_capture_ioctl(struct inode *inode, struct file *file,
 {
 	snd_pcm_file_t *pcm_file;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 
 	if (((cmd >> 8) & 0xff) != 'A')
 		return -ENOTTY;
@@ -2706,7 +2706,7 @@ static ssize_t snd_pcm_read(struct file *file, char __user *buf, size_t count, l
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t result;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
 	runtime = substream->runtime;
@@ -2728,7 +2728,7 @@ static ssize_t snd_pcm_write(struct file *file, const char __user *buf, size_t c
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t result;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, result = -ENXIO; goto end);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, result = -ENXIO; goto end);
 	runtime = substream->runtime;
@@ -2760,7 +2760,7 @@ static ssize_t snd_pcm_readv(struct file *file, const struct iovec *_vector,
 	void __user **bufs;
 	snd_pcm_uframes_t frames;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
 	runtime = substream->runtime;
@@ -2794,7 +2794,7 @@ static ssize_t snd_pcm_writev(struct file *file, const struct iovec *_vector,
 	void __user **bufs;
 	snd_pcm_uframes_t frames;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, result = -ENXIO; goto end);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, result = -ENXIO; goto end);
 	runtime = substream->runtime;
@@ -2829,7 +2829,7 @@ unsigned int snd_pcm_playback_poll(struct file *file, poll_table * wait)
         unsigned int mask;
 	snd_pcm_uframes_t avail;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return 0);
+	pcm_file = file->private_data;
 
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
@@ -2867,7 +2867,7 @@ unsigned int snd_pcm_capture_poll(struct file *file, poll_table * wait)
         unsigned int mask;
 	snd_pcm_uframes_t avail;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return 0);
+	pcm_file = file->private_data;
 
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
@@ -3092,7 +3092,7 @@ static int snd_pcm_mmap(struct file *file, struct vm_area_struct *area)
 	snd_pcm_substream_t *substream;	
 	unsigned long offset;
 	
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
 
@@ -3115,7 +3115,7 @@ static int snd_pcm_fasync(int fd, struct file * file, int on)
 	snd_pcm_runtime_t *runtime;
 	int err;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
 	runtime = substream->runtime;

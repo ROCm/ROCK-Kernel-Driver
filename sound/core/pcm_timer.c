@@ -25,8 +25,6 @@
 #include <sound/pcm.h>
 #include <sound/timer.h>
 
-#define chip_t snd_pcm_substream_t
-
 /*
  *  Timer functions
  */
@@ -79,7 +77,7 @@ static unsigned long snd_pcm_timer_resolution(snd_timer_t * timer)
 {
 	snd_pcm_substream_t * substream;
 	
-	substream = snd_magic_cast(snd_pcm_substream_t, timer->private_data, return -ENXIO);
+	substream = timer->private_data;
 	return substream->runtime ? substream->runtime->timer_resolution : 0;
 }
 
@@ -123,7 +121,7 @@ static struct _snd_timer_hardware snd_pcm_timer =
 
 static void snd_pcm_timer_free(snd_timer_t *timer)
 {
-	snd_pcm_substream_t *substream = snd_magic_cast(snd_pcm_substream_t, timer->private_data, return);
+	snd_pcm_substream_t *substream = timer->private_data;
 	substream->timer = NULL;
 }
 

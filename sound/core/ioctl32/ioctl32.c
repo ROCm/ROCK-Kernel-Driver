@@ -257,7 +257,7 @@ static int get_ctl_type(struct file *file, snd_ctl_elem_id_t *id)
 	snd_ctl_elem_info_t info;
 	int err;
 
-	ctl = snd_magic_cast(snd_ctl_file_t, file->private_data, return -ENXIO);
+	ctl = file->private_data;
 
 	down_read(&ctl->card->controls_rwsem);
 	kctl = snd_ctl_find_id(ctl->card, id);

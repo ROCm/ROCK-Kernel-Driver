@@ -151,46 +151,6 @@ void snd_hidden_kfree(const void *obj)
 	snd_wrapper_kfree(obj);
 }
 
-void *_snd_magic_kcalloc(unsigned long magic, size_t size, int flags)
-{
-	unsigned long *ptr;
-	ptr = _snd_kmalloc(size + sizeof(unsigned long), flags);
-	if (ptr) {
-		*ptr++ = magic;
-		memset(ptr, 0, size);
-	}
-	return ptr;
-}
-
-void *_snd_magic_kmalloc(unsigned long magic, size_t size, int flags)
-{
-	unsigned long *ptr;
-	ptr = _snd_kmalloc(size + sizeof(unsigned long), flags);
-	if (ptr)
-		*ptr++ = magic;
-	return ptr;
-}
-
-void snd_magic_kfree(void *_ptr)
-{
-	unsigned long *ptr = _ptr;
-	if (ptr == NULL) {
-		snd_printk(KERN_WARNING "null snd_magic_kfree (called from %p)\n", __builtin_return_address(0));
-		return;
-	}
-	*--ptr = 0;
-	{
-		struct snd_alloc_track *t;
-		t = snd_alloc_track_entry(ptr);
-		if (t->magic != KMALLOC_MAGIC) {
-			snd_printk(KERN_ERR "bad snd_magic_kfree (called from %p)\n", __builtin_return_address(0));
-			return;
-		}
-	}
-	snd_hidden_kfree(ptr);
-	return;
-}
-
 void *snd_hidden_vmalloc(unsigned long size)
 {
 	void *ptr;

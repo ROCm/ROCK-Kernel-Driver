@@ -62,7 +62,7 @@ static int snd_ctl_open(struct inode *inode, struct file *file)
 		err = -EFAULT;
 		goto __error2;
 	}
-	ctl = snd_magic_kcalloc(snd_ctl_file_t, 0, GFP_KERNEL);
+	ctl = kcalloc(1, sizeof(*ctl), GFP_KERNEL);
 	if (ctl == NULL) {
 		err = -ENOMEM;
 		goto __error;
@@ -108,7 +108,7 @@ static int snd_ctl_release(struct inode *inode, struct file *file)
 	snd_kcontrol_t *control;
 	unsigned int idx;
 
-	ctl = snd_magic_cast(snd_ctl_file_t, file->private_data, return -ENXIO);
+	ctl = file->private_data;
 	fasync_helper(-1, file, 0, &ctl->fasync);
 	file->private_data = NULL;
 	card = ctl->card;
@@ -124,7 +124,7 @@ static int snd_ctl_release(struct inode *inode, struct file *file)
 	}
 	up_write(&card->controls_rwsem);
 	snd_ctl_empty_read_queue(ctl);
-	snd_magic_kfree(ctl);
+	kfree(ctl);
 	module_put(card->module);
 	snd_card_file_remove(card, file);
 	return 0;
@@ -188,9 +188,7 @@ snd_kcontrol_t *snd_ctl_new(snd_kcontrol_t * control, unsigned int access)
 	
 	snd_runtime_check(control != NULL, return NULL);
 	snd_runtime_check(control->count > 0, return NULL);
-	kctl = (snd_kcontrol_t *)snd_magic_kcalloc(snd_kcontrol_t,
-						   sizeof(snd_kcontrol_volatile_t) * control->count,
-						   GFP_KERNEL);
+	kctl = kcalloc(1, sizeof(*kctl) + sizeof(snd_kcontrol_volatile_t) * control->count, GFP_KERNEL);
 	if (kctl == NULL)
 		return NULL;
 	*kctl = *control;
@@ -249,7 +247,7 @@ void snd_ctl_free_one(snd_kcontrol_t * kcontrol)
 	if (kcontrol) {
 		if (kcontrol->private_free)
 			kcontrol->private_free(kcontrol);
-		snd_magic_kfree(kcontrol);
+		kfree(kcontrol);
 	}
 }
 
@@ -1033,7 +1031,7 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 	int __user *ip = argp;
 	int err;
 
-	ctl = snd_magic_cast(snd_ctl_file_t, file->private_data, return -ENXIO);
+	ctl = file->private_data;
 	card = ctl->card;
 	snd_assert(card != NULL, return -ENXIO);
 	switch (cmd) {
@@ -1102,7 +1100,7 @@ static ssize_t snd_ctl_read(struct file *file, char __user *buffer, size_t count
 	int err = 0;
 	ssize_t result = 0;
 
-	ctl = snd_magic_cast(snd_ctl_file_t, file->private_data, return -ENXIO);
+	ctl = file->private_data;
 	snd_assert(ctl != NULL && ctl->card != NULL, return -ENXIO);
 	if (!ctl->subscribed)
 		return -EBADFD;
@@ -1154,7 +1152,7 @@ static unsigned int snd_ctl_poll(struct file *file, poll_table * wait)
 	unsigned int mask;
 	snd_ctl_file_t *ctl;
 
-	ctl = snd_magic_cast(snd_ctl_file_t, file->private_data, return 0);
+	ctl = file->private_data;
 	if (!ctl->subscribed)
 		return 0;
 	poll_wait(file, &ctl->change_sleep, wait);
@@ -1212,7 +1210,7 @@ static int snd_ctl_fasync(int fd, struct file * file, int on)
 {
 	snd_ctl_file_t *ctl;
 	int err;
-	ctl = snd_magic_cast(snd_ctl_file_t, file->private_data, return -ENXIO);
+	ctl = file->private_data;
 	err = fasync_helper(fd, file, on, &ctl->fasync);
 	if (err < 0)
 		return err;

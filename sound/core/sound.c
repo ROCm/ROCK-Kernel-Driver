@@ -443,9 +443,6 @@ EXPORT_SYMBOL(snd_hidden_kcalloc);
 EXPORT_SYMBOL(snd_hidden_kfree);
 EXPORT_SYMBOL(snd_hidden_vmalloc);
 EXPORT_SYMBOL(snd_hidden_vfree);
-EXPORT_SYMBOL(_snd_magic_kmalloc);
-EXPORT_SYMBOL(_snd_magic_kcalloc);
-EXPORT_SYMBOL(snd_magic_kfree);
 #endif
 EXPORT_SYMBOL(snd_kmalloc_strdup);
 EXPORT_SYMBOL(copy_to_user_fromio);

@@ -1060,7 +1060,7 @@ static char *oss_mixer_names[SNDRV_OSS_MAX_MIXERS] = {
 static void snd_mixer_oss_proc_read(snd_info_entry_t *entry,
 				    snd_info_buffer_t * buffer)
 {
-	snd_mixer_oss_t *mixer = snd_magic_cast(snd_mixer_oss_t, entry->private_data, return);
+	snd_mixer_oss_t *mixer = entry->private_data;
 	int i;
 
 	down(&mixer->reg_mutex);
@@ -1084,7 +1084,7 @@ static void snd_mixer_oss_proc_read(snd_info_entry_t *entry,
 static void snd_mixer_oss_proc_write(snd_info_entry_t *entry,
 				     snd_info_buffer_t * buffer)
 {
-	snd_mixer_oss_t *mixer = snd_magic_cast(snd_mixer_oss_t, entry->private_data, return);
+	snd_mixer_oss_t *mixer = entry->private_data;
 	char line[128], str[32], idxstr[16], *cptr;
 	int ch, idx;
 	struct snd_mixer_oss_assign_table *tbl;
@@ -1224,7 +1224,7 @@ static void snd_mixer_oss_build(snd_mixer_oss_t *mixer)
 
 static int snd_mixer_oss_free1(void *private)
 {
-	snd_mixer_oss_t *mixer = snd_magic_cast(snd_mixer_oss_t, private, return -ENXIO);
+	snd_mixer_oss_t *mixer = private;
 	snd_card_t * card;
 	int idx;
  
@@ -1237,7 +1237,7 @@ static int snd_mixer_oss_free1(void *private)
 		if (chn->private_free)
 			chn->private_free(chn);
 	}
-	snd_magic_kfree(mixer);
+	kfree(mixer);
 	return 0;
 }
 
@@ -1249,7 +1249,7 @@ static int snd_mixer_oss_notify_handler(snd_card_t * card, int cmd)
 		char name[128];
 		int idx, err;
 
-		mixer = snd_magic_kcalloc(snd_mixer_oss_t, sizeof(snd_mixer_oss_t), GFP_KERNEL);
+		mixer = kcalloc(2, sizeof(*mixer), GFP_KERNEL);
 		if (mixer == NULL)
 			return -ENOMEM;
 		init_MUTEX(&mixer->reg_mutex);
@@ -1259,7 +1259,7 @@ static int snd_mixer_oss_notify_handler(snd_card_t * card, int cmd)
 						   &snd_mixer_oss_reg,
 						   name)) < 0) {
 			snd_printk("unable to register OSS mixer device %i:%i\n", card->number, 0);
-			snd_magic_kfree(mixer);
+			kfree(mixer);
 			return err;
 		}
 		mixer->oss_dev_alloc = 1;

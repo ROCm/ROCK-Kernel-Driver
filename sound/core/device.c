@@ -47,7 +47,7 @@ int snd_device_new(snd_card_t *card, snd_device_type_t type,
 	snd_device_t *dev;
 
 	snd_assert(card != NULL && device_data != NULL && ops != NULL, return -ENXIO);
-	dev = (snd_device_t *) snd_magic_kcalloc(snd_device_t, 0, GFP_KERNEL);
+	dev = kcalloc(1, sizeof(*dev), GFP_KERNEL);
 	if (dev == NULL)
 		return -ENOMEM;
 	dev->card = card;
@@ -94,7 +94,7 @@ int snd_device_free(snd_card_t *card, void *device_data)
 					snd_printk(KERN_ERR "device free failure\n");
 			}
 		}
-		snd_magic_kfree(dev);
+		kfree(dev);
 		return 0;
 	}
 	snd_printd("device free %p (from %p), not found\n", device_data, __builtin_return_address(0));

@@ -1698,7 +1698,7 @@ static int snd_pcm_oss_release_file(snd_pcm_oss_file_t *pcm_oss_file)
 		snd_pcm_oss_release_substream(substream);
 		snd_pcm_release_substream(substream);
 	}
-	snd_magic_kfree(pcm_oss_file);
+	kfree(pcm_oss_file);
 	return 0;
 }
 
@@ -1717,7 +1717,7 @@ static int snd_pcm_oss_open_file(struct file *file,
 	snd_assert(rpcm_oss_file != NULL, return -EINVAL);
 	*rpcm_oss_file = NULL;
 
-	pcm_oss_file = snd_magic_kcalloc(snd_pcm_oss_file_t, 0, GFP_KERNEL);
+	pcm_oss_file = kcalloc(1, sizeof(*pcm_oss_file), GFP_KERNEL);
 	if (pcm_oss_file == NULL)
 		return -ENOMEM;
 
@@ -1897,7 +1897,7 @@ static int snd_pcm_oss_release(struct inode *inode, struct file *file)
 	snd_pcm_substream_t *substream;
 	snd_pcm_oss_file_t *pcm_oss_file;
 
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	pcm_oss_file = file->private_data;
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
 	if (substream == NULL)
 		substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
@@ -1920,7 +1920,7 @@ static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 	int __user *p = (int __user *)arg;
 	int res;
 
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	pcm_oss_file = file->private_data;
 	if (cmd == OSS_GETVERSION)
 		return put_user(SNDRV_OSS_VERSION, p);
 	if (cmd == OSS_ALSAEMULVER)
@@ -2078,7 +2078,7 @@ static ssize_t snd_pcm_oss_read(struct file *file, char __user *buf, size_t coun
 	snd_pcm_oss_file_t *pcm_oss_file;
 	snd_pcm_substream_t *substream;
 
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	pcm_oss_file = file->private_data;
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
 	if (substream == NULL)
 		return -ENXIO;
@@ -2099,7 +2099,7 @@ static ssize_t snd_pcm_oss_write(struct file *file, const char __user *buf, size
 	snd_pcm_substream_t *substream;
 	long result;
 
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	pcm_oss_file = file->private_data;
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
 	if (substream == NULL)
 		return -ENXIO;
@@ -2136,7 +2136,7 @@ static unsigned int snd_pcm_oss_poll(struct file *file, poll_table * wait)
 	unsigned int mask;
 	snd_pcm_substream_t *psubstream = NULL, *csubstream = NULL;
 	
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return 0);
+	pcm_oss_file = file->private_data;
 
 	psubstream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
 	csubstream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
@@ -2183,7 +2183,7 @@ static int snd_pcm_oss_mmap(struct file *file, struct vm_area_struct *area)
 #ifdef OSS_DEBUG
 	printk("pcm_oss: mmap begin\n");
 #endif
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	pcm_oss_file = file->private_data;
 	switch ((area->vm_flags & (VM_READ | VM_WRITE))) {
 	case VM_READ | VM_WRITE:
 		substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
