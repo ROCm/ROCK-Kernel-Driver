@@ -1044,6 +1044,9 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	int ret;
 	int manual = 0;
 
+	if (dev->state == USB_STATE_SUSPENDED)
+		return -EHOSTUNREACH;
+
 	iface = usb_ifnum_to_if(dev, interface);
 	if (!iface) {
 		dev_dbg(&dev->dev, "selecting invalid interface %d\n",
@@ -1140,6 +1143,9 @@ int usb_reset_configuration(struct usb_device *dev)
 {
 	int			i, retval;
 	struct usb_host_config	*config;
+
+	if (dev->state == USB_STATE_SUSPENDED)
+		return -EHOSTUNREACH;
 
 	/* caller must own dev->serialize (config won't change)
 	 * and the usb bus readlock (so driver bindings are stable);
@@ -1252,6 +1258,9 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	 */
 	if (cp && configuration == 0)
 		dev_warn(&dev->dev, "config 0 descriptor??\n");
+
+	if (dev->state == USB_STATE_SUSPENDED)
+		return -EHOSTUNREACH;
 
 	/* Allocate memory for new interfaces before doing anything else,
 	 * so that if we run out then nothing will have changed. */
