@@ -66,8 +66,8 @@ acpi_system_write_sleep (
 	if (state < 1 || state > 4)
 		goto Done;
 
-	if (!sleep_states[state])
-		return_VALUE(-ENODEV);
+	if (!sleep_states[state]) 
+		goto Done;
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
 	if (state == 4) {
@@ -375,7 +375,7 @@ static struct file_operations acpi_system_alarm_fops = {
 };
 
 
-int acpi_sleep_proc_init(void)
+static int acpi_sleep_proc_init(void)
 {
 	struct proc_dir_entry	*entry = NULL;
 
@@ -392,3 +392,5 @@ int acpi_sleep_proc_init(void)
 		entry->proc_fops = &acpi_system_alarm_fops;
 	return 0;
 }
+
+late_initcall(acpi_sleep_proc_init);

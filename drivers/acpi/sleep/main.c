@@ -270,8 +270,6 @@ static int __init acpi_sleep_init(void)
 	}
 	printk(")\n");
 
-	acpi_sleep_proc_init();
-
 	return_VALUE(0);
 }
 
