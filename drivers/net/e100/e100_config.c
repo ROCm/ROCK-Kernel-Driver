@@ -494,8 +494,7 @@ e100_config_long_rx(struct e100_private *bdp, unsigned char enable)
  * e100_config_wol
  * @bdp: atapter's private data struct
  *
- * This sets configuration options for Wake On LAN functionality (WOL) in the
- * config record. WOL options are retrieved from wolinfo_wolopts in @bdp
+ * This sets configuration options for PHY and Magic Packet WoL 
  */
 void
 e100_config_wol(struct e100_private *bdp)
@@ -504,14 +503,21 @@ e100_config_wol(struct e100_private *bdp)
 
 	if (bdp->wolopts & WAKE_PHY) {
 		bdp->config[9] |= CB_LINK_STATUS_WOL;
-		E100_CONFIG(bdp, 9);
+	}
+	else {
+		/* Disable PHY WoL */
+		bdp->config[9] &= ~CB_LINK_STATUS_WOL;
 	}
 
-	if (!(bdp->wolopts & WAKE_MAGIC)) {
+	if (bdp->wolopts & WAKE_MAGIC) {
+		bdp->config[19] &= ~CB_DISABLE_MAGPAK_WAKE;
+	}
+	else {
+		/* Disable Magic Packet WoL */
 		bdp->config[19] |= CB_DISABLE_MAGPAK_WAKE;
-		E100_CONFIG(bdp, 19);
 	}
 
+	E100_CONFIG(bdp, 19);
 	spin_unlock_bh(&(bdp->config_lock));
 }
 

@@ -268,6 +268,7 @@ struct driver_stats {
 #define SCB_CUC_NOOP            0
 #define SCB_CUC_START           BIT_4	/* CU Start */
 #define SCB_CUC_RESUME          BIT_5	/* CU Resume */
+#define SCB_CUC_UNKNOWN         BIT_7	/* CU unknown command */
 /* Changed for 82558 enhancements */
 #define SCB_CUC_STATIC_RESUME   (BIT_5 | BIT_7)	/* 82558/9 Static Resume */
 #define SCB_CUC_DUMP_ADDR       BIT_6	/* CU Dump Counters Address */
@@ -953,6 +954,10 @@ struct e100_private {
 	u32 pci_state[16];
 #endif
 	char ifname[IFNAMSIZ];
+#ifdef E100_CU_DEBUG	
+	u8 last_cmd;
+	u8 last_sub_cmd;
+#endif	
 };
 
 #define E100_AUTONEG        0
@@ -964,7 +969,7 @@ struct e100_private {
 /********* function prototypes *************/
 extern void e100_isolate_driver(struct e100_private *bdp);
 extern void e100_sw_reset(struct e100_private *bdp, u32 reset_cmd);
-extern void e100_start_cu(struct e100_private *bdp, tcb_t *tcb);
+extern u8 e100_start_cu(struct e100_private *bdp, tcb_t *tcb);
 extern void e100_free_non_tx_cmd(struct e100_private *bdp,
 				 nxmit_cb_entry_t *non_tx_cmd);
 extern nxmit_cb_entry_t *e100_alloc_non_tx_cmd(struct e100_private *bdp);
@@ -976,8 +981,10 @@ extern unsigned char e100_get_link_state(struct e100_private *bdp);
 extern unsigned char e100_wait_scb(struct e100_private *bdp);
 
 extern void e100_deisolate_driver(struct e100_private *bdp, u8 full_reset);
-extern unsigned char e100_hw_reset_recover(struct e100_private *bdp,
-					   u32 reset_cmd);
+extern unsigned char e100_configure_device(struct e100_private *bdp);
+#ifdef E100_CU_DEBUG
+extern unsigned char e100_cu_unknown_state(struct e100_private *bdp);
+#endif
 
 #define ROM_TEST_FAIL		0x01
 #define REGISTER_TEST_FAIL	0x02

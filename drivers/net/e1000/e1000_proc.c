@@ -109,7 +109,7 @@ e1000_proc_info_read(char *page, char **start, off_t off,
 		if(!strlen(elem->tag))
 			p += sprintf(p, "\n");
 		else
-			p += sprintf(p, "%-*.*s %.*s\n", 
+			p += sprintf(p, "%-*.*s %.*s\n",
 				TAG_MAX_LENGTH, TAG_MAX_LENGTH,
 				elem->tag, FIELD_MAX_LENGTH,
 				elem->func(elem->data, elem->len, buf));
@@ -126,7 +126,7 @@ e1000_proc_single_read(char *page, char **start, off_t off,
 {
 	struct proc_list *elem = data;
 
-	sprintf(page, "%.*s", FIELD_MAX_LENGTH, elem->func(elem->data, 
+	sprintf(page, "%.*s", FIELD_MAX_LENGTH, elem->func(elem->data,
 	        elem->len, page));
 
 	return e1000_proc_read(page, start, off, count, eof);
@@ -216,7 +216,7 @@ e1000_proc_singles_create(struct proc_dir_entry *parent,
 }
 
 static void
-e1000_proc_dirs_create(void *data, char *name, 
+e1000_proc_dirs_create(void *data, char *name,
                        struct list_head *proc_list_head)
 {
 	struct proc_dir_entry *intel_proc_dir, *proc_dir, *info_entry;
@@ -257,7 +257,7 @@ e1000_proc_dirs_create(void *data, char *name,
 
 static void
 e1000_proc_list_add(struct list_head *proc_list_head, char *tag,
-                    void *data, size_t len, 
+                    void *data, size_t len,
 		    char *(*func)(void *, size_t, char *))
 {
 	struct proc_list *new = (struct proc_list *)
@@ -509,8 +509,8 @@ e1000_proc_mdi_x_enabled(void *data, size_t len, char *buf)
 {
 	struct e1000_adapter *adapter = data;
 	e1000_auto_x_mode mdix_mode = adapter->phy_info.mdix_mode;
-	sprintf(buf, 
-		mdix_mode == e1000_auto_x_mode_manual_mdi  ? "MDI"   : 
+	sprintf(buf,
+		mdix_mode == e1000_auto_x_mode_manual_mdi  ? "MDI"   :
 		mdix_mode == e1000_auto_x_mode_manual_mdix ? "MDI-X" :
 		"Unknown");
 	return buf;
@@ -531,7 +531,7 @@ e1000_proc_rx_status(void *data, size_t len, char *buf)
  * e1000_proc_list_setup - build link list of proc praramters
  * @adapter: board private structure
  *
- * Order matters - ethx.info entries are ordered in the order links 
+ * Order matters - ethx.info entries are ordered in the order links
  * are added to list.
  */
 
@@ -610,7 +610,7 @@ e1000_proc_list_setup(struct e1000_adapter *adapter)
 	LIST_ADD_U("Tx_Aborted_Errors", &adapter->net_stats.tx_aborted_errors);
 	LIST_ADD_U("Tx_Carrier_Errors", &adapter->net_stats.tx_carrier_errors);
 	LIST_ADD_U("Tx_FIFO_Errors", &adapter->net_stats.tx_fifo_errors);
-	LIST_ADD_U("Tx_Heartbeat_Errors", 
+	LIST_ADD_U("Tx_Heartbeat_Errors",
 	           &adapter->net_stats.tx_heartbeat_errors);
 	LIST_ADD_U("Tx_Window_Errors", &adapter->net_stats.tx_window_errors);
 
@@ -649,17 +649,17 @@ e1000_proc_list_setup(struct e1000_adapter *adapter)
 		           adapter, e1000_proc_cable_polarity);
 		LIST_ADD_F("PHY_Disable_Polarity_Correction",
 		           adapter, e1000_proc_polarity_correction);
-		LIST_ADD_U("PHY_Idle_Errors", 
+		LIST_ADD_U("PHY_Idle_Errors",
 		           &adapter->phy_stats.idle_errors);
 		LIST_ADD_U("PHY_Receive_Errors",
 		           &adapter->phy_stats.receive_errors);
 		LIST_ADD_F("PHY_MDI_X_Enabled",
 		           adapter, e1000_proc_mdi_x_enabled);
 		LIST_ADD_F("PHY_Local_Receiver_Status",
-		           &adapter->phy_info.local_rx, 
+		           &adapter->phy_info.local_rx,
 			   e1000_proc_rx_status);
 		LIST_ADD_F("PHY_Remote_Receiver_Status",
-		           &adapter->phy_info.remote_rx, 
+		           &adapter->phy_info.remote_rx,
 			   e1000_proc_rx_status);
 	}
 
@@ -675,7 +675,7 @@ e1000_proc_dev_setup(struct e1000_adapter *adapter)
 {
 	e1000_proc_list_setup(adapter);
 
-	e1000_proc_dirs_create(adapter, 
+	e1000_proc_dirs_create(adapter,
 	                       adapter->ifname,
 	                       &adapter->proc_list_head);
 }
