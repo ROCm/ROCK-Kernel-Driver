@@ -16,6 +16,7 @@
 #include "asm/current.h"
 #include "kern_util.h"
 #include "user_util.h"
+#include "time_user.h"
 
 u64 jiffies_64;
 

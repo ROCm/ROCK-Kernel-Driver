@@ -34,6 +34,7 @@
 #include "frame_user.h"
 #include "syscall_user.h"
 #include "ptrace_user.h"
+#include "time_user.h"
 #include "task.h"
 #include "os.h"
 
@@ -517,7 +518,14 @@ void alarm_handler(int sig, struct sigcontext sc)
 	user = user_context(SC_SP(&sc));
 	if(!user && !kern_timer_on) return;
 	if(!user && jail_timer_off) return;
+
+	if(sig == SIGALRM)
+		switch_timers(0);
+
 	sig_handler_common(sig, &sc);
+
+	if(sig == SIGALRM)
+		switch_timers(1);
 }
 
 void do_longjmp(void *p)
