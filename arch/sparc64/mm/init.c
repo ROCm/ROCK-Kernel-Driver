@@ -45,6 +45,7 @@ unsigned long *sparc64_valid_addr_bitmap;
 
 /* Ugly, but necessary... -DaveM */
 unsigned long phys_base;
+unsigned long pfn_base;
 
 enum ultra_tlb_layout tlb_type = spitfire;
 
@@ -1335,7 +1336,7 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	}
 #endif	
 	/* Initialize the boot-time allocator. */
-	bootmap_size = init_bootmem_node(NODE_DATA(0), bootmap_pfn, phys_base>>PAGE_SHIFT, end_pfn);
+	bootmap_size = init_bootmem_node(NODE_DATA(0), bootmap_pfn, pfn_base, end_pfn);
 
 	/* Now register the available physical memory with the
 	 * allocator.
@@ -1523,7 +1524,7 @@ void __init paging_init(void)
 		for (znum = 0; znum < MAX_NR_ZONES; znum++)
 			zones_size[znum] = zholes_size[znum] = 0;
 
-		npages = end_pfn - (phys_base >> PAGE_SHIFT);
+		npages = end_pfn - pfn_base;
 		zones_size[ZONE_DMA] = npages;
 		zholes_size[ZONE_DMA] = npages - pages_avail;
 
@@ -1694,7 +1695,7 @@ void __init mem_init(void)
 
 	taint_real_pages();
 
-	max_mapnr = last_valid_pfn - (phys_base >> PAGE_SHIFT);
+	max_mapnr = last_valid_pfn - pfn_base;
 	high_memory = __va(last_valid_pfn << PAGE_SHIFT);
 
 	num_physpages = free_all_bootmem() - 1;

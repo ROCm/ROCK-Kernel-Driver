@@ -113,8 +113,13 @@ typedef unsigned long iopgprot_t;
 
 #define __pa(x)			((unsigned long)(x) - PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long) (x) + PAGE_OFFSET))
-#define virt_to_page(kaddr)	(mem_map + ((__pa(kaddr)-phys_base) >> PAGE_SHIFT))
-#define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
+
+#define pfn_to_page(pfn)	(mem_map + ((pfn)-(pfn_base)))
+#define page_to_pfn(page)	((unsigned long)((page) - ((pfn)-(pfn_base)) - mem_map))
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr)>>PAGE_SHIFT)
+
+#define pfn_valid(pfn)		((pfn) < max_mapnr)
+#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
 #define virt_to_phys __pa
 #define phys_to_virt __va

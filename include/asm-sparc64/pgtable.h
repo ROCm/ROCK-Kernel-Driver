@@ -190,6 +190,7 @@
 #ifndef __ASSEMBLY__
 
 extern unsigned long phys_base;
+extern unsigned long pfn_base;
 
 extern struct page *mem_map_zero;
 #define ZERO_PAGE(vaddr)	(mem_map_zero)
@@ -246,7 +247,8 @@ extern inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 /* Permanent address of a page. */
 #define __page_address(page)	page_address(page)
 
-#define pte_page(x) (mem_map+(((pte_val(x)&_PAGE_PADDR)-phys_base)>>PAGE_SHIFT))
+#define pte_pfn(x)		(pte_val(x) & _PAGE_PADDR)
+#define pte_page(x)		pfn_to_page(pte_pfn(x))
 
 /* Be very careful when you change these three, they are delicate. */
 #define pte_mkyoung(pte)	(__pte(pte_val(pte) | _PAGE_ACCESSED | _PAGE_R))
