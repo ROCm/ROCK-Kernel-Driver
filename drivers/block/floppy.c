@@ -249,6 +249,7 @@ static int irqdma_allocated;
 
 static struct request *current_req;
 static struct request_queue *floppy_queue;
+static void do_fd_request(request_queue_t * q);
 
 #ifndef fd_get_dma_residue
 #define fd_get_dma_residue() get_dma_residue(FLOPPY_DMA)
@@ -631,7 +632,8 @@ static const char *timeout_message;
 static void is_alive(const char *message)
 {
 	/* this routine checks whether the floppy driver is "alive" */
-	if (fdc_busy && command_status < 2 && !timer_pending(&fd_timeout)){
+	if (test_bit(0, &fdc_busy) && command_status < 2
+	    && !timer_pending(&fd_timeout)) {
 		DPRINT("timeout handler died: %s\n",message);
 	}
 }
@@ -661,7 +663,7 @@ static int output_log_pos;
 #define current_reqD -1
 #define MAXTIMEOUT -2
 
-static void reschedule_timeout(int drive, const char *message, int marg)
+static void __reschedule_timeout(int drive, const char *message, int marg)
 {
 	if (drive == current_reqD)
 		drive = current_drive;
@@ -678,6 +680,15 @@ static void reschedule_timeout(int drive, const char *message, int marg)
 		printk("\n");
 	}
 	timeout_message = message;
+}
+
+static void reschedule_timeout(int drive, const char *message, int marg)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&floppy_lock, flags);
+	__reschedule_timeout(drive, message, marg);
+	spin_unlock_irqrestore(&floppy_lock, flags);
 }
 
 static int maximum(int a, int b)
@@ -908,7 +919,7 @@ static int _lock_fdc(int drive, int interruptible, int line)
 	}
 	command_status = FD_COMMAND_NONE;
 
-	reschedule_timeout(drive, "lock fdc", 0);
+	__reschedule_timeout(drive, "lock fdc", 0);
 	set_fdc(drive);
 	return 0;
 }
@@ -922,17 +933,23 @@ if (lock_fdc(drive,interruptible)) return -EINTR;
 /* unlocks the driver */
 static inline void unlock_fdc(void)
 {
+	unsigned long flags;
+
 	raw_cmd = 0;
-	if (!fdc_busy)
+	if (!test_bit(0, &fdc_busy))
 		DPRINT("FDC access conflict!\n");
 
 	if (do_floppy)
 		DPRINT("device interrupt still active at FDC release: %p!\n",
 			do_floppy);
 	command_status = FD_COMMAND_NONE;
+	spin_lock_irqsave(&floppy_lock, flags);
 	del_timer(&fd_timeout);
 	cont = NULL;
 	clear_bit(0, &fdc_busy);
+	if (elv_next_request(floppy_queue))
+		do_fd_request(floppy_queue);
+	spin_unlock_irqrestore(&floppy_lock, flags);
 	floppy_release_irq_and_dma();
 	wake_up(&fdc_wait);
 }
@@ -1010,9 +1027,13 @@ static struct timer_list fd_timer = TIMER_INITIALIZER(NULL, 0, 0);
 
 static void cancel_activity(void)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&floppy_lock, flags);
 	do_floppy = NULL;
 	PREPARE_WORK(&floppy_work, (void*)(void*)empty, NULL);
 	del_timer(&fd_timer);
+	spin_unlock_irqrestore(&floppy_lock, flags);
 }
 
 /* this function makes sure that the disk stays in the drive during the
@@ -2995,7 +3016,7 @@ static void do_fd_request(request_queue_t * q)
 		printk("sect=%ld flags=%lx\n", (long)current_req->sector, current_req->flags);
 		return;
 	}
-	if (fdc_busy){
+	if (test_bit(0, &fdc_busy)) {
 		/* fdc busy, this new request will be treated when the
 		   current one is done */
 		is_alive("do fd request, old request running");
@@ -4245,6 +4266,7 @@ int __init floppy_init(void)
 	}
 
 	floppy_queue = blk_init_queue(do_fd_request, &floppy_lock);
+	blk_queue_max_sectors(floppy_queue, 64);
 	if (!floppy_queue) {
 		err = -ENOMEM;
 		goto fail_queue;
