@@ -44,7 +44,7 @@ if [ "$CONFIG_ISDN_DRV_HISAX" != "n" ]; then
    if [ "$CONFIG_EXPERIMENTAL" != "n" ]; then
 #      bool '  TESTEMULATOR (EXPERIMENTAL)' CONFIG_HISAX_TESTEMU
       bool '  Formula-n enter:now PCI card' CONFIG_HISAX_ENTERNOW_PCI
-      if [ "$ARCH" = "sparc" -o "$ARCH" = "sparc64" ]; then
+      if [ "$CONFIG_SPARC32" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
 	 bool '  Am7930' CONFIG_HISAX_AMD7930
       fi
    fi
