@@ -129,6 +129,7 @@ static int uml_net_open(struct net_device *dev)
 	list_add(&lp->list, &opened);
 	spin_unlock(&opened_lock);
 	MOD_INC_USE_COUNT;
+	while((err = uml_net_rx(dev)) > 0) ; /* clear buffer */
  out:
 	spin_unlock(&lp->lock);
 	return(err);
