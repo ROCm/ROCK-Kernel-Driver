@@ -3340,6 +3340,7 @@ static int create_i2o_procfs(void)
 	i2o_proc_dir_root = proc_mkdir("i2o", 0);
 	if(!i2o_proc_dir_root)
 		return -1;
+	i2o_proc_dir_root->owner = THIS_MODULE;
 
 	for(i = 0; i < MAX_I2O_CONTROLLERS; i++)
 	{
