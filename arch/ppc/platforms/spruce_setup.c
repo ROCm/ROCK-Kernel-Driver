@@ -46,7 +46,6 @@
 #include <linux/ide.h>
 #include <linux/root_dev.h>
 
-#include <asm/keyboard.h>
 #include <asm/system.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
@@ -199,49 +198,6 @@ spruce_map_io(void)
 {
 	io_block_mapping(SPRUCE_PCI_IO_BASE, SPRUCE_PCI_PHY_IO_BASE,
 			 0x08000000, _PAGE_IO);
-}
-
-unsigned char spruce_read_keyb_status(void)
-{
-	unsigned long kbd_status;
-
-	__raw_writel(0x00000088, 0xff500008);
-	eieio();
-
-	__raw_writel(0x03000000, 0xff50000c);
-	eieio();
-
-	asm volatile("	lis	7,0xff88	\n
-			ori	7,7,0x8		\n
-			lswi	6,7,0x8		\n
-			mr	%0,6		\n"
-			: "=r" (kbd_status) :: "6", "7");
-
-	__raw_writel(0x00000000, 0xff50000c);
-	eieio();
-
-	return (unsigned char)(kbd_status >> 24);
-}
-
-unsigned char spruce_read_keyb_data(void)
-{
-	unsigned long kbd_data;
-
-	__raw_writel(0x00000088, 0xff500008);
-	eieio();
-
-	__raw_writel(0x03000000, 0xff50000c);
-	eieio();
-
-	asm volatile("	lis	7,0xff88	\n
-			lswi	6,7,0x8		\n
-			mr	%0,6		\n"
-			: "=r" (kbd_data) :: "6", "7");
-
-	__raw_writel(0x00000000, 0xff50000c);
-	eieio();
-
-	return (unsigned char)(kbd_data >> 24);
 }
 
 void __init

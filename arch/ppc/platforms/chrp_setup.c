@@ -50,7 +50,6 @@
 #include <asm/machdep.h>
 #include <asm/irq.h>
 #include <asm/hydra.h>
-#include <asm/keyboard.h>
 #include <asm/sections.h>
 #include <asm/time.h>
 #include <asm/btext.h>

@@ -58,16 +58,5 @@
 #define SPRUCE_NVRAM_BASE_ADDR	0xff800000
 #define SPRUCE_RTC_BASE_ADDR	SPRUCE_NVRAM_BASE_ADDR
 
-#define KEYBOARD_IRQ    22
-#define AUX_IRQ 	21
-
-unsigned char spruce_read_keyb_data(void);
-unsigned char spruce_read_keyb_status(void);
-
-#define kbd_read_input  spruce_read_keyb_data
-#define kbd_read_status spruce_read_keyb_status
-#define kbd_write_output(val) *((unsigned char *)0xff810000) = (char)val
-#define kbd_write_command(val) *((unsigned char *)0xff810001) = (char)val
-
 #endif /* __ASM_SPRUCE_H__ */
 #endif /* __KERNEL__ */

@@ -83,7 +83,6 @@
 #include <asm/machdep.h>
 #include <asm/prom.h>
 #include <asm/smp.h>
-#include <asm/keyboard.h>
 #include <asm/vga.h>
 #include <asm/open_pic.h>
 #include <asm/i8259.h>

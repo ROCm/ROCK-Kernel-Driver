@@ -25,10 +25,6 @@
 #include <linux/ioport.h>
 #include <linux/kd.h>
 #include <asm/io.h>
-/* IBM Spruce platform is different. */
-#ifdef CONFIG_SPRUCE
-#include <platforms/spruce.h>
-#endif
 
 #ifndef KEYBOARD_IRQ
 #define KEYBOARD_IRQ			1
