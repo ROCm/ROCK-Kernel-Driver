@@ -419,8 +419,6 @@ static int               FIFO_Size = 0x2000; /* 8k FIFO for
 
 static irqreturn_t       do_fdomain_16x0_intr( int irq, void *dev_id,
 					    struct pt_regs * regs );
-static int		 fdomain_16x0_bus_reset(struct scsi_cmnd *SCpnt);
-
 /* Allow insmod parameters to be like LILO parameters.  For example:
    insmod fdomain fdomain=0x140,11 */
 static char * fdomain = NULL;
@@ -1542,7 +1540,7 @@ static int fdomain_16x0_abort(struct scsi_cmnd *SCpnt)
    return SUCCESS;
 }
 
-static int fdomain_16x0_bus_reset(struct scsi_cmnd *SCpnt)
+int fdomain_16x0_bus_reset(struct scsi_cmnd *SCpnt)
 {
    outb( 1, SCSI_Cntl_port );
    do_pause( 2 );
