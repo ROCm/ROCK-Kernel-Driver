@@ -72,9 +72,7 @@ endif
 
 vmlinux: arch/sh/vmlinux.lds.s
 
-CPPFLAGS_arch/sh/vmlinux.lds.s := -traditional
-
-FORCE: ;
+AFLAGS_vmlinux.lds.o := -traditional
 
 zImage: vmlinux
 	@$(MAKEBOOT) zImage
