@@ -222,7 +222,7 @@ static void hci_cc_host_ctl(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb
 		vs = (struct hci_rp_read_voice_setting *) skb->data;
 
 		if (vs->status) {
-			BT_DBG("%s READ_VOICE_SETTING failed %d", hdev->name, vc->status);
+			BT_DBG("%s READ_VOICE_SETTING failed %d", hdev->name, vs->status);
 			break;
 		}
 
@@ -359,7 +359,7 @@ static inline void hci_cs_create_conn(struct hci_dev *hdev, __u8 status)
 	conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, &cp->bdaddr);
 
 	BT_DBG("%s status 0x%x bdaddr %s conn %p", hdev->name,
-			status, batostr(&cc->bdaddr), conn);
+			status, batostr(&cp->bdaddr), conn);
 
 	if (status) {
 		if (conn) {

@@ -55,7 +55,7 @@
 
 #include "hci_usb.h"
 
-#ifndef HCI_USB_DEBUG
+#ifndef CONFIG_BT_HCIUSB_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #undef  BT_DMP
@@ -795,7 +795,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	struct hci_dev *hdev;
 	int i, a, e, size, ifn, isoc_ifnum, isoc_alts;
 
-	BT_DBG("udev %p ifnum %d", udev, ifnum);
+	BT_DBG("udev %p intf %p", udev, intf);
 
 	if (!id->driver_info) {
 		const struct usb_device_id *match;
