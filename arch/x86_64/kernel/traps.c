@@ -582,7 +582,7 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 
 asmlinkage void default_do_nmi(struct pt_regs *regs)
 {
-	unsigned char reason;
+	unsigned char reason = 0;
 
 	/* Only the BSP gets external NMIs from the system.  */
 	if (!smp_processor_id())
