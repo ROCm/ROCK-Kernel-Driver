@@ -69,9 +69,7 @@ int ptrace_check_attach(struct task_struct *child, int kill)
 	if (!kill) {
 		if (child->state != TASK_STOPPED)
 			return -ESRCH;
-#ifdef CONFIG_SMP
 		wait_task_inactive(child);
-#endif		
 	}
 
 	/* All systems go.. */

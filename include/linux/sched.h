@@ -690,7 +690,11 @@ extern void FASTCALL(add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 
+#ifdef CONFIG_SMP
 extern void wait_task_inactive(task_t * p);
+#else
+#define wait_task_inactive(p)	do { } while (0)
+#endif
 extern void kick_if_running(task_t * p);
 
 #define __wait_event(wq, condition) 					\
