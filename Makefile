@@ -394,20 +394,8 @@ backup: mrproper
 	cd .. && tar cf - linux/ | gzip -9 > backup.gz
 	sync
 
-sgmldocs: 
-	chmod 755 $(TOPDIR)/scripts/docgen
-	chmod 755 $(TOPDIR)/scripts/gen-all-syms
-	chmod 755 $(TOPDIR)/scripts/kernel-doc
-	$(MAKE) -C $(TOPDIR)/Documentation/DocBook books
-
-psdocs: sgmldocs
-	$(MAKE) -C Documentation/DocBook ps
-
-pdfdocs: sgmldocs
-	$(MAKE) -C Documentation/DocBook pdf
-
-htmldocs: sgmldocs
-	$(MAKE) -C Documentation/DocBook html
+sgmldocs psdocs pdfdocs htmldocs:
+	$(MAKE) -C Documentation/DocBook $@
 
 sums:
 	find . -type f -print | sort | xargs sum > .SUMS
