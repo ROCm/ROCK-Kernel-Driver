@@ -8,6 +8,7 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
+#include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/init.h>
@@ -76,17 +77,16 @@ static void __init ftvpci_init_irq(void)
 }
 
 static struct map_desc ftvpci_io_desc[] __initdata = {
- 	{ INTCONT_BASE,	INTCONT_START,	0x00001000, DOMAIN_IO, 0, 1, 0, 0 },
- 	{ PLX_BASE,	PLX_START,	0x00001000, DOMAIN_IO, 0, 1, 0, 0 },
- 	{ PCIO_BASE,	PLX_IO_START,	0x00100000, DOMAIN_IO, 0, 1, 0, 0 },
- 	{ DUART_BASE,	DUART_START,	0x00001000, DOMAIN_IO, 0, 1, 0, 0 },
-	{ STATUS_BASE,	STATUS_START,	0x00001000, DOMAIN_IO, 0, 1, 0, 0 },
-	LAST_DESC
+ 	{ INTCONT_BASE,	INTCONT_START,	0x00001000, MT_DEVICE },
+ 	{ PLX_BASE,	PLX_START,	0x00001000, MT_DEVICE },
+ 	{ PCIO_BASE,	PLX_IO_START,	0x00100000, MT_DEVICE },
+ 	{ DUART_BASE,	DUART_START,	0x00001000, MT_DEVICE },
+	{ STATUS_BASE,	STATUS_START,	0x00001000, MT_DEVICE }
 };
 
 static void __init ftvpci_map_io(void)
 {
-	iotable_init(ftvpci_io_desc);
+	iotable_init(ftvpci_io_desc, ARRAY_SIZE(ftvpci_io_desc));
 }
 
 MACHINE_START(NEXUSPCI, "FTV/PCI")

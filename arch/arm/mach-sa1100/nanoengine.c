@@ -25,17 +25,15 @@ fixup_nanoengine(struct machine_desc *desc, struct tag *tags,
 }
 
 static struct map_desc nanoengine_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Flash bank 0 */
-  { 0xf0000000, 0x10000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* System Registers */
-  { 0xf1000000, 0x18A00000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Internal PCI Config Space */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf0000000, 0x10000000, 0x00100000, MT_DEVICE }, /* System Registers */
+  { 0xf1000000, 0x18A00000, 0x00100000, MT_DEVICE }  /* Internal PCI Config Space */
 };
 
 static void __init nanoengine_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(nanoengine_io_desc);
+	iotable_init(nanoengine_io_desc, ARRAY_SIZE(nanoengine_io_desc));
 
 	sa1100_register_uart(0, 1);
 	sa1100_register_uart(1, 2);

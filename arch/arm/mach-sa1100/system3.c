@@ -95,10 +95,9 @@ static void system3_backlight_power(int on);
  */
 
 static struct map_desc system3_io_desc[] __initdata = {
- /* virtual     physical        length      domain     r  w  c  b */
-  { 0xf3000000, PT_CPLD_BASE,   0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* System Registers */
-  { 0xf4000000, PT_SA1111_BASE, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA-1111 */
-  LAST_DESC
+ /* virtual     physical        length      type */
+  { 0xf3000000, PT_CPLD_BASE,   0x00100000, MT_DEVICE }, /* System Registers */
+  { 0xf4000000, PT_SA1111_BASE, 0x00100000, MT_DEVICE }  /* SA-1111 */
 };
 
 static struct sa1100_port_fns system3_port_fns __initdata = {
@@ -119,7 +118,7 @@ static void __init system3_map_io(void)
 {
 	DPRINTK( "%s\n", "START" );
 	sa1100_map_io();
-	iotable_init(system3_io_desc);
+	iotable_init(system3_io_desc, ARRAY_SIZE(system3_io_desc));
 
 	sa1100_register_uart_fns(&system3_port_fns);
 	sa1100_register_uart(0, 1);	/* com port */

@@ -18,16 +18,14 @@
 /* BRADFIXME The egpio addresses aren't verifiably correct. (i.e. they're most
    likely wrong. */
 static struct map_desc itsy_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Flash bank 0 */
-  { 0xf0000000, 0x49000000, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* EGPIO 0 */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf0000000, 0x49000000, 0x01000000, MT_DEVICE } /* EGPIO 0 */
 };
 
 static void __init itsy_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(itsy_io_desc);
+	iotable_init(itsy_io_desc, ARRAY_SIZE(itsy_io_desc));
 
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);

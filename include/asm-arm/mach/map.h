@@ -13,20 +13,18 @@ struct map_desc {
 	unsigned long virtual;
 	unsigned long physical;
 	unsigned long length;
-	int domain:4,
-	    prot_read:1,
-	    prot_write:1,
-	    cacheable:1,
-	    bufferable:1,
-	    last:1;
+	unsigned int type;
 };
-
-#define LAST_DESC \
-  { last: 1 }
 
 struct meminfo;
 
+#define MT_DEVICE	0
+#define MT_CACHECLEAN	1
+#define MT_MINICLEAN	2
+#define MT_VECTORS	3
+#define MT_MEMORY	4
+
 extern void create_memmap_holes(struct meminfo *);
 extern void memtable_init(struct meminfo *);
-extern void iotable_init(struct map_desc *);
+extern void iotable_init(struct map_desc *, int);
 extern void setup_io_desc(void);

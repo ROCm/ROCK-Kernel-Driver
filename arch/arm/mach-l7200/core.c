@@ -6,6 +6,7 @@
  *  Extra MM routines for L7200 architecture
  */
 #include <linux/config.h>
+#include <linux/kernel.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -69,17 +70,16 @@ static void __init l7200_init_irq(void)
 }
 
 static struct map_desc l7200_io_desc[] __initdata = {
-	{ IO_BASE,	IO_START,	IO_SIZE,	DOMAIN_IO, 0, 1 ,0 ,0},
-	{ IO_BASE_2,	IO_START_2,	IO_SIZE_2,	DOMAIN_IO, 0, 1 ,0 ,0},
-	{ AUX_BASE,     AUX_START,      AUX_SIZE,       DOMAIN_IO, 0, 1 ,0 ,0},
-	{ FLASH1_BASE,  FLASH1_START,   FLASH1_SIZE,    DOMAIN_IO, 0, 1 ,0 ,0},
-	{ FLASH2_BASE,  FLASH2_START,   FLASH2_SIZE,    DOMAIN_IO, 0, 1 ,0 ,0},
-	LAST_DESC
+	{ IO_BASE,	IO_START,	IO_SIZE,	MT_DEVICE },
+	{ IO_BASE_2,	IO_START_2,	IO_SIZE_2,	MT_DEVICE },
+	{ AUX_BASE,     AUX_START,      AUX_SIZE,       MT_DEVICE },
+	{ FLASH1_BASE,  FLASH1_START,   FLASH1_SIZE,    MT_DEVICE },
+	{ FLASH2_BASE,  FLASH2_START,   FLASH2_SIZE,    MT_DEVICE }
 };
 
 static void __init l7200_map_io(void)
 {
-	iotable_init(l7200_io_desc);
+	iotable_init(l7200_io_desc, ARRAY_SIZE(l7200_io_desc));
 }
 
 MACHINE_START(L7200, "LinkUp Systems L7200")
