@@ -426,6 +426,9 @@ int pcmcia_modify_window(window_handle_t win, modwin_t *req);
 int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask);
 #endif
 
+struct pcmcia_socket * pcmcia_get_socket(struct pcmcia_socket *skt);
+void pcmcia_put_socket(struct pcmcia_socket *skt);
+
 #endif /* __KERNEL__ */
 
 #endif /* _LINUX_CS_H */

@@ -172,6 +172,29 @@ int pcmcia_socket_dev_resume(struct device *dev)
 EXPORT_SYMBOL(pcmcia_socket_dev_resume);
 
 
+struct pcmcia_socket * pcmcia_get_socket(struct pcmcia_socket *skt)
+{
+	struct class_device *cl_dev = class_device_get(&skt->dev);
+	if (!cl_dev)
+		return NULL;
+	skt = class_get_devdata(cl_dev);
+	if (!try_module_get(skt->owner)) {
+		class_device_put(&skt->dev);
+		return NULL;
+	}
+	return (skt);
+}
+EXPORT_SYMBOL(pcmcia_get_socket);
+
+
+void pcmcia_put_socket(struct pcmcia_socket *skt)
+{
+	module_put(skt->owner);
+	class_device_put(&skt->dev);
+}
+EXPORT_SYMBOL(pcmcia_put_socket);
+
+
 static void pcmcia_release_socket(struct class_device *class_dev)
 {
 	struct pcmcia_socket *socket = class_get_devdata(class_dev);
