@@ -340,7 +340,6 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	unsigned long flags;
 
 	spin_lock_irqsave(shost->host_lock, flags);
-	WARN_ON(!current_sdev->sdev_target->starget_sdev_user);
 	current_sdev->sdev_target->starget_sdev_user = NULL;
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
@@ -352,10 +351,6 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	 */
 	blk_run_queue(current_sdev->request_queue);
 
-	/*
-	 * After unlock, this races with anyone clearing starget_sdev_user,
-	 * but we always enter this function again, avoiding any problems.
-	 */
 	spin_lock_irqsave(shost->host_lock, flags);
 	if (current_sdev->sdev_target->starget_sdev_user)
 		goto out;
