@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.146 $
+ * $Revision: 1.147 $
  */
 
 #include <linux/config.h>
@@ -739,8 +739,16 @@ dasd_start_IO(struct dasd_ccw_req * cqr)
 	if (rc)
 		return rc;
 	device = (struct dasd_device *) cqr->device;
+	if (cqr->retries < 0) {
+		DEV_MESSAGE(KERN_DEBUG, device,
+			    "start_IO: request %p (%02x/%i) - no retry left.",
+			    cqr, cqr->status, cqr->retries);
+		cqr->status = DASD_CQR_FAILED;
+		return -EIO;
+	}
 	cqr->startclk = get_clock();
 	cqr->starttime = jiffies;
+	cqr->retries--;
 	rc = ccw_device_start(device->cdev, cqr->cpaddr, (long) cqr,
 			      cqr->lpm, 0);
 	switch (rc) {
@@ -1067,7 +1075,6 @@ restart:
 			break;
 		/*  Process requests with DASD_CQR_ERROR */
 		if (cqr->status == DASD_CQR_ERROR) {
-			cqr->retries--;
 			if (cqr->irb.scsw.fctl & SCSW_FCTL_HALT_FUNC) {
 				cqr->status = DASD_CQR_FAILED;
 				cqr->stopclk = get_clock();
