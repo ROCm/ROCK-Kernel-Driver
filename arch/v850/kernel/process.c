@@ -28,7 +28,6 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/setup.h>
 #include <asm/pgtable.h>
 
 extern void ret_from_fork (void);

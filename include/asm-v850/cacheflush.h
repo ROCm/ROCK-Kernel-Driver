@@ -17,7 +17,6 @@
 /* Somebody depends on this; sigh...  */
 #include <linux/mm.h>
 
-#include <asm/setup.h>
 #include <asm/machdep.h>
 
 
