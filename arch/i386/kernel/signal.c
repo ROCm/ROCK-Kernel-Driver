@@ -610,9 +610,11 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
 			/* Let the debugger run.  */
 			current->exit_code = signr;
+			preempt_disable();
 			current->state = TASK_STOPPED;
 			notify_parent(current, SIGCHLD);
 			schedule();
+			preempt_enable();
 
 			/* We're back.  Did the debugger cancel the sig?  */
 			if (!(signr = current->exit_code))
@@ -667,12 +669,14 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 
 			case SIGSTOP: {
 				struct signal_struct *sig;
-				current->state = TASK_STOPPED;
 				current->exit_code = signr;
 				sig = current->p_pptr->sig;
+				preempt_disable();
+				current->state = TASK_STOPPED;
 				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
+				preempt_enable();
 				continue;
 			}
 
