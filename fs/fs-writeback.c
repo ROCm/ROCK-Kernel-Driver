@@ -367,7 +367,8 @@ void sync_inodes_sb(struct super_block *sb, int wait)
 	};
 
 	get_page_state(&ps);
-	wbc.nr_to_write = ps.nr_dirty + ps.nr_dirty / 4;
+	wbc.nr_to_write = ps.nr_dirty + ps.nr_unstable +
+		(ps.nr_dirty + ps.nr_unstable) / 4;
 	spin_lock(&inode_lock);
 	sync_sb_inodes(sb, &wbc);
 	spin_unlock(&inode_lock);

@@ -280,8 +280,6 @@ nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 		err = nfs_wb_all(inode);
 	} else
 		nfs_commit_file(inode, NULL, 0, 0, 0);
-	/* Avoid races. Tell upstream we've done all we were told to do */
-	wbc->nr_to_write = 0;
 out:
 	return err;
 }
@@ -490,7 +488,6 @@ nfs_scan_commit(struct inode *inode, struct list_head *dst, struct file *file, u
 	int	res;
 	res = nfs_scan_list(&nfsi->commit, dst, file, idx_start, npages);
 	nfsi->ncommit -= res;
-	sub_page_state(nr_unstable,res);
 	if ((nfsi->ncommit == 0) != list_empty(&nfsi->commit))
 		printk(KERN_ERR "NFS: desynchronized value of nfs_i.ncommit.\n");
 	return res;
@@ -1009,6 +1006,7 @@ nfs_commit_done(struct rpc_task *task)
 {
 	struct nfs_write_data	*data = (struct nfs_write_data *)task->tk_calldata;
 	struct nfs_page		*req;
+	int res = 0;
 
         dprintk("NFS: %4d nfs_commit_done (status %d)\n",
                                 task->tk_pid, task->tk_status);
@@ -1043,7 +1041,9 @@ nfs_commit_done(struct rpc_task *task)
 		nfs_mark_request_dirty(req);
 	next:
 		nfs_unlock_request(req);
+		res++;
 	}
+	sub_page_state(nr_unstable,res);
 }
 #endif
 
