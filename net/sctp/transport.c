@@ -90,6 +90,9 @@ struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 	peer->af_specific = sctp_get_af_specific(addr->sa.sa_family);
 	peer->asoc = NULL;
 
+	peer->dst = NULL;
+	memset(&peer->saddr, 0, sizeof(union sctp_addr));
+
 	/* From 6.3.1 RTO Calculation:
 	 *
 	 * C1) Until an RTT measurement has been made for a packet sent to the
@@ -202,8 +205,22 @@ void sctp_transport_set_owner(struct sctp_transport *transport,
 	sctp_association_hold(asoc);
 }
 
-/* Caches the dst entry for a transport's destination address and an optional
- * souce address.
+/* Initialize the pmtu of a transport. */ 
+void sctp_transport_pmtu(struct sctp_transport *transport)
+{
+	struct dst_entry *dst;
+
+	dst = transport->af_specific->get_dst(NULL, &transport->ipaddr, NULL);
+
+	if (dst) {
+		transport->pmtu = dst_pmtu(dst);
+		dst_release(dst);
+	} else
+		transport->pmtu = SCTP_DEFAULT_MAXSEGMENT;
+}
+
+/* Caches the dst entry and source address for a transport's destination
+ * address.
  */
 void sctp_transport_route(struct sctp_transport *transport,
 			  union sctp_addr *saddr, struct sctp_opt *opt)
@@ -211,64 +228,15 @@ void sctp_transport_route(struct sctp_transport *transport,
 	sctp_association_t *asoc = transport->asoc;
 	struct sctp_af *af = transport->af_specific;
 	union sctp_addr *daddr = &transport->ipaddr;
-	sctp_bind_addr_t *bp;
-	rwlock_t *addr_lock;
-	struct sockaddr_storage_list *laddr;
-	struct list_head *pos;
 	struct dst_entry *dst;
-	union sctp_addr dst_saddr;
 
-	dst = af->get_dst(daddr, saddr);
+	dst = af->get_dst(asoc, daddr, saddr);
 
-	/* If there is no association or if a source address is passed,
-	 * no more validation is required.
-	 */
-	if (!asoc || saddr)
-		goto out;
+	if (saddr)
+		memcpy(&transport->saddr, saddr, sizeof(union sctp_addr));
+	else
+		af->get_saddr(asoc, dst, daddr, &transport->saddr);
 
-	if (SCTP_STATE_ESTABLISHED == asoc->state) {
-		bp = &asoc->base.bind_addr;
-		addr_lock = &asoc->base.addr_lock;
-	} else {
-		bp = &asoc->ep->base.bind_addr;
-		addr_lock = &asoc->ep->base.addr_lock;
-	}
-
-	if (dst) {
-		/* Walk through the bind address list and look for a bind
-		 * address that matches the source address of the returned dst.
-		 */
-		sctp_read_lock(addr_lock);
-		list_for_each(pos, &bp->address_list) {
-			laddr = list_entry(pos, struct sockaddr_storage_list,
-					   list);
-			af->dst_saddr(&dst_saddr, dst, bp->port);
-	                if (opt->pf->cmp_addr(&dst_saddr, &laddr->a, opt))
-				goto out_unlock;
-		}
-		sctp_read_unlock(addr_lock);
-
-		/* None of the bound addresses match the source address of the
-		 * dst. So release it.
-		 */
-		dst_release(dst);
-	}
-
-	/* Walk through the bind address list and try to get a dst that
-	 * matches a bind address as the source address.
-	 */
-	sctp_read_lock(addr_lock);
-	list_for_each(pos, &bp->address_list) {
-		laddr = list_entry(pos, struct sockaddr_storage_list, list);
-
-		dst = af->get_dst(daddr, &laddr->a);
-		if (dst)
-			goto out_unlock;
-	}
-
-out_unlock:
-	sctp_read_unlock(addr_lock);
-out:
 	transport->dst = dst;
 	if (dst)
 		transport->pmtu = dst_pmtu(dst);

@@ -368,15 +368,6 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	 */
 	sh->checksum = htonl(crc32);
 
-	/* FIXME:  Delete the rest of this switch statement once phase 2
-	 * of address selection (ipv6 support) drops in.
-	 */
-	switch (transport->ipaddr.sa.sa_family) {
-	case AF_INET6:
-		SCTP_V6(inet6_sk(sk)->daddr = transport->ipaddr.v6.sin6_addr;)
-		break;
-	};
-
 	/* IP layer ECN support
 	 * From RFC 2481
 	 *  "The ECN-Capable Transport (ECT) bit would be set by the
@@ -426,7 +417,8 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	}
 
 	dst = transport->dst;
-	if (!dst || dst->obsolete) {
+	/* The 'obsolete' field of dst is set to 2 when a dst is freed. */
+	if (!dst || (dst->obsolete > 1)) {
 		sctp_transport_route(transport, NULL, sctp_sk(sk));
 		sctp_assoc_sync_pmtu(asoc);
 	}
@@ -437,14 +429,22 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 
 	SCTP_DEBUG_PRINTK("***sctp_transmit_packet*** skb length %d\n",
 			  nskb->len);
-	(*transport->af_specific->queue_xmit)(nskb, packet->ipfragok);
+	(*transport->af_specific->sctp_xmit)(nskb, transport, packet->ipfragok);
 out:
 	packet->size = SCTP_IP_OVERHEAD;
 	return err;
 no_route:
 	kfree_skb(nskb);
 	IP_INC_STATS_BH(IpOutNoRoutes);
-	err = -EHOSTUNREACH;
+
+	/* FIXME: Returning the 'err' will effect all the associations
+	 * associated with a socket, although only one of the paths of the
+	 * association is unreachable.
+	 * The real failure of a transport or association can be passed on
+	 * to the user via notifications. So setting this error may not be
+	 * required.
+	 */
+	 /* err = -EHOSTUNREACH; */
 	goto out;
 }
 
