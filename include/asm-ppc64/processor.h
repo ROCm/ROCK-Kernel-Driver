@@ -628,6 +628,8 @@ static inline void prefetchw(const void *x)
 
 #endif /* ASSEMBLY */
 
+#define HAVE_ARCH_PICK_MMAP_LAYOUT
+
 /*
  * Number of entries in the SLB. If this ever changes we should handle
  * it with a use a cpu feature fixup.
