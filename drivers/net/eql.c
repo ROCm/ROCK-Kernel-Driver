@@ -503,6 +503,8 @@ static int eql_g_slave_cfg(struct net_device *dev, slave_config_t *scp)
 	slave_dev = dev_get_by_name(sc.slave_name);
 
 	ret = -EINVAL;
+	if (!slave_dev)
+		return ret;
 
 	spin_lock_bh(&eql->queue.lock);
 	if (eql_is_slave(slave_dev)) {
@@ -537,6 +539,8 @@ static int eql_s_slave_cfg(struct net_device *dev, slave_config_t *scp)
 	slave_dev = dev_get_by_name(sc.slave_name);
 
 	ret = -EINVAL;
+	if (!slave_dev)
+		return ret;
 
 	spin_lock_bh(&eql->queue.lock);
 	if (eql_is_slave(slave_dev)) {
