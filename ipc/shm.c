@@ -18,6 +18,7 @@
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/shm.h>
 #include <linux/init.h>
 #include <linux/file.h>
@@ -114,7 +115,8 @@ static void shm_destroy (struct shmid_kernel *shp)
 	shm_tot -= (shp->shm_segsz + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	shm_rmid (shp->id);
 	shm_unlock(shp->id);
-	shmem_lock(shp->shm_file, 0);
+	if (!is_file_hugepages(shp->shm_file))
+		shmem_lock(shp->shm_file, 0);
 	fput (shp->shm_file);
 	security_ops->shm_free_security(shp);
 	kfree (shp);
@@ -194,8 +196,12 @@ static int newseg (key_t key, int shmflg, size_t size)
 		return error;
 	}
 
-	sprintf (name, "SYSV%08x", key);
-	file = shmem_file_setup(name, size, VM_ACCOUNT);
+	if (shmflg & SHM_HUGETLB)
+		file = hugetlb_zero_setup(size);
+	else {
+		sprintf (name, "SYSV%08x", key);
+		file = shmem_file_setup(name, size, VM_ACCOUNT);
+	}
 	error = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto no_file;
@@ -214,7 +220,10 @@ static int newseg (key_t key, int shmflg, size_t size)
 	shp->id = shm_buildid(id,shp->shm_perm.seq);
 	shp->shm_file = file;
 	file->f_dentry->d_inode->i_ino = shp->id;
-	file->f_op = &shm_file_operations;
+	if (shmflg & SHM_HUGETLB)
+		set_file_hugepages(file);
+	else
+		file->f_op = &shm_file_operations;
 	shm_tot += numpages;
 	shm_unlock (id);
 	return shp->id;
@@ -255,6 +264,7 @@ asmlinkage long sys_shmget (key_t key, size_t size, int shmflg)
 		shm_unlock(id);
 	}
 	up(&shm_ids.sem);
+
 	return err;
 }
 
@@ -379,8 +389,10 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 	struct shmid_kernel *shp;
 	int err, version;
 
-	if (cmd < 0 || shmid < 0)
-		return -EINVAL;
+	if (cmd < 0 || shmid < 0) {
+		err = -EINVAL;
+		goto out;
+	}
 
 	version = ipc_parse_version(&cmd);
 
@@ -401,7 +413,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		err= shm_ids.max_id;
 		if(err<0)
 			err = 0;
-		return err;
+		goto out;
 	}
 	case SHM_INFO:
 	{
@@ -418,10 +430,13 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		err = shm_ids.max_id;
 		shm_unlockall();
 		up(&shm_ids.sem);
-		if(copy_to_user (buf, &shm_info, sizeof(shm_info)))
-			return -EFAULT;
+		if(copy_to_user (buf, &shm_info, sizeof(shm_info))) {
+			err = -EFAULT;
+			goto out;
+		}
 
-		return err < 0 ? 0 : err;
+		err = err < 0 ? 0 : err;
+		goto out;
 	}
 	case SHM_STAT:
 	case IPC_STAT:
@@ -430,9 +445,10 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		int result;
 		memset(&tbuf, 0, sizeof(tbuf));
 		shp = shm_lock(shmid);
-		if(shp==NULL)
-			return -EINVAL;
-		if(cmd==SHM_STAT) {
+		if(shp==NULL) {
+			err = -EINVAL;
+			goto out;
+		} else if(cmd==SHM_STAT) {
 			err = -EINVAL;
 			if (shmid > shm_ids.max_id)
 				goto out_unlock;
@@ -456,8 +472,10 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		tbuf.shm_nattch	= shp->shm_nattch;
 		shm_unlock(shmid);
 		if(copy_shmid_to_user (buf, &tbuf, version))
-			return -EFAULT;
-		return result;
+			err = -EFAULT;
+		else
+			err = result;
+		goto out;
 	}
 	case SHM_LOCK:
 	case SHM_UNLOCK:
@@ -465,24 +483,30 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 /* Allow superuser to lock segment in memory */
 /* Should the pages be faulted in here or leave it to user? */
 /* need to determine interaction with current->swappable */
-		if (!capable(CAP_IPC_LOCK))
-			return -EPERM;
+		if (!capable(CAP_IPC_LOCK)) {
+			err = -EPERM;
+			goto out;
+		}
 
 		shp = shm_lock(shmid);
-		if(shp==NULL)
-			return -EINVAL;
+		if(shp==NULL) {
+			err = -EINVAL;
+			goto out;
+		}
 		err = shm_checkid(shp,shmid);
 		if(err)
 			goto out_unlock;
 		if(cmd==SHM_LOCK) {
-			shmem_lock(shp->shm_file, 1);
+			if (!is_file_hugepages(shp->shm_file))
+				shmem_lock(shp->shm_file, 1);
 			shp->shm_flags |= SHM_LOCKED;
 		} else {
-			shmem_lock(shp->shm_file, 0);
+			if (!is_file_hugepages(shp->shm_file))
+				shmem_lock(shp->shm_file, 0);
 			shp->shm_flags &= ~SHM_LOCKED;
 		}
 		shm_unlock(shmid);
-		return err;
+		goto out;
 	}
 	case IPC_RMID:
 	{
@@ -518,13 +542,15 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		} else
 			shm_destroy (shp);
 		up(&shm_ids.sem);
-		return err;
+		goto out;
 	}
 
 	case IPC_SET:
 	{
-		if(copy_shmid_from_user (&setbuf, buf, version))
-			return -EFAULT;
+		if(copy_shmid_from_user (&setbuf, buf, version)) {
+			err = -EFAULT;
+			goto out;
+		}
 		down(&shm_ids.sem);
 		shp = shm_lock(shmid);
 		err=-EINVAL;
@@ -549,7 +575,8 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 	}
 
 	default:
-		return -EINVAL;
+		err = -EINVAL;
+		goto out;
 	}
 
 	err = 0;
@@ -557,9 +584,10 @@ out_unlock_up:
 	shm_unlock(shmid);
 out_up:
 	up(&shm_ids.sem);
-	return err;
+	goto out;
 out_unlock:
 	shm_unlock(shmid);
+out:
 	return err;
 }
 
@@ -579,10 +607,10 @@ asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr)
 	int acc_mode;
 	void *user_addr;
 
-	if (shmid < 0)
-		return -EINVAL;
-
-	if ((addr = (ulong)shmaddr)) {
+	if (shmid < 0) {
+		err = -EINVAL;
+		goto out;
+	} else if ((addr = (ulong)shmaddr)) {
 		if (addr & (SHMLBA-1)) {
 			if (shmflg & SHM_RND)
 				addr &= ~(SHMLBA-1);	   /* round down */
@@ -612,16 +640,19 @@ asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr)
 	 * additional creator id...
 	 */
 	shp = shm_lock(shmid);
-	if(shp == NULL)
-		return -EINVAL;
+	if(shp == NULL) {
+		err = -EINVAL;
+		goto out;
+	}
 	err = shm_checkid(shp,shmid);
 	if (err) {
 		shm_unlock(shmid);
-		return err;
+		goto out;
 	}
 	if (ipcperms(&shp->shm_perm, acc_mode)) {
 		shm_unlock(shmid);
-		return -EACCES;
+		err = -EACCES;
+		goto out;
 	}
 	file = shp->shm_file;
 	size = file->f_dentry->d_inode->i_size;
@@ -662,8 +693,8 @@ invalid:
 	err = 0;
 	if (IS_ERR(user_addr))
 		err = PTR_ERR(user_addr);
+out:
 	return err;
-
 }
 
 /*
@@ -673,18 +704,24 @@ invalid:
 asmlinkage long sys_shmdt (char *shmaddr)
 {
 	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *shmd, *shmdnext;
+	struct vm_area_struct *vma;
+	unsigned long address = (unsigned long)shmaddr;
 	int retval = -EINVAL;
 
 	down_write(&mm->mmap_sem);
-	for (shmd = mm->mmap; shmd; shmd = shmdnext) {
-		shmdnext = shmd->vm_next;
-		if (shmd->vm_ops == &shm_vm_ops
-		    && shmd->vm_start - (shmd->vm_pgoff << PAGE_SHIFT) == (ulong) shmaddr) {
-			do_munmap(mm, shmd->vm_start, shmd->vm_end - shmd->vm_start);
-			retval = 0;
-		}
-	}
+	vma = find_vma(mm, address);
+	if (!vma)
+		goto out;
+	if (vma->vm_start != address)
+		goto out;
+	
+	/* ->vm_pgoff is always 0, see do_mmap() in sys_shmat() */
+	retval = 0;
+	if (vma->vm_ops == &shm_vm_ops || (vma->vm_flags & VM_HUGETLB))
+		do_munmap(mm, vma->vm_start, vma->vm_end - vma->vm_start);
+	else
+		retval = -EINVAL;
+out:
 	up_write(&mm->mmap_sem);
 	return retval;
 }
