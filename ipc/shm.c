@@ -38,9 +38,7 @@ static struct vm_operations_struct shm_vm_ops;
 static struct ipc_ids shm_ids;
 
 #define shm_lock(id)	((struct shmid_kernel*)ipc_lock(&shm_ids,id))
-#define shm_unlock(id)	ipc_unlock(&shm_ids,id)
-#define shm_lockall()	ipc_lockall(&shm_ids)
-#define shm_unlockall()	ipc_unlockall(&shm_ids)
+#define shm_unlock(shp)	ipc_unlock(&(shp)->shm_perm)
 #define shm_get(id)	((struct shmid_kernel*)ipc_get(&shm_ids,id))
 #define shm_buildid(id, seq) \
 	ipc_buildid(&shm_ids, id, seq)
@@ -93,7 +91,7 @@ static inline void shm_inc (int id) {
 	shp->shm_atim = CURRENT_TIME;
 	shp->shm_lprid = current->pid;
 	shp->shm_nattch++;
-	shm_unlock(id);
+	shm_unlock(shp);
 }
 
 /* This is called by fork, once for every shm attach. */
@@ -114,12 +112,12 @@ static void shm_destroy (struct shmid_kernel *shp)
 {
 	shm_tot -= (shp->shm_segsz + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	shm_rmid (shp->id);
-	shm_unlock(shp->id);
+	shm_unlock(shp);
 	if (!is_file_hugepages(shp->shm_file))
 		shmem_lock(shp->shm_file, 0);
 	fput (shp->shm_file);
 	security_ops->shm_free_security(shp);
-	kfree (shp);
+	ipc_rcu_free(shp, sizeof(struct shmid_kernel));
 }
 
 /*
@@ -145,7 +143,7 @@ static void shm_close (struct vm_area_struct *shmd)
 	   shp->shm_flags & SHM_DEST)
 		shm_destroy (shp);
 	else
-		shm_unlock(id);
+		shm_unlock(shp);
 	up (&shm_ids.sem);
 }
 
@@ -182,7 +180,7 @@ static int newseg (key_t key, int shmflg, size_t size)
 	if (shm_tot + numpages >= shm_ctlall)
 		return -ENOSPC;
 
-	shp = (struct shmid_kernel *) kmalloc (sizeof (*shp), GFP_USER);
+	shp = ipc_rcu_alloc(sizeof(*shp));
 	if (!shp)
 		return -ENOMEM;
 
@@ -192,7 +190,7 @@ static int newseg (key_t key, int shmflg, size_t size)
 	shp->shm_perm.security = NULL;
 	error = security_ops->shm_alloc_security(shp);
 	if (error) {
-		kfree(shp);
+		ipc_rcu_free(shp, sizeof(*shp));
 		return error;
 	}
 
@@ -225,14 +223,14 @@ static int newseg (key_t key, int shmflg, size_t size)
 	else
 		file->f_op = &shm_file_operations;
 	shm_tot += numpages;
-	shm_unlock (id);
+	shm_unlock(shp);
 	return shp->id;
 
 no_id:
 	fput(file);
 no_file:
 	security_ops->shm_free_security(shp);
-	kfree(shp);
+	ipc_rcu_free(shp, sizeof(*shp));
 	return error;
 }
 
@@ -261,7 +259,7 @@ asmlinkage long sys_shmget (key_t key, size_t size, int shmflg)
 			err = -EACCES;
 		else
 			err = shm_buildid(id, shp->shm_perm.seq);
-		shm_unlock(id);
+		shm_unlock(shp);
 	}
 	up(&shm_ids.sem);
 
@@ -421,14 +419,12 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 
 		memset(&shm_info,0,sizeof(shm_info));
 		down(&shm_ids.sem);
-		shm_lockall();
 		shm_info.used_ids = shm_ids.in_use;
 		shm_get_stat (&shm_info.shm_rss, &shm_info.shm_swp);
 		shm_info.shm_tot = shm_tot;
 		shm_info.swap_attempts = 0;
 		shm_info.swap_successes = 0;
 		err = shm_ids.max_id;
-		shm_unlockall();
 		up(&shm_ids.sem);
 		if(copy_to_user (buf, &shm_info, sizeof(shm_info))) {
 			err = -EFAULT;
@@ -470,7 +466,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		tbuf.shm_cpid	= shp->shm_cprid;
 		tbuf.shm_lpid	= shp->shm_lprid;
 		tbuf.shm_nattch	= shp->shm_nattch;
-		shm_unlock(shmid);
+		shm_unlock(shp);
 		if(copy_shmid_to_user (buf, &tbuf, version))
 			err = -EFAULT;
 		else
@@ -505,7 +501,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 				shmem_lock(shp->shm_file, 0);
 			shp->shm_flags &= ~SHM_LOCKED;
 		}
-		shm_unlock(shmid);
+		shm_unlock(shp);
 		goto out;
 	}
 	case IPC_RMID:
@@ -538,7 +534,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 			shp->shm_flags |= SHM_DEST;
 			/* Do not find it any more */
 			shp->shm_perm.key = IPC_PRIVATE;
-			shm_unlock(shmid);
+			shm_unlock(shp);
 		} else
 			shm_destroy (shp);
 		up(&shm_ids.sem);
@@ -581,12 +577,12 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 
 	err = 0;
 out_unlock_up:
-	shm_unlock(shmid);
+	shm_unlock(shp);
 out_up:
 	up(&shm_ids.sem);
 	goto out;
 out_unlock:
-	shm_unlock(shmid);
+	shm_unlock(shp);
 out:
 	return err;
 }
@@ -646,18 +642,18 @@ asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr)
 	}
 	err = shm_checkid(shp,shmid);
 	if (err) {
-		shm_unlock(shmid);
+		shm_unlock(shp);
 		goto out;
 	}
 	if (ipcperms(&shp->shm_perm, acc_mode)) {
-		shm_unlock(shmid);
+		shm_unlock(shp);
 		err = -EACCES;
 		goto out;
 	}
 	file = shp->shm_file;
 	size = file->f_dentry->d_inode->i_size;
 	shp->shm_nattch++;
-	shm_unlock(shmid);
+	shm_unlock(shp);
 
 	down_write(&current->mm->mmap_sem);
 	if (addr && !(shmflg & SHM_REMAP)) {
@@ -686,7 +682,7 @@ invalid:
 	   shp->shm_flags & SHM_DEST)
 		shm_destroy (shp);
 	else
-		shm_unlock(shmid);
+		shm_unlock(shp);
 	up (&shm_ids.sem);
 
 	*raddr = (unsigned long) user_addr;
@@ -764,7 +760,7 @@ static int sysvipc_shm_read_proc(char *buffer, char **start, off_t offset, int l
 				shp->shm_atim,
 				shp->shm_dtim,
 				shp->shm_ctim);
-			shm_unlock(i);
+			shm_unlock(shp);
 
 			pos += len;
 			if(pos < offset) {
