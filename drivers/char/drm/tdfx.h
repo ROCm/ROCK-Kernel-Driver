@@ -49,12 +49,4 @@
 #define DRIVER_MINOR		0
 #define DRIVER_PATCHLEVEL	0
 
-#define DRIVER_PCI_IDS							\
-	{0x121a, 0x0003, 0},						\
-	{0x121a, 0x0004, 0},						\
-	{0x121a, 0x0005, 0},						\
-	{0x121a, 0x0007, 0},						\
-	{0x121a, 0x0009, 0},						\
-	{0, 0, 0}
-
 #endif

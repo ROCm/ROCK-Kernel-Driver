@@ -14,4 +14,3 @@
 #define __HAVE_RELEASE			1
 #endif
 
-#define DRIVER_PCI_IDS { 0, 0, 0 }

@@ -540,8 +540,10 @@ static int DRM(takedown)( drm_device_t *dev )
 	return 0;
 }
 
-static drm_pci_id_list_t DRM(pciidlist)[] = {
-	DRIVER_PCI_IDS
+#include "drm_pciids.h"
+
+static struct pci_device_id DRM(pciidlist)[] = {
+	DRM(PCI_IDS)
 };
 
 static int DRM(probe)(struct pci_dev *pdev)
@@ -624,13 +626,14 @@ static int DRM(probe)(struct pci_dev *pdev)
 #endif
 	DRM(numdevs)++; /* no errors, mark it reserved */
 	
-	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d\n",
+	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d: %s\n",
 		DRIVER_NAME,
 		DRIVER_MAJOR,
 		DRIVER_MINOR,
 		DRIVER_PATCHLEVEL,
 		DRIVER_DATE,
-		dev->minor);
+		dev->minor,
+		pci_pretty_name(pdev));
 
 	DRIVER_POSTINIT();
 
