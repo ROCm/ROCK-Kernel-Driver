@@ -69,6 +69,9 @@ struct mmc_data {
 
 	struct mmc_command	*stop;		/* stop command */
 	struct mmc_request	*mrq;		/* assoicated request */
+
+	unsigned int		sg_len;		/* size of scatter list */
+	struct scatterlist	*sg;		/* I/O scatter list */
 };
 
 struct mmc_request {
