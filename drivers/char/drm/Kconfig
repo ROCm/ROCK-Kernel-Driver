@@ -31,7 +31,7 @@ config DRM_GAMMA
 
 config DRM_R128
 	tristate "ATI Rage 128"
-	depends on DRM
+	depends on DRM && PCI
 	help
 	  Choose this option if you have an ATI Rage 128 graphics card.  If M
 	  is selected, the module will be called r128.  AGP support for
@@ -39,7 +39,7 @@ config DRM_R128
 
 config DRM_RADEON
 	tristate "ATI Radeon"
-	depends on DRM
+	depends on DRM && PCI
 	help
 	  Choose this option if you have an ATI Radeon graphics card.  There
 	  are both PCI and AGP versions.  You don't need to choose this to
