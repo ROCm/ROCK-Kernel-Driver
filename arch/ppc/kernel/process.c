@@ -273,8 +273,8 @@ void show_regs(struct pt_regs * regs)
 	trap = TRAP(regs);
 	if (trap == 0x300 || trap == 0x600)
 		printk("DAR: %08lX, DSISR: %08lX\n", regs->dar, regs->dsisr);
-	printk("TASK = %p[%d] '%s' ",
-	       current, current->pid, current->comm);
+	printk("TASK = %p[%d] '%s' THREAD: %p",
+	       current, current->pid, current->comm, current->thread_info);
 	printk("Last syscall: %ld ", current->thread.last_syscall);
 
 #if defined(CONFIG_4xx) && defined(DCRN_PLB0_BEAR)
@@ -303,6 +303,16 @@ void show_regs(struct pt_regs * regs)
 			break;
 	}
 	printk("\n");
+#ifdef CONFIG_KALLSYMS
+	/*
+	 * Lookup NIP late so we have the best change of getting the
+	 * above info out without failing
+	 */
+	printk("NIP [%08lx] ", regs->nip);
+	print_symbol("%s\n", regs->nip);
+	printk("LR [%08lx] ", regs->link);
+	print_symbol("%s\n", regs->link);
+#endif
 	show_stack(current, (unsigned long *) regs->gpr[1]);
 }
 

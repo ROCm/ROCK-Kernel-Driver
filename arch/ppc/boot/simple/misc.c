@@ -17,7 +17,6 @@
  */
 
 #include <linux/types.h>
-#include <linux/elf.h>
 #include <linux/config.h>
 #include <linux/string.h>
 
