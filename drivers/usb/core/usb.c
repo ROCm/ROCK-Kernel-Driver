@@ -196,14 +196,16 @@ void usb_deregister(struct usb_driver *driver)
 	usbfs_update_special();
 }
 
-/*
- * usb_ifnum_to_ifpos - convert the interface _number_ (as in interface.bInterfaceNumber)
- * to the interface _position_ (as in dev->actconfig->interface + position)
+/**
+ * usb_ifnum_to_ifpos - convert the interface number to the interface position
  * @dev: the device to use
  * @ifnum: the interface number (bInterfaceNumber); not interface position
  *
- * Note that the number is the same as the position for all interfaces _except_
- * devices with interfaces not sequentially numbered (e.g., 0, 2, 3, etc).
+ * This is used to convert the interface _number_ (as in
+ * interface.bInterfaceNumber) to the interface _position_ (as in
+ * dev->actconfig->interface + position).  Note that the number is the same as
+ * the position for all interfaces _except_ devices with interfaces not
+ * sequentially numbered (e.g., 0, 2, 3, etc).
  */
 int usb_ifnum_to_ifpos(struct usb_device *dev, unsigned ifnum)
 {
@@ -590,13 +592,14 @@ out_err:
 	return -1;
 }
 
-/*
- * usb_find_interface_driver_for_ifnum - convert ifnum to ifpos via
- * usb_ifnum_to_ifpos and call usb_find_interface_driver().
+/**
+ * usb_find_interface_driver_for_ifnum - finds a usb interface driver for the specified ifnum
  * @dev: the device to use
  * @ifnum: the interface number (bInterfaceNumber); not interface position!
  *
- * Note usb_find_interface_driver's ifnum parameter is actually interface position.
+ * This converts a ifnum to ifpos via a call to usb_ifnum_to_ifpos and then
+ * calls usb_find_interface_driver() with the found ifpos.  Note
+ * usb_find_interface_driver's ifnum parameter is actually interface position.
  */
 int usb_find_interface_driver_for_ifnum(struct usb_device *dev, unsigned ifnum)
 {
