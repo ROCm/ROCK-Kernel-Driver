@@ -373,9 +373,10 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 		write_unlock_bh(&addrconf_lock);
 
 		ipv6_mc_init_dev(ndev);
-
+		ndev->tstamp = jiffies;
 #ifdef CONFIG_SYSCTL
-		neigh_sysctl_register(dev, ndev->nd_parms, NET_IPV6, NET_IPV6_NEIGH, "ipv6");
+		neigh_sysctl_register(dev, ndev->nd_parms, NET_IPV6, 
+			NET_IPV6_NEIGH, "ipv6", &ndisc_ifinfo_sysctl_change);
 		addrconf_sysctl_register(ndev, &ndev->cnf);
 #endif
 	}
@@ -1890,6 +1891,8 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 				rt6_mtu_change(dev, dev->mtu);
 				idev->cnf.mtu6 = dev->mtu;
 			}
+			idev->tstamp = jiffies;
+			inet6_ifinfo_notify(RTM_NEWLINK, idev);
 			/* If the changed mtu during down is lower than IPV6_MIN_MTU
 			   stop IPv6 on this interface.
 			 */
@@ -1921,7 +1924,7 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 		if (idev) {
 			addrconf_sysctl_unregister(&idev->cnf);
 			neigh_sysctl_unregister(idev->nd_parms);
-			neigh_sysctl_register(dev, idev->nd_parms, NET_IPV6, NET_IPV6_NEIGH, "ipv6");
+			neigh_sysctl_register(dev, idev->nd_parms, NET_IPV6, NET_IPV6_NEIGH, "ipv6", &ndisc_ifinfo_sysctl_change);
 			addrconf_sysctl_register(idev, &idev->cnf);
 		}
 #endif
@@ -2031,6 +2034,10 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 	else
 		ipv6_mc_down(idev);
 
+	/* Step 5: netlink notification of this interface */
+	idev->tstamp = jiffies;
+	inet6_ifinfo_notify(RTM_NEWLINK, idev);
+	
 	/* Shot the device (if unregistered) */
 
 	if (how == 1) {
@@ -2732,17 +2739,19 @@ static void inline ipv6_store_devconf(struct ipv6_devconf *cnf,
 #endif
 }
 
-static int inet6_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
-			    struct inet6_dev *idev,
-			    int type, u32 pid, u32 seq)
+static int inet6_fill_ifinfo(struct sk_buff *skb, struct inet6_dev *idev, 
+			     u32 pid, u32 seq, int event)
 {
+	struct net_device	*dev = idev->dev;
 	__s32			*array = NULL;
 	struct ifinfomsg	*r;
 	struct nlmsghdr 	*nlh;
 	unsigned char		*b = skb->tail;
 	struct rtattr		*subattr;
+	__u32			mtu = dev->mtu;
+	struct ifla_cacheinfo	ci;
 
-	nlh = NLMSG_PUT(skb, pid, seq, type, sizeof(*r));
+	nlh = NLMSG_PUT(skb, pid, seq, event, sizeof(*r));
 	if (pid) nlh->nlmsg_flags |= NLM_F_MULTI;
 	r = NLMSG_DATA(nlh);
 	r->ifi_family = AF_INET6;
@@ -2757,6 +2766,13 @@ static int inet6_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 
 	RTA_PUT(skb, IFLA_IFNAME, strlen(dev->name)+1, dev->name);
 
+	if (dev->addr_len)
+		RTA_PUT(skb, IFLA_ADDRESS, dev->addr_len, dev->dev_addr);
+
+	RTA_PUT(skb, IFLA_MTU, sizeof(mtu), &mtu);
+	if (dev->ifindex != dev->iflink)
+		RTA_PUT(skb, IFLA_LINK, sizeof(int), &dev->iflink);
+			
 	subattr = (struct rtattr*)skb->tail;
 
 	RTA_PUT(skb, IFLA_PROTINFO, 0, NULL);
@@ -2764,6 +2780,14 @@ static int inet6_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 	/* return the device flags */
 	RTA_PUT(skb, IFLA_INET6_FLAGS, sizeof(__u32), &idev->if_flags);
 
+	/* return interface cacheinfo */
+	ci.max_reasm_len = IPV6_MAXPLEN;
+	ci.tstamp = (__u32)(TIME_DELTA(idev->tstamp, INITIAL_JIFFIES) / HZ * 100
+		    + TIME_DELTA(idev->tstamp, INITIAL_JIFFIES) % HZ * 100 / HZ);
+	ci.reachable_time = idev->nd_parms->reachable_time;
+	ci.retrans_time = idev->nd_parms->retrans_time;
+	RTA_PUT(skb, IFLA_INET6_CACHEINFO, sizeof(ci), &ci);
+	
 	/* return the device sysctl params */
 	if ((array = kmalloc(DEVCONF_MAX * sizeof(*array), GFP_ATOMIC)) == NULL)
 		goto rtattr_failure;
@@ -2798,8 +2822,8 @@ static int inet6_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
 			continue;
 		if ((idev = in6_dev_get(dev)) == NULL)
 			continue;
-		err = inet6_fill_ifinfo(skb, dev, idev, RTM_NEWLINK,
-				NETLINK_CB(cb->skb).pid, cb->nlh->nlmsg_seq);
+		err = inet6_fill_ifinfo(skb, idev, NETLINK_CB(cb->skb).pid, 
+				cb->nlh->nlmsg_seq, RTM_NEWLINK);
 		in6_dev_put(idev);
 		if (err <= 0)
 			break;
@@ -2808,6 +2832,26 @@ static int inet6_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
 	cb->args[0] = idx;
 
 	return skb->len;
+}
+
+void inet6_ifinfo_notify(int event, struct inet6_dev *idev)
+{
+	struct sk_buff *skb;
+	/* 128 bytes ?? */
+	int size = NLMSG_SPACE(sizeof(struct ifinfomsg)+128);
+	
+	skb = alloc_skb(size, GFP_ATOMIC);
+	if (!skb) {
+		netlink_set_err(rtnl, 0, RTMGRP_IPV6_IFINFO, ENOBUFS);
+		return;
+	}
+	if (inet6_fill_ifinfo(skb, idev, 0, 0, event) < 0) {
+		kfree_skb(skb);
+		netlink_set_err(rtnl, 0, RTMGRP_IPV6_IFINFO, EINVAL);
+		return;
+	}
+	NETLINK_CB(skb).dst_groups = RTMGRP_IPV6_IFINFO;
+	netlink_broadcast(rtnl, skb, 0, RTMGRP_IPV6_IFINFO, GFP_ATOMIC);
 }
 
 static struct rtnetlink_link inet6_rtnetlink_table[RTM_MAX - RTM_BASE + 1] = {

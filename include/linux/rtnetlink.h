@@ -558,9 +558,18 @@ enum
 	IFLA_INET6_CONF,	/* sysctl parameters		*/
 	IFLA_INET6_STATS,	/* statistics			*/
 	IFLA_INET6_MCAST,	/* MC things. What of them?	*/
+	IFLA_INET6_CACHEINFO,	/* time values and max reasm size */
 };
 
-#define IFLA_INET6_MAX	IFLA_INET6_MCAST
+struct ifla_cacheinfo
+{
+	__u32	max_reasm_len;
+	__u32	tstamp;		/* ipv6InterfaceTable updated timestamp */
+	__u32	reachable_time;
+	__u32	retrans_time;
+};
+
+#define IFLA_INET6_MAX	IFLA_INET6_CACHEINFO
 
 /*****************************************************************
  *		Traffic control messages.
@@ -611,6 +620,7 @@ enum
 #define RTMGRP_IPV6_IFADDR	0x100
 #define RTMGRP_IPV6_MROUTE	0x200
 #define RTMGRP_IPV6_ROUTE	0x400
+#define RTMGRP_IPV6_IFINFO	0x800
 
 #define RTMGRP_DECnet_IFADDR    0x1000
 #define RTMGRP_DECnet_ROUTE     0x4000

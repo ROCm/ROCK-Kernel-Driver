@@ -183,6 +183,7 @@ struct inet6_dev
 	struct inet6_dev	*next;
 	struct ipv6_devconf	cnf;
 	struct ipv6_devstat	stats;
+	unsigned long		tstamp; /* ipv6InterfaceTable update timestamp */
 };
 
 extern struct ipv6_devconf ipv6_devconf;
