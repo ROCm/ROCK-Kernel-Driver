@@ -758,34 +758,50 @@ static int nr_connect(struct socket *sock, struct sockaddr *uaddr,
 
 static int nr_accept(struct socket *sock, struct socket *newsock, int flags)
 {
-	struct sock *sk;
-	struct sock *newsk;
+	struct task_struct *tsk = current;
+	DECLARE_WAITQUEUE(wait, tsk);
 	struct sk_buff *skb;
+	struct sock *newsk;
+	struct sock *sk;
+	int err = 0;
 
 	if ((sk = sock->sk) == NULL)
 		return -EINVAL;
 
-	if (sk->type != SOCK_SEQPACKET)
-		return -EOPNOTSUPP;
+	lock_sock(sk);
+	if (sk->type != SOCK_SEQPACKET) {
+		err = -EOPNOTSUPP;
+		goto out;
+	}
 
-	if (sk->state != TCP_LISTEN)
-		return -EINVAL;
+	if (sk->state != TCP_LISTEN) {
+		err = -EINVAL;
+		goto out;
+	}
 
 	/*
 	 *	The write queue this time is holding sockets ready to use
 	 *	hooked into the SABM we saved
 	 */
-	do {
-		if ((skb = skb_dequeue(&sk->receive_queue)) == NULL) {
-			if (flags & O_NONBLOCK) {
-				return -EWOULDBLOCK;
-			}
-			interruptible_sleep_on(sk->sleep);
-			if (signal_pending(current)) {
-				return -ERESTARTSYS;
-			}
+	add_wait_queue(sk->sleep, &wait);
+	for (;;) {
+		skb = skb_dequeue(&sk->receive_queue);
+		if (skb)
+			break;
+
+		current->state = TASK_INTERRUPTIBLE;
+		release_sock(sk);
+		if (flags & O_NONBLOCK)
+			return -EWOULDBLOCK;
+		if (!signal_pending(tsk)) {
+			schedule();
+			lock_sock(sk);
+			continue;
 		}
-	} while (skb == NULL);
+		return -ERESTARTSYS;
+	}
+	current->state = TASK_RUNNING;
+	remove_wait_queue(sk->sleep, &wait);
 
 	newsk = skb->sk;
 	newsk->pair = NULL;
@@ -797,7 +813,8 @@ static int nr_accept(struct socket *sock, struct socket *newsock, int flags)
 	sk->ack_backlog--;
 	newsock->sk = newsk;
 
-	return 0;
+out:
+	return err;
 }
 
 static int nr_getname(struct socket *sock, struct sockaddr *uaddr,

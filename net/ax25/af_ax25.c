@@ -1376,6 +1376,7 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 	if (sk->state != TCP_ESTABLISHED) {
 		/* Not in ABM, not in WAIT_UA -> failed */
 		sock->state = SS_UNCONNECTED;
+		unlock_kernel();
 		return sock_error(sk);	/* Always set at this point */
 	}
 
@@ -1388,49 +1389,53 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 
 static int ax25_accept(struct socket *sock, struct socket *newsock, int flags)
 {
-	struct sock *sk;
-	struct sock *newsk;
+	struct task_struct *tsk = current;
+	DECLARE_WAITQUEUE(wait, tsk);
 	struct sk_buff *skb;
+	struct sock *newsk;
+	struct sock *sk;
+	int err = 0;
 
-	lock_kernel();
-	if (sock->state != SS_UNCONNECTED) {
-		unlock_kernel();
+	if (sock->state != SS_UNCONNECTED)
 		return -EINVAL;
-	}
 
-	if ((sk = sock->sk) == NULL) {
-		unlock_kernel();
+	if ((sk = sock->sk) == NULL)
 		return -EINVAL;
-	}
 
+	lock_sock(sk);
 	if (sk->type != SOCK_SEQPACKET) {
-		unlock_kernel();
-		return -EOPNOTSUPP;
+		err = -EOPNOTSUPP;
+		goto out;
 	}
 
 	if (sk->state != TCP_LISTEN) {
-		unlock_kernel();
-		return -EINVAL;
+		err = -EINVAL;
+		goto out;
 	}
 
 	/*
 	 *	The read queue this time is holding sockets ready to use
 	 *	hooked into the SABM we saved
 	 */
-	do {
-		if ((skb = skb_dequeue(&sk->receive_queue)) == NULL) {
-			if (flags & O_NONBLOCK) {
-				unlock_kernel();
-				return -EWOULDBLOCK;
-			}
+	add_wait_queue(sk->sleep, &wait);
+	for (;;) {
+		skb = skb_dequeue(&sk->receive_queue);
+		if (skb)
+			break;
 
-			interruptible_sleep_on(sk->sleep);
-			if (signal_pending(current)) {
-				unlock_kernel();
-				return -ERESTARTSYS;
-			}
+		current->state = TASK_INTERRUPTIBLE;
+		release_sock(sk);
+		if (flags & O_NONBLOCK)
+			return -EWOULDBLOCK;
+		if (!signal_pending(tsk)) {
+			schedule();
+			lock_sock(sk);
+			continue;
 		}
-	} while (skb == NULL);
+		return -ERESTARTSYS;
+	}
+	current->state = TASK_RUNNING;
+	remove_wait_queue(sk->sleep, &wait);
 
 	newsk = skb->sk;
 	newsk->pair = NULL;
@@ -1442,9 +1447,11 @@ static int ax25_accept(struct socket *sock, struct socket *newsock, int flags)
 	sk->ack_backlog--;
 	newsock->sk    = newsk;
 	newsock->state = SS_CONNECTED;
-	unlock_kernel();
 
-	return 0;
+out:
+	release_sock(sk);
+
+	return err;
 }
 
 static int ax25_getname(struct socket *sock, struct sockaddr *uaddr,
@@ -1996,6 +2003,7 @@ static struct net_proto_family ax25_family_ops = {
 	.create =	ax25_create,
 };
 
+static struct proto_ops ax25_proto_ops = {
 	.family =	PF_AX25,
 
 	.release =	ax25_release,
