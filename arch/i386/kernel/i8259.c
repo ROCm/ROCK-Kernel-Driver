@@ -340,6 +340,7 @@ void __init init_IRQ(void)
 {
 	int i;
 
+	/* all the set up before the call gates are initialised */
 	pre_intr_init_hook();
 
 	/*
@@ -353,6 +354,9 @@ void __init init_IRQ(void)
 			set_intr_gate(vector, interrupt[i]);
 	}
 
+	/* setup after call gates are initialised (usually add in
+	 * the architecture specific gates */
+	intr_init_hook();
 
 	/*
 	 * Set the clock to HZ Hz, we already have a valid
