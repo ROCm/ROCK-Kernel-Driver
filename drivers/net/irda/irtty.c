@@ -39,7 +39,6 @@
 #include <net/irda/wrapper.h>
 #include <net/irda/irda_device.h>
 
-static hashbin_t *irtty = NULL;
 static struct tty_ldisc irda_ldisc;
 
 static int qos_mtt_bits = 0x03;      /* 5 ms or more */
@@ -74,14 +73,6 @@ char *driver_name = "irtty";
 int __init irtty_init(void)
 {
 	int status;
-
-	/* Probably no need to lock here because all operations done in
-	 * open()/close() which are already safe - Jean II */
-	irtty = hashbin_new( HB_NOLOCK);
-	if ( irtty == NULL) {
-		printk( KERN_WARNING "IrDA: Can't allocate irtty hashbin!\n");
-		return -ENOMEM;
-	}
 
 	/* Fill in our line protocol discipline, and register it */
 	memset(&irda_ldisc, 0, sizeof( irda_ldisc));
@@ -124,12 +115,6 @@ static void __exit irtty_cleanup(void)
 		      __FUNCTION__, ret);
 	}
 
-	/*
-	 *  The TTY should care of deallocating the instances by using the
-	 *  callback to irtty_close(), therefore we do give any deallocation
-	 *  function to hashbin_destroy().
-	 */
-	hashbin_delete(irtty, NULL);
 }
 
 /* 
@@ -171,8 +156,6 @@ static int irtty_open(struct tty_struct *tty)
 
 	/* Give self a name */
 	strcpy(name, tty->name);
-
-	hashbin_insert(irtty, (irda_queue_t *) self, (int) self, NULL);
 
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
@@ -285,8 +268,6 @@ static void irtty_close(struct tty_struct *tty)
 	if (self->netdev)
 		unregister_netdev(self->netdev);
 	
-	self = hashbin_remove(irtty, (int) self, NULL);
-
 	/* Protect access to self->task and self->?x_buff - Jean II */
 	spin_lock_irqsave(&self->lock, flags);
 

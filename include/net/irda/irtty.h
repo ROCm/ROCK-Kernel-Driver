@@ -31,7 +31,6 @@
 #include <linux/netdevice.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irqueue.h>
 #include <net/irda/irda_device.h>
 
 /* Used by ioctl */
@@ -45,7 +44,6 @@ struct irtty_info {
 #define IRTTY_IOC_MAXNR   2
 
 struct irtty_cb {
-	irda_queue_t q;     /* Must be first */
 	magic_t magic;
 
 	struct net_device *netdev; /* Yes! we are some kind of netdevice */
