@@ -329,7 +329,7 @@ research:
 	** and jump to the end
 	*/
 	    if (PageUptodate(bh_result->b_page)) {
-		mark_buffer_uptodate(bh_result, 1);
+		set_buffer_uptodate(bh_result);
 		goto finished ;
     }
 
@@ -398,7 +398,7 @@ finished:
     pathrelse (&path);
     /* I _really_ doubt that you want it.  Chris? */
     map_bh(bh_result, inode->i_sb, 0);
-    mark_buffer_uptodate (bh_result, 1);
+    set_buffer_uptodate (bh_result);
     return 0;
 }
 
@@ -653,7 +653,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 		reiserfs_restore_prepared_buffer(inode->i_sb, bh) ;
 		goto research;
 	    }
-	    bh_result->b_state |= (1UL << BH_New);
+	    set_buffer_new(bh_result);
 	    put_block_num(item, pos_in_item, allocated_block_nr) ;
             unfm_ptr = allocated_block_nr;
 	    journal_mark_dirty (&th, inode->i_sb, bh);
@@ -705,7 +705,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 		   allocated block for that */
 		unp = cpu_to_le32 (allocated_block_nr);
 		set_block_dev_mapped (bh_result, allocated_block_nr, inode);
-		bh_result->b_state |= (1UL << BH_New);
+		set_buffer_new(bh_result);
 		done = 1;
 	    }
 	    tmp_key = key; // ;)
@@ -761,7 +761,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 		reiserfs_free_block (&th, allocated_block_nr);
 		goto failure;
 	    }
-	    /* it is important the mark_buffer_uptodate is done after
+	    /* it is important the set_buffer_uptodate is done after
 	    ** the direct2indirect.  The buffer might contain valid
 	    ** data newer than the data on disk (read by readpage, changed,
 	    ** and then sent here by writepage).  direct2indirect needs
@@ -769,7 +769,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	    ** if the data in unbh needs to be replaced with data from
 	    ** the disk
 	    */
-	    mark_buffer_uptodate (unbh, 1);
+	    set_buffer_uptodate (unbh);
 
 	    /* we've converted the tail, so we must 
 	    ** flush unbh before the transaction commits
@@ -809,7 +809,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 		   block for that */
 		un.unfm_nodenum = cpu_to_le32 (allocated_block_nr);
 		set_block_dev_mapped (bh_result, allocated_block_nr, inode);
-		bh_result->b_state |= (1UL << BH_New);
+		set_buffer_new(bh_result);
 		done = 1;
 	    } else {
 		/* paste hole to the indirect item */
@@ -1851,7 +1851,7 @@ research:
 	    goto out ;
 	}
 	set_block_dev_mapped(bh_result, get_block_num(item,pos_in_item),inode);
-        mark_buffer_uptodate(bh_result, 1);
+        set_buffer_uptodate(bh_result);
     } else if (is_direct_le_ih(ih)) {
         char *p ; 
         p = page_address(bh_result->b_page) ;
@@ -1871,7 +1871,7 @@ research:
 	journal_mark_dirty(&th, inode->i_sb, bh) ;
 	bytes_copied += copy_size ;
 	set_block_dev_mapped(bh_result, 0, inode);
-        mark_buffer_uptodate(bh_result, 1);
+        set_buffer_uptodate(bh_result);
 
 	/* are there still bytes left? */
         if (bytes_copied < bh_result->b_size && 
@@ -1921,8 +1921,8 @@ static inline void submit_bh_for_writepage(struct buffer_head **bhp, int nr) {
 	** later on in the call chain will be cleaning it.  So, we
 	** clean the buffer here, it still gets written either way.
 	*/
-	clear_bit(BH_Dirty, &bh->b_state) ;
-	set_bit(BH_Uptodate, &bh->b_state) ;
+	clear_buffer_dirty(bh) ;
+	set_buffer_uptodate(bh) ;
 	submit_bh(WRITE, bh) ;
     }
 }

@@ -474,7 +474,8 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 	new_bh->b_size = jh2bh(jh_in)->b_size;
 	new_bh->b_bdev = transaction->t_journal->j_dev;
 	new_bh->b_blocknr = blocknr;
-	new_bh->b_state |= (1 << BH_Mapped) | (1 << BH_Dirty);
+	set_buffer_mapped(new_bh);
+	set_buffer_dirty(new_bh);
 
 	*jh_out = new_jh;
 
@@ -886,7 +887,7 @@ int journal_create (journal_t *journal)
 		BUFFER_TRACE(bh, "marking dirty");
 		mark_buffer_dirty(bh);
 		BUFFER_TRACE(bh, "marking uptodate");
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		unlock_buffer(bh);
 		__brelse(bh);
 	}

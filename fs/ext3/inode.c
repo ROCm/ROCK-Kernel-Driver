@@ -575,7 +575,7 @@ static int ext3_alloc_branch(handle_t *handle, struct inode *inode,
 			branch[n].p = (u32*) bh->b_data + offsets[n];
 			*branch[n].p = branch[n].key;
 			BUFFER_TRACE(bh, "marking uptodate");
-			mark_buffer_uptodate(bh, 1);
+			set_buffer_uptodate(bh);
 			unlock_buffer(bh);
 
 			BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
@@ -746,7 +746,7 @@ reread:
 
 	/* Simplest case - block found, no allocation needed */
 	if (!partial) {
-		bh_result->b_state &= ~(1UL << BH_New);
+		clear_buffer_new(bh_result);
 got_it:
 		map_bh(bh_result, inode->i_sb, le32_to_cpu(chain[depth-1].key));
 		/* Clean up and exit */
@@ -812,7 +812,7 @@ out:
 	if (new_size > ei->i_disksize)
 		ei->i_disksize = new_size;
 
-	bh_result->b_state |= (1UL << BH_New);
+	set_buffer_new(bh_result);
 	goto got_it;
 
 changed:
@@ -874,7 +874,7 @@ struct buffer_head *ext3_getblk(handle_t *handle, struct inode * inode,
 			if (!fatal) {
 				memset(bh->b_data, 0,
 				       inode->i_sb->s_blocksize);
-				mark_buffer_uptodate(bh, 1);
+				set_buffer_uptodate(bh);
 			}
 			unlock_buffer(bh);
 			BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
@@ -1070,7 +1070,7 @@ static int journal_dirty_async_data(handle_t *handle, struct buffer_head *bh)
 /* For commit_write() in data=journal mode */
 static int commit_write_fn(handle_t *handle, struct buffer_head *bh)
 {
-	set_bit(BH_Uptodate, &bh->b_state);
+	set_buffer_uptodate(bh);
 	return ext3_journal_dirty_metadata(handle, bh);
 }
 
@@ -1423,7 +1423,7 @@ static int ext3_block_truncate_page(handle_t *handle,
 
 	/* Ok, it's mapped. Make sure it's up-to-date */
 	if (PageUptodate(page))
-		set_bit(BH_Uptodate, &bh->b_state);
+		set_buffer_uptodate(bh);
 
 	if (!buffer_uptodate(bh)) {
 		err = -EIO;

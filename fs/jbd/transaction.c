@@ -1202,7 +1202,7 @@ void journal_forget (handle_t *handle, struct buffer_head *bh)
 		/* If we are forgetting a buffer which is already part
 		 * of this transaction, then we can just drop it from
 		 * the transaction immediately. */
-		clear_bit(BH_Dirty, &bh->b_state);
+		clear_buffer_dirty(bh);
 		clear_bit(BH_JBDDirty, &bh->b_state);
 
 		JBUFFER_TRACE(jh, "belongs to current transaction: unfile");
@@ -1547,9 +1547,8 @@ void __journal_unfile_buffer(struct journal_head *jh)
 	
 	__blist_del_buffer(list, jh);
 	jh->b_jlist = BJ_None;
-	if (test_and_clear_bit(BH_JBDDirty, &jh2bh(jh)->b_state)) {
-		set_bit(BH_Dirty, &jh2bh(jh)->b_state);
-	}
+	if (test_and_clear_bit(BH_JBDDirty, &jh2bh(jh)->b_state))
+		set_buffer_dirty(jh2bh(jh));
 }
 
 void journal_unfile_buffer(struct journal_head *jh)
@@ -1856,12 +1855,11 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 
 zap_buffer:	
 	if (buffer_dirty(bh))
-		mark_buffer_clean(bh);
+		clear_buffer_dirty(bh);
 	J_ASSERT_BH(bh, !buffer_jdirty(bh));
-//	clear_bit(BH_Uptodate, &bh->b_state);
-	clear_bit(BH_Mapped, &bh->b_state);
-	clear_bit(BH_Req, &bh->b_state);
-	clear_bit(BH_New, &bh->b_state);
+	clear_buffer_mapped(bh);
+	clear_buffer_req(bh);
+	clear_buffer_new(bh);
 	bh->b_bdev = NULL;
 	return may_free;
 }
@@ -1976,7 +1974,7 @@ void __journal_file_buffer(struct journal_head *jh,
 
 	if (jlist == BJ_Metadata || jlist == BJ_Reserved || 
 	    jlist == BJ_Shadow || jlist == BJ_Forget) {
-		if (atomic_set_buffer_clean(jh2bh(jh))) {
+		if (test_clear_buffer_dirty(jh2bh(jh))) {
 			set_bit(BH_JBDDirty, &jh2bh(jh)->b_state);
 		}
 	}

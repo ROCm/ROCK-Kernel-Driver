@@ -29,7 +29,10 @@ extern spinlock_t journal_datalist_lock;
 static void journal_end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 {
 	BUFFER_TRACE(bh, "");
-	mark_buffer_uptodate(bh, uptodate);
+	if (uptodate)
+		set_buffer_uptodate(bh);
+	else
+		clear_buffer_uptodate(bh);
 	unlock_buffer(bh);
 }
 
@@ -447,9 +450,9 @@ start_journal_io:
 			unlock_journal(journal);
 			for (i=0; i<bufs; i++) {
 				struct buffer_head *bh = wbuf[i];
-				set_bit(BH_Lock, &bh->b_state);
-				clear_bit(BH_Dirty, &bh->b_state);
-				mark_buffer_uptodate(bh, 1);
+				set_buffer_locked(bh);
+				clear_buffer_dirty(bh);
+				set_buffer_uptodate(bh);
 				bh->b_end_io = journal_end_buffer_io_sync;
 				submit_bh(WRITE, bh);
 			}
@@ -588,7 +591,7 @@ start_journal_io:
 	JBUFFER_TRACE(descriptor, "write commit block");
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		ll_rw_block(WRITE, 1, &bh);
 		wait_on_buffer(bh);
 		__brelse(bh);		/* One for getblk() */

@@ -48,7 +48,7 @@ inline void do_balance_mark_leaf_dirty (struct tree_balance * tb,
 					struct buffer_head * bh, int flag)
 {
     if (reiserfs_dont_log(tb->tb_sb)) {
-	if (!test_and_set_bit(BH_Dirty, &bh->b_state)) {
+	if (!test_set_buffer_dirty(bh)) {
 //	    __mark_buffer_dirty(bh) ;
 	    tb->need_balance_dirty = 1;
 	}
@@ -1225,7 +1225,7 @@ struct buffer_head * get_FEB (struct tree_balance * tb)
     bi.bi_parent = 0;
     bi.bi_position = 0;
     make_empty_node (&bi);
-    set_bit(BH_Uptodate, &first_b->b_state);
+    set_buffer_uptodate(first_b);
     tb->FEB[i] = 0;
     tb->used[i] = first_b;
 
@@ -1272,7 +1272,7 @@ void reiserfs_invalidate_buffer (struct tree_balance * tb, struct buffer_head * 
     set_blkh_level( blkh, FREE_LEVEL );
     set_blkh_nr_item( blkh, 0 );
     
-    mark_buffer_clean (bh);
+    clear_buffer_dirty(bh);
     /* reiserfs_free_block is no longer schedule safe 
     reiserfs_free_block (tb->transaction_handle, tb->tb_sb, bh->b_blocknr);
     */

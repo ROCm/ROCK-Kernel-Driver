@@ -124,7 +124,7 @@ static void init_journal_hash(struct super_block *p_s_sb) {
 */
 static int reiserfs_clean_and_file_buffer(struct buffer_head *bh) {
   if (bh)
-    mark_buffer_clean(bh);
+    clear_buffer_dirty(bh);
   return 0 ;
 }
 
@@ -847,7 +847,7 @@ static int _update_journal_header_block(struct super_block *p_s_sb, unsigned lon
     jh->j_last_flush_trans_id = cpu_to_le32(trans_id) ;
     jh->j_first_unflushed_offset = cpu_to_le32(offset) ;
     jh->j_mount_id = cpu_to_le32(SB_JOURNAL(p_s_sb)->j_mount_id) ;
-    set_bit(BH_Dirty, &(SB_JOURNAL(p_s_sb)->j_header_bh->b_state)) ;
+    set_buffer_dirty(SB_JOURNAL(p_s_sb)->j_header_bh) ;
     ll_rw_block(WRITE, 1, &(SB_JOURNAL(p_s_sb)->j_header_bh)) ;
     wait_on_buffer((SB_JOURNAL(p_s_sb)->j_header_bh)) ; 
     if (!buffer_uptodate(SB_JOURNAL(p_s_sb)->j_header_bh)) {
@@ -893,7 +893,10 @@ static void reiserfs_end_buffer_io_sync(struct buffer_head *bh, int uptodate) {
         reiserfs_warning("clm-2084: pinned buffer %lu:%s sent to disk\n",
 	                 bh->b_blocknr, bdevname(bh->b_bdev)) ;
     }
-    mark_buffer_uptodate(bh, uptodate) ;
+    if (uptodate)
+    	set_buffer_uptodate(bh) ;
+    else
+    	clear_buffer_uptodate(bh) ;
     unlock_buffer(bh) ;
     put_bh(bh) ;
 }
@@ -902,7 +905,7 @@ static void submit_logged_buffer(struct buffer_head *bh) {
     get_bh(bh) ;
     bh->b_end_io = reiserfs_end_buffer_io_sync ;
     mark_buffer_notjournal_new(bh) ;
-    clear_bit(BH_Dirty, &bh->b_state) ;
+    clear_buffer_dirty(bh) ;
     submit_bh(WRITE, bh) ;
 }
 
@@ -1565,12 +1568,12 @@ static int journal_read_transaction(struct super_block *p_s_sb, unsigned long cu
       return -1 ;
     }
     memcpy(real_blocks[i]->b_data, log_blocks[i]->b_data, real_blocks[i]->b_size) ;
-    mark_buffer_uptodate(real_blocks[i], 1) ;
+    set_buffer_uptodate(real_blocks[i]) ;
     brelse(log_blocks[i]) ;
   }
   /* flush out the real blocks */
   for (i = 0 ; i < le32_to_cpu(desc->j_len) ; i++) {
-    set_bit(BH_Dirty, &(real_blocks[i]->b_state)) ;
+    set_buffer_dirty(real_blocks[i]) ;
     ll_rw_block(WRITE, 1, real_blocks + i) ;
   }
   for (i = 0 ; i < le32_to_cpu(desc->j_len) ; i++) {
@@ -2389,7 +2392,7 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
   }
 
   if (buffer_dirty(bh)) {
-    clear_bit(BH_Dirty, &bh->b_state) ;
+    clear_buffer_dirty(bh) ;
   }
 
   if (buffer_journaled(bh)) { /* must double check after getting lock */
@@ -2979,7 +2982,7 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
   rs = SB_DISK_SUPER_BLOCK(p_s_sb) ;
   /* setup description block */
   d_bh = journ_getblk(p_s_sb, SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) + SB_JOURNAL(p_s_sb)->j_start) ; 
-  mark_buffer_uptodate(d_bh, 1) ;
+  set_buffer_uptodate(d_bh) ;
   desc = (struct reiserfs_journal_desc *)(d_bh)->b_data ;
   memset(desc, 0, sizeof(struct reiserfs_journal_desc)) ;
   memcpy(desc->j_magic, JOURNAL_DESC_MAGIC, 8) ;
@@ -2991,7 +2994,7 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
   commit = (struct reiserfs_journal_commit *)c_bh->b_data ;
   memset(commit, 0, sizeof(struct reiserfs_journal_commit)) ;
   commit->j_trans_id = cpu_to_le32(SB_JOURNAL(p_s_sb)->j_trans_id) ;
-  mark_buffer_uptodate(c_bh, 1) ;
+  set_buffer_uptodate(c_bh) ;
 
   /* init this journal list */
   atomic_set(&(SB_JOURNAL_LIST(p_s_sb)[SB_JOURNAL_LIST_INDEX(p_s_sb)].j_older_commits_done), 0) ;
@@ -3079,7 +3082,7 @@ printk("journal-2020: do_journal_end: BAD desc->j_len is ZERO\n") ;
       struct buffer_head *tmp_bh ;
       tmp_bh =  journ_getblk(p_s_sb, SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) + 
 		       ((cur_write_start + jindex) % SB_ONDISK_JOURNAL_SIZE(p_s_sb))) ;
-      mark_buffer_uptodate(tmp_bh, 1) ;
+      set_buffer_uptodate(tmp_bh) ;
       memcpy(tmp_bh->b_data, cn->bh->b_data, cn->bh->b_size) ;  
       jindex++ ;
     } else {

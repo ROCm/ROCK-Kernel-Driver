@@ -541,7 +541,7 @@ static void flush_descriptor(journal_t *journal,
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
 		BUFFER_TRACE(bh, "write");
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		ll_rw_block (WRITE, 1, &bh);
 	}
 }

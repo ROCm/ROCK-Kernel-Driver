@@ -361,7 +361,7 @@ affs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh_resul
 		u32 blocknr = affs_alloc_block(inode, ext_bh->b_blocknr);
 		if (!blocknr)
 			goto err_alloc;
-		bh_result->b_state |= (1UL << BH_New);
+		set_buffer_new(bh_result);
 		AFFS_I(inode)->mmu_private += AFFS_SB(sb)->s_data_blksize;
 		AFFS_I(inode)->i_blkcnt++;
 
@@ -400,7 +400,7 @@ err_ext:
 	return PTR_ERR(ext_bh);
 err_alloc:
 	brelse(ext_bh);
-	bh_result->b_state &= ~(1UL << BH_Mapped);
+	clear_buffer_mapped(bh_result);
 	bh_result->b_bdev = NULL;
 	// unlock cache
 	affs_unlock_ext(inode);
@@ -701,7 +701,7 @@ static int affs_commit_write_ofs(struct file *file, struct page *page, unsigned 
 		if (IS_ERR(bh))
 			goto out;
 		memcpy(AFFS_DATA(bh), data + from, bsize);
-		if (bh->b_state & (1UL << BH_New)) {
+		if (buffer_new(bh)) {
 			AFFS_DATA_HEAD(bh)->ptype = cpu_to_be32(T_DATA);
 			AFFS_DATA_HEAD(bh)->key = cpu_to_be32(inode->i_ino);
 			AFFS_DATA_HEAD(bh)->sequence = cpu_to_be32(bidx);
@@ -730,7 +730,7 @@ static int affs_commit_write_ofs(struct file *file, struct page *page, unsigned 
 			goto out;
 		tmp = min(bsize, to - from);
 		memcpy(AFFS_DATA(bh), data + from, tmp);
-		if (bh->b_state & (1UL << BH_New)) {
+		if (buffer_new(bh)) {
 			AFFS_DATA_HEAD(bh)->ptype = cpu_to_be32(T_DATA);
 			AFFS_DATA_HEAD(bh)->key = cpu_to_be32(inode->i_ino);
 			AFFS_DATA_HEAD(bh)->sequence = cpu_to_be32(bidx);

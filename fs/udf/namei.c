@@ -984,7 +984,7 @@ static int udf_symlink(struct inode * dir, struct dentry * dentry, const char * 
 		bh = udf_tread(inode->i_sb, block);
 		lock_buffer(bh);
 		memset(bh->b_data, 0x00, inode->i_sb->s_blocksize);
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		unlock_buffer(bh);
 		mark_buffer_dirty_inode(bh, inode);
 	}

@@ -254,7 +254,7 @@ struct buffer_head * udf_expand_dir_adinicb(struct inode *inode, int *block, int
 		return NULL;
 	lock_buffer(dbh);
 	memset(dbh->b_data, 0x00, inode->i_sb->s_blocksize);
-	mark_buffer_uptodate(dbh, 1);
+	set_buffer_uptodate(dbh);
 	unlock_buffer(dbh);
 	mark_buffer_dirty_inode(dbh, inode);
 
@@ -348,7 +348,7 @@ static int udf_get_block(struct inode *inode, sector_t block, struct buffer_head
 		BUG();
 
 	if (new)
-		bh_result->b_state |= (1UL << BH_New);
+		set_buffer_new(bh_result);
 	map_bh(bh_result, inode->i_sb, phys);
 abort:
 	unlock_kernel();
@@ -375,7 +375,7 @@ struct buffer_head * udf_getblk(struct inode * inode, long block,
 		{
 			lock_buffer(bh);
 			memset(bh->b_data, 0x00, inode->i_sb->s_blocksize);
-			mark_buffer_uptodate(bh, 1);
+			set_buffer_uptodate(bh);
 			unlock_buffer(bh);
 			mark_buffer_dirty_inode(bh, inode);
 		}
@@ -1656,7 +1656,7 @@ int8_t udf_add_aext(struct inode *inode, lb_addr *bloc, int *extoffset,
 		}
 		lock_buffer(nbh);
 		memset(nbh->b_data, 0x00, inode->i_sb->s_blocksize);
-		mark_buffer_uptodate(nbh, 1);
+		set_buffer_uptodate(nbh);
 		unlock_buffer(nbh);
 		mark_buffer_dirty_inode(nbh, inode);
 

@@ -109,8 +109,13 @@ void ubh_mark_buffer_uptodate (struct ufs_buffer_head * ubh, int flag)
 	unsigned i;
 	if (!ubh)
 		return;
-	for ( i = 0; i < ubh->count; i++ )
-		mark_buffer_uptodate (ubh->bh[i], flag);
+	if (flag) {
+		for ( i = 0; i < ubh->count; i++ )
+			set_buffer_uptodate (ubh->bh[i]);
+	} else {
+		for ( i = 0; i < ubh->count; i++ )
+			clear_buffer_uptodate (ubh->bh[i]);
+	}
 }
 
 void ubh_ll_rw_block (int rw, unsigned nr, struct ufs_buffer_head * ubh[])

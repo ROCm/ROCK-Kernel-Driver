@@ -89,7 +89,7 @@ static int alloc_branch(struct inode *inode,
 		branch[n].bh = bh;
 		branch[n].p = (block_t*) bh->b_data + offsets[n];
 		*branch[n].p = branch[n].key;
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		unlock_buffer(bh);
 		mark_buffer_dirty_inode(bh, inode);
 		parent = nr;
@@ -194,7 +194,7 @@ out:
 	if (splice_branch(inode, chain, partial, left) < 0)
 		goto changed;
 
-	bh->b_state |= (1UL << BH_New);
+	set_buffer_new(bh);
 	goto got_it;
 
 changed:

@@ -225,7 +225,7 @@ failed:
 	for (i = oldcount; i < newcount; i++) { \
 		bh = sb_getblk(sb, result + i); \
 		memset (bh->b_data, 0, sb->s_blocksize); \
-		mark_buffer_uptodate(bh, 1); \
+		set_buffer_uptodate(bh); \
 		mark_buffer_dirty (bh); \
 		if (IS_SYNC(inode)) { \
 			ll_rw_block (WRITE, 1, &bh); \
@@ -360,7 +360,7 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 			bh = sb_bread(sb, tmp + i);
 			if(bh)
 			{
-				mark_buffer_clean (bh);
+				clear_buffer_dirty(bh);
 				bh->b_blocknr = result + i;
 				mark_buffer_dirty (bh);
 				if (IS_SYNC(inode)) {

@@ -114,7 +114,7 @@ int hfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_r
 	phys = hfs_extent_map(HFS_I(inode)->fork, iblock, create);
 	if (phys) {
 		if (create)
-			bh_result->b_state |= (1UL << BH_New);
+			set_buffer_new(bh_result);
 		map_bh(bh_result, inode->i_sb, phys);
 		return 0;
 	}
@@ -479,7 +479,7 @@ hfs_s32 hfs_do_write(struct inode *inode, struct hfs_fork * fork, hfs_u32 pos,
 		pos += c;
 		written += c;
 		buf += c;
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		mark_buffer_dirty(bh);
 		brelse(bh);
 	}

@@ -233,11 +233,8 @@ enum jbd_state_bits {
 	BH_JBDDirty,		/* 1 if buffer is dirty but journaled */
 };
 
-/* Return true if the buffer is one which JBD is managing */
-static inline int buffer_jbd(struct buffer_head *bh)
-{
-	return __buffer_state(bh, JBD);
-}
+BUFFER_FNS(JBD, jbd)
+BUFFER_FNS(JBDDirty, jbddirty)
 
 static inline struct buffer_head *jh2bh(struct journal_head *jh)
 {
@@ -838,7 +835,7 @@ static inline int buffer_jlist_eq(struct buffer_head *bh, int list)
 /* Return true if this bufer is dirty wrt the journal */
 static inline int buffer_jdirty(struct buffer_head *bh)
 {
-	return buffer_jbd(bh) && __buffer_state(bh, JBDDirty);
+	return buffer_jbd(bh) && buffer_jbddirty(bh);
 }
 
 /* Return true if it's a data buffer which journalling is managing */

@@ -48,7 +48,10 @@ static void end_buffer_read_file_async(struct buffer_head *bh, int uptodate)
 	struct buffer_head *tmp;
 	struct page *page;
 
-	mark_buffer_uptodate(bh, uptodate);
+	if (uptodate)
+		set_buffer_uptodate(bh);
+	else
+		clear_buffer_uptodate(bh);
 
 	page = bh->b_page;
 
@@ -73,7 +76,7 @@ static void end_buffer_read_file_async(struct buffer_head *bh, int uptodate)
 		SetPageError(page);
 
 	spin_lock_irqsave(&page_uptodate_lock, flags);
-	mark_buffer_async(bh, 0);
+	clear_buffer_async(bh);
 	unlock_buffer(bh);
 
 	tmp = bh->b_this_page;
@@ -167,7 +170,7 @@ retry_remap:
 				/* Setup buffer head to correct block. */
 				bh->b_blocknr = ((lcn << vol->cluster_size_bits)
 						+ vcn_ofs) >> blocksize_bits;
-				bh->b_state |= (1UL << BH_Mapped);
+				set_buffer_mapped(bh);
 				/* Only read initialized data blocks. */
 				if (iblock < zblock) {
 					arr[nr++] = bh;
@@ -200,12 +203,12 @@ retry_remap:
 		 */
 handle_hole:
 		bh->b_blocknr = -1UL;
-		bh->b_state &= ~(1UL << BH_Mapped);
+		clear_buffer_mapped(bh);
 handle_zblock:
 		memset(kmap(page) + i * blocksize, 0, blocksize);
 		flush_dcache_page(page);
 		kunmap(page);
-		set_bit(BH_Uptodate, &bh->b_state);
+		set_buffer_uptodate(bh);
 	} while (i++, iblock++, (bh = bh->b_this_page) != head);
 
 	/* Check we have at least one buffer ready for i/o. */
@@ -215,7 +218,7 @@ handle_zblock:
 			struct buffer_head *tbh = arr[i];
 			lock_buffer(tbh);
 			tbh->b_end_io = end_buffer_read_file_async;
-			mark_buffer_async(tbh, 1);
+			set_buffer_async(tbh);
 		}
 		/* Finally, start i/o on the buffers. */
 		for (i = 0; i < nr; i++)
@@ -346,7 +349,10 @@ static void end_buffer_read_mftbmp_async(struct buffer_head *bh, int uptodate)
 	struct buffer_head *tmp;
 	struct page *page;
 
-	mark_buffer_uptodate(bh, uptodate);
+	if (uptodate)
+		set_buffer_uptodate(bh);
+	else
+		clear_buffer_uptodate(bh);
 
 	page = bh->b_page;
 
@@ -372,7 +378,7 @@ static void end_buffer_read_mftbmp_async(struct buffer_head *bh, int uptodate)
 		SetPageError(page);
 
 	spin_lock_irqsave(&page_uptodate_lock, flags);
-	mark_buffer_async(bh, 0);
+	clear_buffer_async(bh);
 	unlock_buffer(bh);
 
 	tmp = bh->b_this_page;
@@ -454,7 +460,7 @@ static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
 				/* Setup buffer head to correct block. */
 				bh->b_blocknr = ((lcn << vol->cluster_size_bits)
 						+ vcn_ofs) >> blocksize_bits;
-				bh->b_state |= (1UL << BH_Mapped);
+				set_buffer_mapped(bh);
 				/* Only read initialized data blocks. */
 				if (iblock < zblock) {
 					arr[nr++] = bh;
@@ -480,12 +486,12 @@ static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
 		 * the buffer uptodate.
 		 */
 		bh->b_blocknr = -1UL;
-		bh->b_state &= ~(1UL << BH_Mapped);
+		clear_buffer_mapped(bh);
 handle_zblock:
 		memset(kmap(page) + i * blocksize, 0, blocksize);
 		flush_dcache_page(page);
 		kunmap(page);
-		set_bit(BH_Uptodate, &bh->b_state);
+		set_buffer_uptodate(bh);
 	} while (i++, iblock++, (bh = bh->b_this_page) != head);
 
 	/* Check we have at least one buffer ready for i/o. */
@@ -495,7 +501,7 @@ handle_zblock:
 			struct buffer_head *tbh = arr[i];
 			lock_buffer(tbh);
 			tbh->b_end_io = end_buffer_read_mftbmp_async;
-			mark_buffer_async(tbh, 1);
+			set_buffer_async(tbh);
 		}
 		/* Finally, start i/o on the buffers. */
 		for (i = 0; i < nr; i++)
@@ -539,7 +545,10 @@ static void end_buffer_read_mst_async(struct buffer_head *bh, int uptodate)
 	struct page *page;
 	ntfs_inode *ni;
 
-	mark_buffer_uptodate(bh, uptodate);
+	if (uptodate)
+		set_buffer_uptodate(bh);
+	else
+		clear_buffer_uptodate(bh);
 
 	page = bh->b_page;
 
@@ -565,7 +574,7 @@ static void end_buffer_read_mst_async(struct buffer_head *bh, int uptodate)
 		SetPageError(page);
 
 	spin_lock_irqsave(&page_uptodate_lock, flags);
-	mark_buffer_async(bh, 0);
+	clear_buffer_async(bh);
 	unlock_buffer(bh);
 
 	tmp = bh->b_this_page;
@@ -701,7 +710,7 @@ retry_remap:
 				/* Setup buffer head to correct block. */
 				bh->b_blocknr = ((lcn << vol->cluster_size_bits)
 						+ vcn_ofs) >> blocksize_bits;
-				bh->b_state |= (1UL << BH_Mapped);
+				set_buffer_mapped(bh);
 				/* Only read initialized data blocks. */
 				if (iblock < zblock) {
 					arr[nr++] = bh;
@@ -734,12 +743,12 @@ retry_remap:
 		 */
 handle_hole:
 		bh->b_blocknr = -1UL;
-		bh->b_state &= ~(1UL << BH_Mapped);
+		clear_buffer_mapped(bh);
 handle_zblock:
 		memset(kmap(page) + i * blocksize, 0, blocksize);
 		flush_dcache_page(page);
 		kunmap(page);
-		set_bit(BH_Uptodate, &bh->b_state);
+		set_buffer_uptodate(bh);
 	} while (i++, iblock++, (bh = bh->b_this_page) != head);
 
 	/* Check we have at least one buffer ready for i/o. */
@@ -749,7 +758,7 @@ handle_zblock:
 			struct buffer_head *tbh = arr[i];
 			lock_buffer(tbh);
 			tbh->b_end_io = end_buffer_read_mst_async;
-			mark_buffer_async(tbh, 1);
+			set_buffer_async(tbh);
 		}
 		/* Finally, start i/o on the buffers. */
 		for (i = 0; i < nr; i++)

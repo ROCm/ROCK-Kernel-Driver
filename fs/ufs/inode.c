@@ -389,7 +389,7 @@ out:
 	if (err)
 		goto abort;
 	if (new)
-		bh_result->b_state |= (1UL << BH_New);
+		set_buffer_new(bh_result);
 	map_bh(bh_result, sb, phys);
 abort:
 	unlock_kernel();
@@ -419,7 +419,7 @@ struct buffer_head *ufs_getfrag(struct inode *inode, unsigned int fragment,
 		bh = sb_getblk(inode->i_sb, dummy.b_blocknr);
 		if (buffer_new(&dummy)) {
 			memset(bh->b_data, 0, inode->i_sb->s_blocksize);
-			mark_buffer_uptodate(bh, 1);
+			set_buffer_uptodate(bh);
 			mark_buffer_dirty(bh);
 		}
 		return bh;

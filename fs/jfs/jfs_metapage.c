@@ -267,7 +267,7 @@ static int direct_get_block(struct inode *ip, sector_t lblock,
 			    struct buffer_head *bh_result, int create)
 {
 	if (create)
-		bh_result->b_state |= (1UL << BH_New);
+		set_buffer_new(bh_result);
 
 	map_bh(bh_result, ip->i_sb, lblock);
 

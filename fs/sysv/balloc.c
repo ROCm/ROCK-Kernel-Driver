@@ -83,7 +83,7 @@ void sysv_free_block(struct super_block * sb, u32 nr)
 		*(u16*)bh->b_data = cpu_to_fs16(sb, count);
 		memcpy(get_chunk(sb,bh), blocks, count * sizeof(sysv_zone_t));
 		mark_buffer_dirty(bh);
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		brelse(bh);
 		count = 0;
 	}

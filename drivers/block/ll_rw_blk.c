@@ -1405,7 +1405,7 @@ int submit_bh(int rw, struct buffer_head * bh)
 {
 	struct bio *bio;
 
-	BUG_ON(!test_bit(BH_Lock, &bh->b_state));
+	BUG_ON(!buffer_locked(bh));
 	BUG_ON(!buffer_mapped(bh));
 	BUG_ON(!bh->b_end_io);
 
@@ -1414,7 +1414,7 @@ int submit_bh(int rw, struct buffer_head * bh)
 	if (rw == WRITE && !buffer_uptodate(bh))
 		printk("%s: write of non-uptodate buffer\n", __FUNCTION__);
 		
-	set_bit(BH_Req, &bh->b_state);
+	set_buffer_req(bh);
 
 	/*
 	 * from here on down, it's all bio -- do the initial mapping,
@@ -1507,7 +1507,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 		struct buffer_head *bh = bhs[i];
 
 		/* Only one thread can actually submit the I/O. */
-		if (test_and_set_bit(BH_Lock, &bh->b_state))
+		if (test_set_buffer_locked(bh))
 			continue;
 
 		/* We have the buffer lock */
@@ -1516,7 +1516,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 
 		switch(rw) {
 		case WRITE:
-			if (!atomic_set_buffer_clean(bh))
+			if (!test_clear_buffer_dirty(bh))
 				/* Hmmph! Nothing to write */
 				goto end_io;
 			break;
@@ -1530,7 +1530,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 		default:
 			BUG();
 	end_io:
-			bh->b_end_io(bh, test_bit(BH_Uptodate, &bh->b_state));
+			bh->b_end_io(bh, buffer_uptodate(bh));
 			continue;
 		}
 
@@ -1541,7 +1541,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 sorry:
 	/* Make sure we don't get infinite dirty retries.. */
 	for (i = 0; i < nr; i++)
-		mark_buffer_clean(bhs[i]);
+		clear_buffer_dirty(bhs[i]);
 }
 
 #ifdef CONFIG_STRAM_SWAP

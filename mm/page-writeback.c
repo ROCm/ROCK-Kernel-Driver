@@ -463,7 +463,7 @@ int __set_page_dirty_buffers(struct page *page)
 
 		do {
 			if (buffer_uptodate(bh))
-				set_bit(BH_Dirty, &bh->b_state);
+				set_buffer_dirty(bh);
 			bh = bh->b_this_page;
 		} while (bh != head);
 	}
