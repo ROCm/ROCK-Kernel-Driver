@@ -255,14 +255,22 @@ static void __init isapnp_peek(unsigned char *data, int bytes)
 static int isapnp_next_rdp(void)
 {
 	int rdp = isapnp_rdp;
+	static int old_rdp = 0;
+	
+	if(old_rdp)
+	{
+		release_region(old_rdp, 1);
+		old_rdp = 0;
+	}
 	while (rdp <= 0x3ff) {
 		/*
 		 *	We cannot use NE2000 probe spaces for ISAPnP or we
 		 *	will lock up machines.
 		 */
-		if ((rdp < 0x280 || rdp >  0x380) && !check_region(rdp, 1))
+		if ((rdp < 0x280 || rdp >  0x380) && request_region(rdp, 1, "ISAPnP"))
 		{
 			isapnp_rdp = rdp;
+			old_rdp = rdp;
 			return 0;
 		}
 		rdp += RDP_STEP;
