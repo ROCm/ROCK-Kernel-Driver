@@ -173,7 +173,7 @@ static inline void do_get_tz(struct timezone * tz)
 	} while (read_seqretry(&__xtime_lock, sequence));
 }
 
-static int __vsyscall(0) vgettimeofday(struct timeval * tv, struct timezone * tz)
+static int __vsyscall(0) asmlinkage vgettimeofday(struct timeval * tv, struct timezone * tz)
 {
 	if (tv)
 		do_vgettimeofday(tv);
@@ -182,7 +182,7 @@ static int __vsyscall(0) vgettimeofday(struct timeval * tv, struct timezone * tz
 	return 0;
 }
 
-static time_t __vsyscall(1) vtime(time_t * t)
+static time_t __vsyscall(1) asmlinkage vtime(time_t * t)
 {
 	struct timeval tv;
 	vgettimeofday(&tv,NULL);
@@ -191,12 +191,12 @@ static time_t __vsyscall(1) vtime(time_t * t)
 	return tv.tv_sec;
 }
 
-static long __vsyscall(2) venosys_0(void)
+static long __vsyscall(2) asmlinkage venosys_0(void)
 {
 	return -ENOSYS;
 }
 
-static long __vsyscall(3) venosys_1(void)
+static long __vsyscall(3) asmlinkage venosys_1(void)
 {
 	return -ENOSYS;
 }
