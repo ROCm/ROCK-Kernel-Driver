@@ -94,7 +94,6 @@
  *	places.
  */
 
-#define __SND_OSS_COMPAT__
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -102,6 +101,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/gameport.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/mpu401.h>
@@ -122,6 +122,10 @@ MODULE_DEVICES("{{ESS,Maestro 2e},"
 		"{ESS,Maestro 1},"
 		"{TerraTec,DMX}}");
 
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
+#define SUPPORT_JOYSTICK 1
+#endif
+
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 1-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
@@ -131,6 +135,9 @@ static int pcm_substreams_c[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1 };
 static int clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int use_pm[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
 static int enable_mpu[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
+#ifdef SUPPORT_JOYSTICK
+static int joystick[SNDRV_CARDS];
+#endif
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
@@ -159,6 +166,11 @@ MODULE_PARM_SYNTAX(use_pm, SNDRV_ENABLED ",allows:{{0,1,2}},skill:advanced");
 MODULE_PARM(enable_mpu, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable_mpu, "Enable MPU401.  (0 = off, 1 = on, 2 = auto)");
 MODULE_PARM_SYNTAX(enable_mpu, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
+#ifdef SUPPORT_JOYSTICK
+MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(joystick, "Enable joystick.");
+MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+#endif
 
 
 /* PCI Dev ID's */
@@ -601,6 +613,11 @@ struct snd_es1968 {
 
 #ifdef CONFIG_PM
 	u16 apu_map[NR_APUS][NR_APU_REGS];
+#endif
+
+#ifdef SUPPORT_JOYSTICK
+	struct gameport gameport;
+	struct resource *res_joystick;
 #endif
 };
 
@@ -2020,15 +2037,20 @@ static irqreturn_t snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *r
 static int __devinit
 snd_es1968_mixer(es1968_t *chip)
 {
+	ac97_bus_t bus, *pbus;
 	ac97_t ac97;
 	snd_ctl_elem_id_t id;
 	int err;
 
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_es1968_ac97_write;
+	bus.read = snd_es1968_ac97_read;
+	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+		return err;
+
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_es1968_ac97_write;
-	ac97.read = snd_es1968_ac97_read;
 	ac97.private_data = chip;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97)) < 0)
+	if ((err = snd_ac97_mixer(pbus, &ac97, &chip->ac97)) < 0)
 		return err;
 
 	/* attach master switch / volumes for h/w volume control */
@@ -2478,6 +2500,13 @@ static int snd_es1968_free(es1968_t *chip)
 	if (chip->res_io_port)
 		snd_es1968_reset(chip);
 
+#ifdef SUPPORT_JOYSTICK
+	if (chip->res_joystick) {
+		gameport_unregister_port(&chip->gameport);
+		release_resource(chip->res_joystick);
+		kfree_nocheck(chip->res_joystick);
+	}
+#endif
 	snd_es1968_set_acpi(chip, ACPI_D3);
 	chip->master_switch = NULL;
 	chip->master_volume = NULL;
@@ -2538,7 +2567,7 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 		snd_printk("architecture does not support 28bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x0fffffff);
+	pci_set_consistent_dma_mask(pci, 0x0fffffff);
 
 	chip = (es1968_t *) snd_magic_kcalloc(es1968_t, 0, GFP_KERNEL);
 	if (! chip)
@@ -2624,57 +2653,6 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 
 
 /*
- * joystick
- */
-
-static int snd_es1968_joystick_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 1;
-	return 0;
-}
-
-static int snd_es1968_joystick_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
-{
-	es1968_t *chip = snd_kcontrol_chip(kcontrol);
-	u16 val;
-
-	pci_read_config_word(chip->pci, ESM_LEGACY_AUDIO_CONTROL, &val);
-	ucontrol->value.integer.value[0] = (val & 0x04) ? 1 : 0;
-	return 0;
-}
-
-static int snd_es1968_joystick_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
-{
-	es1968_t *chip = snd_kcontrol_chip(kcontrol);
-	u16 val, oval;
-
-	pci_read_config_word(chip->pci, ESM_LEGACY_AUDIO_CONTROL, &oval);
-	val = oval & ~0x04;
-	if (ucontrol->value.integer.value[0])
-		val |= 0x04;
-	if (val != oval) {
-		pci_write_config_word(chip->pci, ESM_LEGACY_AUDIO_CONTROL, val);
-		return 1;
-	}
-	return 0;
-}
-
-#define num_controls(ary) (sizeof(ary) / sizeof(snd_kcontrol_new_t))
-
-static snd_kcontrol_new_t snd_es1968_control_switches[] __devinitdata = {
-	{
-		.name = "Joystick",
-		.iface = SNDRV_CTL_ELEM_IFACE_CARD,
-		.info = snd_es1968_joystick_info,
-		.get = snd_es1968_joystick_get,
-		.put = snd_es1968_joystick_put,
-	}
-};
-
-/*
  */
 static int __devinit snd_es1968_probe(struct pci_dev *pci,
 				      const struct pci_device_id *pci_id)
@@ -2756,14 +2734,17 @@ static int __devinit snd_es1968_probe(struct pci_dev *pci,
 		}
 	}
 
-	/* card switches */
-	for (i = 0; i < num_controls(snd_es1968_control_switches); i++) {
-		err = snd_ctl_add(card, snd_ctl_new1(&snd_es1968_control_switches[i], chip));
-		if (err < 0) {
-			snd_card_free(card);
-			return err;
-		}
+#ifdef SUPPORT_JOYSTICK
+#define JOYSTICK_ADDR	0x200
+	if (joystick[dev] &&
+	    (chip->res_joystick = request_region(JOYSTICK_ADDR, 8, "ES1968 gameport")) != NULL) {
+		u16 val;
+		pci_read_config_word(pci, ESM_LEGACY_AUDIO_CONTROL, &val);
+		pci_write_config_word(pci, ESM_LEGACY_AUDIO_CONTROL, val | 0x04);
+		chip->gameport.io = JOYSTICK_ADDR;
+		gameport_register_port(&chip->gameport);
 	}
+#endif
 
 	snd_es1968_start_irq(chip);
 
@@ -2834,7 +2815,8 @@ module_exit(alsa_card_es1968_exit)
 			 pcm_substreams_c,
 			 clock,
 			 use_pm,
-			 enable_mpu
+			 enable_mpu,
+			 joystick
 */
 
 static int __init alsa_card_es1968_setup(char *str)
@@ -2851,7 +2833,11 @@ static int __init alsa_card_es1968_setup(char *str)
 	       get_option(&str,&pcm_substreams_c[nr_dev]) == 2 &&
 	       get_option(&str,&clock[nr_dev]) == 2 &&
 	       get_option(&str,&use_pm[nr_dev]) == 2 &&
-	       get_option(&str,&enable_mpu[nr_dev]) == 2);
+	       get_option(&str,&enable_mpu[nr_dev]) == 2
+#ifdef SUPPORT_JOYSTICK
+	       && get_option(&str,&joystick[nr_dev]) == 2
+#endif
+	       );
 	nr_dev++;
 	return 1;
 }

@@ -2093,7 +2093,7 @@ static void __devinit snd_korg1212_proc_init(korg1212_t *korg1212)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(korg1212->card, "korg1212", &entry))
-		snd_info_set_text_ops(entry, korg1212, snd_korg1212_proc_read);
+		snd_info_set_text_ops(entry, korg1212, 1024, snd_korg1212_proc_read);
 }
 
 static int

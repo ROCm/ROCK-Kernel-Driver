@@ -993,7 +993,8 @@ int __init snd_pmac_tumbler_init(pmac_t *chip)
 	char *chipname;
 
 #ifdef CONFIG_KMOD
-	request_module("i2c-keywest");
+	if (current->fs->root)
+		request_module("i2c-keywest");
 #endif /* CONFIG_KMOD */	
 
 	mix = kmalloc(sizeof(*mix), GFP_KERNEL);

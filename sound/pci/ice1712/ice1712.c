@@ -1040,16 +1040,21 @@ static void snd_ice1712_set_pro_rate(ice1712_t *ice, unsigned int rate, int forc
 	default:
 		snd_BUG();
 		val = 0;
+		rate = 48000;
 		break;
 	}
 	outb(val, ICEMT(ice, RATE));
 
 	spin_unlock_irqrestore(&ice->reg_lock, flags);
 
+	if (ice->gpio.set_pro_rate)
+		ice->gpio.set_pro_rate(ice, rate);
 	for (i = 0; i < ice->akm_codecs; i++) {
 		if (ice->akm[i].ops.set_rate_val)
 			ice->akm[i].ops.set_rate_val(&ice->akm[i], rate);
 	}
+	if (ice->spdif.ops.setup_rate)
+		ice->spdif.ops.setup_rate(ice, rate);
 }
 
 static int snd_ice1712_playback_pro_prepare(snd_pcm_substream_t * substream)
@@ -1072,8 +1077,6 @@ static int snd_ice1712_playback_pro_hw_params(snd_pcm_substream_t * substream,
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 
 	snd_ice1712_set_pro_rate(ice, params_rate(hw_params), 0);
-	if (ice->spdif.ops.setup_rate)
-		ice->spdif.ops.setup_rate(ice, params_rate(hw_params));
 	return snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 }
 
@@ -1449,13 +1452,17 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 	int err;
 
 	if (ice_has_con_ac97(ice)) {
+		ac97_bus_t bus, *pbus;
 		ac97_t ac97;
+		memset(&bus, 0, sizeof(bus));
+		bus.write = snd_ice1712_ac97_write;
+		bus.read = snd_ice1712_ac97_read;
+		if ((err = snd_ac97_bus(ice->card, &bus, &pbus)) < 0)
+			return err;
 		memset(&ac97, 0, sizeof(ac97));
-		ac97.write = snd_ice1712_ac97_write;
-		ac97.read = snd_ice1712_ac97_read;
 		ac97.private_data = ice;
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
-		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0)
+		if ((err = snd_ac97_mixer(pbus, &ac97, &ice->ac97)) < 0)
 			printk(KERN_WARNING "ice1712: cannot initialize ac97 for consumer, skipped\n");
 		else {
 			if ((err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_mixer_digmix_route_ac97, ice))) < 0)
@@ -1465,13 +1472,17 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 	}
 
 	if (! (ice->eeprom.data[ICE_EEP1_ACLINK] & ICE1712_CFG_PRO_I2S)) {
+		ac97_bus_t bus, *pbus;
 		ac97_t ac97;
+		memset(&bus, 0, sizeof(bus));
+		bus.write = snd_ice1712_pro_ac97_write;
+		bus.read = snd_ice1712_pro_ac97_read;
+		if ((err = snd_ac97_bus(ice->card, &bus, &pbus)) < 0)
+			return err;
 		memset(&ac97, 0, sizeof(ac97));
-		ac97.write = snd_ice1712_pro_ac97_write;
-		ac97.read = snd_ice1712_pro_ac97_read;
 		ac97.private_data = ice;
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
-		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0)
+		if ((err = snd_ac97_mixer(pbus, &ac97, &ice->ac97)) < 0)
 			printk(KERN_WARNING "ice1712: cannot initialize pro ac97, skipped\n");
 		else
 			return 0;
@@ -1532,7 +1543,7 @@ static void __devinit snd_ice1712_proc_init(ice1712_t * ice)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(ice->card, "ice1712", &entry))
-		snd_info_set_text_ops(entry, ice, snd_ice1712_proc_read);
+		snd_info_set_text_ops(entry, ice, 1024, snd_ice1712_proc_read);
 }
 
 /*
@@ -2356,7 +2367,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 		snd_printk("architecture does not support 28bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x0fffffff);
+	pci_set_consistent_dma_mask(pci, 0x0fffffff);
 
 	ice = snd_magic_kcalloc(ice1712_t, 0, GFP_KERNEL);
 	if (ice == NULL)

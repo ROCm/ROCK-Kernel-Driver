@@ -35,7 +35,7 @@ static const char __module_generic_string_##name [] \
 #define MODULE_DEVICES(val) MODULE_GENERIC_STRING(info_devices, val)
 #define MODULE_PARM_SYNTAX(id, val) MODULE_GENERIC_STRING(info_parm_##id, val)
 
-#define SNDRV_AUTO_PORT		0xffff
+#define SNDRV_AUTO_PORT		1
 #define SNDRV_AUTO_IRQ		0xffff
 #define SNDRV_AUTO_DMA		0xffff
 #define SNDRV_AUTO_DMA_SIZE	(0x7fffffff)
@@ -58,7 +58,7 @@ static const char __module_generic_string_##name [] \
 #else
 #define SNDRV_DEFAULT_ENABLE_ISAPNP SNDRV_DEFAULT_ENABLE
 #endif
-#define SNDRV_DEFAULT_PORT	{ SNDRV_AUTO_PORT, [1 ... (SNDRV_CARDS-1)] = -1 }
+#define SNDRV_DEFAULT_PORT	{ [0 ... (SNDRV_CARDS-1)] = SNDRV_AUTO_PORT }
 #define SNDRV_DEFAULT_IRQ	{ [0 ... (SNDRV_CARDS-1)] = SNDRV_AUTO_IRQ }
 #define SNDRV_DEFAULT_DMA	{ [0 ... (SNDRV_CARDS-1)] = SNDRV_AUTO_DMA }
 #define SNDRV_DEFAULT_DMA_SIZE	{ [0 ... (SNDRV_CARDS-1)] = SNDRV_AUTO_DMA_SIZE }
@@ -136,31 +136,41 @@ static int snd_legacy_find_free_dma(int *dma_table)
 #if defined(SNDRV_GET_ID) && !defined(MODULE)
 #include <linux/ctype.h>
 #include <linux/init.h>
+#include <linux/bootmem.h>
 static int __init get_id(char **str, char **dst)
 {
-	char *s, *d;
+	char *s;
 
 	if (!(*str) || !(**str))
 		return 0;
 	for (s = *str; isalpha(*s) || isdigit(*s) || *s == '_'; s++);
 	if (s != *str) {
-		*dst = (char *)kmalloc((s - *str) + 1, GFP_KERNEL);
-		s = *str; d = *dst;
-		while (isalpha(*s) || isdigit(*s) || *s == '_') {
-			if (d != NULL)
-				*d++ = *s;
-			s++;
+		int len = s - *str;
+		char *d = (char *)alloc_bootmem(len + 1);
+		if (d != NULL) {
+			memcpy(*dst = d, *str, len);
+			d[len] = '\0';
 		}
-		if (d != NULL)
-			*d = '\0';
 	}
-	*str = s;
 	if (*s == ',') {
-		(*str)++;
+		*str = s + 1;
 		return 2;
 	}
+	*str = s;
 	return 1;
 }
 #endif
+
+/* simple wrapper for long variable.
+ * the value more than 32bit won't work!
+ */
+inline static int get_option_long(char **str, long *valp)
+{
+	int val, ret;
+	ret = get_option(str, &val);
+	if (ret)
+		*valp = val;
+	return ret;
+}
 
 #endif /* __SOUND_INITVAL_H */

@@ -335,7 +335,7 @@ snd_nm256_write_buffer(nm256_t *chip, void *src, int offset, int size)
 		return;
 	}
 #endif
-	memcpy_toio(chip->buffer + offset, src, size);
+	memcpy_toio((void *)chip->buffer + offset, src, size);
 }
 
 /*
@@ -1195,6 +1195,7 @@ snd_nm256_ac97_reset(ac97_t *ac97)
 static int __devinit
 snd_nm256_mixer(nm256_t *chip)
 {
+	ac97_bus_t bus, *pbus;
 	ac97_t ac97;
 	int i, err;
 	/* looks like nm256 hangs up when unexpected registers are touched... */
@@ -1208,16 +1209,20 @@ snd_nm256_mixer(nm256_t *chip)
 		-1
 	};
 
+	memset(&bus, 0, sizeof(bus));
+	bus.reset = snd_nm256_ac97_reset;
+	bus.write = snd_nm256_ac97_write;
+	bus.read = snd_nm256_ac97_read;
+	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+		return err;
+
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.reset = snd_nm256_ac97_reset;
-	ac97.write = snd_nm256_ac97_write;
-	ac97.read = snd_nm256_ac97_read;
 	ac97.scaps = AC97_SCAP_AUDIO; /* we support audio! */
 	ac97.limited_regs = 1;
 	for (i = 0; mixer_regs[i] >= 0; i++)
 		set_bit(mixer_regs[i], ac97.reg_accessed);
 	ac97.private_data = chip;
-	err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97);
+	err = snd_ac97_mixer(pbus, &ac97, &chip->ac97);
 	if (err < 0)
 		return err;
 	if (! (chip->ac97->id & (0xf0000000))) {
