@@ -10,6 +10,7 @@
 
 #include <linux/config.h>
 #include <linux/rtnetlink.h>
+#include <linux/rcupdate.h>
 #include <net/neighbour.h>
 #include <asm/processor.h>
 
@@ -71,6 +72,7 @@ struct dst_entry
 #endif
 
 	struct  dst_ops	        *ops;
+	struct rcu_head		rcu_head;
 		
 	char			info[0];
 };
