@@ -1089,6 +1089,8 @@ extern int blkdev_open(struct inode *, struct file *);
 extern int blkdev_close(struct inode *, struct file *);
 extern struct file_operations def_blk_fops;
 extern struct address_space_operations def_blk_aops;
+extern struct file_operations def_chr_fops;
+extern struct file_operations bad_sock_fops;
 extern struct file_operations def_fifo_fops;
 extern int ioctl_by_bdev(struct block_device *, unsigned, unsigned long);
 extern int blkdev_ioctl(struct inode *, struct file *, unsigned, unsigned long);

@@ -1270,3 +1270,21 @@ void __init inode_init(unsigned long mempages)
 
 	set_shrinker(DEFAULT_SEEKS, shrink_icache_memory);
 }
+
+void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
+{
+	inode->i_mode = mode;
+	if (S_ISCHR(mode)) {
+		inode->i_fop = &def_chr_fops;
+		inode->i_rdev = to_kdev_t(rdev);
+		inode->i_cdev = cdget(rdev);
+	} else if (S_ISBLK(mode)) {
+		inode->i_fop = &def_blk_fops;
+		inode->i_rdev = to_kdev_t(rdev);
+	} else if (S_ISFIFO(mode))
+		inode->i_fop = &def_fifo_fops;
+	else if (S_ISSOCK(mode))
+		inode->i_fop = &bad_sock_fops;
+	else
+		printk(KERN_DEBUG "init_special_inode: bogus i_mode (%o)\n", mode);
+}
