@@ -31,10 +31,9 @@ int begin_kml_reint (struct file *file, unsigned long arg)
 
         ENTRY;
         /* allocate buffer & copy it to kernel space */
-        error = copy_from_user(&input, (char *)arg, sizeof(input));
-        if ( error ) {
+        if (copy_from_user(&input, (char *)arg, sizeof(input))) {
                 EXIT;
-                return error;
+                return -EFAULT;
         }
 
         if (input.reclen > kml_fsdata->kml_maxsize)
@@ -45,11 +44,10 @@ int begin_kml_reint (struct file *file, unsigned long arg)
                 EXIT;
                 return -ENOMEM;
         }
-        error = copy_from_user(path, input.volname, input.namelen);
-        if ( error ) {
+        if (copy_from_user(path, input.volname, input.namelen)) {
                 PRESTO_FREE(path, input.namelen + 1);
                 EXIT;
-                return error;
+                return -EFAULT;
         }
         path[input.namelen] = '\0';
         fset = kml_getfset (path);
@@ -57,10 +55,9 @@ int begin_kml_reint (struct file *file, unsigned long arg)
 
         kml_fsdata = FSET_GET_KMLDATA(fset);
         /* read the buf from user memory here */
-        error = copy_from_user(kml_fsdata->kml_buf, input.recbuf, input.reclen);
-        if ( error ) {
+        if (copy_from_user(kml_fsdata->kml_buf, input.recbuf, input.reclen)) {
                 EXIT;
-                return error;
+                return -EFAULT;
         }
         kml_fsdata->kml_len = input.reclen;
 
@@ -94,21 +91,19 @@ int do_kml_reint (struct file *file, unsigned long arg)
         struct presto_file_set *fset;
 
         ENTRY;
-        error = copy_from_user(&input, (char *)arg, sizeof(input));
-        if ( error ) {
+        if (copy_from_user(&input, (char *)arg, sizeof(input))) {
                 EXIT;
-                return error;
+                return -EFAULT;
         }
         PRESTO_ALLOC(path, char *, input.namelen + 1);
         if ( !path ) {
                 EXIT;
                 return -ENOMEM;
         }
-        error = copy_from_user(path, input.volname, input.namelen);
-        if ( error ) {
+        if (copy_from_user(path, input.volname, input.namelen)) {
                 PRESTO_FREE(path, input.namelen + 1);
                 EXIT;
-                return error;
+                return -EFAULT;
         }
         path[input.namelen] = '\0';
         fset = kml_getfset (path);
@@ -138,7 +133,8 @@ int do_kml_reint (struct file *file, unsigned long arg)
                                 strlen (close->path) + 1, input.pathlen);
                         error = -ENOMEM;
                 }
-                copy_to_user((char *)arg, &input, sizeof (input));
+                if (copy_to_user((char *)arg, &input, sizeof (input)))
+			return -EFAULT;
         }
         return error;
 }
@@ -161,10 +157,9 @@ int end_kml_reint (struct file *file, unsigned long arg)
         char *path;
 
         ENTRY;
-        error = copy_from_user(&input, (char *)arg, sizeof(input));
-        if ( error ) {
+        if (copy_from_user(&input, (char *)arg, sizeof(input))) { 
                EXIT;
-               return error;
+               return -EFAULT;
         }
 
         PRESTO_ALLOC(path, char *, input.namelen + 1);
@@ -172,11 +167,11 @@ int end_kml_reint (struct file *file, unsigned long arg)
                 EXIT;
                 return -ENOMEM;
         }
-        error = copy_from_user(path, input.volname, input.namelen);
+        if (copy_from_user(path, input.volname, input.namelen)) {
         if ( error ) {
                 PRESTO_FREE(path, input.namelen + 1);
                 EXIT;
-                return error;
+                return -EFAULT;
         }
         path[input.namelen] = '\0';
         fset = kml_getfset (path);
@@ -193,7 +188,8 @@ int end_kml_reint (struct file *file, unsigned long arg)
 #if 0
         input.newpos = kml_upc->newpos;
         input.count = kml_upc->count;
-        copy_to_user((char *)arg, &input, sizeof (input));
+        if (copy_to_user((char *)arg, &input, sizeof (input)))
+		return -EFAULT;
 #endif
         return error;
 }
