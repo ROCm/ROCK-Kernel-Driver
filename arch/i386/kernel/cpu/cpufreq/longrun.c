@@ -229,9 +229,6 @@ static int longrun_cpu_init(struct cpufreq_policy *policy)
 	/* capability check */
 	if (policy->cpu != 0)
 		return -ENODEV;
-	if (c->x86_vendor != X86_VENDOR_TRANSMETA || 
-	    !cpu_has(c, X86_FEATURE_LONGRUN))
-		return -ENODEV;
 
 	/* detect low and high frequency */
 	result = longrun_determine_freqs(&longrun_low_freq, &longrun_high_freq);
