@@ -14,6 +14,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/swap.h>
 #include <linux/mman.h>
@@ -23,6 +24,8 @@
 #include <linux/module.h>
 #include <linux/mm_inline.h>
 #include <linux/buffer_head.h>	/* for try_to_release_page() */
+#include <linux/module.h>
+#include <linux/percpu_counter.h>
 #include <linux/percpu.h>
 
 /* How many pages do we try to swap or page in/out together? */
@@ -380,6 +383,24 @@ void vm_acct_memory(long pages)
 EXPORT_SYMBOL(vm_acct_memory);
 #endif
 
+#ifdef CONFIG_SMP
+void percpu_counter_mod(struct percpu_counter *fbc, long amount)
+{
+	int cpu = get_cpu();
+	long count = fbc->counters[cpu].count;
+
+	count += amount;
+	if (count >= FBC_BATCH || count <= -FBC_BATCH) {
+		spin_lock(&fbc->lock);
+		fbc->count += count;
+		spin_unlock(&fbc->lock);
+		count = 0;
+	}
+	fbc->counters[cpu].count = count;
+	put_cpu();
+}
+EXPORT_SYMBOL(percpu_counter_mod);
+#endif
 
 /*
  * Perform any setup for the swap system
