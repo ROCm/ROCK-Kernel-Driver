@@ -5,15 +5,14 @@
 #include <asm/uaccess.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include <linux/buffer_head.h>		/* for invalidate_buffers() */
-
 #include <linux/blk.h>
 #include <linux/blkpg.h>
+#include <linux/cdrom.h>
+
 #include "scsi.h"
 #include "hosts.h"
 #include <scsi/scsi_ioctl.h>
 
-#include <linux/cdrom.h>
 #include "sr.h"
 
 #if 0
@@ -76,8 +75,8 @@ static int sr_fake_playtrkind(struct cdrom_device_info *cdi, struct cdrom_ti *ti
 
 int sr_do_ioctl(Scsi_CD *cd, struct cdrom_generic_command *cgc)
 {
-	Scsi_Request *SRpnt;
-	Scsi_Device *SDev;
+	struct scsi_request *SRpnt;
+	struct scsi_device *SDev;
         struct request *req;
 	int result, err = 0, retries = 0;
 	char *bounce_buffer;
@@ -555,21 +554,3 @@ int sr_dev_ioctl(struct cdrom_device_info *cdi,
 	Scsi_CD *cd = cdi->handle;
 	return scsi_ioctl(cd->device, cmd, (void *)arg);
 }
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * tab-width: 8
- * End:
- */
