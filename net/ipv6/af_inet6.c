@@ -7,9 +7,10 @@
  *
  *	Adapted from linux/net/ipv4/af_inet.c
  *
- *	$Id: af_inet6.c,v 1.63 2001/03/02 03:13:05 davem Exp $
+ *	$Id: af_inet6.c,v 1.64 2001/06/13 16:25:03 davem Exp $
  *
  * 	Fixes:
+ *	piggy, Karl Knutson	:	Socket protocol table
  * 	Hideaki YOSHIFUJI	:	sin6_scope_id support
  * 	Arnaldo Melo		: 	check proc_net_create return, cleanups
  *
@@ -44,6 +45,7 @@
 #include <linux/inet.h>
 #include <linux/netdevice.h>
 #include <linux/icmpv6.h>
+#include <linux/brlock.h>
 #include <linux/smp_lock.h>
 
 #include <net/ip.h>
@@ -71,9 +73,6 @@ MODULE_DESCRIPTION("IPv6 protocol stack for Linux");
 MODULE_PARM(unloadable, "i");
 #endif
 
-extern struct proto_ops inet6_stream_ops;
-extern struct proto_ops inet6_dgram_ops;
-
 /* IPv6 procfs goodies... */
 
 #ifdef CONFIG_PROC_FS
@@ -93,6 +92,11 @@ extern void ipv6_sysctl_unregister(void);
 atomic_t inet6_sock_nr;
 #endif
 
+/* The inetsw table contains everything that inet_create needs to
+ * build a new socket.
+ */
+struct list_head inetsw6[SOCK_MAX];
+
 static void inet6_sock_destruct(struct sock *sk)
 {
 	inet_sock_destruct(sk);
@@ -106,47 +110,63 @@ static void inet6_sock_destruct(struct sock *sk)
 static int inet6_create(struct socket *sock, int protocol)
 {
 	struct sock *sk;
-	struct proto *prot;
+	struct list_head *p;
+	struct inet_protosw *answer;
 
 	sk = sk_alloc(PF_INET6, GFP_KERNEL, 1);
 	if (sk == NULL) 
 		goto do_oom;
 
-	if(sock->type == SOCK_STREAM || sock->type == SOCK_SEQPACKET) {
-		if (protocol && protocol != IPPROTO_TCP) 
-			goto free_and_noproto;
-		protocol = IPPROTO_TCP;
-		prot = &tcpv6_prot;
-		sock->ops = &inet6_stream_ops;
-	} else if(sock->type == SOCK_DGRAM) {
-		if (protocol && protocol != IPPROTO_UDP) 
-			goto free_and_noproto;
-		protocol = IPPROTO_UDP;
-		sk->no_check = UDP_CSUM_DEFAULT;
-		prot=&udpv6_prot;
-		sock->ops = &inet6_dgram_ops;
-	} else if(sock->type == SOCK_RAW) {
-		if (!capable(CAP_NET_RAW))
-			goto free_and_badperm;
-		if (!protocol) 
-			goto free_and_noproto;
-		prot = &rawv6_prot;
-		sock->ops = &inet6_dgram_ops;
-		sk->reuse = 1;
-		sk->num = protocol;
-	} else {
-		goto free_and_badtype;
+	/* Look for the requested type/protocol pair. */
+	answer = NULL;
+	br_read_lock_bh(BR_NETPROTO_LOCK);
+	list_for_each(p, &inetsw6[sock->type]) {
+		answer = list_entry(p, struct inet_protosw, list);
+
+		/* Check the non-wild match. */
+		if (protocol == answer->protocol) {
+			if (protocol != IPPROTO_IP)
+				break;
+		} else {
+			/* Check for the two wild cases. */
+			if (IPPROTO_IP == protocol) {
+				protocol = answer->protocol;
+				break;
+			}
+			if (IPPROTO_IP == answer->protocol)
+				break;
+		}
+		answer = NULL;
 	}
-	
+	br_read_unlock_bh(BR_NETPROTO_LOCK);
+
+	if (!answer)
+		goto free_and_badtype;
+	if (answer->capability > 0 && !capable(answer->capability))
+		goto free_and_badperm;
+	if (!protocol)
+		goto free_and_noproto;
+
+	sock->ops = answer->ops;
 	sock_init_data(sock, sk);
+
+	sk->prot = answer->prot;
+	sk->no_check = answer->no_check;
+	if (INET_PROTOSW_REUSE & answer->flags)
+		sk->reuse = 1;
+
+	if (SOCK_RAW == sock->type) {
+		sk->num = protocol;
+		if (IPPROTO_RAW == protocol)
+			sk->protinfo.af_inet.hdrincl = 1;
+	}
 
 	sk->destruct            = inet6_sock_destruct;
 	sk->zapped		= 0;
 	sk->family		= PF_INET6;
 	sk->protocol		= protocol;
 
-	sk->prot		= prot;
-	sk->backlog_rcv		= prot->backlog_rcv;
+	sk->backlog_rcv		= answer->prot->backlog_rcv;
 
 	sk->net_pinfo.af_inet6.hop_limit  = -1;
 	sk->net_pinfo.af_inet6.mcast_hops = -1;
@@ -175,9 +195,6 @@ static int inet6_create(struct socket *sock, int protocol)
 #endif
 	MOD_INC_USE_COUNT;
 
-	if (sk->type==SOCK_RAW && protocol==IPPROTO_RAW)
-		sk->protinfo.af_inet.hdrincl=1;
-
 	if (sk->num) {
 		/* It assumes that any protocol which allows
 		 * the user to assign a number at socket
@@ -186,16 +203,15 @@ static int inet6_create(struct socket *sock, int protocol)
 		sk->sport = ntohs(sk->num);
 		sk->prot->hash(sk);
 	}
-
 	if (sk->prot->init) {
 		int err = sk->prot->init(sk);
 		if (err != 0) {
 			MOD_DEC_USE_COUNT;
 			inet_sock_release(sk);
-			return(err);
+			return err;
 		}
 	}
-	return(0);
+	return 0;
 
 free_and_badtype:
 	sk_free(sk);
@@ -504,9 +520,76 @@ extern void ipv6_sysctl_register(void);
 extern void ipv6_sysctl_unregister(void);
 #endif
 
+static struct inet_protosw rawv6_protosw = {
+	type:        SOCK_RAW,
+	protocol:    IPPROTO_IP,	/* wild card */
+	prot:        &rawv6_prot,
+	ops:         &inet6_dgram_ops,
+	capability:  CAP_NET_RAW,
+	no_check:    UDP_CSUM_DEFAULT,
+	flags:       INET_PROTOSW_REUSE,
+};
+
+#define INETSW6_ARRAY_LEN (sizeof(inetsw6_array) / sizeof(struct inet_protosw))
+
+void
+inet6_register_protosw(struct inet_protosw *p)
+{
+	struct list_head *lh;
+	struct inet_protosw *answer;
+	int protocol = p->protocol;
+
+	br_write_lock_bh(BR_NETPROTO_LOCK);
+
+	if (p->type > SOCK_MAX)
+		goto out_illegal;
+
+	/* If we are trying to override a permanent protocol, bail. */
+	answer = NULL;
+	list_for_each(lh, &inetsw6[p->type]) {
+		answer = list_entry(lh, struct inet_protosw, list);
+
+		/* Check only the non-wild match. */
+		if (protocol == answer->protocol &&
+		    (INET_PROTOSW_PERMANENT & answer->flags))
+			break;
+
+		answer = NULL;
+	}
+	if (answer)
+		goto out_permanent;
+
+	/* Add to the BEGINNING so that we override any existing
+	 * entry.  This means that when we remove this entry, the
+	 * system automatically returns to the old behavior.
+	 */
+	list_add(&p->list, &inetsw6[p->type]);
+out:
+	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	return;
+
+out_permanent:
+	printk(KERN_ERR "Attempt to override permanent protocol %d.\n",
+	       protocol);
+	goto out;
+
+out_illegal:
+	printk(KERN_ERR
+	       "Ignoring attempt to register illegal socket type %d.\n",
+	       p->type);
+	goto out;
+}
+
+void
+inet6_unregister_protosw(struct inet_protosw *p)
+{
+	inet_unregister_protosw(p);
+}
+
 static int __init inet6_init(void)
 {
 	struct sk_buff *dummy_skb;
+        struct list_head *r;
 	int err;
 
 #ifdef MODULE
@@ -523,6 +606,15 @@ static int __init inet6_init(void)
 		printk(KERN_CRIT "inet6_proto_init: size fault\n");
 		return -EINVAL;
 	}
+
+	/* Register the socket-side information for inet6_create.  */
+	for(r = &inetsw6[0]; r < &inetsw6[SOCK_MAX]; ++r)
+		INIT_LIST_HEAD(r);
+
+	/* We MUST register RAW sockets before we create the ICMP6,
+	 * IGMP6, or NDISC control sockets.
+	 */
+	inet6_register_protosw(&rawv6_protosw);
 
 	/*
 	 *	ipngwg API draft makes clear that the correct semantics

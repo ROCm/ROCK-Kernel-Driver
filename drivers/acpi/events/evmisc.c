@@ -2,7 +2,7 @@
  *
  * Module Name: evmisc - ACPI device notification handler dispatch
  *                       and ACPI Global Lock support
- *              $Revision: 22 $
+ *              $Revision: 31 $
  *
  *****************************************************************************/
 
@@ -30,13 +30,13 @@
 #include "acinterp.h"
 #include "achware.h"
 
-#define _COMPONENT          EVENT_HANDLING
+#define _COMPONENT          ACPI_EVENTS
 	 MODULE_NAME         ("evmisc")
 
 
-/**************************************************************************
+/*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_notify_dispatch
+ * FUNCTION:    Acpi_ev_queue_notify_request
  *
  * PARAMETERS:
  *
@@ -45,16 +45,20 @@
  * DESCRIPTION: Dispatch a device notification event to a previously
  *              installed handler.
  *
- *************************************************************************/
+ ******************************************************************************/
 
-void
-acpi_ev_notify_dispatch (
-	ACPI_HANDLE             device,
+ACPI_STATUS
+acpi_ev_queue_notify_request (
+	ACPI_NAMESPACE_NODE     *node,
 	u32                     notify_value)
 {
 	ACPI_OPERAND_OBJECT     *obj_desc;
-	ACPI_OPERAND_OBJECT     *handler_obj;
-	NOTIFY_HANDLER          handler;
+	ACPI_OPERAND_OBJECT     *handler_obj = NULL;
+	ACPI_GENERIC_STATE      *notify_info;
+	ACPI_STATUS             status = AE_OK;
+
+
+	PROC_NAME ("Ev_queue_notify_request");
 
 
 	/*
@@ -64,9 +68,7 @@ acpi_ev_notify_dispatch (
 	 * initiate soft-off or sleep operation?
 	 */
 
-
-	switch (notify_value)
-	{
+	switch (notify_value) {
 	case 0:
 		break;
 
@@ -85,16 +87,101 @@ acpi_ev_notify_dispatch (
 
 
 	/*
-	 * Invoke a global notify handler if installed.
+	 * Get the notify object attached to the device Node
+	 */
+
+	obj_desc = acpi_ns_get_attached_object (node);
+	if (obj_desc) {
+
+		/* We have the notify object, Get the right handler */
+
+		switch (node->type) {
+		case ACPI_TYPE_DEVICE:
+			if (notify_value <= MAX_SYS_NOTIFY) {
+				handler_obj = obj_desc->device.sys_handler;
+			}
+			else {
+				handler_obj = obj_desc->device.drv_handler;
+			}
+			break;
+
+		case ACPI_TYPE_THERMAL:
+			if (notify_value <= MAX_SYS_NOTIFY) {
+				handler_obj = obj_desc->thermal_zone.sys_handler;
+			}
+			else {
+				handler_obj = obj_desc->thermal_zone.drv_handler;
+			}
+			break;
+		}
+	}
+
+
+	/* If there is any handler to run, schedule the dispatcher */
+
+	if ((acpi_gbl_sys_notify.handler && (notify_value <= MAX_SYS_NOTIFY)) ||
+		(acpi_gbl_drv_notify.handler && (notify_value > MAX_SYS_NOTIFY)) ||
+		handler_obj) {
+
+		notify_info = acpi_ut_create_generic_state ();
+		if (!notify_info) {
+			return (AE_NO_MEMORY);
+		}
+
+		notify_info->notify.node      = node;
+		notify_info->notify.value     = (u16) notify_value;
+		notify_info->notify.handler_obj = handler_obj;
+
+		status = acpi_os_queue_for_execution (OSD_PRIORITY_HIGH,
+				  acpi_ev_notify_dispatch, notify_info);
+		if (ACPI_FAILURE (status)) {
+			acpi_ut_delete_generic_state (notify_info);
+		}
+	}
+
+	if (!handler_obj) {
+		/* There is no per-device notify handler for this device */
+
+	}
+
+	return (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ev_notify_dispatch
+ *
+ * PARAMETERS:
+ *
+ * RETURN:      None.
+ *
+ * DESCRIPTION: Dispatch a device notification event to a previously
+ *              installed handler.
+ *
+ ******************************************************************************/
+
+void
+acpi_ev_notify_dispatch (
+	void                    *context)
+{
+	ACPI_GENERIC_STATE      *notify_info = (ACPI_GENERIC_STATE *) context;
+	ACPI_NOTIFY_HANDLER     global_handler = NULL;
+	void                    *global_context = NULL;
+	ACPI_OPERAND_OBJECT     *handler_obj;
+
+
+	/*
+	 * We will invoke a global notify handler if installed.
 	 * This is done _before_ we invoke the per-device handler attached to the device.
 	 */
 
-	if (notify_value <= MAX_SYS_NOTIFY) {
+	if (notify_info->notify.value <= MAX_SYS_NOTIFY) {
 		/* Global system notification handler */
 
 		if (acpi_gbl_sys_notify.handler) {
-			acpi_gbl_sys_notify.handler (device, notify_value,
-					  acpi_gbl_sys_notify.context);
+			global_handler = acpi_gbl_sys_notify.handler;
+			global_context = acpi_gbl_sys_notify.context;
 		}
 	}
 
@@ -102,50 +189,34 @@ acpi_ev_notify_dispatch (
 		/* Global driver notification handler */
 
 		if (acpi_gbl_drv_notify.handler) {
-			acpi_gbl_drv_notify.handler (device, notify_value,
-					  acpi_gbl_drv_notify.context);
+			global_handler = acpi_gbl_drv_notify.handler;
+			global_context = acpi_gbl_drv_notify.context;
 		}
 	}
 
 
-	/*
-	 * Get the notify object which must be attached to the device Node
-	 */
+	/* Invoke the system handler first, if present */
 
-	obj_desc = acpi_ns_get_attached_object ((ACPI_HANDLE) device);
-	if (!obj_desc) {
-		/* There can be no notify handler for this device */
+	if (global_handler) {
+		global_handler (notify_info->notify.node, notify_info->notify.value, global_context);
+	}
 
-		return;
+	/* Now invoke the per-device handler, if present */
+
+	handler_obj = notify_info->notify.handler_obj;
+	if (handler_obj) {
+		handler_obj->notify_handler.handler (notify_info->notify.node, notify_info->notify.value,
+				  handler_obj->notify_handler.context);
 	}
 
 
-	/* We have the notify object, Get the right handler */
+	/* All done with the info object */
 
-	if (notify_value <= MAX_SYS_NOTIFY) {
-		handler_obj = obj_desc->device.sys_handler;
-	}
-	else {
-		handler_obj = obj_desc->device.drv_handler;
-	}
-
-	/* Validate the handler */
-
-	if (!handler_obj) {
-		/* There is no notify handler for this device */
-
-		return;
-	}
-
-	/* There is a handler, invoke it */
-
-	handler = handler_obj->notify_handler.handler;
-	handler (device, notify_value, handler_obj->notify_handler.context);
-
+	acpi_ut_delete_generic_state (notify_info);
 }
 
 
-/***************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ev_global_lock_thread
  *
@@ -155,7 +226,7 @@ acpi_ev_notify_dispatch (
  *              Global Lock.  Simply signal all threads that are waiting
  *              for the lock.
  *
- **************************************************************************/
+ ******************************************************************************/
 
 static void
 acpi_ev_global_lock_thread (
@@ -173,7 +244,7 @@ acpi_ev_global_lock_thread (
 }
 
 
-/***************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ev_global_lock_handler
  *
@@ -183,7 +254,7 @@ acpi_ev_global_lock_thread (
  *              release interrupt occurs.  Grab the global lock and queue
  *              the global lock thread for execution
  *
- **************************************************************************/
+ ******************************************************************************/
 
 static u32
 acpi_ev_global_lock_handler (
@@ -216,7 +287,7 @@ acpi_ev_global_lock_handler (
 }
 
 
-/***************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ev_init_global_lock_handler
  *
@@ -224,7 +295,7 @@ acpi_ev_global_lock_handler (
  *
  * DESCRIPTION: Install a handler for the global lock release event
  *
- **************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ev_init_global_lock_handler (void)
@@ -232,14 +303,27 @@ acpi_ev_init_global_lock_handler (void)
 	ACPI_STATUS             status;
 
 
+	acpi_gbl_global_lock_present = TRUE;
 	status = acpi_install_fixed_event_handler (ACPI_EVENT_GLOBAL,
 			  acpi_ev_global_lock_handler, NULL);
+
+	/*
+	 * If the global lock does not exist on this platform, the attempt
+	 * to enable GBL_STS will fail (the GBL_EN bit will not stick)
+	 * Map to AE_OK, but mark global lock as not present.
+	 * Any attempt to actually use the global lock will be flagged
+	 * with an error.
+	 */
+	if (status == AE_NO_HARDWARE_RESPONSE) {
+		acpi_gbl_global_lock_present = FALSE;
+		status = AE_OK;
+	}
 
 	return (status);
 }
 
 
-/***************************************************************************
+/******************************************************************************
  *
  * FUNCTION:    Acpi_ev_acquire_global_lock
  *
@@ -247,7 +331,7 @@ acpi_ev_init_global_lock_handler (void)
  *
  * DESCRIPTION: Attempt to gain ownership of the Global Lock.
  *
- **************************************************************************/
+ *****************************************************************************/
 
 ACPI_STATUS
 acpi_ev_acquire_global_lock(void)
@@ -256,6 +340,12 @@ acpi_ev_acquire_global_lock(void)
 	u8                      acquired = FALSE;
 	void                    *global_lock;
 
+
+	/* Make sure that we actually have a global lock */
+
+	if (!acpi_gbl_global_lock_present) {
+		return (AE_NO_GLOBAL_LOCK);
+	}
 
 	/* One more thread wants the global lock */
 
@@ -283,7 +373,6 @@ acpi_ev_acquire_global_lock(void)
 	   /* We got the lock */
 
 		acpi_gbl_global_lock_acquired = TRUE;
-
 		return (AE_OK);
 	}
 
@@ -298,20 +387,19 @@ acpi_ev_acquire_global_lock(void)
 	  * Since this wait will block, we must release the interpreter
 	  */
 
-	status = acpi_aml_system_wait_semaphore (acpi_gbl_global_lock_semaphore,
+	status = acpi_ex_system_wait_semaphore (acpi_gbl_global_lock_semaphore,
 			  ACPI_UINT32_MAX);
-
 	return (status);
 }
 
 
-/***************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ev_release_global_lock
  *
  * DESCRIPTION: Releases ownership of the Global Lock.
  *
- **************************************************************************/
+ ******************************************************************************/
 
 void
 acpi_ev_release_global_lock (void)
@@ -321,7 +409,7 @@ acpi_ev_release_global_lock (void)
 
 
 	if (!acpi_gbl_global_lock_thread_count) {
-		REPORT_WARNING(("Releasing a non-acquired Global Lock\n"));
+		REPORT_WARNING(("Global Lock has not be acquired, cannot release\n"));
 		return;
 	}
 

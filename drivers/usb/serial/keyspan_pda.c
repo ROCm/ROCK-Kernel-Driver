@@ -1,7 +1,7 @@
 /*
  * USB Keyspan PDA Converter driver
  *
- * Copyright (c) 1999, 2000 Greg Kroah-Hartman	<greg@kroah.com>
+ * Copyright (c) 1999 - 2001 Greg Kroah-Hartman	<greg@kroah.com>
  * Copyright (c) 1999, 2000 Brian Warner	<warner@lothar.com>
  * Copyright (c) 2000 Al Borchers		<borchers@steinerpoint.com>
  *
@@ -12,6 +12,9 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * (05/31/2001) gkh
+ *	switched from using spinlock to a semaphore, which fixes lots of problems.
+ *
  * (04/08/2001) gb
  *	Identify version on module load.
  * 
@@ -452,7 +455,6 @@ static int keyspan_pda_write(struct usb_serial_port *port, int from_user,
 	int request_unthrottle = 0;
 	int rc = 0;
 	struct keyspan_pda_private *priv;
-	unsigned long flags;
 
 	priv = (struct keyspan_pda_private *)(port->private);
 	/* guess how much room is left in the device's ring buffer, and if we
@@ -482,7 +484,6 @@ static int keyspan_pda_write(struct usb_serial_port *port, int from_user,
 	   finished).  Also, the tx process is not throttled. So we are
 	   ready to write. */
 
-	spin_lock_irqsave (&port->port_lock, flags);
 	count = (count > port->bulk_out_size) ? port->bulk_out_size : count;
 
 	/* Check if we might overrun the Tx buffer.   If so, ask the
@@ -502,13 +503,12 @@ static int keyspan_pda_write(struct usb_serial_port *port, int from_user,
 				     2*HZ);
 		if (rc < 0) {
 			dbg(" roomquery failed");
-			spin_unlock_irqrestore (&port->port_lock, flags);
-			return rc; /* failed */
+			goto exit;
 		}
 		if (rc == 0) {
 			dbg(" roomquery returned 0 bytes");
-			spin_unlock_irqrestore (&port->port_lock, flags);
-			return -EIO; /* device didn't return any data */
+			rc = -EIO; /* device didn't return any data */
+			goto exit;
 		}
 		dbg(" roomquery says %d", room);
 		priv->tx_room = room;
@@ -525,8 +525,8 @@ static int keyspan_pda_write(struct usb_serial_port *port, int from_user,
 		if (from_user) {
 			if( copy_from_user(port->write_urb->transfer_buffer,
 			buf, count) ) {
-				spin_unlock_irqrestore (&port->port_lock, flags);
-				return( -EFAULT );
+				rc = -EFAULT;
+				goto exit;
 			}
 		}
 		else {
@@ -538,10 +538,10 @@ static int keyspan_pda_write(struct usb_serial_port *port, int from_user,
 		priv->tx_room -= count;
 
 		port->write_urb->dev = port->serial->dev;
-		if (usb_submit_urb(port->write_urb)) {
+		rc = usb_submit_urb(port->write_urb);
+		if (rc) {
 			dbg(" usb_submit_urb(write bulk) failed");
-			spin_unlock_irqrestore (&port->port_lock, flags);
-			return (0);
+			goto exit;
 		}
 	}
 	else {
@@ -557,8 +557,9 @@ static int keyspan_pda_write(struct usb_serial_port *port, int from_user,
 			MOD_DEC_USE_COUNT;
 	}
 
-	spin_unlock_irqrestore (&port->port_lock, flags);
-	return (count);
+	rc = count;
+exit:
+	return rc;
 }
 
 
@@ -616,11 +617,10 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial = port->serial;
 	unsigned char room;
-	int rc;
+	int rc = 0;
 	struct keyspan_pda_private *priv;
-	unsigned long flags;
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 
 	MOD_INC_USE_COUNT;
 	++port->open_count;
@@ -629,7 +629,6 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 		port->active = 1;
  
 		/* find out how much room is in the Tx ring */
-		spin_unlock_irqrestore (&port->port_lock, flags);
 		rc = usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev, 0),
 				     6, /* write_room */
 				     USB_TYPE_VENDOR | USB_RECIP_INTERFACE
@@ -639,7 +638,6 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 				     &room,
 				     1,
 				     2*HZ);
-		spin_lock_irqsave (&port->port_lock, flags);
 		if (rc < 0) {
 			dbg(__FUNCTION__" - roomquery failed");
 			goto error;
@@ -655,7 +653,6 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 
 		/* the normal serial device seems to always turn on DTR and RTS here,
 		   so do the same */
-		spin_unlock_irqrestore (&port->port_lock, flags);
 		if (port->tty->termios->c_cflag & CBAUD)
 			keyspan_pda_set_modem_info(serial, (1<<7) | (1<<2) );
 		else
@@ -663,19 +660,22 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 
 		/*Start reading from the device*/
 		port->interrupt_in_urb->dev = serial->dev;
-		if (usb_submit_urb(port->interrupt_in_urb))
+		rc = usb_submit_urb(port->interrupt_in_urb);
+		if (rc) {
 			dbg(__FUNCTION__" - usb_submit_urb(read int) failed");
-	} else {
-		spin_unlock_irqrestore (&port->port_lock, flags);
+			goto error;
+		}
+
 	}
 
 
-	return (0);
+	up (&port->sem);
+	return rc;
 error:
 	--port->open_count;
 	port->active = 0;
 	MOD_DEC_USE_COUNT;
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
 	return rc;
 }
 
@@ -683,19 +683,15 @@ error:
 static void keyspan_pda_close(struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial = port->serial;
-	unsigned long flags;
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 
 	--port->open_count;
-	MOD_DEC_USE_COUNT;
 
 	if (port->open_count <= 0) {
 		/* the normal serial device seems to always shut off DTR and RTS now */
-		spin_unlock_irqrestore (&port->port_lock, flags);
 		if (port->tty->termios->c_cflag & HUPCL)
 			keyspan_pda_set_modem_info(serial, 0);
-		spin_lock_irqsave (&port->port_lock, flags);
 
 		/* shutdown our bulk reads and writes */
 		usb_unlink_urb (port->write_urb);
@@ -704,7 +700,8 @@ static void keyspan_pda_close(struct usb_serial_port *port, struct file *filp)
 		port->open_count = 0;
 	}
 
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
+	MOD_DEC_USE_COUNT;
 }
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxfevnt - External Interfaces, ACPI event disable/enable
- *              $Revision: 28 $
+ *              $Revision: 33 $
  *
  *****************************************************************************/
 
@@ -31,11 +31,11 @@
 #include "amlcode.h"
 #include "acinterp.h"
 
-#define _COMPONENT          EVENT_HANDLING
+#define _COMPONENT          ACPI_EVENTS
 	 MODULE_NAME         ("evxfevnt")
 
 
-/**************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_enable
  *
@@ -45,7 +45,7 @@
  *
  * DESCRIPTION: Transfers the system into ACPI mode.
  *
- *************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_enable (void)
@@ -76,7 +76,7 @@ acpi_enable (void)
 }
 
 
-/**************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_disable
  *
@@ -87,13 +87,20 @@ acpi_enable (void)
  * DESCRIPTION: Returns the system to original ACPI/legacy mode, and
  *              uninstalls the SCI interrupt handler.
  *
- *************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_disable (void)
 {
 	ACPI_STATUS             status;
 
+
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
 
 	/* Restore original mode  */
 
@@ -111,7 +118,7 @@ acpi_disable (void)
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_enable_event
  *
@@ -133,17 +140,22 @@ acpi_enable_event (
 	u32                     register_id;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/* The Type must be either Fixed Acpi_event or GPE */
 
-	switch (type)
-	{
+	switch (type) {
 
 	case ACPI_EVENT_FIXED:
 
 		/* Decode the Fixed Acpi_event */
 
-		switch (event)
-		{
+		switch (event) {
 		case ACPI_EVENT_PMTIMER:
 			register_id = TMR_EN;
 			break;
@@ -177,7 +189,7 @@ acpi_enable_event (
 		acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, register_id, 1);
 
 		if (1 != acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_LOCK, register_id)) {
-			return (AE_ERROR);
+			return (AE_NO_HARDWARE_RESPONSE);
 		}
 
 		break;
@@ -187,9 +199,8 @@ acpi_enable_event (
 
 		/* Ensure that we have a valid GPE number */
 
-		if ((event >= NUM_GPE) ||
-			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID))
-		{
+		if ((event > ACPI_GPE_MAX) ||
+			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID)) {
 			return (AE_BAD_PARAMETER);
 		}
 
@@ -210,7 +221,7 @@ acpi_enable_event (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_disable_event
  *
@@ -232,17 +243,22 @@ acpi_disable_event (
 	u32                     register_id;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/* The Type must be either Fixed Acpi_event or GPE */
 
-	switch (type)
-	{
+	switch (type) {
 
 	case ACPI_EVENT_FIXED:
 
 		/* Decode the Fixed Acpi_event */
 
-		switch (event)
-		{
+		switch (event) {
 		case ACPI_EVENT_PMTIMER:
 			register_id = TMR_EN;
 			break;
@@ -276,7 +292,7 @@ acpi_disable_event (
 		acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, register_id, 0);
 
 		if (0 != acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_LOCK, register_id)) {
-			return (AE_ERROR);
+			return (AE_NO_HARDWARE_RESPONSE);
 		}
 
 		break;
@@ -286,9 +302,8 @@ acpi_disable_event (
 
 		/* Ensure that we have a valid GPE number */
 
-		if ((event >= NUM_GPE) ||
-			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID))
-		{
+		if ((event > ACPI_GPE_MAX) ||
+			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID)) {
 			return (AE_BAD_PARAMETER);
 		}
 
@@ -306,7 +321,7 @@ acpi_disable_event (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_clear_event
  *
@@ -328,17 +343,22 @@ acpi_clear_event (
 	u32                     register_id;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/* The Type must be either Fixed Acpi_event or GPE */
 
-	switch (type)
-	{
+	switch (type) {
 
 	case ACPI_EVENT_FIXED:
 
 		/* Decode the Fixed Acpi_event */
 
-		switch (event)
-		{
+		switch (event) {
 		case ACPI_EVENT_PMTIMER:
 			register_id = TMR_STS;
 			break;
@@ -377,9 +397,8 @@ acpi_clear_event (
 
 		/* Ensure that we have a valid GPE number */
 
-		if ((event >= NUM_GPE) ||
-			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID))
-		{
+		if ((event > ACPI_GPE_MAX) ||
+			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID)) {
 			return (AE_BAD_PARAMETER);
 		}
 
@@ -397,7 +416,7 @@ acpi_clear_event (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_get_event_status
  *
@@ -423,6 +442,13 @@ acpi_get_event_status (
 	u32                     register_id;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	if (!event_status) {
 		return (AE_BAD_PARAMETER);
 	}
@@ -430,15 +456,13 @@ acpi_get_event_status (
 
 	/* The Type must be either Fixed Acpi_event or GPE */
 
-	switch (type)
-	{
+	switch (type) {
 
 	case ACPI_EVENT_FIXED:
 
 		/* Decode the Fixed Acpi_event */
 
-		switch (event)
-		{
+		switch (event) {
 		case ACPI_EVENT_PMTIMER:
 			register_id = TMR_STS;
 			break;
@@ -474,9 +498,8 @@ acpi_get_event_status (
 
 		/* Ensure that we have a valid GPE number */
 
-		if ((event >= NUM_GPE) ||
-			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID))
-		{
+		if ((event > ACPI_GPE_MAX) ||
+			(acpi_gbl_gpe_valid[event] == ACPI_GPE_INVALID)) {
 			return (AE_BAD_PARAMETER);
 		}
 

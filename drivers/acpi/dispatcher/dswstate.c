@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 38 $
+ *              $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -31,7 +31,7 @@
 #include "acnamesp.h"
 #include "acinterp.h"
 
-#define _COMPONENT          DISPATCHER
+#define _COMPONENT          ACPI_DISPATCHER
 	 MODULE_NAME         ("dswstate")
 
 
@@ -55,6 +55,9 @@ acpi_ds_result_insert (
 	ACPI_WALK_STATE         *walk_state)
 {
 	ACPI_GENERIC_STATE      *state;
+
+
+	PROC_NAME ("Ds_result_insert");
 
 
 	state = walk_state->results;
@@ -98,6 +101,9 @@ acpi_ds_result_remove (
 	ACPI_WALK_STATE         *walk_state)
 {
 	ACPI_GENERIC_STATE      *state;
+
+
+	PROC_NAME ("Ds_result_remove");
 
 
 	state = walk_state->results;
@@ -145,6 +151,9 @@ acpi_ds_result_pop (
 {
 	u32                     index;
 	ACPI_GENERIC_STATE      *state;
+
+
+	PROC_NAME ("Ds_result_pop");
 
 
 	state = walk_state->results;
@@ -197,6 +206,9 @@ acpi_ds_result_pop_from_bottom (
 {
 	u32                     index;
 	ACPI_GENERIC_STATE      *state;
+
+
+	PROC_NAME ("Ds_result_pop_from_bottom");
 
 
 	state = walk_state->results;
@@ -254,6 +266,9 @@ acpi_ds_result_push (
 	ACPI_GENERIC_STATE      *state;
 
 
+	PROC_NAME ("Ds_result_push");
+
+
 	state = walk_state->results;
 	if (!state) {
 		return (AE_AML_INTERNAL);
@@ -295,12 +310,12 @@ acpi_ds_result_stack_push (
 	ACPI_GENERIC_STATE      *state;
 
 
-	state = acpi_cm_create_generic_state ();
+	state = acpi_ut_create_generic_state ();
 	if (!state) {
 		return (AE_NO_MEMORY);
 	}
 
-	acpi_cm_push_generic_state (&walk_state->results, state);
+	acpi_ut_push_generic_state (&walk_state->results, state);
 
 	return (AE_OK);
 }
@@ -332,9 +347,9 @@ acpi_ds_result_stack_pop (
 	}
 
 
-	state = acpi_cm_pop_generic_state (&walk_state->results);
+	state = acpi_ut_pop_generic_state (&walk_state->results);
 
-	acpi_cm_delete_generic_state (state);
+	acpi_ut_delete_generic_state (state);
 
 	return (AE_OK);
 }
@@ -364,7 +379,7 @@ acpi_ds_obj_stack_delete_all (
 
 	for (i = 0; i < OBJ_NUM_OPERANDS; i++) {
 		if (walk_state->operands[i]) {
-			acpi_cm_remove_reference (walk_state->operands[i]);
+			acpi_ut_remove_reference (walk_state->operands[i]);
 			walk_state->operands[i] = NULL;
 		}
 	}
@@ -432,9 +447,9 @@ acpi_ds_obj_stack_pop_object (
 	/* Check for stack underflow */
 
 	if (walk_state->num_operands == 0) {
+		*object = NULL;
 		return (AE_AML_NO_OPERAND);
 	}
-
 
 	/* Pop the stack */
 
@@ -443,6 +458,7 @@ acpi_ds_obj_stack_pop_object (
 	/* Check for a valid operand */
 
 	if (!walk_state->operands [walk_state->num_operands]) {
+		*object = NULL;
 		return (AE_AML_NO_OPERAND);
 	}
 
@@ -529,7 +545,7 @@ acpi_ds_obj_stack_pop_and_delete (
 		walk_state->num_operands--;
 		obj_desc = walk_state->operands [walk_state->num_operands];
 		if (obj_desc) {
-			acpi_cm_remove_reference (walk_state->operands [walk_state->num_operands]);
+			acpi_ut_remove_reference (walk_state->operands [walk_state->num_operands]);
 			walk_state->operands [walk_state->num_operands] = NULL;
 		}
 	}
@@ -696,7 +712,7 @@ acpi_ds_create_walk_state (
 	ACPI_STATUS             status;
 
 
-	acpi_cm_acquire_mutex (ACPI_MTX_CACHES);
+	acpi_ut_acquire_mutex (ACPI_MTX_CACHES);
 	acpi_gbl_walk_state_cache_requests++;
 
 	/* Check the cache first */
@@ -710,17 +726,17 @@ acpi_ds_create_walk_state (
 		acpi_gbl_walk_state_cache_hits++;
 		acpi_gbl_walk_state_cache_depth--;
 
-		acpi_cm_release_mutex (ACPI_MTX_CACHES);
+		acpi_ut_release_mutex (ACPI_MTX_CACHES);
 	}
 
 	else {
 		/* The cache is empty, create a new object */
 
-		/* Avoid deadlock with Acpi_cm_callocate */
+		/* Avoid deadlock with Acpi_ut_callocate */
 
-		acpi_cm_release_mutex (ACPI_MTX_CACHES);
+		acpi_ut_release_mutex (ACPI_MTX_CACHES);
 
-		walk_state = acpi_cm_callocate (sizeof (ACPI_WALK_STATE));
+		walk_state = acpi_ut_callocate (sizeof (ACPI_WALK_STATE));
 		if (!walk_state) {
 			return (NULL);
 		}
@@ -730,6 +746,7 @@ acpi_ds_create_walk_state (
 	walk_state->owner_id        = owner_id;
 	walk_state->origin          = origin;
 	walk_state->method_desc     = mth_desc;
+	walk_state->walk_list       = walk_list;
 
 	/* Init the method args/local */
 
@@ -787,7 +804,7 @@ acpi_ds_delete_walk_state (
 		state = walk_state->control_state;
 		walk_state->control_state = state->common.next;
 
-		acpi_cm_delete_generic_state (state);
+		acpi_ut_delete_generic_state (state);
 	}
 
 	/* Always must free any linked parse states */
@@ -796,7 +813,7 @@ acpi_ds_delete_walk_state (
 		state = walk_state->scope_info;
 		walk_state->scope_info = state->common.next;
 
-		acpi_cm_delete_generic_state (state);
+		acpi_ut_delete_generic_state (state);
 	}
 
 	/* Always must free any stacked result states */
@@ -805,20 +822,20 @@ acpi_ds_delete_walk_state (
 		state = walk_state->results;
 		walk_state->results = state->common.next;
 
-		acpi_cm_delete_generic_state (state);
+		acpi_ut_delete_generic_state (state);
 	}
 
 
 	/* If walk cache is full, just free this wallkstate object */
 
 	if (acpi_gbl_walk_state_cache_depth >= MAX_WALK_CACHE_DEPTH) {
-		acpi_cm_free (walk_state);
+		acpi_ut_free (walk_state);
 	}
 
 	/* Otherwise put this object back into the cache */
 
 	else {
-		acpi_cm_acquire_mutex (ACPI_MTX_CACHES);
+		acpi_ut_acquire_mutex (ACPI_MTX_CACHES);
 
 		/* Clear the state */
 
@@ -832,7 +849,7 @@ acpi_ds_delete_walk_state (
 		acpi_gbl_walk_state_cache_depth++;
 
 
-		acpi_cm_release_mutex (ACPI_MTX_CACHES);
+		acpi_ut_release_mutex (ACPI_MTX_CACHES);
 	}
 
 	return;
@@ -865,7 +882,7 @@ acpi_ds_delete_walk_state_cache (
 		/* Delete one cached state object */
 
 		next = acpi_gbl_walk_state_cache->next;
-		acpi_cm_free (acpi_gbl_walk_state_cache);
+		acpi_ut_free (acpi_gbl_walk_state_cache);
 		acpi_gbl_walk_state_cache = next;
 		acpi_gbl_walk_state_cache_depth--;
 	}

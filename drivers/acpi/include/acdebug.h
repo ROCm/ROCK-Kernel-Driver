@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdebug.h - ACPI/AML debugger
- *       $Revision: 41 $
+ *       $Revision: 44 $
  *
  *****************************************************************************/
 
@@ -36,7 +36,7 @@
 extern int                      optind;
 extern NATIVE_CHAR              *optarg;
 extern u8                       *aml_ptr;
-extern u32                      acpi_aml_length;
+extern u32                      aml_length;
 
 extern u8                       opt_tables;
 extern u8                       opt_disasm;
@@ -200,6 +200,10 @@ acpi_db_find_references (
 	NATIVE_CHAR             *object_arg);
 
 void
+acpi_db_display_locks (void);
+
+
+void
 acpi_db_display_resources (
 	NATIVE_CHAR             *object_arg);
 
@@ -303,7 +307,7 @@ acpi_db_create_execution_threads (
  * dbfileio - Debugger file I/O commands
  */
 
-OBJECT_TYPE_INTERNAL
+ACPI_OBJECT_TYPE8
 acpi_db_match_argument (
 	NATIVE_CHAR             *user_argument,
 	ARGUMENT_INFO           *arguments);

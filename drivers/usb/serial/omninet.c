@@ -10,6 +10,9 @@
  *
  * Please report both successes and troubles to the author at omninet@kroah.com
  * 
+ * (05/30/2001) gkh
+ *	switched from using spinlock to a semaphore, which fixes lots of problems.
+ *
  * (04/08/2001) gb
  *	Identify version on module load.
  *
@@ -60,7 +63,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_VERSION "v1.1"
 #define DRIVER_AUTHOR "Anonymous"
 #define DRIVER_DESC "USB ZyXEL omni.net LCD PLUS Driver"
 
@@ -145,8 +148,7 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 	struct usb_serial	*serial;
 	struct usb_serial_port	*wport;
 	struct omninet_data	*od;
-	unsigned long		flags;
-	int			result;
+	int			result = 0;
 
 	if (port_paranoia_check (port, __FUNCTION__))
 		return -ENODEV;
@@ -157,7 +159,7 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 	if (!serial)
 		return -ENODEV;
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 
 	MOD_INC_USE_COUNT;
 	++port->open_count;
@@ -170,7 +172,7 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 			err(__FUNCTION__"- kmalloc(%Zd) failed.", sizeof(struct omninet_data));
 			--port->open_count;
 			port->active = 0;
-			spin_unlock_irqrestore (&port->port_lock, flags);
+			up (&port->sem);
 			MOD_DEC_USE_COUNT;
 			return -ENOMEM;
 		}
@@ -189,9 +191,9 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 	}
 
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
 
-	return (0);
+	return result;
 }
 
 static void omninet_close (struct usb_serial_port *port, struct file * filp)
@@ -199,7 +201,6 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 	struct usb_serial 	*serial;
 	struct usb_serial_port 	*wport;
 	struct omninet_data 	*od;
-	unsigned long		flags;
 
 	if (port_paranoia_check (port, __FUNCTION__))
 		return;
@@ -210,10 +211,9 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 
 	--port->open_count;
-	MOD_DEC_USE_COUNT;
 
 	if (port->open_count <= 0) {
 		od = (struct omninet_data *)port->private;
@@ -228,7 +228,8 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 			kfree(od);
 	}
 
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
+	MOD_DEC_USE_COUNT;
 }
 
 
@@ -296,7 +297,6 @@ static int omninet_write (struct usb_serial_port *port, int from_user, const uns
 	struct omninet_data 	*od 	= (struct omninet_data   *) port->private;
 	struct omninet_header	*header = (struct omninet_header *) wport->write_urb->transfer_buffer;
 
-	unsigned long		flags;
 	int			result;
 
 //	dbg("omninet_write port %d", port->number);
@@ -310,12 +310,13 @@ static int omninet_write (struct usb_serial_port *port, int from_user, const uns
 		return (0);
 	}
 
-	spin_lock_irqsave (&port->port_lock, flags);
-	
 	count = (count > OMNINET_BULKOUTSIZE) ? OMNINET_BULKOUTSIZE : count;
 
 	if (from_user) {
-		copy_from_user(wport->write_urb->transfer_buffer + OMNINET_DATAOFFSET, buf, count);
+		if (copy_from_user(wport->write_urb->transfer_buffer + OMNINET_DATAOFFSET, buf, count) != 0) {
+			result = -EFAULT;
+			goto exit;
+		}
 	}
 	else {
 		memcpy (wport->write_urb->transfer_buffer + OMNINET_DATAOFFSET, buf, count);
@@ -333,16 +334,13 @@ static int omninet_write (struct usb_serial_port *port, int from_user, const uns
 
 	wport->write_urb->dev = serial->dev;
 	result = usb_submit_urb(wport->write_urb);
-	if (result) {
+	if (result)
 		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
-		spin_unlock_irqrestore (&port->port_lock, flags);
-		return 0;
-	}
+	else
+		result = count;
 
-//	dbg("omninet_write returns %d", count);
-
-	spin_unlock_irqrestore (&port->port_lock, flags);
-	return (count);
+exit:	
+	return result;
 }
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsfield - Dispatcher field routines
- *              $Revision: 31 $
+ *              $Revision: 41 $
  *
  *****************************************************************************/
 
@@ -31,7 +31,7 @@
 #include "acnamesp.h"
 
 
-#define _COMPONENT          DISPATCHER
+#define _COMPONENT          ACPI_DISPATCHER
 	 MODULE_NAME         ("dsfield")
 
 
@@ -51,7 +51,8 @@
  * FUNCTION:    Acpi_ds_create_field
  *
  * PARAMETERS:  Op              - Op containing the Field definition and args
- *              Region_node - Object for the containing Operation Region
+ *              Region_node     - Object for the containing Operation Region
+ *  `           Walk_state      - Current method state
  *
  * RETURN:      Status
  *
@@ -69,7 +70,6 @@ acpi_ds_create_field (
 	ACPI_PARSE_OBJECT       *arg;
 	ACPI_NAMESPACE_NODE     *node;
 	u8                      field_flags;
-	u8                      access_attribute = 0;
 	u32                     field_bit_position = 0;
 
 
@@ -78,10 +78,8 @@ acpi_ds_create_field (
 	arg = op->value.arg;
 	if (!region_node) {
 		status = acpi_ns_lookup (walk_state->scope_info, arg->value.name,
-				 ACPI_TYPE_REGION, IMODE_EXECUTE,
-				 NS_SEARCH_PARENT, walk_state,
-				 &region_node);
-
+				  ACPI_TYPE_REGION, IMODE_EXECUTE,
+				  NS_SEARCH_PARENT, walk_state, &region_node);
 		if (ACPI_FAILURE (status)) {
 			return (status);
 		}
@@ -96,37 +94,31 @@ acpi_ds_create_field (
 
 	arg = arg->next;
 	while (arg) {
-		switch (arg->opcode)
-		{
-		case AML_RESERVEDFIELD_OP:
+		switch (arg->opcode) {
+		case AML_INT_RESERVEDFIELD_OP:
 
 			field_bit_position += arg->value.size;
 			break;
 
 
-		case AML_ACCESSFIELD_OP:
+		case AML_INT_ACCESSFIELD_OP:
 
 			/*
 			 * Get a new Access_type and Access_attribute for all
 			 * entries (until end or another Access_as keyword)
 			 */
-
-			access_attribute = (u8) arg->value.integer;
-			field_flags     = (u8)
-					  ((field_flags & FIELD_ACCESS_TYPE_MASK) ||
-					  ((u8) (arg->value.integer >> 8)));
+			field_flags = (u8) ((field_flags & FIELD_ACCESS_TYPE_MASK) ||
+					   ((u8) (arg->value.integer >> 8)));
 			break;
 
 
-		case AML_NAMEDFIELD_OP:
+		case AML_INT_NAMEDFIELD_OP:
 
 			status = acpi_ns_lookup (walk_state->scope_info,
 					  (NATIVE_CHAR *) &((ACPI_PARSE2_OBJECT *)arg)->name,
-					  INTERNAL_TYPE_DEF_FIELD,
-					  IMODE_LOAD_PASS1,
+					  INTERNAL_TYPE_REGION_FIELD, IMODE_LOAD_PASS1,
 					  NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
 					  NULL, &node);
-
 			if (ACPI_FAILURE (status)) {
 				return (status);
 			}
@@ -136,9 +128,8 @@ acpi_ds_create_field (
 			 * the object stack
 			 */
 
-			status = acpi_aml_prep_def_field_value (node, region_node, field_flags,
-					  access_attribute, field_bit_position, arg->value.size);
-
+			status = acpi_ex_prep_region_field_value (node, region_node, field_flags,
+					  field_bit_position, arg->value.size);
 			if (ACPI_FAILURE (status)) {
 				return (status);
 			}
@@ -161,7 +152,8 @@ acpi_ds_create_field (
  * FUNCTION:    Acpi_ds_create_bank_field
  *
  * PARAMETERS:  Op              - Op containing the Field definition and args
- *              Region_node - Object for the containing Operation Region
+ *              Region_node     - Object for the containing Operation Region
+ *  `           Walk_state      - Current method state
  *
  * RETURN:      Status
  *
@@ -181,7 +173,6 @@ acpi_ds_create_bank_field (
 	ACPI_NAMESPACE_NODE     *node;
 	u32                     bank_value;
 	u8                      field_flags;
-	u8                      access_attribute = 0;
 	u32                     field_bit_position = 0;
 
 
@@ -190,10 +181,8 @@ acpi_ds_create_bank_field (
 	arg = op->value.arg;
 	if (!region_node) {
 		status = acpi_ns_lookup (walk_state->scope_info, arg->value.name,
-				 ACPI_TYPE_REGION, IMODE_EXECUTE,
-				 NS_SEARCH_PARENT, walk_state,
-				 &region_node);
-
+				  ACPI_TYPE_REGION, IMODE_EXECUTE,
+				  NS_SEARCH_PARENT, walk_state, &region_node);
 		if (ACPI_FAILURE (status)) {
 			return (status);
 		}
@@ -204,11 +193,9 @@ acpi_ds_create_bank_field (
 	arg = arg->next;
 
 	status = acpi_ns_lookup (walk_state->scope_info, arg->value.string,
-			 INTERNAL_TYPE_BANK_FIELD_DEFN,
-			 IMODE_LOAD_PASS1,
-			 NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
-			 NULL, &register_node);
-
+			  INTERNAL_TYPE_BANK_FIELD_DEFN, IMODE_LOAD_PASS1,
+			  NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
+			  NULL, &register_node);
 	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
@@ -228,37 +215,31 @@ acpi_ds_create_bank_field (
 
 	arg = arg->next;
 	while (arg) {
-		switch (arg->opcode)
-		{
-		case AML_RESERVEDFIELD_OP:
+		switch (arg->opcode) {
+		case AML_INT_RESERVEDFIELD_OP:
 
 			field_bit_position += arg->value.size;
 			break;
 
 
-		case AML_ACCESSFIELD_OP:
+		case AML_INT_ACCESSFIELD_OP:
 
 			/*
 			 * Get a new Access_type and Access_attribute for
 			 * all entries (until end or another Access_as keyword)
 			 */
-
-			access_attribute = (u8) arg->value.integer;
-			field_flags     = (u8)
-					  ((field_flags & FIELD_ACCESS_TYPE_MASK) ||
-					  ((u8) (arg->value.integer >> 8)));
+			field_flags = (u8) ((field_flags & FIELD_ACCESS_TYPE_MASK) ||
+					 ((u8) (arg->value.integer >> 8)));
 			break;
 
 
-		case AML_NAMEDFIELD_OP:
+		case AML_INT_NAMEDFIELD_OP:
 
 			status = acpi_ns_lookup (walk_state->scope_info,
 					  (NATIVE_CHAR *) &((ACPI_PARSE2_OBJECT *)arg)->name,
-					  INTERNAL_TYPE_DEF_FIELD,
-					  IMODE_LOAD_PASS1,
+					  INTERNAL_TYPE_REGION_FIELD, IMODE_LOAD_PASS1,
 					  NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
 					  NULL, &node);
-
 			if (ACPI_FAILURE (status)) {
 				return (status);
 			}
@@ -268,10 +249,9 @@ acpi_ds_create_bank_field (
 			 * the object stack
 			 */
 
-			status = acpi_aml_prep_bank_field_value (node, region_node, register_node,
-					  bank_value, field_flags, access_attribute,
-					  field_bit_position, arg->value.size);
-
+			status = acpi_ex_prep_bank_field_value (node, region_node, register_node,
+					  bank_value, field_flags, field_bit_position,
+					  arg->value.size);
 			if (ACPI_FAILURE (status)) {
 				return (status);
 			}
@@ -295,7 +275,8 @@ acpi_ds_create_bank_field (
  * FUNCTION:    Acpi_ds_create_index_field
  *
  * PARAMETERS:  Op              - Op containing the Field definition and args
- *              Region_node - Object for the containing Operation Region
+ *              Region_node     - Object for the containing Operation Region
+ *  `           Walk_state      - Current method state
  *
  * RETURN:      Status
  *
@@ -306,7 +287,7 @@ acpi_ds_create_bank_field (
 ACPI_STATUS
 acpi_ds_create_index_field (
 	ACPI_PARSE_OBJECT       *op,
-	ACPI_HANDLE             region_node,
+	ACPI_NAMESPACE_NODE     *region_node,
 	ACPI_WALK_STATE         *walk_state)
 {
 	ACPI_STATUS             status;
@@ -315,7 +296,6 @@ acpi_ds_create_index_field (
 	ACPI_NAMESPACE_NODE     *index_register_node;
 	ACPI_NAMESPACE_NODE     *data_register_node;
 	u8                      field_flags;
-	u8                      access_attribute = 0;
 	u32                     field_bit_position = 0;
 
 
@@ -324,10 +304,9 @@ acpi_ds_create_index_field (
 	/* First arg is the name of the Index register */
 
 	status = acpi_ns_lookup (walk_state->scope_info, arg->value.string,
-			 ACPI_TYPE_ANY, IMODE_LOAD_PASS1,
-			 NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
-			 NULL, &index_register_node);
-
+			  ACPI_TYPE_ANY, IMODE_LOAD_PASS1,
+			  NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
+			  NULL, &index_register_node);
 	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
@@ -337,11 +316,9 @@ acpi_ds_create_index_field (
 	arg = arg->next;
 
 	status = acpi_ns_lookup (walk_state->scope_info, arg->value.string,
-			 INTERNAL_TYPE_INDEX_FIELD_DEFN,
-			 IMODE_LOAD_PASS1,
-			 NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
-			 NULL, &data_register_node);
-
+			  INTERNAL_TYPE_INDEX_FIELD_DEFN, IMODE_LOAD_PASS1,
+			  NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
+			  NULL, &data_register_node);
 	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
@@ -357,37 +334,31 @@ acpi_ds_create_index_field (
 
 	arg = arg->next;
 	while (arg) {
-		switch (arg->opcode)
-		{
-		case AML_RESERVEDFIELD_OP:
+		switch (arg->opcode) {
+		case AML_INT_RESERVEDFIELD_OP:
 
 			field_bit_position += arg->value.size;
 			break;
 
 
-		case AML_ACCESSFIELD_OP:
+		case AML_INT_ACCESSFIELD_OP:
 
 			/*
 			 * Get a new Access_type and Access_attribute for all
 			 * entries (until end or another Access_as keyword)
 			 */
-
-			access_attribute = (u8) arg->value.integer;
-			field_flags     = (u8)
-					   ((field_flags & FIELD_ACCESS_TYPE_MASK) ||
-					   ((u8) (arg->value.integer >> 8)));
+			field_flags = (u8) ((field_flags & FIELD_ACCESS_TYPE_MASK) ||
+					 ((u8) (arg->value.integer >> 8)));
 			break;
 
 
-		case AML_NAMEDFIELD_OP:
+		case AML_INT_NAMEDFIELD_OP:
 
 			status = acpi_ns_lookup (walk_state->scope_info,
-					 (NATIVE_CHAR *) &((ACPI_PARSE2_OBJECT *)arg)->name,
-					 INTERNAL_TYPE_INDEX_FIELD,
-					 IMODE_LOAD_PASS1,
-					 NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
-					 NULL, &node);
-
+					  (NATIVE_CHAR *) &((ACPI_PARSE2_OBJECT *)arg)->name,
+					  INTERNAL_TYPE_INDEX_FIELD, IMODE_LOAD_PASS1,
+					  NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
+					  NULL, &node);
 			if (ACPI_FAILURE (status)) {
 				return (status);
 			}
@@ -397,10 +368,9 @@ acpi_ds_create_index_field (
 			 * the object stack
 			 */
 
-			status = acpi_aml_prep_index_field_value (node, index_register_node, data_register_node,
-					  field_flags, access_attribute,
+			status = acpi_ex_prep_index_field_value (node, index_register_node,
+					  data_register_node, field_flags,
 					  field_bit_position, arg->value.size);
-
 			if (ACPI_FAILURE (status)) {
 				return (status);
 			}

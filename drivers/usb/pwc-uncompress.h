@@ -15,12 +15,18 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
+/* This file is the bridge between the kernel module and the plugin; it
+   describes the structures and datatypes used in both modules. Any
+   significant change should be reflected by increasing the 
+   pwc_decompressor_version major number.
+ */
 #ifndef PWC_DEC_H
 #define PWC_DEC_H
 
 #include <linux/config.h>
-
 #include <linux/list.h>
+
+#include "pwc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,12 +39,16 @@ extern "C" {
  */
 struct pwc_decompressor
 {
-	int  type;	/* type of camera (645, 646, etc) */
-	int  (* init)(int release, void *buffer, void **data);	/* Initialization routine; should be called after each set_video_mode */
-	void (* exit)(void **data);	/* Cleanup routine */
-	int  (* decompress)(void *data, int width, int height, int bandlength, void *dst, void *src, int planar); /* The decompression routine itself */
-	void (* lock)(void); /* make sure module cannot be unloaded */
-	void (* unlock)(void); /* release lock on module */
+	int  type;		/* type of camera (645, 680, etc) */
+	int  table_size;	/* memory needed */
+
+	void (* init)(int release, void *buffer, void *table);	/* Initialization routine; should be called after each set_video_mode */
+	void (* exit)(void);	/* Cleanup routine */
+	void (* decompress)(struct pwc_coord *image, struct pwc_coord *view, struct pwc_coord *offset,
+                            void *src, void *dst, int planar,
+	                    void *table, int bandlength);
+	void (* lock)(void);	/* make sure module cannot be unloaded */
+	void (* unlock)(void);	/* release lock on module */
 
 	struct list_head pwcd_list;
 };

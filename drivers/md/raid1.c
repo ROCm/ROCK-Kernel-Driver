@@ -82,7 +82,7 @@ static struct buffer_head *raid1_alloc_bh(raid1_conf_t *conf, int cnt)
 			bh = t;
 			cnt--;
 		} else {
-			PRINTK("waiting for %d bh\n", cnt);
+			PRINTK("raid1: waiting for %d bh\n", cnt);
 			wait_event(conf->wait_buffer, conf->freebh_cnt >= cnt);
 		}
 	}
@@ -1123,7 +1123,7 @@ static void raid1d (void *data)
 
 		mddev = r1_bh->mddev;
 		if (mddev->sb_dirty) {
-			printk(KERN_INFO "dirty sb detected, updating.\n");
+			printk(KERN_INFO "raid1: dirty sb detected, updating.\n");
 			mddev->sb_dirty = 0;
 			md_update_sb(mddev);
 		}

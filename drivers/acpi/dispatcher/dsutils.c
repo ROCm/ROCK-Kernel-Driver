@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 52 $
+ *              $Revision: 58 $
  *
  ******************************************************************************/
 
@@ -32,7 +32,7 @@
 #include "acnamesp.h"
 #include "acdebug.h"
 
-#define _COMPONENT          PARSER
+#define _COMPONENT          ACPI_DISPATCHER
 	 MODULE_NAME         ("dsutils")
 
 
@@ -93,15 +93,13 @@ acpi_ds_is_result_used (
 	 * as an operand later.
 	 */
 
-	switch (ACPI_GET_OP_CLASS (parent_info))
-	{
+	switch (ACPI_GET_OP_CLASS (parent_info)) {
 	/*
 	 * In these cases, the parent will never use the return object
 	 */
 	case OPTYPE_CONTROL:        /* IF, ELSE, WHILE only */
 
-		switch (op->parent->opcode)
-		{
+		switch (op->parent->opcode) {
 		case AML_RETURN_OP:
 
 			/* Never delete the return value associated with a return opcode */
@@ -118,8 +116,7 @@ acpi_ds_is_result_used (
 			 */
 
 			if ((walk_state->control_state->common.state == CONTROL_PREDICATE_EXECUTING) &&
-				(walk_state->control_state->control.predicate_op == op))
-			{
+				(walk_state->control_state->control.predicate_op == op)) {
 				return (TRUE);
 			}
 
@@ -136,14 +133,13 @@ acpi_ds_is_result_used (
 		 * These opcodes allow Term_arg(s) as operands and therefore
 		 * method calls.  The result is used.
 		 */
-		if ((op->parent->opcode == AML_REGION_OP)       ||
-			(op->parent->opcode == AML_CREATE_FIELD_OP) ||
-			(op->parent->opcode == AML_BIT_FIELD_OP)    ||
-			(op->parent->opcode == AML_BYTE_FIELD_OP)   ||
-			(op->parent->opcode == AML_WORD_FIELD_OP)   ||
-			(op->parent->opcode == AML_DWORD_FIELD_OP)  ||
-			(op->parent->opcode == AML_QWORD_FIELD_OP))
-		{
+		if ((op->parent->opcode == AML_REGION_OP)               ||
+			(op->parent->opcode == AML_CREATE_FIELD_OP)         ||
+			(op->parent->opcode == AML_CREATE_BIT_FIELD_OP)     ||
+			(op->parent->opcode == AML_CREATE_BYTE_FIELD_OP)    ||
+			(op->parent->opcode == AML_CREATE_WORD_FIELD_OP)    ||
+			(op->parent->opcode == AML_CREATE_DWORD_FIELD_OP)   ||
+			(op->parent->opcode == AML_CREATE_QWORD_FIELD_OP)) {
 			return (TRUE);
 		}
 
@@ -206,7 +202,7 @@ acpi_ds_delete_result_if_not_used (
 
 		status = acpi_ds_result_pop (&obj_desc, walk_state);
 		if (ACPI_SUCCESS (status)) {
-			acpi_cm_remove_reference (result_obj);
+			acpi_ut_remove_reference (result_obj);
 		}
 	}
 
@@ -239,7 +235,7 @@ acpi_ds_create_operand (
 	ACPI_STATUS             status = AE_OK;
 	NATIVE_CHAR             *name_string;
 	u32                     name_length;
-	OBJECT_TYPE_INTERNAL    data_type;
+	ACPI_OBJECT_TYPE8       data_type;
 	ACPI_OPERAND_OBJECT     *obj_desc;
 	ACPI_PARSE_OBJECT       *parent_op;
 	u16                     opcode;
@@ -249,15 +245,12 @@ acpi_ds_create_operand (
 
 	/* A valid name must be looked up in the namespace */
 
-	if ((arg->opcode == AML_NAMEPATH_OP) &&
-		(arg->value.string))
-	{
+	if ((arg->opcode == AML_INT_NAMEPATH_OP) &&
+		(arg->value.string)) {
 		/* Get the entire name string from the AML stream */
 
-		status = acpi_aml_get_name_string (ACPI_TYPE_ANY,
-				   arg->value.buffer,
-				   &name_string,
-				   &name_length);
+		status = acpi_ex_get_name_string (ACPI_TYPE_ANY, arg->value.buffer,
+				  &name_string, &name_length);
 
 		if (ACPI_FAILURE (status)) {
 			return (status);
@@ -277,10 +270,9 @@ acpi_ds_create_operand (
 
 		parent_op = arg->parent;
 		if ((acpi_ps_is_node_op (parent_op->opcode)) &&
-			(parent_op->opcode != AML_METHODCALL_OP) &&
+			(parent_op->opcode != AML_INT_METHODCALL_OP) &&
 			(parent_op->opcode != AML_REGION_OP) &&
-			(parent_op->opcode != AML_NAMEPATH_OP))
-		{
+			(parent_op->opcode != AML_INT_NAMEPATH_OP)) {
 			/* Enter name into namespace if not found */
 
 			interpreter_mode = IMODE_LOAD_PASS2;
@@ -300,7 +292,7 @@ acpi_ds_create_operand (
 
 		/* Free the namestring created above */
 
-		acpi_cm_free (name_string);
+		acpi_ut_free (name_string);
 
 		/*
 		 * The only case where we pass through (ignore) a NOT_FOUND
@@ -347,7 +339,7 @@ acpi_ds_create_operand (
 	else {
 		/* Check for null name case */
 
-		if (arg->opcode == AML_NAMEPATH_OP) {
+		if (arg->opcode == AML_INT_NAMEPATH_OP) {
 			/*
 			 * If the name is null, this means that this is an
 			 * optional result parameter that was not specified
@@ -381,7 +373,6 @@ acpi_ds_create_operand (
 			 * Use value that was already previously returned
 			 * by the evaluation of this argument
 			 */
-
 			status = acpi_ds_result_pop_from_bottom (&obj_desc, walk_state);
 			if (ACPI_FAILURE (status)) {
 				/*
@@ -396,7 +387,7 @@ acpi_ds_create_operand (
 		else {
 			/* Create an ACPI_INTERNAL_OBJECT for the argument */
 
-			obj_desc = acpi_cm_create_internal_object (data_type);
+			obj_desc = acpi_ut_create_internal_object (data_type);
 			if (!obj_desc) {
 				return (AE_NO_MEMORY);
 			}
@@ -406,7 +397,7 @@ acpi_ds_create_operand (
 			status = acpi_ds_init_object_from_op (walk_state, arg,
 					 opcode, &obj_desc);
 			if (ACPI_FAILURE (status)) {
-				acpi_cm_delete_object_desc (obj_desc);
+				acpi_ut_delete_object_desc (obj_desc);
 				return (status);
 			}
 	   }
@@ -509,11 +500,11 @@ acpi_ds_resolve_operands (
 
 	/*
 	 * TBD: [Investigate] Note from previous parser:
-	 *   Ref_of problem with Acpi_aml_resolve_to_value() conversion.
+	 *   Ref_of problem with Acpi_ex_resolve_to_value() conversion.
 	 */
 
 	for (i = 0; i < walk_state->num_operands; i++) {
-		status = acpi_aml_resolve_to_value (&walk_state->operands[i], walk_state);
+		status = acpi_ex_resolve_to_value (&walk_state->operands[i], walk_state);
 		if (ACPI_FAILURE (status)) {
 			break;
 		}
@@ -538,14 +529,17 @@ acpi_ds_resolve_operands (
  *
  ******************************************************************************/
 
-OBJECT_TYPE_INTERNAL
+ACPI_OBJECT_TYPE8
 acpi_ds_map_opcode_to_data_type (
 	u16                     opcode,
 	u32                     *out_flags)
 {
-	OBJECT_TYPE_INTERNAL    data_type = INTERNAL_TYPE_INVALID;
+	ACPI_OBJECT_TYPE8       data_type = INTERNAL_TYPE_INVALID;
 	ACPI_OPCODE_INFO        *op_info;
 	u32                     flags = 0;
+
+
+	PROC_NAME ("Ds_map_opcode_to_data_type");
 
 
 	op_info = acpi_ps_get_opcode_info (opcode);
@@ -555,13 +549,11 @@ acpi_ds_map_opcode_to_data_type (
 		return (data_type);
 	}
 
-	switch (ACPI_GET_OP_CLASS (op_info))
-	{
+	switch (ACPI_GET_OP_CLASS (op_info)) {
 
 	case OPTYPE_LITERAL:
 
-		switch (opcode)
-		{
+		switch (opcode) {
 		case AML_BYTE_OP:
 		case AML_WORD_OP:
 		case AML_DWORD_OP:
@@ -575,7 +567,7 @@ acpi_ds_map_opcode_to_data_type (
 			data_type = ACPI_TYPE_STRING;
 			break;
 
-		case AML_NAMEPATH_OP:
+		case AML_INT_NAMEPATH_OP:
 			data_type = INTERNAL_TYPE_REFERENCE;
 			break;
 
@@ -587,8 +579,7 @@ acpi_ds_map_opcode_to_data_type (
 
 	case OPTYPE_DATA_TERM:
 
-		switch (opcode)
-		{
+		switch (opcode) {
 		case AML_BUFFER_OP:
 
 			data_type = ACPI_TYPE_BUFFER;
@@ -675,17 +666,16 @@ acpi_ds_map_opcode_to_data_type (
  *
  ******************************************************************************/
 
-OBJECT_TYPE_INTERNAL
+ACPI_OBJECT_TYPE8
 acpi_ds_map_named_opcode_to_data_type (
 	u16                     opcode)
 {
-	OBJECT_TYPE_INTERNAL    data_type;
+	ACPI_OBJECT_TYPE8       data_type;
 
 
 	/* Decode Opcode */
 
-	switch (opcode)
-	{
+	switch (opcode) {
 	case AML_SCOPE_OP:
 		data_type = INTERNAL_TYPE_SCOPE;
 		break;
@@ -710,8 +700,8 @@ acpi_ds_map_named_opcode_to_data_type (
 		data_type = ACPI_TYPE_PROCESSOR;
 		break;
 
-	case AML_DEF_FIELD_OP:                          /* Def_field_op */
-		data_type = INTERNAL_TYPE_DEF_FIELD_DEFN;
+	case AML_FIELD_OP:                              /* Field_op */
+		data_type = INTERNAL_TYPE_FIELD_DEFN;
 		break;
 
 	case AML_INDEX_FIELD_OP:                        /* Index_field_op */
@@ -722,12 +712,12 @@ acpi_ds_map_named_opcode_to_data_type (
 		data_type = INTERNAL_TYPE_BANK_FIELD_DEFN;
 		break;
 
-	case AML_NAMEDFIELD_OP:                         /* NO CASE IN ORIGINAL  */
+	case AML_INT_NAMEDFIELD_OP:                     /* NO CASE IN ORIGINAL  */
 		data_type = ACPI_TYPE_ANY;
 		break;
 
 	case AML_NAME_OP:                               /* Name_op - special code in original */
-	case AML_NAMEPATH_OP:
+	case AML_INT_NAMEPATH_OP:
 		data_type = ACPI_TYPE_ANY;
 		break;
 

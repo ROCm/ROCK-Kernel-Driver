@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsutils - Utilities for the resource manager
- *              $Revision: 14 $
+ *              $Revision: 19 $
  *
  ******************************************************************************/
 
@@ -29,7 +29,7 @@
 #include "acresrc.h"
 
 
-#define _COMPONENT          RESOURCE_MANAGER
+#define _COMPONENT          ACPI_RESOURCES
 	 MODULE_NAME         ("rsutils")
 
 
@@ -41,7 +41,7 @@
  *              Ret_buffer      - a pointer to a buffer structure for the
  *                                  results
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to get the _PRT value of an object
  *              contained in an object specified by the handle passed in
@@ -96,8 +96,7 @@ acpi_rs_get_prt_method_data (
 	 *  byte stream buffer that comes back from the _CRS method
 	 *  execution.
 	 */
-	status = acpi_rs_create_pci_routing_table (ret_obj,
-			  ret_buffer->pointer,
+	status = acpi_rs_create_pci_routing_table (ret_obj, ret_buffer->pointer,
 			  &buffer_space_needed);
 
 	/*
@@ -111,8 +110,7 @@ acpi_rs_get_prt_method_data (
 
 cleanup:
 
-	acpi_cm_remove_reference (ret_obj);
-
+	acpi_ut_remove_reference (ret_obj);
 	return (status);
 }
 
@@ -125,7 +123,7 @@ cleanup:
  *              Ret_buffer      - a pointer to a buffer structure for the
  *                                  results
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to get the _CRS value of an object
  *              contained in an object specified by the handle passed in
@@ -177,10 +175,8 @@ acpi_rs_get_crs_method_data (
 	 *  byte stream buffer that comes back from the _CRS method
 	 *  execution.
 	 */
-	status = acpi_rs_create_resource_list (ret_obj,
-			  ret_buffer->pointer,
-			  &buffer_space_needed);
-
+	status = acpi_rs_create_resource_list (ret_obj, ret_buffer->pointer,
+			 &buffer_space_needed);
 
 
 	/*
@@ -194,8 +190,7 @@ acpi_rs_get_crs_method_data (
 
 cleanup:
 
-	acpi_cm_remove_reference (ret_obj);
-
+	acpi_ut_remove_reference (ret_obj);
 	return (status);
 }
 
@@ -208,7 +203,7 @@ cleanup:
  *              Ret_buffer      - a pointer to a buffer structure for the
  *                                  results
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to get the _PRS value of an object
  *              contained in an object specified by the handle passed in
@@ -260,9 +255,8 @@ acpi_rs_get_prs_method_data (
 	 *  byte stream buffer that comes back from the _CRS method
 	 *  execution.
 	 */
-	status = acpi_rs_create_resource_list (ret_obj,
-			  ret_buffer->pointer,
-			  &buffer_space_needed);
+	status = acpi_rs_create_resource_list (ret_obj, ret_buffer->pointer,
+			 &buffer_space_needed);
 
 	/*
 	 * Tell the user how much of the buffer we have used or is needed
@@ -275,8 +269,7 @@ acpi_rs_get_prs_method_data (
 
 cleanup:
 
-	acpi_cm_remove_reference (ret_obj);
-
+	acpi_ut_remove_reference (ret_obj);
 	return (status);
 }
 
@@ -289,7 +282,7 @@ cleanup:
  *              In_buffer       - a pointer to a buffer structure of the
  *                                  parameter
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to set the _SRS of an object contained
  *              in an object specified by the handle passed in
@@ -315,20 +308,19 @@ acpi_rs_set_srs_method_data (
 
 	/*
 	 * The In_buffer parameter will point to a linked list of
-	 *  resource parameters.  It needs to be formatted into a
-	 *  byte stream to be sent in as an input parameter.
+	 * resource parameters.  It needs to be formatted into a
+	 * byte stream to be sent in as an input parameter.
 	 */
 	buffer_size_needed = 0;
 
 	/*
 	 * First call is to get the buffer size needed
 	 */
-	status = acpi_rs_create_byte_stream (in_buffer->pointer,
-			   byte_stream,
-			   &buffer_size_needed);
+	status = acpi_rs_create_byte_stream (in_buffer->pointer, byte_stream,
+			 &buffer_size_needed);
 	/*
 	 * We expect a return of AE_BUFFER_OVERFLOW
-	 *  if not, exit with the error
+	 * if not, exit with the error
 	 */
 	if (AE_BUFFER_OVERFLOW != status) {
 		return (status);
@@ -337,7 +329,7 @@ acpi_rs_set_srs_method_data (
 	/*
 	 * Allocate the buffer needed
 	 */
-	byte_stream = acpi_cm_callocate(buffer_size_needed);
+	byte_stream = acpi_ut_callocate(buffer_size_needed);
 	if (NULL == byte_stream) {
 		return (AE_NO_MEMORY);
 	}
@@ -345,20 +337,19 @@ acpi_rs_set_srs_method_data (
 	/*
 	 * Now call to convert the linked list into a byte stream
 	 */
-	status = acpi_rs_create_byte_stream (in_buffer->pointer,
-			   byte_stream,
-			   &buffer_size_needed);
+	status = acpi_rs_create_byte_stream (in_buffer->pointer, byte_stream,
+			 &buffer_size_needed);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
 	}
 
 	/*
-	 *  Init the param object
+	 * Init the param object
 	 */
-	acpi_cm_init_static_object (&param_obj);
+	acpi_ut_init_static_object (&param_obj);
 
 	/*
-	 *  Method requires one parameter.  Set it up
+	 * Method requires one parameter.  Set it up
 	 */
 	params [0] = &param_obj;
 	params [1] = NULL;
@@ -371,17 +362,16 @@ acpi_rs_set_srs_method_data (
 	param_obj.buffer.pointer = byte_stream;
 
 	/*
-	 *  Execute the method, no return value
+	 * Execute the method, no return value
 	 */
 	status = acpi_ns_evaluate_relative (handle, "_SRS", params, NULL);
 
 	/*
-	 *  Clean up and return the status from Acpi_ns_evaluate_relative
+	 * Clean up and return the status from Acpi_ns_evaluate_relative
 	 */
-
 cleanup:
 
-	acpi_cm_free (byte_stream);
+	acpi_ut_free (byte_stream);
 	return (status);
 }
 

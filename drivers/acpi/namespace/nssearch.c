@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nssearch - Namespace search
- *              $Revision: 64 $
+ *              $Revision: 70 $
  *
  ******************************************************************************/
 
@@ -30,7 +30,7 @@
 #include "acnamesp.h"
 
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nssearch")
 
 
@@ -39,9 +39,9 @@
  * FUNCTION:    Acpi_ns_search_node
  *
  * PARAMETERS:  *Target_name        - Ascii ACPI name to search for
- *              *Node           - Starting table where search will begin
+ *              *Node               - Starting table where search will begin
  *              Type                - Object type to match
- *              **Return_node   - Where the matched Named obj is returned
+ *              **Return_node       - Where the matched Named obj is returned
  *
  * RETURN:      Status
  *
@@ -64,7 +64,7 @@ ACPI_STATUS
 acpi_ns_search_node (
 	u32                     target_name,
 	ACPI_NAMESPACE_NODE     *node,
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	ACPI_NAMESPACE_NODE     **return_node)
 {
 	ACPI_NAMESPACE_NODE     *next_node;
@@ -81,36 +81,29 @@ acpi_ns_search_node (
 
 		if (next_node->name == target_name) {
 			/*
-			 * Found matching entry.  Capture type if
-			 * appropriate before returning the entry.
+			 * Found matching entry.  Capture the type if appropriate, before
+			 * returning the entry.
+			 *
+			 * The Def_field_defn and Bank_field_defn cases are actually looking up
+			 * the Region in which the field will be defined
 			 */
 
-			/*
-			 * The Def_field_defn and Bank_field_defn cases
-			 * are actually looking up the Region in which
-			 * the field will be defined
-			 */
-
-			if ((INTERNAL_TYPE_DEF_FIELD_DEFN == type) ||
-				(INTERNAL_TYPE_BANK_FIELD_DEFN == type))
-			{
+			if ((INTERNAL_TYPE_FIELD_DEFN == type) ||
+				(INTERNAL_TYPE_BANK_FIELD_DEFN == type)) {
 				type = ACPI_TYPE_REGION;
 			}
 
 			/*
-			 * Scope, Def_any, and Index_field_defn are bogus
-			 * "types" which do not actually have anything
-			 * to do with the type of the name being looked
-			 * up.  For any other value of Type, if the type
-			 * stored in the entry is Any (i.e. unknown),
-			 * save the actual type.
+			 * Scope, Def_any, and Index_field_defn are bogus "types" which do not
+			 * actually have anything to do with the type of the name being
+			 * looked up.  For any other value of Type, if the type stored in
+			 * the entry is Any (i.e. unknown), save the actual type.
 			 */
 
 			if (type != INTERNAL_TYPE_SCOPE &&
 				type != INTERNAL_TYPE_DEF_ANY &&
 				type != INTERNAL_TYPE_INDEX_FIELD_DEFN &&
-				next_node->type == ACPI_TYPE_ANY)
-			{
+				next_node->type == ACPI_TYPE_ANY) {
 				next_node->type = (u8) type;
 			}
 
@@ -137,7 +130,6 @@ acpi_ns_search_node (
 
 	/* Searched entire table, not found */
 
-
 	return (AE_NOT_FOUND);
 }
 
@@ -147,9 +139,9 @@ acpi_ns_search_node (
  * FUNCTION:    Acpi_ns_search_parent_tree
  *
  * PARAMETERS:  *Target_name        - Ascii ACPI name to search for
- *              *Node           - Starting table where search will begin
+ *              *Node               - Starting table where search will begin
  *              Type                - Object type to match
- *              **Return_node   - Where the matched Named Obj is returned
+ *              **Return_node       - Where the matched Named Obj is returned
  *
  * RETURN:      Status
  *
@@ -171,7 +163,7 @@ static ACPI_STATUS
 acpi_ns_search_parent_tree (
 	u32                     target_name,
 	ACPI_NAMESPACE_NODE     *node,
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	ACPI_NAMESPACE_NODE     **return_node)
 {
 	ACPI_STATUS             status;
@@ -184,9 +176,8 @@ acpi_ns_search_parent_tree (
 	 * If there is no parent (at the root) or type is "local", we won't be
 	 * searching the parent tree.
 	 */
-	if ((acpi_ns_local (type))  ||
-		(!parent_node))
-	{
+	if ((acpi_ns_local (type)) ||
+		(!parent_node)) {
 
 
 		return (AE_NOT_FOUND);
@@ -199,7 +190,6 @@ acpi_ns_search_parent_tree (
 	 * Search parents until found the target or we have backed up to
 	 * the root
 	 */
-
 	while (parent_node) {
 		/* Search parent scope */
 		/* TBD: [Investigate] Why ACPI_TYPE_ANY? */
@@ -232,12 +222,12 @@ acpi_ns_search_parent_tree (
  *
  * PARAMETERS:  Target_name         - Ascii ACPI name to search for (4 chars)
  *              Walk_state          - Current state of the walk
- *              *Node           - Starting table where search will begin
+ *              *Node               - Starting table where search will begin
  *              Interpreter_mode    - Add names only in MODE_Load_pass_x.
  *                                    Otherwise,search only.
  *              Type                - Object type to match
  *              Flags               - Flags describing the search restrictions
- *              **Return_node   - Where the Node is returned
+ *              **Return_node       - Where the Node is returned
  *
  * RETURN:      Status
  *
@@ -257,7 +247,7 @@ acpi_ns_search_and_enter (
 	ACPI_WALK_STATE         *walk_state,
 	ACPI_NAMESPACE_NODE     *node,
 	OPERATING_MODE          interpreter_mode,
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	u32                     flags,
 	ACPI_NAMESPACE_NODE     **return_node)
 {
@@ -275,7 +265,7 @@ acpi_ns_search_and_enter (
 
 	/* Name must consist of printable characters */
 
-	if (!acpi_cm_valid_acpi_name (target_name)) {
+	if (!acpi_ut_valid_acpi_name (target_name)) {
 		REPORT_ERROR (("Ns_search_and_enter: Bad character in ACPI Name\n"));
 		return (AE_BAD_CHARACTER);
 	}
@@ -284,16 +274,14 @@ acpi_ns_search_and_enter (
 	/* Try to find the name in the table specified by the caller */
 
 	*return_node = ENTRY_NOT_FOUND;
-	status = acpi_ns_search_node (target_name, node,
-			   type, return_node);
+	status = acpi_ns_search_node (target_name, node, type, return_node);
 	if (status != AE_NOT_FOUND) {
 		/*
-		 * If we found it AND the request specifies that a
-		 * find is an error, return the error
+		 * If we found it AND the request specifies that a find is an error,
+		 * return the error
 		 */
 		if ((status == AE_OK) &&
-			(flags & NS_ERROR_IF_FOUND))
-		{
+			(flags & NS_ERROR_IF_FOUND)) {
 			status = AE_EXIST;
 		}
 
@@ -316,8 +304,7 @@ acpi_ns_search_and_enter (
 	 */
 
 	if ((interpreter_mode != IMODE_LOAD_PASS1) &&
-		(flags & NS_SEARCH_PARENT))
-	{
+		(flags & NS_SEARCH_PARENT)) {
 		/*
 		 * Not found in table - search parent tree according
 		 * to ACPI specification

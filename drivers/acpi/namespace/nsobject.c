@@ -2,7 +2,7 @@
  *
  * Module Name: nsobject - Utilities for objects attached to namespace
  *                         table entries
- *              $Revision: 49 $
+ *              $Revision: 55 $
  *
  ******************************************************************************/
 
@@ -32,7 +32,7 @@
 #include "actables.h"
 
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nsobject")
 
 
@@ -57,11 +57,11 @@ ACPI_STATUS
 acpi_ns_attach_object (
 	ACPI_NAMESPACE_NODE     *node,
 	ACPI_OPERAND_OBJECT     *object,
-	OBJECT_TYPE_INTERNAL    type)
+	ACPI_OBJECT_TYPE8       type)
 {
 	ACPI_OPERAND_OBJECT     *obj_desc;
 	ACPI_OPERAND_OBJECT     *previous_obj_desc;
-	OBJECT_TYPE_INTERNAL    obj_type = ACPI_TYPE_ANY;
+	ACPI_OBJECT_TYPE8      obj_type = ACPI_TYPE_ANY;
 	u8                      flags;
 	u16                     opcode;
 
@@ -124,8 +124,7 @@ acpi_ns_attach_object (
 	 */
 
 	else if (VALID_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_NAMED) &&
-			((ACPI_NAMESPACE_NODE *) object)->object)
-	{
+			((ACPI_NAMESPACE_NODE *) object)->object) {
 		/*
 		 * Value passed is a name handle and that name has a
 		 * non-null value.  Use that name's value and type.
@@ -183,10 +182,9 @@ acpi_ns_attach_object (
 
 			MOVE_UNALIGNED16_TO_16 (&opcode, object);
 
-			/* Check for a recognized Op_code */
+			/* Check for a recognized Opcode */
 
-			switch ((u8) opcode)
-			{
+			switch ((u8) opcode) {
 
 			case AML_OP_PREFIX:
 
@@ -257,7 +255,7 @@ acpi_ns_attach_object (
 	 * (if it is an internal object)
 	 */
 
-	acpi_cm_add_reference (obj_desc);
+	acpi_ut_add_reference (obj_desc);
 
 	/* Save the existing object (if any) for deletion later */
 
@@ -277,11 +275,11 @@ acpi_ns_attach_object (
 	if (previous_obj_desc) {
 		/* One for the attach to the Node */
 
-		acpi_cm_remove_reference (previous_obj_desc);
+		acpi_ut_remove_reference (previous_obj_desc);
 
 		/* Now delete */
 
-		acpi_cm_remove_reference (previous_obj_desc);
+		acpi_ut_remove_reference (previous_obj_desc);
 	}
 
 	return (AE_OK);
@@ -321,14 +319,14 @@ acpi_ns_detach_object (
 	/* Found a valid value */
 
 	/*
-	 * Not every value is an object allocated via Acpi_cm_callocate,
+	 * Not every value is an object allocated via Acpi_ut_callocate,
 	 * - must check
 	 */
 
 	if (!acpi_tb_system_table_pointer (obj_desc)) {
 		/* Attempt to delete the object (and all subobjects) */
 
-		acpi_cm_remove_reference (obj_desc);
+		acpi_ut_remove_reference (obj_desc);
 	}
 
 	return;
@@ -339,7 +337,7 @@ acpi_ns_detach_object (
  *
  * FUNCTION:    Acpi_ns_get_attached_object
  *
- * PARAMETERS:  Handle              - Parent Node to be examined
+ * PARAMETERS:  Node             - Parent Node to be examined
  *
  * RETURN:      Current value of the object field from the Node whose
  *              handle is passed
@@ -348,16 +346,16 @@ acpi_ns_detach_object (
 
 void *
 acpi_ns_get_attached_object (
-	ACPI_HANDLE             handle)
+	ACPI_NAMESPACE_NODE     *node)
 {
 
-	if (!handle) {
+	if (!node) {
 		/* handle invalid */
 
 		return (NULL);
 	}
 
-	return (((ACPI_NAMESPACE_NODE *) handle)->object);
+	return (node->object);
 }
 
 

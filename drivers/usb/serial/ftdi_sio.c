@@ -1,7 +1,7 @@
 /*
  * USB FTDI SIO driver
  *
- * 	Copyright (C) 1999, 2000
+ * 	Copyright (C) 1999 - 2001
  * 	    Greg Kroah-Hartman (greg@kroah.com)
  *          Bill Ryder (bryder@sgi.com)
  *
@@ -15,6 +15,9 @@
  * See http://reality.sgi.com/bryder_wellington/ftdi_sio for upto date testing info
  *     and extra documentation
  * 
+ * (31/May/2001) gkh
+ *	switched from using spinlock to a semaphore, which fixes lots of problems.
+ *
  * (23/May/2001)   Bill Ryder
  *     Added runtime debug patch (thanx Tyson D Sawyer).
  *     Cleaned up comments for 8U232
@@ -301,21 +304,18 @@ static int  ftdi_sio_open (struct usb_serial_port *port, struct file *filp)
 { /* ftdi_sio_open */
 	struct termios tmp_termios;
 	struct usb_serial *serial = port->serial;
-	unsigned long flags;	/* Used for spinlock */
-	int result;
+	int result = 0;
 	char buf[1]; /* Needed for the usb_control_msg I think */
 
 	dbg(__FUNCTION__);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 	
 	MOD_INC_USE_COUNT;
 	++port->open_count;
 
 	if (!port->active){
 		port->active = 1;
-
-		spin_unlock_irqrestore (&port->port_lock, flags);
 
 		/* This will push the characters through immediately rather 
 		   than queue a task to deliver them */
@@ -352,11 +352,10 @@ static int  ftdi_sio_open (struct usb_serial_port *port, struct file *filp)
 		result = usb_submit_urb(port->read_urb);
 		if (result)
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
-	} else { /* the port was already active - so no initialisation is done */
-		spin_unlock_irqrestore (&port->port_lock, flags);
 	}
 
-	return (0);
+	up (&port->sem);
+	return result;
 } /* ftdi_sio_open */
 
 
@@ -365,15 +364,13 @@ static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 	struct usb_serial *serial = port->serial;
 	unsigned int c_cflag = port->tty->termios->c_cflag;
 	char buf[1];
-	unsigned long flags;
 
 	dbg( __FUNCTION__);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 	--port->open_count;
 
 	if (port->open_count <= 0) {
-		spin_unlock_irqrestore (&port->port_lock, flags);
 		if (c_cflag & HUPCL){
 			/* Disable flow control */
 			if (usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
@@ -400,8 +397,6 @@ static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 		port->active = 0;
 		port->open_count = 0;
 	} else {  
-		spin_unlock_irqrestore (&port->port_lock, flags);
-
 		/* Send a HUP if necessary */
 		if (!(port->tty->termios->c_cflag & CLOCAL)){
 			tty_hangup(port->tty);
@@ -409,6 +404,7 @@ static void ftdi_sio_close (struct usb_serial_port *port, struct file *filp)
 		
 	}
 
+	up (&port->sem);
 	MOD_DEC_USE_COUNT;
 
 } /* ftdi_sio_close */

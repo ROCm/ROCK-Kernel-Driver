@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 39 $
+ *              $Revision: 46 $
  *
  ******************************************************************************/
 
@@ -32,7 +32,7 @@
 #include "acnamesp.h"
 
 
-#define _COMPONENT          DISPATCHER
+#define _COMPONENT          ACPI_DISPATCHER
 	 MODULE_NAME         ("dsmthdat")
 
 
@@ -60,7 +60,7 @@ acpi_ds_method_data_init (
 
 	/*
 	 * Walk_state fields are initialized to zero by the
-	 * Acpi_cm_callocate().
+	 * Acpi_ut_callocate().
 	 *
 	 * An Node is assigned to each argument and local so
 	 * that Ref_of() can return a pointer to the Node.
@@ -125,7 +125,7 @@ acpi_ds_method_data_delete_all (
 
 			/* Was given a ref when stored */
 
-			acpi_cm_remove_reference (object);
+			acpi_ut_remove_reference (object);
 	   }
 	}
 
@@ -141,7 +141,7 @@ acpi_ds_method_data_delete_all (
 
 			 /* Was given a ref when stored */
 
-			acpi_cm_remove_reference (object);
+			acpi_ut_remove_reference (object);
 		}
 	}
 
@@ -182,16 +182,15 @@ acpi_ds_method_data_init_args (
 
 	for (pindex = mindex = 0;
 		(mindex < MTH_NUM_ARGS) && (pindex < max_param_count);
-		mindex++)
-	{
+		mindex++) {
 		if (params[pindex]) {
 			/*
 			 * A valid parameter.
 			 * Set the current method argument to the
 			 * Params[Pindex++] argument object descriptor
 			 */
-			status = acpi_ds_method_data_set_value (MTH_TYPE_ARG, mindex,
-					 params[pindex], walk_state);
+			status = acpi_ds_store_object_to_local (AML_ARG_OP, mindex,
+					  params[pindex], walk_state);
 			if (ACPI_FAILURE (status)) {
 				break;
 			}
@@ -212,7 +211,7 @@ acpi_ds_method_data_init_args (
  *
  * FUNCTION:    Acpi_ds_method_data_get_entry
  *
- * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
+ * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
  *              Index               - Which local_var or argument to get
  *              Entry               - Pointer to where a pointer to the stack
  *                                    entry is returned.
@@ -220,13 +219,13 @@ acpi_ds_method_data_init_args (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Get the address of the stack entry given by Type:Index
+ * DESCRIPTION: Get the address of the object entry given by Opcode:Index
  *
  ******************************************************************************/
 
 ACPI_STATUS
 acpi_ds_method_data_get_entry (
-	u32                     type,
+	u16                     opcode,
 	u32                     index,
 	ACPI_WALK_STATE         *walk_state,
 	ACPI_OPERAND_OBJECT     ***entry)
@@ -235,31 +234,30 @@ acpi_ds_method_data_get_entry (
 
 	/*
 	 * Get the requested object.
-	 * The stack "Type" is either a Local_variable or an Argument
+	 * The stack "Opcode" is either a Local_variable or an Argument
 	 */
 
-	switch (type)
-	{
+	switch (opcode) {
 
-	case MTH_TYPE_LOCAL:
+	case AML_LOCAL_OP:
 
 		if (index > MTH_MAX_LOCAL) {
 			return (AE_BAD_PARAMETER);
 		}
 
-		*entry =
-			(ACPI_OPERAND_OBJECT  **) &walk_state->local_variables[index].object;
+		*entry = (ACPI_OPERAND_OBJECT  **)
+				 &walk_state->local_variables[index].object;
 		break;
 
 
-	case MTH_TYPE_ARG:
+	case AML_ARG_OP:
 
 		if (index > MTH_MAX_ARG) {
 			return (AE_BAD_PARAMETER);
 		}
 
-		*entry =
-			(ACPI_OPERAND_OBJECT  **) &walk_state->arguments[index].object;
+		*entry = (ACPI_OPERAND_OBJECT  **)
+				 &walk_state->arguments[index].object;
 		break;
 
 
@@ -276,20 +274,20 @@ acpi_ds_method_data_get_entry (
  *
  * FUNCTION:    Acpi_ds_method_data_set_entry
  *
- * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
+ * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
  *              Index               - Which local_var or argument to get
  *              Object              - Object to be inserted into the stack entry
  *              Walk_state          - Current walk state object
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Insert an object onto the method stack at entry Type:Index.
+ * DESCRIPTION: Insert an object onto the method stack at entry Opcode:Index.
  *
  ******************************************************************************/
 
 ACPI_STATUS
 acpi_ds_method_data_set_entry (
-	u32                     type,
+	u16                     opcode,
 	u32                     index,
 	ACPI_OPERAND_OBJECT     *object,
 	ACPI_WALK_STATE         *walk_state)
@@ -300,14 +298,14 @@ acpi_ds_method_data_set_entry (
 
 	/* Get a pointer to the stack entry to set */
 
-	status = acpi_ds_method_data_get_entry (type, index, walk_state, &entry);
+	status = acpi_ds_method_data_get_entry (opcode, index, walk_state, &entry);
 	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
 
 	/* Increment ref count so object can't be deleted while installed */
 
-	acpi_cm_add_reference (object);
+	acpi_ut_add_reference (object);
 
 	/* Install the object into the stack entry */
 
@@ -321,7 +319,7 @@ acpi_ds_method_data_set_entry (
  *
  * FUNCTION:    Acpi_ds_method_data_get_type
  *
- * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
+ * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
  *              Index               - Which local_var or argument whose type
  *                                      to get
  *              Walk_state          - Current walk state object
@@ -331,9 +329,9 @@ acpi_ds_method_data_set_entry (
  *
  ******************************************************************************/
 
-OBJECT_TYPE_INTERNAL
+ACPI_OBJECT_TYPE8
 acpi_ds_method_data_get_type (
-	u32                     type,
+	u16                     opcode,
 	u32                     index,
 	ACPI_WALK_STATE         *walk_state)
 {
@@ -344,7 +342,7 @@ acpi_ds_method_data_get_type (
 
 	/* Get a pointer to the requested stack entry */
 
-	status = acpi_ds_method_data_get_entry (type, index, walk_state, &entry);
+	status = acpi_ds_method_data_get_entry (opcode, index, walk_state, &entry);
 	if (ACPI_FAILURE (status)) {
 		return ((ACPI_TYPE_NOT_FOUND));
 	}
@@ -366,9 +364,9 @@ acpi_ds_method_data_get_type (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_method_data_get_nte
+ * FUNCTION:    Acpi_ds_method_data_get_node
  *
- * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
+ * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
  *              Index               - Which local_var or argument whose type
  *                                      to get
  *              Walk_state          - Current walk state object
@@ -378,18 +376,17 @@ acpi_ds_method_data_get_type (
  ******************************************************************************/
 
 ACPI_NAMESPACE_NODE *
-acpi_ds_method_data_get_nte (
-	u32                     type,
+acpi_ds_method_data_get_node (
+	u16                     opcode,
 	u32                     index,
 	ACPI_WALK_STATE         *walk_state)
 {
 	ACPI_NAMESPACE_NODE     *node = NULL;
 
 
-	switch (type)
-	{
+	switch (opcode) {
 
-	case MTH_TYPE_LOCAL:
+	case AML_LOCAL_OP:
 
 		if (index > MTH_MAX_LOCAL) {
 			return (node);
@@ -399,7 +396,7 @@ acpi_ds_method_data_get_nte (
 		break;
 
 
-	case MTH_TYPE_ARG:
+	case AML_ARG_OP:
 
 		if (index > MTH_MAX_ARG) {
 			return (node);
@@ -422,7 +419,7 @@ acpi_ds_method_data_get_nte (
  *
  * FUNCTION:    Acpi_ds_method_data_get_value
  *
- * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
+ * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
  *              Index               - Which local_var or argument to get
  *              Walk_state          - Current walk state object
  *              *Dest_desc          - Ptr to Descriptor into which selected Arg
@@ -432,13 +429,13 @@ acpi_ds_method_data_get_nte (
  *
  * DESCRIPTION: Retrieve value of selected Arg or Local from the method frame
  *              at the current top of the method stack.
- *              Used only in Acpi_aml_resolve_to_value().
+ *              Used only in Acpi_ex_resolve_to_value().
  *
  ******************************************************************************/
 
 ACPI_STATUS
 acpi_ds_method_data_get_value (
-	u32                     type,
+	u16                     opcode,
 	u32                     index,
 	ACPI_WALK_STATE         *walk_state,
 	ACPI_OPERAND_OBJECT     **dest_desc)
@@ -457,7 +454,7 @@ acpi_ds_method_data_get_value (
 
 	/* Get a pointer to the requested method stack entry */
 
-	status = acpi_ds_method_data_get_entry (type, index, walk_state, &entry);
+	status = acpi_ds_method_data_get_entry (opcode, index, walk_state, &entry);
 	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
@@ -478,14 +475,13 @@ acpi_ds_method_data_get_value (
 		 * before it was initialized.  Either case is an error.
 		 */
 
-		switch (type)
-		{
-		case MTH_TYPE_ARG:
+		switch (opcode) {
+		case AML_ARG_OP:
 
 			return (AE_AML_UNINITIALIZED_ARG);
 			break;
 
-		case MTH_TYPE_LOCAL:
+		case AML_LOCAL_OP:
 
 			return (AE_AML_UNINITIALIZED_LOCAL);
 			break;
@@ -499,7 +495,7 @@ acpi_ds_method_data_get_value (
 	 */
 
 	*dest_desc = object;
-	acpi_cm_add_reference (object);
+	acpi_ut_add_reference (object);
 
 	return (AE_OK);
 }
@@ -509,20 +505,20 @@ acpi_ds_method_data_get_value (
  *
  * FUNCTION:    Acpi_ds_method_data_delete_value
  *
- * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
+ * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
  *              Index               - Which local_var or argument to delete
  *              Walk_state          - Current walk state object
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Delete the entry at Type:Index on the method stack.  Inserts
+ * DESCRIPTION: Delete the entry at Opcode:Index on the method stack.  Inserts
  *              a null into the stack slot after the object is deleted.
  *
  ******************************************************************************/
 
 ACPI_STATUS
 acpi_ds_method_data_delete_value (
-	u32                     type,
+	u16                     opcode,
 	u32                     index,
 	ACPI_WALK_STATE         *walk_state)
 {
@@ -533,7 +529,7 @@ acpi_ds_method_data_delete_value (
 
 	/* Get a pointer to the requested entry */
 
-	status = acpi_ds_method_data_get_entry (type, index, walk_state, &entry);
+	status = acpi_ds_method_data_get_entry (opcode, index, walk_state, &entry);
 	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
@@ -551,14 +547,13 @@ acpi_ds_method_data_delete_value (
 
 
 	if ((object) &&
-		(VALID_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_INTERNAL)))
-	{
+		(VALID_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_INTERNAL))) {
 		/*
 		 * There is a valid object in this slot
 		 * Decrement the reference count by one to balance the
 		 * increment when the object was stored in the slot.
 		 */
-		acpi_cm_remove_reference (object);
+		acpi_ut_remove_reference (object);
 	}
 
 
@@ -568,9 +563,9 @@ acpi_ds_method_data_delete_value (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_method_data_set_value
+ * FUNCTION:    Acpi_ds_store_object_to_local
  *
- * PARAMETERS:  Type                - Either MTH_TYPE_LOCAL or MTH_TYPE_ARG
+ * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
  *              Index               - Which local_var or argument to set
  *              Src_desc            - Value to be stored
  *              Walk_state          - Current walk state
@@ -584,8 +579,8 @@ acpi_ds_method_data_delete_value (
  ******************************************************************************/
 
 ACPI_STATUS
-acpi_ds_method_data_set_value (
-	u32                     type,
+acpi_ds_store_object_to_local (
+	u16                     opcode,
 	u32                     index,
 	ACPI_OPERAND_OBJECT     *src_desc,
 	ACPI_WALK_STATE         *walk_state)
@@ -603,7 +598,7 @@ acpi_ds_method_data_set_value (
 
 	/* Get a pointer to the requested method stack entry */
 
-	status = acpi_ds_method_data_get_entry (type, index, walk_state, &entry);
+	status = acpi_ds_method_data_get_entry (opcode, index, walk_state, &entry);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
 	}
@@ -638,9 +633,8 @@ acpi_ds_method_data_set_value (
 		 * Weird, but true.
 		 */
 
-		if ((type == MTH_TYPE_ARG) &&
-			(VALID_DESCRIPTOR_TYPE (*entry, ACPI_DESC_TYPE_NAMED)))
-		{
+		if ((opcode == AML_ARG_OP) &&
+			(VALID_DESCRIPTOR_TYPE (*entry, ACPI_DESC_TYPE_NAMED))) {
 			/* Detach an existing object from the Node */
 
 			acpi_ns_detach_object ((ACPI_NAMESPACE_NODE *) *entry);
@@ -655,20 +649,22 @@ acpi_ds_method_data_set_value (
 		}
 
 
+#ifdef ACPI_ENABLE_IMPLICIT_CONVERSION
 		/*
 		 * Perform "Implicit conversion" of the new object to the type of the
 		 * existing object
 		 */
-		status = acpi_aml_convert_to_target_type ((*entry)->common.type, &src_desc, walk_state);
+		status = acpi_ex_convert_to_target_type ((*entry)->common.type, &src_desc, walk_state);
 		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}
+#endif
 
 		/*
 		 * Delete the existing object
 		 * before storing the new one
 		 */
-		acpi_ds_method_data_delete_value (type, index, walk_state);
+		acpi_ds_method_data_delete_value (opcode, index, walk_state);
 	}
 
 
@@ -678,7 +674,7 @@ acpi_ds_method_data_set_value (
 	 * Install the new object in the stack entry
 	 * (increments the object reference count by one)
 	 */
-	status = acpi_ds_method_data_set_entry (type, index, src_desc, walk_state);
+	status = acpi_ds_method_data_set_entry (opcode, index, src_desc, walk_state);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
 	}

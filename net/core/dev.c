@@ -20,6 +20,10 @@
  *              Pekka Riikonen <priikone@poesidon.pspt.fi>
  *
  *	Changes:
+ *              D.J. Barrow     :       Fixed bug where dev->refcnt gets set to 2
+ *                                      if register_netdev gets called before
+ *                                      net_dev_init & also removed a few lines
+ *                                      of code in the process.
  *		Alan Cox	:	device private ioctl copies fields back.
  *		Alan Cox	:	Transmit queue code does relevant stunts to
  *					keep the queue safe.
@@ -2382,6 +2386,8 @@ static int dev_boot_phase = 1;
  *	will not get the same name.
  */
 
+int net_dev_init(void);
+
 int register_netdevice(struct net_device *dev)
 {
 	struct net_device *d, **dp;
@@ -2396,47 +2402,8 @@ int register_netdevice(struct net_device *dev)
 	dev->fastpath_lock=RW_LOCK_UNLOCKED;
 #endif
 
-	if (dev_boot_phase) {
-#ifdef CONFIG_NET_DIVERT
-		ret = alloc_divert_blk(dev);
-		if (ret)
-			return ret;
-#endif /* CONFIG_NET_DIVERT */
-		
-		/* This is NOT bug, but I am not sure, that all the
-		   devices, initialized before netdev module is started
-		   are sane. 
-
-		   Now they are chained to device boot list
-		   and probed later. If a module is initialized
-		   before netdev, but assumes that dev->init
-		   is really called by register_netdev(), it will fail.
-
-		   So that this message should be printed for a while.
-		 */
-		printk(KERN_INFO "early initialization of device %s is deferred\n", dev->name);
-
-		/* Check for existence, and append to tail of chain */
-		for (dp=&dev_base; (d=*dp) != NULL; dp=&d->next) {
-			if (d == dev || strcmp(d->name, dev->name) == 0) {
-				return -EEXIST;
-			}
-		}
-		dev->next = NULL;
-		write_lock_bh(&dev_base_lock);
-		*dp = dev;
-		dev_hold(dev);
-		write_unlock_bh(&dev_base_lock);
-
-		/*
-		 *	Default initial state at registry is that the
-		 *	device is present.
-		 */
-
-		set_bit(__LINK_STATE_PRESENT, &dev->state);
-
-		return 0;
-	}
+	if (dev_boot_phase)
+		net_dev_init();
 
 #ifdef CONFIG_NET_DIVERT
 	ret = alloc_divert_blk(dev);
@@ -2679,6 +2646,9 @@ int __init net_dev_init(void)
 {
 	struct net_device *dev, **dp;
 	int i;
+
+	if (!dev_boot_phase)
+		return 0;
 
 #ifdef CONFIG_NET_SCHED
 	pktsched_init();

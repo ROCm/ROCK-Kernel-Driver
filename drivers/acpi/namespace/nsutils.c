@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 77 $
+ *              $Revision: 83 $
  *
  *****************************************************************************/
 
@@ -31,11 +31,11 @@
 #include "amlcode.h"
 #include "actables.h"
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nsutils")
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_valid_root_prefix
  *
@@ -45,7 +45,7 @@
  *
  * DESCRIPTION: Check if a character is a valid ACPI Root prefix
  *
- ***************************************************************************/
+ ******************************************************************************/
 
 u8
 acpi_ns_valid_root_prefix (
@@ -56,7 +56,7 @@ acpi_ns_valid_root_prefix (
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_valid_path_separator
  *
@@ -66,7 +66,7 @@ acpi_ns_valid_root_prefix (
  *
  * DESCRIPTION: Check if a character is a valid ACPI path separator
  *
- ***************************************************************************/
+ ******************************************************************************/
 
 u8
 acpi_ns_valid_path_separator (
@@ -77,7 +77,7 @@ acpi_ns_valid_path_separator (
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_get_type
  *
@@ -85,23 +85,23 @@ acpi_ns_valid_path_separator (
  *
  * RETURN:      Type field from Node whose handle is passed
  *
- ***************************************************************************/
+ ******************************************************************************/
 
-OBJECT_TYPE_INTERNAL
+ACPI_OBJECT_TYPE8
 acpi_ns_get_type (
-	ACPI_HANDLE             handle)
+	ACPI_NAMESPACE_NODE     *node)
 {
 
-	if (!handle) {
-		REPORT_WARNING (("Ns_get_type: Null handle\n"));
+	if (!node) {
+		REPORT_WARNING (("Ns_get_type: Null Node ptr"));
 		return (ACPI_TYPE_ANY);
 	}
 
-	return (((ACPI_NAMESPACE_NODE *) handle)->type);
+	return (node->type);
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_local
  *
@@ -110,14 +110,14 @@ acpi_ns_get_type (
  * RETURN:      LOCAL if names must be found locally in objects of the
  *              passed type, 0 if enclosing scopes should be searched
  *
- ***************************************************************************/
+ ******************************************************************************/
 
 u32
 acpi_ns_local (
-	OBJECT_TYPE_INTERNAL    type)
+	ACPI_OBJECT_TYPE8       type)
 {
 
-	if (!acpi_cm_valid_object_type (type)) {
+	if (!acpi_ut_valid_object_type (type)) {
 		/* Type code out of range  */
 
 		REPORT_WARNING (("Ns_local: Invalid Object Type\n"));
@@ -128,41 +128,32 @@ acpi_ns_local (
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_internalize_name
+ * FUNCTION:    Acpi_ns_get_internal_name_length
  *
- * PARAMETERS:  *External_name            - External representation of name
- *              **Converted Name        - Where to return the resulting
- *                                        internal represention of the name
+ * PARAMETERS:  Info            - Info struct initialized with the
+ *                                external name pointer.
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Convert an external representation (e.g. "\_PR_.CPU0")
- *              to internal form (e.g. 5c 2f 02 5f 50 52 5f 43 50 55 30)
+ * DESCRIPTION: Calculate the length of the internal (AML) namestring
+ *              corresponding to the external (ASL) namestring.
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
-acpi_ns_internalize_name (
-	NATIVE_CHAR             *external_name,
-	NATIVE_CHAR             **converted_name)
+acpi_ns_get_internal_name_length (
+	ACPI_NAMESTRING_INFO    *info)
 {
-	NATIVE_CHAR             *result = NULL;
-	NATIVE_CHAR             *internal_name;
-	u32                     num_segments = 0;
-	u8                      fully_qualified = FALSE;
+	NATIVE_CHAR             *next_external_char;
 	u32                     i;
-	u32                     num_carats = 0;
 
 
-	if ((!external_name)     ||
-		(*external_name == 0) ||
-		(!converted_name))
-	{
-		return (AE_BAD_PARAMETER);
-	}
-
+	next_external_char = info->external_name;
+	info->num_carats = 0;
+	info->num_segments = 0;
+	info->fully_qualified = FALSE;
 
 	/*
 	 * For the internal name, the required length is 4 bytes
@@ -173,10 +164,9 @@ acpi_ns_internalize_name (
 	 * strlen() + 1 covers the first Name_seg, which has no
 	 * path separator
 	 */
-
-	if (acpi_ns_valid_root_prefix (external_name[0])) {
-		fully_qualified = TRUE;
-		external_name++;
+	if (acpi_ns_valid_root_prefix (next_external_char[0])) {
+		info->fully_qualified = TRUE;
+		next_external_char++;
 	}
 
 	else {
@@ -184,9 +174,9 @@ acpi_ns_internalize_name (
 		 * Handle Carat prefixes
 		 */
 
-		while (*external_name == '^') {
-			num_carats++;
-			external_name++;
+		while (*next_external_char == '^') {
+			info->num_carats++;
+			next_external_char++;
 		}
 	}
 
@@ -196,28 +186,51 @@ acpi_ns_internalize_name (
 	 * with one segment since the segment count is (# separators)
 	 * + 1, and zero separators is ok.
 	 */
-
-	if (*external_name) {
-		num_segments = 1;
-		for (i = 0; external_name[i]; i++) {
-			if (acpi_ns_valid_path_separator (external_name[i])) {
-				num_segments++;
+	if (*next_external_char) {
+		info->num_segments = 1;
+		for (i = 0; next_external_char[i]; i++) {
+			if (acpi_ns_valid_path_separator (next_external_char[i])) {
+				info->num_segments++;
 			}
 		}
 	}
 
+	info->length = (ACPI_NAME_SIZE * info->num_segments) +
+			  4 + info->num_carats;
 
-	/* We need a segment to store the internal version of the name */
+	info->next_external_char = next_external_char;
 
-	internal_name = acpi_cm_callocate ((ACPI_NAME_SIZE * num_segments) + 4 + num_carats);
-	if (!internal_name) {
-		return (AE_NO_MEMORY);
-	}
+	return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ns_build_internal_name
+ *
+ * PARAMETERS:  Info            - Info struct fully initialized
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Construct the internal (AML) namestring
+ *              corresponding to the external (ASL) namestring.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_ns_build_internal_name (
+	ACPI_NAMESTRING_INFO    *info)
+{
+	u32                     num_segments = info->num_segments;
+	NATIVE_CHAR             *internal_name = info->internal_name;
+	NATIVE_CHAR             *external_name = info->next_external_char;
+	NATIVE_CHAR             *result = NULL;
+	u32                     i;
 
 
 	/* Setup the correct prefixes, counts, and pointers */
 
-	if (fully_qualified) {
+	if (info->fully_qualified) {
 		internal_name[0] = '\\';
 
 		if (num_segments <= 1) {
@@ -232,7 +245,6 @@ acpi_ns_internalize_name (
 			internal_name[2] = (char) num_segments;
 			result = &internal_name[3];
 		}
-
 	}
 
 	else {
@@ -240,10 +252,9 @@ acpi_ns_internalize_name (
 		 * Not fully qualified.
 		 * Handle Carats first, then append the name segments
 		 */
-
 		i = 0;
-		if (num_carats) {
-			for (i = 0; i < num_carats; i++) {
+		if (info->num_carats) {
+			for (i = 0; i < info->num_carats; i++) {
 				internal_name[i] = '^';
 			}
 		}
@@ -270,31 +281,24 @@ acpi_ns_internalize_name (
 	for (; num_segments; num_segments--) {
 		for (i = 0; i < ACPI_NAME_SIZE; i++) {
 			if (acpi_ns_valid_path_separator (*external_name) ||
-			   (*external_name == 0))
-			{
-				/*
-				 * Pad the segment with underscore(s) if
-				 * segment is short
-				 */
+			   (*external_name == 0)) {
+				/* Pad the segment with underscore(s) if segment is short */
 
 				result[i] = '_';
 			}
 
 			else {
-				/* Convert s8 to uppercase and save it */
+				/* Convert the character to uppercase and save it */
 
 				result[i] = (char) TOUPPER (*external_name);
 				external_name++;
 			}
-
 		}
 
 		/* Now we must have a path separator, or the pathname is bad */
 
 		if (!acpi_ns_valid_path_separator (*external_name) &&
-			(*external_name != 0))
-		{
-			acpi_cm_free (internal_name);
+			(*external_name != 0)) {
 			return (AE_BAD_PARAMETER);
 		}
 
@@ -305,32 +309,87 @@ acpi_ns_internalize_name (
 	}
 
 
-	/* Return the completed name */
+	/* Terminate the string */
 
-	/* Terminate the string! */
 	*result = 0;
-	*converted_name = internal_name;
-
 
 
 	return (AE_OK);
 }
 
 
-/****************************************************************************
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ns_internalize_name
+ *
+ * PARAMETERS:  *External_name          - External representation of name
+ *              **Converted Name        - Where to return the resulting
+ *                                        internal represention of the name
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert an external representation (e.g. "\_PR_.CPU0")
+ *              to internal form (e.g. 5c 2f 02 5f 50 52 5f 43 50 55 30)
+ *
+ *******************************************************************************/
+
+ACPI_STATUS
+acpi_ns_internalize_name (
+	NATIVE_CHAR             *external_name,
+	NATIVE_CHAR             **converted_name)
+{
+	NATIVE_CHAR             *internal_name;
+	ACPI_NAMESTRING_INFO    info;
+	ACPI_STATUS             status;
+
+
+	if ((!external_name)     ||
+		(*external_name == 0) ||
+		(!converted_name)) {
+		return (AE_BAD_PARAMETER);
+	}
+
+
+	/* Get the length of the new internal name */
+
+	info.external_name = external_name;
+	acpi_ns_get_internal_name_length (&info);
+
+	/* We need a segment to store the internal  name */
+
+	internal_name = acpi_ut_callocate (info.length);
+	if (!internal_name) {
+		return (AE_NO_MEMORY);
+	}
+
+	/* Build the name */
+
+	info.internal_name = internal_name;
+	status = acpi_ns_build_internal_name (&info);
+	if (ACPI_FAILURE (status)) {
+		acpi_ut_free (internal_name);
+		return (status);
+	}
+
+	*converted_name = internal_name;
+	return (AE_OK);
+}
+
+
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_externalize_name
  *
  * PARAMETERS:  *Internal_name         - Internal representation of name
  *              **Converted_name       - Where to return the resulting
- *                                        external representation of name
+ *                                       external representation of name
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Convert internal name (e.g. 5c 2f 02 5f 50 52 5f 43 50 55 30)
  *              to its external form (e.g. "\_PR_.CPU0")
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ns_externalize_name (
@@ -349,8 +408,7 @@ acpi_ns_externalize_name (
 	if (!internal_name_length   ||
 		!internal_name          ||
 		!converted_name_length  ||
-		!converted_name)
-	{
+		!converted_name) {
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -358,8 +416,7 @@ acpi_ns_externalize_name (
 	/*
 	 * Check for a prefix (one '\' | one or more '^').
 	 */
-	switch (internal_name[0])
-	{
+	switch (internal_name[0]) {
 	case '\\':
 		prefix_length = 1;
 		break;
@@ -383,8 +440,7 @@ acpi_ns_externalize_name (
 	 * 4-byte elements.
 	 */
 	if (prefix_length < internal_name_length) {
-		switch (internal_name[prefix_length])
-		{
+		switch (internal_name[prefix_length]) {
 
 		/* <count> 4-byte names */
 
@@ -440,7 +496,7 @@ acpi_ns_externalize_name (
 	 * Build Converted_name...
 	 */
 
-	(*converted_name) = acpi_cm_callocate (*converted_name_length);
+	(*converted_name) = acpi_ut_callocate (*converted_name_length);
 	if (!(*converted_name)) {
 		return (AE_NO_MEMORY);
 	}
@@ -468,7 +524,7 @@ acpi_ns_externalize_name (
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_convert_handle_to_entry
  *
@@ -478,7 +534,7 @@ acpi_ns_externalize_name (
  *
  * DESCRIPTION: Convert a namespace handle to a real Node
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_NAMESPACE_NODE *
 acpi_ns_convert_handle_to_entry (
@@ -490,7 +546,6 @@ acpi_ns_convert_handle_to_entry (
 	 * TBD: [Future] Real integer handles allow for more verification
 	 * and keep all pointers within this subsystem!
 	 */
-
 	if (!handle) {
 		return (NULL);
 	}
@@ -510,7 +565,7 @@ acpi_ns_convert_handle_to_entry (
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_convert_entry_to_handle
  *
@@ -520,7 +575,7 @@ acpi_ns_convert_handle_to_entry (
  *
  * DESCRIPTION: Convert a real Node to a namespace handle
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_HANDLE
 acpi_ns_convert_entry_to_handle (
@@ -533,17 +588,18 @@ acpi_ns_convert_entry_to_handle (
 	 * TBD: [Future] Real integer handles allow for more verification
 	 * and keep all pointers within this subsystem!
 	 */
-
 	return ((ACPI_HANDLE) node);
 
 
 /* ---------------------------------------------------
 
-	if (!Node) {
+	if (!Node)
+	{
 		return (NULL);
 	}
 
-	if (Node == Acpi_gbl_Root_node) {
+	if (Node == Acpi_gbl_Root_node)
+	{
 		return (ACPI_ROOT_OBJECT);
 	}
 
@@ -553,7 +609,7 @@ acpi_ns_convert_entry_to_handle (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_terminate
  *
@@ -576,12 +632,10 @@ acpi_ns_terminate (void)
 
 	/*
 	 * 1) Free the entire namespace -- all objects, tables, and stacks
-	 */
-	/*
+	 *
 	 * Delete all objects linked to the root
 	 * (additional table descriptors)
 	 */
-
 	acpi_ns_delete_namespace_subtree (this_node);
 
 	/* Detach any object(s) attached to the root */
@@ -589,23 +643,20 @@ acpi_ns_terminate (void)
 	obj_desc = acpi_ns_get_attached_object (this_node);
 	if (obj_desc) {
 		acpi_ns_detach_object (this_node);
-		acpi_cm_remove_reference (obj_desc);
+		acpi_ut_remove_reference (obj_desc);
 	}
 
 	acpi_ns_delete_children (this_node);
 
-
 	/*
 	 * 2) Now we can delete the ACPI tables
 	 */
-
 	acpi_tb_delete_acpi_tables ();
-
 	return;
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_opens_scope
  *
@@ -614,14 +665,14 @@ acpi_ns_terminate (void)
  * RETURN:      NEWSCOPE if the passed type "opens a name scope" according
  *              to the ACPI specification, else 0
  *
- ***************************************************************************/
+ ******************************************************************************/
 
 u32
 acpi_ns_opens_scope (
-	OBJECT_TYPE_INTERNAL    type)
+	ACPI_OBJECT_TYPE8       type)
 {
 
-	if (!acpi_cm_valid_object_type (type)) {
+	if (!acpi_ut_valid_object_type (type)) {
 		/* type code out of range  */
 
 		REPORT_WARNING (("Ns_opens_scope: Invalid Object Type\n"));
@@ -632,7 +683,7 @@ acpi_ns_opens_scope (
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_get_node
  *
@@ -650,7 +701,7 @@ acpi_ns_opens_scope (
  *
  * MUTEX:       Locks namespace
  *
- ***************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ns_get_node (
@@ -682,7 +733,7 @@ acpi_ns_get_node (
 	}
 
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 	/* Setup lookup scope (search starting point) */
 
@@ -697,17 +748,16 @@ acpi_ns_get_node (
 
 
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	/* Cleanup */
 
-	acpi_cm_free (internal_path);
-
+	acpi_ut_free (internal_path);
 	return (status);
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_find_parent_name
  *
@@ -719,7 +769,7 @@ acpi_ns_get_node (
  *              name segment, or "????" if the parent name can't be found
  *              (which "should not happen").
  *
- ***************************************************************************/
+ ******************************************************************************/
 
 ACPI_NAME
 acpi_ns_find_parent_name (
@@ -740,12 +790,11 @@ acpi_ns_find_parent_name (
 
 	}
 
-
 	return (ACPI_UNKNOWN_NAME);
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_get_parent_object
  *
@@ -755,7 +804,7 @@ acpi_ns_find_parent_name (
  *
  * DESCRIPTION: Obtain the parent entry for a given entry in the namespace.
  *
- ***************************************************************************/
+ ******************************************************************************/
 
 
 ACPI_NAMESPACE_NODE *
@@ -775,7 +824,6 @@ acpi_ns_get_parent_object (
 	 * This saves putting a parent back pointer in each and
 	 * every named object!
 	 */
-
 	while (!(node->flags & ANOBJ_END_OF_PEER_LIST)) {
 		node = node->peer;
 	}
@@ -785,7 +833,7 @@ acpi_ns_get_parent_object (
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_get_next_valid_object
  *
@@ -797,7 +845,7 @@ acpi_ns_get_parent_object (
  * DESCRIPTION: Find the next valid object within a name table.
  *              Useful for implementing NULL-end-of-list loops.
  *
- ***************************************************************************/
+ ******************************************************************************/
 
 
 ACPI_NAMESPACE_NODE *

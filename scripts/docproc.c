@@ -18,6 +18,7 @@ int main(int argc, char *argv[])
 	char type[64];
 	int i;
 	int vp=2;
+	int ret=0;
 	pid_t pid;
 
 
@@ -96,8 +97,8 @@ int main(int argc, char *argv[])
 			perror("exec scripts/kernel-doc");
 			exit(1);
 		default:
-			waitpid(pid, NULL,0);
+			waitpid(pid, &ret ,0);
 		}
 	}
-	exit(0);
+	exit(ret);
 }

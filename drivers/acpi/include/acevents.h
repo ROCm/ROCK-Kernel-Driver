@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acevents.h - Event subcomponent prototypes and defines
- *       $Revision: 63 $
+ *       $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -91,11 +91,14 @@ acpi_ev_gpe_detect (
  * Acpi_evnotify - Device Notify handling and dispatch
  */
 
-void
-acpi_ev_notify_dispatch (
-	ACPI_HANDLE             device,
+ACPI_STATUS
+acpi_ev_queue_notify_request (
+	ACPI_NAMESPACE_NODE     *node,
 	u32                     notify_value);
 
+void
+acpi_ev_notify_dispatch (
+	void                    *context);
 
 /*
  * Acpi_evregion - Address Space handling
@@ -195,22 +198,6 @@ acpi_ev_restore_acpi_state (
 void
 acpi_ev_terminate (
 	void);
-
-
-/* Debug support */
-
-#ifdef ACPI_DEBUG
-
-u32
-acpi_ev_sci_count (
-	u32                     acpi_event);
-
-#define DEBUG_INCREMENT_EVENT_COUNT(a)   acpi_gbl_event_count[a]++;
-
-#else
-
-#define DEBUG_INCREMENT_EVENT_COUNT(a)
-#endif
 
 
 #endif  /* __ACEVENTS_H__  */

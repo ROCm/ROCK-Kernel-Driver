@@ -1,12 +1,7 @@
 /*******************************************************************************
  *
- * Module Name: rsmem24 - Acpi_rs_memory24_resource
- *                        Acpi_rs_memory24_stream
- *                        Acpi_rs_memory32_range_resource
- *                        Acpi_rs_fixed_memory32_resource
- *                        Acpi_rs_memory32_range_stream
- *                        Acpi_rs_fixed_memory32_stream
- *              $Revision: 12 $
+ * Module Name: rsmem24 - Memory resource descriptors
+ *              $Revision: 14 $
  *
  ******************************************************************************/
 
@@ -32,7 +27,7 @@
 #include "acpi.h"
 #include "acresrc.h"
 
-#define _COMPONENT          RESOURCE_MANAGER
+#define _COMPONENT          ACPI_RESOURCES
 	 MODULE_NAME         ("rsmemory")
 
 
@@ -41,20 +36,20 @@
  * FUNCTION:    Acpi_rs_memory24_resource
  *
  * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
- *                                          stream
+ *                                        stream
  *              Bytes_consumed          - u32 pointer that is filled with
- *                                          the number of bytes consumed from
- *                                          the Byte_stream_buffer
+ *                                        the number of bytes consumed from
+ *                                        the Byte_stream_buffer
  *              Output_buffer           - Pointer to the user's return buffer
  *              Structure_size          - u32 pointer that is filled with
- *                                          the number of bytes in the filled
- *                                          in structure
+ *                                        the number of bytes in the filled
+ *                                        in structure
  *
- * RETURN:      Status  AE_OK if okay, else a valid ACPI_STATUS code
+ * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *                  structure pointed to by the Output_buffer. Return the
- *                  number of bytes consumed from the byte stream.
+ *              structure pointed to by the Output_buffer. Return the
+ *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
 
@@ -66,11 +61,10 @@ acpi_rs_memory24_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	RESOURCE                *output_struct = (RESOURCE *) * output_buffer;
+	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	u32                     struct_size = sizeof (MEMORY24_RESOURCE) +
-			  RESOURCE_LENGTH_NO_DATA;
+	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_MEM24);
 
 
 	/*
@@ -81,7 +75,7 @@ acpi_rs_memory24_resource (
 	MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
 	buffer += 2;
 	*bytes_consumed = temp16 + 3;
-	output_struct->id = memory24;
+	output_struct->id = ACPI_RSTYPE_MEM24;
 
 	/*
 	 * Check Byte 3 the Read/Write bit
@@ -126,7 +120,6 @@ acpi_rs_memory24_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-
 	return (AE_OK);
 }
 
@@ -138,19 +131,19 @@ acpi_rs_memory24_resource (
  * PARAMETERS:  Linked_list             - Pointer to the resource linked list
  *              Output_buffer           - Pointer to the user's return buffer
  *              Bytes_consumed          - u32 pointer that is filled with
- *                                          the number of bytes of the
- *                                          Output_buffer used
+ *                                        the number of bytes of the
+ *                                        Output_buffer used
  *
- * RETURN:      Status  AE_OK if okay, else a valid ACPI_STATUS code
+ * RETURN:      Status
  *
  * DESCRIPTION: Take the linked list resource structure and fills in the
- *                  the appropriate bytes in a byte stream
+ *              the appropriate bytes in a byte stream
  *
  ******************************************************************************/
 
 ACPI_STATUS
 acpi_rs_memory24_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -206,9 +199,7 @@ acpi_rs_memory24_stream (
 	/*
 	 * Return the number of bytes consumed in this operation
 	 */
-	*bytes_consumed = (u32) ((NATIVE_UINT) buffer -
-			   (NATIVE_UINT) *output_buffer);
-
+	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
 	return (AE_OK);
 }
 
@@ -218,20 +209,20 @@ acpi_rs_memory24_stream (
  * FUNCTION:    Acpi_rs_memory32_range_resource
  *
  * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
- *                                          stream
+ *                                        stream
  *              Bytes_consumed          - u32 pointer that is filled with
- *                                          the number of bytes consumed from
- *                                          the Byte_stream_buffer
+ *                                        the number of bytes consumed from
+ *                                        the Byte_stream_buffer
  *              Output_buffer           - Pointer to the user's return buffer
  *              Structure_size          - u32 pointer that is filled with
- *                                          the number of bytes in the filled
- *                                          in structure
+ *                                        the number of bytes in the filled
+ *                                        in structure
  *
- * RETURN:      Status  AE_OK if okay, else a valid ACPI_STATUS code
+ * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *                  structure pointed to by the Output_buffer. Return the
- *                  number of bytes consumed from the byte stream.
+ *              structure pointed to by the Output_buffer. Return the
+ *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
 
@@ -243,11 +234,10 @@ acpi_rs_memory32_range_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	RESOURCE                *output_struct = (RESOURCE *) * output_buffer;
+	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	u32                     struct_size = sizeof (MEMORY32_RESOURCE) +
-			  RESOURCE_LENGTH_NO_DATA;
+	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_MEM32);
 
 
 	/*
@@ -259,11 +249,11 @@ acpi_rs_memory32_range_resource (
 	buffer += 2;
 	*bytes_consumed = temp16 + 3;
 
-	output_struct->id = memory32;
+	output_struct->id = ACPI_RSTYPE_MEM32;
 
 	/*
 	 *  Point to the place in the output buffer where the data portion will
-	 *    begin.
+	 *  begin.
 	 *  1. Set the RESOURCE_DATA * Data to point to it's own address, then
 	 *  2. Set the pointer to the next address.
 	 *
@@ -313,7 +303,6 @@ acpi_rs_memory32_range_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-
 	return (AE_OK);
 }
 
@@ -323,20 +312,20 @@ acpi_rs_memory32_range_resource (
  * FUNCTION:    Acpi_rs_fixed_memory32_resource
  *
  * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
- *                                          stream
+ *                                        stream
  *              Bytes_consumed          - u32 pointer that is filled with
- *                                          the number of bytes consumed from
- *                                          the Byte_stream_buffer
+ *                                        the number of bytes consumed from
+ *                                        the Byte_stream_buffer
  *              Output_buffer           - Pointer to the user's return buffer
  *              Structure_size          - u32 pointer that is filled with
- *                                          the number of bytes in the filled
- *                                          in structure
+ *                                        the number of bytes in the filled
+ *                                        in structure
  *
- * RETURN:      Status  AE_OK if okay, else a valid ACPI_STATUS code
+ * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *                  structure pointed to by the Output_buffer. Return the
- *                  number of bytes consumed from the byte stream.
+ *              structure pointed to by the Output_buffer. Return the
+ *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
 
@@ -348,11 +337,10 @@ acpi_rs_fixed_memory32_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	RESOURCE                *output_struct = (RESOURCE *) * output_buffer;
+	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	u32                     struct_size = sizeof (FIXED_MEMORY32_RESOURCE) +
-			  RESOURCE_LENGTH_NO_DATA;
+	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_FIXED_MEM32);
 
 
 	/*
@@ -364,7 +352,7 @@ acpi_rs_fixed_memory32_resource (
 	buffer += 2;
 	*bytes_consumed = temp16 + 3;
 
-	output_struct->id = fixed_memory32;
+	output_struct->id = ACPI_RSTYPE_FIXED_MEM32;
 
 	/*
 	 * Check Byte 3 the Read/Write bit
@@ -395,7 +383,6 @@ acpi_rs_fixed_memory32_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-
 	return (AE_OK);
 }
 
@@ -407,19 +394,19 @@ acpi_rs_fixed_memory32_resource (
  * PARAMETERS:  Linked_list             - Pointer to the resource linked list
  *              Output_buffer           - Pointer to the user's return buffer
  *              Bytes_consumed          - u32 pointer that is filled with
- *                                          the number of bytes of the
- *                                          Output_buffer used
+ *                                        the number of bytes of the
+ *                                        Output_buffer used
  *
- * RETURN:      Status  AE_OK if okay, else a valid ACPI_STATUS code
+ * RETURN:      Status
  *
  * DESCRIPTION: Take the linked list resource structure and fills in the
- *                  the appropriate bytes in a byte stream
+ *              the appropriate bytes in a byte stream
  *
  ******************************************************************************/
 
 ACPI_STATUS
 acpi_rs_memory32_range_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -476,9 +463,7 @@ acpi_rs_memory32_range_stream (
 	/*
 	 * Return the number of bytes consumed in this operation
 	 */
-	*bytes_consumed = (u32) ((NATIVE_UINT) buffer -
-			   (NATIVE_UINT) *output_buffer);
-
+	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
 	return (AE_OK);
 }
 
@@ -490,19 +475,19 @@ acpi_rs_memory32_range_stream (
  * PARAMETERS:  Linked_list             - Pointer to the resource linked list
  *              Output_buffer           - Pointer to the user's return buffer
  *              Bytes_consumed          - u32 pointer that is filled with
- *                                          the number of bytes of the
- *                                          Output_buffer used
+ *                                        the number of bytes of the
+ *                                        Output_buffer used
  *
- * RETURN:      Status  AE_OK if okay, else a valid ACPI_STATUS code
+ * RETURN:      Status
  *
  * DESCRIPTION: Take the linked list resource structure and fills in the
- *                  the appropriate bytes in a byte stream
+ *              the appropriate bytes in a byte stream
  *
  ******************************************************************************/
 
 ACPI_STATUS
 acpi_rs_fixed_memory32_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -549,9 +534,7 @@ acpi_rs_fixed_memory32_stream (
 	/*
 	 * Return the number of bytes consumed in this operation
 	 */
-	*bytes_consumed = (u32) ((NATIVE_UINT) buffer -
-			   (NATIVE_UINT) *output_buffer);
-
+	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
 	return (AE_OK);
 }
 

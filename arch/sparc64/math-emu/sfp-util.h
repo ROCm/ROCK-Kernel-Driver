@@ -1,4 +1,4 @@
-/* $Id: sfp-util.h,v 1.4 1999/09/20 12:14:19 jj Exp $
+/* $Id: sfp-util.h,v 1.5 2001/06/10 06:48:46 davem Exp $
  * arch/sparc64/math-emu/sfp-util.h
  *
  * Copyright (C) 1999 Jakub Jelinek (jj@ultra.linux.cz)
@@ -12,10 +12,10 @@
 #include <asm/byteorder.h>
 
 #define add_ssaaaa(sh, sl, ah, al, bh, bl) 						\
-  __asm__ ("addcc %4,%5,%1
-  	    add %2,%3,%0
-  	    bcs,a,pn %%xcc, 1f
-  	    add %0, 1, %0
+  __asm__ ("addcc %4,%5,%1\n\
+  	    add %2,%3,%0\n\
+  	    bcs,a,pn %%xcc, 1f\n\
+  	    add %0, 1, %0\n\
   	    1:"										\
 	   : "=r" ((UDItype)(sh)),				      			\
 	     "=&r" ((UDItype)(sl))				      			\
@@ -26,10 +26,10 @@
 	   : "cc")
 	   
 #define sub_ddmmss(sh, sl, ah, al, bh, bl) 						\
-  __asm__ ("subcc %4,%5,%1
-  	    sub %2,%3,%0
-  	    bcs,a,pn %%xcc, 1f
-  	    sub %0, 1, %0
+  __asm__ ("subcc %4,%5,%1\n\
+  	    sub %2,%3,%0\n\
+  	    bcs,a,pn %%xcc, 1f\n\
+  	    sub %0, 1, %0\n\
   	    1:"										\
 	   : "=r" ((UDItype)(sh)),				      			\
 	     "=&r" ((UDItype)(sl))				      			\
@@ -43,26 +43,26 @@
   do {											\
 	  UDItype tmp1, tmp2, tmp3, tmp4;						\
 	  __asm__ __volatile__ (							\
-		   "srl %7,0,%3
-		    mulx %3,%6,%1
-		    srlx %6,32,%2
-		    mulx %2,%3,%4
-		    sllx %4,32,%5
-		    srl %6,0,%3
-		    sub %1,%5,%5
-		    srlx %5,32,%5
-		    addcc %4,%5,%4
-		    srlx %7,32,%5
-		    mulx %3,%5,%3
-		    mulx %2,%5,%5
-		    sethi %%hi(0x80000000),%2
-		    addcc %4,%3,%4
-		    srlx %4,32,%4
-		    add %2,%2,%2
-		    movcc %%xcc,%%g0,%2
-		    addcc %5,%4,%5
-		    sllx %3,32,%3
-		    add %1,%3,%1
+		   "srl %7,0,%3\n\
+		    mulx %3,%6,%1\n\
+		    srlx %6,32,%2\n\
+		    mulx %2,%3,%4\n\
+		    sllx %4,32,%5\n\
+		    srl %6,0,%3\n\
+		    sub %1,%5,%5\n\
+		    srlx %5,32,%5\n\
+		    addcc %4,%5,%4\n\
+		    srlx %7,32,%5\n\
+		    mulx %3,%5,%3\n\
+		    mulx %2,%5,%5\n\
+		    sethi %%hi(0x80000000),%2\n\
+		    addcc %4,%3,%4\n\
+		    srlx %4,32,%4\n\
+		    add %2,%2,%2\n\
+		    movcc %%xcc,%%g0,%2\n\
+		    addcc %5,%4,%5\n\
+		    sllx %3,32,%3\n\
+		    add %1,%3,%1\n\
 		    add %5,%2,%0"							\
 	   : "=r" ((UDItype)(wh)),							\
 	     "=&r" ((UDItype)(wl)),							\

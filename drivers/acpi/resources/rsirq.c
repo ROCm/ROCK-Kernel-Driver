@@ -1,10 +1,7 @@
 /*******************************************************************************
  *
- * Module Name: rsirq - Acpi_rs_irq_resource,
- *                      Acpi_rs_irq_stream
- *                      Acpi_rs_extended_irq_resource
- *                      Acpi_rs_extended_irq_stream
- *              $Revision: 13 $
+ * Module Name: rsirq - IRQ resource descriptors
+ *              $Revision: 17 $
  *
  ******************************************************************************/
 
@@ -30,7 +27,7 @@
 #include "acpi.h"
 #include "acresrc.h"
 
-#define _COMPONENT          RESOURCE_MANAGER
+#define _COMPONENT          ACPI_RESOURCES
 	 MODULE_NAME         ("rsirq")
 
 
@@ -39,20 +36,20 @@
  * FUNCTION:    Acpi_rs_irq_resource
  *
  * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
- *                                          stream
+ *                                        stream
  *              Bytes_consumed          - u32 pointer that is filled with
- *                                          the number of bytes consumed from
- *                                          the Byte_stream_buffer
+ *                                        the number of bytes consumed from
+ *                                        the Byte_stream_buffer
  *              Output_buffer           - Pointer to the user's return buffer
  *              Structure_size          - u32 pointer that is filled with
- *                                          the number of bytes in the filled
- *                                          in structure
+ *                                        the number of bytes in the filled
+ *                                        in structure
  *
- * RETURN:      Status  AE_OK if okay, else a valid ACPI_STATUS code
+ * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *                  structure pointed to by the Output_buffer. Return the
- *                  number of bytes consumed from the byte stream.
+ *              structure pointed to by the Output_buffer. Return the
+ *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
 
@@ -64,13 +61,12 @@ acpi_rs_irq_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	RESOURCE                *output_struct = (RESOURCE *) * output_buffer;
+	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	u8                      index;
 	u8                      i;
-	u32                     struct_size = sizeof (IRQ_RESOURCE) +
-			  RESOURCE_LENGTH_NO_DATA;
+	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_IRQ);
 
 
 	/*
@@ -79,7 +75,7 @@ acpi_rs_irq_resource (
 	 */
 	temp8 = *buffer;
 	*bytes_consumed = (temp8 & 0x03) + 1;
-	output_struct->id = irq;
+	output_struct->id = ACPI_RSTYPE_IRQ;
 
 	/*
 	 * Point to the 16-bits of Bytes 1 and 2
@@ -128,8 +124,8 @@ acpi_rs_irq_resource (
 			else {
 				/*
 				 * Only _LL and _HE polarity/trigger interrupts
-				 *  are allowed (ACPI spec v1.0b ection 6.4.2.1),
-				 *  so an error will occur if we reach this point
+				 * are allowed (ACPI spec v1.0b ection 6.4.2.1),
+				 * so an error will occur if we reach this point
 				 */
 				return (AE_BAD_DATA);
 			}
@@ -144,7 +140,7 @@ acpi_rs_irq_resource (
 	else {
 		/*
 		 * Assume Edge Sensitive, Active High, Non-Sharable
-		 *  per ACPI Specification
+		 * per ACPI Specification
 		 */
 		output_struct->data.irq.edge_level = EDGE_SENSITIVE;
 		output_struct->data.irq.active_high_low = ACTIVE_HIGH;
@@ -160,7 +156,6 @@ acpi_rs_irq_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-
 	return (AE_OK);
 }
 
@@ -172,19 +167,19 @@ acpi_rs_irq_resource (
  * PARAMETERS:  Linked_list             - Pointer to the resource linked list
  *              Output_buffer           - Pointer to the user's return buffer
  *              Bytes_consumed          - u32 pointer that is filled with
- *                                          the number of bytes of the
- *                                          Output_buffer used
+ *                                        the number of bytes of the
+ *                                        Output_buffer used
  *
- * RETURN:      Status  AE_OK if okay, else a valid ACPI_STATUS code
+ * RETURN:      Status
  *
  * DESCRIPTION: Take the linked list resource structure and fills in the
- *                  the appropriate bytes in a byte stream
+ *              the appropriate bytes in a byte stream
  *
  ******************************************************************************/
 
 ACPI_STATUS
 acpi_rs_irq_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -197,15 +192,15 @@ acpi_rs_irq_stream (
 
 	/*
 	 * The descriptor field is set based upon whether a third byte is
-	 *  needed to contain the IRQ Information.
+	 * needed to contain the IRQ Information.
 	 */
 	if (EDGE_SENSITIVE == linked_list->data.irq.edge_level &&
 		ACTIVE_HIGH == linked_list->data.irq.active_high_low &&
-		EXCLUSIVE == linked_list->data.irq.shared_exclusive)
-	{
+		EXCLUSIVE == linked_list->data.irq.shared_exclusive) {
 		*buffer = 0x22;
 		IRQinfo_byte_needed = FALSE;
 	}
+
 	else {
 		*buffer = 0x23;
 		IRQinfo_byte_needed = TRUE;
@@ -219,8 +214,7 @@ acpi_rs_irq_stream (
 	 */
 	for(index = 0;
 		index < linked_list->data.irq.number_of_interrupts;
-		index++)
-	{
+		index++) {
 		temp8 = (u8) linked_list->data.irq.interrupts[index];
 		temp16 |= 0x1 << temp8;
 	}
@@ -237,8 +231,7 @@ acpi_rs_irq_stream (
 				 0x01) << 4);
 
 		if (LEVEL_SENSITIVE == linked_list->data.irq.edge_level &&
-			ACTIVE_LOW == linked_list->data.irq.active_high_low)
-		{
+			ACTIVE_LOW == linked_list->data.irq.active_high_low) {
 			temp8 |= 0x08;
 		}
 
@@ -253,9 +246,7 @@ acpi_rs_irq_stream (
 	/*
 	 * Return the number of bytes consumed in this operation
 	 */
-	*bytes_consumed = (u32) ((NATIVE_UINT) buffer -
-			   (NATIVE_UINT) *output_buffer);
-
+	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
 	return (AE_OK);
 }
 
@@ -265,20 +256,20 @@ acpi_rs_irq_stream (
  * FUNCTION:    Acpi_rs_extended_irq_resource
  *
  * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource input byte
- *                                          stream
+ *                                        stream
  *              Bytes_consumed          - u32 pointer that is filled with
- *                                          the number of bytes consumed from
- *                                          the Byte_stream_buffer
+ *                                        the number of bytes consumed from
+ *                                        the Byte_stream_buffer
  *              Output_buffer           - Pointer to the user's return buffer
  *              Structure_size          - u32 pointer that is filled with
- *                                          the number of bytes in the filled
- *                                          in structure
+ *                                        the number of bytes in the filled
+ *                                        in structure
  *
- * RETURN:      Status  AE_OK if okay, else a valid ACPI_STATUS code
+ * RETURN:      Status
  *
  * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *                  structure pointed to by the Output_buffer. Return the
- *                  number of bytes consumed from the byte stream.
+ *              structure pointed to by the Output_buffer. Return the
+ *              number of bytes consumed from the byte stream.
  *
  ******************************************************************************/
 
@@ -290,12 +281,12 @@ acpi_rs_extended_irq_resource (
 	u32                     *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	RESOURCE                *output_struct = (RESOURCE *) * output_buffer;
+	ACPI_RESOURCE           *output_struct = (ACPI_RESOURCE *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
+	NATIVE_CHAR             *temp_ptr;
 	u8                      index;
-	u32                     struct_size = sizeof (EXTENDED_IRQ_RESOURCE) +
-			  RESOURCE_LENGTH_NO_DATA;
+	u32                     struct_size = SIZEOF_RESOURCE (ACPI_RESOURCE_EXT_IRQ);
 
 
 	/*
@@ -305,7 +296,7 @@ acpi_rs_extended_irq_resource (
 	MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
 
 	*bytes_consumed = temp16 + 3;
-	output_struct->id = extended_irq;
+	output_struct->id = ACPI_RSTYPE_EXT_IRQ;
 
 	/*
 	 * Point to the Byte3
@@ -332,8 +323,8 @@ acpi_rs_extended_irq_resource (
 		else {
 			/*
 			 * Only _LL and _HE polarity/trigger interrupts
-			 *  are allowed (ACPI spec v1.0b ection 6.4.2.1),
-			 *  so an error will occur if we reach this point
+			 * are allowed (ACPI spec v1.0b ection 6.4.2.1),
+			 * so an error will occur if we reach this point
 			 */
 			return (AE_BAD_DATA);
 		}
@@ -342,8 +333,7 @@ acpi_rs_extended_irq_resource (
 	/*
 	 * Check for sharable
 	 */
-	output_struct->data.extended_irq.shared_exclusive =
-			(temp8 >> 3) & 0x01;
+	output_struct->data.extended_irq.shared_exclusive = (temp8 >> 3) & 0x01;
 
 	/*
 	 * Point to Byte4 (IRQ Table length)
@@ -355,9 +345,9 @@ acpi_rs_extended_irq_resource (
 
 	/*
 	 * Add any additional structure size to properly calculate
-	 *  the next pointer at the end of this function
+	 * the next pointer at the end of this function
 	 */
-	 struct_size += (temp8 - 1) * 4;
+	struct_size += (temp8 - 1) * 4;
 
 	/*
 	 * Point to Byte5 (First IRQ Number)
@@ -378,33 +368,38 @@ acpi_rs_extended_irq_resource (
 
 	/*
 	 * This will leave us pointing to the Resource Source Index
-	 *  If it is present, then save it off and calculate the
-	 *  pointer to where the null terminated string goes:
-	 *  Each Interrupt takes 32-bits + the 5 bytes of the
-	 *  stream that are default.
+	 * If it is present, then save it off and calculate the
+	 * pointer to where the null terminated string goes:
+	 * Each Interrupt takes 32-bits + the 5 bytes of the
+	 * stream that are default.
 	 */
 	if (*bytes_consumed >
-		(u32)(output_struct->data.extended_irq.number_of_interrupts *
-		 4) + 5)
-	{
+		(u32)(output_struct->data.extended_irq.number_of_interrupts * 4) + 5) {
 		/* Dereference the Index */
 
 		temp8 = *buffer;
-		output_struct->data.extended_irq.resource_source_index =
-				(u32)temp8;
+		output_struct->data.extended_irq.resource_source.index = (u32) temp8;
 
 		/* Point to the String */
 
 		buffer += 1;
+
+		/*
+		 * Point the String pointer to the end of this structure.
+		 */
+		output_struct->data.extended_irq.resource_source.string_ptr =
+				(NATIVE_CHAR *)(output_struct + struct_size);
+
+		temp_ptr = output_struct->data.extended_irq.resource_source.string_ptr;
 
 		/* Copy the string into the buffer */
 
 		index = 0;
 
 		while (0x00 != *buffer) {
-			output_struct->data.extended_irq.resource_source[index] =
-					*buffer;
+			*temp_ptr = *buffer;
 
+			temp_ptr += 1;
 			buffer += 1;
 			index += 1;
 		}
@@ -412,23 +407,22 @@ acpi_rs_extended_irq_resource (
 		/*
 		 * Add the terminating null
 		 */
-		output_struct->data.extended_irq.resource_source[index] = 0x00;
-		output_struct->data.extended_irq.resource_source_string_length =
-				index + 1;
+		*temp_ptr = 0x00;
+		output_struct->data.extended_irq.resource_source.string_length = index + 1;
 
 		/*
-		 * In order for the Struct_size to fall on a 32-bit boundry,
-		 *  calculate the length of the string and expand the
-		 *  Struct_size to the next 32-bit boundry.
+		 * In order for the Struct_size to fall on a 32-bit boundary,
+		 * calculate the length of the string and expand the
+		 * Struct_size to the next 32-bit boundary.
 		 */
 		temp8 = (u8) (index + 1);
-		temp8 = (u8) ROUND_UP_TO_32_bITS (temp8);
+		struct_size += ROUND_UP_TO_32_bITS (temp8);
 	}
 
 	else {
-		output_struct->data.extended_irq.resource_source_index = 0x00;
-		output_struct->data.extended_irq.resource_source_string_length = 0;
-		output_struct->data.extended_irq.resource_source[0] = 0x00;
+		output_struct->data.extended_irq.resource_source.index = 0x00;
+		output_struct->data.extended_irq.resource_source.string_length = 0;
+		output_struct->data.extended_irq.resource_source.string_ptr = NULL;
 	}
 
 	/*
@@ -440,7 +434,6 @@ acpi_rs_extended_irq_resource (
 	 * Return the final size of the structure
 	 */
 	*structure_size = struct_size;
-
 	return (AE_OK);
 }
 
@@ -452,10 +445,10 @@ acpi_rs_extended_irq_resource (
  * PARAMETERS:  Linked_list             - Pointer to the resource linked list
  *              Output_buffer           - Pointer to the user's return buffer
  *              Bytes_consumed          - u32 pointer that is filled with
- *                                          the number of bytes of the
- *                                          Output_buffer used
+ *                                        the number of bytes of the
+ *                                        Output_buffer used
  *
- * RETURN:      Status  AE_OK if okay, else a valid ACPI_STATUS code
+ * RETURN:      Status
  *
  * DESCRIPTION: Take the linked list resource structure and fills in the
  *              the appropriate bytes in a byte stream
@@ -464,7 +457,7 @@ acpi_rs_extended_irq_resource (
 
 ACPI_STATUS
 acpi_rs_extended_irq_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed)
 {
@@ -484,7 +477,6 @@ acpi_rs_extended_irq_stream (
 	/*
 	 * Set a pointer to the Length field - to be filled in later
 	 */
-
 	length_field = (u16 *)buffer;
 	buffer += 2;
 
@@ -492,12 +484,10 @@ acpi_rs_extended_irq_stream (
 	 * Set the Interrupt vector flags
 	 */
 	temp8 = (u8)(linked_list->data.extended_irq.producer_consumer & 0x01);
-
 	temp8 |= ((linked_list->data.extended_irq.shared_exclusive & 0x01) << 3);
 
 	if (LEVEL_SENSITIVE == linked_list->data.extended_irq.edge_level &&
-	   ACTIVE_LOW == linked_list->data.extended_irq.active_high_low)
-	{
+	   ACTIVE_LOW == linked_list->data.extended_irq.active_high_low) {
 		temp8 |= 0x04;
 	}
 	else {
@@ -515,10 +505,8 @@ acpi_rs_extended_irq_stream (
 	*buffer = temp8;
 	buffer += 1;
 
-	for (index = 0;
-		 index < linked_list->data.extended_irq.number_of_interrupts;
-		 index++)
-	{
+	for (index = 0; index < linked_list->data.extended_irq.number_of_interrupts;
+		 index++) {
 		MOVE_UNALIGNED32_TO_32 (buffer,
 				  &linked_list->data.extended_irq.interrupts[index]);
 		buffer += 4;
@@ -527,8 +515,8 @@ acpi_rs_extended_irq_stream (
 	/*
 	 * Resource Source Index and Resource Source are optional
 	 */
-	if (0 != linked_list->data.extended_irq.resource_source_string_length) {
-		*buffer = (u8) linked_list->data.extended_irq.resource_source_index;
+	if (0 != linked_list->data.extended_irq.resource_source.string_length) {
+		*buffer = (u8) linked_list->data.extended_irq.resource_source.index;
 		buffer += 1;
 
 		temp_pointer = (NATIVE_CHAR *) buffer;
@@ -536,27 +524,26 @@ acpi_rs_extended_irq_stream (
 		/*
 		 * Copy the string
 		 */
-		STRCPY (temp_pointer, linked_list->data.extended_irq.resource_source);
+		STRCPY (temp_pointer,
+			linked_list->data.extended_irq.resource_source.string_ptr);
 
 		/*
 		 * Buffer needs to be set to the length of the sting + one for the
-		 *  terminating null
+		 * terminating null
 		 */
-		buffer += (STRLEN (linked_list->data.extended_irq.resource_source) + 1);
+		buffer += (STRLEN (linked_list->data.extended_irq.resource_source.string_ptr) + 1);
 	}
 
 	/*
 	 * Return the number of bytes consumed in this operation
 	 */
-	*bytes_consumed = (u32) ((NATIVE_UINT) buffer -
-			   (NATIVE_UINT) *output_buffer);
+	*bytes_consumed = POINTER_DIFF (buffer, *output_buffer);
 
 	/*
 	 * Set the length field to the number of bytes consumed
-	 *  minus the header size (3 bytes)
+	 * minus the header size (3 bytes)
 	 */
 	*length_field = (u16) (*bytes_consumed - 3);
-
 	return (AE_OK);
 }
 

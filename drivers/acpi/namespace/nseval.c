@@ -2,7 +2,7 @@
  *
  * Module Name: nseval - Object evaluation interfaces -- includes control
  *                       method lookup and execution.
- *              $Revision: 83 $
+ *              $Revision: 91 $
  *
  ******************************************************************************/
 
@@ -32,7 +32,7 @@
 #include "acnamesp.h"
 
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nseval")
 
 
@@ -88,11 +88,11 @@ acpi_ns_evaluate_relative (
 
 	/* Get the prefix handle and Node */
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 	prefix_node = acpi_ns_convert_handle_to_entry (handle);
 	if (!prefix_node) {
-		acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		status = AE_BAD_PARAMETER;
 		goto cleanup;
 	}
@@ -104,7 +104,7 @@ acpi_ns_evaluate_relative (
 			 IMODE_EXECUTE, NS_NO_UPSEARCH, NULL,
 			 &node);
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
@@ -119,10 +119,7 @@ acpi_ns_evaluate_relative (
 
 cleanup:
 
-	/* Cleanup */
-
-	acpi_cm_free (internal_path);
-
+	acpi_ut_free (internal_path);
 	return (status);
 }
 
@@ -165,7 +162,7 @@ acpi_ns_evaluate_by_name (
 		return (status);
 	}
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 	/* Lookup the name in the namespace */
 
@@ -173,7 +170,7 @@ acpi_ns_evaluate_by_name (
 			 IMODE_EXECUTE, NS_NO_UPSEARCH, NULL,
 			 &node);
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
@@ -192,7 +189,7 @@ cleanup:
 	/* Cleanup */
 
 	if (internal_path) {
-		acpi_cm_free (internal_path);
+		acpi_ut_free (internal_path);
 	}
 
 	return (status);
@@ -249,11 +246,11 @@ acpi_ns_evaluate_by_handle (
 
 	/* Get the prefix handle and Node */
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 	node = acpi_ns_convert_handle_to_entry (handle);
 	if (!node) {
-		acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -348,6 +345,15 @@ acpi_ns_execute_control_method (
 	ACPI_OPERAND_OBJECT     *obj_desc;
 
 
+	/* Verify that there is a method associated with this object */
+
+	obj_desc = acpi_ns_get_attached_object (method_node);
+	if (!obj_desc) {
+		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+		return (AE_ERROR);
+	}
+
+
 	/*
 	 * Unlock the namespace before execution.  This allows namespace access
 	 * via the external Acpi* interfaces while a method is being executed.
@@ -355,21 +361,12 @@ acpi_ns_execute_control_method (
 	 * interpreter locks to ensure that no thread is using the portion of the
 	 * namespace that is being deleted.
 	 */
-
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
-
-	/* Verify that there is a method associated with this object */
-
-	obj_desc = acpi_ns_get_attached_object ((ACPI_HANDLE) method_node);
-	if (!obj_desc) {
-		return (AE_ERROR);
-	}
-
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	/*
 	 * Execute the method via the interpreter
 	 */
-	status = acpi_aml_execute_method (method_node, params, return_obj_desc);
+	status = acpi_ex_execute_method (method_node, params, return_obj_desc);
 
 	return (status);
 }
@@ -404,12 +401,11 @@ acpi_ns_get_object_value (
 	 */
 
 	if ((node->type == ACPI_TYPE_PROCESSOR) ||
-		(node->type == ACPI_TYPE_POWER))
-	{
+		(node->type == ACPI_TYPE_POWER)) {
 		/*
 		 *  Create a Reference object to contain the object
 		 */
-		obj_desc = acpi_cm_create_internal_object (node->type);
+		obj_desc = acpi_ut_create_internal_object (node->type);
 		if (!obj_desc) {
 		   status = AE_NO_MEMORY;
 		   goto unlock_and_exit;
@@ -434,6 +430,7 @@ acpi_ns_get_object_value (
 
 		MEMCPY (obj_desc, val_desc, sizeof (ACPI_OPERAND_OBJECT));
 		obj_desc->common.reference_count = 1;
+		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	}
 
 
@@ -444,7 +441,7 @@ acpi_ns_get_object_value (
 	else {
 		/* Create an Reference object to contain the object */
 
-		obj_desc = acpi_cm_create_internal_object (INTERNAL_TYPE_REFERENCE);
+		obj_desc = acpi_ut_create_internal_object (INTERNAL_TYPE_REFERENCE);
 		if (!obj_desc) {
 		   status = AE_NO_MEMORY;
 		   goto unlock_and_exit;
@@ -452,32 +449,37 @@ acpi_ns_get_object_value (
 
 		/* Construct a descriptor pointing to the name */
 
-		obj_desc->reference.op_code = (u8) AML_NAME_OP;
+		obj_desc->reference.opcode = (u8) AML_NAME_OP;
 		obj_desc->reference.object = (void *) node;
 
 		/*
-		 * Use Acpi_aml_resolve_to_value() to get the associated value.
-		 * The call to Acpi_aml_resolve_to_value causes
-		 * Obj_desc (allocated above) to always be deleted.
+		 * Use Resolve_to_value() to get the associated value. This call
+		 * always deletes Obj_desc (allocated above).
 		 *
 		 * NOTE: we can get away with passing in NULL for a walk state
 		 * because Obj_desc is guaranteed to not be a reference to either
 		 * a method local or a method argument
 		 *
-		 * Even though we do not technically need to use the interpreter
-		 * for this, we must enter it because we could hit an opregion.
-		 * The opregion access code assumes it is in the interpreter.
+		 * Even though we do not directly invoke the interpreter
+		 * for this, we must enter it because we could access an opregion.
+		 * The opregion access code assumes that the interpreter
+		 * is locked.
+		 *
+		 * We must release the namespace lock before entering the
+		 * intepreter.
 		 */
 
-		acpi_aml_enter_interpreter();
+		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+		status = acpi_ex_enter_interpreter ();
+		if (ACPI_SUCCESS (status)) {
+			status = acpi_ex_resolve_to_value (&obj_desc, NULL);
 
-		status = acpi_aml_resolve_to_value (&obj_desc, NULL);
-
-		acpi_aml_exit_interpreter();
+			acpi_ex_exit_interpreter ();
+		}
 	}
 
 	/*
-	 * If Acpi_aml_resolve_to_value() succeeded, the return value was
+	 * If Acpi_ex_resolve_to_value() succeeded, the return value was
 	 * placed in Obj_desc.
 	 */
 
@@ -487,11 +489,15 @@ acpi_ns_get_object_value (
 		*return_obj_desc = obj_desc;
 	}
 
+	/* Namespace is unlocked */
+
+	return (status);
+
 
 unlock_and_exit:
 
 	/* Unlock the namespace */
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return (status);
 }

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evregion - ACPI Address_space (Op_region) handler dispatch
- *              $Revision: 96 $
+ *              $Revision: 103 $
  *
  *****************************************************************************/
 
@@ -30,11 +30,11 @@
 #include "acinterp.h"
 #include "amlcode.h"
 
-#define _COMPONENT          EVENT_HANDLING
+#define _COMPONENT          ACPI_EVENTS
 	 MODULE_NAME         ("evregion")
 
 
-/**************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ev_install_default_address_space_handlers
  *
@@ -44,7 +44,7 @@
  *
  * DESCRIPTION: Installs the core subsystem address space handlers.
  *
- *************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ev_install_default_address_space_handlers (
@@ -70,29 +70,26 @@ acpi_ev_install_default_address_space_handlers (
 	 */
 
 	status = acpi_install_address_space_handler (acpi_gbl_root_node,
-			   ADDRESS_SPACE_SYSTEM_MEMORY,
+			   ACPI_ADR_SPACE_SYSTEM_MEMORY,
 			   ACPI_DEFAULT_HANDLER, NULL, NULL);
 	if ((ACPI_FAILURE (status)) &&
-		(status != AE_EXIST))
-	{
+		(status != AE_EXIST)) {
 		return (status);
 	}
 
 	status = acpi_install_address_space_handler (acpi_gbl_root_node,
-			   ADDRESS_SPACE_SYSTEM_IO,
+			   ACPI_ADR_SPACE_SYSTEM_IO,
 			   ACPI_DEFAULT_HANDLER, NULL, NULL);
 	if ((ACPI_FAILURE (status)) &&
-		(status != AE_EXIST))
-	{
+		(status != AE_EXIST)) {
 		return (status);
 	}
 
 	status = acpi_install_address_space_handler (acpi_gbl_root_node,
-			   ADDRESS_SPACE_PCI_CONFIG,
+			   ACPI_ADR_SPACE_PCI_CONFIG,
 			   ACPI_DEFAULT_HANDLER, NULL, NULL);
 	if ((ACPI_FAILURE (status)) &&
-		(status != AE_EXIST))
-	{
+		(status != AE_EXIST)) {
 		return (status);
 	}
 
@@ -103,7 +100,7 @@ acpi_ev_install_default_address_space_handlers (
 
 /* TBD: [Restructure] Move elsewhere */
 
-/**************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ev_execute_reg_method
  *
@@ -114,7 +111,7 @@ acpi_ev_install_default_address_space_handlers (
  *
  * DESCRIPTION: Execute _REG method for a region
  *
- *************************************************************************/
+ ******************************************************************************/
 
 static ACPI_STATUS
 acpi_ev_execute_reg_method (
@@ -141,8 +138,8 @@ acpi_ev_execute_reg_method (
 	 *          Passed as a parameter
 	 */
 
-	acpi_cm_init_static_object (&space_id_desc);
-	acpi_cm_init_static_object (&function_desc);
+	acpi_ut_init_static_object (&space_id_desc);
+	acpi_ut_init_static_object (&function_desc);
 
 	/*
 	 *  Method requires two parameters.
@@ -168,7 +165,7 @@ acpi_ev_execute_reg_method (
 }
 
 
-/**************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ev_address_space_dispatch
  *
@@ -184,7 +181,7 @@ acpi_ev_execute_reg_method (
  * DESCRIPTION: Dispatch an address space or operation region access to
  *              a previously installed handler.
  *
- *************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ev_address_space_dispatch (
@@ -195,28 +192,27 @@ acpi_ev_address_space_dispatch (
 	u32                     *value)
 {
 	ACPI_STATUS             status;
-	ADDRESS_SPACE_HANDLER   handler;
-	ADDRESS_SPACE_SETUP     region_setup;
+	ACPI_ADR_SPACE_HANDLER  handler;
+	ACPI_ADR_SPACE_SETUP    region_setup;
 	ACPI_OPERAND_OBJECT     *handler_desc;
 	void                    *region_context = NULL;
 
 
 	/*
-	 *  Check for an installed handler
+	 * Ensure that there is a handler associated with this region
 	 */
 	handler_desc = region_obj->region.addr_handler;
-
 	if (!handler_desc) {
 		return(AE_NOT_EXIST);
 	}
 
 	/*
-	 *  It may be the case that the region has never been initialized
-	 *  Some types of regions require special init code
+	 * It may be the case that the region has never been initialized
+	 * Some types of regions require special init code
 	 */
 	if (!(region_obj->region.flags & AOPOBJ_INITIALIZED)) {
 		/*
-		 *  This region has not been initialized yet, do it
+		 * This region has not been initialized yet, do it
 		 */
 		region_setup = handler_desc->addr_handler.setup;
 		if (!region_setup) {
@@ -230,15 +226,14 @@ acpi_ev_address_space_dispatch (
 		 * We must exit the interpreter because the region setup will potentially
 		 * execute control methods
 		 */
-		acpi_aml_exit_interpreter ();
+		acpi_ex_exit_interpreter ();
 
 		status = region_setup (region_obj, ACPI_REGION_ACTIVATE,
-				  handler_desc->addr_handler.context,
-				  &region_context);
+				  handler_desc->addr_handler.context, &region_context);
 
 		/* Re-enter the interpreter */
 
-		acpi_aml_enter_interpreter ();
+		acpi_ex_enter_interpreter ();
 
 		/*
 		 *  Init routine may fail
@@ -267,7 +262,7 @@ acpi_ev_address_space_dispatch (
 		 *  exit the interpreter because the handler *might* block -- we don't
 		 *  know what it will do, so we can't hold the lock on the intepreter.
 		 */
-		acpi_aml_exit_interpreter();
+		acpi_ex_exit_interpreter();
 	}
 
 	/*
@@ -282,13 +277,13 @@ acpi_ev_address_space_dispatch (
 		/* We just returned from a non-default handler, we must re-enter the
 		interpreter */
 
-		acpi_aml_enter_interpreter ();
+		acpi_ex_enter_interpreter ();
 	}
 
 	return (status);
 }
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ev_disassociate_region_from_handler
  *
@@ -310,7 +305,7 @@ acpi_ev_disassociate_region_from_handler(
 	ACPI_OPERAND_OBJECT     *handler_obj;
 	ACPI_OPERAND_OBJECT     *obj_desc;
 	ACPI_OPERAND_OBJECT     **last_obj_ptr;
-	ADDRESS_SPACE_SETUP     region_setup;
+	ACPI_ADR_SPACE_SETUP    region_setup;
 	void                    *region_context;
 	ACPI_STATUS             status;
 
@@ -349,7 +344,7 @@ acpi_ev_disassociate_region_from_handler(
 			obj_desc->region.next = NULL;           /* Must clear field */
 
 			if (acpi_ns_is_locked) {
-				acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+				acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 			}
 
 			/*
@@ -358,7 +353,7 @@ acpi_ev_disassociate_region_from_handler(
 			acpi_ev_execute_reg_method (region_obj, 0);
 
 			if (acpi_ns_is_locked) {
-				acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+				acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 			}
 
 			/*
@@ -366,8 +361,7 @@ acpi_ev_disassociate_region_from_handler(
 			 */
 			region_setup = handler_obj->addr_handler.setup;
 			status = region_setup (region_obj, ACPI_REGION_DEACTIVATE,
-					  handler_obj->addr_handler.context,
-					  &region_context);
+					  handler_obj->addr_handler.context, &region_context);
 
 			/*
 			 *  Init routine may fail, Just ignore errors
@@ -407,7 +401,7 @@ acpi_ev_disassociate_region_from_handler(
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ev_associate_region_and_handler
  *
@@ -456,20 +450,20 @@ acpi_ev_associate_region_and_handler (
 	 *  Last thing, tell all users that this region is usable
 	 */
 	if (acpi_ns_is_locked) {
-		acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	}
 
 	status = acpi_ev_execute_reg_method (region_obj, 1);
 
 	if (acpi_ns_is_locked) {
-		acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+		acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	}
 
 	return (status);
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ev_addr_handler_helper
  *
@@ -486,7 +480,7 @@ acpi_ev_associate_region_and_handler (
  *              This is because the existing handler is closer in proximity
  *              to any more regions than the one we are trying to install.
  *
- ***************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ev_addr_handler_helper (
@@ -500,6 +494,9 @@ acpi_ev_addr_handler_helper (
 	ACPI_OPERAND_OBJECT     *obj_desc;
 	ACPI_NAMESPACE_NODE     *node;
 	ACPI_STATUS             status;
+
+
+	PROC_NAME ("Ev_addr_handler_helper");
 
 
 	handler_obj = (ACPI_OPERAND_OBJECT *) context;
@@ -524,14 +521,13 @@ acpi_ev_addr_handler_helper (
 
 	if ((node->type != ACPI_TYPE_DEVICE) &&
 		(node->type != ACPI_TYPE_REGION) &&
-		(node != acpi_gbl_root_node))
-	{
+		(node != acpi_gbl_root_node)) {
 		return (AE_OK);
 	}
 
 	/* Check for an existing internal object */
 
-	obj_desc = acpi_ns_get_attached_object ((ACPI_HANDLE) node);
+	obj_desc = acpi_ns_get_attached_object (node);
 	if (!obj_desc) {
 		/*
 		 *  The object DNE, we don't care about it
@@ -555,7 +551,6 @@ acpi_ev_addr_handler_helper (
 				/*
 				 *  It's for the same address space
 				 */
-
 				/*
 				 *  Since the object we found it on was a device, then it
 				 *  means that someone has already installed a handler for

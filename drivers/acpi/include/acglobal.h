@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acglobal.h - Declarations for global variables
- *       $Revision: 96 $
+ *       $Revision: 101 $
  *
  *****************************************************************************/
 
@@ -150,19 +150,19 @@ ACPI_EXTERN u16                         acpi_gbl_next_method_owner_id;
 
 ACPI_EXTERN u8                          acpi_gbl_debugger_configuration;
 ACPI_EXTERN u8                          acpi_gbl_global_lock_acquired;
-ACPI_EXTERN u8                          acpi_gbl_global_lock_set; /* TBD: [Restructure] OBSOLETE?? */
 ACPI_EXTERN u8                          acpi_gbl_step_to_next_call;
 ACPI_EXTERN u8                          acpi_gbl_acpi_hardware_present;
+ACPI_EXTERN u8                          acpi_gbl_global_lock_present;
 
 ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_drv_notify;
 ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_sys_notify;
 
 
-extern      u8                          acpi_gbl_shutdown;
-extern      u32                         acpi_gbl_system_flags;
-extern      u32                         acpi_gbl_startup_flags;
-extern      u8                          acpi_gbl_decode_to8bit[8];
-extern NATIVE_CHAR                      acpi_gbl_hex_to_ascii[];
+extern u8                               acpi_gbl_shutdown;
+extern u32                              acpi_gbl_system_flags;
+extern u32                              acpi_gbl_startup_flags;
+extern u8                               acpi_gbl_decode_to8bit[8];
+extern NATIVE_CHAR                      acpi_gbl_hex_to_ascii[16];
 
 
 /*****************************************************************************
@@ -178,15 +178,15 @@ extern NATIVE_CHAR                      acpi_gbl_hex_to_ascii[];
 ACPI_EXTERN ACPI_NAMESPACE_NODE         acpi_gbl_root_node_struct;
 ACPI_EXTERN ACPI_NAMESPACE_NODE        *acpi_gbl_root_node;
 
-extern      u8                          acpi_gbl_ns_properties[NUM_NS_TYPES];
-extern      PREDEFINED_NAMES            acpi_gbl_pre_defined_names [NUM_PREDEFINED_NAMES];
+extern u8                               acpi_gbl_ns_properties[NUM_NS_TYPES];
+extern PREDEFINED_NAMES                 acpi_gbl_pre_defined_names [NUM_PREDEFINED_NAMES];
 
 
 /* Used to detect memory leaks (DEBUG ONLY) */
 
 #ifdef ACPI_DEBUG
-ACPI_EXTERN ALLOCATION_INFO            *acpi_gbl_head_alloc_ptr;
-ACPI_EXTERN ALLOCATION_INFO            *acpi_gbl_tail_alloc_ptr;
+ACPI_EXTERN ACPI_ALLOCATION_INFO        *acpi_gbl_head_alloc_ptr;
+ACPI_EXTERN ACPI_ALLOCATION_INFO        *acpi_gbl_tail_alloc_ptr;
 #endif
 
 
@@ -200,15 +200,9 @@ ACPI_EXTERN ALLOCATION_INFO            *acpi_gbl_tail_alloc_ptr;
 ACPI_EXTERN ACPI_WALK_LIST             *acpi_gbl_current_walk_list;
 
 /*
- * Handle to the last method found - used during pass1 of load
- */
-ACPI_EXTERN ACPI_HANDLE                 acpi_gbl_last_method;
-
-/*
  * Table of Address Space handlers
  */
-
-ACPI_EXTERN ACPI_ADDRESS_SPACE_INFO     acpi_gbl_address_spaces[ACPI_NUM_ADDRESS_SPACES];
+ACPI_EXTERN ACPI_ADR_SPACE_INFO         acpi_gbl_address_spaces[ACPI_NUM_ADDRESS_SPACES];
 
 
 /* Control method single step flag */
@@ -240,7 +234,7 @@ extern u32                              acpi_hw_active_cx_state;
  *
  ****************************************************************************/
 
-ACPI_EXTERN ACPI_FIXED_EVENT_INFO       acpi_gbl_fixed_event_handlers[NUM_FIXED_EVENTS];
+ACPI_EXTERN ACPI_FIXED_EVENT_INFO       acpi_gbl_fixed_event_handlers[ACPI_NUM_FIXED_EVENTS];
 
 ACPI_EXTERN ACPI_HANDLE                 acpi_gbl_gpe_obj_handle;
 ACPI_EXTERN u32                         acpi_gbl_gpe_register_count;
@@ -255,12 +249,12 @@ ACPI_EXTERN ACPI_GPE_LEVEL_INFO         *acpi_gbl_gpe_info;
  * This table is needed because the GPE numbers supported by block 1 do not
  * have to be contiguous with the GPE numbers supported by block 0.
  */
-ACPI_EXTERN u8                          acpi_gbl_gpe_valid [NUM_GPE];
+ACPI_EXTERN u8                          acpi_gbl_gpe_valid [ACPI_NUM_GPE];
 
 /* Acpi_event counter for debug only */
 
 #ifdef ACPI_DEBUG
-ACPI_EXTERN u32                         acpi_gbl_event_count[NUM_FIXED_EVENTS];
+ACPI_EXTERN u32                         acpi_gbl_event_count[ACPI_NUM_FIXED_EVENTS];
 #endif
 
 

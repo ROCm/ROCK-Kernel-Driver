@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbutils - Table manipulation utilities
- *              $Revision: 33 $
+ *              $Revision: 38 $
  *
  *****************************************************************************/
 
@@ -29,7 +29,7 @@
 #include "acinterp.h"
 
 
-#define _COMPONENT          TABLE_MANAGER
+#define _COMPONENT          ACPI_TABLES
 	 MODULE_NAME         ("tbutils")
 
 
@@ -57,8 +57,7 @@ acpi_tb_handle_to_object (
 
 	for (i = 0; i < ACPI_TABLE_MAX; i++) {
 		list_head = &acpi_gbl_acpi_tables[i];
-		do
-		{
+		do {
 			if (list_head->table_id == table_id) {
 				*table_desc = list_head;
 				return (AE_OK);
@@ -108,8 +107,7 @@ acpi_tb_system_table_pointer (
 	/* Check for a pointer within the DSDT */
 
 	if ((acpi_gbl_DSDT) &&
-		(IS_IN_ACPI_TABLE (where, acpi_gbl_DSDT)))
-	{
+		(IS_IN_ACPI_TABLE (where, acpi_gbl_DSDT))) {
 		return (TRUE);
 	}
 
@@ -177,6 +175,9 @@ acpi_tb_validate_table_header (
 	ACPI_NAME               signature;
 
 
+	PROC_NAME ("Tb_validate_table_header");
+
+
 	/* Verify that this is a valid address */
 
 	if (!acpi_os_readable (table_header, sizeof (ACPI_TABLE_HEADER))) {
@@ -187,8 +188,8 @@ acpi_tb_validate_table_header (
 	/* Ensure that the signature is 4 ASCII characters */
 
 	MOVE_UNALIGNED32_TO_32 (&signature, &table_header->signature);
-	if (!acpi_cm_valid_acpi_name (signature)) {
-		REPORT_WARNING (("Invalid table signature found\n"));
+	if (!acpi_ut_valid_acpi_name (signature)) {
+		REPORT_WARNING (("Invalid table signature %4.4s found\n", &signature));
 		return (AE_BAD_SIGNATURE);
 	}
 
@@ -224,7 +225,7 @@ ACPI_STATUS
 acpi_tb_map_acpi_table (
 	ACPI_PHYSICAL_ADDRESS   physical_address,
 	u32                     *size,
-	void                    **logical_address)
+	ACPI_TABLE_HEADER       **logical_address)
 {
 	ACPI_TABLE_HEADER       *table;
 	u32                     table_size = *size;

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nswalk - Functions for walking the APCI namespace
- *              $Revision: 19 $
+ *              $Revision: 22 $
  *
  *****************************************************************************/
 
@@ -29,7 +29,7 @@
 #include "acnamesp.h"
 
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nswalk")
 
 
@@ -54,7 +54,7 @@
 
 ACPI_NAMESPACE_NODE *
 acpi_ns_get_next_object (
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	ACPI_NAMESPACE_NODE     *parent_node,
 	ACPI_NAMESPACE_NODE     *child_node)
 {
@@ -139,18 +139,18 @@ acpi_ns_get_next_object (
 
 ACPI_STATUS
 acpi_ns_walk_namespace (
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	ACPI_HANDLE             start_node,
 	u32                     max_depth,
 	u8                      unlock_before_callback,
-	WALK_CALLBACK           user_function,
+	ACPI_WALK_CALLBACK      user_function,
 	void                    *context,
 	void                    **return_value)
 {
 	ACPI_STATUS             status;
 	ACPI_NAMESPACE_NODE     *child_node;
 	ACPI_NAMESPACE_NODE     *parent_node;
-	OBJECT_TYPE_INTERNAL    child_type;
+	ACPI_OBJECT_TYPE8        child_type;
 	u32                     level;
 
 
@@ -202,18 +202,17 @@ acpi_ns_walk_namespace (
 				 */
 
 				if (unlock_before_callback) {
-					acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+					acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 				}
 
 				status = user_function (child_node, level,
 						 context, return_value);
 
 				if (unlock_before_callback) {
-					acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+					acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 				}
 
-				switch (status)
-				{
+				switch (status) {
 				case AE_OK:
 				case AE_CTRL_DEPTH:
 					/* Just keep going */
@@ -242,8 +241,7 @@ acpi_ns_walk_namespace (
 
 			if ((level < max_depth) && (status != AE_CTRL_DEPTH)) {
 				if (acpi_ns_get_next_object (ACPI_TYPE_ANY,
-						 child_node, 0))
-				{
+						 child_node, 0)) {
 					/*
 					 * There is at least one child of this
 					 * object, visit the object

@@ -30,6 +30,7 @@
 #include "actypes.h"
 #include "actbl.h"
 
+
 /*
  * Global interfaces
  */
@@ -65,6 +66,23 @@ acpi_format_exception (
 
 
 /*
+ * ACPI Memory manager
+ */
+
+void *
+acpi_allocate (
+	u32                     size);
+
+void *
+acpi_callocate (
+	u32                     size);
+
+void
+acpi_free (
+	void                    *address);
+
+
+/*
  * ACPI table manipulation interfaces
  */
 
@@ -96,6 +114,13 @@ acpi_get_table (
 	u32                     instance,
 	ACPI_BUFFER             *ret_buffer);
 
+ACPI_STATUS
+acpi_get_firmware_table (
+	ACPI_STRING             signature,
+	u32                     instance,
+	u32                     flags,
+	ACPI_TABLE_HEADER       **table_pointer);
+
 
 /*
  * Namespace and name interfaces
@@ -106,14 +131,14 @@ acpi_walk_namespace (
 	ACPI_OBJECT_TYPE        type,
 	ACPI_HANDLE             start_object,
 	u32                     max_depth,
-	WALK_CALLBACK           user_function,
+	ACPI_WALK_CALLBACK      user_function,
 	void                    *context,
 	void *                  *return_value);
 
 ACPI_STATUS
 acpi_get_devices (
 	NATIVE_CHAR             *HID,
-	WALK_CALLBACK           user_function,
+	ACPI_WALK_CALLBACK      user_function,
 	void                    *context,
 	void                    **return_value);
 
@@ -165,52 +190,52 @@ acpi_get_parent (
 
 
 /*
- * Acpi_event handler interfaces
+ * Event handler interfaces
  */
 
 ACPI_STATUS
 acpi_install_fixed_event_handler (
 	u32                     acpi_event,
-	FIXED_EVENT_HANDLER     handler,
+	ACPI_EVENT_HANDLER      handler,
 	void                    *context);
 
 ACPI_STATUS
 acpi_remove_fixed_event_handler (
 	u32                     acpi_event,
-	FIXED_EVENT_HANDLER     handler);
+	ACPI_EVENT_HANDLER      handler);
 
 ACPI_STATUS
 acpi_install_notify_handler (
 	ACPI_HANDLE             device,
 	u32                     handler_type,
-	NOTIFY_HANDLER          handler,
+	ACPI_NOTIFY_HANDLER     handler,
 	void                    *context);
 
 ACPI_STATUS
 acpi_remove_notify_handler (
 	ACPI_HANDLE             device,
 	u32                     handler_type,
-	NOTIFY_HANDLER          handler);
+	ACPI_NOTIFY_HANDLER     handler);
 
 ACPI_STATUS
 acpi_install_address_space_handler (
 	ACPI_HANDLE             device,
-	ACPI_ADDRESS_SPACE_TYPE space_id,
-	ADDRESS_SPACE_HANDLER   handler,
-	ADDRESS_SPACE_SETUP     setup,
+	ACPI_ADR_SPACE_TYPE     space_id,
+	ACPI_ADR_SPACE_HANDLER  handler,
+	ACPI_ADR_SPACE_SETUP    setup,
 	void                    *context);
 
 ACPI_STATUS
 acpi_remove_address_space_handler (
 	ACPI_HANDLE             device,
-	ACPI_ADDRESS_SPACE_TYPE space_id,
-	ADDRESS_SPACE_HANDLER   handler);
+	ACPI_ADR_SPACE_TYPE     space_id,
+	ACPI_ADR_SPACE_HANDLER  handler);
 
 ACPI_STATUS
 acpi_install_gpe_handler (
 	u32                     gpe_number,
 	u32                     type,
-	GPE_HANDLER             handler,
+	ACPI_GPE_HANDLER        handler,
 	void                    *context);
 
 ACPI_STATUS
@@ -224,7 +249,7 @@ acpi_release_global_lock (
 ACPI_STATUS
 acpi_remove_gpe_handler (
 	u32                     gpe_number,
-	GPE_HANDLER             handler);
+	ACPI_GPE_HANDLER        handler);
 
 ACPI_STATUS
 acpi_enable_event (

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswscope - Scope stack manipulation
- *              $Revision: 42 $
+ *              $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -29,7 +29,7 @@
 #include "acdispat.h"
 
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_DISPATCHER
 	 MODULE_NAME         ("dswscope")
 
 
@@ -60,7 +60,7 @@ acpi_ds_scope_stack_clear (
 		scope_info = walk_state->scope_info;
 		walk_state->scope_info = scope_info->scope.next;
 
-		acpi_cm_delete_generic_state (scope_info);
+		acpi_ut_delete_generic_state (scope_info);
 	}
 }
 
@@ -80,7 +80,7 @@ acpi_ds_scope_stack_clear (
 ACPI_STATUS
 acpi_ds_scope_stack_push (
 	ACPI_NAMESPACE_NODE     *node,
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	ACPI_WALK_STATE         *walk_state)
 {
 	ACPI_GENERIC_STATE      *scope_info;
@@ -95,14 +95,14 @@ acpi_ds_scope_stack_push (
 
 	/* Make sure object type is valid */
 
-	if (!acpi_aml_validate_object_type (type)) {
+	if (!acpi_ex_validate_object_type (type)) {
 		REPORT_WARNING (("Ds_scope_stack_push: type code out of range\n"));
 	}
 
 
 	/* Allocate a new scope object */
 
-	scope_info = acpi_cm_create_generic_state ();
+	scope_info = acpi_ut_create_generic_state ();
 	if (!scope_info) {
 		return (AE_NO_MEMORY);
 	}
@@ -114,7 +114,7 @@ acpi_ds_scope_stack_push (
 
 	/* Push new scope object onto stack */
 
-	acpi_cm_push_generic_state (&walk_state->scope_info, scope_info);
+	acpi_ut_push_generic_state (&walk_state->scope_info, scope_info);
 
 	return (AE_OK);
 }
@@ -148,12 +148,12 @@ acpi_ds_scope_stack_pop (
 	 * Pop scope info object off the stack.
 	 */
 
-	scope_info = acpi_cm_pop_generic_state (&walk_state->scope_info);
+	scope_info = acpi_ut_pop_generic_state (&walk_state->scope_info);
 	if (!scope_info) {
 		return (AE_STACK_UNDERFLOW);
 	}
 
-	acpi_cm_delete_generic_state (scope_info);
+	acpi_ut_delete_generic_state (scope_info);
 
 	return (AE_OK);
 }

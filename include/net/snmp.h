@@ -14,7 +14,7 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  *
- *		$Id: snmp.h,v 1.18 2001/05/16 16:45:35 davem Exp $
+ *		$Id: snmp.h,v 1.19 2001/06/14 13:40:46 davem Exp $
  *
  */
  
@@ -119,6 +119,7 @@ struct icmp_mib
  	unsigned long	IcmpOutTimestampReps;
  	unsigned long	IcmpOutAddrMasks;
  	unsigned long	IcmpOutAddrMaskReps;
+	unsigned long	dummy;
 	unsigned long   __pad[0]; 
 } ____cacheline_aligned;
 

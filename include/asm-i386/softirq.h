@@ -36,13 +36,13 @@ do {									\
 									\
 			".section .text.lock,\"ax\";"			\
 			"2: pushl %%eax; pushl %%ecx; pushl %%edx;"	\
-			"call do_softirq;"				\
+			"call %c1;"					\
 			"popl %%edx; popl %%ecx; popl %%eax;"		\
 			"jmp 1b;"					\
 			".previous;"					\
 									\
 		: /* no output */					\
-		: "r" (ptr)						\
+		: "r" (ptr), "i" (do_softirq)				\
 		/* no registers clobbered */ );				\
 } while (0)
 

@@ -1,7 +1,7 @@
 /*
  * USB Serial Converter driver
  *
- *	Copyright (C) 1999, 2000
+ *	Copyright (C) 1999 - 2001
  *	    Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -10,6 +10,9 @@
  *	(at your option) any later version.
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
+ *
+ * (05/30/2001) gkh
+ *	added sem to port structure and removed port_lock
  *
  * (10/05/2000) gkh
  *	Added interrupt_in_endpointAddress and bulk_in_endpointAddress to help
@@ -77,7 +80,7 @@ struct usb_serial_port {
 
 	struct tq_struct	tqueue;		/* task queue for line discipline waking up */
 	int			open_count;	/* number of times this port has been opened */
-	spinlock_t		port_lock;
+	struct semaphore	sem;		/* locks this structure */
 	
 	void *			private;	/* data private to the specific port */
 };

@@ -132,6 +132,7 @@ struct stripe_head {
 	struct buffer_head	*bh_read[MD_SB_DISKS];	/* read request buffers of the MD device */
 	struct buffer_head	*bh_write[MD_SB_DISKS];	/* write request buffers of the MD device */
 	struct buffer_head	*bh_written[MD_SB_DISKS]; /* write request buffers of the MD device that have been scheduled for write */
+	struct page		*bh_page[MD_SB_DISKS];	/* saved bh_cache[n]->b_page when reading around the cache */
 	unsigned long		sector;			/* sector of this row */
 	int			size;			/* buffers size */
 	int			pd_idx;			/* parity disk index */
@@ -157,6 +158,32 @@ struct stripe_head {
 #define STRIPE_HANDLE		2
 #define	STRIPE_SYNCING		3
 #define	STRIPE_INSYNC		4
+#define	STRIPE_PREREAD_ACTIVE	5
+#define	STRIPE_DELAYED		6
+
+/*
+ * Plugging:
+ *
+ * To improve write throughput, we need to delay the handling of some
+ * stripes until there has been a chance that several write requests
+ * for the one stripe have all been collected.
+ * In particular, any write request that would require pre-reading
+ * is put on a "delayed" queue until there are no stripes currently
+ * in a pre-read phase.  Further, if the "delayed" queue is empty when
+ * a stripe is put on it then we "plug" the queue and do not process it
+ * until an unplg call is made. (the tq_disk list is run).
+ *
+ * When preread is initiated on a stripe, we set PREREAD_ACTIVE and add
+ * it to the count of prereading stripes.
+ * When write is initiated, or the stripe refcnt == 0 (just in case) we
+ * clear the PREREAD_ACTIVE flag and decrement the count
+ * Whenever the delayed queue is empty and the device is not plugged, we
+ * move any strips from delayed to handle and clear the DELAYED flag and set PREREAD_ACTIVE.
+ * In stripe_handle, if we find pre-reading is necessary, we do it if
+ * PREREAD_ACTIVE is set, else we set DELAYED which will send it to the delayed queue.
+ * HANDLE gets cleared if stripe_handle leave nothing locked.
+ */
+ 
 
 struct disk_info {
 	kdev_t	dev;
@@ -181,14 +208,21 @@ struct raid5_private_data {
 	int			max_nr_stripes;
 
 	struct list_head	handle_list; /* stripes needing handling */
+	struct list_head	delayed_list; /* stripes that have plugged requests */
+	atomic_t		preread_active_stripes; /* stripes with scheduled io */
 	/*
 	 * Free stripes pool
 	 */
 	atomic_t		active_stripes;
 	struct list_head	inactive_list;
 	md_wait_queue_head_t	wait_for_stripe;
-
+	int			inactive_blocked;	/* release of inactive stripes blocked,
+							 * waiting for 25% to be free
+							 */        
 	md_spinlock_t		device_lock;
+
+	int			plugged;
+	struct tq_struct	plug_tq;
 };
 
 typedef struct raid5_private_data raid5_conf_t;

@@ -538,7 +538,7 @@ again:
 				break; /* For safety */
 			if ( (p-putp) >= len)
 			{
-				printk("%s: cbp = %x\n", devN->name, H2S(cbp));
+				printk("%s: cbp = %lx\n", devN->name, (long) H2S(cbp));
 				proc_reset(dev0, 1);	/* Freeze IDT */
 				break; /* For Safety */
 			}
@@ -607,7 +607,7 @@ again:
 				break; /* For safety */
 			if ( (p-putp) >= len)
 			{
-				printk("%s: cbp = %x\n", devN->name, H2S(cbp));
+				printk("%s: cbp = %lx\n", devN->name, (long) H2S(cbp));
 				proc_reset(dev0, 1);	/* Freeze IDT */
 				break; /* For Safety */
 			}
@@ -642,7 +642,7 @@ again:
 				break; /* For safety */
 			if ( (p-putp) >= len)
 			{
-				printk("%s: cbp = %x\n", devN->name, H2S(cbp));
+				printk("%s: cbp = %lx\n", devN->name, (long) H2S(cbp));
 				proc_reset(dev0, 1);	/* Freeze IDT */
 				break; /* For Safety */
 			}

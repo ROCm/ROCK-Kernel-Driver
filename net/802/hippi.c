@@ -98,7 +98,7 @@ int hippi_header(struct sk_buff *skb, struct net_device *dev,
 		memcpy(&skb->private.ifield, daddr + 2, 4);
 		return HIPPI_HLEN;
 	}
-	return -HIPPI_HLEN;
+	return -((int)HIPPI_HLEN);
 }
 
 

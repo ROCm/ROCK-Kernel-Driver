@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actables.h - ACPI table management
- *       $Revision: 29 $
+ *       $Revision: 31 $
  *
  *****************************************************************************/
 
@@ -54,6 +54,10 @@ ACPI_STATUS
 acpi_tb_build_common_facs (
 	ACPI_TABLE_DESC         *table_info);
 
+u32
+acpi_tb_get_table_count (
+	RSDP_DESCRIPTOR         *RSDP,
+	ACPI_TABLE_HEADER       *RSDT);
 
 /*
  * tbget - Table "get" routines
@@ -80,6 +84,20 @@ acpi_tb_get_table_facs (
 	ACPI_TABLE_HEADER       *buffer_ptr,
 	ACPI_TABLE_DESC         *table_info);
 
+ACPI_PHYSICAL_ADDRESS
+acpi_tb_get_rsdt_address (
+	void);
+
+ACPI_STATUS
+acpi_tb_validate_rsdt (
+	ACPI_TABLE_HEADER       *table_ptr);
+
+ACPI_STATUS
+acpi_tb_get_table_pointer (
+	ACPI_PHYSICAL_ADDRESS   physical_address,
+	u32                     flags,
+	u32                     *size,
+	ACPI_TABLE_HEADER       **table_ptr);
 
 /*
  * tbgetall - Get all firmware ACPI tables
@@ -151,7 +169,8 @@ acpi_tb_scan_memory_for_rsdp (
 
 ACPI_STATUS
 acpi_tb_find_rsdp (
-	ACPI_TABLE_DESC         *table_info);
+	ACPI_TABLE_DESC         *table_info,
+	u32                     flags);
 
 
 /*
@@ -166,7 +185,7 @@ ACPI_STATUS
 acpi_tb_map_acpi_table (
 	ACPI_PHYSICAL_ADDRESS   physical_address,
 	u32                     *size,
-	void                    **logical_address);
+	ACPI_TABLE_HEADER       **logical_address);
 
 ACPI_STATUS
 acpi_tb_verify_table_checksum (

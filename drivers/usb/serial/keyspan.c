@@ -28,6 +28,9 @@
   open source projects.
 
   Change History
+    Thu May 31 11:56:42 PDT 2001 gkh
+      switched from using spinlock to a semaphore
+   
    (04/08/2001) gb
 	Identify version on module load.
    
@@ -832,7 +835,6 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 	struct usb_serial 		*serial = port->serial;
 	const keyspan_device_details	*d_details;
 	int				i, already_active, err;
-	unsigned long flags;
 	urb_t *urb;
 
 	s_priv = (struct keyspan_serial_private *)(serial->private);
@@ -842,11 +844,11 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 	/*  dbg("keyspan_open called."); */
 	MOD_INC_USE_COUNT;
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 	++port->open_count;
 	already_active = port->active;
 	port->active = 1;
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
 
 	if (already_active)
 		return 0;
@@ -886,13 +888,12 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 	struct usb_serial	*serial = port->serial; /* FIXME should so sanity check */
 	struct keyspan_serial_private 	*s_priv;
 	struct keyspan_port_private 	*p_priv;
-	unsigned long flags;
 
 	/*  dbg("keyspan_close called"); */
 	s_priv = (struct keyspan_serial_private *)(serial->private);
 	p_priv = (struct keyspan_port_private *)(port->private);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 
 	if (--port->open_count <= 0) {
 		if (port->active) {
@@ -913,7 +914,7 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 		port->open_count = 0;
 		port->tty = 0;
 	}
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
 
 	MOD_DEC_USE_COUNT;
 }

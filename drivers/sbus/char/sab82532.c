@@ -1,4 +1,4 @@
-/* $Id: sab82532.c,v 1.60 2001/05/29 05:56:06 ecd Exp $
+/* $Id: sab82532.c,v 1.62 2001/06/10 06:48:47 davem Exp $
  * sab82532.c: ASYNC Driver for the SIEMENS SAB82532 DUSCC.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -410,7 +410,7 @@ static void transmit_chars(struct sab82532 *info,
 
 	if (!(readb(&info->regs->r.star) & SAB82532_STAR_XFW)) {
 #ifdef SERIAL_DEBUG_FIFO
-		printk("%s: XPR, but no XFW (???)\n", __FUNCTION__);
+		printk("%s: XPR, but no XFW (?)\n", __FUNCTION__);
 #endif
 		return;
 	}
@@ -631,6 +631,7 @@ next:
 		transmit_chars(info, &status);
 
 done:
+	;
 #ifdef SERIAL_DEBUG_INTR
 	printk("end.\n");
 #endif
@@ -2211,7 +2212,7 @@ static void __init sab82532_kgdb_hook(int line)
 
 static inline void __init show_serial_version(void)
 {
-	char *revision = "$Revision: 1.60 $";
+	char *revision = "$Revision: 1.62 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');

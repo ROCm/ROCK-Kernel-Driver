@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbget - ACPI Table get* routines
- *              $Revision: 43 $
+ *              $Revision: 48 $
  *
  *****************************************************************************/
 
@@ -29,10 +29,11 @@
 #include "actables.h"
 
 
-#define _COMPONENT          TABLE_MANAGER
+#define _COMPONENT          ACPI_TABLES
 	 MODULE_NAME         ("tbget")
 
 #define RSDP_CHECKSUM_LENGTH 20
+
 
 /*******************************************************************************
  *
@@ -72,13 +73,11 @@ acpi_tb_get_table_ptr (
 	 * For all table types (Single/Multiple), the first
 	 * instance is always in the list head.
 	 */
-
 	if (instance == 1) {
 		/*
 		 * Just pluck the pointer out of the global table!
 		 * Will be null if no table is present
 		 */
-
 		*table_ptr_loc = acpi_gbl_acpi_tables[table_type].pointer;
 		return (AE_OK);
 	}
@@ -92,11 +91,11 @@ acpi_tb_get_table_ptr (
 	}
 
 	/* Walk the list to get the desired table
-	 *  Since the if (Instance == 1) check above checked for the
-	 *  first table, setting Table_desc equal to the .Next member
-	 *  is actually pointing to the second table.  Therefore, we
-	 *  need to walk from the 2nd table until we reach the Instance
-	 *  that the user is looking for and return its table pointer.
+	 * Since the if (Instance == 1) check above checked for the
+	 * first table, setting Table_desc equal to the .Next member
+	 * is actually pointing to the second table.  Therefore, we
+	 * need to walk from the 2nd table until we reach the Instance
+	 * that the user is looking for and return its table pointer.
 	 */
 	table_desc = acpi_gbl_acpi_tables[table_type].next;
 	for (i = 2; i < instance; i++) {
@@ -159,7 +158,7 @@ acpi_tb_get_table (
 
 		/* Allocate buffer for the entire table */
 
-		full_table = acpi_cm_allocate (table_header->length);
+		full_table = acpi_ut_allocate (table_header->length);
 		if (!full_table) {
 			return (AE_NO_MEMORY);
 		}
@@ -182,8 +181,7 @@ acpi_tb_get_table (
 	else {
 		size = SIZE_IN_HEADER;
 
-		status = acpi_tb_map_acpi_table (physical_address, &size,
-				  (void **) &full_table);
+		status = acpi_tb_map_acpi_table (physical_address, &size, &full_table);
 		if (ACPI_FAILURE (status)) {
 			return (status);
 		}
@@ -382,8 +380,7 @@ acpi_tb_verify_rsdp (
 	/*
 	 * Obtain access to the RSDP structure
 	 */
-	status = acpi_os_map_memory (rsdp_physical_address,
-			  sizeof (RSDP_DESCRIPTOR),
+	status = acpi_os_map_memory (rsdp_physical_address, sizeof (RSDP_DESCRIPTOR),
 			  (void **) &table_ptr);
 	if (ACPI_FAILURE (status)) {
 		return (status);
@@ -439,6 +436,133 @@ cleanup:
 
 /*******************************************************************************
  *
+ * FUNCTION:    Acpi_tb_get_rsdt_address
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      RSDT physical address
+ *
+ * DESCRIPTION: Extract the address of the RSDT or XSDT, depending on the
+ *              version of the RSDP
+ *
+ ******************************************************************************/
+
+ACPI_PHYSICAL_ADDRESS
+acpi_tb_get_rsdt_address (void)
+{
+	ACPI_PHYSICAL_ADDRESS   physical_address;
+
+
+	/*
+	 * For RSDP revision 0 or 1, we use the RSDT.
+	 * For RSDP revision 2 (and above), we use the XSDT
+	 */
+	if (acpi_gbl_RSDP->revision < 2) {
+#ifdef _IA64
+		/* 0.71 RSDP has 64bit Rsdt address field */
+		physical_address = ((RSDP_DESCRIPTOR_REV071 *)acpi_gbl_RSDP)->rsdt_physical_address;
+#else
+		physical_address = (ACPI_PHYSICAL_ADDRESS) acpi_gbl_RSDP->rsdt_physical_address;
+#endif
+	}
+
+	else {
+		physical_address = (ACPI_PHYSICAL_ADDRESS)
+				   ACPI_GET_ADDRESS (acpi_gbl_RSDP->xsdt_physical_address);
+	}
+
+
+	return (physical_address);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_tb_validate_rsdt
+ *
+ * PARAMETERS:  Table_ptr       - Addressable pointer to the RSDT.
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Validate signature for the RSDT or XSDT
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_tb_validate_rsdt (
+	ACPI_TABLE_HEADER       *table_ptr)
+{
+	u32                     no_match;
+
+
+	/*
+	 * For RSDP revision 0 or 1, we use the RSDT.
+	 * For RSDP revision 2 (and above), we use the XSDT
+	 */
+	if (acpi_gbl_RSDP->revision < 2) {
+		no_match = STRNCMP ((char *) table_ptr, RSDT_SIG,
+				  sizeof (RSDT_SIG) -1);
+	}
+	else {
+		no_match = STRNCMP ((char *) table_ptr, XSDT_SIG,
+				  sizeof (XSDT_SIG) -1);
+	}
+
+
+	if (no_match) {
+		/* Invalid RSDT or XSDT signature */
+
+		REPORT_ERROR (("Invalid signature where RSDP indicates RSDT/XSDT should be located\n"));
+
+		return (AE_BAD_SIGNATURE);
+	}
+
+	return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_tb_get_table_pointer
+ *
+ * PARAMETERS:  Physical_address    - Address from RSDT
+ *              Flags               - virtual or physical addressing
+ *              Table_ptr           - Addressable address (output)
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Create an addressable pointer to an ACPI table
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_tb_get_table_pointer (
+	ACPI_PHYSICAL_ADDRESS   physical_address,
+	u32                     flags,
+	u32                     *size,
+	ACPI_TABLE_HEADER       **table_ptr)
+{
+	ACPI_STATUS             status;
+
+
+	if ((flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING) {
+		*size = SIZE_IN_HEADER;
+		status = acpi_tb_map_acpi_table (physical_address, size, table_ptr);
+	}
+
+	else {
+		*size = 0;
+		*table_ptr = (ACPI_TABLE_HEADER *) (ACPI_TBLPTR) physical_address;
+
+		status = AE_OK;
+	}
+
+	return (status);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    Acpi_tb_get_table_rsdt
  *
  * PARAMETERS:  Number_of_tables    - Where the table count is placed
@@ -454,36 +578,16 @@ acpi_tb_get_table_rsdt (
 	u32                     *number_of_tables)
 {
 	ACPI_TABLE_DESC         table_info;
-	ACPI_STATUS             status = AE_OK;
+	ACPI_STATUS             status;
 	ACPI_PHYSICAL_ADDRESS   physical_address;
-	u32                     signature_length;
-	char                    *table_signature;
 
 
 	/*
 	 * Get the RSDT from the RSDP
 	 */
 
-	/*
-	 * For RSDP revision 0 or 1, we use the RSDT.
-	 * For RSDP revision 2 (and above), we use the XSDT
-	 */
-	if (acpi_gbl_RSDP->revision < 2) {
-#ifdef _IA64
-		/* 0.71 RSDP has 64bit Rsdt address field */
-		physical_address = ((RSDP_DESCRIPTOR_REV071 *)acpi_gbl_RSDP)->rsdt_physical_address;
-#else
-		physical_address = (ACPI_PHYSICAL_ADDRESS) acpi_gbl_RSDP->rsdt_physical_address;
-#endif
-		table_signature = RSDT_SIG;
-		signature_length = sizeof (RSDT_SIG) -1;
-	}
-	else {
-		physical_address = (ACPI_PHYSICAL_ADDRESS)
-				   ACPI_GET_ADDRESS (acpi_gbl_RSDP->xsdt_physical_address);
-		table_signature = XSDT_SIG;
-		signature_length = sizeof (XSDT_SIG) -1;
-	}
+
+	physical_address = acpi_tb_get_rsdt_address ();
 
 
 	/* Get the RSDT/XSDT */
@@ -496,20 +600,16 @@ acpi_tb_get_table_rsdt (
 
 	/* Check the RSDT or XSDT signature */
 
-	if (STRNCMP ((char *) table_info.pointer, table_signature,
-			  signature_length))
-	{
-		/* Invalid RSDT or XSDT signature */
-
-		REPORT_ERROR (("Invalid signature where RSDP indicates %s should be located\n",
-				  table_signature));
-
+	status = acpi_tb_validate_rsdt (table_info.pointer);
+	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
 
 
-	/* Valid RSDT signature, verify the checksum */
-
+	/*
+	 * Valid RSDT signature, verify the checksum.  If it fails, just
+	 * print a warning and ignore it.
+	 */
 	status = acpi_tb_verify_table_checksum (table_info.pointer);
 
 
@@ -538,7 +638,7 @@ acpi_tb_get_table_rsdt (
  * FUNCTION:    Acpi_tb_get_table_facs
  *
  * PARAMETERS:  *Buffer_ptr             - If Buffer_ptr is valid, read data from
- *                                          buffer rather than searching memory
+ *                                        buffer rather than searching memory
  *              *Table_info             - Where the table info is returned
  *
  * RETURN:      Status
@@ -555,7 +655,7 @@ acpi_tb_get_table_facs (
 	ACPI_TABLE_HEADER       *buffer_ptr,
 	ACPI_TABLE_DESC         *table_info)
 {
-	void                    *table_ptr = NULL;
+	ACPI_TABLE_HEADER       *table_ptr = NULL;
 	u32                     size;
 	u8                      allocation;
 	ACPI_STATUS             status = AE_OK;
@@ -573,7 +673,7 @@ acpi_tb_get_table_facs (
 		 * Getting table from a file -- allocate a buffer and
 		 * read the table.
 		 */
-		table_ptr = acpi_cm_allocate (size);
+		table_ptr = acpi_ut_allocate (size);
 		if(!table_ptr) {
 			return (AE_NO_MEMORY);
 		}
@@ -590,7 +690,7 @@ acpi_tb_get_table_facs (
 
 		status = acpi_tb_map_acpi_table ((ACPI_PHYSICAL_ADDRESS) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xfirmware_ctrl),
 				   &size, &table_ptr);
-		if (ACPI_FAILURE(status)) {
+		if (ACPI_FAILURE (status)) {
 			return (status);
 		}
 

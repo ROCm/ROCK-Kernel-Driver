@@ -1,4 +1,4 @@
-/* $Id: pci_common.c,v 1.21 2001/06/08 06:57:19 davem Exp $
+/* $Id: pci_common.c,v 1.25 2001/06/14 16:57:41 davem Exp $
  * pci_common.c: PCI controller common support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -257,11 +257,13 @@ void __init pci_fill_in_pbm_cookies(struct pci_bus *pbus,
 	}
 }
 
-static void __init bad_assignment(struct linux_prom_pci_registers *ap,
+static void __init bad_assignment(struct pci_dev *pdev,
+				  struct linux_prom_pci_registers *ap,
 				  struct resource *res,
 				  int do_prom_halt)
 {
-	prom_printf("PCI: Bogus PROM assignment.\n");
+	prom_printf("PCI: Bogus PROM assignment. BUS[%02x] DEVFN[%x]\n",
+		    pdev->bus->number, pdev->devfn);
 	if (ap)
 		prom_printf("PCI: phys[%08x:%08x:%08x] size[%08x:%08x]\n",
 			    ap->phys_hi, ap->phys_mid, ap->phys_lo,
@@ -319,7 +321,7 @@ __init get_device_resource(struct linux_prom_pci_registers *ap,
 	case  PCI_ROM_ADDRESS:
 		/* It had better be MEM space. */
 		if (space != 2)
-			bad_assignment(ap, NULL, 0);
+			bad_assignment(pdev, ap, NULL, 0);
 
 		res = &pdev->resource[PCI_ROM_RESOURCE];
 		break;
@@ -334,7 +336,7 @@ __init get_device_resource(struct linux_prom_pci_registers *ap,
 		break;
 
 	default:
-		bad_assignment(ap, NULL, 0);
+		bad_assignment(pdev, ap, NULL, 0);
 		res = NULL;
 		break;
 	};
@@ -371,14 +373,15 @@ static void __init pdev_record_assignments(struct pci_pbm_info *pbm,
 		ap = &pcp->prom_assignments[i];
 		root = get_root_resource(ap, pbm);
 		res = get_device_resource(ap, pdev);
-		if (root == NULL || res == NULL)
+		if (root == NULL || res == NULL ||
+		    res->flags == 0)
 			continue;
 
 		/* Ok we know which resource this PROM assignment is
 		 * for, sanity check it.
 		 */
 		if ((res->start & 0xffffffffUL) != ap->phys_lo)
-			bad_assignment(ap, res, 1);
+			bad_assignment(pdev, ap, res, 1);
 
 		/* If it is a 64-bit MEM space assignment, verify that
 		 * the resource is too and that the upper 32-bits match.
@@ -387,9 +390,9 @@ static void __init pdev_record_assignments(struct pci_pbm_info *pbm,
 			if (((res->flags & IORESOURCE_MEM) == 0) ||
 			    ((res->flags & PCI_BASE_ADDRESS_MEM_TYPE_MASK)
 			     != PCI_BASE_ADDRESS_MEM_TYPE_64))
-				bad_assignment(ap, res, 1);
+				bad_assignment(pdev, ap, res, 1);
 			if ((res->start >> 32) != ap->phys_mid)
-				bad_assignment(ap, res, 1);
+				bad_assignment(pdev, ap, res, 1);
 
 			/* PBM cannot generate cpu initiated PIOs
 			 * to the full 64-bit space.  Therefore the
@@ -439,6 +442,23 @@ void __init pci_record_assignments(struct pci_pbm_info *pbm,
 	walk = &pbus->children;
 	for (walk = walk->next; walk != &pbus->children; walk = walk->next)
 		pci_record_assignments(pbm, pci_bus_b(walk));
+}
+
+/* Return non-zero if PDEV has implicit I/O resources even
+ * though it may not have an I/O base address register
+ * active.
+ */
+static int __init has_implicit_io(struct pci_dev *pdev)
+{
+	int class = pdev->class >> 8;
+
+	if (class == PCI_CLASS_NOT_DEFINED ||
+	    class == PCI_CLASS_NOT_DEFINED_VGA ||
+	    class == PCI_CLASS_STORAGE_IDE ||
+	    (pdev->class >> 16) == PCI_BASE_CLASS_DISPLAY)
+		return 1;
+
+	return 0;
 }
 
 static void __init pdev_assign_unassigned(struct pci_pbm_info *pbm,
@@ -504,7 +524,7 @@ static void __init pdev_assign_unassigned(struct pci_pbm_info *pbm,
 	 */
 	if (io_seen || mem_seen) {
 		pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-		if (io_seen)
+		if (io_seen || has_implicit_io(pdev))
 			cmd |= PCI_COMMAND_IO;
 		if (mem_seen)
 			cmd |= PCI_COMMAND_MEMORY;
@@ -863,6 +883,46 @@ void pci_setup_busmastering(struct pci_pbm_info *pbm,
 	walk = &pbus->children;
 	for (walk = walk->next; walk != &pbus->children; walk = walk->next)
 		pci_setup_busmastering(pbm, pci_bus_b(walk));
+}
+
+void pci_register_legacy_regions(struct resource *io_res,
+				 struct resource *mem_res)
+{
+	struct resource *p;
+
+	/* VGA Video RAM. */
+	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	if (!p)
+		return;
+
+	memset(p, 0, sizeof(*p));
+	p->name = "Video RAM area";
+	p->start = mem_res->start + 0xa0000UL;
+	p->end = p->start + 0x1ffffUL;
+	p->flags = IORESOURCE_BUSY;
+	request_resource(mem_res, p);
+
+	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	if (!p)
+		return;
+
+	memset(p, 0, sizeof(*p));
+	p->name = "System ROM";
+	p->start = mem_res->start + 0xf0000UL;
+	p->end = p->start + 0xffffUL;
+	p->flags = IORESOURCE_BUSY;
+	request_resource(mem_res, p);
+
+	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	if (!p)
+		return;
+
+	memset(p, 0, sizeof(*p));
+	p->name = "Video ROM";
+	p->start = mem_res->start + 0xc0000UL;
+	p->end = p->start + 0x7fffUL;
+	p->flags = IORESOURCE_BUSY;
+	request_resource(mem_res, p);
 }
 
 /* Generic helper routines for PCI error reporting. */

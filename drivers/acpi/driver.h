@@ -69,11 +69,4 @@ int acpi_enter_sx(acpi_sstate_t state);
 
 extern volatile acpi_sstate_t acpi_sleep_state;
 
-/*
- * table.c
- */
-extern FADT_DESCRIPTOR acpi_fadt;
-
-int acpi_find_and_load_tables(u64 rsdp);
-
 #endif /* __DRIVER_H */

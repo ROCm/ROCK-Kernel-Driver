@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsalloc - Namespace allocation and deletion utilities
- *              $Revision: 45 $
+ *              $Revision: 50 $
  *
  ******************************************************************************/
 
@@ -29,7 +29,7 @@
 #include "acinterp.h"
 
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nsalloc")
 
 
@@ -52,7 +52,7 @@ acpi_ns_create_node (
 	ACPI_NAMESPACE_NODE     *node;
 
 
-	node = acpi_cm_callocate (sizeof (ACPI_NAMESPACE_NODE));
+	node = acpi_ut_callocate (sizeof (ACPI_NAMESPACE_NODE));
 	if (!node) {
 		return (NULL);
 	}
@@ -119,7 +119,7 @@ acpi_ns_delete_node (
 		acpi_ns_detach_object (node);
 	}
 
-	acpi_cm_free (node);
+	acpi_ut_free (node);
 
 
 	return;
@@ -146,7 +146,7 @@ acpi_ns_install_node (
 	ACPI_WALK_STATE         *walk_state,
 	ACPI_NAMESPACE_NODE     *parent_node,   /* Parent */
 	ACPI_NAMESPACE_NODE     *node,      /* New Child*/
-	OBJECT_TYPE_INTERNAL    type)
+	ACPI_OBJECT_TYPE8       type)
 {
 	u16                     owner_id = TABLE_ID_DSDT;
 	ACPI_NAMESPACE_NODE     *child_node;
@@ -195,27 +195,22 @@ acpi_ns_install_node (
 	 * add the region in order to define fields in it, we
 	 * have a forward reference.
 	 */
-
 	if ((ACPI_TYPE_ANY == type) ||
-		(INTERNAL_TYPE_DEF_FIELD_DEFN == type) ||
-		(INTERNAL_TYPE_BANK_FIELD_DEFN == type))
-	{
+		(INTERNAL_TYPE_FIELD_DEFN == type) ||
+		(INTERNAL_TYPE_BANK_FIELD_DEFN == type)) {
 		/*
 		 * We don't want to abort here, however!
 		 * We will fill in the actual type when the
 		 * real definition is found later.
 		 */
-
 	}
 
 	/*
 	 * The Def_field_defn and Bank_field_defn cases are actually
 	 * looking up the Region in which the field will be defined
 	 */
-
-	if ((INTERNAL_TYPE_DEF_FIELD_DEFN == type) ||
-		(INTERNAL_TYPE_BANK_FIELD_DEFN == type))
-	{
+	if ((INTERNAL_TYPE_FIELD_DEFN == type) ||
+		(INTERNAL_TYPE_BANK_FIELD_DEFN == type)) {
 		type = ACPI_TYPE_REGION;
 	}
 
@@ -225,11 +220,9 @@ acpi_ns_install_node (
 	 * being looked up.  Save any other value of Type as the type of
 	 * the entry.
 	 */
-
 	if ((type != INTERNAL_TYPE_SCOPE) &&
 		(type != INTERNAL_TYPE_DEF_ANY) &&
-		(type != INTERNAL_TYPE_INDEX_FIELD_DEFN))
-	{
+		(type != INTERNAL_TYPE_INDEX_FIELD_DEFN)) {
 		node->type = (u8) type;
 	}
 
@@ -237,7 +230,6 @@ acpi_ns_install_node (
 	 * Increment the reference count(s) of all parents up to
 	 * the root!
 	 */
-
 	while ((node = acpi_ns_get_parent_object (node)) != NULL) {
 		node->reference_count++;
 	}
@@ -282,8 +274,7 @@ acpi_ns_delete_children (
 	/*
 	 * Deallocate all children at this level
 	 */
-	do
-	{
+	do {
 		/* Get the things we need */
 
 		next_node   = child_node->peer;
@@ -304,7 +295,7 @@ acpi_ns_delete_children (
 			acpi_ns_detach_object (child_node);
 		}
 
-		acpi_cm_free (child_node);
+		acpi_ut_free (child_node);
 
 		/* And move on to the next child in the list */
 
@@ -373,7 +364,7 @@ acpi_ns_delete_namespace_subtree (
 			obj_desc = acpi_ns_get_attached_object (child_node);
 			if (obj_desc) {
 				acpi_ns_detach_object (child_node);
-				acpi_cm_remove_reference (obj_desc);
+				acpi_ut_remove_reference (obj_desc);
 			}
 
 
@@ -519,7 +510,7 @@ acpi_ns_delete_namespace_by_owner (
 				obj_desc = acpi_ns_get_attached_object (child_node);
 				if (obj_desc) {
 					acpi_ns_detach_object (child_node);
-					acpi_cm_remove_reference (obj_desc);
+					acpi_ut_remove_reference (obj_desc);
 				}
 			}
 

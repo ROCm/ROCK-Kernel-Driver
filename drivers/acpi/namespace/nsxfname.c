@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfname - Public interfaces to the ACPI subsystem
  *                         ACPI Namespace oriented interfaces
- *              $Revision: 75 $
+ *              $Revision: 79 $
  *
  *****************************************************************************/
 
@@ -34,7 +34,7 @@
 #include "acevents.h"
 
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nsxfname")
 
 
@@ -67,6 +67,15 @@ acpi_get_handle (
 	ACPI_NAMESPACE_NODE     *prefix_node = NULL;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
+	/* Parameter Validation */
+
 	if (!ret_handle || !pathname) {
 		return (AE_BAD_PARAMETER);
 	}
@@ -74,15 +83,15 @@ acpi_get_handle (
 	/* Convert a parent handle to a prefix node */
 
 	if (parent) {
-		acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+		acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 		prefix_node = acpi_ns_convert_handle_to_entry (parent);
 		if (!prefix_node) {
-			acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+			acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 			return (AE_BAD_PARAMETER);
 		}
 
-		acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	}
 
 	/* Special case for root, since we can't search for it */
@@ -132,6 +141,13 @@ acpi_get_name (
 	ACPI_NAMESPACE_NODE     *node;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/* Buffer pointer must be valid always */
 
 	if (!ret_path_ptr || (name_type > ACPI_NAME_TYPE_MAX)) {
@@ -141,8 +157,7 @@ acpi_get_name (
 	/* Allow length to be zero and ignore the pointer */
 
 	if ((ret_path_ptr->length) &&
-	   (!ret_path_ptr->pointer))
-	{
+	   (!ret_path_ptr->pointer)) {
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -159,7 +174,7 @@ acpi_get_name (
 	 * Validate handle and convert to an Node
 	 */
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	node = acpi_ns_convert_handle_to_entry (handle);
 	if (!node) {
 		status = AE_BAD_PARAMETER;
@@ -184,7 +199,7 @@ acpi_get_name (
 
 unlock_and_exit:
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return (status);
 }
 
@@ -209,13 +224,20 @@ acpi_get_object_info (
 	ACPI_HANDLE             handle,
 	ACPI_DEVICE_INFO        *info)
 {
-	DEVICE_ID               hid;
-	DEVICE_ID               uid;
+	ACPI_DEVICE_ID          hid;
+	ACPI_DEVICE_ID          uid;
 	ACPI_STATUS             status;
 	u32                     device_status = 0;
 	ACPI_INTEGER            address = 0;
 	ACPI_NAMESPACE_NODE     *node;
 
+
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
 
 	/* Parameter validation */
 
@@ -223,18 +245,18 @@ acpi_get_object_info (
 		return (AE_BAD_PARAMETER);
 	}
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 	node = acpi_ns_convert_handle_to_entry (handle);
 	if (!node) {
-		acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		return (AE_BAD_PARAMETER);
 	}
 
 	info->type      = node->type;
 	info->name      = node->name;
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	/*
 	 * If not a device, we are all done.
@@ -256,7 +278,7 @@ acpi_get_object_info (
 
 	/* Execute the _HID method and save the result */
 
-	status = acpi_cm_execute_HID (node, &hid);
+	status = acpi_ut_execute_HID (node, &hid);
 	if (ACPI_SUCCESS (status)) {
 		STRNCPY (info->hardware_id, hid.buffer, sizeof(info->hardware_id));
 
@@ -265,7 +287,7 @@ acpi_get_object_info (
 
 	/* Execute the _UID method and save the result */
 
-	status = acpi_cm_execute_UID (node, &uid);
+	status = acpi_ut_execute_UID (node, &uid);
 	if (ACPI_SUCCESS (status)) {
 		STRCPY (info->unique_id, uid.buffer);
 
@@ -277,7 +299,7 @@ acpi_get_object_info (
 	 * _STA is not always present
 	 */
 
-	status = acpi_cm_execute_STA (node, &device_status);
+	status = acpi_ut_execute_STA (node, &device_status);
 	if (ACPI_SUCCESS (status)) {
 		info->current_status = device_status;
 		info->valid |= ACPI_VALID_STA;
@@ -288,7 +310,7 @@ acpi_get_object_info (
 	 * _ADR is not always present
 	 */
 
-	status = acpi_cm_evaluate_numeric_object (METHOD_NAME__ADR,
+	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__ADR,
 			  node, &address);
 
 	if (ACPI_SUCCESS (status)) {

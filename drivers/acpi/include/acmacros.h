@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 62 $
+ *       $Revision: 72 $
  *
  *****************************************************************************/
 
@@ -88,12 +88,18 @@
 #define ACPI_STORE_ADDRESS(a,b)         ((a)=(b))
 #define ACPI_VALID_ADDRESS(a)           (a)
 #endif
+
  /*
   * Extract a byte of data using a pointer.  Any more than a byte and we
   * get into potential aligment issues -- see the STORE macros below
   */
 #define GET8(addr)                      (*(u8*)(addr))
 
+/* Pointer arithmetic */
+
+
+#define POINTER_ADD(t,a,b)              (t *) ((NATIVE_UINT)(a) + (NATIVE_UINT)(b))
+#define POINTER_DIFF(a,b)               ((u32) ((NATIVE_UINT)(a) - (NATIVE_UINT)(b)))
 
 /*
  * Macros for moving data around to/from buffers that are possibly unaligned.
@@ -108,6 +114,7 @@
 #define MOVE_UNALIGNED16_TO_16(d,s)     *(u16*)(d) = *(u16*)(s)
 #define MOVE_UNALIGNED32_TO_32(d,s)     *(u32*)(d) = *(u32*)(s)
 #define MOVE_UNALIGNED16_TO_32(d,s)     *(u32*)(d) = *(u16*)(s)
+#define MOVE_UNALIGNED64_TO_64(d,s)     *(UINT64*)(d) = *(UINT64*)(s)
 
 #else
 /*
@@ -125,6 +132,15 @@
 			  ((u8 *)(d))[3] = ((u8 *)(s))[3];}
 
 #define MOVE_UNALIGNED16_TO_32(d,s)     {(*(u32*)(d)) = 0; MOVE_UNALIGNED16_TO_16(d,s);}
+
+#define MOVE_UNALIGNED64_TO_64(d,s)     {((u8 *)(d))[0] = ((u8 *)(s))[0];\
+					   ((u8 *)(d))[1] = ((u8 *)(s))[1];\
+					   ((u8 *)(d))[2] = ((u8 *)(s))[2];\
+					   ((u8 *)(d))[3] = ((u8 *)(s))[3];\
+					   ((u8 *)(d))[4] = ((u8 *)(s))[4];\
+					   ((u8 *)(d))[5] = ((u8 *)(s))[5];\
+					   ((u8 *)(d))[6] = ((u8 *)(s))[6];\
+					   ((u8 *)(d))[7] = ((u8 *)(s))[7];}
 
 #endif
 
@@ -177,7 +193,25 @@
 #define ROUND_PTR_UP_TO_4(a,b)          ((b *)(((NATIVE_UINT)(a) + 3) & ~3))
 #define ROUND_PTR_UP_TO_8(a,b)          ((b *)(((NATIVE_UINT)(a) + 7) & ~7))
 
+#define ROUND_BITS_UP_TO_BYTES(a)       DIV_8((a) + 7)
+#define ROUND_BITS_DOWN_TO_BYTES(a)     DIV_8((a))
+
 #define ROUND_UP_TO_1_k(a)              (((a) + 1023) >> 10)
+
+/* Generic (non-power-of-two) rounding */
+
+#define ROUND_UP_TO(value,boundary)     (((value) + ((boundary)-1)) / (boundary))
+
+/*
+ * Bitmask creation
+ * Bit positions start at zero.
+ * MASK_BITS_ABOVE creates a mask starting AT the position and above
+ * MASK_BITS_BELOW creates a mask starting one bit BELOW the position
+ */
+
+
+#define MASK_BITS_ABOVE(position)       (~(((u32)(-1)) << ((u32) (position))))
+#define MASK_BITS_BELOW(position)       (((u32)(-1)) << ((u32) (position)))
 
 #ifdef DEBUG_ASSERT
 #undef DEBUG_ASSERT
@@ -222,6 +256,10 @@
 
 #define IS_SINGLE_TABLE(x)              (((x) & 0x01) == ACPI_TABLE_SINGLE ? 1 : 0)
 
+/* Check if ACPI has been initialized properly */
+
+#define ACPI_IS_INITIALIZATION_COMPLETE(s)  {if (acpi_gbl_root_node) s = AE_OK; else s=AE_NO_NAMESPACE;}
+
 /*
  * Macro to check if a pointer is within an ACPI table.
  * Parameter (a) is the pointer to check.  Parameter (b) must be defined
@@ -231,12 +269,12 @@
 
 #ifndef _IA16
 #define IS_IN_ACPI_TABLE(a,b)           (((u8 *)(a) >= (u8 *)(b + 1)) &&\
-					  ((u8 *)(a) < ((u8 *)b + b->length)))
+							   ((u8 *)(a) < ((u8 *)b + b->length)))
 
 #else
 #define IS_IN_ACPI_TABLE(a,b)           (_segment)(a) == (_segment)(b) &&\
-							   (((u8 *)(a) >= (u8 *)(b + 1)) &&\
-							   ((u8 *)(a) < ((u8 *)b + b->length)))
+									 (((u8 *)(a) >= (u8 *)(b + 1)) &&\
+									 ((u8 *)(a) < ((u8 *)b + b->length)))
 #endif
 
 /*
@@ -276,6 +314,26 @@
 
 
 /*
+ * Build a GAS structure from earlier ACPI table entries (V1.0 and 0.71 extensions)
+ *
+ * 1) Address space
+ * 2) Length in bytes -- convert to length in bits
+ * 3) Bit offset is zero
+ * 4) Reserved field is zero
+ * 5) Expand address to 64 bits
+ */
+#define ASL_BUILD_GAS_FROM_ENTRY(a,b,c,d)   {a.address_space_id = (u8) d;\
+											 a.register_bit_width = (u8) MUL_8 (b);\
+											 a.register_bit_offset = 0;\
+											 a.reserved = 0;\
+											 ACPI_STORE_ADDRESS (a.address,c);}
+
+/* ACPI V1.0 entries -- address space is always I/O */
+
+#define ASL_BUILD_GAS_FROM_V1_ENTRY(a,b,c)  ASL_BUILD_GAS_FROM_ENTRY(a,b,c,ACPI_ADR_SPACE_SYSTEM_IO)
+
+
+/*
  * Reporting macros that are never compiled out
  */
 
@@ -290,7 +348,7 @@
 #ifdef ACPI_DEBUG
 
 #define REPORT_INFO(fp)                 {_report_info(_THIS_MODULE,__LINE__,_COMPONENT); \
-									  debug_print_raw PARAM_LIST(fp);}
+											debug_print_raw PARAM_LIST(fp);}
 #define REPORT_ERROR(fp)                {_report_error(_THIS_MODULE,__LINE__,_COMPONENT); \
 											debug_print_raw PARAM_LIST(fp);}
 #define REPORT_WARNING(fp)              {_report_warning(_THIS_MODULE,__LINE__,_COMPONENT); \
@@ -318,7 +376,7 @@
 
 /* Buffer dump macros */
 
-#define DUMP_BUFFER(a,b)                acpi_cm_dump_buffer((u8 *)a,b,DB_BYTE_DISPLAY,_COMPONENT)
+#define DUMP_BUFFER(a,b)                acpi_ut_dump_buffer((u8 *)a,b,DB_BYTE_DISPLAY,_COMPONENT)
 
 /*
  * Debug macros that are conditionally compiled
@@ -334,6 +392,7 @@
  * as a local string ("_Proc_name) so that it can be also used by the function exit macros below.
  */
 
+#define PROC_NAME(a)                    char * _proc_name = a;
 #define FUNCTION_TRACE(a)               char * _proc_name = a;\
 										function_trace(_THIS_MODULE,__LINE__,_COMPONENT,a)
 #define FUNCTION_TRACE_PTR(a,b)         char * _proc_name = a;\
@@ -351,7 +410,7 @@
  */
 #define return_VOID                     {function_exit(_THIS_MODULE,__LINE__,_COMPONENT,_proc_name);return;}
 #define return_ACPI_STATUS(s)           {function_status_exit(_THIS_MODULE,__LINE__,_COMPONENT,_proc_name,s);return(s);}
-#define return_VALUE(s)                 {function_value_exit(_THIS_MODULE,__LINE__,_COMPONENT,_proc_name,(ACPI_INTEGER)s);return(s);}
+#define return_VALUE(s)                 {function_value_exit(_THIS_MODULE,__LINE__,_COMPONENT,_proc_name,s);return(s);}
 #define return_PTR(s)                   {function_ptr_exit(_THIS_MODULE,__LINE__,_COMPONENT,_proc_name,(u8 *)s);return(s);}
 
 
@@ -368,8 +427,8 @@
 
 /* Stack and buffer dumping */
 
-#define DUMP_STACK_ENTRY(a)             acpi_aml_dump_operand(a)
-#define DUMP_OPERANDS(a,b,c,d,e)        acpi_aml_dump_operands(a,b,c,d,e,_THIS_MODULE,__LINE__)
+#define DUMP_STACK_ENTRY(a)             acpi_ex_dump_operand(a)
+#define DUMP_OPERANDS(a,b,c,d,e)        acpi_ex_dump_operands(a,b,c,d,e,_THIS_MODULE,__LINE__)
 
 
 #define DUMP_ENTRY(a,b)                 acpi_ns_dump_entry (a,b)
@@ -404,6 +463,12 @@
 											debug_print_raw PARAM_LIST(fp);\
 											BREAK_ON_ERROR(lvl);}
 
+#define DEBUG_PRINTP(lvl,fp)            TEST_DEBUG_SWITCH(lvl) {\
+											debug_print_prefix (_THIS_MODULE,__LINE__);\
+											debug_print_raw ("%s: ",_proc_name);\
+											debug_print_raw PARAM_LIST(fp);\
+											BREAK_ON_ERROR(lvl);}
+
 #define DEBUG_PRINT_RAW(lvl,fp)         TEST_DEBUG_SWITCH(lvl) {\
 											debug_print_raw PARAM_LIST(fp);}
 
@@ -431,6 +496,7 @@
 
 #define DEBUG_DEFINE(a)
 #define DEBUG_ONLY_MEMBERS(a)
+#define PROC_NAME(a)
 #define FUNCTION_TRACE(a)
 #define FUNCTION_TRACE_PTR(a,b)
 #define FUNCTION_TRACE_U32(a,b)
@@ -445,6 +511,7 @@
 #define DUMP_PATHNAME(a,b,c,d)
 #define DUMP_RESOURCE_LIST(a)
 #define DEBUG_PRINT(l,f)
+#define DEBUG_PRINTP(l,f)
 #define DEBUG_PRINT_RAW(l,f)
 #define BREAK_MSG(a)
 
@@ -496,6 +563,75 @@
 #define ADD_OBJECT_NAME(a,b)
 
 #endif
+
+
+/*
+ * Memory allocation tracking (DEBUG ONLY)
+ */
+
+#ifndef ACPI_DEBUG_TRACK_ALLOCATIONS
+
+#define acpi_ut_add_element_to_alloc_list(a,b,c,d,e,f)
+#define acpi_ut_delete_element_from_alloc_list(a,b,c,d)
+#define acpi_ut_dump_current_allocations(a,b)
+#define acpi_ut_dump_allocation_info()
+
+#define DECREMENT_OBJECT_METRICS(a)
+#define INCREMENT_OBJECT_METRICS(a)
+#define INITIALIZE_ALLOCATION_METRICS()
+#define DECREMENT_NAME_TABLE_METRICS(a)
+#define INCREMENT_NAME_TABLE_METRICS(a)
+
+#else
+
+#define INITIALIZE_ALLOCATION_METRICS() \
+	acpi_gbl_current_object_count = 0; \
+	acpi_gbl_current_object_size = 0; \
+	acpi_gbl_running_object_count = 0; \
+	acpi_gbl_running_object_size = 0; \
+	acpi_gbl_max_concurrent_object_count = 0; \
+	acpi_gbl_max_concurrent_object_size = 0; \
+	acpi_gbl_current_alloc_size = 0; \
+	acpi_gbl_current_alloc_count = 0; \
+	acpi_gbl_running_alloc_size = 0; \
+	acpi_gbl_running_alloc_count = 0; \
+	acpi_gbl_max_concurrent_alloc_size = 0; \
+	acpi_gbl_max_concurrent_alloc_count = 0; \
+	acpi_gbl_current_node_count = 0; \
+	acpi_gbl_current_node_size = 0; \
+	acpi_gbl_max_concurrent_node_count = 0
+
+
+#define DECREMENT_OBJECT_METRICS(a) \
+	acpi_gbl_current_object_count--; \
+	acpi_gbl_current_object_size -= a
+
+#define INCREMENT_OBJECT_METRICS(a) \
+	acpi_gbl_current_object_count++; \
+	acpi_gbl_running_object_count++; \
+	if (acpi_gbl_max_concurrent_object_count < acpi_gbl_current_object_count) \
+	{ \
+		acpi_gbl_max_concurrent_object_count = acpi_gbl_current_object_count; \
+	} \
+	acpi_gbl_running_object_size += a; \
+	acpi_gbl_current_object_size += a; \
+	if (acpi_gbl_max_concurrent_object_size < acpi_gbl_current_object_size) \
+	{ \
+		acpi_gbl_max_concurrent_object_size = acpi_gbl_current_object_size; \
+	}
+
+#define DECREMENT_NAME_TABLE_METRICS(a) \
+	acpi_gbl_current_node_count--; \
+	acpi_gbl_current_node_size -= (a)
+
+#define INCREMENT_NAME_TABLE_METRICS(a) \
+	acpi_gbl_current_node_count++; \
+	acpi_gbl_current_node_size+= (a); \
+	if (acpi_gbl_max_concurrent_node_count < acpi_gbl_current_node_count) \
+	{ \
+		acpi_gbl_max_concurrent_node_count = acpi_gbl_current_node_count; \
+	}
+#endif /* ACPI_DEBUG_TRACK_ALLOCATIONS */
 
 
 #endif /* ACMACROS_H */

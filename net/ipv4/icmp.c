@@ -3,7 +3,7 @@
  *	
  *		Alan Cox, <alan@redhat.com>
  *
- *	Version: $Id: icmp.c,v 1.76 2001/05/10 01:20:58 davem Exp $
+ *	Version: $Id: icmp.c,v 1.77 2001/06/14 13:40:46 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -928,11 +928,6 @@ error:
 	goto drop;
 }
 
-/*
- *	A spare long used to speed up statistics updating
- */
- 
-static unsigned long dummy;
 
 /* 
  * 	Configurable rate limits.
@@ -954,20 +949,20 @@ int sysctl_icmp_echoreply_time; /* don't limit it per default. */
 static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1] = {
 /* ECHO REPLY (0) */
  { &icmp_statistics[0].IcmpOutEchoReps, &icmp_statistics[0].IcmpInEchoReps, icmp_discard, 0, &sysctl_icmp_echoreply_time},
- { &dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
- { &dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
 /* DEST UNREACH (3) */
  { &icmp_statistics[0].IcmpOutDestUnreachs, &icmp_statistics[0].IcmpInDestUnreachs, icmp_unreach, 1, &sysctl_icmp_destunreach_time },
 /* SOURCE QUENCH (4) */
  { &icmp_statistics[0].IcmpOutSrcQuenchs, &icmp_statistics[0].IcmpInSrcQuenchs, icmp_unreach, 1, },
 /* REDIRECT (5) */
  { &icmp_statistics[0].IcmpOutRedirects, &icmp_statistics[0].IcmpInRedirects, icmp_redirect, 1, },
- { &dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
- { &dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
 /* ECHO (8) */
  { &icmp_statistics[0].IcmpOutEchos, &icmp_statistics[0].IcmpInEchos, icmp_echo, 0, },
- { &dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
- { &dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].IcmpInErrors, icmp_discard, 1, },
 /* TIME EXCEEDED (11) */
  { &icmp_statistics[0].IcmpOutTimeExcds, &icmp_statistics[0].IcmpInTimeExcds, icmp_unreach, 1, &sysctl_icmp_timeexceed_time },
 /* PARAMETER PROBLEM (12) */
@@ -977,9 +972,9 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1] = {
 /* TIMESTAMP REPLY (14) */
  { &icmp_statistics[0].IcmpOutTimestampReps, &icmp_statistics[0].IcmpInTimestampReps, icmp_discard, 0, },
 /* INFO (15) */
- { &dummy, &dummy, icmp_discard, 0, },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].dummy, icmp_discard, 0, },
 /* INFO REPLY (16) */
- { &dummy, &dummy, icmp_discard, 0, },
+ { &icmp_statistics[0].dummy, &icmp_statistics[0].dummy, icmp_discard, 0, },
 /* ADDR MASK (17) */
  { &icmp_statistics[0].IcmpOutAddrMasks, &icmp_statistics[0].IcmpInAddrMasks, icmp_address, 0,  },
 /* ADDR MASK REPLY (18) */

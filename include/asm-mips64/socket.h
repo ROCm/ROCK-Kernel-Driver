@@ -79,6 +79,7 @@ To add: #define SO_REUSEPORT 0x0200	/* Allow local address and port reuse.  */
 					/* level.  For writing rarp and	*/
 					/* other similar things on the	*/
 					/* user level.			*/
+#define	SOCK_MAX	(SOCK_PACKET+1)
 #endif
 
 #endif /* _ASM_SOCKET_H */

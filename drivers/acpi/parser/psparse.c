@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psparse - Parser top level AML parse routines
- *              $Revision: 74 $
+ *              $Revision: 85 $
  *
  *****************************************************************************/
 
@@ -39,8 +39,9 @@
 #include "amlcode.h"
 #include "acnamesp.h"
 #include "acdebug.h"
+#include "acinterp.h"
 
-#define _COMPONENT          PARSER
+#define _COMPONENT          ACPI_PARSER
 	 MODULE_NAME         ("psparse")
 
 
@@ -111,9 +112,9 @@ acpi_ps_peek_opcode (
 	 *
 	 *    if (Opcode == AML_EXTOP
 	 *       || (Opcode == AML_LNOT
-	 *          && (GET8 (Acpi_aml) == AML_LEQUAL
-	 *               || GET8 (Acpi_aml) == AML_LGREATER
-	 *               || GET8 (Acpi_aml) == AML_LLESS)))
+	 *          && (GET8 (Aml) == AML_LEQUAL
+	 *               || GET8 (Aml) == AML_LGREATER
+	 *               || GET8 (Aml) == AML_LLESS)))
 	 *
 	 *     extended Opcode, !=, <=, or >=
 	 */
@@ -135,8 +136,8 @@ acpi_ps_peek_opcode (
  *
  * FUNCTION:    Acpi_ps_create_state
  *
- * PARAMETERS:  Acpi_aml            - Acpi_aml code pointer
- *              Acpi_aml_size       - Length of AML code
+ * PARAMETERS:  Aml             - Aml code pointer
+ *              Aml_size        - Length of AML code
  *
  * RETURN:      A new parser state object
  *
@@ -152,7 +153,7 @@ acpi_ps_create_state (
 	ACPI_PARSE_STATE        *parser_state;
 
 
-	parser_state = acpi_cm_callocate (sizeof (ACPI_PARSE_STATE));
+	parser_state = acpi_ut_callocate (sizeof (ACPI_PARSE_STATE));
 	if (!parser_state) {
 		return (NULL);
 	}
@@ -260,8 +261,7 @@ acpi_ps_complete_this_op (
 		(opcode_class != OPTYPE_LOCAL_VARIABLE) &&
 		(opcode_class != OPTYPE_METHOD_ARGUMENT) &&
 		(opcode_class != OPTYPE_DATA_TERM)      &&
-		(op->opcode  != AML_NAMEPATH_OP))
-	{
+		(op->opcode  != AML_INT_NAMEPATH_OP)) {
 		/* Make sure that we only delete this subtree */
 
 		if (op->parent) {
@@ -272,8 +272,7 @@ acpi_ps_complete_this_op (
 
 			parent_info = acpi_ps_get_opcode_info (op->parent->opcode);
 
-			switch (ACPI_GET_OP_CLASS (parent_info))
-			{
+			switch (ACPI_GET_OP_CLASS (parent_info)) {
 			case OPTYPE_CONTROL:        /* IF, ELSE, WHILE only */
 				break;
 
@@ -284,15 +283,14 @@ acpi_ps_complete_this_op (
 				 * op must be replace by a placeholder return op
 				 */
 
-				if ((op->parent->opcode == AML_REGION_OP)       ||
-					(op->parent->opcode == AML_CREATE_FIELD_OP) ||
-					(op->parent->opcode == AML_BIT_FIELD_OP)    ||
-					(op->parent->opcode == AML_BYTE_FIELD_OP)   ||
-					(op->parent->opcode == AML_WORD_FIELD_OP)   ||
-					(op->parent->opcode == AML_DWORD_FIELD_OP)  ||
-					(op->parent->opcode == AML_QWORD_FIELD_OP))
-				{
-					replacement_op = acpi_ps_alloc_op (AML_RETURN_VALUE_OP);
+				if ((op->parent->opcode == AML_REGION_OP)               ||
+					(op->parent->opcode == AML_CREATE_FIELD_OP)         ||
+					(op->parent->opcode == AML_CREATE_BIT_FIELD_OP)     ||
+					(op->parent->opcode == AML_CREATE_BYTE_FIELD_OP)    ||
+					(op->parent->opcode == AML_CREATE_WORD_FIELD_OP)    ||
+					(op->parent->opcode == AML_CREATE_DWORD_FIELD_OP)   ||
+					(op->parent->opcode == AML_CREATE_QWORD_FIELD_OP)) {
+					replacement_op = acpi_ps_alloc_op (AML_INT_RETURN_VALUE_OP);
 					if (!replacement_op) {
 						return (FALSE);
 					}
@@ -301,7 +299,7 @@ acpi_ps_complete_this_op (
 				break;
 
 			default:
-				replacement_op = acpi_ps_alloc_op (AML_RETURN_VALUE_OP);
+				replacement_op = acpi_ps_alloc_op (AML_INT_RETURN_VALUE_OP);
 				if (!replacement_op) {
 					return (FALSE);
 				}
@@ -388,8 +386,7 @@ acpi_ps_next_parse_state (
 	u32                     package_length;
 
 
-	switch (callback_status)
-	{
+	switch (callback_status) {
 	case AE_CTRL_TERMINATE:
 
 		/*
@@ -505,7 +502,7 @@ acpi_ps_parse_loop (
 	ACPI_PARSE2_OBJECT      *deferred_op;
 	u32                     arg_count;      /* push for fixed or var args */
 	u32                     arg_types = 0;
-	ACPI_PTRDIFF            aml_offset;
+	u32                     aml_offset;
 	u16                     opcode;
 	ACPI_PARSE_OBJECT       pre_op;
 	ACPI_PARSE_STATE        *parser_state;
@@ -528,8 +525,7 @@ acpi_ps_parse_loop (
 				(parser_state->scope->parse_scope.op->opcode == AML_WHILE_OP)) &&
 				(walk_state->control_state) &&
 				(walk_state->control_state->common.state ==
-					CONTROL_PREDICATE_EXECUTING))
-			{
+					CONTROL_PREDICATE_EXECUTING)) {
 
 				/*
 				 * A predicate was just completed, get the value of the
@@ -538,8 +534,7 @@ acpi_ps_parse_loop (
 
 				status = acpi_ds_get_predicate_value (walk_state, NULL, TRUE);
 				if (ACPI_FAILURE (status) &&
-					((status & AE_CODE_MASK) != AE_CODE_CONTROL))
-				{
+					((status & AE_CODE_MASK) != AE_CODE_CONTROL)) {
 					return (status);
 				}
 
@@ -577,8 +572,7 @@ acpi_ps_parse_loop (
 			 */
 
 			op_info = acpi_ps_get_opcode_info (opcode);
-			switch (ACPI_GET_OP_TYPE (op_info))
-			{
+			switch (ACPI_GET_OP_TYPE (op_info)) {
 			case ACPI_OP_TYPE_OPCODE:
 
 				/* Found opcode info, this is a normal opcode */
@@ -594,7 +588,7 @@ acpi_ps_parse_loop (
 				 * string.  Convert the bare name string to a namepath.
 				 */
 
-				opcode = AML_NAMEPATH_OP;
+				opcode = AML_INT_NAMEPATH_OP;
 				arg_types = ARGP_NAMESTRING;
 				break;
 
@@ -684,12 +678,12 @@ acpi_ps_parse_loop (
 				}
 
 
-				if ((op->opcode == AML_CREATE_FIELD_OP) ||
-					(op->opcode == AML_BIT_FIELD_OP)    ||
-					(op->opcode == AML_BYTE_FIELD_OP)   ||
-					(op->opcode == AML_WORD_FIELD_OP)   ||
-					(op->opcode == AML_DWORD_FIELD_OP))
-				 {
+				if ((op->opcode == AML_CREATE_FIELD_OP)        ||
+					(op->opcode == AML_CREATE_BIT_FIELD_OP)    ||
+					(op->opcode == AML_CREATE_BYTE_FIELD_OP)   ||
+					(op->opcode == AML_CREATE_WORD_FIELD_OP)   ||
+					(op->opcode == AML_CREATE_DWORD_FIELD_OP)  ||
+					(op->opcode == AML_CREATE_QWORD_FIELD_OP)) {
 					/*
 					 * Backup to beginning of Create_xXXfield declaration
 					 * Body_length is unknown until we parse the body
@@ -733,8 +727,7 @@ acpi_ps_parse_loop (
 		if (arg_types)  /* Are there any arguments that must be processed? */ {
 			/* get arguments */
 
-			switch (op->opcode)
-			{
+			switch (op->opcode) {
 			case AML_BYTE_OP:       /* AML_BYTEDATA_ARG */
 			case AML_WORD_OP:       /* AML_WORDDATA_ARG */
 			case AML_DWORD_OP:      /* AML_DWORDATA_ARG */
@@ -746,7 +739,7 @@ acpi_ps_parse_loop (
 						 GET_CURRENT_ARG_TYPE (arg_types), op);
 				break;
 
-			case AML_NAMEPATH_OP:   /* AML_NAMESTRING_ARG */
+			case AML_INT_NAMEPATH_OP:   /* AML_NAMESTRING_ARG */
 
 				acpi_ps_get_next_namepath (parser_state, op, &arg_count, 1);
 				arg_types = 0;
@@ -783,8 +776,8 @@ acpi_ps_parse_loop (
 						 */
 
 						deferred_op->data   = parser_state->aml;
-						deferred_op->length = parser_state->pkg_end -
-								  parser_state->aml;
+						deferred_op->length = (u32) (parser_state->pkg_end -
+								   parser_state->aml);
 
 						/*
 						 * Skip body of method.  For Op_regions, we must continue
@@ -824,19 +817,18 @@ acpi_ps_parse_loop (
 						 * know the length.
 						 */
 
-						deferred_op->length = parser_state->aml -
-								 deferred_op->data;
+						deferred_op->length = (u32) (parser_state->aml -
+								   deferred_op->data);
 					}
 				}
 			}
 
-			if ((op->opcode == AML_CREATE_FIELD_OP) ||
-				(op->opcode == AML_BIT_FIELD_OP)    ||
-				(op->opcode == AML_BYTE_FIELD_OP)   ||
-				(op->opcode == AML_WORD_FIELD_OP)   ||
-				(op->opcode == AML_DWORD_FIELD_OP)  ||
-				(op->opcode == AML_QWORD_FIELD_OP))
-			{
+			if ((op->opcode == AML_CREATE_FIELD_OP)         ||
+				(op->opcode == AML_CREATE_BIT_FIELD_OP)     ||
+				(op->opcode == AML_CREATE_BYTE_FIELD_OP)    ||
+				(op->opcode == AML_CREATE_WORD_FIELD_OP)    ||
+				(op->opcode == AML_CREATE_DWORD_FIELD_OP)   ||
+				(op->opcode == AML_CREATE_QWORD_FIELD_OP)) {
 				/*
 				 * Backup to beginning of Create_xXXfield declaration (1 for
 				 * Opcode)
@@ -844,7 +836,8 @@ acpi_ps_parse_loop (
 				 * Body_length is unknown until we parse the body
 				 */
 				deferred_op = (ACPI_PARSE2_OBJECT *) op;
-				deferred_op->length = parser_state->aml - deferred_op->data;
+				deferred_op->length = (u32) (parser_state->aml -
+						  deferred_op->data);
 			}
 
 			/* This op complete, notify the dispatcher */
@@ -873,8 +866,7 @@ close_this_op:
 			}
 
 
-			switch (status)
-			{
+			switch (status) {
 			case AE_OK:
 				break;
 
@@ -908,8 +900,7 @@ close_this_op:
 				status = AE_OK;
 
 				/* Clean up */
-				do
-				{
+				do {
 					if (op) {
 						acpi_ps_complete_this_op (walk_state, op);
 					}
@@ -970,8 +961,7 @@ close_this_op:
 	 * sequential closing braces).  We want to terminate each one cleanly.
 	 */
 
-	do
-	{
+	do {
 		if (op) {
 			if (walk_state->ascending_callback != NULL) {
 				status = walk_state->ascending_callback (walk_state, op);
@@ -985,8 +975,7 @@ close_this_op:
 					status = AE_OK;
 
 					/* Clean up */
-					do
-					{
+					do {
 						if (op) {
 							acpi_ps_complete_this_op (walk_state, op);
 						}
@@ -1068,8 +1057,11 @@ acpi_ps_parse_aml (
 	/* Create and initialize a new walk list */
 
 	walk_list.walk_state = NULL;
+	walk_list.acquired_mutex_list.prev = NULL;
+	walk_list.acquired_mutex_list.next = NULL;
 
-	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT, parser_state->start_op, mth_desc, &walk_list);
+	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT, parser_state->start_op,
+			   mth_desc, &walk_list);
 	if (!walk_state) {
 		status = AE_NO_MEMORY;
 		goto cleanup;
@@ -1180,15 +1172,14 @@ acpi_ps_parse_aml (
 		 /* Delete this walk state and all linked control states */
 
 		acpi_ps_cleanup_scope (walk_state->parser_state);
-		acpi_cm_free (walk_state->parser_state);
+		acpi_ut_free (walk_state->parser_state);
 		acpi_ds_delete_walk_state (walk_state);
 
 	   /* Check if we have restarted a preempted walk */
 
 		walk_state = acpi_ds_get_current_walk_state (&walk_list);
 		if (walk_state &&
-			ACPI_SUCCESS (status))
-		{
+			ACPI_SUCCESS (status)) {
 			/* There is another walk state, restart it */
 
 			/*
@@ -1212,13 +1203,14 @@ acpi_ps_parse_aml (
 		else if (return_desc) {
 			/* Caller doesn't want it, must delete it */
 
-			acpi_cm_remove_reference (return_desc);
+			acpi_ut_remove_reference (return_desc);
 		}
 	}
 
 
 	/* Normal exit */
 
+	acpi_ex_release_all_mutexes ((ACPI_OPERAND_OBJECT *) &walk_list.acquired_mutex_list);
 	acpi_gbl_current_walk_list = prev_walk_list;
 	return (status);
 
@@ -1229,8 +1221,9 @@ cleanup:
 
 	acpi_ds_delete_walk_state (walk_state);
 	acpi_ps_cleanup_scope (parser_state);
-	acpi_cm_free (parser_state);
+	acpi_ut_free (parser_state);
 
+	acpi_ex_release_all_mutexes ((ACPI_OPERAND_OBJECT *)&walk_list.acquired_mutex_list);
 	acpi_gbl_current_walk_list = prev_walk_list;
 
 	return (status);

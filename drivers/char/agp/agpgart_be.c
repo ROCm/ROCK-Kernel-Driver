@@ -67,7 +67,7 @@ static inline void flush_cache(void)
 {
 #if defined(__i386__)
 	asm volatile ("wbinvd":::"memory");
-#elif defined(__alpha__) || defined(__ia64__)
+#elif defined(__alpha__) || defined(__ia64__) || defined(__sparc__)
 	/* ??? I wonder if we'll really need to flush caches, or if the
 	   core logic can manage to keep the system coherent.  The ARM
 	   speaks only of using `cflush' to get things in memory in

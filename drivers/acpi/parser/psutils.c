@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psutils - Parser miscellaneous utilities (Parser only)
- *              $Revision: 32 $
+ *              $Revision: 37 $
  *
  *****************************************************************************/
 
@@ -28,7 +28,7 @@
 #include "acparser.h"
 #include "amlcode.h"
 
-#define _COMPONENT          PARSER
+#define _COMPONENT          ACPI_PARSER
 	 MODULE_NAME         ("psutils")
 
 
@@ -94,6 +94,9 @@ acpi_ps_alloc_op (
 	u8                      flags;
 
 
+	PROC_NAME ("Ps_alloc_op");
+
+
 	/* Allocate the minimum required size object */
 
 	if (acpi_ps_is_deferred_op (opcode)) {
@@ -125,7 +128,7 @@ acpi_ps_alloc_op (
 		 * Check if there is an Op already available in the cache
 		 */
 
-		acpi_cm_acquire_mutex (ACPI_MTX_CACHES);
+		acpi_ut_acquire_mutex (ACPI_MTX_CACHES);
 		acpi_gbl_parse_cache_requests++;
 		if (acpi_gbl_parse_cache) {
 			/* Extract an op from the front of the cache list */
@@ -142,7 +145,7 @@ acpi_ps_alloc_op (
 			MEMSET (op, 0, sizeof (ACPI_PARSE_OBJECT));
 
 		}
-		acpi_cm_release_mutex (ACPI_MTX_CACHES);
+		acpi_ut_release_mutex (ACPI_MTX_CACHES);
 	}
 
 	else {
@@ -153,7 +156,7 @@ acpi_ps_alloc_op (
 		 * Check if there is an Op already available in the cache
 		 */
 
-		acpi_cm_acquire_mutex (ACPI_MTX_CACHES);
+		acpi_ut_acquire_mutex (ACPI_MTX_CACHES);
 		acpi_gbl_ext_parse_cache_requests++;
 		if (acpi_gbl_ext_parse_cache) {
 			/* Extract an op from the front of the cache list */
@@ -170,14 +173,14 @@ acpi_ps_alloc_op (
 			MEMSET (op, 0, sizeof (ACPI_PARSE2_OBJECT));
 
 		}
-		acpi_cm_release_mutex (ACPI_MTX_CACHES);
+		acpi_ut_release_mutex (ACPI_MTX_CACHES);
 	}
 
 
 	/* Allocate a new Op if necessary */
 
 	if (!op) {
-		op = acpi_cm_callocate (size);
+		op = acpi_ut_callocate (size);
 	}
 
 	/* Initialize the Op */
@@ -207,6 +210,7 @@ void
 acpi_ps_free_op (
 	ACPI_PARSE_OBJECT       *op)
 {
+	PROC_NAME ("Ps_free_op");
 
 
 
@@ -221,13 +225,13 @@ acpi_ps_free_op (
 			MEMSET (op, 0, sizeof (ACPI_PARSE_OBJECT));
 			op->flags = PARSEOP_IN_CACHE;
 
-			acpi_cm_acquire_mutex (ACPI_MTX_CACHES);
+			acpi_ut_acquire_mutex (ACPI_MTX_CACHES);
 			acpi_gbl_parse_cache_depth++;
 
 			op->next = acpi_gbl_parse_cache;
 			acpi_gbl_parse_cache = op;
 
-			acpi_cm_release_mutex (ACPI_MTX_CACHES);
+			acpi_ut_release_mutex (ACPI_MTX_CACHES);
 			return;
 		}
 	}
@@ -243,13 +247,13 @@ acpi_ps_free_op (
 			MEMSET (op, 0, sizeof (ACPI_PARSE2_OBJECT));
 			op->flags = PARSEOP_IN_CACHE;
 
-			acpi_cm_acquire_mutex (ACPI_MTX_CACHES);
+			acpi_ut_acquire_mutex (ACPI_MTX_CACHES);
 			acpi_gbl_ext_parse_cache_depth++;
 
 			op->next = (ACPI_PARSE_OBJECT *) acpi_gbl_ext_parse_cache;
 			acpi_gbl_ext_parse_cache = (ACPI_PARSE2_OBJECT *) op;
 
-			acpi_cm_release_mutex (ACPI_MTX_CACHES);
+			acpi_ut_release_mutex (ACPI_MTX_CACHES);
 			return;
 		}
 	}
@@ -259,7 +263,7 @@ acpi_ps_free_op (
 	 * Not a GENERIC OP, or the cache is full, just free the Op
 	 */
 
-	acpi_cm_free (op);
+	acpi_ut_free (op);
 }
 
 
@@ -288,7 +292,7 @@ acpi_ps_delete_parse_cache (
 		/* Delete one cached state object */
 
 		next = acpi_gbl_parse_cache->next;
-		acpi_cm_free (acpi_gbl_parse_cache);
+		acpi_ut_free (acpi_gbl_parse_cache);
 		acpi_gbl_parse_cache = next;
 		acpi_gbl_parse_cache_depth--;
 	}
@@ -299,7 +303,7 @@ acpi_ps_delete_parse_cache (
 		/* Delete one cached state object */
 
 		next = acpi_gbl_ext_parse_cache->next;
-		acpi_cm_free (acpi_gbl_ext_parse_cache);
+		acpi_ut_free (acpi_gbl_ext_parse_cache);
 		acpi_gbl_ext_parse_cache = (ACPI_PARSE2_OBJECT *) next;
 		acpi_gbl_ext_parse_cache_depth--;
 	}
@@ -350,28 +354,29 @@ acpi_ps_is_namespace_object_op (
 	u16                     opcode)
 {
 	return ((u8)
-		   (opcode == AML_SCOPE_OP          ||
-			opcode == AML_DEVICE_OP         ||
-			opcode == AML_THERMAL_ZONE_OP   ||
-			opcode == AML_METHOD_OP         ||
-			opcode == AML_POWER_RES_OP      ||
-			opcode == AML_PROCESSOR_OP      ||
-			opcode == AML_DEF_FIELD_OP      ||
-			opcode == AML_INDEX_FIELD_OP    ||
-			opcode == AML_BANK_FIELD_OP     ||
-			opcode == AML_NAMEDFIELD_OP     ||
-			opcode == AML_NAME_OP           ||
-			opcode == AML_ALIAS_OP          ||
-			opcode == AML_MUTEX_OP          ||
-			opcode == AML_EVENT_OP          ||
-			opcode == AML_REGION_OP         ||
-			opcode == AML_CREATE_FIELD_OP   ||
-			opcode == AML_BIT_FIELD_OP      ||
-			opcode == AML_BYTE_FIELD_OP     ||
-			opcode == AML_WORD_FIELD_OP     ||
-			opcode == AML_DWORD_FIELD_OP    ||
-			opcode == AML_METHODCALL_OP     ||
-			opcode == AML_NAMEPATH_OP));
+		   (opcode == AML_SCOPE_OP              ||
+			opcode == AML_DEVICE_OP             ||
+			opcode == AML_THERMAL_ZONE_OP       ||
+			opcode == AML_METHOD_OP             ||
+			opcode == AML_POWER_RES_OP          ||
+			opcode == AML_PROCESSOR_OP          ||
+			opcode == AML_FIELD_OP              ||
+			opcode == AML_INDEX_FIELD_OP        ||
+			opcode == AML_BANK_FIELD_OP         ||
+			opcode == AML_INT_NAMEDFIELD_OP     ||
+			opcode == AML_NAME_OP               ||
+			opcode == AML_ALIAS_OP              ||
+			opcode == AML_MUTEX_OP              ||
+			opcode == AML_EVENT_OP              ||
+			opcode == AML_REGION_OP             ||
+			opcode == AML_CREATE_FIELD_OP       ||
+			opcode == AML_CREATE_BIT_FIELD_OP   ||
+			opcode == AML_CREATE_BYTE_FIELD_OP  ||
+			opcode == AML_CREATE_WORD_FIELD_OP  ||
+			opcode == AML_CREATE_DWORD_FIELD_OP ||
+			opcode == AML_CREATE_QWORD_FIELD_OP ||
+			opcode == AML_INT_METHODCALL_OP     ||
+			opcode == AML_INT_NAMEPATH_OP));
 }
 
 u8
@@ -385,7 +390,7 @@ acpi_ps_is_namespace_op (
 			opcode == AML_METHOD_OP         ||
 			opcode == AML_POWER_RES_OP      ||
 			opcode == AML_PROCESSOR_OP      ||
-			opcode == AML_DEF_FIELD_OP      ||
+			opcode == AML_FIELD_OP          ||
 			opcode == AML_INDEX_FIELD_OP    ||
 			opcode == AML_BANK_FIELD_OP     ||
 			opcode == AML_NAME_OP           ||
@@ -393,7 +398,7 @@ acpi_ps_is_namespace_op (
 			opcode == AML_MUTEX_OP          ||
 			opcode == AML_EVENT_OP          ||
 			opcode == AML_REGION_OP         ||
-			opcode == AML_NAMEDFIELD_OP));
+			opcode == AML_INT_NAMEDFIELD_OP));
 }
 
 
@@ -408,27 +413,28 @@ acpi_ps_is_node_op (
 	u16                     opcode)
 {
 	return ((u8)
-		   (opcode == AML_SCOPE_OP          ||
-			opcode == AML_DEVICE_OP         ||
-			opcode == AML_THERMAL_ZONE_OP   ||
-			opcode == AML_METHOD_OP         ||
-			opcode == AML_POWER_RES_OP      ||
-			opcode == AML_PROCESSOR_OP      ||
-			opcode == AML_NAMEDFIELD_OP     ||
-			opcode == AML_NAME_OP           ||
-			opcode == AML_ALIAS_OP          ||
-			opcode == AML_MUTEX_OP          ||
-			opcode == AML_EVENT_OP          ||
-			opcode == AML_REGION_OP         ||
+		   (opcode == AML_SCOPE_OP              ||
+			opcode == AML_DEVICE_OP             ||
+			opcode == AML_THERMAL_ZONE_OP       ||
+			opcode == AML_METHOD_OP             ||
+			opcode == AML_POWER_RES_OP          ||
+			opcode == AML_PROCESSOR_OP          ||
+			opcode == AML_INT_NAMEDFIELD_OP     ||
+			opcode == AML_NAME_OP               ||
+			opcode == AML_ALIAS_OP              ||
+			opcode == AML_MUTEX_OP              ||
+			opcode == AML_EVENT_OP              ||
+			opcode == AML_REGION_OP             ||
 
 
-			opcode == AML_CREATE_FIELD_OP   ||
-			opcode == AML_BIT_FIELD_OP      ||
-			opcode == AML_BYTE_FIELD_OP     ||
-			opcode == AML_WORD_FIELD_OP     ||
-			opcode == AML_DWORD_FIELD_OP    ||
-			opcode == AML_METHODCALL_OP     ||
-			opcode == AML_NAMEPATH_OP));
+			opcode == AML_CREATE_FIELD_OP       ||
+			opcode == AML_CREATE_BIT_FIELD_OP   ||
+			opcode == AML_CREATE_BYTE_FIELD_OP  ||
+			opcode == AML_CREATE_WORD_FIELD_OP  ||
+			opcode == AML_CREATE_DWORD_FIELD_OP ||
+			opcode == AML_CREATE_QWORD_FIELD_OP ||
+			opcode == AML_INT_METHODCALL_OP     ||
+			opcode == AML_INT_NAMEPATH_OP));
 }
 
 
@@ -451,7 +457,7 @@ acpi_ps_is_named_op (
 			opcode == AML_MUTEX_OP          ||
 			opcode == AML_EVENT_OP          ||
 			opcode == AML_REGION_OP         ||
-			opcode == AML_NAMEDFIELD_OP));
+			opcode == AML_INT_NAMEDFIELD_OP));
 }
 
 
@@ -460,12 +466,13 @@ acpi_ps_is_deferred_op (
 	u16                     opcode)
 {
 	return ((u8)
-		   (opcode == AML_METHOD_OP         ||
-			opcode == AML_CREATE_FIELD_OP   ||
-			opcode == AML_BIT_FIELD_OP      ||
-			opcode == AML_BYTE_FIELD_OP     ||
-			opcode == AML_WORD_FIELD_OP     ||
-			opcode == AML_DWORD_FIELD_OP    ||
+		   (opcode == AML_METHOD_OP                 ||
+			opcode == AML_CREATE_FIELD_OP           ||
+			opcode == AML_CREATE_BIT_FIELD_OP       ||
+			opcode == AML_CREATE_BYTE_FIELD_OP      ||
+			opcode == AML_CREATE_WORD_FIELD_OP      ||
+			opcode == AML_CREATE_DWORD_FIELD_OP     ||
+			opcode == AML_CREATE_QWORD_FIELD_OP     ||
 			opcode == AML_REGION_OP));
 }
 
@@ -477,7 +484,7 @@ u8
 acpi_ps_is_bytelist_op (
 	u16                     opcode)
 {
-	return ((u8) (opcode == AML_BYTELIST_OP));
+	return ((u8) (opcode == AML_INT_BYTELIST_OP));
 }
 
 
@@ -490,7 +497,7 @@ acpi_ps_is_field_op (
 {
 	return ((u8)
 			  (opcode == AML_CREATE_FIELD_OP
-			|| opcode == AML_DEF_FIELD_OP
+			|| opcode == AML_FIELD_OP
 			|| opcode == AML_INDEX_FIELD_OP
 			|| opcode == AML_BANK_FIELD_OP));
 }
@@ -504,11 +511,12 @@ acpi_ps_is_create_field_op (
 	u16                     opcode)
 {
 	return ((u8)
-		   (opcode == AML_CREATE_FIELD_OP   ||
-			opcode == AML_BIT_FIELD_OP      ||
-			opcode == AML_BYTE_FIELD_OP     ||
-			opcode == AML_WORD_FIELD_OP     ||
-			opcode == AML_DWORD_FIELD_OP));
+		   (opcode == AML_CREATE_FIELD_OP           ||
+			opcode == AML_CREATE_BIT_FIELD_OP       ||
+			opcode == AML_CREATE_BYTE_FIELD_OP      ||
+			opcode == AML_CREATE_WORD_FIELD_OP      ||
+			opcode == AML_CREATE_DWORD_FIELD_OP     ||
+			opcode == AML_CREATE_QWORD_FIELD_OP));
 }
 
 

@@ -1,4 +1,4 @@
-/* $Id: sys_sparc32.c,v 1.176 2001/04/14 01:12:02 davem Exp $
+/* $Id: sys_sparc32.c,v 1.177 2001/06/10 06:48:46 davem Exp $
  * sys_sparc32.c: Conversion between 32bit and 64bit native syscalls.
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -3493,6 +3493,7 @@ sys32_get_kernel_syms(struct kernel_sym *table)
 
 #endif  /* CONFIG_MODULES */
 
+#if defined(CONFIG_NFSD) || defined(CONFIG_NFSD_MODULE)
 /* Stuff for NFS server syscalls... */
 struct nfsctl_svc32 {
 	u16			svc32_port;
@@ -3815,6 +3816,13 @@ done:
 		kfree(kres);
 	return err;
 }
+#else /* !NFSD */
+extern asmlinkage long sys_ni_syscall(void);
+int asmlinkage sys32_nfsservctl(int cmd, void *notused, void *notused2)
+{
+	return sys_ni_syscall();
+}
+#endif
 
 /* Translations due to time_t size differences.  Which affects all
    sorts of things, like timeval and itimerval.  */

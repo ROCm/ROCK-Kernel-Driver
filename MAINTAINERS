@@ -759,8 +759,8 @@ P:	Keith Owens
 M:	kaos@ocs.com.au
 P:	Michael Elizabeth Chastain
 M:	mec@shout.net
-L:	linux-kbuild@torque.net
-W:	http://www.kernel.org/pub/linux/kernel/projects/kbuild/
+L:	kbuild-devel@lists.sourceforge.net
+W:	http://kbuild.sourceforge.net
 S:	Maintained 
 
 KERNEL NFSD

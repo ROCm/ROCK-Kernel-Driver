@@ -1,9 +1,7 @@
 /*******************************************************************************
  *
- * Module Name: rscreate - Acpi_rs_create_resource_list
- *                         Acpi_rs_create_pci_routing_table
- *                         Acpi_rs_create_byte_stream
- *              $Revision: 25 $
+ * Module Name: rscreate - Create resource lists/tables
+ *              $Revision: 33 $
  *
  ******************************************************************************/
 
@@ -31,7 +29,7 @@
 #include "amlcode.h"
 #include "acnamesp.h"
 
-#define _COMPONENT          RESOURCE_MANAGER
+#define _COMPONENT          ACPI_RESOURCES
 	 MODULE_NAME         ("rscreate")
 
 
@@ -39,8 +37,7 @@
  *
  * FUNCTION:    Acpi_rs_create_resource_list
  *
- * PARAMETERS:
- *              Byte_stream_buffer      - Pointer to the resource byte stream
+ * PARAMETERS:  Byte_stream_buffer      - Pointer to the resource byte stream
  *              Output_buffer           - Pointer to the user's buffer
  *              Output_buffer_length    - Pointer to the size of Output_buffer
  *
@@ -63,9 +60,9 @@ acpi_rs_create_resource_list (
 {
 
 	ACPI_STATUS             status;
-	u8                      *byte_stream_start = NULL;
+	u8                      *byte_stream_start;
 	u32                     list_size_needed = 0;
-	u32                     byte_stream_buffer_length = 0;
+	u32                     byte_stream_buffer_length;
 
 
 	/*
@@ -79,8 +76,7 @@ acpi_rs_create_resource_list (
 	 * Pass the Byte_stream_buffer into a module that can calculate
 	 * the buffer size needed for the linked list
 	 */
-	status = acpi_rs_calculate_list_length (byte_stream_start,
-			 byte_stream_buffer_length,
+	status = acpi_rs_calculate_list_length (byte_stream_start, byte_stream_buffer_length,
 			 &list_size_needed);
 
 	/*
@@ -101,8 +97,7 @@ acpi_rs_create_resource_list (
 		 */
 		MEMSET (output_buffer, 0x00, *output_buffer_length);
 
-		status = acpi_rs_byte_stream_to_list (byte_stream_start,
-				 byte_stream_buffer_length,
+		status = acpi_rs_byte_stream_to_list (byte_stream_start, byte_stream_buffer_length,
 				 &output_buffer);
 
 		/*
@@ -121,7 +116,6 @@ acpi_rs_create_resource_list (
 
 	*output_buffer_length = list_size_needed;
 	return (AE_OK);
-
 }
 
 
@@ -129,9 +123,8 @@ acpi_rs_create_resource_list (
  *
  * FUNCTION:    Acpi_rs_create_pci_routing_table
  *
- * PARAMETERS:
- *              Package_object          - Pointer to an ACPI_OPERAND_OBJECT
- *                                          package
+ * PARAMETERS:  Package_object          - Pointer to an ACPI_OPERAND_OBJECT
+ *                                        package
  *              Output_buffer           - Pointer to the user's buffer
  *              Output_buffer_length    - Size of Output_buffer
  *
@@ -167,8 +160,12 @@ acpi_rs_create_pci_routing_table (
 	 * Params already validated, so we don't re-validate here
 	 */
 
-	status = acpi_rs_calculate_pci_routing_table_length(package_object,
-			  &buffer_size_needed);
+	status = acpi_rs_calculate_pci_routing_table_length (package_object,
+			 &buffer_size_needed);
+
+	if (!ACPI_SUCCESS(status)) {
+		return (status);
+	}
 
 	/*
 	 * If the data will fit into the available buffer
@@ -240,8 +237,7 @@ acpi_rs_create_pci_routing_table (
 			sub_object_list++;
 
 			if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
-				user_prt->pin =
-						(u32) (*sub_object_list)->integer.value;
+				user_prt->pin = (u32) (*sub_object_list)->integer.value;
 			}
 
 			else {
@@ -253,10 +249,10 @@ acpi_rs_create_pci_routing_table (
 			 */
 			sub_object_list++;
 
-			switch ((*sub_object_list)->common.type)
-			{
+			switch ((*sub_object_list)->common.type) {
 			case INTERNAL_TYPE_REFERENCE:
-				if ((*sub_object_list)->reference.op_code != AML_NAMEPATH_OP) {
+
+				if ((*sub_object_list)->reference.opcode != AML_INT_NAMEPATH_OP) {
 					return (AE_BAD_DATA);
 				}
 
@@ -298,6 +294,7 @@ acpi_rs_create_pci_routing_table (
 
 
 			default:
+
 			   return (AE_BAD_DATA);
 			   break;
 			}
@@ -312,8 +309,7 @@ acpi_rs_create_pci_routing_table (
 			sub_object_list++;
 
 			if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
-				user_prt->source_index =
-						(u32) (*sub_object_list)->integer.value;
+				user_prt->source_index = (u32) (*sub_object_list)->integer.value;
 			}
 
 			else {
@@ -338,7 +334,6 @@ acpi_rs_create_pci_routing_table (
 	 * Report the amount of buffer used
 	 */
 	*output_buffer_length = buffer_size_needed;
-
 	return (AE_OK);
 }
 
@@ -347,8 +342,7 @@ acpi_rs_create_pci_routing_table (
  *
  * FUNCTION:    Acpi_rs_create_byte_stream
  *
- * PARAMETERS:
- *              Linked_list_buffer      - Pointer to the resource linked list
+ * PARAMETERS:  Linked_list_buffer      - Pointer to the resource linked list
  *              Output_buffer           - Pointer to the user's buffer
  *              Output_buffer_length    - Size of Output_buffer
  *
@@ -365,7 +359,7 @@ acpi_rs_create_pci_routing_table (
 
 ACPI_STATUS
 acpi_rs_create_byte_stream (
-	RESOURCE                *linked_list_buffer,
+	ACPI_RESOURCE           *linked_list_buffer,
 	u8                      *output_buffer,
 	u32                     *output_buffer_length)
 {
@@ -400,8 +394,7 @@ acpi_rs_create_byte_stream (
 		 */
 		MEMSET (output_buffer, 0x00, *output_buffer_length);
 
-		status = acpi_rs_list_to_byte_stream (linked_list_buffer,
-				 byte_stream_size_needed,
+		status = acpi_rs_list_to_byte_stream (linked_list_buffer, byte_stream_size_needed,
 				 &output_buffer);
 
 		/*
@@ -412,6 +405,7 @@ acpi_rs_create_byte_stream (
 		}
 
 	}
+
 	else {
 		*output_buffer_length = byte_stream_size_needed;
 		return (AE_BUFFER_OVERFLOW);

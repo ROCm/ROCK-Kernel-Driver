@@ -451,8 +451,13 @@ try_again:
 			memory_pressure++;
 			if (!order || free_shortage()) {
 				int progress = try_to_free_pages(gfp_mask);
-				if (progress || gfp_mask & __GFP_IO)
+				if (progress || (gfp_mask & __GFP_IO))
 					goto try_again;
+				/*
+				 * Fail in case no progress was made and the
+				 * allocation may not be able to block on IO.
+				 */
+				return NULL;
 			}
 		}
 	}

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
- * Module Name: rsxface - Public interfaces to the ACPI subsystem
- *              $Revision: 10 $
+ * Module Name: rsxface - Public interfaces to the resource manager
+ *              $Revision: 13 $
  *
  ******************************************************************************/
 
@@ -29,7 +29,7 @@
 #include "acnamesp.h"
 #include "acresrc.h"
 
-#define _COMPONENT          RESOURCE_MANAGER
+#define _COMPONENT          ACPI_RESOURCES
 	 MODULE_NAME         ("rsxface")
 
 
@@ -41,7 +41,7 @@
  *              Ret_buffer      - a pointer to a buffer to receive the
  *                                current resources for the device
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to get the IRQ routing table for a
  *              specific bus.  The caller must first acquire a handle for the
@@ -64,21 +64,26 @@ acpi_get_irq_routing_table (
 	ACPI_STATUS             status;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/*
-	 *  Must have a valid handle and buffer, So we have to have a handle
-	 *  and a return buffer structure, and if there is a non-zero buffer length
-	 *  we also need a valid pointer in the buffer. If it's a zero buffer length,
-	 *  we'll be returning the needed buffer size, so keep going.
+	 * Must have a valid handle and buffer, So we have to have a handle
+	 * and a return buffer structure, and if there is a non-zero buffer length
+	 * we also need a valid pointer in the buffer. If it's a zero buffer length,
+	 * we'll be returning the needed buffer size, so keep going.
 	 */
 	if ((!device_handle)        ||
 		(!ret_buffer)           ||
-		((!ret_buffer->pointer) && (ret_buffer->length)))
-	{
+		((!ret_buffer->pointer) && (ret_buffer->length))) {
 		return (AE_BAD_PARAMETER);
 	}
 
 	status = acpi_rs_get_prt_method_data (device_handle, ret_buffer);
-
 	return (status);
 }
 
@@ -92,7 +97,7 @@ acpi_get_irq_routing_table (
  *              Ret_buffer      - a pointer to a buffer to receive the
  *                                current resources for the device
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to get the current resources for a
  *              specific device.  The caller must first acquire a handle for
@@ -115,21 +120,26 @@ acpi_get_current_resources (
 	ACPI_STATUS             status;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/*
-	 *  Must have a valid handle and buffer, So we have to have a handle
-	 *  and a return buffer structure, and if there is a non-zero buffer length
-	 *  we also need a valid pointer in the buffer. If it's a zero buffer length,
-	 *  we'll be returning the needed buffer size, so keep going.
+	 * Must have a valid handle and buffer, So we have to have a handle
+	 * and a return buffer structure, and if there is a non-zero buffer length
+	 * we also need a valid pointer in the buffer. If it's a zero buffer length,
+	 * we'll be returning the needed buffer size, so keep going.
 	 */
 	if ((!device_handle)        ||
 		(!ret_buffer)           ||
-		((ret_buffer->length) && (!ret_buffer->pointer)))
-	{
+		((ret_buffer->length) && (!ret_buffer->pointer))) {
 		return (AE_BAD_PARAMETER);
 	}
 
 	status = acpi_rs_get_crs_method_data (device_handle, ret_buffer);
-
 	return (status);
 }
 
@@ -143,7 +153,7 @@ acpi_get_current_resources (
  *              Ret_buffer      - a pointer to a buffer to receive the
  *                                resources for the device
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to get a list of the possible resources
  *              for a specific device.  The caller must first acquire a handle
@@ -163,21 +173,26 @@ acpi_get_possible_resources (
 	ACPI_STATUS             status;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/*
-	 *  Must have a valid handle and buffer, So we have to have a handle
-	 *  and a return buffer structure, and if there is a non-zero buffer length
-	 *  we also need a valid pointer in the buffer. If it's a zero buffer length,
-	 *  we'll be returning the needed buffer size, so keep going.
+	 * Must have a valid handle and buffer, So we have to have a handle
+	 * and a return buffer structure, and if there is a non-zero buffer length
+	 * we also need a valid pointer in the buffer. If it's a zero buffer length,
+	 * we'll be returning the needed buffer size, so keep going.
 	 */
 	if ((!device_handle)        ||
 		(!ret_buffer)           ||
-		((ret_buffer->length) && (!ret_buffer->pointer)))
-	{
+		((ret_buffer->length) && (!ret_buffer->pointer))) {
 		return (AE_BAD_PARAMETER);
-   }
+	}
 
 	status = acpi_rs_get_prs_method_data (device_handle, ret_buffer);
-
 	return (status);
 }
 
@@ -191,7 +206,7 @@ acpi_get_possible_resources (
  *              In_buffer       - a pointer to a buffer containing the
  *                                resources to be set for the device
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to set the current resources for a
  *              specific device.  The caller must first acquire a handle for
@@ -208,18 +223,23 @@ acpi_set_current_resources (
 	ACPI_STATUS             status;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/*
-	 *  Must have a valid handle and buffer
+	 * Must have a valid handle and buffer
 	 */
 	if ((!device_handle)      ||
 		(!in_buffer)          ||
 		(!in_buffer->pointer) ||
-		(!in_buffer->length))
-	{
+		(!in_buffer->length)) {
 		return (AE_BAD_PARAMETER);
 	}
 
 	status = acpi_rs_set_srs_method_data (device_handle, in_buffer);
-
 	return (status);
 }

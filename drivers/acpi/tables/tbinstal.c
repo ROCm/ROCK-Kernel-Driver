@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbinstal - ACPI table installation and removal
- *              $Revision: 36 $
+ *              $Revision: 39 $
  *
  *****************************************************************************/
 
@@ -29,7 +29,7 @@
 #include "actables.h"
 
 
-#define _COMPONENT          TABLE_MANAGER
+#define _COMPONENT          ACPI_TABLES
 	 MODULE_NAME         ("tbinstal")
 
 
@@ -68,13 +68,13 @@ acpi_tb_install_table (
 
 	/* Lock tables while installing */
 
-	acpi_cm_acquire_mutex (ACPI_MTX_TABLES);
+	acpi_ut_acquire_mutex (ACPI_MTX_TABLES);
 
 	/* Install the table into the global data structure */
 
 	status = acpi_tb_init_table_descriptor (table_info->type, table_info);
 
-	acpi_cm_release_mutex (ACPI_MTX_TABLES);
+	acpi_ut_release_mutex (ACPI_MTX_TABLES);
 	return (status);
 }
 
@@ -127,8 +127,7 @@ acpi_tb_recognize_table (
 	for (i = 1; i < NUM_ACPI_TABLES; i++) {
 		if (!STRNCMP (table_header->signature,
 				  acpi_gbl_acpi_table_data[i].signature,
-				  acpi_gbl_acpi_table_data[i].sig_length))
-		{
+				  acpi_gbl_acpi_table_data[i].sig_length)) {
 			/*
 			 * Found a signature match, get the pertinent info from the
 			 * Table_data structure
@@ -226,7 +225,7 @@ acpi_tb_init_table_descriptor (
 		 */
 
 		if (list_head->pointer) {
-			table_desc = acpi_cm_callocate (sizeof (ACPI_TABLE_DESC));
+			table_desc = acpi_ut_callocate (sizeof (ACPI_TABLE_DESC));
 			if (!table_desc) {
 				return (AE_NO_MEMORY);
 			}
@@ -262,7 +261,7 @@ acpi_tb_init_table_descriptor (
 	table_desc->aml_pointer         = (u8 *) (table_desc->pointer + 1),
 	table_desc->aml_length          = (u32) (table_desc->length -
 			 (u32) sizeof (ACPI_TABLE_HEADER));
-	table_desc->table_id            = acpi_cm_allocate_owner_id (OWNER_TYPE_TABLE);
+	table_desc->table_id            = acpi_ut_allocate_owner_id (OWNER_TYPE_TABLE);
 	table_desc->loaded_into_namespace = FALSE;
 
 	/*
@@ -337,7 +336,7 @@ acpi_tb_delete_acpi_table (
 	}
 
 
-	acpi_cm_acquire_mutex (ACPI_MTX_TABLES);
+	acpi_ut_acquire_mutex (ACPI_MTX_TABLES);
 
 	/* Free the table */
 
@@ -346,8 +345,7 @@ acpi_tb_delete_acpi_table (
 
 	/* Clear the appropriate "typed" global table pointer */
 
-	switch (type)
-	{
+	switch (type) {
 	case ACPI_TABLE_RSDP:
 		acpi_gbl_RSDP = NULL;
 		break;
@@ -374,7 +372,7 @@ acpi_tb_delete_acpi_table (
 		break;
 	}
 
-	acpi_cm_release_mutex (ACPI_MTX_TABLES);
+	acpi_ut_release_mutex (ACPI_MTX_TABLES);
 
 	return;
 }
@@ -445,8 +443,7 @@ acpi_tb_delete_single_table (
 	if (table_desc->pointer) {
 		/* Valid table, determine type of memory allocation */
 
-		switch (table_desc->allocation)
-		{
+		switch (table_desc->allocation) {
 
 		case ACPI_MEM_NOT_ALLOCATED:
 			break;
@@ -454,7 +451,7 @@ acpi_tb_delete_single_table (
 
 		case ACPI_MEM_ALLOCATED:
 
-			acpi_cm_free (table_desc->base_pointer);
+			acpi_ut_free (table_desc->base_pointer);
 			break;
 
 
@@ -527,7 +524,7 @@ acpi_tb_uninstall_table (
 		/* Free the table descriptor */
 
 		next_desc = table_desc->next;
-		acpi_cm_free (table_desc);
+		acpi_ut_free (table_desc);
 	}
 
 

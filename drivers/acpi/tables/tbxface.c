@@ -2,7 +2,7 @@
  *
  * Module Name: tbxface - Public interfaces to the ACPI subsystem
  *                         ACPI table oriented interfaces
- *              $Revision: 34 $
+ *              $Revision: 39 $
  *
  *****************************************************************************/
 
@@ -31,7 +31,7 @@
 #include "actables.h"
 
 
-#define _COMPONENT          TABLE_MANAGER
+#define _COMPONENT          ACPI_TABLES
 	 MODULE_NAME         ("tbxface")
 
 
@@ -52,16 +52,23 @@ ACPI_STATUS
 acpi_load_tables (
 	ACPI_PHYSICAL_ADDRESS   rsdp_physical_address)
 {
-	ACPI_STATUS             status = AE_OK;
+	ACPI_STATUS             status;
 	u32                     number_of_tables = 0;
 
+
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
 
 	/* Map and validate the RSDP */
 
 	status = acpi_tb_verify_rsdp (rsdp_physical_address);
 	if (ACPI_FAILURE (status)) {
 		REPORT_ERROR (("Acpi_load_tables: RSDP Failed validation: %s\n",
-				  acpi_cm_format_exception (status)));
+				  acpi_ut_format_exception (status)));
 		goto error_exit;
 	}
 
@@ -70,7 +77,7 @@ acpi_load_tables (
 	status = acpi_tb_get_table_rsdt (&number_of_tables);
 	if (ACPI_FAILURE (status)) {
 		REPORT_ERROR (("Acpi_load_tables: Could not load RSDT: %s\n",
-				  acpi_cm_format_exception (status)));
+				  acpi_ut_format_exception (status)));
 		goto error_exit;
 	}
 
@@ -79,7 +86,7 @@ acpi_load_tables (
 	status = acpi_tb_get_all_tables (number_of_tables, NULL);
 	if (ACPI_FAILURE (status)) {
 		REPORT_ERROR (("Acpi_load_tables: Error getting required tables (DSDT/FADT/FACS): %s\n",
-				  acpi_cm_format_exception (status)));
+				  acpi_ut_format_exception (status)));
 		goto error_exit;
 	}
 
@@ -89,7 +96,7 @@ acpi_load_tables (
 	status = acpi_ns_load_namespace ();
 	if (ACPI_FAILURE (status)) {
 		REPORT_ERROR (("Acpi_load_tables: Could not load namespace: %s\n",
-				  acpi_cm_format_exception (status)));
+				  acpi_ut_format_exception (status)));
 		goto error_exit;
 	}
 
@@ -98,7 +105,7 @@ acpi_load_tables (
 
 error_exit:
 	REPORT_ERROR (("Acpi_load_tables: Could not load tables: %s\n",
-			  acpi_cm_format_exception (status)));
+			  acpi_ut_format_exception (status)));
 
 	return (status);
 }
@@ -118,8 +125,6 @@ error_exit:
  *              a valid header.  The header fields will be verified, and if it
  *              is determined that the table is invalid, the call will fail.
  *
- *              If the call fails an appropriate status will be returned.
- *
  ******************************************************************************/
 
 ACPI_STATUS
@@ -129,6 +134,13 @@ acpi_load_table (
 	ACPI_STATUS             status;
 	ACPI_TABLE_DESC         table_info;
 
+
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
 
 	if (!table_ptr) {
 		return (AE_BAD_PARAMETER);
@@ -182,7 +194,15 @@ acpi_unload_table (
 	ACPI_TABLE_TYPE         table_type)
 {
 	ACPI_TABLE_DESC         *list_head;
+	ACPI_STATUS             status;
 
+
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
 
 	/* Parameter validation */
 
@@ -194,15 +214,13 @@ acpi_unload_table (
 	/* Find all tables of the requested type */
 
 	list_head = &acpi_gbl_acpi_tables[table_type];
-	do
-	{
+	do {
 		/*
 		 * Delete all namespace entries owned by this table.  Note that these
 		 * entries can appear anywhere in the namespace by virtue of the AML
 		 * "Scope" operator.  Thus, we need to track ownership by an ID, not
 		 * simply a position within the hierarchy
 		 */
-
 		acpi_ns_delete_namespace_by_owner (list_head->table_id);
 
 		/* Delete (or unmap) the actual table */
@@ -234,9 +252,6 @@ acpi_unload_table (
  *              function is not valid for the RSD PTR table since it does not
  *              have a standard header and is fixed length.
  *
- *              If the operation fails for any reason an appropriate status will
- *              be returned and the contents of Out_table_header are undefined.
- *
  ******************************************************************************/
 
 ACPI_STATUS
@@ -249,10 +264,16 @@ acpi_get_table_header (
 	ACPI_STATUS             status;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	if ((instance == 0)                 ||
 		(table_type == ACPI_TABLE_RSDP) ||
-		(!out_table_header))
-	{
+		(!out_table_header)) {
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -260,8 +281,7 @@ acpi_get_table_header (
 
 	if ((table_type > ACPI_TABLE_MAX)   ||
 		(IS_SINGLE_TABLE (acpi_gbl_acpi_table_data[table_type].flags) &&
-		 instance > 1))
-	{
+		 instance > 1)) {
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -311,9 +331,6 @@ acpi_get_table_header (
  *              copied into the Out_buffer->Buf_ptr buffer. This table will be
  *              a complete table including the header.
  *
- *              If the operation fails an appropriate status will be returned
- *              and the contents of Out_buffer are undefined.
- *
  ******************************************************************************/
 
 ACPI_STATUS
@@ -327,13 +344,19 @@ acpi_get_table (
 	u32                     ret_buf_len;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/*
 	 *  If we have a buffer, we must have a length too
 	 */
 	if ((instance == 0)                 ||
 		(!ret_buffer)                   ||
-		((!ret_buffer->pointer) && (ret_buffer->length)))
-	{
+		((!ret_buffer->pointer) && (ret_buffer->length))) {
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -341,8 +364,7 @@ acpi_get_table (
 
 	if ((table_type > ACPI_TABLE_MAX)   ||
 		(IS_SINGLE_TABLE (acpi_gbl_acpi_table_data[table_type].flags) &&
-		 instance > 1))
-	{
+		 instance > 1)) {
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -356,7 +378,7 @@ acpi_get_table (
 
 	/*
 	 * Acpi_tb_get_table_ptr will return a NULL pointer if the
-	 *  table is not loaded.
+	 * table is not loaded.
 	 */
 	if (tbl_ptr == NULL) {
 		return (AE_NOT_EXIST);
@@ -389,4 +411,5 @@ acpi_get_table (
 
 	return (AE_OK);
 }
+
 

@@ -274,10 +274,10 @@ struct fb_info_aty128 {
     struct fb_info fb_info;
     struct fb_info_aty128 *next;
     struct aty128_constants constants;  /* PLL and others      */
-    u32 regbase_phys;                   /* physical mmio       */
+    unsigned long regbase_phys;         /* physical mmio       */
     void *regbase;                      /* remapped mmio       */
-    u32 frame_buffer_phys;              /* physical fb memory  */
-    u32 frame_buffer;                   /* remaped framebuffer */
+    unsigned long frame_buffer_phys;    /* physical fb memory  */
+    void *frame_buffer;                 /* remaped framebuffer */
     u32 vram_size;                      /* onboard video ram   */
     int chip_gen;
     const struct aty128_meminfo *mem;   /* onboard mem info    */
@@ -1380,7 +1380,7 @@ aty128fb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *fb)
 	struct fb_fix_screeninfo fix;
 
 	aty128_encode_fix(&fix, &par, info);
-        display->screen_base = (char *)info->frame_buffer;
+        display->screen_base = info->frame_buffer;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -1833,7 +1833,7 @@ aty128_pci_register(struct pci_dev *pdev,
                                const struct aty128_chip_info *aci)
 {
 	struct fb_info_aty128 *info = NULL;
-	u32 fb_addr, reg_addr;
+	unsigned long fb_addr, reg_addr;
 	int err;
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
 	char *bios_seg = NULL;
@@ -1885,7 +1885,7 @@ aty128_pci_register(struct pci_dev *pdev,
 
 	/* Virtualize the framebuffer */
 	info->frame_buffer_phys = fb_addr;
-	info->frame_buffer = (u32)ioremap(fb_addr, info->vram_size);
+	info->frame_buffer = ioremap(fb_addr, info->vram_size);
 
 	if (!info->frame_buffer) {
 		iounmap((void *)info->regbase);
@@ -1931,8 +1931,8 @@ aty128_pci_register(struct pci_dev *pdev,
 	return 0;
 
 err_out:
-	iounmap((void *)info->frame_buffer);
-	iounmap((void *)info->regbase);
+	iounmap(info->frame_buffer);
+	iounmap(info->regbase);
 err_free_info:
 	kfree(info);
 err_unmap_out:
@@ -2622,7 +2622,7 @@ cleanup_module(void)
                      info->vram_size);
 #endif /* CONFIG_MTRR */
         iounmap(info->regbase);
-        iounmap(&info->frame_buffer);
+        iounmap(info->frame_buffer);
 
         release_mem_region(pci_resource_start(info->pdev, 0),
                            pci_resource_len(info->pdev, 0));

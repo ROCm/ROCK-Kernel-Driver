@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psxface - Parser external interfaces
- *              $Revision: 40 $
+ *              $Revision: 44 $
  *
  *****************************************************************************/
 
@@ -32,7 +32,7 @@
 #include "acnamesp.h"
 
 
-#define _COMPONENT          PARSER
+#define _COMPONENT          ACPI_PARSER
 	 MODULE_NAME         ("psxface")
 
 
@@ -79,7 +79,7 @@ acpi_psx_execute (
 
 	/* Init for new method, wait on concurrency semaphore */
 
-	status = acpi_ds_begin_method_execution (method_node, obj_desc);
+	status = acpi_ds_begin_method_execution (method_node, obj_desc, NULL);
 	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
@@ -91,7 +91,7 @@ acpi_psx_execute (
 		 */
 
 		for (i = 0; params[i]; i++) {
-			acpi_cm_add_reference (params[i]);
+			acpi_ut_add_reference (params[i]);
 		}
 	}
 
@@ -141,7 +141,7 @@ acpi_psx_execute (
 		/* Take away the extra reference that we gave the parameters above */
 
 		for (i = 0; params[i]; i++) {
-			acpi_cm_update_object_reference (params[i], REF_DECREMENT);
+			acpi_ut_update_object_reference (params[i], REF_DECREMENT);
 		}
 	}
 

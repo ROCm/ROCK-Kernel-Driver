@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 103 $
+ *       $Revision: 106 $
  *
  *****************************************************************************/
 
@@ -94,18 +94,18 @@ acpi_ns_init_one_object (
 
 ACPI_STATUS
 acpi_ns_walk_namespace (
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	ACPI_HANDLE             start_object,
 	u32                     max_depth,
 	u8                      unlock_before_callback,
-	WALK_CALLBACK           user_function,
+	ACPI_WALK_CALLBACK      user_function,
 	void                    *context,
 	void                    **return_value);
 
 
 ACPI_NAMESPACE_NODE *
 acpi_ns_get_next_object (
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	ACPI_NAMESPACE_NODE     *parent,
 	ACPI_NAMESPACE_NODE     *child);
 
@@ -150,7 +150,7 @@ ACPI_STATUS
 acpi_ns_lookup (
 	ACPI_GENERIC_STATE      *scope_info,
 	NATIVE_CHAR             *name,
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	OPERATING_MODE          interpreter_mode,
 	u32                     flags,
 	ACPI_WALK_STATE         *walk_state,
@@ -223,7 +223,7 @@ acpi_ns_dump_root_devices (
 
 void
 acpi_ns_dump_objects (
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	u32                     max_depth,
 	u32                     ownder_id,
 	ACPI_HANDLE             start_handle);
@@ -283,7 +283,7 @@ acpi_ns_exist_downstream_sibling (
 
 u32
 acpi_ns_opens_scope (
-	OBJECT_TYPE_INTERNAL    type);
+	ACPI_OBJECT_TYPE8       type);
 
 NATIVE_CHAR *
 acpi_ns_get_table_pathname (
@@ -304,12 +304,6 @@ acpi_ns_pattern_match (
 	ACPI_NAMESPACE_NODE     *obj_node,
 	NATIVE_CHAR             *search_for);
 
-ACPI_STATUS
-acpi_ns_name_compare (
-	ACPI_HANDLE             obj_handle,
-	u32                     level,
-	void                    *context,
-	void                    **return_value);
 
 ACPI_STATUS
 acpi_ns_get_node (
@@ -330,14 +324,7 @@ ACPI_STATUS
 acpi_ns_attach_object (
 	ACPI_NAMESPACE_NODE     *node,
 	ACPI_OPERAND_OBJECT     *object,
-	OBJECT_TYPE_INTERNAL    type);
-
-
-void *
-acpi_ns_compare_value (
-	ACPI_HANDLE             obj_handle,
-	u32                     level,
-	void                    *obj_desc);
+	ACPI_OBJECT_TYPE8       type);
 
 
 /*
@@ -350,7 +337,7 @@ acpi_ns_search_and_enter (
 	ACPI_WALK_STATE         *walk_state,
 	ACPI_NAMESPACE_NODE     *node,
 	OPERATING_MODE          interpreter_mode,
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	u32                     flags,
 	ACPI_NAMESPACE_NODE     **ret_node);
 
@@ -358,7 +345,7 @@ ACPI_STATUS
 acpi_ns_search_node (
 	u32                     entry_name,
 	ACPI_NAMESPACE_NODE     *node,
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	ACPI_NAMESPACE_NODE     **ret_node);
 
 void
@@ -366,7 +353,7 @@ acpi_ns_install_node (
 	ACPI_WALK_STATE         *walk_state,
 	ACPI_NAMESPACE_NODE     *parent_node,   /* Parent */
 	ACPI_NAMESPACE_NODE     *node,      /* New Child*/
-	OBJECT_TYPE_INTERNAL    type);
+	ACPI_OBJECT_TYPE8       type);
 
 
 /*
@@ -381,17 +368,25 @@ u8
 acpi_ns_valid_path_separator (
 	NATIVE_CHAR             sep);
 
-OBJECT_TYPE_INTERNAL
+ACPI_OBJECT_TYPE8
 acpi_ns_get_type (
-	ACPI_HANDLE             obj_handle);
+	ACPI_NAMESPACE_NODE     *node);
 
 void *
 acpi_ns_get_attached_object (
-	ACPI_HANDLE             obj_handle);
+	ACPI_NAMESPACE_NODE     *node);
 
 u32
 acpi_ns_local (
-	OBJECT_TYPE_INTERNAL    type);
+	ACPI_OBJECT_TYPE8       type);
+
+ACPI_STATUS
+acpi_ns_build_internal_name (
+	ACPI_NAMESTRING_INFO    *info);
+
+ACPI_STATUS
+acpi_ns_get_internal_name_length (
+	ACPI_NAMESTRING_INFO    *info);
 
 ACPI_STATUS
 acpi_ns_internalize_name (

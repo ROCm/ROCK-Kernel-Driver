@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfobj - Public interfaces to the ACPI subsystem
  *                         ACPI Object oriented interfaces
- *              $Revision: 80 $
+ *              $Revision: 86 $
  *
  ******************************************************************************/
 
@@ -31,7 +31,7 @@
 #include "acdispat.h"
 
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nsxfobj")
 
 
@@ -76,6 +76,13 @@ acpi_evaluate_object (
 	u32                     object_length;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/*
 	 * If there are parameters to be passed to the object
 	 * (which must be a control method), the external objects
@@ -92,7 +99,7 @@ acpi_evaluate_object (
 		param_length    = (count + 1) * sizeof (void *);
 		object_length   = count * sizeof (ACPI_OPERAND_OBJECT);
 
-		param_ptr = acpi_cm_callocate (param_length + /* Parameter List part */
+		param_ptr = acpi_ut_callocate (param_length + /* Parameter List part */
 				  object_length); /* Actual objects */
 		if (!param_ptr) {
 			return (AE_NO_MEMORY);
@@ -108,7 +115,7 @@ acpi_evaluate_object (
 
 		for (i = 0; i < count; i++) {
 			param_ptr[i] = &object_ptr[i];
-			acpi_cm_init_static_object (&object_ptr[i]);
+			acpi_ut_init_static_object (&object_ptr[i]);
 		}
 		param_ptr[count] = NULL;
 
@@ -117,11 +124,11 @@ acpi_evaluate_object (
 		 * internal object
 		 */
 		for (i = 0; i < count; i++) {
-			status = acpi_cm_copy_eobject_to_iobject (&param_objects->pointer[i],
+			status = acpi_ut_copy_eobject_to_iobject (&param_objects->pointer[i],
 					 param_ptr[i]);
 
 			if (ACPI_FAILURE (status)) {
-				acpi_cm_delete_internal_object_list (param_ptr);
+				acpi_ut_delete_internal_object_list (param_ptr);
 				return (status);
 			}
 		}
@@ -136,8 +143,7 @@ acpi_evaluate_object (
 	 */
 
 	if ((pathname) &&
-		(acpi_ns_valid_root_prefix (pathname[0])))
-	{
+		(acpi_ns_valid_root_prefix (pathname[0]))) {
 		/*
 		 *  The path is fully qualified, just evaluate by name
 		 */
@@ -212,7 +218,7 @@ acpi_evaluate_object (
 				 * Find out how large a buffer is needed
 				 * to contain the returned object
 				 */
-				status = acpi_cm_get_object_size (return_obj,
+				status = acpi_ut_get_object_size (return_obj,
 						   &buffer_space_needed);
 				if (ACPI_SUCCESS (status)) {
 					/*
@@ -235,7 +241,7 @@ acpi_evaluate_object (
 						/*
 						 *  We have enough space for the object, build it
 						 */
-						status = acpi_cm_copy_iobject_to_eobject (return_obj,
+						status = acpi_ut_copy_iobject_to_eobject (return_obj,
 								  return_buffer);
 						return_buffer->length = buffer_space_needed;
 					}
@@ -252,7 +258,7 @@ acpi_evaluate_object (
 		 * Delete the internal return object. (Or at least
 		 * decrement the reference count by one)
 		 */
-		acpi_cm_remove_reference (return_obj);
+		acpi_ut_remove_reference (return_obj);
 	}
 
 	/*
@@ -262,7 +268,7 @@ acpi_evaluate_object (
 	if (param_ptr) {
 		/* Free the allocated parameter block */
 
-		acpi_cm_delete_internal_object_list (param_ptr);
+		acpi_ut_delete_internal_object_list (param_ptr);
 	}
 
 	return (status);
@@ -300,13 +306,20 @@ acpi_get_next_object (
 	ACPI_NAMESPACE_NODE     *child_node = NULL;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/* Parameter validation */
 
 	if (type > ACPI_TYPE_MAX) {
 		return (AE_BAD_PARAMETER);
 	}
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 	/* If null handle, use the parent */
 
@@ -335,7 +348,7 @@ acpi_get_next_object (
 
 	/* Internal function does the real work */
 
-	node = acpi_ns_get_next_object ((OBJECT_TYPE_INTERNAL) type,
+	node = acpi_ns_get_next_object ((ACPI_OBJECT_TYPE8) type,
 			   parent_node, child_node);
 	if (!node) {
 		status = AE_NOT_FOUND;
@@ -349,7 +362,7 @@ acpi_get_next_object (
 
 unlock_and_exit:
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return (status);
 }
 
@@ -373,7 +386,15 @@ acpi_get_type (
 	ACPI_OBJECT_TYPE        *ret_type)
 {
 	ACPI_NAMESPACE_NODE     *node;
+	ACPI_STATUS             status;
 
+
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
 
 	/* Parameter Validation */
 
@@ -390,20 +411,20 @@ acpi_get_type (
 		return (AE_OK);
 	}
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 	/* Convert and validate the handle */
 
 	node = acpi_ns_convert_handle_to_entry (handle);
 	if (!node) {
-		acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		return (AE_BAD_PARAMETER);
 	}
 
 	*ret_type = node->type;
 
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return (AE_OK);
 }
 
@@ -431,8 +452,12 @@ acpi_get_parent (
 	ACPI_STATUS             status = AE_OK;
 
 
-	/* No trace macro, too verbose */
+	/* Ensure that ACPI has been initialized */
 
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
 
 	if (!ret_handle) {
 		return (AE_BAD_PARAMETER);
@@ -445,7 +470,7 @@ acpi_get_parent (
 	}
 
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 	/* Convert and validate the handle */
 
@@ -470,7 +495,7 @@ acpi_get_parent (
 
 unlock_and_exit:
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return (status);
 }
 
@@ -510,19 +535,25 @@ acpi_walk_namespace (
 	ACPI_OBJECT_TYPE        type,
 	ACPI_HANDLE             start_object,
 	u32                     max_depth,
-	WALK_CALLBACK           user_function,
+	ACPI_WALK_CALLBACK      user_function,
 	void                    *context,
 	void                    **return_value)
 {
 	ACPI_STATUS             status;
 
 
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	/* Parameter validation */
 
 	if ((type > ACPI_TYPE_MAX)  ||
 		(!max_depth)            ||
-		(!user_function))
-	{
+		(!user_function)) {
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -533,14 +564,14 @@ acpi_walk_namespace (
 	 * must be allowed to make Acpi calls itself.
 	 */
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
-	status = acpi_ns_walk_namespace ((OBJECT_TYPE_INTERNAL) type,
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	status = acpi_ns_walk_namespace ((ACPI_OBJECT_TYPE8) type,
 			   start_object, max_depth,
 			   NS_WALK_UNLOCK,
 			   user_function, context,
 			   return_value);
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	return (status);
 }
@@ -570,17 +601,15 @@ acpi_ns_get_device_callback (
 	ACPI_STATUS             status;
 	ACPI_NAMESPACE_NODE     *node;
 	u32                     flags;
-	DEVICE_ID               device_id;
+	ACPI_DEVICE_ID          device_id;
 	ACPI_GET_DEVICES_INFO   *info;
 
 
 	info = context;
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
-
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	node = acpi_ns_convert_handle_to_entry (obj_handle);
-
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	if (!node) {
 		return (AE_BAD_PARAMETER);
@@ -589,15 +618,13 @@ acpi_ns_get_device_callback (
 	/*
 	 * Run _STA to determine if device is present
 	 */
-
-	status = acpi_cm_execute_STA (node, &flags);
+	status = acpi_ut_execute_STA (node, &flags);
 	if (ACPI_FAILURE (status)) {
-		return AE_OK;
+		return (AE_CTRL_DEPTH);
 	}
 
 	if (!(flags & 0x01)) {
 		/* don't return at the device or children of the device if not there */
-
 		return (AE_CTRL_DEPTH);
 	}
 
@@ -605,14 +632,13 @@ acpi_ns_get_device_callback (
 	 * Filter based on device HID
 	 */
 	if (info->hid != NULL) {
-		status = acpi_cm_execute_HID (node, &device_id);
-
+		status = acpi_ut_execute_HID (node, &device_id);
 		if (status == AE_NOT_FOUND) {
 			return (AE_OK);
 		}
 
 		else if (ACPI_FAILURE (status)) {
-			return (status);
+			return (AE_CTRL_DEPTH);
 		}
 
 		if (STRNCMP (device_id.buffer, info->hid, sizeof (device_id.buffer)) != 0) {
@@ -621,7 +647,6 @@ acpi_ns_get_device_callback (
 	}
 
 	info->user_function (obj_handle, nesting_level, info->context, return_value);
-
 	return (AE_OK);
 }
 
@@ -654,13 +679,20 @@ acpi_ns_get_device_callback (
 ACPI_STATUS
 acpi_get_devices (
 	NATIVE_CHAR             *HID,
-	WALK_CALLBACK           user_function,
+	ACPI_WALK_CALLBACK      user_function,
 	void                    *context,
 	void                    **return_value)
 {
 	ACPI_STATUS             status;
 	ACPI_GET_DEVICES_INFO   info;
 
+
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
 
 	/* Parameter validation */
 
@@ -683,14 +715,14 @@ acpi_get_devices (
 	 * must be allowed to make Acpi calls itself.
 	 */
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	status = acpi_ns_walk_namespace (ACPI_TYPE_DEVICE,
 			   ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
 			   NS_WALK_UNLOCK,
 			   acpi_ns_get_device_callback, &info,
 			   return_value);
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	return (status);
 }

@@ -43,6 +43,7 @@
 #define TRACE_MEMORY	0x0010
 #define TRACE_FLOW	0x0020
 #define TRACE_SIZE	0x0040
+#define TRACE_PWCX	0x0080
 #define TRACE_SEQUENCE	0x1000
 
 #define Trace(R, A...) if (pwc_trace & R) printk(KERN_DEBUG PWC_NAME " " A)
@@ -56,28 +57,10 @@
 #define TOUCAM_TRAILER_SIZE		4
 
 /* Version block */
-#define PWC_MAJOR	7
-#define PWC_MINOR	1
-#define PWC_RELEASE 	"7.1"
-
-#if defined(CONFIG_ARM)
-  #define PWC_PROCESSOR "ARM"
-#endif
-#if defined(CONFIG_M686)
-  #define PWC_PROCESSOR "PPro"
-#endif
-#if !defined(PWC_PROCESSOR)
-  #define PWC_PROCESSOR "P5"
-#endif  
-
-#if defined(__SMP__) || defined(CONFIG_SMP)
-#define PWC_SMP "(SMP)"
-#else
-#define PWC_SMP "(UP)"
-#endif
-
-#define PWC_VERSION PWC_RELEASE " " PWC_PROCESSOR " " PWC_SMP
-#define PWC_NAME "pwc"
+#define PWC_MAJOR	8
+#define PWC_MINOR	0
+#define PWC_VERSION 	"8.0"
+#define PWC_NAME 	"pwc"
 
 /* Turn certain features on/off */
 #define PWC_INT_PIPE 0
@@ -156,12 +139,12 @@ struct pwc_device
    char vsnapshot;		/* snapshot mode */
    char vsync;			/* used by isoc handler */
 
-   /* The image acquisition requires 3 to 5 steps:
+   /* The image acquisition requires 3 to 4 steps:
       1. data is gathered in short packets from the USB controller
       2. data is synchronized and packed into a frame buffer
-      3. in case data is compressed, decompress it into a separate buffer
-      4. data is optionally converted to RGB/YUV 
-      5. data is transfered to the user process
+      3a. in case data is compressed, decompress it directly into image buffer
+      3b. in case data is uncompressed, copy into image buffer with viewport
+      4. data is transfered to the user process
 
       Note that MAX_ISO_BUFS != MAX_FRAMES != MAX_IMAGES.... 
       We have in effect a back-to-back-double-buffer system.
@@ -171,11 +154,11 @@ struct pwc_device
    char iso_init;
    
    /* 2: frame */
-   struct pwc_frame_buf *fbuf;
-   struct pwc_frame_buf *empty_frames, *empty_frames_tail;
-   struct pwc_frame_buf *full_frames, *full_frames_tail;
-   struct pwc_frame_buf *read_frame;
-   struct pwc_frame_buf *fill_frame;
+   struct pwc_frame_buf *fbuf;	/* all frames */
+   struct pwc_frame_buf *empty_frames, *empty_frames_tail;	/* all empty frames */
+   struct pwc_frame_buf *full_frames, *full_frames_tail;	/* all filled frames */
+   struct pwc_frame_buf *fill_frame;	/* frame currently filled */
+   struct pwc_frame_buf *read_frame;	/* frame currently read by user process */
    int frame_size;
    int frame_header_size, frame_trailer_size;
    int drop_frames;
@@ -186,7 +169,6 @@ struct pwc_device
    /* 3: decompression */
    struct pwc_decompressor *decompressor;	/* function block with decompression routines */
    void *decompress_data;		/* private data for decompression engine */
-   void *decompress_buffer;		/* decompressed data */
 
    /* 4: image */
    /* We have an 'image' and a 'view', where 'image' is the fixed-size image
@@ -205,20 +187,11 @@ struct pwc_device
    int image_read_pos;			/* In case we read data in pieces, keep track of were we are in the imagebuffer */
    int image_used[MAX_IMAGES];		/* For MCAPTURE and SYNC */
 
-   /* Kernel specific structures. These were once moved to the end 
-      of the structure and padded with bytes after I found out
-      some of these have different sizes in different kernel versions.
-      But since this is now a source release, I don't have this problem
-      anymore.
-
-      Fortunately none of these structures are needed in the pwcx module.
-    */
    struct semaphore modlock;		/* to prevent races in video_open(), etc */
    spinlock_t ptrlock;			/* for manipulating the buffer pointers */
 
    /*** Misc. data ***/
    wait_queue_head_t frameq;		/* When waiting for a frame to finish... */
-   wait_queue_head_t pollq;		/* poll() has it's own waitqueue */
    wait_queue_head_t remove_ok;		/* When we got hot unplugged, we have to avoid a few race conditions */
 #if PWC_INT_PIPE
    void *usb_int_handler;		/* for the interrupt endpoint */

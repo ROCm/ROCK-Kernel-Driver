@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsinit - namespace initialization
- *              $Revision: 15 $
+ *              $Revision: 25 $
  *
  *****************************************************************************/
 
@@ -28,7 +28,7 @@
 #include "acnamesp.h"
 #include "acdispat.h"
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nsinit")
 
 
@@ -70,7 +70,7 @@ acpi_ns_initialize_objects (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_initialize_devices
  *
@@ -81,11 +81,10 @@ acpi_ns_initialize_objects (
  * DESCRIPTION: Walk the entire namespace and initialize all ACPI devices.
  *              This means running _INI on all present devices.
  *
- *              Also: Install PCI config space handler for all PCI root bridges.
- *              A PCI root bridge is found by searching for devices containing
- *              a HID with the value EISAID("PNP0A03")
+ *              Note: We install PCI config space handler on region access,
+ *              not here.
  *
- *****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ns_initialize_devices (
@@ -100,8 +99,8 @@ acpi_ns_initialize_devices (
 	info.num_INI = 0;
 
 
-	status = acpi_ns_walk_namespace (ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
-			   FALSE, acpi_ns_init_one_device, &info, NULL);
+	status = acpi_ns_walk_namespace (ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
+			  ACPI_UINT32_MAX, FALSE, acpi_ns_init_one_device, &info, NULL);
 
 
 
@@ -136,7 +135,7 @@ acpi_ns_init_one_object (
 	void                    *context,
 	void                    **return_value)
 {
-	OBJECT_TYPE_INTERNAL    type;
+	ACPI_OBJECT_TYPE8       type;
 	ACPI_STATUS             status;
 	ACPI_INIT_WALK_INFO     *info = (ACPI_INIT_WALK_INFO *) context;
 	ACPI_NAMESPACE_NODE     *node = (ACPI_NAMESPACE_NODE *) obj_handle;
@@ -154,8 +153,7 @@ acpi_ns_init_one_object (
 		return (AE_OK);
 	}
 
-	switch (type)
-	{
+	switch (type) {
 
 	case ACPI_TYPE_REGION:
 
@@ -171,7 +169,7 @@ acpi_ns_init_one_object (
 		break;
 
 
-	case ACPI_TYPE_FIELD_UNIT:
+	case ACPI_TYPE_BUFFER_FIELD:
 
 		info->field_count++;
 		if (obj_desc->common.flags & AOPOBJ_DATA_VALID) {
@@ -179,7 +177,7 @@ acpi_ns_init_one_object (
 		}
 
 		info->field_init++;
-		status = acpi_ds_get_field_unit_arguments (obj_desc);
+		status = acpi_ds_get_buffer_field_arguments (obj_desc);
 
 
 		break;
@@ -196,11 +194,11 @@ acpi_ns_init_one_object (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_init_one_device
  *
- * PARAMETERS:  WALK_CALLBACK
+ * PARAMETERS:  ACPI_WALK_CALLBACK
  *
  * RETURN:      ACPI_STATUS
  *
@@ -208,7 +206,7 @@ acpi_ns_init_one_object (
  *              to initialize each device. It determines if the device is
  *              present, and if so, calls _INI.
  *
- *****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ns_init_one_device (
@@ -226,21 +224,21 @@ acpi_ns_init_one_device (
 
 	info->device_count++;
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 	node = acpi_ns_convert_handle_to_entry (obj_handle);
 	if (!node) {
-		acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		return (AE_BAD_PARAMETER);
 	}
 
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	/*
 	 * Run _STA to determine if we can run _INI on the device.
 	 */
 
-	status = acpi_cm_execute_STA (node, &flags);
+	status = acpi_ut_execute_STA (node, &flags);
 	if (ACPI_FAILURE (status)) {
 		/* Ignore error and move on to next device */
 
@@ -251,6 +249,7 @@ acpi_ns_init_one_device (
 
 	if (!(flags & 0x01)) {
 		/* don't look at children of a not present device */
+
 		return(AE_CTRL_DEPTH);
 	}
 
@@ -258,10 +257,10 @@ acpi_ns_init_one_device (
 	/*
 	 * The device is present. Run _INI.
 	 */
-
 	status = acpi_ns_evaluate_relative (obj_handle, "_INI", NULL, NULL);
 	if (AE_NOT_FOUND == status) {
 		/* No _INI means device requires no initialization */
+
 		status = AE_OK;
 	}
 

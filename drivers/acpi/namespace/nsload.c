@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsload - namespace loading/expanding/contracting procedures
- *              $Revision: 35 $
+ *              $Revision: 41 $
  *
  *****************************************************************************/
 
@@ -33,11 +33,11 @@
 #include "acdebug.h"
 
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nsload")
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_load_namespace
  *
@@ -107,8 +107,7 @@ acpi_ns_one_complete_parse (
 	ACPI_STATUS             status;
 
 
-	switch (pass_number)
-	{
+	switch (pass_number) {
 	case 1:
 		descending_callback = acpi_ds_load1_begin_op;
 		ascending_callback = acpi_ds_load1_end_op;
@@ -140,16 +139,13 @@ acpi_ns_one_complete_parse (
 
 	/* Pass 1:  Parse everything except control method bodies */
 
-	status = acpi_ps_parse_aml (parse_root,
-			 table_desc->aml_pointer,
+	status = acpi_ps_parse_aml (parse_root, table_desc->aml_pointer,
 			 table_desc->aml_length,
 			 ACPI_PARSE_LOAD_PASS1 | ACPI_PARSE_DELETE_TREE,
-			 NULL, NULL, NULL,
-			 descending_callback,
+			 NULL, NULL, NULL, descending_callback,
 			 ascending_callback);
 
 	acpi_ps_delete_parse_tree (parse_root);
-
 	return (status);
 }
 
@@ -211,7 +207,7 @@ acpi_ns_parse_table (
 }
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_load_table
  *
@@ -222,7 +218,7 @@ acpi_ns_parse_table (
  *
  * DESCRIPTION: Load one ACPI table into the namespace
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ns_load_table (
@@ -252,9 +248,9 @@ acpi_ns_load_table (
 	 * because we don't know how many arguments to parse next!
 	 */
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	status = acpi_ns_parse_table (table_desc, node->child);
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	if (ACPI_FAILURE (status)) {
 		return (status);
@@ -273,7 +269,7 @@ acpi_ns_load_table (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_load_table_by_type
  *
@@ -285,7 +281,7 @@ acpi_ns_load_table (
  *              of the given type are loaded.  The mechanism allows this
  *              routine to be called repeatedly.
  *
- *****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ns_load_table_by_type (
@@ -293,11 +289,10 @@ acpi_ns_load_table_by_type (
 {
 	u32                     i;
 	ACPI_STATUS             status = AE_OK;
-	ACPI_TABLE_HEADER       *table_ptr;
 	ACPI_TABLE_DESC         *table_desc;
 
 
-	acpi_cm_acquire_mutex (ACPI_MTX_TABLES);
+	acpi_ut_acquire_mutex (ACPI_MTX_TABLES);
 
 
 	/*
@@ -305,8 +300,7 @@ acpi_ns_load_table_by_type (
 	 * DSDT (one), SSDT/PSDT (multiple)
 	 */
 
-	switch (table_type)
-	{
+	switch (table_type) {
 
 	case ACPI_TABLE_DSDT:
 
@@ -338,16 +332,13 @@ acpi_ns_load_table_by_type (
 
 		table_desc = &acpi_gbl_acpi_tables[ACPI_TABLE_SSDT];
 		for (i = 0; i < acpi_gbl_acpi_tables[ACPI_TABLE_SSDT].count; i++) {
-			table_ptr = table_desc->pointer;
-
 			/*
 			 * Only attempt to load table if it is not
 			 * already loaded!
 			 */
 
 			if (!table_desc->loaded_into_namespace) {
-				status = acpi_ns_load_table (table_desc,
-						  acpi_gbl_root_node);
+				status = acpi_ns_load_table (table_desc, acpi_gbl_root_node);
 				if (ACPI_FAILURE (status)) {
 					break;
 				}
@@ -357,7 +348,6 @@ acpi_ns_load_table_by_type (
 
 			table_desc = table_desc->next;
 		}
-
 		break;
 
 
@@ -370,13 +360,10 @@ acpi_ns_load_table_by_type (
 		table_desc = &acpi_gbl_acpi_tables[ACPI_TABLE_PSDT];
 
 		for (i = 0; i < acpi_gbl_acpi_tables[ACPI_TABLE_PSDT].count; i++) {
-			table_ptr = table_desc->pointer;
-
 			/* Only attempt to load table if it is not already loaded! */
 
 			if (!table_desc->loaded_into_namespace) {
-				status = acpi_ns_load_table (table_desc,
-						  acpi_gbl_root_node);
+				status = acpi_ns_load_table (table_desc, acpi_gbl_root_node);
 				if (ACPI_FAILURE (status)) {
 					break;
 				}
@@ -392,19 +379,20 @@ acpi_ns_load_table_by_type (
 
 	default:
 		status = AE_SUPPORT;
+		break;
 	}
 
 
 unlock_and_exit:
 
-	acpi_cm_release_mutex (ACPI_MTX_TABLES);
+	acpi_ut_release_mutex (ACPI_MTX_TABLES);
 
 	return (status);
 
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_delete_subtree
  *
@@ -432,9 +420,9 @@ acpi_ns_delete_subtree (
 	u32                     level;
 
 
-	parent_handle   = start_handle;
-	child_handle    = 0;
-	level           = 1;
+	parent_handle = start_handle;
+	child_handle = 0;
+	level        = 1;
 
 	/*
 	 * Traverse the tree of objects until we bubble back up
@@ -445,8 +433,7 @@ acpi_ns_delete_subtree (
 		/* Attempt to get the next object in this scope */
 
 		status = acpi_get_next_object (ACPI_TYPE_ANY, parent_handle,
-				  child_handle,
-				  &next_child_handle);
+				  child_handle, &next_child_handle);
 
 		child_handle = next_child_handle;
 
@@ -456,18 +443,16 @@ acpi_ns_delete_subtree (
 		if (ACPI_SUCCESS (status)) {
 			/* Check if this object has any children */
 
-			if (ACPI_SUCCESS (acpi_get_next_object (ACPI_TYPE_ANY,
-					 child_handle, 0,
-					 &dummy)))
-			{
+			if (ACPI_SUCCESS (acpi_get_next_object (ACPI_TYPE_ANY, child_handle,
+					 0, &dummy))) {
 				/*
 				 * There is at least one child of this object,
 				 * visit the object
 				 */
 
 				level++;
-				parent_handle   = child_handle;
-				child_handle    = 0;
+				parent_handle = child_handle;
+				child_handle = 0;
 			}
 		}
 
@@ -491,12 +476,11 @@ acpi_ns_delete_subtree (
 
 	acpi_ns_delete_node (child_handle);
 
-
 	return (AE_OK);
 }
 
 
-/****************************************************************************
+/*******************************************************************************
  *
  *  FUNCTION:       Acpi_ns_unload_name_space
  *
@@ -508,7 +492,7 @@ acpi_ns_delete_subtree (
  *                  event.  Deletes an entire subtree starting from (and
  *                  including) the given handle.
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ns_unload_namespace (

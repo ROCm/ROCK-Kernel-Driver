@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsnames - Name manipulation and search
- *              $Revision: 54 $
+ *              $Revision: 59 $
  *
  ******************************************************************************/
 
@@ -30,7 +30,7 @@
 #include "acnamesp.h"
 
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nsnames")
 
 
@@ -84,7 +84,7 @@ acpi_ns_get_table_pathname (
 
 	/* Allocate a buffer to be returned to caller */
 
-	name_buffer = acpi_cm_callocate (size + 1);
+	name_buffer = acpi_ut_callocate (size + 1);
 	if (!name_buffer) {
 		REPORT_ERROR (("Ns_get_table_pathname: allocation failure\n"));
 		return (NULL);
@@ -95,8 +95,7 @@ acpi_ns_get_table_pathname (
 
 	name_buffer[size] = '\0';
 	while ((size > ACPI_NAME_SIZE) &&
-		acpi_ns_get_parent_object (child_node))
-	{
+		acpi_ns_get_parent_object (child_node)) {
 		size -= ACPI_NAME_SIZE;
 		name = acpi_ns_find_parent_name (child_node);
 
@@ -138,8 +137,7 @@ acpi_ns_get_pathname_length (
 	 */
 	for (size = 0, next_node = node;
 		  acpi_ns_get_parent_object (next_node);
-		  next_node = acpi_ns_get_parent_object (next_node))
-	{
+		  next_node = acpi_ns_get_parent_object (next_node)) {
 		size += PATH_SEGMENT_LENGTH;
 	}
 
@@ -184,7 +182,7 @@ acpi_ns_handle_to_pathname (
 	u32                     size;
 
 
-	if (!acpi_gbl_root_node || !target_handle) {
+	if (!acpi_gbl_root_node) {
 		/*
 		 * If the name space has not been initialized,
 		 * this function should not have been called.

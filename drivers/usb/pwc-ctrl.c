@@ -236,9 +236,7 @@ static inline int set_video_mode_Nala(struct pwc_device *pdev, int size, int fra
 	if (ret < 0)
 		return ret;
 	if (pEntry->compressed)
-		ret = pdev->decompressor->init(pdev->release, buf, &pdev->decompress_data);
-	if (ret < 0)
-		return ret;
+		pdev->decompressor->init(pdev->release, buf, pdev->decompress_data);
 		
 	/* Set various parameters */
 	pdev->vframes = frames;
@@ -303,9 +301,7 @@ static inline int set_video_mode_Timon(struct pwc_device *pdev, int size, int fr
 		return ret;
 
 	if (pChoose->bandlength > 0)
-		ret = pdev->decompressor->init(pdev->release, buf, &pdev->decompress_data);
-	if (ret < 0)
-		return ret;
+		pdev->decompressor->init(pdev->release, buf, pdev->decompress_data);
 	
 	/* Set various parameters */
 	pdev->vframes = frames;
@@ -366,9 +362,7 @@ static inline int set_video_mode_Kiara(struct pwc_device *pdev, int size, int fr
 		return ret;
 
 	if (pChoose->bandlength > 0)
-		ret = pdev->decompressor->init(pdev->release, buf, &pdev->decompress_data);
-	if (ret < 0)
-		return ret;
+		pdev->decompressor->init(pdev->release, buf, pdev->decompress_data);
 		
 	/* All set and go */
 	pdev->vframes = frames;
@@ -429,14 +423,11 @@ int pwc_set_video_mode(struct pwc_device *pdev, int width, int height, int frame
 			return ret;
 		}
 	}
-	/* If the video mode was not supported, we still adjust the view size,
-	   since xawtv (Again! Stupid program...) doesn't care zit about 
-	   return values.
-	 */
 	pdev->view.x = width;
 	pdev->view.y = height;
 	pwc_set_image_buffer_size(pdev);
-	Trace(TRACE_SIZE, "Set viewport to %dx%d, image size is %dx%d. Palette = %d.\n", width, height, pwc_image_sizes[size].x, pwc_image_sizes[size].y, pdev->vpalette);
+	Trace(TRACE_SIZE, "Set viewport to %dx%d, image size is %dx%d, palette = %d.\n", width, height, pwc_image_sizes[size].x, pwc_image_sizes[size].y, pdev->vpalette);
+Debug("bandlength = %d\n", pdev->vbandlength);	
 	return 0;
 }
 
@@ -482,22 +473,15 @@ void pwc_set_image_buffer_size(struct pwc_device *pdev)
 	pdev->image.size = pdev->image.x * pdev->image.y * factor / 4;
 	pdev->view.size  = pdev->view.x  * pdev->view.y  * factor / 4;
 
-	pdev->offset.x = (pdev->view.x - pdev->image.x) / 2;
-	pdev->offset.y = (pdev->view.y - pdev->image.y) / 2;
-	if (pdev->vpalette == VIDEO_PALETTE_YUV420 || pdev->vpalette == VIDEO_PALETTE_YUV420P) {
-		/* Align offset, or you'll get some very weird results in
-		   YUV mode... x must be multiple of 4 (to get the Y's in 
-		   place), and y even (or you'll mixup U & V).
-		 */
-		pdev->offset.x &= 0xFFFC;
-		pdev->offset.y &= 0xFFFE;	
-		/* This is the offset in the Y area, hence no factor */
-		pdev->offset.size = (pdev->offset.y * pdev->view.x + pdev->offset.x);
-	}
-	else
-		pdev->offset.size = (pdev->offset.y * pdev->view.x + pdev->offset.x) * factor / 4;
+	/* Align offset, or you'll get some very weird results in
+	   YUV420 mode... x must be multiple of 4 (to get the Y's in 
+	   place), and y even (or you'll mixup U & V). This is less of a
+	   problem for YUV420P.
+	 */
+	pdev->offset.x = ((pdev->view.x - pdev->image.x) / 2) & 0xFFFC;
+	pdev->offset.y = ((pdev->view.y - pdev->image.y) / 2) & 0xFFFE;
 	
-	/* Set buffers to gray */
+	/* Fill buffers with gray or black */
 	for (i = 0; i < MAX_IMAGES; i++) {
 		if (pdev->image_ptr[i] != NULL)
 			memset(pdev->image_ptr[i], filler, pdev->view.size);

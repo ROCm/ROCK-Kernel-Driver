@@ -63,19 +63,46 @@ struct inet6_protocol
 
 #endif
 
+/* This is used to register socket interfaces for IP protocols.  */
+struct inet_protosw {
+	struct list_head list;
+
+        /* These two fields form the lookup key.  */
+	unsigned short	 type;	   /* This is the 2nd argument to socket(2). */
+	int		 protocol; /* This is the L4 protocol number.  */
+
+	struct proto	 *prot;
+	struct proto_ops *ops;
+  
+	int              capability; /* Which (if any) capability do
+				      * we need to use this socket
+				      * interface?
+                                      */
+	char             no_check;   /* checksum on rcv/xmit/none? */
+	unsigned char	 flags;      /* See INET_PROTOSW_* below.  */
+};
+#define INET_PROTOSW_REUSE 0x01	     /* Are ports automatically reusable? */
+#define INET_PROTOSW_PERMANENT 0x02  /* Permanent protocols are unremovable. */
+
 extern struct inet_protocol *inet_protocol_base;
 extern struct inet_protocol *inet_protos[MAX_INET_PROTOS];
+extern struct list_head inetsw[SOCK_MAX];
 
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
 extern struct inet6_protocol *inet6_protos[MAX_INET_PROTOS];
+extern struct list_head inetsw6[SOCK_MAX];
 #endif
 
 extern void	inet_add_protocol(struct inet_protocol *prot);
 extern int	inet_del_protocol(struct inet_protocol *prot);
+extern void	inet_register_protosw(struct inet_protosw *p);
+extern void	inet_unregister_protosw(struct inet_protosw *p);
 
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
 extern void	inet6_add_protocol(struct inet6_protocol *prot);
 extern int	inet6_del_protocol(struct inet6_protocol *prot);
+extern void	inet6_register_protosw(struct inet_protosw *p);
+extern void	inet6_unregister_protosw(struct inet_protosw *p);
 #endif
 
 #endif	/* _PROTOCOL_H */

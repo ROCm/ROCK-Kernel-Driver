@@ -1,7 +1,15 @@
+/******************************************************************************
+ * 
+ * Module Name: os.c - Linux OSL functions
+ *		$Revision: 28 $
+ *
+ *****************************************************************************/
+
 /*
  *  os.c - OS-dependent functions
  *
  *  Copyright (C) 2000 Andrew Henroid
+ *  Copyright (C) 2001 Andrew Grover
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -17,24 +25,36 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+/* Changes
+ *
+ * Christopher Liebman <liebman@sponsera.com> 2001-5-15
+ * - Fixed improper kernel_thread parameters 
+ */
 
 #include <linux/kernel.h>
-#include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/pci.h>
-#include <linux/acpi.h>
+#include <linux/interrupt.h>
+#include <linux/kmod.h>
 #include <linux/delay.h>
 #include <asm/io.h>
-#include "acpi.h"
+#include <acpi.h>
 #include "driver.h"
 
-#define _COMPONENT	OS_DEPENDENT
+#define _COMPONENT	ACPI_OS_SERVICES
 	MODULE_NAME	("os")
 
-static int acpi_irq_irq = 0;
-static OSD_HANDLER acpi_irq_handler = NULL;
-static void *acpi_irq_context = NULL;
+typedef struct 
+{
+    OSD_EXECUTION_CALLBACK  function;
+    void		    *context;
+} ACPI_OS_DPC;
+
+
+/*****************************************************************************
+ *			       Debugger Stuff
+ *****************************************************************************/
 
 #ifdef ENABLE_DEBUGGER
 
@@ -46,6 +66,19 @@ extern NATIVE_CHAR line_buf[80];
 
 #endif
 
+
+/*****************************************************************************
+ *				    Globals
+ *****************************************************************************/
+
+static int acpi_irq_irq = 0;
+static OSD_HANDLER acpi_irq_handler = NULL;
+static void *acpi_irq_context = NULL;
+
+
+/******************************************************************************
+ *				   Functions
+ *****************************************************************************/
 
 ACPI_STATUS
 acpi_os_initialize(void)
@@ -141,6 +174,17 @@ acpi_os_unmap_memory(void *virt, u32 size)
 		iounmap(virt);
 }
 
+ACPI_STATUS
+acpi_os_get_physical_address(void *virt, ACPI_PHYSICAL_ADDRESS *phys)
+{
+	if(!phys || !virt)
+		return AE_BAD_PARAMETER;
+
+	*phys = virt_to_phys(virt);
+
+	return AE_OK;
+}
+
 static void
 acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -171,6 +215,7 @@ acpi_os_remove_interrupt_handler(u32 irq, OSD_HANDLER handler)
 		free_irq(irq, acpi_irq);
 		acpi_irq_handler = NULL;
 	}
+
 	return AE_OK;
 }
 
@@ -265,10 +310,10 @@ acpi_os_mem_out32 (ACPI_PHYSICAL_ADDRESS phys_addr, UINT32 value)
 
 ACPI_STATUS
 acpi_os_read_pci_cfg_byte(
-			  u32 bus,
-			  u32 func,
-			  u32 addr,
-			  u8 * val)
+	u32 bus,
+	u32 func,
+	u32 addr,
+	u8 * val)
 {
 	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
 	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
@@ -279,10 +324,10 @@ acpi_os_read_pci_cfg_byte(
 
 ACPI_STATUS
 acpi_os_read_pci_cfg_word(
-			  u32 bus,
-			  u32 func,
-			  u32 addr,
-			  u16 * val)
+	u32 bus,
+	u32 func,
+	u32 addr,
+	u16 * val)
 {
 	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
 	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
@@ -293,10 +338,10 @@ acpi_os_read_pci_cfg_word(
 
 ACPI_STATUS
 acpi_os_read_pci_cfg_dword(
-			   u32 bus,
-			   u32 func,
-			   u32 addr,
-			   u32 * val)
+	u32 bus,
+	u32 func,
+	u32 addr,
+	u32 * val)
 {
 	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
 	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
@@ -307,10 +352,10 @@ acpi_os_read_pci_cfg_dword(
 
 ACPI_STATUS
 acpi_os_write_pci_cfg_byte(
-			   u32 bus,
-			   u32 func,
-			   u32 addr,
-			   u8 val)
+	u32 bus,
+	u32 func,
+	u32 addr,
+	u8 val)
 {
 	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
 	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
@@ -321,10 +366,10 @@ acpi_os_write_pci_cfg_byte(
 
 ACPI_STATUS
 acpi_os_write_pci_cfg_word(
-			   u32 bus,
-			   u32 func,
-			   u32 addr,
-			   u16 val)
+	u32 bus,
+	u32 func,
+	u32 addr,
+	u16 val)
 {
 	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
 	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
@@ -335,10 +380,10 @@ acpi_os_write_pci_cfg_word(
 
 ACPI_STATUS
 acpi_os_write_pci_cfg_dword(
-			    u32 bus,
-			    u32 func,
-			    u32 addr,
-			    u32 val)
+	u32 bus,
+	u32 func,
+	u32 addr,
+	u32 val)
 {
 	int devfn = PCI_DEVFN((func >> 16) & 0xffff, func & 0xffff);
 	struct pci_dev *dev = pci_find_slot(bus & 0xffff, devfn);
@@ -347,49 +392,317 @@ acpi_os_write_pci_cfg_dword(
 	return AE_OK;
 }
 
+ACPI_STATUS
+acpi_os_load_module (
+	char *module_name)
+{
+	FUNCTION_TRACE("acpi_os_load_module");
+
+	if (!module_name)
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+
+	if (0 > request_module(module_name)) {
+		DEBUG_PRINT(ACPI_WARN, ("Unable to load module [%s].\n", module_name));
+		return_ACPI_STATUS(AE_ERROR);
+	}
+
+	return_ACPI_STATUS(AE_OK);
+}
+
+ACPI_STATUS
+acpi_os_unload_module (
+	char *module_name)
+{
+	FUNCTION_TRACE("acpi_os_unload_module");
+
+	if (!module_name)
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+
+	/* TODO: How on Linux? */
+	/* this is done automatically for all modules with
+	use_count = 0, I think. see: MOD_INC_USE_COUNT -ASG */
+
+	return_ACPI_STATUS(AE_OK);
+}
+
+
 /*
- * Queue for interpreter thread
+ * See acpi_os_queue_for_execution(), too
  */
+static int
+acpi_os_queue_exec (
+	void *context)
+{
+	ACPI_OS_DPC		*dpc = (ACPI_OS_DPC*)context;
+
+	FUNCTION_TRACE("acpi_os_queue_exec");
+
+	daemonize();
+	strcpy(current->comm, "kacpidpc");
+    
+	if (!dpc || !dpc->function)
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+
+	DEBUG_PRINT(ACPI_INFO, ("Executing function [%p(%p)].\n", dpc->function, dpc->context));
+
+	dpc->function(dpc->context);
+
+	acpi_os_free(dpc);
+
+	return_VALUE(1);
+}
+
+static void
+acpi_os_schedule_exec (
+	void *context)
+{
+	ACPI_OS_DPC		*dpc = NULL;
+	int			thread_pid = -1;
+
+	FUNCTION_TRACE("acpi_os_schedule_exec");
+
+	dpc = (ACPI_OS_DPC*)context;
+	if (!dpc) {
+		DEBUG_PRINT(ACPI_ERROR, ("Invalid (NULL) context.\n"));
+		return;
+	}
+
+	DEBUG_PRINT(ACPI_INFO, ("Creating new thread to run function [%p(%p)].\n", dpc->function, dpc->context));
+
+	thread_pid = kernel_thread(acpi_os_queue_exec, dpc, 
+		(CLONE_FS | CLONE_FILES | SIGCHLD));
+	if (thread_pid < 0) {
+		DEBUG_PRINT(ACPI_ERROR, ("Call to kernel_thread() failed.\n"));
+		acpi_os_free(dpc);
+	}
+
+	return_VOID;
+}
 
 ACPI_STATUS
 acpi_os_queue_for_execution(
-			    u32 priority,
-			    OSD_EXECUTION_CALLBACK callback,
-			    void *context)
+	u32			priority,
+	OSD_EXECUTION_CALLBACK	function,
+	void			*context)
 {
-	if (acpi_run(callback, context))
-		return AE_ERROR;
-	return AE_OK;
+	ACPI_STATUS 		status = AE_OK;
+	ACPI_OS_DPC 		*dpc = NULL;
+
+	FUNCTION_TRACE("acpi_os_queue_for_execution");
+
+	DEBUG_PRINT(ACPI_INFO, ("Scheduling function [%p(%p)] for deferred execution.\n", function, context));
+
+	if (!function)
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+
+	/*
+	 * Allocate/initialize DPC structure.  Note that this memory will be
+	 * freed by the callee.
+	 */
+	dpc = acpi_os_callocate(sizeof(ACPI_OS_DPC));
+	if (!dpc) 
+		return AE_NO_MEMORY;
+
+	dpc->function = function;
+	dpc->context = context;
+
+	/*
+	 * Queue via DPC:
+	 * --------------
+	 * Note that we have to use two different processes for queuing DPCs:
+	 *	 Interrupt-Level: Use schedule_task; can't spawn a new thread.
+	 *	    Kernel-Level: Spawn a new kernel thread, as schedule_task has
+	 *			  its limitations (e.g. single-threaded model), and
+	 *			  all other task queues run at interrupt-level.
+	 */
+	switch (priority) {
+
+	case OSD_PRIORITY_GPE:
+	{
+		static struct tq_struct task;
+
+		memset(&task, 0, sizeof(struct tq_struct));
+
+		task.routine = acpi_os_schedule_exec;
+		task.data = (void*)dpc;
+
+		if (schedule_task(&task) < 0) {
+			DEBUG_PRINT(ACPI_ERROR, ("Call to schedule_task() failed.\n"));
+			status = AE_ERROR;
+		}
+	}
+	break;
+
+	default:
+		acpi_os_schedule_exec(dpc);
+		break;
+	}
+
+	return_ACPI_STATUS(status);
 }
 
-/*
- * Semaphores are unused, interpreter access is single threaded
+
+ACPI_STATUS
+acpi_os_create_semaphore(
+	u32		max_units,
+	u32		initial_units,
+	ACPI_HANDLE	*handle)
+{
+    struct semaphore	    *sem = NULL;
+
+    FUNCTION_TRACE("acpi_os_create_semaphore");
+
+    sem = acpi_os_callocate(sizeof(struct semaphore));
+    if (!sem)
+	return_ACPI_STATUS(AE_NO_MEMORY);
+
+    sema_init(sem, initial_units);
+
+    *handle = (ACPI_HANDLE*)sem;
+
+    DEBUG_PRINT(ACPI_INFO, ("Creating semaphore[%p|%d].\n", *handle, initial_units));
+
+    return_ACPI_STATUS(AE_OK);
+}
+
+
+/* 
+ * TODO: A better way to delete semaphores?  Linux doesn't have a
+ * 'delete_semaphore()' function -- may result in an invalid
+ * pointer dereference for non-synchronized consumers.	Should
+ * we at least check for blocked threads and signal/cancel them?
  */
 
 ACPI_STATUS
-acpi_os_create_semaphore(u32 max_units, u32 init, ACPI_HANDLE * handle)
+acpi_os_delete_semaphore(
+	ACPI_HANDLE handle)
 {
-	/* a hack to fake out sems until we implement them */
-	*handle = (ACPI_HANDLE) handle;
-	return AE_OK;
+    struct semaphore	    *sem = (struct semaphore*)handle;
+
+    FUNCTION_TRACE("acpi_os_delete_semaphore");
+
+    if (!sem) 
+	return AE_BAD_PARAMETER;
+
+    DEBUG_PRINT(ACPI_INFO, ("Deleting semaphore[%p].\n", handle));
+
+    acpi_os_free(sem); sem =  NULL;
+
+    return_ACPI_STATUS(AE_OK);
 }
 
+
+/*
+ * TODO: The kernel doesn't have a 'down_timeout' function -- had to
+ * improvise.  The process is to sleep for one scheduler quantum
+ * until the semaphore becomes available.  Downside is that this
+ * may result in starvation for timeout-based waits when there's
+ * lots of semaphore activity.
+ *
+ * TODO: Support for units > 1?
+ */
 ACPI_STATUS
-acpi_os_delete_semaphore(ACPI_HANDLE handle)
+acpi_os_wait_semaphore(
+	ACPI_HANDLE	handle,
+	u32			units,
+	u32			timeout)
 {
-	return AE_OK;
+	ACPI_STATUS		status = AE_OK;
+	struct semaphore	*sem = (struct semaphore*)handle;
+	int			ret = 0;
+
+	FUNCTION_TRACE("acpi_os_wait_semaphore");
+
+	if (!sem || (units < 1)) 
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+
+	if (units > 1)
+		return_ACPI_STATUS(AE_SUPPORT);
+
+	DEBUG_PRINT(ACPI_INFO, ("Waiting for semaphore[%p|%d|%d]\n", handle, units, timeout));
+
+	switch (timeout)
+	{
+		/*
+		 * No Wait:
+		 * --------
+		 * A zero timeout value indicates that we shouldn't wait - just
+		 * acquire the semaphore if available otherwise return AE_TIME
+		 * (a.k.a. 'would block').
+		 */
+		case 0:
+		ret = down_trylock(sem);
+		if (ret < 0)
+			status = AE_TIME;
+		break;
+
+		/*
+		 * Wait Indefinitely:
+		 * ------------------
+		 */
+		case WAIT_FOREVER:
+		ret = down_interruptible(sem);
+		if (ret < 0)
+			status = AE_ERROR;
+		break;
+
+		/*
+		 * Wait w/ Timeout:
+		 * ----------------
+		 */
+		default:
+		// TODO: A better timeout algorithm?
+		{
+			int i = 0;
+			static const int quantum_ms = 1000/HZ;
+
+			ret = down_trylock(sem);
+			for (i = timeout; (i > 0 && ret < 0); i -= quantum_ms) {
+				current->state = TASK_INTERRUPTIBLE;
+				schedule_timeout(1);
+				ret = down_trylock(sem);
+			}
+	
+			if (ret < 0)
+			 status = AE_TIME;
+			}
+		break;
+	}
+
+	if (ACPI_FAILURE(status)) {
+		DEBUG_PRINT(ACPI_INFO, ("Failed to acquire semaphore[%p|%d|%d]\n", handle, units, timeout));
+	}
+	else {
+		DEBUG_PRINT(ACPI_INFO, ("Acquired semaphore[%p|%d|%d]\n", handle, units, timeout));
+	}
+
+	return_ACPI_STATUS(status);
 }
 
-ACPI_STATUS
-acpi_os_wait_semaphore(ACPI_HANDLE handle, u32 units, u32 timeout)
-{
-	return AE_OK;
-}
 
+/*
+ * TODO: Support for units > 1?
+ */
 ACPI_STATUS
-acpi_os_signal_semaphore(ACPI_HANDLE handle, u32 units)
+acpi_os_signal_semaphore(
+    ACPI_HANDLE 	    handle, 
+    u32 		    units)
 {
-	return AE_OK;
+	struct semaphore *sem = (struct semaphore *) handle;
+
+	FUNCTION_TRACE("acpi_os_signal_semaphore");
+
+	if (!sem || (units < 1)) 
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+
+	if (units > 1)
+		return_ACPI_STATUS(AE_SUPPORT);
+
+	DEBUG_PRINT(ACPI_INFO, ("Signaling semaphore[%p|%d]\n", handle, units));
+
+	up(sem);
+
+	return_ACPI_STATUS(AE_OK);
 }
 
 ACPI_STATUS
@@ -399,8 +712,10 @@ acpi_os_breakpoint(NATIVE_CHAR *msg)
 	return AE_OK;
 }
 
+
 void
 acpi_os_dbg_trap(char *msg)
+
 {
 	acpi_os_printf("trap: %s", msg);
 }
@@ -421,7 +736,7 @@ acpi_os_get_line(NATIVE_CHAR *buffer)
 
 		kdb_read(buffer, sizeof(line_buf));
 
-		/* remove the CR kdb includes */
+		/* remove the CR kdb includes */ 
 		chars = strlen(buffer) - 1;
 		buffer[chars] = '\0';
 	}
@@ -444,4 +759,15 @@ BOOLEAN
 acpi_os_writable(void *ptr, u32 len)
 {
 	return 1;
+}
+
+u32
+acpi_os_get_thread_id (void)
+{
+	if (!in_interrupt())
+		return current->pid;
+
+	/*acpi_os_printf("acpi_os_get_thread_id called from interrupt level!\n");*/
+
+	return 0;
 }

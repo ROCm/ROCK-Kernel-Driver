@@ -1,4 +1,4 @@
-/* $Id: pci_psycho.c,v 1.25 2001/06/04 23:20:32 ecd Exp $
+/* $Id: pci_psycho.c,v 1.26 2001/06/13 06:34:30 davem Exp $
  * pci_psycho.c: PSYCHO/U2P specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -1409,6 +1409,8 @@ static void __init pbm_register_toplevel_resources(struct pci_controller_info *p
 
 	request_resource(&ioport_resource, &pbm->io_space);
 	request_resource(&iomem_resource, &pbm->mem_space);
+	pci_register_legacy_regions(&pbm->io_space,
+				    &pbm->mem_space);
 }
 
 static void psycho_pbm_strbuf_init(struct pci_controller_info *p,

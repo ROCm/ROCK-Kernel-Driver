@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acresrc.h - Resource Manager function prototypes
- *       $Revision: 22 $
+ *       $Revision: 25 $
  *
  *****************************************************************************/
 
@@ -60,7 +60,7 @@ acpi_rs_create_resource_list (
 
 ACPI_STATUS
 acpi_rs_create_byte_stream (
-	RESOURCE                *linked_list_buffer,
+	ACPI_RESOURCE           *linked_list_buffer,
 	u8                      *output_buffer,
 	u32                     *output_buffer_length);
 
@@ -77,7 +77,7 @@ acpi_rs_create_pci_routing_table (
 
 void
 acpi_rs_dump_resource_list (
-	RESOURCE                *resource);
+	ACPI_RESOURCE           *resource);
 
 void
 acpi_rs_dump_irq_list (
@@ -97,7 +97,7 @@ acpi_rs_calculate_list_length (
 
 ACPI_STATUS
 acpi_rs_calculate_byte_stream_length (
-	RESOURCE                *linked_list_buffer,
+	ACPI_RESOURCE           *linked_list_buffer,
 	u32                     *size_needed);
 
 ACPI_STATUS
@@ -113,7 +113,7 @@ acpi_rs_byte_stream_to_list (
 
 ACPI_STATUS
 acpi_rs_list_to_byte_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u32                     byte_stream_size_needed,
 	u8                      **output_buffer);
 
@@ -133,13 +133,13 @@ acpi_rs_fixed_io_resource (
 
 ACPI_STATUS
 acpi_rs_io_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
 ACPI_STATUS
 acpi_rs_fixed_io_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
@@ -152,7 +152,7 @@ acpi_rs_irq_resource (
 
 ACPI_STATUS
 acpi_rs_irq_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
@@ -165,7 +165,7 @@ acpi_rs_dma_resource (
 
 ACPI_STATUS
 acpi_rs_dma_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
@@ -178,7 +178,7 @@ acpi_rs_address16_resource (
 
 ACPI_STATUS
 acpi_rs_address16_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
@@ -191,7 +191,20 @@ acpi_rs_address32_resource (
 
 ACPI_STATUS
 acpi_rs_address32_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
+	u8                      **output_buffer,
+	u32                     *bytes_consumed);
+
+ACPI_STATUS
+acpi_rs_address64_resource (
+	u8                      *byte_stream_buffer,
+	u32                     *bytes_consumed,
+	u8                      **output_buffer,
+	u32                     *structure_size);
+
+ACPI_STATUS
+acpi_rs_address64_stream (
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
@@ -211,13 +224,13 @@ acpi_rs_end_dependent_functions_resource (
 
 ACPI_STATUS
 acpi_rs_start_dependent_functions_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
 ACPI_STATUS
 acpi_rs_end_dependent_functions_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
@@ -230,7 +243,7 @@ acpi_rs_memory24_resource (
 
 ACPI_STATUS
 acpi_rs_memory24_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
@@ -251,13 +264,13 @@ acpi_rs_fixed_memory32_resource (
 
 ACPI_STATUS
 acpi_rs_memory32_range_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
 ACPI_STATUS
 acpi_rs_fixed_memory32_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
@@ -270,7 +283,7 @@ acpi_rs_extended_irq_resource (
 
 ACPI_STATUS
 acpi_rs_extended_irq_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
@@ -283,7 +296,7 @@ acpi_rs_end_tag_resource (
 
 ACPI_STATUS
 acpi_rs_end_tag_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
@@ -296,9 +309,12 @@ acpi_rs_vendor_resource (
 
 ACPI_STATUS
 acpi_rs_vendor_stream (
-	RESOURCE                *linked_list,
+	ACPI_RESOURCE           *linked_list,
 	u8                      **output_buffer,
 	u32                     *bytes_consumed);
 
+u8
+acpi_rs_get_resource_type (
+	u8                      resource_start_byte);
 
 #endif  /* __ACRESRC_H__ */

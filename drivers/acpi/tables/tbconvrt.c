@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 19 $
+ *              $Revision: 23 $
  *
  *****************************************************************************/
 
@@ -30,29 +30,51 @@
 #include "actbl.h"
 
 
-#define _COMPONENT          TABLE_MANAGER
+#define _COMPONENT          ACPI_TABLES
 	 MODULE_NAME         ("tbconvrt")
 
 
-/*
- * Build a GAS structure from earlier ACPI table entries (V1.0 and 0.71 extensions)
+/*******************************************************************************
  *
- * 1) Address space
- * 2) Length in bytes -- convert to length in bits
- * 3) Bit offset is zero
- * 4) Reserved field is zero
- * 5) Expand address to 64 bits
- */
-#define ASL_BUILD_GAS_FROM_ENTRY(a,b,c,d)   {a.address_space_id = (u8) d;\
-			   a.register_bit_width = (u8) MUL_8 (b);\
-			   a.register_bit_offset = 0;\
-			   a.reserved = 0;\
-			   ACPI_STORE_ADDRESS (a.address,c);}
+ * FUNCTION:    Acpi_tb_get_table_count
+ *
+ * PARAMETERS:
+ *
+ * RETURN:
+ *
+ * DESCRIPTION:
+ *
+ ******************************************************************************/
+
+u32
+acpi_tb_get_table_count (
+	RSDP_DESCRIPTOR         *RSDP,
+	ACPI_TABLE_HEADER       *RSDT)
+{
+	u32                     pointer_size;
 
 
-/* ACPI V1.0 entries -- address space is always I/O */
+#ifndef _IA64
 
-#define ASL_BUILD_GAS_FROM_V1_ENTRY(a,b,c)  ASL_BUILD_GAS_FROM_ENTRY(a,b,c,ADDRESS_SPACE_SYSTEM_IO)
+	if (RSDP->revision < 2) {
+		pointer_size = sizeof (u32);
+	}
+
+	else
+#endif
+	{
+		pointer_size = sizeof (UINT64);
+	}
+
+	/*
+	 * Determine the number of tables pointed to by the RSDT/XSDT.
+	 * This is defined by the ACPI Specification to be the number of
+	 * pointers contained within the RSDT/XSDT.  The size of the pointers
+	 * is architecture-dependent.
+	 */
+
+	return ((RSDT->length - sizeof (ACPI_TABLE_HEADER)) / pointer_size);
+}
 
 
 /*******************************************************************************
@@ -73,33 +95,12 @@ acpi_tb_convert_to_xsdt (
 	u32                     *number_of_tables)
 {
 	u32                     table_size;
-	u32                     pointer_size;
 	u32                     i;
 	XSDT_DESCRIPTOR         *new_table;
 
 
-#ifndef _IA64
+	*number_of_tables = acpi_tb_get_table_count (acpi_gbl_RSDP, table_info->pointer);
 
-	if (acpi_gbl_RSDP->revision < 2) {
-		pointer_size = sizeof (u32);
-	}
-
-	else
-#endif
-	{
-		pointer_size = sizeof (UINT64);
-	}
-
-	/*
-	 * Determine the number of tables pointed to by the RSDT/XSDT.
-	 * This is defined by the ACPI Specification to be the number of
-	 * pointers contained within the RSDT/XSDT.  The size of the pointers
-	 * is architecture-dependent.
-	 */
-
-	table_size = table_info->pointer->length;
-	*number_of_tables = (table_size -
-			   sizeof (ACPI_TABLE_HEADER)) / pointer_size;
 
 	/* Compute size of the converted XSDT */
 
@@ -108,7 +109,7 @@ acpi_tb_convert_to_xsdt (
 
 	/* Allocate an XSDT */
 
-	new_table = acpi_cm_callocate (table_size);
+	new_table = acpi_ut_callocate (table_size);
 	if (!new_table) {
 		return (AE_NO_MEMORY);
 	}
@@ -193,7 +194,7 @@ acpi_tb_convert_table_fadt (void)
 	/* Acpi_gbl_FADT is valid */
 	/* Allocate and zero the 2.0 buffer */
 
-	FADT2 = acpi_cm_callocate (sizeof (FADT_DESCRIPTOR_REV2));
+	FADT2 = acpi_ut_callocate (sizeof (FADT_DESCRIPTOR_REV2));
 	if (FADT2 == NULL) {
 		return (AE_NO_MEMORY);
 	}
@@ -501,7 +502,7 @@ acpi_tb_build_common_facs (
 
 	/* Allocate a common FACS */
 
-	common_facs = acpi_cm_callocate (sizeof (ACPI_COMMON_FACS));
+	common_facs = acpi_ut_callocate (sizeof (ACPI_COMMON_FACS));
 	if (!common_facs) {
 		return (AE_NO_MEMORY);
 	}

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psscope - Parser scope stack management routines
- *              $Revision: 24 $
+ *              $Revision: 27 $
  *
  *****************************************************************************/
 
@@ -27,7 +27,7 @@
 #include "acpi.h"
 #include "acparser.h"
 
-#define _COMPONENT          PARSER
+#define _COMPONENT          ACPI_PARSER
 	 MODULE_NAME         ("psscope")
 
 
@@ -95,7 +95,7 @@ acpi_ps_init_scope (
 	ACPI_GENERIC_STATE      *scope;
 
 
-	scope = acpi_cm_create_generic_state ();
+	scope = acpi_ut_create_generic_state ();
 	if (!scope) {
 		return (AE_NO_MEMORY);
 	}
@@ -137,7 +137,7 @@ acpi_ps_push_scope (
 	ACPI_GENERIC_STATE      *scope;
 
 
-	scope = acpi_cm_create_generic_state ();
+	scope = acpi_ut_create_generic_state ();
 	if (!scope) {
 		return (AE_NO_MEMORY);
 	}
@@ -150,7 +150,7 @@ acpi_ps_push_scope (
 
 	/* Push onto scope stack */
 
-	acpi_cm_push_generic_state (&parser_state->scope, scope);
+	acpi_ut_push_generic_state (&parser_state->scope, scope);
 
 
 	if (arg_count == ACPI_VAR_ARGS) {
@@ -199,7 +199,7 @@ acpi_ps_pop_scope (
 	 * Only pop the scope if there is in fact a next scope
 	 */
 	if (scope->common.next) {
-		scope = acpi_cm_pop_generic_state (&parser_state->scope);
+		scope = acpi_ut_pop_generic_state (&parser_state->scope);
 
 
 		/* return to parsing previous op */
@@ -211,7 +211,7 @@ acpi_ps_pop_scope (
 
 		/* All done with this scope state structure */
 
-		acpi_cm_delete_generic_state (scope);
+		acpi_ut_delete_generic_state (scope);
 	}
 
 	else {
@@ -255,8 +255,8 @@ acpi_ps_cleanup_scope (
 	/* Delete anything on the scope stack */
 
 	while (parser_state->scope) {
-		scope = acpi_cm_pop_generic_state (&parser_state->scope);
-		acpi_cm_delete_generic_state (scope);
+		scope = acpi_ut_pop_generic_state (&parser_state->scope);
+		acpi_ut_delete_generic_state (scope);
 	}
 
 	return;

@@ -18,6 +18,7 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -27,6 +28,7 @@
 #include "acdebug.h"
 
 extern int acpi_in_debugger;
+extern FADT_DESCRIPTOR acpi_fadt;
 
 #define _COMPONENT	OS_DEPENDENT
 	MODULE_NAME	("symbols")
@@ -55,9 +57,7 @@ EXPORT_SYMBOL(function_value_exit);
 EXPORT_SYMBOL(debug_print_raw);
 EXPORT_SYMBOL(debug_print_prefix);
 
-EXPORT_SYMBOL(acpi_cm_strncmp);
-EXPORT_SYMBOL(acpi_cm_memcpy);
-EXPORT_SYMBOL(acpi_cm_memset);
+EXPORT_SYMBOL(acpi_ut_format_exception);
 
 EXPORT_SYMBOL(acpi_get_handle);
 EXPORT_SYMBOL(acpi_get_parent);
@@ -66,6 +66,7 @@ EXPORT_SYMBOL(acpi_get_name);
 EXPORT_SYMBOL(acpi_get_object_info);
 EXPORT_SYMBOL(acpi_get_next_object);
 EXPORT_SYMBOL(acpi_evaluate_object);
+EXPORT_SYMBOL(acpi_get_table);
 
 EXPORT_SYMBOL(acpi_install_notify_handler);
 EXPORT_SYMBOL(acpi_remove_notify_handler);
@@ -73,6 +74,11 @@ EXPORT_SYMBOL(acpi_install_gpe_handler);
 EXPORT_SYMBOL(acpi_remove_gpe_handler);
 EXPORT_SYMBOL(acpi_install_address_space_handler);
 EXPORT_SYMBOL(acpi_remove_address_space_handler);
+EXPORT_SYMBOL(acpi_install_fixed_event_handler);
+EXPORT_SYMBOL(acpi_remove_fixed_event_handler);
+
+EXPORT_SYMBOL(acpi_acquire_global_lock);
+EXPORT_SYMBOL(acpi_release_global_lock);
 
 EXPORT_SYMBOL(acpi_get_current_resources);
 EXPORT_SYMBOL(acpi_get_possible_resources);
@@ -81,3 +87,20 @@ EXPORT_SYMBOL(acpi_set_current_resources);
 EXPORT_SYMBOL(acpi_enable_event);
 EXPORT_SYMBOL(acpi_disable_event);
 EXPORT_SYMBOL(acpi_clear_event);
+
+EXPORT_SYMBOL(acpi_get_timer_duration);
+EXPORT_SYMBOL(acpi_get_timer);
+
+EXPORT_SYMBOL(acpi_os_signal_semaphore);
+EXPORT_SYMBOL(acpi_os_create_semaphore);
+EXPORT_SYMBOL(acpi_os_delete_semaphore);
+EXPORT_SYMBOL(acpi_os_wait_semaphore);
+
+EXPORT_SYMBOL(acpi_os_in32);
+EXPORT_SYMBOL(acpi_os_out32);
+EXPORT_SYMBOL(acpi_fadt);
+EXPORT_SYMBOL(acpi_hw_register_bit_access);
+EXPORT_SYMBOL(acpi_hw_obtain_sleep_type_register_data);
+EXPORT_SYMBOL(acpi_enter_sleep_state);
+EXPORT_SYMBOL(acpi_get_system_info);
+

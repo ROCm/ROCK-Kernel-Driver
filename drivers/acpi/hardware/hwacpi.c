@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: hwacpi - ACPI Hardware Initialization/Mode Interface
- *              $Revision: 36 $
+ *              $Revision: 40 $
  *
  *****************************************************************************/
 
@@ -29,7 +29,7 @@
 #include "achware.h"
 
 
-#define _COMPONENT          HARDWARE
+#define _COMPONENT          ACPI_HARDWARE
 	 MODULE_NAME         ("hwacpi")
 
 
@@ -63,7 +63,8 @@ acpi_hw_initialize (
 
 	/* Must support *some* mode! */
 /*
-	if (!(System_flags & SYS_MODES_MASK)) {
+	if (!(System_flags & SYS_MODES_MASK))
+	{
 		Restore_acpi_chipset = FALSE;
 
 		return (AE_ERROR);
@@ -72,8 +73,7 @@ acpi_hw_initialize (
 */
 
 
-	switch (acpi_gbl_system_flags & SYS_MODES_MASK)
-	{
+	switch (acpi_gbl_system_flags & SYS_MODES_MASK) {
 		/* Identify current ACPI/legacy mode   */
 
 	case (SYS_MODE_ACPI):
@@ -128,12 +128,11 @@ acpi_hw_initialize (
 		 */
 
 		if (ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xgpe0blk.address) &&
-			acpi_gbl_FADT->gpe0blk_len)
-		{
+			acpi_gbl_FADT->gpe0blk_len) {
 			/* GPE0 specified in FADT  */
 
 			acpi_gbl_gpe0enable_register_save =
-				acpi_cm_allocate (DIV_2 (acpi_gbl_FADT->gpe0blk_len));
+				acpi_ut_allocate (DIV_2 (acpi_gbl_FADT->gpe0blk_len));
 			if (!acpi_gbl_gpe0enable_register_save) {
 				return (AE_NO_MEMORY);
 			}
@@ -151,12 +150,11 @@ acpi_hw_initialize (
 		}
 
 		if (ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xgpe1_blk.address) &&
-			acpi_gbl_FADT->gpe1_blk_len)
-		{
+			acpi_gbl_FADT->gpe1_blk_len) {
 			/* GPE1 defined */
 
 			acpi_gbl_gpe1_enable_register_save =
-				acpi_cm_allocate (DIV_2 (acpi_gbl_FADT->gpe1_blk_len));
+				acpi_ut_allocate (DIV_2 (acpi_gbl_FADT->gpe1_blk_len));
 			if (!acpi_gbl_gpe1_enable_register_save) {
 				return (AE_NO_MEMORY);
 			}
@@ -196,7 +194,7 @@ acpi_hw_set_mode (
 	u32                     mode)
 {
 
-	ACPI_STATUS             status = AE_ERROR;
+	ACPI_STATUS             status = AE_NO_HARDWARE_RESPONSE;
 
 
 	if (mode == SYS_MODE_ACPI) {

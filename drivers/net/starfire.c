@@ -208,6 +208,7 @@ static int full_duplex[MAX_UNITS] = {0, };
 #include <linux/delay.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/uaccess.h>
+#include <asm/io.h>
 
 #ifdef HAS_FIRMWARE
 #include "starfire_firmware.h"
@@ -584,7 +585,7 @@ static int	netdev_rx(struct net_device *dev);
 static void	netdev_error(struct net_device *dev, int intr_status);
 static void	set_rx_mode(struct net_device *dev);
 static struct net_device_stats *get_stats(struct net_device *dev);
-static int	netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+static int	mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int	netdev_close(struct net_device *dev);
 static void	netdev_media_change(struct net_device *dev);
 
@@ -725,7 +726,7 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 	dev->stop = &netdev_close;
 	dev->get_stats = &get_stats;
 	dev->set_multicast_list = &set_rx_mode;
-	dev->do_ioctl = &netdev_ioctl;
+	dev->do_ioctl = &mii_ioctl;
 
 	if (mtu)
 		dev->mtu = mtu;

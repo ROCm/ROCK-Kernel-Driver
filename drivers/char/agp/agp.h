@@ -92,7 +92,7 @@ struct agp_bridge_data {
 	u32 mode;
 	enum chipset_type type;
 	enum aper_size_type size_type;
-	u32 *key_list;
+	unsigned long *key_list;
 	atomic_t current_memory_agp;
 	atomic_t agp_in_use;
 	int max_memory_agp;	/* in number of pages */

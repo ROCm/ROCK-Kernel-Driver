@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: hwtimer.c - ACPI Power Management Timer Interface
- *              $Revision: 5 $
+ *              $Revision: 10 $
  *
  *****************************************************************************/
 
@@ -27,7 +27,7 @@
 #include "acpi.h"
 #include "achware.h"
 
-#define _COMPONENT          HARDWARE
+#define _COMPONENT          ACPI_HARDWARE
 	 MODULE_NAME         ("hwtimer")
 
 
@@ -47,6 +47,16 @@ ACPI_STATUS
 acpi_get_timer_resolution (
 	u32                     *resolution)
 {
+	ACPI_STATUS             status;
+
+
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	if (!resolution) {
 		return (AE_BAD_PARAMETER);
 	}
@@ -78,6 +88,16 @@ ACPI_STATUS
 acpi_get_timer (
 	u32                     *ticks)
 {
+	ACPI_STATUS             status;
+
+
+	/* Ensure that ACPI has been initialized */
+
+	ACPI_IS_INITIALIZATION_COMPLETE (status);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
 	if (!ticks) {
 		return (AE_BAD_PARAMETER);
 	}
@@ -126,6 +146,7 @@ acpi_get_timer_duration (
 	u32                     microseconds = 0;
 	u32                     remainder = 0;
 
+
 	if (!time_elapsed) {
 		return (AE_BAD_PARAMETER);
 	}
@@ -160,7 +181,7 @@ acpi_get_timer_duration (
 	 * divides in kernel-space we have to do some trickery to preserve
 	 * accuracy while using 32-bit math.
 	 *
-	 * TODO: Change to use 64-bit math when supported.
+	 * TBD: Change to use 64-bit math when supported.
 	 *
 	 * The process is as follows:
 	 *  1. Compute the number of seconds by dividing Delta Ticks by

@@ -1,11 +1,15 @@
 /*
- * bluetooth.c   Version 0.10
+ * bluetooth.c   Version 0.11
  *
  * Copyright (c) 2000, 2001 Greg Kroah-Hartman	<greg@kroah.com>
  * Copyright (c) 2000 Mark Douglas Corner	<mcorner@umich.edu>
  *
  * USB Bluetooth driver, based on the Bluetooth Spec version 1.0B
  * 
+ * (2001/06/05) Version 0.11 gkh
+ *	- Fixed problem with read urb status saying that we have shutdown,
+ *	  and that we shouldn't resubmit the urb.  Patch from unknown.
+ *
  * (2001/05/28) Version 0.10 gkh
  *	- Fixed problem with using data from userspace in the bluetooth_write
  *	  function as found by the CHECKER project.
@@ -110,7 +114,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.10"
+#define DRIVER_VERSION "v0.11"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, Mark Douglas Corner"
 #define DRIVER_DESC "USB Bluetooth driver"
 
@@ -877,6 +881,10 @@ static void bluetooth_read_bulk_callback (struct urb *urb)
 
 	if (urb->status) {
 		dbg(__FUNCTION__ " - nonzero read bulk status received: %d", urb->status);
+		if (urb->status == -ENOENT) {                   
+			dbg(__FUNCTION__ " - URB canceled, won't reschedule");
+			return;
+		}
 		goto exit;
 	}
 

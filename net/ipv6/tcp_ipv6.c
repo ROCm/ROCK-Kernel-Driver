@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: tcp_ipv6.c,v 1.136 2001/04/20 20:46:19 davem Exp $
+ *	$Id: tcp_ipv6.c,v 1.137 2001/06/13 16:25:03 davem Exp $
  *
  *	Based on: 
  *	linux/net/ipv4/tcp.c
@@ -2125,8 +2125,21 @@ static struct inet6_protocol tcpv6_protocol =
 	"TCPv6"			/* name			*/
 };
 
+extern struct proto_ops inet6_stream_ops;
+
+static struct inet_protosw tcpv6_protosw = {
+	type:        SOCK_STREAM,
+	protocol:    IPPROTO_TCP,
+	prot:        &tcpv6_prot,
+	ops:         &inet6_stream_ops,
+	capability:  -1,
+	no_check:    0,
+	flags:       INET_PROTOSW_PERMANENT,
+};
+
 void __init tcpv6_init(void)
 {
 	/* register inet6 protocol */
 	inet6_add_protocol(&tcpv6_protocol);
+	inet6_register_protosw(&tcpv6_protosw);
 }

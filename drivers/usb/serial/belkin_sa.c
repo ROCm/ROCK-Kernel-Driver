@@ -24,6 +24,9 @@
  * -- Add support for flush commands
  * -- Add everything that is missing :)
  * 
+ * (30-May-2001 gkh
+ *	switched from using spinlock to a semaphore, which fixes lots of problems.
+ *
  * 08-Apr-2001 gb
  *	- Identify version on module load.
  *
@@ -85,7 +88,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_VERSION "v1.1"
 #define DRIVER_AUTHOR "William Greathouse <wgreathouse@smva.com>"
 #define DRIVER_DESC "USB Belkin Serial converter driver"
 
@@ -282,11 +285,11 @@ static void belkin_sa_shutdown (struct usb_serial *serial)
 
 static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 {
-	unsigned long flags;
+	int retval = 0;
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 	
 	++port->open_count;
 	MOD_INC_USE_COUNT;
@@ -299,30 +302,32 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 		 *       enhance buffering.  Win trace shows 16 initial read URBs.
 		 */
 		port->read_urb->dev = port->serial->dev;
-		if (usb_submit_urb(port->read_urb))
+		retval = usb_submit_urb(port->read_urb);
+		if (retval) {
 			err("usb_submit_urb(read bulk) failed");
+			goto exit;
+		}
 
 		port->interrupt_in_urb->dev = port->serial->dev;
-		if (usb_submit_urb(port->interrupt_in_urb))
+		retval = usb_submit_urb(port->interrupt_in_urb);
+		if (retval)
 			err(" usb_submit_urb(read int) failed");
 	}
 	
-	spin_unlock_irqrestore (&port->port_lock, flags);
+exit:
+	up (&port->sem);
 
-	return 0;
+	return retval;
 } /* belkin_sa_open */
 
 
 static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 {
-	unsigned long flags;
-
 	dbg(__FUNCTION__" port %d", port->number);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 
 	--port->open_count;
-	MOD_DEC_USE_COUNT;
 
 	if (port->open_count <= 0) {
 		/* shutdown our bulk reads and writes */
@@ -332,7 +337,8 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 		port->active = 0;
 	}
 	
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
+	MOD_DEC_USE_COUNT;
 } /* belkin_sa_close */
 
 

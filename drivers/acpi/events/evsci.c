@@ -2,7 +2,7 @@
  *
  * Module Name: evsci - System Control Interrupt configuration and
  *                      legacy to ACPI mode state transition functions
- *              $Revision: 69 $
+ *              $Revision: 72 $
  *
  ******************************************************************************/
 
@@ -30,7 +30,7 @@
 #include "acevents.h"
 
 
-#define _COMPONENT          EVENT_HANDLING
+#define _COMPONENT          ACPI_EVENTS
 	 MODULE_NAME         ("evsci")
 
 
@@ -172,21 +172,6 @@ acpi_ev_remove_sci_handler (void)
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_sci_count
- *
- * PARAMETERS:  Event       Event that generated an SCI.
- *
- * RETURN:      Number of SCI's for requested event since last time
- *              Sci_occurred() was called for this event.
- *
- * DESCRIPTION: Checks to see if SCI has been generated from requested source
- *              since the last time this function was called.
- *
- ******************************************************************************/
-
-
-/*******************************************************************************
- *
  * FUNCTION:    Acpi_ev_restore_acpi_state
  *
  * PARAMETERS:  none
@@ -209,8 +194,7 @@ acpi_ev_restore_acpi_state (void)
 		/* Restore the fixed events */
 
 		if (acpi_hw_register_read (ACPI_MTX_LOCK, PM1_EN) !=
-				acpi_gbl_pm1_enable_register_save)
-		{
+				acpi_gbl_pm1_enable_register_save) {
 			acpi_hw_register_write (ACPI_MTX_LOCK, PM1_EN,
 				acpi_gbl_pm1_enable_register_save);
 		}
@@ -225,8 +209,7 @@ acpi_ev_restore_acpi_state (void)
 
 		for (index = 0; index < DIV_2 (acpi_gbl_FADT->gpe0blk_len); index++) {
 			if (acpi_hw_register_read (ACPI_MTX_LOCK, GPE0_EN_BLOCK | index) !=
-					acpi_gbl_gpe0enable_register_save[index])
-			{
+					acpi_gbl_gpe0enable_register_save[index]) {
 				acpi_hw_register_write (ACPI_MTX_LOCK, GPE0_EN_BLOCK | index,
 					acpi_gbl_gpe0enable_register_save[index]);
 			}
@@ -237,8 +220,7 @@ acpi_ev_restore_acpi_state (void)
 		if (acpi_gbl_FADT->gpe1_blk_len) {
 			for (index = 0; index < DIV_2 (acpi_gbl_FADT->gpe1_blk_len); index++) {
 				if (acpi_hw_register_read (ACPI_MTX_LOCK, GPE1_EN_BLOCK | index) !=
-					acpi_gbl_gpe1_enable_register_save[index])
-				{
+					acpi_gbl_gpe1_enable_register_save[index]) {
 					acpi_hw_register_write (ACPI_MTX_LOCK, GPE1_EN_BLOCK | index,
 						acpi_gbl_gpe1_enable_register_save[index]);
 				}
@@ -276,11 +258,11 @@ acpi_ev_terminate (void)
 	 */
 
 	if (acpi_gbl_gpe_registers) {
-		acpi_cm_free (acpi_gbl_gpe_registers);
+		acpi_ut_free (acpi_gbl_gpe_registers);
 	}
 
 	if (acpi_gbl_gpe_info) {
-		acpi_cm_free (acpi_gbl_gpe_info);
+		acpi_ut_free (acpi_gbl_gpe_info);
 	}
 
 	return;

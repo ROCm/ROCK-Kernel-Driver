@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 26 $
+ *              $Revision: 37 $
  *
  *****************************************************************************/
 
@@ -33,11 +33,11 @@
 #include "acevents.h"
 
 
-#define _COMPONENT          DISPATCHER
+#define _COMPONENT          ACPI_DISPATCHER
 	 MODULE_NAME         ("dswload")
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ds_load1_begin_op
  *
@@ -49,7 +49,7 @@
  *
  * DESCRIPTION: Descending callback used during the loading of ACPI tables.
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ds_load1_begin_op (
@@ -60,9 +60,11 @@ acpi_ds_load1_begin_op (
 {
 	ACPI_NAMESPACE_NODE     *node;
 	ACPI_STATUS             status;
-	OBJECT_TYPE_INTERNAL    data_type;
+	ACPI_OBJECT_TYPE8       data_type;
 	NATIVE_CHAR             *path;
 
+
+	PROC_NAME ("Ds_load1_begin_op");
 
 	/* We are only interested in opcodes that have an associated name */
 
@@ -92,9 +94,8 @@ acpi_ds_load1_begin_op (
 	 * as we go downward in the parse tree.  Any necessary subobjects that involve
 	 * arguments to the opcode must be created as we go back up the parse tree later.
 	 */
-	status = acpi_ns_lookup (walk_state->scope_info, path,
-			 data_type, IMODE_LOAD_PASS1,
-			 NS_NO_UPSEARCH, walk_state, &(node));
+	status = acpi_ns_lookup (walk_state->scope_info, path, data_type,
+			  IMODE_LOAD_PASS1, NS_NO_UPSEARCH, walk_state, &(node));
 
 	if (ACPI_FAILURE (status)) {
 		return (status);
@@ -128,7 +129,7 @@ acpi_ds_load1_begin_op (
 }
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ds_load1_end_op
  *
@@ -141,16 +142,17 @@ acpi_ds_load1_begin_op (
  * DESCRIPTION: Ascending callback used during the loading of the namespace,
  *              both control methods and everything else.
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ds_load1_end_op (
 	ACPI_WALK_STATE         *walk_state,
 	ACPI_PARSE_OBJECT       *op)
 {
-	OBJECT_TYPE_INTERNAL    data_type;
+	ACPI_OBJECT_TYPE8       data_type;
 
 
+	PROC_NAME ("Ds_load1_end_op");
 	/* We are only interested in opcodes that have an associated name */
 
 	if (!acpi_ps_is_named_op (op->opcode)) {
@@ -177,7 +179,6 @@ acpi_ds_load1_end_op (
 	/* Pop the scope stack */
 
 	if (acpi_ns_opens_scope (data_type)) {
-
 		acpi_ds_scope_stack_pop (walk_state);
 	}
 
@@ -186,7 +187,7 @@ acpi_ds_load1_end_op (
 }
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ds_load2_begin_op
  *
@@ -198,7 +199,7 @@ acpi_ds_load1_end_op (
  *
  * DESCRIPTION: Descending callback used during the loading of ACPI tables.
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ds_load2_begin_op (
@@ -209,16 +210,17 @@ acpi_ds_load2_begin_op (
 {
 	ACPI_NAMESPACE_NODE     *node;
 	ACPI_STATUS             status;
-	OBJECT_TYPE_INTERNAL    data_type;
+	ACPI_OBJECT_TYPE8       data_type;
 	NATIVE_CHAR             *buffer_ptr;
 	void                    *original = NULL;
 
 
+	PROC_NAME ("Ds_load2_begin_op");
+
 	/* We only care about Namespace opcodes here */
 
 	if (!acpi_ps_is_namespace_op (opcode) &&
-		opcode != AML_NAMEPATH_OP)
-	{
+		opcode != AML_INT_NAMEPATH_OP) {
 		return (AE_OK);
 	}
 
@@ -233,7 +235,7 @@ acpi_ds_load2_begin_op (
 		/*
 		 * Get the name we are going to enter or lookup in the namespace
 		 */
-		if (opcode == AML_NAMEPATH_OP) {
+		if (opcode == AML_INT_NAMEPATH_OP) {
 			/* For Namepath op, get the path string */
 
 			buffer_ptr = op->value.string;
@@ -261,15 +263,14 @@ acpi_ds_load2_begin_op (
 	data_type = acpi_ds_map_named_opcode_to_data_type (opcode);
 
 
-	if (opcode == AML_DEF_FIELD_OP      ||
+	if (opcode == AML_FIELD_OP          ||
 		opcode == AML_BANK_FIELD_OP     ||
-		opcode == AML_INDEX_FIELD_OP)
-	{
+		opcode == AML_INDEX_FIELD_OP) {
 		node = NULL;
 		status = AE_OK;
 	}
 
-	else if (opcode == AML_NAMEPATH_OP) {
+	else if (opcode == AML_INT_NAMEPATH_OP) {
 		/*
 		 * The Name_path is an object reference to an existing object. Don't enter the
 		 * name into the namespace, but look it up for use later
@@ -302,10 +303,8 @@ acpi_ds_load2_begin_op (
 		 * as we go downward in the parse tree.  Any necessary subobjects that involve
 		 * arguments to the opcode must be created as we go back up the parse tree later.
 		 */
-		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr,
-				 data_type, IMODE_EXECUTE,
-				 NS_NO_UPSEARCH, walk_state,
-				 &(node));
+		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr, data_type,
+				  IMODE_EXECUTE, NS_NO_UPSEARCH, walk_state, &(node));
 	}
 
 	if (ACPI_SUCCESS (status)) {
@@ -332,12 +331,11 @@ acpi_ds_load2_begin_op (
 
 	}
 
-
 	return (status);
 }
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ds_load2_end_op
  *
@@ -350,7 +348,7 @@ acpi_ds_load2_begin_op (
  * DESCRIPTION: Ascending callback used during the loading of the namespace,
  *              both control methods and everything else.
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_ds_load2_end_op (
@@ -358,12 +356,13 @@ acpi_ds_load2_end_op (
 	ACPI_PARSE_OBJECT       *op)
 {
 	ACPI_STATUS             status = AE_OK;
-	OBJECT_TYPE_INTERNAL    data_type;
+	ACPI_OBJECT_TYPE8      data_type;
 	ACPI_NAMESPACE_NODE     *node;
 	ACPI_PARSE_OBJECT       *arg;
 	ACPI_NAMESPACE_NODE     *new_node;
 
 
+	PROC_NAME ("Ds_load2_end_op");
 	if (!acpi_ps_is_namespace_object_op (op->opcode)) {
 		return (AE_OK);
 	}
@@ -422,6 +421,7 @@ acpi_ds_load2_end_op (
 	 * AML_CREATEBYTEFIELD
 	 * AML_CREATEWORDFIELD
 	 * AML_CREATEDWORDFIELD
+	 * AML_CREATEQWORDFIELD
 	 * AML_METHODCALL
 	 */
 
@@ -430,14 +430,14 @@ acpi_ds_load2_end_op (
 
 	arg = op->value.arg;
 
-	switch (op->opcode)
-	{
+	switch (op->opcode) {
 
 	case AML_CREATE_FIELD_OP:
-	case AML_BIT_FIELD_OP:
-	case AML_BYTE_FIELD_OP:
-	case AML_WORD_FIELD_OP:
-	case AML_DWORD_FIELD_OP:
+	case AML_CREATE_BIT_FIELD_OP:
+	case AML_CREATE_BYTE_FIELD_OP:
+	case AML_CREATE_WORD_FIELD_OP:
+	case AML_CREATE_DWORD_FIELD_OP:
+	case AML_CREATE_QWORD_FIELD_OP:
 
 		/*
 		 * Create the field object, but the field buffer and index must
@@ -455,58 +455,59 @@ acpi_ds_load2_end_op (
 			arg = acpi_ps_get_arg (op, 2);
 		}
 
+		if (!arg) {
+			status = AE_AML_NO_OPERAND;
+			goto cleanup;
+		}
+
 		/*
 		 * Enter the Name_string into the namespace
 		 */
-
-		status = acpi_ns_lookup (walk_state->scope_info,
-				 arg->value.string,
-				 INTERNAL_TYPE_DEF_ANY,
-				 IMODE_LOAD_PASS1,
+		status = acpi_ns_lookup (walk_state->scope_info, arg->value.string,
+				 INTERNAL_TYPE_DEF_ANY, IMODE_LOAD_PASS1,
 				 NS_NO_UPSEARCH | NS_DONT_OPEN_SCOPE,
 				 walk_state, &(new_node));
-
-		if (ACPI_SUCCESS (status)) {
-			/* We could put the returned object (Node) on the object stack for later, but
-			 * for now, we will put it in the "op" object that the parser uses, so we
-			 * can get it again at the end of this scope
-			 */
-			op->node = new_node;
-
-			/*
-			 * If there is no object attached to the node, this node was just created and
-			 * we need to create the field object.  Otherwise, this was a lookup of an
-			 * existing node and we don't want to create the field object again.
-			 */
-			if (!new_node->object) {
-				/*
-				 * The Field definition is not fully parsed at this time.
-				 * (We must save the address of the AML for the buffer and index operands)
-				 */
-				status = acpi_aml_exec_create_field (((ACPI_PARSE2_OBJECT *) op)->data,
-						   ((ACPI_PARSE2_OBJECT *) op)->length,
-						   new_node, walk_state);
-			}
+		if (ACPI_FAILURE (status)) {
+			goto cleanup;
 		}
 
+		/* We could put the returned object (Node) on the object stack for later, but
+		 * for now, we will put it in the "op" object that the parser uses, so we
+		 * can get it again at the end of this scope
+		 */
+		op->node = new_node;
 
+		/*
+		 * If there is no object attached to the node, this node was just created and
+		 * we need to create the field object.  Otherwise, this was a lookup of an
+		 * existing node and we don't want to create the field object again.
+		 */
+		if (!new_node->object) {
+			/*
+			 * The Field definition is not fully parsed at this time.
+			 * (We must save the address of the AML for the buffer and index operands)
+			 */
+			status = acpi_ex_create_buffer_field (((ACPI_PARSE2_OBJECT *) op)->data,
+					  ((ACPI_PARSE2_OBJECT *) op)->length,
+					  new_node, walk_state);
+		}
 		break;
 
 
-	case AML_METHODCALL_OP:
+	case AML_INT_METHODCALL_OP:
 
 		/*
 		 * Lookup the method name and save the Node
 		 */
 
 		status = acpi_ns_lookup (walk_state->scope_info, arg->value.string,
-				 ACPI_TYPE_ANY, IMODE_LOAD_PASS2,
-				 NS_SEARCH_PARENT | NS_DONT_OPEN_SCOPE,
-				 walk_state, &(new_node));
+				  ACPI_TYPE_ANY, IMODE_LOAD_PASS2,
+				  NS_SEARCH_PARENT | NS_DONT_OPEN_SCOPE,
+				  walk_state, &(new_node));
 
 		if (ACPI_SUCCESS (status)) {
 
-/* has name already been resolved by here ??*/
+			/* TBD: has name already been resolved by here ??*/
 
 			/* TBD: [Restructure] Make sure that what we found is indeed a method! */
 			/* We didn't search for a method on purpose, to see if the name would resolve! */
@@ -526,7 +527,7 @@ acpi_ds_load2_end_op (
 
 		/* Nothing to do other than enter object into namespace */
 
-		status = acpi_aml_exec_create_processor (op, (ACPI_HANDLE) node);
+		status = acpi_ex_create_processor (op, node);
 		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}
@@ -538,7 +539,7 @@ acpi_ds_load2_end_op (
 
 		/* Nothing to do other than enter object into namespace */
 
-		status = acpi_aml_exec_create_power_resource (op, (ACPI_HANDLE) node);
+		status = acpi_ex_create_power_resource (op, node);
 		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}
@@ -553,13 +554,11 @@ acpi_ds_load2_end_op (
 		break;
 
 
-	case AML_DEF_FIELD_OP:
+	case AML_FIELD_OP:
 
 		arg = op->value.arg;
 
-		status = acpi_ds_create_field (op,
-				  arg->node,
-				  walk_state);
+		status = acpi_ds_create_field (op, arg->node, walk_state);
 		break;
 
 
@@ -567,8 +566,7 @@ acpi_ds_load2_end_op (
 
 		arg = op->value.arg;
 
-		status = acpi_ds_create_index_field (op,
-				   (ACPI_HANDLE) arg->node,
+		status = acpi_ds_create_index_field (op, (ACPI_HANDLE) arg->node,
 				   walk_state);
 		break;
 
@@ -576,9 +574,7 @@ acpi_ds_load2_end_op (
 	case AML_BANK_FIELD_OP:
 
 		arg = op->value.arg;
-		status = acpi_ds_create_bank_field (op,
-				   arg->node,
-				   walk_state);
+		status = acpi_ds_create_bank_field (op, arg->node, walk_state);
 		break;
 
 
@@ -588,11 +584,10 @@ acpi_ds_load2_end_op (
 	case AML_METHOD_OP:
 
 		if (!node->object) {
-			status = acpi_aml_exec_create_method (((ACPI_PARSE2_OBJECT *) op)->data,
+			status = acpi_ex_create_method (((ACPI_PARSE2_OBJECT *) op)->data,
 					   ((ACPI_PARSE2_OBJECT *) op)->length,
-					   arg->value.integer, (ACPI_HANDLE) node);
+					   arg->value.integer, node);
 		}
-
 		break;
 
 
@@ -603,7 +598,7 @@ acpi_ds_load2_end_op (
 			goto cleanup;
 		}
 
-		status = acpi_aml_exec_create_mutex (walk_state);
+		status = acpi_ex_create_mutex (walk_state);
 		break;
 
 
@@ -614,7 +609,7 @@ acpi_ds_load2_end_op (
 			goto cleanup;
 		}
 
-		status = acpi_aml_exec_create_event (walk_state);
+		status = acpi_ex_create_event (walk_state);
 		break;
 
 
@@ -624,16 +619,13 @@ acpi_ds_load2_end_op (
 			break;
 		}
 
-
 		/*
 		 * The Op_region is not fully parsed at this time. Only valid argument is the Space_id.
 		 * (We must save the address of the AML of the address and length operands)
 		 */
-
-		status = acpi_aml_exec_create_region (((ACPI_PARSE2_OBJECT *) op)->data,
-				   ((ACPI_PARSE2_OBJECT *) op)->length,
-				   (ACPI_ADDRESS_SPACE_TYPE) arg->value.integer,
-				   walk_state);
+		status = acpi_ex_create_region (((ACPI_PARSE2_OBJECT *) op)->data,
+				  ((ACPI_PARSE2_OBJECT *) op)->length,
+						 (ACPI_ADR_SPACE_TYPE) arg->value.integer, walk_state);
 
 		break;
 
@@ -647,7 +639,7 @@ acpi_ds_load2_end_op (
 			goto cleanup;
 		}
 
-		status = acpi_aml_exec_create_alias (walk_state);
+		status = acpi_ex_create_alias (walk_state);
 		break;
 
 
@@ -666,7 +658,7 @@ acpi_ds_load2_end_op (
 		break;
 
 
-	case AML_NAMEPATH_OP:
+	case AML_INT_NAMEPATH_OP:
 
 		break;
 

@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>
  *
- *	$Id: icmp.c,v 1.31 2001/01/22 02:36:37 davem Exp $
+ *	$Id: icmp.c,v 1.32 2001/06/10 09:20:07 davem Exp $
  *
  *	Based on net/ipv4/icmp.c
  *
@@ -564,7 +564,7 @@ int icmpv6_rcv(struct sk_buff *skb)
 		 */
 		if (!pskb_may_pull(skb, sizeof(struct ipv6hdr)))
 			goto discard_it;
-		hdr = (struct icmp6hdr *) skb->data;
+		hdr = (struct icmp6hdr *) skb->h.raw;
 		orig_hdr = (struct ipv6hdr *) (hdr + 1);
 		rt6_pmtu_discovery(&orig_hdr->daddr, &orig_hdr->saddr, dev,
 				   ntohl(hdr->icmp6_mtu));

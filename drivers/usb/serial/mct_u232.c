@@ -24,6 +24,9 @@
  *   Basic tests have been performed with minicom/zmodem transfers and
  *   modem dialing under Linux 2.4.0-test10 (for me it works fine).
  *
+ * 30-May-2001 Greg Kroah-Hartman
+ *	switched from using spinlock to a semaphore, which fixes lots of problems.
+ *
  * 04-May-2001 Stelian Pop
  *   - Set the maximum bulk output size for Sitecom U232-P25 model to 16 bytes
  *     instead of the device reported 32 (using 32 bytes causes many data
@@ -79,7 +82,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_VERSION "v1.1"
 #define DRIVER_AUTHOR "Wolfgang Grandegger <wolfgang@ces.ch>"
 #define DRIVER_DESC "Magic Control Technology USB-RS232 converter driver"
 
@@ -391,13 +394,13 @@ static void mct_u232_shutdown (struct usb_serial *serial)
 
 static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 {
-	unsigned long flags;
 	struct usb_serial *serial = port->serial;
 	struct mct_u232_private *priv = (struct mct_u232_private *)port->private;
+	int retval = 0;
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 	
 	++port->open_count;
 	MOD_INC_USE_COUNT;
@@ -443,16 +446,21 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 		}
 
 		port->read_urb->dev = port->serial->dev;
-		if (usb_submit_urb(port->read_urb))
+		retval = usb_submit_urb(port->read_urb);
+		if (retval) {
 			err("usb_submit_urb(read bulk) failed");
+			goto exit;
+		}
 
 		port->interrupt_in_urb->dev = port->serial->dev;
-		if (usb_submit_urb(port->interrupt_in_urb))
+		retval = usb_submit_urb(port->interrupt_in_urb);
+		if (retval)
 			err(" usb_submit_urb(read int) failed");
 
 	}
 
-	spin_unlock_irqrestore (&port->port_lock, flags);
+exit:
+	up (&port->sem);
 	
 	return 0;
 } /* mct_u232_open */
@@ -460,14 +468,11 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 
 static void mct_u232_close (struct usb_serial_port *port, struct file *filp)
 {
-	unsigned long flags;
-
 	dbg(__FUNCTION__" port %d", port->number);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 
 	--port->open_count;
-	MOD_DEC_USE_COUNT;
 
 	if (port->open_count <= 0) {
 		/* shutdown our bulk reads and writes */
@@ -478,8 +483,8 @@ static void mct_u232_close (struct usb_serial_port *port, struct file *filp)
 		port->active = 0;
 	}
 	
-	spin_unlock_irqrestore (&port->port_lock, flags);
-
+	up (&port->sem);
+	MOD_DEC_USE_COUNT;
 } /* mct_u232_close */
 
 
@@ -490,7 +495,6 @@ static int mct_u232_write (struct usb_serial_port *port, int from_user,
 			   const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
-	unsigned long flags;
 	int result, bytes_sent, size;
 
 	dbg(__FUNCTION__ " - port %d", port->number);
@@ -513,7 +517,7 @@ static int mct_u232_write (struct usb_serial_port *port, int from_user,
 	bytes_sent = 0;
 	while (count > 0) {
 		
-		spin_lock_irqsave (&port->port_lock, flags);
+		down (&port->sem);
 		
 		size = (count > port->bulk_out_size) ? port->bulk_out_size : count;
 		
@@ -541,11 +545,11 @@ static int mct_u232_write (struct usb_serial_port *port, int from_user,
 		if (result) {
 			err(__FUNCTION__
 			    " - failed submitting write urb, error %d", result);
-			spin_unlock_irqrestore (&port->port_lock, flags);
-			return bytes_sent;
+			up (&port->sem);
+			return result;
 		}
 
-		spin_unlock_irqrestore (&port->port_lock, flags);
+		up (&port->sem);
 
 		bytes_sent += size;
 		if (write_blocking)

@@ -6,7 +6,7 @@
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *	Alexey Kuznetsov	<kuznet@ms2.inr.ac.ru>
  *
- *	$Id: addrconf.c,v 1.65 2001/05/03 07:02:47 davem Exp $
+ *	$Id: addrconf.c,v 1.66 2001/06/11 00:39:29 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -1389,7 +1389,10 @@ static void addrconf_rs_timer(unsigned long data)
 	if (ifp->probes++ < ifp->idev->cnf.rtr_solicits) {
 		struct in6_addr all_routers;
 
+		/* The wait after the last probe can be shorter */
 		addrconf_mod_timer(ifp, AC_RS,
+				   (ifp->probes == ifp->idev->cnf.rtr_solicits) ?
+				   ifp->idev->cnf.rtr_solicit_delay :
 				   ifp->idev->cnf.rtr_solicit_interval);
 		spin_unlock(&ifp->lock);
 

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: hwgpe - Low level GPE enable/disable/clear functions
- *              $Revision: 28 $
+ *              $Revision: 29 $
  *
  *****************************************************************************/
 
@@ -29,7 +29,7 @@
 #include "acnamesp.h"
 #include "acevents.h"
 
-#define _COMPONENT          HARDWARE
+#define _COMPONENT          ACPI_HARDWARE
 	 MODULE_NAME         ("hwgpe")
 
 

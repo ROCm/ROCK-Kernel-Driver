@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: hwsleep.c - ACPI Hardware Sleep/Wake Interface
- *              $Revision: 7 $
+ *              $Revision: 12 $
  *
  *****************************************************************************/
 
@@ -28,7 +28,7 @@
 #include "acnamesp.h"
 #include "achware.h"
 
-#define _COMPONENT          HARDWARE
+#define _COMPONENT          ACPI_HARDWARE
 	 MODULE_NAME         ("hwsleep")
 
 
@@ -126,27 +126,28 @@ acpi_get_firmware_waking_vector (
 
 ACPI_STATUS
 acpi_enter_sleep_state (
-	u8 sleep_state)
+	u8                  sleep_state)
 {
-	ACPI_STATUS status;
-	ACPI_OBJECT_LIST arg_list;
-	ACPI_OBJECT arg;
-	u8 type_a;
-	u8 type_b;
-	u16 PM1_acontrol;
-	u16 PM1_bcontrol;
+	ACPI_STATUS         status;
+	ACPI_OBJECT_LIST    arg_list;
+	ACPI_OBJECT         arg;
+	u8                  type_a;
+	u8                  type_b;
+	u16                 PM1_acontrol;
+	u16                 PM1_bcontrol;
+
 
 	/*
 	 * _PSW methods could be run here to enable wake-on keyboard, LAN, etc.
 	 */
 
-	status = acpi_hw_obtain_sleep_type_register_data(sleep_state, &type_a, &type_b);
-
-	if (!ACPI_SUCCESS(status)) {
+	status = acpi_hw_obtain_sleep_type_register_data (sleep_state, &type_a, &type_b);
+	if (!ACPI_SUCCESS (status)) {
 		return status;
 	}
 
 	/* run the _PTS and _GTS methods */
+
 	MEMSET(&arg_list, 0, sizeof(arg_list));
 	arg_list.count = 1;
 	arg_list.pointer = &arg;
@@ -159,28 +160,32 @@ acpi_enter_sleep_state (
 	acpi_evaluate_object(NULL, "\\_GTS", &arg_list, NULL);
 
 	/* clear wake status */
+
 	acpi_hw_register_bit_access(ACPI_WRITE, ACPI_MTX_LOCK, WAK_STS, 1);
+
+	disable();
 
 	PM1_acontrol = (u16) acpi_hw_register_read(ACPI_MTX_LOCK, PM1_CONTROL);
 
 	/* mask off SLP_EN and SLP_TYP fields */
 	PM1_acontrol &= 0xC3FF;
-
-	/* mask in SLP_EN */
-	PM1_acontrol |= (1 << acpi_hw_get_bit_shift (SLP_EN_MASK));
-
 	PM1_bcontrol = PM1_acontrol;
 
 	/* mask in SLP_TYP */
 	PM1_acontrol |= (type_a << acpi_hw_get_bit_shift (SLP_TYPE_X_MASK));
 	PM1_bcontrol |= (type_b << acpi_hw_get_bit_shift (SLP_TYPE_X_MASK));
 
-	disable();
-
+	/* write #1: fill in SLP_TYPE data */
 	acpi_hw_register_write(ACPI_MTX_LOCK, PM1_a_CONTROL, PM1_acontrol);
 	acpi_hw_register_write(ACPI_MTX_LOCK, PM1_b_CONTROL, PM1_bcontrol);
-	acpi_hw_register_write(ACPI_MTX_LOCK, PM1_CONTROL,
-		(1 << acpi_hw_get_bit_shift (SLP_EN_MASK)));
+
+	/* mask in SLP_EN */
+	PM1_acontrol |= (1 << acpi_hw_get_bit_shift (SLP_EN_MASK));
+	PM1_bcontrol |= (1 << acpi_hw_get_bit_shift (SLP_EN_MASK));
+
+	/* write #2: the whole tamale */
+	acpi_hw_register_write(ACPI_MTX_LOCK, PM1_a_CONTROL, PM1_acontrol);
+	acpi_hw_register_write(ACPI_MTX_LOCK, PM1_b_CONTROL, PM1_bcontrol);
 
 	enable();
 

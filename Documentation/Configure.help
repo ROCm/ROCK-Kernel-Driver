@@ -11374,6 +11374,20 @@ CONFIG_USB_PEGASUS
   The module will be called pegasus.o. If you want to compile it as a
   module, say M here and read Documentation/modules.txt.
 
+USB CATC NetMate-based Ethernet device support
+CONFIG_USB_CATC
+  Say Y if you want to use one of the following 10Mbps USB Ethernet
+  device based on the EL1210A chip. Supported devices are:
+    Belkin F5U111
+    CATC NetMate
+    CATC NetMate II
+    smartBridges smartNIC
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called catc.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 USB Kodak DC-2xx Camera support
 CONFIG_USB_DC2XX
   Say Y here if you want to connect this type of still camera to
@@ -14133,7 +14147,7 @@ CONFIG_PM
   will issue the hlt instruction if nothing is to be done, thereby
   sending the processor to sleep and saving power.
 
-ACPI Support
+ACPI support
 CONFIG_ACPI
   ACPI/OSPM support for Linux is currently under development. As such, 
   this support is preliminary and EXPERIMENTAL. Configuring ACPI support
@@ -14162,6 +14176,57 @@ CONFIG_ACPI
   
   The ACPI mailing list may also be of interest:
   http://phobos.fs.tum.de/acpi/index.html
+
+ACPI Debug Statements
+CONFIG_ACPI_DEBUG
+  The ACPI driver can optionally report errors with a great deal
+  of verbosity. Saying Y enables these statements. This will increase
+  your kernel size by around 50K.
+
+ACPI Bus Manager
+CONFIG_ACPI_BUSMGR
+  The ACPI Bus Manager enumerates devices in the ACPI namespace, and
+  handles PnP messages. All ACPI devices use its services, so using them
+  requires saying Y here.
+
+ACPI System Driver
+CONFIG_ACPI_SYS
+  This driver will enable your system to shut down using ACPI, and dump
+  your ACPI DSDT table using /proc/acpi/dsdt.
+
+ACPI Processor Driver
+CONFIG_ACPI_CPU
+  This driver installs ACPI as the idle handler for Linux, and uses ACPI
+  C2 and C3 processor states to save power, on systems that support it.
+
+ACPI Button
+CONFIG_ACPI_BUTTON
+  This driver registers for events based on buttons, such as the power,
+  sleep, and lid switch. In the future, a daemon will read 
+  /proc/acpi/event and perform user-defined actions such as shutting
+  down the system. Until then, you can cat it, and see output when
+  a button is pressed.
+
+ACPI AC Adapter
+CONFIG_ACPI_AC
+  This driver adds support for the AC Adapter object, which indicates
+  whether a system is on AC, or not. Typically, only laptops have this
+  object, since desktops are always on AC.
+
+ACPI Embedded Controller
+CONFIG_ACPI_EC
+  This driver is required on some systems for the proper operation of the
+  battery and thermal drivers. If you are compiling for a laptop, say Y.
+
+ACPI Control Method Battery
+CONFIG_ACPI_CMBATT
+  This driver adds support for battery information through
+  /proc/acpi/battery. If you have a laptop with a battery, say Y.
+
+ACPI Thermal
+CONFIG_ACPI_THERMAL
+  This driver handles overheating conditions on laptops. It is HIGHLY
+  recommended, as your laptop CPU may be damaged without it.
 
 Advanced Power Management BIOS support
 CONFIG_APM

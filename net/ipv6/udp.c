@@ -7,7 +7,7 @@
  *
  *	Based on linux/ipv4/udp.c
  *
- *	$Id: udp.c,v 1.62 2001/03/06 21:15:11 davem Exp $
+ *	$Id: udp.c,v 1.63 2001/06/13 16:25:03 davem Exp $
  *
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
@@ -992,7 +992,21 @@ struct proto udpv6_prot = {
 	get_port:	udp_v6_get_port,
 };
 
+extern struct proto_ops inet6_dgram_ops;
+
+static struct inet_protosw udpv6_protosw = {
+	type:        SOCK_DGRAM,
+	protocol:    IPPROTO_UDP,
+	prot:        &udpv6_prot,
+	ops:         &inet6_dgram_ops,
+	capability:  -1,
+	no_check:    UDP_CSUM_DEFAULT,
+	flags:       INET_PROTOSW_PERMANENT,
+};
+
+
 void __init udpv6_init(void)
 {
 	inet6_add_protocol(&udpv6_protocol);
+	inet6_register_protosw(&udpv6_protosw);
 }

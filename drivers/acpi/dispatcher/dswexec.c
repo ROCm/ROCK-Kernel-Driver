@@ -2,7 +2,7 @@
  *
  * Module Name: dswexec - Dispatcher method execution callbacks;
  *                        dispatch to interpreter.
- *              $Revision: 55 $
+ *              $Revision: 61 $
  *
  *****************************************************************************/
 
@@ -34,7 +34,7 @@
 #include "acdebug.h"
 
 
-#define _COMPONENT          DISPATCHER
+#define _COMPONENT          ACPI_DISPATCHER
 	 MODULE_NAME         ("dswexec")
 
 
@@ -75,7 +75,7 @@ acpi_ds_get_predicate_value (
 			return (status);
 		}
 
-		status = acpi_aml_resolve_to_value (&walk_state->operands [0], walk_state);
+		status = acpi_ex_resolve_to_value (&walk_state->operands [0], walk_state);
 		if (ACPI_FAILURE (status)) {
 			return (status);
 		}
@@ -101,7 +101,7 @@ acpi_ds_get_predicate_value (
 
 	/* Truncate the predicate to 32-bits if necessary */
 
-	acpi_aml_truncate_for32bit_table (obj_desc, walk_state);
+	acpi_ex_truncate_for32bit_table (obj_desc, walk_state);
 
 	/*
 	 * Save the result of the predicate evaluation on
@@ -134,7 +134,7 @@ cleanup:
 	 * we don't need it anymore)
 	 */
 
-	acpi_cm_remove_reference (obj_desc);
+	acpi_ut_remove_reference (obj_desc);
 
 	walk_state->control_state->common.state = CONTROL_NORMAL;
 
@@ -194,8 +194,7 @@ acpi_ds_exec_begin_op (
 
 	if ((walk_state->control_state) &&
 		(walk_state->control_state->common.state ==
-			CONTROL_CONDITIONAL_EXECUTING))
-	{
+			CONTROL_CONDITIONAL_EXECUTING)) {
 		walk_state->control_state->common.state = CONTROL_PREDICATE_EXECUTING;
 
 		/* Save start of predicate */
@@ -208,7 +207,7 @@ acpi_ds_exec_begin_op (
 
 	/* We want to send namepaths to the load code */
 
-	if (op->opcode == AML_NAMEPATH_OP) {
+	if (op->opcode == AML_INT_NAMEPATH_OP) {
 		op_info->flags = OPTYPE_NAMED_OBJECT;
 	}
 
@@ -217,8 +216,7 @@ acpi_ds_exec_begin_op (
 	 * Handle the opcode based upon the opcode type
 	 */
 
-	switch (ACPI_GET_OP_CLASS (op_info))
-	{
+	switch (ACPI_GET_OP_CLASS (op_info)) {
 	case OPTYPE_CONTROL:
 
 		status = acpi_ds_result_stack_push (walk_state);
@@ -308,11 +306,9 @@ acpi_ds_exec_end_op (
 	u16                     opcode;
 	u8                      optype;
 	ACPI_PARSE_OBJECT       *next_op;
-	ACPI_NAMESPACE_NODE     *node;
 	ACPI_PARSE_OBJECT       *first_arg;
 	ACPI_OPERAND_OBJECT     *result_obj = NULL;
 	ACPI_OPCODE_INFO        *op_info;
-	u32                     operand_index;
 
 
 	opcode = (u16) op->opcode;
@@ -342,8 +338,7 @@ acpi_ds_exec_end_op (
 
 	/* Decode the opcode */
 
-	switch (optype)
-	{
+	switch (optype) {
 	case OPTYPE_UNDEFINED:
 
 		return (AE_NOT_IMPLEMENTED);
@@ -383,9 +378,6 @@ acpi_ds_exec_end_op (
 			goto cleanup;
 		}
 
-		operand_index = walk_state->num_operands - 1;
-
-
 		/* Done with this result state (Now that operand stack is built) */
 
 		status = acpi_ds_result_stack_pop (walk_state);
@@ -393,13 +385,12 @@ acpi_ds_exec_end_op (
 			goto cleanup;
 		}
 
-		switch (optype)
-		{
+		switch (optype) {
 		case OPTYPE_MONADIC1:
 
 			/* 1 Operand, 0 External_result, 0 Internal_result */
 
-			status = acpi_aml_exec_monadic1 (opcode, walk_state);
+			status = acpi_ex_monadic1 (opcode, walk_state);
 			break;
 
 
@@ -407,7 +398,7 @@ acpi_ds_exec_end_op (
 
 			/* 1 Operand, 0 External_result, 1 Internal_result */
 
-			status = acpi_aml_exec_monadic2 (opcode, walk_state, &result_obj);
+			status = acpi_ex_monadic2 (opcode, walk_state, &result_obj);
 			break;
 
 
@@ -415,7 +406,7 @@ acpi_ds_exec_end_op (
 
 			/* 1 Operand, 1 External_result, 1 Internal_result */
 
-			status = acpi_aml_exec_monadic2_r (opcode, walk_state, &result_obj);
+			status = acpi_ex_monadic2_r (opcode, walk_state, &result_obj);
 			break;
 
 
@@ -423,7 +414,7 @@ acpi_ds_exec_end_op (
 
 			/* 2 Operands, 0 External_result, 0 Internal_result */
 
-			status = acpi_aml_exec_dyadic1 (opcode, walk_state);
+			status = acpi_ex_dyadic1 (opcode, walk_state);
 			break;
 
 
@@ -431,7 +422,7 @@ acpi_ds_exec_end_op (
 
 			/* 2 Operands, 0 External_result, 1 Internal_result */
 
-			status = acpi_aml_exec_dyadic2 (opcode, walk_state, &result_obj);
+			status = acpi_ex_dyadic2 (opcode, walk_state, &result_obj);
 			break;
 
 
@@ -439,7 +430,7 @@ acpi_ds_exec_end_op (
 
 			/* 2 Operands, 1 or 2 External_results, 1 Internal_result */
 
-			status = acpi_aml_exec_dyadic2_r (opcode, walk_state, &result_obj);
+			status = acpi_ex_dyadic2_r (opcode, walk_state, &result_obj);
 			break;
 
 
@@ -447,7 +438,7 @@ acpi_ds_exec_end_op (
 
 			/* 2 Operands, 0 External_result, 1 Internal_result */
 
-			status = acpi_aml_exec_dyadic2_s (opcode, walk_state, &result_obj);
+			status = acpi_ex_dyadic2_s (opcode, walk_state, &result_obj);
 			break;
 
 
@@ -455,7 +446,7 @@ acpi_ds_exec_end_op (
 
 			/* 3 Operands, 1 External_result, 1 Internal_result */
 
-			status = acpi_aml_exec_index (walk_state, &result_obj);
+			status = acpi_ex_index (walk_state, &result_obj);
 			break;
 
 
@@ -463,7 +454,7 @@ acpi_ds_exec_end_op (
 
 			/* 6 Operands, 0 External_result, 1 Internal_result */
 
-			status = acpi_aml_exec_match (walk_state, &result_obj);
+			status = acpi_ex_match (walk_state, &result_obj);
 			break;
 
 
@@ -471,7 +462,7 @@ acpi_ds_exec_end_op (
 
 			/* 1 or 2 operands, 0 Internal Result */
 
-			status = acpi_aml_exec_reconfiguration (opcode, walk_state);
+			status = acpi_ex_reconfiguration (opcode, walk_state);
 			break;
 
 
@@ -479,7 +470,7 @@ acpi_ds_exec_end_op (
 
 			/* 3 Operands, 0 External_result, 0 Internal_result */
 
-			status = acpi_aml_exec_fatal (walk_state);
+			status = acpi_ex_fatal (walk_state);
 			break;
 		}
 
@@ -488,8 +479,7 @@ acpi_ds_exec_end_op (
 		 * current result stack
 		 */
 		if (ACPI_SUCCESS (status) &&
-			result_obj)
-		{
+			result_obj) {
 			status = acpi_ds_result_push (result_obj, walk_state);
 		}
 
@@ -515,7 +505,6 @@ acpi_ds_exec_end_op (
 		/* Next_op points to the op that holds the method name */
 
 		next_op = first_arg;
-		node = next_op->node;
 
 		/* Next_op points to first argument op */
 
@@ -562,7 +551,7 @@ acpi_ds_exec_end_op (
 			break;
 		}
 
-		status = acpi_ds_eval_field_unit_operands (walk_state, op);
+		status = acpi_ds_eval_buffer_field_operands (walk_state, op);
 		break;
 
 
@@ -573,8 +562,7 @@ acpi_ds_exec_end_op (
 			break;
 		}
 
-		switch (op->opcode)
-		{
+		switch (op->opcode) {
 		case AML_REGION_OP:
 
 			status = acpi_ds_eval_region_operands (walk_state, op);
@@ -617,7 +605,7 @@ acpi_ds_exec_end_op (
 	 * ACPI 2.0 support for 64-bit integers:
 	 * Truncate numeric result value if we are executing from a 32-bit ACPI table
 	 */
-	acpi_aml_truncate_for32bit_table (result_obj, walk_state);
+	acpi_ex_truncate_for32bit_table (result_obj, walk_state);
 
 	/*
 	 * Check if we just completed the evaluation of a
@@ -627,8 +615,7 @@ acpi_ds_exec_end_op (
 	if ((walk_state->control_state) &&
 		(walk_state->control_state->common.state ==
 			CONTROL_PREDICATE_EXECUTING) &&
-		(walk_state->control_state->control.predicate_op == op))
-	{
+		(walk_state->control_state->control.predicate_op == op)) {
 		status = acpi_ds_get_predicate_value (walk_state, op, (u32) result_obj);
 		result_obj = NULL;
 	}

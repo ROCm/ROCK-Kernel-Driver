@@ -3,7 +3,7 @@
  * Name: actbl71.h - IA-64 Extensions to the ACPI Spec Rev. 0.71
  *                   This file includes tables specific to this
  *                   specification revision.
- *       $Revision: 9 $
+ *       $Revision: 11 $
  *
  *****************************************************************************/
 
@@ -28,8 +28,10 @@
 #ifndef __ACTBL71_H__
 #define __ACTBL71_H__
 
+
 /* 0.71 FADT Address_space data item bitmasks defines */
 /* If the associated bit is zero then it is in memory space else in io space */
+
 #define SMI_CMD_ADDRESS_SPACE       0x01
 #define PM1_BLK_ADDRESS_SPACE       0x02
 #define PM2_CNT_BLK_ADDRESS_SPACE   0x04
@@ -38,10 +40,11 @@
 #define GPE1_BLK_ADDRESS_SPACE      0x20
 
 /* Only for clarity in declarations */
+
 typedef UINT64              IO_ADDRESS;
 
-#pragma pack(1)
 
+#pragma pack(1)
 typedef struct  /* Root System Descriptor Pointer */
 {
 	NATIVE_CHAR             signature [8];          /* contains "RSD PTR " */

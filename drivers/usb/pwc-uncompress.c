@@ -21,6 +21,8 @@
    themselves. It also has a decompressor wrapper function.
 */
 
+#include <asm/types.h>
+
 #include "pwc.h"
 #include "pwc-uncompress.h"
 
@@ -38,7 +40,7 @@ const int pwc_decompressor_version = PWC_MAJOR;
 void pwc_register_decompressor(struct pwc_decompressor *pwcd)
 {
 	if (pwc_find_decompressor(pwcd->type) == NULL) {
-		Debug("Adding decompressor for model %d.\n", pwcd->type);
+		Trace(TRACE_PWCX, "Adding decompressor for model %d.\n", pwcd->type);
 		list_add_tail(&pwcd->pwcd_list, &pwc_decompressor_list);
 	}
 }
@@ -50,7 +52,7 @@ void pwc_unregister_decompressor(int type)
 	
 	find = pwc_find_decompressor(type);
 	if (find != NULL) {
-		Debug("Removing decompressor for model %d.\n", type);
+		Trace(TRACE_PWCX, "Removing decompressor for model %d.\n", type);
 		list_del(&find->pwcd_list);
 	}
 }
@@ -74,8 +76,11 @@ struct pwc_decompressor *pwc_find_decompressor(int type)
 int pwc_decompress(struct pwc_device *pdev)
 {
 	struct pwc_frame_buf *fbuf;
-	int n, l, c, w;
+	int n, line, col, stride;
 	void *yuv, *image, *dst;
+	u16 *src;
+	u16 *dsty, *dstu, *dstv;
+
 	
 	if (pdev == NULL)
 		return -EFAULT;
@@ -92,7 +97,7 @@ int pwc_decompress(struct pwc_device *pdev)
 	image = pdev->image_ptr[pdev->fill_image];
 	if (!image)
 		return -EFAULT;
-
+	
 #if PWC_DEBUG
 	/* This is a quickie */
 	if (pdev->vpalette == VIDEO_PALETTE_RAW) {
@@ -101,49 +106,78 @@ int pwc_decompress(struct pwc_device *pdev)
 	}
 #endif
 
-	/* Compressed formats are decompressed in decompress_buffer, then 
-	 * transformed into the desired format 
-	 */
-	yuv = pdev->decompress_buffer;
-	n = 0;
-	if (pdev->vbandlength == 0) { /* uncompressed */
-		yuv = fbuf->data + pdev->frame_header_size;  /* Skip header */
-	}
-	else {
-		if (pdev->decompressor)
-			n = pdev->decompressor->decompress(pdev->decompress_data, pdev->image.x, pdev->image.y, pdev->vbandlength, yuv, fbuf->data + pdev->frame_header_size, 0);
-		else
-			n = -ENXIO; /* No such device or address: missing decompressor */
-	}
-	if (n < 0) {
-		Err("Error in decompression engine: %d\n", n);
-		return n;
-	}
-
-	/* At this point 'yuv' always points to the uncompressed, non-scaled YUV420I data */
-	if (pdev->image.x == pdev->view.x && pdev->image.y == pdev->view.y) {
-		/* Sizes matches; make it quick */
-		switch(pdev->vpalette) {
+	yuv = fbuf->data + pdev->frame_header_size;  /* Skip header */
+	if (pdev->vbandlength == 0) { 
+		/* Uncompressed mode. We copy the data into the output buffer,
+		   using the viewport size (which may be larger than the image
+		   size). Unfortunately we have to do a bit of byte stuffing
+		   to get the desired output format/size.
+		 */
+		switch (pdev->vpalette) {
 		case VIDEO_PALETTE_YUV420:
-			memcpy(image, yuv, pdev->image.size);
+			/* Calculate byte offsets per line in image & view */
+			n   = (pdev->image.x * 3) / 2;
+			col = (pdev->view.x  * 3) / 2;
+			/* Offset into image */
+			dst = image + (pdev->view.x * pdev->offset.y + pdev->offset.x) * 3 / 2;
+			for (line = 0; line < pdev->image.y; line++) {
+				memcpy(dst, yuv, n);
+				yuv += n;
+				dst += col;
+			}
+			break;
+
+		case VIDEO_PALETTE_YUV420P:
+			/* 
+			 * We do some byte shuffling here to go from the 
+			 * native format to YUV420P.
+			 */
+			src = (u16 *)yuv;
+			n = pdev->view.x * pdev->view.y;
+
+			/* offset in Y plane */
+			stride = pdev->view.x * pdev->offset.y + pdev->offset.x;
+			dsty = (u16 *)(image + stride);
+
+			/* offsets in U/V planes */
+			stride = pdev->view.x * pdev->offset.y / 4 + pdev->offset.x / 2;
+			dstu = (u16 *)(image + n +         stride);
+			dstv = (u16 *)(image + n + n / 4 + stride);
+
+			/* increment after each line */
+			stride = (pdev->view.x - pdev->image.x) / 2; /* u16 is 2 bytes */
+
+			for (line = 0; line < pdev->image.y; line++) {
+				for (col = 0; col < pdev->image.x; col += 4) {
+					*dsty++ = *src++;
+					*dsty++ = *src++;
+					if (line & 1)
+						*dstv++ = *src++;
+					else
+						*dstu++ = *src++;
+				}
+				dsty += stride;
+				if (line & 1)
+					dstv += (stride >> 1);
+				else
+					dstu += (stride >> 1);
+			}
 			break;
 		}
 	}
-	else {
- 		/* Size mismatch; use viewport conversion routines */
-	 	switch(pdev->vpalette) {
-		case VIDEO_PALETTE_YUV420:
-			dst = image + pdev->offset.size;
-			w = pdev->view.x * 6;
-			c = pdev->image.x * 6;
-			for (l = 0; l < pdev->image.y; l++) {
-				memcpy(dst, yuv, c);
-				dst += w;
-				yuv += c;
-			}
-			break;
- 		}
- 	}
+	else { 
+		/* Compressed; the decompressor routines will write the data 
+		   in interlaced or planar format immediately.
+		 */
+		if (pdev->decompressor)
+			pdev->decompressor->decompress(
+				&pdev->image, &pdev->view, &pdev->offset,
+				yuv, image, 
+				pdev->vpalette == VIDEO_PALETTE_YUV420P ? 1 : 0,
+				pdev->decompress_data, pdev->vbandlength);
+		else
+			return -ENXIO; /* No such device or address: missing decompressor */
+	}
 	return 0;
 }
 
@@ -154,4 +188,3 @@ int pwc_decompress(struct pwc_device *pdev)
 EXPORT_SYMBOL_NOVERS(pwc_decompressor_version);
 EXPORT_SYMBOL(pwc_register_decompressor);
 EXPORT_SYMBOL(pwc_unregister_decompressor);
-EXPORT_SYMBOL(pwc_find_decompressor);

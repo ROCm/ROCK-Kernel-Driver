@@ -1,0 +1,17 @@
+#
+# ACPI configuration
+#
+#mainmenu_option next_comment
+#comment 'ACPI Configuration'
+
+dep_bool     '    ACPI Debug Statements' CONFIG_ACPI_DEBUG $CONFIG_ACPI
+dep_tristate '    ACPI Bus Manager' CONFIG_ACPI_BUSMGR $CONFIG_ACPI
+
+dep_tristate '      System' CONFIG_ACPI_SYS $CONFIG_ACPI_BUSMGR $CONFIG_ACPI
+dep_tristate '      Processor' CONFIG_ACPI_CPU $CONFIG_ACPI_BUSMGR $CONFIG_ACPI
+dep_tristate '      Button' CONFIG_ACPI_BUTTON $CONFIG_ACPI_BUSMGR $CONFIG_ACPI
+dep_tristate '      AC Adapter' CONFIG_ACPI_AC $CONFIG_ACPI_BUSMGR $CONFIG_ACPI
+dep_tristate '      Embedded Controller' CONFIG_ACPI_EC $CONFIG_ACPI_BUSMGR $CONFIG_ACPI
+dep_tristate '      Control Method Battery' CONFIG_ACPI_CMBATT $CONFIG_ACPI_BUSMGR $CONFIG_ACPI $CONFIG_ACPI_EC
+dep_tristate '      Thermal' CONFIG_ACPI_THERMAL $CONFIG_ACPI_BUSMGR $CONFIG_ACPI  $CONFIG_ACPI_EC
+#endmenu

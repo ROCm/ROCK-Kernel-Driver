@@ -7,7 +7,7 @@
  *	Andi Kleen		<ak@muc.de>
  *	Alexey Kuznetsov	<kuznet@ms2.inr.ac.ru>
  *
- *	$Id: exthdrs.c,v 1.12 2001/01/22 02:36:37 davem Exp $
+ *	$Id: exthdrs.c,v 1.13 2001/06/19 15:58:56 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -112,6 +112,7 @@ static int ip6_parse_tlv(struct tlvtype_proc *procs, struct sk_buff *skb)
 	if ((skb->h.raw + len) - skb->data > skb_headlen(skb))
 		goto bad;
 
+	off += 2;
 	len -= 2;
 
 	while (len > 0) {

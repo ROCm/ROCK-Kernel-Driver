@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: pstree - Parser op tree manipulation/traversal/search
- *              $Revision: 27 $
+ *              $Revision: 30 $
  *
  *****************************************************************************/
 
@@ -28,7 +28,7 @@
 #include "acparser.h"
 #include "amlcode.h"
 
-#define _COMPONENT          PARSER
+#define _COMPONENT          ACPI_PARSER
 	 MODULE_NAME         ("pstree")
 
 
@@ -174,13 +174,12 @@ acpi_ps_get_child (
 	ACPI_PARSE_OBJECT       *child = NULL;
 
 
-	switch (op->opcode)
-	{
+	switch (op->opcode) {
 	case AML_SCOPE_OP:
 	case AML_ELSE_OP:
 	case AML_DEVICE_OP:
 	case AML_THERMAL_ZONE_OP:
-	case AML_METHODCALL_OP:
+	case AML_INT_METHODCALL_OP:
 
 		child = acpi_ps_get_arg (op, 0);
 		break;
@@ -191,7 +190,7 @@ acpi_ps_get_child (
 	case AML_METHOD_OP:
 	case AML_IF_OP:
 	case AML_WHILE_OP:
-	case AML_DEF_FIELD_OP:
+	case AML_FIELD_OP:
 
 		child = acpi_ps_get_arg (op, 1);
 		break;

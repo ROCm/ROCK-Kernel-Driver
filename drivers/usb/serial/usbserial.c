@@ -1,7 +1,7 @@
 /*
  * USB Serial Converter driver
  *
- * Copyright (C) 1999, 2000 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (C) 1999 - 2001 Greg Kroah-Hartman (greg@kroah.com)
  * Copyright (c) 2000 Peter Berger (pberger@brimson.com)
  * Copyright (c) 2000 Al Borchers (borchers@steinerpoint.com)
  *
@@ -15,6 +15,13 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * (06/06/2001) gkh
+ *	added evil hack that is needed for the prolific pl2303 device due to the
+ *	crazy way its endpoints are set up.
+ *
+ * (05/30/2001) gkh
+ *	switched from using spinlock to a semaphore, which fixes lots of problems.
+ *
  * (04/08/2001) gb
  *	Identify version on module load.
  *
@@ -284,13 +291,14 @@
 #endif
 
 #include "usb-serial.h"
+#include "pl2303.h"
 
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_VERSION "v1.2"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux-usb/"
-#define DRIVER_DESC "USB Serial Driver"
+#define DRIVER_DESC "USB Serial Driver core"
 
 #define MAX(a,b)	(((a)>(b))?(a):(b))
 
@@ -735,8 +743,7 @@ static void serial_break (struct tty_struct *tty, int break_state)
 static int generic_open (struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial = port->serial;
-	unsigned long flags;
-	int result;
+	int result = 0;
 
 	if (port_paranoia_check (port, __FUNCTION__))
 		return -ENODEV;
@@ -745,7 +752,7 @@ static int generic_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 	
 	++port->open_count;
 	
@@ -773,20 +780,19 @@ static int generic_open (struct usb_serial_port *port, struct file *filp)
 		}
 	}
 	
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
 	
-	return 0;
+	return result;
 }
 
 
 static void generic_close (struct usb_serial_port *port, struct file * filp)
 {
 	struct usb_serial *serial = port->serial;
-	unsigned long flags;
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 
 	--port->open_count;
 
@@ -801,7 +807,7 @@ static void generic_close (struct usb_serial_port *port, struct file * filp)
 		port->open_count = 0;
 	}
 
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
 	MOD_DEC_USE_COUNT;
 }
 
@@ -809,7 +815,6 @@ static void generic_close (struct usb_serial_port *port, struct file * filp)
 static int generic_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
-	unsigned long flags;
 	int result;
 
 	dbg(__FUNCTION__ " - port %d", port->number);
@@ -826,7 +831,6 @@ static int generic_write (struct usb_serial_port *port, int from_user, const uns
 			return (0);
 		}
 
-		spin_lock_irqsave (&port->port_lock, flags);
 		count = (count > port->bulk_out_size) ? port->bulk_out_size : count;
 
 		if (from_user) {
@@ -849,14 +853,12 @@ static int generic_write (struct usb_serial_port *port, int from_user, const uns
 
 		/* send the data out the bulk port */
 		result = usb_submit_urb(port->write_urb);
-		if (result) {
+		if (result)
 			err(__FUNCTION__ " - failed submitting write urb, error %d", result);
-			spin_unlock_irqrestore (&port->port_lock, flags);
-			return 0;
-		}
+		else
+			result = count;
 
-		spin_unlock_irqrestore (&port->port_lock, flags);
-		return (count);
+		return result;
 	}
 	
 	/* no bulk out, so return 0 bytes written */
@@ -871,9 +873,10 @@ static int generic_write_room (struct usb_serial_port *port)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 	
-	if (serial->num_bulk_out)
+	if (serial->num_bulk_out) {
 		if (port->write_urb->status != -EINPROGRESS)
 			room = port->bulk_out_size;
+	}
 	
 	dbg(__FUNCTION__ " - returns %d", room);
 	return (room);
@@ -887,9 +890,10 @@ static int generic_chars_in_buffer (struct usb_serial_port *port)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 	
-	if (serial->num_bulk_out)
+	if (serial->num_bulk_out) {
 		if (port->write_urb->status == -EINPROGRESS)
 			chars = port->write_urb->transfer_buffer_length;
+	}
 
 	dbg (__FUNCTION__ " - returns %d", chars);
 	return (chars);
@@ -1091,6 +1095,33 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		}
 	}
 	
+#if defined(CONFIG_USB_SERIAL_PL2303) || defined(CONFIG_USB_SERIAL_PL2303_MODULE)
+	/* BEGIN HORRIBLE HACK FOR PL2303 */ 
+	/* this is needed due to the looney way its endpoints are set up */
+	if (ifnum == 1) {
+		if (((dev->descriptor.idVendor == PL2303_VENDOR_ID) &&
+		     (dev->descriptor.idProduct == PL2303_PRODUCT_ID)) ||
+		    ((dev->descriptor.idVendor == ATEN_VENDOR_ID) &&
+		     (dev->descriptor.idProduct == ATEN_PRODUCT_ID))) {
+			/* check out the endpoints of the other interface*/
+			interface = &dev->actconfig->interface[ifnum ^ 1];
+			iface_desc = &interface->altsetting[0];
+			for (i = 0; i < iface_desc->bNumEndpoints; ++i) {
+				endpoint = &iface_desc->endpoint[i];
+				if ((endpoint->bEndpointAddress & 0x80) &&
+				    ((endpoint->bmAttributes & 3) == 0x03)) {
+					/* we found a interrupt in endpoint */
+					dbg("found interrupt in for Prolific device on separate interface");
+					interrupt_pipe = HAS;
+					interrupt_in_endpoint[num_interrupt_in] = endpoint;
+					++num_interrupt_in;
+				}
+			}
+		}
+	}
+	/* END HORRIBLE HACK FOR PL2303 */
+#endif
+	
 	/* verify that we found all of the endpoints that we need */
 	if (!((interrupt_pipe & type->needs_interrupt_in) &&
 	      (bulk_in_pipe & type->needs_bulk_in) &&
@@ -1222,7 +1253,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		port->magic = USB_SERIAL_PORT_MAGIC;
 		port->tqueue.routine = port_softint;
 		port->tqueue.data = port;
-		spin_lock_init (&port->port_lock);
+		init_MUTEX (&port->sem);
 	}
 	
 	/* initialize the devfs nodes for this device and let the user know what ports we are bound to */

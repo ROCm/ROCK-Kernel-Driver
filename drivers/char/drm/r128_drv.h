@@ -385,16 +385,14 @@ extern int  r128_context_switch_complete(drm_device_t *dev, int new);
 #define R128_MAX_VB_VERTS		(0xffff)
 
 
-#define R128_BASE(reg)		((u32)(dev_priv->mmio->handle))
+#define R128_BASE(reg)		((unsigned long)(dev_priv->mmio->handle))
 #define R128_ADDR(reg)		(R128_BASE(reg) + reg)
 
-#define R128_DEREF(reg)		*(__volatile__ int *)R128_ADDR(reg)
-#define R128_READ(reg)		R128_DEREF(reg)
-#define R128_WRITE(reg,val)	do { R128_DEREF(reg) = val; } while (0)
+#define R128_READ(reg)		readl(R128_ADDR(reg))
+#define R128_WRITE(reg,val)	writel(val,R128_ADDR(reg))
 
-#define R128_DEREF8(reg)	*(__volatile__ char *)R128_ADDR(reg)
-#define R128_READ8(reg)		R128_DEREF8(reg)
-#define R128_WRITE8(reg,val)	do { R128_DEREF8(reg) = val; } while (0)
+#define R128_READ8(reg)		readb(R128_ADDR(reg))
+#define R128_WRITE8(reg,val)	writeb(val,R128_ADDR(reg))
 
 #define R128_WRITE_PLL(addr,val)                                              \
 do {                                                                          \

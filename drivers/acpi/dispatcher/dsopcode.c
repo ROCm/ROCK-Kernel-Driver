@@ -2,7 +2,7 @@
  *
  * Module Name: dsopcode - Dispatcher Op Region support and handling of
  *                         "control" opcodes
- *              $Revision: 32 $
+ *              $Revision: 44 $
  *
  *****************************************************************************/
 
@@ -34,25 +34,25 @@
 #include "acevents.h"
 #include "actables.h"
 
-#define _COMPONENT          DISPATCHER
+#define _COMPONENT          ACPI_DISPATCHER
 	 MODULE_NAME         ("dsopcode")
 
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_get_field_unit_arguments
+ * FUNCTION:    Acpi_ds_get_buffer_field_arguments
  *
- * PARAMETERS:  Obj_desc        - A valid Field_unit object
+ * PARAMETERS:  Obj_desc        - A valid Buffer_field object
  *
  * RETURN:      Status.
  *
- * DESCRIPTION: Get Field_unit Buffer and Index. This implements the late
+ * DESCRIPTION: Get Buffer_field Buffer and Index. This implements the late
  *              evaluation of these field attributes.
  *
  ****************************************************************************/
 
 ACPI_STATUS
-acpi_ds_get_field_unit_arguments (
+acpi_ds_get_buffer_field_arguments (
 	ACPI_OPERAND_OBJECT     *obj_desc)
 {
 	ACPI_OPERAND_OBJECT     *extra_desc;
@@ -68,10 +68,10 @@ acpi_ds_get_field_unit_arguments (
 	}
 
 
-	/* Get the AML pointer (method object) and Field_unit node */
+	/* Get the AML pointer (method object) and Buffer_field node */
 
-	extra_desc = obj_desc->field_unit.extra;
-	node = obj_desc->field_unit.node;
+	extra_desc = obj_desc->buffer_field.extra;
+	node = obj_desc->buffer_field.node;
 
 	/*
 	 * Allocate a new parser op to be the root of the parsed
@@ -94,7 +94,7 @@ acpi_ds_get_field_unit_arguments (
 		return (status);
 	}
 
-	/* Pass1: Parse the entire Field_unit declaration */
+	/* Pass1: Parse the entire Buffer_field declaration */
 
 	status = acpi_ps_parse_aml (op, extra_desc->extra.pcode,
 			  extra_desc->extra.pcode_length, 0,
@@ -138,8 +138,8 @@ acpi_ds_get_field_unit_arguments (
 	 * The pseudo-method object is no longer needed since the region is
 	 * now initialized
 	 */
-	acpi_cm_remove_reference (obj_desc->field_unit.extra);
-	obj_desc->field_unit.extra = NULL;
+	acpi_ut_remove_reference (obj_desc->buffer_field.extra);
+	obj_desc->buffer_field.extra = NULL;
 
 	return (status);
 }
@@ -278,29 +278,45 @@ acpi_ds_initialize_region (
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ds_eval_field_unit_operands
+ * FUNCTION:    Acpi_ds_eval_buffer_field_operands
  *
- * PARAMETERS:  Op              - A valid Field_unit Op object
+ * PARAMETERS:  Op              - A valid Buffer_field Op object
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Get Field_unit Buffer and Index
- *              Called from Acpi_ds_exec_end_op during Field_unit parse tree walk
+ * DESCRIPTION: Get Buffer_field Buffer and Index
+ *              Called from Acpi_ds_exec_end_op during Buffer_field parse tree walk
+ *
+ * ACPI SPECIFICATION REFERENCES:
+ *  Each of the Buffer Field opcodes is defined as specified in in-line
+ *  comments below. For each one, use the following definitions.
+ *
+ *  Def_bit_field   :=  Bit_field_op    Src_buf Bit_idx Destination
+ *  Def_byte_field  :=  Byte_field_op   Src_buf Byte_idx Destination
+ *  Def_create_field := Create_field_op Src_buf Bit_idx Num_bits Name_string
+ *  Def_dWord_field :=  DWord_field_op  Src_buf Byte_idx Destination
+ *  Def_word_field  :=  Word_field_op   Src_buf Byte_idx Destination
+ *  Bit_index       :=  Term_arg=>Integer
+ *  Byte_index      :=  Term_arg=>Integer
+ *  Destination     :=  Name_string
+ *  Num_bits        :=  Term_arg=>Integer
+ *  Source_buf      :=  Term_arg=>Buffer
  *
  ****************************************************************************/
 
 ACPI_STATUS
-acpi_ds_eval_field_unit_operands (
+acpi_ds_eval_buffer_field_operands (
 	ACPI_WALK_STATE         *walk_state,
 	ACPI_PARSE_OBJECT       *op)
 {
 	ACPI_STATUS             status;
-	ACPI_OPERAND_OBJECT     *field_desc;
+	ACPI_OPERAND_OBJECT     *obj_desc;
 	ACPI_NAMESPACE_NODE     *node;
 	ACPI_PARSE_OBJECT       *next_op;
 	u32                     offset;
 	u32                     bit_offset;
-	u16                     bit_count;
+	u32                     bit_count;
+	u8                      field_flags;
 
 
 	ACPI_OPERAND_OBJECT     *res_desc = NULL;
@@ -311,12 +327,14 @@ acpi_ds_eval_field_unit_operands (
 
 
 	/*
-	 * This is where we evaluate the address and length fields of the Op_field_unit declaration
+	 * This is where we evaluate the address and length fields of the
+	 * Create_xxx_field declaration
 	 */
 
 	node =  op->node;
 
 	/* Next_op points to the op that holds the Buffer */
+
 	next_op = op->value.arg;
 
 	/* Acpi_evaluate/create the address and length operands */
@@ -326,15 +344,15 @@ acpi_ds_eval_field_unit_operands (
 		return (status);
 	}
 
-	field_desc = acpi_ns_get_attached_object (node);
-	if (!field_desc) {
+	obj_desc = acpi_ns_get_attached_object (node);
+	if (!obj_desc) {
 		return (AE_NOT_EXIST);
 	}
 
 
 	/* Resolve the operands */
 
-	status = acpi_aml_resolve_operands (op->opcode, WALK_OPERANDS, walk_state);
+	status = acpi_ex_resolve_operands (op->opcode, WALK_OPERANDS, walk_state);
 
 	/* Get the operands */
 
@@ -359,7 +377,7 @@ acpi_ds_eval_field_unit_operands (
 
 	/*
 	 * If Res_desc is a Name, it will be a direct name pointer after
-	 * Acpi_aml_resolve_operands()
+	 * Acpi_ex_resolve_operands()
 	 */
 
 	if (!VALID_DESCRIPTOR_TYPE (res_desc, ACPI_DESC_TYPE_NAMED)) {
@@ -372,52 +390,7 @@ acpi_ds_eval_field_unit_operands (
 	 * Setup the Bit offsets and counts, according to the opcode
 	 */
 
-	switch (op->opcode)
-	{
-
-	/* Def_create_bit_field */
-
-	case AML_BIT_FIELD_OP:
-
-		/* Offset is in bits, Field is a bit */
-
-		bit_offset = offset;
-		bit_count = 1;
-		break;
-
-
-	/* Def_create_byte_field */
-
-	case AML_BYTE_FIELD_OP:
-
-		/* Offset is in bytes, field is a byte */
-
-		bit_offset = 8 * offset;
-		bit_count = 8;
-		break;
-
-
-	/* Def_create_word_field */
-
-	case AML_WORD_FIELD_OP:
-
-		/* Offset is in bytes, field is a word */
-
-		bit_offset = 8 * offset;
-		bit_count = 16;
-		break;
-
-
-	/* Def_create_dWord_field */
-
-	case AML_DWORD_FIELD_OP:
-
-		/* Offset is in bytes, field is a dword */
-
-		bit_offset = 8 * offset;
-		bit_count = 32;
-		break;
-
+	switch (op->opcode) {
 
 	/* Def_create_field */
 
@@ -425,8 +398,69 @@ acpi_ds_eval_field_unit_operands (
 
 		/* Offset is in bits, count is in bits */
 
-		bit_offset = offset;
-		bit_count = (u16) cnt_desc->integer.value;
+		bit_offset  = offset;
+		bit_count   = (u32) cnt_desc->integer.value;
+		field_flags = ACCESS_BYTE_ACC;
+		break;
+
+
+	/* Def_create_bit_field */
+
+	case AML_CREATE_BIT_FIELD_OP:
+
+		/* Offset is in bits, Field is one bit */
+
+		bit_offset  = offset;
+		bit_count   = 1;
+		field_flags = ACCESS_BYTE_ACC;
+		break;
+
+
+	/* Def_create_byte_field */
+
+	case AML_CREATE_BYTE_FIELD_OP:
+
+		/* Offset is in bytes, field is one byte */
+
+		bit_offset  = 8 * offset;
+		bit_count   = 8;
+		field_flags = ACCESS_BYTE_ACC;
+		break;
+
+
+	/* Def_create_word_field */
+
+	case AML_CREATE_WORD_FIELD_OP:
+
+		/* Offset is in bytes, field is one word */
+
+		bit_offset  = 8 * offset;
+		bit_count   = 16;
+		field_flags = ACCESS_WORD_ACC;
+		break;
+
+
+	/* Def_create_dWord_field */
+
+	case AML_CREATE_DWORD_FIELD_OP:
+
+		/* Offset is in bytes, field is one dword */
+
+		bit_offset  = 8 * offset;
+		bit_count   = 32;
+		field_flags = ACCESS_DWORD_ACC;
+		break;
+
+
+	/* Def_create_qWord_field */
+
+	case AML_CREATE_QWORD_FIELD_OP:
+
+		/* Offset is in bytes, field is one qword */
+
+		bit_offset  = 8 * offset;
+		bit_count   = 64;
+		field_flags = ACCESS_QWORD_ACC;
 		break;
 
 
@@ -441,35 +475,35 @@ acpi_ds_eval_field_unit_operands (
 	 * Setup field according to the object type
 	 */
 
-	switch (src_desc->common.type)
-	{
+	switch (src_desc->common.type) {
 
 	/* Source_buff :=  Term_arg=>Buffer */
 
 	case ACPI_TYPE_BUFFER:
 
-		if (bit_offset + (u32) bit_count >
-			(8 * (u32) src_desc->buffer.length))
-		{
+		if ((bit_offset + bit_count) >
+			(8 * (u32) src_desc->buffer.length)) {
 			status = AE_AML_BUFFER_LIMIT;
 			goto cleanup;
 		}
 
 
-		/* Construct the remainder of the field object */
+		/*
+		 * Initialize areas of the field object that are common to all fields
+		 * For Field_flags, use LOCK_RULE = 0 (NO_LOCK), UPDATE_RULE = 0 (UPDATE_PRESERVE)
+		 */
+		status = acpi_ex_prep_common_field_object (obj_desc, field_flags,
+				  bit_offset, bit_count);
+		if (ACPI_FAILURE (status)) {
+			return (status);
+		}
 
-		field_desc->field_unit.access     = (u8) ACCESS_ANY_ACC;
-		field_desc->field_unit.lock_rule  = (u8) GLOCK_NEVER_LOCK;
-		field_desc->field_unit.update_rule = (u8) UPDATE_PRESERVE;
-		field_desc->field_unit.length     = bit_count;
-		field_desc->field_unit.bit_offset = (u8) (bit_offset % 8);
-		field_desc->field_unit.offset     = DIV_8 (bit_offset);
-		field_desc->field_unit.container  = src_desc;
+		obj_desc->buffer_field.buffer_obj = src_desc;
 
-		/* Reference count for Src_desc inherits Field_desc count */
+		/* Reference count for Src_desc inherits Obj_desc count */
 
 		src_desc->common.reference_count = (u16) (src_desc->common.reference_count +
-				   field_desc->common.reference_count);
+				  obj_desc->common.reference_count);
 
 		break;
 
@@ -478,8 +512,6 @@ acpi_ds_eval_field_unit_operands (
 
 	default:
 
-		if ((src_desc->common.type > (u8) INTERNAL_TYPE_REFERENCE) ||
-			!acpi_cm_valid_object_type (src_desc->common.type))
 
 
 		status = AE_AML_OPERAND_TYPE;
@@ -490,7 +522,7 @@ acpi_ds_eval_field_unit_operands (
 	if (AML_CREATE_FIELD_OP == op->opcode) {
 		/* Delete object descriptor unique to Create_field */
 
-		acpi_cm_remove_reference (cnt_desc);
+		acpi_ut_remove_reference (cnt_desc);
 		cnt_desc = NULL;
 	}
 
@@ -499,23 +531,23 @@ cleanup:
 
 	/* Always delete the operands */
 
-	acpi_cm_remove_reference (off_desc);
-	acpi_cm_remove_reference (src_desc);
+	acpi_ut_remove_reference (off_desc);
+	acpi_ut_remove_reference (src_desc);
 
 	if (AML_CREATE_FIELD_OP == op->opcode) {
-		acpi_cm_remove_reference (cnt_desc);
+		acpi_ut_remove_reference (cnt_desc);
 	}
 
 	/* On failure, delete the result descriptor */
 
 	if (ACPI_FAILURE (status)) {
-		acpi_cm_remove_reference (res_desc); /* Result descriptor */
+		acpi_ut_remove_reference (res_desc); /* Result descriptor */
 	}
 
 	else {
-		/* Now the address and length are valid for this op_field_unit */
+		/* Now the address and length are valid for this Buffer_field */
 
-		field_desc->field_unit.flags |= AOPOBJ_DATA_VALID;
+		obj_desc->buffer_field.flags |= AOPOBJ_DATA_VALID;
 	}
 
 	return (status);
@@ -568,7 +600,7 @@ acpi_ds_eval_region_operands (
 
 	/* Resolve the length and address operands to numbers */
 
-	status = acpi_aml_resolve_operands (op->opcode, WALK_OPERANDS, walk_state);
+	status = acpi_ex_resolve_operands (op->opcode, WALK_OPERANDS, walk_state);
 	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
@@ -586,7 +618,7 @@ acpi_ds_eval_region_operands (
 	operand_desc = walk_state->operands[walk_state->num_operands - 1];
 
 	obj_desc->region.length = (u32) operand_desc->integer.value;
-	acpi_cm_remove_reference (operand_desc);
+	acpi_ut_remove_reference (operand_desc);
 
 	/*
 	 * Get the address and save it
@@ -595,7 +627,7 @@ acpi_ds_eval_region_operands (
 	operand_desc = walk_state->operands[walk_state->num_operands - 2];
 
 	obj_desc->region.address = (ACPI_PHYSICAL_ADDRESS) operand_desc->integer.value;
-	acpi_cm_remove_reference (operand_desc);
+	acpi_ut_remove_reference (operand_desc);
 
 
 	/* Now the address and length are valid for this opregion */
@@ -629,8 +661,10 @@ acpi_ds_exec_begin_control_op (
 	ACPI_GENERIC_STATE      *control_state;
 
 
-	switch (op->opcode)
-	{
+	PROC_NAME ("Ds_exec_begin_control_op");
+
+
+	switch (op->opcode) {
 	case AML_IF_OP:
 	case AML_WHILE_OP:
 
@@ -640,13 +674,13 @@ acpi_ds_exec_begin_control_op (
 		 * to handle nesting.
 		 */
 
-		control_state = acpi_cm_create_control_state ();
+		control_state = acpi_ut_create_control_state ();
 		if (!control_state) {
 			status = AE_NO_MEMORY;
 			break;
 		}
 
-		acpi_cm_push_generic_state (&walk_state->control_state, control_state);
+		acpi_ut_push_generic_state (&walk_state->control_state, control_state);
 
 		/*
 		 * Save a pointer to the predicate for multiple executions
@@ -708,8 +742,10 @@ acpi_ds_exec_end_control_op (
 	ACPI_GENERIC_STATE      *control_state;
 
 
-	switch (op->opcode)
-	{
+	PROC_NAME ("Ds_exec_end_control_op");
+
+
+	switch (op->opcode) {
 	case AML_IF_OP:
 
 		/*
@@ -718,18 +754,15 @@ acpi_ds_exec_end_control_op (
 		 */
 
 		walk_state->last_predicate =
-				(u8) walk_state->control_state->common.value;
+			(u8) walk_state->control_state->common.value;
 
 		/*
 		 * Pop the control state that was created at the start
 		 * of the IF and free it
 		 */
 
-		control_state =
-				acpi_cm_pop_generic_state (&walk_state->control_state);
-
-		acpi_cm_delete_generic_state (control_state);
-
+		control_state = acpi_ut_pop_generic_state (&walk_state->control_state);
+		acpi_ut_delete_generic_state (control_state);
 		break;
 
 
@@ -746,15 +779,12 @@ acpi_ds_exec_end_control_op (
 			status = AE_CTRL_PENDING;
 		}
 
-
 		/* Pop this control state and free it */
 
-		control_state =
-				acpi_cm_pop_generic_state (&walk_state->control_state);
+		control_state = acpi_ut_pop_generic_state (&walk_state->control_state);
 
 		walk_state->aml_last_while = control_state->control.aml_predicate_start;
-		acpi_cm_delete_generic_state (control_state);
-
+		acpi_ut_delete_generic_state (control_state);
 		break;
 
 
@@ -779,8 +809,7 @@ acpi_ds_exec_end_control_op (
 			 * an arg or local), resolve it now because it may
 			 * cease to exist at the end of the method.
 			 */
-
-			status = acpi_aml_resolve_to_value (&walk_state->operands [0], walk_state);
+			status = acpi_ex_resolve_to_value (&walk_state->operands [0], walk_state);
 			if (ACPI_FAILURE (status)) {
 				return (status);
 			}
@@ -795,19 +824,24 @@ acpi_ds_exec_end_control_op (
 		}
 
 		else if ((walk_state->results) &&
-				 (walk_state->results->results.num_results > 0))
-		{
+				 (walk_state->results->results.num_results > 0)) {
 			/*
 			 * The return value has come from a previous calculation.
 			 *
 			 * If value being returned is a Reference (such as
 			 * an arg or local), resolve it now because it may
 			 * cease to exist at the end of the method.
+			 *
+			 * Allow references created by the Index operator to return unchanged.
 			 */
 
-			status = acpi_aml_resolve_to_value (&walk_state->results->results.obj_desc [0], walk_state);
-			if (ACPI_FAILURE (status)) {
-				return (status);
+			if (VALID_DESCRIPTOR_TYPE (walk_state->results->results.obj_desc [0], ACPI_DESC_TYPE_INTERNAL) &&
+				((walk_state->results->results.obj_desc [0])->common.type == INTERNAL_TYPE_REFERENCE) &&
+				((walk_state->results->results.obj_desc [0])->reference.opcode != AML_INDEX_OP)) {
+					status = acpi_ex_resolve_to_value (&walk_state->results->results.obj_desc [0], walk_state);
+					if (ACPI_FAILURE (status)) {
+						return (status);
+					}
 			}
 
 			walk_state->return_desc = walk_state->results->results.obj_desc [0];
@@ -817,7 +851,7 @@ acpi_ds_exec_end_control_op (
 			/* No return operand */
 
 			if (walk_state->num_operands) {
-				acpi_cm_remove_reference (walk_state->operands [0]);
+				acpi_ut_remove_reference (walk_state->operands [0]);
 			}
 
 			walk_state->operands [0]    = NULL;

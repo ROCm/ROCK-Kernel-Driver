@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 119 $
+ *              $Revision: 126 $
  *
  ******************************************************************************/
 
@@ -31,7 +31,7 @@
 #include "acdispat.h"
 
 
-#define _COMPONENT          NAMESPACE
+#define _COMPONENT          ACPI_NAMESPACE
 	 MODULE_NAME         ("nsaccess")
 
 
@@ -58,7 +58,7 @@ acpi_ns_root_initialize (void)
 	ACPI_OPERAND_OBJECT     *obj_desc;
 
 
-	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 	/*
 	 * The global root ptr is initially NULL, so a non-NULL value indicates
@@ -82,8 +82,7 @@ acpi_ns_root_initialize (void)
 	/* Enter the pre-defined names in the name table */
 
 	for (init_val = acpi_gbl_pre_defined_names; init_val->name; init_val++) {
-		status = acpi_ns_lookup (NULL, init_val->name,
-				 (OBJECT_TYPE_INTERNAL) init_val->type,
+		status = acpi_ns_lookup (NULL, init_val->name, init_val->type,
 				 IMODE_LOAD_PASS2, NS_NO_UPSEARCH,
 				 NULL, &new_node);
 
@@ -100,9 +99,7 @@ acpi_ns_root_initialize (void)
 			 * descriptor for it.
 			 */
 
-			obj_desc = acpi_cm_create_internal_object (
-					  (OBJECT_TYPE_INTERNAL) init_val->type);
-
+			obj_desc = acpi_ut_create_internal_object (init_val->type);
 			if (!obj_desc) {
 				status = AE_NO_MEMORY;
 				goto unlock_and_exit;
@@ -114,8 +111,7 @@ acpi_ns_root_initialize (void)
 			 * used for initial values are implemented here.
 			 */
 
-			switch (init_val->type)
-			{
+			switch (init_val->type) {
 
 			case ACPI_TYPE_INTEGER:
 
@@ -126,18 +122,17 @@ acpi_ns_root_initialize (void)
 
 			case ACPI_TYPE_STRING:
 
-				obj_desc->string.length =
-						(u16) STRLEN (init_val->val);
+				obj_desc->string.length = STRLEN (init_val->val);
 
 				/*
 				 * Allocate a buffer for the string.  All
 				 * String.Pointers must be allocated buffers!
 				 * (makes deletion simpler)
 				 */
-				obj_desc->string.pointer = acpi_cm_allocate (
+				obj_desc->string.pointer = acpi_ut_allocate (
 						   (obj_desc->string.length + 1));
 				if (!obj_desc->string.pointer) {
-					acpi_cm_remove_reference (obj_desc);
+					acpi_ut_remove_reference (obj_desc);
 					status = AE_NO_MEMORY;
 					goto unlock_and_exit;
 				}
@@ -149,7 +144,7 @@ acpi_ns_root_initialize (void)
 			case ACPI_TYPE_MUTEX:
 
 				obj_desc->mutex.sync_level =
-						(u16) STRTOUL (init_val->val, NULL, 10);
+						 (u16) STRTOUL (init_val->val, NULL, 10);
 
 				if (STRCMP (init_val->name, "_GL_") == 0) {
 					/*
@@ -186,21 +181,20 @@ acpi_ns_root_initialize (void)
 			default:
 				REPORT_ERROR (("Unsupported initial type value %X\n",
 					init_val->type));
-				acpi_cm_remove_reference (obj_desc);
+				acpi_ut_remove_reference (obj_desc);
 				obj_desc = NULL;
 				continue;
 			}
 
 			/* Store pointer to value descriptor in the Node */
 
-			acpi_ns_attach_object (new_node, obj_desc,
-					   obj_desc->common.type);
+			acpi_ns_attach_object (new_node, obj_desc, obj_desc->common.type);
 		}
 	}
 
 
 unlock_and_exit:
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return (status);
 }
 
@@ -232,7 +226,7 @@ ACPI_STATUS
 acpi_ns_lookup (
 	ACPI_GENERIC_STATE      *scope_info,
 	NATIVE_CHAR             *pathname,
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	OPERATING_MODE          interpreter_mode,
 	u32                     flags,
 	ACPI_WALK_STATE         *walk_state,
@@ -246,8 +240,8 @@ acpi_ns_lookup (
 	u32                     num_segments;
 	ACPI_NAME               simple_name;
 	u8                      null_name_path = FALSE;
-	OBJECT_TYPE_INTERNAL    type_to_check_for;
-	OBJECT_TYPE_INTERNAL    this_search_type;
+	ACPI_OBJECT_TYPE8       type_to_check_for;
+	ACPI_OBJECT_TYPE8       this_search_type;
 	u32                     local_flags = flags & ~NS_ERROR_IF_FOUND;
 
 
@@ -271,8 +265,7 @@ acpi_ns_lookup (
 	 */
 
 	if ((!scope_info) ||
-		(!scope_info->scope.node))
-	{
+		(!scope_info->scope.node)) {
 		prefix_node = acpi_gbl_root_node;
 	}
 	else {
@@ -281,14 +274,14 @@ acpi_ns_lookup (
 
 
 	/*
-	 * This check is explicitly split provide relax the Type_to_check_for
+	 * This check is explicitly split to relax the Type_to_check_for
 	 * conditions for Bank_field_defn. Originally, both Bank_field_defn and
 	 * Def_field_defn caused Type_to_check_for to be set to ACPI_TYPE_REGION,
 	 * but the Bank_field_defn may also check for a Field definition as well
 	 * as an Operation_region.
 	 */
 
-	if (INTERNAL_TYPE_DEF_FIELD_DEFN == type) {
+	if (INTERNAL_TYPE_FIELD_DEFN == type) {
 		/* Def_field_defn defines fields in a Region */
 
 		type_to_check_for = ACPI_TYPE_REGION;
@@ -376,7 +369,8 @@ acpi_ns_lookup (
 				if (!this_node) {
 					/* Current scope has no parent scope */
 
-					REPORT_ERROR (("Too many parent prefixes (^) - reached root\n"));
+					REPORT_ERROR (
+						("Too many parent prefixes (^) - reached root\n"));
 					return (AE_NOT_FOUND);
 				}
 
@@ -480,8 +474,7 @@ acpi_ns_lookup (
 			(type_to_check_for  != INTERNAL_TYPE_SCOPE)             &&
 			(type_to_check_for  != INTERNAL_TYPE_INDEX_FIELD_DEFN)  &&
 			(this_node->type    != ACPI_TYPE_ANY)                   &&
-			(this_node->type    != type_to_check_for))
-		{
+			(this_node->type    != type_to_check_for)) {
 			/* Complain about a type mismatch */
 
 			REPORT_WARNING (
@@ -500,8 +493,7 @@ acpi_ns_lookup (
 		}
 
 		if ((num_segments || acpi_ns_opens_scope (type)) &&
-			(this_node->child == NULL))
-		{
+			(this_node->child == NULL)) {
 			/*
 			 * More segments or the type implies enclosed scope,
 			 * and the next scope has not been allocated.

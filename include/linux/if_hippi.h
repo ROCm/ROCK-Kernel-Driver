@@ -110,13 +110,13 @@ struct hippi_fp_hdr
 struct hippi_le_hdr
 {
 #if defined (__BIG_ENDIAN_BITFIELD)
-	unsigned long	fc:3;
-	unsigned long	double_wide:1;
-	unsigned long	message_type:4;
+	__u8		fc:3;
+	__u8		double_wide:1;
+	__u8		message_type:4;
 #elif defined(__LITTLE_ENDIAN_BITFIELD)
-	unsigned long	message_type:4;
-	unsigned long	double_wide:1;
-	unsigned long	fc:3;
+	__u8		message_type:4;
+	__u8		double_wide:1;
+	__u8		fc:3;
 #endif
 	__u8		dest_switch_addr[3];
 #if defined (__BIG_ENDIAN_BITFIELD)

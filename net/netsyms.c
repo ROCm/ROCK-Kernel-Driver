@@ -234,6 +234,8 @@ EXPORT_SYMBOL(divert_ioctl);
 EXPORT_SYMBOL(inetdev_lock);
 EXPORT_SYMBOL(inet_add_protocol);
 EXPORT_SYMBOL(inet_del_protocol);
+EXPORT_SYMBOL(inet_register_protosw);
+EXPORT_SYMBOL(inet_unregister_protosw);
 EXPORT_SYMBOL(ip_route_output_key);
 EXPORT_SYMBOL(ip_route_input);
 EXPORT_SYMBOL(icmp_send);

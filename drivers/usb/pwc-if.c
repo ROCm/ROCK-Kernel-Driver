@@ -84,10 +84,10 @@ static struct usb_driver pwc_driver =
 
 static int default_size = PSZ_QCIF;
 static int default_fps = 10;
-static int default_palette = VIDEO_PALETTE_RGB24; /* This is normal for webcams */
+static int default_palette = VIDEO_PALETTE_YUV420P; /* This format is understood by most tools */
 static int default_fbufs = 3;   /* Default number of frame buffers */
 static int default_mbufs = 2;	/* Default number of mmap() buffers */
-       int pwc_trace = TRACE_MODULE | TRACE_FLOW;
+       int pwc_trace = TRACE_MODULE | TRACE_FLOW | TRACE_PWCX;
 static int power_save = 0;
 int pwc_preferred_compression = 2; /* 0..3 = uncompressed..high */
 
@@ -110,7 +110,7 @@ static struct video_device pwc_template = {
 	owner:		THIS_MODULE,
 	name:		"Philips Webcam",	/* Filled in later */
 	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_PWC,	/* Let's pretend for now */
+	hardware:	VID_HARDWARE_PWC,
 	open:		pwc_video_open,
 	close:		pwc_video_close,
 	read:		pwc_video_read,
@@ -321,14 +321,16 @@ static int pwc_allocate_buffers(struct pwc_device *pdev)
 		}
 	}
 	
-	/* Allocate decompressor buffer space */
-	kbuf = vmalloc(FRAME_SIZE);
-	if (kbuf == NULL) {
-		Err("Failed to allocate compressed image buffer.\n");
-		return -ENOMEM;
+	/* Allocate decompressor table space */
+	kbuf = NULL;
+	if (pdev->decompressor != NULL) {
+		kbuf = kmalloc(pdev->decompressor->table_size, GFP_KERNEL);
+		if (kbuf == NULL) {
+			Err("Failed to allocate decompress table.\n");
+			return -ENOMEM;
+		}
 	}
-	memset(kbuf, 0, FRAME_SIZE);
-	pdev->decompress_buffer = kbuf;
+	pdev->decompress_data = kbuf;
 	
 	/* Allocate image buffer; double buffer for mmap() */
 	kbuf = rvmalloc(default_mbufs * pdev->view_max.size * 4);
@@ -361,6 +363,7 @@ static void pwc_free_buffers(struct pwc_device *pdev)
 		return;
 	}
 #endif	
+
 	/* Release Iso-pipe buffers */
 	Trace(TRACE_MEMORY, "Freeing ISO buffers.\n");
 	for (i = 0; i < MAX_ISO_BUFS; i++)
@@ -368,6 +371,7 @@ static void pwc_free_buffers(struct pwc_device *pdev)
 			kfree(pdev->sbuf[i].data);
 			pdev->sbuf[i].data = NULL;
 		}
+
 	/* The same for frame buffers */
 	Trace(TRACE_MEMORY, "Freeing frame buffers.\n");
 	if (pdev->fbuf != NULL) {
@@ -380,11 +384,14 @@ static void pwc_free_buffers(struct pwc_device *pdev)
 		kfree(pdev->fbuf);
 		pdev->fbuf = NULL;
 	}
-	/* Intermediate decompression buffer */
+
+	/* Intermediate decompression buffer & tables */
 	Trace(TRACE_MEMORY, "Freeing decompression buffer\n");
-	if (pdev->decompress_buffer != NULL)
-		vfree(pdev->decompress_buffer);
-	pdev->decompress_buffer = NULL;
+	if (pdev->decompress_data != NULL) {
+		kfree(pdev->decompress_data);
+		pdev->decompress_data = NULL;
+	}
+	pdev->decompressor = NULL;
 
 	/* Release image buffers */
 	Trace(TRACE_MEMORY, "Freeing image buffers\n");
@@ -401,7 +408,7 @@ static void pwc_free_buffers(struct pwc_device *pdev)
    the user program. The first scheme involves the ISO buffers (called thus
    since they transport ISO data from the USB controller), and not really
    interesting. Suffices to say the data from this buffer is quickly 
-   gathered in an interrupt handler (pwc_isoc_hanlder) and placed into the 
+   gathered in an interrupt handler (pwc_isoc_handler) and placed into the 
    frame buffer.
    
    The frame buffer is the second scheme, and is the central element here.
@@ -412,8 +419,8 @@ static void pwc_free_buffers(struct pwc_device *pdev)
    either read() or mmap().
    
    The image buffer is the third scheme, in which frames are decompressed
-   and converted into any of the desired image formats (rgb, bgr, yuv, etc).
-   For mmap() there is more than one image buffer available.
+   and possibly converted into planar format. For mmap() there is more than
+   one image buffer available.
 
    The frame buffers provide the image buffering, in case the user process
    is a bit slow. This introduces lag and some undesired side-effects.
@@ -500,7 +507,7 @@ static inline int pwc_next_fill_frame(struct pwc_device *pdev)
 /**
   \brief Reset all buffers, pointers and lists, except for the image_used[] buffer. 
   
-  If the image_used[] buffer is cleared too mmap()/VIDIOCSYNC will run into trouble.
+  If the image_used[] buffer is cleared too, mmap()/VIDIOCSYNC will run into trouble.
  */
 static void pwc_reset_buffers(struct pwc_device *pdev)
 {
@@ -589,10 +596,11 @@ static inline void pwc_next_image(struct pwc_device *pdev)
 	pdev->fill_image = (pdev->fill_image + 1) % default_mbufs;
 }
 
+/* XXX: 2001-06-17: The YUV420 palette will be phased out soon */
 static int pwc_set_palette(struct pwc_device *pdev, int pal)
 {
-	if (
-            pal == VIDEO_PALETTE_YUV420
+	if (   pal == VIDEO_PALETTE_YUV420
+            || pal == VIDEO_PALETTE_YUV420P
 #if PWC_DEBUG
             || pal == VIDEO_PALETTE_RAW
 #endif
@@ -640,10 +648,7 @@ static void pwc_isoc_handler(purb_t urb)
 	fbuf = pdev->fill_frame;
 	if (fbuf == NULL) {
 		Err("pwc_isoc_handler without valid fill frame.\n");
-		if (waitqueue_active(&pdev->frameq))
-			wake_up_interruptible(&pdev->frameq);
-		if (waitqueue_active(&pdev->pollq))
-			wake_up_interruptible(&pdev->pollq);
+		wake_up_interruptible(&pdev->frameq);
 		return;
 	}
 	fillptr = fbuf->data + fbuf->filled;
@@ -750,12 +755,8 @@ static void pwc_isoc_handler(purb_t urb)
 			pdev->vlast_packet_size = flen;
 		} /* ..status == 0 */
 	}
-	if (awake) {
-		if (waitqueue_active(&pdev->frameq))
-			wake_up_interruptible(&pdev->frameq);
-		if (waitqueue_active(&pdev->pollq))
-			wake_up_interruptible(&pdev->pollq);
-	}
+	if (awake)
+		wake_up_interruptible(&pdev->frameq);
 }
 
 
@@ -811,6 +812,7 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 		while (i >= 0) {
 			if (pdev->sbuf[i].urb != NULL)
 				usb_free_urb(pdev->sbuf[i].urb);
+			pdev->sbuf[i].urb = NULL;
 			i--;
 		}
 		return ret;
@@ -842,6 +844,8 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 		ret = usb_submit_urb(pdev->sbuf[i].urb);
 		if (ret)
 			Err("isoc_init() submit_urb %d failed with error %d\n", i, ret);
+		else
+			Trace(TRACE_OPEN, "pwc_isoc_init(): URB submitted.\n");
 	}
 
 	/* data should stream in now */
@@ -945,10 +949,16 @@ static int pwc_video_open(struct video_device *vdev, int mode)
 		}
 	}
 
+	/* Find our decompressor, if any */
+	pdev->decompressor = pwc_find_decompressor(pdev->type);
+#if PWC_DEBUG	
+	Debug("Found decompressor for %d at 0x%p\n", pdev->type, pdev->decompressor);
+#endif
+
 	/* So far, so good. Allocate memory. */
 	i = pwc_allocate_buffers(pdev);
 	if (i < 0) {
-		Trace(TRACE_OPEN, "Failed to allocate memory.\n");
+		Trace(TRACE_OPEN, "Failed to allocate buffer memory.\n");
 		up(&pdev->modlock);
 		return i;
 	}
@@ -963,12 +973,6 @@ static int pwc_video_open(struct video_device *vdev, int mode)
 	pdev->vpalette = default_palette;
 #if PWC_DEBUG	
 	pdev->sequence = 0;
-#endif
-
-	/* Find our decompressor, if any */
-	pdev->decompressor = pwc_find_decompressor(pdev->type);
-#if PWC_DEBUG	
-	Debug("Found decompressor for %d at 0x%p\n", pdev->type, pdev->decompressor);
 #endif
 
 	/* Set some defaults */
@@ -1064,12 +1068,11 @@ static void pwc_video_close(struct video_device *vdev)
 	}
 
 	pdev->vopen = 0;
-	pwc_free_buffers(pdev);
 	if (pdev->decompressor != NULL) {
-		pdev->decompressor->exit(&pdev->decompress_data);
+		pdev->decompressor->exit();
 		pdev->decompressor->unlock();
 	}
-	pdev->decompressor = NULL;
+	pwc_free_buffers(pdev);
 
 	/* wake up _disconnect() routine */
 	if (pdev->unplugged)
@@ -1078,11 +1081,20 @@ static void pwc_video_close(struct video_device *vdev)
 
 /*
  *	FIXME: what about two parallel reads ????
+ *      ANSWER: Not supported. You can't open the device more than once,
+                despite what the V4L1 interface says. First, I don't see 
+                the need, second there's no mechanism of alerting the 
+                2nd/3rd/... process of events like changing image size.
+                And I don't see the point of blocking that for the 
+                2nd/3rd/... process.
+                In multi-threaded environments reading parallel from any
+                device is tricky anyhow.
  */
  
 static long pwc_video_read(struct video_device *vdev, char *buf, unsigned long count, int noblock)
 {
 	struct pwc_device *pdev;
+	DECLARE_WAITQUEUE(wait, current);
 
 	Trace(TRACE_READ, "video_read(0x%p, %p, %ld, %d) called.\n", vdev, buf, count, noblock);
 	if (vdev == NULL)
@@ -1097,20 +1109,26 @@ static long pwc_video_read(struct video_device *vdev, char *buf, unsigned long c
 
 	/* In case we're doing partial reads, we don't have to wait for a frame */
 	if (pdev->image_read_pos == 0) {
-		/* See if a frame is completed, process that */
-		if (noblock && pdev->full_frames == NULL)
-			return -EAGAIN;
+		/* Do wait queueing according to the (doc)book */
+		add_wait_queue(&pdev->frameq, &wait);
 		while (pdev->full_frames == NULL) {
-			interruptible_sleep_on(&pdev->frameq);
-			if (pdev->unplugged) {
-				Debug("pwc_video_read: Device got unplugged (2).\n");
-				return -EPIPE;
-			}
-			if (signal_pending(current))
-				return -EINTR;
+	                if (noblock) {
+	                	remove_wait_queue(&pdev->frameq, &wait);
+	                	current->state = TASK_RUNNING;
+	                	return -EWOULDBLOCK;
+	                }
+	                if (signal_pending(current)) {
+	                	remove_wait_queue(&pdev->frameq, &wait);
+	                	current->state = TASK_RUNNING;
+	                	return -ERESTARTSYS;
+	                }
+	                schedule();
+	                current->state = TASK_INTERRUPTIBLE;
 		}
- 
-		/* Decompress & convert now */
+		remove_wait_queue(&pdev->frameq, &wait);
+		current->state = TASK_RUNNING;
+	                                                                                                                                                                                
+		/* Decompress [, convert] and release frame */
 		if (pwc_handle_frame(pdev))
 			return -EFAULT;
 	}
@@ -1145,7 +1163,7 @@ static unsigned int pwc_video_poll(struct video_device *vdev, struct file *file,
 	if (pdev == NULL)
 		return -EFAULT;
 	
-	poll_wait(file, &pdev->pollq, wait);
+	poll_wait(file, &pdev->frameq, wait);
 	if (pdev->unplugged) {
 		Debug("pwc_video_poll: Device got unplugged.\n");
 		return POLLERR;
@@ -1159,6 +1177,7 @@ static unsigned int pwc_video_poll(struct video_device *vdev, struct file *file,
 static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 {
 	struct pwc_device *pdev;
+	DECLARE_WAITQUEUE(wait, current);
 	
 	if (vdev == NULL)
 		return -EFAULT;
@@ -1271,6 +1290,11 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 
 			/*
 			 *	FIXME:	Suppose we are mid read
+			        ANSWER: No problem: the firmware of the camera
+			                can handle brightness/contrast/etc
+			                changes at _any_ time, and the palette
+			                is used exactly once in the uncompress
+			                routine.
 			 */
 			pwc_set_brightness(pdev, p.brightness);
 			pwc_set_contrast(pdev, p.contrast);
@@ -1309,11 +1333,6 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 			if (copy_from_user(&vw, arg, sizeof(vw)))
 				return -EFAULT;
 
-/*
-			size = pwc_decode_size(pdev, vw.width, vw.height);
-			if (size < 0)
-				return -EINVAL;
-*/				
 			fps = (vw.flags & PWC_FPS_FRMASK) >> PWC_FPS_SHIFT;
 			snapshot = vw.flags & PWC_FPS_SNAPSHOT;
 			if (fps == 0)
@@ -1385,11 +1404,6 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 				int ret;
 				
 				Trace(TRACE_OPEN, "VIDIOCMCAPTURE: changing size to please xawtv :-(.\n");
-/*
-				size = pwc_decode_size(pdev, vm.width, vm.height);
-				if (size < 0)
-					return -EINVAL;
-*/					
 				ret = pwc_try_video_mode(pdev, vm.width, vm.height, pdev->vframes, pdev->vcompression, pdev->vsnapshot);
 				if (ret)
 					return ret;
@@ -1435,28 +1449,32 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 
 			Trace(TRACE_READ, "VIDIOCSYNC called (%d).\n", mbuf);
 
+			/* bounds check */
 			if (mbuf < 0 || mbuf >= default_mbufs)
 				return -EINVAL;
 			/* check if this buffer was requested anyway */
 			if (pdev->image_used[mbuf] == 0)
 				return -EINVAL;
 
-			/* We (re)use the frame-waitqueue here. That may
-			   conflict with read(), but any programmer that uses
-			   read() and mmap() simultaneously should be given 
-			   a job at Micro$oft. As janitor.
+			/* Add ourselves to the frame wait-queue.
 			   
 			   FIXME: needs auditing for safety.
+			   QUSTION: In what respect? I think that using the
+			            frameq is safe now.
 			 */
+			add_wait_queue(&pdev->frameq, &wait);
 			while (pdev->full_frames == NULL) {
-				interruptible_sleep_on(&pdev->frameq);
-				if (pdev->unplugged) {
-					Debug("VIDIOCSYNC: Device got unplugged.\n");
-					return -EPIPE;
-				}
-				if (signal_pending(current))
-					return -EINTR;
+	                	if (signal_pending(current)) {
+	                		remove_wait_queue(&pdev->frameq, &wait);
+		                	current->state = TASK_RUNNING;
+		                	return -ERESTARTSYS;
+	        	        }
+	                	schedule();
+		                current->state = TASK_INTERRUPTIBLE;
 			}
+			remove_wait_queue(&pdev->frameq, &wait);
+			current->state = TASK_RUNNING;
+				
 			/* The frame is ready. Expand in the image buffer 
 			   requested by the user. I don't care if you 
 			   mmap() 5 buffers and request data in this order: 
@@ -1537,7 +1555,6 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 
 	vendor_id = udev->descriptor.idVendor;
 	product_id = udev->descriptor.idProduct;
-	
 
 	if (vendor_id == 0x0471) {
 		switch (product_id) {
@@ -1612,7 +1629,6 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const st
 
 	pdev->udev = udev;
 	init_waitqueue_head(&pdev->frameq);
-	init_waitqueue_head(&pdev->pollq);
 	init_waitqueue_head(&pdev->remove_ok);
 	pdev->vcompression = pwc_preferred_compression;
 
@@ -1691,7 +1707,6 @@ static void usb_pwc_disconnect(struct usb_device *udev, void *ptr)
 			   a frame, let them return an error condition
 			 */
 			wake_up(&pdev->frameq);
-			wake_up(&pdev->pollq);
 			
 			/* Wait until we get a 'go' from _close(). This
 			   had a gigantic race condition, since we kfree()
@@ -1736,7 +1751,7 @@ MODULE_PARM_DESC(size, "Initial image size. One of sqcif, qsif, qcif, sif, cif, 
 MODULE_PARM(fps, "i");
 MODULE_PARM_DESC(fps, "Initial frames per second. Varies with model, useful range 5-30");
 MODULE_PARM(palette, "s");
-MODULE_PARM_DESC(palette, "Initial colour format of images. One of rgb24, bgr24, rgb32, bgr32, yuyv, yuv420, yuv420p");
+MODULE_PARM_DESC(palette, "Initial colour format of images. One of yuv420, yuv420p");
 MODULE_PARM(fbufs, "i");
 MODULE_PARM_DESC(fbufs, "Number of internal frame buffers to reserve");
 MODULE_PARM(mbufs, "i");
@@ -1786,8 +1801,10 @@ static int __init usb_pwc_init(void)
 		/* Determine default palette */
 		if (!strcmp(palette, "yuv420"))
 			default_palette = VIDEO_PALETTE_YUV420;
+		if (!strcmp(palette, "yuv420p"))
+			default_palette = VIDEO_PALETTE_YUV420P;
 		else {
-			Err("Palette not recognized: try palette=yuv420.\n");
+			Err("Palette not recognized: try palette=yuv420 or yuv420p.\n");
 			return -EINVAL;
 		}
 		Info("Default palette set to %d.\n", default_palette);

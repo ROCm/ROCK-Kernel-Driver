@@ -11,6 +11,9 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * (05/30/2001) gkh
+ *	switched from using spinlock to a semaphore, which fixes lots of problems.
+ *
  * (05/28/2000) gkh
  *	Added initial support for the Palm m500 and Palm m505 devices.
  *
@@ -112,7 +115,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.1"
+#define DRIVER_VERSION "v1.2"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC "USB HandSpring Visor driver"
 
@@ -253,15 +256,14 @@ static int		bytes_out;
 static int visor_open (struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial = port->serial;
-	unsigned long flags;
-	int result;
+	int result = 0;
 
 	if (port_paranoia_check (port, __FUNCTION__))
 		return -ENODEV;
 	
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 	
 	++port->open_count;
 	MOD_INC_USE_COUNT;
@@ -286,9 +288,9 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 	}
 	
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
 	
-	return 0;
+	return result;
 }
 
 
@@ -296,7 +298,6 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 {
 	struct usb_serial *serial;
 	unsigned char *transfer_buffer;
-	unsigned long flags;
 
 	if (port_paranoia_check (port, __FUNCTION__))
 		return;
@@ -307,7 +308,7 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 	
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 
 	--port->open_count;
 
@@ -328,7 +329,7 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 		port->open_count = 0;
 
 	}
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
 
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
@@ -410,7 +411,7 @@ static int visor_write_room (struct usb_serial_port *port)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 	
-	spin_lock_irqsave (&port->port_lock, flags);
+	spin_lock_irqsave (&write_urb_pool_lock, flags);
 
 	for (i = 0; i < NUM_URBS; ++i) {
 		if (write_urb_pool[i]->status != -EINPROGRESS) {
@@ -418,7 +419,7 @@ static int visor_write_room (struct usb_serial_port *port)
 		}
 	}
 	
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	spin_unlock_irqrestore (&write_urb_pool_lock, flags);
 	
 	dbg(__FUNCTION__ " - returns %d", room);
 	return (room);
@@ -433,7 +434,7 @@ static int visor_chars_in_buffer (struct usb_serial_port *port)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 	
-	spin_lock_irqsave (&port->port_lock, flags);
+	spin_lock_irqsave (&write_urb_pool_lock, flags);
 
 	for (i = 0; i < NUM_URBS; ++i) {
 		if (write_urb_pool[i]->status == -EINPROGRESS) {
@@ -441,7 +442,7 @@ static int visor_chars_in_buffer (struct usb_serial_port *port)
 		}
 	}
 	
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	spin_unlock_irqrestore (&write_urb_pool_lock, flags);
 
 	dbg (__FUNCTION__ " - returns %d", chars);
 	return (chars);
@@ -523,15 +524,14 @@ static void visor_read_bulk_callback (struct urb *urb)
 
 static void visor_throttle (struct usb_serial_port *port)
 {
-	unsigned long flags;
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 
 	usb_unlink_urb (port->read_urb);
 
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
 
 	return;
 }
@@ -539,19 +539,18 @@ static void visor_throttle (struct usb_serial_port *port)
 
 static void visor_unthrottle (struct usb_serial_port *port)
 {
-	unsigned long flags;
 	int result;
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	spin_lock_irqsave (&port->port_lock, flags);
+	down (&port->sem);
 
 	port->read_urb->dev = port->serial->dev;
 	result = usb_submit_urb(port->read_urb);
 	if (result)
 		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 
-	spin_unlock_irqrestore (&port->port_lock, flags);
+	up (&port->sem);
 
 	return;
 }

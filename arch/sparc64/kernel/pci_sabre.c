@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.36 2001/06/08 06:25:41 davem Exp $
+/* $Id: pci_sabre.c,v 1.37 2001/06/13 06:34:30 davem Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -1357,6 +1357,12 @@ static void __init pbm_register_toplevel_resources(struct pci_controller_info *p
 			    (pbm == &p->pbm_A ? 'A' : 'B'));
 		prom_halt();
 	}
+
+	/* Register legacy regions if this PBM covers that area. */
+	if (pbm->io_space.start == ibase &&
+	    pbm->mem_space.start == mbase)
+		pci_register_legacy_regions(&pbm->io_space,
+					    &pbm->mem_space);
 }
 
 static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node, u32 dma_begin)
@@ -1497,6 +1503,9 @@ static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node,
 			prom_printf("Cannot register Hummingbird's MEM space.\n");
 			prom_halt();
 		}
+
+		pci_register_legacy_regions(&pbm->io_space,
+					    &pbm->mem_space);
 	}
 }
 

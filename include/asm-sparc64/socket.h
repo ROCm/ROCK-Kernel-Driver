@@ -1,4 +1,4 @@
-/* $Id: socket.h,v 1.9 2001/01/30 07:48:30 davem Exp $ */
+/* $Id: socket.h,v 1.10 2001/06/13 16:25:03 davem Exp $ */
 #ifndef _ASM_SOCKET_H
 #define _ASM_SOCKET_H
 
@@ -63,6 +63,7 @@
 					/* level.  For writing rarp and	*/
 					/* other similar things on the	*/
 					/* user level.			*/
+#define	SOCK_MAX	(SOCK_PACKET+1)
 #endif
 
 #endif /* _ASM_SOCKET_H */

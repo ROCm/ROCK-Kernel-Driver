@@ -1,13 +1,15 @@
 #
 # Makefile for the Linux ACPI interpreter
-#
+# (It's a mess, but it's all here for a reason.)
+# 
 
 O_TARGET := acpi.o
 
 export-objs := acpi_ksyms.o
 
 export ACPI_CFLAGS
-ACPI_CFLAGS := -D_LINUX
+
+ACPI_CFLAGS := -D_LINUX -I$(CURDIR)/include
 
 #
 # CONFIG_ACPI_KERNEL_CONFIG is currently only IA64
@@ -16,25 +18,37 @@ ifdef CONFIG_ACPI_KERNEL_CONFIG
   ACPI_CFLAGS += -DCONFIG_ACPI_KERNEL_CONFIG_ONLY
 endif
 
-EXTRA_CFLAGS += -I./include
+acpi-subdirs := utilities dispatcher events hardware \
+		executer namespace parser resources tables
+
+ifdef CONFIG_ACPI_DEBUG
+  ACPI_CFLAGS += -DACPI_DEBUG -Wno-unused #-DENABLE_DEBUGGER
+
+  #acpi-subdirs += debugger
+endif
 
 EXTRA_CFLAGS += $(ACPI_CFLAGS)
 
-acpi-subdirs := common dispatcher events hardware \
-		interpreter namespace parser resources tables
+mod-subdirs  := ospm
 
-subdir-$(CONFIG_ACPI) += $(acpi-subdirs)
+subdir-$(CONFIG_ACPI) 		+= $(acpi-subdirs)
+subdir-$(CONFIG_ACPI_BUSMGR)	+= ospm
 
-obj-$(CONFIG_ACPI) := $(patsubst %,%.o,$(acpi-subdirs))
-obj-$(CONFIG_ACPI) += os.o acpi_ksyms.o
-
+obj-$(CONFIG_ACPI)	+= os.o acpi_ksyms.o
+obj-$(CONFIG_ACPI)	+= $(foreach dir,$(acpi-subdirs),$(dir)/$(dir).o) 
 ifdef CONFIG_ACPI_KERNEL_CONFIG
-  obj-$(CONFIG_ACPI) += acpiconf.o osconf.o
+   obj-$(CONFIG_ACPI) 	+= acpiconf.o osconf.o
 else
-  obj-$(CONFIG_ACPI) += driver.o cmbatt.o cpu.o ec.o acpi_ksyms.o sys.o table.o power.o
+   obj-$(CONFIG_ACPI)	+= driver.o
 endif
 
-include $(TOPDIR)/Rules.make
+ifeq ($(CONFIG_ACPI_BUSMGR),y)
+	obj-y			+= ospm/ospm.o
+endif
 
-clean:
-	$(RM) *.o */*.o
+# commented out until we distribute it -ASG
+#ifeq ($(CONFIG_KDB),y)
+#	obj-m	+= kdb/kdbm_acpi.o
+#endif
+
+include $(TOPDIR)/Rules.make

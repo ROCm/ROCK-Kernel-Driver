@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdispat.h - dispatcher (parser to interpreter interface)
- *       $Revision: 35 $
+ *       $Revision: 40 $
  *
  *****************************************************************************/
 
@@ -32,12 +32,6 @@
 #define NAMEOF_ARG_NTE      "__A0"
 
 
-/* For Acpi_ds_method_data_set_value */
-
-#define MTH_TYPE_LOCAL              0
-#define MTH_TYPE_ARG                1
-
-
 /* Common interfaces */
 
 ACPI_STATUS
@@ -64,7 +58,7 @@ acpi_ds_obj_stack_pop_object (
 /* dsopcode - support for late evaluation */
 
 ACPI_STATUS
-acpi_ds_get_field_unit_arguments (
+acpi_ds_get_buffer_field_arguments (
 	ACPI_OPERAND_OBJECT     *obj_desc);
 
 ACPI_STATUS
@@ -126,7 +120,7 @@ acpi_ds_create_bank_field (
 ACPI_STATUS
 acpi_ds_create_index_field (
 	ACPI_PARSE_OBJECT       *op,
-	ACPI_HANDLE             region_node,
+	ACPI_NAMESPACE_NODE     *region_node,
 	ACPI_WALK_STATE         *walk_state);
 
 
@@ -173,8 +167,15 @@ acpi_ds_load3_end_op (
 
 
 ACPI_STATUS
+acpi_ds_store_object_to_local (
+	u16                     opcode,
+	u32                     index,
+	ACPI_OPERAND_OBJECT     *src_desc,
+	ACPI_WALK_STATE         *walk_state);
+
+ACPI_STATUS
 acpi_ds_method_data_get_entry (
-	u32                     type,
+	u16                     opcode,
 	u32                     index,
 	ACPI_WALK_STATE         *walk_state,
 	ACPI_OPERAND_OBJECT     ***node);
@@ -187,29 +188,22 @@ u8
 acpi_ds_is_method_value (
 	ACPI_OPERAND_OBJECT     *obj_desc);
 
-OBJECT_TYPE_INTERNAL
+ACPI_OBJECT_TYPE8
 acpi_ds_method_data_get_type (
-	u32                     type,
+	u16                     opcode,
 	u32                     index,
 	ACPI_WALK_STATE         *walk_state);
 
 ACPI_STATUS
 acpi_ds_method_data_get_value (
-	u32                     type,
+	u16                     opcode,
 	u32                     index,
 	ACPI_WALK_STATE         *walk_state,
 	ACPI_OPERAND_OBJECT     **dest_desc);
 
 ACPI_STATUS
-acpi_ds_method_data_set_value (
-	u32                     type,
-	u32                     index,
-	ACPI_OPERAND_OBJECT     *src_desc,
-	ACPI_WALK_STATE         *walk_state);
-
-ACPI_STATUS
 acpi_ds_method_data_delete_value (
-	u32                     type,
+	u16                     opcode,
 	u32                     index,
 	ACPI_WALK_STATE         *walk_state);
 
@@ -220,8 +214,8 @@ acpi_ds_method_data_init_args (
 	ACPI_WALK_STATE         *walk_state);
 
 ACPI_NAMESPACE_NODE *
-acpi_ds_method_data_get_nte (
-	u32                     type,
+acpi_ds_method_data_get_node (
+	u16                     opcode,
 	u32                     index,
 	ACPI_WALK_STATE         *walk_state);
 
@@ -231,7 +225,7 @@ acpi_ds_method_data_init (
 
 ACPI_STATUS
 acpi_ds_method_data_set_entry (
-	u32                     type,
+	u16                     opcode,
 	u32                     index,
 	ACPI_OPERAND_OBJECT     *object,
 	ACPI_WALK_STATE         *walk_state);
@@ -261,7 +255,8 @@ acpi_ds_terminate_control_method (
 ACPI_STATUS
 acpi_ds_begin_method_execution (
 	ACPI_NAMESPACE_NODE     *method_node,
-	ACPI_OPERAND_OBJECT     *obj_desc);
+	ACPI_OPERAND_OBJECT     *obj_desc,
+	ACPI_NAMESPACE_NODE     *calling_method_node);
 
 
 /* dsobj - Parser/Interpreter interface - object initialization and conversion */
@@ -307,7 +302,7 @@ acpi_ds_create_node (
 /* dsregn - Parser/Interpreter interface - Op Region parsing */
 
 ACPI_STATUS
-acpi_ds_eval_field_unit_operands (
+acpi_ds_eval_buffer_field_operands (
 	ACPI_WALK_STATE         *walk_state,
 	ACPI_PARSE_OBJECT       *op);
 
@@ -349,12 +344,12 @@ ACPI_STATUS
 acpi_ds_resolve_operands (
 	ACPI_WALK_STATE         *walk_state);
 
-OBJECT_TYPE_INTERNAL
+ACPI_OBJECT_TYPE8
 acpi_ds_map_opcode_to_data_type (
 	u16                     opcode,
 	u32                     *out_flags);
 
-OBJECT_TYPE_INTERNAL
+ACPI_OBJECT_TYPE8
 acpi_ds_map_named_opcode_to_data_type (
 	u16                     opcode);
 
@@ -366,7 +361,7 @@ acpi_ds_map_named_opcode_to_data_type (
 ACPI_STATUS
 acpi_ds_scope_stack_push (
 	ACPI_NAMESPACE_NODE     *node,
-	OBJECT_TYPE_INTERNAL    type,
+	ACPI_OBJECT_TYPE8       type,
 	ACPI_WALK_STATE         *walk_state);
 
 

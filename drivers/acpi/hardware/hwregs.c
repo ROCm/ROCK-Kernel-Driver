@@ -3,7 +3,7 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 88 $
+ *              $Revision: 97 $
  *
  ******************************************************************************/
 
@@ -30,7 +30,7 @@
 #include "achware.h"
 #include "acnamesp.h"
 
-#define _COMPONENT          HARDWARE
+#define _COMPONENT          ACPI_HARDWARE
 	 MODULE_NAME         ("hwregs")
 
 
@@ -55,8 +55,7 @@ NATIVE_CHAR                 *sleep_state_table[] = {"\\_S0_","\\_S1_","\\_S2_","
 
 u32
 acpi_hw_get_bit_shift (
-	u32                     mask)
-{
+	u32                     mask) {
 	u32                     shift;
 
 
@@ -85,14 +84,14 @@ acpi_hw_clear_acpi_status (void)
 	u16                     index;
 
 
-	acpi_cm_acquire_mutex (ACPI_MTX_HARDWARE);
+	acpi_ut_acquire_mutex (ACPI_MTX_HARDWARE);
 
 	acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, PM1_STS, ALL_FIXED_STS_BITS);
 
 
 	if (ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xpm1b_evt_blk.address)) {
 		acpi_os_out16 ((ACPI_IO_ADDRESS) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm1b_evt_blk.address),
-				  (u16) ALL_FIXED_STS_BITS);
+			(u16) ALL_FIXED_STS_BITS);
 	}
 
 	/* now clear the GPE Bits */
@@ -101,8 +100,9 @@ acpi_hw_clear_acpi_status (void)
 		gpe_length = (u16) DIV_2 (acpi_gbl_FADT->gpe0blk_len);
 
 		for (index = 0; index < gpe_length; index++) {
-			acpi_os_out8 ((ACPI_IO_ADDRESS) (ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe0blk.address) + index),
-					  (u8) 0xff);
+			acpi_os_out8 ((ACPI_IO_ADDRESS) (
+				ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe0blk.address) + index),
+				(u8) 0xff);
 		}
 	}
 
@@ -110,12 +110,13 @@ acpi_hw_clear_acpi_status (void)
 		gpe_length = (u16) DIV_2 (acpi_gbl_FADT->gpe1_blk_len);
 
 		for (index = 0; index < gpe_length; index++) {
-			acpi_os_out8 ((ACPI_IO_ADDRESS) (ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe1_blk.address) + index),
-					  (u8) 0xff);
+			acpi_os_out8 ((ACPI_IO_ADDRESS) (
+				ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe1_blk.address) + index),
+				(u8) 0xff);
 		}
 	}
 
-	acpi_cm_release_mutex (ACPI_MTX_HARDWARE);
+	acpi_ut_release_mutex (ACPI_MTX_HARDWARE);
 	return;
 }
 
@@ -150,8 +151,7 @@ acpi_hw_obtain_sleep_type_register_data (
 	 */
 
 	if ((sleep_state > ACPI_S_STATES_MAX) ||
-		!slp_typ_a || !slp_typ_b)
-	{
+		!slp_typ_a || !slp_typ_b) {
 		return (AE_BAD_PARAMETER);
 	}
 
@@ -175,7 +175,10 @@ acpi_hw_obtain_sleep_type_register_data (
 	 *  two elements
 	 */
 
-	status = acpi_cm_resolve_package_references(obj_desc);
+	/* Even though Acpi_evaluate_object resolves package references,
+	 * Ns_evaluate dpesn't. So, we do it here.
+	 */
+	status = acpi_ut_resolve_package_references(obj_desc);
 
 	if (obj_desc->package.count < 2) {
 		/* Must have at least two elements */
@@ -187,8 +190,7 @@ acpi_hw_obtain_sleep_type_register_data (
 	else if (((obj_desc->package.elements[0])->common.type !=
 			 ACPI_TYPE_INTEGER) ||
 			 ((obj_desc->package.elements[1])->common.type !=
-				ACPI_TYPE_INTEGER))
-	{
+				ACPI_TYPE_INTEGER)) {
 		/* Must have two  */
 
 		REPORT_ERROR (("Sleep State package elements are not both of type Number\n"));
@@ -206,7 +208,7 @@ acpi_hw_obtain_sleep_type_register_data (
 
 
 
-	acpi_cm_remove_reference (obj_desc);
+	acpi_ut_remove_reference (obj_desc);
 
 	return (status);
 }
@@ -239,34 +241,31 @@ acpi_hw_register_bit_access (
 	u32                     register_value = 0;
 	u32                     mask = 0;
 	u32                     value = 0;
+	va_list                 marker;
 
 
 	if (read_write == ACPI_WRITE) {
-		va_list         marker;
-
 		va_start (marker, register_id);
 		value = va_arg (marker, u32);
 		va_end (marker);
 	}
 
 	if (ACPI_MTX_LOCK == use_lock) {
-		acpi_cm_acquire_mutex (ACPI_MTX_HARDWARE);
+		acpi_ut_acquire_mutex (ACPI_MTX_HARDWARE);
 	}
 
 	/*
 	 * Decode the Register ID
-	 *  Register id = Register block id | bit id
+	 * Register id = Register block id | bit id
 	 *
 	 * Check bit id to fine locate Register offset.
-	 *  check Mask to determine Register offset, and then read-write.
+	 * Check Mask to determine Register offset, and then read-write.
 	 */
 
-	switch (REGISTER_BLOCK_ID(register_id))
-	{
+	switch (REGISTER_BLOCK_ID (register_id)) {
 	case PM1_STS:
 
-		switch (register_id)
-		{
+		switch (register_id) {
 		case TMR_STS:
 			mask = TMR_STS_MASK;
 			break;
@@ -315,8 +314,8 @@ acpi_hw_register_bit_access (
 			value &= mask;
 
 			if (value) {
-				acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, PM1_STS, (u16) value);
-
+				acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, PM1_STS,
+					(u16) value);
 				register_value = 0;
 			}
 		}
@@ -326,8 +325,7 @@ acpi_hw_register_bit_access (
 
 	case PM1_EN:
 
-		switch (register_id)
-		{
+		switch (register_id) {
 		case TMR_EN:
 			mask = TMR_EN_MASK;
 			break;
@@ -369,8 +367,7 @@ acpi_hw_register_bit_access (
 
 	case PM1_CONTROL:
 
-		switch (register_id)
-		{
+		switch (register_id) {
 		case SCI_EN:
 			mask = SCI_EN_MASK;
 			break;
@@ -421,16 +418,15 @@ acpi_hw_register_bit_access (
 			 * because we need to do different things. Yuck.
 			 */
 
-			acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK,
-				register_id, (u16) register_value);
+			acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, register_id,
+					(u16) register_value);
 		}
 		break;
 
 
 	case PM2_CONTROL:
 
-		switch (register_id)
-		{
+		switch (register_id) {
 		case ARB_DIS:
 			mask = ARB_DIS_MASK;
 			break;
@@ -507,16 +503,18 @@ acpi_hw_register_bit_access (
 			/* This write will put the Action state into the General Purpose */
 			/* Enable Register indexed by the value in Mask */
 
-			acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK,
-					   register_id, (u8) register_value);
-			register_value = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK, register_id);
+			acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, register_id,
+				(u8) register_value);
+			register_value = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK,
+					   register_id);
 		}
 		break;
 
 
 	case SMI_CMD_BLOCK:
 	case PROCESSOR_BLOCK:
-		/* not used */
+		/* Not used by any callers at this time - therefore, not implemented */
+
 	default:
 
 		mask = 0;
@@ -524,7 +522,7 @@ acpi_hw_register_bit_access (
 	}
 
 	if (ACPI_MTX_LOCK == use_lock) {
-		acpi_cm_release_mutex (ACPI_MTX_HARDWARE);
+		acpi_ut_release_mutex (ACPI_MTX_HARDWARE);
 	}
 
 
@@ -557,13 +555,13 @@ acpi_hw_register_read (
 	u32                     value       = 0;
 	u32                     bank_offset;
 
+
 	if (ACPI_MTX_LOCK == use_lock) {
-		acpi_cm_acquire_mutex (ACPI_MTX_HARDWARE);
+		acpi_ut_acquire_mutex (ACPI_MTX_HARDWARE);
 	}
 
 
-	switch (REGISTER_BLOCK_ID(register_id))
-	{
+	switch (REGISTER_BLOCK_ID(register_id)) {
 	case PM1_STS: /* 16-bit access */
 
 		value =  acpi_hw_low_level_read (16, &acpi_gbl_FADT->Xpm1a_evt_blk, 0);
@@ -637,7 +635,7 @@ acpi_hw_register_read (
 
 
 	if (ACPI_MTX_LOCK == use_lock) {
-		acpi_cm_release_mutex (ACPI_MTX_HARDWARE);
+		acpi_ut_release_mutex (ACPI_MTX_HARDWARE);
 	}
 
 	return (value);
@@ -668,12 +666,11 @@ acpi_hw_register_write (
 
 
 	if (ACPI_MTX_LOCK == use_lock) {
-		acpi_cm_acquire_mutex (ACPI_MTX_HARDWARE);
+		acpi_ut_acquire_mutex (ACPI_MTX_HARDWARE);
 	}
 
 
-	switch (REGISTER_BLOCK_ID (register_id))
-	{
+	switch (REGISTER_BLOCK_ID (register_id)) {
 	case PM1_STS: /* 16-bit access */
 
 		acpi_hw_low_level_write (16, value, &acpi_gbl_FADT->Xpm1a_evt_blk, 0);
@@ -751,7 +748,7 @@ acpi_hw_register_write (
 		/* For 2.0, SMI_CMD is always in IO space */
 		/* TBD: what about 1.0? 0.71? */
 
-	   acpi_os_out8 (acpi_gbl_FADT->smi_cmd, (u8) value);
+		acpi_os_out8 (acpi_gbl_FADT->smi_cmd, (u8) value);
 		break;
 
 
@@ -762,7 +759,7 @@ acpi_hw_register_write (
 
 
 	if (ACPI_MTX_LOCK == use_lock) {
-		acpi_cm_release_mutex (ACPI_MTX_HARDWARE);
+		acpi_ut_release_mutex (ACPI_MTX_HARDWARE);
 	}
 
 	return;
@@ -786,7 +783,7 @@ acpi_hw_register_write (
 u32
 acpi_hw_low_level_read (
 	u32                     width,
-	ACPI_GAS                *reg,
+	ACPI_GENERIC_ADDRESS    *reg,
 	u32                     offset)
 {
 	u32                     value = 0;
@@ -801,8 +798,7 @@ acpi_hw_low_level_read (
 	 * a non-zero address within
 	 */
 	if ((!reg) ||
-		(!ACPI_VALID_ADDRESS (reg->address)))
-	{
+		(!ACPI_VALID_ADDRESS (reg->address))) {
 		return 0;
 	}
 
@@ -812,14 +808,12 @@ acpi_hw_low_level_read (
 	 * Memory, Io, or PCI config.
 	 */
 
-	switch (reg->address_space_id)
-	{
-	case ADDRESS_SPACE_SYSTEM_MEMORY:
+	switch (reg->address_space_id) {
+	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 
 		mem_address = (ACPI_PHYSICAL_ADDRESS) (ACPI_GET_ADDRESS (reg->address) + offset);
 
-		switch (width)
-		{
+		switch (width) {
 		case 8:
 			value = acpi_os_mem_in8 (mem_address);
 			break;
@@ -833,12 +827,11 @@ acpi_hw_low_level_read (
 		break;
 
 
-	case ADDRESS_SPACE_SYSTEM_IO:
+	case ACPI_ADR_SPACE_SYSTEM_IO:
 
 		io_address = (ACPI_IO_ADDRESS) (ACPI_GET_ADDRESS (reg->address) + offset);
 
-		switch (width)
-		{
+		switch (width) {
 		case 8:
 			value = acpi_os_in8 (io_address);
 			break;
@@ -852,13 +845,12 @@ acpi_hw_low_level_read (
 		break;
 
 
-	case ADDRESS_SPACE_PCI_CONFIG:
+	case ACPI_ADR_SPACE_PCI_CONFIG:
 
 		pci_dev_func = ACPI_PCI_DEVFUN  (ACPI_GET_ADDRESS (reg->address));
 		pci_register = ACPI_PCI_REGISTER (ACPI_GET_ADDRESS (reg->address)) + offset;
 
-		switch (width)
-		{
+		switch (width) {
 		case 8:
 			acpi_os_read_pci_cfg_byte (0, pci_dev_func, pci_register, (u8 *) &value);
 			break;
@@ -896,7 +888,7 @@ void
 acpi_hw_low_level_write (
 	u32                     width,
 	u32                     value,
-	ACPI_GAS                *reg,
+	ACPI_GENERIC_ADDRESS    *reg,
 	u32                     offset)
 {
 	ACPI_PHYSICAL_ADDRESS   mem_address;
@@ -910,8 +902,7 @@ acpi_hw_low_level_write (
 	 * a non-zero address within
 	 */
 	if ((!reg) ||
-		(!ACPI_VALID_ADDRESS (reg->address)))
-	{
+		(!ACPI_VALID_ADDRESS (reg->address))) {
 		return;
 	}
 
@@ -921,14 +912,12 @@ acpi_hw_low_level_write (
 	 * Memory, Io, or PCI config.
 	 */
 
-	switch (reg->address_space_id)
-	{
-	case ADDRESS_SPACE_SYSTEM_MEMORY:
+	switch (reg->address_space_id) {
+	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 
 		mem_address = (ACPI_PHYSICAL_ADDRESS) (ACPI_GET_ADDRESS (reg->address) + offset);
 
-		switch (width)
-		{
+		switch (width) {
 		case 8:
 			acpi_os_mem_out8 (mem_address, (u8) value);
 			break;
@@ -942,12 +931,11 @@ acpi_hw_low_level_write (
 		break;
 
 
-	case ADDRESS_SPACE_SYSTEM_IO:
+	case ACPI_ADR_SPACE_SYSTEM_IO:
 
 		io_address = (ACPI_IO_ADDRESS) (ACPI_GET_ADDRESS (reg->address) + offset);
 
-		switch (width)
-		{
+		switch (width) {
 		case 8:
 			acpi_os_out8 (io_address, (u8) value);
 			break;
@@ -961,13 +949,12 @@ acpi_hw_low_level_write (
 		break;
 
 
-	case ADDRESS_SPACE_PCI_CONFIG:
+	case ACPI_ADR_SPACE_PCI_CONFIG:
 
 		pci_dev_func = ACPI_PCI_DEVFUN  (ACPI_GET_ADDRESS (reg->address));
 		pci_register = ACPI_PCI_REGISTER (ACPI_GET_ADDRESS (reg->address)) + offset;
 
-		switch (width)
-		{
+		switch (width) {
 		case 8:
 			acpi_os_write_pci_cfg_byte (0, pci_dev_func, pci_register, (u8) value);
 			break;

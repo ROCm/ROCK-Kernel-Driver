@@ -1,4 +1,4 @@
-/* $Id: pcikbd.c,v 1.57 2001/06/03 13:41:13 ecd Exp $
+/* $Id: pcikbd.c,v 1.58 2001/06/10 06:51:03 davem Exp $
  * pcikbd.c: Ultra/AX PC keyboard support.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -332,7 +332,15 @@ static void ctrl_break(void)
 	pcikbd_write(KBD_DATA_REG, mode);
 	pcikbd_write(KBD_DATA_REG, KBD_CMD_ENABLE);
 	if (pcikbd_wait_for_input() != KBD_REPLY_ACK)
-		printk("Prom Enter: Enable Keyboard: no ACK\n");
+		printk("Prom Leave: Enable Keyboard: no ACK\n");
+
+	/* Reset keyboard rate */
+	pcikbd_write(KBD_DATA_REG, KBD_CMD_SET_RATE);
+	if(pcikbd_wait_for_input() != KBD_REPLY_ACK)
+		printk("Prom Leave: Set rate: no ACK\n");
+	pcikbd_write(KBD_DATA_REG, 0x00);
+	if(pcikbd_wait_for_input() != KBD_REPLY_ACK)
+		printk("Prom Leave: Set rate: no ACK\n");
 }
 
 int pcikbd_translate(unsigned char scancode, unsigned char *keycode,

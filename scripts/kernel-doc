@@ -22,6 +22,10 @@ use strict;
 # 	- add perldoc documentation
 # 	- Look more closely at some of the scarier bits :)
 
+# 26/05/2001 - 	Support for separate source and object trees.
+#		Return error code.
+# 		Keith Owens <kaos@ocs.com.au>
+
 #
 # This will read a 'c' file and scan for embedded comments in the
 # style of gnome comments (+minor extensions - see below).
@@ -96,6 +100,8 @@ use strict;
 # '&struct_name' - name of a structure (up to two words including 'struct')
 # '@parameter' - name of a parameter
 # '%CONST' - name of a constant.
+
+my $errors = 0;
 
 # match expressions used to find embedded type information
 my $type_constant = '\%([-_\w]+)';
@@ -198,6 +204,7 @@ my %parameters = ();
 my @parameterlist = ();
 my %sections = ();
 my @sectionlist = ();
+my %source_map = ();
 
 my $contents = "";
 my $section_default = "Description";	# default section
@@ -776,6 +783,7 @@ sub dump_function($$) {
             if (defined $type && $type && !defined $parameters{$param}) {
 	        $parameters{$param} = "-- undescribed --";
 	        print STDERR "Warning($file:$.): Function parameter '$param' not described in '$function_name'\n";
+		++$errors;
 	    }
 
 	    push @parameterlist, $param;
@@ -784,6 +792,7 @@ sub dump_function($$) {
 	}
     } else {
 	print STDERR "Error($.): cannot understand prototype: '$prototype'\n";
+	++$errors;
 	return;
     }
 
@@ -837,6 +846,19 @@ $section = $section_default;
 
 sub process_file($);
 
+# Read the file that maps relative names to absolute names for
+# separate source and object directories and for shadow trees.
+if (open(SOURCE_MAP, "<.tmp_filelist.txt")) {
+	my ($relname, $absname);
+	while(<SOURCE_MAP>) {
+		chop();
+		($relname, $absname) = (split())[0..1];
+		$relname =~ s:^/+::;
+		$source_map{$relname} = $absname;
+	}
+	close(SOURCE_MAP);
+}
+
 if ($filelist) {
 	open(FLIST,"<$filelist") or die "Can't open file list $filelist";
 	while(<FLIST>) {
@@ -850,11 +872,17 @@ foreach (@ARGV) {
     process_file($_);
 }
 
+exit($errors);
+
 sub process_file($) {
     my ($file) = @_;
+    if (defined($source_map{$file})) {
+	$file = $source_map{$file};
+    }
 
     if (!open(IN,"<$file")) {
 	print STDERR "Error: Cannot open file $file\n";
+	++$errors;
 	return;
     }
 
@@ -887,6 +915,7 @@ sub process_file($) {
 	    } else {
 		print STDERR "WARN($.): Cannot understand $_ on line $.",
 		" - I thought it was a doc line\n";
+		++$errors;
 		$state = 0;
 	    }
 	} elsif ($state == 2) {	# look for head: lines, and include content
@@ -937,6 +966,7 @@ sub process_file($) {
 	    } else {
 		# i dont know - bad line?  ignore.
 		print STDERR "WARNING($.): bad line: $_"; 
+		++$errors;
 	    }
 	} elsif ($state == 3) {	# scanning for function { (end of prototype)
 	    if (m#\s*/\*\s+MACDOC\s*#io) {

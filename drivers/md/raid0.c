@@ -80,14 +80,14 @@ static int create_strip_zones (mddev_t *mddev)
 	{
 		struct strip_zone *zone = conf->strip_zone + i;
 
-		printk("zone %d\n", i);
+		printk("raid0: zone %d\n", i);
 		zone->dev_offset = current_offset;
 		smallest = NULL;
 		c = 0;
 
 		ITERATE_RDEV_ORDERED(mddev,rdev,j) {
 
-			printk(" checking %s ...", partition_name(rdev->dev));
+			printk("raid0: checking %s ...", partition_name(rdev->dev));
 			if (rdev->size > current_offset)
 			{
 				printk(" contained as device %d\n", c);
@@ -103,7 +103,7 @@ static int create_strip_zones (mddev_t *mddev)
 
 		zone->nb_dev = c;
 		zone->size = (smallest->size - current_offset) * c;
-		printk(" zone->nb_dev: %d, size: %ld\n",zone->nb_dev,zone->size);
+		printk("raid0: zone->nb_dev: %d, size: %ld\n",zone->nb_dev,zone->size);
 
 		if (!conf->smallest || (zone->size < conf->smallest->size))
 			conf->smallest = zone;
@@ -112,9 +112,9 @@ static int create_strip_zones (mddev_t *mddev)
 		curr_zone_offset += zone->size;
 
 		current_offset = smallest->size;
-		printk("current zone offset: %ld\n", current_offset);
+		printk("raid0: current zone offset: %ld\n", current_offset);
 	}
-	printk("done.\n");
+	printk("raid0: done.\n");
 	return 0;
 }
 

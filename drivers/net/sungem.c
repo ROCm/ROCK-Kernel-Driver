@@ -1,4 +1,4 @@
-/* $Id: sungem.c,v 1.13 2001/04/20 08:16:28 davem Exp $
+/* $Id: sungem.c,v 1.17 2001/06/17 09:22:46 jgarzik Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
  * Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com)
@@ -565,6 +565,7 @@ static void gem_rx(struct gem *gp)
 
 		gp->net_stats.rx_packets++;
 		gp->net_stats.rx_bytes += len;
+		gp->dev->last_rx = jiffies;
 
 	next:
 		entry = NEXT_RX(entry);
@@ -1616,12 +1617,17 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	unsigned long gemreg_base, gemreg_len;
 	struct net_device *dev;
 	struct gem *gp;
-	int i;
+	int i, err;
 
 	if (gem_version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
 
-	pci_enable_device(pdev);
+	err = pci_enable_device(pdev);
+	if (err) {
+		printk(KERN_ERR PFX "Cannot enable MMIO operation, "
+		       "aborting.\n");
+		return err;
+	}
 	pci_set_master(pdev);
 
 	gemreg_base = pci_resource_start(pdev, 0);
@@ -1646,16 +1652,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 		goto err_out_free_netdev;
 	}
 
-	if (pci_enable_device(pdev)) {
-		printk(KERN_ERR PFX "Cannot enable MMIO operation, "
-		       "aborting.\n");
-		goto err_out_free_mmio_res;
-	}
-
-	pci_set_master(pdev);
-
 	gp = dev->priv;
-	memset(gp, 0, sizeof(*gp));
 
 	gp->pdev = pdev;
 	dev->base_addr = (long) pdev;
