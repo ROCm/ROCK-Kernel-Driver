@@ -793,7 +793,7 @@ static inline void set_timeout(long start_jiffies, struct timeout *to,
 
 static inline void clear_timeout(struct timeout *to)
 {
-	del_timer_sync(&to->timer);
+	del_singleshot_timer_sync(&to->timer);
 }
 
 static int read_events(struct kioctx *ctx,
