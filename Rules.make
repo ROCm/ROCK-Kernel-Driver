@@ -48,12 +48,9 @@ subdir-		+= $(__subdir-)
 obj-y		:= $(patsubst %/, %/built-in.o, $(obj-y))
 obj-m		:= $(filter-out %/, $(obj-m))
 
-# If a dir is selected in $(subdir-y) and also mentioned in $(mod-subdirs),
-# add it to $(subdir-m)
+# Subdirectories we need to descend into
 
-both-m          := $(filter $(mod-subdirs), $(subdir-y))
 subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
-subdir-ymn	:= $(sort $(subdir-ym) $(subdir-n) $(subdir-))
 
 # export.o is never a composite object, since $(export-objs) has a
 # fixed meaning (== objects which EXPORT_SYMBOL())
@@ -85,8 +82,112 @@ subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)
 real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m))) $(EXTRA_TARGETS)
 real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
 
-# Get things started.
+# Only build module versions for files which are selected to be built
+export-objs := $(filter $(export-objs),$(real-objs-y) $(real-objs-m))
+
+# We're called for one of three purposes:
+# o fastdep: build module version files (.ver) for $(export-objs) in
+#   the current directory
+# o modules_install: install the modules in the current directory
+# o build: When no target is given, first_rule is the default and
+#   will build the built-in and modular objects in this dir
+#   (or a subset thereof, depending on $(KBUILD_MODULES),$(KBUILD_BUILTIN)
+#   When targets are given directly (like foo.o), we just build these
+#   targets (That happens when someone does make some/dir/foo.[ois])
+
+ifeq ($(MAKECMDGOALS),fastdep)
+
+# ===========================================================================
+# Module versions
+# ===========================================================================
+
+ifeq ($(strip $(export-objs)),)
+
+# If we don't export any symbols in this dir, just descend
+# ---------------------------------------------------------------------------
+
+fastdep: sub_dirs
+	@echo -n
+
+else
+
+# This sets version suffixes on exported symbols
+# ---------------------------------------------------------------------------
+
+MODVERDIR := $(TOPDIR)/include/linux/modules/$(RELDIR)
+
+#
+# Added the SMP separator to stop module accidents between uniprocessor
+# and SMP Intel boxes - AC - from bits by Michael Chastain
+#
+
+ifdef CONFIG_SMP
+	genksyms_smp_prefix := -p smp_
+else
+	genksyms_smp_prefix := 
+endif
+
+$(MODVERDIR)/$(real-objs-y:.o=.ver): modkern_cflags := $(CFLAGS_KERNEL)
+$(MODVERDIR)/$(real-objs-m:.o=.ver): modkern_cflags := $(CFLAGS_MODULE)
+$(MODVERDIR)/$(export-objs:.o=.ver): export_flags   := -D__GENKSYMS__
+
+c_flags = -Wp,-MD,$(@D)/.$(@F).d $(CFLAGS) $(NOSTDINC_FLAGS) \
+	  $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
+	  -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
+	  $(export_flags) 
+
+# Our objects only depend on modversions.h, not on the individual .ver
+# files (fix-dep filters them), so touch modversions.h if any of the .ver
+# files changes
+
+quiet_cmd_cc_ver_c = MKVER  include/linux/modules/$(RELDIR)/$*.ver
+define cmd_cc_ver_c
+	mkdir -p $(dir $@); \
+	$(CPP) $(c_flags) $< | $(GENKSYMS) $(genksyms_smp_prefix) \
+	  -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp; \
+	if [ ! -r $@ ] || cmp -s $@ $@.tmp; then \
+	  touch $(TOPDIR)/include/linux/modversions.h; \
+	fi; \
+	mv -f $@.tmp $@
+endef
+
+$(MODVERDIR)/%.ver: %.c FORCE
+	@$(call if_changed_dep,cc_ver_c)
+
+targets := $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
+
+fastdep: $(targets) sub_dirs
+	@mkdir -p $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)
+	@touch $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)/,$(export-objs:.o=.ver))
+
+endif # export-objs 
+
+else # ! fastdep
+ifeq ($(MAKECMDGOALS),modules_install)
+
 # ==========================================================================
+# Installing modules
+# ==========================================================================
+
+.PHONY: modules_install
+
+modules_install: sub_dirs
+ifneq ($(obj-m),)
+	@echo Installing modules in $(MODLIB)/kernel/$(RELDIR)
+	@mkdir -p $(MODLIB)/kernel/$(RELDIR)
+	@cp $(obj-m) $(MODLIB)/kernel/$(RELDIR)
+else
+	@echo -n
+endif
+
+else # ! modules_install
+
+# ==========================================================================
+# Building
+# ==========================================================================
+
+# If a Makefile does define neither O_TARGET nor L_TARGET,
+# use a standard O_TARGET named "built-in.o"
 
 ifndef O_TARGET
 ifndef L_TARGET
@@ -103,14 +204,8 @@ first_rule: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
 # Compile C sources (.c)
 # ---------------------------------------------------------------------------
 
-# If we don't know if built-in or modular, assume built-in.
-# Only happens in Makefiles which override the default first_rule:
+# Default is built-in, unless we know otherwise
 modkern_cflags := $(CFLAGS_KERNEL)
-
-$(real-objs-y)        : modkern_cflags := $(CFLAGS_KERNEL)
-$(real-objs-y:.o=.i)  : modkern_cflags := $(CFLAGS_KERNEL)
-$(real-objs-y:.o=.s)  : modkern_cflags := $(CFLAGS_KERNEL)
-$(real-objs-y:.o=.lst): modkern_cflags := $(CFLAGS_KERNEL)
 
 $(real-objs-m)        : modkern_cflags := $(CFLAGS_MODULE)
 $(real-objs-m:.o=.i)  : modkern_cflags := $(CFLAGS_MODULE)
@@ -121,22 +216,25 @@ $(export-objs:.o=.i)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.s)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.lst): export_flags   := $(EXPORT_FLAGS)
 
-c_flags = $(CFLAGS) $(NOSTDINC_FLAGS) $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags) 
+c_flags = -Wp,-MD,$(@D)/.$(@F).d $(CFLAGS) $(NOSTDINC_FLAGS) \
+	  $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
+	  -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
+	  $(export_flags) 
 
 quiet_cmd_cc_s_c = CC     $(RELDIR)/$@
 cmd_cc_s_c       = $(CC) $(c_flags) -S -o $@ $< 
 
 %.s: %.c FORCE
-	$(call cmd,cmd_cc_s_c)
+	$(call if_changed_dep,cc_s_c)
 
 quiet_cmd_cc_i_c = CPP    $(RELDIR)/$@
 cmd_cc_i_c       = $(CPP) $(c_flags)   -o $@ $<
 
 %.i: %.c FORCE
-	$(call cmd,cmd_cc_i_c)
+	$(call if_changed_dep,cc_i_c)
 
 quiet_cmd_cc_o_c = CC     $(RELDIR)/$@
-cmd_cc_o_c       = $(CC) -Wp,-MD,.$(subst /,_,$@).d $(c_flags) -c -o $@ $<
+cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 
 %.o: %.c FORCE
 	$(call if_changed_dep,cc_o_c)
@@ -145,36 +243,32 @@ quiet_cmd_cc_lst_c = Generating $(RELDIR)/$@
 cmd_cc_lst_c     = $(CC) $(c_flags) -g -c -o $*.o $< && $(TOPDIR)/scripts/makelst $*.o $(TOPDIR)/System.map $(OBJDUMP) > $@
 
 %.lst: %.c FORCE
-	$(call cmd,cmd_cc_lst_c)
+	$(call if_changed_dep,cc_lst_c)
 
 # Compile assembler sources (.S)
 # ---------------------------------------------------------------------------
 
-# FIXME (s.a.)
 modkern_aflags := $(AFLAGS_KERNEL)
-
-$(real-objs-y)      : modkern_aflags := $(AFLAGS_KERNEL)
-$(real-objs-y:.o=.s): modkern_aflags := $(AFLAGS_KERNEL)
 
 $(real-objs-m)      : modkern_aflags := $(AFLAGS_MODULE)
 $(real-objs-m:.o=.s): modkern_aflags := $(AFLAGS_MODULE)
 
-a_flags = $(AFLAGS) $(NOSTDINC_FLAGS) $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
+a_flags = -Wp,-MD,$(@D)/.$(@F).d $(AFLAGS) $(NOSTDINC_FLAGS) \
+	  $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
 quiet_cmd_as_s_S = CPP    $(RELDIR)/$@
 cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
 
 %.s: %.S FORCE
-	$(call cmd,cmd_as_s_S)
+	$(call if_changed_dep,as_s_S)
 
 quiet_cmd_as_o_S = AS     $(RELDIR)/$@
-cmd_as_o_S       = $(CC) -Wp,-MD,.$(subst /,_,$@).d $(a_flags) -c -o $@ $<
+cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 
 %.o: %.S FORCE
 	$(call if_changed_dep,as_o_S)
 
-# If a Makefile does define neither O_TARGET nor L_TARGET,
-# use a standard O_TARGET named "built-in.o"
+targets += $(real-objs-y) $(real-objs-m) $(EXTRA_TARGETS) $(MAKECMDGOALS)
 
 # Build the compiled-in targets
 # ---------------------------------------------------------------------------
@@ -193,7 +287,9 @@ cmd_link_o_target = $(if $(strip $(obj-y)),\
 		      rm -f $@; $(AR) rcs $@)
 
 $(O_TARGET): $(obj-y) FORCE
-	$(call if_changed,cmd_link_o_target)
+	$(call if_changed,link_o_target)
+
+targets += $(O_TARGET)
 endif # O_TARGET
 
 #
@@ -204,7 +300,9 @@ quiet_cmd_link_l_target = AR     $(RELDIR)/$@
 cmd_link_l_target = rm -f $@; $(AR) $(EXTRA_ARFLAGS) rcs $@ $(obj-y)
 
 $(L_TARGET): $(obj-y) FORCE
-	$(call if_changed,cmd_link_l_target)
+	$(call if_changed,link_l_target)
+
+targets += $(L_TARGET)
 endif
 
 #
@@ -219,10 +317,12 @@ cmd_link_multi = $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs)
 # but that's not so easy, so we rather make all composite objects depend
 # on the set of all their parts
 $(multi-used-y) : %.o: $(multi-objs-y) FORCE
-	$(call if_changed,cmd_link_multi)
+	$(call if_changed,link_multi)
 
 $(multi-used-m) : %.o: $(multi-objs-m) FORCE
-	$(call if_changed,cmd_link_multi)
+	$(call if_changed,link_multi)
+
+targets += $(multi-used-y) $(multi-used-m)
 
 # Compile programs on the host
 # ===========================================================================
@@ -250,51 +350,26 @@ cmd_host_cc__o        = $(HOSTCC) $(HOSTLDFLAGS) -o $@ $($@-objs) \
 			$(HOST_LOADLIBES)
 
 $(host-progs-multi): %: $(host-progs-multi-objs) FORCE
-	$(call if_changed,cmd_host_cc__o)
+	$(call if_changed,host_cc__o)
 
+targets += $(host-progs-single) $(host-progs-multi-objs) $(host-progs-multi) 
 
-# Descending when making module versions
+endif # ! modules_install
+endif # ! fastdep
+
+# ===========================================================================
+# Generic stuff
+# ===========================================================================
+
+# Descending
 # ---------------------------------------------------------------------------
 
-fastdep-list := $(addprefix _sfdep_,$(subdir-ymn))
+.PHONY: sub_dirs $(subdir-ym)
 
-.PHONY: fastdep $(fastdep-list)
+sub_dirs: $(subdir-ym)
 
-fastdep: $(fastdep-list)
-
-$(fastdep-list):
-	@$(MAKE) -C $(patsubst _sfdep_%,%,$@) fastdep
-
-# Descending when building
-# ---------------------------------------------------------------------------
-
-subdir-list := $(addprefix _subdir_,$(subdir-ym))
-
-.PHONY: sub_dirs $(subdir-list)
-
-sub_dirs: $(subdir-list)
-
-$(subdir-list):
-	@$(MAKE) -C $(patsubst _subdir_%,%,$@)
-
-# Descending and installing modules
-# ---------------------------------------------------------------------------
-
-modinst-list := $(addprefix _modinst_,$(subdir-ym))
-
-.PHONY: modules_install _modinst_ $(modinst-list)
-
-modules_install: $(modinst-list)
-ifneq ($(obj-m),)
-	@echo Installing modules in $(MODLIB)/kernel/$(RELDIR)
-	@mkdir -p $(MODLIB)/kernel/$(RELDIR)
-	@cp $(obj-m) $(MODLIB)/kernel/$(RELDIR)
-else
-	@echo -n
-endif
-
-$(modinst-list):
-	@$(MAKE) -C $(patsubst _modinst_%,%,$@) modules_install
+$(subdir-ym):
+	@$(MAKE) -C $@ $(MAKECMDGOALS)
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------
@@ -304,61 +379,10 @@ $(modinst-list):
 FORCE:
 
 #
-# This is useful for testing
-# FIXME: really?
-script:
-	$(SCRIPT)
-
-#
 # This sets version suffixes on exported symbols
 # Separate the object into "normal" objects and "exporting" objects
 # Exporting objects are: all objects that define symbol tables
 #
-
-ifdef CONFIG_MODVERSIONS
-ifneq "$(strip $(export-objs))" ""
-
-MODVERDIR := $(TOPDIR)/include/linux/modules/$(RELDIR)
-
-#
-# Added the SMP separator to stop module accidents between uniprocessor
-# and SMP Intel boxes - AC - from bits by Michael Chastain
-#
-
-ifdef CONFIG_SMP
-	genksyms_smp_prefix := -p smp_
-else
-	genksyms_smp_prefix := 
-endif
-
-# We don't track dependencies for .ver files, so we FORCE to check
-# them always (i.e. always at "make dep" time).
-
-quiet_cmd_create_ver = Creating include/linux/modules/$(RELDIR)/$*.ver
-cmd_create_ver = $(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $< | \
-		 $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
-
-$(MODVERDIR)/%.ver: %.c FORCE
-	@mkdir -p $(dir $@)
-	@$(call cmd,cmd_create_ver)
-	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
-	  rm -f $@.tmp; \
-	else \
-	  touch $(TOPDIR)/include/linux/modversions.h; \
-	  mv -f $@.tmp $@; \
-	fi
-
-# updates .ver files but not modversions.h
-fastdep: $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
-ifneq ($(export-objs),)
-	@mkdir -p $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)
-	@touch $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)/,$(export-objs:.o=.ver))
-endif
-
-
-endif # export-objs 
-
-endif # CONFIG_MODVERSIONS
 
 # ---------------------------------------------------------------------------
 # Check if command line has changed
@@ -391,9 +415,14 @@ endif # CONFIG_MODVERSIONS
 #   which is saved in .<target>.o, to the current command line using
 #   the two filter-out commands)
 
-# read all saved command lines and dependencies
+# Read all saved command lines and dependencies for the $(targets) we
+# may be building above, using $(if_changed{,_dep}). As an
+# optimization, we don't need to read them if the target does not
+# exist, we will rebuild anyway in that case.
 
-cmd_files := $(wildcard .*.cmd)
+targets := $(wildcard $(sort $(targets)))
+cmd_files := $(wildcard $(foreach f,$(targets),$(dir $(f)).$(notdir $(f)).cmd))
+
 ifneq ($(cmd_files),)
   include $(cmd_files)
 endif
@@ -401,9 +430,12 @@ endif
 # function to only execute the passed command if necessary
 
 if_changed = $(if $(strip $? \
-		          $(filter-out $($(1)),$(cmd_$(@F)))\
-			  $(filter-out $(cmd_$(@F)),$($(1)))),\
-	       @$(if $($(quiet)$(1)),echo '  $($(quiet)$(1))' &&) $($(1)) && echo 'cmd_$@ := $($(1))' > $(@D)/.$(@F).cmd)
+		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
+			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
+	@set -e; \
+	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
+	$(cmd_$(1)); \
+	echo 'cmd_$@ := $(cmd_$(1))' > $(@D)/.$(@F).cmd)
 
 
 # execute the command and also postprocess generated .d dependencies
@@ -415,9 +447,9 @@ if_changed_dep = $(if $(strip $? \
 	@set -e; \
 	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
 	$(cmd_$(1)); \
-	$(TOPDIR)/scripts/fixdep $(subst /,_,$@) $(TOPDIR) '$(cmd_$(1))' > .$(subst /,_,$@).tmp; \
-	rm -f .$(subst /,_,$@).d; \
-	mv -f .$(subst /,_,$@).tmp .$(subst /,_,$@).cmd )
+	$(TOPDIR)/scripts/fixdep $(@D)/.$(@F).d $@ $(TOPDIR) '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
+	rm -f $(@D)/.$(@F).d; \
+	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
 
 # If quiet is set, only print short version of command
 

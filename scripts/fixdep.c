@@ -61,9 +61,9 @@
  *
  * It is invoked as
  *
- *   fixdep <target> <topdir> <cmdline>
+ *   fixdep <depfile> <target> <topdir> <cmdline>
  *
- * and will read the dependency file ".<target>.d".
+ * and will read the dependency file <depfile>
  *
  * The transformed dependency snipped is written to stdout.
  *
@@ -112,29 +112,20 @@
 #define INT_FIG_ ntohl(0x4649475f)
 
 char *topdir;
+char *target;
+char *depfile;
+char *cmdline;
 
 void usage(void)
 
 {
-	fprintf(stderr, "Usage: fixdep <target> <topdir> <cmdline>\n");
+	fprintf(stderr, "Usage: fixdep <depfile> <target> <topdir> <cmdline>\n");
 	exit(1);
 }
 
-void print_cmdline(char *target, char *cmdline)
+void print_cmdline(void)
 {
-	char *s = strdup(target);
-	char *p = s;
-
-	if (!s) {
-		fprintf(stderr, "no mem!\n");
-		exit(2);
-	}
-	while ((p = strchr(p,'/')))
-		*p = '_';
-
-	printf("cmd_%s := %s\n\n", s, cmdline);
-
-	free(s);
+	printf("cmd_%s := %s\n\n", target, cmdline);
 }
 
 char * str_config  = NULL;
@@ -297,11 +288,11 @@ void parse_dep_file(void *map, size_t len)
 
 	p = strchr(m, ':');
 	if (!p) {
-		fprintf(stderr, "parse error at %d", __LINE__);
+		fprintf(stderr, "fixdep: parse error\n");
 		exit(1);
 	}
 	memcpy(s, m, p-m); s[p-m] = 0;
-	printf("%s: \\\n", s);
+	printf("%s: \\\n", target);
 	m = p+1;
 
 	clear_config();
@@ -326,22 +317,20 @@ void parse_dep_file(void *map, size_t len)
 	printf("\n");
 }
 
-void print_deps(char *target)
+void print_deps(void)
 {
-	char filename[PATH_MAX];
 	struct stat st;
 	int fd;
 	void *map;
 
-	sprintf(filename, ".%s.d", target);
-	fd = open(filename, O_RDONLY);
+	fd = open(depfile, O_RDONLY);
 	if (fd < 0) {
-		perror(filename);
+		perror(depfile);
 		exit(2);
 	}
 	fstat(fd, &st);
 	if (st.st_size == 0) {
-		fprintf(stderr,"%s is empty\n",filename);
+		fprintf(stderr,"fixdep: %s is empty\n",depfile);
 		close(fd);
 		return;
 	}
@@ -362,7 +351,7 @@ void traps(void)
 	char *test = "CONF";
 
 	if (*(int *)test != INT_CONF) {
-		fprintf(stderr, "sizeof(int) != 4 or wrong endianess? %#x\n",
+		fprintf(stderr, "fixdep: sizeof(int) != 4 or wrong endianess? %#x\n",
 			*(int *)test);
 		exit(2);
 	}
@@ -370,19 +359,18 @@ void traps(void)
 
 int main(int argc, char *argv[])
 {
-	char *target, *cmdline;
-	
 	traps();
 
-	if (argc != 4)
+	if (argc != 5)
 		usage();
 		
-	target = argv[1];
-	topdir = argv[2];
-	cmdline = argv[3];
+	depfile = argv[1];
+	target = argv[2];
+	topdir = argv[3];
+	cmdline = argv[4];
 
-	print_cmdline(target, cmdline);
-	print_deps(target);
+	print_cmdline();
+	print_deps();
 
 	return 0;
 }
