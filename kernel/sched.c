@@ -3392,17 +3392,17 @@ static int migration_thread(void * data)
 		req = list_entry(head->next, migration_req_t, list);
 		list_del_init(head->next);
 
-		spin_unlock(&rq->lock);
-
 		if (req->type == REQ_MOVE_TASK) {
+			spin_unlock(&rq->lock);
 			__migrate_task(req->task, req->dest_cpu);
+			local_irq_enable();
 		} else if (req->type == REQ_SET_DOMAIN) {
 			rq->sd = req->sd;
+			spin_unlock_irq(&rq->lock);
 		} else {
+			spin_unlock_irq(&rq->lock);
 			WARN_ON(1);
 		}
-
-		local_irq_enable();
 
 		complete(&req->done);
 	}
