@@ -52,7 +52,7 @@ static ssize_t show_dev(struct class_device *cd, char *buf)
 {
 	struct video_device *vfd = container_of(cd, struct video_device, class_dev);
 	dev_t dev = MKDEV(VIDEO_MAJOR, vfd->minor);
-	return sprintf(buf,"%04x\n",old_encode_dev(dev));
+	return print_dev_t(buf,dev);
 }
 
 static CLASS_DEVICE_ATTR(name, S_IRUGO, show_name, NULL);

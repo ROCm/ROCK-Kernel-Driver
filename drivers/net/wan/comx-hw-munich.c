@@ -1849,7 +1849,7 @@ static int MUNICH_open(struct net_device *dev)
     if (board->isx21)
     {
 	init_timer(&board->modemline_timer);
-	board->modemline_timer.data = (unsigned int)board;
+	board->modemline_timer.data = (unsigned long)board;
 	board->modemline_timer.function = pcicom_modemline;
 	board->modemline_timer.expires = jiffies + HZ;
 	add_timer((struct timer_list *)&board->modemline_timer);

@@ -169,7 +169,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 
 	if (num_processors >= NR_CPUS) {
 		printk(KERN_WARNING "NR_CPUS limit of %i reached.  Cannot "
-			"boot CPU(apicid 0x%d).\n", NR_CPUS, m->mpc_apicid);
+			"boot CPU(apicid 0x%x).\n", NR_CPUS, m->mpc_apicid);
 		return;
 	}
 	num_processors++;
