@@ -450,7 +450,6 @@ follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 static void free_huge_page(struct page *page)
 {
 	BUG_ON(page_count(page));
-	BUG_ON(page->mapping);
 
 	INIT_LIST_HEAD(&page->lru);
 

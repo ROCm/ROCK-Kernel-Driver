@@ -242,24 +242,24 @@ extern void FASTCALL(__page_cache_release(struct page *));
 static inline int page_count(struct page *p)
 {
 	if (PageCompound(p))
-		p = (struct page *)p->lru.next;
+		p = (struct page *)p->private;
 	return atomic_read(&(p)->count);
 }
 
 static inline void get_page(struct page *page)
 {
 	if (PageCompound(page))
-		page = (struct page *)page->lru.next;
+		page = (struct page *)page->private;
 	atomic_inc(&page->count);
 }
 
 static inline void put_page(struct page *page)
 {
 	if (PageCompound(page)) {
-		page = (struct page *)page->lru.next;
+		page = (struct page *)page->private;
 		if (put_page_testzero(page)) {
-			if (page->lru.prev) {	/* destructor? */
-				(*(void (*)(struct page *))page->lru.prev)(page);
+			if (page[1].mapping) {	/* destructor? */
+				(*(void (*)(struct page *))page[1].mapping)(page);
 			} else {
 				__page_cache_release(page);
 			}

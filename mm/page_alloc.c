@@ -71,13 +71,14 @@ static int bad_range(struct zone *zone, struct page *page)
 
 static void bad_page(const char *function, struct page *page)
 {
-	printk("Bad page state at %s (in process '%s', page %p)\n", function, current->comm, page);
-	printk("flags:0x%08lx mapping:%p mapped:%d count:%d\n",
+	printk(KERN_EMERG "Bad page state at %s (in process '%s', page %p)\n",
+		function, current->comm, page);
+	printk(KERN_EMERG "flags:0x%08lx mapping:%p mapped:%d count:%d\n",
 		(unsigned long)page->flags, page->mapping,
 		page_mapped(page), page_count(page));
-	printk("Backtrace:\n");
+	printk(KERN_EMERG "Backtrace:\n");
 	dump_stack();
-	printk("Trying to fix it up, but a reboot is needed\n");
+	printk(KERN_EMERG "Trying to fix it up, but a reboot is needed\n");
 	page->flags &= ~(1 << PG_private	|
 			1 << PG_locked	|
 			1 << PG_lru	|
@@ -99,13 +100,13 @@ static void bad_page(const char *function, struct page *page)
  *
  * The remaining PAGE_SIZE pages are called "tail pages".
  *
- * All pages have PG_compound set.  All pages have their lru.next pointing at
+ * All pages have PG_compound set.  All pages have their ->private pointing at
  * the head page (even the head page has this).
  *
- * The head page's lru.prev, if non-zero, holds the address of the compound
- * page's put_page() function.
+ * The first tail page's ->mapping, if non-zero, holds the address of the
+ * compound page's put_page() function.
  *
- * The order of the allocation is stored in the first tail page's lru.prev.
+ * The order of the allocation is stored in the first tail page's ->index
  * This is only for debug at present.  This usage means that zero-order pages
  * may not be compound.
  */
@@ -114,13 +115,13 @@ static void prep_compound_page(struct page *page, unsigned long order)
 	int i;
 	int nr_pages = 1 << order;
 
-	page->lru.prev = NULL;
-	page[1].lru.prev = (void *)order;
+	page[1].mapping = 0;
+	page[1].index = order;
 	for (i = 0; i < nr_pages; i++) {
 		struct page *p = page + i;
 
 		SetPageCompound(p);
-		p->lru.next = (void *)page;
+		p->private = (unsigned long)page;
 	}
 }
 
@@ -129,7 +130,7 @@ static void destroy_compound_page(struct page *page, unsigned long order)
 	int i;
 	int nr_pages = 1 << order;
 
-	if (page[1].lru.prev != (void *)order)
+	if (page[1].index != order)
 		bad_page(__FUNCTION__, page);
 
 	for (i = 0; i < nr_pages; i++) {
@@ -137,7 +138,7 @@ static void destroy_compound_page(struct page *page, unsigned long order)
 
 		if (!PageCompound(p))
 			bad_page(__FUNCTION__, page);
-		if (p->lru.next != (void *)page)
+		if (p->private != (unsigned long)page)
 			bad_page(__FUNCTION__, page);
 		ClearPageCompound(p);
 	}
@@ -512,14 +513,14 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 		spin_lock_irqsave(&zone->lock, flags);
 		page = __rmqueue(zone, order);
 		spin_unlock_irqrestore(&zone->lock, flags);
-		if (order && page)
-			prep_compound_page(page, order);
 	}
 
 	if (page != NULL) {
 		BUG_ON(bad_range(zone, page));
 		mod_page_state_zone(zone, pgalloc, 1 << order);
 		prep_new_page(page, order);
+		if (order)
+			prep_compound_page(page, order);
 	}
 	return page;
 }
