@@ -29,24 +29,24 @@ __RXACCT_DECL(extern atomic_t rxrpc_message_count);
 /*
  * debug tracing
  */
-#define kenter(FMT,...)	printk("==> %s("FMT")\n",__FUNCTION__,##__VA_ARGS__)
-#define kleave(FMT,...)	printk("<== %s()"FMT"\n",__FUNCTION__,##__VA_ARGS__)
-#define kdebug(FMT,...)	printk("    "FMT"\n",##__VA_ARGS__)
-#define kproto(FMT,...)	printk("### "FMT"\n",##__VA_ARGS__)
-#define knet(FMT,...)	printk("    "FMT"\n",##__VA_ARGS__)
+#define kenter(FMT, a...)	printk("==> %s("FMT")\n",__FUNCTION__ , ##a)
+#define kleave(FMT, a...)	printk("<== %s()"FMT"\n",__FUNCTION__ , ##a)
+#define kdebug(FMT, a...)	printk("    "FMT"\n" , ##a)
+#define kproto(FMT, a...)	printk("### "FMT"\n" , ##a)
+#define knet(FMT, a...)		printk("    "FMT"\n" , ##a)
 
 #if 0
-#define _enter(FMT,...)	kenter(FMT,##__VA_ARGS__)
-#define _leave(FMT,...)	kleave(FMT,##__VA_ARGS__)
-#define _debug(FMT,...)	kdebug(FMT,##__VA_ARGS__)
-#define _proto(FMT,...)	kproto(FMT,##__VA_ARGS__)
-#define _net(FMT,...)	knet(FMT,##__VA_ARGS__)
+#define _enter(FMT, a...)	kenter(FMT , ##a)
+#define _leave(FMT, a...)	kleave(FMT , ##a)
+#define _debug(FMT, a...)	kdebug(FMT , ##a)
+#define _proto(FMT, a...)	kproto(FMT , ##a)
+#define _net(FMT, a...)		knet(FMT , ##a)
 #else
-#define _enter(FMT,...)	do { if (rxrpc_ktrace) kenter(FMT,##__VA_ARGS__); } while(0)
-#define _leave(FMT,...)	do { if (rxrpc_ktrace) kleave(FMT,##__VA_ARGS__); } while(0)
-#define _debug(FMT,...)	do { if (rxrpc_kdebug) kdebug(FMT,##__VA_ARGS__); } while(0)
-#define _proto(FMT,...)	do { if (rxrpc_kproto) kproto(FMT,##__VA_ARGS__); } while(0)
-#define _net(FMT,...)	do { if (rxrpc_knet)   knet  (FMT,##__VA_ARGS__); } while(0)
+#define _enter(FMT, a...)	do { if (rxrpc_ktrace) kenter(FMT , ##a); } while(0)
+#define _leave(FMT, a...)	do { if (rxrpc_ktrace) kleave(FMT , ##a); } while(0)
+#define _debug(FMT, a...)	do { if (rxrpc_kdebug) kdebug(FMT , ##a); } while(0)
+#define _proto(FMT, a...)	do { if (rxrpc_kproto) kproto(FMT , ##a); } while(0)
+#define _net(FMT, a...)		do { if (rxrpc_knet)   knet  (FMT , ##a); } while(0)
 #endif
 
 static inline void rxrpc_discard_my_signals(void)

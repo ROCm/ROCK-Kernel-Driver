@@ -403,67 +403,11 @@ int hvc_count(int *start_termno)
 
 
 
-
-/*
- * Create a pte - LPAR .  Used during initialization only.
- * We assume the PTE will fit in the primary PTEG.
- */
-void pSeries_lpar_make_pte(HPTE *htab, unsigned long va, unsigned long pa,
-			   int mode, unsigned long hash_mask, int large)
+long pSeries_lpar_hpte_insert(unsigned long hpte_group,
+			      unsigned long va, unsigned long prpn,
+			      int secondary, unsigned long hpteflags,
+			      int bolted, int large)
 {
-	HPTE local_hpte;
-	unsigned long hash, slot, flags, lpar_rc, vpn;
-	unsigned long dummy1, dummy2;
-
-	if (large)
-		vpn = va >> LARGE_PAGE_SHIFT;
-	else
-		vpn = va >> PAGE_SHIFT;
-
-	hash = hpt_hash(vpn, large);
-
-	slot = ((hash & hash_mask)*HPTES_PER_GROUP);
-
-	local_hpte.dw1.dword1 = pa | mode;
-	local_hpte.dw0.dword0 = 0;
-	local_hpte.dw0.dw0.avpn = va >> 23;
-	local_hpte.dw0.dw0.bolted = 1;		/* bolted */
-	if (large) {
-		local_hpte.dw0.dw0.l = 1;	/* large page */
-		local_hpte.dw0.dw0.avpn &= ~0x1UL;
-	}
-	local_hpte.dw0.dw0.v = 1;
-
-	/* Set CEC cookie to 0                   */
-	/* Zero page = 0                         */
-	/* I-cache Invalidate = 0                */
-	/* I-cache synchronize = 0               */
-	/* Exact = 0 - modify any entry in group */
-	flags = 0;
-
-	lpar_rc =  plpar_pte_enter(flags, slot, local_hpte.dw0.dword0,
-				   local_hpte.dw1.dword1, &dummy1, &dummy2);
-
-	if (lpar_rc == H_PTEG_Full) {
-		while(1)
-			;
-	}
-
-	/*
-	 * NOTE: we explicitly do not check return status here because it is
-	 * "normal" for early boot code to map io regions for which a partition
-	 * has no access.  However, we will die if we actually fault on these
-	 * "permission denied" pages.
-	 */
-}
-
-static long pSeries_lpar_insert_hpte(unsigned long hpte_group,
-				     unsigned long vpn, unsigned long prpn,
-				     int secondary, unsigned long hpteflags,
-				     int bolted, int large)
-{
-	/* XXX fix for large page */
-	unsigned long avpn = vpn >> 11;
 	unsigned long arpn = physRpn_to_absRpn(prpn);
 	unsigned long lpar_rc;
 	unsigned long flags;
@@ -476,13 +420,15 @@ static long pSeries_lpar_insert_hpte(unsigned long hpte_group,
 	lhpte.dw1.flags.flags = hpteflags;
 
 	lhpte.dw0.dword0      = 0;
-	lhpte.dw0.dw0.avpn    = avpn;
+	lhpte.dw0.dw0.avpn    = va >> 23;
 	lhpte.dw0.dw0.h       = secondary;
 	lhpte.dw0.dw0.bolted  = bolted;
 	lhpte.dw0.dw0.v       = 1;
 
-	if (large)
+	if (large) {
 		lhpte.dw0.dw0.l = 1;
+		lhpte.dw0.dw0.avpn &= ~0x1UL;
+	}
 
 	/* Now fill in the actual HPTE */
 	/* Set CEC cookie to 0         */
@@ -522,7 +468,7 @@ static long pSeries_lpar_insert_hpte(unsigned long hpte_group,
 
 static spinlock_t pSeries_lpar_tlbie_lock = SPIN_LOCK_UNLOCKED;
 
-static long pSeries_lpar_remove_hpte(unsigned long hpte_group)
+static long pSeries_lpar_hpte_remove(unsigned long hpte_group)
 {
 	unsigned long slot_offset;
 	unsigned long lpar_rc;
@@ -559,11 +505,14 @@ static long pSeries_lpar_remove_hpte(unsigned long hpte_group)
  * already zero.  For now I am paranoid.
  */
 static long pSeries_lpar_hpte_updatepp(unsigned long slot, unsigned long newpp,
-				       unsigned long va, int large)
+				       unsigned long va, int large, int local)
 {
 	unsigned long lpar_rc;
 	unsigned long flags = (newpp & 7) | H_AVPN;
 	unsigned long avpn = va >> 23;
+
+	if (large)
+		avpn &= ~0x1UL;
 
 	lpar_rc = plpar_pte_protect(flags, slot, (avpn << 7));
 
@@ -662,6 +611,9 @@ static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
 	unsigned long lpar_rc;
 	unsigned long dummy1, dummy2;
 
+	if (large)
+		avpn &= ~0x1UL;
+
 	lpar_rc = plpar_pte_remove(H_AVPN, slot, (avpn << 7), &dummy1,
 				   &dummy2);
 
@@ -695,11 +647,10 @@ void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
 
 void pSeries_lpar_mm_init(void)
 {
-	ppc_md.hpte_invalidate  = pSeries_lpar_hpte_invalidate;
-	ppc_md.hpte_updatepp    = pSeries_lpar_hpte_updatepp;
+	ppc_md.hpte_invalidate	= pSeries_lpar_hpte_invalidate;
+	ppc_md.hpte_updatepp	= pSeries_lpar_hpte_updatepp;
 	ppc_md.hpte_updateboltedpp = pSeries_lpar_hpte_updateboltedpp;
-	ppc_md.insert_hpte      = pSeries_lpar_insert_hpte;
-	ppc_md.remove_hpte      = pSeries_lpar_remove_hpte;
-	ppc_md.make_pte         = pSeries_lpar_make_pte;
+	ppc_md.hpte_insert	= pSeries_lpar_hpte_insert;
+	ppc_md.hpte_remove	= pSeries_lpar_hpte_remove;
 	ppc_md.flush_hash_range	= pSeries_lpar_flush_hash_range;
 }

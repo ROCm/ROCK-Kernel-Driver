@@ -219,6 +219,11 @@ static void __init
 jensen_init_arch(void)
 {
 	struct pci_controller *hose;
+#ifdef CONFIG_PCI
+	static struct pci_dev fake_isa_bridge = { dma_mask: 0xffffffffUL, };
+
+	isa_bridge = &fake_isa_bridge;
+#endif
 
 	/* Create a hose so that we can report i/o base addresses to
 	   userland.  */
@@ -257,7 +262,7 @@ struct alpha_machine_vector jensen_mv __initmv = {
 	IO_LITE(JENSEN,jensen),
 	BUS(jensen),
 	.machine_check		= jensen_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.rtc_port		= 0x170,
 
 	.nr_irqs		= 16,

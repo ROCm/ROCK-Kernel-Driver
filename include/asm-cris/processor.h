@@ -108,10 +108,6 @@ unsigned long get_wchan(struct task_struct *p);
 
 #define KSTK_ESP(tsk)   ((tsk) == current ? rdusp() : (tsk)->thread.usp)
 
-#define copy_segments(tsk, mm)          do { } while (0)
-#define release_segments(mm)            do { } while (0)
-#define forget_segments()               do { } while (0)
- 
 /*
  * Free current thread data structures etc..
  */

@@ -4,7 +4,7 @@
  *  Copyright (C) 2001 Russell King
  *            (C) 2002 Dominik Brodowski <linux@brodo.de>
  *
- *  $Id: cpufreq.c,v 1.43 2002/09/21 09:05:29 db Exp $
+ *  $Id: cpufreq.c,v 1.45 2002/10/08 14:54:23 db Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,12 +21,9 @@
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/ctype.h>
+#include <linux/proc_fs.h>
 
 #include <asm/uaccess.h>
-
-#ifdef CONFIG_CPU_FREQ_26_API
-#include <linux/proc_fs.h>
-#endif
 
 #ifdef CONFIG_CPU_FREQ_24_API
 #include <linux/sysctl.h>
@@ -200,7 +197,6 @@ static int __init cpufreq_setup(char *str)
 __setup("cpufreq=", cpufreq_setup);
 
 
-#ifdef CONFIG_CPU_FREQ_26_API
 #ifdef CONFIG_PROC_FS
 
 /**
@@ -335,7 +331,6 @@ static void cpufreq_proc_exit (void)
 	return;
 }
 #endif /* CONFIG_PROC_FS */
-#endif /* CONFIG_CPU_FREQ_26_API */
 
 
 
@@ -344,10 +339,6 @@ static void cpufreq_proc_exit (void)
  *********************************************************************/
 
 #ifdef CONFIG_CPU_FREQ_24_API
-/* NOTE #1: when you use this API, you may not use any other calls,
- * except cpufreq_[un]register_notifier, of course.
- */
-
 /** 
  * cpufreq_set - set the CPU frequency
  * @freq: target frequency in kHz
@@ -879,7 +870,7 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 		cpufreq_driver->policy[policy->cpu].max    = policy->max;
 		cpufreq_driver->policy[policy->cpu].policy = policy->policy;
 	}
-	
+
 #ifdef CONFIG_CPU_FREQ_24_API
 	if (policy->cpu == CPUFREQ_ALL_CPUS) {
 		for (i=0;i<NR_CPUS;i++)
@@ -945,6 +936,14 @@ void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 	case CPUFREQ_POSTCHANGE:
 		adjust_jiffies(CPUFREQ_POSTCHANGE, freqs);
 		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_POSTCHANGE, freqs);
+#ifdef CONFIG_CPU_FREQ_24_API
+		if (freqs->cpu == CPUFREQ_ALL_CPUS) {
+			int i;
+			for (i=0;i<NR_CPUS;i++)
+				cpu_cur_freq[i] = freqs->new;
+		} else
+			cpu_cur_freq[freqs->cpu] = freqs->new;
+#endif
 		break;
 	}
 	up(&cpufreq_notifier_sem);
@@ -992,9 +991,7 @@ int cpufreq_register(struct cpufreq_driver *driver_data)
 
 	ret = cpufreq_set_policy(&default_policy);
 
-#ifdef CONFIG_CPU_FREQ_26_API
 	cpufreq_proc_init();
-#endif
 
 #ifdef CONFIG_CPU_FREQ_24_API
 	down(&cpufreq_driver_sem);
@@ -1042,9 +1039,7 @@ int cpufreq_unregister(void)
 
 	up(&cpufreq_driver_sem);
 
-#ifdef CONFIG_CPU_FREQ_26_API
 	cpufreq_proc_exit();
-#endif
 
 #ifdef CONFIG_CPU_FREQ_24_API
 	cpufreq_sysctl_exit();
@@ -1086,13 +1081,7 @@ int cpufreq_restore(void)
 		policy.cpu    = i;
 		up(&cpufreq_driver_sem);
 
-#ifdef CONFIG_CPU_FREQ_26_API
 		cpufreq_set_policy(&policy);
-#endif
-
-#ifdef CONFIG_CPU_FREQ_24_API
-		cpufreq_set(cpu_cur_freq[i], i);
-#endif
 	}
 
 	return 0;

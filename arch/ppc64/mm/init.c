@@ -220,16 +220,26 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 		set_pte(ptep, pfn_pte(pa >> PAGE_SHIFT, __pgprot(flags)));
 		spin_unlock(&ioremap_mm.page_table_lock);
 	} else {
-		/* If the mm subsystem is not fully up, we cannot create a
+		unsigned long va, vpn, hash, hpteg;
+
+		/*
+		 * If the mm subsystem is not fully up, we cannot create a
 		 * linux page table entry for this mapping.  Simply bolt an
 		 * entry in the hardware page table. 
 		 */
 		vsid = get_kernel_vsid(ea);
-		ppc_md.make_pte(htab_data.htab,
-			(vsid << 28) | (ea & 0xFFFFFFF), // va (NOT the ea)
-			pa, 
-			_PAGE_NO_CACHE | _PAGE_GUARDED | PP_RWXX,
-			htab_data.htab_hash_mask, 0);
+		va = (vsid << 28) | (ea & 0xFFFFFFF);
+		vpn = va >> PAGE_SHIFT;
+
+		hash = hpt_hash(vpn, 0);
+
+		hpteg = ((hash & htab_data.htab_hash_mask)*HPTES_PER_GROUP);
+
+		if (ppc_md.hpte_insert(hpteg, va, pa >> PAGE_SHIFT, 0,
+				       _PAGE_NO_CACHE|_PAGE_GUARDED|PP_RWXX,
+				       1, 0) == -1) {
+			panic("map_io_page: could not insert mapping");
+		}
 	}
 }
 
@@ -649,7 +659,7 @@ void flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
 
 extern pte_t *find_linux_pte(pgd_t *pgdir, unsigned long ea);
 int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
-		pte_t *ptep, unsigned long trap);
+		pte_t *ptep, unsigned long trap, int local);
 
 /*
  * This is called at the end of handling a user page fault, when the
@@ -665,6 +675,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	unsigned long vsid;
 	void *pgdir;
 	pte_t *ptep;
+	int local = 0;
 
 	/* We only want HPTEs for linux PTEs that have _PAGE_ACCESSED set */
 	if (!pte_young(pte))
@@ -677,6 +688,9 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	ptep = find_linux_pte(pgdir, ea);
 	vsid = get_vsid(vma->vm_mm->context, ea);
 
+	if (vma->vm_mm->cpu_vm_mask == (1 << smp_processor_id()))
+		local = 1;
+
 	__hash_page(ea, pte_val(pte) & (_PAGE_USER|_PAGE_RW), vsid, ptep,
-		    0x300);
+		    0x300, local);
 }

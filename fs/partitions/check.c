@@ -299,7 +299,7 @@ static ssize_t part_attr_show(struct kobject * kobj, struct attribute * attr,
 }
 
 static struct sysfs_ops part_sysfs_ops = {
-	.show	part_attr_show,
+	.show	=	part_attr_show,
 };
 
 static ssize_t part_dev_read(struct hd_struct * p,

@@ -22,46 +22,6 @@
 #include <asm/tlbflush.h>
 #include <asm/tlb.h>
 
-/*
- * Create a pte. Used during initialization only.
- * We assume the PTE will fit in the primary PTEG.
- */
-void pSeries_make_pte(HPTE *htab, unsigned long va, unsigned long pa,
-		      int mode, unsigned long hash_mask, int large)
-{
-	HPTE *hptep;
-	unsigned long hash, i;
-	unsigned long vpn;
-
-	if (large)
-		vpn = va >> LARGE_PAGE_SHIFT;
-	else
-		vpn = va >> PAGE_SHIFT;
-
-	hash = hpt_hash(vpn, large);
-
-	hptep  = htab + ((hash & hash_mask)*HPTES_PER_GROUP);
-
-	for (i = 0; i < 8; ++i, ++hptep) {
-		if (hptep->dw0.dw0.v == 0) {		/* !valid */
-			hptep->dw1.dword1 = pa | mode;
-			hptep->dw0.dword0 = 0;
-			hptep->dw0.dw0.avpn = va >> 23;
-			hptep->dw0.dw0.bolted = 1;	/* bolted */
-			if (large) {
-				hptep->dw0.dw0.l = 1;
-				hptep->dw0.dw0.avpn &= ~0x1UL;
-			}
-			hptep->dw0.dw0.v = 1;		/* make valid */
-			return;
-		}
-	}
-
-	/* We should _never_ get here and too early to call xmon. */
-	while(1)
-		;
-}
-
 #define HPTE_LOCK_BIT 3
 
 static inline void pSeries_lock_hpte(HPTE *hptep)
@@ -72,7 +32,7 @@ static inline void pSeries_lock_hpte(HPTE *hptep)
 		if (!test_and_set_bit(HPTE_LOCK_BIT, word))
 			break;
 		while(test_bit(HPTE_LOCK_BIT, word))
-			barrier();
+			cpu_relax();
 	}
 }
 
@@ -86,11 +46,10 @@ static inline void pSeries_unlock_hpte(HPTE *hptep)
 
 static spinlock_t pSeries_tlbie_lock = SPIN_LOCK_UNLOCKED;
 
-static long pSeries_insert_hpte(unsigned long hpte_group, unsigned long vpn,
-				unsigned long prpn, int secondary,
-				unsigned long hpteflags, int bolted, int large)
+long pSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
+			 unsigned long prpn, int secondary,
+			 unsigned long hpteflags, int bolted, int large)
 {
-	unsigned long avpn = vpn >> 11;
 	unsigned long arpn = physRpn_to_absRpn(prpn);
 	HPTE *hptep = htab_data.htab + hpte_group;
 	Hpte_dword0 dw0;
@@ -120,13 +79,15 @@ static long pSeries_insert_hpte(unsigned long hpte_group, unsigned long vpn,
 	lhpte.dw1.flags.flags = hpteflags;
 
 	lhpte.dw0.dword0      = 0;
-	lhpte.dw0.dw0.avpn    = avpn;
+	lhpte.dw0.dw0.avpn    = va >> 23;
 	lhpte.dw0.dw0.h       = secondary;
 	lhpte.dw0.dw0.bolted  = bolted;
 	lhpte.dw0.dw0.v       = 1;
 
-	if (large)
+	if (large) {
 		lhpte.dw0.dw0.l = 1;
+		lhpte.dw0.dw0.avpn &= ~0x1UL;
+	}
 
 	hptep->dw1.dword1 = lhpte.dw1.dword1;
 
@@ -144,22 +105,15 @@ static long pSeries_insert_hpte(unsigned long hpte_group, unsigned long vpn,
 	return i;
 }
 
-static long pSeries_remove_hpte(unsigned long hpte_group)
+static long pSeries_hpte_remove(unsigned long hpte_group)
 {
 	HPTE *hptep;
 	Hpte_dword0 dw0;
 	int i;
 	int slot_offset;
-	unsigned long vsid, group, pi, pi_high;
-	unsigned long slot;
-	unsigned long flags;
-	int large;
-	unsigned long va;
 
-	/* pick a random slot to start at */
+	/* pick a random entry to start at */
 	slot_offset = mftb() & 0x7;
-
-	udbg_printf("remove_hpte in %d\n", slot_offset);
 
 	for (i = 0; i < HPTES_PER_GROUP; i++) {
 		hptep = htab_data.htab + hpte_group + slot_offset;
@@ -181,29 +135,8 @@ static long pSeries_remove_hpte(unsigned long hpte_group)
 	if (i == HPTES_PER_GROUP)
 		return -1;
 
-	large = dw0.l;
-
 	/* Invalidate the hpte. NOTE: this also unlocks it */
 	hptep->dw0.dword0 = 0;
-
-	/* Invalidate the tlb */
-	vsid = dw0.avpn >> 5;
-	slot = hptep - htab_data.htab;
-	group = slot >> 3;
-	if (dw0.h)
-		group = ~group;
-	pi = (vsid ^ group) & 0x7ff;
-	pi_high = (dw0.avpn & 0x1f) << 11;
-	pi |= pi_high;
-
-	if (large)
-		va = pi << LARGE_PAGE_SHIFT;
-	else
-		va = pi << PAGE_SHIFT;
-
-	spin_lock_irqsave(&pSeries_tlbie_lock, flags);
-	_tlbie(va, large);
-	spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
 
 	return i;
 }
@@ -259,41 +192,40 @@ static long pSeries_hpte_find(unsigned long vpn)
 }
 
 static long pSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
-				  unsigned long va, int large)
+				  unsigned long va, int large, int local)
 {
 	HPTE *hptep = htab_data.htab + slot;
 	Hpte_dword0 dw0;
-	unsigned long vpn, avpn;
+	unsigned long avpn = va >> 23;
 	unsigned long flags;
+	int ret = 0;
 
 	if (large)
-		vpn = va >> LARGE_PAGE_SHIFT;
-	else
-		vpn = va >> PAGE_SHIFT;
-
-	avpn = vpn >> 11;
+		avpn &= ~0x1UL;
 
 	pSeries_lock_hpte(hptep);
 
 	dw0 = hptep->dw0.dw0;
 
+	/* Even if we miss, we need to invalidate the TLB */
 	if ((dw0.avpn != avpn) || !dw0.v) {
 		pSeries_unlock_hpte(hptep);
-		udbg_printf("updatepp missed\n");
-		return -1;
+		ret = -1;
+	} else {
+		set_pp_bit(newpp, hptep);
+		pSeries_unlock_hpte(hptep);
 	}
 
-	set_pp_bit(newpp, hptep);
-
-	pSeries_unlock_hpte(hptep);
-
 	/* Ensure it is out of the tlb too */
-	/* XXX use tlbiel where possible */
-	spin_lock_irqsave(&pSeries_tlbie_lock, flags);
-	_tlbie(va, large);
-	spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
+	if (cpu_has_tlbiel() && !large && local) {
+		_tlbiel(va);
+	} else {
+		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
+		_tlbie(va, large);
+		spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
+	}
 
-	return 0;
+	return ret;
 }
 
 /*
@@ -322,7 +254,6 @@ static void pSeries_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 	set_pp_bit(newpp, hptep);
 
 	/* Ensure it is out of the tlb too */
-	/* XXX use tlbiel where possible */
 	spin_lock_irqsave(&pSeries_tlbie_lock, flags);
 	_tlbie(va, 0);
 	spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
@@ -333,28 +264,23 @@ static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
 {
 	HPTE *hptep = htab_data.htab + slot;
 	Hpte_dword0 dw0;
-	unsigned long vpn, avpn;
+	unsigned long avpn = va >> 23;
 	unsigned long flags;
 
 	if (large)
-		vpn = va >> LARGE_PAGE_SHIFT;
-	else
-		vpn = va >> PAGE_SHIFT;
-
-	avpn = vpn >> 11;
+		avpn &= ~0x1UL;
 
 	pSeries_lock_hpte(hptep);
 
 	dw0 = hptep->dw0.dw0;
 
+	/* Even if we miss, we need to invalidate the TLB */
 	if ((dw0.avpn != avpn) || !dw0.v) {
 		pSeries_unlock_hpte(hptep);
-		udbg_printf("invalidate missed\n");
-		return;
+	} else {
+		/* Invalidate the hpte. NOTE: this also unlocks it */
+		hptep->dw0.dword0 = 0;
 	}
-
-	/* Invalidate the hpte. NOTE: this also unlocks it */
-	hptep->dw0.dword0 = 0;
 
 	/* Invalidate the tlb */
 	if (cpu_has_tlbiel() && !large && local) {
@@ -374,6 +300,7 @@ static void pSeries_flush_hash_range(unsigned long context,
 	HPTE *hptep;
 	Hpte_dword0 dw0;
 	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[smp_processor_id()];
+
 	/* XXX fix for large ptes */
 	unsigned long large = 0;
 
@@ -399,22 +326,24 @@ static void pSeries_flush_hash_range(unsigned long context,
 		slot += (pte_val(batch->pte[i]) & _PAGE_GROUP_IX) >> 12;
 
 		hptep = htab_data.htab + slot;
-		avpn = vpn >> 11;
+
+		avpn = va >> 23;
+		if (large)
+			avpn &= ~0x1UL;
 
 		pSeries_lock_hpte(hptep);
 
 		dw0 = hptep->dw0.dw0;
 
+		/* Even if we miss, we need to invalidate the TLB */
 		if ((dw0.avpn != avpn) || !dw0.v) {
 			pSeries_unlock_hpte(hptep);
-			udbg_printf("invalidate missed\n");
-			continue;
+		} else {
+			/* Invalidate the hpte. NOTE: this also unlocks it */
+			hptep->dw0.dword0 = 0;
 		}
 
 		j++;
-
-		/* Invalidate the hpte. NOTE: this also unlocks it */
-		hptep->dw0.dword0 = 0;
 	}
 
 	if (cpu_has_tlbiel() && !large && local) {
@@ -455,9 +384,8 @@ void hpte_init_pSeries(void)
 	ppc_md.hpte_invalidate	= pSeries_hpte_invalidate;
 	ppc_md.hpte_updatepp	= pSeries_hpte_updatepp;
 	ppc_md.hpte_updateboltedpp = pSeries_hpte_updateboltedpp;
-	ppc_md.insert_hpte	= pSeries_insert_hpte;
-	ppc_md.remove_hpte	= pSeries_remove_hpte;
-	ppc_md.make_pte		= pSeries_make_pte;
+	ppc_md.hpte_insert	= pSeries_hpte_insert;
+	ppc_md.hpte_remove     	= pSeries_hpte_remove;
 
 	/* Disable TLB batching on nighthawk */
 	root = find_path_device("/");
