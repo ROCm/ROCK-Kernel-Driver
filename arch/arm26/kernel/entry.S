@@ -161,7 +161,7 @@ tsk	.req	r9		@ current thread_info
 #endif
 
 /*
- * Our do_softirq out of line code.  See include/asm-arm/softirq.h for
+ * Our do_softirq out of line code.  See include/asm-arm26/hardirq.h for
  * the calling assembly.
  */
 ENTRY(__do_softirq)
