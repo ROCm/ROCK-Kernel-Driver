@@ -88,6 +88,18 @@ config HOTPLUG_PCI_ACPI
 
 	  When in doubt, say N.
 
+config HOTPLUG_PCI_ACPI_IBM
+	tristate "ACPI PCI Hotplug driver IBM extensions"
+	depends on HOTPLUG_PCI_ACPI
+	help
+	  Say Y here if you have an IBM system that supports PCI Hotplug using
+	  ACPI.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called acpiphp_ibm.
+
+	  When in doubt, say N.
+
 config HOTPLUG_PCI_CPCI
 	bool "CompactPCI Hotplug driver"
 	depends on HOTPLUG_PCI

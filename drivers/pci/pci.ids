@@ -8175,7 +8175,9 @@
 	84e6  460GX - 82466GX Wide and fast PCI eXpander Bridge (WXB)
 	84ea  460GX - 84460GX AGP Bridge (GXB function 1)
 	8500  IXP4xx Family  Network Processor (IXP420, 421, 422, 425 and IXC1100)
-	9000  Intel IXP2000 Familly Network Processor
+	9000  Intel IXP2000 Family Network Processor
+	9001  Intel IXP2400 Network Processor
+	9004  Intel IXP2800 Network Processor
 	9621  Integrated RAID
 	9622  Integrated RAID
 	9641  Integrated RAID
@@ -8184,6 +8186,7 @@
 # observed, and documented in Intel revision note; new mask of 1011:0026
 	b154  21154 PCI-to-PCI Bridge
 	b555  21555 Non transparent PCI-to-PCI Bridge
+		1331 0030  Radisys ENP-2611
 		4c53 1050  CT7 mainboard
 		4c53 1051  CE7 mainboard
 		e4bf 1000  CC8-1-BLUES
