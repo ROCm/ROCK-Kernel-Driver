@@ -1035,7 +1035,7 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	if (flags & SLAB_HWCACHE_ALIGN) {
 		/* Need to adjust size so that objs are cache aligned. */
 		/* Small obj size, can get at least two per cache line. */
-		while (size < align/2)
+		while (size <= align/2)
 			align /= 2;
 		size = (size+align-1)&(~(align-1));
 	}
