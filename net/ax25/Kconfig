@@ -6,9 +6,8 @@
 #		Joerg Reuter DL1BKE <jreuter@yaina.de>
 # 19980129	Moved to net/ax25/Config.in, sourcing device drivers.
 
-menu "Amateur Radio support"
-
-config HAMRADIO
+menuconfig HAMRADIO
+	depends on NET
 	bool "Amateur Radio support"
 	help
 	  If you want to connect your Linux box to an amateur radio, answer Y
@@ -106,8 +105,6 @@ menu "AX.25 network device drivers"
 	depends on HAMRADIO && NET && AX25!=n
 
 source "drivers/net/hamradio/Kconfig"
-
-endmenu
 
 endmenu
 
