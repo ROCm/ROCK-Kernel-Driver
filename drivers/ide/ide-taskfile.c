@@ -194,22 +194,16 @@ int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *ar, char *bu
 	request_queue_t *q = &drive->queue;
 	struct list_head *queue_head = &q->queue_head;
 	DECLARE_COMPLETION(wait);
+	struct request req;
 
 #ifdef CONFIG_BLK_DEV_PDC4030
 	if (ch->chipset == ide_pdc4030 && buf)
 		return -ENOSYS;  /* special drive cmds not supported */
 #endif
 
-	rq = __blk_get_request(&drive->queue, READ);
-	if (!rq)
-		rq = __blk_get_request(&drive->queue, WRITE);
-
-	/*
-	 * FIXME: Make sure there is a free slot on the list!
-	 */
-
-	BUG_ON(!rq);
-
+	memset(&req, 0, sizeof(req));
+	rq = &req;
+	
 	rq->flags = REQ_SPECIAL;
 	rq->buffer = buf;
 	rq->special = ar;

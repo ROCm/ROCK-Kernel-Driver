@@ -98,8 +98,7 @@ static int grip_gpp_read_packet(struct gameport *gameport, int shift, unsigned i
 	t = strobe;
 	i = 0;
 
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 
 	v = gameport_read(gameport) >> shift;
 
@@ -140,8 +139,7 @@ static int grip_xt_read_packet(struct gameport *gameport, int shift, unsigned in
 	status = buf = i = j = 0;
 	t = strobe;
 
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 
 	v = w = (gameport_read(gameport) >> shift) & 3;
 

@@ -485,8 +485,7 @@ static void apic_pm_suspend(void *data)
 	apic_pm_state.apic_tdcr = apic_read(APIC_TDCR);
 	apic_pm_state.apic_thmr = apic_read(APIC_LVTTHMR);
 	
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 	disable_local_APIC();
 	rdmsr(MSR_IA32_APICBASE, l, h);
 	l &= ~MSR_IA32_APICBASE_ENABLE;
@@ -499,8 +498,7 @@ static void apic_pm_resume(void *data)
 	unsigned int l, h;
 	unsigned long flags;
 
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 	rdmsr(MSR_IA32_APICBASE, l, h);
 	l &= ~MSR_IA32_APICBASE_BASE;
 	l |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
@@ -1087,9 +1085,6 @@ void smp_apic_timer_interrupt(struct pt_regs regs)
 	irq_enter();
 	smp_local_timer_interrupt(&regs);
 	irq_exit();
-
-	if (softirq_pending(cpu))
-		do_softirq();
 }
 
 /*

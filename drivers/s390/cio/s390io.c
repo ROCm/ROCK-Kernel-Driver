@@ -163,11 +163,10 @@ s390_init_IRQ (void)
 	 *  function we resestablish the old environment.
 	 *
 	 * Note : as we don't need a system wide lock, therefore
-	 *        we shouldn't use cli(), but local_irq_disable() as this
+	 *        we shouldn't use cli(), but local_irq_save() as this
 	 *        affects the current CPU only.
 	 */
-	local_save_flags (flags);
-	local_irq_disable ();
+	local_irq_save(flags);
 
 	/*
 	 * disable all interrupts
@@ -578,10 +577,9 @@ read_dev_chars (int irq, void **buffer, int length)
 	 *   also require to run disabled.
 	 *
 	 * Note : as no global lock is required, we must not use
-	 *        cli(), but local_irq_disable() instead.   
+	 *        cli(), but local_irq_save() instead.   
 	 */
-	local_save_flags (flags);
-	local_irq_disable ();
+	local_irq_save(flags);
 
 	rdc_ccw = &ioinfo[irq]->senseccw;
 
@@ -720,8 +718,7 @@ read_conf_data (int irq, void **buffer, int *length, __u8 lpm)
 		int emulated = 0;	/* no i/O handler installed */
 		int retry = 5;	/* retry count */
 
-		local_save_flags (flags);
-		local_irq_disable ();
+		local_irq_save(flags);
 
 		if (!ioinfo[irq]->ui.flags.ready) {
 			pdevstat = &devstat;

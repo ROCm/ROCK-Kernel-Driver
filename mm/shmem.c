@@ -605,6 +605,7 @@ repeat:
 		}
 		error = move_from_swap_cache(page, idx, mapping);
 		if (error < 0) {
+			spin_unlock(&info->lock);
 			unlock_page(page);
 			page_cache_release(page);
 			return ERR_PTR(error);
@@ -942,7 +943,6 @@ out:
 fail_write:
 	status = -EFAULT;
 	ClearPageUptodate(page);
-	kunmap(page);
 	goto unlock;
 }
 
@@ -1079,9 +1079,6 @@ static int shmem_create(struct inode *dir, struct dentry *dentry, int mode)
 static int shmem_link(struct dentry *old_dentry, struct inode * dir, struct dentry * dentry)
 {
 	struct inode *inode = old_dentry->d_inode;
-
-	if (S_ISDIR(inode->i_mode))
-		return -EPERM;
 
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	inode->i_nlink++;

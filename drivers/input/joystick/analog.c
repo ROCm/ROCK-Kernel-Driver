@@ -232,8 +232,7 @@ static int analog_cooked_read(struct analog_port *port)
 	loopout = (ANALOG_LOOP_TIME * port->loop) / 1000;
 	timeout = ANALOG_MAX_TIME * port->speed;
 	
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 	gameport_trigger(gameport);
 	GET_TIME(now);
 	local_irq_restore(flags);

@@ -82,7 +82,7 @@ static unsigned long bios32_service(unsigned long service)
 	unsigned long entry;		/* %edx */
 	unsigned long flags;
 
-	local_save_flags(flags); local_irq_disable();
+	local_irq_save(flags);
 	__asm__("lcall *(%%edi); cld"
 		: "=a" (return_code),
 		  "=b" (address),
@@ -122,7 +122,7 @@ static int __devinit check_pcibios(void)
 	if ((pcibios_entry = bios32_service(PCI_SERVICE))) {
 		pci_indirect.address = pcibios_entry + PAGE_OFFSET;
 
-		local_save_flags(flags); local_irq_disable();
+		local_irq_save(flags);
 		__asm__(
 			"lcall *(%%edi); cld\n\t"
 			"jc 1f\n\t"

@@ -381,7 +381,7 @@ static int arr3_protected;
 static void set_mtrr_prepare_save (struct set_mtrr_context *ctxt)
 {
     /*  Disable interrupts locally  */
-    local_save_flags (ctxt->flags); local_irq_disable ();
+    local_irq_save(ctxt->flags);
 
     if ( mtrr_if != MTRR_IF_INTEL && mtrr_if != MTRR_IF_CYRIX_ARR )
 	 return;
@@ -546,7 +546,7 @@ static void cyrix_get_arr (unsigned int reg, unsigned long *base,
     arr = CX86_ARR_BASE + (reg << 1) + reg; /* avoid multiplication by 3 */
 
     /* Save flags and disable interrupts */
-    local_save_flags (flags); local_irq_disable ();
+    local_irq_save(flags);
 
     ccr3 = getCx86 (CX86_CCR3);
     setCx86 (CX86_CCR3, (ccr3 & 0x0f) | 0x10);		/* enable MAPEN */

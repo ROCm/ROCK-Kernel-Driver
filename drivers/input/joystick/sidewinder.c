@@ -149,8 +149,7 @@ static int sw_read_packet(struct gameport *gameport, unsigned char *buf, int len
 	pending = 0;
 	sched = 0;
 
-        local_save_flags(flags);					/* Quiet, please */
-        local_irq_disable();
+        local_irq_save(flags);					/* Quiet, please */
 
 	gameport_trigger(gameport);				/* Trigger */
 	v = gameport_read(gameport);
@@ -245,8 +244,7 @@ static void sw_init_digital(struct gameport *gameport)
 	unsigned long flags;
 	int i, t;
 
-        local_save_flags(flags);
-        local_irq_disable();
+        local_irq_save(flags);
 
 	i = 0;
         do {

@@ -62,10 +62,7 @@ void __buffer_error(char *file, int line)
 	printk("buffer layer error at %s:%d\n", file, line);
 #ifdef CONFIG_X86
 	printk("Pass this trace through ksymoops for reporting\n");
-	{
-		extern void show_stack(long *esp);
-		show_stack(0);
-	}
+	show_stack(0);
 #endif
 }
 EXPORT_SYMBOL(__buffer_error);

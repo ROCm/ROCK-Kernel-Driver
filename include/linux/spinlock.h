@@ -26,17 +26,17 @@
 #define write_lock_irq(lock)			do { local_irq_disable();        write_lock(lock); } while (0)
 #define write_lock_bh(lock)			do { local_bh_disable();         write_lock(lock); } while (0)
 
-#define spin_unlock_irqrestore(lock, flags)	do { spin_unlock(lock);  local_irq_restore(flags); } while (0)
+#define spin_unlock_irqrestore(lock, flags)	do { _raw_spin_unlock(lock);  local_irq_restore(flags); preempt_enable(); } while (0)
 #define _raw_spin_unlock_irqrestore(lock, flags) do { _raw_spin_unlock(lock);  local_irq_restore(flags); } while (0)
-#define spin_unlock_irq(lock)			do { spin_unlock(lock);  local_irq_enable();       } while (0)
-#define spin_unlock_bh(lock)			do { spin_unlock(lock);  local_bh_enable();        } while (0)
+#define spin_unlock_irq(lock)			do { _raw_spin_unlock(lock);  local_irq_enable(); preempt_enable();       } while (0)
+#define spin_unlock_bh(lock)			do { spin_unlock(lock); local_bh_enable(); } while (0)
 
-#define read_unlock_irqrestore(lock, flags)	do { read_unlock(lock);  local_irq_restore(flags); } while (0)
-#define read_unlock_irq(lock)			do { read_unlock(lock);  local_irq_enable();       } while (0)
+#define read_unlock_irqrestore(lock, flags)	do { _raw_read_unlock(lock);  local_irq_restore(flags); preempt_enable(); } while (0)
+#define read_unlock_irq(lock)			do { _raw_read_unlock(lock);  local_irq_enable(); preempt_enable(); } while (0)
 #define read_unlock_bh(lock)			do { read_unlock(lock);  local_bh_enable();        } while (0)
 
-#define write_unlock_irqrestore(lock, flags)	do { write_unlock(lock); local_irq_restore(flags); } while (0)
-#define write_unlock_irq(lock)			do { write_unlock(lock); local_irq_enable();       } while (0)
+#define write_unlock_irqrestore(lock, flags)	do { _raw_write_unlock(lock); local_irq_restore(flags); preempt_enable(); } while (0)
+#define write_unlock_irq(lock)			do { _raw_write_unlock(lock); local_irq_enable(); preempt_enable();       } while (0)
 #define write_unlock_bh(lock)			do { write_unlock(lock); local_bh_enable();        } while (0)
 #define spin_trylock_bh(lock)			({ int __r; local_bh_disable();\
 						__r = spin_trylock(lock);      \
@@ -135,12 +135,6 @@ do { \
 	preempt_enable(); \
 } while (0)
 
-#define spin_unlock_no_resched(lock) \
-do { \
-	_raw_spin_unlock(lock); \
-	preempt_enable_no_resched(); \
-} while (0)
-
 #define read_lock(lock)		({preempt_disable(); _raw_read_lock(lock);})
 #define read_unlock(lock)	({_raw_read_unlock(lock); preempt_enable();})
 #define write_lock(lock)	({preempt_disable(); _raw_write_lock(lock);})
@@ -153,7 +147,6 @@ do { \
 #define spin_lock(lock)			_raw_spin_lock(lock)
 #define spin_trylock(lock)		_raw_spin_trylock(lock)
 #define spin_unlock(lock)		_raw_spin_unlock(lock)
-#define spin_unlock_no_resched(lock)	_raw_spin_unlock(lock)
 
 #define read_lock(lock)			_raw_read_lock(lock)
 #define read_unlock(lock)		_raw_read_unlock(lock)
