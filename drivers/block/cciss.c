@@ -1128,6 +1128,7 @@ static int register_new_disk(kdev_t dev, int ctlr)
 	__u32 lunid = 0;
 	unsigned int block_size;
 	unsigned int total_size;
+	kdev_t kdev;
 
         if (!capable(CAP_SYS_RAWIO))
                 return -EPERM;
@@ -1340,7 +1341,7 @@ static int register_new_disk(kdev_t dev, int ctlr)
 
         for(i=max_p-1; i>=0; i--) {
                 int minor = start+i;
-		kdev_t kdev = mk_kdev(MAJOR_NR + ctlr, minor);
+		kdev = mk_kdev(MAJOR_NR + ctlr, minor);
                 invalidate_device(kdev, 1);
                 gdev->part[minor].start_sect = 0;
                 gdev->part[minor].nr_sects = 0;
@@ -1352,7 +1353,8 @@ static int register_new_disk(kdev_t dev, int ctlr)
 	++hba[ctlr]->num_luns;
 	gdev->nr_real = hba[ctlr]->highest_lun + 1;
 	/* setup partitions per disk */
-	grok_partitions(dev, hba[ctlr]->drv[logvol].nr_blocks);
+	kdev = mk_kdev(MAJOR_NR + ctlr, logvol<< gdev->minor_shift);
+	grok_partitions(kdev, hba[ctlr]->drv[logvol].nr_blocks);
 	
 	kfree(ld_buff);
 	kfree(size_buff);
