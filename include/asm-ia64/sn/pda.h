@@ -10,6 +10,7 @@
 
 #include <linux/config.h>
 #include <linux/cache.h>
+#include <linux/mmzone.h>
 #include <asm/percpu.h>
 #include <asm/system.h>
 #include <asm/processor.h>
@@ -56,7 +57,7 @@ typedef struct pda_s {
 
 	unsigned long	sn_soft_irr[4];
 	unsigned long	sn_in_service_ivecs[4];
-	short		cnodeid_to_nasid_table[NR_NODES];	
+	short		cnodeid_to_nasid_table[MAX_NUMNODES];
 	int		sn_lb_int_war_ticks;
 	int		sn_last_irq;
 	int		sn_first_irq;

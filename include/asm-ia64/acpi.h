@@ -99,7 +99,7 @@ int acpi_get_addr_space (void *obj, u8 type, u64 *base, u64 *length,u64 *tra);
 /* Proximity bitmap length; _PXM is at most 255 (8 bit)*/
 #define MAX_PXM_DOMAINS (256)
 extern int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];
-extern int __initdata nid_to_pxm_map[NR_NODES];
+extern int __initdata nid_to_pxm_map[MAX_NUMNODES];
 #endif
 
 #endif /*__KERNEL__*/

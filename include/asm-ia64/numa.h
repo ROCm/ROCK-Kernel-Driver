@@ -16,17 +16,11 @@
 
 #ifdef CONFIG_NUMA
 
-#ifdef CONFIG_DISCONTIGMEM
 # include <asm/mmzone.h>
-# define NR_MEMBLKS   (NR_BANKS)
-#else
-# define NR_NODES     (8)
-# define NR_MEMBLKS   (NR_NODES * 8)
-#endif
 
 #include <linux/cache.h>
 extern volatile char cpu_to_node_map[NR_CPUS] __cacheline_aligned;
-extern volatile cpumask_t node_to_cpu_mask[NR_NODES] __cacheline_aligned;
+extern volatile cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
 
 /* Stuff below this line could be architecture independent */
 
@@ -60,7 +54,7 @@ extern struct node_cpuid_s node_cpuid[NR_CPUS];
  * proportional to the memory access latency ratios.
  */
 
-extern u8 numa_slit[NR_NODES * NR_NODES];
+extern u8 numa_slit[MAX_NUMNODES * MAX_NUMNODES];
 #define node_distance(from,to) (numa_slit[from * numnodes + to])
 
 extern int paddr_to_nid(unsigned long paddr);
