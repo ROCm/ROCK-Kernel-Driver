@@ -319,7 +319,7 @@ void scsi_eh_done(Scsi_Cmnd * SCpnt)
 		return;
 	}
 
-	SCpnt->request.rq_status = RQ_SCSI_DONE;
+	SCpnt->request->rq_status = RQ_SCSI_DONE;
 
 	SCpnt->owner = SCSI_OWNER_ERROR_HANDLER;
 	SCpnt->eh_state = SUCCESS;
@@ -346,7 +346,7 @@ void scsi_eh_done(Scsi_Cmnd * SCpnt)
 STATIC
 void scsi_eh_action_done(Scsi_Cmnd * SCpnt, int answer)
 {
-	SCpnt->request.rq_status = RQ_SCSI_DONE;
+	SCpnt->request->rq_status = RQ_SCSI_DONE;
 
 	SCpnt->owner = SCSI_OWNER_ERROR_HANDLER;
 	SCpnt->eh_state = (answer ? SUCCESS : FAILED);
@@ -601,7 +601,7 @@ retry:
 		 * Set up the semaphore so we wait for the command to complete.
 		 */
 		SCpnt->host->eh_action = &sem;
-		SCpnt->request.rq_status = RQ_SCSI_BUSY;
+		SCpnt->request->rq_status = RQ_SCSI_BUSY;
 
 		spin_lock_irqsave(SCpnt->host->host_lock, flags);
 		host->hostt->queuecommand(SCpnt, scsi_eh_done);
@@ -633,7 +633,7 @@ retry:
 				SCpnt->host->hostt->eh_abort_handler(SCpnt);
 			spin_unlock_irqrestore(SCpnt->host->host_lock, flags);
 			
-			SCpnt->request.rq_status = RQ_SCSI_DONE;
+			SCpnt->request->rq_status = RQ_SCSI_DONE;
 			SCpnt->owner = SCSI_OWNER_ERROR_HANDLER;
 			
 			SCpnt->eh_state = FAILED;

@@ -141,6 +141,19 @@ static struct fb_var_screeninfo vesafb_defined = {
 
 
 /* --------------------------------------------------------------------- */
+static inline void my_install_cmap(WPMINFO2)
+{
+	/* Do not touch this code if you do not understand what it does! */
+	/* Never try to use do_install_cmap() instead. It is crap. */
+	struct fb_cmap* cmap = &ACCESS_FBINFO(currcon_display)->cmap;
+
+	if (cmap->len)
+		fb_set_cmap(cmap, 1, &ACCESS_FBINFO(fbcon));
+	else
+		fb_set_cmap(fb_default_cmap(ACCESS_FBINFO(curr.cmap_len)),
+			    1, &ACCESS_FBINFO(fbcon));
+}
+
 
 static void matrox_pan_var(WPMINFO struct fb_var_screeninfo *var) {
 	unsigned int pos;
@@ -869,7 +882,7 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 				up_read(&ACCESS_FBINFO(altout.lock));
 			}
 			matrox_cfbX_init(PMINFO display);
-			do_install_cmap(ACCESS_FBINFO(fbcon.currcon),&ACCESS_FBINFO(fbcon));
+			my_install_cmap(PMINFO2);
 		}
 	}
 	return 0;

@@ -3573,9 +3573,18 @@ maestro_probe(struct pci_dev *pcidev,const struct pci_device_id *pdid)
 static void maestro_remove(struct pci_dev *pcidev) {
 	struct ess_card *card = pci_get_drvdata(pcidev);
 	int i;
+	u32 n;
 	
 	/* XXX maybe should force stop bob, but should be all 
 		stopped by _release by now */
+
+	/* Turn off hardware volume control interrupt.
+	   This has to come before we leave the IRQ below,
+	   or a crash results if a button is pressed ! */
+	n = inw(card->iobase+0x18);
+	n&=~(1<<6);
+	outw(n, card->iobase+0x18);
+
 	free_irq(card->irq, card);
 	unregister_sound_mixer(card->dev_mixer);
 	for(i=0;i<NR_DSPS;i++)

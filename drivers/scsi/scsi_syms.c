@@ -101,3 +101,8 @@ extern void scsi_add_timer(Scsi_Cmnd *, int, void ((*) (Scsi_Cmnd *)));
 extern int scsi_delete_timer(Scsi_Cmnd *);
 EXPORT_SYMBOL(scsi_add_timer);
 EXPORT_SYMBOL(scsi_delete_timer);
+
+/*
+ * driverfs support for determining driver types
+ */
+EXPORT_SYMBOL(scsi_driverfs_bus_type);

@@ -33,6 +33,8 @@
 #define __NO_VERSION__
 #include "i810.h"
 #include "drmP.h"
+#include "drm.h"
+#include "i810_drm.h"
 #include "i810_drv.h"
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>

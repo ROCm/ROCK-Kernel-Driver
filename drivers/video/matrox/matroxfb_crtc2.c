@@ -29,7 +29,7 @@ MODULE_PARM_DESC(mem, "Memory size reserved for dualhead (default=8MB)");
 static int matroxfb_dh_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 		unsigned *blue, unsigned *transp, struct fb_info* info) {
 #define m2info ((struct matroxfb_dh_fb_info*)info)
-	if (regno > 16)
+	if (regno >= 16)
 		return 1;
 	*red = m2info->palette[regno].red;
 	*blue = m2info->palette[regno].blue;
@@ -44,7 +44,7 @@ static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 #define m2info ((struct matroxfb_dh_fb_info*)info)
 	struct display* p;
 
-	if (regno > 16)
+	if (regno >= 16)
 		return 1;
 	m2info->palette[regno].red = red;
 	m2info->palette[regno].blue = blue;
@@ -83,6 +83,19 @@ static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 	return 0;
 #undef m2info
 }
+
+static inline void my_install_cmap(struct matroxfb_dh_fb_info* m2info)
+{
+	/* Do not touch this code if you do not understand what it does! */
+	/* Never try to use do_install_cmap() instead. It is crap. */
+	struct fb_cmap* cmap = &m2info->currcon_display->cmap;
+	
+	if (cmap->len)
+		fb_set_cmap(cmap, 1, &m2info->fbcon);
+	else
+		fb_set_cmap(fb_default_cmap(16), 1, &m2info->fbcon);
+}
+
 
 static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 		struct my_timming* mt,
@@ -439,7 +452,7 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 			up_read(&ACCESS_FBINFO(altout.lock));
 		}
 		matroxfb_dh_cfbX_init(m2info, p);
-		do_install_cmap(ACCESS_FBINFO(fbcon.currcon), &ACCESS_FBINFO(fbcon));
+		my_install_cmap(m2info);
 	}
 	return 0;
 #undef m2info
