@@ -175,9 +175,8 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	childregs = (struct pt_regs *) sp;
 	*childregs = *regs;
 	if ((childregs->msr & MSR_PR) == 0) {
-		/* for kernel thread, set `current' and stackptr in new task */
+		/* for kernel thread, set stackptr in new task */
 		childregs->gpr[1] = sp + sizeof(struct pt_regs);
-		childregs->gpr[13] = (unsigned long) p;
 		p->thread.regs = NULL;	/* no user register state */
 		clear_ti_thread_flag(p->thread_info, TIF_32BIT);
 #ifdef CONFIG_PPC_ISERIES

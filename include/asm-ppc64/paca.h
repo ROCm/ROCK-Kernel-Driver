@@ -45,7 +45,8 @@
 #define MAX_PACAS MAX_PROCESSORS * 2
 
 extern struct paca_struct paca[];
-#define get_paca() ((struct paca_struct *)mfspr(SPRG3))
+register struct paca_struct *local_paca asm("r13");
+#define get_paca()	local_paca
 
 /*============================================================================
  * Name_______:	paca

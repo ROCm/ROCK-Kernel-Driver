@@ -152,6 +152,7 @@ static void smp_iSeries_probe(void)
 	for (i=0; i < MAX_PACAS; ++i) {
 		lpPaca = paca[i].xLpPacaPtr;
 		if ( lpPaca->xDynProcStatus < 2 ) {
+			paca[i].active = 1;
 			++np;
 			paca[i].next_jiffy_update_tb = paca[0].next_jiffy_update_tb;
 		}

@@ -269,7 +269,7 @@ int timer_interrupt(struct pt_regs * regs)
 #ifdef CONFIG_SMP
 		smp_local_timer_interrupt(regs);
 #endif
-		if (cpu == 0) {
+		if (cpu == boot_cpuid) {
 			write_lock(&xtime_lock);
 			tb_last_stamp = lpaca->next_jiffy_update_tb;
 			do_timer(regs);
