@@ -25,11 +25,14 @@
 #include <sound/pcm.h>
 #define SND_PCM_FORMAT_UNKNOWN (-1)
 
+/* NOTE: "signed" prefix must be given below since the default char is
+ *       unsigned on some architectures!
+ */
 struct pcm_format_data {
-	char width;	/* bit width */
-	char phys;	/* physical bit width */
-	char le;	/* 0 = big-endian, 1 = little-endian, -1 = others */
-	char signd;	/* 0 = unsigned, 1 = signed, -1 = others */
+	unsigned char width;	/* bit width */
+	unsigned char phys;	/* physical bit width */
+	signed char le;	/* 0 = big-endian, 1 = little-endian, -1 = others */
+	signed char signd;	/* 0 = unsigned, 1 = signed, -1 = others */
 	unsigned char silence[8];	/* silence data to fill */
 };
 
