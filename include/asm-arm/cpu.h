@@ -17,7 +17,6 @@ struct cpuinfo_arm {
 	struct cpu	cpu;
 #ifdef CONFIG_SMP
 	unsigned int	loops_per_jiffy;
-	unsigned long	ipi_count;
 #endif
 };
 

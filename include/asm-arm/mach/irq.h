@@ -47,6 +47,13 @@ struct irqchip {
 	 * Set wakeup-enable on the selected IRQ
 	 */
 	int (*wake)(unsigned int, unsigned int);
+
+#ifdef CONFIG_SMP
+	/*
+	 * Route an interrupt to a CPU
+	 */
+	void (*set_cpu)(struct irqdesc *desc, unsigned int irq, unsigned int cpu);
+#endif
 };
 
 struct irqdesc {
@@ -66,6 +73,13 @@ struct irqdesc {
 	unsigned int	valid    : 1;		/* IRQ claimable	      */
 	unsigned int	noautoenable : 1;	/* don't automatically enable IRQ */
 	unsigned int	unused   :25;
+
+	struct proc_dir_entry *procdir;
+
+#ifdef CONFIG_SMP
+	cpumask_t	affinity;
+	unsigned int	cpu;
+#endif
 
 	/*
 	 * IRQ lock detection
