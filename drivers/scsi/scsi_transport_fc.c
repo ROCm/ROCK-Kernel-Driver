@@ -159,7 +159,7 @@ fc_attach_transport(struct fc_function_template *ft)
 	i->t.attrs = &i->attrs[0];
 	i->t.class = &fc_transport_class;
 	i->t.setup = &fc_setup_transport_attrs;
-	i->t.size = sizeof(struct fc_transport_attrs) - sizeof(unsigned long);
+	i->t.size = sizeof(struct fc_transport_attrs);
 	i->f = ft;
 
 	SETUP_ATTRIBUTE_RD(port_id);

@@ -663,7 +663,7 @@ spi_attach_transport(struct spi_function_template *ft)
 	i->t.attrs = &i->attrs[0];
 	i->t.class = &spi_transport_class;
 	i->t.setup = &spi_setup_transport_attrs;
-	i->t.size = sizeof(struct spi_transport_attrs) - sizeof(unsigned long);
+	i->t.size = sizeof(struct spi_transport_attrs);
 	i->f = ft;
 
 	SETUP_ATTRIBUTE(period);
