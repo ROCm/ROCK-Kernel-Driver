@@ -679,8 +679,8 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 			wmb();
 		}
 		current->euid = euid;
-		current->fsuid = euid;
 	}
+	current->fsuid = current->euid;
 	if (suid != (uid_t) -1)
 		current->suid = suid;
 
@@ -725,8 +725,8 @@ asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 			wmb();
 		}
 		current->egid = egid;
-		current->fsgid = egid;
 	}
+	current->fsgid = current->egid;
 	if (rgid != (gid_t) -1)
 		current->gid = rgid;
 	if (sgid != (gid_t) -1)
