@@ -160,8 +160,7 @@ xfs_bmap_btree_to_extents(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			*logflagsp, /* inode logging flags */
-	int			whichfork,  /* data or attr fork */
-	int			async);	    /* xaction can be async */
+	int			whichfork); /* data or attr fork */
 
 #ifdef XFSDEBUG
 /*
@@ -187,7 +186,6 @@ xfs_bmap_del_extent(
 	xfs_bmap_free_t		*flist, /* list of extents to be freed */
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
 	xfs_bmbt_irec_t		*new,	/* new data to put in extent list */
-	int			iflags, /* input flags (meta-data or not) */
 	int			*logflagsp,/* inode logging flags */
 	int			whichfork, /* data or attr fork */
 	int			rsvd);	 /* OK to allocate reserved blocks */
@@ -811,7 +809,7 @@ xfs_bmap_add_extent_delay_real(
 					RIGHT.br_blockcount, &i)))
 				goto done;
 			ASSERT(i == 1);
-			if ((error = xfs_bmbt_delete(cur, 0, &i)))
+			if ((error = xfs_bmbt_delete(cur, &i)))
 				goto done;
 			ASSERT(i == 1);
 			if ((error = xfs_bmbt_decrement(cur, 0, &i)))
@@ -1349,13 +1347,13 @@ xfs_bmap_add_extent_unwritten_real(
 					RIGHT.br_blockcount, &i)))
 				goto done;
 			ASSERT(i == 1);
-			if ((error = xfs_bmbt_delete(cur, 0, &i)))
+			if ((error = xfs_bmbt_delete(cur, &i)))
 				goto done;
 			ASSERT(i == 1);
 			if ((error = xfs_bmbt_decrement(cur, 0, &i)))
 				goto done;
 			ASSERT(i == 1);
-			if ((error = xfs_bmbt_delete(cur, 0, &i)))
+			if ((error = xfs_bmbt_delete(cur, &i)))
 				goto done;
 			ASSERT(i == 1);
 			if ((error = xfs_bmbt_decrement(cur, 0, &i)))
@@ -1394,7 +1392,7 @@ xfs_bmap_add_extent_unwritten_real(
 					&i)))
 				goto done;
 			ASSERT(i == 1);
-			if ((error = xfs_bmbt_delete(cur, 0, &i)))
+			if ((error = xfs_bmbt_delete(cur, &i)))
 				goto done;
 			ASSERT(i == 1);
 			if ((error = xfs_bmbt_decrement(cur, 0, &i)))
@@ -1434,7 +1432,7 @@ xfs_bmap_add_extent_unwritten_real(
 					RIGHT.br_blockcount, &i)))
 				goto done;
 			ASSERT(i == 1);
-			if ((error = xfs_bmbt_delete(cur, 0, &i)))
+			if ((error = xfs_bmbt_delete(cur, &i)))
 				goto done;
 			ASSERT(i == 1);
 			if ((error = xfs_bmbt_decrement(cur, 0, &i)))
@@ -2010,7 +2008,7 @@ xfs_bmap_add_extent_hole_real(
 				right.br_startblock, right.br_blockcount, &i)))
 			return error;
 		ASSERT(i == 1);
-		if ((error = xfs_bmbt_delete(cur, 0, &i)))
+		if ((error = xfs_bmbt_delete(cur, &i)))
 			return error;
 		ASSERT(i == 1);
 		if ((error = xfs_bmbt_decrement(cur, 0, &i)))
@@ -2722,8 +2720,7 @@ xfs_bmap_btree_to_extents(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			*logflagsp, /* inode logging flags */
-	int			whichfork,  /* data or attr fork */
-	int			async)	    /* xaction can be async */
+	int			whichfork)  /* data or attr fork */
 {
 	/* REFERENCED */
 	xfs_bmbt_block_t	*cblock;/* child btree block */
@@ -2757,8 +2754,6 @@ xfs_bmap_btree_to_extents(
 	if ((error = xfs_btree_check_lblock(cur, cblock, 0, cbp)))
 		return error;
 	xfs_bmap_add_free(cbno, 1, cur->bc_private.b.flist, mp);
-	if (!async)
-		xfs_trans_set_sync(tp);
 	ip->i_d.di_nblocks--;
 	if (XFS_IS_QUOTA_ON(mp) &&
 	    ip->i_ino != mp->m_sb.sb_uquotino &&
@@ -2787,7 +2782,6 @@ xfs_bmap_del_extent(
 	xfs_bmap_free_t		*flist, /* list of extents to be freed */
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
 	xfs_bmbt_irec_t		*del,	/* data to remove from extent list */
-	int			iflags, /* input flags */
 	int			*logflagsp, /* inode logging flags */
 	int			whichfork, /* data or attr fork */
 	int			rsvd)	/* OK to allocate reserved blocks */
@@ -2916,7 +2910,7 @@ xfs_bmap_del_extent(
 			flags |= XFS_ILOG_FEXT(whichfork);
 			break;
 		}
-		if ((error = xfs_bmbt_delete(cur, iflags & XFS_BMAPI_ASYNC, &i)))
+		if ((error = xfs_bmbt_delete(cur, &i)))
 			goto done;
 		ASSERT(i == 1);
 		break;
@@ -5027,7 +5021,7 @@ xfs_bmapi(
 	    XFS_IFORK_NEXTENTS(ip, whichfork) <= ifp->if_ext_max) {
 		ASSERT(wr && cur);
 		error = xfs_bmap_btree_to_extents(tp, ip, cur,
-			&tmp_logflags, whichfork, 0);
+			&tmp_logflags, whichfork);
 		logflags |= tmp_logflags;
 		if (error)
 			goto error0;
@@ -5148,7 +5142,6 @@ xfs_bunmapi(
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
 	int			*done)		/* set if not done yet */
 {
-	int			async;		/* xactions can be async */
 	xfs_btree_cur_t		*cur;		/* bmap btree cursor */
 	xfs_bmbt_irec_t		del;		/* extent being deleted */
 	int			eof;		/* is deleting at eof */
@@ -5182,7 +5175,6 @@ xfs_bunmapi(
 	mp = ip->i_mount;
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-	async = flags & XFS_BMAPI_ASYNC;
 	rsvd = (flags & XFS_BMAPI_RSVBLOCKS) != 0;
 	ASSERT(len > 0);
 	ASSERT(nexts >= 0);
@@ -5409,7 +5401,7 @@ xfs_bunmapi(
 			goto error0;
 		}
 		error = xfs_bmap_del_extent(ip, tp, lastx, flist, cur, &del,
-			flags, &tmp_logflags, whichfork, rsvd);
+			&tmp_logflags, whichfork, rsvd);
 		logflags |= tmp_logflags;
 		if (error)
 			goto error0;
@@ -5455,7 +5447,7 @@ nodelete:
 		 XFS_IFORK_NEXTENTS(ip, whichfork) <= ifp->if_ext_max) {
 		ASSERT(cur != NULL);
 		error = xfs_bmap_btree_to_extents(tp, ip, cur, &tmp_logflags,
-			whichfork, async);
+			whichfork);
 		logflags |= tmp_logflags;
 		if (error)
 			goto error0;
