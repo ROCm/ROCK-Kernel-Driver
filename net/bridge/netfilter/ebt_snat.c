@@ -40,7 +40,7 @@ static int ebt_target_snat_check(const char *tablename, unsigned int hookmask,
 {
 	struct ebt_nat_info *info = (struct ebt_nat_info *) data;
 
-	if (datalen != sizeof(struct ebt_nat_info))
+	if (datalen != EBT_ALIGN(sizeof(struct ebt_nat_info)))
 		return -EINVAL;
 	if (BASE_CHAIN && info->target == EBT_RETURN)
 		return -EINVAL;

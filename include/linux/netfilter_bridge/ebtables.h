@@ -33,6 +33,23 @@ struct ebt_counter
 	uint64_t bcnt;
 };
 
+struct ebt_replace
+{
+	char name[EBT_TABLE_MAXNAMELEN];
+	unsigned int valid_hooks;
+	/* nr of rules in the table */
+	unsigned int nentries;
+	/* total size of the entries */
+	unsigned int entries_size;
+	/* start of the chains */
+	struct ebt_entries *hook_entry[NF_BR_NUMHOOKS];
+	/* nr of counters userspace expects back */
+	unsigned int num_counters;
+	/* where the kernel will put the old counters */
+	struct ebt_counter *counters;
+	char *entries;
+};
+
 struct ebt_entries {
 	/* this field is always set to zero
 	 * See EBT_ENTRY_OR_ENTRIES.
@@ -47,7 +64,7 @@ struct ebt_entries {
 	/* nr. of entries */
 	unsigned int nentries;
 	/* entry list */
-	char data[0];
+	char data[0] __attribute__ ((aligned (__alignof__(struct ebt_replace))));
 };
 
 /* used for the bitmask of struct ebt_entry */
@@ -87,7 +104,7 @@ struct ebt_entry_match
 	} u;
 	/* size of data */
 	unsigned int match_size;
-	unsigned char data[0];
+	unsigned char data[0] __attribute__ ((aligned (__alignof__(struct ebt_replace))));
 };
 
 struct ebt_entry_watcher
@@ -98,7 +115,7 @@ struct ebt_entry_watcher
 	} u;
 	/* size of data */
 	unsigned int watcher_size;
-	unsigned char data[0];
+	unsigned char data[0] __attribute__ ((aligned (__alignof__(struct ebt_replace))));
 };
 
 struct ebt_entry_target
@@ -109,7 +126,7 @@ struct ebt_entry_target
 	} u;
 	/* size of data */
 	unsigned int target_size;
-	unsigned char data[0];
+	unsigned char data[0] __attribute__ ((aligned (__alignof__(struct ebt_replace))));
 };
 
 #define EBT_STANDARD_TARGET "standard"
@@ -143,24 +160,7 @@ struct ebt_entry {
 	unsigned int target_offset;
 	/* sizeof ebt_entry + matches + watchers + target */
 	unsigned int next_offset;
-	unsigned char elems[0];
-};
-
-struct ebt_replace
-{
-	char name[EBT_TABLE_MAXNAMELEN];
-	unsigned int valid_hooks;
-	/* nr of rules in the table */
-	unsigned int nentries;
-	/* total size of the entries */
-	unsigned int entries_size;
-	/* start of the chains */
-	struct ebt_entries *hook_entry[NF_BR_NUMHOOKS];
-	/* nr of counters userspace expects back */
-	unsigned int num_counters;
-	/* where the kernel will put the old counters */
-	struct ebt_counter *counters;
-	char *entries;
+	unsigned char elems[0] __attribute__ ((aligned (__alignof__(struct ebt_replace))));
 };
 
 /* {g,s}etsockopt numbers */
@@ -263,6 +263,8 @@ struct ebt_table
 	struct module *me;
 };
 
+#define EBT_ALIGN(s) (((s) + (__alignof__(struct ebt_replace)-1)) & \
+		     ~(__alignof__(struct ebt_replace)-1))
 extern int ebt_register_table(struct ebt_table *table);
 extern void ebt_unregister_table(struct ebt_table *table);
 extern int ebt_register_match(struct ebt_match *match);

@@ -186,7 +186,7 @@ struct netstat_fs_entry {
 
 static ssize_t net_device_stat_show(unsigned long var, char *buf)
 {
-	return sprintf(buf, "%ld\n", var);
+	return sprintf(buf, "%lu\n", var);
 }
 
 /* generate a read-only statistics attribute */
