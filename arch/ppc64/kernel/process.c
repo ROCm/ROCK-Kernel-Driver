@@ -533,8 +533,6 @@ static void show_tsk_stack(struct task_struct *p, unsigned long sp)
 	} while (count++ < 32);
 }
 
-extern unsigned long *_get_SP(void);
-
 void dump_stack(void)
 {
 	show_tsk_stack(current, (unsigned long)_get_SP());
