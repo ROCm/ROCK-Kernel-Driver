@@ -3,5 +3,6 @@
 #
 mainmenu_option next_comment
 comment 'Security options'
+define_bool CONFIG_SECURITY_CAPABILITIES y
 tristate 'Capabilities Support' CONFIG_SECURITY_CAPABILITIES
 endmenu
