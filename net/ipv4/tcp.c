@@ -1712,17 +1712,6 @@ void tcp_shutdown(struct sock *sk, int how)
 	}
 }
 
-
-/*
- *	Return 1 if we still have things to send in our buffers.
- */
-
-static inline int closing(struct sock *sk)
-{
-	return (1 << sk->sk_state) &
-	       (TCPF_FIN_WAIT1 | TCPF_CLOSING | TCPF_LAST_ACK);
-}
-
 static __inline__ void tcp_kill_sk_queues(struct sock *sk)
 {
 	/* First the read buffer. */
@@ -1865,22 +1854,7 @@ void tcp_close(struct sock *sk, long timeout)
 		tcp_send_fin(sk);
 	}
 
-	if (timeout) {
-		struct task_struct *tsk = current;
-		DEFINE_WAIT(wait);
-
-		do {
-			prepare_to_wait(sk->sk_sleep, &wait,
-					TASK_INTERRUPTIBLE);
-			if (!closing(sk))
-				break;
-			release_sock(sk);
-			timeout = schedule_timeout(timeout);
-			lock_sock(sk);
-		} while (!signal_pending(tsk) && timeout);
-
-		finish_wait(sk->sk_sleep, &wait);
-	}
+	sk_stream_wait_close(sk, timeout);
 
 adjudge_to_death:
 	/* It is the last release_sock in its life. It will remove backlog. */
