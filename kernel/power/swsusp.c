@@ -1,4 +1,4 @@
-'/*
+/*
  * linux/kernel/suspend.c
  *
  * This file is to realize architecture-independent
