@@ -111,6 +111,7 @@ struct cyberjack_private {
 static int cyberjack_startup (struct usb_serial *serial)
 {
 	struct cyberjack_private *priv;
+	int i;
 
 	dbg("%s", __FUNCTION__);
 
