@@ -67,7 +67,7 @@ typedef struct {
  * Use "unsigned long" accesses to let user-mode fd_set's be long-aligned.
  */
 static inline
-int get_fd_set(unsigned long nr, void *ufdset, unsigned long *fdset)
+int get_fd_set(unsigned long nr, void __user *ufdset, unsigned long *fdset)
 {
 	nr = FDS_BYTES(nr);
 	if (ufdset) {
@@ -82,7 +82,7 @@ int get_fd_set(unsigned long nr, void *ufdset, unsigned long *fdset)
 }
 
 static inline
-void set_fd_set(unsigned long nr, void *ufdset, unsigned long *fdset)
+void set_fd_set(unsigned long nr, void __user *ufdset, unsigned long *fdset)
 {
 	if (ufdset)
 		__copy_to_user(ufdset, fdset, FDS_BYTES(nr));

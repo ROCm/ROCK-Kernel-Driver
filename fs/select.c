@@ -268,7 +268,7 @@ static void select_bits_free(void *bits, int size)
 	((unsigned long) (MAX_SCHEDULE_TIMEOUT / HZ)-1)
 
 asmlinkage long
-sys_select(int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval *tvp)
+sys_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, struct timeval __user *tvp)
 {
 	fd_set_bits fds;
 	char *bits;
@@ -429,7 +429,7 @@ static int do_poll(unsigned int nfds,  struct poll_list *list,
 	return count;
 }
 
-asmlinkage long sys_poll(struct pollfd * ufds, unsigned int nfds, long timeout)
+asmlinkage long sys_poll(struct pollfd __user * ufds, unsigned int nfds, long timeout)
 {
 	struct poll_wqueues table;
  	int fdcount, err;
