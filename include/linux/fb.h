@@ -428,9 +428,7 @@ struct fb_info {
 #define fb_writeb __raw_writeb
 #define fb_writew __raw_writew
 #define fb_writel __raw_writel
-#if defined(__alpha__) || defined(__hppa__) || defined(__ia64__)
 #define fb_writeq __raw_writeq
-#endif
 #define fb_memset memset_io
 
 #else
