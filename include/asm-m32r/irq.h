@@ -1,7 +1,6 @@
+#ifdef __KERNEL__
 #ifndef _ASM_M32R_IRQ_H
 #define _ASM_M32R_IRQ_H
-
-/* $Id$ */
 
 #include <linux/config.h>
 
@@ -72,15 +71,5 @@
 
 #define irq_canonicalize(irq)	(irq)
 
-#ifndef __ASSEMBLY__
-extern void disable_irq(unsigned int);
-extern void disable_irq_nosync(unsigned int);
-extern void enable_irq(unsigned int);
-
-struct irqaction;
-struct pt_regs;
-int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
-#endif
-
-#endif	/* _ASM_M32R_IRQ_H */
-
+#endif /* _ASM_M32R_IRQ_H */
+#endif /* __KERNEL__ */
