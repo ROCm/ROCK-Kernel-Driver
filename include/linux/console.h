@@ -104,6 +104,7 @@ extern void acquire_console_sem(void);
 extern void release_console_sem(void);
 extern void console_conditional_schedule(void);
 extern void console_unblank(void);
+extern struct tty_driver *console_device(int *);
 extern int is_console_locked(void);
 
 /* Some debug stub to catch some of the obvious races in the VT code */

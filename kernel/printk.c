@@ -684,6 +684,26 @@ void console_unblank(void)
 EXPORT_SYMBOL(console_unblank);
 
 /*
+ * Return the console tty driver structure and its associated index
+ */
+struct tty_driver *console_device(int *index)
+{
+	struct console *c;
+	struct tty_driver *driver = NULL;
+
+	acquire_console_sem();
+	for (c = console_drivers; c != NULL; c = c->next) {
+		if (!c->device)
+			continue;
+		driver = c->device(c, index);
+		if (driver)
+			break;
+	}
+	release_console_sem();
+	return driver;
+}
+
+/*
  * The console driver calls this routine during kernel initialization
  * to register the console printing procedure with printk() and to
  * print any messages that were printed by the kernel before the
