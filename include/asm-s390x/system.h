@@ -39,77 +39,60 @@ extern void __misaligned_u64(void);
 
 static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 {
+	unsigned long addr, old;
+	int shift;
+
         switch (size) {
-                case 1:
-                        asm volatile (
-                                "   lghi  1,3\n"
-                                "   nr    1,%0\n"     /* isolate last 2 bits */
-                                "   xr    %0,1\n"     /* align ptr */
-                                "   bras  2,0f\n"
-                                "   icm   1,8,7(%1)\n"   /* for ptr&3 == 0 */
-                                "   stcm  0,8,7(%1)\n"
-                                "   icm   1,4,7(%1)\n"   /* for ptr&3 == 1 */
-                                "   stcm  0,4,7(%1)\n"
-                                "   icm   1,2,7(%1)\n"   /* for ptr&3 == 2 */
-                                "   stcm  0,2,7(%1)\n"
-                                "   icm   1,1,7(%1)\n"   /* for ptr&3 == 3 */
-                                "   stcm  0,1,7(%1)\n"
-                                "0: sll   1,3\n"
-                                "   la    2,0(1,2)\n" /* r2 points to an icm */
-                                "   l     0,0(%0)\n"  /* get fullword */
-                                "1: lr    1,0\n"      /* cs loop */
-                                "   ex    0,0(2)\n"   /* insert x */
-                                "   cs    0,1,0(%0)\n"
-                                "   jl    1b\n"
-                                "   ex    0,4(2)"     /* store *ptr to x */
-                                : "+&a" (ptr) : "a" (&x)
-                                : "memory", "cc", "0", "1", "2");
-			break;
-                case 2:
-                        if(((addr_t)ptr)&1)
-				__misaligned_u16();
-                        asm volatile (
-                                "   lghi  1,2\n"
-                                "   nr    1,%0\n"     /* isolate bit 2^1 */
-                                "   xr    %0,1\n"     /* align ptr */
-                                "   bras  2,0f\n"
-                                "   icm   1,12,6(%1)\n"   /* for ptr&2 == 0 */
-                                "   stcm  0,12,6(%1)\n"
-                                "   icm   1,3,2(%1)\n"    /* for ptr&2 == 1 */
-                                "   stcm  0,3,2(%1)\n"
-                                "0: sll   1,2\n"
-                                "   la    2,0(1,2)\n" /* r2 points to an icm */
-                                "   l     0,0(%0)\n"  /* get fullword */
-                                "1: lr    1,0\n"      /* cs loop */
-                                "   ex    0,0(2)\n"   /* insert x */
-                                "   cs    0,1,0(%0)\n"
-                                "   jl    1b\n"
-                                "   ex    0,4(2)"     /* store *ptr to x */
-                                : "+&a" (ptr) : "a" (&x)
-                                : "memory", "cc", "0", "1", "2");
-                        break;
-                case 4:
-                        if(((addr_t)ptr)&3)
-				__misaligned_u32();
-                        asm volatile (
-                                "    l    0,0(%1)\n"
-                                "0:  cs   0,%0,0(%1)\n"
-                                "    jl   0b\n"
-                                "    lgfr %0,0\n"
-                                : "+d" (x) : "a" (ptr)
-                                : "memory", "cc", "0" );
-                        break;
-                case 8:
-                        if(((addr_t)ptr)&7)
-				__misaligned_u64();
-                        asm volatile (
-                                "    lg  0,0(%1)\n"
-                                "0:  csg 0,%0,0(%1)\n"
-                                "    jl  0b\n"
-                                "    lgr %0,0\n"
-                                : "+d" (x) : "a" (ptr)
-                                : "memory", "cc", "0" );
-                        break;
+	case 1:
+		addr = (unsigned long) ptr;
+		shift = (3 ^ (addr & 3)) << 3;
+		addr ^= addr & 3;
+		asm volatile(
+			"    l   %0,0(%3)\n"
+			"0:  lr  0,%0\n"
+			"    nr  0,%2\n"
+			"    or  0,%1\n"
+			"    cs  %0,0,0(%3)\n"
+			"    jl  0b\n"
+			: "=&d" (old)
+			: "d" (x << shift), "d" (~(255 << shift)), "a" (addr)
+			: "memory", "cc", "0" );
+		x = old >> shift;
+		break;
+	case 2:
+		addr = (unsigned long) ptr;
+		shift = (2 ^ (addr & 2)) << 3;
+		addr ^= addr & 2;
+		asm volatile(
+			"    l   %0,0(%3)\n"
+			"0:  lr  0,%0\n"
+			"    nr  0,%2\n"
+			"    or  0,%1\n"
+			"    cs  %0,0,0(%3)\n"
+			"    jl  0b\n"
+			: "=&d" (old) 
+			: "d" (x << shift), "d" (~(65535 << shift)), "a" (addr)
+			: "memory", "cc", "0" );
+		x = old >> shift;
+		break;
+	case 4:
+		asm volatile (
+			"    l   %0,0(%2)\n"
+			"0:  cs  %0,%1,0(%2)\n"
+			"    jl  0b\n"
+			: "=&d" (old) : "d" (x), "a" (ptr)
+			: "memory", "cc", "0" );
+		x = old;
+		break;
+	case 8:
+		asm volatile (
+			"    lg  %0,0(%2)\n"
+			"0:  csg %0,%1,0(%2)\n"
+			"    jl  0b\n"
+			: "=&d" (old) : "d" (x), "a" (ptr)
+			: "memory", "cc", "0" );
+		x = old;
+		break;
         }
         return x;
 }

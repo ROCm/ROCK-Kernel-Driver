@@ -27,13 +27,29 @@
  *
  * it's best to have buff aligned on a 32-bit boundary
  */
-unsigned int
-csum_partial(const unsigned char * buff, int len, unsigned int sum);
+static inline unsigned int
+csum_partial(const unsigned char * buff, int len, unsigned int sum)
+{
+	/*
+	 * Experiments with ethernet and slip connections show that buff
+	 * is aligned on either a 2-byte or 4-byte boundary.
+	 */
+        __asm__ __volatile__ (
+                "    lgr  2,%1\n"    /* address in gpr 2 */
+                "    lgfr 3,%2\n"    /* length in gpr 3 */
+                "0:  cksm %0,2\n"    /* do checksum on longs */
+                "    jo   0b\n"
+                : "+&d" (sum)
+                : "d" (buff), "d" (len)
+                : "cc", "2", "3" );
+        return sum;
+	
+}
 
 /*
  * csum_partial as an inline function
  */
-extern inline unsigned int 
+static inline unsigned int 
 csum_partial_inline(const unsigned char * buff, int len, unsigned int sum)
 {
 	__asm__ __volatile__ (
@@ -55,7 +71,7 @@ csum_partial_inline(const unsigned char * buff, int len, unsigned int sum)
  * better 64-bit) boundary
  */
 
-extern inline unsigned int 
+static inline unsigned int 
 csum_partial_copy(const char *src, char *dst, int len,unsigned int sum)
 {
 	memcpy(dst,src,len);
@@ -71,7 +87,7 @@ csum_partial_copy(const char *src, char *dst, int len,unsigned int sum)
  * Copy from userspace and compute checksum.  If we catch an exception
  * then zero the rest of the buffer.
  */
-extern inline unsigned int 
+static inline unsigned int 
 csum_partial_copy_from_user (const char *src, char *dst,
                                           int len, unsigned int sum,
                                           int *err_ptr)
@@ -87,7 +103,7 @@ csum_partial_copy_from_user (const char *src, char *dst,
 	return csum_partial(dst, len, sum);
 }
 
-extern inline unsigned int
+static inline unsigned int
 csum_partial_copy_nocheck (const char *src, char *dst, int len, unsigned int sum)
 {
         memcpy(dst,src,len);
@@ -97,7 +113,7 @@ csum_partial_copy_nocheck (const char *src, char *dst, int len, unsigned int sum
 /*
  *      Fold a partial checksum without adding pseudo headers
  */
-extern inline unsigned short
+static inline unsigned short
 csum_fold(unsigned int sum)
 {
 	__asm__ __volatile__ (
@@ -116,7 +132,7 @@ csum_fold(unsigned int sum)
  *	which always checksum on 4 octet boundaries.
  *
  */
-extern inline unsigned short
+static inline unsigned short
 ip_fast_csum(unsigned char *iph, unsigned int ihl)
 {
 	unsigned long sum;
@@ -137,7 +153,7 @@ ip_fast_csum(unsigned char *iph, unsigned int ihl)
  * computes the checksum of the TCP/UDP pseudo-header
  * returns a 32-bit checksum
  */
-extern inline unsigned int 
+static inline unsigned int 
 csum_tcpudp_nofold(unsigned long saddr, unsigned long daddr,
                    unsigned short len, unsigned short proto,
                    unsigned int sum)
@@ -170,7 +186,7 @@ csum_tcpudp_nofold(unsigned long saddr, unsigned long daddr,
  * returns a 16-bit checksum, already complemented
  */
 
-extern inline unsigned short int
+static inline unsigned short int
 csum_tcpudp_magic(unsigned long saddr, unsigned long daddr,
                   unsigned short len, unsigned short proto,
                   unsigned int sum)
@@ -183,7 +199,7 @@ csum_tcpudp_magic(unsigned long saddr, unsigned long daddr,
  * in icmp.c
  */
 
-extern inline unsigned short
+static inline unsigned short
 ip_compute_csum(unsigned char * buff, int len)
 {
 	return csum_fold(csum_partial_inline(buff, len, 0));
