@@ -278,7 +278,7 @@ static void acm_read_bulk(struct urb *urb, struct pt_regs *regs)
 	urb->actual_length = 0;
 	urb->dev = acm->dev;
 
-	if (usb_submit_urb(urb, GFP_KERNEL))
+	if (usb_submit_urb(urb, GFP_ATOMIC))
 		dbg("failed resubmitting read urb");
 }
 
