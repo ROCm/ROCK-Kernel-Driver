@@ -6,6 +6,7 @@ extern int devices_init(void);
 extern int buses_init(void);
 extern int classes_init(void);
 extern int firmware_init(void);
+extern int platform_bus_init(void);
 extern int sys_bus_init(void);
 extern int cpu_dev_init(void);
 
@@ -27,6 +28,7 @@ void __init driver_init(void)
 	/* These are also core pieces, but must come after the 
 	 * core core pieces.
 	 */
+	platform_bus_init();
 	sys_bus_init();
 	cpu_dev_init();
 }
