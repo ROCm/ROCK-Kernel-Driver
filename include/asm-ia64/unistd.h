@@ -257,96 +257,138 @@
 
 extern long __ia64_syscall (long a0, long a1, long a2, long a3, long a4, long nr);
 
-#define _syscall0(type,name)						\
-type									\
-name (void)								\
-{									\
-	register long dummy1 __asm__ ("out0");				\
-	register long dummy2 __asm__ ("out1");				\
-	register long dummy3 __asm__ ("out2");				\
-	register long dummy4 __asm__ ("out3");				\
-	register long dummy5 __asm__ ("out4");				\
-									\
-	return __ia64_syscall(dummy1, dummy2, dummy3, dummy4, dummy5,	\
-			      __NR_##name);				\
-}
-
-#define _syscall1(type,name,type1,arg1)					\
-type									\
-name (type1 arg1)							\
-{									\
-	register long dummy2 __asm__ ("out1");				\
-	register long dummy3 __asm__ ("out2");				\
-	register long dummy4 __asm__ ("out3");				\
-	register long dummy5 __asm__ ("out4");				\
-									\
-	return __ia64_syscall((long) arg1, dummy2, dummy3, dummy4,	\
-			      dummy5, __NR_##name);			\
-}
-
-#define _syscall2(type,name,type1,arg1,type2,arg2)			\
-type									\
-name (type1 arg1, type2 arg2)						\
-{									\
-	register long dummy3 __asm__ ("out2");				\
-	register long dummy4 __asm__ ("out3");				\
-	register long dummy5 __asm__ ("out4");				\
-									\
-	return __ia64_syscall((long) arg1, (long) arg2, dummy3, dummy4,	\
-			      dummy5, __NR_##name);			\
-}
-
-#define _syscall3(type,name,type1,arg1,type2,arg2,type3,arg3)		\
-type									\
-name (type1 arg1, type2 arg2, type3 arg3)				\
-{									\
-	register long dummy4 __asm__ ("out3");				\
-	register long dummy5 __asm__ ("out4");				\
-									\
-	return __ia64_syscall((long) arg1, (long) arg2, (long) arg3,	\
-			      dummy4, dummy5, __NR_##name);		\
-}
-
-#define _syscall4(type,name,type1,arg1,type2,arg2,type3,arg3,type4,arg4)	\
-type										\
-name (type1 arg1, type2 arg2, type3 arg3, type4 arg4)				\
-{										\
-	register long dummy5 __asm__ ("out4");					\
-										\
-	return __ia64_syscall((long) arg1, (long) arg2, (long) arg3,		\
-			      (long) arg4, dummy5, __NR_##name);		\
-}
-
-#define _syscall5(type,name,type1,arg1,type2,arg2,type3,arg3,type4,arg4,type5,arg5)	\
-type											\
-name (type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5)			\
-{											\
-	return __ia64_syscall((long) arg1, (long) arg2, (long) arg3,			\
-			      (long) arg4, (long) arg5, __NR_##name);			\
-}
-
 #ifdef __KERNEL_SYSCALLS__
 
-struct rusage;
+#include <linux/string.h>
+#include <linux/signal.h>
+#include <asm/ptrace.h>
+#include <linux/stringify.h>
 
-static inline _syscall0(pid_t,setsid)
-static inline _syscall3(int,write,int,fd,const char *,buf,off_t,count)
-static inline _syscall3(int,read,int,fd,char *,buf,off_t,count)
-static inline _syscall3(off_t,lseek,int,fd,off_t,offset,int,count)
-static inline _syscall1(int,dup,int,fd)
-static inline _syscall3(int,execve,const char *,file,char **,argv,char **,envp)
-static inline _syscall3(int,open,const char *,file,int,flag,int,mode)
-static inline _syscall1(int,close,int,fd)
-static inline _syscall4(pid_t,wait4,pid_t,pid,int *,wait_stat,int,options,struct rusage*, rusage)
-static inline _syscall2(pid_t,clone,unsigned long,flags,void*,sp);
+static inline long
+open (const char * name, int mode, int flags)
+{
+	extern long sys_open (const char *, int, int);
+	return sys_open(name, mode, flags);
+}
 
-#define __NR__exit __NR_exit
-static inline _syscall1(int,_exit,int,exitcode)
+static inline long
+dup (int fd)
+{
+	extern long sys_dup (int);
+	return sys_dup(fd);
+}
+
+static inline long
+close (int fd)
+{
+	extern long sys_close(unsigned int);
+	return sys_close(fd);
+}
+
+static inline off_t
+lseek (int fd, off_t off, int whence)
+{
+	extern off_t sys_lseek (int, off_t, int);
+	return sys_lseek(fd, off, whence);
+}
+
+static inline long
+_exit (int value)
+{
+	extern long sys_exit (int);
+	return sys_exit(value);
+}
+
+#define exit(x) _exit(x)
+
+static inline long
+write (int fd, const char * buf, size_t nr)
+{
+	extern long sys_write (int, const char *, size_t);
+	return sys_write(fd, buf, nr);
+}
+
+static inline long
+read (int fd, char * buf, size_t nr)
+{
+	extern long sys_read (int, char *, size_t);
+	return sys_read(fd, buf, nr);
+}
+
+
+static inline long
+setsid (void)
+{
+	extern long sys_setsid (void);
+	return sys_setsid();
+}
 
 static inline pid_t
-waitpid (int pid, int *wait_stat, int flags)
+waitpid (int pid, int * wait_stat, int flags)
 {
-	return wait4(pid, wait_stat, flags, NULL);
+	extern asmlinkage long sys_wait4 (pid_t, unsigned int *, int, struct rusage *);
+	struct rusage;
+
+	return sys_wait4(pid, wait_stat, flags, NULL);
+}
+
+
+static inline int
+execve (const char *filename, char *const av[], char *const ep[])
+{
+	register long r8 asm("r8");
+	register long r10 asm("r10");
+	register long r15 asm("r15") = __NR_execve;
+	register long out0 asm("out0") = (long)filename;
+	register long out1 asm("out1") = (long)av;
+	register long out2 asm("out2") = (long)ep;
+
+	asm volatile ("break " __stringify(__BREAK_SYSCALL) ";;\n\t"
+		      : "=r" (r8), "=r" (r10), "=r" (r15), "=r" (out0), "=r" (out1), "=r" (out2)
+		      : "2" (r15), "3" (out0), "4" (out1), "5" (out2)
+		      : "memory", "out3", "out4", "out5", "out6", "out7",
+		      /* Non-stacked integer registers, minus r8, r10, r15, r13  */
+		      "r2", "r3", "r9", "r11", "r12", "r14", "r16", "r17", "r18",
+		      "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27",
+		      "r28", "r29", "r30", "r31",
+		      /* Predicate registers.  */
+		      "p6", "p7", "p8", "p9", "p10", "p11", "p12", "p13", "p14", "p15",
+		      /* Non-rotating fp registers.  */
+		      "f6", "f7", "f8", "f9", "f10", "f11", "f12", "f13", "f14", "f15",
+		      /* Branch registers.  */
+		      "b6", "b7" );
+	return r8;
+}
+
+static inline pid_t
+clone (unsigned long flags, void *sp)
+{
+	register long r8 asm("r8");
+	register long r10 asm("r10");
+	register long r15 asm("r15") = __NR_clone;
+	register long out0 asm("out0") = (long)flags;
+	register long out1 asm("out1") = (long)sp;
+	long retval;
+
+	/* clone clobbers current, hence the "r13" in the clobbers list */
+	asm volatile ( "break " __stringify(__BREAK_SYSCALL) ";;\n\t"
+		       : "=r" (r8), "=r" (r10), "=r" (r15), "=r" (out0), "=r" (out1)
+		       : "2" (r15), "3" (out0), "4" (out1)
+		       : "memory", "out0", "out1", "out2", "out3", "out4", "out5", "out6", "out7",
+		       "r13",
+		       /* Non-stacked integer registers, minus r8, r10, r15, r13  */
+		       "r2", "r3", "r9", "r11", "r12", "r14", "r16", "r17", "r18",
+		       "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27",
+		       "r28", "r29", "r30", "r31",
+		       /* Predicate registers.  */
+		       "p6", "p7", "p8", "p9", "p10", "p11", "p12", "p13", "p14", "p15",
+		       /* Non-rotating fp registers.  */
+		       "f6", "f7", "f8", "f9", "f10", "f11", "f12", "f13", "f14", "f15",
+		       /* Branch registers.  */
+		       "b6", "b7" );
+	retval = r8;
+	return retval;;
+
 }
 
 #endif /* __KERNEL_SYSCALLS__ */
