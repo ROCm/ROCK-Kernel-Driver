@@ -46,12 +46,14 @@ root of an EISA bus. The eisa_root_device structure holds a reference
 to this device, as well as some parameters for probing purposes.
 
 struct eisa_root_device {
-        struct list_head node;
-        struct device   *dev;    /* Pointer to bridge device */
-        struct resource *res;
-        unsigned long    bus_base_addr;
-        int              slots;  /* Max slot number */
-        int              bus_nr; /* Set by eisa_root_register */
+	struct device   *dev;	 /* Pointer to bridge device */
+	struct resource *res;
+	unsigned long    bus_base_addr;
+	int		 slots;  /* Max slot number */
+	int		 force_probe; /* Probe even when no slot 0 */
+	u64		 dma_mask; /* from bridge device */
+	int              bus_nr; /* Set by eisa_root_register */
+	struct resource  eisa_root_res;	/* ditto */
 };
 
 node          : used for eisa_root_register internal purpose
@@ -59,6 +61,8 @@ dev           : pointer to the root device
 res           : root device I/O resource
 bus_base_addr : slot 0 address on this bus
 slots	      : max slot number to probe
+force_probe   : Probe even when slot 0 is empty (no EISA mainboard)
+dma_mask      : Default DMA mask. Usualy the bridge device dma_mask.
 bus_nr	      : unique bus id, set by eisa_root_register
 
 ** Driver :
@@ -87,7 +91,7 @@ driver		: a generic driver, such as described in
 		  Documentation/driver-model/driver.txt. Only .name,
 		  .probe and .remove members are mandatory.
 
-An example is the 3c509 driver :
+An example is the 3c59x driver :
 
 static struct eisa_device_id vortex_eisa_ids[] = {
 	{ "TCM5920", EISA_3C592_OFFSET },
@@ -116,15 +120,20 @@ encapsulated in a 'struct eisa_device' described as follows :
 struct eisa_device {
         struct eisa_device_id id;
         int                   slot;
-        unsigned long         base_addr;
-        struct resource       res;
+	int                   state;
+	unsigned long         base_addr;
+	struct resource       res[EISA_MAX_RESOURCES];
+	u64                   dma_mask;
         struct device         dev; /* generic device */
 };
 
 id	: EISA id, as read from device. id.driver_data is set from the
 	  matching driver EISA id.
 slot	: slot number which the device was detected on
-res	: I/O resource allocated to this device
+state   : set of flags indicating the state of the device. Current
+	  flags are EISA_CONFIG_ENABLED and EISA_CONFIG_FORCED.
+res	: set of four 256 bytes I/O regions allocated to this device
+dma_mask: DMA mask set from the parent device.
 dev	: generic device (see Documentation/driver-model/device.txt)
 
 You can get the 'struct eisa_device' from 'struct device' using the
@@ -139,6 +148,32 @@ Stores data into the device's driver_data area.
 void *eisa_get_drvdata (struct eisa_device *edev):
 
 Gets the pointer previously stored into the device's driver_data area.
+
+int eisa_get_region_index (void *addr);
+
+Returns the region number (0 <= x < EISA_MAX_RESOURCES) of a given
+address.
+
+** Kernel parameters :
+
+eisa_bus.enable_dev :
+
+A comma-separated list of slots to be enabled, even if the firmware
+set the card as disabled. The driver must be able to properly
+initialize the device in such conditions.
+
+eisa_bus.disable_dev :
+
+A comma-separated list of slots to be enabled, even if the firmware
+set the card as enabled. The driver won't be called to handle this
+device.
+
+virtual_root.force_probe :
+
+Force the probing code to probe EISA slots even when it cannot find an
+EISA compliant mainboard (nothing appears on slot 0). Defaultd to 0
+(don't force), and set to 1 (force probing) when either
+CONFIG_ALPHA_JENSEN or CONFIG_EISA_VLB_PRIMING are set.
 
 ** Random notes :
 
@@ -156,10 +191,13 @@ Unfortunately, most drivers are doing the probing by themselves, and
 expect to have explored the whole machine when they exit their probe
 routine.
 
+For example, switching your favorite EISA SCSI card to the "hotplug"
+model is "the right thing"(tm).
+
 ** Thanks :
 
 I'd like to thank the following people for their help :
 - Xavier Benigni for lending me a wonderful Alpha Jensen,
 - James Bottomley, Jeff Garzik for getting this stuff into the kernel,
 - Andries Brouwer for contributing numerous EISA ids,
-- Catrin Jones for coping with too many machines at home
+- Catrin Jones for coping with far too many machines at home.
