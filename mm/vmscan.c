@@ -779,7 +779,7 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
 		count = atomic_read(&zone->refill_counter);
 		if (count > SWAP_CLUSTER_MAX * 4)
 			count = SWAP_CLUSTER_MAX * 4;
-		atomic_sub(count, &zone->refill_counter);
+		atomic_set(&zone->refill_counter, 0);
 		refill_inactive_zone(zone, count, ps, priority);
 	}
 	return shrink_cache(nr_pages, zone, gfp_mask,
