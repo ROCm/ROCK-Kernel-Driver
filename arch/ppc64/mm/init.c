@@ -93,7 +93,7 @@ unsigned long __max_memory;
 /* This is declared as we are using the more or less generic 
  * include/asm-ppc64/tlb.h file -- tgall
  */
-struct mmu_gather     mmu_gathers[NR_CPUS];
+DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 void show_mem(void)
 {
