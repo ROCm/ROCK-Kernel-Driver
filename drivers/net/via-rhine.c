@@ -1970,7 +1970,7 @@ static int rhine_resume(struct pci_dev *pdev)
         if (request_irq(dev->irq, rhine_interrupt, SA_SHIRQ, dev->name, dev))
 		printk(KERN_ERR "via-rhine %s: request_irq failed\n", dev->name);
 
-	ret = pci_set_power_state(pdev, 0);
+	ret = pci_set_power_state(pdev, PCI_D0);
 	if (debug > 1)
 		printk(KERN_INFO "%s: Entering power state D0 %s (%d).\n",
 			dev->name, ret ? "failed" : "succeeded", ret);

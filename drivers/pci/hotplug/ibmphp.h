@@ -34,7 +34,7 @@
 
 extern int ibmphp_debug;
 
-#if !defined(CONFIG_HOTPLUG_PCI_IBM_MODULE)
+#if !defined(MODULE)
 	#define MY_NAME "ibmphpd"
 #else
 	#define MY_NAME THIS_MODULE->name
