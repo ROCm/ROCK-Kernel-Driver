@@ -1740,9 +1740,8 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 		udelay(50);
 		if (ac97_reset_wait(ac97, HZ/2, 0) < 0 &&
 		    ac97_reset_wait(ac97, HZ/2, 1) < 0) {
-			snd_printk(KERN_ERR "AC'97 %d does not respond - RESET\n", ac97->num);
-			snd_ac97_free(ac97);
-			return -ENXIO;
+			snd_printk(KERN_WARNING "AC'97 %d does not respond - RESET\n", ac97->num);
+			/* proceed anyway - it's often non-critical */
 		}
 	}
       __access_ok:
