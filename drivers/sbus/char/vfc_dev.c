@@ -643,12 +643,12 @@ static int vfc_mmap(struct inode *inode, struct file *file,
 
 
 static struct file_operations vfc_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		vfc_ioctl,
-	mmap:		vfc_mmap,
-	open:		vfc_open,
-	release:	vfc_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.ioctl =	vfc_ioctl,
+	.mmap =		vfc_mmap,
+	.open =		vfc_open,
+	.release =	vfc_release,
 };
 
 static int vfc_probe(void)

@@ -2976,12 +2976,12 @@ static int __init serial_console_setup(struct console *co, char *options)
 }
 
 static struct console sercons = {
-	name:		"ttyS",
-	write:		serial_console_write,
-	device:		serial_console_device,
-	setup:		serial_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"ttyS",
+	.write =	serial_console_write,
+	.device =	serial_console_device,
+	.setup =	serial_console_setup,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 int su_console_registered = 0;

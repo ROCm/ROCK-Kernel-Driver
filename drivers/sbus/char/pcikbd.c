@@ -1184,13 +1184,13 @@ static unsigned int aux_poll(struct file *file, poll_table * wait)
 }
 
 struct file_operations psaux_fops = {
-	owner:		THIS_MODULE,
-	read:		aux_read,
-	write:		aux_write,
-	poll:		aux_poll,
-	open:		aux_open,
-	release:	aux_release,
-	fasync:		aux_fasync,
+	.owner =	THIS_MODULE,
+	.read =		aux_read,
+	.write =	aux_write,
+	.poll =		aux_poll,
+	.open =		aux_open,
+	.release =	aux_release,
+	.fasync =	aux_fasync,
 };
 
 static int aux_no_open(struct inode *inode, struct file *file)
@@ -1199,8 +1199,8 @@ static int aux_no_open(struct inode *inode, struct file *file)
 }
 
 struct file_operations psaux_no_fops = {
-	owner:		THIS_MODULE,
-	open:		aux_no_open,
+	.owner =	THIS_MODULE,
+	.open =		aux_no_open,
 };
 
 static struct miscdevice psaux_mouse = {

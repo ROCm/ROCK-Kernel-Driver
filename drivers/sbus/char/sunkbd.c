@@ -1548,12 +1548,12 @@ kbd_close (struct inode *i, struct file *f)
 
 static struct file_operations kbd_fops =
 {
-	read:		kbd_read,
-	poll:		kbd_poll,
-	ioctl:		kbd_ioctl,
-	open:		kbd_open,
-	release:	kbd_close,
-	fasync:		kbd_fasync,
+	.read =		kbd_read,
+	.poll =		kbd_poll,
+	.ioctl =	kbd_ioctl,
+	.open =		kbd_open,
+	.release =	kbd_close,
+	.fasync =	kbd_fasync,
 };
 
 void __init keyboard_zsinit(void (*put_char)(unsigned char))
