@@ -182,7 +182,7 @@ static int wafwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	}
 
 	default:
-		return -ENOTTY;
+		return -ENOIOCTLCMD;
 	}
 	return 0;
 }

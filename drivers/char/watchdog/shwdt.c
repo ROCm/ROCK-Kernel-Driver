@@ -303,7 +303,7 @@ static int sh_wdt_ioctl(struct inode *inode, struct file *file,
 			return retval;
 		}
 		default:
-			return -ENOTTY;
+			return -ENOIOCTLCMD;
 	}
 
 	return 0;

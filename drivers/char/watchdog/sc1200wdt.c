@@ -180,7 +180,7 @@ static int sc1200wdt_ioctl(struct inode *inode, struct file *file, unsigned int 
 
 	switch (cmd) {
 		default:
-			return -ENOTTY;	/* Keep Pavel Machek amused ;) */
+			return -ENOIOCTLCMD;	/* Keep Pavel Machek amused ;) */
 
 		case WDIOC_GETSUPPORT:
 			if (copy_to_user((struct watchdog_info *)arg, &ident, sizeof ident))

@@ -192,7 +192,7 @@ static int mixcomwd_ioctl(struct inode *inode, struct file *file,
 			mixcomwd_ping();
 			break;
 		default:
-			return -ENOTTY;
+			return -ENOIOCTLCMD;
 	}
 	return 0;
 }

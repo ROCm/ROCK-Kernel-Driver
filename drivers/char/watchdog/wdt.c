@@ -333,7 +333,7 @@ static int wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	switch(cmd)
 	{
 		default:
-			return -ENOTTY;
+			return -ENOIOCTLCMD;
 		case WDIOC_GETSUPPORT:
 			return copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident))?-EFAULT:0;
 

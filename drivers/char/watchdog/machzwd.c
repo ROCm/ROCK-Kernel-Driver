@@ -366,7 +366,7 @@ static int zf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			break;
 
 		default:
-			return -ENOTTY;
+			return -ENOIOCTLCMD;
 	}
 
 	return 0;

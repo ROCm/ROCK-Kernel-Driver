@@ -255,7 +255,7 @@ static int i810tco_ioctl (struct inode *inode, struct file *file,
 	};
 	switch (cmd) {
 		default:
-			return -ENOTTY;
+			return -ENOIOCTLCMD;
 		case WDIOC_GETSUPPORT:
 			if (copy_to_user
 			    ((struct watchdog_info *) arg, &ident, sizeof (ident)))

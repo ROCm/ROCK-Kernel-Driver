@@ -255,7 +255,7 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 
 	switch(cmd) {
 	default:
-		return -ENOTTY;
+		return -ENOIOCTLCMD;
 
 	case WDIOC_GETSUPPORT:
 		if(copy_to_user((void*)arg, &ident, sizeof(ident)))

@@ -175,7 +175,7 @@ static int amdtco_fop_ioctl(struct inode *inode, struct file *file, unsigned int
 
 	switch (cmd) {
 		default:
-			return -ENOTTY;
+			return -ENOIOCTLCMD;
 
 		case WDIOC_GETSUPPORT:
 			if (copy_to_user((struct watchdog_info *)arg, &ident, sizeof ident))
