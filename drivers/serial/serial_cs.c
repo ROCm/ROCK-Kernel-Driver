@@ -300,10 +300,10 @@ static int setup_serial(struct serial_info * info, ioaddr_t port, int irq)
 /*====================================================================*/
 
 static int
-get_tuple(int fn, client_handle_t handle, tuple_t * tuple, cisparse_t * parse)
+first_tuple(client_handle_t handle, tuple_t * tuple, cisparse_t * parse)
 {
 	int i;
-	i = CardServices(fn, handle, tuple);
+	i = pcmcia_get_first_tuple(handle, tuple);
 	if (i != CS_SUCCESS)
 		return CS_NO_MORE_ITEMS;
 	i = pcmcia_get_tuple_data(handle, tuple);
@@ -312,8 +312,18 @@ get_tuple(int fn, client_handle_t handle, tuple_t * tuple, cisparse_t * parse)
 	return pcmcia_parse_tuple(handle, tuple, parse);
 }
 
-#define first_tuple(a, b, c) get_tuple(GetFirstTuple, a, b, c)
-#define next_tuple(a, b, c) get_tuple(GetNextTuple, a, b, c)
+static int
+next_tuple(client_handle_t handle, tuple_t * tuple, cisparse_t * parse)
+{
+	int i;
+	i = pcmcia_get_next_tuple(handle, tuple);
+	if (i != CS_SUCCESS)
+		return CS_NO_MORE_ITEMS;
+	i = pcmcia_get_tuple_data(handle, tuple);
+	if (i != CS_SUCCESS)
+		return i;
+	return pcmcia_parse_tuple(handle, tuple, parse);
+}
 
 /*====================================================================*/
 
