@@ -32,26 +32,26 @@
  * and hooked into this driver.
  */
 #include <linux/config.h>
-#include <linux/module.h>
-#include <linux/tty.h>
-#include <linux/ioport.h>
-#include <linux/init.h>
-#include <linux/serial.h>
-#include <linux/console.h>
-#include <linux/sysrq.h>
-#include <linux/device.h>
-
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/hardware/amba.h>
-#include <asm/hardware/clock.h>
 
 #if defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
 
+#include <linux/module.h>
+#include <linux/ioport.h>
+#include <linux/init.h>
+#include <linux/console.h>
+#include <linux/sysrq.h>
+#include <linux/device.h>
+#include <linux/tty.h>
+#include <linux/tty_flip.h>
 #include <linux/serial_core.h>
+#include <linux/serial.h>
 
+#include <asm/io.h>
+#include <asm/irq.h>
+#include <asm/hardware/amba.h>
+#include <asm/hardware/clock.h>
 #include <asm/hardware/amba_serial.h>
 
 #define UART_NR			14
@@ -115,22 +115,21 @@ pl011_rx_chars(struct uart_amba_port *uap)
 #endif
 {
 	struct tty_struct *tty = uap->port.info->tty;
-	unsigned int status, ch, rsr, max_count = 256;
+	unsigned int status, ch, flag, rsr, max_count = 256;
 
 	status = readw(uap->port.membase + UART01x_FR);
 	while ((status & UART01x_FR_RXFE) == 0 && max_count--) {
 		if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
-			tty->flip.work.func((void *)tty);
-			if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
-				printk(KERN_WARNING "TTY_DONT_FLIP set\n");
-				return;
-			}
+			if (tty->low_latency)
+				tty_flip_buffer_push(tty);
+			/*
+			 * If this failed then we will throw away the
+			 * bytes but must do so to clear interrupts
+			 */
 		}
 
 		ch = readw(uap->port.membase + UART01x_DR);
-
-		*tty->flip.char_buf_ptr = ch;
-		*tty->flip.flag_buf_ptr = TTY_NORMAL;
+		flag = TTY_NORMAL;
 		uap->port.icount.rx++;
 
 		/*
@@ -154,20 +153,18 @@ pl011_rx_chars(struct uart_amba_port *uap)
 			rsr &= uap->port.read_status_mask;
 
 			if (rsr & UART01x_RSR_BE)
-				*tty->flip.flag_buf_ptr = TTY_BREAK;
+				flag = TTY_BREAK;
 			else if (rsr & UART01x_RSR_PE)
-				*tty->flip.flag_buf_ptr = TTY_PARITY;
+				flag = TTY_PARITY;
 			else if (rsr & UART01x_RSR_FE)
-				*tty->flip.flag_buf_ptr = TTY_FRAME;
+				flag = TTY_FRAME;
 		}
 
 		if (uart_handle_sysrq_char(&uap->port, ch, regs))
 			goto ignore_char;
 
 		if ((rsr & uap->port.ignore_status_mask) == 0) {
-			tty->flip.flag_buf_ptr++;
-			tty->flip.char_buf_ptr++;
-			tty->flip.count++;
+			tty_insert_flip_char(tty, ch, flag);
 		}
 		if ((rsr & UART01x_RSR_OE) &&
 		    tty->flip.count < TTY_FLIPBUF_SIZE) {
@@ -176,9 +173,7 @@ pl011_rx_chars(struct uart_amba_port *uap)
 			 * immediately, and doesn't affect the current
 			 * character
 			 */
-			*tty->flip.char_buf_ptr++ = 0;
-			*tty->flip.flag_buf_ptr++ = TTY_OVERRUN;
-			tty->flip.count++;
+			tty_insert_flip_char(tty, 0, TTY_OVERRUN);
 		}
 	ignore_char:
 		status = readw(uap->port.membase + UART01x_FR);

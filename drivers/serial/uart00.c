@@ -27,23 +27,25 @@
  *
  */
 #include <linux/config.h>
-#include <linux/module.h>
-#include <linux/tty.h>
-#include <linux/ioport.h>
-#include <linux/init.h>
-#include <linux/serial.h>
-#include <linux/console.h>
-#include <linux/sysrq.h>
-
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/sizes.h>
 
 #if defined(CONFIG_SERIAL_UART00_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
 
+#include <linux/module.h>
+#include <linux/ioport.h>
+#include <linux/init.h>
+#include <linux/console.h>
+#include <linux/sysrq.h>
+#include <linux/tty.h>
+#include <linux/tty_flip.h>
 #include <linux/serial_core.h>
+#include <linux/serial.h>
+
+#include <asm/io.h>
+#include <asm/irq.h>
+#include <asm/sizes.h>
+
 #include <asm/arch/excalibur.h>
 #define UART00_TYPE (volatile unsigned int*)
 #include <asm/arch/uart00.h>
@@ -132,9 +134,8 @@ uart00_rx_chars(struct uart_port *port, struct pt_regs *regs)
 			goto ignore_char;
 
 	error_return:
-		*tty->flip.flag_buf_ptr++ = flg;
-		*tty->flip.char_buf_ptr++ = ch;
-		tty->flip.count++;
+		tty_insert_flip_char(tty, ch, flg);
+
 	ignore_char:
 		status = UART_GET_RSR(port);
 	}
@@ -174,11 +175,7 @@ uart00_rx_chars(struct uart_port *port, struct pt_regs *regs)
 		 * CHECK: does overrun affect the current character?
 		 * ASSUMPTION: it does not.
 		 */
-		*tty->flip.flag_buf_ptr++ = flg;
-		*tty->flip.char_buf_ptr++ = ch;
-		tty->flip.count++;
-		if (tty->flip.count >= TTY_FLIPBUF_SIZE)
-			goto ignore_char;
+		tty_insert_flip_char(tty, ch, flg);
 		ch = 0;
 		flg = TTY_OVERRUN;
 	}
