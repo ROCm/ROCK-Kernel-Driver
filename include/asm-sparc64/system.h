@@ -66,15 +66,16 @@ enum sparc_cpu {
 #define local_irq_save(flags)		((flags) = read_pil_and_cli())
 #define local_irq_restore(flags)		setipl((flags))
 
-/*
- * Compatibility macros - they will be removed after some time.
+/* On sparc64 IRQ flags are the PIL register.  A value of zero
+ * means all interrupt levels are enabled, any other value means
+ * only IRQ levels greater than that value will be received.
+ * Consequently this means that the lowest IRQ level is one.
  */
-#ifndef CONFIG_SMP
-#define cli() local_irq_disable()
-#define sti() local_irq_enable()
-#define save_flags(x) local_save_flags(x)
-#define restore_flags(x) local_irq_restore(x)
-#endif
+#define irqs_disabled()		\
+({	unsigned long flags;	\
+	local_save_flags(flags);\
+	(flags > 0);		\
+})
 
 #define nop() 		__asm__ __volatile__ ("nop")
 
