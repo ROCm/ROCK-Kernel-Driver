@@ -1,5 +1,5 @@
 /*
- *  $Id: powernow-k6.c,v 1.31 2002/09/21 09:05:29 db Exp $
+ *  $Id: powernow-k6.c,v 1.33 2002/09/29 23:43:11 db Exp $
  *  This file was part of Powertweak Linux (http://powertweak.sf.net)
  *  and is shared with the Linux Kernel module.
  *
@@ -239,7 +239,7 @@ static int __init powernow_k6_init(void)
 		release_region (POWERNOW_IOPORT, 16);
 		return -ENOMEM;
 	}
-	driver->policy = (struct cpufreq_policy *) (driver + sizeof(struct cpufreq_driver));
+	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 #ifdef CONFIG_CPU_FREQ_24_API
 	driver->cpu_min_freq     = busfreq * 20;

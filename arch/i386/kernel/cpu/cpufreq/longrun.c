@@ -1,5 +1,5 @@
 /*
- *  $Id: longrun.c,v 1.10 2002/09/22 09:01:41 db Exp $
+ *  $Id: longrun.c,v 1.12 2002/09/29 23:43:10 db Exp $
  *
  * (C) 2002  Dominik Brodowski <linux@brodo.de>
  *
@@ -241,7 +241,7 @@ static int __init longrun_init(void)
 	if (!driver)
 		return -ENOMEM;
 
-	driver->policy = (struct cpufreq_policy *) (driver + sizeof(struct cpufreq_driver));
+	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 	if (longrun_determine_freqs(&longrun_low_freq, &longrun_high_freq)) {
 		kfree(driver);

@@ -626,7 +626,7 @@ time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 		}
 		for (i=0; i<NR_CPUS; i++)
 			if ((freq->cpu == CPUFREQ_ALL_CPUS) || (freq->cpu == i))
-				cpu_data[i].loops_per_jiffy = cpufreq_scale(loops_per_jiffy, freq->old, freq->new);
+				cpu_data[i].loops_per_jiffy = cpufreq_scale(cpu_data[i].loops_per_jiffy, freq->old, freq->new);
 		break;
 
 	case CPUFREQ_POSTCHANGE:
@@ -637,7 +637,7 @@ time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 		}
 		for (i=0; i<NR_CPUS; i++)
 			if ((freq->cpu == CPUFREQ_ALL_CPUS) || (freq->cpu == i))
-				cpu_data[i].loops_per_jiffy = cpufreq_scale(loops_per_jiffy, freq->old, freq->new);
+				cpu_data[i].loops_per_jiffy = cpufreq_scale(cpu_data[i].loops_per_jiffy, freq->old, freq->new);
 		break;
 	}
 

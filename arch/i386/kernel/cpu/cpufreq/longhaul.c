@@ -1,5 +1,5 @@
 /*
- *  $Id: longhaul.c,v 1.70 2002/09/12 10:22:17 db Exp $
+ *  $Id: longhaul.c,v 1.72 2002/09/29 23:43:10 db Exp $
  *
  *  (C) 2001  Dave Jones. <davej@suse.de>
  *  (C) 2002  Padraig Brady. <padraig@antefacto.com>
@@ -771,7 +771,7 @@ static int __init longhaul_init (void)
 	if (!driver)
 		return -ENOMEM;
 
-	driver->policy = (struct cpufreq_policy *) (driver + sizeof(struct cpufreq_driver));
+	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 #ifdef CONFIG_CPU_FREQ_24_API
 	driver->cpu_min_freq    = (unsigned int) lowest_speed;

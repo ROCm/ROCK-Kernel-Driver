@@ -225,7 +225,7 @@ int __init cpufreq_p4_init(void)
 	if (!driver)
 		return -ENOMEM;
 
-	driver->policy = (struct cpufreq_policy *) (driver + sizeof(struct cpufreq_driver));
+	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 	if (!stock_freq)
 		stock_freq = cpu_khz;
