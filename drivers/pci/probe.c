@@ -384,7 +384,7 @@ int pci_setup_device(struct pci_dev * dev)
 		/* The PCI-to-PCI bridge spec requires that subtractive
 		   decoding (i.e. transparent) bridge must have programming
 		   interface code of 0x01. */ 
-		dev->transparent = ((class & 0xff) == 1);
+		dev->transparent = ((dev->class & 0xff) == 1);
 		pci_read_bases(dev, 2, PCI_ROM_ADDRESS1);
 		break;
 
