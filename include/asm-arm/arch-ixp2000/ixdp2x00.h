@@ -1,5 +1,5 @@
 /*
- * inclue/asm-arm/arch-ixp2000/ixmb2x00.h
+ * include/asm-arm/arch-ixp2000/ixdp2x00.h
  *
  * Register and other defines for IXDP2[48]00 platforms
  *

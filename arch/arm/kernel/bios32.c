@@ -596,7 +596,7 @@ char * __init pcibios_setup(char *str)
 	if (!strcmp(str, "debug")) {
 		debug_pci = 1;
 		return NULL;
-	} else if (!strcmp, "firmware") {
+	} else if (!strcmp(str, "firmware")) {
 		use_firmware = 1;
 		return NULL;
 	}

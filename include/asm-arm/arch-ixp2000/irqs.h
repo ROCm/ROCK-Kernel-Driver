@@ -91,7 +91,7 @@
 
 /*
  * This allows for all the on-chip sources plus up to 32 CPLD based
- * IRQs. Should be more then enough.
+ * IRQs. Should be more than enough.
  */
 #define	IXP2000_BOARD_IRQS		32
 #define NR_IRQS				(NR_IXP2000_IRQS + IXP2000_BOARD_IRQS)

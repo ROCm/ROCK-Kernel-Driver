@@ -265,7 +265,7 @@ static unsigned long GPIO_IRQ_level_high;
 
 void gpio_line_config(int line, int style)
 {
-	int flags;
+	unsigned long flags;
 
 	local_irq_save(flags);
 

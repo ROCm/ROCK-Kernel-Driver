@@ -53,7 +53,6 @@ params_phys-$(CONFIG_ARCH_IOP3XX)	:= 0xa0000100
 params-phys-$(CONFIG_ARCH_IXP4XX)	:= 0x00000100
    zreladdr-$(CONFIG_ARCH_IXP2000)	:= 0x00008000
 params-phys-$(CONFIG_ARCH_IXP2000)	:= 0x00000100
-   zreladdr-$(CONFIG_ARCH_IXP2000)	:= 0x00008000
    zreladdr-$(CONFIG_ARCH_OMAP)		:= 0x10008000
 params_phys-$(CONFIG_ARCH_OMAP)		:= 0x10000100
 initrd_phys-$(CONFIG_ARCH_OMAP)		:= 0x10800000
