@@ -589,6 +589,7 @@ ia64_flush_fph (struct task_struct *task)
 		psr->mfh = 0;
 		ia64_save_fpu(&task->thread.fph[0]);
 		task->thread.flags |= IA64_THREAD_FPH_VALID;
+		task->thread.last_fph_cpu = smp_processor_id();
 	}
 }
 
@@ -608,6 +609,7 @@ ia64_sync_fph (struct task_struct *task)
 	ia64_flush_fph(task);
 	if (!(task->thread.flags & IA64_THREAD_FPH_VALID)) {
 		task->thread.flags |= IA64_THREAD_FPH_VALID;
+		task->thread.last_fph_cpu = -1;		/* force reload */
 		memset(&task->thread.fph, 0, sizeof(task->thread.fph));
 	}
 #ifndef CONFIG_SMP
