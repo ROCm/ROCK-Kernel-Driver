@@ -446,7 +446,7 @@ cpci_find_slot(struct pci_bus *bus, unsigned int devfn)
 }
 
 /* This is the interrupt mode interrupt handler */
-void
+irqreturn_t
 cpci_hp_intr(int irq, void *data, struct pt_regs *regs)
 {
 	dbg("entered cpci_hp_intr");
@@ -455,7 +455,7 @@ cpci_hp_intr(int irq, void *data, struct pt_regs *regs)
 	if((controller->irq_flags & SA_SHIRQ) &&
 	    !controller->ops->check_irq(controller->dev_id)) {
 		dbg("exited cpci_hp_intr, not our interrupt");
-		return;
+		return IRQ_NONE;
 	}
 
 	/* Disable ENUM interrupt */
@@ -465,6 +465,7 @@ cpci_hp_intr(int irq, void *data, struct pt_regs *regs)
 	dbg("Signal event_semaphore");
 	up(&event_semaphore);
 	dbg("exited cpci_hp_intr");
+	return IRQ_HANDLED;
 }
 
 /*

@@ -916,8 +916,9 @@ int cpqhp_resource_sort_and_combine(struct pci_resource **head)
 }
 
 
-void cpqhp_ctrl_intr(int IRQ, struct controller * ctrl, struct pt_regs *regs)
+irqreturn_t cpqhp_ctrl_intr(int IRQ, void *data, struct pt_regs *regs)
 {
+	struct controller *ctrl = data;
 	u8 schedule_flag = 0;
 	u16 misc;
 	u32 Diff;
@@ -929,7 +930,7 @@ void cpqhp_ctrl_intr(int IRQ, struct controller * ctrl, struct pt_regs *regs)
 	// Check to see if it was our interrupt
 	//*********************************
 	if (!(misc & 0x000C)) {
-		return;
+		return IRQ_NONE;
 	}
 
 	if (misc & 0x0004) {
@@ -974,7 +975,7 @@ void cpqhp_ctrl_intr(int IRQ, struct controller * ctrl, struct pt_regs *regs)
 		up(&event_semaphore);
 		dbg("Signal event_semaphore\n");
 	}
-
+	return IRQ_HANDLED;
 }
 
 
