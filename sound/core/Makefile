@@ -22,7 +22,7 @@ snd-rtctimer-objs := rtctimer.o
 snd-hwdep-objs    := hwdep.o
 
 obj-$(CONFIG_SND) += snd.o
-ifeq ($(CONFIG_RTC),y)
+ifeq ($(subst m,y,$(CONFIG_RTC)),y)
   obj-$(CONFIG_SND_RTCTIMER) += snd-timer.o
   obj-$(CONFIG_SND_RTCTIMER) += snd-rtctimer.o
 endif
@@ -93,6 +93,7 @@ obj-$(CONFIG_SND_FM801) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_ICE1712) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_INTEL8X0) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_MAESTRO3) += snd-pcm.o snd-timer.o snd.o
+obj-$(CONFIG_SND_RME32) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_RME96) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_SONICVIBES) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_VIA686) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
@@ -110,5 +111,7 @@ ifeq ($(CONFIG_SND_SB16_CSP),y)
   obj-$(CONFIG_SND_SB16) += snd-hwdep.o
   obj-$(CONFIG_SND_SBAWE) += snd-hwdep.o
 endif
+
+obj-m := $(sort $(obj-m))
 
 include $(TOPDIR)/Rules.make

@@ -11,6 +11,7 @@ fi
 dep_tristate 'EMU10K1 (SB Live!, E-mu APS)' CONFIG_SND_EMU10K1 $CONFIG_SND
 dep_tristate 'Korg 1212 IO' CONFIG_SND_KORG1212 $CONFIG_SND
 dep_tristate 'NeoMagic NM256AV/ZX' CONFIG_SND_NM256 $CONFIG_SND
+dep_tristate 'RME Digi32, 32/8, 32 PRO' CONFIG_SND_RME32 $CONFIG_SND
 dep_tristate 'RME Digi96, 96/8, 96/8 PRO' CONFIG_SND_RME96 $CONFIG_SND
 dep_tristate 'RME Digi9652 (Hammerfall)' CONFIG_SND_RME9652 $CONFIG_SND
 dep_tristate 'Trident 4D-Wave DX/NX; SiS 7018' CONFIG_SND_TRIDENT $CONFIG_SND
@@ -28,5 +29,16 @@ dep_tristate 'Intel i810/i820/i830/i840/MX440 integrated audio' CONFIG_SND_INTEL
 dep_tristate 'S3 SonicVibes' CONFIG_SND_SONICVIBES $CONFIG_SND
 dep_tristate 'VIA 82C686A/B South Bridge' CONFIG_SND_VIA686 $CONFIG_SND
 dep_tristate 'VIA 8233 South Bridge' CONFIG_SND_VIA8233 $CONFIG_SND
+
+# define gameport if necessary
+if [ "$CONFIG_INPUT_GAMEPORT" != "n" ]; then
+  if [ "$CONFIG_SND_CS4281" = "y" \
+       -o "$CONFIG_SND_ES1938" = "y" \
+       -o "$CONFIG_SND_CS46XX" = "y" \
+       -o "$CONFIG_SND_SONICVIBES" = "y" \
+       -o "$CONFIG_SND_TRIDENT" = "y" ]; then
+    define_tristate CONFIG_INPUT_GAMEPORT y
+  fi
+fi
 
 endmenu

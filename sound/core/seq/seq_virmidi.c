@@ -76,6 +76,7 @@ static void snd_virmidi_init_event(snd_virmidi_t *vmidi, snd_seq_event_t *ev)
 		ev->dest.port = vmidi->port;
 		break;
 	}
+	ev->type = SNDRV_SEQ_EVENT_NONE;
 }
 
 /*
@@ -150,12 +151,13 @@ static void snd_virmidi_output_trigger(snd_rawmidi_substream_t * substream, int 
 
 	if (up) {
 		vmidi->trigger = 1;
-		if (!(vmidi->rdev->flags & SNDRV_VIRMIDI_SUBSCRIBE)) {
+		if (vmidi->seq_mode == SNDRV_VIRMIDI_SEQ_DISPATCH &&
+		    !(vmidi->rdev->flags & SNDRV_VIRMIDI_SUBSCRIBE)) {
 			snd_rawmidi_transmit_ack(substream, substream->runtime->buffer_size - substream->runtime->avail);
 			return;		/* ignored */
 		}
 		if (vmidi->event.type != SNDRV_SEQ_EVENT_NONE) {
-			if (snd_seq_kernel_client_dispatch(vmidi->client, &vmidi->event, 0, 0) <= 0)
+			if (snd_seq_kernel_client_dispatch(vmidi->client, &vmidi->event, 0, 0) < 0)
 				return;
 			vmidi->event.type = SNDRV_SEQ_EVENT_NONE;
 		}
@@ -174,7 +176,7 @@ static void snd_virmidi_output_trigger(snd_rawmidi_substream_t * substream, int 
 				pbuf += res;
 				count -= res;
 				if (vmidi->event.type != SNDRV_SEQ_EVENT_NONE) {
-					if (snd_seq_kernel_client_dispatch(vmidi->client, &vmidi->event, 0, 0) <= 0)
+					if (snd_seq_kernel_client_dispatch(vmidi->client, &vmidi->event, 0, 0) < 0)
 						return;
 					vmidi->event.type = SNDRV_SEQ_EVENT_NONE;
 				}

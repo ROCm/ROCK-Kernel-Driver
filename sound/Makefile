@@ -14,7 +14,7 @@ ifeq ($(CONFIG_SOUND_PRIME),y)
   obj-y += oss/sounddrivers.o
 endif
 
-_subdirs := core i2c drivers isa pci ppc synth
+_subdirs := core i2c drivers isa pci ppc arm synth
 
 subdir-$(CONFIG_SND) += $(_subdirs)
 
@@ -44,6 +44,7 @@ ifeq ($(CONFIG_SND),y)
 	   pci/trident/_trident.o \
 	   pci/ymfpci/_ymfpci.o
   obj-y += ppc/ppc.o
+  obj-y += arm/arm.o
   obj-y += synth/synth.o \
 	   synth/emux/_emux.o
   obj-y += last.o

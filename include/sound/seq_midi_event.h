@@ -34,10 +34,13 @@ struct snd_midi_event_t {
 	int read;	/* chars read */
 	int type;	/* current event type */
 	unsigned char lastcmd;
+	unsigned char nostat;
 	int bufsize;
-	unsigned char *buf;	/* input buffer */
+	unsigned char *buf; /* input buffer */
 	spinlock_t lock;
 };
+
+#define SND_MIDI_EVENT_NOSTATUS		(1<<0)	/* don't encode MIDI status */
 
 int snd_midi_event_new(int bufsize, snd_midi_event_t **rdev);
 int snd_midi_event_resize_buffer(snd_midi_event_t *dev, int bufsize);
@@ -45,6 +48,7 @@ void snd_midi_event_free(snd_midi_event_t *dev);
 void snd_midi_event_init(snd_midi_event_t *dev);
 void snd_midi_event_reset_encode(snd_midi_event_t *dev);
 void snd_midi_event_reset_decode(snd_midi_event_t *dev);
+void snd_midi_event_no_status(snd_midi_event_t *dev, int on);
 /* encode from byte stream - return number of written bytes if success */
 long snd_midi_event_encode(snd_midi_event_t *dev, unsigned char *buf, long count, snd_seq_event_t *ev);
 int snd_midi_event_encode_byte(snd_midi_event_t *dev, int c, snd_seq_event_t *ev);

@@ -431,7 +431,6 @@ static int unsubscribe_port(client_t *client, client_port_t *port,
 {
 	int err = 0;
 
-	snd_assert(port->owner, return -EFAULT);
 	if (! grp->count)
 		return -EINVAL;
 	grp->count--;

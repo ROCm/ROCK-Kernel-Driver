@@ -65,4 +65,6 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_YMFPCI) += snd-opl3-synth.o
 endif
 
+obj-m := $(sort $(obj-m))
+
 include $(TOPDIR)/Rules.make

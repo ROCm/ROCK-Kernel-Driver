@@ -38,16 +38,67 @@ int snd_task_name(struct task_struct *task, char *name, size_t size)
 }
 
 #ifdef CONFIG_SND_VERBOSE_PRINTK
-int snd_verbose_printk(const char *file, int line, const char *format)
+void snd_verbose_printk(const char *file, int line, const char *format, ...)
 {
+	va_list args;
+	char tmpbuf[512];
+	
 	if (format[0] == '<' && format[1] >= '0' && format[1] <= '9' && format[2] == '>') {
 		char tmp[] = "<0>";
 		tmp[1] = format[1];
 		printk("%sALSA %s:%d: ", tmp, file, line);
-		return 1;
+		format += 3;
 	} else {
 		printk("ALSA %s:%d: ", file, line);
-		return 0;
 	}
+	va_start(args, format);
+	vsnprintf(tmpbuf, sizeof(tmpbuf)-1, format, args);
+	va_end(args);
+	tmpbuf[sizeof(tmpbuf)-1] = '\0';
+	printk(tmpbuf);
+}
+#endif
+
+#if defined(CONFIG_SND_DEBUG) && defined(CONFIG_SND_VERBOSE_PRINTK)
+void snd_verbose_printd(const char *file, int line, const char *format, ...)
+{
+	va_list args;
+	char tmpbuf[512];
+	
+	if (format[0] == '<' && format[1] >= '0' && format[1] <= '9' && format[2] == '>') {
+		char tmp[] = "<0>";
+		tmp[1] = format[1];
+		printk("%sALSA %s:%d: ", tmp, file, line);
+		format += 3;
+	} else {
+		printk(KERN_DEBUG "ALSA %s:%d: ", file, line);
+	}
+	va_start(args, format);
+	vsnprintf(tmpbuf, sizeof(tmpbuf)-1, format, args);
+	va_end(args);
+	tmpbuf[sizeof(tmpbuf)-1] = '\0';
+	printk(tmpbuf);
+}
+#endif
+
+#if defined(CONFIG_SND_DEBUG) && !defined(CONFIG_SND_VERBOSE_PRINTK)
+void snd_printd(const char *format, ...)
+{
+	va_list args;
+	char tmpbuf[512];
+	
+	if (format[0] == '<' && format[1] >= '0' && format[1] <= '9' && format[2] == '>') {
+		char tmp[] = "<0>";
+		tmp[1] = format[1];
+		printk("%sALSA %s:%d: ", tmp, file, line);
+		format += 3;
+	} else {
+		printk(KERN_DEBUG "ALSA %s:%d: ", file, line);
+	}
+	va_start(args, format);
+	vsnprintf(tmpbuf, sizeof(tmpbuf)-1, format, args);
+	va_end(args);
+	tmpbuf[sizeof(tmpbuf)-1] = '\0';
+	printk(tmpbuf);
 }
 #endif

@@ -123,8 +123,9 @@
 #define AC97_SCAP_CENTER_LFE_DAC (1<<1)	/* center and LFE DACs are present */
 
 /* ac97->flags */
-#define AC97_HAS_PC_BEEP	(1<<0)
+#define AC97_HAS_PC_BEEP	(1<<0)	/* force PC Speaker usage */
 #define AC97_AD_MULTI		(1<<1)	/* Analog Devices - multi codecs */
+#define AC97_CS_SPDIF		(1<<2)	/* Cirrus Logic uses funky SPDIF */
 
 /*
 
