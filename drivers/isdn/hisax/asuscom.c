@@ -57,18 +57,6 @@ readreg(struct IsdnCardState *cs, unsigned int adr, u8 off)
 }
 
 static inline void
-readfifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&asuscom_lock, flags);
-	byteout(cs->hw.asus.adr, off);
-	insb(adr, data, size);
-	spin_unlock_irqrestore(&asuscom_lock, flags);
-}
-
-
-static inline void
 writereg(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 data)
 {
 	unsigned long flags;
@@ -80,14 +68,18 @@ writereg(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 data)
 }
 
 static inline void
+readfifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
+{
+	byteout(cs->hw.asus.adr, off);
+	insb(adr, data, size);
+}
+
+
+static inline void
 writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&asuscom_lock, flags);
 	byteout(cs->hw.asus.adr, off);
 	outsb(adr, data, size);
-	spin_unlock_irqrestore(&asuscom_lock, flags);
 }
 
 static u8

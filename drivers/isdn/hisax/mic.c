@@ -59,23 +59,15 @@ writereg(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 data)
 static inline void
 readfifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&mic_lock, flags);
 	byteout(cs->hw.mic.adr, off);
 	insb(adr, data, size);
-	spin_unlock_irqrestore(&mic_lock, flags);
 }
 
 static inline void
 writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&mic_lock, flags);
 	byteout(cs->hw.mic.adr, off);
 	outsb(adr, data, size);
-	spin_unlock_irqrestore(&mic_lock, flags);
 }
 
 static u8

@@ -146,23 +146,15 @@ readfifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size
 static inline void
 writereg(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 data)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&sedlbauer_lock, flags);
 	byteout(cs->hw.sedl.adr, off);
 	byteout(adr, data);
-	spin_unlock_irqrestore(&sedlbauer_lock, flags);
 }
 
 static inline void
 writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&sedlbauer_lock, flags);
 	byteout(cs->hw.sedl.adr, off);
 	outsb(adr, data, size);
-	spin_unlock_irqrestore(&sedlbauer_lock, flags);
 }
 
 static u8

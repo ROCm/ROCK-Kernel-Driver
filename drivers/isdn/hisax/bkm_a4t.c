@@ -29,7 +29,7 @@ const char *bkm_a4t_revision = "$Revision: 1.13.6.6 $";
 static inline u8
 readreg(unsigned int ale, unsigned long adr, u8 off)
 {
-	register u_int ret;
+	u_int ret;
 	unsigned long flags;
 	unsigned int *po = (unsigned int *) adr;	/* Postoffice */
 	spin_lock_irqsave(&bkm_a4t_lock, flags);
@@ -41,17 +41,6 @@ readreg(unsigned int ale, unsigned long adr, u8 off)
 	spin_unlock_irqrestore(&bkm_a4t_lock, flags);
 	return ((unsigned char) ret);
 }
-
-
-static inline void
-readfifo(unsigned int ale, unsigned long adr, u8 off, u8 * data, int size)
-{
-	/* fifo read without cli because it's allready done  */
-	int i;
-	for (i = 0; i < size; i++)
-		*data++ = readreg(ale, adr, off);
-}
-
 
 static inline void
 writereg(unsigned int ale, unsigned long adr, u8 off, u8 data)
@@ -66,17 +55,23 @@ writereg(unsigned int ale, unsigned long adr, u8 off, u8 data)
 	spin_unlock_irqrestore(&bkm_a4t_lock, flags);
 }
 
+static inline void
+readfifo(unsigned int ale, unsigned long adr, u8 off, u8 * data, int size)
+{
+	int i;
+
+	for (i = 0; i < size; i++)
+		*data++ = readreg(ale, adr, off);
+}
 
 static inline void
 writefifo(unsigned int ale, unsigned long adr, u8 off, u8 * data, int size)
 {
-	/* fifo write without cli because it's allready done  */
 	int i;
 
 	for (i = 0; i < size; i++)
 		writereg(ale, adr, off, *data++);
 }
-
 
 static u8
 isac_read(struct IsdnCardState *cs, u8 offset)

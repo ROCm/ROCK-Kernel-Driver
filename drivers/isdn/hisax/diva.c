@@ -96,18 +96,6 @@ readreg(unsigned int ale, unsigned int adr, u8 off)
 }
 
 static inline void
-readfifo(unsigned int ale, unsigned int adr, u8 off, u8 * data, int size)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&diva_lock, flags);
-	byteout(ale, off);
-	insb(adr, data, size);
-	spin_unlock_irqrestore(&diva_lock, flags);
-}
-
-
-static inline void
 writereg(unsigned int ale, unsigned int adr, u8 off, u8 data)
 {
 	unsigned long flags;
@@ -119,14 +107,17 @@ writereg(unsigned int ale, unsigned int adr, u8 off, u8 data)
 }
 
 static inline void
+readfifo(unsigned int ale, unsigned int adr, u8 off, u8 * data, int size)
+{
+	byteout(ale, off);
+	insb(adr, data, size);
+}
+
+static inline void
 writefifo(unsigned int ale, unsigned int adr, u8 off, u8 *data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&diva_lock, flags);
 	byteout(ale, off);
 	outsb(adr, data, size);
-	spin_unlock_irqrestore(&diva_lock, flags);
 }
 
 static inline u8

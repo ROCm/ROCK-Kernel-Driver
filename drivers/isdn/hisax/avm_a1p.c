@@ -86,24 +86,15 @@ writereg(struct IsdnCardState *cs, int offset, u8 adr, u8 value)
 static inline void
 readfifo(struct IsdnCardState *cs, int offset, u8 *data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&avm_a1p_lock, flags);
         byteout(cs->hw.avm.cfg_reg + ADDRREG_OFFSET, offset);
 	insb(cs->hw.avm.cfg_reg + DATAREG_OFFSET, data, size);
-	spin_unlock_irqrestore(&avm_a1p_lock, flags);
-	return;
 }
 
 static inline void
 writefifo(struct IsdnCardState *cs, int offset, u8 *data, int size)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&avm_a1p_lock, flags);
 	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET, offset);
 	outsb(cs->hw.avm.cfg_reg+DATAREG_OFFSET, data, size);
-	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
 static u8

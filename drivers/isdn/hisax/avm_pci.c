@@ -79,9 +79,9 @@ static spinlock_t avm_pci_lock = SPIN_LOCK_UNLOCKED;
 static u8
 ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
-	register u8 idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
-	register u8 val;
-	register unsigned long flags;
+	u8 idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
+	u8 val;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);
@@ -93,8 +93,8 @@ ReadISAC(struct IsdnCardState *cs, u8 offset)
 static void
 WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	register u8 idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
-	register unsigned long flags;
+	u8 idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);
@@ -126,9 +126,9 @@ static struct dc_hw_ops isac_ops = {
 static inline u_int
 ReadHDLCPCI(struct IsdnCardState *cs, int chan, u8 offset)
 {
-	register u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
-	register u_int val;
-	register unsigned long flags;
+	u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
+	u_int val;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outl(idx, cs->hw.avm.cfg_reg + 4);
@@ -140,8 +140,8 @@ ReadHDLCPCI(struct IsdnCardState *cs, int chan, u8 offset)
 static inline void
 WriteHDLCPCI(struct IsdnCardState *cs, int chan, u8 offset, u_int value)
 {
-	register u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
-	register unsigned long flags;
+	u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outl(idx, cs->hw.avm.cfg_reg + 4);
@@ -152,9 +152,9 @@ WriteHDLCPCI(struct IsdnCardState *cs, int chan, u8 offset, u_int value)
 static inline u8
 ReadHDLCPnP(struct IsdnCardState *cs, int chan, u8 offset)
 {
-	register u8 idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
-	register u8 val;
-	register unsigned long flags;
+	u8 idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
+	u8 val;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);
@@ -166,8 +166,8 @@ ReadHDLCPnP(struct IsdnCardState *cs, int chan, u8 offset)
 static inline void
 WriteHDLCPnP(struct IsdnCardState *cs, int chan, u8 offset, u8 value)
 {
-	register u8 idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
-	register unsigned long flags;
+	u8 idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);

@@ -68,26 +68,20 @@ static inline void
 readfifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
 {
 	int i;
-	unsigned long flags;
 
-	spin_lock_irqsave(&bkm_a8_lock, flags);
 	wordout(cs->hw.ax.base, off);
 	for (i = 0; i < size; i++)
 		data[i] = wordin(cs->hw.ax.data_adr) & 0xFF;
-	spin_unlock_irqrestore(&bkm_a8_lock, flags);
 }
 
 static inline void
 writefifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
 {
 	int i;
-	unsigned long flags;
 
-	spin_lock_irqsave(&bkm_a8_lock, flags);
 	wordout(cs->hw.ax.base, off);
 	for (i = 0; i < size; i++)
 		wordout(cs->hw.ax.data_adr, data[i]);
-	spin_unlock_irqrestore(&bkm_a8_lock, flags);
 }
 
 static u8
