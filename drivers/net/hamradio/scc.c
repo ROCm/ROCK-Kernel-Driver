@@ -1196,11 +1196,7 @@ static void t_tail(unsigned long channel)
  	if (scc->stat.tx_state == TXS_TIMEOUT)		/* we had a timeout? */
  	{
  		scc->stat.tx_state = TXS_WAIT;
-
- 		if (scc->kiss.mintime != TIMER_OFF)	/* try it again */
- 			scc_start_tx_timer(scc, t_dwait, scc->kiss.mintime*100);
- 		else
- 			scc_start_tx_timer(scc, t_dwait, 0);
+		scc_start_tx_timer(scc, t_dwait, scc->kiss.mintime*100);
  		return;
  	}
  	
@@ -1274,8 +1270,7 @@ static void t_idle(unsigned long channel)
 	del_timer(&scc->tx_wdog);
 
 	scc_key_trx(scc, TX_OFF);
-
-	if (scc->kiss.mintime != TIMER_OFF)
+	if(scc->kiss.mintime)
 		scc_start_tx_timer(scc, t_dwait, scc->kiss.mintime*100);
 	scc->stat.tx_state = TXS_WAIT;
 }
