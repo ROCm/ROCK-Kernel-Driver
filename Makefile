@@ -327,15 +327,16 @@ endef
 #	set -e makes the rule exit immediately on error
 
 define rule_vmlinux__
-	set -e								\
+	set -e;								\
 	$(if $(filter .tmp_kallsyms%,$^),,				\
 	  echo '  GEN     .version';					\
 	  . $(srctree)/scripts/mkversion > .tmp_version;		\
 	  mv -f .tmp_version .version;					\
 	  $(MAKE) $(build)=init;					\
-	)
-	set -e								\
-	$(call cmd,vmlinux__);						\
+	)								\
+	$(if $($(quiet)cmd_vmlinux__),					\
+	  echo '  $($(quiet)cmd_vmlinux__)' &&) 			\
+	$(cmd_vmlinux__);						\
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
 
