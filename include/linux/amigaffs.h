@@ -80,14 +80,14 @@ affs_brelse(struct buffer_head *bh)
 static inline void
 affs_adjust_checksum(struct buffer_head *bh, u32 val)
 {
-	u32 tmp = be32_to_cpu(((u32 *)bh->b_data)[5]);
-	((u32 *)bh->b_data)[5] = cpu_to_be32(tmp - val);
+	u32 tmp = be32_to_cpu(((__be32 *)bh->b_data)[5]);
+	((__be32 *)bh->b_data)[5] = cpu_to_be32(tmp - val);
 }
 static inline void
 affs_adjust_bitmapchecksum(struct buffer_head *bh, u32 val)
 {
-	u32 tmp = be32_to_cpu(((u32 *)bh->b_data)[0]);
-	((u32 *)bh->b_data)[0] = cpu_to_be32(tmp - val);
+	u32 tmp = be32_to_cpu(((__be32 *)bh->b_data)[0]);
+	((__be32 *)bh->b_data)[0] = cpu_to_be32(tmp - val);
 }
 
 static inline void
@@ -164,89 +164,89 @@ affs_unlock_ext(struct inode *inode)
 #define AFFS_DATA(bh)		(((struct affs_data_head *)(bh)->b_data)->data)
 
 struct affs_date {
-	u32 days;
-	u32 mins;
-	u32 ticks;
+	__be32 days;
+	__be32 mins;
+	__be32 ticks;
 };
 
 struct affs_short_date {
-	u16 days;
-	u16 mins;
-	u16 ticks;
+	__be16 days;
+	__be16 mins;
+	__be16 ticks;
 };
 
 struct affs_root_head {
-	u32 ptype;
-	u32 spare1;
-	u32 spare2;
-	u32 hash_size;
-	u32 spare3;
-	u32 checksum;
-	u32 hashtable[1];
+	__be32 ptype;
+	__be32 spare1;
+	__be32 spare2;
+	__be32 hash_size;
+	__be32 spare3;
+	__be32 checksum;
+	__be32 hashtable[1];
 };
 
 struct affs_root_tail {
-	u32 bm_flag;
-	u32 bm_blk[AFFS_ROOT_BMAPS];
-	u32 bm_ext;
+	__be32 bm_flag;
+	__be32 bm_blk[AFFS_ROOT_BMAPS];
+	__be32 bm_ext;
 	struct affs_date root_change;
 	u8 disk_name[32];
-	u32 spare1;
-	u32 spare2;
+	__be32 spare1;
+	__be32 spare2;
 	struct affs_date disk_change;
 	struct affs_date disk_create;
-	u32 spare3;
-	u32 spare4;
-	u32 dcache;
-	u32 stype;
+	__be32 spare3;
+	__be32 spare4;
+	__be32 dcache;
+	__be32 stype;
 };
 
 struct affs_head {
-	u32 ptype;
-	u32 key;
-	u32 block_count;
-	u32 spare1;
-	u32 first_data;
-	u32 checksum;
-	u32 table[1];
+	__be32 ptype;
+	__be32 key;
+	__be32 block_count;
+	__be32 spare1;
+	__be32 first_data;
+	__be32 checksum;
+	__be32 table[1];
 };
 
 struct affs_tail {
-	u32 spare1;
-	u16 uid;
-	u16 gid;
-	u32 protect;
-	u32 size;
+	__be32 spare1;
+	__be16 uid;
+	__be16 gid;
+	__be32 protect;
+	__be32 size;
 	u8 comment[92];
 	struct affs_date change;
 	u8 name[32];
-	u32 spare2;
-	u32 original;
-	u32 link_chain;
-	u32 spare[5];
-	u32 hash_chain;
-	u32 parent;
-	u32 extension;
-	u32 stype;
+	__be32 spare2;
+	__be32 original;
+	__be32 link_chain;
+	__be32 spare[5];
+	__be32 hash_chain;
+	__be32 parent;
+	__be32 extension;
+	__be32 stype;
 };
 
 struct slink_front
 {
-	u32 ptype;
-	u32 key;
-	u32 spare1[3];
-	u32 checksum;
+	__be32 ptype;
+	__be32 key;
+	__be32 spare1[3];
+	__be32 checksum;
 	u8 symname[1];	/* depends on block size */
 };
 
 struct affs_data_head
 {
-	u32 ptype;
-	u32 key;
-	u32 sequence;
-	u32 size;
-	u32 next;
-	u32 checksum;
+	__be32 ptype;
+	__be32 key;
+	__be32 sequence;
+	__be32 size;
+	__be32 next;
+	__be32 checksum;
 	u8 data[1];	/* depends on block size */
 };
 

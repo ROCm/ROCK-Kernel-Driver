@@ -5,13 +5,13 @@
 
 struct RigidDiskBlock {
 	u32	rdb_ID;
-	u32	rdb_SummedLongs;
+	__be32	rdb_SummedLongs;
 	s32	rdb_ChkSum;
 	u32	rdb_HostID;
-	u32	rdb_BlockBytes;
+	__be32	rdb_BlockBytes;
 	u32	rdb_Flags;
 	u32	rdb_BadBlockList;
-	u32	rdb_PartitionList;
+	__be32	rdb_PartitionList;
 	u32	rdb_FileSysHeaderList;
 	u32	rdb_DriveInit;
 	u32	rdb_Reserved1[6];
@@ -45,17 +45,17 @@ struct RigidDiskBlock {
 #define	IDNAME_RIGIDDISK	0x5244534B	/* "RDSK" */
 
 struct PartitionBlock {
-	u32	pb_ID;
-	u32	pb_SummedLongs;
+	__be32	pb_ID;
+	__be32	pb_SummedLongs;
 	s32	pb_ChkSum;
 	u32	pb_HostID;
-	u32	pb_Next;
+	__be32	pb_Next;
 	u32	pb_Flags;
 	u32	pb_Reserved1[2];
 	u32	pb_DevFlags;
 	u8	pb_DriveName[32];
 	u32	pb_Reserved2[15];
-	u32	pb_Environment[17];
+	__be32	pb_Environment[17];
 	u32	pb_EReserved[15];
 };
 
