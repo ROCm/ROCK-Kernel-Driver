@@ -107,8 +107,7 @@ struct pcmcia_bus_socket {
 	struct work_struct	removal;
 	socket_bind_t		*bind;
 	struct device		*socket_dev;
-	struct list_head	socket_list;
-	unsigned int		socket_no; /* deprecated */
+	struct pcmcia_socket	*parent;
 };
 
 #define SOCKET_PRESENT		0x01
@@ -121,10 +120,6 @@ struct pcmcia_bus_socket {
 static dev_info_t dev_info = "Driver Services";
 
 static int major_dev = -1;
-
-/* list of all sockets registered with the pcmcia bus driver */
-static DECLARE_RWSEM(bus_socket_list_rwsem);
-static LIST_HEAD(bus_socket_list);
 
 extern struct proc_dir_entry *proc_pccard;
 
@@ -164,20 +159,6 @@ EXPORT_SYMBOL(pcmcia_register_driver);
  */
 void pcmcia_unregister_driver(struct pcmcia_driver *driver)
 {
-	socket_bind_t *b;
-	struct pcmcia_bus_socket *bus_sock;
-
-	if (driver->use_count > 0) {
-		/* Blank out any left-over device instances */
-		driver->attach = NULL; driver->detach = NULL;
-		down_read(&bus_socket_list_rwsem);
-		list_for_each_entry(bus_sock, &bus_socket_list, socket_list) {
-			for (b = bus_sock->bind; b; b = b->next)
-				if (b->driver == driver) 
-					b->instance = NULL;
-		}
-		up_read(&bus_socket_list_rwsem);
-	}
 	driver_unregister(&driver->drv);
 }
 EXPORT_SYMBOL(pcmcia_unregister_driver);
@@ -319,14 +300,14 @@ static int bind_mtd(struct pcmcia_bus_socket *bus_sock, mtd_info_t *mtd_info)
 
     bind_req.dev_info = &mtd_info->dev_info;
     bind_req.Attributes = mtd_info->Attributes;
-    bind_req.Socket = bus_sock->socket_no;
+    bind_req.Socket = bus_sock->parent;
     bind_req.CardOffset = mtd_info->CardOffset;
     ret = pcmcia_bind_mtd(&bind_req);
     if (ret != CS_SUCCESS) {
 	cs_error(NULL, BindMTD, ret);
 	printk(KERN_NOTICE "ds: unable to bind MTD '%s' to socket %d"
 	       " offset 0x%x\n",
-	       (char *)bind_req.dev_info, bus_sock->socket_no, bind_req.CardOffset);
+	       (char *)bind_req.dev_info, bus_sock->parent->sock, bind_req.CardOffset);
 	return -ENODEV;
     }
     return 0;
@@ -351,7 +332,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
     if (!s)
 	    return -EINVAL;
 
-    DEBUG(2, "bind_request(%d, '%s')\n", s->socket_no,
+    DEBUG(2, "bind_request(%d, '%s')\n", s->parent->sock,
 	  (char *)bind_info->dev_info);
     driver = get_pcmcia_driver(&bind_info->dev_info);
     if (!driver)
@@ -366,14 +347,18 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	return -EBUSY;
     }
 
-    bind_req.Socket = s->socket_no;
+    if (!try_module_get(driver->owner))
+	    return -EINVAL;
+
+    bind_req.Socket = s->parent;
     bind_req.Function = bind_info->function;
     bind_req.dev_info = (dev_info_t *) driver->drv.name;
     ret = pcmcia_bind_device(&bind_req);
     if (ret != CS_SUCCESS) {
 	cs_error(NULL, BindDevice, ret);
 	printk(KERN_NOTICE "ds: unable to bind '%s' to socket %d\n",
-	       (char *)dev_info, s->socket_no);
+	       (char *)dev_info, s->parent->sock);
+	module_put(driver->owner);
 	return -ENODEV;
     }
 
@@ -383,6 +368,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
     if (!b) 
     {
     	driver->use_count--;
+	module_put(driver->owner);
 	return -ENOMEM;    
     }
     b->driver = driver;
@@ -396,6 +382,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	if (b->instance == NULL) {
 	    printk(KERN_NOTICE "ds: unable to create instance "
 		   "of '%s'!\n", (char *)bind_info->dev_info);
+	    module_put(driver->owner);
 	    return -ENODEV;
 	}
     }
@@ -476,7 +463,7 @@ static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
     socket_bind_t **b, *c;
 
-    DEBUG(2, "unbind_request(%d, '%s')\n", s->socket_no,
+    DEBUG(2, "unbind_request(%d, '%s')\n", s->parent->sock,
 	  (char *)bind_info->dev_info);
     for (b = &s->bind; *b; b = &(*b)->next)
 	if ((strcmp((char *)(*b)->driver->drv.name,
@@ -492,9 +479,9 @@ static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	if (c->instance)
 	    c->driver->detach(c->instance);
     }
+    module_put(c->driver->owner);
     *b = c->next;
     kfree(c);
-    
     return 0;
 } /* unbind_request */
 
@@ -832,13 +819,13 @@ static struct file_operations ds_fops = {
 	.poll		= ds_poll,
 };
 
-static int __devinit pcmcia_bus_add_socket(struct device *dev, unsigned int socket_nr)
+static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 {
+	struct pcmcia_socket *socket = class_dev->class_data;
 	client_reg_t client_reg;
 	bind_req_t bind;
-	struct pcmcia_bus_socket *s, *tmp_s;
+	struct pcmcia_bus_socket *s;
 	int ret;
-	int i;
 
 	s = kmalloc(sizeof(struct pcmcia_bus_socket), GFP_KERNEL);
 	if(!s)
@@ -855,28 +842,15 @@ static int __devinit pcmcia_bus_add_socket(struct device *dev, unsigned int sock
 	init_waitqueue_head(&s->queue);
 	init_waitqueue_head(&s->request);
 
-	/* find the lowest, unused socket no. Please note that this is a
-	 * temporary workaround until "struct pcmcia_socket" is introduced
-	 * into cs.c which will include this number, and which will be
-	 * accessible to ds.c directly */
-	i = 0;
- next_try:
-	list_for_each_entry(tmp_s, &bus_socket_list, socket_list) {
-		if (tmp_s->socket_no == i) {
-			i++;
-			goto next_try;
-		}
-	}
-	s->socket_no = i;
-
 	/* initialize data */
-	s->socket_dev = dev;
+	s->socket_dev = socket->dev.dev;
 	INIT_WORK(&s->removal, handle_removal, s);
-    
+	s->parent = socket;
+
 	/* Set up hotline to Card Services */
 	client_reg.dev_info = bind.dev_info = &dev_info;
 
-	bind.Socket = s->socket_no;
+	bind.Socket = socket;
 	bind.Function = BIND_FN_ALL;
 	ret = pcmcia_bind_device(&bind);
 	if (ret != CS_SUCCESS) {
@@ -901,50 +875,26 @@ static int __devinit pcmcia_bus_add_socket(struct device *dev, unsigned int sock
 		return -EINVAL;
 	}
 
-	list_add(&s->socket_list, &bus_socket_list);
+	socket->pcmcia = s;
 
 	return 0;
 }
 
 
-static int pcmcia_bus_add_socket_dev(struct class_device *class_dev)
+static void pcmcia_bus_remove_socket(struct class_device *class_dev)
 {
-	struct pcmcia_socket_class_data *cls_d = class_get_devdata(class_dev);
-	unsigned int i;
-	unsigned int ret = 0;
+	struct pcmcia_socket *socket = class_dev->class_data;
 
-	if (!cls_d)
-		return -ENODEV;
-
-	down_write(&bus_socket_list_rwsem);
-        for (i = 0; i < cls_d->nsock; i++)
-		ret += pcmcia_bus_add_socket(class_dev->dev, i);
-	up_write(&bus_socket_list_rwsem);
-
-	return ret;
-}
-
-static void pcmcia_bus_remove_socket_dev(struct class_device *class_dev)
-{
-	struct pcmcia_socket_class_data *cls_d = class_get_devdata(class_dev);
-	struct list_head *list_loop;
-	struct list_head *tmp_storage;
-
-	if (!cls_d)
+	if (!socket || !socket->pcmcia)
 		return;
 
 	flush_scheduled_work();
 
-	down_write(&bus_socket_list_rwsem);
-	list_for_each_safe(list_loop, tmp_storage, &bus_socket_list) {
-		struct pcmcia_bus_socket *bus_sock = container_of(list_loop, struct pcmcia_bus_socket, socket_list);
-		if (bus_sock->socket_dev == class_dev->dev) {
-			pcmcia_deregister_client(bus_sock->handle);
-			list_del(&bus_sock->socket_list);
-			kfree(bus_sock);
-		}
-	}
-	up_write(&bus_socket_list_rwsem);
+	pcmcia_deregister_client(socket->pcmcia->handle);
+
+	kfree(socket->pcmcia);
+	socket->pcmcia = NULL;
+
 	return;
 }
 
@@ -952,8 +902,8 @@ static void pcmcia_bus_remove_socket_dev(struct class_device *class_dev)
 /* the pcmcia_bus_interface is used to handle pcmcia socket devices */
 static struct class_interface pcmcia_bus_interface = {
 	.class = &pcmcia_socket_class,
-	.add = &pcmcia_bus_add_socket_dev,
-	.remove = &pcmcia_bus_remove_socket_dev,
+	.add = &pcmcia_bus_add_socket,
+	.remove = &pcmcia_bus_remove_socket,
 };
 
 
@@ -1008,18 +958,13 @@ module_exit(exit_pcmcia_bus);
 
 /* helpers for backwards-compatible functions */
 
-
 static struct pcmcia_bus_socket * get_socket_info_by_nr(unsigned int nr)
 {
-	struct pcmcia_bus_socket * s;
-	down_read(&bus_socket_list_rwsem);
-	list_for_each_entry(s, &bus_socket_list, socket_list)
-		if (s->socket_no == nr) {
-			up_read(&bus_socket_list_rwsem);
-			return s;
-		}
-	up_read(&bus_socket_list_rwsem);
-	return NULL;
+	struct pcmcia_socket * s = pcmcia_get_socket_by_nr(nr);
+	if (s && s->pcmcia)
+		return s->pcmcia;
+	else
+		return NULL;
 }
 
 /* backwards-compatible accessing of driver --- by name! */

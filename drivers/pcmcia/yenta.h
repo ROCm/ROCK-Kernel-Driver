@@ -2,7 +2,6 @@
 #define __YENTA_H
 
 #include <asm/io.h>
-#include "pci_socket.h"
 
 #define CB_SOCKET_EVENT		0x00
 #define    CB_CSTSEVENT		0x00000001	/* Card status event */
@@ -95,5 +94,24 @@
  * ExCA area extensions in Yenta
  */
 #define CB_MEM_PAGE(map)	(0x40 + (map))
+
+struct yenta_socket {
+	struct pci_dev *dev;
+	int cb_irq, io_irq;
+	void *base;
+	void (*handler)(void *, unsigned int);
+	void *info;
+	socket_cap_t cap;
+	spinlock_t event_lock;
+	unsigned int events;
+	struct work_struct tq_task;
+	struct timer_list poll_timer;
+
+	struct pcmcia_socket socket;
+
+	/* A few words of private data for special stuff of overrides... */
+	unsigned int private[8];
+};
+
 
 #endif

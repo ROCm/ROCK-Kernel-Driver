@@ -125,11 +125,26 @@
 #define rl_mem(socket)		((socket)->private[3])
 #define rl_config(socket)	((socket)->private[4])
 
+static int ricoh_init(struct pcmcia_socket *sock)
+{
+	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
+	yenta_init(sock);
+
+	config_writew(socket, RL5C4XX_MISC, rl_misc(socket));
+	config_writew(socket, RL5C4XX_16BIT_CTL, rl_ctl(socket));
+	config_writew(socket, RL5C4XX_16BIT_IO_0, rl_io(socket));
+	config_writew(socket, RL5C4XX_16BIT_MEM_0, rl_mem(socket));
+	config_writew(socket, RL5C4XX_CONFIG, rl_config(socket));
+	
+	return 0;
+}
+
+
 /*
  * Magic Ricoh initialization code.. Save state at
  * beginning, re-initialize it after suspend.
  */
-static int ricoh_open(pci_socket_t *socket)
+static int ricoh_override(struct yenta_socket *socket)
 {
 	rl_misc(socket) = config_readw(socket, RL5C4XX_MISC);
 	rl_ctl(socket) = config_readw(socket, RL5C4XX_16BIT_CTL);
@@ -146,34 +161,10 @@ static int ricoh_open(pci_socket_t *socket)
 		rl_config(socket) |= RL5C4XX_CONFIG_PREFETCH;
 	}
 
+	socket->socket.ss_entry->init = ricoh_init;
+
 	return 0;
 }
-
-static int ricoh_init(pci_socket_t *socket)
-{
-	yenta_init(socket);
-
-	config_writew(socket, RL5C4XX_MISC, rl_misc(socket));
-	config_writew(socket, RL5C4XX_16BIT_CTL, rl_ctl(socket));
-	config_writew(socket, RL5C4XX_16BIT_IO_0, rl_io(socket));
-	config_writew(socket, RL5C4XX_16BIT_MEM_0, rl_mem(socket));
-	config_writew(socket, RL5C4XX_CONFIG, rl_config(socket));
-	
-	return 0;
-}
-
-static struct pci_socket_ops ricoh_ops = {
-	ricoh_open,
-	yenta_close,
-	ricoh_init,
-	yenta_suspend,
-	yenta_get_status,
-	yenta_get_socket,
-	yenta_set_socket,
-	yenta_set_io_map,
-	yenta_set_mem_map,
-	yenta_proc_setup
-};
 
 #endif /* CONFIG_CARDBUS */
 
