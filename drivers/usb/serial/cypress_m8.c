@@ -740,13 +740,13 @@ static int cypress_ioctl (struct usb_serial_port *port, struct file * file, unsi
 
 	switch (cmd) {
 		case TIOCGSERIAL:
-			if (copy_to_user((void *)arg, port->tty->termios, sizeof(struct termios))) {
+			if (copy_to_user((void __user *)arg, port->tty->termios, sizeof(struct termios))) {
 				return -EFAULT;
 			}
 			return (0);
 			break;
 		case TIOCSSERIAL:
-			if (copy_from_user(port->tty->termios, (void *)arg, sizeof(struct termios))) {
+			if (copy_from_user(port->tty->termios, (void __user *)arg, sizeof(struct termios))) {
 				return -EFAULT;
 			}
 			/* here we need to call cypress_set_termios to invoke the new settings */
@@ -755,13 +755,13 @@ static int cypress_ioctl (struct usb_serial_port *port, struct file * file, unsi
 			break;
 		/* these are called when setting baud rate from gpsd */
 		case TCGETS:
-			if (copy_to_user((void *)arg, port->tty->termios, sizeof(struct termios))) {
+			if (copy_to_user((void __user *)arg, port->tty->termios, sizeof(struct termios))) {
 				return -EFAULT;
 			}
 			return (0);
 			break;
 		case TCSETS:
-			if (copy_from_user(port->tty->termios, (void *)arg, sizeof(struct termios))) {
+			if (copy_from_user(port->tty->termios, (void __user *)arg, sizeof(struct termios))) {
 				return -EFAULT;
 			}
 			/* here we need to call cypress_set_termios to invoke the new settings */
