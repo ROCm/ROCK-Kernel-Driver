@@ -501,14 +501,16 @@ shrink_cache(struct zone *zone, unsigned int gfp_mask,
 			if (!TestClearPageLRU(page))
 				BUG();
 			list_del(&page->lru);
-			if (page_count(page) == 0) {
-				/* It is currently in pagevec_release() */
+			if (get_page_testone(page)) {
+				/*
+				 * It is being freed elsewhere
+				 */
+				__put_page(page);
 				SetPageLRU(page);
 				list_add(&page->lru, &zone->inactive_list);
 				continue;
 			}
 			list_add(&page->lru, &page_list);
-			page_cache_get(page);
 			nr_taken++;
 		}
 		zone->nr_inactive -= nr_taken;
@@ -574,7 +576,7 @@ done:
  * It is safe to rely on PG_active against the non-LRU pages in here because
  * nobody will play with that bit on a non-LRU page.
  *
- * The downside is that we have to touch page->count against each page.
+ * The downside is that we have to touch page->_count against each page.
  * But we had to alter page->flags anyway.
  */
 static void
@@ -603,12 +605,17 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 		if (!TestClearPageLRU(page))
 			BUG();
 		list_del(&page->lru);
-		if (page_count(page) == 0) {
-			/* It is currently in pagevec_release() */
+		if (get_page_testone(page)) {
+			/*
+			 * It was already free!  release_pages() or put_page()
+			 * are about to remove it from the LRU and free it. So
+			 * put the refcount back and put the page back on the
+			 * LRU
+			 */
+			__put_page(page);
 			SetPageLRU(page);
 			list_add(&page->lru, &zone->active_list);
 		} else {
-			page_cache_get(page);
 			list_add(&page->lru, &l_hold);
 			pgmoved++;
 		}
