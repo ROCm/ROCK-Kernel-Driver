@@ -11,19 +11,15 @@
 struct elf64_shdr;			/* forward declration */
 
 struct mod_arch_specific {
-	/*
-	 * PLTs need to be within 16MB of the call-site.  Since the core and the init
-	 * sections are allocated separately, we need to maintain separate PLT areas
-	 * for them.  Function descriptors and global-offset-table entries are, in
-	 * contrast, always allocated in the core.
-	 */
-	struct elf64_shdr *init_text_sec;	/* .init.text section (or NULL) */
-	unsigned long init_plt_offset;
+	struct elf64_shdr *core_plt;	/* core PLT section */
+	struct elf64_shdr *init_plt;	/* init PLT section */
+	struct elf64_shdr *got;		/* global offset table */
+	struct elf64_shdr *opd;		/* official procedure descriptors */
+	struct elf64_shdr *unwind;	/* unwind-table section */
+	unsigned long gp;		/* global-pointer for module */
 
-	struct elf64_shdr *core_text_sec;	/* .text section (or NULL) */
-	unsigned long core_plt_offset;
-	unsigned long fdesc_offset;
-	unsigned long got_offset;
+	void *unw_table;		/* unwind-table cookie returned by unwinder */
+	unsigned int next_got_entry;	/* index of next available got entry */
 };
 
 #define Elf_Shdr	Elf64_Shdr
@@ -32,5 +28,7 @@ struct mod_arch_specific {
 
 #define MODULE_PROC_FAMILY	"ia64"
 #define MODULE_ARCH_VERMAGIC	MODULE_PROC_FAMILY
+
+#define ARCH_SHF_SMALL	SHF_IA_64_SHORT
 
 #endif /* _ASM_IA64_MODULE_H */
