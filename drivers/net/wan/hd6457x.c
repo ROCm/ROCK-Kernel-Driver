@@ -518,9 +518,9 @@ static void sca_set_port(port_t *port)
 
 
 
-static void sca_open(hdlc_device *hdlc)
+static void sca_open(struct net_device *dev)
 {
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 	card_t* card = port_to_card(port);
 	u16 msci = get_msci(port);
 	u8 md0, md2;
@@ -579,7 +579,7 @@ static void sca_open(hdlc_device *hdlc)
    - all DMA interrupts
 */
 
-	hdlc_set_carrier(!(sca_in(msci + ST3, card) & ST3_DCD), hdlc);
+	hdlc_set_carrier(!(sca_in(msci + ST3, card) & ST3_DCD), dev_to_hdlc(dev));
 
 #ifdef __HD64570_H
 	/* MSCI TX INT and RX INT A IRQ enable */
@@ -610,18 +610,18 @@ static void sca_open(hdlc_device *hdlc)
 	sca_out(CMD_TX_ENABLE, msci + CMD, card);
 	sca_out(CMD_RX_ENABLE, msci + CMD, card);
 
-	netif_start_queue(hdlc_to_dev(hdlc));
+	netif_start_queue(dev);
 }
 
 
 
-static void sca_close(hdlc_device *hdlc)
+static void sca_close(struct net_device *dev)
 {
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 	card_t* card = port_to_card(port);
 
 	/* reset channel */
-	netif_stop_queue(hdlc_to_dev(hdlc));
+	netif_stop_queue(dev);
 	sca_out(CMD_RESET, get_msci(port) + CMD, port_to_card(port));
 #ifdef __HD64570_H
 	/* disable MSCI interrupts */
@@ -668,9 +668,9 @@ static int sca_attach(hdlc_device *hdlc, unsigned short encoding,
 
 
 #ifdef DEBUG_RINGS
-static void sca_dump_rings(hdlc_device *hdlc)
+static void sca_dump_rings(struct net_device *dev)
 {
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 	card_t *card = port_to_card(port);
 	u16 cnt;
 #if !defined(PAGE0_ALWAYS_MAPPED) && !defined(ALL_PAGES_ALWAYS_MAPPED)
@@ -739,8 +739,7 @@ static void sca_dump_rings(hdlc_device *hdlc)
 
 static int sca_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 	card_t *card = port_to_card(port);
 	pkt_desc *desc;
 	u32 buff, len;
@@ -763,7 +762,7 @@ static int sca_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 #ifdef DEBUG_PKT
-	printk(KERN_DEBUG "%s TX(%i):", hdlc_to_name(hdlc), skb->len);
+	printk(KERN_DEBUG "%s TX(%i):", dev->name, skb->len);
 	debug_frame(skb);
 #endif
 
