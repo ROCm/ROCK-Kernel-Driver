@@ -660,10 +660,10 @@ static u32 rtl8169_get_rx_csum(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
 
-	return !!(tp->cp_cmd & RxChkSum);
+	return tp->cp_cmd & RxChkSum;
 }
 
-static int rtl8169_set_rx_csum(struct net_device *dev,  u32 data)
+static int rtl8169_set_rx_csum(struct net_device *dev, u32 data)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
 	void *ioaddr = tp->mmio_addr;
@@ -1774,8 +1774,6 @@ static void rtl8169_tx_timeout(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
 
-	printk(KERN_INFO "%s: TX Timeout\n", dev->name);
-
 	rtl8169_hw_reset(tp->mmio_addr);
 
 	/* Let's wait a bit while any (async) irq lands on */
@@ -2176,7 +2174,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		if (likely(netif_rx_schedule_prep(dev)))
 			__netif_rx_schedule(dev);
 		else {
-			printk(KERN_INFO "%s: interrupt %x taken in poll\n",
+			printk(KERN_INFO "%s: interrupt %04x taken in poll\n",
 			       dev->name, status);	
 		}
 		break;
