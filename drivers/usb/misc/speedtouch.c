@@ -141,7 +141,7 @@ struct udsl_instance_data {
 
 	/* usb device part */
 	struct usb_device *usb_dev;
-	struct udsl_data_ctx *rcvbufs;
+	struct udsl_data_ctx rcvbufs [UDSL_NUMBER_RCV_URBS];
 	struct sk_buff_head sndqueue;
 	struct udsl_usb_send_data_context send_ctx [UDSL_NUMBER_SND_URBS];
 	int data_started;
@@ -684,12 +684,6 @@ static int udsl_usb_data_init (struct udsl_instance_data *instance)
 		usb_maxpacket (instance->usb_dev,
 			       usb_sndbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_OUT), 0));
 
-	instance->rcvbufs = kmalloc (sizeof (struct udsl_data_ctx) * UDSL_NUMBER_RCV_URBS, GFP_KERNEL);
-	if (!instance->rcvbufs)
-		return -ENOMEM;
-
-	memset (instance->rcvbufs, 0, sizeof (struct udsl_data_ctx) * UDSL_NUMBER_RCV_URBS);
-
 	skb_queue_head_init (&instance->sndqueue);
 
 	for (i = 0, succes = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
@@ -752,9 +746,6 @@ static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 	if (!instance->data_started)
 		return 0;
 
-	if (!instance->rcvbufs)
-		return 0;
-
 	/* destroy urbs */
 	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
 		struct udsl_data_ctx *ctx = &(instance->rcvbufs[i]);
@@ -783,10 +774,6 @@ static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 		usb_free_urb (ctx->urb);
 
 	}
-
-	/* free receive contexts */
-	kfree (instance->rcvbufs);
-	instance->rcvbufs = NULL;
 
 	instance->data_started = 0;
 	instance->atm_dev->signal = ATM_PHY_SIG_LOST;
@@ -853,7 +840,6 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	/* initialize structure */
 	memset (instance, 0, sizeof (struct udsl_instance_data));
 	instance->usb_dev = dev;
-	instance->rcvbufs = NULL;
 	tasklet_init (&instance->recvqueue_tasklet, udsl_atm_processqueue, (unsigned long) instance);
 
 	udsl_atm_startdevice (instance, &udsl_atm_devops);
