@@ -297,20 +297,20 @@ char * partition_name(kdev_t dev)
 	return dname->name;
 }
 
-static unsigned int calc_dev_sboffset(kdev_t dev, mddev_t *mddev,
+static unsigned int calc_dev_sboffset(mdk_rdev_t *rdev, mddev_t *mddev,
 						int persistent)
 {
-	unsigned int size = (blkdev_size_in_bytes(dev) >> BLOCK_SIZE_BITS);
+	unsigned int size = rdev->bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;
 	if (persistent)
 		size = MD_NEW_SIZE_BLOCKS(size);
 	return size;
 }
 
-static unsigned int calc_dev_size(kdev_t dev, mddev_t *mddev, int persistent)
+static unsigned int calc_dev_size(mdk_rdev_t *rdev, mddev_t *mddev, int persistent)
 {
 	unsigned int size;
 
-	size = calc_dev_sboffset(dev, mddev, persistent);
+	size = calc_dev_sboffset(rdev, mddev, persistent);
 	if (!mddev->sb) {
 		MD_BUG();
 		return size;
@@ -467,7 +467,7 @@ static int read_disk_sb(mdk_rdev_t * rdev)
 	 *
 	 * It also happens to be a multiple of 4Kb.
 	 */
-	sb_offset = calc_dev_sboffset(rdev->dev, rdev->mddev, 1);
+	sb_offset = calc_dev_sboffset(rdev, rdev->mddev, 1);
 	rdev->sb_offset = sb_offset;
 
 	if (!sync_page_io(rdev->bdev, sb_offset<<1, MD_SB_BYTES, rdev->sb_page, READ))
@@ -850,7 +850,7 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 		return 1;
 	}
 
-	sb_offset = calc_dev_sboffset(dev, rdev->mddev, 1);
+	sb_offset = calc_dev_sboffset(rdev, rdev->mddev, 1);
 	if (rdev->sb_offset != sb_offset) {
 		printk(KERN_INFO "%s's sb offset has changed from %ld to %ld, skipping\n",
 		       partition_name(dev), rdev->sb_offset, sb_offset);
@@ -861,7 +861,7 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 	 * its size has changed to zero silently, and the MD code does
 	 * not yet know that it's faulty.
 	 */
-	size = calc_dev_size(dev, rdev->mddev, 1);
+	size = calc_dev_size(rdev, rdev->mddev, 1);
 	if (size != rdev->size) {
 		printk(KERN_INFO "%s's size has changed from %ld to %ld since import, skipping\n",
 		       partition_name(dev), rdev->size, size);
@@ -1001,19 +1001,19 @@ void md_update_sb(mddev_t *mddev)
  *
  * a faulty rdev _never_ has rdev->sb set.
  */
-static int md_import_device(kdev_t newdev, int on_disk)
+static mdk_rdev_t *md_import_device(kdev_t newdev, int on_disk)
 {
 	int err;
 	mdk_rdev_t *rdev;
 	unsigned int size;
 
 	if (find_rdev_all(newdev))
-		return -EEXIST;
+		return ERR_PTR(-EEXIST);
 
 	rdev = (mdk_rdev_t *) kmalloc(sizeof(*rdev), GFP_KERNEL);
 	if (!rdev) {
 		printk(KERN_ERR "md: could not alloc mem for %s!\n", partition_name(newdev));
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	}
 	memset(rdev, 0, sizeof(*rdev));
 
@@ -1030,7 +1030,7 @@ static int md_import_device(kdev_t newdev, int on_disk)
 	rdev->desc_nr = -1;
 	rdev->faulty = 0;
 
-	size = (blkdev_size_in_bytes(newdev) >> BLOCK_SIZE_BITS);
+	size = rdev->bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;
 	if (!size) {
 		printk(KERN_WARNING
 		       "md: %s has zero or unknown size, marking faulty!\n",
@@ -1066,7 +1066,7 @@ static int md_import_device(kdev_t newdev, int on_disk)
 
 	if (rdev->faulty && rdev->sb)
 		free_disk_sb(rdev);
-	return 0;
+	return rdev;
 
 abort_free:
 	if (rdev->sb) {
@@ -1075,7 +1075,7 @@ abort_free:
 		free_disk_sb(rdev);
 	}
 	kfree(rdev);
-	return err;
+	return ERR_PTR(err);
 }
 
 /*
@@ -1463,7 +1463,7 @@ static int device_size_calculation(mddev_t * mddev)
 			MD_BUG();
 			continue;
 		}
-		rdev->size = calc_dev_size(rdev->dev, mddev, persistent);
+		rdev->size = calc_dev_size(rdev, mddev, persistent);
 		if (rdev->size < sb->chunk_size / 1024) {
 			printk(KERN_WARNING
 				"md: Dev %s smaller than chunk_size: %ldk < %dk\n",
@@ -1741,8 +1741,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 			md_unregister_thread(mddev->sync_thread);
 			mddev->sync_thread = NULL;
 			if (mddev->spare) {
-				mddev->pers->diskop(mddev, &mddev->spare,
-						    DISKOP_SPARE_INACTIVE);
+				mddev->pers->spare_inactive(mddev);
 				mddev->spare = NULL;
 			}
 		}
@@ -1951,16 +1950,12 @@ static int autostart_array(kdev_t startdev)
 	mdp_super_t *sb = NULL;
 	mdk_rdev_t *start_rdev = NULL, *rdev;
 
-	if (md_import_device(startdev, 1)) {
+	start_rdev = md_import_device(startdev, 1);
+	if (IS_ERR(start_rdev)) {
 		printk(KERN_WARNING "md: could not import %s!\n", partition_name(startdev));
 		goto abort;
 	}
 
-	start_rdev = find_rdev_all(startdev);
-	if (!start_rdev) {
-		MD_BUG();
-		goto abort;
-	}
 	if (start_rdev->faulty) {
 		printk(KERN_WARNING "md: can not autostart based on faulty %s!\n",
 						partition_name(startdev));
@@ -1989,15 +1984,11 @@ static int autostart_array(kdev_t startdev)
 			continue;
 		if (kdev_same(dev, startdev))
 			continue;
-		if (md_import_device(dev, 1)) {
+		rdev = md_import_device(dev, 1);
+		if (IS_ERR(rdev)) {
 			printk(KERN_WARNING "md: could not import %s, trying to run array nevertheless.\n",
 			       partition_name(dev));
 			continue;
-		}
-		rdev = find_rdev_all(dev);
-		if (!rdev) {
-			MD_BUG();
-			goto abort;
 		}
 		list_add(&rdev->pending, &pending_raid_disks);
 	}
@@ -2108,7 +2099,7 @@ static int get_disk_info(mddev_t * mddev, void * arg)
 
 static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 {
-	int err, size, persistent;
+	int size, persistent;
 	mdk_rdev_t *rdev;
 	unsigned int nr;
 	kdev_t dev;
@@ -2121,14 +2112,9 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 	}
 	if (!mddev->sb) {
 		/* expecting a device which has a superblock */
-		err = md_import_device(dev, 1);
-		if (err) {
-			printk(KERN_WARNING "md: md_import_device returned %d\n", err);
-			return -EINVAL;
-		}
-		rdev = find_rdev_all(dev);
-		if (!rdev) {
-			MD_BUG();
+		rdev = md_import_device(dev, 1);
+		if (IS_ERR(rdev)) {
+			printk(KERN_WARNING "md: md_import_device returned %ld\n", PTR_ERR(rdev));
 			return -EINVAL;
 		}
 		if (!list_empty(&mddev->disks)) {
@@ -2165,17 +2151,11 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 	SET_SB(state);
 
 	if (!(info->state & (1<<MD_DISK_FAULTY))) {
-		err = md_import_device (dev, 0);
-		if (err) {
-			printk(KERN_WARNING "md: error, md_import_device() returned %d\n", err);
+		rdev = md_import_device (dev, 0);
+		if (IS_ERR(rdev)) {
+			printk(KERN_WARNING "md: error, md_import_device() returned %ld\n", PTR_ERR(rdev));
 			return -EINVAL;
 		}
-		rdev = find_rdev_all(dev);
-		if (!rdev) {
-			MD_BUG();
-			return -EINVAL;
-		}
-
 		rdev->old_dev = dev;
 		rdev->desc_nr = info->number;
 
@@ -2185,8 +2165,8 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 		if (!persistent)
 			printk(KERN_INFO "md: nonpersistent superblock ...\n");
 
-		size = calc_dev_size(dev, mddev, persistent);
-		rdev->sb_offset = calc_dev_sboffset(dev, mddev, persistent);
+		size = calc_dev_size(rdev, mddev, persistent);
+		rdev->sb_offset = calc_dev_sboffset(rdev, mddev, persistent);
 
 		if (!mddev->sb->size || (mddev->sb->size > size))
 			mddev->sb->size = size;
@@ -2250,7 +2230,7 @@ static int hot_remove_disk(mddev_t * mddev, kdev_t dev)
 	printk(KERN_INFO "md: trying to remove %s from md%d ... \n",
 		partition_name(dev), mdidx(mddev));
 
-	if (!mddev->pers->diskop) {
+	if (!mddev->pers->hot_remove_disk) {
 		printk(KERN_WARNING "md%d: personality does not support diskops!\n",
 		       mdidx(mddev));
 		return -EINVAL;
@@ -2274,7 +2254,7 @@ static int hot_remove_disk(mddev_t * mddev, kdev_t dev)
 		return -EINVAL;
 	}
 
-	err = mddev->pers->diskop(mddev, &disk, DISKOP_HOT_REMOVE_DISK);
+	err = mddev->pers->hot_remove_disk(mddev, disk->number);
 	if (err == -EBUSY) {
 		MD_BUG();
 		goto busy;
@@ -2308,35 +2288,31 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	printk(KERN_INFO "md: trying to hot-add %s to md%d ... \n",
 		partition_name(dev), mdidx(mddev));
 
-	if (!mddev->pers->diskop) {
+	if (!mddev->pers->hot_add_disk) {
 		printk(KERN_WARNING "md%d: personality does not support diskops!\n",
 		       mdidx(mddev));
 		return -EINVAL;
-	}
-
-	persistent = !mddev->sb->not_persistent;
-	size = calc_dev_size(dev, mddev, persistent);
-
-	if (size < mddev->sb->size) {
-		printk(KERN_WARNING "md%d: disk size %d blocks < array size %d\n",
-				mdidx(mddev), size, mddev->sb->size);
-		return -ENOSPC;
 	}
 
 	rdev = find_rdev(mddev, dev);
 	if (rdev)
 		return -EBUSY;
 
-	err = md_import_device (dev, 0);
-	if (err) {
-		printk(KERN_WARNING "md: error, md_import_device() returned %d\n", err);
+	rdev = md_import_device (dev, 0);
+	if (IS_ERR(rdev)) {
+		printk(KERN_WARNING "md: error, md_import_device() returned %ld\n", PTR_ERR(rdev));
 		return -EINVAL;
 	}
-	rdev = find_rdev_all(dev);
-	if (!rdev) {
-		MD_BUG();
-		return -EINVAL;
+	persistent = !mddev->sb->not_persistent;
+	size = calc_dev_size(rdev, mddev, persistent);
+
+	if (size < mddev->sb->size) {
+		printk(KERN_WARNING "md%d: disk size %d blocks < array size %d\n",
+				mdidx(mddev), size, mddev->sb->size);
+		err = -ENOSPC;
+		goto abort_export;
 	}
+
 	if (rdev->faulty) {
 		printk(KERN_WARNING "md: can not hot-add faulty %s disk to md%d!\n",
 				partition_name(dev), mdidx(mddev));
@@ -2351,7 +2327,7 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	 */
 	rdev->old_dev = dev;
 	rdev->size = size;
-	rdev->sb_offset = calc_dev_sboffset(dev, mddev, persistent);
+	rdev->sb_offset = calc_dev_sboffset(rdev, mddev, persistent);
 
 	disk = mddev->sb->disks + mddev->sb->raid_disks;
 	for (i = mddev->sb->raid_disks; i < MD_SB_DISKS; i++) {
@@ -2386,7 +2362,7 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	disk->major = major(dev);
 	disk->minor = minor(dev);
 
-	if (mddev->pers->diskop(mddev, &disk, DISKOP_HOT_ADD_DISK)) {
+	if (mddev->pers->hot_add_disk(mddev, disk, rdev)) {
 		MD_BUG();
 		err = -EINVAL;
 		goto abort_unbind_export;
@@ -2922,7 +2898,7 @@ int md_error(mddev_t *mddev, struct block_device *bdev)
 	if (!rrdev || rrdev->faulty)
 		return 0;
 	if (!mddev->pers->error_handler
-			|| mddev->pers->error_handler(mddev,rdev) <= 0) {
+			|| mddev->pers->error_handler(mddev,bdev) <= 0) {
 		rrdev->faulty = 1;
 	} else
 		return 1;
@@ -3134,8 +3110,9 @@ mdp_disk_t *get_spare(mddev_t *mddev)
 }
 
 static unsigned int sync_io[DK_MAX_MAJOR][DK_MAX_DISK];
-void md_sync_acct(kdev_t dev, unsigned long nr_sectors)
+void md_sync_acct(struct block_device *bdev, unsigned long nr_sectors)
 {
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	unsigned int major = major(dev);
 	unsigned int index;
 
@@ -3367,7 +3344,7 @@ void md_do_recovery(void *data)
 
 	ITERATE_MDDEV(mddev,tmp) if (mddev_lock(mddev)==0) {
 		sb = mddev->sb;
-		if (!sb || !mddev->pers || !mddev->pers->diskop || mddev->ro)
+		if (!sb || !mddev->pers || mddev->ro)
 			goto unlock;
 		if (mddev->recovery_running > 0)
 			/* resync/recovery still happening */
@@ -3381,16 +3358,19 @@ void md_do_recovery(void *data)
 				 * If we were doing a reconstruction,
 				 * we need to retrieve the spare
 				 */
+				if (!mddev->pers->spare_inactive)
+					goto unlock;
 				if (mddev->spare) {
-					mddev->pers->diskop(mddev, &mddev->spare,
-							    DISKOP_SPARE_INACTIVE);
+					mddev->pers->spare_inactive(mddev);
 					mddev->spare = NULL;
 				}
 			} else {
+				if (!mddev->pers->spare_active)
+					goto unlock;
 				/* success...*/
 				if (mddev->spare) {
-					mddev->pers->diskop(mddev, &mddev->spare,
-							    DISKOP_SPARE_ACTIVE);
+					mddev->pers->spare_active(mddev,
+								&mddev->spare);
 					mark_disk_sync(mddev->spare);
 					mark_disk_active(mddev->spare);
 					sb->active_disks++;
@@ -3429,12 +3409,13 @@ void md_do_recovery(void *data)
 			if (!mddev->sync_thread) {
 				printk(KERN_ERR "md%d: could not start resync thread...\n", mdidx(mddev));
 				if (mddev->spare)
-					mddev->pers->diskop(mddev, &mddev->spare, DISKOP_SPARE_INACTIVE);
+					mddev->pers->spare_inactive(mddev);
 				mddev->spare = NULL;
 				mddev->recovery_running = 0;
 			} else {
 				if (mddev->spare)
-					mddev->pers->diskop(mddev, &mddev->spare, DISKOP_SPARE_WRITE);
+					mddev->pers->spare_write(mddev,
+						mddev->spare->number);
 				mddev->recovery_running = 1;
 				md_wakeup_thread(mddev->sync_thread);
 			}
@@ -3588,17 +3569,10 @@ static void autostart_arrays(void)
 	for (i = 0; i < dev_cnt; i++) {
 		kdev_t dev = detected_devices[i];
 
-		if (md_import_device(dev,1)) {
+		rdev = md_import_device(dev,1);
+		if (IS_ERR(rdev)) {
 			printk(KERN_ALERT "md: could not import %s!\n",
 				partition_name(dev));
-			continue;
-		}
-		/*
-		 * Sanity checks:
-		 */
-		rdev = find_rdev_all(dev);
-		if (!rdev) {
-			MD_BUG();
 			continue;
 		}
 		if (rdev->faulty) {

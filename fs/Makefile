@@ -40,6 +40,7 @@ obj-$(CONFIG_QUOTACTL)		+= quota.o
 obj-$(CONFIG_PROC_FS)		+= proc/
 obj-y				+= partitions/
 obj-y				+= driverfs/
+obj-y				+= devpts/
 
 # Do not add any filesystems before this line
 obj-$(CONFIG_EXT3_FS)		+= ext3/ # Before ext2 so root fs can be ext3
@@ -81,7 +82,6 @@ obj-$(CONFIG_AUTOFS_FS)		+= autofs/
 obj-$(CONFIG_AUTOFS4_FS)	+= autofs4/
 obj-$(CONFIG_ADFS_FS)		+= adfs/
 obj-$(CONFIG_REISERFS_FS)	+= reiserfs/
-obj-$(CONFIG_DEVPTS_FS)		+= devpts/
 obj-$(CONFIG_SUN_OPENPROMFS)	+= openpromfs/
 obj-$(CONFIG_JFS_FS)		+= jfs/
 

@@ -203,8 +203,6 @@ extern struct bio *bio_copy(struct bio *, int, int);
 
 extern inline void bio_init(struct bio *);
 
-extern int bio_ioctl(kdev_t, unsigned int, unsigned long);
-
 #ifdef CONFIG_HIGHMEM
 /*
  * remember to add offset! and never ever reenable interrupts between a

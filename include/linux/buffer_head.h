@@ -121,7 +121,6 @@ BUFFER_FNS(Boundary, boundary)
 #define page_has_buffers(page)	PagePrivate(page)
 
 #define invalidate_buffers(dev)	__invalidate_buffers((dev), 0)
-#define destroy_buffers(dev)	__invalidate_buffers((dev), 1)
 
 
 /*
@@ -156,7 +155,6 @@ int sync_blockdev(struct block_device *bdev);
 void __wait_on_buffer(struct buffer_head *);
 void sleep_on_buffer(struct buffer_head *bh);
 void wake_up_buffer(struct buffer_head *bh);
-int fsync_dev(kdev_t);
 int fsync_bdev(struct block_device *);
 int fsync_super(struct super_block *);
 int fsync_no_super(struct block_device *);

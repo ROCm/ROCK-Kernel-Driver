@@ -4,6 +4,6 @@
 
 obj-$(CONFIG_DEVPTS_FS) += devpts.o
 
-devpts-objs := root.o inode.o
+devpts-objs := inode.o
 
 include $(TOPDIR)/Rules.make

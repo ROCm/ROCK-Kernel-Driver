@@ -1937,9 +1937,9 @@ static int cdrom_read_tocentry(struct ata_device *drive, int trackno, int msf_fl
 /* Try to read the entire TOC for the disk into our internal buffer. */
 static int cdrom_read_toc(struct ata_device *drive, struct request_sense *sense)
 {
-	int minor, stat, ntracks, i;
-	kdev_t dev;
+	int stat, ntracks, i;
 	struct cdrom_info *info = drive->driver_data;
+	struct cdrom_device_info *cdi = &info->devinfo;
 	struct atapi_toc *toc = info->toc;
 	struct {
 		struct atapi_toc_header hdr;
@@ -2071,10 +2071,8 @@ static int cdrom_read_toc(struct ata_device *drive, struct request_sense *sense)
 	toc->xa_flag = (ms_tmp.hdr.first_track != ms_tmp.hdr.last_track);
 
 	/* Now try to get the total cdrom capacity. */
-	minor = (drive->select.b.unit) << PARTN_BITS;
-	dev = mk_kdev(drive->channel->major, minor);
 	/* FIXME: This is making worng assumptions about register layout. */
-	stat = cdrom_get_last_written(dev, (unsigned long *) &toc->capacity);
+	stat = cdrom_get_last_written(cdi, (unsigned long *) &toc->capacity);
 	if (stat)
 		stat = cdrom_read_capacity(drive, &toc->capacity, sense);
 	if (stat)

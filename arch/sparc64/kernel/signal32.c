@@ -1319,7 +1319,7 @@ static inline void syscall_restart32(unsigned long orig_i0, struct pt_regs *regs
 
 #ifdef DEBUG_SIGNALS_MAPS
 
-#define MAPS_LINE_FORMAT	  "%016lx-%016lx %s %016lx %s %lu "
+#define MAPS_LINE_FORMAT	  "%016lx-%016lx %s %016lx %02x:%02x %lu "
 
 static inline void read_maps (void)
 {
@@ -1336,7 +1336,7 @@ static inline void read_maps (void)
 		char *line;
 		char str[5], *cp = str;
 		int flags;
-		kdev_t dev;
+		dev_t dev;
 		unsigned long ino;
 
 		/*
@@ -1361,7 +1361,7 @@ static inline void read_maps (void)
 				      buffer, PAGE_SIZE);
 		}
 		printk(MAPS_LINE_FORMAT, map->vm_start, map->vm_end, str, map->vm_pgoff << PAGE_SHIFT,
-			      kdevname(dev), ino);
+			      MAJOR(dev), MINOR(dev), ino);
 		if (map->vm_file != NULL)
 			printk("%s\n", line);
 		else
