@@ -553,15 +553,14 @@ static void __init pdc20270_device_order_fixup (struct pci_dev *dev, struct ata_
 			}
 		}
 	}
-
-	printk("ATA: %s: controller on PCI bus %02x dev %02x\n",
-			dev->name, dev->bus->number, dev->devfn);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
+			dev->name, dev->slot_name, dev->devfn);
 	setup_pci_device(dev, d);
 	if (!dev2)
 		return;
 	d2 = d;
-	printk("ATA: %s: controller on PCI bus %02x dev %02x\n",
-			dev2->name, dev2->bus->number, dev2->devfn);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
+			dev2->name, dev2->slot_name, dev2->devfn);
 	setup_pci_device(dev2, d2);
 }
 
@@ -584,8 +583,8 @@ static void __init hpt374_device_order_fixup (struct pci_dev *dev, struct ata_pc
 		}
 	}
 
-	printk("%s: IDE controller on PCI bus %02x dev %02x\n",
-		dev->name, dev->bus->number, dev->devfn);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
+		dev->name, dev->slot_name, dev->devfn);
 	setup_pci_device(dev, d);
 	if (!dev2) {
 		return;
@@ -601,8 +600,8 @@ static void __init hpt374_device_order_fixup (struct pci_dev *dev, struct ata_pc
 		}
 	}
 	d2 = d;
-	printk("%s: IDE controller on PCI bus %02x dev %02x\n",
-		dev2->name, dev2->bus->number, dev2->devfn);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
+		dev2->name, dev2->slot_name, dev2->devfn);
 	setup_pci_device(dev2, d2);
 
 }
@@ -623,7 +622,7 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pc
 	switch(class_rev) {
 		case 5:
 		case 4:
-		case 3:	printk("%s: IDE controller on PCI slot %s\n", dev->name, dev->slot_name);
+		case 3:	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev->name, dev->slot_name);
 			setup_pci_device(dev, d);
 			return;
 		default:	break;
@@ -639,17 +638,17 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pc
 			pci_read_config_byte(dev2, PCI_INTERRUPT_PIN, &pin2);
 			if ((pin1 != pin2) && (dev->irq == dev2->irq)) {
 				d->bootable = ON_BOARD;
-				printk("%s: onboard version of chipset, pin1=%d pin2=%d\n", dev->name, pin1, pin2);
+				printk(KERN_INFO "ATAL: %s: onboard version of chipset, pin1=%d pin2=%d\n", dev->name, pin1, pin2);
 			}
 			break;
 		}
 	}
-	printk("%s: IDE controller on PCI slot %s\n", dev->name, dev->slot_name);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev->name, dev->slot_name);
 	setup_pci_device(dev, d);
 	if (!dev2)
 		return;
 	d2 = d;
-	printk("%s: IDE controller on PCI slot %s\n", dev2->name, dev2->slot_name);
+	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev2->name, dev2->slot_name);
 	setup_pci_device(dev2, d2);
 }
 
@@ -679,6 +678,10 @@ static void __init scan_pcidev(struct pci_dev *dev)
 	}
 
 	if (!d) {
+		/* Only check the device calls, if it wasn't listed, since
+		 * there are in esp. some pdc202xx chips which "work around"
+		 * beeing grabbed by generic drivers.
+		 */
 		if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
 			printk(KERN_INFO "ATA: unknown interface: %s, on PCI slot %s\n",
 					dev->name, dev->slot_name);

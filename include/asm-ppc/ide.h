@@ -43,8 +43,6 @@ extern struct ide_machdep_calls ppc_ide_md;
 
 #undef	SUPPORT_SLOW_DATA_PORTS
 #define	SUPPORT_SLOW_DATA_PORTS	0
-#undef	SUPPORT_VLB_SYNC
-#define SUPPORT_VLB_SYNC	0
 
 #define ide__sti()	__sti()
 

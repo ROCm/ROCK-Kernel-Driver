@@ -90,9 +90,6 @@ static __inline__ void ide_init_default_hwifs(void)
 
 /* some configuration options we don't need */
 
-#undef SUPPORT_VLB_SYNC
-#define SUPPORT_VLB_SYNC 0
-
 #undef SUPPORT_SLOW_DATA_PORTS
 #define SUPPORT_SLOW_DATA_PORTS	0
 

@@ -61,41 +61,6 @@ static inline void ide_unmap_rq(struct request *rq, char *to,
  * Data transfer functions for polled IO.
  */
 
-#if SUPPORT_VLB_SYNC
-/*
- * Some localbus EIDE interfaces require a special access sequence
- * when using 32-bit I/O instructions to transfer data.  We call this
- * the "vlb_sync" sequence, which consists of three successive reads
- * of the sector count register location, with interrupts disabled
- * to ensure that the reads all happen together.
- */
-static void ata_read_vlb(struct ata_device *drive, void *buffer, unsigned int wcount)
-{
-	unsigned long flags;
-
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
-	IN_BYTE(IDE_NSECTOR_REG);
-	IN_BYTE(IDE_NSECTOR_REG);
-	IN_BYTE(IDE_NSECTOR_REG);
-	insl(IDE_DATA_REG, buffer, wcount);
-	__restore_flags(flags);	/* local CPU only */
-}
-
-static void ata_write_vlb(struct ata_device *drive, void *buffer, unsigned int wcount)
-{
-	unsigned long flags;
-
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
-	IN_BYTE(IDE_NSECTOR_REG);
-	IN_BYTE(IDE_NSECTOR_REG);
-	IN_BYTE(IDE_NSECTOR_REG);
-	outsl(IDE_DATA_REG, buffer, wcount);
-	__restore_flags(flags);	/* local CPU only */
-}
-#endif
-
 static void ata_read_32(struct ata_device *drive, void *buffer, unsigned int wcount)
 {
 	insl(IDE_DATA_REG, buffer, wcount);
@@ -157,12 +122,7 @@ void ata_read(struct ata_device *drive, void *buffer, unsigned int wcount)
 	io_32bit = drive->channel->io_32bit;
 
 	if (io_32bit) {
-#if SUPPORT_VLB_SYNC
-		if (io_32bit & 2)
-			ata_read_vlb(drive, buffer, wcount);
-		else
-#endif
-			ata_read_32(drive, buffer, wcount);
+		ata_read_32(drive, buffer, wcount);
 	} else {
 #if SUPPORT_SLOW_DATA_PORTS
 		if (drive->channel->slow)
@@ -188,12 +148,7 @@ void ata_write(struct ata_device *drive, void *buffer, unsigned int wcount)
 	io_32bit = drive->channel->io_32bit;
 
 	if (io_32bit) {
-#if SUPPORT_VLB_SYNC
-		if (io_32bit & 2)
-			ata_write_vlb(drive, buffer, wcount);
-		else
-#endif
-			ata_write_32(drive, buffer, wcount);
+		ata_write_32(drive, buffer, wcount);
 	} else {
 #if SUPPORT_SLOW_DATA_PORTS
 		if (drive->channel->slow)
@@ -320,7 +275,6 @@ static ide_startstop_t pre_task_mulout_intr(struct ata_device *drive, struct req
 static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request *rq)
 {
 	u8 stat = GET_STAT();
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	int mcount = drive->mult_count;
 	ide_startstop_t startstop;
 
@@ -349,7 +303,7 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 		}
 
 		/* no data yet, so wait for another interrupt */
-		if (hwgroup->handler == NULL)
+		if (!drive->channel->handler)
 			ide_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
 
 		return ide_started;
@@ -392,7 +346,7 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 	} while (mcount);
 
 	rq->errors = 0;
-	if (hwgroup->handler == NULL)
+	if (!drive->channel->handler)
 		ide_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
 
 	return ide_started;

@@ -83,7 +83,6 @@ static ide_startstop_t tcq_nop_handler(struct ata_device *drive, struct request 
 static void tcq_invalidate_queue(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
-	ide_hwgroup_t *hwgroup = ch->hwgroup;
 	request_queue_t *q = &drive->queue;
 	struct ata_taskfile *args;
 	struct request *rq;
@@ -104,7 +103,7 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 	drive->queue_depth = 1;
 	clear_bit(IDE_BUSY, &ch->active);
 	clear_bit(IDE_DMA, &ch->active);
-	hwgroup->handler = NULL;
+	ch->handler = NULL;
 
 	/*
 	 * Do some internal stuff -- we really need this command to be
@@ -153,7 +152,6 @@ static void ata_tcq_irq_timeout(unsigned long data)
 {
 	struct ata_device *drive = (struct ata_device *) data;
 	struct ata_channel *ch = drive->channel;
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	unsigned long flags;
 
 	printk(KERN_ERR "ATA: %s: timeout waiting for interrupt...\n", __FUNCTION__);
@@ -161,9 +159,9 @@ static void ata_tcq_irq_timeout(unsigned long data)
 	spin_lock_irqsave(&ide_lock, flags);
 
 	if (test_and_set_bit(IDE_BUSY, &ch->active))
-		printk(KERN_ERR "ATA: %s: hwgroup not busy\n", __FUNCTION__);
-	if (hwgroup->handler == NULL)
-		printk(KERN_ERR "ATA: %s: missing isr!\n", __FUNCTION__);
+		printk(KERN_ERR "ATA: %s: IRQ handler not busy\n", __FUNCTION__);
+	if (!ch->handler)
+		printk(KERN_ERR "ATA: %s: missing ISR!\n", __FUNCTION__);
 
 	spin_unlock_irqrestore(&ide_lock, flags);
 
@@ -181,7 +179,6 @@ static void ata_tcq_irq_timeout(unsigned long data)
 static void set_irq(struct ata_device *drive, ata_handler_t *handler)
 {
 	struct ata_channel *ch = drive->channel;
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	unsigned long flags;
 
 	spin_lock_irqsave(&ide_lock, flags);
@@ -197,8 +194,8 @@ static void set_irq(struct ata_device *drive, ata_handler_t *handler)
 	ch->timer.function = ata_tcq_irq_timeout;
 	ch->timer.data = (unsigned long) ch->drive;
 	mod_timer(&ch->timer, jiffies + 5 * HZ);
+	ch->handler = handler;
 
-	hwgroup->handler = handler;
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 

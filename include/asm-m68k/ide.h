@@ -83,9 +83,6 @@ static __inline__ void ide_init_default_hwifs(void)
 #undef SUPPORT_SLOW_DATA_PORTS
 #define SUPPORT_SLOW_DATA_PORTS 0
 
-#undef SUPPORT_VLB_SYNC
-#define SUPPORT_VLB_SYNC 0
-
 /* this definition is used only on startup .. */
 #undef HD_DATA
 #define HD_DATA NULL

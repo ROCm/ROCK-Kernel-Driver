@@ -40,9 +40,6 @@
 
 /* Right now this is only needed by a promise controlled.
  */
-#ifndef SUPPORT_VLB_SYNC		/* 1 to support weird 32-bit chips */
-# define SUPPORT_VLB_SYNC	1	/* 0 to reduce kernel size */
-#endif
 #ifndef DISK_RECOVERY_TIME		/* off=0; on=access_delay_time */
 # define DISK_RECOVERY_TIME	0	/*  for hardware that needs it */
 #endif
@@ -73,8 +70,6 @@ typedef unsigned char	byte;	/* used everywhere */
  * state flags
  */
 #define DMA_PIO_RETRY	1	/* retrying in PIO */
-
-#define HWGROUP(drive)		(drive->channel->hwgroup)
 
 /*
  * Definitions for accessing IDE controller registers
@@ -444,18 +439,16 @@ enum {
 	IDE_DMA		/* DMA in progress */
 };
 
-typedef struct hwgroup_s {
-	/* FIXME: We should look for busy request queues instead of looking at
-	 * the !NULL state of this field.
-	 */
-	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
-} ide_hwgroup_t;
-
 struct ata_channel {
 	struct device	dev;		/* device handle */
 	int		unit;		/* channel number */
 
-	struct hwgroup_s *hwgroup;	/* actually (ide_hwgroup_t *) */
+	/* This lock is used to serialize requests on the same device queue or
+	 * between differen queues sharing the same irq line.
+	 */
+	spinlock_t *lock;
+
+	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
 	struct timer_list timer;	/* failsafe timer */
 	int (*expiry)(struct ata_device *, struct request *);	/* irq handler, if active */
 	unsigned long poll_timeout;	/* timeout value during polled operations */
@@ -777,11 +770,7 @@ extern int set_transfer(struct ata_device *, struct ata_taskfile *);
 
 extern int system_bus_speed;
 
-/*
- * ide_stall_queue() can be used by a drive to give excess bandwidth back
- * to the hwgroup by sleeping for timeout jiffies.
- */
-void ide_stall_queue(struct ata_device *, unsigned long);
+extern void ide_stall_queue(struct ata_device *, unsigned long);
 
 /*
  * CompactFlash cards and their brethern pretend to be removable hard disks,

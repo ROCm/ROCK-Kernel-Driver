@@ -65,9 +65,6 @@ static __inline__ void ide_init_default_hwifs(void)
 #endif
 }
 
-#undef  SUPPORT_VLB_SYNC
-#define SUPPORT_VLB_SYNC 0
-
 #endif /* __KERNEL__ */
 
 #endif /* __ASM_IDE_H */

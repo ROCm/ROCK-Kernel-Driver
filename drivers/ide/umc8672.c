@@ -21,7 +21,7 @@
  */
 
 /*
- * VLB Controller Support from 
+ * VLB Controller Support from
  * Wolfram Podien
  * Rohoefe 3
  * D28832 Achim
@@ -34,7 +34,7 @@
  * #define UMC_DRIVE0 11
  * in the beginning of the driver, which sets the speed of drive 0 to 11 (there
  * are some lines present). 0 - 11 are allowed speed values. These values are
- * the results from the DOS speed test program supplied from UMC. 11 is the 
+ * the results from the DOS speed test program supplied from UMC. 11 is the
  * highest speed (about PIO mode 3)
  */
 #define REALLY_SLOW_IO		/* some systems can safely undef this */
@@ -92,13 +92,11 @@ static void umc_set_speeds (byte speeds[])
 	out_umc (0xd7,(speedtab[0][speeds[2]] | (speedtab[0][speeds[3]]<<4)));
 	out_umc (0xd6,(speedtab[0][speeds[0]] | (speedtab[0][speeds[1]]<<4)));
 	tmp = 0;
-	for (i = 3; i >= 0; i--)
-	{
+	for (i = 3; i >= 0; i--) {
 		tmp = (tmp << 2) | speedtab[1][speeds[i]];
 	}
 	out_umc (0xdc,tmp);
-	for (i = 0;i < 4; i++)
-	{
+	for (i = 0;i < 4; i++) {
 		out_umc (0xd0+i,speedtab[2][speeds[i]]);
 		out_umc (0xd8+i,speedtab[2][speeds[i]]);
 	}
@@ -108,10 +106,9 @@ static void umc_set_speeds (byte speeds[])
 		speeds[0], speeds[1], speeds[2], speeds[3]);
 }
 
-static void tune_umc (ide_drive_t *drive, byte pio)
+static void tune_umc(struct ata_device *drive, byte pio)
 {
 	unsigned long flags;
-	ide_hwgroup_t *hwgroup = ide_hwifs[drive->channel->index ^ 1].hwgroup;
 
 	if (pio == 255)
 		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
@@ -121,16 +118,12 @@ static void tune_umc (ide_drive_t *drive, byte pio)
 	printk("%s: setting umc8672 to PIO mode%d (speed %d)\n", drive->name, pio, pio_to_umc[pio]);
 	save_flags(flags);	/* all CPUs */
 	cli();			/* all CPUs */
-	if (hwgroup && hwgroup->handler != NULL) {
-		printk("umc8672: other interface is busy: exiting tune_umc()\n");
-	} else {
-		current_speeds[drive->name[2] - 'a'] = pio_to_umc[pio];
-		umc_set_speeds (current_speeds);
-	}
+	current_speeds[drive->name[2] - 'a'] = pio_to_umc[pio];
+	umc_set_speeds (current_speeds);
 	restore_flags(flags);	/* all CPUs */
 }
 
-void __init init_umc8672 (void)	/* called from ide.c */
+void __init init_umc8672(void)	/* called from ide.c */
 {
 	unsigned long flags;
 
