@@ -487,6 +487,7 @@ static int ipip6_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		}
 	}
 	if (rt->rt_type != RTN_UNICAST) {
+		ip_rt_put(rt);
 		tunnel->stat.tx_carrier_errors++;
 		goto tx_error_icmp;
 	}
