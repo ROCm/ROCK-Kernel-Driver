@@ -81,16 +81,6 @@ MODULE_PARM(pc_debug, "i");
 #define dprintk(n, format, args...)
 #endif
 
-/*
- * Conversion from Channel (this->chan) to frequency, this information
- * was obtained from the Planet WAP 1000 Access Point web interface. -acme
- */
-static int wl3501_chan2freq[] = {
-	[0] = 2412, [1] = 2417, [2] = 2422, [3] = 2427, [4] = 2432,
-	[5] = 2437, [6] = 2442, [7] = 2447, [8] = 2452, [9] = 2457,
-	[10] = 2462,
-};
-
 #define wl3501_outb(a, b) { outb(a, b); slow_down_io(); }
 #define wl3501_outb_p(a, b) { outb_p(a, b); slow_down_io(); }
 #define wl3501_outsb(a, b, c) { outsb(a, b, c); slow_down_io(); }
@@ -121,6 +111,78 @@ static int wl3501_event(event_t event, int pri, event_callback_args_t *args);
  * database.
  */
 static dev_info_t wl3501_dev_info = "wl3501_cs";
+
+static int wl3501_chan2freq[] = {
+	[0]  = 2412, [1]  = 2417, [2]  = 2422, [3]  = 2427, [4] = 2432,
+	[5]  = 2437, [6]  = 2442, [7]  = 2447, [8]  = 2452, [9] = 2457,
+	[10] = 2462, [11] = 2467, [12] = 2472, [13] = 2477,
+};
+
+static const struct {
+	int reg_domain;
+	int min, max;
+} iw_channel_table[] = {
+	{
+		.reg_domain = IW_REG_DOMAIN_FCC,
+		.min	    = 1,
+		.max	    = 11,
+	},
+	{
+		.reg_domain = IW_REG_DOMAIN_DOC,
+		.min	    = 1,
+		.max	    = 11,
+	},
+	{
+		.reg_domain = IW_REG_DOMAIN_ETSI,
+		.min	    = 1,
+		.max	    = 13,
+	},
+	{
+		.reg_domain = IW_REG_DOMAIN_SPAIN,
+		.min	    = 10,
+		.max	    = 11,
+	},
+	{
+		.reg_domain = IW_REG_DOMAIN_FRANCE,
+		.min	    = 10,
+		.max	    = 13,
+	},
+	{
+		.reg_domain = IW_REG_DOMAIN_MKK,
+		.min	    = 14,
+		.max	    = 14,
+	},
+	{
+		.reg_domain = IW_REG_DOMAIN_MKK1,
+		.min	    = 1,
+		.max	    = 14,
+	},
+	{
+		.reg_domain = IW_REG_DOMAIN_ISRAEL,
+		.min	    = 3,
+		.max	    = 9,
+	},
+};
+
+/**
+ * iw_valid_channel - validate channel in regulatory domain
+ * @reg_comain - regulatory domain
+ * @channel - channel to validate
+ *
+ * Returns 0 if invalid in the specified regulatory domain, non-zero if valid.
+ */
+static int iw_valid_channel(int reg_domain, int channel)
+{
+	int i, rc = 0;
+
+	for (i = 0; i < ARRAY_SIZE(iw_channel_table); i++)
+		if (reg_domain == iw_channel_table[i].reg_domain) {
+			rc = channel >= iw_channel_table[i].min &&
+			     channel <= iw_channel_table[i].max;
+			break;
+		}
+	return rc;
+}
 
 /*
  * A linked list of "instances" of the wl24 device.  Each actual PCMCIA card
@@ -1444,20 +1506,14 @@ static int wl3501_get_name(struct net_device *dev, struct iw_request_info *info,
 static int wl3501_set_freq(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	int channel = wrqu->freq.m;
-	int rc = 0;
+	int rc = -EINVAL;
 
-	if (channel > 1000 || wrqu->freq.e > 0)
-		rc = -EOPNOTSUPP;
-	else if (channel < 1 || channel > ARRAY_SIZE(wl3501_chan2freq))
-		rc = -EINVAL;
-	else {
-		struct wl3501_card *this = (struct wl3501_card *)dev->priv;
-
+	if (iw_valid_channel(this->reg_domain, channel)) {
 		this->chan = channel;
 		rc = wl3501_reset(dev);
 	}
-
 	return rc;
 }
 
@@ -1999,16 +2055,13 @@ static void wl3501_config(dev_link_t *link)
 	init_waitqueue_head(&this->wait);
 
 	switch (this->reg_domain) {
-	case WL3501_REG_DOMAIN_SPAIN:
-	case WL3501_REG_DOMAIN_FRANCE:
+	case IW_REG_DOMAIN_SPAIN:
+	case IW_REG_DOMAIN_FRANCE:
 		this->chan = 10;
 		break;
-	case WL3501_REG_DOMAIN_MKK:
+	case IW_REG_DOMAIN_MKK:
 		this->chan = 14;
 		break;
-	case WL3501_REG_DOMAIN_FCC:
-	case WL3501_REG_DOMAIN_IC:
-	case WL3501_REG_DOMAIN_ETSI:
 	default:
 		this->chan = 1;
 		break;

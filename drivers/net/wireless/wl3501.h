@@ -194,12 +194,14 @@ enum wl3501_status {
 #define WL3501_MGMT_CAPABILITY_CF_POLL_REQUEST	0x0008  /*      - " -	   */
 #define WL3501_MGMT_CAPABILITY_PRIVACY		0x0010  /*      - " -	   */
 
-#define WL3501_REG_DOMAIN_FCC    0x10	/* Channel 1 to 11 */
-#define WL3501_REG_DOMAIN_IC     0x20	/* Channel 1 to 11 */
-#define WL3501_REG_DOMAIN_ETSI   0x30	/* Channel 1 to 13 */
-#define WL3501_REG_DOMAIN_SPAIN  0x31	/* Channel 10 to 11 */
-#define WL3501_REG_DOMAIN_FRANCE 0x32	/* Channel 10 to 13 */
-#define WL3501_REG_DOMAIN_MKK    0x40	/* Channel 14 */
+#define IW_REG_DOMAIN_FCC	0x10	/* Channel 1 to 11	USA    */
+#define IW_REG_DOMAIN_DOC	0x20	/* Channel 1 to 11	Canada */
+#define IW_REG_DOMAIN_ETSI	0x30	/* Channel 1 to 13	Europe */
+#define IW_REG_DOMAIN_SPAIN	0x31	/* Channel 10 to 11	Spain  */
+#define IW_REG_DOMAIN_FRANCE	0x32	/* Channel 10 to 13	France */
+#define IW_REG_DOMAIN_MKK	0x40	/* Channel 14		Japan  */
+#define IW_REG_DOMAIN_MKK1	0x41	/* Channel 1-14		Japan  */
+#define IW_REG_DOMAIN_ISRAEL	0x50	/* Channel 3 - 9	Israel */
 
 #define WL3501_ESSID_MAX_LEN (IW_ESSID_MAX_SIZE + 2)
 
