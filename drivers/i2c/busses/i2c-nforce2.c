@@ -43,14 +43,10 @@
 #include <linux/delay.h>
 #include <asm/io.h>
 
-#ifdef MODULE_LICENSE
 MODULE_LICENSE("GPL");
-#endif
 MODULE_AUTHOR ("Hans-Frieder Vogt <hfvogt@arcor.de>");
 MODULE_DESCRIPTION("nForce2 SMBus driver");
 
-#define LM_VERSION "2.80-lk1"
-#define LM_DATE    "2003/07/12"
 
 #ifndef PCI_DEVICE_ID_NVIDIA_NFORCE2_SMBUS
 #define PCI_DEVICE_ID_NVIDIA_NFORCE2_SMBUS   0x0064
@@ -114,13 +110,6 @@ struct nforce2_smbus {
 static s32 nforce2_access(struct i2c_adapter *adap, u16 addr,
 		       unsigned short flags, char read_write,
 		       u8 command, int size, union i2c_smbus_data *data);
-#if 0
-static void nforce2_do_pause(unsigned int amount);
-#endif
-/*
-static int nforce2_block_transaction(union i2c_smbus_data *data,
-				  char read_write, int i2c_enable);
- */
 static u32 nforce2_func(struct i2c_adapter *adapter);
 
 
@@ -345,18 +334,12 @@ static int __devinit nforce2_probe_smb (struct pci_dev *dev, int reg,
 			smbus->base, smbus->base+smbus->size-1, name);
 		return -1;
 	}
-
-	/* TODO: find a better way to find out whether this file is compiled
-	 * with i2c 2.7.0 of earlier
-	 */
-/*#ifdef I2C_HW_SMBUS_AMD8111
+/*
 	smbus->adapter.owner = THIS_MODULE;
-#endif
-
 	smbus->adapter.id = I2C_ALGO_SMBUS | I2C_HW_SMBUS_NFORCE2;
 	smbus->adapter.algo = &smbus_algorithm;
-	smbus->adapter.algo_data = smbus;*/
-
+	smbus->adapter.algo_data = smbus;
+*/
 	smbus->adapter = nforce2_adapter;
 	smbus->adapter.dev.parent = &dev->dev;
 	snprintf(smbus->adapter.dev.name, DEVICE_NAME_SIZE,
@@ -430,7 +413,6 @@ static struct pci_driver nforce2_driver = {
 
 static int __init nforce2_init(void)
 {
-	printk(KERN_INFO "i2c-nforce2 version %s (%s)\n", LM_VERSION, LM_DATE);
 	return pci_module_init(&nforce2_driver);
 }
 
