@@ -37,6 +37,10 @@ HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
 
 CROSS_COMPILE 	=
 
+# 	That's our default target when none is given on the command line
+
+all:	vmlinux
+
 #
 # Include the make variables (CC, etc...)
 #
@@ -69,20 +73,31 @@ export CPPFLAGS EXPORT_FLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
-all:	do-it-all
+noconfig_targets := oldconfig xconfig menuconfig config clean mrproper \
+		    distclean
 
-#
-# Make "config" the default target if there is no configuration file or
-# "depend" the target if there is no top-level dependency information.
-#
+ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
-ifeq (.config,$(wildcard .config))
-include .config
-do-it-all:	vmlinux
-else
-CONFIGURATION = config
-do-it-all:	config
-endif
+# Here goes the main Makefile
+# ===========================================================================
+#
+# If the user gave a *config target, it'll be handled in another
+# section below, since in this case we cannot include .config
+# Same goes for other targets like clean/mrproper etc, which
+# don't need .config, either
+
+#	In this section, we need .config
+
+-include .config
+
+#	If .config doesn't exist - tough luck
+
+.config:
+	@echo '***'
+	@echo '*** You have not yet configured your kernel!'
+	@echo '*** Please run "make xconfig/menuconfig/config/oldconfig"'
+	@echo '***'
+	@exit 1
 
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map
@@ -172,7 +187,7 @@ define rule_link_vmlinux
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
 
-vmlinux: $(CONFIGURATION) $(vmlinux-objs) FORCE
+vmlinux: $(vmlinux-objs) FORCE
 	$(call if_changed_rule,link_vmlinux)
 
 #	The actual objects are generated when descending, 
@@ -222,6 +237,16 @@ include/asm:
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
 	scripts/split-include include/linux/autoconf.h include/config
 	@ touch include/config/MARKER
+
+# 	if .config is newer than include/linux/autoconf.h, someone tinkered
+# 	with it and forgot to run make oldconfig
+
+include/linux/autoconf.h: .config
+	@echo '***'
+	@echo '*** You changed .config w/o running make *config?'
+	@echo '*** Please run "make oldconfig"'
+	@echo '***'
+	@exit 1
 
 # Generate some files
 # ---------------------------------------------------------------------------
@@ -412,13 +437,36 @@ rpm:	clean spec
 	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
 	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
 
+else # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
+
 # Targets which don't need .config
 # ===========================================================================
+#
+# These targets basically have their own Makefile - not quite, but at
+# least its own exclusive section in the same Makefile. The reason for
+# this is the following:
+# To know the configuration, the main Makefile has to include
+# .config. That's a obviously a problem when .config doesn't exist
+# yet, but that could be kludged around with only including it if it
+# exists.
+# However, the larger problem is: If you run make *config, make will
+# include the old .config, then execute your *config. It will then
+# notice that a piece it included (.config) did change and restart from
+# scratch. Which will cause execution of *config again. You get the
+# picture.
+# If we don't explicitly let the Makefile know that .config is changed
+# by *config (the old way), it won't reread .config after *config,
+# thus working with possibly stale values - we don't that either.
+#
+# So we divide things: This part here is for making *config targets,
+# and other targets which should work when no .config exists yet.
+# The main part above takes care of the rest after a .config exists.
 
 # Kernel configuration
 # ---------------------------------------------------------------------------
 
-.PHONY: oldconfig xconfig menuconfig config
+.PHONY: oldconfig xconfig menuconfig config \
+	make_with_config
 
 oldconfig:
 	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
@@ -434,6 +482,22 @@ menuconfig:
 config:
 	$(CONFIG_SHELL) scripts/Configure arch/$(ARCH)/config.in
 
+#	How we generate .config depends on which *config the
+#	user chose when calling make
+
+.config: $(filter oldconfig xconfig menuconfig config,$(MAKECMDGOALS)) ;
+
+#	If the user gave commands from both the need / need not
+#	.config sections, we need to call make again after
+#	.config is generated, now to take care of the remaining
+#	targets we know nothing about in this section
+
+remaining_targets := $(filter-out $(noconfig_targets),$(MAKECMDGOALS))
+
+$(remaining_targets) : make_with_config
+
+make_with_config: .config
+	@$(MAKE) $(remaining_targets)
 
 # Cleaning up
 # ---------------------------------------------------------------------------
@@ -492,6 +556,9 @@ MRPROPER_DIRS += \
 	include/config \
 	$(TOPDIR)/include/linux/modules
 
+#	That's our way to know about arch specific cleanup.
+
+include arch/$(ARCH)/Makefile
 
 clean:	archclean
 	find . \( -name '*.[oas]' -o -name core -o -name '.*.cmd' \) -type f -print \
@@ -511,6 +578,8 @@ distclean: mrproper
 		\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
 		-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f -print` TAGS tags
+
+endif # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
