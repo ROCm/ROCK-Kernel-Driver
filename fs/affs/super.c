@@ -11,26 +11,10 @@
  */
 
 #include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/fs.h>
-#include <linux/slab.h>
-#include <linux/stat.h>
-#include <linux/time.h>
-#include <linux/affs_fs.h>
-#include <linux/kernel.h>
-#include <linux/mm.h>
-#include <linux/string.h>
-#include <linux/genhd.h>
-#include <linux/amigaffs.h>
-#include <linux/major.h>
-#include <linux/blkdev.h>
 #include <linux/init.h>
-#include <linux/smp_lock.h>
-#include <linux/buffer_head.h>
-#include <linux/vfs.h>
+#include <linux/statfs.h>
 #include <linux/parser.h>
-#include <asm/system.h>
-#include <asm/uaccess.h>
+#include "affs.h"
 
 extern struct timezone sys_tz;
 
