@@ -178,13 +178,13 @@ aoechr_rel(struct inode *inode, struct file *filp)
 static ssize_t
 aoechr_read(struct file *filp, char __user *buf, size_t cnt, loff_t *off)
 {
-	int n;
+	unsigned long n;
 	char *mp;
 	struct ErrMsg *em;
 	ssize_t len;
 	ulong flags;
 
-	n = (int) filp->private_data;
+	n = (unsigned long) filp->private_data;
 	switch (n) {
 	case MINOR_ERR:
 		spin_lock_irqsave(&emsgs_lock, flags);
