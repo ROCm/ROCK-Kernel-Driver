@@ -256,7 +256,7 @@ int write_chan(struct list_head *chans, const char *buf, int len,
 					ret = 0;
 			}
 		}
-	}	
+	}
 	return(ret);
 }
 

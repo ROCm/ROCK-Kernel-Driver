@@ -33,6 +33,9 @@
 #define FP_FRAME_SIZE (27)
 #define FPX_FRAME_SIZE (128)
 
+#define MAX_REG_OFFSET (FRAME_SIZE_OFFSET)
+#define MAX_REG_NR (FRAME_SIZE)
+
 #ifdef PTRACE_GETREGS
 #define UM_HAVE_GETREGS
 #endif

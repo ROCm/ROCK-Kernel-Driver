@@ -5,7 +5,6 @@
 
 obj-y := exec_kern.o mem.o mem_user.o mmu.o process.o process_kern.o \
 	syscall_kern.o syscall_user.o time.o tlb.o trap_user.o uaccess.o \
-	sys-$(SUBARCH)/
 
 subdir-y := util
 

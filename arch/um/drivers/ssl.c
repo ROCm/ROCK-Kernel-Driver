@@ -224,7 +224,7 @@ static void ssl_exit(void)
 {
 	if (!ssl_init_done)
 		return;
-	close_lines(serial_lines, 
+	close_lines(serial_lines,
 		    sizeof(serial_lines)/sizeof(serial_lines[0]));
 }
 __uml_exitcall(ssl_exit);

@@ -175,6 +175,29 @@ static void init_highmem(void)
 }
 #endif /* CONFIG_HIGHMEM */
 
+static void __init fixaddr_user_init( void)
+{
+	long size = FIXADDR_USER_END - FIXADDR_USER_START;
+	pgd_t *pgd;
+	pmd_t *pmd;
+	pte_t *pte;
+	unsigned long paddr, vaddr = FIXADDR_USER_START;
+
+	if (  ! size )
+		return;
+
+	fixrange_init( FIXADDR_USER_START, FIXADDR_USER_END, swapper_pg_dir);
+	paddr = (unsigned long)alloc_bootmem_low_pages( size);
+	memcpy( (void *)paddr, (void *)FIXADDR_USER_START, size);
+	paddr = __pa(paddr);
+	for ( ; size > 0; size-=PAGE_SIZE, vaddr+=PAGE_SIZE, paddr+=PAGE_SIZE) {
+		pgd = swapper_pg_dir + pgd_index(vaddr);
+		pmd = pmd_offset(pgd, vaddr);
+		pte = pte_offset_kernel(pmd, vaddr);
+		pte_set_val( (*pte), paddr, PAGE_READONLY);
+	}
+}
+
 void paging_init(void)
 {
 	unsigned long zones_size[MAX_NR_ZONES], vaddr;
@@ -194,6 +217,8 @@ void paging_init(void)
 	 */
 	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
 	fixrange_init(vaddr, FIXADDR_TOP, swapper_pg_dir);
+
+	fixaddr_user_init();
 
 #ifdef CONFIG_HIGHMEM
 	init_highmem();

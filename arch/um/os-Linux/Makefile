@@ -3,9 +3,10 @@
 # Licensed under the GPL
 #
 
-obj-y = file.o process.o time.o tty.o user_syms.o drivers/
+obj-y = elf_aux.o file.o process.o time.o tty.o user_syms.o drivers/
 
-USER_OBJS := $(foreach file,file.o process.o time.o tty.o,$(obj)/$(file))
+USER_OBJS := elf_aux.o file.o process.o time.o tty.o
+USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<

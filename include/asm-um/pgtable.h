@@ -355,6 +355,8 @@ extern unsigned long page_to_phys(struct page *page);
 
 extern pte_t mk_pte(struct page *page, pgprot_t pgprot);
 
+#define pte_set_val(p, phys, prot) pte_val(p) = (phys | pgprot_val(prot))
+
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
 	pte_val(pte) = (pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot);

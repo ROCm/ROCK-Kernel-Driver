@@ -15,7 +15,7 @@
  */
 static int use_stderr_console = 0;
 
-static void stderr_console_write(struct console *console, const char *string, 
+static void stderr_console_write(struct console *console, const char *string,
 				 unsigned len)
 {
 	generic_write(2 /* stderr */, string, len, NULL);

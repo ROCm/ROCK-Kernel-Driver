@@ -11,6 +11,7 @@
 #include <sched.h>
 #include <sys/wait.h>
 #include <sys/ptrace.h>
+#include <linux/ptrace.h>
 #include <sys/mman.h>
 #include <sys/user.h>
 #include <asm/unistd.h>
@@ -71,14 +72,10 @@ static void handle_segv(int pid)
 /*To use the same value of using_sysemu as the caller, ask it that value (in local_using_sysemu)*/
 static void handle_trap(int pid, union uml_pt_regs *regs, int local_using_sysemu)
 {
-	int err, syscall_nr, status;
+	int err, status;
 
-	syscall_nr = PT_SYSCALL_NR(regs->skas.regs);
-	UPT_SYSCALL_NR(regs) = syscall_nr;
-	if(syscall_nr < 0){
-		relay_signal(SIGTRAP, regs);
-		return;
-	}
+	/* Mark this as a syscall */
+	UPT_SYSCALL_NR(regs) = PT_SYSCALL_NR(regs->skas.regs);
 
 	if (!local_using_sysemu)
 	{
@@ -93,7 +90,7 @@ static void handle_trap(int pid, union uml_pt_regs *regs, int local_using_sysemu
 			      "errno = %d\n", errno);
 
 		CATCH_EINTR(err = waitpid(pid, &status, WUNTRACED));
-		if((err < 0) || !WIFSTOPPED(status) || (WSTOPSIG(status) != SIGTRAP))
+		if((err < 0) || !WIFSTOPPED(status) || (WSTOPSIG(status) != (SIGTRAP + 0x80)))
 			panic("handle_trap - failed to wait at end of syscall, "
 			      "errno = %d, status = %d\n", errno, status);
 	}
@@ -142,6 +139,10 @@ void start_userspace(int cpu)
 		panic("start_userspace : expected SIGSTOP, got status = %d",
 		      status);
 
+	if (ptrace(PTRACE_SETOPTIONS, pid, NULL, (void *)PTRACE_O_TRACESYSGOOD) < 0)
+		panic("start_userspace : PTRACE_SETOPTIONS failed, errno=%d\n",
+		      errno);
+
 	if(munmap(stack, PAGE_SIZE) < 0)
 		panic("start_userspace : munmap failed, errno = %d\n", errno);
 
@@ -150,15 +151,15 @@ void start_userspace(int cpu)
 
 void userspace(union uml_pt_regs *regs)
 {
-	int err, status, op, pt_syscall_parm, pid = userspace_pid[0];
+	int err, status, op, pid = userspace_pid[0];
 	int local_using_sysemu; /*To prevent races if using_sysemu changes under us.*/
 
 	restore_registers(regs);
 		
 	local_using_sysemu = get_using_sysemu();
 
-	pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
-	err = ptrace(pt_syscall_parm, pid, 0, 0);
+	op = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
+	err = ptrace(op, pid, 0, 0);
 
 	if(err)
 		panic("userspace - PTRACE_%s failed, errno = %d\n",
@@ -171,14 +172,18 @@ void userspace(union uml_pt_regs *regs)
 
 		regs->skas.is_user = 1;
 		save_registers(regs);
+		UPT_SYSCALL_NR(regs) = -1; /* Assume: It's not a syscall */
 
 		if(WIFSTOPPED(status)){
 		  	switch(WSTOPSIG(status)){
 			case SIGSEGV:
 				handle_segv(pid);
 				break;
-			case SIGTRAP:
+			case SIGTRAP + 0x80:
 			        handle_trap(pid, regs, local_using_sysemu);
+				break;
+			case SIGTRAP:
+				relay_signal(SIGTRAP, regs);
 				break;
 			case SIGIO:
 			case SIGVTALRM:
@@ -193,16 +198,17 @@ void userspace(union uml_pt_regs *regs)
 				       "%d\n", WSTOPSIG(status));
 			}
 			interrupt_end();
+
+			/* Avoid -ERESTARTSYS handling in host */
+			PT_SYSCALL_NR(regs->skas.regs) = -1;
 		}
 
 		restore_registers(regs);
 
 		/*Now we ended the syscall, so re-read local_using_sysemu.*/
 		local_using_sysemu = get_using_sysemu();
-		pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
 
-		op = singlestepping(NULL) ? PTRACE_SINGLESTEP :
-			pt_syscall_parm;
+		op = SELECT_PTRACE_OPERATION(local_using_sysemu, singlestepping(NULL));
 
 		err = ptrace(op, pid, 0, 0);
 		if(err)

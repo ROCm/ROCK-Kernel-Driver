@@ -26,7 +26,7 @@ static irqreturn_t line_interrupt(int irq, void *data, struct pt_regs *unused)
 	struct tty_struct *tty = data;
 	struct line *line = tty->driver_data;
 
-	if (line) 
+	if (line)
 		chan_interrupt(&line->chan_list, &line->task, tty, irq);
 	return IRQ_HANDLED;
 }
@@ -35,7 +35,7 @@ static void line_timer_cb(void *arg)
 {
 	struct tty_struct *tty = arg;
 	struct line *line = tty->driver_data;
-	
+
 	line_interrupt(line->driver->read_irq, arg, NULL);
 }
 
@@ -326,7 +326,7 @@ int line_open(struct line *lines, struct tty_struct *tty,
 		chan_enable_winch(&line->chan_list, tty);
 		line->sigio = 1;
 	}
-	chan_window_size(&line->chan_list, &tty->winsize.ws_row, 
+	chan_window_size(&line->chan_list, &tty->winsize.ws_row,
 			 &tty->winsize.ws_col);
 	line->count++;
 
@@ -481,8 +481,7 @@ struct tty_driver *line_register_devfs(struct lines *set,
 			 struct tty_operations *ops, struct line *lines,
 			 int nlines)
 {
-	int err, i;
-	char *from, *to;
+	int i;
 	struct tty_driver *driver = alloc_tty_driver(nlines);
 
 	if (!driver)
@@ -505,12 +504,6 @@ struct tty_driver *line_register_devfs(struct lines *set,
 		put_tty_driver(driver);
 		return NULL;
 	}
-
-	from = line_driver->symlink_from;
-	to = line_driver->symlink_to;
-	err = devfs_mk_symlink(from, to);
-	if(err) printk("Symlink creation from /dev/%s to /dev/%s "
-		       "returned %d\n", from, to, err);
 
 	for(i = 0; i < nlines; i++){
 		if(!lines[i].valid) 
@@ -571,7 +564,7 @@ irqreturn_t winch_interrupt(int irq, void *data, struct pt_regs *unused)
 	tty  = winch->tty;
 	line = tty->driver_data;
 	if (tty != NULL) {
-		chan_window_size(&line->chan_list, 
+		chan_window_size(&line->chan_list,
 				 &tty->winsize.ws_row, 
 				 &tty->winsize.ws_col);
 		kill_pg(tty->pgrp, SIGWINCH, 1);
