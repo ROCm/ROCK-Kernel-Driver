@@ -3,6 +3,8 @@
 # Licensed under the GPL
 #
 
+extra-y := vmlinux.lds.s
+
 obj-y = checksum.o config.o exec_kern.o exitcode.o frame_kern.o frame.o \
 	helper.o init_task.o irq.o irq_user.o ksyms.o mem.o mem_user.o \
 	process.o process_kern.o ptrace.o reboot.o resource.o sigio_user.o \
