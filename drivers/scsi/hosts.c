@@ -261,8 +261,6 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	device_initialize(&shost->shost_gendev);
 	snprintf(shost->shost_gendev.bus_id, BUS_ID_SIZE, "host%d",
 		shost->host_no);
-	snprintf(shost->shost_gendev.name, DEVICE_NAME_SIZE, "%s",
-		shost->hostt->proc_name);
 	shost->shost_gendev.release = scsi_host_dev_release;
 
 	class_device_initialize(&shost->shost_classdev);
