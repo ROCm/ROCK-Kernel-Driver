@@ -152,16 +152,16 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
 /*
  * The following macros handle the cache and bufferable bits...
  */
-#define _L_PTE_DEFAULT	L_PTE_PRESENT | L_PTE_YOUNG
-#define _L_PTE_READ	L_PTE_USER | L_PTE_EXEC | L_PTE_CACHEABLE | L_PTE_BUFFERABLE
+#define _L_PTE_DEFAULT	L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_CACHEABLE | L_PTE_BUFFERABLE
+#define _L_PTE_READ	L_PTE_USER | L_PTE_EXEC
+
+extern pgprot_t		pgprot_kernel;
 
 #define PAGE_NONE       __pgprot(_L_PTE_DEFAULT)
 #define PAGE_COPY       __pgprot(_L_PTE_DEFAULT | _L_PTE_READ)
 #define PAGE_SHARED     __pgprot(_L_PTE_DEFAULT | _L_PTE_READ | L_PTE_WRITE)
 #define PAGE_READONLY   __pgprot(_L_PTE_DEFAULT | _L_PTE_READ)
-#define PAGE_KERNEL     __pgprot(_L_PTE_DEFAULT | L_PTE_CACHEABLE | L_PTE_BUFFERABLE | L_PTE_DIRTY | L_PTE_WRITE | L_PTE_EXEC)
-
-#define _PAGE_CHG_MASK	(PAGE_MASK | L_PTE_DIRTY | L_PTE_YOUNG)
+#define PAGE_KERNEL	pgprot_kernel
 
 #endif /* __ASSEMBLY__ */
 
@@ -323,7 +323,8 @@ static inline pte_t *pmd_page_kernel(pmd_t pmd)
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
-	pte_val(pte) = (pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot);
+	const unsigned long mask = L_PTE_EXEC | L_PTE_WRITE | L_PTE_USER;
+	pte_val(pte) = (pte_val(pte) & ~mask) | (pgprot_val(newprot) & mask);
 	return pte;
 }
 

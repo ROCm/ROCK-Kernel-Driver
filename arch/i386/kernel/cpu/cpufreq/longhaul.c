@@ -170,6 +170,9 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
  * between that value multiplied by possible FSBs and cpu_mhz which
  * was calculated at boot time. Really ugly, but no other way to do this.
  */
+
+#define ROUNDING	0xf
+
 static int _guess (int guess, int maxmult)
 {
 	int target;
@@ -177,15 +180,19 @@ static int _guess (int guess, int maxmult)
 	target = ((maxmult/10)*guess);
 	if (maxmult%10 != 0)
 		target += (guess/2);
-	target &= ~0xf;
+	target += ROUNDING/2;
+	target &= ~ROUNDING;
 	return target;
 }
 
 static int guess_fsb(int maxmult)
 {
-	int speed = (cpu_khz/1000) & ~0xf;
+	int speed = (cpu_khz/1000);
 	int i;
 	int speeds[3] = { 66, 100, 133 };
+
+	speed += ROUNDING/2;
+	speed &= ~ROUNDING;
 
 	for (i=0; i<3; i++) {
 		if (_guess(speeds[i],maxmult) == speed)

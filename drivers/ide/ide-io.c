@@ -54,37 +54,6 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-#if (DISK_RECOVERY_TIME > 0)
-
-#error So the User Has To Fix the Compilation And Stop Hacking Port 0x43. Does anyone ever use this anyway ??
-
-/*
- * For really screwy hardware (hey, at least it *can* be used with Linux)
- * we can enforce a minimum delay time between successive operations.
- */
-static unsigned long read_timer (ide_hwif_t *hwif)
-{
-	unsigned long t, flags;
-	int i;
-	
-	/* FIXME this is completely unsafe! */
-	local_irq_save(flags);
-	t = jiffies * 11932;
-	outb_p(0, 0x43);
-	i = inb_p(0x40);
-	i |= inb_p(0x40) << 8;
-	local_irq_restore(flags);
-	return (t - i);
-}
-#endif /* DISK_RECOVERY_TIME */
-
-static inline void set_recovery_timer (ide_hwif_t *hwif)
-{
-#if (DISK_RECOVERY_TIME > 0)
-	hwif->last_time = read_timer(hwif);
-#endif /* DISK_RECOVERY_TIME */
-}
-
 /**
  *	ide_end_request		-	complete an IDE I/O
  *	@drive: IDE device for the I/O
@@ -653,10 +622,6 @@ ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 	if (block == 0 && drive->remap_0_to_1 == 1)
 		block = 1;  /* redirect MBR access to EZ-Drive partn table */
 
-#if (DISK_RECOVERY_TIME > 0)
-	while ((read_timer() - HWIF(drive)->last_time) < DISK_RECOVERY_TIME);
-#endif
-
 	if (blk_pm_suspend_request(rq) &&
 	    rq->pm->pm_step == ide_pm_state_start_suspend)
 		/* Mark drive blocked when starting the suspend sequence. */
@@ -1116,7 +1081,6 @@ void ide_timer_expiry (unsigned long data)
 					startstop =
 					DRIVER(drive)->error(drive, "irq timeout", hwif->INB(IDE_STATUS_REG));
 			}
-			set_recovery_timer(hwif);
 			drive->service_time = jiffies - drive->service_start;
 			spin_lock_irq(&ide_lock);
 			enable_irq(hwif->irq);
@@ -1313,7 +1277,6 @@ irqreturn_t ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 	 * same irq as is currently being serviced here, and Linux
 	 * won't allow another of the same (on any CPU) until we return.
 	 */
-	set_recovery_timer(HWIF(drive));
 	drive->service_time = jiffies - drive->service_start;
 	if (startstop == ide_stopped) {
 		if (hwgroup->handler == NULL) {	/* paranoia */

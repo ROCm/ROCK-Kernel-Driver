@@ -85,6 +85,7 @@ static void isa_enable_dma(dmach_t channel, dma_t *dma)
 			break;
 
 		default:
+			direction = PCI_DMA_NONE;
 			break;
 		}
 

@@ -4435,7 +4435,7 @@ static int __devinit cs4281_probe(struct pci_dev *pcidev,
 
 // --------------------------------------------------------------------- 
 
-static void __devinit cs4281_remove(struct pci_dev *pci_dev)
+static void __devexit cs4281_remove(struct pci_dev *pci_dev)
 {
 	struct cs4281_state *s = pci_get_drvdata(pci_dev);
 	// stop DMA controller 
@@ -4469,7 +4469,7 @@ struct pci_driver cs4281_pci_driver = {
 	.name	  = "cs4281",
 	.id_table = cs4281_pci_tbl,
 	.probe	  = cs4281_probe,
-	.remove	  = cs4281_remove,
+	.remove	  = __devexit_p(cs4281_remove),
 	.suspend  = CS4281_SUSPEND_TBL,
 	.resume	  = CS4281_RESUME_TBL,
 };

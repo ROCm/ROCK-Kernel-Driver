@@ -687,11 +687,13 @@ find_psb_table(void)
 			if (ppst[j].vid < rvo) {	/* vid+rvo >= 0 */
 				printk(KERN_ERR BFX
 				       "0 vid exceeded with pstate %d\n", j);
+				kfree(ppst);
 				return -ENODEV;
 			}
 			if (ppst[j].vid < maxvid+rvo) { /* vid+rvo >= maxvid */
 				printk(KERN_ERR BFX
 				       "maxvid exceeded with pstate %d\n", j);
+				kfree(ppst);
 				return -ENODEV;
 			}
 		}
@@ -706,7 +708,7 @@ find_psb_table(void)
 
 		for (j = 0; j < numps; j++)
 			if ((ppst[j].fid==currfid) && (ppst[j].vid==currvid))
-				return (0);
+				return 0;
 
 		printk(KERN_ERR BFX "currfid/vid do not match PST, ignoring\n");
 		return 0;
@@ -935,10 +937,7 @@ powernowk8_verify(struct cpufreq_policy *pol)
 		return -ENODEV;
 	}
 
-#warning pol->policy is in undefined state here
-	res = find_match(&targ, &min, &max,
-			 pol->policy == CPUFREQ_POLICY_POWERSAVE ?
-			 SEARCH_DOWN : SEARCH_UP, 0, 0);
+	res = find_match(&targ, &min, &max, SEARCH_DOWN, 0, 0);
 	if (!res) {
 		pol->min = min * 1000;
 		pol->max = max * 1000;
@@ -957,9 +956,10 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 
 	pol->governor = CPUFREQ_DEFAULT_GOVERNOR;
 
-	/* Take a crude guess here. */
-	pol->cpuinfo.transition_latency = ((rvo + 8) * vstable * VST_UNITS_20US)
-	    + (3 * (1 << irt) * 10);
+	/* Take a crude guess here. 
+	 * That guess was in microseconds, so multply with 1000 */
+	pol->cpuinfo.transition_latency = (((rvo + 8) * vstable * VST_UNITS_20US)
+	    + (3 * (1 << irt) * 10)) * 1000;
 
 	if (query_current_values_with_pending_wait())
 		return -EIO;

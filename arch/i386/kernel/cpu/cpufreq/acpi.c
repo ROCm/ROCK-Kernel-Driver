@@ -578,8 +578,8 @@ acpi_cpufreq_cpu_init (
 	/* detect transition latency */
 	policy->cpuinfo.transition_latency = 0;
 	for (i=0;i<perf->state_count;i++) {
-		if (perf->states[i].transition_latency > policy->cpuinfo.transition_latency)
-			policy->cpuinfo.transition_latency = perf->states[i].transition_latency;
+		if ((perf->states[i].transition_latency * 1000) > policy->cpuinfo.transition_latency)
+			policy->cpuinfo.transition_latency = perf->states[i].transition_latency * 1000;
 	}
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cur = perf->states[pr->limit.state.px].core_frequency * 1000;
