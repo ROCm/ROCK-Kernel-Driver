@@ -134,7 +134,7 @@ extern struct dentry_operations minix_dentry_operations;
 
 static inline struct minix_sb_info *minix_sb(struct super_block *sb)
 {
-	return &sb->u.minix_sb;
+	return sb->u.generic_sbp;
 }
 
 static inline struct minix_inode_info *minix_i(struct inode *inode)

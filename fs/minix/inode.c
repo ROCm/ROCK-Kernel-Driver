@@ -70,6 +70,8 @@ static void minix_put_super(struct super_block *sb)
 		brelse(sbi->s_zmap[i]);
 	brelse (sbi->s_sbh);
 	kfree(sbi->s_imap);
+	sb->u.generic_sbp = NULL;
+	kfree(sbi);
 
 	return;
 }
@@ -170,7 +172,12 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 	struct minix_super_block *ms;
 	int i, block;
 	struct inode *root_inode;
-	struct minix_sb_info *sbi = minix_sb(s);
+	struct minix_sb_info *sbi;
+
+	sbi = kmalloc(sizeof(struct minix_sb_info), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	s->u.generic_sbp = sbi;
 
 	/* N.B. These should be compile-time tests.
 	   Unfortunately that is impossible. */
@@ -313,6 +320,8 @@ out_bad_hblock:
 out_bad_sb:
 	printk("MINIX-fs: unable to read superblock\n");
  out:
+	s->u.generic_sbp = NULL;
+	kfree(sbi);
 	return -EINVAL;
 }
 
