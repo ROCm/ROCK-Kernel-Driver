@@ -26,6 +26,7 @@ static inline int apic_id_registered(void)
 
 #define APIC_BROADCAST_ID     (0x0f)
 #define check_apicid_used(bitmap, apicid) (0)
+#define check_apicid_present(bit) (phys_cpu_present_map & (1 << bit))
 
 static inline unsigned long calculate_ldr(unsigned long old)
 {
@@ -78,6 +79,13 @@ static inline unsigned long apicid_to_cpu_present(int phys_apicid)
 {
 	return (1ul << phys_apicid);
 }
+
+extern volatile u8 cpu_2_logical_apicid[];
+/* Mapping from cpu number to logical apicid */
+static inline int cpu_to_logical_apicid(int cpu)
+{
+       return (int)cpu_2_logical_apicid[cpu];
+ }
 
 static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
 {

@@ -13,6 +13,7 @@
  
 #define APIC_BROADCAST_ID      0x0F
 #define check_apicid_used(bitmap, apicid) ((bitmap) & (1 << (apicid)))
+#define check_apicid_present(bit) (phys_cpu_present_map & (1 << bit))
 
 static inline int apic_id_registered(void)
 {
@@ -43,6 +44,13 @@ static inline ulong ioapic_phys_id_map(ulong phys_map)
 {
 	/* We don't have a good way to do this yet - hack */
 	return 0xf;
+}
+
+/* Mapping from cpu number to logical apicid */
+extern volatile u8 cpu_2_logical_apicid[];
+static inline int cpu_to_logical_apicid(int cpu)
+{
+	return (int)cpu_2_logical_apicid[cpu];
 }
 
 static inline int cpu_present_to_apicid(int mps_cpu)

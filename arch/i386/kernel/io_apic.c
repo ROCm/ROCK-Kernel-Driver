@@ -278,7 +278,7 @@ static inline void balance_irq(int irq)
 		new_cpu = move(entry->cpu, allowed_mask, now, random_number);
 		if (entry->cpu != new_cpu) {
 			entry->cpu = new_cpu;
-			set_ioapic_affinity(irq, 1 << new_cpu);
+			set_ioapic_affinity(irq, cpu_to_logical_apicid(new_cpu));
 		}
 	}
 }

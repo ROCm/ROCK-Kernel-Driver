@@ -31,6 +31,9 @@ static inline unsigned long calculate_ldr(unsigned long old)
 #define APIC_BROADCAST_ID     (x86_summit ? 0xFF : 0x0F)
 #define check_apicid_used(bitmap, apicid) (0)
 
+/* we don't use the phys_cpu_present_map to indicate apicid presence */
+#define check_apicid_present(bit) (1) 
+
 static inline void clustered_apic_check(void)
 {
 	printk("Enabling APIC mode:  %s.  Using %d I/O APICs\n",
@@ -40,6 +43,13 @@ static inline void clustered_apic_check(void)
 static inline int apicid_to_node(int logical_apicid)
 {
 	return (logical_apicid >> 5);          /* 2 clusterids per CEC */
+}
+
+/* Mapping from cpu number to logical apicid */
+extern volatile u8 cpu_2_logical_apicid[];
+static inline int cpu_to_logical_apicid(int cpu)
+{
+	return (int)cpu_2_logical_apicid[cpu];
 }
 
 static inline int cpu_present_to_apicid(int mps_cpu)
