@@ -8,6 +8,8 @@ affs.txt
 	- info and mount options for the Amiga Fast File System.
 bfs.txt
 	- info for the SCO UnixWare Boot Filesystem (BFS).
+cifs.txt
+	- description of the CIFS filesystem
 coda.txt
 	- description of the CODA filesystem.
 cramfs.txt

@@ -140,6 +140,8 @@ if [ "$CONFIG_NET" = "y" ]; then
    fi
    define_tristate CONFIG_EXPORTFS $CONFIG_NFSD
 
+   dep_tristate 'CIFS support (advanced network filesystem for Samba, Window and other CIFS compliant servers)(EXPERIMENTAL)' CONFIG_CIFS $CONFIG_INET
+
    dep_tristate 'SMB file system support (to mount Windows shares etc.)' CONFIG_SMB_FS $CONFIG_INET
    if [ "$CONFIG_SMB_FS" != "n" ]; then
       bool '  Use a default NLS' CONFIG_SMB_NLS_DEFAULT
