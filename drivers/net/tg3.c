@@ -4271,6 +4271,12 @@ static int tg3_reset_hw(struct tg3 *tp)
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5703_A1)
 		tw32(MAC_SERDES_CFG, 0x616000);
 
+	/* Prevent chip from dropping frames when flow control
+	 * is enabled.
+	 */
+	tw32(MAC_LOW_WMARK_MAX_RX_FRAME, 2);
+	tr32(MAC_LOW_WMARK_MAX_RX_FRAME);
+
 	err = tg3_setup_phy(tp);
 	if (err)
 		return err;
