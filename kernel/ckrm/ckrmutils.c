@@ -21,11 +21,11 @@
  *        Created
  */
 
-#include <linux/ckrm.h>
 #include <linux/mm.h>
 #include <linux/err.h>
 #include <linux/mount.h>
 #include <linux/module.h>
+#include <linux/ckrm_rc.h>
 
 int
 get_exe_path_name(struct task_struct *tsk, char *buf, int buflen)
@@ -66,68 +66,142 @@ get_exe_path_name(struct task_struct *tsk, char *buf, int buflen)
 	return rc;
 }
 
-EXPORT_SYMBOL(get_exe_path_name);
-
-
 
 /*
- *  functions that come in handy for debugging 
+ * must be called with cnt_lock of parres held
+ * Caller is responsible for making sure that the new guarantee doesn't
+ * overflow parent's total guarantee.
  */
-
-#if 0
-
-#include <linux/ckrm_rc.h>
-
 void
-check_tasklist_sanity(struct ckrm_core_class *core)
+child_guarantee_changed(struct ckrm_shares *parent, int cur, int new)
 {
-	struct list_head *lh1, *lh2;
-	int count = 0;
-
-	if (core) {
-		spin_lock(&core->ckrm_lock);
-		if (list_empty(&core->tasklist)) {
-			spin_unlock(&core->ckrm_lock);
-			printk("check_tasklist_sanity: class %s empty list\n",
-					core->name);
-			return;
-		}
-		list_for_each_safe(lh1, lh2, &core->tasklist) {
-			struct task_struct *tsk = container_of(lh1, struct task_struct, ckrm_link);
-			if (count++ > 20000) {
-				printk("list is CORRUPTED\n");
-				break;
-			}
-			if (tsk->ckrm_core != core) {
-				ckrm_core_class_t *tcore = tsk->ckrm_core;
-				printk("sanity: task %s:%d has ckrm_core |%s| but in list |%s|\n",
-						tsk->comm,tsk->pid,
-						tcore ? tcore->name: "NULL",
-						core->name);
-			}
-		}
-		spin_unlock(&core->ckrm_lock);
+	if (new == cur || !parent) {
+		return;
 	}
+	if (new != CKRM_SHARE_DONTCARE) {
+		parent->unused_guarantee -= new;
+	}
+	if (cur != CKRM_SHARE_DONTCARE) {
+		parent->unused_guarantee += cur;
+	}
+	return;
 }
 
-void 
-ckrm_debug_free_core_class(struct ckrm_core_class *core)
+/*
+ * must be called with cnt_lock of parres held
+ * Caller is responsible for making sure that the new limit is not more 
+ * than parent's max_limit
+ */
+void
+child_maxlimit_changed(struct ckrm_shares *parent, int new_limit)
 {
-	struct task_struct *proc, *thread;
-	int count = 0;
+	if (parent && parent->cur_max_limit < new_limit) {
+		parent->cur_max_limit = new_limit;
+	}
+	return;
+}
 
-	printk("Analyze Error <%s> %d\n",core->name,atomic_read(&core->refcnt));
-	read_lock(&tasklist_lock);
-	spin_lock(&core->ckrm_lock);
-	do_each_thread(proc, thread) {
-		struct ckrm_core_class *tcore = (struct ckrm_core_class*) (thread->ckrm_core);
-		count += (core == thread->ckrm_core);
-		printk("%d thread=<%s:%d>  -> <%s> <%lx>\n",
-			count,thread->comm,thread->pid,tcore ? tcore->name : "NULL", thread->flags & PF_EXITING);
-	} while_each_thread(proc, thread);
-	spin_unlock(&core->ckrm_lock);
-	read_unlock(&tasklist_lock);
-	printk("End Analyze Error <%s> %d\n",core->name,atomic_read(&core->refcnt));
-} 
+/*
+ * Caller is responsible for holding any lock to protect the data
+ * structures passed to this function
+ */
+int
+set_shares(struct ckrm_shares *new, struct ckrm_shares *cur,
+		struct ckrm_shares *par)
+{
+	int rc = -EINVAL;
+	int cur_usage_guar = cur->total_guarantee - cur->unused_guarantee;
+	int increase_by = new->my_guarantee - cur->my_guarantee;
 
-#endif
+	// Check total_guarantee for correctness
+	if (new->total_guarantee <= CKRM_SHARE_DONTCARE) {
+		goto set_share_err;
+	} else if (new->total_guarantee == CKRM_SHARE_UNCHANGED) {
+		;// do nothing
+	} else if (cur_usage_guar > new->total_guarantee) {
+		goto set_share_err;
+	}
+
+	// Check max_limit for correctness
+	if (new->max_limit <= CKRM_SHARE_DONTCARE) {
+		goto set_share_err;
+	} else if (new->max_limit == CKRM_SHARE_UNCHANGED) {
+		; // do nothing
+	} else if (cur->cur_max_limit > new->max_limit) {
+		goto set_share_err;
+	}
+
+	// Check my_guarantee for correctness
+	if (new->my_guarantee == CKRM_SHARE_UNCHANGED) {
+		; // do nothing
+	} else if (new->my_guarantee == CKRM_SHARE_DONTCARE) {
+		; // do nothing
+	} else if (par && increase_by > par->unused_guarantee) {
+		goto set_share_err;
+	}
+
+	// Check my_limit for correctness
+	if (new->my_limit == CKRM_SHARE_UNCHANGED) {
+		; // do nothing
+	} else if (new->my_limit == CKRM_SHARE_DONTCARE) {
+		; // do nothing
+	} else if (par && new->my_limit > par->max_limit) {
+		// I can't get more limit than my parent's limit
+		goto set_share_err;
+		
+	}
+
+	// make sure guarantee is lesser than limit
+	if (new->my_limit == CKRM_SHARE_DONTCARE) {
+		; // do nothing
+	} else if (new->my_limit == CKRM_SHARE_UNCHANGED) {
+		if (new->my_guarantee == CKRM_SHARE_DONTCARE) {
+			; // do nothing
+		} else if (new->my_guarantee == CKRM_SHARE_UNCHANGED) {
+			; // do nothing earlier setting would 've taken care of it
+		} else if (new->my_guarantee > cur->my_limit) {
+			goto set_share_err;
+		}
+	} else { // new->my_limit has a valid value
+		if (new->my_guarantee == CKRM_SHARE_DONTCARE) {
+			; // do nothing
+		} else if (new->my_guarantee == CKRM_SHARE_UNCHANGED) {
+			if (cur->my_guarantee > new->my_limit) {
+				goto set_share_err;
+			}
+		} else if (new->my_guarantee > new->my_limit) {
+			goto set_share_err;
+		}
+	}
+
+	if (new->my_guarantee != CKRM_SHARE_UNCHANGED) {
+		child_guarantee_changed(par, cur->my_guarantee,
+				new->my_guarantee);
+		cur->my_guarantee = new->my_guarantee;
+	}
+
+	if (new->my_limit != CKRM_SHARE_UNCHANGED) {
+		child_maxlimit_changed(par, new->my_limit);
+		cur->my_limit = new->my_limit;
+	}
+
+	if (new->total_guarantee != CKRM_SHARE_UNCHANGED) {
+		cur->unused_guarantee = new->total_guarantee - cur_usage_guar;
+		cur->total_guarantee = new->total_guarantee;
+	}
+
+	if (new->max_limit != CKRM_SHARE_UNCHANGED) {
+		cur->max_limit = new->max_limit;
+	}
+
+	rc = 0;
+set_share_err:
+	return rc;
+}
+
+EXPORT_SYMBOL(get_exe_path_name);
+EXPORT_SYMBOL(child_guarantee_changed);
+EXPORT_SYMBOL(child_maxlimit_changed);
+EXPORT_SYMBOL(set_shares);
+
+

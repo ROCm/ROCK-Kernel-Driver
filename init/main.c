@@ -47,7 +47,6 @@
 #include <asm/bugs.h>
 
 #include <linux/ckrm.h>
-#include <linux/ckrm_res.h>
 
 /*
  * This is one of the first .c files built. Error out early

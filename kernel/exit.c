@@ -26,6 +26,7 @@
 #include <linux/kdb.h>
 #endif
 #include <linux/ckrm.h>
+#include <linux/ckrm_tsk.h>
 #include <linux/audit.h>
 
 #include <asm/uaccess.h>
@@ -802,6 +803,7 @@ asmlinkage NORET_TYPE void do_exit(long code)
 		module_put(tsk->binfmt->module);
 
 	tsk->exit_code = code;
+	numtasks_put_ref(tsk->taskclass);
 	exit_notify(tsk);
 	schedule();
 	BUG();

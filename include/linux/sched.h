@@ -513,10 +513,14 @@ struct task_struct {
  * to a stack based synchronous wait) if its doing sync IO.
  */
 	wait_queue_t *io_wait;
+
 #ifdef CONFIG_CKRM
-	void *ckrm_core;
-	struct list_head ckrm_link;
-	void *ce_data;
+	spinlock_t  ckrm_tsklock; 
+	void       *ce_data;
+#ifdef CONFIG_CKRM_TYPE_TASKCLASS
+	struct ckrm_task_class *taskclass;
+	struct list_head        taskclass_link;
+#endif // CONFIG_CKRM_TYPE_TASKCLASS
 #endif // CONFIG_CKRM
 
 	/* this is empty if CONFIG_DELAY_ACCT is not set */

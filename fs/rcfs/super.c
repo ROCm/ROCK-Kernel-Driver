@@ -26,6 +26,7 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
+#include <asm/namei.h>
 #include <linux/namespace.h>
 #include <linux/dcache.h>
 #include <linux/seq_file.h>
@@ -40,7 +41,7 @@
 #include <asm/uaccess.h>
 
 #include <linux/rcfs.h>
-
+#include <linux/ckrm.h>
 
 
 static kmem_cache_t *rcfs_inode_cachep;
@@ -50,21 +51,28 @@ inline struct rcfs_inode_info *RCFS_I(struct inode *inode)
 {
 	return container_of(inode, struct rcfs_inode_info, vfs_inode);
 }
+EXPORT_SYMBOL(RCFS_I);
+
 
 
 static struct inode *
 rcfs_alloc_inode(struct super_block *sb)
 {
 	struct rcfs_inode_info *ri;
-	ri = (struct rcfs_inode_info *) kmem_cache_alloc(rcfs_inode_cachep, SLAB_KERNEL);
+	ri = (struct rcfs_inode_info *) kmem_cache_alloc(rcfs_inode_cachep, 
+							 SLAB_KERNEL);
 	if (!ri)
 		return NULL;
+	ri->name = NULL;
 	return &ri->vfs_inode;
 }
 
 static void 
 rcfs_destroy_inode(struct inode *inode)
 {
+	struct rcfs_inode_info *ri = RCFS_I(inode);
+
+	kfree(ri->name);
 	kmem_cache_free(rcfs_inode_cachep, RCFS_I(inode));
 }
 
@@ -97,8 +105,6 @@ void rcfs_destroy_inodecache(void)
 		printk(KERN_INFO "rcfs_inode_cache: not all structures were freed\n");
 }
 
-
-/* exported operations */
 struct super_operations rcfs_super_ops =
 {
 	.alloc_inode	= rcfs_alloc_inode,
@@ -108,24 +114,34 @@ struct super_operations rcfs_super_ops =
 };
 
 
+struct dentry *rcfs_rootde; /* redundant since one can also get it from sb */
+static struct inode *rcfs_root;
+static struct rcfs_inode_info *rcfs_rootri;
 
-struct dentry *rcfs_rootde, *rcfs_nwde, *rcfs_nw_aqde;
-struct inode *rcfs_root, *rcfs_nw, *rcfs_nw_aq;
-struct rcfs_inode_info *rcfs_rootri, *rcfs_nwri;
+static int rcfs_mounted;
 
 static int rcfs_fill_super(struct super_block * sb, void * data, int silent)
 {
 	struct inode * inode;
 	struct dentry * root;
 	struct rcfs_inode_info *rootri;
+	struct ckrm_classtype *clstype;
+	int i,rc;
+
+	sb->s_fs_info = NULL;
+	if (rcfs_mounted) {
+		return -EPERM;
+	}
+	rcfs_mounted++;
 
 	sb->s_blocksize = PAGE_CACHE_SIZE;
-	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
+	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;	
 	sb->s_magic = RCFS_MAGIC;
 	sb->s_op = &rcfs_super_ops;
 	inode = rcfs_get_inode(sb, S_IFDIR | 0755, 0);
 	if (!inode)
 		return -ENOMEM;
+	inode->i_op = &rcfs_rootdir_inode_operations;
 
 	root = d_alloc_root(inode);
 	if (!root) {
@@ -134,50 +150,42 @@ static int rcfs_fill_super(struct super_block * sb, void * data, int silent)
 	}
 	sb->s_root = root;
 
-	/* Link inode and core class */
-
+	
+	// Link inode and core class 
 	rootri = RCFS_I(inode);
-	rootri->core = &ckrm_dflt_class;
-
+	rootri->name = kmalloc(strlen(RCFS_ROOT) + 1, GFP_KERNEL);
+	if (!rootri->name) {
+		d_delete(root);
+		iput(inode);
+		return -ENOMEM;
+	}
+	strcpy(rootri->name, RCFS_ROOT);
+	rootri->core = NULL;
 
 	rcfs_root = inode;
+	sb->s_fs_info = rcfs_root = inode;
 	rcfs_rootde = root ;
 	rcfs_rootri = rootri ;
 
-	ckrm_dflt_class.dentry = rcfs_rootde;
+	// register metatypes
+	for ( i=0; i<CKRM_MAX_CLASSTYPES; i++) {
+		clstype = ckrm_classtypes[i];
+		if (clstype == NULL) 
+			continue;
+		printk("A non null classtype\n");
 
+		if ((rc = rcfs_register_classtype(clstype)))
+			continue ;  // could return with an error too 
+	}
 
-	printk("get_alloc_super: root class created (%s, de-%p ri-%p in-%p ri->core-%p ri->core->in-%p",root->d_name.name, root, rootri, inode, rootri->core, ((struct ckrm_core_class *)(rootri->core))->dentry);
-	
-#ifdef CONFIG_CKRM_RES_SOCKETAQ
-
-	// Currently both /rcfs/network and /rcfs/network/socket_aq are configured by 
-	// the same option. 
-
-
-	// Create the network root
-	// XXX -- add error reporting
-	rcfs_nwde = rcfs_create_internal(rcfs_rootde, "network", 
-							rcfs_root->i_mode, 0);
-	// Link inode and core class
-	rootri = RCFS_I(rcfs_nwde->d_inode);
-	rootri->core = &ckrm_net_root;
-	ckrm_net_root.dentry = rcfs_nwde;
-
-	// Pre-create other top level network directories
-	// At present only the socket_aq direcotry.
-	rcfs_nw_aqde = rcfs_create_internal(rcfs_nwde, "socket_aq", 
-							rcfs_root->i_mode, 0);
-	// Link inode and core class
-	RCFS_I(rcfs_nw_aqde->d_inode)->core = 
-		ckrm_alloc_core_class((ckrm_core_class_t *)&ckrm_net_root,
-						rcfs_nw_aqde);
-
-#endif
+	// register CE's with rcfs 
+	// check if CE loaded
+	// call rcfs_register_engine for each classtype
+	// AND rcfs_mkroot (preferably subsume latter in former) 
 
 	return 0;
-	
 }
+
 
 static struct super_block *rcfs_get_sb(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
@@ -185,11 +193,66 @@ static struct super_block *rcfs_get_sb(struct file_system_type *fs_type,
 	return get_sb_nodev(fs_type, flags, data, rcfs_fill_super);
 }
 
+
+void 
+rcfs_kill_sb(struct super_block *sb)
+{
+	int i,rc;
+	struct ckrm_classtype *clstype;
+
+	if (sb->s_fs_info != rcfs_root) {
+		generic_shutdown_super(sb);
+		return;
+	}
+	rcfs_mounted--;
+
+	for ( i=0; i < CKRM_MAX_CLASSTYPES; i++) {
+
+		clstype = ckrm_classtypes[i];
+		if (clstype == NULL || clstype->rootde == NULL) 
+			continue;
+
+		if ((rc = rcfs_deregister_classtype(clstype))) {
+			printk(KERN_ERR "Error removing classtype %s\n",
+			       clstype->name);
+			// return ;   // can also choose to stop here
+		}
+	}
+	
+	// do not remove comment block until ce directory issue resolved
+	// deregister CE with rcfs
+	// Check if loaded
+	// if ce is in  one directory /rcfs/ce, 
+	//       rcfs_deregister_engine for all classtypes within above 
+	//             codebase 
+	//       followed by
+	//       rcfs_rmroot here
+	// if ce in multiple (per-classtype) directories
+	//       call rbce_deregister_engine within ckrm_deregister_classtype
+
+	// following will automatically clear rcfs root entry including its 
+	//  rcfs_inode_info
+
+	generic_shutdown_super(sb);
+
+	// printk(KERN_ERR "Removed all entries\n");
+}	
+
+
 static struct file_system_type rcfs_fs_type = {
 	.name		= "rcfs",
 	.get_sb		= rcfs_get_sb,
-	.kill_sb	= kill_litter_super,
+	.kill_sb	= rcfs_kill_sb,
 };
+
+struct rcfs_functions my_rcfs_fn = {
+	.mkroot               = rcfs_mkroot,
+	.rmroot               = rcfs_rmroot,
+	.register_classtype   = rcfs_register_classtype,
+	.deregister_classtype = rcfs_deregister_classtype,
+};
+
+extern struct rcfs_functions rcfs_fn ;
 
 static int __init init_rcfs_fs(void)
 {
@@ -202,6 +265,8 @@ static int __init init_rcfs_fs(void)
 	ret = rcfs_init_inodecache();
 	if (ret)
 		goto init_cache_err;
+
+	rcfs_fn = my_rcfs_fn ;
 	
 	return ret;
 
@@ -220,6 +285,4 @@ static void __exit exit_rcfs_fs(void)
 module_init(init_rcfs_fs)
 module_exit(exit_rcfs_fs)
 
-
-EXPORT_SYMBOL(RCFS_I);
 MODULE_LICENSE("GPL");

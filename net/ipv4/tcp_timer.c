@@ -498,7 +498,16 @@ static void tcp_synack_timer(struct sock *sk)
 	 * ones are about to clog our table.
 	 */
 	if (lopt->qlen>>(lopt->max_qlen_log-1)) {
+#ifdef CONFIG_ACCEPT_QUEUES
+		int young = 0;
+	       
+		for(i=0; i < NUM_ACCEPT_QUEUES; i++) 
+			young += lopt->qlen_young[i];
+		
+		young <<= 1;
+#else
 		int young = (lopt->qlen_young<<1);
+#endif
 
 		while (thresh > 2) {
 			if (lopt->qlen < young)
@@ -524,9 +533,12 @@ static void tcp_synack_timer(struct sock *sk)
 					unsigned long timeo;
 
 					if (req->retrans++ == 0)
-						lopt->qlen_young--;
-					timeo = min((TCP_TIMEOUT_INIT << req->retrans),
-						    TCP_RTO_MAX);
+#ifdef CONFIG_ACCEPT_QUEUES
+			         		lopt->qlen_young[req->acceptq_class]--;
+#else
+			         		lopt->qlen_young--;
+#endif
+					timeo = min((TCP_TIMEOUT_INIT << req->retrans), TCP_RTO_MAX);
 					req->expires = now + timeo;
 					reqp = &req->dl_next;
 					continue;
@@ -538,7 +550,11 @@ static void tcp_synack_timer(struct sock *sk)
 				write_unlock(&tp->syn_wait_lock);
 				lopt->qlen--;
 				if (req->retrans == 0)
-					lopt->qlen_young--;
+#ifdef CONFIG_ACCEPT_QUEUES
+			         		lopt->qlen_young[req->acceptq_class]--;
+#else
+			         		lopt->qlen_young--;
+#endif
 				tcp_openreq_free(req);
 				continue;
 			}

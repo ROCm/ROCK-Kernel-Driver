@@ -245,6 +245,7 @@ struct sock {
 	struct timeval		sk_stamp;
 	struct socket		*sk_socket;
 	void			*sk_user_data;
+	void                    *sk_ns;        // For use by CKRM
 	struct module		*sk_owner;
 	void			*sk_security;
 	void			(*sk_state_change)(struct sock *sk);

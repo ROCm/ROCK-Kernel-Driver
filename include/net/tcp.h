@@ -644,6 +644,10 @@ struct open_request {
 		struct tcp_v6_open_req v6_req;
 #endif
 	} af;
+#ifdef CONFIG_ACCEPT_QUEUES
+	unsigned long acceptq_time_stamp;
+	int	      acceptq_class;
+#endif
 };
 
 /* SLAB cache for open requests. */
@@ -1695,6 +1699,69 @@ static inline int tcp_full_space( struct sock *sk)
 	return tcp_win_from_space(sk->sk_rcvbuf); 
 }
 
+#ifdef CONFIG_ACCEPT_QUEUES
+static inline void tcp_acceptq_removed(struct sock *sk, int class)
+{
+	tcp_sk(sk)->acceptq[class].aq_backlog--;
+}
+
+static inline void tcp_acceptq_added(struct sock *sk, int class)
+{
+	tcp_sk(sk)->acceptq[class].aq_backlog++;
+}
+
+static inline int tcp_acceptq_is_full(struct sock *sk, int class)
+{
+	return tcp_sk(sk)->acceptq[class].aq_backlog >
+		sk->sk_max_ack_backlog;
+}
+
+static inline void tcp_set_acceptq(struct tcp_opt *tp, struct open_request *req)
+{
+	int class = req->acceptq_class;
+	int prev_class;
+
+	if (!tp->acceptq[class].aq_ratio) {
+		req->acceptq_class = 0;
+		class = 0;
+	}
+
+	tp->acceptq[class].aq_qcount++;
+	req->acceptq_time_stamp = jiffies;
+
+	if (tp->acceptq[class].aq_tail) {
+		req->dl_next = tp->acceptq[class].aq_tail->dl_next;
+		tp->acceptq[class].aq_tail->dl_next = req;
+		tp->acceptq[class].aq_tail = req;
+	} else { /* if first request in the class */
+		tp->acceptq[class].aq_head = req;
+		tp->acceptq[class].aq_tail = req;
+
+		prev_class = class - 1;
+		while (prev_class >= 0) {
+			if (tp->acceptq[prev_class].aq_tail)
+				break;
+			prev_class--;
+		}
+		if (prev_class < 0) {
+			req->dl_next = tp->accept_queue;
+			tp->accept_queue = req;
+		}
+		else {
+			req->dl_next = tp->acceptq[prev_class].aq_tail->dl_next;
+			tp->acceptq[prev_class].aq_tail->dl_next = req;
+		}
+	}
+}
+static inline void tcp_acceptq_queue(struct sock *sk, struct open_request *req,
+					 struct sock *child)
+{
+	tcp_set_acceptq(tcp_sk(sk),req);
+	req->sk = child;
+	tcp_acceptq_added(sk,req->acceptq_class);
+}
+
+#else
 static inline void tcp_acceptq_removed(struct sock *sk)
 {
 	sk->sk_ack_backlog--;
@@ -1727,15 +1794,54 @@ static inline void tcp_acceptq_queue(struct sock *sk, struct open_request *req,
 	req->dl_next = NULL;
 }
 
+#endif
+
 struct tcp_listen_opt
 {
 	u8			max_qlen_log;	/* log_2 of maximal queued SYNs */
 	int			qlen;
+#ifdef CONFIG_ACCEPT_QUEUES
+	int			qlen_young[NUM_ACCEPT_QUEUES];
+#else
 	int			qlen_young;
+#endif
 	int			clock_hand;
 	u32			hash_rnd;
 	struct open_request	*syn_table[TCP_SYNQ_HSIZE];
 };
+
+#ifdef CONFIG_ACCEPT_QUEUES
+static inline void
+tcp_synq_removed(struct sock *sk, struct open_request *req)
+{
+	struct tcp_listen_opt *lopt = tcp_sk(sk)->listen_opt;
+
+	if (--lopt->qlen == 0)
+		tcp_delete_keepalive_timer(sk);
+	if (req->retrans == 0)
+		lopt->qlen_young[req->acceptq_class]--;
+}
+
+static inline void tcp_synq_added(struct sock *sk, struct open_request *req)
+{
+	struct tcp_listen_opt *lopt = tcp_sk(sk)->listen_opt;
+
+	if (lopt->qlen++ == 0)
+		tcp_reset_keepalive_timer(sk, TCP_TIMEOUT_INIT);
+	lopt->qlen_young[req->acceptq_class]++;
+}
+
+static inline int tcp_synq_len(struct sock *sk)
+{
+	return tcp_sk(sk)->listen_opt->qlen;
+}
+
+static inline int tcp_synq_young(struct sock *sk, int class)
+{
+	return tcp_sk(sk)->listen_opt->qlen_young[class];
+}
+
+#else
 
 static inline void
 tcp_synq_removed(struct sock *sk, struct open_request *req)
@@ -1766,6 +1872,7 @@ static inline int tcp_synq_young(struct sock *sk)
 {
 	return tcp_sk(sk)->listen_opt->qlen_young;
 }
+#endif
 
 static inline int tcp_synq_is_full(struct sock *sk)
 {

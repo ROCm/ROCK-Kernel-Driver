@@ -26,6 +26,7 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
+#include <asm/namei.h>
 #include <linux/namespace.h>
 #include <linux/dcache.h>
 #include <linux/seq_file.h>
@@ -40,48 +41,39 @@
 #include <asm/uaccess.h>
 
 #include <linux/rcfs.h>
-#include "magic.h"
 
 
-rbce_eng_callback_t rcfs_eng_callbacks = {
-	NULL, NULL
-};
-/* Helper functions */
 
 #define rcfs_positive(dentry)  ((dentry)->d_inode && !d_unhashed((dentry)))
 
-#if 0
-static
 int rcfs_empty(struct dentry *dentry)
 {
-	struct dentry *child;
-	int ret = 0;
-
-	/* Don't use now - don't know if its safe to take the dcache_lock */
-	return 0 ;
-
-	spin_lock(&dcache_lock);
-	list_for_each_entry(child, &dentry->d_subdirs, d_child) 
-		if (!rcfs_is_magic(child) && rcfs_positive(child))
-			goto out;
-	ret = 1;
+        struct dentry *child;
+        int ret = 0;
+                                                                                               
+        spin_lock(&dcache_lock);
+        list_for_each_entry(child, &dentry->d_subdirs, d_child)
+                if (!rcfs_is_magic(child) && rcfs_positive(child))
+                        goto out;
+        ret = 1;
 out:
-	spin_unlock(&dcache_lock);
-	return ret;
+        spin_unlock(&dcache_lock);
+        return ret;
 }
-#endif
 
-
-int 
-rcfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
-{
-	// USEME later when files are only created automagically
-	// return -EPERM;
-	return rcfs_mknod(dir, dentry, mode | S_IFREG, 0);
-}
+                                                                                               
 
 
 /* Directory inode operations */
+
+
+int 
+rcfs_create(struct inode *dir, struct dentry *dentry, int mode, 
+	    struct nameidata *nd)
+{
+	return rcfs_mknod(dir, dentry, mode | S_IFREG, 0);
+}
+EXPORT_SYMBOL(rcfs_create);
 
 
 /* Symlinks permitted ?? */
@@ -105,23 +97,53 @@ rcfs_symlink(struct inode * dir, struct dentry *dentry, const char * symname)
 	}
 	return error;
 }
+EXPORT_SYMBOL(rcfs_symlink);
+
+int
+rcfs_create_coredir(struct inode *dir, struct dentry *dentry)
+{
+
+	struct rcfs_inode_info *ripar, *ridir;
+	int sz;
+
+	ripar = RCFS_I(dir);
+	ridir = RCFS_I(dentry->d_inode);
+
+	// Inform RC's - do Core operations 
+	if (ckrm_is_core_valid(ripar->core)) {
+		sz = strlen(ripar->name) + strlen(dentry->d_name.name) + 2 ;
+		ridir->name = kmalloc(sz, GFP_KERNEL);
+		if (!ridir->name) {
+			return -ENOMEM;
+		}
+		snprintf(ridir->name, sz,"%s/%s", ripar->name, 
+			 dentry->d_name.name);
+		ridir->core = (*(ripar->core->classtype->alloc))
+			(ripar->core,ridir->name);
+	}
+	else {
+		printk(KERN_ERR "rcfs_mkdir: Invalid parent core %p\n",
+		       ripar->core);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(rcfs_create_coredir);
 
 
-int 
+int
 rcfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
+
+	int retval = 0;
+	ckrm_classtype_t *clstype;
+
 #if 0
-	struct dentry *ldentry;
-	int mfmode,i;
-#endif
-	int retval;
-	struct rcfs_inode_info *ripar,*ridir;
-	struct dentry *pd = list_entry(dir->i_dentry.next, struct dentry, d_alias);
-
-//	printk(KERN_ERR "rcfs_mkdir called with dir=%p dentry=%p mode=%d\n",dir,dentry,mode);
-
+	struct dentry *pd = list_entry(dir->i_dentry.next, struct dentry, 
+							d_alias);
 	if ((!strcmp(pd->d_name.name, "/") &&
-				!strcmp(dentry->d_name.name, "ce"))) {
+	     !strcmp(dentry->d_name.name, "ce"))) {
 		// Call CE's mkdir if it has registered, else fail.
 		if (rcfs_eng_callbacks.mkdir) {
 			return (*rcfs_eng_callbacks.mkdir)(dir, dentry, mode);
@@ -129,108 +151,51 @@ rcfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 			return -EINVAL;
 		}
 	}
-
-
-	// Creation of /rcfs/network reserved for network controllers
-
-	if ((!strcmp(pd->d_name.name, "/") &&
-				!strcmp(dentry->d_name.name, "network"))) {
-		return -EPERM;
-	}
-
-#if 0
-	// Creation in /rcfs/network is not allowed
-	// XXX - would be good to instead add a check with the parent's 
-	// core class
-	{
-		extern struct dentry *rcfs_nwde;
-		
-		if (dir == rcfs_nwde->d_inode)
-			return -EPERM;
-	}
 #endif
 
-
-	retval  = rcfs_mknod(dir, dentry, mode | S_IFDIR, 0);
-	if (retval) {
-		printk(KERN_ERR "rcfs_mkdir: error reaching parent\n");
+	if (_rcfs_mknod(dir, dentry, mode | S_IFDIR, 0)) {
+		printk(KERN_ERR "rcfs_mkdir: error in _rcfs_mknod\n");
 		return retval;
 	}
 
 	dir->i_nlink++;
 
-	ripar = RCFS_I(dir);
-	ridir = RCFS_I(dentry->d_inode);
+	// Inherit parent's ops since _rcfs_mknod assigns noperm ops
+	dentry->d_inode->i_op = dir->i_op;
+	dentry->d_inode->i_fop = dir->i_fop;
 
-	/* Inform RC's - do Core operations */
-	/* On error, goto mkdir_err */
 
-	if (is_core_valid(ripar->core))
-		ridir->core = ckrm_alloc_core_class(
-				(ckrm_core_class_t *)ripar->core, dentry);
-	else {
-		printk(KERN_ERR "rcfs_mkdir: Invalid parent core \n");
-		return -EINVAL;
+ 	retval = rcfs_create_coredir(dir, dentry);
+ 	if (retval) {
+		simple_rmdir(dir,dentry);
+		return retval;
+                // goto mkdir_err;
 	}
-#if 0
-	mfmode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;	
-	for (i=0; i < NR_MAGF; i++) {
-		ldentry = 
-			rcfs_create_internal(dentry, magf[i].name, mfmode, 0);
-		if (!ldentry) {
-			printk(KERN_ERR "rcfs_mkdir: error creating magic files. Improve handling\n");
-			goto mkdir_err;
-		}
-		ldentry->d_fsdata = &RCFS_IS_MAGIC;
- 		if (magf[i].i_op)
- 			ldentry->d_inode->i_op = magf[i].i_op;
- 		if (magf[i].i_fop)
- 			ldentry->d_inode->i_fop = magf[i].i_fop;
  
- 		printk(KERN_ERR "rcfs_mkdir: magic entry created(%s, inode %p, dentry %p) created\n",ldentry->d_name.name, ldentry->d_inode, ldentry);
+ 	// create the default set of magic files 
+	clstype = (RCFS_I(dentry->d_inode))->core->classtype;
+	rcfs_create_magic(dentry, &(((struct rcfs_magf*)clstype->mfdesc)[1]), 
+			  clstype->mfcount-1);
 
-	}
-#endif
 	return retval;
 
 //mkdir_err:
 	dir->i_nlink--;
-	return -EINVAL;
+	return retval;
 }
+EXPORT_SYMBOL(rcfs_mkdir);
 
 
 int 
 rcfs_rmdir(struct inode * dir, struct dentry * dentry)
 {
 	struct rcfs_inode_info *ri = RCFS_I(dentry->d_inode);
-	struct dentry *pd = list_entry(dir->i_dentry.next, struct dentry, d_alias);
 
-	
-//	printk(KERN_ERR "dir %p, dentry name %s inode %p, parent name %s inode %p\n", dir, dentry->d_name.name, dentry->d_inode, dentry->d_parent->d_name.name, dentry->d_parent->d_inode);
-	
-
-	/* Class about to be deleted.
-	   Order of operations
-	   - underlying rcfs entry removal (so no new ops initiated from user space)
-	   - Core class removal (should handle CE initiated changes as well)
-	   - rcfs dir removal 
-	*/
-
-
-	/* Ensure following first
-	   a) members/ subdir empty.
-	   b) no subdirs except members, no files except magic (latter not necessary
-	      once we disallow all file creation.
-	   c) remove members/ & magic files
-	   If errors doing any of those, barf.
-	*/
 #if 0
- 	rcfs_clear_magic(dentry);
-#endif
- 	// FIXME - this should be only be removed automagically on CE unregister only
-	
+	struct dentry *pd = list_entry(dir->i_dentry.next, 
+				       struct dentry, d_alias);
 	if ((!strcmp(pd->d_name.name, "/") &&
-				!strcmp(dentry->d_name.name, "ce"))) {
+	     !strcmp(dentry->d_name.name, "ce"))) {
 		// Call CE's mkdir if it has registered, else fail.
 		if (rcfs_eng_callbacks.rmdir) {
 			return (*rcfs_eng_callbacks.rmdir)(dir, dentry);
@@ -238,60 +203,134 @@ rcfs_rmdir(struct inode * dir, struct dentry * dentry)
 			return simple_rmdir(dir, dentry);
 		}
 	}
-
-
-	/* Core class removal */
-	// printk(KERN_ERR "About to remove %s ( %p)\n",dentry->d_name.name, ri);
-
-	if (ckrm_free_core_class(ri->core)) {
-		printk(KERN_ERR "rcfs_rmdir: ckrm_free_core_class failed\n");
-		goto recreate_magic;
+	else if ((!strcmp(pd->d_name.name, "/") &&
+		  !strcmp(dentry->d_name.name, "network"))) {
+		return -EPERM;
 	}
-	ri->core = NULL ; /* just to be safe */
+#endif
+	
+	if (!rcfs_empty(dentry)) {
+		printk(KERN_ERR "rcfs_rmdir: directory not empty\n");
+		goto out;
+	}
 
-	/*
-	dentry->d_inode->i_nlink--;	
-	*/
+	// Core class removal 
+
+	if (ri->core == NULL) {
+		printk(KERN_ERR "rcfs_rmdir: core==NULL\n");
+		// likely a race condition
+		return 0;
+	}
+
+	if ((*(ri->core->classtype->free))(ri->core)) {
+		printk(KERN_ERR "rcfs_rmdir: ckrm_free_core_class failed\n");
+		goto out;
+	}
+	ri->core = NULL ; // just to be safe 
+
+	// Clear magic files only after core successfully removed 
+ 	rcfs_clear_magic(dentry);
+
 	return simple_rmdir(dir, dentry);
 
-recreate_magic:
-	printk("rcfs_rmdir: should recreate magic files here. Do manually now\n");
-	return -EINVAL;
+out:
+	return -EBUSY;
 }
+EXPORT_SYMBOL(rcfs_rmdir);
+
 
 int
-rcfs_register_engine(rbce_eng_callback_t *rcbs)
+rcfs_unlink(struct inode *dir, struct dentry *dentry)
 {
-	if (!rcbs->mkdir || rcfs_eng_callbacks.mkdir) {
-		return -EINVAL;
-	}
-	rcfs_eng_callbacks = *rcbs;
-	return 0;
+	// -ENOENT and not -ENOPERM to allow rm -rf to work despite 
+	// magic files being present
+	return -ENOENT;
 }
-
+EXPORT_SYMBOL(rcfs_unlink);
+	
+// rename is allowed on directories only
 int
-rcfs_unregister_engine(rbce_eng_callback_t *rcbs)
+rcfs_rename(struct inode *old_dir, struct dentry *old_dentry,
+		struct inode *new_dir, struct dentry *new_dentry)
 {
-	if (!rcbs->mkdir || !rcfs_eng_callbacks.mkdir ||
-			(rcbs->mkdir != rcfs_eng_callbacks.mkdir)) {
+	if (S_ISDIR(old_dentry->d_inode->i_mode)) 
+		return simple_rename(old_dir, old_dentry, new_dir, new_dentry);
+	else
 		return -EINVAL;
-	}
-	rcfs_eng_callbacks.mkdir = NULL;
-	rcfs_eng_callbacks.rmdir = NULL;
-	return 0;
 }
+EXPORT_SYMBOL(rcfs_rename);
+
 
 struct inode_operations rcfs_dir_inode_operations = {
 	.create		= rcfs_create,
 	.lookup		= simple_lookup,
 	.link		= simple_link,
-	.unlink		= simple_unlink,
+	.unlink		= rcfs_unlink,
 	.symlink	= rcfs_symlink,
 	.mkdir		= rcfs_mkdir,
 	.rmdir          = rcfs_rmdir,
 	.mknod		= rcfs_mknod,
-	.rename		= simple_rename,
+	.rename		= rcfs_rename,
 };
 
-EXPORT_SYMBOL(rcfs_register_engine);
-EXPORT_SYMBOL(rcfs_unregister_engine);
+
+
+
+
+int 
+rcfs_root_create(struct inode *dir, struct dentry *dentry, int mode, 
+		 struct nameidata *nd)
+{
+	return -EPERM;
+}
+
+
+int  
+rcfs_root_symlink(struct inode * dir, struct dentry *dentry, 
+		  const char * symname)
+{
+	return -EPERM;
+}
+
+int 
+rcfs_root_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+{
+	return -EPERM;
+}
+
+int 
+rcfs_root_rmdir(struct inode * dir, struct dentry * dentry)
+{
+	return -EPERM;
+}
+
+int
+rcfs_root_unlink(struct inode *dir, struct dentry *dentry)
+{
+	return -EPERM;
+}
+
+int
+rcfs_root_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
+{
+	return -EPERM;
+}
+	
+int
+rcfs_root_rename(struct inode *old_dir, struct dentry *old_dentry,
+		struct inode *new_dir, struct dentry *new_dentry)
+{
+	return -EPERM;
+}
+
+struct inode_operations rcfs_rootdir_inode_operations = {
+	.create		= rcfs_root_create,
+	.lookup		= simple_lookup,
+	.link		= simple_link,
+	.unlink		= rcfs_root_unlink,
+	.symlink	= rcfs_root_symlink,
+	.mkdir		= rcfs_root_mkdir,
+	.rmdir          = rcfs_root_rmdir,
+	.mknod		= rcfs_root_mknod,
+	.rename		= rcfs_root_rename,
+};

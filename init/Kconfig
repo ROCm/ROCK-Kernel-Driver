@@ -230,30 +230,54 @@ config RCFS_FS
        tristate "Resource Class File System (User API)"
        depends on CKRM
        help
-	  RCFS is the filesystem API for CKRM. This separate configuration option
-          is provided only for debugging and will eventually disappear since rcfs
-          will be automounted whenever CKRM is configured. 
+	  RCFS is the filesystem API for CKRM. This separate configuration 
+	  option is provided only for debugging and will eventually disappear 
+	  since rcfs will be automounted whenever CKRM is configured. 
 
-          Say N if unsure, Y if you've enabled CKRM, M to debug rcfs initialization.
+          Say N if unsure, Y if you've enabled CKRM, M to debug rcfs 
+	  initialization.
 
-config CKRM_RES_DUMMY
-	tristate "Dummy Resource Manager"
+config CKRM_TYPE_TASKCLASS
+	bool "Class Manager for Task Groups"
 	depends on CKRM
+	help
+	  TASKCLASS provides the extensions for CKRM to track task classes
+	  This is the base to enable task class based resource control for
+	  cpu, memory and disk I/O.
+	
+	  Say N if unsure 
+
+config CKRM_RES_NUMTASKS
+	tristate "Number of Tasks Resource Manager"
+	depends on CKRM_TYPE_TASKCLASS
 	default m
 	help
-	  Provides a Dummy Resource Controller for CKRM that does no useful
-	  work but illustrates how to write and integrate a resource controller
-	  for CKRM.
+	  Provides a Resource Controller for CKRM that allows limiting no of
+	  tasks a task class can have.
 	
-	  Say N if unsure, Y if testing CKRM. 
+	  Say N if unsure, Y to use the feature.
 
-config CKRM_RES_SOCKETAQ
-	tristate "Multiple Accept Queues Resource Manager"
+config CKRM_TYPE_SOCKETCLASS
+	bool "Class Manager for socket groups"
 	depends on CKRM
 	help
-	  Provides a  resource controller for CKRM to prioritize accept queues.
+	  SOCKET provides the extensions for CKRM to track per socket
+	  classes.  This is the base to enable socket based resource 
+	  control for inbound connection control, bandwidth control etc.
+	
+	  Say N if unsure.  
+
+config CKRM_RES_LISTENAQ
+	tristate "Multiple Accept Queues Resource Manager"
+	depends on CKRM_TYPE_SOCKETCLASS && ACCEPT_QUEUES
+	default m
+	help
+	  Provides a  resource controller for CKRM to prioritize inbound
+	  connection requests. See inbound control description for
+	  "IP: TCP Multiple accept queues support". If you choose that
+	  option choose this option to control the queue weights.
  
-	  Say N if unsure. Not needed for testing CKRM framework and API.
+	  If unsure, say N.
 
 endmenu
 
