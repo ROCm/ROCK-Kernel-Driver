@@ -681,8 +681,12 @@ int tcp_write_xmit(struct sock *sk, int nonagle)
 			TCP_SKB_CB(skb)->when = tcp_time_stamp;
 			if (tcp_transmit_skb(sk, skb_clone(skb, GFP_ATOMIC)))
 				break;
-			/* Advance the send_head.  This one is sent out. */
+
+			/* Advance the send_head.  This one is sent out.
+			 * This call will increment packets_out.
+			 */
 			update_send_head(sk, tp, skb);
+
 			tcp_minshall_update(tp, mss_now, skb);
 			sent_pkts = 1;
 		}
@@ -968,11 +972,17 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 		return -EAGAIN;
 
 	if (skb->len > cur_mss) {
+		int old_factor = TCP_SKB_CB(skb)->tso_factor;
+		int new_factor;
+
 		if (tcp_fragment(sk, skb, cur_mss))
 			return -ENOMEM; /* We'll try again later. */
 
 		/* New SKB created, account for it. */
-		tcp_inc_pcount(&tp->packets_out, skb);
+		new_factor = TCP_SKB_CB(skb)->tso_factor;
+		tcp_dec_pcount_explicit(&tp->packets_out,
+					new_factor - old_factor);
+		tcp_inc_pcount(&tp->packets_out, skb->next);
 	}
 
 	/* Collapse two adjacent packets if worthwhile and we can. */
