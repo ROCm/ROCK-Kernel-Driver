@@ -186,8 +186,6 @@ typedef struct cpucache_s {
  * manages a cache.
  */
 
-#define CACHE_NAMELEN	20	/* max name length for a slab cache */
-
 struct kmem_cache_s {
 /* 1) each alloc & free */
 	/* full, partial first, then free */
@@ -225,7 +223,7 @@ struct kmem_cache_s {
 	unsigned long		failures;
 
 /* 3) cache creation/removal */
-	char			name[CACHE_NAMELEN];
+	const char		*name;
 	struct list_head	next;
 #ifdef CONFIG_SMP
 /* 4) per-cpu data */
@@ -335,6 +333,7 @@ typedef struct cache_sizes {
 	kmem_cache_t	*cs_dmacachep;
 } cache_sizes_t;
 
+/* These are the default caches for kmalloc. Custom caches can have other sizes. */
 static cache_sizes_t cache_sizes[] = {
 #if PAGE_SIZE == 4096
 	{    32,	NULL, NULL},
@@ -353,6 +352,29 @@ static cache_sizes_t cache_sizes[] = {
 	{131072,	NULL, NULL},
 	{     0,	NULL, NULL}
 };
+/* Must match cache_sizes above. Out of line to keep cache footprint low. */
+#define CN(x) { x, x " (DMA)" }
+static struct { 
+	char *name; 
+	char *name_dma;
+} cache_names[] = { 
+#if PAGE_SIZE == 4096
+	CN("size-32"),
+#endif
+	CN("size-64"),
+	CN("size-128"),
+	CN("size-256"),
+	CN("size-512"),
+	CN("size-1024"),
+	CN("size-2048"),
+	CN("size-4096"),
+	CN("size-8192"),
+	CN("size-16384"),
+	CN("size-32768"),
+	CN("size-65536"),
+	CN("size-131072")
+}; 
+#undef CN
 
 /* internal cache of cache description objs */
 static kmem_cache_t cache_cache = {
@@ -437,7 +459,6 @@ void __init kmem_cache_init(void)
 void __init kmem_cache_sizes_init(void)
 {
 	cache_sizes_t *sizes = cache_sizes;
-	char name[20];
 	/*
 	 * Fragmentation resistance on low memory - only use bigger
 	 * page orders on machines with more than 32MB of memory.
@@ -450,9 +471,9 @@ void __init kmem_cache_sizes_init(void)
 		 * eliminates "false sharing".
 		 * Note for systems short on memory removing the alignment will
 		 * allow tighter packing of the smaller caches. */
-		sprintf(name,"size-%Zd",sizes->cs_size);
 		if (!(sizes->cs_cachep =
-			kmem_cache_create(name, sizes->cs_size,
+			kmem_cache_create(cache_names[sizes-cache_sizes].name, 
+					  sizes->cs_size,
 					0, SLAB_HWCACHE_ALIGN, NULL, NULL))) {
 			BUG();
 		}
@@ -462,9 +483,10 @@ void __init kmem_cache_sizes_init(void)
 			offslab_limit = sizes->cs_size-sizeof(slab_t);
 			offslab_limit /= 2;
 		}
-		sprintf(name, "size-%Zd(DMA)",sizes->cs_size);
-		sizes->cs_dmacachep = kmem_cache_create(name, sizes->cs_size, 0,
-			      SLAB_CACHE_DMA|SLAB_HWCACHE_ALIGN, NULL, NULL);
+		sizes->cs_dmacachep = kmem_cache_create(
+		    cache_names[sizes-cache_sizes].name_dma, 
+			sizes->cs_size, 0,
+			SLAB_CACHE_DMA|SLAB_HWCACHE_ALIGN, NULL, NULL);
 		if (!sizes->cs_dmacachep)
 			BUG();
 		sizes++;
@@ -604,6 +626,11 @@ static void kmem_slab_destroy (kmem_cache_t *cachep, slab_t *slabp)
  * Cannot be called within a int, but can be interrupted.
  * The @ctor is run when new pages are allocated by the cache
  * and the @dtor is run before the pages are handed back.
+ *
+ * @name must be valid until the cache is destroyed. This implies that
+ * the module calling this has to destroy the cache before getting 
+ * unloaded.
+ * 
  * The flags are
  *
  * %SLAB_POISON - Poison the slab with a known test pattern (a5a5a5a5)
@@ -632,7 +659,6 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	 * Sanity checks... these are all serious usage bugs.
 	 */
 	if ((!name) ||
-		((strlen(name) >= CACHE_NAMELEN - 1)) ||
 		in_interrupt() ||
 		(size < BYTES_PER_WORD) ||
 		(size > (1<<MAX_OBJ_ORDER)*PAGE_SIZE) ||
@@ -797,8 +823,7 @@ next:
 		cachep->slabp_cache = kmem_find_general_cachep(slab_size,0);
 	cachep->ctor = ctor;
 	cachep->dtor = dtor;
-	/* Copy name over so we don't have problems with unloaded modules */
-	strcpy(cachep->name, name);
+	cachep->name = name;
 
 #ifdef CONFIG_SMP
 	if (g_cpucache_up)
@@ -811,10 +836,20 @@ next:
 
 		list_for_each(p, &cache_chain) {
 			kmem_cache_t *pc = list_entry(p, kmem_cache_t, next);
-
-			/* The name field is constant - no lock needed. */
-			if (!strcmp(pc->name, name))
-				BUG();
+			char tmp;
+			/* This happens when the module gets unloaded and doesn't
+			   destroy its slab cache and noone else reuses the vmalloc
+			   area of the module. Print a warning. */
+			if (__get_user(tmp,pc->name)) { 
+				printk("SLAB: cache with size %d has lost its name\n", 
+					pc->objsize); 
+				continue; 
+			} 	
+			if (!strcmp(pc->name,name)) { 
+				printk("kmem_cache_create: duplicate cache %s\n",name); 
+				up(&cache_chain_sem); 
+				BUG(); 
+			}	
 		}
 	}
 
@@ -1878,6 +1913,7 @@ static int proc_getdata (char*page, char**start, off_t off, int count)
 		unsigned long	num_objs;
 		unsigned long	active_slabs = 0;
 		unsigned long	num_slabs;
+		const char *name; 
 		cachep = list_entry(p, kmem_cache_t, next);
 
 		spin_lock_irq(&cachep->spinlock);
@@ -1906,8 +1942,15 @@ static int proc_getdata (char*page, char**start, off_t off, int count)
 		num_slabs+=active_slabs;
 		num_objs = num_slabs*cachep->num;
 
+		name = cachep->name; 
+		{
+		char tmp; 
+		if (__get_user(tmp, name)) 
+			name = "broken"; 
+		} 	
+
 		len += sprintf(page+len, "%-17s %6lu %6lu %6u %4lu %4lu %4u",
-			cachep->name, active_objs, num_objs, cachep->objsize,
+			name, active_objs, num_objs, cachep->objsize,
 			active_slabs, num_slabs, (1<<cachep->gfporder));
 
 #if STATS
