@@ -1763,6 +1763,13 @@ P:	Ingo Molnar
 M:	mingo@redhat.com
 S:	Maintained
 
+X86-64 port
+P:	Andi Kleen
+M:	ak@suse.de
+L:	discuss@x86-64.org
+W:	http://www.x86-64.org
+S:	Maintained
+
 YAM DRIVER FOR AX.25
 P:	Jean-Paul Roubelat
 M:	jpr@f6fbb.org
