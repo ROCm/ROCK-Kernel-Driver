@@ -43,7 +43,6 @@ extern ctxd_t *srmmu_ctx_table_phys;
 extern void calibrate_delay(void);
 
 extern volatile int smp_processors_ready;
-extern unsigned long cpu_present_map;
 extern int smp_num_cpus;
 static int smp_highest_cpu;
 extern int smp_threads_ready;
@@ -172,12 +171,12 @@ void __init smp4d_boot_cpus(void)
 		current_set[0] = NULL;
 
 	local_irq_enable();
-	cpu_present_map = 0;
+	cpus_clear(cpu_present_map);
 
 	/* XXX This whole thing has to go.  See sparc64. */
 	for (i = 0; !cpu_find_by_instance(i, NULL, &mid); i++)
-		cpu_present_map |= (1<<mid);
-	SMP_PRINTK(("cpu_present_map %08lx\n", cpu_present_map));
+		cpu_set(mid, cpu_present_map);
+	SMP_PRINTK(("cpu_present_map %08lx\n", cpus_addr(cpu_present_map)[0]));
 	for(i=0; i < NR_CPUS; i++)
 		__cpu_number_map[i] = -1;
 	for(i=0; i < NR_CPUS; i++)
@@ -195,7 +194,7 @@ void __init smp4d_boot_cpus(void)
 		if(i == boot_cpu_id)
 			continue;
 
-		if(cpu_present_map & (1 << i)) {
+		if (cpu_isset(i, cpu_present_map)) {
 			extern unsigned long sun4d_cpu_startup;
 			unsigned long *entry = &sun4d_cpu_startup;
 			struct task_struct *p;
@@ -252,19 +251,19 @@ void __init smp4d_boot_cpus(void)
 			}
 		}
 		if(!(cpu_callin_map[i])) {
-			cpu_present_map &= ~(1 << i);
+			cpu_clear(i, cpu_present_map);
 			__cpu_number_map[i] = -1;
 		}
 	}
 	local_flush_cache_all();
 	if(cpucount == 0) {
 		printk("Error: only one Processor found.\n");
-		cpu_present_map = (1 << hard_smp4d_processor_id());
+		cpu_present_map = cpumask_of_cpu(hard_smp4d_processor_id());
 	} else {
 		unsigned long bogosum = 0;
 		
 		for(i = 0; i < NR_CPUS; i++) {
-			if(cpu_present_map & (1 << i)) {
+			if (cpu_isset(i, cpu_present_map)) {
 				bogosum += cpu_data(i).udelay_val;
 				smp_highest_cpu = i;
 			}
@@ -344,12 +343,13 @@ void smp4d_cross_call(smpfunc_t func, unsigned long arg1, unsigned long arg2,
 
 		/* Init receive/complete mapping, plus fire the IPI's off. */
 		{
-			register unsigned long mask;
+			cpumask_t mask;
 			register int i;
 
-			mask = (cpu_present_map & ~(1 << hard_smp4d_processor_id()));
+			mask = cpumask_of_cpu(hard_smp4d_processor_id());
+			cpus_andnot(mask, cpu_present_map, mask);
 			for(i = 0; i <= high; i++) {
-				if(mask & (1 << i)) {
+				if (cpu_isset(i, mask)) {
 					ccall_info.processors_in[i] = 0;
 					ccall_info.processors_out[i] = 0;
 					sun4d_send_ipi(i, IRQ_CROSS_CALL);
