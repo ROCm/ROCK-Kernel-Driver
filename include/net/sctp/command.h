@@ -27,6 +27,7 @@
  * 
  * La Monte H.P. Yarroll <piggy@acm.org>
  * Karl Knutson <karl@athena.chicago.il.us>
+ * Ardelle Fan <ardelle.fan@intel.com>
  * 
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -72,6 +73,7 @@ typedef enum {
 	SCTP_CMD_STRIKE,	/* Mark a strike against a transport.  */
 	SCTP_CMD_TRANSMIT,      /* Transmit the outqueue. */
 	SCTP_CMD_HB_TIMERS_START,    /* Start the heartbeat timers.  */
+	SCTP_CMD_HB_TIMERS_UPDATE,   /* Update the heartbeat timers.  */
 	SCTP_CMD_TRANSPORT_RESET,    /* Reset the status of a transport. */
 	SCTP_CMD_TRANSPORT_ON,       /* Mark the transport as active. */
 	SCTP_CMD_REPORT_ERROR,   /* Pass this error back out of the sm. */
@@ -83,6 +85,7 @@ typedef enum {
 	SCTP_CMD_UPDATE_ASSOC,   /* Update association information. */
 	SCTP_CMD_PURGE_OUTQUEUE, /* Purge all data waiting to be sent. */
 	SCTP_CMD_SETUP_T2,       /* Hi-level, setup T2-shutdown parms.  */
+	SCTP_CMD_RTO_PENDING,	 /* Set transport's rto_pending. */
 
 	SCTP_CMD_LAST
 } sctp_verb_t;
