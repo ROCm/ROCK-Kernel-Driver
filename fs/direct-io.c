@@ -900,7 +900,7 @@ generic_file_direct_IO(int rw, struct file *file, const struct iovec *iov,
 	}
 
 	retval = mapping->a_ops->direct_IO(rw, file, iov, offset, nr_segs);
-	if (mapping->nrpages)
+	if (rw == WRITE && mapping->nrpages)
 		invalidate_inode_pages2(mapping);
 out:
 	return retval;
