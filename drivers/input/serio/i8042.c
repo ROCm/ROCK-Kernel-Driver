@@ -62,6 +62,12 @@ static unsigned char i8042_last_e0;
 static unsigned char i8042_mux_open;
 struct timer_list i8042_timer;
 
+/*
+ * Shared IRQ's require a device pointer, but this driver doesn't support
+ * multiple devices
+ */
+#define i8042_request_irq_cookie (&i8042_timer)
+
 static unsigned long i8042_unxlate_seen[256 / BITS_PER_LONG];
 static unsigned char i8042_unxlate_table[128] = {
 	  0,118, 22, 30, 38, 37, 46, 54, 61, 62, 70, 69, 78, 85,102, 13,
@@ -235,7 +241,8 @@ static int i8042_open(struct serio *port)
 		if (i8042_mux_open++)
 			return 0;
 
-	if (request_irq(values->irq, i8042_interrupt, 0, "i8042", NULL)) {
+	if (request_irq(values->irq, i8042_interrupt,
+			SA_SHIRQ, "i8042", i8042_request_irq_cookie)) {
 		printk(KERN_ERR "i8042.c: Can't get irq %d for %s, unregistering the port.\n", values->irq, values->name);
 		values->exists = 0;
 		serio_unregister_port(port);
@@ -275,7 +282,7 @@ static void i8042_close(struct serio *port)
 		return;
 	}
 
-	free_irq(values->irq, NULL);
+	free_irq(values->irq, i8042_request_irq_cookie);
 
 	i8042_flush();
 }
@@ -572,9 +579,10 @@ static int __init i8042_check_mux(struct i8042_values *values)
  * Check if AUX irq is available.
  */
 
-	if (request_irq(values->irq, i8042_interrupt, 0, "i8042", NULL))
+	if (request_irq(values->irq, i8042_interrupt, SA_SHIRQ,
+				"i8042", i8042_request_irq_cookie))
                 return -1;
-	free_irq(values->irq, NULL);
+	free_irq(values->irq, i8042_request_irq_cookie);
 
 /*
  * Get rid of bytes in the queue.
@@ -643,9 +651,10 @@ static int __init i8042_check_aux(struct i8042_values *values)
  * in trying to detect AUX presence.
  */
 
-	if (request_irq(values->irq, i8042_interrupt, 0, "i8042", NULL))
+	if (request_irq(values->irq, i8042_interrupt, SA_SHIRQ,
+				"i8042", i8042_request_irq_cookie))
                 return -1;
-	free_irq(values->irq, NULL);
+	free_irq(values->irq, i8042_request_irq_cookie);
 
 /*
  * Get rid of bytes in the queue.
