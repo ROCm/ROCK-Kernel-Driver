@@ -398,6 +398,37 @@ CONFIG_HDLC
 
   If unsure, say N here.
 
+CONFIG_COMX_HW_MUNICH
+  Hardware driver for the 'SliceCOM' (channelized E1) and 'PciCOM'
+  boards (X21) from the MultiGate family.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called comx-hw-munich.o. If you want to compile it
+  as a module, say M here and read Documentation/modules.txt.
+
+  Read linux/Documentation/networking/slicecom.txt for help on
+  configuring and using SliceCOM interfaces. Further info on these cards
+  can be found at http://www.itc.hu or <info@itc.hu>.
+
+CONFIG_HDLC_RAW
+  Say Y to this option if you want generic HDLC driver to support
+  raw HDLC over WAN (Wide Area Network) connections.
+
+  If unsure, say N here.
+
+CONFIG_HDLC_CISCO
+  Say Y to this option if you want generic HDLC driver to support
+  Cisco HDLC over WAN (Wide Area Network) connections.
+
+  If unsure, say N here.
+
+CONFIG_HDLC_FR
+  Say Y to this option if you want generic HDLC driver to support
+  Frame-Relay protocol over WAN (Wide Area Network) connections.
+
+  If unsure, say N here.
+
 CONFIG_HDLC_PPP
   Say Y to this option if you want generic HDLC driver to support
   PPP over WAN (Wide Area Network) connections.
