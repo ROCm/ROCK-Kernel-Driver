@@ -1836,11 +1836,11 @@ static int mtrr_close (struct inode *ino, struct file *file)
 
 static struct file_operations mtrr_fops =
 {
-    owner:	THIS_MODULE,
-    read:	mtrr_read,
-    write:	mtrr_write,
-    ioctl:	mtrr_ioctl,
-    release:	mtrr_close,
+    .owner	= THIS_MODULE,
+    .read	= mtrr_read,
+    .write	= mtrr_write,
+    .ioctl	= mtrr_ioctl,
+    .release	= mtrr_close,
 };
 
 #  ifdef CONFIG_PROC_FS

@@ -31,7 +31,7 @@ static void default_init(struct cpuinfo_x86 * c)
 }
 
 static struct cpu_dev default_cpu = {
-	c_init:	default_init,
+	.c_init	= default_init,
 };
 static struct cpu_dev * this_cpu = &default_cpu;
 

@@ -945,9 +945,9 @@ static void handle_poweroff (int key, struct pt_regs *pt_regs,
 }
 
 static struct sysrq_key_op	sysrq_poweroff_op = {
-	handler:        handle_poweroff,
-	help_msg:       "Off",
-	action_msg:     "Power Off\n"
+	.handler        = handle_poweroff,
+	.help_msg       = "Off",
+	.action_msg     = "Power Off\n"
 };
 
 
@@ -1840,12 +1840,12 @@ __setup("apm=", apm_setup);
 #endif
 
 static struct file_operations apm_bios_fops = {
-	owner:		THIS_MODULE,
-	read:		do_read,
-	poll:		do_poll,
-	ioctl:		do_ioctl,
-	open:		do_open,
-	release:	do_release,
+	.owner		= THIS_MODULE,
+	.read		= do_read,
+	.poll		= do_poll,
+	.ioctl		= do_ioctl,
+	.open		= do_open,
+	.release	= do_release,
 };
 
 static struct miscdevice apm_device = {

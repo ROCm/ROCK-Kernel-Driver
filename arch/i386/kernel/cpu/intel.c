@@ -327,8 +327,8 @@ static unsigned int intel_size_cache(struct cpuinfo_x86 * c, unsigned int size)
 }
 
 static struct cpu_dev intel_cpu_dev __initdata = {
-	c_vendor:	"Intel",
-	c_ident: 	{ "GenuineIntel" },
+	.c_vendor	= "Intel",
+	.c_ident 	= { "GenuineIntel" },
 	c_models: {
 		{ X86_VENDOR_INTEL,	4,
 		  { 
@@ -375,9 +375,9 @@ static struct cpu_dev intel_cpu_dev __initdata = {
 		  }
 		},
 	},
-	c_init:		init_intel,
-	c_identify:	generic_identify,
-	c_size_cache:	intel_size_cache,
+	.c_init		= init_intel,
+	.c_identify	= generic_identify,
+	.c_size_cache	= intel_size_cache,
 };
 
 __init int intel_cpu_init(void)

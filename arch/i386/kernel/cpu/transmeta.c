@@ -80,10 +80,10 @@ static void transmeta_identify(struct cpuinfo_x86 * c)
 }
 
 static struct cpu_dev transmeta_cpu_dev __initdata = {
-	c_vendor:	"Transmeta",
-	c_ident:	{ "GenuineTMx86", "TransmetaCPU" },
-	c_init:		init_transmeta,
-	c_identify:	transmeta_identify,
+	.c_vendor	= "Transmeta",
+	.c_ident	= { "GenuineTMx86", "TransmetaCPU" },
+	.c_init		= init_transmeta,
+	.c_identify	= transmeta_identify,
 };
 
 int __init transmeta_init_cpu(void)
