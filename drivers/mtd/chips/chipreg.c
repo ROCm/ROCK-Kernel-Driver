@@ -1,5 +1,5 @@
 /*
- * $Id: chipreg.c,v 1.16 2003/05/29 09:36:15 dwmw2 Exp $
+ * $Id: chipreg.c,v 1.17 2004/11/16 18:29:00 dwmw2 Exp $
  *
  * Registration for chip drivers
  *
@@ -15,7 +15,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/compatmac.h>
 
-spinlock_t chip_drvs_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t chip_drvs_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(chip_drvs_list);
 
 void register_mtd_chip_driver(struct mtd_chip_driver *drv)

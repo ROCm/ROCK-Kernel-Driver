@@ -1,5 +1,5 @@
 /*
- * $Id: l440gx.c,v 1.14 2004/09/16 23:27:13 gleixner Exp $
+ * $Id: l440gx.c,v 1.16 2004/11/16 18:29:02 dwmw2 Exp $
  *
  * BIOS Flash chip on Intel 440GX board.
  *
@@ -30,7 +30,7 @@ static struct mtd_info *mymtd;
 
 
 /* Is this really the vpp port? */
-void l440gx_set_vpp(struct map_info *map, int vpp)
+static void l440gx_set_vpp(struct map_info *map, int vpp)
 {
 	unsigned long l;
 
@@ -43,7 +43,7 @@ void l440gx_set_vpp(struct map_info *map, int vpp)
 	outl(l, VPP_PORT);
 }
 
-struct map_info l440gx_map = {
+static struct map_info l440gx_map = {
 	.name = "L440GX BIOS",
 	.size = WINDOW_SIZE,
 	.bankwidth = BUSWIDTH,
@@ -73,7 +73,7 @@ static int __init init_l440gx(void)
 		return -ENODEV;
 	}
 
-	l440gx_map.virt = (void __iomem *)ioremap_nocache(WINDOW_ADDR, WINDOW_SIZE);
+	l440gx_map.virt = ioremap_nocache(WINDOW_ADDR, WINDOW_SIZE);
 
 	if (!l440gx_map.virt) {
 		printk(KERN_WARNING "Failed to ioremap L440GX flash region\n");

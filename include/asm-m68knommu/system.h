@@ -257,6 +257,19 @@ cmpxchg(volatile int *p, int old, int new)
         jmp (%a0);			\
         ");				\
 })
+#elif defined(CONFIG_M528x)
+/*
+ * The MCF528x has a bit (SOFTRST) in memory (Reset Control Register RCR),
+ * that when set, resets the MCF528x.
+ */
+#define HARD_RESET_NOW() \
+({						\
+	unsigned char volatile *reset;		\
+	asm("move.w	#0x2700, %sr");		\
+	reset = ((volatile unsigned short *)(MCF_IPSBAR + 0x110000));	\
+	while(1)				\
+	*reset |= (0x01 << 7);\
+})
 #else
 #define HARD_RESET_NOW() ({		\
         asm("				\

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2001 - 2003 Sistina Software (UK) Limited.
+ * Copyright (C) 2004 Red Hat, Inc. All rights reserved.
  *
  * This file is released under the LGPL.
  */
@@ -76,6 +77,9 @@
  *
  * DM_TABLE_STATUS:
  * Return the targets status for the 'active' table.
+ *
+ * DM_TARGET_MSG:
+ * Pass a message string to the target at a specific offset of a device.
  */
 
 /*
@@ -179,6 +183,15 @@ struct dm_target_versions {
 };
 
 /*
+ * Used to pass message to a target
+ */
+struct dm_target_msg {
+	uint64_t sector;	/* Device sector */
+
+	char message[0];
+};
+
+/*
  * If you change this make sure you make the corresponding change
  * to dm-ioctl.c:lookup_ioctl()
  */
@@ -204,6 +217,7 @@ enum {
 
 	/* Added later */
 	DM_LIST_VERSIONS_CMD,
+	DM_TARGET_MSG_CMD,
 };
 
 /*
@@ -232,6 +246,7 @@ typedef char ioctl_struct[308];
 #define DM_TABLE_DEPS_32    _IOWR(DM_IOCTL, DM_TABLE_DEPS_CMD, ioctl_struct)
 #define DM_TABLE_STATUS_32  _IOWR(DM_IOCTL, DM_TABLE_STATUS_CMD, ioctl_struct)
 #define DM_LIST_VERSIONS_32 _IOWR(DM_IOCTL, DM_LIST_VERSIONS_CMD, ioctl_struct)
+#define DM_TARGET_MSG_32    _IOWR(DM_IOCTL, DM_TARGET_MSG_CMD, ioctl_struct)
 #endif
 
 #define DM_IOCTL 0xfd
@@ -254,10 +269,12 @@ typedef char ioctl_struct[308];
 
 #define DM_LIST_VERSIONS _IOWR(DM_IOCTL, DM_LIST_VERSIONS_CMD, struct dm_ioctl)
 
+#define DM_TARGET_MSG	 _IOWR(DM_IOCTL, DM_TARGET_MSG_CMD, struct dm_ioctl)
+
 #define DM_VERSION_MAJOR	4
-#define DM_VERSION_MINOR	1
+#define DM_VERSION_MINOR	3
 #define DM_VERSION_PATCHLEVEL	0
-#define DM_VERSION_EXTRA	"-ioctl (2003-12-10)"
+#define DM_VERSION_EXTRA	"-ioctl (2004-09-30)"
 
 /* Status bits */
 #define DM_READONLY_FLAG	(1 << 0) /* In/Out */

@@ -444,6 +444,8 @@ static void rivafb_load_cursor_image(struct riva_par *par, u8 *data8,
 	bg = le16_to_cpu(bg);
 	fg = le16_to_cpu(fg);
 
+	w = (w + 1) & ~1;
+
 	for (i = 0; i < h; i++) {
 		b = *data++;
 		reverse_order(&b);
@@ -1577,6 +1579,10 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	u16 fg, bg;
 	int i, set = cursor->set;
 
+	if (cursor->image.width > MAX_CURS ||
+	    cursor->image.height > MAX_CURS)
+		return soft_cursor(info, cursor);
+
 	par->riva.ShowHideCursor(&par->riva, 0);
 
 	if (par->cursor_reset) {
@@ -1606,38 +1612,46 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		u32 d_pitch = MAX_CURS/8;
 		u8 *dat = (u8 *) cursor->image.data;
 		u8 *msk = (u8 *) cursor->mask;
-		u8 src[64];	
+		u8 *src;
 		
-		switch (cursor->rop) {
-		case ROP_XOR:
-			for (i = 0; i < s_pitch * cursor->image.height;
-			     i++)
-				src[i] = dat[i] ^ msk[i];
-			break;
-		case ROP_COPY:
-		default:
-			for (i = 0; i < s_pitch * cursor->image.height;
-			     i++)
-				src[i] = dat[i] & msk[i];
-			break;
+		src = kmalloc(s_pitch * cursor->image.height, GFP_ATOMIC);
+
+		if (src) {
+			switch (cursor->rop) {
+			case ROP_XOR:
+				for (i = 0; i < s_pitch * cursor->image.height;
+				     i++)
+					src[i] = dat[i] ^ msk[i];
+				break;
+			case ROP_COPY:
+			default:
+				for (i = 0; i < s_pitch * cursor->image.height;
+				     i++)
+					src[i] = dat[i] & msk[i];
+				break;
+			}
+
+			fb_sysmove_buf_aligned(info, &info->pixmap, data,
+					       d_pitch, src, s_pitch,
+					       cursor->image.height);
+
+			bg = ((info->cmap.red[bg_idx] & 0xf8) << 7) |
+				((info->cmap.green[bg_idx] & 0xf8) << 2) |
+				((info->cmap.blue[bg_idx] & 0xf8) >> 3) |
+				1 << 15;
+
+			fg = ((info->cmap.red[fg_idx] & 0xf8) << 7) |
+				((info->cmap.green[fg_idx] & 0xf8) << 2) |
+				((info->cmap.blue[fg_idx] & 0xf8) >> 3) |
+				1 << 15;
+
+			par->riva.LockUnlock(&par->riva, 0);
+
+			rivafb_load_cursor_image(par, data, bg, fg,
+						 cursor->image.width,
+						 cursor->image.height);
+			kfree(src);
 		}
-		
-		fb_sysmove_buf_aligned(info, &info->pixmap, data, d_pitch, src,
-				       s_pitch, cursor->image.height);
-
-		bg = ((info->cmap.red[bg_idx] & 0xf8) << 7) |
-		     ((info->cmap.green[bg_idx] & 0xf8) << 2) |
-		     ((info->cmap.blue[bg_idx] & 0xf8) >> 3) | 1 << 15;
-
-		fg = ((info->cmap.red[fg_idx] & 0xf8) << 7) |
-		     ((info->cmap.green[fg_idx] & 0xf8) << 2) |
-		     ((info->cmap.blue[fg_idx] & 0xf8) >> 3) | 1 << 15;
-
-		par->riva.LockUnlock(&par->riva, 0);
-
-		rivafb_load_cursor_image(par, data, bg, fg,
-					 cursor->image.width,
-					 cursor->image.height);
 	}
 
 	if (cursor->enable)

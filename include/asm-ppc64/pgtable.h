@@ -67,12 +67,6 @@
 #define IMALLOC_END       (IMALLOC_BASE + PGTABLE_EA_MASK)
 
 /*
- * Define the address range mapped virt <-> physical
- */
-#define KRANGE_START KERNELBASE
-#define KRANGE_END   (KRANGE_START + PGTABLE_EA_MASK)
-
-/*
  * Define the user address range
  */
 #define USER_START (0UL)

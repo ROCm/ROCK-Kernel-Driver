@@ -28,16 +28,17 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	if (info->state != FBINFO_STATE_RUNNING)
 		return 0;
 
-	src = kmalloc(64 + sizeof(struct fb_image), GFP_ATOMIC);
+	s_pitch = (cursor->image.width + 7) >> 3;
+	dsize = s_pitch * cursor->image.height;
 
+	src = kmalloc(dsize + sizeof(struct fb_image), GFP_ATOMIC);
 	if (!src)
 		return -ENOMEM;
 
-	image = (struct fb_image *) (src + 64);
+	image = (struct fb_image *) (src + dsize);
 	*image = cursor->image;
-	s_pitch = (image->width + 7) >> 3;
-	dsize = s_pitch * image->height;
 	d_pitch = (s_pitch + scan_align) & ~scan_align;
+
 	size = d_pitch * image->height + buf_align;
 	size &= ~buf_align;
 	dst = fb_get_buffer_offset(info, &info->pixmap, size);

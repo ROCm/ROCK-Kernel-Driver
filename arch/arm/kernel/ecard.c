@@ -503,27 +503,33 @@ void ecard_disablefiq(unsigned int fiqnr)
 	}
 }
 
-static void
-ecard_dump_irq_state(ecard_t *ec)
+static void ecard_dump_irq_state(void)
 {
-	printk("  %d: %sclaimed, ",
-	       ec->slot_no,
-	       ec->claimed ? "" : "not ");
+	ecard_t *ec;
 
-	if (ec->ops && ec->ops->irqpending &&
-	    ec->ops != &ecard_default_ops)
-		printk("irq %spending\n",
-		       ec->ops->irqpending(ec) ? "" : "not ");
-	else
-		printk("irqaddr %p, mask = %02X, status = %02X\n",
-		       ec->irqaddr, ec->irqmask, *ec->irqaddr);
+	printk("Expansion card IRQ state:\n");
+
+	for (ec = cards; ec; ec = ec->next) {
+		if (ec->slot_no == 8)
+			continue;
+
+		printk("  %d: %sclaimed, ",
+		       ec->slot_no, ec->claimed ? "" : "not ");
+
+		if (ec->ops && ec->ops->irqpending &&
+		    ec->ops != &ecard_default_ops)
+			printk("irq %spending\n",
+			       ec->ops->irqpending(ec) ? "" : "not ");
+		else
+			printk("irqaddr %p, mask = %02X, status = %02X\n",
+			       ec->irqaddr, ec->irqmask, *ec->irqaddr);
+	}
 }
 
 static void ecard_check_lockup(struct irqdesc *desc)
 {
 	static unsigned long last;
 	static int lockup;
-	ecard_t *ec;
 
 	/*
 	 * If the timer interrupt has not run since the last million
@@ -541,11 +547,7 @@ static void ecard_check_lockup(struct irqdesc *desc)
 			       "disabling all expansion card interrupts\n");
 
 			desc->chip->mask(IRQ_EXPANSIONCARD);
-
-			printk("Expansion card IRQ state:\n");
-
-			for (ec = cards; ec; ec = ec->next)
-				ecard_dump_irq_state(ec);
+			ecard_dump_irq_state();
 		}
 	} else
 		lockup = 0;
@@ -557,6 +559,7 @@ static void ecard_check_lockup(struct irqdesc *desc)
 	if (!last || time_after(jiffies, last + 5*HZ)) {
 		last = jiffies;
 		printk(KERN_WARNING "Unrecognised interrupt from backplane\n");
+		ecard_dump_irq_state();
 	}
 }
 

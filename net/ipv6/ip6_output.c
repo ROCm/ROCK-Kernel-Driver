@@ -147,7 +147,7 @@ static int ip6_output2(struct sk_buff *skb)
 
 int ip6_output(struct sk_buff *skb)
 {
-	if ((skb->len > dst_pmtu(skb->dst) || skb_shinfo(skb)->frag_list))
+	if (skb->len > dst_pmtu(skb->dst))
 		return ip6_fragment(skb, ip6_output2);
 	else
 		return ip6_output2(skb);

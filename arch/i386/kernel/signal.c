@@ -413,7 +413,7 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	regs->xss = __USER_DS;
 	regs->xcs = __USER_CS;
 	if (regs->eflags & TF_MASK) {
-		if (current->ptrace & PT_PTRACED) {
+		if ((current->ptrace & (PT_PTRACED | PT_DTRACE)) == (PT_PTRACED | PT_DTRACE)) {
 			ptrace_notify(SIGTRAP);
 		} else {
 			regs->eflags &= ~TF_MASK;

@@ -1,5 +1,5 @@
 /*
- * $Id: impa7.c,v 1.12 2004/09/16 23:27:13 gleixner Exp $
+ * $Id: impa7.c,v 1.13 2004/11/04 13:24:14 gleixner Exp $
  *
  * Handle mapping of the NOR flash on implementa A7 boards
  *
@@ -91,8 +91,7 @@ int __init init_impa7(void)
 		       pt[i].size, pt[i].addr);
 
 		impa7_map[i].phys = pt[i].addr;
-		impa7_map[i].virt = (void __iomem *)
-		  ioremap(pt[i].addr, pt[i].size);
+		impa7_map[i].virt = ioremap(pt[i].addr, pt[i].size);
 		if (!impa7_map[i].virt) {
 			printk(MSG_PREFIX "failed to ioremap\n");
 			return -EIO;

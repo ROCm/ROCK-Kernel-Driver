@@ -5,9 +5,9 @@
 /* target memory map */
 #ifdef CONFIG_H8300H_GENERIC
 #define ROMTOP  0x000000
-#define ROMSIZE 0x200000
-#define RAMTOP  0x200000
-#define RAMSIZE 0x200000
+#define ROMSIZE 0x400000
+#define RAMTOP  0x400000
+#define RAMSIZE 0x400000
 #endif
 
 #ifdef CONFIG_H8300H_AKI3068NET
@@ -26,16 +26,16 @@
 
 #ifdef CONFIG_H8300H_SIM
 #define ROMTOP  0x000000
-#define ROMSIZE 0x200000
-#define RAMTOP  0x200000
-#define RAMSIZE 0x200000
+#define ROMSIZE 0x400000
+#define RAMTOP  0x400000
+#define RAMSIZE 0x400000
 #endif
 
 #ifdef CONFIG_H8S_SIM
 #define ROMTOP  0x000000
-#define ROMSIZE 0x200000
-#define RAMTOP  0x200000
-#define RAMSIZE 0x200000
+#define ROMSIZE 0x400000
+#define RAMTOP  0x400000
+#define RAMSIZE 0x800000
 #endif
 
 #ifdef CONFIG_H8S_EDOSK2674
@@ -50,6 +50,8 @@ INPUT(romfs.o)
 #endif
 
 _jiffies = _jiffies_64 + 4;
+
+ENTRY(__start)
 
 SECTIONS
 {
@@ -81,6 +83,7 @@ SECTIONS
 	___start___ex_table = .;
 		*(__ex_table)
 	___stop___ex_table = .;
+	}
 
 	RODATA
 #if defined(CONFIG_ROMKERNEL)
@@ -140,10 +143,7 @@ SECTIONS
 #if defined(CONFIG_RAMKERNEL)
 	SECURITY_INIT
 #endif
-	__begin_data = LOADADDR(.data) ;
-#if defined(CONFIG_ROMKERNEL)
-	__erom = LOADADDR(.data) + SIZEOF(.data) ;
-#endif
+	__begin_data = LOADADDR(.data);
         .bss : 
         {
 	. = ALIGN(0x4) ;
@@ -159,12 +159,11 @@ SECTIONS
 	/DISCARD/ : {
 		*(.exitcall.exit)
 	}
-
         .romfs :	
 	{
 		*(.romfs*)
 	}
-	. = RAMTOP+RAMSIZE; 
+	. = RAMTOP+RAMSIZE;
         .dummy :
         {
 	COMMAND_START = . - 0x200 ;

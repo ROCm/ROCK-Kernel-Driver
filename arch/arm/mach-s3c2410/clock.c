@@ -32,6 +32,7 @@
 #include <linux/list.h>
 #include <linux/errno.h>
 #include <linux/err.h>
+#include <linux/device.h>
 
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
@@ -99,17 +100,35 @@ struct clk *clk_get(struct device *dev, const char *id)
 {
 	struct clk *p;
 	struct clk *clk = ERR_PTR(-ENOENT);
+	int idno;
+
+	idno = (dev == NULL) ? -1 : to_platform_device(dev)->id;
 
 	down(&clocks_sem);
+
 	list_for_each_entry(p, &clocks, list) {
-		if (strcmp(id, p->name) == 0 &&
+		if (p->id == idno &&
+		    strcmp(id, p->name) == 0 &&
 		    try_module_get(p->owner)) {
 			clk = p;
 			break;
 		}
 	}
-	up(&clocks_sem);
 
+	/* check for the case where a device was supplied, but the
+	 * clock that was being searched for is not device specific */
+
+	if (IS_ERR(clk)) {
+		list_for_each_entry(p, &clocks, list) {
+			if (p->id == -1 && strcmp(id, p->name) == 0 &&
+			    try_module_get(p->owner)) {
+				clk = p;
+				break;
+			}
+		}
+	}
+
+	up(&clocks_sem);
 	return clk;
 }
 
@@ -147,6 +166,9 @@ void clk_unuse(struct clk *clk)
 
 unsigned long clk_get_rate(struct clk *clk)
 {
+	if (IS_ERR(clk))
+		return 0;
+
 	if (clk->rate != 0)
 		return clk->rate;
 
@@ -185,46 +207,54 @@ EXPORT_SYMBOL(clk_get_parent);
 /* base clocks */
 
 static struct clk clk_f = {
-	.name          = "fclk",
-	.rate          = 0,
-	.parent        = NULL,
-	.ctrlbit       = 0
+	.name		= "fclk",
+	.id		= -1,
+	.rate		= 0,
+	.parent		= NULL,
+	.ctrlbit	= 0,
 };
 
 static struct clk clk_h = {
-	.name          = "hclk",
-	.rate          = 0,
-	.parent        = NULL,
-	.ctrlbit       = 0
+	.name		= "hclk",
+	.id		= -1,
+	.rate		= 0,
+	.parent		= NULL,
+	.ctrlbit	= 0,
 };
 
 static struct clk clk_p = {
-	.name          = "pclk",
-	.rate          = 0,
-	.parent        = NULL,
-	.ctrlbit       = 0
+	.name		= "pclk",
+	.id		= -1,
+	.rate		= 0,
+	.parent		= NULL,
+	.ctrlbit	= 0,
 };
 
 /* clocks that could be registered by external code */
 
 struct clk s3c24xx_dclk0 = {
 	.name		= "dclk0",
+	.id		= -1,
 };
 
 struct clk s3c24xx_dclk1 = {
 	.name		= "dclk1",
+	.id		= -1,
 };
 
 struct clk s3c24xx_clkout0 = {
 	.name		= "clkout1",
+	.id		= -1,
 };
 
 struct clk s3c24xx_clkout1 = {
 	.name		= "clkout1",
+	.id		= -1,
 };
 
 struct clk s3c24xx_uclk = {
 	.name		= "uclk",
+	.id		= -1,
 };
 
 
@@ -232,21 +262,25 @@ struct clk s3c24xx_uclk = {
 
 static struct clk init_clocks[] = {
 	{ .name    = "nand",
+	  .id	   = -1,
 	  .parent  = &clk_h,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_NAND
 	},
 	{ .name    = "lcd",
+	  .id	   = -1,
 	  .parent  = &clk_h,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_LCDC
 	},
 	{ .name    = "usb-host",
+	  .id	   = -1,
 	  .parent  = &clk_h,
 	  .enable  = s3c2410_clkcon_enable,
-	  .ctrlbit =   S3C2410_CLKCON_USBH
+	  .ctrlbit = S3C2410_CLKCON_USBH
 	},
 	{ .name    = "usb-device",
+	  .id	   = -1,
 	  .parent  = &clk_h,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_USBD
@@ -257,56 +291,67 @@ static struct clk init_clocks[] = {
 	  .ctrlbit = S3C2410_CLKCON_PWMT
 	},
 	{ .name    = "sdi",
+	  .id	   = -1,
 	  .parent  = &clk_p,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_SDI
 	},
-	{ .name    = "uart0",
+	{ .name    = "uart",
+	  .id	   = 0,
 	  .parent  = &clk_p,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_UART0
 	},
-	{ .name    = "uart1",
+	{ .name    = "uart",
+	  .id	   = 1,
 	  .parent  = &clk_p,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_UART1
 	},
-	{ .name    = "uart2",
+	{ .name    = "uart",
+	  .id	   = 2,
 	  .parent  = &clk_p,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_UART2
 	},
 	{ .name    = "gpio",
+	  .id	   = -1,
 	  .parent  = &clk_p,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_GPIO
 	},
 	{ .name    = "rtc",
+	  .id	   = -1,
 	  .parent  = &clk_p,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_RTC
 	},
 	{ .name    = "adc",
+	  .id	   = -1,
 	  .parent  = &clk_p,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_ADC
 	},
 	{ .name    = "i2c",
+	  .id	   = -1,
 	  .parent  = &clk_p,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_IIC
 	},
 	{ .name    = "iis",
+	  .id	   = -1,
 	  .parent  = &clk_p,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_IIS
 	},
 	{ .name    = "spi",
+	  .id	   = -1,
 	  .parent  = &clk_p,
 	  .enable  = s3c2410_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_SPI
 	},
 	{ .name    = "watchdog",
+	  .id	   = -1,
 	  .parent  = &clk_p,
 	  .ctrlbit = 0
 	}

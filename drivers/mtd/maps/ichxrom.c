@@ -2,7 +2,7 @@
  * ichxrom.c
  *
  * Normal mappings of chips in physical memory
- * $Id: ichxrom.c,v 1.14 2004/09/18 01:59:56 eric Exp $
+ * $Id: ichxrom.c,v 1.15 2004/11/16 18:29:02 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -349,7 +349,7 @@ static struct pci_driver ichxrom_driver = {
 };
 #endif
 
-int __init init_ichxrom(void)
+static int __init init_ichxrom(void)
 {
 	struct pci_dev *pdev;
 	struct pci_device_id *id;

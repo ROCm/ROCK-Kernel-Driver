@@ -1,6 +1,6 @@
 /*======================================================================
 
-  $Id: slram.c,v 1.31 2004/08/09 13:19:44 dwmw2 Exp $
+  $Id: slram.c,v 1.32 2004/11/16 18:29:01 dwmw2 Exp $
 
   This driver provides a method to access memory not used by the kernel
   itself (i.e. if the kernel commandline mem=xxx is used). To actually
@@ -75,13 +75,13 @@ MODULE_PARM_DESC(map, "List of memory regions to map. \"map=<name>, <start>, <le
 
 static slram_mtd_list_t *slram_mtdlist = NULL;
 
-int slram_erase(struct mtd_info *, struct erase_info *);
-int slram_point(struct mtd_info *, loff_t, size_t, size_t *, u_char **);
-void slram_unpoint(struct mtd_info *, u_char *, loff_t,	size_t);
-int slram_read(struct mtd_info *, loff_t, size_t, size_t *, u_char *);
-int slram_write(struct mtd_info *, loff_t, size_t, size_t *, const u_char *);
+static int slram_erase(struct mtd_info *, struct erase_info *);
+static int slram_point(struct mtd_info *, loff_t, size_t, size_t *, u_char **);
+static void slram_unpoint(struct mtd_info *, u_char *, loff_t,	size_t);
+static int slram_read(struct mtd_info *, loff_t, size_t, size_t *, u_char *);
+static int slram_write(struct mtd_info *, loff_t, size_t, size_t *, const u_char *);
 
-int slram_erase(struct mtd_info *mtd, struct erase_info *instr)
+static int slram_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	slram_priv_t *priv = mtd->priv;
 
@@ -103,7 +103,7 @@ int slram_erase(struct mtd_info *mtd, struct erase_info *instr)
 	return(0);
 }
 
-int slram_point(struct mtd_info *mtd, loff_t from, size_t len,
+static int slram_point(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, u_char **mtdbuf)
 {
 	slram_priv_t *priv = (slram_priv_t *)mtd->priv;
@@ -113,11 +113,11 @@ int slram_point(struct mtd_info *mtd, loff_t from, size_t len,
 	return(0);
 }
 
-void slram_unpoint(struct mtd_info *mtd, u_char *addr, loff_t from, size_t len)
+static void slram_unpoint(struct mtd_info *mtd, u_char *addr, loff_t from, size_t len)
 {
 }
 
-int slram_read(struct mtd_info *mtd, loff_t from, size_t len,
+static int slram_read(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, u_char *buf)
 {
 	slram_priv_t *priv = (slram_priv_t *)mtd->priv;
@@ -128,7 +128,7 @@ int slram_read(struct mtd_info *mtd, loff_t from, size_t len,
 	return(0);
 }
 
-int slram_write(struct mtd_info *mtd, loff_t to, size_t len,
+static int slram_write(struct mtd_info *mtd, loff_t to, size_t len,
 		size_t *retlen, const u_char *buf)
 {
 	slram_priv_t *priv = (slram_priv_t *)mtd->priv;
@@ -141,7 +141,7 @@ int slram_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 /*====================================================================*/
 
-int register_device(char *name, unsigned long start, unsigned long length)
+static int register_device(char *name, unsigned long start, unsigned long length)
 {
 	slram_mtd_list_t **curmtd;
 
@@ -213,7 +213,7 @@ int register_device(char *name, unsigned long start, unsigned long length)
 	return(0);	
 }
 
-void unregister_devices(void)
+static void unregister_devices(void)
 {
 	slram_mtd_list_t *nextitem;
 
@@ -228,7 +228,7 @@ void unregister_devices(void)
 	}
 }
 
-unsigned long handle_unit(unsigned long value, char *unit)
+static unsigned long handle_unit(unsigned long value, char *unit)
 {
 	if ((*unit == 'M') || (*unit == 'm')) {
 		return(value * 1024 * 1024);
@@ -238,7 +238,7 @@ unsigned long handle_unit(unsigned long value, char *unit)
 	return(value);
 }
 
-int parse_cmdline(char *devname, char *szstart, char *szlength)
+static int parse_cmdline(char *devname, char *szstart, char *szlength)
 {
 	char *buffer;
 	unsigned long devstart;
@@ -285,7 +285,7 @@ __setup("slram=", mtd_slram_setup);
 
 #endif
 
-int init_slram(void)
+static int init_slram(void)
 {
 	char *devname;
 	int i;

@@ -417,6 +417,7 @@ struct cdev *cdev_alloc(void)
 
 void cdev_init(struct cdev *cdev, struct file_operations *fops)
 {
+	memset(cdev, 0, sizeof *cdev);
 	INIT_LIST_HEAD(&cdev->list);
 	cdev->kobj.ktype = &ktype_cdev_default;
 	kobject_init(&cdev->kobj);

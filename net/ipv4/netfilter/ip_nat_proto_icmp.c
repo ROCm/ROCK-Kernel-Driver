@@ -53,11 +53,13 @@ icmp_unique_tuple(struct ip_conntrack_tuple *tuple,
 
 static int
 icmp_manip_pkt(struct sk_buff **pskb,
-	       unsigned int hdroff,
+	       unsigned int iphdroff,
 	       const struct ip_conntrack_manip *manip,
 	       enum ip_nat_manip_type maniptype)
 {
+	struct iphdr *iph = (struct iphdr *)((*pskb)->data + iphdroff);
 	struct icmphdr *hdr;
+	unsigned int hdroff = iphdroff + iph->ihl*4;
 
 	if (!skb_ip_make_writable(pskb, hdroff + sizeof(*hdr)))
 		return 0;

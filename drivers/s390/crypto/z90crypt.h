@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/s390/misc/z90crypt.h
+ *  linux/drivers/s390/crypto/z90crypt.h
  *
  *  z90crypt 1.3.2
  *
@@ -24,12 +24,12 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#ifndef _LINUX_Z90CRYPT_H_
-#define _LINUX_Z90CRYPT_H_
+#ifndef _Z90CRYPT_H_
+#define _Z90CRYPT_H_
 
 #include <linux/ioctl.h>
 
-#define VERSION_Z90CRYPT_H "$Revision: 1.10 $"
+#define VERSION_Z90CRYPT_H "$Revision: 1.11 $"
 
 #define z90crypt_VERSION 1
 #define z90crypt_RELEASE 3	// 2 = PCIXCC, 3 = rewrite for coding standards
@@ -255,4 +255,4 @@ struct ica_z90_status {
 	unsigned char qdepth[MASK_LENGTH];
 };
 
-#endif /* _LINUX_Z90CRYPT_H_ */
+#endif /* _Z90CRYPT_H_ */

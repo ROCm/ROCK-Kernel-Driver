@@ -14,7 +14,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- * $Id: dilnetpc.c,v 1.15 2004/10/21 08:31:32 dwmw2 Exp $
+ * $Id: dilnetpc.c,v 1.16 2004/11/04 13:24:14 gleixner Exp $
  *
  * The DIL/Net PC is a tiny embedded PC board made by SSV Embedded Systems
  * featuring the AMD Elan SC410 processor. There are two variants of this
@@ -403,7 +403,7 @@ static int __init init_dnpc(void)
 	printk(KERN_NOTICE "DIL/Net %s flash: 0x%lx at 0x%lx\n", 
 		is_dnp ? "DNPC" : "ADNP", dnpc_map.size, dnpc_map.phys);
 
-	dnpc_map.virt = (void __iomem *)ioremap_nocache(dnpc_map.phys, dnpc_map.size);
+	dnpc_map.virt = ioremap_nocache(dnpc_map.phys, dnpc_map.size);
 
 	dnpc_map_flash(dnpc_map.phys, dnpc_map.size);
 

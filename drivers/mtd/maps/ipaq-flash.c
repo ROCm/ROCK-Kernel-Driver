@@ -5,7 +5,7 @@
  * (C) 2002 Hewlett-Packard Company <jamey.hicks@hp.com>
  * (C) 2003 Christian Pellegrin <chri@ascensit.com>, <chri@infis.univ.ts.it>: concatenation of multiple flashes
  * 
- * $Id: ipaq-flash.c,v 1.2 2004/09/16 23:27:13 gleixner Exp $
+ * $Id: ipaq-flash.c,v 1.3 2004/11/04 13:24:15 gleixner Exp $
  */
 
 #include <linux/config.h>
@@ -246,7 +246,7 @@ int __init ipaq_mtd_init(void)
 			ipaq_map[i].size = h3xxx_max_flash_size;
 			ipaq_map[i].set_vpp = h3xxx_set_vpp;
 			ipaq_map[i].phys = cs_phys[i];
-			ipaq_map[i].virt = (void __iomem *)__ioremap(cs_phys[i], 0x04000000, 0, 1);
+			ipaq_map[i].virt = __ioremap(cs_phys[i], 0x04000000, 0, 1);
 			if (machine_is_h3100 () || machine_is_h1900())
 				ipaq_map[i].bankwidth = 2;
 		}
@@ -443,7 +443,7 @@ static int __init h1900_special_case(void)
 	ipaq_map[0].size = 0x80000;
 	ipaq_map[0].set_vpp = h3xxx_set_vpp;
 	ipaq_map[0].phys = 0x0;
-	ipaq_map[0].virt = (void __iomem *)__ioremap(0x0, 0x04000000, 0, 1);
+	ipaq_map[0].virt = __ioremap(0x0, 0x04000000, 0, 1);
 	ipaq_map[0].bankwidth = 2;
 	
 	printk(KERN_NOTICE "iPAQ flash: probing %d-bit flash bus, window=%lx with JEDEC.\n", ipaq_map[0].bankwidth*8, ipaq_map[0].virt);

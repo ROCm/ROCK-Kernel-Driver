@@ -569,8 +569,8 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	}
 
 	cc->key_size = key_size;
-	if ((key_size == 0 && strcmp(argv[1], "-") != 0)
-	    || crypt_decode_key(cc->key, argv[1], key_size) < 0) {
+	if ((!key_size && strcmp(argv[1], "-") != 0) ||
+	    (key_size && crypt_decode_key(cc->key, argv[1], key_size) < 0)) {
 		ti->error = PFX "Error decoding key";
 		goto bad1;
 	}

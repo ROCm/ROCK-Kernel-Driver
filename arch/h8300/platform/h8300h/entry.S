@@ -247,9 +247,9 @@ SYMBOL_NAME_LABEL(ret_from_interrupt)
 	mov.l	@(TI_FLAGS:16,er4),er1
 	btst	#TIF_NEED_RESCHED,r1l
 	bne	SYMBOL_NAME(reschedule):16
-	mov.l	sp,er1
-	subs	#4,er1			/* adjust retpc */
-	mov.l	er2,er0
+	mov.l	sp,er0
+	subs	#4,er0			/* adjust retpc */
+	mov.l	er2,er1
 	jsr	@SYMBOL_NAME(do_signal)
 #if defined(CONFIG_PREEMPT)
 	bra	done:8			/* userspace thoru */

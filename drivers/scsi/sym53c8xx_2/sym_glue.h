@@ -381,9 +381,6 @@ struct sym_shcb {
 	u_short		io_ws;		/* IO window size		*/
 	int		irq;		/* IRQ number			*/
 
-	SYM_QUEHEAD	wait_cmdq;	/* Awaiting SCSI commands	*/
-	SYM_QUEHEAD	busy_cmdq;	/* Enqueued SCSI commands	*/
-
 	struct timer_list timer;	/* Timer handler link header	*/
 	u_long		lasttime;
 	u_long		settle_time;	/* Resetting the SCSI BUS	*/

@@ -263,7 +263,6 @@ static inline void i2o_dma_unmap(struct device *, struct i2o_dma *);
 
 /* IOP functions */
 extern int i2o_status_get(struct i2o_controller *);
-extern int i2o_hrt_get(struct i2o_controller *);
 
 extern int i2o_event_register(struct i2o_device *, struct i2o_driver *, int,
 			      u32);
@@ -385,7 +384,6 @@ extern int i2o_device_claim_release(struct i2o_device *);
 
 /* Exec OSM functions */
 extern int i2o_exec_lct_get(struct i2o_controller *);
-extern int i2o_exec_lct_notify(struct i2o_controller *, u32);
 
 /* device to i2o_device and driver to i2o_driver convertion functions */
 #define to_i2o_driver(drv) container_of(drv,struct i2o_driver, driver)
@@ -515,10 +513,8 @@ static inline void i2o_flush_reply(struct i2o_controller *c, u32 m)
 static inline struct i2o_message *i2o_msg_out_to_virt(struct i2o_controller *c,
 						      u32 m)
 {
-	if (unlikely
-	    (m < c->out_queue.phys
-	     || m >= c->out_queue.phys + c->out_queue.len))
-		BUG();
+	BUG_ON(m < c->out_queue.phys
+	       || m >= c->out_queue.phys + c->out_queue.len);
 
 	return c->out_queue.virt + (m - c->out_queue.phys);
 };
@@ -633,7 +629,6 @@ static inline void i2o_dma_unmap(struct device *dev, struct i2o_dma *addr)
 #define i2o_raw_writel(val, mem)	__raw_writel(cpu_to_le32(val), mem)
 
 extern int i2o_parm_field_get(struct i2o_device *, int, int, void *, int);
-extern int i2o_parm_field_set(struct i2o_device *, int, int, void *, int);
 extern int i2o_parm_table_get(struct i2o_device *, int, int, int, void *, int,
 			      void *, int);
 /* FIXME: remove

@@ -1,5 +1,5 @@
 /*
- * $Id: ebony.c,v 1.12 2004/09/16 23:27:13 gleixner Exp $
+ * $Id: ebony.c,v 1.13 2004/11/04 13:24:14 gleixner Exp $
  * 
  * Mapping for Ebony user flash
  *
@@ -93,8 +93,7 @@ int __init init_ebony(void)
 		large_flash_base = EBONY_LARGE_FLASH_HIGH;
 
 	ebony_small_map.phys = small_flash_base;
-	ebony_small_map.virt =
-		(void __iomem *)ioremap64(small_flash_base,
+	ebony_small_map.virt = ioremap64(small_flash_base,
 					 ebony_small_map.size);
 
 	if (!ebony_small_map.virt) {

@@ -24,7 +24,7 @@
     ((v).xres == (x) && (v).yres == (y))
 
 #ifdef DEBUG
-#define DPRINTK(fmt, args...)	printk(KERN_DEBUG "%s: " fmt, __FUNCTION__ , ## args)
+#define DPRINTK(fmt, args...)	printk("modedb %s: " fmt, __FUNCTION__ , ## args)
 #else
 #define DPRINTK(fmt, args...)
 #endif
@@ -474,7 +474,7 @@ int fb_find_mode(struct fb_var_screeninfo *var,
 		 const struct fb_videomode *default_mode,
 		 unsigned int default_bpp)
 {
-    int i, j;
+    int i;
 
     /* Set up defaults */
     if (!db) {
@@ -493,7 +493,7 @@ int fb_find_mode(struct fb_var_screeninfo *var,
 	int res_specified = 0, bpp_specified = 0, refresh_specified = 0;
 	unsigned int xres = 0, yres = 0, bpp = default_bpp, refresh = 0;
 	int yres_specified = 0;
-	u32 best = -1, diff = -1;
+	u32 best, diff;
 
 	for (i = namelen-1; i >= 0; i--) {
 	    switch (name[i]) {
@@ -532,16 +532,35 @@ int fb_find_mode(struct fb_var_screeninfo *var,
 	    res_specified = 1;
 	}
 done:
-	for (i = refresh_specified; i >= 0; i--) {
-	    DPRINTK("Trying specified video mode%s %ix%i\n",
-		    i ? "" : " (ignoring refresh rate)", xres, yres);
-	    for (j = 0; j < dbsize; j++)
-		if ((name_matches(db[j], name, namelen) ||
-		     (res_specified && res_matches(db[j], xres, yres))) &&
-		    (!i || db[j].refresh == refresh) &&
-		    !fb_try_mode(var, info, &db[j], bpp))
-		    return 2-i;
+	DPRINTK("Trying specified video mode%s %ix%i\n",
+	    refresh_specified ? "" : " (ignoring refresh rate)", xres, yres);
+
+	diff = refresh;
+	best = -1;
+	for (i = 0; i < dbsize; i++) {
+		if ((name_matches(db[i], name, namelen) &&
+			!fb_try_mode(var, info, &db[i], bpp)))
+			return 1;
+		if (res_specified && res_matches(db[i], xres, yres)) {
+			if(!fb_try_mode(var, info, &db[i], bpp)) {
+				if(!refresh_specified || db[i].refresh == refresh)
+					return 1;
+				else {
+					if(diff > abs(db[i].refresh - refresh)) {
+						diff = abs(db[i].refresh - refresh);
+						best = i;
+					}
+				}
+			}
+		}
 	}
+	if (best != -1) {
+		fb_try_mode(var, info, &db[best], bpp);
+		return 2;
+	}
+
+	diff = xres + yres;
+	best = -1;
 	DPRINTK("Trying best-fit modes\n");
 	for (i = 0; i < dbsize; i++) {
 	    if (xres <= db[i].xres && yres <= db[i].yres) {

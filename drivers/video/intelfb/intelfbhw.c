@@ -295,7 +295,7 @@ intelfbhw_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 	offset = (yoffset * dinfo->pitch) +
 		 (xoffset * var->bits_per_pixel) / 8;
 
-	offset += dinfo->fb.offset >> 12;
+	offset += dinfo->fb.offset << 12;
 
 	OUTREG(DSPABASE, offset);
 

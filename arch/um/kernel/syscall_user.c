@@ -11,7 +11,7 @@
 struct {
 	int syscall;
 	int pid;
-	int result;
+	long result;
 	struct timeval start;
 	struct timeval end;
 } syscall_record[1024];
@@ -30,7 +30,7 @@ int record_syscall_start(int syscall)
 	return(index);
 }
 
-void record_syscall_end(int index, int result)
+void record_syscall_end(int index, long result)
 {
 	syscall_record[index].result = result;
 	gettimeofday(&syscall_record[index].end, NULL);

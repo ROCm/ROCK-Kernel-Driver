@@ -584,7 +584,7 @@ sandpoint_ide_probe(void)
 		sandpoint_ide_ctl_regbase[0]=pdev->resource[1].start;
 		sandpoint_ide_ctl_regbase[1]=pdev->resource[3].start;
 		sandpoint_idedma_regbase=pdev->resource[4].start;
-		pci_dev_put(dev);
+		pci_dev_put(pdev);
 	}
 
 	sandpoint_ide_ports_known = 1;

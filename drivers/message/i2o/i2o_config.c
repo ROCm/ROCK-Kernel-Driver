@@ -50,8 +50,7 @@
 
 extern int i2o_parm_issue(struct i2o_device *, int, void *, int, void *, int);
 
-static spinlock_t i2o_config_lock = SPIN_LOCK_UNLOCKED;
-struct wait_queue *i2o_wait_queue;
+static spinlock_t i2o_config_lock;
 
 #define MODINC(x,y) ((x) = ((x) + 1) % (y))
 
@@ -79,7 +78,7 @@ static ulong i2o_cfg_info_id = 0;
  *	multiplexed by the i2o_core code
  */
 
-struct i2o_driver i2o_config_driver = {
+static struct i2o_driver i2o_config_driver = {
 	.name = "Config-OSM"
 };
 
@@ -1128,6 +1127,8 @@ static int __init i2o_config_init(void)
 {
 	printk(KERN_INFO "I2O configuration manager v 0.04.\n");
 	printk(KERN_INFO "  (C) Copyright 1999 Red Hat Software\n");
+
+	spin_lock_init(&i2o_config_lock);
 
 	if (misc_register(&i2o_miscdev) < 0) {
 		printk(KERN_ERR "i2o_config: can't register device.\n");

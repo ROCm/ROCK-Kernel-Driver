@@ -1,7 +1,7 @@
 /*
  *  Copyright © 2001 Flaga hf. Medical Devices, Kári Davíðsson <kd@flaga.is>
  *
- *  $Id: cfi_flagadm.c,v 1.13 2004/09/16 23:27:12 gleixner Exp $
+ *  $Id: cfi_flagadm.c,v 1.14 2004/11/04 13:24:14 gleixner Exp $
  *  
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -96,7 +96,7 @@ int __init init_flagadm(void)
 			FLASH_SIZE, FLASH_PHYS_ADDR);
 	
 	flagadm_map.phys = FLASH_PHYS_ADDR;
-	flagadm_map.virt = (void __iomem *s)ioremap(FLASH_PHYS_ADDR,
+	flagadm_map.virt = ioremap(FLASH_PHYS_ADDR,
 					FLASH_SIZE);
 
 	if (!flagadm_map.virt) {
