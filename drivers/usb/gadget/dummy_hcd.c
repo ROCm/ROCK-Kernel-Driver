@@ -1160,11 +1160,6 @@ restart:
 			case USB_REQ_SET_ADDRESS:
 				if (setup.bRequestType != Dev_Request)
 					break;
-				if (dum->address != 0) {
-					maybe_set_status (urb, -ETIMEDOUT);
-					urb->actual_length = 0;
-					goto return_urb;
-				}
 				dum->address = setup.wValue;
 				maybe_set_status (urb, 0);
 				dev_dbg (hardware, "set_address = %d\n",
