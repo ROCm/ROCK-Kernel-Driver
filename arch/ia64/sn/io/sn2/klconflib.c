@@ -21,6 +21,7 @@
 #include <asm/sn/module.h>
 #include <asm/sn/router.h>
 #include <asm/sn/xtalk/xbow.h>
+#include <asm/sn/ksys/l1.h>
 
 
 #undef DEBUG_KLGRAPH
