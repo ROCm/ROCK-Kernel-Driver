@@ -807,6 +807,8 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 			}
 			retval = generic_file_direct_IO(READ, iocb,
 					iov, pos, nr_segs);
+			if (retval >= 0 && !is_sync_kiocb(iocb))
+				retval = -EIOCBQUEUED;
 			if (retval > 0)
 				*ppos = pos + retval;
 		}
@@ -1691,6 +1693,8 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 		 */
 		if (written >= 0 && file->f_flags & O_SYNC)
 			status = generic_osync_inode(inode, OSYNC_METADATA);
+		if (written >= 0 && !is_sync_kiocb(iocb))
+			written = -EIOCBQUEUED;
 		goto out_status;
 	}
 
