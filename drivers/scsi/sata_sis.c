@@ -230,7 +230,8 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		probe_ent->host_flags |= SIS_FLAG_CFGSCR;
 	}
 
-	probe_ent->pio_mask = 0x03;
+	probe_ent->pio_mask = 0x1f;
+	probe_ent->mwdma_mask = 0x7;
 	probe_ent->udma_mask = 0x7f;
 	probe_ent->port_ops = &sis_ops;
 
@@ -284,6 +285,6 @@ static void __exit sis_exit(void)
 	pci_unregister_driver(&sis_pci_driver);
 }
 
-
 module_init(sis_init);
 module_exit(sis_exit);
+

@@ -39,6 +39,7 @@ enum {
 	ICH5_PMR		= 0x90, /* port mapping register */
 	ICH5_PCS		= 0x92,	/* port control and status */
 
+	PIIX_FLAG_AHCI		= (1 << 28), /* AHCI possible */
 	PIIX_FLAG_CHECKINTR	= (1 << 29), /* make sure PCI INTx enabled */
 	PIIX_FLAG_COMBINED	= (1 << 30), /* combined mode possible */
 
@@ -58,6 +59,7 @@ enum {
 	ich5_sata		= 1,
 	piix4_pata		= 2,
 	ich6_sata		= 3,
+	ich6_sata_rm		= 4,
 };
 
 static int piix_init_one (struct pci_dev *pdev,
@@ -65,10 +67,8 @@ static int piix_init_one (struct pci_dev *pdev,
 
 static void piix_pata_phy_reset(struct ata_port *ap);
 static void piix_sata_phy_reset(struct ata_port *ap);
-static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio);
-static void piix_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			       unsigned int udma);
+static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev);
+static void piix_set_dmamode (struct ata_port *ap, struct ata_device *adev);
 
 static unsigned int in_module_init = 1;
 
@@ -87,13 +87,9 @@ static struct pci_device_id piix_pci_tbl[] = {
 	{ 0x8086, 0x24df, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_sata },
 	{ 0x8086, 0x25a3, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_sata },
 	{ 0x8086, 0x25b0, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_sata },
-
-	/* ICH6 operates in two modes, "looks-like-ICH5" mode,
-	 * and enhanced mode, with queueing and other fancy stuff.
-	 * This is distinguished by PCI class code.
-	 */
 	{ 0x8086, 0x2651, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich6_sata },
-	{ 0x8086, 0x2652, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich6_sata },
+	{ 0x8086, 0x2652, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich6_sata_rm },
+	{ 0x8086, 0x2653, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich6_sata_rm },
 
 	{ }	/* terminate list */
 };
@@ -126,7 +122,7 @@ static Scsi_Host_Template piix_sht = {
 static struct ata_port_operations piix_pata_ops = {
 	.port_disable		= ata_port_disable,
 	.set_piomode		= piix_set_piomode,
-	.set_udmamode		= piix_set_udmamode,
+	.set_dmamode		= piix_set_dmamode,
 
 	.tf_load		= ata_tf_load_pio,
 	.tf_read		= ata_tf_read_pio,
@@ -151,8 +147,6 @@ static struct ata_port_operations piix_pata_ops = {
 
 static struct ata_port_operations piix_sata_ops = {
 	.port_disable		= ata_port_disable,
-	.set_piomode		= piix_set_piomode,
-	.set_udmamode		= piix_set_udmamode,
 
 	.tf_load		= ata_tf_load_pio,
 	.tf_read		= ata_tf_read_pio,
@@ -181,7 +175,12 @@ static struct ata_port_info piix_port_info[] = {
 		.sht		= &piix_sht,
 		.host_flags	= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST |
 				  PIIX_FLAG_CHECKINTR,
-		.pio_mask	= 0x03,	/* pio3-4 */
+		.pio_mask	= 0x1f,	/* pio0-4 */
+#if 0
+		.mwdma_mask	= 0x06, /* mwdma1-2 */
+#else
+		.mwdma_mask	= 0x00, /* mwdma broken */
+#endif
 		.udma_mask	= ATA_UDMA_MASK_40C, /* FIXME: cbl det */
 		.port_ops	= &piix_pata_ops,
 	},
@@ -191,8 +190,9 @@ static struct ata_port_info piix_port_info[] = {
 		.sht		= &piix_sht,
 		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_SRST |
 				  PIIX_FLAG_COMBINED | PIIX_FLAG_CHECKINTR,
-		.pio_mask	= 0x03,	/* pio3-4 */
-		.udma_mask	= 0x7f,	/* udma0-6 ; FIXME */
+		.pio_mask	= 0x1f,	/* pio0-4 */
+		.mwdma_mask	= 0x07, /* mwdma0-2 */
+		.udma_mask	= 0x7f,	/* udma0-6 */
 		.port_ops	= &piix_sata_ops,
 	},
 
@@ -200,7 +200,12 @@ static struct ata_port_info piix_port_info[] = {
 	{
 		.sht		= &piix_sht,
 		.host_flags	= ATA_FLAG_SLAVE_POSS | ATA_FLAG_SRST,
-		.pio_mask	= 0x03, /* pio3-4 */
+		.pio_mask	= 0x1f,	/* pio0-4 */
+#if 0
+		.mwdma_mask	= 0x06, /* mwdma1-2 */
+#else
+		.mwdma_mask	= 0x00, /* mwdma broken */
+#endif
 		.udma_mask	= ATA_UDMA_MASK_40C, /* FIXME: cbl det */
 		.port_ops	= &piix_pata_ops,
 	},
@@ -211,8 +216,21 @@ static struct ata_port_info piix_port_info[] = {
 		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_SRST |
 				  PIIX_FLAG_COMBINED | PIIX_FLAG_CHECKINTR |
 				  ATA_FLAG_SLAVE_POSS,
-		.pio_mask	= 0x03,	/* pio3-4 */
-		.udma_mask	= 0x7f,	/* udma0-6 ; FIXME */
+		.pio_mask	= 0x1f,	/* pio0-4 */
+		.mwdma_mask	= 0x07, /* mwdma0-2 */
+		.udma_mask	= 0x7f,	/* udma0-6 */
+		.port_ops	= &piix_sata_ops,
+	},
+
+	/* ich6_sata_rm */
+	{
+		.sht		= &piix_sht,
+		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_SRST |
+				  PIIX_FLAG_COMBINED | PIIX_FLAG_CHECKINTR |
+				  ATA_FLAG_SLAVE_POSS | PIIX_FLAG_AHCI,
+		.pio_mask	= 0x1f,	/* pio0-4 */
+		.mwdma_mask	= 0x07, /* mwdma0-2 */
+		.udma_mask	= 0x7f,	/* udma0-6 */
 		.port_ops	= &piix_sata_ops,
 	},
 };
@@ -368,11 +386,11 @@ static void piix_sata_phy_reset(struct ata_port *ap)
  *	None (inherited from caller).
  */
 
-static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio)
+static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev)
 {
+	unsigned int pio	= adev->pio_mode;
 	struct pci_dev *dev	= ap->host_set->pdev;
-	unsigned int is_slave	= (adev->flags & ATA_DFLAG_MASTER) ? 0 : 1;
+	unsigned int is_slave	= (adev->devno != 0);
 	unsigned int master_port= ap->port_no ? 0x42 : 0x40;
 	unsigned int slave_port	= 0x44;
 	u16 master_data;
@@ -409,7 +427,7 @@ static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev,
 }
 
 /**
- *	piix_set_udmamode - Initialize host controller PATA PIO timings
+ *	piix_set_dmamode - Initialize host controller PATA PIO timings
  *	@ap: Port whose timings we are configuring
  *	@adev: um
  *	@udma: udma mode, 0 - 6
@@ -420,9 +438,9 @@ static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev,
  *	None (inherited from caller).
  */
 
-static void piix_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma)
+static void piix_set_dmamode (struct ata_port *ap, struct ata_device *adev)
 {
+	unsigned int udma	= adev->dma_mode; /* FIXME: MWDMA too */
 	struct pci_dev *dev	= ap->host_set->pdev;
 	u8 maslave		= ap->port_no ? 0x42 : 0x40;
 	u8 speed		= udma;
@@ -452,25 +470,38 @@ static void piix_set_udmamode (struct ata_port *ap, struct ata_device *adev,
 		case XFER_UDMA_3:
 		case XFER_UDMA_1:	u_speed = 1 << (drive_dn * 4); break;
 		case XFER_UDMA_0:	u_speed = 0 << (drive_dn * 4); break;
+		case XFER_MW_DMA_2:
+		case XFER_MW_DMA_1:	break;
 		default:
 			BUG();
 			return;
 	}
 
-	if (!(reg48 & u_flag))
-		pci_write_config_byte(dev, 0x48, reg48 | u_flag);
-	if (speed == XFER_UDMA_5) {
-		pci_write_config_byte(dev, 0x55, (u8) reg55|w_flag);
+	if (speed >= XFER_UDMA_0) {
+		if (!(reg48 & u_flag))
+			pci_write_config_byte(dev, 0x48, reg48 | u_flag);
+		if (speed == XFER_UDMA_5) {
+			pci_write_config_byte(dev, 0x55, (u8) reg55|w_flag);
+		} else {
+			pci_write_config_byte(dev, 0x55, (u8) reg55 & ~w_flag);
+		}
+		if ((reg4a & a_speed) != u_speed)
+			pci_write_config_word(dev, 0x4a, (reg4a & ~a_speed) | u_speed);
+		if (speed > XFER_UDMA_2) {
+			if (!(reg54 & v_flag))
+				pci_write_config_byte(dev, 0x54, reg54 | v_flag);
+		} else
+			pci_write_config_byte(dev, 0x54, reg54 & ~v_flag);
 	} else {
-		pci_write_config_byte(dev, 0x55, (u8) reg55 & ~w_flag);
+		if (reg48 & u_flag)
+			pci_write_config_byte(dev, 0x48, reg48 & ~u_flag);
+		if (reg4a & a_speed)
+			pci_write_config_word(dev, 0x4a, reg4a & ~a_speed);
+		if (reg54 & v_flag)
+			pci_write_config_byte(dev, 0x54, reg54 & ~v_flag);
+		if (reg55 & w_flag)
+			pci_write_config_byte(dev, 0x55, (u8) reg55 & ~w_flag);
 	}
-	if ((reg4a & a_speed) != u_speed)
-		pci_write_config_word(dev, 0x4a, (reg4a & ~a_speed) | u_speed);
-	if (speed > XFER_UDMA_2) {
-		if (!(reg54 & v_flag))
-			pci_write_config_byte(dev, 0x54, reg54 | v_flag);
-	} else
-		pci_write_config_byte(dev, 0x54, reg54 & ~v_flag);
 }
 
 /* move to PCI layer, integrate w/ MSI stuff */
@@ -483,6 +514,42 @@ static void pci_enable_intx(struct pci_dev *pdev)
 		pci_command &= ~PCI_COMMAND_INTX_DISABLE;
 		pci_write_config_word(pdev, PCI_COMMAND, pci_command);
 	}
+}
+
+#define AHCI_PCI_BAR 5
+#define AHCI_GLOBAL_CTL 0x04
+#define AHCI_ENABLE (1 << 31)
+static int piix_disable_ahci(struct pci_dev *pdev)
+{
+	void *mmio;
+	unsigned long addr;
+	u32 tmp;
+	int rc = 0;
+
+	/* BUG: pci_enable_device has not yet been called.  This
+	 * works because this device is usually set up by BIOS.
+	 */
+
+	addr = pci_resource_start(pdev, AHCI_PCI_BAR);
+	if (!addr || !pci_resource_len(pdev, AHCI_PCI_BAR))
+		return 0;
+	
+	mmio = ioremap(addr, 64);
+	if (!mmio)
+		return -ENOMEM;
+	
+	tmp = readl(mmio + AHCI_GLOBAL_CTL);
+	if (tmp & AHCI_ENABLE) {
+		tmp &= ~AHCI_ENABLE;
+		writel(tmp, mmio + AHCI_GLOBAL_CTL);
+
+		tmp = readl(mmio + AHCI_GLOBAL_CTL);
+		if (tmp & AHCI_ENABLE)
+			rc = -EIO;
+	}
+	
+	iounmap(mmio);
+	return rc;
 }
 
 /**
@@ -516,6 +583,12 @@ static int piix_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	port_info[0] = &piix_port_info[ent->driver_data];
 	port_info[1] = NULL;
+
+	if (port_info[0]->host_flags & PIIX_FLAG_AHCI) {
+		int rc = piix_disable_ahci(pdev);
+		if (rc)
+			return rc;
+	}
 
 	if (port_info[0]->host_flags & PIIX_FLAG_COMBINED) {
 		u8 tmp;
