@@ -25,6 +25,10 @@
 #define IF_RA_RCVD	0x20
 #define IF_RS_SENT	0x10
 
+/* prefix flags */
+#define IF_PREFIX_ONLINK	0x01
+#define IF_PREFIX_AUTOCONF	0x02
+
 #ifdef __KERNEL__
 
 struct inet6_ifaddr 
