@@ -370,18 +370,18 @@ static int release_aux(struct inode * inode, struct file * file)
 }
 
 static struct file_operations psaux_fops = {
-	read:		read_aux,
-	write:		write_aux,
-	poll:		aux_poll,
-	open:		open_aux,
-	release:	release_aux,
-	fasync:		fasync_aux,
+	.read		= read_aux,
+	.write		= write_aux,
+	.poll		= aux_poll,
+	.open		= open_aux,
+	.release	= release_aux,
+	.fasync		= fasync_aux,
 };
 
 static struct miscdevice psaux_mouse = {
-	minor:		PSMOUSE_MINOR,
-	name:		"psaux",
-	fops:		&psaux_fops,
+	.minor		= PSMOUSE_MINOR,
+	.name		= "psaux",
+	.fops		= &psaux_fops,
 };
 
 #endif /* CONFIG_PSMOUSE */
@@ -452,12 +452,12 @@ static void lasikbd_interrupt(int irq, void *dev, struct pt_regs *regs)
 extern int pckbd_translate(unsigned char, unsigned char *, char);
 
 static struct kbd_ops gsc_ps2_kbd_ops = {
-	translate:	pckbd_translate,
-	init_hw:	lasi_ps2_init_hw,
-	leds:		lasikbd_leds,
+	.translate	= pckbd_translate,
+	.init_hw	= lasi_ps2_init_hw,
+	.leds		= lasikbd_leds,
 #ifdef CONFIG_MAGIC_SYSRQ
-	sysrq_key:	0x54,
-	sysrq_xlate:	hp_ps2kbd_sysrq_xlate,
+	.sysrq_key	= 0x54,
+	.sysrq_xlate	= hp_ps2kbd_sysrq_xlate,
 #endif
 };
 

@@ -540,12 +540,12 @@ static void debug_off(void)
 }
 
 static struct file_operations pcwd_fops = {
-	owner:		THIS_MODULE,
-	read:		pcwd_read,
-	write:		pcwd_write,
-	ioctl:		pcwd_ioctl,
-	open:		pcwd_open,
-	release:	pcwd_close,
+	.owner		= THIS_MODULE,
+	.read		= pcwd_read,
+	.write		= pcwd_write,
+	.ioctl		= pcwd_ioctl,
+	.open		= pcwd_open,
+	.release	= pcwd_close,
 };
 
 static struct miscdevice pcwd_miscdev = {

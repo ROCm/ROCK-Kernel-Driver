@@ -932,10 +932,10 @@ MODULE_DEVICE_TABLE(pci, synclink_pci_tbl);
 MODULE_LICENSE("GPL");
 
 static struct pci_driver synclink_pci_driver = {
-	name:		"synclink",
-	id_table:	synclink_pci_tbl,
-	probe:		synclink_init_one,
-	remove:		__devexit_p(synclink_remove_one),
+	.name		= "synclink",
+	.id_table	= synclink_pci_tbl,
+	.probe		= synclink_init_one,
+	.remove		= __devexit_p(synclink_remove_one),
 };
 
 static struct tty_driver serial_driver, callout_driver;

@@ -25,7 +25,7 @@
  * front fifo request expires.
  */
 static int read_expire = HZ / 2;	/* 500ms start timeout */
-static int fifo_batch = 32;		/* 4 seeks, or 64 contig */
+static int fifo_batch = 16;
 static int seek_cost = 16;		/* seek is 16 times more expensive */
 
 /*
@@ -207,7 +207,7 @@ deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 			break;
 		}
 
-		if (__rq->flags & REQ_BARRIER)
+		if (__rq->flags & (REQ_SOFTBARRIER | REQ_HARDBARRIER))
 			break;
 
 		/*
@@ -413,7 +413,7 @@ deadline_add_request(request_queue_t *q, struct request *rq, struct list_head *i
 	 * flush hash on barrier insert, as not to allow merges before a
 	 * barrier.
 	 */
-	if (unlikely(rq->flags & REQ_BARRIER)) {
+	if (unlikely(rq->flags & REQ_HARDBARRIER)) {
 		DL_INVALIDATE_HASH(dd);
 		q->last_merge = NULL;
 	}

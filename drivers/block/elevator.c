@@ -176,7 +176,9 @@ int elevator_noop_merge(request_queue_t *q, struct list_head **insert,
 	while ((entry = entry->prev) != &q->queue_head) {
 		__rq = list_entry_rq(entry);
 
-		if (__rq->flags & (REQ_BARRIER | REQ_STARTED))
+		if (__rq->flags & (REQ_SOFTBARRIER | REQ_HARDBARRIER))
+			break;
+		else if (__rq->flags & REQ_STARTED)
 			break;
 
 		if (!(__rq->flags & REQ_CMD))
@@ -200,7 +202,7 @@ void elevator_noop_add_request(request_queue_t *q, struct request *rq,
 	/*
 	 * new merges must not precede this barrier
 	 */
-	if (rq->flags & REQ_BARRIER)
+	if (rq->flags & REQ_HARDBARRIER)
 		q->last_merge = NULL;
 	else if (!q->last_merge)
 		q->last_merge = &rq->queuelist;

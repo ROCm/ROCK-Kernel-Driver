@@ -1481,7 +1481,7 @@ nfs4_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 	rpc_init_task(task, NFS_CLIENT(inode), nfs4_commit_done, flags);
 	task->tk_calldata = data;
 	/* Release requests */
-	task->tk_release = nfs_writedata_release;
+	task->tk_release = nfs_commit_release;
 	
 	rpc_call_setup(task, &msg, 0);	
 }

@@ -150,11 +150,11 @@ static int watchdog_ioctl(struct inode *inode, struct file *file,
 
 static struct file_operations watchdog_fops=
 {
-	owner:		THIS_MODULE,
-	write:		watchdog_write,
-	ioctl:		watchdog_ioctl,
-	open:		watchdog_open,
-	release:	watchdog_release,
+	.owner		= THIS_MODULE,
+	.write		= watchdog_write,
+	.ioctl		= watchdog_ioctl,
+	.open		= watchdog_open,
+	.release	= watchdog_release,
 };
 
 static struct miscdevice watchdog_miscdev=

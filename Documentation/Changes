@@ -31,7 +31,7 @@ al español de este documento en varios formatos.
 Eine deutsche Version dieser Datei finden Sie unter
 <http://www.stefan-winter.de/Changes-2.4.0.txt>.
 
-Last updated: October 1st, 2002
+Last updated: October 29th, 2002
 
 Chris Ricker (kaboom@gatech.edu or chris.ricker@genetics.utah.edu).
 
@@ -313,7 +313,7 @@ o  <ftp://rawhide.redhat.com/pub/rawhide/SRPMS/SRPMS/>
 
 E2fsprogs
 ---------
-o  <http://prdownloads.sourceforge.net/e2fsprogs/e2fsprogs-1.25.tar.gz>
+o  <http://prdownloads.sourceforge.net/e2fsprogs/e2fsprogs-1.29.tar.gz>
 
 JFSutils
 --------

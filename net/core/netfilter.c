@@ -138,7 +138,6 @@ void nf_unregister_sockopt(struct nf_sockopt_ops *reg)
 
 #ifdef CONFIG_NETFILTER_DEBUG
 #include <net/ip.h>
-#include <net/route.h>
 #include <net/tcp.h>
 #include <linux/netfilter_ipv4.h>
 

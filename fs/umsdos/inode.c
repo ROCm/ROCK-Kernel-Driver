@@ -108,14 +108,14 @@ void umsdos_set_dirinfo_new (struct dentry *dentry, off_t f_pos)
 }
 
 static struct inode_operations umsdos_file_inode_operations = {
-	truncate:	fat_truncate,
-	setattr:	UMSDOS_notify_change,
+	.truncate	= fat_truncate,
+	.setattr	= UMSDOS_notify_change,
 };
 
 static struct inode_operations umsdos_symlink_inode_operations = {
-	readlink:	page_readlink,
-	follow_link:	page_follow_link,
-	setattr:	UMSDOS_notify_change,
+	.readlink	= page_readlink,
+	.follow_link	= page_follow_link,
+	.setattr	= UMSDOS_notify_change,
 };
 
 /*
@@ -335,12 +335,12 @@ void UMSDOS_write_inode (struct inode *inode, int wait)
 
 static struct super_operations umsdos_sops =
 {
-	write_inode:	UMSDOS_write_inode,
-	put_inode:	UMSDOS_put_inode,
-	delete_inode:	fat_delete_inode,
-	put_super:	UMSDOS_put_super,
-	statfs:		UMSDOS_statfs,
-	clear_inode:	fat_clear_inode,
+	.write_inode	= UMSDOS_write_inode,
+	.put_inode	= UMSDOS_put_inode,
+	.delete_inode	= fat_delete_inode,
+	.put_super	= UMSDOS_put_super,
+	.statfs		= UMSDOS_statfs,
+	.clear_inode	= fat_clear_inode,
 };
 
 int UMSDOS_statfs(struct super_block *sb,struct statfs *buf)

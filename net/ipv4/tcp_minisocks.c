@@ -25,6 +25,7 @@
 #include <linux/sysctl.h>
 #include <net/tcp.h>
 #include <net/inet_common.h>
+#include <net/xfrm.h>
 
 #ifdef CONFIG_SYSCTL
 #define SYNC_INIT 0 /* let the user enable it */
@@ -685,6 +686,13 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		if ((filter = newsk->filter) != NULL)
 			sk_filter_charge(newsk, filter);
 #endif
+		if (unlikely(xfrm_sk_clone_policy(newsk))) {
+			/* It is still raw copy of parent, so invalidate
+			 * destructor and make plain sk_free() */
+			newsk->destruct = NULL;
+			sk_free(newsk);
+			return NULL;
+		}
 
 		/* Now setup tcp_opt */
 		newtp = tcp_sk(newsk);

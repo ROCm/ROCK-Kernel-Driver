@@ -165,7 +165,7 @@ struct nfs_inode {
 	 */
 	struct list_head	dirty;
 	struct list_head	commit;
-	struct list_head	writeback;
+	struct radix_tree_root	nfs_page_tree;
 
 	unsigned int		ndirty,
 				ncommit,
@@ -319,6 +319,7 @@ extern void nfs_complete_unlink(struct dentry *);
  * linux/fs/nfs/write.c
  */
 extern int  nfs_writepage(struct page *);
+extern int  nfs_writepages(struct address_space *, struct writeback_control *);
 extern int  nfs_flush_incompatible(struct file *file, struct page *page);
 extern int  nfs_updatepage(struct file *, struct page *, unsigned int, unsigned int);
 extern void nfs_writeback_done(struct rpc_task *task, int stable,
@@ -326,6 +327,7 @@ extern void nfs_writeback_done(struct rpc_task *task, int stable,
 extern void nfs_writedata_release(struct rpc_task *task);
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
+extern void nfs_commit_release(struct rpc_task *task);
 extern void nfs_commit_done(struct rpc_task *);
 #endif
 
@@ -343,12 +345,19 @@ extern int  nfs_commit_file(struct inode *, struct file *, unsigned long, unsign
 extern int  nfs_commit_list(struct list_head *, int);
 extern int  nfs_scan_lru_commit(struct nfs_server *, struct list_head *);
 extern int  nfs_scan_lru_commit_timeout(struct nfs_server *, struct list_head *);
+#else
+static inline int
+nfs_commit_file(struct inode *inode, struct file *file, unsigned long offset,
+		unsigned int len, int flags)
+{
+	return 0;
+}
 #endif
 
 static inline int
 nfs_have_writebacks(struct inode *inode)
 {
-	return !list_empty(&NFS_I(inode)->writeback);
+	return NFS_I(inode)->npages != 0;
 }
 
 static inline int

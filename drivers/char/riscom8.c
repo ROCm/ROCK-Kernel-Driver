@@ -102,16 +102,16 @@ static unsigned long baud_table[] =  {
 
 static struct riscom_board rc_board[RC_NBOARD] =  {
 	{
-		base:	RC_IOBASE1,
+		.base	= RC_IOBASE1,
 	},
 	{
-		base:	RC_IOBASE2,
+		.base	= RC_IOBASE2,
 	},
 	{
-		base:	RC_IOBASE3,
+		.base	= RC_IOBASE3,
 	},
 	{
-		base:	RC_IOBASE4,
+		.base	= RC_IOBASE4,
 	},
 };
 

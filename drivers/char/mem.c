@@ -49,7 +49,7 @@ static ssize_t do_write_mem(struct file * file, void *p, unsigned long realp,
 	ssize_t written;
 
 	written = 0;
-#if defined(__sparc__) || defined(__mc68000__)
+#if defined(__sparc__) || (defined(__mc68000__) && defined(CONFIG_MMU))
 	/* we don't have page 0 mapped on sparc and m68k.. */
 	if (realp < PAGE_SIZE) {
 		unsigned long sz = PAGE_SIZE-realp;
@@ -86,7 +86,7 @@ static ssize_t read_mem(struct file * file, char * buf,
 	if (count > end_mem - p)
 		count = end_mem - p;
 	read = 0;
-#if defined(__sparc__) || defined(__mc68000__)
+#if defined(__sparc__) || (defined(__mc68000__) && defined(CONFIG_MMU))
 	/* we don't have page 0 mapped on sparc and m68k.. */
 	if (p < PAGE_SIZE) {
 		unsigned long sz = PAGE_SIZE-p;
@@ -229,7 +229,7 @@ static ssize_t read_kmem(struct file *file, char *buf,
 		if (count > (unsigned long) high_memory - p)
 			read = (unsigned long) high_memory - p;
 
-#if defined(__sparc__) || defined(__mc68000__)
+#if defined(__sparc__) || (defined(__mc68000__) && defined(CONFIG_MMU))
 		/* we don't have page 0 mapped on sparc and m68k.. */
 		if (p < PAGE_SIZE && read > 0) {
 			size_t tmp = PAGE_SIZE - p;
@@ -537,47 +537,47 @@ static int open_port(struct inode * inode, struct file * filp)
 #define open_kmem	open_mem
 
 static struct file_operations mem_fops = {
-	llseek:		memory_lseek,
-	read:		read_mem,
-	write:		write_mem,
-	mmap:		mmap_mem,
-	open:		open_mem,
+	.llseek		= memory_lseek,
+	.read		= read_mem,
+	.write		= write_mem,
+	.mmap		= mmap_mem,
+	.open		= open_mem,
 };
 
 static struct file_operations kmem_fops = {
-	llseek:		memory_lseek,
-	read:		read_kmem,
-	write:		write_kmem,
-	mmap:		mmap_kmem,
-	open:		open_kmem,
+	.llseek		= memory_lseek,
+	.read		= read_kmem,
+	.write		= write_kmem,
+	.mmap		= mmap_kmem,
+	.open		= open_kmem,
 };
 
 static struct file_operations null_fops = {
-	llseek:		null_lseek,
-	read:		read_null,
-	write:		write_null,
+	.llseek		= null_lseek,
+	.read		= read_null,
+	.write		= write_null,
 };
 
 #if defined(CONFIG_ISA) || !defined(__mc68000__)
 static struct file_operations port_fops = {
-	llseek:		memory_lseek,
-	read:		read_port,
-	write:		write_port,
-	open:		open_port,
+	.llseek		= memory_lseek,
+	.read		= read_port,
+	.write		= write_port,
+	.open		= open_port,
 };
 #endif
 
 static struct file_operations zero_fops = {
-	llseek:		zero_lseek,
-	read:		read_zero,
-	write:		write_zero,
-	mmap:		mmap_zero,
+	.llseek		= zero_lseek,
+	.read		= read_zero,
+	.write		= write_zero,
+	.mmap		= mmap_zero,
 };
 
 static struct file_operations full_fops = {
-	llseek:		full_lseek,
-	read:		read_full,
-	write:		write_full,
+	.llseek		= full_lseek,
+	.read		= read_full,
+	.write		= write_full,
 };
 
 static int memory_open(struct inode * inode, struct file * filp)
@@ -647,7 +647,7 @@ void __init memory_devfs_register (void)
 }
 
 static struct file_operations memory_fops = {
-	open:		memory_open,	/* just a selector for the real open */
+	.open		= memory_open,	/* just a selector for the real open */
 };
 
 int __init chr_dev_init(void)

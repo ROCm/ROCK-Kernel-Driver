@@ -438,13 +438,13 @@ static int wdt_notify_sys(struct notifier_block *this, unsigned long code,
  
  
 static struct file_operations wdt_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		wdt_read,
-	write:		wdt_write,
-	ioctl:		wdt_ioctl,
-	open:		wdt_open,
-	release:	wdt_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= wdt_read,
+	.write		= wdt_write,
+	.ioctl		= wdt_ioctl,
+	.open		= wdt_open,
+	.release	= wdt_release,
 };
 
 static struct miscdevice wdt_miscdev=

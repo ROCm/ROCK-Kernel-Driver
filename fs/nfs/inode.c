@@ -106,7 +106,7 @@ nfs_write_inode(struct inode *inode, int sync)
 {
 	int flags = sync ? FLUSH_WAIT : 0;
 
-	nfs_sync_file(inode, NULL, 0, 0, flags);
+	nfs_commit_file(inode, NULL, 0, 0, flags);
 }
 
 static void
@@ -327,6 +327,7 @@ int nfs_sb_init(struct super_block *sb)
 		server->acdirmin = server->acdirmax = 0;
 		sb->s_flags |= MS_SYNCHRONOUS;
 	}
+	server->backing_dev_info.ra_pages = server->rpages << 2;
 
 	sb->s_maxbytes = fsinfo.maxfilesize;
 	if (sb->s_maxbytes > MAX_LFS_FILESIZE) 
@@ -696,6 +697,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		if (S_ISREG(inode->i_mode)) {
 			inode->i_fop = &nfs_file_operations;
 			inode->i_data.a_ops = &nfs_file_aops;
+			inode->i_data.backing_dev_info = &NFS_SB(sb)->backing_dev_info;
 		} else if (S_ISDIR(inode->i_mode)) {
 			inode->i_op = &nfs_dir_inode_operations;
 			inode->i_fop = &nfs_dir_operations;
@@ -1557,7 +1559,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		inode_init_once(&nfsi->vfs_inode);
 		INIT_LIST_HEAD(&nfsi->dirty);
 		INIT_LIST_HEAD(&nfsi->commit);
-		INIT_LIST_HEAD(&nfsi->writeback);
+		INIT_RADIX_TREE(&nfsi->nfs_page_tree, GFP_ATOMIC);
 		nfsi->ndirty = 0;
 		nfsi->ncommit = 0;
 		nfsi->npages = 0;

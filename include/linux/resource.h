@@ -50,6 +50,12 @@ struct rlimit {
 #define	PRIO_USER	2
 
 /*
+ * Limit the stack by to some sane default: root can always
+ * increase this limit if needed..  8MB seems reasonable.
+ */
+#define _STK_LIM	(8*1024*1024)
+
+/*
  * Due to binary compatibility, the actual resource numbers
  * may be different for different linux versions..
  */

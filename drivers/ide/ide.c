@@ -2621,7 +2621,8 @@ static int __init match_parm (char *s, const char *keywords[], int vals[], int m
  *				Not fully supported by all chipset types,
  *				and quite likely to cause trouble with
  *				older/odd IDE drives.
- *
+ * "hdx=biostimings"	: driver will NOT attempt to tune interface speed 
+ * 				(DMA/PIO) but always honour BIOS timings.
  * "hdx=slow"		: insert a huge pause after each access to the data
  *				port. Should be used only as a last resort.
  *
@@ -2658,6 +2659,8 @@ static int __init match_parm (char *s, const char *keywords[], int vals[], int m
  * "idex=noautotune"	: driver will NOT attempt to tune interface speed
  *				This is the default for most chipsets,
  *				except the cmd640.
+ * "idex=biostimings"	: driver will NOT attempt to tune interface speed 
+ * 				(DMA/PIO) but always honour BIOS timings.
  * "idex=serialize"	: do not overlap operations on idex and ide(x^1)
  * "idex=four"		: four drives on idex and ide(x^1) share same ports
  * "idex=reset"		: reset interface before first use
@@ -2733,7 +2736,8 @@ int __init ide_setup (char *s)
 		const char *hd_words[] = {"none", "noprobe", "nowerr", "cdrom",
 				"serialize", "autotune", "noautotune",
 				"slow", "swapdata", "bswap", "flash",
-				"remap", "noremap", "scsi", NULL};
+				"remap", "noremap", "scsi", "biostimings",
+				NULL};
 		unit = s[2] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
@@ -2775,10 +2779,10 @@ int __init ide_setup (char *s)
 				printk(" -- USE \"ide%d=serialize\" INSTEAD", hw);
 				goto do_serialize;
 			case -6: /* "autotune" */
-				drive->autotune = 1;
+				drive->autotune = IDE_TUNE_AUTO;
 				goto done;
 			case -7: /* "noautotune" */
-				drive->autotune = 2;
+				drive->autotune = IDE_TUNE_NOAUTO;
 				goto done;
 			case -8: /* "slow" */
 				drive->slow = 1;
@@ -2804,6 +2808,9 @@ int __init ide_setup (char *s)
 				drive->scsi = 0;
 				goto bad_option;
 #endif /* defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI) */
+			case -15: /* "biostimings" */
+				drive->autotune = IDE_TUNE_BIOS;
+				goto done;
 			case 3: /* cyl,head,sect */
 				drive->media	= ide_disk;
 				drive->cyl	= drive->bios_cyl  = vals[0];
@@ -2841,9 +2848,10 @@ int __init ide_setup (char *s)
 		 * -8,-9,-10 : are reserved for future idex calls to ease the hardcoding.
 		 */
 		const char *ide_words[] = {
-			"noprobe", "serialize", "autotune", "noautotune", "reset", "dma", "ata66",
-			"minus8", "minus9", "minus10",
-			"four", "qd65xx", "ht6560b", "cmd640_vlb", "dtc2278", "umc8672", "ali14xx", "dc4030", NULL };
+			"noprobe", "serialize", "autotune", "noautotune", 
+			"reset", "dma", "ata66", "minus8", "minus9", "minus10",
+			"four", "qd65xx", "ht6560b", "cmd640_vlb", "dtc2278", 
+			"umc8672", "ali14xx", "dc4030", "biostimings", NULL };
 		hw = s[3] - '0';
 		hwif = &ide_hwifs[hw];
 		i = match_parm(&s[4], ide_words, vals, 3);
@@ -2862,6 +2870,10 @@ int __init ide_setup (char *s)
 		}
 
 		switch (i) {
+			case -19: /* "biostimings" */
+				hwif->drives[0].autotune = IDE_TUNE_BIOS;
+				hwif->drives[1].autotune = IDE_TUNE_BIOS;
+				goto done;
 #ifdef CONFIG_BLK_DEV_PDC4030
 			case -18: /* "dc4030" */
 			{
@@ -2949,12 +2961,12 @@ int __init ide_setup (char *s)
 				hwif->reset = 1;
 				goto done;
 			case -4: /* "noautotune" */
-				hwif->drives[0].autotune = 2;
-				hwif->drives[1].autotune = 2;
+				hwif->drives[0].autotune = IDE_TUNE_NOAUTO;
+				hwif->drives[1].autotune = IDE_TUNE_NOAUTO;
 				goto done;
 			case -3: /* "autotune" */
-				hwif->drives[0].autotune = 1;
-				hwif->drives[1].autotune = 1;
+				hwif->drives[0].autotune = IDE_TUNE_AUTO;
+				hwif->drives[1].autotune = IDE_TUNE_AUTO;
 				goto done;
 			case -2: /* "serialize" */
 			do_serialize:
@@ -3211,7 +3223,8 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 	spin_lock(&drives_lock);
 	list_add(&drive->list, &driver->drives);
 	spin_unlock(&drives_lock);
-	if (drive->autotune != 2) {
+	if ((drive->autotune == IDE_TUNE_DEFAULT) ||
+		(drive->autotune == IDE_TUNE_AUTO)) {
 		/* DMA timings and setup moved to ide-probe.c */
 		if (!driver->supports_dma && HWIF(drive)->ide_dma_off_quietly)
 //			HWIF(drive)->ide_dma_off_quietly(drive);

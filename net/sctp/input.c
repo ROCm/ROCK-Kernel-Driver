@@ -41,6 +41,7 @@
  *    Jon Grimm <jgrimm@us.ibm.com>
  *    Hui Huang <hui.huang@nokia.com>
  *    Daisy Chang <daisyc@us.ibm.com>
+ *    Sridhar Samudrala <sri@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -217,8 +218,8 @@ int sctp_rcv(struct sk_buff *skb)
 	/* Remember the SCTP header. */
 	chunk->sctp_hdr = sh;
 
-	/* Set the source address.  */
-	sctp_init_source(chunk);
+	/* Set the source and destination addresses of the incoming chunk.  */
+	sctp_init_addrs(chunk);
 
 	/* Remember where we came from.  */
 	chunk->transport = transport;

@@ -24,6 +24,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/pagemap.h>
+#include <linux/mempool.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_page.h>
@@ -37,11 +38,14 @@
 static int nfs_pagein_one(struct list_head *, struct inode *);
 
 static kmem_cache_t *nfs_rdata_cachep;
+static mempool_t *nfs_rdata_mempool;
+
+#define MIN_POOL_READ	(32)
 
 static __inline__ struct nfs_read_data *nfs_readdata_alloc(void)
 {
 	struct nfs_read_data   *p;
-	p = kmem_cache_alloc(nfs_rdata_cachep, SLAB_NOFS);
+	p = (struct nfs_read_data *)mempool_alloc(nfs_rdata_mempool, SLAB_NOFS);
 	if (p) {
 		memset(p, 0, sizeof(*p));
 		INIT_LIST_HEAD(&p->pages);
@@ -51,7 +55,7 @@ static __inline__ struct nfs_read_data *nfs_readdata_alloc(void)
 
 static __inline__ void nfs_readdata_free(struct nfs_read_data *p)
 {
-	kmem_cache_free(nfs_rdata_cachep, p);
+	mempool_free(p, nfs_rdata_mempool);
 }
 
 void nfs_readdata_release(struct rpc_task *task)
@@ -417,11 +421,19 @@ int nfs_init_readpagecache(void)
 	if (nfs_rdata_cachep == NULL)
 		return -ENOMEM;
 
+	nfs_rdata_mempool = mempool_create(MIN_POOL_READ,
+					   mempool_alloc_slab,
+					   mempool_free_slab,
+					   nfs_rdata_cachep);
+	if (nfs_rdata_mempool == NULL)
+		return -ENOMEM;
+
 	return 0;
 }
 
 void nfs_destroy_readpagecache(void)
 {
+	mempool_destroy(nfs_rdata_mempool);
 	if (kmem_cache_destroy(nfs_rdata_cachep))
 		printk(KERN_INFO "nfs_read_data: not all structures were freed\n");
 }

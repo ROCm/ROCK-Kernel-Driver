@@ -245,6 +245,7 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	int err = 0;
 	int padding;		/* How much padding do we need?  */
 	__u8 packet_has_data = 0;
+	struct dst_entry *dst;
 
 	/* Do NOT generate a chunkless packet... */
 	if (skb_queue_empty(&packet->chunks))
@@ -410,13 +411,6 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 		asoc->peer.last_sent_to = transport;
 	}
 
-	/* Hey, before Linux changes, here's what we have to
-	 * do to force IP routing to recognize the change of
-	 * dest addr.				--xguo
-	 */
-	if (sk->dst_cache)
-		sk->dst_cache->obsolete = 1;
-
 	if (packet_has_data) {
 		struct timer_list *timer;
 		unsigned long timeout;
@@ -433,6 +427,13 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 				sctp_association_hold(asoc);
 		}
 	}
+
+	dst = transport->dst;
+	if (!dst || dst->obsolete) {
+		sctp_transport_route(transport, NULL);
+	}
+
+	nskb->dst = dst_clone(transport->dst);
 
 	SCTP_DEBUG_PRINTK("***sctp_transmit_packet*** skb length %d\n",
 			  nskb->len);

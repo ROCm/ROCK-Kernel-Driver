@@ -2,16 +2,11 @@
 #include <linux/pfkeyv2.h>
 #include <linux/ipsec.h>
 
-/* Each xfrm_state is linked to three tables:
+/* Each xfrm_state may be linked to two tables:
 
    1. Hash table by (spi,daddr,ah/esp) to find SA by SPI. (input,ctl)
    2. Hash table by daddr to find what SAs exist for given
       destination/tunnel endpoint. (output)
-   3. (optional, NI) Radix tree by _selector_ for the case,
-      when we have to find a tunnel mode SA appropriate for given flow,
-      but do not know tunnel endpoint. At the moment we do
-      not support this and assume that tunnel endpoint is given
-      by policy. (output)
  */
 
 static spinlock_t xfrm_state_lock = SPIN_LOCK_UNLOCKED;
@@ -29,6 +24,82 @@ static struct list_head xfrm_state_byspi[XFRM_DST_HSIZE];
 
 wait_queue_head_t *km_waitq;
 
+#define ACQ_EXPIRES 30
+
+static void __xfrm_state_delete(struct xfrm_state *x);
+
+unsigned long make_jiffies(long secs)
+{
+	if (secs >= (MAX_SCHEDULE_TIMEOUT-1)/HZ)
+		return MAX_SCHEDULE_TIMEOUT-1;
+	else
+	        return secs*HZ;
+}
+
+static void xfrm_timer_handler(unsigned long data)
+{
+	struct xfrm_state *x = (struct xfrm_state*)data;
+	unsigned long now = (unsigned long)xtime.tv_sec;
+	long next = LONG_MAX;
+	int warn = 0;
+
+	spin_lock(&x->lock);
+	if (x->km.state == XFRM_STATE_DEAD)
+		goto out;
+	if (x->km.state == XFRM_STATE_EXPIRED)
+		goto expired;
+	if (x->lft.hard_add_expires_seconds) {
+		long tmo = x->lft.hard_add_expires_seconds +
+			x->curlft.add_time - now;
+		if (tmo <= 0)
+			goto expired;
+		if (tmo < next)
+			next = tmo;
+	}
+	if (x->lft.hard_use_expires_seconds && x->curlft.use_time) {
+		long tmo = x->lft.hard_use_expires_seconds +
+			x->curlft.use_time - now;
+		if (tmo <= 0)
+			goto expired;
+		if (tmo < next)
+			next = tmo;
+	}
+	if (x->km.dying)
+		goto resched;
+	if (x->lft.soft_add_expires_seconds) {
+		long tmo = x->lft.soft_add_expires_seconds +
+			x->curlft.add_time - now;
+		if (tmo <= 0)
+			warn = 1;
+		else if (tmo < next)
+			next = tmo;
+	}
+	if (x->lft.soft_use_expires_seconds && x->curlft.use_time) {
+		long tmo = x->lft.soft_use_expires_seconds +
+			x->curlft.use_time - now;
+		if (tmo <= 0)
+			warn = 1;
+		else if (tmo < next)
+			next = tmo;
+	}
+
+	if (warn)
+		km_warn_expired(x);
+resched:
+	if (next != LONG_MAX &&
+	    !mod_timer(&x->timer, jiffies + make_jiffies(next)))
+		atomic_inc(&x->refcnt);
+	goto out;
+
+expired:
+	km_expired(x);
+	__xfrm_state_delete(x);
+
+out:
+	spin_unlock(&x->lock);
+	xfrm_state_put(x);
+}
+
 struct xfrm_state *xfrm_state_alloc(void)
 {
 	struct xfrm_state *x;
@@ -40,6 +111,14 @@ struct xfrm_state *xfrm_state_alloc(void)
 		atomic_set(&x->refcnt, 1);
 		INIT_LIST_HEAD(&x->bydst);
 		INIT_LIST_HEAD(&x->byspi);
+		init_timer(&x->timer);
+		x->timer.function = xfrm_timer_handler;
+		x->timer.data	  = (unsigned long)x;
+		x->curlft.add_time = (unsigned long)xtime.tv_sec;
+		x->lft.soft_byte_limit = XFRM_INF;
+		x->lft.soft_packet_limit = XFRM_INF;
+		x->lft.hard_byte_limit = XFRM_INF;
+		x->lft.hard_packet_limit = XFRM_INF;
 		x->lock = SPIN_LOCK_UNLOCKED;
 	}
 	return x;
@@ -48,6 +127,8 @@ struct xfrm_state *xfrm_state_alloc(void)
 void __xfrm_state_destroy(struct xfrm_state *x)
 {
 	BUG_TRAP(x->km.state == XFRM_STATE_DEAD);
+	if (del_timer(&x->timer))
+		BUG();
 	if (x->aalg)
 		kfree(x->aalg);
 	if (x->ealg)
@@ -59,11 +140,10 @@ void __xfrm_state_destroy(struct xfrm_state *x)
 	kfree(x);
 }
 
-void xfrm_state_delete(struct xfrm_state *x)
+static void __xfrm_state_delete(struct xfrm_state *x)
 {
 	int kill = 0;
 
-	spin_lock_bh(&x->lock);
 	if (x->km.state != XFRM_STATE_DEAD) {
 		x->km.state = XFRM_STATE_DEAD;
 		kill = 1;
@@ -75,12 +155,22 @@ void xfrm_state_delete(struct xfrm_state *x)
 			atomic_dec(&x->refcnt);
 		}
 		spin_unlock(&xfrm_state_lock);
+		if (del_timer(&x->timer))
+			atomic_dec(&x->refcnt);
+		if (atomic_read(&x->refcnt) != 1)
+			xfrm_flush_bundles(x);
 	}
-	spin_unlock_bh(&x->lock);
 
 	if (kill && x->type)
 		x->type->destructor(x);
 	wake_up(km_waitq);
+}
+
+void xfrm_state_delete(struct xfrm_state *x)
+{
+	spin_lock_bh(&x->lock);
+	__xfrm_state_delete(x);
+	spin_unlock_bh(&x->lock);
 }
 
 void xfrm_state_flush(u8 proto)
@@ -109,18 +199,21 @@ restart:
 }
 
 struct xfrm_state *
-xfrm_state_find(u32 daddr, struct flowi *fl, struct xfrm_tmpl *tmpl, struct xfrm_policy *pol)
+xfrm_state_find(u32 daddr, u32 saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
+		struct xfrm_policy *pol, int *err)
 {
 	unsigned h = ntohl(daddr);
 	struct xfrm_state *x;
 	int acquire_in_progress = 0;
 	int error = 0;
+	struct xfrm_state *best = NULL;
 
 	h = (h ^ (h>>16)) % XFRM_DST_HSIZE;
 
 	spin_lock_bh(&xfrm_state_lock);
 	list_for_each_entry(x, xfrm_state_bydst+h, bydst) {
 		if (daddr == x->id.daddr.xfrm4_addr &&
+		    (saddr == x->props.saddr.xfrm4_addr || !saddr || !x->props.saddr.xfrm4_addr) &&
 		    tmpl->mode == x->props.mode &&
 		    tmpl->id.proto == x->id.proto) {
 			/* Resolution logic:
@@ -139,9 +232,11 @@ xfrm_state_find(u32 daddr, struct flowi *fl, struct xfrm_tmpl *tmpl, struct xfrm
 			if (x->km.state == XFRM_STATE_VALID) {
 				if (!xfrm4_selector_match(&x->sel, fl))
 					continue;
-				atomic_inc(&x->refcnt);
-				spin_unlock_bh(&xfrm_state_lock);
-				return x;
+				if (!best ||
+				    best->km.dying > x->km.dying ||
+				    (best->km.dying == x->km.dying &&
+				     best->curlft.add_time < x->curlft.add_time))
+					best = x;
 			} else if (x->km.state == XFRM_STATE_ACQ) {
 				acquire_in_progress = 1;
 			} else if (x->km.state == XFRM_STATE_ERROR ||
@@ -150,6 +245,12 @@ xfrm_state_find(u32 daddr, struct flowi *fl, struct xfrm_tmpl *tmpl, struct xfrm
 					error = 1;
 			}
 		}
+	}
+
+	if (best) {
+		atomic_inc(&best->refcnt);
+		spin_unlock_bh(&xfrm_state_lock);
+		return best;
 	}
 
 	x = NULL;
@@ -172,10 +273,10 @@ xfrm_state_find(u32 daddr, struct flowi *fl, struct xfrm_tmpl *tmpl, struct xfrm
 		x->sel.ifindex = fl->oif;
 		x->id = tmpl->id;
 		if (x->id.daddr.xfrm4_addr == 0)
-			x->id.daddr = x->sel.daddr;
+			x->id.daddr.xfrm4_addr = daddr;
 		x->props.saddr = tmpl->saddr;
 		if (x->props.saddr.xfrm4_addr == 0)
-			x->props.saddr = x->sel.saddr;
+			x->props.saddr.xfrm4_addr = saddr;
 		x->props.mode = tmpl->mode;
 
 		if (km_query(x, tmpl, pol) == 0) {
@@ -188,6 +289,9 @@ xfrm_state_find(u32 daddr, struct flowi *fl, struct xfrm_tmpl *tmpl, struct xfrm
 				list_add(&x->byspi, xfrm_state_byspi+h);
 				atomic_inc(&x->refcnt);
 			}
+			x->lft.hard_add_expires_seconds = ACQ_EXPIRES;
+			atomic_inc(&x->refcnt);
+			mod_timer(&x->timer, ACQ_EXPIRES*HZ);
 		} else {
 			x->km.state = XFRM_STATE_DEAD;
 			xfrm_state_put(x);
@@ -195,6 +299,8 @@ xfrm_state_find(u32 daddr, struct flowi *fl, struct xfrm_tmpl *tmpl, struct xfrm
 		}
 	}
 	spin_unlock_bh(&xfrm_state_lock);
+	if (!x)
+		*err = acquire_in_progress ? -EAGAIN : -ENOMEM;
 	return x;
 }
 
@@ -213,26 +319,33 @@ void xfrm_state_insert(struct xfrm_state *x)
 	list_add(&x->byspi, xfrm_state_byspi+h);
 	atomic_inc(&x->refcnt);
 
+	if (!mod_timer(&x->timer, jiffies + HZ))
+		atomic_inc(&x->refcnt);
+
 	spin_unlock_bh(&xfrm_state_lock);
 	wake_up(km_waitq);
 }
 
 int xfrm_state_check_expire(struct xfrm_state *x)
 {
+	if (!x->curlft.use_time)
+		x->curlft.use_time = (unsigned long)xtime.tv_sec;
+
 	if (x->km.state != XFRM_STATE_VALID)
 		return -EINVAL;
 
-	if (x->lft.hard_byte_limit &&
-	    x->curlft.bytes >= x->lft.hard_byte_limit) {
+	if (x->curlft.bytes >= x->lft.hard_byte_limit ||
+	    x->curlft.packets >= x->lft.hard_packet_limit) {
 		km_expired(x);
+		if (!mod_timer(&x->timer, jiffies + ACQ_EXPIRES*HZ))
+			atomic_inc(&x->refcnt);
 		return -EINVAL;
 	}
 
-	if (x->km.warn_bytes &&
-	    x->curlft.bytes >= x->km.warn_bytes) {
-		x->km.warn_bytes = 0;
+	if (!x->km.dying &&
+	    (x->curlft.bytes >= x->lft.soft_byte_limit ||
+	     x->curlft.packets >= x->lft.soft_packet_limit))
 		km_warn_expired(x);
-	}
 	return 0;
 }
 
@@ -309,6 +422,9 @@ xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr)
 		x0->id.proto = proto;
 		x0->props.mode = mode;
 		x0->props.reqid = reqid;
+		x0->lft.hard_add_expires_seconds = ACQ_EXPIRES;
+		atomic_inc(&x0->refcnt);
+		mod_timer(&x0->timer, jiffies + ACQ_EXPIRES*HZ);
 		atomic_inc(&x0->refcnt);
 		list_add_tail(&x0->bydst, xfrm_state_bydst+h);
 		wake_up(km_waitq);
@@ -476,6 +592,7 @@ void km_warn_expired(struct xfrm_state *x)
 {
 	struct xfrm_mgr *km;
 
+	x->km.dying = 1;
 	read_lock(&xfrm_km_lock);
 	list_for_each_entry(km, &xfrm_km_list, list)
 		km->notify(x, 0);

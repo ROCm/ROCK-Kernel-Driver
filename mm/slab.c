@@ -2285,3 +2285,20 @@ ssize_t slabinfo_write(struct file *file, const char *buffer,
 	return res;
 }
 #endif
+
+unsigned int ksize(const void *objp)
+{
+	kmem_cache_t *c;
+	unsigned long flags;
+	unsigned int size = 0;
+
+	if (likely(objp)) {
+		local_irq_save(flags);
+		c = GET_PAGE_CACHE(virt_to_page(objp));
+		size = kmem_cache_size(c);
+		local_irq_restore(flags);
+	}
+
+	return size;
+}
+

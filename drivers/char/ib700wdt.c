@@ -239,12 +239,12 @@ ibwdt_notify_sys(struct notifier_block *this, unsigned long code,
  */
 
 static struct file_operations ibwdt_fops = {
-	owner:		THIS_MODULE,
-	read:		ibwdt_read,
-	write:		ibwdt_write,
-	ioctl:		ibwdt_ioctl,
-	open:		ibwdt_open,
-	release:	ibwdt_close,
+	.owner		= THIS_MODULE,
+	.read		= ibwdt_read,
+	.write		= ibwdt_write,
+	.ioctl		= ibwdt_ioctl,
+	.open		= ibwdt_open,
+	.release	= ibwdt_close,
 };
 
 static struct miscdevice ibwdt_miscdev = {

@@ -231,18 +231,18 @@ out:
  */
 struct file_operations umsdos_rdir_operations =
 {
-	read:		generic_read_dir,
-	readdir:	UMSDOS_rreaddir,
-	ioctl:		UMSDOS_ioctl_dir,
+	.read		= generic_read_dir,
+	.readdir	= UMSDOS_rreaddir,
+	.ioctl		= UMSDOS_ioctl_dir,
 };
 
 struct inode_operations umsdos_rdir_inode_operations =
 {
-	create:		msdos_create,
-	lookup:		UMSDOS_rlookup,
-	unlink:		msdos_unlink,
-	mkdir:		msdos_mkdir,
-	rmdir:		UMSDOS_rrmdir,
-	rename:		msdos_rename,
-	setattr:	UMSDOS_notify_change,
+	.create		= msdos_create,
+	.lookup		= UMSDOS_rlookup,
+	.unlink		= msdos_unlink,
+	.mkdir		= msdos_mkdir,
+	.rmdir		= UMSDOS_rrmdir,
+	.rename		= msdos_rename,
+	.setattr	= UMSDOS_notify_change,
 };

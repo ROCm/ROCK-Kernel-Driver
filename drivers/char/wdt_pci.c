@@ -472,13 +472,13 @@ static int wdtpci_notify_sys(struct notifier_block *this, unsigned long code,
  
  
 static struct file_operations wdtpci_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		wdtpci_read,
-	write:		wdtpci_write,
-	ioctl:		wdtpci_ioctl,
-	open:		wdtpci_open,
-	release:	wdtpci_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= wdtpci_read,
+	.write		= wdtpci_write,
+	.ioctl		= wdtpci_ioctl,
+	.open		= wdtpci_open,
+	.release	= wdtpci_release,
 };
 
 static struct miscdevice wdtpci_miscdev=
@@ -601,10 +601,10 @@ MODULE_DEVICE_TABLE(pci, wdtpci_pci_tbl);
 
 
 static struct pci_driver wdtpci_driver = {
-	name:		"wdt-pci",
-	id_table:	wdtpci_pci_tbl,
-	probe:		wdtpci_init_one,
-	remove:		__devexit_p(wdtpci_remove_one),
+	.name		= "wdt-pci",
+	.id_table	= wdtpci_pci_tbl,
+	.probe		= wdtpci_init_one,
+	.remove		= __devexit_p(wdtpci_remove_one),
 };
 
 

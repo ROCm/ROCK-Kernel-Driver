@@ -1,5 +1,5 @@
 /*
- *  $Id: speedstep.c,v 1.53 2002/09/29 23:43:11 db Exp $
+ *  $Id: speedstep.c,v 1.57 2002/11/05 12:01:12 db Exp $
  *
  * (C) 2001  Dave Jones, Arjan van de ven.
  * (C) 2002  Dominik Brodowski <linux@brodo.de>
@@ -46,7 +46,8 @@ static struct pci_dev                   *speedstep_chipset_dev;
 
 /* speedstep_processor
  */
-static unsigned int                     speedstep_processor;
+static unsigned int                     speedstep_processor = 0;
+static int                              speedstep_coppermine = 0;
 
 #define SPEEDSTEP_PROCESSOR_PIII_C      0x00000001  /* Coppermine core */
 #define SPEEDSTEP_PROCESSOR_PIII_T      0x00000002  /* Tualatin core */
@@ -72,7 +73,7 @@ static unsigned int                     speedstep_high_freq;
 #ifdef SPEEDSTEP_DEBUG
 #define dprintk(msg...) printk(msg)
 #else
-#define dprintk(msg...) do { } while(0);
+#define dprintk(msg...) do { } while(0)
 #endif
 
 
@@ -429,7 +430,7 @@ static unsigned int pentium4_get_frequency(void)
 /** 
  * speedstep_detect_processor - detect Intel SpeedStep-capable processors.
  *
- *   Returns the SPEEDSTEP_PROCESSOR_-number for the detected chipset, 
+ *   Returns the SPEEDSTEP_PROCESSOR_-number for the detected processor, 
  * or zero on failure.
  */
 static unsigned int speedstep_detect_processor (void)
@@ -474,8 +475,6 @@ static unsigned int speedstep_detect_processor (void)
 		return SPEEDSTEP_PROCESSOR_PIII_T;
 
 	case 0x08: /* Intel PIII [Coppermine] */
-		/* based on reverse-engineering information and
-		 * some guessing. HANDLE WITH CARE! */
  	        {
 			u32     msr_lo, msr_hi;
 
@@ -487,21 +486,13 @@ static unsigned int speedstep_detect_processor (void)
 			if (msr_lo != 0x0080000)
 				return 0;
 
-			/* platform ID seems to be 0x00140000 */
-			rdmsr(MSR_IA32_PLATFORM_ID, msr_lo, msr_hi);
-			dprintk(KERN_DEBUG "cpufreq: Coppermine: MSR_IA32_PLATFORM ID is 0x%x, 0x%x\n", msr_lo, msr_hi);
-			msr_hi = msr_lo & 0x001c0000;
-			if (msr_hi != 0x00140000)
-				return 0;
+			if (speedstep_coppermine)
+				return SPEEDSTEP_PROCESSOR_PIII_C;
 
-			/* and these bits seem to be either 00_b, 01_b or
-			 * 10_b but never 11_b */
-			msr_lo &= 0x00030000;
-			if (msr_lo == 0x0030000)
-				return 0;
-
-			/* let's hope this is correct... */
-			return SPEEDSTEP_PROCESSOR_PIII_C;
+			printk(KERN_INFO "cpufreq: in case this is a SpeedStep-capable Intel Pentium III Coppermine\n");
+			printk(KERN_INFO "cpufreq: processor, please pass the boot option or module parameter\n");
+			printk(KERN_INFO "cpufreq: `speedstep_coppermine=1` to the kernel. Thanks!\n");
+			return 0;
 		}
 
 	default:
@@ -622,6 +613,25 @@ static void speedstep_verify (struct cpufreq_policy *policy)
 }
 
 
+#ifndef MODULE
+/**
+ * speedstep_setup  speedstep command line parameter parsing
+ *
+ * speedstep command line parameter.  Use:
+ *  speedstep_coppermine=1
+ * if the CPU in your notebook is a SpeedStep-capable Intel
+ * Pentium III Coppermine. These processors cannot be detected
+ * automatically, as Intel continues to consider the detection 
+ * alogrithm as proprietary material.
+ */
+static int __init speedstep_setup(char *str)
+{
+	speedstep_coppermine = simple_strtoul(str, &str, 0);
+	return 1;
+}
+__setup("speedstep_coppermine=", speedstep_setup);
+#endif
+
 /**
  * speedstep_init - initializes the SpeedStep CPUFreq driver
  *
@@ -637,18 +647,19 @@ static int __init speedstep_init(void)
 
 
 	/* detect chipset */
-	speedstep_chipset = speedstep_detect_chipset();
+	speedstep_chipset = speedstep_detect_chipset(); 
 
 	/* detect chipset */
 	if (speedstep_chipset)
 		speedstep_processor = speedstep_detect_processor();
 
 	if ((!speedstep_chipset) || (!speedstep_processor)) {
-		dprintk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) for this %s not (yet) available.\n", speedstep_processor ? "chipset" : "processor");
+		printk(KERN_INFO "a 0x%x b 0x%x\n", speedstep_processor, speedstep_chipset);
+		printk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) for this %s not (yet) available.\n", speedstep_chipset ? "processor" : "chipset");
 		return -ENODEV;
 	}
 
-	dprintk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) support $Revision: 1.53 $\n");
+	dprintk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) support $Revision: 1.57 $\n");
 	dprintk(KERN_DEBUG "cpufreq: chipset 0x%x - processor 0x%x\n", 
 	       speedstep_chipset, speedstep_processor);
 
@@ -726,3 +737,5 @@ MODULE_DESCRIPTION ("Speedstep driver for Intel mobile processors.");
 MODULE_LICENSE ("GPL");
 module_init(speedstep_init);
 module_exit(speedstep_exit);
+
+MODULE_PARM (speedstep_coppermine, "i");

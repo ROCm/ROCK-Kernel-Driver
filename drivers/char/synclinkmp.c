@@ -517,10 +517,10 @@ MODULE_DEVICE_TABLE(pci, synclinkmp_pci_tbl);
 MODULE_LICENSE("GPL");
 
 static struct pci_driver synclinkmp_pci_driver = {
-	name:		"synclinkmp",
-	id_table:	synclinkmp_pci_tbl,
-	probe:		synclinkmp_init_one,
-	remove:		__devexit_p(synclinkmp_remove_one),
+	.name		= "synclinkmp",
+	.id_table	= synclinkmp_pci_tbl,
+	.probe		= synclinkmp_init_one,
+	.remove		= __devexit_p(synclinkmp_remove_one),
 };
 
 

@@ -590,6 +590,7 @@ static ata_index_t do_ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_
 	u32 port, at_least_one_hwif_enabled = 0, autodma = 0;
 	int pciirq = 0;
 	int tried_config = 0;
+	int drive0_tune, drive1_tune;
 	ata_index_t index;
 	u8 tmp = 0;
 	ide_hwif_t *hwif, *mate = NULL;
@@ -698,11 +699,20 @@ controller_ok:
 		ide_hwif_setup_dma(dev, d, hwif);
 bypass_legacy_dma:
 #endif	/* CONFIG_BLK_DEV_IDEDMA */
+
+		drive0_tune = hwif->drives[0].autotune;
+		drive1_tune = hwif->drives[1].autotune;
+
 		if (d->init_hwif)
 			/* Call chipset-specific routine
 			 * for each enabled hwif
 			 */
 			d->init_hwif(hwif);
+		
+		if (drive0_tune == IDE_TUNE_BIOS) /* biostimings */
+			hwif->drives[0].autotune = IDE_TUNE_BIOS;
+		if (drive1_tune == IDE_TUNE_BIOS)
+			hwif->drives[1].autotune = IDE_TUNE_BIOS;
 
 		mate = hwif;
 		at_least_one_hwif_enabled = 1;

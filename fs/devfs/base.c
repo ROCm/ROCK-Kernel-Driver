@@ -860,7 +860,7 @@ struct fs_info                  /*  This structure is for the mounted devfs  */
     wait_queue_head_t revalidate_wait_queue;  /*  Wake when devfsd sleeps    */
 };
 
-static struct fs_info fs_info = {devfsd_buffer_lock: SPIN_LOCK_UNLOCKED};
+static struct fs_info fs_info = {.devfsd_buffer_lock = SPIN_LOCK_UNLOCKED};
 static kmem_cache_t *devfsd_buf_cache;
 #ifdef CONFIG_DEVFS_DEBUG
 static unsigned int devfs_debug_init __initdata = DEBUG_NONE;

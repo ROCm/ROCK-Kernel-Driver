@@ -213,8 +213,8 @@ static struct tty_struct	*stli_txcooktty;
  *	at 9600 baud, 8 data bits, no parity, 1 stop bit.
  */
 static struct termios		stli_deftermios = {
-	c_cflag:	(B9600 | CS8 | CREAD | HUPCL | CLOCAL),
-	c_cc:		INIT_C_CC,
+	.c_cflag	= (B9600 | CS8 | CREAD | HUPCL | CLOCAL),
+	.c_cc		= INIT_C_CC,
 };
 
 /*
@@ -783,10 +783,10 @@ static inline int	stli_initpcibrd(int brdtype, struct pci_dev *devp);
  *	board. This is also a very useful debugging tool.
  */
 static struct file_operations	stli_fsiomem = {
-	owner:		THIS_MODULE,
-	read:		stli_memread,
-	write:		stli_memwrite,
-	ioctl:		stli_memioctl,
+	.owner		= THIS_MODULE,
+	.read		= stli_memread,
+	.write		= stli_memwrite,
+	.ioctl		= stli_memioctl,
 };
 
 /*****************************************************************************/

@@ -36,7 +36,6 @@ nfs_page_alloc(void)
 	p = kmem_cache_alloc(nfs_page_cachep, SLAB_NOFS);
 	if (p) {
 		memset(p, 0, sizeof(*p));
-		INIT_LIST_HEAD(&p->wb_hash);
 		INIT_LIST_HEAD(&p->wb_list);
 		INIT_LIST_HEAD(&p->wb_lru);
 		init_waitqueue_head(&p->wb_wait);
@@ -161,14 +160,9 @@ nfs_release_request(struct nfs_page *req)
 	spin_unlock(&nfs_wreq_lock);
 
 #ifdef NFS_PARANOIA
-	if (!list_empty(&req->wb_list))
-		BUG();
-	if (!list_empty(&req->wb_hash))
-		BUG();
-	if (NFS_WBACK_BUSY(req))
-		BUG();
-	if (atomic_read(&NFS_REQUESTLIST(req->wb_inode)->nr_requests) < 0)
-		BUG();
+	BUG_ON (!list_empty(&req->wb_list));
+	BUG_ON (NFS_WBACK_BUSY(req));
+	BUG_ON (atomic_read(&NFS_REQUESTLIST(req->wb_inode)->nr_requests) < 0);
 #endif
 
 	/* Release struct file or cached credential */

@@ -419,8 +419,8 @@ static struct real_driver sx_real_driver = {
  */
 
 static struct file_operations sx_fw_fops = {
-	owner:		THIS_MODULE,
-	ioctl:		sx_fw_ioctl,
+	.owner		= THIS_MODULE,
+	.ioctl		= sx_fw_ioctl,
 };
 
 static struct miscdevice sx_fw_device = {

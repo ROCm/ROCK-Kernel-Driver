@@ -15,17 +15,17 @@ static ssize_t fat_file_write(struct file *filp, const char *buf, size_t count,
 			      loff_t *ppos);
 
 struct file_operations fat_file_operations = {
-	llseek:		generic_file_llseek,
-	read:		generic_file_read,
-	write:		fat_file_write,
-	mmap:		generic_file_mmap,
-	fsync:		file_fsync,
-	sendfile:	generic_file_sendfile,
+	.llseek		= generic_file_llseek,
+	.read		= generic_file_read,
+	.write		= fat_file_write,
+	.mmap		= generic_file_mmap,
+	.fsync		= file_fsync,
+	.sendfile	= generic_file_sendfile,
 };
 
 struct inode_operations fat_file_inode_operations = {
-	truncate:	fat_truncate,
-	setattr:	fat_notify_change,
+	.truncate	= fat_truncate,
+	.setattr	= fat_notify_change,
 };
 
 int fat_get_block(struct inode *inode, sector_t iblock,

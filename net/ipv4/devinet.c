@@ -857,6 +857,8 @@ static int inetdev_event(struct notifier_block *this, unsigned long event,
 				memcpy(ifa->ifa_label, dev->name, IFNAMSIZ);
 				inet_insert_ifa(ifa);
 			}
+			in_dev->cnf.no_xfrm = 1;
+			in_dev->cnf.no_policy = 1;
 		}
 		ip_mc_up(in_dev);
 		break;
@@ -1041,7 +1043,7 @@ static int devinet_sysctl_forward(ctl_table *ctl, int write,
 
 static struct devinet_sysctl_table {
 	struct ctl_table_header *sysctl_header;
-	ctl_table		devinet_vars[15];
+	ctl_table		devinet_vars[17];
 	ctl_table		devinet_dev[2];
 	ctl_table		devinet_conf_dir[2];
 	ctl_table		devinet_proto_dir[2];
@@ -1156,6 +1158,22 @@ static struct devinet_sysctl_table {
 			.ctl_name =	NET_IPV4_CONF_ARPFILTER,
 			.procname =	"arp_filter",
 			.data =	&ipv4_devconf.arp_filter,
+			.maxlen =		sizeof(int),
+			.mode =	0644,
+			.proc_handler =&proc_dointvec,
+		},
+		{
+			.ctl_name =	NET_IPV4_CONF_NOXFRM,
+			.procname =	"disable_xfrm",
+			.data =	&ipv4_devconf.no_xfrm,
+			.maxlen =		sizeof(int),
+			.mode =	0644,
+			.proc_handler =&proc_dointvec,
+		},
+		{
+			.ctl_name =	NET_IPV4_CONF_NOPOLICY,
+			.procname =	"disable_policy",
+			.data =	&ipv4_devconf.no_policy,
 			.maxlen =		sizeof(int),
 			.mode =	0644,
 			.proc_handler =&proc_dointvec,

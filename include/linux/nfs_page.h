@@ -23,8 +23,7 @@
 #define PG_BUSY			0
 
 struct nfs_page {
-	struct list_head	wb_hash,	/* Inode */
-				wb_lru,		/* superblock lru list */
+	struct list_head	wb_lru,		/* superblock lru list */
 				wb_list,	/* Defines state of page: */
 				*wb_list_head;	/*      read/write/commit */
 	struct file		*wb_file;
@@ -123,12 +122,6 @@ static inline struct nfs_page *
 nfs_list_entry(struct list_head *head)
 {
 	return list_entry(head, struct nfs_page, wb_list);
-}
-
-static inline struct nfs_page *
-nfs_inode_wb_entry(struct list_head *head)
-{
-	return list_entry(head, struct nfs_page, wb_hash);
 }
 
 static inline void

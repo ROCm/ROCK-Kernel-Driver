@@ -440,12 +440,6 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PT_TRACE_CLONE	0x00000040
 #define PT_TRACE_EXEC	0x00000080
 
-/*
- * Limit the stack by to some sane default: root can always
- * increase this limit if needed..  8MB seems reasonable.
- */
-#define _STK_LIM	(8*1024*1024)
-
 #if CONFIG_SMP
 extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
 #else

@@ -279,6 +279,7 @@ int copy_strings_kernel(int argc,char ** argv, struct linux_binprm *bprm)
 	return r; 
 }
 
+#ifdef CONFIG_MMU
 /*
  * This routine is used to map in a page into an address space: needed by
  * execve() for the initial stack and environment pages.
@@ -293,6 +294,7 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 
 	if (page_count(page) != 1)
 		printk(KERN_ERR "mem_map disagrees with %p at %08lx\n", page, address);
+
 	pgd = pgd_offset(tsk->mm, address);
 
 	spin_lock(&tsk->mm->page_table_lock);
@@ -421,6 +423,25 @@ int setup_arg_pages(struct linux_binprm *bprm)
 	
 	return 0;
 }
+
+#define free_arg_pages(bprm) do { } while (0)
+
+#else
+
+#define put_dirty_page(tsk, page, address)
+#define setup_arg_pages(bprm)			(0)
+static inline void free_arg_pages(struct linux_binprm *bprm)
+{
+	int i;
+
+	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
+		if (bprm->page[i])
+		__free_page(bprm->page[i]);
+		bprm->page[i] = NULL;
+	}
+}
+
+#endif /* CONFIG_MMU */
 
 struct file *open_exec(const char *name)
 {
@@ -1056,6 +1077,8 @@ int do_execve(char * filename, char ** argv, char ** envp, struct pt_regs * regs
 
 	retval = search_binary_handler(&bprm,regs);
 	if (retval >= 0) {
+		free_arg_pages(&bprm);
+
 		/* execve success */
 		security_ops->bprm_free_security(&bprm);
 		return retval;

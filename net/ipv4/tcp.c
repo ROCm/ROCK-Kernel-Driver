@@ -257,6 +257,7 @@
 
 #include <net/icmp.h>
 #include <net/tcp.h>
+#include <net/xfrm.h>
 
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
@@ -1919,6 +1920,8 @@ void tcp_destroy_sock(struct sock *sk)
 	sk->prot->destroy(sk);
 
 	tcp_kill_sk_queues(sk);
+
+	xfrm_sk_free_policy(sk);
 
 #ifdef INET_REFCNT_DEBUG
 	if (atomic_read(&sk->refcnt) != 1) {

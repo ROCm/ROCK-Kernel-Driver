@@ -325,12 +325,12 @@ static int sh_wdt_notify_sys(struct notifier_block *this,
 }
 
 static struct file_operations sh_wdt_fops = {
-	owner:		THIS_MODULE,
-	read:		sh_wdt_read,
-	write:		sh_wdt_write,
-	ioctl:		sh_wdt_ioctl,
-	open:		sh_wdt_open,
-	release:	sh_wdt_close,
+	.owner		= THIS_MODULE,
+	.read		= sh_wdt_read,
+	.write		= sh_wdt_write,
+	.ioctl		= sh_wdt_ioctl,
+	.open		= sh_wdt_open,
+	.release	= sh_wdt_close,
 };
 
 static struct watchdog_info sh_wdt_info = {

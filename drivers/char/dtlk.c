@@ -98,13 +98,13 @@ static int dtlk_ioctl(struct inode *inode, struct file *file,
 
 static struct file_operations dtlk_fops =
 {
-	owner:		THIS_MODULE,
-	read:		dtlk_read,
-	write:		dtlk_write,
-	poll:		dtlk_poll,
-	ioctl:		dtlk_ioctl,
-	open:		dtlk_open,
-	release:	dtlk_release,
+	.owner		= THIS_MODULE,
+	.read		= dtlk_read,
+	.write		= dtlk_write,
+	.poll		= dtlk_poll,
+	.ioctl		= dtlk_ioctl,
+	.open		= dtlk_open,
+	.release	= dtlk_release,
 };
 
 /* local prototypes */

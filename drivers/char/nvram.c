@@ -438,13 +438,13 @@ nvram_read_proc(char *buffer, char **start, off_t offset,
 #endif /* CONFIG_PROC_FS */
 
 static struct file_operations nvram_fops = {
-	owner:		THIS_MODULE,
-	llseek:		nvram_llseek,
-	read:		nvram_read,
-	write:		nvram_write,
-	ioctl:		nvram_ioctl,
-	open:		nvram_open,
-	release:	nvram_release,
+	.owner		= THIS_MODULE,
+	.llseek		= nvram_llseek,
+	.read		= nvram_read,
+	.write		= nvram_write,
+	.ioctl		= nvram_ioctl,
+	.open		= nvram_open,
+	.release	= nvram_release,
 };
 
 static struct miscdevice nvram_dev = {

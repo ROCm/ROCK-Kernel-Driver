@@ -36,6 +36,7 @@ static LIST_HEAD(entries);
 static int enabled = 1;
 
 enum {Enabled, Magic};
+#define MISC_FMT_PRESERVE_ARGV0 (1<<31)
 
 typedef struct {
 	struct list_head list;
@@ -124,7 +125,9 @@ static int load_misc_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	bprm->file = NULL;
 
 	/* Build args for interpreter */
-	remove_arg_zero(bprm);
+	if (!(fmt->flags & MISC_FMT_PRESERVE_ARGV0)) {
+		remove_arg_zero(bprm);
+	}
 	retval = copy_strings_kernel(1, &bprm->filename, bprm);
 	if (retval < 0) goto _ret; 
 	bprm->argc++;
@@ -289,6 +292,11 @@ static Node *create_entry(const char *buffer, size_t count)
 	*p++ = '\0';
 	if (!e->interpreter[0])
 		goto Einval;
+
+	if (*p == 'P') {
+		p++;
+		e->flags |= MISC_FMT_PRESERVE_ARGV0;
+	}
 
 	if (*p == '\n')
 		p++;

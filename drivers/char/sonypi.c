@@ -613,13 +613,13 @@ out:
 }
 
 static struct file_operations sonypi_misc_fops = {
-	owner:		THIS_MODULE,
-	read:		sonypi_misc_read,
-	poll:		sonypi_misc_poll,
-	open:		sonypi_misc_open,
-	release:	sonypi_misc_release,
-	fasync: 	sonypi_misc_fasync,
-	ioctl:		sonypi_misc_ioctl,
+	.owner		= THIS_MODULE,
+	.read		= sonypi_misc_read,
+	.poll		= sonypi_misc_poll,
+	.open		= sonypi_misc_open,
+	.release	= sonypi_misc_release,
+	.fasync 	= sonypi_misc_fasync,
+	.ioctl		= sonypi_misc_ioctl,
 };
 
 struct miscdevice sonypi_misc_device = {

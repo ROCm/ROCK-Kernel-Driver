@@ -1070,8 +1070,8 @@ int __init loop_init(void)
 out_mem2:
 	while (i--)
 		put_disk(disks[i]);
-out_mem:
 	kfree(disks);
+out_mem:
 	kfree(loop_dev);
 	printk(KERN_ERR "loop: ran out of memory\n");
 	return -ENOMEM;

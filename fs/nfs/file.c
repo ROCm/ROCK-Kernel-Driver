@@ -169,6 +169,7 @@ struct address_space_operations nfs_file_aops = {
 	.readpage = nfs_readpage,
 	.readpages = nfs_readpages,
 	.writepage = nfs_writepage,
+	.writepages = nfs_writepages,
 	.prepare_write = nfs_prepare_write,
 	.commit_write = nfs_commit_write,
 #ifdef CONFIG_NFS_DIRECTIO

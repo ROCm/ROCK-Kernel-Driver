@@ -175,7 +175,7 @@
  *	chmod 600 $random_seed
  *	poolfile=/proc/sys/kernel/random/poolsize
  *	[ -r $poolfile ] && bytes=`cat $poolfile` || bytes=512
- *	dd if=/dev/urandom of=$random_seed count=1 bs=bytes
+ *	dd if=/dev/urandom of=$random_seed count=1 bs=$bytes
  *
  * and the following lines in an appropriate script which is run as
  * the system is shutdown:
@@ -188,7 +188,7 @@
  *	chmod 600 $random_seed
  *	poolfile=/proc/sys/kernel/random/poolsize
  *	[ -r $poolfile ] && bytes=`cat $poolfile` || bytes=512
- *	dd if=/dev/urandom of=$random_seed count=1 bs=bytes
+ *	dd if=/dev/urandom of=$random_seed count=1 bs=$bytes
  *
  * For example, on most modern systems using the System V init
  * scripts, such code fragments would be found in
@@ -1674,16 +1674,16 @@ random_ioctl(struct inode * inode, struct file * file,
 }
 
 struct file_operations random_fops = {
-	read:		random_read,
-	write:		random_write,
-	poll:		random_poll,
-	ioctl:		random_ioctl,
+	.read		= random_read,
+	.write		= random_write,
+	.poll		= random_poll,
+	.ioctl		= random_ioctl,
 };
 
 struct file_operations urandom_fops = {
-	read:		urandom_read,
-	write:		random_write,
-	ioctl:		random_ioctl,
+	.read		= urandom_read,
+	.write		= random_write,
+	.ioctl		= random_ioctl,
 };
 
 /***************************************************************

@@ -44,6 +44,7 @@
  *    Dajiang Zhang <dajiang.zhang@nokia.com>
  *    Sridhar Samudrala <sri@us.ibm.com>
  *    Daisy Chang <daisyc@us.ibm.com>
+ *    Ardelle Fan <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -253,6 +254,9 @@ sctp_chunk_t *sctp_make_abort(const sctp_association_t *,
 sctp_chunk_t *sctp_make_abort_no_data(const sctp_association_t *,
 				      const sctp_chunk_t *,
 				      __u32 tsn);
+sctp_chunk_t *sctp_make_abort_user(const sctp_association_t *,
+				   const sctp_chunk_t *,
+				   const struct msghdr *);
 sctp_chunk_t *sctp_make_heartbeat(const sctp_association_t *,
 				  const sctp_transport_t *,
 				  const void *payload,

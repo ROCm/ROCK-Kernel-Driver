@@ -27,6 +27,9 @@
 
 #include <net/sock.h>
 
+#define _X2KEY(x) ((x) == XFRM_INF ? 0 : (x))
+#define _KEY2X(x) ((x) == 0 ? XFRM_INF : (x))
+
 /* List of all pfkey sockets. */
 static struct sock * pfkey_table;
 static DECLARE_WAIT_QUEUE_HEAD(pfkey_table_wait);
@@ -488,7 +491,8 @@ static xfrm_address_t *pfkey_sadb_addr2xfrm_addr(struct sadb_address *addr,
 	case AF_INET:
 		xaddr->xfrm4_addr = 
 			((struct sockaddr_in*)(addr + 1))->sin_addr.s_addr;
-		xaddr->xfrm4_mask = ~0 << (32 - addr->sadb_address_prefixlen);
+		if (addr->sadb_address_prefixlen)
+			xaddr->xfrm4_mask = htonl(~0 << (32 - addr->sadb_address_prefixlen));
 		break;
 	case AF_INET6:
 		memcpy(xaddr->a6, 
@@ -705,9 +709,13 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 	sa->sadb_sa_exttype = SADB_EXT_SA;
 	sa->sadb_sa_spi = x->id.spi;
 	sa->sadb_sa_replay = x->props.replay_window;
-	sa->sadb_sa_state = (x->km.state == XFRM_STATE_VALID ?
-			     SADB_SASTATE_MATURE :
-			     SADB_SASTATE_LARVAL);
+	sa->sadb_sa_state = SADB_SASTATE_DYING;
+	if (x->km.state == XFRM_STATE_VALID && !x->km.dying)
+		sa->sadb_sa_state = SADB_SASTATE_MATURE;
+	else if (x->km.state == XFRM_STATE_ACQ)
+		sa->sadb_sa_state = SADB_SASTATE_LARVAL;
+	else if (x->km.state == XFRM_STATE_EXPIRED)
+		sa->sadb_sa_state = SADB_SASTATE_DEAD;
 	sa->sadb_sa_auth = 0;
 	if (x->aalg) {
 		struct algo_desc *a = aalg_get_byname(x->aalg->alg_name);
@@ -727,8 +735,8 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 		lifetime->sadb_lifetime_len =
 			sizeof(struct sadb_lifetime)/sizeof(uint64_t);
 		lifetime->sadb_lifetime_exttype = SADB_EXT_LIFETIME_HARD;
-		lifetime->sadb_lifetime_allocations =  x->lft.hard_packet_limit;
-		lifetime->sadb_lifetime_bytes = x->lft.hard_byte_limit;	
+		lifetime->sadb_lifetime_allocations =  _X2KEY(x->lft.hard_packet_limit);
+		lifetime->sadb_lifetime_bytes = _X2KEY(x->lft.hard_byte_limit);
 		lifetime->sadb_lifetime_addtime = x->lft.hard_add_expires_seconds;
 		lifetime->sadb_lifetime_usetime = x->lft.hard_use_expires_seconds;
 	}
@@ -739,13 +747,13 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 		lifetime->sadb_lifetime_len =
 			sizeof(struct sadb_lifetime)/sizeof(uint64_t);
 		lifetime->sadb_lifetime_exttype = SADB_EXT_LIFETIME_SOFT;
-		lifetime->sadb_lifetime_allocations =  x->lft.soft_packet_limit;
-		lifetime->sadb_lifetime_bytes = x->lft.soft_byte_limit;
+		lifetime->sadb_lifetime_allocations =  _X2KEY(x->lft.soft_packet_limit);
+		lifetime->sadb_lifetime_bytes = _X2KEY(x->lft.soft_byte_limit);
 		lifetime->sadb_lifetime_addtime = x->lft.soft_add_expires_seconds;
 		lifetime->sadb_lifetime_usetime = x->lft.soft_use_expires_seconds;
 	}
 	/* current time */
-	lifetime = (struct sadb_lifetime *)  skb_put(skb, 
+	lifetime = (struct sadb_lifetime *)  skb_put(skb,
 						     sizeof(struct sadb_lifetime));
 	lifetime->sadb_lifetime_len =
 		sizeof(struct sadb_lifetime)/sizeof(uint64_t);
@@ -870,11 +878,19 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	proto = pfkey_satype2proto(hdr->sadb_msg_satype);
 	if (proto == 0)
 		return ERR_PTR(-EINVAL);
-	/* XXX setkey set SADB_SASTATE_LARVAL here 
-	   if (hdr->sadb_msg_type == SADB_ADD && 
-	   sa->sadb_sa_state != SADB_SASTATE_MATURE) 
-	   return ERR_PTR(-EINVAL);
-	   */
+
+	/* RFC2367:
+
+   Only SADB_SASTATE_MATURE SAs may be submitted in an SADB_ADD message.
+   SADB_SASTATE_LARVAL SAs are created by SADB_GETSPI and it is not
+   sensible to add a new SA in the DYING or SADB_SASTATE_DEAD state.
+   Therefore, the sadb_sa_state field of all submitted SAs MUST be
+   SADB_SASTATE_MATURE and the kernel MUST return an error if this is
+   not true.
+
+           However, KAME setkey always uses SADB_SASTATE_LARVAL.
+	   Hence, we have to _ignore_ sadb_sa_state, which is also reasonable.
+	 */
 	if (sa->sadb_sa_auth > SADB_AALG_MAX ||
 	    sa->sadb_sa_encrypt > SADB_EALG_MAX)
 		return ERR_PTR(-EINVAL);
@@ -899,15 +915,15 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 
 	lifetime = (struct sadb_lifetime*) ext_hdrs[SADB_EXT_LIFETIME_HARD-1];
 	if (lifetime != NULL) {
-		x->lft.hard_packet_limit = lifetime->sadb_lifetime_allocations;
-		x->lft.hard_byte_limit = lifetime->sadb_lifetime_bytes;
+		x->lft.hard_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
+		x->lft.hard_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
 		x->lft.hard_add_expires_seconds = lifetime->sadb_lifetime_addtime;
 		x->lft.hard_use_expires_seconds = lifetime->sadb_lifetime_usetime;
 	}
 	lifetime = (struct sadb_lifetime*) ext_hdrs[SADB_EXT_LIFETIME_SOFT-1];
 	if (lifetime != NULL) {
-		x->lft.soft_packet_limit = lifetime->sadb_lifetime_allocations;
-		x->lft.soft_byte_limit = lifetime->sadb_lifetime_bytes;
+		x->lft.soft_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
+		x->lft.soft_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
 		x->lft.soft_add_expires_seconds = lifetime->sadb_lifetime_addtime;
 		x->lft.soft_use_expires_seconds = lifetime->sadb_lifetime_usetime;
 	}
@@ -952,11 +968,9 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	}
 	/* x->algo.flags = sa->sadb_sa_flags; */
 
-	pfkey_sadb_addr2xfrm_addr(
-				  (struct sadb_address *) ext_hdrs[SADB_EXT_ADDRESS_SRC-1], 
+	pfkey_sadb_addr2xfrm_addr((struct sadb_address *) ext_hdrs[SADB_EXT_ADDRESS_SRC-1], 
 				  &x->props.saddr);
-	pfkey_sadb_addr2xfrm_addr(
-				  (struct sadb_address *) ext_hdrs[SADB_EXT_ADDRESS_DST-1], 
+	pfkey_sadb_addr2xfrm_addr((struct sadb_address *) ext_hdrs[SADB_EXT_ADDRESS_DST-1], 
 				  &x->id.daddr);
 
 	if (ext_hdrs[SADB_X_EXT_SA2-1]) {
@@ -967,20 +981,24 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 		x->props.reqid = sa2->sadb_x_sa2_reqid;
 	}
 
-	x->sel.saddr = x->props.saddr;
-	x->sel.daddr = x->id.daddr;
+	if (ext_hdrs[SADB_EXT_ADDRESS_PROXY-1]) {
+		struct sadb_address *addr = ext_hdrs[SADB_EXT_ADDRESS_PROXY-1];
+
+		/* Nobody uses this, but we try. */
+		pfkey_sadb_addr2xfrm_addr(addr, &x->sel.saddr);
+		x->sel.prefixlen_s = addr->sadb_address_prefixlen;
+	}
+
 	x->type = xfrm_get_type(proto);
 	if (x->type == NULL)
 		goto out;
 	if (x->type->init_state(x, NULL))
 		goto out;
-	x->curlft.add_time = (unsigned long)xtime.tv_sec;
-	x->km.warn_bytes = x->lft.soft_byte_limit;
 	x->km.seq = hdr->sadb_msg_seq;
 	x->km.state = XFRM_STATE_VALID;
 	return x;
 
-	out:
+out:
 	if (x->aalg)
 		kfree(x->aalg);
 	if (x->ealg)
@@ -1247,7 +1265,7 @@ static struct sk_buff *compose_sadb_supported(struct sadb_msg *orig, int allocat
 			*ap++ = ealg_list[i].desc;
 	}
 
-	out_put_algs:
+out_put_algs:
 	return skb;
 }
 
@@ -1375,7 +1393,8 @@ parse_ipsecrequest(struct xfrm_policy *xp, struct sadb_x_ipsecrequest *rq)
 
 	t->id.proto = rq->sadb_x_ipsecrequest_proto; /* XXX check proto */
 	t->mode = rq->sadb_x_ipsecrequest_mode-1;
-	t->share = rq->sadb_x_ipsecrequest_level;
+	if (rq->sadb_x_ipsecrequest_level == IPSEC_LEVEL_USE)
+		t->optional = 1;
 	t->reqid = rq->sadb_x_ipsecrequest_reqid;
 	/* addresses present only in tunnel mode */
 	if (t->mode) {
@@ -1471,8 +1490,8 @@ static struct sk_buff * pfkey_xfrm_policy2msg(struct xfrm_policy *xp, int dir)
 	lifetime->sadb_lifetime_len =
 		sizeof(struct sadb_lifetime)/sizeof(uint64_t);
 	lifetime->sadb_lifetime_exttype = SADB_EXT_LIFETIME_HARD;
-	lifetime->sadb_lifetime_allocations =  xp->lft.hard_packet_limit;
-	lifetime->sadb_lifetime_bytes = xp->lft.hard_byte_limit;
+	lifetime->sadb_lifetime_allocations =  _X2KEY(xp->lft.hard_packet_limit);
+	lifetime->sadb_lifetime_bytes = _X2KEY(xp->lft.hard_byte_limit);
 	lifetime->sadb_lifetime_addtime = xp->lft.hard_add_expires_seconds;
 	lifetime->sadb_lifetime_usetime = xp->lft.hard_use_expires_seconds;
 	/* soft time */
@@ -1481,8 +1500,8 @@ static struct sk_buff * pfkey_xfrm_policy2msg(struct xfrm_policy *xp, int dir)
 	lifetime->sadb_lifetime_len =
 		sizeof(struct sadb_lifetime)/sizeof(uint64_t);
 	lifetime->sadb_lifetime_exttype = SADB_EXT_LIFETIME_SOFT;
-	lifetime->sadb_lifetime_allocations =  xp->lft.soft_packet_limit;
-	lifetime->sadb_lifetime_bytes = xp->lft.soft_byte_limit;
+	lifetime->sadb_lifetime_allocations =  _X2KEY(xp->lft.soft_packet_limit);
+	lifetime->sadb_lifetime_bytes = _X2KEY(xp->lft.soft_byte_limit);
 	lifetime->sadb_lifetime_addtime = xp->lft.soft_add_expires_seconds;
 	lifetime->sadb_lifetime_usetime = xp->lft.soft_use_expires_seconds;
 	/* current time */
@@ -1524,7 +1543,9 @@ static struct sk_buff * pfkey_xfrm_policy2msg(struct xfrm_policy *xp, int dir)
 		rq->sadb_x_ipsecrequest_len = req_size;
 		rq->sadb_x_ipsecrequest_proto = t->id.proto;
 		rq->sadb_x_ipsecrequest_mode = t->mode+1;
-		rq->sadb_x_ipsecrequest_level = t->share;
+		rq->sadb_x_ipsecrequest_level = IPSEC_LEVEL_REQUIRE;
+		if (t->optional)
+			rq->sadb_x_ipsecrequest_level = IPSEC_LEVEL_USE;
 		rq->sadb_x_ipsecrequest_reqid = t->reqid;
 		if (t->mode) {
 			sin = (void*)(rq+1);
@@ -1565,7 +1586,7 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	if (!pol->sadb_x_policy_dir || pol->sadb_x_policy_dir >= IPSEC_DIR_MAX)
 		return -EINVAL;
 
-	xp = xfrm_policy_alloc();
+	xp = xfrm_policy_alloc(GFP_KERNEL);
 	if (xp == NULL)
 		return -ENOBUFS;
 
@@ -1594,25 +1615,19 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	if (xp->selector.dport)
 		xp->selector.dport_mask = ~0;
 
-	xp->curlft.add_time = (unsigned long)xtime.tv_sec;
-	xp->curlft.use_time = (unsigned long)xtime.tv_sec;
-	xp->lft.soft_byte_limit = -1;
-	xp->lft.hard_byte_limit = -1;
-	xp->lft.soft_packet_limit = -1;
-	xp->lft.hard_packet_limit = -1;
-	xp->lft.soft_add_expires_seconds = -1;
-	xp->lft.hard_add_expires_seconds = -1;
-	xp->lft.soft_use_expires_seconds = -1;
-	xp->lft.hard_use_expires_seconds = -1;
+	xp->lft.soft_byte_limit = XFRM_INF;
+	xp->lft.hard_byte_limit = XFRM_INF;
+	xp->lft.soft_packet_limit = XFRM_INF;
+	xp->lft.hard_packet_limit = XFRM_INF;
 	if ((lifetime = ext_hdrs[SADB_EXT_LIFETIME_HARD-1]) != NULL) {
-		xp->lft.hard_packet_limit = lifetime->sadb_lifetime_allocations;
-		xp->lft.hard_byte_limit = lifetime->sadb_lifetime_bytes;
+		xp->lft.hard_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
+		xp->lft.hard_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
 		xp->lft.hard_add_expires_seconds = lifetime->sadb_lifetime_addtime;
 		xp->lft.hard_use_expires_seconds = lifetime->sadb_lifetime_usetime;
 	}
 	if ((lifetime = ext_hdrs[SADB_EXT_LIFETIME_SOFT-1]) != NULL) {
-		xp->lft.soft_packet_limit = lifetime->sadb_lifetime_allocations;
-		xp->lft.soft_byte_limit = lifetime->sadb_lifetime_bytes;
+		xp->lft.soft_packet_limit = _KEY2X(lifetime->sadb_lifetime_allocations);
+		xp->lft.soft_byte_limit = _KEY2X(lifetime->sadb_lifetime_bytes);
 		xp->lft.soft_add_expires_seconds = lifetime->sadb_lifetime_addtime;
 		xp->lft.soft_use_expires_seconds = lifetime->sadb_lifetime_usetime;
 	}
@@ -1710,7 +1725,7 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, struct sadb_msg
 	pfkey_broadcast(out_skb, GFP_ATOMIC, BROADCAST_ALL, sk);
 	err = 0;
 
-	out:
+out:
 	if (xp) {
 		xfrm_policy_kill(xp);
 		xfrm_pol_put(xp);
@@ -1756,7 +1771,7 @@ static int pfkey_spdget(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	pfkey_broadcast(out_skb, GFP_ATOMIC, BROADCAST_ALL, sk);
 	err = 0;
 
-	out:
+out:
 	if (xp) {
 		if (hdr->sadb_msg_type == SADB_X_SPDDELETE2)
 			xfrm_policy_kill(xp);
@@ -2098,7 +2113,7 @@ static struct xfrm_policy *pfkey_compile_policy(int opt, u8 *data, int len, int 
 	    (!pol->sadb_x_policy_dir || pol->sadb_x_policy_dir > IPSEC_DIR_OUTBOUND))
 		return NULL;
 
-	xp = xfrm_policy_alloc();
+	xp = xfrm_policy_alloc(GFP_KERNEL);
 	if (xp == NULL) {
 		*dir = -ENOBUFS;
 		return NULL;
@@ -2108,16 +2123,10 @@ static struct xfrm_policy *pfkey_compile_policy(int opt, u8 *data, int len, int 
 	xp->action = (pol->sadb_x_policy_type == IPSEC_POLICY_DISCARD ?
 		      XFRM_POLICY_BLOCK : XFRM_POLICY_ALLOW);
 
-	xp->curlft.add_time = (unsigned long)xtime.tv_sec;
-	xp->curlft.use_time = (unsigned long)xtime.tv_sec;
-	xp->lft.soft_byte_limit = -1;
-	xp->lft.hard_byte_limit = -1;
-	xp->lft.soft_packet_limit = -1;
-	xp->lft.hard_packet_limit = -1;
-	xp->lft.soft_add_expires_seconds = -1;
-	xp->lft.hard_add_expires_seconds = -1;
-	xp->lft.soft_use_expires_seconds = -1;
-	xp->lft.hard_use_expires_seconds = -1;
+	xp->lft.soft_byte_limit = XFRM_INF;
+	xp->lft.hard_byte_limit = XFRM_INF;
+	xp->lft.soft_packet_limit = XFRM_INF;
+	xp->lft.hard_packet_limit = XFRM_INF;
 
 	xp->xfrm_nr = 0;
 	if (pol->sadb_x_policy_type == IPSEC_POLICY_IPSEC &&

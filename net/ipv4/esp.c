@@ -199,7 +199,7 @@ esp_hmac_digest(struct esp_data *esp, struct sk_buff *skb, int offset,
 
 /* Check that skb data bits are writable. If they are not, copy data
  * to newly created private area. If "tailbits" is given, make sure that
- * tailbits bytes beoynd current end of skb are writable.
+ * tailbits bytes beyond current end of skb are writable.
  *
  * Returns amount of elements of scatterlist to load for subsequent
  * transformations and pointer to writable trailer skb.
@@ -433,6 +433,7 @@ int esp_output(struct sk_buff *skb)
 	skb->nh.raw = skb->data;
 
 	x->curlft.bytes += skb->len;
+	x->curlft.packets++;
 	spin_unlock_bh(&x->lock);
 	if ((skb->dst = dst_pop(dst)) == NULL)
 		goto error;

@@ -53,8 +53,6 @@
    7. ->share		Sharing mode.
       Q: how to implement private sharing mode? To add struct sock* to
       flow id?
-   8. ->resolved	If template uniquely resolves to a static xfrm_state,
-                        the reference is stores here.
 
    Having this template we search through SAD searching for entries
    with appropriate mode/proto/algo, permitted by selector.
@@ -114,6 +112,8 @@ struct xfrm_selector
 	void	*owner;
 };
 
+#define XFRM_INF (~(u64)0)
+
 struct xfrm_lifetime_cfg
 {
 	u64	soft_byte_limit;
@@ -161,9 +161,9 @@ struct xfrm_state
 
 	/* Key manger bits */
 	struct {
-		int		state;
+		u8		state;
+		u8		dying;
 		u32		seq;
-		u64		warn_bytes;
 	} km;
 
 	/* Parameters of this state. */
@@ -195,6 +195,7 @@ struct xfrm_state
 	} stats;
 
 	struct xfrm_lifetime_cur curlft;
+	struct timer_list	timer;
 
 	/* Reference to data common to all the instances of this
 	 * transformer. */
@@ -255,13 +256,13 @@ struct xfrm_tmpl
 /* Sharing mode: unique, this session only, this user only etc. */
 	__u8			share;
 
+/* May skip this transfomration if no SA is found */
+	__u8			optional;
+
 /* Bit mask of algos allowed for acquisition */
 	__u32			aalgos;
 	__u32			ealgos;
 	__u32			calgos;
-
-/* If template statically resolved, hold ref here */
-	struct xfrm_state      *resolved;
 };
 
 #define XFRM_MAX_DEPTH		3
@@ -419,11 +420,35 @@ static inline int xfrm_route_forward(struct sk_buff *skb)
 		__xfrm_route_forward(skb);
 }
 
+extern int __xfrm_sk_clone_policy(struct sock *sk);
+
+static inline int xfrm_sk_clone_policy(struct sock *sk)
+{
+	if (unlikely(sk->policy[0] || sk->policy[1]))
+		return xfrm_sk_clone_policy(sk);
+	return 0;
+}
+
+extern void __xfrm_sk_free_policy(struct xfrm_policy *);
+
+static inline void xfrm_sk_free_policy(struct sock *sk)
+{
+	if (unlikely(sk->policy[0] != NULL)) {
+		__xfrm_sk_free_policy(sk->policy[0]);
+		sk->policy[0] = NULL;
+	}
+	if (unlikely(sk->policy[1] != NULL)) {
+		__xfrm_sk_free_policy(sk->policy[1]);
+		sk->policy[1] = NULL;
+	}
+}
+
 extern void xfrm_state_init(void);
 extern void xfrm_input_init(void);
 extern int xfrm_state_walk(u8 proto, int (*func)(struct xfrm_state *, int, void*), void *);
 extern struct xfrm_state *xfrm_state_alloc(void);
-extern struct xfrm_state *xfrm_state_find(u32 daddr, struct flowi *fl, struct xfrm_tmpl *tmpl, struct xfrm_policy *pol);
+extern struct xfrm_state *xfrm_state_find(u32 daddr, u32 saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
+					  struct xfrm_policy *pol, int *err);
 extern int xfrm_state_check_expire(struct xfrm_state *x);
 extern void xfrm_state_insert(struct xfrm_state *x);
 extern int xfrm_state_check_space(struct xfrm_state *x, struct sk_buff *skb);
@@ -437,7 +462,7 @@ extern int xfrm_check_selectors(struct xfrm_state **x, int n, struct flowi *fl);
 extern int xfrm4_rcv(struct sk_buff *skb);
 extern int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen);
 
-struct xfrm_policy *xfrm_policy_alloc(void);
+struct xfrm_policy *xfrm_policy_alloc(int gfp);
 extern int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*), void *);
 struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl);
 int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl);
@@ -450,6 +475,7 @@ extern void xfrm_policy_flush(void);
 extern void xfrm_policy_kill(struct xfrm_policy *);
 extern int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol);
 extern struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi *fl);
+extern int xfrm_flush_bundles(struct xfrm_state *x);
 
 extern wait_queue_head_t *km_waitq;
 extern void km_warn_expired(struct xfrm_state *x);

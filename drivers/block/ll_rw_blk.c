@@ -644,7 +644,8 @@ void blk_queue_invalidate_tags(request_queue_t *q)
 static char *rq_flags[] = {
 	"REQ_RW",
 	"REQ_RW_AHEAD",
-	"REQ_BARRIER",
+	"REQ_SOFTBARRIER",
+	"REQ_HARDBARRIER",
 	"REQ_CMD",
 	"REQ_NOMERGE",
 	"REQ_STARTED",
@@ -1392,7 +1393,7 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 	 * must not attempt merges on this) and that it acts as a soft
 	 * barrier
 	 */
-	rq->flags |= REQ_SPECIAL | REQ_BARRIER;
+	rq->flags |= REQ_SPECIAL | REQ_SOFTBARRIER;
 
 	rq->special = data;
 
@@ -1788,7 +1789,7 @@ get_rq:
 	 * REQ_BARRIER implies no merging, but lets make it explicit
 	 */
 	if (barrier)
-		req->flags |= (REQ_BARRIER | REQ_NOMERGE);
+		req->flags |= (REQ_HARDBARRIER | REQ_NOMERGE);
 
 	req->errors = 0;
 	req->hard_sector = req->sector = sector;

@@ -81,6 +81,10 @@
 /* Maximum size of the hash in pages */
 #define EP_MAX_HPAGES ((1 << EP_MAX_HASH_BITS) / EP_HENTRY_X_PAGE + 1)
 
+/* Number of pages allocated for an "hbits" sized hash table */
+#define EP_HASH_PAGES(hbits) ((int) ((1 << (hbits)) / EP_HENTRY_X_PAGE + \
+				     ((1 << (hbits)) % EP_HENTRY_X_PAGE ? 1: 0)))
+
 /* Macro to allocate a "struct epitem" from the slab cache */
 #define DPI_MEM_ALLOC()	(struct epitem *) kmem_cache_alloc(dpi_cache, SLAB_KERNEL)
 
@@ -130,9 +134,6 @@ struct eventpoll {
 
 	/* Size of the hash */
 	unsigned int hashbits;
-
-	/* Number of pages currently allocated for the hash */
-	int nhpages;
 
 	/* Pages for the "struct epitem" hash */
 	char *hpages[EP_MAX_HPAGES];
@@ -261,9 +262,8 @@ static unsigned int ep_get_hash_bits(unsigned int hintsize)
 {
 	unsigned int i, val;
 
-	for (i = 0, val = 1; val < hintsize && i < 8 * sizeof(int); i++, val <<= 1);
-	return i <  EP_MIN_HASH_BITS ?  EP_MIN_HASH_BITS:
-		(i > EP_MAX_HASH_BITS ? EP_MAX_HASH_BITS: i);
+	for (i = 0, val = 1; val < hintsize && i < EP_MAX_HASH_BITS; i++, val <<= 1);
+	return i <  EP_MIN_HASH_BITS ?  EP_MIN_HASH_BITS: i;
 }
 
 
@@ -668,15 +668,13 @@ static int ep_init(struct eventpoll *ep, unsigned int hashbits)
 	INIT_LIST_HEAD(&ep->rdllist);
 
 	/* Hash allocation and setup */
-	hsize = 1 << hashbits;
 	ep->hashbits = hashbits;
-	ep->nhpages = (int) (hsize / EP_HENTRY_X_PAGE + (hsize % EP_HENTRY_X_PAGE ? 1: 0));
-	error = ep_alloc_pages(ep->hpages, ep->nhpages);
+	error = ep_alloc_pages(ep->hpages, EP_HASH_PAGES(ep->hashbits));
 	if (error)
 		goto eexit_1;
 
 	/* Initialize hash buckets */
-	for (i = 0; i < hsize; i++)
+	for (i = 0, hsize = 1 << hashbits; i < hsize; i++)
 		INIT_LIST_HEAD(ep_hash_entry(ep, i));
 
 	return 0;
@@ -728,7 +726,7 @@ static void ep_free(struct eventpoll *ep)
 	write_unlock_irqrestore(&eplock, flags);
 
 	/* Free hash pages */
-	ep_free_pages(ep->hpages, ep->nhpages);
+	ep_free_pages(ep->hpages, EP_HASH_PAGES(ep->hashbits));
 }
 
 
@@ -844,8 +842,15 @@ static int ep_insert(struct eventpoll *ep, struct pollfd *pfd, struct file *tfil
 	revents = tfile->f_op->poll(tfile, &pt);
 
 	/* If the file is already "ready" we drop it inside the ready list */
-	if ((revents & pfd->events) && !EP_IS_LINKED(&dpi->rdllink))
-		list_add(&dpi->rdllink, &ep->rdllist);
+	if ((revents & pfd->events) && !EP_IS_LINKED(&dpi->rdllink)) {
+		list_add_tail(&dpi->rdllink, &ep->rdllist);
+
+		/* Notify waiting tasks that events are available */
+		if (waitqueue_active(&ep->wq))
+			wake_up(&ep->wq);
+		if (waitqueue_active(&ep->poll_wait))
+			wake_up(&ep->poll_wait);
+	}
 
 	write_unlock_irqrestore(&ep->lock, flags);
 
@@ -888,8 +893,16 @@ static int ep_modify(struct eventpoll *ep, struct epitem *dpi, unsigned int even
 	dpi->pfd.events = events;
 
 	/* If the file is already "ready" we drop it inside the ready list */
-	if ((revents & events) && EP_IS_LINKED(&dpi->llink) && !EP_IS_LINKED(&dpi->rdllink))
-		list_add(&dpi->rdllink, &ep->rdllist);
+	if ((revents & events) && EP_IS_LINKED(&dpi->llink) &&
+	    !EP_IS_LINKED(&dpi->rdllink)) {
+		list_add_tail(&dpi->rdllink, &ep->rdllist);
+
+		/* Notify waiting tasks that events are available */
+		if (waitqueue_active(&ep->wq))
+			wake_up(&ep->wq);
+		if (waitqueue_active(&ep->poll_wait))
+			wake_up(&ep->poll_wait);
+	}
 
 	write_unlock_irqrestore(&ep->lock, flags);
 
@@ -993,7 +1006,7 @@ static int ep_poll_callback(wait_queue_t *wait, unsigned mode, int sync)
 	if (EP_IS_LINKED(&dpi->rdllink))
 		goto is_linked;
 
-	list_add(&dpi->rdllink, &ep->rdllist);
+	list_add_tail(&dpi->rdllink, &ep->rdllist);
 
 is_linked:
 	/*
@@ -1072,9 +1085,9 @@ static int ep_events_transfer(struct eventpoll *ep, struct pollfd *events, int m
 		EP_LIST_DEL(&dpi->rdllink);
 
 		/*
-		 * If the item is not linked to the main has table this means that
+		 * If the item is not linked to the main hash table this means that
 		 * it's on the way to be removed and we don't want to send events
-		 * to such file descriptor.
+		 * for such file descriptor.
 		 */
 		if (!EP_IS_LINKED(&dpi->llink))
 			continue;
@@ -1125,7 +1138,7 @@ static int ep_events_transfer(struct eventpoll *ep, struct pollfd *events, int m
 static int ep_poll(struct eventpoll *ep, struct pollfd *events, int maxevents,
 		   int timeout)
 {
-	int res = 0, eavail;
+	int res, eavail;
 	unsigned long flags;
 	long jtimeout;
 	wait_queue_t wait;

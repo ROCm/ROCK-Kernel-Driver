@@ -804,10 +804,12 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	SCTP_DEBUG_PRINTK("msg_len: %Zd, sinfo_flags: 0x%x\n",
 			  msg_len, sinfo_flags);
 
-	/* If MSG_EOF|MSG_ABORT is set, no data can be sent.  Disallow
-	 * sending 0-length messages when MSG_EOF|MSG_ABORT is not set.
-	 */
-	if (((sinfo_flags & (MSG_EOF|MSG_ABORT)) && (msg_len > 0)) ||
+	/* If MSG_EOF is set, no data can be sent. Disallow sending zero
+	 * length messages when MSG_EOF|MSG_ABORT is not set.
+	 * If MSG_ABORT is set, the message length could be non zero with
+	 * the msg_iov set to the user abort reason.
+ 	 */
+	if (((sinfo_flags & MSG_EOF) && (msg_len > 0)) ||
 	    (!(sinfo_flags & (MSG_EOF|MSG_ABORT)) && (msg_len == 0))) {
 		err = -EINVAL;
 		goto out_nounlock;
@@ -879,7 +881,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		}
 		if (sinfo_flags & MSG_ABORT) {
 			SCTP_DEBUG_PRINTK("Aborting association: %p\n", asoc);
-			sctp_primitive_ABORT(asoc, NULL);
+			sctp_primitive_ABORT(asoc, msg);
 			err = 0;
 			goto out_unlock;
 		}
@@ -1238,6 +1240,9 @@ static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 {
 	sctp_opt_t *sp = sctp_sk(sk);
 
+	/* Applicable to UDP-style socket only */
+	if (SCTP_SOCKET_TCP == sp->type)
+		return -EOPNOTSUPP;
 	if (optlen != sizeof(int))
 		return -EINVAL;
 	if (copy_from_user(&sp->autoclose, optval, optlen))
@@ -1593,6 +1598,9 @@ static inline int sctp_getsockopt_set_events(struct sock *sk, int len, char *opt
 
 static inline int sctp_getsockopt_autoclose(struct sock *sk, int len, char *optval, int *optlen)
 {
+	/* Applicable to UDP-style socket only */
+	if (SCTP_SOCKET_TCP == sctp_sk(sk)->type)
+		return -EOPNOTSUPP;
 	if (len != sizeof(int))
 		return -EINVAL;
 	if (copy_to_user(optval, &sctp_sk(sk)->autoclose, len))
@@ -1614,10 +1622,10 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 	int err = 0;
 
 	/* An association cannot be branched off from an already peeled-off
-	 * socket.
+	 * socket, nor is this supported for tcp style sockets.
 	 */
-	if (SCTP_SOCKET_UDP_HIGH_BANDWIDTH == sctp_sk(oldsk)->type)
-		return -EINVAL;
+	if (SCTP_SOCKET_UDP != sctp_sk(oldsk)->type)
+		return -EOPNOTSUPP;
 
 	/* Create a new socket.  */
 	err = sock_create(PF_INET, SOCK_SEQPACKET, IPPROTO_SCTP, &tmpsock);

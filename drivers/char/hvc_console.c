@@ -340,12 +340,12 @@ static int __init hvc_console_setup(struct console *co, char *options)
 }
 
 struct console hvc_con_driver = {
-	name:		"hvc",
-	write:		hvc_console_print,
-	device:		hvc_console_device,
-	setup:		hvc_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= "hvc",
+	.write		= hvc_console_print,
+	.device		= hvc_console_device,
+	.setup		= hvc_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 int __init hvc_console_init(void)

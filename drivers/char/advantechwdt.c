@@ -200,12 +200,12 @@ advwdt_notify_sys(struct notifier_block *this, unsigned long code,
  */
  
 static struct file_operations advwdt_fops = {
-	owner:		THIS_MODULE,
-	read:		advwdt_read,
-	write:		advwdt_write,
-	ioctl:		advwdt_ioctl,
-	open:		advwdt_open,
-	release:	advwdt_close,
+	.owner		= THIS_MODULE,
+	.read		= advwdt_read,
+	.write		= advwdt_write,
+	.ioctl		= advwdt_ioctl,
+	.open		= advwdt_open,
+	.release	= advwdt_close,
 };
 
 static struct miscdevice advwdt_miscdev = {

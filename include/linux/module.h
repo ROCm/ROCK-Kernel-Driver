@@ -311,7 +311,7 @@ static const char __module_using_checksums[]
  */
 #define MODULE_GENERIC_TABLE(gtype,name) \
 static const struct gtype##_id * __module_##gtype##_table \
-  __attribute__ ((unused, __section__(".data.exit"))) = name
+  __attribute__ ((unused, __section__(".exit.data"))) = name
 
 #ifndef __GENKSYMS__
 
