@@ -70,12 +70,7 @@
 #define	DRIVER_ID	"i2c-prosavage"
 #define	DRIVER_VERSION	"20030621"
 
-/* lm_sensors2 / kernel 2.5.xx compatibility */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 #define ADAPTER_NAME(x) (x).name
-#else
-#define ADAPTER_NAME(x) (x).dev.name
-#endif /* LINUX_VERSION_CODE */
 
 #define MAX_BUSSES	2
 

@@ -122,7 +122,7 @@ static int saa7111_attach(struct i2c_adapter *adap, int addr, int kind)
 	}
 
 	memset(decoder, 0, sizeof(*decoder));
-	strlcpy(client->dev.name, "saa7111", DEVICE_NAME_SIZE);
+	strlcpy(client->name, "saa7111", DEVICE_NAME_SIZE);
 	decoder->client = client;
 	i2c_set_clientdata(client, decoder);
 	decoder->addr = addr;
@@ -137,10 +137,10 @@ static int saa7111_attach(struct i2c_adapter *adap, int addr, int kind)
 	i = i2c_master_send(client, init, sizeof(init));
 	if (i < 0) {
 		printk(KERN_ERR "%s_attach: init status %d\n",
-		       client->dev.name, i);
+		       client->name, i);
 	} else {
 		printk(KERN_INFO "%s_attach: chip version %x @ 0x%08x\n",
-		       client->dev.name, i2c_smbus_read_byte_data(client, 0x00) >> 4,addr);
+		       client->name, i2c_smbus_read_byte_data(client, 0x00) >> 4,addr);
 	}
 
 	init_MUTEX(&decoder->lock);
@@ -159,7 +159,7 @@ static int saa7111_probe(struct i2c_adapter *adap)
 	}
 	
 	printk("saa7111: probing %s i2c adapter [id=0x%x]\n",
-                       adap->dev.name,adap->id);
+                       adap->name,adap->id);
 	return i2c_probe(adap, &addr_data, saa7111_attach);
 }
 
@@ -188,8 +188,7 @@ static int saa7111_command(struct i2c_client *client, unsigned int cmd,
 			for (i = 0; i < 32; i += 16) {
 				int j;
 
-				printk("KERN_DEBUG %s: %03x", client->dev.name,
-				       i);
+				printk("KERN_DEBUG %s: %03x", client->name, i);
 				for (j = 0; j < 16; ++j) {
 					printk(" %02x",
 					       i2c_smbus_read_byte_data(client,
@@ -413,9 +412,7 @@ static struct i2c_driver i2c_driver_saa7111 = {
 static struct i2c_client client_template = {
 	.id 	= -1,
 	.driver	= &i2c_driver_saa7111,
-	.dev	= {
-		.name	= "saa7111_client",
-	},
+	.name	= "saa7111_client",
 };
 
 static int saa7111_init(void)

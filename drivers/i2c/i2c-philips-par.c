@@ -152,9 +152,7 @@ static struct i2c_algo_bit_data bit_lp_data2 = {
 static struct i2c_adapter bit_lp_ops = {
 	.owner		= THIS_MODULE,
 	.id		= I2C_HW_B_LP,
-	.dev		= {
-		.name	= "Philips Parallel port adapter",
-	},
+	.name		= "Philips Parallel port adapter",
 };
 
 static void i2c_parport_attach (struct parport *port)

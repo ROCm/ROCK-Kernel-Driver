@@ -141,7 +141,7 @@ pci_setup_bridge(struct pci_bus *bus)
 	u32 l;
 
 	DBGC((KERN_INFO "PCI: Bus %d, bridge: %s\n",
-			bus->number, bridge->dev.name));
+			bus->number, pci_name(bridge)));
 
 	/* Set up the top and bottom of the PCI I/O segment for this bus. */
 	pcibios_resource_to_bus(bridge, &region, bus->resource[0]);
@@ -530,6 +530,8 @@ pci_assign_unassigned_resources(void)
 	for(ln=pci_root_buses.next; ln != &pci_root_buses; ln=ln->next)
 		pci_bus_size_bridges(pci_bus_b(ln));
 	/* Depth last, allocate resources and update the hardware. */
-	for(ln=pci_root_buses.next; ln != &pci_root_buses; ln=ln->next)
+	for(ln=pci_root_buses.next; ln != &pci_root_buses; ln=ln->next) {
 		pci_bus_assign_resources(pci_bus_b(ln));
+		pci_enable_bridges(pci_bus_b(ln));
+	}
 }

@@ -399,7 +399,7 @@ void saa7134_i2c_call_clients(struct saa7134_dev *dev,
 int saa7134_i2c_register(struct saa7134_dev *dev)
 {
 	dev->i2c_adap = saa7134_adap_template;
-	strcpy(dev->i2c_adap.dev.name,dev->name);
+	strcpy(dev->i2c_adap.name,dev->name);
 	dev->i2c_adap.algo_data = dev;
 	i2c_add_adapter(&dev->i2c_adap);
 	

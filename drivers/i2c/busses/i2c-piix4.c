@@ -127,7 +127,7 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 	if (PCI_FUNC(PIIX4_dev->devfn) != id->driver_data)
 		return -ENODEV;
 
-	dev_info(&PIIX4_dev->dev, "Found %s device\n", PIIX4_dev->dev.name);
+	dev_info(&PIIX4_dev->dev, "Found %s device\n", pci_name(PIIX4_dev));
 
 	if(ibm_dmi_probe()) {
 		dev_err(&PIIX4_dev->dev, "IBM Laptop detected; this module "
@@ -389,9 +389,7 @@ static struct i2c_adapter piix4_adapter = {
 	.id		= I2C_ALGO_SMBUS | I2C_HW_SMBUS_PIIX4,
 	.class		= I2C_ADAP_CLASS_SMBUS,
 	.algo		= &smbus_algorithm,
-	.dev		= {
-		.name	= "unset",
-	},
+	.name		= "unset",
 };
 
 static struct pci_device_id piix4_ids[] = {
@@ -444,7 +442,7 @@ static int __devinit piix4_probe(struct pci_dev *dev, const struct pci_device_id
 	/* set up the driverfs linkage to our parent device */
 	piix4_adapter.dev.parent = &dev->dev;
 
-	snprintf(piix4_adapter.dev.name, DEVICE_NAME_SIZE,
+	snprintf(piix4_adapter.name, DEVICE_NAME_SIZE,
 		"SMBus PIIX4 adapter at %04x", piix4_smba);
 
 	retval = i2c_add_adapter(&piix4_adapter);

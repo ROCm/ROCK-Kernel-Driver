@@ -131,9 +131,7 @@ static struct i2c_adapter bit_elv_ops = {
 	.owner		= THIS_MODULE,
 	.id		= I2C_HW_B_ELV,
 	.algo_data	= &bit_elv_data,
-	.dev		= {
-		.name	= "ELV Parallel port adaptor",
-	},
+	.name		= "ELV Parallel port adaptor",
 };
 
 static int __init i2c_bitelv_init(void)

@@ -181,7 +181,7 @@ static const unsigned char init_ntsc[] = {
 	0x66, 0x21,		/* FSC3 */
 };
 
-static int saa7185_attach(struct i2c_adapter *adap, int addr, unsigned short flags, int kind)
+static int saa7185_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	int i;
 	struct saa7185 *encoder;
@@ -202,7 +202,7 @@ static int saa7185_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 
 
 	memset(encoder, 0, sizeof(*encoder));
-	strlcpy(client->dev.name, "saa7185", DEVICE_NAME_SIZE);
+	strlcpy(client->name, "saa7185", DEVICE_NAME_SIZE);
 	encoder->client = client;
 	i2c_set_clientdata(client, encoder);
 	encoder->addr = addr;
@@ -215,11 +215,10 @@ static int saa7185_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 					sizeof(init_ntsc));
 	}
 	if (i < 0) {
-		printk(KERN_ERR "%s_attach: init error %d\n", client->dev.name,
-		       i);
+		printk(KERN_ERR "%s_attach: init error %d\n", client->name, i);
 	} else {
 		printk(KERN_INFO "%s_attach: chip version %d\n",
-		       client->dev.name, i2c_smbus_read_byte(client) >> 5);
+		       client->name, i2c_smbus_read_byte(client) >> 5);
 	}
 	init_MUTEX(&encoder->lock);
 	i2c_attach_client(client);
@@ -367,9 +366,7 @@ static struct i2c_driver i2c_driver_saa7185 = {
 static struct i2c_client client_template = {
 	.id 	= -1,
 	.driver = &i2c_driver_saa7185,
-	.dev	= {
-		.name	= "saa7185_client",
-	},
+	.name	= "saa7185_client",
 };
 
 static int saa7185_init(void)
