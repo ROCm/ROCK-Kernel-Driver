@@ -1302,6 +1302,38 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 
 	ntfs_debug("Entering.");
 
+#ifdef NTFS_RW
+	/*
+	 * Commit all inodes while they are still open in case some of them
+	 * cause others to be dirtied.
+	 */
+	ntfs_commit_inode(vol->vol_ino);
+
+	/* NTFS 3.0+ specific. */
+	if (vol->major_ver >= 3) {
+		if (vol->secure_ino)
+			ntfs_commit_inode(vol->secure_ino);
+	}
+
+	ntfs_commit_inode(vol->root_ino);
+
+	down_write(&vol->lcnbmp_lock);
+	ntfs_commit_inode(vol->lcnbmp_ino);
+	up_write(&vol->lcnbmp_lock);
+
+	down_write(&vol->mftbmp_lock);
+	ntfs_commit_inode(vol->mftbmp_ino);
+	up_write(&vol->mftbmp_lock);
+
+	if (vol->logfile_ino)
+		ntfs_commit_inode(vol->logfile_ino);
+
+	if (vol->mftmirr_ino)
+		ntfs_commit_inode(vol->mftmirr_ino);
+
+	ntfs_commit_inode(vol->mft_ino);
+#endif /* NTFS_RW */
+
 	iput(vol->vol_ino);
 	vol->vol_ino = NULL;
 
@@ -1333,6 +1365,9 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 	}
 
 	if (vol->mftmirr_ino) {
+		/* Re-commit the mft mirror and mft just in case. */
+		ntfs_commit_inode(vol->mftmirr_ino);
+		ntfs_commit_inode(vol->mft_ino);
 		iput(vol->mftmirr_ino);
 		vol->mftmirr_ino = NULL;
 	}

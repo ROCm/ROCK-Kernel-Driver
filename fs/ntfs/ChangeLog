@@ -39,6 +39,8 @@ ToDo:
 	  implementation is quite rudimentary for now with lots of things not
 	  implemented yet but I am not sure any of them can actually occur so
 	  I will wait for people to hit each one and only then implement it.
+	- Commit open system inodes at umount time.  This should make it
+	  virtually impossible for sync_mft_mirror_umount() to ever be needed.
 
 2.1.12 - Fix the second fix to the decompression engine and some cleanups.
 
