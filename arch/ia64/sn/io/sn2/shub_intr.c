@@ -26,6 +26,10 @@
 #include <asm/sn/sn2/shub_mmr.h>
 #include <asm/sn/sn_cpuid.h>
 
+
+typedef void pci_bridge_t;
+
+
 /* ARGSUSED */
 void
 hub_intr_init(vertex_hdl_t hubv)

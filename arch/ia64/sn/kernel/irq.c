@@ -36,10 +36,11 @@
 #include <asm/bitops.h>
 #include <asm/sn/sn2/shub_mmr.h>
 
-int irq_to_bit_pos(int irq);
 static void force_interrupt(int irq);
 extern void pcibr_force_interrupt(pcibr_intr_t intr);
 extern int sn_force_interrupt_flag;
+
+static pcibr_intr_list_t *pcibr_intr_list;
 
 
 
@@ -113,8 +114,26 @@ sn_end_irq(unsigned int irq)
 }
 
 static void
-sn_set_affinity_irq(unsigned int irq, unsigned long mask)
+sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 {
+#if CONFIG_SMP  
+        int redir = 0;
+        pcibr_intr_list_t p = pcibr_intr_list[irq];
+        pcibr_intr_t intr; 
+	int	cpu;
+        extern void sn_tio_redirect_intr(pcibr_intr_t intr, unsigned long cpu);
+                
+	if (p == NULL)
+		return; 
+        
+	intr = p->il_intr;
+
+	if (intr == NULL)
+		return; 
+
+	cpu = first_cpu(mask);
+	(void) set_irq_affinity_info(irq, cpu_physical_id(intr->bi_cpu), redir);
+#endif /* CONFIG_SMP */
 }
 
 
@@ -161,41 +180,18 @@ sn_irq_init (void)
 	}
 }
 
-int
-bit_pos_to_irq(int bit) {
-#define BIT_TO_IRQ 64
-	if (bit > 118) bit = 118;
-
-        return bit + BIT_TO_IRQ;
-}
-
-int
-irq_to_bit_pos(int irq) {
-#define IRQ_TO_BIT 64
-	int bit = irq - IRQ_TO_BIT;
-
-        return bit;
-}
-
-struct pcibr_intr_list_t {
-	struct pcibr_intr_list_t *next;
-	pcibr_intr_t intr;
-};
-
-static struct pcibr_intr_list_t **pcibr_intr_list;
-
 void
 register_pcibr_intr(int irq, pcibr_intr_t intr) {
-	struct pcibr_intr_list_t *p = kmalloc(sizeof(struct pcibr_intr_list_t), GFP_KERNEL);
-	struct pcibr_intr_list_t *list;
+	pcibr_intr_list_t p = kmalloc(sizeof(struct pcibr_intr_list_s), GFP_KERNEL);
+	pcibr_intr_list_t list;
 	int cpu = SN_CPU_FROM_IRQ(irq);
 
 	if (pcibr_intr_list == NULL) {
-		pcibr_intr_list = kmalloc(sizeof(struct pcibr_intr_list_t *) * NR_IRQS, GFP_KERNEL);
+		pcibr_intr_list = kmalloc(sizeof(pcibr_intr_list_t) * NR_IRQS, GFP_KERNEL);
 		if (pcibr_intr_list == NULL) 
-			pcibr_intr_list = vmalloc(sizeof(struct pcibr_intr_list_t *) * NR_IRQS);
+			pcibr_intr_list = vmalloc(sizeof(pcibr_intr_list_t) * NR_IRQS);
 		if (pcibr_intr_list == NULL) panic("Could not allocate memory for pcibr_intr_list\n");
-		memset( (void *)pcibr_intr_list, 0, sizeof(struct pcibr_intr_list_t *) * NR_IRQS);
+		memset( (void *)pcibr_intr_list, 0, sizeof(pcibr_intr_list_t) * NR_IRQS);
 	}
 	if (pdacpu(cpu)->sn_last_irq < irq) {
 		pdacpu(cpu)->sn_last_irq = irq;
@@ -203,42 +199,42 @@ register_pcibr_intr(int irq, pcibr_intr_t intr) {
 	if (pdacpu(cpu)->sn_first_irq > irq) pdacpu(cpu)->sn_first_irq = irq;
 	if (!p) panic("Could not allocate memory for pcibr_intr_list_t\n");
 	if ((list = pcibr_intr_list[irq])) {
-		while (list->next) list = list->next;
-		list->next = p;
-		p->next = NULL;
-		p->intr = intr;
+		while (list->il_next) list = list->il_next;
+		list->il_next = p;
+		p->il_next = NULL;
+		p->il_intr = intr;
 	} else {
 		pcibr_intr_list[irq] = p;
-		p->next = NULL;
-		p->intr = intr;
+		p->il_next = NULL;
+		p->il_intr = intr;
 	}
 }
 
 void
 force_polled_int(void) {
 	int i;
-	struct pcibr_intr_list_t *p;
+	pcibr_intr_list_t p;
 
 	for (i=0; i<NR_IRQS;i++) {
 		p = pcibr_intr_list[i];
 		while (p) {
-			if (p->intr){
-				pcibr_force_interrupt(p->intr);
+			if (p->il_intr){
+				pcibr_force_interrupt(p->il_intr);
 			}
-			p = p->next;
+			p = p->il_next;
 		}
 	}
 }
 
 static void
 force_interrupt(int irq) {
-	struct pcibr_intr_list_t *p = pcibr_intr_list[irq];
+	pcibr_intr_list_t p = pcibr_intr_list[irq];
 
 	while (p) {
-		if (p->intr) {
-			pcibr_force_interrupt(p->intr);
+		if (p->il_intr) {
+			pcibr_force_interrupt(p->il_intr);
 		}
-		p = p->next;
+		p = p->il_next;
 	}
 }
 
@@ -298,13 +294,13 @@ sn_lb_int_war_check(void) {
 	if (pda->sn_first_irq == 0) return;
 	for (i=pda->sn_first_irq;
 		i <= pda->sn_last_irq; i++) {
-			struct pcibr_intr_list_t *p = pcibr_intr_list[i];
+			pcibr_intr_list_t p = pcibr_intr_list[i];
 			if (p == NULL) {
 				continue;
 			}
 			while (p) {
-				sn_check_intr(i, p->intr);
-				p = p->next;
+				sn_check_intr(i, p->il_intr);
+				p = p->il_next;
 			}
 	}
 }
