@@ -812,27 +812,66 @@ out_bad:
 	return NULL;
 }
 
+static inline int
+gss_wrap_req_integ(struct gss_cl_ctx *ctx,
+			kxdrproc_t encode, void *rqstp, u32 *p, void *obj)
+{
+	struct rpc_rqst	*req = (struct rpc_rqst *)rqstp;
+	struct xdr_buf	*snd_buf = &req->rq_snd_buf;
+	struct xdr_buf	integ_buf;
+	u32             *integ_len = NULL;
+	struct xdr_netobj mic;
+	u32		offset, *q;
+	struct iovec	*iov;
+	u32             maj_stat = 0;
+	int		status = -EIO;
+
+	integ_len = p++;
+	offset = (u8 *)p - (u8 *)snd_buf->head[0].iov_base;
+	*p++ = htonl(req->rq_seqno);
+
+	status = encode(rqstp, p, obj);
+	if (status)
+		return status;
+
+	if (xdr_buf_subsegment(snd_buf, &integ_buf,
+				offset, snd_buf->len - offset))
+		return status;
+	*integ_len = htonl(integ_buf.len);
+
+	/* guess whether we're in the head or the tail: */
+	if (snd_buf->page_len || snd_buf->tail[0].iov_len) 
+		iov = snd_buf->tail;
+	else
+		iov = snd_buf->head;
+	p = iov->iov_base + iov->iov_len;
+	mic.data = (u8 *)(p + 1);
+
+	maj_stat = gss_get_mic(ctx->gc_gss_ctx,
+			GSS_C_QOP_DEFAULT, &integ_buf, &mic);
+	status = -EIO; /* XXX? */
+	if (maj_stat)
+		return status;
+	q = xdr_encode_opaque(p, NULL, mic.len);
+
+	offset = (u8 *)q - (u8 *)p;
+	iov->iov_len += offset;
+	snd_buf->len += offset;
+	return 0;
+}
+
 static int
 gss_wrap_req(struct rpc_task *task,
 	     kxdrproc_t encode, void *rqstp, u32 *p, void *obj)
 {
-	struct rpc_rqst	*req = (struct rpc_rqst *)rqstp;
-	struct xdr_buf	*snd_buf = &req->rq_snd_buf;
 	struct rpc_cred *cred = task->tk_msg.rpc_cred;
 	struct gss_cred	*gss_cred = container_of(cred, struct gss_cred,
 			gc_base);
 	struct gss_cl_ctx *ctx = gss_cred_get_ctx(cred);
-	u32             *integ_len = NULL;
 	int             status = -EIO;
-	u32             maj_stat = 0;
-	struct xdr_buf	integ_buf;
-	struct xdr_netobj mic;
 	u32		service;
-	u32		offset, *q;
-	struct iovec	*iov;
 
 	dprintk("RPC: %4u gss_wrap_req\n", task->tk_pid);
-	BUG_ON(!ctx);
 	if (ctx->gc_proc != RPC_GSS_PROC_DATA) {
 		/* The spec seems a little ambiguous here, but I think that not
 		 * wrapping context destruction requests makes the most sense.
@@ -847,69 +886,65 @@ gss_wrap_req(struct rpc_task *task,
 			status = encode(rqstp, p, obj);
 			goto out;
 		case RPC_GSS_SVC_INTEGRITY:
-
-			integ_len = p++;
-			offset = (u8 *)p - (u8 *)snd_buf->head[0].iov_base;
-			*p++ = htonl(req->rq_seqno);
-
-			status = encode(rqstp, p, obj);
-			if (status)
-				goto out;
-
-			if (xdr_buf_subsegment(snd_buf, &integ_buf,
-						offset, snd_buf->len - offset))
-				goto out;
-			*integ_len = htonl(integ_buf.len);
-
-			/* guess whether we're in the head or the tail: */
-			if (snd_buf->page_len || snd_buf->tail[0].iov_len) 
-				iov = snd_buf->tail;
-			else
-				iov = snd_buf->head;
-			p = iov->iov_base + iov->iov_len;
-			mic.data = (u8 *)(p + 1);
-
-			maj_stat = gss_get_mic(ctx->gc_gss_ctx,
-					GSS_C_QOP_DEFAULT, &integ_buf, &mic);
-			status = -EIO; /* XXX? */
-			if (maj_stat)
-				goto out;
-			q = xdr_encode_opaque(p, NULL, mic.len);
-
-			offset = (u8 *)q - (u8 *)p;
-			iov->iov_len += offset;
-			snd_buf->len += offset;
-			break;
+			status = gss_wrap_req_integ(ctx, encode, rqstp, p, obj);
+			goto out;
 		case RPC_GSS_SVC_PRIVACY:
 		default:
 			goto out;
 	}
-	status = 0;
 out:
 	gss_put_ctx(ctx);
 	dprintk("RPC: %4u gss_wrap_req returning %d\n", task->tk_pid, status);
 	return status;
 }
 
+static inline int
+gss_unwrap_resp_integ(struct gss_cl_ctx *ctx,
+		kxdrproc_t decode, void *rqstp, u32 **p, void *obj)
+{
+	struct rpc_rqst *req = (struct rpc_rqst *)rqstp;
+	struct xdr_buf	*rcv_buf = &req->rq_rcv_buf;
+	struct xdr_buf integ_buf;
+	struct xdr_netobj mic;
+	u32 data_offset, mic_offset;
+	u32 integ_len;
+	u32 maj_stat;
+	int status = -EIO;
+
+	integ_len = ntohl(*(*p)++);
+	if (integ_len & 3)
+		return status;
+	data_offset = (u8 *)(*p) - (u8 *)rcv_buf->head[0].iov_base;
+	mic_offset = integ_len + data_offset;
+	if (mic_offset > rcv_buf->len)
+		return status;
+	if (ntohl(*(*p)++) != req->rq_seqno)
+		return status;
+
+	if (xdr_buf_subsegment(rcv_buf, &integ_buf, data_offset,
+				mic_offset - data_offset))
+		return status;
+
+	if (xdr_buf_read_netobj(rcv_buf, &mic, mic_offset))
+		return status;
+
+	maj_stat = gss_verify_mic(ctx->gc_gss_ctx, &integ_buf,
+			&mic, NULL);
+	if (maj_stat != GSS_S_COMPLETE)
+		return status;
+	return 0;
+}
+
 static int
 gss_unwrap_resp(struct rpc_task *task,
 		kxdrproc_t decode, void *rqstp, u32 *p, void *obj)
 {
-	struct rpc_rqst *req = (struct rpc_rqst *)rqstp;
-	struct xdr_buf	*rcv_buf = &req->rq_rcv_buf;
 	struct rpc_cred *cred = task->tk_msg.rpc_cred;
 	struct gss_cred *gss_cred = container_of(cred, struct gss_cred,
 			gc_base);
 	struct gss_cl_ctx *ctx = gss_cred_get_ctx(cred);
-	struct xdr_buf	integ_buf;
-	struct xdr_netobj mic;
 	int             status = -EIO;
-	u32		maj_stat = 0;
 	u32		service;
-	u32		data_offset, mic_offset;
-	u32		integ_len;
-
-	BUG_ON(!ctx);
 
 	if (ctx->gc_proc != RPC_GSS_PROC_DATA)
 		goto out_decode;
@@ -919,26 +954,9 @@ gss_unwrap_resp(struct rpc_task *task,
 		case RPC_GSS_SVC_NONE:
 			goto out_decode;
 		case RPC_GSS_SVC_INTEGRITY:
-			integ_len = ntohl(*p++);
-			if (integ_len & 3)
-				goto out;
-			data_offset = (u8 *)p - (u8 *)rcv_buf->head[0].iov_base;
-			mic_offset = integ_len + data_offset;
-			if (mic_offset > rcv_buf->len)
-				goto out;
-			if (ntohl(*p++) != req->rq_seqno)
-				goto out;
-
-			if (xdr_buf_subsegment(rcv_buf, &integ_buf, data_offset,
-						mic_offset - data_offset))
-				goto out;
-
-			if (xdr_buf_read_netobj(rcv_buf, &mic, mic_offset))
-				goto out;
-
-			maj_stat = gss_verify_mic(ctx->gc_gss_ctx, &integ_buf,
-					&mic, NULL);
-			if (maj_stat != GSS_S_COMPLETE)
+			status = gss_unwrap_resp_integ(ctx, decode, 
+							rqstp, &p, obj);
+			if (status)
 				goto out;
 			break;
 		case RPC_GSS_SVC_PRIVACY:
