@@ -431,6 +431,8 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 		 * AGP2.x 4x -> AGP3.0 4x.
 		 */
 		if (*mode & AGPSTAT2_4X) {
+			printk (KERN_INFO PFX "%s passes broken AGP3 flags (%x). Fixed.\n",
+						current->comm, *mode);
 			*mode &= ~AGPSTAT2_4X;
 			*mode |= AGPSTAT3_4X;
 		}
@@ -440,6 +442,8 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 		 * but have been passed an AGP 2.x mode.
 		 * Convert AGP 1x,2x,4x -> AGP 3.0 4x.
 		 */
+		printk (KERN_INFO PFX "%s passes broken AGP2 flags (%x) in AGP3 mode. Fixed.\n",
+					current->comm, *mode);
 		*mode &= ~(AGPSTAT2_4X | AGPSTAT2_2X | AGPSTAT2_1X);
 		*mode |= AGPSTAT3_4X;
 	}
