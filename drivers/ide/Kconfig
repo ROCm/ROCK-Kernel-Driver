@@ -899,12 +899,16 @@ config BLK_DEV_GAYLE
 	bool "Amiga Gayle IDE interface support"
 	depends on AMIGA
 	help
-	  This is the IDE driver for the builtin IDE interface on some Amiga
-	  models. It supports both the `A1200 style' (used in A600 and A1200)
-	  and `A4000 style' (used in A4000 and A4000T) of the Gayle IDE
-	  interface. Say Y if you have such an Amiga model and want to use IDE
-	  devices (hard disks, CD-ROM drives, etc.) that are connected to the
-	  builtin IDE interface.
+	  This is the IDE driver for the Amiga Gayle IDE interface. It supports
+	  both the `A1200 style' and `A4000 style' of the Gayle IDE interface,
+	  This includes builtin IDE interfaces on some Amiga models (A600,
+	  A1200, A4000, and A4000T), and IDE interfaces on the Zorro expansion
+	  bus (M-Tech E-Matrix 530 expansion card).
+	  Say Y if you have an Amiga with a Gayle IDE interface and want to use
+	  IDE devices (hard disks, CD-ROM drives, etc.) that are connected to
+	  it.
+	  Note that you also have to enable Zorro bus support if you want to
+	  use Gayle IDE interfaces on the Zorro expansion bus.
 
 config BLK_DEV_IDEDOUBLER
 	bool "Amiga IDE Doubler support (EXPERIMENTAL)"
