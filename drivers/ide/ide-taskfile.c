@@ -991,22 +991,11 @@ EXPORT_SYMBOL(pre_task_mulout_intr);
 
 #endif /* !CONFIG_IDE_TASKFILE_IO */
 
-/*
- * This function is intended to be used prior to invoking ide_do_drive_cmd().
- */
-void ide_init_drive_taskfile (struct request *rq)
-{
-	memset(rq, 0, sizeof(*rq));
-	rq->flags = REQ_DRIVE_TASKFILE;
-}
-
-EXPORT_SYMBOL(ide_init_drive_taskfile);
-
 int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_size, u8 *buf)
 {
 	struct request rq;
 
-	ide_init_drive_taskfile(&rq);
+	memset(&rq, 0, sizeof(rq));
 	rq.flags = REQ_DRIVE_TASKFILE;
 	rq.buffer = buf;
 

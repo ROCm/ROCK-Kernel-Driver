@@ -1434,7 +1434,6 @@ extern ide_startstop_t pre_task_out_intr(ide_drive_t *, struct request *);
 extern ide_startstop_t task_out_intr(ide_drive_t *);
 extern ide_startstop_t pre_task_mulout_intr(ide_drive_t *, struct request *);
 extern ide_startstop_t task_mulout_intr(ide_drive_t *);
-extern void ide_init_drive_taskfile(struct request *);
 
 extern int ide_raw_taskfile(ide_drive_t *, ide_task_t *, u8 *);
 
