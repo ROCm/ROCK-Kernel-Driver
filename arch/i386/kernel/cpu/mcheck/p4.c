@@ -148,7 +148,7 @@ done:
 	return mce_num_extended_msrs;
 }
 
-static void intel_machine_check(struct pt_regs * regs, long error_code)
+static asmlinkage void intel_machine_check(struct pt_regs * regs, long error_code)
 {
 	int recover=1;
 	u32 alow, ahigh, high, low;
