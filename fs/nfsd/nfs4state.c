@@ -1994,13 +1994,9 @@ nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	strhashval = lock_ownerstr_hashval(inode, 
 			lockt->lt_clientid.cl_id, lockt->lt_owner);
 
-	if (find_lockstateowner_str(strhashval, &lockt->lt_owner, 
+	find_lockstateowner_str(strhashval, &lockt->lt_owner,
 					&lockt->lt_clientid, 
-					&lockt->lt_stateowner)) {
-		printk("NFSD: nsfd4_lockt: lookup_lockowner() failed!\n");
-		goto out;
-	}
-
+					&lockt->lt_stateowner);
 	sop = lockt->lt_stateowner;
 	if (sop) {
 		file_lock.fl_owner = (fl_owner_t) sop;
