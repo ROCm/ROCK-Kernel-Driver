@@ -2270,7 +2270,11 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
  *
  * We don't support i_size changes yet.
  *
- * Called with ->i_sem held.
+ * Called with ->i_sem held.  In all but one case ->i_alloc_sem is held for
+ * writing.  The only case where ->i_alloc_sem is not held is
+ * mm/filemap.c::generic_file_buffered_write() where vmtruncate() is called
+ * with the current i_size as the offset which means that it is a noop as far
+ * as ntfs_truncate() is concerned.
  */
 void ntfs_truncate(struct inode *vi)
 {
@@ -2289,67 +2293,62 @@ void ntfs_truncate(struct inode *vi)
  * @attr:	structure describing the attributes and the changes
  *
  * We have to trap VFS attempts to truncate the file described by @dentry as
- * soon as possible, because we do not implement changes in i_size yet. So we
+ * soon as possible, because we do not implement changes in i_size yet.  So we
  * abort all i_size changes here.
  *
- * Called with ->i_sem held.
+ * We also abort all changes of user, group, and mode as we do not implement
+ * the NTFS ACLs yet.
+ *
+ * Called with ->i_sem held.  For the ATTR_SIZE (i.e. ->truncate) case, also
+ * called with ->i_alloc_sem held for writing.
  *
  * Basically this is a copy of generic notify_change() and inode_setattr()
  * functionality, except we intercept and abort changes in i_size.
  */
 int ntfs_setattr(struct dentry *dentry, struct iattr *attr)
 {
-	struct inode *vi;
+	struct inode *vi = dentry->d_inode;
 	int err;
 	unsigned int ia_valid = attr->ia_valid;
-
-	vi = dentry->d_inode;
 
 	err = inode_change_ok(vi, attr);
 	if (err)
 		return err;
 
-	if ((ia_valid & ATTR_UID && attr->ia_uid != vi->i_uid) ||
-			(ia_valid & ATTR_GID && attr->ia_gid != vi->i_gid)) {
-		err = DQUOT_TRANSFER(vi, attr) ? -EDQUOT : 0;
-		if (err)
-			return err;
+	/* We do not support NTFS ACLs yet. */
+	if (ia_valid & (ATTR_UID | ATTR_GID | ATTR_MODE)) {
+		ntfs_warning(vi->i_sb, "Changes in user/group/mode are not "
+				"supported yet, ignoring.");
+		err = -EOPNOTSUPP;
+		goto out;
 	}
-
-	lock_kernel();
 
 	if (ia_valid & ATTR_SIZE) {
-		ntfs_error(vi->i_sb, "Changes in i_size are not supported "
-				"yet. Sorry.");
-		// TODO: Implement...
-		// err = vmtruncate(vi, attr->ia_size);
-		err = -EOPNOTSUPP;
-		if (err)
-			goto trunc_err;
+		if (attr->ia_size != i_size_read(vi)) {
+			ntfs_warning(vi->i_sb, "Changes in inode size are not "
+					"supported yet, ignoring.");
+			err = -EOPNOTSUPP;
+			// TODO: Implement...
+			// err = vmtruncate(vi, attr->ia_size);
+			if (err || ia_valid == ATTR_SIZE)
+				goto out;
+		} else {
+			/*
+			 * We skipped the truncate but must still update
+			 * timestamps.
+			 */
+			ia_valid |= ATTR_MTIME|ATTR_CTIME;
+		}
 	}
 
-	if (ia_valid & ATTR_UID)
-		vi->i_uid = attr->ia_uid;
-	if (ia_valid & ATTR_GID)
-		vi->i_gid = attr->ia_gid;
 	if (ia_valid & ATTR_ATIME)
 		vi->i_atime = attr->ia_atime;
 	if (ia_valid & ATTR_MTIME)
 		vi->i_mtime = attr->ia_mtime;
 	if (ia_valid & ATTR_CTIME)
 		vi->i_ctime = attr->ia_ctime;
-	if (ia_valid & ATTR_MODE) {
-		vi->i_mode = attr->ia_mode;
-		if (!in_group_p(vi->i_gid) &&
-				!capable(CAP_FSETID))
-			vi->i_mode &= ~S_ISGID;
-	}
 	mark_inode_dirty(vi);
-
-trunc_err:
-
-	unlock_kernel();
-
+out:
 	return err;
 }
 

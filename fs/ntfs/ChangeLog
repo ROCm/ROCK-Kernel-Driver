@@ -21,6 +21,14 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
+2.1.19-WIP
+
+	- Update ->setattr (fs/ntfs/inode.c::ntfs_setattr()) to refuse to
+	  change the uid, gid, and mode of an inode as we do not support NTFS
+	  ACLs yet.
+	- Remove BKL use from ntfs_setattr() syncing up with the rest of the
+	  kernel.
+
 2.1.18 - Fix scheduling latencies at mount time as well as an endianness bug.
 
 	- Remove vol->nr_mft_records as it was pretty meaningless and optimize
