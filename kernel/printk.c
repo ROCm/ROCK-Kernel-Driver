@@ -704,6 +704,27 @@ struct tty_driver *console_device(int *index)
 }
 
 /*
+ * Prevent further output on the passed console device so that (for example)
+ * serial drivers can disable console output before suspending a port, and can
+ * re-enable output afterwards.
+ */
+void console_stop(struct console *console)
+{
+	acquire_console_sem();
+	console->flags &= ~CON_ENABLED;
+	release_console_sem();
+}
+EXPORT_SYMBOL(console_stop);
+
+void console_start(struct console *console)
+{
+	acquire_console_sem();
+	console->flags |= CON_ENABLED;
+	release_console_sem();
+}
+EXPORT_SYMBOL(console_start);
+
+/*
  * The console driver calls this routine during kernel initialization
  * to register the console printing procedure with printk() and to
  * print any messages that were printed by the kernel before the
