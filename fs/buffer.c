@@ -3015,9 +3015,13 @@ EXPORT_SYMBOL(try_to_free_buffers);
 int block_sync_page(struct page *page)
 {
 	struct address_space *mapping;
-	smp_mb();
-	mapping = page_mapping(page);
-	blk_run_address_space(mapping);
+	if (PageSwapCache(page))
+		swap_unplug_io_fn(page);
+	else {
+		smp_mb();
+		mapping = page_mapping(page);
+		blk_run_address_space(mapping);
+	}
 	return 0;
 }
 
