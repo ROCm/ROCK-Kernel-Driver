@@ -34,5 +34,5 @@ struct hw_interrupt_type irq_type_ia64_lsapic = {
 	.disable =	lsapic_noop,
 	.ack =		lsapic_noop,
 	.end =		lsapic_noop,
-	.set_affinity =	(void (*)(unsigned int, unsigned long)) lsapic_noop
+	.set_affinity =	(void (*)(unsigned int, cpumask_t)) lsapic_noop
 };
