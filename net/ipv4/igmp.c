@@ -757,9 +757,10 @@ static void igmp_heard_report(struct in_device *in_dev, u32 group)
 	read_unlock(&in_dev->lock);
 }
 
-static void igmp_heard_query(struct in_device *in_dev, struct igmphdr *ih,
+static void igmp_heard_query(struct in_device *in_dev, struct sk_buff *skb,
 	int len)
 {
+	struct igmphdr 		*ih = skb->h.igmph;
 	struct igmpv3_query *ih3 = (struct igmpv3_query *)ih;
 	struct ip_mc_list	*im;
 	u32			group = ih->group;
@@ -790,6 +791,17 @@ static void igmp_heard_query(struct in_device *in_dev, struct igmphdr *ih,
 	} else if (len < 12) {
 		return;	/* ignore bogus packet; freed by caller */
 	} else { /* v3 */
+		if (!pskb_may_pull(skb, sizeof(struct igmpv3_query)))
+			return;
+		
+		ih3 = (struct igmpv3_query *) skb->h.raw;
+		if (ih3->nsrcs) {
+			if (!pskb_may_pull(skb, sizeof(struct igmpv3_query) 
+					   + ntohs(ih3->nsrcs)*sizeof(__u32)))
+				return;
+			ih3 = (struct igmpv3_query *) skb->h.raw;
+		}
+
 		max_delay = IGMPV3_MRC(ih3->code)*(HZ/IGMP_TIMER_SCALE);
 		if (!max_delay)
 			max_delay = 1;	/* can't mod w/ 0 */
@@ -838,7 +850,7 @@ static void igmp_heard_query(struct in_device *in_dev, struct igmphdr *ih,
 int igmp_rcv(struct sk_buff *skb)
 {
 	/* This basically follows the spec line by line -- see RFC1112 */
-	struct igmphdr *ih = skb->h.igmph;
+	struct igmphdr *ih;
 	struct in_device *in_dev = in_dev_get(skb->dev);
 	int len = skb->len;
 
@@ -847,23 +859,17 @@ int igmp_rcv(struct sk_buff *skb)
 		return 0;
 	}
 
-	if (skb_is_nonlinear(skb)) {
-		if (skb_linearize(skb, GFP_ATOMIC) != 0) {
-			kfree_skb(skb);
-			return -ENOMEM;
-		}
-		ih = skb->h.igmph;
-	}
-
-	if (len < sizeof(struct igmphdr) || ip_compute_csum((void *)ih, len)) {
+	if (!pskb_may_pull(skb, sizeof(struct igmphdr)) || 
+	    (u16)csum_fold(skb_checksum(skb, 0, len, 0))) {
 		in_dev_put(in_dev);
 		kfree_skb(skb);
 		return 0;
 	}
 
+	ih = skb->h.igmph;
 	switch (ih->type) {
 	case IGMP_HOST_MEMBERSHIP_QUERY:
-		igmp_heard_query(in_dev, ih, len);
+		igmp_heard_query(in_dev, skb, len);
 		break;
 	case IGMP_HOST_MEMBERSHIP_REPORT:
 	case IGMPV2_HOST_MEMBERSHIP_REPORT:
