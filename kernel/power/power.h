@@ -10,34 +10,27 @@
 
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
-extern int swsusp_save(void);
-extern int swsusp_write(void);
-extern int swsusp_read(void);
-extern int swsusp_restore(void);
-extern int swsusp_free(void);
+extern int pm_suspend_disk(void);
+
 #else
-static inline int swsusp_save(void) 
+static inline int pm_suspend_disk(void)
 {
-	return 0;
-}
-static inline int swsusp_write(void)
-{
-	return 0;
-}
-static inline int swsusp_read(void)
-{
-	return 0;
-}
-static inline int swsusp_restore(void)
-{
-	return 0;
-}
-static inline int swsusp_free(void)
-{
-	return 0;
+	return -EPERM;
 }
 #endif
 
+extern struct semaphore pm_sem;
+#define power_attr(_name) \
+static struct subsys_attribute _name##_attr = {	\
+	.attr	= {				\
+		.name = __stringify(_name),	\
+		.mode = 0644,			\
+	},					\
+	.show	= _name##_show,			\
+	.store	= _name##_store,		\
+}
+
+extern struct subsystem power_subsys;
 
 extern int freeze_processes(void);
 extern void thaw_processes(void);
