@@ -220,7 +220,7 @@ ip6_packet_match(const struct sk_buff *skb,
 		u_int16_t ptr;		/* Header offset in skb */
 		u_int16_t hdrlen;	/* Header */
 
-		ptr = IPV6_HDR_LEN;
+		ptr = ((char *) ipv6 - (char *) skb->data) + IPV6_HDR_LEN;
 
 		while (ip6t_ext_hdr(currenthdr)) {
 	                /* Is there enough space for the next ext header? */
@@ -1773,10 +1773,23 @@ icmp6_match(const struct sk_buff *skb,
 	   u_int16_t datalen,
 	   int *hotdrop)
 {
-	const struct icmp6hdr *icmp = hdr;
+	struct icmp6hdr icmph;
 	const struct ip6t_icmp *icmpinfo = matchinfo;
+	int hdroff;
+	u8 nexthdr = skb->nh.ipv6h->nexthdr;
 
-	if (offset == 0 && datalen < 2) {
+	/* Must not be a fragment. */
+	if (offset)
+		return 0;
+
+	hdroff = (u8*)(skb->nh.ipv6h+1) - skb->data;
+	hdroff = ipv6_skip_exthdr(skb, hdroff, &nexthdr, skb->len - hdroff);
+	if (hdroff < 0 || hdroff > skb->len || nexthdr != IPPROTO_ICMPV6) {
+		*hotdrop = 1;
+		return 0;
+	}
+
+	if (skb_copy_bits(skb, hdroff, &icmph, sizeof(icmph)) < 0) {
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
 		duprintf("Dropping evil ICMP tinygram.\n");
@@ -1785,11 +1798,10 @@ icmp6_match(const struct sk_buff *skb,
 	}
 
 	/* Must not be a fragment. */
-	return !offset
-		&& icmp6_type_code_match(icmpinfo->type,
+	return icmp6_type_code_match(icmpinfo->type,
 					icmpinfo->code[0],
 					icmpinfo->code[1],
-					icmp->icmp6_type, icmp->icmp6_code,
+					icmph.icmp6_type, icmph.icmp6_code,
 					!!(icmpinfo->invflags&IP6T_ICMP_INV));
 }
 
