@@ -1015,8 +1015,9 @@ static void *pppoe_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 		goto out;
 	}
 	po = v;
-	po = po->next;
-	if (!po) {
+	if (po->next) 
+		po = po->next;
+	else {
 		int hash = hash_item(po->pppoe_pa.sid, po->pppoe_pa.remote);
 
 		while (++hash < PPPOE_HASH_SIZE) {
