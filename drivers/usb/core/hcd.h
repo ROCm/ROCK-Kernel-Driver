@@ -212,6 +212,7 @@ struct hc_driver {
 				char *buf, u16 wLength);
 	int		(*hub_suspend)(struct usb_hcd *);
 	int		(*hub_resume)(struct usb_hcd *);
+	int		(*start_port_reset)(struct usb_hcd *, unsigned port_num);
 };
 
 extern void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs);

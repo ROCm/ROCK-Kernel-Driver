@@ -114,3 +114,5 @@ otg_start_srp(struct otg_transceiver *otg)
 }
 
 
+/* for OTG controller drivers (and maybe other stuff) */
+extern int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num);

@@ -435,6 +435,89 @@ ohci_hub_descriptor (
 
 /*-------------------------------------------------------------------------*/
 
+#ifdef	CONFIG_USB_OTG
+
+static int ohci_start_port_reset (struct usb_hcd *hcd, unsigned port)
+{
+	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
+	u32			status;
+
+	if (!port)
+		return -EINVAL;
+	port--;
+
+	/* start port reset before HNP protocol times out */
+	status = ohci_readl(&ohci->regs->roothub.portstatus [port]);
+	if (!(status & RH_PS_CCS))
+		return -ENODEV;
+
+	/* khubd will finish the reset later */
+	writel(RH_PS_PRS, &ohci->regs->roothub.portstatus [port]);
+	return 0;
+}
+
+static void start_hnp(struct ohci_hcd *ohci);
+
+#else
+
+#define	ohci_start_port_reset		NULL
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+
+
+/* See usb 7.1.7.5:  root hubs must issue at least 50 msec reset signaling,
+ * not necessarily continuous ... to guard against resume signaling.
+ * The short timeout is safe for non-root hubs, and is backward-compatible
+ * with earlier Linux hosts.
+ */
+#ifdef	CONFIG_USB_SUSPEND
+#define	PORT_RESET_MSEC		50
+#else
+#define	PORT_RESET_MSEC		10
+#endif
+
+/* this timer value might be vendor-specific ... */
+#define	PORT_RESET_HW_MSEC	10
+
+/* wrap-aware logic stolen from <linux/jiffies.h> */
+#define tick_before(t1,t2) ((((s16)(t1))-((s16)(t2))) < 0)
+
+/* called from some task, normally khubd */
+static inline void root_port_reset (struct ohci_hcd *ohci, unsigned port)
+{
+	u32	*portstat = &ohci->regs->roothub.portstatus [port];
+	u32	temp;
+	u16	now = readl(&ohci->regs->fmnumber);
+	u16	reset_done = now + PORT_RESET_MSEC;
+
+	/* build a "continuous enough" reset signal, with up to
+	 * 3msec gap between pulses.  scheduler HZ==100 must work;
+	 * this might need to be deadline-scheduled.
+	 */
+	do {
+		/* spin until any current reset finishes */
+		for (;;) {
+			temp = ohci_readl (portstat);
+			if (!(temp & RH_PS_PRS))
+				break;
+			udelay (500);
+		} 
+
+		if (!(temp & RH_PS_CCS))
+			break;
+		if (temp & RH_PS_PRSC)
+			writel (RH_PS_PRSC, portstat);
+
+		/* start the next reset, sleep till it's probably done */
+		writel (RH_PS_PRS, portstat);
+		msleep(PORT_RESET_HW_MSEC);
+		now = readl(&ohci->regs->fmnumber);
+	} while (tick_before(now, reset_done));
+	/* caller synchronizes using PRSC */
+}
+
 static int ohci_hub_control (
 	struct usb_hcd	*hcd,
 	u16		typeReq,
@@ -533,6 +616,12 @@ static int ohci_hub_control (
 		wIndex--;
 		switch (wValue) {
 		case USB_PORT_FEAT_SUSPEND:
+#ifdef	CONFIG_USB_OTG
+			if (ohci->hcd.self.otg_port == (wIndex + 1)
+					&& ohci->hcd.self.b_hnp_enable)
+				start_hnp(ohci);
+			else
+#endif
 			writel (RH_PS_PSS,
 				&ohci->regs->roothub.portstatus [wIndex]);
 			break;
@@ -541,10 +630,7 @@ static int ohci_hub_control (
 				&ohci->regs->roothub.portstatus [wIndex]);
 			break;
 		case USB_PORT_FEAT_RESET:
-			temp = ohci_readl (&ohci->regs->roothub.portstatus [wIndex]);
-			if (temp & RH_PS_CCS)
-				writel (RH_PS_PRS,
-				    &ohci->regs->roothub.portstatus [wIndex]);
+			root_port_reset (ohci, wIndex);
 			break;
 		default:
 			goto error;

@@ -573,12 +573,12 @@ static inline void restart_syscall(struct pt_regs *regs)
  * OK, we're invoking a handler
  */	
 static void
-handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
+handle_signal(unsigned long sig, struct k_sigaction *ka,
+	      siginfo_t *info, sigset_t *oldset,
 	      struct pt_regs * regs, int syscall)
 {
 	struct thread_info *thread = current_thread_info();
 	struct task_struct *tsk = current;
-	struct k_sigaction *ka = &tsk->sighand->action[sig-1];
 	int usig = sig;
 	int ret;
 
@@ -633,11 +633,8 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 		spin_unlock_irq(&tsk->sighand->siglock);
 	}
 
-	if (ret == 0) {
-		if (ka->sa.sa_flags & SA_ONESHOT)
-			ka->sa.sa_handler = SIG_DFL;
+	if (ret == 0)
 		return;
-	}
 
 	force_sigsegv(sig, tsk);
 }
@@ -653,6 +650,7 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
  */
 static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 {
+	struct k_sigaction ka;
 	siginfo_t info;
 	int signr;
 
@@ -673,9 +671,9 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 	if (current->ptrace & PT_SINGLESTEP)
 		ptrace_cancel_bpt(current);
 
-	signr = get_signal_to_deliver(&info, regs, NULL);
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	if (signr > 0) {
-		handle_signal(signr, &info, oldset, regs, syscall);
+		handle_signal(signr, &ka, &info, oldset, regs, syscall);
 		if (current->ptrace & PT_SINGLESTEP)
 			ptrace_set_bpt(current);
 		return 1;

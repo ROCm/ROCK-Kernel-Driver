@@ -73,6 +73,7 @@ host-cxxmulti	:= $(addprefix $(obj)/,$(host-cxxmulti))
 host-cxxobjs	:= $(addprefix $(obj)/,$(host-cxxobjs))
 host-cshlib	:= $(addprefix $(obj)/,$(host-cshlib))
 host-cshobjs	:= $(addprefix $(obj)/,$(host-cshobjs))
+obj-dirs        := $(addprefix $(obj)/,$(obj-dirs))
 
 #####
 # Handle options to gcc. Support building with separate output directory

@@ -490,6 +490,13 @@ UNUSUAL_DEV(  0x066b, 0x0105, 0x0100, 0x0100,
 		US_FL_SINGLE_LUN ),
 #endif
 
+/* Reported by Darsen Lu <darsen@micro.ee.nthu.edu.tw> */
+UNUSUAL_DEV( 0x066f, 0x8000, 0x0001, 0x0001,
+		"SigmaTel",
+		"USBMSC Audio Player",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
+
 /* Submitted by Benny Sjostrand <benny@hostmobility.com> */
 UNUSUAL_DEV( 0x0686, 0x4011, 0x0001, 0x0001,
 		"Minolta",

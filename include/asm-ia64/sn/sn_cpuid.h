@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2000-2004 Silicon Graphics, Inc. All rights reserved.
  */
 
 
@@ -93,6 +93,7 @@
  */
 #define cpu_physical_id_to_nasid(cpi)		((cpi) &0xfff)
 #define cpu_physical_id_to_slice(cpi)		((cpi>>12) & 3)
+#define cpu_physical_id_to_coherence_id(cpi)	(cpu_physical_id_to_nasid(cpi) >> 9)
 #define get_nasid()				((ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xfff)
 #define get_slice()				((ia64_getreg(_IA64_REG_CR_LID) >> 28) & 0xf)
 #define get_node_number(addr)			(((unsigned long)(addr)>>38) & 0x7ff)
@@ -172,6 +173,11 @@ extern short physical_node_map[];			/* indexed by nasid to get cnode */
 
 #define smp_physical_node_id()			(cpuid_to_nasid(smp_processor_id()))
 
+/*
+ * cpuid_to_coherence_id - convert a cpuid to the coherence domain id it
+ * resides on
+ */
+#define cpuid_to_coherence_id(cpuid)	cpu_physical_id_to_coherence_id(cpu_physical_id(cpuid))
 
 #endif /* _ASM_IA64_SN_SN_CPUID_H */
 
