@@ -10,6 +10,30 @@
  *  Registration of PCI drivers and handling of hot-pluggable devices.
  */
 
+/**
+ * pci_match_device - Tell if a PCI device structure has a matching PCI device id structure
+ * @ids: array of PCI device id structures to search in
+ * @dev: the PCI device structure to match against
+ * 
+ * Used by a driver to check whether a PCI device present in the
+ * system is in its list of supported devices.Returns the matching
+ * pci_device_id structure or %NULL if there is no match.
+ */
+const struct pci_device_id *
+pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev)
+{
+	while (ids->vendor || ids->subvendor || ids->class_mask) {
+		if ((ids->vendor == PCI_ANY_ID || ids->vendor == dev->vendor) &&
+		    (ids->device == PCI_ANY_ID || ids->device == dev->device) &&
+		    (ids->subvendor == PCI_ANY_ID || ids->subvendor == dev->subsystem_vendor) &&
+		    (ids->subdevice == PCI_ANY_ID || ids->subdevice == dev->subsystem_device) &&
+		    !((ids->class ^ dev->class) & ids->class_mask))
+			return ids;
+		ids++;
+	}
+	return NULL;
+}
+
 static int pci_device_probe(struct device * dev)
 {
 	int error = 0;
@@ -169,6 +193,7 @@ static int __init pci_driver_init(void)
 
 subsys_initcall(pci_driver_init);
 
+EXPORT_SYMBOL(pci_match_device);
 EXPORT_SYMBOL(pci_register_driver);
 EXPORT_SYMBOL(pci_unregister_driver);
 EXPORT_SYMBOL(pci_dev_driver);
