@@ -315,8 +315,8 @@ acpi_ps_get_next_namepath (
 				acpi_ps_append_arg (arg, name_op);
 
 				if (!method_desc) {
-					ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
-						"Control Method - %p has no attached object\n",
+					ACPI_REPORT_ERROR ((
+						"ps_get_next_namepath: Control Method %p has no attached object\n",
 						node));
 					return_ACPI_STATUS (AE_AML_INTERNAL);
 				}
