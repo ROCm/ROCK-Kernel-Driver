@@ -2045,7 +2045,6 @@ int __init fs_detect(void)
 int __init init_PCI (void)
 { /* Begin init_PCI */
 	
-	int pci_count;
 	printk ("init_PCI\n");
 	/*
 	  memset (&firestream_driver, 0, sizeof (firestream_driver));
@@ -2053,15 +2052,7 @@ int __init init_PCI (void)
 	  firestream_driver.id_table = firestream_pci_tbl;
 	  firestream_driver.probe = fs_register_and_init;
 	*/
-	pci_count = pci_register_driver (&firestream_driver);
-	
-	if (pci_count <= 0) {
-		pci_unregister_driver (&firestream_driver);
-		pci_count = 0;
-	}
-
-	return(pci_count);
-
+	return pci_register_driver(&firestream_driver);
 } /* End init_PCI */
 #endif
 #endif
@@ -2108,5 +2099,6 @@ module_init(firestream_init_module);
 module_exit(firestream_cleanup_module);
 
 MODULE_LICENSE("GPL");
+
 
 

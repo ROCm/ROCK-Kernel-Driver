@@ -1007,7 +1007,7 @@ static struct pci_dev *get_pci_dev(unsigned long port_base) {
    unsigned int addr;
    struct pci_dev *dev = NULL;
 
-   while((dev = pci_find_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) {
+   while((dev = pci_get_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) {
       addr = pci_resource_start (dev, 0);
 
 #if defined(DEBUG_PCI_DETECT)
@@ -1015,6 +1015,11 @@ static struct pci_dev *get_pci_dev(unsigned long port_base) {
              driver_name, dev->bus->number, dev->devfn, addr);
 #endif
 
+      /* we are in so much trouble for a pci hotplug system with this driver
+       * anyway, so doing this at least lets people unload the driver and not
+       * cause memory problems, but in general this is a bad thing to do (this
+       * driver needs to be converted to the proper PCI api someday... */
+      pci_dev_put(dev);
       if (addr + PCI_BASE_ADDRESS_0 == port_base) return dev;
       }
 
@@ -1029,7 +1034,7 @@ static void enable_pci_ports(void) {
 
    struct pci_dev *dev = NULL;
 
-   while((dev = pci_find_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) {
+   while((dev = pci_get_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) {
 
 #if defined(DEBUG_PCI_DETECT)
       printk("%s: enable_pci_ports, bus %d, devfn 0x%x.\n",
@@ -1456,7 +1461,7 @@ static void add_pci_ports(void) {
 
    for (k = 0; k < MAX_PCI; k++) {
 
-      if (!(dev = pci_find_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) break;
+      if (!(dev = pci_get_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) break;
 
       if (pci_enable_device (dev)) {
 
@@ -1480,6 +1485,7 @@ static void add_pci_ports(void) {
              addr + PCI_BASE_ADDRESS_0;
       }
 
+   pci_dev_put(dev);
 #endif /* end CONFIG_PCI */
 
    return;

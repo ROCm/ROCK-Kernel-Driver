@@ -2139,10 +2139,7 @@ int __devinit rivafb_init(void)
 		return -ENODEV;
 	rivafb_setup(option);
 #endif
-	if (pci_register_driver(&rivafb_driver) > 0)
-		return 0;
-	pci_unregister_driver(&rivafb_driver);
-	return -ENODEV;
+	return pci_register_driver(&rivafb_driver);
 }
 
 

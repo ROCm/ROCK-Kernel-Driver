@@ -2411,7 +2411,7 @@ static int __init uhci_hcd_init(void)
 	if (!uhci_up_cachep)
 		goto up_failed;
 
-	retval = pci_module_init(&uhci_pci_driver);
+	retval = pci_register_driver(&uhci_pci_driver);
 	if (retval)
 		goto init_failed;
 

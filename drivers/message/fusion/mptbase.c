@@ -1483,7 +1483,7 @@ mptbase_suspend(struct pci_dev *pdev, u32 state)
 		}
 	}
 
-	pci_save_state(pdev, ioc->PciState);
+	pci_save_state(pdev);
 
 	/* put ioc into READY_STATE */
 	if(SendIocReset(ioc, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET, CAN_SLEEP)) {
@@ -1523,7 +1523,7 @@ mptbase_resume(struct pci_dev *pdev)
 		ioc->name, pdev, pci_name(pdev), device_state);
 
 	pci_set_power_state(pdev, 0);
-	pci_restore_state(pdev, ioc->PciState);
+	pci_restore_state(pdev);
 	pci_enable_device(pdev);
 
 	/* enable interrupts */

@@ -1527,7 +1527,7 @@ static int i810fb_suspend(struct pci_dev *dev, u32 state)
 		par->drm_agp->unbind_memory(par->i810_gtt.i810_cursor_memory);
 		pci_disable_device(dev);
 	}
-	pci_save_state(dev, par->pci_state);
+	pci_save_state(dev);
 	pci_set_power_state(dev, state);
 
 	return 0;
@@ -1541,7 +1541,7 @@ static int i810fb_resume(struct pci_dev *dev)
 	if (par->cur_state == 0)
 		return 0;
 
-	pci_restore_state(dev, par->pci_state);
+	pci_restore_state(dev);
 	pci_set_power_state(dev, 0);
 	pci_enable_device(dev);
 	par->drm_agp->bind_memory(par->i810_gtt.i810_fb_memory, 
@@ -1997,10 +1997,7 @@ int __init i810fb_init(void)
 		return -ENODEV;
 	i810fb_setup(option);
 
-	if (pci_register_driver(&i810fb_driver) > 0)
-		return 0;
-	pci_unregister_driver(&i810fb_driver);
-	return -ENODEV;
+	return pci_register_driver(&i810fb_driver);
 }
 #endif 
 
@@ -2015,10 +2012,7 @@ int __init i810fb_init(void)
 	hsync1 *= 1000;
 	hsync2 *= 1000;
 
-	if (pci_register_driver(&i810fb_driver) > 0)
-		return 0;
-	pci_unregister_driver(&i810fb_driver);
-	return -ENODEV;
+	return pci_register_driver(&i810fb_driver);
 }
 
 MODULE_PARM(vram, "i");

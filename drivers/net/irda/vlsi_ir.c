@@ -1768,7 +1768,7 @@ static int vlsi_irda_suspend(struct pci_dev *pdev, u32 state)
 	if (netif_running(ndev)) {
 		netif_device_detach(ndev);
 		vlsi_stop_hw(idev);
-		pci_save_state(pdev, idev->cfg_space);
+		pci_save_state(pdev);
 		if (!idev->new_baud)
 			/* remember speed settings to restore on resume */
 			idev->new_baud = idev->baud;
@@ -1819,7 +1819,7 @@ static int vlsi_irda_resume(struct pci_dev *pdev)
 	}
 
 	if (netif_running(ndev)) {
-		pci_restore_state(pdev, idev->cfg_space);
+		pci_restore_state(pdev);
 		vlsi_start_hw(idev);
 		netif_device_attach(ndev);
 	}

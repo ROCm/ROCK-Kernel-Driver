@@ -568,9 +568,9 @@ int __init cpqarray_init_step2(void)
 
 	/* detect controllers */
 	printk(DRIVER_NAME "\n");
-/* TODO: If it's an eisa only system, will rc return negative? */
+
 	rc = pci_register_driver(&cpqarray_pci_driver);
-	if (rc < 0)
+	if (rc)
 		return rc;
 	cpqarray_eisa_detect();
 	

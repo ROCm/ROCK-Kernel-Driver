@@ -1777,10 +1777,10 @@ static int find_pci_smic(int intf_num, struct smi_info **new_info)
 
 	pci_smic_checked = 1;
 
-	if ((pci_dev = pci_find_device(PCI_HP_VENDOR_ID, PCI_MMC_DEVICE_ID,
+	if ((pci_dev = pci_get_device(PCI_HP_VENDOR_ID, PCI_MMC_DEVICE_ID,
 				       NULL)))
 		;
-	else if ((pci_dev = pci_find_class(PCI_ERMC_CLASSCODE, NULL)) &&
+	else if ((pci_dev = pci_get_class(PCI_ERMC_CLASSCODE, NULL)) &&
 		 pci_dev->subsystem_vendor == PCI_HP_VENDOR_ID)
 		fe_rmc = 1;
 	else
@@ -1789,6 +1789,7 @@ static int find_pci_smic(int intf_num, struct smi_info **new_info)
 	error = pci_read_config_word(pci_dev, PCI_MMC_ADDR_CW, &base_addr);
 	if (error)
 	{
+		pci_dev_put(pci_dev);
 		printk(KERN_ERR
 		       "ipmi_si: pci_read_config_word() failed (%d).\n",
 		       error);
@@ -1798,6 +1799,7 @@ static int find_pci_smic(int intf_num, struct smi_info **new_info)
 	/* Bit 0: 1 specifies programmed I/O, 0 specifies memory mapped I/O */
 	if (!(base_addr & 0x0001))
 	{
+		pci_dev_put(pci_dev);
 		printk(KERN_ERR
 		       "ipmi_si: memory mapped I/O not supported for PCI"
 		       " smic.\n");
@@ -1809,11 +1811,14 @@ static int find_pci_smic(int intf_num, struct smi_info **new_info)
 		/* Data register starts at base address + 1 in eRMC */
 		++base_addr;
 
-	if (!is_new_interface(-1, IPMI_IO_ADDR_SPACE, base_addr))
-	    return -ENODEV;
+	if (!is_new_interface(-1, IPMI_IO_ADDR_SPACE, base_addr)) {
+		pci_dev_put(pci_dev);
+		return -ENODEV;
+	}
 
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (!info) {
+		pci_dev_put(pci_dev);
 		printk(KERN_ERR "ipmi_si: Could not allocate SI data (5)\n");
 		return -ENOMEM;
 	}
@@ -1836,6 +1841,7 @@ static int find_pci_smic(int intf_num, struct smi_info **new_info)
 	printk("ipmi_si: Found PCI SMIC at I/O address 0x%lx\n",
 		(long unsigned int) base_addr);
 
+	pci_dev_put(pci_dev);
 	return 0;
 }
 #endif /* CONFIG_PCI */

@@ -2120,7 +2120,6 @@ struct tg3 {
 	u8				pci_lat_timer;
 	u8				pci_hdr_type;
 	u8				pci_bist;
-	u32				pci_cfg_state[64 / sizeof(u32)];
 
 	int				pm_cap;
 

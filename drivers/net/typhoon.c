@@ -280,7 +280,6 @@ struct typhoon {
 	u16			xcvr_select;
 	u16			wol_events;
 	u32			offload;
-	u32			pci_state[16];
 
 	/* unused stuff (future use) */
 	int			capabilities;
@@ -1895,7 +1894,7 @@ typhoon_wakeup(struct typhoon *tp, int wait_type)
 	void __iomem *ioaddr = tp->ioaddr;
 
 	pci_set_power_state(pdev, 0);
-	pci_restore_state(pdev, tp->pci_state);
+	pci_restore_state(pdev);
 
 	/* Post 2.x.x versions of the Sleep Image require a reset before
 	 * we can download the Runtime Image. But let's not make users of
@@ -2310,7 +2309,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	 * we lost our configuration and need to restore it to the
 	 * conditions at boot.
 	 */
-	pci_restore_state(pdev, NULL);
+	pci_restore_state(pdev);
 
 	err = pci_set_dma_mask(pdev, 0xffffffffULL);
 	if(err < 0) {
@@ -2378,7 +2377,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	tp->dev = dev;
 
 	/* need to be able to restore PCI state after a suspend */
-	pci_save_state(pdev, tp->pci_state);
+	pci_save_state(pdev);
 
 	/* Init sequence:
 	 * 1) Reset the adapter to clear any bad juju
@@ -2543,7 +2542,7 @@ typhoon_remove_one(struct pci_dev *pdev)
 
 	unregister_netdev(dev);
 	pci_set_power_state(pdev, 0);
-	pci_restore_state(pdev, tp->pci_state);
+	pci_restore_state(pdev);
 	typhoon_reset(tp->ioaddr, NoWait);
 	iounmap(tp->ioaddr);
 	pci_free_consistent(pdev, sizeof(struct typhoon_shared),

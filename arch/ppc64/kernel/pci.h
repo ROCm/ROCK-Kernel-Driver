@@ -15,7 +15,12 @@
 extern unsigned long isa_io_base;
 
 extern struct pci_controller* pci_alloc_pci_controller(enum phb_types controller_type);
+extern struct pci_controller* pci_alloc_phb_dynamic(enum phb_types controller_type);
+extern void pci_setup_phb_io(struct pci_controller *hose, int primary);
+
 extern struct pci_controller* pci_find_hose_for_OF_device(struct device_node* node);
+extern void pci_setup_phb_io_dynamic(struct pci_controller *hose);
+
 
 extern struct list_head hose_list;
 extern int global_phb_number;
@@ -36,6 +41,7 @@ void *traverse_pci_devices(struct device_node *start, traverse_func pre,
 		void *data);
 
 void pci_devs_phb_init(void);
+void pci_devs_phb_init_dynamic(struct pci_controller *phb);
 void pci_fix_bus_sysdata(void);
 struct device_node *fetch_dev_dn(struct pci_dev *dev);
 

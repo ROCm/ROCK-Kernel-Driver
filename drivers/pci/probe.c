@@ -753,6 +753,7 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 
 struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus, struct pci_ops *ops, void *sysdata)
 {
+	int error;
 	struct pci_bus *b;
 	struct device *dev;
 
@@ -772,9 +773,7 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 	if (pci_find_bus(pci_domain_nr(b), bus)) {
 		/* If we already got to this bus through a different bridge, ignore it */
 		DBG("PCI: Bus %02x already known\n", bus);
-		kfree(dev);
-		kfree(b);
-		return NULL;
+		goto err_out;
 	}
 	list_add_tail(&b->node, &pci_root_buses);
 
@@ -782,15 +781,23 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 	dev->parent = parent;
 	dev->release = pci_release_bus_bridge_dev;
 	sprintf(dev->bus_id, "pci%04x:%02x", pci_domain_nr(b), bus);
-	device_register(dev);
+	error = device_register(dev);
+	if (error)
+		goto dev_reg_err;
 	b->bridge = get_device(dev);
 
 	b->class_dev.class = &pcibus_class;
 	sprintf(b->class_dev.class_id, "%04x:%02x", pci_domain_nr(b), bus);
-	class_device_register(&b->class_dev);
-	class_device_create_file(&b->class_dev, &class_device_attr_cpuaffinity);
+	error = class_device_register(&b->class_dev);
+	if (error)
+		goto class_dev_reg_err;
+	error = class_device_create_file(&b->class_dev, &class_device_attr_cpuaffinity);
+	if (error)
+		goto class_dev_create_file_err;
 
-	sysfs_create_link(&b->class_dev.kobj, &b->bridge->kobj, "bridge");
+	error = sysfs_create_link(&b->class_dev.kobj, &b->bridge->kobj, "bridge");
+	if (error)
+		goto sys_create_link_err;
 
 	b->number = b->secondary = bus;
 	b->resource[0] = &ioport_resource;
@@ -801,6 +808,19 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 	pci_bus_add_devices(b);
 
 	return b;
+
+sys_create_link_err:
+	class_device_remove_file(&b->class_dev, &class_device_attr_cpuaffinity);
+class_dev_create_file_err:
+	class_device_unregister(&b->class_dev);
+class_dev_reg_err:
+	device_unregister(dev);
+dev_reg_err:
+	list_del(&b->node);
+err_out:
+	kfree(dev);
+	kfree(b);
+	return NULL;
 }
 EXPORT_SYMBOL(pci_scan_bus_parented);
 

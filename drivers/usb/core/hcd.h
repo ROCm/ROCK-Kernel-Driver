@@ -80,7 +80,6 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 
 #ifdef	CONFIG_PCI
 	int			region;		/* pci region for regs */
-	u32			pci_state [16];	/* for PM state save */
 #endif
 
 #define HCD_BUFFER_POOLS	4

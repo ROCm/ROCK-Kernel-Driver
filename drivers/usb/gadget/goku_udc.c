@@ -1970,7 +1970,7 @@ static struct pci_driver goku_pci_driver = {
 
 static int __init init (void)
 {
-	return pci_module_init (&goku_pci_driver);
+	return pci_register_driver (&goku_pci_driver);
 }
 module_init (init);
 

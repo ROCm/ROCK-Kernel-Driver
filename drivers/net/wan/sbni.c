@@ -294,7 +294,7 @@ sbni_pci_probe( struct net_device  *dev )
 {
 	struct pci_dev  *pdev = NULL;
 
-	while( (pdev = pci_find_class( PCI_CLASS_NETWORK_OTHER << 8, pdev ))
+	while( (pdev = pci_get_class( PCI_CLASS_NETWORK_OTHER << 8, pdev ))
 	       != NULL ) {
 		int  pci_irq_line;
 		unsigned long  pci_ioaddr;
@@ -331,10 +331,14 @@ sbni_pci_probe( struct net_device  *dev )
 		/* avoiding re-enable dual adapters */
 		if( (pci_ioaddr & 7) == 0  &&  pci_enable_device( pdev ) ) {
 			release_region( pci_ioaddr, SBNI_IO_EXTENT );
+			pci_dev_put( pdev );
 			return  -EIO;
 		}
 		if( sbni_probe1( dev, pci_ioaddr, pci_irq_line ) ) {
 			SET_NETDEV_DEV(dev, &pdev->dev);
+			/* not the best thing to do, but this is all messed up 
+			   for hotplug systems anyway... */
+			pci_dev_put( pdev );
 			return  0;
 		}
 	}

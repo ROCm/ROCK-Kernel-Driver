@@ -268,7 +268,7 @@ struct slot {
 	struct timer_list task_event;
 	u8 hp_slot;
 	struct controller *ctrl;
-	void *p_sm_slot;
+	void __iomem *p_sm_slot;
 	struct hotplug_slot *hotplug_slot;
 };
 
@@ -287,7 +287,7 @@ struct controller {
 	struct controller *next;
 	u32 ctrl_int_comp;
 	struct semaphore crit_sect;	/* critical section semaphore */
-	void *hpc_reg;			/* cookie for our pci controller location */
+	void __iomem *hpc_reg;		/* cookie for our pci controller location */
 	struct pci_resource *mem_head;
 	struct pci_resource *p_mem_head;
 	struct pci_resource *io_head;
@@ -405,7 +405,7 @@ extern void cpqhp_create_ctrl_files		(struct controller *ctrl);
 /* controller functions */
 extern void	cpqhp_pushbutton_thread		(unsigned long event_pointer);
 extern irqreturn_t cpqhp_ctrl_intr		(int IRQ, void *data, struct pt_regs *regs);
-extern int	cpqhp_find_available_resources	(struct controller *ctrl, void *rom_start);
+extern int	cpqhp_find_available_resources	(struct controller *ctrl, void __iomem *rom_start);
 extern int	cpqhp_event_start_thread	(void);
 extern void	cpqhp_event_stop_thread		(void);
 extern struct pci_func *cpqhp_slot_create	(unsigned char busnumber);
@@ -707,9 +707,8 @@ static inline int wait_for_ctrl_irq(struct controller *ctrl)
 
 	dbg("%s - start\n", __FUNCTION__);
 	add_wait_queue(&ctrl->queue, &wait);
-	set_current_state(TASK_INTERRUPTIBLE);
 	/* Sleep for up to 1 second to wait for the LED to change. */
-	schedule_timeout(1*HZ);
+	msleep_interruptible(1000);
 	remove_wait_queue(&ctrl->queue, &wait);
 	if (signal_pending(current))
 		retval =  -EINTR;
