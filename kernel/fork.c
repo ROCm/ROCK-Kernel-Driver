@@ -1229,9 +1229,23 @@ long do_fork(unsigned long clone_flags,
         	      audit_fork(current, p);
 #endif
 
-		if (!(clone_flags & CLONE_STOPPED))
-			wake_up_forked_process(p);	/* do this last */
-		else
+		if (!(clone_flags & CLONE_STOPPED)) {
+			/*
+			 * Do the wakeup last. On SMP we treat fork() and
+			 * CLONE_VM separately, because fork() has already
+			 * created cache footprint on this CPU (due to
+			 * copying the pagetables), hence migration would
+			 * probably be costy. Threads on the other hand
+			 * have less traction to the current CPU, and if
+			 * there's an imbalance then the scheduler can
+			 * migrate this fresh thread now, before it
+			 * accumulates a larger cache footprint:
+			 */
+			if (clone_flags & CLONE_VM)
+				wake_up_forked_thread(p);
+			else
+				wake_up_forked_process(p);
+		} else
 			p->state = TASK_STOPPED;
 		++total_forks;
 

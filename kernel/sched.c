@@ -280,21 +280,6 @@ static void enqueue_task(struct task_struct *p, prio_array_t *array)
 	p->array = array;
 }
 
-#ifdef CONFIG_SMP
-/*
- * Used by the migration code - we pull tasks from the head of the
- * remote queue so we want these tasks to show up at the head of the
- * local queue:
- */
-static inline void enqueue_task_head(struct task_struct *p, prio_array_t *array)
-{
-	list_add(&p->run_list, array->queue + p->prio);
-	__set_bit(p->prio, array->bitmap);
-	array->nr_active++;
-	p->array = array;
-}
-#endif
-
 /*
  * effective_prio - return the priority that is based on the static
  * priority but is modified by bonuses/penalties.
@@ -1090,6 +1075,143 @@ static void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
 	if (rq1 != rq2)
 		spin_unlock(&rq2->lock);
 }
+
+#ifdef CONFIG_SMP
+
+/*
+ * Return a low guess at the load of cpu.
+ */
+static inline unsigned long cpu_load(int cpu)
+{
+        return cpu_rq(cpu)->nr_running * SCHED_LOAD_SCALE;
+}
+
+/*
+ * find_idlest_cpu - find the least busy runqueue.
+ */
+static int find_idlest_cpu(int this_cpu, runqueue_t *this_rq, cpumask_t mask)
+{
+	unsigned long load, min_load, this_load;
+	int i, min_cpu;
+	cpumask_t tmp;
+
+	min_cpu = UINT_MAX;
+	min_load = ULONG_MAX;
+
+	cpus_and(tmp, mask, cpu_online_map);
+	for_each_cpu_mask(i, tmp) {
+		load = cpu_load(i);
+
+		if (load < min_load) {
+			min_cpu = i;
+			min_load = load;
+
+			/* break out early on an idle CPU: */
+			if (!min_load)
+				break;
+		}
+	}
+
+	/* add +1 to account for the new task */
+	this_load = cpu_load(this_cpu) + SCHED_LOAD_SCALE;
+
+	/*
+	 * Would with the addition of the new task to the
+	 * current CPU there be an imbalance between this
+	 * CPU and the idlest CPU?
+	 */
+	if (min_load*this_rq->sd->imbalance_pct < 100*this_load)
+		return min_cpu;
+
+	return this_cpu;
+}
+
+/*
+ * wake_up_forked_thread - wake up a freshly forked thread.
+ *
+ * This function will do some initial scheduler statistics housekeeping
+ * that must be done for every newly created context, and it also does
+ * runqueue balancing.
+ */
+void fastcall wake_up_forked_thread(task_t * p)
+{
+	unsigned long flags;
+	int this_cpu = get_cpu(), cpu;
+	runqueue_t *this_rq = cpu_rq(this_cpu), *rq;
+
+	/*
+	 * Migrate the new context to the least busy CPU,
+	 * if that CPU is out of balance.
+	 */
+	cpu = find_idlest_cpu(this_cpu, this_rq, p->cpus_allowed);
+
+	local_irq_save(flags);
+lock_again:
+	rq = cpu_rq(cpu);
+	double_rq_lock(this_rq, rq);
+
+	BUG_ON(p->state != TASK_RUNNING);
+
+	/*
+	 * We did find_idlest_cpu() unlocked, so in theory
+	 * the mask could have changed:
+	 */
+	if (!cpu_isset(cpu, p->cpus_allowed)) {
+		cpu = any_online_cpu(p->cpus_allowed);
+		double_rq_unlock(this_rq, rq);
+		goto lock_again;
+	}
+	/*
+	 * We decrease the sleep average of forking parents
+	 * and children as well, to keep max-interactive tasks
+	 * from forking tasks that are max-interactive.
+	 */
+	current->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(current) *
+		PARENT_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
+
+	p->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(p) *
+		CHILD_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
+
+	p->interactive_credit = 0;
+
+	p->prio = effective_prio(p);
+	set_task_cpu(p, cpu);
+
+	if (cpu == this_cpu) {
+		if (unlikely(!current->array))
+			__activate_task(p, rq);
+		else {
+			p->prio = current->prio;
+			list_add_tail(&p->run_list, &current->run_list);
+			p->array = current->array;
+			p->array->nr_active++;
+			rq->nr_running++;
+		}
+	} else {
+		__activate_task(p, rq);
+		if (TASK_PREEMPTS_CURR(p, rq))
+			resched_task(rq->curr);
+	}
+
+	double_rq_unlock(this_rq, rq);
+	local_irq_restore(flags);
+	put_cpu();
+}
+
+/*
+ * Used by the migration code - we pull tasks from the head of the
+ * remote queue so we want these tasks to show up at the head of the
+ * local queue:
+ */
+static inline void enqueue_task_head(struct task_struct *p, prio_array_t *array)
+{
+	list_add(&p->run_list, array->queue + p->prio);
+	__set_bit(p->prio, array->bitmap);
+	array->nr_active++;
+	p->array = array;
+}
+#endif
+
 
 enum idle_type
 {

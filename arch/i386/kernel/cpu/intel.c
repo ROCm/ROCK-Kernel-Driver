@@ -28,6 +28,15 @@ extern int trap_init_f00f_bug(void);
 struct movsl_mask movsl_mask;
 #endif
 
+void __init early_intel_workaround(struct cpuinfo_x86 *c)
+{
+	if (c->x86_vendor != X86_VENDOR_INTEL)
+		return; 
+	/* Netburst reports 64 bytes clflush size, but does IO in 128 bytes */
+	if (c->x86 == 15 && c->x86_cache_alignment == 64) 
+		c->x86_cache_alignment = 128;
+}
+
 /*
  *	Early probe support logic for ppro memory erratum #50
  *
