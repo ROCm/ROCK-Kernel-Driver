@@ -9,7 +9,6 @@
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
-#include <asm/hardware.h>
 
 /*
  * Note that some reads can be aligned on half-word boundaries.
@@ -30,6 +29,10 @@ ENTRY(__raw_readsl)
 		ldr	ip, [r0]
 		blt	4f
 		bgt	6f
+
+#ifndef	__ARMEB__
+
+		/* little endian code */
 
 		strh	ip, [r1], #2
 		mov	ip, ip, lsr #16
@@ -67,4 +70,49 @@ ENTRY(__raw_readsl)
 		mov	ip, ip, lsr #16
 		strb	ip, [r1]
 		mov	pc, lr
+
+#else
+
+		/* big endian code */
+
+
+		mov	r3, ip, lsr #16
+		strh	r3, [r1], #2
+3:		mov	r3, ip, lsl #16
+		subs	r2, r2, #1
+		ldrne	ip, [r0]
+		orrne	r3, r3, ip, lsr #16
+		strne	r3, [r1], #4
+		bne	3b
+ 		strh	ip, [r1], #2
+ 		mov	pc, lr
+
+4:		mov	r3, ip, lsr #24
+		strb	r3, [r1], #1
+		mov	r3, ip, lsr #8
+		strh	r3, [r1], #2
+5:		mov	r3, ip, lsl #24
+		subs	r2, r2, #1
+		ldrne	ip, [r0]
+		orrne	r3, r3, ip, lsr #8
+		strne	r3, [r1], #4
+		bne	5b
+		strb	ip, [r1], #1
+		mov	pc, lr
+
+6:		mov	r3, ip, lsr #24
+		strb	r3, [r1], #1
+7:		mov	r3, ip, lsl #8
+		subs	r2, r2, #1
+		ldrne	ip, [r0]
+		orrne	r3, r3, ip, lsr #24
+		strne	r3, [r1], #4
+		bne	7b
+		mov	r3, ip, lsr #8
+		strh	r3, [r1], #2
+		strb	ip, [r1], #1
+		mov	pc, lr
+
+#endif
+
 
