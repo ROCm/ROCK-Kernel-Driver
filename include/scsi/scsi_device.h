@@ -192,4 +192,36 @@ static inline int scsi_device_online(struct scsi_device *sdev)
 {
 	return sdev->sdev_state != SDEV_OFFLINE;
 }
+
+/* accessor functions for the SCSI parameters */
+static inline int scsi_device_sync(struct scsi_device *sdev)
+{
+	return sdev->sdtr;
+}
+static inline int scsi_device_wide(struct scsi_device *sdev)
+{
+	return sdev->wdtr;
+}
+static inline int scsi_device_dt(struct scsi_device *sdev)
+{
+	return sdev->ppr;
+}
+static inline int scsi_device_dt_only(struct scsi_device *sdev)
+{
+	if (sdev->inquiry_len < 57)
+		return 0;
+	return (sdev->inquiry[56] & 0x0c) == 0x04;
+}
+static inline int scsi_device_ius(struct scsi_device *sdev)
+{
+	if (sdev->inquiry_len < 57)
+		return 0;
+	return sdev->inquiry[56] & 0x01;
+}
+static inline int scsi_device_qas(struct scsi_device *sdev)
+{
+	if (sdev->inquiry_len < 57)
+		return 0;
+	return sdev->inquiry[56] & 0x02;
+}
 #endif /* _SCSI_SCSI_DEVICE_H */
