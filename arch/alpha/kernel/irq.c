@@ -252,7 +252,7 @@ parse_hex_value (const char *buffer,
 {
 	unsigned char hexnum [HEX_DIGITS];
 	unsigned long value;
-	int i;
+	unsigned long i;
 
 	if (!count)
 		return -EINVAL;
