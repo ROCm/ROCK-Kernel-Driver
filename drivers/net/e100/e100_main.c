@@ -3532,7 +3532,7 @@ e100_ethtool_test(struct net_device *dev, struct ifreq *ifr)
 		       GFP_ATOMIC);
 
 	if (!info)
-		return -EFAULT;
+		return -ENOMEM;
 
 	memset((void *) info, 0, sizeof(*info) +
 				 E100_MAX_TEST_RES * sizeof(u64));
@@ -3616,6 +3616,10 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 		(u16 *) (ifr->ifr_data + offsetof(struct ethtool_eeprom, data));
 
         max_len = bdp->eeprom_size * 2;
+        
+        if (ecmd.offset > ecmd.offset + ecmd.len)
+        	return -EINVAL;
+        	
 	if ((ecmd.offset + ecmd.len) > max_len)
 		ecmd.len = (max_len - ecmd.offset);
 
@@ -3929,7 +3933,7 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 			info.len = E100_MAX_TEST_RES;
 		strings = kmalloc(info.len * ETH_GSTRING_LEN, GFP_ATOMIC);
 		if (!strings)
-			return -EFAULT;
+			return -ENOMEM;
 		memset(strings, 0, info.len * ETH_GSTRING_LEN);
 
 		for (i = 0; i < info.len; i++) {
