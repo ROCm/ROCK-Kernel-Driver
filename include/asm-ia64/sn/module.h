@@ -166,7 +166,6 @@ struct module_s {
     /* Fields for Module System Controller */
     int			mesgpend;	/* Message pending                 */
     int			shutdown;	/* Shutdown in progress            */
-    struct semaphore	thdcnt;		/* Threads finished counter        */
     time_t		intrhist[MODULE_HIST_CNT];
     int			histptr;
 
