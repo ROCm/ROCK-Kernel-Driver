@@ -271,8 +271,8 @@ for devices on that particular bus (this assmumes that drivers do not
 span multiple bus types).
 
 
-More information can device-model specific features can be found in
-Documentation/device-model/. 
+More information can driver-model specific features can be found in
+Documentation/driver-model/. 
 
 
 TODO: Finish this section.
