@@ -1,10 +1,11 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.9-rc1
-# Thu Sep  2 23:38:33 2004
+# Linux kernel version: 2.6.9-rc2
+# Thu Sep 16 14:44:26 2004
 #
 CONFIG_64BIT=y
 CONFIG_MMU=y
+CONFIG_TIME_INTERPOLATION=y
 
 #
 # Code maturity level options
@@ -15,6 +16,7 @@ CONFIG_CLEAN_COMPILE=y
 #
 # General setup
 #
+CONFIG_LOCALVERSION=""
 CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 CONFIG_POSIX_MQUEUE=y
@@ -1077,6 +1079,7 @@ CONFIG_SERIO_I8042=y
 # CONFIG_SERIO_CT82C710 is not set
 # CONFIG_SERIO_PARKBD is not set
 CONFIG_SERIO_PCIPS2=m
+CONFIG_SERIO_RAW=m
 
 #
 # Input Device Drivers
