@@ -1030,6 +1030,32 @@ static int __exit powernowk8_cpu_exit (struct cpufreq_policy *pol)
 	return 0;
 }
 
+static unsigned int powernowk8_get (unsigned int cpu)
+{
+	struct powernow_k8_data *data = powernow_data[cpu];
+	cpumask_t oldmask = current->cpus_allowed;
+	unsigned int khz = 0;
+
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	if (smp_processor_id() != cpu) {
+		printk(KERN_ERR PFX "limiting to CPU %d failed in powernowk8_get\n", cpu);
+		set_cpus_allowed(current, oldmask);
+		return 0;
+	}
+	preempt_disable();
+
+	if (query_current_values_with_pending_wait(data))
+		goto out;
+
+	khz = find_khz_freq_from_fid(data->currfid);	
+
+ out:
+	preempt_enable_no_resched();
+	set_cpus_allowed(current, oldmask);
+
+	return khz;
+}
+
 static struct freq_attr* powernow_k8_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
 	NULL,
@@ -1040,6 +1066,7 @@ static struct cpufreq_driver cpufreq_amd64_driver = {
 	.target = powernowk8_target,
 	.init = powernowk8_cpu_init,
 	.exit = powernowk8_cpu_exit,
+	.get = powernowk8_get,
 	.name = "powernow-k8",
 	.owner = THIS_MODULE,
 	.attr = powernow_k8_attr,
