@@ -13,7 +13,7 @@
 #include "linux/ctype.h"
 #include "linux/interrupt.h"
 #include "linux/sysrq.h"
-#include "linux/tqueue.h"
+#include "linux/workqueue.h"
 #include "linux/module.h"
 #include "linux/proc_fs.h"
 #include "asm/irq.h"
@@ -42,7 +42,7 @@ static struct notifier_block reboot_notifier = {
 
 LIST_HEAD(mc_requests);
 
-void mc_task_proc(void *unused)
+void mc_work_proc(void *unused)
 {
 	struct mconsole_entry *req;
 	unsigned long flags;
@@ -60,10 +60,7 @@ void mc_task_proc(void *unused)
 	} while(!done);
 }
 
-struct tq_struct mconsole_task = {
-	routine:	mc_task_proc,
-	data: 		NULL
-};
+DECLARE_WORK(mconsole_work, mc_work_proc, NULL);
 
 void mconsole_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -84,7 +81,7 @@ void mconsole_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			}
 		}
 	}
-	if(!list_empty(&mc_requests)) schedule_task(&mconsole_task);
+	if(!list_empty(&mc_requests)) schedule_work(&mconsole_work);
 	reactivate_fd(fd, MCONSOLE_IRQ);
 }
 

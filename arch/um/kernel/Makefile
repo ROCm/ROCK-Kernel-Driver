@@ -14,8 +14,9 @@ obj-$(CONFIG_BLK_DEV_INITRD) += initrd_kern.o initrd_user.o
 # user_syms.o not included here because Rules.make has its own ideas about
 # building anything in export-objs
 
-USER_OBJS = $(filter %_user.o,$(obj-y)) config.o process.o time.o umid.o \
-	user_util.o user_syms.o helper.o tty_log.o
+USER_OBJS := $(filter %_user.o,$(obj-y)) config.o frame.o helper.o process.o \
+	time.o tty_log.o umid.o user_util.o user_syms.o
+USER_OBJS := $(foreach file,$(USER_OBJS),arch/um/kernel/$(file))
 
 export-objs := ksyms.o process_kern.o signal_kern.o gprof_syms.o gmon_syms.o
 
@@ -44,19 +45,18 @@ include $(TOPDIR)/Rules.make
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<
 
-unmap.o: unmap.c
+arch/um/kernel/unmap.o: arch/um/kernel/unmap.c
 	$(CC) $(UNMAP_CFLAGS) -c -o $@ $<
 
-frame.o: frame.c
-	$(CC) $(CFLAGS_$@) -c -o $@ $<
-
-unmap_fin.o : unmap.o
+arch/um/kernel/unmap_fin.o : arch/um/kernel/unmap.o
 	ld -r -o $@ $< -lc -L/usr/lib
 
 QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; while(<STDIN>) { $$_ =~ s/CONFIG/$$config/; print $$_ }'
 
-config.c : config.c.in $(TOPDIR)/.config
-	$(PERL) -e $(QUOTE) < config.c.in > $@
+arch/um/kernel/config.c : arch/um/kernel/config.c.in $(TOPDIR)/.config
+	$(PERL) -e $(QUOTE) < arch/um/kernel/config.c.in > $@
+
+arch/um/kernel/config.o : arch/um/kernel/config.c
 
 clean:
 	rm -f config.c

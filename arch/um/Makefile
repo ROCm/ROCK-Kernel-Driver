@@ -30,16 +30,11 @@ PROFILE += -pg -DPROFILING
 LINK_PROFILE = $(PROFILE) -Wl,--wrap,__monstartup
 endif
 
-ARCH_SUBDIRS = $(ARCH_DIR)/drivers $(ARCH_DIR)/kernel \
-	$(ARCH_DIR)/sys-$(SUBARCH) $(ARCH_DIR)/os-$(OS)
-
-SUBDIRS += $(ARCH_SUBDIRS)
-
 core-y			+= $(ARCH_DIR)/kernel/		 \
 			   $(ARCH_DIR)/drivers/          \
 			   $(ARCH_DIR)/sys-$(SUBARCH)/
 
-libs-$(CONFIG_PT_PROXY)	+= $(ARCH_DIR)/ptproxy/
+core-$(CONFIG_PT_PROXY)	+= $(ARCH_DIR)/ptproxy/
 
 ARCH_INCLUDE = $(TOPDIR)/$(ARCH_DIR)/include
 

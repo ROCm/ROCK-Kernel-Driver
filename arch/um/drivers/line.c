@@ -215,7 +215,7 @@ int line_open(struct line *lines, struct tty_struct *tty,
 			if(err) goto out;
 		}
 		enable_chan(&line->chan_list, line);
-		INIT_TQUEUE(&line->task, line_timer_cb, line);
+		INIT_WORK(&line->task, line_timer_cb, line);
 	}
 
 	if(!line->sigio){

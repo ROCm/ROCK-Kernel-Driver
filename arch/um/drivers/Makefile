@@ -56,8 +56,9 @@ obj-y += stdio_console.o $(CHAN_OBJS)
 
 USER_SINGLE_OBJS = $(foreach f,$(patsubst %.o,%,$(obj-y) $(obj-m)),$($(f)-objs))
 
-USER_OBJS = $(filter %_user.o,$(obj-y) $(obj-m) $(USER_SINGLE_OBJS)) fd.o \
+USER_OBJS := $(filter %_user.o,$(obj-y) $(obj-m) $(USER_SINGLE_OBJS)) fd.o \
 	null.o pty.o tty.o xterm.o
+USER_OBJS := $(foreach file,$(USER_OBJS),arch/um/drivers/$(file))
 
 include $(TOPDIR)/Rules.make
 
