@@ -223,6 +223,13 @@ acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 acpi_status
 acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
 {
+	/*
+	 * Ignore the irq from the core, and use the value in our copy of the
+	 * FADT. It may not be the same if an interrupt source override exists
+	 * for the SCI.
+	 */
+	irq = acpi_fadt.sci_int;
+
 #ifdef CONFIG_IA64
 	irq = gsi_to_vector(irq);
 #endif
