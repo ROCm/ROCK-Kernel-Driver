@@ -721,20 +721,6 @@ xcall_flush_tlb_all_cheetah:
 	stxa		%g0, [%g2] ASI_IMMU_DEMAP
 	retry
 
-	.globl		xcall_flush_cache_all_spitfire
-xcall_flush_cache_all_spitfire:
-	sethi		%hi(16383), %g2
-	or		%g2, %lo(16383), %g2
-	clr		%g3
-1:	stxa		%g0, [%g3] ASI_IC_TAG
-	membar		#Sync
-	add		%g3, 32, %g3
-	cmp		%g3, %g2
-	bleu,pt		%xcc, 1b
-	 nop
-	flush		%g6
-	retry
-
 	/* These just get rescheduled to PIL vectors. */
 	.globl		xcall_call_function
 xcall_call_function:
