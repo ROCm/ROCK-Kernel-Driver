@@ -131,6 +131,10 @@ static inline void down(struct semaphore * sem)
 		:"memory");
 }
 
+/*
+ * Interruptible try to acquire a semaphore.  If we obtained
+ * it, return zero.  If we were interrupted, returns -EINTR
+ */
 static inline int down_interruptible(struct semaphore * sem)
 {
 	int result;
@@ -155,6 +159,10 @@ static inline int down_interruptible(struct semaphore * sem)
 	return result;
 }
 
+/*
+ * Non-blockingly attempt to down() a semaphore.
+ * Returns zero if we acquired it
+ */
 static inline int down_trylock(struct semaphore * sem)
 {
 	int result;

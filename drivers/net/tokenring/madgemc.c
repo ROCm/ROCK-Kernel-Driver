@@ -793,6 +793,8 @@ void cleanup_module(void)
 }
 #endif /* MODULE */
 
+MODULE_LICENSE("GPL");
+
 
 /*
  * Local variables:
@@ -804,3 +806,4 @@ void cleanup_module(void)
  *  tab-width: 8
  * End:
  */
+

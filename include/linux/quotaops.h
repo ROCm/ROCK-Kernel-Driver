@@ -37,8 +37,10 @@ extern int  dquot_transfer(struct dentry *dentry, struct iattr *iattr);
  */
 static __inline__ void DQUOT_INIT(struct inode *inode)
 {
-	if (inode->i_sb && inode->i_sb->dq_op)
-		inode->i_sb->dq_op->initialize(inode, -1);
+	if (!IS_NOQUOTA(inode)) {
+		if (inode->i_sb && inode->i_sb->dq_op)
+			inode->i_sb->dq_op->initialize(inode, -1);
+	}
 }
 
 static __inline__ void DQUOT_DROP(struct inode *inode)
@@ -70,7 +72,7 @@ static __inline__ int DQUOT_ALLOC_BLOCK(struct super_block *sb, const struct ino
 static __inline__ int DQUOT_ALLOC_INODE(struct super_block *sb, struct inode *inode)
 {
 	if (sb->dq_op) {
-		sb->dq_op->initialize (inode, -1);
+		DQUOT_INIT(inode);
 		if (sb->dq_op->alloc_inode (inode, 1))
 			return 1;
 	}
@@ -94,8 +96,8 @@ static __inline__ int DQUOT_TRANSFER(struct dentry *dentry, struct iattr *iattr)
 {
 	int error = -EDQUOT;
 
-	if (dentry->d_inode->i_sb->dq_op) {
-		dentry->d_inode->i_sb->dq_op->initialize(dentry->d_inode, -1);
+	if (dentry->d_inode->i_sb->dq_op && !IS_NOQUOTA(dentry->d_inode)) {
+		DQUOT_INIT(dentry->d_inode);
 		error = dentry->d_inode->i_sb->dq_op->transfer(dentry, iattr);
 	} else {
 		error = notify_change(dentry, iattr);

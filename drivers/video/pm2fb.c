@@ -2152,6 +2152,8 @@ int __init pm2fb_setup(char* options){
 
 #ifdef MODULE
 
+MODULE_LICENSE("GPL");
+
 static char *mode = NULL;
 
 MODULE_PARM(mode, "s");

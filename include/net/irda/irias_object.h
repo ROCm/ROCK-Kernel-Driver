@@ -78,7 +78,7 @@ struct ias_attrib {
 	struct ias_value *value; /* Attribute value */
 };
 
-char *strdup(char *str);
+char *strndup(char *str, int max);
 
 struct ias_object *irias_new_object(char *name, int id);
 void irias_insert_object(struct ias_object *obj);

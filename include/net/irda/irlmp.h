@@ -217,6 +217,7 @@ int  irlmp_disconnect_request(struct lsap_cb *, struct sk_buff *userdata);
 void irlmp_discovery_confirm(hashbin_t *discovery_log);
 void irlmp_discovery_request(int nslots);
 struct irda_device_info *irlmp_get_discoveries(int *pn, __u16 mask);
+void irlmp_do_expiry(void);
 void irlmp_do_discovery(int nslots);
 discovery_t *irlmp_get_discovery_response(void);
 void irlmp_discovery_expiry(discovery_t *expiry);
@@ -246,6 +247,7 @@ extern char *lmp_reasons[];
 extern int sysctl_discovery_timeout;
 extern int sysctl_discovery_slots;
 extern int sysctl_discovery;
+extern int sysctl_lap_keepalive_time;	/* in ms, default is LM_IDLE_TIMEOUT */
 extern struct irlmp_cb *irlmp;
 
 static inline hashbin_t *irlmp_get_cachelog(void) { return irlmp->cachelog; }

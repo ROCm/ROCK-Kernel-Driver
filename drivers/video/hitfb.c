@@ -378,6 +378,8 @@ void hitfb_cleanup(struct fb_info *info)
 
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
     return hitfb_init();

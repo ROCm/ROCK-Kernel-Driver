@@ -467,7 +467,7 @@ static struct notifier_block lapbeth_dev_notifier = {
 	notifier_call: lapbeth_device_event,
 };
 
-static const char banner[] __initdata = KERN_INFO "LAPB Ethernet driver version 0.01\n";
+static char banner[] __initdata = KERN_INFO "LAPB Ethernet driver version 0.01\n";
 
 static int __init lapbeth_init_driver(void)
 {
@@ -510,4 +510,6 @@ EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Jonathan Naylor <g4klx@g4klx.demon.co.uk>");
 MODULE_DESCRIPTION("The unofficial LAPB over Ethernet driver");
+MODULE_LICENSE("GPL");
+
 

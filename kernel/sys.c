@@ -1208,7 +1208,7 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 	switch (option) {
 		case PR_SET_PDEATHSIG:
 			sig = arg2;
-			if (sig > _NSIG) {
+			if (sig < 0 || sig > _NSIG) {
 				error = -EINVAL;
 				break;
 			}

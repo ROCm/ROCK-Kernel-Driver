@@ -3000,3 +3000,5 @@ static const struct fore200e_bus fore200e_bus[] = {
 #endif
     {}
 };
+
+MODULE_LICENSE("GPL");

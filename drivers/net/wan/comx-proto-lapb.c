@@ -543,3 +543,5 @@ static void __exit comx_proto_lapb_exit(void)
 module_init(comx_proto_lapb_init);
 #endif
 module_exit(comx_proto_lapb_exit);
+
+MODULE_LICENSE("GPL");

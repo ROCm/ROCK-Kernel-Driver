@@ -30,30 +30,34 @@ obj-	:=
 
 # Each configuration option enables a list of files.
 
-obj-$(CONFIG_INPUT_SERPORT)	+= serport.o serio.o
+obj-$(CONFIG_INPUT_GAMEPORT)	+= gameport.o
+obj-$(CONFIG_INPUT_SERIO)	+= serio.o
 
-obj-$(CONFIG_INPUT_NS558)	+= ns558.o gameport.o
-obj-$(CONFIG_INPUT_LIGHTNING)	+= lightning.o gameport.o
-obj-$(CONFIG_INPUT_PCIGAME)	+= pcigame.o gameport.o
-obj-$(CONFIG_INPUT_CS461X)	+= cs461x.o gameport.o
+obj-$(CONFIG_INPUT_SERPORT)	+= serport.o
 
-obj-$(CONFIG_INPUT_WARRIOR)	+= warrior.o serio.o
-obj-$(CONFIG_INPUT_MAGELLAN)	+= magellan.o serio.o
-obj-$(CONFIG_INPUT_SPACEORB)	+= spaceorb.o serio.o
-obj-$(CONFIG_INPUT_SPACEBALL)	+= spaceball.o serio.o
-obj-$(CONFIG_INPUT_STINGER)	+= stinger.o serio.o
-obj-$(CONFIG_INPUT_IFORCE_232)	+= iforce.o serio.o
+obj-$(CONFIG_INPUT_NS558)	+= ns558.o
+obj-$(CONFIG_INPUT_LIGHTNING)	+= lightning.o
+obj-$(CONFIG_INPUT_PCIGAME)	+= pcigame.o
+obj-$(CONFIG_INPUT_CS461X)	+= cs461x.o
+obj-$(CONFIG_INPUT_EMU10K1)	+= emu10k1-gp.o
+
+obj-$(CONFIG_INPUT_WARRIOR)	+= warrior.o
+obj-$(CONFIG_INPUT_MAGELLAN)	+= magellan.o
+obj-$(CONFIG_INPUT_SPACEORB)	+= spaceorb.o
+obj-$(CONFIG_INPUT_SPACEBALL)	+= spaceball.o
+obj-$(CONFIG_INPUT_STINGER)	+= stinger.o
+obj-$(CONFIG_INPUT_IFORCE_232)	+= iforce.o
 obj-$(CONFIG_INPUT_IFORCE_USB)	+= iforce.o
 
-obj-$(CONFIG_INPUT_ANALOG)	+= analog.o gameport.o
-obj-$(CONFIG_INPUT_A3D)		+= a3d.o gameport.o
-obj-$(CONFIG_INPUT_ADI)		+= adi.o gameport.o
-obj-$(CONFIG_INPUT_COBRA)	+= cobra.o gameport.o
-obj-$(CONFIG_INPUT_GF2K)	+= gf2k.o gameport.o
-obj-$(CONFIG_INPUT_GRIP)	+= grip.o gameport.o
-obj-$(CONFIG_INPUT_INTERACT)	+= interact.o gameport.o
-obj-$(CONFIG_INPUT_TMDC)	+= tmdc.o gameport.o
-obj-$(CONFIG_INPUT_SIDEWINDER)	+= sidewinder.o gameport.o
+obj-$(CONFIG_INPUT_ANALOG)	+= analog.o
+obj-$(CONFIG_INPUT_A3D)		+= a3d.o
+obj-$(CONFIG_INPUT_ADI)		+= adi.o
+obj-$(CONFIG_INPUT_COBRA)	+= cobra.o
+obj-$(CONFIG_INPUT_GF2K)	+= gf2k.o
+obj-$(CONFIG_INPUT_GRIP)	+= grip.o
+obj-$(CONFIG_INPUT_INTERACT)	+= interact.o
+obj-$(CONFIG_INPUT_TMDC)	+= tmdc.o
+obj-$(CONFIG_INPUT_SIDEWINDER)	+= sidewinder.o
 
 obj-$(CONFIG_INPUT_DB9)		+= db9.o
 obj-$(CONFIG_INPUT_GAMECON)	+= gamecon.o

@@ -80,7 +80,8 @@
 	mv_writew:		CAT(low,_writew),			\
 	mv_writel:		CAT(low,_writel),			\
 	mv_writeq:		CAT(low,_writeq),			\
-	mv_ioremap:		CAT(low,_ioremap)			\
+	mv_ioremap:		CAT(low,_ioremap),			\
+	mv_iounmap:		CAT(low,_iounmap)			\
 
 #define IO(UP,low)							\
 	IO_LITE(UP,low),						\

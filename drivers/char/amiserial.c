@@ -2353,3 +2353,5 @@ void __init serial_console_init(void)
 	register_console(&sercons);
 }
 #endif
+
+MODULE_LICENSE("GPL");

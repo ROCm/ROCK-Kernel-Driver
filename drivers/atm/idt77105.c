@@ -374,9 +374,7 @@ int idt77105_stop(struct atm_dev *dev)
             }
         }
 
-#ifdef MODULE
 	MOD_DEC_USE_COUNT;
-#endif /* MODULE */
 	return 0;
 }
 
@@ -384,6 +382,8 @@ int idt77105_stop(struct atm_dev *dev)
 
 EXPORT_SYMBOL(idt77105_init);
 EXPORT_SYMBOL(idt77105_stop);
+
+MODULE_LICENSE("GPL");
 
 #ifdef MODULE
 

@@ -126,5 +126,7 @@ static void __exit EXIT (void)
 
 EXPORT_NO_SYMBOLS;
 
+MODULE_LICENSE("GPL");
+
 module_init(INIT);
 module_exit(EXIT);

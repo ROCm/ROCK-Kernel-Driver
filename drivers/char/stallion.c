@@ -314,6 +314,7 @@ static stlbrdtype_t	stl_brdstr[] = {
  */
 MODULE_AUTHOR("Greg Ungerer");
 MODULE_DESCRIPTION("Stallion Multiport Serial Driver");
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(board0, "1-4s");
 MODULE_PARM_DESC(board0, "Board 0 config -> name[,ioaddr[,ioaddr2][,irq]]");

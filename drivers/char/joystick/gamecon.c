@@ -1,7 +1,7 @@
 /*
- * $Id: gamecon.c,v 1.11 2000/11/01 12:38:53 vojtech Exp $
+ * $Id: gamecon.c,v 1.14 2001/04/29 22:42:14 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
  *  Based on the work of:
  *  	Andree Borrmann		John Dahlstrom
@@ -42,6 +42,7 @@
 #include <linux/input.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
+MODULE_LICENSE("GPL");
 MODULE_PARM(gc, "2-6i");
 MODULE_PARM(gc_2,"2-6i");
 MODULE_PARM(gc_3,"2-6i");
@@ -62,7 +63,7 @@ struct gc {
 	struct pardevice *pd;
 	struct input_dev dev[5];
 	struct timer_list timer;
-	unsigned char pads[GC_PSX + 1];
+	unsigned char pads[GC_MAX + 1];
 	int used;
 };
 
@@ -231,7 +232,7 @@ static void gc_multi_read_packet(struct gc *gc, int length, unsigned char *data)
 
 static short gc_psx_abs[] = { ABS_X, ABS_Y, ABS_RX, ABS_RY, ABS_HAT0X, ABS_HAT0Y };
 static short gc_psx_btn[] = { BTN_TL, BTN_TR, BTN_TL2, BTN_TR2, BTN_A, BTN_B, BTN_X, BTN_Y,
-				BTN_START, BTN_SELECT, BTN_THUMB, BTN_THUMB2 };
+				BTN_START, BTN_SELECT, BTN_THUMBL, BTN_THUMBR };
 
 /*
  * gc_psx_command() writes 8bit command and reads 8bit data from
@@ -345,8 +346,8 @@ static void gc_timer(unsigned long private)
 			s = gc_status_bit[i];
 
 			if (s & (gc->pads[GC_NES] | gc->pads[GC_SNES])) {
-				input_report_abs(dev + i, ABS_X, ! - !(s & data[6]) - !(s & data[7]));
-				input_report_abs(dev + i, ABS_Y, ! - !(s & data[4]) - !(s & data[5]));
+				input_report_abs(dev + i, ABS_X, !(s & data[6]) - !(s & data[7]));
+				input_report_abs(dev + i, ABS_Y, !(s & data[4]) - !(s & data[5]));
 			}
 
 			if (s & gc->pads[GC_NES])

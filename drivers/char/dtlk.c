@@ -678,3 +678,5 @@ static char dtlk_write_tts(char ch)
 #endif
 	return 0;
 }
+
+MODULE_LICENSE("GPL");

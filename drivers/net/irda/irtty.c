@@ -895,6 +895,8 @@ static int irtty_net_init(struct net_device *dev)
 static int irtty_net_open(struct net_device *dev)
 {
 	struct irtty_cb *self = (struct irtty_cb *) dev->priv;
+	struct tty_struct *tty = self->tty;
+	char hwname[16];
 
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRTTY_MAGIC, return -1;);
@@ -907,11 +909,16 @@ static int irtty_net_open(struct net_device *dev)
 	/* Make sure we can receive more data */
 	irtty_stop_receiver(self, FALSE);
 
+	/* Give self a hardware name */
+	sprintf(hwname, "%s%d", tty->driver.name,
+		MINOR(tty->device) - tty->driver.minor_start +
+		tty->driver.name_base);
+
 	/* 
 	 * Open new IrLAP layer instance, now that everything should be
 	 * initialized properly 
 	 */
-	self->irlap = irlap_open(dev, &self->qos);
+	self->irlap = irlap_open(dev, &self->qos, hwname);
 
 	MOD_INC_USE_COUNT;
 

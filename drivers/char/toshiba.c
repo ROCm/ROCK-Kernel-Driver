@@ -82,6 +82,8 @@ static int tosh_fn = 0;
 
 MODULE_PARM(tosh_fn, "i");
 
+MODULE_LICENSE("GPL");
+
 
 static int tosh_get_info(char *, char **, off_t, int);
 static int tosh_ioctl(struct inode *, struct file *, unsigned int,

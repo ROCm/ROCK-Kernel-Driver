@@ -64,6 +64,11 @@ extern int sprintf(char * buf, const char * fmt, ...);
 extern int vsprintf(char *buf, const char *, va_list);
 extern int snprintf(char * buf, size_t size, const char *fmt, ...);
 extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
+
+extern int sscanf(const char *, const char *, ...)
+	__attribute__ ((format (scanf,2,3)));
+extern int vsscanf(const char *, const char *, va_list);
+
 extern int get_option(char **str, int *pint);
 extern char *get_options(char *str, int nints, int *ints);
 extern unsigned long long memparse(char *ptr, char **retptr);

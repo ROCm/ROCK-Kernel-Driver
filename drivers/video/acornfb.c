@@ -1771,3 +1771,5 @@ acornfb_init(void)
 		return -EINVAL;
 	return 0;
 }
+
+MODULE_LICENSE("GPL");

@@ -121,7 +121,7 @@
 
 #include <asm/uaccess.h>
 
-static const char version[] __initdata = 
+static char version[] __initdata = 
 	"Equalizer1996: $Revision: 1.2.1 $ $Date: 1996/09/22 13:52:00 $ Simon Janes (simon@ncm.com)\n";
 
 #ifndef EQL_DEBUG

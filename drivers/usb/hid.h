@@ -2,10 +2,10 @@
 #define __HID_H
 
 /*
- * $Id: hid.h,v 1.7 2000/05/31 22:57:48 vojtech Exp $
+ * $Id: hid.h,v 1.10 2001/05/10 15:56:07 vojtech Exp $
  *
  *  Copyright (c) 1999 Andreas Gal
- *  Copyright (c) 2000 Vojtech Pavlik
+ *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
  *  Sponsored by SuSE
  */
@@ -210,6 +210,7 @@ struct hid_global {
 
 #define HID_MAX_DESCRIPTOR_SIZE		4096
 #define HID_MAX_USAGES			1024
+#define HID_MAX_APPLICATIONS		16
 
 struct hid_local {
 	unsigned usage[HID_MAX_USAGES]; /* usage array */
@@ -239,6 +240,7 @@ struct hid_usage {
 struct hid_field {
 	unsigned  physical;		/* physical usage for this field */
 	unsigned  logical;		/* logical usage for this field */
+	unsigned  application;		/* application usage for this field */
 	struct hid_usage *usage;	/* usage table for this function */
 	unsigned  maxusage;		/* maximum usage index */
 	unsigned  flags;		/* main-item flags (i.e. volatile,array,constant) */
@@ -265,6 +267,8 @@ struct hid_report {
 	struct hid_field *field[HID_MAX_FIELDS];	/* fields of the report */
 	unsigned maxfield;				/* maximum valid field index */
 	unsigned size;					/* size of the report (bits) */
+	unsigned idx;					/* where we're in data */
+	unsigned char *data;				/* data for multi-packet reports */
 	struct hid_device *device;			/* associated device */
 };
 
@@ -284,10 +288,14 @@ struct hid_control_fifo {
 	char buffer[HID_BUFFER_SIZE];
 };
 
+#define HID_CLAIMED_INPUT	1
+#define HID_CLAIMED_HIDDEV	2
+
 struct hid_device {							/* device report descriptor */
 	 __u8 *rdesc;
 	unsigned rsize;
-	unsigned application;						/* HID application, i.e. Digitizer */
+	unsigned application[HID_MAX_APPLICATIONS];			/* List of HID applications */
+	unsigned maxapplication;					/* Number of applications */
 	unsigned version;						/* HID version */
 	unsigned country;						/* HID country */
 	struct hid_report_enum report_enum[HID_REPORT_TYPES];
@@ -302,9 +310,14 @@ struct hid_device {							/* device report descriptor */
 	struct hid_control_fifo out[HID_CONTROL_FIFO_SIZE];		/* Transmit buffer */
 	unsigned char outhead, outtail;					/* Tx buffer head & tail */
 
-	struct input_dev input;						/* input device structure */
-	int open;							/* is the device open by input? */
-	int quirks;							/* Various nasty tricks the device can pull on us */
+	unsigned claimed;						/* Claimed by hidinput, hiddev? */	
+	unsigned quirks;						/* Various quirks the device can pull on us */
+
+	struct input_dev input;						/* The input structure */
+	void *hiddev;							/* The hiddev structure */
+	int minor;							/* Hiddev minor number */
+
+	int open;							/* is the device open by anyone? */
 	char name[128];							/* Device name */
 };
 
@@ -336,6 +349,25 @@ struct hid_descriptor {
 	struct hid_class_descriptor desc[1];
 } __attribute__ ((packed));
 
+void hidinput_hid_event(struct hid_device *, struct hid_field *, struct hid_usage *, __s32);
+int hidinput_connect(struct hid_device *);
+void hidinput_disconnect(struct hid_device *);
+
+#ifdef DEBUG
+#include "hid-debug.h"
+#else
+#define hid_dump_input(a,b)	do { } while (0)
+#define hid_dump_device(c)	do { } while (0)
+#endif
 
 #endif
 
+#define IS_INPUT_APPLICATION(a) ((a >= 0x00010000) && (a <= 0x00010008))
+
+int hid_open(struct hid_device *);
+void hid_close(struct hid_device *);
+int hid_find_field(struct hid_device *, unsigned int, unsigned int, struct hid_field **);
+int hid_set_field(struct hid_field *, unsigned, __s32);
+void hid_write_report(struct hid_device *, struct hid_report *);
+void hid_read_report(struct hid_device *, struct hid_report *);
+void hid_init_reports(struct hid_device *hid);

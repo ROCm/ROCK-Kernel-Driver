@@ -3084,3 +3084,5 @@ debug_setup()
 } /* debug_setup */
 
 #endif
+
+MODULE_LICENSE("GPL");

@@ -102,3 +102,38 @@ sys_pciconfig_write(unsigned long bus, unsigned long dfn,
 	else
 		return -ENODEV;
 }
+/* stubs for the routines in pci_iommu.c */
+void *
+pci_alloc_consistent(struct pci_dev *pdev, long size, dma_addr_t *dma_addrp)
+{
+}
+void
+pci_free_consistent(struct pci_dev *pdev, long size, void *cpu_addr,
+		    dma_addr_t dma_addr)
+{
+}
+dma_addr_t
+pci_map_single(struct pci_dev *pdev, void *cpu_addr, long size,
+	       int direction)
+{
+}
+void
+pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, long size,
+		 int direction)
+{
+}
+int
+pci_map_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
+	   int direction)
+{
+}
+void
+pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
+	     int direction)
+{
+}
+int
+pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
+{
+	return 0;
+}

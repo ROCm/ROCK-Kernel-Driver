@@ -246,9 +246,7 @@ void __init init_modules(void)
 {
 	kernel_module.nsyms = __stop___ksymtab - __start___ksymtab;
 
-#ifdef __alpha__
-	__asm__("stq $29,%0" : "=m"(kernel_module.gp));
-#endif
+	arch_init_modules(&kernel_module);
 }
 
 /*
@@ -440,12 +438,6 @@ sys_init_module(const char *name_user, struct module *mod_user)
 		printk(KERN_ERR "init_module: mod->flags invalid.\n");
 		goto err2;
 	}
-#ifdef __alpha__
-	if (!mod_bound(mod->gp - 0x8000, 0, mod)) {
-		printk(KERN_ERR "init_module: mod->gp out of bounds.\n");
-		goto err2;
-	}
-#endif
 	if (mod_member_present(mod, can_unload)
 	    && mod->can_unload && !mod_bound(mod->can_unload, 0, mod)) {
 		printk(KERN_ERR "init_module: mod->can_unload out of bounds.\n");

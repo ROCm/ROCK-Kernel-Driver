@@ -66,7 +66,9 @@ struct irlap_cb {
 	irda_queue_t q;     /* Must be first */
 	magic_t magic;
 
+	/* Device we are attached to */
 	struct net_device  *netdev;
+	char		hw_name[2*IFNAMSIZ + 1];
 
 	/* Connection state */
 	volatile IRLAP_STATE state;       /* Current state */
@@ -163,7 +165,8 @@ extern hashbin_t *irlap;
 int irlap_init(void);
 void irlap_cleanup(void);
 
-struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos);
+struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
+			    char *	hw_name);
 void irlap_close(struct irlap_cb *self);
 
 void irlap_connect_request(struct irlap_cb *self, __u32 daddr, 

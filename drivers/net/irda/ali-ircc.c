@@ -1344,6 +1344,7 @@ static int ali_ircc_net_open(struct net_device *dev)
 {
 	struct ali_ircc_cb *self;
 	int iobase;
+	char hwname[32];
 		
 	IRDA_DEBUG(2, __FUNCTION__ "(), ---------------- Start ----------------\n");
 	
@@ -1380,11 +1381,14 @@ static int ali_ircc_net_open(struct net_device *dev)
 	/* Ready to play! */
 	netif_start_queue(dev); //benjamin by irport
 	
+	/* Give self a hardware name */
+	sprintf(hwname, "ALI-FIR @ 0x%03x", self->io.fir_base);
+
 	/* 
 	 * Open new IrLAP layer instance, now that everything should be
 	 * initialized properly 
 	 */
-	self->irlap = irlap_open(dev, &self->qos);
+	self->irlap = irlap_open(dev, &self->qos, hwname);
 		
 	MOD_INC_USE_COUNT;
 

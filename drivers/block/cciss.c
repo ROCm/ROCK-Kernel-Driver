@@ -50,6 +50,7 @@
 /* Embedded module documentation macros - see modules.h */
 MODULE_AUTHOR("Charles M. White III - Compaq Computer Corporation");
 MODULE_DESCRIPTION("Driver for Compaq Smart Array Controller 5300");
+MODULE_LICENSE("GPL");
 
 #include "cciss_cmd.h"
 #include "cciss.h"

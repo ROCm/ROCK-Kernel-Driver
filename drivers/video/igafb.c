@@ -789,3 +789,5 @@ int __init igafb_setup(char *options)
     }
     return 0;
 }
+
+MODULE_LICENSE("GPL");

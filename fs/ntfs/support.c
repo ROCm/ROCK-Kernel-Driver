@@ -242,8 +242,8 @@ int ntfs_dupuni2map(ntfs_volume *vol, ntfs_u16 *in, int in_len, char **out,
 			if (chl > 1) {
 				buf = ntfs_malloc(*out_len + chl - 1);
 				if (!buf) {
-					ntfs_free(result);
-					return -ENOMEM;
+					i = -ENOMEM;
+					goto err_ret;
 				}
 				memcpy(buf, result, o);
 				ntfs_free(result);
@@ -259,13 +259,18 @@ int ntfs_dupuni2map(ntfs_volume *vol, ntfs_u16 *in, int in_len, char **out,
 					"to chosen character set. Remount "
 					"with utf8 encoding and this should "
 					"work.\n");
-			ntfs_free(result);
-			return -EILSEQ;
+			i = -EILSEQ;
+			goto err_ret;
 		}
 	}
 	result[*out_len] = '\0';
 	*out = result;
 	return 0;
+err_ret:
+	ntfs_free(result);
+	*out_len = 0;
+	*out = NULL;
+	return i;
 }
 
 int ntfs_dupmap2uni(ntfs_volume *vol, char* in, int in_len, ntfs_u16 **out,
@@ -276,8 +281,10 @@ int ntfs_dupmap2uni(ntfs_volume *vol, char* in, int in_len, ntfs_u16 **out,
 	struct nls_table *nls = vol->nls_map;
 
 	*out = result = ntfs_malloc(2 * in_len);
-	if (!result)
+	if (!result) {
+		*out_len = 0;
 		return -ENOMEM;
+	}
 	*out_len = in_len;
 	for (i = o = 0; i < in_len; i++, o++) {
 		wchar_t uni;
@@ -285,22 +292,25 @@ int ntfs_dupmap2uni(ntfs_volume *vol, char* in, int in_len, ntfs_u16 **out,
 
 		charlen = nls->char2uni(&in[i], in_len - i, &uni);
 		if (charlen < 0) {
-			printk(KERN_ERR "NTFS: Name contains a character that "
-					"cannot be converted to Unicode.\n");
-			ntfs_free(result);
-			return charlen;
+			i = charlen;
+			goto err_ret;
 		}
 		*out_len -= charlen - 1;
 		i += charlen - 1;
 		/* FIXME: Byte order? */
 		result[o] = uni;
 		if (!result[o]) {
-			printk(KERN_ERR "NTFS: Name contains a character that "
-					"cannot be converted to Unicode.\n");
-			ntfs_free(result);
-			return -EILSEQ;
+			i = -EILSEQ;
+			goto err_ret;
 		}
 	}
 	return 0;
+err_ret:
+	printk(KERN_ERR "NTFS: Name contains a character that cannot be "
+			"converted to Unicode.\n");
+	ntfs_free(result);
+	*out_len = 0;
+	*out = NULL;
+	return i;
 }
 

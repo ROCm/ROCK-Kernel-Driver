@@ -297,16 +297,16 @@ static inline void __init show_version (void) {
 #define UCODE2(x) #x
 #define UCODE1(x,y) UCODE2(x ## y)
 
-static const u32 __initdata ucode_start = 
+static u32 __initdata ucode_start = 
 #include UCODE(start)
 ;
 
-static const region __initdata ucode_regions[] = {
+static region __initdata ucode_regions[] = {
 #include UCODE(regions)
   { 0, 0 }
 };
 
-static const u32 __initdata ucode_data[] = {
+static u32 __initdata ucode_data[] = {
 #include UCODE(data)
   0xdeadbeef
 };
@@ -2585,6 +2585,7 @@ EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR(maintainer_string);
 MODULE_DESCRIPTION(description_string);
+MODULE_LICENSE("GPL");
 MODULE_PARM(debug,   "h");
 MODULE_PARM(cmds,    "i");
 MODULE_PARM(txs,     "i");

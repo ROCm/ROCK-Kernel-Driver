@@ -236,6 +236,8 @@ static struct fb_ops controlfb_ops = {
 /********************  The functions for controlfb_ops ********************/
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	struct device_node *dp;

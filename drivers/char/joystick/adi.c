@@ -553,3 +553,5 @@ void __exit adi_exit(void)
 
 module_init(adi_init);
 module_exit(adi_exit);
+
+MODULE_LICENSE("GPL");

@@ -487,3 +487,5 @@ static void do_install_cmap(int con, struct fb_info *info)
 	fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel), 1,
 		    g364fb_setcolreg, info);
 }
+
+MODULE_LICENSE("GPL");

@@ -53,7 +53,8 @@
 
 MODULE_AUTHOR("Author: Tivadar Szemethy <tiv@itc.hu>");
 MODULE_DESCRIPTION("Frame Relay protocol implementation for the COMX drivers"
-	"for Linux kernel 2.2.X");
+	"for Linux kernel 2.4.X");
+MODULE_LICENSE("GPL");
 
 #define	FRAD_UI		0x03
 #define	NLPID_IP	0xcc

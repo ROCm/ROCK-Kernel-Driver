@@ -513,8 +513,7 @@ void clear_inode(struct inode *inode)
 	if (inode->i_state & I_CLEAR)
 		BUG();
 	wait_on_inode(inode);
-	if (IS_QUOTAINIT(inode))
-		DQUOT_DROP(inode);
+	DQUOT_DROP(inode);
 	if (inode->i_sb && inode->i_sb->s_op && inode->i_sb->s_op->clear_inode)
 		inode->i_sb->s_op->clear_inode(inode);
 	if (inode->i_bdev) {
@@ -1049,7 +1048,8 @@ void iput(struct inode *inode)
 
 			if (op && op->delete_inode) {
 				void (*delete)(struct inode *) = op->delete_inode;
-				DQUOT_INIT(inode);
+				if (!is_bad_inode(inode))
+					DQUOT_INIT(inode);
 				/* s_op->delete_inode internally recalls clear_inode() */
 				delete(inode);
 			} else

@@ -102,15 +102,11 @@ extern int mac8390_probe(struct net_device *dev);
 extern int mac89x0_probe(struct net_device *dev);
 extern int mc32_probe(struct net_device *dev);
   
-/* Gigabit Ethernet adapters */
-extern int yellowfin_probe(struct net_device *dev);
-
 /* Detachable devices ("pocket adaptors") */
 extern int de600_probe(struct net_device *);
 extern int de620_probe(struct net_device *);
 
 /* FDDI adapters */
-extern int apfddi_init(struct net_device *dev);
 extern int skfp_probe(struct net_device *dev);
 
 /* Fibre Channel adapters */

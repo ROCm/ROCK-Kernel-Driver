@@ -255,6 +255,7 @@ DPRINTK("phy_init\n");
 
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(uPD98402_init);
 

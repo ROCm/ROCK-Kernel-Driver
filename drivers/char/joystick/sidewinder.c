@@ -1,7 +1,7 @@
 /*
- * $Id: sidewinder.c,v 1.18 2001/02/28 07:09:30 vojtech Exp $
+ * $Id: sidewinder.c,v 1.20 2001/05/19 08:14:54 vojtech Exp $
  *
- *  Copyright (c) 1998-2000 Vojtech Pavlik
+ *  Copyright (c) 1998-2001 Vojtech Pavlik
  *
  *  Sponsored by SuSE
  */
@@ -582,6 +582,9 @@ static void sw_connect(struct gameport *gameport, struct gameport_dev *dev)
 	if (gameport_open(gameport, dev, GAMEPORT_MODE_RAW))
 		goto fail1;
 
+	dbg("Init 0: Opened gameport %d, io %#x, speed %d",
+		gameport->number, gameport->io, gameport->speed);
+
 	i = sw_read_packet(gameport, buf, SW_LENGTH, 0);		/* Read normal packet */
 	m |= sw_guess_mode(buf, i);					/* Data packet (1-bit) can carry mode info [FSP] */
 	udelay(SW_TIMEOUT);
@@ -754,3 +757,5 @@ void __exit sw_exit(void)
 
 module_init(sw_init);
 module_exit(sw_exit);
+
+MODULE_LICENSE("GPL");

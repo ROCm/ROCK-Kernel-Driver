@@ -326,9 +326,16 @@ __EXTERN_INLINE void mcpcia_outl(unsigned int b, unsigned long in_addr)
  *
  */
 
-__EXTERN_INLINE unsigned long mcpcia_ioremap(unsigned long addr)
+__EXTERN_INLINE unsigned long mcpcia_ioremap(unsigned long addr,
+					     unsigned long size
+					     __attribute__((unused)))
 {
 	return addr + MCPCIA_MEM_BIAS;
+}
+
+__EXTERN_INLINE void mcpcia_iounmap(unsigned long addr)
+{
+	return;
 }
 
 __EXTERN_INLINE int mcpcia_is_ioaddr(unsigned long addr)
@@ -452,7 +459,8 @@ __EXTERN_INLINE void mcpcia_writeq(unsigned long b, unsigned long addr)
 #define __writew(x,a)		mcpcia_writew((x),(unsigned long)(a))
 #define __writel(x,a)		mcpcia_writel((x),(unsigned long)(a))
 #define __writeq(x,a)		mcpcia_writeq((x),(unsigned long)(a))
-#define __ioremap(a)		mcpcia_ioremap((unsigned long)(a))
+#define __ioremap(a,s)		mcpcia_ioremap((unsigned long)(a),(s))
+#define __iounmap(a)		mcpcia_iounmap((unsigned long)(a))
 #define __is_ioaddr(a)		mcpcia_is_ioaddr((unsigned long)(a))
 
 #define __raw_readl(a)		__readl(a)

@@ -34,6 +34,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
@@ -1057,3 +1058,5 @@ const struct consw vga_con = {
 	con_build_attr:		vgacon_build_attr,
 	con_invert_region:	vgacon_invert_region,
 };
+
+MODULE_LICENSE("GPL");

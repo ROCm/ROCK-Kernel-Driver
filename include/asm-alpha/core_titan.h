@@ -423,9 +423,16 @@ __EXTERN_INLINE void titan_outl(unsigned int b, unsigned long addr)
  * Memory functions.  all accesses are done through linear space.
  */
 
-__EXTERN_INLINE unsigned long titan_ioremap(unsigned long addr)
+__EXTERN_INLINE unsigned long titan_ioremap(unsigned long addr, 
+					    unsigned long size
+					    __attribute__((unused)))
 {
 	return addr + TITAN_MEM_BIAS;
+}
+
+__EXTERN_INLINE void titan_iounmap(unsigned long addr)
+{
+	return;
 }
 
 __EXTERN_INLINE int titan_is_ioaddr(unsigned long addr)
@@ -480,29 +487,30 @@ __EXTERN_INLINE void titan_writeq(unsigned long b, unsigned long addr)
 
 #ifdef __WANT_IO_DEF
 
-#define __inb		titan_inb
-#define __inw		titan_inw
-#define __inl		titan_inl
-#define __outb		titan_outb
-#define __outw		titan_outw
-#define __outl		titan_outl
-#define __readb		titan_readb
-#define __readw		titan_readw
-#define __writeb	titan_writeb
-#define __writew	titan_writew
-#define __readl		titan_readl
-#define __readq		titan_readq
-#define __writel	titan_writel
-#define __writeq	titan_writeq
-#define __ioremap	titan_ioremap
-#define __is_ioaddr	titan_is_ioaddr
+#define __inb(p)		titan_inb((unsigned long)(p))
+#define __inw(p)		titan_inw((unsigned long)(p))
+#define __inl(p)		titan_inl((unsigned long)(p))
+#define __outb(x,p)		titan_outb((x),(unsigned long)(p))
+#define __outw(x,p)		titan_outw((x),(unsigned long)(p))
+#define __outl(x,p)		titan_outl((x),(unsigned long)(p))
+#define __readb(a)		titan_readb((unsigned long)(a))
+#define __readw(a)		titan_readw((unsigned long)(a))
+#define __readl(a)		titan_readl((unsigned long)(a))
+#define __readq(a)		titan_readq((unsigned long)(a))
+#define __writeb(x,a)		titan_writeb((x),(unsigned long)(a))
+#define __writew(x,a)		titan_writew((x),(unsigned long)(a))
+#define __writel(x,a)		titan_writel((x),(unsigned long)(a))
+#define __writeq(x,a)		titan_writeq((x),(unsigned long)(a))
+#define __ioremap(a,s)		titan_ioremap((unsigned long)(a),(s))
+#define __iounmap(a)		titan_iounmap((unsigned long)(a))
+#define __is_ioaddr(a)		titan_is_ioaddr((unsigned long)(a))
 
-#define inb(port) 	__inb((port))
-#define inw(port) 	__inw((port))
-#define inl(port) 	__inl((port))
-#define outb(v, port) 	__outb((v),(port))
-#define outw(v, port) 	__outw((v),(port))
-#define outl(v, port) 	__outl((v),(port))
+#define inb(port) 		__inb((port))
+#define inw(port) 		__inw((port))
+#define inl(port) 		__inl((port))
+#define outb(v, port) 		__outb((v),(port))
+#define outw(v, port) 		__outw((v),(port))
+#define outl(v, port) 		__outl((v),(port))
 
 #define __raw_readb(a)		__readb((unsigned long)(a))
 #define __raw_readw(a)		__readw((unsigned long)(a))

@@ -911,7 +911,7 @@ static struct fb_videomode ami_modedb[] __initdata = {
 
 #define NUM_TOTAL_MODES  ARRAY_SIZE(ami_modedb)
 
-static const char *mode_option __initdata = NULL;
+static char *mode_option __initdata = NULL;
 static int round_down_bpp = 1;	/* for mode probing */
 
 	/*
@@ -3334,6 +3334,8 @@ static void ami_rebuild_copper(void)
 
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	return amifb_init();

@@ -3137,6 +3137,8 @@ int __init atafb_setup( char *options )
 }
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	return atafb_init();

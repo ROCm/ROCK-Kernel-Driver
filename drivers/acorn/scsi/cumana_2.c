@@ -86,6 +86,7 @@ MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("Cumana SCSI II driver");
 MODULE_PARM(term, "1-8i");
 MODULE_PARM_DESC(term, "SCSI bus termination");
+MODULE_LICENSE("GPL");
 
 /*
  * Use term=0,1,0,0,0 to turn terminators on/off

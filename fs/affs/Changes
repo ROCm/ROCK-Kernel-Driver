@@ -28,6 +28,12 @@ Known bugs:
 
 Please direct bug reports to: zippel@linux-m68k.org
 
+Version 3.18
+------------
+
+- change to global min macro + warning fixes
+- add module tags
+
 Version 3.17
 ------------
 

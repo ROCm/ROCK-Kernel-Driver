@@ -43,7 +43,7 @@
 #define BUDDHA_BASE2	0xa00
 #define BUDDHA_BASE3	0xc00
 
-static const u_int buddha_bases[CATWEASEL_NUM_HWIFS] __initdata = {
+static u_int buddha_bases[CATWEASEL_NUM_HWIFS] __initdata = {
     BUDDHA_BASE1, BUDDHA_BASE2, BUDDHA_BASE3
 };
 
@@ -76,7 +76,7 @@ static int buddha_offsets[IDE_NR_PORTS] __initdata = {
 #define BUDDHA_IRQ2	0xf40		/* interrupt */
 #define BUDDHA_IRQ3	0xf80
 
-static const int buddha_irqports[CATWEASEL_NUM_HWIFS] __initdata = {
+static int buddha_irqports[CATWEASEL_NUM_HWIFS] __initdata = {
     BUDDHA_IRQ1, BUDDHA_IRQ2, BUDDHA_IRQ3
 };
 

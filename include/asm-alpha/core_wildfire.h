@@ -326,9 +326,16 @@ __EXTERN_INLINE void wildfire_outl(unsigned int b, unsigned long addr)
  * Memory functions.  all accesses are done through linear space.
  */
 
-__EXTERN_INLINE unsigned long wildfire_ioremap(unsigned long addr)
+__EXTERN_INLINE unsigned long wildfire_ioremap(unsigned long addr, 
+					       unsigned long size
+					       __attribute__((unused)))
 {
 	return addr + WILDFIRE_MEM_BIAS;
+}
+
+__EXTERN_INLINE void wildfire_iounmap(unsigned long addr)
+{
+	return;
 }
 
 __EXTERN_INLINE int wildfire_is_ioaddr(unsigned long addr)
@@ -397,7 +404,8 @@ __EXTERN_INLINE void wildfire_writeq(unsigned long b, unsigned long addr)
 #define __writew(x,a)		wildfire_writew((x),(unsigned long)(a))
 #define __writel(x,a)		wildfire_writel((x),(unsigned long)(a))
 #define __writeq(x,a)		wildfire_writeq((x),(unsigned long)(a))
-#define __ioremap(a)		wildfire_ioremap((unsigned long)(a))
+#define __ioremap(a,s)		wildfire_ioremap((unsigned long)(a),(s))
+#define __iounmap(a)		wildfire_iounmap((unsigned long)(a))
 #define __is_ioaddr(a)		wildfire_is_ioaddr((unsigned long)(a))
 
 #define inb(p)			__inb(p)

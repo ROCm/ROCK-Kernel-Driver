@@ -67,6 +67,7 @@ static const card_ids __init etherh_cids[] = {
 
 MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("EtherH/EtherM driver");
+MODULE_LICENSE("GPL");
 
 static char version[] __initdata =
 	"EtherH/EtherM Driver (c) 2000 Russell King v1.08\n";

@@ -103,7 +103,7 @@ struct dma_iso_ctx {
 	int ctxMatch;
 	wait_queue_head_t waitq;
         spinlock_t lock;
-    unsigned int syt_offset;
+	unsigned int syt_offset;
 	int flags;
 };
 

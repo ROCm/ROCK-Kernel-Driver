@@ -156,7 +156,14 @@ acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, u32 size, void **virt)
 	}
 
 	if ((unsigned long) phys < virt_to_phys(high_memory)) {
+		struct page *page;
 		*virt = phys_to_virt((unsigned long) phys);
+	
+		/* Check for stamping */
+		page = virt_to_page(*virt);
+		if(page && !test_bit(PG_reserved, &page->flags))
+			printk(KERN_WARNING "ACPI attempting to access kernel owned memory at %08lX.\n", (unsigned long)phys);
+
 		return AE_OK;
 	}
 

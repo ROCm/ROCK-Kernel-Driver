@@ -5570,4 +5570,6 @@ void disable_comm_shutdown(sdla_t *card)
 
 }
 
+MODULE_LICENSE("GPL");
+
 /****** End *****************************************************************/

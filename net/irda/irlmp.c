@@ -49,6 +49,7 @@ struct irlmp_cb *irlmp = NULL;
 int  sysctl_discovery         = 0;
 int  sysctl_discovery_timeout = 3; /* 3 seconds by default */
 int  sysctl_discovery_slots   = 6; /* 6 slots by default */
+int  sysctl_lap_keepalive_time = LM_IDLE_TIMEOUT * 1000 / HZ;
 char sysctl_devname[65];
 
 char *lmp_reasons[] = {
@@ -693,10 +694,43 @@ void irlmp_disconnect_indication(struct lsap_cb *self, LM_REASON reason,
 }
 
 /*
+ * Function irlmp_do_expiry (void)
+ *
+ *    Do a cleanup of the discovery log (remove old entries)
+ *
+ * Note : separate from irlmp_do_discovery() so that we can handle
+ * passive discovery properly.
+ */
+void irlmp_do_expiry()
+{
+	struct lap_cb *lap;
+
+	/*
+	 * Expire discovery on all links which are *not* connected.
+	 * On links which are connected, we can't do discovery
+	 * anymore and can't refresh the log, so we freeze the
+	 * discovery log to keep info about the device we are
+	 * connected to. - Jean II
+	 */
+	lap = (struct lap_cb *) hashbin_get_first(irlmp->links);
+	while (lap != NULL) {
+		ASSERT(lap->magic == LMP_LAP_MAGIC, return;);
+		
+		if (lap->lap_state == LAP_STANDBY) {
+			/* Expire discoveries discovered on this link */
+			irlmp_expire_discoveries(irlmp->cachelog, lap->saddr,
+						 FALSE);
+		}
+		lap = (struct lap_cb *) hashbin_get_next(irlmp->links);
+	}
+}
+
+/*
  * Function irlmp_do_discovery (nslots)
  *
  *    Do some discovery on all links
  *
+ * Note : log expiry is done above.
  */
 void irlmp_do_discovery(int nslots)
 {
@@ -731,10 +765,6 @@ void irlmp_do_discovery(int nslots)
 		ASSERT(lap->magic == LMP_LAP_MAGIC, return;);
 		
 		if (lap->lap_state == LAP_STANDBY) {
-			/* Expire discoveries discovered on this link */
-			irlmp_expire_discoveries(irlmp->cachelog, lap->saddr,
-						 FALSE);
-
 			/* Try to discover */
 			irlmp_do_lap_event(lap, LM_LAP_DISCOVERY_REQUEST, 
 					   NULL);
@@ -764,6 +794,9 @@ void irlmp_discovery_request(int nslots)
 	 */
 	if (!sysctl_discovery)
 		irlmp_do_discovery(nslots);
+	/* Note : we never do expiry here. Expiry will run on the
+	 * discovery timer regardless of the state of sysctl_discovery
+	 * Jean II */
 }
 
 /*

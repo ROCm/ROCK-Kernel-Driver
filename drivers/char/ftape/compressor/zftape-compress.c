@@ -1258,14 +1258,13 @@ KERN_INFO "Compiled for kernel version %s"
 	TRACE_EXIT 0;
 }
 
-
 #ifdef MODULE
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,18)
+
 MODULE_AUTHOR(
 	"(c) 1996, 1997 Claus-Justus Heine (claus@momo.math.rwth-aachen.de");
 MODULE_DESCRIPTION(
 "Compression routines for zftape. Uses the lzrw3 algorithm by Ross Williams");
-#endif
+MODULE_LICENSE("GPL");
 
 #if LINUX_VERSION_CODE >= KERNEL_VER(2,1,18)
 static int can_unload(void)

@@ -2018,7 +2018,7 @@ static int irlap_state_sclose(struct irlap_cb *self, IRLAP_EVENT event,
 {
 	int ret = 0;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(1, __FUNCTION__ "()\n");
 
 	ASSERT(self != NULL, return -ENODEV;);
 	ASSERT(self->magic == LAP_MAGIC, return -EBADR;);
@@ -2048,6 +2048,9 @@ static int irlap_state_sclose(struct irlap_cb *self, IRLAP_EVENT event,
 		irlap_disconnect_indication(self, LAP_DISC_INDICATION);
 		break;
 	case WD_TIMER_EXPIRED:
+		/* Always switch state before calling upper layers */
+		irlap_next_state(self, LAP_NDM);
+
 		irlap_apply_default_connection_parameters(self);
 		
 		irlap_disconnect_indication(self, LAP_DISC_INDICATION);

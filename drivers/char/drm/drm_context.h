@@ -181,7 +181,7 @@ int DRM(setsareactx)(struct inode *inode, struct file *filp,
 	drm_device_t	*dev	= priv->dev;
 	drm_ctx_priv_map_t request;
 	drm_map_t *map = NULL;
-	drm_map_list_t *r_list;
+	drm_map_list_t *r_list = NULL;
 	struct list_head *list;
 
 	if (copy_from_user(&request,

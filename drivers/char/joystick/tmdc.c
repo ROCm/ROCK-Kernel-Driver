@@ -374,3 +374,5 @@ void __exit tmdc_exit(void)
 
 module_init(tmdc_init);
 module_exit(tmdc_exit);
+
+MODULE_LICENSE("GPL");

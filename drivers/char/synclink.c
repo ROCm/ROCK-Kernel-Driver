@@ -934,6 +934,8 @@ static struct pci_device_id synclink_pci_tbl[] __devinitdata = {
 };
 MODULE_DEVICE_TABLE(pci, synclink_pci_tbl);
 
+MODULE_LICENSE("GPL");
+
 static struct pci_driver synclink_pci_driver = {
 	name:		"synclink",
 	id_table:	synclink_pci_tbl,

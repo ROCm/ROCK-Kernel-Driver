@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.uaccess.h 1.5 05/17/01 18:14:26 cort
+ * BK Id: SCCS/s.uaccess.h 1.8 09/11/01 18:10:06 paulus
  */
 #ifdef __KERNEL__
 #ifndef _PPC_UACCESS_H
@@ -116,6 +116,7 @@ do {								\
 	  case 1: __put_user_asm(x,ptr,retval,"stb"); break;	\
 	  case 2: __put_user_asm(x,ptr,retval,"sth"); break;	\
 	  case 4: __put_user_asm(x,ptr,retval,"stw"); break;	\
+	  case 8: __put_user_asm2(x,ptr,retval); break;		\
 	  default: __put_user_bad();				\
 	}							\
 } while (0)
@@ -143,6 +144,22 @@ struct __large_struct { unsigned long buf[100]; };
 		: "=r"(err)					\
 		: "r"(x), "b"(addr), "i"(-EFAULT), "0"(err))
 
+#define __put_user_asm2(x, addr, err)				\
+	__asm__ __volatile__(					\
+		"1:	stw %1,0(%2)\n"				\
+		"2:	stw %1+1,4(%2)\n"				\
+		"3:\n"						\
+		".section .fixup,\"ax\"\n"			\
+		"4:	li %0,%3\n"				\
+		"	b 3b\n"					\
+		".previous\n"					\
+		".section __ex_table,\"a\"\n"			\
+		"	.align 2\n"				\
+		"	.long 1b,4b\n"				\
+		"	.long 2b,4b\n"				\
+		".previous"					\
+		: "=r"(err)					\
+		: "r"(x), "b"(addr), "i"(-EFAULT), "0"(err))
 
 #define __get_user_nocheck(x,ptr,size)				\
 ({								\
@@ -171,6 +188,7 @@ do {								\
 	  case 1: __get_user_asm(x,ptr,retval,"lbz"); break;	\
 	  case 2: __get_user_asm(x,ptr,retval,"lhz"); break;	\
 	  case 4: __get_user_asm(x,ptr,retval,"lwz"); break;	\
+	  case 8: __get_user_asm2(x, ptr, retval);		\
 	  default: (x) = __get_user_bad();			\
 	}							\
 } while (0)
@@ -189,6 +207,25 @@ do {								\
 		"	.long 1b,3b\n"			\
 		".previous"				\
 		: "=r"(err), "=r"(x)			\
+		: "b"(addr), "i"(-EFAULT), "0"(err))
+
+#define __get_user_asm2(x, addr, err)			\
+	__asm__ __volatile__(				\
+		"1:	lwz %1,0(%2)\n"			\
+		"2:	lwz %1+1,4(%2)\n"		\
+		"3:\n"					\
+		".section .fixup,\"ax\"\n"		\
+		"4:	li %0,%3\n"			\
+		"	li %1,0\n"			\
+		"	li %1+1,0\n"			\
+		"	b 3b\n"				\
+		".previous\n"				\
+		".section __ex_table,\"a\"\n"		\
+		"	.align 2\n"			\
+		"	.long 1b,4b\n"			\
+		"	.long 2b,4b\n"			\
+		".previous"				\
+		: "=r"(err), "=&r"(x)			\
 		: "b"(addr), "i"(-EFAULT), "0"(err))
 
 /* more complex routines */

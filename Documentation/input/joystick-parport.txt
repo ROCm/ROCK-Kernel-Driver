@@ -2,6 +2,7 @@
 	       (c) 1998-2000 Vojtech Pavlik <vojtech@suse.cz>
 	       (c) 1998 Andree Borrmann <a.borrmann@tu-bs.de>
 			     Sponsored by SuSE
+	$Id: joystick-parport.txt,v 1.5 2001/05/15 06:41:00 vojtech Exp $
 ----------------------------------------------------------------------------
 
 0. Disclaimer
@@ -157,11 +158,11 @@ joysticks are called "Multisystem".
        |   +----> Button
        +--------> Ground
 
-  However, as time passed, extension to this standard developed, and these
+  However, as time passed, extensions to this standard developed, and these
 were not compatible with each other:
 
 
-  Atari 130, 800(XL/XE)                    MSX
+	Atari 130, 800/XL/XE		   MSX
 
 					 +-----------> Power
       +---------> Right                  | +---------> Right
@@ -179,7 +180,7 @@ were not compatible with each other:
        +--------> Ground                  | +--------> Output 3
 					  +----------> Ground
 
-       Amstrad CPC                         Commodore C64
+	Amstrad CPC			   Commodore C64
 
 					 +-----------> Analog Y
       +---------> Right                  | +---------> Right
@@ -196,6 +197,24 @@ were not compatible with each other:
        | +------> Button 2                | | +------> Power
        +--------> Ground                  | +--------> Ground
 					  +----------> Analog X
+
+	Sinclair Spectrum +2A/+3           Amiga 1200
+                                     
+    +-----------> Up                     +-----------> Button 3
+    | +---------> Fire                   | +---------> Right
+    | |                                  | | +-------> Left
+    | |   +-----> Ground                 | | | +-----> Down
+    | |   |                              | | | | +---> Up
+    | |   |                              | | | | |
+  _____________                        _____________
+5 \ o o x o x / 1                    5 \ o o o o o / 1
+   \ o o o o /                          \ o o o o /
+  9 `~~~~~~~' 6                        9 `~~~~~~~' 6
+     | | | |                              | | | |
+     | | | +----> Right                   | | | +----> Button 1
+     | | +------> Left                    | | +------> Power
+     | +--------> Ground                  | +--------> Ground
+     +----------> Down                    +----------> Button 2
 
   And there were many others.
 
@@ -295,12 +314,8 @@ interface, see
 2.3 Sony Playstation
 ~~~~~~~~~~~~~~~~~~~~
 
-  WARNING: PSX support is experimental, and at the moment doesn't seem to
-work for most people. If you like adventure, you can try yourself.
-
-  The PSX controller is supported by the gamecon.c.
-
-Pinout of the PSX controller (compatible with DirectPadPro):
+  The PSX controller is supported by the gamecon.c. Pinout of the PSX
+controller (compatible with DirectPadPro):
 
   +---------+---------+---------+
 9 | o  o  o | o  o  o | o  o  o | 1               parallel
@@ -311,18 +326,15 @@ Pinout of the PSX controller (compatible with DirectPadPro):
     |  |      |  +--------------->  Power    ---  (5-9)
     |  |      +------------------>  Ground   ---  (18-25)
     |  +------------------------->  Command  ---  (2)
-    +---------------------------->  Data     ---  (10,11,12,13,15) one only...
+    +---------------------------->  Data     ---  (one of 10,11,12,13,15)
 
-  You may have to add pull up/down resistors. Maybe your pad also won't like
-the 5V (PSX uses 3.7V).
-
-  Currently the driver supports only one psx pad per parallel port, and these
-controllers:
+  The driver supports these controllers:
 
  * Standard PSX Pad
  * NegCon PSX Pad
  * Analog PSX Pad (red mode)
  * Analog PSX Pad (green mode)
+ * PSX Rumble Pad
 
 2.4 Sega
 ~~~~~~~~
@@ -438,8 +450,8 @@ uses the following kernel/module command line:
 	  2  | NES pad
 	  4  | Multisystem 1-button joystick
 	  5  | Multisystem 2-button joystick
-	  6  | Sony PSX controller
-	  7  | N64 pad
+	  6  | N64 pad
+	  7  | Sony PSX controller
 
   The exact type of the PSX controller type is autoprobed, so you must have
 your controller plugged in before initializing.

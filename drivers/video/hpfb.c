@@ -397,3 +397,5 @@ int __init hpfb_init(void)
 
 	return 0;
 }
+
+MODULE_LICENSE("GPL");

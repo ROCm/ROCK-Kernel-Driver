@@ -1846,6 +1846,8 @@ int __init zatm_detect(void)
 
 #ifdef MODULE
  
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	if (!zatm_detect()) {

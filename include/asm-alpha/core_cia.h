@@ -470,9 +470,16 @@ __EXTERN_INLINE void cia_writeq(unsigned long b, unsigned long addr)
 	*(vulp)addr = b;
 }
 
-__EXTERN_INLINE unsigned long cia_ioremap(unsigned long addr)
+__EXTERN_INLINE unsigned long cia_ioremap(unsigned long addr,
+					  unsigned long size
+					  __attribute__((unused)))
 {
 	return addr + CIA_DENSE_MEM;
+}
+
+__EXTERN_INLINE void cia_iounmap(unsigned long addr)
+{
+	return;
 }
 
 __EXTERN_INLINE unsigned long cia_bwx_readb(unsigned long addr)
@@ -515,9 +522,15 @@ __EXTERN_INLINE void cia_bwx_writeq(unsigned long b, unsigned long addr)
 	*(vulp)addr = b;
 }
 
-__EXTERN_INLINE unsigned long cia_bwx_ioremap(unsigned long addr)
+__EXTERN_INLINE unsigned long cia_bwx_ioremap(unsigned long addr,
+					      unsigned long size)
 {
 	return addr + CIA_BW_MEM;
+}
+
+__EXTERN_INLINE void cia_bwx_iounmap(unsigned long addr)
+{
+	return;
 }
 
 __EXTERN_INLINE int cia_is_ioaddr(unsigned long addr)
@@ -548,7 +561,8 @@ __EXTERN_INLINE int cia_is_ioaddr(unsigned long addr)
 # define __writew(x,a)		cia_bwx_writew((x),(unsigned long)(a))
 # define __writel(x,a)		cia_bwx_writel((x),(unsigned long)(a))
 # define __writeq(x,a)		cia_bwx_writeq((x),(unsigned long)(a))
-# define __ioremap(a)		cia_bwx_ioremap((unsigned long)(a))
+# define __ioremap(a,s)		cia_bwx_ioremap((unsigned long)(a),(s))
+# define __iounmap(a)           cia_bwx_iounmap((unsigned long)(a))
 # define inb(p)			__inb(p)
 # define inw(p)			__inw(p)
 # define inl(p)			__inl(p)
@@ -578,7 +592,8 @@ __EXTERN_INLINE int cia_is_ioaddr(unsigned long addr)
 # define __writew(x,a)		cia_writew((x),(unsigned long)(a))
 # define __writel(x,a)		cia_writel((x),(unsigned long)(a))
 # define __writeq(x,a)		cia_writeq((x),(unsigned long)(a))
-# define __ioremap(a)		cia_ioremap((unsigned long)(a))
+# define __ioremap(a,s)		cia_ioremap((unsigned long)(a),(s))
+# define __iounmap(a)           cia_iounmap((unsigned long)(a))
 # define __raw_readl(a)		__readl(a)
 # define __raw_readq(a)		__readq(a)
 # define __raw_writel(v,a)	__writel((v),(a))

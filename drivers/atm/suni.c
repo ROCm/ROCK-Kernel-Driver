@@ -309,6 +309,8 @@ int __init suni_init(struct atm_dev *dev)
 EXPORT_SYMBOL(suni_init);
 
 
+MODULE_LICENSE("GPL");
+
 #ifdef MODULE
 
 

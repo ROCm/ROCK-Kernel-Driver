@@ -33,7 +33,7 @@
 
 #define NET_IRDA 412 /* Random number */
 enum { DISCOVERY=1, DEVNAME, DEBUG, SLOTS, DISCOVERY_TIMEOUT, 
-       SLOT_TIMEOUT, MAX_BAUD_RATE, MAX_INACTIVE_TIME };
+       SLOT_TIMEOUT, MAX_BAUD_RATE, MAX_INACTIVE_TIME, LAP_KEEPALIVE_TIME, };
 
 extern int  sysctl_discovery;
 extern int  sysctl_discovery_slots;
@@ -44,6 +44,7 @@ int         sysctl_compression = 0;
 extern char sysctl_devname[];
 extern int  sysctl_max_baud_rate;
 extern int  sysctl_max_inactive_time;
+extern int  sysctl_lap_keepalive_time;
 
 #ifdef CONFIG_IRDA_DEBUG
 extern unsigned int irda_debug;
@@ -88,6 +89,8 @@ static ctl_table irda_table[] = {
 	{ MAX_BAUD_RATE, "max_baud_rate", &sysctl_max_baud_rate,
 	  sizeof(int), 0644, NULL, &proc_dointvec },
 	{ MAX_INACTIVE_TIME, "max_inactive_time", &sysctl_max_inactive_time,
+	  sizeof(int), 0644, NULL, &proc_dointvec },
+	{ LAP_KEEPALIVE_TIME, "lap_keepalive_time", &sysctl_lap_keepalive_time,
 	  sizeof(int), 0644, NULL, &proc_dointvec },
 	{ 0 }
 };

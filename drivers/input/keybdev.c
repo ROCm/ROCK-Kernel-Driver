@@ -39,7 +39,8 @@
 
 #if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(__alpha__) || \
     defined(__mips__) || defined(CONFIG_SPARC64) || defined(CONFIG_SUPERH) || \
-    defined(CONFIG_PPC) || defined(__mc68000__)
+    defined(CONFIG_PPC) || defined(__mc68000__) || defined(__hppa__) || \
+    defined(__arm__)
 
 static int x86_sysrq_alt = 0;
 #ifdef CONFIG_SPARC64
@@ -197,14 +198,14 @@ static struct input_handle *keybdev_connect(struct input_handler *handler, struc
 
 	input_open_device(handle);
 
-	printk(KERN_INFO "keybdev.c: Adding keyboard: input%d\n", dev->number);
+//	printk(KERN_INFO "keybdev.c: Adding keyboard: input%d\n", dev->number);
 
 	return handle;
 }
 
 static void keybdev_disconnect(struct input_handle *handle)
 {
-	printk(KERN_INFO "keybdev.c: Removing keyboard: input%d\n", handle->dev->number);
+//	printk(KERN_INFO "keybdev.c: Removing keyboard: input%d\n", handle->dev->number);
 	input_close_device(handle);
 	kfree(handle);
 }

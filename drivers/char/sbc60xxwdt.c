@@ -340,3 +340,6 @@ err_out:
 
 module_init(sbc60xxwdt_init);
 module_exit(sbc60xxwdt_unload);
+
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

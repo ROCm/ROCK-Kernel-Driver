@@ -4742,4 +4742,6 @@ int wanpipe_tty_init(sdla_t *card)
 #endif
 
 
+MODULE_LICENSE("GPL");
+
 /****** End ****************************************************************/

@@ -10,20 +10,23 @@
 
 #include <linux/module.h>
 #include <linux/ioport.h>
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/gameport.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
 
 MODULE_AUTHOR("Victor Krapivin <vik@belcaf.minsk.by>");
+MODULE_LICENSE("GPL");
 
 /*
 	These options are experimental
 
-#define COOKED_MODE
 #define CS461X_FULL_MAP
-
 */
+
+#define COOKED_MODE
+
 
 #ifndef PCI_VENDOR_ID_CIRRUS
 #define PCI_VENDOR_ID_CIRRUS            0x1013
@@ -281,8 +284,6 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 	}
 	memset(port, 0, sizeof(struct gameport));
 
-	port->io = -1;
-	port->size = -1;
 	pdev->driver_data = port;
 	
 	port->open = cs461x_gameport_open;
@@ -297,9 +298,8 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 
 	gameport_register_port(port);
 
-	printk(KERN_INFO "gameport%d: CS461x PCI", port->number);
-	if (port->size > 1) printk(" size %d", port->size);
-	printk(" speed %d kHz\n", port->speed);
+	printk(KERN_INFO "gameport%d: CS461x Gameport speed %d kHz\n",
+		port->number, port->speed);
 
 	return 0;
 }

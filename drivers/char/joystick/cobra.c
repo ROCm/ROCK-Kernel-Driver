@@ -248,3 +248,5 @@ void __exit cobra_exit(void)
 
 module_init(cobra_init);
 module_exit(cobra_exit);
+
+MODULE_LICENSE("GPL");

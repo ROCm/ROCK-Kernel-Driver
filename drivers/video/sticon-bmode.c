@@ -905,3 +905,5 @@ static int __init sti_init(void)
 }
 
 module_init(sti_init)
+
+MODULE_LICENSE("GPL");

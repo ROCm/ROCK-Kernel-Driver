@@ -56,6 +56,7 @@ unsigned int cycx_debug;
 
 MODULE_AUTHOR("Arnaldo Carvalho de Melo");
 MODULE_DESCRIPTION("Cyclom 2X Sync Card Driver.");
+MODULE_LICENSE("GPL");
 MODULE_PARM(cycx_debug, "i");
 MODULE_PARM_DESC(cycx_debug, "cyclomx debug level");
 

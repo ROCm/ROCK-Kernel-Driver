@@ -271,6 +271,7 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 		if (!tmp) {
 			ufs_error (sb, "ufs_new_fragments", "internal error, "
 				"fragment %u, tmp %u\n", fragment, tmp);
+			unlock_super (sb);
 			return (unsigned)-1;
 		}
 		if (fragment < inode->u.ufs_i.i_lastfrag) {

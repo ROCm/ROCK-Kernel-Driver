@@ -739,3 +739,5 @@ chips_sleep_notify(struct pmu_sleep_notifier *self, int when)
 	return PBOOK_SLEEP_OK;
 }
 #endif /* CONFIG_PMAC_PBOOK */
+
+MODULE_LICENSE("GPL");

@@ -344,9 +344,16 @@ __EXTERN_INLINE void lca_writeq(unsigned long b, unsigned long addr)
 	*(vulp)addr = b;
 }
 
-__EXTERN_INLINE unsigned long lca_ioremap(unsigned long addr)
+__EXTERN_INLINE unsigned long lca_ioremap(unsigned long addr,
+					  unsigned long size
+					  __attribute__((unused)))
 {
 	return addr + LCA_DENSE_MEM;
+}
+
+__EXTERN_INLINE void lca_iounmap(unsigned long addr)
+{
+	return;
 }
 
 __EXTERN_INLINE int lca_is_ioaddr(unsigned long addr)
@@ -374,7 +381,8 @@ __EXTERN_INLINE int lca_is_ioaddr(unsigned long addr)
 #define __writew(x,a)		lca_writew((x),(unsigned long)(a))
 #define __writel(x,a)		lca_writel((x),(unsigned long)(a))
 #define __writeq(x,a)		lca_writeq((x),(unsigned long)(a))
-#define __ioremap(a)		lca_ioremap((unsigned long)(a))
+#define __ioremap(a,s)		lca_ioremap((unsigned long)(a),(s))
+#define __iounmap(a)		lca_iounmap((unsigned long)(a))
 #define __is_ioaddr(a)		lca_is_ioaddr((unsigned long)(a))
 
 #define __raw_readl(a)		__readl(a)

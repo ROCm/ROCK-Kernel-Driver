@@ -359,8 +359,9 @@ static void irlmp_discovery_timeout(u_long	priv)
 	self = (struct lap_cb *) priv;
 	ASSERT(self != NULL, return;);
 
-	/* Just handle it the same way as a discovery confirm */
-	irlmp_do_lap_event(self, LM_LAP_DISCOVERY_CONFIRM, NULL);
+	/* Just handle it the same way as a discovery confirm,
+	 * bypass the LM_LAP state machine (see below) */
+	irlmp_discovery_confirm(irlmp->cachelog);
 }
 
 /*
@@ -377,8 +378,12 @@ static void irlmp_discovery_timeout(u_long	priv)
  *	  we always get ~100% of these.
  *	o Make faster discovery, statistically divide time of discovery
  *	  events by 2 (important for the latency aspect and user feel)
+ *	o Even is we do active discovery, the other node might not
+ *	  answer our discoveries (ex: Palm).
+ *
  * However, when both devices discover each other, they might attempt to
- * connect to each other, and it would create collisions on the medium.
+ * connect to each other following the discovery event, and it would create
+ * collisions on the medium (SNRM battle).
  * The trick here is to defer the event by a little delay to avoid both
  * devices to jump in exactly at the same time...
  *
@@ -387,6 +392,14 @@ static void irlmp_discovery_timeout(u_long	priv)
  * period/timeout that may be set is 1s). The message triggering this
  * event was the last of the discovery, so the medium is now free...
  * Maybe more testing is needed to get the value right...
+
+ * One more problem : the other node might do only a single discovery
+ * and connect immediately to us, and we would receive only a single
+ * discovery indication event, and because of the delay, it will arrive
+ * while the LAP is connected. That's another good reason to
+ * bypass the LM_LAP state machine ;-)
+ *
+ * Jean II
  */
 void irlmp_link_discovery_indication(struct lap_cb *self, 
 				     discovery_t *discovery)
@@ -427,8 +440,13 @@ void irlmp_link_discovery_confirm(struct lap_cb *self, hashbin_t *log)
 	if(timer_pending(&disco_delay))
 		del_timer(&disco_delay);
 
-	/* Propagate event to the state machine */
-	irlmp_do_lap_event(self, LM_LAP_DISCOVERY_CONFIRM, NULL);
+	/* Propagate event to various LSAPs registered for it.
+	 * We bypass the LM_LAP state machine because
+	 *	1) We do it regardless of the LM_LAP state
+	 *	2) It doesn't affect the LM_LAP state
+	 *	3) Faster, slimer, simpler, ...
+	 * Jean II */
+	irlmp_discovery_confirm(irlmp->cachelog);
 }
 
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP

@@ -292,3 +292,6 @@ static void __exit ecoscsi_exit(void)
 
 module_init(ecoscsi_init);
 module_exit(ecoscsi_exit);
+
+EXPORT_NO_SYMBOLS;
+MODULE_LICENSE("GPL");

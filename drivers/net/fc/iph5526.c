@@ -118,6 +118,8 @@ static struct pci_device_id iph5526_pci_tbl[] __initdata = {
 };
 MODULE_DEVICE_TABLE(pci, iph5526_pci_tbl);
 
+MODULE_LICENSE("GPL");
+
 #define MAX_FC_CARDS 2
 static struct fc_info *fc[MAX_FC_CARDS+1];
 static unsigned int pci_irq_line;

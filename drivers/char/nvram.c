@@ -695,9 +695,14 @@ static int atari_proc_infos( unsigned char *nvram, char *buffer, int *len,
 
 #endif /* MACH == ATARI */
 
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;
+
 /*
  * Local variables:
  *  c-indent-level: 4
  *  tab-width: 4
  * End:
  */
+

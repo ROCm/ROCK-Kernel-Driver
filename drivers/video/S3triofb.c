@@ -858,3 +858,5 @@ static struct display_switch fbcon_trio8 = {
    fontwidthmask:	FONTWIDTH(8)
 };
 #endif
+
+MODULE_LICENSE("GPL");

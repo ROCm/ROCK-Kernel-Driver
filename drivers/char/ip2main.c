@@ -418,6 +418,7 @@ mark_requested_irq( char irq )
 	rirqs[iindx++] = irq;
 }
 
+#ifdef MODULE
 static int __init
 clear_requested_irq( char irq )
 {
@@ -430,6 +431,7 @@ clear_requested_irq( char irq )
 	}
 	return 0;
 }
+#endif
 
 static int __init
 have_requested_irq( char irq )

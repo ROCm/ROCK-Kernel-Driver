@@ -776,6 +776,7 @@ static int vlsi_open(struct net_device *ndev)
 {
 	vlsi_irda_dev_t *idev = ndev->priv;
 	struct pci_dev *pdev = idev->pdev;
+	char	hwname[32];
 	int	err;
 
 	MOD_INC_USE_COUNT;		/* still needed? - we have SET_MODULE_OWNER! */
@@ -824,7 +825,8 @@ static int vlsi_open(struct net_device *ndev)
 		(idev->mode==IFF_SIR)?"SIR":((idev->mode==IFF_MIR)?"MIR":"FIR"),
 		(sirpulse)?"3/16 bittime":"short");
 
-	idev->irlap = irlap_open(ndev,&idev->qos);
+	sprintf(hwname, "VLSI-FIR");
+	idev->irlap = irlap_open(ndev,&idev->qos,hwname);
 
 	netif_start_queue(ndev);
 

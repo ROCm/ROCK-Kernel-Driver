@@ -5719,6 +5719,7 @@ module_init(rs_init);
 module_exit(rs_fini);
 MODULE_DESCRIPTION("Standard/generic (dumb) serial driver");
 MODULE_AUTHOR("Theodore Ts'o <tytso@mit.edu>");
+MODULE_LICENSE("GPL");
 
 
 /*

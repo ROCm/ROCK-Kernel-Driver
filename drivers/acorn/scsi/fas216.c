@@ -2777,3 +2777,5 @@ void __exit cleanup_module(void)
 {
 }
 #endif
+
+MODULE_LICENSE("GPL");

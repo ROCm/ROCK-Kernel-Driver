@@ -61,7 +61,8 @@ struct alpha_machine_vector
 	void (*mv_writel)(unsigned int, unsigned long);
 	void (*mv_writeq)(unsigned long, unsigned long);
 
-	unsigned long (*mv_ioremap)(unsigned long);
+	unsigned long (*mv_ioremap)(unsigned long, unsigned long);
+	void (*mv_iounmap)(unsigned long);
 	int (*mv_is_ioaddr)(unsigned long);
 
 	void (*mv_switch_mm)(struct mm_struct *, struct mm_struct *,

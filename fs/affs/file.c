@@ -528,7 +528,7 @@ affs_do_readpage_ofs(struct file *file, struct page *page, unsigned from, unsign
 		bh = affs_bread_ino(inode, bidx, 0);
 		if (IS_ERR(bh))
 			return PTR_ERR(bh);
-		tmp = MIN(bsize - boff, from - to);
+		tmp = min(bsize - boff, from - to);
 		memcpy(data + from, AFFS_DATA(bh) + boff, tmp);
 		affs_brelse(bh);
 		bidx++;
@@ -558,7 +558,7 @@ affs_extent_file_ofs(struct file *file, u32 newsize)
 		bh = affs_bread_ino(inode, bidx, 0);
 		if (IS_ERR(bh))
 			return PTR_ERR(bh);
-		tmp = MIN(bsize - boff, newsize - size);
+		tmp = min(bsize - boff, newsize - size);
 		memset(AFFS_DATA(bh) + boff, 0, tmp);
 		AFFS_DATA_HEAD(bh)->size = cpu_to_be32(be32_to_cpu(AFFS_DATA_HEAD(bh)->size) + tmp);
 		affs_fix_checksum(sb, bh);
@@ -576,7 +576,7 @@ affs_extent_file_ofs(struct file *file, u32 newsize)
 		bh = affs_getzeroblk_ino(inode, bidx);
 		if (IS_ERR(bh))
 			goto out;
-		tmp = MIN(bsize, newsize - size);
+		tmp = min(bsize, newsize - size);
 		AFFS_DATA_HEAD(bh)->ptype = cpu_to_be32(T_DATA);
 		AFFS_DATA_HEAD(bh)->key = cpu_to_be32(inode->i_ino);
 		AFFS_DATA_HEAD(bh)->sequence = cpu_to_be32(bidx);
@@ -685,7 +685,7 @@ static int affs_commit_write_ofs(struct file *file, struct page *page, unsigned 
 		bh = affs_bread_ino(inode, bidx, 0);
 		if (IS_ERR(bh))
 			return PTR_ERR(bh);
-		tmp = MIN(bsize - boff, to - from);
+		tmp = min(bsize - boff, to - from);
 		memcpy(AFFS_DATA(bh) + boff, data + from, tmp);
 		AFFS_DATA_HEAD(bh)->size = cpu_to_be32(be32_to_cpu(AFFS_DATA_HEAD(bh)->size) + tmp);
 		affs_fix_checksum(sb, bh);
@@ -731,7 +731,7 @@ static int affs_commit_write_ofs(struct file *file, struct page *page, unsigned 
 		bh = affs_bread_ino(inode, bidx, 1);
 		if (IS_ERR(bh))
 			goto out;
-		tmp = MIN(bsize, to - from);
+		tmp = min(bsize, to - from);
 		memcpy(AFFS_DATA(bh), data + from, tmp);
 		if (bh->b_state & (1UL << BH_New)) {
 			AFFS_DATA_HEAD(bh)->ptype = cpu_to_be32(T_DATA);

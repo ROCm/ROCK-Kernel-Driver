@@ -128,6 +128,8 @@
 #define CG6_THC_MISC_INT             (1 << 4)
 #define CG6_THC_MISC_INIT            0x9f
 
+MODULE_LICENSE("GPL");
+
 /* The contents are unknown */
 struct cg6_tec {
 	volatile int tec_matrix;

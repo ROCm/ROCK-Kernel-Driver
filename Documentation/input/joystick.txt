@@ -1,6 +1,7 @@
 		       Linux Joystick driver v2.0.0
 	       (c) 1996-2000 Vojtech Pavlik <vojtech@suse.cz>
 			     Sponsored by SuSE
+	   $Id: joystick.txt,v 1.6 2001/06/05 09:57:01 vojtech Exp $
 ----------------------------------------------------------------------------
 
 0. Disclaimer
@@ -91,7 +92,7 @@ module in kernel, either loaded or compiled in:
 
   For gameport joysticks, you'll have to load the gameport driver as well;
 
-	modprove ns558
+	modprobe ns558
 
   And for serial port joysticks, you'll need the serial input line
 discipline module loaded and the inputattach utility started:
@@ -104,10 +105,13 @@ usually you'll have an analog joystick:
 
 	modprobe analog
 	
-  For automatic module loading, something like this might work:
+  For automatic module loading, something like this might work - tailor to
+your needs:
 
 	alias tty-ldisc-2 serport
-	alias char-major-13 joydev ns558 analog
+	alias char-major-13 input
+	above input joydev ns558 analog
+	options analog js=gameport
 
 2.5 Verifying that it works
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -302,9 +306,9 @@ supports:
 of up to two of these pads either chained together or using an Y-cable on a
 single gameport.
 
-GrIP MultiPort isn't supported yet. Gravis Stinger is a serial device and
-hopefully will be supported soon. Other Gravis joysticks are supported by
-the analog driver.
+GrIP MultiPort isn't supported yet. Gravis Stinger is a serial device and is
+supported by the stinger driver. Other Gravis joysticks are supported by the
+analog driver.
 
 3.5 FPGaming A3D and MadCatz A3D
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -339,7 +343,7 @@ module. This includes, but is not limited to:
 
   If you have one of these, contact me.
 
-  BSP devices are autodetected, and thus no parameters to the module
+  TMDC devices are autodetected, and thus no parameters to the module
 are needed. Up to two TMDC devices can be connected to one gameport, using
 an Y-cable.
 
@@ -390,7 +394,27 @@ provide an "Enhanced Game Port" mode where the soundcard handles polling the
 joystick.  This mode is supported by the pcigame.c module. Once loaded the
 analog driver can use the enhanced features of these gameports..
 
-3.12 Amiga
+3.13 Crystal SoundFusion
+~~~~~~~~~~~~~~~~~~~~~~~~
+  Soundcards with Crystal SoundFusion chipsets provide an "Enhanced Game
+Port", much like the 4DWave or Vortex above. This, and also the normal mode
+for the port of the SoundFusion is supported by the cs461x.c module.
+
+3.14 SoundBlaster Live!
+~~~~~~~~~~~~~~~~~~~~~~~~
+  The Live! has a special PCI gameport, which, although it doesn't provide
+any "Enhanced" stuff like 4DWave and friends, is quite a bit faster than
+it's ISA counterparts. It also requires special support, hence the
+emu10k1-gp.c module for it instead of the normal ns558.c one.
+
+3.15 SoundBlaster 64 and 128 - ES1370 and ES1371, ESS Solo1 and S3 SonicVibes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  These PCI soundcards have specific gameports. They are handled by the
+sound drivers themselves. Make sure you select gameport support in the
+joystick menu and sound card support in the sound menu for your appropriate
+card.
+
+3.16 Amiga
 ~~~~~~~~~~
   Amiga joysticks, connected to an Amiga, are supported by the amijoy.c
 driver. Since they can't be autodetected, the driver has a command line.
@@ -408,11 +432,11 @@ the Amiga.
   No more joystick types are supported now, but that should change in the
 future if I get an Amiga in the reach of my fingers.
 
-3.13 Game console and 8-bit pads and joysticks
+3.17 Game console and 8-bit pads and joysticks
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See joystick-parport.txt for more info.
 
-3.14 SpaceTec/LabTec devices
+3.18 SpaceTec/LabTec devices
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   SpaceTec serial devices communicate using the SpaceWare protocol. It is
 supported by the spaceorb.c and spaceball.c drivers. The devices currently
@@ -427,11 +451,11 @@ Devices currently supported by spaceball.c are:
 
   In addition to having the spaceorb/spaceball and serport modules in the
 kernel, you also need to attach a serial port to it. to do that, run the
-jsattach program:
+inputattach program:
 
 	inputattach --spaceorb /dev/tts/x &
 or
-	jsattach --spaceball /dev/tts/x &
+	inputattach --spaceball /dev/tts/x &
 
 where /dev/tts/x is the serial port which the device is connected to. After
 doing this, the device will be reported and will start working.
@@ -444,7 +468,7 @@ you bind it to some other function.
 
 SpaceTec SpaceBall 2003 FLX and 3003 FLX are not supported yet. 
 
-3.15 Logitech SWIFT devices
+3.19 Logitech SWIFT devices
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
   The SWIFT serial protocol is supported by the warrior.c module. It
 currently supports only the:
@@ -452,14 +476,14 @@ currently supports only the:
 * Logitech WingMan Warrior
 
 but in the future, Logitech CyberMan (the original one, not CM2) could be
-supported as well. To use the module, you need to run jsattach after you
+supported as well. To use the module, you need to run inputattach after you
 insert/compile the module into your kernel:
 
 	inputattach --warrior /dev/tts/x &
 
 /dev/tts/x is the serial port your Warrior is attached to.
 
-3.16 Magellan / Space Mouse
+3.20 Magellan / Space Mouse
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
   The Magellan (or Space Mouse), manufactured by LogiCad3d (formerly Space
 Systems), for many other companies (Logitech, HP, ...) is supported by the
@@ -477,14 +501,17 @@ models, the additional buttons on the 'Plus' versions are not supported yet.
 command. After that the Magellan will be detected, initialized, will beep,
 and the /dev/input/jsX device should become usable.
 
-3.17 I-Force devices 
+3.21 I-Force devices 
 ~~~~~~~~~~~~~~~~~~~~
-  All I-Force devices ale supported by the iforce.c module. This includes,
-but is not limited to:
+  All I-Force devices are supported by the iforce.c module. This includes:
 
+* AVB Mag Turbo Force
+* AVB Top Shot Pegasus
 * Logitech WingMan Force
+* Logitech WingMan Force 3D
 * Logitech WingMan Force Wheel 
-* Guillemot Race Leader wheel 
+* Logitech WingMan Strike Force 3D
+* Guillemot Race Leader Force Feedback
 
   To use it, you need to attach the serial port to the driver using the
 
@@ -495,6 +522,18 @@ command. After that the I-Force device will be detected, and the
 
   In case you're using the device via the USB port, the inputattach command
 isn't needed.
+
+  The I-Force driver now supports force feedback via the event interface.
+
+3.22 Gravis Stinger gamepad 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  The Gravis Stinger serial port gamepad, designed for use with laptop
+computers, is supported by the stinger.c module. To use it, attach the
+serial port to the driver using:
+
+        inputattach --stinger /dev/tty/x &
+
+where x is the number of the serial port.
 
 4. Troubleshooting
 ~~~~~~~~~~~~~~~~~~
@@ -542,41 +581,3 @@ Any call to the joystick driver using the old interface will return values
 that are compatible to the old interface.  This interface is still limited
 to 2 axes, and applications using it usually decode only 2 buttons, although
 the driver provides up to 32.
-
-7. Credits
-~~~~~~~~~~
-  Thanks to the following people who contributed code, ideas or specifications
-to the joystick driver development:
-
-	Arthur C. Smith		<asmith@cbnewsd.att.com>
-	Eyal Lebedinsky		<eyal@eyal.emu.id.au>
-	Jeff Tranter		<tranter@software.mitel.com>
-	Carlos Puchol		<cpg@cs.utexas.edu>
-	Matt Rhoten		<mrhoten@oz.net>
-	Dan Fandrich		<dan@fch.wimsey.bc.ca>
-	Sverker Wilberg		<sverkerw@manila.docs.uu.se>
-	Hal Maney		<maney@norden.com>
-	Bernd Schmidt		<crux@pool.informatik.rwth-aachen.de>
-	Alan Cox		<alan@lxorguk.ukuu.org.uk>
-	John Markus Bjorndalen	<johnm@cs.uit.no>
-	Boris Muehmer		<mhs@cybernet-ag.de>
-	Robert W. Grubbs	<rwgrubbs@vt.edu>
-	Pete Chown		<pete.chown@skygate.co.uk>
-	Benji York		<benji@cookeville.com>
-	Leslie F. Donaldson	<donaldlf@cs.rose-hulman.edu>
-	Eng-Jon Ong		<ongej@dcs.qmw.ac.uk>
-	Ragnar Hojland Espinosa	<ragnar@macula.net>
-	Brian Gerst		<bgerst@quark.vpplus.com>
-	Andree Borrmann		<a.borrmann@tu-bs.de>
-	Martin Giguere		<zefrench@hotmail.com>
-	David Thompson		<dcthomp@mail.utexas.edu>
-	Justin Wake		<spectre@telefragged.com>
-	Benoit Triquet		<benoit@adsl-216-100-248-201.dsl.pacbell.net>
-	John Dahlstrom		<jodaman@bradley.edu>
-	Dan Gohman		<gohmandj@mrs.umn.edu>
-	Joe Krahn		<krahn@niehs.nih.gov>
-	David Kuder		<alphagod@penguinpowered.com>
-	Raymond Ingles		<sorceror@tir.com>
-
-  If you think you should be in this list and are not, it's possible that
-I forgot to include you - contact me and I'll correct the error. :)

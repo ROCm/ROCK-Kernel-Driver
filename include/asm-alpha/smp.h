@@ -60,6 +60,12 @@ extern int __cpu_logical_map[NR_CPUS];
 extern unsigned long cpu_present_mask;
 #define cpu_online_map cpu_present_mask
 
+extern int smp_call_function_on_cpu(void (*func) (void *info), void *info,int retry, int wait, unsigned long cpu);
+
+#else /* CONFIG_SMP */
+
+#define smp_call_function_on_cpu(func,info,retry,wait,cpu)    ({ 0; })
+
 #endif /* CONFIG_SMP */
 
 #define NO_PROC_ID	(-1)

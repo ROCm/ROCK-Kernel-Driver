@@ -336,3 +336,4 @@ module_init(keyboard_probe);
 #endif
 
 
+MODULE_LICENSE("GPL");

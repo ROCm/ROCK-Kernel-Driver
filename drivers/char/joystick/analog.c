@@ -42,6 +42,7 @@
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Analog joystick and gamepad driver for Linux");
+MODULE_LICENSE("GPL");
 
 /*
  * Option parsing.

@@ -59,6 +59,7 @@ MODULE_DESCRIPTION(ZFTAPE_VERSION " - "
 		   "Support for QIC-113 compatible volume table "
 		   "and builtin compression (lzrw3 algorithm)");
 MODULE_SUPPORTED_DEVICE("char-major-27");
+MODULE_LICENSE("GPL");
 
 /*      Global vars.
  */

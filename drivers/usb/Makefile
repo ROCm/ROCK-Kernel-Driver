@@ -14,8 +14,9 @@ export-objs		:= usb.o
 
 # Multipart objects.
 
-list-multi		:= usbcore.o
+list-multi		:= usbcore.o hid.o
 usbcore-objs		:= usb.o usb-debug.o hub.o
+hid-objs		:= hid-core.o hid-input.o
 
 ifneq ($(CONFIG_USB_PWC),n)
 	export-objs		+= pwc-uncompress.o
@@ -29,6 +30,10 @@ pwc-objs		:= pwc-if.o pwc-misc.o pwc-ctrl.o pwc-uncompress.o
 
 ifeq ($(CONFIG_USB_DEVICEFS),y)
 	usbcore-objs	+= devio.o inode.o drivers.o devices.o
+endif
+
+ifeq ($(CONFIG_USB_HIDDEV),y)
+	hid-objs	+= hiddev.o
 endif
 
 # Object file lists.
@@ -91,6 +96,8 @@ include $(TOPDIR)/Rules.make
 usbcore.o: $(usbcore-objs)
 	$(LD) -r -o $@ $(usbcore-objs)
 
-pwc.o:		$(pwc-objs)
-	$(LD) -r -o $@ $(pwc-objs)
+hid.o: $(hid-objs)
+	$(LD) -r -o $@ $(hid-objs)
 
+pwc.o: $(pwc-objs)
+	$(LD) -r -o $@ $(pwc-objs)

@@ -213,13 +213,13 @@ static int pci_probe(sdlahw_t *hw);
  * Note: All data must be explicitly initialized!!!
  */
 
-#ifdef LINUX_2_4
 static struct pci_device_id sdladrv_pci_tbl[] __initdata = {
 	{ V3_VENDOR_ID, V3_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, },
 	{ }			/* Terminating entry */
 };
 MODULE_DEVICE_TABLE(pci, sdladrv_pci_tbl);
-#endif
+
+MODULE_LICENSE("GPL");
 
 /* private data */
 static char modname[]	= "sdladrv";

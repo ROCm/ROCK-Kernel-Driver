@@ -1,7 +1,7 @@
 /*
- * $Id: lightning.c,v 1.7 2000/05/24 19:36:03 vojtech Exp $
+ * $Id: lightning.c,v 1.13 2001/04/26 10:24:46 vojtech Exp $
  *
- *  Copyright (c) 1998-2000 Vojtech Pavlik
+ *  Copyright (c) 1998-2001 Vojtech Pavlik
  *
  *  Sponsored by SuSE
  */
@@ -52,6 +52,7 @@
 #define L4_TIMEOUT		80	/* 80 us */
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
+MODULE_LICENSE("GPL");
 
 struct l4 {
 	struct gameport gameport;
@@ -76,7 +77,7 @@ static int l4_wait_ready(void)
 
 static int l4_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	struct l4 *l4 = gameport->driver;
+	struct l4 *l4 = gameport->private;
 	unsigned char status;
 	int i, result = -1;
 
@@ -109,7 +110,7 @@ fail:	outb(L4_SELECT_ANALOG, L4_PORT);
 
 static int l4_open(struct gameport *gameport, int mode)
 {
-	struct l4 *l4 = gameport->driver;
+	struct l4 *l4 = gameport->private;
         if (l4->port != 0 && mode != GAMEPORT_MODE_COOKED)
 		return -1;
 	outb(L4_SELECT_ANALOG, L4_PORT);
@@ -187,7 +188,7 @@ static int l4_calibrate(struct gameport *gameport, int *axes, int *max)
 {
 	int i, t;
 	int cal[4];
-	struct l4 *l4 = gameport->driver;
+	struct l4 *l4 = gameport->private;
 
 	if (l4_getcal(l4->port, cal))
 		return -1;
@@ -247,16 +248,13 @@ int __init l4_init(void)
 			l4->port = i * 4 + j;
 
 			gameport = &l4->gameport;
-			gameport->driver = l4;
+			gameport->private = l4;
 			gameport->open = l4_open;
 			gameport->cooked_read = l4_cooked_read;
 			gameport->calibrate = l4_calibrate;
-			gameport->type = GAMEPORT_EXT;
 
-			if (!i && !j) {
+			if (!i && !j)
 				gameport->io = L4_PORT;
-				gameport->size = 1;
-			}
 
 			if (rev > 0x28)		/* on 2.9+ the setcal command works correctly */
 				l4_setcal(l4->port, cal);

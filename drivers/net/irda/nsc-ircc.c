@@ -1836,6 +1836,7 @@ static int nsc_ircc_net_open(struct net_device *dev)
 {
 	struct nsc_ircc_cb *self;
 	int iobase;
+	char hwname[32];
 	__u8 bank;
 	
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
@@ -1874,14 +1875,16 @@ static int nsc_ircc_net_open(struct net_device *dev)
 	outb(bank, iobase+BSR);
 
 	/* Ready to play! */
-
 	netif_start_queue(dev);
 	
+	/* Give self a hardware name */
+	sprintf(hwname, "NSC-FIR @ 0x%03x", self->io.fir_base);
+
 	/* 
 	 * Open new IrLAP layer instance, now that everything should be
 	 * initialized properly 
 	 */
-	self->irlap = irlap_open(dev, &self->qos);
+	self->irlap = irlap_open(dev, &self->qos, hwname);
 
 	MOD_INC_USE_COUNT;
 

@@ -40,6 +40,7 @@
 #include <linux/init.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
+MODULE_LICENSE("GPL");
 MODULE_PARM(tgfx, "2-8i");
 MODULE_PARM(tgfx_2, "2-8i");
 MODULE_PARM(tgfx_3, "2-8i");

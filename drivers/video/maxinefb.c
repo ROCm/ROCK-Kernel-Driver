@@ -31,7 +31,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/tty.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/fb.h>
@@ -382,6 +382,7 @@ static void __exit maxinefb_exit(void)
 }
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
 module_init(maxinefb_init);
 #endif
 module_exit(maxinefb_exit);

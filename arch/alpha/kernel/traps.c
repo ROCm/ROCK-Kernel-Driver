@@ -19,8 +19,36 @@
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 #include <asm/sysinfo.h>
+#include <asm/hwrpb.h>
 
 #include "proto.h"
+
+/* data/code implementing a work-around for some SRMs which
+   mishandle opDEC faults
+*/
+static int opDEC_testing = 0;
+static int opDEC_fix = 0;
+static unsigned long opDEC_test_pc = 0;
+
+static void
+opDEC_check(void)
+{
+	unsigned long test_pc;
+
+	lock_kernel();
+	opDEC_testing = 1;
+
+	__asm__ __volatile__(
+		"       br      %0,1f\n"
+		"1:     addq    %0,8,%0\n"
+		"       stq     %0,%1\n"
+		"       cvttq/svm $f31,$f31\n"
+		: "=&r"(test_pc), "=m"(opDEC_test_pc)
+		: );
+
+	opDEC_testing = 0;
+	unlock_kernel();
+}
 
 void
 dik_show_regs(struct pt_regs *regs, unsigned long *r9_15)
@@ -56,10 +84,12 @@ __halt();
 #endif
 }
 
+#if 0
 static char * ireg_name[] = {"v0", "t0", "t1", "t2", "t3", "t4", "t5", "t6",
 			   "t7", "s0", "s1", "s2", "s3", "s4", "s5", "s6",
 			   "a0", "a1", "a2", "a3", "a4", "a5", "t8", "t9",
 			   "t10", "t11", "ra", "pv", "at", "gp", "sp", "zero"};
+#endif
 
 static void
 dik_show_code(unsigned int *pc)
@@ -188,8 +218,10 @@ do_entIF(unsigned long type, unsigned long a1,
 	 unsigned long a2, unsigned long a3, unsigned long a4,
 	 unsigned long a5, struct pt_regs regs)
 {
-	die_if_kernel((type == 1 ? "Kernel Bug" : "Instruction fault"),
+	if (!opDEC_testing || type != 4) {
+		die_if_kernel((type == 1 ? "Kernel Bug" : "Instruction fault"),
 		      &regs, type, 0);
+	}
 
 	switch (type) {
 	      case 0: /* breakpoint */
@@ -242,6 +274,21 @@ do_entIF(unsigned long type, unsigned long a1,
 
 	      case 4: /* opDEC */
 		if (implver() == IMPLVER_EV4) {
+			/* The some versions of SRM do not handle
+			   the opDEC properly - they return the PC of the
+			   opDEC fault, not the instruction after as the
+			   Alpha architecture requires.  Here we fix it up.
+			   We do this by intentionally causing an opDEC
+			   fault during the boot sequence and testing if
+			   we get the correct PC.  If not, we set a flag
+			   to correct it every time through.
+			*/
+			if (opDEC_testing && regs.pc == opDEC_test_pc) {
+				opDEC_fix = 4;
+				printk("opDEC fixup enabled.\n");
+			}
+			regs.pc += opDEC_fix; 
+			
 			/* EV4 does not implement anything except normal
 			   rounding.  Everything else will come here as
 			   an illegal instruction.  Emulate them.  */
@@ -257,7 +304,7 @@ do_entIF(unsigned long type, unsigned long a1,
 }
 
 /* There is an ifdef in the PALcode in MILO that enables a 
-   "kernel debugging entry point" as an unprivilaged call_pal.
+   "kernel debugging entry point" as an unpriviledged call_pal.
 
    We don't want to have anything to do with it, but unfortunately
    several versions of MILO included in distributions have it enabled,
@@ -933,4 +980,11 @@ trap_init(void)
 	wrent(entUna, 4);
 	wrent(entSys, 5);
 	wrent(entDbg, 6);
+
+	/* Hack for Multia (UDB) and JENSEN: some of their SRMs have
+	 * a bug in the handling of the opDEC fault.  Fix it up if so.
+	 */
+	if (implver() == IMPLVER_EV4) {
+		opDEC_check();
+	}
 }

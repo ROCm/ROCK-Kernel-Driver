@@ -421,3 +421,5 @@ void __exit grip_exit(void)
 
 module_init(grip_init);
 module_exit(grip_exit);
+
+MODULE_LICENSE("GPL");

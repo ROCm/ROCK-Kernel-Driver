@@ -92,10 +92,15 @@ enum {
 
 #define IRTTP_MAX_SDU_SIZE IRLMP_MAX_SDU_SIZE /* Compatibility */
 
-#define IAS_MAX_STRING         256
-#define IAS_MAX_OCTET_STRING  1024
-#define IAS_MAX_CLASSNAME       64
-#define IAS_MAX_ATTRIBNAME     256
+#define IAS_MAX_STRING         256	/* See IrLMP 1.1, 4.3.3.2 */
+#define IAS_MAX_OCTET_STRING  1024	/* See IrLMP 1.1, 4.3.3.2 */
+#define IAS_MAX_CLASSNAME       60	/* See IrLMP 1.1, 4.3.1 */
+#define IAS_MAX_ATTRIBNAME      60	/* See IrLMP 1.1, 4.3.3.1 */
+#define IAS_MAX_ATTRIBNUMBER   256	/* See IrLMP 1.1, 4.3.3.1 */
+/* For user space backward compatibility - may be fixed in kernel 2.5.X
+ * Note : need 60+1 ('\0'), make it 64 for alignement - Jean II */
+#define IAS_EXPORT_CLASSNAME       64
+#define IAS_EXPORT_ATTRIBNAME     256
 
 /* Attribute type needed for struct irda_ias_set */
 #define IAS_MISSING 0
@@ -126,8 +131,8 @@ struct irda_device_list {
 };
 
 struct irda_ias_set {
-	char irda_class_name[IAS_MAX_CLASSNAME];
-	char irda_attrib_name[IAS_MAX_ATTRIBNAME];
+	char irda_class_name[IAS_EXPORT_CLASSNAME];
+	char irda_attrib_name[IAS_EXPORT_ATTRIBNAME];
 	unsigned int irda_attrib_type;
 	union {
 		unsigned int irda_attrib_int;

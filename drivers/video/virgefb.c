@@ -1392,6 +1392,8 @@ static struct display_switch fbcon_virge16 = {
 #endif
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	return virgefb_init();

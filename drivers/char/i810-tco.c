@@ -363,3 +363,5 @@ static void __exit watchdog_cleanup (void)
 
 module_init(watchdog_init);
 module_exit(watchdog_cleanup);
+
+MODULE_LICENSE("GPL");

@@ -615,6 +615,8 @@ void __init mda_console_init(void)
 
 #ifdef MODULE
 
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	mda_console_init();

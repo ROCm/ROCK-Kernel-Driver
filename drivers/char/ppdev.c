@@ -754,3 +754,7 @@ static void __exit ppdev_cleanup (void)
 
 module_init(ppdev_init);
 module_exit(ppdev_cleanup);
+
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

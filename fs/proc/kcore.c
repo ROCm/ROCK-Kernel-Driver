@@ -42,7 +42,7 @@ static ssize_t read_kcore(struct file *file, char *buf, size_t count, loff_t *pp
 	ssize_t count1;
 	char * pnt;
 	struct user dump;
-#if defined (__i386__) || defined (__mc68000__)
+#if defined (__i386__) || defined (__mc68000__) || defined(__x86_64__)
 #	define FIRST_MAPPED	PAGE_SIZE	/* we don't have page 0 mapped on x86.. */
 #else
 #	define FIRST_MAPPED	0
@@ -51,7 +51,7 @@ static ssize_t read_kcore(struct file *file, char *buf, size_t count, loff_t *pp
 	memset(&dump, 0, sizeof(struct user));
 	dump.magic = CMAGIC;
 	dump.u_dsize = (virt_to_phys(high_memory) >> PAGE_SHIFT);
-#if defined (__i386__)
+#if defined (__i386__) || defined(__x86_64__)
 	dump.start_code = PAGE_OFFSET;
 #endif
 #ifdef __alpha__
@@ -361,7 +361,7 @@ static ssize_t read_kcore(struct file *file, char *buffer, size_t buflen, loff_t
 		read_unlock(&vmlist_lock);
 
 	/* where page 0 not mapped, write zeros into buffer */
-#if defined (__i386__) || defined (__mc68000__)
+#if defined (__i386__) || defined (__mc68000__) || defined(__x86_64__)
 	if (*fpos < PAGE_SIZE + elf_buflen) {
 		/* work out how much to clear */
 		tsz = PAGE_SIZE + elf_buflen - *fpos;

@@ -919,9 +919,8 @@ static void fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	} else { /* not a directory */
 		inode->i_generation |= 1;
 		inode->i_mode = MSDOS_MKMODE(de->attr,
-		    ((IS_NOEXEC(inode) || 
-		      (sbi->options.showexec &&
-		       !is_exec(de->ext)))
+		    ((sbi->options.showexec &&
+		       !is_exec(de->ext))
 		    	? S_IRUGO|S_IWUGO : S_IRWXUGO)
 		    & ~sbi->options.fs_umask) | S_IFREG;
 		MSDOS_I(inode)->i_start = CF_LE_W(de->start);
@@ -1039,9 +1038,7 @@ int fat_notify_change(struct dentry * dentry, struct iattr * attr)
 
 	inode_setattr(inode, attr);
 
-	if (IS_NOEXEC(inode) && !S_ISDIR(inode->i_mode))
-		inode->i_mode &= S_IFMT | S_IRUGO | S_IWUGO;
-	else
+	if (S_ISDIR(inode->i_mode))
 		inode->i_mode |= S_IXUGO;
 
 	inode->i_mode = ((inode->i_mode & S_IFMT) | ((((inode->i_mode & S_IRWXU

@@ -357,3 +357,5 @@ void __exit gf2k_exit(void)
 
 module_init(gf2k_init);
 module_exit(gf2k_exit);
+
+MODULE_LICENSE("GPL");

@@ -71,6 +71,8 @@ cleanup_module(void)
 {
 }
 
+MODULE_LICENSE("GPL");
+
 #else	// !MODULE 
 
 #ifndef NULL

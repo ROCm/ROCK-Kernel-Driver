@@ -376,9 +376,7 @@ static int xd_release (struct inode *inode, struct file *file)
 	int target = DEVICE_NR(inode->i_rdev);
 	if (target < xd_drives) {
 		xd_access[target]--;
-#ifdef MODULE
 		MOD_DEC_USE_COUNT;
-#endif /* MODULE */
 	}
 	return 0;
 }
@@ -1109,6 +1107,8 @@ static int xd[5] = { -1,-1,-1,-1, };
 MODULE_PARM(xd, "1-4i");
 MODULE_PARM(xd_geo, "3-6i");
 MODULE_PARM(nodma, "i");
+
+MODULE_LICENSE("GPL");
 
 static void xd_done (void)
 {

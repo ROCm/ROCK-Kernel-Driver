@@ -1,7 +1,7 @@
 /*
- * $Id: stinger.c,v 1.1 2000/07/17 10:42:14 vojtech Exp $
+ * $Id: stinger.c,v 1.4 2001/05/23 09:25:02 vojtech Exp $
  *
- *  Copyright (c) 2000 Vojtech Pavlik
+ *  Copyright (c) 2000-2001 Vojtech Pavlik
  *  Copyright (c) 2000 Mark Fletcher
  *
  *  Sponsored by SuSE
@@ -79,8 +79,8 @@ static void stinger_process_packet(struct stinger *stinger)
 	input_report_key(dev, BTN_SELECT, ((data[3] & 0x02) >> 1));
 	input_report_key(dev, BTN_START,   (data[3] & 0x01));
 
-	input_report_abs(dev, ABS_X, ((data[1] & 0x3F) - ((data[0] & 0x01) << 6)));
-	input_report_abs(dev, ABS_Y, ((data[2] & 0x3F) - ((data[0] & 0x02) << 5)));
+	input_report_abs(dev, ABS_X, (data[1] & 0x3F) - ((data[0] & 0x01) << 6));
+	input_report_abs(dev, ABS_Y, ((data[0] & 0x02) << 5) - (data[2] & 0x3F));
 
 	return;
 }
@@ -198,3 +198,5 @@ void __exit stinger_exit(void)
 
 module_init(stinger_init);
 module_exit(stinger_exit);
+
+MODULE_LICENSE("GPL");

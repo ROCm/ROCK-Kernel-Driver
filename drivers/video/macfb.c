@@ -1237,3 +1237,5 @@ void __init macfb_init(void)
 	printk("fb%d: %s frame buffer device\n",
 	       GET_FB_IDX(fb_info.node), fb_info.modename);
 }
+
+MODULE_LICENSE("GPL");

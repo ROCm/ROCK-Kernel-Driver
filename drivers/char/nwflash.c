@@ -688,6 +688,8 @@ static void __exit nwflash_exit(void)
 
 EXPORT_NO_SYMBOLS;
 
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(flashdebug, "i");
 
 module_init(nwflash_init);

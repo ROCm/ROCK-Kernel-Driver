@@ -304,3 +304,5 @@ void __exit interact_exit(void)
 
 module_init(interact_init);
 module_exit(interact_exit);
+
+MODULE_LICENSE("GPL");

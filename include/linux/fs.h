@@ -111,10 +111,10 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MS_NOUSER	(1<<31)
 
 /*
- * Flags that can be altered by MS_REMOUNT
+ * Superblock flags that can be altered by MS_REMOUNT
  */
-#define MS_RMT_MASK	(MS_RDONLY|MS_NOSUID|MS_NODEV|MS_NOEXEC|\
-			MS_SYNCHRONOUS|MS_MANDLOCK|MS_NOATIME|MS_NODIRATIME)
+#define MS_RMT_MASK	(MS_RDONLY|MS_SYNCHRONOUS|MS_MANDLOCK|MS_NOATIME|\
+			 MS_NODIRATIME)
 
 /*
  * Old magic mount flag and mask
@@ -130,6 +130,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define S_APPEND	8	/* Append-only file */
 #define S_IMMUTABLE	16	/* Immutable file */
 #define S_DEAD		32	/* removed, but still open directory */
+#define S_NOQUOTA	64	/* Inode is not counted to quota */
 
 /*
  * Note that nosuid etc flags are inode-specific: setting some file-system
@@ -147,13 +148,11 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define __IS_FLG(inode,flg) ((inode)->i_sb->s_flags & (flg))
 
 #define IS_RDONLY(inode) ((inode)->i_sb->s_flags & MS_RDONLY)
-#define IS_NOSUID(inode)	__IS_FLG(inode, MS_NOSUID)
-#define IS_NODEV(inode)		__IS_FLG(inode, MS_NODEV)
-#define IS_NOEXEC(inode)	__IS_FLG(inode, MS_NOEXEC)
 #define IS_SYNC(inode)		(__IS_FLG(inode, MS_SYNCHRONOUS) || ((inode)->i_flags & S_SYNC))
 #define IS_MANDLOCK(inode)	__IS_FLG(inode, MS_MANDLOCK)
 
 #define IS_QUOTAINIT(inode)	((inode)->i_flags & S_QUOTA)
+#define IS_NOQUOTA(inode)	((inode)->i_flags & S_NOQUOTA)
 #define IS_APPEND(inode)	((inode)->i_flags & S_APPEND)
 #define IS_IMMUTABLE(inode)	((inode)->i_flags & S_IMMUTABLE)
 #define IS_NOATIME(inode)	(__IS_FLG(inode, MS_NOATIME) || ((inode)->i_flags & S_NOATIME))

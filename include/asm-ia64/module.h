@@ -14,6 +14,7 @@
 #define module_map(x)		vmalloc(x)
 #define module_unmap(x)		ia64_module_unmap(x)
 #define module_arch_init(x)	ia64_module_init(x)
+#define arch_init_modules(x)	do { } while (0)
 
 /*
  * This must match in size and layout the data created by
@@ -46,27 +47,27 @@ ia64_module_init(struct module *mod)
 
 	if (archdata->unw_table)
 	{
-		printk(KERN_ERR "arch_init_module: archdata->unw_table must be zero.\n");
+		printk(KERN_ERR "module_arch_init: archdata->unw_table must be zero.\n");
 		return 1;
 	}
 	if (!mod_bound(archdata->gp, 0, mod))
 	{
-		printk(KERN_ERR "arch_init_module: archdata->gp out of bounds.\n");
+		printk(KERN_ERR "module_arch_init: archdata->gp out of bounds.\n");
 		return 1;
 	}
 	if (!mod_bound(archdata->unw_start, 0, mod))
 	{
-		printk(KERN_ERR "arch_init_module: archdata->unw_start out of bounds.\n");
+		printk(KERN_ERR "module_arch_init: archdata->unw_start out of bounds.\n");
 		return 1;
 	}
 	if (!mod_bound(archdata->unw_end, 0, mod))
 	{
-		printk(KERN_ERR "arch_init_module: archdata->unw_end out of bounds.\n");
+		printk(KERN_ERR "module_arch_init: archdata->unw_end out of bounds.\n");
 		return 1;
 	}
 	if (!mod_bound(archdata->segment_base, 0, mod))
 	{
-		printk(KERN_ERR "arch_init_module: archdata->unw_table out of bounds.\n");
+		printk(KERN_ERR "module_arch_init: archdata->unw_table out of bounds.\n");
 		return 1;
 	}
 

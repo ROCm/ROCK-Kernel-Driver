@@ -1806,6 +1806,9 @@ int acsi_init( void )
 
 
 #ifdef MODULE
+
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	int err;

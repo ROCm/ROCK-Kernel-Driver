@@ -352,9 +352,16 @@ __EXTERN_INLINE void tsunami_outl(unsigned int b, unsigned long addr)
  * Memory functions.  all accesses are done through linear space.
  */
 
-__EXTERN_INLINE unsigned long tsunami_ioremap(unsigned long addr)
+__EXTERN_INLINE unsigned long tsunami_ioremap(unsigned long addr, 
+					      unsigned long size
+					      __attribute__((unused)))
 {
 	return addr + TSUNAMI_MEM_BIAS;
+}
+
+__EXTERN_INLINE void tsunami_iounmap(unsigned long addr)
+{
+	return;
 }
 
 __EXTERN_INLINE int tsunami_is_ioaddr(unsigned long addr)
@@ -423,7 +430,8 @@ __EXTERN_INLINE void tsunami_writeq(unsigned long b, unsigned long addr)
 #define __writew(x,a)		tsunami_writew((x),(unsigned long)(a))
 #define __writel(x,a)		tsunami_writel((x),(unsigned long)(a))
 #define __writeq(x,a)		tsunami_writeq((x),(unsigned long)(a))
-#define __ioremap(a)		tsunami_ioremap((unsigned long)(a))
+#define __ioremap(a,s)		tsunami_ioremap((unsigned long)(a),(s))
+#define __iounmap(a)		tsunami_iounmap((unsigned long)(a))
 #define __is_ioaddr(a)		tsunami_is_ioaddr((unsigned long)(a))
 
 #define inb(p)			__inb(p)

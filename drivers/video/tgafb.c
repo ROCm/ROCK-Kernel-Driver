@@ -1003,6 +1003,7 @@ void __exit tgafb_cleanup(void)
      */
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
 module_init(tgafb_init);
 #endif
 

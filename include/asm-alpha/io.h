@@ -127,7 +127,8 @@ extern void _sethae (unsigned long addr);	/* cached version */
 # define __writel(v,a)	alpha_mv.mv_writel((v),(unsigned long)(a))
 # define __writeq(v,a)	alpha_mv.mv_writeq((v),(unsigned long)(a))
 
-# define __ioremap(a)	alpha_mv.mv_ioremap((unsigned long)(a))
+# define __ioremap(a,s)	alpha_mv.mv_ioremap((unsigned long)(a),(s))
+# define __iounmap(a)   alpha_mv.mv_iounmap((unsigned long)(a))
 # define __is_ioaddr(a)	alpha_mv.mv_is_ioaddr((unsigned long)(a))
 
 # define inb		__inb
@@ -280,15 +281,24 @@ extern void		writel(unsigned int b, unsigned long addr);
  * discontinuities are all across busses, so we need not care for that
  * for any one device.
  *
+ * The DRM drivers need to be able to map contiguously a (potentially)
+ * discontiguous set of I/O pages. This set of pages is scatter-gather
+ * mapped contiguously from the perspective of the bus, but we can't
+ * directly access DMA addresses from the CPU, these addresses need to
+ * have a real ioremap. Therefore, iounmap and the size argument to
+ * ioremap are needed to give the platforms the ability to fully implement
+ * ioremap.
+ *
  * Map the I/O space address into the kernel's virtual address space.
  */
 static inline void * ioremap(unsigned long offset, unsigned long size)
 {
-	return (void *) __ioremap(offset);
+	return (void *) __ioremap(offset, size);
 } 
 
 static inline void iounmap(void *addr)
 {
+	__iounmap(addr);
 }
 
 static inline void * ioremap_nocache(unsigned long offset, unsigned long size)
@@ -444,15 +454,15 @@ out:
  * ISA space is mapped to some machine-specific location on Alpha.
  * Call into the existing hooks to get the address translated.
  */
-#define isa_readb(a)			readb(__ioremap(a))
-#define isa_readw(a)			readw(__ioremap(a))
-#define isa_readl(a)			readl(__ioremap(a))
-#define isa_writeb(b,a)			writeb((b),__ioremap(a))
-#define isa_writew(w,a)			writew((w),__ioremap(a))
-#define isa_writel(l,a)			writel((l),__ioremap(a))
-#define isa_memset_io(a,b,c)		memset_io(__ioremap(a),(b),(c))
-#define isa_memcpy_fromio(a,b,c)	memcpy_fromio((a),__ioremap(b),(c))
-#define isa_memcpy_toio(a,b,c)		memcpy_toio(__ioremap(a),(b),(c))
+#define isa_readb(a)			readb(__ioremap((a),1))
+#define isa_readw(a)			readw(__ioremap((a),2))
+#define isa_readl(a)			readl(__ioremap((a),4))
+#define isa_writeb(b,a)			writeb((b),__ioremap((a),1))
+#define isa_writew(w,a)			writew((w),__ioremap((a),2))
+#define isa_writel(l,a)			writel((l),__ioremap((a),4))
+#define isa_memset_io(a,b,c)		memset_io(__ioremap((a),(c)),(b),(c))
+#define isa_memcpy_fromio(a,b,c)	memcpy_fromio((a),__ioremap((b),(c)),(c))
+#define isa_memcpy_toio(a,b,c)		memcpy_toio(__ioremap((a),(c)),(b),(c))
 
 static inline int
 isa_check_signature(unsigned long io_addr, const unsigned char *signature,

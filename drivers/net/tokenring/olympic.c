@@ -1722,4 +1722,4 @@ static void __exit olympic_pci_cleanup(void)
 module_init(olympic_pci_init) ; 
 module_exit(olympic_pci_cleanup) ; 
 
-
+MODULE_LICENSE("GPL");

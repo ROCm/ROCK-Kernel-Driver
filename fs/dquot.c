@@ -627,27 +627,11 @@ static struct dquot *dqduplicate(struct dquot *dquot)
 	return dquot;
 }
 
-/* Check whether this inode is quota file */
-static inline int is_quotafile(struct inode *inode)
-{
-	int cnt;
-	struct quota_mount_options *dqopt = sb_dqopt(inode->i_sb);
-	struct file **files;
-
-	if (!dqopt)
-		return 0;
-	files = dqopt->files;
-	for (cnt = 0; cnt < MAXQUOTAS; cnt++)
-		if (files[cnt] && files[cnt]->f_dentry->d_inode == inode)
-			return 1;
-	return 0;
-}
-
 static int dqinit_needed(struct inode *inode, short type)
 {
 	int cnt;
 
-	if (is_quotafile(inode))
+	if (IS_NOQUOTA(inode))
 		return 0;
 	if (type != -1)
 		return inode->i_dquot[type] == NODQUOT;
@@ -674,7 +658,6 @@ restart:
 			struct dentry *dentry = dget(filp->f_dentry);
 			file_list_unlock();
 			sb->dq_op->initialize(inode, type);
-			inode->i_flags |= S_QUOTA;
 			dput(dentry);
 			mntput(mnt);
 			/* As we may have blocked we had better restart... */
@@ -1018,8 +1001,7 @@ void dquot_initialize(struct inode *inode, short type)
 	short cnt;
 
 	lock_kernel();
-	/* We don't want to have quotas on quota files - nasty deadlocks possible */
-	if (is_quotafile(inode)) {
+	if (IS_NOQUOTA(inode)) {
 		unlock_kernel();
 		return;
 	}
@@ -1473,7 +1455,9 @@ static int quota_on(struct super_block *sb, short type, char *path)
 	error = -EINVAL;
 	if (inode->i_size == 0 || !check_quotafile_size(inode->i_size))
 		goto out_f;
-	dquot_drop(inode);	/* We don't want quota on quota files */
+	/* We don't want quota on quota files */
+	dquot_drop(inode);
+	inode->i_flags |= S_NOQUOTA;
 
 	set_enable_flags(dqopt, type);
 	dqopt->files[type] = f;

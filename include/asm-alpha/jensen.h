@@ -274,9 +274,15 @@ __EXTERN_INLINE void jensen_writeq(unsigned long b, unsigned long addr)
 	*(vuip) (addr + (4 << 7)) = b >> 32;
 }
 
-__EXTERN_INLINE unsigned long jensen_ioremap(unsigned long addr)
+__EXTERN_INLINE unsigned long jensen_ioremap(unsigned long addr, 
+					     unsigned long size)
 {
 	return addr;
+}
+
+__EXTERN_INLINE void jensen_iounmap(unsigned long addr)
+{
+	return;
 }
 
 __EXTERN_INLINE int jensen_is_ioaddr(unsigned long addr)
@@ -303,6 +309,7 @@ __EXTERN_INLINE int jensen_is_ioaddr(unsigned long addr)
 #define __writel	jensen_writel
 #define __writeq	jensen_writeq
 #define __ioremap	jensen_ioremap
+#define __iounmap(a)	jensen_iounmap((unsigned long)a)
 #define __is_ioaddr	jensen_is_ioaddr
 
 /*

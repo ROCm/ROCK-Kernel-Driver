@@ -81,6 +81,7 @@ MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("Powertec SCSI driver");
 MODULE_PARM(term, "1-8i");
 MODULE_PARM_DESC(term, "SCSI bus termination");
+MODULE_LICENSE("GPL");
 
 static struct expansion_card *ecs[MAX_ECARDS];
 

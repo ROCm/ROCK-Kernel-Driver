@@ -2332,3 +2332,5 @@ int __init sa1100fb_setup(char *options)
 #endif
 	return 0;
 }
+
+MODULE_LICENSE("GPL");

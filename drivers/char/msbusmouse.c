@@ -167,3 +167,6 @@ static void __exit ms_bus_mouse_exit(void)
 
 module_init(ms_bus_mouse_init)
 module_exit(ms_bus_mouse_exit)
+
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

@@ -609,3 +609,7 @@ void cleanup_module(void)
 	dlci_ioctl_hook = NULL;
 }
 #endif /* MODULE */
+
+MODULE_AUTHOR("Mike McLagan");
+MODULE_DESCRIPTION("Frame Relay DLCI layer");
+MODULE_LICENSE("GPL");

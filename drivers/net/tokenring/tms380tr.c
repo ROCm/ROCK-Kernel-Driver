@@ -71,10 +71,8 @@
 static const char version[] = "tms380tr.c: v1.08 14/01/2001 by Christoph Goos, Adam Fritzler\n";
 #endif
 
-#ifdef MODULE
 #include <linux/module.h>
 #include <linux/version.h>
-#endif
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -2416,6 +2414,8 @@ void cleanup_module(void)
 	TMS380_module = NULL;
 }
 #endif
+
+MODULE_LICENSE("GPL");
 
 
 /*

@@ -201,6 +201,8 @@ struct display_switch fbcon_cfb2 = {
 
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
     return 0;

@@ -81,7 +81,7 @@ __affs_hash_dentry(struct dentry *dentry, struct qstr *qstr, toupper_t toupper)
 		return i;
 
 	hash = init_name_hash();
-	i = MIN(qstr->len, 30);
+	i = min(qstr->len, 30u);
 	for (; i > 0; name++, i--)
 		hash = partial_name_hash(toupper(*name), hash);
 	qstr->hash = end_name_hash(hash);
@@ -172,7 +172,7 @@ affs_hash_name(struct super_block *sb, const u8 *name, unsigned int len)
 	toupper_t toupper = affs_get_toupper(sb);
 	int hash;
 
-	hash = len = MIN(len, 30);
+	hash = len = min(len, 30u);
 	for (; len > 0; len--)
 		hash = (hash * 13 + toupper(*name++)) & 0x7ff;
 

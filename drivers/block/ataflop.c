@@ -2056,6 +2056,9 @@ void __init atari_floppy_setup( char *str, int *ints )
 }
 
 #ifdef MODULE
+
+MODULE_LICENSE("GPL");
+
 int init_module (void)
 {
 	if (!MACH_IS_ATARI)

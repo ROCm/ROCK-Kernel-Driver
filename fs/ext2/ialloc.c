@@ -194,9 +194,11 @@ void ext2_free_inode (struct inode * inode)
 	 * Note: we must free any quota before locking the superblock,
 	 * as writing the quota to disk may need the lock as well.
 	 */
-	DQUOT_INIT(inode);
-	DQUOT_FREE_INODE(sb, inode);
-	DQUOT_DROP(inode);
+	if (!is_bad_inode(inode)) {
+		/* Quota is already initialized in iput() */
+	    	DQUOT_FREE_INODE(sb, inode);
+		DQUOT_DROP(inode);
+	}
 
 	lock_super (sb);
 	es = sb->u.ext2_sb.s_es;
@@ -453,7 +455,8 @@ repeat:
 
 	unlock_super (sb);
 	if(DQUOT_ALLOC_INODE(sb, inode)) {
-		sb->dq_op->drop(inode);
+		DQUOT_DROP(inode);
+		inode->i_flags |= S_NOQUOTA;
 		inode->i_nlink = 0;
 		iput(inode);
 		return ERR_PTR(-EDQUOT);
@@ -463,6 +466,7 @@ repeat:
 
 fail:
 	unlock_super(sb);
+	make_bad_inode(inode);
 	iput(inode);
 	return ERR_PTR(err);
 }

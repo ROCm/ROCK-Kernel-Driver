@@ -420,6 +420,7 @@ void cleanup_module(void)
 	atm_tcp_ops.remove_persistent = NULL;
 }
 
+MODULE_LICENSE("GPL");
 #else
 
 struct atm_tcp_ops atm_tcp_ops = {

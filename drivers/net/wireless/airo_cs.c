@@ -31,7 +31,7 @@
 
 #include <linux/sched.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/netdevice.h>
@@ -55,7 +55,7 @@
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
-static char *version = "$Revision: 1.1.18.1 $";
+static char *version = "$Revision: 1.2 $";
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args);
 #else
 #define DEBUG(n, args...)
@@ -75,6 +75,7 @@ MODULE_AUTHOR("Benjamin Reed");
 MODULE_DESCRIPTION("Support for Cisco/Aironet 802.11 wireless ethernet \
                    cards.  This is the module that links the PCMCIA card \
 		   with the airo module.");
+MODULE_LICENSE("Dual BSD/GPL");
 MODULE_SUPPORTED_DEVICE("Aironet 4500, 4800 and Cisco 340 PCMCIA cards");
 MODULE_PARM(irq_mask, "i");
 MODULE_PARM(irq_list, "1-4i");

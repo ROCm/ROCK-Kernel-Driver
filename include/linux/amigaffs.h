@@ -121,13 +121,6 @@ affs_unlock_ext(struct inode *inode)
 	up(&AFFS_INODE->i_ext_lock);
 }
 
-
-#define MIN(a, b) ({		\
-	typeof(a) _a = (a);	\
-	typeof(b) _b = (b);	\
-	_a < _b ? _a : _b;	\
-})	
-
 #ifdef __LITTLE_ENDIAN
 #define BO_EXBITS	0x18UL
 #elif defined(__BIG_ENDIAN)

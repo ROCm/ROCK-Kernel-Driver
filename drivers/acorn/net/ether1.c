@@ -1102,3 +1102,5 @@ static void __exit ether1_exit(void)
 
 module_init(ether1_init);
 module_exit(ether1_exit);
+
+MODULE_LICENSE("GPL");

@@ -12,6 +12,7 @@
 #include <linux/vmalloc.h>
 #include <linux/tty.h>
 #include <asm/io.h>
+
 /*
  * gzip declarations
  */
@@ -21,6 +22,14 @@
 
 #undef memset
 #undef memcpy
+
+/*
+ * Why do we do this? Don't ask me..
+ *
+ * Incomprehensible are the ways of bootloaders.
+ */
+static void* memset(void *, int, size_t);
+static void* memcpy(void *, __const void *, size_t);
 #define memzero(s, n)     memset ((s), 0, (n))
 
 typedef unsigned char  uch;
@@ -194,7 +203,7 @@ static void puts(const char *s)
 	outb_p(0xff & (pos >> 1), vidport+1);
 }
 
-void* memset(void* s, int c, size_t n)
+static void* memset(void* s, int c, size_t n)
 {
 	int i;
 	char *ss = (char*)s;
@@ -203,7 +212,7 @@ void* memset(void* s, int c, size_t n)
 	return s;
 }
 
-void* memcpy(void* __dest, __const void* __src,
+static void* memcpy(void* __dest, __const void* __src,
 			    size_t __n)
 {
 	int i;

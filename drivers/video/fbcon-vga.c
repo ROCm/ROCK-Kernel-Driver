@@ -188,6 +188,8 @@ struct display_switch fbcon_vga = {
 
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
     return 0;

@@ -285,3 +285,6 @@ static void __exit oakscsi_exit(void)
 
 module_init(oakscsi_init);
 module_exit(oakscsi_exit);
+
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

@@ -2935,6 +2935,7 @@ EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR(maintainer_string);
 MODULE_DESCRIPTION(description_string);
+MODULE_LICENSE("GPL");
 MODULE_PARM(debug, "h");
 MODULE_PARM(vpi_bits, "h");
 MODULE_PARM(max_tx_size, "h");

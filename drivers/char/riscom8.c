@@ -1906,6 +1906,8 @@ MODULE_PARM(iobase, "i");
 MODULE_PARM(iobase1, "i");
 MODULE_PARM(iobase2, "i");
 MODULE_PARM(iobase3, "i");
+
+MODULE_LICENSE("GPL");
 #endif /* MODULE */
 
 /*

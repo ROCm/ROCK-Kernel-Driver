@@ -72,6 +72,8 @@
 #define CG14_MCR_PIXMODE_16		2
 #define CG14_MCR_PIXMODE_32		3
 
+MODULE_LICENSE("GPL");
+
 struct cg14_regs{
 	volatile u8 mcr;	/* Master Control Reg */
 	volatile u8 ppr;	/* Packed Pixel Reg */

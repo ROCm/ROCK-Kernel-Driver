@@ -332,3 +332,5 @@ struct display_switch fbcon_sti = {
 	clear_margins:	fbcon_sti_clear_margins,
 	fontwidthmask:	FONTWIDTH(8)
 };
+
+MODULE_LICENSE("GPL");

@@ -83,6 +83,8 @@ static unsigned int flow_on = ESP_FLOW_ON;
 static unsigned int rx_timeout = ESP_RX_TMOUT;
 static unsigned int pio_threshold = ESP_PIO_THRESHOLD;
 
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(irq, "1-8i");
 MODULE_PARM(divisor, "1-8i");
 MODULE_PARM(dma, "i");

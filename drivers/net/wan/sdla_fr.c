@@ -5476,5 +5476,6 @@ static void initialize_rx_tx_buffers (sdla_t *card)
 
 	
 
+MODULE_LICENSE("GPL");
 
 /****** End *****************************************************************/

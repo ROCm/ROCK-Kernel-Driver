@@ -29,7 +29,7 @@
 #include <linux/pci.h>
 #include <linux/ioport.h>
 #include <linux/slab.h>
-#include <errno.h>
+#include <linux/errno.h>
 
 #include "adapter.h"
 #include "uxio.h"

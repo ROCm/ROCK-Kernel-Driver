@@ -602,3 +602,5 @@ static void __exit eesox_exit(void)
 module_init(eesox_init);
 module_exit(eesox_exit);
 
+EXPORT_NO_SYMBOLS;
+MODULE_LICENSE("GPL");

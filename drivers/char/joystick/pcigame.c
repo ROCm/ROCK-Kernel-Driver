@@ -1,7 +1,7 @@
 /*
- * $Id: pcigame.c,v 1.6 2000/05/25 12:05:24 vojtech Exp $
+ * $Id: pcigame.c,v 1.10 2001/04/26 10:24:46 vojtech Exp $
  *
- *  Copyright (c) 2000 Vojtech Pavlik
+ *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
  *  Based on the work of:
  *	Raymond Ingles
@@ -76,19 +76,19 @@ struct pcigame {
 
 static unsigned char pcigame_read(struct gameport *gameport)
 {
-	struct pcigame *pcigame = gameport->driver;
+	struct pcigame *pcigame = gameport->private;
 	return readb(pcigame->base + pcigame->data->legacy);
 }
 
 static void pcigame_trigger(struct gameport *gameport)
 {
-	struct pcigame *pcigame = gameport->driver;
+	struct pcigame *pcigame = gameport->private;
 	writeb(0xff, pcigame->base + pcigame->data->legacy);
 }
 
 static int pcigame_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-        struct pcigame *pcigame = gameport->driver;
+        struct pcigame *pcigame = gameport->private;
 	int i;
 
 	*buttons = (~readb(pcigame->base + pcigame->data->legacy) >> 4) & 0xf;
@@ -103,7 +103,7 @@ static int pcigame_cooked_read(struct gameport *gameport, int *axes, int *button
 
 static int pcigame_open(struct gameport *gameport, int mode)
 {
-	struct pcigame *pcigame = gameport->driver;
+	struct pcigame *pcigame = gameport->private;
 
 	switch (mode) {
 		case GAMEPORT_MODE_COOKED:
@@ -135,8 +135,7 @@ static int __devinit pcigame_probe(struct pci_dev *dev, const struct pci_device_
 	pcigame->dev = dev;
 	dev->driver_data = pcigame;
 
-	pcigame->gameport.driver = pcigame;
-	pcigame->gameport.type = GAMEPORT_EXT;
+	pcigame->gameport.private = pcigame;
 	pcigame->gameport.fuzz = 64;
 	
 	pcigame->gameport.read = pcigame_read;
@@ -196,3 +195,5 @@ void __exit pcigame_exit(void)
 
 module_init(pcigame_init);
 module_exit(pcigame_exit);
+
+MODULE_LICENSE("GPL");

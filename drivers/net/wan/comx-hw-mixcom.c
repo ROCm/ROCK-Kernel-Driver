@@ -58,6 +58,7 @@
 
 MODULE_AUTHOR("Gergely Madarasz <gorgo@itc.hu>");
 MODULE_DESCRIPTION("Hardware-level driver for the serial port of the MixCom board");
+MODULE_LICENSE("GPL");
 
 #define MIXCOM_DATA(d) ((struct mixcom_privdata *)(COMX_CHANNEL(d)-> \
 	HW_privdata))

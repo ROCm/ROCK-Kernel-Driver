@@ -38,7 +38,7 @@ static void init_file_inode(struct inode *inode, hfs_u8 fork)
 	struct hfs_fork *fk;
 	struct hfs_cat_entry *entry = HFS_I(inode)->entry;
 
-	if (!IS_NOEXEC(inode) && (fork == HFS_FK_DATA)) {
+	if (fork == HFS_FK_DATA) {
 		inode->i_mode = S_IRWXUGO | S_IFREG;
 	} else {
 		inode->i_mode = S_IRUGO | S_IWUGO | S_IFREG;

@@ -2828,7 +2828,7 @@ static struct tty_ldisc strip_ldisc = {
  * STRIP driver
  */
 
-static const char signon[] __initdata = KERN_INFO "STRIP: Version %s (unlimited channels)\n";
+static char signon[] __initdata = KERN_INFO "STRIP: Version %s (unlimited channels)\n";
 
 static int __init strip_init_driver(void)
 {

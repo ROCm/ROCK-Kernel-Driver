@@ -234,3 +234,5 @@ void __exit spaceball_exit(void)
 
 module_init(spaceball_init);
 module_exit(spaceball_exit);
+
+MODULE_LICENSE("GPL");

@@ -18,6 +18,7 @@
 
 MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("SCSI message queue handling");
+MODULE_LICENSE("GPL");
 
 /*
  * Function: struct msgqueue_entry *mqe_alloc(MsgQueue_t *msgq)

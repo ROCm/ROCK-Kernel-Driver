@@ -1673,6 +1673,7 @@ static void __exit cyberpro_exit(void)
 }
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
 module_init(cyber2000fb_init);
 #endif
 module_exit(cyberpro_exit);

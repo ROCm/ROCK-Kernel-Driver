@@ -352,12 +352,14 @@ cia_pci_tbi_try2(struct pci_controller *hose,
 	   so use them and read at window 3 base exactly 4 times. Reading
 	   more sometimes makes the chip crazy.  -ink */
 
-	bus_addr = cia_ioremap(CIA_BROKEN_TBIA_BASE);
+	bus_addr = cia_ioremap(CIA_BROKEN_TBIA_BASE, 32768 * 4);
 
 	cia_readl(bus_addr + 0x00000);
 	cia_readl(bus_addr + 0x08000);
 	cia_readl(bus_addr + 0x10000);
 	cia_readl(bus_addr + 0x18000);
+
+	cia_iounmap(bus_addr);
 
 	/* Restore normal PCI operation.  */
 	mb();
@@ -396,6 +398,7 @@ verify_tb_operation(void)
 	struct pci_iommu_arena *arena = pci_isa_hose->sg_isa;
 	int ctrl, addr0, tag0, pte0, data0;
 	int temp, use_tbia_try2 = 0;
+	unsigned long bus_addr;
 
 	/* pyxis -- tbia is broken */
 	if (pci_isa_hose->dense_io_base)
@@ -428,6 +431,9 @@ verify_tb_operation(void)
 	*(vip)CIA_IOC_TBn_PAGEm(0,2) = 0;
 	*(vip)CIA_IOC_TBn_PAGEm(0,3) = 0;
 	mb();
+
+	/* Get a usable bus address */
+	bus_addr = cia_ioremap(addr0, 8*PAGE_SIZE);
 
 	/* First, verify we can read back what we've written.  If
 	   this fails, we can't be sure of any of the other testing
@@ -464,7 +470,7 @@ verify_tb_operation(void)
 	mcheck_expected(0) = 1;
 	mcheck_taken(0) = 0;
 	mb();
-	temp = cia_readl(cia_ioremap(addr0));
+	temp = cia_readl(bus_addr);
 	mb();
 	mcheck_expected(0) = 0;
 	mb();
@@ -501,7 +507,7 @@ verify_tb_operation(void)
 	mcheck_expected(0) = 1;
 	mcheck_taken(0) = 0;
 	mb();
-	temp = cia_readl(cia_ioremap(addr0 + 4*PAGE_SIZE));
+	temp = cia_readl(bus_addr + 4*PAGE_SIZE);
 	mb();
 	mcheck_expected(0) = 0;
 	mb();
@@ -525,7 +531,7 @@ verify_tb_operation(void)
 	mcheck_expected(0) = 1;
 	mcheck_taken(0) = 0;
 	mb();
-	temp = cia_readl(cia_ioremap(addr0 + 5*PAGE_SIZE));
+	temp = cia_readl(bus_addr + 5*PAGE_SIZE);
 	mb();
 	mcheck_expected(0) = 0;
 	mb();
@@ -549,7 +555,7 @@ verify_tb_operation(void)
 	mcheck_expected(0) = 1;
 	mcheck_taken(0) = 0;
 	mb();
-	temp = cia_readl(cia_ioremap(addr0 + 6*PAGE_SIZE));
+	temp = cia_readl(bus_addr + 6*PAGE_SIZE);
 	mb();
 	mcheck_expected(0) = 0;
 	mb();
@@ -575,6 +581,9 @@ verify_tb_operation(void)
 	alpha_mv.mv_pci_tbi(arena->hose, 0, -1);
 
 exit:
+	/* unmap the bus addr */
+	cia_iounmap(bus_addr);
+
 	/* Restore normal PCI operation.  */
 	mb();
 	*(vip)CIA_IOC_CIA_CTRL = ctrl;

@@ -108,6 +108,8 @@ static struct pci_device_id lmc_pci_tbl[] __devinitdata = {
 };
 
 MODULE_DEVICE_TABLE(pci, lmc_pci_tbl);
+
+MODULE_LICENSE("GPL");
 #endif
 
 

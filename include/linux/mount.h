@@ -12,6 +12,10 @@
 #define _LINUX_MOUNT_H
 #ifdef __KERNEL__
 
+#define MNT_NOSUID	1
+#define MNT_NODEV	2
+#define MNT_NOEXEC	4
+
 struct vfsmount
 {
 	struct list_head mnt_hash;

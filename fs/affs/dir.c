@@ -135,7 +135,7 @@ inside:
 				goto readdir_done;
 			}
 
-			namelen = MIN(AFFS_TAIL(sb, fh_bh)->name[0], 30);
+			namelen = min(AFFS_TAIL(sb, fh_bh)->name[0], (u8)30);
 			name = AFFS_TAIL(sb, fh_bh)->name + 1;
 			pr_debug("AFFS: readdir(): filldir(\"%.*s\", ino=%u), hash=%d, f_pos=%x\n",
 				 namelen, name, ino, hash_pos, f_pos);

@@ -208,6 +208,8 @@ EXPORT_SYMBOL(smp_imb);
 EXPORT_SYMBOL(cpu_data);
 EXPORT_SYMBOL(__cpu_number_map);
 EXPORT_SYMBOL(smp_num_cpus);
+EXPORT_SYMBOL(smp_call_function);
+EXPORT_SYMBOL(smp_call_function_on_cpu);
 EXPORT_SYMBOL(global_irq_holder);
 EXPORT_SYMBOL(__global_cli);
 EXPORT_SYMBOL(__global_sti);

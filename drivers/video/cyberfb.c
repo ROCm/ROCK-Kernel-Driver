@@ -1251,6 +1251,8 @@ static struct display_switch fbcon_cyber8 = {
 
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	return cyberfb_init();

@@ -185,6 +185,13 @@
  *	  is transparently controlled from pppd lcp-max-configure.
  *	o Add ttp_connect flag to prevent rentry on the connect procedure
  *	o Test and fixups to eliminate side effects of retries
+ *
+ * v7 - 22/08/01 - Jean II
+ *	o Cleanup : Change "saddr = 0x0" to "saddr = DEV_ADDR_ANY"
+ *	o Fix bug in BLOCK_WHEN_CONNECT introduced in v6 : due to the
+ *	  asynchronous IAS query, self->tsap is NULL when PPP send the
+ *	  first packet.  This was preventing "connect-delay 0" to work.
+ *	  Change the test in ppp_irnet_send() to self->ttp_connect.
  */
 
 /***************************** INCLUDES *****************************/

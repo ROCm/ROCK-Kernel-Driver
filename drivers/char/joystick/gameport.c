@@ -41,6 +41,7 @@
 #include <linux/delay.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
+MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(gameport_register_port);
 EXPORT_SYMBOL(gameport_unregister_port);

@@ -63,6 +63,7 @@
 
 MODULE_AUTHOR("Gergely Madarasz <gorgo@itc.hu>, Tivadar Szemethy <tiv@itc.hu>, Arpad Bakay");
 MODULE_DESCRIPTION("Hardware-level driver for the COMX and HICOMX adapters\n");
+MODULE_LICENSE("GPL");
 
 #define	COMX_readw(dev, offset)	(readw(dev->mem_start + offset + \
 	(unsigned int)(((struct comx_privdata *)\

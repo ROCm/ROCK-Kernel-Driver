@@ -76,6 +76,9 @@ quirk_ali_ide_ports(struct pci_dev *dev)
 		dev->resource[3].end = dev->resource[3].start + 7;
 }
 
+static void __init
+quirk_cypress(struct pci_dev *dev)
+{
 /*
  * Notorious Cy82C693 chip. One of its numerous bugs: although
  * Cypress IDE controller doesn't support native mode, it has
@@ -85,31 +88,27 @@ quirk_ali_ide_ports(struct pci_dev *dev)
  * and floppy controller. Ugh.
  * Fix that.
  */
-static void __init
-quirk_cypress_ide_ports(struct pci_dev *dev)
-{
-	if (dev->class >> 8 != PCI_CLASS_STORAGE_IDE)
+	if (dev->class >> 8 == PCI_CLASS_STORAGE_IDE) {
+		dev->resource[0].flags = 0;
+		dev->resource[1].flags = 0;
 		return;
-	dev->resource[0].flags = 0;
-	dev->resource[1].flags = 0;
-}
+	}
+/*
+ * Another "feature": Cypress bridge responds on the PCI bus
+ * in the address range 0xffff0000-0xffffffff (conventional
+ * x86 BIOS ROM). No way to turn this off, so if we use
+ * large SG window, we must avoid these addresses.
+ */
+	if (dev->class >> 8 == PCI_CLASS_BRIDGE_ISA) {
+		struct pci_controller *hose = dev->sysdata;
+		long overlap;
 
-static void __init
-quirk_vga_enable_rom(struct pci_dev *dev)
-{
-	/* If it's a VGA, enable its BIOS ROM at C0000.
-	   But if its a Cirrus 543x/544x DISABLE it, since
-	   enabling ROM disables the memory... */
-	if ((dev->class >> 8) == PCI_CLASS_DISPLAY_VGA &&
-	    (dev->vendor != PCI_VENDOR_ID_CIRRUS ||
-	     (dev->device < 0x00a0) || (dev->device > 0x00ac)))
-	{
-		u32 reg;
-
-		pci_read_config_dword(dev, dev->rom_base_reg, &reg);
-		reg |= PCI_ROM_ADDRESS_ENABLE;
-		pci_write_config_dword(dev, dev->rom_base_reg, reg);
-		dev->resource[PCI_ROM_RESOURCE].flags |= PCI_ROM_ADDRESS_ENABLE;
+		if (hose->sg_pci) {
+			overlap = hose->sg_pci->dma_base + hose->sg_pci->size;
+			overlap -= 0xffff0000;
+			if (overlap > 0)
+				hose->sg_pci->size -= overlap;
+		}
 	}
 }
 
@@ -121,8 +120,7 @@ struct pci_fixup pcibios_fixups[] __initdata = {
 	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M5229,
 	  quirk_ali_ide_ports },
 	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_CONTAQ, PCI_DEVICE_ID_CONTAQ_82C693,
-	  quirk_cypress_ide_ports },
-	{ PCI_FIXUP_FINAL, PCI_ANY_ID, PCI_ANY_ID, quirk_vga_enable_rom },
+	  quirk_cypress },
 	{ 0 }
 };
 
@@ -148,10 +146,8 @@ pcibios_align_resource(void *data, struct resource *res, unsigned long size)
 		/*
 		 * Put everything into 0x00-0xff region modulo 0x400
 		 */
-		if (start & 0x300) {
+		if (start & 0x300)
 			start = (start + 0x3ff) & ~0x3ff;
-			res->start = start;
-		}
 	}
 	else if	(res->flags & IORESOURCE_MEM) {
 		/* Make sure we start at our min on all hoses */
@@ -177,13 +173,13 @@ pcibios_align_resource(void *data, struct resource *res, unsigned long size)
 		/* Align to multiple of size of minimum base.  */
 		alignto = MAX(0x1000, size);
 		start = ALIGN(start, alignto);
-		if (size <= 7 * 16*MB) {
+		if (hose->sparse_mem_base && size <= 7 * 16*MB) {
 			if (((start / (16*MB)) & 0x7) == 0) {
 				start &= ~(128*MB - 1);
 				start += 16*MB;
 				start  = ALIGN(start, alignto);
 			}
-			if (start/(128*MB) != (start + size)/(128*MB)) {
+			if (start/(128*MB) != (start + size - 1)/(128*MB)) {
 				start &= ~(128*MB - 1);
 				start += (128 + 16)*MB;
 				start  = ALIGN(start, alignto);

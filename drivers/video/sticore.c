@@ -597,3 +597,5 @@ sti_setup(char *str)
 }
 
 __setup("sti=", sti_setup);
+
+MODULE_LICENSE("GPL");

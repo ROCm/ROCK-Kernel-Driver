@@ -157,6 +157,7 @@ static unsigned long time_counter;
 #if ((LINUX_VERSION_CODE > 0x020111) && defined(MODULE))
 MODULE_AUTHOR("Theodore Ts'o");
 MODULE_DESCRIPTION("Comtrol Rocketport driver");
+MODULE_LICENSE("GPL");
 MODULE_PARM(board1,     "i");
 MODULE_PARM_DESC(board1, "I/O port for (ISA) board #1");
 MODULE_PARM(board2,     "i");

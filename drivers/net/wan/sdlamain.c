@@ -1440,4 +1440,6 @@ void add_gateway(sdla_t *card, netdevice_t *dev)
 	return;
 }
 
+MODULE_LICENSE("GPL");
+
 /****** End *********************************************************/

@@ -67,6 +67,8 @@ static struct pci_device_id tmspci_pci_tbl[] __initdata = {
 };
 MODULE_DEVICE_TABLE(pci, tmspci_pci_tbl);
 
+MODULE_LICENSE("GPL");
+
 static void tms_pci_read_eeprom(struct net_device *dev);
 static unsigned short tms_pci_setnselout_pins(struct net_device *dev);
 

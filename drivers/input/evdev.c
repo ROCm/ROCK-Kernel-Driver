@@ -1,7 +1,7 @@
 /*
- * $Id: evdev.c,v 1.10 2000/06/23 09:23:00 vojtech Exp $
+ * $Id: evdev.c,v 1.27 2001/05/28 09:06:44 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
  *  Event char devices, giving access to raw input device events.
  *
@@ -11,18 +11,18 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
  * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
@@ -72,7 +72,7 @@ static void evdev_event(struct input_handle *handle, unsigned int type, unsigned
 		list->buffer[list->head].code = code;
 		list->buffer[list->head].value = value;
 		list->head = (list->head + 1) & (EVDEV_BUFFER_SIZE - 1);
-		
+
 		kill_fasync(&list->fasync, SIGIO, POLL_IN);
 
 		list = list->next;
@@ -104,7 +104,7 @@ static int evdev_release(struct inode * inode, struct file * file)
 
 	if (!--list->evdev->open) {
 		if (list->evdev->exist) {
-			input_close_device(&list->evdev->handle);	
+			input_close_device(&list->evdev->handle);
 		} else {
 			input_unregister_minor(list->evdev->devfs);
 			evdev_table[list->evdev->minor] = NULL;
@@ -138,14 +138,26 @@ static int evdev_open(struct inode * inode, struct file * file)
 
 	if (!list->evdev->open++)
 		if (list->evdev->exist)
-			input_open_device(&list->evdev->handle);	
+			input_open_device(&list->evdev->handle);
 
 	return 0;
 }
 
 static ssize_t evdev_write(struct file * file, const char * buffer, size_t count, loff_t *ppos)
 {
-	return -EINVAL;
+	struct evdev_list *list = file->private_data;
+	struct input_event event;
+	int retval = 0;
+
+	while (retval < count) {
+
+		if (copy_from_user(&event, buffer + retval, sizeof(struct input_event)))
+			return -EFAULT;
+		input_event(list->evdev->handle.dev, event.type, event.code, event.value);
+		retval += sizeof(struct input_event);
+	}
+
+	return retval;
 }
 
 static ssize_t evdev_read(struct file * file, char * buffer, size_t count, loff_t *ppos)
@@ -161,6 +173,10 @@ static ssize_t evdev_read(struct file * file, char * buffer, size_t count, loff_
 
 		while (list->head == list->tail) {
 
+			if (!list->evdev->exist) {
+				retval = -ENODEV;
+				break;
+			}
 			if (file->f_flags & O_NONBLOCK) {
 				retval = -EAGAIN;
 				break;
@@ -187,7 +203,7 @@ static ssize_t evdev_read(struct file * file, char * buffer, size_t count, loff_
 		retval += sizeof(struct input_event);
 	}
 
-	return retval;	
+	return retval;
 }
 
 /* No kernel lock - fine */
@@ -219,6 +235,32 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			if ((retval = put_user(dev->idversion, ((short *) arg) + 3))) return retval;
 			return 0;
 
+		case EVIOCSFF:
+			if (dev->upload_effect) {
+				struct ff_effect effect;
+				int err;
+
+				if (copy_from_user((void*)(&effect), (void*)arg, sizeof(effect))) {
+					return -EINVAL;
+				}
+				err = dev->upload_effect(dev, &effect);
+				if (put_user(effect.id, &(((struct ff_effect*)arg)->id))) {
+					return -EINVAL;
+				}
+				return err;
+			}
+			else return -ENOSYS;
+
+		case EVIOCRMFF:
+			if (dev->erase_effect) {
+				return dev->erase_effect(dev, (int)arg);
+			}
+			else return -ENOSYS;
+
+		case EVIOCGEFFECTS:
+			put_user(dev->ff_effects_max, (int*) arg);
+			return 0;
+
 		default:
 
 			if (_IOC_TYPE(cmd) != 'E' || _IOC_DIR(cmd) != _IOC_READ)
@@ -236,6 +278,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 					case EV_ABS: bits = dev->absbit; len = ABS_MAX; break;
 					case EV_LED: bits = dev->ledbit; len = LED_MAX; break;
 					case EV_SND: bits = dev->sndbit; len = SND_MAX; break;
+					case EV_FF:  bits = dev->ffbit;  len = FF_MAX;  break;
 					default: return -EINVAL;
 				}
 				len = NBITS(len) * sizeof(long);
@@ -310,7 +353,7 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 
 	evdev->devfs = input_register_minor("event%d", minor, EVDEV_MINOR_BASE);
 
-	printk(KERN_INFO "event%d: Event device for input%d\n", minor, dev->number);
+//	printk(KERN_INFO "event%d: Event device for input%d\n", minor, dev->number);
 
 	return &evdev->handle;
 }
@@ -323,13 +366,14 @@ static void evdev_disconnect(struct input_handle *handle)
 
 	if (evdev->open) {
 		input_close_device(handle);
+		wake_up_interruptible(&evdev->wait);
 	} else {
 		input_unregister_minor(evdev->devfs);
 		evdev_table[evdev->minor] = NULL;
 		kfree(evdev);
 	}
 }
-	
+
 static struct input_handler evdev_handler = {
 	event:		evdev_event,
 	connect:	evdev_connect,

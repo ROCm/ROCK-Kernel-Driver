@@ -2,7 +2,7 @@
 #define _GAMEPORT_H
 
 /*
- * $Id: gameport.h,v 1.8 2000/06/03 20:18:52 vojtech Exp $
+ * $Id: gameport.h,v 1.11 2001/04/26 10:24:46 vojtech Exp $
  *
  *  Copyright (c) 1999-2000 Vojtech Pavlik
  *
@@ -12,24 +12,25 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
  * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/sched.h>
+#include <linux/delay.h>
 #include <asm/io.h>
 
 struct gameport;
@@ -37,26 +38,21 @@ struct gameport;
 struct gameport {
 
 	void *private;
-	void *driver;
 
 	int number;
 
 	int io;
-	int size;
 	int speed;
 	int fuzz;
-	int type;
-	struct pci_dev *pci;
 
 	void (*trigger)(struct gameport *);
 	unsigned char (*read)(struct gameport *);
-	int (*cooked_read)(struct gameport *, int *, int *);	
-	int (*calibrate)(struct gameport *, int *, int *); 
+	int (*cooked_read)(struct gameport *, int *, int *);
+	int (*calibrate)(struct gameport *, int *, int *);
 	int (*open)(struct gameport *, int);
 	void (*close)(struct gameport *);
 
 	struct gameport_dev *dev;
-
 	struct gameport *next;
 };
 
@@ -74,18 +70,20 @@ int gameport_open(struct gameport *gameport, struct gameport_dev *dev, int mode)
 void gameport_close(struct gameport *gameport);
 void gameport_rescan(struct gameport *gameport);
 
+#if defined(CONFIG_INPUT_GAMEPORT) || defined(CONFIG_INPUT_GAMEPORT_MODULE)
 void gameport_register_port(struct gameport *gameport);
 void gameport_unregister_port(struct gameport *gameport);
+#else
+void __inline__ gameport_register_port(struct gameport *gameport) { return; }
+void __inline__ gameport_unregister_port(struct gameport *gameport) { return; }
+#endif
+
 void gameport_register_device(struct gameport_dev *dev);
 void gameport_unregister_device(struct gameport_dev *dev);
 
 #define GAMEPORT_MODE_DISABLED		0
 #define GAMEPORT_MODE_RAW		1
 #define GAMEPORT_MODE_COOKED		2
-
-#define GAMEPORT_ISA       0
-#define GAMEPORT_PNP       1
-#define GAMEPORT_EXT       2
 
 #define GAMEPORT_ID_VENDOR_ANALOG	0x0001
 #define GAMEPORT_ID_VENDOR_MADCATZ	0x0002

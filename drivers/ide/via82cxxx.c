@@ -1,5 +1,5 @@
 /*
- * $Id: via82cxxx.c,v 3.28 2001/09/01 21:10:00 vojtech Exp $
+ * $Id: via82cxxx.c,v 3.29 2001/09/10 10:06:00 vojtech Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
@@ -90,7 +90,7 @@
 #define VIA_BAD_PREQ		0x010	/* Crashes if PREQ# till DDACK# set */
 #define VIA_BAD_CLK66		0x020	/* 66 MHz clock doesn't work correctly */
 #define VIA_SET_FIFO		0x040	/* Needs to have FIFO split set */
-#define VIA_SET_THRESH		0x080	/* Needs to have FIFO thresholds set */
+#define VIA_NO_UNMASK		0x080	/* Doesn't work with IRQ unmasking on */
 
 /*
  * VIA SouthBridge chips.
@@ -106,7 +106,7 @@ static struct via_isa_bridge {
 #ifdef FUTURE_BRIDGES
 	{ "vt8237",	PCI_DEVICE_ID_VIA_8237,     0x00, 0x2f, VIA_UDMA_100 },
 	{ "vt8235",	PCI_DEVICE_ID_VIA_8235,     0x00, 0x2f, VIA_UDMA_100 },
-	{ "vt8233c",	PCI_DEVICE_ID_VIA_8233C,    0x30, 0x4f, VIA_UDMA_100 },
+	{ "vt8233c",	PCI_DEVICE_ID_VIA_8233C,    0x00, 0x2f, VIA_UDMA_100 },
 #endif
 	{ "vt8233",	PCI_DEVICE_ID_VIA_8233_0,   0x00, 0x2f, VIA_UDMA_100 },
 	{ "vt8231",	PCI_DEVICE_ID_VIA_8231,     0x00, 0x2f, VIA_UDMA_100 },
@@ -120,7 +120,7 @@ static struct via_isa_bridge {
 	{ "vt82c586b",	PCI_DEVICE_ID_VIA_82C586_0, 0x30, 0x3f, VIA_UDMA_33 | VIA_SET_FIFO },
 	{ "vt82c586a",	PCI_DEVICE_ID_VIA_82C586_0, 0x20, 0x2f, VIA_UDMA_33 | VIA_SET_FIFO },
 	{ "vt82c586",	PCI_DEVICE_ID_VIA_82C586_0, 0x00, 0x0f, VIA_UDMA_NONE | VIA_SET_FIFO },
-	{ "vt82c576",	PCI_DEVICE_ID_VIA_82C576,   0x00, 0x2f, VIA_UDMA_NONE | VIA_SET_FIFO },
+	{ "vt82c576",	PCI_DEVICE_ID_VIA_82C576,   0x00, 0x2f, VIA_UDMA_NONE | VIA_SET_FIFO | VIA_NO_UNMASK },
 	{ NULL }
 };
 
@@ -161,7 +161,7 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	via_print("----------VIA BusMastering IDE Configuration----------------");
 
-	via_print("Driver Version:                     3.27");
+	via_print("Driver Version:                     3.29");
 	via_print("South Bridge:                       VIA %s", via_config->name);
 
 	pci_read_config_byte(isa_dev, PCI_REVISION_ID, &t);
@@ -431,7 +431,7 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev, const char *name)
 	}
 
 	if (via_config->flags & VIA_BAD_CLK66) {			/* Disable Clk66 */
-		pci_read_config_dword(dev, VIA_UDMA_TIMING, &u);	/* Would cause trouble on 596a */
+		pci_read_config_dword(dev, VIA_UDMA_TIMING, &u);	/* Would cause trouble on 596a and 686 */
 		pci_write_config_dword(dev, VIA_UDMA_TIMING, u & ~0x80008);
 	}
 
@@ -459,9 +459,6 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev, const char *name)
 			case 3: t |= 0x20; break;			/* 8 pri 8 sec */
 		}
 	}
-
-	if (via_config->flags & VIA_SET_THRESH)				/* 1/2 FIFO full to trigger xmit */
-		t = (t & 0xf0) | 0x0a;
 
 	pci_write_config_byte(dev, VIA_FIFO_CONFIG, t);
 
@@ -516,7 +513,7 @@ void __init ide_init_via82cxxx(ide_hwif_t *hwif)
 
 	for (i = 0; i < 2; i++) {
 		hwif->drives[i].io_32bit = 1;
-		hwif->drives[i].unmask = 1;
+		hwif->drives[i].unmask = (via_config->flags & VIA_NO_UNMASK) ? 0 : 1;
 		hwif->drives[i].autotune = 1;
 		hwif->drives[i].dn = hwif->channel * 2 + i;
 	}

@@ -49,6 +49,7 @@
 
 MODULE_AUTHOR("Author: Gergely Madarasz <gorgo@itc.hu>");
 MODULE_DESCRIPTION("Cisco-HDLC / Synchronous PPP driver for the COMX sync serial boards");
+MODULE_LICENSE("GPL");
 
 static struct comx_protocol syncppp_protocol;
 static struct comx_protocol hdlc_protocol;

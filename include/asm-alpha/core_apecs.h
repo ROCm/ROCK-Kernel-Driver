@@ -495,9 +495,16 @@ __EXTERN_INLINE void apecs_writeq(unsigned long b, unsigned long addr)
 	*(vulp)addr = b;
 }
 
-__EXTERN_INLINE unsigned long apecs_ioremap(unsigned long addr)
+__EXTERN_INLINE unsigned long apecs_ioremap(unsigned long addr,
+					    unsigned long size
+					    __attribute__((unused)))
 {
 	return addr + APECS_DENSE_MEM;
+}
+
+__EXTERN_INLINE void apecs_iounmap(unsigned addr)
+{
+	return;
 }
 
 __EXTERN_INLINE int apecs_is_ioaddr(unsigned long addr)
@@ -525,7 +532,8 @@ __EXTERN_INLINE int apecs_is_ioaddr(unsigned long addr)
 #define __writew(x,a)		apecs_writew((x),(unsigned long)(a))
 #define __writel(x,a)		apecs_writel((x),(unsigned long)(a))
 #define __writeq(x,a)		apecs_writeq((x),(unsigned long)(a))
-#define __ioremap(a)		apecs_ioremap((unsigned long)(a))
+#define __ioremap(a,s)		apecs_ioremap((unsigned long)(a),(s))
+#define __iounmap(a)		apecs_iounmap((unsigned long)(a))
 #define __is_ioaddr(a)		apecs_is_ioaddr((unsigned long)(a))
 
 #define __raw_readl(a)		__readl(a)

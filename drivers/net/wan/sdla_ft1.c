@@ -23,27 +23,17 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
+#include <linux/module.h>
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
 #include <linux/string.h>	/* inline memset(), etc. */
-#include <linux/slab.h>	/* kmalloc(), kfree() */
+#include <linux/slab.h>		/* kmalloc(), kfree() */
 #include <linux/wanrouter.h>	/* WAN router definitions */
 #include <linux/wanpipe.h>	/* WANPIPE common user API definitions */
 #include <linux/if_arp.h>	/* ARPHRD_* defines */
 
-#if defined(LINUX_2_4)
-  #include <linux/inetdevice.h>
-  #include <asm/uaccess.h>
-
-#elif defined(LINUX_2_1)
-  #include <linux/inetdevice.h>
-  #include <asm/uaccess.h>
-
-#else
-  #include <net/route.h>          /* Adding new route entries */
-  #include <asm/segment.h>
-  #define test_and_set_bit set_bit
-#endif
+#include <linux/inetdevice.h>
+#include <asm/uaccess.h>
 
 #include <linux/in.h>		/* sockaddr_in */
 #include <linux/inet.h>	
@@ -385,3 +375,4 @@ static int chdlc_error (sdla_t *card, int err, CHDLC_MAILBOX_STRUCT *mb)
 	return 0;
 }
 
+MODULE_LICENSE("GPL");

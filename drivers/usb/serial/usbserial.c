@@ -1259,9 +1259,9 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 
 	/* initialize some parts of the port structures */
 	/* we don't use num_ports here cauz some devices have more endpoint pairs than ports */
-	max_endpoints = max_t(int, num_bulk_in, num_bulk_out);
-	max_endpoints = max_t(int, max_endpoints, num_interrupt_in);
-	max_endpoints = max_t(int, max_endpoints, serial->num_ports);
+	max_endpoints = max(num_bulk_in, num_bulk_out);
+	max_endpoints = max(max_endpoints, num_interrupt_in);
+	max_endpoints = max(max_endpoints, (int)serial->num_ports);
 	dbg (__FUNCTION__ " - setting up %d port structures for this device", max_endpoints);
 	for (i = 0; i < max_endpoints; ++i) {
 		port = &serial->port[i];

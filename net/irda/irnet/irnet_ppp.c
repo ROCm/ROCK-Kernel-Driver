@@ -858,8 +858,8 @@ ppp_irnet_send(struct ppp_channel *	chan,
       irda_irnet_connect(self);
 #endif /* CONNECT_IN_SEND */
 
-      DEBUG(PPP_INFO, "IrTTP not ready ! (%d-0x%X)\n",
-	    self->ttp_open, (unsigned int) self->tsap);
+      DEBUG(PPP_INFO, "IrTTP not ready ! (%d-%d)\n",
+	    self->ttp_open, self->ttp_connect);
 
       /* Note : we can either drop the packet or block the packet.
        *
@@ -882,7 +882,7 @@ ppp_irnet_send(struct ppp_channel *	chan,
        */
 #ifdef BLOCK_WHEN_CONNECT
       /* If we are attempting to connect */
-      if(self->tsap)
+      if(self->ttp_connect)
 	{
 	  /* Blocking packet, ppp_generic will retry later */
 	  return 0;

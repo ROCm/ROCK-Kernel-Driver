@@ -78,6 +78,7 @@
 
 MODULE_AUTHOR("Gergely Madarasz <gorgo@itc.hu>");
 MODULE_DESCRIPTION("Common code for the COMX synchronous serial adapters");
+MODULE_LICENSE("GPL");
 
 extern int comx_hw_comx_init(void);
 extern int comx_hw_locomx_init(void);

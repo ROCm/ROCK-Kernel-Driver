@@ -45,7 +45,7 @@
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <linux/skbuff.h>
-#include <linux/mii.h>
+#include <linux/dp83840.h>
 
 #include <asm/byteorder.h>
 #include <asm/io.h>

@@ -346,7 +346,7 @@ extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 #endif
 
 #define io_remap_page_range(start, busaddr, size, prot) \
-	remap_page_range(start, virt_to_phys(__ioremap(busaddr)), size, prot)
+    remap_page_range(start, virt_to_phys(__ioremap(busaddr, size)), size, prot)
 
 #define pte_ERROR(e) \
 	printk("%s:%d: bad pte %016lx.\n", __FILE__, __LINE__, pte_val(e))
@@ -358,5 +358,10 @@ extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 extern void paging_init(void);
 
 #include <asm-generic/pgtable.h>
+
+/*
+ * No page table caches to initialise
+ */
+#define pgtable_cache_init()	do { } while (0)
 
 #endif /* _ALPHA_PGTABLE_H */

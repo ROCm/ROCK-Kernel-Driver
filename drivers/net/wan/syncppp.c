@@ -1397,7 +1397,7 @@ struct packet_type sppp_packet_type = {
 	func:	sppp_rcv,
 };
 
-static const char banner[] __initdata = 
+static char banner[] __initdata = 
 	KERN_INFO "Cronyx Ltd, Synchronous PPP and CISCO HDLC (c) 1994\n"
 	KERN_INFO "Linux port (c) 1998 Building Number Three Ltd & "
 		  "Jan \"Yenya\" Kasprzak.\n";
@@ -1420,3 +1420,5 @@ static void __exit sync_ppp_cleanup(void)
 module_init(sync_ppp_init);
 module_exit(sync_ppp_cleanup);
 MODULE_PARM(debug,"1i");
+MODULE_LICENSE("GPL");
+

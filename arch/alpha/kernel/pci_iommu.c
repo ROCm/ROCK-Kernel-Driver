@@ -42,24 +42,6 @@ calc_npages(long bytes)
 	return (bytes + PAGE_SIZE - 1) >> PAGE_SHIFT;
 }
 
-static void __init
-iommu_arena_fixup(struct pci_iommu_arena * arena)
-{
-	unsigned long base, size;
-
-	/*
-	 * The Cypress chip has a quirk, it get confused by addresses
-	 * above -1M so reserve the pagetables that maps pci addresses
-	 * above -1M.
-	 */
-	base = arena->dma_base;
-	size = arena->size;
-	if (base + size > 0xfff00000) {
-		int i, fixup_start = (0xfff00000 - base) >> PAGE_SHIFT;
-		for (i= 0; i < (0x100000 >> PAGE_SHIFT); i++)
-			arena->ptes[fixup_start+i] = IOMMU_INVALID_PTE;
-	}
-}
 
 struct pci_iommu_arena *
 iommu_arena_new(struct pci_controller *hose, dma_addr_t base,
@@ -90,24 +72,19 @@ iommu_arena_new(struct pci_controller *hose, dma_addr_t base,
 	   unless there are chip bugs.  */
 	arena->align_entry = 1;
 
-	iommu_arena_fixup(arena);
-
 	return arena;
 }
 
-long
-iommu_arena_alloc(struct pci_iommu_arena *arena, long n)
+/* Must be called with the arena lock held */
+static long
+iommu_arena_find_pages(struct pci_iommu_arena *arena, long n, long mask)
 {
-	unsigned long flags;
 	unsigned long *ptes;
-	long i, p, nent, mask;
+	long i, p, nent;
 
-	spin_lock_irqsave(&arena->lock, flags);
-
-	/* Search forward for the first sequence of N empty ptes.  */
+	/* Search forward for the first mask-aligned sequence of N free ptes */
 	ptes = arena->ptes;
 	nent = arena->size >> PAGE_SHIFT;
-	mask = arena->align_entry - 1;
 	p = (arena->next_entry + mask) & ~mask;
 	i = 0;
 	while (i < n && p+i < nent) {
@@ -130,10 +107,31 @@ iommu_arena_alloc(struct pci_iommu_arena *arena, long n)
 				i = i + 1;
 		}
 
-		if (i < n) {
-			spin_unlock_irqrestore(&arena->lock, flags);
+		if (i < n)
 			return -1;
-		}
+	}
+
+	/* Success. It's the responsibility of the caller to mark them
+	   in use before releasing the lock */
+	return p;
+}
+
+long
+iommu_arena_alloc(struct pci_iommu_arena *arena, long n)
+{
+	unsigned long flags;
+	unsigned long *ptes;
+	long i, p, mask;
+
+	spin_lock_irqsave(&arena->lock, flags);
+
+	/* Search for N empty ptes */
+	ptes = arena->ptes;
+	mask = arena->align_entry - 1;
+	p = iommu_arena_find_pages(arena, n, mask);
+	if (p < 0) {
+		spin_unlock_irqrestore(&arena->lock, flags);
+		return -1;
 	}
 
 	/* Success.  Mark them all in use, ie not zero and invalid
@@ -660,6 +658,104 @@ pci_dma_supported(struct pci_dev *pdev, dma_addr_t mask)
 	arena = hose->sg_pci;
 	if (arena && arena->dma_base + arena->size - 1 <= mask)
 		return 1;
+
+	return 0;
+}
+
+
+/*
+ * AGP GART extensions to the IOMMU
+ */
+int
+iommu_reserve(struct pci_iommu_arena *arena, long pg_count, long align_mask) 
+{
+	unsigned long flags;
+	unsigned long *ptes;
+	long i, p;
+
+	if (!arena) return -EINVAL;
+
+	spin_lock_irqsave(&arena->lock, flags);
+
+	/* Search for N empty ptes.  */
+	ptes = arena->ptes;
+	p = iommu_arena_find_pages(arena, pg_count, align_mask);
+	if (p < 0) {
+		spin_unlock_irqrestore(&arena->lock, flags);
+		return -1;
+	}
+
+	/* Success.  Mark them all reserved (ie not zero and invalid)
+	   for the iommu tlb that could load them from under us.
+	   They will be filled in with valid bits by _bind() */
+	for (i = 0; i < pg_count; ++i)
+		ptes[p+i] = IOMMU_RESERVED_PTE;
+
+	arena->next_entry = p + pg_count;
+	spin_unlock_irqrestore(&arena->lock, flags);
+
+	return p;
+}
+
+int 
+iommu_release(struct pci_iommu_arena *arena, long pg_start, long pg_count)
+{
+	unsigned long *ptes;
+	long i;
+
+	if (!arena) return -EINVAL;
+
+	ptes = arena->ptes;
+
+	/* Make sure they're all reserved first... */
+	for(i = pg_start; i < pg_start + pg_count; i++)
+		if (ptes[i] != IOMMU_RESERVED_PTE)
+			return -EBUSY;
+
+	iommu_arena_free(arena, pg_start, pg_count);
+	return 0;
+}
+
+int
+iommu_bind(struct pci_iommu_arena *arena, long pg_start, long pg_count, 
+	   unsigned long *physaddrs)
+{
+	unsigned long flags;
+	unsigned long *ptes;
+	long i, j;
+
+	if (!arena) return -EINVAL;
+	
+	spin_lock_irqsave(&arena->lock, flags);
+
+	ptes = arena->ptes;
+
+	for(j = pg_start; j < pg_start + pg_count; j++) {
+		if (ptes[j] != IOMMU_RESERVED_PTE) {
+			spin_unlock_irqrestore(&arena->lock, flags);
+			return -EBUSY;
+		}
+	}
+		
+	for(i = 0, j = pg_start; i < pg_count; i++, j++)
+		ptes[j] = mk_iommu_pte(physaddrs[i]);
+
+	spin_unlock_irqrestore(&arena->lock, flags);
+
+	return 0;
+}
+
+int
+iommu_unbind(struct pci_iommu_arena *arena, long pg_start, long pg_count)
+{
+	unsigned long *p;
+	long i;
+
+	if (!arena) return -EINVAL;
+
+	p = arena->ptes + pg_start;
+	for(i = 0; i < pg_count; i++)
+		p[i] = IOMMU_RESERVED_PTE;
 
 	return 0;
 }

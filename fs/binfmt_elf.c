@@ -115,6 +115,7 @@ create_elf_tables(char *p, int argc, int envc,
 	char *k_platform, *u_platform;
 	long hwcap;
 	size_t platform_len = 0;
+	size_t len;
 
 	/*
 	 * Get hold of platform and hardware capabilities masks for
@@ -197,13 +198,19 @@ create_elf_tables(char *p, int argc, int envc,
 	current->mm->arg_start = (unsigned long) p;
 	while (argc-->0) {
 		__put_user((elf_caddr_t)(unsigned long)p,argv++);
-		p += strlen_user(p);
+		len = strnlen_user(p, PAGE_SIZE*MAX_ARG_PAGES);
+		if (!len || len > PAGE_SIZE*MAX_ARG_PAGES)
+			return NULL;
+		p += len;
 	}
 	__put_user(NULL, argv);
 	current->mm->arg_end = current->mm->env_start = (unsigned long) p;
 	while (envc-->0) {
 		__put_user((elf_caddr_t)(unsigned long)p,envp++);
-		p += strlen_user(p);
+		len = strnlen_user(p, PAGE_SIZE*MAX_ARG_PAGES);
+		if (!len || len > PAGE_SIZE*MAX_ARG_PAGES)
+			return NULL;
+		p += len;
 	}
 	__put_user(NULL, envp);
 	current->mm->env_end = (unsigned long) p;
@@ -406,14 +413,15 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	struct elf_phdr * elf_ppnt, *elf_phdata;
 	unsigned long elf_bss, k, elf_brk;
 	int elf_exec_fileno;
-	int retval, size, i;
+	int retval, i;
+	unsigned int size;
 	unsigned long elf_entry, interp_load_addr = 0;
 	unsigned long start_code, end_code, start_data, end_data;
 	struct elfhdr elf_ex;
 	struct elfhdr interp_elf_ex;
   	struct exec interp_ex;
 	char passed_fileno[6];
-
+	
 	/* Get the exec-header */
 	elf_ex = *((struct elfhdr *) bprm->buf);
 
@@ -432,7 +440,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	/* Now read in all of the header information */
 
 	retval = -ENOMEM;
-	size = elf_ex.e_phentsize * elf_ex.e_phnum;
+	size = ((unsigned int)elf_ex.e_phentsize) * elf_ex.e_phnum;
 	if (size > 65536)
 		goto out;
 	elf_phdata = (struct elf_phdr *) kmalloc(size, GFP_KERNEL);
@@ -548,7 +556,8 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		/* Make sure only one type was selected */
 		if ((interpreter_type & INTERPRETER_ELF) &&
 		     interpreter_type != INTERPRETER_ELF) {
-			printk(KERN_WARNING "ELF: Ambiguous type, using ELF\n");
+	     		// FIXME - ratelimit this before re-enabling
+			// printk(KERN_WARNING "ELF: Ambiguous type, using ELF\n");
 			interpreter_type = INTERPRETER_ELF;
 		}
 	}

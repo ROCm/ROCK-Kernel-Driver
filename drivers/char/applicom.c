@@ -1,6 +1,6 @@
 /* Derived from Applicom driver ac.c for SCO Unix                            */
 /* Ported by David Woodhouse, Axiom (Cambridge) Ltd.                         */
-/* Dave@mvhi.com  30/8/98                                                    */
+/* dwmw2@redhat.com  30/8/98                                                 */
 /* $Id: ac.c,v 1.30 2000/03/22 16:03:57 dwmw2 Exp $			     */
 /* This module is for Linux 2.1 and 2.2 series kernels.                      */
 /*****************************************************************************/
@@ -74,6 +74,7 @@ static char *applicom_pci_devnames[] = {
 
 MODULE_AUTHOR("David Woodhouse & Applicom International");
 MODULE_DESCRIPTION("Driver for Applicom Profibus card");
+MODULE_LICENSE("GPL");
 MODULE_PARM(irq, "i");
 MODULE_PARM_DESC(irq, "IRQ of the Applicom board");
 MODULE_PARM(mem, "i");
@@ -82,7 +83,7 @@ MODULE_PARM_DESC(mem, "Shared Memory Address of Applicom board");
 MODULE_SUPPORTED_DEVICE("ac");
 
 
-struct applicom_board {
+static struct applicom_board {
 	unsigned long PhysIO;
 	unsigned long RamIO;
 	wait_queue_head_t FlagSleepSend;
@@ -100,22 +101,21 @@ static unsigned int WriteErrorCount;	/* number of write error      */
 static unsigned int ReadErrorCount;	/* number of read error       */
 static unsigned int DeviceErrorCount;	/* number of device error     */
 
-static loff_t ac_llseek(struct file *, loff_t, int);
 static ssize_t ac_read (struct file *, char *, size_t, loff_t *);
 static ssize_t ac_write (struct file *, const char *, size_t, loff_t *);
 static int ac_ioctl(struct inode *, struct file *, unsigned int,
 		    unsigned long);
 static void ac_interrupt(int, void *, struct pt_regs *);
 
-struct file_operations ac_fops = {
+static struct file_operations ac_fops = {
 	owner:THIS_MODULE,
-	llseek:ac_llseek,
+	llseek:no_llseek,
 	read:ac_read,
 	write:ac_write,
 	ioctl:ac_ioctl,
 };
 
-struct miscdevice ac_miscdev = {
+static struct miscdevice ac_miscdev = {
 	AC_MINOR,
 	"ac",
 	&ac_fops
@@ -123,7 +123,7 @@ struct miscdevice ac_miscdev = {
 
 static int dummy;	/* dev_id for request_irq() */
 
-int ac_register_board(unsigned long physloc, unsigned long loc, 
+static int ac_register_board(unsigned long physloc, unsigned long loc, 
 		      unsigned char boardno)
 {
 	volatile unsigned char byte_reset_it;
@@ -254,6 +254,7 @@ int __init applicom_init(void)
 
 	/* Now try the specified ISA cards */
 
+#warning "LEAK"
 	RamIO = ioremap(mem, LEN_RAM_IO * MAX_ISA_BOARD);
 
 	if (!RamIO) 
@@ -340,11 +341,6 @@ int __init applicom_init(void)
 __initcall(applicom_init);
 #endif
 
-static loff_t ac_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static ssize_t ac_write(struct file *file, const char *buf, size_t count, loff_t * ppos)
 {
 	unsigned int NumCard;	/* Board number 1 -> 8           */
@@ -421,7 +417,7 @@ static ssize_t ac_write(struct file *file, const char *buf, size_t count, loff_t
 	}
 	
 	/* Place ourselves on the wait queue */
-	current->state = TASK_INTERRUPTIBLE;
+	set_current_state(TASK_INTERRUPTIBLE);
 	add_wait_queue(&apbs[IndexCard].FlagSleepSend, &wait);
 
 	/* Check whether the card is ready for us */
@@ -435,8 +431,9 @@ static ssize_t ac_write(struct file *file, const char *buf, size_t count, loff_t
 			remove_wait_queue(&apbs[IndexCard].FlagSleepSend,
 					  &wait);
 			return -EINTR;
-	}
+		}
 		spin_lock_irqsave(&apbs[IndexCard].mutex, flags);
+		set_current_state(TASK_INTERRUPTIBLE);
 	}
 
 	/* We may not have actually slept */
@@ -521,7 +518,7 @@ static int do_ac_read(int IndexCard, char *buf)
 		printk("\n");
 #endif
 
-	/* Je suis stupide. DW. */
+#warning "Je suis stupide. DW. - copy*user in cli"
 
 	if (copy_to_user(buf, &st_loc, sizeof(struct st_ram_io)))
 		return -EFAULT;
@@ -550,7 +547,7 @@ static ssize_t ac_read (struct file *filp, char *buf, size_t count, loff_t *ptr)
 	
 	while(1) {
 		/* Stick ourself on the wait queue */
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		add_wait_queue(&FlagSleepRec, &wait);
 		
 		/* Scan each board, looking for one which has a packet for us */
@@ -565,7 +562,7 @@ static ssize_t ac_read (struct file *filp, char *buf, size_t count, loff_t *ptr)
 				/* Got a packet for us */
 				ret = do_ac_read(i, buf);
 				spin_unlock_irqrestore(&apbs[i].mutex, flags);
-				current->state = TASK_RUNNING;
+				set_current_state(TASK_RUNNING);
 				remove_wait_queue(&FlagSleepRec, &wait);
 				return tmp;
 			}
@@ -575,7 +572,7 @@ static ssize_t ac_read (struct file *filp, char *buf, size_t count, loff_t *ptr)
 				Dummy = readb(apbs[i].RamIO + VERS);
 				
 				spin_unlock_irqrestore(&apbs[i].mutex, flags);
-				current->state = TASK_RUNNING;
+				set_current_state(TASK_RUNNING);
 				remove_wait_queue(&FlagSleepRec, &wait);
 				
 				printk(KERN_WARNING "APPLICOM driver read error board %d, DataToPcReady = %d\n",

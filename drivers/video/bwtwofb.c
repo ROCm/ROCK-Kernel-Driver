@@ -263,3 +263,5 @@ char __init *bwtwofb_init(struct fb_info_sbusfb *fb)
 	
 	return idstring;
 }
+
+MODULE_LICENSE("GPL");

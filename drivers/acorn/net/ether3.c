@@ -938,3 +938,5 @@ static void ether3_exit(void)
 
 module_init(ether3_init);
 module_exit(ether3_exit);
+
+MODULE_LICENSE("GPL");

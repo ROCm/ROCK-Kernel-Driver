@@ -1,7 +1,7 @@
 /*
- * $Id: input.c,v 1.7 2000/05/28 17:31:36 vojtech Exp $
+ * $Id: input.c,v 1.20 2001/05/17 15:50:27 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
  *  The input layer module itself
  *
@@ -124,6 +124,13 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 
 			break;
 
+		case EV_MSC:
+
+			if (code > MSC_MAX || !test_bit(code, dev->mscbit))
+				return;
+	
+			break;
+
 		case EV_LED:
 	
 			if (code > LED_MAX || !test_bit(code, dev->ledbit) || !!test_bit(code, dev->led) == value)
@@ -152,14 +159,11 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 			if (dev->event) dev->event(dev, type, code, value);
 
 			break;
-	}
-/*
- * Add randomness.
- */
 
-#if 0 /* BUG */
-	add_input_randomness(((unsigned long) dev) ^ (type << 24) ^ (code << 16) ^ value);
-#endif
+		case EV_FF:
+			if (dev->event) dev->event(dev, type, code, value);
+			break;
+	}
 
 /*
  * Distribute the event to handler modules.

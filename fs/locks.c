@@ -473,21 +473,26 @@ static void locks_insert_lock(struct file_lock **pos, struct file_lock *fl)
 		fl->fl_insert(fl);
 }
 
-/* Delete a lock and then free it.
- * Remove our lock from the lock lists, wake up processes that are blocked
- * waiting for this lock, notify the FS that the lock has been cleared and
- * finally free the lock.
+/*
+ * Remove lock from the lock lists
  */
-static void locks_delete_lock(struct file_lock **thisfl_p, unsigned int wait)
+static inline void _unhash_lock(struct file_lock **thisfl_p)
 {
 	struct file_lock *fl = *thisfl_p;
 
 	*thisfl_p = fl->fl_next;
 	fl->fl_next = NULL;
 
-	list_del(&fl->fl_link);
-	INIT_LIST_HEAD(&fl->fl_link);
+	list_del_init(&fl->fl_link);
+}
 
+/*
+ * Wake up processes that are blocked waiting for this lock,
+ * notify the FS that the lock has been cleared and
+ * finally free the lock.
+ */
+static inline void _delete_lock(struct file_lock *fl, unsigned int wait)
+{
 	fasync_helper(0, fl->fl_file, 0, &fl->fl_fasync);
 	if (fl->fl_fasync != NULL){
 		printk(KERN_ERR "locks_delete_lock: fasync == %p\n", fl->fl_fasync);
@@ -502,6 +507,17 @@ static void locks_delete_lock(struct file_lock **thisfl_p, unsigned int wait)
 }
 
 /*
+ * Delete a lock and then free it.
+ */
+static void locks_delete_lock(struct file_lock **thisfl_p, unsigned int wait)
+{
+	struct file_lock *fl = *thisfl_p;
+
+	_unhash_lock(thisfl_p);
+	_delete_lock(fl, wait);
+}
+
+/*
  * Call back client filesystem in order to get it to unregister a lock,
  * then delete lock. Essentially useful only in locks_remove_*().
  * Note: this must be called with the semaphore already held!
@@ -511,12 +527,13 @@ static inline void locks_unlock_delete(struct file_lock **thisfl_p)
 	struct file_lock *fl = *thisfl_p;
 	int (*lock)(struct file *, int, struct file_lock *);
 
+	_unhash_lock(thisfl_p);
 	if (fl->fl_file->f_op &&
 	    (lock = fl->fl_file->f_op->lock) != NULL) {
 		fl->fl_type = F_UNLCK;
 		lock(fl->fl_file, F_SETLK, fl);
 	}
-	locks_delete_lock(thisfl_p, 0);
+	_delete_lock(fl, 0);
 }
 
 /* Determine if lock sys_fl blocks lock caller_fl. Common functionality
@@ -1661,6 +1678,7 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 	while ((fl = *before) != NULL) {
 		if ((fl->fl_flags & FL_POSIX) && fl->fl_owner == owner) {
 			locks_unlock_delete(before);
+			before = &inode->i_flock;
 			continue;
 		}
 		before = &fl->fl_next;

@@ -878,3 +878,7 @@ void cleanup_module(void)
 }
 #endif
 /***************************** End of Functions *********************/
+
+MODULE_AUTHOR("Enver Haase");
+MODULE_DESCRIPTION("Amiga A2232 multi-serial board driver");
+MODULE_LICENSE("GPL");

@@ -1,8 +1,8 @@
 /*
- * $Id: hid-debug.h,v 1.2 2000/05/29 10:54:53 vojtech Exp $
+ * $Id: hid-debug.h,v 1.3 2001/05/10 15:56:07 vojtech Exp $
  *
- *  (c) 1999 Andreas Gal	<gal@cs.uni-magdeburg.de>
- *  (c) 2000 Vojtech Pavlik	<vojtech@suse.cz>
+ *  (c) 1999 Andreas Gal		<gal@cs.uni-magdeburg.de>
+ *  (c) 2000-2001 Vojtech Pavlik	<vojtech@suse.cz>
  *
  *  Some debug stuff for the HID parser.
  *
@@ -196,16 +196,18 @@ static void hid_dump_field(struct hid_field *field, int n) {
 	printk(")\n");
 }
 
-void hid_dump_device(struct hid_device *device) {
+static void hid_dump_device(struct hid_device *device) {
 	struct hid_report_enum *report_enum;
 	struct hid_report *report;
 	struct list_head *list;
 	unsigned i,k;
 	static char *table[] = {"INPUT", "OUTPUT", "FEATURE"};
 	
-	printk("Application(");
-	resolv_usage(device->application);
-	printk(")\n");
+	for (i = 0; i < device->maxapplication; i++) {
+		printk("Application(");
+		resolv_usage(device->application[i]);
+		printk(")\n");
+	}
 
 	for (i = 0; i < HID_REPORT_TYPES; i++) {
 		report_enum = device->report_enum + i;
@@ -228,8 +230,8 @@ void hid_dump_device(struct hid_device *device) {
 	}
 }
 
-void hid_dump_input(struct hid_usage *usage, __s32 value) {
-	printk("hidd: input ");
+static void hid_dump_input(struct hid_usage *usage, __s32 value) {
+	printk("hid-debug: input ");
 	resolv_usage(usage->hid);
 	printk(" = %d\n", value);
 }

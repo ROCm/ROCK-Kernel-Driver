@@ -910,7 +910,7 @@ static struct net_proto_family spx_family_ops = {
 	create:		spx_create,
 };
 
-static const char banner[] __initdata = KERN_INFO "NET4: Sequenced Packet eXchange (SPX) 0.02 for Linux NET4.0\n";
+static char banner[] __initdata = KERN_INFO "NET4: Sequenced Packet eXchange (SPX) 0.02 for Linux NET4.0\n";
 
 static int __init spx_proto_init(void)
 {

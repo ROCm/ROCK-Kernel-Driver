@@ -153,9 +153,16 @@ __EXTERN_INLINE void polaris_writeq(unsigned long b, unsigned long addr)
 	*(vulp)addr = b;
 }
 
-__EXTERN_INLINE unsigned long polaris_ioremap(unsigned long addr)
+__EXTERN_INLINE unsigned long polaris_ioremap(unsigned long addr,
+					      unsigned long size
+					      __attribute__((unused)))
 {
 	return addr + POLARIS_DENSE_MEM_BASE;
+}
+
+__EXTERN_INLINE void polaris_iounmap(unsigned long addr)
+{
+	return;
 }
 
 __EXTERN_INLINE int polaris_is_ioaddr(unsigned long addr)
@@ -184,7 +191,8 @@ __EXTERN_INLINE int polaris_is_ioaddr(unsigned long addr)
 #define __writew(x,a)		polaris_writew((x),(unsigned long)(a))
 #define __writel(x,a)		polaris_writel((x),(unsigned long)(a))
 #define __writeq(x,a)		polaris_writeq((x),(unsigned long)(a))
-#define __ioremap(a)		polaris_ioremap((unsigned long)(a))
+#define __ioremap(a,s)		polaris_ioremap((unsigned long)(a),(s))
+#define __iounmap(a)		polaris_iounmap((unsigned long)(a))
 #define __is_ioaddr(a)		polaris_is_ioaddr((unsigned long)(a))
 
 #define inb(p)			__inb(p)

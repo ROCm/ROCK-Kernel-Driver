@@ -406,21 +406,21 @@ struct sol_statvfs64 {
 	u32	f_filler[16];
 };
 
-static int report_statvfs(struct inode *inode, u32 buf)
+static int report_statvfs(struct vfsmount *mnt, struct inode *inode, u32 buf)
 {
 	struct statfs s;
 	int error;
 	struct sol_statvfs *ss = (struct sol_statvfs *)A(buf);
 
-	error = vfs_statfs(inode->i_sb, &s);
+	error = vfs_statfs(mnt->mnt_sb, &s);
 	if (!error) {
-		const char *p = inode->i_sb->s_type->name;
+		const char *p = mnt->mnt_sb->s_type->name;
 		int i = 0;
 		int j = strlen (p);
 		
 		if (j > 15) j = 15;
 		if (IS_RDONLY(inode)) i = 1;
-		if (IS_NOSUID(inode)) i |= 2;
+		if (mnt->mnt_flags & MNT_NOSUID) i |= 2;
 		if (put_user (s.f_bsize, &ss->f_bsize)		||
 		    __put_user (0, &ss->f_frsize)		||
 		    __put_user (s.f_blocks, &ss->f_blocks)	||
@@ -440,21 +440,21 @@ static int report_statvfs(struct inode *inode, u32 buf)
 	return error;
 }
 
-static int report_statvfs64(struct inode *inode, u32 buf)
+static int report_statvfs64(struct vfsmount *mnt, struct inode *inode, u32 buf)
 {
 	struct statfs s;
 	int error;
 	struct sol_statvfs64 *ss = (struct sol_statvfs64 *)A(buf);
 			
-	error = vfs_statfs(inode->i_sb, &s);
+	error = vfs_statfs(mnt->mnt_sb, &s);
 	if (!error) {
-		const char *p = inode->i_sb->s_type->name;
+		const char *p = mnt->mnt_sb->s_type->name;
 		int i = 0;
 		int j = strlen (p);
 		
 		if (j > 15) j = 15;
 		if (IS_RDONLY(inode)) i = 1;
-		if (IS_NOSUID(inode)) i |= 2;
+		if (mnt->mnt_flags & MNT_NOSUID) i |= 2;
 		if (put_user (s.f_bsize, &ss->f_bsize)		||
 		    __put_user (0, &ss->f_frsize)		||
 		    __put_user (s.f_blocks, &ss->f_blocks)	||
@@ -482,7 +482,7 @@ asmlinkage int solaris_statvfs(u32 path, u32 buf)
 	error = user_path_walk((const char *)A(path),&nd);
 	if (!error) {
 		struct inode * inode = nd.dentry->d_inode;
-		error = report_statvfs(inode, buf);
+		error = report_statvfs(nd.mnt, inode, buf);
 		path_release(&nd);
 	}
 	return error;
@@ -496,7 +496,7 @@ asmlinkage int solaris_fstatvfs(unsigned int fd, u32 buf)
 	error = -EBADF;
 	file = fget(fd);
 	if (file) {
-		error = report_statvfs(file->f_dentry->d_inode, buf);
+		error = report_statvfs(file->f_vfsmnt, file->f_dentry->d_inode, buf);
 		fput(file);
 	}
 
@@ -512,7 +512,7 @@ asmlinkage int solaris_statvfs64(u32 path, u32 buf)
 	error = user_path_walk((const char *)A(path), &nd);
 	if (!error) {
 		struct inode * inode = nd.dentry->d_inode;
-		error = report_statvfs64(inode, buf);
+		error = report_statvfs64(nd.mnt, inode, buf);
 		path_release(&nd);
 	}
 	unlock_kernel();
@@ -528,7 +528,7 @@ asmlinkage int solaris_fstatvfs64(unsigned int fd, u32 buf)
 	file = fget(fd);
 	if (file) {
 		lock_kernel();
-		error = report_statvfs64(file->f_dentry->d_inode, buf);
+		error = report_statvfs64(file->f_vfsmnt, file->f_dentry->d_inode, buf);
 		unlock_kernel();
 		fput(file);
 	}

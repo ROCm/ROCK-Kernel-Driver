@@ -153,6 +153,7 @@ MODULE_AUTHOR(
 	"(c) 1996, 1997 Claus-Justus Heine (claus@momo.math.rwth-aachen.de)");
 MODULE_DESCRIPTION(
 	"QIC-117 driver for QIC-40/80/3010/3020 floppy tape drives.");
+MODULE_LICENSE("GPL");
 #endif
 
 /*  Called by modules package when installing the driver

@@ -528,3 +528,5 @@ static void do_install_cmap(int con, struct fb_info *info)
     else
 	fb_set_cmap(fb_default_cmap(256), 1, fm2fb_setcolreg, info);
 }
+
+MODULE_LICENSE("GPL");

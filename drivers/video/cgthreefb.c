@@ -44,6 +44,8 @@
 #define CG3_SR_ID_MONO          0x02
 #define CG3_SR_ID_MONO_ECL      0x03
 
+MODULE_LICENSE("GPL");
+
 enum cg3_type {
 	CG3_AT_66HZ = 0,
 	CG3_AT_76HZ,

@@ -267,10 +267,8 @@ __EXTERN_INLINE void irongate_writeq(unsigned long b, unsigned long addr)
 	*(vulp)addr = b;
 }
 
-__EXTERN_INLINE unsigned long irongate_ioremap(unsigned long addr)
-{
-	return addr + IRONGATE_MEM;
-}
+extern unsigned long irongate_ioremap(unsigned long addr, unsigned long size);
+extern void irongate_iounmap(unsigned long addr);
 
 __EXTERN_INLINE int irongate_is_ioaddr(unsigned long addr)
 {
@@ -298,7 +296,8 @@ __EXTERN_INLINE int irongate_is_ioaddr(unsigned long addr)
 #define __writew(x,a)		irongate_writew((x),(unsigned long)(a))
 #define __writel(x,a)		irongate_writel((x),(unsigned long)(a))
 #define __writeq(x,a)		irongate_writeq((x),(unsigned long)(a))
-#define __ioremap(a)		irongate_ioremap((unsigned long)(a))
+#define __ioremap(a,s)		irongate_ioremap((unsigned long)(a),(s))
+#define __iounmap(a)		irongate_iounmap((unsigned long)(a))
 #define __is_ioaddr(a)		irongate_is_ioaddr((unsigned long)(a))
 
 #define inb(p)			__inb(p)

@@ -61,7 +61,7 @@ enum
 	CTL_FS=5,		/* Filesystems */
 	CTL_DEBUG=6,		/* Debugging */
 	CTL_DEV=7,		/* Devices */
-	CTL_BUS=8,		/* Buses */
+	CTL_BUS=8,		/* Busses */
 	CTL_ABI=9		/* Binary emulation */
 };
 
@@ -119,7 +119,8 @@ enum
 	KERN_SHMPATH=48,	/* string: path to shm fs */
 	KERN_HOTPLUG=49,	/* string: path to hotplug policy agent */
 	KERN_IEEE_EMULATION_WARNINGS=50, /* int: unimplemented ieee instructions */
-	KERN_S390_USER_DEBUG_LOGGING=51  /* int: dumps of user faults */
+	KERN_S390_USER_DEBUG_LOGGING=51,  /* int: dumps of user faults */
+	KERN_CORE_USES_PID=52,		/* int: use core or core.%pid */
 };
 
 
@@ -473,6 +474,7 @@ enum {
 	NET_DECNET_DR_COUNT = 8,
 	NET_DECNET_DST_GC_INTERVAL = 9,
 	NET_DECNET_CONF = 10,
+	NET_DECNET_NO_FC_MAX_CWND = 11,
 	NET_DECNET_DEBUG_LEVEL = 255
 };
 

@@ -192,23 +192,25 @@ static int ntfs_printcb(ntfs_u8 *entry, void *param)
 	default:
 		BUG();
 	}
-	if (ntfs_encodeuni(NTFS_INO2VOL(nf->dir), (ntfs_u16*)(entry + 0x52),
-			name_len, &nf->name, &nf->namelen)) {
+	err = ntfs_encodeuni(NTFS_INO2VOL(nf->dir), (ntfs_u16*)(entry + 0x52),
+			name_len, &nf->name, &nf->namelen);
+	if (err) {
 		ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): Skipping "
 				"unrepresentable file.\n");
-		if (nf->name)
-			ntfs_free(nf->name);
-		return 0;
+		err = 0;
+		goto err_ret;
 	}
 	if (!show_sys_files && inum < 0x10UL) {
 		ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): Skipping system "
 				"file (%s).\n", nf->name);
-		return 0;
+		err = 0;
+		goto err_ret;
 	}
 	/* Do not return ".", as this is faked. */
 	if (nf->namelen == 1 && nf->name[0] == '.') {
 		ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): Skipping \".\"\n");
-		return 0;
+		err = 0;
+		goto err_ret;
 	}
 	nf->name[nf->namelen] = 0;
 	if (flags & 0x10000000) /* FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT */
@@ -229,7 +231,10 @@ static int ntfs_printcb(ntfs_u8 *entry, void *param)
 			(loff_t)(nf->ph << 16) | nf->pl, inum, file_type);
 	if (err)
 		nf->ret_code = err;
+err_ret:
+	nf->namelen = 0;
 	ntfs_free(nf->name);
+	nf->name = NULL;
 	return err;
 }
 
@@ -292,7 +297,7 @@ static int ntfs_readdir(struct file* filp, void *dirent, filldir_t filldir)
 				"0x%Lx.\n", (loff_t)(cb.ph << 16) | cb.pl);
 		err = ntfs_getdir_unsorted(NTFS_LINO2NINO(dir), &cb.ph, &cb.pl,
 				ntfs_printcb, &cb);
-	} while (!err && cb.ph < 0x7fff);
+	} while (!err && !cb.ret_code && cb.ph < 0x7fff);
 	filp->f_pos = (loff_t)(cb.ph << 16) | cb.pl;
 	ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): After ntfs_getdir_unsorted()"
 			" calls, f_pos 0x%Lx.\n", filp->f_pos);
@@ -520,18 +525,22 @@ static struct dentry *ntfs_lookup(struct inode *dir, struct dentry *d)
 	struct inode *res = 0;
 	char *item = 0;
 	ntfs_iterate_s walk;
-	int error;
+	int err;
 	
 	ntfs_debug(DEBUG_NAME1, __FUNCTION__ "(): Looking up %s in directory "
 			"ino 0x%x.\n", d->d_name.name, (unsigned)dir->i_ino);
+	walk.name = NULL;
+	walk.namelen = 0;
 	/* Convert to wide string. */
-	error = ntfs_decodeuni(NTFS_INO2VOL(dir), (char*)d->d_name.name,
+	err = ntfs_decodeuni(NTFS_INO2VOL(dir), (char*)d->d_name.name,
 			       d->d_name.len, &walk.name, &walk.namelen);
-	if (error)
-		return ERR_PTR(error);
+	if (err)
+		goto err_ret;
 	item = ntfs_malloc(ITEM_SIZE);
-	if (!item)
-		return ERR_PTR(-ENOMEM);
+	if (!item) {
+		err = -ENOMEM;
+		goto err_ret;
+	}
 	/* ntfs_getdir will place the directory entry into item, and the first
 	 * long long is the MFT record number. */
 	walk.type = BY_NAME;
@@ -544,6 +553,9 @@ static struct dentry *ntfs_lookup(struct inode *dir, struct dentry *d)
 	ntfs_free(walk.name);
 	/* Always return success, the dcache will handle negative entries. */
 	return NULL;
+err_ret:
+	ntfs_free(walk.name);
+	return ERR_PTR(err);
 }
 
 static struct file_operations ntfs_file_operations = {

@@ -35,6 +35,7 @@
 #include <linux/serio.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(serio_register_port);
 EXPORT_SYMBOL(serio_unregister_port);

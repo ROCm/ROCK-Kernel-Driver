@@ -113,6 +113,7 @@ static int numports[]     = {0, 0, 0, 0};
 # if (LINUX_VERSION_CODE > 0x020111)
 MODULE_AUTHOR("Bernhard Kaindl");
 MODULE_DESCRIPTION("Digiboard PC/X{i,e,eve} driver");
+MODULE_LICENSE("GPL");
 MODULE_PARM(verbose,     "i");
 MODULE_PARM(debug,       "i");
 MODULE_PARM(io,          "1-4i");

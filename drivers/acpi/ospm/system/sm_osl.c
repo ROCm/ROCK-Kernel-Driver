@@ -38,6 +38,7 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - ACPI System Driver");
+MODULE_LICENSE("GPL");
 
 
 #define SM_PROC_INFO		"info"

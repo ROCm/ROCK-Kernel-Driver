@@ -664,9 +664,9 @@ typedef struct {
   unsigned int count;
 } region;
 
-extern const region ucode_regions[];
-extern const u32 ucode_data[];
-extern const u32 ucode_start;
+static region ucode_regions[];
+static u32 ucode_data[];
+static u32 ucode_start;
 
 /* rate rounding */
 

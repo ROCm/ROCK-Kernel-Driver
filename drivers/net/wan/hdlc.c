@@ -1437,6 +1437,7 @@ void unregister_hdlc_device(hdlc_device *hdlc)
 
 MODULE_AUTHOR("Krzysztof Halasa <khc@pm.waw.pl>");
 MODULE_DESCRIPTION("HDLC support module");
+MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(hdlc_netif_rx);
 EXPORT_SYMBOL(register_hdlc_device);

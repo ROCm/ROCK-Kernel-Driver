@@ -1534,6 +1534,8 @@ static int __init get_video_mode(const char *name)
 
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	return retz3fb_init();

@@ -251,6 +251,7 @@ MODULE_PARM_DESC(dma, "The DMA channels of the COSA or SRP cards");
 
 MODULE_AUTHOR("Jan \"Yenya\" Kasprzak, <kas@fi.muni.cz>");
 MODULE_DESCRIPTION("Modular driver for the COSA or SRP synchronous card");
+MODULE_LICENSE("GPL");
 #endif
 
 /* I use this mainly for testing purposes */

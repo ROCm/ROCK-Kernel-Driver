@@ -35,6 +35,7 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - Thermal Zone Driver");
+MODULE_LICENSE("GPL");
 
 int TZP = 0;
 MODULE_PARM(TZP, "i");

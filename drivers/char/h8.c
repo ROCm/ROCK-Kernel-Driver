@@ -1176,3 +1176,6 @@ static void h8_clear_event_mask(int mask)
 	h8_event_mask &= (~mask);
 	restore_flags(flags);
 }
+
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

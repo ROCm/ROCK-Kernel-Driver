@@ -209,3 +209,5 @@ static void __exit amiga_mouse_exit(void)
 
 module_init(amiga_mouse_init);
 module_exit(amiga_mouse_exit);
+
+MODULE_LICENSE("GPL");

@@ -276,7 +276,7 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 			}
 		}
 
-		transfer_size = min_t (int, count, URB_TRANSFER_BUFFER_SIZE);
+		transfer_size = min (count, URB_TRANSFER_BUFFER_SIZE);
 
 		if (from_user) {
 			if (copy_from_user (urb->transfer_buffer, current_position, transfer_size)) {

@@ -19,7 +19,7 @@ static const char *version =
 #include <linux/sched.h>
 #include <linux/timer.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/netdevice.h>
 #include <linux/pci.h>
 #include <linux/delay.h>

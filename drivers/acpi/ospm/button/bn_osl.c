@@ -35,6 +35,7 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - Button Driver");
+MODULE_LICENSE("GPL");
 
 
 #define BN_PROC_ROOT		"button"

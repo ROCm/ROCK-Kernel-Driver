@@ -14,6 +14,7 @@
 #include <linux/list.h>
 #include <linux/stddef.h>
 #include <linux/spinlock.h>
+#include <linux/config.h>
 
 #include <asm/page.h>
 #include <asm/processor.h>
@@ -21,7 +22,11 @@
 /*
  * Debug control.  Slow but useful.
  */
+#if defined(CONFIG_DEBUG_WAITQ)
+#define WAITQUEUE_DEBUG 1
+#else
 #define WAITQUEUE_DEBUG 0
+#endif
 
 struct __wait_queue {
 	unsigned int flags;

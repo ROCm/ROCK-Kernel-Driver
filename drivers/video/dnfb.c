@@ -509,3 +509,5 @@ static struct display_switch dispsw_apollofb = {
     revc:		rev_char_apollofb,
     fontwidthmask:	FONTWIDTH(8)
 };
+
+MODULE_LICENSE("GPL");

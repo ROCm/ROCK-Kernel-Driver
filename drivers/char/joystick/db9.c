@@ -41,6 +41,7 @@
 #include <linux/input.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
+MODULE_LICENSE("GPL");
 MODULE_PARM(db9, "2i");
 MODULE_PARM(db9_2, "2i");
 MODULE_PARM(db9_3, "2i");

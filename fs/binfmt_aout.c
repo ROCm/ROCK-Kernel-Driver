@@ -90,7 +90,7 @@ static int aout_core_dump(long signr, struct pt_regs * regs, struct file *file)
 #	define START_DATA(u)	((u.u_tsize << PAGE_SHIFT) + u.start_code)
 #elif defined(__sparc__)
 #       define START_DATA(u)    (u.u_tsize)
-#elif defined(__i386__) || defined(__mc68000__)
+#elif defined(__i386__) || defined(__mc68000__) || defined(__arch_um__)
 #       define START_DATA(u)	(u.u_tsize << PAGE_SHIFT)
 #endif
 #ifdef __sparc__
@@ -219,7 +219,7 @@ static unsigned long * create_aout_tables(char * p, struct linux_binprm * bprm)
 	envp = (char **) sp;
 	sp -= argc+1;
 	argv = (char **) sp;
-#if defined(__i386__) || defined(__mc68000__) || defined(__arm__)
+#if defined(__i386__) || defined(__mc68000__) || defined(__arm__) || defined(__arch_um__)
 	put_user((unsigned long) envp,--sp);
 	put_user((unsigned long) argv,--sp);
 #endif

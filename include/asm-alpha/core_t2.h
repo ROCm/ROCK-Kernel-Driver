@@ -501,9 +501,16 @@ __EXTERN_INLINE void t2_writeq(unsigned long b, unsigned long addr)
 	*(vuip)(work + (4 << 5)) = b >> 32;
 }
 
-__EXTERN_INLINE unsigned long t2_ioremap(unsigned long addr)
+__EXTERN_INLINE unsigned long t2_ioremap(unsigned long addr, 
+					 unsigned long size
+					 __attribute__((unused)))
 {
 	return addr;
+}
+
+__EXTERN_INLINE void t2_iounmap(unsigned long addr)
+{
+	return;
 }
 
 __EXTERN_INLINE int t2_is_ioaddr(unsigned long addr)
@@ -530,7 +537,8 @@ __EXTERN_INLINE int t2_is_ioaddr(unsigned long addr)
 #define __writew(x,a)		t2_writew((x),(unsigned long)(a))
 #define __writel(x,a)		t2_writel((x),(unsigned long)(a))
 #define __writeq(x,a)		t2_writeq((x),(unsigned long)(a))
-#define __ioremap(a)		t2_ioremap((unsigned long)(a))
+#define __ioremap(a,s)		t2_ioremap((unsigned long)(a),(s))
+#define __iounmap(a)		t2_iounmap((unsigned long)(a))
 #define __is_ioaddr(a)		t2_is_ioaddr((unsigned long)(a))
 
 #endif /* __WANT_IO_DEF */

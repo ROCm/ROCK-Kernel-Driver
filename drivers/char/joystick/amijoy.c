@@ -42,6 +42,7 @@
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_PARM(amijoy, "1-2i");
+MODULE_LICENSE("GPL");
 
 static int amijoy[2] = { 0, 1 };
 static int amijoy_used[2] = { 0, 0 };

@@ -379,7 +379,7 @@ int iriap_getvaluebyclass_request(struct iriap_cb *self,
 				  char *name, char *attr)
 {
 	struct sk_buff *skb;
-	int name_len, attr_len;
+	int name_len, attr_len, skb_len;
 	__u8 *frame;
 
 	ASSERT(self != NULL, return -1;);
@@ -400,12 +400,13 @@ int iriap_getvaluebyclass_request(struct iriap_cb *self,
 	/* Give ourselves 10 secs to finish this operation */
 	iriap_start_watchdog_timer(self, 10*HZ);
 	
-	skb = dev_alloc_skb(64);
+	name_len = strlen(name);	/* Up to IAS_MAX_CLASSNAME = 60 */
+	attr_len = strlen(attr);	/* Up to IAS_MAX_ATTRIBNAME = 60 */
+
+	skb_len = self->max_header_size+2+name_len+1+attr_len+4;
+	skb = dev_alloc_skb(skb_len);
 	if (!skb)
 		return -ENOMEM;
-
-	name_len = strlen(name);
-	attr_len = strlen(attr);
 
 	/* Reserve space for MUX and LAP header */
  	skb_reserve(skb, self->max_header_size);
@@ -500,20 +501,19 @@ void iriap_getvaluebyclass_confirm(struct iriap_cb *self, struct sk_buff *skb)
 		}
 		value_len = fp[n++];
 		IRDA_DEBUG(4, __FUNCTION__ "(), strlen=%d\n", value_len);
-		ASSERT(value_len < 64, return;);
 		
 		/* Make sure the string is null-terminated */
 		fp[n+value_len] = 0x00;
-		
 		IRDA_DEBUG(4, "Got string %s\n", fp+n);
+
+		/* Will truncate to IAS_MAX_STRING bytes */
 		value = irias_new_string_value(fp+n);
 		break;
 	case IAS_OCT_SEQ:
 		value_len = be16_to_cpu(get_unaligned((__u16 *)(fp+n)));
 		n += 2;
 		
-		ASSERT(value_len <= 55, return;);      
-		
+		/* Will truncate to IAS_MAX_OCTET_STRING bytes */
 		value = irias_new_octseq_value(fp+n, value_len);
 		break;
 	default:
@@ -635,8 +635,8 @@ void iriap_getvaluebyclass_indication(struct iriap_cb *self,
 	struct ias_attrib *attrib;
 	int name_len;
 	int attr_len;
-	char name[64];
-	char attr[64];
+	char name[IAS_MAX_CLASSNAME + 1];	/* 60 bytes */
+	char attr[IAS_MAX_ATTRIBNAME + 1];	/* 60 bytes */
 	__u8 *fp;
 	int n;
 
@@ -1013,7 +1013,7 @@ int irias_proc_read(char *buf, char **start, off_t offset, int len)
 					       attrib->value->t.string);
 				break;
 			case IAS_OCT_SEQ:
-				len += sprintf(buf+len, "octet sequence\n");
+				len += sprintf(buf+len, "octet sequence (%d bytes)\n", attrib->value->len);
 				break;
 			case IAS_MISSING:
 				len += sprintf(buf+len, "missing\n");

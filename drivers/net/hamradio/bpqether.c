@@ -87,7 +87,7 @@
 
 #include <linux/bpqether.h>
 
-static const char banner[] __initdata = KERN_INFO "AX.25: bpqether driver version 004\n";
+static char banner[] __initdata = KERN_INFO "AX.25: bpqether driver version 004\n";
 
 static unsigned char ax25_bcast[AX25_ADDR_LEN] =
 	{'Q' << 1, 'S' << 1, 'T' << 1, ' ' << 1, ' ' << 1, ' ' << 1, '0' << 1};

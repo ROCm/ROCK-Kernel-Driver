@@ -1,10 +1,11 @@
 		      Joystick API Documentation                -*-Text-*-
 
 		        Ragnar Hojland Espinosa
-		          <ragnar@macula.net>
+			  <ragnar@macula.net>
 
 			      7 Aug 1998
 
+	$Id: joystick-api.txt,v 1.2 2001/05/08 21:21:23 vojtech Exp $
 
 1. Initialization
 ~~~~~~~~~~~~~~~~~

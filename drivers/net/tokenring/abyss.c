@@ -53,6 +53,8 @@ static struct pci_device_id abyss_pci_tbl[] __initdata = {
 };
 MODULE_DEVICE_TABLE(pci, abyss_pci_tbl);
 
+MODULE_LICENSE("GPL");
+
 static int abyss_open(struct net_device *dev);
 static int abyss_close(struct net_device *dev);
 static void abyss_enable(struct net_device *dev);

@@ -3721,5 +3721,6 @@ static int detect_and_fix_tx_bug (sdla_t *card)
 	return 0;
 }
 
+MODULE_LICENSE("GPL");
 
 /****** End *****************************************************************/

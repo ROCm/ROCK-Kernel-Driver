@@ -505,5 +505,8 @@ static void __exit exit_affs_fs(void)
 
 EXPORT_NO_SYMBOLS;
 
+MODULE_DESCRIPTION("Amiga filesystem support for Linux");
+MODULE_LICENSE("GPL");
+
 module_init(init_affs_fs)
 module_exit(exit_affs_fs)

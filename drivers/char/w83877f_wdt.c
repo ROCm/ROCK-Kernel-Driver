@@ -340,3 +340,5 @@ err_out:
 
 module_init(w83877f_wdt_init);
 module_exit(w83877f_wdt_unload);
+
+MODULE_LICENSE("GPL");

@@ -54,6 +54,7 @@
 
 MODULE_AUTHOR("Gergely Madarasz <gorgo@itc.hu>");
 MODULE_DESCRIPTION("Hardware driver for the LoCOMX board");
+MODULE_LICENSE("GPL");
 
 #define RX_DMA 3
 #define TX_DMA 1

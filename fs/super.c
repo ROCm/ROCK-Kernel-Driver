@@ -410,6 +410,7 @@ static struct vfsmount *clone_mnt(struct vfsmount *old, struct dentry *root)
 	mnt->mnt_root = dget(root);
 	mnt->mnt_mountpoint = mnt->mnt_root;
 	mnt->mnt_parent = mnt;
+	mnt->mnt_flags = old->mnt_flags;
 
 	atomic_inc(&sb->s_active);
 out:
@@ -520,16 +521,17 @@ static struct proc_fs_info {
 	int flag;
 	char *str;
 } fs_info[] = {
-	{ MS_NOEXEC, ",noexec" },
-	{ MS_NOSUID, ",nosuid" },
-	{ MS_NODEV, ",nodev" },
 	{ MS_SYNCHRONOUS, ",sync" },
 	{ MS_MANDLOCK, ",mand" },
 	{ MS_NOATIME, ",noatime" },
 	{ MS_NODIRATIME, ",nodiratime" },
-#ifdef MS_NOSUB			/* Can't find this except in mount.c */
-	{ MS_NOSUB, ",nosub" },
-#endif
+	{ 0, NULL }
+};
+
+static struct proc_fs_info mnt_info[] = {
+	{ MNT_NOSUID, ",nosuid" },
+	{ MNT_NODEV, ",nodev" },
+	{ MNT_NOEXEC, ",noexec" },
 	{ 0, NULL }
 };
 
@@ -578,6 +580,10 @@ int get_filesystem_info( char *buf )
 			       tmp->mnt_sb->s_flags & MS_RDONLY ? "ro" : "rw");
 		for (fs_infop = fs_info; fs_infop->flag; fs_infop++) {
 			if (tmp->mnt_sb->s_flags & fs_infop->flag)
+				MANGLE(fs_infop->str);
+		}
+		for (fs_infop = mnt_info; fs_infop->flag; fs_infop++) {
+			if (tmp->mnt_flags & fs_infop->flag)
 				MANGLE(fs_infop->str);
 		}
 		if (!strcmp("nfs", tmp->mnt_sb->s_type->name)) {
@@ -917,7 +923,7 @@ static struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	if (!S_ISBLK(inode->i_mode))
 		goto out;
 	error = -EACCES;
-	if (IS_NODEV(inode))
+	if (nd.mnt->mnt_flags & MNT_NODEV)
 		goto out;
 	bdev = inode->i_bdev;
 	bdops = devfs_get_ops ( devfs_get_handle_from_inode (inode) );
@@ -1382,7 +1388,7 @@ static int do_loopback(struct nameidata *nd, char *old_name)
  * on it - tough luck.
  */
 
-static int do_remount(struct nameidata *nd, int flags, char *data)
+static int do_remount(struct nameidata *nd,int flags,int mnt_flags,char *data)
 {
 	int err;
 	struct super_block * sb = nd->mnt->mnt_sb;
@@ -1395,6 +1401,8 @@ static int do_remount(struct nameidata *nd, int flags, char *data)
 
 	down_write(&sb->s_umount);
 	err = do_remount_sb(sb, flags, data);
+	if (!err)
+		nd->mnt->mnt_flags=mnt_flags;
 	up_write(&sb->s_umount);
 	return err;
 }
@@ -1463,13 +1471,15 @@ struct vfsmount *kern_mount(struct file_system_type *type)
 }
 
 static int do_add_mount(struct nameidata *nd, char *type, int flags,
-			char *name, void *data)
+			int mnt_flags, char *name, void *data)
 {
 	struct vfsmount *mnt = do_kern_mount(type, flags, name, data);
 	int retval = PTR_ERR(mnt);
 
 	if (IS_ERR(mnt))
 		goto out;
+
+	mnt->mnt_flags = mnt_flags;
 
 	down(&mount_sem);
 	/* Something was mounted here while we slept */
@@ -1539,6 +1549,7 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 {
 	struct nameidata nd;
 	int retval = 0;
+	int mnt_flags = 0;
 
 	/* Discard magic */
 	if ((flags & MS_MGC_MSK) == MS_MGC_VAL)
@@ -1551,6 +1562,15 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 	if (dev_name && !memchr(dev_name, 0, PAGE_SIZE))
 		return -EINVAL;
 
+	/* Separate the per-mountpoint flags */
+	if (flags & MS_NOSUID)
+		mnt_flags |= MNT_NOSUID;
+	if (flags & MS_NODEV)
+		mnt_flags |= MNT_NODEV;
+	if (flags & MS_NOEXEC)
+		mnt_flags |= MNT_NOEXEC;
+	flags &= ~(MS_NOSUID|MS_NOEXEC|MS_NODEV);
+
 	/* ... and get the mountpoint */
 	if (path_init(dir_name, LOOKUP_FOLLOW|LOOKUP_POSITIVE, &nd))
 		retval = path_walk(dir_name, &nd);
@@ -1558,12 +1578,12 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 		return retval;
 
 	if (flags & MS_REMOUNT)
-		retval = do_remount(&nd, flags&~MS_REMOUNT,
+		retval = do_remount(&nd, flags&~MS_REMOUNT, mnt_flags,
 				  (char *)data_page);
 	else if (flags & MS_BIND)
 		retval = do_loopback(&nd, dev_name);
 	else
-		retval = do_add_mount(&nd, type_page, flags,
+		retval = do_add_mount(&nd, type_page, flags, mnt_flags,
 				      dev_name, data_page);
 	path_release(&nd);
 	return retval;

@@ -238,4 +238,7 @@ advwdt_exit(void)
 module_init(advwdt_init);
 module_exit(advwdt_exit);
 
+MODULE_LICENSE("GPL");
+
 /* end of advantechwdt.c */
+

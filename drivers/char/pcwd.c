@@ -656,3 +656,7 @@ static void __exit pcwatchdog_exit(void)
 
 module_init(pcwatchdog_init);
 module_exit(pcwatchdog_exit);
+
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

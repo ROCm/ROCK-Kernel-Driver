@@ -130,6 +130,16 @@ struct module_info
 	((unsigned long)(&((struct module *)0L)->member + 1)		\
 	 <= (mod)->size_of_struct)
 
+/*
+ * Ditto for archdata.  Assumes mod->archdata_start and mod->archdata_end
+ * are validated elsewhere.
+ */
+#define mod_archdata_member_present(mod, type, member)			\
+	(((unsigned long)(&((type *)0L)->member) +			\
+	  sizeof(((type *)0L)->member)) <=				\
+	 ((mod)->archdata_end - (mod)->archdata_start))
+	 
+
 /* Check if an address p with number of entries n is within the body of module m */
 #define mod_bound(p, n, m) ((unsigned long)(p) >= ((unsigned long)(m) + ((m)->size_of_struct)) && \
 	         (unsigned long)((p)+(n)) <= (unsigned long)(m) + (m)->size)

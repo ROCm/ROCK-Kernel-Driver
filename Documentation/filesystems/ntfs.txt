@@ -98,6 +98,16 @@ list at sourceforge: linux-ntfs-dev@lists.sourceforge.net
 ChangeLog
 =========
 
+NTFS 1.1.19:
+	- Fixed ntfs_getdir_unsorted(), ntfs_readdir() and ntfs_printcb() to
+	  cope with arbitrary cluster sizes. Very important for Win2k+. Also,
+	  make them detect directories which are too large and truncate the
+	  enumeration pretending end of directory was reached. Detect more
+	  error conditions and overflows. All this fixes the problem where the
+	  driver could end up in an infinite loop under certain circumstances.
+	- Fixed potential memory leaks in Unicode conversion functions and
+	  setup correct NULL return values.
+
 NTFS 1.1.18:
 
 	- Enhanced & bug fixed cluster deallocation (race fixes, etc.)

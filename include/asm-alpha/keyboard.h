@@ -13,8 +13,13 @@
 
 #ifdef __KERNEL__
 
-#define KEYBOARD_IRQ			1
-#define DISABLE_KBD_DURING_INTERRUPTS	0
+#include <linux/kernel.h>
+#include <linux/ioport.h>
+#include <linux/kd.h>
+#include <asm/io.h>
+
+#define KEYBOARD_IRQ                    1
+#define DISABLE_KBD_DURING_INTERRUPTS   0
 
 extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
 extern int pckbd_getkeycode(unsigned int scancode);

@@ -601,6 +601,8 @@ static void do_install_cmap(int con, struct fb_info *info)
 
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
     return vfb_init();

@@ -114,6 +114,7 @@ static int debug;
 /* Module parameters */
 MODULE_AUTHOR("Maintainer: Francois Romieu <romieu@cogenit.fr>");
 MODULE_DESCRIPTION("Siemens PEB20534 PCI Controller");
+MODULE_LICENSE("GPL");
 MODULE_PARM(debug,"i");
 
 /* Structures */

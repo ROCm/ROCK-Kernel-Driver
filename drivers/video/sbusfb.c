@@ -1210,4 +1210,6 @@ int __init sbusfb_init(void)
 		sbusfb_init_fb(sbdp->prom_node, sbdp->bus->prom_node, type, sbdp);
 	}
 	return 0;
-}	
+}
+
+MODULE_LICENSE("GPL");	

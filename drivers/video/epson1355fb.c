@@ -25,7 +25,7 @@
 #include <linux/fb.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/sched.h>
@@ -538,3 +538,4 @@ void e1355fb_cleanup(struct fb_info *info)
 	/* ... */
 }
 
+MODULE_LICENSE("GPL");

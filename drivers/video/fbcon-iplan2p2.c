@@ -450,6 +450,8 @@ struct display_switch fbcon_iplan2p2 = {
 
 
 #ifdef MODULE
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
     return 0;

@@ -2474,4 +2474,6 @@ static void send_ppp_term_request (netdevice_t *dev)
 }
 
 
+MODULE_LICENSE("GPL");
+
 /****** End ****************************************************************/

@@ -663,3 +663,5 @@ static void __exit exit_serial_cs(void)
 
 module_init(init_serial_cs);
 module_exit(exit_serial_cs);
+
+MODULE_LICENSE("GPL");

@@ -6,6 +6,7 @@
  */
 #include <linux/config.h>
 #include <linux/sched.h>
+#include <linux/prefetch.h>
 #include <asm/page.h>
 
 #define VERIFY_READ 0
@@ -545,6 +546,7 @@ unsigned long __generic_copy_from_user(void *, const void *, unsigned long);
 static inline unsigned long
 __constant_copy_to_user(void *to, const void *from, unsigned long n)
 {
+	prefetch(from);
 	if (access_ok(VERIFY_WRITE, to, n))
 		__constant_copy_user(to,from,n);
 	return n;

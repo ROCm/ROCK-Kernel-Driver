@@ -507,7 +507,7 @@ affs_check_name(const unsigned char *name, int len)
 int
 affs_copy_name(unsigned char *bstr, struct dentry *dentry)
 {
-	int len = MIN(dentry->d_name.len, 30);
+	int len = min(dentry->d_name.len, 30u);
 
 	*bstr++ = len;
 	memcpy(bstr, dentry->d_name.name, len);

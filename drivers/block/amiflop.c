@@ -118,6 +118,7 @@
 static long int fd_def_df0 = FD_DD_3;     /* default for df0 if it doesn't identify */
 
 MODULE_PARM(fd_def_df0,"l");
+MODULE_LICENSE("GPL");
 
 /*
  *  Macros

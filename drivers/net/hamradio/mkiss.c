@@ -54,7 +54,7 @@
 #include <linux/tcp.h>
 #endif
 
-static const char banner[] __initdata = KERN_INFO "mkiss: AX.25 Multikiss, Hans Albas PE1AYX\n";
+static char banner[] __initdata = KERN_INFO "mkiss: AX.25 Multikiss, Hans Albas PE1AYX\n";
 
 #define NR_MKISS 4
 #define MKISS_SERIAL_TYPE_NORMAL 1

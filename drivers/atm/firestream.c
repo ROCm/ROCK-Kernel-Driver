@@ -271,11 +271,11 @@ struct reginit_item PHY_NTC_INIT[] __initdata = {
 
    150000 packets per second is close to the limit a PC is going to have
    anyway. We therefore have to disable this for production. -- REW */
-#undef IRQ_RATE_LIMIT 100
+#undef IRQ_RATE_LIMIT // 100
 
 /* Interrupts work now. Unlike serial cards, ATM cards don't work all
    that great without interrupts. -- REW */
-#undef FS_POLL_FREQ 100
+#undef FS_POLL_FREQ // 100
 
 /* 
    This driver can spew a whole lot of debugging output at you. If you
@@ -1928,8 +1928,6 @@ static int __init firestream_init_one (struct pci_dev *pci_dev,
 
  err_out_free_atm_dev:
 	atm_dev_deregister(atm_dev);
- err_out_free_fs_dev:
-	kfree(fs_dev);
  err_out:
 	return -ENODEV;
 }
@@ -2120,3 +2118,5 @@ static void __exit firestream_cleanup_module(void)
 module_init(firestream_init_module);
 module_exit(firestream_cleanup_module);
 
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

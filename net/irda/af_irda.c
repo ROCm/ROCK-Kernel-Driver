@@ -98,6 +98,8 @@ static int irda_data_indication(void *instance, void *sap, struct sk_buff *skb)
 	struct sock *sk;
 	int err;
 
+	IRDA_DEBUG(3, __FUNCTION__ "()\n");
+
 	self = (struct irda_sock *) instance;
 	ASSERT(self != NULL, return -1;);
 
@@ -128,9 +130,9 @@ static void irda_disconnect_indication(void *instance, void *sap,
 	struct irda_sock *self;
 	struct sock *sk;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
-
 	self = (struct irda_sock *) instance;
+
+	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
 
 	sk = self->sk;
 	if (sk == NULL)
@@ -155,8 +157,10 @@ static void irda_disconnect_indication(void *instance, void *sap,
 	 * Note : all socket function do check sk->state, so we are safe...
 	 * Jean II
 	 */
-	irttp_close_tsap(self->tsap);
-	self->tsap = NULL;
+	if (self->tsap) {
+		irttp_close_tsap(self->tsap);
+		self->tsap = NULL;
+	}
 
 	/* Note : once we are there, there is not much you want to do
 	 * with the socket anymore, apart from closing it.
@@ -180,9 +184,9 @@ static void irda_connect_confirm(void *instance, void *sap,
 	struct irda_sock *self;
 	struct sock *sk;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
-
 	self = (struct irda_sock *) instance;
+
+	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
 
 	sk = self->sk;
 	if (sk == NULL)
@@ -238,9 +242,9 @@ static void irda_connect_indication(void *instance, void *sap,
 	struct irda_sock *self;
 	struct sock *sk;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
-
  	self = (struct irda_sock *) instance;
+
+	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
 
 	sk = self->sk;
 	if (sk == NULL)
@@ -358,13 +362,13 @@ static void irda_getvalue_confirm(int result, __u16 obj_id,
 {
 	struct irda_sock *self;
 	
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
-
 	self = (struct irda_sock *) priv;
 	if (!self) {
 		WARNING(__FUNCTION__ "(), lost myself!\n");
 		return;
 	}
+
+	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
 
 	/* We probably don't need to make any more queries */
 	iriap_close(self->iriap);
@@ -539,7 +543,7 @@ static int irda_open_lsap(struct irda_sock *self, int pid)
  */
 static int irda_find_lsap_sel(struct irda_sock *self, char *name)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "(), name=%s\n", name);
+	IRDA_DEBUG(2, __FUNCTION__ "(%p, %s)\n", self, name);
 
 	ASSERT(self != NULL, return -1;);
 
@@ -550,6 +554,8 @@ static int irda_find_lsap_sel(struct irda_sock *self, char *name)
 
 	self->iriap = iriap_open(LSAP_ANY, IAS_CLIENT, self,
 				 irda_getvalue_confirm);
+	if(self->iriap == NULL)
+		return -ENOMEM;
 
 	/* Treat unexpected signals as disconnect */
 	self->errno = -EHOSTUNREACH;
@@ -777,10 +783,10 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct irda_sock *self;
 	int err;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
-
 	self = sk->protinfo.irda;
 	ASSERT(self != NULL, return -1;);
+
+	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
 
 	if (addr_len != sizeof(struct sockaddr_irda))
 		return -EINVAL;
@@ -942,10 +948,10 @@ static int irda_connect(struct socket *sock, struct sockaddr *uaddr,
 	struct irda_sock *self;
 	int err;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
-
 	self = sk->protinfo.irda;
 	
+	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
+
 	/* Don't allow connect for Ultra sockets */
 	if ((sk->type == SOCK_DGRAM) && (sk->protocol == IRDAPROTO_ULTRA))
 		return -ESOCKTNOSUPPORT;
@@ -1063,22 +1069,29 @@ static int irda_create(struct socket *sock, int protocol)
 		return -ESOCKTNOSUPPORT;
 	}
 
-	/* Allocate socket */
+	/* Allocate networking socket */
 	if ((sk = sk_alloc(PF_IRDA, GFP_ATOMIC, 1)) == NULL)
 		return -ENOMEM;
-	
+
+	/* Allocate IrDA socket */
 	self = kmalloc(sizeof(struct irda_sock), GFP_ATOMIC);
 	if (self == NULL) {
-		kfree (sk);
+		sk_free(sk);
 		return -ENOMEM;
 	}
 	memset(self, 0, sizeof(struct irda_sock));
 
+	IRDA_DEBUG(2, __FUNCTION__ "() : self is %p\n", self);
+
 	init_waitqueue_head(&self->query_wait);
 
-	self->sk = sk;
+	/* Initialise networking socket struct */ 
+	sock_init_data(sock, sk);	/* Note : set sk->refcnt to 1 */
+	sk->family = PF_IRDA;
+	sk->protocol = protocol;
+	/* Link networking socket and IrDA socket structs together */
 	sk->protinfo.irda = self;
-	sock_init_data(sock, sk);
+	self->sk = sk;
 
 	switch (sock->type) {
 	case SOCK_STREAM:
@@ -1110,8 +1123,6 @@ static int irda_create(struct socket *sock, int protocol)
 		return -ESOCKTNOSUPPORT;
 	}		
 
-	sk->protocol = protocol;
-
 	/* Register as a client with IrLMP */
 	self->ckey = irlmp_register_client(0, NULL, NULL, NULL);
 	self->mask = 0xffff;
@@ -1133,7 +1144,7 @@ static int irda_create(struct socket *sock, int protocol)
  */
 void irda_destroy_socket(struct irda_sock *self)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
 
 	ASSERT(self != NULL, return;);
 
@@ -1187,12 +1198,47 @@ static int irda_release(struct socket *sock)
 	sk->state       = TCP_CLOSE;
 	sk->shutdown   |= SEND_SHUTDOWN;
 	sk->state_change(sk);
-	sk->dead        = 1;
 
+	/* Destroy IrDA socket */
 	irda_destroy_socket(sk->protinfo.irda);
+	/* Prevent sock_def_destruct() to create havoc */
+	sk->protinfo.irda = NULL;
 
+	sock_orphan(sk);
         sock->sk   = NULL;      
-        sk->socket = NULL;      /* Not used, but we should do this. */
+
+	/* Purge queues (see sock_init_data()) */
+	skb_queue_purge(&sk->receive_queue);
+
+	/* Destroy networking socket if we are the last reference on it,
+	 * i.e. if(sk->refcnt == 0) -> sk_free(sk) */
+	sock_put(sk);
+
+	/* Notes on socket locking and deallocation... - Jean II
+	 * In theory we should put pairs of sock_hold() / sock_put() to
+	 * prevent the socket to be destroyed whenever there is an
+	 * outstanding request or outstanding incomming packet or event.
+	 *
+	 * 1) This may include IAS request, both in connect and getsockopt.
+	 * Unfortunately, the situation is a bit more messy than it looks,
+	 * because we close iriap and kfree(self) above.
+	 * 
+	 * 2) This may include selective discovery in getsockopt.
+	 * Same stuff as above, irlmp registration and self are gone.
+	 *
+	 * Probably 1 and 2 may not matter, because it's all triggered
+	 * by a process and the socket layer already prevent the
+	 * socket to go away while a process is holding it, through
+	 * sockfd_put() and fput()...
+	 *
+	 * 3) This may include deferred TSAP closure. In particular,
+	 * we may receive a late irda_disconnect_indication()
+	 * Fortunately, (tsap_cb *)->close_pend should protect us
+	 * from that.
+	 *
+	 * I did some testing on SMP, and it looks solid. And the socket
+	 * memory leak is now gone... - Jean II
+	 */
 
         return 0;
 }
@@ -1585,10 +1631,10 @@ static int irda_shutdown(struct socket *sock, int how)
 	struct irda_sock *self;
 	struct sock *sk = sock->sk;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
-
 	self = sk->protinfo.irda;
 	ASSERT(self != NULL, return -1;);
+
+	IRDA_DEBUG(1, __FUNCTION__ "(%p)\n", self);
 
 	sk->state       = TCP_CLOSE;
 	sk->shutdown   |= SEND_SHUTDOWN;
@@ -1762,6 +1808,8 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 	
 	self = sk->protinfo.irda;
 	ASSERT(self != NULL, return -1;);
+
+	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
 
 	if (level != SOL_IRLMP)
 		return -ENOPROTOOPT;
@@ -2028,6 +2076,8 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 	int offset, total;
 
 	self = sk->protinfo.irda;
+
+	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
 
 	if (level != SOL_IRLMP)
 		return -ENOPROTOOPT;

@@ -94,7 +94,8 @@ void irlap_cleanup(void)
  *    Initialize IrLAP layer
  *
  */
-struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos)
+struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
+			    char *	hw_name)
 {
 	struct irlap_cb *self;
 
@@ -111,6 +112,13 @@ struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos)
 	/* Make a binding between the layers */
 	self->netdev = dev;
 	self->qos_dev = qos;
+	/* Copy hardware name */
+	if(hw_name != NULL) {
+		strncpy(self->hw_name, hw_name, 2*IFNAMSIZ);
+		self->hw_name[2*IFNAMSIZ] = '\0';
+	} else {
+		self->hw_name[0] = '\0';
+	}
 
 	/* FIXME: should we get our own field? */
 	dev->atalk_ptr = self;
@@ -1101,6 +1109,10 @@ int irlap_proc_read(char *buf, char **start, off_t offset, int len)
 		len += sprintf(buf+len, "state: %s\n", 
 			       irlap_state[self->state]);
 		
+		len += sprintf(buf+len, "  device name: %s, ",
+			       (self->netdev) ? self->netdev->name : "bug");
+		len += sprintf(buf+len, "hardware name: %s\n", self->hw_name);
+
 		len += sprintf(buf+len, "  caddr: %#02x, ", self->caddr);
 		len += sprintf(buf+len, "saddr: %#08x, ", self->saddr);
 		len += sprintf(buf+len, "daddr: %#08x\n", self->daddr);

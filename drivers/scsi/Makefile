@@ -139,7 +139,7 @@ obj-$(CONFIG_BLK_DEV_SD)	+= sd_mod.o
 obj-$(CONFIG_BLK_DEV_SR)	+= sr_mod.o
 obj-$(CONFIG_CHR_DEV_SG)	+= sg.o
 
-list-multi	:= scsi_mod.o sd_mod.o sr_mod.o initio.o a100u2w.o
+list-multi	:= scsi_mod.o sd_mod.o sr_mod.o initio.o a100u2w.o cpqfc.o
 scsi_mod-objs	:= scsi.o hosts.o scsi_ioctl.o constants.o \
 			scsicam.o scsi_proc.o scsi_error.o \
 			scsi_obsolete.o scsi_queue.o scsi_lib.o \
@@ -149,6 +149,7 @@ sd_mod-objs	:= sd.o
 sr_mod-objs	:= sr.o sr_ioctl.o sr_vendor.o
 initio-objs	:= ini9100u.o i91uscsi.o
 a100u2w-objs	:= inia100.o i60uscsi.o
+cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o cpqfcTSworker.o cpqfcTStrigger.o
 
 include $(TOPDIR)/Rules.make
 
@@ -167,6 +168,9 @@ initio.o: $(initio-objs)
 
 a100u2w.o: $(a100u2w-objs)
 	$(LD) -r -o $@ $(a100u2w-objs)
+
+cpqfc.o: $(cpqfc-objs)
+	$(LD) -r -o $@ $(cpqfc-objs)
 
 53c8xx_d.h: 53c7,8xx.scr script_asm.pl
 	ln -sf 53c7,8xx.scr fake8.c
@@ -212,8 +216,3 @@ sim710.o : sim710_d.h
 	echo "/* WARNING: GENERATED FILE (from $<), DO NOT MODIFY */" > $@
 	echo "#define MEM_MAPPED" >> $@
 	cat $< >> $@
-
-cpqfc.o: cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o cpqfcTSworker.o \
-	cpqfcTStrigger.o
-	$(LD) -r -o cpqfc.o cpqfcTSinit.o cpqfcTScontrol.o \
-	cpqfcTSi2c.o cpqfcTSworker.o cpqfcTStrigger.o

@@ -1,7 +1,7 @@
 /*
- * $Id: serport.c,v 1.4 2000/05/29 10:54:53 vojtech Exp $
+ * $Id: serport.c,v 1.7 2001/05/25 19:00:27 jdeneux Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
  *  Sponsored by SuSE
  */
@@ -148,7 +148,11 @@ static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, u
 	DECLARE_WAITQUEUE(wait, current);
 	char name[32];
 
+#ifdef CONFIG_DEVFS_FS
 	sprintf(name, tty->driver.name, MINOR(tty->device) - tty->driver.minor_start);
+#else
+	sprintf(name, "%s%d", tty->driver.name, MINOR(tty->device) - tty->driver.minor_start);
+#endif
 
 	serio_register_port(&serport->serio);
 
@@ -218,3 +222,5 @@ void __exit serport_exit(void)
 
 module_init(serport_init);
 module_exit(serport_exit);
+
+MODULE_LICENSE("GPL");

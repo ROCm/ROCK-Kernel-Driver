@@ -37,6 +37,7 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - ACPI Bus Manager");
+MODULE_LICENSE("GPL");
 
 
 #ifdef ACPI_DEBUG

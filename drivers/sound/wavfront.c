@@ -86,22 +86,6 @@
 
 #include <linux/wavefront.h>
 
-/*
- *	This sucks, hopefully it'll get standardised
- */
- 
-#if defined(__alpha__)
-#ifdef CONFIG_SMP
-#define LOOPS_PER_TICK cpu_data[smp_processor_id()].loops_per_jiffy
-#else
-#define LOOPS_PER_TICK	loops_per_jiffy
-#endif
-#endif
-
-#if defined(__i386__)
-#define LOOPS_PER_TICK current_cpu_data.loops_per_jiffy
-#endif
- 
 #define _MIDI_SYNTH_C_
 #define MIDI_SYNTH_NAME	"WaveFront MIDI"
 #define MIDI_SYNTH_CAPS	SYNTH_CAP_INPUT
@@ -191,21 +175,17 @@ char *ospath = "/etc/sound/wavefront.os"; /* where to find a processed
 					     version of the WaveFront OS
 					  */
 
-int wait_usecs = 150; /* This magic number seems to give pretty optimal
-			 throughput based on my limited experimentation.
-			 If you want to play around with it and find a better
-			 value, be my guest. Remember, the idea is to
-			 get a number that causes us to just busy wait
-			 for as many WaveFront commands as possible, without
-			 coming up with a number so large that we hog the
-			 whole CPU.
+int wait_polls = 2000;	/* This is a number of tries we poll the status register
+			   before resorting to sleeping. WaveFront being an ISA
+			   card each poll takes about 1.2us. So before going to
+			   sleep we wait up to 2.4ms in a loop.
+			*/
 
-			 Specifically, with this number, out of about 134,000
-			 status waits, only about 250 result in a sleep.
-		      */
+int sleep_length = HZ/100; /* This says how long we're going to sleep between polls.
+			      10ms sounds reasonable for fast response.
+			   */
 
-int sleep_interval = 100;     /* HZ/sleep_interval seconds per sleep */
-int sleep_tries = 50;       /* number of times we'll try to sleep */
+int sleep_tries = 50;       /* Wait for status 0.5 seconds total. */
 
 int reset_time = 2;        /* hundreths of a second we wait after a HW reset for
 			      the expected interrupt.
@@ -222,8 +202,8 @@ int osrun_time = 10;       /* time in seconds we wait for the OS to
 MODULE_PARM(wf_raw,"i");
 MODULE_PARM(fx_raw,"i");
 MODULE_PARM(debug_default,"i");
-MODULE_PARM(wait_usecs,"i");
-MODULE_PARM(sleep_interval,"i");
+MODULE_PARM(wait_polls,"i");
+MODULE_PARM(sleep_length,"i");
 MODULE_PARM(sleep_tries,"i");
 MODULE_PARM(ospath,"s");
 MODULE_PARM(reset_time,"i");
@@ -437,54 +417,30 @@ wavefront_status (void)
 }
 
 static int
-wavefront_sleep (int limit)
-
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(limit);
-
-	return signal_pending(current);
-}
-
-static int
 wavefront_wait (int mask)
 
 {
-	int             i;
-	static int      short_loop_cnt = 0;
+	int i;
 
-	/* Compute the loop count that lets us sleep for about the
-	   right amount of time, cache issues, bus speeds and all
-	   other issues being unequal but largely irrelevant.
-	*/
-
-	if (short_loop_cnt == 0) {
-		short_loop_cnt = wait_usecs *
-			(LOOPS_PER_TICK / (1000000 / HZ));
-	}
-
-	/* Spin for a short period of time, because >99% of all
-	   requests to the WaveFront can be serviced inline like this.
-	*/
-
-	for (i = 0; i < short_loop_cnt; i++) {
-		if (wavefront_status() & mask) {
+	for (i = 0; i < wait_polls; i++)
+		if (wavefront_status() & mask)
 			return 1;
-		}
-	}
 
 	for (i = 0; i < sleep_tries; i++) {
 
 		if (wavefront_status() & mask) {
+			set_current_state(TASK_RUNNING);
 			return 1;
 		}
 
-		if (wavefront_sleep (HZ/sleep_interval)) {
-			return (0);
-		}
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(sleep_length);
+		if (signal_pending(current))
+			break;
 	}
 
-	return (0);
+	set_current_state(TASK_RUNNING);
+	return 0;
 }
 
 static int

@@ -478,9 +478,9 @@ irda_irnet_create(irnet_socket *	self)
   self->ttp_connect = 0;	/* Not connecting yet */
   self->rname[0] = '\0';	/* May be set via control channel */
   self->rdaddr = DEV_ADDR_ANY;	/* May be set via control channel */
-  self->rsaddr = 0x0;		/* May be set via control channel */
+  self->rsaddr = DEV_ADDR_ANY;	/* May be set via control channel */
   self->daddr = DEV_ADDR_ANY;	/* Until we get connected */
-  self->saddr = 0x0;		/* Until we get connected */
+  self->saddr = DEV_ADDR_ANY;	/* Until we get connected */
   self->max_sdu_size_rx = TTP_SAR_UNBOUND;
 
   /* Register as a client with IrLMP */

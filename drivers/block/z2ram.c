@@ -376,6 +376,9 @@ z2_init( void )
 }
 
 #if defined(MODULE)
+
+MODULE_LICENSE("GPL");
+
 int
 init_module( void )
 {

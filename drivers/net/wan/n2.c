@@ -586,5 +586,6 @@ module_exit(n2_cleanup);
 
 MODULE_AUTHOR("Krzysztof Halasa <khc@pm.waw.pl>");
 MODULE_DESCRIPTION("RISCom/N2 serial port driver");
+MODULE_LICENSE("GPL");
 MODULE_PARM(hw, "s");		/* hw=io,irq,ram,ports:io,irq,... */
 EXPORT_NO_SYMBOLS;

@@ -368,3 +368,5 @@ static int q40con_updatevar(int con, struct fb_info *info)
 static void q40con_blank(int blank, struct fb_info *info)
 {
 }
+
+MODULE_LICENSE("GPL");

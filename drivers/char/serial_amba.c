@@ -2027,3 +2027,6 @@ void __init ambauart_console_init(void)
 }
 
 #endif /* CONFIG_SERIAL_AMBA_CONSOLE */
+
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

@@ -403,3 +403,5 @@ efi_rtc_exit(void)
 
 module_init(efi_rtc_init);
 module_exit(efi_rtc_exit);
+
+MODULE_LICENSE("GPL");

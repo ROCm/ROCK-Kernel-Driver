@@ -25,12 +25,8 @@ if [ "$CONFIG_PARPORT" != "n" ]; then
          bool '    SuperIO chipset support (EXPERIMENTAL)' CONFIG_PARPORT_PC_SUPERIO
       fi
    fi
-   if [ "$CONFIG_PARPORT_PC" = "y" ]; then
-      # Don't bother with this if parport_pc is a module; it only affects
-      # the presence or not of some __init's, which are no-ops for modules.
-      if [ "$CONFIG_HOTPLUG" = "y" -a "$CONFIG_PCMCIA" != "n" ]; then
-	 bool '    Support for PCMCIA management for PC-style ports' CONFIG_PARPORT_PC_PCMCIA
-      fi
+   if [ "$CONFIG_HOTPLUG" = "y" -a "$CONFIG_PCMCIA" != "n" ]; then
+	 dep_tristate '    Support for PCMCIA management for PC-style ports' CONFIG_PARPORT_PC_PCMCIA $CONFIG_PCMCIA
    fi
    if [ "$CONFIG_ARM" = "y" ]; then
       dep_tristate '  Archimedes hardware' CONFIG_PARPORT_ARC $CONFIG_PARPORT

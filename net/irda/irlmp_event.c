@@ -150,6 +150,10 @@ void irlmp_discovery_timer_expired(void *data)
 {
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 	
+	/* We always cleanup the log (active & passive discovery) */ 
+	irlmp_do_expiry();
+
+	/* Active discovery is conditional */
 	if (sysctl_discovery)
 		irlmp_do_discovery(sysctl_discovery_slots);
 
@@ -205,10 +209,6 @@ static void irlmp_state_standby(struct lap_cb *self, IRLMP_EVENT event,
 		
 		irlap_discovery_request(self->irlap, &irlmp->discovery_cmd);
 		break;
-	case LM_LAP_DISCOVERY_CONFIRM:
- 		/* irlmp_next_station_state( LMP_READY); */
-		irlmp_discovery_confirm(irlmp->cachelog);
- 		break;
 	case LM_LAP_CONNECT_INDICATION:
 		/*  It's important to switch state first, to avoid IrLMP to 
 		 *  think that the link is free since IrLMP may then start
@@ -274,6 +274,12 @@ static void irlmp_state_u_connect(struct lap_cb *self, IRLMP_EVENT event,
 			irlmp_do_lsap_event(lsap, LM_LAP_CONNECT_CONFIRM, NULL);
 			lsap = (struct lsap_cb*) hashbin_get_next(self->lsaps);
 		}
+		/* Note : by the time we get there (LAP retries and co),
+		 * the lsaps may already have gone. This avoid getting stuck
+		 * forever in LAP_ACTIVE state - Jean II */
+		if (HASHBIN_GET_SIZE(self->lsaps) == 0) {
+			irlmp_start_idle_timer(self, LM_IDLE_TIMEOUT);
+		}
 		break;
 	case LM_LAP_CONNECT_REQUEST:
 		/* Already trying to connect */
@@ -287,6 +293,12 @@ static void irlmp_state_u_connect(struct lap_cb *self, IRLMP_EVENT event,
 		while (lsap != NULL) {
 			irlmp_do_lsap_event(lsap, LM_LAP_CONNECT_CONFIRM, NULL);
 			lsap = (struct lsap_cb*) hashbin_get_next(self->lsaps);
+		}
+		/* Note : by the time we get there (LAP retries and co),
+		 * the lsaps may already have gone. This avoid getting stuck
+		 * forever in LAP_ACTIVE state - Jean II */
+		if (HASHBIN_GET_SIZE(self->lsaps) == 0) {
+			irlmp_start_idle_timer(self, LM_IDLE_TIMEOUT);
 		}
 		break;
 	case LM_LAP_DISCONNECT_INDICATION:
@@ -375,9 +387,15 @@ static void irlmp_state_active(struct lap_cb *self, IRLMP_EVENT event,
 		 *  must be the one that tries to close IrLAP. It will be 
 		 *  removed later and moved to the list of unconnected LSAPs
 		 */
-		if (HASHBIN_GET_SIZE(self->lsaps) > 0)
-			irlmp_start_idle_timer(self, LM_IDLE_TIMEOUT);
-		else {
+		if (HASHBIN_GET_SIZE(self->lsaps) > 0) {
+			/* Make sure the timer has sensible value (the user
+			 * may have set it) - Jean II */
+			if(sysctl_lap_keepalive_time < 100)	/* 100ms */
+				sysctl_lap_keepalive_time = 100;
+			if(sysctl_lap_keepalive_time > 10000)	/* 10s */
+				sysctl_lap_keepalive_time = 10000;
+			irlmp_start_idle_timer(self, sysctl_lap_keepalive_time * HZ / 1000);
+		} else {
 			/* No more connections, so close IrLAP */
 
 			/* We don't want to change state just yet, because

@@ -838,3 +838,6 @@ static void lp_cleanup_module (void)
 __setup("lp=", lp_setup);
 module_init(lp_init_module);
 module_exit(lp_cleanup_module);
+
+MODULE_LICENSE("GPL");
+EXPORT_NO_SYMBOLS;

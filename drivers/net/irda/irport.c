@@ -774,6 +774,7 @@ int irport_net_open(struct net_device *dev)
 {
 	struct irport_cb *self;
 	int iobase;
+	char hwname[16];
 
 	IRDA_DEBUG(0, __FUNCTION__ "()\n");
 	
@@ -792,11 +793,14 @@ int irport_net_open(struct net_device *dev)
 	irport_start(self);
 
 
+	/* Give self a hardware name */
+	sprintf(hwname, "SIR @ 0x%03x", self->io.sir_base);
+
 	/* 
 	 * Open new IrLAP layer instance, now that everything should be
 	 * initialized properly 
 	 */
-	self->irlap = irlap_open(dev, &self->qos);
+	self->irlap = irlap_open(dev, &self->qos, hwname);
 
 	/* FIXME: change speed of dongle */
 	/* Ready to play! */

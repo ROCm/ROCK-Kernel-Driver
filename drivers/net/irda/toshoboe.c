@@ -510,6 +510,7 @@ static int
 toshoboe_net_open (struct net_device *dev)
 {
   struct toshoboe_cb *self;
+  char hwname[32];
 
   IRDA_DEBUG (4, __FUNCTION__ "()\n");
 
@@ -537,11 +538,13 @@ toshoboe_net_open (struct net_device *dev)
 
   /* Ready to play! */
   netif_start_queue(dev);  
+  /* Give self a hardware name */
+  sprintf(hwname, "Toshiba-FIR @ 0x%03x", self->base);
   /* 
    * Open new IrLAP layer instance, now that everything should be
    * initialized properly 
    */
-  self->irlap = irlap_open(dev, &self->qos);	
+  self->irlap = irlap_open(dev, &self->qos, hwname);	
 
   self->open = 1;
 	
