@@ -19,10 +19,6 @@
 #ifndef	__ISERIES_SETUP_H__
 #define	__ISERIES_SETUP_H__
 
-extern void iSeries_init_early(void);
-extern void iSeries_init(unsigned long r3, unsigned long ird_start,
-		unsigned long ird_end, unsigned long cline_start,
-		unsigned long cline_end);
 extern void iSeries_setup_arch(void);
 extern void iSeries_setup_residual(struct seq_file *m, int cpu_id);
 extern void iSeries_get_cpuinfo(struct seq_file *m);

@@ -56,6 +56,9 @@ struct machdep_calls {
 	void		(*flush_hash_range)(unsigned long context,
 					    unsigned long number,
 					    int local);
+	/* special for kexec, to be called in real mode, linar mapping is
+	 * destroyed as well */
+	void		(*htpe_clear_all)(void);
 
 	void		(*tce_build)(struct iommu_table * tbl,
 				     long index,
@@ -67,7 +70,9 @@ struct machdep_calls {
 				    long npages);
 	void		(*tce_flush)(struct iommu_table *tbl);
 
+	int		(*probe)(int platform);
 	void		(*setup_arch)(void);
+	void		(*init_early)(void);
 	/* Optional, may be NULL. */
 	void		(*get_cpuinfo)(struct seq_file *m);
 
@@ -76,9 +81,6 @@ struct machdep_calls {
 
 	/* PCI stuff */
 	void		(*pcibios_fixup)(void);
-
-	/* Optional, may be NULL. */
-	void		(*init)(void);
 
 	void		(*restart)(char *cmd);
 	void		(*power_off)(void);

@@ -252,30 +252,28 @@ extern inline void sync(void)
 
 static inline void disable_surveillance(void)
 {
-#ifndef CONFIG_PPC_ISERIES
+#ifdef CONFIG_PPC_PSERIES
 	/* Since this can't be a module, args should end up below 4GB. */
 	static struct rtas_args args;
 
-	if (systemcfg->platform & PLATFORM_PSERIES) {
-		/*
-		 * At this point we have got all the cpus we can into
-		 * xmon, so there is hopefully no other cpu calling RTAS
-		 * at the moment, even though we don't take rtas.lock.
-		 * If we did try to take rtas.lock there would be a
-		 * real possibility of deadlock.
-		 */
-		args.token = rtas_token("set-indicator");
-		if (args.token == RTAS_UNKNOWN_SERVICE)
-			return;
-		args.nargs = 3;
-		args.nret = 1;
-		args.rets = &args.args[3];
-		args.args[0] = SURVEILLANCE_TOKEN;
-		args.args[1] = 0;
-		args.args[2] = 0;
-		enter_rtas(__pa(&args));
-	}
-#endif
+	/*
+	 * At this point we have got all the cpus we can into
+	 * xmon, so there is hopefully no other cpu calling RTAS
+	 * at the moment, even though we don't take rtas.lock.
+	 * If we did try to take rtas.lock there would be a
+	 * real possibility of deadlock.
+	 */
+	args.token = rtas_token("set-indicator");
+	if (args.token == RTAS_UNKNOWN_SERVICE)
+		return;
+	args.nargs = 3;
+	args.nret = 1;
+	args.rets = &args.args[3];
+	args.args[0] = SURVEILLANCE_TOKEN;
+	args.args[1] = 0;
+	args.args[2] = 0;
+	enter_rtas(__pa(&args));
+#endif /* CONFIG_PPC_PSERIES */
 }
 
 #ifdef CONFIG_SMP

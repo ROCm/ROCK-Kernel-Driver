@@ -1,5 +1,5 @@
 /*
- * pSeries hashtable management.
+ * native hashtable management.
  *
  * SMP scalability work:
  *    Copyright (C) 2001 Anton Blanchard <anton@au.ibm.com>, IBM
@@ -25,7 +25,9 @@
 
 #define HPTE_LOCK_BIT 3
 
-static inline void pSeries_lock_hpte(HPTE *hptep)
+static spinlock_t native_tlbie_lock = SPIN_LOCK_UNLOCKED;
+
+static inline void native_lock_hpte(HPTE *hptep)
 {
 	unsigned long *word = &hptep->dw0.dword0;
 
@@ -37,7 +39,7 @@ static inline void pSeries_lock_hpte(HPTE *hptep)
 	}
 }
 
-static inline void pSeries_unlock_hpte(HPTE *hptep)
+static inline void native_unlock_hpte(HPTE *hptep)
 {
 	unsigned long *word = &hptep->dw0.dword0;
 
@@ -45,11 +47,9 @@ static inline void pSeries_unlock_hpte(HPTE *hptep)
 	clear_bit(HPTE_LOCK_BIT, word);
 }
 
-static spinlock_t pSeries_tlbie_lock = SPIN_LOCK_UNLOCKED;
-
-long pSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
-			 unsigned long prpn, int secondary,
-			 unsigned long hpteflags, int bolted, int large)
+long native_hpte_insert(unsigned long hpte_group, unsigned long va,
+			unsigned long prpn, int secondary,
+			unsigned long hpteflags, int bolted, int large)
 {
 	unsigned long arpn = physRpn_to_absRpn(prpn);
 	HPTE *hptep = htab_data.htab + hpte_group;
@@ -62,11 +62,11 @@ long pSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
 
 		if (!dw0.v) {
 			/* retry with lock held */
-			pSeries_lock_hpte(hptep);
+			native_lock_hpte(hptep);
 			dw0 = hptep->dw0.dw0;
 			if (!dw0.v)
 				break;
-			pSeries_unlock_hpte(hptep);
+			native_unlock_hpte(hptep);
 		}
 
 		hptep++;
@@ -106,7 +106,7 @@ long pSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
 	return i | (secondary << 3);
 }
 
-static long pSeries_hpte_remove(unsigned long hpte_group)
+static long native_hpte_remove(unsigned long hpte_group)
 {
 	HPTE *hptep;
 	Hpte_dword0 dw0;
@@ -122,11 +122,11 @@ static long pSeries_hpte_remove(unsigned long hpte_group)
 
 		if (dw0.v && !dw0.bolted) {
 			/* retry with lock held */
-			pSeries_lock_hpte(hptep);
+			native_lock_hpte(hptep);
 			dw0 = hptep->dw0.dw0;
 			if (dw0.v && !dw0.bolted)
 				break;
-			pSeries_unlock_hpte(hptep);
+			native_unlock_hpte(hptep);
 		}
 
 		slot_offset++;
@@ -161,7 +161,7 @@ static inline void set_pp_bit(unsigned long pp, HPTE *addr)
  * Only works on small pages. Yes its ugly to have to check each slot in
  * the group but we only use this during bootup.
  */
-static long pSeries_hpte_find(unsigned long vpn)
+static long native_hpte_find(unsigned long vpn)
 {
 	HPTE *hptep;
 	unsigned long hash;
@@ -192,8 +192,8 @@ static long pSeries_hpte_find(unsigned long vpn)
 	return -1;
 }
 
-static long pSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
-				  unsigned long va, int large, int local)
+static long native_hpte_updatepp(unsigned long slot, unsigned long newpp,
+				 unsigned long va, int large, int local)
 {
 	HPTE *hptep = htab_data.htab + slot;
 	Hpte_dword0 dw0;
@@ -203,17 +203,17 @@ static long pSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	if (large)
 		avpn &= ~0x1UL;
 
-	pSeries_lock_hpte(hptep);
+	native_lock_hpte(hptep);
 
 	dw0 = hptep->dw0.dw0;
 
 	/* Even if we miss, we need to invalidate the TLB */
 	if ((dw0.avpn != avpn) || !dw0.v) {
-		pSeries_unlock_hpte(hptep);
+		native_unlock_hpte(hptep);
 		ret = -1;
 	} else {
 		set_pp_bit(newpp, hptep);
-		pSeries_unlock_hpte(hptep);
+		native_unlock_hpte(hptep);
 	}
 
 	/* Ensure it is out of the tlb too */
@@ -223,10 +223,10 @@ static long pSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 		int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
 
 		if (lock_tlbie)
-			spin_lock(&pSeries_tlbie_lock);
+			spin_lock(&native_tlbie_lock);
 		tlbie(va, large);
 		if (lock_tlbie)
-			spin_unlock(&pSeries_tlbie_lock);
+			spin_unlock(&native_tlbie_lock);
 	}
 
 	return ret;
@@ -240,7 +240,7 @@ static long pSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
  *
  * No need to lock here because we should be the only user.
  */
-static void pSeries_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
+static void native_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 {
 	unsigned long vsid, va, vpn, flags;
 	long slot;
@@ -251,7 +251,7 @@ static void pSeries_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 	va = (vsid << 28) | (ea & 0x0fffffff);
 	vpn = va >> PAGE_SHIFT;
 
-	slot = pSeries_hpte_find(vpn);
+	slot = native_hpte_find(vpn);
 	if (slot == -1)
 		panic("could not find page to bolt\n");
 	hptep = htab_data.htab + slot;
@@ -260,13 +260,13 @@ static void pSeries_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 
 	/* Ensure it is out of the tlb too */
 	if (lock_tlbie)
-		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
+		spin_lock_irqsave(&native_tlbie_lock, flags);
 	tlbie(va, 0);
 	if (lock_tlbie)
-		spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
+		spin_unlock_irqrestore(&native_tlbie_lock, flags);
 }
 
-static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
+static void native_hpte_invalidate(unsigned long slot, unsigned long va,
 				    int large, int local)
 {
 	HPTE *hptep = htab_data.htab + slot;
@@ -279,13 +279,13 @@ static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
 		avpn &= ~0x1UL;
 
 	local_irq_save(flags);
-	pSeries_lock_hpte(hptep);
+	native_lock_hpte(hptep);
 
 	dw0 = hptep->dw0.dw0;
 
 	/* Even if we miss, we need to invalidate the TLB */
 	if ((dw0.avpn != avpn) || !dw0.v) {
-		pSeries_unlock_hpte(hptep);
+		native_unlock_hpte(hptep);
 	} else {
 		/* Invalidate the hpte. NOTE: this also unlocks it */
 		hptep->dw0.dword0 = 0;
@@ -296,16 +296,16 @@ static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
 		tlbiel(va);
 	} else {
 		if (lock_tlbie)
-			spin_lock(&pSeries_tlbie_lock);
+			spin_lock(&native_tlbie_lock);
 		tlbie(va, large);
 		if (lock_tlbie)
-			spin_unlock(&pSeries_tlbie_lock);
+			spin_unlock(&native_tlbie_lock);
 	}
 	local_irq_restore(flags);
 }
 
-static void pSeries_flush_hash_range(unsigned long context,
-				     unsigned long number, int local)
+static void native_flush_hash_range(unsigned long context,
+				    unsigned long number, int local)
 {
 	unsigned long vsid, vpn, va, hash, secondary, slot, flags, avpn;
 	int i, j;
@@ -345,13 +345,13 @@ static void pSeries_flush_hash_range(unsigned long context,
 		if (large)
 			avpn &= ~0x1UL;
 
-		pSeries_lock_hpte(hptep);
+		native_lock_hpte(hptep);
 
 		dw0 = hptep->dw0.dw0;
 
 		/* Even if we miss, we need to invalidate the TLB */
 		if ((dw0.avpn != avpn) || !dw0.v) {
-			pSeries_unlock_hpte(hptep);
+			native_unlock_hpte(hptep);
 		} else {
 			/* Invalidate the hpte. NOTE: this also unlocks it */
 			hptep->dw0.dword0 = 0;
@@ -371,7 +371,7 @@ static void pSeries_flush_hash_range(unsigned long context,
 		int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
 
 		if (lock_tlbie)
-			spin_lock(&pSeries_tlbie_lock);
+			spin_lock(&native_tlbie_lock);
 
 		asm volatile("ptesync":::"memory");
 
@@ -381,23 +381,26 @@ static void pSeries_flush_hash_range(unsigned long context,
 		asm volatile("eieio; tlbsync; ptesync":::"memory");
 
 		if (lock_tlbie)
-			spin_unlock(&pSeries_tlbie_lock);
+			spin_unlock(&native_tlbie_lock);
 	}
 
 	local_irq_restore(flags);
 }
 
-void hpte_init_pSeries(void)
+void hpte_init_native(void)
 {
+#ifdef CONFIG_PPC_PSERIES
 	struct device_node *root;
 	const char *model;
+#endif /* CONFIG_PPC_PSERIES */
 
-	ppc_md.hpte_invalidate	= pSeries_hpte_invalidate;
-	ppc_md.hpte_updatepp	= pSeries_hpte_updatepp;
-	ppc_md.hpte_updateboltedpp = pSeries_hpte_updateboltedpp;
-	ppc_md.hpte_insert	= pSeries_hpte_insert;
-	ppc_md.hpte_remove     	= pSeries_hpte_remove;
+	ppc_md.hpte_invalidate	= native_hpte_invalidate;
+	ppc_md.hpte_updatepp	= native_hpte_updatepp;
+	ppc_md.hpte_updateboltedpp = native_hpte_updateboltedpp;
+	ppc_md.hpte_insert	= native_hpte_insert;
+	ppc_md.hpte_remove     	= native_hpte_remove;
 
+#ifdef CONFIG_PPC_PSERIES
 	/* Disable TLB batching on nighthawk */
 	root = of_find_node_by_path("/");
 	if (root) {
@@ -408,6 +411,9 @@ void hpte_init_pSeries(void)
 		}
 		of_node_put(root);
 	}
+#endif /* CONFIG_PPC_PSERIES */
 
-	ppc_md.flush_hash_range = pSeries_flush_hash_range;
+	ppc_md.flush_hash_range = native_flush_hash_range;
+
+	htab_finish_init();
 }

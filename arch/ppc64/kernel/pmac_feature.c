@@ -44,9 +44,9 @@
 #undef DEBUG_FEATURE
 
 #ifdef DEBUG_FEATURE
-#define DBG(fmt,...) printk(KERN_DEBUG fmt)
+#define DBG(fmt...) printk(KERN_DEBUG fmt)
 #else
-#define DBG(fmt,...)
+#define DBG(fmt...)
 #endif
 
 /*

@@ -17,7 +17,7 @@ obj-$(CONFIG_PPC_OF) +=	of_device.o
 
 pci-obj-$(CONFIG_PPC_ISERIES)	+= iSeries_pci.o iSeries_pci_reset.o \
 				     iSeries_IoMmTable.o
-pci-obj-$(CONFIG_PPC_PSERIES)	+= pci_dn.o pci_dma_direct.o
+pci-obj-$(CONFIG_PPC_MULTIPLATFORM)	+= pci_dn.o pci_dma_direct.o
 
 obj-$(CONFIG_PCI)	+= pci.o pci_iommu.o $(pci-obj-y)
 
@@ -28,10 +28,11 @@ obj-$(CONFIG_PPC_ISERIES) += iSeries_irq.o \
 			     mf.o HvLpEvent.o iSeries_proc.o iSeries_htab.o \
 			     iSeries_iommu.o
 
+obj-$(CONFIG_PPC_MULTIPLATFORM) += nvram.o open_pic.o i8259.o prom_init.o prom.o
+
 obj-$(CONFIG_PPC_PSERIES) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o \
-			     eeh.o nvram.o pSeries_nvram.o rtasd.o ras.o \
-			     open_pic.o xics.o pSeries_htab.o rtas.o \
-			     chrp_setup.o i8259.o prom.o pSeries_iommu.o
+			     eeh.o pSeries_nvram.o rtasd.o ras.o \
+			     xics.o rtas.o pSeries_setup.o pSeries_iommu.o
 
 obj-$(CONFIG_PROC_FS)		+= proc_ppc64.o
 obj-$(CONFIG_RTAS_FLASH)	+= rtas_flash.o

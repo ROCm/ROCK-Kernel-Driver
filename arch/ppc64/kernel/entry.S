@@ -746,6 +746,10 @@ _STATIC(rtas_restore_regs)
 	mtlr    r0
         blr				/* return to caller */
 
+#endif /* CONFIG_PPC_PSERIES */
+
+#ifdef CONFIG_PPC_MULTIPLATFORM
+
 _GLOBAL(enter_prom)
 	mflr	r0
 	std	r0,16(r1)
@@ -777,11 +781,8 @@ _GLOBAL(enter_prom)
 	std	r11,_MSR(r1)
 
 	/* Get the PROM entrypoint */
-        bl      .reloc_offset
-	LOADADDR(r12,prom)
-	sub	r12,r12,r3
-	ld	r12,PROMENTRY(r12)
-	mtlr	r12
+	ld	r0,GPR4(r1)
+	mtlr	r0
 
 	/* Switch MSR to 32 bits mode
 	 */
@@ -834,4 +835,4 @@ _GLOBAL(enter_prom)
 	mtlr    r0
         blr
 	
-#endif	/* defined(CONFIG_PPC_PSERIES) */
+#endif	/* CONFIG_PPC_MULTIPLATFORM */

@@ -603,6 +603,7 @@ void __exit nvram_cleanup(void)
 }
 
 
+#ifdef CONFIG_PPC_PSERIES
 
 /* nvram_write_error_log
  *
@@ -727,6 +728,7 @@ int nvram_clear_error_log()
 	return 0;
 }
 
+#endif /* CONFIG_PPC_PSERIES */
 
 module_init(nvram_init);
 module_exit(nvram_cleanup);

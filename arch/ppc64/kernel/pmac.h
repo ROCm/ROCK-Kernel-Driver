@@ -29,4 +29,6 @@ extern void pmac_ide_init_hwif_ports(hw_regs_t *hw,
 
 extern void pmac_nvram_init(void);
 
+extern void pmac_iommu_alloc(void);
+
 #endif /* __PMAC_H__ */

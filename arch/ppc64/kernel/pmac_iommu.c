@@ -37,13 +37,14 @@
 #include <linux/vmalloc.h>
 #include <asm/io.h>
 #include <asm/prom.h>
-#include <asm/rtas.h>
 #include <asm/ppcdebug.h>
 #include <asm/iommu.h>
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 #include <asm/abs_addr.h>
 #include <asm/cacheflush.h>
+#include <asm/lmb.h>
+
 #include "pci.h"
 
 
@@ -76,8 +77,8 @@
 #define DARTMAP_RPNMASK 0x00ffffff
 
 /* Physical base address and size of the DART table */
-unsigned long dart_tablebase;
-unsigned long dart_tablesize;
+unsigned long dart_tablebase; /* exported to htab_initialize */
+static unsigned long dart_tablesize;
 
 /* Virtual base address of the DART table */
 static u32 *dart_vbase;
@@ -263,7 +264,6 @@ static int dart_init(struct device_node *dart_node)
 	return 0;
 }
 
-
 void iommu_setup_pmac(void)
 {
 	struct pci_dev *dev = NULL;
@@ -300,6 +300,22 @@ void iommu_setup_pmac(void)
 	}
 }
 
+void __init pmac_iommu_alloc(void)
+{
+	/* Only reserve DART space if machine has more than 2GB of RAM
+	 * or if requested with iommu=on on cmdline.
+	 */
+	if (lmb_end_of_DRAM() <= 0x80000000ull &&
+	    get_property(of_chosen, "linux,iommu-force-on", NULL) == NULL)
+		return;
 
+	/* 512 pages (2MB) is max DART tablesize. */
+	dart_tablesize = 1UL << 21;
+	/* 16MB (1 << 24) alignment. We allocate a full 16Mb chuck since we
+	 * will blow up an entire large page anyway in the kernel mapping
+	 */
+	dart_tablebase = (unsigned long)
+		abs_to_virt(lmb_alloc_base(1UL<<24, 1UL<<24, 0x80000000L));
 
-
+	printk(KERN_INFO "U3-DART allocated at: %lx\n", dart_tablebase);
+}

@@ -24,13 +24,46 @@
 #define LONG_LSW(X) (((unsigned long)X) & 0xffffffff)
 #define LONG_MSW(X) (((unsigned long)X) >> 32)
 
+/* Definitions used by the flattened device tree */
+#define OF_DT_HEADER		0xd00dfeed	/* 4: version, 4: total size */
+#define OF_DT_BEGIN_NODE	0x1		/* Start node: full name */
+#define OF_DT_END_NODE		0x2		/* End node */
+#define OF_DT_PROP		0x3		/* Property: name off, size, content */
+#define OF_DT_END		0x9
+
+#define OF_DT_VERSION		1
+
+/*
+ * This is what gets passed to the kernel by prom_init or kexec
+ *
+ * The dt struct contains the device tree structure, full pathes and
+ * property contents. The dt strings contain a separate block with just
+ * the strings for the property names, and is fully page aligned and
+ * self contained in a page, so that it can be kept around by the kernel,
+ * each property name appears only once in this page (cheap compression)
+ *
+ * the mem_rsvmap contains a map of reserved ranges of physical memory,
+ * passing it here instead of in the device-tree itself greatly simplifies
+ * the job of everybody. It's just a list of u64 pairs (base/size) that
+ * ends when size is 0
+ */
+struct boot_param_header
+{
+	u32	magic;			/* magic word OF_DT_HEADER */
+	u32	totalsize;		/* total size of DT block */
+	u32	off_dt_struct;		/* offset to structure */
+	u32	off_dt_strings;		/* offset to strings */
+	u32	off_mem_rsvmap;		/* offset to memory reserve map */
+	u32	version;		/* format version */
+	u32	last_comp_version;	/* last compatible version */
+};
+
+
+
 typedef u32 phandle;
 typedef u32 ihandle;
 typedef u32 phandle32;
 typedef u32 ihandle32;
-
-extern char *prom_display_paths[];
-extern unsigned int prom_num_displays;
 
 struct address_range {
 	unsigned long space;
@@ -136,6 +169,7 @@ struct property {
  */
 struct pci_controller;
 struct iommu_table;
+
 struct device_node {
 	char	*name;
 	char	*type;
@@ -171,6 +205,8 @@ struct device_node {
 	unsigned long _flags;
 };
 
+extern struct device_node *of_chosen;
+
 /* flag descriptions */
 #define OF_STALE   0 /* node is slated for deletion */
 #define OF_DYNAMIC 1 /* node and properties were allocated via kmalloc */
@@ -202,34 +238,6 @@ static void inline set_node_addr_link(struct device_node *dn, struct proc_dir_en
 	dn->addr_link = de;
 }
 
-typedef u32 prom_arg_t;
-
-struct prom_args {
-        u32 service;
-        u32 nargs;
-        u32 nret;
-        prom_arg_t args[10];
-        prom_arg_t *rets;     /* Pointer to return values in args[16]. */
-};
-
-struct prom_t {
-	unsigned long entry;
-	ihandle root;
-	ihandle chosen;
-	int cpu;
-	ihandle stdout;
-	ihandle disp_node;
-	struct prom_args args;
-	unsigned long version;
-	unsigned long encode_phys_size;
-	struct bi_record *bi_recs;
-};
-
-extern struct prom_t prom;
-extern char *of_stdout_device;
-
-extern int boot_cpuid;
-
 /* OBSOLETE: Old stlye node lookup */
 extern struct device_node *find_devices(const char *name);
 extern struct device_node *find_type_devices(const char *type);
@@ -246,6 +254,7 @@ extern struct device_node *of_find_node_by_type(struct device_node *from,
 extern struct device_node *of_find_compatible_node(struct device_node *from,
 	const char *type, const char *compat);
 extern struct device_node *of_find_node_by_path(const char *path);
+extern struct device_node *of_find_node_by_phandle(phandle handle);
 extern struct device_node *of_find_all_nodes(struct device_node *prev);
 extern struct device_node *of_get_parent(const struct device_node *node);
 extern struct device_node *of_get_next_child(const struct device_node *node,
