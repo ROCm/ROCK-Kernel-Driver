@@ -79,14 +79,12 @@ void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
  *	llc_sap_state_process - sends event to SAP state machine
  *	@sap: sap to use
  *	@skb: pointer to occurred event
- *	@pt: packet type, for datalink protos
  *
  *	After executing actions of the event, upper layer will be indicated
  *	if needed(on receiving an UI frame). sk can be null for the
  *	datalink_proto case.
  */
-void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb,
-			   struct packet_type *pt)
+void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
@@ -99,18 +97,14 @@ void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb,
 	ev->ind_cfm_flag = 0;
 	llc_sap_next_state(sap, skb);
 	if (ev->ind_cfm_flag == LLC_IND) {
-		if (sap->rcv_func)
-			sap->rcv_func(skb, skb->dev, pt);
+		if (skb->sk->state == TCP_LISTEN)
+			kfree_skb(skb);
 		else {
-			if (skb->sk->state == TCP_LISTEN)
-				kfree_skb(skb);
-			else {
-				llc_save_primitive(skb, ev->prim);
+			llc_save_primitive(skb, ev->prim);
 
-				/* queue skb to the user. */
-				if (sock_queue_rcv_skb(skb->sk, skb))
-					kfree_skb(skb);
-			}
+			/* queue skb to the user. */
+			if (sock_queue_rcv_skb(skb->sk, skb))
+				kfree_skb(skb);
 		}
 	} 
 	kfree_skb(skb);

@@ -613,7 +613,7 @@ unlock:
 	return len;
 }
 
-struct packet_type llc_packet_type = {
+static struct packet_type llc_packet_type = {
 	.type = __constant_htons(ETH_P_802_2),
 	.func = llc_rcv,
 	.data = (void *)1,
