@@ -9,6 +9,11 @@
  */
 
 #include <linux/config.h>
+#ifdef CONFIG_USB_DEBUG
+	#define DEBUG
+#else
+	#undef DEBUG
+#endif
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/module.h>
@@ -19,11 +24,6 @@
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/ioctl.h>
-#ifdef CONFIG_USB_DEBUG
-	#define DEBUG
-#else
-	#undef DEBUG
-#endif
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
 #include <linux/suspend.h>
@@ -40,7 +40,6 @@
 static spinlock_t hub_event_lock = SPIN_LOCK_UNLOCKED;
 
 static LIST_HEAD(hub_event_list);	/* List of hubs needing servicing */
-static LIST_HEAD(hub_list);		/* List of all hubs (for cleanup) */
 
 static DECLARE_WAIT_QUEUE_HEAD(khubd_wait);
 static pid_t khubd_pid = 0;			/* PID of khubd */
@@ -268,7 +267,7 @@ resubmit:
 	if ((status = usb_submit_urb (hub->urb, GFP_ATOMIC)) != 0
 			/* ENODEV means we raced disconnect() */
 			&& status != -ENODEV)
-		dev_err (&hub->intf->dev, "resubmit --> %d\n", urb->status);
+		dev_err (&hub->intf->dev, "resubmit --> %d\n", status);
 	if (status == 0)
 		hub->urb_active = 1;
 done:
@@ -646,7 +645,6 @@ static void hub_disconnect(struct usb_interface *intf)
 
 	/* Delete it and then reset it */
 	list_del_init(&hub->event_list);
-	list_del_init(&hub->hub_list);
 
 	spin_unlock_irqrestore(&hub_event_lock, flags);
 
@@ -695,7 +693,6 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	struct usb_device *hdev;
 	struct usb_hub *hub;
 	struct device *hub_dev;
-	unsigned long flags;
 
 	desc = intf->cur_altsetting;
 	hdev = interface_to_usbdev(intf);
@@ -711,23 +708,19 @@ descriptor_error:
 	}
 
 	/* Multiple endpoints? What kind of mutant ninja-hub is this? */
-	if (desc->desc.bNumEndpoints != 1) {
+	if (desc->desc.bNumEndpoints != 1)
 		goto descriptor_error;
-	}
 
 	endpoint = &desc->endpoint[0].desc;
 
 	/* Output endpoint? Curiouser and curiouser.. */
-	if (!(endpoint->bEndpointAddress & USB_DIR_IN)) {
+	if (!(endpoint->bEndpointAddress & USB_DIR_IN))
 		goto descriptor_error;
-	}
 
 	/* If it's not an interrupt endpoint, we'd better punt! */
 	if ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
-			!= USB_ENDPOINT_XFER_INT) {
+			!= USB_ENDPOINT_XFER_INT)
 		goto descriptor_error;
-		return -EIO;
-	}
 
 	/* We found a hub */
 	dev_info (hub_dev, "USB hub found\n");
@@ -744,12 +737,6 @@ descriptor_error:
 	hub->intf = intf;
 	init_MUTEX(&hub->khubd_sem);
 	INIT_WORK(&hub->leds, led_work, hub);
-
-	/* Record the new hub's existence */
-	spin_lock_irqsave(&hub_event_lock, flags);
-	INIT_LIST_HEAD(&hub->hub_list);
-	list_add(&hub->hub_list, &hub_list);
-	spin_unlock_irqrestore(&hub_event_lock, flags);
 
 	usb_set_intfdata (intf, hub);
 
@@ -1581,9 +1568,6 @@ static struct usb_driver hub_driver = {
 	.id_table =	hub_id_table,
 };
 
-/*
- * This should be a separate module.
- */
 int usb_hub_init(void)
 {
 	pid_t pid;

@@ -202,7 +202,6 @@ struct usb_hub {
 	int			error;		/* last reported error */
 	int			nerrors;	/* track consecutive errors */
 
-	struct list_head	hub_list;	/* all hubs */
 	struct list_head	event_list;	/* hubs w/data or errs ready */
 
 	struct usb_hub_descriptor *descriptor;	/* class descriptor */
