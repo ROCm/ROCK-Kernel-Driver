@@ -2711,7 +2711,7 @@ out:
 static int selinux_parse_skb_ipv6(struct sk_buff *skb, struct avc_audit_data *ad)
 {
 	u8 nexthdr;
-	int ret, offset = skb->nh.raw - skb->data;
+	int ret, offset;
 	struct ipv6hdr ipv6h;
 
 	offset = skb->nh.raw - skb->data;
