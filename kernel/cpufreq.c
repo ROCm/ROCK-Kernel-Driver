@@ -575,9 +575,19 @@ EXPORT_SYMBOL(cpufreq_unregister_notifier);
  *                              GOVERNORS                            *
  *********************************************************************/
 
-inline int cpufreq_driver_target(struct cpufreq_policy *policy,
-				 unsigned int target_freq,
-				 unsigned int relation)
+
+int __cpufreq_driver_target(struct cpufreq_policy *policy,
+			    unsigned int target_freq,
+			    unsigned int relation)
+{
+	return cpufreq_driver->target(policy, target_freq, relation);
+}
+EXPORT_SYMBOL_GPL(__cpufreq_driver_target);
+
+
+int cpufreq_driver_target(struct cpufreq_policy *policy,
+			  unsigned int target_freq,
+			  unsigned int relation)
 {
 	unsigned int ret;
 
@@ -587,7 +597,7 @@ inline int cpufreq_driver_target(struct cpufreq_policy *policy,
 
 	down(&policy->lock);
 
-	ret = cpufreq_driver->target(policy, target_freq, relation);
+	ret = __cpufreq_driver_target(policy, target_freq, relation);
 
 	up(&policy->lock);
 
@@ -606,35 +616,35 @@ int cpufreq_governor(unsigned int cpu, unsigned int event)
 	if (!policy)
 		return -EINVAL;
 
+	down(&policy->lock);
+
 	switch (policy->policy) {
 	case CPUFREQ_POLICY_POWERSAVE: 
 		if ((event == CPUFREQ_GOV_LIMITS) || (event == CPUFREQ_GOV_START)) {
-			down(&cpufreq_driver->policy[cpu].lock);
-			ret = cpufreq_driver->target(policy, policy->min, CPUFREQ_RELATION_L);
-			up(&cpufreq_driver->policy[cpu].lock);
+			ret = __cpufreq_driver_target(policy, policy->min, CPUFREQ_RELATION_L);
 		}
 		break;
 	case CPUFREQ_POLICY_PERFORMANCE:
 		if ((event == CPUFREQ_GOV_LIMITS) || (event == CPUFREQ_GOV_START)) {
-			down(&cpufreq_driver->policy[cpu].lock);
-			ret = cpufreq_driver->target(policy, policy->max, CPUFREQ_RELATION_H);
-			up(&cpufreq_driver->policy[cpu].lock);
+			ret = __cpufreq_driver_target(policy, policy->max, CPUFREQ_RELATION_H);
 		}
 		break;
 	case CPUFREQ_POLICY_GOVERNOR:
 		ret = -EINVAL;
-		if (!try_module_get(cpufreq_driver->policy[cpu].governor->owner))
+		if (!try_module_get(policy->governor->owner))
 			break;
-		ret = cpufreq_driver->policy[cpu].governor->governor(policy, event);
+		ret = policy->governor->governor(policy, event);
 		/* we keep one module reference alive for each CPU governed by this CPU */
 		if ((event != CPUFREQ_GOV_START) || ret)
-			module_put(cpufreq_driver->policy[cpu].governor->owner);
+			module_put(policy->governor->owner);
 		if ((event == CPUFREQ_GOV_STOP) && !ret)
-			module_put(cpufreq_driver->policy[cpu].governor->owner);
+			module_put(policy->governor->owner);
 		break;
 	default:
 		ret = -EINVAL;
 	}
+
+	up(&policy->lock);
 
 	cpufreq_cpu_put(policy);
 

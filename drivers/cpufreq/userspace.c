@@ -524,10 +524,10 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_min_freq[cpu] = policy->min;
 		cpu_max_freq[cpu] = policy->max;
 		if (policy->max < cpu_cur_freq[cpu])
-			cpufreq_driver_target(&current_policy[cpu], policy->max, 
+			__cpufreq_driver_target(&current_policy[cpu], policy->max, 
 			      CPUFREQ_RELATION_H);
 		else if (policy->min > cpu_cur_freq[cpu])
-			cpufreq_driver_target(&current_policy[cpu], policy->min, 
+			__cpufreq_driver_target(&current_policy[cpu], policy->min, 
 			      CPUFREQ_RELATION_L);
 		memcpy (&current_policy[cpu], policy, sizeof(struct cpufreq_policy));
 		up(&userspace_sem);
