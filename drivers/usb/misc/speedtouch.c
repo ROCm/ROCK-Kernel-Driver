@@ -326,10 +326,10 @@ static void udsl_complete_receive (struct urb *urb, struct pt_regs *regs)
 
 	dbg ("udsl_complete_receive entered (urb 0x%p, status %d)", urb, urb->status);
 
-	tasklet_schedule (&instance->receive_tasklet);
 	/* may not be in_interrupt() */
 	spin_lock_irqsave (&instance->completed_receivers_lock, flags);
 	list_add_tail (&rcv->list, &instance->completed_receivers);
+	tasklet_schedule (&instance->receive_tasklet);
 	spin_unlock_irqrestore (&instance->completed_receivers_lock, flags);
 }
 
@@ -489,11 +489,11 @@ static void udsl_complete_send (struct urb *urb, struct pt_regs *regs)
 
 	dbg ("udsl_complete_send entered (urb 0x%p, status %d)", urb, urb->status);
 
-	tasklet_schedule (&instance->send_tasklet);
 	/* may not be in_interrupt() */
 	spin_lock_irqsave (&instance->send_lock, flags);
 	list_add (&snd->list, &instance->spare_senders);
 	list_add (&snd->buffer->list, &instance->spare_buffers);
+	tasklet_schedule (&instance->send_tasklet);
 	spin_unlock_irqrestore (&instance->send_lock, flags);
 }
 
