@@ -36,7 +36,8 @@
 #define PORT_16850	12
 #define PORT_RSA	13
 #define PORT_NS16550A	14
-#define PORT_MAX_8250	14	/* max port ID */
+#define PORT_XSCALE	15
+#define PORT_MAX_8250	15	/* max port ID */
 
 /*
  * ARM specific type numbers.  These are not currently guaranteed
