@@ -82,7 +82,10 @@ int boot_cpuid;
  * called before console_init(), so we put "unregister" code
  * there to prevent schizophrenic console behavior later... ;-}
  *
- * By default, OFF; set it with a bootcommand arg of "srmcons".
+ * By default, OFF; set it with a bootcommand arg of "srmcons" or 
+ * "console=srm". The meaning of these two args is:
+ *     "srmcons"     - early callback prints 
+ *     "console=srm" - full callback based console, including early prints
  */
 int srmcons_output = 0;
 
@@ -464,57 +467,6 @@ page_is_ram(unsigned long pfn)
 #undef PFN_PHYS
 #undef PFN_MAX
 
-#if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_SRM)
-/*
- *      Manage the SRM callbacks as a "console".
- */
-static struct console srmcons;
-
-void __init register_srm_console(void)
-{
-        register_console(&srmcons);
-}
-
-void __init unregister_srm_console(void)
-{
-        unregister_console(&srmcons);
-}
-
-static void srm_console_write(struct console *co, const char *s,
-                                unsigned count)
-{
-	srm_printk(s);
-}
-
-static kdev_t srm_console_device(struct console *c)
-{
-	/* Huh? */
-        return mk_kdev(TTY_MAJOR, 64 + c->index);
-}
-
-static int __init srm_console_setup(struct console *co, char *options)
-{
-	return 1;
-}
-
-static struct console srmcons = {
-	.name		= "srm0",
-	.write		= srm_console_write,
-	.device		= srm_console_device,
-	.setup		= srm_console_setup,
-	.flags		= CON_PRINTBUFFER | CON_ENABLED, /* fake it out */
-	.index		= -1,
-};
-
-#else
-void __init register_srm_console(void)
-{
-}
-void __init unregister_srm_console(void)
-{
-}
-#endif
-
 void __init
 setup_arch(char **cmdline_p)
 {
@@ -577,7 +529,11 @@ setup_arch(char **cmdline_p)
 			continue;
 		}
 		if (strncmp(p, "srmcons", 7) == 0) {
-			srmcons_output = 1;
+			srmcons_output |= 1;
+			continue;
+		}
+		if (strncmp(p, "console=srm", 11) == 0) {
+			srmcons_output |= 2;
 			continue;
 		}
 		if (strncmp(p, "gartsize=", 9) == 0) {
@@ -593,6 +549,13 @@ setup_arch(char **cmdline_p)
 	/* If we want SRM console printk echoing early, do it now. */
 	if (alpha_using_srm && srmcons_output) {
 		register_srm_console();
+
+		/*
+		 * If "console=srm" was specified, clear the srmcons_output
+		 * flag now so that time.c won't unregister_srm_console
+		 */
+		if (srmcons_output & 2)
+			srmcons_output = 0;
 	}
 
 #ifdef CONFIG_MAGIC_SYSRQ

@@ -35,7 +35,12 @@ obj-y    += err_titan.o err_marvel.o
 
 obj-y	 += es1888.o smc37c669.o smc37c93x.o ns87312.o gct.o
 
+obj-y    += srmcons.o
+
 else
+
+# Misc support
+obj-$(CONFIG_ALPHA_SRM)		+= srmcons.o
 
 # Core logic support
 obj-$(CONFIG_ALPHA_APECS)	+= core_apecs.o

@@ -110,8 +110,15 @@ extern unsigned long wildfire_node_mem_size(int);
 extern unsigned long srm_hae;
 extern int boot_cpuid;
 extern int srmcons_output;
+
+/* srmcons.c */
+#if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_SRM)
 extern void register_srm_console(void);
 extern void unregister_srm_console(void);
+#else
+#define register_srm_console()
+#define unregister_srm_console()
+#endif
 
 /* smp.c */
 extern void setup_smp(void);
