@@ -2014,7 +2014,7 @@ int snd_emu10k1_fx8010_tram_setup(emu10k1_t *emu, u32 size)
 		}
 		size = 0x2000 << size_reg;
 	}
-	if (emu->fx8010.etram_pages.bytes == size)
+	if ((emu->fx8010.etram_pages.bytes / 2) == size)
 		return 0;
 	spin_lock_irq(&emu->emu_lock);
 	outl(HCFG_LOCKTANKCACHE_MASK | inl(emu->port + HCFG), emu->port + HCFG);
