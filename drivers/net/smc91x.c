@@ -588,23 +588,26 @@ static void smc_hardware_send_pkt(unsigned long data)
 	struct net_device *dev = (struct net_device *)data;
 	struct smc_local *lp = netdev_priv(dev);
 	unsigned long ioaddr = dev->base_addr;
-	struct sk_buff *skb = lp->pending_tx_skb;
+	struct sk_buff *skb;
 	unsigned int packet_no, len;
 	unsigned char *buf;
 
 	DBG(3, "%s: %s\n", dev->name, __FUNCTION__);
 
 	if (!smc_special_trylock(&lp->lock)) {
+		netif_stop_queue(dev);
 		tasklet_schedule(&lp->tx_task);
 		return;
 	}
 
+	skb = lp->pending_tx_skb;
 	lp->pending_tx_skb = NULL;
 	packet_no = SMC_GET_AR();
 	if (unlikely(packet_no & AR_FAILED)) {
 		printk("%s: Memory allocation failed.\n", dev->name);
 		lp->stats.tx_errors++;
 		lp->stats.tx_fifo_errors++;
+		smc_special_unlock(&lp->lock);
 		goto done;
 	}
 
@@ -645,15 +648,15 @@ static void smc_hardware_send_pkt(unsigned long data)
 	/* queue the packet for TX */
 	SMC_SET_MMU_CMD(MC_ENQUEUE);
 	SMC_ACK_INT(IM_TX_EMPTY_INT);
-	SMC_ENABLE_INT(IM_TX_INT | IM_TX_EMPTY_INT);
+	smc_special_unlock(&lp->lock);
 
 	dev->trans_start = jiffies;
 	lp->stats.tx_packets++;
 	lp->stats.tx_bytes += len;
 
-done:	smc_special_unlock(&lp->lock);
+	SMC_ENABLE_INT(IM_TX_INT | IM_TX_EMPTY_INT);
 
-	if (!THROTTLE_TX_PKTS)
+done:	if (!THROTTLE_TX_PKTS)
 		netif_wake_queue(dev);
 
 	dev_kfree_skb(skb);
@@ -1825,6 +1828,7 @@ static int __init smc_probe(struct net_device *dev, unsigned long ioaddr)
 	/* fill in some of the fields */
 	dev->base_addr = ioaddr;
 	lp->version = revision_register & 0xff;
+	spin_lock_init(&lp->lock);
 
 	/* Get the MAC address */
 	SMC_SELECT_BANK(1);
@@ -1880,7 +1884,6 @@ static int __init smc_probe(struct net_device *dev, unsigned long ioaddr)
 	dev->set_multicast_list = smc_set_multicast_list;
 	dev->ethtool_ops = &smc_ethtool_ops;
 
-	spin_lock_init(&lp->lock);
 	tasklet_init(&lp->tx_task, smc_hardware_send_pkt, (unsigned long)dev);
 	INIT_WORK(&lp->phy_configure, smc_phy_configure, dev);
 	lp->mii.phy_id_mask = 0x1f;
