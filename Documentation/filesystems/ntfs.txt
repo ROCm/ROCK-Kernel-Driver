@@ -30,7 +30,7 @@ fault-tolerance, encryption or journalling) and very limited, but safe, write
 support.
 
 For fault tolerance and raid support (i.e. volume and stripe sets), you can
-use the kernel's Software RAID / MD driver. See section "Using Software RAID
+use the kernel's Software RAID / MD driver.  See section "Using Software RAID
 with NTFS" for details.
 
 
@@ -64,14 +64,18 @@ Features
 	time find . -type f -exec md5sum "{}" \;
   run three times in sequence with each driver (after a reboot) on a 1.4GiB
   NTFS partition, showed the new driver to be 20% faster in total time elapsed
-  (from 9:43 minutes on average down to 7:53). The time spent in user space
+  (from 9:43 minutes on average down to 7:53).  The time spent in user space
   was unchanged but the time spent in the kernel was decreased by a factor of
   2.5 (from 85 CPU seconds down to 33).
-- The driver does not support short file names in general. For backwards
+- The driver does not support short file names in general.  For backwards
   compatibility, we implement access to files using their short file names if
-  they exist. The driver will not create short file names however, and a rename
-  will discard any existing short file name.
+  they exist.  The driver will not create short file names however, and a
+  rename will discard any existing short file name.
 - The new driver supports exporting of mounted NTFS volumes via NFS.
+- The new driver supports async io (aio).
+- The new driver supports fsync(2), fdatasync(2), and msync(2).
+- The new driver supports readv(2) and writev(2).
+- The new driver supports access time updates (including mtime and ctime).
 
 
 Supported mount options
@@ -273,6 +277,8 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.17:
+	- Fix bugs in mount time error code paths.
 2.1.16:
 	- Implement access time updates (including mtime and ctime).
 	- Implement fsync(2), fdatasync(2), and msync(2) system calls.
