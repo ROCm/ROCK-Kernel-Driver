@@ -43,15 +43,12 @@
 static unsigned int numscales=16, numvscales;
 static int minvid, maxvid;
 static int can_scale_voltage;
-static int can_scale_fsb;
 static int vrmrev;
 
 
 /* Module parameters */
-static int prefer_slow_fsb;
 static int dont_scale_voltage;
-static int dont_scale_fsb;
-static unsigned int current_fsb;
+static unsigned int fsb;
 
 #define __hlt()     __asm__ __volatile__("hlt": : :"memory")
 
@@ -231,14 +228,6 @@ static int __initdata c5m_eblcr[32] = {
 	145, /* 1111 -> 14.5x */
 };
 
-/* fsb values as defined in CPU */
-static unsigned int eblcr_fsb_table[] = { 66, 133, 100, -1 };
-/* fsb values to favour low fsb speed (lower power) */
-static unsigned int power_fsb_table[] = { 66, 100, 133, -1 };
-/* fsb values to favour high fsb speed (for e.g. if lowering CPU 
-   freq because of heat, but want to maintain highest performance possible) */
-static unsigned int perf_fsb_table[] = { 133, 100, 66, -1 };
-
 /* Voltage scales. Div by 1000 to get actual voltage. */
 static int __initdata vrm85scales[32] = {
 	1250, 1200, 1150, 1100, 1050, 1800, 1750, 1700,
@@ -265,14 +254,15 @@ static struct cpufreq_frequency_table *longhaul_table;
 
 static int longhaul_get_cpu_fsb (void)
 {
+	unsigned int eblcr_fsb_table[] = { 66, 133, 100, -1 };
 	unsigned long invalue=0,lo, hi;
 
-	if (current_fsb == 0) {
+	if (fsb == 0) {
 		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 		invalue = (lo & (1<<18|1<<19)) >>18;
 		return eblcr_fsb_table[invalue];
 	} else {
-		return current_fsb;
+		return fsb;
 	}
 }
 
@@ -294,12 +284,11 @@ static int longhaul_get_cpu_mult (void)
 /**
  * longhaul_set_cpu_frequency()
  * @clock_ratio_index : index of clock_ratio[] for new frequency
- * @newfsb: the new FSB
  *
  * Sets a new clock ratio, and -if applicable- a new Front Side Bus
  */
 
-static void longhaul_setstate (unsigned int clock_ratio_index, unsigned int newfsb)
+static void longhaul_setstate (unsigned int clock_ratio_index)
 {
 	unsigned long lo, hi;
 	unsigned int bits;
@@ -307,24 +296,21 @@ static void longhaul_setstate (unsigned int clock_ratio_index, unsigned int newf
 	int vidindex, i;
 	struct cpufreq_freqs freqs;
 	
-	if (!newfsb || (clock_ratio[clock_ratio_index] == -1))
+	if (clock_ratio[clock_ratio_index] == -1)
 		return;
 
-	if ((!can_scale_fsb) && (newfsb != current_fsb))
-		return;
-
-	if (((clock_ratio[clock_ratio_index] * newfsb * 100) > highest_speed) ||
-	    ((clock_ratio[clock_ratio_index] * newfsb * 100) < lowest_speed))
+	if (((clock_ratio[clock_ratio_index] * fsb * 100) > highest_speed) ||
+	    ((clock_ratio[clock_ratio_index] * fsb * 100) < lowest_speed))
 		return;
 
 	freqs.old = longhaul_get_cpu_mult() * longhaul_get_cpu_fsb() * 100;
-	freqs.new = clock_ratio[clock_ratio_index] * newfsb * 100;
+	freqs.new = clock_ratio[clock_ratio_index] * fsb * 100;
 	freqs.cpu = 0; /* longhaul.c is UP only driver */
 	
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-	dprintk (KERN_INFO "longhaul: New FSB:%d Mult(x10):%d\n",
-				newfsb, clock_ratio[clock_ratio_index]);
+	dprintk (KERN_INFO "longhaul: FSB:%d Mult(x10):%d\n",
+				fsb * 100, clock_ratio[clock_ratio_index]);
 
 	bits = clock_ratio_index;
 	/* "bits" contains the bitpattern of the new multiplier.
@@ -358,14 +344,9 @@ static void longhaul_setstate (unsigned int clock_ratio_index, unsigned int newf
 		lo |= revkey;
 
 		if (can_scale_voltage) {
-			if (can_scale_fsb==1) {
-				dprintk (KERN_INFO "longhaul: Voltage scaling + FSB scaling not done yet.\n");
-				goto bad_voltage;
-			} else {
-				/* PB: TODO fix this up */
-				vidindex = (((highest_speed-lowest_speed) / (newfsb/2)) -
-						((highest_speed-((clock_ratio[clock_ratio_index] * newfsb * 100)/1000)) / (newfsb/2)));
-			}
+			/* PB: TODO fix this up */
+			vidindex = (((highest_speed-lowest_speed) / (fsb/2)) -
+					((highest_speed-((clock_ratio[clock_ratio_index] * fsb * 100)/1000)) / (fsb/2)));
 			for (i=0;i<32;i++) {
 				dprintk (KERN_INFO "VID hunting. Looking for %d, found %d\n",
 						minvid+(vidindex*25), voltage_table[i]);
@@ -403,17 +384,6 @@ bad_voltage:
 		lo |= (1<<8);	/* EnableSoftBusRatio */
 		lo |= revkey;
 
-		/* Set FSB */
-		if (can_scale_fsb==1) {
-			lo &= ~(1<<28|1<<29);
-			switch (newfsb) {
-				case 66:	lo |= (1<<28|1<<29); /* 11 */
-							break;
-				case 100:	lo |= 1<<28;	/* 01 */
-							break;
-				case 133:	break;	/* 00*/
-			}
-		}
 		wrmsr (MSR_VIA_LONGHAUL, lo, hi);
 		__hlt();
 
@@ -431,14 +401,11 @@ bad_voltage:
 static int __init longhaul_get_ranges (void)
 {
 	unsigned long lo, hi, invalue;
-	unsigned int minmult=0, maxmult=0, minfsb=0, maxfsb=0;
+	unsigned int minmult=0, maxmult=0;
 	unsigned int multipliers[32]= {
 		50,30,40,100,55,35,45,95,90,70,80,60,120,75,85,65,
 		-1,110,120,-1,135,115,125,105,130,150,160,140,-1,155,-1,145 };
-	unsigned int fsb_table[4] = { 133, 100, -1, 66 };
-	unsigned int fsbcount = 1;
-	unsigned int i, j, k = 0;
-	static unsigned int *fsb_search_table;
+	unsigned int j, k = 0;
 
 	switch (longhaul) {
 	case 1:
@@ -446,7 +413,6 @@ static int __init longhaul_get_ranges (void)
 		   Assume min=3.0x & max = whatever we booted at. */
 		minmult = 30;
 		maxmult = longhaul_get_cpu_mult();
-		minfsb = maxfsb = current_fsb;
 		break;
 
 	case 2 ... 3:
@@ -465,55 +431,30 @@ static int __init longhaul_get_ranges (void)
 #else
 		minmult = 30; /* as per spec */
 #endif
-
-		if (can_scale_fsb==1) {
-			invalue = (hi & (1<<9|1<<10)) >> 9;
-			maxfsb = fsb_table[invalue];
-
-			invalue = (hi & (1<<25|1<<26)) >> 25;
-			minfsb = fsb_table[invalue];
-
-			dprintk (KERN_INFO "longhaul: Min FSB=%d Max FSB=%d\n",
-				minfsb, maxfsb);
-			fsbcount = 0;
-			for (i=0;i<4;i++) {
-				if((fsb_table[i] >= minfsb) && (fsb_table[i] <= maxfsb))
-					fsbcount++;
-			}
-		} else {
-			minfsb = maxfsb = current_fsb;
-		}
 		break;
 	}
 
-	highest_speed = maxmult * maxfsb * 100;
-	lowest_speed = minmult * minfsb * 100;
+	highest_speed = maxmult * fsb * 100;
+	lowest_speed = minmult * fsb * 100;
 	dprintk (KERN_INFO "longhaul: MinMult(x10)=%d MaxMult(x10)=%d\n",
 		 minmult, maxmult);
 	dprintk (KERN_INFO "longhaul: Lowestspeed=%d Highestspeed=%d\n",
 		 lowest_speed, highest_speed);
 
-	longhaul_table = kmalloc((numscales * fsbcount + 1) * sizeof(struct cpufreq_frequency_table), GFP_KERNEL);
+	longhaul_table = kmalloc((numscales + 1) * sizeof(struct cpufreq_frequency_table), GFP_KERNEL);
 	if(!longhaul_table)
 		return -ENOMEM;
 
-	if (prefer_slow_fsb) 
-		fsb_search_table = perf_fsb_table;   // yep, this is right: the last entry is preferred by cpufreq_frequency_table_* ...
-	else
-		fsb_search_table = power_fsb_table;
-
-	for (i=0; (i<4); i++) {
-		if ((fsb_search_table[i] > maxfsb) || (fsb_search_table[i] < minfsb) || (fsb_search_table[i] == -1))
+	for (j=0; (j<numscales); j++) {
+		if (clock_ratio[j] == -1)
 			continue;
-		for (j=0; (j<numscales); j++) {
-			if ((clock_ratio[j] > maxmult) || (clock_ratio[j] < minmult) || (clock_ratio[j] == -1))
-				continue;
-			longhaul_table[k].frequency= clock_ratio[j] * fsb_search_table[i] * 100;
-			longhaul_table[k].index	= (j << 8) | (i);
-			k++;
-		}
+		if (((unsigned int)clock_ratio[j] > maxmult) || ((unsigned int)clock_ratio[j] < minmult))
+			continue;
+		longhaul_table[k].frequency= clock_ratio[j] * fsb * 100;
+		longhaul_table[k].index	= (j << 8);
+		k++;
 	}
-	
+
 	longhaul_table[k].frequency = CPUFREQ_TABLE_END;
 	if (!k)
 		return -EINVAL;
@@ -568,16 +509,14 @@ static int longhaul_target (struct cpufreq_policy *policy,
 			    unsigned int relation)
 {
 	unsigned int    table_index = 0;
- 	unsigned int    new_fsb = 0;
  	unsigned int    new_clock_ratio = 0;
 
 	if (cpufreq_frequency_table_target(policy, longhaul_table, target_freq, relation, &table_index))
 		return -EINVAL;
 
 	new_clock_ratio = longhaul_table[table_index].index & 0xFF;
-	new_fsb = power_fsb_table[(longhaul_table[table_index].index & 0xFF00) >> 8];
  
-	longhaul_setstate(new_clock_ratio, new_fsb);
+	longhaul_setstate(new_clock_ratio);
 
 	return 0;
 }
@@ -628,9 +567,6 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		rdmsr (MSR_VIA_LONGHAUL, lo, hi);
 		if ((lo & (1<<0)) && (dont_scale_voltage==0))
 			longhaul_setup_voltagescaling (lo, hi);
-
-		if ((lo & (1<<1)) && (dont_scale_fsb==0) && (current_fsb==0))
-			can_scale_fsb = 1;
 	}
 
 	if (longhaul_get_ranges())
@@ -639,7 +575,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
  	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
  	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 
-        policy->cur = (unsigned int) (longhaul_get_cpu_fsb() * longhaul_get_cpu_mult() * 100);
+	policy->cur = (unsigned int) (longhaul_get_cpu_fsb() * longhaul_get_cpu_mult() * 100);
 
 	return cpufreq_frequency_table_cpuinfo(policy, longhaul_table);
 }
@@ -677,10 +613,7 @@ static void __exit longhaul_exit (void)
 	kfree(longhaul_table);
 }
 
-MODULE_PARM (dont_scale_fsb, "i");
 MODULE_PARM (dont_scale_voltage, "i");
-MODULE_PARM (current_fsb, "i");
-MODULE_PARM (prefer_slow_fsb, "i");
 
 MODULE_AUTHOR ("Dave Jones <davej@suse.de>");
 MODULE_DESCRIPTION ("Longhaul driver for VIA Cyrix processors.");
