@@ -130,6 +130,21 @@ acpi_ex_setup_region (
 	if (rgn_desc->region.length < (obj_desc->common_field.base_byte_offset
 			   + field_datum_byte_offset
 			   + obj_desc->common_field.access_byte_width)) {
+		if (acpi_gbl_enable_interpeter_slack) {
+			/*
+			 * Slack mode only:  We will go ahead and allow access to this
+			 * field if it is within the region length rounded up to the next
+			 * access width boundary.
+			 */
+			if (ACPI_ROUND_UP (rgn_desc->region.length,
+					   obj_desc->common_field.access_byte_width) >=
+				(obj_desc->common_field.base_byte_offset +
+				 obj_desc->common_field.access_byte_width +
+				 field_datum_byte_offset)) {
+				return_ACPI_STATUS (AE_OK);
+			}
+		}
+
 		if (rgn_desc->region.length < obj_desc->common_field.access_byte_width) {
 			/*
 			 * This is the case where the access_type (acc_word, etc.) is wider

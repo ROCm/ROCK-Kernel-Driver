@@ -189,13 +189,13 @@ acpi_os_get_physical_address (
 acpi_status
 acpi_os_install_interrupt_handler (
 	u32                             gsi,
-	OSD_HANDLER                     service_routine,
+	acpi_osd_handler                service_routine,
 	void                            *context);
 
 acpi_status
 acpi_os_remove_interrupt_handler (
-	u32                             interrupt_number,
-	OSD_HANDLER                     service_routine);
+	u32                             gsi,
+	acpi_osd_handler                service_routine);
 
 
 /*
@@ -209,7 +209,7 @@ acpi_os_get_thread_id (
 acpi_status
 acpi_os_queue_for_execution (
 	u32                             priority,
-	OSD_EXECUTION_CALLBACK  function,
+	acpi_osd_exec_callback          function,
 	void                            *context);
 
 void
@@ -262,25 +262,28 @@ acpi_os_write_memory (
 
 /*
  * Platform and hardware-independent PCI configuration space access
+ * Note: Can't use "Register" as a parameter, changed to "Reg" --
+ * certain compilers complain.
  */
 
 acpi_status
 acpi_os_read_pci_configuration (
 	struct acpi_pci_id              *pci_id,
-	u32                             register,
+	u32                             reg,
 	void                            *value,
 	u32                             width);
 
 acpi_status
 acpi_os_write_pci_configuration (
 	struct acpi_pci_id              *pci_id,
-	u32                             register,
+	u32                             reg,
 	acpi_integer                    value,
 	u32                             width);
 
 /*
  * Interim function needed for PCI IRQ routing
  */
+
 void
 acpi_os_derive_pci_id(
 	acpi_handle                     rhandle,

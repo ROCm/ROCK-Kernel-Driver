@@ -565,42 +565,42 @@ acpi_ex_do_logical_op (
 
 		case AML_LGREATER_OP:           /* LGreater (Operand0, Operand1) */
 
-			/* Check lengths first */
+			/* Lexicographic compare:  Scan the 1-to-1 data */
 
-			if (length0 > length1) {
-				return (TRUE);
-			}
-			else if (length0 < length1) {
-				return (FALSE);
-			}
-
-			/* Lengths equal, now scan the data */
-
-			for (i = 0; i < length0; i++) {
+			for (i = 0; (i < length0) && (i < length1); i++) {
 				if (ptr0[i] > ptr1[i]) {
 					return (TRUE);
 				}
 			}
+
+			/* Bytes match, now check lengths */
+
+			if (length0 > length1) {
+				return (TRUE);
+			}
+
+			/* Length0 <= Length1 */
+
 			return (FALSE);
 
 		case AML_LLESS_OP:              /* LLess (Operand0, Operand1) */
 
-			/* Check lengths first */
+			/* Lexicographic compare:  Scan the 1-to-1 data */
 
-			if (length0 < length1) {
-				return (TRUE);
-			}
-			else if (length0 > length1) {
-				return (FALSE);
-			}
-
-			/* Lengths equal, now scan the data */
-
-			for (i = 0; i < length0; i++) {
+			for (i = 0; (i < length0) && (i < length1); i++) {
 				if (ptr0[i] < ptr1[i]) {
 					return (TRUE);
 				}
 			}
+
+			/* Bytes match, now check lengths */
+
+			if (length0 < length1) {
+				return (TRUE);
+			}
+
+			/* Length0 >= Length1 */
+
 			return (FALSE);
 
 		default:

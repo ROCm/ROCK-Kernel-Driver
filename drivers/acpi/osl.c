@@ -51,7 +51,7 @@ ACPI_MODULE_NAME	("osl")
 
 struct acpi_os_dpc
 {
-    OSD_EXECUTION_CALLBACK  function;
+    acpi_osd_exec_callback  function;
     void		    *context;
 };
 
@@ -64,7 +64,7 @@ extern char line_buf[80];
 #endif /*ENABLE_DEBUGGER*/
 
 static unsigned int acpi_irq_irq;
-static OSD_HANDLER acpi_irq_handler;
+static acpi_osd_handler acpi_irq_handler;
 static void *acpi_irq_context;
 static struct workqueue_struct *kacpid_wq;
 
@@ -246,7 +246,7 @@ acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 acpi_status
-acpi_os_install_interrupt_handler(u32 gsi, OSD_HANDLER handler, void *context)
+acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler, void *context)
 {
 	unsigned int irq;
 
@@ -274,7 +274,7 @@ acpi_os_install_interrupt_handler(u32 gsi, OSD_HANDLER handler, void *context)
 }
 
 acpi_status
-acpi_os_remove_interrupt_handler(u32 irq, OSD_HANDLER handler)
+acpi_os_remove_interrupt_handler(u32 irq, acpi_osd_handler handler)
 {
 	if (irq) {
 		free_irq(irq, acpi_irq);
@@ -624,7 +624,7 @@ acpi_os_execute_deferred (
 acpi_status
 acpi_os_queue_for_execution(
 	u32			priority,
-	OSD_EXECUTION_CALLBACK	function,
+	acpi_osd_exec_callback	function,
 	void			*context)
 {
 	acpi_status 		status = AE_OK;

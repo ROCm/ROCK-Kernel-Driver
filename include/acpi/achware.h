@@ -138,15 +138,15 @@ acpi_hw_get_gpe_status (
 
 acpi_status
 acpi_hw_disable_all_gpes (
-	void);
+	u32                             flags);
 
 acpi_status
 acpi_hw_enable_all_runtime_gpes (
-	void);
+	u32                             flags);
 
 acpi_status
 acpi_hw_enable_all_wakeup_gpes (
-	void);
+	u32                             flags);
 
 acpi_status
 acpi_hw_enable_runtime_gpe_block (

@@ -111,7 +111,8 @@ acpi_ev_notify_dispatch (
 
 acpi_status
 acpi_ev_walk_gpe_list (
-	ACPI_GPE_CALLBACK       gpe_walk_callback);
+	ACPI_GPE_CALLBACK       gpe_walk_callback,
+	u32                             flags);
 
 u8
 acpi_ev_valid_gpe_event (
