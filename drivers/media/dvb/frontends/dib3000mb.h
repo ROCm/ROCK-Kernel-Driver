@@ -7,6 +7,7 @@
  *	modify it under the terms of the GNU General Public License as
  *	published by the Free Software Foundation, version 2.
  *
+ * 
  *
  * for more information see dib3000mb.c .
  */
@@ -320,7 +321,7 @@ static u16 dib3000mb_bandwidth_8mhz[] =
 #define DIB3000MB_REG_UNK_108			(   108)
 #define DIB3000MB_UNK_108					(0x0080)
 
-/* fft ??? */
+/* fft */
 #define DIB3000MB_REG_UNK_121			(   121)
 #define DIB3000MB_UNK_121_2K				(     7)
 #define DIB3000MB_UNK_121_DEFAULT			(     5)
@@ -351,12 +352,11 @@ static u16 dib3000mb_bandwidth_8mhz[] =
 #define DIB3000MB_REG_VIT_CODE_RATE		(   129)
 
 /* forward error correction code rates */
-#define DIB3000MB_FEC_1_2					(     0)
-#define DIB3000MB_FEC_2_3					(     1)
-#define DIB3000MB_FEC_3_4					(     2)
-#define DIB3000MB_FEC_4_5					(     3)
-#define DIB3000MB_FEC_5_6					(     4)
-#define DIB3000MB_FEC_7_8					(     5)
+#define DIB3000MB_FEC_1_2					(     1)
+#define DIB3000MB_FEC_2_3					(     2)
+#define DIB3000MB_FEC_3_4					(     3)
+#define DIB3000MB_FEC_5_6					(     5)
+#define DIB3000MB_FEC_7_8					(     7)
 
 /* vit select hp */
 #define DIB3000MB_REG_VIT_HP			(   130)
@@ -627,8 +627,8 @@ static u16 dib3000mb_filter_coeffs[] = {
 /* packet error rate (uncorrected TS packets) (16) */
 #define DIB3000MB_REG_PACKET_ERROR_RATE	(   417)
 
-/* packet error count (16) */
-#define DIB3000MB_REG_PACKET_ERROR_COUNT	(   420)
+/* uncorrected packet count (16) */
+#define DIB3000MB_REG_UNC				(   420)
 
 /* viterbi locked (1) */
 #define DIB3000MB_REG_VIT_LCK			(   421)

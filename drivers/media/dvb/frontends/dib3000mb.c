@@ -17,6 +17,8 @@
  *  Amaury Demol (ademol@dibcom.fr) from DiBcom for providing specs and driver
  *  sources, on which this driver (and the dvb-dibusb) are based.
  *
+ * 
+ * 
  * see Documentation/dvb/README.dibusb for more information
  *
  */
@@ -36,19 +38,21 @@
 /* debug */
 
 #ifdef CONFIG_DVB_DIBCOM_DEBUG
-#define dprintk_new(level,args...) \
+#define dprintk(level,args...) \
 	do { if ((debug & level)) { printk(args); } } while (0)
 
 static int debug;
 module_param(debug, int, 0x644);
-MODULE_PARM_DESC(debug, "set debugging level (1=info,2=xfer,4=alotmore (|-able)).");
+MODULE_PARM_DESC(debug, "set debugging level (1=info,2=xfer,4=alotmore,8=setfe,16=getfe (|-able)).");
 #else
-#define dprintk_new(args...)
+#define dprintk(args...) do { } while (0);
 #endif
 
-#define deb_info(args...) dprintk_new(0x01,args)
-#define deb_xfer(args...) dprintk_new(0x02,args)
-#define deb_alot(args...) dprintk_new(0x04,args)
+#define deb_info(args...) dprintk(0x01,args)
+#define deb_xfer(args...) dprintk(0x02,args)
+#define deb_alot(args...) dprintk(0x04,args)
+#define deb_setf(args...) dprintk(0x08,args)
+#define deb_getf(args...) dprintk(0x10,args)
 
 /* Version information */
 #define DRIVER_VERSION "0.1"
@@ -63,7 +67,7 @@ struct dib3000mb_state {
 };
 
 static struct dvb_frontend_info dib3000mb_info = {
-	.name			= "DiBcom 3000-MB DVB-T frontend",
+	.name			= "DiBcom 3000-MB DVB-T",
 	.type 			= FE_OFDM,
 	.frequency_min 		= 44250000,
 	.frequency_max 		= 867250000,
@@ -72,8 +76,8 @@ static struct dvb_frontend_info dib3000mb_info = {
 			FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 			FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
 			FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO |
-			FE_CAN_TRANSMISSION_MODE_AUTO |
 			FE_CAN_GUARD_INTERVAL_AUTO |
+			FE_CAN_TRANSMISSION_MODE_AUTO | 
 			FE_CAN_HIERARCHY_AUTO,
 };
 
@@ -149,7 +153,7 @@ static int dib3000mb_get_frontend(struct dib3000mb_state *state,
 	u32 dds_val, threshold = 0x800000;
 
 	if (!rd(DIB3000MB_REG_TPS_LOCK))
-		return -EINVAL;
+		return 0;
 
 	dds_val = ((rd(DIB3000MB_REG_DDS_VALUE_MSB) & 0xff) << 16) + rd(DIB3000MB_REG_DDS_VALUE_LSB);
 	if (dds_val & threshold)
@@ -172,56 +176,56 @@ static int dib3000mb_get_frontend(struct dib3000mb_state *state,
 					||
 		((inv_test2 == 0) && (inv_test1==1 || inv_test1==2));
 
-	deb_info("inversion %d %d, %d\n",inv_test2,inv_test1, fep->inversion);
+	deb_getf("inversion %d %d, %d\n",inv_test2,inv_test1, fep->inversion);
 
 	switch ((tps_val = rd(DIB3000MB_REG_TPS_QAM))) {
 		case DIB3000MB_QAM_QPSK:
-			deb_info("QPSK ");
+			deb_getf("QPSK ");
 			ofdm->constellation = QPSK;
 			break;
 		case DIB3000MB_QAM_QAM16:
-			deb_info("QAM16 ");
+			deb_getf("QAM16 ");
 			ofdm->constellation = QAM_16;
 			break;
 		case DIB3000MB_QAM_QAM64:
-			deb_info("QAM64 ");
+			deb_getf("QAM64 ");
 			ofdm->constellation = QAM_64;
 			break;
 		default:
 			err("Unexpected constellation returned by TPS (%d)",tps_val);
 			break;
  	}
-	deb_info("TPS: %d\n",tps_val);
+	deb_getf("TPS: %d\n",tps_val);
 
 	if (rd(DIB3000MB_REG_TPS_HRCH)) {
-		deb_info("HRCH ON\n");
+		deb_getf("HRCH ON\n");
 		tps_val = rd(DIB3000MB_REG_TPS_CODE_RATE_LP);
 		cr = &ofdm->code_rate_LP;
 		ofdm->code_rate_HP = FEC_NONE;
 
 		switch ((tps_val = rd(DIB3000MB_REG_TPS_VIT_ALPHA))) {
 			case DIB3000MB_VIT_ALPHA_OFF:
-				deb_info("HIERARCHY_NONE ");
+				deb_getf("HIERARCHY_NONE ");
 				ofdm->hierarchy_information = HIERARCHY_NONE;
 				break;
 			case DIB3000MB_VIT_ALPHA_1:
-				deb_info("HIERARCHY_1 ");
+				deb_getf("HIERARCHY_1 ");
 				ofdm->hierarchy_information = HIERARCHY_1;
 				break;
 			case DIB3000MB_VIT_ALPHA_2:
-				deb_info("HIERARCHY_2 ");
+				deb_getf("HIERARCHY_2 ");
 				ofdm->hierarchy_information = HIERARCHY_2;
 				break;
 			case DIB3000MB_VIT_ALPHA_4:
-				deb_info("HIERARCHY_4 ");
+				deb_getf("HIERARCHY_4 ");
 				ofdm->hierarchy_information = HIERARCHY_4;
 				break;
 			default:
 				err("Unexpected ALPHA value returned by TPS (%d)",tps_val);
 		}
-		deb_info("TPS: %d\n",tps_val);
+		deb_getf("TPS: %d\n",tps_val);
 	} else {
-		deb_info("HRCH OFF\n");
+		deb_getf("HRCH OFF\n");
 		tps_val = rd(DIB3000MB_REG_TPS_CODE_RATE_HP);
 		cr = &ofdm->code_rate_HP;
 		ofdm->code_rate_LP = FEC_NONE;
@@ -230,67 +234,67 @@ static int dib3000mb_get_frontend(struct dib3000mb_state *state,
 
 	switch (tps_val) {
 		case DIB3000MB_FEC_1_2:
-			deb_info("FEC_1_2 ");
+			deb_getf("FEC_1_2 ");
 			*cr = FEC_1_2;
 			break;
 		case DIB3000MB_FEC_2_3:
-			deb_info("FEC_2_3 ");
+			deb_getf("FEC_2_3 ");
 			*cr = FEC_2_3;
 			break;
 		case DIB3000MB_FEC_3_4:
-			deb_info("FEC_3_4 ");
+			deb_getf("FEC_3_4 ");
 			*cr = FEC_3_4;
 			break;
 		case DIB3000MB_FEC_5_6:
-			deb_info("FEC_5_6 ");
+			deb_getf("FEC_5_6 ");
 			*cr = FEC_4_5;
 			break;
 		case DIB3000MB_FEC_7_8:
-			deb_info("FEC_7_8 ");
+			deb_getf("FEC_7_8 ");
 			*cr = FEC_7_8;
 			break;
 		default:
 			err("Unexpected FEC returned by TPS (%d)",tps_val);
 			break;
 	}
-	deb_info("TPS: %d\n",tps_val);
+	deb_getf("TPS: %d\n",tps_val);
 
 	switch ((tps_val = rd(DIB3000MB_REG_TPS_GUARD_TIME))) {
 		case DIB3000MB_GUARD_TIME_1_32:
-			deb_info("GUARD_INTERVAL_1_32 ");
+			deb_getf("GUARD_INTERVAL_1_32 ");
 			ofdm->guard_interval = GUARD_INTERVAL_1_32;
 			break;
 		case DIB3000MB_GUARD_TIME_1_16:
-			deb_info("GUARD_INTERVAL_1_16 ");
+			deb_getf("GUARD_INTERVAL_1_16 ");
 			ofdm->guard_interval = GUARD_INTERVAL_1_16;
 			break;
 		case DIB3000MB_GUARD_TIME_1_8:
-			deb_info("GUARD_INTERVAL_1_8 ");
+			deb_getf("GUARD_INTERVAL_1_8 ");
 			ofdm->guard_interval = GUARD_INTERVAL_1_8;
 			break;
 		case DIB3000MB_GUARD_TIME_1_4:
-			deb_info("GUARD_INTERVAL_1_4 ");
+			deb_getf("GUARD_INTERVAL_1_4 ");
 			ofdm->guard_interval = GUARD_INTERVAL_1_4;
 			break;
 		default:
 			err("Unexpected Guard Time returned by TPS (%d)",tps_val);
 			break;
 	}
-	deb_info("TPS: %d\n",tps_val);
+	deb_getf("TPS: %d\n",tps_val);
 
 	switch ((tps_val = rd(DIB3000MB_REG_TPS_FFT))) {
 		case DIB3000MB_FFT_2K:
-			deb_info("TRANSMISSION_MODE_2K ");
+			deb_getf("TRANSMISSION_MODE_2K ");
 			ofdm->transmission_mode = TRANSMISSION_MODE_2K;
 			break;
 		case DIB3000MB_FFT_8K:
-			deb_info("TRANSMISSION_MODE_8K ");
+			deb_getf("TRANSMISSION_MODE_8K ");
 			ofdm->transmission_mode = TRANSMISSION_MODE_8K;
 			break;
 		default:
 			err("unexpected transmission mode return by TPS (%d)",tps_val);
 	}
-	deb_info("TPS: %d\n",tps_val);
+	deb_getf("TPS: %d\n",tps_val);
 	return 0;
 }
 
@@ -307,18 +311,18 @@ static int dib3000mb_fe_read_search_status(struct dib3000mb_state *state)
 	if (irq & 0x02) {
 		if (rd(DIB3000MB_REG_LOCK2_VALUE) & 0x01) {
 			if (dib3000mb_get_frontend(state,&fep) == 0) {
-				deb_info("reading tuning data from frontend succeeded.\n");
+				deb_setf("reading tuning data from frontend succeeded.\n");
 				return dib3000mb_set_frontend(state,&fep,0) == 0;
 			} else {
-				deb_info("reading tuning data failed -> tuning failed.\n");
+				deb_setf("reading tuning data failed -> tuning failed.\n");
 				return 0;
 			}
 		} else {
-			deb_info("AS IRQ was pending, but LOCK2 was not & 0x01.\n");
+			deb_setf("AS IRQ was pending, but LOCK2 was not & 0x01.\n");
 			return 0;
 		}
 	} else if (irq & 0x01) {
-		deb_info("Autosearch failed.\n");
+		deb_setf("Autosearch failed.\n");
 		return 0;
 	}
 
@@ -329,7 +333,7 @@ static int dib3000mb_set_frontend(struct dib3000mb_state *state,
 		struct dvb_frontend_parameters *fep, int tuner)
 {
 	struct dvb_ofdm_parameters *ofdm = &fep->u.ofdm;
-	fe_code_rate_t fe_cr;
+	fe_code_rate_t fe_cr = FEC_NONE;
 	int search_state,seq;
 
 	if (tuner) {
@@ -342,82 +346,105 @@ static int dib3000mb_set_frontend(struct dib3000mb_state *state,
 		wr(DIB3000MB_REG_TUNER,
 				DIB3000MB_DEACTIVATE_TUNER_XFER( DIB3000MB_TUNER_ADDR_DEFAULT ) );
 
+		deb_setf("bandwidth: ");
 		switch (ofdm->bandwidth) {
 			case BANDWIDTH_8_MHZ:
-			case BANDWIDTH_AUTO:
+				deb_setf("8 MHz\n");
 				wr_foreach(dib3000mb_reg_timing_freq,dib3000mb_timing_freq[2]);
 				wr_foreach(dib3000mb_reg_bandwidth,dib3000mb_bandwidth_8mhz);
 				break;
 			case BANDWIDTH_7_MHZ:
+				deb_setf("7 MHz\n");
 				wr_foreach(dib3000mb_reg_timing_freq,dib3000mb_timing_freq[1]);
 				wr_foreach(dib3000mb_reg_bandwidth,dib3000mb_bandwidth_7mhz);
 				break;
 			case BANDWIDTH_6_MHZ:
+				deb_setf("6 MHz\n");
 				wr_foreach(dib3000mb_reg_timing_freq,dib3000mb_timing_freq[0]);
 				wr_foreach(dib3000mb_reg_bandwidth,dib3000mb_bandwidth_6mhz);
 				break;
+			case BANDWIDTH_AUTO:
+				return -EOPNOTSUPP;
 			default:
 				err("unkown bandwidth value.");
 				return -EINVAL;
-				break;
 		}
 	}
 	wr(DIB3000MB_REG_LOCK1_MASK,DIB3000MB_LOCK1_SEARCH_4);
 
+	deb_setf("transmission mode: ");
 	switch (ofdm->transmission_mode) {
 		case TRANSMISSION_MODE_2K:
+			deb_setf("2k\n");
 			wr(DIB3000MB_REG_FFT,DIB3000MB_FFT_2K);
 			break;
 		case TRANSMISSION_MODE_8K:
+			deb_setf("8k\n");
 			wr(DIB3000MB_REG_FFT,DIB3000MB_FFT_8K);
 			break;
 		case TRANSMISSION_MODE_AUTO:
+			deb_setf("auto\n");
 			wr(DIB3000MB_REG_FFT,DIB3000MB_FFT_AUTO);
 			break;
 		default:
 			return -EINVAL;
 	}
 
+	deb_setf("guard: ");
 	switch (ofdm->guard_interval) {
 		case GUARD_INTERVAL_1_32:
+			deb_setf("1_32\n");
 			wr(DIB3000MB_REG_GUARD_TIME,DIB3000MB_GUARD_TIME_1_32);
 			break;
 		case GUARD_INTERVAL_1_16:
+			deb_setf("1_16\n");
 			wr(DIB3000MB_REG_GUARD_TIME,DIB3000MB_GUARD_TIME_1_16);
 			break;
 		case GUARD_INTERVAL_1_8:
+			deb_setf("1_8\n");
 			wr(DIB3000MB_REG_GUARD_TIME,DIB3000MB_GUARD_TIME_1_8);
 			break;
 		case GUARD_INTERVAL_1_4:
+			deb_setf("1_4\n");
 			wr(DIB3000MB_REG_GUARD_TIME,DIB3000MB_GUARD_TIME_1_4);
 			break;
 		case GUARD_INTERVAL_AUTO:
+			deb_setf("auto\n");
 			wr(DIB3000MB_REG_GUARD_TIME,DIB3000MB_GUARD_TIME_AUTO);
 			break;
 		default:
 			return -EINVAL;
 	}
 
+	deb_setf("invsersion: ");
 	switch (fep->inversion) {
+		case INVERSION_AUTO:
+			deb_setf("auto\n");
+			break;
 		case INVERSION_OFF:
+			deb_setf("on\n");
 			wr(DIB3000MB_REG_DDS_INV,DIB3000MB_DDS_INV_OFF);
 			break;
-		case INVERSION_AUTO:
 		case INVERSION_ON:
+			deb_setf("on\n");
 			wr(DIB3000MB_REG_DDS_INV,DIB3000MB_DDS_INV_ON);
 			break;
 		default:
 			return -EINVAL;
 	}
 
+	deb_setf("constellation: ");
 	switch (ofdm->constellation) {
 		case QPSK:
+			deb_setf("qpsk\n");
 			wr(DIB3000MB_REG_QAM,DIB3000MB_QAM_QPSK);
 			break;
 		case QAM_16:
+			deb_setf("qam16\n");
 			wr(DIB3000MB_REG_QAM,DIB3000MB_QAM_QAM16);
 			break;
 		case QAM_64:
+			deb_setf("qam64\n");
 			wr(DIB3000MB_REG_QAM,DIB3000MB_QAM_QAM64);
 			break;
 		case QAM_AUTO:
@@ -425,53 +452,69 @@ static int dib3000mb_set_frontend(struct dib3000mb_state *state,
 		default:
 			return -EINVAL;
 	}
-
+	deb_setf("hierachy: ");	
 	switch (ofdm->hierarchy_information) {
 		case HIERARCHY_NONE:
+			deb_setf("none ");
+			/* fall through alpha is 1, even when HIERARCHY is NONE */ 
 		case HIERARCHY_1:
+			deb_setf("alpha=1\n");	
 			wr(DIB3000MB_REG_VIT_ALPHA,DIB3000MB_VIT_ALPHA_1);
 			break;
 		case HIERARCHY_2:
+			deb_setf("alpha=2\n");	
 			wr(DIB3000MB_REG_VIT_ALPHA,DIB3000MB_VIT_ALPHA_2);
 			break;
 		case HIERARCHY_4:
+			deb_setf("alpha=4\n");	
 			wr(DIB3000MB_REG_VIT_ALPHA,DIB3000MB_VIT_ALPHA_4);
 			break;
 		case HIERARCHY_AUTO:
+			deb_setf("alpha=auto\n");	
 			wr(DIB3000MB_REG_VIT_ALPHA,DIB3000MB_VIT_ALPHA_AUTO);
 			break;
 		default:
 			return -EINVAL;
 	}
 
+	deb_setf("hierarchy: ");
 	if (ofdm->hierarchy_information == HIERARCHY_NONE) {
+		deb_setf("none\n");
 		wr(DIB3000MB_REG_VIT_HRCH,DIB3000MB_VIT_HRCH_OFF);
 		wr(DIB3000MB_REG_VIT_HP,DIB3000MB_VIT_HP);
 		fe_cr = ofdm->code_rate_HP;
-	} else {
+	} else if (ofdm->hierarchy_information != HIERARCHY_AUTO) {
+		deb_setf("on\n");
 		wr(DIB3000MB_REG_VIT_HRCH,DIB3000MB_VIT_HRCH_ON);
 		wr(DIB3000MB_REG_VIT_HP,DIB3000MB_VIT_LP);
 		fe_cr = ofdm->code_rate_LP;
 	}
-
+	deb_setf("fec: ");
 	switch (fe_cr) {
 		case FEC_1_2:
+			deb_setf("1_2\n");
 			wr(DIB3000MB_REG_VIT_CODE_RATE,DIB3000MB_FEC_1_2);
 			break;
 		case FEC_2_3:
+			deb_setf("2_3\n");
 			wr(DIB3000MB_REG_VIT_CODE_RATE,DIB3000MB_FEC_2_3);
 			break;
 		case FEC_3_4:
+			deb_setf("3_4\n");
 			wr(DIB3000MB_REG_VIT_CODE_RATE,DIB3000MB_FEC_3_4);
 			break;
 		case FEC_5_6:
+			deb_setf("5_6\n");
 			wr(DIB3000MB_REG_VIT_CODE_RATE,DIB3000MB_FEC_5_6);
 			break;
 		case FEC_7_8:
+			deb_setf("7_8\n");
 			wr(DIB3000MB_REG_VIT_CODE_RATE,DIB3000MB_FEC_7_8);
 			break;
 		case FEC_NONE:
+			deb_setf("none ");
 		case FEC_AUTO:
+			deb_setf("auto\n");
 			break;
 		default:
 			return -EINVAL;
@@ -482,7 +525,7 @@ static int dib3000mb_set_frontend(struct dib3000mb_state *state,
 		[ofdm->guard_interval == GUARD_INTERVAL_AUTO]
 		[fep->inversion == INVERSION_AUTO];
 
-	deb_info("seq? %d\n",seq);
+	deb_setf("seq? %d\n",seq);
 
 	wr(DIB3000MB_REG_SEQ,seq);
 
@@ -522,7 +565,7 @@ static int dib3000mb_set_frontend(struct dib3000mb_state *state,
 		fe_cr == FEC_AUTO ||
 		fep->inversion == INVERSION_AUTO) {
 
-		deb_info("autosearch enabled.\n");
+		deb_setf("autosearch enabled.\n");	
 
 		wr(DIB3000MB_REG_ISI,DIB3000MB_ISI_INHIBIT);
 
@@ -530,7 +573,7 @@ static int dib3000mb_set_frontend(struct dib3000mb_state *state,
 		wr(DIB3000MB_REG_RESTART,DIB3000MB_RESTART_OFF);
 
 		while ((search_state = dib3000mb_fe_read_search_status(state)) < 0);
-
+		deb_info("search_state after autosearch %d\n",search_state);
 		return search_state ? 0 : -EINVAL;
 	} else {
 		wr(DIB3000MB_REG_RESTART,DIB3000MB_RESTART_CTRL);
@@ -622,14 +665,25 @@ static int dib3000mb_fe_init(struct dib3000mb_state *state,int mobile_mode)
 static int dib3000mb_read_status(struct dib3000mb_state *state,fe_status_t *stat)
 {
 	*stat = 0;
-	*stat |= rd(DIB3000MB_REG_AGC_LOCK) ? FE_HAS_SIGNAL : 0;
-	*stat |= rd(DIB3000MB_REG_CARRIER_LOCK) ? FE_HAS_CARRIER : 0;
-	*stat |= rd(DIB3000MB_REG_VIT_LCK) ? FE_HAS_VITERBI : 0;
-	*stat |= rd(DIB3000MB_REG_TS_SYNC_LOCK) ? FE_HAS_SYNC : 0;
-	*stat |= *stat ? FE_HAS_LOCK : 0;
+
+	if (rd(DIB3000MB_REG_AGC_LOCK))
+		*stat |= FE_HAS_SIGNAL;
+	if (rd(DIB3000MB_REG_CARRIER_LOCK))
+		*stat |= FE_HAS_CARRIER;
+	if (rd(DIB3000MB_REG_VIT_LCK))
+		*stat |= FE_HAS_VITERBI;
+	if (rd(DIB3000MB_REG_TS_SYNC_LOCK))
+		*stat |= (FE_HAS_SYNC | FE_HAS_LOCK);
 
 	deb_info("actual status is %2x\n",*stat);
 
+	deb_getf("tps %x %x %x %x %x\n",
+			rd(DIB3000MB_REG_TPS_1),
+			rd(DIB3000MB_REG_TPS_2),
+			rd(DIB3000MB_REG_TPS_3),
+			rd(DIB3000MB_REG_TPS_4),
+			rd(DIB3000MB_REG_TPS_5));
+	
 	deb_info("autoval: tps: %d, qam: %d, hrch: %d, alpha: %d, hp: %d, lp: %d, guard: %d, fft: %d cell: %d\n",
 			rd(DIB3000MB_REG_TPS_LOCK),
 			rd(DIB3000MB_REG_TPS_QAM),
@@ -647,15 +701,75 @@ static int dib3000mb_read_status(struct dib3000mb_state *state,fe_status_t *stat
 
 static int dib3000mb_read_ber(struct dib3000mb_state *state,u32 *ber)
 {
-	*ber =
-		(((rd(DIB3000MB_REG_BER_MSB) << 16) & 0x1f) | rd(DIB3000MB_REG_BER_LSB) ) /
-		 100000000;
+	*ber = ((rd(DIB3000MB_REG_BER_MSB) << 16) | rd(DIB3000MB_REG_BER_LSB) );
+	return 0;
+}
+/*
+ * Amaury:
+ * signal strength is measured with dBm (power compared to mW)
+ * the standard range is -90dBm(low power) to -10 dBm (strong power),
+ * but the calibration is done for -100 dBm to 0dBm
+ */
+
+#define DIB3000MB_AGC_REF_dBm		-14
+#define DIB3000MB_GAIN_SLOPE_dBm	100
+#define DIB3000MB_GAIN_DELTA_dBm	-2
+static int dib3000mb_read_signal_strength(struct dib3000mb_state *state, u16 *strength)
+{
+/* TODO log10 
+	u16 sigpow = rd(DIB3000MB_REG_SIGNAL_POWER), 
+		n_agc_power = rd(DIB3000MB_REG_AGC_POWER),
+		rf_power = rd(DIB3000MB_REG_RF_POWER);
+	double rf_power_dBm, ad_power_dBm, minar_power_dBm;
+	
+	if (n_agc_power == 0 )
+		n_agc_power = 1 ;
+
+	ad_power_dBm    = 10 * log10 ( (float)n_agc_power / (float)(1<<16) );
+	minor_power_dBm = ad_power_dBm - DIB3000MB_AGC_REF_dBm;
+	rf_power_dBm = (-DIB3000MB_GAIN_SLOPE_dBm * (float)rf_power / (float)(1<<16) + 
+			DIB3000MB_GAIN_DELTA_dBm) + minor_power_dBm;
+	// relative rf_power 
+	*strength = (u16) ((rf_power_dBm + 100) / 100 * 0xffff);
+*/
+	*strength = rd(DIB3000MB_REG_SIGNAL_POWER) * 0xffff / 0x170;
 	return 0;
 }
 
-static int dib3000mb_signal_strength(struct dib3000mb_state *state, u16 *strength)
+/*
+ * Amaury: 
+ * snr is the signal quality measured in dB.
+ * snr = 10*log10(signal power / noise power)
+ * the best quality is near 35dB (cable transmission & good modulator)
+ * the minimum without errors depend of transmission parameters
+ * some indicative values are given in en300744 Annex A
+ * ex : 16QAM 2/3 (Gaussian)  = 11.1 dB
+ *
+ * If SNR is above 20dB, BER should be always 0.
+ * choose 0dB as the minimum
+ */
+static int dib3000mb_read_snr(struct dib3000mb_state *state,u16 *snr)
 {
-//	*stength = DIB3000MB_REG_SIGNAL_POWER
+	short sigpow = rd(DIB3000MB_REG_SIGNAL_POWER);
+	int icipow = ((rd(DIB3000MB_REG_NOISE_POWER_MSB) & 0xff) << 16) |
+		rd(DIB3000MB_REG_NOISE_POWER_LSB);
+/*
+	float snr_dBm=0;
+
+	if (sigpow > 0 && icipow > 0)
+		snr_dBm = 10.0 * log10( (float) (sigpow<<8) / (float)icipow )  ;
+	else if (sigpow > 0)
+		snr_dBm = 35;
+	
+	*snr = (u16) ((snr_dBm / 35) * 0xffff);
+*/
+	*snr = (sigpow<<8) / (icipow > 0 ? icipow : 1);
+	return 0;
+}
+
+static int dib3000mb_read_unc_blocks(struct dib3000mb_state *state,u32 *unc)
+{
+	*unc = rd(DIB3000MB_REG_UNC);
 	return 0;
 }
 
@@ -665,63 +779,81 @@ static int dib3000mb_sleep(struct dib3000mb_state *state)
 	return 0;
 }
 
+static int dib3000mb_fe_get_tune_settings(struct dib3000mb_state *state, 
+		struct dvb_frontend_tune_settings *tune)
+{
+	tune->min_delay_ms = 800;
+	tune->step_size = 166667;
+	tune->max_drift = 166667*2;
+					
+	return 0;
+}
+
 static int dib3000mb_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
 	struct dib3000mb_state *state = fe->data;
-	int ret = 0;
 	switch (cmd) {
 		case FE_GET_INFO:
 			deb_info("FE_GET_INFO\n");
 			memcpy(arg, &dib3000mb_info, sizeof(struct dvb_frontend_info));
+			return 0;
 			break;
 
 		case FE_READ_STATUS:
 			deb_info("FE_READ_STATUS\n");
-			ret = dib3000mb_read_status(state,(fe_status_t *)arg);
+			return dib3000mb_read_status(state,(fe_status_t *)arg);
 			break;
 
 		case FE_READ_BER:
 			deb_info("FE_READ_BER\n");
-			ret = dib3000mb_read_ber(state,(u32 *)arg);
+			return dib3000mb_read_ber(state,(u32 *)arg);
 			break;
 
 		case FE_READ_SIGNAL_STRENGTH:
 			deb_info("FE_READ_SIG_STRENGTH\n");
-			ret = dib3000mb_signal_strength(state,(u16 *) arg);
+			return dib3000mb_read_signal_strength(state,(u16 *) arg);
 			break;
 
 		case FE_READ_SNR:
 			deb_info("FE_READ_SNR\n");
+			return dib3000mb_read_snr(state,(u16 *) arg);
 			break;
 
 		case FE_READ_UNCORRECTED_BLOCKS:
 			deb_info("FE_READ_UNCORRECTED_BLOCKS\n");
+			return dib3000mb_read_unc_blocks(state,(u32 *) arg);
 			break;
 
 		case FE_SET_FRONTEND:
 			deb_info("FE_SET_FRONTEND\n");
-			ret = dib3000mb_set_frontend(state,(struct dvb_frontend_parameters *) arg,1);
+			return dib3000mb_set_frontend(state,(struct dvb_frontend_parameters *) arg,1);
 			break;
 
 		case FE_GET_FRONTEND:
 			deb_info("FE_GET_FRONTEND\n");
-			ret = dib3000mb_get_frontend(state,(struct dvb_frontend_parameters *) arg);
+			return dib3000mb_get_frontend(state,(struct dvb_frontend_parameters *) arg);
 			break;
 
 		case FE_SLEEP:
 			deb_info("FE_SLEEP\n");
-			ret = dib3000mb_sleep(state);
+			return dib3000mb_sleep(state);
 			break;
 
 		case FE_INIT:
 			deb_info("FE_INIT\n");
-			ret = dib3000mb_fe_init(state,0);
+			return dib3000mb_fe_init(state,0);
 			break;
 
+		case FE_GET_TUNE_SETTINGS:
+			deb_info("GET_TUNE_SETTINGS");
+			return dib3000mb_fe_get_tune_settings(state, (struct
+						dvb_frontend_tune_settings *) arg);
+
+			break;
 		case FE_SET_TONE:
 		case FE_SET_VOLTAGE:
 		default:
-			ret = -EOPNOTSUPP;
+			return -EOPNOTSUPP;
 			break;
 	}
 	return 0;
@@ -753,16 +885,20 @@ static int dib3000mb_attach_adapter(struct i2c_adapter *adapter)
 	i2c_set_clientdata(client,state);
 
 	state->manufactor_id = dib3000mb_read_reg(client, DIB3000MB_REG_MANUFACTOR_ID);
+	if (state->manufactor_id != 0x01b3) {
+		ret = -ENODEV;
+		goto probe_err;
+	}
+	
 	state->device_id = dib3000mb_read_reg(client,DIB3000MB_REG_DEVICE_ID);
-	if (state->manufactor_id == 0x01b3 && state->device_id == 0x3000)
-		info("found a DiBCom (0x%04x) 3000-MB DVB-T frontend (ver: %x).",
-				state->manufactor_id, state->device_id);
-	else {
-		err("did not found a DiBCom 3000-MB.");
+	if (state->device_id != 0x3000) {
 		ret = -ENODEV;
 		goto probe_err;
 	}
 
+	info("found a DiBCom (0x%04x) 3000-MB DVB-T frontend (ver: %x).",
+			state->manufactor_id, state->device_id);
+	
 	if ((ret = i2c_attach_client(client)))
 		goto i2c_attach_err;
 
