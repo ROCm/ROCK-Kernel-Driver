@@ -200,6 +200,7 @@
 #define __NR_putpmsg		188	/* some people actually want streams */
 #define __NR_vfork		189
 #define __NR_ugetrlimit		190	/* SuS compliant getrlimit */
+#define __NR_readahead		191
 #define __NR_mmap2		192
 #define __NR_truncate64		193
 #define __NR_ftruncate64	194
@@ -230,15 +231,10 @@
 #define __NR_lremovexattr	219
 #define __NR_fremovexattr	220
 #define __NR_futex		221
-#define __NR_tux		222
-#define __NR_sched_setaffinity	223     
-#define __NR_sched_getaffinity	224
-
-#if 0
-/* Remind paulus to add these into ppc32 */
-__NR_security
-__NR_readahead
-#endif
+#define __NR_sched_setaffinity	222     
+#define __NR_sched_getaffinity	223
+#define __NR_security		224
+#define __NR_tuxcall		225
 
 #define __NR(n)	#n
 

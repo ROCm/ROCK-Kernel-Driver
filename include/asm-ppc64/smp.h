@@ -30,7 +30,6 @@
 extern unsigned long cpu_online_map;
 
 extern void smp_message_pass(int target, int msg, unsigned long data, int wait);
-extern void smp_store_cpu_info(int id);
 extern void smp_send_tlb_invalidate(int);
 extern void smp_send_xmon_break(int cpu);
 struct pt_regs;

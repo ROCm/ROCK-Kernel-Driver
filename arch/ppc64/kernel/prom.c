@@ -144,6 +144,7 @@ static interpret_func interpret_root_props;
 #define FB_MAX	8
 #endif
 
+static int ppc64_is_smp;
 
 struct prom_t prom = {
 	0,			/* entry */
