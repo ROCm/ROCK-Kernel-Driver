@@ -115,63 +115,31 @@
 **==========================================================
 */
 
-#include <linux/version.h>
-
+#include <linux/blkdev.h>
+#include <linux/delay.h>
+#include <linux/dma-mapping.h>
+#include <linux/errno.h>
+#include <linux/init.h>
+#include <linux/interrupt.h>
+#include <linux/ioport.h>
+#include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/pci.h>
+#include <linux/sched.h>
+#include <linux/signal.h>
+#include <linux/spinlock.h>
+#include <linux/stat.h>
+#include <linux/string.h>
+#include <linux/time.h>
+#include <linux/timer.h>
+#include <linux/types.h>
+
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,17)
-#include <linux/spinlock.h>
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
-#include <asm/spinlock.h>
-#endif
-#include <linux/delay.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/errno.h>
-#include <linux/pci.h>
-#include <linux/dma-mapping.h>
-#include <linux/interrupt.h>
-#include <linux/string.h>
-#include <linux/mm.h>
-#include <linux/ioport.h>
-#include <linux/time.h>
-#include <linux/timer.h>
-#include <linux/stat.h>
-
-#include <linux/blkdev.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,35)
-#include <linux/init.h>
-#endif
-
-#ifndef	__init
-#define	__init
-#endif
-#ifndef	__initdata
-#define	__initdata
-#endif
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
-#include <linux/bios32.h>
-#endif
 
 #include "scsi.h"
 #include "hosts.h"
-
-#include <linux/types.h>
-
-/*
-**	Define BITS_PER_LONG for earlier linux versions.
-*/
-#ifndef	BITS_PER_LONG
-#if (~0UL) == 0xffffffffUL
-#define	BITS_PER_LONG	32
-#else
-#define	BITS_PER_LONG	64
-#endif
-#endif
 
 #include "ncr53c8xx.h"
 
@@ -1028,9 +996,7 @@ struct ncb {
 					/*  when lcb is not allocated.	*/
 	Scsi_Cmnd	*done_list;	/* Commands waiting for done()  */
 					/* callback to be invoked.      */ 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 	spinlock_t	smp_lock;	/* Lock for SMP threading       */
-#endif
 
 	/*----------------------------------------------------------------
 	**	Chip and controller indentification.
@@ -3739,7 +3705,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	if(device->slot.base_v)
 		np->vaddr = device->slot.base_v;
 	else
-		np->vaddr = remap_pci_mem(device->slot.base_c, (u_long) 128);
+		np->vaddr = (unsigned long)ioremap(device->slot.base_c, 128);
 
 	if (!np->vaddr) {
 		printk(KERN_ERR
@@ -3809,11 +3775,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	instance->max_id	= np->maxwide ? 16 : 8;
 	instance->max_lun	= SCSI_NCR_MAX_LUN;
 #ifndef SCSI_NCR_IOMAPPED
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,29)
 	instance->base		= (unsigned long) np->reg;
-#else
-	instance->base		= (char *) np->reg;
-#endif
 #endif
 	instance->irq		= device->slot.irq;
 	instance->unique_id	= device->slot.io_port;
@@ -9199,28 +9161,13 @@ printk("ncr53c8xx_proc_info: hostno=%d, func=%d\n", host->host_no, func);
 
 /*==========================================================
 **
-**	/proc directory entry.
-**
-**==========================================================
-*/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,27)
-static struct proc_dir_entry proc_scsi_ncr53c8xx = {
-    PROC_SCSI_NCR53C8XX, 9, NAME53C8XX,
-    S_IFDIR | S_IRUGO | S_IXUGO, 2
-};
-#endif
-
-/*==========================================================
-**
 **	Boot command line.
 **
 **==========================================================
 */
 #ifdef	MODULE
 char *ncr53c8xx = 0;	/* command line passed by insmod */
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,30)
 MODULE_PARM(ncr53c8xx, "s");
-# endif
 #endif
 
 int __init ncr53c8xx_setup(char *str)
@@ -9228,10 +9175,8 @@ int __init ncr53c8xx_setup(char *str)
 	return sym53c8xx__setup(str);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,13)
 #ifndef MODULE
 __setup("ncr53c8xx=", ncr53c8xx_setup);
-#endif
 #endif
 
 /*===================================================================

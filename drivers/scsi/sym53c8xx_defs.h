@@ -68,12 +68,7 @@
 **	Check supported Linux versions
 */
 
-#if !defined(LINUX_VERSION_CODE)
-#include <linux/version.h>
-#endif
 #include <linux/config.h>
-
-#define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
 
 /*
  * NCR PQS/PDS special device support.
@@ -183,11 +178,6 @@
 #define	SCSI_NCR_IOMAPPED
 #elif defined(__alpha__)
 #define	SCSI_NCR_IOMAPPED
-#elif defined(__powerpc__)
-#if LINUX_VERSION_CODE <= LinuxVersionCode(2,4,3)
-#define	SCSI_NCR_IOMAPPED
-#define SCSI_NCR_PCI_MEM_NOT_SUPPORTED
-#endif
 #endif
 
 /*
@@ -363,10 +353,6 @@
 
 #ifdef	__BIG_ENDIAN
 
-#if	LINUX_VERSION_CODE < LinuxVersionCode(2,1,0)
-#error	"BIG ENDIAN byte ordering needs kernel version >= 2.1.0"
-#endif
-
 #define	inw_l2b		inw
 #define	inl_l2b		inl
 #define	outw_b2l	outw
@@ -437,18 +423,9 @@
  *  Other architectures implement a weaker ordering that 
  *  requires memory barriers (and also IO barriers when they 
  *  make sense) to be used.
- *  We want to be paranoid for ppc and ia64. :)
  */
 
-#if	defined(__i386__) || defined(__x86_64__)
-#define MEMORY_BARRIER()	do { ; } while(0)
-#elif	defined	__powerpc__
-#define MEMORY_BARRIER()	__asm__ volatile("eieio; sync" : : : "memory")
-#elif	defined	__ia64__
-#define MEMORY_BARRIER()	__asm__ volatile("mf.a; mf" : : : "memory")
-#else
 #define MEMORY_BARRIER()	mb()
-#endif
 
 
 /*

@@ -74,9 +74,7 @@
 **==========================================================
 */
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,47)
 #define SCSI_NCR_DYNAMIC_DMA_MAPPING
-#endif
 
 /*==========================================================
 **
@@ -262,8 +260,6 @@ static inline struct xpt_quehead *xpt_remque_tail(struct xpt_quehead *head)
 **==========================================================
 */
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,2,0)
-
 typedef struct pci_dev *pcidev_t;
 typedef struct device *device_t;
 #define PCIDEV_NULL		(0)
@@ -276,17 +272,7 @@ typedef struct device *device_t;
 static u_long __init
 pci_get_base_cookie(struct pci_dev *pdev, int index)
 {
-	u_long base;
-
-#if LINUX_VERSION_CODE > LinuxVersionCode(2,3,12)
-	base = pdev->resource[index].start;
-#else
-	base = pdev->base_address[index];
-#if BITS_PER_LONG > 32
-	if ((base & 0x7) == 0x4)
-		*base |= (((u_long)pdev->base_address[++index]) << 32);
-#endif
-#endif
+	u_long base = pdev->resource[index].start;
 	return (base & ~0x7ul);
 }
 
@@ -310,102 +296,6 @@ pci_get_base_address(struct pci_dev *pdev, int index, u_long *base)
 #undef PCI_BAR_OFFSET
 }
 
-#else	/* Incomplete emulation of current PCI code for pre-2.2 kernels */
-
-typedef unsigned int pcidev_t;
-typedef unsinged int device_t;
-#define PCIDEV_NULL		(~0u)
-#define PciBusNumber(d)		((d)>>8)
-#define PciDeviceFn(d)		((d)&0xff)
-#define __PciDev(busn, devfn)	(((busn)<<8)+(devfn))
-
-#define pci_read_config_byte(d, w, v) \
-	pcibios_read_config_byte(PciBusNumber(d), PciDeviceFn(d), w, v)
-#define pci_read_config_word(d, w, v) \
-	pcibios_read_config_word(PciBusNumber(d), PciDeviceFn(d), w, v)
-#define pci_read_config_dword(d, w, v) \
-	pcibios_read_config_dword(PciBusNumber(d), PciDeviceFn(d), w, v)
-
-#define pci_write_config_byte(d, w, v) \
-	pcibios_write_config_byte(PciBusNumber(d), PciDeviceFn(d), w, v)
-#define pci_write_config_word(d, w, v) \
-	pcibios_write_config_word(PciBusNumber(d), PciDeviceFn(d), w, v)
-#define pci_write_config_dword(d, w, v) \
-	pcibios_write_config_dword(PciBusNumber(d), PciDeviceFn(d), w, v)
-
-static pcidev_t __init
-pci_find_device(unsigned int vendor, unsigned int device, pcidev_t prev)
-{
-	static unsigned short pci_index;
-	int retv;
-	unsigned char bus_number, device_fn;
-
-	if (prev == PCIDEV_NULL)
-		pci_index = 0;
-	else
-		++pci_index;
-	retv = pcibios_find_device (vendor, device, pci_index,
-				    &bus_number, &device_fn);
-	return retv ? PCIDEV_NULL : __PciDev(bus_number, device_fn);
-}
-
-static u_short __init PciVendorId(pcidev_t dev)
-{
-	u_short vendor_id;
-	pci_read_config_word(dev, PCI_VENDOR_ID, &vendor_id);
-	return vendor_id;
-}
-
-static u_short __init PciDeviceId(pcidev_t dev)
-{
-	u_short device_id;
-	pci_read_config_word(dev, PCI_DEVICE_ID, &device_id);
-	return device_id;
-}
-
-static u_int __init PciIrqLine(pcidev_t dev)
-{
-	u_char irq;
-	pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
-	return irq;
-}
-
-static int __init 
-pci_get_base_address(pcidev_t dev, int offset, u_long *base)
-{
-	u_int32 tmp;
-	
-	pci_read_config_dword(dev, PCI_BASE_ADDRESS_0 + offset, &tmp);
-	*base = tmp;
-	offset += sizeof(u_int32);
-	if ((tmp & 0x7) == 0x4) {
-#if BITS_PER_LONG > 32
-		pci_read_config_dword(dev, PCI_BASE_ADDRESS_0 + offset, &tmp);
-		*base |= (((u_long)tmp) << 32);
-#endif
-		offset += sizeof(u_int32);
-	}
-	return offset;
-}
-static u_long __init
-pci_get_base_cookie(struct pci_dev *pdev, int offset)
-{
-	u_long base;
-
-	(void) pci_get_base_address(dev, offset, &base);
-
-	return base;
-}
-
-#endif	/* LINUX_VERSION_CODE >= LinuxVersionCode(2,2,0) */
-
-/* Does not make sense in earlier kernels */
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,4,0)
-#define pci_enable_device(pdev)		(0)
-#endif
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,4,4)
-#define	scsi_set_pci_device(inst, pdev)	(0)
-#endif
 
 /*==========================================================
 **
@@ -428,7 +318,6 @@ pci_get_base_cookie(struct pci_dev *pdev, int offset)
 **==========================================================
 */
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,93)
 spinlock_t DRIVER_SMP_LOCK = SPIN_LOCK_UNLOCKED;
 #define	NCR_LOCK_DRIVER(flags)     spin_lock_irqsave(&DRIVER_SMP_LOCK, flags)
 #define	NCR_UNLOCK_DRIVER(flags)   \
@@ -442,20 +331,6 @@ spinlock_t DRIVER_SMP_LOCK = SPIN_LOCK_UNLOCKED;
 		spin_lock_irqsave((host)->host_lock, flags)
 #define	NCR_UNLOCK_SCSI_DONE(host, flags) \
 		spin_unlock_irqrestore(((host)->host_lock), flags)
-
-#else
-
-#define	NCR_LOCK_DRIVER(flags)     do { save_flags(flags); cli(); } while (0)
-#define	NCR_UNLOCK_DRIVER(flags)   do { restore_flags(flags); } while (0)
-
-#define	NCR_INIT_LOCK_NCB(np)      do { } while (0)
-#define	NCR_LOCK_NCB(np, flags)    do { save_flags(flags); cli(); } while (0)
-#define	NCR_UNLOCK_NCB(np, flags)  do { restore_flags(flags); } while (0)
-
-#define	NCR_LOCK_SCSI_DONE(host, flags)    do {;} while (0)
-#define	NCR_UNLOCK_SCSI_DONE(host, flags)  do {;} while (0)
-
-#endif
 
 /*==========================================================
 **
@@ -472,37 +347,11 @@ spinlock_t DRIVER_SMP_LOCK = SPIN_LOCK_UNLOCKED;
 **==========================================================
 */
 
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,1,0)
-#define ioremap vremap
-#define iounmap vfree
-#endif
-
 #ifdef __sparc__
-#  include <asm/irq.h>
-#  define memcpy_to_pci(a, b, c)	memcpy_toio((a), (b), (c))
-#elif defined(__alpha__)
-#  define memcpy_to_pci(a, b, c)	memcpy_toio((a), (b), (c))
-#else	/* others */
-#  define memcpy_to_pci(a, b, c)	memcpy_toio((a), (b), (c))
+#include <asm/irq.h>
 #endif
 
-#ifndef SCSI_NCR_PCI_MEM_NOT_SUPPORTED
-static u_long __init remap_pci_mem(u_long base, u_long size)
-{
-	u_long page_base	= ((u_long) base) & PAGE_MASK;
-	u_long page_offs	= ((u_long) base) - page_base;
-	u_long page_remapped	= (u_long) ioremap(page_base, page_offs+size);
-
-	return page_remapped? (page_remapped + page_offs) : 0UL;
-}
-
-static void __init unmap_pci_mem(u_long vaddr, u_long size)
-{
-	if (vaddr)
-		iounmap((void *) (vaddr & PAGE_MASK));
-}
-
-#endif /* not def SCSI_NCR_PCI_MEM_NOT_SUPPORTED */
+#define memcpy_to_pci(a, b, c)	memcpy_toio((a), (b), (c))
 
 /*==========================================================
 **
@@ -518,13 +367,8 @@ static void __init unmap_pci_mem(u_long vaddr, u_long size)
 **==========================================================
 */
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,105)
 #define UDELAY udelay
 #define MDELAY mdelay
-#else
-static void UDELAY(long us) { udelay(us); }
-static void MDELAY(long ms) { while (ms--) UDELAY(1000); }
-#endif
 
 /*==========================================================
 **
@@ -544,11 +388,7 @@ static void MDELAY(long ms) { while (ms--) UDELAY(1000); }
 **==========================================================
 */
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,0)
 #define __GetFreePages(flags, order) __get_free_pages(flags, order)
-#else
-#define __GetFreePages(flags, order) __get_free_pages(flags, order, 0)
-#endif
 
 #define MEMO_SHIFT	4	/* 16 bytes minimum memory chunk */
 #if PAGE_SIZE >= 8192
@@ -2253,39 +2093,11 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 		command |= (PCI_COMMAND_IO | PCI_COMMAND_MEMORY);
 		pci_write_config_word(pdev, PCI_COMMAND, command);
 	}
-
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,2,0)
-	if ( is_prep ) {
-		if (io_port >= 0x10000000) {
-			printk(NAME53C8XX ": reallocating io_port (Wacky IBM)");
-			io_port = (io_port & 0x00FFFFFF) | 0x01000000;
-			pci_write_config_dword(pdev,
-					       PCI_BASE_ADDRESS_0, io_port);
-		}
-		if (base >= 0x10000000) {
-			printk(NAME53C8XX ": reallocating base (Wacky IBM)");
-			base = (base & 0x00FFFFFF) | 0x01000000;
-			pci_write_config_dword(pdev,
-					       PCI_BASE_ADDRESS_1, base);
-		}
-		if (base_2 >= 0x10000000) {
-			printk(NAME53C8XX ": reallocating base2 (Wacky IBM)");
-			base_2 = (base_2 & 0x00FFFFFF) | 0x01000000;
-			pci_write_config_dword(pdev,
-					       PCI_BASE_ADDRESS_2, base_2);
-		}
-	}
-#endif
 #endif	/* __powerpc__ */
 
 #if defined(__i386__) && !defined(MODULE)
 	if (!cache_line_size) {
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,1,75)
-		extern char x86;
-		switch(x86) {
-#else
 		switch(boot_cpu_data.x86) {
-#endif
 		case 4:	suggested_cache_line_size = 4; break;
 		case 6:
 		case 5:	suggested_cache_line_size = 8; break;
