@@ -1702,8 +1702,8 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 
 	init_waitqueue_head(&hid->wait);
 	
-	hid->outlock = SPIN_LOCK_UNLOCKED;
-	hid->ctrllock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&hid->outlock);
+	spin_lock_init(&hid->ctrllock);
 
 	hid->version = le16_to_cpu(hdesc->bcdHID);
 	hid->country = hdesc->bCountryCode;

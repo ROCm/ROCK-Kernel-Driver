@@ -773,8 +773,8 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 	catc->usbdev = usbdev;
 	catc->netdev = netdev;
 
-	catc->tx_lock = SPIN_LOCK_UNLOCKED;
-	catc->ctrl_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&catc->tx_lock);
+	spin_lock_init(&catc->ctrl_lock);
 
 	init_timer(&catc->timer);
 	catc->timer.data = (long) catc;
