@@ -99,7 +99,7 @@ EXPORT_SYMBOL(_prep_type);
 EXPORT_SYMBOL(ucSystemType);
 #endif
 
-#if !__INLINE_BITOPS
+#if !defined(__INLINE_BITOPS)
 EXPORT_SYMBOL(set_bit);
 EXPORT_SYMBOL(clear_bit);
 EXPORT_SYMBOL(change_bit);

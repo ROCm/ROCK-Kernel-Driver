@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/sysrq.h>
+#include <asm/xmon.h>
 #include <asm/prom.h>
 #include <asm/bootx.h>
 #include <asm/machdep.h>
@@ -397,7 +398,7 @@ static unsigned char scc_inittab[] = {
 };
 
 void
-xmon_init_scc()
+xmon_init_scc(void)
 {
 	if ( _machine == _MACH_chrp )
 	{

@@ -205,7 +205,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 	struct task_struct *last;
 	
 	local_irq_save(s);
-#if CHECK_STACK
+#ifdef CHECK_STACK
 	check_stack(prev);
 	check_stack(new);
 #endif

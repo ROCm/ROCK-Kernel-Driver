@@ -476,7 +476,9 @@ static void __init printlargepacket(PnP_TAG_PACKET * pkt, int size) {
 	  break;
 	}
 }
-static void __init printpackets(PnP_TAG_PACKET * pkt, const char * cat) {
+
+static void __init printpackets(PnP_TAG_PACKET * pkt, const char * cat)
+{
 	if (pkt->S1_Pack.Tag== END_TAG) {
 		printk("  No packets describing %s resources.\n", cat);
 		return;
@@ -493,7 +495,7 @@ static void __init printpackets(PnP_TAG_PACKET * pkt, const char * cat) {
 			size=tag_small_count(pkt->S1_Pack.Tag)+1;
 			printsmallpacket(pkt, size);
 		}
-		(unsigned char *) pkt+=size;
+		pkt = (PnP_TAG_PACKET *)((unsigned char *) pkt + size);
 	} while (pkt->S1_Pack.Tag != END_TAG);
 }
 

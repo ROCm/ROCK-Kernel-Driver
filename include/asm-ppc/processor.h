@@ -691,8 +691,10 @@ struct thread_struct {
 	unsigned long	fpscr_pad;	/* fpr ... fpscr must be contiguous */
 	unsigned long	fpscr;		/* Floating point status */
 #ifdef CONFIG_ALTIVEC
-	vector128	vr[32];		/* Complete AltiVec set */
-	vector128	vscr;		/* AltiVec status */
+	/* Complete AltiVec register set */
+	vector128	vr[32] __attribute((aligned(16)));
+	/* AltiVec status */
+	vector128	vscr __attribute((aligned(16)));
 	unsigned long	vrsave;
 #endif /* CONFIG_ALTIVEC */
 };
