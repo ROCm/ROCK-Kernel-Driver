@@ -31,12 +31,12 @@ static int snd_gus_dram_poke(snd_gus_card_t *gus, char __user *_buffer,
 {
 	unsigned long flags;
 	unsigned int size1, size2;
-	char buffer[512], *pbuffer;
+	char buffer[256], *pbuffer;
 
 	while (size > 0) {
-		if (copy_from_user(buffer, _buffer, 512))
+		size1 = size > sizeof(buffer) ? sizeof(buffer) : size;
+		if (copy_from_user(buffer, _buffer, size1))
 			return -EFAULT;
-		size1 = size > 512 ? 512 : size;
 		if (gus->interwave) {
 			spin_lock_irqsave(&gus->reg_lock, flags);
 			snd_gf1_write8(gus, SNDRV_GF1_GB_MEMORY_CONTROL, 0x01);
@@ -69,10 +69,10 @@ static int snd_gus_dram_peek(snd_gus_card_t *gus, char __user *_buffer,
 {
 	unsigned long flags;
 	unsigned int size1, size2;
-	char buffer[512], *pbuffer;
+	char buffer[256], *pbuffer;
 
 	while (size > 0) {
-		size1 = size > 512 ? 512 : size;
+		size1 = size > sizeof(buffer) ? sizeof(buffer) : size;
 		if (gus->interwave) {
 			spin_lock_irqsave(&gus->reg_lock, flags);
 			snd_gf1_write8(gus, SNDRV_GF1_GB_MEMORY_CONTROL, rom ? 0x03 : 0x01);
