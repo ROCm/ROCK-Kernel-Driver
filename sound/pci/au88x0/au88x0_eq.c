@@ -54,7 +54,7 @@ static void vortex_EqHw_SetTimeConsts(vortex_t * vortex, u16 gain, u16 level)
 	hwwrite(vortex->mmio, 0x2b3c8, level);
 }
 
-static inline short sign_invert(short a)
+static inline u16 sign_invert(u16 a)
 {
 	/* -(-32768) -> -32768 so we do -(-32768) -> 32767 to make the result positive */
 	if (a == -32768)
@@ -73,13 +73,13 @@ static void vortex_EqHw_SetLeftCoefs(vortex_t * vortex, u16 coefs[])
 		hwwrite(vortex->mmio, 0x2b004 + n * 0x30, coefs[i + 1]);
 
 		if (eqhw->this08 == 0) {
-			hwwrite(vortex->mmio, 0x2b008 + n * 0x30, coefs[i + 2] & 0xffff);
-			hwwrite(vortex->mmio, 0x2b00c + n * 0x30, coefs[i + 3] & 0xffff);
-			hwwrite(vortex->mmio, 0x2b010 + n * 0x30, coefs[i + 4] & 0xffff);
+			hwwrite(vortex->mmio, 0x2b008 + n * 0x30, coefs[i + 2]);
+			hwwrite(vortex->mmio, 0x2b00c + n * 0x30, coefs[i + 3]);
+			hwwrite(vortex->mmio, 0x2b010 + n * 0x30, coefs[i + 4]);
 		} else {
-			hwwrite(vortex->mmio, 0x2b008 + n * 0x30, sign_invert(coefs[2 + i]) & 0xffff);
-			hwwrite(vortex->mmio, 0x2b00c + n * 0x30, sign_invert(coefs[3 + i]) & 0xffff);
-		        hwwrite(vortex->mmio, 0x2b010 + n * 0x30, sign_invert(coefs[4 + i]) & 0xffff);
+			hwwrite(vortex->mmio, 0x2b008 + n * 0x30, sign_invert(coefs[2 + i]));
+			hwwrite(vortex->mmio, 0x2b00c + n * 0x30, sign_invert(coefs[3 + i]));
+		        hwwrite(vortex->mmio, 0x2b010 + n * 0x30, sign_invert(coefs[4 + i]));
 		}
 		i += 5;
 	}
@@ -95,13 +95,13 @@ static void vortex_EqHw_SetRightCoefs(vortex_t * vortex, u16 coefs[])
 		hwwrite(vortex->mmio, 0x2b1e4 + n * 0x30, coefs[1 + i]);
 
 		if (eqhw->this08 == 0) {
-			hwwrite(vortex->mmio, 0x2b1e8 + n * 0x30, coefs[2 + i] & 0xffff);
-			hwwrite(vortex->mmio, 0x2b1ec + n * 0x30, coefs[3 + i] & 0xffff);
-			hwwrite(vortex->mmio, 0x2b1f0 + n * 0x30, coefs[4 + i] & 0xffff);
+			hwwrite(vortex->mmio, 0x2b1e8 + n * 0x30, coefs[2 + i]);
+			hwwrite(vortex->mmio, 0x2b1ec + n * 0x30, coefs[3 + i]);
+			hwwrite(vortex->mmio, 0x2b1f0 + n * 0x30, coefs[4 + i]);
 		} else {
-			hwwrite(vortex->mmio, 0x2b1e8 + n * 0x30, sign_invert(coefs[2 + i]) & 0xffff);
-			hwwrite(vortex->mmio, 0x2b1ec + n * 0x30, sign_invert(coefs[3 + i]) & 0xffff);
-			hwwrite(vortex->mmio, 0x2b1f0 + n * 0x30, sign_invert(coefs[4 + i]) & 0xffff);
+			hwwrite(vortex->mmio, 0x2b1e8 + n * 0x30, sign_invert(coefs[2 + i]));
+			hwwrite(vortex->mmio, 0x2b1ec + n * 0x30, sign_invert(coefs[3 + i]));
+			hwwrite(vortex->mmio, 0x2b1f0 + n * 0x30, sign_invert(coefs[4 + i]));
 		}
 		i += 5;
 	}
@@ -178,8 +178,8 @@ static void vortex_EqHw_SetBypassGain(vortex_t * vortex, u16 a, u16 b)
 		hwwrite(vortex->mmio, 0x2b3d4, a);
 		hwwrite(vortex->mmio, 0x2b3ec, b);
 	} else {
-		hwwrite(vortex->mmio, 0x2b3d4, sign_invert(a) & 0xffff);
-		hwwrite(vortex->mmio, 0x2b3ec, sign_invert(b) & 0xffff);
+		hwwrite(vortex->mmio, 0x2b3d4, sign_invert(a));
+		hwwrite(vortex->mmio, 0x2b3ec, sign_invert(b));
 	}
 }
 
