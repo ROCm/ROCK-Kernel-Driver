@@ -1060,19 +1060,6 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 	int err;
 	unsigned long flags;
 	struct via_rate_lock *ratep;
-	struct ratetbl {
-		int rate;
-		unsigned int bit;
-	} ratebits[] = {
-		{8000, SNDRV_PCM_RATE_8000},
-		{11025, SNDRV_PCM_RATE_11025},
-		{16000, SNDRV_PCM_RATE_16000},
-		{22050, SNDRV_PCM_RATE_22050},
-		{32000, SNDRV_PCM_RATE_32000},
-		{44100, SNDRV_PCM_RATE_44100},
-		{48000, SNDRV_PCM_RATE_48000},
-	};
-	int i;
 
 	runtime->hw = snd_via82xx_hw;
 	
@@ -1080,10 +1067,10 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 	ratep = &chip->rates[viadev->direction];
 	spin_lock_irqsave(&ratep->lock, flags);
 	ratep->used++;
-	if (chip->spdif_on) {
-		runtime->hw.rates = SNDRV_PCM_RATE_32000|SNDRV_PCM_RATE_44100|SNDRV_PCM_RATE_48000;
-		runtime->hw.rate_min = 32000;
-		runtime->hw.rate_max = 48000;
+	if (chip->spdif_on && viadev->reg_offset == 0x30) {
+		/* DXS#3 and spdif is on */
+		runtime->hw.rates = chip->ac97->rates[AC97_RATES_SPDIF];
+		snd_pcm_limit_hw_rates(runtime);
 	} else if (chip->dxs_fixed && viadev->reg_offset < 0x40) {
 		/* fixed DXS playback rate */
 		runtime->hw.rates = SNDRV_PCM_RATE_48000;
@@ -1091,27 +1078,10 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 	} else if (! ratep->rate) {
 		int idx = viadev->direction ? AC97_RATES_ADC : AC97_RATES_FRONT_DAC;
 		runtime->hw.rates = chip->ac97->rates[idx];
-		for (i = 0; i < (int)ARRAY_SIZE(ratebits); i++) {
-			if (runtime->hw.rates & ratebits[i].bit) {
-				runtime->hw.rate_min = ratebits[i].rate;
-				break;
-			}
-		}
-		for (i = ARRAY_SIZE(ratebits) - 1; i >= 0; i--) {
-			if (runtime->hw.rates & ratebits[i].bit) {
-				runtime->hw.rate_max = ratebits[i].rate;
-				break;
-			}
-		}
+		snd_pcm_limit_hw_rates(runtime);
 	} else {
 		/* a fixed rate */
 		runtime->hw.rates = SNDRV_PCM_RATE_KNOT;
-		for (i = 0; i < (int)ARRAY_SIZE(ratebits); i++) {
-			if (ratep->rate == ratebits[i].rate) {
-				runtime->hw.rates = ratebits[i].bit;
-				break;
-			}
-		}
 		runtime->hw.rate_max = runtime->hw.rate_min = ratep->rate;
 	}
 	spin_unlock_irqrestore(&ratep->lock, flags);
@@ -1362,6 +1332,10 @@ static int __devinit snd_via8233a_pcm_new(via82xx_t *chip)
 	if ((err = snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV_SG,
 							 snd_dma_pci_data(chip->pci), 64*1024, 128*1024)) < 0)
 		return err;
+
+	/* SPDIF supported? */
+	if (! ac97_can_spdif(chip->ac97))
+		return 0;
 
 	/* PCM #1:  DXS3 playback (for spdif) */
 	err = snd_pcm_new(chip->card, chip->card->shortname, 1, 1, 0, &pcm);
@@ -1660,9 +1634,11 @@ static int snd_via8233_init_misc(via82xx_t *chip, int dev)
 		if (err < 0)
 			return err;
 	}
-	err = snd_ctl_add(chip->card, snd_ctl_new1(&snd_via8233_dxs3_spdif_control, chip));
-	if (err < 0)
-		return err;
+	if (ac97_can_spdif(chip->ac97)) {
+		err = snd_ctl_add(chip->card, snd_ctl_new1(&snd_via8233_dxs3_spdif_control, chip));
+		if (err < 0)
+			return err;
+	}
 	if (chip->chip_type != TYPE_VIA8233A) {
 		err = snd_ctl_add(chip->card, snd_ctl_new1(&snd_via8233_dxs_volume_control, chip));
 		if (err < 0)
@@ -1672,6 +1648,7 @@ static int snd_via8233_init_misc(via82xx_t *chip, int dev)
 	/* select spdif data slot 10/11 */
 	pci_read_config_byte(chip->pci, VIA8233_SPDIF_CTRL, &val);
 	val = (val & ~VIA8233_SPDIF_SLOT_MASK) | VIA8233_SPDIF_SLOT_1011;
+	val &= ~VIA8233_SPDIF_DX3; /* SPDIF off as default */
 	pci_write_config_byte(chip->pci, VIA8233_SPDIF_CTRL, val);
 
 	return 0;
