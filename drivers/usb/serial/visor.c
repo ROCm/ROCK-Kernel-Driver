@@ -12,6 +12,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (03/09/2003) gkh
+ *	Added support for the Sony Clie NZ90V device.  Thanks to Martin Brachtl
+ *	<brachtl@redgrep.cz> for the information.
+ *
  * (03/05/2003) gkh
  *	Think Treo support is now working.
  *
@@ -217,6 +221,8 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NX60_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NZ90V_ID),
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ }					/* Terminating entry */
 };
 
@@ -243,6 +249,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NX60_ID) },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NZ90V_ID) },
 	{ }					/* Terminating entry */
 };
 

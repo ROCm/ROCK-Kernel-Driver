@@ -39,6 +39,7 @@
 #define SONY_CLIE_S360_ID		0x0095
 #define SONY_CLIE_4_1_ID		0x009A
 #define SONY_CLIE_NX60_ID		0x00DA
+#define SONY_CLIE_NZ90V_ID		0x00E9
 
 /****************************************************************************
  * Handspring Visor Vendor specific request codes (bRequest values)
