@@ -708,7 +708,7 @@ static struct scsi_id_instance_data *sbp2_alloc_device(struct unit_directory *ud
 	INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_inuse);
 	INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_completed);
 	INIT_LIST_HEAD(&scsi_id->scsi_list);
-	scsi_id->sbp2_command_orb_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&scsi_id->sbp2_command_orb_lock);
 	scsi_id->sbp2_device_type_and_lun = SBP2_DEVICE_TYPE_LUN_UNINITIALIZED;
 
 	ud->device.driver_data = scsi_id;
