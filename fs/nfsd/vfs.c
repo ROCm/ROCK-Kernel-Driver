@@ -1128,7 +1128,19 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	if (IS_ERR(dnew))
 		goto out_nfserr;
 
-	err = vfs_symlink(dentry->d_inode, dnew, path);
+	if (unlikely(path[plen] != 0)) {
+		char *path_alloced = kmalloc(plen+1, GFP_KERNEL);
+		if (path_alloced == NULL)
+			err = -ENOMEM;
+		else {
+			strncpy(path_alloced, path, plen);
+			path_alloced[plen] = 0;
+			err = vfs_symlink(dentry->d_inode, dnew, path_alloced);
+			kfree(path_alloced);
+		}
+	} else
+		err = vfs_symlink(dentry->d_inode, dnew, path);
+
 	if (!err) {
 		if (EX_ISSYNC(fhp->fh_export))
 			nfsd_sync_dir(dentry);
