@@ -161,22 +161,22 @@ static const struct isapnp_card_id *snd_cs4236_isapnp_id[SNDRV_CARDS] __devinitd
 #define ISAPNP_CS4232(_va, _vb, _vc, _device, _wss, _ctrl, _mpu401) \
 	{ \
 		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		devs : { ISAPNP_DEVICE_ID(_va, _vb, _vc, _wss), \
-                         ISAPNP_DEVICE_ID(_va, _vb, _vc, _ctrl), \
-			 ISAPNP_DEVICE_ID(_va, _vb, _vc, _mpu401) } \
+		.devs = { ISAPNP_DEVICE_ID(_va, _vb, _vc, _wss), \
+                          ISAPNP_DEVICE_ID(_va, _vb, _vc, _ctrl), \
+			  ISAPNP_DEVICE_ID(_va, _vb, _vc, _mpu401) } \
         }
 #define ISAPNP_CS4232_1(_va, _vb, _vc, _device, _wss, _ctrl, _mpu401) \
 	{ \
 		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		devs : { ISAPNP_DEVICE_ID(_va, _vb, _vc, _wss), \
-                         ISAPNP_DEVICE_ID(_va, _vb, _vc, _ctrl), \
-			 ISAPNP_DEVICE_ID('P', 'N', 'P', _mpu401) } \
+		.devs = { ISAPNP_DEVICE_ID(_va, _vb, _vc, _wss), \
+                          ISAPNP_DEVICE_ID(_va, _vb, _vc, _ctrl), \
+		 	  ISAPNP_DEVICE_ID('P', 'N', 'P', _mpu401) } \
         }
 #define ISAPNP_CS4232_WOMPU(_va, _vb, _vc, _device, _wss, _ctrl) \
 	{ \
 		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		devs : { ISAPNP_DEVICE_ID(_va, _vb, _vc, _wss), \
-                         ISAPNP_DEVICE_ID(_va, _vb, _vc, _ctrl) } \
+		.devs = { ISAPNP_DEVICE_ID(_va, _vb, _vc, _wss), \
+                          ISAPNP_DEVICE_ID(_va, _vb, _vc, _ctrl) } \
         }
 
 
