@@ -12,11 +12,12 @@ enum pid_type
 
 struct pid
 {
+	/* Try to keep hash_chain in the same cacheline as nr for find_pid */
+	struct hlist_node hash_chain;
 	int nr;
 	atomic_t count;
 	struct task_struct *task;
 	struct list_head task_list;
-	struct hlist_node hash_chain;
 };
 
 struct pid_link
