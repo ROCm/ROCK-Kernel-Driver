@@ -141,7 +141,7 @@ static void send_reset(struct sk_buff *oldskb, int local)
 	nskb->nf_debug = 0;
 #endif
 	nskb->nfmark = 0;
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 	nf_bridge_put(nskb->nf_bridge);
 	nskb->nf_bridge = NULL;
 #endif
