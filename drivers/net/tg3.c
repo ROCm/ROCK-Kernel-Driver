@@ -4442,9 +4442,6 @@ static int tg3_set_mac_addr(struct net_device *dev, void *p)
 	struct tg3 *tp = dev->priv;
 	struct sockaddr *addr = p;
 
-	if (netif_running(dev))
-		return -EBUSY;
-
 	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
 
 	spin_lock_irq(&tp->lock);
