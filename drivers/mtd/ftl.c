@@ -846,7 +846,7 @@ static int ftl_open(struct inode *inode, struct file *file)
     if (partition->state != FTL_FORMATTED)
 	return -ENXIO;
     
-    if (partition->disk->part[0].nr_sects == 0)
+    if (get_capacity(partition->disk) == 0)
 	return -ENXIO;
 
     if (!get_mtd_device(partition->mtd, -1))
@@ -1132,8 +1132,8 @@ static int ftl_revalidate(kdev_t dev)
 	int unit = minor(dev) >> 4;
 	partition_t *part = myparts[unit];
 	scan_header(part);
-	part->disk->part[0].nr_sects =
-		le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE);
+	set_capacity(part->disk,
+		le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE));
 	return 0;
 }
 

@@ -1500,7 +1500,7 @@ static int idefloppy_get_capacity (ide_drive_t *drive)
 	drive->bios_cyl = 0;
 	drive->bios_head = drive->bios_sect = 0;
 	floppy->blocks = floppy->bs_factor = 0;
-	drive->part[0].nr_sects = 0;
+	set_capacity(drive->disk, 0);
 
 	idefloppy_create_read_capacity_cmd (&pc);
 	if (idefloppy_queue_pc_tail (drive, &pc)) {
@@ -1555,7 +1555,7 @@ static int idefloppy_get_capacity (ide_drive_t *drive)
 		(void) idefloppy_get_flexible_disk_page (drive);
 	}
 
-	drive->part[0].nr_sects = floppy->blocks * floppy->bs_factor;
+	set_capacity(drive->disk, floppy->blocks * floppy->bs_factor);
 	return rc;
 }
 
@@ -2213,7 +2213,7 @@ static int idefloppy_reinit (ide_drive_t *drive)
 	add_gendisk(g);
 	register_disk(g, mk_kdev(g->major,g->first_minor),
 		      1<<g->minor_shift, ide_fops,
-		      g->part[0].nr_sects);
+		      get_capacity(g));
 	return 0;
 failed:
 	return 1;

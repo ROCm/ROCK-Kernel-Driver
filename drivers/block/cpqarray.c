@@ -1497,7 +1497,7 @@ static int ida_revalidate(kdev_t dev)
         int ctlr = major(dev) - MAJOR_NR;
 	int target = DEVICE_NR(dev);
         struct gendisk *gdev = &ida_gendisk[ctlr*NWD+target];
-	gdev->part[minor(dev)].nr_sects = hba[ctlr]->drv[target].nr_blks;
+	set_capacity(gdev, hba[ctlr]->drv[target].nr_blks);
 	return 0;
 }
 

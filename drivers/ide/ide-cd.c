@@ -2138,7 +2138,7 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 	if (stat)
 		toc->capacity = 0x1fffff;
 
-	drive->part[0].nr_sects = toc->capacity * SECTORS_PER_FRAME;
+	set_capacity(drive->disk, toc->capacity * SECTORS_PER_FRAME);
 
 	/* Remember that we've read this stuff. */
 	CDROM_STATE_FLAGS (drive)->toc_valid = 1;
@@ -3148,7 +3148,7 @@ static int ide_cdrom_reinit (ide_drive_t *drive)
 	add_gendisk(g);
 	register_disk(g, mk_kdev(g->major,g->first_minor),
 		      1<<g->minor_shift, ide_fops,
-		      g->part[0].nr_sects);
+		      get_capacity(g));
 	return 0;
 failed:
 	return 1;

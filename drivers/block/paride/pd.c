@@ -438,9 +438,9 @@ static int pd_revalidate(kdev_t dev)
 	if ((unit >= PD_UNITS) || !PD.present)
 		return -ENODEV;
 	if (pd_identify(unit))
-		pd_hd[minor(dev)].nr_sects = PD.capacity;
+		set_capacity(&PD.gd, PD.capacity);
 	else
-		pd_hd[minor(dev)].nr_sects = 0;
+		set_capacity(&PD.gd, 0);
         return 0;
 }
 
@@ -727,7 +727,7 @@ repeat:
         pd_count = CURRENT->current_nr_sectors;
 
         if ((pd_dev >= PD_DEVS) || 
-	    ((pd_block+pd_count) > pd_hd[pd_dev].nr_sects)) {
+	    ((pd_block+pd_count) > get_capacity(&pd[unit].gd))) {
                 end_request(CURRENT, 0);
                 goto repeat;
         }

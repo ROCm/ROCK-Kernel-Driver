@@ -338,13 +338,11 @@ void register_disk(struct gendisk *disk, kdev_t dev, unsigned minors,
 	struct block_device_operations *ops, long size)
 {
 	struct block_device *bdev;
-	struct hd_struct *p;
 
 	if (!disk)
 		return;
 
-	p = disk->part;
-	p[0].nr_sects = size;
+	set_capacity(disk, size);
 
 	/* No minors to use for partitions */
 	if (!disk->minor_shift)
@@ -410,7 +408,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	}
 	if (bdev->bd_op->revalidate)
 		bdev->bd_op->revalidate(dev);
-	if (disk->part[0].nr_sects)
+	if (get_capacity(disk))
 		check_partition(disk, bdev);
 	for (p = 1; p < (1<<disk->minor_shift); p++)
 		update_partition(disk, p);

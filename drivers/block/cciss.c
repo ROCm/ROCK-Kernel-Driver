@@ -407,8 +407,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
                         driver_geo.sectors = 0x3f;
                         driver_geo.cylinders = hba[ctlr]->drv[dsk].nr_blocks / (0xff*0x3f);
                 }
-                driver_geo.start=
-                        hba[ctlr]->hd[minor(inode->i_rdev)].start_sect;
+                driver_geo.start= get_start_sect(inode->i_bdev);
                 if (copy_to_user((void *) arg, &driver_geo,
                                 sizeof( struct hd_geometry)))
                         return  -EFAULT;
@@ -705,7 +704,7 @@ static int cciss_revalidate(kdev_t dev)
         int ctlr = major(dev) - MAJOR_NR;
 	int target = minor(dev) >> NWD_SHIFT;
         struct gendisk *disk = &hba[ctlr]->gendisk[target];
-	disk->part[0].nr_sects = hba[ctlr]->drv[target].nr_blocks;
+	set_capacity(disk, hba[ctlr]->drv[target].nr_blocks);
 	return 0;
 }
 

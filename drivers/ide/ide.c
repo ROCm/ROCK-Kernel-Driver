@@ -1661,7 +1661,7 @@ ide_drive_t *get_info_ptr (kdev_t i_rdev)
 			if (unit < MAX_DRIVES) {
 				ide_drive_t *drive = &hwif->drives[unit];
 #if 0
-				if ((drive->present) && (drive->part[minor].nr_sects))
+				if (drive->present && get_capacity(drive->disk))
 #else
 				if (drive->present)
 #endif
@@ -1748,7 +1748,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 
 void ide_revalidate_drive (ide_drive_t *drive)
 {
-	drive->disk->part[0].nr_sects = current_capacity(drive);
+	set_capacity(drive->disk, current_capacity(drive));
 }
 
 /*
@@ -1975,7 +1975,7 @@ void ide_unregister (unsigned int index)
 			continue;
 		minor = drive->select.b.unit << PARTN_BITS;
 		for (p = 0; p < (1<<PARTN_BITS); ++p) {
-			if (drive->part[p].nr_sects > 0) {
+			if (get_capacity(drive->disk)) {
 				kdev_t devp = mk_kdev(hwif->major, minor+p);
 				invalidate_device(devp, 0);
 			}
@@ -2523,7 +2523,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			if (put_user(drive->bios_head, (byte *) &loc->heads)) return -EFAULT;
 			if (put_user(drive->bios_sect, (byte *) &loc->sectors)) return -EFAULT;
 			if (put_user(bios_cyl, (unsigned short *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)drive->part[minor(inode->i_rdev)&PARTN_MASK].start_sect,
+			if (put_user((unsigned)get_start_sect(inode->i_bdev),
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}
@@ -2535,7 +2535,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			if (put_user(drive->head, (byte *) &loc->heads)) return -EFAULT;
 			if (put_user(drive->sect, (byte *) &loc->sectors)) return -EFAULT;
 			if (put_user(drive->cyl, (unsigned int *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)drive->part[minor(inode->i_rdev)&PARTN_MASK].start_sect,
+			if (put_user((unsigned)get_start_sect(inode->i_bdev),
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}

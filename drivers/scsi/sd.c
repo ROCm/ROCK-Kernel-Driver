@@ -286,6 +286,8 @@ static request_queue_t *sd_find_queue(kdev_t dev)
 		return NULL;	/* No such device */
 }
 
+static struct gendisk **sd_disks;
+
 /**
  *	sd_init_command - build a scsi (read or write) command from
  *	information in the request structure.
@@ -321,7 +323,7 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	/* >>>>> this change is not in the lk 2.5 series */
 	if (part_nr >= (sd_template.dev_max << 4) || (part_nr & 0xf) ||
 	    !sdp || !sdp->online ||
- 	    block + SCpnt->request->nr_sectors > sd[part_nr].nr_sects) {
+ 	    block + SCpnt->request->nr_sectors > get_capacity(sd_disks[dsk_nr])) {
 		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", 
 				 SCpnt->request->nr_sectors));
 		SCSI_LOG_HLQUEUE(2, printk("Retry with 0x%p\n", SCpnt));
@@ -587,8 +589,6 @@ static struct block_device_operations sd_fops =
 	check_media_change:	check_scsidisk_media_change,
 	revalidate:		sd_revalidate
 };
-
-static struct gendisk **sd_disks;
 
 /**
  *	sd_rw_intr - bottom half handler: called when the lower level
@@ -1374,7 +1374,7 @@ static int sd_revalidate(kdev_t dev)
 		return -ENODEV;
 
 	sd_init_onedisk(sdkp, dsk_nr);
-	sd_disks[dsk_nr]->part[0].nr_sects = sdkp->capacity;
+	set_capacity(sd_disks[dsk_nr], sdkp->capacity);
 	return 0;
 }
 

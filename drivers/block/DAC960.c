@@ -2033,10 +2033,9 @@ static long disk_size(DAC960_Controller_T *Controller, int disk)
 
 static void DAC960_ComputeGenericDiskInfo(DAC960_Controller_T *Controller)
 {
-	struct gendisk *disks = Controller->disks;
 	int disk;
 	for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++)
-		disks->part[0].nr_sects = disk_size(Controller, disk);
+		set_capacity(Controller->disks + disk, disk_size(Controller, disk));
 }
 
 static int DAC960_revalidate(kdev_t dev)
@@ -2044,7 +2043,7 @@ static int DAC960_revalidate(kdev_t dev)
 	int ctlr = DAC960_ControllerNumber(dev);
 	int disk = DAC960_LogicalDriveNumber(dev);
 	DAC960_Controller_T *p = DAC960_Controllers[ctlr];
-	p->disks[disk].part[0].nr_sects = disk_size(p, disk);
+	set_capacity(&p->disks[disk], disk_size(p, disk));
 	return 0;
 }
 
@@ -5276,7 +5275,7 @@ static int DAC960_Open(Inode_T *Inode, File_T *File)
 	    DAC960_KernelDevice(Controller->ControllerNumber, LogicalDriveNumber, 0),
 	    DAC960_MaxPartitions, &DAC960_BlockDeviceOperations, size);
     }
-  if (Controller->disks[LogicalDriveNumber].part[0].nr_sects == 0)
+  if (!get_capacity(&Controller->disks[LogicalDriveNumber]))
     return -ENXIO;
   /*
     Increment Controller and Logical Drive Usage Counts.

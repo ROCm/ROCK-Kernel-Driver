@@ -95,6 +95,14 @@ static inline unsigned long get_start_sect(struct block_device *bdev)
 {
 	return bdev->bd_offset;
 }
+static inline sector_t get_capacity(struct gendisk *disk)
+{
+	return disk->part[0].nr_sects;
+}
+static inline void set_capacity(struct gendisk *disk, sector_t size)
+{
+	disk->part[0].nr_sects = size;
+}
 
 #endif  /*  __KERNEL__  */
 

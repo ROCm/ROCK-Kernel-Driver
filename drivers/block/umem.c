@@ -812,7 +812,7 @@ static void del_battery_timer(void)
 static int mm_revalidate(kdev_t i_rdev)
 {
 	int card_number = DEVICE_NR(i_rdev);
-	mm_partitions[minor(i_rdev)].nr_sects = cards[card_number].mm_size << 1;
+	set_capacity(mm_gendisk + card_number, cards[card_number].mm_size << 1);
 	return 0;
 }
 /*

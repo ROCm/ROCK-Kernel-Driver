@@ -234,9 +234,9 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 		 * block.  Therefore, if we hit a medium error within the last
 		 * 75 2K sectors, we decrease the saved size value.
 		 */
-		if (error_sector < cd->disk->part[0].nr_sects &&
+		if (error_sector < get_capacity(cd->disk) &&
 		    cd->capacity - error_sector < 4 * 75)
-			cd->disk->part[0].nr_sects = error_sector;
+			set_capacity(cd->disk, error_sector);
 	}
 
 	/*
@@ -555,7 +555,7 @@ static void get_sectorsize(Scsi_CD *cd)
 		 * what the device is capable of.
 		 */
 		cd->needs_sector_size = 0;
-		cd->disk->part[0].nr_sects = cd->capacity;
+		set_capacity(cd->disk, cd->capacity);
 	}
 
 	queue = &cd->device->request_queue;

@@ -279,15 +279,17 @@ static void do_xd_request (request_queue_t * q)
 		return;
 
 	while (1) {
+		int unit;
 		code = 0;
 		/* do some checking on the request structure */
 		if (blk_queue_empty(QUEUE))
 			return;
 
-		if (DEVICE_NR(CURRENT->rq_dev) < xd_drives
+		unit = DEVICE_NR(CURRENT->rq_dev);
+		if (unit < xd_drives
 		    && (CURRENT->flags & REQ_CMD)
 		    && CURRENT->sector + CURRENT->nr_sectors
-		         <= xd_struct[minor(CURRENT->rq_dev)].nr_sects) {
+		         <= get_capacity(xd_gendisk + unit)) {
 			block = CURRENT->sector;
 			count = CURRENT->nr_sectors;
 
@@ -295,7 +297,7 @@ static void do_xd_request (request_queue_t * q)
 				case READ:
 				case WRITE:
 					for (retry = 0; (retry < XD_RETRIES) && !code; retry++)
-						code = xd_readwrite(rq_data_dir(CURRENT),DEVICE_NR(CURRENT->rq_dev),
+						code = xd_readwrite(rq_data_dir(CURRENT),unit,
 							CURRENT->buffer,block,count);
 					break;
 				default:

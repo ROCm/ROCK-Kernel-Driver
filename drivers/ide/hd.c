@@ -596,22 +596,21 @@ repeat:
 		reset_hd();
 		return;
 	}
-	dev = minor(CURRENT->rq_dev);
+	dev = DEVICE_NR(CURRENT->rq_dev);
 	block = CURRENT->sector;
 	nsect = CURRENT->nr_sectors;
-	if (dev >= (NR_HD<<6) || (dev & 0x3f) ||
-	    block >= hd[dev].nr_sects || ((block+nsect) > hd[dev].nr_sects)) {
-		if (dev >= (NR_HD<<6) || (dev & 0x3f))
+	if (dev >= NR_HD || block >= get_capacity(hd_gendisk+dev) ||
+	    ((block+nsect) > get_capacity(hd_gendisk+unit))) {
+		if (dev >= NR_HD)
 			printk("hd: bad minor number: device=%s\n",
 			       kdevname(CURRENT->rq_dev));
 		else
 			printk("hd%c: bad access: block=%d, count=%d\n",
-				(minor(CURRENT->rq_dev)>>6)+'a', block, nsect);
+				dev+'a', block, nsect);
 		end_request(CURRENT, 0);
 		goto repeat;
 	}
 
-	dev >>= 6;
 	if (special_op[dev]) {
 		if (do_special_op(dev))
 			goto repeat;
@@ -819,10 +818,11 @@ static void __init hd_geninit(void)
 #endif
 
 	for (drive=0 ; drive < NR_HD ; drive++) {
-		hd[drive<<6].nr_sects = hd_info[drive].head *
+		sector_t size = hd_info[drive].head *
 			hd_info[drive].sect * hd_info[drive].cyl;
-		printk ("hd%c: %ldMB, CHS=%d/%d/%d\n", drive+'a',
-			hd[drive<<6].nr_sects / 2048, hd_info[drive].cyl,
+		set_capacity(hd_gendisk + drive, size);
+		printk ("%s: %ldMB, CHS=%d/%d/%d\n", hd_gendisk[drive].major_name,
+			size / 2048, hd_info[drive].cyl,
 			hd_info[drive].head, hd_info[drive].sect);
 	}
 	if (!NR_HD)

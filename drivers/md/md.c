@@ -618,7 +618,7 @@ static void free_mddev(mddev_t *mddev)
 
 	export_array(mddev);
 	md_size[mdidx(mddev)] = 0;
-	md_hd_struct[mdidx(mddev)].nr_sects = 0;
+	set_capacity(disks[mdidx(mddev)], 0);
 }
 
 #undef BAD_CSUM
@@ -2343,7 +2343,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 			err = put_user (4, (char *) &loc->sectors);
 			if (err)
 				goto abort_unlock;
-			err = put_user (md_hd_struct[mdidx(mddev)].nr_sects/8,
+			err = put_user(get_capacity(disks[mdidx(mddev)])/8,
 						(short *) &loc->cylinders);
 			if (err)
 				goto abort_unlock;

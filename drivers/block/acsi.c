@@ -783,7 +783,7 @@ static void read_intr( void )
 	
 	status = acsi_getstatus();
 	if (status != 0) {
-		int dev = minor(CURRENT->rq_dev);
+		int dev = DEVICE_NR(CURRENT->rq_dev);
 		printk( KERN_ERR "ad%c: ", dev+'a' );
 		if (!acsi_reqsense( acsi_buffer, acsi_info[dev].target, 
 					acsi_info[dev].lun))
@@ -814,7 +814,7 @@ static void write_intr(void)
 
 	status = acsi_getstatus();
 	if (status != 0) {
-		int	dev = minor(CURRENT->rq_dev);
+		int	dev = DEVICE_NR(CURRENT->rq_dev);
 		printk( KERN_ERR "ad%c: ", dev+'a' );
 		if (!acsi_reqsense( acsi_buffer, acsi_info[dev].target,
 					acsi_info[dev].lun))
@@ -973,15 +973,15 @@ static void redo_acsi_request( void )
 			panic(DEVICE_NAME ": block not locked");
 	}
 
-	dev = minor(CURRENT->rq_dev);
+	dev = DEVICE_NR(CURRENT->rq_dev);
 	block = CURRENT->sector;
 	if (dev >= NDevices ||
-		block+CURRENT->nr_sectors >= acsi_part[dev].nr_sects) {
+		block+CURRENT->nr_sectors >= get_capacity(acsi_gendisk + dev)) {
 #ifdef DEBUG
 		printk( "ad%c: attempted access for blocks %d...%ld past end of device at block %ld.\n",
 		       dev+'a',
 		       block, block + CURRENT->nr_sectors - 1,
-		       acsi_part[dev].nr_sects);
+		       get_capacity(acsi_gendisk + dev));
 #endif
 		end_request(CURRENT, 0);
 		goto repeat;
@@ -1088,11 +1088,7 @@ static void redo_acsi_request( void )
 static int acsi_ioctl( struct inode *inode, struct file *file,
 					   unsigned int cmd, unsigned long arg )
 {
-	dev_t dev;
-
-	if (!inode)
-		return -EINVAL;
-	dev = minor(inode->i_rdev);
+	int dev = DEVICE_NR(inode->i_rdev);
 	if (dev >= NDevices)
 		return -EINVAL;
 	switch (cmd) {
@@ -1140,7 +1136,7 @@ static int acsi_open( struct inode * inode, struct file * filp )
 	int  device;
 	struct acsi_info_struct *aip;
 
-	device = minor(inode->i_rdev);
+	device = DEVICE_NR(inode->i_rdev);
 	if (device >= NDevices)
 		return -ENXIO;
 	aip = &acsi_info[device];
@@ -1176,7 +1172,7 @@ static int acsi_open( struct inode * inode, struct file * filp )
 
 static int acsi_release( struct inode * inode, struct file * file )
 {
-	int device = minor(inode->i_rdev);
+	int device = DEVICE_NR(inode->i_rdev);
 	if (--access_count[device] == 0 && acsi_info[device].removable)
 		acsi_prevent_removal(device, 0);
 	return( 0 );
@@ -1204,7 +1200,7 @@ static void acsi_prevent_removal(int device, int flag)
 
 static int acsi_media_change (kdev_t dev)
 {
-	int device = minor(dev);
+	int device = DEVICE_NR(dev);
 	struct acsi_info_struct *aip;
 
 	aip = &acsi_info[device];
@@ -1807,7 +1803,7 @@ void cleanup_module(void)
 
 static int acsi_revalidate(kdev_t dev)
 {
-	int unit = DEVICE_NR(minor(dev));
+	int unit = DEVICE_NR(dev);
 	struct acsi_info_struct *aip = &acsi_info[unit];
 	stdma_lock( NULL, NULL );
 	if (acsi_devinit(aip) != DEV_SUPPORTED) {
@@ -1821,6 +1817,6 @@ static int acsi_revalidate(kdev_t dev)
 
 	ENABLE_IRQ();
 	stdma_release();
-	acsi_part[minor(dev)].nr_sects = aip->size;
+	set_capacity(acsi_gendisk + unit, aip->size);
 	return 0;
 }

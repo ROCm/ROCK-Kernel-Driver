@@ -487,6 +487,7 @@ static void __init ps2esdi_get_device_cfg(void)
 static void do_ps2esdi_request(request_queue_t * q)
 {
 	u_int block, count;
+	int unit;
 	/* since, this routine is called with interrupts cleared - they 
 	   must be before it finishes  */
 
@@ -503,18 +504,19 @@ static void do_ps2esdi_request(request_queue_t * q)
 	if (blk_queue_empty(QUEUE))
 		return;
 
+	unit = DEVICE_NR(CURRENT->rq_dev);
 	if (isa_virt_to_bus(CURRENT->buffer + CURRENT->current_nr_sectors * 512) > 16 * MB) {
 		printk("%s: DMA above 16MB not supported\n", DEVICE_NAME);
 		end_request(CURRENT, FAIL);
 	}			/* check for above 16Mb dmas */
-	else if ((DEVICE_NR(CURRENT->rq_dev) < ps2esdi_drives) &&
+	else if ((unit < ps2esdi_drives) &&
 	    (CURRENT->sector + CURRENT->current_nr_sectors <=
-	     ps2esdi[minor(CURRENT->rq_dev)].nr_sects) &&
+	     get_capacity(&ps2esdi_gendisk[unit])) &&
 	    	CURRENT->flags & REQ_CMD) {
 #if 0
 		printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld\n",
 		       DEVICE_NAME,
-		       DEVICE_NR(CURRENT->rq_dev), minor(CURRENT->rq_dev),
+		       unit, minor(CURRENT->rq_dev),
 		       CURRENT->cmd, CURRENT->sector,
 		       CURRENT->current_nr_sectors);
 #endif
@@ -524,10 +526,10 @@ static void do_ps2esdi_request(request_queue_t * q)
 
 		switch (rq_data_dir(CURRENT)) {
 		case READ:
-			ps2esdi_readwrite(READ, DEVICE_NR(CURRENT->rq_dev), block, count);
+			ps2esdi_readwrite(READ, unit, block, count);
 			break;
 		case WRITE:
-			ps2esdi_readwrite(WRITE, DEVICE_NR(CURRENT->rq_dev), block, count);
+			ps2esdi_readwrite(WRITE, unit, block, count);
 			break;
 		default:
 			printk("%s: Unknown command\n", DEVICE_NAME);
@@ -538,7 +540,7 @@ static void do_ps2esdi_request(request_queue_t * q)
 	/* is request is valid */ 
 	else {
 		printk("Grrr. error. ps2esdi_drives: %d, %lu %lu\n", ps2esdi_drives,
-		       CURRENT->sector, ps2esdi[minor(CURRENT->rq_dev)].nr_sects);
+		       CURRENT->sector, get_capacity(&ps2esdi_gendisk[unit]));
 		end_request(CURRENT, FAIL);
 	}
 

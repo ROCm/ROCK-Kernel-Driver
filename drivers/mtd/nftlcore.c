@@ -846,10 +846,10 @@ void nftl_request(RQFUNC_ARG)
 		down(&nftl->mutex);
 		DEBUG(MTD_DEBUG_LEVEL3, "Got mutex\n");
 
-		if (block + nsect > part_table[dev].nr_sects) {
+		if (block + nsect > get_capacity(nftl->disk)) {
 			/* access past the end of device */
 			printk("nftl%c%d: bad access: block = %d, count = %d\n",
-			       (minor(req->rq_dev)>>6)+'a', dev & 0xf, block, nsect);
+			       unit+'a', dev & 0xf, block, nsect);
 			up(&nftl->mutex);
 			res = 0; /* fail */
 			goto repeat;
