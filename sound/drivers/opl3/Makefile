@@ -45,5 +45,3 @@ obj-$(CONFIG_SND_SONICVIBES) += $(OPL3_OBJS)
 obj-$(CONFIG_SND_YMFPCI) += $(OPL3_OBJS)
 
 obj-m := $(sort $(obj-m))
-
-include $(TOPDIR)/Rules.make

@@ -16,8 +16,10 @@
 #define CSR_BUSY_TIMEOUT          0x210
 #define CSR_BUS_MANAGER_ID        0x21c
 #define CSR_BANDWIDTH_AVAILABLE   0x220
+#define CSR_CHANNELS_AVAILABLE    0x224
 #define CSR_CHANNELS_AVAILABLE_HI 0x224
 #define CSR_CHANNELS_AVAILABLE_LO 0x228
+#define CSR_BROADCAST_CHANNEL     0x234
 #define CSR_CONFIG_ROM            0x400
 #define CSR_CONFIG_ROM_END        0x800
 #define CSR_FCP_COMMAND           0xB00
@@ -40,6 +42,7 @@ struct csr_control {
         quadlet_t bus_manager_id;
         quadlet_t bandwidth_available;
         quadlet_t channels_available_hi, channels_available_lo;
+	quadlet_t broadcast_channel;
 
         quadlet_t *rom;
         size_t rom_size;

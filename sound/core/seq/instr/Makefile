@@ -43,5 +43,3 @@ obj-$(CONFIG_SND_TRIDENT) += snd-ainstr-simple.o
 obj-$(CONFIG_SND_YMFPCI) += snd-ainstr-fm.o
 
 obj-m := $(sort $(obj-m))
-
-include $(TOPDIR)/Rules.make

@@ -19,5 +19,3 @@ obj-$(CONFIG_SMP)		+= smp.o
 AFLAGS_r4k_genex.o := -P
 AFLAGS_r4k_tlb_glue.o := -P
 EXTRA_AFLAGS := $(CFLAGS)
-
-include $(TOPDIR)/Rules.make

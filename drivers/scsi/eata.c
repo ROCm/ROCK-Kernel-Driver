@@ -1,6 +1,12 @@
 /*
  *      eata.c - Low-level driver for EATA/DMA SCSI host adapters.
  *
+ *      12 Nov 2002 Rev. 8.02 for linux 2.5.47
+ *        + Release driver_lock before calling scsi_register.
+ *
+ *      11 Nov 2002 Rev. 8.01 for linux 2.5.47
+ *        + Fixed bios_param and scsicam_bios_param calling parameters.
+ *
  *      28 Oct 2002 Rev. 8.00 for linux 2.5.44-ac4
  *        + Use new tcq and adjust_queue_depth api.
  *        + New command line option (tm:[0-2]) to choose the type of tags:
@@ -460,6 +466,9 @@ MODULE_PARM(max_queue_depth, "i");
 MODULE_PARM(tag_mode, "i");
 MODULE_PARM(ext_tran, "i");
 MODULE_PARM(rev_scan, "i");
+MODULE_PARM(isa_probe, "i");
+MODULE_PARM(eisa_probe, "i");
+MODULE_PARM(pci_probe, "i");
 MODULE_AUTHOR("Dario Ballabio");
 
 #endif
@@ -548,7 +557,7 @@ MODULE_AUTHOR("Dario Ballabio");
 #define REG_LM          3
 #define REG_MID         4
 #define REG_MSB         5
-#define REGION_SIZE     9
+#define REGION_SIZE     9UL
 #define MAX_ISA_ADDR    0x03ff
 #define MIN_EISA_ADDR   0x1c88
 #define MAX_EISA_ADDR   0xfc88
@@ -572,7 +581,7 @@ MODULE_AUTHOR("Dario Ballabio");
 #define TLDEV(type) ((type) == TYPE_DISK || (type) == TYPE_ROM)
 
 /* "EATA", in Big Endian format */
-#define EATA_SIGNATURE 0x41544145
+#define EATA_SIG_BE 0x45415441
 
 /* Number of valid bytes in the board config structure for EATA 2.0x */
 #define EATA_2_0A_SIZE 28
@@ -583,6 +592,12 @@ MODULE_AUTHOR("Dario Ballabio");
 struct eata_info {
    u_int32_t data_len;  /* Number of valid bytes after this field */
    u_int32_t sign;      /* ASCII "EATA" signature */
+
+#if defined(__BIG_ENDIAN_BITFIELD)
+   unchar version:4, :4;
+   unchar  haaval:1, ata:1, drqvld:1, dmasup:1, morsup:1, trnxfr:1, tarsup:1,
+           ocsena:1;
+#else
    unchar        :4,    /* unused low nibble */
           version:4;    /* EATA version, should be 0x1 */
    unchar  ocsena:1,    /* Overlap Command Support Enabled */
@@ -593,6 +608,8 @@ struct eata_info {
            drqvld:1,    /* DRQ Index (DRQX) is valid */
               ata:1,    /* This is an ATA device */
            haaval:1;    /* Host Adapter Address Valid */
+#endif
+
    ushort cp_pad_len;   /* Number of pad bytes after cp_len */
    unchar host_addr[4]; /* Host Adapter SCSI ID for channels 3, 2, 1, 0 */
    u_int32_t cp_len;    /* Number of valid bytes in cp */
@@ -600,6 +617,15 @@ struct eata_info {
    ushort queue_size;   /* Max number of cp that can be queued */
    ushort unused;
    ushort scatt_size;   /* Max number of entries in scatter/gather table */
+
+#if defined(__BIG_ENDIAN_BITFIELD)
+   unchar    drqx:2, second:1, irq_tr:1, irq:4;
+   unchar  sync;
+   unchar         :4, res1:1, large_sg:1, forcaddr:1, isaena:1;
+   unchar max_chan:3, max_id:5;
+   unchar   max_lun;
+   unchar     eisa:1, pci:1, idquest:1, m1:1, :4;
+#else
    unchar     irq:4,    /* Interrupt Request assigned to this controller */
            irq_tr:1,    /* 0 for edge triggered, 1 for level triggered */
            second:1,    /* 1 if this is a secondary (not primary) controller */
@@ -622,6 +648,8 @@ struct eata_info {
           idquest:1,    /* RAIDNUM returned is questionable */
               pci:1,    /* This board is PCI */
              eisa:1;    /* This board is EISA */
+#endif
+
    unchar   raidnum;    /* Uniquely identifies this HBA in a system */
    unchar   notused;
 
@@ -631,18 +659,30 @@ struct eata_info {
 /* Board config structure */
 struct eata_config {
    ushort len;          /* Number of bytes following this field */
+
+#if defined(__BIG_ENDIAN_BITFIELD)
+   unchar     :4, tarena:1, mdpena:1, ocena:1, edis:1;
+#else
    unchar edis:1,       /* Disable EATA interface after config command */
          ocena:1,       /* Overlapped Commands Enabled */
         mdpena:1,       /* Transfer all Modified Data Pointer Messages */
         tarena:1,       /* Target Mode Enabled for this controller */
               :4;
+#endif
+
    unchar cpad[511];
    };
 
 /* Returned status packet structure */
 struct mssp {
+
+#if defined(__BIG_ENDIAN_BITFIELD)
+   unchar            eoc:1, adapter_status:7;
+#else
    unchar adapter_status:7,    /* State related to current command */
                      eoc:1;    /* End Of Command (1 = command completed) */
+#endif
+
    unchar target_status;       /* SCSI status received after data transfer */
    unchar unused[2];
    u_int32_t inv_res_len;      /* Number of bytes not transferred */
@@ -657,6 +697,16 @@ struct sg_list {
 
 /* MailBox SCSI Command Packet */
 struct mscp {
+
+#if defined(__BIG_ENDIAN_BITFIELD)
+   unchar     din:1, dout:1, interp:1, :1, sg:1, reqsen:1, init:1, sreset:1;
+   unchar sense_len;
+   unchar unused[3];
+   unchar        :7, fwnest:1;
+   unchar        :5, hbaci:1, iat:1, phsunit:1;
+   unchar channel:3, target:5;
+   unchar     one:1, dispri:1, luntar:1, lun:5;
+#else
    unchar  sreset:1,     /* SCSI Bus Reset Signal should be asserted */
              init:1,     /* Re-initialize controller and self test */
            reqsen:1,     /* Transfer Request Sense Data to addr using DMA */
@@ -679,6 +729,8 @@ struct mscp {
            luntar:1,     /* This cp is for Target (not LUN) */
            dispri:1,     /* Disconnect Privilege granted */
               one:1;     /* 1 */
+#endif
+
    unchar mess[3];       /* Massage to/from Target */
    unchar cdb[12];       /* Command Descriptor Block */
    u_int32_t data_len;   /* If sg=0 Data Length, if sg=1 sglist length */
@@ -755,8 +807,13 @@ static unsigned long io_port[] = {
 #define BN(board) (HD(board)->board_name)
 
 /* Device is Big Endian */
-#define H2DEV(x) cpu_to_be32(x)
-#define DEV2H(x) be32_to_cpu(x)
+#define H2DEV(x)   cpu_to_be32(x)
+#define DEV2H(x)   be32_to_cpu(x)
+#define H2DEV16(x) cpu_to_be16(x)
+#define DEV2H16(x) be16_to_cpu(x)
+
+/* But transfer orientation from the 16 bit data register is Little Endian */
+#define REG2H(x)   le16_to_cpu(x)
 
 static void do_interrupt_handler(int, void *, struct pt_regs *);
 static void flush_dev(Scsi_Device *, unsigned long, unsigned int, unsigned int);
@@ -893,7 +950,7 @@ static int read_pio(unsigned long iobase, ushort *start, ushort *end) {
          }
 
       loop = MAXLOOP;
-      *p = inw(iobase);
+      *p = REG2H(inw(iobase));
       }
 
    return FALSE;
@@ -970,31 +1027,48 @@ static int port_detect \
       }
 
    if (do_dma(port_base, 0, READ_CONFIG_PIO)) {
+#if defined(DEBUG_DETECT)
+      printk("%s: detect, do_dma failed at 0x%03lx.\n", name, port_base);
+#endif
       release_region(port_base, REGION_SIZE);
       return FALSE;
       }
 
    /* Read the info structure */
    if (read_pio(port_base, (ushort *)&info, (ushort *)&info.ipad[0])) {
+#if defined(DEBUG_DETECT)
+      printk("%s: detect, read_pio failed at 0x%03lx.\n", name, port_base);
+#endif
       release_region(port_base, REGION_SIZE);
       return FALSE;
       }
+
+   info.data_len = DEV2H(info.data_len);
+   info.sign = DEV2H(info.sign);
+   info.cp_pad_len = DEV2H16(info.cp_pad_len);
+   info.cp_len = DEV2H(info.cp_len);
+   info.sp_len = DEV2H(info.sp_len);
+   info.scatt_size = DEV2H16(info.scatt_size);
+   info.queue_size = DEV2H16(info.queue_size);
 
    /* Check the controller "EATA" signature */
-   if (info.sign != EATA_SIGNATURE) {
+   if (info.sign != EATA_SIG_BE) {
+#if defined(DEBUG_DETECT)
+      printk("%s: signature 0x%04x discarded.\n", name, info.sign);
+#endif
       release_region(port_base, REGION_SIZE);
       return FALSE;
       }
 
-   if (DEV2H(info.data_len) < EATA_2_0A_SIZE) {
+   if (info.data_len < EATA_2_0A_SIZE) {
       printk("%s: config structure size (%d bytes) too short, detaching.\n",
-             name, DEV2H(info.data_len));
+             name, info.data_len);
       release_region(port_base, REGION_SIZE);
       return FALSE;
       }
-   else if (DEV2H(info.data_len) == EATA_2_0A_SIZE)
+   else if (info.data_len == EATA_2_0A_SIZE)
       protocol_rev = 'A';
-   else if (DEV2H(info.data_len) == EATA_2_0B_SIZE)
+   else if (info.data_len == EATA_2_0B_SIZE)
       protocol_rev = 'B';
    else
       protocol_rev = 'C';
@@ -1106,7 +1180,7 @@ static int port_detect \
 
    /* Set board configuration */
    memset((char *)cf, 0, sizeof(struct eata_config));
-   cf->len = (ushort) cpu_to_be16((ushort)510);
+   cf->len = (ushort) H2DEV16((ushort)510);
    cf->ocena = TRUE;
 
    if (do_dma(port_base, cf_dma_addr, SET_CONFIG_DMA)) {
@@ -1119,7 +1193,9 @@ static int port_detect \
    }
 #endif
 
+   spin_unlock(&driver_lock);
    sh[j] = scsi_register(tpnt, sizeof(struct hostdata));
+   spin_lock(&driver_lock);
 
    if (sh[j] == NULL) {
       printk("%s: unable to register host, detaching.\n", name);
@@ -1137,9 +1213,9 @@ static int port_detect \
    sh[j]->n_io_port = REGION_SIZE;
    sh[j]->dma_channel = dma_channel;
    sh[j]->irq = irq;
-   sh[j]->sg_tablesize = (ushort) be16_to_cpu(info.scatt_size);
+   sh[j]->sg_tablesize = (ushort) info.scatt_size;
    sh[j]->this_id = (ushort) info.host_addr[3];
-   sh[j]->can_queue = (ushort) be16_to_cpu(info.queue_size);
+   sh[j]->can_queue = (ushort) info.queue_size;
    sh[j]->cmd_per_lun = MAX_CMD_PER_LUN;
    memset(HD(j), 0, sizeof(struct hostdata));
    HD(j)->subversion = subversion;
@@ -1254,8 +1330,8 @@ static int port_detect \
    printk("%s: Vers. 0x%x, ocs %u, tar %u, trnxfr %u, more %u, SYNC 0x%x, "\
           "sec. %u, infol %d, cpl %d spl %d.\n", name, info.version,
           info.ocsena, info.tarsup, info.trnxfr, info.morsup, info.sync,
-          info.second, DEV2H(info.data_len), DEV2H(info.cp_len),
-          DEV2H(info.sp_len));
+          info.second, info.data_len, info.cp_len,
+          info.sp_len);
 
    if (protocol_rev == 'B' || protocol_rev == 'C')
       printk("%s: isaena %u, forcaddr %u, max_id %u, max_chan %u, "\
@@ -1305,6 +1381,9 @@ static void internal_setup(char *str, int *ints) {
       else if (!strncmp(cur, "ls:", 3))  link_statistics = val;
       else if (!strncmp(cur, "et:", 3))  ext_tran = val;
       else if (!strncmp(cur, "rs:", 3))  rev_scan = val;
+      else if (!strncmp(cur, "ip:", 3))  isa_probe = val;
+      else if (!strncmp(cur, "ep:", 3))  eisa_probe = val;
+      else if (!strncmp(cur, "pp:", 3))  pci_probe = val;
 
       if ((cur = strchr(cur, ','))) ++cur;
       }
@@ -1389,7 +1468,19 @@ static int eata2x_detect(Scsi_Host_Template *tpnt) {
 
    for (k = 0; k < MAX_BOARDS + 1; k++) sh[k] = NULL;
 
-   if (!setup_done) add_pci_ports();
+   for (k = MAX_INT_PARAM; io_port[k]; k++)
+      if (io_port[k] == SKIP) continue;
+      else if (io_port[k] <= MAX_ISA_ADDR) {
+         if (!isa_probe) io_port[k] = SKIP;
+         }
+      else if (io_port[k] >= MIN_EISA_ADDR && io_port[k] <= MAX_EISA_ADDR) {
+         if (!eisa_probe) io_port[k] = SKIP;
+         }
+
+   if (pci_probe) {
+      if (!setup_done) add_pci_ports();
+      else          enable_pci_ports();
+      }
 
    for (k = 0; io_port[k]; k++) {
 
@@ -1834,9 +1925,9 @@ static int eata2x_eh_host_reset(Scsi_Cmnd *SCarg) {
    return SUCCESS;
 }
 
-int eata2x_bios_param(struct scsi_device *sdev, struct block_device *bdev, 
-		sector_t capacity, int *dkinfo) {
-   int size = capacity;
+int eata2x_bios_param(struct scsi_device *sdev, struct block_device *bdev,
+                      sector_t capacity, int *dkinfo) {
+   unsigned int size = capacity;
 
    if (ext_tran || (scsicam_bios_param(bdev, capacity, dkinfo) < 0)) {
       dkinfo[0] = 255;

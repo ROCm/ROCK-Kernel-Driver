@@ -37,8 +37,7 @@
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
 #include <linux/devfs_fs_kernel.h>
-
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/types.h>
 #include <linux/wrapper.h>
 #include <linux/vmalloc.h>
@@ -1249,18 +1248,15 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 int video1394_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct file_ctx *ctx = (struct file_ctx *)file->private_data;
-	struct video_card *video = ctx->video;
-	struct ti_ohci *ohci = video->ohci;
 	int res = -EINVAL;
 
 	lock_kernel();
-	ohci = video->ohci;
-
 	if (ctx->current_ctx == NULL) {
-		PRINT(KERN_ERR, ohci->id, "Current iso context not set");
+		PRINT(KERN_ERR, ctx->video->ohci->id, "Current iso context not set");
 	} else
-		res = do_iso_mmap(ohci, ctx->current_ctx, vma);
+		res = do_iso_mmap(ctx->video->ohci, ctx->current_ctx, vma);
 	unlock_kernel();
+
 	return res;
 }
 

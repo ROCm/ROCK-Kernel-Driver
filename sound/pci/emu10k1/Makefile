@@ -15,5 +15,3 @@ obj-$(CONFIG_SND_EMU10K1) += snd-emu10k1.o
 ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_EMU10K1) += snd-emu10k1-synth.o
 endif
-
-include $(TOPDIR)/Rules.make

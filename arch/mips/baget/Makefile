@@ -9,8 +9,6 @@ obj-y			:= baget.o print.o setup.o time.o irq.o bagetIRQ.o \
 obj-$(CONFIG_SERIAL)	+= vacserial.o
 obj-$(CONFIG_VAC_RTC)	+= vacrtc.o
 
-include $(TOPDIR)/Rules.make
-
 bagetIRQ.o : bagetIRQ.S
 	$(CC) $(CFLAGS) -c -o $@ $<
 

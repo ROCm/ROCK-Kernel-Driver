@@ -2557,7 +2557,7 @@ static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 		
 	switch(ecmd.cmd) {
         case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = { cmd: ETHTOOL_GDRVINFO };
+		struct ethtool_drvinfo info = { .cmd = ETHTOOL_GDRVINFO };
 
 		strncpy(info.driver, DRV_NAME, ETHTOOL_BUSINFO_LEN);
 		strncpy(info.version, DRV_VERSION, ETHTOOL_BUSINFO_LEN);
@@ -2652,7 +2652,7 @@ static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 
 	/* get link status */
 	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = { cmd: ETHTOOL_GLINK };
+		struct ethtool_value edata = { .cmd = ETHTOOL_GLINK };
 
 		edata.data = (gp->lstate == link_up);
 		if (copy_to_user(ep_user, &edata, sizeof(edata)))
@@ -2662,7 +2662,7 @@ static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 
 	/* get message-level */
 	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = { cmd: ETHTOOL_GMSGLVL };
+		struct ethtool_value edata = { .cmd = ETHTOOL_GMSGLVL };
 
 		edata.data = gp->msg_enable;
 		if (copy_to_user(ep_user, &edata, sizeof(edata)))

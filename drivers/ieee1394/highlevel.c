@@ -28,7 +28,7 @@
 
 
 LIST_HEAD(hl_drivers);
-rwlock_t hl_drivers_lock = RW_LOCK_UNLOCKED;
+static DECLARE_MUTEX(hl_drivers_lock);
 
 LIST_HEAD(addr_space);
 rwlock_t addr_space_lock = RW_LOCK_UNLOCKED;
@@ -53,11 +53,11 @@ struct hpsb_highlevel *hpsb_register_highlevel(const char *name,
         hl->name = name;
         hl->op = ops;
 
-        write_lock_irq(&hl_drivers_lock);
+	down(&hl_drivers_lock);
         list_add_tail(&hl->hl_list, &hl_drivers);
-        write_unlock_irq(&hl_drivers_lock);
+	up(&hl_drivers_lock);
 
-        hl_all_hosts(hl->op->add_host);
+	hl_all_hosts(hl->op->add_host);
 
         return hl;
 }
@@ -82,9 +82,9 @@ void hpsb_unregister_highlevel(struct hpsb_highlevel *hl)
         }
         write_unlock_irq(&addr_space_lock);
 
-        write_lock_irq(&hl_drivers_lock);
+	down(&hl_drivers_lock);
         list_del(&hl->hl_list);
-        write_unlock_irq(&hl_drivers_lock);
+	up(&hl_drivers_lock);
 
         if (hl->op->remove_host)
 		hl_all_hosts(hl->op->remove_host);
@@ -119,10 +119,8 @@ int hpsb_register_addrspace(struct hpsb_highlevel *hl,
         write_lock_irq(&addr_space_lock);
         entry = addr_space.next;
 
-        while (list_entry(entry, struct hpsb_address_serve, as_list)->end
-               <= start) {
-                if (list_entry(entry->next, struct hpsb_address_serve, as_list)
-                    ->start >= end) {
+        while (list_entry(entry, struct hpsb_address_serve, as_list)->end <= start) {
+                if (list_entry(entry->next, struct hpsb_address_serve, as_list)->start >= end) {
                         list_add(&as->as_list, entry);
                         list_add_tail(&as->addr_list, &hl->addr_list);
                         retval = 1;
@@ -198,13 +196,13 @@ void highlevel_add_host(struct hpsb_host *host)
         struct list_head *entry;
         struct hpsb_highlevel *hl;
 
-        read_lock(&hl_drivers_lock);
+	down(&hl_drivers_lock);
         list_for_each(entry, &hl_drivers) {
                 hl = list_entry(entry, struct hpsb_highlevel, hl_list);
 
 		hl->op->add_host(host);
         }
-        read_unlock(&hl_drivers_lock);
+        up(&hl_drivers_lock);
 }
 
 void highlevel_remove_host(struct hpsb_host *host)
@@ -212,14 +210,14 @@ void highlevel_remove_host(struct hpsb_host *host)
         struct list_head *entry;
         struct hpsb_highlevel *hl;
 
-        write_lock_irq(&hl_drivers_lock);
+        down(&hl_drivers_lock);
 	list_for_each(entry, &hl_drivers) {
                 hl = list_entry(entry, struct hpsb_highlevel, hl_list);
 
 		if (hl->op->remove_host)
 			hl->op->remove_host(host);
         }
-        write_unlock_irq(&hl_drivers_lock);
+        up(&hl_drivers_lock);
 }
 
 void highlevel_host_reset(struct hpsb_host *host)
@@ -227,14 +225,14 @@ void highlevel_host_reset(struct hpsb_host *host)
         struct list_head *entry;
         struct hpsb_highlevel *hl;
 
-	read_lock(&hl_drivers_lock);
+	down(&hl_drivers_lock);
 	list_for_each(entry, &hl_drivers) {
                 hl = list_entry(entry, struct hpsb_highlevel, hl_list);
 
                 if (hl->op->host_reset)
                         hl->op->host_reset(host);
         }
-	read_unlock(&hl_drivers_lock);
+	up(&hl_drivers_lock);
 }
 
 void highlevel_iso_receive(struct hpsb_host *host, quadlet_t *data,
@@ -244,7 +242,7 @@ void highlevel_iso_receive(struct hpsb_host *host, quadlet_t *data,
         struct hpsb_highlevel *hl;
         int channel = (data[0] >> 8) & 0x3f;
 
-        read_lock(&hl_drivers_lock);
+        down(&hl_drivers_lock);
         entry = hl_drivers.next;
 
         while (entry != &hl_drivers) {
@@ -254,7 +252,7 @@ void highlevel_iso_receive(struct hpsb_host *host, quadlet_t *data,
                 }
                 entry = entry->next;
         }
-        read_unlock(&hl_drivers_lock);
+        up(&hl_drivers_lock);
 }
 
 void highlevel_fcp_request(struct hpsb_host *host, int nodeid, int direction,
@@ -264,7 +262,7 @@ void highlevel_fcp_request(struct hpsb_host *host, int nodeid, int direction,
         struct hpsb_highlevel *hl;
         int cts = data[0] >> 4;
 
-        read_lock(&hl_drivers_lock);
+        down(&hl_drivers_lock);
         entry = hl_drivers.next;
 
         while (entry != &hl_drivers) {
@@ -275,7 +273,7 @@ void highlevel_fcp_request(struct hpsb_host *host, int nodeid, int direction,
                 }
                 entry = entry->next;
         }
-        read_unlock(&hl_drivers_lock);
+        up(&hl_drivers_lock);
 }
 
 int highlevel_read(struct hpsb_host *host, int nodeid, quadlet_t *buffer,

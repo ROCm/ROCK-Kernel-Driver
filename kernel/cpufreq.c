@@ -119,8 +119,8 @@ static int cpufreq_parse_policy(char input_string[42], struct cpufreq_policy *po
 	if (sscanf(input_string, "%d%%%d%%%d%%%s", &cpu, &min, &max, policy_string) == 4)
 	{
 		if (!cpufreq_get_policy(&current_policy, cpu)) {
-			policy->min = (min * current_policy.max_cpu_freq) / 100;
-			policy->max = (max * current_policy.max_cpu_freq) / 100;
+			policy->min = (min * current_policy.cpuinfo.max_freq) / 100;
+			policy->max = (max * current_policy.cpuinfo.max_freq) / 100;
 			policy->cpu = cpu;
 			result = 0;
 			goto scan_policy;
@@ -138,8 +138,8 @@ static int cpufreq_parse_policy(char input_string[42], struct cpufreq_policy *po
 	if (sscanf(input_string, "%d%%%d%%%s", &min, &max, policy_string) == 3)
 	{
 		if (!cpufreq_get_policy(&current_policy, cpu)) {
-			policy->min = (min * current_policy.max_cpu_freq) / 100;
-			policy->max = (max * current_policy.max_cpu_freq) / 100;
+			policy->min = (min * current_policy.cpuinfo.max_freq) / 100;
+			policy->max = (max * current_policy.cpuinfo.max_freq) / 100;
 			result = 0;
 			goto scan_policy;
 		}
@@ -229,11 +229,11 @@ static int cpufreq_proc_read (
 
 		cpufreq_get_policy(&policy, i);
 
-		if (!policy.max_cpu_freq)
+		if (!policy.cpuinfo.max_freq)
 			continue;
 
-		min_pctg = (policy.min * 100) / policy.max_cpu_freq;
-		max_pctg = (policy.max * 100) / policy.max_cpu_freq;
+		min_pctg = (policy.min * 100) / policy.cpuinfo.max_freq;
+		max_pctg = (policy.max * 100) / policy.cpuinfo.max_freq;
 
 		p += sprintf(p, "CPU%3d    %9d kHz (%3d %%)  -  %9d kHz (%3d %%)  -  ",
 			     i , policy.min, min_pctg, policy.max, max_pctg);
@@ -279,6 +279,7 @@ static int cpufreq_proc_write (
 	int                     result = 0;
 	char			proc_string[42] = {'\0'};
 	struct cpufreq_policy   policy;
+	unsigned int            i = 0;
 
 
 	if ((count > sizeof(proc_string) - 1))
@@ -293,7 +294,17 @@ static int cpufreq_proc_write (
 	if (result)
 		return -EFAULT;
 
-	cpufreq_set_policy(&policy);
+	if (policy.cpu == CPUFREQ_ALL_CPUS)
+	{
+		for (i=0; i<NR_CPUS; i++) 
+		{
+			policy.cpu = i;
+			if (cpu_online(i))
+				cpufreq_set_policy(&policy);
+		}
+	} 
+	else
+		cpufreq_set_policy(&policy);
 
 	return count;
 }
@@ -811,7 +822,9 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu)
 	policy->min    = cpufreq_driver->policy[cpu].min;
 	policy->max    = cpufreq_driver->policy[cpu].max;
 	policy->policy = cpufreq_driver->policy[cpu].policy;
-	policy->max_cpu_freq = cpufreq_driver->policy[cpu].max_cpu_freq;
+	policy->cpuinfo.max_freq       = cpufreq_driver->policy[cpu].cpuinfo.max_freq;
+	policy->cpuinfo.min_freq       = cpufreq_driver->policy[cpu].cpuinfo.min_freq;
+	policy->cpuinfo.transition_latency = cpufreq_driver->policy[cpu].cpuinfo.transition_latency;
 	policy->cpu    = cpu;
 
 	up(&cpufreq_driver_sem);
@@ -835,16 +848,14 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 	down(&cpufreq_driver_sem);
 	if (!cpufreq_driver || !cpufreq_driver->verify || 
 	    !cpufreq_driver->setpolicy || !policy ||
-	    (policy->cpu > NR_CPUS)) {
+	    (policy->cpu >= NR_CPUS) || (!cpu_online(policy->cpu))) {
 		up(&cpufreq_driver_sem);
 		return -EINVAL;
 	}
 
-	if (policy->cpu == CPUFREQ_ALL_CPUS)
-		policy->max_cpu_freq = cpufreq_driver->policy[0].max_cpu_freq;
-	else
-		policy->max_cpu_freq = cpufreq_driver->policy[policy->cpu].max_cpu_freq;
-
+	policy->cpuinfo.max_freq       = cpufreq_driver->policy[policy->cpu].cpuinfo.max_freq;
+	policy->cpuinfo.min_freq       = cpufreq_driver->policy[policy->cpu].cpuinfo.min_freq;
+	policy->cpuinfo.transition_latency = cpufreq_driver->policy[policy->cpu].cpuinfo.transition_latency;
 
 	/* verify the cpu speed can be set within this limit */
 	ret = cpufreq_driver->verify(policy);
@@ -1039,8 +1050,8 @@ int cpufreq_register(struct cpufreq_driver *driver_data)
  	down(&cpufreq_driver_sem);
 	for (i=0; i<NR_CPUS; i++) 
 	{
-		cpu_min_freq[i] = driver_data->cpu_min_freq[i];
-		cpu_max_freq[i] = driver_data->policy[i].max_cpu_freq;
+		cpu_min_freq[i] = driver_data->policy[i].cpuinfo.min_freq;
+		cpu_max_freq[i] = driver_data->policy[i].cpuinfo.max_freq;
 		cpu_cur_freq[i] = driver_data->cpu_cur_freq[i];
 	}
 	up(&cpufreq_driver_sem);

@@ -22,5 +22,3 @@ archdep:
 	@$(MAKEBOOT) dep
 
 modules:
-
-include $(TOPDIR)/Rules.make

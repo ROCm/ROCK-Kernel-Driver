@@ -7,5 +7,3 @@
 #
 
 obj-y := init.o setup.o
-
-include $(TOPDIR)/Rules.make

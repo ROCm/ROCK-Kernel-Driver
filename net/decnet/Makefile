@@ -5,6 +5,3 @@ decnet-y := af_decnet.o dn_nsp_in.o dn_nsp_out.o dn_route.o dn_dev.o dn_neigh.o 
 decnet-$(CONFIG_DECNET_ROUTER) += dn_fib.o dn_rules.o dn_table.o
 decnet-$(CONFIG_DECNET_FW) += dn_fw.o
 decnet-y += sysctl_net_decnet.o
-
-include $(TOPDIR)/Rules.make
-

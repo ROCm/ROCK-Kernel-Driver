@@ -40,5 +40,3 @@ obj-$(CONFIG_FTL)		+= ftl.o
 obj-$(CONFIG_NFTL)		+= nftl.o
 
 nftl-objs	:= nftlcore.o nftlmount.o
-
-include $(TOPDIR)/Rules.make

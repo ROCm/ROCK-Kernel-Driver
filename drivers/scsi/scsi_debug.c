@@ -1636,8 +1636,8 @@ static int pseudo_lld_bus_match(struct device *dev,
 }
 
 static struct bus_type pseudo_lld_bus = {
-        name: "pseudo",
-        match: pseudo_lld_bus_match,
+        .name = "pseudo",
+        .match = pseudo_lld_bus_match,
 };
 
 int scsi_debug_register_driver(struct device_driver *dev_driver)

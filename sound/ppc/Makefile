@@ -7,5 +7,3 @@ snd-powermac-objs := powermac.o pmac.o awacs.o burgundy.o daca.o tumbler.o keywe
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_POWERMAC) += snd-powermac.o
-
-include $(TOPDIR)/Rules.make

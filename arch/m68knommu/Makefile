@@ -96,8 +96,6 @@ core-y	+= arch/m68knommu/kernel/ \
 	   arch/m68knommu/platform/$(PLATFORM)/
 libs-y	+= arch/m68knommu/lib/
 
-include $(TOPDIR)/Rules.make
-
 prepare: include/asm-$(ARCH)/asm-offsets.h
 
 archmrproper:

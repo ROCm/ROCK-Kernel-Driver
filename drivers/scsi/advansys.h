@@ -72,22 +72,22 @@ void advansys_setup(char *, int *);
  */
 #if ASC_LINUX_KERNEL24
 #define ADVANSYS { \
-    proc_name:                  "advansys", \
-    proc_info:                  advansys_proc_info, \
-    name:                       "advansys", \
-    detect:                     advansys_detect, \
-    release:                    advansys_release, \
-    info:                       advansys_info, \
-    queuecommand:               advansys_queuecommand, \
-    eh_bus_reset_handler:	advansys_reset, \
-    bios_param:                 advansys_biosparam, \
-    slave_configure:		advansys_slave_configure, \
+    .proc_name                  = "advansys", \
+    .proc_info                  = advansys_proc_info, \
+    .name                       = "advansys", \
+    .detect                     = advansys_detect, \
+    .release                    = advansys_release, \
+    .info                       = advansys_info, \
+    .queuecommand               = advansys_queuecommand, \
+    .eh_bus_reset_handler	= advansys_reset, \
+    .bios_param                 = advansys_biosparam, \
+    .slave_configure		= advansys_slave_configure, \
     /* \
      * Because the driver may control an ISA adapter 'unchecked_isa_dma' \
      * must be set. The flag will be cleared in advansys_detect for non-ISA \
      * adapters. Refer to the comment in scsi_module.c for more information. \
      */ \
-    unchecked_isa_dma:          1, \
+    .unchecked_isa_dma          = 1, \
     /* \
      * All adapters controlled by this driver are capable of large \
      * scatter-gather lists. According to the mid-level SCSI documentation \
@@ -95,25 +95,25 @@ void advansys_setup(char *, int *);
      * 'use_clustering'. But empirically while CPU utilization is increased \
      * by enabling clustering, I/O throughput increases as well. \
      */ \
-    use_clustering:             ENABLE_CLUSTERING, \
+    .use_clustering             = ENABLE_CLUSTERING, \
 }
 #elif ASC_LINUX_KERNEL22
 #define ADVANSYS { \
-    proc_info:                  advansys_proc_info, \
-    name:                       "advansys", \
-    detect:                     advansys_detect, \
-    release:                    advansys_release, \
-    info:                       advansys_info, \
-    queuecommand:               advansys_queuecommand, \
-    use_new_eh_code:		1, \
-    eh_bus_reset_handler:	advansys_reset, \
-    bios_param:                 advansys_biosparam, \
+    .proc_info                  = advansys_proc_info, \
+    .name                       = "advansys", \
+    .detect                     = advansys_detect, \
+    .release                    = advansys_release, \
+    .info                       = advansys_info, \
+    .queuecommand               = advansys_queuecommand, \
+    .use_new_eh_code		= 1, \
+    .eh_bus_reset_handler	= advansys_reset, \
+    .bios_param                 = advansys_biosparam, \
     /* \
      * Because the driver may control an ISA adapter 'unchecked_isa_dma' \
      * must be set. The flag will be cleared in advansys_detect for non-ISA \
      * adapters. Refer to the comment in scsi_module.c for more information. \
      */ \
-    unchecked_isa_dma:          1, \
+    .unchecked_isa_dma          = 1, \
     /* \
      * All adapters controlled by this driver are capable of large \
      * scatter-gather lists. According to the mid-level SCSI documentation \
@@ -121,7 +121,7 @@ void advansys_setup(char *, int *);
      * 'use_clustering'. But empirically while CPU utilization is increased \
      * by enabling clustering, I/O throughput increases as well. \
      */ \
-    use_clustering:             ENABLE_CLUSTERING, \
+    .use_clustering             = ENABLE_CLUSTERING, \
 }
 #endif
 #endif /* _ADVANSYS_H */

@@ -56,6 +56,3 @@ endif
 # SK_DBGCAT_DRV_EVENT           0x08000000      driver events
 
 EXTRA_CFLAGS += -Idrivers/net/sk98lin -DSK_USE_CSUM $(DBGDEF)
-
-include $(TOPDIR)/Rules.make
-

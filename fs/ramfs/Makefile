@@ -5,5 +5,3 @@
 obj-$(CONFIG_RAMFS) += ramfs.o
 
 ramfs-objs := inode.o
-
-include $(TOPDIR)/Rules.make

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/blacklist.c
  *   S/390 common I/O routines -- blacklisting of specific devices
- *   $Revision: 1.22 $
+ *   $Revision: 1.23 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -162,10 +162,10 @@ blacklist_parse_proc_parameters (char *buf)
 		else
 			blacklist_parse_parameters (buf + 5, free);
 	} else if (strncmp (buf, "add ", 4) == 0) {
-		/* FIXME: the old code was checking if the new bl'ed
-		 * devices are already known to the system so
-		 * validate_subchannel would still give a working
-		 * status. is that necessary? */
+		/* 
+		 * We don't need to check for known devices since
+		 * css_probe_device will handle this correctly. 
+		 */
 		blacklist_parse_parameters (buf + 4, add);
 	} else {
 		printk (KERN_WARNING "cio_ignore: Parse error; \n"

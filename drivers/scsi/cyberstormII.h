@@ -43,18 +43,18 @@ extern int esp_reset(Scsi_Cmnd *, unsigned int);
 extern int esp_proc_info(char *buffer, char **start, off_t offset, int length,
 			 int hostno, int inout);
 
-#define SCSI_CYBERSTORMII { proc_name:		"esp-cyberstormII", \
-			    proc_info:		esp_proc_info, \
-			    name:		"CyberStorm Mk II SCSI", \
-			    detect:		cyberII_esp_detect, \
-			    release:		cyberII_esp_release, \
-			    queuecommand:	esp_queue, \
-			    abort:		esp_abort, \
-			    reset:		esp_reset, \
-			    can_queue:          7, \
-			    this_id:		7, \
-			    sg_tablesize:	SG_ALL, \
-			    cmd_per_lun:	1, \
-			    use_clustering:	ENABLE_CLUSTERING }
+#define SCSI_CYBERSTORMII { .proc_name		= "esp-cyberstormII", \
+			    .proc_info		= esp_proc_info, \
+			    .name		= "CyberStorm Mk II SCSI", \
+			    .detect		= cyberII_esp_detect, \
+			    .release		= cyberII_esp_release, \
+			    .queuecommand	= esp_queue, \
+			    .abort		= esp_abort, \
+			    .reset		= esp_reset, \
+			    .can_queue          = 7, \
+			    .this_id		= 7, \
+			    .sg_tablesize	= SG_ALL, \
+			    .cmd_per_lun	= 1, \
+			    .use_clustering	= ENABLE_CLUSTERING }
 
 #endif /* CYBERII_ESP_H */

@@ -14,5 +14,3 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_SBAWE) += snd-util-mem.o
   obj-$(CONFIG_SND) += emux/
 endif
-
-include $(TOPDIR)/Rules.make

@@ -81,15 +81,15 @@ int eata_release(struct Scsi_Host *);
 #include <scsi/scsicam.h>
 
 #define EATA_DMA {                                      \
-        proc_info:         eata_proc_info,     /* procinfo       */ \
-        name:              "EATA (Extended Attachment) HBA driver", \
-        detect:            eata_detect,                 \
-        release:           eata_release,                \
-	queuecommand:      eata_queue,                  \
-	abort:             eata_abort,                  \
-	reset:             eata_reset,                  \
-	unchecked_isa_dma: 1,      /* True if ISA  */   \
-	use_clustering:    ENABLE_CLUSTERING }
+        .proc_info         = eata_proc_info,     /* procinfo       */ \
+        .name              = "EATA (Extended Attachment) HBA driver", \
+        .detect            = eata_detect,                 \
+        .release           = eata_release,                \
+	.queuecommand      = eata_queue,                  \
+	.abort             = eata_abort,                  \
+	.reset             = eata_reset,                  \
+	.unchecked_isa_dma = 1,      /* True if ISA  */   \
+	.use_clustering    = ENABLE_CLUSTERING }
 
 
 #endif /* _EATA_DMA_H */

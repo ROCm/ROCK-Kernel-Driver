@@ -7,5 +7,3 @@ export-objs	:= amiga_ksyms.o
 obj-y		:= config.o amiints.o cia.o chipram.o amisound.o amiga_ksyms.o
 
 obj-$(CONFIG_AMIGA_PCMCIA)	+= pcmcia.o
-
-include $(TOPDIR)/Rules.make

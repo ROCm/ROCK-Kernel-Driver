@@ -19,7 +19,7 @@
 struct file_operations generic_ro_fops = {
 	.llseek		= generic_file_llseek,
 	.read		= generic_file_read,
-	.mmap		= generic_file_mmap,
+	.mmap		= generic_file_readonly_mmap,
 	.sendfile	= generic_file_sendfile,
 };
 

@@ -6,5 +6,3 @@
 EXTRA_AFLAGS := $(CFLAGS)
 
 obj-y	:= setup.o irq.o time.o prom.o pci.o int-handler.o nile4.o
-
-include $(TOPDIR)/Rules.make

@@ -21,8 +21,6 @@ qconf-cxxobjs	:= qconf.o
 clean-files	:= libkconfig.so lkc_defs.h qconf.moc .tmp_qtcheck \
 		   zconf.tab.c zconf.tab.h lex.zconf.c
 
-include $(TOPDIR)/Rules.make
-
 # generated files seem to need this to find local include files
 HOSTCFLAGS_lex.zconf.o	:= -I$(src)
 HOSTCFLAGS_zconf.tab.o	:= -I$(src)
@@ -35,12 +33,13 @@ $(obj)/conf.o $(obj)/mconf.o $(obj)/qconf.o: $(obj)/zconf.tab.h
 $(obj)/qconf.o: $(obj)/.tmp_qtcheck
 
 ifeq ($(MAKECMDGOALS),$(obj)/qconf)
+MOC = $(QTDIR)/bin/moc
 -include $(obj)/.tmp_qtcheck
 
 # QT needs some extra effort...
 $(obj)/.tmp_qtcheck:
 	@set -e; for d in $$QTDIR /usr/share/qt /usr/lib/qt3; do \
-	  if [ -x $$d/bin/moc ]; then DIR=$$d; break; fi; \
+	  if [ -f $$d/include/qconfig.h ]; then DIR=$$d; break; fi; \
 	done; \
 	if [ -z "$$DIR" ]; then \
 	  echo "*"; \
@@ -52,7 +51,13 @@ $(obj)/.tmp_qtcheck:
 	fi; \
 	LIB=qt; \
 	if [ -f $$DIR/lib/libqt-mt.so ]; then LIB=qt-mt; fi; \
-	echo "QTDIR=$$DIR" > $@; echo "QTLIB=$$LIB" >> $@
+	echo "QTDIR=$$DIR" > $@; echo "QTLIB=$$LIB" >> $@; \
+	if [ ! -x $$DIR/bin/moc -a -x /usr/bin/moc ]; then \
+	  echo "*"; \
+	  echo "* Unable to find $$DIR/bin/moc, using /usr/bin/moc instead."; \
+	  echo "*"; \
+	  echo "MOC=/usr/bin/moc" >> $@; \
+	fi
 endif
 
 $(obj)/zconf.tab.o: $(obj)/lex.zconf.c
@@ -62,7 +67,7 @@ $(obj)/kconfig_load.o: $(obj)/lkc_defs.h
 $(obj)/qconf.o: $(obj)/qconf.moc $(obj)/lkc_defs.h
 
 $(obj)/%.moc: $(src)/%.h
-	$(QTDIR)/bin/moc -i $< -o $@
+	$(MOC) -i $< -o $@
 
 $(obj)/lkc_defs.h: $(src)/lkc_proto.h
 	sed < $< > $@ 's/P(\([^,]*\),.*/#define \1 (\*\1_p)/'

@@ -18,5 +18,3 @@ obj-$(CONFIG_PCI_HERMES)	+= orinoco_pci.o
 
 obj-$(CONFIG_AIRO)		+= airo.o
 obj-$(CONFIG_AIRO_CS)		+= airo_cs.o airo.o
-
-include $(TOPDIR)/Rules.make

@@ -3,5 +3,3 @@
 #
 
 obj-y        := video/ radio/ dvb/
-
-include $(TOPDIR)/Rules.make

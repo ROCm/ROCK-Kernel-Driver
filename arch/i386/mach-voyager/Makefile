@@ -13,5 +13,3 @@ export-objs	:=
 obj-y			:= setup.o voyager_basic.o voyager_thread.o
 
 obj-$(CONFIG_SMP)	+= voyager_smp.o voyager_cat.o
-
-include $(TOPDIR)/Rules.make

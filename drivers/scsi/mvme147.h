@@ -31,19 +31,19 @@ int wd33c93_reset(Scsi_Cmnd *, unsigned int);
 
 #ifdef HOSTS_C
 
-#define MVME147_SCSI {proc_name:	   "MVME147",			\
-		      proc_info:           NULL,			\
-		      name:                "MVME147 built-in SCSI",	\
-		      detect:              mvme147_detect,		\
-		      release:             mvme147_release,		\
-		      queuecommand:        wd33c93_queuecommand,	\
-		      abort:               wd33c93_abort,		\
-		      reset:               wd33c93_reset,		\
-		      can_queue:           CAN_QUEUE,			\
-		      this_id:             7,				\
-		      sg_tablesize:        SG_ALL,			\
-		      cmd_per_lun:	   CMD_PER_LUN,			\
-		      use_clustering:      ENABLE_CLUSTERING }
+#define MVME147_SCSI {.proc_name	   = "MVME147",			\
+		      .proc_info           = NULL,			\
+		      .name                = "MVME147 built-in SCSI",	\
+		      .detect              = mvme147_detect,		\
+		      .release             = mvme147_release,		\
+		      .queuecommand        = wd33c93_queuecommand,	\
+		      .abort               = wd33c93_abort,		\
+		      .reset               = wd33c93_reset,		\
+		      .can_queue           = CAN_QUEUE,			\
+		      .this_id             = 7,				\
+		      .sg_tablesize        = SG_ALL,			\
+		      .cmd_per_lun	   = CMD_PER_LUN,			\
+		      .use_clustering      = ENABLE_CLUSTERING }
 
 #endif /* else def HOSTS_C */
 

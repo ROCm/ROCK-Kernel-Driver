@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.29 2002/12/06 12:31:38 cohuck Exp $
+ * $Id: ctcmain.c,v 1.30 2002/12/09 13:56:20 aberg Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.29 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.30 $
  *
  */
 
@@ -279,7 +279,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.29 $";
+	char vbuf[] = "$Revision: 1.30 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -2821,7 +2821,7 @@ ctc_remove_files(struct device *dev)
  * @returns 0 on success, !0 on failure.
  */
 
-int
+static int
 ctc_probe_device(struct ccwgroup_device *cgdev)
 {
 	struct ctc_priv *priv;
@@ -2864,7 +2864,7 @@ ctc_probe_device(struct ccwgroup_device *cgdev)
  *
  * @returns 0 on success, !0 on failure.
  */
-int
+static int
 ctc_new_device(struct ccwgroup_device *cgdev)
 {
 	char read_id[CTC_ID_SIZE];
@@ -2941,7 +2941,7 @@ ctc_new_device(struct ccwgroup_device *cgdev)
  *
  * @returns 0 on success, !0 on failure.
  */
-int
+static int
 ctc_shutdown_device(struct ccwgroup_device *cgdev)
 {
 	struct ctc_priv *priv;
@@ -2975,7 +2975,7 @@ ctc_shutdown_device(struct ccwgroup_device *cgdev)
 
 }
 
-int
+static int
 ctc_remove_device(struct ccwgroup_device *cgdev)
 {
 	struct ctc_priv *priv;
@@ -2991,7 +2991,7 @@ ctc_remove_device(struct ccwgroup_device *cgdev)
 	return 0;
 }
 
-struct ccwgroup_driver ctc_group_driver = {
+static struct ccwgroup_driver ctc_group_driver = {
 	.name        = "ctc",
 	.max_slaves  = 2,
 	.driver_id   = 0xC3E3C3,

@@ -79,5 +79,3 @@ obj-$(CONFIG_SND_YMFPCI) += $(RAWMIDI_OBJS) $(OPL3_OBJS)
 obj-$(CONFIG_SND_USB_AUDIO) += $(RAWMIDI_OBJS)
 
 obj-m := $(sort $(obj-m))
-
-include $(TOPDIR)/Rules.make

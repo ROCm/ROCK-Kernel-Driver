@@ -16,5 +16,3 @@ ifeq ($(CONFIG_USB_DEVICEFS),y)
 endif
 
 obj-$(CONFIG_USB)	+= usbcore.o
-
-include $(TOPDIR)/Rules.make

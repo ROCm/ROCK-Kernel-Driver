@@ -5,7 +5,7 @@ menu "IEEE 1394 (FireWire) support (EXPERIMENTAL)"
 
 config IEEE1394
 	tristate "IEEE 1394 (FireWire) support (EXPERIMENTAL)"
-	---help---
+	help
 	  IEEE 1394 describes a high performance serial bus, which is also
 	  known as FireWire(tm) or i.Link(tm) and is used for connecting all
 	  sorts of devices (most notably digital video cameras) to your
@@ -19,6 +19,36 @@ config IEEE1394
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
 	  will be called ieee1394.o.
+
+comment "Subsystem Options"
+	depends on IEEE1394
+
+config IEEE1394_VERBOSEDEBUG
+	bool "Excessive debugging output"
+	depends on IEEE1394
+	help
+	  If you say Y here, you will get very verbose debugging logs from
+	  the subsystem which includes a dump of the header of every sent
+	  and received packet.  This can amount to a high amount of data
+	  collected in a very short time which is usually also saved to
+	  disk by the system logging daemons.
+
+	  Say Y if you really want or need the debugging output, everyone
+	  else says N.
+
+config IEEE1394_OUI_DB
+	bool "OUI Database built-in"
+	depends on IEEE1394
+	help
+	  If you say Y here, then an OUI list (vendor unique ID's) will be
+	  compiled into the ieee1394 module. This doesn't really do much
+	  accept being able to display the vendor of a hardware node. The
+	  downside is that it adds about 300k to the size of the module,
+	  or kernel (depending on whether you compile ieee1394 as a
+	  module, or static in the kernel).
+
+	  This option is not needed for userspace programs like gscanbus
+	  to show this information.
 
 comment "Device Drivers"
 	depends on IEEE1394
@@ -47,7 +77,7 @@ config IEEE1394_PCILYNX
 config IEEE1394_OHCI1394
 	tristate "OHCI-1394 support"
 	depends on IEEE1394
-	---help---
+	help
 	  Enable this driver if you have an IEEE 1394 controller based on the
 	  OHCI-1394 specification. The current driver is only tested with OHCI
 	  chipsets made by Texas Instruments and NEC. Most third-party vendors
@@ -64,7 +94,7 @@ comment "Protocol Drivers"
 
 config IEEE1394_VIDEO1394
 	tristate "OHCI-1394 Video support"
-	depends on IEEE1394_OHCI1394
+	depends on IEEE1394 && IEEE1394_OHCI1394
 	help
 	  This option enables video device usage for OHCI-1394 cards.  Enable
 	  this option only if you have an IEEE 1394 video device connected to
@@ -72,14 +102,14 @@ config IEEE1394_VIDEO1394
 
 config IEEE1394_SBP2
 	tristate "SBP-2 support (Harddisks etc.)"
-	depends on SCSI && IEEE1394
+	depends on IEEE1394 && SCSI
 	help
 	  This option enables you to use SBP-2 devices connected to your IEEE
 	  1394 bus.  SBP-2 devices include harddrives and DVD devices.
 
 config IEEE1394_SBP2_PHYS_DMA
 	bool "Enable Phys DMA support for SBP2 (Debug)"
-	depends on IEEE1394_SBP2
+	depends on IEEE1394 && IEEE1394_SBP2
 
 config IEEE1394_ETH1394
 	tristate "Ethernet over 1394"
@@ -90,8 +120,8 @@ config IEEE1394_ETH1394
 
 config IEEE1394_DV1394
 	tristate "OHCI-DV I/O support"
-	depends on IEEE1394_OHCI1394
-	---help---
+	depends on IEEE1394 && IEEE1394_OHCI1394
+	help
 	  This driver allows you to transmit and receive DV (digital video)
 	  streams on an OHCI-1394 card using a simple frame-oriented
 	  interface.
@@ -131,8 +161,8 @@ config IEEE1394_CMP
 
 config IEEE1394_AMDTP
 	tristate "IEC61883-6 (Audio transmission) support"
-	depends on IEEE1394_OHCI1394 && IEEE1394_CMP
-	---help---
+	depends on IEEE1394 && IEEE1394_OHCI1394 && IEEE1394_CMP
+	help
 	  This option enables the Audio & Music Data Transmission Protocol
 	  (IEC61883-6) driver, which implements audio transmission over
 	  IEEE1394.
@@ -144,18 +174,4 @@ config IEEE1394_AMDTP
 	  say M here and read <file:Documentation/modules.txt>.  The module
 	  will be called amdtp.o.
 
-config IEEE1394_VERBOSEDEBUG
-	bool "Excessive debugging output"
-	depends on IEEE1394
-	help
-	  If you say Y here, you will get very verbose debugging logs from the
-	  subsystem which includes a dump of the header of every sent and
-	  received packet.  This can amount to a high amount of data collected
-	  in a very short time which is usually also saved to disk by the
-	  system logging daemons.
-
-	  Say Y if you really want or need the debugging output, everyone else
-	  says N.
-
 endmenu
-

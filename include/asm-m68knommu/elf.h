@@ -62,7 +62,7 @@ typedef struct user_m68kfp_struct elf_fpregset_t;
 	pr_reg[8] = regs->a1;						\
 	pr_reg[14] = regs->d0;						\
 	pr_reg[15] = rdusp();						\
-	pr_reg[16] = 0 /* regs->orig_d0; */			\
+	pr_reg[16] = 0 /* regs->orig_d0 */;				\
 	pr_reg[17] = regs->sr;						\
 	pr_reg[18] = regs->pc;						\
 	/* pr_reg[19] = (regs->format << 12) | regs->vector; */		\
@@ -70,7 +70,6 @@ typedef struct user_m68kfp_struct elf_fpregset_t;
 	  struct switch_stack *sw = ((struct switch_stack *)regs) - 1;	\
 	  pr_reg[5] = sw->d6;						\
 	  pr_reg[6] = sw->d7;						\
-	  pr_reg[9] = sw->a2;						\
 	  pr_reg[10] = sw->a3;						\
 	  pr_reg[11] = sw->a4;						\
 	  pr_reg[12] = sw->a5;						\

@@ -39,5 +39,3 @@ btfix.s: btfixupprep $(TOPDIR)/vmlinux
 
 btfix.o: btfix.s
 	$(CC) -c -o btfix.o btfix.s
-
-include $(TOPDIR)/Rules.make

@@ -8,6 +8,7 @@
 #include <linux/list.h>
 #include <linux/init.h>
 #include <linux/string.h>
+#include <asm/semaphore.h>
 #include <asm/byteorder.h>
 
 
@@ -61,6 +62,30 @@
 #define HPSB_INIT_WORK(x,y,z) INIT_WORK(x,y,z)
 #define HPSB_PREPARE_WORK(x,y,z) PREPARE_WORK(x,y,z)
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,44)
+/* pci_pool_create changed. does not take the flags arg any longer */
+#define hpsb_pci_pool_create(a,b,c,d,e,f) pci_pool_create(a,b,c,d,e,f)
+#else
+#define hpsb_pci_pool_create(a,b,c,d,e,f) pci_pool_create(a,b,c,d,e)
+#endif
+
+/* Transaction Label handling */
+struct hpsb_tlabel_pool {
+	u64 pool;
+	spinlock_t lock;
+	u8 next;
+	u32 allocations;
+	struct semaphore count;
+};
+
+#define HPSB_TPOOL_INIT(_tp)            \
+do {                                    \
+	sema_init(&(_tp)->count, 63);   \
+	spin_lock_init(&(_tp)->lock);   \
+	(_tp)->next = 0;                \
+	(_tp)->pool = 0;                \
+} while(0)
 
 
 typedef u32 quadlet_t;

@@ -21,5 +21,3 @@ clean:
 mrproper:	
 	rm -f offset.[hs] $(TARGET).new
 	rm -f $(TARGET)
-
-include $(TOPDIR)/Rules.make

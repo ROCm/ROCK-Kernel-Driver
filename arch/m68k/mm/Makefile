@@ -9,6 +9,3 @@ obj-y		+= kmap.o memory.o motorola.o
 else
 obj-y		+= sun3kmap.o sun3mmu.o
 endif
-
-
-include $(TOPDIR)/Rules.make

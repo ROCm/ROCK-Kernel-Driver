@@ -6,5 +6,3 @@ aacraid-objs	:= linit.o aachba.o commctrl.o comminit.o commsup.o \
 		   dpcsup.o rx.o sa.o
 
 EXTRA_CFLAGS	:= -Idrivers/scsi
-
-include $(TOPDIR)/Rules.make
