@@ -22,18 +22,6 @@ static inline void *qdisc_priv(struct Qdisc *q)
 			      & ~QDISC_ALIGN_CONST);
 }
 
-#define cls_set_class(tp, clp, cl) tcf_set_class(tp, clp, cl)
-static inline unsigned long
-__cls_set_class(unsigned long *clp, unsigned long cl)
-{
-	unsigned long old_cl;
-
-	old_cl = *clp;
-	*clp = cl;
-	return old_cl;
-}
-
-
 /* 
    Timer resolution MUST BE < 10% of min_schedulable_packet_size/bandwidth
    
