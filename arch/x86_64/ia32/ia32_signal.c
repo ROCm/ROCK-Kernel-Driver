@@ -106,20 +106,24 @@ sys32_sigaltstack(const stack_ia32_t *uss_ptr, stack_ia32_t *uoss_ptr,
 	stack_t uss,uoss; 
 	int ret;
 	mm_segment_t seg; 
+	if (uss_ptr) { 
+		u32 ptr;
 	if (!access_ok(VERIFY_READ,uss_ptr,sizeof(stack_ia32_t)) ||
-	    __get_user(ptr_to_u32(uss.ss_sp), &uss_ptr->ss_sp) ||
-	    __get_user((u32)uss.ss_flags, &uss_ptr->ss_flags) ||
-	    __get_user((u32)uss.ss_size, &uss_ptr->ss_size))
+		    __get_user(ptr, &uss_ptr->ss_sp) ||
+		    __get_user(uss.ss_flags, &uss_ptr->ss_flags) ||
+		    __get_user(uss.ss_size, &uss_ptr->ss_size))
 		return -EFAULT;
+		uss.ss_sp = (void *)(u64)ptr;
+	}
 	seg = get_fs(); 
 	set_fs(KERNEL_DS); 
-	ret = do_sigaltstack(&uss, &uoss, regs.rsp);
+	ret = do_sigaltstack(uss_ptr ? &uss : NULL, &uoss, regs.rsp);
 	set_fs(seg); 
 	if (ret >= 0 && uoss_ptr)  {
-		if (!access_ok(VERIFY_WRITE,uss_ptr,sizeof(stack_ia32_t)) ||
-		    __put_user(ptr_to_u32(uss.ss_sp), &uss_ptr->ss_sp) ||
-		    __put_user((u32)uss.ss_flags, &uss_ptr->ss_flags) ||
-		    __put_user((u32)uss.ss_size, &uss_ptr->ss_size))
+		if (!access_ok(VERIFY_WRITE,uoss_ptr,sizeof(stack_ia32_t)) ||
+		    __put_user((u32)(u64)uss.ss_sp, &uoss_ptr->ss_sp) ||
+		    __put_user(uss.ss_flags, &uoss_ptr->ss_flags) ||
+		    __put_user(uss.ss_size, &uoss_ptr->ss_size))
 			ret = -EFAULT;
 	} 	
 	return ret;	

@@ -172,6 +172,9 @@ int put_cmsg(struct msghdr * msg, int level, int type, int len, void *data)
 	int cmlen = CMSG_LEN(len);
 	int err;
 
+	if (MSG_CMSG_COMPAT & msg->msg_flags)
+		return put_cmsg_compat(msg, level, type, len, data);
+
 	if (cm==NULL || msg->msg_controllen < sizeof(*cm)) {
 		msg->msg_flags |= MSG_CTRUNC;
 		return 0; /* XXX: return error? check spec. */
@@ -206,6 +209,9 @@ void scm_detach_fds(struct msghdr *msg, struct scm_cookie *scm)
 	struct file **fp = scm->fp->fp;
 	int *cmfptr;
 	int err = 0, i;
+
+	if (MSG_CMSG_COMPAT & msg->msg_flags)
+		return scm_detach_fds_compat(msg, scm);
 
 	if (msg->msg_controllen > sizeof(struct cmsghdr))
 		fdmax = ((msg->msg_controllen - sizeof(struct cmsghdr))

@@ -300,7 +300,7 @@ ia32_syscall_table:
 	data8 compat_sys_statfs
 	data8 compat_sys_fstatfs	  /* 100 */
 	data8 sys32_ioperm
-	data8 sys32_socketcall
+	data8 compat_sys_socketcall
 	data8 sys_syslog
 	data8 compat_sys_setitimer
 	data8 compat_sys_getitimer	  /* 105 */

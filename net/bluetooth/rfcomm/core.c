@@ -605,29 +605,17 @@ void rfcomm_session_getaddr(struct rfcomm_session *s, bdaddr_t *src, bdaddr_t *d
 /* ---- RFCOMM frame sending ---- */
 static int rfcomm_send_frame(struct rfcomm_session *s, u8 *data, int len)
 {
-	struct kiocb iocb;
-	struct sock_iocb *si;
 	struct socket *sock = s->sock;
 	struct iovec iv = { data, len };
 	struct msghdr msg;
-	int err;
 
 	BT_DBG("session %p len %d", s, len);
 
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_iovlen = 1;
 	msg.msg_iov = &iv;
-	init_sync_kiocb(&iocb, NULL);
-	si = kiocb_to_siocb(&iocb);
-	si->scm = NULL;
-	si->sock = sock;
-	si->msg = &msg;
-	si->size = len;
 
-	err = sock->ops->sendmsg(&iocb, sock, &msg, len, NULL);
-	if (-EIOCBQUEUED == err)
-		err = wait_on_sync_kiocb(&iocb);
-	return err;
+	return sock_sendmsg(sock, &msg, len);
 }
 
 static int rfcomm_send_sabm(struct rfcomm_session *s, u8 dlci)
@@ -839,13 +827,10 @@ static int rfcomm_send_msc(struct rfcomm_session *s, int cr, u8 dlci, u8 v24_sig
 
 static int rfcomm_send_test(struct rfcomm_session *s, int cr, u8 *pattern, int len)
 {
-	struct kiocb iocb;
-	struct sock_iocb *si;
 	struct socket *sock = s->sock;
 	struct iovec iv[3];
 	struct msghdr msg;
 	unsigned char hdr[5], crc[1];
-	int err;
 
 	if (len > 125)
 		return -EINVAL;
@@ -870,18 +855,8 @@ static int rfcomm_send_test(struct rfcomm_session *s, int cr, u8 *pattern, int l
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_iovlen = 3;
 	msg.msg_iov = iv;
-	init_sync_kiocb(&iocb, NULL);
-	si = kiocb_to_siocb(&iocb);
-	si->scm = NULL;
-	si->sock = sock;
-	si->msg = &msg;
-	si->size = 6 + len;
 
-	err = sock->ops->sendmsg(&iocb, sock, &msg, 6 + len, NULL);
-	if (-EIOCBQUEUED == err)
-		err = wait_on_sync_kiocb(&iocb);
-
-	return err;
+	return sock_sendmsg(sock, &msg, 6 + len);
 }
 
 static int rfcomm_send_credits(struct rfcomm_session *s, u8 addr, u8 credits)

@@ -480,7 +480,7 @@ void __init cpu_init (void)
 	 */
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
-	if(current->mm)
+	if (current->mm)
 		BUG();
 	enter_lazy_tlb(&init_mm, current, cpu);
 
@@ -508,7 +508,7 @@ void __init cpu_init (void)
 	/*
 	 * Force FPU initialization:
 	 */
-	clear_thread_flag(TIF_USEDFPU);
+	current_thread_info()->status = 0;
 	current->used_math = 0;
 	stts();
 }

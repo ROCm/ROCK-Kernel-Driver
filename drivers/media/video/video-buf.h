@@ -110,7 +110,7 @@ struct videobuf_buffer;
 struct videobuf_queue;
 
 struct videobuf_mapping {
-	int count;
+	unsigned int count;
 	int highmem_ok;
 	unsigned long start;
 	unsigned long end;
@@ -128,19 +128,19 @@ enum videobuf_state {
 };
 
 struct videobuf_buffer {
-	int                     i;
+	unsigned int            i;
 
 	/* info about the buffer */
-	int                     width;
-	int                     height;
-	long                    size;
+	unsigned int            width;
+	unsigned int            height;
+	unsigned long           size;
 	enum v4l2_field         field;
 	enum videobuf_state     state;
 	struct videobuf_dmabuf  dma;
 	struct list_head        stream;  /* QBUF/DQBUF list */
 
 	/* for mmap'ed buffers */
-	off_t                   boff;    /* buffer offset (mmap) */
+	size_t                  boff;    /* buffer offset (mmap) */
 	size_t                  bsize;   /* buffer size */
 	unsigned long           baddr;   /* buffer addr (userland ptr!) */
 	struct videobuf_mapping *map;
@@ -148,12 +148,13 @@ struct videobuf_buffer {
 	/* touched by irq handler */
 	struct list_head        queue;
 	wait_queue_head_t       done;
-	int                     field_count;
+	unsigned int            field_count;
 	struct timeval          ts;
 };
 
 struct videobuf_queue_ops {
-	int (*buf_setup)(struct file *file, int *count, int *size);
+	int (*buf_setup)(struct file *file,
+			 unsigned int *count, unsigned int *size);
 	int (*buf_prepare)(struct file *file,struct videobuf_buffer *vb,
 			   enum v4l2_field field);
 	void (*buf_queue)(struct file *file,struct videobuf_buffer *vb);
@@ -166,23 +167,23 @@ struct videobuf_queue {
 	struct pci_dev             *pci;
 
 	enum v4l2_buf_type         type;
-	int                        msize;
+	unsigned int               msize;
 	enum v4l2_field            field;
 	enum v4l2_field            last; /* for field=V4L2_FIELD_ALTERNATE */
 	struct videobuf_buffer     *bufs[VIDEO_MAX_FRAME];
 	struct videobuf_queue_ops  *ops;
 
 	/* capture via mmap() + ioctl(QBUF/DQBUF) */
-	int                        streaming;
+	unsigned int               streaming;
 	struct list_head           stream;
 
 	/* capture via read() */
-	int                        reading;
-	int                        read_off;
+	unsigned int               reading;
+	unsigned int               read_off;
 	struct videobuf_buffer     *read_buf;
 };
 
-void* videobuf_alloc(int size);
+void* videobuf_alloc(unsigned int size);
 int videobuf_waiton(struct videobuf_buffer *vb, int non_blocking, int intr);
 int videobuf_iolock(struct pci_dev *pci, struct videobuf_buffer *vb);
 
@@ -190,7 +191,8 @@ void videobuf_queue_init(struct videobuf_queue *q,
 			 struct videobuf_queue_ops *ops,
 			 struct pci_dev *pci, spinlock_t *irqlock,
 			 enum v4l2_buf_type type,
-			 enum v4l2_field field, int msize);
+			 enum v4l2_field field,
+			 unsigned int msize);
 int  videobuf_queue_is_busy(struct videobuf_queue *q);
 void videobuf_queue_cancel(struct file *file, struct videobuf_queue *q);
 
@@ -218,7 +220,7 @@ unsigned int videobuf_poll_stream(struct file *file,
 				  poll_table *wait);
 
 int videobuf_mmap_setup(struct file *file, struct videobuf_queue *q,
-			int bcount, int bsize);
+			unsigned int bcount, unsigned int bsize);
 int videobuf_mmap_free(struct file *file, struct videobuf_queue *q);
 int videobuf_mmap_mapper(struct vm_area_struct *vma,
 			 struct videobuf_queue *q);

@@ -499,7 +499,7 @@ sys_call_table:
         .long  SYSCALL(sys_statfs,compat_sys_statfs_wrapper)
         .long  SYSCALL(sys_fstatfs,compat_sys_fstatfs_wrapper)   /* 100 */
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall)
-        .long  SYSCALL(sys_socketcall,sys32_socketcall_wrapper)
+        .long  SYSCALL(sys_socketcall,compat_sys_socketcall_wrapper)
         .long  SYSCALL(sys_syslog,sys32_syslog_wrapper)
         .long  SYSCALL(sys_setitimer,compat_sys_setitimer_wrapper)
         .long  SYSCALL(sys_getitimer,compat_sys_getitimer_wrapper)   /* 105 */

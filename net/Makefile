@@ -7,6 +7,8 @@
 
 obj-y	:= socket.o core/
 
+obj-$(CONFIG_COMPAT)		+= compat.o
+
 # LLC has to be linked before the files in net/802/
 obj-$(CONFIG_LLC)		+= llc/
 obj-$(CONFIG_NET)		+= ethernet/ 802/ sched/ netlink/

@@ -142,6 +142,17 @@ struct tcp_bind_bucket *tcp_bucket_create(struct tcp_bind_hashbucket *head,
 	return tb;
 }
 
+/* Caller must hold hashbucket lock for this tb with local BH disabled */
+void tcp_bucket_destroy(struct tcp_bind_bucket *tb)
+{
+	if (!tb->owners) {
+		if (tb->next)
+			tb->next->pprev = tb->pprev;
+		*(tb->pprev) = tb->next;
+		kmem_cache_free(tcp_bucket_cachep, tb);
+	}
+}
+
 /* Caller must disable local BH processing. */
 static __inline__ void __tcp_inherit_port(struct sock *sk, struct sock *child)
 {
@@ -300,12 +311,7 @@ static void __tcp_put_port(struct sock *sk)
 	*(sk->bind_pprev) = sk->bind_next;
 	sk->prev  = NULL;
 	inet->num = 0;
-	if (!tb->owners) {
-		if (tb->next)
-			tb->next->pprev = tb->pprev;
-		*(tb->pprev) = tb->next;
-		kmem_cache_free(tcp_bucket_cachep, tb);
-	}
+	tcp_bucket_destroy(tb);
 	spin_unlock(&head->lock);
 }
 

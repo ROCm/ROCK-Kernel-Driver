@@ -604,7 +604,7 @@ _GLOBAL(sys_call_table32)
 	.llong .compat_sys_statfs
 	.llong .compat_sys_fstatfs		/* 100 */
 	.llong .sys_ioperm
-	.llong .sys32_socketcall
+	.llong .compat_sys_socketcall
 	.llong .sys32_syslog
 	.llong .compat_sys_setitimer
 	.llong .compat_sys_getitimer		/* 105 */

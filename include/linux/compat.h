@@ -45,5 +45,12 @@ extern int put_compat_flock(struct flock *, struct compat_flock *);
 extern int get_compat_timespec(struct timespec *, struct compat_timespec *);
 extern int put_compat_timespec(struct timespec *, struct compat_timespec *);
 
+struct compat_iovec {
+	u32		iov_base;
+	compat_size_t	iov_len;
+};
+#else /* no CONFIG_COMPAT */
+#define compat_size_t	size_t
+
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */

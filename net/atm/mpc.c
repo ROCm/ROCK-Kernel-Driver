@@ -520,7 +520,7 @@ static int send_via_shortcut(struct sk_buff *skb, struct mpoa_client *mpc)
 		memcpy(skb->data, &llc_snap_mpoa_data, sizeof(struct llc_snap_hdr));
 	}
 
-	atomic_add(skb->truesize, &entry->shortcut->tx_inuse);
+	atomic_add(skb->truesize, &entry->shortcut->sk->wmem_alloc);
 	ATM_SKB(skb)->iovcnt = 0; /* just to be safe ... */
 	ATM_SKB(skb)->atm_options = entry->shortcut->atm_options;
 	entry->shortcut->send(entry->shortcut, skb);
@@ -665,7 +665,7 @@ static void mpc_push(struct atm_vcc *vcc, struct sk_buff *skb)
 	skb->dev = dev;
 	if (memcmp(skb->data, &llc_snap_mpoa_ctrl, sizeof(struct llc_snap_hdr)) == 0) {
 		dprintk("mpoa: (%s) mpc_push: control packet arrived\n", dev->name);
-		skb_queue_tail(&vcc->recvq, skb);           /* Pass control packets to daemon */
+		skb_queue_tail(&vcc->sk->receive_queue, skb);           /* Pass control packets to daemon */
 		wake_up(&vcc->sleep);
 		return;
 	}
@@ -841,7 +841,7 @@ static void mpoad_close(struct atm_vcc *vcc)
 	mpc->in_ops->destroy_cache(mpc);
 	mpc->eg_ops->destroy_cache(mpc);
 
-	while ( (skb = skb_dequeue(&vcc->recvq)) ){
+	while ( (skb = skb_dequeue(&vcc->sk->receive_queue)) ){
 		atm_return(vcc, skb->truesize);
 		kfree_skb(skb);
 	}
@@ -861,7 +861,7 @@ static int msg_from_mpoad(struct atm_vcc *vcc, struct sk_buff *skb)
 	
 	struct mpoa_client *mpc = find_mpc_by_vcc(vcc);
 	struct k_message *mesg = (struct k_message*)skb->data;
-	atomic_sub(skb->truesize+ATM_PDU_OVHD, &vcc->tx_inuse);
+	atomic_sub(skb->truesize+ATM_PDU_OVHD, &vcc->sk->wmem_alloc);
 	
 	if (mpc == NULL) {
 		printk("mpoa: msg_from_mpoad: no mpc found\n");
@@ -938,7 +938,7 @@ int msg_to_mpoad(struct k_message *mesg, struct mpoa_client *mpc)
 	skb_put(skb, sizeof(struct k_message));
 	memcpy(skb->data, mesg, sizeof(struct k_message));
 	atm_force_charge(mpc->mpoad_vcc, skb->truesize);
-	skb_queue_tail(&mpc->mpoad_vcc->recvq, skb);
+	skb_queue_tail(&mpc->mpoad_vcc->sk->receive_queue, skb);
 	wake_up(&mpc->mpoad_vcc->sleep);
 
 	return 0;
@@ -1215,7 +1215,7 @@ static void purge_egress_shortcut(struct atm_vcc *vcc, eg_cache_entry *entry)
 		purge_msg->content.eg_info = entry->ctrl_info;
 
 	atm_force_charge(vcc, skb->truesize);
-	skb_queue_tail(&vcc->recvq, skb);
+	skb_queue_tail(&vcc->sk->receive_queue, skb);
 	wake_up(&vcc->sleep);
 	dprintk("mpoa: purge_egress_shortcut: exiting:\n");
 

@@ -19,46 +19,37 @@
 #define __KERNEL_SYSCALLS__
 #include <stdarg.h>
 
-#include <linux/compiler.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/elfcore.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
-#include <linux/stddef.h>
 #include <linux/unistd.h>
-#include <linux/ptrace.h>
 #include <linux/slab.h>
-#include <linux/vmalloc.h>
 #include <linux/user.h>
 #include <linux/module.h>
 #include <linux/a.out.h>
 #include <linux/interrupt.h>
-#include <linux/config.h>
 #include <linux/delay.h>
-#include <linux/init.h>
-#include <linux/ctype.h>
-#include <linux/slab.h>
+#include <linux/irq.h>
+#include <linux/ptrace.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/ldt.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
-#include <asm/desc.h>
 #include <asm/mmu_context.h>
 #include <asm/pda.h>
 #include <asm/prctl.h>
 #include <asm/kdebug.h>
-
-#include <linux/irq.h>
+#include <asm/desc.h>
+#include <asm/proto.h>
+#include <asm/ia32.h>
 
 asmlinkage extern void ret_from_fork(void);
-int sys_arch_prctl(int code, unsigned long addr);
 
 unsigned long kernel_thread_flags = CLONE_VM | CLONE_UNTRACED;
 
@@ -245,10 +236,36 @@ void release_thread(struct task_struct *dead_task)
 	}
 }
 
+static inline void set_32bit_tls(struct task_struct *t, int tls, u32 addr)
+{
+	struct user_desc ud = { 
+		.base_addr = addr,
+		.limit = 0xfffff,
+		.seg_32bit = 1,
+		.limit_in_pages = 1,
+		.useable = 1,
+	};
+	struct n_desc_struct *desc = (void *)t->thread.tls_array;
+	desc += tls;
+	desc->a = LDT_entry_a(&ud); 
+	desc->b = LDT_entry_b(&ud); 
+}
+
+static inline u32 read_32bit_tls(struct task_struct *t, int tls)
+{
+	struct desc_struct *desc = (void *)t->thread.tls_array;
+	desc += tls;
+	return desc->base0 | 
+		(((u32)desc->base1) << 16) | 
+		(((u32)desc->base2) << 24);
+}
+
+
 int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp, 
 		unsigned long unused,
 	struct task_struct * p, struct pt_regs * regs)
 {
+	int err;
 	struct pt_regs * childregs;
 	struct task_struct *me = current;
 
@@ -265,7 +282,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 
 	p->thread.rsp = (unsigned long) childregs;
 	p->thread.rsp0 = (unsigned long) (childregs+1);
-	p->thread.userrsp = current->thread.userrsp; 
+	p->thread.userrsp = me->thread.userrsp; 
 
 	p->thread.rip = (unsigned long) ret_from_fork;
 
@@ -277,8 +294,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	asm("movl %%es,%0" : "=m" (p->thread.es));
 	asm("movl %%ds,%0" : "=m" (p->thread.ds));
 
-	unlazy_fpu(current);	
-	p->thread.i387 = current->thread.i387;
+	unlazy_fpu(me);	
+	p->thread.i387 = me->thread.i387;
 
 	if (unlikely(me->thread.io_bitmap_ptr != NULL)) { 
 		p->thread.io_bitmap_ptr = kmalloc((IO_BITMAP_SIZE+1)*4, GFP_KERNEL);
@@ -292,27 +309,20 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	 * Set a new TLS for the child thread?
 	 */
 	if (clone_flags & CLONE_SETTLS) {
-		struct n_desc_struct *desc;
-		struct user_desc info;
-		int idx;
-
-		if (copy_from_user(&info, test_thread_flag(TIF_IA32) ? 
-								  (void *)childregs->rsi : 
-								  (void *)childregs->rdx, sizeof(info)))
-			return -EFAULT;
-		if (LDT_empty(&info))
-			return -EINVAL;
-
-		idx = info.entry_number;
-		if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
-			return -EINVAL;
-
-		desc = (struct n_desc_struct *)(p->thread.tls_array) + idx - GDT_ENTRY_TLS_MIN;
-		desc->a = LDT_entry_a(&info);
-		desc->b = LDT_entry_b(&info);
+#ifdef CONFIG_IA32_EMULATION
+		if (test_thread_flag(TIF_IA32))
+			err = ia32_child_tls(p, childregs); 
+		else 			
+#endif	 
+			err = do_arch_prctl(p, ARCH_SET_FS, childregs->r10); 
+		if (err) 
+			goto out;
 	}
-
-	return 0;
+	err = 0;
+out:
+	if (err && p->thread.io_bitmap_ptr)
+		kfree(p->thread.io_bitmap_ptr);
+	return err;
 }
 
 /*
@@ -422,7 +432,7 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
 		if (next->io_bitmap_ptr) {
 			/*
-			 * 4 cachelines copy ... not good, but not that
+			 * 2 cachelines copy ... not good, but not that
 			 * bad either. Anyone got something better?
 			 * This only affects processes which use ioperm().
 			 */
@@ -537,19 +547,35 @@ unsigned long get_wchan(struct task_struct *p)
 #undef last_sched
 #undef first_sched
 
-int sys_arch_prctl(int code, unsigned long addr)
+long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 { 
 	int ret = 0; 
+	int doit = task == current;
+	int cpu;
 
 	switch (code) { 
 	case ARCH_SET_GS:
 		if (addr >= TASK_SIZE) 
 			return -EPERM; 
-		get_cpu();
+		cpu = get_cpu();
+		/* handle small bases via the GDT because that's faster to 
+		   switch. */
+		if (addr <= 0xffffffff) {  
+			set_32bit_tls(task, GS_TLS, addr); 
+			if (doit) { 
+				load_TLS(&task->thread, cpu);
+				load_gs_index(GS_TLS_SEL); 
+			}
+			task->thread.gsindex = GS_TLS_SEL; 
+			task->thread.gs = 0;
+		} else { 
+			task->thread.gsindex = 0;
+			task->thread.gs = addr;
+			if (doit) {
 		load_gs_index(0);
-		current->thread.gsindex = 0;
-		current->thread.gs = addr;
 		ret = checking_wrmsrl(MSR_KERNEL_GS_BASE, addr); 
+			} 
+		}
 		put_cpu();
 		break;
 	case ARCH_SET_FS:
@@ -557,22 +583,51 @@ int sys_arch_prctl(int code, unsigned long addr)
 		   with gs */
 		if (addr >= TASK_SIZE)
 			return -EPERM; 
-		get_cpu();
+		cpu = get_cpu();
+		/* handle small bases via the GDT because that's faster to 
+		   switch. */
+		if (addr <= 0xffffffff) { 
+			set_32bit_tls(task, FS_TLS, addr);
+			if (doit) { 
+				load_TLS(&task->thread, cpu); 
+				asm volatile("movl %0,%%fs" :: "r" (FS_TLS_SEL));
+			}
+			task->thread.fsindex = FS_TLS_SEL;
+			task->thread.fs = 0;
+		} else { 
+			task->thread.fsindex = 0;
+			task->thread.fs = addr;
+			if (doit) {
+				/* set the selector to 0 to not confuse
+				   __switch_to */
 		asm volatile("movl %0,%%fs" :: "r" (0));
-		current->thread.fsindex = 0;
-		current->thread.fs = addr;
 		ret = checking_wrmsrl(MSR_FS_BASE, addr); 
+			}
+		}
 		put_cpu();
 		break;
-
-		/* Returned value may not be correct when the user changed fs/gs */ 
-	case ARCH_GET_FS:
-		ret = put_user(current->thread.fs, (unsigned long *)addr); 
+	case ARCH_GET_FS: { 
+		unsigned long base; 
+		if (task->thread.fsindex == FS_TLS_SEL)
+			base = read_32bit_tls(task, FS_TLS);
+		else if (doit) {
+			rdmsrl(MSR_FS_BASE, base);
+		} else
+			base = task->thread.fs;
+		ret = put_user(base, (unsigned long *)addr); 
 		break; 
-
-	case ARCH_GET_GS: 
-		ret = put_user(current->thread.gs, (unsigned long *)addr); 
+	}
+	case ARCH_GET_GS: { 
+		unsigned long base;
+		if (task->thread.gsindex == GS_TLS_SEL)
+			base = read_32bit_tls(task, GS_TLS);
+		else if (doit) {
+			rdmsrl(MSR_KERNEL_GS_BASE, base);
+		} else
+			base = task->thread.gs;
+		ret = put_user(base, (unsigned long *)addr); 
 		break;
+	}
 
 	default:
 		ret = -EINVAL;
@@ -582,131 +637,9 @@ int sys_arch_prctl(int code, unsigned long addr)
 	return ret;	
 } 
 
-/*
- * sys_alloc_thread_area: get a yet unused TLS descriptor index.
- */
-static int get_free_idx(void)
+long sys_arch_prctl(int code, unsigned long addr)
 {
-	struct thread_struct *t = &current->thread;
-	int idx;
-
-	for (idx = 0; idx < GDT_ENTRY_TLS_ENTRIES; idx++)
-		if (desc_empty((struct n_desc_struct *)(t->tls_array) + idx))
-			return idx + GDT_ENTRY_TLS_MIN;
-	return -ESRCH;
-}
-
-/*
- * Set a given TLS descriptor:
- * When you want addresses > 32bit use arch_prctl() 
- */
-int do_set_thread_area(struct thread_struct *t, struct user_desc *u_info)
-{
-	struct user_desc info;
-	struct n_desc_struct *desc;
-	int cpu, idx;
-
-	if (copy_from_user(&info, u_info, sizeof(info)))
-		return -EFAULT;
-
-	idx = info.entry_number;
-
-	/*
-	 * index -1 means the kernel should try to find and
-	 * allocate an empty descriptor:
-	 */
-	if (idx == -1) {
-		idx = get_free_idx();
-		if (idx < 0)
-			return idx;
-		if (put_user(idx, &u_info->entry_number))
-			return -EFAULT;
-	}
-
-	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
-		return -EINVAL;
-
-	desc = ((struct n_desc_struct *)t->tls_array) + idx - GDT_ENTRY_TLS_MIN;
-
-	/*
-	 * We must not get preempted while modifying the TLS.
-	 */
-	cpu = get_cpu();
-
-	if (LDT_empty(&info)) {
-		desc->a = 0;
-		desc->b = 0;
-	} else {
-		desc->a = LDT_entry_a(&info);
-		desc->b = LDT_entry_b(&info);
-	}
-	if (t == &current->thread)
-	load_TLS(t, cpu);
-
-	put_cpu();
-	return 0;
-}
-
-asmlinkage int sys_set_thread_area(struct user_desc *u_info)
-{ 
-	return do_set_thread_area(&current->thread, u_info); 
-} 
-
-
-/*
- * Get the current Thread-Local Storage area:
- */
-
-#define GET_BASE(desc) ( \
-	(((desc)->a >> 16) & 0x0000ffff) | \
-	(((desc)->b << 16) & 0x00ff0000) | \
-	( (desc)->b        & 0xff000000)   )
-
-#define GET_LIMIT(desc) ( \
-	((desc)->a & 0x0ffff) | \
-	 ((desc)->b & 0xf0000) )
-	
-#define GET_32BIT(desc)		(((desc)->b >> 23) & 1)
-#define GET_CONTENTS(desc)	(((desc)->b >> 10) & 3)
-#define GET_WRITABLE(desc)	(((desc)->b >>  9) & 1)
-#define GET_LIMIT_PAGES(desc)	(((desc)->b >> 23) & 1)
-#define GET_PRESENT(desc)	(((desc)->b >> 15) & 1)
-#define GET_USEABLE(desc)	(((desc)->b >> 20) & 1)
-#define GET_LONGMODE(desc)	(((desc)->b >> 21) & 1)
-
-int do_get_thread_area(struct thread_struct *t, struct user_desc *u_info)
-{
-	struct user_desc info;
-	struct n_desc_struct *desc;
-	int idx;
-
-	if (get_user(idx, &u_info->entry_number))
-		return -EFAULT;
-	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
-		return -EINVAL;
-
-	desc = ((struct n_desc_struct *)t->tls_array) + idx - GDT_ENTRY_TLS_MIN;
-
-	memset(&info, 0, sizeof(struct user_desc));
-	info.entry_number = idx;
-	info.base_addr = GET_BASE(desc);
-	info.limit = GET_LIMIT(desc);
-	info.seg_32bit = GET_32BIT(desc);
-	info.contents = GET_CONTENTS(desc);
-	info.read_exec_only = !GET_WRITABLE(desc);
-	info.limit_in_pages = GET_LIMIT_PAGES(desc);
-	info.seg_not_present = !GET_PRESENT(desc);
-	info.useable = GET_USEABLE(desc);
-	info.lm = GET_LONGMODE(desc);
-
-	if (copy_to_user(u_info, &info, sizeof(info)))
-		return -EFAULT;
-	return 0;
-}
-
-asmlinkage int sys_get_thread_area(struct user_desc *u_info)
-{
-	return do_get_thread_area(&current->thread, u_info);
+	return do_arch_prctl(current, code, addr);
 } 
 
 /* 

@@ -173,13 +173,13 @@ sunos_sys_table:
 	.word compat_sys_getitimer, sys_gethostname, sys_sethostname
 	.word sunos_getdtablesize, sys_dup2, sunos_nop
 	.word sys32_fcntl, sunos_select, sunos_nop
-	.word sys_fsync, sys_setpriority32, sunos_socket
+	.word sys_fsync, sys_setpriority32, sys_socket
 	.word sys_connect, sunos_accept
 /*100*/	.word sys_getpriority, sunos_send, sunos_recv
 	.word sunos_nosys, sys_bind, sunos_setsockopt
 	.word sys_listen, sunos_nosys, sunos_sigaction
 	.word sunos_sigblock, sunos_sigsetmask, sys_sigpause
-	.word sys32_sigstack, sys32_recvmsg, sys32_sendmsg
+	.word sys32_sigstack, compat_sys_recvmsg, compat_sys_sendmsg
 	.word sunos_nosys, sys32_gettimeofday, sys32_getrusage
 	.word sunos_getsockopt, sunos_nosys, sunos_readv
 	.word sunos_writev, sys32_settimeofday, sys32_fchown16

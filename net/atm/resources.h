@@ -10,7 +10,7 @@
 #include <linux/atmdev.h>
 
 
-extern struct atm_dev *atm_devs;
+extern struct list_head atm_devs;
 extern struct atm_vcc *nodev_vccs; /* VCCs not linked to any device */
 
 

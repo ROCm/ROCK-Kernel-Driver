@@ -23,7 +23,8 @@
 #include "internal.h"
 
 typedef void (cryptfn_t)(void *, u8 *, const u8 *);
-typedef void (procfn_t)(struct crypto_tfm *, u8 *, u8*, cryptfn_t, int enc);
+typedef void (procfn_t)(struct crypto_tfm *, u8 *,
+                        u8*, cryptfn_t, int enc, void *);
 
 struct scatter_walk {
 	struct scatterlist	*sg;
@@ -32,6 +33,13 @@ struct scatter_walk {
 	unsigned int		len_this_page;
 	unsigned int		len_this_segment;
 	unsigned int		offset;
+};
+
+enum km_type crypto_km_types[] = {
+	KM_USER0,
+	KM_USER1,
+	KM_SOFTIRQ0,
+	KM_SOFTIRQ1,
 };
 
 static inline void xor_64(u8 *a, const u8 *b)
@@ -159,7 +167,8 @@ static int copy_chunks(void *buf, struct scatter_walk *walk,
 static int crypt(struct crypto_tfm *tfm,
 		 struct scatterlist *dst,
 		 struct scatterlist *src,
-                 unsigned int nbytes, cryptfn_t crfn, procfn_t prfn, int enc)
+                 unsigned int nbytes, cryptfn_t crfn,
+                 procfn_t prfn, int enc, void *info)
 {
 	struct scatter_walk walk_in, walk_out;
 	const unsigned int bsize = crypto_tfm_alg_blocksize(tfm);
@@ -189,7 +198,7 @@ static int crypt(struct crypto_tfm *tfm,
 
 		copy_chunks(src_p, &walk_in, bsize, 0);
 
-		prfn(tfm, dst_p, src_p, crfn, enc);
+		prfn(tfm, dst_p, src_p, crfn, enc, info);
 
 		scatter_done(&walk_in, 0, nbytes);
 
@@ -204,35 +213,35 @@ static int crypt(struct crypto_tfm *tfm,
 }
 
 static void cbc_process(struct crypto_tfm *tfm,
-                        u8 *dst, u8 *src, cryptfn_t fn, int enc)
+                        u8 *dst, u8 *src, cryptfn_t fn, int enc, void *info)
 {
+	u8 *iv = info;
+	
 	/* Null encryption */
-	if (!tfm->crt_cipher.cit_iv)
+	if (!iv)
 		return;
 		
 	if (enc) {
-		tfm->crt_u.cipher.cit_xor_block(tfm->crt_cipher.cit_iv, src);
-		fn(tfm->crt_ctx, dst, tfm->crt_cipher.cit_iv);
-		memcpy(tfm->crt_cipher.cit_iv, dst,
-		       crypto_tfm_alg_blocksize(tfm));
+		tfm->crt_u.cipher.cit_xor_block(iv, src);
+		fn(crypto_tfm_ctx(tfm), dst, iv);
+		memcpy(iv, dst, crypto_tfm_alg_blocksize(tfm));
 	} else {
 		const int need_stack = (src == dst);
 		u8 stack[need_stack ? crypto_tfm_alg_blocksize(tfm) : 0];
 		u8 *buf = need_stack ? stack : dst;
 		
-		fn(tfm->crt_ctx, buf, src);
-		tfm->crt_u.cipher.cit_xor_block(buf, tfm->crt_cipher.cit_iv);
-		memcpy(tfm->crt_cipher.cit_iv, src,
-		       crypto_tfm_alg_blocksize(tfm));
+		fn(crypto_tfm_ctx(tfm), buf, src);
+		tfm->crt_u.cipher.cit_xor_block(buf, iv);
+		memcpy(iv, src, crypto_tfm_alg_blocksize(tfm));
 		if (buf != dst)
 			memcpy(dst, buf, crypto_tfm_alg_blocksize(tfm));
 	}
 }
 
 static void ecb_process(struct crypto_tfm *tfm, u8 *dst, u8 *src,
-                        cryptfn_t fn, int enc)
+                        cryptfn_t fn, int enc, void *info)
 {
-	fn(tfm->crt_ctx, dst, src);
+	fn(crypto_tfm_ctx(tfm), dst, src);
 }
 
 static int setkey(struct crypto_tfm *tfm, const u8 *key, unsigned int keylen)
@@ -243,7 +252,7 @@ static int setkey(struct crypto_tfm *tfm, const u8 *key, unsigned int keylen)
 		tfm->crt_flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
 		return -EINVAL;
 	} else
-		return cia->cia_setkey(tfm->crt_ctx, key, keylen,
+		return cia->cia_setkey(crypto_tfm_ctx(tfm), key, keylen,
 		                       &tfm->crt_flags);
 }
 
@@ -252,7 +261,8 @@ static int ecb_encrypt(struct crypto_tfm *tfm,
                        struct scatterlist *src, unsigned int nbytes)
 {
 	return crypt(tfm, dst, src, nbytes,
-	             tfm->__crt_alg->cra_cipher.cia_encrypt, ecb_process, 1);
+	             tfm->__crt_alg->cra_cipher.cia_encrypt,
+	             ecb_process, 1, NULL);
 }
 
 static int ecb_decrypt(struct crypto_tfm *tfm,
@@ -261,7 +271,8 @@ static int ecb_decrypt(struct crypto_tfm *tfm,
 		       unsigned int nbytes)
 {
 	return crypt(tfm, dst, src, nbytes,
-	             tfm->__crt_alg->cra_cipher.cia_decrypt, ecb_process, 1);
+	             tfm->__crt_alg->cra_cipher.cia_decrypt,
+	             ecb_process, 1, NULL);
 }
 
 static int cbc_encrypt(struct crypto_tfm *tfm,
@@ -270,7 +281,18 @@ static int cbc_encrypt(struct crypto_tfm *tfm,
 		       unsigned int nbytes)
 {
 	return crypt(tfm, dst, src, nbytes,
-	             tfm->__crt_alg->cra_cipher.cia_encrypt, cbc_process, 1);
+	             tfm->__crt_alg->cra_cipher.cia_encrypt,
+	             cbc_process, 1, tfm->crt_cipher.cit_iv);
+}
+
+static int cbc_encrypt_iv(struct crypto_tfm *tfm,
+                          struct scatterlist *dst,
+                          struct scatterlist *src,
+                          unsigned int nbytes, u8 *iv)
+{
+	return crypt(tfm, dst, src, nbytes,
+	             tfm->__crt_alg->cra_cipher.cia_encrypt,
+	             cbc_process, 1, iv);
 }
 
 static int cbc_decrypt(struct crypto_tfm *tfm,
@@ -279,13 +301,32 @@ static int cbc_decrypt(struct crypto_tfm *tfm,
 		       unsigned int nbytes)
 {
 	return crypt(tfm, dst, src, nbytes,
-	             tfm->__crt_alg->cra_cipher.cia_decrypt, cbc_process, 0);
+	             tfm->__crt_alg->cra_cipher.cia_decrypt,
+	             cbc_process, 0, tfm->crt_cipher.cit_iv);
+}
+
+static int cbc_decrypt_iv(struct crypto_tfm *tfm,
+                          struct scatterlist *dst,
+                          struct scatterlist *src,
+                          unsigned int nbytes, u8 *iv)
+{
+	return crypt(tfm, dst, src, nbytes,
+	             tfm->__crt_alg->cra_cipher.cia_decrypt,
+	             cbc_process, 0, iv);
 }
 
 static int nocrypt(struct crypto_tfm *tfm,
                    struct scatterlist *dst,
                    struct scatterlist *src,
 		   unsigned int nbytes)
+{
+	return -ENOSYS;
+}
+
+static int nocrypt_iv(struct crypto_tfm *tfm,
+                      struct scatterlist *dst,
+                      struct scatterlist *src,
+                      unsigned int nbytes, u8 *iv)
 {
 	return -ENOSYS;
 }
@@ -318,16 +359,22 @@ int crypto_init_cipher_ops(struct crypto_tfm *tfm)
 	case CRYPTO_TFM_MODE_CBC:
 		ops->cit_encrypt = cbc_encrypt;
 		ops->cit_decrypt = cbc_decrypt;
+		ops->cit_encrypt_iv = cbc_encrypt_iv;
+		ops->cit_decrypt_iv = cbc_decrypt_iv;
 		break;
 		
 	case CRYPTO_TFM_MODE_CFB:
 		ops->cit_encrypt = nocrypt;
 		ops->cit_decrypt = nocrypt;
+		ops->cit_encrypt_iv = nocrypt_iv;
+		ops->cit_decrypt_iv = nocrypt_iv;
 		break;
 	
 	case CRYPTO_TFM_MODE_CTR:
 		ops->cit_encrypt = nocrypt;
 		ops->cit_decrypt = nocrypt;
+		ops->cit_encrypt_iv = nocrypt_iv;
+		ops->cit_decrypt_iv = nocrypt_iv;
 		break;
 
 	default:

@@ -46,7 +46,7 @@ endif
 ifeq ($(CONFIG_ATM_FORE200E_SBA),y)
   fore_200e-objs		+= fore200e_sba_fw.o
   ifeq ($(CONFIG_ATM_FORE200E_SBA_DEFAULT_FW),y)
-    CONFIG_ATM_FORE200E_SBA_FW	:= sba200e_ecd.bin2
+    CONFIG_ATM_FORE200E_SBA_FW	:= $(obj)/sba200e_ecd.bin2
   endif
 endif
 

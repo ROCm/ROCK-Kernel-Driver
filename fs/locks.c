@@ -107,22 +107,22 @@
  *  Use slab allocator instead of kmalloc/kfree.
  *  Use generic list implementation from <linux/list.h>.
  *  Sped up posix_locks_deadlock by only considering blocked locks.
- *  Matthew Wilcox <willy@thepuffingroup.com>, March, 2000.
+ *  Matthew Wilcox <willy@debian.org>, March, 2000.
  *
  *  Leases and LOCK_MAND
- *  Matthew Wilcox <willy@linuxcare.com>, June, 2000.
+ *  Matthew Wilcox <willy@debian.org>, June, 2000.
  *  Stephen Rothwell <sfr@canb.auug.org.au>, June, 2000.
  */
 
-#include <linux/slab.h>
-#include <linux/file.h>
-#include <linux/smp_lock.h>
-#include <linux/init.h>
 #include <linux/capability.h>
-#include <linux/timer.h>
-#include <linux/time.h>
+#include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/init.h>
+#include <linux/module.h>
 #include <linux/security.h>
+#include <linux/slab.h>
+#include <linux/smp_lock.h>
+#include <linux/time.h>
 
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
@@ -519,19 +519,11 @@ static void locks_delete_lock(struct file_lock **thisfl_p)
  */
 static int locks_conflict(struct file_lock *caller_fl, struct file_lock *sys_fl)
 {
-	switch (caller_fl->fl_type) {
-	case F_RDLCK:
-		return (sys_fl->fl_type == F_WRLCK);
-
-	case F_WRLCK:
-		return (1);
-
-	default:
-		printk(KERN_ERR "locks_conflict(): impossible lock type - %d\n",
-		       caller_fl->fl_type);
-		break;
-	}
-	return (0);	/* This should never happen */
+	if (sys_fl->fl_type == F_WRLCK)
+		return 1;
+	if (caller_fl->fl_type == F_WRLCK)
+		return 1;
+	return 0;
 }
 
 /* Determine if lock sys_fl blocks lock caller_fl. POSIX specific
@@ -1966,3 +1958,13 @@ static int __init filelock_init(void)
 }
 
 module_init(filelock_init)
+
+EXPORT_SYMBOL(file_lock_list);
+EXPORT_SYMBOL(locks_init_lock);
+EXPORT_SYMBOL(locks_copy_lock);
+EXPORT_SYMBOL(posix_lock_file);
+EXPORT_SYMBOL(posix_test_lock);
+EXPORT_SYMBOL(posix_block_lock);
+EXPORT_SYMBOL(posix_unblock_lock);
+EXPORT_SYMBOL(posix_locks_deadlock);
+EXPORT_SYMBOL(locks_mandatory_area);

@@ -378,8 +378,8 @@ illegal_syscall:
 	sys	sys32_select	5
 	sys	sys_flock	2
 	sys	sys_msync	3
-	sys	sys32_readv	3			/* 4145 */
-	sys	sys32_writev	3
+	sys	compat_sys_readv	3			/* 4145 */
+	sys	compat_sys_writev	3
 	sys	sys_cacheflush	3
 	sys	sys_cachectl	3
 	sys	sys_sysmips	4
@@ -410,11 +410,11 @@ illegal_syscall:
 	sys	sys_listen	2
 	sys	sys_recv	4			/* 4175 */
 	sys	sys_recvfrom	6
-	sys	sys32_recvmsg	3
+	sys	compat_sys_recvmsg	3
 	sys	sys_send	4
-	sys	sys32_sendmsg	3
+	sys	compat_sys_sendmsg	3
 	sys	sys_sendto	6			/* 4180 */
-	sys	sys32_setsockopt	5
+	sys	compat_sys_setsockopt	5
 	sys	sys_shutdown	2
 	sys	sys_socket	3
 	sys	sys_socketpair	4

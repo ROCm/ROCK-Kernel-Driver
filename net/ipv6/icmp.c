@@ -353,7 +353,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	ip6_build_xmit(sk, icmpv6_getfrag, &msg, &fl, len, NULL, -1,
 		       MSG_DONTWAIT);
 	if (type >= ICMPV6_DEST_UNREACH && type <= ICMPV6_PARAMPROB)
-		ICMP6_STATS_PTR_BH(Icmp6OutDestUnreachs) [type-1]++;
+		ICMP6_STATS_PTR_BH(Icmp6OutDestUnreachs) [type-ICMPV6_DEST_UNREACH]++;
 	ICMP6_INC_STATS_BH(Icmp6OutMsgs);
 out:
 	icmpv6_xmit_unlock();
@@ -524,7 +524,7 @@ static int icmpv6_rcv(struct sk_buff *skb)
 		break;
 
 	case ICMPV6_ECHO_REPLY:
-		/* we coulnd't care less */
+		/* we couldn't care less */
 		break;
 
 	case ICMPV6_PKT_TOOBIG:
@@ -577,7 +577,7 @@ static int icmpv6_rcv(struct sk_buff *skb)
 
 	default:
 		if (net_ratelimit())
-			printk(KERN_DEBUG "icmpv6: msg of unkown type\n");
+			printk(KERN_DEBUG "icmpv6: msg of unknown type\n");
 
 		/* informational */
 		if (type & ICMPV6_INFOMSG_MASK)

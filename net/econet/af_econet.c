@@ -126,8 +126,7 @@ static void econet_insert_socket(struct sock **list, struct sock *sk)
  */
 
 static int econet_recvmsg(struct kiocb *iocb, struct socket *sock,
-			  struct msghdr *msg, int len, int flags,
-			  struct scm_cookie *scm)
+			  struct msghdr *msg, int len, int flags)
 {
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb;
@@ -260,7 +259,7 @@ static void ec_tx_done(struct sk_buff *skb, int result)
  */
 
 static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
-			  struct msghdr *msg, int len, struct scm_cookie *scm)
+			  struct msghdr *msg, int len)
 {
 	struct sock *sk = sock->sk;
 	struct sockaddr_ec *saddr=(struct sockaddr_ec *)msg->msg_name;

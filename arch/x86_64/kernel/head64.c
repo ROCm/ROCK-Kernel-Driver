@@ -79,6 +79,9 @@ void __init x86_64_start_kernel(char * real_mode_data)
 	clear_bss();
 	pda_init(0);
 	copy_bootdata(real_mode_data);
+	/* default console: */
+	if (!strstr(saved_command_line, "console="))
+		strcat(saved_command_line, " console=tty0"); 
 	s = strstr(saved_command_line, "earlyprintk="); 
 	if (s != NULL)
 		setup_early_printk(s+12); 

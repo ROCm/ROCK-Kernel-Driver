@@ -267,35 +267,6 @@ struct sol_cmsghdr {
 	unsigned char	cmsg_data[0];
 };
 
-struct iovec32 {
-	u32		iov_base;
-	u32 iov_len;
-};
-
-static inline int iov_from_user32_to_kern(struct iovec *kiov,
-					  struct iovec32 *uiov32,
-					  int niov)
-{
-	int tot_len = 0;
-
-	while(niov > 0) {
-		u32 len, buf;
-
-		if(get_user(len, &uiov32->iov_len) ||
-		   get_user(buf, &uiov32->iov_base)) {
-			tot_len = -EFAULT;
-			break;
-		}
-		tot_len += len;
-		kiov->iov_base = (void *)A(buf);
-		kiov->iov_len = (__kernel_size_t) len;
-		uiov32++;
-		kiov++;
-		niov--;
-	}
-	return tot_len;
-}
-
 static inline int msghdr_from_user32_to_kern(struct msghdr *kmsg,
 					     struct sol_nmsghdr *umsg)
 {
@@ -321,42 +292,6 @@ static inline int msghdr_from_user32_to_kern(struct msghdr *kmsg,
 	return err;
 }
 
-/* I've named the args so it is easy to tell whose space the pointers are in. */
-static int verify_iovec32(struct msghdr *kern_msg, struct iovec *kern_iov,
-			  char *kern_address, int mode)
-{
-	int tot_len;
-
-	if(kern_msg->msg_namelen) {
-		if(mode==VERIFY_READ) {
-			int err = move_addr_to_kernel(kern_msg->msg_name,
-						      kern_msg->msg_namelen,
-						      kern_address);
-			if(err < 0)
-				return err;
-		}
-		kern_msg->msg_name = kern_address;
-	} else
-		kern_msg->msg_name = NULL;
-
-	if(kern_msg->msg_iovlen > UIO_FASTIOV) {
-		kern_iov = kmalloc(kern_msg->msg_iovlen * sizeof(struct iovec),
-				   GFP_KERNEL);
-		if(!kern_iov)
-			return -ENOMEM;
-	}
-
-	tot_len = iov_from_user32_to_kern(kern_iov,
-					  (struct iovec32 *)kern_msg->msg_iov,
-					  kern_msg->msg_iovlen);
-	if(tot_len >= 0)
-		kern_msg->msg_iov = kern_iov;
-	else if(kern_msg->msg_iovlen > UIO_FASTIOV)
-		kfree(kern_iov);
-
-	return tot_len;
-}
-
 asmlinkage int solaris_sendmsg(int fd, struct sol_nmsghdr *user_msg, unsigned user_flags)
 {
 	struct socket *sock;
@@ -371,7 +306,7 @@ asmlinkage int solaris_sendmsg(int fd, struct sol_nmsghdr *user_msg, unsigned us
 		return -EFAULT;
 	if(kern_msg.msg_iovlen > UIO_MAXIOV)
 		return -EINVAL;
-	err = verify_iovec32(&kern_msg, iov, address, VERIFY_READ);
+	err = verify_compat_iovec(&kern_msg, iov, address, VERIFY_READ);
 	if (err < 0)
 		goto out;
 	total_len = err;
@@ -439,7 +374,7 @@ asmlinkage int solaris_recvmsg(int fd, struct sol_nmsghdr *user_msg, unsigned in
 
 	uaddr = kern_msg.msg_name;
 	uaddr_len = &user_msg->msg_namelen;
-	err = verify_iovec32(&kern_msg, iov, addr, VERIFY_WRITE);
+	err = verify_compat_iovec(&kern_msg, iov, addr, VERIFY_WRITE);
 	if (err < 0)
 		goto out;
 	total_len = err;

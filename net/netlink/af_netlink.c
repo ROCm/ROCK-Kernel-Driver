@@ -595,10 +595,10 @@ static inline void netlink_rcv_wake(struct sock *sk)
 		wake_up_interruptible(&nlk->wait);
 }
 
-static int netlink_sendmsg(struct kiocb *iocb, struct socket *sock,
-			   struct msghdr *msg, int len,
-			   struct scm_cookie *scm)
+static int netlink_sendmsg(struct kiocb *kiocb, struct socket *sock,
+			   struct msghdr *msg, int len)
 {
+	struct sock_iocb *siocb = kiocb_to_siocb(kiocb);
 	struct sock *sk = sock->sk;
 	struct netlink_opt *nlk = nlk_sk(sk);
 	struct sockaddr_nl *addr=msg->msg_name;
@@ -606,9 +606,16 @@ static int netlink_sendmsg(struct kiocb *iocb, struct socket *sock,
 	u32 dst_groups;
 	struct sk_buff *skb;
 	int err;
+	struct scm_cookie scm;
 
 	if (msg->msg_flags&MSG_OOB)
 		return -EOPNOTSUPP;
+
+	if (NULL == siocb->scm)
+		siocb->scm = &scm;
+	err = scm_send(sock, msg, siocb->scm);
+	if (err < 0)
+		return err;
 
 	if (msg->msg_namelen) {
 		if (addr->nl_family != AF_NETLINK)
@@ -640,7 +647,7 @@ static int netlink_sendmsg(struct kiocb *iocb, struct socket *sock,
 	NETLINK_CB(skb).groups	= nlk->groups;
 	NETLINK_CB(skb).dst_pid = dst_pid;
 	NETLINK_CB(skb).dst_groups = dst_groups;
-	memcpy(NETLINK_CREDS(skb), &scm->creds, sizeof(struct ucred));
+	memcpy(NETLINK_CREDS(skb), &siocb->scm->creds, sizeof(struct ucred));
 
 	/* What can I do? Netlink is asynchronous, so that
 	   we will have to save current capabilities to
@@ -670,10 +677,12 @@ out:
 	return err;
 }
 
-static int netlink_recvmsg(struct kiocb *iocb, struct socket *sock,
+static int netlink_recvmsg(struct kiocb *kiocb, struct socket *sock,
 			   struct msghdr *msg, int len,
-			   int flags, struct scm_cookie *scm)
+			   int flags)
 {
+	struct sock_iocb *siocb = kiocb_to_siocb(kiocb);
+	struct scm_cookie scm;
 	struct sock *sk = sock->sk;
 	struct netlink_opt *nlk = nlk_sk(sk);
 	int noblock = flags&MSG_DONTWAIT;
@@ -709,11 +718,17 @@ static int netlink_recvmsg(struct kiocb *iocb, struct socket *sock,
 		msg->msg_namelen = sizeof(*addr);
 	}
 
-	scm->creds = *NETLINK_CREDS(skb);
+	if (NULL == siocb->scm) {
+		memset(&scm, 0, sizeof(scm));
+		siocb->scm = &scm;
+	}
+	siocb->scm->creds = *NETLINK_CREDS(skb);
 	skb_free_datagram(sk, skb);
 
 	if (nlk->cb && atomic_read(&sk->rmem_alloc) <= sk->rcvbuf / 2)
 		netlink_dump(sk);
+
+	scm_recv(sock, msg, siocb->scm, flags);
 
 out:
 	netlink_rcv_wake(sk);

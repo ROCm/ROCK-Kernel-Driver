@@ -78,6 +78,7 @@
 #include <linux/divert.h>
 #include <linux/mount.h>
 #include <linux/security.h>
+#include <linux/compat.h>
 
 #if defined(CONFIG_KMOD) && defined(CONFIG_NET)
 #include <linux/kmod.h>
@@ -88,9 +89,9 @@
 #endif	/* CONFIG_NET_RADIO */
 
 #include <asm/uaccess.h>
+#include <net/compat_socket.h>
 
 #include <net/sock.h>
-#include <net/scm.h>
 #include <linux/netfilter.h>
 
 static int sock_no_open(struct inode *irrelevant, struct file *dontcare);
@@ -518,13 +519,13 @@ void sock_release(struct socket *sock)
 	sock->file=NULL;
 }
 
-static int __sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int size)
+static inline int __sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int size)
 {
 	struct sock_iocb *si = kiocb_to_siocb(iocb);
 	int err;
 
-	si->scm = &si->async_scm;
 	si->sock = sock;
+	si->scm = NULL;
 	si->msg = msg;
 	si->size = size;
 
@@ -532,13 +533,7 @@ static int __sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr
 	if (err)
 		return err;
 
-	err = scm_send(sock, msg, si->scm);
-	if (err >= 0) {
-		err = sock->ops->sendmsg(iocb, sock, msg, size, si->scm);
-		if (-EIOCBQUEUED != err)
-			scm_destroy(si->scm);
-	}
-	return err;
+	return sock->ops->sendmsg(iocb, sock, msg, size);
 }
 
 int sock_sendmsg(struct socket *sock, struct msghdr *msg, int size)
@@ -554,14 +549,13 @@ int sock_sendmsg(struct socket *sock, struct msghdr *msg, int size)
 }
 
 
-int __sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int size, int flags)
+static inline int __sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int size, int flags)
 {
 	int err;
 	struct sock_iocb *si = kiocb_to_siocb(iocb);
 
 	si->sock = sock;
-	si->scm = &si->async_scm;
-	si->sock = sock;
+	si->scm = NULL;
 	si->msg = msg;
 	si->size = size;
 	si->flags = flags;
@@ -570,13 +564,7 @@ int __sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, 
 	if (err)
 		return err;
 
-	memset(si->scm, 0, sizeof(*si->scm));
-
-	size = sock->ops->recvmsg(iocb, sock, msg, size, flags, si->scm);
-	if (size >= 0)
-		scm_recv(sock, msg, si->scm, flags);
-
-	return size;
+	return sock->ops->recvmsg(iocb, sock, msg, size, flags);
 }
 
 int sock_recvmsg(struct socket *sock, struct msghdr *msg, int size, int flags)
@@ -1545,12 +1533,21 @@ asmlinkage long sys_shutdown(int fd, int how)
 	return err;
 }
 
+/* A couple of helpful macros for getting the address of the 32/64 bit 
+ * fields which are the same type (int / unsigned) on our platforms.
+ */
+#define COMPAT_MSG(msg, member)	((MSG_CMSG_COMPAT & flags) ? &msg##_compat->member : &msg->member)
+#define COMPAT_NAMELEN(msg)	COMPAT_MSG(msg, msg_namelen)
+#define COMPAT_FLAGS(msg)	COMPAT_MSG(msg, msg_flags)
+
+
 /*
  *	BSD sendmsg interface
  */
 
 asmlinkage long sys_sendmsg(int fd, struct msghdr *msg, unsigned flags)
 {
+	struct compat_msghdr *msg_compat = (struct compat_msghdr *)msg;
 	struct socket *sock;
 	char address[MAX_SOCK_ADDR];
 	struct iovec iovstack[UIO_FASTIOV], *iov = iovstack;
@@ -1560,8 +1557,11 @@ asmlinkage long sys_sendmsg(int fd, struct msghdr *msg, unsigned flags)
 	int err, ctl_len, iov_size, total_len;
 	
 	err = -EFAULT;
-	if (copy_from_user(&msg_sys,msg,sizeof(struct msghdr)))
-		goto out; 
+	if (MSG_CMSG_COMPAT & flags) {
+		if (msghdr_from_user_compat_to_kern(&msg_sys, msg_compat))
+			return -EFAULT;
+	} else if (copy_from_user(&msg_sys, msg, sizeof(struct msghdr)))
+		return -EFAULT;
 
 	sock = sockfd_lookup(fd, &err);
 	if (!sock) 
@@ -1582,7 +1582,10 @@ asmlinkage long sys_sendmsg(int fd, struct msghdr *msg, unsigned flags)
 	}
 
 	/* This will also move the address data into kernel space */
-	err = verify_iovec(&msg_sys, iov, address, VERIFY_READ);
+	if (MSG_CMSG_COMPAT & flags) {
+		err = verify_compat_iovec(&msg_sys, iov, address, VERIFY_READ);
+	} else
+		err = verify_iovec(&msg_sys, iov, address, VERIFY_READ);
 	if (err < 0) 
 		goto out_freeiov;
 	total_len = err;
@@ -1592,8 +1595,12 @@ asmlinkage long sys_sendmsg(int fd, struct msghdr *msg, unsigned flags)
 	if (msg_sys.msg_controllen > INT_MAX)
 		goto out_freeiov;
 	ctl_len = msg_sys.msg_controllen; 
-	if (ctl_len) 
-	{
+	if ((MSG_CMSG_COMPAT & flags) && ctl_len) {
+		err = cmsghdr_from_user_compat_to_kern(&msg_sys, ctl, sizeof(ctl));
+		if (err)
+			goto out_freeiov;
+		ctl_buf = msg_sys.msg_control;
+	} else if (ctl_len) {
 		if (ctl_len > sizeof(ctl))
 		{
 			ctl_buf = sock_kmalloc(sock->sk, ctl_len, GFP_KERNEL);
@@ -1629,6 +1636,7 @@ out:
 
 asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 {
+	struct compat_msghdr *msg_compat = (struct compat_msghdr *)msg;
 	struct socket *sock;
 	struct iovec iovstack[UIO_FASTIOV];
 	struct iovec *iov=iovstack;
@@ -1643,9 +1651,12 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 	struct sockaddr *uaddr;
 	int *uaddr_len;
 	
-	err=-EFAULT;
-	if (copy_from_user(&msg_sys,msg,sizeof(struct msghdr)))
-		goto out;
+	if (MSG_CMSG_COMPAT & flags) {
+		if (msghdr_from_user_compat_to_kern(&msg_sys, msg_compat))
+			return -EFAULT;
+	} else
+		if (copy_from_user(&msg_sys,msg,sizeof(struct msghdr)))
+			return -EFAULT;
 
 	sock = sockfd_lookup(fd, &err);
 	if (!sock)
@@ -1670,8 +1681,11 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 	 */
 	 
 	uaddr = msg_sys.msg_name;
-	uaddr_len = &msg->msg_namelen;
-	err = verify_iovec(&msg_sys, iov, addr, VERIFY_WRITE);
+	uaddr_len = COMPAT_NAMELEN(msg);
+	if (MSG_CMSG_COMPAT & flags) {
+		err = verify_compat_iovec(&msg_sys, iov, addr, VERIFY_WRITE);
+	} else
+		err = verify_iovec(&msg_sys, iov, addr, VERIFY_WRITE);
 	if (err < 0)
 		goto out_freeiov;
 	total_len=err;
@@ -1691,11 +1705,20 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 		if (err < 0)
 			goto out_freeiov;
 	}
-	err = __put_user(msg_sys.msg_flags, &msg->msg_flags);
+	err = __put_user(msg_sys.msg_flags, COMPAT_FLAGS(msg));
 	if (err)
 		goto out_freeiov;
-	err = __put_user((unsigned long)msg_sys.msg_control-cmsg_ptr, 
-							 &msg->msg_controllen);
+	if (MSG_CMSG_COMPAT & flags) {
+		unsigned long ucmsg_ptr;
+		compat_size_t uclen;
+		if((unsigned long) msg_sys.msg_control != cmsg_ptr)
+			cmsg_compat_recvmsg_fixup(&msg_sys, cmsg_ptr);
+		ucmsg_ptr = ((unsigned long)msg_sys.msg_control);
+		uclen = (compat_size_t) (ucmsg_ptr - cmsg_ptr);
+		err = __put_user(uclen, &msg_compat->msg_controllen);
+	} else
+		err = __put_user((unsigned long)msg_sys.msg_control-cmsg_ptr, 
+				 &msg->msg_controllen);
 	if (err)
 		goto out_freeiov;
 	err = len;

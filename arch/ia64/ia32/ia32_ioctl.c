@@ -97,11 +97,9 @@ typedef struct sg_io_hdr32 {
 	int info;		/* [o] auxiliary information */
 } sg_io_hdr32_t;  /* 64 bytes long (on IA32) */
 
-struct iovec32 { unsigned int iov_base; int iov_len; };
-
 static int alloc_sg_iovec(sg_io_hdr_t *sgp, int uptr32)
 {
-	struct iovec32 *uiov = (struct iovec32 *) P(uptr32);
+	struct compat_iovec *uiov = (struct compat_iovec *) P(uptr32);
 	sg_iovec_t *kiov;
 	int i;
 
@@ -136,7 +134,7 @@ static int alloc_sg_iovec(sg_io_hdr_t *sgp, int uptr32)
 
 static int copy_back_sg_iovec(sg_io_hdr_t *sgp, int uptr32)
 {
-	struct iovec32 *uiov = (struct iovec32 *) P(uptr32);
+	struct compat_iovec *uiov = (struct compat_iovec *) P(uptr32);
 	sg_iovec_t *kiov = (sg_iovec_t *) sgp->dxferp;
 	int i;
 

@@ -729,7 +729,6 @@
 
 #define OPTION_NONE             0x00
 #define OPTION_MOUNT            0x01
-#define OPTION_ONLY             0x02
 
 #define PRINTK(format, args...) \
    {printk (KERN_ERR "%s" format, __FUNCTION__ , ## args);}
@@ -773,7 +772,6 @@ struct bdev_type
 {
     struct block_device_operations *ops;
     dev_t dev;
-    unsigned char autogen:1;
     unsigned char removable:1;
 };
 
@@ -938,8 +936,6 @@ void devfs_put (devfs_handle_t de)
     if ( S_ISLNK (de->mode) ) kfree (de->u.symlink.linkname);
     if ( S_ISCHR (de->mode) && de->u.cdev.autogen )
 	devfs_dealloc_devnum (de->mode, de->u.cdev.dev);
-    if ( S_ISBLK (de->mode) && de->u.bdev.autogen )
-	devfs_dealloc_devnum (de->mode, de->u.bdev.dev);
     WRITE_ENTRY_MAGIC (de, 0);
 #ifdef CONFIG_DEVFS_DEBUG
     spin_lock (&stat_lock);
@@ -1495,17 +1491,6 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 	PRINTK ("(%s): creating symlinks is not allowed\n", name);
 	return NULL;
     }
-    if ( ( S_ISCHR (mode) || S_ISBLK (mode) ) &&
-	 (flags & DEVFS_FL_AUTO_DEVNUM) )
-    {
-	devnum = devfs_alloc_devnum (mode);
-	if (!devnum) {
-	    PRINTK ("(%s): exhausted %s device numbers\n",
-		    name, S_ISCHR (mode) ? "char" : "block");
-	    return NULL;
-	}
-	dev = devnum;
-    }
     if ( ( de = _devfs_prepare_leaf (&dir, name, mode) ) == NULL )
     {
 	PRINTK ("(%s): could not prepare leaf\n", name);
@@ -1870,18 +1855,6 @@ int devfs_set_file_size (devfs_handle_t de, unsigned long size)
 
 
 /**
- *	devfs_only - returns true if "devfs=only" is a boot option
- *
- *	If "devfs=only" this function will return 1, otherwise 0 is returned.
- */
-
-int devfs_only (void)
-{
-    return (boot_options & OPTION_ONLY) ? 1 : 0;
-}   /*  End Function devfs_only  */
-
-
-/**
  *	devfs_setup - Process kernel boot options.
  *	@str: The boot options after the "devfs=".
  */
@@ -1909,7 +1882,6 @@ static int __init devfs_setup (char *str)
 	{"dilookup",  DEBUG_I_LOOKUP,     &devfs_debug_init},
 	{"diunlink",  DEBUG_I_UNLINK,     &devfs_debug_init},
 #endif  /*  CONFIG_DEVFS_DEBUG  */
-	{"only",      OPTION_ONLY,        &boot_options},
 	{"mount",     OPTION_MOUNT,       &boot_options},
 	{NULL,        0,                  NULL}
     };

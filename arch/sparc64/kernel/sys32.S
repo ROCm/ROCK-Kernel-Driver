@@ -202,38 +202,38 @@ do_sys_shutdown: /* sys_shutdown(int, int) */
 	nop
 	nop
 	nop
-do_sys_setsockopt: /* sys32_setsockopt(int, int, int, char *, int) */
+do_sys_setsockopt: /* compat_sys_setsockopt(int, int, int, char *, int) */
 	ldswa		[%o1 + 0x0] %asi, %o0
-	sethi		%hi(sys32_setsockopt), %g1
+	sethi		%hi(compat_sys_setsockopt), %g1
 	ldswa		[%o1 + 0x8] %asi, %o2
 	lduwa		[%o1 + 0xc] %asi, %o3
 	ldswa		[%o1 + 0x10] %asi, %o4
-	jmpl		%g1 + %lo(sys32_setsockopt), %g0
+	jmpl		%g1 + %lo(compat_sys_setsockopt), %g0
 	 ldswa		[%o1 + 0x4] %asi, %o1
 	nop
-do_sys_getsockopt: /* sys32_getsockopt(int, int, int, u32, u32) */
+do_sys_getsockopt: /* compat_sys_getsockopt(int, int, int, u32, u32) */
 	ldswa		[%o1 + 0x0] %asi, %o0
-	sethi		%hi(sys32_getsockopt), %g1
+	sethi		%hi(compat_sys_getsockopt), %g1
 	ldswa		[%o1 + 0x8] %asi, %o2
 	lduwa		[%o1 + 0xc] %asi, %o3
 	lduwa		[%o1 + 0x10] %asi, %o4
-	jmpl		%g1 + %lo(sys32_getsockopt), %g0
+	jmpl		%g1 + %lo(compat_sys_getsockopt), %g0
 	 ldswa		[%o1 + 0x4] %asi, %o1
 	nop
-do_sys_sendmsg: /* sys32_sendmsg(int, struct msghdr32 *, unsigned int) */
+do_sys_sendmsg: /* compat_sys_sendmsg(int, struct compat_msghdr *, unsigned int) */
 	ldswa		[%o1 + 0x0] %asi, %o0
-	sethi		%hi(sys32_sendmsg), %g1
+	sethi		%hi(compat_sys_sendmsg), %g1
 	lduwa		[%o1 + 0x8] %asi, %o2
-	jmpl		%g1 + %lo(sys32_sendmsg), %g0
+	jmpl		%g1 + %lo(compat_sys_sendmsg), %g0
 	 lduwa		[%o1 + 0x4] %asi, %o1
 	nop
 	nop
 	nop
-do_sys_recvmsg: /* sys32_recvmsg(int, struct msghdr32 *, unsigned int) */
+do_sys_recvmsg: /* compat_sys_recvmsg(int, struct compat_msghdr *, unsigned int) */
 	ldswa		[%o1 + 0x0] %asi, %o0
-	sethi		%hi(sys32_recvmsg), %g1
+	sethi		%hi(compat_sys_recvmsg), %g1
 	lduwa		[%o1 + 0x8] %asi, %o2
-	jmpl		%g1 + %lo(sys32_recvmsg), %g0
+	jmpl		%g1 + %lo(compat_sys_recvmsg), %g0
 	 lduwa		[%o1 + 0x4] %asi, %o1
 	nop
 	nop

@@ -18,18 +18,12 @@
 #include <asm/softirq.h>
 #include <asm/kmap_types.h>
 
-static enum km_type km_types[] = {
-	KM_USER0,
-	KM_USER1,
-	KM_SOFTIRQ0,
-	KM_SOFTIRQ1,
-};
+extern enum km_type crypto_km_types[];
 
 static inline enum km_type crypto_kmap_type(int out)
 {
-	return km_types[(in_softirq() ? 2 : 0) + out];
+	return crypto_km_types[(in_softirq() ? 2 : 0) + out];
 }
-	
 
 static inline void *crypto_kmap(struct page *page, int out)
 {
@@ -50,6 +44,11 @@ static inline void crypto_yield(struct crypto_tfm *tfm)
 static inline u32 crypto_cipher_flags(u32 flags)
 {
 	return flags & (CRYPTO_TFM_MODE_MASK|CRYPTO_TFM_REQ_WEAK_KEY);
+}
+
+static inline void *crypto_tfm_ctx(struct crypto_tfm *tfm)
+{
+	return (void *)&tfm[1];
 }
 
 struct crypto_alg *crypto_alg_lookup(const char *name);

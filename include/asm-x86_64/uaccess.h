@@ -5,6 +5,7 @@
  * User space memory access functions
  */
 #include <linux/config.h>
+#include <linux/compiler.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/prefetch.h>
@@ -47,7 +48,7 @@
 
 #define access_ok(type,addr,size) (__range_not_ok(addr,size) == 0)
 
-extern inline int verify_area(int type, const void * addr, unsigned long size)
+extern __force_inline int verify_area(int type, const void * addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }
@@ -237,7 +238,7 @@ extern unsigned long copy_user_generic(void *to, const void *from, unsigned len)
 extern unsigned long copy_to_user(void *to, const void *from, unsigned len); 
 extern unsigned long copy_from_user(void *to, const void *from, unsigned len); 
 
-static inline int __copy_from_user(void *dst, const void *src, unsigned size) 
+static __force_inline int __copy_from_user(void *dst, const void *src, unsigned size) 
 { 
 	if (!__builtin_constant_p(size))
 		return copy_user_generic(dst,src,size);
@@ -266,7 +267,7 @@ static inline int __copy_from_user(void *dst, const void *src, unsigned size)
 	}
 }	
 
-static inline int __copy_to_user(void *dst, const void *src, unsigned size) 
+static __force_inline int __copy_to_user(void *dst, const void *src, unsigned size) 
 { 
 	if (!__builtin_constant_p(size))
 		return copy_user_generic(dst,src,size);

@@ -125,7 +125,7 @@ static void lec_handle_bridge(struct sk_buff *skb, struct net_device *dev)
 
                 priv = (struct lec_priv *)dev->priv;
                 atm_force_charge(priv->lecd, skb2->truesize);
-                skb_queue_tail(&priv->lecd->recvq, skb2);
+                skb_queue_tail(&priv->lecd->sk->receive_queue, skb2);
                 wake_up(&priv->lecd->sleep);
         }
 
@@ -202,7 +202,7 @@ static __inline__ void
 lec_send(struct atm_vcc *vcc, struct sk_buff *skb, struct lec_priv *priv)
 {
 	if (atm_may_send(vcc, skb->len)) {
-		atomic_add(skb->truesize, &vcc->tx_inuse);
+		atomic_add(skb->truesize, &vcc->sk->wmem_alloc);
 	        ATM_SKB(skb)->vcc = vcc;
 	        ATM_SKB(skb)->iovcnt = 0;
 	        ATM_SKB(skb)->atm_options = vcc->atm_options;
@@ -399,7 +399,7 @@ lec_atm_send(struct atm_vcc *vcc, struct sk_buff *skb)
         int i;
         char *tmp; /* FIXME */
 
-	atomic_sub(skb->truesize+ATM_PDU_OVHD, &vcc->tx_inuse);
+	atomic_sub(skb->truesize+ATM_PDU_OVHD, &vcc->sk->wmem_alloc);
         mesg = (struct atmlec_msg *)skb->data;
         tmp = skb->data;
         tmp += sizeof(struct atmlec_msg);
@@ -505,7 +505,7 @@ lec_atm_send(struct atm_vcc *vcc, struct sk_buff *skb)
                         skb2->len = sizeof(struct atmlec_msg);
                         memcpy(skb2->data, mesg, sizeof(struct atmlec_msg));
                         atm_force_charge(priv->lecd, skb2->truesize);
-                        skb_queue_tail(&priv->lecd->recvq, skb2);
+                        skb_queue_tail(&priv->lecd->sk->receive_queue, skb2);
                         wake_up(&priv->lecd->sleep);
                 }
                 if (f != NULL) br_fdb_put_hook(f);
@@ -534,10 +534,10 @@ lec_atm_close(struct atm_vcc *vcc)
         netif_stop_queue(dev);
         lec_arp_destroy(priv);
 
-        if (skb_peek(&vcc->recvq))
+        if (skb_peek(&vcc->sk->receive_queue))
 		printk("%s lec_atm_close: closing with messages pending\n",
                        dev->name);
-        while ((skb = skb_dequeue(&vcc->recvq))) {
+        while ((skb = skb_dequeue(&vcc->sk->receive_queue))) {
                 atm_return(vcc, skb->truesize);
 		dev_kfree_skb(skb);
         }
@@ -595,13 +595,13 @@ send_to_lecd(struct lec_priv *priv, atmlec_msg_type type,
 		memcpy(&mesg->content.normal.atm_addr, atm_addr, ATM_ESA_LEN);
 
         atm_force_charge(priv->lecd, skb->truesize);
-	skb_queue_tail(&priv->lecd->recvq, skb);
+	skb_queue_tail(&priv->lecd->sk->receive_queue, skb);
         wake_up(&priv->lecd->sleep);
 
         if (data != NULL) {
                 DPRINTK("lec: about to send %d bytes of data\n", data->len);
                 atm_force_charge(priv->lecd, data->truesize);
-                skb_queue_tail(&priv->lecd->recvq, data);
+                skb_queue_tail(&priv->lecd->sk->receive_queue, data);
                 wake_up(&priv->lecd->sleep);
         }
 
@@ -683,7 +683,7 @@ lec_push(struct atm_vcc *vcc, struct sk_buff *skb)
 #endif /* DUMP_PACKETS > 0 */
         if (memcmp(skb->data, lec_ctrl_magic, 4) ==0) { /* Control frame, to daemon*/
                 DPRINTK("%s: To daemon\n",dev->name);
-                skb_queue_tail(&vcc->recvq, skb);
+                skb_queue_tail(&vcc->sk->receive_queue, skb);
                 wake_up(&vcc->sleep);
         } else { /* Data frame, queue to protocol handlers */
                 unsigned char *dst;
@@ -784,16 +784,20 @@ lecd_attach(struct atm_vcc *vcc, int arg)
                 size = sizeof(struct lec_priv);
 #ifdef CONFIG_TR
                 if (is_trdev)
-                        dev_lec[i] = init_trdev(NULL, size);
+                        dev_lec[i] = alloc_trdev(size);
                 else
 #endif
-                dev_lec[i] = init_etherdev(NULL, size);
+                dev_lec[i] = alloc_etherdev(size);
                 if (!dev_lec[i])
                         return -ENOMEM;
+                snprintf(dev_lec[i]->name, IFNAMSIZ, "lec%d", i);
+                if (register_netdev(dev_lec[i])) {
+                        kfree(dev_lec[i]);
+                        return -EINVAL;
+                }
 
                 priv = dev_lec[i]->priv;
                 priv->is_trdev = is_trdev;
-                sprintf(dev_lec[i]->name, "lec%d", i);
                 lec_init(dev_lec[i]);
         } else {
                 priv = dev_lec[i]->priv;

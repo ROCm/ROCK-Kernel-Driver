@@ -72,6 +72,12 @@ DF_MASK		= 0x00000400
 NT_MASK		= 0x00004000
 VM_MASK		= 0x00020000
 
+/*
+ * ESP0 is at offset 4. 0x100 is the size of the TSS, and
+ * also thus the top-of-stack pointer offset of SYSENTER_ESP
+ */
+TSS_ESP0_OFFSET = (4 - 0x100)
+
 #ifdef CONFIG_PREEMPT
 #define preempt_stop		cli
 #else
@@ -229,6 +235,8 @@ need_resched:
 
 	# sysenter call handler stub
 ENTRY(sysenter_entry)
+	movl TSS_ESP0_OFFSET(%esp),%esp
+sysenter_past_esp:
 	sti
 	pushl $(__USER_DS)
 	pushl %ebp
@@ -458,12 +466,36 @@ device_not_available_emulate:
 	addl $4, %esp
 	jmp ret_from_exception
 
+/*
+ * Debug traps and NMI can happen at the one SYSENTER instruction
+ * that sets up the real kernel stack. Check here, since we can't
+ * allow the wrong stack to be used.
+ *
+ * "TSS_ESP0_OFFSET+12" is because the NMI/debug handler will have
+ * already pushed 3 words if it hits on the sysenter instruction:
+ * eflags, cs and eip.
+ *
+ * We just load the right stack, and push the three (known) values
+ * by hand onto the new stack - while updating the return eip past
+ * the instruction that would have done it for sysenter.
+ */
+#define CHECK_SYSENTER_EIP			\
+	cmpl $sysenter_entry,(%esp);		\
+	jne 1f;					\
+	movl TSS_ESP0_OFFSET+12(%esp),%esp;	\
+	pushfl;					\
+	pushl $__KERNEL_CS;			\
+	pushl $sysenter_past_esp;		\
+1:
+
 ENTRY(debug)
+	CHECK_SYSENTER_EIP
 	pushl $0
 	pushl $do_debug
 	jmp error_code
 
 ENTRY(nmi)
+	CHECK_SYSENTER_EIP
 	pushl %eax
 	SAVE_ALL
 	movl %esp, %edx

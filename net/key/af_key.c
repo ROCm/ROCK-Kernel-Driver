@@ -2457,8 +2457,7 @@ out:
 }
 
 static int pfkey_sendmsg(struct kiocb *kiocb,
-			 struct socket *sock, struct msghdr *msg, int len,
-			 struct scm_cookie *scm)
+			 struct socket *sock, struct msghdr *msg, int len)
 {
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb = NULL;
@@ -2501,7 +2500,7 @@ out:
 
 static int pfkey_recvmsg(struct kiocb *kiocb,
 			 struct socket *sock, struct msghdr *msg, int len,
-			 int flags, struct scm_cookie *scm)
+			 int flags)
 {
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb;

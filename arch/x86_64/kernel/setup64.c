@@ -22,15 +22,13 @@
 #include <asm/i387.h>
 #include <asm/percpu.h>
 #include <asm/mtrr.h>
+#include <asm/proto.h>
 
 char x86_boot_params[2048] __initdata = {0,};
 
 unsigned long cpu_initialized __initdata = 0;
 
 struct x8664_pda cpu_pda[NR_CPUS] __cacheline_aligned; 
-
-extern void system_call(void); 
-extern void ia32_cstar_target(void); 
 
 extern struct task_struct init_task;
 
@@ -130,6 +128,24 @@ void pda_init(int cpu)
 #define EXCEPTION_STK_ORDER 0 /* >= N_EXCEPTION_STACKS*EXCEPTION_STKSZ */
 char boot_exception_stacks[N_EXCEPTION_STACKS*EXCEPTION_STKSZ];
 
+void syscall_init(void)
+{
+	/* 
+	 * LSTAR and STAR live in a bit strange symbiosis.
+	 * They both write to the same internal register. STAR allows to set CS/DS
+	 * but only a 32bit target. LSTAR sets the 64bit rip. 	 
+	 */ 
+	wrmsrl(MSR_STAR,  ((u64)__USER32_CS)<<48  | ((u64)__KERNEL_CS)<<32); 
+	wrmsrl(MSR_LSTAR, system_call); 
+
+#ifdef CONFIG_IA32_EMULATION   		
+	wrmsrl(MSR_CSTAR, ia32_cstar_target); 
+#endif
+
+	/* Flags to clear on syscall */
+	wrmsrl(MSR_SYSCALL_MASK, EF_TF|EF_DF|EF_IE|0x3000); 
+}
+
 /*
  * cpu_init() initializes state that is per-CPU. Some data is already
  * initialized (naturally) in the bootstrap process, such as the GDT
@@ -188,20 +204,7 @@ void __init cpu_init (void)
 
 	asm volatile("pushfq ; popq %%rax ; btr $14,%%rax ; pushq %%rax ; popfq" ::: "eax");
 
-	/* 
-	 * LSTAR and STAR live in a bit strange symbiosis.
-	 * They both write to the same internal register. STAR allows to set CS/DS
-	 * but only a 32bit target. LSTAR sets the 64bit rip. 	 
-	 */ 
-	wrmsrl(MSR_STAR,  ((u64)__USER32_CS)<<48  | ((u64)__KERNEL_CS)<<32); 
-	wrmsrl(MSR_LSTAR, system_call); 
-
-#ifdef CONFIG_IA32_EMULATION   		
-	wrmsrl(MSR_CSTAR, ia32_cstar_target); 
-#endif
-
-	/* Flags to clear on syscall */
-	wrmsrl(MSR_SYSCALL_MASK, EF_TF|EF_DF|EF_IE|0x3000); 
+	syscall_init();
 
 	wrmsrl(MSR_FS_BASE, 0);
 	wrmsrl(MSR_KERNEL_GS_BASE, 0);

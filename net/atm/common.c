@@ -85,14 +85,14 @@ static struct sk_buff *alloc_tx(struct atm_vcc *vcc,unsigned int size)
 {
 	struct sk_buff *skb;
 
-	if (atomic_read(&vcc->tx_inuse) && !atm_may_send(vcc,size)) {
-		DPRINTK("Sorry: tx_inuse = %d, size = %d, sndbuf = %d\n",
-		    atomic_read(&vcc->tx_inuse),size,vcc->sk->sndbuf);
+	if (atomic_read(&vcc->sk->wmem_alloc) && !atm_may_send(vcc,size)) {
+		DPRINTK("Sorry: wmem_alloc = %d, size = %d, sndbuf = %d\n",
+		    atomic_read(&vcc->sk->wmem_alloc),size,vcc->sk->sndbuf);
 		return NULL;
 	}
 	while (!(skb = alloc_skb(size,GFP_KERNEL))) schedule();
-	DPRINTK("AlTx %d += %d\n",atomic_read(&vcc->tx_inuse),skb->truesize);
-	atomic_add(skb->truesize+ATM_PDU_OVHD,&vcc->tx_inuse);
+	DPRINTK("AlTx %d += %d\n",atomic_read(&vcc->sk->wmem_alloc),skb->truesize);
+	atomic_add(skb->truesize+ATM_PDU_OVHD,&vcc->sk->wmem_alloc);
 	return skb;
 }
 
@@ -108,21 +108,19 @@ int atm_create(struct socket *sock,int protocol,int family)
 	vcc = atm_sk(sk);
 	memset(&vcc->flags,0,sizeof(vcc->flags));
 	vcc->dev = NULL;
-	vcc->family = sock->ops->family;
 	vcc->alloc_tx = alloc_tx;
 	vcc->callback = NULL;
 	memset(&vcc->local,0,sizeof(struct sockaddr_atmsvc));
 	memset(&vcc->remote,0,sizeof(struct sockaddr_atmsvc));
 	vcc->qos.txtp.max_sdu = 1 << 16; /* for meta VCs */
-	atomic_set(&vcc->tx_inuse,0);
-	atomic_set(&vcc->rx_inuse,0);
+	atomic_set(&vcc->sk->wmem_alloc,0);
+	atomic_set(&vcc->sk->rmem_alloc,0);
 	vcc->push = NULL;
 	vcc->pop = NULL;
 	vcc->push_oam = NULL;
 	vcc->vpi = vcc->vci = 0; /* no VCI/VPI yet */
 	vcc->atm_options = vcc->aal_options = 0;
 	init_waitqueue_head(&vcc->sleep);
-	skb_queue_head_init(&vcc->recvq);
 	skb_queue_head_init(&vcc->listenq);
 	sk->sleep = &vcc->sleep;
 	sock->sk = sk;
@@ -139,7 +137,7 @@ void atm_release_vcc_sk(struct sock *sk,int free_sk)
 	if (vcc->dev) {
 		if (vcc->dev->ops->close) vcc->dev->ops->close(vcc);
 		if (vcc->push) vcc->push(vcc,NULL); /* atmarpd has no push */
-		while ((skb = skb_dequeue(&vcc->recvq))) {
+		while ((skb = skb_dequeue(&vcc->sk->receive_queue))) {
 			atm_return(vcc,skb->truesize);
 			if (vcc->dev->ops->free_rx_skb)
 				vcc->dev->ops->free_rx_skb(vcc,skb);
@@ -147,10 +145,10 @@ void atm_release_vcc_sk(struct sock *sk,int free_sk)
 		}
 		spin_lock (&atm_dev_lock);	
 		fops_put (vcc->dev->ops);
-		if (atomic_read(&vcc->rx_inuse))
+		if (atomic_read(&vcc->sk->rmem_alloc))
 			printk(KERN_WARNING "atm_release_vcc: strange ... "
-			    "rx_inuse == %d after closing\n",
-			    atomic_read(&vcc->rx_inuse));
+			    "rmem_alloc == %d after closing\n",
+			    atomic_read(&vcc->sk->rmem_alloc));
 		bind_vcc(vcc,NULL);
 	} else
 		spin_lock (&atm_dev_lock);	
@@ -305,11 +303,15 @@ int atm_connect_vcc(struct atm_vcc *vcc,int itf,short vpi,int vci)
 		if (error) return error;
 	}
 	else {
-		struct atm_dev *dev;
+		struct atm_dev *dev = NULL;
+		struct list_head *p;
 
 		spin_lock (&atm_dev_lock);
-		for (dev = atm_devs; dev; dev = dev->next)
+		list_for_each(p, &atm_devs) {
+			dev = list_entry(p, struct atm_dev, dev_list);
 			if (!atm_do_connect_dev(vcc,dev,vpi,vci)) break;
+			dev = NULL;
+		}
 		spin_unlock (&atm_dev_lock);
 		if (!dev) return -ENODEV;
 	}
@@ -336,7 +338,7 @@ int atm_connect(struct socket *sock,int itf,short vpi,int vci)
 
 
 int atm_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
-		int total_len, int flags, struct scm_cookie *scm)
+		int total_len, int flags)
 {
 	DECLARE_WAITQUEUE(wait,current);
 	struct atm_vcc *vcc;
@@ -354,7 +356,7 @@ int atm_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 	add_wait_queue(&vcc->sleep,&wait);
 	set_current_state(TASK_INTERRUPTIBLE);
 	error = 1; /* <= 0 is error */
-	while (!(skb = skb_dequeue(&vcc->recvq))) {
+	while (!(skb = skb_dequeue(&vcc->sk->receive_queue))) {
 		if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
 		    test_bit(ATM_VF_CLOSE,&vcc->flags)) {
 			error = vcc->reply;
@@ -385,7 +387,7 @@ int atm_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 	if (vcc->dev->ops->feedback)
 		vcc->dev->ops->feedback(vcc,skb,(unsigned long) skb->data,
 		    (unsigned long) buff,eff_len);
-	DPRINTK("RcvM %d -= %d\n",atomic_read(&vcc->rx_inuse),skb->truesize);
+	DPRINTK("RcvM %d -= %d\n",atomic_read(&vcc->sk->rmem_alloc),skb->truesize);
 	atm_return(vcc,skb->truesize);
 	if (ATM_SKB(skb)->iovcnt) { /* @@@ hack */
 		/* iovcnt set, use scatter-gather for receive */
@@ -417,7 +419,7 @@ int atm_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 
 
 int atm_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
-		int total_len, struct scm_cookie *scm)
+		int total_len)
 {
 	DECLARE_WAITQUEUE(wait,current);
 	struct atm_vcc *vcc;
@@ -488,14 +490,14 @@ unsigned int atm_poll(struct file *file,struct socket *sock,poll_table *wait)
 	vcc = ATM_SD(sock);
 	poll_wait(file,&vcc->sleep,wait);
 	mask = 0;
-	if (skb_peek(&vcc->recvq) || skb_peek(&vcc->listenq))
+	if (skb_peek(&vcc->sk->receive_queue) || skb_peek(&vcc->listenq))
 		mask |= POLLIN | POLLRDNORM;
 	if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
 	    test_bit(ATM_VF_CLOSE,&vcc->flags))
 		mask |= POLLHUP;
 	if (sock->state != SS_CONNECTING) {
 		if (vcc->qos.txtp.traffic_class != ATM_NONE &&
-		    vcc->qos.txtp.max_sdu+atomic_read(&vcc->tx_inuse)+
+		    vcc->qos.txtp.max_sdu+atomic_read(&vcc->sk->wmem_alloc)+
 		    ATM_PDU_OVHD <= vcc->sk->sndbuf)
 			mask |= POLLOUT | POLLWRNORM;
 	}
@@ -546,6 +548,7 @@ static int fetch_stats(struct atm_dev *dev,struct atm_dev_stats *arg,int zero)
 int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 {
 	struct atm_dev *dev;
+	struct list_head *p;
 	struct atm_vcc *vcc;
 	int *tmp_buf, *tmp_p;
 	void *buf;
@@ -562,7 +565,7 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 				goto done;
 			}
 			ret_val =  put_user(vcc->sk->sndbuf-
-			    atomic_read(&vcc->tx_inuse)-ATM_PDU_OVHD,
+			    atomic_read(&vcc->sk->wmem_alloc)-ATM_PDU_OVHD,
 			    (int *) arg) ? -EFAULT : 0;
 			goto done;
 		case SIOCINQ:
@@ -573,7 +576,7 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 					ret_val = -EINVAL;
 					goto done;
 				}
-				skb = skb_peek(&vcc->recvq);
+				skb = skb_peek(&vcc->sk->receive_queue);
 				ret_val = put_user(skb ? skb->len : 0,(int *) arg)
 				    ? -EFAULT : 0;
 				goto done;
@@ -590,7 +593,7 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 				goto done;
 			}
 			size = 0;
-			for (dev = atm_devs; dev; dev = dev->next)
+			list_for_each(p, &atm_devs)
 				size += sizeof(int);
 			if (size > len) {
 				ret_val = -E2BIG;
@@ -602,8 +605,10 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 				goto done;
 			}
 			tmp_p = tmp_buf;
-			for (dev = atm_devs; dev; dev = dev->next)
+			list_for_each(p, &atm_devs) {
+				dev = list_entry(p, struct atm_dev, dev_list);
 				*tmp_p++ = dev->number;
+			}
 		        ret_val = ((copy_to_user(buf, tmp_buf, size)) ||
 			    put_user(size, &((struct atm_iobuf *) arg)->length)
 			    ) ? -EFAULT : 0;
@@ -963,7 +968,7 @@ static int atm_change_qos(struct atm_vcc *vcc,struct atm_qos *qos)
 	if (!error) error = adjust_tp(&qos->rxtp,qos->aal);
 	if (error) return error;
 	if (!vcc->dev->ops->change_qos) return -EOPNOTSUPP;
-	if (vcc->family == AF_ATMPVC)
+	if (vcc->sk->family == AF_ATMPVC)
 		return vcc->dev->ops->change_qos(vcc,qos,ATM_MF_SET);
 	return svc_change_qos(vcc,qos);
 }

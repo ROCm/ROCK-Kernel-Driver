@@ -22,6 +22,8 @@
 #include <asm/errno.h>
 #include <asm/debugreg.h>
 #include <asm/i387.h>
+#include <asm/desc.h>
+#include <asm/ldt.h>
 #include <asm/fpu32.h>
 #include <linux/mm.h>
 #include <linux/ptrace.h>

@@ -251,8 +251,10 @@ static ssize_t vlan_proc_read(struct file *file, char *buf,
 	offs = file->f_pos;
 	if (offs < pos) {
 		len = min_t(int, pos - offs, count);
-		if (copy_to_user(buf, (page + offs), len))
+		if (copy_to_user(buf, (page + offs), len)) {
+			kfree(page);
 			return -EFAULT;
+		}
 
 		file->f_pos += len;
 	} else {

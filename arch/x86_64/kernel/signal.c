@@ -96,14 +96,6 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc, unsigned long *p
 
 #define COPY(x)		err |= __get_user(regs->x, &sc->x)
 
-	{ 
-		unsigned int seg; 
-		err |= __get_user(seg, &sc->gs); 
-		load_gs_index(seg); 
-		err |= __get_user(seg, &sc->fs);
-		loadsegment(fs,seg);
-	}
-
 	COPY(rdi); COPY(rsi); COPY(rbp); COPY(rsp); COPY(rbx);
 	COPY(rdx); COPY(rcx); COPY(rip);
 	COPY(r8);
@@ -189,13 +181,10 @@ badframe:
 static inline int
 setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs, unsigned long mask, struct task_struct *me)
 {
-	int tmp, err = 0;
+	int err = 0;
 
-	tmp = 0;
-	__asm__("movl %%gs,%0" : "=r"(tmp): "0"(tmp));
-	err |= __put_user(tmp, (unsigned int *)&sc->gs);
-	__asm__("movl %%fs,%0" : "=r"(tmp): "0"(tmp));
-	err |= __put_user(tmp, (unsigned int *)&sc->fs);
+	err |= __put_user(0, &sc->gs);
+	err |= __put_user(0, &sc->fs);
 
 	err |= __put_user(regs->rdi, &sc->rdi);
 	err |= __put_user(regs->rsi, &sc->rsi);

@@ -111,9 +111,13 @@ static struct
     }
 };
 
-static struct ip6t_table packet_mangler
-= { { NULL, NULL }, "mangle", &initial_table.repl,
-    MANGLE_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL, THIS_MODULE };
+static struct ip6t_table packet_mangler = {
+	.name		= "mangle",
+	.table		= &initial_table.repl,
+	.valid_hooks	= MANGLE_VALID_HOOKS,
+	.lock		= RW_LOCK_UNLOCKED,
+	.me		= THIS_MODULE,
+};
 
 /* The work comes in here from netfilter.c. */
 static unsigned int
@@ -175,12 +179,37 @@ ip6t_local_hook(unsigned int hook,
 	return ret;
 }
 
-static struct nf_hook_ops ip6t_ops[]
-= { { { NULL, NULL }, ip6t_route_hook, PF_INET6, NF_IP6_PRE_ROUTING,  NF_IP6_PRI_MANGLE },
-    { { NULL, NULL }, ip6t_local_hook, PF_INET6, NF_IP6_LOCAL_IN,     NF_IP6_PRI_MANGLE },
-    { { NULL, NULL }, ip6t_route_hook, PF_INET6, NF_IP6_FORWARD,      NF_IP6_PRI_MANGLE },
-    { { NULL, NULL }, ip6t_local_hook, PF_INET6, NF_IP6_LOCAL_OUT,    NF_IP6_PRI_MANGLE },
-    { { NULL, NULL }, ip6t_route_hook, PF_INET6, NF_IP6_POST_ROUTING, NF_IP6_PRI_MANGLE }
+static struct nf_hook_ops ip6t_ops[] = {
+	{
+		.hook		= ip6t_route_hook,
+		.pf		= PF_INET6,
+		.hooknum	= NF_IP6_PRE_ROUTING,
+		.priority	= NF_IP6_PRI_MANGLE,
+	},
+	{
+		.hook		= ip6t_local_hook,
+		.pf		= PF_INET6,
+		.hooknum	= NF_IP6_LOCAL_IN,
+		.priority	= NF_IP6_PRI_MANGLE,
+	},
+	{
+		.hook		= ip6t_route_hook,
+		.pf		= PF_INET6,
+		.hooknum	= NF_IP6_FORWARD,
+		.priority	= NF_IP6_PRI_MANGLE,
+	},
+	{
+		.hook		= ip6t_local_hook,
+		.pf		= PF_INET6,
+		.hooknum	= NF_IP6_LOCAL_OUT,
+		.priority	= NF_IP6_PRI_MANGLE,
+	},
+	{
+		.hook		= ip6t_route_hook,
+		.pf		= PF_INET6,
+		.hooknum	= NF_IP6_POST_ROUTING,
+		.priority	= NF_IP6_PRI_MANGLE,
+	},
 };
 
 static int __init init(void)

@@ -153,6 +153,12 @@ static int sock_set_timeout(long *timeo_p, char *optval, int optlen)
 	return 0;
 }
 
+static void sock_warn_obsolete_bsdism(const char *name)
+{
+	printk(KERN_WARNING "process `%s' is using obsolete "
+	       "%s SO_BSDCOMPAT\n", current->comm, name);
+}
+
 /*
  *	This is meant for all protocols to use and covers goings on
  *	at the socket level. Everything here is generic.
@@ -303,7 +309,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 			break;
 
 		case SO_BSDCOMPAT:
-			sock_valbool_flag(sk, SOCK_BSDISM, valbool);
+			sock_warn_obsolete_bsdism("setsockopt");
 			break;
 
 		case SO_PASSCRED:
@@ -491,7 +497,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 			break;
 					
 		case SO_BSDCOMPAT:
-			v.val = test_bit(SOCK_BSDISM, &sk->flags);
+			sock_warn_obsolete_bsdism("getsockopt");
 			break;
 
 		case SO_TIMESTAMP:
@@ -961,13 +967,13 @@ int sock_no_getsockopt(struct socket *sock, int level, int optname,
 }
 
 int sock_no_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
-		    int flags, struct scm_cookie *scm)
+		    int flags)
 {
 	return -EOPNOTSUPP;
 }
 
 int sock_no_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
-		    int len, int flags, struct scm_cookie *scm)
+		    int len, int flags)
 {
 	return -EOPNOTSUPP;
 }
