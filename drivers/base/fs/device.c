@@ -67,10 +67,10 @@ dev_attr_store(struct driver_dir_entry * dir, struct attribute * attr,
 }
 
 static struct driverfs_ops dev_attr_ops = {
-	open:	dev_attr_open,
-	close:	dev_attr_close,
-	show:	dev_attr_show,
-	store:	dev_attr_store,
+	.open	= dev_attr_open,
+	.close	= dev_attr_close,
+	.show	= dev_attr_show,
+	.store	= dev_attr_store,
 };
 
 /**
@@ -231,4 +231,3 @@ int device_make_dir(struct device * dev)
 
 EXPORT_SYMBOL(device_create_file);
 EXPORT_SYMBOL(device_remove_file);
-

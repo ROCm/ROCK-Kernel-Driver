@@ -16,8 +16,8 @@
 #include "base.h"
 
 struct device device_root = {
-	bus_id:		"root",
-	name:		"System root",
+	.bus_id		= "root",
+	.name		= "System root",
 };
 
 int (*platform_notify)(struct device * dev) = NULL;
