@@ -302,21 +302,24 @@ static void __init assabet_map_io(void)
 		 */
 		neponset_map_io();
 #endif
-		/*
-		 * When Neponset is attached, the first UART should be
-		 * UART3.  That's what Angel is doing and many documents
-		 * are stating this.
-		 * We do the Neponset mapping even if Neponset support
-		 * isn't compiled in so the user will still get something on
-		 * the expected physical serial port.
-		 */
-		sa1100_register_uart(0, 3);
-		sa1100_register_uart(2, 1);
 	} else {
 		sa1100_register_uart_fns(&assabet_port_fns);
-		sa1100_register_uart(0, 1);	/* com port */
-		sa1100_register_uart(2, 3);	/* radio module */
 	}
+
+	/*
+	 * When Neponset is attached, the first UART should be
+	 * UART3.  That's what Angel is doing and many documents
+	 * are stating this.
+	 *
+	 * We do the Neponset mapping even if Neponset support
+	 * isn't compiled in so the user will still get something on
+	 * the expected physical serial port.
+	 *
+	 * We no longer do this; not all boot loaders support it,
+	 * and UART3 appears to be somewhat unreliable with blob.
+	 */
+	sa1100_register_uart(0, 1);
+	sa1100_register_uart(2, 3);
 }
 
 
