@@ -231,6 +231,4 @@ extern struct list_head tty_drivers;
 #define SERIAL_TYPE_NORMAL	1
 #define SERIAL_TYPE_CALLOUT	2
 
-extern struct device_class tty_devclass;
-
 #endif /* #ifdef _LINUX_TTY_DRIVER_H */

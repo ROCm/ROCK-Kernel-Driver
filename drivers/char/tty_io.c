@@ -2288,17 +2288,16 @@ void __init console_init(void)
 extern int vty_init(void);
 #endif
 
-struct device_class tty_devclass = {
+static struct class tty_class = {
 	.name	= "tty",
 };
-EXPORT_SYMBOL(tty_devclass);
 
-static int __init tty_devclass_init(void)
+static int __init tty_class_init(void)
 {
-	return devclass_register(&tty_devclass);
+	return class_register(&tty_class);
 }
 
-postcore_initcall(tty_devclass_init);
+postcore_initcall(tty_class_init);
 
 /*
  * Ok, now we can initialize the rest of the tty devices and can count

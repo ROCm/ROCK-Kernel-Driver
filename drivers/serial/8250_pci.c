@@ -2044,9 +2044,6 @@ static struct pci_driver serial_pci_driver = {
 	.suspend	= pciserial_suspend_one,
 	.resume		= pciserial_resume_one,
 	.id_table	= serial_pci_tbl,
-	.driver = {
-		.devclass = &tty_devclass,
-	},
 };
 
 static int __init serial8250_pci_init(void)
