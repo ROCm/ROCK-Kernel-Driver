@@ -65,7 +65,7 @@ static const int debug = 0;
 #endif
 
 
-/* Some default values for inital camera settings,
+/* Some default values for initial camera settings,
    can be set by modprobe */
 
 static enum frame_sizes size;	

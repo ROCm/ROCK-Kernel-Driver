@@ -1,5 +1,5 @@
 /*
- * Driver for USB Scanners (linux-2.5.64)
+ * Driver for USB Scanners (linux-2.5)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  * Previously maintained by Brian Beattie
@@ -335,7 +335,9 @@ struct scn_usb_data {
 	wait_queue_head_t rd_wait_q; /* read timeouts */
 	struct semaphore sem; /* lock to prevent concurrent reads or writes */
 	unsigned int rd_nak_timeout; /* Seconds to wait before read() timeout. */
+	struct kobject kobj;	/* Handles our reference counting */
 };
+#define to_scanner(d) container_of(d, struct scn_usb_data, kobj)
 
 extern devfs_handle_t usb_devfs_handle;
 

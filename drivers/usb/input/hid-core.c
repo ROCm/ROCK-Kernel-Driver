@@ -954,7 +954,7 @@ void hid_output_report(struct hid_report *report, __u8 *data)
 
 /*
  * Set a field value. The report this field belongs to has to be
- * created and transfered to the device, to set this value in the
+ * created and transferred to the device, to set this value in the
  * device.
  */
 

@@ -69,7 +69,7 @@ void usb_free_urb(struct urb *urb)
  * usb_get_urb - increments the reference count of the urb
  * @urb: pointer to the urb to modify
  *
- * This must be  called whenever a urb is transfered from a device driver to a
+ * This must be  called whenever a urb is transferred from a device driver to a
  * host controller driver.  This allows proper reference counting to happen
  * for urbs.
  *
@@ -383,7 +383,7 @@ int usb_unlink_urb(struct urb *urb)
 {
 	/* FIXME
 	 * We should not care about the state here, but the host controllers
-	 * die a horrible death if we submit a urb for a device that has been
+	 * die a horrible death if we unlink a urb for a device that has been
 	 * physically removed.
 	 */
 	if (urb &&

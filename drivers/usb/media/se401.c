@@ -692,7 +692,7 @@ static int se401_set_size(struct usb_se401 *se401, int width, int height)
 /*
 	This shouldn't really be done in a v4l driver....
 	But it does make the image look a lot more usable.
-	Basicly it lifts the dark pixels more than the light pixels.
+	Basically it lifts the dark pixels more than the light pixels.
 */
 static inline void enhance_picture(unsigned char *frame, int len)
 {

@@ -33,6 +33,12 @@
 
  History:
 
+ Version 0.30:
+ 	Markus: Updates for 2.5.x kernel and more ISO compiant source
+
+ Version 0.25:
+        PSL and Markus: Cleanup, radio now doesn't stop on device close
+
  Version 0.24:
  	Markus: Hope I got these silly VIDEO_TUNER_LOW issues finally
 	right.  Some minor cleanup, improved standalone compilation
@@ -69,14 +75,21 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.24"
+#define DRIVER_VERSION "v0.25"
 #define DRIVER_AUTHOR "Markus Demleitner <msdemlei@tucana.harvard.edu>"
-#define DRIVER_DESC "D-Link DSB-R100 USB radio driver"
+#define DRIVER_DESC "D-Link DSB-R100 USB FM radio driver"
 
 #define DSB100_VENDOR 0x04b4
 #define DSB100_PRODUCT 0x1002
 
 #define TB_LEN 16
+
+/* Frequency limits in MHz -- these are European values.  For Japanese
+devices, that would be 76 and 91.  */
+#define FREQ_MIN  87.5
+#define FREQ_MAX 108.0
+#define FREQ_MUL 16000
+
 
 static int usb_dsbr100_probe(struct usb_interface *intf,
 			     const struct usb_device_id *id);
@@ -108,7 +121,7 @@ static struct file_operations usb_dsbr100_fops = {
 static struct video_device usb_dsbr100_radio=
 {
 	.owner =	THIS_MODULE,
-	.name =		"D-Link DSB R-100 USB radio",
+	.name =		"D-Link DSB-R 100",
 	.type =		VID_TYPE_TUNER,
 	.hardware =	VID_HARDWARE_AZTECH,
 	.fops =         &usb_dsbr100_fops,
@@ -189,7 +202,7 @@ static int usb_dsbr100_probe(struct usb_interface *intf,
 		return -ENOMEM;
 	usb_dsbr100_radio.priv = radio;
 	radio->dev = interface_to_usbdev (intf);
-	radio->curfreq = 1454000;
+	radio->curfreq = FREQ_MIN*FREQ_MUL;
 	usb_set_intfdata (intf, radio);
 	return 0;
 }
@@ -225,11 +238,11 @@ static int usb_dsbr100_do_ioctl(struct inode *inode, struct file *file,
 	{
 		case VIDIOCGCAP: {
 			struct video_capability *v = arg;
-			memset(v,0,sizeof(*v));
-			v->type=VID_TYPE_TUNER;
-			v->channels=1;
-			v->audios=1;
-			strcpy(v->name, "D-Link R-100 USB Radio");
+			memset(v, 0, sizeof(*v));
+			v->type = VID_TYPE_TUNER;
+			v->channels = 1;
+			v->audios = 1;
+			strcpy(v->name, "D-Link R-100 USB FM Radio");
 			return 0;
 		}
 		case VIDIOCGTUNER: {
@@ -237,8 +250,8 @@ static int usb_dsbr100_do_ioctl(struct inode *inode, struct file *file,
 			dsbr100_getstat(radio);
 			if(v->tuner)	/* Only 1 tuner */ 
 				return -EINVAL;
-			v->rangelow = 87*16000;
-			v->rangehigh = 108*16000;
+			v->rangelow = FREQ_MIN*FREQ_MUL;
+			v->rangehigh = FREQ_MAX*FREQ_MUL;
 			v->flags = VIDEO_TUNER_LOW;
 			v->mode = VIDEO_MODE_AUTO;
 			v->signal = radio->stereo*0x7000;
@@ -268,31 +281,31 @@ static int usb_dsbr100_do_ioctl(struct inode *inode, struct file *file,
 
 			radio->curfreq = *freq;
 			if (dsbr100_setfreq(radio, radio->curfreq)==-1)
-				warn("set frequency failed");
+				warn("Set frequency failed");
 			return 0;
 		}
 		case VIDIOCGAUDIO: {
 			struct video_audio *v = arg;
-			memset(v,0, sizeof(*v));
-			v->flags|=VIDEO_AUDIO_MUTABLE;
-			v->mode=VIDEO_SOUND_STEREO;
-			v->volume=1;
-			v->step=1;
+			memset(v, 0, sizeof(*v));
+			v->flags |= VIDEO_AUDIO_MUTABLE;
+			v->mode = VIDEO_SOUND_STEREO;
+			v->volume = 1;
+			v->step = 1;
 			strcpy(v->name, "Radio");
 			return 0;			
 		}
 		case VIDIOCSAUDIO: {
 			struct video_audio *v = arg;
-			if(v->audio) 
+			if (v->audio) 
 				return -EINVAL;
 
-			if(v->flags&VIDEO_AUDIO_MUTE) {
+			if (v->flags&VIDEO_AUDIO_MUTE) {
 				if (dsbr100_stop(radio)==-1)
-					warn("radio did not respond properly");
+					warn("Radio did not respond properly");
 			}
 			else
 				if (dsbr100_start(radio)==-1)
-					warn("radio did not respond properly");
+					warn("Radio did not respond properly");
 			return 0;
 		}
 		default:
@@ -312,18 +325,18 @@ static int usb_dsbr100_open(struct inode *inode, struct file *file)
 	usb_dsbr100 *radio=dev->priv;
 
 	if (! radio) {
-		warn("radio not initialised");
+		warn("Radio not initialised");
 		return -EAGAIN;
 	}
 	if(users)
 	{
-		warn("radio in use");
+		warn("Radio in use");
 		return -EBUSY;
 	}
 	users++;
 	if (dsbr100_start(radio)<0)
-		warn("radio did not start up properly");
-	dsbr100_setfreq(radio,radio->curfreq);
+		warn("Radio did not start up properly");
+	dsbr100_setfreq(radio, radio->curfreq);
 	return 0;
 }
 
@@ -335,7 +348,6 @@ static int usb_dsbr100_close(struct inode *inode, struct file *file)
 	if (!radio)
 		return -ENODEV;
 	users--;
-	dsbr100_stop(radio);
 	return 0;
 }
 
@@ -343,8 +355,9 @@ static int __init dsbr100_init(void)
 {
 	usb_dsbr100_radio.priv = NULL;
 	usb_register(&usb_dsbr100_driver);
-	if (video_register_device(&usb_dsbr100_radio,VFL_TYPE_RADIO,radio_nr)==-1) {	
-		warn("couldn't register video device");
+	if (video_register_device(&usb_dsbr100_radio, VFL_TYPE_RADIO,
+		radio_nr)==-1) {	
+		warn("Couldn't register video device");
 		return -EINVAL;
 	}
 	info(DRIVER_VERSION ":" DRIVER_DESC);
@@ -367,9 +380,3 @@ module_exit (dsbr100_exit);
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
-
-/*
-vi: ts=8
-Sigh.  Of course, I am one of the ts=2 heretics, but Linus' wish is
-my command.
-*/

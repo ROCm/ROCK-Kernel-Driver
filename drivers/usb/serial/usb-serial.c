@@ -229,7 +229,7 @@
  * (01/23/2000) gkh
  *	Fixed problem of crash when trying to open a port that didn't have a
  *	device assigned to it. Made the minor node finding a little smarter,
- *	now it looks to find a continous space for the new device.
+ *	now it looks to find a continuous space for the new device.
  *
  * (01/21/2000) gkh
  *	Fixed bug in visor_startup with patch from Miles Lott (milos@insync.net)
@@ -1293,7 +1293,7 @@ static int __init usb_serial_init(void)
 	int i;
 	int result = 0;
 
-	/* Initalize our global data */
+	/* Initialize our global data */
 	for (i = 0; i < SERIAL_TTY_MINORS; ++i) {
 		serial_table[i] = NULL;
 	}

@@ -1,7 +1,7 @@
 /* -*- linux-c -*- */
 
 /* 
- * Driver for USB Scanners (linux-2.5.64)
+ * Driver for USB Scanners (linux-2.5)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  * Copyright (C) 2002, 2003 Henning Meier-Geinitz
@@ -33,8 +33,8 @@
  *  0.1  8/31/1999
  *
  *    Developed/tested using linux-2.3.15 with minor ohci.c changes to
- *    support short packes during bulk xfer mode.  Some testing was
- *    done with ohci-hcd but the performace was low.  Very limited
+ *    support short packets during bulk xfer mode.  Some testing was
+ *    done with ohci-hcd but the performance was low.  Very limited
  *    testing was performed with uhci but I was unable to get it to
  *    work.  Initial relase to the linux-usb development effort.
  *
@@ -338,7 +338,7 @@
  *      Till Kamppeter <till.kamppeter@gmx.net> and others for all the ids.
  *    - Cleaned up list of vendor/product ids.
  *    - Print information about user-supplied ids only once at startup instead
- *      of everytime any USB device is plugged in.
+ *      of every time any USB device is plugged in.
  *    - Removed PV8630 ioctls. Use the standard ioctls instead.
  *    - Made endpoint detection more generic. Basically, only one bulk-in 
  *      endpoint is required, everything else is optional.
@@ -350,6 +350,9 @@
  *    - Added vendor/product ids for Artec, Avision, Brother, Medion, Primax,
  *      Prolink, Fujitsu, Plustek, and SYSCAN scanners.
  *    - Fixed generation of devfs names if dynamic minors are disabled.
+ *    - Used kobject reference counting to free the scn struct when the device
+ *      is closed and disconnected. Avoids crashes when writing to a 
+ *      disconnected device. (Thanks to Greg KH).
  *
  * TODO
  *    - Performance
@@ -427,6 +430,7 @@ irq_scanner(struct urb *urb, struct pt_regs *regs)
 		return;
 	default:
 		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+	        return;	
 	}
 
 	dbg("irq_scanner(%d): data:%x", scn->scn_minor, *data);
@@ -461,6 +465,7 @@ open_scanner(struct inode * inode, struct file * file)
 		return -ENODEV;
 	}
 	scn = usb_get_intfdata(intf);
+	kobject_get(&scn->kobj);
 
 	dev = scn->scn_dev;
 
@@ -520,6 +525,8 @@ close_scanner(struct inode * inode, struct file * file)
 
 	up(&scn_mutex);
 	up(&(scn->sem));
+
+	kobject_put(&scn->kobj);
 
 	return 0;
 }
@@ -813,6 +820,37 @@ ioctl_scanner(struct inode *inode, struct file *file,
 	return retval;
 }
 
+static void destroy_scanner (struct kobject *kobj)
+{
+	struct scn_usb_data *scn;
+
+	dbg ("%s", __FUNCTION__);
+
+	scn = to_scanner(kobj);
+
+	down (&scn_mutex);
+	down (&(scn->sem));
+
+	usb_driver_release_interface(&scanner_driver,
+		&scn->scn_dev->actconfig->interface[scn->ifnum]);
+
+	kfree(scn->ibuf);
+	kfree(scn->obuf);
+
+	dbg("%s: De-allocating minor:%d", __FUNCTION__, scn->scn_minor);
+	devfs_unregister(scn->devfs);
+	usb_deregister_dev(1, scn->scn_minor);
+	usb_free_urb(scn->scn_irq);
+	usb_put_dev(scn->scn_dev);
+	up (&(scn->sem));
+	kfree (scn);
+	up (&scn_mutex);
+}
+
+static struct kobj_type scanner_kobj_type = {
+	.release = destroy_scanner,
+};
+
 static struct
 file_operations usb_scanner_fops = {
 	.owner =	THIS_MODULE,
@@ -982,6 +1020,8 @@ probe_scanner(struct usb_interface *intf,
 		return -ENOMEM;
 	}
 	memset (scn, 0, sizeof(struct scn_usb_data));
+	kobject_init(&scn->kobj);
+	scn->kobj.ktype = &scanner_kobj_type;
 
 	scn->scn_irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!scn->scn_irq) {
@@ -1049,6 +1089,7 @@ probe_scanner(struct usb_interface *intf,
 	}
 
 
+	usb_get_dev(dev);
 	scn->bulk_in_ep = have_bulk_in;
 	scn->bulk_out_ep = have_bulk_out;
 	scn->intr_ep = have_intr;
@@ -1089,28 +1130,13 @@ disconnect_scanner(struct usb_interface *intf)
 	intf->kdev = NODEV;
 
 	usb_set_intfdata(intf, NULL);
-	if (scn) {
-		down (&scn_mutex);
-		down (&(scn->sem));
-
-		if(scn->intr_ep) {
-			dbg("disconnect_scanner(%d): Unlinking IRQ URB", scn->scn_minor);
-			usb_unlink_urb(scn->scn_irq);
-		}
-		usb_driver_release_interface(&scanner_driver,
-			&scn->scn_dev->actconfig->interface[scn->ifnum]);
-
-		kfree(scn->ibuf);
-		kfree(scn->obuf);
-
-		dbg("disconnect_scanner: De-allocating minor:%d", scn->scn_minor);
-		devfs_unregister(scn->devfs);
-		usb_deregister_dev(1, scn->scn_minor);
-		usb_free_urb(scn->scn_irq);
-		up (&(scn->sem));
-		kfree (scn);
-		up (&scn_mutex);
+	if(scn->intr_ep) {
+		dbg("%s(%d): Unlinking IRQ URB", __FUNCTION__, scn->scn_minor);
+		usb_unlink_urb(scn->scn_irq);
 	}
+
+	if (scn)
+		kobject_put(&scn->kobj);
 }
 
 /* we want to look at all devices, as the vendor/product id can change

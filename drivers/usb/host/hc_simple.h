@@ -44,8 +44,8 @@ struct virt_root_hub {
 	int devnum;		/* Address of Root Hub endpoint */
 	void *urb;		/* interrupt URB of root hub */
 	int send;		/* active flag */
-	int interval;		/* intervall of roothub interrupt transfers */
-	struct timer_list rh_int_timer;	/* intervall timer for rh interrupt EP */
+	int interval;		/* interval of roothub interrupt transfers */
+	struct timer_list rh_int_timer;	/* interval timer for rh interrupt EP */
 };
 
 #if 1

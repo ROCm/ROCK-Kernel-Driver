@@ -129,7 +129,7 @@ static struct Nala_table_entry Nala_table[PSZ_MAX][8] =
      4 compression modi: none, low, medium, high
      
    When an uncompressed mode is not available, the next available compressed mode 
-   will be choosen (unless the decompressor is absent). Sometimes there are only
+   will be chosen (unless the decompressor is absent). Sometimes there are only
    1 or 2 compressed modes available; in that case entries are duplicated.
 */
 struct Timon_table_entry 
