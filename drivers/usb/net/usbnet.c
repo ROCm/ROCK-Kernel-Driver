@@ -2342,7 +2342,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 		if (!((skb->len + sizeof *trailer) & 0x01))
 			*skb_put (skb, 1) = PAD_BYTE;
 		trailer = (struct nc_trailer *) skb_put (skb, sizeof *trailer);
-	} else
+	} 
 #endif	/* CONFIG_USB_NET1080 */
 
 	usb_fill_bulk_urb (urb, dev->udev, dev->out,
