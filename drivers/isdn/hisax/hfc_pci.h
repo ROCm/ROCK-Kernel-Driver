@@ -185,7 +185,7 @@
 typedef struct {
     unsigned short z1;  /* Z1 pointer 16 Bit */
     unsigned short z2;  /* Z2 pointer 16 Bit */
-  } z_type;
+  } __attribute__((packed)) z_type;
 
 typedef struct {
     u_char data[D_FIFO_SIZE]; /* FIFO data space */
@@ -194,20 +194,20 @@ typedef struct {
     u_char fill2[0x20C0-0x20A2]; /* reserved, do not use */
     z_type za[MAX_D_FRAMES+1]; /* mask index with D_FREG_MASK for access */
     u_char fill3[0x4000-0x2100]; /* align 16K */  
-  } dfifo_type;
+  } __attribute__((packed)) dfifo_type;
 
 typedef struct {
     z_type za[MAX_B_FRAMES+1]; /* only range 0x0..0x1F allowed */ 
     u_char f1,f2; /* f pointers */
     u_char fill[0x2100-0x2082]; /* alignment */
-  } bzfifo_type;
+  } __attribute__((packed)) bzfifo_type;
 
 
 typedef union {
     struct { 
       dfifo_type d_tx; /* D-send channel */
       dfifo_type d_rx; /* D-receive channel */
-    } d_chan; 
+    } __attribute__((packed)) d_chan; 
     struct {
       u_char fill1[0x200];
       u_char txdat_b1[B_FIFO_SIZE];
@@ -223,13 +223,15 @@ typedef union {
 
       bzfifo_type rxbz_b2;
       u_char rxdat_b2[B_FIFO_SIZE];
-    } b_chans;  
+    } __attribute__((packed)) b_chans;  
     u_char fill[32768]; 
-  } fifo_area;
+  } __attribute__((packed)) fifo_area;
 
 
-#define Write_hfc(a,b,c) (*(((u_char *)a->hw.hfcpci.pci_io)+b) = c) 
-#define Read_hfc(a,b) (*(((u_char *)a->hw.hfcpci.pci_io)+b))
+//#define Write_hfc(a,b,c) (*(((u_char *)a->hw.hfcpci.pci_io)+b) = c) 
+//#define Read_hfc(a,b) (*(((u_char *)a->hw.hfcpci.pci_io)+b))
+#define Write_hfc(a,b,c)	writeb(c, ((u_char *)a->hw.hfcpci.pci_io)+b)
+#define Read_hfc(a,b)		readb(((u_char *)a->hw.hfcpci.pci_io)+b)
 
 extern void main_irq_hcpci(struct BCState *bcs);
 extern void inithfcpci(struct IsdnCardState *cs);
