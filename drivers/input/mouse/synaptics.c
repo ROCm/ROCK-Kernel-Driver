@@ -28,6 +28,16 @@
 #include "psmouse.h"
 #include "synaptics.h"
 
+/*
+ * The x/y limits are taken from the Synaptics TouchPad interfacing Guide,
+ * section 2.3.2, which says that they should be valid regardless of the
+ * actual size of the sensor.
+ */
+#define XMIN_NOMINAL 1472
+#define XMAX_NOMINAL 5472
+#define YMIN_NOMINAL 1408
+#define YMAX_NOMINAL 4448
+
 /*****************************************************************************
  *	Synaptics communications functions
  ****************************************************************************/
@@ -316,20 +326,17 @@ static inline void set_abs_params(struct input_dev *dev, int axis, int min, int 
 
 static void set_input_params(struct input_dev *dev, struct synaptics_data *priv)
 {
-	/*
-	 * The x/y limits are taken from the Synaptics TouchPad interfacing Guide,
-	 * which says that they should be valid regardless of the actual size of
-	 * the sensor.
-	 */
 	set_bit(EV_ABS, dev->evbit);
-	set_abs_params(dev, ABS_X, 1472, 5472, 0, 0);
-	set_abs_params(dev, ABS_Y, 1408, 4448, 0, 0);
+	set_abs_params(dev, ABS_X, XMIN_NOMINAL, XMAX_NOMINAL, 0, 0);
+	set_abs_params(dev, ABS_Y, YMIN_NOMINAL, YMAX_NOMINAL, 0, 0);
 	set_abs_params(dev, ABS_PRESSURE, 0, 255, 0, 0);
-
-	set_bit(EV_MSC, dev->evbit);
-	set_bit(MSC_GESTURE, dev->mscbit);
+	set_bit(ABS_TOOL_WIDTH, dev->absbit);
 
 	set_bit(EV_KEY, dev->evbit);
+	set_bit(BTN_TOOL_FINGER, dev->keybit);
+	set_bit(BTN_TOOL_DOUBLETAP, dev->keybit);
+	set_bit(BTN_TOOL_TRIPLETAP, dev->keybit);
+
 	set_bit(BTN_LEFT, dev->keybit);
 	set_bit(BTN_RIGHT, dev->keybit);
 	set_bit(BTN_FORWARD, dev->keybit);
@@ -489,42 +496,49 @@ static void synaptics_process_packet(struct psmouse *psmouse)
 	struct input_dev *dev = &psmouse->dev;
 	struct synaptics_data *priv = psmouse->private;
 	struct synaptics_hw_state hw;
+	int num_fingers;
+	int finger_width;
 
 	synaptics_parse_hw_state(psmouse->packet, priv, &hw);
 
 	if (hw.z > 0) {
-		int w_ok = 0;
-		/*
-		 * Use capability bits to decide if the w value is valid.
-		 * If not, set it to 5, which corresponds to a finger of
-		 * normal width.
-		 */
+		num_fingers = 1;
+		finger_width = 5;
 		if (SYN_CAP_EXTENDED(priv->capabilities)) {
 			switch (hw.w) {
 			case 0 ... 1:
-				w_ok = SYN_CAP_MULTIFINGER(priv->capabilities);
+				if (SYN_CAP_MULTIFINGER(priv->capabilities))
+					num_fingers = hw.w + 2;
 				break;
 			case 2:
-				w_ok = SYN_MODEL_PEN(priv->model_id);
+				if (SYN_MODEL_PEN(priv->model_id))
+					;   /* Nothing, treat a pen as a single finger */
 				break;
 			case 4 ... 15:
-				w_ok = SYN_CAP_PALMDETECT(priv->capabilities);
+				if (SYN_CAP_PALMDETECT(priv->capabilities))
+					finger_width = hw.w;
 				break;
 			}
 		}
-		if (!w_ok)
-			hw.w = 5;
+	} else {
+		num_fingers = 0;
+		finger_width = 0;
 	}
 
 	/* Post events */
-	input_report_abs(dev, ABS_X,        hw.x);
-	input_report_abs(dev, ABS_Y,        hw.y);
+	if (hw.z > 0) {
+		input_report_abs(dev, ABS_X, hw.x);
+		if (SYN_MODEL_ROT180(priv->model_id))
+			input_report_abs(dev, ABS_Y, YMAX_NOMINAL + YMIN_NOMINAL - hw.y);
+		else
+			input_report_abs(dev, ABS_Y, hw.y);
+	}
 	input_report_abs(dev, ABS_PRESSURE, hw.z);
 
-	if (hw.w != priv->old_w) {
-		input_event(dev, EV_MSC, MSC_GESTURE, hw.w);
-		priv->old_w = hw.w;
-	}
+	input_report_abs(dev, ABS_TOOL_WIDTH, finger_width);
+	input_report_key(dev, BTN_TOOL_FINGER, num_fingers == 1);
+	input_report_key(dev, BTN_TOOL_DOUBLETAP, num_fingers == 2);
+	input_report_key(dev, BTN_TOOL_TRIPLETAP, num_fingers == 3);
 
 	input_report_key(dev, BTN_LEFT,    hw.left);
 	input_report_key(dev, BTN_RIGHT,   hw.right);
