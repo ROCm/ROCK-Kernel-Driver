@@ -2826,9 +2826,6 @@ static void snd_usb_audio_create_proc(snd_usb_audio_t *chip)
 
 static int snd_usb_audio_free(snd_usb_audio_t *chip)
 {
-	down(&register_mutex);
-	usb_chip[chip->index] = NULL;
-	up(&register_mutex);
 	snd_magic_kfree(chip);
 	return 0;
 }
@@ -2843,10 +2840,11 @@ static int snd_usb_audio_dev_free(snd_device_t *device)
 /*
  * create a chip instance and set its names.
  */
-static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
+static int snd_usb_audio_create(struct usb_device *dev, int idx,
 				const snd_usb_audio_quirk_t *quirk,
 				snd_usb_audio_t **rchip)
 {
+	snd_card_t *card;
 	snd_usb_audio_t *chip;
 	int err, len;
 	char component[14];
@@ -2859,14 +2857,22 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 	if (dev->speed != USB_SPEED_FULL &&
 	    dev->speed != USB_SPEED_HIGH) {
 		snd_printk(KERN_ERR "unknown device speed %d\n", dev->speed);
-		snd_usb_audio_free(chip);
 		return -ENXIO;
 	}
 
-	chip = snd_magic_kcalloc(snd_usb_audio_t, 0, GFP_KERNEL);
-	if (! chip)
+	card = snd_card_new(index[idx], id[idx], THIS_MODULE, 0);
+	if (card == NULL) {
+		snd_printk(KERN_ERR "cannot create card instance %d\n", idx);
 		return -ENOMEM;
+	}
 
+	chip = snd_magic_kcalloc(snd_usb_audio_t, 0, GFP_KERNEL);
+	if (! chip) {
+		snd_card_free(card);
+		return -ENOMEM;
+	}
+
+	chip->index = idx;
 	chip->dev = dev;
 	chip->card = card;
 	INIT_LIST_HEAD(&chip->pcm_list);
@@ -2874,6 +2880,7 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_usb_audio_free(chip);
+		snd_card_free(card);
 		return err;
 	}
 
@@ -2946,7 +2953,6 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 	struct usb_host_config *config = dev->actconfig;
 	const snd_usb_audio_quirk_t *quirk = (const snd_usb_audio_quirk_t *)usb_id->driver_info;
 	int i, err;
-	snd_card_t *card;
 	snd_usb_audio_t *chip;
 	struct usb_host_interface *alts;
 	int ifnum;
@@ -2974,11 +2980,11 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 	down(&register_mutex);
 	for (i = 0; i < SNDRV_CARDS; i++) {
 		if (usb_chip[i] && usb_chip[i]->dev == dev) {
-			chip = usb_chip[i];
-			if (chip->shutdown) {
+			if (usb_chip[i]->shutdown) {
 				snd_printk(KERN_ERR "USB device is in the shutdown state, cannot create a card instance\n");
 				goto __error;
 			}
+			chip = usb_chip[i];
 			break;
 		}
 	}
@@ -2995,17 +3001,9 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 			if (enable[i] && ! usb_chip[i] &&
 			    (vid[i] == -1 || vid[i] == dev->descriptor.idVendor) &&
 			    (pid[i] == -1 || pid[i] == dev->descriptor.idProduct)) {
-				card = snd_card_new(index[i], id[i], THIS_MODULE, 0);
-				if (card == NULL) {
-					snd_printk(KERN_ERR "cannot create a card instance %d\n", i);
+				if (snd_usb_audio_create(dev, i, quirk, &chip) < 0) {
 					goto __error;
 				}
-				if (snd_usb_audio_create(card, dev, quirk, &chip) < 0) {
-					snd_card_free(card);
-					goto __error;
-				}
-				chip->index = i;
-				usb_chip[i] = chip;
 				break;
 			}
 		if (! chip) {
@@ -3031,16 +3029,17 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 
 	/* we are allowed to call snd_card_register() many times */
 	if (snd_card_register(chip->card) < 0) {
-		if (! chip->num_interfaces)
-			snd_card_free(chip->card);
 		goto __error;
 	}
 
+	usb_chip[chip->index] = chip;
 	chip->num_interfaces++;
 	up(&register_mutex);
 	return chip;
 
  __error:
+	if (chip && !chip->num_interfaces)
+		snd_card_free(chip->card);
 	up(&register_mutex);
  __err_val:
 	return NULL;
@@ -3074,6 +3073,7 @@ static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 		list_for_each(p, &chip->midi_list) {
 			snd_usbmidi_disconnect(p, &usb_audio_driver);
 		}
+		usb_chip[chip->index] = NULL;
 		up(&register_mutex);
 		snd_card_free_in_thread(card);
 	} else {
