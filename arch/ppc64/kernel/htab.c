@@ -101,7 +101,7 @@ create_pte_mapping(unsigned long start, unsigned long end,
 
 		hpteg = ((hash & htab_data.htab_hash_mask)*HPTES_PER_GROUP);
 
-		if (naca->platform == PLATFORM_PSERIES_LPAR)
+		if (systemcfg->platform == PLATFORM_PSERIES_LPAR)
 			ret = pSeries_lpar_hpte_insert(hpteg, va,
 				(unsigned long)__v2a(addr) >> PAGE_SHIFT,
 				0, mode, 1, large);
@@ -140,7 +140,7 @@ htab_initialize(void)
 	htab_data.htab_num_ptegs = pteg_count;
 	htab_data.htab_hash_mask = pteg_count - 1;
 
-	if (naca->platform == PLATFORM_PSERIES) {
+	if (systemcfg->platform == PLATFORM_PSERIES) {
 		/* Find storage for the HPT.  Must be contiguous in
 		 * the absolute address space.
 		 */
@@ -165,15 +165,15 @@ htab_initialize(void)
 	mode_rw = _PAGE_ACCESSED | _PAGE_COHERENT | PP_RWXX;
 
 	/* XXX we currently map kernel text rw, should fix this */
-	if (cpu_has_largepage() && naca->physicalMemorySize > 256*MB) {
+	if (cpu_has_largepage() && systemcfg->physicalMemorySize > 256*MB) {
 		create_pte_mapping((unsigned long)KERNELBASE, 
 				   KERNELBASE + 256*MB, mode_rw, 0);
 		create_pte_mapping((unsigned long)KERNELBASE + 256*MB, 
-				   KERNELBASE + (naca->physicalMemorySize), 
+				   KERNELBASE + (systemcfg->physicalMemorySize), 
 				   mode_rw, 1);
 	} else {
 		create_pte_mapping((unsigned long)KERNELBASE, 
-				   KERNELBASE+(naca->physicalMemorySize), 
+				   KERNELBASE+(systemcfg->physicalMemorySize), 
 				   mode_rw, 0);
 	}
 }

@@ -457,7 +457,7 @@ nextnode:
 		xics_irq_8259_cascade = virt_irq_create_mapping(xics_irq_8259_cascade_real);
 	}
 
-	if (naca->platform == PLATFORM_PSERIES) {
+	if (systemcfg->platform == PLATFORM_PSERIES) {
 #ifdef CONFIG_SMP
 		for (i = 0; i < NR_CPUS; ++i) {
 			if (!cpu_possible(i))
@@ -474,7 +474,7 @@ nextnode:
 	/* actually iSeries does not use any of xics...but it has link dependencies
 	 * for now, except this new one...
 	 */
-	} else if (naca->platform == PLATFORM_PSERIES_LPAR) {
+	} else if (systemcfg->platform == PLATFORM_PSERIES_LPAR) {
 		ops = &pSeriesLP_ops;
 #endif
 	}

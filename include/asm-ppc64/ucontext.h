@@ -1,8 +1,9 @@
 #ifndef _ASMPPC64_UCONTEXT_H
 #define _ASMPPC64_UCONTEXT_H
 
-/* Copied from i386. 
- *
+#include <asm/sigcontext.h>
+
+/*
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version
@@ -13,8 +14,9 @@ struct ucontext {
 	unsigned long	  uc_flags;
 	struct ucontext  *uc_link;
 	stack_t		  uc_stack;
-	struct sigcontext uc_mcontext;
-	sigset_t	  uc_sigmask;	/* mask last for extensibility */
+	sigset_t	  uc_sigmask;
+	sigset_t	  __unsued[15];	/* Allow for uc_sigmask growth */
+	struct sigcontext uc_mcontext;  /* last for extensibility */
 };
 
 #endif /* _ASMPPC64_UCONTEXT_H */

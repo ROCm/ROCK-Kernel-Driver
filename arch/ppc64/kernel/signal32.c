@@ -114,6 +114,40 @@ struct rt_sigframe_32 {
  *        setup_frame32
  */
 
+/*
+ * Atomically swap in the new signal mask, and wait for a signal.
+ */
+long sys32_sigsuspend(old_sigset_t mask, int p2, int p3, int p4, int p6, int p7,
+	       struct pt_regs *regs)
+{
+	sigset_t saveset;
+
+	mask &= _BLOCKABLE;
+	spin_lock_irq(&current->sighand->siglock);
+	saveset = current->blocked;
+	siginitset(&current->blocked, mask);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
+
+	regs->result = -EINTR;
+	regs->gpr[3] = EINTR;
+	regs->ccr |= 0x10000000;
+	while (1) {
+		current->state = TASK_INTERRUPTIBLE;
+		schedule();
+		if (do_signal32(&saveset, regs))
+			/*
+			 * If a signal handler needs to be called,
+			 * do_signal32() has set R3 to the signal number (the
+			 * first argument of the signal handler), so don't
+			 * overwrite that with EINTR !
+			 * In the other cases, do_signal32() doesn't touch 
+			 * R3, so it's still set to -EINTR (see above).
+			 */
+			return regs->gpr[3];
+	}
+}
+
 long sys32_sigaction(int sig, struct old_sigaction32 *act,
 		struct old_sigaction32 *oact)
 {
@@ -792,13 +826,13 @@ int sys32_rt_sigsuspend(compat_sigset_t* unewset, size_t sigsetsize, int p3,
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
-		if (do_signal(&saveset, regs))
+		if (do_signal32(&saveset, regs))
 			/*
 			 * If a signal handler needs to be called,
-			 * do_signal() has set R3 to the signal number (the
+			 * do_signal32() has set R3 to the signal number (the
 			 * first argument of the signal handler), so don't
 			 * overwrite that with EINTR !
-			 * In the other cases, do_signal() doesn't touch 
+			 * In the other cases, do_signal32() doesn't touch 
 			 * R3, so it's still set to -EINTR (see above).
 			 */
 			return regs->gpr[3];
