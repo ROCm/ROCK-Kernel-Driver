@@ -132,54 +132,54 @@ extern int sctp_register_pf(struct sctp_pf *, sa_family_t);
 /*
  * sctp/socket.c
  */
-extern int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb);
-extern int sctp_inet_listen(struct socket *sock, int backlog);
-extern void sctp_write_space(struct sock *sk);
-extern unsigned int sctp_poll(struct file *file, struct socket *sock,
+int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb);
+int sctp_inet_listen(struct socket *sock, int backlog);
+void sctp_write_space(struct sock *sk);
+unsigned int sctp_poll(struct file *file, struct socket *sock,
 		poll_table *wait);
 
 /*
  * sctp/primitive.c
  */
-extern int sctp_primitive_ASSOCIATE(struct sctp_association *, void *arg);
-extern int sctp_primitive_SHUTDOWN(struct sctp_association *, void *arg);
-extern int sctp_primitive_ABORT(struct sctp_association *, void *arg);
-extern int sctp_primitive_SEND(struct sctp_association *, void *arg);
-extern int sctp_primitive_REQUESTHEARTBEAT(struct sctp_association *, void *arg);
+int sctp_primitive_ASSOCIATE(struct sctp_association *, void *arg);
+int sctp_primitive_SHUTDOWN(struct sctp_association *, void *arg);
+int sctp_primitive_ABORT(struct sctp_association *, void *arg);
+int sctp_primitive_SEND(struct sctp_association *, void *arg);
+int sctp_primitive_REQUESTHEARTBEAT(struct sctp_association *, void *arg);
 
 /*
  * sctp/crc32c.c
  */
-extern __u32 sctp_start_cksum(__u8 *ptr, __u16 count);
-extern __u32 sctp_update_cksum(__u8 *ptr, __u16 count, __u32 cksum);
-extern __u32 sctp_end_cksum(__u32 cksum);
-extern __u32 sctp_update_copy_cksum(__u8 *, __u8 *, __u16 count, __u32 cksum);
+__u32 sctp_start_cksum(__u8 *ptr, __u16 count);
+__u32 sctp_update_cksum(__u8 *ptr, __u16 count, __u32 cksum);
+__u32 sctp_end_cksum(__u32 cksum);
+__u32 sctp_update_copy_cksum(__u8 *, __u8 *, __u16 count, __u32 cksum);
 
 /*
  * sctp/input.c
  */
-extern int sctp_rcv(struct sk_buff *skb);
-extern void sctp_v4_err(struct sk_buff *skb, u32 info);
-extern void sctp_hash_established(struct sctp_association *);
-extern void __sctp_hash_established(struct sctp_association *);
-extern void sctp_unhash_established(struct sctp_association *);
-extern void __sctp_unhash_established(struct sctp_association *);
-extern void sctp_hash_endpoint(struct sctp_endpoint *);
-extern void __sctp_hash_endpoint(struct sctp_endpoint *);
-extern void sctp_unhash_endpoint(struct sctp_endpoint *);
-extern void __sctp_unhash_endpoint(struct sctp_endpoint *);
-extern struct sctp_association *__sctp_lookup_association(
+int sctp_rcv(struct sk_buff *skb);
+void sctp_v4_err(struct sk_buff *skb, u32 info);
+void sctp_hash_established(struct sctp_association *);
+void __sctp_hash_established(struct sctp_association *);
+void sctp_unhash_established(struct sctp_association *);
+void __sctp_unhash_established(struct sctp_association *);
+void sctp_hash_endpoint(struct sctp_endpoint *);
+void __sctp_hash_endpoint(struct sctp_endpoint *);
+void sctp_unhash_endpoint(struct sctp_endpoint *);
+void __sctp_unhash_endpoint(struct sctp_endpoint *);
+struct sctp_association *__sctp_lookup_association(
 	const union sctp_addr *,
 	const union sctp_addr *,
 	struct sctp_transport **);
-extern struct sock *sctp_err_lookup(int family, struct sk_buff *,
-				    struct sctphdr *, struct sctp_endpoint **,
-				    struct sctp_association **,
-				    struct sctp_transport **);
-extern void sctp_err_finish(struct sock *, struct sctp_endpoint *,
+struct sock *sctp_err_lookup(int family, struct sk_buff *,
+			     struct sctphdr *, struct sctp_endpoint **,
+			     struct sctp_association **,
+			     struct sctp_transport **);
+void sctp_err_finish(struct sock *, struct sctp_endpoint *,
 			    struct sctp_association *);
-extern void sctp_icmp_frag_needed(struct sock *, struct sctp_association *,
-				  struct sctp_transport *t, __u32 pmtu);
+void sctp_icmp_frag_needed(struct sock *, struct sctp_association *,
+			   struct sctp_transport *t, __u32 pmtu);
 
 /*
  *  Section:  Macros, externs, and inlines
@@ -293,8 +293,8 @@ atomic_t sctp_dbg_objcnt_## name = ATOMIC_INIT(0)
 #define SCTP_DBG_OBJCNT_ENTRY(name) \
 {.label= #name, .counter= &sctp_dbg_objcnt_## name}
 
-extern void sctp_dbg_objcnt_init(void);
-extern void sctp_dbg_objcnt_exit(void);
+void sctp_dbg_objcnt_init(void);
+void sctp_dbg_objcnt_exit(void);
 
 #else
 
@@ -307,8 +307,8 @@ static inline void sctp_dbg_objcnt_exit(void) { return; }
 #endif /* CONFIG_SCTP_DBG_OBJCOUNT */
 
 #if defined CONFIG_SYSCTL
-extern void sctp_sysctl_register(void);
-extern void sctp_sysctl_unregister(void);
+void sctp_sysctl_register(void);
+void sctp_sysctl_unregister(void);
 #else
 static inline void sctp_sysctl_register(void) { return; }
 static inline void sctp_sysctl_unregister(void) { return; }
@@ -319,9 +319,9 @@ static inline void sctp_sysctl_unregister(void) { return; }
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 
-extern int sctp_v6_init(void);
-extern void sctp_v6_exit(void);
-extern void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
+int sctp_v6_init(void);
+void sctp_v6_exit(void);
+void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 			int type, int code, int offset, __u32 info);
 
 #else /* #ifdef defined(CONFIG_IPV6) */
@@ -348,7 +348,6 @@ static inline sctp_assoc_t sctp_assoc2id(const struct sctp_association *asoc)
 {
 	return (sctp_assoc_t) asoc;
 }
-
 
 /* Look up the association by its id.  */
 struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id);
@@ -484,7 +483,7 @@ static inline void tv_add(const struct timeval *entered, struct timeval *leaved)
 
 extern struct proto sctp_prot;
 extern struct proc_dir_entry *proc_net_sctp;
-extern void sctp_put_port(struct sock *sk);
+void sctp_put_port(struct sock *sk);
 
 /* Static inline functions. */
 
@@ -574,5 +573,24 @@ struct sctp6_sock {
 #endif /* CONFIG_IPV6 */
 
 #define sctp_sk(__sk) (&((struct sctp_sock *)__sk)->sctp)
+
+#define sctp_style(sk, style) __sctp_style((sk), (SCTP_SOCKET_##style))
+int static inline __sctp_style(struct sock *sk, sctp_socket_type_t style)
+{
+	return sctp_sk(sk)->type == style;
+}
+
+#define sctp_state(asoc, state) __sctp_state((asoc), (SCTP_STATE_##state))
+int static inline __sctp_state(struct sctp_association *asoc, 
+			       sctp_state_t state)
+{
+	return asoc->state == state;
+}
+
+#define sctp_sstate(sk, state) __sctp_sstate((sk), (SCTP_SS_##state))
+int static inline __sctp_sstate(struct sock *sk, sctp_sock_state_t state)
+{
+	return sk->state == state;
+}
 
 #endif /* __net_sctp_h__ */

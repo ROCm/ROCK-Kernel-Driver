@@ -212,9 +212,8 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const struct sctp_endpoint *ep,
 	 * on the TCP-style socket exceed the max backlog, respond with an
 	 * ABORT.
 	 */
-	if ((SCTP_SS_LISTENING != sk->state) ||
-	    ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
-	     (sk->ack_backlog >= sk->max_ack_backlog)))
+	if (!sctp_sstate(sk, LISTENING) ||
+	    (sctp_style(sk, TCP) && (sk->ack_backlog >= sk->max_ack_backlog)))
 		return sctp_sf_tabort_8_4_8(ep, asoc, type, arg, commands);
 
 	/* Verify the INIT chunk before processing it. */
@@ -1191,7 +1190,7 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 	 * since there are no peer addresses to check against.
 	 * Upon return an ABORT will have been sent if needed.
 	 */
-	if (asoc->state != SCTP_STATE_COOKIE_WAIT) {
+	if (!sctp_state(asoc, COOKIE_WAIT)) {
 		if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk,
 						 commands)) {
 			retval = SCTP_DISPOSITION_CONSUME;

@@ -108,7 +108,7 @@ struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
 	/* If this is not a UDP-style socket, assoc id should be
 	 * ignored.
 	 */
-	if (SCTP_SOCKET_UDP != sctp_sk(sk)->type) {
+	if (!sctp_style(sk, UDP)) {
 		if (!list_empty(&sctp_sk(sk)->ep->asocs))
 			asoc = list_entry(sctp_sk(sk)->ep->asocs.next,
 					  struct sctp_association, asocs);
@@ -693,8 +693,7 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 		 * belongs to a TCP-style listening socket that is not
 		 * yet accepted.
 		 */
-		if ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
-		    (SCTP_STATE_CLOSED == asoc->state)) {
+		if (sctp_style(sk, TCP) && sctp_state(asoc, CLOSED)) {
 			sctp_unhash_established(asoc);
 			sctp_association_free(asoc);
 		} else
@@ -795,8 +794,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 
 	SCTP_DEBUG_PRINTK("Using endpoint: %s.\n", ep->debug_name);
 
-	if ((SCTP_SOCKET_TCP == sp->type) &&
-	    (SCTP_SS_ESTABLISHED != sk->state)) {
+	if (sctp_style(sk, TCP) && (SCTP_SS_ESTABLISHED != sk->state)) {
 		err = -EPIPE;
 		goto out_nounlock;
 	}
@@ -814,7 +812,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	 * the address we will send to.
 	 * For a peeled-off socket, msg_name is ignored.
 	 */
-	if ((SCTP_SOCKET_UDP_HIGH_BANDWIDTH != sp->type) && msg->msg_name) {
+	if (!sctp_style(sk, UDP_HIGH_BANDWIDTH) && msg->msg_name) {
 		int msg_namelen = msg->msg_namelen;
 
 		err = sctp_verify_addr(sk, (union sctp_addr *)msg->msg_name,
@@ -901,8 +899,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		 * happen when an accepted socket has an association that is
 		 * already CLOSED. 
 		 */
-		if ((SCTP_STATE_CLOSED == asoc->state) &&
-		    (SCTP_SOCKET_TCP == sp->type)) {
+		if (sctp_state(asoc, CLOSED) && sctp_style(sk, TCP)) {
 			err = -EPIPE;
 			goto out_unlock;
 		}
@@ -1196,8 +1193,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
 
 	sctp_lock_sock(sk);
 
-	if ((SCTP_SOCKET_TCP == sp->type) &&
-	    (SCTP_SS_ESTABLISHED != sk->state)) {
+	if (sctp_style(sk, TCP) && (SCTP_SS_ESTABLISHED != sk->state)) {
 		err = -ENOTCONN;
 		goto out;
 	}
@@ -1304,7 +1300,7 @@ static int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 	struct sctp_opt *sp = sctp_sk(sk);
 
 	/* Applicable to UDP-style socket only */
-	if (SCTP_SOCKET_TCP == sp->type)
+	if (sctp_style(sk, TCP))
 		return -EOPNOTSUPP;
 	if (optlen != sizeof(int))
 		return -EINVAL;
@@ -1635,9 +1631,8 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 	 * is already connected.
 	 * It cannot be done even on a TCP-style listening socket.
 	 */
-	if ((SCTP_SS_ESTABLISHED == sk->state) ||
-	    ((SCTP_SOCKET_TCP == sp->type) &&
-	     (SCTP_SS_LISTENING == sk->state))) {
+	if (sctp_sstate(sk, ESTABLISHED) ||
+	    (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING))) {
 		err = -EISCONN;
 		goto out_unlock;
 	}
@@ -1746,12 +1741,12 @@ SCTP_STATIC struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 	sp = sctp_sk(sk);
 	ep = sp->ep;
 
-	if (SCTP_SOCKET_TCP != sp->type) {
+	if (!sctp_style(sk, TCP)) {
 		error = -EOPNOTSUPP;
 		goto out;
 	}
 
-	if (SCTP_SS_LISTENING != sk->state) {
+	if (!sctp_sstate(sk, LISTENING)) {
 		error = -EINVAL;
 		goto out;
 	}
@@ -1847,7 +1842,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	 * enable the events needed.  By default, UDP-style
 	 * sockets enable io and association change notifications.
 	 */
-	if (SCTP_SOCKET_UDP == sp->type) {
+	if (sctp_style(sk, UDP)) {
 		sp->subscribe.sctp_data_io_event     = 1;
 		sp->subscribe.sctp_association_event = 1;
 	}
@@ -1928,7 +1923,7 @@ SCTP_STATIC void sctp_shutdown(struct sock *sk, int how)
 	struct sctp_endpoint *ep;
 	struct sctp_association *asoc;
 
-	if (SCTP_SOCKET_TCP != sctp_sk(sk)->type)
+	if (!sctp_style(sk, TCP))
 		return;
 
 	if (how & SEND_SHUTDOWN) {
