@@ -39,7 +39,7 @@ static spinlock_t		pmap_lock = SPIN_LOCK_UNLOCKED;
  * be called for an ongoing RPC request.
  */
 void
-rpc_getport(struct rpc_task *task, struct rpc_clnt *clnt, unsigned long timeout)
+rpc_getport(struct rpc_task *task, struct rpc_clnt *clnt)
 {
 	struct rpc_portmap *map = clnt->cl_pmap;
 	struct sockaddr_in *sap = &clnt->cl_xprt->addr;
@@ -58,7 +58,7 @@ rpc_getport(struct rpc_task *task, struct rpc_clnt *clnt, unsigned long timeout)
 
 	spin_lock(&pmap_lock);
 	if (map->pm_binding) {
-		rpc_sleep_on(&map->pm_bindwait, task, NULL, 0, timeout);
+		rpc_sleep_on(&map->pm_bindwait, task, NULL, 0);
 		spin_unlock(&pmap_lock);
 		return;
 	}

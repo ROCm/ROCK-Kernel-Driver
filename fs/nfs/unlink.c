@@ -182,7 +182,7 @@ nfs_async_unlink(struct dentry *dentry)
 	dentry->d_flags |= DCACHE_NFSFS_RENAMED;
 	data->cred = rpcauth_lookupcred(clnt->cl_auth, 0);
 
-	rpc_sleep_on(&nfs_delete_queue, task, NULL, NULL, 0);
+	rpc_sleep_on(&nfs_delete_queue, task, NULL, NULL);
 	status = 0;
  out:
 	return status;

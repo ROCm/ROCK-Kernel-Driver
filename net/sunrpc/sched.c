@@ -334,14 +334,12 @@ __rpc_sleep_on(struct rpc_wait_queue *q, struct rpc_task *task,
 
 void
 rpc_sleep_on(struct rpc_wait_queue *q, struct rpc_task *task,
-				rpc_action action, rpc_action timer,
-				unsigned long timeout)
+				rpc_action action, rpc_action timer)
 {
 	/*
 	 * Protect the queue operations.
 	 */
 	spin_lock_bh(&rpc_queue_lock);
-	task->tk_timeout = timeout;
 	__rpc_sleep_on(q, task, action, timer);
 	spin_unlock_bh(&rpc_queue_lock);
 }
@@ -471,7 +469,8 @@ static void	__rpc_atrun(struct rpc_task *);
 void
 rpc_delay(struct rpc_task *task, unsigned long delay)
 {
-	rpc_sleep_on(&delay_queue, task, NULL, __rpc_atrun, delay);
+	task->tk_timeout = delay;
+	rpc_sleep_on(&delay_queue, task, NULL, __rpc_atrun);
 }
 
 static void

@@ -377,7 +377,8 @@ retry:
 	/* Has someone updated the credential behind our back? */
 	if (!gss_cred_is_uptodate_ctx(cred)) {
 		/* No, so do upcall and sleep */
-		rpc_sleep_on(&gss_msg->waitq, task, NULL, NULL, 0);
+		task->tk_timeout = 0;
+		rpc_sleep_on(&gss_msg->waitq, task, NULL, NULL);
 		spin_unlock(&gss_auth->lock);
 		res = rpc_queue_upcall(dentry->d_inode, msg);
 		if (res)
@@ -391,7 +392,8 @@ retry:
 	return res;
 out_sleep:
 	/* Sleep forever */
-	rpc_sleep_on(&gss_msg->waitq, task, NULL, NULL, 0);
+	task->tk_timeout = 0;
+	rpc_sleep_on(&gss_msg->waitq, task, NULL, NULL);
 	spin_unlock(&gss_auth->lock);
 	if (gss_new)
 		kfree(gss_new);

@@ -642,7 +642,8 @@ call_bind(struct rpc_task *task)
 
 	if (!clnt->cl_port) {
 		task->tk_action = call_connect;
-		rpc_getport(task, clnt, RPC_CONNECT_TIMEOUT);
+		task->tk_timeout = RPC_CONNECT_TIMEOUT;
+		rpc_getport(task, clnt);
 	}
 }
 

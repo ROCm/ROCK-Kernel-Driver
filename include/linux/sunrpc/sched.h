@@ -176,8 +176,7 @@ void		rpc_run_child(struct rpc_task *parent, struct rpc_task *child,
 int		rpc_add_wait_queue(struct rpc_wait_queue *, struct rpc_task *);
 void		rpc_remove_wait_queue(struct rpc_task *);
 void		rpc_sleep_on(struct rpc_wait_queue *, struct rpc_task *,
-					rpc_action action, rpc_action timer,
-					unsigned long timeout);
+					rpc_action action, rpc_action timer);
 void		rpc_add_timer(struct rpc_task *, rpc_action);
 void		rpc_wake_up_task(struct rpc_task *);
 void		rpc_wake_up(struct rpc_wait_queue *);
