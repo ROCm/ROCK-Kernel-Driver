@@ -367,7 +367,8 @@ int dquot_release(struct dquot *dquot)
 	if (atomic_read(&dquot->dq_count) > 1)
 		goto out_dqlock;
 	down(&dqopt->dqio_sem);
-	ret = dqopt->ops[dquot->dq_type]->release_dqblk(dquot);
+	if (dqopt->ops[dquot->dq_type]->release_dqblk)
+		ret = dqopt->ops[dquot->dq_type]->release_dqblk(dquot);
 	clear_bit(DQ_ACTIVE_B, &dquot->dq_flags);
 	up(&dqopt->dqio_sem);
 out_dqlock:
