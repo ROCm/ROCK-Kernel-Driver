@@ -19,9 +19,5 @@ extern int icmp_reply_translation(struct sk_buff **pskb,
 				  unsigned int hooknum,
 				  int dir);
 
-extern void replace_in_hashes(struct ip_conntrack *conntrack,
-			      struct ip_nat_info *info);
-extern void place_in_hashes(struct ip_conntrack *conntrack,
-			    struct ip_nat_info *info);
 
 #endif /* _IP_NAT_CORE_H */

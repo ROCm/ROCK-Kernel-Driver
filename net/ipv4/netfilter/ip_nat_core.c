@@ -288,6 +288,31 @@ static unsigned int opposite_hook[NF_IP_NUMHOOKS]
     [NF_IP_LOCAL_IN] = NF_IP_LOCAL_OUT,
 };
 
+static void replace_in_hashes(struct ip_conntrack *conntrack,
+			      struct ip_nat_info *info)
+{
+	/* Source has changed, so replace in hashes. */
+	unsigned int srchash
+		= hash_by_src(&conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
+			      .tuple.src,
+			      conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
+			      .tuple.dst.protonum);
+	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
+	list_move(&info->bysource, &bysource[srchash]);
+}
+
+static void place_in_hashes(struct ip_conntrack *conntrack,
+			    struct ip_nat_info *info)
+{
+	unsigned int srchash
+		= hash_by_src(&conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
+			      .tuple.src,
+			      conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
+			      .tuple.dst.protonum);
+	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
+	list_add(&info->bysource, &bysource[srchash]);
+}
+
 unsigned int
 ip_nat_setup_info(struct ip_conntrack *conntrack,
 		  const struct ip_nat_range *range,
@@ -409,31 +434,6 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 		place_in_hashes(conntrack, info);
 
 	return NF_ACCEPT;
-}
-
-void replace_in_hashes(struct ip_conntrack *conntrack,
-		       struct ip_nat_info *info)
-{
-	/* Source has changed, so replace in hashes. */
-	unsigned int srchash
-		= hash_by_src(&conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
-			      .tuple.src,
-			      conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
-			      .tuple.dst.protonum);
-	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
-	list_move(&info->bysource, &bysource[srchash]);
-}
-
-void place_in_hashes(struct ip_conntrack *conntrack,
-		     struct ip_nat_info *info)
-{
-	unsigned int srchash
-		= hash_by_src(&conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
-			      .tuple.src,
-			      conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
-			      .tuple.dst.protonum);
-	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
-	list_add(&info->bysource, &bysource[srchash]);
 }
 
 /* Returns true if succeeded. */

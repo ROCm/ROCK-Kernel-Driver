@@ -47,7 +47,7 @@
 #define DUMP_OFFSET(x)
 #endif
 
-DECLARE_LOCK(ip_nat_seqofs_lock);
+static DECLARE_LOCK(ip_nat_seqofs_lock);
 
 /* Setup TCP sequence correction given this change at this sequence */
 static inline void 

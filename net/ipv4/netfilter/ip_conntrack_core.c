@@ -78,7 +78,7 @@ static int ip_conntrack_vmalloc;
 
 DEFINE_PER_CPU(struct ip_conntrack_stat, ip_conntrack_stat);
 
-inline void 
+void 
 ip_conntrack_put(struct ip_conntrack *ct)
 {
 	IP_NF_ASSERT(ct);
@@ -440,7 +440,7 @@ static inline int helper_cmp(const struct ip_conntrack_helper *i,
 	return ip_ct_tuple_mask_cmp(rtuple, &i->tuple, &i->mask);
 }
 
-struct ip_conntrack_helper *ip_ct_find_helper(const struct ip_conntrack_tuple *tuple)
+static struct ip_conntrack_helper *ip_ct_find_helper(const struct ip_conntrack_tuple *tuple)
 {
 	return LIST_FIND(&helpers, helper_cmp,
 			 struct ip_conntrack_helper *,

@@ -29,7 +29,6 @@ MODULE_DESCRIPTION("ftp connection tracking helper");
 static char ftp_buffer[65536];
 
 static DECLARE_LOCK(ip_ftp_lock);
-struct module *ip_conntrack_ftp = THIS_MODULE;
 
 #define MAX_PORTS 8
 static int ports[MAX_PORTS];
@@ -477,7 +476,7 @@ static int __init init(void)
 		ftp[i].mask.dst.protonum = 0xFFFF;
 		ftp[i].max_expected = 1;
 		ftp[i].timeout = 5 * 60; /* 5 minutes */
-		ftp[i].me = ip_conntrack_ftp;
+		ftp[i].me = THIS_MODULE;
 		ftp[i].help = help;
 
 		tmpname = &ftp_names[i][0];

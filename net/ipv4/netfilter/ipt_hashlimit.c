@@ -97,7 +97,7 @@ struct ipt_hashlimit_htable {
 	struct list_head hash[0];	/* hashtable itself */
 };
 
-DECLARE_RWLOCK(hashlimit_lock);		/* protects htables list */
+static DECLARE_RWLOCK(hashlimit_lock);	/* protects htables list */
 static LIST_HEAD(hashlimit_htables);
 static kmem_cache_t *hashlimit_cachep;
 

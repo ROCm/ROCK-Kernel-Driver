@@ -66,7 +66,7 @@ static LIST_HEAD(clusterip_configs);
 
 /* clusterip_lock protects the clusterip_configs list _AND_ the configurable
  * data within all structurses (num_local_nodes, local_nodes[]) */
-DECLARE_RWLOCK(clusterip_lock);
+static DECLARE_RWLOCK(clusterip_lock);
 
 #ifdef CONFIG_PROC_FS
 static struct file_operations clusterip_proc_fops;

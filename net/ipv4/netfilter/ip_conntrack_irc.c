@@ -63,8 +63,6 @@ MODULE_PARM_DESC(dcc_timeout, "timeout on for unestablished DCC channels");
 static char *dccprotos[] = { "SEND ", "CHAT ", "MOVE ", "TSEND ", "SCHAT " };
 #define MINMATCHLEN	5
 
-struct module *ip_conntrack_irc = THIS_MODULE;
-
 #if 0
 #define DEBUGP(format, args...) printk(KERN_DEBUG "%s:%s:" format, \
                                        __FILE__, __FUNCTION__ , ## args)
@@ -270,7 +268,7 @@ static int __init init(void)
 		hlpr->mask.dst.protonum = 0xFFFF;
 		hlpr->max_expected = max_dcc_channels;
 		hlpr->timeout = dcc_timeout;
-		hlpr->me = ip_conntrack_irc;
+		hlpr->me = THIS_MODULE;
 		hlpr->help = help;
 
 		tmpname = &irc_names[i][0];

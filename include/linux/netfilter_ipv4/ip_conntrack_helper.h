@@ -29,9 +29,6 @@ struct ip_conntrack_helper
 extern int ip_conntrack_helper_register(struct ip_conntrack_helper *);
 extern void ip_conntrack_helper_unregister(struct ip_conntrack_helper *);
 
-extern struct ip_conntrack_helper *ip_ct_find_helper(const struct ip_conntrack_tuple *tuple);
-
-
 /* Allocate space for an expectation: this is mandatory before calling 
    ip_conntrack_expect_related. */
 extern struct ip_conntrack_expect *ip_conntrack_expect_alloc(void);
