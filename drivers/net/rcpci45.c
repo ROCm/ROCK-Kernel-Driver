@@ -131,12 +131,6 @@ rcpci45_remove_one (struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata (pdev);
 	PDPA pDpa = dev->priv;
 
-	if (!dev) {
-		printk (KERN_ERR "%s: remove non-existent device\n",
-				dev->name);
-		return;
-	}
-
 	RCResetIOP (dev);
 	unregister_netdev (dev);
 	free_irq (dev->irq, dev);
