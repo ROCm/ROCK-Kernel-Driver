@@ -75,10 +75,9 @@ static void stdma_int (int irq, void *dummy, struct pt_regs *fp);
 
 void stdma_lock(void (*handler)(int, void *, struct pt_regs *), void *data)
 {
-	unsigned long	oldflags;
+	unsigned long flags;
 
-	save_flags(oldflags);
-	cli();		/* protect lock */
+	local_irq_save(flags);		/* protect lock */
 
 	while(stdma_locked)
 		/* Since the DMA is used for file system purposes, we
@@ -89,7 +88,7 @@ void stdma_lock(void (*handler)(int, void *, struct pt_regs *), void *data)
 	stdma_locked   = 1;
 	stdma_isr      = handler;
 	stdma_isr_data = data;
-	restore_flags(oldflags);
+	local_irq_restore(flags);
 }
 
 
@@ -106,17 +105,16 @@ void stdma_lock(void (*handler)(int, void *, struct pt_regs *), void *data)
 
 void stdma_release(void)
 {
-	unsigned long	oldflags;
+	unsigned long flags;
 
-	save_flags(oldflags);
-	cli();
-	
+	local_irq_save(flags);
+
 	stdma_locked   = 0;
 	stdma_isr      = NULL;
 	stdma_isr_data = NULL;
 	wake_up(&stdma_wait);
 
-	restore_flags(oldflags);
+	local_irq_restore(flags);
 }
 
 

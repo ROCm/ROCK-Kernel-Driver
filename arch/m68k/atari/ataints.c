@@ -481,8 +481,7 @@ int atari_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_r
 		irq_node_t *node;
 		unsigned long flags;
 
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 
 		if (irq_handler[irq].handler != atari_call_irq_list) {
 			/* Only one handler yet, make a node for this first one */
@@ -507,7 +506,7 @@ int atari_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_r
 		node->next = irq_handler[irq].dev_id;
 		irq_handler[irq].dev_id = node;
 
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return 0;
 	} else {
 		printk ("%s: Irq %d allocated by other type int (call from %s)\n",
@@ -531,13 +530,12 @@ void atari_free_irq(unsigned int irq, void *dev_id)
 	if (vectors[vector] == bad_interrupt)
 		goto not_found;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	if (irq_handler[irq].handler != atari_call_irq_list) {
 		/* It's the only handler for the interrupt */
 		if (irq_handler[irq].dev_id != dev_id) {
-			restore_flags(flags);
+			local_irq_restore(flags);
 			goto not_found;
 		}
 		irq_handler[irq].handler = NULL;
@@ -548,7 +546,7 @@ void atari_free_irq(unsigned int irq, void *dev_id)
 		atari_disable_irq(irq);
 		atari_turnoff_irq(irq);
 
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return;
 	}
 
@@ -557,7 +555,7 @@ void atari_free_irq(unsigned int irq, void *dev_id)
 		if ((*list)->dev_id == dev_id) break;
 	}
 	if (!*list) {
-		restore_flags(flags);
+		local_irq_restore(flags);
 		goto not_found;
 	}
 
@@ -574,7 +572,7 @@ void atari_free_irq(unsigned int irq, void *dev_id)
 		node->handler = NULL; /* Mark it as free for reallocation */
 	}
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return;
 
 not_found:
