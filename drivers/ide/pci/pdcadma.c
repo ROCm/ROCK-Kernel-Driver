@@ -55,7 +55,6 @@ static int pdcadma_get_info (char *buffer, char **addr, off_t offset, int count)
 }
 #endif  /* defined(DISPLAY_PDCADMA_TIMINGS) && defined(CONFIG_PROC_FS) */
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 /*
  * pdcadma_dma functions() initiates/aborts (U)DMA read/write
  * operations on a drive.
@@ -81,8 +80,6 @@ static int pdcadma_get_info (char *buffer, char **addr, off_t offset, int count)
         int (*ide_dma_timeout)(ide_drive_t *drive);
 
 #endif
-
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 static unsigned int __init init_chipset_pdcadma (struct pci_dev *dev, const char *name)
 {
