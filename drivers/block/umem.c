@@ -341,8 +341,9 @@ static void mm_start_io(struct cardinfo *card)
 	offset = ((char*)desc) - ((char*)page->desc);
 	writel(cpu_to_le32((page->page_dma+offset)&0xffffffff),
 	       card->csr_remap + DMA_DESCRIPTOR_ADDR);
-	/* if sizeof(dma_addr_t) == 32, this will generate a warning, sorry */
-	writel(cpu_to_le32((page->page_dma)>>32),
+	/* Force the value to u64 before shifting otherwise >> 32 is undefined C
+	 * and on some ports will do nothing ! */
+	writel(cpu_to_le32(((u64)page->page_dma)>>32),
 	       card->csr_remap + DMA_DESCRIPTOR_ADDR + 4);
 
 	/* Go, go, go */
