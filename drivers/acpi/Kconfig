@@ -66,9 +66,9 @@ config ACPI_BOOT
 	default y
 
 config ACPI_SLEEP
-	bool "Sleep States"
+	bool "Sleep States (EXPERIMENTAL)"
 	depends on X86 && ACPI
-	depends on SOFTWARE_SUSPEND
+	depends on EXPERIMENTAL
 	default y
 	---help---
 	  This option adds support for ACPI suspend states. 
