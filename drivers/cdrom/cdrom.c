@@ -267,6 +267,7 @@
 #include <linux/blkpg.h>
 #include <linux/init.h>
 #include <linux/fcntl.h>
+#include <linux/blkdev.h>
 
 #include <asm/uaccess.h>
 
@@ -1435,6 +1436,11 @@ int cdrom_ioctl(struct cdrom_device_info *cdi, struct inode *ip,
 {
 	struct cdrom_device_ops *cdo = cdi->ops;
 	int ret;
+
+	/* Try the generic SCSI command ioctl's first.. */
+	ret = scsi_cmd_ioctl(ip->i_bdev, cmd, arg);
+	if (ret != -ENOTTY)
+		return ret;
 
 	/* the first few commands do not deal with audio drive_info, but
 	   only with routines in cdrom device operations. */

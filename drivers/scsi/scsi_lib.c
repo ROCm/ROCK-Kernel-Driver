@@ -857,7 +857,7 @@ void scsi_request_fn(request_queue_t * q)
 				scsi_init_cmd_from_req(SCpnt, SRpnt);
 			}
 
-		} else if (req->flags & REQ_CMD) {
+		} else if (req->flags & (REQ_CMD | REQ_BLOCK_PC)) {
 			SRpnt = NULL;
 			STpnt = scsi_get_request_dev(req);
 			if (!STpnt) {
@@ -919,7 +919,7 @@ void scsi_request_fn(request_queue_t * q)
 		req = NULL;
 		spin_unlock_irq(q->queue_lock);
 
-		if (SCpnt->request->flags & REQ_CMD) {
+		if (SCpnt->request->flags & (REQ_CMD | REQ_BLOCK_PC)) {
 			/*
 			 * This will do a couple of things:
 			 *  1) Fill in the actual SCSI command.
