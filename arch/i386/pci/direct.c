@@ -10,19 +10,19 @@
  * Functions for accessing PCI configuration space with type 1 accesses
  */
 
-#define PCI_CONF1_ADDRESS(bus, dev, fn, reg) \
-	(0x80000000 | (bus << 16) | (dev << 11) | (fn << 8) | (reg & ~3))
+#define PCI_CONF1_ADDRESS(bus, devfn, reg) \
+	(0x80000000 | (bus << 16) | (devfn << 8) | (reg & ~3))
 
-static int pci_conf1_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+static int pci_conf1_read (int seg, int bus, int devfn, int reg, int len, u32 *value)
 {
 	unsigned long flags;
 
-	if (!value || (bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
+	if (!value || (bus > 255) || (devfn > 255) || (reg > 255))
 		return -EINVAL;
 
 	spin_lock_irqsave(&pci_config_lock, flags);
 
-	outl(PCI_CONF1_ADDRESS(bus, dev, fn, reg), 0xCF8);
+	outl(PCI_CONF1_ADDRESS(bus, devfn, reg), 0xCF8);
 
 	switch (len) {
 	case 1:
@@ -41,16 +41,16 @@ static int pci_conf1_read (int seg, int bus, int dev, int fn, int reg, int len, 
 	return 0;
 }
 
-static int pci_conf1_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+static int pci_conf1_write (int seg, int bus, int devfn, int reg, int len, u32 value)
 {
 	unsigned long flags;
 
-	if ((bus > 255) || (dev > 31) || (fn > 7) || (reg > 255)) 
+	if ((bus > 255) || (devfn > 255) || (reg > 255)) 
 		return -EINVAL;
 
 	spin_lock_irqsave(&pci_config_lock, flags);
 
-	outl(PCI_CONF1_ADDRESS(bus, dev, fn, reg), 0xCF8);
+	outl(PCI_CONF1_ADDRESS(bus, devfn, reg), 0xCF8);
 
 	switch (len) {
 	case 1:
@@ -83,12 +83,16 @@ struct pci_raw_ops pci_direct_conf1 = {
 
 #define PCI_CONF2_ADDRESS(dev, reg)	(u16)(0xC000 | (dev << 8) | reg)
 
-static int pci_conf2_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+static int pci_conf2_read(int seg, int bus, int devfn, int reg, int len, u32 *value)
 {
 	unsigned long flags;
+	int dev, fn;
 
-	if (!value || (bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
+	if (!value || (bus > 255) || (devfn > 255) || (reg > 255))
 		return -EINVAL;
+
+	dev = PCI_SLOT(devfn);
+	fn = PCI_FUNC(devfn);
 
 	if (dev & 0x10) 
 		return PCIBIOS_DEVICE_NOT_FOUND;
@@ -110,19 +114,23 @@ static int pci_conf2_read (int seg, int bus, int dev, int fn, int reg, int len, 
 		break;
 	}
 
-	outb (0, 0xCF8);
+	outb(0, 0xCF8);
 
 	spin_unlock_irqrestore(&pci_config_lock, flags);
 
 	return 0;
 }
 
-static int pci_conf2_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+static int pci_conf2_write (int seg, int bus, int devfn, int reg, int len, u32 value)
 {
 	unsigned long flags;
+	int dev, fn;
 
-	if ((bus > 255) || (dev > 31) || (fn > 7) || (reg > 255)) 
+	if ((bus > 255) || (devfn > 255) || (reg > 255)) 
 		return -EINVAL;
+
+	dev = PCI_SLOT(devfn);
+	fn = PCI_FUNC(devfn);
 
 	if (dev & 0x10) 
 		return PCIBIOS_DEVICE_NOT_FOUND;
@@ -134,17 +142,17 @@ static int pci_conf2_write (int seg, int bus, int dev, int fn, int reg, int len,
 
 	switch (len) {
 	case 1:
-		outb ((u8)value, PCI_CONF2_ADDRESS(dev, reg));
+		outb((u8)value, PCI_CONF2_ADDRESS(dev, reg));
 		break;
 	case 2:
-		outw ((u16)value, PCI_CONF2_ADDRESS(dev, reg));
+		outw((u16)value, PCI_CONF2_ADDRESS(dev, reg));
 		break;
 	case 4:
-		outl ((u32)value, PCI_CONF2_ADDRESS(dev, reg));
+		outl((u32)value, PCI_CONF2_ADDRESS(dev, reg));
 		break;
 	}
 
-	outb (0, 0xCF8);    
+	outb(0, 0xCF8);    
 
 	spin_unlock_irqrestore(&pci_config_lock, flags);
 
@@ -178,14 +186,12 @@ static int __devinit pci_sanity_check(struct pci_raw_ops *o)
 		return 1;
 
 	for (devfn = 0; devfn < 0x100; devfn++) {
-		if (o->read(0, 0, PCI_SLOT(devfn), PCI_FUNC(devfn),
-						PCI_CLASS_DEVICE, 2, &x))
+		if (o->read(0, 0, devfn, PCI_CLASS_DEVICE, 2, &x))
 			continue;
 		if (x == PCI_CLASS_BRIDGE_HOST || x == PCI_CLASS_DISPLAY_VGA)
 			return 1;
 
-		if (o->read(0, 0, PCI_SLOT(devfn), PCI_FUNC(devfn),
-						PCI_VENDOR_ID, 2, &x))
+		if (o->read(0, 0, devfn, PCI_VENDOR_ID, 2, &x))
 			continue;
 		if (x == PCI_VENDOR_ID_INTEL || x == PCI_VENDOR_ID_COMPAQ)
 			return 1;

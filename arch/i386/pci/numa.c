@@ -10,19 +10,19 @@
 #define BUS2LOCAL(global) (mp_bus_id_to_local[global])
 #define QUADLOCAL2BUS(quad,local) (quad_local_to_mp_bus_id[quad][local])
 
-#define PCI_CONF1_MQ_ADDRESS(bus, dev, fn, reg) \
-	(0x80000000 | (BUS2LOCAL(bus) << 16) | (dev << 11) | (fn << 8) | (reg & ~3))
+#define PCI_CONF1_MQ_ADDRESS(bus, devfn, reg) \
+	(0x80000000 | (BUS2LOCAL(bus) << 16) | (devfn << 8) | (reg & ~3))
 
-static int pci_conf1_mq_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+static int pci_conf1_mq_read (int seg, int bus, int devfn, int reg, int len, u32 *value)
 {
 	unsigned long flags;
 
-	if (!value || (bus > MAX_MP_BUSSES) || (dev > 31) || (fn > 7) || (reg > 255))
+	if (!value || (bus > MAX_MP_BUSSES) || (devfn > 255) || (reg > 255))
 		return -EINVAL;
 
 	spin_lock_irqsave(&pci_config_lock, flags);
 
-	outl_quad(PCI_CONF1_MQ_ADDRESS(bus, dev, fn, reg), 0xCF8, BUS2QUAD(bus));
+	outl_quad(PCI_CONF1_MQ_ADDRESS(bus, devfn, reg), 0xCF8, BUS2QUAD(bus));
 
 	switch (len) {
 	case 1:
@@ -41,16 +41,16 @@ static int pci_conf1_mq_read (int seg, int bus, int dev, int fn, int reg, int le
 	return 0;
 }
 
-static int pci_conf1_mq_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+static int pci_conf1_mq_write (int seg, int bus, int devfn, int reg, int len, u32 value)
 {
 	unsigned long flags;
 
-	if ((bus > MAX_MP_BUSSES) || (dev > 31) || (fn > 7) || (reg > 255)) 
+	if ((bus > MAX_MP_BUSSES) || (devfn > 255) || (reg > 255)) 
 		return -EINVAL;
 
 	spin_lock_irqsave(&pci_config_lock, flags);
 
-	outl_quad(PCI_CONF1_MQ_ADDRESS(bus, dev, fn, reg), 0xCF8, BUS2QUAD(bus));
+	outl_quad(PCI_CONF1_MQ_ADDRESS(bus, devfn, reg), 0xCF8, BUS2QUAD(bus));
 
 	switch (len) {
 	case 1:
