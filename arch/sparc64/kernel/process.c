@@ -209,6 +209,8 @@ static void show_regwindow(struct pt_regs *regs)
 	       rw->ins[0], rw->ins[1], rw->ins[2], rw->ins[3]);
 	printk("i4: %016lx i5: %016lx i6: %016lx i7: %016lx\n",
 	       rw->ins[4], rw->ins[5], rw->ins[6], rw->ins[7]);
+	if (regs->tstate & TSTATE_PRIV)
+		print_symbol("I7: <%s>\n", rw->ins[7]);
 }
 
 void show_stackframe(struct sparc_stackf *sf)
@@ -298,6 +300,7 @@ void __show_regs(struct pt_regs * regs)
 	printk("o4: %016lx o5: %016lx sp: %016lx ret_pc: %016lx\n",
 	       regs->u_regs[12], regs->u_regs[13], regs->u_regs[14],
 	       regs->u_regs[15]);
+	print_symbol("RPC: <%s>\n", regs->u_regs[15]);
 	show_regwindow(regs);
 #ifdef CONFIG_SMP
 	spin_unlock(&regdump_lock);
