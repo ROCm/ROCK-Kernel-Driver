@@ -488,16 +488,34 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		}
 	}
 },
-{
+{	/*
+	 * This quirk is for the "Advanced" modes of the Edirol UA-700.
+	 * If the sample format switch is not in an advanced setting, the
+	 * UA-700 has ID 0x0582/0x002c and is standard compliant (no quirks),
+	 * but offers only 16-bit PCM and no MIDI.
+	 */
 	USB_DEVICE_VENDOR_SPEC(0x0582, 0x002b),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "UA-700",
-		.ifnum = 3,
-		.type = QUIRK_MIDI_FIXED_ENDPOINT,
-		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.out_cables = 0x0003,
-			.in_cables  = 0x0003
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_COMPOSITE,
+		.data = (const snd_usb_audio_quirk_t[]) {
+			{
+				.ifnum = 1,
+				.type = QUIRK_AUDIO_EDIROL_UA700
+			},
+			{
+				.ifnum = 2,
+				.type = QUIRK_AUDIO_EDIROL_UA700
+			},
+			{
+				.ifnum = 3,
+				.type = QUIRK_AUDIO_EDIROL_UA700
+			},
+			{
+				.ifnum = -1
+			}
 		}
 	}
 },

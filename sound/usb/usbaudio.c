@@ -2742,6 +2742,83 @@ static int create_standard_interface_quirk(snd_usb_audio_t *chip,
 	return 0;
 }
 
+/*
+ * Create a stream for an Edirol UA-700 interface.  The only way
+ * to detect the sample rate is by looking at wMaxPacketSize.
+ */
+static int create_ua700_quirk(snd_usb_audio_t *chip, struct usb_interface *iface)
+{
+	static const struct audioformat ua700_format = {
+		.format = SNDRV_PCM_FORMAT_S24_3LE,
+		.channels = 2,
+		.fmt_type = USB_FORMAT_TYPE_I,
+		.altsetting = 1,
+		.altset_idx = 1,
+		.rates = SNDRV_PCM_RATE_CONTINUOUS,
+	};
+	struct usb_host_interface *alts;
+	struct usb_interface_descriptor *altsd;
+	struct audioformat *fp;
+	int stream, err;
+
+	/* both PCM and MIDI interfaces have 2 altsettings */
+	if (iface->num_altsetting != 2)
+		return -ENXIO;
+	alts = &iface->altsetting[1];
+	altsd = get_iface_desc(alts);
+
+	if (altsd->bNumEndpoints == 2) {
+		static const snd_usb_midi_endpoint_info_t ep = {
+			.out_cables = 0x0003,
+			.in_cables  = 0x0003
+		};
+		static const snd_usb_audio_quirk_t quirk = {
+			.type = QUIRK_MIDI_FIXED_ENDPOINT,
+			.data = &ep
+		};
+		return snd_usb_create_midi_interface(chip, iface, &quirk);
+	}
+
+	if (altsd->bNumEndpoints != 1)
+		return -ENXIO;
+
+	fp = kmalloc(sizeof(*fp), GFP_KERNEL);
+	if (!fp)
+		return -ENOMEM;
+	memcpy(fp, &ua700_format, sizeof(*fp));
+
+	fp->iface = altsd->bInterfaceNumber;
+	fp->endpoint = get_endpoint(alts, 0)->bEndpointAddress;
+	fp->ep_attr = get_endpoint(alts, 0)->bmAttributes;
+	fp->maxpacksize = get_endpoint(alts, 0)->wMaxPacketSize;
+
+	switch (fp->maxpacksize) {
+	case 0x120:
+		fp->rate_max = fp->rate_min = 44100;
+		break;
+	case 0x138:
+		fp->rate_max = fp->rate_min = 48000;
+		break;
+	case 0x258:
+		fp->rate_max = fp->rate_min = 96000;
+		break;
+	default:
+		snd_printk(KERN_ERR "unknown sample rate\n");
+		kfree(fp);
+		return -ENXIO;
+	}
+
+	stream = (fp->endpoint & USB_DIR_IN)
+		? SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
+	err = add_audio_endpoint(chip, stream, fp);
+	if (err < 0) {
+		kfree(fp);
+		return err;
+	}
+	usb_set_interface(chip->dev, fp->iface, 0);
+	return 0;
+}
+
 static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 				struct usb_interface *iface,
 				const snd_usb_audio_quirk_t *quirk);
@@ -2829,6 +2906,8 @@ static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 	case QUIRK_AUDIO_STANDARD_INTERFACE:
 	case QUIRK_MIDI_STANDARD_INTERFACE:
 		return create_standard_interface_quirk(chip, iface, quirk);
+	case QUIRK_AUDIO_EDIROL_UA700:
+		return create_ua700_quirk(chip, iface);
 	default:
 		snd_printd(KERN_ERR "invalid quirk type %d\n", quirk->type);
 		return -ENXIO;
