@@ -406,14 +406,13 @@ void acct_process(long exitcode)
 
 	spin_lock(&acct_globals.lock);
 	file = acct_globals.file;
-	if (!file)
-		goto out_unlock;
-
+	if (unlikely(!file)) {
+		spin_unlock(&acct_globals.lock);
+		return;
+	}
 	get_file(file);
 	spin_unlock(&acct_globals.lock);
+
 	do_acct_process(exitcode, file);
 	fput(file);
-
-out_unlock:
-	spin_unlock(&acct_globals.lock);
 }
