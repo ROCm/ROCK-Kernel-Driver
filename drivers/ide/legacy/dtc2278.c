@@ -134,7 +134,7 @@ void __init probe_dtc2278 (void)
 	probe_hwif_init(&ide_hwifs[1]);
 }
 
-void __init dtc2278_release (void)
+static void dtc2278_release (void)
 {
 	if (ide_hwifs[0].chipset != ide_dtc2278 &&
 	    ide_hwifs[1].chipset != ide_dtc2278)

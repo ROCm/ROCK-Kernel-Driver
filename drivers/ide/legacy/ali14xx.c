@@ -227,7 +227,7 @@ int __init probe_ali14xx (void)
 	return 0;
 }
 
-void __init ali14xx_release (void)
+static void ali14xx_release (void)
 {
 	if (ide_hwifs[0].chipset != ide_ali14xx &&
 	    ide_hwifs[1].chipset != ide_ali14xx)

@@ -160,7 +160,7 @@ int __init probe_umc8672 (void)
 	return 0;
 }
 
-void __init umc8672_release (void)
+static void umc8672_release (void)
 {
 	unsigned long flags;
 
