@@ -13,40 +13,30 @@
 #include "net_user.h"
 #include "tuntap.h"
 
-struct tuntap_setup {
+struct tuntap_init {
 	char *dev_name;
 	char *gate_addr;
 };
 
-struct tuntap_setup tuntap_priv[MAX_UML_NETDEV] = { 
-	[ 0 ... MAX_UML_NETDEV - 1 ] =
-	{
-		dev_name:	NULL,
-		gate_addr:	NULL,
-	}
-};
-
-static void tuntap_init(struct net_device *dev, int index)
+static void tuntap_init(struct net_device *dev, void *data)
 {
 	struct uml_net_private *pri;
 	struct tuntap_data *tpri;
+	struct tuntap_init *init = data;
 
 	init_etherdev(dev, 0);
 	pri = dev->priv;
 	tpri = (struct tuntap_data *) pri->user;
-	tpri->dev_name = tuntap_priv[index].dev_name;
-	tpri->fixed_config = (tpri->dev_name != NULL);
-	tpri->gate_addr = tuntap_priv[index].gate_addr;
+	*tpri = ((struct tuntap_data)
+		{ dev_name :		init->dev_name,
+		  fixed_config :	(init->dev_name != NULL),
+		  gate_addr :		init->gate_addr,
+		  fd :			-1,
+		  dev :			dev });
 	printk("TUN/TAP backend - ");
 	if(tpri->gate_addr != NULL) 
 		printk("IP = %s", tpri->gate_addr);
 	printk("\n");
-	tpri->fd = -1;
-}
-
-static unsigned short tuntap_protocol(struct sk_buff *skb)
-{
-	return(eth_type_trans(skb, skb->dev));
 }
 
 static int tuntap_read(int fd, struct sk_buff **skb, 
@@ -66,34 +56,33 @@ static int tuntap_write(int fd, struct sk_buff **skb,
 
 struct net_kern_info tuntap_kern_info = {
 	init:			tuntap_init,
-	protocol:		tuntap_protocol,
+	protocol:		eth_protocol,
 	read:			tuntap_read,
 	write: 			tuntap_write,
 };
 
-static int tuntap_count = 0;
-
-int tuntap_setup(char *str, struct uml_net *dev)
+int tuntap_setup(char *str, char **mac_out, void *data)
 {
-	struct tuntap_setup *pri;
-	int err;
+	struct tuntap_init *init = data;
 
-	pri = &tuntap_priv[tuntap_count];
-	err = tap_setup_common(str, "tuntap", &pri->dev_name, dev->mac,  
-			       &dev->have_mac, &pri->gate_addr);
-	if(err) return(err);
+	*init = ((struct tuntap_init)
+		{ dev_name :	NULL,
+		  gate_addr :	NULL });
+	if(tap_setup_common(str, "tuntap", &init->dev_name, mac_out,
+			    &init->gate_addr))
+		return(0);
 
-	dev->user = &tuntap_user_info;
-	dev->kern = &tuntap_kern_info;
-	dev->private_size = sizeof(struct tuntap_data);
-	dev->transport_index = tuntap_count++;
-	return(0);
+	return(1);
 }
 
 static struct transport tuntap_transport = {
-	list :	LIST_HEAD_INIT(tuntap_transport.list),
-	name :	"tuntap",
-	setup : tuntap_setup
+	list :		LIST_HEAD_INIT(tuntap_transport.list),
+	name :		"tuntap",
+	setup : 	tuntap_setup,
+	user :		&tuntap_user_info,
+	kern :		&tuntap_kern_info,
+	private_size :	sizeof(struct tuntap_data),
+	setup_size :	sizeof(struct tuntap_init),
 };
 
 static int register_tuntap(void)

@@ -6,14 +6,10 @@
 #include "linux/socket.h"
 #include "linux/list.h"
 
-#define MAX_UML_NETDEV (16)
-
 struct uml_net {
+	struct list_head list;
 	struct net_device *dev;
-	struct net_user_info *user;
-	struct net_kern_info *kern;
-	int private_size;
-	int transport_index;
+	int index;
 	unsigned char mac[ETH_ALEN];
 	int have_mac;
 };
@@ -41,7 +37,7 @@ struct uml_net_private {
 };
 
 struct net_kern_info {
-	void (*init)(struct net_device *, int);
+	void (*init)(struct net_device *, void *);
 	unsigned short (*protocol)(struct sk_buff *);
 	int (*read)(int, struct sk_buff **skb, struct uml_net_private *);
 	int (*write)(int, struct sk_buff **skb, struct uml_net_private *);
@@ -50,7 +46,11 @@ struct net_kern_info {
 struct transport {
 	struct list_head list;
 	char *name;
-	int (*setup)(char *, struct uml_net *);
+	int (*setup)(char *, char **, void *);
+	struct net_user_info *user;
+	struct net_kern_info *kern;
+	int private_size;
+	int setup_size;
 };
 
 extern struct net_device *ether_init(int);
@@ -58,8 +58,9 @@ extern unsigned short ether_protocol(struct sk_buff *);
 extern int setup_etheraddr(char *str, unsigned char *addr);
 extern struct sk_buff *ether_adjust_skb(struct sk_buff *skb, int extra);
 extern int tap_setup_common(char *str, char *type, char **dev_name, 
-			    char *hw_addr, int *hw_setup, char **gate_addr);
+			    char **mac_out, char **gate_addr);
 extern void register_transport(struct transport *new);
+extern unsigned short eth_protocol(struct sk_buff *skb);
 
 #endif
 

@@ -9,6 +9,7 @@ dep_bool '  TUN/TAP transport' CONFIG_UML_NET_TUNTAP $CONFIG_UML_NET
 dep_bool '  SLIP transport' CONFIG_UML_NET_SLIP $CONFIG_UML_NET
 dep_bool '  Daemon transport' CONFIG_UML_NET_DAEMON $CONFIG_UML_NET
 dep_bool '  Multicast transport' CONFIG_UML_NET_MCAST $CONFIG_UML_NET
+dep_bool '  pcap transport' CONFIG_UML_NET_PCAP $CONFIG_UML_NET
 
 # Below are hardware-independent drivers mirrored from
 # drivers/net/Config.in. It would be nice if Linux
