@@ -105,7 +105,13 @@
 #define SEALEVEL_2803_6_PID	0X2863 	/* SeaLINK+8 (2803) Port 6 */
 #define SEALEVEL_2803_7_PID	0X2873 	/* SeaLINK+8 (2803) Port 7 */
 #define SEALEVEL_2803_8_PID	0X2883 	/* SeaLINK+8 (2803) Port 8 */
+
+/*
+ * DSS-20 Sync Station for Sony Ericsson P800
+ */
  
+#define FTDI_DSS20_PID          0xFC82  
+
 /*
  * Home Electronics (www.home-electro.com) USB gadgets
  */
