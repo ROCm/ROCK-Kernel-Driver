@@ -919,6 +919,7 @@ e100_phy_reset(struct e100_private *bdp)
 unsigned char __devinit
 e100_phy_init(struct e100_private *bdp)
 {
+	e100_phy_reset(bdp);
 	e100_phy_address_detect(bdp);
 	e100_phy_isolate(bdp);
 	e100_phy_id_detect(bdp);
@@ -930,7 +931,6 @@ e100_phy_init(struct e100_private *bdp)
 	bdp->PhyDelay = 0;
 	bdp->zlock_state = ZLOCK_INITIAL;
 
-	e100_phy_reset(bdp);
 	e100_phy_set_speed_duplex(bdp, false);
 	e100_fix_polarity(bdp);
 
