@@ -131,7 +131,7 @@ static int __init init(void)
 		tftp[i].mask.dst.protonum = 0xFFFF;
 		tftp[i].mask.src.u.udp.port = 0xFFFF;
 		tftp[i].max_expected = 1;
-		tftp[i].timeout = 0;
+		tftp[i].timeout = 5 * 60; /* 5 minutes */
 		tftp[i].me = THIS_MODULE;
 		tftp[i].help = tftp_help;
 

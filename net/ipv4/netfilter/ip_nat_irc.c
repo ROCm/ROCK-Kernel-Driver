@@ -34,8 +34,6 @@ MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
 MODULE_DESCRIPTION("IRC (DCC) NAT helper");
 MODULE_LICENSE("GPL");
 
-/* FIXME: Time out? --RR */
-
 static unsigned int help(struct sk_buff **pskb,
 			 enum ip_conntrack_info ctinfo,
 			 unsigned int matchoff,

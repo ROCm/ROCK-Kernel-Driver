@@ -476,7 +476,7 @@ static int __init init(void)
 		ftp[i].mask.src.u.tcp.port = 0xFFFF;
 		ftp[i].mask.dst.protonum = 0xFFFF;
 		ftp[i].max_expected = 1;
-		ftp[i].timeout = 0;
+		ftp[i].timeout = 5 * 60; /* 5 minutes */
 		ftp[i].me = ip_conntrack_ftp;
 		ftp[i].help = help;
 
