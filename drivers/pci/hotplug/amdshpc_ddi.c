@@ -1220,7 +1220,7 @@ int hp_get_led_cmd_available_mutex_thread(void *ptr)
 
 	lock_kernel ();
 	daemonize ("amdshpc_getledcmd_av_mutex");
-	reparent_to_init ();
+	
 	unlock_kernel ();
 
 	slot_context = (struct slot_context* ) ptr;
@@ -1263,7 +1263,7 @@ int hp_led_cmd_available_mutex_thread(void *ptr)
 
 	lock_kernel ();
 	daemonize ("amdshpc_ledcmd_av_mutex");
-	reparent_to_init ();
+	
 	unlock_kernel ();
 
 	slot_context = (struct slot_context* ) ptr;
@@ -1332,7 +1332,7 @@ int hp_get_cmd_available_mutex_thread(void *ptr)
 
 	lock_kernel ();
 	daemonize ("amdshpc_getcmd_av_mutex");
-	reparent_to_init ();
+	
 	unlock_kernel ();
 
 	slot_context = (struct slot_context* ) ptr;
@@ -1377,7 +1377,7 @@ int hp_cmd_available_mutex_thread(void *ptr)
 
 	lock_kernel ();
 	daemonize ("amdshpc_cmd_av_mutex");
-	reparent_to_init ();
+	
 	unlock_kernel ();
 
 	slot_context = (struct slot_context* ) ptr;
@@ -1446,7 +1446,7 @@ int hp_get_bus_available_mutex_thread(void *ptr)
 
 	lock_kernel ();
 	daemonize ("amdshpc_getbus_av_mutex");
-	reparent_to_init ();
+	
 	unlock_kernel ();
 
 	slot_context = (struct slot_context* ) ptr;
@@ -1490,7 +1490,7 @@ int hp_bus_available_mutex_thread(void *ptr)
 
 	lock_kernel ();
 	daemonize ("amdshpc_bus_av_mutex");
-	reparent_to_init ();
+	
 	unlock_kernel ();
 
 	slot_context = (struct slot_context* ) ptr;
