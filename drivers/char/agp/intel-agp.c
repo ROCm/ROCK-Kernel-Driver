@@ -140,7 +140,7 @@ static int intel_i810_configure(void)
 
 static void intel_i810_cleanup(void)
 {
-	writel(I810_PGETBL_CTL, intel_i810_private.registers);
+	writel(0, intel_i810_private.registers+I810_PGETBL_CTL);
 	readl(intel_i810_private.registers);	/* PCI Posting. */
 	iounmap(intel_i810_private.registers);
 }
@@ -464,7 +464,7 @@ static int intel_i830_create_gatt_table(void)
 	if (!intel_i830_private.registers)
 		return -ENOMEM;
 
-	temp = readb(intel_i830_private.registers+I810_PGETBL_CTL) & 0xfffff000;
+	temp = readl(intel_i830_private.registers+I810_PGETBL_CTL) & 0xfffff000;
 	global_cache_flush();	/* FIXME: ?? */
 
 	/* we have to call this as early as possible after the MMIO base address is known */
