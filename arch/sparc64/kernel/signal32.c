@@ -331,6 +331,9 @@ asmlinkage void do_sigreturn32(struct pt_regs *regs)
 	unsigned int seta[_COMPAT_NSIG_WORDS];
 	int err;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	synchronize_user_stack();
 	if (test_thread_flag(TIF_NEWSIGNALS))
 		return do_new_sigreturn32(regs);
@@ -398,6 +401,9 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	stack_t st;
 	int err, i;
 	
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	synchronize_user_stack();
 	regs->u_regs[UREG_FP] &= 0x00000000ffffffffUL;
 	sf = (struct rt_signal_frame32 __user *) regs->u_regs[UREG_FP];
@@ -1257,12 +1263,6 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 		struct k_sigaction *ka;
 
 		ka = &current->sighand->action[signr-1];
-
-		/* Always make any pending restarted system
-		 * calls return -EINTR.
-		 */
-		current_thread_info()->restart_block.fn =
-			do_no_restart_syscall;
 
 		if (cookie.restart_syscall)
 			syscall_restart32(orig_i0, regs, &ka->sa);
