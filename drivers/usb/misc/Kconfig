@@ -96,6 +96,15 @@ config USB_LCD
 config USB_SPEEDTOUCH
 	tristate "Alcatel Speedtouch ADSL USB Modem"
 	depends on USB && ATM
+	help
+	  Say Y here if you have an Alcatel SpeedTouch USB or SpeedTouch 330
+	  modem.  In order to use your modem you will need to install some user
+	  space tools, see <http://www.linux-usb.org/SpeedTouch/> for details.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called speedtch. If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_TEST
 	tristate "USB testing driver (DEVELOPMENT)"

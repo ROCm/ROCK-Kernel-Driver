@@ -314,7 +314,7 @@ static int interpret_urb_result(struct us_data *us, unsigned int pipe,
 		return USB_STOR_XFER_ERROR;
 
 	/* the transfer was cancelled, presumably by an abort */
-	case -ENODEV:
+	case -ECONNRESET:
 		US_DEBUGP("-- transfer cancelled\n");
 		return USB_STOR_XFER_ERROR;
 

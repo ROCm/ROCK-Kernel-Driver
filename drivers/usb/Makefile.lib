@@ -1,0 +1,2 @@
+obj-$(CONFIG_USB_CATC)		+= crc32.o
+obj-$(CONFIG_USB_SPEEDTOUCH)	+= crc32.o
