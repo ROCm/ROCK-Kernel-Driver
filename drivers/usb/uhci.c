@@ -619,7 +619,7 @@ static struct urb_priv *uhci_alloc_urb_priv(struct uhci *uhci, struct urb *urb)
 {
 	struct urb_priv *urbp;
 
-	urbp = kmem_cache_alloc(uhci_up_cachep, in_interrupt() ? SLAB_ATOMIC : SLAB_KERNEL);
+	urbp = kmem_cache_alloc(uhci_up_cachep, SLAB_ATOMIC);
 	if (!urbp) {
 		err("uhci_alloc_urb_priv: couldn't allocate memory for urb_priv\n");
 		return NULL;
