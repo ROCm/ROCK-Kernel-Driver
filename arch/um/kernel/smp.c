@@ -247,7 +247,7 @@ int smp_call_function(void (*_func)(void *info), void *_info, int nonatomic,
 	func = _func;
 	info = _info;
 
-	for_each_cpu(i)
+	for_each_online_cpu(i)
 		os_write_file(cpu_data[i].ipi_pipe[1], "C", 1);
 
 	while (atomic_read(&scf_started) != cpus)
