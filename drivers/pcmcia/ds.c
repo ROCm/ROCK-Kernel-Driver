@@ -356,6 +356,7 @@ static void pcmcia_put_dev(struct pcmcia_device *p_dev)
 static void pcmcia_release_dev(struct device *dev)
 {
 	struct pcmcia_device *p_dev = to_pcmcia_dev(dev);
+	ds_dbg(1, "releasing dev %p\n", p_dev);
 	pcmcia_put_bus_socket(p_dev->socket->pcmcia);
 	kfree(p_dev);
 }
@@ -430,11 +431,11 @@ static int send_event_callback(struct device *dev, void * _data)
 	if (p_dev->socket != data->skt)
 		return 0;
 
-	if (p_dev->client->state & (CLIENT_UNBOUND|CLIENT_STALE))
+	if (p_dev->client.state & (CLIENT_UNBOUND|CLIENT_STALE))
 		return 0;
 
-	if (p_dev->client->EventMask & data->event)
-		return EVENT(p_dev->client, data->event, data->priority);
+	if (p_dev->client.EventMask & data->event)
+		return EVENT(&p_dev->client, data->event, data->priority);
 
 	return 0;
 }
@@ -559,10 +560,10 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
 	struct pcmcia_driver *p_drv;
 	struct pcmcia_device *p_dev, *tmp_dev;
-	client_t *client;
 	unsigned long flags;
 	int ret = 0;
 
+	s = pcmcia_get_bus_socket(s);
 	if (!s)
 		return -EINVAL;
 
@@ -570,25 +571,10 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	       (char *)bind_info->dev_info);
 
 	p_drv = get_pcmcia_driver(&bind_info->dev_info);
-	if (!p_drv)
-		return -EINVAL;
-
-	if (!try_module_get(p_drv->owner))
-		return -EINVAL;
-
-	client = (client_t *) kmalloc(sizeof(client_t), GFP_KERNEL);
-	if (!client) {
-		ret = -ENOMEM;
+	if ((!p_drv) || (!try_module_get(p_drv->owner))) {
+		ret = -EINVAL;
 		goto err_put;
 	}
-	memset(client, 0, sizeof(client_t));
-
-	client->client_magic = CLIENT_MAGIC;
-	client->Socket = s->parent;
-	client->Function = bind_info->function;
-	client->state = CLIENT_UNBOUND;
-	client->next = s->parent->clients;
-	strlcpy(client->dev_info, p_drv->drv.name, DEV_NAME_LEN);
 
 	/* Currently, the userspace pcmcia cardmgr detects pcmcia devices.
 	 * Here this information is translated into a kernel
@@ -598,21 +584,13 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	p_dev = kmalloc(sizeof(struct pcmcia_device), GFP_KERNEL);
 	if (!p_dev) {
 		ret = -ENOMEM;
-		goto err_free_client;
+		goto err_put_module;
 	}
 	memset(p_dev, 0, sizeof(struct pcmcia_device));
-
-	s = pcmcia_get_bus_socket(s);
- 	if (!s) {
-		ret = -ENODEV;
-		kfree(p_dev);
-		goto err_free_client;
-	}
 
 	p_dev->socket = s->parent;
 	p_dev->device_no = (s->device_count++);
 	p_dev->func   = bind_info->function;
-	p_dev->client = client;
 
 	p_dev->dev.bus = &pcmcia_bus_type;
 	p_dev->dev.parent = s->parent->dev.dev;
@@ -620,11 +598,17 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	sprintf (p_dev->dev.bus_id, "pcmcia%d.%d", p_dev->socket->sock, p_dev->device_no);
 	p_dev->dev.driver = &p_drv->drv;
 
+	/* compat */
+	p_dev->client.client_magic = CLIENT_MAGIC;
+	p_dev->client.Socket = s->parent;
+	p_dev->client.Function = bind_info->function;
+	p_dev->client.state = CLIENT_UNBOUND;
+	strlcpy(p_dev->client.dev_info, p_drv->drv.name, DEV_NAME_LEN);
+
 	ret = device_register(&p_dev->dev);
 	if (ret) {
 		kfree(p_dev);
-		pcmcia_put_bus_socket(s);
-		goto err_free_client;
+		goto err_put_module;
 	}
 
 	/* Add to the list in pcmcia_bus_socket, but only if no device
@@ -642,15 +626,11 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	list_add_tail(&p_dev->socket_device_list, &s->devices_list);
 	spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
 
-	/* finally here the parent client is registered */
-	s->parent->clients = client;
-
 	if (p_drv->attach) {
 		p_dev->instance = p_drv->attach();
-		if (!p_dev->instance) {
+		if ((!p_dev->instance) || (p_dev->client.state & CLIENT_UNBOUND)) {
 			printk(KERN_NOTICE "ds: unable to create instance "
 			       "of '%s'!\n", (char *)bind_info->dev_info);
-			/* FIXME: client isn't freed here */
 			ret = -ENODEV;
 			goto err_unregister;
 		}
@@ -660,10 +640,13 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 
  err_unregister:
 	device_unregister(&p_dev->dev);
- err_free_client:
-	kfree(client);
- err_put:
 	module_put(p_drv->owner);
+	return (ret);
+
+ err_put_module:
+	module_put(p_drv->owner);
+ err_put:
+	pcmcia_put_bus_socket(s);
 	return (ret);
 } /* bind_request */
 
@@ -690,11 +673,11 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 			continue;
 		spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
 		list_for_each_entry(p_dev, &skt->devices_list, socket_device_list) {
-			if ((p_dev->client->state & CLIENT_UNBOUND) &&
-			    (!strcmp(p_dev->client->dev_info, (char *)req->dev_info))) {
+			if ((p_dev->client.state & CLIENT_UNBOUND) &&
+			    (!strcmp(p_dev->client.dev_info, (char *)req->dev_info))) {
 				p_dev = pcmcia_get_dev(p_dev);
 				if (p_dev)
-					client = p_dev->client;
+					client = &p_dev->client;
 				spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
 				goto found;
 			}
@@ -753,7 +736,6 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 	}
 
 	up(&s->skt_sem);
-	pcmcia_put_dev(p_dev); /* FIXME: put in deregister_client. */
 	return CS_SUCCESS;
 
  out_no_resource:
@@ -877,7 +859,7 @@ static int unbind_request(struct pcmcia_bus_socket *s)
 		}
 		p_dev = list_entry((&s->devices_list)->next, struct pcmcia_device, socket_device_list);
 		list_del(&p_dev->socket_device_list);
-		p_dev->client->state |= CLIENT_STALE;
+		p_dev->client.state |= CLIENT_STALE;
 		spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
 
 		/* detach the "instance" */
@@ -896,10 +878,9 @@ static int unbind_request(struct pcmcia_bus_socket *s)
 
 int pcmcia_deregister_client(client_handle_t handle)
 {
-	client_t **client;
 	struct pcmcia_socket *s;
-	u_long flags;
 	int i;
+	struct pcmcia_device *p_dev = handle_to_pdev(handle);
 
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
@@ -914,18 +895,9 @@ int pcmcia_deregister_client(client_handle_t handle)
 			goto warn_out;
 
 	if (handle->state & CLIENT_STALE) {
-		spin_lock_irqsave(&s->lock, flags);
-		client = &s->clients;
-		while ((*client) && ((*client) != handle))
-			client = &(*client)->next;
-		if (*client == NULL) {
-			spin_unlock_irqrestore(&s->lock, flags);
-			return CS_BAD_HANDLE;
-		}
-		*client = handle->next;
 		handle->client_magic = 0;
-		kfree(handle);
-		spin_unlock_irqrestore(&s->lock, flags);
+		handle->state &= ~CLIENT_STALE;
+		pcmcia_put_dev(p_dev);
 	} else {
 		handle->state = CLIENT_UNBOUND;
 		handle->event_handler = NULL;

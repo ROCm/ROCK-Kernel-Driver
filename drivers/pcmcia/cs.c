@@ -41,6 +41,7 @@
 #include <pcmcia/bulkmem.h>
 #include <pcmcia/cistpl.h>
 #include <pcmcia/cisreg.h>
+#include <pcmcia/ds.h>
 #include "cs_internal.h"
 
 #ifdef CONFIG_PCI
@@ -198,8 +199,6 @@ EXPORT_SYMBOL(pcmcia_put_socket);
 static void pcmcia_release_socket(struct class_device *class_dev)
 {
 	struct pcmcia_socket *socket = class_get_devdata(class_dev);
-
-	BUG_ON(socket->clients);
 
 	complete(&socket->socket_released);
 }
@@ -369,7 +368,6 @@ static void shutdown_socket(struct pcmcia_socket *s)
 	kfree(s->config);
 	s->config = NULL;
     }
-    BUG_ON(s->clients);
     free_regions(&s->a_region);
     free_regions(&s->c_region);
 

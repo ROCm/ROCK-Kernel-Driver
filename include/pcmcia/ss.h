@@ -153,7 +153,6 @@ struct pcmcia_socket {
 	u_int				state;
 	u_short				functions;
 	u_short				lock_count;
-	client_handle_t			clients;
 	pccard_mem_map			cis_mem;
 	void __iomem 			*cis_virt;
 	struct config_t			*config;

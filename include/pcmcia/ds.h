@@ -128,7 +128,6 @@ typedef struct dev_link_t {
 
 
 struct pcmcia_socket;
-struct client_t;
 
 extern struct bus_type pcmcia_bus_type;
 
@@ -159,7 +158,18 @@ struct pcmcia_device {
 	/* deprecated, a cleaned up version will be moved into this
 	   struct soon */
 	dev_link_t		*instance;
-	struct client_t		*client;
+	struct client_t {
+		u_short			client_magic;
+		struct pcmcia_socket	*Socket;
+		u_char			Function;
+		dev_info_t		dev_info;
+		u_int			Attributes;
+		u_int			state;
+		event_t			EventMask, PendingEvents;
+		int (*event_handler)	(event_t event, int priority,
+					 event_callback_args_t *);
+		event_callback_args_t 	event_callback_args;
+	}			client;
 
 	struct device		dev;
 };
@@ -167,6 +177,7 @@ struct pcmcia_device {
 #define to_pcmcia_dev(n) container_of(n, struct pcmcia_device, dev)
 #define to_pcmcia_drv(n) container_of(n, struct pcmcia_driver, drv)
 
+#define handle_to_pdev(handle) container_of(handle, struct pcmcia_device, client);
 
 /* error reporting */
 void cs_error(client_handle_t handle, int func, int ret);

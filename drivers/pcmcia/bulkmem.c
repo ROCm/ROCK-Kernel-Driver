@@ -27,6 +27,7 @@
 #include <pcmcia/cs.h>
 #include <pcmcia/bulkmem.h>
 #include <pcmcia/cistpl.h>
+#include <pcmcia/ds.h>
 #include "cs_internal.h"
 
 #ifdef DEBUG

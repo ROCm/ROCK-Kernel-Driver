@@ -18,19 +18,7 @@
 #include <linux/config.h>
 
 #define CLIENT_MAGIC 	0x51E6
-typedef struct client_t {
-    u_short		client_magic;
-    struct pcmcia_socket *Socket;
-    u_char		Function;
-    dev_info_t		dev_info;
-    u_int		Attributes;
-    u_int		state;
-    event_t		EventMask, PendingEvents;
-    int (*event_handler)(event_t event, int priority,
-			 event_callback_args_t *);
-    event_callback_args_t event_callback_args;
-    struct client_t 	*next;
-} client_t;
+typedef struct client_t client_t;
 
 /* Flags in client state */
 #define CLIENT_CONFIG_LOCKED	0x0001
