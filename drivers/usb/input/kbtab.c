@@ -74,12 +74,15 @@ static void kbtab_irq(struct urb *urb, struct pt_regs *regs)
 
 	input_report_abs(dev, ABS_X, kbtab->x);
 	input_report_abs(dev, ABS_Y, kbtab->y);
-	/*input_report_abs(dev, ABS_PRESSURE, kbtab->pressure);*/
 
 	/*input_report_key(dev, BTN_TOUCH , data[0] & 0x01);*/
 	input_report_key(dev, BTN_RIGHT, data[0] & 0x02);
-	
-	input_report_key(dev, BTN_LEFT, (kbtab->pressure > kb_pressure_click) ? 1 : 0);
+
+	if( -1 == kb_pressure_click){ 
+		input_report_abs(dev, ABS_PRESSURE, kbtab->pressure);
+	} else {
+		input_report_key(dev, BTN_LEFT, (kbtab->pressure > kb_pressure_click) ? 1 : 0);
+	};
 	
 	input_sync(dev);
 
