@@ -170,7 +170,7 @@ tab[] =
     /* for assembly files which can't include sched.h: */
     { "IA64_CLONE_VFORK",		CLONE_VFORK },
     { "IA64_CLONE_VM",			CLONE_VM },
-	/* used by fsys_gettimeofday in arch/ia64/kernel/fsys.S */
+    /* used by fsys_gettimeofday in arch/ia64/kernel/fsys.S */
     { "IA64_CPUINFO_ITM_DELTA_OFFSET", 		offsetof (struct cpuinfo_ia64, itm_delta) },
     { "IA64_CPUINFO_ITM_NEXT_OFFSET", 		offsetof (struct cpuinfo_ia64, itm_next) },
     { "IA64_CPUINFO_NSEC_PER_CYC_OFFSET",	offsetof (struct cpuinfo_ia64, nsec_per_cyc) },
