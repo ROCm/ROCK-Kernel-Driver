@@ -935,6 +935,7 @@ drv_verify(struct cpufreq_policy *pol)
 		return -ENODEV;
 	}
 
+#warning pol->policy is in undefined state here
 	res = find_match(&targ, &min, &max,
 			 pol->policy == CPUFREQ_POLICY_POWERSAVE ?
 			 SEARCH_DOWN : SEARCH_UP, 0, 0);
@@ -954,7 +955,7 @@ drv_cpu_init(struct cpufreq_policy *pol)
 		return -ENODEV;
 	}
 
-	pol->policy = CPUFREQ_POLICY_PERFORMANCE; /* boot as fast as we can */
+	pol->policy = CPUFREQ_DEFAULT_GOVERNOR;
 
 	/* Take a crude guess here. */
 	pol->cpuinfo.transition_latency = ((rvo + 8) * vstable * VST_UNITS_20US)
