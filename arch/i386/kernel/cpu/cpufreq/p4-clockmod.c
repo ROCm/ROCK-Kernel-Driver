@@ -180,13 +180,6 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
 	int cpuid = 0;
 	unsigned int i;
 
-	/* capability check */
-	if (c->x86_vendor != X86_VENDOR_INTEL)
-		return -ENODEV;
-	if (!test_bit(X86_FEATURE_ACPI, c->x86_capability) ||
-	    !test_bit(X86_FEATURE_ACC, c->x86_capability))
-		return -ENODEV;
-	
 	/* Errata workaround */
 	cpuid = (c->x86 << 8) | (c->x86_model << 4) | c->x86_mask;
 	switch (cpuid) {

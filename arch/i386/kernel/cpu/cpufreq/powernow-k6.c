@@ -145,10 +145,6 @@ static int powernow_k6_cpu_init(struct cpufreq_policy *policy)
 	struct cpuinfo_x86 *c = cpu_data;
 	unsigned int i;
 
-	/* capability check */
-	if ((c->x86_vendor != X86_VENDOR_AMD) || (c->x86 != 5) ||
-	    ((c->x86_model != 12) && (c->x86_model != 13)))
-		return -ENODEV;
 	if (policy->cpu != 0)
 		return -ENODEV;
 
