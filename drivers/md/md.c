@@ -2444,9 +2444,9 @@ static struct block_device_operations md_fops =
 
 static inline void flush_curr_signals(void)
 {
-	spin_lock(&current->sig->siglock);
+	spin_lock(&current->sighand->siglock);
 	flush_signals(current);
-	spin_unlock(&current->sig->siglock);
+	spin_unlock(&current->sighand->siglock);
 }
 
 int md_thread(void * arg)

@@ -1581,10 +1581,10 @@ pagebuf_daemon(
 	daemonize();
 
 	/* Avoid signals */
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	strcpy(current->comm, "pagebufd");
 	current->flags |= PF_MEMALLOC;

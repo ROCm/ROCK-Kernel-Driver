@@ -778,7 +778,7 @@ static inline void cond_resched_lock(spinlock_t * lock)
 
 /* Reevaluate whether the task has signals pending delivery.
    This is required every time the blocked sigset_t changes.
-   callers must hold sig->siglock.  */
+   callers must hold sighand->siglock.  */
 
 extern FASTCALL(void recalc_sigpending_tsk(struct task_struct *t));
 extern void recalc_sigpending(void);

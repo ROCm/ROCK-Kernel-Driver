@@ -479,13 +479,13 @@ ia32_rt_sigsuspend (compat_sigset_t *uset, unsigned int sigsetsize, struct sigsc
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	{
 		oldset = current->blocked;
 		current->blocked = set;
 		recalc_sigpending();
 	}
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	/*
 	 * The return below usually returns to the signal handler.  We need to pre-set the
@@ -1007,10 +1007,10 @@ sys32_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = (sigset_t) set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	if (restore_sigcontext_ia32(regs, &frame->sc, &eax))
 		goto badframe;
@@ -1038,10 +1038,10 @@ sys32_rt_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, 
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked =  set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	if (restore_sigcontext_ia32(regs, &frame->uc.uc_mcontext, &eax))
 		goto badframe;
