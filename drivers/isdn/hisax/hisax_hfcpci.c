@@ -40,12 +40,12 @@ MODULE_AUTHOR("Kai Germaschewski <kai.germaschewski@gmx.de>/Werner Cornelius <we
 MODULE_DESCRIPTION("HFC PCI ISDN driver");
 
 #define ID(ven, dev, name)                     \
-        { vendor:      PCI_VENDOR_ID_##ven,    \
-	  device:      PCI_DEVICE_ID_##dev,    \
-	  subvendor:   PCI_ANY_ID,             \
-	  subdevice:   PCI_ANY_ID,             \
-	  class:       0,                      \
-          class_mask:  0,                      \
+        { .vendor      = PCI_VENDOR_ID_##ven,    \
+	  .device      = PCI_DEVICE_ID_##dev,    \
+	  .subvendor   = PCI_ANY_ID,             \
+	  .subdevice   = PCI_ANY_ID,             \
+	  .class       = 0,                      \
+          .class_mask  = 0,                      \
 	  driver_data: (unsigned long) name }
 
 static struct pci_device_id hfcpci_ids[] __devinitdata = {
@@ -1604,10 +1604,10 @@ static void __devexit hfcpci_remove(struct pci_dev *pdev)
 }
 
 static struct pci_driver hfcpci_driver = {
-	name:     "hfcpci",
-	probe:    hfcpci_probe,
-	remove:   hfcpci_remove,
-	id_table: hfcpci_ids,
+	.name     = "hfcpci",
+	.probe    = hfcpci_probe,
+	.remove   = hfcpci_remove,
+	.id_table = hfcpci_ids,
 };
 
 static int __init hisax_hfcpci_init(void)

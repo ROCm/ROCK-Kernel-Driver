@@ -48,6 +48,12 @@ enum {
 	ST_WAIT_BEFORE_CB,
 };
 
+enum {
+	ST_CHARGE_NULL,
+	ST_CHARGE_GOT_CINF,  /* got a first charge info */
+	ST_CHARGE_HAVE_CINT, /* got a second chare info and thus the timing */
+};
+
 /* keep clear of ISDN_CMD_* and ISDN_STAT_* */
 enum {
 	EV_NET_DIAL            = 0x200,
@@ -349,12 +355,7 @@ isdn_net_unbind_channel(isdn_net_local * lp)
  * outgoing packet), if counter exceeds configured limit either do a
  * hangup immediately or - if configured - wait until just before the next
  * charge-info.
- *
- * cps-calculation (needed for dynamic channel-bundling):
- * Since this function is called every second, simply reset the
- * byte-counter of the interface after copying it to the cps-variable.
  */
-unsigned long last_jiffies = -HZ;
 
 void
 isdn_net_autohup()
@@ -366,59 +367,54 @@ isdn_net_autohup()
 	list_for_each(l, &isdn_net_devs) {
 		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
 		isdn_net_local *l = &p->local;
-		if (jiffies == last_jiffies)
-			l->cps = l->transcount;
-		else
-			l->cps = (l->transcount * HZ) / (jiffies - last_jiffies);
-		l->transcount = 0;
-		if (dev->net_verbose > 3)
-			printk(KERN_DEBUG "%s: %d bogocps\n", l->name, l->cps);
-		if ((l->flags & ISDN_NET_CONNECTED) && (l->dialstate == ST_ACTIVE)) {
+
+		if (!(l->flags & ISDN_NET_CONNECTED) || l->dialstate != ST_ACTIVE)
+			continue;
+
+		if(dev->global_flags & ISDN_GLOBAL_STOPPED || 
+		   ISDN_NET_DIALMODE(*l) == ISDN_NET_DM_OFF) {
+			isdn_net_hangup(&p->dev);
+			continue;
+		}
+		dbg_net_dial("%s: huptimer %d, onhtime %d, chargetime %ld, chargeint %d\n",
+			     l->name, l->huptimer, l->onhtime, l->chargetime, l->chargeint);
+
+		if (!(l->onhtime))
+			continue;
+
+		if (l->huptimer++ <= l->onhtime) {
 			anymore = 1;
-			l->huptimer++;
-			printk("huptimer %d, onhtime %d, chargetime %d, chargeint %d\n", l->huptimer, l->onhtime, l->chargetime, l->chargeint);
-			/*
-			 * if there is some dialmode where timeout-hangup
-			 * should _not_ be done, check for that here
-			 */
-			if ((l->onhtime) &&
-			    (l->huptimer > l->onhtime))
-			{
-				if (l->hupflags & ISDN_MANCHARGE &&
-				    l->hupflags & ISDN_CHARGEHUP) {
-					while (time_after(jiffies, l->chargetime + l->chargeint))
-						l->chargetime += l->chargeint;
-					if (time_after(jiffies, l->chargetime + l->chargeint - 2 * HZ))
-						if (l->outgoing || l->hupflags & ISDN_INHUP) {
-							HERE;
-							isdn_net_hangup(&p->dev);
-						}
-				} else if (l->outgoing) {
-					if (l->hupflags & ISDN_CHARGEHUP) {
-						if (l->hupflags & ISDN_WAITCHARGE) {
-							printk(KERN_DEBUG "isdn_net: Hupflags of %s are %X\n",
-							       l->name, l->hupflags);
-							isdn_net_hangup(&p->dev);
-						} else if (time_after(jiffies, l->chargetime + l->chargeint)) {
-							printk(KERN_DEBUG
-							       "isdn_net: %s: chtime = %lu, chint = %d\n",
-							       l->name, l->chargetime, l->chargeint);
-							isdn_net_hangup(&p->dev);
-						}
-					}
-				} else if (l->hupflags & ISDN_INHUP) {
-					HERE;
+			continue;
+		}
+		if (l->hupflags & ISDN_MANCHARGE && l->hupflags & ISDN_CHARGEHUP) {
+			while (time_after(jiffies, l->chargetime + l->chargeint))
+				l->chargetime += l->chargeint;
+
+			if (time_after(jiffies, l->chargetime + l->chargeint - 2 * HZ)) {
+				if (l->outgoing || l->hupflags & ISDN_INHUP) {
 					isdn_net_hangup(&p->dev);
+					continue;
 				}
 			}
-
-			if(dev->global_flags & ISDN_GLOBAL_STOPPED || (ISDN_NET_DIALMODE(*l) == ISDN_NET_DM_OFF)) {
-				isdn_net_hangup(&p->dev);
-				break;
+		} else if (l->outgoing) {
+			if (l->hupflags & ISDN_CHARGEHUP) {
+				if (l->charge_state != ST_CHARGE_HAVE_CINT) {
+					dbg_net_dial("%s: did not get CINT\n", l->name);
+					isdn_net_hangup(&p->dev);
+					continue;
+				} else if (time_after(jiffies, l->chargetime + l->chargeint)) {
+					dbg_net_dial("%s: chtime = %lu, chint = %d\n",
+						     l->name, l->chargetime, l->chargeint);
+					isdn_net_hangup(&p->dev);
+					continue;
+				}
 			}
+		} else if (l->hupflags & ISDN_INHUP) {
+			isdn_net_hangup(&p->dev);
+			continue;
 		}
+		anymore = 1;
 	}
-	last_jiffies = jiffies;
 	isdn_timer_ctrl(ISDN_TIMER_NETHANGUP, anymore);
 }
 
@@ -453,6 +449,10 @@ static void isdn_net_connected(isdn_net_local *lp)
 	lp->dialstarted = 0;
 	lp->dialwait_timer = 0;
 	
+	lp->transcount = 0;
+	lp->cps = 0;
+	lp->last_jiffies = jiffies;
+
 #ifdef CONFIG_ISDN_PPP
 	if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
 		isdn_ppp_wakeup_daemon(lp);
@@ -499,7 +499,7 @@ isdn_net_dial_timer(unsigned long data)
 		isdn_BUG();
 		return;
 	}
-	printk("%s: %s %#x\n", __FUNCTION__, lp->name, lp->dial_event);
+	printk("%s: %s %#x\n", __FUNCTION__ , lp->name, lp->dial_event);
 	isdn_net_handle_event(lp, lp->dial_event, NULL);
 }
 
@@ -608,13 +608,11 @@ do_dialout(isdn_net_local *lp)
 	}
 	lp->huptimer = 0;
 	lp->outgoing = 1;
-	if (lp->chargeint) {
-		lp->hupflags |= ISDN_HAVECHARGE;
-		lp->hupflags &= ~ISDN_WAITCHARGE;
-	} else {
-		lp->hupflags |= ISDN_WAITCHARGE;
-		lp->hupflags &= ~ISDN_HAVECHARGE;
-	}
+	if (lp->chargeint)
+		lp->charge_state = ST_CHARGE_HAVE_CINT;
+	else
+		lp->charge_state = ST_CHARGE_NULL;
+
 	if (lp->cbdelay && (lp->flags & ISDN_NET_CBOUT)) {
 		lp->dial_timer.expires = jiffies + lp->cbdelay;
 		lp->dial_event = EV_NET_TIMER_CB;
@@ -701,15 +699,19 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			 * usage by isdn_net_autohup()
 			 */
 			lp->charge++;
-			if (lp->hupflags & ISDN_HAVECHARGE) {
-				lp->hupflags &= ~ISDN_WAITCHARGE;
-				lp->chargeint = jiffies - lp->chargetime - (2 * HZ);
+			switch (lp->charge_state) {
+			case ST_CHARGE_NULL:
+				lp->charge_state = ST_CHARGE_GOT_CINF;
+				break;
+			case ST_CHARGE_GOT_CINF:
+				lp->charge_state = ST_CHARGE_HAVE_CINT;
+				/* fall through */
+			case ST_CHARGE_HAVE_CINT:
+				lp->chargeint = jiffies - lp->chargetime - 2 * HZ;
+				break;
 			}
-			if (lp->hupflags & ISDN_WAITCHARGE)
-				lp->hupflags |= ISDN_HAVECHARGE;
 			lp->chargetime = jiffies;
-			printk(KERN_DEBUG "isdn_net: Got CINF chargetime of %s now %lu\n",
-			       lp->name, lp->chargetime);
+			dbg_net_dial("%s: got CINF\n", lp->name);
 			return 1;
 		}
 		break;
@@ -1054,7 +1056,7 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 	int retv = 0;
 
 	if (((isdn_net_local *) (ndev->priv))->master) {
-		printk("isdn BUG at %s:%d!\n", __FILE__, __LINE__);
+		isdn_BUG();
 		dev_kfree_skb(skb);
 		return 0;
 	}
@@ -1083,6 +1085,14 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 	 * should move to userspace and get based on an overall cps
 	 * calculation
 	 */
+	if (jiffies != lp->last_jiffies) {
+		lp->cps = lp->transcount * HZ / (jiffies - lp->last_jiffies);
+		lp->last_jiffies = jiffies;
+		lp->transcount = 0;
+	}
+	if (dev->net_verbose > 3)
+		printk(KERN_DEBUG "%s: %d bogocps\n", lp->name, lp->cps);
+
 	if (lp->cps > lp->triggercps) {
 		if (lp->slave) {
 			if (!lp->sqfull) {
@@ -2381,8 +2391,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 
 					lp->outgoing = 0;
 					lp->huptimer = 0;
-					lp->hupflags |= ISDN_WAITCHARGE;
-					lp->hupflags &= ~ISDN_HAVECHARGE;
+					lp->charge_state = ST_CHARGE_NULL;
 					/* Got incoming Call, setup L2 and L3 protocols,
 					 * then wait for D-Channel-connect
 					 */
@@ -2837,8 +2846,9 @@ isdn_net_setcfg(isdn_net_ioctl_cfg * cfg)
 		else
 			lp->hupflags &= ~ISDN_INHUP;
 		if (cfg->chargeint > 10) {
-			lp->hupflags |= ISDN_HAVECHARGE | ISDN_MANCHARGE;
 			lp->chargeint = cfg->chargeint * HZ;
+			lp->charge_state = ST_CHARGE_HAVE_CINT;
+			lp->hupflags |= ISDN_MANCHARGE;
 		}
 		if (cfg->p_encap != lp->p_encap) {
 			if (cfg->p_encap == ISDN_NET_ENCAP_RAWIP) {

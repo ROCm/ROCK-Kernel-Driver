@@ -389,12 +389,12 @@ hysdn_log_poll(struct file *file, poll_table * wait)
 /**************************************************/
 static struct file_operations log_fops =
 {
-	llseek:         no_llseek,
-	read:           hysdn_log_read,
-	write:          hysdn_log_write,
-	poll:           hysdn_log_poll,
-	open:           hysdn_log_open,
-	release:        hysdn_log_close,                                        
+	.llseek         = no_llseek,
+	.read           = hysdn_log_read,
+	.write          = hysdn_log_write,
+	.poll           = hysdn_log_poll,
+	.open           = hysdn_log_open,
+	.release        = hysdn_log_close,                                        
 };
 
 
