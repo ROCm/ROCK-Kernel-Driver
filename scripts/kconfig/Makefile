@@ -43,7 +43,7 @@ check_CONFIG_IKCONFIG_PROC:
 	fi
 
 _cloneconfig: check_CONFIG_IKCONFIG_PROC
-	$(Q)gzip -cd /proc/config.gz > $(obj)/.config
+	$(Q)gzip -cd /proc/config.gz > $(objtree)/.config
 cloneconfig: check-meta _cloneconfig oldconfig
 
 .PHONY: randconfig allyesconfig allnoconfig allmodconfig defconfig
@@ -67,7 +67,7 @@ _defconfig: check_CONFIG_IKCONFIG_PROC
 	    echo "Config file $$config not found";			\
 	    false;							\
 	fi;								\
-	cp $$config $(obj)/.config
+	cp $$config $(objtree)/.config
 defconfig: check-meta _defconfig oldconfig
 
 # Help text used by make help
