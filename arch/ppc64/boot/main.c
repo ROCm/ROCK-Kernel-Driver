@@ -166,7 +166,7 @@ void start(unsigned long a1, unsigned long a2, void *promptr)
 		gunzip((void *)vmlinux.addr, vmlinux.size,
 			(unsigned char *)vmlinuz.addr, &len);
 		printf("done 0x%lx bytes\n\r", len);
-		printf("0x%x bytes of heap consumed, max in use 0x%\n\r",
+		printf("0x%x bytes of heap consumed, max in use 0x%x\n\r",
 		       (unsigned)(avail_high - begin_avail), heap_max);
 	} else {
 		memmove((void *)vmlinux.addr,(void *)vmlinuz.addr,vmlinuz.size);
