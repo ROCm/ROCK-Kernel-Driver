@@ -77,9 +77,6 @@ static void ip_nat_cleanup_conntrack(struct ip_conntrack *conn)
 	if (!info->initialized)
 		return;
 
-	IP_NF_ASSERT(info->bysource.conntrack);
-	IP_NF_ASSERT(info->byipsproto.conntrack);
-
 	hs = hash_by_src(&conn->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src,
 	                 conn->tuplehash[IP_CT_DIR_ORIGINAL]
 	                 .tuple.dst.protonum);
@@ -90,8 +87,8 @@ static void ip_nat_cleanup_conntrack(struct ip_conntrack *conn)
 	                      .tuple.dst.protonum);
 
 	WRITE_LOCK(&ip_nat_lock);
-	LIST_DELETE(&bysource[hs], &info->bysource);
-	LIST_DELETE(&byipsproto[hp], &info->byipsproto);
+	list_del(&info->bysource);
+	list_del(&info->byipsproto);
 	WRITE_UNLOCK(&ip_nat_lock);
 }
 
@@ -171,20 +168,18 @@ in_range(const struct ip_conntrack_tuple *tuple,
 }
 
 static inline int
-src_cmp(const struct ip_nat_hash *i,
+src_cmp(const struct ip_conntrack *ct,
 	const struct ip_conntrack_tuple *tuple,
 	const struct ip_nat_multi_range *mr)
 {
-	return (i->conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum
+	return (ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum
 		== tuple->dst.protonum
-		&& i->conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip
+		&& ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip
 		== tuple->src.ip
-		&& i->conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.u.all
+		&& ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.u.all
 		== tuple->src.u.all
 		&& in_range(tuple,
-			    &i->conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
-			    .tuple.src,
-			    mr));
+			    &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src, mr));
 }
 
 /* Only called for SRC manip */
@@ -193,14 +188,13 @@ find_appropriate_src(const struct ip_conntrack_tuple *tuple,
 		     const struct ip_nat_multi_range *mr)
 {
 	unsigned int h = hash_by_src(&tuple->src, tuple->dst.protonum);
-	struct ip_nat_hash *i;
+	struct ip_conntrack *ct;
 
 	MUST_BE_READ_LOCKED(&ip_nat_lock);
-	i = LIST_FIND(&bysource[h], src_cmp, struct ip_nat_hash *, tuple, mr);
-	if (i)
-		return &i->conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src;
-	else
-		return NULL;
+	list_for_each_entry(ct, &bysource[h], nat.info.bysource)
+		if (src_cmp(ct, tuple, mr))
+			return &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src;
+	return NULL;
 }
 
 #ifdef CONFIG_IP_NF_NAT_LOCAL
@@ -226,19 +220,17 @@ do_extra_mangle(u_int32_t var_ip, u_int32_t *other_ipp)
 #endif
 
 /* Simple way to iterate through all. */
-static inline int fake_cmp(const struct ip_nat_hash *i,
+static inline int fake_cmp(const struct ip_conntrack *ct,
 			   u_int32_t src, u_int32_t dst, u_int16_t protonum,
-			   unsigned int *score,
-			   const struct ip_conntrack *conntrack)
+			   unsigned int *score, const struct ip_conntrack *ct2)
 {
 	/* Compare backwards: we're dealing with OUTGOING tuples, and
            inside the conntrack is the REPLY tuple.  Don't count this
            conntrack. */
-	if (i->conntrack != conntrack
-	    && i->conntrack->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip == dst
-	    && i->conntrack->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip == src
-	    && (i->conntrack->tuplehash[IP_CT_DIR_REPLY].tuple.dst.protonum
-		== protonum))
+	if (ct != ct2
+	    && ct->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip == dst
+	    && ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip == src
+	    && (ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.protonum == protonum))
 		(*score)++;
 	return 0;
 }
@@ -247,13 +239,14 @@ static inline unsigned int
 count_maps(u_int32_t src, u_int32_t dst, u_int16_t protonum,
 	   const struct ip_conntrack *conntrack)
 {
+	struct ip_conntrack *ct;
 	unsigned int score = 0;
 	unsigned int h;
 
 	MUST_BE_READ_LOCKED(&ip_nat_lock);
 	h = hash_by_ipsproto(src, dst, protonum);
-	LIST_FIND(&byipsproto[h], fake_cmp, struct ip_nat_hash *,
-	          src, dst, protonum, &score, conntrack);
+	list_for_each_entry(ct, &byipsproto[h], nat.info.byipsproto)
+		fake_cmp(ct, src, dst, protonum, &score, conntrack);
 
 	return score;
 }
@@ -640,12 +633,10 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 	/* It's done. */
 	info->initialized |= (1 << HOOK2MANIP(hooknum));
 
-	if (in_hashes) {
-		IP_NF_ASSERT(info->bysource.conntrack);
+	if (in_hashes)
 		replace_in_hashes(conntrack, info);
-	} else {
+	else
 		place_in_hashes(conntrack, info);
-	}
 
 	return NF_ACCEPT;
 }
@@ -669,14 +660,9 @@ void replace_in_hashes(struct ip_conntrack *conntrack,
 				   conntrack->tuplehash[IP_CT_DIR_REPLY]
 				   .tuple.dst.protonum);
 
-	IP_NF_ASSERT(info->bysource.conntrack == conntrack);
 	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
-
-	list_del(&info->bysource.list);
-	list_del(&info->byipsproto.list);
-
-	list_prepend(&bysource[srchash], &info->bysource);
-	list_prepend(&byipsproto[ipsprotohash], &info->byipsproto);
+	list_move(&info->bysource, &bysource[srchash]);
+	list_move(&info->byipsproto, &byipsproto[ipsprotohash]);
 }
 
 void place_in_hashes(struct ip_conntrack *conntrack,
@@ -697,14 +683,9 @@ void place_in_hashes(struct ip_conntrack *conntrack,
 				   conntrack->tuplehash[IP_CT_DIR_REPLY]
 				   .tuple.dst.protonum);
 
-	IP_NF_ASSERT(!info->bysource.conntrack);
-
 	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
-	info->byipsproto.conntrack = conntrack;
-	info->bysource.conntrack = conntrack;
-
-	list_prepend(&bysource[srchash], &info->bysource);
-	list_prepend(&byipsproto[ipsprotohash], &info->byipsproto);
+	list_add(&info->bysource, &bysource[srchash]);
+	list_add(&info->byipsproto, &byipsproto[ipsprotohash]);
 }
 
 /* Returns true if succeeded. */
