@@ -874,8 +874,6 @@ static struct tty_operations rfcomm_ops = {
 
 int rfcomm_init_ttys(void)
 {
-	int i;
-
 	rfcomm_tty_driver = alloc_tty_driver(RFCOMM_TTY_PORTS);
 	if (!rfcomm_tty_driver)
 		return -1;
