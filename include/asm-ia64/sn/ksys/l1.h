@@ -87,14 +87,23 @@
 					   command string */
 
 /* brick type response codes */
+#define L1_BRICKTYPE_PX         0x23            /* # */
+#define L1_BRICKTYPE_PE         0x25            /* % */
+#define L1_BRICKTYPE_N_p0       0x26            /* & */
 #define L1_BRICKTYPE_IP45       0x34            /* 4 */
-#define L1_BRICKTYPE_C          0x43            /* C */
-#define L1_BRICKTYPE_R          0x52            /* R */
-#define L1_BRICKTYPE_CHI_CG     0x76            /* v */
-#define L1_BRICKTYPE_N          0x4e            /* N */
-#define L1_BRICKTYPE_PX		0x23		/* # */
-#define L1_BRICKTYPE_IX		0x3d		/* = */
+#define L1_BRICKTYPE_IP41       0x35            /* 5 */
+#define L1_BRICKTYPE_TWISTER    0x36            /* 6 */ /* IP53 & ROUTER */
+#define L1_BRICKTYPE_IX         0x3d            /* = */
+#define L1_BRICKTYPE_IP34       0x61            /* a */
+#define L1_BRICKTYPE_C          0x63            /* c */
+#define L1_BRICKTYPE_I          0x69            /* i */
+#define L1_BRICKTYPE_N          0x6e            /* n */
 #define L1_BRICKTYPE_OPUS       0x6f		/* o */
+#define L1_BRICKTYPE_P          0x70            /* p */
+#define L1_BRICKTYPE_R          0x72            /* r */
+#define L1_BRICKTYPE_CHI_CG     0x76            /* v */
+#define L1_BRICKTYPE_X          0x78            /* x */
+#define L1_BRICKTYPE_X2         0x79            /* y */
 
 /* EEPROM codes (for the "read EEPROM" request) */
 /* c brick */

@@ -37,7 +37,7 @@
 vertex_hdl_t hwgraph_root;
 vertex_hdl_t linux_busnum;
 
-extern void pci_bus_cvlink_init(void);
+extern int pci_bus_cvlink_init(void);
 
 /*
  * Debug flag definition.
@@ -102,7 +102,10 @@ int __init init_hcl(void)
 		return -1;
 	}
 
-	pci_bus_cvlink_init();
+	if (pci_bus_cvlink_init() < 0 ) {
+		printk("init_hcl: Failed to create pcibus cvlink.\n");
+		return -1;
+	}
 
 	/*
 	 * Initialize the ifconfgi_net driver that does network devices 

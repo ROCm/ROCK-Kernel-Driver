@@ -16,7 +16,6 @@
 #include <linux/namei.h>
 #include <linux/string.h>
 #include <linux/slab.h>
-#include <linux/dcache.h>
 #include <asm/sn/hwgfs.h>
 
 
@@ -273,8 +272,7 @@ hwgfs_find_handle(
 
 	nd.mnt = mntget(hwgfs_vfsmount);
 	nd.dentry = dget(base ? base : hwgfs_vfsmount->mnt_sb->s_root);
-	if (traverse_symlinks)
-		nd.flags = LOOKUP_FOLLOW;
+	nd.flags = (traverse_symlinks ? LOOKUP_FOLLOW : 0);
 
 	error = link_path_walk(name, &nd);
 	if (likely(!error)) {
