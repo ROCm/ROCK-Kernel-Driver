@@ -77,7 +77,7 @@ static struct i2c_adapter *i2cdev_adaps[I2CDEV_ADAPS_MAX];
 
 static struct i2c_driver i2cdev_driver = {
 	.owner		= THIS_MODULE,
-	.name		= "i2c-dev dummy driver",
+	.name		= "dev driver",
 	.id		= I2C_DRIVERID_I2CDEV,
 	.flags		= I2C_DF_DUMMY,
 	.attach_adapter	= i2cdev_attach_adapter,
@@ -100,10 +100,6 @@ static ssize_t i2cdev_read (struct file *file, char *buf, size_t count,
 	char *tmp;
 	int ret;
 
-#ifdef DEBUG
-	struct inode *inode = file->f_dentry->d_inode;
-#endif /* DEBUG */
-
 	struct i2c_client *client = (struct i2c_client *)file->private_data;
 
 	if (count > 8192)
@@ -114,10 +110,8 @@ static ssize_t i2cdev_read (struct file *file, char *buf, size_t count,
 	if (tmp==NULL)
 		return -ENOMEM;
 
-#ifdef DEBUG
-	printk(KERN_DEBUG "i2c-dev.o: i2c-%d reading %d bytes.\n",minor(inode->i_rdev),
-	       count);
-#endif
+	pr_debug("i2c-dev.o: i2c-%d reading %d bytes.\n",
+		minor(file->f_dentry->d_inode->i_rdev), count);
 
 	ret = i2c_master_recv(client,tmp,count);
 	if (ret >= 0)
@@ -133,10 +127,6 @@ static ssize_t i2cdev_write (struct file *file, const char *buf, size_t count,
 	char *tmp;
 	struct i2c_client *client = (struct i2c_client *)file->private_data;
 
-#ifdef DEBUG
-	struct inode *inode = file->f_dentry->d_inode;
-#endif /* DEBUG */
-
 	if (count > 8192)
 		count = 8192;
 
@@ -149,10 +139,9 @@ static ssize_t i2cdev_write (struct file *file, const char *buf, size_t count,
 		return -EFAULT;
 	}
 
-#ifdef DEBUG
-	printk(KERN_DEBUG "i2c-dev.o: i2c-%d writing %d bytes.\n",minor(inode->i_rdev),
-	       count);
-#endif
+	pr_debug("i2c-dev.o: i2c-%d writing %d bytes.\n",
+		minor(file->f_dentry->d_inode->i_rdev), count);
+
 	ret = i2c_master_send(client,tmp,count);
 	kfree(tmp);
 	return ret;
@@ -169,10 +158,8 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 	int i,datasize,res;
 	unsigned long funcs;
 
-#ifdef DEBUG
-	printk(KERN_DEBUG "i2c-dev.o: i2c-%d ioctl, cmd: 0x%x, arg: %lx.\n", 
-	       minor(inode->i_rdev),cmd, arg);
-#endif /* DEBUG */
+	pr_debug("i2c-dev.o: i2c-%d ioctl, cmd: 0x%x, arg: %lx.\n",
+		minor(inode->i_rdev),cmd, arg);
 
 	switch ( cmd ) {
 	case I2C_SLAVE:
@@ -207,6 +194,11 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 				   sizeof(rdwr_arg)))
 			return -EFAULT;
 
+		/* Put an arbritrary limit on the number of messages that can
+		 * be sent at once */
+		if (rdwr_arg.nmsgs > 42)
+			return -EINVAL;
+		
 		rdwr_pa = (struct i2c_msg *)
 			kmalloc(rdwr_arg.nmsgs * sizeof(struct i2c_msg), 
 			GFP_KERNEL);
@@ -214,38 +206,43 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		if (rdwr_pa == NULL) return -ENOMEM;
 
 		res = 0;
-		for( i=0; i<rdwr_arg.nmsgs; i++ )
-		{
+		for( i=0; i<rdwr_arg.nmsgs; i++ ) {
 		    	if(copy_from_user(&(rdwr_pa[i]),
 					&(rdwr_arg.msgs[i]),
-					sizeof(rdwr_pa[i])))
-			{
+					sizeof(rdwr_pa[i]))) {
 			        res = -EFAULT;
 				break;
 			}
+			/* Limit the size of the message to a sane amount */
+			if (rdwr_pa[i].len > 8192) {
+				res = -EINVAL;
+				break;
+			}
 			rdwr_pa[i].buf = kmalloc(rdwr_pa[i].len, GFP_KERNEL);
-			if(rdwr_pa[i].buf == NULL)
-			{
+			if(rdwr_pa[i].buf == NULL) {
 				res = -ENOMEM;
 				break;
 			}
 			if(copy_from_user(rdwr_pa[i].buf,
 				rdwr_arg.msgs[i].buf,
-				rdwr_pa[i].len))
-			{
-			    	kfree(rdwr_pa[i].buf);
+				rdwr_pa[i].len)) {
 			    	res = -EFAULT;
 				break;
 			}
 		}
-		if (!res) 
-		{
+		if (res < 0) {
+			int j;
+			for (j = 0; j < i; ++j)
+				kfree(rdwr_pa[j].buf);
+			kfree(rdwr_pa);
+			return res;
+		}
+		if (!res) {
 			res = i2c_transfer(client->adapter,
 				rdwr_pa,
 				rdwr_arg.nmsgs);
 		}
-		while(i-- > 0)
-		{
+		while(i-- > 0) {
 			if( res>=0 && (rdwr_pa[i].flags & I2C_M_RD))
 			{
 				if(copy_to_user(
@@ -274,20 +271,18 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		    (data_arg.size != I2C_SMBUS_BLOCK_DATA) &&
 		    (data_arg.size != I2C_SMBUS_I2C_BLOCK_DATA) &&
 		    (data_arg.size != I2C_SMBUS_BLOCK_PROC_CALL)) {
-#ifdef DEBUG
-			printk(KERN_DEBUG "i2c-dev.o: size out of range (%x) in ioctl I2C_SMBUS.\n",
-			       data_arg.size);
-#endif
+			dev_dbg(&client->dev,
+				"size out of range (%x) in ioctl I2C_SMBUS.\n",
+				data_arg.size);
 			return -EINVAL;
 		}
 		/* Note that I2C_SMBUS_READ and I2C_SMBUS_WRITE are 0 and 1, 
 		   so the check is valid if size==I2C_SMBUS_QUICK too. */
 		if ((data_arg.read_write != I2C_SMBUS_READ) && 
 		    (data_arg.read_write != I2C_SMBUS_WRITE)) {
-#ifdef DEBUG
-			printk(KERN_DEBUG "i2c-dev.o: read_write out of range (%x) in ioctl I2C_SMBUS.\n",
-			       data_arg.read_write);
-#endif
+			dev_dbg(&client->dev, 
+				"read_write out of range (%x) in ioctl I2C_SMBUS.\n",
+				data_arg.read_write);
 			return -EINVAL;
 		}
 
@@ -298,15 +293,14 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		    (data_arg.read_write == I2C_SMBUS_WRITE)))
 			/* These are special: we do not use data */
 			return i2c_smbus_xfer(client->adapter, client->addr,
-			                      client->flags,
-			                      data_arg.read_write,
-			                      data_arg.command,
-			                      data_arg.size, NULL);
+					      client->flags,
+					      data_arg.read_write,
+					      data_arg.command,
+					      data_arg.size, NULL);
 
 		if (data_arg.data == NULL) {
-#ifdef DEBUG
-			printk(KERN_DEBUG "i2c-dev.o: data is NULL pointer in ioctl I2C_SMBUS.\n");
-#endif
+			dev_dbg(&client->dev,
+				"data is NULL pointer in ioctl I2C_SMBUS.\n");
 			return -EINVAL;
 		}
 
@@ -365,7 +359,7 @@ static int i2cdev_open(struct inode *inode, struct file *file)
 
 	return 0;
 
- out_kfree:
+out_kfree:
 	kfree(client);
 	return -ENODEV;
 }
@@ -428,7 +422,8 @@ int __init i2c_dev_init(void)
 {
 	int res;
 
-	printk(KERN_INFO "i2c-dev.o: i2c /dev entries driver module version %s (%s)\n", I2C_VERSION, I2C_DATE);
+	printk(KERN_INFO "i2c /dev entries driver module version %s (%s)\n",
+		I2C_VERSION, I2C_DATE);
 
 	if (register_chrdev(I2C_MAJOR,"i2c",&i2cdev_fops)) {
 		printk(KERN_ERR "i2c-dev.o: unable to get major %d for i2c bus\n",
