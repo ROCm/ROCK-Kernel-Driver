@@ -472,12 +472,12 @@ int write_one_page(struct page *page, int wait)
 	if (wait)
 		wait_on_page_writeback(page);
 
-	spin_lock(&mapping->page_lock);
+	spin_lock_irq(&mapping->tree_lock);
 	list_del(&page->list);
 	if (test_clear_page_dirty(page)) {
 		list_add(&page->list, &mapping->locked_pages);
 		page_cache_get(page);
-		spin_unlock(&mapping->page_lock);
+		spin_unlock_irq(&mapping->tree_lock);
 		ret = mapping->a_ops->writepage(page, &wbc);
 		if (ret == 0 && wait) {
 			wait_on_page_writeback(page);
@@ -487,7 +487,7 @@ int write_one_page(struct page *page, int wait)
 		page_cache_release(page);
 	} else {
 		list_add(&page->list, &mapping->clean_pages);
-		spin_unlock(&mapping->page_lock);
+		spin_unlock_irq(&mapping->tree_lock);
 		unlock_page(page);
 	}
 	return ret;
@@ -515,7 +515,7 @@ int __set_page_dirty_nobuffers(struct page *page)
 		struct address_space *mapping = page->mapping;
 
 		if (mapping) {
-			spin_lock(&mapping->page_lock);
+			spin_lock_irq(&mapping->tree_lock);
 			if (page->mapping) {	/* Race with truncate? */
 				BUG_ON(page->mapping != mapping);
 				if (!mapping->backing_dev_info->memory_backed)
@@ -523,7 +523,7 @@ int __set_page_dirty_nobuffers(struct page *page)
 				list_del(&page->list);
 				list_add(&page->list, &mapping->dirty_pages);
 			}
-			spin_unlock(&mapping->page_lock);
+			spin_unlock_irq(&mapping->tree_lock);
 			if (!PageSwapCache(page))
 				__mark_inode_dirty(mapping->host,
 							I_DIRTY_PAGES);

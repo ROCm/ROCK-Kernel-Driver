@@ -187,7 +187,7 @@ void inode_init_once(struct inode *inode)
 	sema_init(&inode->i_sem, 1);
 	init_rwsem(&inode->i_alloc_sem);
 	INIT_RADIX_TREE(&inode->i_data.page_tree, GFP_ATOMIC);
-	spin_lock_init(&inode->i_data.page_lock);
+	spin_lock_init(&inode->i_data.tree_lock);
 	init_MUTEX(&inode->i_data.i_shared_sem);
 	atomic_set(&inode->i_data.truncate_count, 0);
 	INIT_LIST_HEAD(&inode->i_data.private_list);

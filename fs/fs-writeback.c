@@ -159,10 +159,10 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 	 * read speculatively by this cpu before &= ~I_DIRTY  -- mikulas
 	 */
 
-	spin_lock(&mapping->page_lock);
+	spin_lock_irq(&mapping->tree_lock);
 	if (wait || !wbc->for_kupdate || list_empty(&mapping->io_pages))
 		list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
-	spin_unlock(&mapping->page_lock);
+	spin_unlock_irq(&mapping->tree_lock);
 	spin_unlock(&inode_lock);
 
 	ret = do_writepages(mapping, wbc);

@@ -253,10 +253,10 @@ static int exclusive_swap_page(struct page *page)
 		/* Is the only swap cache user the cache itself? */
 		if (p->swap_map[swp_offset(entry)] == 1) {
 			/* Recheck the page count with the pagecache lock held.. */
-			spin_lock(&swapper_space.page_lock);
+			spin_lock_irq(&swapper_space.tree_lock);
 			if (page_count(page) - !!PagePrivate(page) == 2)
 				retval = 1;
-			spin_unlock(&swapper_space.page_lock);
+			spin_unlock_irq(&swapper_space.tree_lock);
 		}
 		swap_info_put(p);
 	}
@@ -324,13 +324,13 @@ int remove_exclusive_swap_page(struct page *page)
 	retval = 0;
 	if (p->swap_map[swp_offset(entry)] == 1) {
 		/* Recheck the page count with the pagecache lock held.. */
-		spin_lock(&swapper_space.page_lock);
+		spin_lock_irq(&swapper_space.tree_lock);
 		if ((page_count(page) == 2) && !PageWriteback(page)) {
 			__delete_from_swap_cache(page);
 			SetPageDirty(page);
 			retval = 1;
 		}
-		spin_unlock(&swapper_space.page_lock);
+		spin_unlock_irq(&swapper_space.tree_lock);
 	}
 	swap_info_put(p);
 

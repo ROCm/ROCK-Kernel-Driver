@@ -635,7 +635,7 @@ mpage_writepages(struct address_space *mapping,
 	if (get_block == NULL)
 		writepage = mapping->a_ops->writepage;
 
-	spin_lock(&mapping->page_lock);
+	spin_lock_irq(&mapping->tree_lock);
 	while (!list_empty(&mapping->io_pages) && !done) {
 		struct page *page = list_entry(mapping->io_pages.prev,
 					struct page, list);
@@ -655,10 +655,10 @@ mpage_writepages(struct address_space *mapping,
 		list_add(&page->list, &mapping->locked_pages);
 
 		page_cache_get(page);
-		spin_unlock(&mapping->page_lock);
+		spin_unlock_irq(&mapping->tree_lock);
 
 		/*
-		 * At this point we hold neither mapping->page_lock nor
+		 * At this point we hold neither mapping->tree_lock nor
 		 * lock on the page itself: the page may be truncated or
 		 * invalidated (changing page->mapping to NULL), or even
 		 * swizzled back from swapper_space to tmpfs file mapping.
@@ -695,12 +695,12 @@ mpage_writepages(struct address_space *mapping,
 			unlock_page(page);
 		}
 		page_cache_release(page);
-		spin_lock(&mapping->page_lock);
+		spin_lock_irq(&mapping->tree_lock);
 	}
 	/*
 	 * Leave any remaining dirty pages on ->io_pages
 	 */
-	spin_unlock(&mapping->page_lock);
+	spin_unlock_irq(&mapping->tree_lock);
 	if (bio)
 		mpage_bio_submit(WRITE, bio);
 	return ret;

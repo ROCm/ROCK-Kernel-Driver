@@ -396,7 +396,7 @@ out:
  * Hack idea: for the blockdev mapping, i_bufferlist_lock contention
  * may be quite high.  This code could TryLock the page, and if that
  * succeeds, there is no need to take private_lock. (But if
- * private_lock is contended then so is mapping->page_lock).
+ * private_lock is contended then so is mapping->tree_lock).
  */
 static struct buffer_head *
 __find_get_block_slow(struct block_device *bdev, sector_t block, int unused)
@@ -867,14 +867,14 @@ int __set_page_dirty_buffers(struct page *page)
 	spin_unlock(&mapping->private_lock);
 
 	if (!TestSetPageDirty(page)) {
-		spin_lock(&mapping->page_lock);
+		spin_lock_irq(&mapping->tree_lock);
 		if (page->mapping) {	/* Race with truncate? */
 			if (!mapping->backing_dev_info->memory_backed)
 				inc_page_state(nr_dirty);
 			list_del(&page->list);
 			list_add(&page->list, &mapping->dirty_pages);
 		}
-		spin_unlock(&mapping->page_lock);
+		spin_unlock_irq(&mapping->tree_lock);
 		__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
 	}
 	
@@ -1254,7 +1254,7 @@ __getblk_slow(struct block_device *bdev, sector_t block, int size)
  * inode to its superblock's dirty inode list.
  *
  * mark_buffer_dirty() is atomic.  It takes bh->b_page->mapping->private_lock,
- * mapping->page_lock and the global inode_lock.
+ * mapping->tree_lock and the global inode_lock.
  */
 void fastcall mark_buffer_dirty(struct buffer_head *bh)
 {

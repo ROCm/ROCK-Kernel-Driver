@@ -25,7 +25,7 @@ extern struct address_space_operations swap_aops;
 
 struct address_space swapper_space = {
 	.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC),
-	.page_lock	= SPIN_LOCK_UNLOCKED,
+	.tree_lock	= SPIN_LOCK_UNLOCKED,
 	.clean_pages	= LIST_HEAD_INIT(swapper_space.clean_pages),
 	.dirty_pages	= LIST_HEAD_INIT(swapper_space.dirty_pages),
 	.io_pages	= LIST_HEAD_INIT(swapper_space.io_pages),
@@ -182,9 +182,9 @@ void delete_from_swap_cache(struct page *page)
   
 	entry.val = page->index;
 
-	spin_lock(&swapper_space.page_lock);
+	spin_lock_irq(&swapper_space.tree_lock);
 	__delete_from_swap_cache(page);
-	spin_unlock(&swapper_space.page_lock);
+	spin_unlock_irq(&swapper_space.tree_lock);
 
 	swap_free(entry);
 	page_cache_release(page);
@@ -195,8 +195,8 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 	struct address_space *mapping = page->mapping;
 	int err;
 
-	spin_lock(&swapper_space.page_lock);
-	spin_lock(&mapping->page_lock);
+	spin_lock_irq(&swapper_space.tree_lock);
+	spin_lock(&mapping->tree_lock);
 
 	err = radix_tree_insert(&swapper_space.page_tree, entry.val, page);
 	if (!err) {
@@ -204,8 +204,8 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 		___add_to_page_cache(page, &swapper_space, entry.val);
 	}
 
-	spin_unlock(&mapping->page_lock);
-	spin_unlock(&swapper_space.page_lock);
+	spin_unlock(&mapping->tree_lock);
+	spin_unlock_irq(&swapper_space.tree_lock);
 
 	if (!err) {
 		if (!swap_duplicate(entry))
@@ -231,8 +231,8 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 
 	entry.val = page->index;
 
-	spin_lock(&swapper_space.page_lock);
-	spin_lock(&mapping->page_lock);
+	spin_lock_irq(&swapper_space.tree_lock);
+	spin_lock(&mapping->tree_lock);
 
 	err = radix_tree_insert(&mapping->page_tree, index, page);
 	if (!err) {
@@ -240,8 +240,8 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 		___add_to_page_cache(page, mapping, index);
 	}
 
-	spin_unlock(&mapping->page_lock);
-	spin_unlock(&swapper_space.page_lock);
+	spin_unlock(&mapping->tree_lock);
+	spin_unlock_irq(&swapper_space.tree_lock);
 
 	if (!err) {
 		swap_free(entry);
