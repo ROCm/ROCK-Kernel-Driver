@@ -98,7 +98,7 @@ struct capi_driver {
 void attach_capi_driver(struct capi_driver *driver);
 void detach_capi_driver(struct capi_driver *driver);
 
-struct capi_ctr *attach_capi_ctr(struct capi_driver *driver, char *name, void *data);
+int attach_capi_ctr(struct capi_ctr *);
 int detach_capi_ctr(struct capi_ctr *);
 
 

@@ -523,7 +523,7 @@ static void c4_handle_rx(avmcard *card)
 		DataB3Len = _get_slice(&p, card->databuf);
 		cidx = CAPIMSG_CONTROLLER(card->msgbuf)-card->cardnr;
 		if (cidx >= card->nlogcontr) cidx = 0;
-		ctrl = card->ctrlinfo[cidx].capi_ctrl;
+		ctrl = &card->ctrlinfo[cidx].capi_ctrl;
 
 		if (MsgLen < 30) { /* not CAPI 64Bit */
 			memset(card->msgbuf+MsgLen, 0, 30-MsgLen);
@@ -547,7 +547,7 @@ static void c4_handle_rx(avmcard *card)
 		cidx = CAPIMSG_CONTROLLER(card->msgbuf)-card->cardnr;
 		if (cidx >= card->nlogcontr) cidx = 0;
 		cinfo = &card->ctrlinfo[cidx];
-		ctrl = card->ctrlinfo[cidx].capi_ctrl;
+		ctrl = &card->ctrlinfo[cidx].capi_ctrl;
 
 		if (!(skb = alloc_skb(MsgLen, GFP_ATOMIC))) {
 			printk(KERN_ERR "%s: incoming packet dropped\n",
@@ -593,16 +593,16 @@ static void c4_handle_rx(avmcard *card)
 #endif
 		if (!suppress_pollack)
 			queue_pollack(card);
-		for (cidx=0; cidx < 4; cidx++) {
-			ctrl = card->ctrlinfo[cidx].capi_ctrl;
+		for (cidx=0; cidx < card->nr_controllers; cidx++) {
+			ctrl = &card->ctrlinfo[cidx].capi_ctrl;
 			if (ctrl)
 				ctrl->resume_output(ctrl);
 		}
 		break;
 
 	case RECEIVE_STOP:
-		for (cidx=0; cidx < 4; cidx++) {
-			ctrl = card->ctrlinfo[cidx].capi_ctrl;
+		for (cidx=0; cidx < card->nr_controllers; cidx++) {
+			ctrl = &card->ctrlinfo[cidx].capi_ctrl;
 			if (ctrl)
 				ctrl->suspend_output(ctrl);
 		}
@@ -611,21 +611,21 @@ static void c4_handle_rx(avmcard *card)
 	case RECEIVE_INIT:
 
 	        cidx = card->nlogcontr;
-		if (cidx >= 4 || !card->ctrlinfo[cidx].capi_ctrl) {
+		if (cidx >= card->nr_controllers) {
 			printk(KERN_ERR "%s: card with %d controllers ??\n",
 					card->name, cidx+1);
 			break;
 		}
 	        card->nlogcontr++;
 	        cinfo = &card->ctrlinfo[cidx];
-		ctrl = cinfo->capi_ctrl;
+		ctrl = &cinfo->capi_ctrl;
 		cinfo->versionlen = _get_slice(&p, cinfo->versionbuf);
 		b1_parse_version(cinfo);
 		printk(KERN_INFO "%s: %s-card (%s) now active\n",
 		       card->name,
 		       cinfo->version[VER_CARDTYPE],
 		       cinfo->version[VER_DRIVER]);
-		ctrl->ready(cinfo->capi_ctrl);
+		ctrl->ready(&cinfo->capi_ctrl);
 		break;
 
 	case RECEIVE_TASK_READY:
@@ -673,12 +673,11 @@ static void c4_handle_interrupt(avmcard *card)
 		if (card->nlogcontr == 0)
 			return;
 		printk(KERN_ERR "%s: unexpected reset\n", card->name);
-                for (i=0; i < 4; i++) {
+                for (i=0; i < card->nr_controllers; i++) {
 			avmctrl_info *cinfo = &card->ctrlinfo[i];
 			memset(cinfo->version, 0, sizeof(cinfo->version));
 			capilib_release(&cinfo->ncci_head);
-			if (cinfo->capi_ctrl)
-				cinfo->capi_ctrl->reseted(cinfo->capi_ctrl);
+			cinfo->capi_ctrl.reseted(&cinfo->capi_ctrl);
 		}
 		card->nlogcontr = 0;
 		return;
@@ -888,11 +887,10 @@ void c4_reset_ctr(struct capi_ctr *ctrl)
 
  	c4_reset(card);
 
-        for (i=0; i < 4; i++) {
+        for (i=0; i < card->nr_controllers; i++) {
 		cinfo = &card->ctrlinfo[i];
 		memset(cinfo->version, 0, sizeof(cinfo->version));
-		if (cinfo->capi_ctrl)
-			cinfo->capi_ctrl->reseted(cinfo->capi_ctrl);
+		cinfo->capi_ctrl.reseted(&cinfo->capi_ctrl);
 	}
 	card->nlogcontr = 0;
 }
@@ -905,12 +903,9 @@ static void c4_remove(struct pci_dev *pdev)
 
  	c4_reset(card);
 
-        for (i=0; i < 4; i++) {
+        for (i=0; i < card->nr_controllers; i++) {
 		cinfo = &card->ctrlinfo[i];
-		if (cinfo->capi_ctrl) {
-			detach_capi_ctr(cinfo->capi_ctrl);
-			cinfo->capi_ctrl = NULL;
-		}
+		detach_capi_ctr(&cinfo->capi_ctrl);
 	}
 
 	free_irq(card->irq, card);
@@ -1168,22 +1163,25 @@ static int c4_add_card(struct capi_driver *driver,
 
 	for (i=0; i < nr_controllers ; i++) {
 		cinfo = &card->ctrlinfo[i];
-		cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
-		if (!cinfo->capi_ctrl) {
+		cinfo->capi_ctrl.driver = driver;
+		cinfo->capi_ctrl.driverdata = cinfo;
+		strcpy(cinfo->capi_ctrl.name, card->name);
+		retval = attach_capi_ctr(&cinfo->capi_ctrl);
+		if (retval) {
 			printk(KERN_ERR "%s: attach controller failed (%d).\n",
 					driver->name, i);
 			for (i--; i >= 0; i--) {
 				cinfo = &card->ctrlinfo[i];
-				detach_capi_ctr(cinfo->capi_ctrl);
+				detach_capi_ctr(&cinfo->capi_ctrl);
 			}
 			goto err_free_irq;
 		}
 		if (i == 0)
-			card->cardnr = cinfo->capi_ctrl->cnr;
+			card->cardnr = cinfo->capi_ctrl.cnr;
 	}
 
 	printk(KERN_INFO "%s: AVM C%d at i/o %#x, irq %d, mem %#lx\n",
-		driver->name, nr_controllers, card->port, card->irq,
+	       driver->name, nr_controllers, card->port, card->irq,
 	       card->membase);
 
 	return 0;

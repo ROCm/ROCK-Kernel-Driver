@@ -447,7 +447,7 @@ static void b1dma_handle_rx(avmcard *card)
 {
 	avmctrl_info *cinfo = &card->ctrlinfo[0];
 	avmcard_dmainfo *dma = card->dma;
-	struct capi_ctr *ctrl = cinfo->capi_ctrl;
+	struct capi_ctr *ctrl = &cinfo->capi_ctrl;
 	struct sk_buff *skb;
 	void *p = dma->recvbuf.dmabuf+4;
 	u32 ApplId, MsgLen, DataB3Len, NCCI, WindowSize;

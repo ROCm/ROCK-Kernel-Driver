@@ -46,7 +46,7 @@ static void b1isa_remove(struct pci_dev *pdev)
 	b1_reset(port);
 	b1_reset(port);
 
-	detach_capi_ctr(cinfo->capi_ctrl);
+	detach_capi_ctr(&cinfo->capi_ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
 	b1_free_card(card);
@@ -106,10 +106,12 @@ static int __init b1isa_probe(struct pci_dev *pdev)
 	b1_reset(card->port);
 	b1_getrevision(card);
 
-	cinfo->capi_ctrl = attach_capi_ctr(&b1isa_driver, card->name, cinfo);
-	if (!cinfo->capi_ctrl) {
+	cinfo->capi_ctrl.driver = &b1isa_driver;
+	cinfo->capi_ctrl.driverdata = cinfo;
+	strcpy(cinfo->capi_ctrl.name, card->name);
+	retval = attach_capi_ctr(&cinfo->capi_ctrl);
+	if (retval) {
 		printk(KERN_ERR "b1isa: attach controller failed.\n");
-		retval = -EBUSY;
 		goto err_free_irq;
 	}
 

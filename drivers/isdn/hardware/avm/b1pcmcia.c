@@ -95,11 +95,13 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 	b1_reset(card->port);
 	b1_getrevision(card);
 
-	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
-	if (!cinfo->capi_ctrl) {
+	cinfo->capi_ctrl.driver = driver;
+	cinfo->capi_ctrl.driverdata = cinfo;
+	strcpy(cinfo->capi_ctrl.name, card->name);
+	retval = attach_capi_ctr(&cinfo->capi_ctrl);
+	if (retval) {
 		printk(KERN_ERR "%s: attach controller failed.\n",
 				driver->name);
-		retval = -EBUSY;
 		goto err_free_irq;
 	}
 	switch (cardtype) {
@@ -112,7 +114,7 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 		"%s: AVM %s at i/o %#x, irq %d, revision %d\n",
 		driver->name, cardname, card->port, card->irq, card->revision);
 
-	return cinfo->capi_ctrl->cnr;
+	return cinfo->capi_ctrl.cnr;
 
  err_free_irq:
 	free_irq(card->irq, card);

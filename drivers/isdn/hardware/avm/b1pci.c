@@ -107,11 +107,13 @@ static int b1pci_probe(struct capi_driver *driver,
 		goto err_release_region;
 	}
 	
-	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
-	if (!cinfo->capi_ctrl) {
+	cinfo->capi_ctrl.driver = driver;
+	cinfo->capi_ctrl.driverdata = cinfo;
+	strcpy(cinfo->capi_ctrl.name, card->name);
+	retval = attach_capi_ctr(&cinfo->capi_ctrl);
+	if (retval) {
 		printk(KERN_ERR "%s: attach controller failed.\n",
 		       driver->name);
-		retval = -EBUSY;
 		goto err_free_irq;
 	}
 
@@ -147,7 +149,7 @@ static void b1pci_remove(struct pci_dev *pdev)
 	b1_reset(port);
 	b1_reset(port);
 
-	detach_capi_ctr(cinfo->capi_ctrl);
+	detach_capi_ctr(&cinfo->capi_ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
 	b1_free_card(card);
@@ -256,13 +258,15 @@ static int b1pciv4_probe(struct capi_driver *driver,
 		goto err_unmap;
 	}
 
-	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
-	if (!cinfo->capi_ctrl) {
+	cinfo->capi_ctrl.driver = driver;
+	cinfo->capi_ctrl.driverdata = cinfo;
+	strcpy(cinfo->capi_ctrl.name, card->name);
+	retval = attach_capi_ctr(&cinfo->capi_ctrl);
+	if (retval) {
 		printk(KERN_ERR "%s: attach controller failed.\n", driver->name);
-		retval = -EBUSY;
 		goto err_free_irq;
 	}
-	card->cardnr = cinfo->capi_ctrl->cnr;
+	card->cardnr = cinfo->capi_ctrl.cnr;
 
 	printk(KERN_INFO
 		"%s: AVM B1 PCI V4 at i/o %#x, irq %d, mem %#lx, revision %d (dma)\n",
@@ -294,7 +298,7 @@ static void b1pciv4_remove(struct pci_dev *pdev)
 
  	b1dma_reset(card);
 
-	detach_capi_ctr(cinfo->capi_ctrl);
+	detach_capi_ctr(&cinfo->capi_ctrl);
 	free_irq(card->irq, card);
 	iounmap(card->mbase);
 	release_region(card->port, AVMB1_PORTLEN);

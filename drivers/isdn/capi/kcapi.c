@@ -434,33 +434,28 @@ static void controllercb_resume_output(struct capi_ctr *card)
 
 /* ------------------------------------------------------------- */
 
-
-struct capi_ctr *
-attach_capi_ctr(struct capi_driver *driver, char *name, void *driverdata)
+int
+attach_capi_ctr(struct capi_ctr *card)
 {
-	struct capi_ctr *card;
 	int i;
 
-	for (i=0; i < CAPI_MAXCONTR; i++) {
+	for (i = 0; i < CAPI_MAXCONTR; i++) {
 		if (capi_cards[i] == NULL)
 			break;
 	}
 	if (i == CAPI_MAXCONTR) {
 		printk(KERN_ERR "kcapi: out of controller slots\n");
-	   	return NULL;
+	   	return -EBUSY;
 	}
-	card = kmalloc(sizeof(*card), GFP_KERNEL);
-	if (!card)
-		return NULL;
-
 	capi_cards[i] = card;
-	memset(card, 0, sizeof(struct capi_ctr));
-	card->driver = driver;
+
+	card->nrecvctlpkt = 0;
+	card->nrecvdatapkt = 0;
+	card->nsentctlpkt = 0;
+	card->nsentdatapkt = 0;
 	card->cnr = i + 1;
-	strncpy(card->name, name, sizeof(card->name));
 	card->cardstate = CARD_DETECTED;
 	card->blocked = 0;
-	card->driverdata = driverdata;
 	card->traceflag = showcapimsgs;
 
         card->ready = controllercb_ready; 
@@ -469,21 +464,21 @@ attach_capi_ctr(struct capi_driver *driver, char *name, void *driverdata)
         card->resume_output = controllercb_resume_output;
         card->handle_capimsg = controllercb_handle_capimsg;
 
-	list_add_tail(&card->driver_list, &driver->contr_head);
-	driver->ncontroller++;
+	list_add_tail(&card->driver_list, &card->driver->contr_head);
+	card->driver->ncontroller++;
 	sprintf(card->procfn, "capi/controllers/%d", card->cnr);
 	card->procent = create_proc_entry(card->procfn, 0, 0);
 	if (card->procent) {
 	   card->procent->read_proc = 
 		(int (*)(char *,char **,off_t,int,int *,void *))
-			driver->ctr_read_proc;
+			card->driver->ctr_read_proc;
 	   card->procent->data = card;
 	}
 
 	ncards++;
 	printk(KERN_NOTICE "kcapi: Controller %d: %s attached\n",
 			card->cnr, card->name);
-	return card;
+	return 0;
 }
 
 EXPORT_SYMBOL(attach_capi_ctr);

@@ -67,7 +67,7 @@ typedef	struct avmctrl_info {
 	char infobuf[128];	/* for function procinfo */
 	
 	struct avmcard  *card;
-	struct capi_ctr *capi_ctrl;
+	struct capi_ctr  capi_ctrl;
 	
 	struct list_head ncci_head;
 } avmctrl_info;
@@ -93,6 +93,7 @@ typedef struct avmcard {
 
 	struct avmctrl_info *ctrlinfo;
 
+	int nr_controllers;
 	int nlogcontr;
 } avmcard;
 

@@ -132,7 +132,7 @@ static void t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
 	avmcard *card = devptr;
 	avmctrl_info *cinfo = &card->ctrlinfo[0];
-	struct capi_ctr *ctrl = cinfo->capi_ctrl;
+	struct capi_ctr *ctrl = &cinfo->capi_ctrl;
 	unsigned char b1cmd;
 	struct sk_buff *skb;
 
@@ -337,7 +337,7 @@ static void t1isa_remove(struct pci_dev *pdev)
 	b1_reset(port);
 	t1_reset(port);
 
-	detach_capi_ctr(cinfo->capi_ctrl);
+	detach_capi_ctr(&cinfo->capi_ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
 	b1_free_card(card);
@@ -400,11 +400,13 @@ static int __init t1isa_probe(struct pci_dev *pdev, int cardnr)
 	t1_disable_irq(card->port);
 	b1_reset(card->port);
 
-	cinfo->capi_ctrl = attach_capi_ctr(&t1isa_driver, card->name, cinfo);
-	if (!cinfo->capi_ctrl) {
+	cinfo->capi_ctrl.driver = &t1isa_driver;
+	cinfo->capi_ctrl.driverdata = cinfo;
+	strcpy(cinfo->capi_ctrl.name, card->name);
+	retval = attach_capi_ctr(&cinfo->capi_ctrl);
+	if (retval) {
 		printk(KERN_INFO "%s: attach controller failed.\n",
 		       t1isa_driver.name);
-		retval = -EBUSY;
 		goto err_free_irq;
 	}
 

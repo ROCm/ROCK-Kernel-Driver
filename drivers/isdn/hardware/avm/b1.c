@@ -99,6 +99,7 @@ avmcard *b1_alloc_card(int nr_controllers)
 		cinfo[i].card = card;
 	}
 	spin_lock_init(&card->lock);
+	card->nr_controllers = nr_controllers;
 
 	return card;
 }
@@ -433,7 +434,7 @@ u16 b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 
 void b1_parse_version(avmctrl_info *cinfo)
 {
-	struct capi_ctr *ctrl = cinfo->capi_ctrl;
+	struct capi_ctr *ctrl = &cinfo->capi_ctrl;
 	avmcard *card = cinfo->card;
 	capi_profile *profp;
 	u8 *dversion;
@@ -509,7 +510,7 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
 	avmcard *card = devptr;
 	avmctrl_info *cinfo = &card->ctrlinfo[0];
-	struct capi_ctr *ctrl = cinfo->capi_ctrl;
+	struct capi_ctr *ctrl = &cinfo->capi_ctrl;
 	unsigned char b1cmd;
 	struct sk_buff *skb;
 
