@@ -413,25 +413,23 @@ static void usX2Y_urbs_release(snd_usX2Y_substream_t *subs)
 static int usX2Y_urbs_allocate(snd_usX2Y_substream_t *subs)
 {
 	int i;
-	unsigned int datapipe;  		/* the data i/o pipe */
+	unsigned int pipe;
 	int is_playback = subs == subs->usX2Y->subs[SNDRV_PCM_STREAM_PLAYBACK];
 	struct usb_device *dev = subs->usX2Y->chip.dev;
 
-	if (is_playback) {	/* allocate a temporary buffer for playback */
-		datapipe = usb_sndisocpipe(dev, subs->endpoint);
-		subs->maxpacksize = dev->epmaxpacketout[subs->endpoint];
-		if (NULL == subs->tmpbuf) {
-			subs->tmpbuf = kcalloc(nr_of_packs(), subs->maxpacksize, GFP_KERNEL);
-			if (NULL == subs->tmpbuf) {
-				snd_printk(KERN_ERR "cannot malloc tmpbuf\n");
-				return -ENOMEM;
-			}
-		}
-	} else {
-		datapipe = usb_rcvisocpipe(dev, subs->endpoint);
-		subs->maxpacksize = dev->epmaxpacketin[subs->endpoint];
-	}
+	pipe = is_playback ? usb_sndisocpipe(dev, subs->endpoint) :
+			usb_rcvisocpipe(dev, subs->endpoint);
+	subs->maxpacksize = usb_maxpacket(dev, pipe, is_playback);
+	if (!subs->maxpacksize)
+		return -EINVAL;
 
+	if (is_playback && NULL == subs->tmpbuf) {	/* allocate a temporary buffer for playback */
+		subs->tmpbuf = kcalloc(nr_of_packs(), subs->maxpacksize, GFP_KERNEL);
+		if (NULL == subs->tmpbuf) {
+			snd_printk(KERN_ERR "cannot malloc tmpbuf\n");
+			return -ENOMEM;
+		}
+	}
 	/* allocate and initialize data urbs */
 	for (i = 0; i < NRURBS; i++) {
 		struct urb** purb = subs->urb + i;
@@ -453,7 +451,7 @@ static int usX2Y_urbs_allocate(snd_usX2Y_substream_t *subs)
 			}
 		}
 		(*purb)->dev = dev;
-		(*purb)->pipe = datapipe;
+		(*purb)->pipe = pipe;
 		(*purb)->number_of_packets = nr_of_packs();
 		(*purb)->context = subs;
 		(*purb)->interval = 1;
