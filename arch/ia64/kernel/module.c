@@ -322,6 +322,10 @@ module_alloc (unsigned long size)
 void
 module_free (struct module *mod, void *module_region)
 {
+	if (mod->arch.init_unw_table && module_region == mod->module_init) {
+		unw_remove_unwind_table(mod->arch.init_unw_table);
+		mod->arch.init_unw_table = NULL;
+	}
 	vfree(module_region);
 }
 
@@ -843,28 +847,92 @@ apply_relocate (Elf64_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 	return -ENOEXEC;
 }
 
+/*
+ * Modules contain a single unwind table which covers both the core and the init text
+ * sections but since the two are not contiguous, we need to split this table up such that
+ * we can register (and unregister) each "segment" seperately.  Fortunately, this sounds
+ * more complicated than it really is.
+ */
+static void
+register_unwind_table (struct module *mod)
+{
+	struct unw_table_entry *start = (void *) mod->arch.unwind->sh_addr;
+	struct unw_table_entry *end = start + mod->arch.unwind->sh_size / sizeof (*start);
+	struct unw_table_entry tmp, *e1, *e2, *core, *init;
+	unsigned long num_init = 0, num_core = 0;
+
+	/* First, count how many init and core unwind-table entries there are.  */
+	for (e1 = start; e1 < end; ++e1)
+		if (in_init(mod, e1->start_offset))
+			++num_init;
+		else
+			++num_core;
+	/*
+	 * Second, sort the table such that all unwind-table entries for the init and core
+	 * text sections are nicely separated.  We do this with a stupid bubble sort
+	 * (unwind tables don't get ridiculously huge).
+	 */
+	for (e1 = start; e1 < end; ++e1) {
+		for (e2 = e1 + 1; e2 < end; ++e2) {
+			if (e2->start_offset < e1->start_offset) {
+				tmp = *e1;
+				*e1 = *e2;
+				*e2 = tmp;
+			}
+		}
+	}
+	/*
+	 * Third, locate the init and core segments in the unwind table:
+	 */
+	if (in_init(mod, start->start_offset)) {
+		init = start;
+		core = start + num_init;
+	} else {
+		core = start;
+		init = start + num_core;
+	}
+
+	DEBUGP("%s: name=%s, gp=%lx, num_init=%lu, num_core=%lu\n", __FUNCTION__,
+	       mod->name, mod->arch.gp, num_init, num_core);
+
+	/*
+	 * Fourth, register both tables (if not empty).
+	 */
+	if (num_core > 0) {
+		mod->arch.core_unw_table = unw_add_unwind_table(mod->name, 0, mod->arch.gp,
+								core, core + num_core);
+		DEBUGP("%s:  core: handle=%p [%p-%p)\n", __FUNCTION__,
+		       mod->arch.core_unw_table, core, core + num_core);
+	}
+	if (num_init > 0) {
+		mod->arch.init_unw_table = unw_add_unwind_table(mod->name, 0, mod->arch.gp,
+								init, init + num_init);
+		DEBUGP("%s:  init: handle=%p [%p-%p)\n", __FUNCTION__,
+		       mod->arch.init_unw_table, init, init + num_init);
+	}
+}
+
 int
 module_finalize (const Elf_Ehdr *hdr, const Elf_Shdr *sechdrs, struct module *mod)
 {
 	DEBUGP("%s: init: entry=%p\n", __FUNCTION__, mod->init);
 	if (mod->arch.unwind)
-		mod->arch.unw_table = unw_add_unwind_table(mod->name, 0, mod->arch.gp,
-							   (void *) mod->arch.unwind->sh_addr,
-							   ((void *) mod->arch.unwind->sh_addr
-							    + mod->arch.unwind->sh_size));
+		register_unwind_table(mod);
 	return 0;
 }
 
 void
 module_arch_cleanup (struct module *mod)
 {
-	if (mod->arch.unwind)
-		unw_remove_unwind_table(mod->arch.unw_table);
+	if (mod->arch.init_unw_table)
+		unw_remove_unwind_table(mod->arch.init_unw_table);
+	if (mod->arch.core_unw_table)
+		unw_remove_unwind_table(mod->arch.core_unw_table);
 }
 
 #ifdef CONFIG_SMP
 void
-percpu_modcopy (void  *pcpudst, const void *src, unsigned long size)
+percpu_modcopy (void *pcpudst, const void *src, unsigned long size)
 {
 	unsigned int i;
 	for (i = 0; i < NR_CPUS; i++)
