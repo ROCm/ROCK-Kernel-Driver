@@ -1,11 +1,13 @@
 #ifndef _LINUX_MEMPOLICY_H
 #define _LINUX_MEMPOLICY_H 1
 
+#include <linux/errno.h>
+
 /*
  * NUMA memory policies for Linux.
  * Copyright 2003,2004 Andi Kleen SuSE Labs
  */
-#include <linux/errno.h>
+
 /* Policies */
 #define MPOL_DEFAULT     0
 #define MPOL_PREFERRED    1
