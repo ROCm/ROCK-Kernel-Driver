@@ -1,5 +1,5 @@
 /*
- * $Id: edb7312.c,v 1.2 2002/09/05 05:11:24 acurtis Exp $
+ * $Id: edb7312.c,v 1.8 2003/05/21 12:45:18 dwmw2 Exp $
  *
  * Handle mapping of the NOR flash on Cogent EDB7312 boards
  *
@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -35,61 +36,11 @@
 
 static struct mtd_info *mymtd;
 
-__u8 edb7312nor_read8(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readb(map->map_priv_1 + ofs);
-}
-
-__u16 edb7312nor_read16(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readw(map->map_priv_1 + ofs);
-}
-
-__u32 edb7312nor_read32(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readl(map->map_priv_1 + ofs);
-}
-
-void edb7312nor_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy_fromio(to, map->map_priv_1 + from, len);
-}
-
-void edb7312nor_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	__raw_writeb(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void edb7312nor_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	__raw_writew(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void edb7312nor_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	__raw_writel(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void edb7312nor_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy_toio(map->map_priv_1 + to, from, len);
-}
-
 struct map_info edb7312nor_map = {
-	.name		= "NOR flash on EDB7312",
-	.size		= WINDOW_SIZE,
-	.buswidth	= BUSWIDTH,
-	.read8		= edb7312nor_read8,
-	.read16		= edb7312nor_read16,
-	.read32		= edb7312nor_read32,
-	.copy_from	= edb7312nor_copy_from,
-	.write8		= edb7312nor_write8,
-	.write16	= edb7312nor_write16,
-	.write32	= edb7312nor_write32,
-	.copy_to	= edb7312nor_copy_to
+	.name = "NOR flash on EDB7312",
+	.size = WINDOW_SIZE,
+	.buswidth = BUSWIDTH,
+	.phys = WINDOW_ADDR,
 };
 
 #ifdef CONFIG_MTD_PARTITIONS
@@ -97,7 +48,8 @@ struct map_info edb7312nor_map = {
 /*
  * MTD partitioning stuff 
  */
-static struct mtd_partition static_partitions[3] = {
+static struct mtd_partition static_partitions[3] =
+{
 	{
 		.name = "ARMboot",
 		.size = 0x40000,
@@ -116,12 +68,7 @@ static struct mtd_partition static_partitions[3] = {
 };
 
 #define NB_OF(x) (sizeof (x) / sizeof (x[0]))
-
-#ifdef CONFIG_MTD_CMDLINE_PARTS
-int parse_cmdline_partitions(struct mtd_info *master, 
-			     struct mtd_partition **pparts,
-			     const char *mtd_id);
-#endif
+static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
 
 #endif
 
@@ -136,13 +83,15 @@ int __init init_edb7312nor(void)
 
        	printk(KERN_NOTICE MSG_PREFIX "0x%08x at 0x%08x\n", 
 	       WINDOW_SIZE, WINDOW_ADDR);
-	edb7312nor_map.map_priv_1 = (unsigned long)
+	edb7312nor_map.virt = (unsigned long)
 	  ioremap(WINDOW_ADDR, WINDOW_SIZE);
 
-	if (!edb7312nor_map.map_priv_1) {
+	if (!edb7312nor_map.virt) {
 		printk(MSG_PREFIX "failed to ioremap\n");
 		return -EIO;
 	}
+	
+	simple_map_init(&edb7312nor_map);
 
 	mymtd = 0;
 	type = rom_probe_types;
@@ -150,14 +99,13 @@ int __init init_edb7312nor(void)
 		mymtd = do_map_probe(*type, &edb7312nor_map);
 	}
 	if (mymtd) {
-		mymtd->module = THIS_MODULE;
+		mymtd->owner = THIS_MODULE;
 
 #ifdef CONFIG_MTD_PARTITIONS
-#ifdef CONFIG_MTD_CMDLINE_PARTS
-		mtd_parts_nb = parse_cmdline_partitions(mymtd, &mtd_parts, MTDID);
+		mtd_parts_nb = parse_mtd_partitions(mymtd, probes, &mtd_parts, MTDID);
 		if (mtd_parts_nb > 0)
-		  part_type = "command line";
-#endif
+		  part_type = "detected";
+
 		if (mtd_parts_nb == 0)
 		{
 			mtd_parts = static_partitions;
@@ -177,7 +125,7 @@ int __init init_edb7312nor(void)
 		return 0;
 	}
 
-	iounmap((void *)edb7312nor_map.map_priv_1);
+	iounmap((void *)edb7312nor_map.virt);
 	return -ENXIO;
 }
 
@@ -187,9 +135,9 @@ static void __exit cleanup_edb7312nor(void)
 		del_mtd_device(mymtd);
 		map_destroy(mymtd);
 	}
-	if (edb7312nor_map.map_priv_1) {
-		iounmap((void *)edb7312nor_map.map_priv_1);
-		edb7312nor_map.map_priv_1 = 0;
+	if (edb7312nor_map.virt) {
+		iounmap((void *)edb7312nor_map.virt);
+		edb7312nor_map.virt = 0;
 	}
 }
 

@@ -2,7 +2,7 @@
 /* Linux driver for Disk-On-Chip 2000       */
 /* (c) 1999 Machine Vision Holdings, Inc.   */
 /* Author: David Woodhouse <dwmw2@mvhi.com> */
-/* $Id: doc2000.h,v 1.15 2001/09/19 00:22:15 dwmw2 Exp $ */
+/* $Id: doc2000.h,v 1.16 2003/05/23 11:29:33 dwmw2 Exp $ */
 
 #ifndef __MTD_DOC2000_H__
 #define __MTD_DOC2000_H__
@@ -38,6 +38,35 @@
 #define DoC_Mil_CDSN_IO 	0x0800
 #define DoC_2k_CDSN_IO 		0x1800
 
+#define DoC_Mplus_NOP			0x1002
+#define DoC_Mplus_AliasResolution	0x1004
+#define DoC_Mplus_DOCControl		0x1006
+#define DoC_Mplus_AccessStatus		0x1008
+#define DoC_Mplus_DeviceSelect		0x1008
+#define DoC_Mplus_Configuration		0x100a
+#define DoC_Mplus_OutputControl		0x1002
+#define DoC_Mplus_FlashControl		0x1020
+#define DoC_Mplus_FlashSelect 		0x1022
+#define DoC_Mplus_FlashCmd		0x1024
+#define DoC_Mplus_FlashAddress		0x1026
+#define DoC_Mplus_FlashData0		0x1028
+#define DoC_Mplus_FlashData1		0x1029
+#define DoC_Mplus_ReadPipeInit		0x102a
+#define DoC_Mplus_LastDataRead		0x102c
+#define DoC_Mplus_LastDataRead1		0x102d
+#define DoC_Mplus_WritePipeTerm 	0x102e
+#define DoC_Mplus_ECCSyndrome0		0x1040
+#define DoC_Mplus_ECCSyndrome1		0x1041
+#define DoC_Mplus_ECCSyndrome2		0x1042
+#define DoC_Mplus_ECCSyndrome3		0x1043
+#define DoC_Mplus_ECCSyndrome4		0x1044
+#define DoC_Mplus_ECCSyndrome5		0x1045
+#define DoC_Mplus_ECCConf 		0x1046
+#define DoC_Mplus_Toggle		0x1046
+#define DoC_Mplus_DownloadStatus	0x1074
+#define DoC_Mplus_CtrlConfirm		0x1076
+#define DoC_Mplus_Power			0x1fff
+
 /* How to access the device? 
  * On ARM, it'll be mmap'd directly with 32-bit wide accesses. 
  * On PPC, it's mmap'd and 16-bit wide.
@@ -71,13 +100,20 @@
 #define DOC_MODE_RESERVED1 	2
 #define DOC_MODE_RESERVED2 	3
 
-#define DOC_MODE_MDWREN 	4
 #define DOC_MODE_CLR_ERR 	0x80
+#define	DOC_MODE_RST_LAT	0x10
+#define	DOC_MODE_BDECT		0x08
+#define DOC_MODE_MDWREN 	0x04
 
 #define DOC_ChipID_Doc2k 	0x20
 #define DOC_ChipID_DocMil 	0x30
+#define DOC_ChipID_DocMilPlus32	0x40
+#define DOC_ChipID_DocMilPlus16	0x41
 
 #define CDSN_CTRL_FR_B 		0x80
+#define CDSN_CTRL_FR_B0		0x40
+#define CDSN_CTRL_FR_B1		0x80
+
 #define CDSN_CTRL_ECC_IO 	0x20
 #define CDSN_CTRL_FLASH_IO 	0x10
 #define CDSN_CTRL_WP 		0x08
@@ -92,6 +128,10 @@
 #define DOC_TOGGLE_BIT 		0x04
 #define DOC_ECC_RESV 		0x02
 #define DOC_ECC_IGNORE		0x01
+
+#define DOC_FLASH_CE		0x80
+#define DOC_FLASH_WP		0x40
+#define DOC_FLASH_BANK		0x02
 
 /* We have to also set the reserved bit 1 for enable */
 #define DOC_ECC_EN (DOC_ECC__EN | DOC_ECC_RESV)
@@ -110,6 +150,9 @@ struct Nand {
 #define MAX_FLOORS_MIL 4
 #define MAX_CHIPS_MIL 1
 
+#define MAX_FLOORS_MPLUS 1
+#define MAX_CHIPS_MPLUS 1
+
 #define ADDR_COLUMN 1
 #define ADDR_PAGE 2
 #define ADDR_COLUMN_PAGE 3
@@ -126,6 +169,7 @@ struct DiskOnChip {
 	int chipshift;
 	char page256;
 	char pageadrlen;
+	char interleave; /* Internal interleaving - Millennium Plus style */
 	unsigned long erasesize;
 	
 	int curfloor;

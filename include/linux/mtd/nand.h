@@ -2,9 +2,10 @@
  *  linux/include/linux/mtd/nand.h
  *
  *  Copyright (c) 2000 David Woodhouse <dwmw2@mvhi.com>
- *                     Steven J. Hill <sjhill@cotw.com>
+ *                     Steven J. Hill <sjhill@realitydiluted.com>
+ *		       Thomas Gleixner <tglx@linutronix.de>
  *
- * $Id: nand.h,v 1.8 2000/10/30 17:16:17 sjhill Exp $
+ * $Id: nand.h,v 1.25 2003/05/21 15:15:02 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,17 +24,49 @@
  *			bat later if I did something naughty.
  *   10-11-2000 SJH     Added private NAND flash structure for driver
  *   10-24-2000 SJH     Added prototype for 'nand_scan' function
+ *   10-29-2001 TG	changed nand_chip structure to support 
+ *			hardwarespecific function for accessing control lines
+ *   02-21-2002 TG	added support for different read/write adress and
+ *			ready/busy line access function
+ *   02-26-2002 TG	added chip_delay to nand_chip structure to optimize
+ *			command delay times for different chips
+ *   04-28-2002 TG	OOB config defines moved from nand.c to avoid duplicate
+ *			defines in jffs2/wbuf.c
+ *   08-07-2002 TG	forced bad block location to byte 5 of OOB, even if
+ *			CONFIG_MTD_NAND_ECC_JFFS2 is not set
+ *   08-10-2002 TG	extensions to nand_chip structure to support HW-ECC
+ *
+ *   08-29-2002 tglx 	nand_chip structure: data_poi for selecting 
+ *			internal / fs-driver buffer
+ *			support for 6byte/512byte hardware ECC
+ *			read_ecc, write_ecc extended for different oob-layout
+ *			oob layout selections: NAND_NONE_OOB, NAND_JFFS2_OOB,
+ *			NAND_YAFFS_OOB
+ *  11-25-2002 tglx	Added Manufacturer code FUJITSU, NATIONAL
+ *			Split manufacturer and device ID structures 
  */
 #ifndef __LINUX_MTD_NAND_H
 #define __LINUX_MTD_NAND_H
 
 #include <linux/config.h>
-#include <linux/sched.h>
+#include <linux/wait.h>
+#include <linux/spinlock.h>
 
+struct mtd_info;
 /*
  * Searches for a NAND device
  */
 extern int nand_scan (struct mtd_info *mtd);
+
+/*
+ * Constants for hardware specific CLE/ALE/NCE function
+*/
+#define NAND_CTL_SETNCE 	1
+#define NAND_CTL_CLRNCE		2
+#define NAND_CTL_SETCLE		3
+#define NAND_CTL_CLRCLE		4
+#define NAND_CTL_SETALE		5
+#define NAND_CTL_CLRALE		6
 
 /*
  * Standard NAND flash commands
@@ -49,6 +82,29 @@ extern int nand_scan (struct mtd_info *mtd);
 #define NAND_CMD_ERASE2		0xd0
 #define NAND_CMD_RESET		0xff
 
+/* 
+ * Constants for ECC_MODES
+ *
+ * NONE:	No ECC
+ * SOFT:	Software ECC 3 byte ECC per 256 Byte data
+ * HW3_256:	Hardware ECC 3 byte ECC per 256 Byte data
+ * HW3_512:	Hardware ECC 3 byte ECC per 512 Byte data
+ *
+ *
+*/
+#define NAND_ECC_NONE		0
+#define NAND_ECC_SOFT		1
+#define NAND_ECC_HW3_256	2
+#define NAND_ECC_HW3_512	3
+#define NAND_ECC_HW6_512	4
+#define NAND_ECC_DISKONCHIP	5
+
+/*
+ * Constants for Hardware ECC
+*/
+#define NAND_ECC_READ		0
+#define NAND_ECC_WRITE		1
+	
 /*
  * Enumeration for NAND flash chip state
  */
@@ -60,20 +116,33 @@ typedef enum {
 	FL_SYNCING
 } nand_state_t;
 
+
 /*
  * NAND Private Flash Chip Data
  *
  * Structure overview:
  *
- *  IO_ADDR - address to access the 8 I/O lines to the flash device
+ *  IO_ADDR_R - address to read the 8 I/O lines of the flash device 
  *
- *  CTRL_ADDR - address where ALE, CLE and CE control bits are accessed
+ *  IO_ADDR_W - address to write the 8 I/O lines of the flash device 
  *
- *  CLE - location in control word for Command Latch Enable bit
+ *  hwcontrol - hardwarespecific function for accesing control-lines
  *
- *  ALE - location in control word for Address Latch Enable bit
+ *  dev_ready - hardwarespecific function for accesing device ready/busy line
  *
- *  NCE - location in control word for nChip Enable bit
+ *  waitfunc - hardwarespecific function for wait on ready
+ *
+ *  calculate_ecc - function for ecc calculation or readback from ecc hardware
+ *
+ *  correct_data - function for ecc correction, matching to ecc generator (sw/hw)
+ *
+ *  enable_hwecc - function to enable (reset) hardware ecc generator
+ *
+ *  eccmod - mode of ecc: see constants
+ *
+ *  eccsize - databytes used per ecc-calculation
+ *
+ *  chip_delay - chip dependent delay for transfering data from array to read regs (tR)
  *
  *  chip_lock - spinlock used to protect access to this structure
  *
@@ -85,27 +154,30 @@ typedef enum {
  *
  *  data_buf - data buffer passed to/from MTD user modules
  *
- *  ecc_code_buf - used only for holding calculated or read ECCs for
- *                 a page read or written when ECC is in use
+ *  data_cache - data cache for redundant page access and shadow for
+ *		 ECC failure
  *
- *  reserved - padding to make structure fall on word boundary if
- *             when ECC is in use
+ *  cache_page - number of last valid page in page_cache 
  */
 struct nand_chip {
-	unsigned long IO_ADDR;
-	unsigned long CTRL_ADDR;
-	unsigned int CLE;
-	unsigned int ALE;
-	unsigned int NCE;
-	spinlock_t chip_lock;
+	unsigned long 	IO_ADDR_R;
+	unsigned long 	IO_ADDR_W;
+	void 		(*hwcontrol)(int cmd);
+	int  		(*dev_ready)(void);
+	void 		(*cmdfunc)(struct mtd_info *mtd, unsigned command, int column, int page_addr);
+	int 		(*waitfunc)(struct mtd_info *mtd, struct nand_chip *this, int state);
+	void		(*calculate_ecc)(const u_char *dat, u_char *ecc_code);
+	int 		(*correct_data)(u_char *dat, u_char *read_ecc, u_char *calc_ecc);
+	void		(*enable_hwecc)(int mode);
+	int		eccmode;
+	int		eccsize;
+	int 		chip_delay;
+	spinlock_t 	chip_lock;
 	wait_queue_head_t wq;
-	nand_state_t state;
-	int page_shift;
-	u_char *data_buf;
-#ifdef CONFIG_MTD_NAND_ECC
-	u_char ecc_code_buf[6];
-	u_char reserved[2];
-#endif
+	nand_state_t 	state;
+	int 		page_shift;
+	u_char 		*data_buf;
+	u_char		*data_poi;
 };
 
 /*
@@ -113,17 +185,17 @@ struct nand_chip {
  */
 #define NAND_MFR_TOSHIBA	0x98
 #define NAND_MFR_SAMSUNG	0xec
+#define NAND_MFR_FUJITSU	0x04
+#define NAND_MFR_NATIONAL	0x8f
 
 /*
  * NAND Flash Device ID Structure
  *
  * Structure overview:
  *
- *  name - Complete name of device
+ *  name - Identify the device type
  *
- *  manufacture_id - manufacturer ID code of device.
- *
- *  model_id - model ID code of device.
+ *  id -  device ID code
  *
  *  chipshift - total number of address bits for the device which
  *              is used to calculate address offsets and the total
@@ -143,12 +215,30 @@ struct nand_chip {
  */
 struct nand_flash_dev {
 	char * name;
-	int manufacture_id;
-	int model_id;
+	int id;
 	int chipshift;
-	char page256;
-	char pageadrlen;
 	unsigned long erasesize;
+	char page256;
 };
+
+/*
+ * NAND Flash Manufacturer ID Structure
+ *
+ *  name - Manufacturer name
+ *
+ *  id - manufacturer ID code of device.
+*/
+struct nand_manufacturers {
+	int id;
+	char * name;
+};
+
+extern struct nand_flash_dev nand_flash_ids[];
+extern struct nand_manufacturers nand_manuf_ids[];
+
+/*
+* Constants for oob configuration
+*/
+#define NAND_BADBLOCK_POS		5
 
 #endif /* __LINUX_MTD_NAND_H */

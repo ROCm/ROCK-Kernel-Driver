@@ -11,10 +11,16 @@
  * not going to guess how to send commands to them, plus I expect they will
  * all speak CFI..
  *
- * $Id: jedec.c,v 1.12 2001/11/06 14:37:35 dwmw2 Exp $
+ * $Id: jedec.c,v 1.18 2003/05/28 12:51:48 dwmw2 Exp $
  */
 
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
 #include <linux/mtd/jedec.h>
+#include <linux/mtd/map.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/compatmac.h>
 
 static struct mtd_info *jedec_probe(struct map_info *);
 static int jedec_probe8(struct map_info *map,unsigned long base,
@@ -168,7 +174,8 @@ static struct mtd_info *jedec_probe(struct map_info *map)
    /* Generate a part name that includes the number of different chips and
       other configuration information */
    count = 1;
-   strlcpy(Part,map->name,sizeof(Part)-10);
+   strncpy(Part,map->name,sizeof(Part)-10);
+   Part[sizeof(Part)-11] = 0;
    strcat(Part," ");
    Uniq = 0;
    for (I = 0; priv->chips[I].jedec != 0 && I < MAX_JEDEC_CHIPS; I++)
@@ -245,7 +252,8 @@ static struct mtd_info *jedec_probe(struct map_info *map)
    //   printk("Part: '%s'\n",Part);
    
    memset(MTD,0,sizeof(*MTD));
-  // strlcpy(MTD->name,Part,sizeof(MTD->name));
+  // strncpy(MTD->name,Part,sizeof(MTD->name));
+  // MTD->name[sizeof(MTD->name)-1] = 0;
    MTD->name = map->name;
    MTD->type = MTD_NORFLASH;
    MTD->flags = MTD_CAP_NORFLASH;
@@ -264,7 +272,7 @@ static struct mtd_info *jedec_probe(struct map_info *map)
    MTD->priv = map;
    map->fldrv_priv = priv;
    map->fldrv = &jedec_chipdrv;
-   MOD_INC_USE_COUNT;
+   __module_get(THIS_MODULE);
    return MTD;
 }
 
@@ -386,8 +394,8 @@ static const struct JEDECTable *jedec_idtoinf(__u8 mfr,__u8 id)
 static int jedec_probe8(struct map_info *map,unsigned long base,
 		  struct jedec_private *priv)
 { 
-   #define flread(x) map->read8(map,base+x)
-   #define flwrite(v,x) map->write8(map,v,base+x)
+   #define flread(x) map_read8(map,base+x)
+   #define flwrite(v,x) map_write8(map,v,base+x)
 
    const unsigned long AutoSel1 = 0xAA;
    const unsigned long AutoSel2 = 0x55;
@@ -446,8 +454,8 @@ static int jedec_probe16(struct map_info *map,unsigned long base,
 static int jedec_probe32(struct map_info *map,unsigned long base,
 		  struct jedec_private *priv)
 {
-   #define flread(x) map->read32(map,base+((x)<<2))
-   #define flwrite(v,x) map->write32(map,v,base+((x)<<2))
+   #define flread(x) map_read32(map,base+((x)<<2))
+   #define flwrite(v,x) map_write32(map,v,base+((x)<<2))
 
    const unsigned long AutoSel1 = 0xAAAAAAAA;
    const unsigned long AutoSel2 = 0x55555555;
@@ -500,8 +508,8 @@ static int jedec_probe32(struct map_info *map,unsigned long base,
       we call this routine with the JEDEC return still enabled, if two or
       more flashes have a truncated address space the probe test will still
       work */
-   if (base + Size+0x555 < map->size &&
-       base + Size+0x555 < (base & (~(my_bank_size-1))) + my_bank_size)
+   if (base + (Size<<2)+0x555 < map->size &&
+       base + (Size<<2)+0x555 < (base & (~(my_bank_size-1))) + my_bank_size)
    {
       if (flread(base+Size) != flread(base+Size + 0x100) ||
 	  flread(base+Size + 1) != flread(base+Size + 0x101))
@@ -525,7 +533,7 @@ static int jedec_read(struct mtd_info *mtd, loff_t from, size_t len,
 {
    struct map_info *map = (struct map_info *)mtd->priv;
    
-   map->copy_from(map, buf, from, len);
+   map_copy_from(map, buf, from, len);
    *retlen = len;
    return 0;   
 }
@@ -549,7 +557,7 @@ static int jedec_read_banked(struct mtd_info *mtd, loff_t from, size_t len,
 	 get = priv->bank_fill[0] - offset;
 
       bank /= priv->bank_fill[0];      
-      map->copy_from(map,buf + *retlen,bank*my_bank_size + offset,get);
+      map_copy_from(map,buf + *retlen,bank*my_bank_size + offset,get);
       
       len -= get;
       *retlen += get;
@@ -580,8 +588,8 @@ static void jedec_flash_failed(unsigned char code)
 static int flash_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
    // Does IO to the currently selected chip
-   #define flread(x) map->read8(map,chip->base+((x)<<chip->addrshift))
-   #define flwrite(v,x) map->write8(map,v,chip->base+((x)<<chip->addrshift))
+   #define flread(x) map_read8(map,chip->base+((x)<<chip->addrshift))
+   #define flwrite(v,x) map_write8(map,v,chip->base+((x)<<chip->addrshift))
    
    unsigned long Time = 0;
    unsigned long NoTime = 0;
@@ -686,19 +694,19 @@ static int flash_erase(struct mtd_info *mtd, struct erase_info *instr)
   	    or this is not really flash ;> */
 	 switch (map->buswidth) {
 	 case 1:
-	    Last[0] = map->read8(map,(chip->base >> chip->addrshift) + chip->start + off);
-	    Last[1] = map->read8(map,(chip->base >> chip->addrshift) + chip->start + off);
-	    Last[2] = map->read8(map,(chip->base >> chip->addrshift) + chip->start + off);
+	    Last[0] = map_read8(map,(chip->base >> chip->addrshift) + chip->start + off);
+	    Last[1] = map_read8(map,(chip->base >> chip->addrshift) + chip->start + off);
+	    Last[2] = map_read8(map,(chip->base >> chip->addrshift) + chip->start + off);
 	    break;
 	 case 2:
-	    Last[0] = map->read16(map,(chip->base >> chip->addrshift) + chip->start + off);
-	    Last[1] = map->read16(map,(chip->base >> chip->addrshift) + chip->start + off);
-	    Last[2] = map->read16(map,(chip->base >> chip->addrshift) + chip->start + off);
+	    Last[0] = map_read16(map,(chip->base >> chip->addrshift) + chip->start + off);
+	    Last[1] = map_read16(map,(chip->base >> chip->addrshift) + chip->start + off);
+	    Last[2] = map_read16(map,(chip->base >> chip->addrshift) + chip->start + off);
 	    break;
 	 case 3:
-	    Last[0] = map->read32(map,(chip->base >> chip->addrshift) + chip->start + off);
-	    Last[1] = map->read32(map,(chip->base >> chip->addrshift) + chip->start + off);
-	    Last[2] = map->read32(map,(chip->base >> chip->addrshift) + chip->start + off);
+	    Last[0] = map_read32(map,(chip->base >> chip->addrshift) + chip->start + off);
+	    Last[1] = map_read32(map,(chip->base >> chip->addrshift) + chip->start + off);
+	    Last[2] = map_read32(map,(chip->base >> chip->addrshift) + chip->start + off);
 	    break;
 	 }
 	 Count = 3;
@@ -734,13 +742,13 @@ static int flash_erase(struct mtd_info *mtd, struct erase_info *instr)
 
 	    switch (map->buswidth) {
 	    case 1:
-	       Last[Count % 4] = map->read8(map,(chip->base >> chip->addrshift) + chip->start + off);
+	       Last[Count % 4] = map_read8(map,(chip->base >> chip->addrshift) + chip->start + off);
 	      break;
 	    case 2:
-	       Last[Count % 4] = map->read16(map,(chip->base >> chip->addrshift) + chip->start + off);
+	       Last[Count % 4] = map_read16(map,(chip->base >> chip->addrshift) + chip->start + off);
 	      break;
 	    case 4:
-	       Last[Count % 4] = map->read32(map,(chip->base >> chip->addrshift) + chip->start + off);
+	       Last[Count % 4] = map_read32(map,(chip->base >> chip->addrshift) + chip->start + off);
 	      break;
 	    }
 	    Count++;
@@ -773,6 +781,7 @@ static int flash_erase(struct mtd_info *mtd, struct erase_info *instr)
    }
        	    
    //printk("done\n");
+   instr->state = MTD_ERASE_DONE;
    if (instr->callback)
 	instr->callback(instr);
    return 0;
@@ -790,9 +799,9 @@ static int flash_write(struct mtd_info *mtd, loff_t start, size_t len,
 {
    /* Does IO to the currently selected chip. It takes the bank addressing
       base (which is divisible by the chip size) adds the necessary lower bits
-      of addrshift (interleve index) and then adds the control register index. */
-   #define flread(x) map->read8(map,base+(off&((1<<chip->addrshift)-1))+((x)<<chip->addrshift))
-   #define flwrite(v,x) map->write8(map,v,base+(off&((1<<chip->addrshift)-1))+((x)<<chip->addrshift))
+      of addrshift (interleave index) and then adds the control register index. */
+   #define flread(x) map_read8(map,base+(off&((1<<chip->addrshift)-1))+((x)<<chip->addrshift))
+   #define flwrite(v,x) map_write8(map,v,base+(off&((1<<chip->addrshift)-1))+((x)<<chip->addrshift))
    
    struct map_info *map = (struct map_info *)mtd->priv;
    struct jedec_private *priv = (struct jedec_private *)map->fldrv_priv;
@@ -828,7 +837,7 @@ static int flash_write(struct mtd_info *mtd, loff_t start, size_t len,
       // Loop over this page
       for (; off != (chip->size << chip->addrshift) && len != 0; start++, len--, off++,buf++)
       {
-	 unsigned char oldbyte = map->read8(map,base+off);
+	 unsigned char oldbyte = map_read8(map,base+off);
 	 unsigned char Last[4];
 	 unsigned long Count = 0;
 
@@ -843,10 +852,10 @@ static int flash_write(struct mtd_info *mtd, loff_t start, size_t len,
 	 flwrite(0xAA,0x555);
 	 flwrite(0x55,0x2AA);
 	 flwrite(0xA0,0x555);
-	 map->write8(map,*buf,base + off);
-	 Last[0] = map->read8(map,base + off);
-	 Last[1] = map->read8(map,base + off);
-	 Last[2] = map->read8(map,base + off);
+	 map_write8(map,*buf,base + off);
+	 Last[0] = map_read8(map,base + off);
+	 Last[1] = map_read8(map,base + off);
+	 Last[2] = map_read8(map,base + off);
 	 
 	 /* Wait for the flash to finish the operation. We store the last 4
 	    status bytes that have been retrieved so we can determine why
@@ -854,7 +863,7 @@ static int flash_write(struct mtd_info *mtd, loff_t start, size_t len,
 	    failure */
 	 for (Count = 3; Last[(Count - 1) % 4] != Last[(Count - 2) % 4] &&
 	      Count < 10000; Count++)
-	    Last[Count % 4] = map->read8(map,base + off);
+	    Last[Count % 4] = map_read8(map,base + off);
 	 if (Last[(Count - 1) % 4] != *buf)
 	 {
 	    jedec_flash_failed(Last[(Count - 3) % 4]);

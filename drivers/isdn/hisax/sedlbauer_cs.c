@@ -633,34 +633,32 @@ static int sedlbauer_event(event_t event, int priority,
     return 0;
 } /* sedlbauer_event */
 
-/*====================================================================*/
+static struct pcmcia_driver sedlbauer_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "sedlbauer_cs",
+	},
+	.attach		= sedlbauer_attach,
+	.detach		= sedlbauer_detach,
+};
 
 static int __init init_sedlbauer_cs(void)
 {
-    servinfo_t serv;
-    DEBUG(0, "%s\n", version);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "sedlbauer_cs: Card Services release "
-	       "does not match!\n");
-	return -1;
-    }
-    register_pccard_driver(&dev_info, &sedlbauer_attach, &sedlbauer_detach);
-    return 0;
+	return pcmcia_register_driver(&sedlbauer_driver);
 }
 
 static void __exit exit_sedlbauer_cs(void)
 {
-    DEBUG(0, "sedlbauer_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL) {
-	del_timer(&dev_list->release);
-	if (dev_list->state & DEV_CONFIG)
-	    sedlbauer_release((u_long)dev_list);
-	sedlbauer_detach(dev_list);
-    }
+	pcmcia_unregister_driver(&sedlbauer_driver);
+
+	/* XXX: this really needs to move into generic code.. */
+	while (dev_list != NULL) {
+		del_timer(&dev_list->release);
+		if (dev_list->state & DEV_CONFIG)
+			sedlbauer_release((u_long)dev_list);
+		sedlbauer_detach(dev_list);
+	}
 }
 
 module_init(init_sedlbauer_cs);
 module_exit(exit_sedlbauer_cs);
-

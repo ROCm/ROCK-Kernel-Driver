@@ -1,11 +1,12 @@
 /* fortunet.c memory map
  *
- * $Id: fortunet.c,v 1.2 2002/10/14 12:50:22 rmk Exp $
+ * $Id: fortunet.c,v 1.6 2003/05/21 12:45:18 dwmw2 Exp $
  */
 
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -23,7 +24,7 @@
 
 struct map_region
 {
-	int			window_addr_phyical;
+	int			window_addr_physical;
 	int			altbuswidth;
 	struct map_info		map_info;
 	struct mtd_info		*mymtd;
@@ -37,57 +38,10 @@ static int			map_regions_set[MAX_NUM_REGIONS] = {0,0,0,0};
 static int			map_regions_parts[MAX_NUM_REGIONS] = {0,0,0,0};
 
 
-__u8 fortunet_read8(struct map_info *map, unsigned long ofs)
-{
-	return *(__u8 *)(map->map_priv_1 + ofs);
-}
-
-__u16 fortunet_read16(struct map_info *map, unsigned long ofs)
-{
-	return *(__u16 *)(map->map_priv_1 + ofs);
-}
-
-__u32 fortunet_read32(struct map_info *map, unsigned long ofs)
-{
-	return *(__u32 *)(map->map_priv_1 + ofs);
-}
-
-void fortunet_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy(to, (void *)(map->map_priv_1 + from), len);
-}
-
-void fortunet_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	*(__u8 *)(map->map_priv_1 + adr) = d;
-}
-
-void fortunet_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	*(__u16 *)(map->map_priv_1 + adr) = d;
-}
-
-void fortunet_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	*(__u32 *)(map->map_priv_1 + adr) = d;
-}
-
-void fortunet_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy((void *)(map->map_priv_1 + to), from, len);
-}
 
 struct map_info default_map = {
-	.size		= DEF_WINDOW_SIZE,
-	.buswidth	= 4,
-	.read8		= fortunet_read8,
-	.read16		= fortunet_read16,
-	.read32		= fortunet_read32,
-	.copy_from	= fortunet_copy_from,
-	.write8		= fortunet_write8,
-	.write16	= fortunet_write16,
-	.write32	= fortunet_write32,
-	.copy_to	= fortunet_copy_to
+	.size = DEF_WINDOW_SIZE,
+	.buswidth = 4,
 };
 
 static char * __init get_string_option(char *dest,int dest_size,char *sor)
@@ -147,7 +101,7 @@ static int __init MTD_New_Region(char *line)
 	get_options (get_string_option(string,sizeof(string),line),6,params);
 	if(params[0]<1)
 	{
-		printk(MTD_FORTUNET_PK "Bad paramters for MTD Region "
+		printk(MTD_FORTUNET_PK "Bad parameters for MTD Region "
 			" name,region-number[,base,size,buswidth,altbuswidth]\n");
 		return 1;
 	}
@@ -161,14 +115,14 @@ static int __init MTD_New_Region(char *line)
 	memcpy(&map_regions[params[1]].map_info,
 		&default_map,sizeof(map_regions[params[1]].map_info));
         map_regions_set[params[1]] = 1;
-        map_regions[params[1]].window_addr_phyical = DEF_WINDOW_ADDR_PHY;
+        map_regions[params[1]].window_addr_physical = DEF_WINDOW_ADDR_PHY;
         map_regions[params[1]].altbuswidth = 2;
         map_regions[params[1]].mymtd = NULL;
 	map_regions[params[1]].map_info.name = map_regions[params[1]].map_name;
 	strcpy(map_regions[params[1]].map_info.name,string);
 	if(params[0]>1)
 	{
-		map_regions[params[1]].window_addr_phyical = params[2];
+		map_regions[params[1]].window_addr_physical = params[2];
 	}
 	if(params[0]>2)
 	{
@@ -185,14 +139,14 @@ static int __init MTD_New_Region(char *line)
 	return 1;
 }
 
-static int __init MTD_New_Partion(char *line)
+static int __init MTD_New_Partition(char *line)
 {
 	char	string[MAX_NAME_SIZE];
 	int	params[4];
 	get_options (get_string_option(string,sizeof(string),line),4,params);
 	if(params[0]<3)
 	{
-		printk(MTD_FORTUNET_PK "Bad paramters for MTD Partion "
+		printk(MTD_FORTUNET_PK "Bad parameters for MTD Partition "
 			" name,region-number,size,offset\n");
 		return 1;
 	}
@@ -204,7 +158,7 @@ static int __init MTD_New_Partion(char *line)
 	}
 	if(map_regions_parts[params[1]]>=MAX_NUM_PARTITIONS)
 	{
-		printk(MTD_FORTUNET_PK "Out of space for partion in this region\n");
+		printk(MTD_FORTUNET_PK "Out of space for partition in this region\n");
 		return 1;
 	}
 	map_regions[params[1]].parts[map_regions_parts[params[1]]].name =
@@ -220,7 +174,10 @@ static int __init MTD_New_Partion(char *line)
 }
 
 __setup("MTD_Region=", MTD_New_Region);
-__setup("MTD_Partion=", MTD_New_Partion);
+__setup("MTD_Partition=", MTD_New_Partition);
+
+/* Backwards-spelling-compatibility */
+__setup("MTD_Partion=", MTD_New_Partition);
 
 int __init init_fortunet(void)
 {
@@ -229,13 +186,13 @@ int __init init_fortunet(void)
 	{
 		if(map_regions_parts[ix]&&(!map_regions_set[ix]))
 		{
-			printk(MTD_FORTUNET_PK "Region %d is not setup (Seting to default)\n",
+			printk(MTD_FORTUNET_PK "Region %d is not setup (Setting to default)\n",
 				ix);
 			memset(&map_regions[ix],0,sizeof(map_regions[ix]));
 			memcpy(&map_regions[ix].map_info,&default_map,
 				sizeof(map_regions[ix].map_info));
 			map_regions_set[ix] = 1;
-			map_regions[ix].window_addr_phyical = DEF_WINDOW_ADDR_PHY;
+			map_regions[ix].window_addr_physical = DEF_WINDOW_ADDR_PHY;
 			map_regions[ix].altbuswidth = 2;
 			map_regions[ix].mymtd = NULL;
 			map_regions[ix].map_info.name = map_regions[ix].map_name;
@@ -244,30 +201,35 @@ int __init init_fortunet(void)
 		if(map_regions_set[ix])
 		{
 			iy++;
-			printk(KERN_NOTICE MTD_FORTUNET_PK "%s flash device at phyicaly "
+			printk(KERN_NOTICE MTD_FORTUNET_PK "%s flash device at physically "
 				" address %x size %x\n",
 				map_regions[ix].map_info.name,
-				map_regions[ix].window_addr_phyical,
+				map_regions[ix].window_addr_physical,
 				map_regions[ix].map_info.size);
-			map_regions[ix].map_info.map_priv_1 =
+
+			map_regions[ix].map_info.phys =	map_regions[ix].window_addr_physical,
+
+			map_regions[ix].map_info.virt =
 				(int)ioremap_nocache(
-				map_regions[ix].window_addr_phyical,
+				map_regions[ix].window_addr_physical,
 				map_regions[ix].map_info.size);
-			if(!map_regions[ix].map_info.map_priv_1)
+			if(!map_regions[ix].map_info.virt)
 			{
 				printk(MTD_FORTUNET_PK "%s flash failed to ioremap!\n",
 					map_regions[ix].map_info.name);
 				return -ENXIO;
 			}
-			printk(KERN_NOTICE MTD_FORTUNET_PK "%s flash is veritualy at: %x\n",
+			simple_map_init(&map_regions[ix].map_info);
+
+			printk(KERN_NOTICE MTD_FORTUNET_PK "%s flash is virtually at: %x\n",
 				map_regions[ix].map_info.name,
-				map_regions[ix].map_info.map_priv_1);
+				map_regions[ix].map_info.virt);
 			map_regions[ix].mymtd = do_map_probe("cfi_probe",
 				&map_regions[ix].map_info);
 			if((!map_regions[ix].mymtd)&&(
 				map_regions[ix].altbuswidth!=map_regions[ix].map_info.buswidth))
 			{
-				printk(KERN_NOTICE MTD_FORTUNET_PK "Trying alternet buswidth "
+				printk(KERN_NOTICE MTD_FORTUNET_PK "Trying alternate buswidth "
 					"for %s flash.\n",
 					map_regions[ix].map_info.name);
 				map_regions[ix].map_info.buswidth =
@@ -275,7 +237,7 @@ int __init init_fortunet(void)
 				map_regions[ix].mymtd = do_map_probe("cfi_probe",
 					&map_regions[ix].map_info);
 			}
-			map_regions[ix].mymtd->module = THIS_MODULE;
+			map_regions[ix].mymtd->owner = THIS_MODULE;
 			add_mtd_partitions(map_regions[ix].mymtd,
 				map_regions[ix].parts,map_regions_parts[ix]);
 		}
@@ -297,7 +259,7 @@ static void __exit cleanup_fortunet(void)
 				del_mtd_partitions( map_regions[ix].mymtd );
 				map_destroy( map_regions[ix].mymtd );
 			}
-			iounmap((void *)map_regions[ix].map_info.map_priv_1);
+			iounmap((void *)map_regions[ix].map_info.virt);
 		}
 	}
 }
