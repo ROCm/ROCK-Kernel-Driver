@@ -90,7 +90,7 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 	dev->base_addr = ioaddr;
 	dev->irq = pdev->irq;
 	dev->dev_addr[0] = node;
-	lp->card_name = pdev->name;
+	lp->card_name = pdev->dev.name;
 	lp->card_flags = id->driver_data;
 	lp->backplane = backplane;
 	lp->clockp = clockp & 7;
