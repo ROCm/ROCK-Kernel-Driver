@@ -38,7 +38,6 @@ typedef struct
 	wait_queue_head_t	remove_ok;
 
 	int		minor;			/* which minor dev #? */
-	devfs_handle_t	devfs;			/* devfs device */
 
 	driver_state_t	state;			/* started/stopped */
 	int		opened;			/* tru if open */

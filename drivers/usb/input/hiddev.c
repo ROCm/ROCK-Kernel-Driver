@@ -781,6 +781,6 @@ int __init hiddev_init(void)
 
 void __exit hiddev_exit(void)
 {
-	devfs_unregister(hiddev_devfs_handle);
 	usb_deregister(&hiddev_driver);
+	devfs_remove("usb/hid");
 }
