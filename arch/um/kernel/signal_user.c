@@ -21,13 +21,12 @@
 
 void set_sigstack(void *sig_stack, int size)
 {
-	stack_t stack;
+	stack_t stack = ((stack_t) { .ss_flags	= 0,
+				     .ss_sp	= (__ptr_t) sig_stack,
+				     .ss_size 	= size - sizeof(void *) });
 
-	stack.ss_sp = (__ptr_t) sig_stack;
-	stack.ss_flags = 0;
-	stack.ss_size = size - sizeof(void *);
 	if(sigaltstack(&stack, NULL) != 0)
-		panic("sigaltstack failed");
+		panic("enabling signal stack failed, errno = %d\n", errno);
 }
 
 void set_handler(int sig, void (*handler)(int), int flags, ...)

@@ -1,12 +1,22 @@
 /* 
- * Copyright (C) 2000, 2002 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
-#include "asm/processor.h"
+#ifndef __MODE_KERN_H__
+#define __MODE_KERN_H__
 
-struct cpuinfo_um boot_cpu_data = { loops_per_jiffy :	0,
-				    ipi_pipe : 		{ -1, -1 } };
+#include "linux/config.h"
+
+#ifdef CONFIG_MODE_TT
+#include "../kernel/tt/include/mode_kern.h"
+#endif
+
+#ifdef CONFIG_MODE_SKAS
+#include "../kernel/skas/include/mode_kern.h"
+#endif
+
+#endif
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

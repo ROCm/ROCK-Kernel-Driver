@@ -108,6 +108,7 @@ void mconsole_version(struct mc_request *req)
     reboot - Reboot UML
     config <dev>=<config> - Add a new device to UML; 
 	same syntax as command line
+    config <dev> - Query the configuration of a device
     remove <dev> - Remove a device from UML
     sysrq <letter> - Performs the SysRq action controlled by the letter
     cad - invoke the Ctl-Alt-Del handler
@@ -181,10 +182,56 @@ static struct mc_device *mconsole_find_dev(char *name)
 	return(NULL);
 }
 
+#define CONFIG_BUF_SIZE 64
+
+static void mconsole_get_config(int (*get_config)(char *, char *, int, 
+						  char **),
+				struct mc_request *req, char *name)
+{
+	char default_buf[CONFIG_BUF_SIZE], *error, *buf;
+	int n, size;
+
+	if(get_config == NULL){
+		mconsole_reply(req, "No get_config routine defined", 1, 0);
+		return;
+	}
+
+	error = NULL;
+	size = sizeof(default_buf)/sizeof(default_buf[0]);
+	buf = default_buf;
+
+	while(1){
+		n = (*get_config)(name, buf, size, &error);
+		if(error != NULL){
+			mconsole_reply(req, error, 1, 0);
+			goto out;
+		}
+
+		if(n <= size){
+			mconsole_reply(req, buf, 0, 0);
+			goto out;
+		}
+
+		if(buf != default_buf)
+			kfree(buf);
+
+		size = n;
+		buf = kmalloc(size, GFP_KERNEL);
+		if(buf == NULL){
+			mconsole_reply(req, "Failed to allocate buffer", 1, 0);
+			return;
+		}
+	}
+ out:
+	if(buf != default_buf)
+		kfree(buf);
+	
+}
+
 void mconsole_config(struct mc_request *req)
 {
 	struct mc_device *dev;
-	char *ptr = req->request.data;
+	char *ptr = req->request.data, *name;
 	int err;
 
 	ptr += strlen("config");
@@ -194,8 +241,17 @@ void mconsole_config(struct mc_request *req)
 		mconsole_reply(req, "Bad configuration option", 1, 0);
 		return;
 	}
-	err = (*dev->config)(&ptr[strlen(dev->name)]);
-	mconsole_reply(req, "", err, 0);
+
+	name = &ptr[strlen(dev->name)];
+	ptr = name;
+	while((*ptr != '=') && (*ptr != '\0'))
+		ptr++;
+
+	if(*ptr == '='){
+		err = (*dev->config)(name);
+		mconsole_reply(req, "", err, 0);
+	}
+	else mconsole_get_config(dev->get_config, req, name);
 }
 
 void mconsole_remove(struct mc_request *req)
