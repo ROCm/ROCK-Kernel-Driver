@@ -2131,7 +2131,7 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 
 		case SIOCGIFHWADDR:
 			memcpy(ifr->ifr_hwaddr.sa_data, dev->dev_addr,
-			       MAX_ADDR_LEN);
+			       min(sizeof ifr->ifr_hwaddr.sa_data, (size_t) dev->addr_len));
 			ifr->ifr_hwaddr.sa_family = dev->type;
 			return 0;
 
@@ -2152,7 +2152,7 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 			if (ifr->ifr_hwaddr.sa_family != dev->type)
 				return -EINVAL;
 			memcpy(dev->broadcast, ifr->ifr_hwaddr.sa_data,
-			       MAX_ADDR_LEN);
+			       min(sizeof ifr->ifr_hwaddr.sa_data, (size_t) dev->addr_len));
 			notifier_call_chain(&netdev_chain,
 					    NETDEV_CHANGEADDR, dev);
 			return 0;
