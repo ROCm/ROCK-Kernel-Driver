@@ -345,12 +345,22 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 
 	/* Find all AGP devices, and add them to dev_list. */
 	pci_for_each_dev(dev) { 
+		mcapndx = pci_find_capability(dev, PCI_CAP_ID_AGP);
 		switch ((dev->class >>8) & 0xff00) {
+			case 0x0600:    /* Bridge */
+				/* Skip bridges. We should call this function for each one. */
+				continue;
+
 			case 0x0001:    /* Unclassified device */
+				/* Don't know what this is, but log it for investigation. */
+				if (mcapndx != 0) {
+					printk (KERN_INFO PFX "Wacky, found unclassified AGP device. %x:%x\n",
+						dev->vendor, dev->device);
+				}
+				continue;
+
 			case 0x0300:    /* Display controller */
 			case 0x0400:    /* Multimedia controller */
-			case 0x0600:    /* Bridge */
-				mcapndx = pci_find_capability(dev, PCI_CAP_ID_AGP);
 				if (mcapndx == 0)
 					continue;
 
