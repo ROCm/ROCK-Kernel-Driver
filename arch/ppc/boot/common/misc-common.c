@@ -526,6 +526,11 @@ _dump_buf(unsigned char *p, int s)
  * on others it's an offset from a given location. -- Tom
  */
 
+void ISA_init(unsigned long base)
+{
+	ISA_io = (unsigned char *)base;
+}
+
 void
 outb(int port, unsigned char val)
 {

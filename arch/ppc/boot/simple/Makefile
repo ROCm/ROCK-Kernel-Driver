@@ -73,7 +73,7 @@ zimageinitrd-$(CONFIG_OCOTEA)		:= zImage.initrd-TREE
 zimageinitrd-$(CONFIG_GEMINI)		:= zImage.initrd-STRIPELF
          end-$(CONFIG_GEMINI)		:= gemini
 
-     extra.o-$(CONFIG_K2)		:= legacy.o
+     extra.o-$(CONFIG_K2)		:= prepmap.o
          end-$(CONFIG_K2)		:= k2
    cacheflag-$(CONFIG_K2)		:= -include $(clear_L2_L3)
 
@@ -89,7 +89,7 @@ zimageinitrd-$(motorola)		:= zImage.initrd-PPLUS
          end-$(motorola)		:= pplus
 
 # Overrides previous assingment
-     extra.o-$(CONFIG_PPLUS)		:= legacy.o
+     extra.o-$(CONFIG_PPLUS)		:= prepmap.o
      extra.o-$(CONFIG_LOPEC)		:= mpc10x_memory.o
 
       zimage-$(pcore)			:= zImage-STRIPELF
@@ -100,7 +100,7 @@ zimageinitrd-$(pcore)			:= zImage.initrd-STRIPELF
 
       zimage-$(CONFIG_PPC_PREP)		:= zImage-PPLUS
 zimageinitrd-$(CONFIG_PPC_PREP)		:= zImage.initrd-PPLUS
-     extra.o-$(CONFIG_PPC_PREP)		:= legacy.o
+     extra.o-$(CONFIG_PPC_PREP)		:= prepmap.o
         misc-$(CONFIG_PPC_PREP)		+= misc-prep.o mpc10x_memory.o
          end-$(CONFIG_PPC_PREP)		:= prep
 
