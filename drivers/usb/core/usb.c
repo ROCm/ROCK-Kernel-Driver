@@ -525,9 +525,8 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	if (!dev)
 		return -ENODEV;
 
-	/* check for generic driver, we do not call do hotplug calls for it */
 	if (dev->driver == &usb_generic_driver)
-		return -ENODEV;
+		return 0;
 
 	intf = to_usb_interface(dev);
 	if (!intf)
