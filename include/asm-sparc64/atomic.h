@@ -62,6 +62,9 @@ extern int __atomic64_sub(__s64, atomic64_t *);
 #define atomic_dec(v) ((void)__atomic_sub(1, v))
 #define atomic64_dec(v) ((void)__atomic64_sub(1, v))
 
+#define atomic_add_negative(i, v) (__atomic_add(i, v) < 0)
+#define atomic64_add_negative(i, v) (__atomic64_add(i, v) < 0)
+
 /* Atomic operations are already serializing */
 #define smp_mb__before_atomic_dec()	barrier()
 #define smp_mb__after_atomic_dec()	barrier()
