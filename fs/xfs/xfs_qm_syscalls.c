@@ -99,8 +99,6 @@ linvfs_setxstate(
 		return -xfs_qm_scall_quotaon(mp, qflags);
 	case Q_XQUOTAOFF:
 		qflags = xfs_qm_import_flags(flags);
-		if (mp->m_dev == rootdev)
-			return -xfs_qm_scall_quotaoff(mp, qflags, B_FALSE);
 		if (!XFS_IS_QUOTA_ON(mp))
 			return -ESRCH;
 		return -xfs_qm_scall_quotaoff(mp, qflags, B_FALSE);
@@ -169,17 +167,16 @@ xfs_qm_scall_quotaoff(
 	int			error;
 	uint			inactivate_flags;
 	xfs_qoff_logitem_t	*qoffstart;
-	uint			sbflags, newflags;
 	int			nculprits;
 
 	if (!force && !capable(CAP_SYS_ADMIN))
 		return XFS_ERROR(EPERM);
 	/*
-	 * Only root file system can have quotas enabled on disk but not
-	 * in core. Note that quota utilities (like quotaoff) _expect_
+	 * No file system can have quotas enabled on disk but not in core.
+	 * Note that quota utilities (like quotaoff) _expect_
 	 * errno == EEXIST here.
 	 */
-	if (mp->m_dev != rootdev && (mp->m_qflags & flags) == 0)
+	if ((mp->m_qflags & flags) == 0)
 		return XFS_ERROR(EEXIST);
 	error = 0;
 
@@ -191,54 +188,14 @@ xfs_qm_scall_quotaoff(
 	 * critical thing.
 	 * If quotaoff, then we must be dealing with the root filesystem.
 	 */
-	ASSERT(mp->m_quotainfo || mp->m_dev == rootdev);
+	ASSERT(mp->m_quotainfo);
 	if (mp->m_quotainfo)
 		mutex_lock(&(XFS_QI_QOFFLOCK(mp)), PINOD);
 
-	/*
-	 * Root file system may or may not have quotas on in core.
-	 * We have to perform the quotaoff accordingly.
-	 */
-	if (mp->m_dev == rootdev) {
-		s = XFS_SB_LOCK(mp);
-		sbflags = mp->m_sb.sb_qflags;
-		if ((mp->m_qflags & flags) == 0) {
-			mp->m_sb.sb_qflags &= ~(flags);
-			newflags = mp->m_sb.sb_qflags;
-			XFS_SB_UNLOCK(mp, s);
-			if (mp->m_quotainfo)
-				mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
-			if (sbflags != newflags)
-			      error = xfs_qm_write_sb_changes(mp, XFS_SB_QFLAGS);
-			return (error);
-		}
-		XFS_SB_UNLOCK(mp, s);
-
-		if ((sbflags & flags) != (mp->m_qflags & flags)) {
-			/*
-			 * This can happen only with grp+usr quota
-			 * combination. Note: 1) accounting cannot be turned
-			 * off without enforcement also getting turned off.
-			 * 2) Every flag that exists in mpqflags MUST exist
-			 * in sbqflags (but not vice versa).
-			 * which means at this point sbqflags = UQ+GQ+..,
-			 * and mpqflags = UQ or GQ.
-			 */
-			ASSERT(sbflags & XFS_GQUOTA_ACCT);
-			ASSERT((sbflags & XFS_ALL_QUOTA_ACCT) !=
-			       (mp->m_qflags & XFS_ALL_QUOTA_ACCT));
-
-			qdprintk("quotaoff, sbflags=%x flags=%x m_qflags=%x\n",
-				sbflags, flags, mp->m_qflags);
-			/* XXX TBD Finish this for group quota support */
-			/* We need to update the SB and mp separately */
-			return XFS_ERROR(EINVAL);
-		}
-	}
 	ASSERT(mp->m_quotainfo);
 
 	/*
-	 * if we're just turning off quota enforcement, change mp and go.
+	 * If we're just turning off quota enforcement, change mp and go.
 	 */
 	if ((flags & XFS_ALL_QUOTA_ACCT) == 0) {
 		mp->m_qflags &= ~(flags);
@@ -272,8 +229,8 @@ xfs_qm_scall_quotaoff(
 	}
 
 	/*
-	 * Nothing to do? Don't complain.
-	 * This happens when we're just turning off quota enforcement.
+	 * Nothing to do?  Don't complain. This happens when we're just
+	 * turning off quota enforcement.
 	 */
 	if ((mp->m_qflags & flags) == 0) {
 		mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
@@ -326,9 +283,8 @@ xfs_qm_scall_quotaoff(
 	 * So, if we couldn't purge all the dquots from the filesystem,
 	 * we can't get rid of the incore data structures.
 	 */
-	while ((nculprits = xfs_qm_dqpurge_all(mp, dqtype|XFS_QMOPT_QUOTAOFF))) {
+	while ((nculprits = xfs_qm_dqpurge_all(mp, dqtype|XFS_QMOPT_QUOTAOFF)))
 		delay(10 * nculprits);
-	}
 
 	/*
 	 * Transactions that had started before ACTIVE state bit was cleared
@@ -406,11 +362,9 @@ xfs_qm_scall_trunc_qfiles(
 
 
 /*
- * This does two separate functions:
- * Switch on quotas for the root file system. This will take effect only
- * on reboot.
- * Switch on (a given) quota enforcement for both root and non-root filesystems.
- * This takes effect immediately.
+ * Switch on (a given) quota enforcement for a filesystem.  This takes
+ * effect immediately.
+ * (Switching on quota accounting must be done at mount time.)
  */
 STATIC int
 xfs_qm_scall_quotaon(
@@ -422,37 +376,26 @@ xfs_qm_scall_quotaon(
 	uint		qf;
 	uint		accflags;
 	__int64_t	sbflags;
-	boolean_t	rootfs;
-	boolean_t	delay;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return XFS_ERROR(EPERM);
 
-	rootfs = (boolean_t) (mp->m_dev == rootdev);
-
 	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
 	/*
-	 * If caller wants to turn on accounting on /, but accounting
-	 * is already turned on, ignore ACCTing flags.
-	 * Switching on quota accounting for non-root filesystems
-	 * must be done at mount time.
+	 * Switching on quota accounting must be done at mount time.
 	 */
 	accflags = flags & XFS_ALL_QUOTA_ACCT;
-	if (!rootfs ||
-	    (accflags && rootfs && ((mp->m_qflags & accflags) == accflags))) {
-		flags &= ~(XFS_ALL_QUOTA_ACCT);
-	}
+	flags &= ~(XFS_ALL_QUOTA_ACCT);
 
 	sbflags = 0;
-	delay = (boolean_t) ((flags & XFS_ALL_QUOTA_ACCT) != 0);
 
 	if (flags == 0) {
 		qdprintk("quotaon: zero flags, m_qflags=%x\n", mp->m_qflags);
 		return XFS_ERROR(EINVAL);
 	}
 
-	/* Only rootfs can turn on quotas with a delayed effect */
-	ASSERT(!delay || rootfs);
+	/* No fs can turn on quotas with a delayed effect */
+	ASSERT((flags & XFS_ALL_QUOTA_ACCT) == 0);
 
 	/*
 	 * Can't enforce without accounting. We check the superblock
@@ -477,22 +420,6 @@ xfs_qm_scall_quotaon(
 		return XFS_ERROR(EEXIST);
 
 	/*
-	 * Change superblock version (if needed) for the root filesystem
-	 */
-	if (rootfs && !XFS_SB_VERSION_HASQUOTA(&mp->m_sb)) {
-		qdprintk("Old superblock version %x\n", mp->m_sb.sb_versionnum);
-		s = XFS_SB_LOCK(mp);
-		XFS_SB_VERSION_ADDQUOTA(&mp->m_sb);
-		mp->m_sb.sb_uquotino = NULLFSINO;
-		mp->m_sb.sb_gquotino = NULLFSINO;
-		mp->m_sb.sb_qflags = 0;
-		XFS_SB_UNLOCK(mp, s);
-		qdprintk("Converted to version %x\n", mp->m_sb.sb_versionnum);
-		sbflags |= (XFS_SB_VERSIONNUM | XFS_SB_UQUOTINO |
-			    XFS_SB_GQUOTINO | XFS_SB_QFLAGS);
-	}
-
-	/*
 	 * Change sb_qflags on disk but not incore mp->qflags
 	 * if this is the root filesystem.
 	 */
@@ -511,11 +438,9 @@ xfs_qm_scall_quotaon(
 	if ((error = xfs_qm_write_sb_changes(mp, sbflags)))
 		return (error);
 	/*
-	 * If we had just turned on quotas (ondisk) for rootfs, or if we aren't
-	 * trying to switch on quota enforcement, we are done.
+	 * If we aren't trying to switch on quota enforcement, we are done.
 	 */
-	if (delay ||
-	    ((mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT) !=
+	if  (((mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT) !=
 	     (mp->m_qflags & XFS_UQUOTA_ACCT)) ||
 	    (flags & XFS_ALL_QUOTA_ENFD) == 0)
 		return (0);
@@ -524,8 +449,7 @@ xfs_qm_scall_quotaon(
 		return XFS_ERROR(ESRCH);
 
 	/*
-	 * Switch on quota enforcement in core. This applies to both root
-	 * and non-root file systems.
+	 * Switch on quota enforcement in core.
 	 */
 	mutex_lock(&(XFS_QI_QOFFLOCK(mp)), PINOD);
 	mp->m_qflags |= (flags & XFS_ALL_QUOTA_ENFD);
@@ -546,7 +470,6 @@ xfs_qm_scall_getqstat(
 {
 	xfs_inode_t	*uip, *gip;
 	boolean_t	tempuqip, tempgqip;
-	__uint16_t	sbflags;
 
 	uip = gip = NULL;
 	tempuqip = tempgqip = B_FALSE;
@@ -561,20 +484,6 @@ xfs_qm_scall_getqstat(
 	out->qs_flags = (__uint16_t) xfs_qm_export_flags(mp->m_qflags &
 							(XFS_ALL_QUOTA_ACCT|
 							 XFS_ALL_QUOTA_ENFD));
-	/*
-	 * If the qflags are different on disk, as can be the case when
-	 * root filesystem's quotas are being turned on, return them in the
-	 * HI 8 bits.
-	 */
-	if (mp->m_dev == rootdev) {
-		sbflags = (__uint16_t) xfs_qm_export_flags(mp->m_sb.sb_qflags &
-							   (XFS_ALL_QUOTA_ACCT|
-							    XFS_ALL_QUOTA_ENFD));
-		ASSERT((out->qs_flags & 0xff00) == 0);
-		if (sbflags != out->qs_flags)
-			out->qs_flags |= ((sbflags & 0x00ff) << 8);
-	}
-
 	out->qs_pad = 0;
 	out->qs_uquota.qfs_ino = mp->m_sb.sb_uquotino;
 	out->qs_gquota.qfs_ino = mp->m_sb.sb_gquotino;

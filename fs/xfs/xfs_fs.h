@@ -30,12 +30,8 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _LINUX_XFS_FS_H
-#define _LINUX_XFS_FS_H
-
-#include <linux/types.h>
-#include <asm/ioctl.h>
-
+#ifndef __XFS_FS_H__
+#define __XFS_FS_H__
 
 /*
  * SGI's XFS filesystem's major stuff (constants, structures)
@@ -394,11 +390,13 @@ typedef struct {
  * This is typically called by a stateless file server in order to generate
  * "file handles".
  */
+#ifndef MAXFIDSZ
 #define MAXFIDSZ	46
 typedef struct fid {
 	__u16		fid_len;		/* length of data in bytes */
 	unsigned char	fid_data[MAXFIDSZ];	/* data (variable length)  */
 } fid_t;
+#endif
 
 typedef struct xfs_fid {
 	__u16	xfs_fid_len;		/* length of remainder	*/
@@ -499,4 +497,4 @@ typedef struct xfs_handle {
 #define BTOBBT(bytes)	((__u64)(bytes) >> BBSHIFT)
 #define BBTOB(bbs)	((bbs) << BBSHIFT)
 
-#endif	/* _LINUX_XFS_FS_H */
+#endif	/* __XFS_FS_H__ */

@@ -37,7 +37,6 @@
  * Directory version 2, single block format structures
  */
 
-struct dirent;
 struct uio;
 struct xfs_dabuf;
 struct xfs_da_args;

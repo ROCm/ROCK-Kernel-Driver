@@ -8,7 +8,6 @@
  */
 #include <linux/fs.h>
 #include <linux/slab.h>
-#include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
 #include <linux/file.h>
 #include <linux/xattr.h>
@@ -18,7 +17,7 @@
 /*
  * Extended attribute memory allocation wrappers, originally
  * based on the Intermezzo PRESTO_ALLOC/PRESTO_FREE macros.
- * The vmalloc use here is very uncommon - extended attributes
+ * Values larger than a page are uncommon - extended attributes
  * are supposed to be small chunks of metadata, and it is quite
  * unusual to have very many extended attributes, so lists tend
  * to be quite short as well.  The 64K upper limit is derived
@@ -35,10 +34,8 @@ xattr_alloc(size_t size, size_t limit)
 
 	if (!size)	/* size request, no buffer is needed */
 		return NULL;
-	else if (size <= PAGE_SIZE)
-		ptr = kmalloc((unsigned long) size, GFP_KERNEL);
-	else
-		ptr = vmalloc((unsigned long) size);
+
+	ptr = kmalloc((unsigned long) size, GFP_KERNEL);
 	if (!ptr)
 		return ERR_PTR(-ENOMEM);
 	return ptr;
@@ -47,12 +44,8 @@ xattr_alloc(size_t size, size_t limit)
 static void
 xattr_free(void *ptr, size_t size)
 {
-	if (!size)	/* size request, no buffer was needed */
-		return;
-	else if (size <= PAGE_SIZE)
+	if (size)	/* for a size request, no buffer was needed */
 		kfree(ptr);
-	else
-		vfree(ptr);
 }
 
 /*

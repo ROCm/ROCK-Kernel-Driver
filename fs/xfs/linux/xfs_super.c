@@ -46,10 +46,6 @@
 extern int  xfs_init(void);
 extern void xfs_cleanup(void);
 
-#ifndef EVMS_MAJOR
-# define EVMS_MAJOR		117
-#endif
-
 /* For kernels which have the s_maxbytes field - set it */
 #ifdef MAX_NON_LFS
 # define set_max_bytes(sb)	((sb)->s_maxbytes = XFS_MAX_FILE_OFFSET)
@@ -101,7 +97,6 @@ STATIC struct export_operations linvfs_export_ops;
 #define MNTOPT_NORECOVERY "norecovery"	/* don't run XFS recovery */
 #define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
 #define MNTOPT_QUOTA	"quota"		/* disk quotas */
-#define MNTOPT_MRQUOTA	"mrquota"	/* don't turnoff if SB has quotas on */
 #define MNTOPT_NOQUOTA	"noquota"	/* no quotas */
 #define MNTOPT_UQUOTA	"usrquota"	/* user quota enabled */
 #define MNTOPT_GQUOTA	"grpquota"	/* group quota enabled */
@@ -513,6 +508,23 @@ xfs_free_buftarg(
 	kfree(btp);
 }
 
+void
+xfs_size_buftarg(
+	xfs_buftarg_t		*btp,
+	unsigned int		blocksize,
+	unsigned int		sectorsize)
+{
+	btp->pbr_bsize = blocksize;
+	btp->pbr_sshift = ffs(sectorsize) - 1;
+	btp->pbr_smask = sectorsize - 1;
+
+	if (set_blocksize(btp->pbr_bdev, sectorsize)) {
+		printk(KERN_WARNING
+			"XFS: Cannot set_blocksize to %u on device 0x%x\n",
+			sectorsize, btp->pbr_dev);
+	}
+}
+
 xfs_buftarg_t *
 xfs_alloc_buftarg(
 	struct block_device	*bdev)
@@ -524,14 +536,7 @@ xfs_alloc_buftarg(
 	btp->pbr_dev =  bdev->bd_dev;
 	btp->pbr_bdev = bdev;
 	btp->pbr_mapping = bdev->bd_inode->i_mapping;
-	btp->pbr_blocksize = PAGE_CACHE_SIZE;
-
-	switch (MAJOR(btp->pbr_dev)) {
-	case MD_MAJOR:
-	case EVMS_MAJOR:
-		btp->pbr_flags = PBR_ALIGNED_ONLY;
-		break;
-	}
+	xfs_size_buftarg(btp, PAGE_CACHE_SIZE, bdev_hardsect_size(bdev));
 
 	return btp;
 }
