@@ -878,7 +878,7 @@ rpm:	clean spec
 	$(CONFIG_SHELL) $(srctree)/scripts/mkversion > $(objtree)/.tmp_version;\
 	mv -f $(objtree)/.tmp_version $(objtree)/.version;
 
-	$(RPM) -ta ../$(KERNELPATH).tar.gz
+	$(RPM) --target $(UTS_MACHINE) -ta ../$(KERNELPATH).tar.gz
 	rm ../$(KERNELPATH).tar.gz
 
 # Brief documentation of the typical targets used
