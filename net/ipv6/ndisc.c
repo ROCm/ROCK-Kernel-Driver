@@ -144,6 +144,19 @@ struct neigh_table nd_tbl = {
 	.gc_thresh3 =	1024,
 };
 
+/* ND options */
+struct ndisc_options {
+	struct nd_opt_hdr *nd_opt_array[7];
+	struct nd_opt_hdr *nd_opt_piend;
+};
+
+#define nd_opts_src_lladdr	nd_opt_array[ND_OPT_SOURCE_LL_ADDR]
+#define nd_opts_tgt_lladdr	nd_opt_array[ND_OPT_TARGET_LL_ADDR]
+#define nd_opts_pi		nd_opt_array[ND_OPT_PREFIX_INFO]
+#define nd_opts_pi_end		nd_opt_piend
+#define nd_opts_rh		nd_opt_array[ND_OPT_REDIRECT_HDR]
+#define nd_opts_mtu		nd_opt_array[ND_OPT_MTU]
+
 #define NDISC_OPT_SPACE(len) (((len)+2+7)&~7)
 
 static u8 *ndisc_fill_option(u8 *opt, int type, void *data, int data_len)
@@ -160,8 +173,8 @@ static u8 *ndisc_fill_option(u8 *opt, int type, void *data, int data_len)
 	return opt + space;
 }
 
-struct nd_opt_hdr *ndisc_next_option(struct nd_opt_hdr *cur,
-				     struct nd_opt_hdr *end)
+static struct nd_opt_hdr *ndisc_next_option(struct nd_opt_hdr *cur,
+					    struct nd_opt_hdr *end)
 {
 	int type;
 	if (!cur || !end || cur >= end)
@@ -173,8 +186,8 @@ struct nd_opt_hdr *ndisc_next_option(struct nd_opt_hdr *cur,
 	return (cur <= end && cur->nd_opt_type == type ? cur : NULL);
 }
 
-struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
-					  struct ndisc_options *ndopts)
+static struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
+						 struct ndisc_options *ndopts)
 {
 	struct nd_opt_hdr *nd_opt = (struct nd_opt_hdr *)opt;
 
@@ -375,7 +388,7 @@ ndisc_build_ll_hdr(struct sk_buff *skb, struct net_device *dev,
  *	Send a Neighbour Advertisement
  */
 
-int ndisc_output(struct sk_buff *skb)
+static int ndisc_output(struct sk_buff *skb)
 {
 	if (skb) {
 		struct neighbour *neigh = (skb->dst ? skb->dst->neighbour : NULL);
@@ -701,7 +714,7 @@ static void ndisc_solicit(struct neighbour *neigh, struct sk_buff *skb)
 	}
 }
 
-void ndisc_recv_ns(struct sk_buff *skb)
+static void ndisc_recv_ns(struct sk_buff *skb)
 {
 	struct nd_msg *msg = (struct nd_msg *)skb->h.raw;
 	struct in6_addr *saddr = &skb->nh.ipv6h->saddr;
@@ -908,7 +921,7 @@ void ndisc_recv_ns(struct sk_buff *skb)
 	return;
 }
 
-void ndisc_recv_na(struct sk_buff *skb)
+static void ndisc_recv_na(struct sk_buff *skb)
 {
 	struct nd_msg *msg = (struct nd_msg *)skb->h.raw;
 	struct in6_addr *saddr = &skb->nh.ipv6h->saddr;
