@@ -299,7 +299,7 @@ found_it:
 		goto err_out;
 	}
 	/* Get the starting vcn of the index_block holding the child node. */
-	vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->length) - 8);
+	vcn = sle64_to_cpup((sle64*)((u8*)ie + le16_to_cpu(ie->length) - 8));
 	ia_mapping = VFS_I(dir_ni)->i_mapping;
 	/*
 	 * We are done with the index root and the mft record. Release them,
@@ -551,7 +551,8 @@ found_it2:
 		}
 		/* Child node present, descend into it. */
 		old_vcn = vcn;
-		vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->length) - 8);
+		vcn = sle64_to_cpup((sle64*)((u8*)ie +
+				le16_to_cpu(ie->length) - 8));
 		if (vcn >= 0) {
 			/* If vcn is in the same page cache page as old_vcn we
 			 * recycle the mapped page. */

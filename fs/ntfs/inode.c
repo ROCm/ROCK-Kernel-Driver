@@ -214,7 +214,7 @@ struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no)
  * value with IS_ERR() and if true, the function failed and the error code is
  * obtained from PTR_ERR().
  */
-struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
+struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPE type,
 		ntfschar *name, u32 name_len)
 {
 	struct inode *vi;
@@ -2404,7 +2404,7 @@ out:
  */
 int ntfs_write_inode(struct inode *vi, int sync)
 {
-	s64 nt;
+	sle64 nt;
 	ntfs_inode *ni = NTFS_I(vi);
 	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *m;

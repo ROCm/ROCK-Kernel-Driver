@@ -60,18 +60,18 @@
  * BIOS parameter block (bpb) structure.
  */
 typedef struct {
-	u16 bytes_per_sector;		/* Size of a sector in bytes. */
+	le16 bytes_per_sector;		/* Size of a sector in bytes. */
 	u8  sectors_per_cluster;	/* Size of a cluster in sectors. */
-	u16 reserved_sectors;		/* zero */
+	le16 reserved_sectors;		/* zero */
 	u8  fats;			/* zero */
-	u16 root_entries;		/* zero */
-	u16 sectors;			/* zero */
+	le16 root_entries;		/* zero */
+	le16 sectors;			/* zero */
 	u8  media_type;			/* 0xf8 = hard disk */
-	u16 sectors_per_fat;		/* zero */
-	u16 sectors_per_track;		/* irrelevant */
-	u16 heads;			/* irrelevant */
-	u32 hidden_sectors;		/* zero */
-	u32 large_sectors;		/* zero */
+	le16 sectors_per_fat;		/* zero */
+	le16 sectors_per_track;		/* irrelevant */
+	le16 heads;			/* irrelevant */
+	le32 hidden_sectors;		/* zero */
+	le32 large_sectors;		/* zero */
 } __attribute__ ((__packed__)) BIOS_PARAMETER_BLOCK;
 
 /*
@@ -79,7 +79,7 @@ typedef struct {
  */
 typedef struct {
 	u8  jump[3];			/* Irrelevant (jump to boot up code).*/
-	u64 oem_id;			/* Magic "NTFS    ". */
+	le64 oem_id;			/* Magic "NTFS    ". */
 	BIOS_PARAMETER_BLOCK bpb;	/* See BIOS_PARAMETER_BLOCK. */
 	u8  unused[4];			/* zero, NTFS diskedit.exe states that
 					   this is actually:
@@ -89,21 +89,21 @@ typedef struct {
 									// 0x80
 						__u8 unused;		// zero
 					 */
-/*0x28*/s64 number_of_sectors;		/* Number of sectors in volume. Gives
+/*0x28*/sle64 number_of_sectors;	/* Number of sectors in volume. Gives
 					   maximum volume size of 2^63 sectors.
 					   Assuming standard sector size of 512
 					   bytes, the maximum byte size is
 					   approx. 4.7x10^21 bytes. (-; */
-	s64 mft_lcn;			/* Cluster location of mft data. */
-	s64 mftmirr_lcn;		/* Cluster location of copy of mft. */
+	sle64 mft_lcn;			/* Cluster location of mft data. */
+	sle64 mftmirr_lcn;		/* Cluster location of copy of mft. */
 	s8  clusters_per_mft_record;	/* Mft record size in clusters. */
 	u8  reserved0[3];		/* zero */
 	s8  clusters_per_index_record;	/* Index block size in clusters. */
 	u8  reserved1[3];		/* zero */
-	u64 volume_serial_number;	/* Irrelevant (serial number). */
-	u32 checksum;			/* Boot sector checksum. */
+	le64 volume_serial_number;	/* Irrelevant (serial number). */
+	le32 checksum;			/* Boot sector checksum. */
 /*0x54*/u8  bootstrap[426];		/* Irrelevant (boot up code). */
-	u16 end_of_sector_marker;	/* End of bootsector magic. Always is
+	le16 end_of_sector_marker;	/* End of bootsector magic. Always is
 					   0xaa55 in little endian. */
 /* sizeof() = 512 (0x200) bytes */
 } __attribute__ ((__packed__)) NTFS_BOOT_SECTOR;
@@ -112,88 +112,95 @@ typedef struct {
  * Magic identifiers present at the beginning of all ntfs record containing
  * records (like mft records for example).
  */
-typedef enum {
-	/* Found in $MFT/$DATA. */
-	magic_FILE = const_cpu_to_le32(0x454c4946), /* Mft entry. */
-	magic_INDX = const_cpu_to_le32(0x58444e49), /* Index buffer. */
-	magic_HOLE = const_cpu_to_le32(0x454c4f48), /* ? (NTFS 3.0+?) */
+/* Found in $MFT/$DATA. */
+#define magic_FILE const_cpu_to_le32(0x454c4946) /* Mft entry. */
+#define magic_INDX const_cpu_to_le32(0x58444e49) /* Index buffer. */
+#define magic_HOLE const_cpu_to_le32(0x454c4f48) /* ? (NTFS 3.0+?) */
 
-	/* Found in $LogFile/$DATA. */
-	magic_RSTR = const_cpu_to_le32(0x52545352), /* Restart page. */
-	magic_RCRD = const_cpu_to_le32(0x44524352), /* Log record page. */
+/* Found in $LogFile/$DATA. */
+#define magic_RSTR const_cpu_to_le32(0x52545352) /* Restart page. */
+#define magic_RCRD const_cpu_to_le32(0x44524352) /* Log record page. */
 
-	/* Found in $LogFile/$DATA.  (May be found in $MFT/$DATA, also?) */
-	magic_CHKD = const_cpu_to_le32(0x424b4843), /* Modified by chkdsk. */
+/* Found in $LogFile/$DATA.  (May be found in $MFT/$DATA, also?) */
+#define magic_CHKD const_cpu_to_le32(0x424b4843) /* Modified by chkdsk. */
 
-	/* Found in all ntfs record containing records. */
-	magic_BAAD = const_cpu_to_le32(0x44414142), /* Failed multi sector
-						       transfer was detected. */
-
-	/*
-	 * Found in $LogFile/$DATA when a page is full or 0xff bytes and is
-	 * thus not initialized.  User has to initialize the page before using
-	 * it.
-	 */
-	magic_empty = const_cpu_to_le32(0xffffffff),/* Record is empty and has
-						       to be initialized before
-						       it can be used. */
-} NTFS_RECORD_TYPES;
+/* Found in all ntfs record containing records. */
+#define magic_BAAD const_cpu_to_le32(0x44414142) /* Failed multi sector
+						    transfer was detected. */
+/*
+ * Found in $LogFile/$DATA when a page is full or 0xff bytes and is thus not
+ * initialized.  User has to initialize the page before using it.
+ */
+#define magic_empty const_cpu_to_le32(0xffffffff)/* Record is empty and has to
+						    be initialized before it
+						    can be used. */
+typedef le32 NTFS_RECORD_TYPE;
 
 /*
  * Generic magic comparison macros. Finally found a use for the ## preprocessor
  * operator! (-8
  */
-#define ntfs_is_magic(x, m)	(   (u32)(x) == magic_##m )
-#define ntfs_is_magicp(p, m)	( *(u32*)(p) == magic_##m )
+
+static inline BOOL __ntfs_is_magic(le32 x, NTFS_RECORD_TYPE r)
+{
+	return (x == (__force le32)r);
+}
+#define ntfs_is_magic(x, m)	__ntfs_is_magic(x, magic_##m)
+
+static inline BOOL __ntfs_is_magicp(le32 *p, NTFS_RECORD_TYPE r)
+{
+	return (*p == (__force le32)r);
+}
+#define ntfs_is_magicp(p, m)	__ntfs_is_magicp(p, magic_##m)
 
 /*
- * Specialised magic comparison macros for the NTFS_RECORD_TYPES defined above.
+ * Specialised magic comparison macros for the NTFS_RECORD_TYPEs defined above.
  */
-#define ntfs_is_file_record(x)	( ntfs_is_magic (x, FILE) )
-#define ntfs_is_file_recordp(p)	( ntfs_is_magicp(p, FILE) )
-#define ntfs_is_mft_record(x)	( ntfs_is_file_record(x) )
-#define ntfs_is_mft_recordp(p)	( ntfs_is_file_recordp(p) )
-#define ntfs_is_indx_record(x)	( ntfs_is_magic (x, INDX) )
-#define ntfs_is_indx_recordp(p)	( ntfs_is_magicp(p, INDX) )
-#define ntfs_is_hole_record(x)	( ntfs_is_magic (x, HOLE) )
-#define ntfs_is_hole_recordp(p)	( ntfs_is_magicp(p, HOLE) )
+#define ntfs_is_file_record(x)		( ntfs_is_magic (x, FILE) )
+#define ntfs_is_file_recordp(p)		( ntfs_is_magicp(p, FILE) )
+#define ntfs_is_mft_record(x)		( ntfs_is_file_record (x) )
+#define ntfs_is_mft_recordp(p)		( ntfs_is_file_recordp(p) )
+#define ntfs_is_indx_record(x)		( ntfs_is_magic (x, INDX) )
+#define ntfs_is_indx_recordp(p)		( ntfs_is_magicp(p, INDX) )
+#define ntfs_is_hole_record(x)		( ntfs_is_magic (x, HOLE) )
+#define ntfs_is_hole_recordp(p)		( ntfs_is_magicp(p, HOLE) )
 
-#define ntfs_is_rstr_record(x)	( ntfs_is_magic (x, RSTR) )
-#define ntfs_is_rstr_recordp(p)	( ntfs_is_magicp(p, RSTR) )
-#define ntfs_is_rcrd_record(x)	( ntfs_is_magic (x, RCRD) )
-#define ntfs_is_rcrd_recordp(p)	( ntfs_is_magicp(p, RCRD) )
+#define ntfs_is_rstr_record(x)		( ntfs_is_magic (x, RSTR) )
+#define ntfs_is_rstr_recordp(p)		( ntfs_is_magicp(p, RSTR) )
+#define ntfs_is_rcrd_record(x)		( ntfs_is_magic (x, RCRD) )
+#define ntfs_is_rcrd_recordp(p)		( ntfs_is_magicp(p, RCRD) )
 
-#define ntfs_is_chkd_record(x)	( ntfs_is_magic (x, CHKD) )
-#define ntfs_is_chkd_recordp(p)	( ntfs_is_magicp(p, CHKD) )
+#define ntfs_is_chkd_record(x)		( ntfs_is_magic (x, CHKD) )
+#define ntfs_is_chkd_recordp(p)		( ntfs_is_magicp(p, CHKD) )
 
-#define ntfs_is_baad_record(x)	( ntfs_is_magic (x, BAAD) )
-#define ntfs_is_baad_recordp(p)	( ntfs_is_magicp(p, BAAD) )
+#define ntfs_is_baad_record(x)		( ntfs_is_magic (x, BAAD) )
+#define ntfs_is_baad_recordp(p)		( ntfs_is_magicp(p, BAAD) )
 
 #define ntfs_is_empty_record(x)		( ntfs_is_magic (x, empty) )
 #define ntfs_is_empty_recordp(p)	( ntfs_is_magicp(p, empty) )
 
 /*
- * The Update Sequence Array (usa) is an array of the u16 values which belong
+ * The Update Sequence Array (usa) is an array of the le16 values which belong
  * to the end of each sector protected by the update sequence record in which
  * this array is contained. Note that the first entry is the Update Sequence
  * Number (usn), a cyclic counter of how many times the protected record has
  * been written to disk. The values 0 and -1 (ie. 0xffff) are not used. All
- * last u16's of each sector have to be equal to the usn (during reading) or
+ * last le16's of each sector have to be equal to the usn (during reading) or
  * are set to it (during writing). If they are not, an incomplete multi sector
  * transfer has occurred when the data was written.
  * The maximum size for the update sequence array is fixed to:
  *	maximum size = usa_ofs + (usa_count * 2) = 510 bytes
- * The 510 bytes comes from the fact that the last u16 in the array has to
- * (obviously) finish before the last u16 of the first 512-byte sector.
+ * The 510 bytes comes from the fact that the last le16 in the array has to
+ * (obviously) finish before the last le16 of the first 512-byte sector.
  * This formula can be used as a consistency check in that usa_ofs +
  * (usa_count * 2) has to be less than or equal to 510.
  */
 typedef struct {
-	NTFS_RECORD_TYPES magic;	/* A four-byte magic identifying the
-					   record type and/or status. */
-	u16 usa_ofs;		/* Offset to the Update Sequence Array (usa)
+	NTFS_RECORD_TYPE magic;	/* A four-byte magic identifying the record
+				   type and/or status. */
+	le16 usa_ofs;		/* Offset to the Update Sequence Array (usa)
 				   from the start of the ntfs record. */
-	u16 usa_count;		/* Number of u16 sized entries in the usa
+	le16 usa_count;		/* Number of le16 sized entries in the usa
 				   including the Update Sequence Number (usn),
 				   thus the number of fixups is the usa_count
 				   minus 1. */
@@ -249,11 +256,10 @@ typedef enum {
  * These are the so far known MFT_RECORD_* flags (16-bit) which contain
  * information about the mft record in which they are present.
  */
-typedef enum {
-	MFT_RECORD_IN_USE	= const_cpu_to_le16(0x0001),
-	MFT_RECORD_IS_DIRECTORY	= const_cpu_to_le16(0x0002),
-	MFT_REC_SPACE_FILLER	= 0xffff	/* Just to make flags 16-bit. */
-} __attribute__ ((__packed__)) MFT_RECORD_FLAGS;
+#define MFT_RECORD_IN_USE	const_cpu_to_le16(0x0001)
+#define MFT_RECORD_IS_DIRECTORY	const_cpu_to_le16(0x0002)
+
+typedef le16 MFT_RECORD_FLAGS;
 
 /*
  * mft references (aka file references or file record segment references) are
@@ -305,6 +311,7 @@ typedef enum {
 } MFT_REF_CONSTS;
 
 typedef u64 MFT_REF;
+typedef le64 leMFT_REF;
 
 #define MREF(x)		((unsigned long)((x) & MFT_REF_MASK_CPU))
 #define MSEQNO(x)	((u16)(((x) >> 48) & 0xffff))
@@ -325,18 +332,18 @@ typedef u64 MFT_REF;
 typedef struct {
 /*Ofs*/
 /*  0	NTFS_RECORD; -- Unfolded here as gcc doesn't like unnamed structs. */
-	NTFS_RECORD_TYPES magic;/* Usually the magic is "FILE". */
-	u16 usa_ofs;		/* See NTFS_RECORD definition above. */
-	u16 usa_count;		/* See NTFS_RECORD definition above. */
+	NTFS_RECORD_TYPE magic;	/* Usually the magic is "FILE". */
+	le16 usa_ofs;		/* See NTFS_RECORD definition above. */
+	le16 usa_count;		/* See NTFS_RECORD definition above. */
 
-/*  8*/	u64 lsn;		/* $LogFile sequence number for this record.
+/*  8*/	le64 lsn;		/* $LogFile sequence number for this record.
 				   Changed every time the record is modified. */
-/* 16*/	u16 sequence_number;	/* Number of times this mft record has been
+/* 16*/	le16 sequence_number;	/* Number of times this mft record has been
 				   reused. (See description for MFT_REF
 				   above.) NOTE: The increment (skipping zero)
 				   is done when the file is deleted. NOTE: If
 				   this is zero it is left zero. */
-/* 18*/	u16 link_count;		/* Number of hard links, i.e. the number of
+/* 18*/	le16 link_count;	/* Number of hard links, i.e. the number of
 				   directory entries referencing this record.
 				   NOTE: Only used in mft base records.
 				   NOTE: When deleting a directory entry we
@@ -346,18 +353,18 @@ typedef struct {
 				   directory entry from the mft record and
 				   decrement the link_count.
 				   FIXME: Careful with Win32 + DOS names! */
-/* 20*/	u16 attrs_offset;	/* Byte offset to the first attribute in this
+/* 20*/	le16 attrs_offset;	/* Byte offset to the first attribute in this
 				   mft record from the start of the mft record.
 				   NOTE: Must be aligned to 8-byte boundary. */
 /* 22*/	MFT_RECORD_FLAGS flags;	/* Bit array of MFT_RECORD_FLAGS. When a file
 				   is deleted, the MFT_RECORD_IN_USE flag is
 				   set to zero. */
-/* 24*/	u32 bytes_in_use;	/* Number of bytes used in this mft record.
+/* 24*/	le32 bytes_in_use;	/* Number of bytes used in this mft record.
 				   NOTE: Must be aligned to 8-byte boundary. */
-/* 28*/	u32 bytes_allocated;	/* Number of bytes allocated for this mft
+/* 28*/	le32 bytes_allocated;	/* Number of bytes allocated for this mft
 				   record. This should be equal to the mft
 				   record size. */
-/* 32*/	MFT_REF base_mft_record; /* This is zero for base mft records.
+/* 32*/	leMFT_REF base_mft_record;/* This is zero for base mft records.
 				   When it is not zero it is a mft reference
 				   pointing to the base mft record to which
 				   this record belongs (this is then used to
@@ -369,17 +376,16 @@ typedef struct {
 				   attribute list also means finding the other
 				   potential extents, belonging to the non-base
 				   mft record). */
-/* 40*/	u16 next_attr_instance;	/* The instance number that will be
-				   assigned to the next attribute added to this
-				   mft record. NOTE: Incremented each time
-				   after it is used. NOTE: Every time the mft
-				   record is reused this number is set to zero.
-				   NOTE: The first instance number is always 0.
-				 */
+/* 40*/	le16 next_attr_instance;/* The instance number that will be assigned to
+				   the next attribute added to this mft record.
+				   NOTE: Incremented each time after it is used.
+				   NOTE: Every time the mft record is reused
+				   this number is set to zero.  NOTE: The first
+				   instance number is always 0. */
 /* sizeof() = 42 bytes */
 /* NTFS 3.1+ (Windows XP and above) introduce the following additions. */
-/* 42*/ //u16 reserved;		/* Reserved/alignment. */
-/* 44*/ //u32 mft_record_number;/* Number of this mft record. */
+/* 42*/ //le16 reserved;	/* Reserved/alignment. */
+/* 44*/ //le32 mft_record_number;/* Number of this mft record. */
 /* sizeof() = 48 bytes */
 /*
  * When (re)using the mft record, we place the update sequence array at this
@@ -393,38 +399,40 @@ typedef struct {
 } __attribute__ ((__packed__)) MFT_RECORD;
 
 /*
- * System defined attributes (32-bit). Each attribute type has a corresponding
+ * System defined attributes (32-bit).  Each attribute type has a corresponding
  * attribute name (Unicode string of maximum 64 character length) as described
  * by the attribute definitions present in the data attribute of the $AttrDef
- * system file. On NTFS 3.0 volumes the names are just as the types are named
- * in the below enum exchanging AT_ for the dollar sign ($). If that isn't a
- * revealing choice of symbol... (-;
+ * system file.  On NTFS 3.0 volumes the names are just as the types are named
+ * in the below defines exchanging AT_ for the dollar sign ($).  If that is not
+ * a revealing choice of symbol I do not know what is... (-;
  */
-typedef enum {
-	AT_UNUSED			= const_cpu_to_le32(	     0),
-	AT_STANDARD_INFORMATION		= const_cpu_to_le32(      0x10),
-	AT_ATTRIBUTE_LIST		= const_cpu_to_le32(      0x20),
-	AT_FILE_NAME			= const_cpu_to_le32(      0x30),
-	AT_OBJECT_ID			= const_cpu_to_le32(      0x40),
-	AT_SECURITY_DESCRIPTOR		= const_cpu_to_le32(      0x50),
-	AT_VOLUME_NAME			= const_cpu_to_le32(      0x60),
-	AT_VOLUME_INFORMATION		= const_cpu_to_le32(      0x70),
-	AT_DATA				= const_cpu_to_le32(      0x80),
-	AT_INDEX_ROOT			= const_cpu_to_le32(      0x90),
-	AT_INDEX_ALLOCATION		= const_cpu_to_le32(      0xa0),
-	AT_BITMAP			= const_cpu_to_le32(      0xb0),
-	AT_REPARSE_POINT		= const_cpu_to_le32(      0xc0),
-	AT_EA_INFORMATION		= const_cpu_to_le32(      0xd0),
-	AT_EA				= const_cpu_to_le32(      0xe0),
-	AT_PROPERTY_SET			= const_cpu_to_le32(      0xf0),
-	AT_LOGGED_UTILITY_STREAM	= const_cpu_to_le32(     0x100),
-	AT_FIRST_USER_DEFINED_ATTRIBUTE	= const_cpu_to_le32(    0x1000),
-	AT_END				= const_cpu_to_le32(0xffffffff),
-} ATTR_TYPES;
+#define AT_UNUSED			const_cpu_to_le32(         0)
+#define AT_STANDARD_INFORMATION		const_cpu_to_le32(      0x10)
+#define AT_ATTRIBUTE_LIST		const_cpu_to_le32(      0x20)
+#define AT_FILE_NAME			const_cpu_to_le32(      0x30)
+#define AT_OBJECT_ID			const_cpu_to_le32(      0x40)
+#define AT_SECURITY_DESCRIPTOR		const_cpu_to_le32(      0x50)
+#define AT_VOLUME_NAME			const_cpu_to_le32(      0x60)
+#define AT_VOLUME_INFORMATION		const_cpu_to_le32(      0x70)
+#define AT_DATA				const_cpu_to_le32(      0x80)
+#define AT_INDEX_ROOT			const_cpu_to_le32(      0x90)
+#define AT_INDEX_ALLOCATION		const_cpu_to_le32(      0xa0)
+#define AT_BITMAP			const_cpu_to_le32(      0xb0)
+#define AT_REPARSE_POINT		const_cpu_to_le32(      0xc0)
+#define AT_EA_INFORMATION		const_cpu_to_le32(      0xd0)
+#define AT_EA				const_cpu_to_le32(      0xe0)
+#define AT_PROPERTY_SET			const_cpu_to_le32(      0xf0)
+#define AT_LOGGED_UTILITY_STREAM	const_cpu_to_le32(     0x100)
+#define AT_FIRST_USER_DEFINED_ATTRIBUTE	const_cpu_to_le32(    0x1000)
+#define AT_END				const_cpu_to_le32(0xffffffff)
+
+typedef le32 ATTR_TYPE;
 
 /*
  * The collation rules for sorting views/indexes/etc (32-bit).
  *
+ * COLLATION_BINARY - Collate by binary compare where the first byte is most
+ *	significant.
  * COLLATION_UNICODE_STRING - Collate Unicode strings by comparing their binary
  *	Unicode values, except that when a character can be uppercased, the
  *	upper case value collates before the lower case one.
@@ -435,63 +443,55 @@ typedef enum {
  *	unistr.c::ntfs_collate_names() and unistr.c::legal_ansi_char_array[]
  *	for what I mean but COLLATION_UNICODE_STRING would not give any special
  *	treatment to any characters at all, but this is speculation.
- * COLLATION_NTOFS_ULONG - Sorting is done according to ascending u32 key
+ * COLLATION_NTOFS_ULONG - Sorting is done according to ascending le32 key
  *	values. E.g. used for $SII index in FILE_Secure, which sorts by
- *	security_id (u32).
+ *	security_id (le32).
  * COLLATION_NTOFS_SID - Sorting is done according to ascending SID values.
  *	E.g. used for $O index in FILE_Extend/$Quota.
  * COLLATION_NTOFS_SECURITY_HASH - Sorting is done first by ascending hash
  *	values and second by ascending security_id values. E.g. used for $SDH
  *	index in FILE_Secure.
  * COLLATION_NTOFS_ULONGS - Sorting is done according to a sequence of ascending
- *	u32 key values. E.g. used for $O index in FILE_Extend/$ObjId, which
+ *	le32 key values. E.g. used for $O index in FILE_Extend/$ObjId, which
  *	sorts by object_id (16-byte), by splitting up the object_id in four
- *	u32 values and using them as individual keys. E.g. take the following
+ *	le32 values and using them as individual keys. E.g. take the following
  *	two security_ids, stored as follows on disk:
  *		1st: a1 61 65 b7 65 7b d4 11 9e 3d 00 e0 81 10 42 59
  *		2nd: 38 14 37 d2 d2 f3 d4 11 a5 21 c8 6b 79 b1 97 45
- *	To compare them, they are split into four u32 values each, like so:
+ *	To compare them, they are split into four le32 values each, like so:
  *		1st: 0xb76561a1 0x11d47b65 0xe0003d9e 0x59421081
  *		2nd: 0xd2371438 0x11d4f3d2 0x6bc821a5 0x4597b179
  *	Now, it is apparent why the 2nd object_id collates after the 1st: the
- *	first u32 value of the 1st object_id is less than the first u32 of
- *	the 2nd object_id. If the first u32 values of both object_ids were
- *	equal then the second u32 values would be compared, etc.
+ *	first le32 value of the 1st object_id is less than the first le32 of
+ *	the 2nd object_id. If the first le32 values of both object_ids were
+ *	equal then the second le32 values would be compared, etc.
  */
-typedef enum {
-	COLLATION_BINARY	 = const_cpu_to_le32(0x00), /* Collate by
-					binary compare where the first byte is
-					most significant. */
-	COLLATION_FILE_NAME	 = const_cpu_to_le32(0x01), /* Collate file
-					names as Unicode strings. */
-	COLLATION_UNICODE_STRING = const_cpu_to_le32(0x02), /* Collate Unicode
-					strings by comparing their binary
-					Unicode values, except that when a
-					character can be uppercased, the upper
-					case value collates before the lower
-					case one. */
-	COLLATION_NTOFS_ULONG		= const_cpu_to_le32(0x10),
-	COLLATION_NTOFS_SID		= const_cpu_to_le32(0x11),
-	COLLATION_NTOFS_SECURITY_HASH	= const_cpu_to_le32(0x12),
-	COLLATION_NTOFS_ULONGS		= const_cpu_to_le32(0x13),
-} COLLATION_RULES;
+#define COLLATION_BINARY		const_cpu_to_le32(0x00)
+#define COLLATION_FILE_NAME		const_cpu_to_le32(0x01)
+#define COLLATION_UNICODE_STRING	const_cpu_to_le32(0x02)
+#define COLLATION_NTOFS_ULONG		const_cpu_to_le32(0x10)
+#define COLLATION_NTOFS_SID		const_cpu_to_le32(0x11)
+#define COLLATION_NTOFS_SECURITY_HASH	const_cpu_to_le32(0x12)
+#define COLLATION_NTOFS_ULONGS		const_cpu_to_le32(0x13)
+
+typedef le32 COLLATION_RULE;
 
 /*
  * The flags (32-bit) describing attribute properties in the attribute
- * definition structure. FIXME: This information is from Regis's information
+ * definition structure.  FIXME: This information is from Regis's information
  * and, according to him, it is not certain and probably incomplete.
  * The INDEXABLE flag is fairly certainly correct as only the file name
  * attribute has this flag set and this is the only attribute indexed in NT4.
  */
-typedef enum {
-	INDEXABLE	    = const_cpu_to_le32(0x02),	/* Attribute can be
-							   indexed. */
-	NEED_TO_REGENERATE  = const_cpu_to_le32(0x40),	/* Need to regenerate
-							   during regeneration
-							   phase. */
-	CAN_BE_NON_RESIDENT = const_cpu_to_le32(0x80),	/* Attribute can be
-							   non-resident. */
-} ATTR_DEF_FLAGS;
+#define INDEXABLE	    const_cpu_to_le32(0x02) /* Attribute can be
+						       indexed. */
+#define NEED_TO_REGENERATE  const_cpu_to_le32(0x40) /* Need to regenerate
+						       during regeneration
+						       phase. */
+#define CAN_BE_NON_RESIDENT const_cpu_to_le32(0x80) /* Attribute can be
+						       non-resident. */
+
+typedef le32 ATTR_DEF_FLAGS;
 
 /*
  * The data attribute of FILE_AttrDef contains a sequence of attribute
@@ -506,27 +506,27 @@ typedef struct {
 /*hex ofs*/
 /*  0*/	ntfschar name[0x40];		/* Unicode name of the attribute. Zero
 					   terminated. */
-/* 80*/	ATTR_TYPES type;		/* Type of the attribute. */
-/* 84*/	u32 display_rule;		/* Default display rule.
+/* 80*/	ATTR_TYPE type;			/* Type of the attribute. */
+/* 84*/	le32 display_rule;		/* Default display rule.
 					   FIXME: What does it mean? (AIA) */
-/* 88*/ COLLATION_RULES collation_rule;	/* Default collation rule. */
+/* 88*/ COLLATION_RULE collation_rule;	/* Default collation rule. */
 /* 8c*/	ATTR_DEF_FLAGS flags;		/* Flags describing the attribute. */
-/* 90*/	u64 min_size;			/* Optional minimum attribute size. */
-/* 98*/	u64 max_size;			/* Maximum size of attribute. */
+/* 90*/	le64 min_size;			/* Optional minimum attribute size. */
+/* 98*/	le64 max_size;			/* Maximum size of attribute. */
 /* sizeof() = 0xa0 or 160 bytes */
 } __attribute__ ((__packed__)) ATTR_DEF;
 
 /*
  * Attribute flags (16-bit).
  */
-typedef enum {
-	ATTR_IS_COMPRESSED	= const_cpu_to_le16(0x0001),
-	ATTR_COMPRESSION_MASK	= const_cpu_to_le16(0x00ff),  /* Compression
-						method mask. Also, first
-						illegal value. */
-	ATTR_IS_ENCRYPTED	= const_cpu_to_le16(0x4000),
-	ATTR_IS_SPARSE		= const_cpu_to_le16(0x8000),
-} __attribute__ ((__packed__)) ATTR_FLAGS;
+#define ATTR_IS_COMPRESSED    const_cpu_to_le16(0x0001)
+#define	ATTR_COMPRESSION_MASK const_cpu_to_le16(0x00ff) /* Compression method
+							   mask.  Also, first
+							   illegal value. */
+#define ATTR_IS_ENCRYPTED     const_cpu_to_le16(0x4000)
+#define ATTR_IS_SPARSE	      const_cpu_to_le16(0x8000)
+
+typedef le16 ATTR_FLAGS;
 
 /*
  * Attribute compression.
@@ -598,26 +598,26 @@ typedef enum {
 /*
  * Flags of resident attributes (8-bit).
  */
-typedef enum {
-	RESIDENT_ATTR_IS_INDEXED = 0x01, /* Attribute is referenced in an index
-					    (has implications for deleting and
-					    modifying the attribute). */
-} __attribute__ ((__packed__)) RESIDENT_ATTR_FLAGS;
+#define RESIDENT_ATTR_IS_INDEXED 0x01 /* Attribute is referenced in an index
+					 (has implications for deleting and
+					 modifying the attribute). */
+
+typedef u8 RESIDENT_ATTR_FLAGS;
 
 /*
  * Attribute record header. Always aligned to 8-byte boundary.
  */
 typedef struct {
 /*Ofs*/
-/*  0*/	ATTR_TYPES type;	/* The (32-bit) type of the attribute. */
-/*  4*/	u32 length;		/* Byte size of the resident part of the
+/*  0*/	ATTR_TYPE type;		/* The (32-bit) type of the attribute. */
+/*  4*/	le32 length;		/* Byte size of the resident part of the
 				   attribute (aligned to 8-byte boundary).
 				   Used to get to the next attribute. */
 /*  8*/	u8 non_resident;	/* If 0, attribute is resident.
 				   If 1, attribute is non-resident. */
 /*  9*/	u8 name_length;		/* Unicode character size of name of attribute.
 				   0 if unnamed. */
-/* 10*/	u16 name_offset;	/* If name_length != 0, the byte offset to the
+/* 10*/	le16 name_offset;	/* If name_length != 0, the byte offset to the
 				   beginning of the name from the attribute
 				   record. Note that the name is stored as a
 				   Unicode string. When creating, place offset
@@ -627,15 +627,15 @@ typedef struct {
 				   respectively, aligning to an 8-byte
 				   boundary. */
 /* 12*/	ATTR_FLAGS flags;	/* Flags describing the attribute. */
-/* 14*/	u16 instance;		/* The instance of this attribute record. This
+/* 14*/	le16 instance;		/* The instance of this attribute record. This
 				   number is unique within this mft record (see
 				   MFT_RECORD/next_attribute_instance notes in
 				   in mft.h for more details). */
 /* 16*/	union {
 		/* Resident attributes. */
 		struct {
-/* 16 */		u32 value_length; /* Byte size of attribute value. */
-/* 20 */		u16 value_offset; /* Byte offset of the attribute
+/* 16 */		le32 value_length;/* Byte size of attribute value. */
+/* 20 */		le16 value_offset;/* Byte offset of the attribute
 					     value from the start of the
 					     attribute record. When creating,
 					     align to 8-byte boundary if we
@@ -648,18 +648,18 @@ typedef struct {
 		} __attribute__ ((__packed__)) resident;
 		/* Non-resident attributes. */
 		struct {
-/* 16*/			VCN lowest_vcn;	/* Lowest valid virtual cluster number
+/* 16*/			leVCN lowest_vcn;/* Lowest valid virtual cluster number
 				for this portion of the attribute value or
 				0 if this is the only extent (usually the
 				case). - Only when an attribute list is used
 				does lowest_vcn != 0 ever occur. */
-/* 24*/			VCN highest_vcn; /* Highest valid vcn of this extent of
+/* 24*/			leVCN highest_vcn;/* Highest valid vcn of this extent of
 				the attribute value. - Usually there is only one
 				portion, so this usually equals the attribute
 				value size in clusters minus 1. Can be -1 for
 				zero length files. Can be 0 for "single extent"
 				attributes. */
-/* 32*/			u16 mapping_pairs_offset; /* Byte offset from the
+/* 32*/			le16 mapping_pairs_offset; /* Byte offset from the
 				beginning of the structure to the mapping pairs
 				array which contains the mappings between the
 				vcns and the logical cluster numbers (lcns).
@@ -674,7 +674,7 @@ typedef struct {
 /* 35*/			u8 reserved[5];		/* Align to 8-byte boundary. */
 /* The sizes below are only used when lowest_vcn is zero, as otherwise it would
    be difficult to keep them up-to-date.*/
-/* 40*/			s64 allocated_size;	/* Byte size of disk space
+/* 40*/			sle64 allocated_size;	/* Byte size of disk space
 				allocated to hold the attribute value. Always
 				is a multiple of the cluster size. When a file
 				is compressed, this field is a multiple of the
@@ -682,14 +682,14 @@ typedef struct {
 				it represents the logically allocated space
 				rather than the actual on disk usage. For this
 				use the compressed_size (see below). */
-/* 48*/			s64 data_size;	/* Byte size of the attribute
+/* 48*/			sle64 data_size;	/* Byte size of the attribute
 				value. Can be larger than allocated_size if
 				attribute value is compressed or sparse. */
-/* 56*/			s64 initialized_size;	/* Byte size of initialized
+/* 56*/			sle64 initialized_size;	/* Byte size of initialized
 				portion of the attribute value. Usually equals
 				data_size. */
 /* sizeof(uncompressed attr) = 64*/
-/* 64*/			s64 compressed_size;	/* Byte size of the attribute
+/* 64*/			sle64 compressed_size;	/* Byte size of the attribute
 				value after compression. Only present when
 				compressed. Always is a multiple of the
 				cluster size. Represents the actual amount of
@@ -703,57 +703,56 @@ typedef ATTR_RECORD ATTR_REC;
 
 /*
  * File attribute flags (32-bit).
+ *
+ * The following flags are only present in the STANDARD_INFORMATION attribute
+ * (in the field file_attributes).
  */
-typedef enum {
-	/*
-	 * These flags are only present in the STANDARD_INFORMATION attribute
-	 * (in the field file_attributes).
-	 */
-	FILE_ATTR_READONLY		= const_cpu_to_le32(0x00000001),
-	FILE_ATTR_HIDDEN		= const_cpu_to_le32(0x00000002),
-	FILE_ATTR_SYSTEM		= const_cpu_to_le32(0x00000004),
-	/* Old DOS volid. Unused in NT.	= cpu_to_le32(0x00000008), */
+#define	FILE_ATTR_READONLY		const_cpu_to_le32(0x00000001)
+#define	FILE_ATTR_HIDDEN		const_cpu_to_le32(0x00000002)
+#define	FILE_ATTR_SYSTEM		const_cpu_to_le32(0x00000004)
+/* Old DOS volid. Unused in NT.	= cpu_to_le32(0x00000008), */
 
-	FILE_ATTR_DIRECTORY		= const_cpu_to_le32(0x00000010),
-	/* FILE_ATTR_DIRECTORY is not considered valid in NT. It is reserved
-	   for the DOS SUBDIRECTORY flag. */
-	FILE_ATTR_ARCHIVE		= const_cpu_to_le32(0x00000020),
-	FILE_ATTR_DEVICE		= const_cpu_to_le32(0x00000040),
-	FILE_ATTR_NORMAL		= const_cpu_to_le32(0x00000080),
+#define FILE_ATTR_DIRECTORY		const_cpu_to_le32(0x00000010)
+/* FILE_ATTR_DIRECTORY is not considered valid in NT.  It is reserved for the
+   DOS SUBDIRECTORY flag. */
+#define FILE_ATTR_ARCHIVE		const_cpu_to_le32(0x00000020)
+#define FILE_ATTR_DEVICE		const_cpu_to_le32(0x00000040)
+#define FILE_ATTR_NORMAL		const_cpu_to_le32(0x00000080)
 
-	FILE_ATTR_TEMPORARY		= const_cpu_to_le32(0x00000100),
-	FILE_ATTR_SPARSE_FILE		= const_cpu_to_le32(0x00000200),
-	FILE_ATTR_REPARSE_POINT		= const_cpu_to_le32(0x00000400),
-	FILE_ATTR_COMPRESSED		= const_cpu_to_le32(0x00000800),
+#define FILE_ATTR_TEMPORARY		const_cpu_to_le32(0x00000100)
+#define FILE_ATTR_SPARSE_FILE		const_cpu_to_le32(0x00000200)
+#define FILE_ATTR_REPARSE_POINT		const_cpu_to_le32(0x00000400)
+#define FILE_ATTR_COMPRESSED		const_cpu_to_le32(0x00000800)
 
-	FILE_ATTR_OFFLINE		= const_cpu_to_le32(0x00001000),
-	FILE_ATTR_NOT_CONTENT_INDEXED	= const_cpu_to_le32(0x00002000),
-	FILE_ATTR_ENCRYPTED		= const_cpu_to_le32(0x00004000),
+#define FILE_ATTR_OFFLINE		const_cpu_to_le32(0x00001000)
+#define FILE_ATTR_NOT_CONTENT_INDEXED	const_cpu_to_le32(0x00002000)
+#define FILE_ATTR_ENCRYPTED		const_cpu_to_le32(0x00004000)
 
-	FILE_ATTR_VALID_FLAGS		= const_cpu_to_le32(0x00007fb7),
-	/* FILE_ATTR_VALID_FLAGS masks out the old DOS VolId and the
-	   FILE_ATTR_DEVICE and preserves everything else. This mask
-	   is used to obtain all flags that are valid for reading. */
-	FILE_ATTR_VALID_SET_FLAGS	= const_cpu_to_le32(0x000031a7),
-	/* FILE_ATTR_VALID_SET_FLAGS masks out the old DOS VolId, the
-	   F_A_DEVICE, F_A_DIRECTORY, F_A_SPARSE_FILE, F_A_REPARSE_POINT,
-	   F_A_COMPRESSED and F_A_ENCRYPTED and preserves the rest. This mask
-	   is used to to obtain all flags that are valid for setting. */
+#define FILE_ATTR_VALID_FLAGS		const_cpu_to_le32(0x00007fb7)
+/* FILE_ATTR_VALID_FLAGS masks out the old DOS VolId and the FILE_ATTR_DEVICE
+   and preserves everything else.  This mask is used to obtain all flags that
+   are valid for reading. */
+#define FILE_ATTR_VALID_SET_FLAGS	const_cpu_to_le32(0x000031a7)
+/* FILE_ATTR_VALID_SET_FLAGS masks out the old DOS VolId, the F_A_DEVICE,
+   F_A_DIRECTORY, F_A_SPARSE_FILE, F_A_REPARSE_POINT, F_A_COMPRESSED, and
+   F_A_ENCRYPTED and preserves the rest.  This mask is used to to obtain all
+   flags that are valid for setting. */
 
-	/*
-	 * These flags are only present in the FILE_NAME attribute (in the
-	 * field file_attributes).
-	 */
-	FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT	= const_cpu_to_le32(0x10000000),
-	/* This is a copy of the corresponding bit from the mft record, telling
-	   us whether this is a directory or not, i.e. whether it has an
-	   index root attribute or not. */
-	FILE_ATTR_DUP_VIEW_INDEX_PRESENT	= const_cpu_to_le32(0x20000000),
-	/* This is a copy of the corresponding bit from the mft record, telling
-	   us whether this file has a view index present (eg. object id index,
-	   quota index, one of the security indexes or the encrypting file
-	   system related indexes). */
-} FILE_ATTR_FLAGS;
+/*
+ * The following flags are only present in the FILE_NAME attribute (in the
+ * field file_attributes).
+ */
+#define FILE_ATTR_DUP_FILE_NAME_INDEX_PRESENT	const_cpu_to_le32(0x10000000)
+/* This is a copy of the corresponding bit from the mft record, telling us
+   whether this is a directory or not, i.e. whether it has an index root
+   attribute or not. */
+#define FILE_ATTR_DUP_VIEW_INDEX_PRESENT	const_cpu_to_le32(0x20000000)
+/* This is a copy of the corresponding bit from the mft record, telling us
+   whether this file has a view index present (eg. object id index, quota
+   index, one of the security indexes or the encrypting file system related
+   indexes). */
+
+typedef le32 FILE_ATTR_FLAGS;
 
 /*
  * NOTE on times in NTFS: All times are in MS standard time format, i.e. they
@@ -774,13 +773,13 @@ typedef enum {
  */
 typedef struct {
 /*Ofs*/
-/*  0*/	s64 creation_time;		/* Time file was created. Updated when
+/*  0*/	sle64 creation_time;		/* Time file was created. Updated when
 					   a filename is changed(?). */
-/*  8*/	s64 last_data_change_time;	/* Time the data attribute was last
+/*  8*/	sle64 last_data_change_time;	/* Time the data attribute was last
 					   modified. */
-/* 16*/	s64 last_mft_change_time;	/* Time this mft record was last
+/* 16*/	sle64 last_mft_change_time;	/* Time this mft record was last
 					   modified. */
-/* 24*/	s64 last_access_time;		/* Approximate time when the file was
+/* 24*/	sle64 last_access_time;		/* Approximate time when the file was
 					   last accessed (obviously this is not
 					   updated on read-only volumes). In
 					   Windows this is only updated when
@@ -817,23 +816,23 @@ typedef struct {
  * views that as a corruption, assuming that it behaves like this for all
  * attributes.
  */
-		/* 36*/	u32 maximum_versions;	/* Maximum allowed versions for
+		/* 36*/	le32 maximum_versions;	/* Maximum allowed versions for
 				file. Zero if version numbering is disabled. */
-		/* 40*/	u32 version_number;	/* This file's version (if any).
+		/* 40*/	le32 version_number;	/* This file's version (if any).
 				Set to zero if maximum_versions is zero. */
-		/* 44*/	u32 class_id;		/* Class id from bidirectional
+		/* 44*/	le32 class_id;		/* Class id from bidirectional
 				class id index (?). */
-		/* 48*/	u32 owner_id;		/* Owner_id of the user owning
+		/* 48*/	le32 owner_id;		/* Owner_id of the user owning
 				the file. Translate via $Q index in FILE_Extend
 				/$Quota to the quota control entry for the user
 				owning the file. Zero if quotas are disabled. */
-		/* 52*/	u32 security_id;	/* Security_id for the file.
+		/* 52*/	le32 security_id;	/* Security_id for the file.
 				Translate via $SII index and $SDS data stream
 				in FILE_Secure to the security descriptor. */
-		/* 56*/	u64 quota_charged;	/* Byte size of the charge to
+		/* 56*/	le64 quota_charged;	/* Byte size of the charge to
 				the quota for all streams of the file. Note: Is
 				zero if quotas are disabled. */
-		/* 64*/	u64 usn;		/* Last update sequence number
+		/* 64*/	le64 usn;		/* Last update sequence number
 				of the file. This is a direct index into the
 				change (aka usn) journal file. It is zero if
 				the usn journal is disabled.
@@ -886,14 +885,14 @@ typedef struct {
  */
 typedef struct {
 /*Ofs*/
-/*  0*/	ATTR_TYPES type;	/* Type of referenced attribute. */
-/*  4*/	u16 length;		/* Byte size of this entry (8-byte aligned). */
+/*  0*/	ATTR_TYPE type;		/* Type of referenced attribute. */
+/*  4*/	le16 length;		/* Byte size of this entry (8-byte aligned). */
 /*  6*/	u8 name_length;		/* Size in Unicode chars of the name of the
 				   attribute or 0 if unnamed. */
 /*  7*/	u8 name_offset;		/* Byte offset to beginning of attribute name
 				   (always set this to where the name would
 				   start even if unnamed). */
-/*  8*/	VCN lowest_vcn;		/* Lowest virtual cluster number of this portion
+/*  8*/	leVCN lowest_vcn;	/* Lowest virtual cluster number of this portion
 				   of the attribute value. This is usually 0. It
 				   is non-zero for the case where one attribute
 				   does not fit into one mft record and thus
@@ -905,10 +904,10 @@ typedef struct {
 				   value! The windows driver uses cmp, followed
 				   by jg when comparing this, thus it treats it
 				   as signed. */
-/* 16*/	MFT_REF mft_reference;	/* The reference of the mft record holding
+/* 16*/	leMFT_REF mft_reference;/* The reference of the mft record holding
 				   the ATTR_RECORD for this portion of the
 				   attribute value. */
-/* 24*/	u16 instance;		/* If lowest_vcn = 0, the instance of the
+/* 24*/	le16 instance;		/* If lowest_vcn = 0, the instance of the
 				   attribute being referenced; otherwise 0. */
 /* 26*/	ntfschar name[0];	/* Use when creating only. When reading use
 				   name_offset to determine the location of the
@@ -924,28 +923,26 @@ typedef struct {
 /*
  * Possible namespaces for filenames in ntfs (8-bit).
  */
-typedef enum {
-	FILE_NAME_POSIX			= 0x00,
-		/* This is the largest namespace. It is case sensitive and
-		   allows all Unicode characters except for: '\0' and '/'.
-		   Beware that in WinNT/2k files which eg have the same name
-		   except for their case will not be distinguished by the
-		   standard utilities and thus a "del filename" will delete
-		   both "filename" and "fileName" without warning. */
-	FILE_NAME_WIN32			= 0x01,
-		/* The standard WinNT/2k NTFS long filenames. Case insensitive.
-		   All Unicode chars except: '\0', '"', '*', '/', ':', '<',
-		   '>', '?', '\' and '|'. Further, names cannot end with a '.'
-		   or a space. */
-	FILE_NAME_DOS			= 0x02,
-		/* The standard DOS filenames (8.3 format). Uppercase only.
-		   All 8-bit characters greater space, except: '"', '*', '+',
-		   ',', '/', ':', ';', '<', '=', '>', '?' and '\'. */
-	FILE_NAME_WIN32_AND_DOS		= 0x03,
-		/* 3 means that both the Win32 and the DOS filenames are
-		   identical and hence have been saved in this single filename
-		   record. */
-} __attribute__ ((__packed__)) FILE_NAME_TYPE_FLAGS;
+#define FILE_NAME_POSIX		0x00
+	/* This is the largest namespace. It is case sensitive and allows all
+	   Unicode characters except for: '\0' and '/'.  Beware that in
+	   WinNT/2k files which eg have the same name except for their case
+	   will not be distinguished by the standard utilities and thus a "del
+	   filename" will delete both "filename" and "fileName" without
+	   warning. */
+#define FILE_NAME_WIN32		0x01
+	/* The standard WinNT/2k NTFS long filenames. Case insensitive.  All
+	   Unicode chars except: '\0', '"', '*', '/', ':', '<', '>', '?', '\',
+	   and '|'.  Further, names cannot end with a '.' or a space. */
+#define FILE_NAME_DOS		0x02
+	/* The standard DOS filenames (8.3 format). Uppercase only.  All 8-bit
+	   characters greater space, except: '"', '*', '+', ',', '/', ':', ';',
+	   '<', '=', '>', '?', and '\'. */
+#define FILE_NAME_WIN32_AND_DOS	0x03
+	/* 3 means that both the Win32 and the DOS filenames are identical and
+	   hence have been saved in this single filename record. */
+
+typedef u8 FILE_NAME_TYPE_FLAGS;
 
 /*
  * Attribute: Filename (0x30).
@@ -962,30 +959,30 @@ typedef enum {
  */
 typedef struct {
 /*hex ofs*/
-/*  0*/	MFT_REF parent_directory;	/* Directory this filename is
+/*  0*/	leMFT_REF parent_directory;	/* Directory this filename is
 					   referenced from. */
-/*  8*/	s64 creation_time;		/* Time file was created. */
-/* 10*/	s64 last_data_change_time;	/* Time the data attribute was last
+/*  8*/	sle64 creation_time;		/* Time file was created. */
+/* 10*/	sle64 last_data_change_time;	/* Time the data attribute was last
 					   modified. */
-/* 18*/	s64 last_mft_change_time;	/* Time this mft record was last
+/* 18*/	sle64 last_mft_change_time;	/* Time this mft record was last
 					   modified. */
-/* 20*/	s64 last_access_time;		/* Time this mft record was last
+/* 20*/	sle64 last_access_time;		/* Time this mft record was last
 					   accessed. */
-/* 28*/	s64 allocated_size;		/* Byte size of allocated space for the
+/* 28*/	sle64 allocated_size;		/* Byte size of allocated space for the
 					   data attribute. NOTE: Is a multiple
 					   of the cluster size. */
-/* 30*/	s64 data_size;			/* Byte size of actual data in data
+/* 30*/	sle64 data_size;		/* Byte size of actual data in data
 					   attribute. */
 /* 38*/	FILE_ATTR_FLAGS file_attributes;	/* Flags describing the file. */
 /* 3c*/	union {
 	/* 3c*/	struct {
-		/* 3c*/	u16 packed_ea_size;	/* Size of the buffer needed to
+		/* 3c*/	le16 packed_ea_size;	/* Size of the buffer needed to
 						   pack the extended attributes
 						   (EAs), if such are present.*/
-		/* 3e*/	u16 reserved;		/* Reserved for alignment. */
+		/* 3e*/	le16 reserved;		/* Reserved for alignment. */
 		} __attribute__ ((__packed__)) ea;
 	/* 3c*/	struct {
-		/* 3c*/	u32 reparse_point_tag;	/* Type of reparse point,
+		/* 3c*/	le32 reparse_point_tag;	/* Type of reparse point,
 						   present only in reparse
 						   points and only if there are
 						   no EAs. */
@@ -1007,9 +1004,9 @@ typedef struct {
  *	1F010768-5A73-BC91-0010A52216A7
  */
 typedef struct {
-	u32 data1;	/* The first eight hexadecimal digits of the GUID. */
-	u16 data2;	/* The first group of four hexadecimal digits. */
-	u16 data3;	/* The second group of four hexadecimal digits. */
+	le32 data1;	/* The first eight hexadecimal digits of the GUID. */
+	le16 data2;	/* The first group of four hexadecimal digits. */
+	le16 data3;	/* The second group of four hexadecimal digits. */
 	u8 data4[8];	/* The first two bytes are the third group of four
 			   hexadecimal digits. The remaining six bytes are the
 			   final 12 hexadecimal digits. */
@@ -1027,7 +1024,7 @@ typedef struct {
  *	domain_id	- Reserved (always zero).
  */
 typedef struct {
-	MFT_REF mft_reference;	/* Mft record containing the object_id in
+	leMFT_REF mft_reference;/* Mft record containing the object_id in
 				   the index entry key. */
 	union {
 		struct {
@@ -1195,13 +1192,16 @@ typedef enum {					/* Identifier authority. */
 
 /*
  * The SID_IDENTIFIER_AUTHORITY is a 48-bit value used in the SID structure.
+ *
+ * NOTE: This is stored as a big endian number, hence the high_part comes
+ * before the low_part.
  */
 typedef union {
 	struct {
-		u32 low;	/* Low 32-bits. */
-		u16 high;	/* High 16-bits. */
+		u16 high_part;	/* High 16-bits. */
+		u32 low_part;	/* Low 32-bits. */
 	} __attribute__ ((__packed__)) parts;
-	u8 value[6];			/* Value as individual bytes. */
+	u8 value[6];		/* Value as individual bytes. */
 } __attribute__ ((__packed__)) SID_IDENTIFIER_AUTHORITY;
 
 /*
@@ -1232,7 +1232,7 @@ typedef struct {
 	u8 revision;
 	u8 sub_authority_count;
 	SID_IDENTIFIER_AUTHORITY identifier_authority;
-	u32 sub_authority[1];		/* At least one sub_authority. */
+	le32 sub_authority[1];		/* At least one sub_authority. */
 } __attribute__ ((__packed__)) SID;
 
 /*
@@ -1248,30 +1248,31 @@ typedef enum {
 /*
  * The predefined ACE types (8-bit, see below).
  */
-typedef enum {
-	ACCESS_MIN_MS_ACE_TYPE		= 0,
-	ACCESS_ALLOWED_ACE_TYPE		= 0,
-	ACCESS_DENIED_ACE_TYPE		= 1,
-	SYSTEM_AUDIT_ACE_TYPE		= 2,
-	SYSTEM_ALARM_ACE_TYPE		= 3, /* Not implemented as of Win2k. */
-	ACCESS_MAX_MS_V2_ACE_TYPE	= 3,
+#define ACCESS_MIN_MS_ACE_TYPE			0
+#define ACCESS_ALLOWED_ACE_TYPE			0
+#define ACCESS_DENIED_ACE_TYPE			1
+#define SYSTEM_AUDIT_ACE_TYPE			2
+#define SYSTEM_ALARM_ACE_TYPE			3 /* Not implemented as of
+						     Win2k. */
+#define ACCESS_MAX_MS_V2_ACE_TYPE		3
 
-	ACCESS_ALLOWED_COMPOUND_ACE_TYPE= 4,
-	ACCESS_MAX_MS_V3_ACE_TYPE	= 4,
+#define ACCESS_ALLOWED_COMPOUND_ACE_TYPE	4
+#define ACCESS_MAX_MS_V3_ACE_TYPE		4
 
-	/* The following are Win2k only. */
-	ACCESS_MIN_MS_OBJECT_ACE_TYPE	= 5,
-	ACCESS_ALLOWED_OBJECT_ACE_TYPE	= 5,
-	ACCESS_DENIED_OBJECT_ACE_TYPE	= 6,
-	SYSTEM_AUDIT_OBJECT_ACE_TYPE	= 7,
-	SYSTEM_ALARM_OBJECT_ACE_TYPE	= 8,
-	ACCESS_MAX_MS_OBJECT_ACE_TYPE	= 8,
+/* The following are Win2k only. */
+#define ACCESS_MIN_MS_OBJECT_ACE_TYPE		5
+#define ACCESS_ALLOWED_OBJECT_ACE_TYPE		5
+#define ACCESS_DENIED_OBJECT_ACE_TYPE		6
+#define SYSTEM_AUDIT_OBJECT_ACE_TYPE		7
+#define SYSTEM_ALARM_OBJECT_ACE_TYPE		8
+#define ACCESS_MAX_MS_OBJECT_ACE_TYPE		8
 
-	ACCESS_MAX_MS_V4_ACE_TYPE	= 8,
+#define ACCESS_MAX_MS_V4_ACE_TYPE		8
 
-	/* This one is for WinNT&2k. */
-	ACCESS_MAX_MS_ACE_TYPE		= 8,
-} __attribute__ ((__packed__)) ACE_TYPES;
+/* This one is for WinNT/2k. */
+#define	ACCESS_MAX_MS_ACE_TYPE			8
+
+typedef u8 ACE_TYPES;
 
 /*
  * The ACE flags (8-bit) for audit and inheritance (see below).
@@ -1283,19 +1284,19 @@ typedef enum {
  * FAILED_ACCESS_ACE_FLAG is only used with system audit and alarm ACE types
  * to indicate that a message is generated (in Windows!) for failed accesses.
  */
-typedef enum {
-	/* The inheritance flags. */
-	OBJECT_INHERIT_ACE		= 0x01,
-	CONTAINER_INHERIT_ACE		= 0x02,
-	NO_PROPAGATE_INHERIT_ACE	= 0x04,
-	INHERIT_ONLY_ACE		= 0x08,
-	INHERITED_ACE			= 0x10,	/* Win2k only. */
-	VALID_INHERIT_FLAGS		= 0x1f,
+/* The inheritance flags. */
+#define OBJECT_INHERIT_ACE		0x01
+#define CONTAINER_INHERIT_ACE		0x02
+#define NO_PROPAGATE_INHERIT_ACE	0x04
+#define INHERIT_ONLY_ACE		0x08
+#define INHERITED_ACE			0x10	/* Win2k only. */
+#define VALID_INHERIT_FLAGS		0x1f
 
-	/* The audit flags. */
-	SUCCESSFUL_ACCESS_ACE_FLAG	= 0x40,
-	FAILED_ACCESS_ACE_FLAG		= 0x80,
-} __attribute__ ((__packed__)) ACE_FLAGS;
+/* The audit flags. */
+#define SUCCESSFUL_ACCESS_ACE_FLAG	0x40
+#define FAILED_ACCESS_ACE_FLAG		0x80
+
+typedef u8 ACE_FLAGS;
 
 /*
  * An ACE is an access-control entry in an access-control list (ACL).
@@ -1312,141 +1313,140 @@ typedef struct {
 /*Ofs*/
 /*  0*/	ACE_TYPES type;		/* Type of the ACE. */
 /*  1*/	ACE_FLAGS flags;	/* Flags describing the ACE. */
-/*  2*/	u16 size;		/* Size in bytes of the ACE. */
+/*  2*/	le16 size;		/* Size in bytes of the ACE. */
 } __attribute__ ((__packed__)) ACE_HEADER;
 
 /*
  * The access mask (32-bit). Defines the access rights.
+ *
+ * The specific rights (bits 0 to 15).  These depend on the type of the object
+ * being secured by the ACE.
  */
-typedef enum {
-	/*
-	 * The specific rights (bits 0 to 15). Depend on the type of the
-	 * object being secured by the ACE.
-	 */
 
-	/* Specific rights for files and directories are as follows: */
+/* Specific rights for files and directories are as follows: */
 
-	/* Right to read data from the file. (FILE) */
-	FILE_READ_DATA			= const_cpu_to_le32(0x00000001),
-	/* Right to list contents of a directory. (DIRECTORY) */
-	FILE_LIST_DIRECTORY		= const_cpu_to_le32(0x00000001),
+/* Right to read data from the file. (FILE) */
+#define FILE_READ_DATA			const_cpu_to_le32(0x00000001)
+/* Right to list contents of a directory. (DIRECTORY) */
+#define FILE_LIST_DIRECTORY		const_cpu_to_le32(0x00000001)
 
-	/* Right to write data to the file. (FILE) */
-	FILE_WRITE_DATA			= const_cpu_to_le32(0x00000002),
-	/* Right to create a file in the directory. (DIRECTORY) */
-	FILE_ADD_FILE			= const_cpu_to_le32(0x00000002),
+/* Right to write data to the file. (FILE) */
+#define FILE_WRITE_DATA			const_cpu_to_le32(0x00000002)
+/* Right to create a file in the directory. (DIRECTORY) */
+#define FILE_ADD_FILE			const_cpu_to_le32(0x00000002)
 
-	/* Right to append data to the file. (FILE) */
-	FILE_APPEND_DATA		= const_cpu_to_le32(0x00000004),
-	/* Right to create a subdirectory. (DIRECTORY) */
-	FILE_ADD_SUBDIRECTORY		= const_cpu_to_le32(0x00000004),
+/* Right to append data to the file. (FILE) */
+#define FILE_APPEND_DATA		const_cpu_to_le32(0x00000004)
+/* Right to create a subdirectory. (DIRECTORY) */
+#define FILE_ADD_SUBDIRECTORY		const_cpu_to_le32(0x00000004)
 
-	/* Right to read extended attributes. (FILE/DIRECTORY) */
-	FILE_READ_EA			= const_cpu_to_le32(0x00000008),
+/* Right to read extended attributes. (FILE/DIRECTORY) */
+#define FILE_READ_EA			const_cpu_to_le32(0x00000008)
 
-	/* Right to write extended attributes. (FILE/DIRECTORY) */
-	FILE_WRITE_EA			= const_cpu_to_le32(0x00000010),
+/* Right to write extended attributes. (FILE/DIRECTORY) */
+#define FILE_WRITE_EA			const_cpu_to_le32(0x00000010)
 
-	/* Right to execute a file. (FILE) */
-	FILE_EXECUTE			= const_cpu_to_le32(0x00000020),
-	/* Right to traverse the directory. (DIRECTORY) */
-	FILE_TRAVERSE			= const_cpu_to_le32(0x00000020),
+/* Right to execute a file. (FILE) */
+#define FILE_EXECUTE			const_cpu_to_le32(0x00000020)
+/* Right to traverse the directory. (DIRECTORY) */
+#define FILE_TRAVERSE			const_cpu_to_le32(0x00000020)
 
-	/*
-	 * Right to delete a directory and all the files it contains (its
-	 * children), even if the files are read-only. (DIRECTORY)
-	 */
-	FILE_DELETE_CHILD		= const_cpu_to_le32(0x00000040),
+/*
+ * Right to delete a directory and all the files it contains (its children),
+ * even if the files are read-only. (DIRECTORY)
+ */
+#define FILE_DELETE_CHILD		const_cpu_to_le32(0x00000040)
 
-	/* Right to read file attributes. (FILE/DIRECTORY) */
-	FILE_READ_ATTRIBUTES		= const_cpu_to_le32(0x00000080),
+/* Right to read file attributes. (FILE/DIRECTORY) */
+#define FILE_READ_ATTRIBUTES		const_cpu_to_le32(0x00000080)
 
-	/* Right to change file attributes. (FILE/DIRECTORY) */
-	FILE_WRITE_ATTRIBUTES		= const_cpu_to_le32(0x00000100),
+/* Right to change file attributes. (FILE/DIRECTORY) */
+#define FILE_WRITE_ATTRIBUTES		const_cpu_to_le32(0x00000100)
 
-	/*
-	 * The standard rights (bits 16 to 23). Are independent of the type of
-	 * object being secured.
-	 */
+/*
+ * The standard rights (bits 16 to 23).  These are independent of the type of
+ * object being secured.
+ */
 
-	/* Right to delete the object. */
-	DELETE				= const_cpu_to_le32(0x00010000),
+/* Right to delete the object. */
+#define DELETE				const_cpu_to_le32(0x00010000)
 
-	/*
-	 * Right to read the information in the object's security descriptor,
-	 * not including the information in the SACL. I.e. right to read the
-	 * security descriptor and owner.
-	 */
-	READ_CONTROL			= const_cpu_to_le32(0x00020000),
+/*
+ * Right to read the information in the object's security descriptor, not
+ * including the information in the SACL. I.e. right to read the security
+ * descriptor and owner.
+ */
+#define READ_CONTROL			const_cpu_to_le32(0x00020000)
 
-	/* Right to modify the DACL in the object's security descriptor. */
-	WRITE_DAC			= const_cpu_to_le32(0x00040000),
+/* Right to modify the DACL in the object's security descriptor. */
+#define WRITE_DAC			const_cpu_to_le32(0x00040000)
 
-	/* Right to change the owner in the object's security descriptor. */
-	WRITE_OWNER			= const_cpu_to_le32(0x00080000),
+/* Right to change the owner in the object's security descriptor. */
+#define WRITE_OWNER			const_cpu_to_le32(0x00080000)
 
-	/*
-	 * Right to use the object for synchronization. Enables a process to
-	 * wait until the object is in the signalled state. Some object types
-	 * do not support this access right.
-	 */
-	SYNCHRONIZE			= const_cpu_to_le32(0x00100000),
+/*
+ * Right to use the object for synchronization. Enables a process to wait until
+ * the object is in the signalled state. Some object types do not support this
+ * access right.
+ */
+#define SYNCHRONIZE			const_cpu_to_le32(0x00100000)
 
-	/*
-	 * The following STANDARD_RIGHTS_* are combinations of the above for
-	 * convenience and are defined by the Win32 API.
-	 */
+/*
+ * The following STANDARD_RIGHTS_* are combinations of the above for
+ * convenience and are defined by the Win32 API.
+ */
 
-	/* These are currently defined to READ_CONTROL. */
-	STANDARD_RIGHTS_READ		= const_cpu_to_le32(0x00020000),
-	STANDARD_RIGHTS_WRITE		= const_cpu_to_le32(0x00020000),
-	STANDARD_RIGHTS_EXECUTE		= const_cpu_to_le32(0x00020000),
+/* These are currently defined to READ_CONTROL. */
+#define STANDARD_RIGHTS_READ		const_cpu_to_le32(0x00020000)
+#define STANDARD_RIGHTS_WRITE		const_cpu_to_le32(0x00020000)
+#define STANDARD_RIGHTS_EXECUTE		const_cpu_to_le32(0x00020000)
 
-	/* Combines DELETE, READ_CONTROL, WRITE_DAC, and WRITE_OWNER access. */
-	STANDARD_RIGHTS_REQUIRED	= const_cpu_to_le32(0x000f0000),
+/* Combines DELETE, READ_CONTROL, WRITE_DAC, and WRITE_OWNER access. */
+#define STANDARD_RIGHTS_REQUIRED	const_cpu_to_le32(0x000f0000)
 
-	/*
-	 * Combines DELETE, READ_CONTROL, WRITE_DAC, WRITE_OWNER, and
-	 * SYNCHRONIZE access.
-	 */
-	STANDARD_RIGHTS_ALL		= const_cpu_to_le32(0x001f0000),
+/*
+ * Combines DELETE, READ_CONTROL, WRITE_DAC, WRITE_OWNER, and
+ * SYNCHRONIZE access.
+ */
+#define STANDARD_RIGHTS_ALL		const_cpu_to_le32(0x001f0000)
 
-	/*
-	 * The access system ACL and maximum allowed access types (bits 24 to
-	 * 25, bits 26 to 27 are reserved).
-	 */
-	ACCESS_SYSTEM_SECURITY		= const_cpu_to_le32(0x01000000),
-	MAXIMUM_ALLOWED			= const_cpu_to_le32(0x02000000),
+/*
+ * The access system ACL and maximum allowed access types (bits 24 to
+ * 25, bits 26 to 27 are reserved).
+ */
+#define ACCESS_SYSTEM_SECURITY		const_cpu_to_le32(0x01000000)
+#define MAXIMUM_ALLOWED			const_cpu_to_le32(0x02000000)
 
-	/*
-	 * The generic rights (bits 28 to 31). These map onto the standard and
-	 * specific rights.
-	 */
+/*
+ * The generic rights (bits 28 to 31). These map onto the standard and specific
+ * rights.
+ */
 
-	/* Read, write, and execute access. */
-	GENERIC_ALL			= const_cpu_to_le32(0x10000000),
+/* Read, write, and execute access. */
+#define GENERIC_ALL			const_cpu_to_le32(0x10000000)
 
-	/* Execute access. */
-	GENERIC_EXECUTE			= const_cpu_to_le32(0x20000000),
+/* Execute access. */
+#define GENERIC_EXECUTE			const_cpu_to_le32(0x20000000)
 
-	/*
-	 * Write access. For files, this maps onto:
-	 *	FILE_APPEND_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_DATA |
-	 *	FILE_WRITE_EA | STANDARD_RIGHTS_WRITE | SYNCHRONIZE
-	 * For directories, the mapping has the same numberical value. See
-	 * above for the descriptions of the rights granted.
-	 */
-	GENERIC_WRITE			= const_cpu_to_le32(0x40000000),
+/*
+ * Write access. For files, this maps onto:
+ *	FILE_APPEND_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_DATA |
+ *	FILE_WRITE_EA | STANDARD_RIGHTS_WRITE | SYNCHRONIZE
+ * For directories, the mapping has the same numberical value.  See above for
+ * the descriptions of the rights granted.
+ */
+#define GENERIC_WRITE			const_cpu_to_le32(0x40000000)
 
-	/*
-	 * Read access. For files, this maps onto:
-	 *	FILE_READ_ATTRIBUTES | FILE_READ_DATA | FILE_READ_EA |
-	 *	STANDARD_RIGHTS_READ | SYNCHRONIZE
-	 * For directories, the mapping has the same numberical value. See
-	 * above for the descriptions of the rights granted.
-	 */
-	GENERIC_READ			= const_cpu_to_le32(0x80000000),
-} ACCESS_MASK;
+/*
+ * Read access. For files, this maps onto:
+ *	FILE_READ_ATTRIBUTES | FILE_READ_DATA | FILE_READ_EA |
+ *	STANDARD_RIGHTS_READ | SYNCHRONIZE
+ * For directories, the mapping has the same numberical value.  See above for
+ * the descriptions of the rights granted.
+ */
+#define GENERIC_READ			const_cpu_to_le32(0x80000000)
+
+typedef le32 ACCESS_MASK;
 
 /*
  * The generic mapping array. Used to denote the mapping of each generic
@@ -1472,7 +1472,7 @@ typedef struct {
 /*  0	ACE_HEADER; -- Unfolded here as gcc doesn't like unnamed structs. */
 	ACE_TYPES type;		/* Type of the ACE. */
 	ACE_FLAGS flags;	/* Flags describing the ACE. */
-	u16 size;		/* Size in bytes of the ACE. */
+	le16 size;		/* Size in bytes of the ACE. */
 /*  4*/	ACCESS_MASK mask;	/* Access mask associated with the ACE. */
 
 /*  8*/	SID sid;		/* The SID associated with the ACE. */
@@ -1482,16 +1482,16 @@ typedef struct {
 /*
  * The object ACE flags (32-bit).
  */
-typedef enum {
-	ACE_OBJECT_TYPE_PRESENT			= const_cpu_to_le32(1),
-	ACE_INHERITED_OBJECT_TYPE_PRESENT	= const_cpu_to_le32(2),
-} OBJECT_ACE_FLAGS;
+#define ACE_OBJECT_TYPE_PRESENT			const_cpu_to_le32(1)
+#define ACE_INHERITED_OBJECT_TYPE_PRESENT	const_cpu_to_le32(2)
+
+typedef le32 OBJECT_ACE_FLAGS;
 
 typedef struct {
 /*  0	ACE_HEADER; -- Unfolded here as gcc doesn't like unnamed structs. */
 	ACE_TYPES type;		/* Type of the ACE. */
 	ACE_FLAGS flags;	/* Flags describing the ACE. */
-	u16 size;		/* Size in bytes of the ACE. */
+	le16 size;		/* Size in bytes of the ACE. */
 /*  4*/	ACCESS_MASK mask;	/* Access mask associated with the ACE. */
 
 /*  8*/	OBJECT_ACE_FLAGS object_flags;	/* Flags describing the object ACE. */
@@ -1514,10 +1514,10 @@ typedef struct {
 typedef struct {
 	u8 revision;	/* Revision of this ACL. */
 	u8 alignment1;
-	u16 size;	/* Allocated space in bytes for ACL. Includes this
+	le16 size;	/* Allocated space in bytes for ACL. Includes this
 			   header, the ACEs and the remaining free space. */
-	u16 ace_count;	/* Number of ACEs in the ACL. */
-	u16 alignment2;
+	le16 ace_count;	/* Number of ACEs in the ACL. */
+	le16 alignment2;
 /* sizeof() = 8 bytes */
 } __attribute__ ((__packed__)) ACL;
 
@@ -1582,22 +1582,22 @@ typedef enum {
  *	security descriptor are contiguous in memory and all pointer fields are
  *	expressed as offsets from the beginning of the security descriptor.
  */
-typedef enum {
-	SE_OWNER_DEFAULTED		= const_cpu_to_le16(0x0001),
-	SE_GROUP_DEFAULTED		= const_cpu_to_le16(0x0002),
-	SE_DACL_PRESENT			= const_cpu_to_le16(0x0004),
-	SE_DACL_DEFAULTED		= const_cpu_to_le16(0x0008),
-	SE_SACL_PRESENT			= const_cpu_to_le16(0x0010),
-	SE_SACL_DEFAULTED		= const_cpu_to_le16(0x0020),
-	SE_DACL_AUTO_INHERIT_REQ	= const_cpu_to_le16(0x0100),
-	SE_SACL_AUTO_INHERIT_REQ	= const_cpu_to_le16(0x0200),
-	SE_DACL_AUTO_INHERITED		= const_cpu_to_le16(0x0400),
-	SE_SACL_AUTO_INHERITED		= const_cpu_to_le16(0x0800),
-	SE_DACL_PROTECTED		= const_cpu_to_le16(0x1000),
-	SE_SACL_PROTECTED		= const_cpu_to_le16(0x2000),
-	SE_RM_CONTROL_VALID		= const_cpu_to_le16(0x4000),
-	SE_SELF_RELATIVE		= const_cpu_to_le16(0x8000),
-} __attribute__ ((__packed__)) SECURITY_DESCRIPTOR_CONTROL;
+#define SE_OWNER_DEFAULTED		const_cpu_to_le16(0x0001)
+#define SE_GROUP_DEFAULTED		const_cpu_to_le16(0x0002)
+#define SE_DACL_PRESENT			const_cpu_to_le16(0x0004)
+#define SE_DACL_DEFAULTED		const_cpu_to_le16(0x0008)
+#define SE_SACL_PRESENT			const_cpu_to_le16(0x0010)
+#define SE_SACL_DEFAULTED		const_cpu_to_le16(0x0020)
+#define SE_DACL_AUTO_INHERIT_REQ	const_cpu_to_le16(0x0100)
+#define SE_SACL_AUTO_INHERIT_REQ	const_cpu_to_le16(0x0200)
+#define SE_DACL_AUTO_INHERITED		const_cpu_to_le16(0x0400)
+#define SE_SACL_AUTO_INHERITED		const_cpu_to_le16(0x0800)
+#define SE_DACL_PROTECTED		const_cpu_to_le16(0x1000)
+#define SE_SACL_PROTECTED		const_cpu_to_le16(0x2000)
+#define SE_RM_CONTROL_VALID		const_cpu_to_le16(0x4000)
+#define SE_SELF_RELATIVE		const_cpu_to_le16(0x8000)
+
+typedef le16 SECURITY_DESCRIPTOR_CONTROL;
 
 /*
  * Self-relative security descriptor. Contains the owner and group SIDs as well
@@ -1608,17 +1608,17 @@ typedef struct {
 	u8 alignment;
 	SECURITY_DESCRIPTOR_CONTROL control; /* Flags qualifying the type of
 			   the descriptor as well as the following fields. */
-	u32 owner;	/* Byte offset to a SID representing an object's
+	le32 owner;	/* Byte offset to a SID representing an object's
 			   owner. If this is NULL, no owner SID is present in
 			   the descriptor. */
-	u32 group;	/* Byte offset to a SID representing an object's
+	le32 group;	/* Byte offset to a SID representing an object's
 			   primary group. If this is NULL, no primary group
 			   SID is present in the descriptor. */
-	u32 sacl;	/* Byte offset to a system ACL. Only valid, if
+	le32 sacl;	/* Byte offset to a system ACL. Only valid, if
 			   SE_SACL_PRESENT is set in the control field. If
 			   SE_SACL_PRESENT is set but sacl is NULL, a NULL ACL
 			   is specified. */
-	u32 dacl;	/* Byte offset to a discretionary ACL. Only valid, if
+	le32 dacl;	/* Byte offset to a discretionary ACL. Only valid, if
 			   SE_DACL_PRESENT is set in the control field. If
 			   SE_DACL_PRESENT is set but dacl is NULL, a NULL ACL
 			   (unconditionally granting access) is specified. */
@@ -1721,10 +1721,10 @@ typedef SECURITY_DESCRIPTOR_RELATIVE SECURITY_DESCRIPTOR_ATTR;
  * This is also the index entry data part of both the $SII and $SDH indexes.
  */
 typedef struct {
-	u32 hash;	   /* Hash of the security descriptor. */
-	u32 security_id;   /* The security_id assigned to the descriptor. */
-	u64 offset;	   /* Byte offset of this entry in the $SDS stream. */
-	u32 length;	   /* Size in bytes of this entry in $SDS stream. */
+	le32 hash;	  /* Hash of the security descriptor. */
+	le32 security_id; /* The security_id assigned to the descriptor. */
+	le64 offset;	  /* Byte offset of this entry in the $SDS stream. */
+	le32 length;	  /* Size in bytes of this entry in $SDS stream. */
 } __attribute__ ((__packed__)) SECURITY_DESCRIPTOR_HEADER;
 
 /*
@@ -1742,10 +1742,10 @@ typedef struct {
 /*Ofs*/
 /*  0	SECURITY_DESCRIPTOR_HEADER; -- Unfolded here as gcc doesn't like
 				       unnamed structs. */
-	u32 hash;	   /* Hash of the security descriptor. */
-	u32 security_id;   /* The security_id assigned to the descriptor. */
-	u64 offset;	   /* Byte offset of this entry in the $SDS stream. */
-	u32 length;	   /* Size in bytes of this entry in $SDS stream. */
+	le32 hash;	  /* Hash of the security descriptor. */
+	le32 security_id; /* The security_id assigned to the descriptor. */
+	le64 offset;	  /* Byte offset of this entry in the $SDS stream. */
+	le32 length;	  /* Size in bytes of this entry in $SDS stream. */
 /* 20*/	SECURITY_DESCRIPTOR_RELATIVE sid; /* The self-relative security
 					     descriptor. */
 } __attribute__ ((__packed__)) SDS_ENTRY;
@@ -1755,7 +1755,7 @@ typedef struct {
  * COLLATION_NTOFS_ULONG.
  */
 typedef struct {
-	u32 security_id; /* The security_id assigned to the descriptor. */
+	le32 security_id; /* The security_id assigned to the descriptor. */
 } __attribute__ ((__packed__)) SII_INDEX_KEY;
 
 /*
@@ -1764,8 +1764,8 @@ typedef struct {
  * COLLATION_NTOFS_SECURITY_HASH.
  */
 typedef struct {
-	u32 hash;	   /* Hash of the security descriptor. */
-	u32 security_id;   /* The security_id assigned to the descriptor. */
+	le32 hash;	  /* Hash of the security descriptor. */
+	le32 security_id; /* The security_id assigned to the descriptor. */
 } __attribute__ ((__packed__)) SDH_INDEX_KEY;
 
 /*
@@ -1781,19 +1781,19 @@ typedef struct {
 /*
  * Possible flags for the volume (16-bit).
  */
-typedef enum {
-	VOLUME_IS_DIRTY			= const_cpu_to_le16(0x0001),
-	VOLUME_RESIZE_LOG_FILE		= const_cpu_to_le16(0x0002),
-	VOLUME_UPGRADE_ON_MOUNT		= const_cpu_to_le16(0x0004),
-	VOLUME_MOUNTED_ON_NT4		= const_cpu_to_le16(0x0008),
-	VOLUME_DELETE_USN_UNDERWAY	= const_cpu_to_le16(0x0010),
-	VOLUME_REPAIR_OBJECT_ID		= const_cpu_to_le16(0x0020),
-	VOLUME_MODIFIED_BY_CHKDSK	= const_cpu_to_le16(0x8000),
-	VOLUME_FLAGS_MASK		= const_cpu_to_le16(0x803f),
+#define VOLUME_IS_DIRTY			const_cpu_to_le16(0x0001)
+#define VOLUME_RESIZE_LOG_FILE		const_cpu_to_le16(0x0002)
+#define VOLUME_UPGRADE_ON_MOUNT		const_cpu_to_le16(0x0004)
+#define VOLUME_MOUNTED_ON_NT4		const_cpu_to_le16(0x0008)
+#define VOLUME_DELETE_USN_UNDERWAY	const_cpu_to_le16(0x0010)
+#define VOLUME_REPAIR_OBJECT_ID		const_cpu_to_le16(0x0020)
+#define VOLUME_MODIFIED_BY_CHKDSK	const_cpu_to_le16(0x8000)
+#define VOLUME_FLAGS_MASK		const_cpu_to_le16(0x803f)
 
-	/* To make our life easier when checking if we must mount read-only. */
-	VOLUME_MUST_MOUNT_RO_MASK	= const_cpu_to_le16(0x8037),
-} __attribute__ ((__packed__)) VOLUME_FLAGS;
+/* To make our life easier when checking if we must mount read-only. */
+#define VOLUME_MUST_MOUNT_RO_MASK	const_cpu_to_le16(0x8037)
+
+typedef le16 VOLUME_FLAGS;
 
 /*
  * Attribute: Volume information (0x70).
@@ -1804,7 +1804,7 @@ typedef enum {
  *	 NTFS 1.2. I haven't personally seen other values yet.
  */
 typedef struct {
-	u64 reserved;		/* Not used (yet?). */
+	le64 reserved;		/* Not used (yet?). */
 	u8 major_ver;		/* Major version of the ntfs format. */
 	u8 minor_ver;		/* Minor version of the ntfs format. */
 	VOLUME_FLAGS flags;	/* Bit array of VOLUME_* flags. */
@@ -1823,25 +1823,26 @@ typedef struct {
 
 /*
  * Index header flags (8-bit).
+ *
+ * When index header is in an index root attribute:
  */
-typedef enum {
-	/* When index header is in an index root attribute: */
-	SMALL_INDEX	= 0, /* The index is small enough to fit inside the
-				index root attribute and there is no index
-				allocation attribute present. */
-	LARGE_INDEX	= 1, /* The index is too large to fit in the index
-				root attribute and/or an index allocation
-				attribute is present. */
-	/*
-	 * When index header is in an index block, i.e. is part of index
-	 * allocation attribute:
-	 */
-	LEAF_NODE	= 0, /* This is a leaf node, i.e. there are no more
-				nodes branching off it. */
-	INDEX_NODE	= 1, /* This node indexes other nodes, i.e. is not a
-				leaf node. */
-	NODE_MASK	= 1, /* Mask for accessing the *_NODE bits. */
-} __attribute__ ((__packed__)) INDEX_HEADER_FLAGS;
+#define SMALL_INDEX 0 /* The index is small enough to fit inside the index root
+			 attribute and there is no index allocation attribute
+			 present. */
+#define LARGE_INDEX 1 /* The index is too large to fit in the index root
+			 attribute and/or an index allocation attribute is
+			 present. */
+/*
+ * When index header is in an index block, i.e. is part of index allocation
+ * attribute:
+ */
+#define LEAF_NODE  0 /* This is a leaf node, i.e. there are no more nodes
+			branching off it. */
+#define INDEX_NODE 1 /* This node indexes other nodes, i.e. it is not a leaf
+			node. */
+#define NODE_MASK  1 /* Mask for accessing the *_NODE bits. */
+
+typedef u8 INDEX_HEADER_FLAGS;
 
 /*
  * This is the header for indexes, describing the INDEX_ENTRY records, which
@@ -1853,12 +1854,12 @@ typedef enum {
  * start of the index root or index allocation structures themselves.
  */
 typedef struct {
-	u32 entries_offset;		/* Byte offset to first INDEX_ENTRY
+	le32 entries_offset;		/* Byte offset to first INDEX_ENTRY
 					   aligned to 8-byte boundary. */
-	u32 index_length;		/* Data size of the index in bytes,
+	le32 index_length;		/* Data size of the index in bytes,
 					   i.e. bytes used from allocated
 					   size, aligned to 8-byte boundary. */
-	u32 allocated_size;		/* Byte size of this index (block),
+	le32 allocated_size;		/* Byte size of this index (block),
 					   multiple of 8 bytes. */
 	/* NOTE: For the index root attribute, the above two numbers are always
 	   equal, as the attribute is resident and it is resized as needed. In
@@ -1891,14 +1892,14 @@ typedef struct {
  * dircetories do not contain entries for themselves, though.
  */
 typedef struct {
-	ATTR_TYPES type;		/* Type of the indexed attribute. Is
+	ATTR_TYPE type;			/* Type of the indexed attribute. Is
 					   $FILE_NAME for directories, zero
 					   for view indexes. No other values
 					   allowed. */
-	COLLATION_RULES collation_rule;	/* Collation rule used to sort the
+	COLLATION_RULE collation_rule;	/* Collation rule used to sort the
 					   index entries. If type is $FILE_NAME,
 					   this must be COLLATION_FILE_NAME. */
-	u32 index_block_size;		/* Size of each index block in bytes (in
+	le32 index_block_size;		/* Size of each index block in bytes (in
 					   the index allocation attribute). */
 	u8 clusters_per_index_block;	/* Cluster size of each index block (in
 					   the index allocation attribute), when
@@ -1924,13 +1925,13 @@ typedef struct {
  */
 typedef struct {
 /*  0	NTFS_RECORD; -- Unfolded here as gcc doesn't like unnamed structs. */
-	NTFS_RECORD_TYPES magic;/* Magic is "INDX". */
-	u16 usa_ofs;		/* See NTFS_RECORD definition. */
-	u16 usa_count;		/* See NTFS_RECORD definition. */
+	NTFS_RECORD_TYPE magic;	/* Magic is "INDX". */
+	le16 usa_ofs;		/* See NTFS_RECORD definition. */
+	le16 usa_count;		/* See NTFS_RECORD definition. */
 
-/*  8*/	s64 lsn;		/* $LogFile sequence number of the last
+/*  8*/	sle64 lsn;		/* $LogFile sequence number of the last
 				   modification of this index block. */
-/* 16*/	VCN index_block_vcn;	/* Virtual cluster number of the index block.
+/* 16*/	leVCN index_block_vcn;	/* Virtual cluster number of the index block.
 				   If the cluster_size on the volume is <= the
 				   index_block_size of the directory,
 				   index_block_vcn counts in units of clusters,
@@ -1960,34 +1961,35 @@ typedef INDEX_BLOCK INDEX_ALLOCATION;
  * primary key / is not a key at all. (AIA)
  */
 typedef struct {
-	u32 reparse_tag;	/* Reparse point type (inc. flags). */
-	MFT_REF file_id;	/* Mft record of the file containing the
+	le32 reparse_tag;	/* Reparse point type (inc. flags). */
+	leMFT_REF file_id;	/* Mft record of the file containing the
 				   reparse point attribute. */
 } __attribute__ ((__packed__)) REPARSE_INDEX_KEY;
 
 /*
  * Quota flags (32-bit).
+ *
+ * The user quota flags.  Names explain meaning.
  */
-typedef enum {
-	/* The user quota flags. Names explain meaning. */
-	QUOTA_FLAG_DEFAULT_LIMITS	= const_cpu_to_le32(0x00000001),
-	QUOTA_FLAG_LIMIT_REACHED	= const_cpu_to_le32(0x00000002),
-	QUOTA_FLAG_ID_DELETED		= const_cpu_to_le32(0x00000004),
+#define QUOTA_FLAG_DEFAULT_LIMITS	const_cpu_to_le32(0x00000001)
+#define QUOTA_FLAG_LIMIT_REACHED	const_cpu_to_le32(0x00000002)
+#define QUOTA_FLAG_ID_DELETED		const_cpu_to_le32(0x00000004)
 
-	QUOTA_FLAG_USER_MASK		= const_cpu_to_le32(0x00000007),
-		/* Bit mask for user quota flags. */
+#define QUOTA_FLAG_USER_MASK		const_cpu_to_le32(0x00000007)
+	/* Bit mask for user quota flags. */
 
-	/* These flags are only present in the quota defaults index entry,
-	   i.e. in the entry where owner_id = QUOTA_DEFAULTS_ID. */
-	QUOTA_FLAG_TRACKING_ENABLED	= const_cpu_to_le32(0x00000010),
-	QUOTA_FLAG_ENFORCEMENT_ENABLED	= const_cpu_to_le32(0x00000020),
-	QUOTA_FLAG_TRACKING_REQUESTED	= const_cpu_to_le32(0x00000040),
-	QUOTA_FLAG_LOG_THRESHOLD	= const_cpu_to_le32(0x00000080),
-	QUOTA_FLAG_LOG_LIMIT		= const_cpu_to_le32(0x00000100),
-	QUOTA_FLAG_OUT_OF_DATE		= const_cpu_to_le32(0x00000200),
-	QUOTA_FLAG_CORRUPT		= const_cpu_to_le32(0x00000400),
-	QUOTA_FLAG_PENDING_DELETES	= const_cpu_to_le32(0x00000800),
-} QUOTA_FLAGS;
+/* These flags are only present in the quota defaults index entry, i.e. in the
+   entry where owner_id = QUOTA_DEFAULTS_ID. */
+#define QUOTA_FLAG_TRACKING_ENABLED	const_cpu_to_le32(0x00000010)
+#define QUOTA_FLAG_ENFORCEMENT_ENABLED	const_cpu_to_le32(0x00000020)
+#define QUOTA_FLAG_TRACKING_REQUESTED	const_cpu_to_le32(0x00000040)
+#define QUOTA_FLAG_LOG_THRESHOLD	const_cpu_to_le32(0x00000080)
+#define QUOTA_FLAG_LOG_LIMIT		const_cpu_to_le32(0x00000100)
+#define QUOTA_FLAG_OUT_OF_DATE		const_cpu_to_le32(0x00000200)
+#define QUOTA_FLAG_CORRUPT		const_cpu_to_le32(0x00000400)
+#define QUOTA_FLAG_PENDING_DELETES	const_cpu_to_le32(0x00000800)
+
+typedef le32 QUOTA_FLAGS;
 
 /*
  * The system file FILE_Extend/$Quota contains two indexes $O and $Q. Quotas
@@ -2011,13 +2013,13 @@ typedef enum {
  * The $Q index entry data is the quota control entry and is defined below.
  */
 typedef struct {
-	u32 version;		/* Currently equals 2. */
+	le32 version;		/* Currently equals 2. */
 	QUOTA_FLAGS flags;	/* Flags describing this quota entry. */
-	u64 bytes_used;		/* How many bytes of the quota are in use. */
-	s64 change_time;	/* Last time this quota entry was changed. */
-	s64 threshold;		/* Soft quota (-1 if not limited). */
-	s64 limit;		/* Hard quota (-1 if not limited). */
-	s64 exceeded_time;	/* How long the soft quota has been exceeded. */
+	le64 bytes_used;	/* How many bytes of the quota are in use. */
+	sle64 change_time;	/* Last time this quota entry was changed. */
+	sle64 threshold;	/* Soft quota (-1 if not limited). */
+	sle64 limit;		/* Hard quota (-1 if not limited). */
+	sle64 exceeded_time;	/* How long the soft quota has been exceeded. */
 	SID sid;		/* The SID of the user/object associated with
 				   this quota entry.  Equals zero for the quota
 				   defaults entry (and in fact on a WinXP
@@ -2027,11 +2029,9 @@ typedef struct {
 /*
  * Predefined owner_id values (32-bit).
  */
-typedef enum {
-	QUOTA_INVALID_ID	= const_cpu_to_le32(0x00000000),
-	QUOTA_DEFAULTS_ID	= const_cpu_to_le32(0x00000001),
-	QUOTA_FIRST_USER_ID	= const_cpu_to_le32(0x00000100),
-} PREDEFINED_OWNER_IDS;
+#define QUOTA_INVALID_ID	const_cpu_to_le32(0x00000000)
+#define QUOTA_DEFAULTS_ID	const_cpu_to_le32(0x00000001)
+#define QUOTA_FIRST_USER_ID	const_cpu_to_le32(0x00000100)
 
 /*
  * Current constants for quota control entries.
@@ -2044,18 +2044,14 @@ typedef enum {
 /*
  * Index entry flags (16-bit).
  */
-typedef enum {
-	INDEX_ENTRY_NODE = const_cpu_to_le16(1), /* This entry contains a
-					      sub-node, i.e. a reference to an
-					      index block in form of a virtual
-					      cluster number (see below). */
-	INDEX_ENTRY_END  = const_cpu_to_le16(2), /* This signifies the last
-					      entry in an index block.  The
-					      index entry does not represent a
-					      file but it can point to a
-					      sub-node. */
-	INDEX_ENTRY_SPACE_FILLER = 0xffff, /* Just to force 16-bit width. */
-} __attribute__ ((__packed__)) INDEX_ENTRY_FLAGS;
+#define INDEX_ENTRY_NODE const_cpu_to_le16(1) /* This entry contains a
+			sub-node, i.e. a reference to an index block in form of
+			a virtual cluster number (see below). */
+#define INDEX_ENTRY_END  const_cpu_to_le16(2) /* This signifies the last entry
+			in an index block.  The index entry does not represent
+			a file but it can point to a sub-node. */
+
+typedef le16 INDEX_ENTRY_FLAGS;
 
 /*
  * This the index entry header (see below).
@@ -2063,26 +2059,26 @@ typedef enum {
 typedef struct {
 /*  0*/	union {
 		struct { /* Only valid when INDEX_ENTRY_END is not set. */
-			MFT_REF indexed_file;	/* The mft reference of the file
+			leMFT_REF indexed_file;	/* The mft reference of the file
 						   described by this index
 						   entry. Used for directory
 						   indexes. */
 		} __attribute__ ((__packed__)) dir;
 		struct { /* Used for views/indexes to find the entry's data. */
-			u16 data_offset;	/* Data byte offset from this
+			le16 data_offset;	/* Data byte offset from this
 						   INDEX_ENTRY. Follows the
 						   index key. */
-			u16 data_length;	/* Data length in bytes. */
-			u32 reservedV;		/* Reserved (zero). */
+			le16 data_length;	/* Data length in bytes. */
+			le32 reservedV;		/* Reserved (zero). */
 		} __attribute__ ((__packed__)) vi;
 	} __attribute__ ((__packed__)) data;
-/*  8*/	u16 length;		 /* Byte size of this index entry, multiple of
+/*  8*/	le16 length;		 /* Byte size of this index entry, multiple of
 				    8-bytes. */
-/* 10*/	u16 key_length;		 /* Byte size of the key value, which is in the
+/* 10*/	le16 key_length;	 /* Byte size of the key value, which is in the
 				    index entry. It follows field reserved. Not
 				    multiple of 8-bytes. */
 /* 12*/	INDEX_ENTRY_FLAGS flags; /* Bit field of INDEX_ENTRY_* flags. */
-/* 14*/	u16 reserved;		 /* Reserved/align to 8-byte boundary. */
+/* 14*/	le16 reserved;		 /* Reserved/align to 8-byte boundary. */
 /* sizeof() = 16 bytes */
 } __attribute__ ((__packed__)) INDEX_ENTRY_HEADER;
 
@@ -2098,26 +2094,26 @@ typedef struct {
 /*  0	INDEX_ENTRY_HEADER; -- Unfolded here as gcc dislikes unnamed structs. */
 	union {
 		struct { /* Only valid when INDEX_ENTRY_END is not set. */
-			MFT_REF indexed_file;	/* The mft reference of the file
+			leMFT_REF indexed_file;	/* The mft reference of the file
 						   described by this index
 						   entry. Used for directory
 						   indexes. */
 		} __attribute__ ((__packed__)) dir;
 		struct { /* Used for views/indexes to find the entry's data. */
-			u16 data_offset;	/* Data byte offset from this
+			le16 data_offset;	/* Data byte offset from this
 						   INDEX_ENTRY. Follows the
 						   index key. */
-			u16 data_length;	/* Data length in bytes. */
-			u32 reservedV;		/* Reserved (zero). */
+			le16 data_length;	/* Data length in bytes. */
+			le32 reservedV;		/* Reserved (zero). */
 		} __attribute__ ((__packed__)) vi;
 	} __attribute__ ((__packed__)) data;
-	u16 length;		 /* Byte size of this index entry, multiple of
+	le16 length;		 /* Byte size of this index entry, multiple of
 				    8-bytes. */
-	u16 key_length;		 /* Byte size of the key value, which is in the
+	le16 key_length;	 /* Byte size of the key value, which is in the
 				    index entry. It follows field reserved. Not
 				    multiple of 8-bytes. */
 	INDEX_ENTRY_FLAGS flags; /* Bit field of INDEX_ENTRY_* flags. */
-	u16 reserved;		 /* Reserved/align to 8-byte boundary. */
+	le16 reserved;		 /* Reserved/align to 8-byte boundary. */
 
 /* 16*/	union {		/* The key of the indexed attribute. NOTE: Only present
 			   if INDEX_ENTRY_END bit in flags is not set. NOTE: On
@@ -2134,13 +2130,13 @@ typedef struct {
 						   FILE_Extend/$Reparse. */
 		SID sid;		/* $O index in FILE_Extend/$Quota:
 					   SID of the owner of the user_id. */
-		u32 owner_id;		/* $Q index in FILE_Extend/$Quota:
+		le32 owner_id;		/* $Q index in FILE_Extend/$Quota:
 					   user_id of the owner of the quota
 					   control entry in the data part of
 					   the index. */
 	} __attribute__ ((__packed__)) key;
 	/* The (optional) index data is inserted here when creating. */
-	// VCN vcn;	/* If INDEX_ENTRY_NODE bit in flags is set, the last
+	// leVCN vcn;	/* If INDEX_ENTRY_NODE bit in flags is set, the last
 	//		   eight bytes of this index entry contain the virtual
 	//		   cluster number of the index block that holds the
 	//		   entries immediately preceding the current entry (the
@@ -2185,29 +2181,29 @@ typedef struct {
  *		be slow. (E.g. the data is stored on a tape drive.)
  *	bit 31: Microsoft bit. If set, the tag is owned by Microsoft. User
  *		defined tags have to use zero here.
+ *
+ * These are the predefined reparse point tags:
  */
-typedef enum {
-	IO_REPARSE_TAG_IS_ALIAS		= const_cpu_to_le32(0x20000000),
-	IO_REPARSE_TAG_IS_HIGH_LATENCY	= const_cpu_to_le32(0x40000000),
-	IO_REPARSE_TAG_IS_MICROSOFT	= const_cpu_to_le32(0x80000000),
+#define IO_REPARSE_TAG_IS_ALIAS		const_cpu_to_le32(0x20000000)
+#define IO_REPARSE_TAG_IS_HIGH_LATENCY	const_cpu_to_le32(0x40000000)
+#define IO_REPARSE_TAG_IS_MICROSOFT	const_cpu_to_le32(0x80000000)
 
-	IO_REPARSE_TAG_RESERVED_ZERO	= const_cpu_to_le32(0x00000000),
-	IO_REPARSE_TAG_RESERVED_ONE	= const_cpu_to_le32(0x00000001),
-	IO_REPARSE_TAG_RESERVED_RANGE	= const_cpu_to_le32(0x00000001),
+#define IO_REPARSE_TAG_RESERVED_ZERO	const_cpu_to_le32(0x00000000)
+#define IO_REPARSE_TAG_RESERVED_ONE	const_cpu_to_le32(0x00000001)
+#define IO_REPARSE_TAG_RESERVED_RANGE	const_cpu_to_le32(0x00000001)
 
-	IO_REPARSE_TAG_NSS		= const_cpu_to_le32(0x68000005),
-	IO_REPARSE_TAG_NSS_RECOVER	= const_cpu_to_le32(0x68000006),
-	IO_REPARSE_TAG_SIS		= const_cpu_to_le32(0x68000007),
-	IO_REPARSE_TAG_DFS		= const_cpu_to_le32(0x68000008),
+#define IO_REPARSE_TAG_NSS		const_cpu_to_le32(0x68000005)
+#define IO_REPARSE_TAG_NSS_RECOVER	const_cpu_to_le32(0x68000006)
+#define IO_REPARSE_TAG_SIS		const_cpu_to_le32(0x68000007)
+#define IO_REPARSE_TAG_DFS		const_cpu_to_le32(0x68000008)
 
-	IO_REPARSE_TAG_MOUNT_POINT	= const_cpu_to_le32(0x88000003),
+#define IO_REPARSE_TAG_MOUNT_POINT	const_cpu_to_le32(0x88000003)
 
-	IO_REPARSE_TAG_HSM		= const_cpu_to_le32(0xa8000004),
+#define IO_REPARSE_TAG_HSM		const_cpu_to_le32(0xa8000004)
 
-	IO_REPARSE_TAG_SYMBOLIC_LINK	= const_cpu_to_le32(0xe8000000),
+#define IO_REPARSE_TAG_SYMBOLIC_LINK	const_cpu_to_le32(0xe8000000)
 
-	IO_REPARSE_TAG_VALID_VALUES	= const_cpu_to_le32(0xe000ffff),
-} PREDEFINED_REPARSE_TAGS;
+#define IO_REPARSE_TAG_VALID_VALUES	const_cpu_to_le32(0xe000ffff)
 
 /*
  * Attribute: Reparse point (0xc0).
@@ -2215,9 +2211,9 @@ typedef enum {
  * NOTE: Can be resident or non-resident.
  */
 typedef struct {
-	u32 reparse_tag;		/* Reparse point type (inc. flags). */
-	u16 reparse_data_length;	/* Byte size of reparse data. */
-	u16 reserved;			/* Align to 8-byte boundary. */
+	le32 reparse_tag;		/* Reparse point type (inc. flags). */
+	le16 reparse_data_length;	/* Byte size of reparse data. */
+	le16 reserved;			/* Align to 8-byte boundary. */
 	u8 reparse_data[0];		/* Meaning depends on reparse_tag. */
 } __attribute__ ((__packed__)) REPARSE_POINT;
 
@@ -2227,11 +2223,11 @@ typedef struct {
  * NOTE: Always resident. (Is this true???)
  */
 typedef struct {
-	u16 ea_length;		/* Byte size of the packed extended
+	le16 ea_length;		/* Byte size of the packed extended
 				   attributes. */
-	u16 need_ea_count;	/* The number of extended attributes which have
+	le16 need_ea_count;	/* The number of extended attributes which have
 				   the NEED_EA bit set. */
-	u32 ea_query_length;	/* Byte size of the buffer required to query
+	le32 ea_query_length;	/* Byte size of the buffer required to query
 				   the extended attributes when calling
 				   ZwQueryEaFile() in Windows NT/2k. I.e. the
 				   byte size of the unpacked extended
@@ -2241,9 +2237,9 @@ typedef struct {
 /*
  * Extended attribute flags (8-bit).
  */
-typedef enum {
-	NEED_EA	= 0x80,
-} __attribute__ ((__packed__)) EA_FLAGS;
+#define NEED_EA	0x80
+
+typedef u8 EA_FLAGS;
 
 /*
  * Attribute: Extended attribute (EA) (0xe0).
@@ -2256,10 +2252,10 @@ typedef enum {
  * FIXME: It appears weird that the EA name is not unicode. Is it true?
  */
 typedef struct {
-	u32 next_entry_offset;	/* Offset to the next EA_ATTR. */
+	le32 next_entry_offset;	/* Offset to the next EA_ATTR. */
 	EA_FLAGS flags;		/* Flags describing the EA. */
 	u8 ea_name_length;	/* Length of the name of the EA in bytes. */
-	u16 ea_value_length;	/* Byte size of the EA's value. */
+	le16 ea_value_length;	/* Byte size of the EA's value. */
 	u8 ea_name[0];		/* Name of the EA. */
 	u8 ea_value[0];		/* The value of the EA. Immediately follows
 				   the name. */

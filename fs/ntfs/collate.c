@@ -97,24 +97,26 @@ static ntfs_collate_func_t ntfs_do_collate0x1[4] = {
  * For speed we use the collation rule @cr as an index into two tables of
  * function pointers to call the appropriate collation function.
  */
-int ntfs_collate(ntfs_volume *vol, COLLATION_RULES cr,
+int ntfs_collate(ntfs_volume *vol, COLLATION_RULE cr,
 		const void *data1, const int data1_len,
 		const void *data2, const int data2_len) {
+	int i;
+
 	ntfs_debug("Entering.");
 	/*
 	 * FIXME:  At the moment we only support COLLATION_BINARY and
 	 * COLLATION_NTOFS_ULONG, so we BUG() for everything else for now.
 	 */
 	BUG_ON(cr != COLLATION_BINARY && cr != COLLATION_NTOFS_ULONG);
-	cr = le32_to_cpu(cr);
-	BUG_ON(cr < 0);
-	if (cr <= 0x02)
-		return ntfs_do_collate0x0[cr](vol, data1, data1_len,
+	i = le32_to_cpu(cr);
+	BUG_ON(i < 0);
+	if (i <= 0x02)
+		return ntfs_do_collate0x0[i](vol, data1, data1_len,
 				data2, data2_len);
-	BUG_ON(cr < 0x10);
-	cr -= 0x10;
-	if (likely(cr <= 3))
-		return ntfs_do_collate0x1[cr](vol, data1, data1_len,
+	BUG_ON(i < 0x10);
+	i -= 0x10;
+	if (likely(i <= 3))
+		return ntfs_do_collate0x1[i](vol, data1, data1_len,
 				data2, data2_len);
 	BUG();
 	return 0;

@@ -96,7 +96,7 @@ int ntfs_collate_names(const ntfschar *name1, const u32 name1_len,
 		const ntfschar *upcase, const u32 upcase_len)
 {
 	u32 cnt, min_len;
-	ntfschar c1, c2;
+	u16 c1, c2;
 
 	min_len = name1_len;
 	if (name1_len > name2_len)
@@ -144,7 +144,7 @@ int ntfs_collate_names(const ntfschar *name1, const u32 name1_len,
  */
 int ntfs_ucsncmp(const ntfschar *s1, const ntfschar *s2, size_t n)
 {
-	ntfschar c1, c2;
+	u16 c1, c2;
 	size_t i;
 
 	for (i = 0; i < n; ++i) {
@@ -181,8 +181,8 @@ int ntfs_ucsncmp(const ntfschar *s1, const ntfschar *s2, size_t n)
 int ntfs_ucsncasecmp(const ntfschar *s1, const ntfschar *s2, size_t n,
 		const ntfschar *upcase, const u32 upcase_size)
 {
-	ntfschar c1, c2;
 	size_t i;
+	u16 c1, c2;
 
 	for (i = 0; i < n; ++i) {
 		if ((c1 = le16_to_cpu(s1[i])) < upcase_size)
@@ -203,7 +203,7 @@ void ntfs_upcase_name(ntfschar *name, u32 name_len, const ntfschar *upcase,
 		const u32 upcase_len)
 {
 	u32 i;
-	ntfschar u;
+	u16 u;
 
 	for (i = 0; i < name_len; i++)
 		if ((u = le16_to_cpu(name[i])) < upcase_len)
