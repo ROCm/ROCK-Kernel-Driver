@@ -103,7 +103,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x41445370, 0xffffffff, "AD1980",		patch_ad1980,	NULL },
 { 0x41445372, 0xffffffff, "AD1981A",		patch_ad1881,	NULL },
 { 0x41445374, 0xffffffff, "AD1981B",		patch_ad1881,	NULL },
-{ 0x41445375, 0xffffffff, "AD1985",		patch_ad1980,	NULL },
+{ 0x41445375, 0xffffffff, "AD1985",		patch_ad1985,	NULL },
 { 0x414c4300, 0xfffffff0, "RL5306",	 	NULL,		NULL },
 { 0x414c4310, 0xfffffff0, "RL5382", 		NULL,		NULL },
 { 0x414c4320, 0xfffffff0, "RL5383", 		NULL,		NULL },
@@ -2235,6 +2235,14 @@ static int swap_surround(ac97_t *ac97)
 	return 0;
 }
 
+static int tune_ad_sharing(ac97_t *ac97)
+{
+	unsigned short scfg;
+	/* Turn on OMS bit to route microphone to back panel */
+	scfg = snd_ac97_read(ac97, AC97_AD_SERIAL_CFG);
+	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, scfg | 0x0200);
+	return swap_headphone(ac97, 1);
+}
 
 /**
  * snd_ac97_tune_hardware - tune up the hardware
@@ -2253,7 +2261,10 @@ int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk)
 	snd_assert(quirk, return -EINVAL);
 
 	for (; quirk->vendor; quirk++) {
-		if (quirk->vendor == ac97->subsystem_vendor && quirk->device == ac97->subsystem_device) {
+		if (quirk->vendor != ac97->subsystem_vendor)
+			continue;
+		if ((! quirk->mask && quirk->device == ac97->subsystem_device) ||
+		    quirk->device == (quirk->mask & ac97->subsystem_device)) {
 			snd_printdd("ac97 quirk for %s (%04x:%04x)\n", quirk->name, ac97->subsystem_vendor, ac97->subsystem_device);
 			switch (quirk->type) {
 			case AC97_TUNE_HP_ONLY:
@@ -2262,6 +2273,8 @@ int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk)
 				return swap_headphone(ac97, 0);
 			case AC97_TUNE_SWAP_SURROUND:
 				return swap_surround(ac97);
+			case AC97_TUNE_AD_SHARING:
+				return tune_ad_sharing(ac97);
 			}
 			snd_printk(KERN_ERR "invalid quirk type %d for %s\n", quirk->type, quirk->name);
 			return -EINVAL;

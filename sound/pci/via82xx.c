@@ -886,9 +886,11 @@ static int snd_via8233_playback_prepare(snd_pcm_substream_t *substream)
 		snd_ac97_set_rate(chip->ac97, AC97_PCM_LFE_DAC_RATE, runtime->rate);
 		snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
 	}
+#if 0
 	if (chip->revision == VIA_REV_8233A)
 		rbits = 0;
 	else
+#endif
 		rbits = (0xfffff / 48000) * runtime->rate + ((0xfffff % 48000) * runtime->rate) / 48000;
 	snd_assert((rbits & ~0xfffff) == 0, return -EINVAL);
 	snd_via82xx_channel_reset(chip, viadev);
@@ -928,9 +930,12 @@ static int snd_via8233_multi_prepare(snd_pcm_substream_t *substream)
 	fmt = (runtime->format == SNDRV_PCM_FORMAT_S16_LE) ? VIA_REG_MULTPLAY_FMT_16BIT : VIA_REG_MULTPLAY_FMT_8BIT;
 	fmt |= runtime->channels << 4;
 	outb(fmt, VIADEV_REG(viadev, OFS_MULTPLAY_FORMAT));
+#if 0
 	if (chip->revision == VIA_REV_8233A)
 		slots = 0;
-	else {
+	else
+#endif
+	{
 		/* set sample number to slot 3, 4, 7, 8, 6, 9 (for VIA8233/C,8235) */
 		/* corresponding to FL, FR, RL, RR, C, LFE ?? */
 		switch (runtime->channels) {
@@ -1501,7 +1506,12 @@ static void snd_via82xx_mixer_free_ac97(ac97_t *ac97)
 }
 
 static struct ac97_quirk ac97_quirks[] = {
-	{ 0x1106, 0x4161, "ASRock K7VT2", AC97_TUNE_HP_ONLY },
+	{
+		.vendor = 0x1106,
+		.device = 0x4161,
+		.name = "ASRock K7VT2",
+		.type = AC97_TUNE_HP_ONLY
+	},
 	{ } /* terminator */
 };
 
