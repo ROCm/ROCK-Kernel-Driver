@@ -272,10 +272,20 @@
 #define __NR_fdatasync          253
 #define __NR_nfsservctl         254
 #define __NR_aplib              255
-/* WARNING: You MAY NOT add syscall numbers larger than 255, since
+#define __NR_clock_settime	256
+#define __NR_clock_gettime	257
+#define __NR_clock_getres	258
+#define __NR_clock_nanosleep	259
+#define __NR_sched_getaffinity	260
+#define __NR_sched_setaffinity	261
+#define __NR_timer_settime	262
+#define __NR_timer_gettime	263
+#define __NR_timer_getoverrun	264
+#define __NR_timer_delete	265
+/* WARNING: You MAY NOT add syscall numbers larger than 265, since
  *          all of the syscall tables in the Sparc kernel are
- *          sized to have 256 entries (starting at zero).  Therefore
- *          find a free slot in the 0-255 range.
+ *          sized to have 266 entries (starting at zero).  Therefore
+ *          find a free slot in the 0-265 range.
  */
 
 #define _syscall0(type,name) \
