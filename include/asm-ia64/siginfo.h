@@ -66,6 +66,7 @@ typedef struct siginfo {
 			long _band;	/* POLL_IN, POLL_OUT, POLL_MSG (XPG requires a "long") */
 			int _fd;
 		} _sigpoll;
+
 		/* SIGPROF */
 		struct {
 			pid_t _pid;		/* which child */
