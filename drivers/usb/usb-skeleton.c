@@ -238,9 +238,9 @@ static int skel_open (struct inode *inode, struct file *file)
 	int subminor;
 	int retval = 0;
 	
-	dbg(__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 
-	subminor = MINOR (inode->i_rdev) - USB_SKEL_MINOR_BASE;
+	subminor = minor (inode->i_rdev) - USB_SKEL_MINOR_BASE;
 	if ((subminor < 0) ||
 	    (subminor >= MAX_DEVICES)) {
 		return -ENODEV;
@@ -291,11 +291,11 @@ static int skel_release (struct inode *inode, struct file *file)
 
 	dev = (struct usb_skel *)file->private_data;
 	if (dev == NULL) {
-		dbg (__FUNCTION__ " - object is NULL");
+		dbg ("%s - object is NULL", __FUNCTION__);
 		return -ENODEV;
 	}
 
-	dbg(__FUNCTION__ " - minor %d", dev->minor);
+	dbg("%s - minor %d", __FUNCTION__, dev->minor);
 
 	/* lock our minor table */
 	down (&minor_table_mutex);
@@ -304,7 +304,7 @@ static int skel_release (struct inode *inode, struct file *file)
 	down (&dev->sem);
 
 	if (dev->open_count <= 0) {
-		dbg (__FUNCTION__ " - device not opened");
+		dbg ("%s - device not opened", __FUNCTION__);
 		retval = -ENODEV;
 		goto exit_not_opened;
 	}
@@ -347,7 +347,7 @@ static ssize_t skel_read (struct file *file, char *buffer, size_t count, loff_t 
 
 	dev = (struct usb_skel *)file->private_data;
 	
-	dbg(__FUNCTION__ " - minor %d, count = %d", dev->minor, count);
+	dbg("%s - minor %d, count = %d", __FUNCTION__, dev->minor, count);
 
 	/* lock this object */
 	down (&dev->sem);
@@ -390,7 +390,7 @@ static ssize_t skel_write (struct file *file, const char *buffer, size_t count, 
 
 	dev = (struct usb_skel *)file->private_data;
 
-	dbg(__FUNCTION__ " - minor %d, count = %d", dev->minor, count);
+	dbg("%s - minor %d, count = %d", __FUNCTION__, dev->minor, count);
 
 	/* lock this object */
 	down (&dev->sem);
@@ -403,13 +403,13 @@ static ssize_t skel_write (struct file *file, const char *buffer, size_t count, 
 
 	/* verify that we actually have some data to write */
 	if (count == 0) {
-		dbg(__FUNCTION__ " - write request of 0 bytes");
+		dbg("%s - write request of 0 bytes", __FUNCTION__);
 		goto exit;
 	}
 
 	/* see if we are already in the middle of a write */
 	if (dev->write_urb->status == -EINPROGRESS) {
-		dbg (__FUNCTION__ " - already writing");
+		dbg ("%s - already writing", __FUNCTION__);
 		goto exit;
 	}
 
@@ -438,8 +438,8 @@ static ssize_t skel_write (struct file *file, const char *buffer, size_t count, 
 	 unless a spinlock is held */
 	retval = usb_submit_urb(dev->write_urb, GFP_KERNEL);
 	if (retval) {
-		err(__FUNCTION__ " - failed submitting write urb, error %d",
-		    retval);
+		err("%s - failed submitting write urb, error %d",
+		    __FUNCTION__, retval);
 	} else {
 		retval = bytes_written;
 	}
@@ -470,7 +470,7 @@ static int skel_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		return -ENODEV;
 	}
 
-	dbg(__FUNCTION__ " - minor %d, cmd 0x%.4x, arg %ld", 
+	dbg("%s - minor %d, cmd 0x%.4x, arg %ld", __FUNCTION__,
 	    dev->minor, cmd, arg);
 
 
@@ -491,12 +491,12 @@ static void skel_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_skel *dev = (struct usb_skel *)urb->context;
 
-	dbg(__FUNCTION__ " - minor %d", dev->minor);
+	dbg("%s - minor %d", __FUNCTION__, dev->minor);
 
 	if ((urb->status != -ENOENT) && 
 	    (urb->status != -ECONNRESET)) {
-		dbg(__FUNCTION__ " - nonzero write bulk status received: %d",
-		    urb->status);
+		dbg("%s - nonzero write bulk status received: %d",
+		    __FUNCTION__, urb->status);
 		return;
 	}
 
@@ -514,7 +514,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 {
 	struct usb_device *udev = interface_to_usbdev(interface);
 	struct usb_skel *dev = NULL;
-	struct usb_interface_descriptor *iface_desc;
+	struct usb_host_interface *iface_desc;
 	struct usb_endpoint_descriptor *endpoint;
 	int minor;
 	int buffer_size;
@@ -554,7 +554,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	/* set up the endpoint information */
 	/* check out the endpoints */
 	iface_desc = &interface->altsetting[0];
-	for (i = 0; i < iface_desc->bNumEndpoints; ++i) {
+	for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {
 		endpoint = &iface_desc->endpoint[i].desc;
 
 		if ((endpoint->bEndpointAddress & 0x80) &&
