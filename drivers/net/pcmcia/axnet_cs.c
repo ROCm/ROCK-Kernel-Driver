@@ -458,6 +458,7 @@ static void axnet_config(dev_link_t *link)
     info->phy_id = (i < 32) ? i : -1;
     link->dev = &info->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     if (register_netdev(dev) != 0) {
 	printk(KERN_NOTICE "axnet_cs: register_netdev() failed\n");

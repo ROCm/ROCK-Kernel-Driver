@@ -519,6 +519,7 @@ static void tc574_config(dev_link_t *link)
 
 	link->state &= ~DEV_CONFIG_PENDING;
 	link->dev = &lp->node;
+	SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
 	if (register_netdev(dev) != 0) {
 		printk(KERN_NOTICE "3c574_cs: register_netdev() failed\n");

@@ -1121,6 +1121,7 @@ xirc2ps_config(dev_link_t * link)
 
     link->dev = &local->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     if ((err=register_netdev(dev))) {
 	printk(KNOT_XIRC "register_netdev() failed\n");

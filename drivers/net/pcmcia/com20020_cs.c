@@ -394,6 +394,7 @@ static void com20020_config(dev_link_t *link)
 
     link->dev = &info->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     i = com20020_found(dev, 0);	/* calls register_netdev */
     

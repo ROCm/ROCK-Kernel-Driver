@@ -178,6 +178,7 @@ struct pcmcia_device {
 #define to_pcmcia_drv(n) container_of(n, struct pcmcia_driver, drv)
 
 #define handle_to_pdev(handle) container_of(handle, struct pcmcia_device, client);
+#define handle_to_dev(handle) ((container_of(handle, struct pcmcia_device, client))->dev)
 
 /* error reporting */
 void cs_error(client_handle_t handle, int func, int ret);

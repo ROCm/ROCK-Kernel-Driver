@@ -775,6 +775,7 @@ static void nmclan_config(dev_link_t *link)
 
   link->dev = &lp->node;
   link->state &= ~DEV_CONFIG_PENDING;
+  SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
   i = register_netdev(dev);
   if (i != 0) {
