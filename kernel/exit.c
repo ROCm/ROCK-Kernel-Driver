@@ -1376,6 +1376,8 @@ asmlinkage long sys_waitid(int which, pid_t pid,
 			   struct siginfo __user *infop, int options,
 			   struct rusage __user *ru)
 {
+	long ret;
+
 	if (options & ~(WNOHANG|WNOWAIT|WEXITED|WSTOPPED|WCONTINUED))
 		return -EINVAL;
 	if (!(options & (WEXITED|WSTOPPED|WCONTINUED)))
@@ -1398,15 +1400,25 @@ asmlinkage long sys_waitid(int which, pid_t pid,
 		return -EINVAL;
 	}
 
-	return do_wait(pid, options, infop, NULL, ru);
+	ret = do_wait(pid, options, infop, NULL, ru);
+
+	/* avoid REGPARM breakage on x86: */
+	prevent_tail_call(ret);
+	return ret;
 }
 
 asmlinkage long sys_wait4(pid_t pid, int __user *stat_addr,
 			  int options, struct rusage __user *ru)
 {
+	long ret;
+
 	if (options & ~(WNOHANG|WUNTRACED|__WNOTHREAD|__WCLONE|__WALL))
 		return -EINVAL;
-	return do_wait(pid, options | WEXITED, NULL, stat_addr, ru);
+	ret = do_wait(pid, options | WEXITED, NULL, stat_addr, ru);
+
+	/* avoid REGPARM breakage on x86: */
+	prevent_tail_call(ret);
+	return ret;
 }
 
 #ifdef __ARCH_WANT_SYS_WAITPID
