@@ -62,7 +62,7 @@
 #ifdef CONFIG_ALL_PPC
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
-#include "macmodes.h"
+#include "../macmodes.h"
 #endif
 
 #ifdef CONFIG_ADB_PMU
@@ -1994,23 +1994,21 @@ aty128fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 	if (regno < 16) {
 		int i;
+		u32 *pal = info->pseudo_palette;
+
 		switch (par->crtc.depth) {
 		case 15:
-			((u16 *) (info->pseudo_palette))[regno] =
-			    (regno << 10) | (regno << 5) | regno;
+			pal[regno] = (regno << 10) | (regno << 5) | regno;
 			break;
 		case 16:
-			((u16 *) (info->pseudo_palette))[regno] =
-			    (regno << 11) | (regno << 6) | regno;
+			pal[regno] = (regno << 11) | (regno << 6) | regno;
 			break;
 		case 24:
-			((u32 *) (info->pseudo_palette))[regno] =
-			    (regno << 16) | (regno << 8) | regno;
+			pal[regno] = (regno << 16) | (regno << 8) | regno;
 			break;
 		case 32:
 			i = (regno << 8) | regno;
-			((u32 *) (info->pseudo_palette))[regno] =
-			    (i << 16) | i;
+			pal[regno] = (i << 16) | i;
 			break;
 		}
 	}

@@ -376,13 +376,12 @@ static int controlfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		int i;
 		switch (p->par.cmode) {
 		case CMODE_16:
-			((u16 *) (info->pseudo_palette))[regno] =
+			p->pseudo_palette[regno] =
 			    (regno << 10) | (regno << 5) | regno;
 			break;
 		case CMODE_32:
 			i = (regno << 8) | regno;
-			((u32 *) (info->pseudo_palette))[regno] =
-			    (i << 16) | i;
+			p->pseudo_palette[regno] = (i << 16) | i;
 			break;
 		}
 	}
@@ -475,7 +474,6 @@ try_again:
 		var.yres_virtual = vyres;
 
 	/* Apply default var */
-	p->info.var = var;
 	var.activate = FB_ACTIVATE_NOW;
 	rc = fb_set_var(&var, &p->info);
 	if (rc && (vmode != VMODE_640_480_60 || cmode != CMODE_8))
@@ -1068,17 +1066,7 @@ void __init control_setup(char *options)
 		return;
 
 	while ((this_opt = strsep(&options, ",")) != NULL) {
-		if (!strncmp(this_opt, "font:", 5)) {
-			char *p;
-			int i;
-
-			p = this_opt +5;
-			for (i = 0; i < sizeof(fontname) - 1; i++)
-				if (!*p || *p == ' ' || *p == ',')
-					break;
-			memcpy(fontname, this_opt + 5, i);
-			fontname[i] = 0;
-		} else if (!strncmp(this_opt, "vmode:", 6)) {
+		if (!strncmp(this_opt, "vmode:", 6)) {
 			int vmode = simple_strtoul(this_opt+6, NULL, 0);
 			if (vmode > 0 && vmode <= VMODE_MAX &&
 			    control_mac_modes[vmode - 1].m[1] >= 0)

@@ -881,6 +881,16 @@ static void radeon_get_pllinfo(struct radeonfb_info *rinfo, char *bios_seg)
 				rinfo->pll.ref_div = 12;
 				rinfo->pll.ref_clk = 2700;
 				break;
+			case PCI_DEVICE_ID_ATI_RADEON_ND:
+			case PCI_DEVICE_ID_ATI_RADEON_NE:
+			case PCI_DEVICE_ID_ATI_RADEON_NF:
+			case PCI_DEVICE_ID_ATI_RADEON_NG:
+				rinfo->pll.ppll_max = 40000;
+				rinfo->pll.ppll_min = 20000;
+				rinfo->pll.xclk = 27000;
+				rinfo->pll.ref_div = 12;
+				rinfo->pll.ref_clk = 2700;
+				break;
 			case PCI_DEVICE_ID_ATI_RADEON_QD:
 			case PCI_DEVICE_ID_ATI_RADEON_QE:
 			case PCI_DEVICE_ID_ATI_RADEON_QF:

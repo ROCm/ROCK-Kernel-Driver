@@ -36,8 +36,8 @@
 #include <asm/prom.h>
 #include <asm/pgtable.h>
 
-#include "platinumfb.h"
 #include "macmodes.h"
+#include "platinumfb.h"
 
 static int default_vmode = VMODE_NVRAM;
 static int default_cmode = CMODE_NVRAM;
@@ -219,15 +219,14 @@ static int platinumfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 	if (regno < 16) {
 		int i;
+		u32 *pal = info->pseudo_palette;
 		switch (p->par.cmode) {
 		case CMODE_16:
-			((u16 *) (info->pseudo_palette))[regno] =
-			    (regno << 10) | (regno << 5) | regno;
+			pal[regno] = (regno << 10) | (regno << 5) | regno;
 			break;
 		case CMODE_32:
 			i = (regno << 8) | regno;
-			((u32 *) (info->pseudo_palette))[regno] =
-			    (i << 16) | i;
+			pal[regno] = (i << 16) | i;
 			break;
 		}
 	}
@@ -401,7 +400,7 @@ try_again:
 	/* Apply default var */
 	p->info.var = var;
 	var.activate = FB_ACTIVATE_NOW;
-	rc = gen_set_var(&var, -1, &p->info);
+	rc = fb_set_var(&var, &p->info);
 	if (rc && (default_vmode != VMODE_640_480_60 || default_cmode != CMODE_8))
 		goto try_again;
 
@@ -410,7 +409,7 @@ try_again:
 		return 0;
 
 	printk(KERN_INFO "fb%d: platinum frame buffer device\n",
-	       GET_FB_IDX(p->info.node));
+	       minor(p->info.node));
 
 	return 1;
 }
@@ -607,21 +606,10 @@ int __init platinum_setup(char *options)
 		return 0;
 
 	while ((this_opt = strsep(&options, ",")) != NULL) {
-		if (!strncmp(this_opt, "font:", 5)) {
-			char *p;
-			int i;
-
-			p = this_opt + 5;
-			for (i = 0; i < sizeof(fontname) - 1; i++)
-				if (!*p || *p == ' ' || *p == ',')
-					break;
-			memcpy(fontname, this_opt + 5, i);
-			fontname[i] = 0;
-		}
 		if (!strncmp(this_opt, "vmode:", 6)) {
 	    		int vmode = simple_strtoul(this_opt+6, NULL, 0);
-	    	if (vmode > 0 && vmode <= VMODE_MAX)
-			default_vmode = vmode;
+			if (vmode > 0 && vmode <= VMODE_MAX)
+				default_vmode = vmode;
 		} else if (!strncmp(this_opt, "cmode:", 6)) {
 			int depth = simple_strtoul(this_opt+6, NULL, 0);
 			switch (depth) {
