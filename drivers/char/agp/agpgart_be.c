@@ -2391,7 +2391,7 @@ static int amd_create_gatt_table(void)
 
 	agp_bridge.gatt_table_real = page_dir.real;
 	agp_bridge.gatt_table = page_dir.remapped;
-	agp_bridge.gatt_bus_addr = virt_to_bus(page_dir.real);
+	agp_bridge.gatt_bus_addr = virt_to_phys(page_dir.real);
 
 	/* Get the address for the gart region.
 	 * This is a bus address even on the alpha, b/c its
@@ -2405,7 +2405,7 @@ static int amd_create_gatt_table(void)
 	/* Calculate the agp offset */
 	for(i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
 		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] =
-			virt_to_bus(amd_irongate_private.gatt_pages[i]->real);
+			virt_to_phys(amd_irongate_private.gatt_pages[i]->real);
 		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] |= 0x00000001;
 	}
 
@@ -3027,7 +3027,7 @@ static int serverworks_create_gatt_table(void)
 	for(i = 0; i < 1024; i++) {
 		serverworks_private.scratch_dir.remapped[i] = (unsigned long) agp_bridge.scratch_page;
 		page_dir.remapped[i] =
-			virt_to_bus(serverworks_private.scratch_dir.real);
+			virt_to_phys(serverworks_private.scratch_dir.real);
 		page_dir.remapped[i] |= 0x00000001;
 	}
 
@@ -3040,7 +3040,7 @@ static int serverworks_create_gatt_table(void)
 
 	agp_bridge.gatt_table_real = page_dir.real;
 	agp_bridge.gatt_table = page_dir.remapped;
-	agp_bridge.gatt_bus_addr = virt_to_bus(page_dir.real);
+	agp_bridge.gatt_bus_addr = virt_to_phys(page_dir.real);
 
 	/* Get the address for the gart region.
 	 * This is a bus address even on the alpha, b/c its
@@ -3056,7 +3056,7 @@ static int serverworks_create_gatt_table(void)
 
 	for(i = 0; i < value->num_entries / 1024; i++) {
 		page_dir.remapped[i] =
-			virt_to_bus(serverworks_private.gatt_pages[i]->real);
+			virt_to_phys(serverworks_private.gatt_pages[i]->real);
 		page_dir.remapped[i] |= 0x00000001;
 	}
 
