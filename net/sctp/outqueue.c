@@ -2,7 +2,7 @@
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
- * Copyright (c) 2001-2002 International Business Machines Corp.
+ * Copyright (c) 2001-2003 International Business Machines Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -230,7 +230,7 @@ void sctp_retransmit_insert(struct list_head *tlchunk, sctp_outqueue_t *q)
 		list_add_tail(tlchunk, &q->retransmit);
 	}
 }
-			
+
 /* Mark all the eligible packets on a transport for retransmission.  */
 void sctp_retransmit_mark(sctp_outqueue_t *q, sctp_transport_t *transport,
 			  __u8 fast_retransmit)
@@ -374,6 +374,18 @@ static int sctp_flush_retran_queue(sctp_outqueue_t *q, sctp_packet_t *pkt,
 			continue;
 		}
 #endif
+
+		/* Make sure that Gap Acked TSNs are not retransmitted.  A
+		 * simple approach is just to move such TSNs out of the
+		 * way and into a 'transmitted' queue and skip to the
+		 * next chunk.
+		 */
+		if (chunk->tsn_gap_acked) {
+			list_add_tail(lchunk, &transport->transmitted);
+			lchunk = sctp_list_dequeue(lqueue);
+			continue;
+		}
+
 		/* Attempt to append this chunk to the packet. */
 		status = (*q->append_output)(pkt, chunk);
 
@@ -1028,7 +1040,7 @@ static __u32 sctp_highest_new_tsn(sctp_sackhdr_t *sack,
 	}
 
 	return highest_new_tsn;
-} 
+}
 
 /* This is where we REALLY process a SACK.
  *
@@ -1053,7 +1065,7 @@ int sctp_sack_outqueue(sctp_outqueue_t *q, sctp_sackhdr_t *sack)
 	sack_ctsn = ntohl(sack->cum_tsn_ack);
 
 	/* Get the highest TSN in the sack. */
-	highest_tsn = sack_ctsn + 
+	highest_tsn = sack_ctsn +
 		      ntohs(frags[ntohs(sack->num_gap_ack_blocks) - 1].gab.end);
 
 	if (TSN_lt(asoc->highest_sacked, highest_tsn)) {
