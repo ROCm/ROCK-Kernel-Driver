@@ -27,10 +27,11 @@
 
 /**
  * The "cpufreq driver" - the arch- or hardware-dependend low
- * level driver of CPUFreq support, and its spinlock.
- * cpu_max_freq is in kHz.
+ * level driver of CPUFreq support, and its spinlock. This lock
+ * also protects the cpufreq_cpu_data array.
  */
 static struct cpufreq_driver   	*cpufreq_driver;
+static struct cpufreq_policy	*cpufreq_cpu_data[NR_CPUS];
 static spinlock_t		cpufreq_driver_lock = SPIN_LOCK_UNLOCKED;
 
 /* will go away once the locking mess is cleaned up */
@@ -72,7 +73,10 @@ static int cpufreq_cpu_get(unsigned int cpu)
 
 
 	/* get the CPU */
-	data = &cpufreq_driver->policy[cpu];
+	data = cpufreq_cpu_data[cpu];
+
+	if (!data)
+		goto err_out_put_module;
 
 	if (!kobject_get(&data->kobj))
 		goto err_out_put_module;
@@ -349,15 +353,17 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	struct cpufreq_policy new_policy;
 	struct cpufreq_policy *policy;
 	struct freq_attr **drv_attr;
+	unsigned long flags;
 
 	if (!try_module_get(cpufreq_driver->owner))
 		return -EINVAL;
 
+	policy = &cpufreq_driver->policy[cpu];
+	policy->cpu = cpu;
+
 	/* call driver. From then on the cpufreq must be able
 	 * to accept all calls to ->verify and ->setpolicy for this CPU
 	 */
-	policy = &cpufreq_driver->policy[cpu];
-	policy->cpu = cpu;
 	ret = cpufreq_driver->init(policy);
 	if (ret)
 		goto out;
@@ -387,10 +393,17 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 		sysfs_create_file(&policy->kobj, &((*drv_attr)->attr));
 		drv_attr++;
 	}
+
+	spin_lock_irqsave(&cpufreq_driver_lock, flags);
+	cpufreq_cpu_data[cpu] = policy;
+	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 	
 	/* set default policy */
 	ret = cpufreq_set_policy(&new_policy);
 	if (ret) {
+		spin_lock_irqsave(&cpufreq_driver_lock, flags);
+		cpufreq_cpu_data[cpu] = NULL;
+		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 		kobject_unregister(&policy->kobj);
 		wait_for_completion(&policy->kobj_unregister);
 	}
@@ -409,6 +422,15 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 static int cpufreq_remove_dev (struct sys_device * sys_dev)
 {
 	unsigned int cpu = sys_dev->id;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cpufreq_driver_lock, flags);
+	if (!cpufreq_cpu_data[cpu]) {
+		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+		return -EINVAL;
+	}
+	cpufreq_cpu_data[cpu] = NULL;
+	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
 	if (!kobject_get(&cpufreq_driver->policy[cpu].kobj))
 		return -EFAULT;
