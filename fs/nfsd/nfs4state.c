@@ -2268,7 +2268,6 @@ int
 nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lockt *lockt)
 {
 	struct inode *inode;
-	struct nfs4_stateowner *sop;
 	struct file file;
 	struct file_lock file_lock;
 	struct file_lock *conflicting_lock;
@@ -2320,14 +2319,9 @@ nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	find_lockstateowner_str(strhashval, &lockt->lt_owner,
 					&lockt->lt_clientid, 
 					&lockt->lt_stateowner);
-	sop = lockt->lt_stateowner;
-	if (sop) {
-		file_lock.fl_owner = (fl_owner_t) sop;
-		file_lock.fl_pid = current->tgid;
-	} else {
-		file_lock.fl_owner = NULL;
-		file_lock.fl_pid = 0;
-	}
+	if (lockt->lt_stateowner)
+		file_lock.fl_owner = (fl_owner_t)lockt->lt_stateowner;
+	file_lock.fl_pid = current->tgid;
 	file_lock.fl_flags = FL_POSIX;
 
 	file_lock.fl_start = lockt->lt_offset;
