@@ -99,15 +99,15 @@ This document is aimed towards normal developers and arch developers.
 
 === 3 Makefile language
 
-The kernel Makefiles are designed to run with Gnu Make.  The Makefiles
-use only the documented features of Gnu Make, but they do use many
-Gnu extensions.
+The kernel Makefiles are designed to run with GNU Make.  The Makefiles
+use only the documented features of GNU Make, but they do use many
+GNU extensions.
 
-Gnu Make supports elementary list-processing functions.  The kernel
+GNU Make supports elementary list-processing functions.  The kernel
 Makefiles use a novel style of list building and manipulation with few
 "if" statements.
 
-Gnu Make has two assignment operators, ":=" and "=".  ":=" performs
+GNU Make has two assignment operators, ":=" and "=".  ":=" performs
 immediate evaluation of the right-hand side and stores an actual string
 into the left-hand side.  "=" is like a formula definition; it stores the
 right-hand side in an unevaluated form and then evaluates this form each
@@ -191,7 +191,7 @@ The top Makefile exports the following variables:
 	$(DRIVERS), and $(LIBS).  The arch Makefile defines $(HEAD)
 	and $(LINKFLAGS), and extends $(CORE_FILES) and $(LIBS).
 
-	Note: there are more names here than necessary.  $(NETWORKS),
+	Note: there are more variables here than necessary.  $(NETWORKS),
 	$(DRIVERS), and even $(LIBS) could be subsumed into $(CORE_FILES).
 
     CPP, CC, AS, LD, AR, NM, STRIP, OBJCOPY, OBJDUMP
@@ -289,12 +289,12 @@ The top Makefile exports the following variables:
 
     MAKE, MAKEFILES
 
-	Some variables internal to Gnu Make.
+	Some variables internal to GNU Make.
 
 	$(MAKEFILES) in particular is used to force the arch Makefiles
 	and subdirectory Makefiles to read $(TOPDIR)/.config without
-	including it explicitly.  (This was an implementation hack and
-	could be fixed).
+	including it explicitly.  (This was an implementational hack
+	and could be fixed).
 
 
 
@@ -338,7 +338,7 @@ architecture-specific values.
 	extends them.
 
 	Many arch Makefiles dynamically run the target C compiler to
-	probe what options it supports:
+	probe supported options:
 
 		# arch/i386/Makefile
 
@@ -375,7 +375,7 @@ architecture-specific values.
 
 --- 5.2 Vmlinux build variables
 
-An arch Makefile co-operates with the top Makefile to define variables
+An arch Makefile cooperates with the top Makefile to define variables
 which specify how to build the vmlinux file.  Note that there is no
 corresponding arch-specific section for modules; the module-building
 machinery is all architecture-independent.
@@ -471,11 +471,9 @@ A subdirectory Makefile has four sections.
 
 --- 6.1 Comments
 
-The first section is a comment header.  Just write what you would
-write if you were editing a C source file, but use "# ..." instead of
-"/* ... */".  Historically, many anonymous people have edited kernel
-Makefiles without leaving any change histories in the header; comments
-from them would have been valuable.
+The first section is a comment header. Historically, many anonymous
+people have edited kernel Makefiles without leaving any change
+histories in the header; comments from them would have been valuable.
 
 
 
@@ -657,8 +655,8 @@ $(subdir-y), not $(subdir-m).
     export-objs
 
 	When using loadable modules, not every global symbol in the
-	kernel / other modules is automatically available for your
-	module, only those explicitly exported are.
+	kernel / other modules is automatically available, only those
+	explicitly exported are available for your module.
 
 	To make a symbol available for use in modules, to "export" it,
 	use the EXPORT_SYMBOL(<symbol>) directive in your source. In
@@ -827,7 +825,7 @@ people define most variables using "new style" but then fall back to
 		obj-$(CONFIG_ATARI_FLOPPY)      += ataflop.o
 
 	Notice the use of $(CONFIG_...) substitutions on the left hand
-	side of an assignment operator.  This gives Gnu Make the power
+	side of an assignment operator.  This gives GNU Make the power
 	of associative indexing!  Each of these assignments replaces
 	eight lines of code in an old-style Makefile.
 
@@ -840,9 +838,8 @@ people define most variables using "new style" but then fall back to
 	$(obj-n) and $(obj-) are ignored.
 
 	Each list may contain duplicates items; duplicates are
-	automatically removed later.  Also, if a file appears in both
-	$(obj-y) and $(obj-m), it will automatically be removed from
-	the $(obj-m) list.
+	automatically removed later.  Duplicates in both $(obj-y) and
+	$(obj-m) will automatically be removed from the $(obj-m) list.
 
 	Example:
 
@@ -926,9 +923,9 @@ people define most variables using "new style" but then fall back to
 	of sr_mod.o will be linked together with "$(LD) -r" to make the
 	kernel module sr_mod.o.
 
-	And suppose CONFIG_SCSI_INITIO=n.  Then initio.o goes onto the
-	$(obj-n) list and that's the end of it.  Its component files
-	are not compiled, and the composite file is not created.
+	Also suppose CONFIG_SCSI_INITIO=n.  Then initio.o goes onto
+	the $(obj-n) list and that's the end of it.  Its component
+	files are not compiled, and the composite file is not created.
 
 
     subdir-y subdir-m subdir-n subdir-
@@ -947,9 +944,9 @@ people define most variables using "new style" but then fall back to
 	These variables work similar to obj-*, but are used for
 	subdirectories instead of object files.
 
-	After executing all of the assignments, the subdirectory
-	Makefile has built up four lists: $(subdir-y), $(subdir-m),
-	$(subdir-n), and $(subdir-).
+	After executing all assignments, the subdirectory Makefile has
+	built up four lists: $(subdir-y), $(subdir-m), $(subdir-n),
+	and $(subdir-).
 
 	$(subdir-y) is a list of directories that should be entered
 		for making vmlinux.
