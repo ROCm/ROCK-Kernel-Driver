@@ -48,6 +48,10 @@ static int atkbd_softrepeat;
 module_param_named(softrepeat, atkbd_softrepeat, bool, 0);
 MODULE_PARM_DESC(softrepeat, "Use software keyboard repeat");
 
+__obsolete_setup("atkbd_set=");
+__obsolete_setup("atkbd_reset");
+__obsolete_setup("atkbd_softrepeat=");
+
 /*
  * Scancode to keycode tables. These are just the default setting, and
  * are loadable via an userland utility.

@@ -47,6 +47,12 @@ unsigned int psmouse_resetafter;
 module_param_named(resetafter, psmouse_resetafter, uint, 0);
 MODULE_PARM_DESC(resetafter, "Reset Synaptics Touchpad after so many bad packets (0 = never).");
 
+__obsolete_setup("psmouse_noext");
+__obsolete_setup("psmouse_resolution=");
+__obsolete_setup("psmouse_smartscroll=");
+__obsolete_setup("psmouse_resetafter=");
+__obsolete_setup("psmouse_rate=");
+
 static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2"};
 
 /*

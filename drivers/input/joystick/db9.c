@@ -58,6 +58,10 @@ static int db9_nargs_3 __initdata = 0;
 module_param_array_named(dev3, db9_3, int, db9_nargs_3, 0);
 MODULE_PARM_DESC(dev3, "Describes third attached device (<parport#>,<type>)");
 
+__obsolete_setup("db9=");
+__obsolete_setup("db9_2=");
+__obsolete_setup("db9_3=");
+
 #define DB9_MULTI_STICK		0x01
 #define DB9_MULTI2_STICK	0x02
 #define DB9_GENESIS_PAD		0x03

@@ -59,6 +59,10 @@ static int gc_nargs_3 __initdata = 0;
 module_param_array_named(map3, gc_3, int, gc_nargs_3, 0);
 MODULE_PARM_DESC(map3, "Describers third set of devices");
 
+__obsolete_setup("gc=");
+__obsolete_setup("gc_2=");
+__obsolete_setup("gc_3=");
+
 /* see also gs_psx_delay parameter in PSX support section */
 
 #define GC_SNES		1
@@ -243,6 +247,8 @@ static void gc_multi_read_packet(struct gc *gc, int length, unsigned char *data)
 static int gc_psx_delay = GC_PSX_DELAY;
 module_param_named(psx_delay, gc_psx_delay, uint, 0);
 MODULE_PARM_DESC(psx_delay, "Delay when accessing Sony PSX controller (usecs)");
+
+__obsolete_setup("gc_psx_delay=");
 
 static short gc_psx_abs[] = { ABS_X, ABS_Y, ABS_RX, ABS_RY, ABS_HAT0X, ABS_HAT0Y };
 static short gc_psx_btn[] = { BTN_TL, BTN_TR, BTN_TL2, BTN_TR2, BTN_A, BTN_B, BTN_X, BTN_Y,

@@ -57,6 +57,10 @@ static int tgfx_nargs_3 __initdata = 0;
 module_param_array_named(map3, tgfx_3, int, tgfx_nargs_3, 0);
 MODULE_PARM_DESC(map3, "Describes third set of devices");
 
+__obsolete_setup("tgfx=");
+__obsolete_setup("tgfx_2=");
+__obsolete_setup("tgfx_3=");
+
 #define TGFX_REFRESH_TIME	HZ/100	/* 10 ms */
 
 #define TGFX_TRIGGER		0x08

@@ -50,6 +50,8 @@ static int amijoy_nargs;
 module_param_array_named(map, amijoy, uint, amijoy_nargs, 0);
 MODULE_PARM_DESC(map, "Map of attached joysticks in form of <a>,<b> (default is 0,1)");
 
+__obsolete_setup("amijoy=");
+
 static int amijoy_used[2] = { 0, 0 };
 static struct input_dev amijoy_dev[2];
 static char *amijoy_phys[2] = { "amijoy/input0", "amijoy/input1" };
