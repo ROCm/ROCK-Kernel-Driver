@@ -61,7 +61,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #define DISPLAY_HPT366_TIMINGS
 
@@ -600,9 +600,9 @@ static void config_chipset_for_pio (ide_drive_t *drive)
 	unsigned short xfer_pio = drive->id->eide_pio_modes;
 	byte	timing, speed, pio;
 
-	pio = ide_get_best_pio_mode(drive, 255, 5, NULL);
+	pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
-	if (xfer_pio> 4)
+	if (xfer_pio > 4)
 		xfer_pio = 0;
 
 	if (drive->id->eide_pio_iordy > 0) {
@@ -928,13 +928,13 @@ static int hpt3xx_tristate (ide_drive_t * drive, int state)
 	pci_read_config_byte(dev, state_reg, &regXXh);
 
 	if (state) {
-		(void) ide_do_reset(drive);
+		// reset drives...
 		pci_write_config_byte(dev, state_reg, regXXh|0x80);
 		pci_write_config_byte(dev, 0x59, reg59h|reset);
 	} else {
 		pci_write_config_byte(dev, 0x59, reg59h & ~(reset));
 		pci_write_config_byte(dev, state_reg, regXXh & ~(0x80));
-		(void) ide_do_reset(drive);
+		// reset drives...
 	}
 	return 0;
 }

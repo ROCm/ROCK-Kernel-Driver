@@ -65,7 +65,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #define PIIX_DEBUG_DRIVE_INFO		0
 
@@ -225,7 +225,11 @@ static void piix_tune_drive (ide_drive_t *drive, byte pio)
 				    { 2, 1 },
 				    { 2, 3 }, };
 
-	pio = ide_get_best_pio_mode(drive, pio, 5, NULL);
+	if (pio == 255)
+		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
+	else
+		pio = min_t(byte, pio, 4);
+
 	pci_read_config_word(HWIF(drive)->pci_dev, master_port, &master_data);
 	if (is_slave) {
 		master_data = master_data | 0x4000;
@@ -352,27 +356,9 @@ static int piix_config_drive_for_dma (ide_drive_t *drive)
 				   (dev->device == PCI_DEVICE_ID_INTEL_82451NX) ||
 				   (dev->device == PCI_DEVICE_ID_INTEL_82801AB_1)) ? 1 : 0;
 
-	if ((id->dma_ultra & 0x0020) && (udma_66) && (ultra100)) {
-		speed = XFER_UDMA_5;
-	} else if ((id->dma_ultra & 0x0010) && (ultra)) {
-		speed = ((udma_66) && (ultra66)) ? XFER_UDMA_4 : XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0008) && (ultra)) {
-		speed = ((udma_66) && (ultra66)) ? XFER_UDMA_3 : XFER_UDMA_1;
-	} else if ((id->dma_ultra & 0x0004) && (ultra)) {
-		speed = XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0002) && (ultra)) {
-		speed = XFER_UDMA_1;
-	} else if ((id->dma_ultra & 0x0001) && (ultra)) {
-		speed = XFER_UDMA_0;
-	} else if (id->dma_mword & 0x0004) {
-		speed = XFER_MW_DMA_2;
-	} else if (id->dma_mword & 0x0002) {
-		speed = XFER_MW_DMA_1;
-	} else if (id->dma_1word & 0x0004) {
-		speed = XFER_SW_DMA_2;
-        } else {
-		speed = XFER_PIO_0 + ide_get_best_pio_mode(drive, 255, 5, NULL);
-	}
+	speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO | XFER_SWDMA | XFER_MWDMA
+					| (ultra ? XFER_UDMA : 0) | ((udma_66 & ultra66) ? XFER_UDMA_66 : 0)
+					| ((udma_66 & ultra100) ? XFER_UDMA_100 : 0));
 
 	(void) piix_tune_chipset(drive, speed);
 
@@ -385,7 +371,7 @@ static int piix_config_drive_for_dma (ide_drive_t *drive)
 
 static void config_chipset_for_pio (ide_drive_t *drive)
 {
-	piix_tune_drive(drive, ide_get_best_pio_mode(drive, 255, 5, NULL));
+	piix_tune_drive(drive, ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0);
 }
 
 static int config_drive_xfer_rate (ide_drive_t *drive)

@@ -354,7 +354,6 @@ struct hd_big_geometry {
 
 #define HDIO_GET_BUSSTATE	0x031a	/* get the bus state of the hwif */
 #define HDIO_TRISTATE_HWIF	0x031b	/* execute a channel tristate */
-#define HDIO_DRIVE_RESET	0x031c	/* execute a device reset */
 #define HDIO_DRIVE_TASK		0x031e	/* execute task and special drive command */
 #define HDIO_DRIVE_CMD		0x031f	/* execute a special drive command */
 

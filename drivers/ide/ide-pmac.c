@@ -36,7 +36,7 @@
 #include <linux/pmu.h>
 #include <asm/irq.h>
 #endif
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 extern char *ide_dmafunc_verbose(ide_dma_action_t dmafunc);
 
@@ -274,7 +274,7 @@ pmac_ide_do_setfeature(ide_drive_t *drive, byte command)
 		printk(KERN_ERR "pmac_ide_do_setfeature disk not ready after SET_FEATURE !\n");
 out:
 	restore_flags(flags);
-	
+
 	return result;
 }
 
@@ -282,34 +282,40 @@ out:
 static void
 pmac_ide_tuneproc(ide_drive_t *drive, byte pio)
 {
-	ide_pio_data_t d;
+	struct ata_timing *t;
 	int i;
 	u32 *timings;
 	int accessTicks, recTicks;
-	
+
 	i = pmac_ide_find(drive);
 	if (i < 0)
 		return;
-		
-	pio = ide_get_best_pio_mode(drive, pio, 4, &d);
-	accessTicks = SYSCLK_TICKS(ide_pio_timings[pio].active_time);
+
+	if (pio = 255)
+		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
+	else
+		pio = XFER_PIO_0 + min_t(byte, pio, 4);
+
+	t = ata_timing_data(pio);
+
+	accessTicks = SYSCLK_TICKS(t->active);
 	if (drive->select.all & 0x10)
 		timings = &pmac_ide[i].timings[1];
 	else
 		timings = &pmac_ide[i].timings[0];
-	
+
 	if (pmac_ide[i].kind == controller_kl_ata4) {
 		/* The "ata-4" IDE controller of Core99 machines */
-		accessTicks = SYSCLK_TICKS_UDMA(ide_pio_timings[pio].active_time * 1000);
-		recTicks = SYSCLK_TICKS_UDMA(d.cycle_time * 1000) - accessTicks;
+		accessTicks = SYSCLK_TICKS_UDMA(t->active * 1000);
+		recTicks = SYSCLK_TICKS_UDMA(t->cycle * 1000) - accessTicks;
 
 		*timings = ((*timings) & 0x1FFFFFC00) | accessTicks | (recTicks << 5);
 	} else {
 		/* The old "ata-3" IDE controller */
-		accessTicks = SYSCLK_TICKS(ide_pio_timings[pio].active_time);
+		accessTicks = SYSCLK_TICKS(t->active);
 		if (accessTicks < 4)
 			accessTicks = 4;
-		recTicks = SYSCLK_TICKS(d.cycle_time) - accessTicks - 4;
+		recTicks = SYSCLK_TICKS(t->cycle) - accessTicks - 4;
 		if (recTicks < 1)
 			recTicks = 1;
 	

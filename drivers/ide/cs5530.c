@@ -27,7 +27,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #define DISPLAY_CS5530_TIMINGS
 
@@ -114,10 +114,13 @@ static void cs5530_tuneproc (ide_drive_t *drive, byte pio)	/* pio=255 means "aut
 {
 	ide_hwif_t	*hwif = HWIF(drive);
 	unsigned int	format, basereg = CS5530_BASEREG(hwif);
-	static byte	modes[5] = {XFER_PIO_0, XFER_PIO_1, XFER_PIO_2, XFER_PIO_3, XFER_PIO_4};
 
-	pio = ide_get_best_pio_mode(drive, pio, 4, NULL);
-	if (!cs5530_set_xfer_mode(drive, modes[pio])) {
+	if (pio == 255)
+		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
+	else
+		pio = XFER_PIO_0 + min_t(byte, pio, 4);
+
+	if (!cs5530_set_xfer_mode(drive, pio)) {
 		format = (inl(basereg+4) >> 31) & 1;
 		outl(cs5530_pio_timings[format][pio], basereg+(drive->select.b.unit<<3));
 	}

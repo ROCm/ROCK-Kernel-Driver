@@ -44,7 +44,7 @@
 #include <linux/ide.h>
 #include <asm/io.h>
 
-#include "ide-timing.h"
+#include "ata-timing.h"
 
 #define AMD_IDE_ENABLE		0x40
 #define AMD_IDE_CONFIG		0x41
@@ -193,7 +193,7 @@ static int amd_get_info(char *buffer, char **addr, off_t offset, int count)
  * amd_set_speed() writes timing values to the chipset registers
  */
 
-static void amd_set_speed(struct pci_dev *dev, unsigned char dn, struct ide_timing *timing)
+static void amd_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_timing *timing)
 {
 	unsigned char t;
 
@@ -226,7 +226,7 @@ static void amd_set_speed(struct pci_dev *dev, unsigned char dn, struct ide_timi
 static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
 {
 	ide_drive_t *peer = HWIF(drive)->drives + (~drive->dn & 1);
-	struct ide_timing t, p;
+	struct ata_timing t, p;
 	int T, UT;
 
 	if (speed != XFER_PIO_SLOW && speed != drive->current_speed)
@@ -235,13 +235,13 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
 				drive->dn >> 1, drive->dn & 1);
 
 	T = 1000000000 / amd_clock;
-	UT = T / MIN(MAX(amd_config->flags & AMD_UDMA, 1), 2);
+	UT = T / min_t(int, max_t(int, amd_config->flags & AMD_UDMA, 1), 2);
 
-	ide_timing_compute(drive, speed, &t, T, UT);
+	ata_timing_compute(drive, speed, &t, T, UT);
 
 	if (peer->present) {
-		ide_timing_compute(peer, peer->current_speed, &p, T, UT);
-		ide_timing_merge(&p, &t, &t, IDE_TIMING_8BIT);
+		ata_timing_compute(peer, peer->current_speed, &p, T, UT);
+		ata_timing_merge(&p, &t, &t, IDE_TIMING_8BIT);
 	}
 
 	if (speed == XFER_UDMA_5 && amd_clock <= 33333) t.udma = 1;
@@ -266,11 +266,11 @@ static void amd74xx_tune_drive(ide_drive_t *drive, unsigned char pio)
 		return;
 
 	if (pio == 255) {
-		amd_set_drive(drive, ide_find_best_mode(drive, XFER_PIO | XFER_EPIO));
+		amd_set_drive(drive, ata_timing_mode(drive, XFER_PIO | XFER_EPIO));
 		return;
 	}
 
-	amd_set_drive(drive, XFER_PIO_0 + MIN(pio, 5));
+	amd_set_drive(drive, XFER_PIO_0 + min_t(byte, pio, 5));
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -288,7 +288,7 @@ int amd74xx_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 
 		short w80 = HWIF(drive)->udma_four;
 
-		short speed = ide_find_best_mode(drive,
+		short speed = ata_timing_mode(drive,
 			XFER_PIO | XFER_EPIO | XFER_MWDMA | XFER_UDMA |
 			((amd_config->flags & AMD_BAD_SWDMA) ? 0 : XFER_SWDMA) |
 			(w80 && (amd_config->flags & AMD_UDMA) >= AMD_UDMA_66 ? XFER_UDMA_66 : 0) |

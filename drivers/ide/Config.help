@@ -253,15 +253,6 @@ CONFIG_IDEDMA_NEW_DRIVE_LISTINGS
 
   If in doubt, say N.
 
-CONFIG_BLK_DEV_IDEDMA_TIMEOUT
-  If you say Y here, this is a NASTY UGLY HACK!
-
-  We have to issue an abort and requeue the request DMA engine got
-  turned off by a goofy ASIC, and we have to clean up the mess, and
-  here is as good as any.  Do it globally for all chipsets.
-
-  If in doubt, say N.
-
 CONFIG_BLK_DEV_OFFBOARD
   Normally, IDE controllers built into the motherboard (on-board
   controllers) are assigned to ide0 and ide1 while those on add-in PCI

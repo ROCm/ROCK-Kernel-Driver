@@ -33,7 +33,7 @@
 #include <linux/init.h>
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 #include "qd65xx.h"
 
 /*
@@ -249,42 +249,46 @@ static void qd6500_tune_drive (ide_drive_t *drive, byte pio)
 
 static void qd6580_tune_drive (ide_drive_t *drive, byte pio)
 {
-	ide_pio_data_t d;
+	struct ata_timing *t;
 	int base = HWIF(drive)->select_data;
 	int active_time   = 175;
 	int recovery_time = 415; /* worst case values from the dos driver */
 
 	if (drive->id && !qd_find_disk_type(drive,&active_time,&recovery_time)) {
-		pio = ide_get_best_pio_mode(drive, pio, 255, &d);
-		pio = min(pio,4);
+
+		if (pio == 255)
+			pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
+		else
+			pio = XFER_PIO_0 + min_t(byte, pio, 4);
+
+		t = ata_timing_data(pio);
 
 		switch (pio) {
 			case 0: break;
 			case 3:
-				if (d.cycle_time >= 110) {
+				if (t->cycle >= 110) {
 					active_time = 86;
-					recovery_time = d.cycle_time-102;
+					recovery_time = t->cycle-102;
 				} else
 					printk(KERN_WARNING "%s: Strange recovery time !\n",drive->name);
 				break;
 			case 4:
-				if (d.cycle_time >= 69) {
+				if (t->cycle >= 69) {
 					active_time = 70;
-					recovery_time = d.cycle_time-61;
+					recovery_time = t->cycle-61;
 				} else
 					printk(KERN_WARNING "%s: Strange recovery time !\n",drive->name);
 				break;
 			default:
-				if (d.cycle_time >= 180) {
+				if (t->cycle >= 180) {
 					active_time = 110;
-					recovery_time = d.cycle_time - 120;
+					recovery_time = t->cycle - 120;
 				} else {
-					active_time = ide_pio_timings[pio].active_time;
-					recovery_time = d.cycle_time
-							-active_time;
+					active_time = t->active;
+					recovery_time = t->cycle - active_time;
 				}
 		}
-		printk(KERN_INFO "%s: PIO mode%d\n",drive->name,pio);
+		printk(KERN_INFO "%s: PIO mode%d\n", drive->name, pio - XFER_PIO_0);
 	}
 
 	if (!HWIF(drive)->channel && drive->type != ATA_DISK) {

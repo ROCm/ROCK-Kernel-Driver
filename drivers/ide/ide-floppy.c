@@ -931,7 +931,7 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 			rq->errors++;
 			if (pc->c[0] == IDEFLOPPY_REQUEST_SENSE_CMD) {
 				printk (KERN_ERR "ide-floppy: I/O error in request sense command\n");
-				return ide_do_reset (drive);
+				return ide_stopped;
 			}
 			idefloppy_retry_pc (drive);				/* Retry operation */
 			return ide_stopped; /* queued, but not started */
@@ -945,8 +945,8 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
 		printk (KERN_ERR "ide-floppy: The floppy wants to issue more interrupts in DMA mode\n");
-		(void) HWIF(drive)->dmaproc(ide_dma_off, drive);
-		return ide_do_reset (drive);
+		HWIF(drive)->dmaproc(ide_dma_off, drive);
+		return ide_stopped;
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 	bcount.b.high=IN_BYTE (IDE_BCOUNTH_REG);			/* Get the number of bytes to transfer */
@@ -955,12 +955,12 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 
 	if (ireason.b.cod) {
 		printk (KERN_ERR "ide-floppy: CoD != 0 in idefloppy_pc_intr\n");
-		return ide_do_reset (drive);
+		return ide_stopped;
 	}
 	if (ireason.b.io == test_bit (PC_WRITING, &pc->flags)) {	/* Hopefully, we will never get here */
 		printk (KERN_ERR "ide-floppy: We wanted to %s, ", ireason.b.io ? "Write":"Read");
 		printk (KERN_ERR "but the floppy wants us to %s !\n",ireason.b.io ? "Read":"Write");
-		return ide_do_reset (drive);
+		return ide_stopped;
 	}
 	if (!test_bit (PC_WRITING, &pc->flags)) {			/* Reading - Check that we have enough space */
 		temp = pc->actually_transferred + bcount.all;
@@ -1012,7 +1012,7 @@ static ide_startstop_t idefloppy_transfer_pc (ide_drive_t *drive)
 	ireason.all=IN_BYTE (IDE_IREASON_REG);
 	if (!ireason.b.cod || ireason.b.io) {
 		printk (KERN_ERR "ide-floppy: (IO,CoD) != (0,1) while issuing a packet command\n");
-		return ide_do_reset (drive);
+		return ide_stopped;
 	}
 	ide_set_handler (drive, &idefloppy_pc_intr, IDEFLOPPY_WAIT_CMD, NULL);	/* Set the interrupt routine */
 	atapi_output_bytes (drive, floppy->pc->c, 12); /* Send the actual packet */
@@ -1053,7 +1053,7 @@ static ide_startstop_t idefloppy_transfer_pc1 (ide_drive_t *drive)
 	ireason.all=IN_BYTE (IDE_IREASON_REG);
 	if (!ireason.b.cod || ireason.b.io) {
 		printk (KERN_ERR "ide-floppy: (IO,CoD) != (0,1) while issuing a packet command\n");
-		return ide_do_reset (drive);
+		return ide_stopped;
 	}
 	/* 
 	 * The following delay solves a problem with ATAPI Zip 100 drives where the

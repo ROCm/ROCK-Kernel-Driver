@@ -439,7 +439,7 @@ static unsigned long long idedisk_read_native_max_address_ext(ide_drive_t *drive
 	if ((args.tfRegister[IDE_STATUS_OFFSET] & 0x01) == 0) {
 		u32 high = ((args.hobRegister[IDE_HCYL_OFFSET_HOB])<<16) |
 			   ((args.hobRegister[IDE_LCYL_OFFSET_HOB])<<8) |
-  			    (args.hobRegister[IDE_SECTOR_OFFSET_HOB]); 
+			    (args.hobRegister[IDE_SECTOR_OFFSET_HOB]);
 		u32 low  = ((args.tfRegister[IDE_HCYL_OFFSET])<<16) |
 			   ((args.tfRegister[IDE_LCYL_OFFSET])<<8) |
 			    (args.tfRegister[IDE_SECTOR_OFFSET]);
@@ -458,7 +458,7 @@ static unsigned long idedisk_set_max_address(ide_drive_t *drive, unsigned long a
 {
 	ide_task_t args;
 	unsigned long addr_set = 0;
-	
+
 	addr_req--;
 	/* Create IDE/ATA command request structure */
 	memset(&args, 0, sizeof(ide_task_t));
@@ -907,13 +907,26 @@ static void idedisk_add_settings(ide_drive_t *drive)
 
 static int idedisk_suspend(struct device *dev, u32 state, u32 level)
 {
-	int i;
 	ide_drive_t *drive = dev->driver_data;
 
+	/* I hope that every freeze operations from the upper levels have
+	 * already been done...
+	 */
+
+	/* wait until all commands are finished */
 	printk("ide_disk_suspend()\n");
 	while (HWGROUP(drive)->handler)
-		schedule();
+		yield();
+
+	/* set the drive to standby */
+	printk(KERN_INFO "suspending: %s ", drive->name);
+	if (ata_ops(drive)) {
+		if (ata_ops(drive)->standby)
+			ata_ops(drive)->standby(drive);
+	}
 	drive->blocked = 1;
+
+	return 0;
 }
 
 static int idedisk_resume(struct device *dev, u32 level)
@@ -921,7 +934,9 @@ static int idedisk_resume(struct device *dev, u32 level)
 	ide_drive_t *drive = dev->driver_data;
 	if (!drive->blocked)
 		panic("ide: Resume but not suspended?\n");
+
 	drive->blocked = 0;
+	return 0;
 }
 
 

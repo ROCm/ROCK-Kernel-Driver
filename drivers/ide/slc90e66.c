@@ -48,7 +48,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #define SLC90E66_DEBUG_DRIVE_INFO		0
 
@@ -202,7 +202,11 @@ static void slc90e66_tune_drive (ide_drive_t *drive, byte pio)
 				    { 2, 1 },
 				    { 2, 3 }, };
 
-	pio = ide_get_best_pio_mode(drive, pio, 5, NULL);
+	if (pio == 255)
+		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
+	else
+		pio = min_t(byte, pio, 4);
+
 	pci_read_config_word(HWIF(drive)->pci_dev, master_port, &master_data);
 	if (is_slave) {
 		master_data = master_data | 0x4000;
@@ -299,30 +303,14 @@ static int slc90e66_config_drive_for_dma (ide_drive_t *drive)
 
 #if 1 /* allow PIO modes */
 	if (!HWIF(drive)->autodma) {
-		speed = XFER_PIO_0 + ide_get_best_pio_mode(drive, 255, 5, NULL);
+		speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
 		(void) slc90e66_tune_chipset(drive, speed);
 		return ((int) ide_dma_off_quietly);
 	}
 #endif
-	if ((id->dma_ultra & 0x0010) && (ultra)) {
-		speed = (udma_66) ? XFER_UDMA_4 : XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0008) && (ultra)) {
-		speed = (udma_66) ? XFER_UDMA_3 : XFER_UDMA_1;
-	} else if ((id->dma_ultra & 0x0004) && (ultra)) {
-		speed = XFER_UDMA_2;
-	} else if ((id->dma_ultra & 0x0002) && (ultra)) {
-		speed = XFER_UDMA_1;
-	} else if ((id->dma_ultra & 0x0001) && (ultra)) {
-		speed = XFER_UDMA_0;
-	} else if (id->dma_mword & 0x0004) {
-		speed = XFER_MW_DMA_2;
-	} else if (id->dma_mword & 0x0002) {
-		speed = XFER_MW_DMA_1;
-	} else if (id->dma_1word & 0x0004) {
-		speed = XFER_SW_DMA_2;
-        } else {
-		speed = XFER_PIO_0 + ide_get_best_pio_mode(drive, 255, 5, NULL);
-	}
+
+	speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO | XFER_SWDMA | XFER_MWDMA 
+					| (ultra ? XFER_UDMA : 0) | ((ultra && udma_66) ? XFER_UDMA_66 : 0));
 
 	(void) slc90e66_tune_chipset(drive, speed);
 

@@ -15,7 +15,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 /*
  * Changing this #undef to #define may solve start up problems in some systems.
@@ -70,7 +70,7 @@ static void tune_dtc2278 (ide_drive_t *drive, byte pio)
 {
 	unsigned long flags;
 
-	pio = ide_get_best_pio_mode(drive, pio, 4, NULL);
+	pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
 	if (pio >= 3) {
 		save_flags(flags);	/* all CPUs */

@@ -53,7 +53,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 /* the current version */
 #define CY82_VERSION	"CY82C693U driver v0.34 99-13-12 Andreas S. Krebs (akrebs@altavista.net)"
@@ -137,10 +137,13 @@ static int calc_clk (int time, int bus_speed)
  * NOTE: for mode 0,1 and 2 drives 8-bit IDE command control registers are used
  *       for mode 3 and 4 drives 8 and 16-bit timings are the same
  *
- */ 
+ */
 static void compute_clocks (byte pio, pio_clocks_t *p_pclk)
 {
+	struct ata_timing *t;
 	int clk1, clk2;
+
+	t = ata_timing_data(XFER_PIO_0 + pio);
 
 	/* we don't check against CY82C693's min and max speed,
 	 * so you can play with the idebus=xx parameter
@@ -150,15 +153,13 @@ static void compute_clocks (byte pio, pio_clocks_t *p_pclk)
 		pio = CY82C693_MAX_PIO;
 
 	/* let's calc the address setup time clocks */
-	p_pclk->address_time = (byte)calc_clk(ide_pio_timings[pio].setup_time, system_bus_speed);
+	p_pclk->address_time = (byte)calc_clk(t->setup, system_bus_speed);
 
 	/* let's calc the active and recovery time clocks */
-	clk1 = calc_clk(ide_pio_timings[pio].active_time, system_bus_speed);
+	clk1 = calc_clk(t->active, system_bus_speed);
 
 	/* calc recovery timing */
-	clk2 =	ide_pio_timings[pio].cycle_time -
-		ide_pio_timings[pio].active_time -
-		ide_pio_timings[pio].setup_time;
+	clk2 =	t->cycle - t->active - t->setup;
 
 	clk2 = calc_clk(clk2, system_bus_speed);
 
@@ -166,7 +167,7 @@ static void compute_clocks (byte pio, pio_clocks_t *p_pclk)
 
 	/* note: we use the same values for 16bit IOR and IOW
          *	those are all the same, since I don't have other
-	 *	timings than those from ide_modes.h
+	 *	timings than those from ata-timing.h
 	 */
 
 	p_pclk->time_16r = (byte)clk1;
@@ -321,7 +322,7 @@ static void cy82c693_tune_drive (ide_drive_t *drive, byte pio)
 #endif /* CY82C693_DEBUG_LOGS */
 
         /* first let's calc the pio modes */
-	pio = ide_get_best_pio_mode(drive, pio, CY82C693_MAX_PIO, NULL);
+	pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
 #if CY82C693_DEBUG_INFO
 	printk (KERN_INFO "%s: Selected PIO mode %d\n", drive->name, pio);

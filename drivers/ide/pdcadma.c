@@ -24,7 +24,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #undef DISPLAY_PDCADMA_TIMINGS
 
