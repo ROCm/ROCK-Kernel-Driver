@@ -572,6 +572,19 @@ static __init int disable_acpi_pci(struct dmi_blacklist *d)
 	acpi_noirq_set();
 	return 0;
 } 
+
+static __init int hp_ht_bigsmp(struct dmi_blacklist *d) 
+{ 
+#ifdef CONFIG_X86_GENERICARCH
+	extern int dmi_bigsmp;
+	printk(KERN_NOTICE "%s detected: force use of apic=bigsmp pci=noacpi\n", d->ident);
+	dmi_bigsmp = 1;
+#else
+	printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n", d->ident);
+#endif
+	acpi_noirq_set();
+	return 0;
+} 
 #endif
 
 /*
@@ -1017,6 +1030,17 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 #endif	// CONFIG_ACPI_BOOT
 
 #ifdef	CONFIG_ACPI_PCI
+
+	{ hp_ht_bigsmp, "HP ProLiant DL760 G2", {
+			MATCH(DMI_BIOS_VENDOR, "HP"),
+			MATCH(DMI_BIOS_VERSION, "P44-"),
+			NO_MATCH, NO_MATCH }},
+
+	{ hp_ht_bigsmp, "HP ProLiant DL740", {
+			MATCH(DMI_BIOS_VENDOR, "HP"),
+			MATCH(DMI_BIOS_VERSION, "P47-"),
+			NO_MATCH, NO_MATCH }},
+
 	/*
 	 *	Boxes that need ACPI PCI IRQ routing disabled
 	 */
