@@ -217,7 +217,9 @@ check_fw_ready_again:
 					rval = QLA_FUNCTION_FAILED;
 				if (ha->mem_err)
 					restart_risc = 1;
-			}
+			} else if (ha->device_flags & DFLG_NO_CABLE)
+				/* If no cable, then all is good. */
+				rval = QLA_SUCCESS;
 		}
 	} while (restart_risc && retry--);
 
@@ -1201,9 +1203,6 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 	uint8_t  timer_mode;
 
 	rval = QLA_SUCCESS;
-
-	if (ha->flags.init_done)
-		return (rval);
 
 	/* Determine NVRAM starting address. */
 	ha->nvram_base = 0;

@@ -1582,14 +1582,10 @@ qla2xxx_eh_bus_reset(struct scsi_cmnd *cmd)
 	if (rval == FAILED)
 		goto out;
 
-	/*
-	 * Blocking Call. It goes to sleep waiting for cmd to get to done q
-	 *
-	 * XXX(hch): really?  We're under host_lock here..
-	 */
 	/* Waiting for our command in done_queue to be returned to OS.*/
-	if (!qla2x00_eh_wait_for_pending_commands(ha))
-		rval = FAILED;
+	if (cmd->device->host->eh_active)
+		if (!qla2x00_eh_wait_for_pending_commands(ha))
+			rval = FAILED;
 
  out:
 	qla_printk(KERN_INFO, ha, "%s: reset %s\n", __func__,
@@ -1932,7 +1928,7 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 	if (host == NULL) {
 		printk(KERN_WARNING
 		    "qla2xxx: Couldn't allocate host from scsi layer!\n");
-		return -1;
+		goto probe_disable_device;
 	}
 
 	/* Clear our data area */
@@ -2155,6 +2151,9 @@ probe_failed:
 
 	scsi_host_put(host);
 
+probe_disable_device:
+	pci_disable_device(pdev);
+
 	return -1;
 }
 EXPORT_SYMBOL_GPL(qla2x00_probe_one);
@@ -2222,6 +2221,8 @@ qla2x00_free_device(scsi_qla_host_t *ha)
 
 	/* release io space registers  */
 	pci_release_regions(ha->pdev);
+
+	pci_disable_device(ha->pdev);
 
 #if MEMORY_MAPPED_IO
 	if (ha->mmio_address)
@@ -3231,9 +3232,6 @@ qla2x00_do_dpc(void *data)
 		if (ha->dpc_should_die)
 			break;
 
-		if (!list_empty(&ha->done_queue))
-			qla2x00_done(ha);
-
 		DEBUG3(printk("qla2x00: DPC handler waking up\n"));
 
 		/* Initialization not yet finished. Don't do anything yet. */
@@ -3243,6 +3241,9 @@ qla2x00_do_dpc(void *data)
 		DEBUG3(printk("scsi(%ld): DPC handler\n", ha->host_no));
 
 		ha->dpc_active = 1;
+
+		if (!list_empty(&ha->done_queue))
+			qla2x00_done(ha);
 
 		/* Process commands in retry queue */
 		if (test_and_clear_bit(PORT_RESTART_NEEDED, &ha->dpc_flags)) {

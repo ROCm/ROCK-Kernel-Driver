@@ -969,7 +969,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 		    sizeof(cp->sense_buffer))
 			sense_sz = le16_to_cpu(pkt->req_sense_length);
 		else
-			sense_sz = sizeof(cp->sense_buffer) - 1;
+			sense_sz = sizeof(cp->sense_buffer);
 
 		CMD_ACTUAL_SNSLEN(cp) = sense_sz;
 		sp->request_sense_length = sense_sz;
@@ -1039,7 +1039,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 			    sizeof(cp->sense_buffer))
 				sense_sz = le16_to_cpu(pkt->req_sense_length);
 			else
-				sense_sz = sizeof(cp->sense_buffer) - 1;
+				sense_sz = sizeof(cp->sense_buffer);
 
 			CMD_ACTUAL_SNSLEN(cp) = sense_sz;
 			sp->request_sense_length = sense_sz;
