@@ -61,7 +61,7 @@ config I2C_ALGO_SIBYTE
 
 config I2C_ALGO_SGI
 	tristate "I2C SGI interfaces"
-	depends on I2C
+	depends on I2C && (SGI_IP22 || SGI_IP32 || X86_VISWS)
 	help
 	  Supports the SGI interfaces like the ones found on SGI Indy VINO
 	  or SGI O2 MACE.
