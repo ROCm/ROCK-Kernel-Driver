@@ -100,7 +100,7 @@ static void sis_648_enable(u32 mode)
 		 */
 		if (device->device == PCI_DEVICE_ID_SI_648 ||
 			device->device == PCI_DEVICE_ID_SI_746) {
-			printk(KERN_INFO PFX "sis 648 agp fix - giving bridge time to recover\n");
+			printk(KERN_INFO PFX "SiS chipset with AGP problems detected. Giving bridge time to recover.\n");
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout (1+(HZ*10)/1000);
 		}
