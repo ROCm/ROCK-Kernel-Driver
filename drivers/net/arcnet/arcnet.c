@@ -340,7 +340,7 @@ void arcdev_setup(struct net_device *dev)
 	dev->hard_header_len = sizeof(struct archdr);
 	dev->mtu = choose_mtu();
 
-	dev->addr_len = 1;
+	dev->addr_len = ARCNET_ALEN;
 	dev->tx_queue_len = 30;
 	dev->broadcast[0] = 0x00;	/* for us, broadcasts are address 0 */
 	dev->watchdog_timeo = TX_TIMEOUT;
