@@ -230,6 +230,10 @@ ia64_phys_addr_valid (unsigned long addr)
 
 #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
 
+/* This takes a physical page address that is used by the remapping functions */
+#define mk_pte_phys(physpage, pgprot) \
+({ pte_t __pte; pte_val(__pte) = physpage + pgprot_val(pgprot); __pte; })
+
 #define pte_modify(_pte, newprot) \
 	(__pte((pte_val(_pte) & ~_PAGE_CHG_MASK) | (pgprot_val(newprot) & _PAGE_CHG_MASK)))
 

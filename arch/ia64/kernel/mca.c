@@ -83,9 +83,8 @@ u64				ia64_mca_stack[1024] __attribute__((aligned(16)));
 u64				ia64_mca_stackframe[32];
 u64				ia64_mca_bspstore[1024];
 u64				ia64_init_stack[KERNEL_STACK_SIZE/8] __attribute__((aligned(16)));
-u64				ia64_mca_sal_data_area[1356];
-u64				ia64_tlb_functional;
 u64				ia64_os_mca_recovery_successful;
+u64				ia64_mca_serialize;
 static void			ia64_mca_wakeup_ipi_wait(void);
 static void			ia64_mca_wakeup(int cpu);
 static void			ia64_mca_wakeup_all(void);
@@ -94,6 +93,8 @@ extern void			ia64_monarch_init_handler (void);
 extern void			ia64_slave_init_handler (void);
 static u64			ia64_log_get(int sal_info_type, u8 **buffer);
 extern struct hw_interrupt_type	irq_type_iosapic_level;
+
+struct ia64_mca_tlb_info ia64_mca_tlb_list[NR_CPUS];
 
 static struct irqaction cmci_irqaction = {
 	.handler =	ia64_mca_cmc_int_handler,
@@ -984,6 +985,9 @@ ia64_mca_wakeup_int_handler(int wakeup_irq, void *arg, struct pt_regs *ptregs)
 void
 ia64_return_to_sal_check(void)
 {
+	pal_processor_state_info_t *psp = (pal_processor_state_info_t *)
+		&ia64_sal_to_os_handoff_state.proc_state_param;
+
 	/* Copy over some relevant stuff from the sal_to_os_mca_handoff
 	 * so that it can be used at the time of os_mca_to_sal_handoff
 	 */
@@ -993,14 +997,22 @@ ia64_return_to_sal_check(void)
 	ia64_os_to_sal_handoff_state.imots_sal_check_ra =
 		ia64_sal_to_os_handoff_state.imsto_sal_check_ra;
 
-	/* Cold Boot for uncorrectable MCA */
-	ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_COLD_BOOT;
+	/*
+	 * Did we correct the error? At the moment the only error that
+	 * we fix is a TLB error, if any other kind of error occurred
+	 * we must reboot.
+	 */
+	if (psp->cc == 1 && psp->bc == 1 && psp->rc == 1 && psp->uc == 1)
+		ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_COLD_BOOT;
+	else
+		ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_CORRECTED;
 
 	/* Default = tell SAL to return to same context */
 	ia64_os_to_sal_handoff_state.imots_context = IA64_MCA_SAME_CONTEXT;
 
 	ia64_os_to_sal_handoff_state.imots_new_min_state =
 		(u64 *)ia64_sal_to_os_handoff_state.pal_min_state;
+
 }
 
 /*
@@ -1359,8 +1371,8 @@ ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 void
 ia64_log_prt_guid (efi_guid_t *p_guid, prfunc_t prfunc)
 {
-	char out[40];
-	printk(KERN_DEBUG "GUID = %s\n", efi_guid_unparse(p_guid, out));
+	//char out[40];
+	//printk(KERN_DEBUG "GUID = %s\n", efi_guid_unparse(p_guid, out));
 }
 
 static void
