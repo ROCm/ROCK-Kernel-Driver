@@ -39,6 +39,8 @@ struct parport_pc_private {
 	char *dma_buf;
 	dma_addr_t dma_handle;
 	struct pci_dev *dev;
+	struct list_head list;
+	struct parport *port;
 };
 
 static __inline__ void parport_pc_write_data(struct parport *p, unsigned char d)

@@ -2107,6 +2107,9 @@ static int __devinit parport_dma_probe (struct parport *p)
 
 /* --- Initialisation code -------------------------------- */
 
+static LIST_HEAD(ports_list);
+static spinlock_t ports_lock = SPIN_LOCK_UNLOCKED;
+
 struct parport *parport_pc_probe_port (unsigned long int base,
 				       unsigned long int base_hi,
 				       int irq, int dma,
@@ -2145,6 +2148,8 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 	priv->dma_buf = 0;
 	priv->dma_handle = 0;
 	priv->dev = dev;
+	INIT_LIST_HEAD(&priv->list);
+	priv->port = p;
 	p->base_hi = base_hi;
 	p->modes = PARPORT_MODE_PCSPP | PARPORT_MODE_SAFEININT;
 	p->private_data = priv;
@@ -2296,6 +2301,9 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 	/* Now that we've told the sharing engine about the port, and
 	   found out its characteristics, let the high-level drivers
 	   know about it. */
+	spin_lock(&ports_lock);
+	list_add(&priv->list, &ports_list);
+	spin_unlock(&ports_lock);
 	parport_announce_port (p);
 
 	return p;
@@ -2320,11 +2328,13 @@ EXPORT_SYMBOL (parport_pc_probe_port);
 
 void parport_pc_unregister_port (struct parport *p)
 {
-#ifdef CONFIG_PARPORT_PC_FIFO
 	struct parport_pc_private *priv = p->private_data;
-#endif /* CONFIG_PARPORT_PC_FIFO */
 	struct parport_operations *ops = p->ops;
+
 	parport_remove_port(p);
+	spin_lock(&ports_lock);
+	list_del_init(&priv->list);
+	spin_unlock(&ports_lock);
 	if (p->dma != PARPORT_DMA_NONE)
 		free_dma(p->dma);
 	if (p->irq != PARPORT_IRQ_NONE)
@@ -3126,19 +3136,21 @@ static int __init parport_pc_init(void)
 
 static void __exit parport_pc_exit(void)
 {
-	/* We ought to keep track of which ports are actually ours. */
-	struct parport *p = parport_enumerate(), *tmp;
-
 	if (registered_parport)
 		pci_unregister_driver (&parport_pc_pci_driver);
 
-	while (p) {
-		tmp = p->next;
-		if (p->modes & PARPORT_MODE_PCSPP)
-			parport_pc_unregister_port (p);
-
-		p = tmp;
+	spin_lock(&ports_lock);
+	while (!list_empty(&ports_list)) {
+		struct parport_pc_private *priv;
+		struct parport *port;
+		priv = list_entry(ports_list.next,
+				  struct parport_pc_private, list);
+		port = priv->port;
+		spin_unlock(&ports_lock);
+		parport_pc_unregister_port(port);
+		spin_lock(&ports_lock);
 	}
+	spin_unlock(&ports_lock);
 	pnp_unregister_driver (&parport_pc_pnp_driver);
 }
 
