@@ -31,7 +31,6 @@
 
 extern char arg_maxnodes[];
 void mark_cpuvertex_as_cpu(vertex_hdl_t vhdl, cpuid_t cpuid);
-int is_specified(char *);
 
 
 /* ARGSUSED */
@@ -125,7 +124,6 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 	vertex_hdl_t xbow_v, hubv;
 	/*REFERENCED*/
 	graph_error_t err;
-	extern int is_specified(char *s);
 
 	if ((brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_IOBRICK_XBOW)) == NULL)
 			return;
@@ -149,7 +147,7 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 
 		hub_cnode = NASID_TO_COMPACT_NODEID(hub_nasid);
 
-		if (is_specified(arg_maxnodes) && hub_cnode == INVALID_CNODEID) {
+		if (hub_cnode == INVALID_CNODEID) {
 			continue;
 		}
 			
@@ -340,7 +338,7 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 
 	rc = hwgraph_traverse(hwgraph_root, path_buffer, &router_hndl);
 
-	if (rc != GRAPH_SUCCESS && is_specified(arg_maxnodes))
+	if (rc != GRAPH_SUCCESS)
 			return;
 
 	if (rc != GRAPH_SUCCESS)
@@ -365,7 +363,7 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 				 port));
 			continue;
 		}
-		if (is_specified(arg_maxnodes) && NASID_TO_COMPACT_NODEID(router->rou_port[port].port_nasid) 
+		if (NASID_TO_COMPACT_NODEID(router->rou_port[port].port_nasid) 
 		    == INVALID_CNODEID) {
 			continue;
 		}
@@ -380,7 +378,7 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 		rc = hwgraph_traverse(hwgraph_root, dest_path, &dest_hndl);
 
 		if (rc != GRAPH_SUCCESS) {
-			if (is_specified(arg_maxnodes) && KL_CONFIG_DUPLICATE_BOARD(dest_brd))
+			if (KL_CONFIG_DUPLICATE_BOARD(dest_brd))
 				continue;
 			printk("Can't find router: %s", dest_path);
 			return;
@@ -466,7 +464,7 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 				continue; /* Port not active */
 			}
 
-			if (is_specified(arg_maxnodes) && NASID_TO_COMPACT_NODEID(hub->hub_port[port].port_nasid) == INVALID_CNODEID)
+			if (NASID_TO_COMPACT_NODEID(hub->hub_port[port].port_nasid) == INVALID_CNODEID)
 				continue;
 
 			/* Generate a hardware graph path for this board. */
@@ -486,7 +484,7 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 			rc = hwgraph_traverse(hwgraph_root, dest_path, &dest_hndl);
 
 			if (rc != GRAPH_SUCCESS) {
-				if (is_specified(arg_maxnodes) && KL_CONFIG_DUPLICATE_BOARD(dest_brd))
+				if (KL_CONFIG_DUPLICATE_BOARD(dest_brd))
 					continue;
 				printk("Can't find board: %s", dest_path);
 				return;

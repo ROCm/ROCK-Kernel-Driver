@@ -17,16 +17,6 @@
 #include <asm/sn/sn_private.h>
 
 cpuid_t         master_procid;
-char arg_maxnodes[4];
-
-/*
- * Return non-zero if the given variable was specified
- */
-int
-is_specified(char *s)
-{
-        return (strlen(s) != 0);
-}
 
 /*
  * Routines provided by ml/SN/promif.c.
