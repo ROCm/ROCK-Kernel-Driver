@@ -272,7 +272,7 @@ restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr)
 				     sizeof(sr->mc_vregs)))
 			return 1;
 	} else if (current->thread.used_vr)
-		memset(&current->thread.vr, 0, sizeof(current->thread.vr));
+		memset(&current->thread.vr, 0, ELF_NVRREG * sizeof(vector128));
 
 	/* Always get VRSAVE back */
 	if (__get_user(current->thread.vrsave, (u32 *)&sr->mc_vregs[32]))
@@ -328,7 +328,6 @@ handle_rt_signal(unsigned long sig, struct k_sigaction *ka,
 			  &rt_sf->uc.uc_stack.ss_flags)
 	    || __put_user(current->sas_ss_size, &rt_sf->uc.uc_stack.ss_size)
 	    || __put_user(&rt_sf->uc.uc_mcontext, &rt_sf->uc.uc_regs)
-	    || __copy_to_user(&rt_sf->uc.uc_oldsigmask, oldset, sizeof(*oldset))
 	    || __copy_to_user(&rt_sf->uc.uc_sigmask, oldset, sizeof(*oldset)))
 		goto badframe;
 
@@ -363,12 +362,13 @@ badframe:
 static int do_setcontext(struct ucontext __user *ucp, struct pt_regs *regs)
 {
 	sigset_t set;
+	struct mcontext *mcp;
 
-	if (__copy_from_user(&set, &ucp->uc_sigmask, sizeof(set)))
+	if (__copy_from_user(&set, &ucp->uc_sigmask, sizeof(set))
+	    || __get_user(mcp, &ucp->uc_regs))
 		return -EFAULT;
 	restore_sigmask(&set);
-
-	if (restore_user_regs(regs, &ucp->uc_mcontext))
+	if (restore_user_regs(regs, mcp))
 		return -EFAULT;
 
 	return 0;
@@ -384,9 +384,6 @@ int sys_swapcontext(struct ucontext __user *old_ctx,
 		if (verify_area(VERIFY_WRITE, old_ctx, sizeof(*old_ctx))
 		    || save_user_regs(regs, &old_ctx->uc_mcontext, 0)
 		    || __copy_to_user(&old_ctx->uc_sigmask,
-				      &current->blocked, sizeof(sigset_t))
-		    /* the next 2 things aren't strictly necessary */
-		    || __copy_to_user(&old_ctx->uc_oldsigmask,
 				      &current->blocked, sizeof(sigset_t))
 		    || __put_user(&old_ctx->uc_mcontext, &old_ctx->uc_regs))
 			return -EFAULT;
