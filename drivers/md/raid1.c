@@ -296,7 +296,7 @@ static int raid1_end_read_request(struct bio *bio, unsigned int bytes_done, int 
 		reschedule_retry(r1_bio);
 	}
 
-	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
+	rdev_dec_pending(conf->mirrors[mirror].rdev, conf->mddev);
 	return 0;
 }
 
@@ -343,7 +343,7 @@ static int raid1_end_write_request(struct bio *bio, unsigned int bytes_done, int
 		raid_end_bio_io(r1_bio);
 	}
 
-	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
+	rdev_dec_pending(conf->mirrors[mirror].rdev, conf->mddev);
 	return 0;
 }
 
@@ -805,7 +805,7 @@ static int end_sync_read(struct bio *bio, unsigned int bytes_done, int error)
 			 conf->mirrors[r1_bio->read_disk].rdev);
 	else
 		set_bit(R1BIO_Uptodate, &r1_bio->state);
-	atomic_dec(&conf->mirrors[r1_bio->read_disk].rdev->nr_pending);
+	rdev_dec_pending(conf->mirrors[r1_bio->read_disk].rdev, conf->mddev);
 	reschedule_retry(r1_bio);
 	return 0;
 }
@@ -835,7 +835,7 @@ static int end_sync_write(struct bio *bio, unsigned int bytes_done, int error)
 		md_done_sync(mddev, r1_bio->sectors, uptodate);
 		put_buf(r1_bio);
 	}
-	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
+	rdev_dec_pending(conf->mirrors[mirror].rdev, mddev);
 	return 0;
 }
 

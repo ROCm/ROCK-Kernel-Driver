@@ -131,7 +131,7 @@ int multipath_end_request(struct bio *bio, unsigned int bytes_done, int error)
 		       (unsigned long long)bio->bi_sector);
 		multipath_reschedule_retry(mp_bh);
 	}
-	atomic_dec(&rdev->nr_pending);
+	rdev_dec_pending(rdev, conf->mddev);
 	return 0;
 }
 

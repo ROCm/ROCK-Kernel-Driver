@@ -395,7 +395,7 @@ static int raid5_end_read_request (struct bio * bi, unsigned int bytes_done,
 		md_error(conf->mddev, conf->disks[i].rdev);
 		clear_bit(R5_UPTODATE, &sh->dev[i].flags);
 	}
-	atomic_dec(&conf->disks[i].rdev->nr_pending);
+	rdev_dec_pending(conf->disks[i].rdev, conf->mddev);
 #if 0
 	/* must restore b_page before unlocking buffer... */
 	if (sh->bh_page[i] != bh->b_page) {
@@ -438,7 +438,7 @@ static int raid5_end_write_request (struct bio *bi, unsigned int bytes_done,
 	if (!uptodate)
 		md_error(conf->mddev, conf->disks[i].rdev);
 
-	atomic_dec(&conf->disks[i].rdev->nr_pending);
+	rdev_dec_pending(conf->disks[i].rdev, conf->mddev);
 	
 	clear_bit(R5_LOCKED, &sh->dev[i].flags);
 	set_bit(STRIPE_HANDLE, &sh->state);
