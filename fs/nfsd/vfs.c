@@ -1203,7 +1203,9 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 				iap->ia_mode = (iap->ia_mode&S_IALLUGO)
 					| S_IFLNK;
 				err = notify_change(dnew, iap);
-				if (!err && EX_ISSYNC(fhp->fh_export))
+				if (err)
+					err = nfserrno(err);
+				else if (EX_ISSYNC(fhp->fh_export))
 					write_inode_now(dentry->d_inode, 1);
 		       }
 		}
