@@ -133,7 +133,8 @@ static void get_writeback_state(struct writeback_state *wbs)
  * clamping level.
  */
 static void
-get_dirty_limits(struct writeback_state *wbs, long *pbackground, long *pdirty)
+get_dirty_limits(struct writeback_state *wbs, long *pbackground, long *pdirty,
+		 struct address_space *mapping)
 {
 	int background_ratio;		/* Percentages */
 	int dirty_ratio;
@@ -141,10 +142,20 @@ get_dirty_limits(struct writeback_state *wbs, long *pbackground, long *pdirty)
 	long background;
 	long dirty;
 	struct task_struct *tsk;
+	unsigned long available_memory = total_pages;
 
 	get_writeback_state(wbs);
 
-	unmapped_ratio = 100 - (wbs->nr_mapped * 100) / total_pages;
+#ifdef CONFIG_HIGHMEM
+	/*
+	 * In some cases we can only allocate from low memory,
+	 * so we exclude high memory from our count.
+	 */
+	if (mapping && !(mapping_gfp_mask(mapping) & __GFP_HIGHMEM))
+		available_memory -= totalhigh_pages;
+#endif
+
+	unmapped_ratio = 100 - (wbs->nr_mapped * 100) / available_memory;
 
 	dirty_ratio = vm_dirty_ratio;
 	if (dirty_ratio > unmapped_ratio / 2)
@@ -194,7 +205,7 @@ static void balance_dirty_pages(struct address_space *mapping)
 			.nr_to_write	= write_chunk,
 		};
 
-		get_dirty_limits(&wbs, &background_thresh, &dirty_thresh);
+		get_dirty_limits(&wbs, &background_thresh, &dirty_thresh, mapping);
 		nr_reclaimable = wbs.nr_dirty + wbs.nr_unstable;
 		if (nr_reclaimable + wbs.nr_writeback <= dirty_thresh)
 			break;
@@ -210,7 +221,7 @@ static void balance_dirty_pages(struct address_space *mapping)
 		if (nr_reclaimable) {
 			writeback_inodes(&wbc);
 			get_dirty_limits(&wbs, &background_thresh,
-					&dirty_thresh);
+					&dirty_thresh, mapping);
 			nr_reclaimable = wbs.nr_dirty + wbs.nr_unstable;
 			if (nr_reclaimable + wbs.nr_writeback <= dirty_thresh)
 				break;
@@ -296,7 +307,7 @@ static void background_writeout(unsigned long _min_pages)
 		long background_thresh;
 		long dirty_thresh;
 
-		get_dirty_limits(&wbs, &background_thresh, &dirty_thresh);
+		get_dirty_limits(&wbs, &background_thresh, &dirty_thresh, NULL);
 		if (wbs.nr_dirty + wbs.nr_unstable < background_thresh
 				&& min_pages <= 0)
 			break;
