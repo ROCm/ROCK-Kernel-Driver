@@ -15,6 +15,7 @@
  *  03-Sep-2003 BJD  Linux v2.6 support
  *  12-Mar-2004 BJD  Fixed include protection, fixed type of clock vars
  *  14-Sep-2004 BJD  Added misccr and getpin to gpio
+ *  01-Oct-2004 BJD  Added the new gpio functions
 */
 
 #ifndef __ASM_ARCH_HARDWARE_H
@@ -44,6 +45,20 @@ extern unsigned long s3c2410_fclk;
 */
 
 extern void s3c2410_gpio_cfgpin(unsigned int pin, unsigned int function);
+
+extern unsigned int s3c2410_gpio_getcfg(unsigned int pin);
+
+
+/* s3c2410_gpio_getirq
+ *
+ * turn the given pin number into the corresponding IRQ number
+ *
+ * returns:
+ *	< 0 = no interrupt for this pin
+ *	>=0 = interrupt number for the pin
+*/
+
+extern int s3c2410_gpio_getirq(unsigned int pin);
 
 /* s3c2410_gpio_pullup
  *

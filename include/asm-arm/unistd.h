@@ -299,6 +299,13 @@
 #define __NR_pciconfig_iobase		(__NR_SYSCALL_BASE+271)
 #define __NR_pciconfig_read		(__NR_SYSCALL_BASE+272)
 #define __NR_pciconfig_write		(__NR_SYSCALL_BASE+273)
+#define __NR_mq_open			(__NR_SYSCALL_BASE+274)
+#define __NR_mq_unlink			(__NR_SYSCALL_BASE+275)
+#define __NR_mq_timedsend		(__NR_SYSCALL_BASE+276)
+#define __NR_mq_timedreceive		(__NR_SYSCALL_BASE+277)
+#define __NR_mq_notify			(__NR_SYSCALL_BASE+278)
+#define __NR_mq_getsetattr		(__NR_SYSCALL_BASE+279)
+#define __NR_waitid			(__NR_SYSCALL_BASE+280)
 
 /*
  * The following SWIs are ARM private.

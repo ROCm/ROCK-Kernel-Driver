@@ -138,7 +138,7 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, int gfp,
 	struct page *page;
 	struct vm_region *c;
 	unsigned long order;
-	u64 mask = 0x00ffffff, limit; /* ISA default */
+	u64 mask = ISA_DMA_THRESHOLD, limit;
 
 	if (!consistent_pte) {
 		printk(KERN_ERR "%s: not initialised\n", __func__);
@@ -148,19 +148,34 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, int gfp,
 
 	if (dev) {
 		mask = dev->coherent_dma_mask;
+
+		/*
+		 * Sanity check the DMA mask - it must be non-zero, and
+		 * must be able to be satisfied by a DMA allocation.
+		 */
 		if (mask == 0) {
 			dev_warn(dev, "coherent DMA mask is unset\n");
-			return NULL;
+			goto no_page;
+		}
+
+		if ((~mask) & ISA_DMA_THRESHOLD) {
+			dev_warn(dev, "coherent DMA mask %#llx is smaller "
+				 "than system GFP_DMA mask %#llx\n",
+				 mask, (unsigned long long)ISA_DMA_THRESHOLD);
+			goto no_page;
 		}
 	}
 
+	/*
+	 * Sanity check the allocation size.
+	 */
 	size = PAGE_ALIGN(size);
 	limit = (mask + 1) & ~mask;
-	if ((limit && size >= limit) || size >= (CONSISTENT_END - CONSISTENT_BASE)) {
-		printk(KERN_WARNING "coherent allocation too big (requested %#x mask %#Lx)\n",
-		       size, mask);
-		*handle = ~0;
-		return NULL;
+	if ((limit && size >= limit) ||
+	    size >= (CONSISTENT_END - CONSISTENT_BASE)) {
+		printk(KERN_WARNING "coherent allocation too big "
+		       "(requested %#x mask %#llx)\n", size, mask);
+		goto no_page;
 	}
 
 	order = get_order(size);
@@ -221,6 +236,7 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, int gfp,
 	if (page)
 		__free_pages(page, order);
  no_page:
+	*handle = ~0;
 	return NULL;
 }
 
