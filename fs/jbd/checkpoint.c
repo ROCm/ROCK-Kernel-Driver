@@ -333,6 +333,10 @@ int log_do_checkpoint(journal_t *journal)
 				break;
 			}
 			retry = __flush_buffer(journal, jh, bhs, &batch_count, &drop_count);
+			if (cond_resched_lock(&journal->j_list_lock)) {
+				retry = 1;
+				break;
+			}
 		} while (jh != last_jh && !retry);
 
 		if (batch_count)
@@ -487,6 +491,14 @@ int __journal_clean_checkpoint_list(journal_t *journal)
 				/* Use trylock because of the ranknig */
 				if (jbd_trylock_bh_state(jh2bh(jh)))
 					ret += __try_to_free_cp_buf(jh);
+				/*
+				 * This function only frees up some memory
+				 * if possible so we dont have an obligation
+				 * to finish processing. Bail out if preemption
+				 * requested:
+				 */
+				if (need_resched())
+					goto out;
 			} while (jh != last_jh);
 		}
 	} while (transaction != last_transaction);

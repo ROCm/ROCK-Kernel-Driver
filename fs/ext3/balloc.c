@@ -378,6 +378,11 @@ do_more:
 		}
 		jbd_lock_bh_state(bitmap_bh);
 #endif
+		if (need_resched()) {
+			jbd_unlock_bh_state(bitmap_bh);
+			cond_resched();
+			jbd_lock_bh_state(bitmap_bh);
+		}
 		/* @@@ This prevents newly-allocated data from being
 		 * freed and then reallocated within the same
 		 * transaction. 
