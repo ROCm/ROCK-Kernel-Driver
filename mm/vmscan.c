@@ -38,11 +38,49 @@
 
 #include <linux/swapops.h>
 
+/* possible outcome of pageout() */
+typedef enum {
+	/* failed to write page out, page is locked */
+	PAGE_KEEP,
+	/* move page to the active list, page is locked */
+	PAGE_ACTIVATE,
+	/* page has been sent to the disk successfully, page is unlocked */
+	PAGE_SUCCESS,
+	/* page is clean and locked */
+	PAGE_CLEAN,
+} pageout_t;
+
+struct scan_control {
+	/* Ask refill_inactive_zone, or shrink_cache to scan this many pages */
+	unsigned long nr_to_scan;
+
+	/* Incremented by the number of inactive pages that were scanned */
+	unsigned long nr_scanned;
+
+	/* Incremented by the number of pages reclaimed */
+	unsigned long nr_reclaimed;
+
+	unsigned long nr_mapped;	/* From page_state */
+
+	/* Ask shrink_caches, or shrink_zone to scan at this priority */
+	unsigned int priority;
+
+	/* This context's GFP mask */
+	unsigned int gfp_mask;
+
+	int may_writepage;
+};
+
 /*
- * From 0 .. 100.  Higher means more swappy.
+ * The list of shrinker callbacks used by to apply pressure to
+ * ageable caches.
  */
-int vm_swappiness = 60;
-static long total_memory;
+struct shrinker {
+	shrinker_t		shrinker;
+	struct list_head	list;
+	int			seeks;	/* seeks to recreate an obj */
+	long			nr;	/* objs pending delete */
+};
 
 #define lru_to_page(_head) (list_entry((_head)->prev, struct page, lru))
 
@@ -66,7 +104,7 @@ static long total_memory;
 		if ((_page)->lru.prev != _base) {			\
 			struct page *prev;				\
 									\
-			prev = lru_to_page(&(_page->lru));			\
+			prev = lru_to_page(&(_page->lru));		\
 			prefetchw(&prev->_field);			\
 		}							\
 	} while (0)
@@ -75,15 +113,10 @@ static long total_memory;
 #endif
 
 /*
- * The list of shrinker callbacks used by to apply pressure to
- * ageable caches.
+ * From 0 .. 100.  Higher means more swappy.
  */
-struct shrinker {
-	shrinker_t		shrinker;
-	struct list_head	list;
-	int			seeks;	/* seeks to recreate an obj */
-	long			nr;	/* objs pending delete */
-};
+int vm_swappiness = 60;
+static long total_memory;
 
 static LIST_HEAD(shrinker_list);
 static DECLARE_MUTEX(shrinker_sem);
@@ -106,7 +139,6 @@ struct shrinker *set_shrinker(int seeks, shrinker_t theshrinker)
 	}
 	return shrinker;
 }
-
 EXPORT_SYMBOL(set_shrinker);
 
 /*
@@ -119,7 +151,6 @@ void remove_shrinker(struct shrinker *shrinker)
 	up(&shrinker_sem);
 	kfree(shrinker);
 }
-
 EXPORT_SYMBOL(remove_shrinker);
  
 #define SHRINK_BATCH 128
@@ -239,18 +270,6 @@ static void handle_write_error(struct address_space *mapping,
 	unlock_page(page);
 }
 
-/* possible outcome of pageout() */
-typedef enum {
-	/* failed to write page out, page is locked */
-	PAGE_KEEP,
-	/* move page to the active list, page is locked */
-	PAGE_ACTIVATE,
-	/* page has been sent to the disk successfully, page is unlocked */
-	PAGE_SUCCESS,
-	/* page is clean and locked */
-	PAGE_CLEAN,
-} pageout_t;
-
 /*
  * pageout is called by shrink_list() for each dirty page. Calls ->writepage().
  */
@@ -309,27 +328,6 @@ static pageout_t pageout(struct page *page, struct address_space *mapping)
 
 	return PAGE_CLEAN;
 }
-
-struct scan_control {
-	/* Ask refill_inactive_zone, or shrink_cache to scan this many pages */
-	unsigned long nr_to_scan;
-
-	/* Incremented by the number of inactive pages that were scanned */
-	unsigned long nr_scanned;
-
-	/* Incremented by the number of pages reclaimed */
-	unsigned long nr_reclaimed;
-
-	unsigned long nr_mapped;	/* From page_state */
-
-	/* Ask shrink_caches, or shrink_zone to scan at this priority */
-	unsigned int priority;
-
-	/* This context's GFP mask */
-	unsigned int gfp_mask;
-
-	int may_writepage;
-};
 
 /*
  * shrink_list adds the number of reclaimed pages to sc->nr_reclaimed
