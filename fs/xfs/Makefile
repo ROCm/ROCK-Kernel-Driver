@@ -54,10 +54,6 @@ endif
 
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 
-ifneq ($(CONFIG_XFS_DMAPI),y)
-xfs-y				+= xfs_dmops.o
-endif
-
 xfs-$(CONFIG_XFS_QUOTA)		+= $(addprefix quota/, \
 				   xfs_dquot.o \
 				   xfs_dquot_item.o \
@@ -67,8 +63,6 @@ xfs-$(CONFIG_XFS_QUOTA)		+= $(addprefix quota/, \
 				   xfs_qm.o)
 ifeq ($(CONFIG_XFS_QUOTA),y)
 xfs-$(CONFIG_PROC_FS)		+= quota/xfs_qm_stats.o
-else
-xfs-y				+= xfs_qmops.o
 endif
 
 xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
@@ -124,13 +118,14 @@ xfs-y				+= xfs_alloc.o \
 				   xfs_utils.o \
 				   xfs_vfsops.o \
 				   xfs_vnodeops.o \
-				   xfs_rw.o
+				   xfs_rw.o \
+				   xfs_dmops.o \
+				   xfs_qmops.o
 
 xfs-$(CONFIG_XFS_TRACE)		+= xfs_dir2_trace.o
 
 # Objects in linux/
 xfs-y				+= $(addprefix linux/, \
-				   mrlock.o \
 				   xfs_aops.o \
 				   xfs_buf.o \
 				   xfs_file.o \

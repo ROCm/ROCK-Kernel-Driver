@@ -413,8 +413,9 @@ xfs_setattr(
 	} else {
 		if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_TRUNCATE) &&
 		    !(flags & ATTR_DMI)) {
+			int dmflags = AT_DELAY_FLAG(flags) | DM_SEM_FLAG_WR;
 			code = XFS_SEND_DATA(mp, DM_EVENT_TRUNCATE, vp,
-				vap->va_size, 0, AT_DELAY_FLAG(flags), NULL);
+				vap->va_size, 0, dmflags, NULL);
 			if (code) {
 				lock_flags = 0;
 				goto error_return;

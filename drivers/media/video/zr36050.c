@@ -24,7 +24,7 @@
  * ------------------------------------------------------------------------
  */
 
-#define ZR050_VERSION "v0.7"
+#define ZR050_VERSION "v0.7.1"
 
 #include <linux/version.h>
 #include <linux/module.h>
@@ -479,7 +479,7 @@ zr36050_init (struct zr36050 *ptr)
 		zr36050_write(ptr, ZR050_INT_REQ_1, 3);	// low 2 bits always 1
 
 		/* volume control settings */
-		zr36050_write(ptr, ZR050_MBCV, ptr->max_block_vol >> 1);
+		/*zr36050_write(ptr, ZR050_MBCV, ptr->max_block_vol);*/
 		zr36050_write(ptr, ZR050_SF_HI, ptr->scalefact >> 8);
 		zr36050_write(ptr, ZR050_SF_LO, ptr->scalefact & 0xff);
 
@@ -521,13 +521,13 @@ zr36050_init (struct zr36050 *ptr)
 		/* setup misc. data for compression (target code sizes) */
 
 		/* size of compressed code to reach without header data */
-		sum = ptr->total_code_vol - sum;
+		sum = ptr->real_code_vol - sum;
 		bitcnt = sum << 3;	/* need the size in bits */
 
 		tmp = bitcnt >> 16;
 		dprintk(3,
 			"%s: code: csize=%d, tot=%d, bit=%ld, highbits=%ld\n",
-			ptr->name, sum, ptr->total_code_vol, bitcnt, tmp);
+			ptr->name, sum, ptr->real_code_vol, bitcnt, tmp);
 		zr36050_write(ptr, ZR050_TCV_NET_HI, tmp >> 8);
 		zr36050_write(ptr, ZR050_TCV_NET_MH, tmp & 0xff);
 		tmp = bitcnt & 0xffff;
@@ -629,16 +629,36 @@ zr36050_set_video (struct videocodec   *codec,
 		   struct vfe_polarity *pol)
 {
 	struct zr36050 *ptr = (struct zr36050 *) codec->data;
+	int size;
 
-	dprintk(2, "%s: set_video %d.%d, %d/%d-%dx%d (0x%x) call\n",
+	dprintk(2, "%s: set_video %d.%d, %d/%d-%dx%d (0x%x) q%d call\n",
 		ptr->name, norm->HStart, norm->VStart,
 		cap->x, cap->y, cap->width, cap->height,
-		cap->decimation);
+		cap->decimation, cap->quality);
 	/* if () return -EINVAL;
 	 * trust the master driver that it knows what it does - so
 	 * we allow invalid startx/y and norm for now ... */
 	ptr->width = cap->width / (cap->decimation & 0xff);
 	ptr->height = cap->height / ((cap->decimation >> 8) & 0xff);
+
+	/* (KM) JPEG quality */
+	size = ptr->width * ptr->height;
+	size *= 16; /* size in bits */
+	/* apply quality setting */
+	size = size * cap->quality / 200;
+
+	/* Minimum: 1kb */
+	if (size < 8192)
+		size = 8192;
+	/* Maximum: 7/8 of code buffer */
+	if (size > ptr->total_code_vol * 7)
+		size = ptr->total_code_vol * 7;
+
+	ptr->real_code_vol = size >> 3; /* in bytes */
+
+	/* Set max_block_vol here (previously in zr36050_init, moved
+	 * here for consistency with zr36060 code */
+	zr36050_write(ptr, ZR050_MBCV, ptr->max_block_vol);
 
 	return 0;
 }
@@ -697,6 +717,9 @@ zr36050_control (struct videocodec *codec,
 		if (size != sizeof(int))
 			return -EFAULT;
 		ptr->total_code_vol = *ival;
+		/* (Kieran Morrissey)
+		 * code copied from zr36060.c to ensure proper bitrate */
+		ptr->real_code_vol = (ptr->total_code_vol * 6) >> 3;
 		break;
 
 	case CODEC_G_JPEG_SCALE:	/* get scaling factor */

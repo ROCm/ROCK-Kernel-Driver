@@ -616,8 +616,6 @@ void __init trap_init(void)
         pgm_check_table[9] = &divide_exception;
         pgm_check_table[0x10] = &do_segment_exception;
         pgm_check_table[0x11] = &do_page_exception;
-        pgm_check_table[0x10] = &do_segment_exception;
-        pgm_check_table[0x11] = &do_page_exception;
         pgm_check_table[0x12] = &translation_exception;
         pgm_check_table[0x13] = &special_op_exception;
 #ifndef CONFIG_ARCH_S390X

@@ -331,19 +331,6 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 		periodic_unlink (ohci, ed);
 		break;
 	}
-
-	/* NOTE: Except for a couple of exceptionally clean unlink cases
-	 * (like unlinking the only c/b ED, with no TDs) HCs may still be
-	 * caching this operational ED (or its address).  Safe unlinking
-	 * involves not marking it ED_IDLE till INTR_SF; we always do that
-	 * if td_list isn't empty.  Otherwise the race is small; but ...
-	 */
-	if (ed->state == ED_OPER) {
-		ed->state = ED_IDLE;
-		ed->hwINFO &= ~(ED_SKIP | ED_DEQUEUE);
-		ed->hwHeadP &= ~ED_H;
-		wmb ();
-	}
 }
 
 
@@ -665,6 +652,7 @@ static void td_submit_urb (
 
 	/* start periodic dma if needed */
 	if (periodic) {
+		wmb ();
 		ohci->hc_control |= OHCI_CTRL_PLE|OHCI_CTRL_IE;
 		writel (ohci->hc_control, &ohci->regs->control);
 	}
@@ -1053,7 +1041,7 @@ dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
 
 		/* clean schedule:  unlink EDs that are no longer busy */
 		if (list_empty (&ed->td_list))
-			ed_deschedule (ohci, ed);
+			start_ed_unlink (ohci, ed);
 		/* ... reenabling halted EDs only after fault cleanup */
 		else if ((ed->hwINFO & (ED_SKIP | ED_DEQUEUE)) == ED_SKIP) {
 			td = list_entry (ed->td_list.next, struct td, td_list);

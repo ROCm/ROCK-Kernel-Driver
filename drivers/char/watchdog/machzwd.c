@@ -98,6 +98,7 @@ static unsigned short zf_readb(unsigned char port)
 MODULE_AUTHOR("Fernando Fuganti <fuganti@conectiva.com.br>");
 MODULE_DESCRIPTION("MachZ ZF-Logic Watchdog driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;

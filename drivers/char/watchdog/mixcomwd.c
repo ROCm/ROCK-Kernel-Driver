@@ -302,4 +302,7 @@ static void __exit mixcomwd_exit(void)
 module_init(mixcomwd_init);
 module_exit(mixcomwd_exit);
 
+MODULE_AUTHOR("Gergely Madarasz <gorgo@itc.hu>");
+MODULE_DESCRIPTION("MixCom Watchdog driver");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);

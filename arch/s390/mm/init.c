@@ -42,9 +42,9 @@ char  empty_zero_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 
 void diag10(unsigned long addr)
 {
-#ifdef __s390x__
-        if (addr >= 0x80000000)
+        if (addr >= 0x7ff00000)
                 return;
+#ifdef __s390x__
         asm volatile ("sam31\n\t"
                       "diag %0,%0,0x10\n\t"
                       "sam64" : : "a" (addr) );

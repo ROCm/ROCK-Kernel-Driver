@@ -450,28 +450,6 @@ config DISPLAY7SEG
 	  another UltraSPARC-IIi-cEngine boardset with a 7-segment display,
 	  you should say N to this option.
 
-config WATCHDOG_CP1XXX
-	tristate "CP1XXX Hardware Watchdog support"
-	depends on PCI
-	---help---
-	  This is the driver for the hardware watchdog timers present on
-	  Sun Microsystems CompactPCI models CP1400 and CP1500.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called cpwatchdog.
-
-	  If you do not have a CompactPCI model CP1400 or CP1500, or
-	  another UltraSPARC-IIi-cEngine boardset with hardware watchdog,
-	  you should say N to this option.
-
-config WATCHDOG_RIO
-	tristate "RIO Hardware Watchdog support"
-	depends on PCI
-	help
-	  Say Y here to support the hardware watchdog capability on Sun RIO
-	  machines.  The watchdog timeout period is normally one minute but
-	  can be changed with a boot-time parameter.
-
 config CMDLINE_BOOL
 	bool "Default bootloader kernel arguments"
 
@@ -632,6 +610,15 @@ config DEBUG_KERNEL
 	help
 	  Say Y here if you are developing drivers or trying to debug and
 	  identify kernel problems.
+
+config DEBUG_STACK_USAGE
+	bool "Enable stack utilization instrumentation"
+	depends on DEBUG_KERNEL
+	help
+	  Enables the display of the minimum amount of free stack which each
+	  task has ever had available in the sysrq-T and sysrq-P debug output.
+
+	  This option will slow down process creation somewhat.
 
 config DEBUG_SLAB
 	bool "Debug memory allocations"

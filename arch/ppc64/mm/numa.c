@@ -33,7 +33,10 @@ bootmem_data_t plat_node_bdata[MAX_NUMNODES];
 static unsigned long node0_io_hole_size;
 
 EXPORT_SYMBOL(node_data);
+EXPORT_SYMBOL(numa_cpu_lookup_table);
 EXPORT_SYMBOL(numa_memory_lookup_table);
+EXPORT_SYMBOL(numa_cpumask_lookup_table);
+EXPORT_SYMBOL(nr_cpus_in_node);
 
 static inline void map_cpu_to_node(int cpu, int node)
 {

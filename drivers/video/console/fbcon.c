@@ -159,7 +159,7 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 static void fbcon_bmove(struct vc_data *vc, int sy, int sx, int dy, int dx,
 			int height, int width);
 static int fbcon_switch(struct vc_data *vc);
-static int fbcon_blank(struct vc_data *vc, int blank);
+static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch);
 static int fbcon_font_op(struct vc_data *vc, struct console_font_op *op);
 static int fbcon_set_palette(struct vc_data *vc, unsigned char *table);
 static int fbcon_scrolldelta(struct vc_data *vc, int lines);
@@ -1697,14 +1697,23 @@ static int fbcon_switch(struct vc_data *vc)
 	return 1;
 }
 
-static int fbcon_blank(struct vc_data *vc, int blank)
+static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 {
 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
 
-	if (blank < 0)		/* Entering graphics mode */
-		return 0;
+	if (mode_switch) {
+		struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
+		struct fb_var_screeninfo var = info->var;
+
+		if (blank) {
+			fbcon_cursor(vc, CM_ERASE);
+			return 0;
+		}
+		var.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_FORCE;
+		fb_set_var(info, &var);
+	}
 
 	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
 

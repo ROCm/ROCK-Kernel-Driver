@@ -957,7 +957,7 @@ int __init i8042_init(void)
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
         if (sysdev_class_register(&kbc_sysclass) == 0) {
-                if (sys_device_register(&device_i8042) == 0)
+                if (sysdev_register(&device_i8042) == 0)
 			i8042_sysdev_initialized = 1;
 		else
 			sysdev_class_unregister(&kbc_sysclass);
@@ -980,7 +980,7 @@ void __exit i8042_exit(void)
 		pm_unregister(i8042_pm_dev);
 
 	if (i8042_sysdev_initialized) {
-		sys_device_unregister(&device_i8042);
+		sysdev_unregister(&device_i8042);
 		sysdev_class_unregister(&kbc_sysclass);
 	}
 

@@ -826,7 +826,7 @@ static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 	case 0x24df:
 	case 0x25a3:
 	case 0x25b0:
-	case 0x2562:
+	case 0x2652:
 		break;
 	default:
 		/* we do not handle this PCI device */
