@@ -63,5 +63,27 @@ __write_lock: /* %o0 = lock_ptr */
 	be,pt		%icc, 99b
 	 membar		#StoreLoad | #StoreStore
 	ba,a,pt		%xcc, 1b
+
+	.globl		__write_trylock
+__write_trylock: /* %o0 = lock_ptr */
+	sethi		%hi(0x80000000), %g2
+1:	lduw		[%o0], %g5
+	brnz,pn		%g5, __write_trylock_fail
+4:	 or		%g5, %g2, %g7
+
+	cas		[%o0], %g5, %g7
+	cmp		%g5, %g7
+	be,pt		%icc, __write_trylock_succeed
+	 membar		#StoreLoad | #StoreStore
+
+	ba,pt		%xcc, 1b
+	 nop
+__write_trylock_succeed:
+	retl
+	 mov		1, %o0
+
+__write_trylock_fail:
+	retl
+	 mov		0, %o0
 rwlock_impl_end:
 

@@ -270,9 +270,14 @@ to_kernel:
 #ifdef CONFIG_PREEMPT
 		ldsw			[%g6 + TI_PRE_COUNT], %l5
 		brnz			%l5, kern_fpucheck
+		 ldx			[%g6 + TI_FLAGS], %l5
+		andcc			%l5, _TIF_NEED_RESCHED, %g0
+		be,pt			%xcc, kern_fpucheck
+		 srl			%l4, 20, %l5
+		cmp			%l5, 0
+		bne,pn			%xcc, kern_fpucheck
 		 sethi			%hi(PREEMPT_ACTIVE), %l6
 		stw			%l6, [%g6 + TI_PRE_COUNT]
-		wrpr			0, %pil
 		call			schedule
 		 nop
 		ba,pt			%xcc, rtrap

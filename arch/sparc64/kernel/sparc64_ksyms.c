@@ -136,6 +136,7 @@ EXPORT_SYMBOL(__read_lock);
 EXPORT_SYMBOL(__read_unlock);
 EXPORT_SYMBOL(__write_lock);
 EXPORT_SYMBOL(__write_unlock);
+EXPORT_SYMBOL(__write_trylock);
 #endif
 
 /* Hard IRQ locking */
