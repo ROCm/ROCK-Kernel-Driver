@@ -825,6 +825,7 @@ static void mts_usb_disconnect (struct usb_interface *intf)
 	usb_kill_urb(desc->urb);
 	scsi_remove_host(desc->host);
 
+	scsi_host_put(desc->host);
 	usb_free_urb(desc->urb);
 	kfree(desc);
 }
