@@ -473,10 +473,12 @@ struct pci_bus {
 
 	char		name[48];
 
-	struct	device	* dev;
+	struct device		*bridge;
+	struct class_device	class_dev;
 };
 
-#define pci_bus_b(n) list_entry(n, struct pci_bus, node)
+#define pci_bus_b(n)	list_entry(n, struct pci_bus, node)
+#define to_pci_bus(n)	container_of(n, struct pci_bus, class_dev)
 
 /*
  * Error values that may be returned by PCI functions.
