@@ -2321,7 +2321,7 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 
 	if (cmd) {
 		if (unlikely(drv_stat & (ATA_ERR | ATA_BUSY | ATA_DRQ))) {
-			if (qc->flags & ATA_QCFLAG_ATAPI)
+			if (is_atapi_taskfile(&qc->tf))
 				cmd->result = SAM_STAT_CHECK_CONDITION;
 			else
 				ata_to_sense_error(qc);

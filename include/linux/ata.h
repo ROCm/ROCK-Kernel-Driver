@@ -218,4 +218,10 @@ struct ata_taskfile {
 	  ((u64) dev->id[(n) + 1] << 16) |	\
 	  ((u64) dev->id[(n) + 0]) )
 
+static inline int is_atapi_taskfile(struct ata_taskfile *tf)
+{
+	return (tf->protocol == ATA_PROT_ATAPI) ||
+	       (tf->protocol == ATA_PROT_ATAPI_DMA);
+}
+
 #endif /* __LINUX_ATA_H__ */

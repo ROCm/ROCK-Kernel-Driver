@@ -951,8 +951,6 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 {
 	struct scsi_cmnd *cmd = qc->scsicmd;
 
-	qc->flags |= ATA_QCFLAG_ATAPI;
-
 	qc->tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
 	if (cmd->sc_data_direction == SCSI_DATA_WRITE) {
 		qc->tf.flags |= ATA_TFLAG_WRITE;

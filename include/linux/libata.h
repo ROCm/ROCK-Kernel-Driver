@@ -111,7 +111,6 @@ enum {
 
 	ATA_QCFLAG_ACTIVE	= (1 << 1), /* cmd not yet ack'd to scsi lyer */
 	ATA_QCFLAG_DMA		= (1 << 2), /* data delivered via DMA */
-	ATA_QCFLAG_ATAPI	= (1 << 3), /* is ATAPI packet command? */
 	ATA_QCFLAG_SG		= (1 << 4), /* have s/g table? */
 
 	/* various lengths of time */
