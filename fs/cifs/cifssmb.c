@@ -2291,6 +2291,11 @@ QFSAttributeRetry:
 			    (FILE_SYSTEM_ATTRIBUTE_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
 				 pSMBr->DataOffset);
+			response_data->Attributes = le32_to_cpu(response_data->Attributes);
+			response_data->MaxPathNameComponentLength = 
+				le32_to_cpu(response_data->MaxPathNameComponentLength);
+			response_data->FileSystemNameLen = 
+				le32_to_cpu(response_data->FileSystemNameLen);
 			memcpy(&tcon->fsAttrInfo, response_data,
 			       sizeof (FILE_SYSTEM_ATTRIBUTE_INFO));
 		}
@@ -2360,6 +2365,10 @@ QFSDeviceRetry:
 			    (FILE_SYSTEM_DEVICE_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
 				 pSMBr->DataOffset);
+			response_data->DeviceType = 
+				le32_to_cpu(response_data->DeviceType);
+			response_data->DeviceCharacteristics = 
+				le32_to_cpu(response_data->DeviceCharacteristics);
 			memcpy(&tcon->fsDevInfo, response_data,
 			       sizeof (FILE_SYSTEM_DEVICE_INFO));
 		}
@@ -2369,7 +2378,6 @@ QFSDeviceRetry:
 
 	if (rc == -EAGAIN)
 		goto QFSDeviceRetry;
-
 
 	return rc;
 }
@@ -2428,6 +2436,12 @@ QFSUnixRetry:
 			    (FILE_SYSTEM_UNIX_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
 				 pSMBr->DataOffset);
+			response_data->MajorVersionNumber =
+				le16_to_cpu(response_data->MajorVersionNumber);
+			response_data->MinorVersionNumber =
+				le16_to_cpu(response_data->MinorVersionNumber);
+			response_data->Capability =
+				le64_to_cpu(response_data->Capability);
 			memcpy(&tcon->fsUnixInfo, response_data,
 			       sizeof (FILE_SYSTEM_UNIX_INFO));
 		}

@@ -74,7 +74,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		    "---------------------------------------------------\n");
 	buf += length;
 
-	length = sprintf(buf, "Servers: \n");
+	length = sprintf(buf, "Servers:\n");
 	buf += length;
 
 	i = 0;
@@ -89,8 +89,10 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 				ses->serverOS, ses->serverNOS, ses->capabilities,ses->status,ses->server->tcpStatus);
 		buf += length;
 		if(ses->server) {
-			buf += sprintf(buf, "\n\tLocal Users To Same Server: %d SecMode: 0x%x",
-				atomic_read(&ses->server->socketUseCount),ses->server->secMode);
+			buf += sprintf(buf, "\n\tLocal Users To Same Server: %d SecMode: 0x%x Req Active: %d",
+				atomic_read(&ses->server->socketUseCount),
+				ses->server->secMode,
+				atomic_read(&ses->server->inFlight));
 			
 			/* length = sprintf(buf, "\nMIDs: \n");
 			buf += length;
@@ -113,7 +115,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 	sprintf(buf, "\n");
 	buf++;
 
-	length = sprintf(buf, "\nShares: \n");
+	length = sprintf(buf, "\nShares:\n");
 	buf += length;
 
 	i = 0;
