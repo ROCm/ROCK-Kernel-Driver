@@ -1264,6 +1264,21 @@ void scsi_detach_device(struct scsi_device *sdev)
 	up_read(&scsi_devicelist_mutex);
 }
 
+void scsi_rescan_device(struct scsi_device *sdev)
+{
+	struct Scsi_Device_Template *sdt;
+
+	down_read(&scsi_devicelist_mutex);
+	list_for_each_entry(sdt, &scsi_devicelist, list) {
+		if (!try_module_get(sdt->module))
+			continue;
+		if (*sdt->rescan)
+			(*sdt->rescan)(sdev);
+		module_put(sdt->module);
+	}
+	up_read(&scsi_devicelist_mutex);
+}
+
 int scsi_device_get(struct scsi_device *sdev)
 {
 	if (!try_module_get(sdev->host->hostt->module))

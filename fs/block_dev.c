@@ -573,6 +573,8 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			up(&whole->bd_sem);
 		}
 	} else {
+		if (!part)
+			bd_set_size(bdev,(loff_t)get_capacity(disk)<<9);
 		put_disk(disk);
 		module_put(owner);
 		if (bdev->bd_contains == bdev) {
