@@ -44,7 +44,7 @@ static struct inode *coda_alloc_inode(struct super_block *sb)
 	ei = (struct coda_inode_info *)kmem_cache_alloc(coda_inode_cachep, SLAB_KERNEL);
 	if (!ei)
 		return NULL;
-	memset(&ei->c_fid, 0, sizeof(struct ViceFid));
+	memset(&ei->c_fid, 0, sizeof(struct CodaFid));
 	ei->c_flags = 0;
 	ei->c_uid = 0;
 	ei->c_cached_perm = 0;
@@ -138,7 +138,7 @@ static int coda_fill_super(struct super_block *sb, void *data, int silent)
         struct inode *root = 0; 
 	struct coda_sb_info *sbi = NULL;
 	struct venus_comm *vc = NULL;
-        ViceFid fid;
+	struct CodaFid fid;
         int error;
 	int idx;
 

@@ -11,7 +11,7 @@
 #include <linux/coda_fs_i.h>
 #include <linux/coda_psdev.h>
 
-inline int coda_fideq(ViceFid *fid1, ViceFid *fid2)
+inline int coda_fideq(struct CodaFid *fid1, struct CodaFid *fid2)
 {
 	return memcmp(fid1, fid2, sizeof(*fid1)) == 0;
 }
@@ -43,13 +43,13 @@ static void coda_fill_inode(struct inode *inode, struct coda_vattr *attr)
 
 static int coda_test_inode(struct inode *inode, void *data)
 {
-	ViceFid *fid = (ViceFid *)data;
+	struct CodaFid *fid = (struct CodaFid *)data;
 	return coda_fideq(&(ITOC(inode)->c_fid), fid);
 }
 
 static int coda_set_inode(struct inode *inode, void *data)
 {
-	ViceFid *fid = (ViceFid *)data;
+	struct CodaFid *fid = (struct CodaFid *)data;
 	ITOC(inode)->c_fid = *fid;
 	return 0;
 }
@@ -59,7 +59,7 @@ static int coda_fail_inode(struct inode *inode, void *data)
 	return -1;
 }
 
-struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
+struct inode * coda_iget(struct super_block * sb, struct CodaFid * fid,
 			 struct coda_vattr * attr)
 {
 	struct inode *inode;
@@ -90,7 +90,7 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
    - link the two up if this is needed
    - fill in the attributes
 */
-int coda_cnode_make(struct inode **inode, ViceFid *fid, struct super_block *sb)
+int coda_cnode_make(struct inode **inode, struct CodaFid *fid, struct super_block *sb)
 {
         struct coda_vattr attr;
         int error;
@@ -111,8 +111,8 @@ int coda_cnode_make(struct inode **inode, ViceFid *fid, struct super_block *sb)
 }
 
 
-void coda_replace_fid(struct inode *inode, struct ViceFid *oldfid, 
-		      struct ViceFid *newfid)
+void coda_replace_fid(struct inode *inode, struct CodaFid *oldfid, 
+		      struct CodaFid *newfid)
 {
 	struct coda_inode_info *cii;
 	unsigned long hash = coda_f2i(newfid);
@@ -131,7 +131,7 @@ void coda_replace_fid(struct inode *inode, struct ViceFid *oldfid,
 }
 
 /* convert a fid to an inode. */
-struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb) 
+struct inode *coda_fid_to_inode(struct CodaFid *fid, struct super_block *sb) 
 {
 	struct inode *inode;
 	unsigned long hash = coda_f2i(fid);

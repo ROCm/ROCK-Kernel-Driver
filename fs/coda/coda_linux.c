@@ -25,10 +25,10 @@
 int coda_fake_statfs;
 
 /* print a fid */
-char * coda_f2s(ViceFid *f)
+char * coda_f2s(struct CodaFid *f)
 {
 	static char s[60];
-	sprintf(s, "(%-#x.%-#x.%-#x)", f->Volume, f->Vnode, f->Unique);
+ 	sprintf(s, "(%08x.%08x.%08x)", f->opaque[0], f->opaque[1], f->opaque[2]);
 	return s;
 }
 

@@ -93,7 +93,7 @@ struct file_operations coda_dir_operations = {
 static struct dentry *coda_lookup(struct inode *dir, struct dentry *entry, struct nameidata *nd)
 {
 	struct inode *res_inode = NULL;
-	struct ViceFid resfid = {0,0,0};
+	struct CodaFid resfid = { { 0, } };
 	int dropme = 0; /* to indicate entry should not be cached */
 	int type = 0;
 	int error = 0;
@@ -196,7 +196,7 @@ static int coda_create(struct inode *dir, struct dentry *de, int mode, struct na
 	const char *name=de->d_name.name;
 	int length=de->d_name.len;
 	struct inode *inode;
-	struct ViceFid newfid;
+	struct CodaFid newfid;
 	struct coda_vattr attrs;
 
 	lock_kernel();
@@ -236,7 +236,7 @@ static int coda_mknod(struct inode *dir, struct dentry *de, int mode, dev_t rdev
 	const char *name=de->d_name.name;
 	int length=de->d_name.len;
 	struct inode *inode;
-	struct ViceFid newfid;
+	struct CodaFid newfid;
 	struct coda_vattr attrs;
 
 	if ( coda_hasmknod == 0 )
@@ -283,7 +283,7 @@ static int coda_mkdir(struct inode *dir, struct dentry *de, int mode)
 	const char *name = de->d_name.name;
 	int len = de->d_name.len;
 	int error;
-	struct ViceFid newfid;
+	struct CodaFid newfid;
 
 	lock_kernel();
 	coda_vfs_stat.mkdir++;

@@ -47,10 +47,10 @@ int coda_setattr(struct dentry *, struct iattr *);
 extern int coda_fake_statfs;
 
 /* this file:  heloers */
-static __inline__ struct ViceFid *coda_i2f(struct inode *);
+static __inline__ struct CodaFid *coda_i2f(struct inode *);
 static __inline__ char *coda_i2s(struct inode *);
 static __inline__ void coda_flag_inode(struct inode *, int flag);
-char *coda_f2s(ViceFid *f);
+char *coda_f2s(struct CodaFid *f);
 int coda_isroot(struct inode *i);
 int coda_iscontrol(const char *name, size_t length);
 
@@ -83,7 +83,7 @@ static inline struct coda_inode_info *ITOC(struct inode *inode)
 	return list_entry(inode, struct coda_inode_info, vfs_inode);
 }
 
-static __inline__ struct ViceFid *coda_i2f(struct inode *inode)
+static __inline__ struct CodaFid *coda_i2f(struct inode *inode)
 {
 	return &(ITOC(inode)->c_fid);
 }
