@@ -19,5 +19,5 @@ $(obj)/version.o: $(obj)/../include/linux/compile.h
 # actual file if its content has changed.
 
 $(obj)/../include/linux/compile.h: FORCE
-	@echo -n '  Generating $(echo_target)'
+	@echo -n '  Generating $@'
 	@sh $(srctree)/scripts/mkcompile_h $@ "$(ARCH)" "$(CONFIG_SMP)" "$(CC) $(CFLAGS)"

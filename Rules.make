@@ -28,20 +28,12 @@ ifdef list-multi
 $(warning kbuild: $(obj)/Makefile - list-multi := $(list-multi) is obsolete in 2.5. Please fix!)
 endif
 
-# Some paths for the Makefiles to use
-# ---------------------------------------------------------------------------
-
-# FIXME. For now, we leave it possible to use make -C or make -f
-# to do work in subdirs.
-
 ifndef obj
-obj = .
-CFLAGS := $(patsubst -I%,-I$(TOPDIR)/%,$(patsubst -I$(TOPDIR)/%,-I%,$(CFLAGS)))
-AFLAGS := $(patsubst -I%,-I$(TOPDIR)/%,$(patsubst -I$(TOPDIR)/%,-I%,$(AFLAGS)))
+$(warning kbuild: Rules.make is included improperly)
 endif
 
-# For use in the quiet output
-echo_target = $@
+# Some paths for the Makefiles to use
+# ---------------------------------------------------------------------------
 
 # Usage:
 #
@@ -190,7 +182,7 @@ endif # ! fastdep
 # Shipped files
 # ===========================================================================
 
-quiet_cmd_shipped = SHIPPED $(echo_target)
+quiet_cmd_shipped = SHIPPED $@
 cmd_shipped = cat $< > $@
 
 %:: %_shipped
@@ -210,20 +202,20 @@ cmd_shipped = cat $< > $@
 # Linking
 # ---------------------------------------------------------------------------
 
-quiet_cmd_ld = LD      $(echo_target)
+quiet_cmd_ld = LD      $@
 cmd_ld = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LDFLAGS_$(@F)) \
 	       $(filter-out FORCE,$^) -o $@ 
 
 # Objcopy
 # ---------------------------------------------------------------------------
 
-quiet_cmd_objcopy = OBJCOPY $(echo_target)
+quiet_cmd_objcopy = OBJCOPY $@
 cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 
 # Gzip
 # ---------------------------------------------------------------------------
 
-quiet_cmd_gzip = GZIP    $(echo_target)
+quiet_cmd_gzip = GZIP    $@
 cmd_gzip = gzip -f -9 < $< > $@
 
 # ===========================================================================

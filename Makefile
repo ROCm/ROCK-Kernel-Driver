@@ -833,12 +833,10 @@ endif # ifdef include-config
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
 
-echo_target = $@
-
 a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS) \
 	  $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
-quiet_cmd_as_s_S = CPP     $(echo_target)
+quiet_cmd_as_s_S = CPP     $@
 cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
 
 # read all saved command lines
