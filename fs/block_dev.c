@@ -540,7 +540,6 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 				if (ret)
 					goto out_first;
 			}
-			bdev->bd_offset = 0;
 			if (!bdev->bd_openers) {
 				bd_set_size(bdev,(loff_t)get_capacity(disk)<<9);
 				bdi = blk_get_backing_dev_info(bdev);
@@ -572,7 +571,8 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 				ret = -ENXIO;
 				goto out_first;
 			}
-			bdev->bd_offset = p->start_sect;
+			kobject_get(&p->kobj);
+			bdev->bd_part = p;
 			bd_set_size(bdev, (loff_t) p->nr_sects << 9);
 			up(&whole->bd_sem);
 		}
@@ -693,6 +693,10 @@ int blkdev_put(struct block_device *bdev, int kind)
 		put_disk(disk);
 		module_put(owner);
 
+		if (bdev->bd_contains != bdev) {
+			kobject_put(&bdev->bd_part->kobj);
+			bdev->bd_part = NULL;
+		}
 		bdev->bd_disk = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
