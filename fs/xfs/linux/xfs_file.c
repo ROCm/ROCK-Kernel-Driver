@@ -202,7 +202,7 @@ linvfs_fsync(
 
 	ASSERT(vp);
 
-	VOP_FSYNC(vp, flags, NULL, (off_t)0, (off_t)-1, error);
+	VOP_FSYNC(vp, flags, NULL, (xfs_off_t)0, (xfs_off_t)-1, error);
 
 	return -error;
 }
@@ -228,7 +228,7 @@ linvfs_readdir(
 	caddr_t		read_buf;
 	int		namelen, size = 0;
 	size_t		rlen = PAGE_CACHE_SIZE << 2;
-	off_t		start_offset;
+	xfs_off_t	start_offset;
 	xfs_dirent_t	*dbp = NULL;
 
 	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
