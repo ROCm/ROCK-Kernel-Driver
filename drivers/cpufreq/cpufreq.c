@@ -362,6 +362,7 @@ static struct kobj_type ktype_cpufreq = {
 	.release	= cpufreq_sysfs_release,
 };
 
+static void handle_update(void *data);
 
 /**
  * cpufreq_add_dev - add a CPU device
@@ -390,6 +391,7 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	policy->cpu = cpu;
 	init_MUTEX_LOCKED(&policy->lock);
 	init_completion(&policy->kobj_unregister);
+	INIT_WORK(&policy->update, handle_update, (void *) cpu);
 
 	/* call driver. From then on the cpufreq must be able
 	 * to accept all calls to ->verify and ->setpolicy for this CPU
@@ -500,6 +502,39 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 }
 
 
+static void handle_update(void *data)
+{
+	unsigned int cpu = (unsigned int) data;
+	cpufreq_update_policy(cpu);
+}
+
+/**
+ *	cpufreq_out_of_sync - If actual and saved CPU frequency differs, we're in deep trouble.
+ *	@cpu: cpu number
+ *	@old_freq: CPU frequency the kernel thinks the CPU runs at
+ *	@new_freq: CPU frequency the CPU actually runs at
+ *
+ *	We adjust to current frequency first, and need to clean up later. So either call
+ *	to cpufreq_update_policy() or schedule handle_update()).
+ */
+static void cpufreq_out_of_sync(unsigned int cpu, unsigned int old_freq, unsigned int new_freq)
+{
+	struct cpufreq_freqs freqs;
+
+	if (cpufreq_driver->flags & CPUFREQ_PANIC_OUTOFSYNC)
+		panic("CPU Frequency is out of sync.");
+
+	printk(KERN_WARNING "Warning: CPU frequency out of sync: cpufreq and timing "
+	       "core thinks of %u, is %u kHz.\n", old_freq, new_freq);
+
+	freqs.cpu = cpu;
+	freqs.old = old_freq;
+	freqs.new = new_freq;
+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+}
+
+
 /** 
  * cpufreq_get - get the current CPU frequency (in kHz)
  * @cpu: CPU number
@@ -520,6 +555,15 @@ unsigned int cpufreq_get(unsigned int cpu)
 	down(&policy->lock);
 
 	ret = cpufreq_driver->get(cpu);
+
+	if (ret && policy->cur && !(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) 
+	{
+		/* verify no discrepancy between actual and saved value exists */
+		if (unlikely(ret != policy->cur)) {
+			cpufreq_out_of_sync(cpu, policy->cur, ret);
+			schedule_work(&policy->update);
+		}
+	}
 
 	up(&policy->lock);
 
@@ -961,6 +1005,9 @@ static unsigned int  l_p_j_ref_freq;
 
 static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
 {
+	if (cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)
+		return;
+
 	if (!l_p_j_ref_freq) {
 		l_p_j_ref = loops_per_jiffy;
 		l_p_j_ref_freq = ci->old;
@@ -1026,6 +1073,9 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	if (!driver_data || !driver_data->verify || !driver_data->init ||
 	    ((!driver_data->setpolicy) && (!driver_data->target)))
 		return -EINVAL;
+
+	if (driver_data->setpolicy)
+		driver_data->flags |= CPUFREQ_CONST_LOOPS;
 
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	if (cpufreq_driver) {

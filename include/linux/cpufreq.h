@@ -21,6 +21,7 @@
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 #include <linux/completion.h>
+#include <linux/workqueue.h>
 
 #define CPUFREQ_NAME_LEN 16
 
@@ -80,6 +81,9 @@ struct cpufreq_policy {
 
  	struct semaphore	lock;   /* CPU ->setpolicy or ->target may
 					   only be called once a time */
+
+	struct work_struct	update; /* if update_policy() needs to be
+					 * called, but you're in IRQ context */
 
 	struct cpufreq_real_policy	user_policy;
 
@@ -198,8 +202,15 @@ struct cpufreq_driver {
 
 /* flags */
 
-#define CPUFREQ_STICKY	0x01	/* the driver isn't removed even if 
-				   all ->init() calls failed */
+#define CPUFREQ_STICKY		0x01	/* the driver isn't removed even if 
+					 * all ->init() calls failed */
+#define CPUFREQ_CONST_LOOPS 	0x02	/* loops_per_jiffy or other kernel
+					 * "constants" aren't affected by
+					 * frequency transitions */
+#define CPUFREQ_PANIC_OUTOFSYNC	0x04	/* panic if cpufreq's opinion of
+					 * current frequency differs from
+					 * actual frequency */
+
 
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
 int cpufreq_unregister_driver(struct cpufreq_driver *driver_data);
