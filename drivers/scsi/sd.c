@@ -174,7 +174,6 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 			timeout = rq->timeout;
 
 		SCpnt->transfersize = rq->data_len;
-		SCpnt->underflow = rq->data_len;
 		goto queue;
 	}
 
