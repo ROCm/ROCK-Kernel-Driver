@@ -59,7 +59,6 @@
 #include <asm/bitops.h>
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
-#include <asm/kgdb.h>
 #include <asm/dbdma.h>
 #include <asm/macio.h>
 
