@@ -1797,7 +1797,7 @@ static __inline__ struct net_device *dev_get_idx(struct seq_file *seq,
 void *dev_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
-	return *pos ? dev_get_idx(seq, *pos) : (void *)1;
+	return *pos ? dev_get_idx(seq, *pos - 1) : (void *)1;
 }
 
 void *dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
