@@ -129,11 +129,9 @@ struct capincci {
 };
 
 struct capidev {
-	struct capidev *next;
-	struct file    *file;
+	struct list_head list;
 	u16		applid;
 	u16		errcode;
-	unsigned int    minor;
 	unsigned        userflags;
 
 	struct sk_buff_head recvqueue;
@@ -150,17 +148,18 @@ struct capidev {
 
 /* -------- global variables ---------------------------------------- */
 
-static struct capi_interface *capifuncs = 0;
-static struct capidev *capidev_openlist = 0;
+static struct capi_interface *capifuncs;
+static rwlock_t capidev_list_lock;
+static LIST_HEAD(capidev_list);
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
-static struct capiminor *minors = 0;
+static struct capiminor *minors;
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
-static kmem_cache_t *capidev_cachep = 0;
-static kmem_cache_t *capincci_cachep = 0;
+static kmem_cache_t *capidev_cachep;
+static kmem_cache_t *capincci_cachep;
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
-static kmem_cache_t *capiminor_cachep = 0;
-static kmem_cache_t *capidh_cachep = 0;
+static kmem_cache_t *capiminor_cachep;
+static kmem_cache_t *capidh_cachep;
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
@@ -318,9 +317,9 @@ static struct capincci *capincci_alloc(struct capidev *cdev, u32 ncci)
 		printk(KERN_DEBUG "set mp->nccip\n");
 #endif
 #if defined(CONFIG_ISDN_CAPI_CAPIFS) || defined(CONFIG_ISDN_CAPI_CAPIFS_MODULE)
-		kdev = MKDEV(capi_rawmajor, mp->minor);
+		kdev = mk_kdev(capi_rawmajor, mp->minor);
 		capifs_new_ncci('r', mp->minor, kdev);
-		kdev = MKDEV(capi_ttymajor, mp->minor);
+		kdev = mk_kdev(capi_ttymajor, mp->minor);
 		capifs_new_ncci(0, mp->minor, kdev);
 #endif
 	}
@@ -391,48 +390,52 @@ static struct capincci *capincci_find(struct capidev *cdev, u32 ncci)
 static struct capidev *capidev_alloc(struct file *file)
 {
 	struct capidev *cdev;
-	struct capidev **pp;
+	unsigned long flags;
 
 	cdev = (struct capidev *)kmem_cache_alloc(capidev_cachep, GFP_KERNEL);
 	if (!cdev)
 		return 0;
 	memset(cdev, 0, sizeof(struct capidev));
-	cdev->file = file;
-	cdev->minor = MINOR(file->f_dentry->d_inode->i_rdev);
 
 	skb_queue_head_init(&cdev->recvqueue);
 	init_waitqueue_head(&cdev->recvwait);
-	pp=&capidev_openlist;
-	while (*pp) pp = &(*pp)->next;
-	*pp = cdev;
+	write_lock_irqsave(&capidev_list_lock, flags);
+	list_add_tail(&cdev->list, &capidev_list);
+	write_unlock_irqrestore(&capidev_list_lock, flags);
         return cdev;
 }
 
 static void capidev_free(struct capidev *cdev)
 {
-	struct capidev **pp;
+	unsigned long flags;
 
 	if (cdev->applid)
 		(*capifuncs->capi_release) (cdev->applid);
 	cdev->applid = 0;
-
 	skb_queue_purge(&cdev->recvqueue);
-	
-	pp=&capidev_openlist;
-	while (*pp && *pp != cdev) pp = &(*pp)->next;
-	if (*pp)
-		*pp = cdev->next;
-
+	write_lock_irqsave(&capidev_list_lock, flags);
+	list_del(&cdev->list);
+	write_unlock_irqrestore(&capidev_list_lock, flags);
 	kmem_cache_free(capidev_cachep, cdev);
 }
 
 static struct capidev *capidev_find(u16 applid)
 {
-	struct capidev *p;
-	for (p=capidev_openlist; p; p = p->next) {
+	// FIXME this doesn't guarantee that the device won't go away shortly
+	struct list_head *l;
+	struct capidev *p = NULL;
+
+	read_lock(&capidev_list_lock);
+	list_for_each(l, &capidev_list) {
+		p = list_entry(l, struct capidev, list);
 		if (p->applid == applid)
 			break;
 	}
+	read_unlock(&capidev_list_lock);
+	
+	if (l == &capidev_list)
+		return NULL;
+	
 	return p;
 }
 
@@ -1088,7 +1091,7 @@ capinc_raw_open(struct inode *inode, struct file *file)
 
 	if (file->private_data)
 		return -EEXIST;
-	if ((mp = capiminor_find(MINOR(file->f_dentry->d_inode->i_rdev))) == 0)
+	if ((mp = capiminor_find(minor(file->f_dentry->d_inode->i_rdev))) == 0)
 		return -ENXIO;
 	if (mp->nccip == 0)
 		return -ENXIO;
@@ -1272,7 +1275,7 @@ static int capinc_tty_open(struct tty_struct * tty, struct file * file)
 {
 	struct capiminor *mp;
 
-	if ((mp = capiminor_find(MINOR(file->f_dentry->d_inode->i_rdev))) == 0)
+	if ((mp = capiminor_find(minor(file->f_dentry->d_inode->i_rdev))) == 0)
 		return -ENXIO;
 	if (mp->nccip == 0)
 		return -ENXIO;
@@ -1662,11 +1665,13 @@ static int proc_capidev_read_proc(char *page, char **start, off_t off,
                                        int count, int *eof, void *data)
 {
         struct capidev *cdev;
+	struct list_head *l;
 	int len = 0;
 
-	for (cdev=capidev_openlist; cdev; cdev = cdev->next) {
-		len += sprintf(page+len, "%d %d %lu %lu %lu %lu\n",
-			cdev->minor,
+	read_lock(&capidev_list_lock);
+	list_for_each(l, &capidev_list) {
+		cdev = list_entry(l, struct capidev, list);
+		len += sprintf(page+len, "0 %d %lu %lu %lu %lu\n",
 			cdev->applid,
 			cdev->nrecvctlpkt,
 			cdev->nrecvdatapkt,
@@ -1680,11 +1685,13 @@ static int proc_capidev_read_proc(char *page, char **start, off_t off,
 				goto endloop;
 		}
 	}
+
 endloop:
+	read_unlock(&capidev_list_lock);
 	if (len < count)
 		*eof = 1;
-	if (len>count) len = count;
-	if (len<0) len = 0;
+	if (len > count) len = count;
+	if (len < 0) len = 0;
 	return len;
 }
 
@@ -1697,9 +1704,12 @@ static int proc_capincci_read_proc(char *page, char **start, off_t off,
 {
         struct capidev *cdev;
         struct capincci *np;
+	struct list_head *l;
 	int len = 0;
 
-	for (cdev=capidev_openlist; cdev; cdev = cdev->next) {
+	read_lock(&capidev_list_lock);
+	list_for_each(l, &capidev_list) {
+		cdev = list_entry(l, struct capidev, list);
 		for (np=cdev->nccis; np; np = np->next) {
 			len += sprintf(page+len, "%d 0x%x%s\n",
 				cdev->applid,
@@ -1719,6 +1729,7 @@ static int proc_capincci_read_proc(char *page, char **start, off_t off,
 		}
 	}
 endloop:
+	read_unlock(&capidev_list_lock);
 	*start = page+off;
 	if (len < count)
 		*eof = 1;

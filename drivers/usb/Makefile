@@ -10,19 +10,13 @@ O_TARGET	:= usbdrv.o
 
 # Objects that export symbols.
 
-export-objs		:= usb.o
+export-objs		:= usb.o hcd.o ov511.o pwc-uncompress.o
 
 # Multipart objects.
 
-list-multi		:= usbcore.o hid.o
-usbcore-objs		:= usb.o usb-debug.o hub.o
+list-multi		:= usbcore.o hid.o pwc.o
+usbcore-objs		:= usb.o usb-debug.o hub.o hcd.o
 hid-objs		:= hid-core.o hid-input.o
-
-ifneq ($(CONFIG_USB_PWC),n)
-	export-objs		+= pwc-uncompress.o
-	list-multi		+= pwc.o
-endif
-
 pwc-objs		:= pwc-if.o pwc-misc.o pwc-ctrl.o pwc-uncompress.o
 
 
@@ -65,8 +59,10 @@ obj-$(CONFIG_USB_DC2XX)		+= dc2xx.o
 obj-$(CONFIG_USB_MDC800)	+= mdc800.o
 obj-$(CONFIG_USB_USS720)	+= uss720.o
 obj-$(CONFIG_USB_DABUSB)	+= dabusb.o
+obj-$(CONFIG_USB_VICAM)		+= vicam.o
 obj-$(CONFIG_USB_OV511)		+= ov511.o
 obj-$(CONFIG_USB_SE401)		+= se401.o
+obj-$(CONFIG_USB_STV680)	+= stv680.o
 obj-$(CONFIG_USB_PEGASUS)	+= pegasus.o
 obj-$(CONFIG_USB_CATC)		+= catc.o
 obj-$(CONFIG_USB_KAWETH)        += kaweth.o
@@ -79,9 +75,15 @@ obj-$(CONFIG_USB_BLUETOOTH)	+= bluetooth.o
 obj-$(CONFIG_USB_USBNET)	+= usbnet.o
 
 # Object files in subdirectories
+mod-subdirs	:= serial hcd
 
+subdir-$(CONFIG_USB_EHCI_HCD)	+= hcd
 subdir-$(CONFIG_USB_SERIAL)	+= serial
 subdir-$(CONFIG_USB_STORAGE)	+= storage
+
+ifeq ($(CONFIG_USB_EHCI_HCD),y)
+	obj-y += hcd/ehci-hcd.o
+endif
 
 ifeq ($(CONFIG_USB_SERIAL),y)
 	obj-y += serial/usb-serial.o

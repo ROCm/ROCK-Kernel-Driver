@@ -95,6 +95,66 @@ HandSpring Visor, Palm USB, and Clié USB driver
   Kroah-Hartman at greg@kroah.com
 
 
+Compaq iPAQ driver
+
+  This driver can be used to connect to Compaq iPAQ PDAs running
+  Windows CE 3.0 using a USB autosync cable. It has been tested only on
+  the Compaq H3135. It should work with the H3600 and later models too.
+  It may work with other CE based handhelds as well.
+
+  The driver presents a serial interface (usually on /dev/ttyUSB0) over
+  which one may run ppp and establish a TCP/IP link to the iPAQ. Once this
+  is done, you can transfer files, backup, download email etc. The most
+  significant advantage of using USB is speed - you can get 73 to 113
+  kbytes/sec for download/upload to the iPAQ.
+
+  The driver works intermittently with the usb-uhci driver but quite
+  reliably with the uhci driver. Make sure you have the right driver
+  loaded - usb-uhci is often the default.
+
+  You must setup hotplug to invoke pppd as soon as the iPAQ is connected.
+  A ppp script like the one below may be used:
+
+	#!/bin/bash
+
+	MYIP=linux.box.ip
+	REMOTEIP=ipaq.ip
+	MYDNS=my.dns.server
+	killall -9 pppd
+	/usr/sbin/pppd /dev/ttyUSB0 \
+	connect "/usr/sbin/chat -v TIMEOUT 60 CLIENT 'CLIENTSERVER\c'" \
+	nocrtscts local debug passive $MYIP:$REMOTEIP ms-dns $MYDNS noauth \
+	proxyarp
+
+  You must also download and install asyncd from http://synce.sourceforge.net
+  This is required to emulate keep-alive packets which are exchanged by
+  ActiveSync and the iPAQ.
+
+  On connecting the cable, you should see the usual "Device Connected",
+  "User Authenticated" messages flash by on your iPAQ. Once connected,
+  you can use Win CE programs like ftpView, Pocket Outlook from the iPAQ
+  and other synce utilities from the Linux side. Remember to enable IP
+  forwarding. 
+
+  To use Pocket IE, follow the instructions given at
+  http://www.tekguru.co.uk/EM500/usbtonet.htm to achieve the same thing
+  on Win98. Omit the proxy server part; Linux is quite capable of forwarding
+  packets unlike Win98. Another modification is required at least for the
+  iPAQ - disable autosync by going to the Start/Settings/Connections menu
+  and unchecking the "Automatically synchronize ..." box. Go to
+  Start/Programs/Connections, connect the cable and select "usbdial" (or
+  whatever you named your new USB connection). You should finally wind
+  up with a "Connected to usbdial" window with status shown as connected.
+  Now start up PIE and browse away.
+
+  If it doesn't work for some reason, load both the usbserial and ipaq module
+  with the module parameter "debug" set to 1 and examine the system log.
+  You can also try soft-resetting your iPAQ before attempting a connection.
+
+  For any questions or problems with the driver, please contact Ganesh
+  Varadarajan <ganesh@veritas.com>
+
+
 Keyspan PDA Serial Adapter
 
   Single port DB-9 serial adapter, pushed as a PDA adapter for iMacs (mostly
@@ -301,6 +361,32 @@ Prolific PL2303 Driver
   For any questions or problems with this driver, please contact Greg
   Kroah-Hartman at greg@kroah.com
   
+
+KL5KUSB105 chipset / PalmConnect USB single-port adapter
+  
+Current status:
+  The driver was put together by looking at the usb bus transactions
+  done by Palm's driver under Windows, so a lot of functionality is
+  still missing.  Notably, serial ioctls are sometimes faked or not yet
+  implemented.  Support for finding out about DSR and CTS line status is
+  however implemented (though not nicely), so your favorite autopilot(1)
+  and pilot-manager -daemon calls will work.  Baud rates up to 115200
+  are supported, but handshaking (software or hardware) is not, which is
+  why it is wise to cut down on the rate used is wise for large
+  transfers until this is settled.
+  
+Options supported:
+  If this driver is compiled as a module you can pass the following
+  options to it:
+  debug			- extra verbose debugging info
+  			  (default: 0; nonzero enables)
+  use_lowlatency	- use low_latency flag to speed up tty layer
+			  when reading from from the device.
+			  (default: 0; nonzero enables)
+
+  See http://www.uuhaus.de/linux/palmconnect.html for up-to-date
+  information on this driver.
+
 
 Generic Serial driver
 

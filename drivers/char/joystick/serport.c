@@ -149,9 +149,9 @@ static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, u
 	char name[32];
 
 #ifdef CONFIG_DEVFS_FS
-	sprintf(name, tty->driver.name, MINOR(tty->device) - tty->driver.minor_start);
+	sprintf(name, tty->driver.name, minor(tty->device) - tty->driver.minor_start);
 #else
-	sprintf(name, "%s%d", tty->driver.name, MINOR(tty->device) - tty->driver.minor_start);
+	sprintf(name, "%s%d", tty->driver.name, minor(tty->device) - tty->driver.minor_start);
 #endif
 
 	serio_register_port(&serport->serio);

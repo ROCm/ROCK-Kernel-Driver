@@ -3,7 +3,6 @@
 
 struct option {
 	const char *name;
-	int has_arg;
 	unsigned long flag;
 	int val;
 };

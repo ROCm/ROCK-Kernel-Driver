@@ -66,8 +66,10 @@
  * some technical information which has shed a glimmer of light on some of the
  * problems I was having, especially with writes. 
  *
- * There are still problems with the robustness and efficiency of this driver
- * because I still don't understand what the card is doing with interrupts.
+ * There are still potential problems with the robustness and efficiency of
+ * this driver because I still don't understand what the card is doing with
+ * interrupts, however, it has been stable for a while with no reports of ill
+ * effects.
  */
 
 #define DEBUG_READ
@@ -308,7 +310,9 @@ static ide_startstop_t promise_read_intr (ide_drive_t *drive)
 	byte stat;
 	int total_remaining;
 	unsigned int sectors_left, sectors_avail, nsect;
+	unsigned long flags;
 	struct request *rq;
+	char *to;
 
 	if (!OK_STAT(stat=GET_STAT(),DATA_READY,BAD_R_STAT)) {
 		return ide_error(drive, "promise_read_intr", stat);
@@ -330,15 +334,15 @@ read_next:
 	if (nsect > sectors_avail)
 		nsect = sectors_avail;
 	sectors_avail -= nsect;
-	ide_input_data(drive, rq->buffer, nsect * SECTOR_WORDS);
+	to = ide_map_buffer(rq, &flags);
+	idedisk_input_data(drive, to, nsect * SECTOR_WORDS);
 #ifdef DEBUG_READ
 	printk(KERN_DEBUG "%s:  promise_read: sectors(%ld-%ld), "
 	       "buf=0x%08lx, rem=%ld\n", drive->name, rq->sector,
-	       rq->sector+nsect-1, (unsigned long) rq->buffer,
-	       rq->nr_sectors-nsect);
+	       rq->sector+nsect-1, (unsigned long) to, rq->nr_sectors-nsect);
 #endif
+	ide_unmap_buffer(to, &flags);
 	rq->sector += nsect;
-	rq->buffer += nsect<<9;
 	rq->errors = 0;
 	rq->nr_sectors -= nsect;
 	total_remaining = rq->nr_sectors;
@@ -406,10 +410,7 @@ static ide_startstop_t promise_complete_pollfunc(ide_drive_t *drive)
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: Write complete - end_request\n", drive->name);
 #endif
-	for (i = rq->nr_sectors; i > 0; ) {
-		i -= rq->current_nr_sectors;
-		ide_end_request(1, hwgroup);
-	}
+	__ide_end_request(hwgroup, 1, rq->nr_sectors);
 	return ide_stopped;
 }
 
@@ -498,7 +499,15 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, struct request *rq)
 	unsigned long timeout;
 	byte stat;
 
-	if (rq->cmd == READ) {
+/* Check that it's a regular command. If not, bomb out early. */
+	if (!(rq->flags & REQ_CMD)) {
+		blk_dump_rq_flags(rq, "pdc4030 bad flags");
+		ide_end_request(0, HWGROUP(drive));
+		return ide_stopped;
+	}
+
+	switch (rq_data_dir(rq)) {
+	case READ:
 		OUT_BYTE(PROMISE_READ, IDE_COMMAND_REG);
 /*
  * The card's behaviour is odd at this point. If the data is
@@ -531,9 +540,18 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, struct request *rq)
 		printk(KERN_ERR "%s: reading: No DRQ and not waiting - Odd!\n",
 			drive->name);
 		return ide_stopped;
-	} else if (rq->cmd == WRITE) {
+		break;
+
+	case WRITE:
 		ide_startstop_t startstop;
 		OUT_BYTE(PROMISE_WRITE, IDE_COMMAND_REG);
+/*
+ * Strategy on write is:
+ *	look for the DRQ that should have been immediately asserted
+ *	copy the request into the hwgroup's scratchpad
+ *	call the promise_write function to deal with writing the data out
+ * NOTE: No interrupts are generated on writes. Write completion must be polled
+ */
 		if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
 			printk(KERN_ERR "%s: no DRQ after issuing "
 			       "PROMISE_WRITE\n", drive->name);
@@ -543,11 +561,11 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, struct request *rq)
 			__cli();	/* local CPU only */
 		HWGROUP(drive)->wrq = *rq; /* scratchpad */
 		return promise_write(drive);
+		break;
 
-	} else {
-		printk("KERN_WARNING %s: bad command: %d\n",
-		       drive->name, rq->cmd);
+	default:
+		printk(KERN_ERR "pdc4030: command not READ or WRITE! Huh?\n");
 		ide_end_request(0, HWGROUP(drive));
-		return ide_stopped;
+		break;
 	}
 }

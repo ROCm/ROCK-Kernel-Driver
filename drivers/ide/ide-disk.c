@@ -30,7 +30,7 @@
  * Version 1.11		Highmem I/O support, Jens Axboe <axboe@suse.de>
  */
 
-#define IDEDISK_VERSION	"1.10"
+#define IDEDISK_VERSION	"1.11"
 
 #undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
@@ -70,7 +70,7 @@ static void idedisk_bswap_data (void *buffer, int wcount)
 	}
 }
 
-static inline void idedisk_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
+inline void idedisk_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
 	ide_input_data(drive, buffer, wcount);
 	if (drive->bswap)

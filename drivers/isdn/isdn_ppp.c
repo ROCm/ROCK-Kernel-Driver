@@ -586,7 +586,7 @@ isdn_ppp_poll(struct file *file, poll_table * wait)
 
 	if (is->debug & 0x2)
 		printk(KERN_DEBUG "isdn_ppp_poll: minor: %d\n",
-				MINOR(file->f_dentry->d_inode->i_rdev));
+				minor(file->f_dentry->d_inode->i_rdev));
 
 	/* just registers wait_queue hook. This doesn't really wait. */
 	poll_wait(file, &is->wq, wait);

@@ -270,7 +270,6 @@ out:
 static int smb_prepare_write(struct file *file, struct page *page, 
 			     unsigned offset, unsigned to)
 {
-	kmap(page);
 	return 0;
 }
 
@@ -283,7 +282,6 @@ static int smb_commit_write(struct file *file, struct page *page,
 	lock_kernel();
 	status = smb_updatepage(file, page, offset, to-offset);
 	unlock_kernel();
-	kunmap(page);
 	return status;
 }
 
@@ -349,8 +347,14 @@ static int
 smb_file_release(struct inode *inode, struct file * file)
 {
 	lock_kernel();
-	if (!--inode->u.smbfs_i.openers)
+	if (!--inode->u.smbfs_i.openers) {
+		/* We must flush any dirty pages now as we won't be able to
+		   write anything after close. mmap can trigger this.
+		   "openers" should perhaps include mmap'ers ... */
+		filemap_fdatasync(inode->i_mapping);
+		filemap_fdatawait(inode->i_mapping);
 		smb_close(inode);
+	}
 	unlock_kernel();
 	return 0;
 }

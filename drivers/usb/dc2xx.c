@@ -298,7 +298,7 @@ static int camera_open (struct inode *inode, struct file *file)
 	int			value = 0;
 
 	down (&state_table_mutex);
-	subminor = MINOR (inode->i_rdev) - USB_CAMERA_MINOR_BASE;
+	subminor = minor (inode->i_rdev) - USB_CAMERA_MINOR_BASE;
 	if (subminor < 0 || subminor >= MAX_CAMERAS
 			|| !(camera = minor_data [subminor])) {
 		up (&state_table_mutex);

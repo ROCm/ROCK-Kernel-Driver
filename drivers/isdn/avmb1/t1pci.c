@@ -1,4 +1,4 @@
-/* $Id: t1pci.c,v 1.13.6.6 2001/09/23 22:24:34 kai Exp $
+/* $Id: t1pci.c,v 1.1.4.1.2.1 2001/12/21 15:00:17 kai Exp $
  * 
  * Module for AVM T1 PCI-card.
  * 
@@ -26,7 +26,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.13.6.6 $";
+static char *revision = "$Revision: 1.1.4.1.2.1 $";
 
 #undef CONFIG_T1PCI_DEBUG
 #undef CONFIG_T1PCI_POLLDEBUG
@@ -62,7 +62,7 @@ static void t1pci_remove_ctr(struct capi_ctr *ctrl)
 	release_region(card->port, AVMB1_PORTLEN);
 	ctrl->driverdata = 0;
 	kfree(card->ctrlinfo);
-	kfree(card->dma);
+	avmcard_dma_free(card->dma);
 	kfree(card);
 
 	MOD_DEC_USE_COUNT;
@@ -70,7 +70,9 @@ static void t1pci_remove_ctr(struct capi_ctr *ctrl)
 
 /* ------------------------------------------------------------- */
 
-static int t1pci_add_card(struct capi_driver *driver, struct capicardparams *p)
+static int t1pci_add_card(struct capi_driver *driver,
+                          struct capicardparams *p,
+	                  struct pci_dev *dev)
 {
 	avmcard *card;
 	avmctrl_info *cinfo;
@@ -86,18 +88,17 @@ static int t1pci_add_card(struct capi_driver *driver, struct capicardparams *p)
 		return -ENOMEM;
 	}
 	memset(card, 0, sizeof(avmcard));
-	card->dma = (avmcard_dmainfo *) kmalloc(sizeof(avmcard_dmainfo), GFP_ATOMIC);
+        card->dma = avmcard_dma_alloc(driver->name, dev, 2048+128, 2048+128);
 	if (!card->dma) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
-	memset(card->dma, 0, sizeof(avmcard_dmainfo));
         cinfo = (avmctrl_info *) kmalloc(sizeof(avmctrl_info), GFP_ATOMIC);
 	if (!cinfo) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-		kfree(card->dma);
+		avmcard_dma_free(card->dma);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -ENOMEM;
@@ -116,7 +117,7 @@ static int t1pci_add_card(struct capi_driver *driver, struct capicardparams *p)
 		       "%s: ports 0x%03x-0x%03x in use.\n",
 		       driver->name, card->port, card->port + AVMB1_PORTLEN);
 	        kfree(card->ctrlinfo);
-		kfree(card->dma);
+		avmcard_dma_free(card->dma);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -EBUSY;
@@ -127,7 +128,7 @@ static int t1pci_add_card(struct capi_driver *driver, struct capicardparams *p)
 		printk(KERN_NOTICE "%s: can't remap memory at 0x%lx\n",
 					driver->name, card->membase);
 	        kfree(card->ctrlinfo);
-		kfree(card->dma);
+		avmcard_dma_free(card->dma);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -EIO;
@@ -144,7 +145,7 @@ static int t1pci_add_card(struct capi_driver *driver, struct capicardparams *p)
 					driver->name, card->port, retval);
                 iounmap(card->mbase);
 	        kfree(card->ctrlinfo);
-		kfree(card->dma);
+		avmcard_dma_free(card->dma);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -EIO;
@@ -160,7 +161,7 @@ static int t1pci_add_card(struct capi_driver *driver, struct capicardparams *p)
                 iounmap(card->mbase);
 		release_region(card->port, AVMB1_PORTLEN);
 	        kfree(card->ctrlinfo);
-		kfree(card->dma);
+		avmcard_dma_free(card->dma);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -EBUSY;
@@ -173,14 +174,12 @@ static int t1pci_add_card(struct capi_driver *driver, struct capicardparams *p)
 		free_irq(card->irq, card);
 		release_region(card->port, AVMB1_PORTLEN);
 	        kfree(card->ctrlinfo);
-		kfree(card->dma);
+		avmcard_dma_free(card->dma);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -EBUSY;
 	}
 	card->cardnr = cinfo->capi_ctrl->cnr;
-
-	skb_queue_head_init(&card->dma->send_queue);
 
 	printk(KERN_INFO
 		"%s: AVM T1 PCI at i/o %#x, irq %d, mem %#lx\n",
@@ -271,7 +270,7 @@ static int __init t1pci_init(void)
 		printk(KERN_INFO
 			"%s: PCI BIOS reports AVM-T1-PCI at i/o %#x, irq %d, mem %#x\n",
 			driver->name, param.port, param.irq, param.membase);
-		retval = t1pci_add_card(driver, &param);
+		retval = t1pci_add_card(driver, &param, dev);
 		if (retval != 0) {
 		        printk(KERN_ERR
 			"%s: no AVM-T1-PCI at i/o %#x, irq %d detected, mem %#x\n",

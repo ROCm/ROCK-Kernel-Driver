@@ -1349,9 +1349,9 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 
 		printk(KERN_INFO "aha152x%d: trying software interrupt, ", HOSTNO);
 		SETPORT(DMACNTRL0, SWINT|INTEN);
-		spin_unlock_irq(&io_request_lock);
+		spin_unlock_irq(&shpnt->host_lock);
 		mdelay(1000);
-		spin_lock_irq(&io_request_lock);
+		spin_lock_irq(&shpnt->host_lock);
 		free_irq(shpnt->irq, shpnt);
 
 		if (!HOSTDATA(shpnt)->swint) {

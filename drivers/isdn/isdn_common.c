@@ -963,7 +963,7 @@ isdn_info_update(void)
 static ssize_t
 isdn_read(struct file *file, char *buf, size_t count, loff_t * off)
 {
-	uint minor = MINOR(file->f_dentry->d_inode->i_rdev);
+	uint minor = minor(file->f_dentry->d_inode->i_rdev);
 	int len = 0;
 	ulong flags;
 	int drvidx;
@@ -1077,7 +1077,7 @@ isdn_read(struct file *file, char *buf, size_t count, loff_t * off)
 static ssize_t
 isdn_write(struct file *file, const char *buf, size_t count, loff_t * off)
 {
-	uint minor = MINOR(file->f_dentry->d_inode->i_rdev);
+	uint minor = minor(file->f_dentry->d_inode->i_rdev);
 	int drvidx;
 	int chidx;
 	int retval;
@@ -1143,7 +1143,7 @@ static unsigned int
 isdn_poll(struct file *file, poll_table * wait)
 {
 	unsigned int mask = 0;
-	unsigned int minor = MINOR(file->f_dentry->d_inode->i_rdev);
+	unsigned int minor = minor(file->f_dentry->d_inode->i_rdev);
 	int drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
 
 	lock_kernel();
@@ -1184,7 +1184,7 @@ isdn_poll(struct file *file, poll_table * wait)
 static int
 isdn_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 {
-	uint minor = MINOR(inode->i_rdev);
+	uint minor = minor(inode->i_rdev);
 	isdn_ctrl c;
 	int drvidx;
 	int chidx;
@@ -1635,7 +1635,7 @@ isdn_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 static int
 isdn_open(struct inode *ino, struct file *filep)
 {
-	uint minor = MINOR(ino->i_rdev);
+	uint minor = minor(ino->i_rdev);
 	int drvidx;
 	int chidx;
 	int retval = -ENODEV;
@@ -1696,7 +1696,7 @@ isdn_open(struct inode *ino, struct file *filep)
 static int
 isdn_close(struct inode *ino, struct file *filep)
 {
-	uint minor = MINOR(ino->i_rdev);
+	uint minor = minor(ino->i_rdev);
 
 	lock_kernel();
 	if (minor == ISDN_MINOR_STATUS) {

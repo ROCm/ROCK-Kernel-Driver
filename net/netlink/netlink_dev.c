@@ -41,7 +41,7 @@ static struct socket *netlink_user[MAX_LINKS];
  
 static unsigned int netlink_poll(struct file *file, poll_table * wait)
 {
-	struct socket *sock = netlink_user[MINOR(file->f_dentry->d_inode->i_rdev)];
+	struct socket *sock = netlink_user[minor(file->f_dentry->d_inode->i_rdev)];
 
 	if (sock->ops->poll==NULL)
 		return 0;
@@ -56,7 +56,7 @@ static ssize_t netlink_write(struct file * file, const char * buf,
 			     size_t count, loff_t *pos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	struct socket *sock = netlink_user[MINOR(inode->i_rdev)];
+	struct socket *sock = netlink_user[minor(inode->i_rdev)];
 	struct msghdr msg;
 	struct iovec iov;
 
@@ -80,7 +80,7 @@ static ssize_t netlink_read(struct file * file, char * buf,
 			    size_t count, loff_t *pos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	struct socket *sock = netlink_user[MINOR(inode->i_rdev)];
+	struct socket *sock = netlink_user[minor(inode->i_rdev)];
 	struct msghdr msg;
 	struct iovec iov;
 
@@ -105,7 +105,7 @@ static loff_t netlink_lseek(struct file * file, loff_t offset, int origin)
 
 static int netlink_open(struct inode * inode, struct file * file)
 {
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	struct socket *sock;
 	struct sockaddr_nl nladdr;
 	int err;
@@ -137,7 +137,7 @@ out:
 
 static int netlink_release(struct inode * inode, struct file * file)
 {
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	struct socket *sock;
 
 	sock = netlink_user[minor];
@@ -151,7 +151,7 @@ static int netlink_release(struct inode * inode, struct file * file)
 static int netlink_ioctl(struct inode *inode, struct file *file,
 		    unsigned int cmd, unsigned long arg)
 {
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	int retval = 0;
 
 	if (minor >= MAX_LINKS)

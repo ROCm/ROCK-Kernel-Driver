@@ -158,7 +158,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	unsigned char cmd[MAX_COMMAND_SIZE];	/* the scsi-command */
 	int rc, no_multi, minor;
 
-	minor = MINOR(cdi->dev);
+	minor = minor(cdi->dev);
 	if (scsi_CDs[minor].cdi.mask & CDC_MULTI_SESSION)
 		return 0;
 

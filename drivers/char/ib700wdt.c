@@ -155,7 +155,7 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static int
 ibwdt_open(struct inode *inode, struct file *file)
 {
-	switch (MINOR(inode->i_rdev)) {
+	switch (minor(inode->i_rdev)) {
 		case WATCHDOG_MINOR:
 			spin_lock(&ibwdt_lock);
 			if (ibwdt_is_open) {
@@ -179,7 +179,7 @@ static int
 ibwdt_close(struct inode *inode, struct file *file)
 {
 	lock_kernel();
-	if (MINOR(inode->i_rdev) == WATCHDOG_MINOR) {
+	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
 		spin_lock(&ibwdt_lock);
 #ifndef CONFIG_WATCHDOG_NOWAYOUT
 		outb_p(WD_TIMO, WDT_STOP);

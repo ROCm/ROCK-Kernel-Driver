@@ -2386,7 +2386,7 @@ static int reset_camera(struct cam_data *cam)
 		goto_high_power(cam);
 		do_command(cam, CPIA_COMMAND_DiscardFrame, 0, 0, 0, 0);
 		if (goto_low_power(cam))
-			return -NODEV;
+			return -ENODEV;
 	}
 	
 	/* procedure described in developer's guide p3-28 */

@@ -81,7 +81,7 @@ jffs_read_super(struct super_block *sb, void *data, int silent)
 	D1(printk(KERN_NOTICE "JFFS: Trying to mount device %s.\n",
 		  kdevname(dev)));
 
-	if (MAJOR(dev) != MTD_BLOCK_MAJOR) {
+	if (major(dev) != MTD_BLOCK_MAJOR) {
 		printk(KERN_WARNING "JFFS: Trying to mount a "
 		       "non-mtd device.\n");
 		return 0;

@@ -400,7 +400,7 @@ static ssize_t pcwd_write(struct file *file, const char *buf, size_t len,
 
 static int pcwd_open(struct inode *ino, struct file *filep)
 {
-        switch (MINOR(ino->i_rdev))
+        switch (minor(ino->i_rdev))
         {
                 case WATCHDOG_MINOR:
                     if ( !atomic_dec_and_test(&open_allowed) )
@@ -433,7 +433,7 @@ static ssize_t pcwd_read(struct file *file, char *buf, size_t count,
 	/*  Can't seek (pread) on this device  */
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
-	switch(MINOR(file->f_dentry->d_inode->i_rdev)) 
+	switch(minor(file->f_dentry->d_inode->i_rdev)) 
 	{
 		case TEMP_MINOR:
 			/*
@@ -453,7 +453,7 @@ static ssize_t pcwd_read(struct file *file, char *buf, size_t count,
 
 static int pcwd_close(struct inode *ino, struct file *filep)
 {
-	if (MINOR(ino->i_rdev)==WATCHDOG_MINOR)
+	if (minor(ino->i_rdev)==WATCHDOG_MINOR)
 	{
 #ifndef CONFIG_WATCHDOG_NOWAYOUT
 		/*  Disable the board  */

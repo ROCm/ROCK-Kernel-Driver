@@ -70,7 +70,7 @@ static int get_device_index(struct coda_mount_data *data)
 		inode = file->f_dentry->d_inode;
 	
 	if(!inode || !S_ISCHR(inode->i_mode) ||
-	   MAJOR(inode->i_rdev) != CODA_PSDEV_MAJOR) {
+	   major(inode->i_rdev) != CODA_PSDEV_MAJOR) {
 		if(file)
 			fput(file);
 
@@ -78,7 +78,7 @@ static int get_device_index(struct coda_mount_data *data)
 		return -1;
 	}
 
-	idx = MINOR(inode->i_rdev);
+	idx = minor(inode->i_rdev);
 	fput(file);
 
 	if(idx < 0 || idx >= MAX_CODADEVS) {

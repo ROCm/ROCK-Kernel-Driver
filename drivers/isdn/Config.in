@@ -42,6 +42,7 @@ if [ "$CONFIG_ISDN_DRV_HISAX" != "n" ]; then
    fi
    bool '  HiSax Support for german 1TR6' CONFIG_HISAX_1TR6
    bool '  HiSax Support for US NI1' CONFIG_HISAX_NI1
+   int  '  Maximum number of cards supported by HiSax' CONFIG_HISAX_MAX_CARDS 8
    comment '  HiSax supported cards'
    bool '  Teles 16.0/8.0' CONFIG_HISAX_16_0
    bool '  Teles 16.3 or PNP or PCMCIA' CONFIG_HISAX_16_3
@@ -81,7 +82,7 @@ if [ "$CONFIG_ISDN_DRV_HISAX" != "n" ]; then
    dep_tristate 'Sedlbauer PCMCIA cards' CONFIG_HISAX_SEDLBAUER_CS $CONFIG_PCMCIA
    dep_tristate 'ELSA PCMCIA MicroLink cards' CONFIG_HISAX_ELSA_CS $CONFIG_PCMCIA
    dep_tristate 'ST5481 USB ISDN modem (EXPERIMENTAL)' CONFIG_HISAX_ST5481 $CONFIG_HISAX $CONFIG_USB $CONFIG_EXPERIMENTAL
-   dep_tristate 'Fritz!PCIv2 support (EXPERIMENTAL)' CONFIG_HISAX_FRITZ_PCIPNP $CONFIG_HISAX $CONFIG_EXPERIMENTAL
+   dep_tristate 'AVM Fritz!Card PCI/PCIv2/PnP support (EXPERIMENTAL)' CONFIG_HISAX_FRITZ_PCIPNP $CONFIG_HISAX $CONFIG_EXPERIMENTAL
 fi
 endmenu
 

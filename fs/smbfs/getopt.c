@@ -46,7 +46,7 @@ int smb_getopt(char *caller, char **options, struct option *opts,
 
 	for (i = 0; opts[i].name != NULL; i++) {
 		if (!strcmp(opts[i].name, token)) {
-			if (opts[i].has_arg && (!val || !*val)) {
+			if (!opts[i].flag && (!val || !*val)) {
 				printk("%s: the %s option requires an argument\n",
 				       caller, token);
 				return -1;

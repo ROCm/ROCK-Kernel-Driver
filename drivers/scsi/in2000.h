@@ -393,8 +393,9 @@ struct IN2000_hostdata {
 # define in2000__INITFUNC(function) __initfunc(function)
 # define in2000__INIT __init
 # define in2000__INITDATA __initdata
-# define CLISPIN_LOCK(flags)   spin_lock_irqsave(&io_request_lock, flags)
-# define CLISPIN_UNLOCK(flags) spin_unlock_irqrestore(&io_request_lock, flags)
+# define CLISPIN_LOCK(host,flags)   spin_lock_irqsave(&host->host_lock, flags)
+# define CLISPIN_UNLOCK(host,flags) spin_unlock_irqrestore(&host->host_lock, \
+							   flags)
 
 int in2000_detect(Scsi_Host_Template *) in2000__INIT;
 int in2000_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));

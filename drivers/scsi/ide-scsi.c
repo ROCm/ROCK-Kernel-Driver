@@ -747,7 +747,7 @@ static inline int should_transform(ide_drive_t *drive, Scsi_Cmnd *cmd)
 {
 	idescsi_scsi_t *scsi = drive->driver_data;
 
-	if (MAJOR(cmd->request.rq_dev) == SCSI_GENERIC_MAJOR)
+	if (major(cmd->request.rq_dev) == SCSI_GENERIC_MAJOR)
 		return test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
 	return test_bit(IDESCSI_TRANSFORM, &scsi->transform);
 }

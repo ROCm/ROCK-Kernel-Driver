@@ -49,7 +49,7 @@ void UMSDOS_put_inode (struct inode *inode)
 void UMSDOS_put_super (struct super_block *sb)
 {
 	Printk ((KERN_DEBUG "UMSDOS_put_super: entering\n"));
-	if (saved_root && pseudo_root && sb->s_dev == ROOT_DEV) {
+	if (saved_root && pseudo_root && kdev_same(sb->s_dev, ROOT_DEV)) {
 		shrink_dcache_parent(saved_root);
 		dput(saved_root);
 		saved_root = NULL;
@@ -414,7 +414,7 @@ static struct dentry *check_pseudo_root(struct super_block *sb)
 	 * must check like this, because we can be used with initrd
 	 */
 		
-	if (sb->s_dev != ROOT_DEV)
+	if (!kdev_same(sb->s_dev, ROOT_DEV))
 		goto out_noroot;
 
 	/* 

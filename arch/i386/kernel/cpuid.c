@@ -101,7 +101,7 @@ static ssize_t cpuid_read(struct file * file, char * buf,
   u32 data[4];
   size_t rv;
   u32 reg = *ppos;
-  int cpu = MINOR(file->f_dentry->d_inode->i_rdev);
+  int cpu = minor(file->f_dentry->d_inode->i_rdev);
   
   if ( count % 16 )
     return -EINVAL; /* Invalid chunk size */
@@ -119,7 +119,7 @@ static ssize_t cpuid_read(struct file * file, char * buf,
 
 static int cpuid_open(struct inode *inode, struct file *file)
 {
-  int cpu = MINOR(file->f_dentry->d_inode->i_rdev);
+  int cpu = minor(file->f_dentry->d_inode->i_rdev);
   struct cpuinfo_x86 *c = &(cpu_data)[cpu];
 
   if ( !(cpu_online_map & (1UL << cpu)) )

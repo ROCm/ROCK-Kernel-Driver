@@ -128,7 +128,7 @@ advwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static int
 advwdt_open(struct inode *inode, struct file *file)
 {
-	switch (MINOR(inode->i_rdev)) {
+	switch (minor(inode->i_rdev)) {
 		case WATCHDOG_MINOR:
 			spin_lock(&advwdt_lock);
 			if (advwdt_is_open) {
@@ -151,7 +151,7 @@ advwdt_open(struct inode *inode, struct file *file)
 static int
 advwdt_close(struct inode *inode, struct file *file)
 {
-	if (MINOR(inode->i_rdev) == WATCHDOG_MINOR) {
+	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
 		spin_lock(&advwdt_lock);
 #ifndef CONFIG_WATCHDOG_NOWAYOUT	
 		inb_p(WDT_STOP);

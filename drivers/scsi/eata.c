@@ -1,6 +1,13 @@
 /*
  *      eata.c - Low-level driver for EATA/DMA SCSI host adapters.
  *
+ *      01 Jan 2002 Rev. 7.20 for linux 2.5.1
+ *        + Use the dynamic DMA mapping API.
+ *
+ *      19 Dec 2001 Rev. 7.02 for linux 2.5.1
+ *        + Use SCpnt->sc_data_direction if set.
+ *        + Use sglist.page instead of sglist.address.
+ *
  *      11 Dec 2001 Rev. 7.00 for linux 2.5.1
  *        + Use host->host_lock instead of io_request_lock.
  *
@@ -223,7 +230,7 @@
  *          This driver is based on the CAM (Common Access Method Committee)
  *          EATA (Enhanced AT Bus Attachment) rev. 2.0A, using DMA protocol.
  *
- *  Copyright (C) 1994-2001 Dario Ballabio (ballabio_dario@emc.com)
+ *  Copyright (C) 1994-2002 Dario Ballabio (ballabio_dario@emc.com)
  *
  *  Alternate email: dario.ballabio@inwind.it, dario.ballabio@tiscalinet.it
  *
@@ -634,7 +641,7 @@ struct mscp {
    u_int32_t data_len;   /* If sg=0 Data Length, if sg=1 sglist length */
    u_int32_t cpp_index;  /* Index of address to be returned in sp */
    u_int32_t data_address; /* If sg=0 Data Address, if sg=1 sglist address */
-   u_int32_t sp_addr;    /* Address where sp is DMA'ed when cp completes */
+   u_int32_t sp_dma_addr;  /* Address where sp is DMA'ed when cp completes */
    u_int32_t sense_addr; /* Address where Sense Data is DMA'ed on error */
    /* Additional fields begin here. */
    Scsi_Cmnd *SCpnt;
@@ -656,7 +663,11 @@ struct hostdata {
    unsigned long last_retried_pid;      /* Pid of last retried command */
    unsigned char subversion;            /* Bus type, either ISA or EISA/PCI */
    unsigned char protocol_rev;          /* EATA 2.0 rev., 'A' or 'B' or 'C' */
-   struct mssp sp[2];                   /* Returned status for this board */
+   unsigned char is_pci;                /* TRUE is bus type is PCI */
+   struct pci_dev *pdev;                /* pdev for PCI bus, NULL otherwise */
+   struct mssp *sp_cpu_addr;            /* cpu addr for DMA buffer sp */
+   dma_addr_t sp_dma_addr;              /* dma handle for DMA buffer sp */
+   struct mssp sp;                      /* Local copy of sp buffer */
    };
 
 static struct Scsi_Host *sh[MAX_BOARDS + 1];
@@ -693,10 +704,11 @@ static unsigned long io_port[] = {
 #define HD(board) ((struct hostdata *) &sh[board]->hostdata)
 #define BN(board) (HD(board)->board_name)
 
-#define H2DEV(x) htonl(x)
-#define DEV2H(x) H2DEV(x)
+/* Device is Big Endian */
+#define H2DEV(x) cpu_to_be32(x)
+#define DEV2H(x) be32_to_cpu(x)
+
 #define V2DEV(addr) ((addr) ? H2DEV(virt_to_bus((void *)addr)) : 0)
-#define DEV2V(addr) ((addr) ? DEV2H(bus_to_virt((unsigned long)addr)) : 0)
 
 static void do_interrupt_handler(int, void *, struct pt_regs *);
 static void flush_dev(Scsi_Device *, unsigned long, unsigned int, unsigned int);
@@ -855,7 +867,7 @@ static inline struct pci_dev *get_pci_dev(unsigned long port_base) {
 
 static inline int port_detect \
       (unsigned long port_base, unsigned int j, Scsi_Host_Template *tpnt) {
-   unsigned char irq, dma_channel, subversion, i;
+   unsigned char irq, dma_channel, subversion, i, is_pci = FALSE;
    unsigned char protocol_rev;
    struct eata_info info;
    char *bus_type, dma_name[16], tag_type;
@@ -907,10 +919,12 @@ static inline int port_detect \
 
    if (!setup_done && j > 0 && j <= MAX_PCI) {
       bus_type = "PCI";
+      is_pci = TRUE;
       subversion = ESA;
       }
    else if (port_base > MAX_EISA_ADDR || (protocol_rev == 'C' && info.pci)) {
       bus_type = "PCI";
+      is_pci = TRUE;
       subversion = ESA;
       }
    else if (port_base >= MIN_EISA_ADDR || (protocol_rev == 'C' && info.eisa)) {
@@ -923,6 +937,7 @@ static inline int port_detect \
       }
    else if (port_base > MAX_ISA_ADDR) {
       bus_type = "PCI";
+      is_pci = TRUE;
       subversion = ESA;
       }
    else {
@@ -963,7 +978,13 @@ static inline int port_detect \
       printk("%s: warning, LEVEL triggering is suggested for IRQ %u.\n",
              name, irq);
 
-   pdev = get_pci_dev(port_base);
+   if (is_pci) {
+      pdev = get_pci_dev(port_base);
+      if (!pdev) 
+         printk("%s: warning, failed to get pci_dev structure.\n", name);
+      }
+   else
+      pdev = NULL;
 
    if (pdev && (irq != pdev->irq)) {
       printk("%s: IRQ %u mapped to IO-APIC IRQ %u.\n", name, irq, pdev->irq);
@@ -993,7 +1014,7 @@ static inline int port_detect \
 
    /* Set board configuration */
    memset((char *)&config, 0, sizeof(struct eata_config));
-   config.len = (ushort) htons((ushort)510);
+   config.len = (ushort) cpu_to_be16((ushort)510);
    config.ocena = TRUE;
 
    if (do_dma(port_base, (unsigned long)&config, SET_CONFIG_DMA)) {
@@ -1022,14 +1043,16 @@ static inline int port_detect \
    sh[j]->n_io_port = REGION_SIZE;
    sh[j]->dma_channel = dma_channel;
    sh[j]->irq = irq;
-   sh[j]->sg_tablesize = (ushort) ntohs(info.scatt_size);
+   sh[j]->sg_tablesize = (ushort) be16_to_cpu(info.scatt_size);
    sh[j]->this_id = (ushort) info.host_addr[3];
-   sh[j]->can_queue = (ushort) ntohs(info.queue_size);
+   sh[j]->can_queue = (ushort) be16_to_cpu(info.queue_size);
    sh[j]->cmd_per_lun = MAX_CMD_PER_LUN;
    sh[j]->select_queue_depths = select_queue_depths;
    memset(HD(j), 0, sizeof(struct hostdata));
    HD(j)->subversion = subversion;
    HD(j)->protocol_rev = protocol_rev;
+   HD(j)->is_pci = is_pci;
+   HD(j)->pdev = pdev;
    HD(j)->board_number = j;
 
    if (HD(j)->subversion == ESA)
@@ -1038,14 +1061,14 @@ static inline int port_detect \
       unsigned long flags;
       scsi_register_blocked_host(sh[j]);
       sh[j]->unchecked_isa_dma = TRUE;
-      
+
       flags=claim_dma_lock();
       disable_dma(dma_channel);
       clear_dma_ff(dma_channel);
       set_dma_mode(dma_channel, DMA_MODE_CASCADE);
       enable_dma(dma_channel);
       release_dma_lock(flags);
-      
+
       }
 
    strcpy(BN(j), name);
@@ -1094,6 +1117,13 @@ static inline int port_detect \
          return FALSE;
          }
 
+   if (! (HD(j)->sp_cpu_addr = pci_alloc_consistent(HD(j)->pdev, 
+         sizeof(struct mssp), &HD(j)->sp_dma_addr))) {
+      printk("%s: pci_alloc_consistent failed, detaching.\n", BN(j));
+      eata2x_release(sh[j]);
+      return FALSE;
+      }
+
    if (max_queue_depth > MAX_TAGGED_CMD_PER_LUN)
        max_queue_depth = MAX_TAGGED_CMD_PER_LUN;
 
@@ -1108,7 +1138,7 @@ static inline int port_detect \
    else                                 tag_type = 'n';
 
    if (j == 0) {
-      printk("EATA/DMA 2.0x: Copyright (C) 1994-2001 Dario Ballabio.\n");
+      printk("EATA/DMA 2.0x: Copyright (C) 1994-2002 Dario Ballabio.\n");
       printk("%s config options -> tc:%c, lc:%c, mq:%d, rs:%c, et:%c.\n",
              driver_name, tag_type, YESNO(linked_comm), max_queue_depth,
              YESNO(rev_scan), YESNO(ext_tran));
@@ -1144,7 +1174,11 @@ static inline int port_detect \
              info.pci, info.eisa, info.raidnum);
 #endif
 
-   if (pdev) pci_set_master(pdev);
+   if (HD(j)->pdev) {
+      pci_set_master(HD(j)->pdev);
+      if (pci_set_dma_mask(HD(j)->pdev, 0xffffffff))
+         printk("%s: warning, pci_set_dma_mask failed.\n", BN(j));
+      }
 
    return TRUE;
 }
@@ -1271,25 +1305,92 @@ int eata2x_detect(Scsi_Host_Template *tpnt) {
    return j;
 }
 
-static inline void build_sg_list(struct mscp *cpp, Scsi_Cmnd *SCpnt) {
-   unsigned int k;
+static inline void map_dma(unsigned int i, unsigned int j) {
+   unsigned int k, count, pci_dir;
    struct scatterlist *sgpnt;
+   struct mscp *cpp;
+   Scsi_Cmnd *SCpnt;
 
-   sgpnt = (struct scatterlist *) SCpnt->request_buffer;
+   cpp = &HD(j)->cp[i]; SCpnt = cpp->SCpnt;
+   pci_dir = scsi_to_pci_dma_dir(SCpnt->sc_data_direction);
 
-   for (k = 0; k < SCpnt->use_sg; k++) {
-      cpp->sglist[k].address = V2DEV(sgpnt[k].address);
-      cpp->sglist[k].num_bytes = H2DEV(sgpnt[k].length);
+   if (SCpnt->sense_buffer)
+      cpp->sense_addr = H2DEV(pci_map_single(HD(j)->pdev, SCpnt->sense_buffer,
+                           sizeof SCpnt->sense_buffer, PCI_DMA_FROMDEVICE));
+
+   cpp->sense_len = sizeof SCpnt->sense_buffer;
+
+   if (!SCpnt->use_sg) {
+
+      if (!SCpnt->request_bufflen)
+         cpp->data_address = V2DEV(SCpnt->request_buffer);
+
+      else if (SCpnt->request_buffer)
+         cpp->data_address = H2DEV(pci_map_single(HD(j)->pdev,
+                  SCpnt->request_buffer, SCpnt->request_bufflen, pci_dir));
+
+      cpp->data_len = H2DEV(SCpnt->request_bufflen);
+      return;
       }
 
+   sgpnt = (struct scatterlist *) SCpnt->request_buffer;
+   count = pci_map_sg(HD(j)->pdev, sgpnt, SCpnt->use_sg, pci_dir);
+
+   for (k = 0; k < count; k++) {
+      cpp->sglist[k].address = H2DEV(sg_dma_address(&sgpnt[k]));
+      cpp->sglist[k].num_bytes = H2DEV(sg_dma_len(&sgpnt[k]));
+      }
+
+   cpp->sg = TRUE;
    cpp->data_address = V2DEV(cpp->sglist);
    cpp->data_len = H2DEV((SCpnt->use_sg * sizeof(struct sg_list)));
 }
 
-static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
-   unsigned int i, j, k;
+static void unmap_dma(unsigned int i, unsigned int j) {
+   unsigned int pci_dir;
    struct mscp *cpp;
-   struct mssp *spp;
+   Scsi_Cmnd *SCpnt;
+
+   cpp = &HD(j)->cp[i]; SCpnt = cpp->SCpnt;
+   pci_dir = scsi_to_pci_dma_dir(SCpnt->sc_data_direction);
+
+   if (DEV2H(cpp->sense_addr))
+      pci_unmap_single(HD(j)->pdev, DEV2H(cpp->sense_addr),
+                       DEV2H(cpp->sense_len), PCI_DMA_FROMDEVICE);
+
+   if (SCpnt->use_sg) 
+      pci_unmap_sg(HD(j)->pdev, SCpnt->request_buffer, SCpnt->use_sg, pci_dir);
+
+   else if (DEV2H(cpp->data_address) && DEV2H(cpp->data_len))
+      pci_unmap_single(HD(j)->pdev, DEV2H(cpp->data_address), 
+                       DEV2H(cpp->data_len), pci_dir);
+
+}
+
+static void sync_dma(unsigned int i, unsigned int j) {
+   unsigned int pci_dir;
+   struct mscp *cpp;
+   Scsi_Cmnd *SCpnt;
+
+   cpp = &HD(j)->cp[i]; SCpnt = cpp->SCpnt;
+   pci_dir = scsi_to_pci_dma_dir(SCpnt->sc_data_direction);
+
+   if (DEV2H(cpp->sense_addr))
+      pci_dma_sync_single(HD(j)->pdev, DEV2H(cpp->sense_addr),
+                          DEV2H(cpp->sense_len), PCI_DMA_FROMDEVICE);
+
+   if (SCpnt->use_sg) 
+      pci_dma_sync_sg(HD(j)->pdev, SCpnt->request_buffer, 
+                         SCpnt->use_sg, pci_dir);
+
+   else if (DEV2H(cpp->data_address) && DEV2H(cpp->data_len))
+      pci_dma_sync_single(HD(j)->pdev, DEV2H(cpp->data_address), 
+                          DEV2H(cpp->data_len), pci_dir);
+
+}
+
+static inline void scsi_to_dev_dir(unsigned int i, unsigned int j) {
+   unsigned int k;
 
    static const unsigned char data_out_cmds[] = {
       0x0a, 0x2a, 0x15, 0x55, 0x04, 0x07, 0x18, 0x1d, 0x24, 0x2e,
@@ -1300,8 +1401,52 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    static const unsigned char data_none_cmds[] = {
       0x01, 0x0b, 0x10, 0x11, 0x13, 0x16, 0x17, 0x19, 0x2b, 0x1e,
       0x2c, 0xac, 0x2f, 0xaf, 0x33, 0xb3, 0x35, 0x36, 0x45, 0x47,
-      0x48, 0x49, 0xa9, 0x4b, 0xa5, 0xa6, 0xb5
+      0x48, 0x49, 0xa9, 0x4b, 0xa5, 0xa6, 0xb5, 0x00
       };
+
+   struct mscp *cpp;
+   Scsi_Cmnd *SCpnt;
+
+   cpp = &HD(j)->cp[i];
+   SCpnt = cpp->SCpnt;
+
+   if (SCpnt->sc_data_direction == SCSI_DATA_READ) {
+      cpp->din  = TRUE;
+      cpp->dout = FALSE;
+      return;
+      }
+   else if (SCpnt->sc_data_direction == SCSI_DATA_WRITE) {
+      cpp->din  = FALSE;
+      cpp->dout = TRUE;
+      return;
+      }
+   else if (SCpnt->sc_data_direction == SCSI_DATA_NONE) {
+      cpp->din  = FALSE;
+      cpp->dout = FALSE;
+      return;
+      }
+
+   if (SCpnt->sc_data_direction != SCSI_DATA_UNKNOWN) 
+      panic("%s: qcomm, invalid SCpnt->sc_data_direction.\n", BN(j));
+
+   for (k = 0; k < ARRAY_SIZE(data_out_cmds); k++)
+      if (SCpnt->cmnd[0] == data_out_cmds[k]) {
+         cpp->dout = TRUE;
+         break;
+         }
+
+   if ((cpp->din = !cpp->dout))
+      for (k = 0; k < ARRAY_SIZE(data_none_cmds); k++)
+         if (SCpnt->cmnd[0] == data_none_cmds[k]) {
+            cpp->din = FALSE;
+            break;
+            }
+
+}
+
+static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
+   unsigned int i, j, k;
+   struct mscp *cpp;
 
    /* j is the board number */
    j = ((struct hostdata *) SCpnt->host->hostdata)->board_number;
@@ -1334,11 +1479,8 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
 
    memset(cpp, 0, sizeof(struct mscp) - sizeof(struct sg_list *));
 
-   /* Set pointer to status packet structure */
-   spp = &HD(j)->sp[0];
-
-   /* The EATA protocol uses Big Endian format */
-   cpp->sp_addr = V2DEV(spp);
+   /* Set pointer to status packet structure, Big Endian format */
+   cpp->sp_dma_addr = H2DEV(HD(j)->sp_dma_addr);
 
    SCpnt->scsi_done = done;
    cpp->cpp_index = i;
@@ -1347,19 +1489,6 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    if (do_trace) printk("%s: qcomm, mbox %d, target %d.%d:%d, pid %ld.\n",
                         BN(j), i, SCpnt->channel, SCpnt->target,
                         SCpnt->lun, SCpnt->pid);
-
-   for (k = 0; k < ARRAY_SIZE(data_out_cmds); k++)
-     if (SCpnt->cmnd[0] == data_out_cmds[k]) {
-        cpp->dout = TRUE;
-        break;
-        }
-
-   if ((cpp->din = !cpp->dout))
-      for (k = 0; k < ARRAY_SIZE(data_none_cmds); k++)
-        if (SCpnt->cmnd[0] == data_none_cmds[k]) {
-           cpp->din = FALSE;
-           break;
-           }
 
    cpp->reqsen = TRUE;
    cpp->dispri = TRUE;
@@ -1371,8 +1500,13 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    cpp->target = SCpnt->target;
    cpp->lun = SCpnt->lun;
    cpp->SCpnt = SCpnt;
-   cpp->sense_addr = V2DEV(SCpnt->sense_buffer);
-   cpp->sense_len = sizeof SCpnt->sense_buffer;
+   memcpy(cpp->cdb, SCpnt->cmnd, SCpnt->cmd_len);
+
+   /* Use data transfer direction SCpnt->sc_data_direction */
+   scsi_to_dev_dir(i, j);
+
+   /* Map DMA buffers and SG list */
+   map_dma(i, j);
 
    if (SCpnt->device->tagged_queue) {
 
@@ -1392,17 +1526,6 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
       cpp->mess[1] = SCpnt->device->current_tag++;
       }
 
-   if (SCpnt->use_sg) {
-      cpp->sg = TRUE;
-      build_sg_list(cpp, SCpnt);
-      }
-   else {
-      cpp->data_address = V2DEV(SCpnt->request_buffer);
-      cpp->data_len = H2DEV(SCpnt->request_bufflen);
-      }
-
-   memcpy(cpp->cdb, SCpnt->cmnd, SCpnt->cmd_len);
-
    if (linked_comm && SCpnt->device->queue_depth > 2
                                      && TLDEV(SCpnt->device->type)) {
       HD(j)->cp_stat[i] = READY;
@@ -1412,6 +1535,7 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
 
    /* Send control packet to the board */
    if (do_dma(sh[j]->io_port, (unsigned long) cpp, SEND_CP_DMA)) {
+      unmap_dma(i, j);
       SCpnt->host_scribble = NULL;
       printk("%s: qcomm, target %d.%d:%d, pid %ld, adapter busy.\n",
              BN(j), SCpnt->channel, SCpnt->target, SCpnt->lun, SCpnt->pid);
@@ -1468,6 +1592,7 @@ static inline int do_abort(Scsi_Cmnd *SCarg) {
          printk("%s: abort, mbox %d, interrupt pending.\n", BN(j), i);
 
       if (SCarg->eh_state == SCSI_STATE_TIMEOUT) {
+         unmap_dma(i, j);
          SCarg->host_scribble = NULL;
          HD(j)->cp_stat[i] = FREE;
          printk("%s, abort, mbox %d, eh_state timeout, pid %ld.\n",
@@ -1489,6 +1614,7 @@ static inline int do_abort(Scsi_Cmnd *SCarg) {
       }
 
    if (HD(j)->cp_stat[i] == READY || HD(j)->cp_stat[i] == ABORTING) {
+      unmap_dma(i, j);
       SCarg->result = DID_ABORT << 16;
       SCarg->host_scribble = NULL;
       HD(j)->cp_stat[i] = FREE;
@@ -1597,6 +1723,7 @@ static inline int do_reset(Scsi_Cmnd *SCarg) {
 
       if (HD(j)->cp_stat[i] == IN_RESET) {
          SCpnt = HD(j)->cp[i].SCpnt;
+         unmap_dma(i, j);
          SCpnt->result = DID_RESET << 16;
          SCpnt->host_scribble = NULL;
 
@@ -1609,6 +1736,7 @@ static inline int do_reset(Scsi_Cmnd *SCarg) {
 
       else if (HD(j)->cp_stat[i] == ABORTING) {
          SCpnt = HD(j)->cp[i].SCpnt;
+         unmap_dma(i, j);
          SCpnt->result = DID_RESET << 16;
          SCpnt->host_scribble = NULL;
 
@@ -1821,7 +1949,7 @@ static void flush_dev(Scsi_Device *dev, unsigned long cursec, unsigned int j,
 static inline void ihdlr(int irq, unsigned int j) {
    Scsi_Cmnd *SCpnt;
    unsigned int i, k, c, status, tstatus, reg;
-   struct mssp *dspp, *spp;
+   struct mssp *spp;
    struct mscp *cpp;
 
    if (sh[j]->irq != irq)
@@ -1843,14 +1971,13 @@ static inline void ihdlr(int irq, unsigned int j) {
       return;
       }
 
-   dspp = &HD(j)->sp[0];
-   spp  = &HD(j)->sp[1];
+   spp  = &HD(j)->sp;
 
    /* Make a local copy just before clearing the interrupt indication */
-   memcpy(spp, dspp, sizeof(struct mssp));
+   memcpy(spp, HD(j)->sp_cpu_addr, sizeof(struct mssp));
 
    /* Clear the completion flag and cp pointer on the dynamic copy of sp */
-   memset(dspp, 0, sizeof(struct mssp));
+   memset(HD(j)->sp_cpu_addr, 0, sizeof(struct mssp));
 
    /* Read the status register to clear the interrupt indication */
    reg = inb(sh[j]->io_port + REG_STATUS);
@@ -1907,6 +2034,8 @@ static inline void ihdlr(int irq, unsigned int j) {
    if (*(unsigned int *)SCpnt->host_scribble != i)
       panic("%s: ihdlr, mbox %d, pid %ld, index mismatch %d.\n",
             BN(j), i, SCpnt->pid, *(unsigned int *)SCpnt->host_scribble);
+
+   sync_dma(i, j);
 
    if (linked_comm && SCpnt->device->queue_depth > 2
                                      && TLDEV(SCpnt->device->type))
@@ -1985,6 +2114,7 @@ static inline void ihdlr(int irq, unsigned int j) {
 #else
             status = DID_BUS_BUSY << 16;
 #endif
+
             HD(j)->retries++;
             HD(j)->last_retried_pid = SCpnt->pid;
             }
@@ -2021,6 +2151,8 @@ static inline void ihdlr(int irq, unsigned int j) {
              SCpnt->channel, SCpnt->target, SCpnt->lun, SCpnt->pid,
              reg, HD(j)->iocount);
 
+   unmap_dma(i, j);
+
    /* Set the command state to inactive */
    SCpnt->host_scribble = NULL;
 
@@ -2052,13 +2184,15 @@ int eata2x_release(struct Scsi_Host *shpnt) {
    if (sh[j] == NULL) panic("%s: release, invalid Scsi_Host pointer.\n",
                             driver_name);
 
-   if( sh[j]->unchecked_isa_dma ) {
-	   scsi_deregister_blocked_host(sh[j]);
-   }
+   if(sh[j]->unchecked_isa_dma) scsi_deregister_blocked_host(sh[j]);
 
    for (i = 0; i < sh[j]->can_queue; i++)
       if ((&HD(j)->cp[i])->sglist) kfree((&HD(j)->cp[i])->sglist);
 
+   if (HD(j)->sp_cpu_addr) 
+      pci_free_consistent(HD(j)->pdev, sizeof(struct mssp),
+                          HD(j)->sp_cpu_addr, HD(j)->sp_dma_addr);
+                       
    free_irq(sh[j]->irq, &sha[j]);
 
    if (sh[j]->dma_channel != NO_DMA) free_dma(sh[j]->dma_channel);

@@ -262,7 +262,7 @@ affs_read_super(struct super_block *sb, void *data, int silent)
 	 * blocks, we will have to change it.
 	 */
 
-	blocks = blk_size[MAJOR(dev)] ? blk_size[MAJOR(dev)][MINOR(dev)] : 0;
+	blocks = blk_size[major(dev)] ? blk_size[major(dev)][minor(dev)] : 0;
 	if (!blocks) {
 		printk(KERN_ERR "AFFS: Could not determine device size\n");
 		goto out_error;

@@ -397,16 +397,16 @@ static struct usb_serial	*serial_table[SERIAL_TTY_MINORS];	/* initially all NULL
 static LIST_HEAD(usb_serial_driver_list);
 
 
-static struct usb_serial *get_serial_by_minor (int minor)
+static struct usb_serial *get_serial_by_minor (unsigned int minor)
 {
 	return serial_table[minor];
 }
 
 
-static struct usb_serial *get_free_serial (int num_ports, int *minor)
+static struct usb_serial *get_free_serial (int num_ports, unsigned int *minor)
 {
 	struct usb_serial *serial = NULL;
-	int i, j;
+	unsigned int i, j;
 	int good_spot;
 
 	dbg(__FUNCTION__ " %d", num_ports);
@@ -505,7 +505,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 {
 	struct usb_serial *serial;
 	struct usb_serial_port *port;
-	int portNumber;
+	unsigned int portNumber;
 	
 	dbg(__FUNCTION__);
 
@@ -513,14 +513,14 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	tty->driver_data = NULL;
 
 	/* get the serial object associated with this tty pointer */
-	serial = get_serial_by_minor (MINOR(tty->device));
+	serial = get_serial_by_minor (minor(tty->device));
 
 	if (serial_paranoia_check (serial, __FUNCTION__)) {
 		return -ENODEV;
 	}
 
 	/* set up our port structure making the tty driver remember our port object, and us it */
-	portNumber = MINOR(tty->device) - serial->minor;
+	portNumber = minor(tty->device) - serial->minor;
 	port = &serial->port[portNumber];
 	tty->driver_data = port;
 	port->tty = tty;

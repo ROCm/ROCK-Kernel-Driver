@@ -739,7 +739,7 @@ sl_alloc(kdev_t line)
 			break;
 
 		if (slp->ctrl.leased) {
-			if (slp->ctrl.line != line)
+			if (!kdev_same(slp->ctrl.line, line))
 				continue;
 			if (slp->ctrl.tty)
 				return NULL;
@@ -753,7 +753,7 @@ sl_alloc(kdev_t line)
 			continue;
 
 		if (current->pid == slp->ctrl.pid) {
-			if (slp->ctrl.line == line && score < 3) {
+			if (kdev_same(slp->ctrl.line, line) && score < 3) {
 				sel = i;
 				score = 3;
 				continue;
@@ -764,7 +764,7 @@ sl_alloc(kdev_t line)
 			}
 			continue;
 		}
-		if (slp->ctrl.line == line && score < 1) {
+		if (kdev_same(slp->ctrl.line, line) && score < 1) {
 			sel = i;
 			score = 1;
 			continue;
@@ -944,7 +944,7 @@ slip_close(struct tty_struct *tty)
 	tty->disc_data = 0;
 	sl->tty = NULL;
 	if (!sl->leased)
-		sl->line = 0;
+		sl->line = NODEV;
 
 	/* VSV = very important to remove timers */
 #ifdef CONFIG_SLIP_SMART

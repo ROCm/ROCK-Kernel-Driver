@@ -1201,8 +1201,9 @@ nfs_commit_done(struct rpc_task *task)
 		req = nfs_list_entry(data->pages.next);
 		nfs_list_remove_request(req);
 
-		dprintk("NFS: commit (%x/%Ld %d@%Ld)",
-			req->wb_inode->i_dev,
+		dprintk("NFS: commit (%02x:%02x/%Ld %d@%Ld)",
+			major(req->wb_inode->i_dev),
+			minor(req->wb_inode->i_dev),
 			(long long)NFS_FILEID(req->wb_inode),
 			req->wb_bytes,
 			(long long)(page_offset(req->wb_page) + req->wb_offset));

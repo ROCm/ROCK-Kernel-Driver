@@ -1063,16 +1063,16 @@ static struct devfs_entry *_devfs_get_root_entry (void)
     if ( ( new = _devfs_alloc_entry (".devfsd", 0, S_IFCHR |S_IRUSR |S_IWUSR) )
 	 == NULL ) return NULL;
     devnum = devfs_alloc_devnum (DEVFS_SPECIAL_CHR);
-    new->u.fcb.u.device.major = MAJOR (devnum);
-    new->u.fcb.u.device.minor = MINOR (devnum);
+    new->u.fcb.u.device.major = major (devnum);
+    new->u.fcb.u.device.minor = minor (devnum);
     new->u.fcb.ops = &devfsd_fops;
     _devfs_append_entry (root_entry, new, FALSE, NULL);
 #ifdef CONFIG_DEVFS_DEBUG
     if ( ( new = _devfs_alloc_entry (".stat", 0, S_IFCHR | S_IRUGO | S_IWUGO) )
 	 == NULL ) return NULL;
     devnum = devfs_alloc_devnum (DEVFS_SPECIAL_CHR);
-    new->u.fcb.u.device.major = MAJOR (devnum);
-    new->u.fcb.u.device.minor = MINOR (devnum);
+    new->u.fcb.u.device.major = major (devnum);
+    new->u.fcb.u.device.minor = minor (devnum);
     new->u.fcb.ops = &stat_fops;
     _devfs_append_entry (root_entry, new, FALSE, NULL);
 #endif
@@ -1558,8 +1558,8 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 		    name, S_ISCHR (mode) ? "char" : "block");
 	    return NULL;
 	}
-	major = MAJOR (devnum);
-	minor = MINOR (devnum);
+	major = major (devnum);
+	minor = minor (devnum);
     }
     if ( ( de = _devfs_prepare_leaf (&dir, name, mode) ) == NULL )
     {

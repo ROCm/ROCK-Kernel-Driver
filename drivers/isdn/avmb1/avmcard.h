@@ -1,4 +1,4 @@
-/* $Id: avmcard.h,v 1.8.6.4 2001/09/23 22:24:33 kai Exp $
+/* $Id: avmcard.h,v 1.1.4.1.2.1 2001/12/21 15:00:17 kai Exp $
  *
  * Copyright 1999 by Carsten Paeth <calle@calle.de>
  *
@@ -39,13 +39,21 @@ enum avmcardtype {
 	avm_c2
 };
 
-typedef struct avmcard_dmainfo {
-	__u32 recvlen;   
-	__u8  recvbuf[128+2048];
-	struct sk_buff_head send_queue;
-	__u8  sendbuf[128+2048];
-} avmcard_dmainfo;
+typedef struct avmcard_dmabuf {
+    long        size;
+    __u8       *dmabuf;
+    dma_addr_t  dmaaddr;
+} avmcard_dmabuf;
 
+typedef struct avmcard_dmainfo {
+	__u32                recvlen;
+        avmcard_dmabuf       recvbuf;
+
+        avmcard_dmabuf       sendbuf;
+	struct sk_buff_head  send_queue;
+
+	struct pci_dev      *pcidev;
+} avmcard_dmainfo;
 
 typedef struct avmcard {
 	char name[32];
@@ -543,6 +551,11 @@ void b1_handle_interrupt(avmcard * card);
 
 int b1ctl_read_proc(char *page, char **start, off_t off,
         		int count, int *eof, struct capi_ctr *ctrl);
+
+avmcard_dmainfo *avmcard_dma_alloc(char *name, struct pci_dev *,
+				   long rsize, long ssize);
+void avmcard_dma_free(avmcard_dmainfo *);
+
 
 /* b1dma.c */
 int b1pciv4_detect(avmcard *card);

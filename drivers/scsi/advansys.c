@@ -3610,36 +3610,6 @@ typedef struct {
 #define ASC_MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif /* CONFIG_PROC_FS */
 
-/*
- * XXX - Release and acquire the io_request_lock. These macros are needed
- * because the 2.4 kernel SCSI mid-level driver holds the 'io_request_lock'
- * on entry to SCSI low-level drivers.
- *
- * These definitions and all code that uses code should be removed when the
- * SCSI mid-level driver no longer holds the 'io_request_lock' on entry to
- * SCSI low-level driver detect, queuecommand, and reset entrypoints.
- *
- * The interrupt flags values doesn't matter in the macros because the
- * SCSI mid-level will save and restore the flags values before and after
- * calling advansys_detect, advansys_queuecommand, and advansys_reset where
- * these macros are used. We do want interrupts enabled after the lock is
- * released so an explicit sti() is done. The driver only needs interrupts
- * disabled when it acquires the per board lock.
- */
-#define ASC_UNLOCK_IO_REQUEST_LOCK \
-    { \
-        ulong flags; /* flags value not needed, cf. comment above. */ \
-        save_flags(flags); \
-        spin_unlock_irqrestore(&io_request_lock, flags); \
-        sti(); /* enable interrupts */ \
-    }
-
-#define ASC_LOCK_IO_REQUEST_LOCK \
-    { \
-        ulong flags; /* flags value not needed, cf. comment above. */ \
-        spin_lock_irqsave(&io_request_lock, flags); \
-    }
-
 /* Asc Library return codes */
 #define ASC_TRUE        1
 #define ASC_FALSE       0
@@ -4084,7 +4054,6 @@ typedef struct asc_board {
         ADVEEP_38C1600_CONFIG adv_38C1600_eep;  /* 38C1600 EEPROM config. */
     } eep_config;
     ulong                last_reset;            /* Saved last reset time */
-    spinlock_t lock;                            /* Board spinlock */
 #ifdef CONFIG_PROC_FS
     /* /proc/scsi/advansys/[0...] */
     char                 *prtbuf;               /* /proc print buffer */
@@ -4604,13 +4573,6 @@ advansys_detect(Scsi_Host_Template *tpnt)
 
     ASC_DBG(1, "advansys_detect: begin\n");
 
-    /*
-     * XXX - Remove this comment and the next line when SCSI mid-level
-     * no longer acquires 'io_request_lock' before calling the SCSI
-     * low-level detect entrypoint.
-     */
-    ASC_UNLOCK_IO_REQUEST_LOCK
-
 #if ASC_LINUX_KERNEL24
     tpnt->proc_name = "advansys";
 #elif ASC_LINUX_KERNEL22
@@ -4836,9 +4798,6 @@ advansys_detect(Scsi_Host_Template *tpnt)
             boardp = ASC_BOARDP(shp);
             memset(boardp, 0, sizeof(asc_board_t));
             boardp->id = asc_board_count - 1;
-
-            /* Initialize spinlock. */
-            boardp->lock = SPIN_LOCK_UNLOCKED;
 
             /*
              * Handle both narrow and wide boards.
@@ -5723,13 +5682,6 @@ advansys_detect(Scsi_Host_Template *tpnt)
         }
     }
 
-    /*
-     * XXX - Remove this comment and the next line when SCSI mid-level
-     * no longer acquires 'io_request_lock' before calling the SCSI
-     * low-level detect entrypoint.
-     */
-    ASC_LOCK_IO_REQUEST_LOCK
-
     ASC_DBG1(1, "advansys_detect: done: asc_board_count %d\n", asc_board_count);
     return asc_board_count;
 }
@@ -5893,14 +5845,7 @@ advansys_queuecommand(Scsi_Cmnd *scp, void (*done)(Scsi_Cmnd *))
     boardp = ASC_BOARDP(shp);
     ASC_STATS(shp, queuecommand);
 
-    /*
-     * XXX - Remove this comment and the next line when SCSI mid-level
-     * no longer acquires 'io_request_lock' before calling the SCSI
-     * low-level queuecommand entrypoint.
-     */
-    ASC_UNLOCK_IO_REQUEST_LOCK
-
-    spin_lock_irqsave(&boardp->lock, flags);
+    spin_lock_irqsave(&shp->host_lock, flags);
 
     /*
      * Block new commands while handling a reset or abort request.
@@ -5917,7 +5862,7 @@ advansys_queuecommand(Scsi_Cmnd *scp, void (*done)(Scsi_Cmnd *))
          * handling.
          */
         asc_enqueue(&boardp->done, scp, ASC_BACK);
-        spin_unlock_irqrestore(&boardp->lock, flags);
+        spin_unlock_irqrestore(&shp->host_lock, flags);
         return 0;
     }
 
@@ -5961,15 +5906,7 @@ advansys_queuecommand(Scsi_Cmnd *scp, void (*done)(Scsi_Cmnd *))
         break;
     }
 
-    spin_unlock_irqrestore(&boardp->lock, flags);
-
-    /*
-     * XXX - Remove this comment and the next line when SCSI mid-level
-     * no longer acquires 'io_request_lock' before calling the SCSI
-     * low-level queuecommand entrypoint.
-     */
-    ASC_LOCK_IO_REQUEST_LOCK
-
+    spin_unlock_irqrestore(&shp->host_lock, flags);
     return 0;
 }
 
@@ -6015,20 +5952,13 @@ advansys_reset(Scsi_Cmnd *scp)
     /*
      * Check for re-entrancy.
      */
-    spin_lock_irqsave(&boardp->lock, flags);
+    spin_lock_irqsave(&shp->host_lock, flags);
     if (boardp->flags & ASC_HOST_IN_RESET) {
-        spin_unlock_irqrestore(&boardp->lock, flags);
+        spin_unlock_irqrestore(&shp->host_lock, flags);
         return FAILED;
     }
     boardp->flags |= ASC_HOST_IN_RESET;
-    spin_unlock_irqrestore(&boardp->lock, flags);
-
-    /*
-     * XXX - Remove this comment and the next line when SCSI mid-level
-     * no longer acquires 'io_request_lock' before calling the SCSI
-     * low-level reset entrypoint.
-     */
-    ASC_UNLOCK_IO_REQUEST_LOCK
+    spin_unlock_irqrestore(&shp->host_lock, flags);
 
     if (ASC_NARROW_BOARD(boardp)) {
         /*
@@ -6063,7 +5993,7 @@ advansys_reset(Scsi_Cmnd *scp)
         /*
          * Acquire the board lock.
          */
-        spin_lock_irqsave(&boardp->lock, flags);
+        spin_lock_irqsave(&shp->host_lock, flags);
 
     } else {
         /*
@@ -6094,7 +6024,7 @@ advansys_reset(Scsi_Cmnd *scp)
          * Acquire the board lock and ensure all requests completed by the
          * microcode have been processed by calling AdvISR().
          */
-        spin_lock_irqsave(&boardp->lock, flags);
+        spin_lock_irqsave(&shp->host_lock, flags);
         (void) AdvISR(adv_dvc_varp);
     }
 
@@ -6160,7 +6090,7 @@ advansys_reset(Scsi_Cmnd *scp)
     boardp->flags &= ~ASC_HOST_IN_RESET;
 
     /* Release the board. */
-    spin_unlock_irqrestore(&boardp->lock, flags);
+    spin_unlock_irqrestore(&shp->host_lock, flags);
 
     /*
      * Complete all the 'done_scp' requests.
@@ -6168,13 +6098,6 @@ advansys_reset(Scsi_Cmnd *scp)
     if (done_scp != NULL) {
         asc_scsi_done_list(done_scp);
     }
-
-    /*
-     * XXX - Remove this comment and the next line when SCSI mid-level
-     * no longer acquires 'io_request_lock' before calling the SCSI
-     * low-level reset entrypoint.
-     */
-    ASC_LOCK_IO_REQUEST_LOCK
 
     ASC_DBG1(1, "advansys_reset: ret %d\n", ret);
 
@@ -6344,10 +6267,11 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
      * AscISR() will call asc_isr_callback().
      */
     for (i = 0; i < asc_board_count; i++) {
-        boardp = ASC_BOARDP(asc_host[i]);
+	struct Scsi_Host *shp = asc_host[i];
+        boardp = ASC_BOARDP(shp);
         ASC_DBG2(2, "advansys_interrupt: i %d, boardp 0x%lx\n",
             i, (ulong) boardp);
-        spin_lock_irqsave(&boardp->lock, flags);
+        spin_lock_irqsave(&shp->host_lock, flags);
         if (ASC_NARROW_BOARD(boardp)) {
             /*
              * Narrow Board
@@ -6403,7 +6327,7 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
                 }
             }
         }
-        spin_unlock_irqrestore(&boardp->lock, flags);
+        spin_unlock_irqrestore(&shp->host_lock, flags);
     }
 
     /*

@@ -389,8 +389,8 @@ static void dump_orphan_list(struct super_block *sb, struct ext3_sb_info *sbi)
 	list_for_each(l, &sbi->s_orphan) {
 		struct inode *inode = orphan_list_entry(l);
 		printk(KERN_ERR "  "
-		       "inode 0x%04x:%ld at %p: mode %o, nlink %d, next %d\n",
-		       inode->i_dev, inode->i_ino, inode,
+		       "inode 0x%04x.0x%04x:%ld at %p: mode %o, nlink %d, next %d\n",
+		       major(inode->i_dev), minor(inode->i_dev), inode->i_ino, inode,
 		       inode->i_mode, inode->i_nlink, 
 		       le32_to_cpu(NEXT_ORPHAN(inode)));
 	}
@@ -430,7 +430,7 @@ void ext3_put_super (struct super_block * sb)
 	J_ASSERT(list_empty(&sbi->s_orphan));
 
 	invalidate_buffers(sb->s_dev);
-	if (j_dev != sb->s_dev) {
+	if (!kdev_same(j_dev, sb->s_dev)) {
 		/*
 		 * Invalidate the journal device's buffers.  We don't want them
 		 * floating about in memory - the physical journal device may
@@ -917,7 +917,7 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 	sbi->s_resuid = EXT3_DEF_RESUID;
 	sbi->s_resgid = EXT3_DEF_RESGID;
 	if (!parse_options ((char *) data, &sb_block, sbi, &journal_inum, 0)) {
-		sb->s_dev = 0;
+		sb->s_dev = NODEV;
 		goto out_fail;
 	}
 
@@ -1259,7 +1259,7 @@ static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
 }
 
 static journal_t *ext3_get_dev_journal(struct super_block *sb,
-				       int dev)
+				       kdev_t j_dev)
 {
 	struct buffer_head * bh;
 	journal_t *journal;
@@ -1268,16 +1268,15 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 	int hblock, blocksize;
 	unsigned long sb_block;
 	unsigned long offset;
-	kdev_t journal_dev = to_kdev_t(dev);
 	struct ext3_super_block * es;
 	struct block_device *bdev;
 
-	bdev = ext3_blkdev_get(journal_dev);
+	bdev = ext3_blkdev_get(j_dev);
 	if (bdev == NULL)
 		return NULL;
 
 	blocksize = sb->s_blocksize;
-	hblock = get_hardsect_size(journal_dev);
+	hblock = get_hardsect_size(j_dev);
 	if (blocksize < hblock) {
 		printk(KERN_ERR
 			"EXT3-fs: blocksize too small for journal device.\n");
@@ -1286,8 +1285,8 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 	
 	sb_block = EXT3_MIN_BLOCK_SIZE / blocksize;
 	offset = EXT3_MIN_BLOCK_SIZE % blocksize;
-	set_blocksize(dev, blocksize);
-	if (!(bh = bread(dev, sb_block, blocksize))) {
+	set_blocksize(j_dev, blocksize);
+	if (!(bh = bread(j_dev, sb_block, blocksize))) {
 		printk(KERN_ERR "EXT3-fs: couldn't read superblock of "
 		       "external journal\n");
 		goto out_bdev;
@@ -1313,7 +1312,7 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 	start = sb_block + 1;
 	brelse(bh);	/* we're done with the superblock */
 
-	journal = journal_init_dev(journal_dev, sb->s_dev, 
+	journal = journal_init_dev(j_dev, sb->s_dev,
 					start, len, blocksize);
 	if (!journal) {
 		printk(KERN_ERR "EXT3-fs: failed to create device journal\n");
@@ -1345,7 +1344,7 @@ static int ext3_load_journal(struct super_block * sb,
 {
 	journal_t *journal;
 	int journal_inum = le32_to_cpu(es->s_journal_inum);
-	int journal_dev = le32_to_cpu(es->s_journal_dev);
+	kdev_t journal_dev = to_kdev_t(le32_to_cpu(es->s_journal_dev));
 	int err = 0;
 	int really_read_only;
 
@@ -1371,7 +1370,7 @@ static int ext3_load_journal(struct super_block * sb,
 		}
 	}
 
-	if (journal_inum && journal_dev) {
+	if (journal_inum && !kdev_none(journal_dev)) {
 		printk(KERN_ERR "EXT3-fs: filesystem has both journal "
 		       "and inode journals!\n");
 		return -EINVAL;

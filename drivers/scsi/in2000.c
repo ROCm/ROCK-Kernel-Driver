@@ -855,7 +855,7 @@ unsigned long flags;
 
 /* Get the spin_lock and disable further ints, for SMP */
 
-   CLISPIN_LOCK(flags);
+   CLISPIN_LOCK(instance, flags);
 
 #ifdef PROC_STATISTICS
    hostdata->int_cnt++;
@@ -993,7 +993,7 @@ DB(DB_FIFO,printk("{W:%02x} ",read1_io(IO_FIFO_COUNT)))
       write1_io(0, IO_LED_OFF);
 
 /* release the SMP spin_lock and restore irq state */
-      CLISPIN_UNLOCK(flags);
+      CLISPIN_UNLOCK(instance, flags);
       return;
       }
 
@@ -1011,7 +1011,7 @@ DB(DB_FIFO,printk("{W:%02x} ",read1_io(IO_FIFO_COUNT)))
       write1_io(0, IO_LED_OFF);
 
 /* release the SMP spin_lock and restore irq state */
-      CLISPIN_UNLOCK(flags);
+      CLISPIN_UNLOCK(instance, flags);
       return;
       }
 
@@ -1433,7 +1433,7 @@ DB(DB_INTR,printk("%02x",hostdata->outgoing_msg[0]))
             hostdata->state = S_UNCONNECTED;
 
 /* release the SMP spin_lock and restore irq state */
-            CLISPIN_UNLOCK(flags);
+            CLISPIN_UNLOCK(instance, flags);
             return;
             }
 DB(DB_INTR,printk("UNEXP_DISC-%ld",cmd->pid))
@@ -1609,7 +1609,7 @@ DB(DB_INTR,printk("-%ld",cmd->pid))
 DB(DB_INTR,printk("} "))
 
 /* release the SMP spin_lock and restore irq state */
-   CLISPIN_UNLOCK(flags);
+   CLISPIN_UNLOCK(instance, flags);
 
 }
 

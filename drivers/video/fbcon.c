@@ -271,10 +271,10 @@ int PROC_CONSOLE(const struct fb_info *info)
                 /* XXX Should report error here? */
                 return fgc;
 
-        if (MINOR(current->tty->device) < 1)
+        if (minor(current->tty->device) < 1)
                 return fgc;
 
-        return MINOR(current->tty->device) - 1;
+        return minor(current->tty->device) - 1;
 }
 
 

@@ -2345,7 +2345,7 @@ static void i810_ac97_set(struct ac97_codec *dev, u8 reg, u16 data)
 static int i810_open_mixdev(struct inode *inode, struct file *file)
 {
 	int i;
-	int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	struct i810_card *card = devs;
 
 	for (card = devs; card != NULL; card = card->next)

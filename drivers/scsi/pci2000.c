@@ -275,11 +275,6 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	int					z;
     unsigned long		flags;
 
-    /*
-     * Disable interrupts, if they aren't already disabled and acquire
-     * the I/O spinlock.
-     */
-    spin_lock_irqsave (&io_request_lock, flags);
 
 	DEB(printk ("\npci2000 received interrupt "));
 	for ( z = 0; z < NumAdapters;  z++ )										// scan for interrupt to process
@@ -298,9 +293,10 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	if ( !shost )
 		{
 		DEB (printk ("\npci2000: not my interrupt"));
-		goto irq_return;
+		goto out;
 		}
 
+	spin_lock_irqsave(&shost->host_lock, flags);
 	padapter = HOSTDATA(shost);
 
 	tag0 = tag & 0x7F;															// mask off the error bit
@@ -392,14 +388,10 @@ irqProceed:;
 	outb_p (CMD_DONE, padapter->cmd);										// complete the op
 	OpDone (SCpnt, DID_OK << 16);
 
-irq_return:;
-    /*
-     * Release the I/O spinlock and restore the original flags
-     * which will enable interrupts if and only if they were
-     * enabled on entry.
-     */
-    spin_unlock_irqrestore (&io_request_lock, flags);
-	}
+irq_return:
+    spin_unlock_irqrestore(&shost->host_flag, flags);
+out:;
+}
 /****************************************************************
  *	Name:	Pci2000_QueueCommand
  *

@@ -1,4 +1,4 @@
-/* $Id: b1dma.c,v 1.11.6.8 2001/09/23 22:24:33 kai Exp $
+/* $Id: b1dma.c,v 1.1.4.1.2.1 2001/12/21 15:00:17 kai Exp $
  * 
  * Common module for AVM B1 cards that support dma with AMCC
  * 
@@ -32,7 +32,7 @@
 #error FIXME: driver requires 32-bit platform
 #endif
 
-static char *revision = "$Revision: 1.11.6.8 $";
+static char *revision = "$Revision: 1.1.4.1.2.1 $";
 
 /* ------------------------------------------------------------- */
 
@@ -388,7 +388,7 @@ static void b1dma_dispatch_tx(avmcard *card)
 		cmd = CAPIMSG_COMMAND(skb->data);
 		subcmd = CAPIMSG_SUBCOMMAND(skb->data);
 
-		p = dma->sendbuf;
+		p = dma->sendbuf.dmabuf;
 
 		if (CAPICMD(cmd, subcmd) == CAPI_DATA_B3_REQ) {
 			__u16 dlen = CAPIMSG_DATALEN(skb->data);
@@ -399,7 +399,7 @@ static void b1dma_dispatch_tx(avmcard *card)
 			_put_byte(&p, SEND_MESSAGE);
 			_put_slice(&p, skb->data, len);
 		}
-		txlen = (__u8 *)p - (__u8 *)dma->sendbuf;
+		txlen = (__u8 *)p - (__u8 *)dma->sendbuf.dmabuf;
 #ifdef CONFIG_B1DMA_DEBUG
 		printk(KERN_DEBUG "tx(%d): put msg len=%d\n",
 				inint, txlen);
@@ -414,11 +414,11 @@ static void b1dma_dispatch_tx(avmcard *card)
 		printk(KERN_DEBUG "tx(%d): put 0x%x len=%d\n",
 				inint, skb->data[2], txlen);
 #endif
-		memcpy(dma->sendbuf, skb->data+2, skb->len-2);
+		memcpy(dma->sendbuf.dmabuf, skb->data+2, skb->len-2);
 	}
 	txlen = (txlen + 3) & ~3;
 
-	b1dmaoutmeml(card->mbase+AMCC_TXPTR, virt_to_phys(dma->sendbuf));
+	b1dmaoutmeml(card->mbase+AMCC_TXPTR, dma->sendbuf.dmaaddr);
 	b1dmaoutmeml(card->mbase+AMCC_TXLEN, txlen);
 
 	card->csr |= EN_TX_TC_INT;
@@ -461,7 +461,7 @@ static void b1dma_handle_rx(avmcard *card)
 	avmcard_dmainfo *dma = card->dma;
 	struct capi_ctr *ctrl = cinfo->capi_ctrl;
 	struct sk_buff *skb;
-	void *p = dma->recvbuf+4;
+	void *p = dma->recvbuf.dmabuf+4;
 	__u32 ApplId, MsgLen, DataB3Len, NCCI, WindowSize;
 	__u8 b1cmd =  _get_byte(&p);
 
@@ -597,18 +597,19 @@ static void b1dma_handle_interrupt(avmcard *card)
 	b1dmaoutmeml(card->mbase+AMCC_INTCSR, newcsr);
 
 	if ((status & RX_TC_INT) != 0) {
-		__u8 *recvbuf = card->dma->recvbuf;
+		struct avmcard_dmainfo *dma = card->dma;
 		__u32 rxlen;
 	   	if (card->dma->recvlen == 0) {
-			card->dma->recvlen = *((__u32 *)recvbuf);
-			rxlen = (card->dma->recvlen + 3) & ~3;
+			dma->recvlen = *((__u32 *)dma->recvbuf.dmabuf);
+			rxlen = (dma->recvlen + 3) & ~3;
 			b1dmaoutmeml(card->mbase+AMCC_RXPTR,
-					virt_to_phys(recvbuf+4));
+					dma->recvbuf.dmaaddr+4);
 			b1dmaoutmeml(card->mbase+AMCC_RXLEN, rxlen);
 		} else {
 			b1dma_handle_rx(card);
-	   		card->dma->recvlen = 0;
-			b1dmaoutmeml(card->mbase+AMCC_RXPTR, virt_to_phys(recvbuf));
+	   		dma->recvlen = 0;
+			b1dmaoutmeml(card->mbase+AMCC_RXPTR,
+					dma->recvbuf.dmaaddr);
 			b1dmaoutmeml(card->mbase+AMCC_RXLEN, 4);
 		}
 	}
@@ -744,7 +745,7 @@ int b1dma_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 	t1outp(card->port, 0x10, 0xF0);
 
 	card->dma->recvlen = 0;
-	b1dmaoutmeml(card->mbase+AMCC_RXPTR, virt_to_phys(card->dma->recvbuf));
+	b1dmaoutmeml(card->mbase+AMCC_RXPTR, card->dma->recvbuf.dmaaddr);
 	b1dmaoutmeml(card->mbase+AMCC_RXLEN, 4);
 	card->csr |= EN_RX_TC_INT;
 	b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
@@ -855,7 +856,7 @@ int b1dmactl_read_proc(char *page, char **start, off_t off,
 	__u8 flag;
 	int len = 0;
 	char *s;
-	__u32 txaddr, txlen, rxaddr, rxlen, csr;
+	__u32 txoff, txlen, rxoff, rxlen, csr;
 
 	len += sprintf(page+len, "%-16s %s\n", "name", card->name);
 	len += sprintf(page+len, "%-16s 0x%x\n", "io", card->port);
@@ -911,13 +912,11 @@ int b1dmactl_read_proc(char *page, char **start, off_t off,
 	save_flags(flags);
 	cli();
 
-	txaddr = (__u32)phys_to_virt(b1dmainmeml(card->mbase+0x2c));
-	txaddr -= (__u32)card->dma->sendbuf;
-	txlen  = b1dmainmeml(card->mbase+0x30);
+	txoff = (dma_addr_t)b1dmainmeml(card->mbase+0x2c)-card->dma->sendbuf.dmaaddr;
+	txlen = b1dmainmeml(card->mbase+0x30);
 
-	rxaddr = (__u32)phys_to_virt(b1dmainmeml(card->mbase+0x24));
-	rxaddr -= (__u32)card->dma->recvbuf;
-	rxlen  = b1dmainmeml(card->mbase+0x28);
+	rxoff = (dma_addr_t)b1dmainmeml(card->mbase+0x24)-card->dma->recvbuf.dmaaddr;
+	rxlen = b1dmainmeml(card->mbase+0x28);
 
 	csr  = b1dmainmeml(card->mbase+AMCC_INTCSR);
 
@@ -928,11 +927,11 @@ int b1dmactl_read_proc(char *page, char **start, off_t off,
         len += sprintf(page+len, "%-16s 0x%lx\n",
 				"csr", (unsigned long)csr);
         len += sprintf(page+len, "%-16s %lu\n",
-				"txoff", (unsigned long)txaddr);
+				"txoff", (unsigned long)txoff);
         len += sprintf(page+len, "%-16s %lu\n",
 				"txlen", (unsigned long)txlen);
         len += sprintf(page+len, "%-16s %lu\n",
-				"rxoff", (unsigned long)rxaddr);
+				"rxoff", (unsigned long)rxoff);
         len += sprintf(page+len, "%-16s %lu\n",
 				"rxlen", (unsigned long)rxlen);
 

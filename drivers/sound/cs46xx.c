@@ -1835,7 +1835,7 @@ static unsigned int cs_midi_poll(struct file *file, struct poll_table_struct *wa
 
 static int cs_midi_open(struct inode *inode, struct file *file)
 {
-        int minor = MINOR(inode->i_rdev);
+        unsigned int minor = minor(inode->i_rdev);
         struct cs_card *card=NULL;
         unsigned long flags;
 	struct list_head *entry;
@@ -3198,7 +3198,7 @@ static int cs_open(struct inode *inode, struct file *file)
 	struct cs_state *state = NULL;
 	struct dmabuf *dmabuf = NULL;
 	struct list_head *entry;
-        int minor = MINOR(inode->i_rdev);
+        unsigned int minor = minor(inode->i_rdev);
 	int ret=0;
 	unsigned int tmp;
 
@@ -4047,7 +4047,7 @@ static void cs_ac97_set(struct ac97_codec *dev, u8 reg, u16 val)
 static int cs_open_mixdev(struct inode *inode, struct file *file)
 {
 	int i=0;
-	int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	struct cs_card *card=NULL;
 	struct list_head *entry;
 	unsigned int tmp;
@@ -4094,7 +4094,7 @@ static int cs_open_mixdev(struct inode *inode, struct file *file)
 
 static int cs_release_mixdev(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	struct cs_card *card=NULL;
 	struct list_head *entry;
 	int i;

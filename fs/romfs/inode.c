@@ -518,7 +518,9 @@ romfs_read_inode(struct inode *i)
 		default:
 			/* depending on MBZ for sock/fifos */
 			nextfh = ntohl(ri.spec);
-			nextfh = kdev_t_to_nr(MKDEV(nextfh>>16,nextfh&0xffff));
+			/* convert back and forth for typechecking and
+			 * source tagging */
+			nextfh = kdev_t_to_nr(mk_kdev(nextfh>>16,nextfh&0xffff));
 			init_special_inode(i, ino, nextfh);
 	}
 }

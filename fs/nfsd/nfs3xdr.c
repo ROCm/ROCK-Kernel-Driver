@@ -173,9 +173,9 @@ encode_fattr3(struct svc_rqst *rqstp, u32 *p, struct dentry *dentry)
 		p = xdr_encode_hyper(p, (u64)(inode->i_size +511)& ~511);
 	else
 		p = xdr_encode_hyper(p, ((u64)inode->i_blocks) << 9);
-	*p++ = htonl((u32) MAJOR(inode->i_rdev));
-	*p++ = htonl((u32) MINOR(inode->i_rdev));
-	p = xdr_encode_hyper(p, (u64) inode->i_dev);
+	*p++ = htonl((u32) major(inode->i_rdev));
+	*p++ = htonl((u32) minor(inode->i_rdev));
+	p = xdr_encode_hyper(p, (u64) kdev_t_to_nr(inode->i_dev));
 	p = xdr_encode_hyper(p, (u64) inode->i_ino);
 	p = encode_time3(p, inode->i_atime);
 	p = encode_time3(p, lease_get_mtime(inode));
@@ -203,9 +203,9 @@ encode_saved_post_attr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 		p = xdr_encode_hyper(p, (u64) fhp->fh_post_size);
 	}
 	p = xdr_encode_hyper(p, ((u64)fhp->fh_post_blocks) << 9);
-	*p++ = htonl((u32) MAJOR(fhp->fh_post_rdev));
-	*p++ = htonl((u32) MINOR(fhp->fh_post_rdev));
-	p = xdr_encode_hyper(p, (u64) inode->i_dev);
+	*p++ = htonl((u32) major(fhp->fh_post_rdev));
+	*p++ = htonl((u32) minor(fhp->fh_post_rdev));
+	p = xdr_encode_hyper(p, (u64) kdev_t_to_nr(inode->i_dev));
 	p = xdr_encode_hyper(p, (u64) inode->i_ino);
 	p = encode_time3(p, fhp->fh_post_atime);
 	p = encode_time3(p, fhp->fh_post_mtime);

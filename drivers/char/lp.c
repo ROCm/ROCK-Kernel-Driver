@@ -294,7 +294,7 @@ static int lp_wait_ready(int minor)
 static ssize_t lp_write(struct file * file, const char * buf,
 		        size_t count, loff_t *ppos)
 {
-	unsigned int minor = MINOR(file->f_dentry->d_inode->i_rdev);
+	unsigned int minor = minor(file->f_dentry->d_inode->i_rdev);
 	struct parport *port = lp_table[minor].dev->port;
 	char *kbuf = lp_table[minor].lp_buffer;
 	ssize_t retv = 0;
@@ -403,7 +403,7 @@ static ssize_t lp_write(struct file * file, const char * buf,
 static ssize_t lp_read(struct file * file, char * buf,
 		       size_t count, loff_t *ppos)
 {
-	unsigned int minor=MINOR(file->f_dentry->d_inode->i_rdev);
+	unsigned int minor=minor(file->f_dentry->d_inode->i_rdev);
 	struct parport *port = lp_table[minor].dev->port;
 	ssize_t retval = 0;
 	char *kbuf = lp_table[minor].lp_buffer;
@@ -430,7 +430,7 @@ static ssize_t lp_read(struct file * file, char * buf,
 
 static int lp_open(struct inode * inode, struct file * file)
 {
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 
 	if (minor >= LP_NO)
 		return -ENXIO;
@@ -488,7 +488,7 @@ static int lp_open(struct inode * inode, struct file * file)
 
 static int lp_release(struct inode * inode, struct file * file)
 {
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 
 	lp_claim_parport_or_block (&lp_table[minor]);
 	parport_negotiate (lp_table[minor].dev->port, IEEE1284_MODE_COMPAT);
@@ -503,7 +503,7 @@ static int lp_release(struct inode * inode, struct file * file)
 static int lp_ioctl(struct inode *inode, struct file *file,
 		    unsigned int cmd, unsigned long arg)
 {
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	int status;
 	int retval = 0;
 

@@ -360,7 +360,7 @@ static int bluetooth_open (struct tty_struct *tty, struct file * filp)
 	tty->driver_data = NULL;
 
 	/* get the bluetooth object associated with this tty pointer */
-	bluetooth = get_bluetooth_by_minor (MINOR(tty->device));
+	bluetooth = get_bluetooth_by_minor (minor(tty->device));
 
 	if (bluetooth_paranoia_check (bluetooth, __FUNCTION__)) {
 		return -ENODEV;

@@ -83,7 +83,6 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
 	rq->q = NULL;
 	rq->bio = rq->biotail = NULL;
 	rq->nr_phys_segments = 0;
-	rq->elevator_sequence = 0;
 
 	/*
 	 * We have the option of inserting the head or the tail of the queue.
@@ -92,7 +91,7 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
 	 * device, or a host that is unable to accept a particular command.
 	 */
 	spin_lock_irqsave(q->queue_lock, flags);
-	__elv_add_request(q, rq, !at_head, 0);
+	_elv_add_request(q, rq, !at_head, 0);
 	q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
@@ -262,7 +261,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 		 * the bad sector.
 		 */
 		SCpnt->request.special = (void *) SCpnt;
-		__elv_add_request(q, &SCpnt->request, 0, 0);
+		_elv_add_request(q, &SCpnt->request, 0, 0);
 	}
 
 	/*

@@ -22,6 +22,7 @@
 #include <linux/dcache.h>
 #include <linux/smp_lock.h>
 #include <linux/nls.h>
+#include <linux/seq_file.h>
 
 #include <linux/smb_fs.h>
 #include <linux/smbno.h>
@@ -41,9 +42,12 @@
 #define SMB_NLS_REMOTE ""
 #endif
 
+#define SMB_TTL_DEFAULT 1000
+
 static void smb_delete_inode(struct inode *);
 static void smb_put_super(struct super_block *);
 static int  smb_statfs(struct super_block *, struct statfs *);
+static int  smb_show_options(struct seq_file *, struct vfsmount *);
 
 static struct super_operations smb_sops =
 {
@@ -51,6 +55,7 @@ static struct super_operations smb_sops =
 	delete_inode:	smb_delete_inode,
 	put_super:	smb_put_super,
 	statfs:		smb_statfs,
+	show_options:	smb_show_options,
 };
 
 
@@ -259,21 +264,20 @@ smb_delete_inode(struct inode *ino)
 	clear_inode(ino);
 }
 
-/* FIXME: flags and has_arg could probably be merged. */
 static struct option opts[] = {
-	{ "version",	1, 0, 'v' },
-	{ "win95",	0, SMB_MOUNT_WIN95, 1 },
-	{ "oldattr",	0, SMB_MOUNT_OLDATTR, 1 },
-	{ "dirattr",	0, SMB_MOUNT_DIRATTR, 1 },
-	{ "case",	0, SMB_MOUNT_CASE, 1 },
-	{ "uid",	1, 0, 'u' },
-	{ "gid",	1, 0, 'g' },
-	{ "file_mode",	1, 0, 'f' },
-	{ "dir_mode",	1, 0, 'd' },
-	{ "iocharset",	1, 0, 'i' },
-	{ "codepage",	1, 0, 'c' },
-	{ "ttl",	1, 0, 't' },
-	{ NULL,		0, 0, 0}
+	{ "version",	0, 'v' },
+	{ "win95",	SMB_MOUNT_WIN95, 1 },
+	{ "oldattr",	SMB_MOUNT_OLDATTR, 1 },
+	{ "dirattr",	SMB_MOUNT_DIRATTR, 1 },
+	{ "case",	SMB_MOUNT_CASE, 1 },
+	{ "uid",	0, 'u' },
+	{ "gid",	0, 'g' },
+	{ "file_mode",	0, 'f' },
+	{ "dir_mode",	0, 'd' },
+	{ "iocharset",	0, 'i' },
+	{ "codepage",	0, 'c' },
+	{ "ttl",	0, 't' },
+	{ NULL,		0, 0}
 };
 
 static int
@@ -310,12 +314,10 @@ parse_options(struct smb_mount_data_kernel *mnt, char *options)
 			mnt->gid = value;
 			break;
 		case 'f':
-			mnt->file_mode = value & (S_IRWXU | S_IRWXG | S_IRWXO);
-			mnt->file_mode |= S_IFREG;
+			mnt->file_mode = (value & S_IRWXUGO) | S_IFREG;
 			break;
 		case 'd':
-			mnt->dir_mode = value & (S_IRWXU | S_IRWXG | S_IRWXO);
-			mnt->dir_mode |= S_IFDIR;
+			mnt->dir_mode = (value & S_IRWXUGO) | S_IFDIR;
 			break;
 		case 'i':
 			strncpy(mnt->codepage.local_name, optarg, 
@@ -338,6 +340,45 @@ parse_options(struct smb_mount_data_kernel *mnt, char *options)
 	return c;
 }
 
+/*
+ * smb_show_options() is for displaying mount options in /proc/mounts.
+ * It tries to avoid showing settings that were not changed from their
+ * defaults.
+ */
+static int
+smb_show_options(struct seq_file *s, struct vfsmount *m)
+{
+	struct smb_mount_data_kernel *mnt = m->mnt_sb->u.smbfs_sb.mnt;
+	int i;
+
+	for (i = 0; opts[i].name != NULL; i++)
+		if (mnt->flags & opts[i].flag)
+			seq_printf(s, ",%s", opts[i].name);
+
+	if (mnt->uid != 0)
+		seq_printf(s, ",uid=%d", mnt->uid);
+	if (mnt->gid != 0)
+		seq_printf(s, ",gid=%d", mnt->gid);
+	if (mnt->mounted_uid != 0)
+		seq_printf(s, ",mounted_uid=%d", mnt->mounted_uid);
+
+	/* 
+	 * Defaults for file_mode and dir_mode are unknown to us; they
+	 * depend on the current umask of the user doing the mount.
+	 */
+	seq_printf(s, ",file_mode=%04o", mnt->file_mode & S_IRWXUGO);
+	seq_printf(s, ",dir_mode=%04o", mnt->dir_mode & S_IRWXUGO);
+
+	if (strcmp(mnt->codepage.local_name, CONFIG_NLS_DEFAULT))
+		seq_printf(s, ",iocharset=%s", mnt->codepage.local_name);
+	if (strcmp(mnt->codepage.remote_name, SMB_NLS_REMOTE))
+		seq_printf(s, ",codepage=%s", mnt->codepage.remote_name);
+
+	if (mnt->ttl != SMB_TTL_DEFAULT)
+		seq_printf(s, ",ttl=%d", mnt->ttl);
+
+	return 0;
+}
 
 static void
 smb_put_super(struct super_block *sb)
@@ -425,7 +466,7 @@ smb_read_super(struct super_block *sb, void *raw_data, int silent)
 	strncpy(mnt->codepage.remote_name, SMB_NLS_REMOTE,
 		SMB_NLS_MAXNAMELEN);
 
-	mnt->ttl = 1000;
+	mnt->ttl = SMB_TTL_DEFAULT;
 	if (ver == SMB_MOUNT_OLDVERSION) {
 		mnt->version = oldmnt->version;
 
@@ -434,12 +475,8 @@ smb_read_super(struct super_block *sb, void *raw_data, int silent)
 		mnt->uid = oldmnt->uid;
 		mnt->gid = oldmnt->gid;
 
-		mnt->file_mode =
-			oldmnt->file_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
-		mnt->dir_mode =
-			oldmnt->dir_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
-		mnt->file_mode |= S_IFREG;
-		mnt->dir_mode  |= S_IFDIR;
+		mnt->file_mode = (oldmnt->file_mode & S_IRWXUGO) | S_IFREG;
+		mnt->dir_mode = (oldmnt->dir_mode & S_IRWXUGO) | S_IFDIR;
 
 		mnt->flags = (oldmnt->file_mode >> 9);
 	} else {
@@ -510,7 +547,7 @@ smb_notify_change(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
 	struct smb_sb_info *server = server_from_dentry(dentry);
-	unsigned int mask = (S_IFREG | S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO);
+	unsigned int mask = (S_IFREG | S_IFDIR | S_IRWXUGO);
 	int error, changed, refresh = 0;
 	struct smb_fattr fattr;
 
@@ -535,6 +572,10 @@ smb_notify_change(struct dentry *dentry, struct iattr *attr)
 		VERBOSE("changing %s/%s, old size=%ld, new size=%ld\n",
 			DENTRY_PATH(dentry),
 			(long) inode->i_size, (long) attr->ia_size);
+
+		filemap_fdatasync(inode->i_mapping);
+		filemap_fdatawait(inode->i_mapping);
+
 		error = smb_open(dentry, O_WRONLY);
 		if (error)
 			goto out;

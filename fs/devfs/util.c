@@ -320,8 +320,8 @@ void devfs_dealloc_devnum (char type, kdev_t devnum)
 	semaphore = &block_semaphore;
 	list = &block_list;
     }
-    major = MAJOR (devnum);
-    minor = MINOR (devnum);
+    major = major (devnum);
+    minor = minor (devnum);
     down (semaphore);
     for (entry = list->first; entry != NULL; entry = entry->next)
     {

@@ -246,7 +246,7 @@ static int rd_make_request(request_queue_t * q, struct bio *sbh)
 	unsigned long offset, len;
 	int rw = sbh->bi_rw;
 
-	minor = MINOR(sbh->bi_dev);
+	minor = minor(sbh->bi_dev);
 
 	if (minor >= NUM_RAMDISKS)
 		goto fail;
@@ -280,10 +280,10 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 	int error = -EINVAL;
 	unsigned int minor;
 
-	if (!inode || !inode->i_rdev) 	
+	if (!inode || kdev_none(inode->i_rdev))
 		goto out;
 
-	minor = MINOR(inode->i_rdev);
+	minor = minor(inode->i_rdev);
 
 	switch (cmd) {
 		case BLKFLSBUF:
@@ -407,7 +407,7 @@ static void __exit rd_cleanup (void)
 		rd_bdev[i] = NULL;
 		if (bdev)
 			blkdev_put(bdev, BDEV_FILE);
-		destroy_buffers(MKDEV(MAJOR_NR, i));
+		destroy_buffers(mk_kdev(MAJOR_NR, i));
 	}
 
 	devfs_unregister (devfs_handle);
@@ -449,7 +449,7 @@ static int __init rd_init (void)
 			       &rd_bd_op, NULL);
 
 	for (i = 0; i < NUM_RAMDISKS; i++)
-		register_disk(NULL, MKDEV(MAJOR_NR,i), 1, &rd_bd_op, rd_size<<1);
+		register_disk(NULL, mk_kdev(MAJOR_NR,i), 1, &rd_bd_op, rd_size<<1);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* We ought to separate initrd operations here */

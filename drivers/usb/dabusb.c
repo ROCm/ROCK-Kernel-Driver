@@ -579,7 +579,7 @@ static ssize_t dabusb_read (struct file *file, char *buf, size_t count, loff_t *
 
 static int dabusb_open (struct inode *inode, struct file *file)
 {
-	int devnum = MINOR (inode->i_rdev);
+	int devnum = minor (inode->i_rdev);
 	pdabusb_t s;
 
 	if (devnum < DABUSB_MINOR || devnum >= (DABUSB_MINOR + NRDABUSB))

@@ -2006,15 +2006,11 @@ void tty_register_devfs (struct tty_driver *driver, unsigned int flags, unsigned
 	int idx = minor - driver->minor_start;
 	char buf[32];
 
-	switch (device) {
-		case TTY_DEV:
-		case PTMX_DEV:
+	if (IS_TTY_DEV(device) || IS_PTMX_DEV(device)) 
+		mode |= S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+	else {
+		if (driver->major == PTY_MASTER_MAJOR)
 			mode |= S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
-			break;
-		default:
-			if (driver->major == PTY_MASTER_MAJOR)
-				mode |= S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
-			break;
 	}
 	if ( (minor <  driver->minor_start) || 
 	     (minor >= driver->minor_start + driver->num) ) {

@@ -159,7 +159,7 @@ static int presto_get_minor(char *dev_path, int *minor)
 {
         struct nameidata nd;
         struct dentry *dentry;
-        kdev_t devno = 0;
+        kdev_t devno = NODEV;
         int error; 
         ENTRY;
 
@@ -188,19 +188,19 @@ static int presto_get_minor(char *dev_path, int *minor)
 	}
 
         devno = dentry->d_inode->i_rdev;
-        if ( MAJOR(devno) != PRESTO_PSDEV_MAJOR ) { 
+        if ( major(devno) != PRESTO_PSDEV_MAJOR ) { 
 		EXIT;
 		goto out;
 	}
 
-        if ( MINOR(devno) >= MAX_PRESTODEV ) {
+        if ( minor(devno) >= MAX_PRESTODEV ) {
 		EXIT;
 		goto out;
 	}
 
 	EXIT;
  out:
-        *minor = MINOR(devno);
+        *minor = minor(devno);
         path_release(&nd);
         return 0;
 }

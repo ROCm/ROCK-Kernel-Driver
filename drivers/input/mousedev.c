@@ -214,7 +214,7 @@ static int mousedev_release(struct inode * inode, struct file * file)
 static int mousedev_open(struct inode * inode, struct file * file)
 {
 	struct mousedev_list *list;
-	int i = MINOR(inode->i_rdev) - MOUSEDEV_MINOR_BASE;
+	int i = minor(inode->i_rdev) - MOUSEDEV_MINOR_BASE;
 
 	if (i >= MOUSEDEV_MINORS || !mousedev_table[i])
 		return -ENODEV;

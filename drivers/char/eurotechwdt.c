@@ -280,7 +280,7 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
  
 static int eurwdt_open(struct inode *inode, struct file *file)
 {
-   switch (MINOR(inode->i_rdev)) {
+   switch (minor(inode->i_rdev)) {
       case WATCHDOG_MINOR:
          spin_lock(&eurwdt_lock);
          if (eurwdt_is_open) {
@@ -322,7 +322,7 @@ static int eurwdt_open(struct inode *inode, struct file *file)
  
 static int eurwdt_release(struct inode *inode, struct file *file)
 {
-   if (MINOR(inode->i_rdev) == WATCHDOG_MINOR) {
+   if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
 #ifndef CONFIG_WATCHDOG_NOWAYOUT
       eurwdt_disable_timer();
 #endif

@@ -1157,17 +1157,13 @@ static int adpt_i2o_post_wait(adpt_hba* pHba, u32* msg, int len, int timeout)
 	msg[2] |= 0x80000000 | ((u32)wait_data->id);
 	timeout *= HZ;
 	if((status = adpt_i2o_post_this(pHba, msg, len)) == 0){
-		if(!timeout){
-			set_current_state(TASK_INTERRUPTIBLE);
-			spin_unlock_irq(&io_request_lock);
+		set_current_state(TASK_INTERRUPTIBLE);
+		spin_unlock_irq(&pHba->host->host_lock);
+		if (!timeout)
 			schedule();
-			spin_lock_irq(&io_request_lock);
-		} else {
-			set_current_state(TASK_INTERRUPTIBLE);
-			spin_unlock_irq(&io_request_lock);
+		else
 			schedule_timeout(timeout*HZ);
-			spin_lock_irq(&io_request_lock);
-		}
+		spin_lock_irq(&pHba->host->host_lock);
 	}
 	wq_write_lock_irq(&adpt_wq_i2o_post.lock);
 	__remove_wait_queue(&adpt_wq_i2o_post, &wait);
@@ -1560,7 +1556,7 @@ static int adpt_open(struct inode *inode, struct file *file)
 
 	//TODO check for root access
 	//
-	minor = MINOR(inode->i_rdev);
+	minor = minor(inode->i_rdev);
 	if (minor >= hba_count) {
 		return -ENXIO;
 	}
@@ -1591,7 +1587,7 @@ static int adpt_close(struct inode *inode, struct file *file)
 	int minor;
 	adpt_hba* pHba;
 
-	minor = MINOR(inode->i_rdev);
+	minor = minor(inode->i_rdev);
 	if (minor >= hba_count) {
 		return -ENXIO;
 	}
@@ -1705,7 +1701,7 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32* arg)
 	}
 
 	do {
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(&pHba->host->host_lock, flags);
 		// This state stops any new commands from enterring the
 		// controller while processing the ioctl
 //		pHba->state |= DPTI_STATE_IOCTL;
@@ -1713,7 +1709,7 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32* arg)
 //		the queue empties and stops.  We need a way to restart the queue
 		rcode = adpt_i2o_post_wait(pHba, msg, size, FOREVER);
 //		pHba->state &= ~DPTI_STATE_IOCTL;
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(&pHba->host->host_lock, flags);
 	} while(rcode == -ETIMEDOUT);  
 
 	if(rcode){
@@ -1887,7 +1883,7 @@ static int adpt_ioctl(struct inode *inode, struct file *file, uint cmd,
 	adpt_hba* pHba;
 	ulong flags;
 
-	minor = MINOR(inode->i_rdev);
+	minor = minor(inode->i_rdev);
 	if (minor >= DPTI_MAX_HBA){
 		return -ENXIO;
 	}
@@ -1951,9 +1947,9 @@ static int adpt_ioctl(struct inode *inode, struct file *file, uint cmd,
 		break;
 		}
 	case I2ORESETCMD:
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(&pHba->host->host_lock, flags);
 		adpt_hba_reset(pHba);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(&pHba->host->host_lock, flags);
 		break;
 	case I2ORESCANCMD:
 		adpt_rescan(pHba);
@@ -1989,19 +1985,18 @@ static int adpt_ioctl(struct inode *inode, struct file *file, uint cmd,
 static void adpt_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	Scsi_Cmnd* cmd;
-	adpt_hba* pHba=NULL;
+	adpt_hba* pHba = dev_id;
 	u32 m;
 	ulong reply;
 	u32 status=0;
 	u32 context;
 	ulong flags = 0;
 
-	pHba = dev_id;
 	if (pHba == NULL ){
 		printk(KERN_WARNING"adpt_isr: NULL dev_id\n");
 		return;
 	}
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&pHba->host->host_lock, flags);
 	while( readl(pHba->irq_mask) & I2O_INTERRUPT_PENDING_B) {
 		m = readl(pHba->reply_port);
 		if(m == EMPTY_QUEUE){
@@ -2011,8 +2006,7 @@ static void adpt_isr(int irq, void *dev_id, struct pt_regs *regs)
 			if(m == EMPTY_QUEUE){ 
 				// This really should not happen
 				printk(KERN_ERR"dpti: Could not get reply frame\n");
-				spin_unlock_irqrestore(&io_request_lock,flags);
-				return;
+				goto out;
 			}
 		}
 		reply = (ulong)bus_to_virt(m);
@@ -2067,9 +2061,7 @@ static void adpt_isr(int irq, void *dev_id, struct pt_regs *regs)
 		wmb();
 		rmb();
 	}
-	spin_unlock_irqrestore(&io_request_lock, flags);
-	return;
-
+out:	spin_unlock_irqrestore(&pHba->host->host_lock, flags);
 }
 
 static s32 adpt_scsi_to_i2o(adpt_hba* pHba, Scsi_Cmnd* cmd, struct adpt_device* d)
@@ -2342,18 +2334,14 @@ static s32 adpt_rescan(adpt_hba* pHba)
 	s32 rcode;
 	ulong flags;
 
-	spin_lock_irqsave(&io_request_lock, flags);
-	if ((rcode=adpt_i2o_lct_get(pHba)) < 0){
-		spin_unlock_irqrestore(&io_request_lock, flags);
-		return rcode;
-	}
-
-	if ((rcode=adpt_i2o_reparse_lct(pHba)) < 0){
-		spin_unlock_irqrestore(&io_request_lock, flags);
-		return rcode;
-	}
-	spin_unlock_irqrestore(&io_request_lock, flags);
-	return 0;
+	spin_lock_irqsave(&pHba->host->host_lock, flags);
+	if ((rcode=adpt_i2o_lct_get(pHba)) < 0)
+		goto out;
+	if ((rcode=adpt_i2o_reparse_lct(pHba)) < 0)
+		goto out;
+	rcode = 0;
+out:	spin_unlock_irqrestore(&pHba->host->host_lock, flags);
+	return rcode;
 }
 
 

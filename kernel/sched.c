@@ -51,11 +51,11 @@ extern void mem_use(void);
  * NOTE! The unix "nice" value influences how long a process
  * gets. The nice value ranges from -20 to +19, where a -20
  * is a "high-priority" task, and a "+10" is a low-priority
- * task. The default time slice for zero-nice tasks will be 43ms.
+ * task. The default time slice for zero-nice tasks will be 37ms.
  */
 #define NICE_RANGE	40
-#define MIN_NICE_TSLICE	10000
-#define MAX_NICE_TSLICE	80000
+#define MIN_NICE_TSLICE	5000
+#define MAX_NICE_TSLICE	70000
 #define TASK_TIMESLICE(p)	((int) ts_table[19 - (p)->nice])
 
 static unsigned char ts_table[NICE_RANGE];
@@ -538,7 +538,7 @@ void expire_task(struct task_struct *p)
 		goto need_resched;
 
 	if (!--p->time_slice) {
-		if (p->dyn_prio > 0) {
+		if (p->dyn_prio) {
 			p->time_slice--;
 			p->dyn_prio--;
 		}
@@ -1070,7 +1070,8 @@ asmlinkage long sys_sched_yield(void)
 		current->need_resched = 1;
 
 		current->time_slice = 0;
-		current->dyn_prio++;
+		if (++current->dyn_prio > MAX_DYNPRIO)
+			current->dyn_prio = MAX_DYNPRIO;
 	}
 	return 0;
 }
@@ -1323,9 +1324,12 @@ static void fill_tslice_map(void)
 {
 	int i;
 
-	for (i = 0; i < NICE_RANGE; i++)
+	for (i = 0; i < NICE_RANGE; i++) {
 		ts_table[i] = ((MIN_NICE_TSLICE +
-						((MAX_NICE_TSLICE - MIN_NICE_TSLICE) / NICE_RANGE) * i) * HZ) / 1000000;
+						((MAX_NICE_TSLICE -
+						  MIN_NICE_TSLICE) / (NICE_RANGE - 1)) * i) * HZ) / 1000000;
+		if (!ts_table[i]) ts_table[i] = 1;
+	}
 }
 
 void __init sched_init(void)

@@ -1241,12 +1241,6 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 		printk("%s: bad device number: %s\n", hwif->name, kdevname(rq->rq_dev));
 		goto kill_rq;
 	}
-#ifdef DEBUG
-	if (rq->bh && !buffer_locked(rq->bh)) {
-		printk("%s: block not locked\n", drive->name);
-		goto kill_rq;
-	}
-#endif
 	block    = rq->sector;
 
 	/* Strange disk manager remap */

@@ -904,11 +904,12 @@ handle_script_int(struct Scsi_Host * host, Scsi_Cmnd * cmd)
 static void
 do_sim710_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 {
+    struct Scsi_Host *host = dev_id;
     unsigned long flags;
 
-    spin_lock_irqsave(&io_request_lock, flags);
-    sim710_intr_handle(irq, dev_id, regs);
-    spin_unlock_irqrestore(&io_request_lock, flags);
+    spin_lock_irqsave(&host->host_lock, flags);
+    sim710_intr_handle(irq, host, regs);
+    spin_unlock_irqrestore(&host->host_lock, flags);
 }
 
 

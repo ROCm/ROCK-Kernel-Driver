@@ -1152,6 +1152,7 @@ static int InitFailover (PADAPTER2220I padapter, POUR_DEVICE pdev)
 static void TimerExpiry (unsigned long data)
 	{
 	PADAPTER2220I	padapter = (PADAPTER2220I)data;
+	struct Scsi_Host *host = padapter->SCpnt->host;
 	POUR_DEVICE		pdev = padapter->pdev;
 	UCHAR			status = IDE_STATUS_BUSY;
 	UCHAR			temp, temp1;
@@ -1161,7 +1162,7 @@ static void TimerExpiry (unsigned long data)
      * Disable interrupts, if they aren't already disabled and acquire
      * the I/O spinlock.
      */
-    spin_lock_irqsave (&io_request_lock, flags);
+    spin_lock_irqsave (&host->host_lock, flags);
 	DEB (printk ("\nPCI2220I: Timeout expired "));
 
 	if ( padapter->failinprog )
@@ -1295,7 +1296,7 @@ timerExpiryDone:;
      * which will enable interrupts if and only if they were
      * enabled on entry.
      */
-    spin_unlock_irqrestore (&io_request_lock, flags);
+    spin_unlock_irqrestore (&host->host_lock, flags);
 	}
 /****************************************************************
  *	Name:			SetReconstruct	:LOCAL
@@ -1328,7 +1329,8 @@ static LONG SetReconstruct (POUR_DEVICE pdev, int index)
  ****************************************************************/
 static void ReconTimerExpiry (unsigned long data)
 	{
-	PADAPTER2220I	padapter;
+	PADAPTER2220I	padapter = (PADAPTER2220I)data;
+	struct Scsi_Host *host = padapter->SCpnt->host;
 	POUR_DEVICE		pdev;
 	ULONG			testsize = 0;
 	PIDENTIFY_DATA	pid;
@@ -1342,9 +1344,8 @@ static void ReconTimerExpiry (unsigned long data)
      * Disable interrupts, if they aren't already disabled and acquire
      * the I/O spinlock.
      */
-    spin_lock_irqsave (&io_request_lock, flags);
+    spin_lock_irqsave(&host->host_lock, flags);
 
-	padapter = (PADAPTER2220I)data;
 	if ( padapter->SCpnt )
 		goto reconTimerExpiry;
 
@@ -1567,7 +1568,7 @@ reconTimerExpiry:;
      * which will enable interrupts if and only if they were
      * enabled on entry.
      */
-    spin_unlock_irqrestore (&io_request_lock, flags);
+    spin_unlock_irqrestore(&host->host_lock, flags);
 	}
 /****************************************************************
  *	Name:	Irq_Handler	:LOCAL
@@ -1596,12 +1597,6 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	ULONG				zl;
     unsigned long		flags;
 
-    /*
-     * Disable interrupts, if they aren't already disabled and acquire
-     * the I/O spinlock.
-     */
-    spin_lock_irqsave (&io_request_lock, flags);
-
 //	DEB (printk ("\npci2220i received interrupt\n"));
 
 	for ( z = 0; z < NumAdapters;  z++ )								// scan for interrupt to process
@@ -1619,9 +1614,10 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	if ( !shost )
 		{
 		DEB (printk ("\npci2220i: not my interrupt"));
-		goto irq_return;
+		goto out;
 		}
 
+	spin_lock_irqsave(&shost->host_lock, flags);
 	padapter = HOSTDATA(shost);
 	pdev = padapter->pdev;
 	SCpnt = padapter->SCpnt;
@@ -2023,13 +2019,9 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 		zl = DID_OK << 16;
 
 	OpDone (padapter, zl);
-irq_return:;
-    /*
-     * Release the I/O spinlock and restore the original flags
-     * which will enable interrupts if and only if they were
-     * enabled on entry.
-     */
-    spin_unlock_irqrestore (&io_request_lock, flags);
+irq_return:
+    spin_unlock_irqrestore(&shost->host_lock, flags);
+out:;
 	}
 /****************************************************************
  *	Name:	Pci2220i_QueueCommand

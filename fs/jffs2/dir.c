@@ -795,7 +795,7 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, in
 	
 	if ((mode & S_IFMT) == S_IFBLK ||
 	    (mode & S_IFMT) == S_IFCHR) {
-		dev = (MAJOR(to_kdev_t(rdev)) << 8) | MINOR(to_kdev_t(rdev));
+		dev = (MAJOR(rdev) << 8) | MINOR(rdev);
 		devlen = sizeof(dev);
 	}
 	

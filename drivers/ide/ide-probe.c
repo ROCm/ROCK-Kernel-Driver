@@ -595,17 +595,18 @@ static void ide_init_queue(ide_drive_t *drive)
 {
 	request_queue_t *q = &drive->queue;
 	int max_sectors;
+#ifdef CONFIG_BLK_DEV_PDC4030
+	int is_pdc4030_chipset = (HWIF(drive)->chipset == ide_pdc4030);
+#else
+	const int is_pdc4030_chipset = 0;
+#endif
 
 	q->queuedata = HWGROUP(drive);
 	blk_init_queue(q, do_ide_request, &ide_lock);
 	blk_queue_segment_boundary(q, 0xffff);
 
 	/* IDE can do up to 128K per request, pdc4030 needs smaller limit */
-#ifdef CONFIG_BLK_DEV_PDC4030
-	max_sectors = 127;
-#else
-	max_sectors = 255;
-#endif
+	max_sectors = (is_pdc4030_chipset ? 127 : 255);
 	blk_queue_max_sectors(q, max_sectors);
 
 	/* IDE DMA can do PRD_ENTRIES number of segments. */

@@ -254,7 +254,7 @@ static Sg_device ** sg_dev_arr = NULL;
 
 static int sg_open(struct inode * inode, struct file * filp)
 {
-    int dev = MINOR(inode->i_rdev);
+    int dev = minor(inode->i_rdev);
     int flags = filp->f_flags;
     Sg_device * sdp;
     Sg_fd * sfp;
@@ -340,7 +340,7 @@ static int sg_release(struct inode * inode, struct file * filp)
     if ((! (sfp = (Sg_fd *)filp->private_data)) || (! (sdp = sfp->parentdp))) {
         return -ENXIO;
     }
-    SCSI_LOG_TIMEOUT(3, printk("sg_release: dev=%d\n", MINOR(sdp->i_rdev)));
+    SCSI_LOG_TIMEOUT(3, printk("sg_release: dev=%d\n", minor(sdp->i_rdev)));
     sg_fasync(-1, filp, 0);   /* remove filp from async notification list */
     if (0 == sg_remove_sfp(sdp, sfp)) { /* Returns 1 when sdp gone */
         if (! sdp->detached) {
@@ -369,7 +369,7 @@ static ssize_t sg_read(struct file * filp, char * buf,
     if ((! (sfp = (Sg_fd *)filp->private_data)) || (! (sdp = sfp->parentdp)))
         return -ENXIO;
     SCSI_LOG_TIMEOUT(3, printk("sg_read: dev=%d, count=%d\n",
-                               MINOR(sdp->i_rdev), (int)count));
+                               minor(sdp->i_rdev), (int)count));
     if (ppos != &filp->f_pos)
         ; /* FIXME: Hmm.  Seek to the right place, or fail?  */
     if ((k = verify_area(VERIFY_WRITE, buf, count)))
@@ -514,7 +514,7 @@ static ssize_t sg_write(struct file * filp, const char * buf,
     if ((! (sfp = (Sg_fd *)filp->private_data)) || (! (sdp = sfp->parentdp)))
         return -ENXIO;
     SCSI_LOG_TIMEOUT(3, printk("sg_write: dev=%d, count=%d\n",
-                               MINOR(sdp->i_rdev), (int)count));
+                               minor(sdp->i_rdev), (int)count));
     if (sdp->detached)
     	return -ENODEV;
     if (! ((filp->f_flags & O_NONBLOCK) ||
@@ -731,7 +731,7 @@ static int sg_ioctl(struct inode * inode, struct file * filp,
     if ((! (sfp = (Sg_fd *)filp->private_data)) || (! (sdp = sfp->parentdp)))
         return -ENXIO;
     SCSI_LOG_TIMEOUT(3, printk("sg_ioctl: dev=%d, cmd=0x%x\n",
-                               MINOR(sdp->i_rdev), (int)cmd_in));
+                               minor(sdp->i_rdev), (int)cmd_in));
     read_only = (O_RDWR != (filp->f_flags & O_ACCMODE));
 
     switch(cmd_in)
@@ -1011,7 +1011,7 @@ static unsigned int sg_poll(struct file * filp, poll_table * wait)
     else if (count < SG_MAX_QUEUE)
         res |= POLLOUT | POLLWRNORM;
     SCSI_LOG_TIMEOUT(3, printk("sg_poll: dev=%d, res=0x%x\n",
-                        MINOR(sdp->i_rdev), (int)res));
+                        minor(sdp->i_rdev), (int)res));
     return res;
 }
 
@@ -1024,7 +1024,7 @@ static int sg_fasync(int fd, struct file * filp, int mode)
     if ((! (sfp = (Sg_fd *)filp->private_data)) || (! (sdp = sfp->parentdp)))
         return -ENXIO;
     SCSI_LOG_TIMEOUT(3, printk("sg_fasync: dev=%d, mode=%d\n",
-                               MINOR(sdp->i_rdev), mode));
+                               minor(sdp->i_rdev), mode));
 
     retval = fasync_helper(fd, filp, mode, &sfp->async_qp);
     return (retval < 0) ? retval : 0;
@@ -1035,7 +1035,7 @@ static int sg_fasync(int fd, struct file * filp, int mode)
 static void sg_cmd_done_bh(Scsi_Cmnd * SCpnt)
 {
     Scsi_Request * SRpnt = SCpnt->sc_request;
-    int dev = MINOR(SRpnt->sr_request.rq_dev);
+    int dev = minor(SRpnt->sr_request.rq_dev);
     Sg_device * sdp = NULL;
     Sg_fd * sfp;
     Sg_request * srp = NULL;
@@ -1278,7 +1278,7 @@ static int sg_attach(Scsi_Device * scsidp)
     sdp->sgdebug = 0;
     sdp->detached = 0;
     sdp->sg_tablesize = scsidp->host ? scsidp->host->sg_tablesize : 0;
-    sdp->i_rdev = MKDEV(SCSI_GENERIC_MAJOR, k);
+    sdp->i_rdev = mk_kdev(SCSI_GENERIC_MAJOR, k);
     sdp->de = devfs_register (scsidp->de, "generic", DEVFS_FL_DEFAULT,
                              SCSI_GENERIC_MAJOR, k,
                              S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
@@ -2415,7 +2415,7 @@ static void sg_clr_srpnt(Scsi_Request * SRpnt)
     SRpnt->sr_bufflen = 0;
     SRpnt->sr_buffer = NULL;
     SRpnt->sr_underflow = 0;
-    SRpnt->sr_request.rq_dev = MKDEV(0, 0);  /* "sg" _disowns_ command blk */
+    SRpnt->sr_request.rq_dev = mk_kdev(0, 0);  /* "sg" _disowns_ command blk */
 }
 
 static int sg_ms_to_jif(unsigned int msecs)
@@ -2694,7 +2694,7 @@ static int sg_proc_debug_info(char * buffer, int * len, off_t * begin,
 		PRINT_PROC("device %d detached ??\n", j);
 		continue;
 	    }
-	    dev = MINOR(sdp->i_rdev);
+	    dev = minor(sdp->i_rdev);
 
 	    if (sg_get_nth_sfp(sdp, 0)) {
 		PRINT_PROC(" >>> device=sg%d ", dev);

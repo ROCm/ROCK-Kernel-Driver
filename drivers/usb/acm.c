@@ -297,7 +297,7 @@ static void acm_softint(void *private)
 
 static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 {
-	struct acm *acm = acm_table[MINOR(tty->device)];
+	struct acm *acm = acm_table[minor(tty->device)];
 
 	if (!acm || !acm->dev) return -EINVAL;
 

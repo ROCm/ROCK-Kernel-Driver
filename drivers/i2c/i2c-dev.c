@@ -382,7 +382,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 
 int i2cdev_open (struct inode *inode, struct file *file)
 {
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	struct i2c_client *client;
 
 	if ((minor >= I2CDEV_ADAPS_MAX) || ! (i2cdev_adaps[minor])) {
@@ -415,7 +415,7 @@ int i2cdev_open (struct inode *inode, struct file *file)
 
 static int i2cdev_release (struct inode *inode, struct file *file)
 {
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	kfree(file->private_data);
 	file->private_data=NULL;
 #ifdef DEBUG

@@ -28,8 +28,8 @@
  */
 
 #define DRV_NAME		"de2104x"
-#define DRV_VERSION		"0.5.1"
-#define DRV_RELDATE		"Nov 20, 2001"
+#define DRV_VERSION		"0.5.4"
+#define DRV_RELDATE		"Jan 1, 2002"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -45,6 +45,7 @@
 #include <linux/rtnetlink.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <asm/unaligned.h>
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __initdata =
@@ -99,6 +100,7 @@ MODULE_PARM_DESC (rx_copybreak, "de2104x Breakpoint at which Rx packets are copi
 #define DE_DUMMY_SKB		((struct sk_buff *) 2)
 #define DE_SETUP_FRAME_WORDS	96
 #define DE_EEPROM_WORDS		256
+#define DE_EEPROM_SIZE		(DE_EEPROM_WORDS * sizeof(u16))
 #define DE_MAX_MEDIA		5
 
 #define DE_MEDIA_TP_AUTO	0
@@ -109,6 +111,8 @@ MODULE_PARM_DESC (rx_copybreak, "de2104x Breakpoint at which Rx packets are copi
 #define DE_MEDIA_INVALID	DE_MAX_MEDIA
 #define DE_MEDIA_FIRST		0
 #define DE_MEDIA_LAST		(DE_MAX_MEDIA - 1)
+#define DE_AUI_BNC		(SUPPORTED_AUI | SUPPORTED_BNC)
+
 #define DE_TIMER_LINK		(60 * HZ)
 #define DE_TIMER_NO_LINK	(5 * HZ)
 
@@ -117,7 +121,9 @@ MODULE_PARM_DESC (rx_copybreak, "de2104x Breakpoint at which Rx packets are copi
 #define DE_REGS_VER		1
 
 /* Time in jiffies before concluding the transmitter is hung. */
-#define TX_TIMEOUT  (6*HZ)
+#define TX_TIMEOUT		(6*HZ)
+
+#define DE_UNALIGNED_16(a)	(u16)(get_unaligned((u16 *)(a)))
 
 /* This is a mysterious value that can be written to CSR11 in the 21040 (only)
    to support a pre-NWay full-duplex signaling mechanism using short frames.
@@ -254,7 +260,6 @@ struct de_srom_info_leaf {
 	u16			default_media;
 	u8			n_blocks;
 	u8			unused;
-	struct de_srom_media_block	media[0];
 } __attribute__((packed));
 
 struct de_desc {
@@ -307,6 +312,7 @@ struct de_private {
 	struct media_info	media[DE_MAX_MEDIA];
 	struct timer_list	media_timer;
 
+	u8			*ee_data;
 	unsigned		board_idx;
 	unsigned		de21040 : 1;
 	unsigned		media_lock : 1;
@@ -319,6 +325,7 @@ static void de_clean_rings (struct de_private *de);
 static void de_media_interrupt (struct de_private *de, u32 status);
 static void de21040_media_timer (unsigned long data);
 static void de21041_media_timer (unsigned long data);
+static unsigned int de_ok_to_advertise (struct de_private *de, u32 new_media);
 
 
 static struct pci_device_id de_pci_tbl[] __initdata = {
@@ -918,7 +925,6 @@ static void de_stop_hw (struct de_private *de)
 
 	dw32(MacStatus, dr32(MacStatus));
 
-	synchronize_irq();
 	udelay(10);
 
 	de->rx_tail = 0;
@@ -968,15 +974,29 @@ static void de_set_media (struct de_private *de)
 	else
 		de->macmode &= ~FullDuplex;
 	
-	if (netif_msg_link(de))
-		printk(KERN_INFO "%s: set link %s, mode %x, sia %x,%x,%x,%x\n"
-		       KERN_INFO "                 set mode %x, set sia %x,%x,%x\n",
+	if (netif_msg_link(de)) {
+		printk(KERN_INFO "%s: set link %s\n"
+		       KERN_INFO "%s:    mode 0x%x, sia 0x%x,0x%x,0x%x,0x%x\n"
+		       KERN_INFO "%s:    set mode 0x%x, set sia 0x%x,0x%x,0x%x\n",
 		       de->dev->name, media_name[media],
-		       dr32(MacMode), dr32(SIAStatus), dr32(CSR13),
-		       dr32(CSR14), dr32(CSR15), de->macmode,
-			de->media[media].csr13,
-			de->media[media].csr14,
-			de->media[media].csr15);
+		       de->dev->name, dr32(MacMode), dr32(SIAStatus),
+		       dr32(CSR13), dr32(CSR14), dr32(CSR15),
+		       de->dev->name, de->macmode, de->media[media].csr13,
+		       de->media[media].csr14, de->media[media].csr15);
+	}
+}
+
+static void de_next_media (struct de_private *de, u32 *media,
+			   unsigned int n_media)
+{
+	unsigned int i;
+
+	for (i = 0; i < n_media; i++) {
+		if (de_ok_to_advertise(de, media[i])) {
+			de->media_type = media[i];
+			return;
+		}
+	}
 }
 
 static void de21040_media_timer (unsigned long data)
@@ -985,6 +1005,7 @@ static void de21040_media_timer (unsigned long data)
 	struct net_device *dev = de->dev;
 	u32 status = dr32(SIAStatus);
 	unsigned int carrier;
+	unsigned long flags;
 	
 	carrier = (status & NetCxnErr) ? 0 : 1;
 		
@@ -1009,12 +1030,17 @@ static void de21040_media_timer (unsigned long data)
 	if (de->media_lock)
 		return;
 
-	if (de->media_type == DE_MEDIA_AUI)
-		de->media_type = DE_MEDIA_TP;
-	else
-		de->media_type = DE_MEDIA_AUI;
+	if (de->media_type == DE_MEDIA_AUI) {
+		u32 next_state = DE_MEDIA_TP;
+		de_next_media(de, &next_state, 1);
+	} else {
+		u32 next_state = DE_MEDIA_AUI;
+		de_next_media(de, &next_state, 1);
+	}
 
+	spin_lock_irqsave(&de->lock, flags);
 	de_stop_rxtx(de);
+	spin_unlock_irqrestore(&de->lock, flags);
 	de_set_media(de);
 	de_start_rxtx(de);
 
@@ -1061,8 +1087,9 @@ static void de21041_media_timer (unsigned long data)
 {
 	struct de_private *de = (struct de_private *) data;
 	struct net_device *dev = de->dev;
-	u32 status = dr32(SIAStatus), new_media;
+	u32 status = dr32(SIAStatus);
 	unsigned int carrier;
+	unsigned long flags;
 	
 	carrier = (status & NetCxnErr) ? 0 : 1;
 		
@@ -1093,27 +1120,55 @@ static void de21041_media_timer (unsigned long data)
 
 	/* if activity detected, use that as hint for new media type */
 	if (status & NonselPortActive) {
-		if (de->media_type == DE_MEDIA_AUI)
-			de->media_type = DE_MEDIA_TP;
-		else
+		unsigned int have_media = 1;
+
+		/* if AUI/BNC selected, then activity is on TP port */
+		if (de->media_type == DE_MEDIA_AUI ||
+		    de->media_type == DE_MEDIA_BNC) {
+			if (de_ok_to_advertise(de, DE_MEDIA_TP_AUTO))
+				de->media_type = DE_MEDIA_TP_AUTO;
+			else
+				have_media = 0;
+		}
+
+		/* TP selected.  If there is only TP and BNC, then it's BNC */
+		else if (((de->media_supported & DE_AUI_BNC) == SUPPORTED_BNC) &&
+			 de_ok_to_advertise(de, DE_MEDIA_BNC))
+			de->media_type = DE_MEDIA_BNC;
+
+		/* TP selected.  If there is only TP and AUI, then it's AUI */
+		else if (((de->media_supported & DE_AUI_BNC) == SUPPORTED_AUI) &&
+			 de_ok_to_advertise(de, DE_MEDIA_AUI))
 			de->media_type = DE_MEDIA_AUI;
-		goto set_media;
+
+		/* otherwise, ignore the hint */
+		else
+			have_media = 0;
+
+		if (have_media)
+			goto set_media;
 	}
 
-	/* move to next advertised media */
-	new_media = de->media_type;
-	do {
-		if (new_media == DE_MEDIA_LAST)
-			new_media = DE_MEDIA_FIRST;
-		else
-			new_media++;
-	} while ((!de_ok_to_advertise(de, new_media)) &&
-	         (new_media != de->media_type));
-
-	de->media_type = new_media;
+	/*
+	 * Absent or ambiguous activity hint, move to next advertised
+	 * media state.  If de->media_type is left unchanged, this
+	 * simply resets the PHY and reloads the current media settings.
+	 */
+	if (de->media_type == DE_MEDIA_AUI) {
+		u32 next_states[] = { DE_MEDIA_BNC, DE_MEDIA_TP_AUTO };
+		de_next_media(de, next_states, ARRAY_SIZE(next_states));
+	} else if (de->media_type == DE_MEDIA_BNC) {
+		u32 next_states[] = { DE_MEDIA_TP_AUTO, DE_MEDIA_AUI };
+		de_next_media(de, next_states, ARRAY_SIZE(next_states));
+	} else {
+		u32 next_states[] = { DE_MEDIA_AUI, DE_MEDIA_BNC, DE_MEDIA_TP_AUTO };
+		de_next_media(de, next_states, ARRAY_SIZE(next_states));
+	}
 	
 set_media:
+	spin_lock_irqsave(&de->lock, flags);
 	de_stop_rxtx(de);
+	spin_unlock_irqrestore(&de->lock, flags);
 	de_set_media(de);
 	de_start_rxtx(de);
 
@@ -1145,20 +1200,21 @@ static void de_media_interrupt (struct de_private *de, u32 status)
 
 static int de_reset_mac (struct de_private *de)
 {
-	unsigned tmp;
-	u32 status;
+	u32 status, tmp;
 
 	/*
 	 * Reset MAC.  Copied from de4x5.c.
 	 */
 
-	dr32 (BusMode);
+	tmp = dr32 (BusMode);
+	if (tmp == 0xffffffff)
+		return -ENODEV;
 	mdelay (1);
 
-	dw32 (BusMode, de_bus_mode | CmdReset);
+	dw32 (BusMode, tmp | CmdReset);
 	mdelay (1);
 
-	dw32 (BusMode, de_bus_mode);
+	dw32 (BusMode, tmp);
 	mdelay (1);
 
 	for (tmp = 0; tmp < 5; tmp++) {
@@ -1309,12 +1365,20 @@ static void de_clean_rings (struct de_private *de)
 	}
 
 	for (i = 0; i < DE_TX_RING_SIZE; i++) {
-		if (de->tx_skb[i].skb) {
-			struct sk_buff *skb = de->tx_skb[i].skb;
-			pci_unmap_single(de->pdev, de->tx_skb[i].mapping,
-					 skb->len, PCI_DMA_TODEVICE);
-			dev_kfree_skb(skb);
-			de->net_stats.tx_dropped++;
+		struct sk_buff *skb = de->tx_skb[i].skb;
+		if ((skb) && (skb != DE_DUMMY_SKB)) {
+			if (skb != DE_SETUP_SKB) {
+				dev_kfree_skb(skb);
+				de->net_stats.tx_dropped++;
+				pci_unmap_single(de->pdev,
+					de->tx_skb[i].mapping,
+					skb->len, PCI_DMA_TODEVICE);
+			} else {
+				pci_unmap_single(de->pdev,
+					de->tx_skb[i].mapping,
+					sizeof(de->setup_frame),
+					PCI_DMA_TODEVICE);
+			}
 		}
 	}
 
@@ -1334,6 +1398,7 @@ static int de_open (struct net_device *dev)
 {
 	struct de_private *de = dev->priv;
 	int rc;
+	unsigned long flags;
 
 	if (netif_msg_ifup(de))
 		printk(KERN_DEBUG "%s: enabling interface\n", dev->name);
@@ -1362,11 +1427,15 @@ static int de_open (struct net_device *dev)
 	}
 
 	netif_start_queue(dev);
+	mod_timer(&de->media_timer, jiffies + DE_TIMER_NO_LINK);
 
 	return 0;
 
 err_out_hw:
+	spin_lock_irqsave(&de->lock, flags);
 	de_stop_hw(de);
+	spin_unlock_irqrestore(&de->lock, flags);
+
 err_out_free:
 	de_free_rings(de);
 	return rc;
@@ -1375,15 +1444,21 @@ err_out_free:
 static int de_close (struct net_device *dev)
 {
 	struct de_private *de = dev->priv;
+	unsigned long flags;
 
 	if (netif_msg_ifdown(de))
 		printk(KERN_DEBUG "%s: disabling interface\n", dev->name);
 
+	del_timer_sync(&de->media_timer);
+
+	spin_lock_irqsave(&de->lock, flags);
+	de_stop_hw(de);
 	netif_stop_queue(dev);
 	netif_carrier_off(dev);
-	del_timer_sync(&de->media_timer);
-	de_stop_hw(de);
+	spin_unlock_irqrestore(&de->lock, flags);
+	
 	free_irq(dev->irq, dev);
+
 	de_free_rings(de);
 	de_adapter_sleep(de);
 	pci_disable_device(de->pdev);
@@ -1558,6 +1633,7 @@ static int de_ethtool_ioctl (struct de_private *de, void *useraddr)
 		strcpy (info.driver, DRV_NAME);
 		strcpy (info.version, DRV_VERSION);
 		strcpy (info.bus_info, de->pdev->slot_name);
+		info.eedump_len = DE_EEPROM_SIZE;
 		info.regdump_len = DE_REGS_SIZE;
 		if (copy_to_user (useraddr, &info, sizeof (info)))
 			return -EFAULT;
@@ -1658,6 +1734,23 @@ static int de_ethtool_ioctl (struct de_private *de, void *useraddr)
 		return 0;
 	}
 
+	/* get SROM dump */
+	case ETHTOOL_GEEPROM: {
+		struct ethtool_eeprom eeprom;
+
+		if (!de->ee_data)
+			break;
+		if (copy_from_user(&eeprom, useraddr, sizeof(eeprom)))
+			return -EFAULT;
+		if ((eeprom.offset != 0) || (eeprom.magic != 0) ||
+		    (eeprom.len != DE_EEPROM_SIZE))
+			return -EINVAL;
+
+		useraddr += offsetof(struct ethtool_regs, data);
+		if (copy_to_user(useraddr, de->ee_data, DE_EEPROM_SIZE))
+			return -EFAULT;
+	}
+
 	default:
 		break;
 	}
@@ -1703,7 +1796,31 @@ static void __init de21040_get_mac_address (struct de_private *de)
 	}
 }
 
-/* Reading a serial EEPROM is a "bit" grungy, but we work our way through:->.*/
+static void __init de21040_get_media_info(struct de_private *de)
+{
+	unsigned int i;
+
+	de->media_type = DE_MEDIA_TP;
+	de->media_supported |= SUPPORTED_TP | SUPPORTED_10baseT_Full |
+			       SUPPORTED_10baseT_Half | SUPPORTED_AUI;
+	de->media_advertise = de->media_supported;
+
+	for (i = 0; i < DE_MAX_MEDIA; i++) {
+		switch (i) {
+		case DE_MEDIA_AUI:
+		case DE_MEDIA_TP:
+		case DE_MEDIA_TP_FD:
+			de->media[i].type = i;
+			de->media[i].csr13 = t21040_csr13[i];
+			de->media[i].csr14 = t21040_csr14[i];
+			de->media[i].csr15 = t21040_csr15[i];
+			break;
+		default:
+			de->media[i].type = DE_MEDIA_INVALID;
+			break;
+		}
+	}
+}
 
 /* Note: this routine returns extra data bits for size detection. */
 static unsigned __init tulip_read_eeprom(void *regs, int location, int addr_len)
@@ -1741,15 +1858,16 @@ static unsigned __init tulip_read_eeprom(void *regs, int location, int addr_len)
 	return retval;
 }
 
-static void __init tulip_get_srom_info (struct de_private *de)
+static void __init de21041_get_srom_info (struct de_private *de)
 {
 	unsigned i, sa_offset = 0, ofs;
-	u8 ee_data[DE_EEPROM_WORDS * sizeof(u16)];
+	u8 ee_data[DE_EEPROM_SIZE + 6] = {};
 	unsigned ee_addr_size = tulip_read_eeprom(de->regs, 0xff, 8) & 0x40000 ? 8 : 6;
 	struct de_srom_info_leaf *il;
+	void *bufp;
 
 	/* download entire eeprom */
-	for (i = 0; i < sizeof(ee_data)/2; i++)
+	for (i = 0; i < DE_EEPROM_WORDS; i++)
 		((u16 *)ee_data)[i] =
 			le16_to_cpu(tulip_read_eeprom(de->regs, i, ee_addr_size));
 
@@ -1780,13 +1898,18 @@ static void __init tulip_get_srom_info (struct de_private *de)
 		goto bad_srom;
 
 	/* get default media type */
-	switch (il->default_media) {
+	switch (DE_UNALIGNED_16(&il->default_media)) {
 	case 0x0001:  de->media_type = DE_MEDIA_BNC; break;
 	case 0x0002:  de->media_type = DE_MEDIA_AUI; break;
 	case 0x0204:  de->media_type = DE_MEDIA_TP_FD; break;
 	default: de->media_type = DE_MEDIA_TP_AUTO; break;
 	}
 	
+	if (netif_msg_probe(de))
+		printk(KERN_INFO "de%d: SROM leaf offset %u, default media %s\n",
+		       de->board_idx, ofs,
+		       media_name[de->media_type]);
+
 	/* init SIA register values to defaults */
 	for (i = 0; i < DE_MAX_MEDIA; i++) {
 		de->media[i].type = DE_MEDIA_INVALID;
@@ -1798,8 +1921,9 @@ static void __init tulip_get_srom_info (struct de_private *de)
 	/* parse media blocks to see what medias are supported,
 	 * and if any custom CSR values are provided
 	 */
+	bufp = ((void *)il) + sizeof(*il);
 	for (i = 0; i < il->n_blocks; i++) {
-		struct de_srom_media_block *ib = &il[i].media[0];
+		struct de_srom_media_block *ib = bufp;
 		unsigned idx;
 
 		/* index based on media type in media block */
@@ -1828,15 +1952,36 @@ static void __init tulip_get_srom_info (struct de_private *de)
 			goto bad_srom;
 		}
 
-		if (ib->opts & MediaCustomCSRs) {
-			de->media[idx].csr13 = ib->csr13;
-			de->media[idx].csr14 = ib->csr14;
-			de->media[idx].csr15 = ib->csr15;
-		}
-
 		de->media[idx].type = idx;
-		de->media_advertise |= de->media_supported;
+
+		if (netif_msg_probe(de))
+			printk(KERN_INFO "de%d:   media block #%u: %s",
+			       de->board_idx, i,
+			       media_name[de->media[idx].type]);
+
+		bufp += sizeof (ib->opts);
+
+		if (ib->opts & MediaCustomCSRs) {
+			de->media[idx].csr13 = DE_UNALIGNED_16(&ib->csr13);
+			de->media[idx].csr14 = DE_UNALIGNED_16(&ib->csr14);
+			de->media[idx].csr15 = DE_UNALIGNED_16(&ib->csr15);
+			bufp += sizeof(ib->csr13) + sizeof(ib->csr14) +
+				sizeof(ib->csr15);
+
+			if (netif_msg_probe(de))
+				printk(" (%x,%x,%x)\n",
+				       de->media[idx].csr13,
+				       de->media[idx].csr14,
+				       de->media[idx].csr15);
+				       
+		} else if (netif_msg_probe(de))
+			printk("\n");
+
+		if (bufp > ((void *)&ee_data[DE_EEPROM_SIZE - 3]))
+			break;
 	}
+
+	de->media_advertise = de->media_supported;
 
 fill_defaults:
 	/* fill in defaults, for cases where custom CSRs not used */
@@ -1849,12 +1994,9 @@ fill_defaults:
 			de->media[i].csr15 = t21041_csr15[i];
 	}
 
-	if (netif_msg_link(de))
-		printk(KERN_INFO "de%d: SROM-listed ports: %s%s%s\n",
-		       de->board_idx,
-		       de->media_supported & SUPPORTED_TP ? "TP " : "",
-		       de->media_supported & SUPPORTED_BNC ? "BNC " : "",
-		       de->media_supported & SUPPORTED_AUI ? "AUI" : "");
+	de->ee_data = kmalloc(DE_EEPROM_SIZE, GFP_KERNEL);
+	if (de->ee_data)
+		memcpy(de->ee_data, &ee_data[0], DE_EEPROM_SIZE);
 
 	return;
 
@@ -1970,35 +2112,21 @@ static int __init de_init_one (struct pci_dev *pdev,
 	de_adapter_wake(de);
 
 	/* make sure hardware is not running */
-	de_stop_hw(de);
+	rc = de_reset_mac(de);
+	if (rc) {
+		printk(KERN_ERR PFX "Cannot reset MAC, pci dev %s\n",
+		       pdev->slot_name);
+		goto err_out_iomap;
+	}
 
-	/* get MAC address, and some register values related to media types */
+	/* get MAC address, initialize default media type and
+	 * get list of supported media
+	 */
 	if (de->de21040) {
-		unsigned i;
-		
 		de21040_get_mac_address(de);
-
-		de->media_type = DE_MEDIA_TP;
-		de->media_supported |= SUPPORTED_TP | SUPPORTED_10baseT_Full |
-				  SUPPORTED_10baseT_Half | SUPPORTED_AUI;
-		de->media_advertise = de->media_supported;
-		for (i = 0; i < DE_MAX_MEDIA; i++) {
-			switch (i) {
-			case DE_MEDIA_AUI:
-			case DE_MEDIA_TP:
-			case DE_MEDIA_TP_FD:
-				de->media[i].type = i;
-				de->media[i].csr13 = t21040_csr13[i];
-				de->media[i].csr14 = t21040_csr14[i];
-				de->media[i].csr15 = t21040_csr15[i];
-				break;
-			default:
-				de->media[i].type = DE_MEDIA_INVALID;
-				break;
-			}
-		}
+		de21040_get_media_info(de);
 	} else {
-		tulip_get_srom_info(de);
+		de21041_get_srom_info(de);
 	}
 
 	/* register new network interface with kernel */
@@ -2029,6 +2157,8 @@ static int __init de_init_one (struct pci_dev *pdev,
 	return 0;
 
 err_out_iomap:
+	if (de->ee_data)
+		kfree(de->ee_data);
 	iounmap(regs);
 err_out_res:
 	pci_release_regions(pdev);
@@ -2047,6 +2177,8 @@ static void __exit de_remove_one (struct pci_dev *pdev)
 	if (!dev)
 		BUG();
 	unregister_netdev(dev);
+	if (de->ee_data)
+		kfree(de->ee_data);
 	iounmap(de->regs);
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);

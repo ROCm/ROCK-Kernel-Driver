@@ -18,7 +18,8 @@ comment 'Miscellaneous USB options'
    bool '  Long timeout for slow-responding devices (some MGE Ellipse UPSes)' CONFIG_USB_LONG_TIMEOUT
 fi
 
-comment 'USB Controllers'
+comment 'USB Host Controller Drivers'
+source drivers/usb/hcd/Config.in
 if [ "$CONFIG_USB_UHCI_ALT" != "y" ]; then
    dep_tristate '  UHCI (Intel PIIX4, VIA, ...) support' CONFIG_USB_UHCI $CONFIG_USB
 fi
@@ -72,6 +73,8 @@ else
    dep_tristate '  USB OV511 Camera support' CONFIG_USB_OV511 $CONFIG_USB $CONFIG_VIDEO_DEV
    dep_tristate '  USB Philips Cameras' CONFIG_USB_PWC $CONFIG_USB $CONFIG_VIDEO_DEV
    dep_tristate '  USB SE401 Camera support' CONFIG_USB_SE401 $CONFIG_USB $CONFIG_VIDEO_DEV
+   dep_tristate '  USB STV680 (Pencam) Camera support' CONFIG_USB_STV680 $CONFIG_USB $CONFIG_VIDEO_DEV
+   dep_tristate '  USB 3com HomeConnect (aka vicam) support (EXPERIMENTAL)' CONFIG_USB_VICAM $CONFIG_USB $CONFIG_VIDEO_DEV $CONFIG_EXPERIMENTAL
    dep_tristate '  D-Link USB FM radio support (EXPERIMENTAL)' CONFIG_USB_DSBR $CONFIG_USB $CONFIG_VIDEO_DEV $CONFIG_EXPERIMENTAL
    dep_tristate '  DABUSB driver' CONFIG_USB_DABUSB $CONFIG_USB
 fi

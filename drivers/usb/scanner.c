@@ -365,7 +365,7 @@ open_scanner(struct inode * inode, struct file * file)
 	struct scn_usb_data *scn;
 	struct usb_device *dev;
 
-	kdev_t scn_minor;
+	int scn_minor;
 
 	int err=0;
 
@@ -432,7 +432,7 @@ close_scanner(struct inode * inode, struct file * file)
 {
 	struct scn_usb_data *scn;
 
-	kdev_t scn_minor;
+	int scn_minor;
 
 	scn_minor = USB_SCN_MINOR (inode);
 
@@ -469,7 +469,7 @@ write_scanner(struct file * file, const char * buffer,
 	ssize_t bytes_written = 0; /* Overall count of bytes written */
 	ssize_t ret = 0;
 
-	kdev_t scn_minor;
+	int scn_minor;
 
 	int this_write;		/* Number of bytes to write */
 	int partial;		/* Number of bytes successfully written */
@@ -556,8 +556,7 @@ read_scanner(struct file * file, char * buffer,
 	ssize_t bytes_read;	/* Overall count of bytes_read */
 	ssize_t ret;
 
-	kdev_t scn_minor;
-
+	int scn_minor;
 	int partial;		/* Number of bytes successfully read */
 	int this_read;		/* Max number of bytes to read */
 	int result;
@@ -671,7 +670,7 @@ ioctl_scanner(struct inode *inode, struct file *file,
 {
 	struct usb_device *dev;
 
-	kdev_t scn_minor;
+	int scn_minor;
 
 	scn_minor = USB_SCN_MINOR(inode);
 
@@ -810,8 +809,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 
 	int ep_cnt;
 	int ix;
-
-	kdev_t scn_minor;
+	int scn_minor;
 
 	char valid_device = 0;
 	char have_bulk_in, have_bulk_out, have_intr;

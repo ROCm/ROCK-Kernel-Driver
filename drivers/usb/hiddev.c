@@ -218,7 +218,7 @@ static int hiddev_release(struct inode * inode, struct file * file)
 static int hiddev_open(struct inode * inode, struct file * file) {
 	struct hiddev_list *list;
 
-	int i = MINOR(inode->i_rdev) - HIDDEV_MINOR_BASE;
+	int i = minor(inode->i_rdev) - HIDDEV_MINOR_BASE;
 
 	if (i >= HIDDEV_MINORS || !hiddev_table[i])
 		return -ENODEV;

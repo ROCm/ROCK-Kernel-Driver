@@ -386,13 +386,13 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 {
 	struct ircomm_tty_cb *self;
-	int line;
+	unsigned int line;
 	int ret;
 
 	IRDA_DEBUG(2, __FUNCTION__ "()\n");
 
 	MOD_INC_USE_COUNT;
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	if ((line < 0) || (line >= IRCOMM_TTY_PORTS)) {
 		MOD_DEC_USE_COUNT;
 		return -ENODEV;

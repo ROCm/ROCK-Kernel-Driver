@@ -310,8 +310,8 @@ hfs_s32 hfs_do_read(struct inode *inode, struct hfs_fork * fork, hfs_u32 pos,
 
 	bhb = bhe = buflist;
 	if (reada) {
-		if (blocks < read_ahead[MAJOR(dev)] / (HFS_SECTOR_SIZE>>9)) {
-			blocks = read_ahead[MAJOR(dev)] / (HFS_SECTOR_SIZE>>9);
+		if (blocks < read_ahead[major(dev)] / (HFS_SECTOR_SIZE>>9)) {
+			blocks = read_ahead[major(dev)] / (HFS_SECTOR_SIZE>>9);
 		}
 		if (block + blocks > size) {
 			blocks = size - block;

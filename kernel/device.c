@@ -732,15 +732,10 @@ device_write_power(const char * buf, size_t count, loff_t off, void * data)
 
 	error = -EINVAL;
 
-	if (!num_args) {
-		printk("have no arguments\n");
+	if (!num_args)
 		goto done;
-	}
 
 	if (!strnicmp(str_command,"suspend",7)) {
-
-		printk("%s: we know it's a suspend action\n",__FUNCTION__);
-
 		if (num_args != 3)
 			goto done;
 		if (!strnicmp(str_stage,"notify",6))
@@ -775,8 +770,7 @@ device_write_power(const char * buf, size_t count, loff_t off, void * data)
 			error = dev->driver->resume(dev,int_stage);
 		else
 			error = 0;
-	} else
-		printk("%s: couldn't find any thing to do\n",__FUNCTION__);
+	}
  done:
 	put_device(dev);
 

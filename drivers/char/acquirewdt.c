@@ -117,7 +117,7 @@ static int acq_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static int acq_open(struct inode *inode, struct file *file)
 {
-	switch(MINOR(inode->i_rdev))
+	switch(minor(inode->i_rdev))
 	{
 		case WATCHDOG_MINOR:
 			spin_lock(&acq_lock);
@@ -141,7 +141,7 @@ static int acq_open(struct inode *inode, struct file *file)
 
 static int acq_close(struct inode *inode, struct file *file)
 {
-	if(MINOR(inode->i_rdev)==WATCHDOG_MINOR)
+	if(minor(inode->i_rdev)==WATCHDOG_MINOR)
 	{
 		spin_lock(&acq_lock);
 #ifndef CONFIG_WATCHDOG_NOWAYOUT	

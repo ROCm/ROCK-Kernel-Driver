@@ -1589,7 +1589,7 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
 		goto exit_lock;
 
 	error = -EXDEV;
-	if (!kdev_same(dir->i_dev, inode->i_dev))
+	if (dir->i_sb != inode->i_sb)
 		goto exit_lock;
 
 	/*
@@ -1707,7 +1707,7 @@ int vfs_rename_dir(struct inode *old_dir, struct dentry *old_dentry,
 	if (error)
 		return error;
 
-	if (!kdev_same(new_dir->i_dev, old_dir->i_dev))
+	if (new_dir->i_sb != old_dir->i_sb)
 		return -EXDEV;
 
 	if (!new_dentry->d_inode)
@@ -1787,7 +1787,7 @@ int vfs_rename_other(struct inode *old_dir, struct dentry *old_dentry,
 	if (error)
 		return error;
 
-	if (!kdev_same(new_dir->i_dev, old_dir->i_dev))
+	if (new_dir->i_sb != old_dir->i_sb)
 		return -EXDEV;
 
 	if (!new_dentry->d_inode)

@@ -1,4 +1,4 @@
-/* $Id: b1.c,v 1.20.6.7 2001/09/23 22:24:33 kai Exp $
+/* $Id: b1.c,v 1.1.4.1.2.1 2001/12/21 15:00:17 kai Exp $
  * 
  * Common module for AVM B1 cards.
  * 
@@ -11,6 +11,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/pci.h>
 #include <linux/skbuff.h>
 #include <linux/delay.h>
 #include <linux/mm.h>
@@ -27,7 +28,7 @@
 #include "capicmd.h"
 #include "capiutil.h"
 
-static char *revision = "$Revision: 1.20.6.7 $";
+static char *revision = "$Revision: 1.1.4.1.2.1 $";
 
 /* ------------------------------------------------------------- */
 
@@ -638,6 +639,65 @@ int b1ctl_read_proc(char *page, char **start, off_t off,
 }
 
 /* ------------------------------------------------------------- */
+
+#ifdef CONFIG_PCI
+
+avmcard_dmainfo *
+avmcard_dma_alloc(char *name, struct pci_dev *pdev, long rsize, long ssize)
+{
+	avmcard_dmainfo *p;
+	void *buf;
+
+	p = kmalloc(sizeof(avmcard_dmainfo), GFP_KERNEL);
+	if (!p) {
+		printk(KERN_WARNING "%s: no memory.\n", name);
+		goto err;
+	}
+	memset(p, 0, sizeof(avmcard_dmainfo));
+
+	p->recvbuf.size = rsize;
+	buf = pci_alloc_consistent(pdev, rsize, &p->recvbuf.dmaaddr);
+	if (!buf) {
+		printk(KERN_WARNING "%s: allocation of receive dma buffer failed.\n", name);
+		goto err_kfree;
+	}
+	p->recvbuf.dmabuf = buf;
+
+	p->sendbuf.size = ssize;
+	buf = pci_alloc_consistent(pdev, ssize, &p->sendbuf.dmaaddr);
+	if (!buf) {
+		printk(KERN_WARNING "%s: allocation of send dma buffer failed.\n", name);
+		goto err_free_consistent;
+	}
+
+	p->sendbuf.dmabuf = buf;
+	skb_queue_head_init(&p->send_queue);
+
+	return p;
+
+ err_free_consistent:
+	pci_free_consistent(p->pcidev, p->recvbuf.size,
+			    p->recvbuf.dmabuf, p->recvbuf.dmaaddr);
+ err_kfree:
+	kfree(p);
+ err:
+	return 0;
+}
+
+void avmcard_dma_free(avmcard_dmainfo *p)
+{
+	pci_free_consistent(p->pcidev, p->recvbuf.size,
+			    p->recvbuf.dmabuf, p->recvbuf.dmaaddr);
+	pci_free_consistent(p->pcidev, p->sendbuf.size,
+			    p->sendbuf.dmabuf, p->sendbuf.dmaaddr);
+	skb_queue_purge(&p->send_queue);
+	kfree(p);
+}
+
+EXPORT_SYMBOL(avmcard_dma_alloc);
+EXPORT_SYMBOL(avmcard_dma_free);
+
+#endif
 
 EXPORT_SYMBOL(b1_irq_table);
 

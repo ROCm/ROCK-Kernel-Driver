@@ -1969,7 +1969,7 @@ free_dmabuf(struct pci_dev *pci_dev, struct dmabuf *db)
 
 static int m3_open(struct inode *inode, struct file *file)
 {
-    int minor = MINOR(inode->i_rdev);
+    unsigned int minor = minor(inode->i_rdev);
     struct m3_card *c;
     struct m3_state *s = NULL;
     int i;
@@ -2137,7 +2137,7 @@ out:
 /* OSS /dev/mixer file operation methods */
 static int m3_open_mixdev(struct inode *inode, struct file *file)
 {
-    int minor = MINOR(inode->i_rdev);
+    unsigned int minor = minor(inode->i_rdev);
     struct m3_card *card = devs;
 
     for (card = devs; card != NULL; card = card->next) {

@@ -1483,7 +1483,7 @@ asmlinkage long sys_quotactl(int cmd, const char *special, int id, caddr_t addr)
 			goto out;
 	}
 
-	ret = -NODEV;
+	ret = -ENODEV;
 	if (sb && sb_has_quota_enabled(sb, type))
 		ret = set_dqblk(sb, id, type, flags, (struct dqblk *) addr);
 out:

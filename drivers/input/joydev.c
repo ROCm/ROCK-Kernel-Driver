@@ -189,7 +189,7 @@ static int joydev_release(struct inode * inode, struct file * file)
 static int joydev_open(struct inode *inode, struct file *file)
 {
 	struct joydev_list *list;
-	int i = MINOR(inode->i_rdev) - JOYDEV_MINOR_BASE;
+	int i = minor(inode->i_rdev) - JOYDEV_MINOR_BASE;
 
 	if (i >= JOYDEV_MINORS || !joydev_table[i])
 		return -ENODEV;

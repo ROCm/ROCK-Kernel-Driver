@@ -4,6 +4,10 @@
 
 O_TARGET	  := vmlinux-obj.o
 
+# Define maximum number of cards
+
+EXTRA_CFLAGS      += -DHISAX_MAX_CARDS=$(CONFIG_HISAX_MAX_CARDS)
+
 # Objects that export symbols.
 
 export-objs	  := config.o fsm.o hisax_isac.o

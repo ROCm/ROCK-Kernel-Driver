@@ -201,7 +201,7 @@ static int usblp_check_status(struct usblp *usblp, int err)
 
 static int usblp_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev) - USBLP_MINOR_BASE;
+	int minor = minor(inode->i_rdev) - USBLP_MINOR_BASE;
 	struct usblp *usblp;
 	int retval;
 

@@ -625,7 +625,7 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 #if 1 /* to go away in 2.5.0 */
 int GET_FB_IDX(kdev_t rdev)
 {
-    int fbidx = MINOR(rdev);
+    int fbidx = minor(rdev);
     if (fbidx >= 32) {
 	int newfbidx = fbidx >> 5;
 	static int warned;
@@ -719,7 +719,7 @@ register_framebuffer(struct fb_info *fb_info)
 	for (i = 0 ; i < FB_MAX; i++)
 		if (!registered_fb[i])
 			break;
-	fb_info->node = MKDEV(FB_MAJOR, i);
+	fb_info->node = mk_kdev(FB_MAJOR, i);
 	registered_fb[i] = fb_info;
 	if (!fb_ever_opened[i]) {
 		struct module *owner = fb_info->fbops->owner;

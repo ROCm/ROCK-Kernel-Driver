@@ -1,4 +1,4 @@
-/* $Id: c4.c,v 1.20.6.11 2001/09/23 22:24:33 kai Exp $
+/* $Id: c4.c,v 1.1.4.1.2.1 2001/12/21 15:00:17 kai Exp $
  * 
  * Module for AVM C4 & C2 card.
  * 
@@ -29,7 +29,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.20.6.11 $";
+static char *revision = "$Revision: 1.1.4.1.2.1 $";
 
 #undef CONFIG_C4_DEBUG
 #undef CONFIG_C4_POLLDEBUG
@@ -439,7 +439,7 @@ static void c4_dispatch_tx(avmcard *card)
 		cmd = CAPIMSG_COMMAND(skb->data);
 		subcmd = CAPIMSG_SUBCOMMAND(skb->data);
 
-		p = dma->sendbuf;
+		p = dma->sendbuf.dmabuf;
 
 		if (CAPICMD(cmd, subcmd) == CAPI_DATA_B3_REQ) {
 			__u16 dlen = CAPIMSG_DATALEN(skb->data);
@@ -450,7 +450,7 @@ static void c4_dispatch_tx(avmcard *card)
 			_put_byte(&p, SEND_MESSAGE);
 			_put_slice(&p, skb->data, len);
 		}
-		txlen = (__u8 *)p - (__u8 *)dma->sendbuf;
+		txlen = (__u8 *)p - (__u8 *)dma->sendbuf.dmabuf;
 #ifdef CONFIG_C4_DEBUG
 		printk(KERN_DEBUG "%s: tx put msg len=%d\n", card->name, txlen);
 #endif
@@ -464,11 +464,11 @@ static void c4_dispatch_tx(avmcard *card)
 		printk(KERN_DEBUG "%s: tx put 0x%x len=%d\n",
 				card->name, skb->data[2], txlen);
 #endif
-		memcpy(dma->sendbuf, skb->data+2, skb->len-2);
+		memcpy(dma->sendbuf.dmabuf, skb->data+2, skb->len-2);
 	}
 	txlen = (txlen + 3) & ~3;
 
-	c4outmeml(card->mbase+MBOX_DOWN_ADDR, virt_to_phys(dma->sendbuf));
+	c4outmeml(card->mbase+MBOX_DOWN_ADDR, dma->sendbuf.dmaaddr);
 	c4outmeml(card->mbase+MBOX_DOWN_LEN, txlen);
 
 	card->csr |= DBELL_DOWN_ARM;
@@ -510,7 +510,7 @@ static void c4_handle_rx(avmcard *card)
 	struct capi_ctr *ctrl;
 	avmctrl_info *cinfo;
 	struct sk_buff *skb;
-	void *p = dma->recvbuf;
+	void *p = dma->recvbuf.dmabuf;
 	__u32 ApplId, MsgLen, DataB3Len, NCCI, WindowSize;
 	__u8 b1cmd =  _get_byte(&p);
 	__u32 cidx;
@@ -702,7 +702,7 @@ static void c4_handle_interrupt(avmcard *card)
 		c4outmeml(card->mbase+MBOX_UP_LEN, 0);
 		c4_handle_rx(card);
 		card->dma->recvlen = 0;
-		c4outmeml(card->mbase+MBOX_UP_LEN, sizeof(card->dma->recvbuf));
+		c4outmeml(card->mbase+MBOX_UP_LEN, card->dma->recvbuf.size);
 		c4outmeml(card->mbase+DOORBELL, DBELL_UP_ARM);
 	}
 
@@ -885,8 +885,8 @@ static int c4_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 	c4outmeml(card->mbase+PCI_OUT_INT_MASK, 0x08);
 
 	card->dma->recvlen = 0;
-	c4outmeml(card->mbase+MBOX_UP_ADDR, virt_to_phys(card->dma->recvbuf));
-	c4outmeml(card->mbase+MBOX_UP_LEN, sizeof(card->dma->recvbuf));
+	c4outmeml(card->mbase+MBOX_UP_ADDR, card->dma->recvbuf.dmaaddr);
+	c4outmeml(card->mbase+MBOX_UP_LEN, card->dma->recvbuf.size);
 	c4outmeml(card->mbase+DOORBELL, DBELL_UP_ARM);
 	restore_flags(flags);
 
@@ -944,7 +944,7 @@ static void c4_remove_ctr(struct capi_ctr *ctrl)
 	release_region(card->port, AVMB1_PORTLEN);
 	ctrl->driverdata = 0;
 	kfree(card->ctrlinfo);
-	kfree(card->dma);
+        avmcard_dma_free(card->dma);
 	kfree(card);
 
 	MOD_DEC_USE_COUNT;
@@ -1123,6 +1123,7 @@ static int c4_read_proc(char *page, char **start, off_t off,
 
 static int c4_add_card(struct capi_driver *driver,
 		       struct capicardparams *p,
+                       struct pci_dev *dev,
 		       int nr)
 {
 	avmctrl_info *cinfo;
@@ -1140,18 +1141,17 @@ static int c4_add_card(struct capi_driver *driver,
 		return -ENOMEM;
 	}
 	memset(card, 0, sizeof(avmcard));
-	card->dma = (avmcard_dmainfo *) kmalloc(sizeof(avmcard_dmainfo), GFP_ATOMIC);
+        card->dma = avmcard_dma_alloc(driver->name, dev, 2048+128, 2048+128);
 	if (!card->dma) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
-	memset(card->dma, 0, sizeof(avmcard_dmainfo));
         cinfo = (avmctrl_info *) kmalloc(sizeof(avmctrl_info)*4, GFP_ATOMIC);
 	if (!cinfo) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-		kfree(card->dma);
+                avmcard_dma_free(card->dma);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -ENOMEM;
@@ -1173,7 +1173,7 @@ static int c4_add_card(struct capi_driver *driver,
 		       "%s: ports 0x%03x-0x%03x in use.\n",
 		       driver->name, card->port, card->port + AVMB1_PORTLEN);
 	        kfree(card->ctrlinfo);
-		kfree(card->dma);
+                avmcard_dma_free(card->dma);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -EBUSY;
@@ -1184,7 +1184,7 @@ static int c4_add_card(struct capi_driver *driver,
 		printk(KERN_NOTICE "%s: can't remap memory at 0x%lx\n",
 					driver->name, card->membase);
 	        kfree(card->ctrlinfo);
-		kfree(card->dma);
+                avmcard_dma_free(card->dma);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -EIO;
@@ -1195,7 +1195,7 @@ static int c4_add_card(struct capi_driver *driver,
 					driver->name, card->port, retval);
                 iounmap(card->mbase);
 	        kfree(card->ctrlinfo);
-		kfree(card->dma);
+                avmcard_dma_free(card->dma);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -EIO;
@@ -1211,7 +1211,7 @@ static int c4_add_card(struct capi_driver *driver,
                 iounmap(card->mbase);
 		release_region(card->port, AVMB1_PORTLEN);
 	        kfree(card->ctrlinfo);
-		kfree(card->dma);
+                avmcard_dma_free(card->dma);
 		kfree(card);
 	        MOD_DEC_USE_COUNT;
 		return -EBUSY;
@@ -1231,7 +1231,7 @@ static int c4_add_card(struct capi_driver *driver,
                 	iounmap(card->mbase);
 			free_irq(card->irq, card);
 			release_region(card->port, AVMB1_PORTLEN);
-	        	kfree(card->dma);
+                        avmcard_dma_free(card->dma);
 	        	kfree(card->ctrlinfo);
 			kfree(card);
 	        	MOD_DEC_USE_COUNT;
@@ -1240,8 +1240,6 @@ static int c4_add_card(struct capi_driver *driver,
 		if (i == 0)
 			card->cardnr = cinfo->capi_ctrl->cnr;
 	}
-
-	skb_queue_head_init(&card->dma->send_queue);
 
 	printk(KERN_INFO
 		"%s: AVM C%d at i/o %#x, irq %d, mem %#lx\n",
@@ -1335,7 +1333,7 @@ static int __init search_cards(struct capi_driver * driver,
 		printk(KERN_INFO
 			"%s: PCI BIOS reports AVM-C%d at i/o %#x, irq %d, mem %#x\n",
 			driver->name, nr, param.port, param.irq, param.membase);
-		retval = c4_add_card(driver, &param, nr);
+		retval = c4_add_card(driver, &param, dev, nr);
 		if (retval != 0) {
 		        printk(KERN_ERR
 			"%s: no AVM-C%d at i/o %#x, irq %d detected, mem %#x\n",

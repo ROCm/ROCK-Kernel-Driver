@@ -213,6 +213,7 @@ int aha1740_test_port(unsigned int base)
 /* A "high" level interrupt handler */
 void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
 {
+    struct Scsi_Host *host = aha_host[irq - 9];
     void (*my_done)(Scsi_Cmnd *);
     int errstatus, adapstat;
     int number_serviced;
@@ -221,11 +222,10 @@ void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
     unsigned int base;
     unsigned long flags;
 
-    spin_lock_irqsave(&io_request_lock, flags);
-
-    if (!aha_host[irq - 9])
+    if (!host)
 	panic("aha1740.c: Irq from unknown host!\n");
-    base = aha_host[irq - 9]->io_port;
+    spin_lock_irqsave(&host->host_lock, flags);
+    base = host->io_port;
     number_serviced = 0;
 
     while(inb(G2STAT(base)) & G2STAT_INTPEND)
@@ -299,7 +299,7 @@ void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
 	number_serviced++;
     }
 
-    spin_unlock_irqrestore(&io_request_lock, flags);
+    spin_unlock_irqrestore(&host->host_lock, flags);
 }
 
 int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))

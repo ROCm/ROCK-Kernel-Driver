@@ -200,13 +200,10 @@ void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 
 	/* Hardware imposed limit. */
 	blk_queue_max_hw_segments(q, SHpnt->sg_tablesize);
-
-	/*
-	 * When we remove scsi_malloc soonish, this can die too
-	 */
-	blk_queue_max_phys_segments(q, PAGE_SIZE / sizeof(struct scatterlist));
-
 	blk_queue_max_sectors(q, SHpnt->max_sectors);
+
+	/* scsi_alloc_sgtable max */
+	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
 
 	if (!SHpnt->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);

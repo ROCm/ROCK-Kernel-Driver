@@ -78,12 +78,12 @@ static inline struct upc_comm *presto_psdev_f2u(struct file *file)
 {
         int minor;
 
-        if ( MAJOR(file->f_dentry->d_inode->i_rdev) != PRESTO_PSDEV_MAJOR ) {
+        if ( major(file->f_dentry->d_inode->i_rdev) != PRESTO_PSDEV_MAJOR ) {
                 EXIT;
                 return NULL;
         }
 
-        minor = MINOR(file->f_dentry->d_inode->i_rdev);
+        minor = minor(file->f_dentry->d_inode->i_rdev);
         if ( minor < 0 || minor >= MAX_PRESTODEV ) {
                 EXIT;
                 return NULL;

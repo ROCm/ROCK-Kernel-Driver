@@ -1947,7 +1947,7 @@ extern inline int prog_dmabuf_out(struct usb_audiodev *as)
 
 static int usb_audio_open_mixdev(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	struct list_head *devs, *mdevs;
 	struct usb_mixerdev *ms;
 	struct usb_audio_state *s;
@@ -2621,7 +2621,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 
 static int usb_audio_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	struct list_head *devs, *adevs;
 	struct usb_audiodev *as;

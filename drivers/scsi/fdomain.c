@@ -382,22 +382,23 @@ enum out_port_type {
    Write_FIFO       = 12
 };
 
-static int               port_base         = 0;
-static unsigned long     bios_base         = 0;
-static int               bios_major        = 0;
-static int               bios_minor        = 0;
-static int               PCI_bus           = 0;
-static int               Quantum           = 0;	/* Quantum board variant */
-static int               interrupt_level   = 0;
-static volatile int      in_command        = 0;
-static Scsi_Cmnd         *current_SC       = NULL;
+/* .bss will zero all the static variables below */
+static int               port_base;
+static unsigned long     bios_base;
+static int               bios_major;
+static int               bios_minor;
+static int               PCI_bus;
+static int               Quantum;	/* Quantum board variant */
+static int               interrupt_level;
+static volatile int      in_command;
+static Scsi_Cmnd         *current_SC;
 static enum chip_type    chip              = unknown;
-static int               adapter_mask      = 0;
-static int               this_id           = 0;
-static int               setup_called      = 0;
+static int               adapter_mask;
+static int               this_id;
+static int               setup_called;
 
 #if DEBUG_RACE
-static volatile int      in_interrupt_flag = 0;
+static volatile int      in_interrupt_flag;
 #endif
 
 static int               SCSI_Mode_Cntl_port;
@@ -1265,9 +1266,9 @@ void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
 	 printk( " AFAIL " );
 #endif
-         spin_lock_irqsave(&io_request_lock, flags);
+         spin_lock_irqsave(&current_SC->host->host_lock, flags);
 	 my_done( DID_BUS_BUSY << 16 );
-         spin_unlock_irqrestore(&io_request_lock, flags);
+         spin_unlock_irqrestore(&current_SC->host->host_lock, flags);
 	 return;
       }
       current_SC->SCp.phase = in_selection;
@@ -1291,9 +1292,9 @@ void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
 	    printk( " SFAIL " );
 #endif
-            spin_lock_irqsave(&io_request_lock, flags);
+            spin_lock_irqsave(&current_SC->host->host_lock, flags);
 	    my_done( DID_NO_CONNECT << 16 );
-            spin_unlock_irqrestore(&io_request_lock, flags);
+            spin_unlock_irqrestore(&current_SC->host->host_lock, flags);
 	    return;
 	 } else {
 #if EVERY_ACCESS
@@ -1638,10 +1639,10 @@ void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
       printk( "BEFORE MY_DONE. . ." );
 #endif
-      spin_lock_irqsave(&io_request_lock, flags);
+      spin_lock_irqsave(&current_SC->host->host_lock, flags);
       my_done( (current_SC->SCp.Status & 0xff)
 	       | ((current_SC->SCp.Message & 0xff) << 8) | (DID_OK << 16) );
-      spin_unlock_irqrestore(&io_request_lock, flags);
+      spin_unlock_irqrestore(&current_SC->host->host_lock, flags);
 #if EVERY_ACCESS
       printk( "RETURNING.\n" );
 #endif
@@ -1932,11 +1933,11 @@ int fdomain_16x0_biosparam( Scsi_Disk *disk, kdev_t dev, int *info_array )
       0x0a bytes long.  Heads are one less than we need to report.
     */
 
-   if (MAJOR(dev) != SCSI_DISK0_MAJOR) {
+   if (major(dev) != SCSI_DISK0_MAJOR) {
       printk("scsi: <fdomain> fdomain_16x0_biosparam: too many disks");
       return 0;
    }
-   drive = MINOR(dev) >> 4;
+   drive = minor(dev) >> 4;
 
    if (bios_major == 2) {
       switch (Quantum) {

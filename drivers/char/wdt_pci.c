@@ -281,7 +281,7 @@ static ssize_t wdtpci_read(struct file *file, char *buf, size_t count, loff_t *p
 	if (ptr != &file->f_pos)
 		return -ESPIPE;
 
-	switch(MINOR(file->f_dentry->d_inode->i_rdev))
+	switch(minor(file->f_dentry->d_inode->i_rdev))
 	{
 		case TEMP_MINOR:
 			c*=11;
@@ -350,7 +350,7 @@ static int wdtpci_ioctl(struct inode *inode, struct file *file, unsigned int cmd
  
 static int wdtpci_open(struct inode *inode, struct file *file)
 {
-	switch(MINOR(inode->i_rdev))
+	switch(minor(inode->i_rdev))
 	{
 		case WATCHDOG_MINOR:
 			if( test_and_set_bit(0,&wdt_is_open) ) 
@@ -410,7 +410,7 @@ static int wdtpci_open(struct inode *inode, struct file *file)
  
 static int wdtpci_release(struct inode *inode, struct file *file)
 {
-	if(MINOR(inode->i_rdev)==WATCHDOG_MINOR)
+	if(minor(inode->i_rdev)==WATCHDOG_MINOR)
 	{
 #ifndef CONFIG_WATCHDOG_NOWAYOUT	
 		inb_p(WDT_DC);		/* Disable counters */

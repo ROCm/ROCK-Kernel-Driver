@@ -115,7 +115,7 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 	struct buffer_head * read_array[BLKS_PER_BUF];
 	unsigned i, blocknr, buffer, unread;
 	unsigned long devsize;
-	int major, minor;
+	unsigned int major, minor;
 	
 	char *data;
 
@@ -140,8 +140,8 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 	}
 
 	devsize = ~0UL;
-	major = MAJOR(sb->s_dev);
-	minor = MINOR(sb->s_dev);
+	major = major(sb->s_dev);
+	minor = minor(sb->s_dev);
 
 	if (blk_size[major])
 		devsize = blk_size[major][minor] >> 2;

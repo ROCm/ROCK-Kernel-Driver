@@ -105,7 +105,7 @@ static struct sysrq_key_op sysrq_reboot_op = {
 /* Guesses if the device is a local hard drive */
 static int is_local_disk(kdev_t dev) {
 	unsigned int major;
-	major = MAJOR(dev);
+	major = major(dev);
 
 	switch (major) {
 	case IDE0_MAJOR:
@@ -206,7 +206,7 @@ void do_emergency_sync(void) {
 	for (sb = sb_entry(super_blocks.next);
 	     sb != sb_entry(&super_blocks); 
 	     sb = sb_entry(sb->s_list.next))
-		if (!is_local_disk(sb->s_dev) && MAJOR(sb->s_dev))
+		if (!is_local_disk(sb->s_dev) && major(sb->s_dev))
 			go_sync(sb, remount_flag);
 
 	unlock_kernel();

@@ -203,7 +203,7 @@ MODULE_DEVICE_TABLE (usb, scanner_device_ids);
 #define IS_EP_BULK_OUT(ep) (IS_EP_BULK(ep) && ((ep).bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT)
 #define IS_EP_INTR(ep) ((ep).bmAttributes == USB_ENDPOINT_XFER_INT ? 1 : 0)
 
-#define USB_SCN_MINOR(X) MINOR((X)->i_rdev) - SCN_BASE_MNR
+#define USB_SCN_MINOR(X) minor((X)->i_rdev) - SCN_BASE_MNR
 
 #ifdef DEBUG
 #define SCN_DEBUG(X) X
@@ -243,7 +243,7 @@ struct scn_usb_data {
 	devfs_handle_t devfs;	/* devfs device */
 	struct urb scn_irq;
 	unsigned int ifnum;	/* Interface number of the USB device */
-	kdev_t scn_minor;	/* Scanner minor - used in disconnect() */
+	int scn_minor;		/* Scanner minor - used in disconnect() */
 	unsigned char button;	/* Front panel buffer */
 	char isopen;		/* Not zero if the device is open */
 	char present;		/* Not zero if device is present */

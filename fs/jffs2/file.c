@@ -105,8 +105,8 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	if ((inode->i_mode & S_IFMT) == S_IFBLK ||
 	    (inode->i_mode & S_IFMT) == S_IFCHR) {
 		/* For these, we don't actually need to read the old node */
-		dev =  (MAJOR(to_kdev_t(dentry->d_inode->i_rdev)) << 8) | 
-			MINOR(to_kdev_t(dentry->d_inode->i_rdev));
+		dev =  (major(dentry->d_inode->i_rdev) << 8) | 
+			minor(dentry->d_inode->i_rdev);
 		mdata = (char *)&dev;
 		mdatalen = sizeof(dev);
 		D1(printk(KERN_DEBUG "jffs2_setattr(): Writing %d bytes of kdev_t\n", mdatalen));

@@ -317,8 +317,8 @@ static void cciss_geninit( int ctlr)
  */
 static int cciss_open(struct inode *inode, struct file *filep)
 {
-	int ctlr = MAJOR(inode->i_rdev) - MAJOR_NR;
-	int dsk  = MINOR(inode->i_rdev) >> NWD_SHIFT;
+	int ctlr = major(inode->i_rdev) - MAJOR_NR;
+	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "cciss_open %x (%x:%x)\n", inode->i_rdev, ctlr, dsk);
@@ -327,7 +327,7 @@ static int cciss_open(struct inode *inode, struct file *filep)
 	if (ctlr > MAX_CTLR || hba[ctlr] == NULL)
 		return -ENXIO;
 
-	if (!suser() && hba[ctlr]->sizes[ MINOR(inode->i_rdev)] == 0)
+	if (!suser() && hba[ctlr]->sizes[minor(inode->i_rdev)] == 0)
 		return -ENXIO;
 
 	/*
@@ -337,8 +337,8 @@ static int cciss_open(struct inode *inode, struct file *filep)
 	 * for "raw controller".
 	 */
 	if (suser()
-		&& (hba[ctlr]->sizes[MINOR(inode->i_rdev)] == 0) 
-		&& (MINOR(inode->i_rdev)!= 0))
+		&& (hba[ctlr]->sizes[minor(inode->i_rdev)] == 0) 
+		&& (minor(inode->i_rdev)!= 0))
 		return -ENXIO;
 
 	hba[ctlr]->drv[dsk].usage_count++;
@@ -350,8 +350,8 @@ static int cciss_open(struct inode *inode, struct file *filep)
  */
 static int cciss_release(struct inode *inode, struct file *filep)
 {
-	int ctlr = MAJOR(inode->i_rdev) - MAJOR_NR;
-	int dsk  = MINOR(inode->i_rdev) >> NWD_SHIFT;
+	int ctlr = major(inode->i_rdev) - MAJOR_NR;
+	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "cciss_release %x (%x:%x)\n", inode->i_rdev, ctlr, dsk);
@@ -370,8 +370,8 @@ static int cciss_release(struct inode *inode, struct file *filep)
 static int cciss_ioctl(struct inode *inode, struct file *filep, 
 		unsigned int cmd, unsigned long arg)
 {
-	int ctlr = MAJOR(inode->i_rdev) - MAJOR_NR;
-	int dsk  = MINOR(inode->i_rdev) >> NWD_SHIFT;
+	int ctlr = major(inode->i_rdev) - MAJOR_NR;
+	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "cciss_ioctl: Called with cmd=%x %lx\n", cmd, arg);
@@ -696,8 +696,8 @@ static int revalidate_logvol(kdev_t dev, int maxusage)
         unsigned long flags;
         int res;
 
-        target = MINOR(dev) >> NWD_SHIFT;
-        ctlr = MAJOR(dev) - MAJOR_NR;
+        target = minor(dev) >> NWD_SHIFT;
+        ctlr = major(dev) - MAJOR_NR;
         gdev = &(hba[ctlr]->gendisk);
 
         spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
@@ -746,8 +746,8 @@ static int revalidate_allvol(kdev_t dev)
 	int ctlr, i;
 	unsigned long flags;
 
-	ctlr = MAJOR(dev) - MAJOR_NR;
-        if (MINOR(dev) != 0)
+	ctlr = major(dev) - MAJOR_NR;
+        if (minor(dev) != 0)
                 return -ENXIO;
 
         spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
@@ -781,9 +781,11 @@ static int revalidate_allvol(kdev_t dev)
         hba[ctlr]->access.set_intr_mask(hba[ctlr], CCISS_INTR_ON);
 
         cciss_geninit(ctlr);
-        for(i=0; i<NWD; i++)
+        for(i=0; i<NWD; i++) {
+		kdev_t kdev = mk_kdev(major(dev), i << NWD_SHIFT);
                 if (hba[ctlr]->sizes[ i<<NWD_SHIFT ])
-                        revalidate_logvol(dev+(i<<NWD_SHIFT), 2);
+                        revalidate_logvol(kdev, 2);
+	}
 
         hba[ctlr]->usage_count--;
         return 0;
@@ -1205,7 +1207,6 @@ static void do_cciss_request(request_queue_t *q)
 	ctlr_info_t *h= q->queuedata; 
 	CommandList_struct *c;
 	int log_unit, start_blk, seg;
-	struct list_head *queue_head = &q->queue_head;
 	struct request *creq;
 	u64bit temp64;
 	struct scatterlist tmp_sg[MAXSGENTRIES];
@@ -1215,17 +1216,17 @@ static void do_cciss_request(request_queue_t *q)
 		goto startio;
 
 queue:
-	if (list_empty(queue_head))
+	if (blk_queue_empty(q))
 		goto startio;
 
 	creq = elv_next_request(q);
 	if (creq->nr_phys_segments > MAXSGENTRIES)
                 BUG();
 
-        if (h->ctlr != MAJOR(creq->rq_dev)-MAJOR_NR )
+        if (h->ctlr != major(creq->rq_dev)-MAJOR_NR )
         {
                 printk(KERN_WARNING "doreq cmd for %d, %x at %p\n",
-                                h->ctlr, creq->rq_dev, creq);
+                                h->ctlr, major(creq->rq_dev), creq);
                 blkdev_dequeue_request(creq);
                 complete_buffers(creq->bio, 0);
 		end_that_request_last(creq);
@@ -1243,7 +1244,7 @@ queue:
 	c->rq = creq;
 	
 	/* fill in the request */ 
-	log_unit = MINOR(creq->rq_dev) >> NWD_SHIFT; 
+	log_unit = minor(creq->rq_dev) >> NWD_SHIFT; 
 	c->Header.ReplyQueue = 0;  // unused in simple mode
 	c->Header.Tag.lower = c->busaddr;  // use the physical address the cmd block for tag
 	c->Header.LUN.LogDev.VolId= hba[h->ctlr]->drv[log_unit].LunID;
@@ -1896,7 +1897,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	cciss_geninit(i);
 	for(j=0; j<NWD; j++)
 		register_disk(&(hba[i]->gendisk),
-			MKDEV(MAJOR_NR+i, j <<4), 
+			mk_kdev(MAJOR_NR+i, j <<4), 
 			MAX_PART, &cciss_fops, 
 			hba[i]->drv[j].nr_blocks);
 

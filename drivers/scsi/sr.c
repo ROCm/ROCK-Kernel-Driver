@@ -99,11 +99,11 @@ static int sr_packet(struct cdrom_device_info *, struct cdrom_generic_command *)
 
 static void sr_release(struct cdrom_device_info *cdi)
 {
-	if (scsi_CDs[MINOR(cdi->dev)].device->sector_size > 2048)
-		sr_set_blocklength(MINOR(cdi->dev), 2048);
-	scsi_CDs[MINOR(cdi->dev)].device->access_count--;
-	if (scsi_CDs[MINOR(cdi->dev)].device->host->hostt->module)
-		__MOD_DEC_USE_COUNT(scsi_CDs[MINOR(cdi->dev)].device->host->hostt->module);
+	if (scsi_CDs[minor(cdi->dev)].device->sector_size > 2048)
+		sr_set_blocklength(minor(cdi->dev), 2048);
+	scsi_CDs[minor(cdi->dev)].device->access_count--;
+	if (scsi_CDs[minor(cdi->dev)].device->host->hostt->module)
+		__MOD_DEC_USE_COUNT(scsi_CDs[minor(cdi->dev)].device->host->hostt->module);
 	if (sr_template.module)
 		__MOD_DEC_USE_COUNT(sr_template.module);
 }
@@ -150,7 +150,7 @@ int sr_media_change(struct cdrom_device_info *cdi, int slot)
 		/* no changer support */
 		return -EINVAL;
 	}
-	retval = scsi_ioctl(scsi_CDs[MINOR(cdi->dev)].device,
+	retval = scsi_ioctl(scsi_CDs[minor(cdi->dev)].device,
 			    SCSI_IOCTL_TEST_UNIT_READY, 0);
 
 	if (retval) {
@@ -159,13 +159,13 @@ int sr_media_change(struct cdrom_device_info *cdi, int slot)
 		 * and we will figure it out later once the drive is
 		 * available again.  */
 
-		scsi_CDs[MINOR(cdi->dev)].device->changed = 1;
+		scsi_CDs[minor(cdi->dev)].device->changed = 1;
 		return 1;	/* This will force a flush, if called from
 				 * check_disk_change */
 	};
 
-	retval = scsi_CDs[MINOR(cdi->dev)].device->changed;
-	scsi_CDs[MINOR(cdi->dev)].device->changed = 0;
+	retval = scsi_CDs[minor(cdi->dev)].device->changed;
+	scsi_CDs[minor(cdi->dev)].device->changed = 0;
 	/* If the disk changed, the capacity will now be different,
 	 * so we force a re-read of this information */
 	if (retval) {
@@ -179,9 +179,9 @@ int sr_media_change(struct cdrom_device_info *cdi, int slot)
 		 * be trying to use something that is too small if the disc
 		 * has changed.
 		 */
-		scsi_CDs[MINOR(cdi->dev)].needs_sector_size = 1;
+		scsi_CDs[minor(cdi->dev)].needs_sector_size = 1;
 
-		scsi_CDs[MINOR(cdi->dev)].device->sector_size = 2048;
+		scsi_CDs[minor(cdi->dev)].device->sector_size = 2048;
 	}
 	return retval;
 }
@@ -253,17 +253,17 @@ static request_queue_t *sr_find_queue(kdev_t dev)
 	/*
 	 * No such device
 	 */
-	if (MINOR(dev) >= sr_template.dev_max || !scsi_CDs[MINOR(dev)].device)
+	if (minor(dev) >= sr_template.dev_max || !scsi_CDs[minor(dev)].device)
 		return NULL;
 
-	return &scsi_CDs[MINOR(dev)].device->request_queue;
+	return &scsi_CDs[minor(dev)].device->request_queue;
 }
 
 static int sr_init_command(Scsi_Cmnd * SCpnt)
 {
 	int dev, devm, block=0, this_count, s_size;
 
-	devm = MINOR(SCpnt->request.rq_dev);
+	devm = minor(SCpnt->request.rq_dev);
 	dev = DEVICE_NR(SCpnt->request.rq_dev);
 
 	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %d, block = %d\n", devm, block));
@@ -399,20 +399,20 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 {
 	check_disk_change(cdi->dev);
 
-	if (MINOR(cdi->dev) >= sr_template.dev_max
-	    || !scsi_CDs[MINOR(cdi->dev)].device) {
+	if (minor(cdi->dev) >= sr_template.dev_max
+	    || !scsi_CDs[minor(cdi->dev)].device) {
 		return -ENXIO;	/* No such device */
 	}
 	/*
 	 * If the device is in error recovery, wait until it is done.
 	 * If the device is offline, then disallow any access to it.
 	 */
-	if (!scsi_block_when_processing_errors(scsi_CDs[MINOR(cdi->dev)].device)) {
+	if (!scsi_block_when_processing_errors(scsi_CDs[minor(cdi->dev)].device)) {
 		return -ENXIO;
 	}
-	scsi_CDs[MINOR(cdi->dev)].device->access_count++;
-	if (scsi_CDs[MINOR(cdi->dev)].device->host->hostt->module)
-		__MOD_INC_USE_COUNT(scsi_CDs[MINOR(cdi->dev)].device->host->hostt->module);
+	scsi_CDs[minor(cdi->dev)].device->access_count++;
+	if (scsi_CDs[minor(cdi->dev)].device->host->hostt->module)
+		__MOD_INC_USE_COUNT(scsi_CDs[minor(cdi->dev)].device->host->hostt->module);
 	if (sr_template.module)
 		__MOD_INC_USE_COUNT(sr_template.module);
 
@@ -421,8 +421,8 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 	 * this is the case, and try again.
 	 */
 
-	if (scsi_CDs[MINOR(cdi->dev)].needs_sector_size)
-		get_sectorsize(MINOR(cdi->dev));
+	if (scsi_CDs[minor(cdi->dev)].needs_sector_size)
+		get_sectorsize(minor(cdi->dev));
 
 	return 0;
 }
@@ -671,13 +671,13 @@ void get_capabilities(int i)
  */
 static int sr_packet(struct cdrom_device_info *cdi, struct cdrom_generic_command *cgc)
 {
-	Scsi_Device *device = scsi_CDs[MINOR(cdi->dev)].device;
+	Scsi_Device *device = scsi_CDs[minor(cdi->dev)].device;
 
 	/* set the LUN */
 	if (device->scsi_level <= SCSI_2)
 		cgc->cmd[1] |= device->lun << 5;
 
-	cgc->stat = sr_do_ioctl(MINOR(cdi->dev), cgc->cmd, cgc->buffer, cgc->buflen, cgc->quiet, cgc->data_direction, cgc->sense);
+	cgc->stat = sr_do_ioctl(minor(cdi->dev), cgc->cmd, cgc->buffer, cgc->buflen, cgc->quiet, cgc->data_direction, cgc->sense);
 
 	return cgc->stat;
 }
@@ -766,7 +766,7 @@ void sr_finish()
 
 		scsi_CDs[i].cdi.ops = &sr_dops;
 		scsi_CDs[i].cdi.handle = &scsi_CDs[i];
-		scsi_CDs[i].cdi.dev = MKDEV(MAJOR_NR, i);
+		scsi_CDs[i].cdi.dev = mk_kdev(MAJOR_NR, i);
 		scsi_CDs[i].cdi.mask = 0;
 		scsi_CDs[i].cdi.capacity = 1;
 		/*
@@ -809,7 +809,7 @@ static void sr_detach(Scsi_Device * SDp)
 			 * the device.
 			 * We should be kind to our buffer cache, however.
 			 */
-			invalidate_device(MKDEV(MAJOR_NR, i), 0);
+			invalidate_device(mk_kdev(MAJOR_NR, i), 0);
 
 			/*
 			 * Reset things back to a sane state so that one can

@@ -530,8 +530,10 @@ static inline int ll_new_hw_segment(request_queue_t *q,
 				    struct bio *bio)
 {
 	int nr_hw_segs = bio_hw_segments(q, bio);
+	int nr_phys_segs = bio_phys_segments(q, bio);
 
-	if (req->nr_hw_segments + nr_hw_segs > q->max_hw_segments) {
+	if (req->nr_hw_segments + nr_hw_segs > q->max_hw_segments
+	    || req->nr_phys_segments + nr_phys_segs > q->max_phys_segments) {
 		req->flags |= REQ_NOMERGE;
 		q->last_merge = NULL;
 		return 0;
@@ -542,7 +544,7 @@ static inline int ll_new_hw_segment(request_queue_t *q,
 	 * counters.
 	 */
 	req->nr_hw_segments += nr_hw_segs;
-	req->nr_phys_segments += bio_phys_segments(q, bio);
+	req->nr_phys_segments += nr_phys_segs;
 	return 1;
 }
 
@@ -801,7 +803,7 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	if (blk_init_free_list(q))
 		return -ENOMEM;
 
-	if ((ret = elevator_init(q, &q->elevator, ELEVATOR_LINUS))) {
+	if ((ret = elevator_init(q, &q->elevator, elevator_linus))) {
 		blk_cleanup_queue(q);
 		return ret;
 	}
@@ -822,6 +824,9 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 
 	blk_queue_make_request(q, __make_request);
 	blk_queue_max_segment_size(q, MAX_SEGMENT_SIZE);
+
+	blk_queue_max_hw_segments(q, MAX_HW_SEGMENTS);
+	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
 	return 0;
 }
 
@@ -968,7 +973,7 @@ static inline void add_request(request_queue_t * q, struct request * req,
 	 * elevator indicated where it wants this request to be
 	 * inserted at elevator_merge time
 	 */
-	q->elevator.elevator_add_req_fn(q, req, insert_here);
+	__elv_add_request(q, req, insert_here);
 }
 
 /*
@@ -1028,7 +1033,7 @@ static void attempt_merge(request_queue_t *q, struct request *req,
 	 * counts here.
 	 */
 	if (q->merge_requests_fn(q, req, next)) {
-		q->elevator.elevator_merge_req_fn(req, next);
+		elv_merge_requests(q, req, next);
 
 		blkdev_dequeue_request(next);
 
@@ -1082,9 +1087,8 @@ void blk_attempt_remerge(request_queue_t *q, struct request *rq)
 static int __make_request(request_queue_t *q, struct bio *bio)
 {
 	struct request *req, *freereq = NULL;
-	int el_ret, latency = 0, rw, nr_sectors, cur_nr_sectors, barrier;
+	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier;
 	struct list_head *insert_here;
-	elevator_t *elevator = &q->elevator;
 	sector_t sector;
 
 	sector = bio->bi_sector;
@@ -1101,7 +1105,6 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 
 	spin_lock_prefetch(q->queue_lock);
 
-	latency = elevator_request_latency(elevator, rw);
 	barrier = test_bit(BIO_RW_BARRIER, &bio->bi_rw);
 
 	spin_lock_irq(q->queue_lock);
@@ -1114,14 +1117,14 @@ again:
 		goto get_rq;
 	}
 
-	el_ret = elevator->elevator_merge_fn(q, &req, bio);
+	el_ret = elv_merge(q, &req, bio);
 	switch (el_ret) {
 		case ELEVATOR_BACK_MERGE:
 			BUG_ON(!rq_mergeable(req));
 			if (!q->back_merge_fn(q, req, bio))
 				break;
 
-			elevator->elevator_merge_cleanup_fn(q, req, nr_sectors);
+			elv_merge_cleanup(q, req, nr_sectors);
 
 			req->biotail->bi_next = bio;
 			req->biotail = bio;
@@ -1135,7 +1138,7 @@ again:
 			if (!q->front_merge_fn(q, req, bio))
 				break;
 
-			elevator->elevator_merge_cleanup_fn(q, req, nr_sectors);
+			elv_merge_cleanup(q, req, nr_sectors);
 
 			bio->bi_next = req->bio;
 			req->bio = bio;
@@ -1195,11 +1198,6 @@ get_rq:
 		spin_lock_irq(q->queue_lock);
 		goto again;
 	}
-
-	/*
-	 * fill up the request-info, and add it to the queue
-	 */
-	req->elevator_sequence = latency;
 
 	/*
 	 * first three bits are identical in rq->flags and bio->bi_rw,

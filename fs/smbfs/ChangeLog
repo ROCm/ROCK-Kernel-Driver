@@ -1,5 +1,15 @@
 ChangeLog for smbfs.
 
+2001-12-31 René Scharfe <l.s.r@web.de>
+
+	* inode.c: added smb_show_options to show mount options in /proc/mounts
+	* inode.c, getopt.c, getopt.h: merged flag and has_arg in struct option
+	* inode.c: use S_IRWXUGO where appropriate
+
+2001-12-22 Urban Widmark <urban@teststation.com>
+
+	* file.c, proc.c: Fix problems triggered by the "fsx test"
+
 2001-09-17 Urban Widmark <urban@teststation.com>
 
 	* proc.c: Use 4096 (was 512) as the blocksize for better write

@@ -1,4 +1,4 @@
-/* $Id: config.c,v 2.57.6.20 2001/09/23 22:24:47 kai Exp $
+/* $Id: config.c,v 1.1.4.2.2.1 2001/12/09 20:18:40 kai Exp $
  *
  * Author       Karsten Keil
  * Copyright    by Karsten Keil      <keil@isdn4linux.de>
@@ -336,27 +336,19 @@ EXPORT_SYMBOL(HiSax_closecard);
 	NULL, \
 }
 
-#define EMPTY_CARD	{0, DEFAULT_PROTO, {0, 0, 0, 0}, NULL}
-
-struct IsdnCard cards[] = {
+struct IsdnCard cards[HISAX_MAX_CARDS] = {
 	FIRST_CARD,
-	EMPTY_CARD,
-	EMPTY_CARD,
-	EMPTY_CARD,
-	EMPTY_CARD,
-	EMPTY_CARD,
-	EMPTY_CARD,
-	EMPTY_CARD,
 };
 
-static char HiSaxID[64] __devinitdata = { 0, };
+#define HISAX_IDSIZE (HISAX_MAX_CARDS*8)
+static char HiSaxID[HISAX_IDSIZE] __devinitdata = { 0, };
 
 char *HiSax_id __devinitdata = HiSaxID;
 #ifdef MODULE
 /* Variables for insmod */
-static int type[8] __devinitdata = { 0, };
-static int protocol[8] __devinitdata = { 0, };
-static int io[8] __devinitdata = { 0, };
+static int type[HISAX_MAX_CARDS] __devinitdata = { 0, };
+static int protocol[HISAX_MAX_CARDS] __devinitdata = { 0, };
+static int io[HISAX_MAX_CARDS] __devinitdata = { 0, };
 #undef IO0_IO1
 #ifdef CONFIG_HISAX_16_3
 #define IO0_IO1
@@ -366,25 +358,27 @@ static int io[8] __devinitdata = { 0, };
 #define IO0_IO1
 #endif
 #ifdef IO0_IO1
-static int io0[8] __devinitdata = { 0, };
-static int io1[8] __devinitdata = { 0, };
+static int io0[HISAX_MAX_CARDS] __devinitdata = { 0, };
+static int io1[HISAX_MAX_CARDS] __devinitdata = { 0, };
 #endif
-static int irq[8] __devinitdata = { 0, };
-static int mem[8] __devinitdata = { 0, };
+static int irq[HISAX_MAX_CARDS] __devinitdata = { 0, };
+static int mem[HISAX_MAX_CARDS] __devinitdata = { 0, };
 static char *id __devinitdata = HiSaxID;
+
+#define PARM_PARA "1-" __MODULE_STRING(HISAX_MAX_CARDS) "i"
 
 MODULE_DESCRIPTION("ISDN4Linux: Driver for passive ISDN cards");
 MODULE_AUTHOR("Karsten Keil");
 MODULE_LICENSE("GPL");
-MODULE_PARM(type, "1-8i");
-MODULE_PARM(protocol, "1-8i");
-MODULE_PARM(io, "1-8i");
-MODULE_PARM(irq, "1-8i");
-MODULE_PARM(mem, "1-8i");
+MODULE_PARM(type, PARM_PARA);
+MODULE_PARM(protocol, PARM_PARA);
+MODULE_PARM(io, PARM_PARA);
+MODULE_PARM(irq, PARM_PARA);
+MODULE_PARM(mem, PARM_PARA);
 MODULE_PARM(id, "s");
 #ifdef IO0_IO1
-MODULE_PARM(io0, "1-8i");
-MODULE_PARM(io1, "1-8i");
+MODULE_PARM(io0, PARM_PARA);
+MODULE_PARM(io1, PARM_PARA);
 #endif
 #endif /* MODULE */
 
@@ -448,6 +442,7 @@ static int __init HiSax_setup(char *line)
 	i = 0;
 	j = 1;
 	while (argc && (i < HISAX_MAX_CARDS)) {
+		cards[i].protocol = DEFAULT_PROTO;
 		if (argc) {
 			cards[i].typ = ints[j];
 			j++;
@@ -475,13 +470,15 @@ static int __init HiSax_setup(char *line)
 		}
 		i++;
 	}
-	if (str && *str) {
-		strcpy(HiSaxID, str);
-		HiSax_id = HiSaxID;
-	} else {
+  	if (str && *str) {
+		if (strlen(str) < HISAX_IDSIZE)
+			strcpy(HiSaxID, str);
+		else
+			printk(KERN_WARNING "HiSax: ID too long!");
+	} else
 		strcpy(HiSaxID, "HiSax");
-		HiSax_id = HiSaxID;
-	}
+
+	HiSax_id = HiSaxID;
 	return 1;
 }
 
@@ -1396,6 +1393,8 @@ static int __init HiSax_init(void)
 		if (protocol[i]) {
 			cards[j].protocol = protocol[i];
 			nzproto++;
+		} else {
+			cards[j].protocol = DEFAULT_PROTO;
 		}
 		switch (type[i]) {
 		case ISDN_CTYPE_16_0:
@@ -1473,15 +1472,22 @@ static int __init HiSax_init(void)
 			} else {
 				/* QUADRO is a 4 BRI card */
 				cards[j++].para[0] = 1;
-				cards[j].typ = ISDN_CTYPE_SCT_QUADRO;
-				cards[j].protocol = protocol[i];
-				cards[j++].para[0] = 2;
-				cards[j].typ = ISDN_CTYPE_SCT_QUADRO;
-				cards[j].protocol = protocol[i];
-				cards[j++].para[0] = 3;
-				cards[j].typ = ISDN_CTYPE_SCT_QUADRO;
-				cards[j].protocol = protocol[i];
-				cards[j].para[0] = 4;
+				/* we need to check if further cards can be added */
+				if (j < HISAX_MAX_CARDS) {
+					cards[j].typ = ISDN_CTYPE_SCT_QUADRO;
+					cards[j].protocol = protocol[i];
+					cards[j++].para[0] = 2;
+				}
+				if (j < HISAX_MAX_CARDS) {
+					cards[j].typ = ISDN_CTYPE_SCT_QUADRO;
+					cards[j].protocol = protocol[i];
+					cards[j++].para[0] = 3;
+				}
+				if (j < HISAX_MAX_CARDS) {
+					cards[j].typ = ISDN_CTYPE_SCT_QUADRO;
+					cards[j].protocol = protocol[i];
+					cards[j].para[0] = 4;
+				}
 			}
 			break;
 		}
@@ -1554,6 +1560,8 @@ int elsa_init_pcmcia(void *pcm_iob, int pcm_irq, int *busy_flag, int prot)
 		cards[i].typ = type[i];
 		if (protocol[i]) {
 			cards[i].protocol = protocol[i];
+		} else {
+			cards[i].protocol = DEFAULT_PROTO;
 		}
 	}
 	cards[0].para[0] = pcm_irq;
@@ -1594,6 +1602,8 @@ int hfc_init_pcmcia(void *pcm_iob, int pcm_irq, int *busy_flag, int prot)
 		cards[i].typ = type[i];
 		if (protocol[i]) {
 			cards[i].protocol = protocol[i];
+		} else {
+			cards[i].protocol = DEFAULT_PROTO;
 		}
 	}
 	cards[0].para[0] = pcm_irq;
@@ -1634,6 +1644,8 @@ int sedl_init_pcmcia(void *pcm_iob, int pcm_irq, int *busy_flag, int prot)
 		cards[i].typ = type[i];
 		if (protocol[i]) {
 			cards[i].protocol = protocol[i];
+		} else {
+			cards[i].protocol = DEFAULT_PROTO;
 		}
 	}
 	cards[0].para[0] = pcm_irq;
@@ -1674,6 +1686,8 @@ int avm_a1_init_pcmcia(void *pcm_iob, int pcm_irq, int *busy_flag, int prot)
 		cards[i].typ = type[i];
 		if (protocol[i]) {
 			cards[i].protocol = protocol[i];
+		} else {
+			cards[i].protocol = DEFAULT_PROTO;
 		}
 	}
 	cards[0].para[0] = pcm_irq;

@@ -8,6 +8,7 @@ O_TARGET	:= usb-serial.o
 
 obj-$(CONFIG_USB_SERIAL)                        += usbserial.o
 obj-$(CONFIG_USB_SERIAL_VISOR)			+= visor.o
+obj-$(CONFIG_USB_SERIAL_IPAQ)			+= ipaq.o
 obj-$(CONFIG_USB_SERIAL_WHITEHEAT)		+= whiteheat.o
 obj-$(CONFIG_USB_SERIAL_FTDI_SIO)		+= ftdi_sio.o
 obj-$(CONFIG_USB_SERIAL_KEYSPAN_PDA)		+= keyspan_pda.o
@@ -22,7 +23,8 @@ obj-$(CONFIG_USB_SERIAL_EDGEPORT)		+= io_edgeport.o
 obj-$(CONFIG_USB_SERIAL_PL2303)			+= pl2303.o
 obj-$(CONFIG_USB_SERIAL_CYBERJACK)		+= cyberjack.o
 obj-$(CONFIG_USB_SERIAL_IR)			+= ir-usb.o
- 
+obj-$(CONFIG_USB_SERIAL_KLSI)			+= kl5kusb105.o
+
 # Objects that export symbols.
 export-objs	:= usbserial.o
 

@@ -51,7 +51,7 @@ struct busmouse_data {
 
 #define NR_MICE			15
 #define FIRST_MOUSE		0
-#define DEV_TO_MOUSE(dev)	MINOR_TO_MOUSE(MINOR(dev))
+#define DEV_TO_MOUSE(dev)	MINOR_TO_MOUSE(minor(dev))
 #define MINOR_TO_MOUSE(minor)	((minor) - FIRST_MOUSE)
 
 /*

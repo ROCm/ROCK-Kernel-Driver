@@ -500,7 +500,7 @@ static int __devinit dfx_init_one(struct pci_dev *pdev, const struct pci_device_
 
 static int __init dfx_eisa_init(void)
 {
-	int rc = -NODEV;
+	int rc = -ENODEV;
 	int i;			/* used in for loops */
 	u16 port;		/* temporary I/O (port) address */
 	u32 slot_id;		/* EISA hardware (slot) ID read from adapter */

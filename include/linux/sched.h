@@ -302,7 +302,7 @@ struct task_struct {
  * all fields in a single cacheline that are needed for
  * the goodness() loop in schedule().
  */
-	long dyn_prio;
+	unsigned long dyn_prio;
 	long nice;
 	unsigned long policy;
 	struct mm_struct *mm;
@@ -322,7 +322,6 @@ struct task_struct {
 	 */
 	struct list_head run_list;
 	long time_slice;
-	unsigned long sleep_time;
 	/* recalculation loop checkpoint */
 	unsigned long rcl_last;
 
@@ -453,7 +452,7 @@ struct task_struct {
  */
 #define _STK_LIM	(8*1024*1024)
 
-#define MAX_DYNPRIO	100
+#define MAX_DYNPRIO	40
 #define DEF_TSLICE	(6 * HZ / 100)
 #define MAX_TSLICE	(20 * HZ / 100)
 #define DEF_NICE	(0)
@@ -886,7 +885,6 @@ do {									\
 static inline void del_from_runqueue(struct task_struct * p)
 {
 	nr_running--;
-	p->sleep_time = jiffies;
 	list_del(&p->run_list);
 	p->run_list.next = NULL;
 }

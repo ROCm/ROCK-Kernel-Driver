@@ -2,6 +2,7 @@
 #define _BLK_H
 
 #include <linux/blkdev.h>
+#include <linux/elevator.h>
 #include <linux/locks.h>
 #include <linux/config.h>
 #include <linux/spinlock.h>
@@ -43,9 +44,10 @@ extern void end_that_request_last(struct request *);
 static inline void blkdev_dequeue_request(struct request *req)
 {
 	list_del(&req->queuelist);
-}
 
-#define __elv_next_request(q)	(q)->elevator.elevator_next_req_fn((q))
+	if (req->q)
+		elv_remove_request(req->q, req);
+}
 
 extern inline struct request *elv_next_request(request_queue_t *q)
 {
@@ -79,21 +81,21 @@ extern inline struct request *elv_next_request(request_queue_t *q)
 	return rq;
 }
 
-#define __elv_add_request_core(q, rq, where, plug)			\
+#define _elv_add_request_core(q, rq, where, plug)			\
 	do {								\
 		if ((plug))						\
 			blk_plug_device((q));				\
 		(q)->elevator.elevator_add_req_fn((q), (rq), (where));	\
 	} while (0)
 
-#define __elv_add_request(q, rq, back, p) do {				      \
+#define _elv_add_request(q, rq, back, p) do {				      \
 	if ((back))							      \
-		__elv_add_request_core((q), (rq), (q)->queue_head.prev, (p)); \
+		_elv_add_request_core((q), (rq), (q)->queue_head.prev, (p)); \
 	else								      \
-		__elv_add_request_core((q), (rq), &(q)->queue_head, 0);	      \
+		_elv_add_request_core((q), (rq), &(q)->queue_head, 0);	      \
 } while (0)
 
-#define elv_add_request(q, rq, back) __elv_add_request((q), (rq), (back), 1)
+#define elv_add_request(q, rq, back) _elv_add_request((q), (rq), (back), 1)
 	
 #if defined(MAJOR_NR) || defined(IDE_DRIVER)
 

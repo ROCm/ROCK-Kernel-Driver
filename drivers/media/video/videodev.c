@@ -70,7 +70,7 @@ LIST_HEAD(videodev_proc_list);
 static ssize_t video_read(struct file *file,
 	char *buf, size_t count, loff_t *ppos)
 {
-	struct video_device *vfl=video_device[MINOR(file->f_dentry->d_inode->i_rdev)];
+	struct video_device *vfl=video_device[minor(file->f_dentry->d_inode->i_rdev)];
 	if(vfl->read)
 		return vfl->read(vfl, buf, count, file->f_flags&O_NONBLOCK);
 	else
@@ -86,7 +86,7 @@ static ssize_t video_read(struct file *file,
 static ssize_t video_write(struct file *file, const char *buf, 
 	size_t count, loff_t *ppos)
 {
-	struct video_device *vfl=video_device[MINOR(file->f_dentry->d_inode->i_rdev)];
+	struct video_device *vfl=video_device[minor(file->f_dentry->d_inode->i_rdev)];
 	if(vfl->write)
 		return vfl->write(vfl, buf, count, file->f_flags&O_NONBLOCK);
 	else
@@ -100,7 +100,7 @@ static ssize_t video_write(struct file *file, const char *buf,
 
 static unsigned int video_poll(struct file *file, poll_table * wait)
 {
-	struct video_device *vfl=video_device[MINOR(file->f_dentry->d_inode->i_rdev)];
+	struct video_device *vfl=video_device[minor(file->f_dentry->d_inode->i_rdev)];
 	if(vfl->poll)
 		return vfl->poll(vfl, file, wait);
 	else
@@ -114,7 +114,7 @@ static unsigned int video_poll(struct file *file, poll_table * wait)
 
 static int video_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	int err, retval = 0;
 	struct video_device *vfl;
 	
@@ -170,7 +170,7 @@ static int video_release(struct inode *inode, struct file *file)
 {
 	struct video_device *vfl;
 	lock_kernel();
-	vfl=video_device[MINOR(inode->i_rdev)];
+	vfl=video_device[minor(inode->i_rdev)];
 	if(vfl->close)
 		vfl->close(vfl);
 	vfl->busy=0;
@@ -183,7 +183,7 @@ static int video_release(struct inode *inode, struct file *file)
 static int video_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
-	struct video_device *vfl=video_device[MINOR(inode->i_rdev)];
+	struct video_device *vfl=video_device[minor(inode->i_rdev)];
 	int err=vfl->ioctl(vfl, cmd, (void *)arg);
 
 	if(err!=-ENOIOCTLCMD)
@@ -203,7 +203,7 @@ static int video_ioctl(struct inode *inode, struct file *file,
 int video_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	int ret = -EINVAL;
-	struct video_device *vfl=video_device[MINOR(file->f_dentry->d_inode->i_rdev)];
+	struct video_device *vfl=video_device[minor(file->f_dentry->d_inode->i_rdev)];
 	if(vfl->mmap) {
 		lock_kernel();
 		ret = vfl->mmap(vfl, (char *)vma->vm_start, 

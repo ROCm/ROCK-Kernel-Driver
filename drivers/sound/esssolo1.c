@@ -913,7 +913,7 @@ static int mixer_ioctl(struct solo1_state *s, unsigned int cmd, unsigned long ar
 
 static int solo1_open_mixdev(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	struct solo1_state *s = NULL;
 	struct pci_dev *pci_dev;
 
@@ -1590,7 +1590,7 @@ static int solo1_release(struct inode *inode, struct file *file)
 
 static int solo1_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	struct solo1_state *s = NULL;
 	struct pci_dev *pci_dev;
@@ -1879,7 +1879,7 @@ static unsigned int solo1_midi_poll(struct file *file, struct poll_table_struct 
 
 static int solo1_midi_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct solo1_state *s = NULL;
@@ -2105,7 +2105,7 @@ static int solo1_dmfm_ioctl(struct inode *inode, struct file *file, unsigned int
 
 static int solo1_dmfm_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	struct solo1_state *s = NULL;
 	struct pci_dev *pci_dev;

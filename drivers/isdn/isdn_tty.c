@@ -1019,12 +1019,12 @@ isdn_tty_paranoia_check(modem_info * info, kdev_t device, const char *routine)
 #ifdef MODEM_PARANOIA_CHECK
 	if (!info) {
 		printk(KERN_WARNING "isdn_tty: null info_struct for (%d, %d) in %s\n",
-		       MAJOR(device), MINOR(device), routine);
+		       major(device), minor(device), routine);
 		return 1;
 	}
 	if (info->magic != ISDN_ASYNC_MAGIC) {
 		printk(KERN_WARNING "isdn_tty: bad magic for modem struct (%d, %d) in %s\n",
-		       MAJOR(device), MINOR(device), routine);
+		       major(device), minor(device), routine);
 		return 1;
 	}
 #endif
@@ -1740,7 +1740,7 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 	int retval,
 	 line;
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	if (line < 0 || line > ISDN_MAX_CHANNELS)
 		return -ENODEV;
 	info = &dev->mdm.info[line];

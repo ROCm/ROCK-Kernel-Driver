@@ -119,7 +119,7 @@ static int evdev_release(struct inode * inode, struct file * file)
 static int evdev_open(struct inode * inode, struct file * file)
 {
 	struct evdev_list *list;
-	int i = MINOR(inode->i_rdev) - EVDEV_MINOR_BASE;
+	int i = minor(inode->i_rdev) - EVDEV_MINOR_BASE;
 
 	if (i >= EVDEV_MINORS || !evdev_table[i])
 		return -ENODEV;

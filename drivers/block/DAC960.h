@@ -2054,13 +2054,13 @@ extern int DAC960_KernelIOCTL(unsigned int Request, void *Argument);
 */
 
 #define DAC960_ControllerNumber(Device) \
-  (MAJOR(Device) - DAC960_MAJOR)
+  (major(Device) - DAC960_MAJOR)
 
 #define DAC960_LogicalDriveNumber(Device) \
-  (MINOR(Device) >> DAC960_MaxPartitionsBits)
+  (minor(Device) >> DAC960_MaxPartitionsBits)
 
 #define DAC960_PartitionNumber(Device) \
-  (MINOR(Device) & (DAC960_MaxPartitions - 1))
+  (minor(Device) & (DAC960_MaxPartitions - 1))
 
 #define DAC960_MajorNumber(ControllerNumber) \
   (DAC960_MAJOR + (ControllerNumber))

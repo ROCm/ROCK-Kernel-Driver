@@ -917,6 +917,12 @@ int ide_system_bus_speed (void);
 int ide_multwrite (ide_drive_t *drive, unsigned int mcount);
 
 /*
+ * idedisk_input_data() is a wrapper around ide_input_data() which copes
+ * with byte-swapping the input data if required.
+ */
+inline void idedisk_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
+
+/*
  * ide_stall_queue() can be used by a drive to give excess bandwidth back
  * to the hwgroup by sleeping for timeout jiffies.
  */

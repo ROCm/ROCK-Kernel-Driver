@@ -144,7 +144,7 @@ static int get_mixer_levels(caddr_t arg)
 
 static ssize_t sound_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
-	int dev = MINOR(file->f_dentry->d_inode->i_rdev);
+	int dev = minor(file->f_dentry->d_inode->i_rdev);
 	int ret = -EINVAL;
 
 	/*
@@ -177,7 +177,7 @@ static ssize_t sound_read(struct file *file, char *buf, size_t count, loff_t *pp
 
 static ssize_t sound_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
-	int dev = MINOR(file->f_dentry->d_inode->i_rdev);
+	int dev = minor(file->f_dentry->d_inode->i_rdev);
 	int ret = -EINVAL;
 	
 	lock_kernel();
@@ -204,7 +204,7 @@ static ssize_t sound_write(struct file *file, const char *buf, size_t count, lof
 
 static int sound_open(struct inode *inode, struct file *file)
 {
-	int dev = MINOR(inode->i_rdev);
+	int dev = minor(inode->i_rdev);
 	int retval;
 
 	DEB(printk("sound_open(dev=%d)\n", dev));
@@ -255,7 +255,7 @@ static int sound_open(struct inode *inode, struct file *file)
 
 static int sound_release(struct inode *inode, struct file *file)
 {
-	int dev = MINOR(inode->i_rdev);
+	int dev = minor(inode->i_rdev);
 
 	lock_kernel();
 	DEB(printk("sound_release(dev=%d)\n", dev));
@@ -341,7 +341,7 @@ static int sound_ioctl(struct inode *inode, struct file *file,
 		       unsigned int cmd, unsigned long arg)
 {
 	int err, len = 0, dtype;
-	int dev = MINOR(inode->i_rdev);
+	int dev = minor(inode->i_rdev);
 
 	if (_SIOC_DIR(cmd) != _SIOC_NONE && _SIOC_DIR(cmd) != 0) {
 		/*
@@ -404,7 +404,7 @@ static int sound_ioctl(struct inode *inode, struct file *file,
 static unsigned int sound_poll(struct file *file, poll_table * wait)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	int dev = MINOR(inode->i_rdev);
+	int dev = minor(inode->i_rdev);
 
 	DEB(printk("sound_poll(dev=%d)\n", dev));
 	switch (dev & 0x0f) {
@@ -428,7 +428,7 @@ static int sound_mmap(struct file *file, struct vm_area_struct *vma)
 	int dev_class;
 	unsigned long size;
 	struct dma_buffparms *dmap = NULL;
-	int dev = MINOR(file->f_dentry->d_inode->i_rdev);
+	int dev = minor(file->f_dentry->d_inode->i_rdev);
 
 	dev_class = dev & 0x0f;
 	dev >>= 4;

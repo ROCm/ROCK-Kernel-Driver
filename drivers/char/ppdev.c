@@ -103,7 +103,7 @@ static inline void pp_enable_irq (struct pp_struct *pp)
 static ssize_t pp_read (struct file * file, char * buf, size_t count,
 			loff_t * ppos)
 {
-	unsigned int minor = MINOR (file->f_dentry->d_inode->i_rdev);
+	unsigned int minor = minor (file->f_dentry->d_inode->i_rdev);
 	struct pp_struct *pp = file->private_data;
 	char * kbuffer;
 	ssize_t bytes_read = 0;
@@ -183,7 +183,7 @@ static ssize_t pp_read (struct file * file, char * buf, size_t count,
 static ssize_t pp_write (struct file * file, const char * buf, size_t count,
 			 loff_t * ppos)
 {
-	unsigned int minor = MINOR (file->f_dentry->d_inode->i_rdev);
+	unsigned int minor = minor (file->f_dentry->d_inode->i_rdev);
 	struct pp_struct *pp = file->private_data;
 	char * kbuffer;
 	ssize_t bytes_written = 0;
@@ -315,7 +315,7 @@ static enum ieee1284_phase init_phase (int mode)
 static int pp_ioctl(struct inode *inode, struct file *file,
 		    unsigned int cmd, unsigned long arg)
 {
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	struct pp_struct *pp = file->private_data;
 	struct parport * port;
 
@@ -613,7 +613,7 @@ static int pp_ioctl(struct inode *inode, struct file *file,
 
 static int pp_open (struct inode * inode, struct file * file)
 {
-	unsigned int minor = MINOR (inode->i_rdev);
+	unsigned int minor = minor (inode->i_rdev);
 	struct pp_struct *pp;
 
 	if (minor >= PARPORT_MAX)
@@ -642,7 +642,7 @@ static int pp_open (struct inode * inode, struct file * file)
 
 static int pp_release (struct inode * inode, struct file * file)
 {
-	unsigned int minor = MINOR (inode->i_rdev);
+	unsigned int minor = minor (inode->i_rdev);
 	struct pp_struct *pp = file->private_data;
 	int compat_negot;
 

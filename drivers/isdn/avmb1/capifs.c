@@ -430,7 +430,7 @@ void capifs_new_ncci(char type, unsigned int num, kdev_t device)
 			inode->i_gid = sbi->setgid ? sbi->gid : current->fsgid;
 			inode->i_nlink = 1;
 			inode->i_ino = ino + 2;
-			init_special_inode(inode, sbi->mode|S_IFCHR, np->kdev);
+			init_special_inode(inode, sbi->mode|S_IFCHR, kdev_t_to_nr(np->kdev));
 		}
 	}
 }
