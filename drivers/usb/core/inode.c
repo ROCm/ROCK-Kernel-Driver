@@ -4,7 +4,7 @@
  *	inode.c  --  Inode/Dentry functions for the USB device file system.
  *
  *	Copyright (C) 2000 Thomas Sailer (sailer@ife.ee.ethz.ch)
- *	Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
+ *	Copyright (c) 2001,2002 Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -176,7 +176,10 @@ static int usbfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
 			int dev)
 {
 	struct inode *inode = usbfs_get_inode(dir->i_sb, mode, dev);
-	int error = -ENOSPC;
+	int error = -EPERM;
+
+	if (dentry->d_inode)
+		return -EEXIST;
 
 	if (inode) {
 		d_instantiate(dentry, inode);
@@ -188,12 +191,19 @@ static int usbfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
 
 static int usbfs_mkdir (struct inode *dir, struct dentry *dentry, int mode)
 {
-	return usbfs_mknod (dir, dentry, mode | S_IFDIR, 0);
+	int res;
+
+	mode = (mode & (S_IRWXUGO | S_ISVTX)) | S_IFDIR;
+	res = usbfs_mknod (dir, dentry, mode, 0);
+	if (!res)
+		dir->i_nlink++;
+	return res;
 }
 
 static int usbfs_create (struct inode *dir, struct dentry *dentry, int mode)
 {
- 	return usbfs_mknod (dir, dentry, mode | S_IFREG, 0);
+	mode = (mode & S_IALLUGO) | S_IFREG;
+	return usbfs_mknod (dir, dentry, mode, 0);
 }
 
 static inline int usbfs_positive (struct dentry *dentry)
@@ -221,21 +231,53 @@ static int usbfs_empty (struct dentry *dentry)
 
 static int usbfs_unlink (struct inode *dir, struct dentry *dentry)
 {
+	struct inode *inode = dentry->d_inode;
+	down(&inode->i_sem);
+	dentry->d_inode->i_nlink--;
+	dput(dentry);
+	up(&inode->i_sem);
+	d_delete(dentry);
+	return 0;
+}
+
+static void d_unhash(struct dentry *dentry)
+{
+	dget(dentry);
+	spin_lock(&dcache_lock);
+	switch (atomic_read(&dentry->d_count)) {
+	default:
+		spin_unlock(&dcache_lock);
+		shrink_dcache_parent(dentry);
+		spin_lock(&dcache_lock);
+		if (atomic_read(&dentry->d_count) != 2)
+			break;
+	case 2:
+		list_del_init(&dentry->d_hash);
+	}
+	spin_unlock(&dcache_lock);
+}
+
+static int usbfs_rmdir(struct inode *dir, struct dentry *dentry)
+{
 	int error = -ENOTEMPTY;
+	struct inode * inode = dentry->d_inode;
 
+	down(&inode->i_sem);
+	d_unhash(dentry);
 	if (usbfs_empty(dentry)) {
-		struct inode *inode = dentry->d_inode;
-
-		lock_kernel();
-		inode->i_nlink--;
-		unlock_kernel();
+		dentry->d_inode->i_nlink -= 2;
 		dput(dentry);
+		inode->i_flags |= S_DEAD;
+		dir->i_nlink--;
 		error = 0;
 	}
+	up(&inode->i_sem);
+	if (!error)
+		d_delete(dentry);
+	dput(dentry);
 	return error;
 }
 
-#define usbfs_rmdir usbfs_unlink
 
 /* default file operations */
 static ssize_t default_read_file (struct file *file, char *buf,
@@ -254,7 +296,7 @@ static loff_t default_file_lseek (struct file *file, loff_t offset, int orig)
 {
 	loff_t retval = -EINVAL;
 
-	lock_kernel();
+	down(&file->f_dentry->d_inode->i_sem);
 	switch(orig) {
 	case 0:
 		if (offset > 0) {
@@ -271,14 +313,18 @@ static loff_t default_file_lseek (struct file *file, loff_t offset, int orig)
 	default:
 		break;
 	}
-	unlock_kernel();
+	up(&file->f_dentry->d_inode->i_sem);
 	return retval;
 }
 
-static int default_open (struct inode *inode, struct file *filp)
+static int default_open (struct inode *inode, struct file *file)
 {
-	if (inode->u.generic_ip)
-		filp->private_data = inode->u.generic_ip;
+	void *data;
+
+	data = file->f_dentry->d_parent->d_fsdata;
+	if (!data)
+		return -EFAULT;
+	file->private_data = data;
 
 	return 0;
 }
@@ -291,11 +337,7 @@ static struct file_operations default_file_operations = {
 };
 
 static struct inode_operations usbfs_dir_inode_operations = {
-	.create =	usbfs_create,
 	.lookup =	simple_lookup,
-	.unlink =	usbfs_unlink,
-	.mkdir =	usbfs_mkdir,
-	.rmdir =	usbfs_rmdir,
 };
 
 static struct super_operations usbfs_ops = {
@@ -334,26 +376,32 @@ static int usbfs_fill_super(struct super_block *sb, void *data, int silent)
 	return 0;
 }
 
-/**
+static struct dentry * get_dentry(struct dentry *parent, const char *name)
+{               
+	struct qstr qstr;
+
+	qstr.name = name;
+	qstr.len = strlen(name);
+	qstr.hash = full_name_hash(name,qstr.len);
+	return lookup_hash(&qstr,parent);
+}               
+
+
+/*
  * fs_create_by_name - create a file, given a name
  * @name:	name of file
  * @mode:	type of file
  * @parent:	dentry of directory to create it in
  * @dentry:	resulting dentry of file
+ * @data:	data to put in this dentry
  *
- * There is a bit of overhead in creating a file - basically, we 
- * have to hash the name of the file, then look it up. This will
- * prevent files of the same name. 
- * We then call the proper vfs_ function to take care of all the 
- * file creation details. 
  * This function handles both regular files and directories.
  */
 static int fs_create_by_name (const char *name, mode_t mode,
-			      struct dentry *parent, struct dentry **dentry)
+			      struct dentry *parent, struct dentry **dentry,
+			      void *data)
 {
-	struct dentry *d = NULL;
-	struct qstr qstr;
-	int error;
+	int error = 0;
 
 	/* If the parent is not specified, we create it in the root.
 	 * We need the root dentry to do this, which is in the super 
@@ -372,34 +420,18 @@ static int fs_create_by_name (const char *name, mode_t mode,
 	}
 
 	*dentry = NULL;
-	qstr.name = name;
-	qstr.len = strlen(name);
- 	qstr.hash = full_name_hash(name,qstr.len);
-
-	parent = dget(parent);
-
 	down(&parent->d_inode->i_sem);
-
-	d = lookup_hash(&qstr,parent);
-
-	error = PTR_ERR(d);
-	if (!IS_ERR(d)) {
-		switch(mode & S_IFMT) {
-			case 0: 
-			case S_IFREG:
-				error = vfs_create(parent->d_inode,d,mode);
-				break;
-			case S_IFDIR:
-				error = vfs_mkdir(parent->d_inode,d,mode);
-				break;
-			default:
-				err("cannot create special files");
-		}
-		*dentry = d;
-	}
+	*dentry = get_dentry (parent, name);
+	if (!IS_ERR(dentry)) {
+		(*dentry)->d_fsdata = data;
+		if ((mode & S_IFMT) == S_IFDIR)
+			error = usbfs_mkdir (parent->d_inode, *dentry, mode);
+		else 
+			error = usbfs_create (parent->d_inode, *dentry, mode);
+	} else
+		error = PTR_ERR(dentry);
 	up(&parent->d_inode->i_sem);
 
-	dput(parent);
 	return error;
 }
 
@@ -413,13 +445,11 @@ static struct dentry *fs_create_file (const char *name, mode_t mode,
 
 	dbg("creating file '%s'",name);
 
-	error = fs_create_by_name(name,mode,parent,&dentry);
+	error = fs_create_by_name (name, mode, parent, &dentry, data);
 	if (error) {
 		dentry = NULL;
 	} else {
 		if (dentry->d_inode) {
-			if (data)
-				dentry->d_inode->u.generic_ip = data;
 			if (fops)
 				dentry->d_inode->i_fop = fops;
 			dentry->d_inode->i_uid = uid;
@@ -441,12 +471,11 @@ static void fs_remove_file (struct dentry *dentry)
 	if (usbfs_positive(dentry)) {
 		if (dentry->d_inode) {
 			if (S_ISDIR(dentry->d_inode->i_mode))
-				vfs_rmdir(parent->d_inode,dentry);
+				usbfs_rmdir(parent->d_inode, dentry);
 			else
-				vfs_unlink(parent->d_inode,dentry);
-		}
-
+				usbfs_unlink(parent->d_inode, dentry);
 		dput(dentry);
+		}
 	}
 	up(&parent->d_inode->i_sem);
 }
@@ -471,14 +500,14 @@ static struct file_system_type usbdevice_fs_type = {
 	.owner =	THIS_MODULE,
 	.name =		"usbdevfs",
 	.get_sb =	usb_get_sb,
-	.kill_sb =	kill_anon_super,
+	.kill_sb =	kill_litter_super,
 };
 
 static struct file_system_type usb_fs_type = {
 	.owner =	THIS_MODULE,
 	.name =		"usbfs",
 	.get_sb =	usb_get_sb,
-	.kill_sb =	kill_anon_super,
+	.kill_sb =	kill_litter_super,
 };
 
 /* --------------------------------------------------------------------- */
@@ -536,7 +565,7 @@ static int create_special_files (void)
 {
 	int retval;
 
-	/* create the devices and drivers special files */
+	/* create the devices special file */
 	retval = get_mount ();
 	if (retval)
 		return retval;

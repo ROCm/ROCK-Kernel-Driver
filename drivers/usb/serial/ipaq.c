@@ -9,6 +9,10 @@
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
  *
+ * (26/7/2002) ganesh
+ * 	Fixed up broken error handling in ipaq_open. Retry the "kickstart"
+ * 	packet much harder - this drastically reduces connection failures.
+ *
  * (30/4/2002) ganesh
  * 	Added support for the Casio EM500. Completely untested. Thanks
  * 	to info from Nathan <wfilardo@fuse.net>
@@ -53,6 +57,8 @@
 
 #include "usb-serial.h"
 #include "ipaq.h"
+
+#define KP_RETRIES	100
 
 /*
  * Version Information
@@ -118,6 +124,7 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 	struct ipaq_private	*priv;
 	struct ipaq_packet	*pkt;
 	int			i, result = 0;
+	int			retries = KP_RETRIES;
 
 	if (port_paranoia_check(port, __FUNCTION__)) {
 		return -ENODEV;
@@ -192,31 +199,35 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (result) {
 		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
+		goto error;
 	}
 
 	/*
-	 * Send out two control messages observed in win98 sniffs. Not sure what
-	 * they do.
+	 * Send out control message observed in win98 sniffs. Not sure what
+	 * it does, but from empirical observations, it seems that the device
+	 * will start the chat sequence once one of these messages gets
+	 * through. Since this has a reasonably high failure rate, we retry
+	 * several times.
 	 */
 
-	result = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0), 0x22, 0x21,
-			0x1, 0, NULL, 0, 5 * HZ);
-	if (result < 0) {
-		err(__FUNCTION__ " - failed doing control urb, error %d", result);
+	while (retries--) {
+		result = usb_control_msg(serial->dev,
+				usb_sndctrlpipe(serial->dev, 0), 0x22, 0x21,
+				0x1, 0, NULL, 0, HZ / 10 + 1);
+		if (result == 0) {
+			return 0;
+		}
 	}
-	result = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0), 0x22, 0x21,
-			0x1, 0, NULL, 0, 5 * HZ);
-	if (result < 0) {
-		err(__FUNCTION__ " - failed doing control urb, error %d", result);
-	}
-	
-	return result;
+	err(__FUNCTION__ " - failed doing control urb, error %d", result);
+	goto error;
 
 enomem:
+	result = -ENOMEM;
+	err(__FUNCTION__ " - Out of memory");
+error:
 	ipaq_destroy_lists(port);
 	kfree(priv);
-	err(__FUNCTION__ " - Out of memory");
-	return -ENOMEM;
+	return result;
 }
 
 

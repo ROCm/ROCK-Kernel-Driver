@@ -86,7 +86,6 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
-#include <linux/usb.h>
 
 #ifdef CONFIG_USB_SERIAL_DEBUG
 	static int debug = 1;
