@@ -358,21 +358,12 @@ static int __init alsa_sound_init(void)
 static void __exit alsa_sound_exit(void)
 {
 #ifdef CONFIG_DEVFS_FS
-	devfs_handle_t master;
 	char controlname[24];
 	short controlnum;
 
 	for (controlnum = 0; controlnum < snd_cards_limit; controlnum++) {
 		sprintf(controlname, "snd/controlC%d", controlnum);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-		master = devfs_find_handle(NULL, controlname, strlen(controlname), 0, 0, DEVFS_SPECIAL_CHR, 0);
-		devfs_unregister(master);
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-		master = devfs_find_handle(NULL, controlname, 0, 0, DEVFS_SPECIAL_CHR, 0);
-		devfs_unregister(master);
-#else
 		devfs_find_and_unregister(NULL, controlname, 0, 0, DEVFS_SPECIAL_CHR, 0);
-#endif
 	}
 #endif
 	
