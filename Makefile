@@ -263,6 +263,11 @@ include/linux/version.h: ./Makefile
 	@echo Generating $@
 	@. scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
 
+# helpers built in scripts/
+
+scripts/mkdep scripts/split-include : FORCE
+	@$(MAKE) -C scripts
+
 # ---------------------------------------------------------------------------
 # Generate dependencies
 
@@ -360,15 +365,6 @@ endif # CONFIG_MODULES
 # ---------------------------------------------------------------------------
 
 include Rules.make
-
-# Build helpers in scripts/
-# FIXME: do that in scripts/Makefile?
-
-scripts/mkdep: scripts/mkdep.c
-	$(HOSTCC) $(HOSTCFLAGS) -o scripts/mkdep scripts/mkdep.c
-
-scripts/split-include: scripts/split-include.c
-	$(HOSTCC) $(HOSTCFLAGS) -o scripts/split-include scripts/split-include.c
 
 # Cleaning up
 # ---------------------------------------------------------------------------

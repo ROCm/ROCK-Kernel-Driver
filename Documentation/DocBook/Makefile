@@ -12,17 +12,12 @@ EPS-parportbook := $(patsubst %.fig, %.eps, $(IMG-parportbook))
 PNG-parportbook := $(patsubst %.fig, %.png, $(IMG-parportbook))
 C-procfs-example = procfs_example.sgml
 
-$(TOPDIR)/scripts/docgen: FORCE
-	chmod 755 $(TOPDIR)/scripts/docgen
+$(TOPDIR)/scripts/docgen $(TOPDIR)/scripts/gen-all-syms \
+$(TOPDIR)/scripts/kernel-doc $(TOPDIR)/scripts/docproc: doc-progs ;
 
-$(TOPDIR)/scripts/gen-all-syms: FORCE
-	chmod 755 $(TOPDIR)/scripts/gen-all-syms
-
-$(TOPDIR)/scripts/kernel-doc: FORCE
-	chmod 755 $(TOPDIR)/scripts/kernel-doc
-
-$(TOPDIR)/scripts/docproc: FORCE
-	$(MAKE) -C $(TOPDIR)/scripts docproc
+.PHONY: doc-progs
+doc-progs:
+	@$(MAKE) -C $(TOPDIR)/scripts doc-progs
 
 $(BOOKS): $(TOPDIR)/scripts/docgen $(TOPDIR)/scripts/gen-all-syms \
 	  $(TOPDIR)/scripts/kernel-doc $(TOPDIR)/scripts/docproc
