@@ -99,6 +99,7 @@ static struct pci_device_id e1000_pci_tbl[] __devinitdata = {
 	{0x8086, 0x1008, 0x8086, 0x1107, 0, 0, 0},
 	{0x8086, 0x1009, 0x8086, 0x1109, 0, 0, 0},
 	{0x8086, 0x100C, 0x8086, 0x1112, 0, 0, 0},
+	{0x8086, 0x100E, 0x8086, 0x001E, 0, 0, 0},
 	/* Compaq Gigabit Ethernet Server Adapter */
 	{0x8086, 0x1000, 0x0E11, PCI_ANY_ID, 0, 0, 1},
 	{0x8086, 0x1001, 0x0E11, PCI_ANY_ID, 0, 0, 1},
@@ -115,6 +116,7 @@ static struct pci_device_id e1000_pci_tbl[] __devinitdata = {
 	{0x8086, 0x1009, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x100C, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x100D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x100E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	/* required last entry */
 	{0,}
 };
@@ -131,6 +133,8 @@ static char *e1000_strings[] = {
 
 int e1000_up(struct e1000_adapter *adapter);
 void e1000_down(struct e1000_adapter *adapter);
+void e1000_reset(struct e1000_adapter *adapter);
+
 static int e1000_init_module(void);
 static void e1000_exit_module(void);
 static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
@@ -163,7 +167,6 @@ static void e1000_clean_tx_irq(struct e1000_adapter *adapter);
 static void e1000_clean_rx_irq(struct e1000_adapter *adapter);
 static void e1000_alloc_rx_buffers(struct e1000_adapter *adapter);
 static int e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
-static void e1000_reset(struct e1000_adapter *adapter);
 static void e1000_enter_82542_rst(struct e1000_adapter *adapter);
 static void e1000_leave_82542_rst(struct e1000_adapter *adapter);
 static inline void e1000_rx_checksum(struct e1000_adapter *adapter,
@@ -248,8 +251,6 @@ e1000_up(struct e1000_adapter *adapter)
 	e1000_configure_rx(adapter);
 	e1000_alloc_rx_buffers(adapter);
 
-	e1000_clear_hw_cntrs(&adapter->shared);
-
 	mod_timer(&adapter->watchdog_timer, jiffies);
 	e1000_irq_enable(adapter);
 
@@ -259,7 +260,6 @@ e1000_up(struct e1000_adapter *adapter)
 void
 e1000_down(struct e1000_adapter *adapter)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
 	struct net_device *netdev = adapter->netdev;
 
 	e1000_irq_disable(adapter);
@@ -269,64 +269,30 @@ e1000_down(struct e1000_adapter *adapter)
 	netif_carrier_off(netdev);
 	netif_stop_queue(netdev);
 
-	/* disable the transmit and receive units */
-
-	E1000_WRITE_REG(shared, RCTL, 0);
-	E1000_WRITE_REG(shared, TCTL, E1000_TCTL_PSP);
-
-	/* delay to allow PCI transactions to complete */
-
-	msec_delay(10);
-
+	e1000_reset(adapter);
 	e1000_clean_tx_ring(adapter);
 	e1000_clean_rx_ring(adapter);
-
-	e1000_reset(adapter);
 }
 
-static void
+void
 e1000_reset(struct e1000_adapter *adapter)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
-	uint32_t ctrl_ext;
-
 	/* Repartition Pba for greater than 9k mtu
 	 * To take effect CTRL.RST is required.
 	 */
 
 	if(adapter->rx_buffer_len > E1000_RXBUFFER_8192)
-		E1000_WRITE_REG(shared, PBA, E1000_JUMBO_PBA);
+		E1000_WRITE_REG(&adapter->shared, PBA, E1000_JUMBO_PBA);
 	else
-		E1000_WRITE_REG(shared, PBA, E1000_DEFAULT_PBA);
+		E1000_WRITE_REG(&adapter->shared, PBA, E1000_DEFAULT_PBA);
 
-	/* 82542 2.0 needs MWI disabled while issuing a reset */
-
-	if(shared->mac_type == e1000_82542_rev2_0)
-		e1000_enter_82542_rst(adapter);
-
-	/* global reset */
-
-	E1000_WRITE_REG(shared, CTRL, E1000_CTRL_RST);
-	msec_delay(10);
-
-	/* EEPROM reload */
-
-	ctrl_ext = E1000_READ_REG(shared, CTRL_EXT);
-	ctrl_ext |= E1000_CTRL_EXT_EE_RST;
-	E1000_WRITE_REG(shared, CTRL_EXT, ctrl_ext);
-	msec_delay(5);
-
-	if(shared->mac_type == e1000_82542_rev2_0)
-		e1000_leave_82542_rst(adapter);
-
-	shared->tbi_compatibility_on = FALSE;
-	shared->fc = shared->original_fc;
-
-	e1000_init_hw(shared);
+	adapter->shared.fc = adapter->shared.original_fc;
+	e1000_reset_hw(&adapter->shared);
+	e1000_init_hw(&adapter->shared);
+	e1000_reset_adaptive(&adapter->shared);
+	e1000_phy_get_info(&adapter->shared, &adapter->phy_info);
 
 	e1000_enable_WOL(adapter);
-
-	return;
 }
 
 /**
@@ -422,7 +388,7 @@ e1000_probe(struct pci_dev *pdev,
 
 	/* make sure the EEPROM is good */
 
-	if(!e1000_validate_eeprom_checksum(&adapter->shared))
+	if(e1000_validate_eeprom_checksum(&adapter->shared) < 0)
 		goto err_eeprom;
 
 	/* copy the MAC address out of the EEPROM */
@@ -516,7 +482,7 @@ e1000_remove(struct pci_dev *pdev)
 static void __devinit
 e1000_sw_init(struct e1000_adapter *adapter)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *shared = &adapter->shared;
 	struct net_device *netdev = adapter->netdev;
 	struct pci_dev *pdev = adapter->pdev;
 
@@ -565,6 +531,9 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	case E1000_DEV_ID_82544GC_COPPER:
 	case E1000_DEV_ID_82544GC_LOM:
 		shared->mac_type = e1000_82544;
+		break;
+	case E1000_DEV_ID_82540EM:
+		shared->mac_type = e1000_82540;
 		break;
 	default:
 		/* should never have loaded on this device */
@@ -890,8 +859,19 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 
 	/* set the Receive Delay Timer Register */
 
-	E1000_WRITE_REG(&adapter->shared, RDTR,
-	                adapter->rx_int_delay | E1000_RDT_FPDB);
+	if(adapter->shared.mac_type == e1000_82540) {
+		E1000_WRITE_REG(&adapter->shared, RADV, adapter->rx_int_delay);
+		E1000_WRITE_REG(&adapter->shared, RDTR, 64);
+
+		/* Set the interrupt throttling rate.  Value is calculated
+		 * as DEFAULT_ITR = 1/(MAX_INTS_PER_SEC * 256ns) */
+#define MAX_INTS_PER_SEC        8000
+#define DEFAULT_ITR             1000000000/(MAX_INTS_PER_SEC * 256)
+		E1000_WRITE_REG(&adapter->shared, ITR, DEFAULT_ITR);
+
+	} else {
+		E1000_WRITE_REG(&adapter->shared, RDTR, adapter->rx_int_delay);
+	}
 
 	/* Setup the Base and Length of the Rx Descriptor Ring */
 
@@ -1152,7 +1132,7 @@ static void
 e1000_set_multi(struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *shared = &adapter->shared;
 	struct dev_mc_list *mc_ptr;
 	uint32_t rctl;
 	uint32_t hash_value;
@@ -1519,8 +1499,9 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 static void
 e1000_update_stats(struct e1000_adapter *adapter)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *shared = &adapter->shared;
 	unsigned long flags;
+	uint16_t phy_tmp;
 
 #define PHY_IDLE_ERROR_COUNT_MASK 0x00FF
 
@@ -1626,14 +1607,18 @@ e1000_update_stats(struct e1000_adapter *adapter)
 
 	/* Tx Dropped needs to be maintained elsewhere */
 
-	if(adapter->shared.media_type == e1000_media_type_copper) {
-		adapter->phy_stats.idle_errors +=
-			(e1000_read_phy_reg(shared, PHY_1000T_STATUS)
-			 & PHY_IDLE_ERROR_COUNT_MASK);
-		adapter->phy_stats.receive_errors +=
-			e1000_read_phy_reg(shared, M88E1000_RX_ERR_CNTR);
+	/* Phy Stats */
+
+	if(shared->media_type == e1000_media_type_copper) {
+		if((adapter->link_speed == SPEED_1000) &&
+		   (!e1000_read_phy_reg(shared, PHY_1000T_STATUS, &phy_tmp))) {
+			phy_tmp &= PHY_IDLE_ERROR_COUNT_MASK;
+			adapter->phy_stats.idle_errors += phy_tmp;
+		}
+
+		if(!e1000_read_phy_reg(shared, M88E1000_RX_ERR_CNTR, &phy_tmp))
+			adapter->phy_stats.receive_errors += phy_tmp;
 	}
-	return;
 }
 
 /**
@@ -1804,7 +1789,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 
 			last_byte = *(skb->data + length - 1);
 
-			if(TBI_ACCEPT(&adapter->shared, rx_desc->special,
+			if(TBI_ACCEPT(&adapter->shared, rx_desc->status,
 			              rx_desc->errors, length, last_byte)) {
 
 				spin_lock_irqsave(&adapter->stats_lock, flags);
@@ -2003,7 +1988,7 @@ e1000_enable_WOL(struct e1000_adapter *adapter)
 }
 
 void
-e1000_write_pci_cfg(struct e1000_shared_adapter *shared,
+e1000_write_pci_cfg(struct e1000_hw *shared,
                     uint32_t reg, uint16_t *value)
 {
 	struct e1000_adapter *adapter = shared->back;

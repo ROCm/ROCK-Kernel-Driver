@@ -546,18 +546,6 @@ e1000_proc_polarity_correction(void *data, size_t len, char *buf)
 	sprintf(buf,
 		correction == e1000_polarity_reversal_enabled  ? "Disabled" :
 		correction == e1000_polarity_reversal_disabled ? "Enabled"  :
-		"Undefined");
-	return buf;
-}
-
-static char *
-e1000_proc_link_reset_enabled(void *data, size_t len, char *buf)
-{
-	struct e1000_adapter *adapter = data;
-	e1000_down_no_idle link_reset = adapter->phy_info.link_reset;
-	sprintf(buf,
-		link_reset == e1000_down_no_idle_no_detect ? "Disabled" :
-		link_reset == e1000_down_no_idle_detect    ? "Enabled"  :
 		"Unknown");
 	return buf;
 }
@@ -567,7 +555,10 @@ e1000_proc_mdi_x_enabled(void *data, size_t len, char *buf)
 {
 	struct e1000_adapter *adapter = data;
 	e1000_auto_x_mode mdix_mode = adapter->phy_info.mdix_mode;
-	sprintf(buf, mdix_mode == 0 ? "MDI" : "MDI-X");
+	sprintf(buf, 
+		mdix_mode == e1000_auto_x_mode_manual_mdi  ? "MDI"   : 
+		mdix_mode == e1000_auto_x_mode_manual_mdix ? "MDI-X" :
+		"Unknown");
 	return buf;
 }
 
@@ -600,7 +591,7 @@ e1000_proc_rx_status(void *data, size_t len, char *buf)
 static void __devinit
 e1000_proc_list_setup(struct e1000_adapter *adapter)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *shared = &adapter->shared;
 	struct list_head *proc_list_head = &adapter->proc_list_head;
 
 	INIT_LIST_HEAD(proc_list_head);
@@ -703,8 +694,6 @@ e1000_proc_list_setup(struct e1000_adapter *adapter)
 		           adapter, e1000_proc_polarity_correction);
 		LIST_ADD_U("PHY_Idle_Errors", 
 		           &adapter->phy_stats.idle_errors);
-		LIST_ADD_F("PHY_Link_Reset_Enabled",
-		           adapter, e1000_proc_link_reset_enabled);
 		LIST_ADD_U("PHY_Receive_Errors",
 		           &adapter->phy_stats.receive_errors);
 		LIST_ADD_F("PHY_MDI_X_Enabled",

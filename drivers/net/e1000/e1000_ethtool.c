@@ -88,7 +88,7 @@ extern void e1000_enable_WOL(struct e1000_adapter *adapter);
 static void
 e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *shared = &adapter->shared;
 
 	if(shared->media_type == e1000_media_type_copper) {
 
@@ -158,7 +158,7 @@ e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 static int
 e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *shared = &adapter->shared;
 
 	if(ecmd->autoneg == AUTONEG_ENABLE) {
 		shared->autoneg = 1;
@@ -197,9 +197,13 @@ e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 }
 
 static inline int
-e1000_eeprom_size(struct e1000_shared_adapter *shared)
+e1000_eeprom_size(struct e1000_hw *shared)
 {
-	return 128;
+	if((shared->mac_type > e1000_82544) &&
+	   (E1000_READ_REG(shared, EECD) & E1000_EECD_SIZE))
+		return 512;
+	else
+		return 128;
 }
 
 static void
@@ -218,7 +222,7 @@ static void
 e1000_ethtool_geeprom(struct e1000_adapter *adapter,
                       struct ethtool_eeprom *eeprom, uint16_t *eeprom_buff)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *shared = &adapter->shared;
 	int i, max_len;
 
 	eeprom->magic = shared->vendor_id | (shared->device_id << 16);
@@ -229,15 +233,13 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 		eeprom->len = (max_len - eeprom->offset);
 
 	for(i = 0; i < max_len; i++)
-		eeprom_buff[i] = e1000_read_eeprom(&adapter->shared, i);
-
-	return;
+		e1000_read_eeprom(&adapter->shared, i, &eeprom_buff[i]);
 }
 
 static void
 e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *shared = &adapter->shared;
 	
 	if(shared->mac_type < e1000_82544) {
 		wol->supported = 0;
@@ -266,7 +268,7 @@ e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 static int
 e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *shared = &adapter->shared;
 
 	if(shared->mac_type < e1000_82544)
 		return wol->wolopts == 0 ? 0 : -EOPNOTSUPP;

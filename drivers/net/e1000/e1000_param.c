@@ -205,7 +205,7 @@ E1000_PARAM(TxIntDelay, "Transmit Interrupt Delay");
  *
  * Valid Range: 0-65535
  *
- * Default Value: 64
+ * Default Value: 64/128
  */
 
 E1000_PARAM(RxIntDelay, "Receive Interrupt Delay");
@@ -255,9 +255,10 @@ E1000_PARAM(DisablePolarityCorrection,
 #define MAX_TIDV                  0xFFFF
 #define MIN_TIDV                       0
 
-#define DEFAULT_RIDV                  64
-#define MAX_RIDV                  0xFFFF
-#define MIN_RIDV                       0
+#define DEFAULT_RDTR                  64
+#define DEFAULT_RADV                 128
+#define MAX_RXDELAY               0xFFFF
+#define MIN_RXDELAY                    0
 
 #define DEFAULT_MDIX                   0
 #define MAX_MDIX                       3
@@ -435,13 +436,16 @@ e1000_check_options(struct e1000_adapter *adapter)
 		e1000_validate_option(&adapter->tx_int_delay, &opt);
 	}
 	{ /* Receive Interrupt Delay */
+		char *rdtr = "using default of " __MODULE_STRING(DEFAULT_RDTR);
+		char *radv = "using default of " __MODULE_STRING(DEFAULT_RADV);
 		struct e1000_option opt = {
 			type: range_option,
 			name: "Receive Interrupt Delay",
-			err:  "using default of " __MODULE_STRING(DEFAULT_RIDV),
-			def:  DEFAULT_RIDV,
-			arg: { r: { min: MIN_RIDV, max: MAX_RIDV }}
+			arg: { r: { min: MIN_RXDELAY, max: MAX_RXDELAY }}
 		};
+		e1000_mac_type mac_type = adapter->shared.mac_type;
+		opt.def = mac_type < e1000_82540 ? DEFAULT_RDTR : DEFAULT_RADV;
+		opt.err = mac_type < e1000_82540 ? rdtr : radv;
 
 		adapter->rx_int_delay = RxIntDelay[bd];
 		e1000_validate_option(&adapter->rx_int_delay, &opt);
@@ -700,7 +704,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 	}
 	
 	/* Speed, AutoNeg and MDI/MDI-X must all play nice */
-	if (!e1000_validate_mdi_setting(&(adapter->shared))) {
+	if (e1000_validate_mdi_setting(&(adapter->shared)) < 0) {
 		printk(KERN_INFO "Speed, AutoNeg and MDI-X specifications are "
 		       "incompatible. Setting MDI-X to a compatible value.\n");
 	}
