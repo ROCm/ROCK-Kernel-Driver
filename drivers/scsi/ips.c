@@ -433,6 +433,7 @@ int ips_eh_abort(Scsi_Cmnd *);
 int ips_eh_reset(Scsi_Cmnd *);
 int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
 int ips_biosparam(Disk *, struct block_device *, int *);
+int ips_slave_attach(Scsi_Device *);
 const char * ips_info(struct Scsi_Host *);
 void do_ipsintr(int, void *, struct pt_regs *);
 static int ips_hainit(ips_ha_t *);
@@ -481,7 +482,7 @@ static int ips_flash_firmware(ips_ha_t *, ips_passthru_t *, ips_scb_t *);
 static void ips_free_flash_copperhead(ips_ha_t *ha);
 static void ips_get_bios_version(ips_ha_t *, int);
 static void ips_identify_controller(ips_ha_t *);
-static void ips_select_queue_depth(struct Scsi_Host *, Scsi_Device *);
+//static void ips_select_queue_depth(struct Scsi_Host *, Scsi_Device *);
 static void ips_chkstatus(ips_ha_t *, IPS_STATUS *);
 static void ips_enable_int_copperhead(ips_ha_t *);
 static void ips_enable_int_copperhead_memio(ips_ha_t *);
@@ -1087,7 +1088,7 @@ ips_detect(Scsi_Host_Template *SHT) {
          sh->n_io_port = io_addr ? 255 : 0;
          sh->unique_id = (io_addr) ? io_addr : mem_addr;
          sh->irq = irq;
-         sh->select_queue_depths = ips_select_queue_depth;
+         //sh->select_queue_depths = ips_select_queue_depth;
          sh->sg_tablesize = sh->hostt->sg_tablesize;
          sh->can_queue = sh->hostt->can_queue;
          sh->cmd_per_lun = sh->hostt->cmd_per_lun;
@@ -1827,7 +1828,7 @@ ips_biosparam(Disk *disk, struct block_device *dev, int geom[]) {
 /*   Select queue depths for the devices on the contoller                   */
 /*                                                                          */
 /****************************************************************************/
-static void
+/*static void
 ips_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs) {
    Scsi_Device *device;
    ips_ha_t    *ha;
@@ -1859,6 +1860,30 @@ ips_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs) {
             device->queue_depth = 2;
       }
    }
+}
+*/
+
+/****************************************************************************/
+/*                                                                          */
+/* Routine Name: ips_slave_attach                                           */
+/*                                                                          */
+/* Routine Description:                                                     */
+/*                                                                          */
+/*   Set queue depths on devices once scan is complete                      */
+/*                                                                          */
+/****************************************************************************/
+int
+ips_slave_attach(Scsi_Device *SDptr)
+{
+   ips_ha_t    *ha;
+   int          min;
+
+   ha = IPS_HA(SDptr->host);
+   min = ha->max_cmds / 4;
+   if (min < 8)
+      min = ha->max_cmds - 1;
+   scsi_adjust_queue_depth(SDptr, MSG_ORDERED_TAG, min);
+   return 0;
 }
 
 /****************************************************************************/
@@ -7407,7 +7432,7 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
     sh->n_io_port = io_addr ? 255 : 0;
     sh->unique_id = (io_addr) ? io_addr : mem_addr;
     sh->irq = irq;
-    sh->select_queue_depths = ips_select_queue_depth;
+    //sh->select_queue_depths = ips_select_queue_depth;
     sh->sg_tablesize = sh->hostt->sg_tablesize;
     sh->can_queue = sh->hostt->can_queue;
     sh->cmd_per_lun = sh->hostt->cmd_per_lun;
