@@ -260,10 +260,8 @@ acpi_system_suspend(
 	u32			state)
 {
 	acpi_status		status = AE_ERROR;
-#if 0
 	unsigned long		flags = 0;
 
-	/* this is very broken, so don't do anything until it's fixed */
 	save_flags(flags);
 	
 	switch (state)
@@ -289,8 +287,6 @@ acpi_sleep_done:
 	fix_processor_context();
 
 	restore_flags(flags);
-#endif
-	printk("ACPI: ACPI-based suspend currently broken, aborting\n");
 
 	return status;
 }
