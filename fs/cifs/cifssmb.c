@@ -387,6 +387,7 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 			spin_lock(&GlobalMid_Lock);
 			ses->server->tcpStatus = CifsExiting;
 			spin_unlock(&GlobalMid_Lock);
+			rc = -ESHUTDOWN;
 		}
 	}
 	if (pSMB)

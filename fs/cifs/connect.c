@@ -453,7 +453,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		spin_unlock(&GlobalMid_Lock);
 		read_unlock(&GlobalSMBSeslock);
 		set_current_state(TASK_INTERRUPTIBLE);
-		/* 1/8th of sec should be more than enough time for them to exit */
+		/* 1/8th of sec is more than enough time for them to exit */
 		schedule_timeout(HZ/8); 
 	}
 
@@ -468,7 +468,8 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 	}
 	kfree(server);
 
-	cFYI(1, ("About to exit from demultiplex thread"));
+	set_current_state(TASK_INTERRUPTIBLE);
+	schedule_timeout(HZ/4);
 	return 0;
 }
 
@@ -2769,6 +2770,7 @@ cifs_umount(struct super_block *sb, struct cifs_sb_info *cifs_sb)
 	int rc = 0;
 	int xid;
 	struct cifsSesInfo *ses = NULL;
+	struct task_struct *cifsd_task;
 
 	xid = GetXid();
 
@@ -2781,19 +2783,25 @@ cifs_umount(struct super_block *sb, struct cifs_sb_info *cifs_sb)
 		}
 		tconInfoFree(cifs_sb->tcon);
 		if ((ses) && (ses->server)) {
+			/* save off task so we do not refer to ses later */
+			cifsd_task = ses->server->tsk;
 			cFYI(1, ("About to do SMBLogoff "));
 			rc = CIFSSMBLogoff(xid, ses);
 			if (rc == -EBUSY) {
 				FreeXid(xid);
 				return 0;
-			}
- 
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ / 4);	/* give captive thread time to exit */
-			if((ses->server) && (ses->server->ssocket)) {            
-				cFYI(1,("Waking up socket by sending it signal "));
-				send_sig(SIGKILL,ses->server->tsk,1);
-			}
+			} else if (rc == -ESHUTDOWN) {
+			/* should we add wake_up_all(&server->request_q); 
+			   and add a check in  the check inFlight loop
+			   for the session ending */
+				set_current_state(TASK_INTERRUPTIBLE);
+			/* give captive thread time to exit */
+				schedule_timeout(HZ / 4);
+				cFYI(1,("Waking up socket by sending it signal"));
+				send_sig(SIGKILL,cifsd_task,1);
+				rc = 0;
+			} /* else - we have an smb session
+				left on this socket do not kill cifsd */
 		} else
 			cFYI(1, ("No session or bad tcon"));
 	}
