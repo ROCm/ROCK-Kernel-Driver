@@ -91,10 +91,7 @@ static struct ipt_target ipt_dscp_reg = {
 
 static int __init init(void)
 {
-	if (ipt_register_target(&ipt_dscp_reg))
-		return -EINVAL;
-
-	return 0;
+	return ipt_register_target(&ipt_dscp_reg);
 }
 
 static void __exit fini(void)
