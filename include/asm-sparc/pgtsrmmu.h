@@ -73,6 +73,7 @@
 #define SRMMU_CACHE        0x80
 #define SRMMU_DIRTY        0x40
 #define SRMMU_REF          0x20
+#define SRMMU_NOREAD       0x10
 #define SRMMU_EXEC         0x08
 #define SRMMU_WRITE        0x04
 #define SRMMU_VALID        0x02 /* SRMMU_ET_PTE */
