@@ -134,7 +134,7 @@ int esp_output(struct sk_buff *skb)
 
 	if (esp->auth.icv_full_len) {
 		esp->auth.icv(esp, skb, (u8*)esph-skb->data,
-		              8+esp->conf.ivlen+clen, trailer->tail);
+		              sizeof(struct ip_esp_hdr) + esp->conf.ivlen+clen, trailer->tail);
 		pskb_put(skb, trailer, alen);
 	}
 
@@ -171,7 +171,7 @@ int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 	struct sk_buff *trailer;
 	int blksize = crypto_tfm_alg_blocksize(esp->conf.tfm);
 	int alen = esp->auth.icv_trunc_len;
-	int elen = skb->len - 8 - esp->conf.ivlen - alen;
+	int elen = skb->len - sizeof(struct ip_esp_hdr) - esp->conf.ivlen - alen;
 	int nfrags;
 
 	if (!pskb_may_pull(skb, sizeof(struct ip_esp_hdr)))
@@ -220,7 +220,7 @@ int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 			if (!sg)
 				goto out;
 		}
-		skb_to_sgvec(skb, sg, 8+esp->conf.ivlen, elen);
+		skb_to_sgvec(skb, sg, sizeof(struct ip_esp_hdr) + esp->conf.ivlen, elen);
 		crypto_cipher_decrypt(esp->conf.tfm, sg, sg, elen);
 		if (unlikely(sg != sgbuf))
 			kfree(sg);
@@ -237,8 +237,8 @@ int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 		iph->protocol = nexthdr[1];
 		pskb_trim(skb, skb->len - alen - padlen - 2);
 		memcpy(workbuf, skb->nh.raw, iph->ihl*4);
-		skb->h.raw = skb_pull(skb, 8 + esp->conf.ivlen);
-		skb->nh.raw += 8 + esp->conf.ivlen;
+		skb->h.raw = skb_pull(skb, sizeof(struct ip_esp_hdr) + esp->conf.ivlen);
+		skb->nh.raw += sizeof(struct ip_esp_hdr) + esp->conf.ivlen;
 		memcpy(skb->nh.raw, workbuf, iph->ihl*4);
 		skb->nh.iph->tot_len = htons(skb->len);
 	}
@@ -365,7 +365,7 @@ int esp_init_state(struct xfrm_state *x, void *args)
 		get_random_bytes(esp->conf.ivec, esp->conf.ivlen);
 	}
 	crypto_cipher_setkey(esp->conf.tfm, esp->conf.key, esp->conf.key_len);
-	x->props.header_len = 8 + esp->conf.ivlen;
+	x->props.header_len = sizeof(struct ip_esp_hdr) + esp->conf.ivlen;
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct iphdr);
 	x->data = esp;
