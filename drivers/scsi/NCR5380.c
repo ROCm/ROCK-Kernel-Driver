@@ -2512,7 +2512,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 					case HEAD_OF_QUEUE_TAG:
 					case ORDERED_QUEUE_TAG:
 					case SIMPLE_QUEUE_TAG:
-						cmd->device->tagged_queue = 0;
+						cmd->device->simple_tags = 0;
 						hostdata->busy[cmd->device->id] |= (1 << cmd->device->lun);
 						break;
 					default:

@@ -1819,7 +1819,7 @@ static void fas216_allocate_tag(FAS216_Info *info, Scsi_Cmnd *SCpnt)
 	/*
 	 * tagged queuing - allocate a new tag to this command
 	 */
-	if (SCpnt->device->tagged_queue && SCpnt->cmnd[0] != REQUEST_SENSE &&
+	if (SCpnt->device->simple_tags && SCpnt->cmnd[0] != REQUEST_SENSE &&
 	    SCpnt->cmnd[0] != INQUIRY) {
 	    SCpnt->device->current_tag += 1;
 		if (SCpnt->device->current_tag == 0)
@@ -3012,7 +3012,7 @@ int fas216_print_devices(FAS216_Info *info, char *buffer)
 		p += sprintf(p, "     %d/%d   ", scd->id, scd->lun);
 		if (scd->tagged_supported)
 			p += sprintf(p, "%3sabled(%3d) ",
-				     scd->tagged_queue ? "en" : "dis",
+				     scd->simple_tags ? "en" : "dis",
 				     scd->current_tag);
 		else
 			p += sprintf(p, "unsupported   ");

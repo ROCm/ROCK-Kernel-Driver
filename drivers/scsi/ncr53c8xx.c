@@ -4357,19 +4357,6 @@ static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 	}
 	cp->cmd = cmd;
 
-	/*---------------------------------------------------
-	**
-	**	Enable tagged queue if asked by scsi ioctl
-	**
-	**----------------------------------------------------
-	*/
-#if 0	/* This stuff was only useful for linux-1.2.13 */
-	if (lp && !lp->numtags && cmd->device && cmd->device->tagged_queue) {
-		lp->numtags = tp->usrtags;
-		ncr_setup_tags (np, cmd->device->id, cmd->device->lun);
-	}
-#endif
-
 	/*----------------------------------------------------
 	**
 	**	Build the identify / tag / sdtr message

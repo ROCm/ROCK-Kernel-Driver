@@ -3330,9 +3330,8 @@ mptscsih_slave_configure(Scsi_Device *device)
 		device, device->id, device->lun, device->channel));
 	dsprintk((KERN_INFO "sdtr %d wdtr %d ppr %d inq length=%d\n",
 		device->sdtr, device->wdtr, device->ppr, device->inquiry_len));
-	dsprintk(("tagged %d queue %d simple %d ordered %d\n",
-		device->tagged_supported, device->tagged_queue,
-		device->simple_tags, device->ordered_tags));
+	dsprintk(("tagged %d simple %d ordered %d\n",
+		device->tagged_supported, device->simple_tags, device->ordered_tags));
 
 	/*	set target parameters, queue depths, set dv flags ?  */
 	if (hd && (hd->Targets != NULL)) {
