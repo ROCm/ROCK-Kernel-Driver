@@ -1,4 +1,4 @@
-/* $Id: kcapi.c,v 1.1.2.5 2004/03/15 12:32:31 armin Exp $
+/* $Id: kcapi.c,v 1.1.2.6 2004/03/16 08:00:08 armin Exp $
  * 
  * Kernel CAPI 2.0 Module
  * 
@@ -31,7 +31,7 @@
 #include <linux/b1lli.h>
 #endif
 
-static char *revision = "$Revision: 1.1.2.5 $";
+static char *revision = "$Revision: 1.1.2.6 $";
 
 /* ------------------------------------------------------------- */
 
@@ -45,7 +45,7 @@ MODULE_PARM(showcapimsgs, "i");
 /* ------------------------------------------------------------- */
 
 struct capi_notifier {
-	struct capi_notifier *next;
+	struct work_struct work;
 	unsigned int cmd;
 	u32 controller;
 	u16 applid;
@@ -69,7 +69,6 @@ struct capi_ctr *capi_cards[CAPI_MAXCONTR];
 static int ncards;
 static struct sk_buff_head recv_queue;
 
-static struct work_struct tq_state_notify;
 static struct work_struct tq_recv_notify;
 
 /* -------- controller ref counting -------------------------------------- */
@@ -161,79 +160,6 @@ static void release_appl(struct capi_ctr *card, u16 applid)
 	capi_ctr_put(card);
 }
 
-
-/* -------- Notifier handling --------------------------------- */
-
-static struct capi_notifier_list{
-	struct capi_notifier *head;
-	struct capi_notifier *tail;
-} notifier_list;
-
-static spinlock_t notifier_lock = SPIN_LOCK_UNLOCKED;
-
-static inline void notify_enqueue(struct capi_notifier *np)
-{
-	struct capi_notifier_list *q = &notifier_list;
-	unsigned long flags;
-
-	spin_lock_irqsave(&notifier_lock, flags);
-	if (q->tail) {
-		q->tail->next = np;
-		q->tail = np;
-	} else {
-		q->head = q->tail = np;
-	}
-	spin_unlock_irqrestore(&notifier_lock, flags);
-}
-
-static inline struct capi_notifier *notify_dequeue(void)
-{
-	struct capi_notifier_list *q = &notifier_list;
-	struct capi_notifier *np = 0;
-	unsigned long flags;
-
-	spin_lock_irqsave(&notifier_lock, flags);
-	if (q->head) {
-		np = q->head;
-		if ((q->head = np->next) == 0)
- 			q->tail = 0;
-		np->next = 0;
-	}
-	spin_unlock_irqrestore(&notifier_lock, flags);
-	return np;
-}
-
-static int notify_push(unsigned int cmd, u32 controller,
-				u16 applid, u32 ncci)
-{
-	struct capi_notifier *np;
-
-	if (!try_module_get(THIS_MODULE)) {
-		printk(KERN_WARNING "%s: cannot reserve module\n", __FUNCTION__);
-		return -1;
-	}
-	np = (struct capi_notifier *)kmalloc(sizeof(struct capi_notifier), GFP_ATOMIC);
-	if (!np) {
-		module_put(THIS_MODULE);
-		return -1;
-	}
-	memset(np, 0, sizeof(struct capi_notifier));
-	np->cmd = cmd;
-	np->controller = controller;
-	np->applid = applid;
-	np->ncci = ncci;
-	notify_enqueue(np);
-	/*
-	 * The notifier will result in adding/deleteing
-	 * of devices. Devices can only removed in
-	 * user process, not in bh.
-	 */
-	__module_get(THIS_MODULE);
-	if (schedule_work(&tq_state_notify) == 0)
-		module_put(THIS_MODULE);
-	return 0;
-}
-
 /* -------- KCI_CONTRUP --------------------------------------- */
 
 static void notify_up(u32 contr)
@@ -271,31 +197,43 @@ static void notify_down(u32 contr)
 	}
 }
 
-/* ------------------------------------------------------------ */
-
-static inline void notify_doit(struct capi_notifier *np)
+static void notify_handler(void *data)
 {
+	struct capi_notifier *np = data;
+
 	switch (np->cmd) {
-		case KCI_CONTRUP:
-			notify_up(np->controller);
-			break;
-		case KCI_CONTRDOWN:
-			notify_down(np->controller);
-			break;
+	case KCI_CONTRUP:
+		notify_up(np->controller);
+		break;
+	case KCI_CONTRDOWN:
+		notify_down(np->controller);
+		break;
 	}
+
+	kfree(np);
 }
 
-static void notify_handler(void *dummy)
+/*
+ * The notifier will result in adding/deleteing of devices. Devices can
+ * only removed in user process, not in bh.
+ */
+static int notify_push(unsigned int cmd, u32 controller, u16 applid, u32 ncci)
 {
-	struct capi_notifier *np;
+	struct capi_notifier *np = kmalloc(sizeof(*np), GFP_ATOMIC);
 
-	while ((np = notify_dequeue()) != 0) {
-		notify_doit(np);
-		kfree(np);
-		module_put(THIS_MODULE);
-	}
-	module_put(THIS_MODULE);
+	if (!np)
+		return -ENOMEM;
+
+	INIT_WORK(&np->work, notify_handler, np);
+	np->cmd = cmd;
+	np->controller = controller;
+	np->applid = applid;
+	np->ncci = ncci;
+
+	schedule_work(&np->work);
+	return 0;
 }
+
 	
 /* -------- Receiver ------------------------------------------ */
 
@@ -989,7 +927,6 @@ static int __init kcapi_init(void)
 
 	skb_queue_head_init(&recv_queue);
 
-	INIT_WORK(&tq_state_notify, notify_handler, NULL);
 	INIT_WORK(&tq_recv_notify, recv_handler, NULL);
 
         kcapi_proc_init();
@@ -1009,6 +946,9 @@ static int __init kcapi_init(void)
 static void __exit kcapi_exit(void)
 {
         kcapi_proc_exit();
+
+	/* make sure all notifiers are finished */
+	flush_scheduled_work();
 }
 
 module_init(kcapi_init);
