@@ -131,14 +131,16 @@ void timer_handler(int sig, union uml_pt_regs *regs)
 
 static spinlock_t timer_spinlock = SPIN_LOCK_UNLOCKED;
 
-void time_lock(void)
+unsigned long time_lock(void)
 {
-	spin_lock(&timer_spinlock);
+	unsigned long flags;
+	spin_lock_irqsave(&timer_spinlock, flags);
+	return(flags);
 }
 
-void time_unlock(void)
+void time_unlock(unsigned long flags)
 {
-	spin_unlock(&timer_spinlock);
+	spin_unlock_irqrestore(&timer_spinlock, flags);
 }
 
 int __init timer_init(void)

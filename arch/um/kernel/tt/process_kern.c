@@ -169,7 +169,7 @@ void finish_fork_handler(int sig)
 #endif
 	enable_timer();
 	change_sig(SIGVTALRM, 1);
-	local_irq_disable();
+	local_irq_enable();
 	force_flush_all();
 	if(current->mm != current->parent->mm)
 		protect_memory(uml_reserved, high_physmem - uml_reserved, 1, 
@@ -189,7 +189,7 @@ int fork_tramp(void *stack)
 {
 	int sig = sigusr1;
 
-	local_irq_enable();
+	local_irq_disable();
 	init_new_thread_stack(stack, finish_fork_handler);
 
 	kill(os_getpid(), sig);

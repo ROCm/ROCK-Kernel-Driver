@@ -7,6 +7,7 @@
 
 #include <errno.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/time.h>
@@ -24,8 +25,8 @@ enum request_type { REQ_NEW_CONTROL };
 #define SWITCH_MAGIC 0xfeedface
 
 struct request_v3 {
-	unsigned long magic;
-	int version;
+	uint32_t magic;
+	uint32_t version;
 	enum request_type type;
 	struct sockaddr_un sock;
 };
