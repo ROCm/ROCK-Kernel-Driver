@@ -479,19 +479,23 @@ static void drivers_unsuspend(void)
 /* Called from process context */
 static int drivers_suspend(void)
 {
-	device_suspend(4, SUSPEND_NOTIFY);
-	device_suspend(4, SUSPEND_SAVE_STATE);
-	device_suspend(4, SUSPEND_DISABLE);
-	if(!pm_suspend_state) {
+	if (device_suspend(4, SUSPEND_NOTIFY))
+		return -EIO;
+	if (device_suspend(4, SUSPEND_SAVE_STATE)) {
+		device_resume(RESUME_RESTORE_STATE);
+		return -EIO;
+	}
+	if (!pm_suspend_state) {
 		if(pm_send_all(PM_SUSPEND,(void *)3)) {
 			printk(KERN_WARNING "Problem while sending suspend event\n");
-			return(1);
+			return -EIO;
 		}
 		pm_suspend_state=1;
 	} else
 		printk(KERN_WARNING "PM suspend state already raised\n");
+	device_suspend(4, SUSPEND_DISABLE);
 	  
-	return(0);
+	return 0;
 }
 
 #define RESUME_PHASE1 1 /* Called from interrupts disabled */
@@ -504,7 +508,7 @@ static void drivers_resume(int flags)
 		device_resume(RESUME_ENABLE);
 	}
   	if (flags & RESUME_PHASE2) {
-		if(pm_suspend_state) {
+		if (pm_suspend_state) {
 			if(pm_send_all(PM_RESUME,(void *)0))
 				printk(KERN_WARNING "Problem while sending resume event\n");
 			pm_suspend_state=0;
@@ -715,7 +719,7 @@ static void do_software_suspend(void)
 		blk_run_queues();
 
 		/* Save state of all device drivers, and stop them. */		   
-		if(drivers_suspend()==0)
+		if (drivers_suspend()==0)
 			/* If stopping device drivers worked, we proceed basically into
 			 * suspend_save_image.
 			 *
