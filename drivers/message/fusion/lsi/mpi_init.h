@@ -6,7 +6,7 @@
  *          Title:  MPI initiator mode messages and structures
  *  Creation Date:  June 8, 2000
  *
- *    MPI Version:  01.01.05
+ *    MPI Version:  01.02.04
  *
  *  Version History
  *  ---------------
@@ -22,6 +22,13 @@
  *  02-20-01  01.01.03  Started using MPI_POINTER.
  *  03-27-01  01.01.04  Added structure offset comments.
  *  04-10-01  01.01.05  Added new MsgFlag for MSG_SCSI_TASK_MGMT.
+ *  08-08-01  01.02.01  Original release for v1.2 work.
+ *  08-29-01  01.02.02  Added MPI_SCSITASKMGMT_TASKTYPE_LOGICAL_UNIT_RESET.
+ *                      Added MPI_SCSI_STATE_QUEUE_TAG_REJECTED for
+ *                      MSG_SCSI_IO_REPLY.
+ *  09-28-01  01.02.03  Added structures and defines for SCSI Enclosure
+ *                      Processor messages.
+ *  10-04-01  01.02.04  Added defines for SEP request Action field.
  *  --------------------------------------------------------------------------
  */
 
@@ -151,6 +158,7 @@ typedef struct _MSG_SCSI_IO_REPLY
 #define MPI_SCSI_STATE_NO_SCSI_STATUS           (0x04)
 #define MPI_SCSI_STATE_TERMINATED               (0x08)
 #define MPI_SCSI_STATE_RESPONSE_INFO_VALID      (0x10)
+#define MPI_SCSI_STATE_QUEUE_TAG_REJECTED       (0x20)
 
 /* SCSIIO Reply ResponseInfo values */
 /* (FCP-1 RSP_CODE values and SPI-3 Packetized Failure codes) */
@@ -191,6 +199,7 @@ typedef struct _MSG_SCSI_TASK_MGMT
 #define MPI_SCSITASKMGMT_TASKTYPE_ABRT_TASK_SET         (0x02)
 #define MPI_SCSITASKMGMT_TASKTYPE_TARGET_RESET          (0x03)
 #define MPI_SCSITASKMGMT_TASKTYPE_RESET_BUS             (0x04)
+#define MPI_SCSITASKMGMT_TASKTYPE_LOGICAL_UNIT_RESET    (0x05)
 
 /* MsgFlags bits */
 #define MPI_SCSITASKMGMT_MSGFLAGS_TARGET_RESET_OPTION   (0x00)
@@ -215,5 +224,92 @@ typedef struct _MSG_SCSI_TASK_MGMT_REPLY
     U32                     TerminationCount;   /* 14h */
 } MSG_SCSI_TASK_MGMT_REPLY, MPI_POINTER PTR_MSG_SCSI_TASK_MGMT_REPLY,
   SCSITaskMgmtReply_t, MPI_POINTER pSCSITaskMgmtReply_t;
+
+
+/****************************************************************************/
+/*  SCSI Enclosure Processor messages                                       */
+/****************************************************************************/
+
+typedef struct _MSG_SEP_REQUEST
+{
+    U8                      TargetID;           /* 00h */
+    U8                      Bus;                /* 01h */
+    U8                      ChainOffset;        /* 02h */
+    U8                      Function;           /* 03h */
+    U8                      Action;             /* 04h */
+    U8                      Reserved1;          /* 05h */
+    U8                      Reserved2;          /* 06h */
+    U8                      MsgFlags;           /* 07h */
+    U32                     MsgContext;         /* 08h */
+    U32                     SlotStatus;         /* 0Ch */
+} MSG_SEP_REQUEST, MPI_POINTER PTR_MSG_SEP_REQUEST,
+  SEPRequest_t, MPI_POINTER pSEPRequest_t;
+
+/* Action defines */
+#define MPI_SEP_REQ_ACTION_WRITE_STATUS                 (0x00)
+#define MPI_SEP_REQ_ACTION_READ_STATUS                  (0x01)
+
+/* SlotStatus bits for MSG_SEP_REQUEST */
+#define MPI_SEP_REQ_SLOTSTATUS_NO_ERROR                 (0x00000001)
+#define MPI_SEP_REQ_SLOTSTATUS_DEV_FAULTY               (0x00000002)
+#define MPI_SEP_REQ_SLOTSTATUS_DEV_REBUILDING           (0x00000004)
+#define MPI_SEP_REQ_SLOTSTATUS_IN_FAILED_ARRAY          (0x00000008)
+#define MPI_SEP_REQ_SLOTSTATUS_IN_CRITICAL_ARRAY        (0x00000010)
+#define MPI_SEP_REQ_SLOTSTATUS_PARITY_CHECK             (0x00000020)
+#define MPI_SEP_REQ_SLOTSTATUS_PREDICTED_FAULT          (0x00000040)
+#define MPI_SEP_REQ_SLOTSTATUS_UNCONFIGURED             (0x00000080)
+#define MPI_SEP_REQ_SLOTSTATUS_HOT_SPARE                (0x00000100)
+#define MPI_SEP_REQ_SLOTSTATUS_REBUILD_STOPPED          (0x00000200)
+#define MPI_SEP_REQ_SLOTSTATUS_IDENTIFY_REQUEST         (0x00020000)
+#define MPI_SEP_REQ_SLOTSTATUS_REQUEST_REMOVE           (0x00040000)
+#define MPI_SEP_REQ_SLOTSTATUS_REQUEST_INSERT           (0x00080000)
+#define MPI_SEP_REQ_SLOTSTATUS_DO_NOT_MOVE              (0x00400000)
+#define MPI_SEP_REQ_SLOTSTATUS_B_ENABLE_BYPASS          (0x04000000)
+#define MPI_SEP_REQ_SLOTSTATUS_A_ENABLE_BYPASS          (0x08000000)
+#define MPI_SEP_REQ_SLOTSTATUS_DEV_OFF                  (0x10000000)
+#define MPI_SEP_REQ_SLOTSTATUS_SWAP_RESET               (0x80000000)
+
+
+typedef struct _MSG_SEP_REPLY
+{
+    U8                      TargetID;           /* 00h */
+    U8                      Bus;                /* 01h */
+    U8                      MsgLength;          /* 02h */
+    U8                      Function;           /* 03h */
+    U8                      Action;             /* 04h */
+    U8                      Reserved1;          /* 05h */
+    U8                      Reserved2;          /* 06h */
+    U8                      MsgFlags;           /* 07h */
+    U32                     MsgContext;         /* 08h */
+    U16                     Reserved3;          /* 0Ch */
+    U16                     IOCStatus;          /* 0Eh */
+    U32                     IOCLogInfo;         /* 10h */
+    U32                     SlotStatus;         /* 14h */
+} MSG_SEP_REPLY, MPI_POINTER PTR_MSG_SEP_REPLY,
+  SEPReply_t, MPI_POINTER pSEPReply_t;
+
+/* SlotStatus bits for MSG_SEP_REPLY */
+#define MPI_SEP_REPLY_SLOTSTATUS_NO_ERROR               (0x00000001)
+#define MPI_SEP_REPLY_SLOTSTATUS_DEV_FAULTY             (0x00000002)
+#define MPI_SEP_REPLY_SLOTSTATUS_DEV_REBUILDING         (0x00000004)
+#define MPI_SEP_REPLY_SLOTSTATUS_IN_FAILED_ARRAY        (0x00000008)
+#define MPI_SEP_REPLY_SLOTSTATUS_IN_CRITICAL_ARRAY      (0x00000010)
+#define MPI_SEP_REPLY_SLOTSTATUS_PARITY_CHECK           (0x00000020)
+#define MPI_SEP_REPLY_SLOTSTATUS_PREDICTED_FAULT        (0x00000040)
+#define MPI_SEP_REPLY_SLOTSTATUS_UNCONFIGURED           (0x00000080)
+#define MPI_SEP_REPLY_SLOTSTATUS_HOT_SPARE              (0x00000100)
+#define MPI_SEP_REPLY_SLOTSTATUS_REBUILD_STOPPED        (0x00000200)
+#define MPI_SEP_REPLY_SLOTSTATUS_REPORT                 (0x00010000)
+#define MPI_SEP_REPLY_SLOTSTATUS_IDENTIFY_REQUEST       (0x00020000)
+#define MPI_SEP_REPLY_SLOTSTATUS_REMOVE_READY           (0x00040000)
+#define MPI_SEP_REPLY_SLOTSTATUS_INSERT_READY           (0x00080000)
+#define MPI_SEP_REPLY_SLOTSTATUS_DO_NOT_REMOVE          (0x00400000)
+#define MPI_SEP_REPLY_SLOTSTATUS_B_BYPASS_ENABLED       (0x01000000)
+#define MPI_SEP_REPLY_SLOTSTATUS_A_BYPASS_ENABLED       (0x02000000)
+#define MPI_SEP_REPLY_SLOTSTATUS_B_ENABLE_BYPASS        (0x04000000)
+#define MPI_SEP_REPLY_SLOTSTATUS_A_ENABLE_BYPASS        (0x08000000)
+#define MPI_SEP_REPLY_SLOTSTATUS_DEV_OFF                (0x10000000)
+#define MPI_SEP_REPLY_SLOTSTATUS_FAULT_SENSED           (0x40000000)
+#define MPI_SEP_REPLY_SLOTSTATUS_SWAPPED                (0x80000000)
 
 #endif

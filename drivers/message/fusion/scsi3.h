@@ -4,11 +4,12 @@
  *      (Ultimately) SCSI-3 definitions; for now, inheriting
  *      SCSI-2 definitions.
  *
- *  Copyright (c) 1996-2001 Steven J. Ralston
+ *  Copyright (c) 1996-2002 Steven J. Ralston
  *  Written By: Steven J. Ralston (19960517)
- *  (mailto:Steve.Ralston@lsil.com)
+ *  (mailto:sjralston1@netscape.net)
+ *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: scsi3.h,v 1.5 2001/04/06 14:31:32 sralston Exp $
+ *  $Id: scsi3.h,v 1.9 2002/02/27 18:45:02 sralston Exp $
  */
 
 #ifndef SCSI3_H_INCLUDED
@@ -63,7 +64,10 @@
 #define CMD_Write10            0x2A
 #define CMD_WriteVerify        0x2E
 #define CMD_Verify             0x2F
+#define CMD_SynchronizeCache   0x35
 #define CMD_ReadDefectData     0x37
+#define CMD_WriteBuffer        0x3B
+#define CMD_ReadBuffer         0x3C
 #define CMD_ReadLong           0x3E
 #define CMD_LogSelect          0x4C
 #define CMD_LogSense           0x4D
