@@ -313,31 +313,21 @@ static inline void sctp_sysctl_unregister(void) { return; }
 #endif
 
 
+/* Size of Supported Address Parameter for 'x' address types. */
+#define SCTP_SAT_LEN(x) (sizeof(struct sctp_paramhdr) + (x) * sizeof(__u16))
+
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 
 extern int sctp_v6_init(void);
 extern void sctp_v6_exit(void);
-
 static inline int sctp_ipv6_addr_type(const struct in6_addr *addr)
 {
 	return ipv6_addr_type((struct in6_addr*) addr);
 }
 
-/* Size of Supported Address Parameter for 'x' address types. */
-#define SCTP_SAT_LEN(x) (sizeof(struct sctp_paramhdr) + (x) * sizeof(__u16))
-
-/* Note: These V6 macros are obsolescent.  */
-/* Use this macro to enclose code fragments which are V6-dependent. */
-#define SCTP_V6(m...)	m
-#define SCTP_V6_SUPPORT 1
-
 #else /* #ifdef defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE) */
 
 #define sctp_ipv6_addr_type(a) 0
-#define SCTP_SAT_LEN (sizeof(sctp_paramhdr_t) + 1 * sizeof(__u16))
-#define SCTP_V6(m...) /* Do nothing. */
-#undef SCTP_V6_SUPPORT
-
 static inline int sctp_v6_init(void) { return 0; }
 static inline void sctp_v6_exit(void) { return; }
 

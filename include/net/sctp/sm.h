@@ -3,40 +3,40 @@
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001-2002 International Business Machines Corp.
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
+ *
  * This file is part of the implementation of the add-IP extension,
  * based on <draft-ietf-tsvwg-addip-sctp-02.txt> June 29, 2001,
  * for the SCTP kernel reference Implementation.
- * 
+ *
  * These are definitions needed by the state machine.
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email addresses:
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Karl Knutson <karl@athena.chicago.il.us>
  *    Xingang Guo <xingang.guo@intel.com>
@@ -313,18 +313,18 @@ void sctp_generate_t3_rtx_event(unsigned long peer);
 void sctp_generate_heartbeat_event(unsigned long peer);
 
 sctp_sackhdr_t *sctp_sm_pull_sack(sctp_chunk_t *);
-sctp_packet_t *sctp_abort_pkt_new(const sctp_endpoint_t *ep,
-				  const sctp_association_t *asoc,
-				  sctp_chunk_t *chunk,
-				  const void *payload,
-				  size_t paylen);
-sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
-				 const sctp_chunk_t *chunk);
-void sctp_ootb_pkt_free(sctp_packet_t *packet);
+struct sctp_packet *sctp_abort_pkt_new(const struct sctp_endpoint *,
+				       const struct sctp_association *,
+				       struct sctp_chunk *chunk,
+				       const void *payload,
+				       size_t paylen);
+struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *,
+				      const struct sctp_chunk *);
+void sctp_ootb_pkt_free(struct sctp_packet *);
 
 sctp_cookie_param_t *
-sctp_pack_cookie(const sctp_endpoint_t *, const sctp_association_t *,
-		 const sctp_chunk_t *, int *cookie_len,
+sctp_pack_cookie(const struct sctp_endpoint *, const struct sctp_association *,
+		 const struct sctp_chunk *, int *cookie_len,
 		 const __u8 *, int addrs_len);
 sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *,
 				       const sctp_association_t *,

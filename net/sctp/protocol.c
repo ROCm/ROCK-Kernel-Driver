@@ -502,10 +502,13 @@ static int sctp_inetaddr_event(struct notifier_block *this, unsigned long event,
  */
 int sctp_ctl_sock_init(void)
 {
-	int err = 0;
-	int family = PF_INET;
+	int err;
+	sa_family_t family;
 
-	SCTP_V6(family = PF_INET6;)
+	if (sctp_get_pf_specific(PF_INET6))
+		family = PF_INET6;
+	else 
+		family = PF_INET;
 
 	err = sock_create(family, SOCK_SEQPACKET, IPPROTO_SCTP,
 			  &sctp_ctl_socket);

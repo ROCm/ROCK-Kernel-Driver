@@ -88,7 +88,6 @@ struct sctp_ssnmap;
 
 typedef struct sctp_endpoint sctp_endpoint_t;
 typedef struct sctp_association sctp_association_t;
-typedef struct sctp_packet sctp_packet_t;
 typedef struct sctp_chunk sctp_chunk_t;
 typedef struct sctp_bind_addr sctp_bind_addr_t;
 typedef struct sctp_endpoint_common sctp_endpoint_common_t;
@@ -602,26 +601,26 @@ struct sctp_packet {
 
 typedef int (sctp_outq_thandler_t)(struct sctp_outq *, void *);
 typedef int (sctp_outq_ehandler_t)(struct sctp_outq *);
-typedef sctp_packet_t *(sctp_outq_ohandler_init_t)
-	(sctp_packet_t *,
+typedef struct sctp_packet *(sctp_outq_ohandler_init_t)
+	(struct sctp_packet *,
          struct sctp_transport *,
          __u16 sport,
          __u16 dport);
-typedef sctp_packet_t *(sctp_outq_ohandler_config_t)
-        (sctp_packet_t *,
+typedef struct sctp_packet *(sctp_outq_ohandler_config_t)
+        (struct sctp_packet *,
 	 __u32 vtag,
 	 int ecn_capable,
 	 sctp_packet_phandler_t *get_prepend_chunk);
-typedef sctp_xmit_t (sctp_outq_ohandler_t)(sctp_packet_t *,
+typedef sctp_xmit_t (sctp_outq_ohandler_t)(struct sctp_packet *,
                                                sctp_chunk_t *);
-typedef int (sctp_outq_ohandler_force_t)(sctp_packet_t *);
+typedef int (sctp_outq_ohandler_force_t)(struct sctp_packet *);
 
 sctp_outq_ohandler_init_t    sctp_packet_init;
 sctp_outq_ohandler_config_t  sctp_packet_config;
 sctp_outq_ohandler_t         sctp_packet_append_chunk;
 sctp_outq_ohandler_t         sctp_packet_transmit_chunk;
 sctp_outq_ohandler_force_t   sctp_packet_transmit;
-void sctp_packet_free(sctp_packet_t *);
+void sctp_packet_free(struct sctp_packet *);
 
 
 /* This represents a remote transport address.
@@ -787,7 +786,7 @@ struct sctp_transport {
 	struct list_head transmitted;
 
 	/* We build bundle-able packets for this transport here.  */
-	sctp_packet_t packet;
+	struct sctp_packet packet;
 
 	/* This is the list of transports that have chunks to send.  */
 	struct list_head send_ready;
@@ -863,11 +862,10 @@ void sctp_inq_set_th_handler(struct sctp_inq *, void (*)(void *), void *);
 struct sctp_outq {
 	sctp_association_t *asoc;
 
-	/* BUG: This really should be an array of streams.
-	 * This really holds a list of chunks (one stream).
-	 * FIXME: If true, why so?
-	 */
+	/* Data pending that has never been transmitted.  */
 	struct sk_buff_head out;
+
+	unsigned out_qlen;	/* Total length of queued data chunks. */
 
 	/* These are control chunks we want to send.  */
 	struct sk_buff_head control;
@@ -883,7 +881,7 @@ struct sctp_outq {
 	struct list_head retransmit;
 
 	/* Call these functions to send chunks down to the next lower
-	 * layer.  This is always SCTP_packet, but we separate the two
+	 * layer.  This is always sctp_packet, but we separate the two
 	 * structures to make testing simpler.
 	 */
 	sctp_outq_ohandler_init_t	*init_output;

@@ -345,6 +345,7 @@ typedef enum {
 	SCTP_XMIT_PMTU_FULL,
 	SCTP_XMIT_RWND_FULL,
 	SCTP_XMIT_MUST_FRAG,
+	SCTP_XMIT_NAGLE_DELAY,
 } sctp_xmit_t;
 
 /* These are the commands for manipulating transports.  */
