@@ -65,7 +65,7 @@ int usb_hcd_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 {
 	struct hc_driver	*driver;
 	unsigned long		resource, len;
-	void			*base;
+	void __iomem		*base;
 	struct usb_hcd		*hcd;
 	int			retval, region;
 	char			buf [8], *bufp = buf;
@@ -121,7 +121,7 @@ clean_1:
 			dev_dbg (&dev->dev, "no i/o regions available\n");
 			return -EBUSY;
 		}
-		base = (void *) resource;
+		base = (void __iomem *) resource;
 	}
 
 	// driver->reset(), later on, will transfer device from
