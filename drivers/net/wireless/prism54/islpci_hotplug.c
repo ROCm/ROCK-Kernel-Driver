@@ -293,8 +293,13 @@ prism54_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * 	Writing zero to both these two registers will disable both timeouts and
 	 * 	*can* solve problems caused by devices that are slow to respond.
 	 */
+	/*	I am taking these out, we should not be poking around in the
+	 *	programmable timers - MSW
+	*/
+/*	Do not zero the programmable timers
 	pci_write_config_byte(pdev, 0x40, 0);
 	pci_write_config_byte(pdev, 0x41, 0);
+*/
 
 	/* request the pci device I/O regions */
 	rvalue = pci_request_regions(pdev, DRV_NAME);
