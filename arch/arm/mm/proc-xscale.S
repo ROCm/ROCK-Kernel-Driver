@@ -770,7 +770,7 @@ __80200_proc_info:
 	.type	__pxa250_proc_info,#object
 __pxa250_proc_info:
 	.long	0x69052100
-	.long	0xfffffff0
+	.long	0xfffff7f0
 	.long	0x00000c0e
 	b	__xscale_setup
 	.long	cpu_arch_name
