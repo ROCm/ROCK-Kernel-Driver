@@ -248,7 +248,8 @@ void huge_page_release(struct page *page)
 	free_huge_page(page);
 }
 
-void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
+void unmap_hugepage_range(struct vm_area_struct *vma,
+		unsigned long start, unsigned long end)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long address;
@@ -258,8 +259,6 @@ void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsig
 	BUG_ON(start & (HPAGE_SIZE - 1));
 	BUG_ON(end & (HPAGE_SIZE - 1));
 
-	spin_lock(&htlbpage_lock);
-	spin_unlock(&htlbpage_lock);
 	for (address = start; address < end; address += HPAGE_SIZE) {
 		pte = huge_pte_offset(mm, address);
 		if (pte_none(*pte))
@@ -272,7 +271,9 @@ void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsig
 	flush_tlb_range(vma, start, end);
 }
 
-void zap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsigned long length)
+void
+zap_hugepage_range(struct vm_area_struct *vma,
+		unsigned long start, unsigned long length)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	spin_lock(&mm->page_table_lock);
@@ -477,8 +478,8 @@ int is_hugepage_mem_enough(size_t size)
  * hugegpage VMA.  do_page_fault() is supposed to trap this, so BUG is we get
  * this far.
  */
-static struct page *
-hugetlb_nopage(struct vm_area_struct *vma, unsigned long address, int unused)
+static struct page *hugetlb_nopage(struct vm_area_struct *vma,
+				unsigned long address, int unused)
 {
 	BUG();
 	return NULL;
