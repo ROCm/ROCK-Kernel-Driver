@@ -1709,10 +1709,11 @@ cond_iput_mft_ino_err_out_now:
 	}
 #undef OGIN
 	/*
-	 * This is needed to get ntfs_clear_inode() called for each inode we
-	 * have ever called iget()/iput() on, otherwise we A) leak resources
-	 * and B) a subsequent mount fails automatically due to iget() never
-	 * calling down into our ntfs_read_inode{_mount}() methods again...
+	 * This is needed to get ntfs_clear_extent_inode() called for each
+	 * inode we have ever called iget()/iput() on, otherwise we A) leak
+	 * resources and B) a subsequent mount fails automatically due to
+	 * iget() never calling down into our ntfs_read_inode{_mount}() methods
+	 * again...
 	 */
 	if (invalidate_inodes(sb)) {
 		ntfs_error(sb, "Busy inodes left. This is most likely a NTFS "
