@@ -157,6 +157,7 @@ static inline void free_pages_check(const char *function, struct page *page)
 			1 << PG_private |
 			1 << PG_locked	|
 			1 << PG_active	|
+			1 << PG_reclaim	|
 			1 << PG_writeback )))
 		bad_page(function, page);
 	if (PageDirty(page))
@@ -260,6 +261,7 @@ static void prep_new_page(struct page *page, int order)
 			1 << PG_lru	|
 			1 << PG_active	|
 			1 << PG_dirty	|
+			1 << PG_reclaim	|
 			1 << PG_writeback )))
 		bad_page(__FUNCTION__, page);
 

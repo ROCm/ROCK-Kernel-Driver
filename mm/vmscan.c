@@ -316,12 +316,25 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 					bdi_write_congested(bdi))
 				goto keep_locked;
 			if (test_clear_page_dirty(page)) {
+				int res;
+
 				write_lock(&mapping->page_lock);
 				list_move(&page->list, &mapping->locked_pages);
 				write_unlock(&mapping->page_lock);
 
-				if (mapping->a_ops->writepage(page) == -EAGAIN)
+				SetPageReclaim(page);
+				res = mapping->a_ops->writepage(page);
+
+				if (res == -EAGAIN) {
+					ClearPageReclaim(page);
 					__set_page_dirty_nobuffers(page);
+				} else if (!PageWriteback(page)) {
+					/*
+					 * synchronous writeout or broken
+					 * a_ops?
+					 */
+					ClearPageReclaim(page);
+				}
 				goto keep;
 			}
 		}
