@@ -141,7 +141,7 @@ static int x11_keymap[] = {
 
 	// [  92 ] = KEY_Print,
 	// [  93 ] = KEY_Mode_switch,
-	// [  94 ] = KEY_less,
+	[  94 ] = KEY_102ND,
 
 	[  95 ] = KEY_F11,
 	[  96 ] = KEY_F12,
@@ -408,7 +408,8 @@ int x11_has_data(struct x11_window *win, struct x11_kerndata *kd)
 				x11_blit_fb(win, 0,0, win->var.xres, win->var.yres);
 			break;
 		case ClientMessage:
-//			if (e.xclient.data.l[0] == win->delete_window)
+			/* hmm, don't get client messages ... */
+			if (e.xclient.data.l[0] == win->delete_window)
 				x11_cad(kd);
 			break;
 		}

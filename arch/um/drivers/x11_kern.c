@@ -1,10 +1,12 @@
 #include <linux/init.h>
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/fb.h>
 #include <linux/input.h>
 #include <linux/kthread.h>
 #include <linux/sched.h>
+#include <linux/console.h>
 
 #include "irq_kern.h"
 #include "irq_user.h"
@@ -14,7 +16,7 @@
 /* ---------------------------------------------------------------------------- */
 
 static int x11_enable  = 0;
-static int x11_fps;
+static int x11_fps     = 5;
 static int x11_width;
 static int x11_height;
 
@@ -319,13 +321,13 @@ module_exit(x11_fini);
 
 static int x11_setup(char *str)
 {
-	if (3 == sscanf(str,"%dx%d@%d",&x11_width,&x11_height,&x11_fps)) {
+	if (3 == sscanf(str,"%dx%d@%d",&x11_width,&x11_height,&x11_fps) ||
+	    2 == sscanf(str,"%dx%d",&x11_width,&x11_height)) {
 		x11_enable = 1;
-		return 0;
-	}
-	if (2 == sscanf(str,"%dx%d",&x11_width,&x11_height)) {
-		x11_enable = 1;
-		x11_fps    = 5;
+#if defined(CONFIG_DUMMY_CONSOLE)
+		/* this enables the virtual consoles */
+		conswitchp = &dummy_con;
+#endif  
 		return 0;
 	}
 	return -1;

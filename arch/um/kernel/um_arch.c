@@ -17,7 +17,6 @@
 #include "linux/sysrq.h"
 #include "linux/seq_file.h"
 #include "linux/delay.h"
-#include "linux/console.h"
 #include "asm/page.h"
 #include "asm/pgtable.h"
 #include "asm/ptrace.h"
@@ -423,9 +422,6 @@ void __init setup_arch(char **cmdline_p)
  	strcpy(command_line, saved_command_line);
  	*cmdline_p = command_line;
 	setup_hostinfo();
-#if defined(CONFIG_DUMMY_CONSOLE)
-	conswitchp = &dummy_con;
-#endif  
 }
 
 void __init check_bugs(void)
