@@ -920,30 +920,6 @@ void udf_truncate(struct inode * inode)
 	unlock_kernel();
 }
 
-/*
- * udf_read_inode
- *
- * PURPOSE
- *	Read an inode.
- *
- * DESCRIPTION
- *	This routine is called by iget() [which is called by udf_iget()]
- *      (clean_inode() will have been called first)
- *	when an inode is first read into memory.
- *
- * HISTORY
- *	July 1, 1997 - Andrew E. Mileski
- *	Written, tested, and released.
- *
- * 12/19/98 dgb  Updated to fix size problems.
- */
-
-void
-udf_read_inode(struct inode *inode)
-{
-	memset(&UDF_I_LOCATION(inode), 0xFF, sizeof(kernel_lb_addr));
-}
-
 static void
 __udf_read_inode(struct inode *inode)
 {
@@ -1567,66 +1543,36 @@ udf_update_inode(struct inode *inode, int do_sync)
 	return err;
 }
 
-/*
- * udf_iget
- *
- * PURPOSE
- *	Get an inode.
- *
- * DESCRIPTION
- *	This routine replaces iget() and read_inode().
- *
- * HISTORY
- *	October 3, 1997 - Andrew E. Mileski
- *	Written, tested, and released.
- *
- * 12/19/98 dgb  Added semaphore and changed to be a wrapper of iget
- */
 struct inode *
 udf_iget(struct super_block *sb, kernel_lb_addr ino)
 {
-	struct inode *inode;
-	unsigned long block;
-
-	block = udf_get_lb_pblock(sb, ino, 0);
-
-	/* Get the inode */
-
-	inode = iget(sb, block);
-		/* calls udf_read_inode() ! */
+	unsigned long block = udf_get_lb_pblock(sb, ino, 0);
+	struct inode *inode = iget_locked(sb, block);
 
 	if (!inode)
-	{
-		printk(KERN_ERR "udf: iget() failed\n");
 		return NULL;
-	}
-	else if (is_bad_inode(inode))
-	{
-		iput(inode);
-		return NULL;
-	}
-	else if (UDF_I_LOCATION(inode).logicalBlockNum == 0xFFFFFFFF &&
-		UDF_I_LOCATION(inode).partitionReferenceNum == 0xFFFF)
-	{
+
+	if (inode->i_state & I_NEW) {
 		memcpy(&UDF_I_LOCATION(inode), &ino, sizeof(kernel_lb_addr));
 		__udf_read_inode(inode);
-		if (is_bad_inode(inode))
-		{
-			iput(inode);
-			return NULL;
-		}
+		unlock_new_inode(inode);
 	}
 
-	if ( ino.logicalBlockNum >= UDF_SB_PARTLEN(sb, ino.partitionReferenceNum) )
-	{
+	if (is_bad_inode(inode))
+		goto out_iput;
+
+	if (ino.logicalBlockNum >= UDF_SB_PARTLEN(sb, ino.partitionReferenceNum)) {
 		udf_debug("block=%d, partition=%d out of range\n",
 			ino.logicalBlockNum, ino.partitionReferenceNum);
 		make_bad_inode(inode);
-		iput(inode);
-		return NULL;
- 	}
+		goto out_iput;
+	}
 
 	return inode;
+
+ out_iput:
+	iput(inode);
+	return NULL;
 }
 
 int8_t udf_add_aext(struct inode *inode, kernel_lb_addr *bloc, int *extoffset,

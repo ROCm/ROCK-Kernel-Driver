@@ -162,7 +162,6 @@ static void destroy_inodecache(void)
 static struct super_operations udf_sb_ops = {
 	.alloc_inode		= udf_alloc_inode,
 	.destroy_inode		= udf_destroy_inode,
-	.read_inode		= udf_read_inode,
 	.write_inode		= udf_write_inode,
 	.put_inode		= udf_put_inode,
 	.delete_inode		= udf_delete_inode,
