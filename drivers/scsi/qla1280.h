@@ -22,13 +22,6 @@
 
 #ifndef HOSTS_C			/* included in hosts.c */
 
-#ifndef TRUE
-#define TRUE 1
-#endif
-#ifndef FALSE
-#define FALSE 0
-#endif
-
 /*
  * Data bit definitions.
  */
