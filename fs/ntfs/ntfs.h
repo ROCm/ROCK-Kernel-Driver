@@ -221,9 +221,9 @@ extern int allocate_compression_buffers(void);
 extern void free_compression_buffers(void);
 
 /* From fs/ntfs/mst.c */
-extern inline void __post_read_mst_fixup(NTFS_RECORD *b, const u32 size);
 extern int post_read_mst_fixup(NTFS_RECORD *b, const u32 size);
 extern int pre_write_mst_fixup(NTFS_RECORD *b, const u32 size);
+extern void post_write_mst_fixup(NTFS_RECORD *b);
 
 /* From fs/ntfs/time.c */
 extern inline s64 utc2ntfs(const time_t time);

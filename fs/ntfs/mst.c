@@ -23,40 +23,6 @@
 #include "ntfs.h"
 
 /**
- * __post_read_mst_fixup - fast deprotect multi sector transfer protected data
- * @b:		pointer to the data to deprotect
- * @size:	size in bytes of @b
- * 
- * Perform the necessary post read multi sector transfer fixup, not checking for
- * any errors. Defined inline for additional speed. 
- */
-inline void __post_read_mst_fixup(NTFS_RECORD *b, const u32 size)
-{
-	u16 usa_ofs, usa_count;
-	u16 *usa_pos, *data_pos;
-
-	/* Setup the variables. */
-	usa_ofs = le16_to_cpu(b->usa_ofs);
-	usa_count = le16_to_cpu(b->usa_count) - 1;
-	/* Position of usn in update sequence array. */  
-	usa_pos = (u16*)b + usa_ofs/sizeof(u16);
-	/*
-	 * Position in protected data of first u16 that needs fixing up.
-	 */
-	data_pos = (u16*)b + NTFS_BLOCK_SIZE/sizeof(u16) - 1;
-        /* Fixup all sectors. */
-	while (usa_count--) {
-		/*
-		 * Increment position in usa and restore original data from
-		 * the usa into the data buffer.
-		 */
-		*data_pos = *(++usa_pos);
-                /* Increment position in data as well. */
-		data_pos += NTFS_BLOCK_SIZE/sizeof(u16);
-        }
-}
-
-/**
  * post_read_mst_fixup - deprotect multi sector transfer protected data
  * @b:		pointer to the data to deprotect
  * @size:	size in bytes of @b
@@ -198,5 +164,39 @@ int pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
 		data_pos += NTFS_BLOCK_SIZE/sizeof(u16);
         }
 	return 0;
+}
+
+/**
+ * post_write_mst_fixup - fast deprotect multi sector transfer protected data
+ * @b:		pointer to the data to deprotect
+ * 
+ * Perform the necessary post write multi sector transfer fixup, not checking
+ * for any errors, because we assume we have just used pre_write_mst_fixup(),
+ * thus the data will be fine or we would never have gotten here.
+ */
+void post_write_mst_fixup(NTFS_RECORD *b)
+{
+	u16 *usa_pos, *data_pos;
+
+	u16 usa_ofs = le16_to_cpu(b->usa_ofs);
+	u16 usa_count = le16_to_cpu(b->usa_count) - 1;
+
+	/* Position of usn in update sequence array. */  
+	usa_pos = (u16*)b + usa_ofs/sizeof(u16);
+
+	/* Position in protected data of first u16 that needs fixing up. */
+	data_pos = (u16*)b + NTFS_BLOCK_SIZE/sizeof(u16) - 1;
+
+        /* Fixup all sectors. */
+	while (usa_count--) {
+		/*
+		 * Increment position in usa and restore original data from
+		 * the usa into the data buffer.
+		 */
+		*data_pos = *(++usa_pos);
+
+                /* Increment position in data as well. */
+		data_pos += NTFS_BLOCK_SIZE/sizeof(u16);
+        }
 }
 

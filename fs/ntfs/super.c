@@ -1525,9 +1525,11 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 
 	/*
 	 * Default is group and other don't have any access to files or
-	 * directories while owner has full access.
+	 * directories while owner has full access. Further files by default
+	 * are not executable but directories are of course browseable.
 	 */
-	vol->fmask = vol->dmask = 0077;
+	vol->fmask = 0177;
+	vol->dmask = 0077;
 
 	/*
 	 * Default is to show long file names (including POSIX file names), and

@@ -470,7 +470,7 @@ static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
  * @bh:		buffer head on which io is completed
  * @uptodate:	whether @bh is now uptodate or not
  *
- * Asynchronous I/O completion handler for reading pages belogning to the
+ * Asynchronous I/O completion handler for reading pages belonging to the
  * index allocation attribute address space of directory inodes.
  *
  * Perform the post read mst fixups when all IO on the page has been completed

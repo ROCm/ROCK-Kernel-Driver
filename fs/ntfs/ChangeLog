@@ -27,6 +27,12 @@ ToDo:
 	  quite big. Modularising them a bit, e.g. a-la get_block(), will make
 	  them cleaner and make code reuse easier.
 
+2.0.2 - Minor updates and cleanups.
+
+	- Cleanup: rename mst.c::__post_read_mst_fixup to post_write_mst_fixup
+	  and cleanup the code a bit, removing the unused size parameter.
+	- Change default fmask to 0177 and update documentation.
+
 2.0.1 - Minor updates.
 
 	- Make default umask correspond to documentation.
