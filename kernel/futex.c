@@ -420,7 +420,7 @@ out:
 	return ret;
 }
 
-long do_futex(unsigned long uaddr, int op, int val, unsinged long timeout)
+long do_futex(unsigned long uaddr, int op, int val, unsigned long timeout)
 {
 	unsigned long pos_in_page;
 	int ret;
@@ -453,11 +453,10 @@ asmlinkage long sys_futex(u32 *uaddr, int op, int val, struct timespec *utime)
 	struct timespec t;
 	unsigned long timeout = MAX_SCHEDULE_TIMEOUT;
 
-
 	if ((op == FUTEX_WAIT) && utime) {
 		if (copy_from_user(&t, utime, sizeof(t)) != 0)
 			return -EFAULT;
-		timeout = timespec_to_jiffies(t) + 1;
+		timeout = timespec_to_jiffies(&t) + 1;
 	}
 	return do_futex((unsigned long)uaddr, op, val, timeout);
 }
