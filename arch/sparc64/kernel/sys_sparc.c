@@ -208,10 +208,10 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 	if (call <= SEMCTL)
 		switch (call) {
 		case SEMOP:
-			err = sys_semtimedop (first, (struct sembuf *)ptr, second, NULL);
+			err = sys_semtimedop (first, (struct sembuf __user *)ptr, second, NULL);
 			goto out;
 		case SEMTIMEDOP:
-			err = sys_semtimedop (first, (struct sembuf *)ptr, second, (const struct timespec *) fifth);
+			err = sys_semtimedop (first, (struct sembuf __user *)ptr, second, (const struct timespec __user *) fifth);
 			goto out;
 		case SEMGET:
 			err = sys_semget (first, second, (int)third);
@@ -222,7 +222,7 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 			if (!ptr)
 				goto out;
 			err = -EFAULT;
-			if(get_user(fourth.__pad, (void **)ptr))
+			if (get_user(fourth.__pad, (void __user * __user *)ptr))
 				goto out;
 			err = sys_semctl (first, second | IPC_64, (int)third, fourth);
 			goto out;
@@ -234,17 +234,17 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 	if (call <= MSGCTL) 
 		switch (call) {
 		case MSGSND:
-			err = sys_msgsnd (first, (struct msgbuf *) ptr, 
+			err = sys_msgsnd (first, (struct msgbuf __user *) ptr, 
 					  second, (int)third);
 			goto out;
 		case MSGRCV:
-			err = sys_msgrcv (first, (struct msgbuf *) ptr, second, fifth, (int)third);
+			err = sys_msgrcv (first, (struct msgbuf __user *) ptr, second, fifth, (int)third);
 			goto out;
 		case MSGGET:
 			err = sys_msgget ((key_t) first, second);
 			goto out;
 		case MSGCTL:
-			err = sys_msgctl (first, second | IPC_64, (struct msqid_ds *) ptr);
+			err = sys_msgctl (first, second | IPC_64, (struct msqid_ds __user *) ptr);
 			goto out;
 		default:
 			err = -ENOSYS;
@@ -254,7 +254,7 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 		switch (call) {
 		case SHMAT: {
 			ulong raddr;
-			err = do_shmat (first, (char *) ptr, second, &raddr);
+			err = do_shmat (first, (char __user *) ptr, second, &raddr);
 			if (!err) {
 				if (put_user(raddr, (ulong __user *) third))
 					err = -EFAULT;
@@ -262,13 +262,13 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 			goto out;
 		}
 		case SHMDT:
-			err = sys_shmdt ((char *)ptr);
+			err = sys_shmdt ((char __user *)ptr);
 			goto out;
 		case SHMGET:
 			err = sys_shmget (first, second, (int)third);
 			goto out;
 		case SHMCTL:
-			err = sys_shmctl (first, second | IPC_64, (struct shmid_ds *) ptr);
+			err = sys_shmctl (first, second | IPC_64, (struct shmid_ds __user *) ptr);
 			goto out;
 		default:
 			err = -ENOSYS;
@@ -636,8 +636,8 @@ sys_perfctr(int opcode, unsigned long arg0, unsigned long arg1, unsigned long ar
 	switch(opcode) {
 	case PERFCTR_ON:
 		current_thread_info()->pcr_reg = arg2;
-		current_thread_info()->user_cntd0 = (u64 *) arg0;
-		current_thread_info()->user_cntd1 = (u64 *) arg1;
+		current_thread_info()->user_cntd0 = (u64 __user *) arg0;
+		current_thread_info()->user_cntd1 = (u64 __user *) arg1;
 		current_thread_info()->kernel_cntd0 =
 			current_thread_info()->kernel_cntd1 = 0;
 		write_pcr(arg2);
@@ -684,7 +684,8 @@ sys_perfctr(int opcode, unsigned long arg0, unsigned long arg1, unsigned long ar
 		break;
 
 	case PERFCTR_SETPCR: {
-		u64 *user_pcr = (u64 *)arg0;
+		u64 __user *user_pcr = (u64 __user *)arg0;
+
 		if (!test_thread_flag(TIF_PERFCTR)) {
 			err = -EINVAL;
 			break;
@@ -698,7 +699,8 @@ sys_perfctr(int opcode, unsigned long arg0, unsigned long arg1, unsigned long ar
 	}
 
 	case PERFCTR_GETPCR: {
-		u64 *user_pcr = (u64 *)arg0;
+		u64 __user *user_pcr = (u64 __user *)arg0;
+
 		if (!test_thread_flag(TIF_PERFCTR)) {
 			err = -EINVAL;
 			break;
