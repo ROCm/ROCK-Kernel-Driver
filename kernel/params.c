@@ -77,10 +77,16 @@ static int parse_one(char *param,
 static char *next_arg(char *args, char **param, char **val)
 {
 	unsigned int i, equals = 0;
-	int in_quote = 0;
+	int in_quote = 0, quoted = 0;
+	char *next;
 
 	/* Chew any extra spaces */
 	while (*args == ' ') args++;
+	if (*args == '"') {
+		args++;
+		in_quote = 1;
+		quoted = 1;
+	}
 
 	for (i = 0; args[i]; i++) {
 		if (args[i] == ' ' && !in_quote)
@@ -106,13 +112,16 @@ static char *next_arg(char *args, char **param, char **val)
 			if (args[i-1] == '"')
 				args[i-1] = '\0';
 		}
+		if (quoted && args[i-1] == '"')
+			args[i-1] = '\0';
 	}
 
 	if (args[i]) {
 		args[i] = '\0';
-		return args + i + 1;
+		next = args + i + 1;
 	} else
-		return args + i;
+		next = args + i;
+	return next;
 }
 
 /* Args looks like "foo=bar,bar2 baz=fuz wiz". */

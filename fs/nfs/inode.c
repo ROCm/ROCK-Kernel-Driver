@@ -486,13 +486,27 @@ nfs_statfs(struct super_block *sb, struct kstatfs *buf)
 	if (error < 0)
 		goto out_err;
 
-	buf->f_frsize = server->wtmult;
+	/*
+	 * Current versions of glibc do not correctly handle the
+	 * case where f_frsize != f_bsize.  Eventually we want to
+	 * report the value of wtmult in this field.
+	 */
+	buf->f_frsize = sb->s_blocksize;
+
+	/*
+	 * On most *nix systems, f_blocks, f_bfree, and f_bavail
+	 * are reported in units of f_frsize.  Linux hasn't had
+	 * an f_frsize field in its statfs struct until recently,
+	 * thus historically Linux's sys_statfs reports these
+	 * fields in units of f_bsize.
+	 */
 	buf->f_bsize = sb->s_blocksize;
 	blockbits = sb->s_blocksize_bits;
 	blockres = (1 << blockbits) - 1;
 	buf->f_blocks = (res.tbytes + blockres) >> blockbits;
 	buf->f_bfree = (res.fbytes + blockres) >> blockbits;
 	buf->f_bavail = (res.abytes + blockres) >> blockbits;
+
 	buf->f_files = res.tfiles;
 	buf->f_ffree = res.afiles;
 

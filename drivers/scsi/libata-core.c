@@ -1919,7 +1919,24 @@ static void ata_fill_sg(struct ata_queued_cmd *qc)
 	if (idx)
 		ap->prd[idx - 1].flags_len |= cpu_to_le32(ATA_PRD_EOT);
 }
+/**
+ *	ata_check_atapi_dma - Check whether ATAPI DMA can be supported
+ *	@qc: Metadata associated with taskfile to check
+ *
+ *	LOCKING:
+ *	RETURNS: 0 when ATAPI DMA can be used
+ *               nonzero otherwise
+ */
+int ata_check_atapi_dma(struct ata_queued_cmd *qc)
+{
+	struct ata_port *ap = qc->ap;
+	int rc = 0; /* Assume ATAPI DMA is OK by default */
 
+	if (ap->ops->check_atapi_dma)
+		rc = ap->ops->check_atapi_dma(qc);
+
+	return rc;
+}
 /**
  *	ata_qc_prep - Prepare taskfile for submission
  *	@qc: Metadata associated with taskfile to be prepared
@@ -2369,6 +2386,9 @@ static void ata_pio_task(void *_data)
 	unsigned long timeout = 0;
 
 	switch (ap->pio_task_state) {
+	case PIO_ST_IDLE:
+		return;
+
 	case PIO_ST:
 		ata_pio_block(ap);
 		break;
@@ -2385,18 +2405,14 @@ static void ata_pio_task(void *_data)
 	case PIO_ST_TMOUT:
 	case PIO_ST_ERR:
 		ata_pio_error(ap);
-		break;
+		return;
 	}
 
-	if ((ap->pio_task_state != PIO_ST_IDLE) &&
-	    (ap->pio_task_state != PIO_ST_TMOUT) &&
-	    (ap->pio_task_state != PIO_ST_ERR)) {
-		if (timeout)
-			queue_delayed_work(ata_wq, &ap->pio_task,
-					   timeout);
-		else
-			queue_work(ata_wq, &ap->pio_task);
-	}
+	if (timeout)
+		queue_delayed_work(ata_wq, &ap->pio_task,
+				   timeout);
+	else
+		queue_work(ata_wq, &ap->pio_task);
 }
 
 static void atapi_request_sense(struct ata_port *ap, struct ata_device *dev,

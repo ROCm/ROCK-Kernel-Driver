@@ -4596,8 +4596,6 @@ static void __init parse_floppy_cfg_string(char *cfg)
 
 int init_module(void)
 {
-	printk(KERN_INFO "inserting floppy driver for " UTS_RELEASE "\n");
-
 	if (floppy)
 		parse_floppy_cfg_string(floppy);
 	return floppy_init();

@@ -303,7 +303,7 @@ static inline struct zone *next_zone(struct zone *zone)
 {
 	pg_data_t *pgdat = zone->zone_pgdat;
 
-	if (zone - pgdat->node_zones < MAX_NR_ZONES - 1)
+	if (zone < pgdat->node_zones + MAX_NR_ZONES - 1)
 		zone++;
 	else if (pgdat->pgdat_next) {
 		pgdat = pgdat->pgdat_next;
@@ -349,12 +349,12 @@ static inline int is_normal_idx(int idx)
  */
 static inline int is_highmem(struct zone *zone)
 {
-	return (is_highmem_idx(zone - zone->zone_pgdat->node_zones));
+	return zone == zone->zone_pgdat->node_zones + ZONE_HIGHMEM;
 }
 
 static inline int is_normal(struct zone *zone)
 {
-	return (is_normal_idx(zone - zone->zone_pgdat->node_zones));
+	return zone == zone->zone_pgdat->node_zones + ZONE_NORMAL;
 }
 
 /* These two functions are used to setup the per zone pages min values */

@@ -1076,6 +1076,8 @@ int open_for_data(struct cdrom_device_info * cdi)
 			}
 			cdinfo(CD_OPEN, "the tray is now closed.\n"); 
 		}
+		/* the door should be closed now, check for the disc */
+		ret = cdo->drive_status(cdi, CDSL_CURRENT);
 		if (ret!=CDS_DISC_OK) {
 			ret = -ENOMEDIUM;
 			goto clean_up_and_return;

@@ -356,7 +356,7 @@ static int sg_scsi_ioctl(struct file *file, request_queue_t *q,
 
 	bytes = max(in_len, out_len);
 	if (bytes) {
-		buffer = kmalloc(bytes, q->bounce_gfp | GFP_USER);
+		buffer = kmalloc(bytes, q->bounce_gfp | GFP_USER| __GFP_NOWARN);
 		if (!buffer)
 			return -ENOMEM;
 

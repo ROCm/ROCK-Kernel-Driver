@@ -29,6 +29,7 @@ restrictions referred to are that the relevant option is valid if:
 	CD	Appropriate CD support is enabled.
 	DEVFS	devfs support is enabled. 
 	DRM	Direct Rendering Management support is enabled. 
+	EDD	BIOS Enhanced Disk Drive Services (EDD) is enabled
 	EFI	EFI Partitioning (GPT) is enabled
 	EIDE	EIDE/ATAPI support is enabled.
 	FB	The frame buffer device is enabled.
@@ -407,6 +408,10 @@ running once the system is up.
 	eda=		[HW,PS2]
 
 	edb=		[HW,PS2]
+
+	edd=		[EDD]
+			Format: {"of[f]" | "sk[ipmbr]"}
+			See comment in arch/i386/boot/edd.S
 
 	eicon=		[HW,ISDN] 
 			Format: <id>,<membase>,<irq>

@@ -1,5 +1,6 @@
 /*
  * BIOS Enhanced Disk Drive support
+ * Copyright (C) 2002, 2003, 2004 Dell, Inc.
  * by Matt Domsch <Matt_Domsch@dell.com> October 2002
  * conformant to T13 Committee www.t13.org
  *   projects 1572D, 1484D, 1386D, 1226DT
@@ -7,14 +8,52 @@
  *	and Andrew Wilks <Andrew_Wilks@dell.com> September 2003, June 2004
  * legacy CHS retreival by Patrick J. LoPresti <patl@users.sourceforge.net>
  *      March 2004
+ * Command line option parsing, Matt Domsch, November 2004
  */
 
 #include <linux/edd.h>
+#include <asm/setup.h>
 
 #if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
+	movb	$0, (EDD_MBR_SIG_NR_BUF)
+	movb	$0, (EDDNR)
+
+# Check the command line for two options:
+# edd=of  disables EDD completely  (edd=off)
+# edd=sk  skips the MBR test    (edd=skipmbr)
+	pushl	%esi
+    	cmpl	$0, %cs:cmd_line_ptr
+	jz	done_cl
+	movl	%cs:(cmd_line_ptr), %esi
+# ds:esi has the pointer to the command line now
+	movl	$(COMMAND_LINE_SIZE-7), %ecx
+# loop through kernel command line one byte at a time
+cl_loop:
+	cmpl	$EDD_CL_EQUALS, (%si)
+	jz	found_edd_equals
+	incl	%esi
+	loop	cl_loop
+	jmp	done_cl
+found_edd_equals:
+# only looking at first two characters after equals
+    	addl	$4, %esi
+	cmpw	$EDD_CL_OFF, (%si)	# edd=of
+	jz	do_edd_off
+	cmpw	$EDD_CL_SKIP, (%si)	# edd=sk
+	jz	do_edd_skipmbr
+	jmp	done_cl
+do_edd_skipmbr:
+    	popl	%esi
+	jmp	edd_start
+do_edd_off:
+	popl	%esi
+	jmp	edd_done
+done_cl:
+	popl	%esi
+
+
 # Read the first sector of each BIOS disk device and store the 4-byte signature
 edd_mbr_sig_start:
-	movb	$0, (EDD_MBR_SIG_NR_BUF)	# zero value at EDD_MBR_SIG_NR_BUF
 	movb	$0x80, %dl			# from device 80
 	movw	$EDD_MBR_SIG_BUF, %bx		# store buffer ptr in bx
 edd_mbr_sig_read:
@@ -76,7 +115,6 @@ edd_start:
        						# result buffer for fn48
 	movw	$EDDBUF+EDDEXTSIZE, %si		# in ds:si, fn41 results
 						# kept just before that
-	movb	$0, (EDDNR)			# zero value at EDDNR
 	movb	$0x80, %dl			# BIOS device 0x80
 
 edd_check_ext:

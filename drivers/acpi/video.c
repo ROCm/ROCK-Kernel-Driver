@@ -1523,7 +1523,7 @@ static int acpi_video_device_enumerate(struct acpi_video_bus *video)
 		dod->package.count));
 
 	active_device_list= kmalloc(
- 		dod->package.count*sizeof(struct acpi_video_enumerated_device),
+ 		(1+dod->package.count)*sizeof(struct acpi_video_enumerated_device),
 	       	GFP_KERNEL);
 
 	if (!active_device_list) {

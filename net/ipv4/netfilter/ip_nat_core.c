@@ -678,7 +678,7 @@ manip_pkt(u_int16_t proto,
 	struct iphdr *iph;
 
 	(*pskb)->nfcache |= NFC_ALTERED;
-	if (!skb_ip_make_writable(pskb, iphdroff+sizeof(iph)))
+	if (!skb_ip_make_writable(pskb, iphdroff+sizeof(*iph)))
 		return 0;
 
 	iph = (void *)(*pskb)->data + iphdroff;
