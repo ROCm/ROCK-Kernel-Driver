@@ -1426,8 +1426,6 @@ static int i596_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 	remove_rx_bufs(dev);
 
-	MOD_DEC_USE_COUNT;
-
 	return 0;
 }
 

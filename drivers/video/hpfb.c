@@ -211,4 +211,5 @@ int __init hpfb_init(void)
 	return 0;
 }
 
+module_init(hpfb_init);
 MODULE_LICENSE("GPL");

@@ -1477,12 +1477,6 @@ tgafb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 	return ret;
 }
 
-int __init
-tgafb_init(void)
-{
-	return pci_module_init(&tgafb_driver);
-}
-
 #ifdef MODULE
 static void __exit
 tgafb_pci_unregister(struct pci_dev *pdev)
@@ -1529,12 +1523,22 @@ tgafb_setup(char *arg)
 }
 #endif /* !MODULE */
 
+int __init
+tgafb_init(void)
+{
+#ifndef MODULE
+	tgafb_setup(fb_get_options("tgafb"));
+#endif
+	return pci_module_init(&tgafb_driver);
+}
+
 /*
  *  Modularisation
  */
 
-#ifdef MODULE
 module_init(tgafb_init);
+
+#ifdef MODULE
 module_exit(tgafb_exit);
 #endif
 

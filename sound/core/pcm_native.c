@@ -2908,6 +2908,18 @@ unsigned int snd_pcm_capture_poll(struct file *file, poll_table * wait)
 	return mask;
 }
 
+/*
+ * mmap support
+ */
+
+/*
+ * Only on coherent architectures, we can mmap the status and the control records
+ * for effcient data transfer.  On others, we have to use HWSYNC ioctl...
+ */
+#if defined(CONFIG_X86) || defined(CONFIG_PPC) || defined(CONFIG_ALPHA)
+/*
+ * mmap status record
+ */
 static struct page * snd_pcm_mmap_status_nopage(struct vm_area_struct *area, unsigned long address, int *type)
 {
 	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)area->vm_private_data;
@@ -2930,8 +2942,8 @@ static struct vm_operations_struct snd_pcm_vm_ops_status =
 	.nopage =	snd_pcm_mmap_status_nopage,
 };
 
-int snd_pcm_mmap_status(snd_pcm_substream_t *substream, struct file *file,
-			struct vm_area_struct *area)
+static int snd_pcm_mmap_status(snd_pcm_substream_t *substream, struct file *file,
+			       struct vm_area_struct *area)
 {
 	snd_pcm_runtime_t *runtime;
 	long size;
@@ -2948,6 +2960,9 @@ int snd_pcm_mmap_status(snd_pcm_substream_t *substream, struct file *file,
 	return 0;
 }
 
+/*
+ * mmap control record
+ */
 static struct page * snd_pcm_mmap_control_nopage(struct vm_area_struct *area, unsigned long address, int *type)
 {
 	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)area->vm_private_data;
@@ -2987,20 +3002,26 @@ static int snd_pcm_mmap_control(snd_pcm_substream_t *substream, struct file *fil
 	area->vm_flags |= VM_RESERVED;
 	return 0;
 }
-
-static void snd_pcm_mmap_data_open(struct vm_area_struct *area)
+#else /* ! coherent mmap */
+/*
+ * don't support mmap for status and control records.
+ */
+static int snd_pcm_mmap_status(snd_pcm_substream_t *substream, struct file *file,
+			       struct vm_area_struct *area)
 {
-	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)area->vm_private_data;
-	atomic_inc(&substream->runtime->mmap_count);
+	return -ENXIO;
 }
-
-static void snd_pcm_mmap_data_close(struct vm_area_struct *area)
+static int snd_pcm_mmap_control(snd_pcm_substream_t *substream, struct file *file,
+				struct vm_area_struct *area)
 {
-	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)area->vm_private_data;
-	atomic_dec(&substream->runtime->mmap_count);
+	return -ENXIO;
 }
+#endif /* coherent mmap */
 
-static struct page * snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsigned long address, int *type)
+/*
+ * nopage callback for mmapping a RAM page
+ */
+static struct page *snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsigned long address, int *type)
 {
 	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)area->vm_private_data;
 	snd_pcm_runtime_t *runtime;
@@ -3040,12 +3061,52 @@ static struct vm_operations_struct snd_pcm_vm_ops_data =
 	.nopage =	snd_pcm_mmap_data_nopage,
 };
 
+/*
+ * mmap the DMA buffer on RAM
+ */
+static int snd_pcm_default_mmap(snd_pcm_substream_t *substream, struct vm_area_struct *area)
+{
+	area->vm_ops = &snd_pcm_vm_ops_data;
+	area->vm_private_data = substream;
+	area->vm_flags |= VM_RESERVED;
+	atomic_inc(&substream->runtime->mmap_count);
+	return 0;
+}
+
+/*
+ * mmap the DMA buffer on I/O memory area
+ */
+#if SNDRV_PCM_INFO_MMAP_IOMEM
 static struct vm_operations_struct snd_pcm_vm_ops_data_mmio =
 {
 	.open =		snd_pcm_mmap_data_open,
 	.close =	snd_pcm_mmap_data_close,
 };
 
+int snd_pcm_lib_mmap_iomem(snd_pcm_substream_t *substream, struct vm_area_struct *area)
+{
+	long size;
+	unsigned long offset;
+
+#ifdef pgprot_noncached
+	area->vm_page_prot = pgprot_noncached(area->vm_page_prot);
+#endif
+	area->vm_ops = &snd_pcm_vm_ops_data_mmio;
+	area->vm_flags |= VM_IO;
+	size = area->vm_end - area->vm_start;
+	offset = area->vm_pgoff << PAGE_SHIFT;
+	if (io_remap_page_range(area, area->vm_start,
+				substream->runtime->dma_addr + offset,
+				size, area->vm_page_prot))
+		return -EAGAIN;
+	atomic_inc(&substream->runtime->mmap_count);
+	return 0;
+}
+#endif /* SNDRV_PCM_INFO_MMAP */
+
+/*
+ * mmap DMA buffer
+ */
 int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
 		      struct vm_area_struct *area)
 {
@@ -3078,19 +3139,10 @@ int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
 	if (offset > dma_bytes - size)
 		return -EINVAL;
 
-	area->vm_ops = &snd_pcm_vm_ops_data;
-	area->vm_private_data = substream;
-	area->vm_flags |= VM_RESERVED;
-	if (runtime->hw.info & SNDRV_PCM_INFO_MMAP_IOMEM) {
-		area->vm_ops = &snd_pcm_vm_ops_data_mmio;
-		area->vm_flags |= VM_IO;
-		if (io_remap_page_range(area, area->vm_start,
-					runtime->dma_addr + offset,
-					size, area->vm_page_prot))
-			return -EAGAIN;
-	}
-	atomic_inc(&runtime->mmap_count);
-	return 0;
+	if (substream->ops->mmap)
+		return substream->ops->mmap(substream, area);
+	else
+		return snd_pcm_default_mmap(substream, area);
 }
 
 static int snd_pcm_mmap(struct file *file, struct vm_area_struct *area)

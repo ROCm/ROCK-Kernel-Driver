@@ -44,21 +44,6 @@ static inline void atomic_set(atomic_t *v, int i)
 	: "cc");
 }
 
-static inline void atomic_add(int i, atomic_t *v)
-{
-	unsigned long tmp, tmp2;
-
-	__asm__ __volatile__("@ atomic_add\n"
-"1:	ldrex	%0, [%2]\n"
-"	add	%0, %0, %3\n"
-"	strex	%1, %0, [%2]\n"
-"	teq	%1, #0\n"
-"	bne	1b"
-	: "=&r" (tmp), "=&r" (tmp2)
-	: "r" (&v->counter), "Ir" (i)
-	: "cc");
-}
-
 static inline int atomic_add_return(int i, atomic_t *v)
 {
 	unsigned long tmp;
@@ -75,21 +60,6 @@ static inline int atomic_add_return(int i, atomic_t *v)
 	: "cc");
 
 	return result;
-}
-
-static inline void atomic_sub(int i, atomic_t *v)
-{
-	unsigned long tmp, tmp2;
-
-	__asm__ __volatile__("@ atomic_sub\n"
-"1:	ldrex	%0, [%2]\n"
-"	sub	%0, %0, %3\n"
-"	strex	%1, %0, [%2]\n"
-"	teq	%1, #0\n"
-"	bne	1b"
-	: "=&r" (tmp), "=&r" (tmp2)
-	: "r" (&v->counter), "Ir" (i)
-	: "cc");
 }
 
 static inline int atomic_sub_return(int i, atomic_t *v)
@@ -135,15 +105,6 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 
 #define atomic_set(v,i)	(((v)->counter) = (i))
 
-static inline void atomic_add(int i, atomic_t *v)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	v->counter += i;
-	local_irq_restore(flags);
-}
-
 static inline int atomic_add_return(int i, atomic_t *v)
 {
 	unsigned long flags;
@@ -155,15 +116,6 @@ static inline int atomic_add_return(int i, atomic_t *v)
 	local_irq_restore(flags);
 
 	return val;
-}
-
-static inline void atomic_sub(int i, atomic_t *v)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	v->counter -= i;
-	local_irq_restore(flags);
 }
 
 static inline int atomic_sub_return(int i, atomic_t *v)
@@ -190,8 +142,10 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 
 #endif /* __LINUX_ARM_ARCH__ */
 
-#define atomic_inc(v)		atomic_add(1, v)
-#define atomic_dec(v)		atomic_sub(1, v)
+#define atomic_add(i, v)	(void) atomic_add_return(i, v)
+#define atomic_inc(v)		(void) atomic_add_return(1, v)
+#define atomic_sub(i, v)	(void) atomic_sub_return(i, v)
+#define atomic_dec(v)		(void) atomic_sub_return(1, v)
 
 #define atomic_inc_and_test(v)	(atomic_add_return(1, v) == 0)
 #define atomic_dec_and_test(v)	(atomic_sub_return(1, v) == 0)

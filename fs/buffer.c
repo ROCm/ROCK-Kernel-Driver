@@ -39,6 +39,7 @@
 #include <linux/cpu.h>
 #include <asm/bitops.h>
 
+static int fsync_buffers_list(spinlock_t *lock, struct list_head *list);
 static void invalidate_bh_lrus(void);
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_assoc_buffers)
@@ -725,12 +726,11 @@ still_busy:
  * PageLocked prevents anyone from starting writeback of a page which is
  * under read I/O (PageWriteback is only ever set against a locked page).
  */
-void mark_buffer_async_read(struct buffer_head *bh)
+static void mark_buffer_async_read(struct buffer_head *bh)
 {
 	bh->b_end_io = end_buffer_async_read;
 	set_buffer_async_read(bh);
 }
-EXPORT_SYMBOL(mark_buffer_async_read);
 
 void mark_buffer_async_write(struct buffer_head *bh)
 {
@@ -788,14 +788,6 @@ EXPORT_SYMBOL(mark_buffer_async_write);
  * filesystems (do it inside bforget()).  It could also be done by bringing
  * b_inode back.
  */
-
-void buffer_insert_list(spinlock_t *lock,
-		struct buffer_head *bh, struct list_head *list)
-{
-	spin_lock(lock);
-	list_move_tail(&bh->b_assoc_buffers, list);
-	spin_unlock(lock);
-}
 
 /*
  * The buffer's backing address_space's private_lock must be held
@@ -899,9 +891,12 @@ void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
 		if (mapping->assoc_mapping != buffer_mapping)
 			BUG();
 	}
-	if (list_empty(&bh->b_assoc_buffers))
-		buffer_insert_list(&buffer_mapping->private_lock,
-				bh, &mapping->private_list);
+	if (list_empty(&bh->b_assoc_buffers)) {
+		spin_lock(&buffer_mapping->private_lock);
+		list_move_tail(&bh->b_assoc_buffers,
+				&mapping->private_list);
+		spin_unlock(&buffer_mapping->private_lock);
+	}
 }
 EXPORT_SYMBOL(mark_buffer_dirty_inode);
 
@@ -982,7 +977,7 @@ EXPORT_SYMBOL(__set_page_dirty_buffers);
  * the osync code to catch these locked, dirty buffers without requeuing
  * any newly dirty buffers for write.
  */
-int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
+static int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
 {
 	struct buffer_head *bh;
 	struct list_head tmp;
@@ -3153,14 +3148,12 @@ EXPORT_SYMBOL(block_read_full_page);
 EXPORT_SYMBOL(block_sync_page);
 EXPORT_SYMBOL(block_truncate_page);
 EXPORT_SYMBOL(block_write_full_page);
-EXPORT_SYMBOL(buffer_insert_list);
 EXPORT_SYMBOL(cont_prepare_write);
 EXPORT_SYMBOL(end_buffer_async_write);
 EXPORT_SYMBOL(end_buffer_read_sync);
 EXPORT_SYMBOL(end_buffer_write_sync);
 EXPORT_SYMBOL(file_fsync);
 EXPORT_SYMBOL(fsync_bdev);
-EXPORT_SYMBOL(fsync_buffers_list);
 EXPORT_SYMBOL(generic_block_bmap);
 EXPORT_SYMBOL(generic_commit_write);
 EXPORT_SYMBOL(generic_cont_expand);

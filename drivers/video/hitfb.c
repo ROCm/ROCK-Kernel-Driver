@@ -341,8 +341,9 @@ static void __exit hitfb_exit(void)
 	unregister_framebuffer(&fb_info);
 }
 
-#ifdef MODULE
 module_init(hitfb_init);
+
+#ifdef MODULE
 module_exit(hitfb_exit);
 #endif
 

@@ -23,8 +23,11 @@
 #include <linux/string.h>
 #include <linux/buffer_head.h>
 
-uint8_t * udf_filead_read(struct inode *dir, uint8_t *tmpad, uint8_t ad_size,
-	lb_addr fe_loc, int *pos, int *offset, struct buffer_head **bh, int *error)
+#if 0
+static uint8_t *
+udf_filead_read(struct inode *dir, uint8_t *tmpad, uint8_t ad_size,
+		kernel_lb_addr fe_loc, int *pos, int *offset,
+		struct buffer_head **bh, int *error)
 {
 	int loffset = *offset;
 	int block;
@@ -71,13 +74,14 @@ uint8_t * udf_filead_read(struct inode *dir, uint8_t *tmpad, uint8_t ad_size,
 	}
 	return ad;
 }
+#endif
 
 struct fileIdentDesc *
 udf_fileident_read(struct inode *dir, loff_t *nf_pos,
 	struct udf_fileident_bh *fibh,
 	struct fileIdentDesc *cfi,
-	lb_addr *bloc, uint32_t *extoffset, 
-	lb_addr *eloc, uint32_t *elen,
+	kernel_lb_addr *bloc, uint32_t *extoffset, 
+	kernel_lb_addr *eloc, uint32_t *elen,
 	uint32_t *offset, struct buffer_head **bh)
 {
 	struct fileIdentDesc *fi;
@@ -259,7 +263,8 @@ udf_get_fileident(void * buffer, int bufsize, int * offset)
 	return fi;
 }
 
-extent_ad *
+#if 0
+static extent_ad *
 udf_get_fileextent(void * buffer, int bufsize, int * offset)
 {
 	extent_ad * ext;
@@ -293,6 +298,7 @@ udf_get_fileextent(void * buffer, int bufsize, int * offset)
 	*offset = *offset + sizeof(extent_ad);
 	return ext;
 }
+#endif
 
 short_ad *
 udf_get_fileshortad(uint8_t *ptr, int maxoffset, int *offset, int inc)

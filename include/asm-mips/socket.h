@@ -68,20 +68,4 @@ To add: #define SO_REUSEPORT 0x0200	/* Allow local address and port reuse.  */
 
 #define SO_PEERSEC		30
 
-/* Nast libc5 fixup - bletch */
-#if defined(__KERNEL__)
-/* Socket types. */
-#define SOCK_DGRAM	1		/* datagram (conn.less) socket	*/
-#define SOCK_STREAM	2		/* stream (connection) socket	*/
-#define SOCK_RAW	3		/* raw socket			*/
-#define SOCK_RDM	4		/* reliably-delivered message	*/
-#define SOCK_SEQPACKET	5		/* sequential packet socket	*/
-#define SOCK_PACKET	10		/* linux specific way of	*/
-					/* getting packets at the dev	*/
-					/* level.  For writing rarp and	*/
-					/* other similar things on the	*/
-					/* user level.			*/
-#define	SOCK_MAX	(SOCK_PACKET+1)
-#endif
-
 #endif /* _ASM_SOCKET_H */

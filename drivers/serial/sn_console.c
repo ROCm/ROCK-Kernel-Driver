@@ -920,10 +920,10 @@ sn_sal_module_init(void)
 {
 	int retval;
 
-	printk(KERN_INFO "sn_console: Console driver init\n");
-
 	if (!ia64_platform_is("sn2"))
 		return -ENODEV;
+
+	printk(KERN_INFO "sn_console: Console driver init\n");
 
 	if (USE_DYNAMIC_MINOR == 1) {
 		misc.minor = MISC_DYNAMIC_MINOR;

@@ -28,6 +28,8 @@
 #include <linux/fs.h>
 #include <linux/smp_lock.h>
 
+static int udf_fsync_inode(struct inode *, int);
+
 /*
  *	File may be NULL when we are called. Perhaps we shouldn't
  *	even pass file to fsync ?
@@ -39,7 +41,7 @@ int udf_fsync_file(struct file * file, struct dentry *dentry, int datasync)
 	return udf_fsync_inode(inode, datasync);
 }
 
-int udf_fsync_inode(struct inode *inode, int datasync)
+static int udf_fsync_inode(struct inode *inode, int datasync)
 {
 	int err;
 

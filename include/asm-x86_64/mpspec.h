@@ -156,8 +156,8 @@ struct mpc_config_lintsrc
  *	7	2 CPU MCA+PCI
  */
 
+#define MAX_MP_BUSSES 270
 #define MAX_IRQ_SOURCES 256
-#define MAX_MP_BUSSES 32
 enum mp_bustype {
 	MP_BUS_ISA = 1,
 	MP_BUS_EISA,

@@ -64,22 +64,22 @@ static const struct super_operations befs_sops = {
 /* slab cache for befs_inode_info objects */
 static kmem_cache_t *befs_inode_cachep;
 
-struct file_operations befs_dir_operations = {
+static struct file_operations befs_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= befs_readdir,
 };
 
-struct inode_operations befs_dir_inode_operations = {
+static struct inode_operations befs_dir_inode_operations = {
 	.lookup		= befs_lookup,
 };
 
-struct file_operations befs_file_operations = {
+static struct file_operations befs_file_operations = {
 	.llseek		= default_llseek,
 	.read		= generic_file_read,
 	.mmap		= generic_file_readonly_mmap,
 };
 
-struct address_space_operations befs_aops = {
+static struct address_space_operations befs_aops = {
 	.readpage	= befs_readpage,
 	.sync_page	= block_sync_page,
 	.bmap		= befs_bmap,

@@ -389,7 +389,7 @@ static void rp_do_transmit(struct r_port *info)
 	while (1) {
 		if (tty->stopped || tty->hw_stopped)
 			break;
-		c = MIN(info->xmit_fifo_room, MIN(info->xmit_cnt, XMIT_BUF_SIZE - info->xmit_tail));
+		c = min(info->xmit_fifo_room, min(info->xmit_cnt, XMIT_BUF_SIZE - info->xmit_tail));
 		if (c <= 0 || info->xmit_fifo_room <= 0)
 			break;
 		sOutStrW(sGetTxRxDataIO(cp), (unsigned short *) (info->xmit_buf + info->xmit_tail), c / 2);
@@ -1658,7 +1658,7 @@ static int rp_write(struct tty_struct *tty, int from_user,
 	 *  into FIFO.  Use the write queue for temp storage.
          */
 	if (!tty->stopped && !tty->hw_stopped && info->xmit_cnt == 0 && info->xmit_fifo_room > 0) {
-		c = MIN(count, info->xmit_fifo_room);
+		c = min(count, info->xmit_fifo_room);
 		b = buf;
 		if (from_user) {
 			if (copy_from_user(info->xmit_buf, buf, c)) {
@@ -1668,7 +1668,7 @@ static int rp_write(struct tty_struct *tty, int from_user,
 			if (info->tty == 0)
 				goto end;
 			b = info->xmit_buf;
-			c = MIN(c, info->xmit_fifo_room);
+			c = min(c, info->xmit_fifo_room);
 		}
 
 		/*  Push data into FIFO, 2 bytes at a time */
@@ -1696,7 +1696,7 @@ static int rp_write(struct tty_struct *tty, int from_user,
 		if (info->tty == 0)	/*   Seemingly obligatory check... */
 			goto end;
 
-		c = MIN(count, MIN(XMIT_BUF_SIZE - info->xmit_cnt - 1, XMIT_BUF_SIZE - info->xmit_head));
+		c = min(count, min(XMIT_BUF_SIZE - info->xmit_cnt - 1, XMIT_BUF_SIZE - info->xmit_head));
 		if (c <= 0)
 			break;
 

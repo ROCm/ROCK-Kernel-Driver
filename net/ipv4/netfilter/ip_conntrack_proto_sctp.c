@@ -623,8 +623,8 @@ int __init init(void)
 
 	return ret;
 
- cleanup:
 #ifdef CONFIG_SYSCTL
+ cleanup:
 	ip_conntrack_protocol_unregister(&ip_conntrack_protocol_sctp);
 #endif
  out:

@@ -47,7 +47,12 @@ struct pt_regs {
 
 #ifndef __ASSEMBLY__
 #define instruction_pointer(regs) ((regs)->nip)
+#ifdef CONFIG_SMP
+extern unsigned long profile_pc(struct pt_regs *regs);
+#else
 #define profile_pc(regs) instruction_pointer(regs)
+#endif
+
 #define user_mode(regs) (((regs)->msr & MSR_PR) != 0)
 
 #define force_successful_syscall_return()   \

@@ -24,10 +24,10 @@
 #include <linux/init.h>
 #include <linux/sysdev.h>
 #include <linux/i2c.h>
+#include <linux/hardirq.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
 #include <asm/irq.h>
-#include <asm/hardirq.h>
 #include <asm/pmac_feature.h>
 #include <asm/mmu_context.h>
 #include <asm/sections.h>

@@ -94,7 +94,6 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
 
 #include "cs46xxpm-24.h"
 #include "cs46xx_wrapper-24.h"

@@ -33,7 +33,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/leds.h>
-
+#include <asm/thread_info.h>
 #include <asm/mach/time.h>
 
 u64 jiffies_64 = INITIAL_JIFFIES;
@@ -52,6 +52,21 @@ EXPORT_SYMBOL(rtc_lock);
 /* change this if you have some constant time drift */
 #define USECS_PER_JIFFY	(1000000/HZ)
 
+#ifdef CONFIG_SMP
+unsigned long profile_pc(struct pt_regs *regs)
+{
+	unsigned long fp, pc = instruction_pointer(regs);
+
+	if (pc >= (unsigned long)&__lock_text_start &&
+	    pc <= (unsigned long)&__lock_text_end) {
+		fp = thread_saved_fp(current);
+		pc = pc_pointer(((unsigned long *)fp)[-1]);
+	}
+
+	return pc;
+}
+EXPORT_SYMBOL(profile_pc);
+#endif
 
 /*
  * hook for setting the RTC's idea of the current time.

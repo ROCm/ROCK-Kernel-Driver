@@ -17,62 +17,10 @@ void __init cyclone_setup(void)
 	use_cyclone = 1;
 }
 
-static u32* volatile cyclone_timer;	/* Cyclone MPMC0 register */
-static u32 last_update_cyclone;
-
-static unsigned long offset_base;
-
-static unsigned long get_offset_cyclone(void)
-{
-	u32 now;
-	unsigned long offset;
-
-	/* Read the cyclone timer */
-	now = readl(cyclone_timer);
-	/* .. relative to previous update*/
-	offset = now - last_update_cyclone;
-
-	/* convert cyclone ticks to nanoseconds */
-	offset = (offset*NSEC_PER_SEC)/CYCLONE_TIMER_FREQ;
-
-	/* our adjusted time in nanoseconds */
-	return offset_base + offset;
-}
-
-static void update_cyclone(long delta_nsec)
-{
-	u32 now;
-	unsigned long offset;
-
-	/* Read the cyclone timer */
-	now = readl(cyclone_timer);
-	/* .. relative to previous update*/
-	offset = now - last_update_cyclone;
-
-	/* convert cyclone ticks to nanoseconds */
-	offset = (offset*NSEC_PER_SEC)/CYCLONE_TIMER_FREQ;
-
-	offset += offset_base;
-
-	/* Be careful about signed/unsigned comparisons here: */
-	if (delta_nsec < 0 || (unsigned long) delta_nsec < offset)
-		offset_base = offset - delta_nsec;
-	else
-		offset_base = 0;
-
-	last_update_cyclone = now;
-}
-
-static void reset_cyclone(void)
-{
-	offset_base = 0;
-	last_update_cyclone = readl(cyclone_timer);
-}
 
 struct time_interpolator cyclone_interpolator = {
-	.get_offset =	get_offset_cyclone,
-	.update =	update_cyclone,
-	.reset =	reset_cyclone,
+	.source =	TIME_SOURCE_MMIO32,
+	.shift =	32,
 	.frequency =	CYCLONE_TIMER_FREQ,
 	.drift =	-100,
 };
@@ -83,6 +31,7 @@ int __init init_cyclone_clock(void)
 	u64 base;	/* saved cyclone base address */
 	u64 offset;	/* offset from pageaddr to cyclone_timer register */
 	int i;
+	u32* volatile cyclone_timer;	/* Cyclone MPMC0 register */
 
 	if (!use_cyclone)
 		return -ENODEV;
@@ -150,7 +99,7 @@ int __init init_cyclone_clock(void)
 		}
 	}
 	/* initialize last tick */
-	last_update_cyclone = readl(cyclone_timer);
+	cyclone_interpolator.addr = cyclone_timer;
 	register_time_interpolator(&cyclone_interpolator);
 
 	return 0;

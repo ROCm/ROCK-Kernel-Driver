@@ -5,7 +5,7 @@
  * second extended file system inode data in memory
  */
 struct ext2_inode_info {
-	__u32	i_data[15];
+	__le32	i_data[15];
 	__u32	i_flags;
 	__u32	i_faddr;
 	__u8	i_frag_no;

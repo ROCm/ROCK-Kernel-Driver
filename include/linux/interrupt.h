@@ -8,8 +8,8 @@
 #include <linux/bitops.h>
 #include <linux/preempt.h>
 #include <linux/cpumask.h>
+#include <linux/hardirq.h>
 #include <asm/atomic.h>
-#include <asm/hardirq.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
 

@@ -68,6 +68,7 @@ unsigned long mmu_context_bmap[CTX_BMAP_SLOTS];
 extern char  _start[], _end[];
 
 /* Initial ramdisk setup */
+extern unsigned long sparc_ramdisk_image64;
 extern unsigned int sparc_ramdisk_image;
 extern unsigned int sparc_ramdisk_size;
 
@@ -1279,10 +1280,12 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* Now have to check initial ramdisk, so that bootmap does not overwrite it */
-	if (sparc_ramdisk_image) {
-		if (sparc_ramdisk_image >= (unsigned long)_end - 2 * PAGE_SIZE)
-			sparc_ramdisk_image -= KERNBASE;
-		initrd_start = sparc_ramdisk_image + phys_base;
+	if (sparc_ramdisk_image || sparc_ramdisk_image64) {
+		unsigned long ramdisk_image = sparc_ramdisk_image ?
+			sparc_ramdisk_image : sparc_ramdisk_image64;
+		if (ramdisk_image >= (unsigned long)_end - 2 * PAGE_SIZE)
+			ramdisk_image -= KERNBASE;
+		initrd_start = ramdisk_image + phys_base;
 		initrd_end = initrd_start + sparc_ramdisk_size;
 		if (initrd_end > end_of_phys_memory) {
 			printk(KERN_CRIT "initrd extends beyond end of memory "
@@ -1325,6 +1328,10 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 		size = initrd_end - initrd_start;
 
 		/* Resert the initrd image area. */
+#ifdef CONFIG_DEBUG_BOOTMEM
+		prom_printf("reserve_bootmem(initrd): base[%llx] size[%lx]\n",
+			initrd_start, initrd_end);
+#endif
 		reserve_bootmem(initrd_start, size);
 		*pages_avail -= PAGE_ALIGN(size) >> PAGE_SHIFT;
 
@@ -1377,7 +1384,7 @@ void __init paging_init(void)
 	if ((real_end > ((unsigned long)KERNBASE + 0x400000)))
 		bigkernel = 1;
 #ifdef CONFIG_BLK_DEV_INITRD
-	if (sparc_ramdisk_image)
+	if (sparc_ramdisk_image || sparc_ramdisk_image64)
 		real_end = (PAGE_ALIGN(real_end) + PAGE_ALIGN(sparc_ramdisk_size));
 #endif
 

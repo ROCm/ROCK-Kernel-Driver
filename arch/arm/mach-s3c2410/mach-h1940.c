@@ -17,6 +17,7 @@
  *     18-Jan-2003 BJD  Added serial port configuration
  *     17-Feb-2003 BJD  Copied to mach-ipaq.c
  *     21-Aug-2004 BJD  Added struct s3c2410_board
+ *     04-Sep-2004 BJD  Changed uart init, renamed ipaq_ -> h1940_
 */
 
 #include <linux/kernel.h>
@@ -41,8 +42,9 @@
 
 #include "s3c2410.h"
 #include "devs.h"
+#include "cpu.h"
 
-static struct map_desc ipaq_iodesc[] __initdata = {
+static struct map_desc h1940_iodesc[] __initdata = {
 	/* nothing here yet */
 };
 
@@ -50,7 +52,7 @@ static struct map_desc ipaq_iodesc[] __initdata = {
 #define ULCON S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB
 #define UFCON S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE
 
-static struct s3c2410_uartcfg ipaq_uartcfgs[] = {
+static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[0] = {
 		.hwport	     = 0,
 		.flags	     = 0,
@@ -94,23 +96,20 @@ static struct s3c2410_board h1940_board __initdata = {
 	.devices_count = ARRAY_SIZE(h1940_devices)
 };
 
-void __init ipaq_map_io(void)
+void __init h1940_map_io(void)
 {
-	s3c2410_map_io(ipaq_iodesc, ARRAY_SIZE(ipaq_iodesc));
-	s3c2410_uartcfgs = ipaq_uartcfgs;
-
+	s3c24xx_init_io(h1940_iodesc, ARRAY_SIZE(h1940_iodesc));
+	s3c2410_init_uarts(h1940_uartcfgs, ARRAY_SIZE(h1940_uartcfgs));
 	s3c2410_set_board(&h1940_board);
 }
 
-void __init ipaq_init_irq(void)
+void __init h1940_init_irq(void)
 {
-	//llprintk("ipaq_init_irq:\n");
-
 	s3c2410_init_irq();
 
 }
 
-void __init ipaq_init_time(void)
+void __init h1940_init_time(void)
 {
 	s3c2410_init_time();
 }
@@ -119,7 +118,7 @@ MACHINE_START(H1940, "IPAQ-H1940")
      MAINTAINER("Ben Dooks <ben@fluff.org>")
      BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, S3C2410_VA_UART)
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
-     MAPIO(ipaq_map_io)
-     INITIRQ(ipaq_init_irq)
-     INITTIME(ipaq_init_time)
+     MAPIO(h1940_map_io)
+     INITIRQ(h1940_init_irq)
+     INITTIME(h1940_init_time)
 MACHINE_END

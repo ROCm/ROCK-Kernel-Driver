@@ -381,7 +381,7 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
 {
 	struct vm_area_struct *vma;
 
-	if (end < start)
+	if (end < start || flags)
 		return;
 
 	vma = find_vma(current->active_mm, start);
@@ -391,7 +391,7 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
 		if (end > vma->vm_end)
 			end = vma->vm_end;
 
-		flush_cache_range(vma, start, end);
+		flush_cache_user_range(vma, start, end);
 	}
 }
 
@@ -562,7 +562,7 @@ asmlinkage void __div0(void)
 	printk("Division by zero in kernel.\n");
 	dump_stack();
 }
-EXPORT_SYMBOL_NOVERS(__div0);
+EXPORT_SYMBOL(__div0);
 
 void abort(void)
 {

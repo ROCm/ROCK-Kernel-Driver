@@ -156,6 +156,9 @@ struct saa7134_format {
 #define SAA7134_BOARD_AVERMEDIA_305    35
 #define SAA7133_BOARD_UPMOST_PURPLE_TV 36
 #define SAA7134_BOARD_ITEMS_MTV005     37
+#define SAA7134_BOARD_CINERGY200       38
+#define SAA7134_BOARD_FLYTVPLATINUM    39
+#define SAA7134_BOARD_VIDEOMATE_TV_PVR 40
 
 #define SAA7134_INPUT_MAX 8
 
@@ -178,13 +181,12 @@ struct saa7134_board {
 	struct saa7134_input    mute;
 	
 	/* peripheral I/O */
-	unsigned int            i2s_rate;
 	unsigned int            has_ts;
 	enum saa7134_video_out  video_out;
 
 	/* i2c chip info */
 	unsigned int            tuner_type;
-	unsigned int            need_tda9887:1;
+	unsigned int            tda9887_conf;
 };
 
 #define card_has_radio(dev)   (NULL != saa7134_boards[dev->board].radio.name)
@@ -362,6 +364,7 @@ struct saa7134_dev {
 	/* config info */
 	unsigned int               board;
 	unsigned int               tuner_type;
+	unsigned int               tda9887_conf;
 	unsigned int               gpio_value;
 
 	/* i2c i/o */
@@ -397,6 +400,7 @@ struct saa7134_dev {
 	int                        ctl_mirror;
 	int                        ctl_y_odd;
 	int                        ctl_y_even;
+	int                        ctl_automute;
 
 	/* crop */
 	struct v4l2_rect           crop_bounds;

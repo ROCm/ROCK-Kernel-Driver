@@ -48,6 +48,7 @@
 #include <linux/miscdevice.h>
 #include <linux/interrupt.h>
 #include <linux/timer.h>
+#include <linux/delay.h>
 #include <linux/ioport.h>
 
 #include <asm/uaccess.h>
@@ -389,7 +390,7 @@ static void isicom_tx(unsigned long _data)
 		
 		tty = port->tty;
 		save_flags(flags); cli();
-		txcount = MIN(TX_SIZE, port->xmit_cnt);
+		txcount = min_t(short, TX_SIZE, port->xmit_cnt);
 		if ((txcount <= 0) || tty->stopped || tty->hw_stopped) {
 			restore_flags(flags);
 			continue;
@@ -421,7 +422,7 @@ static void isicom_tx(unsigned long _data)
 		residue = NO;
 		wrd = 0;			
 		while (1) {
-			cnt = MIN(txcount, (SERIAL_XMIT_SIZE - port->xmit_tail));
+			cnt = min_t(int, txcount, (SERIAL_XMIT_SIZE - port->xmit_tail));
 			if (residue == YES) {
 				residue = NO;
 				if (cnt > 0) {
@@ -650,7 +651,7 @@ static irqreturn_t isicom_interrupt(int irq, void *dev_id,
 		}	 
 	}
 	else {				/* Data   Packet */
-		count = MIN(byte_count, (TTY_FLIPBUF_SIZE - tty->flip.count));
+		count = min_t(unsigned short, byte_count, (TTY_FLIPBUF_SIZE - tty->flip.count));
 #ifdef ISICOM_DEBUG
 		printk(KERN_DEBUG "ISICOM: Intr: Can rx %d of %d bytes.\n", 
 					count, byte_count);
@@ -1163,8 +1164,8 @@ static int isicom_write(struct tty_struct * tty, int from_user,
 	save_flags(flags);
 	while(1) {	
 		cli();
-		cnt = MIN(count, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
-			SERIAL_XMIT_SIZE - port->xmit_head));
+		cnt = min_t(int, count, min(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
+					    SERIAL_XMIT_SIZE - port->xmit_head));
 		if (cnt <= 0) 
 			break;
 		
@@ -1180,8 +1181,8 @@ static int isicom_write(struct tty_struct * tty, int from_user,
 				return -EFAULT;
 			}
 			cli();
-			cnt = MIN(cnt, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
-			SERIAL_XMIT_SIZE - port->xmit_head));
+			cnt = min_t(int, cnt, min(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
+						  SERIAL_XMIT_SIZE - port->xmit_head));
 			memcpy(port->xmit_buf + port->xmit_head, tmp_buf, cnt);
 		}	
 		else
@@ -1906,8 +1907,7 @@ int init_module(void)
 void cleanup_module(void)
 {
 	re_schedule = 0;
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(HZ);
+	msleep(1000);
 
 #ifdef ISICOM_DEBUG	
 	printk("ISICOM: isicom_tx tx_count = %ld.\n", tx_count);

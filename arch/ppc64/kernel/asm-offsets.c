@@ -22,11 +22,11 @@
 #include <linux/types.h>
 #include <linux/mman.h>
 #include <linux/mm.h>
+#include <linux/hardirq.h>
 #include <asm/io.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
-#include <asm/hardirq.h>
 
 #include <asm/naca.h>
 #include <asm/paca.h>
@@ -58,6 +58,7 @@ int main(void)
 	DEFINE(THREAD_FPR0, offsetof(struct thread_struct, fpr[0]));
 	DEFINE(THREAD_FPSCR, offsetof(struct thread_struct, fpscr));
 	DEFINE(KSP, offsetof(struct thread_struct, ksp));
+	DEFINE(KSP_VSID, offsetof(struct thread_struct, ksp_vsid));
 
 #ifdef CONFIG_ALTIVEC
 	DEFINE(THREAD_VR0, offsetof(struct thread_struct, vr[0]));
@@ -93,7 +94,6 @@ int main(void)
 	DEFINE(PACASLBCACHE, offsetof(struct paca_struct, slb_cache));
 	DEFINE(PACASLBCACHEPTR, offsetof(struct paca_struct, slb_cache_ptr));
 	DEFINE(PACACONTEXTID, offsetof(struct paca_struct, context.id));
-	DEFINE(PACASLBR3, offsetof(struct paca_struct, slb_r3));
 #ifdef CONFIG_HUGETLB_PAGE
 	DEFINE(PACAHTLBSEGS, offsetof(struct paca_struct, context.htlb_segs));
 #endif /* CONFIG_HUGETLB_PAGE */

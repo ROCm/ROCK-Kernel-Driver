@@ -528,9 +528,9 @@ struct mempolicy *shmem_get_policy(struct vm_area_struct *vma,
 int shmem_lock(struct file *file, int lock, struct user_struct *user);
 #else
 #define shmem_nopage filemap_nopage
-#define shmem_lock(a, b) /* always in memory, no need to lock */
-#define shmem_set_policy(a, b) (0)
-#define shmem_get_policy(a, b) (NULL)
+#define shmem_lock(a, b, c) 	({0;})	/* always in memory, no need to lock */
+#define shmem_set_policy(a, b)	(0)
+#define shmem_get_policy(a, b)	(NULL)
 #endif
 struct file *shmem_file_setup(char *name, loff_t size, unsigned long flags);
 

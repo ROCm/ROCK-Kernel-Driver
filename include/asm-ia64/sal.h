@@ -819,6 +819,16 @@ struct sal_ret_values {
 	long r8; long r9; long r10; long r11;
 };
 
+#define IA64_SAL_OEMFUNC_MIN		0x02000000
+#define IA64_SAL_OEMFUNC_MAX		0x03ffffff
+
+extern int ia64_sal_oemcall(struct ia64_sal_retval *, u64, u64, u64, u64, u64,
+			    u64, u64, u64);
+extern int ia64_sal_oemcall_nolock(struct ia64_sal_retval *, u64, u64, u64,
+				   u64, u64, u64, u64, u64);
+extern int ia64_sal_oemcall_reentrant(struct ia64_sal_retval *, u64, u64, u64,
+				      u64, u64, u64, u64, u64);
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_IA64_SAL_H */

@@ -29,6 +29,7 @@
 static void afs_vlocation_update_timer(struct afs_timer *timer);
 static void afs_vlocation_update_attend(struct afs_async_op *op);
 static void afs_vlocation_update_discard(struct afs_async_op *op);
+static void __afs_put_vlocation(struct afs_vlocation *vlocation);
 
 static void __afs_vlocation_timeout(struct afs_timer *timer)
 {
@@ -455,7 +456,7 @@ int afs_vlocation_lookup(struct afs_cell *cell,
  * finish using a volume location record
  * - caller must have cell->vol_sem write-locked
  */
-void __afs_put_vlocation(struct afs_vlocation *vlocation)
+static void __afs_put_vlocation(struct afs_vlocation *vlocation)
 {
 	struct afs_cell *cell;
 

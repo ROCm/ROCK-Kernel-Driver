@@ -1377,11 +1377,17 @@ out_err0:
 static int stifb_disabled __initdata;
 
 int __init
+stifb_setup(char *options);
+
+int __init
 stifb_init(void)
 {
 	struct sti_struct *sti;
 	int i;
 	
+#ifndef MODULE
+	stifb_setup(fb_get_options("stifb"));
+#endif
 	if (stifb_disabled) {
 		printk(KERN_INFO "stifb: disabled by \"stifb=off\" kernel parameter\n");
 		return -ENXIO;
@@ -1452,9 +1458,7 @@ stifb_setup(char *options)
 
 __setup("stifb=", stifb_setup);
 
-#ifdef MODULE
 module_init(stifb_init);
-#endif
 module_exit(stifb_cleanup);
 
 MODULE_AUTHOR("Helge Deller <deller@gmx.de>, Thomas Bogendoerfer <tsbogend@alpha.franken.de>");

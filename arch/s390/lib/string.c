@@ -46,7 +46,7 @@ size_t strlen(const char *s)
 {
 	return __strend(s) - s;
 }
-EXPORT_SYMBOL_NOVERS(strlen);
+EXPORT_SYMBOL(strlen);
 
 /**
  * strnlen - Find the length of a length-limited string
@@ -59,7 +59,7 @@ size_t strnlen(const char * s, size_t n)
 {
 	return __strnend(s, n) - s;
 }
-EXPORT_SYMBOL_NOVERS(strnlen);
+EXPORT_SYMBOL(strnlen);
 
 /**
  * strcpy - Copy a %NUL terminated string
@@ -79,7 +79,7 @@ char *strcpy(char *dest, const char *src)
 		      : "cc", "memory" );
 	return ret;
 }
-EXPORT_SYMBOL_NOVERS(strcpy);
+EXPORT_SYMBOL(strcpy);
 
 /**
  * strlcpy - Copy a %NUL terminated string into a sized buffer
@@ -103,7 +103,7 @@ size_t strlcpy(char *dest, const char *src, size_t size)
 	}
 	return ret;
 }
-EXPORT_SYMBOL_NOVERS(strlcpy);
+EXPORT_SYMBOL(strlcpy);
 
 /**
  * strncpy - Copy a length-limited, %NUL-terminated string
@@ -121,7 +121,7 @@ char *strncpy(char *dest, const char *src, size_t n)
 	__builtin_memcpy(dest, src, len);
 	return dest;
 }
-EXPORT_SYMBOL_NOVERS(strncpy);
+EXPORT_SYMBOL(strncpy);
 
 /**
  * strcat - Append one %NUL-terminated string to another
@@ -144,7 +144,7 @@ char *strcat(char *dest, const char *src)
 		      : "d" (r0), "0" (0UL) : "cc", "memory" );
 	return ret;
 }
-EXPORT_SYMBOL_NOVERS(strcat);
+EXPORT_SYMBOL(strcat);
 
 /**
  * strlcat - Append a length-limited, %NUL-terminated string to another
@@ -168,7 +168,7 @@ size_t strlcat(char *dest, const char *src, size_t n)
 	}
 	return res;
 }
-EXPORT_SYMBOL_NOVERS(strlcat);
+EXPORT_SYMBOL(strlcat);
 
 /**
  * strncat - Append a length-limited, %NUL-terminated string to another
@@ -190,7 +190,7 @@ char *strncat(char *dest, const char *src, size_t n)
 	__builtin_memcpy(p, src, len);
 	return dest;
 }
-EXPORT_SYMBOL_NOVERS(strncat);
+EXPORT_SYMBOL(strncat);
 
 /**
  * strcmp - Compare two strings
@@ -217,7 +217,7 @@ int strcmp(const char *cs, const char *ct)
 		      : : "cc" );
 	return ret;
 }
-EXPORT_SYMBOL_NOVERS(strcmp);
+EXPORT_SYMBOL(strcmp);
 
 /**
  * strrchr - Find the last occurrence of a character in a string
@@ -235,7 +235,7 @@ char * strrchr(const char * s, int c)
 	       } while (--len > 0);
        return 0;
 }
-EXPORT_SYMBOL_NOVERS(strrchr);
+EXPORT_SYMBOL(strrchr);
 
 /**
  * strstr - Find the first substring in a %NUL terminated string
@@ -269,7 +269,7 @@ char * strstr(const char * s1,const char * s2)
 	}
 	return 0;
 }
-EXPORT_SYMBOL_NOVERS(strstr);
+EXPORT_SYMBOL(strstr);
 
 /**
  * memchr - Find a character in an area of memory.
@@ -293,7 +293,7 @@ void *memchr(const void *s, int c, size_t n)
 		      : "+a" (ret), "+&a" (s) : "d" (r0) : "cc" );
 	return (void *) ret;
 }
-EXPORT_SYMBOL_NOVERS(memchr);
+EXPORT_SYMBOL(memchr);
 
 /**
  * memcmp - Compare two areas of memory
@@ -319,7 +319,7 @@ int memcmp(const void *cs, const void *ct, size_t n)
 		ret = *(char *) r2 - *(char *) r4;
 	return ret;
 }
-EXPORT_SYMBOL_NOVERS(memcmp);
+EXPORT_SYMBOL(memcmp);
 
 /**
  * memscan - Find a character in an area of memory.
@@ -340,7 +340,7 @@ void *memscan(void *s, int c, size_t n)
 		      : "+a" (ret), "+&a" (s) : "d" (r0) : "cc" );
 	return (void *) ret;
 }
-EXPORT_SYMBOL_NOVERS(memscan);
+EXPORT_SYMBOL(memscan);
 
 /**
  * memcpy - Copy one area of memory to another
@@ -354,7 +354,7 @@ void *memcpy(void *dest, const void *src, size_t n)
 {
 	return __builtin_memcpy(dest, src, n);
 }
-EXPORT_SYMBOL_NOVERS(memcpy);
+EXPORT_SYMBOL(memcpy);
 
 /**
  * bcopy - Copy one area of memory to another
@@ -369,7 +369,7 @@ void bcopy(const void *srcp, void *destp, size_t n)
 {
 	__builtin_memcpy(destp, srcp, n);
 }
-EXPORT_SYMBOL_NOVERS(bcopy);
+EXPORT_SYMBOL(bcopy);
 
 /**
  * memset - Fill a region of memory with the given value
@@ -393,4 +393,4 @@ void *memset(void *s, int c, size_t n)
 		} while (--n > 0);
 	return s;
 }
-EXPORT_SYMBOL_NOVERS(memset);
+EXPORT_SYMBOL(memset);

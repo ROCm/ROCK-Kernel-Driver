@@ -16,7 +16,7 @@
  *      Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <asm/hardirq.h>
+#include <linux/interrupt.h>
 
 
 #define disable(oldspl) save_flags (oldspl)

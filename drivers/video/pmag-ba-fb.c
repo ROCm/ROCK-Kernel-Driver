@@ -172,4 +172,5 @@ int __init pmagbafb_init(void)
 	}
 }
 
+module_init(pmagbafb_init);
 MODULE_LICENSE("GPL");

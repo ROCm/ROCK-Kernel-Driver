@@ -756,6 +756,7 @@ static const char *hwcap_str[] = {
 	"fpa",
 	"vfp",
 	"edsp",
+	"java",
 	NULL
 };
 

@@ -14,7 +14,6 @@
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
 
 extern void die (char *, struct pt_regs *, long);
 

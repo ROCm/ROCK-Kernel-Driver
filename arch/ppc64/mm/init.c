@@ -85,7 +85,6 @@ unsigned long __max_memory;
 /* info on what we think the IO hole is */
 unsigned long 	io_hole_start;
 unsigned long	io_hole_size;
-unsigned long	top_of_ram;
 
 void show_mem(void)
 {
@@ -498,16 +497,12 @@ void __init mm_init_ppc64(void)
 	 * So we need some rough way to tell where your big IO hole
 	 * is. On pmac, it's between 2G and 4G, on POWER3, it's around
 	 * that area as well, on POWER4 we don't have one, etc...
-	 * We need that to implement something approx. decent for
-	 * page_is_ram() so that /dev/mem doesn't map cacheable IO space
-	 * when XFree resquest some IO regions witout using O_SYNC, we
-	 * also need that as a "hint" when sizing the TCE table on POWER3
+	 * We need that as a "hint" when sizing the TCE table on POWER3
 	 * So far, the simplest way that seem work well enough for us it
 	 * to just assume that the first discontinuity in our physical
 	 * RAM layout is the IO hole. That may not be correct in the future
 	 * (and isn't on iSeries but then we don't care ;)
 	 */
-	top_of_ram = lmb_end_of_DRAM();
 
 #ifndef CONFIG_PPC_ISERIES
 	for (i = 1; i < lmb.memory.cnt; i++) {
@@ -530,22 +525,32 @@ void __init mm_init_ppc64(void)
 	ppc64_boot_msg(0x100, "MM Init Done");
 }
 
-
 /*
  * This is called by /dev/mem to know if a given address has to
  * be mapped non-cacheable or not
  */
-int page_is_ram(unsigned long physaddr)
+int page_is_ram(unsigned long pfn)
 {
-#ifdef CONFIG_PPC_ISERIES
-	return 1;
-#endif
-	if (physaddr >= top_of_ram)
-		return 0;
-	return io_hole_start == 0 ||  physaddr < io_hole_start ||
-		physaddr >= (io_hole_start + io_hole_size);
-}
+	int i;
+	unsigned long paddr = (pfn << PAGE_SHIFT);
 
+	for (i=0; i < lmb.memory.cnt; i++) {
+		unsigned long base;
+
+#ifdef CONFIG_MSCHUNKS
+		base = lmb.memory.region[i].physbase;
+#else
+		base = lmb.memory.region[i].base;
+#endif
+		if ((paddr >= base) &&
+			(paddr < (base + lmb.memory.region[i].size))) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(page_is_ram);
 
 /*
  * Initialize the bootmem system and give it all the memory we
@@ -599,6 +604,7 @@ void __init paging_init(void)
 	unsigned long zones_size[MAX_NR_ZONES];
 	unsigned long zholes_size[MAX_NR_ZONES];
 	unsigned long total_ram = lmb_phys_mem_size();
+	unsigned long top_of_ram = lmb_end_of_DRAM();
 
 	printk(KERN_INFO "Top of RAM: 0x%lx, Total RAM: 0x%lx\n",
 	       top_of_ram, total_ram);
@@ -648,59 +654,53 @@ module_init(setup_kcore);
 
 void __init mem_init(void)
 {
-#ifndef CONFIG_DISCONTIGMEM
-	unsigned long addr;
+#ifdef CONFIG_DISCONTIGMEM
+	int nid;
 #endif
-	int codepages = 0;
-	int datapages = 0;
-	int initpages = 0;
+	pg_data_t *pgdat;
+	unsigned long i;
+	struct page *page;
+	unsigned long reservedpages = 0, codesize, initsize, datasize, bsssize;
 
 	num_physpages = max_low_pfn;	/* RAM is assumed contiguous */
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
 
 #ifdef CONFIG_DISCONTIGMEM
-{
-	int nid;
-
         for (nid = 0; nid < numnodes; nid++) {
-		if (node_data[nid].node_spanned_pages != 0) {
+		if (NODE_DATA(nid)->node_spanned_pages != 0) {
 			printk("freeing bootmem node %x\n", nid);
 			totalram_pages +=
 				free_all_bootmem_node(NODE_DATA(nid));
 		}
 	}
-
-	printk("Memory: %luk available (%dk kernel code, %dk data, %dk init) [%08lx,%08lx]\n",
-	       (unsigned long)nr_free_pages()<< (PAGE_SHIFT-10),
-	       codepages<< (PAGE_SHIFT-10), datapages<< (PAGE_SHIFT-10),
-	       initpages<< (PAGE_SHIFT-10),
-	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
-}
 #else
 	max_mapnr = num_physpages;
-
 	totalram_pages += free_all_bootmem();
+#endif
 
-	for (addr = KERNELBASE; addr < (unsigned long)__va(lmb_end_of_DRAM());
-	     addr += PAGE_SIZE) {
-		if (!PageReserved(virt_to_page(addr)))
-			continue;
-		if (addr < (unsigned long)_etext)
-			codepages++;
-
-		else if (addr >= (unsigned long)__init_begin
-			 && addr < (unsigned long)__init_end)
-			initpages++;
-		else if (addr < klimit)
-			datapages++;
+	for_each_pgdat(pgdat) {
+		for (i = 0; i < pgdat->node_spanned_pages; i++) {
+			page = pgdat->node_mem_map + i;
+			if (PageReserved(page))
+				reservedpages++;
+		}
 	}
 
-	printk("Memory: %luk available (%dk kernel code, %dk data, %dk init) [%08lx,%08lx]\n",
-	       (unsigned long)nr_free_pages()<< (PAGE_SHIFT-10),
-	       codepages<< (PAGE_SHIFT-10), datapages<< (PAGE_SHIFT-10),
-	       initpages<< (PAGE_SHIFT-10),
-	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
-#endif
+	codesize = (unsigned long)&_etext - (unsigned long)&_stext;
+	initsize = (unsigned long)&__init_end - (unsigned long)&__init_begin;
+	datasize = (unsigned long)&_edata - (unsigned long)&__init_end;
+	bsssize = (unsigned long)&__bss_stop - (unsigned long)&__bss_start;
+
+	printk(KERN_INFO "Memory: %luk/%luk available (%luk kernel code, "
+	       "%luk reserved, %luk data, %luk bss, %luk init)\n",
+		(unsigned long)nr_free_pages() << (PAGE_SHIFT-10),
+		num_physpages << (PAGE_SHIFT-10),
+		codesize >> 10,
+		reservedpages << (PAGE_SHIFT-10),
+		datasize >> 10,
+		bsssize >> 10,
+		initsize >> 10);
+
 	mem_init_done = 1;
 
 #ifdef CONFIG_PPC_ISERIES

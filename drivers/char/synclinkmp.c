@@ -453,8 +453,6 @@ typedef struct _synclinkmp_info {
 #define CRCE	BIT2
 
 
-#define jiffies_from_ms(a) ((((a) * HZ)/1000)+1)
-
 /*
  * Global linked list of SyncLink devices
  */
@@ -514,10 +512,6 @@ static struct tty_driver *serial_driver;
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
-
-#ifndef MIN
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-#endif
 
 
 /* tty callbacks */
@@ -1000,8 +994,8 @@ static int write(struct tty_struct *tty, int from_user,
 	}
 
 	for (;;) {
-		c = MIN(count,
-			MIN(info->max_frame_size - info->tx_count - 1,
+		c = min_t(int, count,
+			min(info->max_frame_size - info->tx_count - 1,
 			    info->max_frame_size - info->tx_put));
 		if (c <= 0)
 			break;
@@ -1144,7 +1138,7 @@ static void wait_until_sent(struct tty_struct *tty, int timeout)
 		char_time = 1;
 
 	if (timeout)
-		char_time = MIN(char_time, timeout);
+		char_time = min_t(unsigned long, char_time, timeout);
 
 	if ( info->params.mode == MGSL_MODE_HDLC ) {
 		while (info->tx_active) {
@@ -2763,7 +2757,7 @@ static int startup(SLMP_INFO * info)
 
 	change_params(info);
 
-	info->status_timer.expires = jiffies + jiffies_from_ms(10);
+	info->status_timer.expires = jiffies + msecs_to_jiffies(10);
 	add_timer(&info->status_timer);
 
 	if (info->tty)
@@ -4321,7 +4315,7 @@ void tx_start(SLMP_INFO *info)
 			write_reg(info, TXDMA + DIR, 0x40);		/* enable Tx DMA interrupts (EOM) */
 			write_reg(info, TXDMA + DSR, 0xf2);		/* clear Tx DMA IRQs, enable Tx DMA */
 	
-			info->tx_timer.expires = jiffies + jiffies_from_ms(5000);
+			info->tx_timer.expires = jiffies + msecs_to_jiffies(5000);
 			add_timer(&info->tx_timer);
 		}
 		else {
@@ -5026,7 +5020,7 @@ CheckAgain:
 
 	if ( debug_level >= DEBUG_LEVEL_DATA )
 		trace_block(info,info->rx_buf_list_ex[StartIndex].virt_addr,
-			MIN(framesize,SCABUFSIZE),0);
+			min_t(int, framesize,SCABUFSIZE),0);
 
 	if (framesize) {
 		if (framesize > info->max_frame_size)
@@ -5041,7 +5035,7 @@ CheckAgain:
 			info->icount.rxok++;
 
 			while(copy_count) {
-				int partial_count = MIN(copy_count,SCABUFSIZE);
+				int partial_count = min(copy_count,SCABUFSIZE);
 				memcpy( ptmp,
 					info->rx_buf_list_ex[index].virt_addr,
 					partial_count );
@@ -5098,14 +5092,14 @@ void tx_load_dma_buffer(SLMP_INFO *info, const char *buf, unsigned int count)
 	SCADESC_EX *desc_ex;
 
 	if ( debug_level >= DEBUG_LEVEL_DATA )
-		trace_block(info,buf, MIN(count,SCABUFSIZE), 1);
+		trace_block(info,buf, min_t(int, count,SCABUFSIZE), 1);
 
 	/* Copy source buffer to one or more DMA buffers, starting with
 	 * the first transmit dma buffer.
 	 */
 	for(i=0;;)
 	{
-		copy_count = MIN(count,SCABUFSIZE);
+		copy_count = min_t(unsigned short,count,SCABUFSIZE);
 
 		desc = &info->tx_buf_list[i];
 		desc_ex = &info->tx_buf_list_ex[i];
@@ -5209,7 +5203,7 @@ int irq_test(SLMP_INFO *info)
 	timeout=100;
 	while( timeout-- && !info->irq_occurred ) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(jiffies_from_ms(10));
+		schedule_timeout(msecs_to_jiffies(10));
 	}
 
 	spin_lock_irqsave(&info->lock,flags);
@@ -5360,7 +5354,7 @@ int loopback_test(SLMP_INFO *info)
 	/* Set a timeout for waiting for interrupt. */
 	for ( timeout = 100; timeout; --timeout ) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(jiffies_from_ms(10));
+		schedule_timeout(msecs_to_jiffies(10));
 
 		if (rx_get_frame(info)) {
 			rc = TRUE;
@@ -5616,7 +5610,7 @@ void status_timeout(unsigned long context)
 
 	info->status_timer.data = (unsigned long)info;
 	info->status_timer.function = status_timeout;
-	info->status_timer.expires = jiffies + jiffies_from_ms(10);
+	info->status_timer.expires = jiffies + msecs_to_jiffies(10);
 	add_timer(&info->status_timer);
 }
 

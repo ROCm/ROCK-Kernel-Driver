@@ -26,20 +26,20 @@
 #define EXT2_XATTR_INDEX_SECURITY	        6
 
 struct ext2_xattr_header {
-	__u32	h_magic;	/* magic number for identification */
-	__u32	h_refcount;	/* reference count */
-	__u32	h_blocks;	/* number of disk blocks used */
-	__u32	h_hash;		/* hash value of all attributes */
+	__le32	h_magic;	/* magic number for identification */
+	__le32	h_refcount;	/* reference count */
+	__le32	h_blocks;	/* number of disk blocks used */
+	__le32	h_hash;		/* hash value of all attributes */
 	__u32	h_reserved[4];	/* zero right now */
 };
 
 struct ext2_xattr_entry {
 	__u8	e_name_len;	/* length of name */
 	__u8	e_name_index;	/* attribute name index */
-	__u16	e_value_offs;	/* offset in disk block of value */
-	__u32	e_value_block;	/* disk block attribute is stored on (n/i) */
-	__u32	e_value_size;	/* size of attribute value */
-	__u32	e_hash;		/* hash value of name and value */
+	__le16	e_value_offs;	/* offset in disk block of value */
+	__le32	e_value_block;	/* disk block attribute is stored on (n/i) */
+	__le32	e_value_size;	/* size of attribute value */
+	__le32	e_hash;		/* hash value of name and value */
 	char	e_name[0];	/* attribute name */
 };
 

@@ -1561,7 +1561,7 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
  * This expects to be called with tasklist_lock read-locked or better,
  * and the siglock not locked.  It may momentarily take the siglock.
  *
- * When sampling multiple threads for RUSAGE_GROUP, under SMP we might have
+ * When sampling multiple threads for RUSAGE_SELF, under SMP we might have
  * races with threads incrementing their own counters.  But since word
  * reads are atomic, we either get new values or old values and we don't
  * care which for the sums.  We always take the siglock to protect reading
@@ -1582,14 +1582,6 @@ void k_getrusage(struct task_struct *p, int who, struct rusage *r)
 		return;
 
 	switch (who) {
-		case RUSAGE_SELF:
-			jiffies_to_timeval(p->utime, &r->ru_utime);
-			jiffies_to_timeval(p->stime, &r->ru_stime);
-			r->ru_nvcsw = p->nvcsw;
-			r->ru_nivcsw = p->nivcsw;
-			r->ru_minflt = p->min_flt;
-			r->ru_majflt = p->maj_flt;
-			break;
 		case RUSAGE_CHILDREN:
 			spin_lock_irqsave(&p->sighand->siglock, flags);
 			utime = p->signal->cutime;
@@ -1602,7 +1594,7 @@ void k_getrusage(struct task_struct *p, int who, struct rusage *r)
 			jiffies_to_timeval(utime, &r->ru_utime);
 			jiffies_to_timeval(stime, &r->ru_stime);
 			break;
-		case RUSAGE_GROUP:
+		case RUSAGE_SELF:
 			spin_lock_irqsave(&p->sighand->siglock, flags);
 			utime = stime = 0;
 			goto sum_group;
@@ -1651,8 +1643,7 @@ int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 
 asmlinkage long sys_getrusage(int who, struct rusage __user *ru)
 {
-	if (who != RUSAGE_SELF && who != RUSAGE_CHILDREN
-	    && who != RUSAGE_GROUP)
+	if (who != RUSAGE_SELF && who != RUSAGE_CHILDREN)
 		return -EINVAL;
 	return getrusage(current, who, ru);
 }

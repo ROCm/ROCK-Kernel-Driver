@@ -86,9 +86,9 @@ static void afs_vnode_cb_timed_out(struct afs_timer *timer)
  * - starts callback expiry timer
  * - adds to server's callback list
  */
-void afs_vnode_finalise_status_update(struct afs_vnode *vnode,
-				      struct afs_server *server,
-				      int ret)
+static void afs_vnode_finalise_status_update(struct afs_vnode *vnode,
+					     struct afs_server *server,
+					     int ret)
 {
 	struct afs_server *oldserver = NULL;
 

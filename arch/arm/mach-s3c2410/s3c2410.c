@@ -37,6 +37,7 @@
 #include <asm/arch/regs-serial.h>
 
 #include "s3c2410.h"
+#include "cpu.h"
 
 int s3c2410_clock_tick_rate = 12*1000*1000;  /* current timers at 12MHz */
 
@@ -50,24 +51,14 @@ unsigned long s3c2410_fclk;
 unsigned long s3c2410_hclk;
 unsigned long s3c2410_pclk;
 
-#ifndef MHZ
-#define MHZ (1000*1000)
-#endif
-
-#define print_mhz(m) ((m) / MHZ), ((m / 1000) % 1000)
-
-#define IODESC_ENT(x) { S3C2410_VA_##x, S3C2410_PA_##x, S3C2410_SZ_##x, MT_DEVICE }
-
 static struct map_desc s3c2410_iodesc[] __initdata = {
-	IODESC_ENT(IRQ),
-	IODESC_ENT(MEMCTRL),
 	IODESC_ENT(USBHOST),
 	IODESC_ENT(CLKPWR),
 	IODESC_ENT(LCD),
 	IODESC_ENT(UART),
 	IODESC_ENT(TIMER),
-	IODESC_ENT(GPIO),
 	IODESC_ENT(ADC),
+	IODESC_ENT(WATCHDOG)
 };
 
 static struct resource s3c_uart0_resource[] = {
@@ -140,14 +131,16 @@ static struct platform_device *uart_devices[] __initdata = {
 	&s3c_uart2
 };
 
-void __init s3c2410_map_io(struct map_desc *mach_desc, int size)
+void __init s3c2410_map_io(struct map_desc *mach_desc, int mach_size)
 {
 	unsigned long tmp;
 
 	/* register our io-tables */
 
 	iotable_init(s3c2410_iodesc, ARRAY_SIZE(s3c2410_iodesc));
-	iotable_init(mach_desc, size);
+	iotable_init(mach_desc, mach_size);
+
+	printk("machine_initted %p,%d\n", mach_desc, mach_size);
 
 	/* now we've got our machine bits initialised, work out what
 	 * clocks we've got */
@@ -176,7 +169,12 @@ void s3c2410_set_board(struct s3c2410_board *b)
 	board = b;
 }
 
-static int __init s3c2410_init(void)
+void s3c2410_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+{
+	s3c2410_uartcfgs = cfg;
+}
+
+int __init s3c2410_init(void)
 {
 	int ret;
 
@@ -202,5 +200,3 @@ static int __init s3c2410_init(void)
 
 	return ret;
 }
-
-arch_initcall(s3c2410_init);

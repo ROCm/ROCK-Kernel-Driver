@@ -20,7 +20,7 @@
 #include <asm/abs_addr.h>
 #include <asm/bitops.h>
 
-struct lmb lmb __initdata;
+struct lmb lmb;
 
 static unsigned long __init
 lmb_addrs_overlap(unsigned long base1, unsigned long size1,

@@ -27,13 +27,6 @@ struct systemcfg *systemcfg;
  * field correctly */
 extern unsigned long __toc_start;
 
-/* Stack space used when we detect a bad kernel stack pointer, and
- * early in SMP boots before relocation is enabled.
- *
- * ABI requires stack to be 128-byte aligned
- */
-char emergency_stack[PAGE_SIZE * NR_CPUS] __attribute__((aligned(128)));
-
 /* The Paca is an array with one entry per processor.  Each contains an 
  * ItLpPaca, which contains the information shared between the 
  * hypervisor and Linux.  Each also contains an ItLpRegSave area which
@@ -44,18 +37,27 @@ char emergency_stack[PAGE_SIZE * NR_CPUS] __attribute__((aligned(128)));
  * processors.  The processor VPD array needs one entry per physical
  * processor (not thread).
  */
+#ifdef CONFIG_PPC_ISERIES
+#define EXTRA_INITS(number, lpq)					    \
+	.lppaca_ptr = &paca[number].lppaca,				    \
+	.lpqueue_ptr = (lpq),		/* &xItLpQueue, */		    \
+	.reg_save_ptr = &paca[number].reg_save,				    \
+	.reg_save = {							    \
+		.xDesc = 0xd397d9e2,	/* "LpRS" */			    \
+		.xSize = sizeof(struct ItLpRegSave)			    \
+	},
+#else
+#define EXTRA_INITS(number, lpq)
+#endif
+
 #define PACAINITDATA(number,start,lpq,asrr,asrv)			    \
 {									    \
-	.lppaca_ptr = &paca[number].lppaca,				    \
-	.reg_save_ptr = &paca[number].reg_save,				    \
 	.lock_token = 0x8000,						    \
 	.paca_index = (number),		/* Paca Index */		    \
-	.lpqueue_ptr = (lpq),		/* &xItLpQueue, */		    \
 	.default_decr = 0x00ff0000,	/* Initial Decr */		    \
 	.kernel_toc = (unsigned long)(&__toc_start) + 0x8000UL,		    \
 	.stab_real = (asrr), 		/* Real pointer to segment table */ \
 	.stab_addr = (asrv),		/* Virt pointer to segment table */ \
-	.emergency_sp = &emergency_stack[((number)+1) * PAGE_SIZE],	    \
 	.cpu_start = (start),		/* Processor start */		    \
 	.lppaca = {							    \
 		.xDesc = 0xd397d781,	/* "LpPa" */			    \
@@ -66,13 +68,10 @@ char emergency_stack[PAGE_SIZE * NR_CPUS] __attribute__((aligned(128)));
 		.xEndOfQuantum = 0xfffffffffffffffful,			    \
 		.xSLBCount = 64,					    \
 	},								    \
-	.reg_save = {							    \
-		.xDesc = 0xd397d9e2,	/* "LpRS" */			    \
-		.xSize = sizeof(struct ItLpRegSave)			    \
-	},								    \
+	EXTRA_INITS((number), (lpq))					    \
 }
 
-struct paca_struct paca[] __page_aligned = {
+struct paca_struct paca[] = {
 #ifdef CONFIG_PPC_ISERIES
 	PACAINITDATA( 0, 1, &xItLpQueue, 0, STAB0_VIRT_ADDR),
 #else

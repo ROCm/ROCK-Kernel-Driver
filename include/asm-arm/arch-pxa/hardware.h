@@ -59,10 +59,9 @@ typedef struct { volatile u32 offset[4096]; } __regbase;
 # define __REG(x)	__REGP(io_p2v(x))
 #endif
 
-/* Let's kick gcc's ass again... */
-# define __REG2(x,y)	\
-	( __builtin_constant_p(y) ? (__REG((x) + (y))) \
-				  : (*(volatile u32 *)((u32)&__REG(x) + (y))) )
+/* With indexed regs we don't want to feed the index through io_p2v()
+   especially if it is a variable, otherwise horrible code will result. */
+# define __REG2(x,y)     (*(volatile u32 *)((u32)&__REG(x) + (y)))
 
 # define __PREG(x)	(io_v2p((u32)&(x)))
 

@@ -411,8 +411,16 @@
 
 		.macro	addruart,rx
 		mov	\rx, #0xfe000000	@ physical
-#if defined(CONFIG_ARCH_IQ80321)
+#if defined(CONFIG_ARCH_IQ80321) || defined(CONFIG_ARCH_IQ31244)
 		orr	\rx, \rx, #0x00800000	@ location of the UART
+#elif defined(CONFIG_ARCH_IOP331)
+		mrc	p15, 0, \rx, c1, c0
+		tst	\rx, #1			@ MMU enabled?
+		moveq	\rx, #0x000fe000	@ Physical Base
+		movne	\rx, #0
+		orr	\rx, \rx, #0xfe000000
+		orr	\rx, \rx, #0x00f00000	@ Virtual Base
+		orr	\rx, \rx, #0x00001700   @ location of the UART
 #else
 #error Unknown IOP3XX implementation
 #endif
@@ -430,7 +438,7 @@
 		.endm
 
 		.macro	waituart,rd,rx
-#ifndef	CONFIG_ARCH_IQ80321
+#if !defined(CONFIG_ARCH_IQ80321) || !defined(CONFIG_ARCH_IQ31244) || !defined(CONFIG_ARCH_IQ80331)
 1001:		ldrb	\rd, [\rx, #0x6]
 		tst	\rd, #0x10
 		beq	1001b

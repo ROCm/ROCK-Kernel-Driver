@@ -388,7 +388,7 @@ static int ufs_parse_options (char * options, unsigned * mount_options)
 /*
  * Read on-disk structures associated with cylinder groups
  */
-int ufs_read_cylinder_structures (struct super_block * sb) {
+static int ufs_read_cylinder_structures (struct super_block *sb) {
 	struct ufs_sb_info * sbi = UFS_SB(sb);
 	struct ufs_sb_private_info * uspi;
 	struct ufs_super_block *usb;
@@ -488,7 +488,7 @@ failed:
  * Put on-disk structures associated with cylinder groups and 
  * write them back to disk
  */
-void ufs_put_cylinder_structures (struct super_block * sb) {
+static void ufs_put_cylinder_structures (struct super_block *sb) {
 	struct ufs_sb_info * sbi = UFS_SB(sb);
 	struct ufs_sb_private_info * uspi;
 	struct ufs_buffer_head * ubh;
@@ -993,7 +993,7 @@ failed_nomem:
 	return -ENOMEM;
 }
 
-void ufs_write_super (struct super_block * sb) {
+static void ufs_write_super (struct super_block *sb) {
 	struct ufs_sb_private_info * uspi;
 	struct ufs_super_block_first * usb1;
 	struct ufs_super_block_third * usb3;
@@ -1020,7 +1020,7 @@ void ufs_write_super (struct super_block * sb) {
 	unlock_kernel();
 }
 
-void ufs_put_super (struct super_block * sb)
+static void ufs_put_super (struct super_block *sb)
 {
 	struct ufs_sb_info * sbi = UFS_SB(sb);
 		
@@ -1037,7 +1037,7 @@ void ufs_put_super (struct super_block * sb)
 }
 
 
-int ufs_remount (struct super_block * sb, int * mount_flags, char * data)
+static int ufs_remount (struct super_block *sb, int *mount_flags, char *data)
 {
 	struct ufs_sb_private_info * uspi;
 	struct ufs_super_block_first * usb1;
@@ -1112,7 +1112,7 @@ int ufs_remount (struct super_block * sb, int * mount_flags, char * data)
 	return 0;
 }
 
-int ufs_statfs (struct super_block * sb, struct kstatfs * buf)
+static int ufs_statfs (struct super_block *sb, struct kstatfs *buf)
 {
 	struct ufs_sb_private_info * uspi;
 	struct ufs_super_block_first * usb1;

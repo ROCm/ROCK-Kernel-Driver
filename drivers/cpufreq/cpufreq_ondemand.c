@@ -90,11 +90,6 @@ struct dbs_tuners dbs_tuners_ins = {
 };
 
 /************************** sysfs interface ************************/
-static ssize_t show_current_freq(struct cpufreq_policy *policy, char *buf)
-{
-	return sprintf (buf, "%u\n", policy->cur);
-}
-
 static ssize_t show_sampling_rate_max(struct cpufreq_policy *policy, char *buf)
 {
 	return sprintf (buf, "%u\n", MAX_SAMPLING_RATE);
@@ -111,7 +106,6 @@ static struct freq_attr _name = { 				\
 	.show = show_##_name, 					\
 }
 
-define_one_ro(current_freq);
 define_one_ro(sampling_rate_max);
 define_one_ro(sampling_rate_min);
 
@@ -208,7 +202,6 @@ define_one_rw(up_threshold);
 define_one_rw(down_threshold);
 
 static struct attribute * dbs_attributes[] = {
-	&current_freq.attr,
 	&sampling_rate_max.attr,
 	&sampling_rate_min.attr,
 	&sampling_rate.attr,

@@ -200,7 +200,7 @@ typedef u_int32_t vuid_t;
 typedef u_int32_t vgid_t;
 #endif /*_VUID_T_ */
 
-#ifdef CODA_FS_OLD_API
+#ifdef CONFIG_CODA_FS_OLD_API
 struct CodaFid {
 	u_int32_t opaque[3];
 };
@@ -220,7 +220,7 @@ struct coda_cred {
     vgid_t cr_groupid, cr_egid, cr_sgid, cr_fsgid; /* same for groups */
 };
 
-#else /* not defined(CODA_FS_OLD_API) */
+#else /* not defined(CONFIG_CODA_FS_OLD_API) */
 
 struct CodaFid {
 	u_int32_t opaque[4];
@@ -318,7 +318,7 @@ struct coda_statfs {
 #define CODA_KERNEL_VERSION 0 /* don't care about kernel version number */
 #define CODA_KERNEL_VERSION 1 /* The old venus 4.6 compatible interface */
 #endif
-#ifdef CODA_FS_OLD_API
+#ifdef CONFIG_CODA_FS_OLD_API
 #define CODA_KERNEL_VERSION 2 /* venus_lookup got an extra parameter */
 #else
 #define CODA_KERNEL_VERSION 3 /* 128-bit file identifiers */
@@ -330,7 +330,7 @@ struct coda_statfs {
 struct coda_in_hdr {
     u_int32_t opcode;
     u_int32_t unique;	    /* Keep multiple outstanding msgs distinct */
-#ifdef CODA_FS_OLD_API
+#ifdef CONFIG_CODA_FS_OLD_API
     u_int16_t pid;	    /* Common to all */
     u_int16_t pgid;	    /* Common to all */
     u_int16_t sid;          /* Common to all */
@@ -614,7 +614,7 @@ struct coda_vget_out {
 /* CODA_PURGEUSER is a venus->kernel call */
 struct coda_purgeuser_out {
     struct coda_out_hdr oh;
-#ifdef CODA_FS_OLD_API
+#ifdef CONFIG_CODA_FS_OLD_API
     struct coda_cred cred;
 #else
     vuid_t uid;

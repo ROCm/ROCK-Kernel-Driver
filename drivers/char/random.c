@@ -1541,6 +1541,7 @@ static int __init rand_initialize(void)
 	clear_entropy_store(urandom_state);
 	init_std_data(random_state);
 	init_std_data(sec_random_state);
+	init_std_data(urandom_state);
 #ifdef CONFIG_SYSCTL
 	sysctl_init_random(random_state);
 #endif
@@ -2278,19 +2279,7 @@ __u32 secure_tcpv6_sequence_number(__u32 *saddr, __u32 *daddr,
 	return seq;
 }
 EXPORT_SYMBOL(secure_tcpv6_sequence_number);
-
-__u32 secure_ipv6_id(__u32 *daddr)
-{
-	struct keydata *keyptr;
-
-	keyptr = check_and_rekey(get_seconds());
-
-	return halfMD4Transform(daddr, keyptr->secret);
-}
-
-EXPORT_SYMBOL(secure_ipv6_id);
 #endif
-
 
 __u32 secure_tcp_sequence_number(__u32 saddr, __u32 daddr,
 				 __u16 sport, __u16 dport)

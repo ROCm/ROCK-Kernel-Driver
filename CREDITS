@@ -281,6 +281,11 @@ S: Code 930.5, Goddard Space Flight Center
 S: Greenbelt, Maryland 20771
 S: USA
 
+N: Adam Belay
+E: ambx1@neo.rr.com
+D: Linux Plug and Play Support
+S: USA
+
 N: Daniele Bellucci
 E: bellucda@tiscali.it
 D: Various Janitor work.
@@ -513,6 +518,14 @@ S: 25-29 St Giles
 S: Oxford
 S: United Kingdom
 
+N: Luiz Fernando N. Capitulino
+E: lcapitulino@terra.com.br
+E: lcapitulino@prefeitura.sp.gov.br
+W: http://www.telecentros.sp.gov.br
+D: Little fixes and a lot of janitorial work
+S: E-GOV Telecentros SP
+S: Brazil
+
 N: Remy Card
 E: Remy.Card@masi.ibp.fr
 E: Remy.Card@linux.org
@@ -625,6 +638,14 @@ E: nconway.list@ukaea.org.uk
 D: Assorted sched/mm titbits
 S: Oxfordshire, UK.
 
+N: Kees Cook
+E: kees@outflux.net
+W: http://outflux.net/
+P: 1024D/17063E6D 9FA3 C49C 23C9 D1BC 2E30  1975 1FFF 4BA9 1706 3E6D
+D: Minor updates to SCSI code for the Communications type
+S: (ask for current address)
+S: USA
+
 N: Mark Corner
 E: mcorner@umich.edu
 W: http://www.eecs.umich.edu/~mcorner/
@@ -637,14 +658,6 @@ E: cornwell@acm.org
 D: Original designer and co-author of ATA Taskfile
 D: Kernel module SMART utilities
 S: Santa Cruz, California
-S: USA
-
-N: Kees Cook
-E: kees@outflux.net
-W: http://outflux.net/
-P: 1024D/17063E6D 9FA3 C49C 23C9 D1BC 2E30  1975 1FFF 4BA9 1706 3E6D
-D: Minor updates to SCSI code for the Communications type
-S: (ask for current address)
 S: USA
 
 N: Alan Cox
@@ -1059,6 +1072,12 @@ S: R. Tocantins, 89 - Cristo Rei
 S: 80050-430 - Curitiba - Paraná
 S: Brazil
 
+N: Kumar Gala
+E: kumar.gala@freescale.com
+D: Embedded PowerPC 6xx/7xx/74xx/82xx/85xx support
+S: Austin, Texas 78729
+S: USA
+
 N: Nigel Gamble
 E: nigel@nrg.org
 D: Interrupt-driven printer driver
@@ -1069,12 +1088,6 @@ S: USA
 
 N: Jeff Garzik
 E: jgarzik@pobox.com
-
-N: Kumar Gala
-E: kumar.gala@freescale.com
-D: Embedded PowerPC 6xx/7xx/74xx/82xx/85xx support
-S: Austin, Texas 78729
-S: USA
 
 N: Jacques Gelinas
 E: jacques@solucorp.qc.ca
@@ -1573,9 +1586,36 @@ D: Backport/Forwardport merge monkey.
 D: Various Janitor work.
 S: United Kingdom
 
+N: Martin Josfsson
+E: gandalf@wlug.westbo.se
+P: 1024D/F6B6D3B1 7610 7CED 5C34 4AA6 DBA2  8BE1 5A6D AF95 F6B6 D3B1
+D: netfilter: SAME target
+D: netfilter: helper target
+D: netfilter: various other hacks
+S: Ronneby
+S: Sweden
+
 N: Ani Joshi
 E: ajoshi@shell.unixbox.com
 D: fbdev hacking
+
+N: Jesper Juhl
+E: juhl-lkml@dif.dk
+D: Various small janitor fixes, cleanups etc.
+S: Lemnosvej 1, 3.tv
+S: 2300 Copenhagen S
+S: Denmark
+
+N: Jozsef Kadlecsik
+E: kadlec@blackhole.kfki.hu
+P: 1024D/470DB964 4CB3 1A05 713E 9BF7 FAC5  5809 DD8C B7B1 470D B964
+D: netfilter: TCP window tracking code
+D: netfilter: raw table
+D: netfilter: iprange match
+D: netfilter: new logging interfaces
+D: netfilter: various other hacks
+S: Tata
+S: Hungary
 
 N: Bernhard Kaindl
 E: bkaindl@netway.at
@@ -1828,11 +1868,6 @@ S: Sindlovy Dvory 117
 S: 370 01  Ceske Budejovice
 S: Czech Republic
 
-N: Adam Belay
-E: ambx1@neo.rr.com
-D: Linux Plug and Play Support
-S: USA
-
 N: Bas Laarhoven
 E: sjml@xs4all.nl
 D: Loadable modules and ftape driver
@@ -1962,12 +1997,6 @@ E: imp@village.org
 D: Linux/MIPS Deskstation support, Provided OI/OB for Linux
 S: 8786 Niwot Road
 S: Niwot, Colorado 80503
-S: USA
-
-N: Pete Popov
-E: pete_popov@yahoo.com
-D: Linux/MIPS AMD/Alchemy Port and mips hacking and debugging
-S: San Jose, CA 95134
 S: USA
 
 N: Robert M. Love
@@ -2136,6 +2165,16 @@ P: 1024D/357375CC 317C 58AC 1B39 2AB0 AB96  EB38 0B6F 731F 3573 75CC
 D: OV511 driver
 S: (address available on request)
 S: USA
+
+N: Patrick McHardy
+E: kaber@trash.net
+P: 1024D/12155E80 B128 7DE6 FF0A C2B2 48BE  AB4C C9D4 964E 1215 5E80
+D: netfilter: endless number of bugfixes
+D: netfilter: CLASSIFY target
+D: netfilter: addrtype match
+D: tc: HFSC scheduler
+S: Freiburg
+S: Germany
 
 N: Mike McLagan
 E: mike.mclagan@linux.org
@@ -2591,6 +2630,12 @@ P: 1024D/EDBB6147 7B36 0E07 04BC 11DC A7A0  D3F7 7185 9E7A EDBB 6147
 D: sonypi, meye drivers, mct_u232 usb serial hacks
 S: Paris, France
 
+N: Pete Popov
+E: pete_popov@yahoo.com
+D: Linux/MIPS AMD/Alchemy Port and mips hacking and debugging
+S: San Jose, CA 95134
+S: USA
+
 N: Matt Porter
 E: mporter@kernel.crashing.org
 D: Motorola PowerPC PReP support
@@ -2806,7 +2851,7 @@ S: Germany
 
 N: Paul `Rusty' Russell
 E: rusty@rustcorp.com.au
-W: http://www.samba.org/netfilter
+W: http://ozlabs.org/~rusty
 D: Ruggedly handsome.
 D: netfilter, ipchains with Michael Neuling.
 S: 52 Moore St
@@ -2829,7 +2874,6 @@ W: http://reality.sgi.com/bryder_wellington/ftdi_sio
 S: I/3 Walter St
 S: Wellington
 S: New Zealand
-
 
 N: Sampo Saaristo
 E: sambo@cs.tut.fi
@@ -3301,14 +3345,6 @@ S: Chudenicka 8
 S: 10200 Prague 10, Hostivar
 S: Czech Republic
 
-N: James R. Van Zandt
-E: jrv@vanzandt.mv.com
-P: 1024/E298966D F0 37 4F FD E5 7E C5 E6  F1 A0 1E 22 6F 46 DA 0C
-D: Author and maintainer of the Double Talk speech synthesizer driver
-S: 27 Spencer Drive
-S: Nashua, New Hampshire 03062
-S: USA
-
 N: Heikki Vatiainen
 E: hessu@cs.tut.fi
 D: Co-author of Multi-Protocol Over ATM (MPOA), some LANE hacks
@@ -3398,6 +3434,18 @@ S: Computer Science Division
 S: UC Berkeley
 S: Berkeley, CA 94720-1776
 S: USA
+
+N: Harald Welte
+E: laforge@netfilter.org
+P: 1024D/30F48BFF DBDE 6912 8831 9A53 879B  9190 5DA5 C655 30F4 8BFF
+W: http://gnumonks.org/users/laforge
+D: netfilter: new nat helper infrastructure
+D: netfilter: ULOG, ECN, DSCP target
+D: netfilter: TTL match
+D: netfilter: IPv6 mangle table
+D: netfilter: various other hacks
+S: Berlin
+S: Germany
 
 N: Bill Wendling
 E: wendling@ganymede.isdn.uiuc.edu
@@ -3590,6 +3638,14 @@ S: ARCO Tower 1-8-1 Shimomeguro Meguro-ku
 S: Tokyo 153
 S: Japan
 
+N: James R. Van Zandt
+E: jrv@vanzandt.mv.com
+P: 1024/E298966D F0 37 4F FD E5 7E C5 E6  F1 A0 1E 22 6F 46 DA 0C
+D: Author and maintainer of the Double Talk speech synthesizer driver
+S: 27 Spencer Drive
+S: Nashua, New Hampshire 03062
+S: USA
+
 N: Orest Zborowski
 E: orestz@eskimo.com
 D: XFree86 and kernel development
@@ -3631,13 +3687,6 @@ D: MD driver
 D: EISA/sysfs subsystem
 S: France
 
-N: Luiz Fernando N. Capitulino
-E: lcapitulino@terra.com.br
-E: lcapitulino@prefeitura.sp.gov.br
-W: http://www.telecentros.sp.gov.br
-D: Little fixes and a lot of janitorial work
-S: E-GOV Telecentros SP
-S: Brazil
 
 # Don't add your name here, unless you really _are_ after Marc
 # alphabetically. Leonard used to be very proud of being the 

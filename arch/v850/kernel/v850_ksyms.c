@@ -14,7 +14,6 @@
 #include <asm/io.h>
 #include <asm/semaphore.h>
 #include <asm/checksum.h>
-#include <asm/hardirq.h>
 #include <asm/current.h>
 
 
@@ -37,29 +36,29 @@ EXPORT_SYMBOL (ip_compute_csum);
 EXPORT_SYMBOL (ip_fast_csum);
 
 /* string / mem functions */
-EXPORT_SYMBOL_NOVERS (strcpy);
-EXPORT_SYMBOL_NOVERS (strncpy);
-EXPORT_SYMBOL_NOVERS (strcat);
-EXPORT_SYMBOL_NOVERS (strncat);
-EXPORT_SYMBOL_NOVERS (strcmp);
-EXPORT_SYMBOL_NOVERS (strncmp);
-EXPORT_SYMBOL_NOVERS (strchr);
-EXPORT_SYMBOL_NOVERS (strlen);
-EXPORT_SYMBOL_NOVERS (strnlen);
-EXPORT_SYMBOL_NOVERS (strpbrk);
-EXPORT_SYMBOL_NOVERS (strrchr);
-EXPORT_SYMBOL_NOVERS (strstr);
-EXPORT_SYMBOL_NOVERS (memset);
-EXPORT_SYMBOL_NOVERS (memcpy);
-EXPORT_SYMBOL_NOVERS (memmove);
-EXPORT_SYMBOL_NOVERS (memcmp);
-EXPORT_SYMBOL_NOVERS (memscan);
+EXPORT_SYMBOL (strcpy);
+EXPORT_SYMBOL (strncpy);
+EXPORT_SYMBOL (strcat);
+EXPORT_SYMBOL (strncat);
+EXPORT_SYMBOL (strcmp);
+EXPORT_SYMBOL (strncmp);
+EXPORT_SYMBOL (strchr);
+EXPORT_SYMBOL (strlen);
+EXPORT_SYMBOL (strnlen);
+EXPORT_SYMBOL (strpbrk);
+EXPORT_SYMBOL (strrchr);
+EXPORT_SYMBOL (strstr);
+EXPORT_SYMBOL (memset);
+EXPORT_SYMBOL (memcpy);
+EXPORT_SYMBOL (memmove);
+EXPORT_SYMBOL (memcmp);
+EXPORT_SYMBOL (memscan);
 
 /* semaphores */
-EXPORT_SYMBOL_NOVERS (__down);
-EXPORT_SYMBOL_NOVERS (__down_interruptible);
-EXPORT_SYMBOL_NOVERS (__down_trylock);
-EXPORT_SYMBOL_NOVERS (__up);
+EXPORT_SYMBOL (__down);
+EXPORT_SYMBOL (__down_interruptible);
+EXPORT_SYMBOL (__down_trylock);
+EXPORT_SYMBOL (__up);
 
 /*
  * libgcc functions - functions that are used internally by the
@@ -72,8 +71,8 @@ extern void __lshrdi3 (void);
 extern void __muldi3 (void);
 extern void __negdi2 (void);
 
-EXPORT_SYMBOL_NOVERS (__ashldi3);
-EXPORT_SYMBOL_NOVERS (__ashrdi3);
-EXPORT_SYMBOL_NOVERS (__lshrdi3);
-EXPORT_SYMBOL_NOVERS (__muldi3);
-EXPORT_SYMBOL_NOVERS (__negdi2);
+EXPORT_SYMBOL (__ashldi3);
+EXPORT_SYMBOL (__ashrdi3);
+EXPORT_SYMBOL (__lshrdi3);
+EXPORT_SYMBOL (__muldi3);
+EXPORT_SYMBOL (__negdi2);

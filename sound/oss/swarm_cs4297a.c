@@ -70,6 +70,7 @@
 #include <linux/ac97_codec.h>
 #include <linux/pci.h>
 #include <linux/bitops.h>
+#include <linux/interrupt.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <linux/init.h>
@@ -77,7 +78,6 @@
 #include <linux/smp_lock.h>
 #include <linux/wrapper.h>
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
 
 #include <asm/sibyte/sb1250_regs.h>
 #include <asm/sibyte/sb1250_int.h>

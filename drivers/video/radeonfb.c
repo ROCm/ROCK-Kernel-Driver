@@ -3132,9 +3132,13 @@ static struct pci_driver radeonfb_driver = {
 	.remove		= __devexit_p(radeonfb_pci_unregister),
 };
 
+int __init radeonfb_old_setup (char *options);
 
 int __init radeonfb_old_init (void)
 {
+#ifndef MODULE
+	radeonfb_old_setup(fb_get_options("radeonfb_old"));
+#endif
 	return pci_module_init (&radeonfb_driver);
 }
 
@@ -3172,8 +3176,9 @@ int __init radeonfb_old_setup (char *options)
 	return 0;
 }
 
-#ifdef MODULE
 module_init(radeonfb_old_init);
+
+#ifdef MODULE
 module_exit(radeonfb_old_exit);
 #endif
 

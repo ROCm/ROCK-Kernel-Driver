@@ -217,7 +217,6 @@
 #include <linux/gameport.h>
 #include <linux/kernel.h>
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 

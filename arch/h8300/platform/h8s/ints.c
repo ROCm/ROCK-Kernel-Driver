@@ -22,6 +22,7 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/random.h>
+#include <linux/hardirq.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -29,7 +30,6 @@
 #include <asm/io.h>
 #include <asm/setup.h>
 #include <asm/gpio.h>
-#include <asm/hardirq.h>
 #include <asm/regs267x.h>
 #include <asm/errno.h>
 

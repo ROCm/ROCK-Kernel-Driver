@@ -18,11 +18,8 @@
 #include <asm/machdep.h>
 #include <asm/abs_addr.h>
 
-#if 1
-#define dbg(args...) printk(KERN_INFO args)
-#else
-#define dbg(args...)
-#endif
+static int numa_debug;
+#define dbg(args...) if (numa_debug) { printk(KERN_INFO args); }
 
 #ifdef DEBUG_NUMA
 #define ARRAY_INITIALISER -1
@@ -36,9 +33,18 @@ char *numa_memory_lookup_table;
 cpumask_t numa_cpumask_lookup_table[MAX_NUMNODES];
 int nr_cpus_in_node[MAX_NUMNODES] = { [0 ... (MAX_NUMNODES -1)] = 0};
 
-struct pglist_data node_data[MAX_NUMNODES];
-bootmem_data_t plat_node_bdata[MAX_NUMNODES];
+struct pglist_data *node_data[MAX_NUMNODES];
+bootmem_data_t __initdata plat_node_bdata[MAX_NUMNODES];
 static unsigned long node0_io_hole_size;
+
+/*
+ * We need somewhere to store start/span for each node until we have
+ * allocated the real node_data structures.
+ */
+static struct {
+	unsigned long node_start_pfn;
+	unsigned long node_spanned_pages;
+} init_node_data[MAX_NUMNODES] __initdata;
 
 EXPORT_SYMBOL(node_data);
 EXPORT_SYMBOL(numa_cpu_lookup_table);
@@ -48,7 +54,6 @@ EXPORT_SYMBOL(nr_cpus_in_node);
 
 static inline void map_cpu_to_node(int cpu, int node)
 {
-	dbg("cpu %d maps to domain %d\n", cpu, node);
 	numa_cpu_lookup_table[cpu] = node;
 	if (!(cpu_isset(cpu, numa_cpumask_lookup_table[node]))) {
 		cpu_set(cpu, numa_cpumask_lookup_table[node]);
@@ -107,8 +112,8 @@ static int of_node_numa_domain(struct device_node *device, int depth)
 	if (tmp && (tmp[0] >= depth)) {
 		numa_domain = tmp[depth];
 	} else {
-		printk(KERN_ERR "WARNING: no NUMA information for "
-		       "%s\n", device->full_name);
+		dbg("WARNING: no NUMA information for %s\n",
+		    device->full_name);
 		numa_domain = 0;
 	}
 	return numa_domain;
@@ -137,11 +142,8 @@ static int find_min_common_depth(void)
 
 	rtas_root = of_find_node_by_path("/rtas");
 
-	if (!rtas_root) {
-		printk(KERN_ERR "WARNING: %s() could not find rtas root\n",
-				__FUNCTION__);
+	if (!rtas_root)
 		return -1;
-	}
 
 	/*
 	 * this property is 2 32-bit integers, each representing a level of
@@ -155,8 +157,8 @@ static int find_min_common_depth(void)
 	if ((len >= 1) && ref_points) {
 		depth = ref_points[1];
 	} else {
-		printk(KERN_ERR "WARNING: could not find NUMA "
-				"associativity reference point\n");
+		dbg("WARNING: could not find NUMA "
+		    "associativity reference point\n");
 		depth = -1;
 	}
 	of_node_put(rtas_root);
@@ -187,6 +189,9 @@ static int __init parse_numa_properties(void)
 	long entries = lmb_end_of_DRAM() >> MEMORY_INCREMENT_SHIFT;
 	unsigned long i;
 
+	if (strstr(saved_command_line, "numa=debug"))
+		numa_debug = 1;
+
 	if (strstr(saved_command_line, "numa=off")) {
 		printk(KERN_WARNING "NUMA disabled by user\n");
 		return -1;
@@ -194,13 +199,14 @@ static int __init parse_numa_properties(void)
 
 	numa_memory_lookup_table =
 		(char *)abs_to_virt(lmb_alloc(entries * sizeof(char), 1));
+	memset(numa_memory_lookup_table, 0, entries * sizeof(char));
 
 	for (i = 0; i < entries ; i++)
 		numa_memory_lookup_table[i] = ARRAY_INITIALISER;
 
 	depth = find_min_common_depth();
 
-	printk(KERN_INFO "NUMA associativity depth for CPU/Memory: %d\n", depth);
+	dbg("NUMA associativity depth for CPU/Memory: %d\n", depth);
 	if (depth < 0)
 		return depth;
 
@@ -225,8 +231,7 @@ static int __init parse_numa_properties(void)
 				numa_domain = 0;
 			}
 		} else {
-			printk(KERN_ERR "WARNING: no NUMA information for "
-			       "cpu %ld\n", i);
+			dbg("WARNING: no NUMA information for cpu %ld\n", i);
 			numa_domain = 0;
 		}
 
@@ -281,31 +286,28 @@ new_range:
 		 * this simple case and complain if there is a gap in
 		 * memory
 		 */
-		if (node_data[numa_domain].node_spanned_pages) {
+		if (init_node_data[numa_domain].node_spanned_pages) {
 			unsigned long shouldstart =
-				node_data[numa_domain].node_start_pfn + 
-				node_data[numa_domain].node_spanned_pages;
+				init_node_data[numa_domain].node_start_pfn +
+				init_node_data[numa_domain].node_spanned_pages;
 			if (shouldstart != (start / PAGE_SIZE)) {
-				printk(KERN_ERR "Hole in node, disabling "
-						"region start %lx length %lx\n",
-						start, size);
+				printk(KERN_ERR "WARNING: Hole in node, "
+						"disabling region start %lx "
+						"length %lx\n", start, size);
 				continue;
 			}
-			node_data[numa_domain].node_spanned_pages +=
+			init_node_data[numa_domain].node_spanned_pages +=
 				size / PAGE_SIZE;
 		} else {
-			node_data[numa_domain].node_start_pfn =
+			init_node_data[numa_domain].node_start_pfn =
 				start / PAGE_SIZE;
-			node_data[numa_domain].node_spanned_pages =
+			init_node_data[numa_domain].node_spanned_pages =
 				size / PAGE_SIZE;
 		}
 
 		for (i = start ; i < (start+size); i += MEMORY_INCREMENT)
 			numa_memory_lookup_table[i >> MEMORY_INCREMENT_SHIFT] =
 				numa_domain;
-
-		dbg("memory region %lx to %lx maps to domain %d\n",
-		    start, start+size, numa_domain);
 
 		ranges--;
 		if (ranges)
@@ -332,6 +334,7 @@ static void __init setup_nonnuma(void)
 		long entries = top_of_ram >> MEMORY_INCREMENT_SHIFT;
 		numa_memory_lookup_table =
 			(char *)abs_to_virt(lmb_alloc(entries * sizeof(char), 1));
+		memset(numa_memory_lookup_table, 0, entries * sizeof(char));
 		for (i = 0; i < entries ; i++)
 			numa_memory_lookup_table[i] = ARRAY_INITIALISER;
 	}
@@ -341,13 +344,115 @@ static void __init setup_nonnuma(void)
 
 	node_set_online(0);
 
-	node_data[0].node_start_pfn = 0;
-	node_data[0].node_spanned_pages = lmb_end_of_DRAM() / PAGE_SIZE;
+	init_node_data[0].node_start_pfn = 0;
+	init_node_data[0].node_spanned_pages = lmb_end_of_DRAM() / PAGE_SIZE;
 
 	for (i = 0 ; i < top_of_ram; i += MEMORY_INCREMENT)
 		numa_memory_lookup_table[i >> MEMORY_INCREMENT_SHIFT] = 0;
 
 	node0_io_hole_size = top_of_ram - total_ram;
+}
+
+static void __init dump_numa_topology(void)
+{
+	unsigned int node;
+	unsigned int cpu, count;
+
+	for (node = 0; node < MAX_NUMNODES; node++) {
+		if (!node_online(node))
+			continue;
+
+		printk(KERN_INFO "Node %d CPUs:", node);
+
+		count = 0;
+		/*
+		 * If we used a CPU iterator here we would miss printing
+		 * the holes in the cpumap.
+		 */
+		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+			if (cpu_isset(cpu, numa_cpumask_lookup_table[node])) {
+				if (count == 0)
+					printk(" %u", cpu);
+				++count;
+			} else {
+				if (count > 1)
+					printk("-%u", cpu - 1);
+				count = 0;
+			}
+		}
+
+		if (count > 1)
+			printk("-%u", NR_CPUS - 1);
+		printk("\n");
+	}
+
+	for (node = 0; node < MAX_NUMNODES; node++) {
+		unsigned long i;
+
+		if (!node_online(node))
+			continue;
+
+		printk(KERN_INFO "Node %d Memory:", node);
+
+		count = 0;
+
+		for (i = 0; i < lmb_end_of_DRAM(); i += MEMORY_INCREMENT) {
+			if (numa_memory_lookup_table[i >> MEMORY_INCREMENT_SHIFT] == node) {
+				if (count == 0)
+					printk(" 0x%lx", i);
+				++count;
+			} else {
+				if (count > 0)
+					printk("-0x%lx", i);
+				count = 0;
+			}
+		}
+
+		if (count > 0)
+			printk("-0x%lx", i);
+		printk("\n");
+	}
+}
+
+/*
+ * Allocate some memory, satisfying the lmb or bootmem allocator where
+ * required. nid is the preferred node and end is the physical address of
+ * the highest address in the node.
+ *
+ * Returns the physical address of the memory.
+ */
+static unsigned long careful_allocation(int nid, unsigned long size,
+					unsigned long align, unsigned long end)
+{
+	unsigned long ret = lmb_alloc_base(size, align, end);
+
+	/* retry over all memory */
+	if (!ret)
+		ret = lmb_alloc_base(size, align, lmb_end_of_DRAM());
+
+	if (!ret)
+		panic("numa.c: cannot allocate %lu bytes on node %d",
+		      size, nid);
+
+	/*
+	 * If the memory came from a previously allocated node, we must
+	 * retry with the bootmem allocator.
+	 */
+	if (pa_to_nid(ret) < nid) {
+		nid = pa_to_nid(ret);
+		ret = (unsigned long)__alloc_bootmem_node(NODE_DATA(nid),
+				size, align, 0);
+
+		if (!ret)
+			panic("numa.c: cannot allocate %lu bytes on node %d",
+			      size, nid);
+
+		ret = virt_to_abs(ret);
+
+		dbg("alloc_bootmem %lx %lx\n", ret, size);
+	}
+
+	return ret;
 }
 
 void __init do_init_bootmem(void)
@@ -360,6 +465,8 @@ void __init do_init_bootmem(void)
 
 	if (parse_numa_properties())
 		setup_nonnuma();
+	else
+		dump_numa_topology();
 
 	for (nid = 0; nid < numnodes; nid++) {
 		unsigned long start_paddr, end_paddr;
@@ -367,24 +474,38 @@ void __init do_init_bootmem(void)
 		unsigned long bootmem_paddr;
 		unsigned long bootmap_pages;
 
-		if (node_data[nid].node_spanned_pages == 0)
-			continue;
+		start_paddr = init_node_data[nid].node_start_pfn * PAGE_SIZE;
+		end_paddr = start_paddr + (init_node_data[nid].node_spanned_pages * PAGE_SIZE);
 
-		start_paddr = node_data[nid].node_start_pfn * PAGE_SIZE;
-		end_paddr = start_paddr + 
-				(node_data[nid].node_spanned_pages * PAGE_SIZE);
+		/* Allocate the node structure node local if possible */
+		NODE_DATA(nid) = (struct pglist_data *)careful_allocation(nid,
+					sizeof(struct pglist_data),
+					SMP_CACHE_BYTES, end_paddr);
+		NODE_DATA(nid) = abs_to_virt(NODE_DATA(nid));
+		memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
 
-		dbg("node %d\n", nid);
-		dbg("start_paddr = %lx\n", start_paddr);
-		dbg("end_paddr = %lx\n", end_paddr);
+  		dbg("node %d\n", nid);
+		dbg("NODE_DATA() = %p\n", NODE_DATA(nid));
 
 		NODE_DATA(nid)->bdata = &plat_node_bdata[nid];
+		NODE_DATA(nid)->node_start_pfn =
+			init_node_data[nid].node_start_pfn;
+		NODE_DATA(nid)->node_spanned_pages =
+			init_node_data[nid].node_spanned_pages;
+
+		if (init_node_data[nid].node_spanned_pages == 0)
+  			continue;
+
+  		dbg("start_paddr = %lx\n", start_paddr);
+  		dbg("end_paddr = %lx\n", end_paddr);
 
 		bootmap_pages = bootmem_bootmap_pages((end_paddr - start_paddr) >> PAGE_SHIFT);
-		dbg("bootmap_pages = %lx\n", bootmap_pages);
 
-		bootmem_paddr = lmb_alloc_base(bootmap_pages << PAGE_SHIFT,
+		bootmem_paddr = careful_allocation(nid,
+				bootmap_pages << PAGE_SHIFT,
 				PAGE_SIZE, end_paddr);
+		memset(abs_to_virt(bootmem_paddr), 0,
+		       bootmap_pages << PAGE_SHIFT);
 		dbg("bootmap_paddr = %lx\n", bootmem_paddr);
 
 		init_bootmem_node(NODE_DATA(nid), bootmem_paddr >> PAGE_SHIFT,
@@ -462,16 +583,6 @@ void __init paging_init(void)
 		dbg("free_area_init node %d %lx %lx (hole: %lx)\n", nid,
 		    zones_size[ZONE_DMA], start_pfn, zholes_size[ZONE_DMA]);
 
-		/* 
-		 * Give this empty node a dummy struct page to avoid
-		 * us from trying to allocate a node local mem_map
-		 * in free_area_init_node (which will fail).
-		 */
-		if (!node_data[nid].node_spanned_pages)
-			NODE_DATA(nid)->node_mem_map
-					= alloc_bootmem(sizeof(struct page));
-		else
-			NODE_DATA(nid)->node_mem_map = NULL;
 		free_area_init_node(nid, NODE_DATA(nid), zones_size,
 							start_pfn, zholes_size);
 	}

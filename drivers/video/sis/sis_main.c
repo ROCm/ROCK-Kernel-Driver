@@ -5718,8 +5718,19 @@ static struct pci_driver sisfb_driver = {
 
 int __init sisfb_init(void)
 {
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,8)
+#ifndef MODULE
+	sisfb_setup(fb_get_options("sisfb"));
+#endif
+#endif
 	return(pci_module_init(&sisfb_driver));
 }
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,8)
+#ifndef MODULE
+module_init(sisfb_init);
+#endif
+#endif
 
 /*****************************************************/
 /*                      MODULE                       */

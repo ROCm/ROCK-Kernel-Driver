@@ -241,6 +241,22 @@ ENTRY(xscale_flush_user_cache_range)
  *	it also trashes the mini I-cache used by JTAG debuggers.
  */
 ENTRY(xscale_coherent_kern_range)
+	/* FALLTHROUGH */
+
+/*
+ *	coherent_user_range(start, end)
+ *
+ *	Ensure coherency between the Icache and the Dcache in the
+ *	region described by start.  If you have non-snooping
+ *	Harvard caches, you need to implement this function.
+ *
+ *	- start  - virtual start address
+ *	- end	 - virtual end address
+ *
+ *	Note: single I-cache line invalidation isn't used here since
+ *	it also trashes the mini I-cache used by JTAG debuggers.
+ */
+ENTRY(xscale_coherent_user_range)
 	bic	r0, r0, #CACHELINESIZE - 1
 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	add	r0, r0, #CACHELINESIZE
@@ -341,6 +357,7 @@ ENTRY(xscale_cache_fns)
 	.long	xscale_flush_user_cache_all
 	.long	xscale_flush_user_cache_range
 	.long	xscale_coherent_kern_range
+	.long	xscale_coherent_user_range
 	.long	xscale_flush_kern_dcache_page
 	.long	xscale_dma_inv_range
 	.long	xscale_dma_clean_range
@@ -637,10 +654,15 @@ cpu_80200_name:
 	.asciz	"XScale-80200"
 	.size	cpu_80200_name, . - cpu_80200_name
 
-	.type	cpu_80321_name, #object
-cpu_80321_name:
-	.asciz	"XScale-IOP80321"
-	.size	cpu_80321_name, . - cpu_80321_name
+	.type	cpu_8032x_name, #object
+cpu_8032x_name:
+	.asciz	"XScale-IOP8032x Family"
+	.size	cpu_8032x_name, . - cpu_8032x_name
+
+	.type	cpu_8033x_name, #object
+cpu_8033x_name:
+	.asciz	"XScale-IOP8033x Family"
+	.size	cpu_8033x_name, . - cpu_8033x_name
 
 	.type	cpu_pxa250_name, #object
 cpu_pxa250_name:
@@ -687,21 +709,37 @@ __80200_proc_info:
 	.long	xscale_cache_fns
 	.size	__80200_proc_info, . - __80200_proc_info
 
-	.type	__80321_proc_info,#object
-__80321_proc_info:
+	.type	__8032x_proc_info,#object
+__8032x_proc_info:
 	.long	0x69052420
-	.long	0xfffff7e0
+	.long	0xfffff5e0      @ mask should accomodate IOP80219 also
 	.long	0x00000c0e
 	b	__xscale_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-	.long	cpu_80321_name
+	.long	cpu_8032x_name
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
 	.long	xscale_mc_user_fns
 	.long	xscale_cache_fns
-	.size	__80321_proc_info, . - __80321_proc_info
+	.size	__8032x_proc_info, . - __8032x_proc_info
+
+	.type	__8033x_proc_info,#object
+__8033x_proc_info:
+	.long	0x69054090
+	.long	0xffffffb0
+	.long	0x00000c0e
+	b	__xscale_setup
+	.long	cpu_arch_name
+	.long	cpu_elf_name
+	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+	.long	cpu_8033x_name
+	.long	xscale_processor_functions
+	.long	v4wbi_tlb_fns
+	.long	xscale_mc_user_fns
+	.long	xscale_cache_fns
+	.size	__8033x_proc_info, . - __8033x_proc_info
 
 	.type	__pxa250_proc_info,#object
 __pxa250_proc_info:

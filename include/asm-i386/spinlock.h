@@ -46,20 +46,18 @@ typedef struct {
 #define spin_lock_string \
 	"\n1:\t" \
 	"lock ; decb %0\n\t" \
-	"js 2f\n" \
-	LOCK_SECTION_START("") \
+	"jns 3f\n" \
 	"2:\t" \
 	"rep;nop\n\t" \
 	"cmpb $0,%0\n\t" \
 	"jle 2b\n\t" \
 	"jmp 1b\n" \
-	LOCK_SECTION_END
+	"3:\n\t"
 
 #define spin_lock_string_flags \
 	"\n1:\t" \
 	"lock ; decb %0\n\t" \
-	"js 2f\n\t" \
-	LOCK_SECTION_START("") \
+	"jns 4f\n\t" \
 	"2:\t" \
 	"testl $0x200, %1\n\t" \
 	"jz 3f\n\t" \
@@ -70,7 +68,7 @@ typedef struct {
 	"jle 3b\n\t" \
 	"cli\n\t" \
 	"jmp 1b\n" \
-	LOCK_SECTION_END
+	"4:\n\t"
 
 /*
  * This works. Despite all the confusion.

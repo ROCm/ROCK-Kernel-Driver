@@ -47,389 +47,15 @@
 
 #include <linux/fb.h>
 
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-#include "console/fbcon.h"
-#endif
     /*
      *  Frame buffer device initialization and setup routines
      */
 
-extern int acornfb_init(void);
-extern int acornfb_setup(char*);
-extern int amba_clcdfb_init(void);
-extern int amifb_init(void);
-extern int amifb_setup(char*);
-extern int atafb_init(void);
-extern int atafb_setup(char*);
-extern int macfb_init(void);
-extern int macfb_setup(char*);
-extern int cyberfb_init(void);
-extern int cyberfb_setup(char*);
-extern int pm2fb_init(void);
-extern int pm2fb_setup(char*);
-extern int pm3fb_init(void);
-extern int pm3fb_setup(char*);
-extern int clps711xfb_init(void);
-extern int cyber2000fb_init(void);
-extern int cyber2000fb_setup(char*);
-extern int retz3fb_init(void);
-extern int retz3fb_setup(char*);
-extern int cirrusfb_init(void);
-extern int cirrusfb_setup(char*);
-extern int hitfb_init(void);
-extern int vfb_init(void);
-extern int vfb_setup(char*);
-extern int offb_init(void);
-extern int atyfb_init(void);
-extern int atyfb_setup(char*);
-extern int aty128fb_init(void);
-extern int aty128fb_setup(char*);
-extern int neofb_init(void);
-extern int neofb_setup(char*);
-extern int igafb_init(void);
-extern int igafb_setup(char*);
-extern int imsttfb_init(void);
-extern int imsttfb_setup(char*);
-extern int dnfb_init(void);
-extern int tgafb_init(void);
-extern int tgafb_setup(char*);
-extern int virgefb_init(void);
-extern int virgefb_setup(char*);
-extern int resolver_video_setup(char*);
-extern int s3triofb_init(void);
-extern int vesafb_init(void);
-extern int vesafb_setup(char*);
-extern int vga16fb_init(void);
-extern int vga16fb_setup(char*);
-extern int hgafb_init(void);
-extern int hgafb_setup(char*);
-extern int matroxfb_init(void);
-extern int matroxfb_setup(char*);
-extern int hpfb_init(void);
-extern int platinumfb_init(void);
-extern int platinumfb_setup(char*);
-extern int control_init(void);
-extern int control_setup(char*);
-extern int valkyriefb_init(void);
-extern int valkyriefb_setup(char*);
-extern int chips_init(void);
-extern int g364fb_init(void);
-extern int sa1100fb_init(void);
-extern int pxafb_init(void);
-extern int pxafb_setup(char*);
-extern int fm2fb_init(void);
-extern int fm2fb_setup(char*);
-extern int q40fb_init(void);
-extern int sun3fb_init(void);
-extern int sun3fb_setup(char *);
-extern int sgivwfb_init(void);
-extern int sgivwfb_setup(char*);
-extern int gbefb_init(void);
-extern int gbefb_setup(char*);
-extern int rivafb_init(void);
-extern int rivafb_setup(char*);
-extern int tdfxfb_init(void);
-extern int tdfxfb_setup(char*);
-extern int tridentfb_init(void);
-extern int tridentfb_setup(char*);
-extern int sisfb_init(void);
-extern int sisfb_setup(char*);
-extern int stifb_init(void);
-extern int stifb_setup(char*);
-extern int pmagbafb_init(void);
-extern int pmagbbfb_init(void);
-extern int maxinefb_init(void);
-extern int tx3912fb_init(void);
-extern int tx3912fb_setup(char*);
-extern int radeonfb_init(void);
-extern int radeonfb_setup(char*);
-extern int radeonfb_old_init(void);
-extern int radeonfb_old_setup(char*);
-extern int e1355fb_init(void);
-extern int e1355fb_setup(char*);
-extern int pvr2fb_init(void);
-extern int pvr2fb_setup(char*);
-extern int sstfb_init(void);
-extern int sstfb_setup(char*);
-extern int i810fb_init(void);
-extern int i810fb_setup(char*);
-extern int ffb_init(void);
-extern int ffb_setup(char*);
-extern int cg6_init(void);
-extern int cg6_setup(char*);
-extern int cg3_init(void);
-extern int cg3_setup(char*);
-extern int bw2_init(void);
-extern int bw2_setup(char*);
-extern int cg14_init(void);
-extern int cg14_setup(char*);
-extern int p9100_init(void);
-extern int p9100_setup(char*);
-extern int tcx_init(void);
-extern int tcx_setup(char*);
-extern int leo_init(void);
-extern int leo_setup(char*);
-extern int kyrofb_init(void);
-extern int kyrofb_setup(char*);
-extern int mc68x328fb_init(void);
-extern int mc68x328fb_setup(char *);
-extern int asiliantfb_init(void);
-
-static struct {
-	const char *name;
-	int (*init)(void);
-	int (*setup)(char*);
-} fb_drivers[] __initdata = {
-
-	/*
-	 * Chipset specific drivers that use resource management
-	 */
-#ifdef CONFIG_FB_RETINAZ3
-	{ "retz3fb", retz3fb_init, retz3fb_setup },
-#endif
-#ifdef CONFIG_FB_AMIGA
-	{ "amifb", amifb_init, amifb_setup },
-#endif
-#ifdef CONFIG_FB_CLPS711X
-	{ "clps711xfb", clps711xfb_init, NULL },
-#endif
-#ifdef CONFIG_FB_CYBER
-	{ "cyberfb", cyberfb_init, cyberfb_setup },
-#endif
-#ifdef CONFIG_FB_CYBER2000
-	{ "cyber2000fb", cyber2000fb_init, cyber2000fb_setup },
-#endif
-#ifdef CONFIG_FB_ARMCLCD
-	{ "ambaclcdfb", amba_clcdfb_init, NULL },
-#endif
-#ifdef CONFIG_FB_PM2
-	{ "pm2fb", pm2fb_init, pm2fb_setup },
-#endif
-#ifdef CONFIG_FB_PM3
-	{ "pm3fb", pm3fb_init, pm3fb_setup },
-#endif           
-#ifdef CONFIG_FB_CIRRUS
-	{ "cirrusfb", cirrusfb_init, cirrusfb_setup },
-#endif
-#ifdef CONFIG_FB_ATY
-	{ "atyfb", atyfb_init, atyfb_setup },
-#endif
-#ifdef CONFIG_FB_MATROX
-	{ "matroxfb", matroxfb_init, matroxfb_setup },
-#endif
-#ifdef CONFIG_FB_ATY128
-	{ "aty128fb", aty128fb_init, aty128fb_setup },
-#endif
-#ifdef CONFIG_FB_NEOMAGIC
-	{ "neofb", neofb_init, neofb_setup },
-#endif
-#ifdef CONFIG_FB_VIRGE
-	{ "virgefb", virgefb_init, virgefb_setup },
-#endif
-#ifdef CONFIG_FB_RIVA
-	{ "rivafb", rivafb_init, rivafb_setup },
-#endif
-#ifdef CONFIG_FB_3DFX
-	{ "tdfxfb", tdfxfb_init, tdfxfb_setup },
-#endif
-#ifdef CONFIG_FB_RADEON
-	{ "radeonfb", radeonfb_init, radeonfb_setup },
-#endif
-#ifdef CONFIG_FB_RADEON_OLD
-	{ "radeonfb_old", radeonfb_old_init, radeonfb_old_setup },
-#endif
-#ifdef CONFIG_FB_CONTROL
-	{ "controlfb", control_init, control_setup },
-#endif
-#ifdef CONFIG_FB_PLATINUM
-	{ "platinumfb", platinumfb_init, platinumfb_setup },
-#endif
-#ifdef CONFIG_FB_VALKYRIE
-	{ "valkyriefb", valkyriefb_init, valkyriefb_setup },
-#endif
-#ifdef CONFIG_FB_CT65550
-	{ "chipsfb", chips_init, NULL },
-#endif
-#ifdef CONFIG_FB_IMSTT
-	{ "imsttfb", imsttfb_init, imsttfb_setup },
-#endif
-#ifdef CONFIG_FB_S3TRIO
-	{ "s3triofb", s3triofb_init, NULL },
-#endif 
-#ifdef CONFIG_FB_FM2
-	{ "fm2fb", fm2fb_init, fm2fb_setup },
-#endif 
-#ifdef CONFIG_FB_SIS
-	{ "sisfb", sisfb_init, sisfb_setup },
-#endif
-#ifdef CONFIG_FB_TRIDENT
-	{ "tridentfb", tridentfb_init, tridentfb_setup },
-#endif
-#ifdef CONFIG_FB_I810
-	{ "i810fb", i810fb_init, i810fb_setup },
-#endif	
-#ifdef CONFIG_FB_STI
-	{ "stifb", stifb_init, stifb_setup },
-#endif
-#ifdef CONFIG_FB_FFB
-	{ "ffb", ffb_init, ffb_setup },
-#endif
-#ifdef CONFIG_FB_CG6
-	{ "cg6fb", cg6_init, cg6_setup },
-#endif
-#ifdef CONFIG_FB_CG3
-	{ "cg3fb", cg3_init, cg3_setup },
-#endif
-#ifdef CONFIG_FB_BW2
-	{ "bw2fb", bw2_init, bw2_setup },
-#endif
-#ifdef CONFIG_FB_CG14
-	{ "cg14fb", cg14_init, cg14_setup },
-#endif
-#ifdef CONFIG_FB_P9100
-	{ "p9100fb", p9100_init, p9100_setup },
-#endif
-#ifdef CONFIG_FB_TCX
-	{ "tcxfb", tcx_init, tcx_setup },
-#endif
-#ifdef CONFIG_FB_LEO
-	{ "leofb", leo_init, leo_setup },
-#endif
-
-	/*
-	 * Generic drivers that are used as fallbacks
-	 * 
-	 * These depend on resource management and must be initialized
-	 * _after_ all other frame buffer devices that use resource
-	 * management!
-	 */
-
-#ifdef CONFIG_FB_OF
-	{ "offb", offb_init, NULL },
-#endif
-#ifdef CONFIG_FB_VESA
-	{ "vesafb", vesafb_init, vesafb_setup },
-#endif 
-
-	/*
-	 * Chipset specific drivers that don't use resource management (yet)
-	 */
-
-#ifdef CONFIG_FB_SGIVW
-	{ "sgivwfb", sgivwfb_init, sgivwfb_setup },
-#endif
-#ifdef CONFIG_FB_GBE
-	{ "gbefb", gbefb_init, gbefb_setup },
-#endif
-#ifdef CONFIG_FB_ACORN
-	{ "acornfb", acornfb_init, acornfb_setup },
-#endif
-#ifdef CONFIG_FB_ATARI
-	{ "atafb", atafb_init, atafb_setup },
-#endif
-#ifdef CONFIG_FB_MAC
-	{ "macfb", macfb_init, macfb_setup },
-#endif
-#ifdef CONFIG_FB_HGA
-	{ "hgafb", hgafb_init, hgafb_setup },
-#endif 
-#ifdef CONFIG_FB_IGA
-	{ "igafb", igafb_init, igafb_setup },
-#endif
-#ifdef CONFIG_APOLLO
-	{ "apollofb", dnfb_init, NULL },
-#endif
-#ifdef CONFIG_FB_Q40
-	{ "q40fb", q40fb_init, NULL },
-#endif
-#ifdef CONFIG_FB_TGA
-	{ "tgafb", tgafb_init, tgafb_setup },
-#endif
-#ifdef CONFIG_FB_HP300
-	{ "hpfb", hpfb_init, NULL },
-#endif 
-#ifdef CONFIG_FB_G364
-	{ "g364fb", g364fb_init, NULL },
-#endif
-#ifdef CONFIG_FB_SA1100
-	{ "sa1100fb", sa1100fb_init, NULL },
-#endif
-#ifdef CONFIG_FB_PXA
-	{ "pxafb", pxafb_init, pxafb_setup },
-#endif
-#ifdef CONFIG_FB_SUN3
-	{ "sun3fb", sun3fb_init, sun3fb_setup },
-#endif
-#ifdef CONFIG_FB_HIT
-	{ "hitfb", hitfb_init, NULL },
-#endif
-#ifdef CONFIG_FB_TX3912
-	{ "tx3912fb", tx3912fb_init, tx3912fb_setup },
-#endif
-#ifdef CONFIG_FB_E1355
-	{ "e1355fb", e1355fb_init, e1355fb_setup },
-#endif
-#ifdef CONFIG_FB_PVR2
-	{ "pvr2fb", pvr2fb_init, pvr2fb_setup },
-#endif
-#ifdef CONFIG_FB_PMAG_BA
-	{ "pmagbafb", pmagbafb_init, NULL },
-#endif          
-#ifdef CONFIG_FB_PMAGB_B
-	{ "pmagbbfb", pmagbbfb_init, NULL },
-#endif
-#ifdef CONFIG_FB_MAXINE
-	{ "maxinefb", maxinefb_init, NULL },
-#endif            
-#ifdef CONFIG_FB_VOODOO1
-	{ "sstfb", sstfb_init, sstfb_setup },
-#endif
-#ifdef CONFIG_FB_KYRO
-	{ "kyrofb", kyrofb_init, kyrofb_setup },
-#endif
-#ifdef CONFIG_FB_68328
-	{ "68328fb", mc68x328fb_init, mc68x328fb_setup },
-#endif
-#ifdef CONFIG_FB_ASILIANT
-	{ "asiliantfb", asiliantfb_init, NULL },
-#endif
-
-	/*
-	 * Generic drivers that don't use resource management (yet)
-	 */
-
-#ifdef CONFIG_FB_VGA16
-	{ "vga16fb", vga16fb_init, vga16fb_setup },
-#endif 
-
-#ifdef CONFIG_GSP_RESOLVER
-	/* Not a real frame buffer device... */
-	{ "resolverfb", NULL, resolver_video_setup },
-#endif
-
-#ifdef CONFIG_FB_VIRTUAL
-	/*
-	 * Vfb must be last to avoid that it becomes your primary display if
-	 * other display devices are present
-	 */
-	{ "vfb", vfb_init, vfb_setup },
-#endif
-};
-
-#define NUM_FB_DRIVERS	(sizeof(fb_drivers)/sizeof(*fb_drivers))
 #define FBPIXMAPSIZE	16384
 
-extern const char *global_mode_option;
-
-static initcall_t pref_init_funcs[FB_MAX];
-static int num_pref_init_funcs __initdata = 0;
 static struct notifier_block *fb_notifier_list;
 struct fb_info *registered_fb[FB_MAX];
 int num_registered_fb;
-
-#ifdef CONFIG_FB_OF
-static int ofonly __initdata = 0;
-#endif
 
 /*
  * Helpers
@@ -1236,10 +862,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct fb_ops *fb = info->fbops;
 	struct fb_var_screeninfo var;
 	struct fb_fix_screeninfo fix;
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	struct fb_con2fbmap con2fb;
-#endif
 	struct fb_cmap_user cmap;
+	struct fb_event event;
 	void __user *argp = (void __user *)arg;
 	int i;
 	
@@ -1288,13 +913,16 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		i = fb_cursor(info, argp);
 		release_console_sem();
 		return i;
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	case FBIOGET_CON2FBMAP:
 		if (copy_from_user(&con2fb, argp, sizeof(con2fb)))
 			return -EFAULT;
 		if (con2fb.console < 1 || con2fb.console > MAX_NR_CONSOLES)
 		    return -EINVAL;
-		con2fb.framebuffer = con2fb_map[con2fb.console-1];
+		con2fb.framebuffer = -1;
+		event.info = info;
+		event.data = &con2fb;
+		notifier_call_chain(&fb_notifier_list,
+				    FB_EVENT_GET_CONSOLE_MAP, &event);
 		return copy_to_user(argp, &con2fb,
 				    sizeof(con2fb)) ? -EFAULT : 0;
 	case FBIOPUT_CON2FBMAP:
@@ -1310,11 +938,14 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 #endif /* CONFIG_KMOD */
 		if (!registered_fb[con2fb.framebuffer])
 		    return -EINVAL;
-		if (con2fb.console > 0 && con2fb.console < MAX_NR_CONSOLES)
-			return set_con2fb_map(con2fb.console-1,
-					      con2fb.framebuffer);
+		if (con2fb.console > 0 && con2fb.console < MAX_NR_CONSOLES) {
+			event.info = info;
+			event.data = &con2fb;
+			return notifier_call_chain(&fb_notifier_list,
+						   FB_EVENT_SET_CONSOLE_MAP,
+						   &event);
+		}
 		return -EINVAL;
-#endif	/* CONFIG_FRAMEBUFFER_CONSOLE */
 	case FBIOBLANK:
 		acquire_console_sem();
 		i = fb_blank(info, arg);
@@ -1493,6 +1124,7 @@ register_framebuffer(struct fb_info *fb_info)
 {
 	int i;
 	struct class_device *c;
+	struct fb_event event;
 
 	if (num_registered_fb == FB_MAX)
 		return -ENXIO;
@@ -1546,6 +1178,9 @@ register_framebuffer(struct fb_info *fb_info)
 
 	devfs_mk_cdev(MKDEV(FB_MAJOR, i),
 			S_IFCHR | S_IRUGO | S_IWUGO, "fb/%d", i);
+	event.info = fb_info;
+	notifier_call_chain(&fb_notifier_list,
+			    FB_EVENT_FB_REGISTERED, &event);
 	return 0;
 }
 
@@ -1631,11 +1266,9 @@ void fb_set_suspend(struct fb_info *info, int state)
  *
  */
 
-void __init 
+int __init
 fbmem_init(void)
 {
-	int i;
-
 	create_proc_read_entry("fb", 0, NULL, fbmem_read_proc, NULL);
 
 	devfs_mk_dir("fb");
@@ -1647,25 +1280,46 @@ fbmem_init(void)
 		printk(KERN_WARNING "Unable to create fb class; errno = %ld\n", PTR_ERR(fb_class));
 		fb_class = NULL;
 	}
-
-#ifdef CONFIG_FB_OF
-	if (ofonly) {
-		offb_init();
-		return;
-	}
-#endif
-
-	/*
-	 *  Probe for all builtin frame buffer devices
-	 */
-	for (i = 0; i < num_pref_init_funcs; i++)
-		pref_init_funcs[i]();
-
-	for (i = 0; i < NUM_FB_DRIVERS; i++)
-		if (fb_drivers[i].init)
-			fb_drivers[i].init();
+	return 0;
 }
+module_init(fbmem_init);
 
+#define NR_FB_DRIVERS 64
+static char *video_options[NR_FB_DRIVERS];
+
+/**
+ * fb_get_options - get kernel boot parameters
+ * @name - framebuffer name as it would appear in
+ *         the boot parameter line
+ *         (video=<name>:<options>)
+ *
+ * NOTE: Needed to maintain backwards compatibility
+ */
+char* fb_get_options(char *name)
+{
+	char *option = NULL;
+	char *opt;
+	int opt_len;
+	int name_len = strlen(name), i;
+
+	if (!name_len)
+		return option;
+
+	for (i = 0; i < NR_FB_DRIVERS; i++) {
+		if (video_options[i] == NULL)
+			continue;
+		opt_len = strlen(video_options[i]);
+		if (!opt_len)
+			continue;
+		opt = video_options[i];
+		if (!strncmp(name, opt, name_len) &&
+		    opt[name_len] == ':') {
+			option = opt + name_len + 1;
+			break;
+		}
+	}
+	return option;
+}
 
 /**
  *	video_setup - process command line options
@@ -1674,6 +1328,8 @@ fbmem_init(void)
  *	Process command line options for frame buffer subsystem.
  *
  *	NOTE: This function is a __setup and __init function.
+ *            It only stores the options.  Drivers have to call
+ *            fb_get_options() as necessary.
  *
  *	Returns zero.
  *
@@ -1681,48 +1337,20 @@ fbmem_init(void)
 
 int __init video_setup(char *options)
 {
-	int i, j;
+	int i;
 
 	if (!options || !*options)
 		return 0;
-	   
-#ifdef CONFIG_FB_OF
-	if (!strcmp(options, "ofonly")) {
-		ofonly = 1;
-		return 0;
-	}
-#endif
 
-	if (num_pref_init_funcs == FB_MAX)
-		return 0;
-
-	for (i = 0; i < NUM_FB_DRIVERS; i++) {
-		j = strlen(fb_drivers[i].name);
-		if (!strncmp(options, fb_drivers[i].name, j) &&
-			options[j] == ':') {
-			if (!strcmp(options+j+1, "off"))
-				fb_drivers[i].init = NULL;
-			else {
-				if (fb_drivers[i].init) {
-					pref_init_funcs[num_pref_init_funcs++] =
-						fb_drivers[i].init;
-					fb_drivers[i].init = NULL;
-				}
-				if (fb_drivers[i].setup)
-					fb_drivers[i].setup(options+j+1);
-			}
-			return 0;
+	for (i = 0; i < NR_FB_DRIVERS; i++) {
+		if (video_options[i] == NULL) {
+			video_options[i] = options;
+			break;
 		}
 	}
 
-	/*
-	 * If we get here no fb was specified.
-	 * We consider the argument to be a global video mode option.
-	 */
-	global_mode_option = options;
 	return 0;
 }
-
 __setup("video=", video_setup);
 
     /*
@@ -1747,5 +1375,6 @@ EXPORT_SYMBOL(fb_load_cursor_image);
 EXPORT_SYMBOL(fb_set_suspend);
 EXPORT_SYMBOL(fb_register_client);
 EXPORT_SYMBOL(fb_unregister_client);
+EXPORT_SYMBOL(fb_get_options);
 
 MODULE_LICENSE("GPL");

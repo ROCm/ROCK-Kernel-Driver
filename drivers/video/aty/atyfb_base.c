@@ -1917,12 +1917,21 @@ int __init atyfb_init(void)
 	char prop[128];
 	int node, len, j;
 	u32 mem, chip_id;
+#else
+	u16 tmp;
+#endif
+#endif
 
+#ifndef MODULE
+	atyfb_setup(fb_get_options("atyfb"));
+#endif
+
+#if defined(CONFIG_PCI)
+
+#ifdef __sparc__
 	/* Do not attach when we have a serial console. */
 	if (!con_is_present())
 		return -ENXIO;
-#else
-	u16 tmp;
 #endif
 
 	while ((pdev =
@@ -2445,6 +2454,7 @@ int __init atyfb_setup(char *options)
 	}
 	return 0;
 }
+module_init(atyfb_init);
 #endif				/* !MODULE */
 
 #ifdef CONFIG_ATARI

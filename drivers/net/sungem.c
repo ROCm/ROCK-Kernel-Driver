@@ -181,6 +181,18 @@ static inline void phy_write(struct gem *gp, int reg, u16 val)
 	__phy_write(gp, gp->mii_phy_addr, reg, val);
 }
 
+static inline void gem_enable_ints(struct gem *gp)
+{
+	/* Enable all interrupts but TXDONE */
+	writel(GREG_STAT_TXDONE, gp->regs + GREG_IMASK);
+}
+
+static inline void gem_disable_ints(struct gem *gp)
+{
+	/* Disable all interrupts, including TXDONE */
+	writel(GREG_STAT_NAPI | GREG_STAT_TXDONE, gp->regs + GREG_IMASK);
+}
+
 static void gem_handle_mif_event(struct gem *gp, u32 reg_val, u32 changed_bits)
 {
 	if (netif_msg_intr(gp))
@@ -639,7 +651,7 @@ static __inline__ void gem_tx(struct net_device *dev, struct gem *gp, u32 gem_st
 		}
 
 		gp->net_stats.tx_packets++;
-		dev_kfree_skb_irq(skb);
+		dev_kfree_skb(skb);
 	}
 	gp->tx_old = entry;
 
@@ -678,12 +690,12 @@ static __inline__ void gem_post_rxds(struct gem *gp, int limit)
 	}
 }
 
-static void gem_rx(struct gem *gp)
+static int gem_rx(struct gem *gp, int work_to_do)
 {
-	int entry, drops;
+	int entry, drops, work_done = 0;
 	u32 done;
 
-	if (netif_msg_intr(gp))
+	if (netif_msg_rx_status(gp))
 		printk(KERN_DEBUG "%s: rx interrupt, done: %d, rx_new: %d\n",
 			gp->dev->name, readl(gp->regs + RXDMA_DONE), gp->rx_new);
 
@@ -700,6 +712,9 @@ static void gem_rx(struct gem *gp)
 		if ((status & RXDCTRL_OWN) != 0)
 			break;
 
+		if (work_done >= RX_RING_SIZE || work_done >= work_to_do)
+			break;
+
 		/* When writing back RX descriptor, GEM writes status
 		 * then buffer address, possibly in seperate transactions.
 		 * If we don't wait for the chip to write both, we could
@@ -712,6 +727,9 @@ static void gem_rx(struct gem *gp)
 			if (entry == done)
 				break;
 		}
+
+		/* We can now account for the work we're about to do */
+		work_done++;
 
 		skb = gp->rx_skbs[entry];
 
@@ -775,7 +793,8 @@ static void gem_rx(struct gem *gp)
 		skb->csum = ntohs((status & RXDCTRL_TCPCSUM) ^ 0xffff);
 		skb->ip_summed = CHECKSUM_HW;
 		skb->protocol = eth_type_trans(skb, gp->dev);
-		netif_rx(skb);
+
+		netif_receive_skb(skb);
 
 		gp->net_stats.rx_packets++;
 		gp->net_stats.rx_bytes += len;
@@ -792,32 +811,88 @@ static void gem_rx(struct gem *gp)
 	if (drops)
 		printk(KERN_INFO "%s: Memory squeeze, deferring packet.\n",
 		       gp->dev->name);
+
+	return work_done;
+}
+
+static int gem_poll(struct net_device *dev, int *budget)
+{
+	struct gem *gp = dev->priv;
+	unsigned long flags;
+
+	spin_lock_irqsave(&gp->lock, flags);
+
+	do {
+		int work_to_do, work_done;
+
+		/* Handle anomalies */
+		if (gp->status & GREG_STAT_ABNORMAL) {
+			if (gem_abnormal_irq(dev, gp, gp->status))
+				break;
+		}
+
+		/* Run TX completion thread */
+		gem_tx(dev, gp, gp->status);
+
+		spin_unlock_irqrestore(&gp->lock, flags);
+
+		/* Run RX thread. We don't use any locking here, 
+		 * code willing to do bad things - like cleaning the 
+		 * rx ring - must call netif_poll_disable(), which
+		 * schedule_timeout()'s if polling is already disabled.
+		 */
+		work_to_do = min(*budget, dev->quota);
+
+		work_done = gem_rx(gp, work_to_do);
+
+		*budget -= work_done;
+		dev->quota -= work_done;
+
+		if (work_done >= work_to_do)
+			return 1;
+
+		spin_lock_irqsave(&gp->lock, flags);
+		
+		gp->status = readl(gp->regs + GREG_STAT);
+	} while (gp->status & GREG_STAT_NAPI);
+
+	__netif_rx_complete(dev);
+	gem_enable_ints(gp);
+
+	spin_unlock_irqrestore(&gp->lock, flags);
+	return 0;
 }
 
 static irqreturn_t gem_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct gem *gp = dev->priv;
-	u32 gem_status = readl(gp->regs + GREG_STAT);
+	unsigned long flags;
 
 	/* Swallow interrupts when shutting the chip down */
-	if (gp->hw_running == 0)
-		goto out;
+	if (!gp->hw_running)
+		return IRQ_HANDLED;
 
-	spin_lock(&gp->lock);
+	spin_lock_irqsave(&gp->lock, flags);
+	
+	if (netif_rx_schedule_prep(dev)) {
+		u32 gem_status = readl(gp->regs + GREG_STAT);
 
-	if (gem_status & GREG_STAT_ABNORMAL) {
-		if (gem_abnormal_irq(dev, gp, gem_status))
-			goto out_unlock;
+		if (gem_status == 0) {
+			spin_unlock_irqrestore(&gp->lock, flags);
+			return IRQ_NONE;
+		}
+		gp->status = gem_status;
+		gem_disable_ints(gp);
+		__netif_rx_schedule(dev);
 	}
-	if (gem_status & (GREG_STAT_TXALL | GREG_STAT_TXINTME))
-		gem_tx(dev, gp, gem_status);
-	if (gem_status & GREG_STAT_RXDONE)
-		gem_rx(gp);
 
-out_unlock:
-	spin_unlock(&gp->lock);
-out:
+	spin_unlock_irqrestore(&gp->lock, flags);
+  
+	/* If polling was disabled at the time we received that
+	 * interrupt, we may return IRQ_HANDLED here while we 
+	 * should return IRQ_NONE. No big deal...
+	 */
 	return IRQ_HANDLED;
 }
 
@@ -1312,18 +1387,11 @@ static void gem_reset_task(void *data)
 {
 	struct gem *gp = (struct gem *) data;
 
-	/* The link went down, we reset the ring, but keep
-	 * DMA stopped. Todo: Use this function for reset
-	 * on error as well.
-	 */
-
+	netif_poll_disable(gp->dev);
 	spin_lock_irq(&gp->lock);
 
 	if (gp->hw_running && gp->opened) {
-		/* Make sure we don't get interrupts or tx packets */
 		netif_stop_queue(gp->dev);
-
-		writel(0xffffffff, gp->regs + GREG_IMASK);
 
 		/* Reset the chip & rings */
 		gem_stop(gp);
@@ -1337,6 +1405,7 @@ static void gem_reset_task(void *data)
 	gp->reset_task_pending = 0;
 
 	spin_unlock_irq(&gp->lock);
+	netif_poll_enable(gp->dev);
 }
 
 static void gem_link_timer(unsigned long data)
@@ -2214,11 +2283,15 @@ static int gem_close(struct net_device *dev)
 	/* Make sure we don't get distracted by suspend/resume */
 	down(&gp->pm_sem);
 
+	/* Note: we don't need to call netif_poll_disable() here because
+	 * our caller (dev_close) already did it for us
+	 */
+
 	/* Stop traffic, mark us closed */
 	spin_lock_irq(&gp->lock);
 
 	gp->opened = 0;	
-	writel(0xffffffff, gp->regs + GREG_IMASK);
+
 	netif_stop_queue(dev);
 
 	/* Stop chip */
@@ -2247,6 +2320,8 @@ static int gem_suspend(struct pci_dev *pdev, u32 state)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct gem *gp = dev->priv;
 
+	netif_poll_disable(dev);
+
 	/* We hold the PM semaphore during entire driver
 	 * sleep time
 	 */
@@ -2261,8 +2336,6 @@ static int gem_suspend(struct pci_dev *pdev, u32 state)
 
 		/* Stop traffic, mark us closed */
 		netif_device_detach(dev);
-
-		writel(0xffffffff, gp->regs + GREG_IMASK);
 
 		/* Stop chip */
 		gem_stop(gp);
@@ -2317,6 +2390,8 @@ static int gem_resume(struct pci_dev *pdev)
 	}
 	up(&gp->pm_sem);
 
+	netif_poll_enable(dev);
+	
 	return 0;
 }
 #endif /* CONFIG_PM */
@@ -2806,6 +2881,8 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->get_stats = gem_get_stats;
 	dev->set_multicast_list = gem_set_multicast;
 	dev->do_ioctl = gem_ioctl;
+	dev->poll = gem_poll;
+	dev->weight = 64;
 	dev->ethtool_ops = &gem_ethtool_ops;
 	dev->tx_timeout = gem_tx_timeout;
 	dev->watchdog_timeo = 5 * HZ;

@@ -2417,6 +2417,8 @@ int __init matroxfb_init(void)
 {
 	DBG(__FUNCTION__)
 
+	matroxfb_setup(fb_get_options("matroxfb"));
+
 	if (disabled)
 		return -ENXIO;
 	if (!initialized) {
@@ -2427,6 +2429,8 @@ int __init matroxfb_init(void)
 	/* never return failure, user can hotplug matrox later... */
 	return 0;
 }
+
+module_init(matroxfb_init);
 
 #else
 

@@ -83,10 +83,6 @@
 #undef  CYCLOM_16Y_HACK
 #define  CYCLOM_ENABLE_MONITORING
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 #define WAKEUP_CHARS 256
 
 #define STD_COM_FLAGS (0)
@@ -1238,8 +1234,8 @@ cy_write(struct tty_struct * tty, int from_user,
     if (from_user) {
 	    down(&tmp_buf_sem);
 	    while (1) {
-		    c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				       SERIAL_XMIT_SIZE - info->xmit_head));
+		    c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+					      SERIAL_XMIT_SIZE - info->xmit_head));
 		    if (c <= 0)
 			    break;
 
@@ -1251,8 +1247,8 @@ cy_write(struct tty_struct * tty, int from_user,
 		    }
 
 		    local_irq_save(flags);
-		    c = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				   SERIAL_XMIT_SIZE - info->xmit_head));
+		    c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+					  SERIAL_XMIT_SIZE - info->xmit_head));
 		    memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
 		    info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
 		    info->xmit_cnt += c;
@@ -1266,8 +1262,8 @@ cy_write(struct tty_struct * tty, int from_user,
     } else {
 	    while (1) {
 		    local_irq_save(flags);
-		    c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				       SERIAL_XMIT_SIZE - info->xmit_head));
+		    c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+					      SERIAL_XMIT_SIZE - info->xmit_head));
 		    if (c <= 0) {
 			    local_irq_restore(flags);
 			    break;

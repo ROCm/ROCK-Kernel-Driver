@@ -272,7 +272,8 @@ static struct saa7134_tvnorm tvnorms[] = {
 #define V4L2_CID_PRIVATE_INVERT      (V4L2_CID_PRIVATE_BASE + 0)
 #define V4L2_CID_PRIVATE_Y_ODD       (V4L2_CID_PRIVATE_BASE + 1)
 #define V4L2_CID_PRIVATE_Y_EVEN      (V4L2_CID_PRIVATE_BASE + 2)
-#define V4L2_CID_PRIVATE_LASTP1      (V4L2_CID_PRIVATE_BASE + 3)
+#define V4L2_CID_PRIVATE_AUTOMUTE    (V4L2_CID_PRIVATE_BASE + 3)
+#define V4L2_CID_PRIVATE_LASTP1      (V4L2_CID_PRIVATE_BASE + 4)
 
 static const struct v4l2_queryctrl no_ctrl = {
 	.name  = "42",
@@ -356,6 +357,13 @@ static const struct v4l2_queryctrl video_ctrls[] = {
 		.maximum       = 128,
 		.default_value = 0,
 		.type          = V4L2_CTRL_TYPE_INTEGER,
+	},{
+		.id            = V4L2_CID_PRIVATE_AUTOMUTE,
+		.name          = "automute",
+		.minimum       = 0,
+		.maximum       = 1,
+		.default_value = 1,
+		.type          = V4L2_CTRL_TYPE_BOOLEAN,
 	}
 };
 static const unsigned int CTRLS = ARRAY_SIZE(video_ctrls);
@@ -433,10 +441,11 @@ void res_free(struct saa7134_dev *dev, struct saa7134_fh *fh, unsigned int bits)
 
 static void set_tvnorm(struct saa7134_dev *dev, struct saa7134_tvnorm *norm)
 {
-	int luma_control,sync_control,mux;
+	int luma_control,sync_control,mux,nosignal;
 
 	dprintk("set tv norm = %s\n",norm->name);
 	dev->tvnorm = norm;
+        nosignal = (0 == (saa_readb(SAA7134_STATUS_VIDEO1) & 0x03));
 
 	mux = card_in(dev,dev->ctl_input).vmux;
 	luma_control = norm->luma_control;
@@ -444,7 +453,7 @@ static void set_tvnorm(struct saa7134_dev *dev, struct saa7134_tvnorm *norm)
 
 	if (mux > 5)
 		luma_control |= 0x80; /* svideo */
-	if (noninterlaced)
+	if (noninterlaced || nosignal)
 		sync_control |= 0x20;
 
 	/* setup cropping */
@@ -1043,6 +1052,9 @@ static int get_control(struct saa7134_dev *dev, struct v4l2_control *c)
 	case V4L2_CID_PRIVATE_Y_ODD:
 		c->value = dev->ctl_y_odd;
 		break;
+	case V4L2_CID_PRIVATE_AUTOMUTE:
+		c->value = dev->ctl_automute;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -1117,6 +1129,17 @@ static int set_control(struct saa7134_dev *dev, struct saa7134_fh *fh,
 	case V4L2_CID_PRIVATE_Y_ODD:
 		dev->ctl_y_odd = c->value;
 		restart_overlay = 1;
+		break;
+	case V4L2_CID_PRIVATE_AUTOMUTE:
+		dev->ctl_automute = c->value;
+		if (dev->tda9887_conf) {
+			if (dev->ctl_automute)
+				dev->tda9887_conf |= TDA9887_AUTOMUTE;
+			else
+				dev->tda9887_conf &= ~TDA9887_AUTOMUTE;
+			saa7134_i2c_call_clients(dev, TDA9887_SET_CONFIG,
+						 &dev->tda9887_conf);
+		}
 		break;
 	default:
 		return -EINVAL;
@@ -1820,7 +1843,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 		struct v4l2_frequency *f = arg;
 
 		memset(f,0,sizeof(*f));
-		f->type = V4L2_TUNER_ANALOG_TV;
+		f->type = fh->radio ? V4L2_TUNER_RADIO : V4L2_TUNER_ANALOG_TV;
 		f->frequency = dev->ctl_freq;
 		return 0;
 	}
@@ -1830,7 +1853,9 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 
 		if (0 != f->tuner)
 			return -EINVAL;
-		if (V4L2_TUNER_ANALOG_TV != f->type)
+		if (0 == fh->radio && V4L2_TUNER_ANALOG_TV != f->type)
+			return -EINVAL;
+		if (1 == fh->radio && V4L2_TUNER_RADIO != f->type)
 			return -EINVAL;
 		down(&dev->lock);
 		dev->ctl_freq = f->frequency;
@@ -2244,9 +2269,12 @@ int saa7134_video_init1(struct saa7134_dev *dev)
 	dev->ctl_hue        = ctrl_by_id(V4L2_CID_HUE)->default_value;
 	dev->ctl_saturation = ctrl_by_id(V4L2_CID_SATURATION)->default_value;
 	dev->ctl_volume     = ctrl_by_id(V4L2_CID_AUDIO_VOLUME)->default_value;
+	dev->ctl_mute       = ctrl_by_id(V4L2_CID_AUDIO_MUTE)->default_value;
+	dev->ctl_invert     = ctrl_by_id(V4L2_CID_PRIVATE_INVERT)->default_value;
+	dev->ctl_automute   = ctrl_by_id(V4L2_CID_PRIVATE_AUTOMUTE)->default_value;
 
-	dev->ctl_invert     = 0;
-	dev->ctl_mute       = 1;
+	if (dev->tda9887_conf && dev->ctl_automute)
+		dev->tda9887_conf |= TDA9887_AUTOMUTE;
 	dev->automute       = 0;
 
         INIT_LIST_HEAD(&dev->video_q.queue);
@@ -2300,10 +2328,14 @@ void saa7134_irq_video_intl(struct saa7134_dev *dev)
 	if (0 != norm) {
 		/* wake up tvaudio audio carrier scan thread */
 		saa7134_tvaudio_do_scan(dev);
+		if (!noninterlaced)
+			saa_clearb(SAA7134_SYNC_CTRL, 0x20);
 	} else {
 		/* no video signal -> mute audio */
-		dev->automute = 1;
+		if (dev->ctl_automute)
+			dev->automute = 1;
 		saa7134_tvaudio_setmute(dev);
+		saa_setb(SAA7134_SYNC_CTRL, 0x20);
 	}
 }
 

@@ -69,8 +69,7 @@ static int cadet_getrds(void)
 	outb(inb(io+1)&0x7f,io+1);  /* Reset RDS detection */
 	spin_unlock(&cadet_io_lock);
 	
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ/10);
+	msleep(100);
 
 	spin_lock(&cadet_io_lock);	
         outb(3,io);                 /* Select Decoder Control/Status */
@@ -243,8 +242,7 @@ static void cadet_setfreq(unsigned freq)
 		outb(curvol,io+1);
 		spin_unlock(&cadet_io_lock);
 		
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/10);
+		msleep(100);
 
 		cadet_gettune();
 		if((tunestat & 0x40) == 0) {   /* Tuned */

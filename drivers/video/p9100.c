@@ -368,8 +368,9 @@ p9100_setup(char *arg)
 	return 0;
 }
 
-#ifdef MODULE
 module_init(p9100_init);
+
+#ifdef MODULE
 module_exit(p9100_exit);
 #endif
 

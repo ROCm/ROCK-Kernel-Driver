@@ -23,7 +23,7 @@
 #define ASYNC_ORDER  0
 #endif
 #else /* __s390x__ */
-#ifndef __SMALL_STACK_STACK
+#ifndef __SMALL_STACK
 #define THREAD_ORDER 2
 #define ASYNC_ORDER  2
 #else

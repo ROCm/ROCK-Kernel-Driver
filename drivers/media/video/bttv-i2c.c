@@ -40,6 +40,7 @@ static void bttv_inc_use(struct i2c_adapter *adap);
 static void bttv_dec_use(struct i2c_adapter *adap);
 #endif
 static int attach_inform(struct i2c_client *client);
+static int detach_inform(struct i2c_client *client);
 
 static int i2c_debug = 0;
 static int i2c_hw = 0;
@@ -114,6 +115,7 @@ static struct i2c_adapter bttv_i2c_adap_sw_template = {
 	I2C_DEVNAME("bt848"),
 	.id                = I2C_HW_B_BT848,
 	.client_register   = attach_inform,
+	.client_unregister = detach_inform,
 };
 
 /* ----------------------------------------------------------------------- */
@@ -298,6 +300,7 @@ static struct i2c_adapter bttv_i2c_adap_hw_template = {
 	.id            = I2C_ALGO_BIT | I2C_HW_B_BT848 /* FIXME */,
 	.algo          = &bttv_algo,
 	.client_register = attach_inform,
+	.client_unregister = detach_inform,
 };
 
 /* ----------------------------------------------------------------------- */
@@ -324,11 +327,20 @@ static int attach_inform(struct i2c_client *client)
 	if (btv->pinnacle_id != UNSET)
 		bttv_call_i2c_clients(btv,AUDC_CONFIG_PINNACLE,
 				      &btv->pinnacle_id);
+	bttv_i2c_info(&btv->c, client, 1);
 
         if (bttv_debug)
 		printk("bttv%d: i2c attach [client=%s]\n",
 		       btv->c.nr, i2c_clientname(client));
         return 0;
+}
+
+static int detach_inform(struct i2c_client *client)
+{
+        struct bttv *btv = i2c_get_adapdata(client->adapter);
+
+	bttv_i2c_info(&btv->c, client, 0);
+	return 0;
 }
 
 void bttv_call_i2c_clients(struct bttv *btv, unsigned int cmd, void *arg)

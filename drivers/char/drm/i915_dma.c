@@ -91,7 +91,7 @@ int i915_dma_cleanup(drm_device_t * dev)
 		    (drm_i915_private_t *) dev->dev_private;
 
 		if (dev_priv->ring.virtual_start) {
-			DRM_IOREMAPFREE(&dev_priv->ring.map, dev);
+			drm_core_ioremapfree( &dev_priv->ring.map, dev);
 		}
 
 		if (dev_priv->hw_status_page) {
@@ -125,7 +125,7 @@ static int i915_initialize(drm_device_t * dev,
 		return DRM_ERR(EINVAL);
 	}
 
-	DRM_FIND_MAP(dev_priv->mmio_map, init->mmio_offset);
+	dev_priv->mmio_map = drm_core_findmap(dev, init->mmio_offset);
 	if (!dev_priv->mmio_map) {
 		dev->dev_private = (void *)dev_priv;
 		i915_dma_cleanup(dev);
@@ -147,7 +147,7 @@ static int i915_initialize(drm_device_t * dev,
 	dev_priv->ring.map.flags = 0;
 	dev_priv->ring.map.mtrr = 0;
 
-	DRM_IOREMAP(&dev_priv->ring.map, dev);
+	drm_core_ioremap( &dev_priv->ring.map, dev );
 
 	if (dev_priv->ring.map.handle == NULL) {
 		dev->dev_private = (void *)dev_priv;
@@ -296,7 +296,14 @@ static int do_validate_cmd(int cmd)
 		case 0x1c:
 			return 1;
 		case 0x1d:
-			return (cmd & 0xffff) + 2;
+			switch ((cmd>>16)&0xff) {
+			case 0x3:
+				return (cmd & 0x1f) + 2;
+			case 0x4:
+				return (cmd & 0xf) + 2;
+			default:
+				return (cmd & 0xffff) + 2;
+			}
 		case 0x1e:
 			if (cmd & (1 << 23))
 				return (cmd & 0xffff) + 1;
@@ -711,4 +718,32 @@ int i915_setparam(DRM_IOCTL_ARGS)
 	}
 
 	return 0;
+}
+
+static void i915_driver_pretakedown(drm_device_t *dev)
+{
+	if ( dev->dev_private ) {
+		drm_i915_private_t *dev_priv = dev->dev_private;
+	        i915_mem_takedown( &(dev_priv->agp_heap) );
+ 	}
+	i915_dma_cleanup( dev );
+}
+
+static void i915_driver_prerelease(drm_device_t *dev, DRMFILE filp)
+{
+	if ( dev->dev_private ) {
+		drm_i915_private_t *dev_priv = dev->dev_private;
+                i915_mem_release( dev, filp, dev_priv->agp_heap );
+	}
+}
+
+void i915_driver_register_fns(drm_device_t *dev)
+{
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED;
+	dev->fn_tbl.pretakedown = i915_driver_pretakedown;
+	dev->fn_tbl.prerelease = i915_driver_prerelease;
+	dev->fn_tbl.irq_preinstall = i915_driver_irq_preinstall;
+	dev->fn_tbl.irq_postinstall = i915_driver_irq_postinstall;
+	dev->fn_tbl.irq_uninstall = i915_driver_irq_uninstall;
+	dev->fn_tbl.irq_handler = i915_driver_irq_handler;
 }

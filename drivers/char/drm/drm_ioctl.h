@@ -341,9 +341,9 @@ int DRM(setversion)(DRM_IOCTL_ARGS)
 		if (sv.drm_dd_major != DRIVER_MAJOR ||
 		    sv.drm_dd_minor < 0 || sv.drm_dd_minor > DRIVER_MINOR)
 			return EINVAL;
-#ifdef DRIVER_SETVERSION
-		DRIVER_SETVERSION(dev, &sv);
-#endif
+
+		if (dev->fn_tbl.set_version)
+			dev->fn_tbl.set_version(dev, &sv);
 	}
 	return 0;
 }

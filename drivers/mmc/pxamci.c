@@ -530,6 +530,7 @@ static int pxamci_remove(struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
 static int pxamci_suspend(struct device *dev, u32 state, u32 level)
 {
 	struct mmc_host *mmc = dev_get_drvdata(dev);
@@ -551,6 +552,10 @@ static int pxamci_resume(struct device *dev, u32 level)
 
 	return ret;
 }
+#else
+#define pxamci_suspend	NULL
+#define pxamci_resume	NULL
+#endif
 
 static struct device_driver pxamci_driver = {
 	.name		= "pxa2xx-mci",

@@ -100,6 +100,15 @@
 		.macro	writeb, rb
 		strb	\rb, [r3]
 		.endm
+#elif defined(CONFIG_ARCH_IOP331)
+		.macro loadsp, rb
+                mov   	\rb, #0xff000000
+                orr     \rb, \rb, #0x00ff0000
+                orr     \rb, \rb, #0x0000f700   @ location of the UART
+		.endm
+		.macro	writeb, rb
+		str	\rb, [r3, #0]
+		.endm
 #else
 #error no serial architecture defined
 #endif

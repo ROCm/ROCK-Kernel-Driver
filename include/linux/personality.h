@@ -12,17 +12,6 @@ extern int		register_exec_domain(struct exec_domain *);
 extern int		unregister_exec_domain(struct exec_domain *);
 extern int		__set_personality(unsigned long);
 
-
-/*
- * Sysctl variables related to binary emulation.
- */
-extern unsigned long abi_defhandler_coff;
-extern unsigned long abi_defhandler_elf;
-extern unsigned long abi_defhandler_lcall7;
-extern unsigned long abi_defhandler_libcso;
-extern int abi_fake_utsname;
-
-
 /*
  * Flags for bug emulation.
  *

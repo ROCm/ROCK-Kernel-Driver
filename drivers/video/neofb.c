@@ -2267,16 +2267,19 @@ int __init neofb_setup(char *options)
 
 int __init neofb_init(void)
 {
+#ifndef MODULE
+	neofb_setup(fb_get_options("neofb"));
+#endif
 	return pci_register_driver(&neofb_driver);
 }
 
-#ifdef MODULE
+module_init(neofb_init);
 
+#ifdef MODULE
 static void __exit neofb_exit(void)
 {
 	pci_unregister_driver(&neofb_driver);
 }
 
-module_init(neofb_init);
 module_exit(neofb_exit);
 #endif				/* MODULE */

@@ -602,8 +602,8 @@ restart_int_handler:
         l       %r15,__LC_SAVE_AREA+60 # load ksp
         lctl    %c0,%c15,__LC_CREGS_SAVE_AREA # get new ctl regs
         lam     %a0,%a15,__LC_AREGS_SAVE_AREA
-        stosm   0(%r15),0x04           # now we can turn dat on
         lm      %r6,%r15,__SF_GPRS(%r15) # load registers from clone
+        stosm   __SF_EMPTY(%r15),0x04    # now we can turn dat on
         basr    %r14,0
         l       %r14,restart_addr-.(%r14)
         br      %r14                   # branch to start_secondary

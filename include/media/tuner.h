@@ -70,6 +70,8 @@
 #define TUNER_PHILIPS_FM1236_MK3 43
 #define TUNER_PHILIPS_4IN1       44	/* ATI TV Wonder Pro - Conexant */
 #define TUNER_MICROTUNE_4049FM5  45
+#define TUNER_LG_NTSC_TAPE       47
+#define TUNER_TNF_8831BGFF       48
 
 #define NOTUNER 0
 #define PAL     1	/* PAL_BG */
@@ -88,6 +90,7 @@
 #define Samsung 7
 #define Microtune 8
 #define HITACHI 9
+#define Panasonic 10
 
 #define TUNER_SET_TYPE               _IOW('t',1,int)    /* set tuner type */
 #define TUNER_SET_TVFREQ             _IOW('t',2,int)    /* set tv freq */
@@ -95,5 +98,19 @@
 # define TUNER_SET_RADIOFREQ         _IOW('t',3,int)    /* set radio freq */
 # define TUNER_SET_MODE              _IOW('t',4,int)    /* set tuner mode */
 #endif
+
+#define  TDA9887_SET_CONFIG          _IOW('t',5,int)
+/* tv card specific */
+# define TDA9887_PRESENT             (1<<0)
+# define TDA9887_PORT1               (1<<1)
+# define TDA9887_PORT2               (1<<2)
+# define TDA9887_QSS                 (1<<3)
+# define TDA9887_INTERCARRIER        (1<<4)
+/* config options */
+# define TDA9887_DEEMPHASIS_MASK     (3<<16)
+# define TDA9887_DEEMPHASIS_NONE     (1<<16)
+# define TDA9887_DEEMPHASIS_50       (2<<16)
+# define TDA9887_DEEMPHASIS_75       (3<<16)
+# define TDA9887_AUTOMUTE            (1<<18)
 
 #endif

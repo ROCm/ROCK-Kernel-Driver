@@ -25,8 +25,8 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
+#include <linux/hardirq.h>	/* in_interrupt() */
 #include <asm/system.h>
-#include <asm/hardirq.h>	/* in_interrupt() */
 
 #undef INIT_STUCK
 #define INIT_STUCK 1L << 30

@@ -452,6 +452,13 @@ struct fb_cursor_user {
 #define FB_EVENT_RESUME			0x03
 /*      An entry from the modelist was removed */
 #define FB_EVENT_MODE_DELETE            0x04
+/*      A driver registered itself */
+#define FB_EVENT_FB_REGISTERED          0x05
+/*      get console to framebuffer mapping */
+#define FB_EVENT_GET_CONSOLE_MAP        0x06
+/*      set console to framebuffer mapping */
+#define FB_EVENT_SET_CONSOLE_MAP        0x07
+
 
 struct fb_event {
 	struct fb_info *info;
@@ -701,6 +708,7 @@ extern void fb_sysmove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
 extern void fb_load_cursor_image(struct fb_info *);
 extern void fb_set_suspend(struct fb_info *info, int state);
 extern int fb_get_color_depth(struct fb_info *info);
+extern char* fb_get_options(char *name);
 
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;

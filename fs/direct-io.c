@@ -235,7 +235,8 @@ static void finished_one_bio(struct dio *dio)
 			dio_complete(dio, dio->block_in_file << dio->blkbits,
 					dio->result);
 			/* Complete AIO later if falling back to buffered i/o */
-			if (dio->result == dio->size || dio->rw == READ) {
+			if (dio->result == dio->size ||
+				((dio->rw == READ) && dio->result)) {
 				aio_complete(dio->iocb, dio->result, 0);
 				kfree(dio);
 				return;

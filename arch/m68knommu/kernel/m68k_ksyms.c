@@ -16,7 +16,6 @@
 #include <asm/io.h>
 #include <asm/semaphore.h>
 #include <asm/checksum.h>
-#include <asm/hardirq.h>
 #include <asm/current.h>
 
 extern void dump_thread(struct pt_regs *, struct user *);
@@ -50,16 +49,16 @@ EXPORT_SYMBOL(csum_partial_copy);
    explicitly (the C compiler generates them).  Fortunately,
    their interface isn't gonna change any time soon now, so
    it's OK to leave it out of version control.  */
-EXPORT_SYMBOL_NOVERS(memcpy);
-EXPORT_SYMBOL_NOVERS(memset);
-EXPORT_SYMBOL_NOVERS(memcmp);
-EXPORT_SYMBOL_NOVERS(memscan);
-EXPORT_SYMBOL_NOVERS(memmove);
+EXPORT_SYMBOL(memcpy);
+EXPORT_SYMBOL(memset);
+EXPORT_SYMBOL(memcmp);
+EXPORT_SYMBOL(memscan);
+EXPORT_SYMBOL(memmove);
 
-EXPORT_SYMBOL_NOVERS(__down_failed);
-EXPORT_SYMBOL_NOVERS(__down_failed_interruptible);
-EXPORT_SYMBOL_NOVERS(__down_failed_trylock);
-EXPORT_SYMBOL_NOVERS(__up_wakeup);
+EXPORT_SYMBOL(__down_failed);
+EXPORT_SYMBOL(__down_failed_interruptible);
+EXPORT_SYMBOL(__down_failed_trylock);
+EXPORT_SYMBOL(__up_wakeup);
 
 EXPORT_SYMBOL(get_wchan);
 
@@ -79,27 +78,27 @@ extern void __udivsi3(void);
 extern void __umodsi3(void);
 
         /* gcc lib functions */
-EXPORT_SYMBOL_NOVERS(__ashldi3);
-EXPORT_SYMBOL_NOVERS(__ashrdi3);
-EXPORT_SYMBOL_NOVERS(__divsi3);
-EXPORT_SYMBOL_NOVERS(__lshrdi3);
-EXPORT_SYMBOL_NOVERS(__modsi3);
-EXPORT_SYMBOL_NOVERS(__muldi3);
-EXPORT_SYMBOL_NOVERS(__mulsi3);
-EXPORT_SYMBOL_NOVERS(__udivsi3);
-EXPORT_SYMBOL_NOVERS(__umodsi3);
+EXPORT_SYMBOL(__ashldi3);
+EXPORT_SYMBOL(__ashrdi3);
+EXPORT_SYMBOL(__divsi3);
+EXPORT_SYMBOL(__lshrdi3);
+EXPORT_SYMBOL(__modsi3);
+EXPORT_SYMBOL(__muldi3);
+EXPORT_SYMBOL(__mulsi3);
+EXPORT_SYMBOL(__udivsi3);
+EXPORT_SYMBOL(__umodsi3);
 
-EXPORT_SYMBOL_NOVERS(is_in_rom);
+EXPORT_SYMBOL(is_in_rom);
 
 #ifdef CONFIG_COLDFIRE
 extern unsigned int *dma_device_address;
 extern unsigned long dma_base_addr, _ramend;
-EXPORT_SYMBOL_NOVERS(dma_base_addr);
-EXPORT_SYMBOL_NOVERS(dma_device_address);
-EXPORT_SYMBOL_NOVERS(_ramend);
+EXPORT_SYMBOL(dma_base_addr);
+EXPORT_SYMBOL(dma_device_address);
+EXPORT_SYMBOL(_ramend);
 
 extern asmlinkage void trap(void);
 extern void	*_ramvec;
-EXPORT_SYMBOL_NOVERS(trap);
-EXPORT_SYMBOL_NOVERS(_ramvec);
+EXPORT_SYMBOL(trap);
+EXPORT_SYMBOL(_ramvec);
 #endif /* CONFIG_COLDFIRE */

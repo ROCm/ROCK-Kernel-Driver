@@ -65,28 +65,6 @@ void ext2_error (struct super_block * sb, const char * function,
 	}
 }
 
-NORET_TYPE void ext2_panic (struct super_block * sb, const char * function,
-			    const char * fmt, ...)
-{
-	va_list args;
-	struct ext2_sb_info *sbi = EXT2_SB(sb);
-
-	if (!(sb->s_flags & MS_RDONLY)) {
-		sbi->s_mount_state |= EXT2_ERROR_FS;
-		sbi->s_es->s_state =
-			cpu_to_le16(le16_to_cpu(sbi->s_es->s_state) | EXT2_ERROR_FS);
-		mark_buffer_dirty(sbi->s_sbh);
-		sb->s_dirt = 1;
-	}
-	va_start(args, fmt);
-	printk(KERN_CRIT "EXT2-fs error (device %s): %s: ",sb->s_id, function);
-	vprintk(fmt, args);
-	printk("\n");
-	va_end(args);
-	sb->s_flags |= MS_RDONLY;
-	panic("EXT2-fs panic forced\n");
-}
-
 void ext2_warning (struct super_block * sb, const char * function,
 		   const char * fmt, ...)
 {
@@ -135,7 +113,7 @@ static void ext2_put_super (struct super_block * sb)
 	if (!(sb->s_flags & MS_RDONLY)) {
 		struct ext2_super_block *es = sbi->s_es;
 
-		es->s_state = le16_to_cpu(sbi->s_mount_state);
+		es->s_state = cpu_to_le16(sbi->s_mount_state);
 		ext2_sync_super(sb, es);
 	}
 	db_count = sbi->s_gdb_count;
@@ -450,8 +428,8 @@ static int ext2_setup_super (struct super_block * sb,
 		(le32_to_cpu(es->s_lastcheck) + le32_to_cpu(es->s_checkinterval) <= get_seconds()))
 		printk ("EXT2-fs warning: checktime reached, "
 			"running e2fsck is recommended\n");
-	if (!(__s16) le16_to_cpu(es->s_max_mnt_count))
-		es->s_max_mnt_count = (__s16) cpu_to_le16(EXT2_DFL_MAX_MNT_COUNT);
+	if (!le16_to_cpu(es->s_max_mnt_count))
+		es->s_max_mnt_count = cpu_to_le16(EXT2_DFL_MAX_MNT_COUNT);
 	es->s_mnt_count=cpu_to_le16(le16_to_cpu(es->s_mnt_count) + 1);
 	ext2_write_super(sb);
 	if (test_opt (sb, DEBUG))
@@ -573,6 +551,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	int blocksize = BLOCK_SIZE;
 	int db_count;
 	int i, j;
+	__le32 features;
 
 	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
@@ -662,17 +641,18 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	 * previously didn't change the revision level when setting the flags,
 	 * so there is a chance incompat flags are set on a rev 0 filesystem.
 	 */
-	if ((i = EXT2_HAS_INCOMPAT_FEATURE(sb, ~EXT2_FEATURE_INCOMPAT_SUPP))) {
+	features = EXT2_HAS_INCOMPAT_FEATURE(sb, ~EXT2_FEATURE_INCOMPAT_SUPP);
+	if (features) {
 		printk("EXT2-fs: %s: couldn't mount because of "
 		       "unsupported optional features (%x).\n",
-		       sb->s_id, i);
+		       sb->s_id, le32_to_cpu(features));
 		goto failed_mount;
 	}
 	if (!(sb->s_flags & MS_RDONLY) &&
-	    (i = EXT2_HAS_RO_COMPAT_FEATURE(sb, ~EXT2_FEATURE_RO_COMPAT_SUPP))){
+	    (features = EXT2_HAS_RO_COMPAT_FEATURE(sb, ~EXT2_FEATURE_RO_COMPAT_SUPP))){
 		printk("EXT2-fs: %s: couldn't mount RDWR because of "
 		       "unsupported optional features (%x).\n",
-		       sb->s_id, i);
+		       sb->s_id, le32_to_cpu(features));
 		goto failed_mount;
 	}
 	blocksize = BLOCK_SIZE << le32_to_cpu(sbi->s_es->s_log_block_size);
@@ -695,7 +675,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		}
 		es = (struct ext2_super_block *) (((char *)bh->b_data) + offset);
 		sbi->s_es = es;
-		if (es->s_magic != le16_to_cpu(EXT2_SUPER_MAGIC)) {
+		if (es->s_magic != cpu_to_le16(EXT2_SUPER_MAGIC)) {
 			printk ("EXT2-fs: Magic mismatch, very weird !\n");
 			goto failed_mount;
 		}
@@ -938,12 +918,12 @@ static int ext2_remount (struct super_block * sb, int * flags, char * data)
 		es->s_state = cpu_to_le16(sbi->s_mount_state);
 		es->s_mtime = cpu_to_le32(get_seconds());
 	} else {
-		int ret;
-		if ((ret = EXT2_HAS_RO_COMPAT_FEATURE(sb,
-					       ~EXT2_FEATURE_RO_COMPAT_SUPP))) {
+		__le32 ret = EXT2_HAS_RO_COMPAT_FEATURE(sb,
+					       ~EXT2_FEATURE_RO_COMPAT_SUPP);
+		if (ret) {
 			printk("EXT2-fs: %s: couldn't remount RDWR because of "
 			       "unsupported optional features (%x).\n",
-			       sb->s_id, ret);
+			       sb->s_id, le32_to_cpu(ret));
 			return -EROFS;
 		}
 		/*

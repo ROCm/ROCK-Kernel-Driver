@@ -29,7 +29,6 @@
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/oplib.h>
-#include <asm/hardirq.h>
 #include <asm/cpudata.h>
 
 #define IRQ_RESCHEDULE		13

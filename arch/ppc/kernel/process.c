@@ -36,6 +36,7 @@
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/mqueue.h>
+#include <linux/hardirq.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -44,7 +45,6 @@
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/prom.h>
-#include <asm/hardirq.h>
 
 extern unsigned long _get_SP(void);
 

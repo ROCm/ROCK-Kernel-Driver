@@ -60,6 +60,8 @@ struct cpuinfo_x86 {
 	int	x86_cache_alignment;
 	int	x86_tlbsize;	/* number of 4K pages in DTLB/ITLB combined(in pages)*/
         __u8    x86_virt_bits, x86_phys_bits;
+	__u8	x86_num_cores;
+	__u8	x86_apicid;
         __u32   x86_power; 	
 	unsigned long loops_per_jiffy;
 } ____cacheline_aligned;
@@ -82,7 +84,7 @@ extern struct tss_struct init_tss[NR_CPUS];
 extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
 #else
-#define cpu_data &boot_cpu_data
+#define cpu_data (&boot_cpu_data)
 #define current_cpu_data boot_cpu_data
 #endif
 

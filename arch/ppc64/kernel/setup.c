@@ -67,6 +67,7 @@ extern void  pmac_init(unsigned long r3,
 		       unsigned long r6,
 		       unsigned long r7);
 
+extern void fw_feature_init(void);
 extern void iSeries_init( void );
 extern void iSeries_init_early( void );
 extern void pSeries_init_early( void );
@@ -279,11 +280,13 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 
 #ifdef CONFIG_PPC_PSERIES
 	case PLATFORM_PSERIES:
+		fw_feature_init();
 		pSeries_init_early();
 		parse_bootinfo();
 		break;
 
 	case PLATFORM_PSERIES_LPAR:
+		fw_feature_init();
 		pSeriesLP_init_early();
 		parse_bootinfo();
 		break;
@@ -698,9 +701,12 @@ extern void (*calibrate_delay)(void);
 #ifdef CONFIG_IRQSTACKS
 static void __init irqstack_early_init(void)
 {
-	int i;
+	unsigned int i;
 
-	/* interrupt stacks must be under 256MB, we cannot afford to take SLB misses on them */
+	/*
+	 * interrupt stacks must be under 256MB, we cannot afford to take
+	 * SLB misses on them.
+	 */
 	for_each_cpu(i) {
 		softirq_ctx[i] = (struct thread_info *)__va(lmb_alloc_base(THREAD_SIZE,
 					THREAD_SIZE, 0x10000000));
@@ -711,6 +717,31 @@ static void __init irqstack_early_init(void)
 #else
 #define irqstack_early_init()
 #endif
+
+/*
+ * Stack space used when we detect a bad kernel stack pointer, and
+ * early in SMP boots before relocation is enabled.
+ */
+static void __init emergency_stack_init(void)
+{
+	unsigned long limit;
+	unsigned int i;
+
+	/*
+	 * Emergency stacks must be under 256MB, we cannot afford to take
+	 * SLB misses on them. The ABI also requires them to be 128-byte
+	 * aligned.
+	 *
+	 * Since we use these as temporary stacks during secondary CPU
+	 * bringup, we need to get at them in real mode. This means they
+	 * must also be within the RMO region.
+	 */
+	limit = min(0x10000000UL, lmb.rmo_size);
+
+	for_each_cpu(i)
+		paca[i].emergency_sp = __va(lmb_alloc_base(PAGE_SIZE, 128,
+						limit)) + PAGE_SIZE;
+}
 
 /*
  * Called into from start_kernel, after lock_kernel has been called.
@@ -758,6 +789,7 @@ void __init setup_arch(char **cmdline_p)
 	*cmdline_p = cmd_line;
 
 	irqstack_early_init();
+	emergency_stack_init();
 
 	/* set up the bootmem stuff with available memory */
 	do_init_bootmem();

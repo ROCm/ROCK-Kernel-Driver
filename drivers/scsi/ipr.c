@@ -1822,10 +1822,11 @@ static void ipr_worker_thread(void *data)
 
 	if (ioa_cfg->sdt_state == GET_DUMP) {
 		dump = ioa_cfg->dump;
-		if (!dump || !kref_get(&dump->kref)) {
+		if (!dump) {
 			spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 			return;
 		}
+		kref_get(&dump->kref);
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		ipr_get_ioa_dump(ioa_cfg, dump);
 		kref_put(&dump->kref, ipr_release_dump);
@@ -2423,11 +2424,11 @@ static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
 	dump = ioa_cfg->dump;
 
-	if (ioa_cfg->sdt_state != DUMP_OBTAINED || !dump || !kref_get(&dump->kref)) {
+	if (ioa_cfg->sdt_state != DUMP_OBTAINED || !dump) {
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		return 0;
 	}
-
+	kref_get(&dump->kref);
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 
 	if (off > dump->driver_dump.hdr.len) {

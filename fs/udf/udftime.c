@@ -58,7 +58,7 @@ const unsigned short int __mon_yday[2][13] =
 #define SPD 0x15180 /*3600*24*/
 #define SPY(y,l,s) (SPD * (365*y+l)+s)
 
-time_t year_seconds[MAX_YEAR_SECONDS]= {
+static time_t year_seconds[MAX_YEAR_SECONDS]= {
 /*1970*/ SPY( 0, 0,0), SPY( 1, 0,0), SPY( 2, 0,0), SPY( 3, 1,0), 
 /*1974*/ SPY( 4, 1,0), SPY( 5, 1,0), SPY( 6, 1,0), SPY( 7, 2,0), 
 /*1978*/ SPY( 8, 2,0), SPY( 9, 2,0), SPY(10, 2,0), SPY(11, 3,0), 
@@ -85,7 +85,7 @@ extern struct timezone sys_tz;
 #define SECS_PER_DAY	(SECS_PER_HOUR * 24)
 
 time_t *
-udf_stamp_to_time(time_t *dest, long *dest_usec, timestamp src)
+udf_stamp_to_time(time_t *dest, long *dest_usec, kernel_timestamp src)
 {
 	int yday;
 	uint8_t type = src.typeAndTimezone >> 12;
@@ -120,8 +120,8 @@ udf_stamp_to_time(time_t *dest, long *dest_usec, timestamp src)
 }
 
 
-timestamp *
-udf_time_to_stamp(timestamp *dest, struct timespec ts)
+kernel_timestamp *
+udf_time_to_stamp(kernel_timestamp *dest, struct timespec ts)
 {
 	long int days, rem, y;
 	const unsigned short int *ip;

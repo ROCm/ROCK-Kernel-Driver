@@ -615,6 +615,8 @@ void __init macfb_init(void)
 	int video_cmap_len, video_is_nubus = 0;
 	struct nubus_dev* ndev = NULL;
 
+	macfb_setup(fb_get_options("macfb"));
+
 	if (!MACH_IS_MAC) 
 		return;
 
@@ -961,4 +963,5 @@ void __init macfb_init(void)
 	       fb_info.node, fb_info.fix.id);
 }
 
+module_init(macfb_init);
 MODULE_LICENSE("GPL");

@@ -229,10 +229,6 @@ void __init
 chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	  unsigned long r6, unsigned long r7)
 {
-	struct device_node * dn;
-	char * hypertas;
-	unsigned int len;
-
 	ppc_md.setup_arch     = chrp_setup_arch;
 	ppc_md.get_cpuinfo    = chrp_get_cpuinfo;
 	if (naca->interrupt_controller == IC_OPEN_PIC) {
@@ -261,10 +257,18 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.progress       = chrp_progress;
 
-        /* Build up the firmware_features bitmask field
-         * using contents of device-tree/ibm,hypertas-functions.
-         * Ultimately this functionality may be moved into prom.c prom_init().
-         */
+}
+
+/* Build up the firmware_features bitmask field
+ * using contents of device-tree/ibm,hypertas-functions.
+ * Ultimately this functionality may be moved into prom.c prom_init().
+ */
+void __init fw_feature_init(void)
+{
+	struct device_node * dn;
+	char * hypertas;
+	unsigned int len;
+
 	cur_cpu_spec->firmware_features = 0;
 	dn = of_find_node_by_path("/rtas");
 	if (dn == NULL) {

@@ -14,6 +14,7 @@ SECTIONS
   .text : {
 	*(.text .text.*)
 	SCHED_TEXT
+	LOCK_TEXT
 	*(.fixup)
 	. = ALIGN(4096);
 	_etext = .;

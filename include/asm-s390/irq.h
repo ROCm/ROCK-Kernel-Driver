@@ -2,7 +2,7 @@
 #define _ASM_IRQ_H
 
 #ifdef __KERNEL__
-#include <asm/hardirq.h>
+#include <linux/hardirq.h>
 
 /*
  * the definition of irqs has changed in 2.5.46:

@@ -31,7 +31,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/vmalloc.h>
-#ifdef CONFIG_FW_LOADER
+#if defined(CONFIG_FW_LOADER) || defined(CONFIG_FW_LOADER_MODULE)
 # include <linux/firmware.h>
 #endif
 
@@ -73,6 +73,9 @@ static void PXC200_muxsel(struct bttv *btv, unsigned int input);
 
 static void picolo_tetra_muxsel(struct bttv *btv, unsigned int input);
 static void picolo_tetra_init(struct bttv *btv);
+
+static void sigmaSLC_muxsel(struct bttv *btv, unsigned int input);
+static void sigmaSQ_muxsel(struct bttv *btv, unsigned int input);
 
 static int terratec_active_radio_upgrade(struct bttv *btv);
 static int tea5757_read(struct bttv *btv);
@@ -170,6 +173,7 @@ static struct CARD {
 
 	{ 0x6606107d, BTTV_WINFAST2000,   "Leadtek WinFast TV 2000" },
 	{ 0x6607107d, BTTV_WINFASTVC100,  "Leadtek WinFast VC 100" },
+	{ 0x6609107d, BTTV_WINFAST2000,   "Leadtek TV 2000 XP" },
 	{ 0x263610b4, BTTV_STB2,          "STB TV PCI FM, Gateway P/N 6000704" },
 	{ 0x264510b4, BTTV_STB2,          "STB TV PCI FM, Gateway P/N 6000704" },
  	{ 0x402010fc, BTTV_GVBCTV3PCI,    "I-O Data Co. GV-BCTV3/PCI" },
@@ -224,6 +228,7 @@ static struct CARD {
 	{ 0x1431aa00, BTTV_PV143,         "Provideo PV143B" },
 	{ 0x1432aa00, BTTV_PV143,         "Provideo PV143C" },
 	{ 0x1433aa00, BTTV_PV143,         "Provideo PV143D" },
+	{ 0x1433aa03, BTTV_PV143,         "Security Eyes" },
 
 	{ 0x1460aa00, BTTV_PV150,         "Provideo PV150A-1" },
 	{ 0x1461aa01, BTTV_PV150,         "Provideo PV150A-2" },
@@ -265,6 +270,7 @@ static struct CARD {
 	{ 0x01020304, BTTV_XGUARD,        "Grandtec Grand X-Guard" },
 	
 	{ 0x18501851, BTTV_CHRONOS_VS2,   "FlyVideo 98 (LR50)/ Chronos Video Shuttle II" },
+	{ 0xa0501851, BTTV_CHRONOS_VS2,   "FlyVideo 98 (LR50)/ Chronos Video Shuttle II" },
 	{ 0x18511851, BTTV_FLYVIDEO98EZ,  "FlyVideo 98EZ (LR51)/ CyberMail AV" },
 	{ 0x18521852, BTTV_TYPHOON_TVIEW, "FlyVideo 98FM (LR50)/ Typhoon TView TV/FM Tuner" },
 	{ 0x41a0a051, BTTV_FLYVIDEO_98FM, "Lifeview FlyVideo 98 LR50 Rev Q" },
@@ -297,7 +303,7 @@ static struct CARD {
 	
 	// DVB cards (using pci function .1 for mpeg data xfer)
 	{ 0x01010071, BTTV_NEBULA_DIGITV, "Nebula Electronics DigiTV" },
-	{ 0x07611461, BTTV_NEBULA_DIGITV, "AverMedia AverTV DVB-T" },
+	{ 0x07611461, BTTV_AVDVBT_761,    "AverMedia AverTV DVB-T" },
 	{ 0x002611bd, BTTV_TWINHAN_DST,   "Pinnacle PCTV SAT CI" },
 	{ 0x00011822, BTTV_TWINHAN_DST,   "Twinhan VisionPlus DVB-T" },
 	{ 0xfc00270f, BTTV_TWINHAN_DST,   "ChainTech digitop DST-1000 DVB-S" },
@@ -2078,6 +2084,69 @@ struct tvcard bttv_tvcards[] = {
 #if 0 /* untested */
         .has_remote     = 1,
 #endif
+},{
+	/* ---- card 0x7c ---------------------------------- */
+	/* Matt Jesson <dvb@jesson.eclipse.co.uk> */
+	/* Based on the Nebula card data - added remote and new card number - BTTV_AVDVBT_761, see also ir-kbd-gpio.c */
+	.name           = "AverMedia AverTV DVB-T 761",
+	.video_inputs   = 1,
+	.tuner          = -1,
+	.svhs           = -1,
+	.muxsel         = { 2, 3, 1, 0},
+	.no_msp34xx     = 1,
+	.no_tda9875     = 1,
+	.no_tda7432     = 1,
+	.pll            = PLL_28,
+	.tuner_type     = -1,
+	.has_dvb        = 1,
+	.no_gpioirq     = 1,
+	.has_remote     = 1,
+},{
+	/* andre.schwarz@matrix-vision.de */
+	.name             = "MATRIX Vision Sigma-SQ",
+	.video_inputs     = 16,
+	.audio_inputs     = 0,
+	.tuner            = -1,
+	.svhs             = -1,
+	.gpiomask         = 0x0,
+	.muxsel           = { 2, 2, 2, 2, 2, 2, 2, 2,
+			      3, 3, 3, 3, 3, 3, 3, 3 },
+	.muxsel_hook      = sigmaSQ_muxsel,
+	.audiomux         = { 0 },
+	.no_msp34xx       = 1,
+	.pll              = PLL_28,
+	.tuner_type       = -1,
+},{
+	/* andre.schwarz@matrix-vision.de */
+	.name             = "MATRIX Vision Sigma-SLC",
+	.video_inputs     = 4,
+	.audio_inputs     = 0,
+	.tuner            = -1,
+	.svhs             = -1,
+	.gpiomask         = 0x0,
+	.muxsel           = { 2, 2, 2, 2 },
+	.muxsel_hook      = sigmaSLC_muxsel,
+	.audiomux         = { 0 },
+	.no_msp34xx       = 1,
+	.pll              = PLL_28,
+	.tuner_type       = -1,
+},{
+	/* BTTV_APAC_VIEWCOMP */
+	/* Attila Kondoros <attila.kondoros@chello.hu> */
+	/* bt878 TV + FM 0x00000000 subsystem ID */
+	.name           = "APAC Viewcomp 878(AMAX)",
+	.video_inputs   = 2,
+	.audio_inputs   = 1,
+	.tuner          = 0,
+	.svhs           = -1,
+	.gpiomask       = 0xFF,
+	.muxsel         = { 2, 3, 1, 1},
+	.audiomux       = { 2, 0, 0, 0, 10},
+	.needs_tvaudio  = 0,
+	.pll            = PLL_28,
+	.tuner_type     = TUNER_PHILIPS_PAL,
+	.has_remote     = 1,   /* miniremote works, see ir-kbd-gpio.c */
+	.has_radio      = 1,   /* not every card has radio */
 }};
 
 const unsigned int bttv_num_tvcards = ARRAY_SIZE(bttv_tvcards);
@@ -2405,6 +2474,19 @@ static void init_lmlbt4x(struct bttv *btv)
 	gpio_write(0x000000);
 }
 
+static void sigmaSQ_muxsel(struct bttv *btv, unsigned int input)
+{
+	unsigned int inmux = input % 8;
+	gpio_inout( 0xf, 0xf );
+	gpio_bits( 0xf, inmux );
+}
+
+static void sigmaSLC_muxsel(struct bttv *btv, unsigned int input)
+{
+	unsigned int inmux = input % 4;
+	gpio_inout( 3<<9, 3<<9 );
+	gpio_bits( 3<<9, inmux<<9 );
+}
 
 /* ----------------------------------------------------------------------- */
 
@@ -2859,7 +2941,7 @@ static int __devinit pvr_altera_load(struct bttv *btv, u8 *micro, u32 microlen)
 	return 0;
 }
 
-#ifndef CONFIG_FW_LOADER
+#if !defined(CONFIG_FW_LOADER) && !defined(CONFIG_FW_LOADER_MODULE)
 /* old 2.4.x way -- via soundcore's mod_firmware_load */
    
 static char *firm_altera = "/usr/lib/video4linux/hcwamc.rbf";
@@ -4063,7 +4145,7 @@ static void PXC200_muxsel(struct bttv *btv, unsigned int input)
 	  return;
 	}
 
-	rc=bttv_I2CRead(btv,(PX_I2C_PIC<<1),NULL);
+	rc=bttv_I2CRead(btv,(PX_I2C_PIC<<1),0);
 	if (!(rc & PX_CFG_PXC200F)) {
 	  printk(KERN_DEBUG "bttv%d: PXC200_muxsel: not PXC200F rc:%d \n", btv->c.nr,rc);
 	  return;

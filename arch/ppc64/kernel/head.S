@@ -199,6 +199,7 @@ exception_marker:
 #define EX_R12		24
 #define EX_R13		32
 #define EX_SRR0		40
+#define EX_R3		40	/* SLB miss saves R3, but not SRR0 */
 #define EX_DAR		48
 #define EX_LR		48	/* SLB miss saves LR, but not DAR */
 #define EX_DSISR	56
@@ -421,21 +422,13 @@ DataAccessSLB_Pseries:
 	std	r10,PACA_EXSLB+EX_R10(r13)
 	std	r11,PACA_EXSLB+EX_R11(r13)
 	std	r12,PACA_EXSLB+EX_R12(r13)
-	std	r3,PACASLBR3(r13)
+	std	r3,PACA_EXSLB+EX_R3(r13)
 	mfspr	r9,SPRG1
 	std	r9,PACA_EXSLB+EX_R13(r13)
 	mfcr	r9
-	clrrdi	r12,r13,32		/* get high part of &label */
-	mfmsr	r10
-	mfspr	r11,SRR0		/* save SRR0 */
-	ori	r12,r12,(.do_slb_miss)@l
-	ori	r10,r10,MSR_IR|MSR_DR	/* DON'T set RI for SLB miss */
-	mtspr	SRR0,r12
 	mfspr	r12,SRR1		/* and SRR1 */
-	mtspr	SRR1,r10
 	mfspr	r3,DAR
-	rfid
-	b	.	/* prevent speculative execution */
+	b	.do_slb_miss		/* Rel. branch works in real mode */
 
 	STD_EXCEPTION_PSERIES(0x400, InstructionAccess)
 
@@ -449,21 +442,13 @@ InstructionAccessSLB_Pseries:
 	std	r10,PACA_EXSLB+EX_R10(r13)
 	std	r11,PACA_EXSLB+EX_R11(r13)
 	std	r12,PACA_EXSLB+EX_R12(r13)
-	std	r3,PACASLBR3(r13)
+	std	r3,PACA_EXSLB+EX_R3(r13)
 	mfspr	r9,SPRG1
 	std	r9,PACA_EXSLB+EX_R13(r13)
 	mfcr	r9
-	clrrdi	r12,r13,32		/* get high part of &label */
-	mfmsr	r10
-	mfspr	r11,SRR0		/* save SRR0 */
-	ori	r12,r12,(.do_slb_miss)@l
-	ori	r10,r10,MSR_IR|MSR_DR	/* DON'T set RI for SLB miss */
-	mtspr	SRR0,r12
 	mfspr	r12,SRR1		/* and SRR1 */
-	mtspr	SRR1,r10
-	mr	r3,r11			/* SRR0 is faulting address */
-	rfid
-	b	.	/* prevent speculative execution */
+	mfspr	r3,SRR0			/* SRR0 is faulting address */
+	b	.do_slb_miss		/* Rel. branch works in real mode */
 
 	STD_EXCEPTION_PSERIES(0x500, HardwareInterrupt)
 	STD_EXCEPTION_PSERIES(0x600, Alignment)
@@ -609,8 +594,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 DataAccessSLB_Iseries:
 	mtspr	SPRG1,r13		/* save r13 */
 	EXCEPTION_PROLOG_ISERIES_1(PACA_EXSLB)
-	std	r3,PACASLBR3(r13)
-	ld	r11,PACALPPACA+LPPACASRR0(r13)
+	std	r3,PACA_EXSLB+EX_R3(r13)
 	ld	r12,PACALPPACA+LPPACASRR1(r13)
 	mfspr	r3,DAR
 	b	.do_slb_miss
@@ -621,10 +605,9 @@ DataAccessSLB_Iseries:
 InstructionAccessSLB_Iseries:
 	mtspr	SPRG1,r13		/* save r13 */
 	EXCEPTION_PROLOG_ISERIES_1(PACA_EXSLB)
-	std	r3,PACASLBR3(r13)
-	ld	r11,PACALPPACA+LPPACASRR0(r13)
+	std	r3,PACA_EXSLB+EX_R3(r13)
 	ld	r12,PACALPPACA+LPPACASRR1(r13)
-	mr	r3,r11
+	ld	r3,PACALPPACA+LPPACASRR0(r13)
 	b	.do_slb_miss
 
 	MASKABLE_EXCEPTION_ISERIES(0x500, HardwareInterrupt)
@@ -1169,7 +1152,6 @@ _GLOBAL(do_slb_miss)
 	mflr	r10
 
 	stw	r9,PACA_EXSLB+EX_CCR(r13)	/* save CR in exc. frame */
-	std	r11,PACA_EXSLB+EX_SRR0(r13)	/* save SRR0 in exc. frame */
 	std	r10,PACA_EXSLB+EX_LR(r13)	/* save LR */
 
 	bl	.slb_allocate			/* handle it */
@@ -1177,9 +1159,11 @@ _GLOBAL(do_slb_miss)
 	/* All done -- return from exception. */
 
 	ld	r10,PACA_EXSLB+EX_LR(r13)
-	ld	r3,PACASLBR3(r13)
+	ld	r3,PACA_EXSLB+EX_R3(r13)
 	lwz	r9,PACA_EXSLB+EX_CCR(r13)	/* get saved CR */
-	ld	r11,PACA_EXSLB+EX_SRR0(r13)	/* get saved SRR0 */
+#ifdef CONFIG_PPC_ISERIES
+	ld	r11,PACALPPACA+LPPACASRR0(r13)	/* get SRR0 value */
+#endif /* CONFIG_PPC_ISERIES */
 
 	mtlr	r10
 
@@ -1192,8 +1176,10 @@ _GLOBAL(do_slb_miss)
 	mtcrf	0x01,r9		/* slb_allocate uses cr0 and cr7 */
 .machine	pop
 
+#ifdef CONFIG_PPC_ISERIES
 	mtspr	SRR0,r11
 	mtspr	SRR1,r12
+#endif /* CONFIG_PPC_ISERIES */
 	ld	r9,PACA_EXSLB+EX_R9(r13)
 	ld	r10,PACA_EXSLB+EX_R10(r13)
 	ld	r11,PACA_EXSLB+EX_R11(r13)

@@ -1,35 +1,49 @@
-if ARCH_IOP3XX
 
 menu "IOP3xx Implementation Options"
 
-choice
-	prompt "IOP3xx System Type"
-	default ARCH_IQ80321
+comment "IOP3xx Platform Types"
 
 config ARCH_IQ80321
-	bool "IQ80321"
+	bool "Enable support for IQ80321"
+	select ARCH_IOP321
 	help
 	  Say Y here if you want to run your kernel on the Intel IQ80321
 	  evaluation kit for the IOP321 chipset.
-endchoice
+
+config ARCH_IQ31244
+	bool "Enable support for IQ31244"
+	select ARCH_IOP321
+	help
+	  Say Y here if you want to run your kernel on the Intel IQ31244
+	  evaluation kit for the IOP321 chipset.
+
+config ARCH_IQ80331
+	bool "Enable support for IQ80331"
+	select ARCH_IOP331
+	help
+	  Say Y here if you want to run your kernel on the Intel IQ80331
+	  evaluation kit for the IOP331 chipset.
+
+config ARCH_EP80219
+    bool "Enable support for EP80219"
+    select ARCH_IOP321
+    select ARCH_IQ31244
 
 # Which IOP variant are we running?
 config ARCH_IOP321
 	bool
-	default ARCH_IQ80321
 	help
 	  The IQ80321 uses the IOP321 variant.
+	  The IQ31244 and EP80219 uses the IOP321 variant.
+
+config ARCH_IOP331
+	bool
+	default ARCH_IQ80331
+	help
+	  The IQ80331 uses the IOP331 variant.
 
 comment "IOP3xx Chipset Features"
 
-config IOP3XX_AAU
-	bool "Support Intel IOP3xx Application Accelerator Unit (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
-
-config IOP3XX_DMA
-	bool "Support Intel IOP3xx DMA (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
-
 endmenu
 
-endif
+

@@ -1258,7 +1258,7 @@ out:
 
 int fastcall wake_up_process(task_t * p)
 {
-	return try_to_wake_up(p, TASK_STOPPED |
+	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
 		       		 TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0);
 }
 
@@ -3362,6 +3362,17 @@ out_unlock:
 	return retval;
 }
 
+static int get_user_cpu_mask(unsigned long __user *user_mask_ptr, unsigned len,
+			     cpumask_t *new_mask)
+{
+	if (len < sizeof(cpumask_t)) {
+		memset(new_mask, 0, sizeof(cpumask_t));
+	} else if (len > sizeof(cpumask_t)) {
+		len = sizeof(cpumask_t);
+	}
+	return copy_from_user(new_mask, user_mask_ptr, len) ? -EFAULT : 0;
+}
+
 /**
  * sys_sched_setaffinity - set the cpu affinity of a process
  * @pid: pid of the process
@@ -3375,11 +3386,9 @@ asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
 	int retval;
 	task_t *p;
 
-	if (len < sizeof(new_mask))
-		return -EINVAL;
-
-	if (copy_from_user(&new_mask, user_mask_ptr, sizeof(new_mask)))
-		return -EFAULT;
+	retval = get_user_cpu_mask(user_mask_ptr, len, &new_mask);
+	if (retval)
+		return retval;
 
 	lock_cpu_hotplug();
 	read_lock(&tasklist_lock);
@@ -3670,7 +3679,7 @@ static void show_task(task_t * p)
 	task_t *relative;
 	unsigned state;
 	unsigned long free = 0;
-	static const char *stat_nam[] = { "R", "S", "D", "T", "Z", "W" };
+	static const char *stat_nam[] = { "R", "S", "D", "T", "t", "Z", "X" };
 
 	printk("%-13.13s ", p->comm);
 	state = p->state ? __ffs(p->state) + 1 : 0;
@@ -4214,7 +4223,12 @@ static void cpu_attach_domain(struct sched_domain *sd, int cpu)
 	unlock_cpu_hotplug();
 }
 
-#ifdef CONFIG_NUMA
+/*
+ * To enable disjoint top-level NUMA domains, define SD_NODES_PER_DOMAIN
+ * in arch code. That defines the number of nearby nodes in a node's top
+ * level scheduling domain.
+ */
+#if defined(CONFIG_NUMA) && defined(SD_NODES_PER_DOMAIN)
 /**
  * find_next_best_node - find the next node to include in a sched_domain
  * @node: node whose sched_domain we're building
@@ -4261,7 +4275,7 @@ static int __init find_next_best_node(int node, unsigned long *used_nodes)
  * should be one that prevents unnecessary balancing, but also spreads tasks
  * out optimally.
  */
-cpumask_t __init sched_domain_node_span(int node, int size)
+cpumask_t __init sched_domain_node_span(int node)
 {
 	int i;
 	cpumask_t span;
@@ -4270,7 +4284,7 @@ cpumask_t __init sched_domain_node_span(int node, int size)
 	cpus_clear(span);
 	bitmap_zero(used_nodes, MAX_NUMNODES);
 
-	for (i = 0; i < size; i++) {
+	for (i = 0; i < SD_NODES_PER_DOMAIN; i++) {
 		int next_node = find_next_best_node(node, used_nodes);
 		cpumask_t  nodemask;
 
@@ -4280,7 +4294,12 @@ cpumask_t __init sched_domain_node_span(int node, int size)
 
 	return span;
 }
-#endif /* CONFIG_NUMA */
+#else /* CONFIG_NUMA && SD_NODES_PER_DOMAIN */
+cpumask_t __init sched_domain_node_span(int node)
+{
+	return cpu_possible_map;
+}
+#endif /* CONFIG_NUMA && SD_NODES_PER_DOMAIN */
 
 #ifdef CONFIG_SCHED_SMT
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
@@ -4303,9 +4322,6 @@ __init static int cpu_to_phys_group(int cpu)
 }
 
 #ifdef CONFIG_NUMA
-
-/* Number of nearby nodes in a node's scheduling domain */
-#define SD_NODES_PER_DOMAIN 4
 
 static DEFINE_PER_CPU(struct sched_domain, node_domains);
 static struct sched_group sched_group_nodes[MAX_NUMNODES];
@@ -4433,7 +4449,7 @@ __init static void arch_init_sched_domains(void)
 		group = cpu_to_node_group(i);
 		*sd = SD_NODE_INIT;
 		/* FIXME: should be multilevel, in arch code */
-		sd->span = sched_domain_node_span(i, SD_NODES_PER_DOMAIN);
+		sd->span = sched_domain_node_span(i);
 		cpus_and(sd->span, sd->span, cpu_default_map);
 		sd->groups = &sched_group_nodes[group];
 #endif
@@ -4442,7 +4458,11 @@ __init static void arch_init_sched_domains(void)
 		sd = &per_cpu(phys_domains, i);
 		group = cpu_to_phys_group(i);
 		*sd = SD_CPU_INIT;
+#ifdef CONFIG_NUMA
 		sd->span = nodemask;
+#else
+		sd->span = cpu_possible_map;
+#endif
 		sd->parent = p;
 		sd->groups = &sched_group_phys[group];
 
@@ -4480,6 +4500,7 @@ __init static void arch_init_sched_domains(void)
 						&cpu_to_isolated_group);
 	}
 
+#ifdef CONFIG_NUMA
 	/* Set up physical groups */
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		cpumask_t nodemask = node_to_cpumask(i);
@@ -4491,6 +4512,10 @@ __init static void arch_init_sched_domains(void)
 		init_sched_build_groups(sched_group_phys, nodemask,
 						&cpu_to_phys_group);
 	}
+#else
+	init_sched_build_groups(sched_group_phys, cpu_possible_map,
+							&cpu_to_phys_group);
+#endif
 
 #ifdef CONFIG_NUMA
 	/* Set up node groups */

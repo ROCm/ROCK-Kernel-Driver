@@ -85,13 +85,13 @@ static void udf_write_super(struct super_block *);
 static int udf_remount_fs(struct super_block *, int *, char *);
 static int udf_check_valid(struct super_block *, int, int);
 static int udf_vrs(struct super_block *sb, int silent);
-static int udf_load_partition(struct super_block *, lb_addr *);
-static int udf_load_logicalvol(struct super_block *, struct buffer_head *, lb_addr *);
-static void udf_load_logicalvolint(struct super_block *, extent_ad);
+static int udf_load_partition(struct super_block *, kernel_lb_addr *);
+static int udf_load_logicalvol(struct super_block *, struct buffer_head *, kernel_lb_addr *);
+static void udf_load_logicalvolint(struct super_block *, kernel_extent_ad);
 static void udf_find_anchor(struct super_block *);
-static int udf_find_fileset(struct super_block *, lb_addr *, lb_addr *);
+static int udf_find_fileset(struct super_block *, kernel_lb_addr *, kernel_lb_addr *);
 static void udf_load_pvoldesc(struct super_block *, struct buffer_head *);
-static void udf_load_fileset(struct super_block *, struct buffer_head *, lb_addr *);
+static void udf_load_fileset(struct super_block *, struct buffer_head *, kernel_lb_addr *);
 static void udf_load_partdesc(struct super_block *, struct buffer_head *);
 static void udf_open_lvid(struct super_block *);
 static void udf_close_lvid(struct super_block *);
@@ -769,7 +769,7 @@ udf_find_anchor(struct super_block *sb)
 }
 
 static int 
-udf_find_fileset(struct super_block *sb, lb_addr *fileset, lb_addr *root)
+udf_find_fileset(struct super_block *sb, kernel_lb_addr *fileset, kernel_lb_addr *root)
 {
 	struct buffer_head *bh = NULL;
 	long lastblock;
@@ -792,7 +792,7 @@ udf_find_fileset(struct super_block *sb, lb_addr *fileset, lb_addr *root)
 
 	if (!bh) /* Search backwards through the partitions */
 	{
-		lb_addr newfileset;
+		kernel_lb_addr newfileset;
 
 		return 1;
 		
@@ -874,7 +874,7 @@ udf_load_pvoldesc(struct super_block *sb, struct buffer_head *bh)
 	if ( udf_stamp_to_time(&recording, &recording_usec,
 		lets_to_cpu(pvoldesc->recordingDateAndTime)) )
 	{
-		timestamp ts;
+		kernel_timestamp ts;
 		ts = lets_to_cpu(pvoldesc->recordingDateAndTime);
 		udf_debug("recording time %ld/%ld, %04u/%02u/%02u %02u:%02u (%x)\n",
 			recording, recording_usec,
@@ -901,7 +901,7 @@ udf_load_pvoldesc(struct super_block *sb, struct buffer_head *bh)
 }
 
 static void 
-udf_load_fileset(struct super_block *sb, struct buffer_head *bh, lb_addr *root)
+udf_load_fileset(struct super_block *sb, struct buffer_head *bh, kernel_lb_addr *root)
 {
 	struct fileSetDesc *fset;
 
@@ -948,7 +948,7 @@ udf_load_partdesc(struct super_block *sb, struct buffer_head *bh)
 				phd = (struct partitionHeaderDesc *)(p->partitionContentsUse);
 				if (phd->unallocSpaceTable.extLength)
 				{
-					lb_addr loc = { le32_to_cpu(phd->unallocSpaceTable.extPosition), i };
+					kernel_lb_addr loc = { le32_to_cpu(phd->unallocSpaceTable.extPosition), i };
 
 					UDF_SB_PARTMAPS(sb)[i].s_uspace.s_table =
 						udf_iget(sb, loc);
@@ -974,7 +974,7 @@ udf_load_partdesc(struct super_block *sb, struct buffer_head *bh)
 					udf_debug("partitionIntegrityTable (part %d)\n", i);
 				if (phd->freedSpaceTable.extLength)
 				{
-					lb_addr loc = { le32_to_cpu(phd->freedSpaceTable.extPosition), i };
+					kernel_lb_addr loc = { le32_to_cpu(phd->freedSpaceTable.extPosition), i };
 
 					UDF_SB_PARTMAPS(sb)[i].s_fspace.s_table =
 						udf_iget(sb, loc);
@@ -1013,7 +1013,7 @@ udf_load_partdesc(struct super_block *sb, struct buffer_head *bh)
 }
 
 static int 
-udf_load_logicalvol(struct super_block *sb, struct buffer_head * bh, lb_addr *fileset)
+udf_load_logicalvol(struct super_block *sb, struct buffer_head * bh, kernel_lb_addr *fileset)
 {
 	struct logicalVolDesc *lvd;
 	int i, j, offset;
@@ -1041,12 +1041,12 @@ udf_load_logicalvol(struct super_block *sb, struct buffer_head * bh, lb_addr *fi
 			struct udfPartitionMap2 *upm2 = (struct udfPartitionMap2 *)&(lvd->partitionMaps[offset]);
 			if (!strncmp(upm2->partIdent.ident, UDF_ID_VIRTUAL, strlen(UDF_ID_VIRTUAL)))
 			{
-				if (le16_to_cpu(((uint16_t *)upm2->partIdent.identSuffix)[0]) == 0x0150)
+				if (le16_to_cpu(((__le16 *)upm2->partIdent.identSuffix)[0]) == 0x0150)
 				{
 					UDF_SB_PARTTYPE(sb,i) = UDF_VIRTUAL_MAP15;
 					UDF_SB_PARTFUNC(sb,i) = udf_get_pblock_virt15;
 				}
-				else if (le16_to_cpu(((uint16_t *)upm2->partIdent.identSuffix)[0]) == 0x0200)
+				else if (le16_to_cpu(((__le16 *)upm2->partIdent.identSuffix)[0]) == 0x0200)
 				{
 					UDF_SB_PARTTYPE(sb,i) = UDF_VIRTUAL_MAP20;
 					UDF_SB_PARTFUNC(sb,i) = udf_get_pblock_virt20;
@@ -1110,7 +1110,7 @@ udf_load_logicalvol(struct super_block *sb, struct buffer_head * bh, lb_addr *fi
  *
  */
 static void
-udf_load_logicalvolint(struct super_block *sb, extent_ad loc)
+udf_load_logicalvolint(struct super_block *sb, kernel_extent_ad loc)
 {
 	struct buffer_head *bh = NULL;
 	uint16_t ident;
@@ -1150,7 +1150,7 @@ udf_load_logicalvolint(struct super_block *sb, extent_ad loc)
  *	Written, tested, and released.
  */
 static  int
-udf_process_sequence(struct super_block *sb, long block, long lastblock, lb_addr *fileset)
+udf_process_sequence(struct super_block *sb, long block, long lastblock, kernel_lb_addr *fileset)
 {
 	struct buffer_head *bh = NULL;
 	struct udf_vds_record vds[VDS_POS_LENGTH];
@@ -1293,7 +1293,7 @@ udf_check_valid(struct super_block *sb, int novrs, int silent)
 }
 
 static int
-udf_load_partition(struct super_block *sb, lb_addr *fileset)
+udf_load_partition(struct super_block *sb, kernel_lb_addr *fileset)
 {
 	struct anchorVolDescPtr *anchor;
 	uint16_t ident;
@@ -1350,7 +1350,7 @@ udf_load_partition(struct super_block *sb, lb_addr *fileset)
 			case UDF_VIRTUAL_MAP15:
 			case UDF_VIRTUAL_MAP20:
 			{
-				lb_addr ino;
+				kernel_lb_addr ino;
 
 				if (!UDF_SB_LASTBLOCK(sb))
 				{
@@ -1415,7 +1415,7 @@ static void udf_open_lvid(struct super_block *sb)
 	if (UDF_SB_LVIDBH(sb))
 	{
 		int i;
-		timestamp cpu_time;
+		kernel_timestamp cpu_time;
 
 		UDF_SB_LVIDIU(sb)->impIdent.identSuffix[0] = UDF_OS_CLASS_UNIX;
 		UDF_SB_LVIDIU(sb)->impIdent.identSuffix[1] = UDF_OS_ID_LINUX;
@@ -1443,7 +1443,7 @@ static void udf_close_lvid(struct super_block *sb)
 		UDF_SB_LVID(sb)->integrityType == LVID_INTEGRITY_TYPE_OPEN)
 	{
 		int i;
-		timestamp cpu_time;
+		kernel_timestamp cpu_time;
 
 		UDF_SB_LVIDIU(sb)->impIdent.identSuffix[0] = UDF_OS_CLASS_UNIX;
 		UDF_SB_LVIDIU(sb)->impIdent.identSuffix[1] = UDF_OS_ID_LINUX;
@@ -1455,7 +1455,7 @@ static void udf_close_lvid(struct super_block *sb)
 			UDF_SB_LVIDIU(sb)->minUDFReadRev = cpu_to_le16(UDF_SB_UDFREV(sb));
 		if (UDF_SB_UDFREV(sb) > le16_to_cpu(UDF_SB_LVIDIU(sb)->minUDFWriteRev))
 			UDF_SB_LVIDIU(sb)->minUDFWriteRev = cpu_to_le16(UDF_SB_UDFREV(sb));
-		UDF_SB_LVID(sb)->integrityType = LVID_INTEGRITY_TYPE_CLOSE;
+		UDF_SB_LVID(sb)->integrityType = cpu_to_le32(LVID_INTEGRITY_TYPE_CLOSE);
 
 		UDF_SB_LVID(sb)->descTag.descCRC =
 			cpu_to_le16(udf_crc((char *)UDF_SB_LVID(sb) + sizeof(tag),
@@ -1492,7 +1492,7 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 	int i;
 	struct inode *inode=NULL;
 	struct udf_options uopt;
-	lb_addr rootdir, fileset;
+	kernel_lb_addr rootdir, fileset;
 	struct udf_sb_info *sbi;
 
 	uopt.flags = (1 << UDF_FLAG_USE_AD_IN_ICB) | (1 << UDF_FLAG_STRICT);
@@ -1585,7 +1585,8 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 		if (minUDFReadRev > UDF_MAX_READ_VERSION)
 		{
 			printk("UDF-fs: minUDFReadRev=%x (max is %x)\n",
-				UDF_SB_LVIDIU(sb)->minUDFReadRev, UDF_MAX_READ_VERSION);
+				le16_to_cpu(UDF_SB_LVIDIU(sb)->minUDFReadRev),
+				UDF_MAX_READ_VERSION);
 			goto error_out;
 		}
 		else if (minUDFWriteRev > UDF_MAX_WRITE_VERSION)
@@ -1615,7 +1616,7 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 
 	if (!silent)
 	{
-		timestamp ts;
+		kernel_timestamp ts;
 		udf_time_to_stamp(&ts, UDF_SB_RECORDTIME(sb));
 		udf_info("UDF %s (%s) Mounting volume '%s', timestamp %04u/%02u/%02u %02u:%02u (%x)\n",
 			UDFFS_VERSION, UDFFS_DATE,
@@ -1798,7 +1799,7 @@ udf_count_free_bitmap(struct super_block *sb, struct udf_bitmap *bitmap)
 	unsigned int accum = 0;
 	int index;
 	int block = 0, newblock;
-	lb_addr loc;
+	kernel_lb_addr loc;
 	uint32_t bytes;
 	uint8_t value;
 	uint8_t *ptr;
@@ -1824,7 +1825,7 @@ udf_count_free_bitmap(struct super_block *sb, struct udf_bitmap *bitmap)
 	}
 
 	bm = (struct spaceBitmapDesc *)bh->b_data;
-	bytes = bm->numOfBytes;
+	bytes = le32_to_cpu(bm->numOfBytes);
 	index = sizeof(struct spaceBitmapDesc); /* offset in first block only */
 	ptr = (uint8_t *)bh->b_data;
 
@@ -1865,7 +1866,7 @@ udf_count_free_table(struct super_block *sb, struct inode * table)
 {
 	unsigned int accum = 0;
 	uint32_t extoffset, elen;
-	lb_addr bloc, eloc;
+	kernel_lb_addr bloc, eloc;
 	int8_t etype;
 	struct buffer_head *bh = NULL;
 

@@ -662,40 +662,10 @@ int hpet_control(struct hpet_task *tp, unsigned int cmd, unsigned long arg)
 
 #ifdef	CONFIG_TIME_INTERPOLATION
 
-static unsigned long hpet_offset, last_wall_hpet;
-static long hpet_nsecs_per_cycle, hpet_cycles_per_sec;
-
-static unsigned long hpet_getoffset(void)
-{
-	return hpet_offset + (read_counter(&hpets->hp_hpet->hpet_mc) -
-			      last_wall_hpet) * hpet_nsecs_per_cycle;
-}
-
-static void hpet_update(long delta)
-{
-	unsigned long mc;
-	unsigned long offset;
-
-	mc = read_counter(&hpets->hp_hpet->hpet_mc);
-	offset = hpet_offset + (mc - last_wall_hpet) * hpet_nsecs_per_cycle;
-
-	if (delta < 0 || (unsigned long)delta < offset)
-		hpet_offset = offset - delta;
-	else
-		hpet_offset = 0;
-	last_wall_hpet = mc;
-}
-
-static void hpet_reset(void)
-{
-	hpet_offset = 0;
-	last_wall_hpet = read_counter(&hpets->hp_hpet->hpet_mc);
-}
-
 static struct time_interpolator hpet_interpolator = {
-	.get_offset = hpet_getoffset,
-	.update = hpet_update,
-	.reset = hpet_reset
+	.source = TIME_SOURCE_MMIO64,
+	.shift = 10,
+	.addr = MC
 };
 
 #endif
@@ -789,6 +759,7 @@ int __init hpet_alloc(struct hpet_data *hdp)
 	size_t siz;
 	struct hpet *hpet;
 	static struct hpets *last __initdata = (struct hpets *)0;
+	unsigned long ns;
 
 	/*
 	 * hpet_alloc can be called by platform dependent code.
@@ -839,6 +810,18 @@ int __init hpet_alloc(struct hpet_data *hdp)
 
 	hpetp->hp_period = (cap & HPET_COUNTER_CLK_PERIOD_MASK) >>
 	    HPET_COUNTER_CLK_PERIOD_SHIFT;
+
+	printk(KERN_INFO "hpet%d: at MMIO 0x%p, IRQ%s",
+		hpetp->hp_which, hpet, hpetp->hp_ntimer > 1 ? "s" : "");
+	for (i = 0; i < hpetp->hp_ntimer; i++)
+		printk("%s %d", i > 0 ? "," : "", hdp->hd_irq[i]);
+	printk("\n");
+
+	ns = hpetp->hp_period;	/* femptoseconds, 10^-15 */
+	do_div(ns, 1000000);	/* convert to nanoseconds, 10^-9 */
+	printk(KERN_INFO "hpet%d: %ldns tick, %d %d-bit timers\n",
+		hpetp->hp_which, ns, hpetp->hp_ntimer,
+		cap & HPET_COUNTER_SIZE_MASK ? 64 : 32);
 
 	mcfg = readq(&hpet->hpet_config);
 	if ((mcfg & HPET_ENABLE_CNF_MASK) == 0) {
@@ -946,7 +929,6 @@ static int __init hpet_acpi_remove(struct acpi_device *device, int type)
 
 static struct acpi_driver hpet_acpi_driver __initdata = {
 	.name = "hpet",
-	.class = "",
 	.ids = "PNP0103",
 	.ops = {
 		.add = hpet_acpi_add,

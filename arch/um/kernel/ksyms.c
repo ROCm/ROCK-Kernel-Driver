@@ -108,10 +108,10 @@ EXPORT_SYMBOL(sys_wait4);
 /* required for SMP */
 
 extern void FASTCALL( __write_lock_failed(rwlock_t *rw));
-EXPORT_SYMBOL_NOVERS(__write_lock_failed);
+EXPORT_SYMBOL(__write_lock_failed);
 
 extern void FASTCALL( __read_lock_failed(rwlock_t *rw));
-EXPORT_SYMBOL_NOVERS(__read_lock_failed);
+EXPORT_SYMBOL(__read_lock_failed);
 
 #endif
 

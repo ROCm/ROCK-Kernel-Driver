@@ -416,8 +416,9 @@ bw2_setup(char *arg)
 	return 0;
 }
 
-#ifdef MODULE
 module_init(bw2_init);
+
+#ifdef MODULE
 module_exit(bw2_exit);
 #endif
 

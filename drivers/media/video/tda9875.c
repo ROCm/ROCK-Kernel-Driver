@@ -403,13 +403,12 @@ static struct i2c_client client_template =
         .driver    = &driver,
 };
 
-static int tda9875_init(void)
+static int __init tda9875_init(void)
 {
-	i2c_add_driver(&driver);
-	return 0;
+	return i2c_add_driver(&driver);
 }
 
-static void tda9875_fini(void)
+static void __exit tda9875_fini(void)
 {
 	i2c_del_driver(&driver);
 }

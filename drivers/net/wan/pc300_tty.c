@@ -760,7 +760,7 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 	int rx_len, rx_aux; 
 	volatile unsigned char status; 
 	unsigned short first_bd = pc300chan->rx_first_bd;
-	st_cpc_rx_buf	*new;
+	st_cpc_rx_buf	*new=NULL;
 	unsigned char dsr_rx;
 
 	if (pc300dev->cpc_tty == NULL) { 

@@ -130,6 +130,7 @@ struct uart_8250_port {
 	struct timer_list	timer;		/* "no irq" timer */
 	struct list_head	list;		/* ports on this IRQ */
 	unsigned int		capabilities;	/* port capabilities */
+	unsigned int		tx_loadsz;	/* transmit fifo load size */
 	unsigned short		rev;
 	unsigned char		acr;
 	unsigned char		ier;
@@ -156,23 +157,23 @@ static struct irq_info irq_lists[NR_IRQS];
 /*
  * Here we define the default xmit fifo size used for each type of UART.
  */
-static const struct serial_uart_config uart_config[PORT_MAX_8250+1] = {
-	{ "unknown",	1,	0 },
-	{ "8250",	1,	0 },
-	{ "16450",	1,	0 },
-	{ "16550",	1,	0 },
-	{ "16550A",	16,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "Cirrus",	1, 	0 },
-	{ "ST16650",	1,	UART_CLEAR_FIFO | UART_STARTECH },
-	{ "ST16650V2",	32,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
-	{ "TI16750",	64,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "Startech",	1,	0 },
-	{ "16C950/954",	128,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "ST16654",	64,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
-	{ "XR16850",	128,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
-	{ "RSA",	2048,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "NS16550A",	16,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_NATSEMI },
-	{ "XScale",	32,	UART_CLEAR_FIFO | UART_USE_FIFO  },
+static const struct serial8250_config uart_config[PORT_MAX_8250+1] = {
+	{ "unknown",	1,	1,	0 },
+	{ "8250",	1,	1,	0 },
+	{ "16450",	1,	1,	0 },
+	{ "16550",	1,	1,	0 },
+	{ "16550A",	16,	16,	UART_CAP_FIFO },
+	{ "Cirrus",	1, 	1,	0 },
+	{ "ST16650",	1,	1,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
+	{ "ST16650V2",	32,	16,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
+	{ "TI16750",	64,	64,	UART_CAP_FIFO | UART_CAP_SLEEP },
+	{ "Startech",	1,	1,	0 },
+	{ "16C950/954",	128,	128,	UART_CAP_FIFO },
+	{ "ST16654",	64,	32,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
+	{ "XR16850",	128,	128,	UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_EFR },
+	{ "RSA",	2048,	2048,	UART_CAP_FIFO },
+	{ "NS16550A",	16,	16,	UART_CAP_FIFO | UART_NATSEMI },
+	{ "XScale",	32,	32,	UART_CAP_FIFO },
 };
 
 static _INLINE_ unsigned int serial_in(struct uart_8250_port *up, int offset)
@@ -241,6 +242,41 @@ static unsigned int serial_icr_read(struct uart_8250_port *up, int offset)
 	serial_icr_write(up, UART_ACR, up->acr);
 
 	return value;
+}
+
+/*
+ * FIFO support.
+ */
+static inline void serial8250_clear_fifos(struct uart_8250_port *p)
+{
+	if (p->capabilities & UART_CAP_FIFO) {
+		serial_outp(p, UART_FCR, UART_FCR_ENABLE_FIFO);
+		serial_outp(p, UART_FCR, UART_FCR_ENABLE_FIFO |
+			       UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
+		serial_outp(p, UART_FCR, 0);
+	}
+}
+
+/*
+ * IER sleep support.  UARTs which have EFRs need the "extended
+ * capability" bit enabled.  Note that on XR16C850s, we need to
+ * reset LCR to write to IER.
+ */
+static inline void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
+{
+	if (p->capabilities & UART_CAP_SLEEP) {
+		if (p->capabilities & UART_CAP_EFR) {
+			serial_outp(p, UART_LCR, 0xBF);
+			serial_outp(p, UART_EFR, UART_EFR_ECB);
+			serial_outp(p, UART_LCR, 0);
+		}
+		serial_outp(p, UART_IER, sleep ? UART_IERX_SLEEP : 0);
+		if (p->capabilities & UART_CAP_EFR) {
+			serial_outp(p, UART_LCR, 0xBF);
+			serial_outp(p, UART_EFR, 0);
+			serial_outp(p, UART_LCR, 0);
+		}
+	}
 }
 
 #ifdef CONFIG_SERIAL_8250_RSA
@@ -697,8 +733,9 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 #endif
 	serial_outp(up, UART_LCR, save_lcr);
 
-	up->port.fifosize = uart_config[up->port.type].dfl_xmit_fifo_size;
+	up->port.fifosize = uart_config[up->port.type].fifo_size;
 	up->capabilities = uart_config[up->port.type].flags;
+	up->tx_loadsz = uart_config[up->port.type].tx_loadsz;
 
 	if (up->port.type == PORT_UNKNOWN)
 		goto out;
@@ -711,10 +748,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 		serial_outp(up, UART_RSA_FRR, 0);
 #endif
 	serial_outp(up, UART_MCR, save_mcr);
-	serial_outp(up, UART_FCR, (UART_FCR_ENABLE_FIFO |
-				     UART_FCR_CLEAR_RCVR |
-				     UART_FCR_CLEAR_XMIT));
-	serial_outp(up, UART_FCR, 0);
+	serial8250_clear_fifos(up);
 	(void)serial_in(up, UART_RX);
 	serial_outp(up, UART_IER, 0);
 
@@ -923,7 +957,7 @@ static _INLINE_ void transmit_chars(struct uart_8250_port *up)
 		return;
 	}
 
-	count = up->port.fifosize;
+	count = up->tx_loadsz;
 	do {
 		serial_out(up, UART_TX, xmit->buf[xmit->tail]);
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
@@ -1227,12 +1261,7 @@ static int serial8250_startup(struct uart_port *port)
 	 * Clear the FIFO buffers and disable them.
 	 * (they will be reeanbled in set_termios())
 	 */
-	if (up->capabilities & UART_CLEAR_FIFO) {
-		serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO);
-		serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO |
-				UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
-		serial_outp(up, UART_FCR, 0);
-	}
+	serial8250_clear_fifos(up);
 
 	/*
 	 * Clear the interrupt registers.
@@ -1251,6 +1280,23 @@ static int serial8250_startup(struct uart_port *port)
 	    (serial_inp(up, UART_LSR) == 0xff)) {
 		printk("ttyS%d: LSR safety check engaged!\n", up->port.line);
 		return -ENODEV;
+	}
+
+	/*
+	 * For a XR16C850, we need to set the trigger levels
+	 */
+	if (up->port.type == PORT_16850) {
+		unsigned char fctr;
+
+		serial_outp(up, UART_LCR, 0xbf);
+
+		fctr = serial_inp(up, UART_FCTR) & ~(UART_FCTR_RX|UART_FCTR_TX);
+		serial_outp(up, UART_FCTR, fctr | UART_FCTR_TRGD | UART_FCTR_RX);
+		serial_outp(up, UART_TRG, UART_TRG_96);
+		serial_outp(up, UART_FCTR, fctr | UART_FCTR_TRGD | UART_FCTR_TX);
+		serial_outp(up, UART_TRG, UART_TRG_96);
+
+		serial_outp(up, UART_LCR, 0);
 	}
 
 	/*
@@ -1345,10 +1391,7 @@ static void serial8250_shutdown(struct uart_port *port)
 	 * Disable break condition and FIFOs
 	 */
 	serial_out(up, UART_LCR, serial_inp(up, UART_LCR) & ~UART_LCR_SBC);
-	serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO |
-				  UART_FCR_CLEAR_RCVR |
-				  UART_FCR_CLEAR_XMIT);
-	serial_outp(up, UART_FCR, 0);
+	serial8250_clear_fifos(up);
 
 #ifdef CONFIG_SERIAL_8250_RSA
 	/*
@@ -1440,7 +1483,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	    up->rev == 0x5201)
 		quot ++;
 
-	if (up->capabilities & UART_USE_FIFO) {
+	if (up->capabilities & UART_CAP_FIFO && up->port.fifosize > 1) {
 		if (baud < 2400)
 			fcr = UART_FCR_ENABLE_FIFO | UART_FCR_TRIGGER_1;
 #ifdef CONFIG_SERIAL_8250_RSA
@@ -1514,7 +1557,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 
 	serial_out(up, UART_IER, up->ier);
 
-	if (up->capabilities & UART_STARTECH) {
+	if (up->capabilities & UART_CAP_EFR) {
 		serial_outp(up, UART_LCR, 0xBF);
 		serial_outp(up, UART_EFR,
 			    termios->c_cflag & CRTSCTS ? UART_EFR_CTS :0);
@@ -1554,71 +1597,12 @@ static void
 serial8250_pm(struct uart_port *port, unsigned int state,
 	      unsigned int oldstate)
 {
-	struct uart_8250_port *up = (struct uart_8250_port *)port;
-	if (state) {
-		/* sleep */
-		if (up->capabilities & UART_STARTECH) {
-			/* Arrange to enter sleep mode */
-			serial_outp(up, UART_LCR, 0xBF);
-			serial_outp(up, UART_EFR, UART_EFR_ECB);
-			serial_outp(up, UART_LCR, 0);
-			serial_outp(up, UART_IER, UART_IERX_SLEEP);
-			serial_outp(up, UART_LCR, 0xBF);
-			serial_outp(up, UART_EFR, 0);
-			serial_outp(up, UART_LCR, 0);
-		}
-		if (up->port.type == PORT_16750) {
-			/* Arrange to enter sleep mode */
-			serial_outp(up, UART_IER, UART_IERX_SLEEP);
-		}
+	struct uart_8250_port *p = (struct uart_8250_port *)port;
 
-		if (up->pm)
-			up->pm(port, state, oldstate);
-	} else {
-		/* wake */
-		if (up->capabilities & UART_STARTECH) {
-			/* Wake up UART */
-			serial_outp(up, UART_LCR, 0xBF);
-			serial_outp(up, UART_EFR, UART_EFR_ECB);
-			/*
-			 * Turn off LCR == 0xBF so we actually set the IER
-			 * register on the XR16C850
-			 */
-			serial_outp(up, UART_LCR, 0);
-			serial_outp(up, UART_IER, 0);
-			/*
-			 * Now reset LCR so we can turn off the ECB bit
-			 */
-			serial_outp(up, UART_LCR, 0xBF);
-			serial_outp(up, UART_EFR, 0);
-			/*
-			 * For a XR16C850, we need to set the trigger levels
-			 */
-			if (up->port.type == PORT_16850) {
-				unsigned char fctr;
+	serial8250_set_sleep(p, state != 0);
 
-				fctr = serial_inp(up, UART_FCTR) &
-					 ~(UART_FCTR_RX | UART_FCTR_TX);
-				serial_outp(up, UART_FCTR, fctr |
-						UART_FCTR_TRGD |
-						UART_FCTR_RX);
-				serial_outp(up, UART_TRG, UART_TRG_96);
-				serial_outp(up, UART_FCTR, fctr |
-						UART_FCTR_TRGD |
-						UART_FCTR_TX);
-				serial_outp(up, UART_TRG, UART_TRG_96);
-			}
-			serial_outp(up, UART_LCR, 0);
-		}
-
-		if (up->port.type == PORT_16750) {
-			/* Wake up UART */
-			serial_outp(up, UART_IER, 0);
-		}
-
-		if (up->pm)
-			up->pm(port, state, oldstate);
-	}
+	if (p->pm)
+		p->pm(port, state, oldstate);
 }
 
 /*

@@ -2623,8 +2623,7 @@ mptscsih_tm_pending_wait(MPT_SCSI_HOST * hd)
 			break;
 		}
 		spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/4);
+		msleep(250);
 	} while (--loop_count);
 
 	return status;
@@ -4788,8 +4787,7 @@ mptscsih_domainValidation(void *arg)
 			}
 			spin_unlock_irqrestore(&dvtaskQ_lock, flags);
 
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ/4);
+			msleep(250);
 
 			/* DV only to SCSI adapters */
 			if ((int)ioc->chip_type <= (int)FC929)
@@ -4837,8 +4835,7 @@ mptscsih_domainValidation(void *arg)
 					hd->ioc->spi_data.dvStatus[id] |= MPT_SCSICFG_DV_PENDING;
 					hd->ioc->spi_data.dvStatus[id] &= ~MPT_SCSICFG_NEED_DV;
 
-					set_current_state(TASK_INTERRUPTIBLE);
-					schedule_timeout(HZ/4);
+					msleep(250);
 
 					/* If hidden phys disk, block IO's to all
 					 *	raid volumes

@@ -749,8 +749,6 @@ int ubd_init(void)
 		return -1;
 	}
 		
-	elevator_init(ubd_queue, &elevator_noop);
-
 	if (fake_major != MAJOR_NR) {
 		char name[sizeof("ubd_nnn\0")];
 
@@ -1038,8 +1036,7 @@ static void do_ubd_request(request_queue_t *q)
 	int err, n;
 
 	if(thread_fd == -1){
-		while(!elv_queue_empty(q)){
-			req = elv_next_request(q);
+		while((req = elv_next_request(q)) != NULL){
 			err = prepare_request(req, &io_req);
 			if(!err){
 				do_io(&io_req);
@@ -1048,9 +1045,8 @@ static void do_ubd_request(request_queue_t *q)
 		}
 	}
 	else {
-		if(do_ubd || elv_queue_empty(q))
+		if(do_ubd || (req = elv_next_request(q)) == NULL)
 			return;
-		req = elv_next_request(q);
 		err = prepare_request(req, &io_req);
 		if(!err){
 			do_ubd = ubd_handler;

@@ -36,26 +36,6 @@
 #include <linux/vmalloc.h>
 #include "drmP.h"
 
-#ifndef __HAVE_PCI_DMA
-#define __HAVE_PCI_DMA		0
-#endif
-
-#ifndef __HAVE_SG
-#define __HAVE_SG		0
-#endif
-
-#ifndef DRIVER_BUF_PRIV_T
-#define DRIVER_BUF_PRIV_T		u32
-#endif
-#ifndef DRIVER_AGP_BUFFERS_MAP
-#if __HAVE_AGP && __HAVE_DMA
-#error "You must define DRIVER_AGP_BUFFERS_MAP()"
-#else
-#define DRIVER_AGP_BUFFERS_MAP( dev )	NULL
-#endif
-#endif
-
-
 /**
  * Compute size order.  Returns the exponent of the smaller power of two which
  * is greater or equal to given number.
@@ -142,13 +122,13 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 #ifdef __alpha__
 		map->offset += dev->hose->mem_space->start;
 #endif
-#if __REALLY_HAVE_MTRR
-		if ( map->type == _DRM_FRAME_BUFFER ||
-		     (map->flags & _DRM_WRITE_COMBINING) ) {
-			map->mtrr = mtrr_add( map->offset, map->size,
-					      MTRR_TYPE_WRCOMB, 1 );
+		if (drm_core_has_MTRR(dev)) {
+			if ( map->type == _DRM_FRAME_BUFFER ||
+			     (map->flags & _DRM_WRITE_COMBINING) ) {
+				map->mtrr = mtrr_add( map->offset, map->size,
+						      MTRR_TYPE_WRCOMB, 1 );
+			}
 		}
-#endif
 		if (map->type == _DRM_REGISTERS)
 			map->handle = DRM(ioremap)( map->offset, map->size,
 						    dev );
@@ -174,15 +154,15 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 			dev->lock.hw_lock = map->handle; /* Pointer to lock */
 		}
 		break;
-#if __REALLY_HAVE_AGP
 	case _DRM_AGP:
+		if (drm_core_has_AGP(dev)) {
 #ifdef __alpha__
-		map->offset += dev->hose->mem_space->start;
+			map->offset += dev->hose->mem_space->start;
 #endif
-		map->offset += dev->agp->base;
-		map->mtrr   = dev->agp->agp_mtrr; /* for getmap */
+			map->offset += dev->agp->base;
+			map->mtrr   = dev->agp->agp_mtrr; /* for getmap */
+		}
 		break;
-#endif
 	case _DRM_SCATTER_GATHER:
 		if (!dev->sg) {
 			DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
@@ -282,15 +262,15 @@ int DRM(rmmap)(struct inode *inode, struct file *filp,
 		switch (map->type) {
 		case _DRM_REGISTERS:
 		case _DRM_FRAME_BUFFER:
-#if __REALLY_HAVE_MTRR
-			if (map->mtrr >= 0) {
-				int retcode;
-				retcode = mtrr_del(map->mtrr,
-						   map->offset,
-						   map->size);
-				DRM_DEBUG("mtrr_del = %d\n", retcode);
+		  if (drm_core_has_MTRR(dev)) {
+				if (map->mtrr >= 0) {
+					int retcode;
+					retcode = mtrr_del(map->mtrr,
+							   map->offset,
+							   map->size);
+					DRM_DEBUG("mtrr_del = %d\n", retcode);
+				}
 			}
-#endif
 			DRM(ioremapfree)(map->handle, map->size, dev);
 			break;
 		case _DRM_SHM:
@@ -305,8 +285,6 @@ int DRM(rmmap)(struct inode *inode, struct file *filp,
 	up(&dev->struct_sem);
 	return 0;
 }
-
-#if __HAVE_DMA
 
 /**
  * Cleanup after an error on one of the addbufs() functions.
@@ -348,15 +326,11 @@ static void DRM(cleanup_buf_error)(drm_buf_entry_t *entry)
 			  sizeof(*entry->buflist),
 			  DRM_MEM_BUFS);
 
-#if __HAVE_DMA_FREELIST
-	   	DRM(freelist_destroy)(&entry->freelist);
-#endif
-
 		entry->buf_count = 0;
 	}
 }
 
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 /**
  * Add AGP buffers for DMA transfers (ioctl).
  *
@@ -473,8 +447,8 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 		init_waitqueue_head( &buf->dma_wait );
 		buf->filp    = NULL;
 
-		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
-		buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
+		buf->dev_priv_size = dev->dev_priv_size;
+		buf->dev_private = DRM(alloc)( buf->dev_priv_size,
 					       DRM_MEM_BUFS );
 		if(!buf->dev_private) {
 			/* Set count correctly so we free the proper amount. */
@@ -520,12 +494,6 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 	DRM_DEBUG( "dma->buf_count : %d\n", dma->buf_count );
 	DRM_DEBUG( "entry->buf_count : %d\n", entry->buf_count );
 
-#if __HAVE_DMA_FREELIST
-	DRM(freelist_create)( &entry->freelist, entry->buf_count );
-	for ( i = 0 ; i < entry->buf_count ; i++ ) {
-		DRM(freelist_put)( dev, &entry->freelist, &entry->buflist[i] );
-	}
-#endif
 	up( &dev->struct_sem );
 
 	request.count = entry->buf_count;
@@ -539,9 +507,8 @@ int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 	atomic_dec( &dev->buf_alloc );
 	return 0;
 }
-#endif /* __REALLY_HAVE_AGP */
+#endif /* __OS_HAS_AGP */
 
-#if __HAVE_PCI_DMA
 int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 		      unsigned int cmd, unsigned long arg )
 {
@@ -566,6 +533,7 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 	drm_buf_t **temp_buflist;
 	drm_buf_desc_t __user *argp = (void __user *)arg;
 
+	if (!drm_core_check_feature(dev, DRIVER_PCI_DMA)) return -EINVAL;
 	if ( !dma ) return -EINVAL;
 
 	if ( copy_from_user( &request, argp, sizeof(request) ) )
@@ -691,15 +659,14 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 			buf->used    = 0;
 			buf->offset  = (dma->byte_count + byte_count + offset);
 			buf->address = (void *)(page + offset);
-			buf->bus_address = virt_to_bus(buf->address);
 			buf->next    = NULL;
 			buf->waiting = 0;
 			buf->pending = 0;
 			init_waitqueue_head( &buf->dma_wait );
 			buf->filp    = NULL;
 
-			buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
-			buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
+			buf->dev_priv_size = dev->dev_priv_size;
+			buf->dev_private = DRM(alloc)( dev->dev_priv_size,
 						       DRM_MEM_BUFS );
 			if(!buf->dev_private) {
 				/* Set count correctly so we free the proper amount. */
@@ -759,12 +726,6 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 	dma->page_count += entry->seg_count << page_order;
 	dma->byte_count += PAGE_SIZE * (entry->seg_count << page_order);
 
-#if __HAVE_DMA_FREELIST
-	DRM(freelist_create)( &entry->freelist, entry->buf_count );
-	for ( i = 0 ; i < entry->buf_count ; i++ ) {
-		DRM(freelist_put)( dev, &entry->freelist, &entry->buflist[i] );
-	}
-#endif
 	up( &dev->struct_sem );
 
 	request.count = entry->buf_count;
@@ -777,9 +738,7 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 	return 0;
 
 }
-#endif /* __HAVE_PCI_DMA */
 
-#if __HAVE_SG
 int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
                      unsigned int cmd, unsigned long arg )
 {
@@ -802,6 +761,8 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 	int i;
 	drm_buf_t **temp_buflist;
 
+	if (!drm_core_check_feature(dev, DRIVER_SG)) return -EINVAL;
+	
 	if ( !dma ) return -EINVAL;
 
 	if ( copy_from_user( &request, argp, sizeof(request) ) )
@@ -882,8 +843,8 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 		init_waitqueue_head( &buf->dma_wait );
 		buf->filp    = NULL;
 
-		buf->dev_priv_size = sizeof(DRIVER_BUF_PRIV_T);
-		buf->dev_private = DRM(alloc)( sizeof(DRIVER_BUF_PRIV_T),
+		buf->dev_priv_size = dev->dev_priv_size;
+		buf->dev_private = DRM(alloc)( dev->dev_priv_size,
 					       DRM_MEM_BUFS );
 		if(!buf->dev_private) {
 			/* Set count correctly so we free the proper amount. */
@@ -930,12 +891,6 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 	DRM_DEBUG( "dma->buf_count : %d\n", dma->buf_count );
 	DRM_DEBUG( "entry->buf_count : %d\n", entry->buf_count );
 
-#if __HAVE_DMA_FREELIST
-	DRM(freelist_create)( &entry->freelist, entry->buf_count );
-	for ( i = 0 ; i < entry->buf_count ; i++ ) {
-		DRM(freelist_put)( dev, &entry->freelist, &entry->buflist[i] );
-	}
-#endif
 	up( &dev->struct_sem );
 
 	request.count = entry->buf_count;
@@ -949,7 +904,6 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 	atomic_dec( &dev->buf_alloc );
 	return 0;
 }
-#endif /* __HAVE_SG */
 
 /**
  * Add buffers for DMA transfers (ioctl).
@@ -969,26 +923,25 @@ int DRM(addbufs)( struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg )
 {
 	drm_buf_desc_t request;
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	
+	if (!drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+		return -EINVAL;
 
 	if ( copy_from_user( &request, (drm_buf_desc_t __user *)arg,
 			     sizeof(request) ) )
 		return -EFAULT;
 
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 	if ( request.flags & _DRM_AGP_BUFFER )
 		return DRM(addbufs_agp)( inode, filp, cmd, arg );
 	else
 #endif
-#if __HAVE_SG
 	if ( request.flags & _DRM_SG_BUFFER )
 		return DRM(addbufs_sg)( inode, filp, cmd, arg );
 	else
-#endif
-#if __HAVE_PCI_DMA
 		return DRM(addbufs_pci)( inode, filp, cmd, arg );
-#else
-		return -EINVAL;
-#endif
 }
 
 
@@ -1019,6 +972,9 @@ int DRM(infobufs)( struct inode *inode, struct file *filp,
 	drm_buf_info_t __user *argp = (void __user *)arg;
 	int i;
 	int count;
+
+	if (!drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+		return -EINVAL;
 
 	if ( !dma ) return -EINVAL;
 
@@ -1101,6 +1057,9 @@ int DRM(markbufs)( struct inode *inode, struct file *filp,
 	int order;
 	drm_buf_entry_t *entry;
 
+	if (!drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+		return -EINVAL;
+
 	if ( !dma ) return -EINVAL;
 
 	if ( copy_from_user( &request,
@@ -1147,6 +1106,9 @@ int DRM(freebufs)( struct inode *inode, struct file *filp,
 	int i;
 	int idx;
 	drm_buf_t *buf;
+
+	if (!drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+		return -EINVAL;
 
 	if ( !dma ) return -EINVAL;
 
@@ -1205,6 +1167,9 @@ int DRM(mapbufs)( struct inode *inode, struct file *filp,
 	drm_buf_map_t request;
 	int i;
 
+	if (!drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+		return -EINVAL;
+
 	if ( !dma ) return -EINVAL;
 
 	spin_lock( &dev->count_lock );
@@ -1219,9 +1184,9 @@ int DRM(mapbufs)( struct inode *inode, struct file *filp,
 		return -EFAULT;
 
 	if ( request.count >= dma->buf_count ) {
-		if ( (__HAVE_AGP && (dma->flags & _DRM_DMA_USE_AGP)) ||
-		     (__HAVE_SG && (dma->flags & _DRM_DMA_USE_SG)) ) {
-			drm_map_t *map = DRIVER_AGP_BUFFERS_MAP( dev );
+		if ((drm_core_has_AGP(dev) && (dma->flags & _DRM_DMA_USE_AGP)) ||
+		    (drm_core_check_feature(dev, DRIVER_SG) && (dma->flags & _DRM_DMA_USE_SG)) ) {
+			drm_map_t *map = dev->agp_buffer_map;
 
 			if ( !map ) {
 				retcode = -EINVAL;
@@ -1302,4 +1267,3 @@ int DRM(mapbufs)( struct inode *inode, struct file *filp,
 	return retcode;
 }
 
-#endif /* __HAVE_DMA */

@@ -67,9 +67,9 @@
 #include <linux/smp_lock.h>
 #include <linux/ac97_codec.h>
 #include <linux/wrapper.h>
+#include <linux/interrupt.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
 #include <asm/au1000.h>
 #include <asm/au1000_dma.h>
 

@@ -76,7 +76,9 @@ tcf_gact_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int ov
 {
 	struct rtattr *tb[TCA_GACT_MAX];
 	struct tc_gact *parm = NULL;
+#ifdef CONFIG_GACT_PROB
 	struct tc_gact_p *p_parm = NULL;
+#endif
 	struct tcf_gact *p = NULL;
 	int ret = 0;
 	int size = sizeof (*p);
@@ -176,7 +178,9 @@ tcf_gact_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 {
 	unsigned char *b = skb->tail;
 	struct tc_gact opt;
+#ifdef CONFIG_GACT_PROB
 	struct tc_gact_p p_opt;
+#endif
 	struct tcf_gact *p;
 	struct tcf_t t;
 

@@ -3,10 +3,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1999,2001-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (C) 1999,2001-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * Module to export the system's Firmware Interface Tables, including
- * PROM revision numbers, in /proc
+ * PROM revision numbers and banners, in /proc
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -45,8 +45,17 @@ MODULE_LICENSE("GPL");
 #  define TRACE()
 #endif
 
+/* Architected IA64 firmware space */
+#define FW_BASE			0x00000000FF000000
+#define FW_TOP			0x0000000100000000
+
 /* Sub-regions determined by bits in Node Offset */
 #define	LB_PROM_SPACE		0x0000000700000000ul /* Local LB PROM */
+
+/* Offset of PROM banner pointers in SAL A and SAL B */
+#define SAL_A_BANNER_OFFSET	(1 * 16)
+#define SAL_B_BANNER_OFFSET	(3 * 16)
+
 
 #define FIT_SIGNATURE		0x2020205f5449465ful
 /* Standard Intel FIT entry types */
@@ -125,6 +134,26 @@ fit_type_name(unsigned char type)
 	return "Unknown type";
 }
 
+static unsigned long
+convert_fw_addr(nasid_t nasid, unsigned long addr)
+{
+	/* snag just the node-relative offset */
+	addr &= ~0ul >> (63-35);
+	/* the pointer to SAL A is relative to IA-64 compatibility
+	 * space.  However, the PROM is mapped at a different offset
+	 * in MMR space (both local and global)
+	 */
+	addr += 0x700000000;
+	return GLOBAL_MMR_ADDR(nasid, addr);
+}
+
+static int
+valid_fw_addr(unsigned long addr)
+{
+	addr &= ~(1ul << 63); /* Clear cached/uncached bit */
+	return (addr >= FW_BASE && addr < FW_TOP);
+}
+
 /* These two routines read the FIT table directly from the FLASH PROM
  * on a specific node.  The PROM can only be accessed using aligned 64
  * bit reads, so we do that and then shift and mask the result to get
@@ -194,6 +223,8 @@ dump_version(char *page, unsigned long *fit)
 	int nentries;
 	int fentry;
 	unsigned long qw;
+	int len;
+	nasid_t nasid = NASID_GET(fit);
 
 	TRACE();
 
@@ -203,10 +234,31 @@ dump_version(char *page, unsigned long *fit)
 	for (fentry = 0; fentry < nentries; fentry++) {
 		qw = readq(fit + 2 * fentry + 1);
 		if (FIT_TYPE(qw) == FIT_ENTRY_SAL_A)
-			return sprintf(page, "%x.%02x\n",
-				       FIT_MAJOR(qw), FIT_MINOR(qw));
+			break;
 	}
-	return 0;
+	if (fentry >= nentries)
+		return 0;
+
+	len = sprintf(page, "%x.%02x\n", FIT_MAJOR(qw), FIT_MINOR(qw));
+	page += len;
+
+	qw = readq(fit + 2 * fentry);	/* Address of SAL A */
+	DPRINTK("SAL A at %p\n", (void *)qw);
+	if (!valid_fw_addr(qw))
+		return len;
+
+	qw += SAL_A_BANNER_OFFSET;
+	qw = convert_fw_addr(nasid, qw);
+	DPRINTK("Banner ptr at %p\n", (void *)qw);
+
+	qw = readq(qw);			/* Address of banner */
+	if (!valid_fw_addr(qw))
+		return len;
+	qw = convert_fw_addr(nasid, qw);
+	DPRINTK("Banner at %p\n", (void *)qw);
+
+	len += snprintf(page, PAGE_SIZE-len, "%s\n", (char *)qw);
+	return len;
 }
 
 /* same as in proc_misc.c */
@@ -278,14 +330,10 @@ lookup_fit(int nasid)
 	DPRINTK("pointer to fit at %p\n", (void *)fitp);
 	fit_paddr = readq(fitp);
 	DPRINTK("fit pointer contains %lx\n", fit_paddr);
-	/* snag just the node-relative offset */
-	fit_paddr &= ~0ul >> (63-35);
-	/* the pointer to the FIT is relative to IA-64 compatibility
-	 * space.  However, the PROM is mapped at a different offset
-	 * in MMR space (both local and global)
-	 */
-	fit_paddr += 0x700000000;
-	fit_vaddr = (void *)GLOBAL_MMR_ADDR(nasid, fit_paddr);
+
+	BUG_ON(!valid_fw_addr(fit_paddr));
+	fit_vaddr = (void *)convert_fw_addr(nasid, fit_paddr);
+
 	DPRINTK("fit at %p\n", (void *)fit_vaddr);
 	return fit_vaddr;
 }

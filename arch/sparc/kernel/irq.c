@@ -45,7 +45,6 @@
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
-#include <asm/hardirq.h>
 #include <asm/pcic.h>
 #include <asm/cacheflush.h>
 

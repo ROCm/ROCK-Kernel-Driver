@@ -233,13 +233,11 @@ int i830_dma_cleanup(drm_device_t *dev)
 {
 	drm_device_dma_t *dma = dev->dma;
 
-#if __HAVE_IRQ
 	/* Make sure interrupts are disabled here because the uninstall ioctl
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
 	 */
 	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
-#endif
 
 	if (dev->dev_private) {
 		int i;
@@ -371,15 +369,15 @@ static int i830_dma_initialize(drm_device_t *dev,
 		DRM_ERROR("can not find sarea!\n");
 		return -EINVAL;
 	}
-	DRM_FIND_MAP( dev_priv->mmio_map, init->mmio_offset );
+	dev_priv->mmio_map = drm_core_findmap(dev, init->mmio_offset);
 	if(!dev_priv->mmio_map) {
 		dev->dev_private = (void *)dev_priv;
 		i830_dma_cleanup(dev);
 		DRM_ERROR("can not find mmio map!\n");
 		return -EINVAL;
 	}
-	DRM_FIND_MAP( dev_priv->buffer_map, init->buffers_offset );
-	if(!dev_priv->buffer_map) {
+	dev->agp_buffer_map = drm_core_findmap(dev, init->buffers_offset);
+	if(!dev->agp_buffer_map) {
 		dev->dev_private = (void *)dev_priv;
 		i830_dma_cleanup(dev);
 		DRM_ERROR("can not find dma buffer map!\n");
@@ -1582,3 +1580,40 @@ int i830_setparam( struct inode *inode, struct file *filp, unsigned int cmd,
 
 	return 0;
 }
+
+
+static void i830_driver_pretakedown(drm_device_t *dev)
+{
+	i830_dma_cleanup( dev );
+}
+
+static void i830_driver_release(drm_device_t *dev, struct file *filp)
+{
+	i830_reclaim_buffers(filp);
+}
+
+static int i830_driver_dma_quiescent(drm_device_t *dev)
+{
+	i830_dma_quiescent( dev );
+	return 0;
+}
+
+void i830_driver_register_fns(drm_device_t *dev)
+{
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_DMA | DRIVER_DMA_QUEUE;
+#if USE_IRQS
+	dev->driver_features |= DRIVER_HAVE_IRQ | DRIVER_SHARED_IRQ;
+#endif
+	dev->dev_priv_size = sizeof(drm_i830_buf_priv_t);
+	dev->fn_tbl.pretakedown = i830_driver_pretakedown;
+	dev->fn_tbl.release = i830_driver_release;
+	dev->fn_tbl.dma_quiescent = i830_driver_dma_quiescent;
+	dev->fn_tbl.reclaim_buffers = i830_reclaim_buffers;
+#if USE_IRQS
+	dev->fn_tbl.irq_preinstall = i830_driver_irq_preinstall;
+	dev->fn_tbl.irq_postinstall = i830_driver_irq_postinstall;
+	dev->fn_tbl.irq_uninstall = i830_driver_irq_uninstall;
+	dev->fn_tbl.irq_handler = i830_driver_irq_handler;
+#endif
+}
+

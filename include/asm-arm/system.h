@@ -55,6 +55,38 @@
 		__val;							\
 	})
 
+#define __cacheid_present(val)		(val != read_cpuid(CPUID_ID))
+#define __cacheid_vivt(val)		((val & (15 << 25)) != (14 << 25))
+#define __cacheid_vipt(val)		((val & (15 << 25)) == (14 << 25))
+#define __cacheid_vipt_nonaliasing(val)	((val & (15 << 25 | 1 << 23)) == (14 << 25))
+#define __cacheid_vipt_aliasing(val)	((val & (15 << 25 | 1 << 23)) == (14 << 25 | 1 << 23))
+
+#define cache_is_vivt()							\
+	({								\
+		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
+		(!__cacheid_present(__val)) || __cacheid_vivt(__val);	\
+	})
+		
+#define cache_is_vipt()							\
+	({								\
+		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
+		__cacheid_present(__val) && __cacheid_vipt(__val);	\
+	})
+
+#define cache_is_vipt_nonaliasing()					\
+	({								\
+		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
+		__cacheid_present(__val) &&				\
+		 __cacheid_vipt_nonaliasing(__val);			\
+	})
+
+#define cache_is_vipt_aliasing()					\
+	({								\
+		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
+		__cacheid_present(__val) &&				\
+		 __cacheid_vipt_aliasing(__val);			\
+	})
+
 /*
  * This is used to ensure the compiler did actually allocate the register we
  * asked it for some inline assembly sequences.  Apparently we can't trust

@@ -583,6 +583,13 @@ int __init xxxfb_init(void)
 static void __exit xxxfb_cleanup(void)
 {
     /*
+     *  For kernel boot options (in 'video=xxxfb:<options>' format)
+     */
+#ifndef MODULE
+    xxxfb_setup(fb_get_options("xxxfb"));
+#endif
+
+    /*
      *  If your driver supports multiple boards, you should unregister and
      *  clean up all instances.
      */
@@ -639,9 +646,7 @@ static struct fb_ops xxxfb_ops = {
      *  Modularization
      */
 
-#ifdef MODULE
 module_init(xxxfb_init);
-#endif 
 module_exit(xxxfb_cleanup);
 
 MODULE_LICENSE("GPL");

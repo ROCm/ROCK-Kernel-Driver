@@ -17,8 +17,8 @@
 #include <linux/slab.h>
 #include <linux/device.h>
 #include <linux/kernel_stat.h>
+#include <linux/interrupt.h>
 
-#include <asm/hardirq.h>
 #include <asm/cio.h>
 #include <asm/delay.h>
 #include <asm/irq.h>

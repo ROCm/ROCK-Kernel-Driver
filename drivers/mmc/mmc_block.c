@@ -43,7 +43,6 @@
 #define MMC_SHIFT	3
 
 static int mmc_major;
-static int maxsectors = 8;
 
 /*
  * There is one mmc_blk_data per slot.
@@ -180,22 +179,22 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		brq.mrq.data = &brq.data;
 
 		brq.cmd.arg = req->sector << 9;
-		brq.cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
+		brq.cmd.flags = MMC_RSP_R1;
 		brq.data.req = req;
 		brq.data.timeout_ns = card->csd.tacc_ns * 10;
 		brq.data.timeout_clks = card->csd.tacc_clks * 10;
 		brq.data.blksz_bits = md->block_bits;
-		brq.data.blocks = req->current_nr_sectors >> (md->block_bits - 9);
+		brq.data.blocks = req->nr_sectors >> (md->block_bits - 9);
 		brq.stop.opcode = MMC_STOP_TRANSMISSION;
 		brq.stop.arg = 0;
-		brq.stop.flags = MMC_RSP_SHORT | MMC_RSP_CRC | MMC_RSP_BUSY;
+		brq.stop.flags = MMC_RSP_R1B;
 
 		if (rq_data_dir(req) == READ) {
 			brq.cmd.opcode = brq.data.blocks > 1 ? MMC_READ_MULTIPLE_BLOCK : MMC_READ_SINGLE_BLOCK;
 			brq.data.flags |= MMC_DATA_READ;
 		} else {
 			brq.cmd.opcode = MMC_WRITE_BLOCK;
-			brq.cmd.flags |= MMC_RSP_BUSY;
+			brq.cmd.flags = MMC_RSP_R1B;
 			brq.data.flags |= MMC_DATA_WRITE;
 			brq.data.blocks = 1;
 		}
@@ -225,7 +224,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 
 			cmd.opcode = MMC_SEND_STATUS;
 			cmd.arg = card->rca << 16;
-			cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
+			cmd.flags = MMC_RSP_R1;
 			err = mmc_wait_for_cmd(card->host, &cmd, 5);
 			if (err) {
 				printk(KERN_ERR "%s: error %d requesting status\n",
@@ -334,11 +333,10 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 		sprintf(md->disk->disk_name, "mmcblk%d", devidx);
 		sprintf(md->disk->devfs_name, "mmc/blk%d", devidx);
 
-		md->block_bits = md->queue.card->csd.read_blkbits;
+		md->block_bits = card->csd.read_blkbits;
 
-		blk_queue_max_sectors(md->queue.queue, maxsectors);
 		blk_queue_hardsect_size(md->queue.queue, 1 << md->block_bits);
-		set_capacity(md->disk, md->queue.card->csd.capacity);
+		set_capacity(md->disk, card->csd.capacity);
 	}
  out:
 	return md;
@@ -353,7 +351,7 @@ mmc_blk_set_blksize(struct mmc_blk_data *md, struct mmc_card *card)
 	mmc_card_claim_host(card);
 	cmd.opcode = MMC_SET_BLOCKLEN;
 	cmd.arg = 1 << card->csd.read_blkbits;
-	cmd.flags = MMC_RSP_SHORT | MMC_RSP_CRC;
+	cmd.flags = MMC_RSP_R1;
 	err = mmc_wait_for_cmd(card->host, &cmd, 5);
 	mmc_card_release_host(card);
 
@@ -440,7 +438,7 @@ static int mmc_blk_resume(struct mmc_card *card)
 	struct mmc_blk_data *md = mmc_get_drvdata(card);
 
 	if (md) {
-		mmc_blk_set_blksize(md, md->queue.card);
+		mmc_blk_set_blksize(md, card);
 		blk_start_queue(md->queue.queue);
 	}
 	return 0;
@@ -489,9 +487,6 @@ static void __exit mmc_blk_exit(void)
 
 module_init(mmc_blk_init);
 module_exit(mmc_blk_exit);
-module_param(maxsectors, int, 0444);
-
-MODULE_PARM_DESC(maxsectors, "Maximum number of sectors for a single request");
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Multimedia Card (MMC) block device driver");
