@@ -415,7 +415,7 @@ void __init clock_probe(void)
 	struct linux_central *cbus;
 #ifdef CONFIG_PCI
 	struct linux_ebus *ebus = NULL;
-	struct isa_bridge *isa_br = NULL;
+	struct sparc_isa_bridge *isa_br = NULL;
 #endif
 	static int invoked;
 
@@ -547,7 +547,7 @@ void __init clock_probe(void)
 			break;
 		}
 		else if (isa_br != NULL) {
-			struct isa_device *isadev;
+			struct sparc_isa_device *isadev;
 
 try_isa_clock:
 			for_each_isadev(isadev, isa_br)
