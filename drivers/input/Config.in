@@ -9,7 +9,7 @@ define_tristate CONFIG_INPUT y
 
 comment 'Userland interfaces'
 dep_tristate '  Mouse interface' CONFIG_INPUT_MOUSEDEV $CONFIG_INPUT
-dep_mbool '    Provide legacy /dev/psaux device' CONFIG_INPUT_MOUSEDEV_PSAUX $CONFIG_INPUT
+dep_mbool '    Provide legacy /dev/psaux device' CONFIG_INPUT_MOUSEDEV_PSAUX $CONFIG_INPUT_MOUSEDEV
 if [ "$CONFIG_INPUT_MOUSEDEV" != "n" ]; then
    int '   Horizontal screen resolution' CONFIG_INPUT_MOUSEDEV_SCREEN_X 1024
    int '   Vertical screen resolution' CONFIG_INPUT_MOUSEDEV_SCREEN_Y 768

@@ -113,13 +113,15 @@ struct aiptek_features {
 };
 
 struct aiptek {
-	signed char data[10];
 	struct input_dev dev;
 	struct usb_device *usbdev;
 	struct urb *irq;
 	struct aiptek_features *features;
 	int tool;
 	int open;
+
+	signed char *data;
+	dma_addr_t data_dma;
 };
 
 static void
@@ -235,11 +237,18 @@ aiptek_probe(struct usb_device *dev, unsigned int ifnum,
 
 	memset(aiptek, 0, sizeof (struct aiptek));
 
-    aiptek->irq = usb_alloc_urb(0, GFP_KERNEL);
-    if (!aiptek->irq) {
-        kfree(aiptek);
-        return NULL;
-    }
+	aiptek->data = usb_buffer_alloc(dev, 10, SLAB_ATOMIC, &aiptek->data_dma);
+	if (!aiptek->data) {
+		kfree(aiptek);
+		return NULL;
+	}
+
+	aiptek->irq = usb_alloc_urb(0, GFP_KERNEL);
+	if (!aiptek->irq) {
+		usb_buffer_free(dev, 10, aiptek->data, aiptek->data_dma);
+		kfree(aiptek);
+		return NULL;
+	}
 
 	// Resolution500LPI
 	aiptek_command(dev, ifnum, 0x18, 0x04);
@@ -287,14 +296,15 @@ aiptek_probe(struct usb_device *dev, unsigned int ifnum,
 
 	endpoint = dev->config[0].interface[ifnum].altsetting[0].endpoint + 0;
 
-	FILL_INT_URB(aiptek->irq,
-		  dev,
-		  usb_rcvintpipe(dev, endpoint->bEndpointAddress),
-		         aiptek->data,
-		  aiptek->features->pktlen,
-		         aiptek->features->irq,
-		  aiptek,
-		  endpoint->bInterval);
+	if (aiptek->features->pktlen > 10)
+		BUG();
+
+	usb_fill_int_urb(aiptek->irq, dev,
+			 usb_rcvintpipe(dev, endpoint->bEndpointAddress),
+			 aiptek->data, aiptek->features->pktlen,
+			 aiptek->features->irq, aiptek, endpoint->bInterval);
+	aiptek->irq->transfer_dma = aiptek->data_dma;
+	aiptek->irq->transfer_flags |= URB_NO_DMA_MAP;
 
 	input_register_device(&aiptek->dev);
 
@@ -310,7 +320,8 @@ aiptek_disconnect(struct usb_device *dev, void *ptr)
 	struct aiptek *aiptek = ptr;
 	usb_unlink_urb(aiptek->irq);
 	input_unregister_device(&aiptek->dev);
-    usb_free_urb(aiptek->irq);
+	usb_free_urb(aiptek->irq);
+	usb_buffer_free(dev, 10, aiptek->data, aiptek->data_dma);
 	kfree(aiptek);
 }
 

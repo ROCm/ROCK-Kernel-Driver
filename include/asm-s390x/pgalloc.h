@@ -68,7 +68,7 @@ static inline void pmd_free (pmd_t *pmd)
 	free_pages((unsigned long) pmd, 2);
 }
 
-#define pmd_free_tlb(tlb,pmd) pmd_free(pmd)
+#define __pmd_free_tlb(tlb,pmd) pmd_free(pmd)
 
 static inline void
 pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmd, pte_t *pte)
@@ -123,7 +123,7 @@ static inline void pte_free(struct page *pte)
         __free_page(pte);
 }
 
-#define pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
+#define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
 
 /*
  * This establishes kernel virtual mappings (e.g., as a result of a

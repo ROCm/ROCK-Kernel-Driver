@@ -11,8 +11,8 @@
 static struct nls_table *p_nls;
 
 static struct nls_table table = {
-	charset:	"gb2312",
-	owner:		THIS_MODULE,
+	.charset	= "gb2312",
+	.owner		= THIS_MODULE,
 };
 
 static int __init init_nls_gb2312(void)

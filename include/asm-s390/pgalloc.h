@@ -49,7 +49,7 @@ static inline void pgd_free(pgd_t *pgd)
  */
 #define pmd_alloc_one(mm,address)       ({ BUG(); ((pmd_t *)2); })
 #define pmd_free(x)                     do { } while (0)
-#define pmd_free_tlb(tlb,x)		do { } while (0)
+#define __pmd_free_tlb(tlb,x)		do { } while (0)
 #define pgd_populate(mm, pmd, pte)      BUG()
 
 static inline void 
@@ -107,7 +107,7 @@ static inline void pte_free(struct page *pte)
         __free_page(pte);
 }
 
-#define pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
+#define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
 
 /*
  * This establishes kernel virtual mappings (e.g., as a result of a

@@ -67,6 +67,7 @@
 #include <linux/ctype.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
+#include <linux/seq_file.h>
 
 #include <asm/io.h>
 
@@ -372,24 +373,6 @@ static int ide_getdigit(char c)
 	else
 		digit = -1;
 	return digit;
-}
-
-static int proc_ide_read_drivers
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	char		*out = page;
-	int		len;
-	ide_module_t	*p = ide_modules;
-	ide_driver_t	*driver;
-
-	while (p) {
-		driver = (ide_driver_t *) p->info;
-		if (driver)
-			out += sprintf(out, "%s version %s\n", driver->name, driver->version);
-		p = p->next;
-	}
-	len = out - page;
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
 static int proc_ide_read_imodel
@@ -832,15 +815,29 @@ static void destroy_proc_ide_interfaces(void)
 	}
 }
 
+extern struct seq_operations ide_drivers_op;
+static int ide_drivers_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &ide_drivers_op);
+}
+static struct file_operations ide_drivers_operations = {
+	open:		ide_drivers_open,
+	read:		seq_read,
+	llseek:		seq_lseek,
+	release:	seq_release,
+};
+
 void proc_ide_create(void)
 {
+	struct proc_dir_entry *entry;
 	proc_ide_root = proc_mkdir("ide", 0);
 	if (!proc_ide_root) return;
 
 	create_proc_ide_interfaces();
 
-	create_proc_read_entry("drivers", 0, proc_ide_root,
-				proc_ide_read_drivers, NULL);
+	entry = create_proc_entry("drivers", 0, proc_ide_root);
+	if (entry)
+		entry->proc_fops = &ide_drivers_operations;
 
 #ifdef CONFIG_BLK_DEV_AEC62XX
 	if ((aec62xx_display_info) && (aec62xx_proc))

@@ -46,13 +46,15 @@ MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE(DRIVER_LICENSE);
 
 struct usb_mouse {
-	signed char data[8];
 	char name[128];
 	char phys[64];
 	struct usb_device *usbdev;
 	struct input_dev dev;
 	struct urb *irq;
 	int open;
+
+	signed char *data;
+	dma_addr_t data_dma;
 };
 
 static void usb_mouse_irq(struct urb *urb)
@@ -124,8 +126,15 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 	if (!(mouse = kmalloc(sizeof(struct usb_mouse), GFP_KERNEL))) return NULL;
 	memset(mouse, 0, sizeof(struct usb_mouse));
 
+	mouse->data = usb_buffer_alloc(dev, 8, SLAB_ATOMIC, &mouse->data_dma);
+	if (!mouse->data) {
+		kfree(mouse);
+		return NULL;
+	}
+
 	mouse->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!mouse->irq) {
+		usb_buffer_free(dev, 8, mouse->data, mouse->data_dma);
 		kfree(mouse);
 		return NULL;
 	}
@@ -153,6 +162,7 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 	mouse->dev.id.version = dev->descriptor.bcdDevice;
 
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {
+		usb_buffer_free(dev, 8, mouse->data, mouse->data_dma);
 		kfree(mouse);
 		return NULL;
 	}
@@ -170,8 +180,11 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 
 	kfree(buf);
 
-	FILL_INT_URB(mouse->irq, dev, pipe, mouse->data, maxp > 8 ? 8 : maxp,
-		usb_mouse_irq, mouse, endpoint->bInterval);
+	usb_fill_int_urb(mouse->irq, dev, pipe, mouse->data,
+			 (maxp > 8 ? 8 : maxp),
+			 usb_mouse_irq, mouse, endpoint->bInterval);
+	mouse->irq->transfer_dma = mouse->data_dma;
+	mouse->irq->transfer_flags |= URB_NO_DMA_MAP;
 
 	input_register_device(&mouse->dev);
 
@@ -186,6 +199,7 @@ static void usb_mouse_disconnect(struct usb_device *dev, void *ptr)
 	usb_unlink_urb(mouse->irq);
 	input_unregister_device(&mouse->dev);
 	usb_free_urb(mouse->irq);
+	usb_buffer_free(dev, 8, mouse->data, mouse->data_dma);
 	kfree(mouse);
 }
 

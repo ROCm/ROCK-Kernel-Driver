@@ -925,6 +925,24 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
 
 	RADEON_WRITE( RADEON_SCRATCH_UMSK, 0x7 );
 
+	/* Writeback doesn't seem to work everywhere, test it first */
+	DRM_WRITE32( &dev_priv->scratch[1], 0 );
+	RADEON_WRITE( RADEON_SCRATCH_REG1, 0xdeadbeef );
+
+	for ( tmp = 0 ; tmp < dev_priv->usec_timeout ; tmp++ ) {
+		if ( DRM_READ32( &dev_priv->scratch[1] ) == 0xdeadbeef )
+			break;
+		DRM_UDELAY( 1 );
+	}
+
+	if ( tmp < dev_priv->usec_timeout ) {
+		dev_priv->writeback_works = 1;
+		DRM_DEBUG( "writeback test succeeded, tmp=%d\n", tmp );
+	} else {
+		dev_priv->writeback_works = 0;
+		DRM_DEBUG( "writeback test failed\n" );
+	}
+
 	dev_priv->sarea_priv->last_frame = dev_priv->scratch[0] = 0;
 	RADEON_WRITE( RADEON_LAST_FRAME_REG,
 		      dev_priv->sarea_priv->last_frame );
@@ -1000,7 +1018,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	}
 
 	dev_priv->is_r200 = (init->func == RADEON_INIT_R200_CP);
-	dev_priv->do_boxes = 1;
+	dev_priv->do_boxes = 0;
 	dev_priv->cp_mode = init->cp_mode;
 
 	/* We don't support anything other than bus-mastering ring mode,
@@ -1307,12 +1325,12 @@ int radeon_cp_start( DRM_IOCTL_ARGS )
 	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( dev_priv->cp_running ) {
-		DRM_DEBUG( "%s while CP running\n", __func__ );
+		DRM_DEBUG( "%s while CP running\n", __FUNCTION__ );
 		return 0;
 	}
 	if ( dev_priv->cp_mode == RADEON_CSQ_PRIDIS_INDDIS ) {
 		DRM_DEBUG( "%s called with bogus CP mode (%d)\n",
-			   __func__, dev_priv->cp_mode );
+			   __FUNCTION__, dev_priv->cp_mode );
 		return 0;
 	}
 
@@ -1374,7 +1392,7 @@ int radeon_cp_reset( DRM_IOCTL_ARGS )
 	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( !dev_priv ) {
-		DRM_DEBUG( "%s called before init done\n", __func__ );
+		DRM_DEBUG( "%s called before init done\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
@@ -1456,8 +1474,8 @@ drm_buf_t *radeon_freelist_get( drm_device_t *dev )
 	start = dev_priv->last_buf;
 
 	for ( t = 0 ; t < dev_priv->usec_timeout ; t++ ) {
-		u32 done_age = DRM_READ32(&dev_priv->scratch[1]);
-
+		u32 done_age = GET_SCRATCH( 1 );
+		DRM_DEBUG("done_age = %d\n",done_age);
 		for ( i = start ; i < dma->buf_count ; i++ ) {
 			buf = dma->buflist[i];
 			buf_priv = buf->dev_private;

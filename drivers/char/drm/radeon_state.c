@@ -50,8 +50,7 @@ static __inline__ void radeon_emit_clip_rect( drm_radeon_private_t *dev_priv,
 	OUT_RING( CP_PACKET0( RADEON_RE_TOP_LEFT, 0 ) );
 	OUT_RING( (box->y1 << 16) | box->x1 );
 	OUT_RING( CP_PACKET0( RADEON_RE_WIDTH_HEIGHT, 0 ) );
-/*     OUT_RING( ((box->y2 - 1) << 16) | (box->x2 - 1) );*/
-	OUT_RING( (box->y2 << 16) | box->x2 );
+	OUT_RING( ((box->y2 - 1) << 16) | (box->x2 - 1) );
 	ADVANCE_RING();
 }
 
@@ -411,7 +410,6 @@ static void radeon_cp_dispatch_clear( drm_device_t *dev,
 	int i;
 	RING_LOCALS;
 	DRM_DEBUG( "flags = 0x%x\n", flags );
-
 
 	dev_priv->stats.clears++;
 
@@ -810,9 +808,6 @@ static void radeon_cp_dispatch_flip( drm_device_t *dev )
 	BEGIN_RING( 4 );
 
 	RADEON_WAIT_UNTIL_3D_IDLE();
-/*
-	RADEON_WAIT_UNTIL_PAGE_FLIPPED();
-*/
 	OUT_RING( CP_PACKET0( RADEON_CRTC_OFFSET, 0 ) );
 
 	if ( dev_priv->current_page == 0 ) {
@@ -1383,7 +1378,7 @@ int radeon_cp_vertex( DRM_IOCTL_ARGS )
 	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __func__ );
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
@@ -1470,7 +1465,7 @@ int radeon_cp_indices( DRM_IOCTL_ARGS )
 	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __func__ );
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
@@ -1620,7 +1615,7 @@ int radeon_cp_indirect( DRM_IOCTL_ARGS )
 	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __func__ );
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
@@ -1697,7 +1692,7 @@ int radeon_cp_vertex2( DRM_IOCTL_ARGS )
 	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __func__ );
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
@@ -1941,6 +1936,19 @@ static int radeon_emit_packet3_cliprect( drm_device_t *dev,
 		if ( i < cmdbuf->nbox ) {
 			if (DRM_COPY_FROM_USER_UNCHECKED( &box, &boxes[i], sizeof(box) ))
 				return DRM_ERR(EFAULT);
+			/* FIXME The second and subsequent times round this loop, send a
+			 * WAIT_UNTIL_3D_IDLE before calling emit_clip_rect(). This
+			 * fixes a lockup on fast machines when sending several
+			 * cliprects with a cmdbuf, as when waving a 2D window over
+			 * a 3D window. Something in the commands from user space
+			 * seems to hang the card when they're sent several times
+			 * in a row. That would be the correct place to fix it but
+			 * this works around it until I can figure that out - Tim Smith */
+			if ( i ) {
+				BEGIN_RING( 2 );
+				RADEON_WAIT_UNTIL_3D_IDLE();
+				ADVANCE_RING();
+			}
 			radeon_emit_clip_rect( dev_priv, &box );
 		}
 		
@@ -1949,7 +1957,6 @@ static int radeon_emit_packet3_cliprect( drm_device_t *dev,
 		ADVANCE_RING();
 
 	} while ( ++i < cmdbuf->nbox );
-
  	if (cmdbuf->nbox == 1)
 		cmdbuf->nbox = 0;
 
@@ -1975,7 +1982,7 @@ int radeon_cp_cmdbuf( DRM_IOCTL_ARGS )
 	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __func__ );
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
@@ -2097,7 +2104,7 @@ int radeon_cp_getparam( DRM_IOCTL_ARGS )
 	int value;
 
 	if ( !dev_priv ) {
-		DRM_ERROR( "%s called with no initialization\n", __func__ );
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 
@@ -2112,14 +2119,14 @@ int radeon_cp_getparam( DRM_IOCTL_ARGS )
 		break;
 	case RADEON_PARAM_LAST_FRAME:
 		dev_priv->stats.last_frame_reads++;
-		value = DRM_READ32(&dev_priv->scratch[0]);
+		value = GET_SCRATCH( 0 );
 		break;
 	case RADEON_PARAM_LAST_DISPATCH:
-		value = DRM_READ32(&dev_priv->scratch[1]);
+		value = GET_SCRATCH( 1 );
 		break;
 	case RADEON_PARAM_LAST_CLEAR:
 		dev_priv->stats.last_clear_reads++;
-		value = DRM_READ32(&dev_priv->scratch[2]);
+		value = GET_SCRATCH( 2 );
 		break;
 	default:
 		return DRM_ERR(EINVAL);

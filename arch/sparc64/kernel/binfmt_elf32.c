@@ -147,7 +147,6 @@ jiffies_to_timeval32(unsigned long jiffies, struct timeval32 *value)
 }
 
 #define elf_addr_t	u32
-#define elf_caddr_t	u32
 #undef start_thread
 #define start_thread start_thread32
 #define init_elf_binfmt init_elf32_binfmt

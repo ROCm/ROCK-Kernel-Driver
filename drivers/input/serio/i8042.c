@@ -23,7 +23,7 @@
 
 #include "i8042.h"
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("i8042 keyboard and mouse controller driver");
 MODULE_LICENSE("GPL");
 
@@ -347,6 +347,11 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long flags;
 	unsigned char str, data;
 	unsigned int dfl;
+	struct {
+		int data;
+		int str;
+	} buffer[I8042_BUFFER_SIZE];
+	int i, j = 0;
 
 #ifdef CONFIG_VT
 	kbd_pt_regs = regs;
@@ -354,20 +359,31 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	spin_lock_irqsave(&i8042_lock, flags);
 
-	while ((str = i8042_read_status()) & I8042_STR_OBF) {
+	while (j < I8042_BUFFER_SIZE && 
+	    (buffer[j].str = i8042_read_status()) & I8042_STR_OBF)
+		buffer[j++].data = i8042_read_data();
 
-		data = i8042_read_data();
+	spin_unlock_irqrestore(&i8042_lock, flags);
+
+	for (i = 0; i < j; i++) {
+
+		str = buffer[i].str;
+		data = buffer[i].data;
+
 		dfl = ((str & I8042_STR_PARITY) ? SERIO_PARITY : 0) |
 		      ((str & I8042_STR_TIMEOUT) ? SERIO_TIMEOUT : 0);
 
 #ifdef I8042_DEBUG_IO
-		printk(KERN_DEBUG "i8042.c: %02x <- i8042 (interrupt, %s, %d) [%d]\n",
-			data, (str & I8042_STR_AUXDATA) ? "aux" : "kbd", irq, (int) (jiffies - i8042_start));
+		printk(KERN_DEBUG "i8042.c: %02x <- i8042 (interrupt, %s, %d%s%s) [%d]\n",
+			data, (str & I8042_STR_AUXDATA) ? "aux" : "kbd", irq, 
+			dfl & SERIO_PARITY ? ", bad parity" : "",
+			dfl & SERIO_TIMEOUT ? ", timeout" : "",
+			(int) (jiffies - i8042_start));
 #endif
 
-		if (i8042_aux_values.exists && (str & I8042_STR_AUXDATA)) {
-			serio_interrupt(&i8042_aux_port, data, dfl);
-		} else {
+		if (i8042_aux_values.exists && (buffer[i].str & I8042_STR_AUXDATA)) {
+			serio_interrupt(&i8042_aux_port, buffer[i].data, dfl);
+		} else 
 			if (i8042_kbd_values.exists) {
 				if (!i8042_direct) {
 					if (data > 0x7f) {
@@ -385,10 +401,8 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				}
 				serio_interrupt(&i8042_kbd_port, data, dfl);
 			}
-		}
 	}
 
-	spin_unlock_irqrestore(&i8042_lock, flags);
 }
 
 /*

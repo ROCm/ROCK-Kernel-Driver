@@ -80,7 +80,6 @@ struct elf_prpsinfo32
 };
 
 #define elf_addr_t	u32
-#define elf_caddr_t	u32
 #define init_elf_binfmt init_elf32_binfmt
 #undef CONFIG_BINFMT_ELF
 #ifdef CONFIG_BINFMT_ELF32

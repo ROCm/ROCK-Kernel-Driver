@@ -278,7 +278,7 @@ machzwd.c -- MachZ ZF-Logic
 	when the timeout runs out which can be 0 = RESET (default), 
 	1 = SMI, 2 = NMI, 3 = SCI.
 
-	Supports CONFIG_WATCHDOG_NOWAYOUT and the the magic character
+	Supports CONFIG_WATCHDOG_NOWAYOUT and the magic character
 	'V' close handling.
 
 	GETSUPPORT returns WDIOF_KEEPALIVEPING, and the GETSTATUS call

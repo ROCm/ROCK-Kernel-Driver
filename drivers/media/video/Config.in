@@ -4,7 +4,7 @@
 mainmenu_option next_comment
 comment 'Video For Linux'
 
-bool '  V4L information in proc filesystem' CONFIG_VIDEO_PROC_FS
+dep_bool '  V4L information in proc filesystem' CONFIG_VIDEO_PROC_FS $CONFIG_PROC_FS
 
 comment 'Video Adapters'
 if [ "$CONFIG_I2C_ALGOBIT" = "y" -o "$CONFIG_I2C_ALGOBIT" = "m" ]; then

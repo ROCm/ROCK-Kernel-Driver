@@ -186,7 +186,6 @@ MODULE_AUTHOR("Eric Youngdale, Andi Kleen");
 #undef MODULE_AUTHOR
 
 #define elf_addr_t __u32
-#define elf_caddr_t __u32
 
 static void elf32_init(struct pt_regs *);
 

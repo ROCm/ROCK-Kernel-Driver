@@ -191,4 +191,10 @@ struct sysinfo {
 };
 
 #define BUG_ON(condition) do { if (unlikely((condition)!=0)) BUG(); } while(0)
+
+/* Trap pasters of __FUNCTION__ at compile-time */
+#if __GNUC__ > 2 || __GNUC_MINOR__ >= 95
+#define __FUNCTION__ (__func__)
+#endif
+
 #endif
