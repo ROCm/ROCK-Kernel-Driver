@@ -302,7 +302,7 @@ static void change_speed (unsigned int index)
 
 #ifdef CONFIG_X86_POWERNOW_K7_ACPI
 
-struct acpi_processor_performance *acpi_processor_perf;
+static struct acpi_processor_performance *acpi_processor_perf;
 
 static int powernow_acpi_init(void)
 {
