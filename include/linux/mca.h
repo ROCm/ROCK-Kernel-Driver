@@ -94,6 +94,7 @@ struct mca_bus {
 
 struct mca_driver {
 	const short		*id_table;
+	void			*driver_data;
 	struct device_driver	driver;
 };
 #define to_mca_driver(mdriver) container_of(mdriver, struct mca_driver, driver)
@@ -119,6 +120,11 @@ extern void mca_device_set_claim(struct mca_device *mca_dev, int val);
 extern enum MCA_AdapterStatus mca_device_status(struct mca_device *mca_dev);
 
 extern struct bus_type mca_bus_type;
+
+static inline void mca_register_driver(struct mca_driver *drv)
+{
+	driver_register(&drv->driver);
+}
 
 /* for now, include the legacy API */
 #include <linux/mca-legacy.h>

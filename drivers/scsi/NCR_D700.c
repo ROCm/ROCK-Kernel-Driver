@@ -103,6 +103,7 @@
 #include <linux/sched.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
+#include <linux/device.h>
 #include <linux/mca.h>
 #include <asm/dma.h>
 #include <asm/system.h>
@@ -182,131 +183,140 @@ param_setup(char *string)
 __setup("NCR_D700=", param_setup);
 #endif
 
+/* private stack allocated structure for passing device information from
+ * detect to probe */
+struct NCR_700_info {
+	Scsi_Host_Template *tpnt;
+	int found;
+};
+
 /* Detect a D700 card.  Note, because of the set up---the chips are
  * essentially connectecd to the MCA bus independently, it is easier
  * to set them up as two separate host adapters, rather than one
  * adapter with two channels */
-STATIC int __init
-D700_detect(Scsi_Host_Template *tpnt)
+static int
+NCR_D700_probe(struct device *dev)
 {
-	int slot = 0;
-	int found = 0;
 	int differential;
-	int banner = 1;
+	static int banner = 1;
+	struct mca_device *mca_dev = to_mca_device(dev);
+	int slot = mca_dev->slot;
+	struct NCR_700_info *info = to_mca_driver(dev->driver)->driver_data;
+	int found = 0;
+	int irq, i;
+	int pos3j, pos3k, pos3a, pos3b, pos4;
+	__u32 base_addr, offset_addr;
+	struct Scsi_Host *host = NULL;
 
-	if(!MCA_bus)
-		return 0;
+	/* enable board interrupt */
+	pos4 = mca_device_read_pos(mca_dev, 4);
+	pos4 |= 0x4;
+	mca_device_write_pos(mca_dev, 4, pos4);
 
-#ifdef MODULE
-	if(NCR_D700)
-		param_setup(NCR_D700);
-#endif
+	mca_device_write_pos(mca_dev, 6, 9);
+	pos3j = mca_device_read_pos(mca_dev, 3);
+	mca_device_write_pos(mca_dev, 6, 10);
+	pos3k = mca_device_read_pos(mca_dev, 3);
+	mca_device_write_pos(mca_dev, 6, 0);
+	pos3a = mca_device_read_pos(mca_dev, 3);
+	mca_device_write_pos(mca_dev, 6, 1);
+	pos3b = mca_device_read_pos(mca_dev, 3);
 
-	for(slot = 0; (slot = mca_find_adapter(NCR_D700_MCA_ID, slot)) != MCA_NOTFOUND; slot++) {
-		int irq, i;
-		int pos3j, pos3k, pos3a, pos3b, pos4;
-		__u32 base_addr, offset_addr;
-		struct Scsi_Host *host = NULL;
+	base_addr = ((pos3j << 8) | pos3k) & 0xfffffff0;
+	offset_addr = ((pos3a << 8) | pos3b) & 0xffffff70;
 
-		/* enable board interrupt */
-		pos4 = mca_read_pos(slot, 4);
-		pos4 |= 0x4;
-		mca_write_pos(slot, 4, pos4);
+	irq = (pos4 & 0x3) + 11;
+	if(irq >= 13)
+		irq++;
+	if(banner) {
+		printk(KERN_NOTICE "NCR D700: Driver Version " NCR_D700_VERSION "\n"
+		       "NCR D700:  Copyright (c) 2001 by James.Bottomley@HansenPartnership.com\n"
+		       "NCR D700:\n");
+		banner = 0;
+	}
+	/* now do the bus related transforms */
+	irq = mca_device_transform_irq(mca_dev, irq);
+	base_addr = mca_device_transform_ioport(mca_dev, base_addr);
+	offset_addr = mca_device_transform_ioport(mca_dev, offset_addr);
 
-		mca_write_pos(slot, 6, 9);
-		pos3j = mca_read_pos(slot, 3);
-		mca_write_pos(slot, 6, 10);
-		pos3k = mca_read_pos(slot, 3);
-		mca_write_pos(slot, 6, 0);
-		pos3a = mca_read_pos(slot, 3);
-		mca_write_pos(slot, 6, 1);
-		pos3b = mca_read_pos(slot, 3);
+	printk(KERN_NOTICE "NCR D700: found in slot %d  irq = %d  I/O base = 0x%x\n", slot, irq, offset_addr);
 
-		base_addr = ((pos3j << 8) | pos3k) & 0xfffffff0;
-		offset_addr = ((pos3a << 8) | pos3b) & 0xffffff70;
+	info->tpnt->proc_name = "NCR_D700";
 
-		irq = (pos4 & 0x3) + 11;
-		if(irq >= 13)
-			irq++;
-		if(banner) {
-			printk(KERN_NOTICE "NCR D700: Driver Version " NCR_D700_VERSION "\n"
-			       "NCR D700:  Copyright (c) 2001 by James.Bottomley@HansenPartnership.com\n"
-			       "NCR D700:\n");
-			banner = 0;
-		}
-		printk(KERN_NOTICE "NCR D700: found in slot %d  irq = %d  I/O base = 0x%x\n", slot, irq, offset_addr);
+	/*outb(BOARD_RESET, base_addr);*/
 
-		tpnt->proc_name = "NCR_D700";
-
-		/*outb(BOARD_RESET, base_addr);*/
-
-		/* clear any pending interrupts */
-		(void)inb(base_addr + 0x08);
-		/* get modctl, used later for setting diff bits */
-		switch(differential = (inb(base_addr + 0x08) >> 6)) {
-		case 0x00:
-			/* only SIOP1 differential */
-			differential = 0x02;
-			break;
-		case 0x01:
-			/* Both SIOPs differential */
-			differential = 0x03;
-			break;
-		case 0x03:
-			/* No SIOPs differential */
-			differential = 0x00;
-			break;
-		default:
-			printk(KERN_ERR "D700: UNEXPECTED DIFFERENTIAL RESULT 0x%02x\n",
-			       differential);
-			differential = 0x00;
-			break;
-		}
-
-		/* plumb in both 700 chips */
-		for(i=0; i<2; i++) {
-			__u32 region = offset_addr | (0x80 * i);
-			struct NCR_700_Host_Parameters *hostdata =
-				kmalloc(sizeof(struct NCR_700_Host_Parameters),
-					GFP_KERNEL);
-			if(hostdata == NULL) {
-				printk(KERN_ERR "NCR D700: Failed to allocate host data for channel %d, detatching\n", i);
-				continue;
-			}
-			memset(hostdata, 0, sizeof(struct NCR_700_Host_Parameters));
-			if(request_region(region, 64, "NCR_D700") == NULL) {
-				printk(KERN_ERR "NCR D700: Failed to reserve IO region 0x%x\n", region);
-				kfree(hostdata);
-				continue;
-			}
-
-			/* Fill in the three required pieces of hostdata */
-			hostdata->base = region;
-			hostdata->differential = (((1<<i) & differential) != 0);
-			hostdata->clock = NCR_D700_CLOCK_MHZ;
-			/* and register the chip */
-			if((host = NCR_700_detect(tpnt, hostdata)) == NULL) {
-				kfree(hostdata);
-				release_region(host->base, 64);
-				continue;
-			}
-			host->irq = irq;
-			/* FIXME: Read this from SUS */
-			host->this_id = id_array[slot * 2 + i];
-			printk(KERN_NOTICE "NCR D700: SIOP%d, SCSI id is %d\n",
-			       i, host->this_id);
-			if(request_irq(irq, NCR_700_intr, SA_SHIRQ, "NCR_D700", host)) {
-				printk(KERN_ERR "NCR D700, channel %d: irq problem, detatching\n", i);
-				scsi_unregister(host);
-				NCR_700_release(host);
-				continue;
-			}
-			found++;
-			mca_set_adapter_name(slot, "NCR D700 SCSI Adapter (version " NCR_D700_VERSION ")");
-		}
+	/* clear any pending interrupts */
+	(void)inb(base_addr + 0x08);
+	/* get modctl, used later for setting diff bits */
+	switch(differential = (inb(base_addr + 0x08) >> 6)) {
+	case 0x00:
+		/* only SIOP1 differential */
+		differential = 0x02;
+		break;
+	case 0x01:
+		/* Both SIOPs differential */
+		differential = 0x03;
+		break;
+	case 0x03:
+		/* No SIOPs differential */
+		differential = 0x00;
+		break;
+	default:
+		printk(KERN_ERR "D700: UNEXPECTED DIFFERENTIAL RESULT 0x%02x\n",
+		       differential);
+		differential = 0x00;
+		break;
 	}
 
-	return found;
+	/* plumb in both 700 chips */
+	for(i=0; i<2; i++) {
+		__u32 region = offset_addr | (0x80 * i);
+		struct NCR_700_Host_Parameters *hostdata =
+			kmalloc(sizeof(struct NCR_700_Host_Parameters),
+				GFP_KERNEL);
+		if(hostdata == NULL) {
+			printk(KERN_ERR "NCR D700: Failed to allocate host data for channel %d, detatching\n", i);
+			continue;
+		}
+		memset(hostdata, 0, sizeof(struct NCR_700_Host_Parameters));
+		if(request_region(region, 64, "NCR_D700") == NULL) {
+			printk(KERN_ERR "NCR D700: Failed to reserve IO region 0x%x\n", region);
+			kfree(hostdata);
+			continue;
+		}
+		
+		/* Fill in the three required pieces of hostdata */
+		hostdata->base = region;
+		hostdata->differential = (((1<<i) & differential) != 0);
+		hostdata->clock = NCR_D700_CLOCK_MHZ;
+		/* and register the chip */
+		if((host = NCR_700_detect(info->tpnt, hostdata)) == NULL) {
+			kfree(hostdata);
+			release_region(host->base, 64);
+			continue;
+		}
+		host->irq = irq;
+		/* FIXME: Read this from SUS */
+		host->this_id = id_array[slot * 2 + i];
+		printk(KERN_NOTICE "NCR D700: SIOP%d, SCSI id is %d\n",
+		       i, host->this_id);
+		if(request_irq(irq, NCR_700_intr, SA_SHIRQ, "NCR_D700", host)) {
+			printk(KERN_ERR "NCR D700, channel %d: irq problem, detatching\n", i);
+			scsi_unregister(host);
+			NCR_700_release(host);
+			continue;
+		}
+		scsi_set_device(host, dev);
+		found++;
+	}
+	info->found += found;
+
+	if(found) {
+		mca_device_set_claim(mca_dev, 1);
+		strncpy(dev->name, "NCR_D700", sizeof(dev->name));
+	}
+
+	return found? 0 : -ENODEV;
 }
 
 
@@ -323,7 +333,38 @@ D700_release(struct Scsi_Host *host)
 	return 1;
 }
 
+static short NCR_D700_id_table[] = { NCR_D700_MCA_ID, 0 };
 
+struct mca_driver NCR_D700_driver = {
+	.id_table = NCR_D700_id_table,
+	.driver = {
+		.name = "NCR_D700",
+		.bus = &mca_bus_type,
+		.probe = NCR_D700_probe,
+	},
+};
+		
+
+STATIC int __init
+D700_detect(Scsi_Host_Template *tpnt)
+{
+	struct NCR_700_info info;
+
+	if(!MCA_bus)
+		return 0;
+
+#ifdef MODULE
+	if(NCR_D700)
+		param_setup(NCR_D700);
+#endif
+	info.tpnt = tpnt;
+	info.found = 0;
+	NCR_D700_driver.driver_data = &info;
+	mca_register_driver(&NCR_D700_driver);
+
+	return info.found;
+}
+	
 static Scsi_Host_Template driver_template = NCR_D700_SCSI;
 
 #include "scsi_module.c"
