@@ -1108,7 +1108,7 @@ void arp_ifdown(struct net_device *dev)
 static struct packet_type arp_packet_type = {
 	.type =	__constant_htons(ETH_P_ARP),
 	.func =	arp_rcv,
-	.data =	(void*) 1, /* understand shared skbs */
+	.data =	PKT_CAN_SHARE_SKB,
 };
 
 static int arp_proc_init(void);
