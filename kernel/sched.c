@@ -1341,7 +1341,7 @@ void fastcall wake_up_new_task(task_t * p, unsigned long clone_flags)
 {
 	unsigned long flags;
 	int this_cpu, cpu;
-	runqueue_t *rq;
+	runqueue_t *rq, *this_rq;
 
 	rq = task_rq_lock(p, &flags);
 	cpu = task_cpu(p);
@@ -1383,8 +1383,15 @@ void fastcall wake_up_new_task(task_t * p, unsigned long clone_flags)
 		} else
 			/* Run child last */
 			__activate_task(p, rq);
+		/*
+		 * We skip the following code due to cpu == this_cpu
+	 	 *
+		 *   task_rq_unlock(rq, &flags);
+		 *   this_rq = task_rq_lock(current, &flags);
+		 */
+		this_rq = rq;
 	} else {
-		runqueue_t *this_rq = cpu_rq(this_cpu);
+		this_rq = cpu_rq(this_cpu);
 
 		/*
 		 * Not the local CPU - must adjust timestamp. This should
@@ -1396,18 +1403,17 @@ void fastcall wake_up_new_task(task_t * p, unsigned long clone_flags)
 		if (TASK_PREEMPTS_CURR(p, rq))
 			resched_task(rq->curr);
 
-		current->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(current) *
-			PARENT_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
 		schedstat_inc(rq, wunt_moved);
-	}
-
-	if (unlikely(cpu != this_cpu)) {
+		/*
+		 * Parent and child are on different CPUs, now get the
+		 * parent runqueue to update the parent's ->sleep_avg:
+		 */
 		task_rq_unlock(rq, &flags);
-		rq = task_rq_lock(current, &flags);
+		this_rq = task_rq_lock(current, &flags);
 	}
 	current->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(current) *
 		PARENT_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
-	task_rq_unlock(rq, &flags);
+	task_rq_unlock(this_rq, &flags);
 }
 
 /*
