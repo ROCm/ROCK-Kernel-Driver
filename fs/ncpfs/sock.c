@@ -391,7 +391,14 @@ static void __ncpdgram_rcv_proc(void *s) {
 						if (result < 8 + 8) {
 							result = -EIO;
 						} else {
+							unsigned int hdrl;
+							
 							result -= 8;
+							hdrl = sock->sk->family == AF_INET ? 8 : 6;
+							if (sign_verify_reply(server, ((char*)req->reply_buf) + hdrl, result - hdrl, cpu_to_le32(result), ((char*)req->reply_buf) + result)) {
+								printk(KERN_INFO "ncpfs: Signature violation\n");
+								result = -EIO;
+							}
 						}
 					}
 #endif
@@ -593,6 +600,15 @@ skipdata:;
 						return -EIO;
 					}
 				}
+#ifdef CONFIG_NCPFS_PACKET_SIGNING				
+				if (server->sign_active && req->tx_type != NCP_DEALLOC_SLOT_REQUEST) {
+					if (sign_verify_reply(server, (unsigned char*)(req->reply_buf) + 6, req->datalen - 6, cpu_to_be32(req->datalen + 16), &server->rcv.buf.type)) {
+						printk(KERN_ERR "ncpfs: tcp: Signature violation\n");
+						__ncp_abort_request(server, req, -EIO);
+						return -EIO;
+					}
+				}
+#endif				
 				ncp_finish_request(req, req->datalen);
 			nextreq:;
 				__ncp_next_request(server);
