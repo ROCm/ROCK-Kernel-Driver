@@ -1127,17 +1127,17 @@ int __init dm_interface_init(void)
 	return 0;
 
       failed:
+	devfs_remove(DM_DIR "/control");
+	if (misc_deregister(&_dm_misc) < 0)
+		DMERR("misc_deregister failed for control device");
 	dm_hash_exit();
-	misc_deregister(&_dm_misc);
 	return r;
 }
 
 void dm_interface_exit(void)
 {
-	dm_hash_exit();
-
 	devfs_remove(DM_DIR "/control");
-
 	if (misc_deregister(&_dm_misc) < 0)
 		DMERR("misc_deregister failed for control device");
+	dm_hash_exit();
 }
