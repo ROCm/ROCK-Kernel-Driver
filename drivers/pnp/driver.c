@@ -93,7 +93,7 @@ static int pnp_device_probe(struct device *dev)
 
 	if (pnp_dev->active == 0)
 		if(pnp_activate_dev(pnp_dev)<0)
-			return 0;
+			return -1;
 	if (pnp_drv->probe && pnp_dev->active) {
 		if (pnp_dev->card && pnp_drv->card_id_table){
 			card_id = match_card(pnp_drv, pnp_dev->card);

@@ -12,7 +12,6 @@
 #include <linux/isapnp.h>
 #include <linux/string.h>
 #include <linux/module.h>
-#include "base.h"
 
 static void pnp_convert_id(char *buf, unsigned short vendor, unsigned short device)
 {
