@@ -162,10 +162,8 @@ struct device_class {
 	u32			devnum;
 
 	struct subsystem	subsys;
-	struct subsystem	devsubsys;
-	struct subsystem	drvsubsys;
-	struct list_head	drivers;
-	struct list_head	devices;
+	struct subsystem	devices;
+	struct subsystem	drivers;
 
 	int	(*add_device)(struct device *);
 	void	(*remove_device)(struct device *);

@@ -147,7 +147,7 @@ static void add_intf(struct device_interface * intf)
 	struct list_head * entry;
 
 	down_write(&cls->subsys.rwsem);
-	list_for_each(entry,&cls->devices)
+	list_for_each(entry,&cls->devices.list)
 		add(intf,to_dev(entry));
 	up_write(&cls->subsys.rwsem);
 }
