@@ -4,7 +4,9 @@ Written by Gerard Roudier <groudier@free.fr>
 21 Rue Carnot
 95170 DEUIL LA BARRE - FRANCE
 
-Decembre 28 2000
+Updated by Matthew Wilcox <matthew@wil.cx>
+
+2004-10-09
 ===============================================================================
 
 1.  Introduction
@@ -29,26 +31,20 @@ Decembre 28 2000
 10. Boot setup commands
       10.1 Syntax
       10.2 Available arguments
-             10.2.1  Master parity checking
-             10.2.2  Scsi parity checking
-             10.2.3  Default number of tagged commands
-             10.2.4  Default synchronous period factor
-             10.2.5  Verbosity level
-             10.2.6  Debug mode
-             10.2.7  Burst max
-             10.2.8  LED support
-             10.2.9  Max wide
-             10.2.10 Differential mode
-             10.2.11 IRQ mode
-             10.2.12 Reverse probe
-             10.2.13 Fix up PCI configuration space
-             10.2.14 Serial NVRAM
-             10.2.15 Check SCSI BUS 
-             10.2.16 Exclude a host from being attached
-             10.2.17 Suggest a default SCSI id for hosts
-      10.3 PCI configuration fix-up boot option
-      10.4 Serial NVRAM support boot option
-      10.5 SCSI BUS checking boot option
+             10.2.1  Default number of tagged commands
+             10.2.2  Burst max
+             10.2.3  LED support
+             10.2.4  Differential mode
+             10.2.5  IRQ mode
+             10.2.6  Check SCSI BUS 
+             10.2.7  Suggest a default SCSI id for hosts
+             10.2.8  Verbosity level
+             10.2.9  Debug mode
+             10.2.10 Settle delay
+             10.2.11 Serial NVRAM
+             10.2.12 Exclude a host from being attached
+      10.3 Converting from old options
+      10.4 SCSI BUS checking boot option
 11. SCSI problem troubleshooting
       15.1 Problem tracking
       15.2 Understanding hardware error reports
@@ -93,6 +89,9 @@ The history of this driver can be summerized as follows:
       code from the core code that can be shared among different O/Ses.
       Write a glue code for Linux.
           Gerard Roudier
+
+2004: Remove FreeBSD compatibility code.  Remove support for versions of
+      Linux before 2.6.  Start using Linux facilities.
 
 This README file addresses the Linux version of the driver. Under FreeBSD, 
 the driver documentation is the sym.8 man page.
@@ -279,11 +278,10 @@ setting verbose level to zero, as follow:
 6. Parity checking
 
 The driver supports SCSI parity checking and PCI bus master parity
-checking. These features must be enabled in order to ensure safe data
-transfers. However, some flawed devices or mother boards will have
-problems with parity. You can disable either PCI parity or SCSI parity 
-checking by entering appropriate options from the boot command line.
-(See 10: Boot setup commands).
+checking.  These features must be enabled in order to ensure safe
+data transfers.  Some flawed devices or mother boards may have problems
+with parity.  The options to defeat parity checking have been removed
+from the driver.
 
 7. Profiling information
 
@@ -428,77 +426,90 @@ Synchronous transfers frequency       (default answer: 80)
 
 10.1 Syntax
 
-Setup commands can be passed to the driver either at boot time or as a 
-string variable using 'insmod'.
-
-A boot setup command for this driver begins with the driver name "sym53c8xx=".
-The kernel syntax parser then expects an optionnal list of integers separated 
-with comma followed by an optional list of  comma-separated strings.
+Setup commands can be passed to the driver either at boot time or as
+parameters to modprobe, as described in Documentation/kernel-parameters.txt
 
 Example of boot setup command under lilo prompt:
 
-lilo: linux root=/dev/sda2 sym53c8xx=tags:4,sync:10,debug:0x200
+lilo: linux root=/dev/sda2 sym53c8xx.cmd_per_lun=4 sym53c8xx.sync=10 sym53c8xx.debug=0x200
 
 - enable tagged commands, up to 4 tagged commands queued.
 - set synchronous negotiation speed to 10 Mega-transfers / second.
 - set DEBUG_NEGO flag.
 
-Since comma seems not to be allowed when defining a string variable using  
-'insmod', the driver also accepts <space> as option separator. 
-The following command will install driver module with the same options as 
-above.
+The following command will install the driver module with the same
+options as above.
 
-    insmod sym53c8xx.o sym53c8xx="tags:4 sync:10 debug:0x200"
-
-The integer list of arguments is discarded by the driver. 
-
-Each string argument must be specified as "keyword:value". Only lower-case 
-characters and digits are allowed.
+    modprobe sym53c8xx cmd_per_lun=4 sync=10 debug=0x200"
 
 10.2 Available arguments
 
-10.2.1  Master parity checking
-        mpar:y     enabled
-        mpar:n     disabled
-
-10.2.2  Scsi parity checking
-        spar:y     enabled
-        spar:n     disabled
-
-10.2.3  Default number of tagged commands
-        tags:0     (or tags:1 ) tagged command queuing disabled
-        tags:#tags (#tags  > 1) tagged command queuing enabled
+10.2.1  Default number of tagged commands
+        cmd_per_lun=0 (or cmd_per_lun=1) tagged command queuing disabled
+        cmd_per_lun=#tags (#tags > 1) tagged command queuing enabled
   #tags will be truncated to the max queued commands configuration parameter.
-  This option also allows to specify a command queue depth for each device 
-  that support tagged command queueing.
+
+10.2.2  Detailed control of tagged commands
+  This option allows you to specify a command queue depth for each device 
+  that supports tagged command queueing.
   Example:
-      sym53c8xx=tags:10/t2t3q16-t5q24/t1u2q32
-               will set devices queue depth as follow:
+      tag_ctrl=10/t2t3q16-t5q24/t1u2q32
+  will set devices queue depth as follow:
       - controller #0 target #2 and target #3                  -> 16 commands,
       - controller #0 target #5                                -> 24 commands,
       - controller #1 target #1 logical unit #2                -> 32 commands,
       - all other logical units (all targets, all controllers) -> 10 commands.
 
-10.2.4  Default synchronous period factor
-        sync:255     disabled (asynchronous transfer mode)
-        sync:#factor
-  #factor =  9     Ultra-3 SCSI 80 Mega-transfers / second (Wide only)
-  #factor = 10     Ultra-2 SCSI 40 Mega-transfers / second
-  #factor = 11     Ultra-2 SCSI 33 Mega-transfers / second
-  #factor < 25     Ultra   SCSI 20 Mega-transfers / second
-  #factor < 50     Fast    SCSI-2
+10.2.3 Burst max
+        burst=0    burst disabled
+        burst=255  get burst length from initial IO register settings.
+        burst=#x   burst enabled (1<<#x burst transfers max)
+  #x is an integer value which is log base 2 of the burst transfers max.
+  By default the driver uses the maximum value supported by the chip.
 
-  In all cases, the driver will use the minimum transfer period supported by 
-  controllers according to SYM53C8XX chip type.
+10.2.4 LED support
+        led=1      enable  LED support
+        led=0      disable LED support
+  Do not enable LED support if your scsi board does not use SDMS BIOS.
+  (See 'Configuration parameters')
 
-10.2.5  Verbosity level
-        verb:0     minimal
-        verb:1     normal
-        verb:2     too much
+10.2.4 Differential mode
+        diff=0	never set up diff mode
+        diff=1	set up diff mode if BIOS set it
+        diff=2	always set up diff mode
+        diff=3	set diff mode if GPIO3 is not set
 
-10.2.6 Debug mode
-        debug:0	 clear debug flags
-        debug:#x   set debug flags
+10.2.5 IRQ mode
+        irqm=0     always open drain
+        irqm=1     same as initial settings (assumed BIOS settings)
+        irqm=2     always totem pole
+
+10.2.6 Check SCSI BUS 
+        buschk=<option bits>
+
+    Available option bits:
+        0x0:   No check.
+        0x1:   Check and do not attach the controller on error.  
+        0x2:   Check and just warn on error.
+
+10.2.7 Suggest a default SCSI id for hosts
+        hostid=255	no id suggested.
+        hostid=#x   (0 < x < 7) x suggested for hosts SCSI id.
+
+    If a host SCSI id is available from the NVRAM, the driver will ignore 
+    any value suggested as boot option. Otherwise, if a suggested value 
+    different from 255 has been supplied, it will use it. Otherwise, it will 
+    try to deduce the value previously set in the hardware and use value 
+    7 if the hardware value is zero.
+
+10.2.8  Verbosity level
+        verb=0     minimal
+        verb=1     normal
+        verb=2     too much
+
+10.2.9 Debug mode
+        debug=0	 clear debug flags
+        debug=#x   set debug flags
   #x is an integer value combining the following power-of-2 values:
   DEBUG_ALLOC       0x1
   DEBUG_PHASE       0x2
@@ -517,55 +528,17 @@ characters and digits are allowed.
   You can play safely with DEBUG_NEGO. However, some of these flags may 
   generate bunches of syslog messages. 
 
-10.2.7 Burst max
-        burst:0    burst disabled
-        burst:255  get burst length from initial IO register settings.
-        burst:#x   burst enabled (1<<#x burst transfers max)
-  #x is an integer value which is log base 2 of the burst transfers max.
-  By default the driver uses the maximum value supported by the chip.
+10.2.10 Settle delay
+        settle=n	delay for n seconds
 
-10.2.8 LED support
-        led:1      enable  LED support
-        led:0      disable LED support
-  Donnot enable LED support if your scsi board does not use SDMS BIOS.
-  (See 'Configuration parameters')
+  After a bus reset, the driver will delay for n seconds before talking
+  to any device on the bus.  The default is 3 seconds and safe mode will
+  default it to 10.
 
-10.2.9 Max wide
-        wide:1      wide scsi enabled
-        wide:0      wide scsi disabled
-  Some scsi boards use a 875 (ultra wide) and only supply narrow connectors.
-  If you have connected a wide device with a 50 pins to 68 pins cable 
-  converter, any accepted wide negotiation will break further data transfers.
-  In such a case, using "wide:0" in the bootup command will be helpfull. 
-
-10.2.10 Differential mode
-        diff:0	never set up diff mode
-        diff:1	set up diff mode if BIOS set it
-        diff:2	always set up diff mode
-        diff:3	set diff mode if GPIO3 is not set
-
-10.2.11 IRQ mode
-        irqm:0     always open drain
-        irqm:1     same as initial settings (assumed BIOS settings)
-        irqm:2     always totem pole
-
-10.2.12 Reverse probe
-        revprob:n   probe chip ids from the PCI configuration in this order:
-                    810, 815, 825, 860, 875, 885, 875A, 895, 896, 895A,
-                    1510D, 1010-33, 1010-66.
-        revprob:y   probe chip ids in the reverse order.
-
-10.2.13 Fix up PCI configuration space
-        pcifix:<option bits>
-
-    Available option bits:
-        0x0:   No attempt to fix PCI configuration space registers values.
-        0x1:   Set PCI cache-line size register if not set.
-        0x2:   Set write and invalidate bit in PCI command register.
-
-10.2.14 Serial NVRAM
-        nvram:n     do not look for serial NVRAM
-        nvram:y     test controllers for onboard serial NVRAM
+10.2.11 Serial NVRAM
+	NB: option not currently implemented.
+        nvram=n     do not look for serial NVRAM
+        nvram=y     test controllers for onboard serial NVRAM
         (alternate binary form)
         nvram=<bits options>
         0x01   look for NVRAM  (equivalent to nvram=y)
@@ -574,105 +547,28 @@ characters and digits are allowed.
         0x08   ignore NVRAM "Scan at boot time" parameter for all devices
         0x80   also attach controllers set to OFF in the NVRAM (sym53c8xx only)
 
-10.2.15 Check SCSI BUS 
-        buschk:<option bits>
-
-    Available option bits:
-        0x0:   No check.
-        0x1:   Check and do not attach the controller on error.  
-        0x2:   Check and just warn on error.
-
-10.2.16 Exclude a host from being attached
-        excl=<io_address>
+10.2.12 Exclude a host from being attached
+        excl=<io_address>,...
 
     Prevent host at a given io address from being attached.
-    For example 'sym53c8xx=excl:0xb400,excl:0xc000' indicate to the 
+    For example 'excl=0xb400,0xc000' indicate to the 
     driver not to attach hosts at address 0xb400 and 0xc000.
 
-10.2.17 Suggest a default SCSI id for hosts
-        hostid:255	no id suggested.
-        hostid:#x   (0 < x < 7) x suggested for hosts SCSI id.
+10.3 Converting from old style options
 
-    If a host SCSI id is available from the NVRAM, the driver will ignore 
-    any value suggested as boot option. Otherwise, if a suggested value 
-    different from 255 has been supplied, it will use it. Otherwise, it will 
-    try to deduce the value previously set in the hardware and use value 
-    7 if the hardware value is zero.
+Previously, the sym2 driver accepted arguments of the form
+	sym53c8xx=tags:4,sync:10,debug:0x200
 
-10.3 PCI configuration fix-up boot option
+As a result of the new module parameters, this is no longer available.
+Most of the options have remained the same, but tags has split into
+cmd_per_lun and tag_ctrl for its two different purposes.  The sample above
+would be specified as:
+	modprobe sym53c8xx cmd_per_lun=4 sync=10 debug=0x200
 
-pcifix:<option bits>
+or on the kernel boot line as:
+	sym53c8xx.cmd_per_lun=4 sym53c8xx.sync=10 sym53c8xx.debug=0x200
 
-Available option bits:
-    0x1:     Set PCI cache-line size register if not set.
-    0x2:     Set write and invalidate bit in PCI command register.
-
-Use 'pcifix:3' in order to allow the driver to fix both PCI features.
-
-Recent SYMBIOS 53C8XX scsi processors are able to use PCI read multiple 
-and PCI write and invalidate commands. These features require the 
-cache line size register to be properly set in the PCI configuration 
-space of the chips. On the other hand, chips will use PCI write and 
-invalidate commands only if the corresponding bit is set to 1 in the 
-PCI command register.
-
-Not all PCI bioses set the PCI cache line register and the PCI write and 
-invalidate bit in the PCI configuration space of 53C8XX chips.
-Optimized PCI accesses may be broken for some PCI/memory controllers or 
-make problems with some PCI boards.
-
-10.4 Serial NVRAM support boot option
-
-nvram:n     do not look for serial NVRAM
-nvram:y     test controllers for onboard serial NVRAM
-
-This option can also been entered as an hexadecimal value that allows 
-to control what information the driver will get from the NVRAM and what 
-information it will ignore.
-For details see '17. Serial NVRAM support'.
-
-When this option is enabled, the driver tries to detect all boards using 
-a Serial NVRAM. This memory is used to hold user set up parameters.
-
-The parameters the driver is able to get from the NVRAM depend on the 
-data format used, as follow:
-
-                                 Tekram format      Symbios format
-General and host parameters
-    Boot order                         N                   Y
-    Host SCSI ID                       Y                   Y
-    SCSI parity checking               Y                   Y
-    Verbose boot messages              N                   Y
-SCSI devices parameters
-    Synchronous transfer speed         Y                   Y
-    Wide 16 / Narrow                   Y                   Y
-    Tagged Command Queuing enabled     Y                   Y
-    Disconnections enabled             Y                   Y
-    Scan at boot time                  N                   Y
-
-In order to speed up the system boot, for each device configured without 
-the "scan at boot time" option, the driver forces an error on the 
-first TEST UNIT READY command received for this device.
-
-Some SDMS BIOS revisions seem to be unable to boot cleanly with very fast 
-hard disks. In such a situation you cannot configure the NVRAM with 
-optimized parameters value.
-
-The 'nvram' boot option can be entered in hexadecimal form in order 
-to ignore some options configured in the NVRAM, as follow:
-
-nvram=<bits options>
-      0x01   look for NVRAM  (equivalent to nvram=y)
-      0x02   ignore NVRAM "Synchronous negotiation" parameters for all devices
-      0x04   ignore NVRAM "Wide negotiation"  parameter for all devices
-      0x08   ignore NVRAM "Scan at boot time" parameter for all devices
-      0x80   also attach controllers set to OFF in the NVRAM (sym53c8xx only)
-
-Option 0x80 is disabled by default.
-Result is that, by default (option not set), the sym53c8xx driver will not 
-attach controllers set to OFF in the NVRAM.
-
-10.5 SCSI BUS checking boot option.
+10.4 SCSI BUS checking boot option.
 
 When this option is set to a non-zero value, the driver checks SCSI lines 
 logic state, 100 micro-seconds after having asserted the SCSI RESET line.
@@ -805,14 +701,8 @@ serial NVRAM is used by Symbios and Tekram to hold set up parameters for the
 host adaptor and it's attached drives.
 
 The Symbios NVRAM also holds data on the boot order of host adaptors in a
-system with more than one host adaptor. This enables the order of scanning
-the cards for drives to be changed from the default used during host adaptor
-detection.
-
-This can be done to a limited extent at the moment using "reverse probe" but
-this only changes the order of detection of different types of cards. The
-NVRAM boot order settings can do this as well as change the order the same
-types of cards are scanned in, something "reverse probe" cannot do.
+system with more than one host adaptor.  This information is no longer used
+as it's fundamentally incompatible with the hotplug PCI model.
 
 Tekram boards using Symbios chips, DC390W/F/U, which have NVRAM are detected
 and this is used to distinguish between Symbios compatible and Tekram host 
@@ -823,6 +713,26 @@ used together with the Symbios cards using all their features, including
 "diff" support. ("led pin" support for Symbios compatible cards can remain
 enabled when using Tekram cards. It does nothing useful for Tekram host
 adaptors but does not cause problems either.)
+
+The parameters the driver is able to get from the NVRAM depend on the 
+data format used, as follow:
+
+                                 Tekram format      Symbios format
+General and host parameters
+    Boot order                         N                   Y
+    Host SCSI ID                       Y                   Y
+    SCSI parity checking               Y                   Y
+    Verbose boot messages              N                   Y
+SCSI devices parameters
+    Synchronous transfer speed         Y                   Y
+    Wide 16 / Narrow                   Y                   Y
+    Tagged Command Queuing enabled     Y                   Y
+    Disconnections enabled             Y                   Y
+    Scan at boot time                  N                   Y
+
+In order to speed up the system boot, for each device configured without 
+the "scan at boot time" option, the driver forces an error on the 
+first TEST UNIT READY command received for this device.
 
 
 17.2 Symbios NVRAM layout
