@@ -998,12 +998,10 @@ void usb_disconnect(struct usb_device **pdev)
 	 */
 	usb_disable_device(dev, 0);
 
-	dev_dbg (&dev->dev, "unregistering device\n");
 	/* Free the device number and remove the /proc/bus/usb entry */
-	if (dev->devnum > 0) {
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		usbfs_remove_device(dev);
-	}
+	dev_dbg (&dev->dev, "unregistering device\n");
+	usb_release_address(dev);
+	usbfs_remove_device(dev);
 	up(&dev->serialize);
 	device_unregister(&dev->dev);
 }
@@ -1038,23 +1036,22 @@ void usb_choose_address(struct usb_device *dev)
 	}
 }
 
-
-// hub-only!! ... and only exported for reset/reinit path.
-// otherwise used internally, for usb_new_device()
-int usb_set_address(struct usb_device *dev)
+/**
+ * usb_release_address - deallocate device address (usbcore-internal)
+ * @dev: newly removed device
+ *
+ * Removes and deallocates the address assigned to a device.
+ * Only hub drivers (but not virtual root hub drivers for host
+ * controllers) should ever call this.
+ */
+void usb_release_address(struct usb_device *dev)
 {
-	int retval;
-
-	if (dev->devnum == 0)
-		return -EINVAL;
-	if (dev->state != USB_STATE_DEFAULT && dev->state != USB_STATE_ADDRESS)
-		return -EINVAL;
-	retval = usb_control_msg(dev, usb_snddefctrl(dev), USB_REQ_SET_ADDRESS,
-		0, dev->devnum, 0, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
-	if (retval == 0)
-		dev->state = USB_STATE_ADDRESS;
-	return retval;
+	if (dev->devnum > 0) {
+		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
+		dev->devnum = -1;
+	}
 }
+
 
 static inline void usb_show_string(struct usb_device *dev, char *id, int index)
 {
@@ -1166,8 +1163,7 @@ int usb_new_device(struct usb_device *dev)
 	return 0;
 fail:
 	dev->state = USB_STATE_NOTATTACHED;
-	clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-	dev->devnum = -1;
+	usb_release_address(dev);
 	usb_put_dev(dev);
 	return err;
 }

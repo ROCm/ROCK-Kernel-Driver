@@ -1030,6 +1030,21 @@ static int hub_port_debounce(struct usb_device *hub, int port)
 	return ((portstatus&USB_PORT_STAT_CONNECTION)) ? 0 : 1;
 }
 
+static int hub_set_address(struct usb_device *dev)
+{
+	int retval;
+
+	if (dev->devnum == 0)
+		return -EINVAL;
+	if (dev->state != USB_STATE_DEFAULT && dev->state != USB_STATE_ADDRESS)
+		return -EINVAL;
+	retval = usb_control_msg(dev, usb_snddefctrl(dev), USB_REQ_SET_ADDRESS,
+		0, dev->devnum, 0, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
+	if (retval == 0)
+		dev->state = USB_STATE_ADDRESS;
+	return retval;
+}
+
 /* reset device, (re)assign address, get device descriptor.
  * device connection is stable, no more debouncing needed.
  * returns device in USB_STATE_ADDRESS, except on error.
@@ -1143,7 +1158,7 @@ hub_port_init (struct usb_device *hub, struct usb_device *dev, int port)
 	 */
 	for (i = 0; i < GET_DESCRIPTOR_TRIES; ++i) {
 		for (j = 0; j < SET_ADDRESS_TRIES; ++j) {
-			retval = usb_set_address(dev);
+			retval = hub_set_address(dev);
 			if (retval >= 0)
 				break;
 			msleep(200);
@@ -1154,8 +1169,7 @@ hub_port_init (struct usb_device *hub, struct usb_device *dev, int port)
 				dev->devnum, retval);
  fail:
 			hub_port_disable(hub, port);
-			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-			dev->devnum = -1;
+			usb_release_address(dev);
 			usb_put_dev(dev);
 			up(&usb_address0_sem);
 			return retval;
