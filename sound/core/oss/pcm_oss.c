@@ -1448,7 +1448,7 @@ static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, str
 	}
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DELAY, &delay);
-		if (err == -EPIPE || err == -ESTRPIPE) {
+		if (err == -EPIPE || err == -ESTRPIPE || (! err && delay < 0)) {
 			err = 0;
 			delay = 0;
 			fixup = 0;
@@ -1461,11 +1461,6 @@ static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, str
 	}
 	if (err < 0)
 		return err;
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		info.bytes = runtime->oss.bytes - snd_pcm_oss_bytes(substream, delay);
-	} else {
-		info.bytes = runtime->oss.bytes + snd_pcm_oss_bytes(substream, delay);
-	}
 	info.ptr = snd_pcm_oss_bytes(substream, runtime->status->hw_ptr % runtime->buffer_size);
 	if (atomic_read(&runtime->mmap_count)) {
 		snd_pcm_sframes_t n;
@@ -1476,9 +1471,14 @@ static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, str
 		runtime->oss.prev_hw_ptr_interrupt = runtime->hw_ptr_interrupt;
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			snd_pcm_oss_simulate_fill(substream);
+		info.bytes = snd_pcm_oss_bytes(substream, runtime->status->hw_ptr);
 	} else {
 		delay = snd_pcm_oss_bytes(substream, delay) + fixup;
 		info.blocks = delay / runtime->oss.period_bytes;
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			info.bytes = runtime->oss.bytes - snd_pcm_oss_bytes(substream, delay);
+		else
+			info.bytes = runtime->oss.bytes + snd_pcm_oss_bytes(substream, delay);
 	}
 	if (copy_to_user(_info, &info, sizeof(info)))
 		return -EFAULT;
@@ -1509,7 +1509,7 @@ static int snd_pcm_oss_get_space(snd_pcm_oss_file_t *pcm_oss_file, int stream, s
 	info.fragstotal = runtime->periods;
 	if (runtime->oss.prepare) {
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			info.bytes = runtime->oss.period_bytes * runtime->periods;
+			info.bytes = runtime->oss.period_bytes * runtime->oss.periods;
 			info.fragments = runtime->oss.periods;
 		} else {
 			info.bytes = 0;
@@ -1518,7 +1518,7 @@ static int snd_pcm_oss_get_space(snd_pcm_oss_file_t *pcm_oss_file, int stream, s
 	} else {
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DELAY, &avail);
-			if (err == -EPIPE || err == -ESTRPIPE) {
+			if (err == -EPIPE || err == -ESTRPIPE || (! err && avail < 0)) {
 				avail = runtime->buffer_size;
 				err = 0;
 				fixup = 0;
