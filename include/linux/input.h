@@ -806,7 +806,6 @@ struct input_dev {
 	unsigned int repeat_key;
 	struct timer_list timer;
 
-	struct pm_dev *pm_dev;
 	struct pt_regs *regs;
 	int state;
 

@@ -17,7 +17,6 @@
 #include <linux/module.h>
 #include <linux/random.h>
 #include <linux/major.h>
-#include <linux/pm.h>
 #include <linux/proc_fs.h>
 #include <linux/kmod.h>
 #include <linux/interrupt.h>
@@ -460,9 +459,6 @@ void input_unregister_device(struct input_dev *dev)
 	struct list_head * node, * next;
 
 	if (!dev) return;
-
-	if (dev->pm_dev)
-		pm_unregister(dev->pm_dev);
 
 	del_timer_sync(&dev->timer);
 
