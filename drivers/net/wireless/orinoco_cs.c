@@ -1,4 +1,4 @@
-/* orinoco_cs.c 0.11a	- (formerly known as dldwd_cs.c)
+/* orinoco_cs.c 0.11b	- (formerly known as dldwd_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -47,7 +47,7 @@
 
 /*====================================================================*/
 
-static char version[] __initdata = "orinoco_cs.c 0.11a (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata = "orinoco_cs.c 0.11b (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_DESCRIPTION("Driver for PCMCIA Lucent Orinoco, Prism II based and similar wireless cards");
@@ -373,6 +373,7 @@ orinoco_cs_detach(dev_link_t * link)
 {
 	dev_link_t **linkp;
 	struct orinoco_private *priv = link->priv;
+	struct net_device *dev = priv->ndev;
 
 	TRACE_ENTER("orinoco");
 
@@ -408,9 +409,9 @@ orinoco_cs_detach(dev_link_t * link)
 	if (link->dev) {
 		DEBUG(0, "orinoco_cs: About to unregister net device %p\n",
 		      priv->ndev);
-		unregister_netdev(priv->ndev);
+		unregister_netdev(dev);
 	}
-	kfree(priv->card);
+	kfree(dev);
 
  out:
 	TRACE_EXIT("orinoco");

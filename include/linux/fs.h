@@ -660,15 +660,6 @@ struct super_block {
 	 * even looking at it. You had been warned.
 	 */
 	struct semaphore s_vfs_rename_sem;	/* Kludge */
-
-	/* The next field is used by knfsd when converting a (inode number based)
-	 * file handle into a dentry. As it builds a path in the dcache tree from
-	 * the bottom up, there may for a time be a subpath of dentrys which is not
-	 * connected to the main tree.  This semaphore ensure that there is only ever
-	 * one such free path per filesystem.  Note that unconnected files (or other
-	 * non-directories) are allowed, but not unconnected diretories.
-	 */
-	struct semaphore s_nfsd_free_path_sem;
 };
 
 /*
@@ -798,30 +789,6 @@ struct super_operations {
 	void (*clear_inode) (struct inode *);
 	void (*umount_begin) (struct super_block *);
 
-	/* Following are for knfsd to interact with "interesting" filesystems
-	 * Currently just reiserfs, but possibly FAT and others later
-	 *
-	 * fh_to_dentry is given a filehandle fragement with length, and a type flag
-	 *   and must return a dentry for the referenced object or, if "parent" is
-	 *   set, a dentry for the parent of the object.
-	 *   If a dentry cannot be found, a "root" dentry should be created and
-	 *   flaged as DCACHE_DISCONNECTED. nfsd_iget is an example implementation.
-	 *
-	 * dentry_to_fh is given a dentry and must generate the filesys specific
-	 *   part of the file handle.  Available length is passed in *lenp and used
-	 *   length should be returned therein.
-	 *   If need_parent is set, then dentry_to_fh should encode sufficient information
-	 *   to find the (current) parent.
-	 *   dentry_to_fh should return a 1byte "type" which will be passed back in
-	 *   the fhtype arguement to fh_to_dentry.  Type of 0 is reserved.
-	 *   If filesystem was exportable before the introduction of fh_to_dentry,
-	 *   types 1 and 2 should be used is that same way as the generic code.
-	 *   Type 255 means error.
-	 *
-	 * Lengths are in units of 4bytes, not bytes.
-	 */
-	struct dentry * (*fh_to_dentry)(struct super_block *sb, __u32 *fh, int len, int fhtype, int parent);
-	int (*dentry_to_fh)(struct dentry *, __u32 *fh, int *lenp, int need_parent);
 	int (*show_options)(struct seq_file *, struct vfsmount *);
 };
 

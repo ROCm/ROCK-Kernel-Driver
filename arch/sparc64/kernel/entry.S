@@ -1429,7 +1429,7 @@ sys_fork:	 clr		%o1
 sys_clone:	flushw
 		movrz		%o1, %fp, %o1
 		mov		0, %o3
-		ba,pt		%xcc, do_fork
+		ba,pt		%xcc, do_fork_FIXME_NOW_RETURNS_TASK_STRUCT
 		 add		%sp, STACK_BIAS + REGWIN_SZ, %o2
 ret_from_syscall:
 		/* Clear SPARC_FLAG_NEWCHILD, switch_to leaves thread.flags in

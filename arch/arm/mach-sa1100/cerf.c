@@ -36,7 +36,7 @@ static void __init cerf_init_irq(void)
 }
 
 static void __init
-fixup_cerf(struct machine_desc *desc, struct param_struct *params,
+fixup_cerf(struct machine_desc *desc, struct tag *tags,
 	   char **cmdline, struct meminfo *mi)
 {
 #if defined(CONFIG_SA1100_CERF_64MB)

@@ -43,6 +43,5 @@ struct address_space_operations ntfs_attr_aops = {
 						   disk request queue. */
 	prepare_write:	NULL,			/* . */
 	commit_write:	NULL,			/* . */
-	//truncatepage:	NULL,			/* . */
 };
 

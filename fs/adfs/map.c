@@ -1,7 +1,7 @@
 /*
  *  linux/fs/adfs/map.c
  *
- *  Copyright (C) 1997-1999 Russell King
+ *  Copyright (C) 1997-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -13,30 +13,64 @@
 #include <linux/adfs_fs.h>
 #include <linux/spinlock.h>
 
+#include <asm/unaligned.h>
+
 #include "adfs.h"
+
+/*
+ * The ADFS map is basically a set of sectors.  Each sector is called a
+ * zone which contains a bitstream made up of variable sized fragments.
+ * Each bit refers to a set of bytes in the filesystem, defined by
+ * log2bpmb.  This may be larger or smaller than the sector size, but
+ * the overall size it describes will always be a round number of
+ * sectors.  A fragment id is always idlen bits long.
+ *
+ *  < idlen > <       n        > <1>
+ * +---------+-------//---------+---+
+ * | frag id |  0000....000000  | 1 |
+ * +---------+-------//---------+---+
+ *
+ * The physical disk space used by a fragment is taken from the start of
+ * the fragment id up to and including the '1' bit - ie, idlen + n + 1
+ * bits.
+ *
+ * A fragment id can be repeated multiple times in the whole map for
+ * large or fragmented files.  The first map zone a fragment starts in
+ * is given by fragment id / ids_per_zone - this allows objects to start
+ * from any zone on the disk.
+ *
+ * Free space is described by a linked list of fragments.  Each free
+ * fragment describes free space in the same way as the other fragments,
+ * however, the frag id specifies an offset (in map bits) from the end
+ * of this fragment to the start of the next free fragment.
+ *
+ * Objects stored on the disk are allocated object ids (we use these as
+ * our inode numbers.)  Object ids contain a fragment id and an optional
+ * offset.  This allows a directory fragment to contain small files
+ * associated with that directory.
+ */
 
 /*
  * For the future...
  */
-static rwlock_t adfs_map_lock;
+static rwlock_t adfs_map_lock = RW_LOCK_UNLOCKED;
 
+/*
+ * This is fun.  We need to load up to 19 bits from the map at an
+ * arbitary bit alignment.  (We're limited to 19 bits by F+ version 2).
+ */
 #define GET_FRAG_ID(_map,_start,_idmask)				\
 	({								\
-		unsigned long _v2, _frag;				\
-		unsigned int _tmp;					\
-		_tmp = _start >> 5;					\
-		_frag = le32_to_cpu(_map[_tmp]);			\
-		_v2   = le32_to_cpu(_map[_tmp + 1]);			\
-		_tmp = start & 31;					\
-		_frag = (_frag >> _tmp) | (_v2 << (32 - _tmp));		\
+		unsigned char *_m = _map + (_start >> 3);		\
+		u32 _frag = get_unaligned((u32 *)_m);			\
+		_frag >>= (_start & 7);					\
 		_frag & _idmask;					\
 	})
 
 /*
- * return the map bit offset of the fragment frag_id in
- * the zone dm.
- * Note that the loop is optimised for best asm code -
- * look at the output of:
+ * return the map bit offset of the fragment frag_id in the zone dm.
+ * Note that the loop is optimised for best asm code - look at the
+ * output of:
  *  gcc -D__KERNEL__ -O2 -I../../include -o - -S map.c
  */
 static int
@@ -44,14 +78,13 @@ lookup_zone(const struct adfs_discmap *dm, const unsigned int idlen,
 	    const unsigned int frag_id, unsigned int *offset)
 {
 	const unsigned int mapsize = dm->dm_endbit;
-	const unsigned int idmask = (1 << idlen) - 1;
-	unsigned long *map = ((unsigned long *)dm->dm_bh->b_data) + 1;
+	const u32 idmask = (1 << idlen) - 1;
+	unsigned char *map = dm->dm_bh->b_data + 4;
 	unsigned int start = dm->dm_startbit;
 	unsigned int mapptr;
+	u32 frag;
 
 	do {
-		unsigned long frag;
-
 		frag = GET_FRAG_ID(map, start, idmask);
 		mapptr = start + idlen;
 
@@ -59,15 +92,17 @@ lookup_zone(const struct adfs_discmap *dm, const unsigned int idlen,
 		 * find end of fragment
 		 */
 		{
-			unsigned long v2;
+			u32 v, *_map = (u32 *)map;
 
-			while ((v2 = map[mapptr >> 5] >> (mapptr & 31)) == 0) {
+			v = le32_to_cpu(_map[mapptr >> 5]) >> (mapptr & 31);
+			while (v == 0) {
 				mapptr = (mapptr & ~31) + 32;
 				if (mapptr >= mapsize)
 					goto error;
+				v = le32_to_cpu(_map[mapptr >> 5]);
 			}
 
-			mapptr += 1 + ffz(~v2);
+			mapptr += 1 + ffz(~v);
 		}
 
 		if (frag == frag_id)
@@ -75,8 +110,11 @@ lookup_zone(const struct adfs_discmap *dm, const unsigned int idlen,
 again:
 		start = mapptr;
 	} while (mapptr < mapsize);
+	return -1;
 
 error:
+	printk(KERN_ERR "adfs: oversized fragment 0x%x at 0x%x-0x%x\n",
+		frag, start, mapptr);
 	return -1;
 
 found:
@@ -102,10 +140,10 @@ scan_free_map(struct adfs_sb_info *asb, struct adfs_discmap *dm)
 	const unsigned int mapsize = dm->dm_endbit + 32;
 	const unsigned int idlen  = asb->s_idlen;
 	const unsigned int frag_idlen = idlen <= 15 ? idlen : 15;
-	const unsigned int idmask = (1 << frag_idlen) - 1;
-	unsigned long *map = (unsigned long *)dm->dm_bh->b_data;
+	const u32 idmask = (1 << frag_idlen) - 1;
+	unsigned char *map = dm->dm_bh->b_data;
 	unsigned int start = 8, mapptr;
-	unsigned long frag;
+	u32 frag;
 	unsigned long total = 0;
 
 	/*
@@ -133,15 +171,17 @@ scan_free_map(struct adfs_sb_info *asb, struct adfs_discmap *dm)
 		 * find end of fragment
 		 */
 		{
-			unsigned long v2;
+			u32 v, *_map = (u32 *)map;
 
-			while ((v2 = map[mapptr >> 5] >> (mapptr & 31)) == 0) {
+			v = le32_to_cpu(_map[mapptr >> 5]) >> (mapptr & 31);
+			while (v == 0) {
 				mapptr = (mapptr & ~31) + 32;
 				if (mapptr >= mapsize)
 					goto error;
+				v = le32_to_cpu(_map[mapptr >> 5]);
 			}
 
-			mapptr += 1 + ffz(~v2);
+			mapptr += 1 + ffz(~v);
 		}
 
 		total += mapptr - start;
@@ -212,7 +252,9 @@ adfs_map_free(struct super_block *sb)
 	return signed_asl(total, asb->s_map2blk);
 }
 
-int adfs_map_lookup (struct super_block *sb, int frag_id, int offset)
+int
+adfs_map_lookup(struct super_block *sb, unsigned int frag_id,
+		unsigned int offset)
 {
 	struct adfs_sb_info *asb = &sb->u.adfs_sb;
 	unsigned int zone, mapoff;
@@ -245,12 +287,12 @@ int adfs_map_lookup (struct super_block *sb, int frag_id, int offset)
 		return secoff + signed_asl(result, asb->s_map2blk);
 	}
 
-	adfs_error(sb, "fragment %04X at offset %d not found in map",
+	adfs_error(sb, "fragment 0x%04x at offset %d not found in map",
 		   frag_id, offset);
 	return 0;
 
 bad_fragment:
-	adfs_error(sb, "fragment %X is invalid (zone = %d, max = %d)",
+	adfs_error(sb, "invalid fragment 0x%04x (zone = %d, max = %d)",
 		   frag_id, zone, asb->s_map_size);
 	return 0;
 }

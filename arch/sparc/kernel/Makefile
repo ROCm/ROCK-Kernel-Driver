@@ -7,17 +7,15 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
+USE_STANDARD_AS_RULE := true
+
 SH = $(CONFIG_SHELL)
-
-.S.s:
-	$(CPP) $(AFLAGS) -ansi $< -o $*.s
-
-.S.o:
-	$(CC) $(AFLAGS) -ansi -c $< -o $*.o
 
 all: kernel.o head.o init_task.o
 
 O_TARGET := kernel.o
+
+EXTRA_AFLAGS := -ansi
 
 export-objs := sparc_ksyms.o
 IRQ_OBJS := irq.o sun4m_irq.o sun4c_irq.o sun4d_irq.o

@@ -214,7 +214,7 @@ void __init smp4d_boot_cpus(void)
 			int no;
 
 			/* Cook up an idler for this guy. */
-			kernel_thread(start_secondary, NULL, CLONE_PID);
+			kernel_thread(start_secondary, NULL, CLONE_IDLETASK);
 
 			cpucount++;
 

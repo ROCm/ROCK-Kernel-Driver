@@ -125,18 +125,9 @@ static inline int get_order(unsigned long size)
 	return order;
 }
 
+#include <asm/memory.h>
+
 #endif /* !__ASSEMBLY__ */
-
-#include <asm/arch/memory.h>
-
-#define __pa(x)			__virt_to_phys((unsigned long)(x))
-#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
-
-#ifndef CONFIG_DISCONTIGMEM
-#define virt_to_page(kaddr)	(mem_map + (__pa(kaddr) >> PAGE_SHIFT) - \
-				 (PHYS_OFFSET >> PAGE_SHIFT))
-#define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
-#endif
 
 #define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
 				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)

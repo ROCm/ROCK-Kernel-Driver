@@ -24,15 +24,6 @@
 
 
 /*
- * Those are statically mapped PCMCIA IO space for designs using it as a
- * generic IO bus, typically with ISA parts, hardwired IDE interfaces, etc.
- * The actual PCMCIA code is mapping required IO region at run time.
- */
-#define PCMCIA_IO_0_BASE	0xf6000000
-#define PCMCIA_IO_1_BASE	0xf7000000
-
-
-/*
  * We requires absolute addresses i.e. (PCMCIA_IO_0_BASE + 0x3f8) for 
  * in*()/out*() macros to be usable for all cases.
  */

@@ -308,7 +308,7 @@ static ide_startstop_t pre_task_mulout_intr(struct ata_device *drive, struct req
 	struct ata_taskfile *args = rq->special;
 	ide_startstop_t startstop;
 
-	if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ))
+	if (ide_wait_stat(&startstop, drive, rq, DATA_READY, drive->bad_wstat, WAIT_DRQ))
 		return startstop;
 
 	ata_poll_drive_ready(drive);
@@ -329,7 +329,7 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 	 */
 	if (!rq->nr_sectors) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
-			startstop = ide_error(drive, "task_mulout_intr", stat);
+			startstop = ide_error(drive, rq, "task_mulout_intr", stat);
 
 			return startstop;
 		}
@@ -342,7 +342,7 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & (ERR_STAT | DRQ_STAT)) {
-			startstop = ide_error(drive, "task_mulout_intr", stat);
+			startstop = ide_error(drive, rq, "task_mulout_intr", stat);
 
 			return startstop;
 		}
@@ -489,12 +489,12 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 /*
  * This is invoked on completion of a WIN_RESTORE (recalibrate) cmd.
  */
-ide_startstop_t recal_intr(struct ata_device *drive, struct request *__rq)
+ide_startstop_t recal_intr(struct ata_device *drive, struct request *rq)
 {
 	u8 stat;
 
 	if (!OK_STAT(stat = GET_STAT(),READY_STAT,BAD_STAT))
-		return ide_error(drive, "recal_intr", stat);
+		return ide_error(drive, rq, "recal_intr", stat);
 	return ide_stopped;
 }
 
@@ -511,11 +511,11 @@ ide_startstop_t task_no_data_intr(struct ata_device *drive, struct request *rq)
 	if (!OK_STAT(stat = GET_STAT(), READY_STAT, BAD_STAT)) {
 		/* Keep quiet for NOP because it is expected to fail. */
 		if (args && args->taskfile.command != WIN_NOP)
-			return ide_error(drive, "task_no_data_intr", stat);
+			return ide_error(drive, rq, "task_no_data_intr", stat);
 	}
 
 	if (args)
-		ide_end_drive_cmd (drive, stat, GET_ERR());
+		ide_end_drive_cmd(drive, rq, stat, GET_ERR());
 
 	return ide_stopped;
 }
@@ -523,7 +523,7 @@ ide_startstop_t task_no_data_intr(struct ata_device *drive, struct request *rq)
 /*
  * Handler for command with PIO data-in phase
  */
-static ide_startstop_t task_in_intr (struct ata_device *drive, struct request *rq)
+static ide_startstop_t task_in_intr(struct ata_device *drive, struct request *rq)
 {
 	u8 stat	= GET_STAT();
 	char *pBuf = NULL;
@@ -531,7 +531,7 @@ static ide_startstop_t task_in_intr (struct ata_device *drive, struct request *r
 
 	if (!OK_STAT(stat,DATA_READY,BAD_R_STAT)) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
-			return ide_error(drive, "task_in_intr", stat);
+			return ide_error(drive, rq, "task_in_intr", stat);
 		}
 		if (!(stat & BUSY_STAT)) {
 			DTF("task_in_intr to Soon wait for next interrupt\n");
@@ -569,7 +569,7 @@ static ide_startstop_t pre_task_out_intr(struct ata_device *drive, struct reques
 	struct ata_taskfile *args = rq->special;
 	ide_startstop_t startstop;
 
-	if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
+	if (ide_wait_stat(&startstop, drive, rq, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
 		printk(KERN_ERR "%s: no DRQ after issuing %s\n", drive->name, drive->mult_count ? "MULTWRITE" : "WRITE");
 		return startstop;
 	}
@@ -600,7 +600,7 @@ static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *r
 	unsigned long flags;
 
 	if (!OK_STAT(stat,DRIVE_READY,drive->bad_wstat))
-		return ide_error(drive, "task_out_intr", stat);
+		return ide_error(drive, rq, "task_out_intr", stat);
 
 	if (!rq->current_nr_sectors)
 		if (!ide_end_request(drive, rq, 1))
@@ -632,7 +632,7 @@ static ide_startstop_t task_mulin_intr(struct ata_device *drive, struct request 
 
 	if (!OK_STAT(stat = GET_STAT(),DATA_READY,BAD_R_STAT)) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
-			return ide_error(drive, "task_mulin_intr", stat);
+			return ide_error(drive, rq, "task_mulin_intr", stat);
 		}
 		/* no data yet, so wait for another interrupt */
 		ide_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);

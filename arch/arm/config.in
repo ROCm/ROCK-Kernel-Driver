@@ -464,20 +464,8 @@ bool 'Power Management support' CONFIG_PM
 dep_bool 'Preemptible Kernel (experimental)' CONFIG_PREEMPT $CONFIG_CPU_32 $CONFIG_EXPERIMENTAL
 dep_tristate 'Advanced Power Management Emulation' CONFIG_APM $CONFIG_PM
 dep_tristate 'RISC OS personality' CONFIG_ARTHUR $CONFIG_CPU_32
+string 'Default kernel command string' CONFIG_CMDLINE ""
 
-if [ "$CONFIG_ARCH_EBSA110" = "y" -o         \
-     "$CONFIG_ARCH_SA1100" = "y" -o          \
-     "$CONFIG_ARCH_CLPS7500" = "y" -o        \
-     "$CONFIG_ARCH_PERSONAL_SERVER" = "y" -o \
-     "$CONFIG_ARCH_CATS" = "y" -o            \
-     "$CONFIG_ARCH_P720T" = "y" -o	     \
-     "$CONFIG_ARCH_CDB89712" = "y" -o	     \
-     "$CONFIG_ARCH_CAMELOT" = "y" -o	     \
-     "$CONFIG_ARCH_ANAKIN" = "y" -o          \
-     "$CONFIG_ARCH_IOP310" = "y" -o 	     \
-     "$CONFIG_ARCH_ADIFCC" = "y" ]; then
-   string 'Default kernel command string' CONFIG_CMDLINE ""
-fi
 if [ "$CONFIG_ARCH_NETWINDER" = "y" -o  \
      "$CONFIG_ARCH_EBSA110" = "y" -o    \
      "$CONFIG_ARCH_EBSA285" = "y" -o    \

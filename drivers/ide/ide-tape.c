@@ -1925,7 +1925,7 @@ static int idetape_end_request(struct ata_device *drive, struct request *rq, int
 				idetape_increase_max_pipeline_stages (drive);
 		}
 	}
-	ide_end_drive_cmd (drive, 0, 0);
+	ide_end_drive_cmd(drive, rq, 0, 0);
 	if (remove_stage)
 		idetape_remove_stage_head (drive);
 	if (tape->active_data_request == NULL)
@@ -2228,7 +2228,7 @@ static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request 
  *		we will handle the next request.
  *
  */
-static ide_startstop_t idetape_transfer_pc(struct ata_device *drive, struct request *__rq)
+static ide_startstop_t idetape_transfer_pc(struct ata_device *drive, struct request *rq)
 {
 	idetape_tape_t *tape = drive->driver_data;
 	idetape_pc_t *pc = tape->pc;
@@ -2236,7 +2236,7 @@ static ide_startstop_t idetape_transfer_pc(struct ata_device *drive, struct requ
 	int retries = 100;
 	ide_startstop_t startstop;
 
-	if (ide_wait_stat (&startstop,drive,DRQ_STAT,BUSY_STAT,WAIT_READY)) {
+	if (ide_wait_stat(&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY)) {
 		printk (KERN_ERR "ide-tape: Strange, packet command initiated yet DRQ isn't asserted\n");
 		return startstop;
 	}
@@ -5926,41 +5926,7 @@ static void idetape_get_blocksize_from_block_descriptor(ide_drive_t *drive)
 	tape->tape_block_size =( block_descrp->length[0]<<16) + (block_descrp->length[1]<<8) + block_descrp->length[2];
 #if IDETAPE_DEBUG_INFO
 	printk (KERN_INFO "ide-tape: Adjusted block size - %d\n", tape->tape_block_size);
-#endif /* IDETAPE_DEBUG_INFO */
-}
-static void idetape_add_settings (ide_drive_t *drive)
-{
-	idetape_tape_t *tape = drive->driver_data;
-
-/*
- *			drive	setting name	read/write	ioctl	ioctl		data type	min			max			mul_factor			div_factor			data pointer				set function
- */
-	ide_add_setting(drive,	"buffer",	SETTING_READ,	-1,	-1,		TYPE_SHORT,	0,			0xffff,			1,				2,				&tape->capabilities.buffer_size,	NULL);
-	ide_add_setting(drive,	"pipeline_min",	SETTING_RW,	-1,	-1,		TYPE_INT,	2,			0xffff,			tape->stage_size / 1024,	1,				&tape->min_pipeline,			NULL);
-	ide_add_setting(drive,	"pipeline",	SETTING_RW,	-1,	-1,		TYPE_INT,	2,			0xffff,			tape->stage_size / 1024,	1,				&tape->max_stages,			NULL);
-	ide_add_setting(drive,	"pipeline_max",	SETTING_RW,	-1,	-1,		TYPE_INT,	2,			0xffff,			tape->stage_size / 1024,	1,				&tape->max_pipeline,			NULL);
-	ide_add_setting(drive,	"pipeline_used",SETTING_READ,	-1,	-1,		TYPE_INT,	0,			0xffff,			tape->stage_size / 1024,	1,				&tape->nr_stages,			NULL);
-	ide_add_setting(drive,	"pipeline_pending",SETTING_READ,-1,	-1,		TYPE_INT,	0,			0xffff,			tape->stage_size / 1024,	1,				&tape->nr_pending_stages,		NULL);
-	ide_add_setting(drive,	"speed",	SETTING_READ,	-1,	-1,		TYPE_SHORT,	0,			0xffff,			1,				1,				&tape->capabilities.speed,		NULL);
-	ide_add_setting(drive,	"stage",	SETTING_READ,	-1,	-1,		TYPE_INT,	0,			0xffff,			1,				1024,				&tape->stage_size,			NULL);
-	ide_add_setting(drive,	"tdsc",		SETTING_RW,	-1,	-1,		TYPE_INT,	IDETAPE_DSC_RW_MIN,	IDETAPE_DSC_RW_MAX,	1000,				HZ,				&tape->best_dsc_rw_frequency,		NULL);
-	ide_add_setting(drive,	"dsc_overlap",	SETTING_RW,	-1,	-1,		TYPE_BYTE,	0,			1,			1,				1,				&drive->dsc_overlap,			NULL);
-	ide_add_setting(drive,	"pipeline_head_speed_c",SETTING_READ,	-1,	-1,	TYPE_INT,	0,			0xffff,			1,				1,				&tape->controlled_pipeline_head_speed,	NULL);
-	ide_add_setting(drive,	"pipeline_head_speed_u",SETTING_READ,	-1,	-1,	TYPE_INT,	0,			0xffff,			1,				1,				&tape->uncontrolled_pipeline_head_speed,	NULL);
-	ide_add_setting(drive,	"avg_speed",	SETTING_READ,	-1,	-1,		TYPE_INT,	0,			0xffff,			1,				1,				&tape->avg_speed,		NULL);
-	ide_add_setting(drive,	"debug_level",SETTING_RW,	-1,	-1,		TYPE_INT,	0,			0xffff,			1,				1,				&tape->debug_level,		NULL);
-	if (tape->onstream) {
-		ide_add_setting(drive,	"cur_frames",	SETTING_READ,	-1,	-1,		TYPE_SHORT,	0,			0xffff,			1,				1,				&tape->cur_frames,		NULL);
-		ide_add_setting(drive,	"max_frames",	SETTING_READ,	-1,	-1,		TYPE_SHORT,	0,			0xffff,			1,				1,				&tape->max_frames,		NULL);
-		ide_add_setting(drive,	"insert_speed",	SETTING_READ,	-1,	-1,		TYPE_INT,	0,			0xffff,			1,				1,				&tape->insert_speed,		NULL);
-		ide_add_setting(drive,	"speed_control",SETTING_RW,	-1,	-1,		TYPE_INT,	0,			0xffff,			1,				1,				&tape->speed_control,		NULL);
-		ide_add_setting(drive,	"tape_still_time",SETTING_READ,	-1,	-1,		TYPE_INT,	0,			0xffff,			1,				1,				&tape->tape_still_time,		NULL);
-		ide_add_setting(drive,	"max_insert_speed",SETTING_RW,	-1,	-1,		TYPE_INT,	0,			0xffff,			1,				1,				&tape->max_insert_speed,	NULL);
-		ide_add_setting(drive,	"insert_size",	SETTING_READ,	-1,	-1,		TYPE_INT,	0,			0xffff,			1,				1,				&tape->insert_size,		NULL);
-		ide_add_setting(drive,	"capacity",	SETTING_READ,	-1,	-1,		TYPE_INT,	0,			0xffff,			1,				1,				&tape->capacity,		NULL);
-		ide_add_setting(drive,	"first_frame",	SETTING_READ,	-1,	-1,		TYPE_INT,	0,			0xffff,			1,				1,				&tape->first_frame_position,		NULL);
-		ide_add_setting(drive,	"logical_blk",	SETTING_READ,	-1,	-1,		TYPE_INT,	0,			0xffff,			1,				1,				&tape->logical_blk_num,		NULL);
-	}
+#endif
 }
 
 /*
@@ -6074,8 +6040,6 @@ static void idetape_setup (ide_drive_t *drive, idetape_tape_t *tape, int minor)
 		drive->name, tape->name, tape->capabilities.speed, (tape->capabilities.buffer_size * 512) / tape->stage_size,
 		tape->stage_size / 1024, tape->max_stages * tape->stage_size / 1024,
 		tape->best_dsc_rw_frequency * 1000 / HZ, drive->using_dma ? ", DMA":"");
-
-	idetape_add_settings(drive);
 }
 
 static int idetape_cleanup (ide_drive_t *drive)

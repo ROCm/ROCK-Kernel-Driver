@@ -264,8 +264,6 @@ void ide_setup_ports(hw_regs_t *hw,
 #define ATA_SCSI	0x21
 #define ATA_NO_LUN      0x7f
 
-struct ide_settings_s;
-
 typedef union {
 	unsigned all			: 8;	/* all of the bits together */
 	struct {
@@ -329,8 +327,6 @@ struct ata_device {
 
 	unsigned long sleep;	/* sleep until this time */
 
-	u8 XXX_tune_req;			/* requested drive tuning setting */
-
 	byte     using_dma;		/* disk is using dma for read/write */
 	byte	 using_tcq;		/* disk is using queueing */
 	byte	 retry_pio;		/* retrying dma capable host in pio */
@@ -379,7 +375,6 @@ struct ata_device {
 
 	void		*driver_data;	/* extra driver data */
 	devfs_handle_t	de;		/* directory for device */
-	struct ide_settings_s *settings;    /* ioctl entires */
 	char		driver_req[10];	/* requests specific driver */
 
 	int		last_lun;	/* last logical unit */
@@ -418,6 +413,9 @@ struct ata_channel {
 	int		unit;		/* channel number */
 
 	struct hwgroup_s *hwgroup;	/* actually (ide_hwgroup_t *) */
+	struct timer_list timer;	/* failsafe timer */
+	int (*expiry)(struct ata_device *, struct request *);	/* irq handler, if active */
+	struct ata_device *drive;	/* last serviced drive */
 
 	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
 	hw_regs_t	hw;		/* Hardware info */
@@ -569,50 +567,10 @@ typedef struct hwgroup_s {
 	 */
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
 	unsigned long flags;		/* BUSY, SLEEPING */
-	struct ata_device *XXX_drive;	/* current drive */
 	struct request *rq;		/* current request */
-	struct timer_list timer;	/* failsafe timer */
-	int (*expiry)(struct ata_device *, struct request *);	/* irq handler, if active */
 } ide_hwgroup_t;
 
-/* structure attached to the request for IDE_TASK_CMDS */
-
-/*
- * configurable drive settings
- */
-
-#define TYPE_INT	0
-#define TYPE_INTA	1
-#define TYPE_BYTE	2
-#define TYPE_SHORT	3
-
-#define SETTING_READ	(1 << 0)
-#define SETTING_WRITE	(1 << 1)
-#define SETTING_RW	(SETTING_READ | SETTING_WRITE)
-
-typedef int (ide_procset_t)(struct ata_device *, int);
-typedef struct ide_settings_s {
-	char			*name;
-	int			rw;
-	int			read_ioctl;
-	int			write_ioctl;
-	int			data_type;
-	int			min;
-	int			max;
-	int			mul_factor;
-	int			div_factor;
-	void			*data;
-	ide_procset_t		*set;
-	int			auto_remove;
-	struct ide_settings_s	*next;
-} ide_settings_t;
-
-extern void ide_add_setting(struct ata_device *, const char *, int, int, int, int, int, int, int, int, void *, ide_procset_t *);
-extern void ide_remove_setting(struct ata_device *, char *);
-extern int ide_read_setting(struct ata_device *, ide_settings_t *);
-extern int ide_write_setting(struct ata_device *, ide_settings_t *, int);
-extern void ide_add_generic_settings(struct ata_device *);
-
+/* FIXME: kill this as soon as possible */
 #define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) return 0;
 
 /*
@@ -683,13 +641,10 @@ extern void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
 /*
  * Error reporting, in human readable form (luxurious, but a memory hog).
  */
-extern byte ide_dump_status(struct ata_device *, const char *, byte);
+extern u8 ide_dump_status(struct ata_device *, struct request *rq, const char *, u8);
 
-/*
- * ide_error() takes action based on the error returned by the controller.
- * The caller should return immediately after invoking this.
- */
-extern ide_startstop_t ide_error(struct ata_device *, const char *, byte);
+extern ide_startstop_t ide_error(struct ata_device *, struct request *rq,
+		const char *, byte);
 
 /*
  * Issue a simple drive command
@@ -713,7 +668,9 @@ void ide_fixstring(byte *s, const int bytecount, const int byteswap);
  * caller should return the updated value of "startstop" in this case.
  * "startstop" is unchanged when the function returns 0;
  */
-extern int ide_wait_stat(ide_startstop_t *, struct ata_device *, byte, byte, unsigned long);
+extern int ide_wait_stat(ide_startstop_t *,
+		struct ata_device *, struct request *rq,
+		byte, byte, unsigned long);
 
 extern int ide_wait_noerr(struct ata_device *, byte, byte, unsigned long);
 
@@ -759,7 +716,7 @@ extern int ide_do_drive_cmd(struct ata_device *, struct request *, ide_action_t)
 /*
  * Clean up after success/failure of an explicit drive cmd.
  */
-extern void ide_end_drive_cmd(struct ata_device *, byte, byte);
+extern void ide_end_drive_cmd(struct ata_device *, struct request *, u8, u8);
 
 struct ata_taskfile {
 	struct hd_drive_task_hdr taskfile;

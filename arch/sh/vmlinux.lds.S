@@ -5,8 +5,10 @@
 #include <linux/config.h>
 #ifdef CONFIG_CPU_LITTLE_ENDIAN
 OUTPUT_FORMAT("elf32-sh-linux", "elf32-sh-linux", "elf32-sh-linux")
+jiffies = jiffies_64;        
 #else
 OUTPUT_FORMAT("elf32-shbig-linux", "elf32-shbig-linux", "elf32-shbig-linux")
+jiffies = jiffies_64 + 4;
 #endif
 OUTPUT_ARCH(sh)
 ENTRY(_start)

@@ -24,6 +24,4 @@ endif		# CONFIG_MULTIQUAD
 obj-y		+= irq.o common.o
 endif		# CONFIG_VISWS
 
-export-objs     +=      $(obj-y)
-
 include $(TOPDIR)/Rules.make

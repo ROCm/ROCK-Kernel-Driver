@@ -570,7 +570,7 @@ ENTRY(kernel_thread)
 	movq %rsp, %rdx
 
 	# clone now
-	call do_fork
+	call do_fork_FIXME_NOW_RETURNS_TASK_STRUCT
 	# save retval on the stack so it's popped before `ret`
 	movq %rax, RAX(%rsp)
 

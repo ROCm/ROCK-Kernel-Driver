@@ -26,7 +26,7 @@ extern void iq80310_map_io(void);
 extern void iq80310_init_irq(void);
 
 static void __init
-fixup_iq80310(struct machine_desc *desc, struct param_struct *params,
+fixup_iq80310(struct machine_desc *desc, struct tag *tags,
 	      char **cmdline, struct meminfo *mi)
 {
 	system_rev = (*(volatile unsigned int*)0xfe830000) & 0x0f;

@@ -185,7 +185,7 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 	if (pdc4030_cmd(drive,PROMISE_GET_CONFIG)) {
 		return 0;
 	}
-	if (ide_wait_stat(&startstop, drive,DATA_READY,BAD_W_STAT,WAIT_DRQ)) {
+	if (ide_wait_stat(&startstop, drive, NULL, DATA_READY,BAD_W_STAT,WAIT_DRQ)) {
 		printk(KERN_INFO
 			"%s: Failed Promise read config!\n",hwif->name);
 		return 0;
@@ -309,14 +309,14 @@ void __init ide_probe_for_pdc4030(void)
  */
 static ide_startstop_t promise_read_intr(struct ata_device *drive, struct request *rq)
 {
-	byte stat;
+	u8 stat;
 	int total_remaining;
 	unsigned int sectors_left, sectors_avail, nsect;
 	unsigned long flags;
 	char *to;
 
 	if (!OK_STAT(stat=GET_STAT(),DATA_READY,BAD_R_STAT)) {
-		return ide_error(drive, "promise_read_intr", stat);
+		return ide_error(drive, rq, "promise_read_intr", stat);
 	}
 
 read_again:
@@ -348,17 +348,18 @@ read_next:
 	if ((rq->current_nr_sectors -= nsect) <= 0) {
 		ide_end_request(drive, rq, 1);
 	}
-/*
- * Now the data has been read in, do the following:
- * 
- * if there are still sectors left in the request, 
- *   if we know there are still sectors available from the interface,
- *     go back and read the next bit of the request.
- *   else if DRQ is asserted, there are more sectors available, so
- *     go back and find out how many, then read them in.
- *   else if BUSY is asserted, we are going to get an interrupt, so
- *     set the handler for the interrupt and just return
- */
+
+	/*
+	 * Now the data has been read in, do the following:
+	 *
+	 * if there are still sectors left in the request, if we know there are
+	 * still sectors available from the interface, go back and read the
+	 * next bit of the request.  else if DRQ is asserted, there are more
+	 * sectors available, so go back and find out how many, then read them
+	 * in.  else if BUSY is asserted, we are going to get an interrupt, so
+	 * set the handler for the interrupt and just return
+	 */
+
 	if (total_remaining > 0) {
 		if (sectors_avail)
 			goto read_next;
@@ -375,7 +376,7 @@ read_next:
 		}
 		printk(KERN_ERR "%s: Eeek! promise_read_intr: sectors left "
 		       "!DRQ !BUSY\n", drive->name);
-		return ide_error(drive, "promise read intr", stat);
+		return ide_error(drive, rq, "promise read intr", stat);
 	}
 	return ide_stopped;
 }
@@ -400,7 +401,7 @@ static ide_startstop_t promise_complete_pollfunc(struct ata_device *drive, struc
 		ch->poll_timeout = 0;
 		printk(KERN_ERR "%s: completion timeout - still busy!\n",
 		       drive->name);
-		return ide_error(drive, "busy timeout", GET_STAT());
+		return ide_error(drive, rq, "busy timeout", GET_STAT());
 	}
 
 	ch->poll_timeout = 0;
@@ -478,7 +479,7 @@ static ide_startstop_t promise_write_pollfunc(struct ata_device *drive, struct r
 		}
 		ch->poll_timeout = 0;
 		printk(KERN_ERR "%s: write timed out!\n",drive->name);
-		return ide_error(drive, "write timeout", GET_STAT());
+		return ide_error(drive, rq, "write timeout", GET_STAT());
 	}
 
 	/*
@@ -613,7 +614,7 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
  *	call the promise_write function to deal with writing the data out
  * NOTE: No interrupts are generated on writes. Write completion must be polled
  */
-		if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
+		if (ide_wait_stat(&startstop, drive, rq, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
 			printk(KERN_ERR "%s: no DRQ after issuing "
 			       "PROMISE_WRITE\n", drive->name);
 			return startstop;

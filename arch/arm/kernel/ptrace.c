@@ -45,7 +45,7 @@ static inline struct pt_regs *
 get_user_regs(struct task_struct *task)
 {
 	return (struct pt_regs *)
-		((unsigned long)task + 8192 - sizeof(struct pt_regs));
+		((unsigned long)task->thread_info + 8192 - sizeof(struct pt_regs));
 }
 
 /*
