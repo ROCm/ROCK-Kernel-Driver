@@ -163,7 +163,6 @@ struct pcmcia_device {
 		struct pcmcia_socket	*Socket;
 		u_char			Function;
 		dev_info_t		dev_info;
-		u_int			Attributes;
 		u_int			state;
 		event_t			EventMask;
 		int (*event_handler)	(event_t event, int priority,

@@ -175,7 +175,6 @@ dev_link_t *snd_vxpocket_attach(struct snd_vxp_entry *hw)
 	/* Register with Card Services */
 	memset(&client_reg, 0, sizeof(client_reg));
 	client_reg.dev_info = hw->dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask = 
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL
 #ifdef CONFIG_PM

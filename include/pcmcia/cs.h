@@ -124,7 +124,7 @@ typedef struct client_req_t {
 /* For RegisterClient */
 typedef struct client_reg_t {
     dev_info_t	*dev_info;
-    u_int	Attributes;
+    u_int	Attributes;  /* UNUSED */
     u_int	EventMask;
     int		(*event_handler)(event_t event, int priority,
 				 event_callback_args_t *);
@@ -279,7 +279,7 @@ typedef struct win_req_t {
 #define WIN_BAR_MASK		0xe000
 #define WIN_BAR_SHIFT		13
 
-/* Attributes for RegisterClient */
+/* Attributes for RegisterClient -- UNUSED -- */
 #define INFO_MASTER_CLIENT	0x01
 #define INFO_IO_CLIENT		0x02
 #define INFO_MTD_CLIENT		0x04

@@ -131,7 +131,6 @@ static dev_link_t *fdomain_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.event_handler = &fdomain_event;
     client_reg.EventMask =
 	CS_EVENT_RESET_REQUEST | CS_EVENT_CARD_RESET |

@@ -800,7 +800,6 @@ static dev_link_t *pcmciamtd_attach(void)
 
 	/* Register with Card Services */
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask =
 		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |

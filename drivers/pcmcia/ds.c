@@ -709,7 +709,6 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 	*handle = client;
 	client->state &= ~CLIENT_UNBOUND;
 	client->Socket = s;
-	client->Attributes = req->Attributes;
 	client->EventMask = req->EventMask;
 	client->event_handler = req->event_handler;
 	client->event_callback_args = req->event_callback_args;

@@ -2015,7 +2015,6 @@ static dev_link_t *wl3501_attach(void)
 	link->next		 = wl3501_dev_list;
 	wl3501_dev_list		 = link;
 	client_reg.dev_info	 = &wl3501_dev_info;
-	client_reg.Attributes	 = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask	 = CS_EVENT_CARD_INSERTION |
 				   CS_EVENT_RESET_PHYSICAL |
 				   CS_EVENT_CARD_RESET |

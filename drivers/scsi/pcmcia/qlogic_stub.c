@@ -212,7 +212,6 @@ static dev_link_t *qlogic_attach(void)
 	link->next = dev_list;
 	dev_list = link;
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.event_handler = &qlogic_event;
 	client_reg.EventMask = CS_EVENT_RESET_REQUEST | CS_EVENT_CARD_RESET | CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL | CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
 	client_reg.Version = 0x0210;
