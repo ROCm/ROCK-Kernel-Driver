@@ -38,8 +38,6 @@ struct mem_pieces {
 extern void	*mem_pieces_find(unsigned int size, unsigned int align);
 extern void	 mem_pieces_remove(struct mem_pieces *mp, unsigned int start,
 				   unsigned int size, int must_exist);
-extern void	 mem_pieces_append(struct mem_pieces *mp, unsigned int start,
-				   unsigned int size);
 extern void	 mem_pieces_coalesce(struct mem_pieces *mp);
 extern void	 mem_pieces_sort(struct mem_pieces *mp);
 
