@@ -156,6 +156,11 @@ static struct block_device_operations cciss_fops  = {
 /*
  * Report information about this controller.
  */
+#define ENG_GIG 1048576000
+#define ENG_GIG_FACTOR (ENG_GIG/512)
+#define RAID_UNKNOWN 6
+static const char *raid_label[] = {"0","4","1(0+1)","5","5+1","ADG",
+	                                   "UNKNOWN"};
 #ifdef CONFIG_PROC_FS
 
 static struct proc_dir_entry *proc_cciss;
@@ -168,49 +173,80 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
         int size, i, ctlr;
         ctlr_info_t *h = (ctlr_info_t*)data;
         drive_info_struct *drv;
+	unsigned long flags;
+	unsigned int vol_sz, vol_sz_frac;
 
         ctlr = h->ctlr;
-        size = sprintf(buffer, "%s:  Compaq %s Controller\n"
-                "       Board ID: 0x%08lx\n"
-		"       Firmware Version: %c%c%c%c\n"
-                "       Memory Address: 0x%08lx\n"
-                "       IRQ: %d\n"
-                "       Logical drives: %d\n"
-		"       Highest Logical Volume ID: %d\n"
-                "       Current Q depth: %d\n"
-                "       Max Q depth since init: %d\n"
-		"       Max # commands on controller since init: %d\n"
-		"       Max SG entries since init: %d\n\n",
+
+	/* prevent displaying bogus info during configuration
+	 * or deconfiguration of a logical volume
+	 */
+	spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
+	if (h->busy_configuring) {
+		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
+	return -EBUSY;
+	}
+	h->busy_configuring = 1;
+	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
+
+        size = sprintf(buffer, "%s: HP %s Controller\n"
+		"Board ID: 0x%08lx\n"
+		"Firmware Version: %c%c%c%c\n"
+		"IRQ: %d\n"
+		"Logical drives: %d\n"
+		"Current Q depth: %d\n"
+		"Current # commands on controller: %d\n"
+		"Max Q depth since init: %d\n"
+		"Max # commands on controller since init: %d\n"
+		"Max SG entries since init: %d\n\n",
                 h->devname,
                 h->product_name,
                 (unsigned long)h->board_id,
 		h->firm_ver[0], h->firm_ver[1], h->firm_ver[2], h->firm_ver[3],
-                (unsigned long)h->vaddr,
                 (unsigned int)h->intr,
                 h->num_luns, 
-                h->highest_lun, 
-                h->Qdepth, h->maxQsinceinit, h->max_outstanding, h->maxSG);
+		h->Qdepth, h->commands_outstanding,
+		h->maxQsinceinit, h->max_outstanding, h->maxSG);
 
         pos += size; len += size;
 	cciss_proc_tape_report(ctlr, buffer, &pos, &len);
 	for(i=0; i<h->highest_lun; i++) {
+		sector_t tmp;
+
                 drv = &h->drv[i];
 		if (drv->block_size == 0)
 			continue;
-                size = sprintf(buffer+len, "cciss/c%dd%d: blksz=%d nr_blocks=%llu\n",
-                                ctlr, i, drv->block_size, (unsigned long long)drv->nr_blocks);
+		vol_sz = drv->nr_blocks;
+		sector_div(vol_sz, ENG_GIG_FACTOR);
+
+		/*
+		 * Awkwardly do this:
+		 * vol_sz_frac =
+		 *     (drv->nr_blocks%ENG_GIG_FACTOR)*100/ENG_GIG_FACTOR;
+		 */
+		tmp = drv->nr_blocks;
+		vol_sz_frac = sector_div(tmp, ENG_GIG_FACTOR);
+
+		/* Now, vol_sz_frac = (drv->nr_blocks%ENG_GIG_FACTOR) */
+
+		vol_sz_frac *= 100;
+		sector_div(vol_sz_frac, ENG_GIG_FACTOR);
+
+		if (drv->raid_level > 5)
+			drv->raid_level = RAID_UNKNOWN;
+		size = sprintf(buffer+len, "cciss/c%dd%d:"
+				"\t%4d.%02dGB\tRAID %s\n",
+				ctlr, i, vol_sz,vol_sz_frac,
+				raid_label[drv->raid_level]);
                 pos += size; len += size;
         }
-
-	size = sprintf(buffer+len, "nr_allocs = %d\nnr_frees = %d\n",
-                        h->nr_allocs, h->nr_frees);
-        pos += size; len += size;
 
         *eof = 1;
         *start = buffer+offset;
         len -= offset;
         if (len>length)
                 len = length;
+	h->busy_configuring = 0;
         return len;
 }
 
@@ -2158,10 +2194,10 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 	for(i=0; i<DEVICE_COUNT_RESOURCE; i++)
 	{
 		/* is this an IO range */ 
-		if( pdev_resource_flags(pdev, i) & 0x01 ) {
-			c->io_mem_addr = pdev_resource_start(pdev, i);
-			c->io_mem_length = pdev_resource_end(pdev, i) -
-				pdev_resource_start(pdev, i) +1;
+		if( pci_resource_flags(pdev, i) & 0x01 ) {
+			c->io_mem_addr = pci_resource_start(pdev, i);
+			c->io_mem_length = pci_resource_end(pdev, i) -
+				pci_resource_start(pdev, i) +1;
 #ifdef CCISS_DEBUG
 			printk("IO value found base_addr[%d] %lx %lx\n", i,
 				c->io_mem_addr, c->io_mem_length);

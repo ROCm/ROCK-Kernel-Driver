@@ -32,6 +32,7 @@ typedef struct _drive_info_struct
 	int 	heads;
 	int	sectors;
 	int 	cylinders;
+	int	raid_level;
 } drive_info_struct;
 
 struct ctlr_info 
@@ -78,6 +79,7 @@ struct ctlr_info
         unsigned long  		*cmd_pool_bits;
 	int			nr_allocs;
 	int			nr_frees; 
+	int			busy_configuring;
 
 	// Disk structures we need to pass back
 	struct gendisk   *gendisk[NWD];
