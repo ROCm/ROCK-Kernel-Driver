@@ -24,6 +24,7 @@
 */
 
 /*
+ * Bluetooth HCI USB driver.
  * Based on original USB Bluetooth driver for Linux kernel
  *    Copyright (c) 2000 Greg Kroah-Hartman        <greg@kroah.com>
  *    Copyright (c) 2000 Mark Douglas Corner       <mcorner@umich.edu>
@@ -952,9 +953,7 @@ int hci_usb_init(void)
 {
 	int err;
 
-	BT_INFO("BlueZ HCI USB driver ver %s Copyright (C) 2000,2001 Qualcomm Inc",  
-		VERSION);
-	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
+	BT_INFO("HCI USB driver ver %s", VERSION);
 
 	if ((err = usb_register(&hci_usb_driver)) < 0)
 		BT_ERR("Failed to register HCI USB driver");
@@ -971,5 +970,5 @@ module_init(hci_usb_init);
 module_exit(hci_usb_cleanup);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
-MODULE_DESCRIPTION("BlueZ HCI USB driver ver " VERSION);
+MODULE_DESCRIPTION("Bluetooth HCI USB driver ver " VERSION);
 MODULE_LICENSE("GPL");
