@@ -769,11 +769,11 @@ static struct pci_func *ibm_slot_find (u8 busno, u8 device, u8 function)
  * Parameters: bus number
  * Returns : pci_bus *  or NULL if not found
  */
-static struct pci_bus *find_bus (u8 busno)
+static struct pci_bus *ibmphp_find_bus (u8 busno)
 {
 	const struct list_head *tmp;
 	struct pci_bus *bus;
-	debug ("inside find_bus, busno = %x \n", busno);
+	debug ("inside %s, busno = %x \n", __FUNCTION__, busno);
 
 	list_for_each (tmp, &pci_root_buses) {
 		bus = (struct pci_bus *) pci_bus_b (tmp);
@@ -1002,7 +1002,7 @@ static u8 bus_structure_fixup (u8 busno)
 	struct pci_dev *dev;
 	u16 l;
 
-	if (find_bus (busno) || !(ibmphp_find_same_bus_num (busno)))
+	if (ibmphp_find_bus (busno) || !(ibmphp_find_same_bus_num (busno)))
 		return 1;
 
 	bus = kmalloc (sizeof (*bus), GFP_KERNEL);
@@ -1056,7 +1056,7 @@ static int ibm_configure_device (struct pci_func *func)
 		func->dev = pci_find_slot (func->busno, (func->device << 3) | (func->function & 0x7));
 
 	if (func->dev == NULL) {
-		dev0.bus = find_bus (func->busno);
+		dev0.bus = ibmphp_find_bus (func->busno);
 		dev0.devfn = ((func->device << 3) + (func->function & 0x7));
 		dev0.sysdata = dev0.bus->sysdata;
 
@@ -1636,7 +1636,7 @@ static int __init ibmphp_init (void)
 		return -ENOMEM;
 	}
 
-	bus = find_bus (0);
+	bus = ibmphp_find_bus (0);
 	if (!bus) {
 		err ("Can't find the root pci bus, can not continue\n");
 		return -ENODEV;
