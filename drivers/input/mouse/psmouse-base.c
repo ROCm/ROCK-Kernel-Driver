@@ -410,22 +410,21 @@ static int im_explorer_detect(struct psmouse *psmouse)
  * the mouse may have.
  */
 
-static int psmouse_extensions(struct psmouse *psmouse, unsigned int max_proto)
+static int psmouse_extensions(struct psmouse *psmouse,
+			      unsigned int max_proto, int set_properties)
 {
 	int synaptics_hardware = 0;
-
-	psmouse->vendor = "Generic";
-	psmouse->name = "Mouse";
-	psmouse->model = 0;
-	psmouse->protocol_handler = psmouse_process_byte;
 
 /*
  * Try Synaptics TouchPad
  */
 	if (max_proto > PSMOUSE_PS2 && synaptics_detect(psmouse)) {
 		synaptics_hardware = 1;
-		psmouse->vendor = "Synaptics";
-		psmouse->name = "TouchPad";
+
+		if (set_properties) {
+			psmouse->vendor = "Synaptics";
+			psmouse->name = "TouchPad";
+		}
 
 		if (max_proto > PSMOUSE_IMEX) {
 			if (synaptics_init(psmouse) == 0)
@@ -444,33 +443,44 @@ static int psmouse_extensions(struct psmouse *psmouse, unsigned int max_proto)
 	}
 
 	if (max_proto > PSMOUSE_IMEX && genius_detect(psmouse)) {
-		set_bit(BTN_EXTRA, psmouse->dev.keybit);
-		set_bit(BTN_SIDE, psmouse->dev.keybit);
-		set_bit(REL_WHEEL, psmouse->dev.relbit);
 
-		psmouse->vendor = "Genius";
-		psmouse->name = "Wheel Mouse";
+		if (set_properties) {
+			set_bit(BTN_EXTRA, psmouse->dev.keybit);
+			set_bit(BTN_SIDE, psmouse->dev.keybit);
+			set_bit(REL_WHEEL, psmouse->dev.relbit);
+			psmouse->vendor = "Genius";
+			psmouse->name = "Wheel Mouse";
+		}
+
 		return PSMOUSE_GENPS;
 	}
 
 	if (max_proto > PSMOUSE_IMEX) {
-		int type = ps2pp_detect(psmouse);
-		if (type)
+		int type = ps2pp_init(psmouse, set_properties);
+		if (type > PSMOUSE_PS2)
 			return type;
 	}
 
 	if (max_proto >= PSMOUSE_IMPS && intellimouse_detect(psmouse)) {
-		set_bit(REL_WHEEL, psmouse->dev.relbit);
+
+		if (set_properties) {
+			set_bit(REL_WHEEL, psmouse->dev.relbit);
+			if (!psmouse->name)
+				psmouse->name = "Wheel Mouse";
+		}
 
 		if (max_proto >= PSMOUSE_IMEX && im_explorer_detect(psmouse)) {
-			set_bit(BTN_SIDE, psmouse->dev.keybit);
-			set_bit(BTN_EXTRA, psmouse->dev.keybit);
 
-			psmouse->name = "Explorer Mouse";
+			if (!set_properties) {
+				set_bit(BTN_SIDE, psmouse->dev.keybit);
+				set_bit(BTN_EXTRA, psmouse->dev.keybit);
+				if (!psmouse->name)
+					psmouse->name = "Explorer Mouse";
+			}
+
 			return PSMOUSE_IMEX;
 		}
 
-		psmouse->name = "Wheel Mouse";
 		return PSMOUSE_IMPS;
 	}
 
@@ -520,12 +530,7 @@ static int psmouse_probe(struct psmouse *psmouse)
 	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_RESET_DIS))
 		printk(KERN_WARNING "psmouse.c: Failed to reset mouse on %s\n", psmouse->serio->phys);
 
-/*
- * And here we try to determine if it has any extensions over the
- * basic PS/2 3-button mouse.
- */
-
-	return psmouse->type = psmouse_extensions(psmouse, psmouse_max_proto);
+	return 0;
 }
 
 /*
@@ -663,7 +668,6 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	psmouse->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REL);
 	psmouse->dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);
 	psmouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y);
-
 	psmouse->state = PSMOUSE_CMD_MODE;
 	psmouse->serio = serio;
 	psmouse->dev.private = psmouse;
@@ -675,12 +679,20 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 		return;
 	}
 
-	if (psmouse_probe(psmouse) <= 0) {
+	if (psmouse_probe(psmouse) < 0) {
 		serio_close(serio);
 		kfree(psmouse);
 		serio->private = NULL;
 		return;
 	}
+
+	psmouse->type = psmouse_extensions(psmouse, psmouse_max_proto, 1);
+	if (!psmouse->vendor)
+		psmouse->vendor = "Generic";
+	if (!psmouse->name)
+		psmouse->name = "Mouse";
+	if (!psmouse->protocol_handler)
+		psmouse->protocol_handler = psmouse_process_byte;
 
 	sprintf(psmouse->devname, "%s %s %s",
 		psmouse_protocols[psmouse->type], psmouse->vendor, psmouse->name);
@@ -715,28 +727,24 @@ static int psmouse_reconnect(struct serio *serio)
 {
 	struct psmouse *psmouse = serio->private;
 	struct serio_dev *dev = serio->dev;
-	int old_type;
 
 	if (!dev || !psmouse) {
 		printk(KERN_DEBUG "psmouse: reconnect request, but serio is disconnected, ignoring...\n");
 		return -1;
 	}
 
-	old_type = psmouse->type;
-
 	psmouse->state = PSMOUSE_CMD_MODE;
-	psmouse->type = psmouse->acking = 0;
-	psmouse->cmdcnt = psmouse->pktcnt = psmouse->out_of_sync = 0;
+	psmouse->acking = psmouse->cmdcnt = psmouse->pktcnt = psmouse->out_of_sync = 0;
 	if (psmouse->reconnect) {
 	       if (psmouse->reconnect(psmouse))
 			return -1;
-	} else if (psmouse_probe(psmouse) != old_type)
+	} else if (psmouse_probe(psmouse) < 0 ||
+		   psmouse->type != psmouse_extensions(psmouse, psmouse_max_proto, 0))
 		return -1;
 
 	/* ok, the device type (and capabilities) match the old one,
 	 * we can continue using it, complete intialization
 	 */
-	psmouse->type = old_type;
 	psmouse_initialize(psmouse);
 
 	if (psmouse->ptport) {
