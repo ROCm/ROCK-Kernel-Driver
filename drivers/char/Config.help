@@ -633,25 +633,6 @@ CONFIG_BUSMOUSE
   The module will be called busmouse.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_PSMOUSE
-  The PS/2 mouse connects to a special mouse port that looks much like
-  the keyboard port (small circular connector with 6 pins). This way,
-  the mouse does not use any serial ports. This port can also be used
-  for other input devices like light pens, tablets, keypads. Compaq,
-  AST and IBM all use this as their mouse port on currently shipping
-  machines. The trackballs of some laptops are PS/2 mice also. In
-  particular, the C&T 82C710 mouse on TI Travelmates is a PS/2 mouse.
-
-  Although PS/2 mice are not technically bus mice, they are explained
-  in detail in the Busmouse-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>.
-
-  When using a PS/2 mouse, you can get problems if you want to use the
-  mouse both on the Linux console and under X. Using the "-R" option
-  of the Linux mouse managing program gpm (available from
-  <ftp://gnu.systemy.it/pub/gpm/>) solves this problem, or you can get
-  the "mconv2" utility from <ftp://ibiblio.org/pub/Linux/system/mouse/>.
-
 CONFIG_QIC02_TAPE
   If you have a non-SCSI tape drive like that, say Y. Or, if you want
   to compile this driver as a module ( = code which can be inserted in

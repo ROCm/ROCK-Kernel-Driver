@@ -28,7 +28,7 @@ dep_tristate '  Multisystem, NES, SNES, N64, PSX joysticks and gamepads' CONFIG_
 dep_tristate '  Multisystem joysticks via TurboGraFX device' CONFIG_JOYSTICK_TURBOGRAFX $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK $CONFIG_PARPORT
 
 if [ "$CONFIG_AMIGA" = "y" ]; then
-   dep_tristate '  Amiga joysticks' CONFIG_JOYSTICK_AMIJOY $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK
+   dep_tristate '  Amiga joysticks' CONFIG_JOYSTICK_AMIGA $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK
 fi
 
 dep_tristate '  Gameport data dumper' CONFIG_INPUT_JOYDUMP $CONFIG_INPUT $CONFIG_INPUT_JOYSTICK

@@ -34,6 +34,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/input.h>
+#include <linux/delay.h>
 
 #include <asm/amigaints.h>
 #include <asm/amigahw.h>
@@ -51,9 +52,9 @@ static unsigned char amikbd_keycode[0x78] = {
 	 57, 14, 15, 96, 28,  1,111,  0,  0,  0, 74,  0,103,108,106,105,
 	 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 98, 55, 78, 87,
 	 42, 54, 58, 29, 56,100
-}
+};
 
-static char *amikbd_messages[] = {
+static const char *amikbd_messages[8] = {
 	KERN_ALERT "amikbd: Ctrl-Amiga-Amiga reset warning!!\n",
 	KERN_WARNING "amikbd: keyboard lost sync\n",
 	KERN_WARNING "amikbd: keyboard buffer overflow\n",
@@ -79,19 +80,19 @@ static void amikbd_interrupt(int irq, void *dummy, struct pt_regs *fp)
 	ciaa.cra &= ~0x40;		/* switch CIA serial port to input mode */
 
 	down = scancode & 1;		/* lowest bit is release bit */
-	scancode = scancode >> 1;
+	scancode >>= 1;
 
 	if (scancode < 0x78) {		/* scancodes < 0x78 are keys */
 
 		scancode = amikbd_keycode[scancode];
-	
-		if (scancode == KEY_CAPS) {	/* CapsLock is a toggle switch key on Amiga */
+
+		if (scancode == KEY_CAPSLOCK) {	/* CapsLock is a toggle switch key on Amiga */
 			input_report_key(&amikbd_dev, scancode, 1);
 			input_report_key(&amikbd_dev, scancode, 0);
 			input_sync(&amikbd_dev);
 			return;
 		}
-		
+
 		input_report_key(&amikbd_dev, scancode, down);
 		input_sync(&amikbd_dev);
 
@@ -106,20 +107,22 @@ static int __init amikbd_init(void)
 	int i;
 
 	if (!AMIGAHW_PRESENT(AMI_KEYBOARD))
-	 	return -EIO;
+		return -EIO;
 
-	if (!request_mem_region(CIAA_PHYSADDR-1+0xb00, 0x100, "amikeyb"))   
+	if (!request_mem_region(CIAA_PHYSADDR-1+0xb00, 0x100, "amikeyb"))
 		return -EBUSY;
 
-	amikbd_dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP);	
+	amikbd_dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP);
 	amikbd_dev.keycode = amikbd_keycode;
-	
- 	for (i = 0; i < 0x78; i++)
+	amikbd_dev.keycodesize = sizeof(unsigned char);
+	amikbd_dev.keycodemax = ARRAY_SIZE(amikbd_keycode);
+
+	for (i = 0; i < 0x78; i++)
 		if (amikbd_keycode[i])
 			set_bit(amikbd_keycode[i], amikbd_dev.keybit);
 
 	ciaa.cra &= ~0x41;	 /* serial data in, turn off TA */
-	request_irq(IRQ_AMIGA_CIAA_SP, amikbd_interrupt, 0, "amikbd", NULL);
+	request_irq(IRQ_AMIGA_CIAA_SP, amikbd_interrupt, 0, "amikbd", amikbd_interrupt);
 
 	amikbd_dev.name = amikbd_name;
 	amikbd_dev.phys = amikbd_phys;

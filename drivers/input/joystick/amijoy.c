@@ -37,6 +37,7 @@
 
 #include <asm/system.h>
 #include <asm/amigahw.h>
+#include <asm/amigaints.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Driver for Amiga joysticks");
@@ -78,13 +79,13 @@ static int amijoy_open(struct input_dev *dev)
 
 	if ((*used)++)
 		return 0;
-	
-	if (request_irq(IRQ_AMIGA_VERTB, amijoy_interrupt, 0, "amijoy", NULL)) {
+
+	if (request_irq(IRQ_AMIGA_VERTB, amijoy_interrupt, 0, "amijoy", amijoy_interrupt)) {
 		(*used)--;
-		printk(KERN_ERR "amijoy.c: Can't allocate irq %d\n", amijoy_irq);
+		printk(KERN_ERR "amijoy.c: Can't allocate irq %d\n", IRQ_AMIGA_VERTB);
 		return -EBUSY;
 	}
-		
+
 	return 0;
 }
 
@@ -99,8 +100,9 @@ static void amijoy_close(struct input_dev *dev)
 static int __init amijoy_setup(char *str)
 {
 	int i;
-	int ints[4]
-        str = get_options(str, ARRAY_SIZE(ints), ints);
+	int ints[4];
+
+	str = get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 2; i++) amijoy[i] = ints[i+1];
 	return 1;
 }
@@ -109,9 +111,6 @@ __setup("amijoy=", amijoy_setup);
 static int __init amijoy_init(void)
 {
 	int i, j;
-
-	init_timer(amijoy_timer);
-	port->timer.function = amijoy_timer;
 
 	for (i = 0; i < 2; i++)
 		if (amijoy[i]) {
@@ -134,12 +133,12 @@ static int __init amijoy_init(void)
 				amijoy_dev[i].absmax[ABS_X + j] = 1;
 			}
 
-			amijoy->dev[i].name = amijoy_name;
-			amijoy->dev[i].phys = amijoy_phys[i];
-			amijoy->dev[i].id.bustype = BUS_AMIGA;
-			amijoy->dev[i].id.vendor = 0x0001;
-			amijoy->dev[i].id.product = 0x0003;
-			amijoy->dev[i].id.version = 0x0100;
+			amijoy_dev[i].name = amijoy_name;
+			amijoy_dev[i].phys = amijoy_phys[i];
+			amijoy_dev[i].id.bustype = BUS_AMIGA;
+			amijoy_dev[i].id.vendor = 0x0001;
+			amijoy_dev[i].id.product = 0x0003;
+			amijoy_dev[i].id.version = 0x0100;
 
 			amijoy_dev[i].private = amijoy_used + i;
 
@@ -149,7 +148,7 @@ static int __init amijoy_init(void)
 	return 0;
 }
 
-static void _exit amijoy_exit(void)
+static void __exit amijoy_exit(void)
 {
 	int i;
 

@@ -17,115 +17,27 @@ export-objs     :=	busmouse.o console.o keyboard.o sysrq.o \
 			sonypi.o tty_io.o tty_ioctl.o generic_serial.o rtc.o \
 			ip2main.o
 
-KEYMAP   =defkeymap.o
-KEYBD    =pc_keyb.o
-CONSOLE  =console.o
-
-ifeq ($(ARCH),s390)
-  KEYMAP   =
-  KEYBD    =
-  CONSOLE  =
-endif
-
-ifeq ($(ARCH),mips)
-  ifneq ($(CONFIG_PC_KEYB),y)
-    KEYBD    =
-  endif
-endif
-
-ifeq ($(ARCH),s390x)
-  KEYMAP   =
-  KEYBD    =
-  CONSOLE  =
-endif
-
-ifeq ($(ARCH),m68k)
-   ifdef CONFIG_AMIGA
-      KEYBD = amikeyb.o
-   else
-      KEYBD =
-   endif
+ifneq ($(ARCH),s390)
+	ifneq ($(ARCH),s390x)
+		ifneq ($(ARCH),um)
+			KEYMAP   =defkeymap.o
+			CONSOLE  =console.o
+		endif
+	endif
 endif
 
 ifdef CONFIG_Q40
-  KEYBD += q40_keyb.o
   SERIAL = serial.o
 endif
 
-ifdef CONFIG_APOLLO
-  KEYBD += dn_keyb.o
-endif
-
-ifeq ($(ARCH),arm)
-  ifneq ($(CONFIG_PC_KEYMAP),y)
-    KEYMAP   =
-  endif
-  ifneq ($(CONFIG_PC_KEYB),y)
-    KEYBD    =
-  endif
-endif
-
-ifeq ($(ARCH),um)
-  KEYMAP   =
-  KEYBD    =
-  CONSOLE  =
-endif
-
-ifeq ($(ARCH),sh)
-  KEYMAP   =
-  KEYBD    =
-  CONSOLE  =
-  ifeq ($(CONFIG_SH_HP600),y)
-  KEYMAP   = defkeymap.o
-  KEYBD    = scan_keyb.o hp600_keyb.o
-  CONSOLE  = console.o
-  endif
-  ifeq ($(CONFIG_SH_DMIDA),y)
-  # DMIDA does not connect the HD64465 PS/2 keyboard port
-  # but we allow for USB keyboards to be plugged in.
-  KEYMAP   = defkeymap.o
-  KEYBD    = # hd64465_keyb.o pc_keyb.o
-  CONSOLE  = console.o
-  endif
-  ifeq ($(CONFIG_SH_EC3104),y)
-  KEYMAP   = defkeymap.o
-  KEYBD    = ec3104_keyb.o
-  CONSOLE  = console.o
-  endif
-  ifeq ($(CONFIG_SH_DREAMCAST),y)
-  KEYMAP   = defkeymap.o
-  KEYBD    =
-  CONSOLE  = console.o
-  endif
-endif
-
 ifeq ($(CONFIG_DECSTATION),y)
-  KEYMAP   =
-  KEYBD    =
   SERIAL   = decserial.o
-endif
-
-ifeq ($(CONFIG_BAGET_MIPS),y)
-  KEYBD    =
-endif
-
-ifeq ($(CONFIG_QTRONIX_KEYBOARD),y)
-  KEYBD    = qtronix.o
-  KEYMAP   = qtronixmap.o
-endif
-
-ifeq ($(CONFIG_SPARC32),y)
-  KEYBD    =
-endif
-
-ifeq ($(CONFIG_SPARC64),y)
-  KEYBD    =
 endif
 
 obj-$(CONFIG_VT) += vt.o vc_screen.o consolemap.o consolemap_deftbl.o $(CONSOLE) selection.o
 #obj-$(CONFIG_SERIAL) += $(SERIAL) # Fix for decserial.o
 
-obj-$(CONFIG_VT) += keyboard.o $(KEYMAP) $(KEYBD)
+obj-$(CONFIG_VT) += keyboard.o $(KEYMAP)
 
 obj-$(CONFIG_MAGIC_SYSRQ) += sysrq.o
 obj-$(CONFIG_ATARI_DSP56K) += dsp56k.o
