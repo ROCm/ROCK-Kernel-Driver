@@ -173,10 +173,15 @@ anakinfb_init(void)
 	fb_info.changevar = NULL;
 	fb_info.switch_con = &anakinfb_switch_con;
 	fb_info.updatevar = &anakinfb_updatevar;
-	fb_info.screen_base = ioremap(VGA_START, VGA_SIZE);
 
 	memset(&display, 0, sizeof(struct display));
 	anakinfb_get_var(&display.var, 0, &fb_info);
+	if (!(request_mem_region(VGA_START, VGA_SIZE, "vga")))
+		return -ENOMEM;
+	if (!(fb_info.screen_base = ioremap(VGA_START, VGA_SIZE))) {
+		release_mem_region(VGA_START, VGA_SIZE);
+		return -EIO;
+	}
 	display.visual = FB_VISUAL_TRUECOLOR;
 	display.type = FB_TYPE_PACKED_PIXELS;
 	display.type_aux = 0;
@@ -193,8 +198,11 @@ anakinfb_init(void)
 	display.dispsw = &fbcon_dummy;
 #endif
 
-	if (register_framebuffer(&fb_info) < 0)
+	if (register_framebuffer(&fb_info) < 0) {
+		iounmap(fb_info.screen_base);
+		release_mem_region(VGA_START, VGA_SIZE);
 		return -EINVAL;
+	}
 
 	MOD_INC_USE_COUNT;
 	return 0;
