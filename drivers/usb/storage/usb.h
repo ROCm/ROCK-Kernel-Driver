@@ -176,6 +176,5 @@ extern void fill_inquiry_response(struct us_data *us,
  * single queue element srb for write access */
 #define scsi_unlock(host)	spin_unlock_irq(host->host_lock)
 #define scsi_lock(host)		spin_lock_irq(host->host_lock)
-#define sg_address(psg)		(page_address((psg).page) + (psg).offset)
 
 #endif

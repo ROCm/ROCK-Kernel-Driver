@@ -189,7 +189,7 @@ void usb_deregister(struct usb_driver *driver)
 }
 
 /**
- * usb_ifnum_to_if - get the interface object with a given interface number (usbcore-internal)
+ * usb_ifnum_to_if - get the interface object with a given interface number
  * @dev: the device whose current configuration is considered
  * @ifnum: the desired interface
  *
@@ -216,6 +216,33 @@ struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
 				.desc.bInterfaceNumber == ifnum)
 			return config->interface[i];
 
+	return NULL;
+}
+
+/**
+ * usb_altnum_to_altsetting - get the altsetting structure with a given
+ *	alternate setting number.
+ * @intf: the interface containing the altsetting in question
+ * @altnum: the desired alternate setting number
+ *
+ * This searches the altsetting array of the specified interface for
+ * an entry with the correct bAlternateSetting value and returns a pointer
+ * to that entry, or null.
+ *
+ * Note that altsettings need not be stored sequentially by number, so
+ * it would be incorrect to assume that the first altsetting entry in
+ * the array corresponds to altsetting zero.  This routine helps device
+ * drivers avoid such mistakes.
+ */
+struct usb_host_interface *usb_altnum_to_altsetting(struct usb_interface *intf,
+		unsigned int altnum)
+{
+	int i;
+
+	for (i = 0; i < intf->num_altsetting; i++) {
+		if (intf->altsetting[i].desc.bAlternateSetting == altnum)
+			return &intf->altsetting[i];
+	}
 	return NULL;
 }
 
@@ -247,7 +274,7 @@ usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
 
 		/* only endpoints in current altsetting are active */
 		intf = config->interface[i];
-		alt = intf->altsetting + intf->act_altsetting;
+		alt = intf->cur_altsetting;
 
 		for (k = 0; k < alt->desc.bNumEndpoints; k++)
 			if (epnum == alt->endpoint[k].desc.bEndpointAddress)
@@ -421,7 +448,7 @@ usb_match_id(struct usb_interface *interface, const struct usb_device_id *id)
 	if (id == NULL)
 		return NULL;
 
-	intf = &interface->altsetting [interface->act_altsetting];
+	intf = interface->cur_altsetting;
 	dev = interface_to_usbdev(interface);
 
 	/* It is important to check that id->driver_info is nonzero,
@@ -624,7 +651,7 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	scratch += length;
 
 	if (usb_dev->descriptor.bDeviceClass == 0) {
-		int alt = intf->act_altsetting;
+		struct usb_host_interface *alt = intf->cur_altsetting;
 
 		/* 2.4 only exposed interface zero.  in 2.5, hotplug
 		 * agents are called for all interfaces, and can use
@@ -633,9 +660,9 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 		envp [i++] = scratch;
 		length += snprintf (scratch, buffer_size - length,
 			    "INTERFACE=%d/%d/%d",
-			    intf->altsetting[alt].desc.bInterfaceClass,
-			    intf->altsetting[alt].desc.bInterfaceSubClass,
-			    intf->altsetting[alt].desc.bInterfaceProtocol);
+			    alt->desc.bInterfaceClass,
+			    alt->desc.bInterfaceSubClass,
+			    alt->desc.bInterfaceProtocol);
 		if ((buffer_size - length <= 0) || (i >= num_envp))
 			return -ENOMEM;
 		++length;
@@ -1598,6 +1625,7 @@ EXPORT_SYMBOL(usb_driver_release_interface);
 EXPORT_SYMBOL(usb_match_id);
 EXPORT_SYMBOL(usb_find_interface);
 EXPORT_SYMBOL(usb_ifnum_to_if);
+EXPORT_SYMBOL(usb_altnum_to_altsetting);
 
 EXPORT_SYMBOL(usb_reset_device);
 EXPORT_SYMBOL(usb_disconnect);

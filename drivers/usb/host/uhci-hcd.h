@@ -141,7 +141,7 @@ struct uhci_qh {
 				 TD_CTRL_BABBLE | TD_CTRL_CRCTIME | TD_CTRL_BITSTUFF)
 
 #define uhci_maxerr(err)		((err) << TD_CTRL_C_ERR_SHIFT)
-#define uhci_status_bits(ctrl_sts)	((ctrl_sts) & 0xFE0000)
+#define uhci_status_bits(ctrl_sts)	((ctrl_sts) & 0xF60000)
 #define uhci_actual_length(ctrl_sts)	(((ctrl_sts) + 1) & TD_CTRL_ACTLEN_MASK) /* 1-based */
 
 /*
@@ -350,6 +350,7 @@ struct uhci_hcd {
 	enum uhci_state state;			/* FIXME: needs a spinlock */
 	unsigned long state_end;		/* Time of next transition */
 	int resume_detect;			/* Need a Global Resume */
+	unsigned int saved_framenumber;		/* Save during PM suspend */
 
 	/* Main list of URB's currently controlled by this HC */
 	spinlock_t urb_list_lock;

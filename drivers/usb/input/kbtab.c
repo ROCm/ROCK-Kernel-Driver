@@ -4,6 +4,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/usb.h>
+#include <asm/unaligned.h>
+#include <asm/byteorder.h>
 
 /*
  * Version Information
@@ -65,8 +67,8 @@ static void kbtab_irq(struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
-	kbtab->x = (data[2] << 8) + data[1];
-	kbtab->y = (data[4] << 8) + data[3];
+	kbtab->x = le16_to_cpu(get_unaligned((u16 *) &data[1]));
+	kbtab->y = le16_to_cpu(get_unaligned((u16 *) &data[3]));
 
 	kbtab->pressure = (data[5]);
 
@@ -74,12 +76,15 @@ static void kbtab_irq(struct urb *urb, struct pt_regs *regs)
 
 	input_report_abs(dev, ABS_X, kbtab->x);
 	input_report_abs(dev, ABS_Y, kbtab->y);
-	/*input_report_abs(dev, ABS_PRESSURE, kbtab->pressure);*/
 
 	/*input_report_key(dev, BTN_TOUCH , data[0] & 0x01);*/
 	input_report_key(dev, BTN_RIGHT, data[0] & 0x02);
-	
-	input_report_key(dev, BTN_LEFT, (kbtab->pressure > kb_pressure_click) ? 1 : 0);
+
+	if( -1 == kb_pressure_click){ 
+		input_report_abs(dev, ABS_PRESSURE, kbtab->pressure);
+	} else {
+		input_report_key(dev, BTN_LEFT, (kbtab->pressure > kb_pressure_click) ? 1 : 0);
+	};
 	
 	input_sync(dev);
 
@@ -105,8 +110,10 @@ static int kbtab_open(struct input_dev *dev)
 		return 0;
 
 	kbtab->irq->dev = kbtab->usbdev;
-	if (usb_submit_urb(kbtab->irq, GFP_KERNEL))
+	if (usb_submit_urb(kbtab->irq, GFP_KERNEL)) {
+		kbtab->open--;
 		return -EIO;
+	}
 
 	return 0;
 }
@@ -130,7 +137,7 @@ static int kbtab_probe(struct usb_interface *intf, const struct usb_device_id *i
 		return -ENOMEM;
 	memset(kbtab, 0, sizeof(struct kbtab));
 
-	kbtab->data = usb_buffer_alloc(dev, 8, SLAB_ATOMIC, &kbtab->data_dma);
+	kbtab->data = usb_buffer_alloc(dev, 8, GFP_KERNEL, &kbtab->data_dma);
 	if (!kbtab->data) {
 		kfree(kbtab);
 		return -ENOMEM;

@@ -1966,13 +1966,6 @@ P:     Romain Lievin
 M:     roms@lpg.ticalc.org
 S:     Maintained
 
-TIEMAN VOYAGER USB BRAILLE DISPLAY DRIVER
-P:	Stephane Dalton
-M:	sdalton@videotron.ca
-P:	Stéphane Doyon
-M:	s.doyon@videotron.ca
-S:	Maintained
-
 TLAN NETWORK DRIVER
 P:	Samuel Chessman
 M:	chessman@tux.org
@@ -2150,14 +2143,6 @@ M:	petkan@users.sourceforge.net
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 W:	http://pegasus2.sourceforge.net/
-S:	Maintained
-
-USB SCANNER DRIVER
-P:	Henning Meier-Geinitz
-M:	henning@meier-geinitz.de
-L:	linux-usb-users@lists.sourceforge.net
-L:	linux-usb-devel@lists.sourceforge.net
-W:	http://www.meier-geinitz.de/kernel/
 S:	Maintained
 
 USB SE401 DRIVER

@@ -261,6 +261,14 @@ UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450,
 		US_SC_SCSI, US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN | US_FL_MODE_XLATE ),
 
+/* This entry is needed because the device reports Sub=ff */
+UNUSUAL_DEV(  0x054c, 0x0010, 0x0500, 0x0500, 
+               "Sony",
+               "DSC-T1", 
+               US_SC_8070, US_PR_DEVICE, NULL,
+               US_FL_SINGLE_LUN | US_FL_MODE_XLATE ),
+
+
 /* Reported by wim@geeks.nl */
 UNUSUAL_DEV(  0x054c, 0x0025, 0x0100, 0x0100, 
 		"Sony",
@@ -368,7 +376,7 @@ UNUSUAL_DEV(  0x05ab, 0x5701, 0x0100, 0x0110,
 UNUSUAL_DEV(  0x05dc, 0x0001, 0x0000, 0x0001,
 		"Lexar",
 		"Jumpshot USB CF Reader",
-		US_SC_SCSI, US_PR_JUMPSHOT, NULL,
+		US_SC_DEVICE, US_PR_JUMPSHOT, NULL,
 		US_FL_MODE_XLATE ),
 #endif
 
@@ -409,6 +417,13 @@ UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0x0001,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
+/* Reported by Henning Schild <henning@wh9.tu-dresden.de> */
+UNUSUAL_DEV(  0x05e3, 0x0702, 0x0113, 0x0113,
+		"EagleTec",
+		"External Hard Disk",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_INQUIRY ),
+
 /* Reported by Hanno Boeck <hanno@gmx.de>
  * Taken from the Lycoris Kernel */
 UNUSUAL_DEV(  0x0636, 0x0003, 0x0000, 0x9999,
@@ -437,12 +452,6 @@ UNUSUAL_DEV(  0x066b, 0x0105, 0x0100, 0x0100,
 UNUSUAL_DEV( 0x0686, 0x4006, 0x0001, 0x0001,
 		"Minolta",
 		"DiMAGE 7",
-		US_SC_SCSI, US_PR_DEVICE, NULL,
-		0 ),
-
-UNUSUAL_DEV( 0x0686, 0x400b, 0x0001, 0x0001,
-		"Minolta",
-		"DiMAGE 7i",
 		US_SC_SCSI, US_PR_DEVICE, NULL,
 		0 ),
 
@@ -619,6 +628,9 @@ UNUSUAL_DEV(  0x07c4, 0xa400, 0x0000, 0xffff,
  *   are using transport protocol CB.
  * - They don't like the INQUIRY command. So we must handle this command
  *   of the SCSI layer ourselves.
+ * - Some cameras with idProduct=0x1001 and bcdDevice=0x1000 have
+ *   bInterfaceProtocol=0x00 (US_PR_CBI) while others have 0x01 (US_PR_CB).
+ *   So don't remove the US_PR_CB override!
  */
 UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
 		"Casio",
@@ -648,6 +660,17 @@ UNUSUAL_DEV(  0x08ca, 0x2011, 0x0000, 0x9999,
 		"PocketCAM 3Mega",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MODE_XLATE ),
+
+/* Entry needed for flags. Moreover, all devices with this ID use
+ * bulk-only transport, but _some_ falsely report Control/Bulk instead.
+ * One example is "Trumpion Digital Research MYMP3".
+ * Submitted by Bjoern Brill <brill(at)fs.math.uni-frankfurt.de>
+ */
+UNUSUAL_DEV(  0x090a, 0x1001, 0x0100, 0x0100,
+		"Trumpion",
+		"t33520 USB Flash Card Controller",
+		US_SC_DEVICE, US_PR_BULK, NULL,
+		US_FL_MODE_XLATE),
 
 /* Trumpion Microelectronics MP3 player (felipe_alfaro@linuxmail.org) */
 UNUSUAL_DEV( 0x090a, 0x1200, 0x0000, 0x9999,
@@ -688,15 +711,9 @@ UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
                 US_SC_DEVICE, US_PR_DEVICE, NULL,
                 US_FL_FIX_INQUIRY ),
 
-/* This entry from <matthias@ma-c.de> in the Debian mailing list */
-UNUSUAL_DEV( 0x0a17, 0x0006, 0x0000, 0xffff,
-		"Pentax",
-		"Optio 330GS",
-		US_SC_8070, US_PR_CB, NULL,
-		US_FL_MODE_XLATE | US_FL_FIX_INQUIRY ),
 
 /* Submitted by Per Winkvist <per.winkvist@uk.com> */
-UNUSUAL_DEV( 0x0a17, 0x006, 0x1000, 0x9009,
+UNUSUAL_DEV( 0x0a17, 0x006, 0x0000, 0xffff,
                 "Pentax",
                 "Optio S/S4",
                 US_SC_DEVICE, US_PR_DEVICE, NULL,

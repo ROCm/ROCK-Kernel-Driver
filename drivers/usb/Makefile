@@ -20,10 +20,15 @@ obj-$(CONFIG_USB_PRINTER)	+= class/
 obj-$(CONFIG_USB_STORAGE)	+= storage/
 
 obj-$(CONFIG_USB_AIPTEK)	+= input/
+obj-$(CONFIG_USB_ATI_REMOTE)	+= input/
 obj-$(CONFIG_USB_HID)		+= input/
 obj-$(CONFIG_USB_KBD)		+= input/
+obj-$(CONFIG_USB_KBTAB)		+= input/
 obj-$(CONFIG_USB_MOUSE)		+= input/
+obj-$(CONFIG_USB_MTOUCH)	+= input/
+obj-$(CONFIG_USB_POWERMATE)	+= input/
 obj-$(CONFIG_USB_WACOM)		+= input/
+obj-$(CONFIG_USB_XPAD)		+= input/
 
 obj-$(CONFIG_USB_DABUSB)	+= media/
 obj-$(CONFIG_USB_DSBR)		+= media/
@@ -50,7 +55,6 @@ obj-$(CONFIG_USB_MICROTEK)	+= image/
 obj-$(CONFIG_USB_SERIAL)	+= serial/
 
 obj-$(CONFIG_USB_AUERSWALD)	+= misc/
-obj-$(CONFIG_USB_BRLVGER)	+= misc/
 obj-$(CONFIG_USB_EMI26)		+= misc/
 obj-$(CONFIG_USB_LCD)		+= misc/
 obj-$(CONFIG_USB_LEGOTOWER)	+= misc/

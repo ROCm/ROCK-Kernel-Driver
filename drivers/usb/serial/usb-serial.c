@@ -1006,7 +1006,7 @@ int usb_serial_probe(struct usb_interface *interface,
 
 	/* descriptor matches, let's find the endpoints needed */
 	/* check out the endpoints */
-	iface_desc = &interface->altsetting[0];
+	iface_desc = interface->cur_altsetting;
 	for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {
 		endpoint = &iface_desc->endpoint[i].desc;
 		

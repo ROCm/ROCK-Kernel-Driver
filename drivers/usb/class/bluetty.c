@@ -1025,7 +1025,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 	int num_bulk_in = 0;
 	int num_bulk_out = 0;
 
-	interface = &intf->altsetting[0];
+	interface = intf->cur_altsetting;
 	control_out_endpoint = interface->desc.bInterfaceNumber;
 
 	/* find the endpoints that we need */

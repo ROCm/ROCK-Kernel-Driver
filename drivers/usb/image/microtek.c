@@ -693,7 +693,6 @@ static int mts_usb_probe(struct usb_interface *intf,
 			 const struct usb_device_id *id)
 {
 	int i;
-	int result;
 	int ep_out = -1;
 	int ep_in_set[3]; /* this will break if we have more than three endpoints
 			   which is why we check */
@@ -703,7 +702,7 @@ static int mts_usb_probe(struct usb_interface *intf,
 	struct vendor_product const* p;
 	struct usb_device *dev = interface_to_usbdev (intf);
 
-	/* the altsettting 0 on the interface we're probing */
+	/* the current altsetting on the interface we're probing */
 	struct usb_host_interface *altsetting;
 
 	MTS_DEBUG_GOT_HERE();
@@ -724,8 +723,8 @@ static int mts_usb_probe(struct usb_interface *intf,
 		MTS_MESSAGE( "model %s is not known to be fully supported, reports welcome!\n",
 			     p->name );
 
-	/* the altsettting 0 on the interface we're probing */
-	altsetting = &(intf->altsetting[0]);
+	/* the current altsetting on the interface we're probing */
+	altsetting = intf->cur_altsetting;
 
 
 	/* Check if the config is sane */
@@ -765,20 +764,6 @@ static int mts_usb_probe(struct usb_interface *intf,
 	if ( ep_out == -1 ) {
 		MTS_WARNING( "couldn't find an output bulk endpoint. Bailing out.\n" );
 		return -ENODEV;
-	}
-
-	result = usb_set_interface(dev, altsetting->desc.bInterfaceNumber, 0);
-
-	MTS_DEBUG("usb_set_interface returned %d.\n",result);
-	switch( result )
-	{
-	case 0: /* no error */
-		break;
-
-	default:
-		MTS_DEBUG( "unknown error %d from usb_set_interface\n",
-			(int)result );
- 		return -ENODEV;
 	}
 	
 	

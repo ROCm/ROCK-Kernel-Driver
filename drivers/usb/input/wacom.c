@@ -63,6 +63,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/usb.h>
+#include <asm/unaligned.h>
+#include <asm/byteorder.h>
 
 /*
  * Version Information
@@ -194,8 +196,8 @@ static void wacom_penpartner_irq(struct urb *urb, struct pt_regs *regs)
 
 	input_regs(dev, regs);
 	input_report_key(dev, BTN_TOOL_PEN, 1);
-	input_report_abs(dev, ABS_X, data[2] << 8 | data[1]);
-	input_report_abs(dev, ABS_Y, data[4] << 8 | data[3]);
+	input_report_abs(dev, ABS_X, le16_to_cpu(get_unaligned((u16 *) &data[1])));
+	input_report_abs(dev, ABS_Y, le16_to_cpu(get_unaligned((u16 *) &data[3])));
 	input_report_abs(dev, ABS_PRESSURE, (signed char)data[6] + 127);
 	input_report_key(dev, BTN_TOUCH, ((signed char)data[6] > -80) && !(data[5] & 0x20));
 	input_report_key(dev, BTN_STYLUS, (data[5] & 0x40));
@@ -234,8 +236,8 @@ static void wacom_graphire_irq(struct urb *urb, struct pt_regs *regs)
 	if (data[0] != 2)
 		dbg("received unknown report #%d", data[0]);
 
-	x = data[2] | ((__u32)data[3] << 8);
-	y = data[4] | ((__u32)data[5] << 8);
+	x = le16_to_cpu(*(u16 *) &data[2]);
+	y = le16_to_cpu(*(u16 *) &data[4]);
 
 	input_regs(dev, regs);
 
@@ -269,7 +271,7 @@ static void wacom_graphire_irq(struct urb *urb, struct pt_regs *regs)
 		input_report_abs(dev, ABS_Y, y);
 	}
 
-	input_report_abs(dev, ABS_PRESSURE, data[6] | ((__u32)data[7] << 8));
+	input_report_abs(dev, ABS_PRESSURE, le16_to_cpu(*(u16 *) &data[6]));
 	input_report_key(dev, BTN_TOUCH, data[1] & 0x01);
 	input_report_key(dev, BTN_STYLUS, data[1] & 0x02);
 	input_report_key(dev, BTN_STYLUS2, data[1] & 0x04);
@@ -354,8 +356,8 @@ static void wacom_intuos_irq(struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
-	input_report_abs(dev, ABS_X, ((__u32)data[2] << 8) | data[3]);
-	input_report_abs(dev, ABS_Y, ((__u32)data[4] << 8) | data[5]);
+	input_report_abs(dev, ABS_X, be16_to_cpu(*(u16 *) &data[2]));
+	input_report_abs(dev, ABS_Y, be16_to_cpu(*(u16 *) &data[4]));
 	input_report_abs(dev, ABS_DISTANCE, data[9] >> 4);
 
 	if ((data[1] & 0xb8) == 0xa0) {						/* general pen packet */
@@ -483,8 +485,10 @@ static int wacom_open(struct input_dev *dev)
 		return 0;
 
 	wacom->irq->dev = wacom->usbdev;
-	if (usb_submit_urb(wacom->irq, GFP_KERNEL))
+	if (usb_submit_urb(wacom->irq, GFP_KERNEL)) {
+		wacom->open--;
 		return -EIO;
+	}
 
 	return 0;
 }
@@ -509,7 +513,7 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 		return -ENOMEM;
 	memset(wacom, 0, sizeof(struct wacom));
 
-	wacom->data = usb_buffer_alloc(dev, 10, SLAB_ATOMIC, &wacom->data_dma);
+	wacom->data = usb_buffer_alloc(dev, 10, GFP_KERNEL, &wacom->data_dma);
 	if (!wacom->data) {
 		kfree(wacom);
 		return -ENOMEM;

@@ -2663,7 +2663,7 @@ static void gadget_release (struct device *_dev)
 
 /* tear down the binding between this driver and the pci device */
 
-static void __exit net2280_remove (struct pci_dev *pdev)
+static void net2280_remove (struct pci_dev *pdev)
 {
 	struct net2280		*dev = pci_get_drvdata (pdev);
 
@@ -2736,6 +2736,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 	spin_lock_init (&dev->lock);
 	dev->pdev = pdev;
 	dev->gadget.ops = &net2280_ops;
+	dev->gadget.is_dualspeed = 1;
 
 	/* the "gadget" abstracts/virtualizes the controller */
 	strcpy (dev->gadget.dev.bus_id, "gadget");
@@ -2884,7 +2885,7 @@ static struct pci_driver net2280_pci_driver = {
 	.id_table =	pci_ids,
 
 	.probe =	net2280_probe,
-	.remove =	__exit_p(net2280_remove),
+	.remove =	net2280_remove,
 
 	/* FIXME add power management support */
 };
