@@ -42,6 +42,8 @@
 
 #include "io_ports.h"
 
+int (*ioapic_renumber_irq)(int ioapic, int irq);
+
 static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
 
 /*
@@ -1069,11 +1071,13 @@ static int pin_2_irq(int idx, int apic, int pin)
 			while (i < apic)
 				irq += nr_ioapic_registers[i++];
 			irq += pin;
+
 			/*
-			 * For MPS mode, so far only used by ES7000 platform
+			 * For MPS mode, so far only needed by ES7000 platform
 			 */
-			if (platform_rename_gsi)
-				irq = platform_rename_gsi(apic, irq);
+			if (ioapic_renumber_irq)
+				irq = ioapic_renumber_irq(apic, irq);
+
 			break;
 		}
 		default:
