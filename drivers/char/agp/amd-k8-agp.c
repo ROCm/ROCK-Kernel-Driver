@@ -1,5 +1,5 @@
 /* 
- * Copyright 2001,2002 SuSE Labs
+ * Copyright 2001-2003 SuSE Labs
  * Distributed under the GNU public license, v2.
  * 
  * This is a GART driver for the AMD K8 northbridge and the AMD 8151 
