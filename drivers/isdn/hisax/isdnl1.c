@@ -358,8 +358,6 @@ init_bcstate(struct IsdnCardState *cs,
 	bcs->cs = cs;
 	bcs->channel = bc;
 	INIT_WORK(&bcs->work, BChannel_bh, bcs);
-	bcs->BC_SetStack = NULL;
-	bcs->BC_Close = NULL;
 	bcs->Flag = 0;
 }
 

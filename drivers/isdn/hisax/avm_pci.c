@@ -175,6 +175,39 @@ WriteHDLCPnP(struct IsdnCardState *cs, int chan, u8 offset, u8 value)
 	spin_unlock_irqrestore(&avm_pci_lock, flags);
 }
 
+static void
+hdlc_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int len)
+{
+	u8 idx = hscx ? AVM_HDLC_2 : AVM_HDLC_1;
+	int i;
+
+	if (cs->subtyp == AVM_FRITZ_PCI) {
+		u32 *ptr = (u32 *) data;
+
+		outl(idx, cs->hw.avm.cfg_reg + 4);
+		for (i = 0; i < len; i += 4) {
+#ifdef __powerpc__
+#ifdef CONFIG_APUS
+			*ptr++ = in_le32((u32 *)(cs->hw.avm.isac +_IO_BASE));
+#else
+			*ptr++ = in_be32((u32 *)(cs->hw.avm.isac +_IO_BASE));
+#endif /* CONFIG_APUS */
+#else
+			*ptr++ = inl(cs->hw.avm.isac);
+#endif /* __powerpc__ */
+		}
+	} else {
+		outb(idx, cs->hw.avm.cfg_reg + 4);
+		for (i = 0; i < len; i++) {
+			*data++ = inb(cs->hw.avm.isac);
+		}
+	}
+}
+
+static struct bc_hw_ops hdlc_hw_ops = {
+	.read_fifo  = hdlc_read_fifo,
+};
+
 static inline
 struct BCState *Sel_BCS(struct IsdnCardState *cs, int channel)
 {
@@ -259,52 +292,7 @@ modehdlc(struct BCState *bcs, int mode, int bc)
 static inline void
 hdlc_empty_fifo(struct BCState *bcs, int count)
 {
-	register u_int *ptr;
-	u8 *p;
-	u8 idx = bcs->channel ? AVM_HDLC_2 : AVM_HDLC_1;
-	int cnt=0;
-	struct IsdnCardState *cs = bcs->cs;
-
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "hdlc_empty_fifo %d", count);
-	if (bcs->hw.hdlc.rcvidx + count > HSCX_BUFMAX) {
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "hdlc_empty_fifo: incoming packet too large");
-		return;
-	}
-	ptr = (u_int *) p = bcs->hw.hdlc.rcvbuf + bcs->hw.hdlc.rcvidx;
-	bcs->hw.hdlc.rcvidx += count;
-	if (cs->subtyp == AVM_FRITZ_PCI) {
-		outl(idx, cs->hw.avm.cfg_reg + 4);
-		while (cnt < count) {
-#ifdef __powerpc__
-#ifdef CONFIG_APUS
-			*ptr++ = in_le32((unsigned *)(cs->hw.avm.isac +_IO_BASE));
-#else
-			*ptr++ = in_be32((unsigned *)(cs->hw.avm.isac +_IO_BASE));
-#endif /* CONFIG_APUS */
-#else
-			*ptr++ = inl(cs->hw.avm.isac);
-#endif /* __powerpc__ */
-			cnt += 4;
-		}
-	} else {
-		outb(idx, cs->hw.avm.cfg_reg + 4);
-		while (cnt < count) {
-			*p++ = inb(cs->hw.avm.isac);
-			cnt++;
-		}
-	}
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		if (cs->subtyp == AVM_FRITZ_PNP)
-			p = (u8 *) ptr;
-		t += sprintf(t, "hdlc_empty_fifo %c cnt %d",
-			     bcs->channel ? 'B' : 'A', count);
-		QuickHex(t, p, count);
-		debugl1(cs, bcs->blog);
-	}
+	recv_empty_fifo_b(bcs, count);
 }
 
 static void
@@ -360,15 +348,10 @@ reset_xmit(struct BCState *bcs)
 	hdlc_fill_fifo(bcs);
 }
 
-static struct bc_l1_ops hdlc_l1_ops = {
-	.fill_fifo = hdlc_fill_fifo,
-};
-
 static inline void
 HDLC_irq(struct BCState *bcs, u_int stat)
 {
 	int len;
-	struct sk_buff *skb;
 
 	if (bcs->cs->debug & L1_DEB_HSCX)
 		debugl1(bcs->cs, "ch%d stat %#x", bcs->channel, stat);
@@ -384,7 +367,7 @@ HDLC_irq(struct BCState *bcs, u_int stat)
 			write_ctrl(bcs, 1);
 			bcs->hw.hdlc.ctrl.sr.cmd &= ~HDLC_CMD_RRS;
 			write_ctrl(bcs, 1);
-			bcs->hw.hdlc.rcvidx = 0;
+			bcs->rcvidx = 0;
 		} else {
 			if (!(len = (stat & HDLC_STAT_RML_MASK)>>8))
 				len = 32;
@@ -392,21 +375,13 @@ HDLC_irq(struct BCState *bcs, u_int stat)
 			if ((stat & HDLC_STAT_RME) || (bcs->mode == L1_MODE_TRANS)) {
 				if (((stat & HDLC_STAT_CRCVFRRAB)==HDLC_STAT_CRCVFR) ||
 					(bcs->mode == L1_MODE_TRANS)) {
-					if (!(skb = dev_alloc_skb(bcs->hw.hdlc.rcvidx)))
-						printk(KERN_WARNING "HDLC: receive out of memory\n");
-					else {
-						memcpy(skb_put(skb, bcs->hw.hdlc.rcvidx),
-							bcs->hw.hdlc.rcvbuf, bcs->hw.hdlc.rcvidx);
-						skb_queue_tail(&bcs->rqueue, skb);
-					}
-					bcs->hw.hdlc.rcvidx = 0;
-					sched_b_event(bcs, B_RCVBUFREADY);
+					recv_rme_b(bcs);
 				} else {
 					if (bcs->cs->debug & L1_DEB_HSCX)
 						debugl1(bcs->cs, "invalid frame");
 					else
 						debugl1(bcs->cs, "ch%d invalid frame %#x", bcs->channel, stat);
-					bcs->hw.hdlc.rcvidx = 0;
+					bcs->rcvidx = 0;
 				}
 			}
 		}
@@ -492,57 +467,20 @@ void
 close_hdlcstate(struct BCState *bcs)
 {
 	modehdlc(bcs, 0, 0);
-	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (bcs->hw.hdlc.rcvbuf) {
-			kfree(bcs->hw.hdlc.rcvbuf);
-			bcs->hw.hdlc.rcvbuf = NULL;
-		}
-		if (bcs->blog) {
-			kfree(bcs->blog);
-			bcs->blog = NULL;
-		}
-		skb_queue_purge(&bcs->rqueue);
-		skb_queue_purge(&bcs->squeue);
-		if (bcs->tx_skb) {
-			dev_kfree_skb_any(bcs->tx_skb);
-			bcs->tx_skb = NULL;
-			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-		}
-	}
+	bc_close(bcs);
 }
 
 int
 open_hdlcstate(struct IsdnCardState *cs, struct BCState *bcs)
 {
-	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (!(bcs->hw.hdlc.rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-			       "HiSax: No memory for hdlc.rcvbuf\n");
-			return (1);
-		}
-		if (!(bcs->blog = kmalloc(MAX_BLOG_SPACE, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-				"HiSax: No memory for bcs->blog\n");
-			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
-			kfree(bcs->hw.hdlc.rcvbuf);
-			bcs->hw.hdlc.rcvbuf = NULL;
-			return (2);
-		}
-		skb_queue_head_init(&bcs->rqueue);
-		skb_queue_head_init(&bcs->squeue);
-	}
-	bcs->tx_skb = NULL;
-	test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-	bcs->event = 0;
-	bcs->hw.hdlc.rcvidx = 0;
-	bcs->tx_cnt = 0;
-	return (0);
+	return bc_open(bcs);
 }
 
 int
 setstack_hdlc(struct PStack *st, struct BCState *bcs)
 {
 	bcs->channel = st->l1.bc;
+	bcs->unit = bcs->channel;
 	if (open_hdlcstate(st->l1.hardware, bcs))
 		return (-1);
 	st->l1.bcs = bcs;
@@ -552,6 +490,12 @@ setstack_hdlc(struct PStack *st, struct BCState *bcs)
 	setstack_l1_B(st);
 	return (0);
 }
+
+static struct bc_l1_ops hdlc_l1_ops = {
+	.fill_fifo = hdlc_fill_fifo,
+	.open      = setstack_hdlc,
+	.close     = close_hdlcstate,
+};
 
 void __init
 inithdlc(struct IsdnCardState *cs)
@@ -582,10 +526,6 @@ inithdlc(struct IsdnCardState *cs)
 		debugl1(cs, "HDLC 2 VIN %x", val);
 	}
 
-	cs->bcs[0].BC_SetStack = setstack_hdlc;
-	cs->bcs[1].BC_SetStack = setstack_hdlc;
-	cs->bcs[0].BC_Close = close_hdlcstate;
-	cs->bcs[1].BC_Close = close_hdlcstate;
 	modehdlc(cs->bcs, -1, 0);
 	modehdlc(cs->bcs + 1, -1, 1);
 }
@@ -774,6 +714,7 @@ ready:
 		cs->irq, cs->hw.avm.cfg_reg);
 
 	cs->dc_hw_ops = &isac_ops;
+	cs->bc_hw_ops = &hdlc_hw_ops;
 	cs->bc_l1_ops = &hdlc_l1_ops;
 	cs->cardmsg = &AVM_card_msg;
 	cs->irq_func = &avm_pcipnp_interrupt;

@@ -349,17 +349,12 @@ struct l3_process {
 };
 
 struct hscx_hw {
-	int hscx;
-	int rcvidx;
-	u8 *rcvbuf;         /* B-Channel receive Buffer */
 	u8 tsaxr0;
 	u8 tsaxr1;
 };
 
 struct w6692B_hw {
 	int bchan;
-	int rcvidx;
-	u8 *rcvbuf;         /* B-Channel receive Buffer */
 };
 
 struct isar_reg {
@@ -407,8 +402,6 @@ struct hdlc_hw {
 		struct hdlc_stat_reg sr;
 	} ctrl;
 	u_int stat;
-	int rcvidx;
-	u8 *rcvbuf;         /* B-Channel receive Buffer */
 };
 
 struct hfcB_hw {
@@ -479,10 +472,13 @@ struct amd7930_hw {
 struct BCState {
 	int channel;
 	int mode;
-	long Flag; /* long req'd for set_bit --RR */
+	long Flag;
 	struct IsdnCardState *cs;
-	int tx_cnt;		/* B-Channel transmit counter */
-	struct sk_buff *tx_skb; /* B-Channel transmit Buffer */
+	int unit;                       /* first or second unit (e.g. HSCX) */
+	int rcvidx;
+	u8 *rcvbuf;                     /* B-Channel receive Buffer */
+	int tx_cnt;  		        /* B-Channel transmit counter */
+	struct sk_buff *tx_skb;         /* B-Channel transmit Buffer */
 	struct sk_buff_head rqueue;	/* B-Channel receive queue */
 	struct sk_buff_head squeue;	/* B-Channel send queue */
 	struct sk_buff_head cmpl_queue;	/* B-Channel send complete queue */
@@ -492,8 +488,6 @@ struct BCState {
 	struct timer_list transbusy;
 	struct work_struct work;
 	unsigned long event;
-	int  (*BC_SetStack) (struct PStack *, struct BCState *);
-	void (*BC_Close) (struct BCState *);
 #ifdef ERROR_STATISTIC
 	int err_crc;
 	int err_tx;
@@ -882,6 +876,8 @@ struct dc_hw_ops {
 
 struct bc_l1_ops {
 	void   (*fill_fifo)  (struct BCState *);
+	int    (*open)       (struct PStack *, struct BCState *);
+	void   (*close)      (struct BCState *);
 };
 
 #define HW_IOM1			0

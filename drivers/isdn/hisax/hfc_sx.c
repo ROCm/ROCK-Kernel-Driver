@@ -1114,6 +1114,8 @@ hfcsx_bh(void *data)
 
 static struct bc_l1_ops hfcsx_l1_ops = {
 	.fill_fifo = hfcsx_fill_fifo,
+	.open      = setstack_2b,
+	.close     = close_hfcsx,
 };
 
 /********************************/
@@ -1129,10 +1131,6 @@ inithfcsx(struct IsdnCardState *cs)
 	INIT_WORK(&cs->work, hfcsx_bh, cs);
 	cs->bc_l1_ops = &hfcsx_l1_ops;
 	cs->DC_Send_Data = hfcsx_fill_dfifo;
-	cs->bcs[0].BC_SetStack = setstack_2b;
-	cs->bcs[1].BC_SetStack = setstack_2b;
-	cs->bcs[0].BC_Close = close_hfcsx;
-	cs->bcs[1].BC_Close = close_hfcsx;
 	mode_hfcsx(cs->bcs, 0, 0);
 	mode_hfcsx(cs->bcs + 1, 0, 1);
 }

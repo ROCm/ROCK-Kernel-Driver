@@ -372,7 +372,7 @@ xmit_fill_fifo_b(struct BCState *bcs, int fifo_size, int *count, int *more)
 		char *t = bcs->blog;
 
 		t += sprintf(t, "%s %c cnt %d", __FUNCTION__,
-			     bcs->hw.hscx.hscx ? 'B' : 'A', *count);
+			     bcs->unit ? 'B' : 'A', *count);
 		QuickHex(t, p, *count);
 		debugl1(cs, bcs->blog);
 	}
@@ -412,4 +412,173 @@ xmit_fill_fifo_d(struct IsdnCardState *cs, int fifo_size, int *count, int *more)
 		debugl1(cs, cs->dlog);
 	}
 	return p;
+}
+
+static inline void
+recv_empty_fifo_d(struct IsdnCardState *cs, int count)
+{
+	u8 *p;
+
+	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
+		debugl1(cs, __FUNCTION__);
+
+	if (cs->rcvidx + count > MAX_DFRAME_LEN_L1) {
+		if (cs->debug & L1_DEB_WARN)
+			debugl1(cs, "%s: incoming packet too large", __FUNCTION__);
+		cs->rcvidx = 0;
+		return;
+	}
+	p = cs->rcvbuf + cs->rcvidx;
+	cs->rcvidx += count;
+	cs->dc_hw_ops->read_fifo(cs, p, count);
+
+	if (cs->debug & L1_DEB_ISAC_FIFO) {
+		char *t = cs->dlog;
+
+		t += sprintf(t, "%s cnt %d", __FUNCTION__, count);
+		QuickHex(t, p, count);
+		debugl1(cs, cs->dlog);
+	}
+}
+
+static inline void
+recv_empty_fifo_b(struct BCState *bcs, int count)
+{
+	u8 *p;
+	struct IsdnCardState *cs = bcs->cs;
+
+	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
+		debugl1(cs, __FUNCTION__);
+
+	if (bcs->rcvidx + count > HSCX_BUFMAX) {
+		if (cs->debug & L1_DEB_WARN)
+			debugl1(cs, "%s: incoming packet too large", __FUNCTION__);
+		bcs->rcvidx = 0;
+		return;
+	}
+	p = bcs->rcvbuf + bcs->rcvidx;
+	bcs->rcvidx += count;
+	cs->bc_hw_ops->read_fifo(cs, bcs->unit, p, count);
+
+	if (cs->debug & L1_DEB_HSCX_FIFO) {
+		char *t = bcs->blog;
+
+		t += sprintf(t, "%s %c cnt %d", __FUNCTION__,
+			     bcs->unit ? 'B' : 'A', count);
+		QuickHex(t, p, count);
+		debugl1(cs, bcs->blog);
+	}
+}
+
+/* RME - receive message end */
+static inline void
+recv_rme_d(struct IsdnCardState *cs)
+{
+	struct sk_buff *skb;
+	int count;
+
+	count = cs->rcvidx - 1;
+	cs->rcvidx = 0;
+	if (count == 0)
+		return;
+
+	skb = dev_alloc_skb(count);
+	if (!skb) {
+		printk(KERN_WARNING "HiSax: %s: out of memory\n", __FUNCTION__);
+		return;
+	}
+	memcpy(skb_put(skb, count), cs->rcvbuf, count);
+	skb_queue_tail(&cs->rq, skb);
+	sched_d_event(cs, D_RCVBUFREADY);
+}
+
+static inline void
+recv_rme_b(struct BCState *bcs)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	struct sk_buff *skb;
+	int count;
+
+	count = bcs->rcvidx - 1;
+	bcs->rcvidx = 0;
+	if (count == 0)
+		return;
+
+	if (cs->debug & L1_DEB_HSCX_FIFO)
+		debugl1(cs, "HX Frame %d", count);
+
+	skb = dev_alloc_skb(count);
+	if (!skb) {
+		printk(KERN_WARNING "HiSax: %s: out of memory\n", __FUNCTION__);
+		return;
+	}
+	memcpy(skb_put(skb, count), bcs->rcvbuf, count);
+	skb_queue_tail(&bcs->rqueue, skb);
+	sched_b_event(bcs, B_RCVBUFREADY);
+}
+
+/* RPF - receive pull full */
+static inline void
+recv_rpf_b(struct BCState *bcs)
+{
+	if (bcs->mode != L1_MODE_TRANS)
+		return;
+
+	recv_rme_b(bcs);
+}
+	
+static inline int
+bc_open(struct BCState *bcs)
+{
+	if (test_and_set_bit(BC_FLG_INIT, &bcs->Flag))
+		return 0;
+
+	bcs->rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC);
+	if (!bcs->rcvbuf)
+		goto err;
+
+	bcs->blog = kmalloc(MAX_BLOG_SPACE, GFP_ATOMIC);
+	if (!bcs->blog)
+		goto err_rcvbuf;
+	
+	skb_queue_head_init(&bcs->rqueue);
+	skb_queue_head_init(&bcs->squeue);
+	skb_queue_head_init(&bcs->cmpl_queue);
+
+	clear_bit(BC_FLG_BUSY, &bcs->Flag);
+	bcs->tx_skb = NULL;
+	bcs->rcvidx = 0;
+	bcs->tx_cnt = 0;
+	bcs->event = 0;
+
+	return 0;
+
+ err_rcvbuf:
+	kfree(bcs->rcvbuf);
+ err:
+	clear_bit(BC_FLG_INIT, &bcs->Flag);
+	printk(KERN_WARNING "HiSax: %s: out of memory\n", __FUNCTION__);
+	return -ENOMEM;;
+}
+
+static inline void
+bc_close(struct BCState *bcs)
+{
+	if (!test_and_clear_bit(BC_FLG_INIT, &bcs->Flag))
+		return;
+
+	kfree(bcs->rcvbuf);
+	bcs->rcvbuf = NULL;
+
+	kfree(bcs->blog);
+	bcs->blog = NULL;
+
+	skb_queue_purge(&bcs->rqueue);
+	skb_queue_purge(&bcs->squeue);
+	skb_queue_purge(&bcs->cmpl_queue);
+	if (bcs->tx_skb) {
+		dev_kfree_skb_any(bcs->tx_skb);
+		bcs->tx_skb = NULL;
+		clear_bit(BC_FLG_BUSY, &bcs->Flag);
+	}
 }

@@ -1337,6 +1337,8 @@ hfcpci_bh(void *data)
 
 static struct bc_l1_ops hfcpci_l1_ops = {
 	.fill_fifo = hfcpci_fill_fifo,
+	.open      = setstack_2b,
+	.close     = close_hfcpci,
 };
 
 /********************************/
@@ -1352,10 +1354,6 @@ inithfcpci(struct IsdnCardState *cs)
 	INIT_WORK(&cs->work, hfcpci_bh, cs);
 	cs->bc_l1_ops = &hfcpci_l1_ops;
 	cs->DC_Send_Data = hfcpci_fill_dfifo;
-	cs->bcs[0].BC_SetStack = setstack_2b;
-	cs->bcs[1].BC_SetStack = setstack_2b;
-	cs->bcs[0].BC_Close = close_hfcpci;
-	cs->bcs[1].BC_Close = close_hfcpci;
 	mode_hfcpci(cs->bcs, 0, 0);
 	mode_hfcpci(cs->bcs + 1, 0, 1);
 }

@@ -1745,14 +1745,12 @@ isar_auxcmd(struct IsdnCardState *cs, isdn_ctrl *ic) {
 
 static struct bc_l1_ops isar_l1_ops = {
 	.fill_fifo = isar_fill_fifo,
+	.open      = setstack_isar,
+	.close     = close_isarstate,
 };
 
 void __devinit
 initisar(struct IsdnCardState *cs)
 {
 	cs->bc_l1_ops = &isar_l1_ops;
-	cs->bcs[0].BC_SetStack = setstack_isar;
-	cs->bcs[1].BC_SetStack = setstack_isar;
-	cs->bcs[0].BC_Close = close_isarstate;
-	cs->bcs[1].BC_Close = close_isarstate;
 }

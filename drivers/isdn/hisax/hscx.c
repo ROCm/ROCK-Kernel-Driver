@@ -25,36 +25,24 @@ static inline u8
 hscx_read(struct BCState *bcs, u8 addr)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
 
-	return cs->bc_hw_ops->read_reg(cs, hscx, addr);
+	return cs->bc_hw_ops->read_reg(cs, bcs->unit, addr);
 }
 
 static inline void
 hscx_write(struct BCState *bcs, u8 addr, u8 val)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
 
-	cs->bc_hw_ops->write_reg(cs, hscx, addr, val);
-}
-
-static inline void
-hscx_read_fifo(struct BCState *bcs, u8 *p, int len)
-{
-	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
-
-	cs->bc_hw_ops->read_fifo(cs, hscx, p, len);
+	cs->bc_hw_ops->write_reg(cs, bcs->unit, addr, val);
 }
 
 static inline void
 hscx_write_fifo(struct BCState *bcs, u8 *p, int len)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
 
-	cs->bc_hw_ops->write_fifo(cs, hscx, p, len);
+	cs->bc_hw_ops->write_fifo(cs, bcs->unit, p, len);
 }
 
 int __init
@@ -67,16 +55,16 @@ HscxVersion(struct IsdnCardState *cs, char *s)
 	printk(KERN_INFO "%s HSCX version A: %s  B: %s\n", s,
 	       HSCXVer[verA], HSCXVer[verB]);
 	if ((verA == 0) | (verA == 0xf) | (verB == 0) | (verB == 0xf))
-		return (1);
+		return 1;
 	else
-		return (0);
+		return 0;
 }
 
 void
 modehscx(struct BCState *bcs, int mode, int bc)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int hscx = bcs->hw.hscx.hscx;
+	int hscx = bcs->unit;
 
 	if (cs->debug & L1_DEB_HSCX)
 		debugl1(cs, "hscx %c mode %d ichan %d",
@@ -164,52 +152,17 @@ void
 close_hscxstate(struct BCState *bcs)
 {
 	modehscx(bcs, 0, bcs->channel);
-	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (bcs->hw.hscx.rcvbuf) {
-			kfree(bcs->hw.hscx.rcvbuf);
-			bcs->hw.hscx.rcvbuf = NULL;
-		}
-		if (bcs->blog) {
-			kfree(bcs->blog);
-			bcs->blog = NULL;
-		}
-		skb_queue_purge(&bcs->rqueue);
-		skb_queue_purge(&bcs->squeue);
-		skb_queue_purge(&bcs->cmpl_queue);
-		if (bcs->tx_skb) {
-			dev_kfree_skb_any(bcs->tx_skb);
-			bcs->tx_skb = NULL;
-			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-		}
-	}
+	bc_close(bcs);
 }
 
 int
 open_hscxstate(struct IsdnCardState *cs, struct BCState *bcs)
 {
-	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (!(bcs->hw.hscx.rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-				"HiSax: No memory for hscx.rcvbuf\n");
-			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
-			return (1);
-		}
-		if (!(bcs->blog = kmalloc(MAX_BLOG_SPACE, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-				"HiSax: No memory for bcs->blog\n");
-			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
-			kfree(bcs->hw.hscx.rcvbuf);
-			bcs->hw.hscx.rcvbuf = NULL;
-			return (2);
-		}
-		skb_queue_head_init(&bcs->rqueue);
-		skb_queue_head_init(&bcs->squeue);
-		skb_queue_head_init(&bcs->cmpl_queue);
-	}
+	bc_open(bcs);
 	bcs->tx_skb = NULL;
 	test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 	bcs->event = 0;
-	bcs->hw.hscx.rcvidx = 0;
+	bcs->rcvidx = 0;
 	bcs->tx_cnt = 0;
 	return (0);
 }
@@ -228,8 +181,12 @@ setstack_hscx(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
+static void hscx_fill_fifo(struct BCState *bcs);
+
 static struct bc_l1_ops hscx_l1_ops = {
 	.fill_fifo = hscx_fill_fifo,
+	.open      = setstack_hscx,
+	.close     = close_hscxstate,
 };
 
 void __init
@@ -238,12 +195,8 @@ inithscx(struct IsdnCardState *cs)
 	int val, eval;
 	
 	cs->bc_l1_ops = &hscx_l1_ops;
-	cs->bcs[0].BC_SetStack = setstack_hscx;
-	cs->bcs[1].BC_SetStack = setstack_hscx;
-	cs->bcs[0].BC_Close = close_hscxstate;
-	cs->bcs[1].BC_Close = close_hscxstate;
-	cs->bcs[0].hw.hscx.hscx = 0;
-	cs->bcs[1].hw.hscx.hscx = 1;
+	cs->bcs[0].unit = 0;
+	cs->bcs[1].unit = 1;
 	cs->bcs[0].hw.hscx.tsaxr0 = 0x2f;
 	cs->bcs[0].hw.hscx.tsaxr1 = 3;
 	cs->bcs[1].hw.hscx.tsaxr0 = 0x2f;

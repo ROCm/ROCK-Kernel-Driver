@@ -40,12 +40,6 @@ isac_write(struct IsdnCardState *cs, u8 addr, u8 val)
 }
 
 static inline void
-isac_read_fifo(struct IsdnCardState *cs, u8 *p, int len)
-{
-	return cs->dc_hw_ops->read_fifo(cs, p, len);
-}
-
-static inline void
 isac_write_fifo(struct IsdnCardState *cs, u8 *p, int len)
 {
 	return cs->dc_hw_ops->write_fifo(cs, p, len);
@@ -140,30 +134,8 @@ isac_bh(void *data)
 void
 isac_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	u8 *ptr;
-
-	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
-		debugl1(cs, "isac_empty_fifo");
-
-	if ((cs->rcvidx + count) >= MAX_DFRAME_LEN_L1) {
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "isac_empty_fifo overrun %d",
-				cs->rcvidx + count);
-		isac_write(cs, ISAC_CMDR, 0x80);
-		cs->rcvidx = 0;
-		return;
-	}
-	ptr = cs->rcvbuf + cs->rcvidx;
-	cs->rcvidx += count;
-	isac_read_fifo(cs, ptr, count);
+	recv_empty_fifo_d(cs, count);
 	isac_write(cs, ISAC_CMDR, 0x80);
-	if (cs->debug & L1_DEB_ISAC_FIFO) {
-		char *t = cs->dlog;
-
-		t += sprintf(t, "isac_empty_fifo cnt %d", count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, cs->dlog);
-	}
 }
 
 static void
@@ -191,7 +163,6 @@ void
 isac_interrupt(struct IsdnCardState *cs, u8 val)
 {
 	u8 exval, v1;
-	struct sk_buff *skb;
 	unsigned int count;
 
 	if (cs->debug & L1_DEB_ISAC)
@@ -214,20 +185,13 @@ isac_interrupt(struct IsdnCardState *cs, u8 val)
 #endif
 			}
 			isac_write(cs, ISAC_CMDR, 0x80);
+			cs->rcvidx = 0;
 		} else {
 			count = isac_read(cs, ISAC_RBCL) & 0x1f;
 			if (count == 0)
 				count = 32;
 			isac_empty_fifo(cs, count);
-			if ((count = cs->rcvidx) > 0) {
-				cs->rcvidx = 0;
-				if (!(skb = alloc_skb(count, GFP_ATOMIC)))
-					printk(KERN_WARNING "HiSax: D receive out of memory\n");
-				else {
-					memcpy(skb_put(skb, count), cs->rcvbuf, count);
-					skb_queue_tail(&cs->rq, skb);
-				}
-			}
+ 			recv_rme_d(cs);
 		}
 		cs->rcvidx = 0;
 		sched_d_event(cs, D_RCVBUFREADY);
